@@ -79,3 +79,16 @@ b=set(k);
 print(9999999999 in a)
 print(9999999999 in b) # more fast !!
 
+
+selList = cmds.ls ( sl=True, fl=True);
+set_sl = set();
+for sl in selList :
+    set_sl.add(cmds.objectType(sl));
+print(set_sl); # {'joint'}
+
+
+selList = cmds.ls ( sl=True, fl=True);
+set_sl = set();
+for sl in selList :
+    set_sl. |= set(cmds.objectType(sl));
+print(set_sl); # {'o', 'j', 'i', 't', 'n'}

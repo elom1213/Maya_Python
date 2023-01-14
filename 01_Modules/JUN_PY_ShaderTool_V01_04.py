@@ -1,10 +1,10 @@
-# last Update date 22 03 15
+# last Update date 22 03 16
 # Python Script by Ji Hun Park
 
-# Shader Tool V01.03
+# Shader Tool V01.04
 
-# 03.15
-# Creatae UI : Buttons Select Faces, Selecte Shader
+# 03.15 -> 01.03  Creatae UI : Buttons Select Faces, Selecte Shader
+# 03.16 -> 01.04  bug fix : remove unknown characters in UI funtion
 
 import maya.cmds as cmds;
 
@@ -193,14 +193,14 @@ def PY_JUN_makeUI_shaderTool ():
     
     cmds.frameLayout( label='Base Group', collapsable= True, bgc =color_main );
 
-    #===================================================================================┐┐
-    # paneLayout : vertical2(open)                                                      ││
-    #                                                                                   ││
+    #===================================================================================
+    # paneLayout : vertical2(open)                                                      
+    #                                                                                   
     
     cmds.paneLayout( configuration= "vertical2" )
 
-    #----------------------------------------------------------------------------┐
-    # columnLayout : Left Section(open)                                          │
+    #----------------------------------------------------------------------------
+    # columnLayout : Left Section(open)                                          
 
     cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
     
@@ -231,13 +231,12 @@ def PY_JUN_makeUI_shaderTool ():
     # buttons(close)
     cmds.setParent( '..' )
 
-
-    # columnLayout : Left Section(close)                                         │
-    #----------------------------------------------------------------------------┘
+    # columnLayout : Left Section(close)                                         
+    #----------------------------------------------------------------------------
     cmds.setParent( '..' )
     
-    #----------------------------------------------------------------------------┐
-    # Shader Endgine(SG) Tool (open)                                             │
+    #----------------------------------------------------------------------------
+    # Shader Endgine(SG) Tool (open)                                             
 
     cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
 
@@ -269,14 +268,13 @@ def PY_JUN_makeUI_shaderTool ():
 
     # Buttons(open)
     cmds.setParent( '..' )
-
-    # Shader Endgine(SG) Tool (close)                                            │
-    #----------------------------------------------------------------------------┘
+    # Shader Endgine(SG) Tool (close)                                            
+    #----------------------------------------------------------------------------
     cmds.setParent( '..' )
 
-    #                                                                                   ││
-    # paneLayout : vertical2(close)                                                     ││
-    #===================================================================================┘┘
+    #                                                                                   
+    # paneLayout : vertical2(close)                                                     
+    #===================================================================================
     cmds.setParent( '..' )
 
     #===================================================================================
@@ -284,8 +282,8 @@ def PY_JUN_makeUI_shaderTool ():
     #===================================================================================
     cmds.setParent( '..' )
 
-    #----------------------------------------------------------------------------┐
-    # Target Group (open)                                                        │
+    #----------------------------------------------------------------------------
+    # Target Group (open)                                                        
 
     cmds.frameLayout( label='Target Group', collapsable= True, bgc =color_main );
     
@@ -309,9 +307,8 @@ def PY_JUN_makeUI_shaderTool ():
 
     # columnLayout(close)
     cmds.setParent( '..' )
-
-    # Target Group (close)                                                       │
-    #----------------------------------------------------------------------------┘
+    # Target Group (close)                                                       
+    #----------------------------------------------------------------------------
     cmds.setParent( '..' )
 
     cmds.button( "name_btn_separate", 
@@ -324,5 +321,5 @@ def PY_JUN_makeUI_shaderTool ():
     cmds.showWindow(str_winName);
     cmds.window(str_winName, e = True, widthHeight = [win_width, win_height]);
     
-
-PY_JUN_makeUI_shaderTool();
+def JUN_PY_ShaderTool_V01_04():
+    PY_JUN_makeUI_shaderTool();

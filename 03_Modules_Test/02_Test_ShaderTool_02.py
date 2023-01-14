@@ -325,4 +325,5 @@ def PY_JUN_makeUI_shaderTool ():
     cmds.window(str_winName, e = True, widthHeight = [win_width, win_height]);
     
 
-PY_JUN_makeUI_shaderTool();
+def JUN_PY_ShaderTool_V01_03():
+    PY_JUN_makeUI_shaderTool();
