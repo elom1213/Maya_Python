@@ -1,7 +1,7 @@
-# last Update date 23 01 14
+# last Update date 23 01 15
 # Python Script by Ji Hun Park
 
-# Selction Tool V01.01
+# Selction Tool V01.02
 
 import maya.cmds as cmds;
 
@@ -128,6 +128,45 @@ def JUN_cmd_SelTool_toolSelType_btn (str_toolSelOpt_rbg_option,
     int_numItem = cmds.textScrollList( str_selTool_tsl_selList, q=True, numberOfItems=True );
     
     cmds.text( str_selTool_t_selNum, e=True, label= 'Number: ' + str(int_numItem) );
+
+
+def JUN_cmd_SelTool_toolSelType_btn_V02 (str_toolSelOpt_rbg_option, 
+                                         str_selTool_tsl_selList,
+                                         str_selTool_t_selNum ):
+
+    int_selOpt  = cmds.radioButtonGrp( str_toolSelOpt_rbg_option,  q=True, select=True );
+    str_selList = [];
+    
+    if int_selOpt == 2: # s Selected
+        str_selList = cmds.ls ( sl=True, fl=True );
+    elif int_selOpt == 1 : # Hierarchy
+        str_selList = BF_SELECTION_makeList_hierarchy ( cmds.ls ( sl=True, fl=True ), 1, 1 );
+    
+    name_types = set();
+
+    for sl in str_selList :
+
+        shape_current = cmds.listRelatives(sl, shapes=True);
+        
+        if(shape_current) :
+            print(str(shape_current) + "\n")
+            print(str(shape_current[0]) + "\n")
+            shape_current = sl + "|" + shape_current[0]
+            type_current =  cmds.objectType(shape_current)
+        else :
+            type_current = cmds.objectType(sl)
+
+        name_types.add(type_current);
+
+    name_types = sorted(list(name_types));
+
+    cmds.textScrollList( str_selTool_tsl_selList, e=True, removeAll=True );
+    cmds.textScrollList( str_selTool_tsl_selList, e=True, append = name_types );
+    
+    int_numItem = cmds.textScrollList( str_selTool_tsl_selList, q=True, numberOfItems=True );
+    
+    cmds.text( str_selTool_t_selNum, e=True, label= 'Number: ' + str(int_numItem) );
+
 
 def JUN_cmd_tsl_select ( str_selTool_tsl_selList ):
 
@@ -291,9 +330,11 @@ def JUN_cmd_Select_ByName(JUN_name_toolSelTyp_tsl, JUN_name_toolSelObjs_tsl, JUN
     for obj in str_allItemList_Objest :
         shape_current = cmds.listRelatives(obj, shapes=True);
         
-
         if(shape_current) :
-            type_current =  cmds.objectType(shape_current[0])
+            print(str(shape_current) + "\n")
+            print(str(shape_current[0]) + "\n")
+            shape_current = obj + "|" + shape_current[0]
+            type_current =  cmds.objectType(shape_current)
         else :
             type_current = cmds.objectType(obj)
 
@@ -331,8 +372,30 @@ def JUN_cmd_Select_ByType(JUN_name_toolSelTyp_tsl, JUN_name_toolSelObjs_tsl, JUN
     cmds.select(sel_list);
     cmds.textScrollList( JUN_name_toolSelObjs_tsl, e=True, deselectAll=True);
     cmds.textScrollList( JUN_name_toolSelObjs_tsl, e=True, selectItem=sel_list);
-        
+
+
+def JUN_cmd_Select_ByType_V02(JUN_name_toolSelTyp_tsl, JUN_name_toolSelObjs_tsl, JUN_name_toolSel_cbg_invertSelect):
+
+    str_slItemList_Shape = cmds.textScrollList( JUN_name_toolSelTyp_tsl, q=True, selectItem=True);
+    # str_allItemList_Objest  = cmds.textScrollList( JUN_name_toolSelObjs_tsl , q=True, allItems=True);
+    # int_invertSelect = cmds.checkBoxGrp(JUN_name_toolSel_cbg_invertSelect, q=True, value1=True);
+
+    # sel_list = set();
+
+    JUN_cmd_Select_ByName(JUN_name_toolSelTyp_tsl, JUN_name_toolSelObjs_tsl, JUN_name_toolSel_cbg_invertSelect, str_slItemList_Shape);
+
+    # for obj in str_allItemList_Objest :
+    #     type_current = cmds.objectType(obj);
+    #     if type_current in str_slItemList_Shape :
+    #         sel_list.add(obj);
     
+    # if(int_invertSelect) :
+    #     sel_list = set(str_allItemList_Objest) - sel_list;
+
+    # cmds.select(sel_list);
+    # cmds.textScrollList( JUN_name_toolSelObjs_tsl, e=True, deselectAll=True);
+    # cmds.textScrollList( JUN_name_toolSelObjs_tsl, e=True, selectItem=sel_list);
+        
 
 
 #===================================================================================
@@ -357,7 +420,7 @@ def PY_JUN_makeUI_SelectionTool ():
     
     # window
 
-    cmds.window( str_winName, bgc=color_mainDark, title="Selection Tool V01" );
+    cmds.window( str_winName, bgc=color_mainDark, title="Selection Tool V01.02" );
         
     #------------------------------------------------------------------
     # UI: MenuBar
@@ -405,7 +468,7 @@ def PY_JUN_makeUI_SelectionTool ():
     cmds.button( "name_btn_toolSel_Types", 
                  label='Select Type', 
                  bgc=color_btn, 
-                 command='JUN_cmd_SelTool_toolSelType_btn(\"JUN_name_toolSelOpt_rbg_option\", \"JUN_name_toolSelTyp_tsl\", \"JUN_name_tootSelBase_selNum\")');
+                 command='JUN_cmd_SelTool_toolSelType_btn_V02(\"JUN_name_toolSelOpt_rbg_option\", \"JUN_name_toolSelTyp_tsl\", \"JUN_name_tootSelBase_selNum\")');
 
     cmds.text( "JUN_name_tootSelBase_selNum", align="left", label='Number:0' );     
 
@@ -521,14 +584,14 @@ def PY_JUN_makeUI_SelectionTool ():
     cmds.button( "name_btn_SelectByType", 
                  label='Select By Type', 
                  bgc=color_btn, 
-                 command='JUN_cmd_Select_ByType(\"JUN_name_toolSelTyp_tsl\", \"JUN_name_toolSelObjs_tsl\",\"JUN_name_toolSel_cbg_invertSelect\")');
+                 command='JUN_cmd_Select_ByType_V02(\"JUN_name_toolSelTyp_tsl\", \"JUN_name_toolSelObjs_tsl\",\"JUN_name_toolSel_cbg_invertSelect\")');
 
     cmds.text( align="center", label='Copyright (c) Park Ji Hun. All rights reserved.' );
 
     cmds.showWindow(str_winName);
     cmds.window(str_winName, e = True, widthHeight = [win_width, win_height]);
     
-def JUN_PY_CopyKeyTool_V01_01():
+def JUN_PY_SelectionTool_V01_02():
     PY_JUN_makeUI_SelectionTool();
 
 PY_JUN_makeUI_SelectionTool();

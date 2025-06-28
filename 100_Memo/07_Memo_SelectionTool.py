@@ -53,10 +53,8 @@ set_sl = {};
 types = set()
 shapes = set()
 for sl in selList :
-#    cmds.select(sl)
     print(cmds.objectType(sl))
     types.add(cmds.objectType(sl));
-#    print(cmds.listRelatives(sl, shapes=True))
     shape = cmds.listRelatives(sl, shapes=True)
     if(shape):
         set_sl[sl] = shape[0];
@@ -119,3 +117,6 @@ joint_B
 str_obj = cmds.ls ( sl=True, fl=True);
 rel = cmds.listRelatives ( str_obj[0], allDescendents=True, path=True );
 print(rel); #['pPlaneShape1', 'pPlane1', 'curveShape2', 'curve2', 'joint_B|joint2']
+
+
+# {'aimConstraint', 'orientConstraint', 'pointConstraint', 'scaleConstraint', 'parentConstraint'}
