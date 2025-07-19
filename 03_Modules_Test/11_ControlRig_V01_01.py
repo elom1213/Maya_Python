@@ -372,7 +372,7 @@ class JUN_cage():
         self.kneeJnt_l = 202        # 202
         self.kneeJnt_r = 203        # 203
 
-        # dictionary which value is list
+        # dictionary which value is list which member is MSN
 
         self.tkn_lstDic = { self.arm_l: self.MSN_tkn_lst_Arm_L,
                             self.arm_r: self.MSN_tkn_lst_Arm_R,
@@ -513,7 +513,25 @@ class JUN_cage():
 
             rnm_lst_input.sort()
 
+    def clear_all(self):
+        self.MSN_rnm_lst_spine.clear()
+        self.MSN_rnm_lst_shoulders.clear()
+
+        self.MSN_rnm_lst_fingers_l.clear()
+        self.MSN_rnm_lst_fingers_r.clear()
+
+        self.MSN_rnm_lst_arm_l.clear()
+        self.MSN_rnm_lst_arm_r.clear()
+        self.MSN_rnm_lst_leg_l.clear()
+        self.MSN_rnm_lst_leg_r.clear()
+
+        self.rnm_armJnt_l_PA.clear()
+        self.rnm_armJnt_r_PA.clear()
+        self.rnm_legJnt_l_PA.clear()
+        self.rnm_legJnt_r_PA.clear()
+
     def set_rnm_lst_all(self):
+        self.clear_all()
         self.set_rnm_lst_pos_child()
         self.set_rnm_lst_tgt_child()
 
