@@ -1,8 +1,9 @@
-# last Update date 25 07 20
+# last Update date 25 07 30
 # Python Script by Ji Hun Park
 
-# Naming Tool V03.02
+# Naming Tool V03.03
 # 03.02 update padding zero rules
+# 03.03 rename start function name
 
 import maya.cmds as cmds;
 
@@ -331,9 +332,9 @@ def JUN_cmd_rename_for_dyn_02(str_NamingDyn_tsl,
 #===================================================================================
 #===================================================================================
 
-def PY_JUN_makeUI_copyNameUI ():
+def PY_JUN_makeUI_NamingToolUI ():
     str_winTitle = "Naming Tool";
-    str_winName = "Junny_win_CopyName_Tools";
+    str_winName = "Junny_win_Naming_Tools";
     win_width = 480;
     win_height = 480;
 
@@ -346,7 +347,7 @@ def PY_JUN_makeUI_copyNameUI ():
     
     # window
 
-    cmds.window( str_winName, bgc=color_mainDark, title="Naming Tool V03.02" );
+    cmds.window( str_winName, bgc=color_mainDark, title="Naming Tool V03.03" );
         
     #------------------------------------------------------------------
     # UI: MenuBar
@@ -354,7 +355,7 @@ def PY_JUN_makeUI_copyNameUI ():
 
     cmds.menuBarLayout (bgc=color_mainDark); 
     
-    menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 20-JUL-2025\')".format(color_main)
+    menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 30-JUL-2025\')".format(color_main)
 
     cmds.menu( label='Help' );
     cmds.menuItem( label='About', command = menu_cmd);
@@ -614,7 +615,7 @@ def PY_JUN_makeUI_copyNameUI ():
     cmds.showWindow(str_winName);
     cmds.window(str_winName, e = True, widthHeight = [win_width, win_height]);
     
-def JUN_PY_CopyPasteName_V01_01():
-    PY_JUN_makeUI_copyNameUI();
+def JUN_PY_NamingTool_V03_03():
+    PY_JUN_makeUI_NamingToolUI();
 
-PY_JUN_makeUI_copyNameUI();
+PY_JUN_makeUI_NamingToolUI();
