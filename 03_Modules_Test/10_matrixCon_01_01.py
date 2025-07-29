@@ -522,7 +522,7 @@ def PY_JUN_makeUI_matrixContstraintUI ():
     cmds.showWindow(str_winName);
     cmds.window(str_winName, e = True, widthHeight = [win_width, win_height]);
     
-def JUN_PY_CopyKeyTool_V03_00():
+def JUN_PY_matrixCon_01_01():
     PY_JUN_makeUI_matrixContstraintUI();
 
 PY_JUN_makeUI_matrixContstraintUI();

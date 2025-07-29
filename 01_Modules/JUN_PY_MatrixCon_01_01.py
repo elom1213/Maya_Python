@@ -336,7 +336,7 @@ def JUN_cmd_matrixConstraint_01(str_selTool_tsl_targets,
 #===================================================================================
 
 def PY_JUN_makeUI_matrixContstraintUI ():
-    str_winTitle = "CopyKey Tool";
+    str_winTitle = "matrix constraint";
     str_winName = "Junny_win_matrixConstarint_01";
     win_width = 480;
     win_height = 700;
@@ -522,7 +522,7 @@ def PY_JUN_makeUI_matrixContstraintUI ():
     cmds.showWindow(str_winName);
     cmds.window(str_winName, e = True, widthHeight = [win_width, win_height]);
     
-def JUN_PY_CopyKeyTool_V03_00():
+def JUN_PY_MatrixCon_01_01():
     PY_JUN_makeUI_matrixContstraintUI();
 
 PY_JUN_makeUI_matrixContstraintUI();
