@@ -3,7 +3,7 @@
 {"BrowInnerUp", "BrowDownLeft", "BrowDownRight", "BrowOuterUpLeft", "BrowOuterUpRight", "EyeLookUpLeft", "EyeLookUpRight", "EyeLookDownLeft", "EyeLookDownRight", "EyeLookInLeft", "EyeLookInRight", "EyeLookOutLeft", "EyeLookOutRight", "EyeBlinkLeft", "EyeBlinkRight", "EyeSquintLeft", "EyeSquintRight", "EyeWideLeft", "EyeWideRight", "CheekPuff", "CheekSquintLeft", "CheekSquintRight", "NoseSneerLeft", "NoseSneerRight", "JawOpen", "JawForward", "JawLeft", "JawRight", "MouthFunnel", "MouthPucker", "MouthLeft", "MouthRight", "MouthRollUpper", "MouthRollLower", "MouthShrugUpper", "MouthShrugLower", "MouthClose", "MouthSmileLeft ", "MouthSmileRight", "MouthFrownLeft", "MouthFrownRight", "MouthDimpleLeft", "MouthDimpleRight", "MouthUpperUpLeft", "MouthUpperUpRight", "MouthLowerDownLeft", "MouthLowerDownRight", "MouthPressLeft", "MouthPressRight", "MouthStretchLeft", "MouthStretchRight", "tongueOut"}
 
 
-TROWINNERUP
+BROWINNERUP
 BROWDOWNLEFT
 BROWDOWNRIGHT
 BROWOUTERUPLEFT

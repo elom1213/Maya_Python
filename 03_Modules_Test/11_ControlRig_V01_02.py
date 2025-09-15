@@ -1,7 +1,7 @@
 # last Update date 25 06 29
 # Python Script by Ji Hun Park
 
-# Control Rig Tool V01.00
+# Control Rig Tool V01.02
 
 import maya.cmds as cmds;
 import maya.mel as mel;
