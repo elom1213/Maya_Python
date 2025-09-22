@@ -597,7 +597,7 @@ def PY_JUN_makeUI_MatrixPinningTool():
     cmds.showWindow(str_winName);
     cmds.window(str_winName, e = True, widthHeight = [win_width, win_height]);
     
-def JUN_PY_MatrixPinningTool_V01_01():
+def JUN_PY_matrixPinning_V01_01():
     PY_JUN_makeUI_MatrixPinningTool();
 
-JUN_PY_MatrixPinningTool_V01_01();
+JUN_PY_matrixPinning_V01_01();
