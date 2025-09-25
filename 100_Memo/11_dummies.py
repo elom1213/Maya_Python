@@ -37,3 +37,5 @@ def create_joint_chain(objs, suffix="_jnt"):
 
 def vector_element_wise_multiply(v1, v2):
     return  [a * b for a, b in zip(v1, v2)]
+
+    
