@@ -262,6 +262,12 @@ def JUN_add_suffix_to_children(parent_object, suffix="_new"):
 
 def JUN_MATCH_twoObjects ( str_tgtList, str_flwList, int_rotOrder, int_rotAxis, int_trs, int_rot ):     
 
+    if not isinstance(str_flwList, list):
+        str_tgtList = [str_tgtList]
+
+    if not isinstance(str_flwList, list):
+        str_flwList = [str_flwList]
+
     for i in range( 0, len(str_tgtList) ):
 
         str_rotOrder = cmds.xform ( str_tgtList[i], q = True, rotateOrder = True );
@@ -269,25 +275,33 @@ def JUN_MATCH_twoObjects ( str_tgtList, str_flwList, int_rotOrder, int_rotAxis, 
         vec_trs      = cmds.xform ( str_tgtList[i], q = True,  worldSpace = True, translation = True );
         vec_rot      = cmds.xform ( str_tgtList[i], q = True,  worldSpace = True, rotation    = True );
         
-        print(str_flwList[i])
-        str_rotOrder_ori = cmds.xform ( str_flwList[i], q = True, rotateOrder = True );
+        # print(str_flwList[i])
+        try:
+            print("match=================================")
+            print(str_tgtList)
+            print("flw")
+            print(str_flwList)
+            print("match end =================================")
+            str_rotOrder_ori = cmds.xform ( str_flwList[i], q = True, rotateOrder = True );
 
-        if int_rotOrder == 1: 
-            cmds.xform ( str_flwList[i], rotateOrder = str_rotOrder );
+            if int_rotOrder == 1: 
+                cmds.xform ( str_flwList[i], rotateOrder = str_rotOrder );
 
-        if int_rotAxis == 1: 
-            cmds.xform ( str_flwList[i], rotateAxis = vec_rotAixs );
+            if int_rotAxis == 1: 
+                cmds.xform ( str_flwList[i], rotateAxis = vec_rotAixs );
 
-        if int_trs == 1: 
-            cmds.xform ( str_flwList[i],  worldSpace = True, translation = vec_trs );
-            
-        if int_rot == 1: 
-            cmds.xform ( str_flwList[i],  worldSpace = True, rotation = vec_rot ); 
+            if int_trs == 1: 
+                cmds.xform ( str_flwList[i],  worldSpace = True, translation = vec_trs );
 
-        cmds.xform ( str_flwList[i], rotateOrder = str_rotOrder_ori );
+            if int_rot == 1: 
+                cmds.xform ( str_flwList[i],  worldSpace = True, rotation = vec_rot ); 
+
+            cmds.xform ( str_flwList[i], rotateOrder = str_rotOrder_ori );
+        except:
+            print("------------------------------------------------------------match error")
 
 
-def JUN_create_ik_with_polevector(start_joint, end_joint, pv_object, solver="ikRPsolver"):
+def JUN_create_ik_with_polevector(start_joint, end_joint, pv_object, solver="ikRPsolver", pole_name="pole_defualt"):
     """
     Create an IK handle between two joints and connect a pole vector control.
     
@@ -306,6 +320,7 @@ def JUN_create_ik_with_polevector(start_joint, end_joint, pv_object, solver="ikR
     # Create IK handle
     if solver is "ikRPsolver":
         pv_object_new = cmds.duplicate(pv_object)[0]
+        pv_object_new = cmds.rename(pv_object_new, pole_name)
         cmds.parent(pv_object_new, world=True)
 
     ik_handle, effector = cmds.ikHandle(
@@ -361,6 +376,7 @@ class JUN_cage():
 
         self.MSN_tkn_A02_Arm_R_05_Wrist_WS = "Arm_R_03_Wrist_World"
         self.MSN_tkn_A02_Arm_R_05_Wrist_LS = "Arm_R_03_Wrist_Local"
+        self.MSN_tkn_A02_Arm_R_05_FK_Ydwn = "Arm_R_03_Wrist_FK_Ydwn"
 
         self.MSN_tkn_B01_Leg_L_01 = "B01_Leg_L_01"
         self.MSN_tkn_B01_Leg_L_02 = "B01_Leg_L_02"
@@ -432,6 +448,7 @@ class JUN_cage():
         self.MSN_rnm_lst_wrist_l_LS = []
         self.MSN_rnm_lst_wrist_r_WS = []
         self.MSN_rnm_lst_wrist_r_LS = []
+        self.MSN_rnm_lst_wrist_FK_Ydwn = []
 
         self.rnm_armJnt_l_PA = []
         self.rnm_armJnt_r_PA = []
@@ -470,6 +487,7 @@ class JUN_cage():
         self.wirst_l_LS = 107       # 107
         self.wirst_r_WS = 108       # 108
         self.wirst_r_LS = 109       # 109
+        self.wirst_r_FK_ydwn = 110  # 110
 
         self.idStart_PA = 200 
         self.elbowJnt_l = 200       # 200
@@ -514,7 +532,8 @@ class JUN_cage():
                             self.wirst_l_WS : None,
                             self.wirst_l_LS : None,
                             self.wirst_r_WS : self.MSN_tkn_A02_Arm_R_05_Wrist_WS,
-                            self.wirst_r_LS : self.MSN_tkn_A02_Arm_R_05_Wrist_LS}
+                            self.wirst_r_LS : self.MSN_tkn_A02_Arm_R_05_Wrist_LS,
+                            self.wirst_r_FK_ydwn : self.MSN_tkn_A02_Arm_R_05_FK_Ydwn}
 
 
         self.rnm_strDic = { self.spine     : self.MSN_rnm_lst_spine,
@@ -523,7 +542,8 @@ class JUN_cage():
                             self.wirst_l_WS : None,
                             self.wirst_l_LS : None,
                             self.wirst_r_WS : self.MSN_rnm_lst_wrist_r_WS,
-                            self.wirst_r_LS : self.MSN_rnm_lst_wrist_r_LS}
+                            self.wirst_r_LS : self.MSN_rnm_lst_wrist_r_LS,
+                            self.wirst_r_FK_ydwn : self.MSN_rnm_lst_wrist_FK_Ydwn}
 
 
         # dictionary which value is for setting prefered angle (joint)
@@ -779,6 +799,7 @@ class JUN_cage():
             secne_rnm_poleVecObj = self.find_object_by_name(tkn_poleVecObj)
             cage_rnm_poleVecObj.append(secne_rnm_poleVecObj)
 
+            print("cage_rnm_poleVecObj==============================")
             print(cage_rnm_poleVecObj)
 
 #        elif self.value_is_helper_jnts(key_input):
@@ -839,6 +860,7 @@ class JUN_cage():
 
         self.set_rnm_lst_member(self.wirst_r_WS)
         self.set_rnm_lst_member(self.wirst_r_LS)
+        self.set_rnm_lst_member(self.wirst_r_FK_ydwn)
 
         self.set_rnm_lst_member(self.spine)
         self.set_rnm_lst_member(self.fingers_l)
@@ -1003,14 +1025,25 @@ class JUN_matcher_v02():
             lst_member_from_set = [str_member_from_set]
             JUN_MATCH_twoObjects(lst_tgt_single, lst_member_from_set, 1, 1, 1, 1)
 
+    def match_lst_to_single_tgt(self, str_tgt_single, str_lstName):
+        if not isinstance(str_tgt_single, list): #if str_tgt_single is not a list, make it to list
+            str_tgt_single = [str_tgt_single]
+        for i in range(0, len(str_lstName)):
+            JUN_MATCH_twoObjects(str_tgt_single, str_lstName[i], 1, 1, 1, 1)
 
-    def match(self, orient_to_joint=False, jntOrd="xyz", secAxOri="yup", is_leg=False, is_spine__=False, set_ik=False, pole_obj=None, helper_objs=None):
-        member_flws = copy.deepcopy(self.flw)
+
+    def match(self, orient_to_joint=False, jntOrd="xyz", secAxOri="yup", is_leg=False, is_spine__=False, set_ik=False, pole_obj=None, helper_objs=None, tgt_given=None):
         member_tgts = copy.deepcopy(self.tgt)
+        member_flws = copy.deepcopy(self.flw)
         lst_remain = []
 
         if orient_to_joint:
             member_tgts = self.mtacher_create_joint_chain(member_tgts, jntOrd, secAxOri)
+
+            if tgt_given:
+                cmds.delete(member_tgts)
+                member_tgts = tgt_given
+
             if is_leg:
                 cmds.joint(member_tgts[-2], edit=True, orientJoint="xzy", secondaryAxisOrient="yup", children=True, zeroScaleOrient=True)
                 cmds.joint(member_tgts[-1], edit=True, orientJoint="none", children=True, zeroScaleOrient=True)
@@ -1020,10 +1053,6 @@ class JUN_matcher_v02():
                     lst_remain_B = JUN_create_ik_with_polevector(helper_objs[-3], helper_objs[-2], pole_obj, "ikSCsolver")
                     lst_remain_C = JUN_create_ik_with_polevector(helper_objs[0], helper_objs[2], pole_obj)
                     lst_remain = [*lst_remain_A, *lst_remain_B, *lst_remain_C]
-
-                    # cmds.parent(member_tgts[3], world=True)
-                    # JUN_MATCH_twoObjects(member_tgts, helper_objs, 1, 1, 1, 1)
-                    # cmds.parent(member_tgts[3], member_tgts[2])
 
             elif is_spine__:
                 cmds.joint(member_tgts, edit=True, orientJoint="none", children=True, zeroScaleOrient=True)
@@ -1049,7 +1078,8 @@ class JUN_matcher_v02():
                 member_flw = [member_flw]
                 member_tgt = [member_tgt]
                 JUN_MATCH_twoObjects(member_tgt, member_flw, 1, 1, 1, 1)
-
+        
+        
         if orient_to_joint:
             cmds.delete(member_tgts)
 
@@ -1062,34 +1092,51 @@ class JUN_matcher_v02():
     def match_cage_spine(self):
         self.match(True, "yzx", "zup", False, True)
 
+    def get_worldSpace_obj(self, obj):
+        pos = cmds.xform(obj, query=True, translation=True, worldSpace = True)
+        loc = cmds.spaceLocator()[0]
+        cmds.xform(loc, ws=True, t=pos)
+        return loc
+
+    def match_flw_to_tgt_zro_rotate(self, tgt_idx=0, flw_idx=0, flw_given=None):
+        member_flws = copy.deepcopy(self.flw)
+        member_tgts = copy.deepcopy(self.tgt)
+        if flw_given:
+            member_flws = flw_given
+
+        ws_obj = self.get_worldSpace_obj(member_tgts[tgt_idx])
+        self.match_set_members_to_single_tgt(ws_obj, member_flws[flw_idx])
+
+        cmds.delete(ws_obj)
+
+#=========================================================================================
+
     def match_cage_arm_left(self, pole_obj=None, helper_objs=None):
         self.match(True, "xyz", "yup", False, False, True, pole_obj, helper_objs)
+        self.match_flw_to_tgt_zro_rotate(tgt_idx=2, flw_idx=2)
 
-    def match_cage_arm_right(self, pole_obj=None, cage_given = None):
+
+    def match_cage_arm_right(self, pole_obj=None, cage_given =None, helper_objs=None):
         jnts_arm_r_primX = self.mtacher_create_joint_chain(self.tgt, suffix = "_r_jnt")
         jnts_arm_l_from_oriRightArm = cmds.mirrorJoint(jnts_arm_r_primX[0], mirrorYZ=True, mirrorBehavior=True, searchReplace=["_r_", "_l_"])
         jnts_arm_l_primX = self.mtacher_create_joint_chain(jnts_arm_l_from_oriRightArm, suffix = "_l_jnt_yUp")
         jnts_arm_r_primMX_yDwn = cmds.mirrorJoint(jnts_arm_l_primX[0], mirrorYZ=True, mirrorBehavior=True, searchReplace=["_l_jnt_yUp", "_r_jnt_yDwn"])
 
-        for i in range(0, len(jnts_arm_r_primMX_yDwn)):
+        self.match(True, "xyz", "yup", False, False, True, pole_obj, helper_objs, tgt_given=jnts_arm_r_primMX_yDwn)
+        self.match_flw_to_tgt_zro_rotate(tgt_idx=2, flw_idx=0, flw_given=cage_given.MSN_rnm_wrist_r_WS)
+        
+        # lst_wrist_r_Ydwn = cmds.sets(cage_given.MSN_rnm_lst_wrist_FK_Ydwn ,q=True)
+        member_tgts = copy.deepcopy(self.tgt)
+        obj_wrist_r_Ydwn = self.get_worldSpace_obj(member_tgts[2])
+        cmds.rotate(180, 0, 0, obj_wrist_r_Ydwn, relative=True, objectSpace=True)
+        self.match_lst_to_single_tgt(obj_wrist_r_Ydwn, cage_given.MSN_rnm_lst_wrist_FK_Ydwn)
+
+        dele_lst = [*jnts_arm_r_primX,*jnts_arm_l_from_oriRightArm,*jnts_arm_l_primX,*jnts_arm_r_primMX_yDwn, obj_wrist_r_Ydwn]
+        for i in range(0, len(dele_lst)):
             try:
-                self.match_set_members_to_single_tgt(jnts_arm_r_primMX_yDwn[i], self.flw[i])
+                cmds.delete(dele_lst[i])
             except:
-                print("error")
-
-        jnts_arm_l_primX_yDwn = self.mtacher_create_joint_chain(jnts_arm_l_from_oriRightArm, suffix = "_l_jnt_ydwn", secAxOri = "ydown")
-        jnts_arm_r_primMX_yUp = cmds.mirrorJoint(jnts_arm_l_primX_yDwn[0], mirrorYZ=True, mirrorBehavior=True, searchReplace=["_l_jnt_ydwn", "_r_jnt_yUp"])
-
-        lst_remain_01 = JUN_create_ik_with_polevector(jnts_arm_r_primMX_yDwn[0], jnts_arm_r_primMX_yDwn[2], pole_obj)
-        lst_remain_02 = JUN_create_ik_with_polevector(jnts_arm_r_primMX_yUp[0], jnts_arm_r_primMX_yUp[2], pole_obj)
-
-        if cage_given:
-            self.match_set_members_to_single_tgt(jnts_arm_r_primMX_yDwn[-1], cage_given.MSN_rnm_wrist_r_LS[0])
-            self.match_set_members_to_single_tgt(jnts_arm_r_primMX_yUp[-1], cage_given.MSN_rnm_wrist_r_WS[0])
-            self.match_set_members_to_single_tgt(jnts_arm_r_primMX_yDwn[-1], cage_given.MSN_rnm_wrist_r_LS[0])
-
-        cmds.delete([*jnts_arm_r_primX,*jnts_arm_l_from_oriRightArm,*jnts_arm_l_primX,*jnts_arm_r_primMX_yDwn,*jnts_arm_l_primX_yDwn,*jnts_arm_r_primMX_yUp])
-        cmds.delete([*lst_remain_01, *lst_remain_02])
+                print("error 1140")
         
     def match_cage_leg_l(self, pole_obj=None, helper_obj=None):
         self.match(True, "xzy", "zup", True, False, True, pole_obj, helper_obj)
@@ -1161,10 +1208,10 @@ def JUN_CR_match( cage_glo, lst_cbg_name, tsl_tgt, tsl_flw):
                 cmds.setAttr(obj_hid+".visibility", False)
 
             if cage_glo.is_arm_left(idx):
-                mcr.match_cage_arm_left(cage_glo.rnm_poleObj_armLeft[0], cage_glo.rnm_helperJnts_arm_l)
+                mcr.match_cage_arm_left(cage_glo.rnm_poleObj_armLeft[0], helper_objs = cage_glo.rnm_helperJnts_arm_l)
 
             if cage_glo.is_arm_right(idx):
-                mcr.match_cage_arm_right(cage_glo.rnm_poleObj_armRight[0], cage_glo)
+                mcr.match_cage_arm_right(cage_glo.rnm_poleObj_armRight[0], cage_given= cage_glo, helper_objs = cage_glo.rnm_helperJnts_arm_r)
 
             if cage_glo.is_leg_left(idx):
                 mcr.match_cage_leg_l(cage_glo.rnm_poleObj_legLefg[0], cage_glo.rnm_helperJnts_leg_l)
