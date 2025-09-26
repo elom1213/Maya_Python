@@ -1031,6 +1031,46 @@ class JUN_matcher_v02():
         for i in range(0, len(str_lstName)):
             JUN_MATCH_twoObjects(str_tgt_single, str_lstName[i], 1, 1, 1, 1)
 
+    def lock_translation(self, objs):
+        for obj in objs:
+            for axis in ["tx", "ty", "tz"]:
+                attr = f"{obj}.{axis}"
+                if cmds.objExists(attr):
+                    cmds.setAttr(attr, lock=True)
+
+    def group_list_items(self, objs, name="newGroup"):
+        """
+        Group all valid objects in the given list under a single group.
+        Invalid entries like "" or None are ignored.
+
+        Args:
+            objs (list): List of object names to group.
+            name (str): Name of the new group.
+
+        Returns:
+            str: The created group name.
+        """
+        # Filter out invalid names
+        valid_objs = [obj for obj in objs if obj and cmds.objExists(obj)]
+
+        if not valid_objs:
+            raise ValueError("No valid objects found in the list.")
+
+        grp = cmds.group(valid_objs, name=name)
+        return grp
+    
+    def filter_ik_handles(self, objs):
+        """
+        Filter a list so it only contains IK handles.
+
+        Args:
+            objs (list): List of object names.
+
+        Returns:
+            list: A new list containing only IK handles.
+        """
+        iks = [obj for obj in objs if cmds.objExists(obj) and cmds.objectType(obj) == "ikHandle"]
+        return iks
 
     def match(self, orient_to_joint=False, jntOrd="xyz", secAxOri="yup", is_leg=False, is_spine__=False, set_ik=False, pole_obj=None, helper_objs=None, tgt_given=None):
         member_tgts = copy.deepcopy(self.tgt)
@@ -1040,39 +1080,44 @@ class JUN_matcher_v02():
         if orient_to_joint:
             member_tgts = self.mtacher_create_joint_chain(member_tgts, jntOrd, secAxOri)
 
-            if tgt_given:
-                cmds.delete(member_tgts)
-                member_tgts = tgt_given
+        if tgt_given:
+            cmds.delete(member_tgts)
+            member_tgts = tgt_given
 
-            if is_leg:
-                cmds.joint(member_tgts[-2], edit=True, orientJoint="xzy", secondaryAxisOrient="yup", children=True, zeroScaleOrient=True)
-                cmds.joint(member_tgts[-1], edit=True, orientJoint="none", children=True, zeroScaleOrient=True)
-                if set_ik:
-                    JUN_MATCH_twoObjects(member_tgts, helper_objs, 1, 1, 1, 1)
-                    lst_remain_A = JUN_create_ik_with_polevector(helper_objs[-2], helper_objs[-1], pole_obj, "ikSCsolver")
-                    lst_remain_B = JUN_create_ik_with_polevector(helper_objs[-3], helper_objs[-2], pole_obj, "ikSCsolver")
-                    lst_remain_C = JUN_create_ik_with_polevector(helper_objs[0], helper_objs[2], pole_obj)
-                    lst_remain = [*lst_remain_A, *lst_remain_B, *lst_remain_C]
+        if is_leg:
+            cmds.joint(member_tgts[-2], edit=True, orientJoint="xzy", secondaryAxisOrient="yup", children=True, zeroScaleOrient=True)
+            cmds.joint(member_tgts[-1], edit=True, orientJoint="none", children=True, zeroScaleOrient=True)
+            JUN_MATCH_twoObjects(member_tgts, helper_objs, 1, 1, 1, 1)
+            lst_remain_A = JUN_create_ik_with_polevector(helper_objs[-2], helper_objs[-1], pole_obj, "ikSCsolver")
+            lst_remain_B = JUN_create_ik_with_polevector(helper_objs[-3], helper_objs[-2], pole_obj, "ikSCsolver")
 
-            elif is_spine__:
-                cmds.joint(member_tgts, edit=True, orientJoint="none", children=True, zeroScaleOrient=True)
-            elif set_ik:
-                JUN_MATCH_twoObjects(member_tgts, helper_objs, 1, 1, 1, 1)
-                lst_remain = JUN_create_ik_with_polevector(helper_objs[0], helper_objs[2], pole_obj)
+            lst_remain = [*lst_remain_A, *lst_remain_B]
+            lst_remain_ik = self.filter_ik_handles(lst_remain)
+            grp_remain = self.group_list_items(lst_remain_ik)
+
+            lst_remain_C = JUN_create_ik_with_polevector(helper_objs[0], helper_objs[2], pole_obj)
+            lst_remain = [*lst_remain_A, *lst_remain_B, *lst_remain_C, grp_remain]
+
+
+        elif is_spine__:
+            cmds.joint(member_tgts, edit=True, orientJoint="none", children=True, zeroScaleOrient=True)
+        elif set_ik and helper_objs:
+            JUN_MATCH_twoObjects(member_tgts, helper_objs, 1, 1, 1, 1)
+            lst_remain = JUN_create_ik_with_polevector(helper_objs[0], helper_objs[2], pole_obj)
 
         for i in range(0, self.num_iter):
             member_flw = member_flws[i]
             member_tgt = member_tgts[i]
-            helper_obj = helper_objs[i]
 
             if self.type_is_set(member_flw):
-                if helper_obj:
+                if helper_objs:
+                    helper_obj = helper_objs[i]
                     self.match_set_members_to_single_tgt(helper_obj, member_flw)
                 else:
                     try:
                         self.match_set_members_to_single_tgt(member_tgt, member_flw)
                     except:
-                        print("aa")
+                        print("error 1072")
 
             else:   
                 member_flw = [member_flw]
@@ -1087,8 +1132,8 @@ class JUN_matcher_v02():
             try:
                 cmds.delete(item)
             except:
-                print("a")
-            
+                print("error 1087")
+
     def match_cage_spine(self):
         self.match(True, "yzx", "zup", False, True)
 
@@ -1125,7 +1170,6 @@ class JUN_matcher_v02():
         self.match(True, "xyz", "yup", False, False, True, pole_obj, helper_objs, tgt_given=jnts_arm_r_primMX_yDwn)
         self.match_flw_to_tgt_zro_rotate(tgt_idx=2, flw_idx=0, flw_given=cage_given.MSN_rnm_wrist_r_WS)
         
-        # lst_wrist_r_Ydwn = cmds.sets(cage_given.MSN_rnm_lst_wrist_FK_Ydwn ,q=True)
         member_tgts = copy.deepcopy(self.tgt)
         obj_wrist_r_Ydwn = self.get_worldSpace_obj(member_tgts[2])
         cmds.rotate(180, 0, 0, obj_wrist_r_Ydwn, relative=True, objectSpace=True)
