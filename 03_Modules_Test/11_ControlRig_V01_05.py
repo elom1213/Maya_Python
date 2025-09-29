@@ -4,13 +4,17 @@
 # Control Rig Tool V01.04
 # 25 09 23    v01.03 : deleting joints for matching cage's objects
 #                        fix joints orientation for leg, spine
-# 25 09 25    v01.04 : set pole vector on helping joints  
+# 25 09 25    v01.04 : set pole vector on helping joints 
+#                      set wrist controllers orientaion to 0 0 0 in world space
+# 25 09 29    v01.05 : match pole vector object to correct place
+#                      set distance to option controller
 
 
 
 
 import maya.cmds as cmds;
 import maya.mel as mel;
+import math;
 import copy
 
 def JUN_cmd_toolSel_btn ( str_selTool_tsl_selList, str_selTool_t_selNum ):
@@ -224,6 +228,9 @@ def JUN_cmd_controlRig_setup_btn(cage_glo, name_rig_name_tsl, text_state):
         if cage_glo.MSN_tkn_Cage_04_helper in str_set:
             cage_glo.set_rnm_str_helper(str_set)
 
+
+    cage_glo.set_tsl_selected_objs(name_rig_name_tsl)
+
     cage_glo.set_rnm_lst_all()
     cage_glo.set_idx_for_cbg()
     cage_glo.dbg_print_rnm()
@@ -260,7 +267,7 @@ def JUN_add_suffix_to_children(parent_object, suffix="_new"):
     return child_new
 
 
-def JUN_MATCH_twoObjects ( str_tgtList, str_flwList, int_rotOrder, int_rotAxis, int_trs, int_rot ):     
+def JUN_MATCH_twoObjects ( str_tgtList, str_flwList, int_rotOrder=1, int_rotAxis=1, int_trs=1, int_rot=1 ):     
 
     if not isinstance(str_flwList, list):
         str_tgtList = [str_tgtList]
@@ -399,6 +406,9 @@ class JUN_cage():
 
         # set token : real name
 
+        self.tkn_CH_n_MainGlobal_xx_zro = "CH_n_MainGlobal_xx_zro"
+        self.tkn_optionCtl = "OptionAll_xx_ctl"
+
         self.tkn_poleObj_armLeft = "CH_l_ArmPoleSetup_xx_pos"
         self.tkn_poleObj_armRight = "CH_r_ArmPoleSetup_xx_pos"
         self.tkn_poleObj_legLefg = "CH_l_LegPoleSetup_xx_pos"
@@ -430,6 +440,7 @@ class JUN_cage():
         self.MSN_rnm_wrist_r_WS = []
         self.MSN_rnm_wrist_r_LS = []
 
+
         self.MSN_rnm_Cage_01_pos_childe = None
         self.MSN_rnm_Cage_03_Tgt_childe = None
 
@@ -450,6 +461,9 @@ class JUN_cage():
         self.MSN_rnm_lst_wrist_r_LS = []
         self.MSN_rnm_lst_wrist_FK_Ydwn = []
 
+        self.rnm_CH_n_MainGlobal_xx_zro = []
+        self.rnm_optionCtl = []
+
         self.rnm_armJnt_l_PA = []
         self.rnm_armJnt_r_PA = []
         self.rnm_legJnt_l_PA = []
@@ -457,7 +471,7 @@ class JUN_cage():
 
         self.rnm_poleObj_armLeft = []
         self.rnm_poleObj_armRight = []
-        self.rnm_poleObj_legLefg = []
+        self.rnm_poleObj_legLeft = []
         self.rnm_poleObj_legRight = []
 
         self.rnm_helperJnts_arm_l = []
@@ -573,7 +587,7 @@ class JUN_cage():
 
         self.dic_rnm_poleVecObjs = {self.poleVecObj_arm_l : self.rnm_poleObj_armLeft, 
                                     self.poleVecObj_arm_r : self.rnm_poleObj_armRight, 
-                                    self.poleVecObj_leg_l : self.rnm_poleObj_legLefg, 
+                                    self.poleVecObj_leg_l : self.rnm_poleObj_legLeft, 
                                     self.poleVecObj_leg_r : self.rnm_poleObj_legRight}
 
         self.dic_rnm_helperObjs = {self.key_helperJnts_arm_l : self.rnm_helperJnts_arm_l,
@@ -712,12 +726,17 @@ class JUN_cage():
                 self.rnm_helperJnts_leg_r.extend(str_helperMember)
                 self.rnm_helperJnts_leg_r.sort()
 
-        print("helpers")
-        print(self.rnm_helperJnts_arm_l)
-        print(self.rnm_helperJnts_arm_r)
-        print(self.rnm_helperJnts_leg_l)
-        print(self.rnm_helperJnts_leg_r)
+    def set_tsl_selected_objs(self, name_tsl):
+        lst_selected_items = cmds.textScrollList(name_tsl, q=True, allItems=True)
 
+        for item in lst_selected_items:
+            if self.tkn_CH_n_MainGlobal_xx_zro in item:
+                self.rnm_CH_n_MainGlobal_xx_zro.append(item)
+        
+        set_objs_child = set(BF_SELECTION_makeList_hierarchy(self.rnm_CH_n_MainGlobal_xx_zro, 1, 1))
+        for obj in set_objs_child:
+            if self.tkn_optionCtl in obj:
+                self.rnm_optionCtl.append(obj)
 
     def set_rnm_lst_pos_child(self):
         if self.MSN_rnm_Cage_01_pos_root is not None:
@@ -728,13 +747,13 @@ class JUN_cage():
         if self.MSN_rnm_Cage_03_Tgt_root is not None:
             self.MSN_rnm_Cage_03_Tgt_childe = cmds.sets(self.MSN_rnm_Cage_03_Tgt_root, query=True)
             self.MSN_rnm_Cage_03_Tgt_childe.sort()
-
+    '''
     def set_rnm_lst_member_spine(self):
         for MSN_rnm_pos in self.MSN_rnm_Cage_01_pos_childe:
             if self.MSN_tkn_spine in MSN_rnm_pos:
                 self.MSN_rnm_lst_spine = cmds.sets(MSN_rnm_pos, query=True)
                 self.MSN_rnm_lst_spine.sort()
-
+   ''' 
     def value_is_singleMSN(self, key_input):
         return True if key_input >= self.idStart_SingleMSN and key_input < self.idStart_PA else False
 
@@ -799,9 +818,6 @@ class JUN_cage():
             secne_rnm_poleVecObj = self.find_object_by_name(tkn_poleVecObj)
             cage_rnm_poleVecObj.append(secne_rnm_poleVecObj)
 
-            print("cage_rnm_poleVecObj==============================")
-            print(cage_rnm_poleVecObj)
-
 #        elif self.value_is_helper_jnts(key_input):
 
         else:
@@ -840,7 +856,7 @@ class JUN_cage():
 
         self.rnm_poleObj_armLeft.clear()
         self.rnm_poleObj_armRight.clear()
-        self.rnm_poleObj_legLefg.clear()
+        self.rnm_poleObj_legLeft.clear()
         self.rnm_poleObj_legRight.clear()
 
         #self.rnm_helperJnts_arm_l.clear()
@@ -1017,13 +1033,13 @@ class JUN_matcher_v02():
     def type_is_set(self, type_input):
         return True if cmds.objectType(type_input) in "objectSet" else False
 
-    def match_set_members_to_single_tgt(self, str_tgt_single, str_setName):
+    def match_set_members_to_single_tgt(self, str_tgt_single, str_setName, int_rotOrder=1, int_rotAxis=1, int_trs=1, int_rot=1):
         lst_tgt_single = [str_tgt_single]
         lst_members_from_set = cmds.sets(str_setName, q=True)
 
         for str_member_from_set in lst_members_from_set:
             lst_member_from_set = [str_member_from_set]
-            JUN_MATCH_twoObjects(lst_tgt_single, lst_member_from_set, 1, 1, 1, 1)
+            JUN_MATCH_twoObjects(lst_tgt_single, lst_member_from_set, int_rotOrder, int_rotAxis, int_trs, int_rot)
 
     def match_lst_to_single_tgt(self, str_tgt_single, str_lstName):
         if not isinstance(str_tgt_single, list): #if str_tgt_single is not a list, make it to list
@@ -1153,12 +1169,33 @@ class JUN_matcher_v02():
         self.match_set_members_to_single_tgt(ws_obj, member_flws[flw_idx])
 
         cmds.delete(ws_obj)
+    
+    def get_distance(self, obj1, obj2):
+        pos1 = cmds.xform(obj1, query=True, worldSpace=True, translation=True)
+        pos2 = cmds.xform(obj2, query=True, worldSpace=True, translation=True)
 
+        # Euclidean distance
+        distance = math.sqrt(
+            (pos2[0] - pos1[0])**2 +
+            (pos2[1] - pos1[1])**2 +
+            (pos2[2] - pos1[2])**2
+        )
+        return distance
 #=========================================================================================
 
-    def match_cage_arm_left(self, pole_obj=None, helper_objs=None):
+    def match_cage_arm_left(self, cage_given=None, pole_obj=None, helper_objs=None):
         self.match(True, "xyz", "yup", False, False, True, pole_obj, helper_objs)
         self.match_flw_to_tgt_zro_rotate(tgt_idx=2, flw_idx=2)
+
+        self.match_set_members_to_single_tgt(cage_given.rnm_poleObj_armLeft[0] ,cage_given.MSN_rnm_lst_arm_l[-1], int_rot=0)
+
+        dist_arm_l_all = self.get_distance(self.tgt[0], self.tgt[2])
+        dist_arm_l_up = self.get_distance(self.tgt[0], self.tgt[1])
+        dist_arm_l_low = self.get_distance(self.tgt[1], self.tgt[2])
+
+        cmds.setAttr(cage_given.rnm_optionCtl[0]+".Arm_L", dist_arm_l_all)
+        cmds.setAttr(cage_given.rnm_optionCtl[0]+".arm_l_up", dist_arm_l_up)
+        cmds.setAttr(cage_given.rnm_optionCtl[0]+".arm_l_low", dist_arm_l_low)
 
 
     def match_cage_arm_right(self, pole_obj=None, cage_given =None, helper_objs=None):
@@ -1181,13 +1218,42 @@ class JUN_matcher_v02():
                 cmds.delete(dele_lst[i])
             except:
                 print("error 1140")
+
+        self.match_set_members_to_single_tgt(cage_given.rnm_poleObj_armRight[0] ,cage_given.MSN_rnm_lst_arm_r[-1], int_rot=0)
+
+        dist_arm_r_all = self.get_distance(self.tgt[0], self.tgt[2])
+        dist_arm_r_up = self.get_distance(self.tgt[0], self.tgt[1])
+        dist_arm_r_low = self.get_distance(self.tgt[1], self.tgt[2])
+
+        cmds.setAttr(cage_given.rnm_optionCtl[0]+".Arm_r", dist_arm_r_all)
+        cmds.setAttr(cage_given.rnm_optionCtl[0]+".arm_r_up", dist_arm_r_up)
+        cmds.setAttr(cage_given.rnm_optionCtl[0]+".arm_r_low", dist_arm_r_low)
         
-    def match_cage_leg_l(self, pole_obj=None, helper_obj=None):
+    def match_cage_leg_l(self, cage_given=None, pole_obj=None, helper_obj=None):
         self.match(True, "xzy", "zup", True, False, True, pole_obj, helper_obj)
 
-    def match_cage_leg_r(self, pole_obj=None, helper_obj=None):
+        self.match_set_members_to_single_tgt(cage_given.rnm_poleObj_legLeft[0] ,cage_given.MSN_rnm_lst_leg_l[-1], int_rot=0)
+
+        dist_leg_l_all = self.get_distance(self.tgt[0], self.tgt[2])
+        dist_leg_l_up = self.get_distance(self.tgt[0], self.tgt[1])
+        dist_leg_l_low = self.get_distance(self.tgt[1], self.tgt[2])
+
+        cmds.setAttr(cage_given.rnm_optionCtl[0]+".Leg_L", dist_leg_l_all)
+        cmds.setAttr(cage_given.rnm_optionCtl[0]+".leg_l_up", dist_leg_l_up)
+        cmds.setAttr(cage_given.rnm_optionCtl[0]+".leg_l_low", dist_leg_l_low)
+
+    def match_cage_leg_r(self, cage_given=None, pole_obj=None, helper_obj=None):
         self.match(True, "xzy", "zup", True, False, True, pole_obj, helper_obj)
 
+        self.match_set_members_to_single_tgt(cage_given.rnm_poleObj_legRight[0] ,cage_given.MSN_rnm_lst_leg_r[-1], int_rot=0)
+
+        dist_leg_r_all = self.get_distance(self.tgt[0], self.tgt[2])
+        dist_leg_r_up = self.get_distance(self.tgt[0], self.tgt[1])
+        dist_leg_r_low = self.get_distance(self.tgt[1], self.tgt[2])
+
+        cmds.setAttr(cage_given.rnm_optionCtl[0]+".Leg_R", dist_leg_r_all)
+        cmds.setAttr(cage_given.rnm_optionCtl[0]+".leg_r_up", dist_leg_r_up)
+        cmds.setAttr(cage_given.rnm_optionCtl[0]+".leg_r_low", dist_leg_r_low)
             
 # Set class : matcher_V02 (close)
 #=========================================================================================
@@ -1252,16 +1318,16 @@ def JUN_CR_match( cage_glo, lst_cbg_name, tsl_tgt, tsl_flw):
                 cmds.setAttr(obj_hid+".visibility", False)
 
             if cage_glo.is_arm_left(idx):
-                mcr.match_cage_arm_left(cage_glo.rnm_poleObj_armLeft[0], helper_objs = cage_glo.rnm_helperJnts_arm_l)
+                mcr.match_cage_arm_left(cage_glo, pole_obj=cage_glo.rnm_poleObj_armLeft[0], helper_objs = cage_glo.rnm_helperJnts_arm_l)
 
             if cage_glo.is_arm_right(idx):
                 mcr.match_cage_arm_right(cage_glo.rnm_poleObj_armRight[0], cage_given= cage_glo, helper_objs = cage_glo.rnm_helperJnts_arm_r)
 
             if cage_glo.is_leg_left(idx):
-                mcr.match_cage_leg_l(cage_glo.rnm_poleObj_legLefg[0], cage_glo.rnm_helperJnts_leg_l)
+                mcr.match_cage_leg_l(cage_glo, cage_glo.rnm_poleObj_legLeft[0], cage_glo.rnm_helperJnts_leg_l)
 
             if cage_glo.is_leg_right(idx):
-                mcr.match_cage_leg_r(cage_glo.rnm_poleObj_legRight[0], cage_glo.rnm_helperJnts_leg_r)
+                mcr.match_cage_leg_r(cage_glo, cage_glo.rnm_poleObj_legRight[0], cage_glo.rnm_helperJnts_leg_r)
                 
             if cage_glo.is_fingers_left(idx):
                 print("fig l")
@@ -1478,7 +1544,7 @@ def PY_JUN_makeUI_ContrlRigTool ():
     
     # window
 
-    cmds.window( str_winName, bgc=color_mainDark, title="Control Rig Tool V01.04" );
+    cmds.window( str_winName, bgc=color_mainDark, title="Control Rig Tool V01.05" );
         
     #------------------------------------------------------------------
     # UI: MenuBar
@@ -1486,7 +1552,7 @@ def PY_JUN_makeUI_ContrlRigTool ():
 
     cmds.menuBarLayout (bgc=color_mainDark); 
     
-    menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 23-SEP-2025\')".format(color_main)
+    menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 29-SEP-2025\')".format(color_main)
 
     cmds.menu( label='Help' );
     cmds.menuItem( label='About', command = menu_cmd);
@@ -1732,7 +1798,7 @@ def PY_JUN_makeUI_ContrlRigTool ():
     cmds.showWindow(str_winName);
     cmds.window(str_winName, e = True, widthHeight = [win_width, win_height]);
     
-def JUN_PY_ControlRigTool_V01_04():
+def JUN_PY_ControlRigTool_V01_05():
     PY_JUN_makeUI_ContrlRigTool();
 
 PY_JUN_makeUI_ContrlRigTool();
