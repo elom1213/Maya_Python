@@ -39,3 +39,5 @@ def vector_element_wise_multiply(v1, v2):
     return  [a * b for a, b in zip(v1, v2)]
 
     
+
+    
