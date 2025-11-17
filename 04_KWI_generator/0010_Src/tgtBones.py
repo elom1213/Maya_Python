@@ -1,1 +1,1 @@
-['Ribbon_001_L_003', 'Ribbon_001_L_007', 'Ribbon_001_R_003', 'Ribbon_001_R_007']
+['HatRibbon_001', 'HatRibbon_002']

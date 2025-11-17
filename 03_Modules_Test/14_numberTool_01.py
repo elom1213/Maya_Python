@@ -439,7 +439,7 @@ def PY_JUN_makeUI_numberTool ():
     cmds.showWindow(str_winName);
     cmds.window(str_winName, e = True, widthHeight = [win_width, win_height]);
     
-def JUN_PY_numberTool_V01_01():
+def JUN_PY_GS_invertShapeTool_V01_01():
     PY_JUN_makeUI_numberTool();
 
-PY_JUN_makeUI_numberTool();
+JUN_PY_GS_invertShapeTool_V01_01();

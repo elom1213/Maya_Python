@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 
+# print(cmds.ls(sl = True))
+
 import glob, os, re, math, ast
-# import os
-# import re
-# import math
-# import ast
+
 
 path_read = "0010_Src"
 path_write = "0020_out"
@@ -24,7 +23,7 @@ KWI_use_kawaii_generator = True
 KWI_tgtBones_name = ["testBoneName_01", "testBoneName_02", "testBoneName_03", "testBoneName_04", "testBoneName_05", "testBoneName_06"]
 
 KWI_tgt_node_num = -1
-KWI_node_num = 7
+KWI_node_num = 1
 KWI_idx_jump = 1
 
 KWI_class_name = "AnimGraphNode_KawaiiPhysics_"
@@ -33,7 +32,7 @@ KWI_token_nodePos_X = "NodePosX="
 KWI_token_nodePos_Y = "NodePosY="
 KWI_nodePos_start_X = 200
 KWI_nodePos_start_Y = 30
-KWI_nodePos_offset_X = 250
+KWI_nodePos_offset_X = 280
 KWI_nodePos_offset_Y = 200
 KWI_nodePos_lineChange = 4
 
@@ -96,7 +95,7 @@ for idx_fileToOpen in range(0, len(file_list)):
             KWI_text_single_node = KWI_get_changed_num(read_text, KWI_node_num, KWI_class_name)
             KWI_text_single_node = KWI_get_replace_bone_name(KWI_text_single_node, KWI_tgtBones_name[idx_nodeNum])
 
-            posX = KWI_nodePos_start_X + KWI_nodePos_start_X * (idx_nodeNum % KWI_nodePos_lineChange)
+            posX = KWI_nodePos_start_X + KWI_nodePos_offset_X * (idx_nodeNum % KWI_nodePos_lineChange)
             posY = KWI_nodePos_start_Y + (math.floor(idx_nodeNum/KWI_nodePos_lineChange) * KWI_nodePos_offset_Y)
 
             KWI_text_single_node = KWI_get_changed_num(KWI_text_single_node, posX, KWI_token_nodePos_X)
@@ -109,4 +108,5 @@ for idx_fileToOpen in range(0, len(file_list)):
 
     with open(target_path_write, 'w', encoding="utf-8") as f:
         f.write(text_new_string)
+
 
