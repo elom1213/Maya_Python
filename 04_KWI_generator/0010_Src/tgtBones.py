@@ -1,1 +1,1 @@
-['HatRibbon_001', 'HatRibbon_002']
+['mdBob_SideA', 'mdBob_BackA_L', 'mdBob_BackB_L', 'mdBob_BackC', 'mdBob_BackB_R', 'mdBob_BackA_R']
