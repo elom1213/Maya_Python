@@ -935,9 +935,7 @@ def JUN_create_loc_for_given_objs(lst_objs):
     return  lst_loc
 
 def JUN_cmd_FKIK_gen_create_pos_objs_FKIK_Gen(lst_tsl_source_FK, 
-                                              lst_tsl_source_IK, 
-                                              lst_tsl_drv_IK_to_FK, 
-                                              lst_tsl_drv_FK_to_IK, 
+                                              lst_tsl_source_IK,
                                               lst_tsl_match_FK_ctl, 
                                               lst_tsl_match_IK_ctl, 
                                               lst_tsl_match_FK_pose_objs,
@@ -1514,7 +1512,7 @@ def PY_JUN_makeUI_general_FKIKTool ():
     #===================================================================================
     # Tab : Source (close)
     #===================================================================================
-
+    '''
     #===================================================================================
     # Tab Start : IK to FK (drivers)
     #===================================================================================
@@ -1829,7 +1827,7 @@ def PY_JUN_makeUI_general_FKIKTool ():
     cmds.setParent( '..' )
 
 
-
+    '''
     #===================================================================================
     # Tab End : drivers
     #===================================================================================
@@ -2438,83 +2436,19 @@ def PY_JUN_makeUI_general_FKIKTool ():
     #===================================================================================
     #===================================================================================
 
-    cmds.tabLayout( tab_all, edit=True, tabLabel=((tab_source, 'Source'), (tab_drivers, 'Drivers'),(tab_matcher_FK, 'Match IK to FK'), (tab_matcher_IK, 'Match FK to IK')));
+    cmds.tabLayout( tab_all, edit=True, tabLabel=((tab_source, 'Source'), (tab_matcher_FK, 'Match FK'), (tab_matcher_IK, 'Match IK')));
     
-    cmds.frameLayout( label=' Option', collapsable= True, bgc =color_main, h = win_height/2.8 );
+    cmds.frameLayout( label=' Option', collapsable= True, bgc =color_main);
 
     
-    cmds.paneLayout( configuration= "vertical3", paneSize = ([1,30,100],[2,30,100],[3,40,100]) )
-
-    #===================================================================================
-    # paneLayout for check box : vertical2(open)
+    cmds.paneLayout( configuration= "vertical2", paneSize = ([1,35,100],[2,65,100]) )
 
     str_name_FKIK_gen_arm_l_cbg = "JUN_name_FKIK_arm_l_cbg"
     str_name_FKIK_gen_arm_r_cbg = "JUN_name_FKIK_arm_r_cbg"
     str_name_FKIK_gen_leg_l_cbg = "JUN_name_FKIK_leg_l_cbg"
     str_name_FKIK_gen_leg_r_cbg = "JUN_name_FKIK_leg_r_cbg"
 
-    cmds.paneLayout( configuration= "vertical2" )
-
-    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
-
-    cmds.text( "JUN_name_checkBoxGrp_Arm", align="left", font = "boldLabelFont",  label='Arm' );
-
-    cmds.checkBoxGrp( str_name_FKIK_gen_arm_l_cbg, label='Arm Left', columnWidth2=(50, 20) ,columnAlign = (1, "left"), columnAttach2 = ("both", "both") , value1 = True );
-    cmds.checkBoxGrp( str_name_FKIK_gen_arm_r_cbg, label='Arm Right', columnWidth2=(50, 20) ,columnAlign = (1, "left"), columnAttach2 = ("both", "both") , value1 = True );
-
-    cmds.setParent( '..' )
-
-    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
-
-    cmds.text( "JUN_name_checkBoxGrp_Leg", align="left", font = "boldLabelFont",  label='Leg' );
-
-    cmds.checkBoxGrp( str_name_FKIK_gen_leg_l_cbg, label='Leg Left', columnWidth2=(50, 20) ,columnAlign = (1, "left"), columnAttach2 = ("both", "both") , value1 = True );
-    cmds.checkBoxGrp( str_name_FKIK_gen_leg_r_cbg, label='Leg Right', columnWidth2=(50, 20) ,columnAlign = (1, "left"), columnAttach2 = ("both", "both") , value1 = True );
-    
-    cmds.setParent( '..' )
-
-    cmds.setParent( '..' )
-
-    # paneLayout for check box : vertical2(close)
-    #==============================================================================
-
-    #==============================================================================
-    # intFieldGrp for strat end frame (open)
-
-
-    cmds.rowColumnLayout( numberOfColumns=1)
-
-    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
-
-    FKIK_time_str = int(cmds.playbackOptions(query=True, minTime=True));
-    FKIK_time_end = int(cmds.playbackOptions(query=True, maxTime=True));
-
-    cmds.intFieldGrp( 'name_FKIK_gen_ifg_timeStr', 
-                        columnAlign = [1, 'right'], 
-                        columnWidth2 = [ win_width/8-15, 120 ], 
-                        value1 = FKIK_time_str,
-                        label="Start Frame :"    );    
-    
-    cmds.setParent( '..' )
-
-    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
-
-    cmds.intFieldGrp( 'name_FKIK_gen_ifg_timeEnd', 
-                        columnAlign= [1, 'right'], 
-                        columnWidth2=[ win_width/8-15, 120 ], 
-                        value1 = FKIK_time_end,
-                        label="End Frame:"  );  
-
-    cmds.setParent( '..' )
-
-    cmds.setParent( '..' )
-
-
-    # intFieldGrp for strat end frame (close)
-    #==============================================================================
-
-    #==============================================================================
-    # buttons for setup pose objects (open)
+   
 
     lst_tsl_source_FK = [ str_tls_ctl_FK_arm_left,
                           str_tls_ctl_FK_arm_right,
@@ -2525,18 +2459,6 @@ def PY_JUN_makeUI_general_FKIKTool ():
                           str_tls_ctl_IK_arm_right,
                           str_tls_ctl_IK_leg_left,
                           str_tls_ctl_IK_leg_right]
-
-    lst_tsl_drv_IK_to_FK = [ str_tls_drv_IK_to_FK_arm_left,
-                             str_tls_drv_IK_to_FK_arm_right,
-                             str_tls_drv_IK_to_FK_leg_left,
-                             str_tls_drv_IK_to_FK_leg_right]
-    
-    lst_tsl_drv_FK_to_IK = [ str_tls_drv_FK_to_IK_pole_arm,
-                             str_tls_drv_FK_to_IK_pole_leg,
-                             str_tls_drv_FK_to_IK_leg_ankle,
-                             str_tls_drv_FK_to_IK_leg_toe,
-                             str_tls_drv_FK_to_IK_wrist]
-    #
     
     lst_tsl_match_FK_all = [str_tls_match_FK_arm_left_pose_objs,
                             str_tls_match_FK_arm_left_ctl,
@@ -2584,21 +2506,24 @@ def PY_JUN_makeUI_general_FKIKTool ():
     
     cage_glo = JUN_cage_FKIK_Gen()
 
+    #==============================================================================
+    # buttons for setup pose objects (open)
+
     cmds.rowColumnLayout( numberOfColumns=2)
 
     
     cmds.button( "name_btn_setup_triangle_pose_objects", 
-                 label='Set up triangle pose objects', 
+                 label='Set up triangle drivers', 
                  bgc=color_btn, 
+                 h = win_height/15,
                  command=lambda *argv : JUN_cmd_FKIK_gen_setup_triangle_pos_objs(lst_tsl_source_FK, cage_glo));
     
     cmds.button( "name_btn_create_pose_objects", 
-                 label='pose objects for FK to IK', 
+                 label='Drivers for FK IK switch', 
                  bgc=color_btn, 
+                 h = win_height/15,
                  command=lambda *argv : JUN_cmd_FKIK_gen_create_pos_objs_FKIK_Gen(lst_tsl_source_FK, 
-                                                                                  lst_tsl_source_IK, 
-                                                                                  lst_tsl_drv_IK_to_FK, 
-                                                                                  lst_tsl_drv_FK_to_IK, 
+                                                                                  lst_tsl_source_IK,
                                                                                   lst_tsl_match_FK_ctl, 
                                                                                   lst_tsl_match_IK_ctl, 
                                                                                   lst_tsl_match_FK_pose_objs,
@@ -2608,92 +2533,102 @@ def PY_JUN_makeUI_general_FKIKTool ():
     cmds.button( "name_btn_constraint_pose_objects", 
                  label='Load setting', 
                  bgc=color_btn, 
+                 h = win_height/15,
                  command=lambda *argv : JUN_cmd_FKIK_gen_load_setting());
 
     cmds.button( "name_btn_setup_all_pose_objects", 
                  label='Save setting', 
                  bgc=color_btn, 
+                 h = win_height/15,
                  command=lambda *argv : JUN_cmd_FKIK_gen_save_setting(lst_tsl_match_FK_all, lst_tsl_match_IK_all));
     
     cmds.setParent( '..' )
     
     # buttons for setup pose objects (close)
     #==============================================================================
-    
-    cmds.setParent( '..' )
 
-    cmds.paneLayout( configuration= "vertical2", paneSize = ([1,40,100],[2,60,100]))
-
-    #==============================================================================
-    # tls for pose objects, ctl (open)
-    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5, h = win_height/12, bgc = color_main );
+    cmds.rowColumnLayout( numberOfColumns=1)
+    #===================================================================================
+    # paneLayout for check box : vertical2(open)
 
     cmds.paneLayout( configuration= "vertical2" )
 
     cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
 
-    cmds.text( "JUN_FKIK_gen_pos", align="left", font = "boldLabelFont",  label='Targets' );
-    cmds.text( "JUN_FKIK_gen_tgt_selNum", align="left", label='Number:0' );
-    
-    cmds.textScrollList("JUN_FKIK_gen_targetsPos_tsl", 
-                        height = (win_height*0.12),
-                        numberOfRows=15, 
-                        allowMultiSelection=True, 
-                        selectCommand='JUN_cmd_tsl_select(\"JUN_FKIK_gen_targetsPos_tsl\")');
+    cmds.text( "JUN_name_checkBoxGrp_Arm", align="left", font = "boldLabelFont",  label='Arm' );
 
-    cmds.rowLayout( numberOfColumns=4 );
-
-    cmds.button( "NAM_toolSelTgt_b_add",  width= 40, label='Add', bgc =color_btn, command='CMD_ToolSel_b_add  ( \"JUN_FKIK_gen_targetsPos_tsl\", \"JUN_FKIK_gen_tgt_selNum\" )' );
-    cmds.button( "NAM_toolSelTgt_b_del",  width= 40, label='Del', bgc =color_btn, command='CMD_ToolSel_b_del  ( \"JUN_FKIK_gen_targetsPos_tsl\", \"JUN_FKIK_gen_tgt_selNum\" )' );
-    cmds.button( "NAM_toolSelTgt_b_up",   width= 40, label='Up',  bgc =color_btn, command='CMD_ToolSel_b_up   ( \"JUN_FKIK_gen_targetsPos_tsl\", \"JUN_FKIK_gen_tgt_selNum\" )' );
-    cmds.button( "NAM_toolSelTgt_b_down", width= 40, label='Down',bgc =color_btn, command='CMD_ToolSel_b_down ( \"JUN_FKIK_gen_targetsPos_tsl\", \"JUN_FKIK_gen_tgt_selNum\" )' );
+    cmds.checkBoxGrp( str_name_FKIK_gen_arm_l_cbg, label='Arm Left', width=180 ,columnAlign = (1, "left"), columnAttach2 = ("both", "both") , value1 = True );
+    cmds.checkBoxGrp( str_name_FKIK_gen_arm_r_cbg, label='Arm Right', width=180 ,columnAlign = (1, "left"), columnAttach2 = ("both", "both") , value1 = True );
 
     cmds.setParent( '..' )
 
-    cmds.button( "name_btn_FK_IK_Gen_tgt",
-                 label='Select Objects',
-                 bgc =color_btn,
-                 command='JUN_cmd_FKIK_gen_toolSel_btn(\"JUN_FKIK_gen_targetsPos_tsl\", \"JUN_FKIK_gen_tgt_selNum\")');
+    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
+
+    cmds.text( "JUN_name_checkBoxGrp_Leg", align="left", font = "boldLabelFont",  label='Leg' );
+
+    cmds.checkBoxGrp( str_name_FKIK_gen_leg_l_cbg, label='Leg Left', width=180 ,columnAlign = (1, "left"), columnAttach2 = ("both", "both") , value1 = True );
+    cmds.checkBoxGrp( str_name_FKIK_gen_leg_r_cbg, label='Leg Right', width=180 ,columnAlign = (1, "left"), columnAttach2 = ("both", "both") , value1 = True );
+    
+    cmds.setParent( '..' )
+
+    cmds.setParent( '..' )
+
+    # paneLayout for check box : vertical2(close)
+    #==============================================================================
+
+    #==============================================================================
+    # intFieldGrp for strat end frame (open)
+
+
+    cmds.rowColumnLayout( numberOfColumns=1)
+
+    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
+
+    FKIK_time_str = int(cmds.playbackOptions(query=True, minTime=True));
+    FKIK_time_end = int(cmds.playbackOptions(query=True, maxTime=True));
+
+    cmds.intFieldGrp( 'name_FKIK_gen_ifg_timeStr', 
+                        columnAlign = [1, 'left'], 
+                        width = 390, 
+                        columnWidth2 = [100,160],
+                        value1 = FKIK_time_str,
+                        label="Start Frame :"    );    
     
     cmds.setParent( '..' )
 
     cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
 
-    cmds.text( "JUN_FKIK_gen_followers", align="left", font = "boldLabelFont",  label='Followers' );
-    cmds.text( "JUN_FKIK_gen_flw_selNum", align="left", label='Number:0' );
-
-    cmds.textScrollList("JUN_FKIK_gen_followersCtl_tsl", 
-                        height = (win_height*0.12),
-                        numberOfRows=15, 
-                        allowMultiSelection=True, 
-                        selectCommand='JUN_cmd_tsl_select(\"JUN_FKIK_gen_followersCtl_tsl\")');
-                        
-    cmds.rowLayout( numberOfColumns=4 );
-
-    cmds.button( "NAM_toolSelTgt_b_add",  width= 40, label='Add', bgc =color_btn, command='CMD_ToolSel_b_add  ( \"JUN_FKIK_gen_followersCtl_tsl\", \"JUN_FKIK_gen_flw_selNum\" )' );
-    cmds.button( "NAM_toolSelTgt_b_del",  width= 40, label='Del', bgc =color_btn, command='CMD_ToolSel_b_del  ( \"JUN_FKIK_gen_followersCtl_tsl\", \"JUN_FKIK_gen_flw_selNum\" )' );
-    cmds.button( "NAM_toolSelTgt_b_up",   width= 40, label='Up',  bgc =color_btn, command='CMD_ToolSel_b_up   ( \"JUN_FKIK_gen_followersCtl_tsl\", \"JUN_FKIK_gen_flw_selNum\" )' );
-    cmds.button( "NAM_toolSelTgt_b_down", width= 40, label='Down',bgc =color_btn, command='CMD_ToolSel_b_down ( \"JUN_FKIK_gen_followersCtl_tsl\", \"JUN_FKIK_gen_flw_selNum\" )' );
+    cmds.intFieldGrp( 'name_FKIK_gen_ifg_timeEnd', 
+                        columnAlign= [1, 'left'], 
+                        width = 390, 
+                        columnWidth2 = [100,160],
+                        value1 = FKIK_time_end,
+                        label="End Frame :"  );  
 
     cmds.setParent( '..' )
 
-    cmds.button( "name_btn_FK_IK_Gen_flw",
-                 label='Select Objects',
-                 bgc =color_btn,
-                 command='JUN_cmd_FKIK_gen_toolSel_btn(\"JUN_FKIK_gen_followersCtl_tsl\", \"JUN_FKIK_gen_flw_selNum\")');
-    
-    cmds.setParent( '..' )
-    
     cmds.setParent( '..' )
 
-    cmds.setParent( '..' )
-    # tls for pose objects, ctl (close)
+
+    # intFieldGrp for strat end frame (close)
     #==============================================================================
 
+    
+    cmds.setParent( '..' )
+    
+    cmds.setParent( '..' )
+
+    cmds.setParent( '..' )
+
+    #==============================================================================
+    # tls for pose objects, ctl (open)
+    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5, bgc = color_main, h = win_height/6 );
+
+ 
     #==============================================================================
     # buttons for match (open)
 
-    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5, bgc = color_main );
+    cmds.paneLayout( configuration= "vertical2", paneSize = ([1,50,100],[2,50,100]) )
 
     cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5, bgc = color_main );
 
@@ -2701,39 +2636,39 @@ def PY_JUN_makeUI_general_FKIKTool ():
     cmds.text( height = 20 , align="left", font = "boldLabelFont",  label='Match' );
 
     cmds.button( "name_btn_match_IK_to_FK", 
-                 h = win_height/40,
+                 h = win_height/20,
                  label='Match IK', 
                  bgc=color_btn, 
                  command='JUN_cmd_match_IK_and_FK(\"JUN_FKIK_gen_targetsPos_tsl\", \"JUN_FKIK_gen_followersCtl_tsl\",\"JUN_name_FKIK_arm_l_cbg\",\"JUN_name_FKIK_arm_r_cbg\", \"JUN_name_FKIK_leg_l_cbg\",\"JUN_name_FKIK_leg_r_cbg\", 1)');
 
     cmds.button( "name_btn_match_FK_to_IK", 
-                 h = win_height/40,
+                 h = win_height/20,
                  label='Match FK', 
                  bgc=color_btn, 
                  command='JUN_cmd_match_IK_and_FK(\"JUN_FKIK_gen_targetsPos_tsl\", \"JUN_FKIK_gen_followersCtl_tsl\",\"JUN_name_FKIK_arm_l_cbg\",\"JUN_name_FKIK_arm_r_cbg\", \"JUN_name_FKIK_leg_l_cbg\",\"JUN_name_FKIK_leg_r_cbg\", 0)');
 
     cmds.setParent( '..' )
 
-    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5, h = win_height/12, bgc = color_main );
+    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5, bgc = color_main );
 
     cmds.text( height = 20 , align="left", font = "boldLabelFont",  label='Bake' );
 
     cmds.button( "name_btn_bake_IK", 
-                 h = win_height/40,
+                 h = win_height/20,
                  label='Bake IK', 
                  bgc=color_btn, 
                  command=f'JUN_cmd_bake_IK_FK_Gen({lst_tsl_match_IK_all}, {lst_tsl_match_FK_all}, {lst_cbx_match}, 1, \"name_FKIK_gen_ifg_timeStr\", \"name_FKIK_gen_ifg_timeEnd\")');
 
     cmds.button( "name_btn_bake_FK", 
-                 h = win_height/40,
+                 h = win_height/20,
                  label='Bake FK', 
                  bgc=color_btn, 
                  command=f'JUN_cmd_bake_IK_FK_Gen({lst_tsl_match_IK_all}, {lst_tsl_match_FK_all}, {lst_cbx_match} ,0, \"name_FKIK_gen_ifg_timeStr\", \"name_FKIK_gen_ifg_timeEnd\")');
 
     cmds.setParent( '..' )
 
-    cmds.setParent( '..' )
 
+    cmds.setParent( '..' )
     # buttons for match (close)
     #==============================================================================
 
