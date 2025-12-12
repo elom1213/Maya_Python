@@ -1,6 +1,7 @@
 # last Update date 25 12 12
 # Python Script by Ji Hun Park
 
+# code for Publish
 # FKIK General Tool V01.02
 
 import maya.cmds as cmds
@@ -528,7 +529,6 @@ class JUN_checker():
 # match fk ik End
 #===================================================================================
 
-
 class OGSFreeze:
     def __enter__(self):
         self.was_paused = bool(mel.eval('ogs -query -pause;'))
@@ -595,6 +595,7 @@ def JUN_cmd_bake_IK_FK_Gen(lst_tsl_match_IK_all,
     mcr_FK_arm_right.set_tgt_flw_from_tsl(lst_tsl_match_FK[2], lst_tsl_match_FK[3])
     mcr_FK_leg_left.set_tgt_flw_from_tsl(lst_tsl_match_FK[4], lst_tsl_match_FK[5])
     mcr_FK_leg_right.set_tgt_flw_from_tsl(lst_tsl_match_FK[6], lst_tsl_match_FK[7])
+    print(lst_tsl_match_FK)
 
     mcr_IK_arm_left.set_tgt_flw_from_tsl(lst_tsl_match_IK_all[0], lst_tsl_match_IK_all[1])
     mcr_IK_arm_right.set_tgt_flw_from_tsl(lst_tsl_match_IK_all[2], lst_tsl_match_IK_all[3])
@@ -615,7 +616,7 @@ def JUN_cmd_bake_IK_FK_Gen(lst_tsl_match_IK_all,
     if is_bake:
         timeStr = cmds.intFieldGrp(ifg_timeStr, q=True, value1=True);
         timeEnd = cmds.intFieldGrp(ifg_timeEnd, q=True, value1=True);
-
+    
 
     if bake_ik:
         if checker_body_part.is_checked(idx_arm_left):
@@ -956,92 +957,6 @@ def JUN_cmd_FKIK_gen_setup_all_pos_objs(lst_tsl_source, lst_tsl_drv, lst_tsl_mat
         JUN_MATCH_twoObjects( loc_pin_on_sfc_xform, [loc_child_of_sfc], 1, 1, 1, 1)
 
 
-
-def JUN_cmd_FKIK_gen_setup_triangle_pos_objs(lst_tsl_source, cage_given=None):
-    lst_tri = {}
-    len_for_FK_tsl = 4
-    str_name_grp_posObjs = "JUN_posObjs_grp"
-    lst_str_name_triMesh = ["CH_l_triArm_sfc",
-                            "CH_r_triArm_sfc",
-                            "CH_l_triLeg_sfc",
-                            "CH_r_triLeg_sfc,"]
-    
-    lst_drv = []
-    
-    if not cmds.objExists(str_name_grp_posObjs):
-        cmds.group(em=True, name=str_name_grp_posObjs)
-
-    lst_child_of_posObjs_grp = cmds.listRelatives(str_name_grp_posObjs, children=True, fullPath=False) or []
-    
-    for i in range(0, len_for_FK_tsl):
-        objs_ctls  = cmds.textScrollList( lst_tsl_source[i] , q=True, allItems=True);
-        lst_pos_for_tri = []
-        tri_nurbs = []
-
-        if objs_ctls is None:
-            print(lst_str_name_triMesh[i] + " : Pass")
-            continue
-
-        if lst_str_name_triMesh[i] in lst_child_of_posObjs_grp:
-            print("Remove exsisting : " + lst_str_name_triMesh[i])
-            cmds.delete(lst_str_name_triMesh[i])
-           
-        tri_nurbs = cmds.nurbsPlane(degree = 1)
-        cmds.DeleteHistory(tri_nurbs)
-
-        tri_nurbs_newName = cmds.rename(tri_nurbs[0], lst_str_name_triMesh[i])
-
-        tri_nurbs.clear()
-        tri_nurbs.append(tri_nurbs_newName)
-
-        JUN_parent(tri_nurbs[0], str_name_grp_posObjs)
-
-        for j in range(0, 3):
-            decomNode = cmds.createNode("decomposeMatrix")
-            cmds.connectAttr(objs_ctls[j] + ".worldMatrix", decomNode + ".inputMatrix")
-            cmds.connectAttr(decomNode + ".outputTranslate", tri_nurbs[0] + f".controlPoints[{j}]" )
-
-            if j == 2 :
-                cmds.connectAttr(decomNode + ".outputTranslate", tri_nurbs[0] + f".controlPoints[{j+1}]" )
-
-
-            lst_pos = JUN_get_world_positions(objs_ctls[j])
-            lst_pos_for_tri.append(lst_pos) # [[],[],[]]
-
-
-        pos_average = JUN_average_position(lst_pos_for_tri)
-        loc_triAverage = cmds.spaceLocator()
-        loc_child_of_sfc = loc_triAverage
-        cmds.xform(loc_triAverage, translation = pos_average)
-
-
-        loc_pin_on_sfc_shape = str(pin_to_surface(pm.PyNode(tri_nurbs[0]), sourceObj = loc_triAverage[0]))
-        cmds.listRelatives(loc_pin_on_sfc_shape, parent=True, fullPath=False)
-        loc_pin_on_sfc_xform = cmds.listRelatives(loc_pin_on_sfc_shape, parent=True, fullPath=False)
-        print(loc_pin_on_sfc_xform)
-        
-        JUN_parent(loc_child_of_sfc, loc_pin_on_sfc_xform[0])
-        JUN_parent(loc_pin_on_sfc_xform[0], str_name_grp_posObjs)
-        loc_child_of_sfc[0] = cmds.rename(loc_child_of_sfc[0], loc_pin_on_sfc_xform[0] + "_tgt")
-        JUN_MATCH_twoObjects( loc_pin_on_sfc_xform, [loc_child_of_sfc], 1, 1, 1, 1)
-
-        lst_drv.append(loc_child_of_sfc[0])
-
-    funcs = [cage_given.set_drv_pole_arm_l,
-             cage_given.set_drv_pole_arm_r,
-             cage_given.set_drv_pole_leg_l,
-             cage_given.set_drv_pole_leg_r]
-
-    for i, func in enumerate(funcs):
-        try:
-            func(lst_drv[i])
-        except:
-            continue
-
-    cage_given.print_lst_all()
-
-        
-
 def JUN_create_loc_for_given_objs(lst_objs):
     lst_loc = []
     for obj_single in lst_objs:
@@ -1050,149 +965,7 @@ def JUN_create_loc_for_given_objs(lst_objs):
         lst_loc.append(loc[0])
     return  lst_loc
 
-def JUN_cmd_FKIK_gen_create_pos_objs_FKIK_Gen(lst_tsl_source_FK, 
-                                              lst_tsl_source_IK,
-                                              lst_tsl_match_FK_ctl, 
-                                              lst_tsl_match_IK_ctl, 
-                                              lst_tsl_match_FK_pose_objs,
-                                              lst_tsl_match_IK_pose_objs, 
-                                              cage_given = None):
-    # for given wrist, ankle, toe FK ctl, create loc and match it rotation to IK ctl
 
-
-    # create drviers for IK to FK
-    # create drivers matched with source IK object, match rotation to FK ctl
-
-    str_name_grp_posObjs = "JUN_posObjs_grp"
-    # lst_ctl_FK_for_match_posObjs = []
-    # lst_ctl_IK_for_match_posObjs_rot = []
-    posObj_flw = []
-
-    if not cmds.objExists(str_name_grp_posObjs):
-        cmds.group(em=True, name=str_name_grp_posObjs)
-
-    lst_child_of_posObjs_grp = cmds.listRelatives(str_name_grp_posObjs, children=True, fullPath=False) or []
- 
-    for i in range(0, 4):
-        ctl_FK =  cmds.textScrollList(lst_tsl_match_FK_ctl[i], q=True, allItems=True)
-        source_IK =  cmds.textScrollList(lst_tsl_source_IK[i], q=True, allItems=True)
-        if source_IK == None:
-            print("tsl pass : " +  lst_tsl_source_IK[i])
-            continue
-
-        lst_locs_ =  JUN_create_loc_for_given_objs(source_IK)
-
-        if ctl_FK != None:
-            # for j in range(0, 3):
-            clt_FK_0_to_2 = ctl_FK[:3]
-            JUN_MATCH_twoObjects(clt_FK_0_to_2, lst_locs_, 1, 1, 0, 1)
-
-        for j in range(0, len(lst_locs_)):
-            name_drv = source_IK[j]+ "_drv"
-
-            if name_drv in lst_child_of_posObjs_grp:
-                print("Remove exsisting : " + name_drv)
-                cmds.delete(name_drv)
-
-            lst_locs_[j] = cmds.rename(lst_locs_[j], name_drv)
-            JUN_parent( lst_locs_[j], str_name_grp_posObjs)
-
-            cmds.parentConstraint(source_IK[j], lst_locs_[j], mo=True)
-
-        cmds.textScrollList(lst_tsl_match_FK_pose_objs[i], e=True, removeAll=True )
-        cmds.textScrollList(lst_tsl_match_FK_pose_objs[i], e=True, append = lst_locs_ );
-    
-    # create driver for FK to IK : wrist and ankle
-    lst_locs_wrist_ankle = []
-    idx_wrist_and_ankle_FK = 2
-    idx_wrist_and_ankle_IK = 1
-    for i in range(0,4):
-        ctl_FK_all = cmds.textScrollList(lst_tsl_match_FK_ctl[i], q=True, allItems=True)
-        ctl_IK_all = cmds.textScrollList(lst_tsl_match_IK_ctl[i], q=True, allItems=True)
-
-        if ctl_FK_all == None:
-            print("tsl pass : " +  lst_tsl_match_FK_ctl[i])
-            continue
-
-        name_drv = str(ctl_FK_all[idx_wrist_and_ankle_FK]) + "_drv"
-
-        lst_locs_ = JUN_create_loc_for_given_objs([ctl_FK_all[idx_wrist_and_ankle_FK]])
-
-        if ctl_IK_all != None:
-            JUN_MATCH_twoObjects([ctl_IK_all[idx_wrist_and_ankle_IK]], lst_locs_, 1, 1, 0, 1)
-
-        if name_drv in lst_child_of_posObjs_grp:
-            print("Remove exsisting : " + name_drv)
-            cmds.delete(name_drv)
-
-        lst_locs_[0] = cmds.rename(lst_locs_[0], name_drv)
-        JUN_parent(lst_locs_[0], str_name_grp_posObjs)
-        cmds.parentConstraint( ctl_FK_all[idx_wrist_and_ankle_FK], lst_locs_[0], mo=True)
-
-        lst_locs_wrist_ankle.append(lst_locs_[0])
-
-    funcs = [cage_given.set_drv_wrist_l,
-             cage_given.set_drv_wrist_r,
-             cage_given.set_drv_ankle_l,
-             cage_given.set_drv_ankle_r]
-    
-    for i, func in enumerate(funcs):
-        try:
-            func(lst_locs_wrist_ankle[i])
-        except:
-            continue
-
-    # create driver for FK to IK : toe
-    lst_locs_toe = []
-    idx_toe_FK = 3
-    idx_toe_IK = 1
-    for i in range(2,4):
-        ctl_FK_legOnly = cmds.textScrollList(lst_tsl_match_FK_ctl[i], q=True, allItems=True)
-        ctl_IK_legOnly = cmds.textScrollList(lst_tsl_match_IK_ctl[i], q=True, allItems=True)
-
-        if ctl_FK_legOnly == None:
-            print("tsl pass : " +  lst_tsl_match_FK_ctl[i])
-            continue
-
-        name_drv = str(ctl_FK_legOnly[idx_toe_FK]) + "_drv"
-
-        lst_locs_ = JUN_create_loc_for_given_objs([ctl_FK_legOnly[idx_toe_FK]])
-
-        if ctl_IK_legOnly != None:
-            JUN_MATCH_twoObjects([ctl_IK_legOnly[idx_toe_IK]], lst_locs_, 1, 1, 0, 1)
-
-        if name_drv in lst_child_of_posObjs_grp:
-            print("Remove exsisting : " + name_drv)
-            cmds.delete(name_drv)
-
-        lst_locs_[0] = cmds.rename(lst_locs_[0], name_drv)
-        JUN_parent(lst_locs_[0], str_name_grp_posObjs)
-        cmds.parentConstraint( ctl_FK_legOnly[idx_toe_FK], lst_locs_[0], mo=True)
-
-        lst_locs_toe.append(lst_locs_[0])
-
-    funcs = [cage_given.set_drv_toe_l,
-             cage_given.set_drv_toe_r]
-    
-    for i, func in enumerate(funcs):
-        try:
-            func(lst_locs_toe[i])
-        except:
-            continue
-
-   
-    cage_given.print_lst_all()
-
-    for i in range(0, 4):
-        cmds.textScrollList(lst_tsl_match_IK_pose_objs[i], e=True, removeAll=True )
-        try:
-            cmds.textScrollList(lst_tsl_match_IK_pose_objs[i], e=True, append =  cage_given.lst_drv_all[i] );
-        except:
-            continue
-
-
-
-    return
 
 def JUN_browse_json_save_path(fileMode_given=0, state = "Save"):
     """
@@ -1317,309 +1090,11 @@ def PY_JUN_makeUI_general_FKIKTool ():
     #===================================================================================
     # Tab : Source (open)
     #===================================================================================
-    
-    tab_source = cmds.columnLayout(adjustableColumn=True, 
-                                    columnAttach=('both', 5), 
-                                    rowSpacing=6, 
-                                    bgc =color_mainDark, 
-                                    width = 390 );
-    
-    #===================================================================================
-    # frameLayout : Tool  Setup FK source(open)
-    #===================================================================================
-    
-    cmds.frameLayout( label='Tool : Setup Source', collapsable= True, bgc =color_main );
-
-    cmds.rowLayout( numberOfColumns=1 );
-
-    cmds.text( "JUN_text_ctl_FK", height = 20 , align="left", backgroundColor = [1, 1, 1], font = "boldLabelFont",  label='Set source : FK ' );
-    
-    cmds.setParent( '..' )
-
-    cmds.paneLayout( configuration= "vertical4" )
-
     mult_tsl_ctl_FK_hight = 0.09
-
-    # tsl ctl fk arm left(open)
-    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
-
-    cmds.text( "JUN_FKIK_Gen_title_ctl_arm_left", align="left", font = "boldLabelFont",  label='Arm Left' );
-    cmds.text( "JUN_name_selNum_ctl_IK_arm_left", align="left", label='Number:0' );
-
-    str_tls_ctl_FK_arm_left = "JUN_FKIK_Gen_ctl_FK_arm_left"
-
-    cmds.textScrollList(str_tls_ctl_FK_arm_left, 
-                        height = (win_height*mult_tsl_ctl_FK_hight),
-                        numberOfRows=15, 
-                        allowMultiSelection=True, 
-                        selectCommand='JUN_cmd_tsl_select(\"JUN_FKIK_Gen_ctl_FK_arm_left\")');
-
-    cmds.rowLayout( numberOfColumns=4 );
-
-    cmds.button( "NAM_toolSelTgt_b_add",  width= 40, label='Add', bgc =color_btn, command=f'CMD_ToolSel_b_add  ( "{str_tls_ctl_FK_arm_left}", \"JUN_name_selNum_ctl_IK_arm_left\" )' );
-    cmds.button( "NAM_toolSelTgt_b_del",  width= 40, label='Del', bgc =color_btn, command=f'CMD_ToolSel_b_del  ( "{str_tls_ctl_FK_arm_left}", \"JUN_name_selNum_ctl_IK_arm_left\" )' );
-    cmds.button( "NAM_toolSelTgt_b_up",   width= 40, label='Up',  bgc =color_btn, command=f'CMD_ToolSel_b_up   ( "{str_tls_ctl_FK_arm_left}", \"JUN_name_selNum_ctl_IK_arm_left\" )' );
-    cmds.button( "NAM_toolSelTgt_b_down", width= 40, label='Down',bgc =color_btn, command=f'CMD_ToolSel_b_down ( "{str_tls_ctl_FK_arm_left}", \"JUN_name_selNum_ctl_IK_arm_left\" )' );
-
-    cmds.setParent( '..' )
-
-    cmds.button( "name_btn_FK_IK_Gen_ctl_fk_arm_left",
-                 label='Select Objects',
-                 bgc =color_btn,
-                 command=f'JUN_cmd_FKIK_gen_toolSel_btn("{str_tls_ctl_FK_arm_left}", \"JUN_name_selNum_ctl_IK_arm_left\")');
-
-    cmds.setParent( '..' )
-    # tsl ctl fk arm left(close)
-
-    # tsl ctl fk arm right(open)
-    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
-
-    cmds.text( "JUN_FKIK_Gen_title_ctl_arm_right", align="left", font = "boldLabelFont",  label='Arm Right' );
-    cmds.text( "JUN_name_selNum_ctl_arm_right", align="left", label='Number:0' );
-
-    str_tls_ctl_FK_arm_right = "JUN_FKIK_Gen_ctl_FK_arm_right"
-    cmds.textScrollList(str_tls_ctl_FK_arm_right, 
-                        height = (win_height*mult_tsl_ctl_FK_hight),
-                        numberOfRows=15, 
-                        allowMultiSelection=True, 
-                        selectCommand='JUN_cmd_tsl_select(\"JUN_FKIK_Gen_ctl_FK_arm_right\")');
-                        
-    cmds.rowLayout( numberOfColumns=4 );
-
-    cmds.button( "NAM_toolSelTgt_b_add",  width= 40, label='Add', bgc =color_btn, command=f'CMD_ToolSel_b_add  ( "{str_tls_ctl_FK_arm_right}", \"JUN_name_selNum_ctl_arm_right\" )' );
-    cmds.button( "NAM_toolSelTgt_b_del",  width= 40, label='Del', bgc =color_btn, command=f'CMD_ToolSel_b_del  ( "{str_tls_ctl_FK_arm_right}", \"JUN_name_selNum_ctl_arm_right\" )' );
-    cmds.button( "NAM_toolSelTgt_b_up",   width= 40, label='Up',  bgc =color_btn, command=f'CMD_ToolSel_b_up   ( "{str_tls_ctl_FK_arm_right}", \"JUN_name_selNum_ctl_arm_right\" )' );
-    cmds.button( "NAM_toolSelTgt_b_down", width= 40, label='Down',bgc =color_btn, command=f'CMD_ToolSel_b_down ( "{str_tls_ctl_FK_arm_right}", \"JUN_name_selNum_ctl_arm_right\" )' );
-
-
-    cmds.setParent( '..' )
-
-    cmds.button( "name_btn_FK_IK_Gen_ctl_fk_arm_right",
-                 label='Select Objects',
-                 bgc =color_btn,
-                 command=f'JUN_cmd_FKIK_gen_toolSel_btn("{str_tls_ctl_FK_arm_right}", \"JUN_name_selNum_ctl_arm_right\")');
-    
-    cmds.setParent( '..' )
-    # tsl ctl fk arm right(close)
-
-    # tsl ctl fk leg left(open)
-    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
-
-    cmds.text( "JUN_FKIK_Gen_title_ctl_leg_left", align="left", font = "boldLabelFont",  label='Leg Left' );
-    cmds.text( "JUN_name_selNum_ctl_leg_left", align="left", label='Number:0' );
-
-    str_tls_ctl_FK_leg_left = "JUN_FKIK_Gen_ctl_FK_leg_left"
-    cmds.textScrollList(str_tls_ctl_FK_leg_left, 
-                        height = (win_height*mult_tsl_ctl_FK_hight),
-                        numberOfRows=15, 
-                        allowMultiSelection=True, 
-                        selectCommand='JUN_cmd_tsl_select(\"JUN_FKIK_Gen_ctl_FK_leg_left\")');
-                        
-    cmds.rowLayout( numberOfColumns=4 );
-
-    cmds.button( "NAM_toolSelTgt_b_add",  width= 40, label='Add', bgc =color_btn, command=f'CMD_ToolSel_b_add  ( "{str_tls_ctl_FK_leg_left}", \"JUN_name_selNum_ctl_leg_left\" )' );
-    cmds.button( "NAM_toolSelTgt_b_del",  width= 40, label='Del', bgc =color_btn, command=f'CMD_ToolSel_b_del  ( "{str_tls_ctl_FK_leg_left}", \"JUN_name_selNum_ctl_leg_left\" )' );
-    cmds.button( "NAM_toolSelTgt_b_up",   width= 40, label='Up',  bgc =color_btn, command=f'CMD_ToolSel_b_up   ( "{str_tls_ctl_FK_leg_left}", \"JUN_name_selNum_ctl_leg_left\" )' );
-    cmds.button( "NAM_toolSelTgt_b_down", width= 40, label='Down',bgc =color_btn, command=f'CMD_ToolSel_b_down ( "{str_tls_ctl_FK_leg_left}", \"JUN_name_selNum_ctl_leg_left\" )' );
-
-
-    cmds.setParent( '..' )
-
-    cmds.button( "name_btn_FK_IK_Gen_ctl_fk_leg_left",
-                 label='Select Objects',
-                 bgc =color_btn,
-                 command=f'JUN_cmd_FKIK_gen_toolSel_btn("{str_tls_ctl_FK_leg_left}", \"JUN_name_selNum_ctl_leg_left\")');
-    
-    cmds.setParent( '..' )
-    # tsl ctl fk leg left(close)
-
-    # tsl ctl fk leg right(open)
-    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
-
-    cmds.text( "JUN_FKIK_Gen_title_ctl_leg_right", align="left", font = "boldLabelFont",  label='Leg right' );
-    cmds.text( "JUN_name_selNum_ctl_leg_right", align="left", label='Number:0' );
-
-    str_tls_ctl_FK_leg_right = "JUN_FKIK_Gen_ctl_FK_leg_right"
-    cmds.textScrollList(str_tls_ctl_FK_leg_right, 
-                        height = (win_height*mult_tsl_ctl_FK_hight),
-                        numberOfRows=15, 
-                        allowMultiSelection=True, 
-                        selectCommand='JUN_cmd_tsl_select(\"JUN_FKIK_Gen_ctl_FK_leg_right\")');
-                        
-    cmds.rowLayout( numberOfColumns=4 );
-
-    cmds.button( "NAM_toolSelTgt_b_add",  width= 40, label='Add', bgc =color_btn, command=f'CMD_ToolSel_b_add  ( "{str_tls_ctl_FK_leg_right}", \"JUN_name_selNum_ctl_leg_right\" )' );
-    cmds.button( "NAM_toolSelTgt_b_del",  width= 40, label='Del', bgc =color_btn, command=f'CMD_ToolSel_b_del  ( "{str_tls_ctl_FK_leg_right}", \"JUN_name_selNum_ctl_leg_right\" )' );
-    cmds.button( "NAM_toolSelTgt_b_up",   width= 40, label='Up',  bgc =color_btn, command=f'CMD_ToolSel_b_up   ( "{str_tls_ctl_FK_leg_right}", \"JUN_name_selNum_ctl_leg_right\" )' );
-    cmds.button( "NAM_toolSelTgt_b_down", width= 40, label='Down',bgc =color_btn, command=f'CMD_ToolSel_b_down ( "{str_tls_ctl_FK_leg_right}", \"JUN_name_selNum_ctl_leg_right\" )' );
-
-
-    cmds.setParent( '..' )
-
-    cmds.button( "name_btn_FK_IK_Gen_ctl_fk_leg_right",
-                 label='Select Objects',
-                 bgc =color_btn,
-                 command=f'JUN_cmd_FKIK_gen_toolSel_btn("{str_tls_ctl_FK_leg_right}", \"JUN_name_selNum_ctl_leg_right\")');
-    
-    cmds.setParent( '..' )
-    # tsl ctl fk leg right(close)
-    
-    cmds.setParent( '..' )
-    #===================================================================================
-    # frameLayout : Tool  Setup FK source(close)
-    #===================================================================================
-
-    mult_tsl_ctl_IK_hight = 0.09
-    mult_tsl_btn_width_01 = 25
-    #===================================================================================
-    # frameLayout : Tool  Setup IK source(open)
-    #==================================================================================
-    
-    ###
-    cmds.rowLayout( numberOfColumns=1 );
-
-    cmds.text( "JUN_text_ctl_FK", height = 20 , align="left", backgroundColor = [1, 1, 1], font = "boldLabelFont",  label='Set source : IK ' );
-    
-    cmds.setParent( '..' )
-
-    cmds.paneLayout( configuration= "vertical4" )
-
-    # tsl ctl fk arm left(open)
-    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
-
-    cmds.text( "JUN_FKIK_Gen_title_ctl_arm_left", align="left", font = "boldLabelFont",  label='Arm Left' );
-    cmds.text( "JUN_name_selNum_src_IK_arm_left", align="left", label='Number:0' );
-
-    str_tls_ctl_IK_arm_left = "JUN_FKIK_Gen_ctl_IK_arm_left"
-
-    cmds.textScrollList(str_tls_ctl_IK_arm_left, 
-                        height = (win_height*mult_tsl_ctl_FK_hight),
-                        numberOfRows=15, 
-                        allowMultiSelection=True, 
-                        selectCommand='JUN_cmd_tsl_select(\"JUN_FKIK_Gen_ctl_IK_arm_left\")');
-
-    cmds.rowLayout( numberOfColumns=4 );
-
-    cmds.button( "NAM_toolSelTgt_b_add",  width= 40, label='Add', bgc =color_btn, command=f'CMD_ToolSel_b_add  ( "{str_tls_ctl_IK_arm_left}", \"JUN_name_selNum_src_IK_arm_left\" )' );
-    cmds.button( "NAM_toolSelTgt_b_del",  width= 40, label='Del', bgc =color_btn, command=f'CMD_ToolSel_b_del  ( "{str_tls_ctl_IK_arm_left}", \"JUN_name_selNum_src_IK_arm_left\" )' );
-    cmds.button( "NAM_toolSelTgt_b_up",   width= 40, label='Up',  bgc =color_btn, command=f'CMD_ToolSel_b_up   ( "{str_tls_ctl_IK_arm_left}", \"JUN_name_selNum_src_IK_arm_left\" )' );
-    cmds.button( "NAM_toolSelTgt_b_down", width= 40, label='Down',bgc =color_btn, command=f'CMD_ToolSel_b_down ( "{str_tls_ctl_IK_arm_left}", \"JUN_name_selNum_src_IK_arm_left\" )' );
-
-    cmds.setParent( '..' )
-
-    cmds.button( "name_btn_FK_IK_Gen_ctl_fk_arm_left",
-                 label='Select Objects',
-                 bgc =color_btn,
-                 command=f'JUN_cmd_FKIK_gen_toolSel_btn("{str_tls_ctl_IK_arm_left}", \"JUN_name_selNum_src_IK_arm_left\")');
-
-    cmds.setParent( '..' )
-    # tsl ctl fk arm left(close)
-
-    # tsl ctl fk arm right(open)
-    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
-
-    cmds.text( "JUN_FKIK_Gen_title_ctl_arm_right", align="left", font = "boldLabelFont",  label='Arm Right' );
-    cmds.text( "JUN_name_selNum_src_arm_right", align="left", label='Number:0' );
-
-    str_tls_ctl_IK_arm_right = "JUN_FKIK_Gen_ctl_IK_arm_right"
-    cmds.textScrollList(str_tls_ctl_IK_arm_right, 
-                        height = (win_height*mult_tsl_ctl_FK_hight),
-                        numberOfRows=15, 
-                        allowMultiSelection=True, 
-                        selectCommand='JUN_cmd_tsl_select(\"JUN_FKIK_Gen_ctl_IK_arm_right\")');
-                        
-    cmds.rowLayout( numberOfColumns=4 );
-
-    cmds.button( "NAM_toolSelTgt_b_add",  width= 40, label='Add', bgc =color_btn, command=f'CMD_ToolSel_b_add  ( "{str_tls_ctl_IK_arm_right}", \"JUN_name_selNum_src_arm_right\" )' );
-    cmds.button( "NAM_toolSelTgt_b_del",  width= 40, label='Del', bgc =color_btn, command=f'CMD_ToolSel_b_del  ( "{str_tls_ctl_IK_arm_right}", \"JUN_name_selNum_src_arm_right\" )' );
-    cmds.button( "NAM_toolSelTgt_b_up",   width= 40, label='Up',  bgc =color_btn, command=f'CMD_ToolSel_b_up   ( "{str_tls_ctl_IK_arm_right}", \"JUN_name_selNum_src_arm_right\" )' );
-    cmds.button( "NAM_toolSelTgt_b_down", width= 40, label='Down',bgc =color_btn, command=f'CMD_ToolSel_b_down ( "{str_tls_ctl_IK_arm_right}", \"JUN_name_selNum_src_arm_right\" )' );
-
-
-    cmds.setParent( '..' )
-
-    cmds.button( "name_btn_FK_IK_Gen_ctl_fk_arm_right",
-                 label='Select Objects',
-                 bgc =color_btn,
-                 command=f'JUN_cmd_FKIK_gen_toolSel_btn("{str_tls_ctl_IK_arm_right}", \"JUN_name_selNum_src_arm_right\")');
-    
-    cmds.setParent( '..' )
-    # tsl ctl fk arm right(close)
-
-    # tsl ctl fk leg left(open)
-    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
-
-    cmds.text( "JUN_FKIK_Gen_title_ctl_leg_left", align="left", font = "boldLabelFont",  label='Leg Left' );
-    cmds.text( "JUN_name_selNum_src_leg_left", align="left", label='Number:0' );
-
-    str_tls_ctl_IK_leg_left = "JUN_FKIK_Gen_ctl_IK_leg_left"
-    cmds.textScrollList(str_tls_ctl_IK_leg_left, 
-                        height = (win_height*mult_tsl_ctl_FK_hight),
-                        numberOfRows=15, 
-                        allowMultiSelection=True, 
-                        selectCommand='JUN_cmd_tsl_select(\"JUN_FKIK_Gen_ctl_IK_leg_left\")');
-                        
-    cmds.rowLayout( numberOfColumns=4 );
-
-    cmds.button( "NAM_toolSelTgt_b_add",  width= 40, label='Add', bgc =color_btn, command=f'CMD_ToolSel_b_add  ( "{str_tls_ctl_IK_leg_left}", \"JUN_name_selNum_src_leg_left\" )' );
-    cmds.button( "NAM_toolSelTgt_b_del",  width= 40, label='Del', bgc =color_btn, command=f'CMD_ToolSel_b_del  ( "{str_tls_ctl_IK_leg_left}", \"JUN_name_selNum_src_leg_left\" )' );
-    cmds.button( "NAM_toolSelTgt_b_up",   width= 40, label='Up',  bgc =color_btn, command=f'CMD_ToolSel_b_up   ( "{str_tls_ctl_IK_leg_left}", \"JUN_name_selNum_src_leg_left\" )' );
-    cmds.button( "NAM_toolSelTgt_b_down", width= 40, label='Down',bgc =color_btn, command=f'CMD_ToolSel_b_down ( "{str_tls_ctl_IK_leg_left}", \"JUN_name_selNum_src_leg_left\" )' );
-
-
-    cmds.setParent( '..' )
-
-    cmds.button( "name_btn_FK_IK_Gen_ctl_fk_leg_left",
-                 label='Select Objects',
-                 bgc =color_btn,
-                 command=f'JUN_cmd_FKIK_gen_toolSel_btn("{str_tls_ctl_IK_leg_left}", \"JUN_name_selNum_src_leg_left\")');
-    
-    cmds.setParent( '..' )
-    # tsl ctl fk leg left(close)
-
-    # tsl ctl fk leg right(open)
-    cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =color_sub );
-
-    cmds.text( "JUN_FKIK_Gen_title_ctl_leg_right", align="left", font = "boldLabelFont",  label='Leg right' );
-    cmds.text( "JUN_name_selNum_src_leg_right", align="left", label='Number:0' );
-
-    str_tls_ctl_IK_leg_right = "JUN_FKIK_Gen_ctl_IK_leg_right"
-    cmds.textScrollList(str_tls_ctl_IK_leg_right, 
-                        height = (win_height*mult_tsl_ctl_FK_hight),
-                        numberOfRows=15, 
-                        allowMultiSelection=True, 
-                        selectCommand='JUN_cmd_tsl_select(\"JUN_FKIK_Gen_ctl_IK_leg_right\")');
-                        
-    cmds.rowLayout( numberOfColumns=4 );
-
-    cmds.button( "NAM_toolSelTgt_b_add",  width= 40, label='Add', bgc =color_btn, command=f'CMD_ToolSel_b_add  ( "{str_tls_ctl_IK_leg_right}", \"JUN_name_selNum_src_leg_right\" )' );
-    cmds.button( "NAM_toolSelTgt_b_del",  width= 40, label='Del', bgc =color_btn, command=f'CMD_ToolSel_b_del  ( "{str_tls_ctl_IK_leg_right}", \"JUN_name_selNum_src_leg_right\" )' );
-    cmds.button( "NAM_toolSelTgt_b_up",   width= 40, label='Up',  bgc =color_btn, command=f'CMD_ToolSel_b_up   ( "{str_tls_ctl_IK_leg_right}", \"JUN_name_selNum_src_leg_right\" )' );
-    cmds.button( "NAM_toolSelTgt_b_down", width= 40, label='Down',bgc =color_btn, command=f'CMD_ToolSel_b_down ( "{str_tls_ctl_IK_leg_right}", \"JUN_name_selNum_src_leg_right\" )' );
-
-
-    cmds.setParent( '..' )
-
-    cmds.button( "name_btn_FK_IK_Gen_ctl_fk_leg_right",
-                 label='Select Objects',
-                 bgc =color_btn,
-                 command=f'JUN_cmd_FKIK_gen_toolSel_btn("{str_tls_ctl_IK_leg_right}", \"JUN_name_selNum_src_leg_right\")');
-    
-    cmds.setParent( '..' )
-    # tsl ctl fk leg right(close)
-    
-    cmds.setParent( '..' )
-    #===================================================================================
-    # frameLayout : Tool  Setup IK source(close)
-    #===================================================================================
-
-    cmds.setParent( '..' )
-
-    cmds.setParent( '..' )
+   
     #===================================================================================
     # Tab : Source (close)
     #===================================================================================
-  
     #===================================================================================
     # Tab End : drivers
     #===================================================================================
@@ -2228,7 +1703,7 @@ def PY_JUN_makeUI_general_FKIKTool ():
     #===================================================================================
     #===================================================================================
 
-    cmds.tabLayout( tab_all, edit=True, tabLabel=((tab_source, 'Source'), (tab_matcher_FK, 'Match FK'), (tab_matcher_IK, 'Match IK')));
+    cmds.tabLayout( tab_all, edit=True, tabLabel=((tab_matcher_FK, 'Match FK'), (tab_matcher_IK, 'Match IK')));
     
     cmds.frameLayout( label=' Option', collapsable= True, bgc =color_main);
 
@@ -2240,18 +1715,6 @@ def PY_JUN_makeUI_general_FKIKTool ():
     str_name_FKIK_gen_leg_l_cbg = "JUN_name_FKIK_leg_l_cbg"
     str_name_FKIK_gen_leg_r_cbg = "JUN_name_FKIK_leg_r_cbg"
 
-   
-
-    lst_tsl_source_FK = [ str_tls_ctl_FK_arm_left,
-                          str_tls_ctl_FK_arm_right,
-                          str_tls_ctl_FK_leg_left,
-                          str_tls_ctl_FK_leg_right]
-                    
-    lst_tsl_source_IK = [ str_tls_ctl_IK_arm_left,
-                          str_tls_ctl_IK_arm_right,
-                          str_tls_ctl_IK_leg_left,
-                          str_tls_ctl_IK_leg_right]
-    
     lst_tsl_match_FK_all = [str_tls_match_FK_arm_left_pose_objs,
                             str_tls_match_FK_arm_left_ctl,
                             str_tls_match_FK_arm_right_pose_objs,
@@ -2302,35 +1765,18 @@ def PY_JUN_makeUI_general_FKIKTool ():
     # buttons for setup pose objects (open)
 
     cmds.rowColumnLayout( numberOfColumns=2)
-
-    
-    cmds.button( "name_btn_setup_triangle_pose_objects", 
-                 label='Set up triangle drivers', 
-                 bgc=color_btn, 
-                 h = win_height/15,
-                 command=lambda *argv : JUN_cmd_FKIK_gen_setup_triangle_pos_objs(lst_tsl_source_FK, cage_glo));
-    
-    cmds.button( "name_btn_create_pose_objects", 
-                 label='Drivers for FK IK switch', 
-                 bgc=color_btn, 
-                 h = win_height/15,
-                 command=lambda *argv : JUN_cmd_FKIK_gen_create_pos_objs_FKIK_Gen(lst_tsl_source_FK, 
-                                                                                  lst_tsl_source_IK,
-                                                                                  lst_tsl_match_FK_ctl, 
-                                                                                  lst_tsl_match_IK_ctl, 
-                                                                                  lst_tsl_match_FK_pose_objs,
-                                                                                  lst_tsl_match_IK_pose_objs, 
-                                                                                  cage_glo));
     
     cmds.button( "name_btn_constraint_pose_objects", 
                  label='Load setting', 
                  bgc=color_btn, 
+                 w = win_width/5,
                  h = win_height/15,
                  command=lambda *argv : JUN_cmd_FKIK_gen_load_setting());
 
     cmds.button( "name_btn_setup_all_pose_objects", 
                  label='Save setting', 
                  bgc=color_btn, 
+                 w = win_width/5,
                  h = win_height/15,
                  command=lambda *argv : JUN_cmd_FKIK_gen_save_setting(lst_tsl_match_FK_all, lst_tsl_match_IK_all));
     
@@ -2437,7 +1883,7 @@ def PY_JUN_makeUI_general_FKIKTool ():
                  h = win_height/20,
                  label='Match FK', 
                  bgc=color_btn, 
-                 command=f'JUN_cmd_bake_IK_FK_Gen({lst_tsl_match_IK_all}, {lst_tsl_match_FK_all}, {lst_cbx_match} ,0, \"name_FKIK_gen_ifg_timeStr\", \"name_FKIK_gen_ifg_timeEnd\", 0)');
+                 command=f'JUN_cmd_bake_IK_FK_Gen({lst_tsl_match_IK_all}, {lst_tsl_match_FK_all}, {lst_cbx_match}, 0, \"name_FKIK_gen_ifg_timeStr\", \"name_FKIK_gen_ifg_timeEnd\", 0)')
 
     cmds.setParent( '..' )
 
@@ -2471,11 +1917,11 @@ def PY_JUN_makeUI_general_FKIKTool ():
     cmds.showWindow(str_winName);
     cmds.window(str_winName, e = True, widthHeight = [win_width, win_height]);
     
-def JUN_PY_FKIK_General_Tool_V01_02():
+def JUN_PY_FKIK_General_Tool_Pub_V01_02():
     PY_JUN_makeUI_general_FKIKTool();
 
 PY_JUN_makeUI_general_FKIKTool();
 
 def onMayaDroppedPythonFile(*args):
     print("drag drop success")
-    JUN_PY_FKIK_General_Tool_V01_02()
+    JUN_PY_FKIK_General_Tool_Pub_V01_02()

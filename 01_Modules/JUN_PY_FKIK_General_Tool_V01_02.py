@@ -1,9 +1,10 @@
-# last Update date 25 12 09
+# last Update date 25 12 12
 # Python Script by Ji Hun Park
 
-# FKIK General Tool V01.01
+# FKIK General Tool V01.02
 
 import maya.cmds as cmds
+import maya.mel as mel
 import json
 import sys
 import traceback
@@ -528,6 +529,22 @@ class JUN_checker():
 #===================================================================================
 
 
+class OGSFreeze:
+    def __enter__(self):
+        self.was_paused = bool(mel.eval('ogs -query -pause;'))
+        if not self.was_paused:
+            mel.eval('ogs -pause;')
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        mel.eval('ogs -pause;')
+
+class DummyContext:
+    def __enter__(self):
+        pass
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
 def JUN_cmd_bake_IK_FK(targetsPos_tsl, 
                         followersCtl_tsl,
                         arm_l_cbg,
@@ -561,7 +578,8 @@ def JUN_cmd_bake_IK_FK_Gen(lst_tsl_match_IK_all,
                            lst_tsl_match_FK, 
                            lst_cbx_match, bake_ik, 
                            ifg_timeStr, 
-                           ifg_timeEnd):
+                           ifg_timeEnd,
+                           is_bake = 0):
     mcr_FK_arm_left = JUN_matcher_FKIK_Gen()
     mcr_FK_arm_right = JUN_matcher_FKIK_Gen()
     mcr_FK_leg_left = JUN_matcher_FKIK_Gen()
@@ -577,7 +595,6 @@ def JUN_cmd_bake_IK_FK_Gen(lst_tsl_match_IK_all,
     mcr_FK_arm_right.set_tgt_flw_from_tsl(lst_tsl_match_FK[2], lst_tsl_match_FK[3])
     mcr_FK_leg_left.set_tgt_flw_from_tsl(lst_tsl_match_FK[4], lst_tsl_match_FK[5])
     mcr_FK_leg_right.set_tgt_flw_from_tsl(lst_tsl_match_FK[6], lst_tsl_match_FK[7])
-    print(lst_tsl_match_FK)
 
     mcr_IK_arm_left.set_tgt_flw_from_tsl(lst_tsl_match_IK_all[0], lst_tsl_match_IK_all[1])
     mcr_IK_arm_right.set_tgt_flw_from_tsl(lst_tsl_match_IK_all[2], lst_tsl_match_IK_all[3])
@@ -592,8 +609,12 @@ def JUN_cmd_bake_IK_FK_Gen(lst_tsl_match_IK_all,
     idx_leg_left = 2
     idx_leg_right = 3
 
-    timeStr = cmds.intFieldGrp(ifg_timeStr, q=True, value1=True);
-    timeEnd = cmds.intFieldGrp(ifg_timeEnd, q=True, value1=True);
+    timeStr = int(cmds.currentTime( query=True ))
+    timeEnd = timeStr+1
+
+    if is_bake:
+        timeStr = cmds.intFieldGrp(ifg_timeStr, q=True, value1=True);
+        timeEnd = cmds.intFieldGrp(ifg_timeEnd, q=True, value1=True);
 
 
     if bake_ik:
@@ -629,12 +650,14 @@ def JUN_cmd_bake_IK_FK_Gen(lst_tsl_match_IK_all,
         if checker_body_part.is_checked(idx_leg_right):
             mcr_assemble.append_to_tgt(mcr_FK_leg_right.tgt_all)
             mcr_assemble.append_to_flw(mcr_FK_leg_right.flw_all)
-                
-    for frame_tgt in range(timeStr, timeEnd):
-        cmds.currentTime( frame_tgt, edit=True)
-        JUN_MATCH_twoObjects(mcr_assemble.tgt_all, mcr_assemble.flw_all, 1,1,1,1)
-        frame_now = cmds.currentTime( query=True )
-        cmds.setKeyframe( mcr_assemble.flw_all, t=frame_now)
+
+    with OGSFreeze() if is_bake else DummyContext():
+        for frame_tgt in range(timeStr, timeEnd):
+            cmds.currentTime( frame_tgt, edit=True)
+            for i in range(0,2):
+                JUN_MATCH_twoObjects(mcr_assemble.tgt_all, mcr_assemble.flw_all, 1,1,1,1)
+            frame_now = cmds.currentTime( query=True )
+            cmds.setKeyframe( mcr_assemble.flw_all, t=frame_now)
 
 
 def JUN_cmd_bake_IK_to_FK(targetsPos_tsl, followersCtl_tsl) :
@@ -1263,7 +1286,7 @@ def PY_JUN_makeUI_general_FKIKTool ():
     
     # window
 
-    cmds.window( str_winName, bgc=color_mainDark, title="FKIK General Tool V01.01" );
+    cmds.window( str_winName, bgc=color_mainDark, title="FKIK General Tool V01.02" );
         
     #------------------------------------------------------------------
     # UI: MenuBar
@@ -1271,7 +1294,7 @@ def PY_JUN_makeUI_general_FKIKTool ():
 
     cmds.menuBarLayout (bgc=color_mainDark); 
     
-    menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 09-DEC-2025\')".format(color_main)
+    menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 12-DEC-2025\')".format(color_main)
 
     cmds.menu( label='Help' );
     cmds.menuItem( label='About', command = menu_cmd);
@@ -2408,13 +2431,13 @@ def PY_JUN_makeUI_general_FKIKTool ():
                  h = win_height/20,
                  label='Match IK', 
                  bgc=color_btn, 
-                 command='JUN_cmd_match_IK_and_FK(\"JUN_FKIK_gen_targetsPos_tsl\", \"JUN_FKIK_gen_followersCtl_tsl\",\"JUN_name_FKIK_arm_l_cbg\",\"JUN_name_FKIK_arm_r_cbg\", \"JUN_name_FKIK_leg_l_cbg\",\"JUN_name_FKIK_leg_r_cbg\", 1)');
+                 command=f'JUN_cmd_bake_IK_FK_Gen({lst_tsl_match_IK_all}, {lst_tsl_match_FK_all}, {lst_cbx_match}, 1, \"name_FKIK_gen_ifg_timeStr\", \"name_FKIK_gen_ifg_timeEnd\", 0)')
 
     cmds.button( "name_btn_match_FK_to_IK", 
                  h = win_height/20,
                  label='Match FK', 
                  bgc=color_btn, 
-                 command='JUN_cmd_match_IK_and_FK(\"JUN_FKIK_gen_targetsPos_tsl\", \"JUN_FKIK_gen_followersCtl_tsl\",\"JUN_name_FKIK_arm_l_cbg\",\"JUN_name_FKIK_arm_r_cbg\", \"JUN_name_FKIK_leg_l_cbg\",\"JUN_name_FKIK_leg_r_cbg\", 0)');
+                 command=f'JUN_cmd_bake_IK_FK_Gen({lst_tsl_match_IK_all}, {lst_tsl_match_FK_all}, {lst_cbx_match} ,0, \"name_FKIK_gen_ifg_timeStr\", \"name_FKIK_gen_ifg_timeEnd\", 0)');
 
     cmds.setParent( '..' )
 
@@ -2426,13 +2449,13 @@ def PY_JUN_makeUI_general_FKIKTool ():
                  h = win_height/20,
                  label='Bake IK', 
                  bgc=color_btn, 
-                 command=f'JUN_cmd_bake_IK_FK_Gen({lst_tsl_match_IK_all}, {lst_tsl_match_FK_all}, {lst_cbx_match}, 1, \"name_FKIK_gen_ifg_timeStr\", \"name_FKIK_gen_ifg_timeEnd\")');
+                 command=f'JUN_cmd_bake_IK_FK_Gen({lst_tsl_match_IK_all}, {lst_tsl_match_FK_all}, {lst_cbx_match}, 1, \"name_FKIK_gen_ifg_timeStr\", \"name_FKIK_gen_ifg_timeEnd\", 1)');
 
     cmds.button( "name_btn_bake_FK", 
                  h = win_height/20,
                  label='Bake FK', 
                  bgc=color_btn, 
-                 command=f'JUN_cmd_bake_IK_FK_Gen({lst_tsl_match_IK_all}, {lst_tsl_match_FK_all}, {lst_cbx_match} ,0, \"name_FKIK_gen_ifg_timeStr\", \"name_FKIK_gen_ifg_timeEnd\")');
+                 command=f'JUN_cmd_bake_IK_FK_Gen({lst_tsl_match_IK_all}, {lst_tsl_match_FK_all}, {lst_cbx_match} ,0, \"name_FKIK_gen_ifg_timeStr\", \"name_FKIK_gen_ifg_timeEnd\", 1)');
 
     cmds.setParent( '..' )
 
@@ -2448,11 +2471,11 @@ def PY_JUN_makeUI_general_FKIKTool ():
     cmds.showWindow(str_winName);
     cmds.window(str_winName, e = True, widthHeight = [win_width, win_height]);
     
-def JUN_PY_FKIK_General_Tool_V01_01():
+def JUN_PY_FKIK_General_Tool_V01_02():
     PY_JUN_makeUI_general_FKIKTool();
 
 PY_JUN_makeUI_general_FKIKTool();
 
 def onMayaDroppedPythonFile(*args):
     print("drag drop success")
-    JUN_PY_FKIK_General_Tool_V01_01()
+    JUN_PY_FKIK_General_Tool_V01_02()
