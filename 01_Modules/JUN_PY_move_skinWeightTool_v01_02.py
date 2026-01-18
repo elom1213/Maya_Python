@@ -1,4 +1,4 @@
-# last Update date 26 01 18
+# last Update date 26 01 19
 # Python Script by Ji Hun Park
 
 # Kangaroo sub tool : move joints weight v01.02
@@ -290,6 +290,7 @@ class JUN_ToolUI_moveSkinWeightTool:
                                 }
         weights.moveSkinClusterWeights(xJoints=joints_from_to_list, bDisableIslandCheck=True, sChooseSkinCluster=None, iSmoothBorderMask=1)
 
+
     def build(self):
 
         if cmds.window( self.str_winName , exists=True ): 
@@ -365,8 +366,8 @@ class JUN_ToolUI_moveSkinWeightTool:
                      command=partial(flag_command, *cb_args, **cb_kwargs));
 
            
-def JUN_PY_move_skinWeightTool_v01_01():
+def JUN_PY_move_skinWeightTool_v01_02():
     JUN_Win_QuickTool = JUN_ToolUI_moveSkinWeightTool()
     JUN_Win_QuickTool.build()
 
-JUN_PY_move_skinWeightTool_v01_01()
+JUN_PY_move_skinWeightTool_v01_02()
