@@ -1,3 +1,59 @@
+import unreal
+
+# 선택된 AnimSequence들
+anims = [
+    a for a in unreal.EditorUtilityLibrary.get_selected_assets()
+    if isinstance(a, unreal.AnimSequence)
+]
+
+if not anims:
+    raise RuntimeError("AnimSequence를 선택하세요")
+
+# Control Rig
+control_rig = unreal.load_object(
+    None,
+    "/Game/Characters/Mannequins/Rigs/CR_Manny_footIKFollow_JUN.CR_Manny_footIKFollow_JUN"
+)
+
+# Level Sequence 생성
+seq = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+    "Temp_Bake_Sequence",
+    "/Game/_Temp",
+    unreal.LevelSequence,
+    unreal.LevelSequenceFactoryNew()
+)
+
+# Sequencer 열기
+unreal.LevelSequenceEditorBlueprintLibrary.open_level_sequence(seq)
+
+for anim in anims:
+    print("Baking:", anim.get_name())
+
+    # Skeletal Mesh Actor 추가
+    actor = unreal.EditorLevelLibrary.spawn_actor_from_class(
+        unreal.SkeletalMeshActor,
+        unreal.Vector(0, 0, 0)
+    )
+
+    sk_comp = actor.skeletal_mesh_component
+    sk_comp.set_animation_mode(
+        unreal.AnimationMode.ANIMATION_SINGLE_NODE
+    )
+    sk_comp.set_animation(anim)
+
+    binding = seq.add_possessable(actor)
+
+    # Control Rig 트랙 추가
+    track = binding.add_track(unreal.MovieSceneControlRigParameterTrack)
+    # track.set_control_rig(control_rig)
+
+    # 🔥 핵심: Bake
+    unreal.SequencerTools.bake_to_anim_sequence(
+        level_sequence=seq,
+        bindings=[binding],
+        bake_settings=unreal.SequencerBakeSettings()
+    )
+
 import maya.cmds as cmds
 
 class FKIKSourceUI:
@@ -83,3 +139,76 @@ class FKIKToolMainUI:
         cmds.showWindow(self.win)
         
 ui = FKIKToolMainUI(dev_mode=False)
+
+
+import unreal
+
+rig_asset = unreal.load_object(
+    None,
+    "/Game/Characters/Mannequins/Rigs/CR_Manny_footIKFollow_JUN"
+)
+
+selected_assets = unreal.EditorUtilityLibrary.get_selected_assets()
+
+for asset in selected_assets:
+    if not isinstance(asset, unreal.AnimSequence):
+        continue
+
+    print(f"Baking: {asset.get_name()}")
+
+    unreal.ControlRigSequencerLibrary.bake_anim_sequence_to_control_rig(
+        anim_sequence=asset,
+        control_rig=rig_asset,
+        bake_settings=unreal.ControlRigBakeSettings()
+    )
+
+    ##=============================================================
+
+
+src_ = "Jog_CH_n_MainRoot_xx_ctl"
+dst_ = "CH:Cage:CH_n_MainRoot_xx_ctl"
+time_range_ = (0, 4)
+
+def fast_copy_paste(src, dst, time_range):
+    # --- 상태 저장 ---
+    ogs_paused = bool(mel.eval('ogs -query -pause;'))
+    auto_key = cmds.autoKeyframe(q=True, state=True)
+    refresh = cmds.refresh(suspend=True)
+
+    try:
+        # --- 완전 정지 ---
+        if not ogs_paused:
+            mel.eval('ogs -pause;')
+
+        cmds.autoKeyframe(state=False)
+        cmds.refresh(suspend=True)
+
+        # --- 핵심 작업 ---
+        cmds.copyKey(src, time=time_range)
+        cmds.pasteKey(dst, option="insert")
+
+    finally:
+        # --- 복원 ---
+        cmds.refresh(suspend=False)
+        cmds.autoKeyframe(state=auto_key)
+
+        if not ogs_paused:
+            mel.eval('ogs -resume;')
+            
+fast_copy_paste(src_, dst_, time_range_)
+
+
+#==========================================================================
+
+
+class JUN_ToolUI_QuickTool:
+    def __init__(self):
+
+        mod_tsl_from = JUN_module_tsl_v01()
+        mod_tsl_to__ = JUN_module_tsl_v01()
+
+
+    def build(self, btn_specs):
+        
+        self.mod_tsl_from.build()
+        
