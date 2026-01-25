@@ -1,7 +1,8 @@
-# last Update date 26 01 24
+# last Update date 26 01 26
 # Python Script by Ji Hun Park
 
-# Quickk Tool V01.03
+# Quickk Tool V01.04
+# V01.04 : Create Create tool
 
 import maya.cmds as cmds;
 import maya.mel as mel
@@ -22,15 +23,43 @@ def JUN_cmd_print_selected(*args, **kwargs):
 def JUN_cmd_importFBX_nrm(*args, **kwargs):
     mel.eval('FBXProperty "Import|IncludeGrp|Geometry|OverrideNormalsLock" -v 1')
 
+def JUN_cmd_create_tex_file(*args, **kwargs):
+    file__ =  mel.eval("shadingNode -asTexture -isColorManaged file")
+    place2Tex__ =  mel.eval("shadingNode -asUtility place2dTexture;")
+
+    lst_attr = ["coverage",
+                "translateFrame",
+                "rotateFrame",
+                "mirrorU",
+                "mirrorV",
+                "stagger",
+                "wrapU",
+                "wrapV",
+                "repeatUV",
+                "offset",
+                "rotateUV",
+                "noiseUV",
+                "vertexUvOne",
+                "vertexUvTwo",
+                "vertexUvThree",
+                "vertexCameraOne"]
+
+    for i in range(len(lst_attr)):
+        cmds.connectAttr( place2Tex__ + "." + lst_attr[i], file__ + "." + lst_attr[i])
+
+    cmds.connectAttr( place2Tex__ + ".outUV", file__ + ".uv")
+    cmds.connectAttr( place2Tex__ + ".outUvFilterSize", file__ + ".uvFilterSize")
+
+
 # call back functions (End)
 #====================================================================
 
 
 class JUN_ToolUI_QuickTool:
     def __init__(self):
-        self.str_winTitle = "Quick Tool V01.03";
-        self.str_headTitle = "Quick Tool V01.03"
-        self.str_winName = "Junny_win_Quick_tool_V01_03";
+        self.str_winTitle = "Quick Tool V01.04"
+        self.str_headTitle = self.str_winTitle
+        self.str_winName = "Junny_win_Quick_tool_V01_04"
         self.win_width = 300;
         self.win_height = 400;
         self.btn_hight = self.win_height/40
@@ -44,8 +73,9 @@ class JUN_ToolUI_QuickTool:
         self.idx_updateWin = 0
         self.idx_printTool = 1
         self.idx_importFBX_nrm = 2
+        self.idx_create_tex_file = 3
 
-        self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 24-JAN-2026\')".format(self.color_main)
+        self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 26-JAN-2026\')".format(self.color_main)
 
     def fun_dummy(self, *args , **kwargs):
         print("fun_dummy called")
@@ -116,6 +146,20 @@ class JUN_ToolUI_QuickTool:
         cmds.setParent( '..' )
         # Import tool (close)
 
+        # Create tool (open)
+        cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =self.color_sub );
+
+        cmds.text( align="left", label='Create tool' );
+
+        cmds.setParent( '..' )
+
+        cmds.paneLayout( configuration= "vertical2", paneSize = ([1,50,100],[2,50,100]))
+
+        self.create_buttons(btn_specs[self.idx_create_tex_file])
+
+        cmds.setParent( '..' )
+        # Create tool (close)
+
         cmds.text( align="center", label='Copyright (c) Park Ji Hun. All rights reserved.' );
 
         cmds.showWindow(self.str_winName);
@@ -138,7 +182,7 @@ class JUN_ToolUI_QuickTool:
                      command=partial(flag_command, *cb_args, **cb_kwargs));
 
            
-def JUN_PY_Quick_tool_v01_03():
+def JUN_PY_Quick_tool_v01_04():
     JUN_Win_QuickTool = JUN_ToolUI_QuickTool()
     btn_specs =  [
                     # idx_updateWin : 0
@@ -167,10 +211,18 @@ def JUN_PY_Quick_tool_v01_03():
                             "label": "Import FBX normal",
                             "callback": JUN_cmd_importFBX_nrm
                         }
+                    ],
+                    # idx_create_tex_file : 3
+                    [
+                        {
+                            "label": "Create texture file",
+                            "callback": JUN_cmd_create_tex_file
+                        }
+
                     ]
                 ]
     
     JUN_Win_QuickTool.build(btn_specs)
 
 
-# JUN_PY_Quick_tool_v01_03()
+JUN_PY_Quick_tool_v01_04()

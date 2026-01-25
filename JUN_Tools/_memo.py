@@ -16,4 +16,17 @@ import JUN_Tools.JUN_ui
 
 it well run __init__.py in JUN_Tools, JUN_ui
 
+
+의도한 경로가 sys.path 에 있는지 확인방법
+
+import sys
+    
+ROOT = r"G:\D_link_dir/02_Maya_python_Jun"
+print(ROOT in sys.path)
+
+sys.path 경로 다 출력
+
+for p in sys.path:
+    print(p)
+
 '''
