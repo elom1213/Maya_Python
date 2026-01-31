@@ -217,10 +217,11 @@ class JUN_mod_tsl_v01:
                      command=partial(self.JUN_cmd_toolSel_btn, self.name_tsl, self.name_toolSelTgt_selNum));
         
 
-        cmds.rowLayout( numberOfColumns=2 , columnWidth2= [self.win_width/2-3, self.win_width/2-3])
+        # cmds.rowLayout( numberOfColumns=2 , columnWidth2= [self.win_width/2-3, self.win_width/2-3])
+        cmds.rowLayout( numberOfColumns=2 )
 
-        cmds.text( align="left", font = "boldLabelFont",  label=self.tsl_title );
-        cmds.text( self.name_toolSelTgt_selNum, align="right", label='Number:0' );
+        cmds.text( align="left", font = "boldLabelFont",  label=self.tsl_title, width = self.win_width * 0.3 );
+        cmds.text( self.name_toolSelTgt_selNum, align="right", label='Number:0' , width = self.win_width * 0.3);
 
         cmds.setParent( '..' )
 

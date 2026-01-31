@@ -48,6 +48,11 @@ class JUN_module_radioCollection_v01_01:
         label_selected = cmds.radioButton(user_selected, q=True, label=True)
         return self.lst_lable.index(label_selected)
     
+    def get_checked_label(self, *args , **kwargs):
+        user_selected = cmds.radioCollection(self.radCol__, q=True, select=True)
+        label_selected = cmds.radioButton(user_selected, q=True, label=True)
+        return label_selected
+    
     def build(self):
         lst_btn = []
         form__ = cmds.formLayout()

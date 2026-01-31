@@ -30,3 +30,12 @@ for p in sys.path:
     print(p)
 
 '''
+
+'''
+
+running code in shelf
+
+import JUN_All.tools.A0020_move_skineWeightTool as tool_moveSkinWeightTool
+tool_moveSkinWeightTool.run(True)
+
+'''

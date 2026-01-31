@@ -96,6 +96,12 @@ class JUN_module_tsl_v01:
         str_scrollList = cmds.textScrollList( str_selTool_tsl_selList, q=True, selectItem=True );
         
         cmds.select ( str_scrollList );
+    
+    def JUN_cmd_tsl_select_gen ( self, str_selTool_tsl_selList):
+
+        str_scrollList = cmds.textScrollList( str_selTool_tsl_selList, q=True, selectItem=True );
+        
+        cmds.select ( str_scrollList );
 
 
     #===================================================================================

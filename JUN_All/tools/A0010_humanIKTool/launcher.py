@@ -1,7 +1,9 @@
+# HumanIKTol
+
 import importlib
 import sys
 
-from . import MOD_move_skinWeightTool_v01 as tool
+from . import MOD_humanIKTool_v01 as tool
 from . import config
 
 
@@ -12,7 +14,7 @@ def run(reload_module=False):
     """
 
     if reload_module:
-        print("[DEV MODE] : reload skinWeightTool")
+        print("[DEV MODE] : reload MOD_humanIKTool_v01")
         skinWeightTool_reload(tool)
 
     tool.build__()
