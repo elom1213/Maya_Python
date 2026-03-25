@@ -1,9 +1,10 @@
-# last Update date 26 02 03
+# last Update date 26 03 25
 # Python Script by Ji Hun Park
 
 # Quickk Tool V01.04
 # V01.04 : Create Create tool
 # V01.05 : Create Anim Tool
+# V01.06 : Create UV Tool
 
 import maya.cmds as cmds;
 import maya.mel as mel
@@ -56,15 +57,38 @@ def JUN_cmd_anim_rot_x_z_to_zero(*args, **kwargs):
     cmds.setKeyframe( objs[0], at="rx", v = 0)
     cmds.setKeyframe( objs[0], at="rz", v = 0)
 
+def JUN_cmd_rename_uvSet(*args, **kwargs):
+    objs = cmds.ls(sl = True, fl= True)
+    lst_origin_uvSets = []
+    lst_new_uvSets = []
+    for i in range(len(objs)):
+        cmds.select(objs[i])
+        lst_uvSets_origin = cmds.polyUVSet(q=True, allUVSets=True)
+
+        lst_origin_uvSets.append(objs[i] + " : " + " ".join(lst_uvSets_origin))
+        try :
+            cmds.polyUVSet(rename=True,newUVSet="map1", uvSet=lst_uvSets_origin[0])
+        except:
+            pass
+        lst_uvSets_new = cmds.polyUVSet(q=True, allUVSets=True)
+        lst_new_uvSets.append(objs[i] + " : " + " ".join(lst_uvSets_new))
+
+    str_origin_uvSets = "\n".join(lst_origin_uvSets)
+    str_new_uvSets = "\n".join(lst_new_uvSets)
+    print(str_origin_uvSets)
+    print("COMPLETE")
+    print(str_new_uvSets)
+
+
 # call back functions (End)
 #====================================================================
 
 
 class JUN_ToolUI_QuickTool:
     def __init__(self):
-        # self.str_winTitle = "Quick Tool V01.05"
-        self.str_headTitle = "Quick Tool V01.05"
-        self.str_winName = "Junny_win_Quick_tool_V01_05"
+        # self.str_winTitle = "Quick Tool V01.06"
+        self.str_headTitle = "Quick Tool V01.06"
+        self.str_winName = "Junny_win_Quick_tool_V01_06"
         self.win_width = 300;
         self.win_height = 400;
         self.btn_hight = self.win_height/40
@@ -80,8 +104,9 @@ class JUN_ToolUI_QuickTool:
         self.idx_importFBX_nrm = 2
         self.idx_create_tex_file = 3
         self.idx_anim_rot_x_z_to_zro = 4
+        self.idx_rename_uvSet = 5
 
-        self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 03-FEB-2026\')".format(self.color_main)
+        self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 25-MAR-2026\')".format(self.color_main)
 
     def fun_dummy(self, *args , **kwargs):
         print("fun_dummy called")
@@ -180,6 +205,20 @@ class JUN_ToolUI_QuickTool:
         cmds.setParent( '..' )
         # Anim Tool (close)
 
+        # UV Tool (open)
+        cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =self.color_sub );
+
+        cmds.text( align="left", label='UV Tool' );
+
+        cmds.setParent( '..' )
+
+        cmds.paneLayout( configuration= "vertical2", paneSize = ([1,50,100],[2,50,100]))
+
+        self.create_buttons(btn_specs[self.idx_rename_uvSet])
+
+        cmds.setParent( '..' )
+        # UV Tool (close)
+
         cmds.text( align="center", label='Copyright (c) Park Ji Hun. All rights reserved.' );
 
         cmds.showWindow(self.str_winName);
@@ -202,7 +241,7 @@ class JUN_ToolUI_QuickTool:
                      command=partial(flag_command, *cb_args, **cb_kwargs));
 
            
-def JUN_PY_Quick_tool_v01_05():
+def JUN_PY_Quick_tool_v01_06():
     JUN_Win_QuickTool = JUN_ToolUI_QuickTool()
     btn_specs =  [
                     # idx_updateWin : 0
@@ -247,10 +286,18 @@ def JUN_PY_Quick_tool_v01_05():
                             "callback": JUN_cmd_anim_rot_x_z_to_zero
                         }
 
+                    ],
+                    # idx_rename_uvSet : 5
+                    [
+                        {
+                            "label": "rename uvSet name",
+                            "callback": JUN_cmd_rename_uvSet
+                        }
+
                     ]
                 ]
     
     JUN_Win_QuickTool.build(btn_specs)
 
 def build__():
-    JUN_PY_Quick_tool_v01_05()
+    JUN_PY_Quick_tool_v01_06()
