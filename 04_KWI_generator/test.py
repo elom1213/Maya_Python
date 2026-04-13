@@ -20,6 +20,7 @@ target_path_write = os.path.join(current_dir, path_write, fileName_out_KWI_nodes
 file_list = glob.glob(target_path_read_root)
 
 KWI_use_kawaii_generator = True
+
 KWI_create_multiple_nodes = False
 KWI_create_single_node = True
 
@@ -139,7 +140,7 @@ for idx_fileToOpen in range(0, len(file_list)):
 
 if not KWI_use_kawaii_generator:
     exit()
-    
+
 if KWI_create_multiple_nodes and KWI_create_single_node:
     print("check single mode")
     exit()
