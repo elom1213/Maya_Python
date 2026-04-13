@@ -8,6 +8,7 @@ MODULES = {
         "JUN_All.ui.MOD_radioCollection_01_01",
         "JUN_All.ui.MOD_tsl_01_01",
         "JUN_All.ui.MOD_tsl_gen_01",
+        "JUN_All.ui.MOD_tfg_01"
     ],
     "tools": [
         "JUN_All.tools.A0010_humanIKTool.__init__",

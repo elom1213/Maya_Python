@@ -1,14 +1,18 @@
-# last Update date 26 03 25
+# last Update date 26 04 14
 # Python Script by Ji Hun Park
 
 # Quickk Tool V01.04
 # V01.04 : Create Create tool
 # V01.05 : Create Anim Tool
 # V01.06 : Create UV Tool
+# V01.07 : Update Anim Tool
 
 import maya.cmds as cmds;
 import maya.mel as mel
 from functools import partial
+
+from JUN_All import config
+from JUN_All.ui import JUN_mod_tfg
 
 #====================================================================
 # call back functions (Start)
@@ -54,8 +58,13 @@ def JUN_cmd_create_tex_file(*args, **kwargs):
 
 def JUN_cmd_anim_rot_x_z_to_zero(*args, **kwargs):
     objs = cmds.ls(sl = True, fl= True)
-    cmds.setKeyframe( objs[0], at="rx", v = 0)
-    cmds.setKeyframe( objs[0], at="rz", v = 0)
+
+    val_rot_x = int(args[0].get_val())
+    val_rot_z = int(args[1].get_val())
+
+    print(val_rot_x, val_rot_z)
+    cmds.setKeyframe( objs[0], at="rx", v = val_rot_x)
+    cmds.setKeyframe( objs[0], at="rz", v = val_rot_z)
 
 def JUN_cmd_rename_uvSet(*args, **kwargs):
     objs = cmds.ls(sl = True, fl= True)
@@ -87,8 +96,8 @@ def JUN_cmd_rename_uvSet(*args, **kwargs):
 class JUN_ToolUI_QuickTool:
     def __init__(self):
         # self.str_winTitle = "Quick Tool V01.06"
-        self.str_headTitle = "Quick Tool V01.06"
-        self.str_winName = "Junny_win_Quick_tool_V01_06"
+        self.str_headTitle = "Quick Tool V01.07"
+        self.str_winName = "Junny_win_Quick_tool_V01_07"
         self.win_width = 300;
         self.win_height = 400;
         self.btn_hight = self.win_height/40
@@ -106,7 +115,30 @@ class JUN_ToolUI_QuickTool:
         self.idx_anim_rot_x_z_to_zro = 4
         self.idx_rename_uvSet = 5
 
-        self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 25-MAR-2026\')".format(self.color_main)
+        self.tfg_rot_x = JUN_mod_tfg.JUN_mod_tfg_v01()  
+        self.tfg_rot_z = JUN_mod_tfg.JUN_mod_tfg_v01()  
+
+        self.tfg_rot_x_name = "rot_X"
+        self.tfg_rot_x_colWidth = [100, 100]
+        self.tfg_rot_x_lalbel = "rotate X : "
+        self.tfg_spec_x = {  "tfg_name" : self.tfg_rot_x_name, 
+                      "tfg_columWidth" : self.tfg_rot_x_colWidth, 
+                      "tfg_label" : self.tfg_rot_x_lalbel,
+                      "tfg_text" : "0" }
+        
+        
+        self.tfg_rot_z_name = "rot_Z"
+        self.tfg_rot_z_colWidth = [100, 100]
+        self.tfg_rot_z_lalbel = "rotate Z : "
+        self.tfg_spec_z = {  "tfg_name" : self.tfg_rot_z_name, 
+                      "tfg_columWidth" : self.tfg_rot_z_colWidth, 
+                      "tfg_label" : self.tfg_rot_z_lalbel,
+                       "tfg_text" : "0" }
+        
+        self.tfg_rot_x.set__(self.tfg_spec_x)
+        self.tfg_rot_z.set__(self.tfg_spec_z)
+
+        self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 14-APR-2026\')".format(self.color_main)
 
     def fun_dummy(self, *args , **kwargs):
         print("fun_dummy called")
@@ -192,11 +224,17 @@ class JUN_ToolUI_QuickTool:
         # Create tool (close)
 
         # Anim Tool (open)
+
         cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =self.color_sub );
 
         cmds.text( align="left", label='Anim Tool' );
 
         cmds.setParent( '..' )
+
+        self.tfg_rot_x.build()
+        self.tfg_rot_z.build()
+
+        btn_specs[self.idx_anim_rot_x_z_to_zro][0]["args"] = [self.tfg_rot_x, self.tfg_rot_z]
 
         cmds.paneLayout( configuration= "vertical2", paneSize = ([1,50,100],[2,50,100]))
 
@@ -243,6 +281,7 @@ class JUN_ToolUI_QuickTool:
            
 def JUN_PY_Quick_tool_v01_06():
     JUN_Win_QuickTool = JUN_ToolUI_QuickTool()
+
     btn_specs =  [
                     # idx_updateWin : 0
                     [
