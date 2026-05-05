@@ -1,4 +1,4 @@
-# last Update date 26 04 14
+# last Update date 26 04 18
 # Python Script by Ji Hun Park
 
 # Quickk Tool V01.04
@@ -6,6 +6,7 @@
 # V01.05 : Create Anim Tool
 # V01.06 : Create UV Tool
 # V01.07 : Update Anim Tool
+# V01.08 : Update Anim Tool. Add ty
 
 import maya.cmds as cmds;
 import maya.mel as mel
@@ -59,12 +60,16 @@ def JUN_cmd_create_tex_file(*args, **kwargs):
 def JUN_cmd_anim_rot_x_z_to_zero(*args, **kwargs):
     objs = cmds.ls(sl = True, fl= True)
 
-    val_rot_x = int(args[0].get_val())
-    val_rot_z = int(args[1].get_val())
+    val_rot_x = float(args[0].get_val())
+    val_rot_z = float(args[1].get_val())
 
-    print(val_rot_x, val_rot_z)
+    val_rot_y = float(args[2].get_val())
+
+    print(val_rot_x, val_rot_z, val_rot_y)
     cmds.setKeyframe( objs[0], at="rx", v = val_rot_x)
     cmds.setKeyframe( objs[0], at="rz", v = val_rot_z)
+
+    cmds.setKeyframe( objs[0], at="ty", v = val_rot_y)
 
 def JUN_cmd_rename_uvSet(*args, **kwargs):
     objs = cmds.ls(sl = True, fl= True)
@@ -96,10 +101,10 @@ def JUN_cmd_rename_uvSet(*args, **kwargs):
 class JUN_ToolUI_QuickTool:
     def __init__(self):
         # self.str_winTitle = "Quick Tool V01.06"
-        self.str_headTitle = "Quick Tool V01.07"
-        self.str_winName = "Junny_win_Quick_tool_V01_07"
+        self.str_headTitle = "Quick Tool V01.08"
+        self.str_winName = "Junny_win_Quick_tool_V01_08"
         self.win_width = 300;
-        self.win_height = 400;
+        self.win_height = 500;
         self.btn_hight = self.win_height/40
 
         self.color_mainDark = [0.10, 0.12, 0.18]
@@ -117,6 +122,7 @@ class JUN_ToolUI_QuickTool:
 
         self.tfg_rot_x = JUN_mod_tfg.JUN_mod_tfg_v01()  
         self.tfg_rot_z = JUN_mod_tfg.JUN_mod_tfg_v01()  
+        self.tfg_trn_y = JUN_mod_tfg.JUN_mod_tfg_v01()  
 
         self.tfg_rot_x_name = "rot_X"
         self.tfg_rot_x_colWidth = [100, 100]
@@ -135,8 +141,17 @@ class JUN_ToolUI_QuickTool:
                       "tfg_label" : self.tfg_rot_z_lalbel,
                        "tfg_text" : "0" }
         
+        self.tfg_trn_y_name = "trn_Y"
+        self.tfg_trn_y_colWidth = [100, 100]
+        self.tfg_trn_y_lalbel = "translate Y : "
+        self.tfg_spec_ty = {  "tfg_name" : self.tfg_trn_y_name, 
+                      "tfg_columWidth" : self.tfg_trn_y_colWidth, 
+                      "tfg_label" : self.tfg_trn_y_lalbel,
+                       "tfg_text" : "0" }
+        
         self.tfg_rot_x.set__(self.tfg_spec_x)
         self.tfg_rot_z.set__(self.tfg_spec_z)
+        self.tfg_trn_y.set__(self.tfg_spec_ty)
 
         self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 14-APR-2026\')".format(self.color_main)
 
@@ -233,8 +248,9 @@ class JUN_ToolUI_QuickTool:
 
         self.tfg_rot_x.build()
         self.tfg_rot_z.build()
+        self.tfg_trn_y.build()
 
-        btn_specs[self.idx_anim_rot_x_z_to_zro][0]["args"] = [self.tfg_rot_x, self.tfg_rot_z]
+        btn_specs[self.idx_anim_rot_x_z_to_zro][0]["args"] = [self.tfg_rot_x, self.tfg_rot_z, self.tfg_trn_y]
 
         cmds.paneLayout( configuration= "vertical2", paneSize = ([1,50,100],[2,50,100]))
 
@@ -279,7 +295,7 @@ class JUN_ToolUI_QuickTool:
                      command=partial(flag_command, *cb_args, **cb_kwargs));
 
            
-def JUN_PY_Quick_tool_v01_06():
+def JUN_PY_Quick_tool_v01_08():
     JUN_Win_QuickTool = JUN_ToolUI_QuickTool()
 
     btn_specs =  [
@@ -339,4 +355,4 @@ def JUN_PY_Quick_tool_v01_06():
     JUN_Win_QuickTool.build(btn_specs)
 
 def build__():
-    JUN_PY_Quick_tool_v01_06()
+    JUN_PY_Quick_tool_v01_08()

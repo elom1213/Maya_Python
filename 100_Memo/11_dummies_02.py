@@ -212,3 +212,47 @@ class JUN_ToolUI_QuickTool:
         
         self.mod_tsl_from.build()
         
+
+scaleKey -scaleSpecifiedKeys 1 -autoSnap 0 -time ":" -float ":" -timeScale 1.3 -timePivot 0 -floatScale 1.3 -floatPivot 0 -valueScale 1 -valuePivot 0 -hierarchy none -controlPoints 0 -shape 1 {"skk:Cage:CH_n_MainRoot_xx_ctl.visibility", "skk:Cage:CH_n_MainRoot_xx_ctl.translateX", "skk:Cage:CH_n_MainRoot_xx_ctl.translateY", "skk:Cage:CH_n_MainRoot_xx_ctl.translateZ", "skk:Cage:CH_n_MainRoot_xx_ctl.rotateX", "skk:Cage:CH_n_MainRoot_xx_ctl.rotateY", "skk:Cage:CH_n_MainRoot_xx_ctl.rotateZ", "skk:Cage:CH_n_MainRoot_xx_ctl.scaleX", "skk:Cage:CH_n_MainRoot_xx_ctl.scaleY", "skk:Cage:CH_n_MainRoot_xx_ctl.scaleZ"};
+
+
+['CH_Lttle_intermediate_L_xx_ctl',
+ 'CH_Thumb_intermediate_L_xx_ctl',
+ 'CH_Index_intermediate_L_xx_ctl',
+ 'CH_Lttle_distal_L_xx_ctl',
+ 'CH_Index_distal_L_xx_ctl',
+ 'CH_Index_proxinal_L_xx_ctl',
+ 'CH_Ring_metacarpal_L_xx_ctl',
+ 'CH_Index_metacarpal_L_xx_ctl',
+ 'CH_Lttle_proximal_L_xx_ctl',
+ 'CH_Lttle_metacarpal_L_xx_ctl',
+ 'CH_Ring_proximal_L_xx_ctl',
+ 'CH_Middle_proximal_L_xx_ctl',
+ 'CH_Ring_distal_L_xx_ctl',
+ 'CH_Middle_intermideate_L_xx_ctl',
+ 'CH_Middle_distal_L_xx_ctl',
+ 'CH_Thumb_distal_L_xx_ctl',
+ 'CH_Ring_intermediate_L_xx_ctl',
+  'CH_Thumb_proxinal_L_xx_ctl',
+  'CH_Middle_metacarpal_L_xx_ctl']
+
+
+['CH_Middle_metacarpal_R_xx_ctl',
+ 'CH_Lttle_intermediate_R_xx_ctl',
+ 'CH_Middle_distal_R_xx_ctl',
+ 'CH_Thumb_intermediate_R_xx_ctl',
+ 'CH_Lttle_metacarpal_R_xx_ctl',
+ 'CH_Index_proxinal_R_xx_ctl',
+ 'CH_Lttle_proximal_R_xx_ctl',
+ 'CH_Index_distal_R_xx_ctl',
+ 'CH_Thumb_proxinal_R_xx_ctl',
+ 'CH_Index_intermediate_R_xx_ctl',
+ 'CH_Ring_intermediate_R_xx_ctl',
+ 'CH_Ring_proximal_R_xx_ctl',
+ 'CH_Ring_distal_R_xx_ctl',
+  'CH_Middle_proximal_R_xx_ctl',
+  'CH_Middle_intermideate_R_xx_ctl',
+  'CH_Lttle_distal_R_xx_ctl',
+  'CH_Ring_metacarpal_R_xx_ctl',
+  'CH_Thumb_distal_R_xx_ctl',
+  'CH_Index_metacarpal_R_xx_ctl']
