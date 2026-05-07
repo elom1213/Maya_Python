@@ -11,6 +11,11 @@ MODULES = {
         "JUN_All.ui.MOD_tfg_01"
     ],
     "tools": [
+        "JUN_All.tools.A00000_base.__init__",
+        "JUN_All.tools.A00000_base.config",
+        "JUN_All.tools.A00000_base.launcher",
+        "JUN_All.tools.A00000_base.base",
+
         "JUN_All.tools.A0010_humanIKTool.__init__",
         "JUN_All.tools.A0010_humanIKTool.config",
         "JUN_All.tools.A0010_humanIKTool.launcher",
