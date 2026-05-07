@@ -10,7 +10,7 @@ import maya.mel as mel
 from functools import partial
 
 from JUN_All import config
-from JUN_All.ui import JUN_mod_tfg
+from JUN_All.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem
 
 #====================================================================
 # call back functions (Start)
@@ -28,12 +28,18 @@ class JUN_ToolUI_base:
         self.win_height = 500;
         self.btn_hight = self.win_height/40
 
-        self.color_mainDark = [0.10, 0.12, 0.18]
-        self.color_main     = [0.14, 0.17, 0.25]
-        self.color_sub      = [0.18, 0.22, 0.32]
-        self.color_btn      = [0.30, 0.35, 0.45]
-        self.color_back     = [0.12, 0.14, 0.20]
+        # set color them (open)
+        colorThem_name = "coral_01"
+        colorThem__ = JUN_mod_colorThem.ColorThemeRegistry.get(colorThem_name)
 
+        self.color_mainDark = colorThem__.get("color_mainDark")
+        self.color_main     = colorThem__.get("color_main")
+        self.color_sub      = colorThem__.get("color_sub")
+        self.color_btn      = colorThem__.get("color_btn")
+        self.color_back     = colorThem__.get("color_back")
+
+        self.color_all = colorThem__.as_dict()
+        # set color them (close)
 
         self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 14-APR-2026\')".format(self.color_main)
 

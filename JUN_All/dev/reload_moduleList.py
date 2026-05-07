@@ -30,5 +30,10 @@ MODULES = {
         "JUN_All.tools.A00030_quickTool.config",
         "JUN_All.tools.A00030_quickTool.launcher",
         "JUN_All.tools.A00030_quickTool.MOD_QuickTool_v01",
+
+        "JUN_All.tools.A00040_file_exporter.__init__",
+        "JUN_All.tools.A00040_file_exporter.config",
+        "JUN_All.tools.A00040_file_exporter.launcher",
+        "JUN_All.tools.A00040_file_exporter.file_exporter_v01",
     ],
 }
