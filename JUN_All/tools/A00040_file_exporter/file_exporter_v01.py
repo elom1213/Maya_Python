@@ -8,9 +8,10 @@
 import maya.cmds as cmds;
 import maya.mel as mel
 from functools import partial
+from .utility import *
 
 from JUN_All import config
-from JUN_All.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_tfg
+from JUN_All.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_tfg, JUN_mod_omg
 
 #====================================================================
 # call back functions (Start)
@@ -26,7 +27,7 @@ class JUN_ToolUI_file_exporter:
         self.str_winName = "Junny_win_file_exporter_tool_V01_00"
         self.win_width = 500;
         self.win_height = 600;
-        self.btn_hight = self.win_height/40
+        self.btn_hight = self.win_height/25
 
         # set color them (open)
         colorThem_name = "blue_01"
@@ -52,14 +53,16 @@ class JUN_ToolUI_file_exporter:
         self.tfg_export_path = JUN_mod_tfg.JUN_mod_tfg_v01()  
 
         self.tfg_export_path_name = "name_export_path__"
-        self.tfg_export_path_colWidth = [100, 100]
+        self.tfg_export_path_colWidth = [100, 300]
         self.tfg_export_path_lalbel = "Export path  :  "
-        self.tfg_spec_x = {  "tfg_name" : self.tfg_export_path_name, 
-                             "tfg_columWidth" : self.tfg_export_path_colWidth, 
-                             "tfg_label" : self.tfg_export_path_lalbel,
-                             "tfg_text" : "Empty" }
+        self.tfg_spec_export = {  "tfg_name" : self.tfg_export_path_name, 
+                                  "tfg_columWidth" : self.tfg_export_path_colWidth, 
+                                  "tfg_label" : self.tfg_export_path_lalbel,
+                                  "tfg_is_editable" : False,
+                                  "tfg_bck_color" : [1, 1, 1],
+                                  "tfg_text" : "Empty" }
         
-        self.tfg_export_path.set__(self.tfg_spec_x)
+        self.tfg_export_path.set__(self.tfg_spec_export)
         
         # tfg : Browser (open)
         #===================================================
@@ -69,7 +72,7 @@ class JUN_ToolUI_file_exporter:
         #===================================================
         # tsl : Set name, result name (open)
 
-        self.winSize_for_mod_tsl = {"window_height" : self.win_height-100,
+        self.winSize_for_mod_tsl = {"window_height" : self.win_height-300,
                                     "window_width" : self.win_width*0.5}
 
         self.cls_tsl_selected_set = JUN_mod_tsl.JUN_mod_tsl_v01()
@@ -95,7 +98,54 @@ class JUN_ToolUI_file_exporter:
 
         # tsl : Set name, result name (close)
         #===================================================
-       
+
+
+        #===================================================
+        # optionMenuGrp : Set text type (open)
+
+        self.lst_omg_text_type = []
+        self.num_token = 6
+        self.lst_label = ["Custom", "Set's Name", "Version"]
+
+        self.omg_spec_base = {
+                                "omg_name" : "omg_token_",
+                                # "omg_label_main" : 
+                                # "extraLabel" : 
+                                # "col_width" : 
+                                "lst_label" : self.lst_label
+                             }
+
+        for i in range(0, self.num_token):
+            self.omg_tmp = JUN_mod_omg.JUN_mod_omg_v01()
+            self.omg_copied = self.omg_spec_base.copy()
+            self.omg_copied["omg_name"] = self.omg_copied["omg_name"] + str(i)
+            print(self.omg_copied["omg_name"])
+            self.omg_tmp.set__(self.omg_copied)
+            self.lst_omg_text_type.append(self.omg_tmp)
+
+
+        # optionMenuGrp : Set text type (close)
+        #===================================================
+
+        
+       #===================================================
+        # btn spec (open)
+        self.idx_brows_path = 0
+
+        self.btn_specs = [
+                            # idx_brows_path : 0
+                            [
+                                { 
+                                    "label": "Brows",
+                                    "callback": JUN_cmd_brows_path,
+                                    "args": [self.tfg_export_path]
+                                }
+                            ]
+
+                        ]
+        
+        # btn spec (close)
+        #===================================================
 
     def fun_dummy(self, *args , **kwargs):
         print("fun_dummy called")
@@ -123,11 +173,13 @@ class JUN_ToolUI_file_exporter:
         # frameLayout : Brows path (open)
         cmds.frameLayout( label='Brows path', collapsable= True, bgc =self.color_main);
 
-        cmds.paneLayout( configuration= "vertical2", paneSize = ([1,35,100],[2,65,100]) )
+        cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =self.color_sub );
+
+        # cmds.paneLayout( configuration= "vertical2", paneSize = ([1,35,100],[2,65,100]) )
 
         self.tfg_export_path.build()
 
-        self.create_buttons(btn_specs[self.idx_create_tex_file])
+        self.create_buttons(self.btn_specs[self.idx_brows_path])
 
         cmds.setParent( '..' )
 
@@ -137,7 +189,8 @@ class JUN_ToolUI_file_exporter:
         # Brows path ==================================================
 
 
-        # tsl ==================================================
+        # ==================================================
+        # tsl (open)
         # frameLayout : Set Up (open)
         cmds.frameLayout( label='Set Up', collapsable= True, bgc =self.color_main );
 
@@ -167,7 +220,45 @@ class JUN_ToolUI_file_exporter:
 
         # frameLayout : Set Up (close)
         cmds.setParent( '..' )
-        # tsl ==================================================
+
+        # tsl (close)
+        # ==================================================
+
+        # ==================================================
+        # nameing (open)
+
+
+
+        num_col = 6
+        col_space = 4
+        col_width_ = int(self.win_width / num_col - 10)
+        lst_col_spacing = [(i, col_space) for i in range(2, num_col + 1)]
+        lst_col_width = [(i+1, col_width_) for i in range(0, num_col)]
+
+        lst_lable = ["SK", "MANU", "CH", "Name", "Type", "Version"]
+        lst_text = ["SK", "MANU", "CH", "Name", "Basic", "Version"]
+
+        cmds.frameLayout( label='Naming', collapsable= True, bgc =self.color_main );
+
+        cmds.rowColumnLayout( numberOfColumns=num_col, 
+                              cs= lst_col_spacing, 
+                              cw= lst_col_width);
+        
+        for i in range(0, num_col):
+            cmds.text( label=lst_lable[i], align = 'center' );    
+        
+        for i in range(0, num_col):
+            cmds.textField( text = lst_text[i]);    
+        
+        for i in range(0, num_col):
+            self.lst_omg_text_type[i].build()
+
+        cmds.setParent( '..' )
+
+        cmds.setParent( '..' )
+
+        # nameing (close)
+        # ==================================================
 
 
         cmds.text( align="center", label='Copyright (c) Park Ji Hun. All rights reserved.' );

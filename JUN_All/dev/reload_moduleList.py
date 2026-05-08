@@ -5,6 +5,7 @@ MODULES = {
         "JUN_All.ui.__init__",
         "JUN_All.ui.config",
         "JUN_All.ui.MOD_colorThem",
+        "JUN_All.ui.MOD_optionMenuGrp_v01",
         "JUN_All.ui.MOD_radioCollection_01_01",
         "JUN_All.ui.MOD_tsl_01_01",
         "JUN_All.ui.MOD_tsl_gen_01",
@@ -35,5 +36,6 @@ MODULES = {
         "JUN_All.tools.A00040_file_exporter.config",
         "JUN_All.tools.A00040_file_exporter.launcher",
         "JUN_All.tools.A00040_file_exporter.file_exporter_v01",
-    ],
+        "JUN_All.tools.A00040_file_exporter.utility",
+    ]
 }
