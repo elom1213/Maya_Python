@@ -180,3 +180,15 @@ cmds.optionMenuGrp(
 cmds.menuItem(label='10')
 cmds.menuItem(label='100')
 cmds.menuItem(label='1000')
+
+
+
+def on_option_changed(textfield_name, selected_label):
+
+    cmds.textField(
+        textfield_name,
+        e=True,
+        text=selected_label
+    )
+    
+changeCommand=partial(on_option_changed, name_tfg)

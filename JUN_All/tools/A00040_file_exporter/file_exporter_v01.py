@@ -7,6 +7,7 @@
 
 import maya.cmds as cmds;
 import maya.mel as mel
+import copy
 from functools import partial
 from .utility import *
 
@@ -105,32 +106,62 @@ class JUN_ToolUI_file_exporter:
 
         self.lst_omg_text_type = []
         self.num_token = 6
-        self.lst_label = ["Custom", "Set's Name", "Version"]
+        # self.lst_label = ["Custom", "Set's Name", "Version"]
+        self.menu_specs = {
+                            "Custom"    :   {
+                                              "callback": get_tf_text, 
+                                            #   "icon": "tool.png",
+                                            #   "tooltip": "Run 10"
+                                             },
+                            "Set's Name"    :   {
+                                              "callback": get_obj_name, 
+                                            #   "icon": "tool.png",
+                                            #   "tooltip": "Run 10"
+                                             },
+                            "Version"    :   {
+                                              "callback": test_03
+                                            #   "icon": "tool.png",
+                                            #   "tooltip": "Run 10"
+                                             }
+                           }
 
         self.omg_spec_base = {
                                 "omg_name" : "omg_token_",
                                 # "omg_label_main" : 
                                 # "extraLabel" : 
                                 # "col_width" : 
-                                "lst_label" : self.lst_label
+                                "lst_label" : self.menu_specs,
+                                "changeCommand" : None
                              }
 
         for i in range(0, self.num_token):
             self.omg_tmp = JUN_mod_omg.JUN_mod_omg_v01()
             self.omg_copied = self.omg_spec_base.copy()
             self.omg_copied["omg_name"] = self.omg_copied["omg_name"] + str(i)
-            print(self.omg_copied["omg_name"])
+            # print(self.omg_copied["omg_name"])
             self.omg_tmp.set__(self.omg_copied)
-            self.lst_omg_text_type.append(self.omg_tmp)
+            self.lst_omg_text_type.append(copy.deepcopy(self.omg_tmp))
 
 
         # optionMenuGrp : Set text type (close)
         #===================================================
 
-        
-       #===================================================
+        #===================================================
+        # optionMenuGrp (open)
+
+        self.num_col = 6
+        self.col_space = 4
+        self.lst_tf = []
+        self.matrix_name = []
+
+        # optionMenuGrp (close)
+        #===================================================
+
+
+        #===================================================
         # btn spec (open)
-        self.idx_brows_path = 0
+        self.idx_brows_path     = 0
+        self.idx_set_name       = 1
 
         self.btn_specs = [
                             # idx_brows_path : 0
@@ -139,6 +170,24 @@ class JUN_ToolUI_file_exporter:
                                     "label": "Brows",
                                     "callback": JUN_cmd_brows_path,
                                     "args": [self.tfg_export_path]
+                                }
+                            ],
+
+                            # idx_set_name : 1
+                            [
+                                { 
+                                    "label": "Set name",
+                                    "callback": JUN_cmd_set_name,
+                                    # "callback": self.fun_dummy ,
+                                    "kwargs":   {
+                                                "num_col"           : self.num_col,
+                                                "matrix_name"       : self.matrix_name,
+                                                "lst_tf"            : self.lst_tf,
+                                                "lst_omg_text_type" : self.lst_omg_text_type,
+                                                "menu_specs"        : self.menu_specs,
+                                                "tsl_selected_set"  : self.cls_tsl_selected_set, 
+                                                "tsl_result_name_"  : self.cls_tsl_result_name_ 
+                                                }
                                 }
                             ]
 
@@ -227,32 +276,45 @@ class JUN_ToolUI_file_exporter:
         # ==================================================
         # nameing (open)
 
+        
+        col_width_ = int(self.win_width / self.num_col - 10)
+        lst_col_spacing = [(i, self.col_space) for i in range(2, self.num_col + 1)]
+        lst_col_width = [(i+1, col_width_) for i in range(0, self.num_col)]
 
-
-        num_col = 6
-        col_space = 4
-        col_width_ = int(self.win_width / num_col - 10)
-        lst_col_spacing = [(i, col_space) for i in range(2, num_col + 1)]
-        lst_col_width = [(i+1, col_width_) for i in range(0, num_col)]
-
+        
         lst_lable = ["SK", "MANU", "CH", "Name", "Type", "Version"]
         lst_text = ["SK", "MANU", "CH", "Name", "Basic", "Version"]
 
+        # num_obj = self.cls_tsl_selected_set.get_objs_num()
+        # [[None for i in range(0, self.num_col)] for j in range(0, num_obj)]
+
+        specs_tf_all = {
+                            "textfield_name" : None,
+                            **self.menu_specs
+                        }
+
         cmds.frameLayout( label='Naming', collapsable= True, bgc =self.color_main );
 
-        cmds.rowColumnLayout( numberOfColumns=num_col, 
+        cmds.rowColumnLayout( numberOfColumns=self.num_col, 
                               cs= lst_col_spacing, 
                               cw= lst_col_width);
         
-        for i in range(0, num_col):
-            cmds.text( label=lst_lable[i], align = 'center' );    
+        for i in range(0, self.num_col):
+            cmds.text( label=lst_lable[i], align = 'center' )
         
-        for i in range(0, num_col):
-            cmds.textField( text = lst_text[i]);    
+        for i in range(0, self.num_col):
+            tmp_tf = cmds.textField( text = lst_text[i]);    
+            self.lst_tf.append(tmp_tf)    
         
-        for i in range(0, num_col):
+        for i in range(0, self.num_col):
             self.lst_omg_text_type[i].build()
+            specs_tf_tmp = specs_tf_all.copy()
+            specs_tf_tmp["textfield_name"] = self.lst_tf[i]
+            self.lst_omg_text_type[i].set_callback(partial(on_option_changed, specs_tf_tmp))
 
+
+        self.create_buttons(self.btn_specs[self.idx_set_name])
+                      
         cmds.setParent( '..' )
 
         cmds.setParent( '..' )

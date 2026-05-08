@@ -23,19 +23,29 @@ class JUN_mod_omg_v01:
 
         self.lable_len = len(self.lst_label)
 
-    def get_select(self):
-        aa = cmds.optionMenuGrp(self.omg_name, q=True, value = True)
-        print(aa)
+    def set_callback(self, callback__ = None):
+        if callback__:
+            cmds.optionMenuGrp(self.omg_name, e=True, changeCommand = callback__)
 
-    def fun_test(self, selected_lable):
-        print(selected_lable)
+    # def get_select(self):
+    #     aa = cmds.optionMenuGrp(self.omg_name, q=True, value = True)
+    #     print(aa)
+
+    def get_label(self):
+        return cmds.optionMenuGrp(self.omg_name, q=True, value = True)
+
 
     def build(self):
         # cmds.optionMenuGrp( label='Size', extraLabel='cm', columnWidth=[(1,80), (2, 120)], columnAttach=(1,"left",20))
         cmds.optionMenuGrp(self.omg_name)
 
-        for i in range(0, self.lable_len):
-            cmds.menuItem( label=self.lst_label[i])
+        if type(self.lst_label) is list:
+            for i in range(0, self.lable_len):
+                cmds.menuItem( label=self.lst_label[i])
+
+        if type(self.lst_label) is dict:
+            for lable__ in self.lst_label:
+                cmds.menuItem( label=lable__)
 
         if self.omg_label_main:
             cmds.optionMenuGrp(self.omg_name, e=True, label = self.omg_label_main)
@@ -47,4 +57,4 @@ class JUN_mod_omg_v01:
             cmds.optionMenuGrp(self.omg_name, e=True, columnWidth = self.col_width)
 
         if self.changeCommand:
-            cmds.optionMenuGrp(self.omg_name, e=True, changeCommand = self.changeCommand)
+            self.set_callback(self.changeCommand)

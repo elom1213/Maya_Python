@@ -208,6 +208,15 @@ class JUN_mod_tsl_v01:
         for i in range( 0, len(str_moveIndexList[1]) ):
             cmds.textScrollList( str_selTool_tsl_selList, e=True, selectIndexedItem = str_moveIndexList[1][i]+1 ); 
     
+    def get_objs_num(self):
+        return cmds.textScrollList( self.name_tsl, q=True, numberOfItems=True );
+
+    def get_indexed_item(self, idx):
+        cmds.textScrollList( self.name_tsl, e=True, selectIndexedItem = idx)
+        selected__ = cmds.textScrollList( self.name_tsl, q=True, selectItem = True)[0]
+        cmds.textScrollList( self.name_tsl, e=True, deselectAll = True)
+        return selected__
+    
     def build(self):
         cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =self.color_sub );
 
