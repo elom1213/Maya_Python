@@ -1,7 +1,8 @@
 import importlib
 import sys
 
-from JUN_All import config
+# from JUN_All import config
+import config
 from .reload_moduleList import *
 
 def reload_all():

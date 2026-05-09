@@ -11,7 +11,7 @@ import copy
 from functools import partial
 from .utility import *
 
-from JUN_All import config
+import config
 from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_tfg, JUN_mod_omg
 
 

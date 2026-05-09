@@ -7,7 +7,7 @@ from functools import partial
 
 
 
-from JUN_All import config
+import config
 from Framework.ui import MOD_tsl_gen_01
 from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_tsl_gen
 

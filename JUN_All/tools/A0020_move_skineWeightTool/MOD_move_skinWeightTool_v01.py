@@ -13,7 +13,7 @@ from functools import partial
 
 import kangarooTabTools.weights as weights
 
-from JUN_All import config
+import config
 from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem
 
 class JUN_ToolUI_moveSkinWeightTool_01_05:
