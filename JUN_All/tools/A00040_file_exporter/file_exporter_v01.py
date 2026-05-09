@@ -1,8 +1,8 @@
-# last Update date 
+# last Update date 2026. 05. 09
 # Python Script by Ji Hun Park
 
 # file_exporter_v01 V01.00
-# V01.00 : 
+# V01.00 : create
 
 
 import maya.cmds as cmds;
@@ -13,13 +13,6 @@ from .utility import *
 
 from JUN_All import config
 from JUN_All.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_tfg, JUN_mod_omg
-
-#====================================================================
-# call back functions (Start)
-
-
-# call back functions (End)
-#====================================================================
 
 
 class JUN_ToolUI_file_exporter:
@@ -61,7 +54,7 @@ class JUN_ToolUI_file_exporter:
                                   "tfg_label" : self.tfg_export_path_lalbel,
                                   "tfg_is_editable" : False,
                                   "tfg_bck_color" : [1, 1, 1],
-                                  "tfg_text" : "Empty" }
+                                  "tfg_text" : "" }
         
         self.tfg_export_path.set__(self.tfg_spec_export)
         
@@ -83,14 +76,14 @@ class JUN_ToolUI_file_exporter:
         self.name_tsl_result_name_ = "tsl_result_name_"
 
         self.tsl_spec_Set_name__  = { "name_tsl" : self.name_tsl_selected_set,
-                                      "name_title" : "Set Name",
+                                      "name_title" : "Set's Name",
                                       "num_item" : "num_Set_Name",
                                       **self.color_all,
                                       **self.winSize_for_mod_tsl }
         
         self.tsl_spec_result_name  = { "name_tsl" : self.name_tsl_result_name_,
-                                       "name_title" : "To",
-                                       "num_item" : "num_to",
+                                       "name_title" : "File name",
+                                       "num_item" : "num_file_name",
                                        **self.color_all,
                                        **self.winSize_for_mod_tsl}
 
@@ -108,21 +101,19 @@ class JUN_ToolUI_file_exporter:
         self.num_token = 6
         # self.lst_label = ["Custom", "Set's Name", "Version"]
         self.menu_specs = {
-                            "Custom"    :   {
-                                              "callback": get_tf_text, 
-                                            #   "icon": "tool.png",
-                                            #   "tooltip": "Run 10"
+                            "Custom"        :   {
+                                              "callback_on_set_name_btn_click"  : get_tf_text, 
+                                              "callback_on_change"              : able_tf, 
                                              },
                             "Set's Name"    :   {
-                                              "callback": get_obj_name, 
-                                            #   "icon": "tool.png",
-                                            #   "tooltip": "Run 10"
-                                             },
-                            "Version"    :   {
-                                              "callback": test_03
-                                            #   "icon": "tool.png",
-                                            #   "tooltip": "Run 10"
+                                              "callback_on_set_name_btn_click"  : get_obj_name, 
+                                              "callback_on_change"              : disable_tf, 
                                              }
+
+                            # "Version"    :   {
+                                            #   "callback": test_03
+                                            #  }
+
                            }
 
         self.omg_spec_base = {
@@ -154,6 +145,11 @@ class JUN_ToolUI_file_exporter:
         self.lst_tf = []
         self.matrix_name = []
 
+        self.lst_lable_on_text  = ["SK", "MANU", "CH", "Name", "Type", "Version"]
+        self.lst_text_on_tf     = ["SK", "MANU", "CH", "Name", "Basic", "Version"]
+
+        self.tf_bckColor = [0, 0, 0]
+
         # optionMenuGrp (close)
         #===================================================
 
@@ -162,6 +158,12 @@ class JUN_ToolUI_file_exporter:
         # btn spec (open)
         self.idx_brows_path     = 0
         self.idx_set_name       = 1
+        self.idx_export_file    = 2
+
+        self.subSpec_tsl = {
+                            "tsl_selected_set"  : self.cls_tsl_selected_set, 
+                            "tsl_result_name_"  : self.cls_tsl_result_name_ 
+                            }
 
         self.btn_specs = [
                             # idx_brows_path : 0
@@ -178,19 +180,28 @@ class JUN_ToolUI_file_exporter:
                                 { 
                                     "label": "Set name",
                                     "callback": JUN_cmd_set_name,
-                                    # "callback": self.fun_dummy ,
                                     "kwargs":   {
-                                                "num_col"           : self.num_col,
-                                                "matrix_name"       : self.matrix_name,
                                                 "lst_tf"            : self.lst_tf,
                                                 "lst_omg_text_type" : self.lst_omg_text_type,
                                                 "menu_specs"        : self.menu_specs,
-                                                "tsl_selected_set"  : self.cls_tsl_selected_set, 
-                                                "tsl_result_name_"  : self.cls_tsl_result_name_ 
+                                                **self.subSpec_tsl
                                                 }
                                 }
-                            ]
+                            ],
 
+                            # idx_export_file : 2
+                            [
+
+                                { 
+                                    "label": "Export",
+                                    "callback": JUN_cmd_export,
+                                    "kwargs": {
+                                                "tfg_export_path"   : self.tfg_export_path,
+                                                **self.subSpec_tsl
+                                                }
+                                    
+                                }
+                            ]
                         ]
         
         # btn spec (close)
@@ -281,13 +292,7 @@ class JUN_ToolUI_file_exporter:
         lst_col_spacing = [(i, self.col_space) for i in range(2, self.num_col + 1)]
         lst_col_width = [(i+1, col_width_) for i in range(0, self.num_col)]
 
-        
-        lst_lable = ["SK", "MANU", "CH", "Name", "Type", "Version"]
-        lst_text = ["SK", "MANU", "CH", "Name", "Basic", "Version"]
-
-        # num_obj = self.cls_tsl_selected_set.get_objs_num()
-        # [[None for i in range(0, self.num_col)] for j in range(0, num_obj)]
-
+ 
         specs_tf_all = {
                             "textfield_name" : None,
                             **self.menu_specs
@@ -300,10 +305,10 @@ class JUN_ToolUI_file_exporter:
                               cw= lst_col_width);
         
         for i in range(0, self.num_col):
-            cmds.text( label=lst_lable[i], align = 'center' )
+            cmds.text( label=self.lst_lable_on_text[i], align = 'center' )
         
         for i in range(0, self.num_col):
-            tmp_tf = cmds.textField( text = lst_text[i]);    
+            tmp_tf = cmds.textField( text = self.lst_text_on_tf[i], backgroundColor = self.tf_bckColor);    
             self.lst_tf.append(tmp_tf)    
         
         for i in range(0, self.num_col):
@@ -313,9 +318,11 @@ class JUN_ToolUI_file_exporter:
             self.lst_omg_text_type[i].set_callback(partial(on_option_changed, specs_tf_tmp))
 
 
-        self.create_buttons(self.btn_specs[self.idx_set_name])
                       
         cmds.setParent( '..' )
+
+        self.create_buttons(self.btn_specs[self.idx_set_name])
+        self.create_buttons(self.btn_specs[self.idx_export_file])
 
         cmds.setParent( '..' )
 

@@ -79,17 +79,30 @@ class JUN_mod_tsl_v01:
         str_list_sorted = sorted(str_list_tsl);
         cmds.textScrollList(str_name_tsl_input, e=1, removeAll=1);
         cmds.textScrollList(str_name_tsl_input, e=1, append=str_list_sorted);
+
+    def JUN_cmd_append_tsl(self, 
+                           lst_to_append = [], 
+                           *args):
+
+        cmds.textScrollList( self.name_tsl, e=True, removeAll=True );
+        cmds.textScrollList( self.name_tsl, e=True, append = lst_to_append );
+        
+        int_numItem = cmds.textScrollList( self.name_tsl, q=True, numberOfItems=True );
+
+        cmds.text( self.name_toolSelTgt_selNum, e=True, label= 'Number: ' + str(int_numItem) );
     
     def JUN_cmd_toolSel_btn ( self, str_selTool_tsl_selList, str_selTool_t_selNum,*args ):
 
         str_selList = cmds.ls ( sl=True, fl=True );
 
-        cmds.textScrollList( str_selTool_tsl_selList, e=True, removeAll=True );
-        cmds.textScrollList( str_selTool_tsl_selList, e=True, append = str_selList );
+        self.JUN_cmd_append_tsl(str_selList, *args)
+
+        # cmds.textScrollList( str_selTool_tsl_selList, e=True, removeAll=True );
+        # cmds.textScrollList( str_selTool_tsl_selList, e=True, append = str_selList );
         
-        int_numItem = cmds.textScrollList( str_selTool_tsl_selList, q=True, numberOfItems=True );
+        # int_numItem = cmds.textScrollList( str_selTool_tsl_selList, q=True, numberOfItems=True );
         
-        cmds.text( str_selTool_t_selNum, e=True, label= 'Number: ' + str(int_numItem) );
+        # cmds.text( str_selTool_t_selNum, e=True, label= 'Number: ' + str(int_numItem) );
     
     def JUN_cmd_tsl_select ( self, str_selTool_tsl_selList, *args ):
 

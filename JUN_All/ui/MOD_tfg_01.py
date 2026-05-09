@@ -36,6 +36,12 @@ class JUN_mod_tfg_v01:
 
     def set_val(self, *args):
         cmds.textFieldGrp(self.tfg_name, e=True, text=args[0])
+    
+    def set_tf_able(self):
+        cmds.textFieldGrp(self.tfg_name, e=True, enable=True)
+
+    def set_tf_disable(self):
+        cmds.textFieldGrp(self.tfg_name, e=True, enable=False)
 
     def build(self):
         cmds.textFieldGrp(  self.tfg_name, 

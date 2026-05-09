@@ -10,16 +10,18 @@ class JUN_mod_omg_v01:
 
         self.lst_label = []
         self.lable_len = 0
+        self.backgroundColor = [0, 0, 0]
 
         self.changeCommand = None
 
     def set__(self, omg_spec):
-        self.omg_name       = omg_spec.get("omg_name", self.omg_name)
-        self.omg_label_main = omg_spec.get("omg_label_main", self.omg_label_main)
-        self.extraLabel     = omg_spec.get("extraLabel", self.extraLabel)
-        self.col_width      = omg_spec.get("col_width", self.col_width)
-        self.lst_label      = omg_spec.get("lst_label", self.lst_label)
-        self.changeCommand  = omg_spec.get("changeCommand", self.changeCommand)
+        self.omg_name           = omg_spec.get("omg_name", self.omg_name)
+        self.omg_label_main     = omg_spec.get("omg_label_main", self.omg_label_main)
+        self.extraLabel         = omg_spec.get("extraLabel", self.extraLabel)
+        self.col_width          = omg_spec.get("col_width", self.col_width)
+        self.lst_label          = omg_spec.get("lst_label", self.lst_label)
+        self.backgroundColor    = omg_spec.get("backgroundColor", self.backgroundColor)
+        self.changeCommand      = omg_spec.get("changeCommand", self.changeCommand)
 
         self.lable_len = len(self.lst_label)
 
@@ -55,6 +57,9 @@ class JUN_mod_omg_v01:
 
         if self.col_width:
             cmds.optionMenuGrp(self.omg_name, e=True, columnWidth = self.col_width)
+
+        if self.backgroundColor:
+            cmds.optionMenuGrp(self.omg_name, e=True, backgroundColor = self.backgroundColor)
 
         if self.changeCommand:
             self.set_callback(self.changeCommand)
