@@ -1,1 +1,1 @@
-['dyn_skirt_n_01_02', 'dyn_skirt_n_02_02', 'dyn_skirt_n_03_02', 'dyn_skirt_n_04_02', 'dyn_skirt_n_05_02', 'dyn_skirt_n_06_02', 'dyn_skirt_n_07_02', 'dyn_skirt_n_08_02', 'dyn_skirt_n_09_02', 'dyn_skirt_n_10_02', 'dyn_skirt_n_11_02', 'dyn_skirt_n_12_02', 'dyn_skirt_n_13_02', 'dyn_skirt_n_14_02', 'dyn_skirt_n_15_02']
+['cv_spline_necklace_02_01', 'cv_spline_necklace_03_01', 'cv_spline_necklace_04_01', 'cv_spline_necklace_05_01', 'cv_spline_necklace_06_01', 'cv_spline_necklace_07_01', 'cv_spline_necklace_08_01', 'cv_spline_necklace_09_01', 'cv_spline_necklace_10_01']
