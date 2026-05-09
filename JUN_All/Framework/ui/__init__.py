@@ -1,8 +1,6 @@
 # config
 from Framework.ui import config
 
-
-# forwarding aliases
 from Framework.ui import MOD_tsl_01_01 as JUN_mod_tsl
 from Framework.ui import MOD_tsl_gen_01 as JUN_mod_tsl_gen
 from Framework.ui import MOD_radioCollection_01_01 as JUN_mod_radCol
