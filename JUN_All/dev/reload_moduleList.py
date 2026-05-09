@@ -2,15 +2,7 @@ MODULES = {
     "core": [
     ],
     "ui": [
-        "JUN_All.ui.__init__",
-        "JUN_All.ui.config",
-        "JUN_All.ui.MOD_colorThem",
-        "JUN_All.ui.MOD_optionMenuGrp_v01",
-        "JUN_All.ui.MOD_radioCollection_01_01",
-        "JUN_All.ui.MOD_tsl_01_01",
-        "JUN_All.ui.MOD_tsl_gen_01",
-        "JUN_All.ui.MOD_tfg_01",
-
+        "Framework.ui.__init__",
         "Framework.ui.config",
         "Framework.ui.MOD_colorThem",
         "Framework.ui.MOD_optionMenuGrp_v01",

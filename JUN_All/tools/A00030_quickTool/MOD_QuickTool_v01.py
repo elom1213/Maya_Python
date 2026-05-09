@@ -13,7 +13,7 @@ import maya.mel as mel
 from functools import partial
 
 from JUN_All import config
-from JUN_All.ui import JUN_mod_tfg
+from Framework.ui import JUN_mod_tfg
 
 #====================================================================
 # call back functions (Start)

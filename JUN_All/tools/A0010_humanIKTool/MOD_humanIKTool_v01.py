@@ -8,8 +8,8 @@ from functools import partial
 
 
 from JUN_All import config
-from JUN_All.ui import MOD_tsl_gen_01
-from JUN_All.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_tsl_gen
+from Framework.ui import MOD_tsl_gen_01
+from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_tsl_gen
 
 class JUN_ToolUI_humanIKTool_01_01:
     def __init__(self):
