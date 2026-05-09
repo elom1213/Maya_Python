@@ -9,7 +9,15 @@ MODULES = {
         "JUN_All.ui.MOD_radioCollection_01_01",
         "JUN_All.ui.MOD_tsl_01_01",
         "JUN_All.ui.MOD_tsl_gen_01",
-        "JUN_All.ui.MOD_tfg_01"
+        "JUN_All.ui.MOD_tfg_01",
+
+        "Framework.ui.config",
+        "Framework.ui.MOD_colorThem",
+        "Framework.ui.MOD_optionMenuGrp_v01",
+        "Framework.ui.MOD_radioCollection_01_01",
+        "Framework.ui.MOD_tsl_01_01",
+        "Framework.ui.MOD_tsl_gen_01",
+        "Framework.ui.MOD_tfg_01"
     ],
     "tools": [
         "JUN_All.tools.A00000_base.__init__",

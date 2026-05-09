@@ -202,3 +202,63 @@ JUN_All/
   │  ├─colorThem.py
   │  ├─optionMenuGrp.py
   │  └─radioColleciton.py
+
+
+from JUN_All import config
+from JUN_All.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_tfg, JUN_mod_omg
+
+지금 내 툴들은 모두 위처럼 JUN_All 폴더 안에있는 코드들을 임포트 하고있어. 네 말대로라면 아래처럼 JUN_All 경로를 JUN_Framework 로 바꿔야 할 것 같아.
+
+from JUN_Framework import config
+from JUN_Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_tfg, JUN_mod_omg
+
+그럼 내가 지금까지 작업해온 모든 툴들마다 이런 수정을 해야하는데. 반드시 이래야 할까? 아니면 더 효율적인 방법이 있을까?
+
+
+
+ui 폴더 안 __init__.py 파일은 아래와 같았어.
+
+from . import config
+
+from . import MOD_tsl_01_01 as JUN_mod_tsl
+from . import MOD_tsl_gen_01 as JUN_mod_tsl_gen
+from . import MOD_radioCollection_01_01 as JUN_mod_radCol
+from . import MOD_colorThem as JUN_mod_colorThem
+from . import MOD_tfg_01 as JUN_mod_tfg
+from . import MOD_optionMenuGrp_v01 as JUN_mod_omg
+
+네 말대로 아래처럼
+from ..JUN_Framework.ui import *
+이 코드를 추가하니 아래처럼 에러가 났어
+ImportError: cannot import name 'config' from partially initialized module 'JUN_All.ui' (most likely due to a circular import) (G:\D_link_dir/02_Maya_python_Jun\JUN_All\ui\__init__.py)
+에러를 고쳐줘
+                                                                                                                                
+네 말대로 __init__.py 코드를 고치니 아래처럼 에러가 생겼어
+ImportError: cannot import name 'config' from 'JUN_All.JUN_Framework' (unknown location)
+해결애
+
+
+네가 말한대로 아래처럼 폴더구조를 만들었어
+
+JUN_Framework/
+│
+├─ ui/
+├─ core/
+├─ utils/
+└─ dev/
+
+
+JUN_Tools/
+│
+├─ humanikTool/
+│   ├─ tool_main.py
+│   ├─ config.py
+    └─ JUN_Framework/
+        └─ ui/
+
+그런데 tool_main.py. 파일에서 아래처럼 코드를 써놓으면
+from JUN_Framework.ui.optionMenuGrp import ...
+이 상태에선 humanikTool 폴더 안에있는 JUN_Framework 안의 ui 를 선택하는 거잖아.
+만약 JUN_Tools 상위 경로에 있는 JUN_Framework 를 참조하고 싶으면
+from ..JUN_Framework.ui.optionMenuGrp import ...
+이렇게 작성을 해야하잖아. 개발 도중과 배포시에 이런 수정이 없어야 할 텐데. 어떻게 해야 이런 수정이 없을까
