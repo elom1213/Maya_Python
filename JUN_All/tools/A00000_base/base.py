@@ -1,4 +1,4 @@
-# last Update date 
+# last Update date : 
 # Python Script by Ji Hun Park
 
 # base V01.00
@@ -9,16 +9,8 @@ import maya.cmds as cmds;
 import maya.mel as mel
 from functools import partial
 
-from JUN_All import config
+import config
 from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem
-
-#====================================================================
-# call back functions (Start)
-
-
-# call back functions (End)
-#====================================================================
-
 
 class JUN_ToolUI_base:
     def __init__(self):
@@ -28,6 +20,7 @@ class JUN_ToolUI_base:
         self.win_height = 500;
         self.btn_hight = self.win_height/40
 
+        # =============================================================
         # set color them (open)
         colorThem_name = "coral_01"
         colorThem__ = JUN_mod_colorThem.ColorThemeRegistry.get(colorThem_name)
@@ -40,6 +33,7 @@ class JUN_ToolUI_base:
 
         self.color_all = colorThem__.as_dict()
         # set color them (close)
+        # =============================================================
 
         self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 14-APR-2026\')".format(self.color_main)
 
@@ -98,5 +92,6 @@ def base__():
     
     JUN_Win_base.build()
 
+# Do not rename build__ funcion
 def build__():
     base__()

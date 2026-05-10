@@ -285,3 +285,33 @@ JUN_Tools/
 그러면 배포받을 사람들은 RELEASE/ 안의 내용물만 계속 업데이트 받으면 되는 구조가 되는 것 같아.
 그렇다면 깃 저장소에 RELEASE 폴더만 따로 배포해놓고 업데이트가 있을 때 마다 배포받을 사람들에게 깃에서 pull하라고 하면 좋을까?
 내가 아는 엔진프로그래머는 업데이트를 자동으로 해주는 exe,혹은 bat 파일을 만들어서 그것만 클릭하면 자동으로 업데이트 되도록 했는데 이 방법도 좋은 방법일까?
+
+
+
+
+
+배포 후 사용자가 업데이트를 위해 네가 launcher + updater 구조를 추천했잖아. 근데 그건 파이썬 파일이라 사용자가 bat 파일처럼 더블클릭해서 실행할 수가 없잖아.
+그렇다면 아래처럼 파일 구조를 만들고 bat 파일이 파이썬 파일을 실행하도록 해야할까? 아니라면 사용자는 업데이트를 위해 파이썬 파일을 어떻게 실해하게 해야할까?
+
+MayaTools/
+├─ launch.py
+├─ update_py.py
+├─ update.bat
+└─ humanikTool/
+
+@echo off
+
+cd /d %~dp0
+
+echo Updating Tools...
+py update_py
+
+
+네 말대로 update.bat, update.py 파일을 만들어서 동작하게 했어. 근데 한번 update.bat 을 실행하고 이후 release 폴더 안의 파일들 몇개를 없애고 다시 update.bat 파일을 통해 pull 요청을 했어.
+근데 Already up to date 라고 뜨면서 없앤 파일이 복구가 안되. 이렇게 파일이 몇개 없으면 로컬저장소의 버전이 최근 버전이더라도 강제로 최근 버전으로 폴더, 파일 구조가 복구 되도록 하고싶어
+
+
+import tools.A00040_file_exporter as A00040_file_exporter
+A00040_file_exporter.run(True)
+위 코드를 마야 shelf 에 아이콘으로 저장해서 원하는 툴을 실행시켜. 배포받은 사용자도 똑같이 shelf 의 아이콘이 생성되도록 해야해.
+이 경우 사용자가 dragDrop.py 같은 파일을 마야에 드래그, 드랍 하면 자동으로 shelf 에 위 코드가 저장되도록 하고싶어. 해당 기능을 하는 코드를 만들어

@@ -9,8 +9,16 @@ import remove_pycache as rmv_pyc
 # =========================
 
 DEV_ROOT = r"G:/D_link_dir/02_Maya_python_Jun/JUN_All"
-RELEASE_ROOT_PARENT = r"G:/D_link_dir/02_Maya_python_Jun_Release"
-TOOL_PATH = "A00010_humanIKTool"
+RELEASE_ROOT_PARENT = r"G:/D_link_dir/02_Maya_python_Jun_Release/Maya_Tool_Release/tools"
+TOOL_PATH = "A00040_file_exporter"
+
+IGNORE_DIRS = [
+    "__pycache__",
+    "*.pyc",
+    "dev",
+    ".git",
+    ".vs"
+]
 
 FRAMEWORK_ROOT = os.path.join(
     DEV_ROOT,
@@ -25,7 +33,7 @@ TOOL_ROOT = os.path.join(
 
 RELEASE_ROOT = os.path.join(
     RELEASE_ROOT_PARENT,
-    "RELEASE",
+    # "RELEASE",
     TOOL_PATH
 )
 
@@ -44,7 +52,8 @@ if os.path.exists(RELEASE_ROOT):
 
 shutil.copytree(
     TOOL_ROOT,
-    RELEASE_ROOT
+    RELEASE_ROOT,
+    ignore=shutil.ignore_patterns(*IGNORE_DIRS)
 )
 
 
@@ -57,12 +66,12 @@ framework_dst = os.path.join(
     "Framework"
 )
 
+
 shutil.copytree(
     FRAMEWORK_ROOT,
-    framework_dst
+    framework_dst,
+    ignore=shutil.ignore_patterns(*IGNORE_DIRS)
 )
-
-rmv_pyc.remove_pycache(RELEASE_ROOT_PARENT)
 
 print("==================================================")
 print(f"Release : {RELEASE_ROOT}")
