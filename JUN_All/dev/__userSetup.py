@@ -18,7 +18,7 @@ it well run __init__.py in JUN_Tools, JUN_ui
 '''
 
 from JUN_All import config 
-from JUN_All.tools.A0020_move_skineWeightTool import *
+from JUN_All.tools.A00020_move_skineWeightTool import *
 
 import importlib
 

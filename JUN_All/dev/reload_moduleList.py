@@ -12,20 +12,15 @@ MODULES = {
         "Framework.ui.MOD_tfg_01"
     ],
     "tools": [
-        "tools.A00000_base.__init__",
-        "tools.A00000_base.config",
-        "tools.A00000_base.launcher",
-        "tools.A00000_base.base",
+        "tools.A00010_humanIKTool.__init__",
+        "tools.A00010_humanIKTool.config",
+        "tools.A00010_humanIKTool.launcher",
+        "tools.A00010_humanIKTool.MOD_humanIKTool_v01",
 
-        "tools.A0010_humanIKTool.__init__",
-        "tools.A0010_humanIKTool.config",
-        "tools.A0010_humanIKTool.launcher",
-        "tools.A0010_humanIKTool.MOD_humanIKTool_v01",
-
-        "tools.A0020_move_skineWeightTool.__init__",
-        "tools.A0020_move_skineWeightTool.config",
-        "tools.A0020_move_skineWeightTool.launcher",
-        "tools.A0020_move_skineWeightTool.MOD_move_skinWeightTool_v01",
+        "tools.A00020_move_skineWeightTool.__init__",
+        "tools.A00020_move_skineWeightTool.config",
+        "tools.A00020_move_skineWeightTool.launcher",
+        "tools.A00020_move_skineWeightTool.MOD_move_skinWeightTool_v01",
 
         "tools.A00030_quickTool.__init__",
         "tools.A00030_quickTool.config",
