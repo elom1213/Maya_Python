@@ -262,3 +262,26 @@ from JUN_Framework.ui.optionMenuGrp import ...
 만약 JUN_Tools 상위 경로에 있는 JUN_Framework 를 참조하고 싶으면
 from ..JUN_Framework.ui.optionMenuGrp import ...
 이렇게 작성을 해야하잖아. 개발 도중과 배포시에 이런 수정이 없어야 할 텐데. 어떻게 해야 이런 수정이 없을까
+
+
+JUN_Framework/
+│
+├─ ui/
+├─ core/
+├─ utils/
+└─ dev/
+
+JUN_Tools/
+│
+├─ humanikTool/
+│   ├─ tool_main.py
+    └─ JUN_Framework/
+        └─ ui/
+
+네 조언대로 폴더 구조를 위처럼 만들었어. 이제 각 툴들을 배포하려고 해.
+각 툴들이 쓰는 ui 파이썬 파일들을 툴 폴더 내부의 JUN_Framework/ui 폴더에 복사붙여넣기 하면 되나?
+그래야 한다면 필요한 프레임워크를 자동으로 복사해주는 코드를 만들어줘
+
+그러면 배포받을 사람들은 RELEASE/ 안의 내용물만 계속 업데이트 받으면 되는 구조가 되는 것 같아.
+그렇다면 깃 저장소에 RELEASE 폴더만 따로 배포해놓고 업데이트가 있을 때 마다 배포받을 사람들에게 깃에서 pull하라고 하면 좋을까?
+내가 아는 엔진프로그래머는 업데이트를 자동으로 해주는 exe,혹은 bat 파일을 만들어서 그것만 클릭하면 자동으로 업데이트 되도록 했는데 이 방법도 좋은 방법일까?
