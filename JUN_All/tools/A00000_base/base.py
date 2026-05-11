@@ -9,7 +9,7 @@ import maya.cmds as cmds;
 import maya.mel as mel
 from functools import partial
 
-import config
+from . import config
 from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem
 
 class JUN_ToolUI_base:
