@@ -10,7 +10,7 @@ import remove_pycache as rmv_pyc
 
 DEV_ROOT = r"G:/D_link_dir/02_Maya_python_Jun/JUN_All"
 RELEASE_ROOT_PARENT = r"G:/D_link_dir/02_Maya_python_Jun_Release/Maya_Tool_Release/tools"
-TOOL_PATH = "A00040_file_exporter"
+TOOL_PATH = "A00050_uvTool"
 
 IGNORE_DIRS = [
     "__pycache__",

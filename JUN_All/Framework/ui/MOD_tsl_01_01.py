@@ -57,22 +57,28 @@ class JUN_mod_tsl_v01:
         self.color_btn      = [0.30, 0.35, 0.45]
         self.color_back     = [0.12, 0.14, 0.20]
 
+        self.able_btn_select = True
+        self.able_btn_edit = True
+
         self.win_height = 100
         self.win_width = 100
     
     def set__(self, tsl_spec):
-        self.name_tsl = tsl_spec.get("name_tsl", "tsl_name_default")
-        self.tsl_title = tsl_spec.get("name_title", "tsl_title")
+        self.name_tsl               = tsl_spec.get("name_tsl", "tsl_name_default")
+        self.tsl_title              = tsl_spec.get("name_title", "tsl_title")
         self.name_toolSelTgt_selNum = tsl_spec.get("num_item", "num_item_defulat")
 
-        self.color_mainDark = tsl_spec.get("color_mainDark", [0.0, 0.0, 0.0])
-        self.color_main = tsl_spec.get("color_main", [0.0, 0.0, 0.0])
-        self.color_sub = tsl_spec.get("color_sub", [0.0, 0.0, 0.0])
-        self.color_btn = tsl_spec.get("color_btn", [0.0, 0.0, 0.0])
-        self.color_back = tsl_spec.get("color_back", [0.0, 0.0, 0.0])
+        self.color_mainDark         = tsl_spec.get("color_mainDark", [0.0, 0.0, 0.0])
+        self.color_main             = tsl_spec.get("color_main", [0.0, 0.0, 0.0])
+        self.color_sub              = tsl_spec.get("color_sub", [0.0, 0.0, 0.0])
+        self.color_btn              = tsl_spec.get("color_btn", [0.0, 0.0, 0.0])
+        self.color_back             = tsl_spec.get("color_back", [0.0, 0.0, 0.0])
 
-        self.win_height = tsl_spec.get("window_height", self.win_height)
-        self.win_width = tsl_spec.get("window_width", self.win_width)
+        self.able_btn_select        = tsl_spec.get("able_btn_select", self.able_btn_select)
+        self.able_btn_edit          = tsl_spec.get("able_btn_edit", self.able_btn_edit)
+
+        self.win_height             = tsl_spec.get("window_height", self.win_height)
+        self.win_width              = tsl_spec.get("window_width", self.win_width)
 
     def JUN_cmd_sort(self, str_name_tsl_input, *args):
         str_list_tsl = cmds.textScrollList(str_name_tsl_input, q = 1, allItems=1);
@@ -91,26 +97,31 @@ class JUN_mod_tsl_v01:
 
         cmds.text( self.name_toolSelTgt_selNum, e=True, label= 'Number: ' + str(int_numItem) );
     
-    def JUN_cmd_toolSel_btn ( self, str_selTool_tsl_selList, str_selTool_t_selNum,*args ):
+    def get_objs_num(self):
+        return cmds.textScrollList( self.name_tsl, q=True, numberOfItems=True );
+
+    def get_indexed_item(self, idx):
+        cmds.textScrollList( self.name_tsl, e=True, selectIndexedItem = idx)
+        selected__ = cmds.textScrollList( self.name_tsl, q=True, selectItem = True)[0]
+        cmds.textScrollList( self.name_tsl, e=True, deselectAll = True)
+        return selected__
+    
+    def select_all_in_tsl(self):
+        objects__ =  cmds.textScrollList( self.name_tsl, q=True, allItems=True );
+        cmds.select(objects__)
+    
+    def JUN_cmd_toolSel_btn ( self, *args ):
 
         str_selList = cmds.ls ( sl=True, fl=True );
 
         self.JUN_cmd_append_tsl(str_selList, *args)
 
-        # cmds.textScrollList( str_selTool_tsl_selList, e=True, removeAll=True );
-        # cmds.textScrollList( str_selTool_tsl_selList, e=True, append = str_selList );
-        
-        # int_numItem = cmds.textScrollList( str_selTool_tsl_selList, q=True, numberOfItems=True );
-        
-        # cmds.text( str_selTool_t_selNum, e=True, label= 'Number: ' + str(int_numItem) );
-    
     def JUN_cmd_tsl_select ( self, str_selTool_tsl_selList, *args ):
 
         str_scrollList = cmds.textScrollList( str_selTool_tsl_selList, q=True, selectItem=True );
         
         cmds.select ( str_scrollList );
-
-
+    
     #===================================================================================
     # tsl edit funcionts Detail
     #===================================================================================
@@ -221,23 +232,15 @@ class JUN_mod_tsl_v01:
         for i in range( 0, len(str_moveIndexList[1]) ):
             cmds.textScrollList( str_selTool_tsl_selList, e=True, selectIndexedItem = str_moveIndexList[1][i]+1 ); 
     
-    def get_objs_num(self):
-        return cmds.textScrollList( self.name_tsl, q=True, numberOfItems=True );
-
-    def get_indexed_item(self, idx):
-        cmds.textScrollList( self.name_tsl, e=True, selectIndexedItem = idx)
-        selected__ = cmds.textScrollList( self.name_tsl, q=True, selectItem = True)[0]
-        cmds.textScrollList( self.name_tsl, e=True, deselectAll = True)
-        return selected__
-    
     def build(self):
         cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =self.color_sub );
 
-        cmds.button( self.name_tsl,
-                     label='Select Objects',
-                     bgc =self.color_btn,
-                     command=partial(self.JUN_cmd_toolSel_btn, self.name_tsl, self.name_toolSelTgt_selNum));
-        
+        if self.able_btn_select:
+            cmds.button( self.name_tsl,
+                            label='Select Objects',
+                            bgc =self.color_btn,
+                            command=partial(self.JUN_cmd_toolSel_btn, self.name_tsl, self.name_toolSelTgt_selNum));
+    
 
         # cmds.rowLayout( numberOfColumns=2 , columnWidth2= [self.win_width/2-3, self.win_width/2-3])
         cmds.rowLayout( numberOfColumns=2 )
@@ -256,19 +259,21 @@ class JUN_mod_tsl_v01:
         # rowLayout : edit tsl (open)
         cmds.rowLayout( numberOfColumns=4 );
 
-        cmds.button( "NAM_toolSelTgt_b_add",  width= self.win_width/4 - 10, label='Add', bgc = self.color_btn, command=partial(self.CMD_ToolSel_b_add , self.name_tsl, self.name_toolSelTgt_selNum));
-        cmds.button( "NAM_toolSelTgt_b_del",  width= self.win_width/4 - 10, label='Del', bgc = self.color_btn, command=partial(self.CMD_ToolSel_b_del , self.name_tsl, self.name_toolSelTgt_selNum));
-        cmds.button( "NAM_toolSelTgt_b_up",   width= self.win_width/4 - 10, label='Up',  bgc = self.color_btn, command=partial(self.CMD_ToolSel_b_up  , self.name_tsl, self.name_toolSelTgt_selNum));
-        cmds.button( "NAM_toolSelTgt_b_down", width= self.win_width/4 - 5, label='Down',bgc = self.color_btn, command=partial(self.CMD_ToolSel_b_down, self.name_tsl, self.name_toolSelTgt_selNum));
+        if self.able_btn_edit:
+            cmds.button( "NAM_toolSelTgt_b_add",  width= self.win_width/4 - 10, label='Add', bgc = self.color_btn, command=partial(self.CMD_ToolSel_b_add , self.name_tsl, self.name_toolSelTgt_selNum));
+            cmds.button( "NAM_toolSelTgt_b_del",  width= self.win_width/4 - 10, label='Del', bgc = self.color_btn, command=partial(self.CMD_ToolSel_b_del , self.name_tsl, self.name_toolSelTgt_selNum));
+            cmds.button( "NAM_toolSelTgt_b_up",   width= self.win_width/4 - 10, label='Up',  bgc = self.color_btn, command=partial(self.CMD_ToolSel_b_up  , self.name_tsl, self.name_toolSelTgt_selNum));
+            cmds.button( "NAM_toolSelTgt_b_down", width= self.win_width/4 - 5, label='Down',bgc = self.color_btn, command=partial(self.CMD_ToolSel_b_down, self.name_tsl, self.name_toolSelTgt_selNum));
 
 
         cmds.setParent( '..' )
 
-        cmds.button( "name_btn_sortBase",
-                 label='Sort', 
-                 width=self.win_width/2-10,
-                 bgc =self.color_btn, 
-                 command=partial(self.JUN_cmd_sort, self.name_tsl));
+        if self.able_btn_edit:
+            cmds.button( "name_btn_sortBase",
+                        label='Sort', 
+                        width=self.win_width/2-10,
+                        bgc =self.color_btn, 
+                        command=partial(self.JUN_cmd_sort, self.name_tsl));
 
         # rowLayout : edit tsl (close)
         cmds.setParent( '..' )

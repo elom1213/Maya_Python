@@ -1,8 +1,8 @@
-# last Update date : 
+# last Update date : 2026. 05. 10
 # Python Script by Ji Hun Park
 
-# base V01.00
-# V01.xx : 
+# uvTool V01.00
+# V01.00 : create 
 
 
 import maya.cmds as cmds;
@@ -10,15 +10,16 @@ import maya.mel as mel
 from functools import partial
 
 import config
+from .utility import *
 from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem
 
-class JUN_ToolUI_base:
+class JUN_ToolUI_uvTool_v01:
     def __init__(self):
-        self.str_headTitle = "Base Tool V01.00"
-        self.str_winName = "Junny_win_base_tool_V01_00"
+        self.str_headTitle = "uvTool V01.00"
+        self.str_winName = "Junny_win_uvTool_v01_V01_00"
         self.win_width = 300;
-        self.win_height = 500;
-        self.btn_hight = self.win_height/40
+        self.win_height = 400;
+        self.btn_hight = self.win_height/15
         self.updated = "10-MAY-2026"
 
         # =============================================================
@@ -36,8 +37,53 @@ class JUN_ToolUI_base:
         # set color them (close)
         # =============================================================
 
-    def show_about(self, *args):
+        #===================================================
+        # tsl : main (open)
+
+        self.cls_tsl_selected_obj = JUN_mod_tsl.JUN_mod_tsl_v01()
+
+        self.name_tsl_uvTool_main = "tsl_uvTool_main"
+
+        self.winSize_for_mod_tsl = {"window_height" : max(1, int(self.win_height*0.9)),
+                                    "window_width" : max(1, int(self.win_width*0.5))}
+
+        self.tsl_spec_uvTool_main__  = { "name_tsl" : self.name_tsl_uvTool_main,
+                                         "name_title" : "Objects",
+                                         "num_item" : "num_object_main",
+                                         "able_btn_select" : False,
+                                         "able_btn_edit" : False,
+                                         **self.color_all,
+                                         **self.winSize_for_mod_tsl }
         
+        self.cls_tsl_selected_obj.set__(self.tsl_spec_uvTool_main__)
+
+        # tsl : main (close)
+        #===================================================
+
+
+        #===================================================
+        # btn spec (open)
+
+
+        self.idx_set_objects = 0
+
+        self.btn_specs = [
+                            # idx_set_objects : 0
+                            [
+                                { 
+                                    "label": "Catch Objects",
+                                    "callback": JUN_cmd_set_object_for_uv,
+                                    "kwargs": { "tsl_uvTool_main" : self.cls_tsl_selected_obj}
+                                }
+                            ]
+                        ]
+
+
+        # btn spec (close)
+        #===================================================
+       
+    def show_about(self, *args):
+
         cmds.confirmDialog(
         title='About',
         icon='information',
@@ -70,9 +116,26 @@ class JUN_ToolUI_base:
                           bgc =self.color_mainDark);
         
         
-        #
-        # create content here
-        #
+        # ==================================================
+        # tsl (open)
+        
+        cmds.frameLayout( label='Set Up', collapsable= True, bgc =self.color_main );
+
+        self.create_buttons(self.btn_specs[self.idx_set_objects])
+
+        cmds.columnLayout(adjustableColumn=True, 
+                          columnAttach=('both', 5), 
+                          rowSpacing=6, 
+                          bgc =self.color_sub);
+        
+        self.cls_tsl_selected_obj.build()
+
+        cmds.setParent( '..' )
+
+        cmds.setParent( '..' )
+
+        # tsl (close)
+        # ==================================================
 
 
         cmds.text( align="center", label='Copyright (c) Park Ji Hun. All rights reserved.' );
@@ -98,7 +161,7 @@ class JUN_ToolUI_base:
 
            
 def base__():
-    JUN_Win_base = JUN_ToolUI_base()
+    JUN_Win_base = JUN_ToolUI_uvTool_v01()
     
     JUN_Win_base.build()
 

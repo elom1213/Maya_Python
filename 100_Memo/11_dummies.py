@@ -315,3 +315,15 @@ import tools.A00040_file_exporter as A00040_file_exporter
 A00040_file_exporter.run(True)
 위 코드를 마야 shelf 에 아이콘으로 저장해서 원하는 툴을 실행시켜. 배포받은 사용자도 똑같이 shelf 의 아이콘이 생성되도록 해야해.
 이 경우 사용자가 dragDrop.py 같은 파일을 마야에 드래그, 드랍 하면 자동으로 shelf 에 위 코드가 저장되도록 하고싶어. 해당 기능을 하는 코드를 만들어
+
+i@ListNum = 9999999;
+s@AU_name;
+string AUs[] = {"browInnerUp", "browDownLeft", "browDownRight", "browOuterUpLeft", "browOuterUpRight", "eyeLookUpLeft", "eyeLookUpRight", "eyeLookDownLeft", "eyeLookDownRight", "eyeLookInLeft", "eyeLookInRight", "eyeLookOutLeft", "eyeLookOutRight", "eyeBlinkLeft", "eyeBlinkRight", "eyeSquintLeft", "eyeSquintRight", "eyeWideLeft", "eyeWideRight", "cheekPuff", "cheekSquintLeft", "cheekSquintRight", "noseSneerLeft", "noseSneerRight", "jawOpen", "jawForward", "jawLeft", "jawRight", "mouthFunnel", "mouthPucker", "mouthLeft", "mouthRight", "mouthRollUpper", "mouthRollLower", "mouthShrugUpper", "mouthShrugLower", "mouthClose", "mouthSmileLeft ", "mouthSmileRight", "mouthFrownLeft", "mouthFrownRight", "mouthDimpleLeft", "mouthDimpleRight", "mouthUpperUpLeft", "mouthUpperUpRight", "mouthLowerDownLeft", "mouthLowerDownRight", "mouthPressLeft", "mouthPressRight", "mouthStretchLeft", "mouthStretchRight", "eyeBlinkLeft_02", "eyeBlinkRight_02"};
+for(int i = 1; i <= len(AUs); i++)
+{
+    if(match(("*" + AUs[i-1]), @name))
+    {
+        i@ListNum = i;
+        s@AU_name = AUs[i-1];
+    }
+}

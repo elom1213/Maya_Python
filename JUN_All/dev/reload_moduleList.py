@@ -32,5 +32,11 @@ MODULES = {
         "tools.A00040_file_exporter.launcher",
         "tools.A00040_file_exporter.file_exporter_v01",
         "tools.A00040_file_exporter.utility",
+
+        "tools.A00050_uvTool.__init__",
+        "tools.A00050_uvTool.config",
+        "tools.A00050_uvTool.launcher",
+        "tools.A00050_uvTool.file_exporter_v01",
+        "tools.A00050_uvTool.utility",
     ]
 }
