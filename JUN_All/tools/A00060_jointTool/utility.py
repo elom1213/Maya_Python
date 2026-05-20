@@ -142,7 +142,7 @@ def reverse_joint_chain(root_joint):
             new_joints[0],
             e=True,
             oj="xyz",
-            secondaryAxisOrient="yup",
+            secondaryAxisOrient="zup",
             ch=True,
             zso=True
         )

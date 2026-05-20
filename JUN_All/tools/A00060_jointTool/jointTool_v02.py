@@ -1,8 +1,8 @@
-# last Update date : 
+# last Update date : 26.05.21
 # Python Script by Ji Hun Park
 
 # jointTool V02.00
-# V01.xx : 
+# V02.00 : Create
 
 
 import maya.cmds as cmds;
