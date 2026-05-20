@@ -10,7 +10,8 @@ import maya.mel as mel
 from functools import partial
 
 from . import config
-from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem
+from .utility import *
+from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_tfg, JUN_mod_omg, JUN_mod_cbg
 
 class JUN_ToolUI_base:
     def __init__(self):

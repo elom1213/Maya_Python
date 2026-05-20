@@ -7,6 +7,7 @@ from Framework.ui import MOD_radioCollection_01_01 as JUN_mod_radCol
 from Framework.ui import MOD_colorThem as JUN_mod_colorThem
 from Framework.ui import MOD_tfg_01 as JUN_mod_tfg
 from Framework.ui import MOD_optionMenuGrp_v01 as JUN_mod_omg
+from Framework.ui import MOD_cbg_01 as JUN_mod_cbg
 
 
 __all__ = [
@@ -17,4 +18,5 @@ __all__ = [
     "JUN_mod_colorThem",
     "JUN_mod_tfg",
     "JUN_mod_omg",
+    "JUN_mod_cbg",
 ]

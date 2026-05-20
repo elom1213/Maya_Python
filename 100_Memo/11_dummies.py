@@ -327,3 +327,26 @@ for(int i = 1; i <= len(AUs); i++)
         s@AU_name = AUs[i-1];
     }
 }
+
+
+"C:\Users\user\Documents\maya"
+위 경로에서 user 라는 문자는 컴퓨터마다 다른 이름으로 되어있을거야. setUp_app_dir.py 라는 코드를 만들어서 위 경로에 특정한 폴더, 파일을 만들거야.
+import getpass
+username = getpass.getuser()
+setUp_app_dir.py 에 위 코드를 입력새 각 컴퓨터마다 다른 사용자 이름으로 user 문자열을 교체해야해. 교체 후
+"C:\Users\user\Documents\maya\scripts" 라는 경로에 userSetup.py 이라는 파이썬 파일을 만들어야 해. 
+파이썬 파일의 내용은 아래와 같아.
+
+
+TOOLS_ROOT = 
+
+if TOOLS_ROOT not in sys.path:
+    sys.path.append(TOOLS_ROOT)
+
+TOOLS_ROOT 는 setUp_app_dir.py 이 실행되는 경로야
+setUp_app_dir.py 기능을 하는 코드를 만들어
+
+
+with open(user_setup_path, "w", encoding="utf-8") as f:
+    f.write(user_setup_code)
+위 코드를 통해 파일을 생성할때 이름이 같은 파일이 있다면 덮어 쓰지말고 접미사로 001, 002.. 를 붙여서 다른 버전이 만들어지도록 하고싶어. 코드를 생성해

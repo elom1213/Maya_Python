@@ -48,7 +48,8 @@ class JUN_mod_tfg_v01:
                             columnWidth2=self.tfg_columWidth, 
                             label= self.tfg_label,
                             editable = self.tfg_is_editable,
-                            text = self.tfg_text  );
+                            text = self.tfg_text )
+                            # columnAlign = {1, "left"} )
         
         if self.tfg_bck_color:
             cmds.textFieldGrp(  self.tfg_name, 

@@ -9,7 +9,8 @@ MODULES = {
         "Framework.ui.MOD_radioCollection_01_01",
         "Framework.ui.MOD_tsl_01_01",
         "Framework.ui.MOD_tsl_gen_01",
-        "Framework.ui.MOD_tfg_01"
+        "Framework.ui.MOD_tfg_01",
+        "Framework.ui.MOD_cbg_01"
     ],
     "tools": [
         "tools.A00010_humanIKTool.__init__",
@@ -38,5 +39,11 @@ MODULES = {
         "tools.A00050_uvTool.launcher",
         "tools.A00050_uvTool.file_exporter_v01",
         "tools.A00050_uvTool.utility",
+
+        "tools.A00060_jointTool.__init__",
+        "tools.A00060_jointTool.config",
+        "tools.A00060_jointTool.launcher",
+        "tools.A00060_jointTool.jointTool_v02",
+        "tools.A00060_jointTool.utility",
     ]
 }

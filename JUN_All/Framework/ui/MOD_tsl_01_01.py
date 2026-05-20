@@ -100,6 +100,9 @@ class JUN_mod_tsl_v01:
     def get_objs_num(self):
         return cmds.textScrollList( self.name_tsl, q=True, numberOfItems=True );
 
+    def get_all_item(self):
+        return cmds.textScrollList(self.name_tsl, query=True, allItems=True)
+
     def get_indexed_item(self, idx):
         cmds.textScrollList( self.name_tsl, e=True, selectIndexedItem = idx)
         selected__ = cmds.textScrollList( self.name_tsl, q=True, selectItem = True)[0]
