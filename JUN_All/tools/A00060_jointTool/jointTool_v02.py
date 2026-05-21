@@ -1,8 +1,9 @@
 # last Update date : 26.05.21
 # Python Script by Ji Hun Park
 
-# jointTool V02.00
+# jointTool V02.01
 # V02.00 : Create
+# V02.01 : Updaet max joint num
 
 
 import maya.cmds as cmds;
@@ -15,8 +16,8 @@ from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod
 
 class JUN_ToolUI_base:
     def __init__(self):
-        self.str_headTitle = "jointTool V02.00"
-        self.str_winName = "Junny_win_joint_tool_V02_00"
+        self.str_headTitle = "jointTool V02.01"
+        self.str_winName = "Junny_win_joint_tool_V02_01"
         self.win_width = 300;
         self.win_height = 600;
         self.btn_hight = self.win_height/20
@@ -87,6 +88,7 @@ class JUN_ToolUI_base:
 
 
         self.tfg_for_every_n_cm = JUN_mod_tfg.JUN_mod_tfg_v01()  
+        self.tfg_max_jnts       = JUN_mod_tfg.JUN_mod_tfg_v01()  
 
         self.tfg_for_every_n_cm_name = "name_tfg_for_every_n_cm"
         self.tfg_for_every_n_cm_colWidth = [self.win_width * 0.25, self.win_width * 0.25]
@@ -98,7 +100,18 @@ class JUN_ToolUI_base:
                                   "tfg_bck_color" : [1, 1, 1],
                                   "tfg_text" : "2.5" }
         
+        self.tfg_max_jnts_name = "name_tfg_max_jnts"
+        self.tfg_max_jnts_colWidth = [self.win_width * 0.25, self.win_width * 0.25]
+        self.tfg_max_jnts_lalbel = "Max joints :  "
+        self.tfg_spec_max_jnts = {  "tfg_name" : self.tfg_max_jnts_name, 
+                                  "tfg_columWidth" : self.tfg_max_jnts_colWidth, 
+                                  "tfg_label" : self.tfg_max_jnts_lalbel,
+                                  "tfg_is_editable" : True,
+                                  "tfg_bck_color" : [1, 1, 1],
+                                  "tfg_text" : "5" }
+        
         self.tfg_for_every_n_cm.set__(self.tfg_spec_export)
+        self.tfg_max_jnts.set__(self.tfg_spec_max_jnts)
         
 
         # tfg : tfg for every n cm (close)
@@ -115,11 +128,12 @@ class JUN_ToolUI_base:
                                     "callback": JUN_rebuild_crv,
                                     "kwargs": {
                                                 "tsl_jointTool_main" : self.tsl_jointTool_main,
-                                                "tfg_for_every_n_cm" : self.tfg_for_every_n_cm
+                                                "tfg_for_every_n_cm" : self.tfg_for_every_n_cm,
+                                                "tfg_max_jnts" : self.tfg_max_jnts,
                                             }
                                 }
                             ], 
-                            # idx_rebuild_by_cv_count : 1
+                            # idx_reverse_joint : 1
                             [
                                 { 
                                     "label": "Reverse joint chain ",
@@ -195,9 +209,25 @@ class JUN_ToolUI_base:
 
         cmds.paneLayout( configuration= "vertical2" )
 
+        cmds.columnLayout(adjustableColumn=True, 
+                          columnAttach=('both', 5), 
+                          rowSpacing=6, 
+                          bgc =self.color_sub);
+
         self.tfg_for_every_n_cm.build()        
+        self.tfg_max_jnts.build()        
+
+        cmds.setParent( '..' )
+
+        cmds.columnLayout(adjustableColumn=True, 
+                          columnAttach=('both', 5), 
+                          rowSpacing=6, 
+                          bgc =self.color_sub);
 
         self.create_buttons(self.btn_specs[self.idx_rebuild_by_cv_count])        
+
+
+        cmds.setParent( '..' )
 
         cmds.setParent( '..' )
 

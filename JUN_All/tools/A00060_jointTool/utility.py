@@ -7,21 +7,24 @@ from functools import partial
 def JUN_rebuild_crv(*args , **kwargs):
     tsl_main             = kwargs.get("tsl_jointTool_main")
     tfg_for_every_n_cm   = kwargs.get("tfg_for_every_n_cm")
+    tfg_max_jnts         = kwargs.get("tfg_max_jnts")
 
     
     interval = float(tfg_for_every_n_cm.get_val())
+    max_jnts = float(tfg_max_jnts.get_val())
     lst_crv = tsl_main.get_all_item()
 
-    rebuild_curves_by_length(lst_crv, interval)
+    rebuild_curves_by_length(lst_crv, interval, max_jnts-1)
 
-def rebuild_curves_by_length(curves, interval):
+def rebuild_curves_by_length(curves, interval, max_spans = 4):
 
     for crv in curves:
 
         # curve length 측정
         length = cmds.arclen(crv)
 
-        spans = max(2, int(length / interval))
+        spans = max(1, int(length / interval))
+        spans = min(spans, max_spans)
 
         # rebuild
         cmds.rebuildCurve(
