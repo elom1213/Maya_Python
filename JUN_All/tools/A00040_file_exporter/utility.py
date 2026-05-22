@@ -140,6 +140,14 @@ def get_unique_filepath(filepath):
 
         index += 1
 
+def get_parents(objs):
+    lst_prnt = []
+    for obj__ in objs:
+        cmds.select(obj__)
+        sel_obj = cmds.ls(selection=True, long=True)
+        lst_prnt.append(cmds.listRelatives(sel_obj, parent = True)[0])
+    return lst_prnt
+
 def JUN_cmd_export(*args, **kwargs):
     tfg_export_path__   = kwargs.get("tfg_export_path")
     tsl_selected_set__  = kwargs.get("tsl_selected_set")
@@ -147,6 +155,7 @@ def JUN_cmd_export(*args, **kwargs):
 
     export_path = tfg_export_path__.get_val()
     members_for_export = []
+    parents_origin = []
     logs_all = []
 
     cmds.select(clear=True)
@@ -161,6 +170,7 @@ def JUN_cmd_export(*args, **kwargs):
         if  cmds.objectType(obj_current) == "objectSet":
             members = cmds.sets(obj_current, q=True)
             members_for_export.extend(copy.deepcopy(members))
+            parents_origin = get_parents(members)
             members.clear()
 
 
@@ -178,10 +188,22 @@ def JUN_cmd_export(*args, **kwargs):
         logs_all.append(log_export_obj)
         logs_all.append(log_export_path)
 
-        cmds.select(members_for_export)
+        objs_out =  cmds.parent(members_for_export, world=True)
+
+        cmds.select(objs_out)
         cmds.file(mainpath, force=True, options="v=0;", typ="FBX export", pr=True, es=True)
+
+        print("obj out " + str(objs_out))
+        print("parent ori " + str(parents_origin) + "\n")
+
+        for i in range(0, len(objs_out)):
+            cmds.parent(objs_out[i], parents_origin[i])
+
         members_for_export.clear()
+        parents_origin.clear()
+
         cmds.select(clear=True)
+
 
     logs_all = "\n".join(logs_all)
     print(logs_all)

@@ -4,6 +4,20 @@ import copy, os
 from functools import partial
 
 
+def JUN_remove_crv_by_len(*args , **kwargs):
+    tsl_main             = kwargs.get("tsl_jointTool_main")
+    tfg_max_crv_len      = kwargs.get("tfg_max_crv_len")
+
+    lst_crv = tsl_main.get_all_item()
+    maxLen = float(tfg_max_crv_len.get_val())
+    crv_short = []
+
+    for crv in lst_crv:
+        length = cmds.arclen(crv)
+        if length <= maxLen:
+            crv_short.append(crv)
+    cmds.delete(crv_short)
+
 def JUN_rebuild_crv(*args , **kwargs):
     tsl_main             = kwargs.get("tsl_jointTool_main")
     tfg_for_every_n_cm   = kwargs.get("tfg_for_every_n_cm")
