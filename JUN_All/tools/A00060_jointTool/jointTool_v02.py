@@ -1,9 +1,10 @@
-# last Update date : 26.05.21
+# last Update date : 26.05.22
 # Python Script by Ji Hun Park
 
-# jointTool V02.01
+# jointTool V02.02
 # V02.00 : Create
 # V02.01 : Updaet max joint num
+# V02.02 : Update removing curves by length
 
 
 import maya.cmds as cmds;
@@ -16,12 +17,12 @@ from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod
 
 class JUN_ToolUI_base:
     def __init__(self):
-        self.str_headTitle = "jointTool V02.01"
-        self.str_winName = "Junny_win_joint_tool_V02_01"
+        self.str_headTitle = "jointTool V02.02"
+        self.str_winName = "Junny_win_joint_tool_V02_02"
         self.win_width = 300;
         self.win_height = 600;
         self.btn_hight = self.win_height/20
-        self.updated = "20-MAY-2026"
+        self.updated = "22-MAY-2026"
 
         # =============================================================
         # set color them (open)
@@ -87,9 +88,20 @@ class JUN_ToolUI_base:
         # tfg : tfg for every n cm (open)
 
 
+        self.tfg_max_crv_len    = JUN_mod_tfg.JUN_mod_tfg_v01()  
         self.tfg_for_every_n_cm = JUN_mod_tfg.JUN_mod_tfg_v01()  
         self.tfg_max_jnts       = JUN_mod_tfg.JUN_mod_tfg_v01()  
 
+        self.tfg_max_crv_len_name = "name_tfg_max_crv_len"
+        self.tfg_max_crv_len_colWidth = [self.win_width * 0.25, self.win_width * 0.25]
+        self.tfg_max_crv_len_lalbel = "Max Length :  "
+        self.tfg_spec_tfg_max_crv_len = {   "tfg_name" : self.tfg_max_crv_len_name, 
+                                            "tfg_columWidth" : self.tfg_max_crv_len_colWidth, 
+                                            "tfg_label" : self.tfg_max_crv_len_lalbel,
+                                            "tfg_is_editable" : True,
+                                            "tfg_bck_color" : [1, 1, 1],
+                                            "tfg_text" : "0.8" }
+        
         self.tfg_for_every_n_cm_name = "name_tfg_for_every_n_cm"
         self.tfg_for_every_n_cm_colWidth = [self.win_width * 0.25, self.win_width * 0.25]
         self.tfg_for_every_n_cm_lalbel = "Interval :  "
@@ -110,41 +122,52 @@ class JUN_ToolUI_base:
                                   "tfg_bck_color" : [1, 1, 1],
                                   "tfg_text" : "5" }
         
+        self.tfg_max_crv_len.set__(self.tfg_spec_tfg_max_crv_len)
         self.tfg_for_every_n_cm.set__(self.tfg_spec_export)
         self.tfg_max_jnts.set__(self.tfg_spec_max_jnts)
         
 
         # tfg : tfg for every n cm (close)
         # =============================================================
-
-        self.idx_rebuild_by_cv_count    = 0
-        self.idx_reverse_joint          = 1
-
-        self.btn_specs = [
-                            # idx_rebuild_by_cv_count : 0
-                            [
-                                { 
-                                    "label": "Rebuild curve by length ",
-                                    "callback": JUN_rebuild_crv,
-                                    "kwargs": {
-                                                "tsl_jointTool_main" : self.tsl_jointTool_main,
-                                                "tfg_for_every_n_cm" : self.tfg_for_every_n_cm,
-                                                "tfg_max_jnts" : self.tfg_max_jnts,
-                                            }
-                                }
-                            ], 
-                            # idx_reverse_joint : 1
-                            [
-                                { 
-                                    "label": "Reverse joint chain ",
-                                    "callback": JUN_reverse_joint,
-                                    "kwargs": {
-                                                "tsl_jointTool_main" : self.tsl_jointTool_main,
-                                                "cbg_remove_origin" : self.cbg_remove_origin,
-                                            }
-                                }
-                            ]
-                        ]
+      
+        self.btn_specs =    { 
+                                "remove_crv_by_length" :
+                                [
+                                    { 
+                                        "label": "Remove Curve",
+                                        "callback": JUN_remove_crv_by_len,
+                                        "kwargs": {
+                                                    "tsl_jointTool_main" : self.tsl_jointTool_main,
+                                                    "tfg_max_crv_len" : self.tfg_max_crv_len,
+                                                }
+                                    }
+                                ], 
+                                "rebuild_by_cv_count" :
+                                [
+                                    { 
+                                        "label": "Rebuild Curve",
+                                        "callback": JUN_rebuild_crv,
+                                        "btn_hight": 50,
+                                        "kwargs": {
+                                                    "tsl_jointTool_main" : self.tsl_jointTool_main,
+                                                    "tfg_for_every_n_cm" : self.tfg_for_every_n_cm,
+                                                    "tfg_max_jnts" : self.tfg_max_jnts,
+                                                }
+                                    }
+                                ], 
+                                "reverse_joint" :
+                                [
+                                    { 
+                                        "label": "Reverse joint chain ",
+                                        "callback": JUN_reverse_joint,
+                                        "kwargs": {
+                                                    "tsl_jointTool_main" : self.tsl_jointTool_main,
+                                                    "cbg_remove_origin" : self.cbg_remove_origin,
+                                                }
+                                    }
+                                ]
+                            }
+        
         
 
     def show_about(self, *args):
@@ -214,6 +237,29 @@ class JUN_ToolUI_base:
                           rowSpacing=6, 
                           bgc =self.color_sub);
 
+        self.tfg_max_crv_len.build()        
+
+        cmds.setParent( '..' )
+
+        cmds.columnLayout(adjustableColumn=True, 
+                          columnAttach=('both', 5), 
+                          rowSpacing=6, 
+                          bgc =self.color_sub);
+
+        self.create_buttons(self.btn_specs["remove_crv_by_length"])        
+
+
+        cmds.setParent( '..' )
+
+        cmds.setParent( '..' )
+
+        cmds.paneLayout( configuration= "vertical2" )
+
+        cmds.columnLayout(adjustableColumn=True, 
+                          columnAttach=('both', 5), 
+                          rowSpacing=6, 
+                          bgc =self.color_sub);
+
         self.tfg_for_every_n_cm.build()        
         self.tfg_max_jnts.build()        
 
@@ -224,7 +270,7 @@ class JUN_ToolUI_base:
                           rowSpacing=6, 
                           bgc =self.color_sub);
 
-        self.create_buttons(self.btn_specs[self.idx_rebuild_by_cv_count])        
+        self.create_buttons(self.btn_specs["rebuild_by_cv_count"])        
 
 
         cmds.setParent( '..' )
@@ -246,7 +292,7 @@ class JUN_ToolUI_base:
 
         self.cbg_remove_origin.build()
 
-        self.create_buttons(self.btn_specs[self.idx_reverse_joint])        
+        self.create_buttons(self.btn_specs["reverse_joint"])        
 
         cmds.setParent( '..' )
 
@@ -265,13 +311,16 @@ class JUN_ToolUI_base:
         for spec in button_specs:
             self.create_btn(spec.get("label", "default"),
                             spec.get("callback", self.fun_dummy),
+                            spec.get("btn_hight", self.btn_hight),
                             *spec.get("args", []),
                             **spec.get("kwargs", {}))
             
-    def create_btn(self, flag_lable = "default", flag_command = None, *cb_args, **cb_kwargs):
+    def create_btn(self, flag_lable = "default", flag_command = None, btn_hight = None ,*cb_args, **cb_kwargs):
         if flag_command is None:
             flag_command = self.fun_dummy
-        cmds.button( h = self.btn_hight,
+        if btn_hight is None:
+            btn_hight = self.btn_hight
+        cmds.button( h = btn_hight,
                      label= flag_lable, 
                      bgc=self.color_btn, 
                      command=partial(flag_command, *cb_args, **cb_kwargs));
