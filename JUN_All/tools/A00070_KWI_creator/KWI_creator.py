@@ -185,7 +185,7 @@ num_setting_node = 5
 with open(target_path_read_KWI_setting_node, 'r', encoding="utf-8") as f:
     read_text_setting_node = f.readlines()
 
-lst_setting_node =  build_setting_nodes_lst_linked_to(num_setting_node, KWI_tgt_node_num)
+lst_setting_node =  create_keyword_linked_to(num_setting_node, KWI_tgt_node_num)
 setting_node_new =  build_setting_nodes_link(read_text_setting_node, lst_setting_node)
 
 with open(target_path_write_setting_node, 'w', encoding="utf-8") as f:
@@ -199,7 +199,7 @@ read_text_limited_data_node = None
 with open(target_path_read_KWI_LD_node, 'r', encoding="utf-8") as f:
     read_text_limited_data_node = f.readlines()
 
-LD_linked_to = build_setting_nodes_lst_linked_to(1, KWI_tgt_node_num, pin_id = "6222BDF34477D9F24F863390648BE4CA")
+LD_linked_to = create_keyword_linked_to(1, KWI_tgt_node_num, pin_id = "6222BDF34477D9F24F863390648BE4CA")
 print(LD_linked_to[0])
 read_text_limited_data_node = build_LD_node_link(read_text_limited_data_node, LD_linked_to[0])
 

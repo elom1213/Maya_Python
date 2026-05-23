@@ -87,7 +87,7 @@ def build_setting_nodes_member_name(text, target_text = "JUN_KWI_setting_name=")
     replaced_text = re.sub(pattern, f'BoneName="{new_name}"', text)
 
 
-def build_setting_nodes_lst_linked_to(
+def create_keyword_linked_to(
         num_setting_node,
         KWI_tgt_node_num,
         node_name="AnimGraphNode_KawaiiPhysics",
