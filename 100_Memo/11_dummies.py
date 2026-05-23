@@ -457,3 +457,12 @@ list_main 이라는 리스트는 아래처럼 구성되어 있어
 ['\n   NodeGuid=E4EEC3844791DCA414111991977D42B4\n   CustomProperties Pin (PinId=F56CA1A44D9143498D4F0E924F403F39,PinName="PhysicsSettings")\n   CustomProperties Pin (PinId=07E3FD484D9ABE61B95D8EB9E224A86E,PinName="ComponentPose")\n   CustomProperties Pin (PinId=DC552E7948A3DC1994B46F8B5978E079,PinName="bAlphaBoolEnabled")\n   CustomProperties Pin (PinId=4C2E67F14A6019EDAE94CAA3A405A4BF,PinName="Alpha")\n   CustomProperties Pin (PinId=4A24133641A333F5ED52C596E98B562B,PinName="AlphaCurveName")\n   CustomProperties Pin (PinId=6222BDF34477D9F24F863390648BE4CA,PinName="LimitsDataAsset")\n   CustomProperties Pin (PinId=B73F8A01491AB1A7136BE2849B11E587,PinName="BoneConstraintsDataAsset")\n   CustomProperties Pin (PinId=4D524E0342A22F9A278E3EB31AF3C195,PinName="Pose")\nEnd Object\n']
 이때 네가 제시한 함수의 enumerate 기능이 의도대로 기능하지 않아
 list_main 에 맞는 기능으로 수정해
+
+주어진 정수 num_setting_node 와 KWI_tgt_node_num 에 대하여 아래와 같은 명령을 하는 함수를 만들어야해
+num_setting_node = 3
+KWI_tgt_node_num = 8
+
+setting_nodes = [LinkedTo=(AnimGraphNode_KawaiiPhysics_1 F56CA1A44D9143498D4F0E924F403F39,AnimGraphNode_KawaiiPhysics_4 F56CA1A44D9143498D4F0E924F403F39, AnimGraphNode_KawaiiPhysics_7 F56CA1A44D9143498D4F0E924F403F39),
+LinkedTo=(AnimGraphNode_KawaiiPhysics_2 F56CA1A44D9143498D4F0E924F403F39,AnimGraphNode_KawaiiPhysics_5 F56CA1A44D9143498D4F0E924F403F39, AnimGraphNode_KawaiiPhysics_8 F56CA1A44D9143498D4F0E924F403F39),
+LinkedTo=(AnimGraphNode_KawaiiPhysics_3 F56CA1A44D9143498D4F0E924F403F39,AnimGraphNode_KawaiiPhysics_6 F56CA1A44D9143498D4F0E924F403F39)]
+와 같이 setting_nodes 라는 리스트를 만드는 함수여야해. 해당 함수를 만들어
