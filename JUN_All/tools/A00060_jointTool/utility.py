@@ -4,6 +4,16 @@ import copy, os
 from functools import partial
 
 
+def JUN_separate_crv(*args , **kwargs):
+    tsl_main             = kwargs.get("tsl_jointTool_main")
+    lst_crv = tsl_main.get_all_item()
+
+    for crv_single in lst_crv:
+        for shape in cmds.listRelatives(crv_single, c=1, type='shape', fullPath = True):
+            newTrans = cmds.createNode('transform', n='hairCrv')
+            cmds.parent(shape, newTrans, s=1)
+
+
 def JUN_remove_crv_by_len(*args , **kwargs):
     tsl_main             = kwargs.get("tsl_jointTool_main")
     tfg_max_crv_len      = kwargs.get("tfg_max_crv_len")

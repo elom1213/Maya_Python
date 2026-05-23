@@ -1,10 +1,11 @@
-# last Update date : 26.05.22
+# last Update date : 26.05.23
 # Python Script by Ji Hun Park
 
 # jointTool V02.02
 # V02.00 : Create
 # V02.01 : Updaet max joint num
 # V02.02 : Update removing curves by length
+# V02.03 : create separate curve util
 
 
 import maya.cmds as cmds;
@@ -17,12 +18,12 @@ from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod
 
 class JUN_ToolUI_base:
     def __init__(self):
-        self.str_headTitle = "jointTool V02.02"
-        self.str_winName = "Junny_win_joint_tool_V02_02"
+        self.str_headTitle = "jointTool V02.03"
+        self.str_winName = "Junny_win_joint_tool_V02_03"
         self.win_width = 300;
         self.win_height = 600;
         self.btn_hight = self.win_height/20
-        self.updated = "22-MAY-2026"
+        self.updated = "23-MAY-2026"
 
         # =============================================================
         # set color them (open)
@@ -131,6 +132,16 @@ class JUN_ToolUI_base:
         # =============================================================
       
         self.btn_specs =    { 
+                                "separate_crv" :
+                                [
+                                    { 
+                                        "label": "Separate Curve",
+                                        "callback": JUN_separate_crv,
+                                        "kwargs": {
+                                                    "tsl_jointTool_main" : self.tsl_jointTool_main
+                                                }
+                                    }
+                                ], 
                                 "remove_crv_by_length" :
                                 [
                                     { 
@@ -229,6 +240,8 @@ class JUN_ToolUI_base:
         # Sub Tool : Curve (open)
 
         cmds.frameLayout( label='Sub Tool : Curve', collapsable= True, bgc =self.color_main );
+
+        self.create_buttons(self.btn_specs["separate_crv"])        
 
         cmds.paneLayout( configuration= "vertical2" )
 

@@ -1,13 +1,14 @@
-# last Update date 26 05 20
+# last Update date 26 05 23
 # Python Script by Ji Hun Park
 
-# Quickk Tool V01.04
+# Quickk Tool V01.10
 # V01.04 : Create Create tool
 # V01.05 : Create Anim Tool
 # V01.06 : Create UV Tool
 # V01.07 : Update Anim Tool
 # V01.08 : Update Anim Tool. Add ty
 # V01.09 : Create separate curve tool
+# V01.10 : remove separate curve tool
 
 import maya.cmds as cmds;
 import maya.mel as mel
@@ -94,11 +95,6 @@ def JUN_cmd_rename_uvSet(*args, **kwargs):
     print("COMPLETE")
     print(str_new_uvSets)
 
-def JUN_cmd_separate_curve(*args, **kwargs):
-    for shape in cmds.listRelatives(cmds.ls(sl=1), c=1, type='shape'):
-        newTrans = cmds.createNode('transform', n='hairCrv')
-        cmds.parent(shape, newTrans, s=1)
-
 
 # call back functions (End)
 #====================================================================
@@ -107,8 +103,8 @@ def JUN_cmd_separate_curve(*args, **kwargs):
 class JUN_ToolUI_QuickTool:
     def __init__(self):
         # self.str_winTitle = "Quick Tool V01.06"
-        self.str_headTitle = "Quick Tool V01.09"
-        self.str_winName = "Junny_win_Quick_tool_V01_09"
+        self.str_headTitle = "Quick Tool V01.10"
+        self.str_winName = "Junny_win_Quick_tool_V01_10"
         self.win_width = 300;
         self.win_height = 500;
         self.btn_hight = self.win_height/40
@@ -160,7 +156,7 @@ class JUN_ToolUI_QuickTool:
         self.tfg_rot_z.set__(self.tfg_spec_z)
         self.tfg_trn_y.set__(self.tfg_spec_ty)
 
-        self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 20-MAY-2026\')".format(self.color_main)
+        self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 23-MAY-2026\')".format(self.color_main)
 
     def fun_dummy(self, *args , **kwargs):
         print("fun_dummy called")
@@ -279,20 +275,6 @@ class JUN_ToolUI_QuickTool:
 
         cmds.setParent( '..' )
         # UV Tool (close)
-
-        # Curve Tool (open)
-        cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =self.color_sub );
-
-        cmds.text( align="left", label='Curve Tool' );
-
-        cmds.setParent( '..' )
-
-        cmds.paneLayout( configuration= "vertical2", paneSize = ([1,50,100],[2,50,100]))
-
-        self.create_buttons(btn_specs[self.idx_separate_curve])
-
-        cmds.setParent( '..' )
-        # Curve Tool (close)
 
         cmds.text( align="center", label='Copyright (c) Park Ji Hun. All rights reserved.' );
 
