@@ -112,3 +112,19 @@ def build_setting_nodes_lst_linked_to(
 
     return setting_nodes
 
+def build_LD_node_link(text, str_linked_to, target_text = "EGPD_Output"):
+    new_lines = []
+    for idx, line in enumerate(text):
+        if target_text in line:
+            close_paren_index = line.rfind(")")
+            if close_paren_index != -1:
+
+                line = (
+                    line[:close_paren_index]
+                    + str_linked_to
+                    + line[close_paren_index:]
+                )
+
+        new_lines.append(line)
+
+    return "".join(new_lines)

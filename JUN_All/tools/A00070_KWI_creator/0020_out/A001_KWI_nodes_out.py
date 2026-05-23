@@ -775,7 +775,7 @@ Begin Object Class=/Script/KawaiiPhysicsEd.AnimGraphNode_KawaiiPhysics Name="Ani
 End Object
 Begin Object Class=/Script/BlueprintGraph.K2Node_VariableGet Name="K2Node_VariableGet_11" ExportPath="/Script/BlueprintGraph.K2Node_VariableGet'/Game/SplineTest_01/AV_main_04/ABP_splineTest_04_codeTest.ABP_splineTest_04_codeTest:AnimGraph.K2Node_VariableGet_11'"
    VariableReference=(MemberName="PS_base_01",MemberGuid=AD70307F4717706EF8C9D3BEEA06B4A6,bSelfContext=True)
-   NodePosX=-200
+   NodePosX=-100
    NodePosY= 30 
    NodeGuid=8BC4D085467AD2A2266087B5B6EB74AB
    CustomProperties Pin (PinId=895E04954E34956594997588B4A95E71,PinName="PS_base_01",Direction="EGPD_Output",PinType.PinCategory="struct",PinType.PinSubCategory="",PinType.PinSubCategoryObject="/Script/CoreUObject.ScriptStruct'/Script/KawaiiPhysics.KawaiiPhysicsSettings'",PinType.PinSubCategoryMemberReference=(),PinType.PinValueType=(),PinType.ContainerType=None,PinType.bIsReference=False,PinType.bIsConst=False,PinType.bIsWeakPointer=False,PinType.bIsUObjectWrapper=False,PinType.bSerializeAsSinglePrecisionFloat=False,PersistentGuid=00000000000000000000000000000000,bHidden=False,bNotConnectable=False,bDefaultValueIsReadOnly=False,bDefaultValueIsIgnored=False,bAdvancedView=False,bOrphanedPin=False,LinkedTo=(AnimGraphNode_KawaiiPhysics_1 F56CA1A44D9143498D4F0E924F403F39,AnimGraphNode_KawaiiPhysics_6 F56CA1A44D9143498D4F0E924F403F39))
@@ -783,7 +783,7 @@ Begin Object Class=/Script/BlueprintGraph.K2Node_VariableGet Name="K2Node_Variab
 End Object
 Begin Object Class=/Script/BlueprintGraph.K2Node_VariableGet Name="K2Node_VariableGet_12" ExportPath="/Script/BlueprintGraph.K2Node_VariableGet'/Game/SplineTest_01/AV_main_04/ABP_splineTest_04_codeTest.ABP_splineTest_04_codeTest:AnimGraph.K2Node_VariableGet_12'"
    VariableReference=(MemberName="PS_base_02",MemberGuid=C97CEF274ABFB1349B8F0E8D3C6FBCA7,bSelfContext=True)
-   NodePosX=-200
+   NodePosX=-100
    NodePosY= 78
    NodeGuid=6D85E4C944CC33F60DBD328895320B57
    CustomProperties Pin (PinId=37AADA364A4751E3815F52BE79957433,PinName="PS_base_02",Direction="EGPD_Output",PinType.PinCategory="struct",PinType.PinSubCategory="",PinType.PinSubCategoryObject="/Script/CoreUObject.ScriptStruct'/Script/KawaiiPhysics.KawaiiPhysicsSettings'",PinType.PinSubCategoryMemberReference=(),PinType.PinValueType=(),PinType.ContainerType=None,PinType.bIsReference=False,PinType.bIsConst=False,PinType.bIsWeakPointer=False,PinType.bIsUObjectWrapper=False,PinType.bSerializeAsSinglePrecisionFloat=False,PersistentGuid=00000000000000000000000000000000,bHidden=False,bNotConnectable=False,bDefaultValueIsReadOnly=False,bDefaultValueIsIgnored=False,bAdvancedView=False,bOrphanedPin=False,LinkedTo=(AnimGraphNode_KawaiiPhysics_2 F56CA1A44D9143498D4F0E924F403F39,AnimGraphNode_KawaiiPhysics_7 F56CA1A44D9143498D4F0E924F403F39))
@@ -791,7 +791,7 @@ Begin Object Class=/Script/BlueprintGraph.K2Node_VariableGet Name="K2Node_Variab
 End Object
 Begin Object Class=/Script/BlueprintGraph.K2Node_VariableGet Name="K2Node_VariableGet_13" ExportPath="/Script/BlueprintGraph.K2Node_VariableGet'/Game/SplineTest_01/AV_main_04/ABP_splineTest_04_codeTest.ABP_splineTest_04_codeTest:AnimGraph.K2Node_VariableGet_13'"
    VariableReference=(MemberName="PS_base_03",MemberGuid=6676DAAC45C77FF6994FE7A8BABA9821,bSelfContext=True)
-   NodePosX=-200
+   NodePosX=-100
    NodePosY= 126
    NodeGuid=9789C67A4B19204249AB828A71977F76
    CustomProperties Pin (PinId=D28FFB29406DFF0BE7240090B3BA0D65,PinName="PS_base_03",Direction="EGPD_Output",PinType.PinCategory="struct",PinType.PinSubCategory="",PinType.PinSubCategoryObject="/Script/CoreUObject.ScriptStruct'/Script/KawaiiPhysics.KawaiiPhysicsSettings'",PinType.PinSubCategoryMemberReference=(),PinType.PinValueType=(),PinType.ContainerType=None,PinType.bIsReference=False,PinType.bIsConst=False,PinType.bIsWeakPointer=False,PinType.bIsUObjectWrapper=False,PinType.bSerializeAsSinglePrecisionFloat=False,PersistentGuid=00000000000000000000000000000000,bHidden=False,bNotConnectable=False,bDefaultValueIsReadOnly=False,bDefaultValueIsIgnored=False,bAdvancedView=False,bOrphanedPin=False,LinkedTo=(AnimGraphNode_KawaiiPhysics_3 F56CA1A44D9143498D4F0E924F403F39,AnimGraphNode_KawaiiPhysics_8 F56CA1A44D9143498D4F0E924F403F39))
@@ -799,7 +799,7 @@ Begin Object Class=/Script/BlueprintGraph.K2Node_VariableGet Name="K2Node_Variab
 End Object
 Begin Object Class=/Script/BlueprintGraph.K2Node_VariableGet Name="K2Node_VariableGet_14" ExportPath="/Script/BlueprintGraph.K2Node_VariableGet'/Game/SplineTest_01/AV_main_04/ABP_splineTest_04_codeTest.ABP_splineTest_04_codeTest:AnimGraph.K2Node_VariableGet_14'"
    VariableReference=(MemberName="PS_base_04",MemberGuid=E776E80B4D96407C99E0148646348EB0,bSelfContext=True)
-   NodePosX=-200
+   NodePosX=-100
    NodePosY= 174
    NodeGuid=E7066FA64DFE19F7796734BDB10F5A5B
    CustomProperties Pin (PinId=787684F44E85216DAAC281AC34AB7CFC,PinName="PS_base_04",Direction="EGPD_Output",PinType.PinCategory="struct",PinType.PinSubCategory="",PinType.PinSubCategoryObject="/Script/CoreUObject.ScriptStruct'/Script/KawaiiPhysics.KawaiiPhysicsSettings'",PinType.PinSubCategoryMemberReference=(),PinType.PinValueType=(),PinType.ContainerType=None,PinType.bIsReference=False,PinType.bIsConst=False,PinType.bIsWeakPointer=False,PinType.bIsUObjectWrapper=False,PinType.bSerializeAsSinglePrecisionFloat=False,PersistentGuid=00000000000000000000000000000000,bHidden=False,bNotConnectable=False,bDefaultValueIsReadOnly=False,bDefaultValueIsIgnored=False,bAdvancedView=False,bOrphanedPin=False,LinkedTo=(AnimGraphNode_KawaiiPhysics_4 F56CA1A44D9143498D4F0E924F403F39,AnimGraphNode_KawaiiPhysics_9 F56CA1A44D9143498D4F0E924F403F39))
@@ -807,9 +807,18 @@ Begin Object Class=/Script/BlueprintGraph.K2Node_VariableGet Name="K2Node_Variab
 End Object
 Begin Object Class=/Script/BlueprintGraph.K2Node_VariableGet Name="K2Node_VariableGet_15" ExportPath="/Script/BlueprintGraph.K2Node_VariableGet'/Game/SplineTest_01/AV_main_04/ABP_splineTest_04_codeTest.ABP_splineTest_04_codeTest:AnimGraph.K2Node_VariableGet_15'"
    VariableReference=(MemberName="PS_base_05",MemberGuid=1547B0FB4B0D37E92937329A4395CEED,bSelfContext=True)
-   NodePosX=-200
+   NodePosX=-100
    NodePosY= 222
    NodeGuid=4E8E58FD4F5FC5C45FFE1CB33DD4C250
    CustomProperties Pin (PinId=A76A698E4CE31EE8E2B8B5B3A7C78319,PinName="PS_base_05",Direction="EGPD_Output",PinType.PinCategory="struct",PinType.PinSubCategory="",PinType.PinSubCategoryObject="/Script/CoreUObject.ScriptStruct'/Script/KawaiiPhysics.KawaiiPhysicsSettings'",PinType.PinSubCategoryMemberReference=(),PinType.PinValueType=(),PinType.ContainerType=None,PinType.bIsReference=False,PinType.bIsConst=False,PinType.bIsWeakPointer=False,PinType.bIsUObjectWrapper=False,PinType.bSerializeAsSinglePrecisionFloat=False,PersistentGuid=00000000000000000000000000000000,bHidden=False,bNotConnectable=False,bDefaultValueIsReadOnly=False,bDefaultValueIsIgnored=False,bAdvancedView=False,bOrphanedPin=False,LinkedTo=(AnimGraphNode_KawaiiPhysics_5 F56CA1A44D9143498D4F0E924F403F39))
    CustomProperties Pin (PinId=43441CCA45A775B15DBDECAD4D7AD8DB,PinName="self",PinFriendlyName=NSLOCTEXT("K2Node", "Target", "Target"),PinType.PinCategory="object",PinType.PinSubCategory="",PinType.PinSubCategoryObject="/Script/Engine.AnimBlueprintGeneratedClass'/Game/SplineTest_01/AV_main_04/ABP_splineTest_04_codeTest.ABP_splineTest_04_codeTest_C'",PinType.PinSubCategoryMemberReference=(),PinType.PinValueType=(),PinType.ContainerType=None,PinType.bIsReference=False,PinType.bIsConst=False,PinType.bIsWeakPointer=False,PinType.bIsUObjectWrapper=False,PinType.bSerializeAsSinglePrecisionFloat=False,PersistentGuid=00000000000000000000000000000000,bHidden=True,bNotConnectable=False,bDefaultValueIsReadOnly=False,bDefaultValueIsIgnored=False,bAdvancedView=False,bOrphanedPin=False,)
+End Object
+
+Begin Object Class=/Script/BlueprintGraph.K2Node_VariableGet Name="K2Node_VariableGet_19" ExportPath="/Script/BlueprintGraph.K2Node_VariableGet'/Game/SplineTest_01/AV_main_04/ABP_splineTest_04_codeTest.ABP_splineTest_04_codeTest:AnimGraph.K2Node_VariableGet_19'"
+   VariableReference=(MemberName="LD_base_01",MemberGuid=CD25E1C740E5F5ACA84558A9C72F283E,bSelfContext=True)
+   NodePosX=-300
+   NodePosY=30
+   NodeGuid=165D85694FAF8F46863E8987B316C30E
+   CustomProperties Pin (PinId=A10BBAC94D24C50EC9DAA5B2F4BF1695,PinName="LD_base_01",Direction="EGPD_Output",PinType.PinCategory="object",PinType.PinSubCategory="",PinType.PinSubCategoryObject="/Script/CoreUObject.Class'/Script/KawaiiPhysics.KawaiiPhysicsLimitsDataAsset'",PinType.PinSubCategoryMemberReference=(),PinType.PinValueType=(),PinType.ContainerType=None,PinType.bIsReference=False,PinType.bIsConst=False,PinType.bIsWeakPointer=False,PinType.bIsUObjectWrapper=True,PinType.bSerializeAsSinglePrecisionFloat=False, PersistentGuid=00000000000000000000000000000000,bHidden=False,bNotConnectable=False,bDefaultValueIsReadOnly=False,bDefaultValueIsIgnored=False,bAdvancedView=False,bOrphanedPin=False,LinkedTo=(AnimGraphNode_KawaiiPhysics_1 6222BDF34477D9F24F863390648BE4CA,AnimGraphNode_KawaiiPhysics_2 6222BDF34477D9F24F863390648BE4CA,AnimGraphNode_KawaiiPhysics_3 6222BDF34477D9F24F863390648BE4CA,AnimGraphNode_KawaiiPhysics_4 6222BDF34477D9F24F863390648BE4CA,AnimGraphNode_KawaiiPhysics_5 6222BDF34477D9F24F863390648BE4CA,AnimGraphNode_KawaiiPhysics_6 6222BDF34477D9F24F863390648BE4CA,AnimGraphNode_KawaiiPhysics_7 6222BDF34477D9F24F863390648BE4CA,AnimGraphNode_KawaiiPhysics_8 6222BDF34477D9F24F863390648BE4CA,AnimGraphNode_KawaiiPhysics_9 6222BDF34477D9F24F863390648BE4CA))
+   CustomProperties Pin (PinId=104BEA6145561AF8599026B0E574DC3E,PinName="self",PinFriendlyName=NSLOCTEXT("K2Node", "Target", "Target"),PinType.PinCategory="object",PinType.PinSubCategory="",PinType.PinSubCategoryObject="/Script/Engine.AnimBlueprintGeneratedClass'/Game/SplineTest_01/AV_main_04/ABP_splineTest_04_codeTest.ABP_splineTest_04_codeTest_C'",PinType.PinSubCategoryMemberReference=(),PinType.PinValueType=(),PinType.ContainerType=None,PinType.bIsReference=False,PinType.bIsConst=False,PinType.bIsWeakPointer=False,PinType.bIsUObjectWrapper=False,PinType.bSerializeAsSinglePrecisionFloat=False,PersistentGuid=00000000000000000000000000000000,bHidden=True,bNotConnectable=False,bDefaultValueIsReadOnly=False,bDefaultValueIsIgnored=False,bAdvancedView=False,bOrphanedPin=False,)
 End Object

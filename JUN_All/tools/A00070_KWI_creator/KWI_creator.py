@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 
-# last Update date : 26.05.23
+# last Update date : 26.05.24
 # Python Script by Ji Hun Park
 
-# KWI creator V01.00
+# KWI creator V01.01
 # V01.00 : Create
+# V01.01 : create linking setting nodes, LD nodes
 
 
 import glob, os, re, math, ast
@@ -16,19 +17,25 @@ path_write = "0020_out"
 
 fileName_KWI_node           = "A0001_Src_KWI_node.py"
 fileName_KWI_setting_node   = "A0002_Src_KWI_setting_node.py"
+fileName_KWI_LD_node        = "A0003_Src_KWI_LD.py"
+
 fileName_tgtBones           = "A0101_tgtBones.py"
 
 fileName_out_KWI_nodes          = "A001_KWI_nodes_out.py"
 fileName_out_KWI_setting_nodes  = "A002_KWI_setting_nodes_out.py"
+fileName_out_KWI_LD_nodes       = "A003_KWI_LD_nodes_out.py"
 
 current_dir                         = os.path.dirname(os.path.abspath(__file__))
 target_path_read_root               = os.path.join(current_dir, path_read, "*")
 target_path_read_KWI_node           = os.path.join(current_dir, path_read, fileName_KWI_node)
 target_path_read_KWI_setting_node   = os.path.join(current_dir, path_read, fileName_KWI_setting_node)
+target_path_read_KWI_LD_node        = os.path.join(current_dir, path_read, fileName_KWI_LD_node)
+
 target_path_read_tgtBones           = os.path.join(current_dir, path_read, fileName_tgtBones)
 
 target_path_write_base_node         = os.path.join(current_dir, path_write, fileName_out_KWI_nodes)
 target_path_write_setting_node      = os.path.join(current_dir, path_write, fileName_out_KWI_setting_nodes)
+target_path_write_LD_node           = os.path.join(current_dir, path_write, fileName_out_KWI_LD_nodes)
 
 
 file_list = glob.glob(target_path_read_root)
@@ -184,3 +191,17 @@ setting_node_new =  build_setting_nodes_link(read_text_setting_node, lst_setting
 with open(target_path_write_setting_node, 'w', encoding="utf-8") as f:
     f.write(setting_node_new)
 
+# ==============================================================================
+# create and link limited data nodes
+
+read_text_limited_data_node = None
+
+with open(target_path_read_KWI_LD_node, 'r', encoding="utf-8") as f:
+    read_text_limited_data_node = f.readlines()
+
+LD_linked_to = build_setting_nodes_lst_linked_to(1, KWI_tgt_node_num, pin_id = "6222BDF34477D9F24F863390648BE4CA")
+print(LD_linked_to[0])
+read_text_limited_data_node = build_LD_node_link(read_text_limited_data_node, LD_linked_to[0])
+
+with open(target_path_write_LD_node, 'w', encoding="utf-8") as f:
+    f.write(read_text_limited_data_node)
