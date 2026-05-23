@@ -440,3 +440,20 @@ self.btn_test_01 = JUN_button__.Buttons(self.btn_spec["test_01"])
 
 Buttons 과 ButtonSpec 클래스를 하나의 파일에 구현해서 관리를 할까.
 아니면 각각 파일을 만들어서 관리할까?
+
+read 함수를 통해 어떤 파일을 읽고 list_main 이라는 리스트로 받아왔어. 
+매 줄마다 07E3FD484D9ABE61B95D8EB9E224A86E 라는 텍스트가 있는지 검사하고 텍스트가 발견되면 그 줄에만 특정한 텍스트를 추가하고 싶어.
+매번 발견된 줄은 "CustomProperties Pin (PinId = .... )" 이라는 형식일거야.
+첫번째로 발견된 줄에는 LinkedTo=(AnimGraphNode_KawaiiPhysics_0 4D524E0342A22F9A278E3EB31AF3C195) 을 소괄호 맨 마지막에 추가할거야. 
+그렇다면 첫번째줄은
+"CustomProperties Pin (PinId = .... , LinkedTo=(AnimGraphNode_KawaiiPhysics_0 4D524E0342A22F9A278E3EB31AF3C195))" 
+이렇게 바뀌겠지. 두번째줄에는 LinkedTo=(AnimGraphNode_KawaiiPhysics_2 4D524E0342A22F9A278E3EB31AF3C195) 를 추가할거야.
+그렇다면
+"CustomProperties Pin (PinId = .... , LinkedTo=(AnimGraphNode_KawaiiPhysics_1 4D524E0342A22F9A278E3EB31AF3C195))"
+이렇게 바뀌겠지. 
+이렇게 list_main 을 수정시키고 싶어. 해당 함수를 파이썬으로 만들어
+
+list_main 이라는 리스트는 아래처럼 구성되어 있어
+['\n   NodeGuid=E4EEC3844791DCA414111991977D42B4\n   CustomProperties Pin (PinId=F56CA1A44D9143498D4F0E924F403F39,PinName="PhysicsSettings")\n   CustomProperties Pin (PinId=07E3FD484D9ABE61B95D8EB9E224A86E,PinName="ComponentPose")\n   CustomProperties Pin (PinId=DC552E7948A3DC1994B46F8B5978E079,PinName="bAlphaBoolEnabled")\n   CustomProperties Pin (PinId=4C2E67F14A6019EDAE94CAA3A405A4BF,PinName="Alpha")\n   CustomProperties Pin (PinId=4A24133641A333F5ED52C596E98B562B,PinName="AlphaCurveName")\n   CustomProperties Pin (PinId=6222BDF34477D9F24F863390648BE4CA,PinName="LimitsDataAsset")\n   CustomProperties Pin (PinId=B73F8A01491AB1A7136BE2849B11E587,PinName="BoneConstraintsDataAsset")\n   CustomProperties Pin (PinId=4D524E0342A22F9A278E3EB31AF3C195,PinName="Pose")\nEnd Object\n']
+이때 네가 제시한 함수의 enumerate 기능이 의도대로 기능하지 않아
+list_main 에 맞는 기능으로 수정해
