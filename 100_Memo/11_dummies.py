@@ -350,3 +350,93 @@ setUp_app_dir.py 기능을 하는 코드를 만들어
 with open(user_setup_path, "w", encoding="utf-8") as f:
     f.write(user_setup_code)
 위 코드를 통해 파일을 생성할때 이름이 같은 파일이 있다면 덮어 쓰지말고 접미사로 001, 002.. 를 붙여서 다른 버전이 만들어지도록 하고싶어. 코드를 생성해
+
+
+from dataclasses import dataclass, field
+
+
+@dataclass
+class ButtonSpec:
+
+    label: str
+
+    height: int = 30
+
+    width: int = 120
+
+    backgroundcolor: list = field(default_factory=list)
+
+    callback: callable
+
+    args: tuple = field(default_factory=tuple)
+
+    kwargs: dict = field(default_factory=dict)
+
+위 코드 작성후 아래와 같은 에러가 떴어
+
+# Error: non-default argument 'callback' follows default argument
+# # Traceback (most recent call last):
+# #   File "<maya console>", line 1, in <module>
+# #   File "G:\D_link_dir/02_Maya_python_Jun/JUN_All\tools\A00030_quickTool\__init__.py", line 1, in <module>
+# #     from .launcher import run
+# #   File "G:\D_link_dir/02_Maya_python_Jun/JUN_All\tools\A00030_quickTool\launcher.py", line 4, in <module>
+# #     from . import MOD_QuickTool_v01 as tool
+# #   File "G:\D_link_dir/02_Maya_python_Jun/JUN_All\tools\A00030_quickTool\MOD_QuickTool_v01.py", line 17, in <module>
+# #     from Framework.ui import JUN_mod_tfg
+# #   File "G:\D_link_dir/02_Maya_python_Jun/JUN_All\Framework\ui\__init__.py", line 12, in <module>
+# #     from Framework.ui import MOD_buttonSpec_v01 as JUN_buttonSpec
+# #   File "G:\D_link_dir/02_Maya_python_Jun/JUN_All\Framework\ui\MOD_buttonSpec_v01.py", line 6, in <module>
+# #     class ButtonSpec:
+# #   File "C:\Program Files\Autodesk\Maya2023\Python\lib\dataclasses.py", line 1021, in dataclass
+# #     return wrap(cls)
+# #   File "C:\Program Files\Autodesk\Maya2023\Python\lib\dataclasses.py", line 1013, in wrap
+# #     return _process_class(cls, init, repr, eq, order, unsafe_hash, frozen)
+# #   File "C:\Program Files\Autodesk\Maya2023\Python\lib\dataclasses.py", line 927, in _process_class
+# #     _init_fn(flds,
+# #   File "C:\Program Files\Autodesk\Maya2023\Python\lib\dataclasses.py", line 504, in _init_fn
+# #     raise TypeError(f'non-default argument {f.name!r} '
+# # TypeError: non-default argument 'callback' follows default argument
+
+해결해줘
+
+
+
+class Buttons:
+    def __init__(self):
+        self.btnSpec = None
+    
+    def set__(self, spec):
+        self.btnSpec = spec
+
+
+self.btn_test_01 = JUN_button__.Buttons.set__(self.btn_spec["test_01"])  
+
+위처럼 set__ 함수를 호출하면 아래처럼 spec 을 채우라고 애러가 떠
+
+ # TypeError: set__() missing 1 required positional argument: 'spec'
+
+그럼 self 하고 spec 둘 다 변수를 채워야 하나? 그렇게 안해도 다른 클래스들은 self 없어도 잘 됐는데
+
+class Buttons:
+    def __init__(self):
+        self.btnSpec = None
+    def set__(self, spec):
+        self.btnSpec = spec
+
+self.btn_test_01 = JUN_button__.Buttons()
+
+self.btn_test_01.set__(self.btn_spec["test_01"])        
+
+위처럼 클래스 만들고 set__ 함수로 세팅하지 말고
+
+class Buttons:
+    def __init__(self, spec = None):
+        self.btnSpec = spec
+
+self.btn_test_01 = JUN_button__.Buttons(self.btn_spec["test_01"])
+
+이렇게 선언하는 동시에 세팅을 하는게 좋은 방법일까?
+
+
+Buttons 과 ButtonSpec 클래스를 하나의 파일에 구현해서 관리를 할까.
+아니면 각각 파일을 만들어서 관리할까?

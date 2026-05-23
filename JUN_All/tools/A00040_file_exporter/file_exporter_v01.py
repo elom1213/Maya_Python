@@ -1,8 +1,9 @@
-# last Update date 2026. 05. 09
+# last Update date 2026. 05. 22
 # Python Script by Ji Hun Park
 
-# file_exporter_v01 V01.00
+# file_exporter_v01 V01.01
 # V01.00 : create
+# V01.01 : update unparent and parenting until
 
 
 import maya.cmds as cmds;

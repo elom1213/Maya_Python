@@ -4,6 +4,7 @@ MODULES = {
     "ui": [
         "Framework.ui.__init__",
         "Framework.ui.config",
+        "Framework.ui.MOD_button_v01",
         "Framework.ui.MOD_colorThem",
         "Framework.ui.MOD_optionMenuGrp_v01",
         "Framework.ui.MOD_radioCollection_01_01",

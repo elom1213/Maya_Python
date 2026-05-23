@@ -11,7 +11,7 @@ from functools import partial
 
 from . import config
 from .utility import *
-from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_tfg, JUN_mod_omg, JUN_mod_cbg
+from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_tfg, JUN_mod_omg, JUN_mod_cbg, JUN_button__
 
 class JUN_ToolUI_base:
     def __init__(self):
@@ -36,6 +36,31 @@ class JUN_ToolUI_base:
         self.color_all = colorThem__.as_dict()
         # set color them (close)
         # =============================================================
+
+        self.btn_spec = {
+                        "test_01" : 
+                         JUN_button__.ButtonSpec(  label           = "test_01",
+                                                   callback        = self.fun_dummy,
+                                                   height          = 50,
+                                                   width           = 100,
+                                                   backgroundcolor = self.color_btn,
+                                                   args            = ["arg_01", "arg_02"],
+                                                   kwargs          = { "key_01": "kwargs_01",
+                                                                       "key_02": "kwargs_02"}),
+                         "test_02" : 
+                         JUN_button__.ButtonSpec(  label="test_02",
+                                                   callback=self.fun_dummy,
+                                                   height= 80,
+                                                   width = 150,
+                                                   backgroundcolor = self.color_btn,
+                                                   args = ["arg_03", "arg_04"],
+                                                   kwargs={"key_01": "kwargs_03",
+                                                           "key_02": "kwargs_04",})
+                        }
+        
+        self.btn_test_01 = JUN_button__.Buttons(self.btn_spec["test_01"])
+        self.btn_test_02 = JUN_button__.Buttons(self.btn_spec["test_02"])
+
 
     def show_about(self, *args):
         
@@ -75,6 +100,9 @@ class JUN_ToolUI_base:
         # create content here
         #
 
+        self.btn_test_01.build()
+        self.btn_test_02.build()
+
 
         cmds.text( align="center", label='Copyright (c) Park Ji Hun. All rights reserved.' );
 
@@ -86,16 +114,19 @@ class JUN_ToolUI_base:
         for spec in button_specs:
             self.create_btn(spec.get("label", "default"),
                             spec.get("callback", self.fun_dummy),
+                            spec.get("btn_hight", self.btn_hight),
                             *spec.get("args", []),
                             **spec.get("kwargs", {}))
             
-    def create_btn(self, flag_lable = "default", flag_command = None, *cb_args, **cb_kwargs):
-        if flag_command is None:
-            flag_command = self.fun_dummy
-        cmds.button( h = self.btn_hight,
+    def create_btn(self, flag_lable = "default", callback_fun = None, btn_hight = None ,*cb_args, **cb_kwargs):
+        if callback_fun is None:
+            callback_fun = self.fun_dummy
+        if btn_hight is None:
+            btn_hight = self.btn_hight
+        cmds.button( h = btn_hight,
                      label= flag_lable, 
                      bgc=self.color_btn, 
-                     command=partial(flag_command, *cb_args, **cb_kwargs));
+                     command=partial(callback_fun, *cb_args, **cb_kwargs));
 
            
 def base__():
