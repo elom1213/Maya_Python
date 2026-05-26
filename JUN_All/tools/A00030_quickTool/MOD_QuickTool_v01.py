@@ -1,7 +1,7 @@
-# last Update date 26 05 23
+# last Update date 26 05 27
 # Python Script by Ji Hun Park
 
-# Quickk Tool V01.10
+# Quickk Tool V01.11
 # V01.04 : Create Create tool
 # V01.05 : Create Anim Tool
 # V01.06 : Create UV Tool
@@ -9,6 +9,7 @@
 # V01.08 : Update Anim Tool. Add ty
 # V01.09 : Create separate curve tool
 # V01.10 : remove separate curve tool
+# V01.11 : remove rename uv button
 
 import maya.cmds as cmds;
 import maya.mel as mel
@@ -73,28 +74,6 @@ def JUN_cmd_anim_rot_x_z_to_zero(*args, **kwargs):
 
     cmds.setKeyframe( objs[0], at="ty", v = val_rot_y)
 
-def JUN_cmd_rename_uvSet(*args, **kwargs):
-    objs = cmds.ls(sl = True, fl= True)
-    lst_origin_uvSets = []
-    lst_new_uvSets = []
-    for i in range(len(objs)):
-        cmds.select(objs[i])
-        lst_uvSets_origin = cmds.polyUVSet(q=True, allUVSets=True)
-
-        lst_origin_uvSets.append(objs[i] + " : " + " ".join(lst_uvSets_origin))
-        try :
-            cmds.polyUVSet(rename=True,newUVSet="map1", uvSet=lst_uvSets_origin[0])
-        except:
-            pass
-        lst_uvSets_new = cmds.polyUVSet(q=True, allUVSets=True)
-        lst_new_uvSets.append(objs[i] + " : " + " ".join(lst_uvSets_new))
-
-    str_origin_uvSets = "\n".join(lst_origin_uvSets)
-    str_new_uvSets = "\n".join(lst_new_uvSets)
-    print(str_origin_uvSets)
-    print("COMPLETE")
-    print(str_new_uvSets)
-
 
 # call back functions (End)
 #====================================================================
@@ -106,7 +85,7 @@ class JUN_ToolUI_QuickTool:
         self.str_headTitle = "Quick Tool V01.10"
         self.str_winName = "Junny_win_Quick_tool_V01_10"
         self.win_width = 300;
-        self.win_height = 500;
+        self.win_height = 450;
         self.btn_hight = self.win_height/40
 
         self.color_mainDark = [0.10, 0.12, 0.18]
@@ -260,20 +239,6 @@ class JUN_ToolUI_QuickTool:
 
         cmds.setParent( '..' )
         # Anim Tool (close)
-
-        # UV Tool (open)
-        cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =self.color_sub );
-
-        cmds.text( align="left", label='UV Tool' );
-
-        cmds.setParent( '..' )
-
-        cmds.paneLayout( configuration= "vertical2", paneSize = ([1,50,100],[2,50,100]))
-
-        self.create_buttons(btn_specs[self.idx_rename_uvSet])
-
-        cmds.setParent( '..' )
-        # UV Tool (close)
 
         cmds.text( align="center", label='Copyright (c) Park Ji Hun. All rights reserved.' );
 

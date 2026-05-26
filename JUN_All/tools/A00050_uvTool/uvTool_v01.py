@@ -1,8 +1,9 @@
-# last Update date : 2026. 05. 10
+# last Update date : 2026. 05. 27
 # Python Script by Ji Hun Park
 
-# uvTool V01.00
+# uvTool V01.01
 # V01.00 : create 
+# V01.01 : create rename uv set button
 
 
 import maya.cmds as cmds;
@@ -18,7 +19,7 @@ class JUN_ToolUI_uvTool_v01:
         self.str_headTitle = "uvTool V01.00"
         self.str_winName = "Junny_win_uvTool_v01_V01_00"
         self.win_width = 300;
-        self.win_height = 400;
+        self.win_height = 450;
         self.btn_hight = self.win_height/15
         self.updated = "10-MAY-2026"
 
@@ -44,14 +45,14 @@ class JUN_ToolUI_uvTool_v01:
 
         self.name_tsl_uvTool_main = "tsl_uvTool_main"
 
-        self.winSize_for_mod_tsl = {"window_height" : max(1, int(self.win_height*0.9)),
-                                    "window_width" : max(1, int(self.win_width*0.5))}
+        self.winSize_for_mod_tsl = {"window_height" : max(1, int(self.win_height*0.7)),
+                                    "window_width" : max(1, int(self.win_width*0.95))}
 
         self.tsl_spec_uvTool_main__  = { "name_tsl" : self.name_tsl_uvTool_main,
                                          "name_title" : "Objects",
                                          "num_item" : "num_object_main",
-                                         "able_btn_select" : False,
-                                         "able_btn_edit" : False,
+                                         "able_btn_select" : True,
+                                         "able_btn_edit" : True,
                                          **self.color_all,
                                          **self.winSize_for_mod_tsl }
         
@@ -66,6 +67,7 @@ class JUN_ToolUI_uvTool_v01:
 
 
         self.idx_set_objects = 0
+        self.idx_rename_uv_set = 1
 
         self.btn_specs = [
                             # idx_set_objects : 0
@@ -73,6 +75,14 @@ class JUN_ToolUI_uvTool_v01:
                                 { 
                                     "label": "Catch Objects",
                                     "callback": JUN_cmd_set_object_for_uv,
+                                    "kwargs": { "tsl_uvTool_main" : self.cls_tsl_selected_obj}
+                                }
+                            ], 
+                            # idx_set_objects : 1
+                            [
+                                { 
+                                    "label": "Rename uv set",
+                                    "callback": JUN_cmd_rename_uvSet,
                                     "kwargs": { "tsl_uvTool_main" : self.cls_tsl_selected_obj}
                                 }
                             ]
@@ -121,7 +131,6 @@ class JUN_ToolUI_uvTool_v01:
         
         cmds.frameLayout( label='Set Up', collapsable= True, bgc =self.color_main );
 
-        self.create_buttons(self.btn_specs[self.idx_set_objects])
 
         cmds.columnLayout(adjustableColumn=True, 
                           columnAttach=('both', 5), 
@@ -129,6 +138,21 @@ class JUN_ToolUI_uvTool_v01:
                           bgc =self.color_sub);
         
         self.cls_tsl_selected_obj.build()
+
+
+        cmds.setParent( '..' )
+
+        cmds.frameLayout( label='Tool', collapsable= True, bgc =self.color_main );
+
+        cmds.columnLayout(adjustableColumn=True, 
+                          columnAttach=('both', 5), 
+                          rowSpacing=6, 
+                          bgc =self.color_sub);
+        
+        self.create_buttons(self.btn_specs[self.idx_set_objects])
+        self.create_buttons(self.btn_specs[self.idx_rename_uv_set])
+
+        cmds.setParent( '..' )
 
         cmds.setParent( '..' )
 
