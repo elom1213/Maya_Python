@@ -1,1 +1,5 @@
-JUN_QT/**/0020_out/
+**/0020_out/
+
+# Python
+__pycache__/
+*.pyc

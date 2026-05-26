@@ -656,3 +656,21 @@ Node=(RootBone=(BoneName="cv_spline_necklace_02_01"),DampingCurveData= ...
 A0001_Src_KWI_node.py 는 Node=(RootBone=(BoneName="cv_spline_necklace_02_01") 라는 원본 코드 대신 이 위치에 JUN_RootBone 이라고 적어놓은 코드야.
 그리고 ...을 내가 원하는 값으로 수정한 후 JUN_RootBone 를 Node=(RootBone=(BoneName="...") 라는 문자열로 바꾸는 함수를 만들었어.
 바꾸고 싶은 위치마다 이런식으로 함수를 만들었는데. 이게 좋은 구성일까. 개선할 수 있는 부분이 있으면 말해줘
+
+root/
+├─   JUN_QT/
+│       └─ tools/
+│          └─ A00010_KWI_creator/
+│                 └─ app/
+│                     └─ core/
+│                        └─ 0020_out/
+│    
+├─ .git/
+└─ .gitignore
+
+내 로컬 저장소 폴더 구조는 위와 같아. .gitignore 파일을 통해 0020_out/ 내부의 모든파일이 관리되지 않았으면 해서 아래와 같이 .gitignore 을 작성했어
+
+
+JUN_QT/**/0020_out/
+
+이렇게 해서 push 를 해도 0020_out 내부의 수정사항이 계속 반영이 돼. 내 기대대로 작동하도록 .gitignore 를 수정하고 싶어.
