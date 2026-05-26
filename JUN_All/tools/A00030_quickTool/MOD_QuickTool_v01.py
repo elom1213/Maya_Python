@@ -121,7 +121,6 @@ class JUN_ToolUI_QuickTool:
         self.idx_create_tex_file = 3
         self.idx_anim_rot_x_z_to_zro = 4
         self.idx_rename_uvSet = 5
-        self.idx_separate_curve = 6
 
         self.tfg_rot_x = JUN_mod_tfg.JUN_mod_tfg_v01()  
         self.tfg_rot_z = JUN_mod_tfg.JUN_mod_tfg_v01()  
@@ -352,15 +351,7 @@ def JUN_PY_Quick_tool_v01_08():
                             "callback": JUN_cmd_rename_uvSet
                         }
 
-                    ],
-                    # idx_separate_curve : 6
-                    [
-                        {
-                            "label": "Separate Curve",
-                            "callback": JUN_cmd_separate_curve
-                        }
-
-                    ]
+                    ]                  
                 ]
     
     JUN_Win_QuickTool.build(btn_specs)
