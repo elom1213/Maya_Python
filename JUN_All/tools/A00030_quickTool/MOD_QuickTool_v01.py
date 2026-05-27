@@ -99,7 +99,6 @@ class JUN_ToolUI_QuickTool:
         self.idx_importFBX_nrm = 2
         self.idx_create_tex_file = 3
         self.idx_anim_rot_x_z_to_zro = 4
-        self.idx_rename_uvSet = 5
 
         self.tfg_rot_x = JUN_mod_tfg.JUN_mod_tfg_v01()  
         self.tfg_rot_z = JUN_mod_tfg.JUN_mod_tfg_v01()  
@@ -308,15 +307,7 @@ def JUN_PY_Quick_tool_v01_08():
                             "callback": JUN_cmd_anim_rot_x_z_to_zero
                         }
 
-                    ],
-                    # idx_rename_uvSet : 5
-                    [
-                        {
-                            "label": "rename uvSet name",
-                            "callback": JUN_cmd_rename_uvSet
-                        }
-
-                    ]                  
+                    ]
                 ]
     
     JUN_Win_QuickTool.build(btn_specs)
