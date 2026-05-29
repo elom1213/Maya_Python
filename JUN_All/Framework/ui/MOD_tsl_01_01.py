@@ -80,6 +80,10 @@ class JUN_mod_tsl_v01:
         self.win_height             = tsl_spec.get("window_height", self.win_height)
         self.win_width              = tsl_spec.get("window_width", self.win_width)
 
+    def select_item_for_given_list(self, sel_list):
+        cmds.textScrollList( self.name_tsl, e=True, deselectAll=True);
+        cmds.textScrollList( self.name_tsl, e=True, selectItem=sel_list);
+
     def JUN_cmd_sort(self, str_name_tsl_input, *args):
         str_list_tsl = cmds.textScrollList(str_name_tsl_input, q = 1, allItems=1);
         str_list_sorted = sorted(str_list_tsl);
@@ -119,7 +123,9 @@ class JUN_mod_tsl_v01:
 
         self.JUN_cmd_append_tsl(str_selList, *args)
 
-    def JUN_cmd_tsl_select ( self, str_selTool_tsl_selList, *args ):
+    def JUN_cmd_tsl_select ( self, str_selTool_tsl_selList = None, *args ):
+        if str_selTool_tsl_selList is None:
+            str_selTool_tsl_selList = self.name_tsl
 
         str_scrollList = cmds.textScrollList( str_selTool_tsl_selList, q=True, selectItem=True );
         

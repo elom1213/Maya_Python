@@ -1,12 +1,13 @@
 # last Update date : 26.05.29
 # Python Script by Ji Hun Park
 
-# jointTool V02.04
+# jointTool V02.05
 # V02.00 : Create
 # V02.01 : Updaet max joint num
 # V02.02 : Update removing curves by length
 # V02.03 : create separate curve util
 # V02.04 : set joint radius on revere joints
+# V02.05 : create select unused joints 
 
 
 import maya.cmds as cmds;
@@ -19,7 +20,7 @@ from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod
 
 class JUN_ToolUI_base:
     def __init__(self):
-        self.jntTool_version = "V02.04"
+        self.jntTool_version = "V02.05"
         self.jntTool_version__ = self.jntTool_version.replace(".", "_")
         self.str_headTitle = f"jointTool {self.jntTool_version}"
         self.str_winName = f"Junny_win_joint_tool_{self.jntTool_version__}"
@@ -179,6 +180,16 @@ class JUN_ToolUI_base:
                                                     "cbg_remove_origin" : self.cbg_remove_origin,
                                                 }
                                     }
+                                ],
+                                "select_unused_joints" :
+                                [
+                                    { 
+                                        "label": "Select Unused Joints ",
+                                        "callback": select_unused_joints,
+                                        "kwargs": {
+                                                    "tsl_jointTool_main" : self.tsl_jointTool_main
+                                                }
+                                    }
                                 ]
                             }
         
@@ -311,6 +322,8 @@ class JUN_ToolUI_base:
         self.create_buttons(self.btn_specs["reverse_joint"])        
 
         cmds.setParent( '..' )
+
+        self.create_buttons(self.btn_specs["select_unused_joints"])        
 
         cmds.setParent( '..' )
 

@@ -203,3 +203,31 @@ def reverse_joint_chain(root_joint):
     print("Reverse chain created")
 
     return new_joints
+
+def select_unused_joints(*args, **kwargs):
+    tsl_main             = kwargs.get("tsl_jointTool_main")
+    lst_joint_all = tsl_main.get_all_item()
+    lst_joint_unused =  get_unused_joints(lst_joint_all)
+    tsl_main.select_item_for_given_list(lst_joint_unused)
+    cmds.select(clear = True)
+    tsl_main.JUN_cmd_tsl_select()
+
+def get_unused_joints(joint_list):
+
+    weighted = set()
+
+    for skin in cmds.ls(type="skinCluster") or []:
+
+        influences = cmds.skinCluster(
+            skin,
+            q=True,
+            weightedInfluence=True
+        ) or []
+
+        weighted.update(influences)
+
+    return [
+        jnt
+        for jnt in joint_list
+        if jnt not in weighted
+    ]
