@@ -103,7 +103,7 @@ def reverse_joint_chain(root_joint):
     # =========================
     # joint chain 수집
     # =========================
-
+    parent_root_jnt = cmds.listRelatives(root_joint, parent=True, fullPath = True)
     joints = cmds.listRelatives(
         root_joint,
         ad=True,
@@ -133,20 +133,27 @@ def reverse_joint_chain(root_joint):
             t=True
         )
 
+        rad = cmds.getAttr(jnt + '.radius')
+
         joint_data.append({
             "name": jnt,
-            "pos": pos
+            "pos": pos,
+            "radius" : float(rad)
         })
 
     # =========================
     # 역순 생성
     # =========================
 
-    reversed_data = list(reversed(joint_data))
+    reversed_data = copy.deepcopy(list(reversed(joint_data)))
 
     new_joints = []
 
     cmds.select(clear=True)
+
+    for i in range(0, len(reversed_data)):
+        reversed_data[i]["radius"] = joint_data[i]["radius"]
+        reversed_data[i]["name"] = joint_data[i]["name"]
 
     for data in reversed_data:
 
@@ -156,8 +163,11 @@ def reverse_joint_chain(root_joint):
             name=new_name,
             p=data["pos"]
         )
-
+        cmds.setAttr(jnt + ".radius", data["radius"])
         new_joints.append(jnt)
+
+    if parent_root_jnt is not None:
+        jnt = cmds.parent(new_joints[0], parent_root_jnt)
 
     # =========================
     # orient 정리

@@ -1,11 +1,12 @@
-# last Update date : 26.05.23
+# last Update date : 26.05.29
 # Python Script by Ji Hun Park
 
-# jointTool V02.02
+# jointTool V02.04
 # V02.00 : Create
 # V02.01 : Updaet max joint num
 # V02.02 : Update removing curves by length
 # V02.03 : create separate curve util
+# V02.04 : set joint radius on revere joints
 
 
 import maya.cmds as cmds;
@@ -18,12 +19,14 @@ from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod
 
 class JUN_ToolUI_base:
     def __init__(self):
-        self.str_headTitle = "jointTool V02.03"
-        self.str_winName = "Junny_win_joint_tool_V02_03"
+        self.jntTool_version = "V02.04"
+        self.jntTool_version__ = self.jntTool_version.replace(".", "_")
+        self.str_headTitle = f"jointTool {self.jntTool_version}"
+        self.str_winName = f"Junny_win_joint_tool_{self.jntTool_version__}"
         self.win_width = 300;
         self.win_height = 600;
         self.btn_hight = self.win_height/20
-        self.updated = "23-MAY-2026"
+        self.updated = "29-MAY-2026"
 
         # =============================================================
         # set color them (open)
