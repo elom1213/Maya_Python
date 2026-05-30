@@ -1,5 +1,64 @@
 import glob, os, re, math, ast
 
+
+def remove_specific_pattern(text, patterns_to_remove):
+    for pattern in patterns_to_remove:
+        text = text.replace(pattern, "")
+    return text
+
+def join_list_with_newline(items, end_newline=False):
+    text = "\n".join(items)
+    if end_newline:
+        text += "\n"
+    return text
+
+def get_replaced_root_bone_name(text, new_name, pattern_given = "JUN_RootBone"):
+    pattern = pattern_given
+    replaced_text = re.sub(pattern, f'Node=(RootBone=(BoneName="{new_name}")', text)
+    return replaced_text
+
+def KWI_replace_by_pattern_before_num(text, new_pattern, pattern_given):
+    pattern = rf"({pattern_given})-?\d+"
+    replaced_text = re.sub(pattern, r"\g<1>" + str(new_pattern), text)
+    return replaced_text
+
+  
+def KWI_add_addtitional_bones(text, bones_list, pattern_given = 'JUN_AdditionalRootBones'):
+    pattern = pattern_given
+    
+    return re.sub(
+        pattern,
+        f"{bones_list}",
+        text
+    )
+   
+def KWI_create_text_rootBones(bone_list):
+    if not bone_list:
+        return ""
+
+    # 첫 번째는 RootBone
+    root_bone = bone_list[0]
+
+    # 나머지는 AdditionalRootBones
+    additional = bone_list[1:]
+
+    # AdditionalRootBones 문자열 생성
+    if additional:
+        additional_str = ",".join(
+            f'(RootBone=(BoneName="{bone}"))' for bone in additional
+        )
+        additional_part = f',AdditionalRootBones=({additional_str})'
+    else:
+        additional_part = ""
+
+    # 최종 문자열
+    result = (
+        f'Node=(RootBone=(BoneName="{root_bone}")'
+        f'{additional_part})'
+    )
+    return result
+
+
 def get_tgt_bones(target_path_tgtBones):
   with open(target_path_tgtBones, 'r', encoding="utf-8") as f:
     read_text = f.read()
@@ -23,7 +82,7 @@ def add_linkedto_to_lines(
         link_id="4D524E0342A22F9A278E3EB31AF3C195"
     ):
 
-    if found_index == 0:
+    if found_index < 0:
         return text_block
 
     lines = text_block.splitlines()

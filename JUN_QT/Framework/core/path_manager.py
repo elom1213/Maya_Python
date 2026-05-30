@@ -41,3 +41,13 @@ class PathManager:
         if not isinstance(value, str):
             raise ValueError("Name must be a string")
         self._dirs["write"] = value
+
+    @staticmethod
+    def ensure_dir(file_path):
+
+        path = Path(file_path)
+
+        path.parent.mkdir(
+            parents=True,
+            exist_ok=True
+        )

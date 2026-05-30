@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QTextEdit,
 )
 
+from app.config.version import VERSION
 from app.core.file_processor import process_file
 from app.core.KWI_creator import KWI_creator
 
@@ -19,7 +20,7 @@ class MainWindow(QWidget):
 
         super().__init__()
 
-        self.win_title = "Kawaii Creator v01.00"
+        self.win_title = f"Kawaii Creator v{VERSION}"
         self.win_width = 600
         self.win_hight = 400
 
@@ -41,12 +42,19 @@ class MainWindow(QWidget):
         self.label_setting_nodes_num = QLabel("Setting nodes Number")
 
         self.ipf_setting_nodes_num = QLineEdit()    
-        self.ipf_setting_nodes_num.setPlaceholderText("1")
+        self.ipf_setting_nodes_num.setText ("1")
 
         # radio button
         self.radio_create_multiple_nodes = QRadioButton("Multiple Nodes")
         self.radio_create_single_node    = QRadioButton("Single Node")
 
+        self.radio_create_multiple_nodes.toggled.connect(
+                                                            lambda checked:
+                                                            checked and self.KWI_creator.set_mode("multiple")
+                                                            )
+        self.radio_create_single_node.toggled.connect(      lambda checked:
+                                                            checked and self.KWI_creator.set_mode("single")
+                                                            )
         self.radio_create_multiple_nodes.setChecked(True)
 
         # btn : create nodes
@@ -81,32 +89,12 @@ class MainWindow(QWidget):
     def is_create_multiple_nodes(self):
         return self.radio_create_multiple_nodes.isChecked()
 
-    def log_create_create_mult_nodes(self):
-
-        create_mult_nodes = self.is_create_multiple_nodes()
-        log = None
-
-        if create_mult_nodes:
-            log = "Create multiple nodees"
-        else :
-            log = "Create single nodee"
-
-
-        self.log_main.append(log)
-
     def create_base_nodes_on_click(self):
 
-        create_mult_nodes = self.is_create_multiple_nodes()
-
-
-        self.KWI_creator.reset_create_type()
-        self.KWI_creator.create_multiple_nodes = create_mult_nodes
-        self.KWI_creator.create_single_node = not create_mult_nodes
-
         self.KWI_creator.create_base_nodes()
-
-        self.log_create_create_mult_nodes()
-        self.log(self.log_main)
+        mode_current = self.KWI_creator.create_mode
+        mode_current = "Current mode  :  " + str(mode_current)
+        self.log(mode_current)
 
 
     def create_setting_nodes_on_click(self):
@@ -120,9 +108,6 @@ class MainWindow(QWidget):
 
             self.log("Must be integer")
             return
-        
-        print(num_setting_node__)
-        print(type(num_setting_node__))
 
         self.KWI_creator.num_setting_node = num_setting_node__
         self.KWI_creator.create_setting_nodes()

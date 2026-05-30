@@ -13,84 +13,18 @@ from .tool_path import KWIPaths
 from .utility import *
 from Framework.core.path_manager import PathManager
 
-def remove_specific_pattern(text, patterns_to_remove):
-    for pattern in patterns_to_remove:
-        text = text.replace(pattern, "")
-    return text
-
-def join_list_with_newline(items, end_newline=False):
-    text = "\n".join(items)
-    if end_newline:
-        text += "\n"
-    return text
-
-def get_replaced_root_bone_name(text, new_name, pattern_given = "JUN_RootBone"):
-    pattern = pattern_given
-    replaced_text = re.sub(pattern, f'Node=(RootBone=(BoneName="{new_name}")', text)
-    return replaced_text
-
-def KWI_replace_by_pattern_before_num(text, new_pattern, pattern_given):
-    pattern = rf"({pattern_given})-?\d+"
-    replaced_text = re.sub(pattern, r"\g<1>" + str(new_pattern), text)
-    return replaced_text
-
-  
-def KWI_add_addtitional_bones(text, bones_list, pattern_given = 'JUN_AdditionalRootBones'):
-    pattern = pattern_given
-    
-    return re.sub(
-        pattern,
-        f"{bones_list}",
-        text
-    )
-   
-def KWI_create_text_rootBones(bone_list):
-    if not bone_list:
-        return ""
-
-    # 첫 번째는 RootBone
-    root_bone = bone_list[0]
-
-    # 나머지는 AdditionalRootBones
-    additional = bone_list[1:]
-
-    # AdditionalRootBones 문자열 생성
-    if additional:
-        additional_str = ",".join(
-            f'(RootBone=(BoneName="{bone}"))' for bone in additional
-        )
-        additional_part = f',AdditionalRootBones=({additional_str})'
-    else:
-        additional_part = ""
-
-    # 최종 문자열
-    result = (
-        f'Node=(RootBone=(BoneName="{root_bone}")'
-        f'{additional_part})'
-    )
-    return result
-
-
 # ==============================================================================
 # create base nodes
 
 class KWI_creator:
     def __init__(self):
 
-        self.text_new_lst = []
         self.KWI_text_single_node = []
         self.patten_to_remove = ["JUN_RootBone,", "JUN_AdditionalRootBones,"]
 
         self.set_path()
-            
-        self.KWI_use_kawaii_generator = True
-
-        self._create_multiple_nodes = True
-        self._create_single_node = False
 
         self._num_setting_node = 5
-
-        self.base_node_num_str = 1
 
         self.KWI_class_name = "AnimGraphNode_KawaiiPhysics_"
 
@@ -101,56 +35,55 @@ class KWI_creator:
         self.KWI_nodePos_offset_X = 280
         self.KWI_nodePos_offset_Y = 200
         self.KWI_nodePos_lineChange = 4
-            
-        self.read_base_node = None
 
+        self.KWI_tgtBones_name = get_tgt_bones(self.paths.read_tgtBones)
+        self.KWI_tgt_node_num = len(self.KWI_tgtBones_name)
+
+        self._create_mode = "multiple"
 
     def set_path(self):
         self.pm = PathManager(  __file__, 
                                 read_dir  = "0010_src",
                                 write_dir = "0020_out" )
-
+        
+        self.extension = "py"
         self.paths = KWIPaths(
                                 read_KWI_base_node      =   self.pm.path(
                                     "read",
-                                    "A0001_Src_KWI_node.py"
+                                    f"A0001_Src_KWI_node.{self.extension}"
                                 ),
                             
                                 read_KWI_setting_node   =   self.pm.path(
                                     "read",
-                                    "A0002_Src_KWI_setting_node.py"
+                                    f"A0002_Src_KWI_setting_node.{self.extension}"
                                 ),
                             
                                 read_KWI_LD_node        =   self.pm.path(
                                     "read",
-                                    "A0003_Src_KWI_LD.py"
+                                    f"A0003_Src_KWI_LD.{self.extension}"
                                 ),
 
                                 read_tgtBones           =   self.pm.path(
                                     "read",
-                                    "A0101_tgtBones.py"
+                                    f"A0101_tgtBones.{self.extension}"
                                 ),
 
                                 write_base_node         =   self.pm.path(
                                     "write",
-                                    "A001_KWI_nodes_out.py"
+                                    f"A001_KWI_nodes_out.{self.extension}"
                                 ),
 
                                 write_setting_node      =   self.pm.path(
                                     "write",
-                                    "A002_KWI_setting_nodes_out.py"
+                                    f"A002_KWI_setting_nodes_out.{self.extension}"
                                 ),
 
                                 write_LD_node           =   self.pm.path(
                                     "write",
-                                    "A003_KWI_LD_nodes_out.py"
+                                    f"A003_KWI_LD_nodes_out.{self.extension}"
                                 ),
                             )
         
-        self.KWI_tgtBones_name = get_tgt_bones(self.paths.read_tgtBones)
-        self.KWI_tgt_node_num = len(self.KWI_tgtBones_name)
-        
-    
     @property
     def create_multiple_nodes(self):
         return self._create_multiple_nodes
@@ -162,6 +95,11 @@ class KWI_creator:
     @property
     def num_setting_node(self):
         return self._num_setting_node
+    
+    @property
+    def create_mode(self):
+        return self._create_mode
+
     
     @create_multiple_nodes.setter
     def create_multiple_nodes(self, value):
@@ -181,56 +119,94 @@ class KWI_creator:
             raise ValueError("Name must be a int")
         self._num_setting_node = value
 
+    @create_mode.setter
+    def create_mode(self, value):
+        if not isinstance(value, str):
+            raise ValueError("Name must be a string")
+        self._create_mode = value
 
-    def reset_create_type(self):
-        self._create_multiple_nodes = None
-        self._create_single_node = None
+    def set_mode(self, mode):
+        self._create_mode = mode
+        print(mode)
 
     def create_base_nodes(self):
 
+        mode_map = {
+            "multiple"      :   self._create_multiple_nodes_impl,
+            "single"        :   self._create_single_node_impl
+        }
+
+        func = mode_map.get(self._create_mode)
+
+        if func:
+            func()
+    
+    def set_mode(self, mode):
+        self._create_mode = mode
+
+    def _create_multiple_nodes_impl(self):
+
+        text_new_lst = []
+        read_base_node = []
+        base_node_num_str = 0
         with open(self.paths.read_KWI_base_node, 'r', encoding="utf-8") as f:
-            self.read_base_node = f.read()
+            read_base_node = f.read()
 
 
-        if self._create_multiple_nodes:
-            for idx_nodeNum in range(0, self.KWI_tgt_node_num):
-                self.KWI_text_single_node = KWI_replace_by_pattern_before_num(self.read_base_node, self.base_node_num_str, self.KWI_class_name)
-                self.KWI_text_single_node = get_replaced_root_bone_name(self.KWI_text_single_node, self.KWI_tgtBones_name[idx_nodeNum])
+        for idx_nodeNum in range(0, self.KWI_tgt_node_num):
+            self.KWI_text_single_node = KWI_replace_by_pattern_before_num(read_base_node, base_node_num_str, self.KWI_class_name)
+            self.KWI_text_single_node = get_replaced_root_bone_name(self.KWI_text_single_node, self.KWI_tgtBones_name[idx_nodeNum])
 
-                posX = self.KWI_nodePos_start_X + self.KWI_nodePos_offset_X * (idx_nodeNum % self.KWI_nodePos_lineChange)
-                posY = self.KWI_nodePos_start_Y + (math.floor(idx_nodeNum/self.KWI_nodePos_lineChange) * self.KWI_nodePos_offset_Y)
+            posX = self.KWI_nodePos_start_X + self.KWI_nodePos_offset_X * (idx_nodeNum % self.KWI_nodePos_lineChange)
+            posY = self.KWI_nodePos_start_Y + (math.floor(idx_nodeNum/self.KWI_nodePos_lineChange) * self.KWI_nodePos_offset_Y)
 
-                self.KWI_text_single_node = KWI_replace_by_pattern_before_num(self.KWI_text_single_node, posX, self.KWI_token_nodePos_X)
-                self.KWI_text_single_node = KWI_replace_by_pattern_before_num(self.KWI_text_single_node, posY, self.KWI_token_nodePos_Y)
+            self.KWI_text_single_node = KWI_replace_by_pattern_before_num(self.KWI_text_single_node, posX, self.KWI_token_nodePos_X)
+            self.KWI_text_single_node = KWI_replace_by_pattern_before_num(self.KWI_text_single_node, posY, self.KWI_token_nodePos_Y)
 
-                self.KWI_text_single_node = add_linkedto_to_lines(self.KWI_text_single_node, idx_nodeNum)
-                self.text_new_lst.append(self.KWI_text_single_node)
-                self.base_node_num_str += 1
+            self.KWI_text_single_node = add_linkedto_to_lines(self.KWI_text_single_node, idx_nodeNum-1)
+            text_new_lst.append(self.KWI_text_single_node)
+            base_node_num_str += 1
 
-        if self._create_single_node:
-            KWI_text_root_bones = KWI_create_text_rootBones(self.KWI_tgtBones_name)
-            KWI_text_mult_bones_in_single_node = KWI_add_addtitional_bones(self.read_base_node, KWI_text_root_bones)
-            self.text_new_lst.append(KWI_text_mult_bones_in_single_node)
-
-        text_new_string = join_list_with_newline(self.text_new_lst, True)
+        text_new_string = join_list_with_newline(text_new_lst, True)
 
         text_new_string = remove_specific_pattern(text_new_string, self.patten_to_remove)
 
-
+        self.pm.ensure_dir(self.paths.write_base_node)
         with open(self.paths.write_base_node, 'w', encoding="utf-8") as f:
             f.write(text_new_string)
+
+
+    def _create_single_node_impl(self):
+
+        text_new_lst = []
+        read_base_node = []
+        with open(self.paths.read_KWI_base_node, 'r', encoding="utf-8") as f:
+            read_base_node = f.read()
+    
+        KWI_text_root_bones = KWI_create_text_rootBones(self.KWI_tgtBones_name)
+        KWI_text_mult_bones_in_single_node = KWI_add_addtitional_bones(read_base_node, KWI_text_root_bones)
+        text_new_lst.append(KWI_text_mult_bones_in_single_node)
+
+        text_new_string = join_list_with_newline(text_new_lst, True)
+
+        text_new_string = remove_specific_pattern(text_new_string, self.patten_to_remove)
+
+        self.pm.ensure_dir(self.paths.write_base_node)
+        with open(self.paths.write_base_node, 'w', encoding="utf-8") as f:
+            f.write(text_new_string)
+
 
     def create_setting_nodes(self):
 
         read_text_setting_node = None
         
-
         with open(self.paths.read_KWI_setting_node, 'r', encoding="utf-8") as f:
             read_text_setting_node = f.readlines()
 
         lst_setting_node =  create_keyword_linked_to(self._num_setting_node, self.KWI_tgt_node_num)
         setting_node_new =  build_setting_nodes_link(read_text_setting_node, lst_setting_node)
 
+        self.pm.ensure_dir(self.paths.write_setting_node)
         with open(self.paths.write_setting_node, 'w', encoding="utf-8") as f:
             f.write(setting_node_new)
 
@@ -244,5 +220,6 @@ class KWI_creator:
         LD_linked_to = create_keyword_linked_to(1, self.KWI_tgt_node_num, pin_id = "6222BDF34477D9F24F863390648BE4CA")
         read_text_limited_data_node = link_LD_node(read_text_limited_data_node, LD_linked_to[0])
 
+        self.pm.ensure_dir(self.paths.write_LD_node)
         with open(self.paths.write_LD_node, 'w', encoding="utf-8") as f:
             f.write(read_text_limited_data_node)
