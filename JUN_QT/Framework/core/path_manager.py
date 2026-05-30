@@ -16,8 +16,6 @@ class PathManager:
                         "read": read_dir,
                         "write": write_dir,
                     }
-    # def set_dir(self, key, value):
-    #     self._dirs[key] = value
 
     def path(self, key, filename=""):
         return self.root / self._dirs[key] / filename

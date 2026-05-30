@@ -3,9 +3,9 @@ from dataclasses import dataclass
 
 @dataclass
 class KWIPaths:
-    read_KWI_base_node      : str
-    read_KWI_setting_node   : str
-    read_KWI_LD_node        : str
+    read_base_node      : str
+    read_setting_node   : str
+    read_LD_node        : str
      
     read_tgtBones           : str
 

@@ -41,8 +41,8 @@ class MainWindow(QWidget):
         self.label_create_type = QLabel("Create type")
         self.label_setting_nodes_num = QLabel("Setting nodes Number")
 
-        self.ipf_setting_nodes_num = QLineEdit()    
-        self.ipf_setting_nodes_num.setText ("1")
+        self.ipf_setting_nodes_interval = QLineEdit()    
+        self.ipf_setting_nodes_interval.setText ("1")
 
         # radio button
         self.radio_create_multiple_nodes = QRadioButton("Multiple Nodes")
@@ -79,7 +79,7 @@ class MainWindow(QWidget):
         self.layout.addWidget(self.radio_create_single_node)
 
         self.layout.addWidget(self.label_setting_nodes_num)
-        self.layout.addWidget(self.ipf_setting_nodes_num)
+        self.layout.addWidget(self.ipf_setting_nodes_interval)
 
         self.layout.addWidget(self.btn_create_base_nodes)
         self.layout.addWidget(self.btn_create_setting_nodes)
@@ -99,17 +99,17 @@ class MainWindow(QWidget):
 
     def create_setting_nodes_on_click(self):
 
-        num_setting_node__ = self.ipf_setting_nodes_num.text()
+        interval_setting_node__ = self.ipf_setting_nodes_interval.text()
 
         try:
-            num_setting_node__ = int(num_setting_node__)
+            interval_setting_node__ = int(interval_setting_node__)
 
         except ValueError:
 
             self.log("Must be integer")
             return
 
-        self.KWI_creator.num_setting_node = num_setting_node__
+        self.KWI_creator.interval_setting_node = interval_setting_node__
         self.KWI_creator.create_setting_nodes()
 
     def create_LD_nodes_on_click(self):

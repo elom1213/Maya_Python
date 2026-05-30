@@ -11,6 +11,7 @@
 import glob, os, re, math, ast
 from .tool_path import KWIPaths
 from .utility import *
+from .template_engine import *
 from Framework.core.path_manager import PathManager
 
 # ==============================================================================
@@ -19,27 +20,54 @@ from Framework.core.path_manager import PathManager
 class KWI_creator:
     def __init__(self):
 
-        self.KWI_text_single_node = []
-        self.patten_to_remove = ["JUN_RootBone,", "JUN_AdditionalRootBones,"]
-
         self.set_path()
 
-        self._num_setting_node = 5
+        self._interval_setting_node = 5
 
-        self.KWI_class_name = "AnimGraphNode_KawaiiPhysics_"
+        self.node_name = "AnimGraphNode_KawaiiPhysics"
 
-        self.KWI_token_nodePos_X = "NodePosX="
-        self.KWI_token_nodePos_Y = "NodePosY="
-        self.KWI_nodePos_start_X = 200
-        self.KWI_nodePos_start_Y = 30
-        self.KWI_nodePos_offset_X = 280
-        self.KWI_nodePos_offset_Y = 200
-        self.KWI_nodePos_lineChange = 4
+        self.nodePos_start_X = 200
+        self.nodePos_start_Y = 30
+        self.nodePos_offset_X = 280
+        self.nodePos_offset_Y = 200
 
-        self.KWI_tgtBones_name = get_tgt_bones(self.paths.read_tgtBones)
-        self.KWI_tgt_node_num = len(self.KWI_tgtBones_name)
+        self.setting_nodePos_offset_Y = 48
+
+        self.nodePos_lineChange = 4
+
+        self.tgtBones = get_file_to_list(self.paths.read_tgtBones)
+        self.tgt_node_num = len(self.tgtBones)
 
         self._create_mode = "multiple"
+
+        self.id_PhysicsSettings      = "F56CA1A44D9143498D4F0E924F403F39"
+        self.id_pose                 = "4D524E0342A22F9A278E3EB31AF3C195"
+        self.id_LD                   = "6222BDF34477D9F24F863390648BE4CA"
+
+        self.replacements = {
+                                "NODE_NAME"             : "cv_spline_necklace_02_01",
+                                "ROOT_BONE"             : 'AdditionalRootBones=((RootBone=(BoneName="Spine1")),(RootBone=(BoneName="Spine")))',
+                                "ROOT_BONE_ADDITIONAL"  : "",
+                                "LINKED_TO"             : "(AnimGraphNode_KawaiiPhysics_0 4D524E0342A22F9A278E3EB31AF3C195)",
+                                "NODE_POS_X"            : "",
+                                "NODE_POS_Y"            : "",
+                            }
+        
+        self.replacements_setting = {
+                                        "NODE_NAME"     : "K2Node_VariableGet_1",
+                                        "MEMBER_NAME"   : 'PS_base_01',
+                                        "LINKED_TO"     : "(AnimGraphNode_KawaiiPhysics_0 4D524E0342A22F9A278E3EB31AF3C195)",
+                                        "NODE_POS_X"    : "",
+                                        "NODE_POS_Y"    : "",
+                                    }
+        
+        self.replacements_LD = {
+                                    "NODE_NAME"      : "K2Node_VariableGet_1",
+                                    "MEMBER_NAME"    : 'LD_base_01',
+                                    "LINKED_TO"      : "(AnimGraphNode_KawaiiPhysics_0 4D524E0342A22F9A278E3EB31AF3C195)",
+                                    "NODE_POS_X"     : "",
+                                    "NODE_POS_Y"     : "",
+                                }
 
     def set_path(self):
         self.pm = PathManager(  __file__, 
@@ -48,19 +76,19 @@ class KWI_creator:
         
         self.extension = "py"
         self.paths = KWIPaths(
-                                read_KWI_base_node      =   self.pm.path(
+                                read_base_node          =   self.pm.path(
                                     "read",
-                                    f"A0001_Src_KWI_node.{self.extension}"
+                                    f"A0001_Src_KWI_node_v02.{self.extension}"
                                 ),
                             
-                                read_KWI_setting_node   =   self.pm.path(
+                                read_setting_node        =   self.pm.path(
                                     "read",
-                                    f"A0002_Src_KWI_setting_node.{self.extension}"
+                                    f"A0002_Src_KWI_setting_node_v02.{self.extension}"
                                 ),
                             
-                                read_KWI_LD_node        =   self.pm.path(
+                                read_LD_node             =   self.pm.path(
                                     "read",
-                                    f"A0003_Src_KWI_LD.{self.extension}"
+                                    f"A0003_Src_KWI_LD_v02.{self.extension}"
                                 ),
 
                                 read_tgtBones           =   self.pm.path(
@@ -93,8 +121,8 @@ class KWI_creator:
         return self._create_single_node
     
     @property
-    def num_setting_node(self):
-        return self._num_setting_node
+    def interval_setting_node(self):
+        return self._interval_setting_node
     
     @property
     def create_mode(self):
@@ -113,11 +141,11 @@ class KWI_creator:
             raise ValueError("Name must be a bool")
         self._create_single_node = value
 
-    @num_setting_node.setter
-    def num_setting_node(self, value):
+    @interval_setting_node.setter
+    def interval_setting_node(self, value):
         if not isinstance(value, int):
             raise ValueError("Name must be a int")
-        self._num_setting_node = value
+        self._interval_setting_node = value
 
     @create_mode.setter
     def create_mode(self, value):
@@ -144,32 +172,41 @@ class KWI_creator:
     def set_mode(self, mode):
         self._create_mode = mode
 
-    def _create_multiple_nodes_impl(self):
+    def clear_replacements(self, repl):
+        for key, val in repl.items():
+            repl[key] = ""
 
+    def _create_multiple_nodes_impl(self):
         text_new_lst = []
+        text_lst = []
         read_base_node = []
-        base_node_num_str = 0
-        with open(self.paths.read_KWI_base_node, 'r', encoding="utf-8") as f:
+
+        self.clear_replacements(self.replacements)
+
+        with open(self.paths.read_base_node, 'r', encoding="utf-8") as f:
             read_base_node = f.read()
 
 
-        for idx_nodeNum in range(0, self.KWI_tgt_node_num):
-            self.KWI_text_single_node = KWI_replace_by_pattern_before_num(read_base_node, base_node_num_str, self.KWI_class_name)
-            self.KWI_text_single_node = get_replaced_root_bone_name(self.KWI_text_single_node, self.KWI_tgtBones_name[idx_nodeNum])
+        for idx_nodeNum in range(0, self.tgt_node_num):
+            linked_to =  f"LinkedTo=({self.node_name}_{idx_nodeNum-1} {self.id_pose})"
+            if idx_nodeNum-1 < 0:
+                linked_to = ""
 
-            posX = self.KWI_nodePos_start_X + self.KWI_nodePos_offset_X * (idx_nodeNum % self.KWI_nodePos_lineChange)
-            posY = self.KWI_nodePos_start_Y + (math.floor(idx_nodeNum/self.KWI_nodePos_lineChange) * self.KWI_nodePos_offset_Y)
+            posX = self.nodePos_start_X + self.nodePos_offset_X * (idx_nodeNum % self.nodePos_lineChange)
+            posY = self.nodePos_start_Y + (math.floor(idx_nodeNum/self.nodePos_lineChange) * self.nodePos_offset_Y)
 
-            self.KWI_text_single_node = KWI_replace_by_pattern_before_num(self.KWI_text_single_node, posX, self.KWI_token_nodePos_X)
-            self.KWI_text_single_node = KWI_replace_by_pattern_before_num(self.KWI_text_single_node, posY, self.KWI_token_nodePos_Y)
+            self.replacements["NODE_NAME"] = self.node_name + "_" + str(idx_nodeNum)
+            self.replacements["ROOT_BONE"] = self.tgtBones[idx_nodeNum]
+            self.replacements["LINKED_TO"] = linked_to
+            self.replacements["NODE_POS_X"] = posX
+            self.replacements["NODE_POS_Y"] = posY
+            
+            text_lst = TemplateEngine.apply(read_base_node, self.replacements)
+            self.clear_replacements(self.replacements)
 
-            self.KWI_text_single_node = add_linkedto_to_lines(self.KWI_text_single_node, idx_nodeNum-1)
-            text_new_lst.append(self.KWI_text_single_node)
-            base_node_num_str += 1
+            text_new_lst.append(text_lst)
 
         text_new_string = join_list_with_newline(text_new_lst, True)
-
-        text_new_string = remove_specific_pattern(text_new_string, self.patten_to_remove)
 
         self.pm.ensure_dir(self.paths.write_base_node)
         with open(self.paths.write_base_node, 'w', encoding="utf-8") as f:
@@ -180,46 +217,81 @@ class KWI_creator:
 
         text_new_lst = []
         read_base_node = []
-        with open(self.paths.read_KWI_base_node, 'r', encoding="utf-8") as f:
+        self.clear_replacements(self.replacements)
+        with open(self.paths.read_base_node, 'r', encoding="utf-8") as f:
             read_base_node = f.read()
-    
-        KWI_text_root_bones = KWI_create_text_rootBones(self.KWI_tgtBones_name)
-        KWI_text_mult_bones_in_single_node = KWI_add_addtitional_bones(read_base_node, KWI_text_root_bones)
-        text_new_lst.append(KWI_text_mult_bones_in_single_node)
 
-        text_new_string = join_list_with_newline(text_new_lst, True)
+        additional = self.tgtBones[1:]
 
-        text_new_string = remove_specific_pattern(text_new_string, self.patten_to_remove)
+        if additional:
+            additional_str = ",".join(
+                f'(RootBone=(BoneName="{bone}"))' for bone in additional
+            )
+
+        self.replacements["NODE_NAME"] = self.node_name + "_0"
+        self.replacements["ROOT_BONE"] = self.tgtBones[0]
+        self.replacements["ROOT_BONE_ADDITIONAL"] = additional_str
+
+        text_new_lst = TemplateEngine.apply(read_base_node, self.replacements)
 
         self.pm.ensure_dir(self.paths.write_base_node)
         with open(self.paths.write_base_node, 'w', encoding="utf-8") as f:
-            f.write(text_new_string)
+            f.write(text_new_lst)
 
 
     def create_setting_nodes(self):
 
-        read_text_setting_node = None
+        setting_node = None
+        text_new_lst = []
+        self.clear_replacements(self.replacements_setting)
         
-        with open(self.paths.read_KWI_setting_node, 'r', encoding="utf-8") as f:
-            read_text_setting_node = f.readlines()
+        with open(self.paths.read_setting_node, 'r', encoding="utf-8") as f:
+            setting_node = f.read()
+        lst_setting_node = get_keyword_linked_to(self._interval_setting_node, 
+                                                 self.tgt_node_num, 
+                                                 self.id_PhysicsSettings,
+                                                 self.node_name)
 
-        lst_setting_node =  create_keyword_linked_to(self._num_setting_node, self.KWI_tgt_node_num)
-        setting_node_new =  build_setting_nodes_link(read_text_setting_node, lst_setting_node)
+        for idx_nodeNum in range(0, self._interval_setting_node):
+            self.replacements_setting["NODE_NAME"] = "K2Node_VariableGet_" + str(idx_nodeNum)
+            self.replacements_setting["MEMBER_NAME"] = "PS_base_" + str(idx_nodeNum)
+            self.replacements_setting["LINKED_TO"] = lst_setting_node[idx_nodeNum]
+            self.replacements_setting["NODE_POS_X"] = self.nodePos_start_X - 300
+            self.replacements_setting["NODE_POS_Y"] = self.nodePos_start_Y + self.setting_nodePos_offset_Y*idx_nodeNum
+
+            text_lst = TemplateEngine.apply(setting_node, self.replacements_setting)
+            self.clear_replacements(self.replacements_setting)
+
+            text_new_lst.append(text_lst)
+
+        text_new_string = join_list_with_newline(text_new_lst, True)
 
         self.pm.ensure_dir(self.paths.write_setting_node)
         with open(self.paths.write_setting_node, 'w', encoding="utf-8") as f:
-            f.write(setting_node_new)
-
+            f.write(text_new_string)
 
     def create_LD_nodes(self):
-        read_text_limited_data_node = None
 
-        with open(self.paths.read_KWI_LD_node, 'r', encoding="utf-8") as f:
-            read_text_limited_data_node = f.readlines()
+        LD_node_base = None
+        self.clear_replacements(self.replacements_LD)
 
-        LD_linked_to = create_keyword_linked_to(1, self.KWI_tgt_node_num, pin_id = "6222BDF34477D9F24F863390648BE4CA")
-        read_text_limited_data_node = link_LD_node(read_text_limited_data_node, LD_linked_to[0])
+        with open(self.paths.read_LD_node, 'r', encoding="utf-8") as f:
+            LD_node_base = f.read()
+
+        LD_linked_to = get_keyword_linked_to(1, 
+                                             self.tgt_node_num, 
+                                             self.id_LD,
+                                             self.node_name)
+
+        self.replacements_setting["NODE_NAME"] = "K2Node_VariableGet_1"
+        self.replacements_setting["MEMBER_NAME"] = "LD_base_1"
+        self.replacements_setting["LINKED_TO"] = LD_linked_to[0]
+        self.replacements_setting["NODE_POS_X"] = self.nodePos_start_X - 600
+        self.replacements_setting["NODE_POS_Y"] = self.nodePos_start_Y
+
+        text_lst = TemplateEngine.apply(LD_node_base, self.replacements_setting)
+        self.clear_replacements(self.replacements_LD)
 
         self.pm.ensure_dir(self.paths.write_LD_node)
         with open(self.paths.write_LD_node, 'w', encoding="utf-8") as f:
-            f.write(read_text_limited_data_node)
+            f.write(text_lst)
