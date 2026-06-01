@@ -1,6 +1,7 @@
 import os
 import sys
 
+from PySide2.QtWidgets import QApplication
 
 
 def resource_path(relative_path):
@@ -50,6 +51,20 @@ class ThemeManager:
         with open(qss_path, "r", encoding="utf-8") as f:
 
             app.setStyleSheet(f.read())
+
+    @staticmethod
+    def load_theme_to_widget(widget, theme_name="dark"):
+
+        root = ThemeManager.get_root()
+
+        qss_path = os.path.join(
+            root,
+            "styles",
+            f"{theme_name}.qss"
+        )
+
+        with open(qss_path,"r",encoding="utf-8") as f:
+            widget.setStyleSheet(f.read())
 
     @staticmethod
     def load_theme(app, theme_name):
