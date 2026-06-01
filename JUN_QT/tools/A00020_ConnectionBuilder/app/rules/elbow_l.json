@@ -1,0 +1,15 @@
+{
+   "solver_node": "WRK_elbow_l_UERBFSolver",
+
+    "driver_node": "WRK_elbow_l",
+
+    "blendshape_node": "",
+
+    "mapping":
+    [
+        "WRK_elbow_l_01_IN_000",
+        "WRK_elbow_l_01_IN_060",
+        "WRK_elbow_l_01_IN_090",
+        "WRK_elbow_l_01_IN_110"
+    ]
+}
