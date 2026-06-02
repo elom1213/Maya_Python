@@ -14,7 +14,7 @@ if ROOT not in sys.path:
 
 from PySide6.QtWidgets import QApplication
 
-from app.ui.main_window import MainWindow
+from JUN_All.tools.A00004_base_QT.app.ui.main_window import MainWindow
 from Framework.themes.theme_manager import ThemeManager
 
 
@@ -22,7 +22,7 @@ def main():
 
     app = QApplication(sys.argv)
 
-    ThemeManager.load_theme_dev(app, "dark")
+    ThemeManager.load_theme(app, "dark")
 
     window = MainWindow()
 

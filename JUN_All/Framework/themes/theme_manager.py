@@ -1,7 +1,7 @@
 import os
 import sys
 
-from PySide2.QtWidgets import QApplication
+from Framework.qt.qt import QApplication
 
 
 def resource_path(relative_path):

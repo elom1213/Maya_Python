@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import (
+from PySide2.QtWidgets import (
     QWidget,
     QPushButton,
     QTextEdit,
@@ -6,7 +6,9 @@ from PySide6.QtWidgets import (
     QFileDialog
 )
 
-from app.core.file_processor import process_file
+from tools.A00008_base_QT_maya.app.core.file_processor import process_file
+from tools.A00090_ConnectionBuilder.app.core.rule_loader import RuleLoader
+from tools.A00090_ConnectionBuilder.app.core.connection_manager import ConnectionManager
 
 
 class MainWindow(QWidget):

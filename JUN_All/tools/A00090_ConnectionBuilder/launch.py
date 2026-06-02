@@ -1,4 +1,9 @@
 import sys, os
+from PySide2.QtWidgets import QApplication
+import importlib
+
+from .app.ui.main_window import MainWindow
+from Framework.themes.theme_manager import ThemeManager
 
 ROOT = os.path.abspath(
     os.path.join(
@@ -11,16 +16,10 @@ ROOT = os.path.abspath(
 if ROOT not in sys.path:
     sys.path.append(ROOT)
 
-
-from PySide2.QtWidgets import QApplication
-
-from .app.ui.main_window import MainWindow
-
-
 window_instance = None
 
-
-def run():
+def run(reload_module=True):
+    
 
     global window_instance
 
@@ -32,6 +31,8 @@ def run():
         pass
 
     window_instance = MainWindow()
+    
+    ThemeManager.load_theme_to_widget( window_instance, "red")
 
     window_instance.show()
 

@@ -8,8 +8,7 @@ from functools import partial
 
 
 import config
-from Framework.ui import MOD_tsl_gen_01
-from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_tsl_gen
+from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem
 
 class JUN_ToolUI_humanIKTool_01_01:
     def __init__(self):
@@ -147,8 +146,7 @@ class JUN_ToolUI_humanIKTool_01_01:
         cmds.textScrollList( tsl_HIK_node,
                             height = (self.win_height*0.08),
                             numberOfRows=15, 
-                            allowMultiSelection=True, 
-                            selectCommand=partial(JUN_mod_tsl_gen.JUN_gen_tsl_select, tsl_HIK_node));
+                            allowMultiSelection=True )
 
         cmds.setParent( '..' )
 
