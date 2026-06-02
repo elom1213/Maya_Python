@@ -1,12 +1,22 @@
+# from Framework.qt.qt import QApplication
+from PySide2.QtCore import Qt
 from PySide2.QtWidgets import (
     QWidget,
+    QLabel,
     QPushButton,
-    QTextEdit,
     QVBoxLayout,
+    QHBoxLayout,
+    QLineEdit,
+    QTextEdit,
+    QComboBox,
     QFileDialog
 )
 
+from tools.A00090_ConnectionBuilder.app.config.version import VERSION
+
 from tools.A00001_base_maya.app.core.file_processor import process_file
+from tools.A00090_ConnectionBuilder.app.core import RuleLoader
+from tools.A00090_ConnectionBuilder.app.core import ConnectionManager
 
 
 class MainWindow(QWidget):
@@ -15,15 +25,26 @@ class MainWindow(QWidget):
 
         super().__init__()
 
+        self.win_width      =  600
+        self.win_height     =  400
+        self.win_title     =  f"MetaHuman Connection Builder v{VERSION}"
+
         self.setWindowTitle("My Qt Tool")
 
-        self.resize(600, 400)
+        self.resize(self.win_width, self.win_height)
 
         self.build_ui()
 
     def build_ui(self):
 
         self.layout = QVBoxLayout(self)
+
+        self.setWindowTitle(self.win_title)
+
+        self.setWindowFlags(
+            self.windowFlags()
+            | Qt.WindowStaysOnTopHint
+        )
 
         # 버튼
         self.btn_open = QPushButton("Open File")
