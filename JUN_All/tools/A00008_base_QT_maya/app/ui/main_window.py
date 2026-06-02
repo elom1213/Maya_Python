@@ -1,4 +1,5 @@
-# from Framework.qt.qt import QApplication
+from Framework.qt.qt import QApplication
+'''
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import (
     QWidget,
@@ -11,6 +12,7 @@ from PySide2.QtWidgets import (
     QComboBox,
     QFileDialog
 )
+'''
 
 from tools.A00090_ConnectionBuilder.app.config.version import VERSION
 

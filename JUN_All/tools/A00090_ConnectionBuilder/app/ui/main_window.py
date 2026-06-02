@@ -1,4 +1,5 @@
-# from Framework.qt.qt import QApplication
+from Framework.qt.qt import QApplication 
+'''
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import (
     QWidget,
@@ -11,12 +12,15 @@ from PySide2.QtWidgets import (
     QComboBox,
     QFileDialog
 )
+'''
 
 import maya.cmds as cmds
 from tools.A00090_ConnectionBuilder.app.config.version import VERSION
 
 from tools.A00090_ConnectionBuilder.app.core import RuleLoader
 from tools.A00090_ConnectionBuilder.app.core import ConnectionManager
+from tools.A00090_ConnectionBuilder.app.core import AttributeManager
+from tools.A00090_ConnectionBuilder.app.core import BlendShapeManager
 
 
 class MainWindow(QWidget):
@@ -29,7 +33,7 @@ class MainWindow(QWidget):
         self.win_height     =  500
         self.win_title     =  f"MetaHuman Connection Builder v{VERSION}"
         self.btn_get_label = "Get"
-        self.btn_width_01 = 40
+        self.btn_width_01 = 70
 
         self.manager = ConnectionManager()
 
@@ -47,10 +51,34 @@ class MainWindow(QWidget):
         )
 
         main_layout = QVBoxLayout(self)
+        
+        # -------------------------
+        # mesh to create blend shape
+        # -------------------------
+
+        row = QHBoxLayout()
+
+        row.addWidget(QLabel("Mesh for blendShape"))
+
+        self.le_mesh = QLineEdit()
+
+        row.addWidget(self.le_mesh)
+
+        self.btn_mesh = QPushButton(self.btn_get_label)
+        self.btn_create_targets = QPushButton("Create targets")
+
+        self.btn_mesh.setFixedWidth(self.btn_width_01)
+        self.btn_create_targets.setFixedWidth(self.btn_width_01*2 + 10)
+
+        row.addWidget(self.btn_mesh)
+        row.addWidget(self.btn_create_targets)
+
+        main_layout.addLayout(row)
 
         # -------------------------
         # Solver
         # -------------------------
+
         row = QHBoxLayout()
 
         row.addWidget(QLabel("Solver"))
@@ -61,10 +89,16 @@ class MainWindow(QWidget):
 
 
         self.btn_solver = QPushButton(self.btn_get_label)
+        self.btn_set_attr_solver = QPushButton("Set Attr")
+        self.btn_del_attr_solver = QPushButton("Del Attr")
 
         self.btn_solver.setFixedWidth(self.btn_width_01)
+        self.btn_set_attr_solver.setFixedWidth(self.btn_width_01)
+        self.btn_del_attr_solver.setFixedWidth(self.btn_width_01)
 
         row.addWidget(self.btn_solver)
+        row.addWidget(self.btn_set_attr_solver)
+        row.addWidget(self.btn_del_attr_solver)
 
 
         main_layout.addLayout(row)
@@ -83,10 +117,16 @@ class MainWindow(QWidget):
 
 
         self.btn_driver = QPushButton(self.btn_get_label)
+        self.btn_set_attr_driver = QPushButton("Set Attr")
+        self.btn_del_attr_driver = QPushButton("Del Attr")
 
         self.btn_driver.setFixedWidth(self.btn_width_01)
+        self.btn_set_attr_driver.setFixedWidth(self.btn_width_01)
+        self.btn_del_attr_driver.setFixedWidth(self.btn_width_01)
 
         row.addWidget(self.btn_driver)
+        row.addWidget(self.btn_set_attr_driver)
+        row.addWidget(self.btn_del_attr_driver)
 
 
         main_layout.addLayout(row)
@@ -105,10 +145,16 @@ class MainWindow(QWidget):
 
         
         self.btn_blendShape = QPushButton(self.btn_get_label)
+        self.btn_set_attr_blendShape = QPushButton("Set Attr")
+        self.btn_del_attr_blendShape = QPushButton("Del Attr")
 
         self.btn_blendShape.setFixedWidth(self.btn_width_01)
+        self.btn_set_attr_blendShape.setFixedWidth(self.btn_width_01)
+        self.btn_del_attr_blendShape.setFixedWidth(self.btn_width_01)
 
         row.addWidget(self.btn_blendShape)
+        row.addWidget(self.btn_set_attr_blendShape)
+        row.addWidget(self.btn_del_attr_blendShape)
 
 
         main_layout.addLayout(row)
@@ -170,35 +216,29 @@ class MainWindow(QWidget):
         # button connect
         # -------------------------
 
-        self.btn_connect.clicked.connect(
-            self.on_connect
-        )
+        self.btn_mesh.clicked.connect( lambda: self.set_selected_node(self.le_mesh ))
+        self.btn_create_targets.clicked.connect(lambda: self.on_create_target(self.le_mesh))
 
-        self.btn_disconnect.clicked.connect(
-            self.on_disconnect
-        )
+        self.btn_solver.clicked.connect( lambda: self.set_selected_node(self.le_solver ))
+        self.btn_set_attr_solver.clicked.connect(lambda: self.create_attributes(self.le_solver))
+        self.btn_del_attr_solver.clicked.connect(lambda: self.create_attributes(self.le_solver))
 
-        self.btn_validate.clicked.connect(
-            self.on_validate
-        )
+        self.btn_driver.clicked.connect( lambda: self.set_selected_node(self.le_driver ))
+        self.btn_set_attr_driver.clicked.connect( lambda:self.create_attributes(self.le_driver))
+        self.btn_del_attr_driver.clicked.connect( lambda:self.delete_attributes(self.le_driver))
 
-        self.btn_solver.clicked.connect(
-            lambda: self.set_selected_node(
-                self.le_solver
-            )
-        )
+        self.btn_blendShape.clicked.connect( lambda: self.set_selected_node(self.le_blendshape ))
+        self.btn_set_attr_blendShape.clicked.connect( lambda:self.create_attributes(self.le_blendshape))
+        self.btn_del_attr_blendShape.clicked.connect( lambda:self.delete_attributes(self.le_blendshape))
 
-        self.btn_driver.clicked.connect(
-            lambda: self.set_selected_node(
-                self.le_driver
-            )
-        )
 
-        self.btn_blendShape.clicked.connect(
-            lambda: self.set_selected_node(
-                self.le_blendshape
-            )
-        )
+
+        self.btn_connect.clicked.connect( self.on_connect)
+
+        self.btn_disconnect.clicked.connect( self.on_disconnect)
+
+        self.btn_validate.clicked.connect( self.on_validate)
+
 
     def log(self, text):
 
@@ -258,4 +298,39 @@ class MainWindow(QWidget):
 
         line_edit.setText(
             ", ".join(selection)
+        )
+
+    def create_attributes(self, le_target):
+
+        rule = self.get_rule()
+
+        target = le_target.text()
+
+        AttributeManager.create(
+            rule,
+            target
+        )
+    def delete_attributes(self, le_target):
+
+        rule = self.get_rule()
+
+        target = le_target.text()
+
+        AttributeManager.delete(
+            rule,
+            target
+        )
+
+
+    def on_create_target(self, le_mesh):
+        mesh = self.le_mesh.text().strip()
+
+        if not mesh:
+            return
+
+        rule = self.get_rule()
+
+        BlendShapeManager.create_blendshape(
+            rule,
+            mesh
         )

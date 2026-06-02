@@ -15,11 +15,11 @@ class ConnectionRule:
         self.driver_node = driver_node
         self.blendshape_node = blendshape_node
 
-        self.mapping = mapping
+        self._mapping = mapping
 
     def connect(self):
 
-        for idx, attr_name in enumerate(self.mapping):
+        for idx, attr_name in enumerate(self._mapping):
 
             solver_attr = (
                 f"{self.solver_node}.outputs[{idx}]"
@@ -46,3 +46,7 @@ class ConnectionRule:
                     blendshape_attr,
                     force=True
                 )
+
+    @property
+    def mapping(self):
+        return self._mapping
