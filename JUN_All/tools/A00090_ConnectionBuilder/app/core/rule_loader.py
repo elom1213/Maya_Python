@@ -45,3 +45,23 @@ class RuleLoader:
 
             mapping=data["mapping"]
         )
+    
+    @classmethod
+    def find_all_json(cls):
+        # get file name in RULE_DIR removing extension
+        return [os.path.splitext(f)[0] for f in os.listdir(cls.RULE_DIR) if os.path.isfile(os.path.join(cls.RULE_DIR, f))]
+
+    @classmethod
+    def load_all(cls):
+
+        rules = []
+
+        for json_path in cls.find_all_json():
+
+            rule = cls.load(json_path)
+
+            if rule:
+                rules.append(rule)
+                
+        print(cls.find_all_json())
+        return rules

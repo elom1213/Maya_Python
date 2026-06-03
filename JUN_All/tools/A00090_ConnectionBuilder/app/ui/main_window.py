@@ -41,7 +41,7 @@ class MainWindow(QWidget):
         self.btn_get_label = "Get"
         self.btn_width_01 = 70
         
-        self.manager = ConnectionManager()
+        self.connection_manager = ConnectionManager()
 
         APP_DIR = os.path.join(os.path.dirname(__file__),"." )
         self.pm = PathManager(  APP_DIR, 
@@ -93,7 +93,12 @@ class MainWindow(QWidget):
 
         row = QHBoxLayout()
 
-        row.addWidget(QLabel("Solver"))
+        self.cb_is_solver = QCheckBox('Is Solver')
+        self.cb_is_solver.setChecked(True)
+
+        row.addWidget(self.cb_is_solver)
+        
+        row.addWidget(QLabel("Base"))
 
         self.le_solver = QLineEdit()
 
@@ -193,12 +198,12 @@ class MainWindow(QWidget):
 
         row = QHBoxLayout()
 
+        self.btn_connect_all = QPushButton("Connect All")
         self.btn_connect = QPushButton("Connect")
-
         self.btn_disconnect = QPushButton("Disconnect")
-
         self.btn_validate = QPushButton("Validate")
 
+        row.addWidget(self.btn_connect_all)
         row.addWidget(self.btn_connect)
         row.addWidget(self.btn_disconnect)
         row.addWidget(self.btn_validate)
@@ -241,10 +246,9 @@ class MainWindow(QWidget):
 
 
 
+        self.btn_connect_all.clicked.connect( self.on_connect_all)
         self.btn_connect.clicked.connect( self.on_connect)
-
         self.btn_disconnect.clicked.connect( self.on_disconnect)
-
         self.btn_validate.clicked.connect( self.on_validate)
 
 
@@ -259,24 +263,45 @@ class MainWindow(QWidget):
         directory = self.pm.path("read")
         return [os.path.splitext(f)[0] for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
 
-    def get_rule(self):
+    def get_rule(self, rule_name=None):
+
+        if rule_name is None:
+            rule_name = self.cb_rule.currentText()
 
         return RuleLoader.load(
-
-            rule_name=self.cb_rule.currentText(),
-
+            rule_name=rule_name,
             solver_node=self.le_solver.text(),
-
             driver_node=self.le_driver.text(),
-
             blendshape_node=self.le_blendshape.text()
         )
+        
+    def get_rule_all(self):
+        json_all = RuleLoader.find_all_json()
+        rules = []
+        for json_current in json_all:
+            rule = self.get_rule(json_current)
+            rules.append(rule)
+        return rules
+
+
+    def on_connect_all(self):
+        rules = self.get_rule_all()
+
+        is_solver = self.cb_is_solver.isChecked()
+
+        for rule in rules:
+            self.connection_manager.connect(rule, is_solver)
+
+        self.log("Connect All Finished")
+
 
     def on_connect(self):
 
         rule = self.get_rule()
 
-        self.manager.connect(rule)
+        is_solver = self.cb_is_solver.isChecked()
+
+        self.connection_manager.connect(rule, is_solver)
 
         self.log("Connect Finished")
 
@@ -286,7 +311,7 @@ class MainWindow(QWidget):
 
         rule = self.get_rule()
 
-        self.manager.disconnect(rule)
+        self.connection_manager.disconnect(rule)
 
         self.log("Disconnect Finished")
 
@@ -296,7 +321,7 @@ class MainWindow(QWidget):
 
         rule = self.get_rule()
 
-        result = self.manager.validate(rule)
+        result = self.connection_manager.validate(rule)
 
         self.log(
             f"Validate Result : {result}"

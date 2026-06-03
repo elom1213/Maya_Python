@@ -3,6 +3,11 @@ import maya.cmds as cmds
 
 class AttributeManager:
 
+    @staticmethod
+    def attr_exist(node, attr_name):
+        return cmds.attributeQuery(attr_name,
+                                    node=node,
+                                    exists=True)
 
     @staticmethod
     def create(rule, target_node):
