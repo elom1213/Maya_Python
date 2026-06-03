@@ -12,7 +12,8 @@ if ROOT not in sys.path:
     sys.path.append(ROOT)
 
 
-from PySide2.QtWidgets import QApplication
+# from Framework.qt.qt import QApplication 
+from Framework.qt.qt import * 
 
 from .app.ui.main_window import MainWindow
 from Framework.themes.theme_manager import ThemeManager

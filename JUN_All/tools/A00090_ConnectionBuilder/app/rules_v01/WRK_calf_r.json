@@ -1,0 +1,16 @@
+{
+   "solver_node": "WRK_calf_r_UERBFSolver",
+
+    "driver_node": "WRK_calf_r__null__",
+
+    "blendshape_node": "",
+
+    "mapping":
+    [
+        "calf_r_default",
+        "calf_r_back_50",
+        "calf_r_back_90",
+        "calf_r_back_120",
+        "calf_r_back_150"
+    ]
+}

@@ -1,4 +1,8 @@
-from Framework.qt.qt import QApplication 
+# from Framework.qt.qt import QApplication 
+from Framework.qt.qt import * 
+
+print("QT version  :  " + str(QT_VERSION))
+
 '''
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import (
@@ -14,8 +18,10 @@ from PySide2.QtWidgets import (
 )
 '''
 
+import sys, os
 import maya.cmds as cmds
 from tools.A00090_ConnectionBuilder.app.config.version import VERSION
+from Framework.core.path_manager import PathManager
 
 from tools.A00090_ConnectionBuilder.app.core import RuleLoader
 from tools.A00090_ConnectionBuilder.app.core import ConnectionManager
@@ -34,8 +40,14 @@ class MainWindow(QWidget):
         self.win_title     =  f"MetaHuman Connection Builder v{VERSION}"
         self.btn_get_label = "Get"
         self.btn_width_01 = 70
-
+        
         self.manager = ConnectionManager()
+
+        APP_DIR = os.path.join(os.path.dirname(__file__),"." )
+        self.pm = PathManager(  APP_DIR, 
+                                read_dir  = "rules_v01")
+
+        self.rules_file_name =  self.get_rules_file_name()
 
         self.resize(self.win_width, self.win_height)
 
@@ -169,11 +181,7 @@ class MainWindow(QWidget):
 
         self.cb_rule = QComboBox()
 
-        self.cb_rule.addItems([
-            "elbow_l",
-            "elbow_r",
-            "shoulder_l"
-        ])
+        self.cb_rule.addItems(self.rules_file_name)
 
         row.addWidget(self.cb_rule)
 
@@ -245,6 +253,11 @@ class MainWindow(QWidget):
         self.te_log.append(text)
     
     # -------------------------------------------------
+
+    def get_rules_file_name(self):
+        # return [f.name for f in self.pm.path("read").iterdir() if f.is_file()]
+        directory = self.pm.path("read")
+        return [os.path.splitext(f)[0] for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
 
     def get_rule(self):
 

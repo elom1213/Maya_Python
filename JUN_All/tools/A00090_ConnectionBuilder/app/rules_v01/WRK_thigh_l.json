@@ -1,0 +1,16 @@
+{
+   "solver_node": "WRK_thigh_l_UERBFSolver",
+
+    "driver_node": "WRK_thigh_l__null__",
+
+    "blendshape_node": "",
+
+    "mapping":
+    [
+        "thigh_l_default",
+        "thigh_l_fwd_10",
+        "thigh_l_fwd_45",
+        "thigh_l_fwd_90",
+        "thigh_l_fwd_110"
+    ]
+}

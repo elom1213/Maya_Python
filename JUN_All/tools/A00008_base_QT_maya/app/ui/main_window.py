@@ -1,4 +1,7 @@
-from Framework.qt.qt import QApplication
+# from Framework.qt.qt import QApplication 
+from Framework.qt.qt import * 
+
+print("QT version  :  " + str(QT_VERSION))
 '''
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import (

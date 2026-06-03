@@ -9,7 +9,7 @@ class RuleLoader:
     RULE_DIR = os.path.join(
         os.path.dirname(__file__),
         "..",
-        "rules"
+        "rules_v01"
     )
 
     @classmethod

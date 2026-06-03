@@ -59,8 +59,8 @@ def main():
                                 write_dir = "0020_out" )
     
                             
-    input_file = 'sample_01.json'
-    output_file = 'sorted_sample_01.json'
+    input_file = 'sample_02.json'
+    output_file = 'sorted_sample_02.json'
     
 
     try:
