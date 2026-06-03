@@ -9,9 +9,9 @@ from PySide6.QtWidgets import (
     QTextEdit,
 )
 
-from JUN_All.tools.A00080_KWI_creator_V02.app.config.version import VERSION
-from JUN_All.tools.A00080_KWI_creator_V02.app.core.file_processor import process_file
-from JUN_All.tools.A00080_KWI_creator_V02.app.core.KWI_creator import KWI_creator
+from tools.A00080_KWI_creator_V02.app.config.version import VERSION
+from tools.A00080_KWI_creator_V02.app.core.file_processor import process_file
+from tools.A00080_KWI_creator_V02.app.core.KWI_creator import KWI_creator
 
 
 class MainWindow(QWidget):
