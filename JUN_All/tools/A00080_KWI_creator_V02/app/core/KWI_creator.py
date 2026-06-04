@@ -78,7 +78,7 @@ class KWI_creator:
         self.paths = KWIPaths(
                                 read_base_node          =   self.pm.path(
                                     "read",
-                                    f"A0001_Src_KWI_node_v02.{self.extension}"
+                                    f"A0001_Src_KWI_node_v03.{self.extension}"
                                 ),
                             
                                 read_setting_node        =   self.pm.path(
