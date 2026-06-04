@@ -9,6 +9,7 @@ class ConnectionManager:
     # --------------------------------------------------
 
     def is_exist_attr(self, node_name, attr):
+        return cmds.objExists(f"{node_name}.{attr}")
         if not cmds.objExists(node_name):
             return False
         return cmds.attributeQuery(attr, node=node_name, exists=True)
