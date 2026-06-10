@@ -1,0 +1,433 @@
+A00120_FKIK — 레거시 FKIK Tool 모듈화 / 리팩토링 + Qt UI 이식
+
+ Context (왜 만드는가)
+
+ 01_Modules/JUN_PY_FKIK_Tool_V02_01.py(964줄, 단일 파일)는 현재도 사용 중인 FK/IK 매칭·베이크 툴이지만, 모듈화/리팩토링이 안
+ 된 레거시다. 전역 함수 + maya.cmds 윈도우에 위젯명·콜백을 문자열로 박아 넘기는 옛 방식이라 유지보수가 어렵다.
+
+ 이 코드를 JUN_All/tools/A00120_FKIK/ 로 옮겨, 저장소 현행 컨벤션(A00090 / A00110)에 맞춰 UI(app/ui)와 로직(app/core) 분리 +
+ PySide(Qt) UI + 셸프 드래그&드롭 설치 구조로 재작성한다.
+
+ 사용자 확정 방향
+
+ 1. 적극 개선 — 1:1 유지가 아니라 분석 중 발견한 버그를 수정한다(아래 "버그 수정" 절).
+ 2. 미연결 기능까지 복원 — 원본에 정의됐으나 UI에 안 붙은 기능(토큰 검색, 타입별 Add, parentConstraint 기반 Bake)도 UI에 노출.
+ 3. 신규 프레임워크 스타일로 현대화 — JUN_/BF_/str_/int_ 접두사 제거, snake_case + 명확한 이름(A00090 ConnectionManager
+ 스타일). UI 문자는 영어(메모리 규칙 ui-text-english-only).
+
+ ---
+ 레거시 코드 분석 (도메인)
+
+ 이 툴은 특정 리그 네이밍 컨벤션에 의존한다: 포지션 헬퍼는 *_xx_pos(follicle/locator), 컨트롤러는 *_xx_ctl(nurbsCurve), 묶음
+ 그룹은 BlendFKIKPos_grp. Target(=_xx_pos)의 월드 트랜스폼을 Follower(=_xx_ctl 컨트롤러)로 복사하는 것이 매칭의 핵심. 베이크는
+ 프레임마다 매칭+키.
+
+ ┌────────────────────────────────────────────────────────┬───────────────────────────────────────────────────────────────┐
+ │                      레거시 함수                       │                             역할                              │
+ ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ BF_LIST_remove_repetitionArray                         │ 순서 유지 중복 제거                                           │
+ ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ BF_SELECTION_makeList_hierarchy_withoutShape /         │ shape 제외 계층 수집, reverse/dedupe                          │
+ │ _hierarchy                                             │                                                               │
+ ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ BF_LIST_moveUp_index / _moveDown_index                 │ 리스트 항목 위/아래 이동(+선택 인덱스 추적)                   │
+ ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ JUN_get_list_by_shapes                                 │ 셰이프 타입(follicle/locator/nurbsCurve)으로 필터             │
+ ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ JUN_get_set_by_token / _ordered_by_token               │ 이름 토큰 포함 필터 / 토큰 순서대로 정렬                      │
+ ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ JUN_cmd_FKIKTool_setup_btn                             │ BlendFKIKPos_grp 찾고 24 pos / 24 ctl 검증 →                  │
+ │                                                        │ Targets·Followers 채움                                        │
+ ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ JUN_MATCH_twoObjects                                   │ xform 복사(rotateOrder/Axis/translation/rotation)             │
+ ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ JUN_matcher_FKIK / JUN_cmd_match_IK_and_FK             │ arm/leg L·R 플래그로 매칭 쌍 구성, IK↔FK 방향                 │
+ ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ JUN_cmd_bake_IK_FK                                     │ 프레임 루프 매칭+setKeyframe                                  │
+ ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ JUN_cmd_bake_IK_to_FK                                  │ parentConstraint + bakeSimulation (UI 미연결)                 │
+ ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ CMD_ToolSel_b_add/_del/_up/_down, _add_type            │ TSL 편집 (_add_type UI 미연결)                                │
+ ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ JUN_cmd_Search_By_Token                                │ 토큰 검색/선택 (UI 미연결)                                    │
+ ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ PY_JUN_makeUI_FKIKTool                                 │ maya.cmds 윈도우(문자열 콜백)                                 │
+ └────────────────────────────────────────────────────────┴───────────────────────────────────────────────────────────────┘
+
+ ---
+ 생성할 파일 구조 (A00110 패턴 준용)
+
+ JUN_All/tools/A00120_FKIK/
+ ├── __init__.py            # from .launch import run ; __all__=["run"]
+ ├── launch.py              # run(reload_module=True): DEV reload → MainWindow → "red" 테마 → show
+ ├── config.py              # 셸프 드래그&드롭 설치 (A00110 config.py 복제, 식별자 교체)
+ ├── requirements.txt       # PySide6 / pyinstaller
+ └── app/
+     ├── __init__.py
+     ├── config/
+     │   ├── __init__.py
+     │   ├── version.py     # VERSION="01.00", LAST_UPDATE="2026-06-10"
+     │   └── naming.py      # ★ 리그 네이밍 데이터(토큰/쌍 테이블/상수) 전부 집약
+     ├── core/
+     │   ├── __init__.py    # 매니저/유틸 export
+     │   ├── selection_utils.py   # 계층·중복·셰이프/토큰 필터·리스트 이동 (maya.cmds, UI 무관)
+     │   ├── fkik_setup.py        # FKIKSetup: 검증 후 (targets, followers, ok, msg) 반환
+     │   ├── fkik_matcher.py      # FKIKMatcher: 쌍 구성·match_transform·bake·bake_constraint
+     │   └── search_utils.py      # search_by_token (복원, 순수 함수)
+     └── ui/
+         ├── __init__.py
+         └── main_window.py       # Qt UI (QListWidget/QCheckBox/QSpinBox/QLineEdit)
+
+ ---
+ 모듈별 설계
+
+ app/config/naming.py — ★ 리그 네이밍 데이터 집약 (가장 중요)
+
+ 레거시에 흩어진 하드코딩 토큰/이름 리스트를 문자열 그대로 한 곳에 모은다(오타 한 글자가 동작을 깸 → 검증 용이).
+ - 상수: BLEND_GRP_TOKEN = "BlendFKIKPos_grp", NUM_POS = 24, POS_SHAPES = ["follicle","locator"], CTL_SHAPE = ["nurbsCurve"]
+ - 정렬용 토큰 리스트: TGT_POS_TOKENS(ik+fk), CTL_TOKENS(ik+fk) — JUN_cmd_FKIKTool_setup_btn의 리스트들
+ - 매칭 쌍 테이블: FK_PAIRS(tgt↔flw), IK_PAIRS(tgt↔flw) — JUN_matcher_FKIK 의 fk/ik List
+ - 부위별 그룹: LIMB_GROUPS = {"arm_l": (tgt[...], flw[...]), "arm_r":..., "leg_l":..., "leg_r":...} — set_match_objs
+
+ app/core/selection_utils.py (← BF_*, JUN_get_*)
+
+ 순수/maya.cmds 헬퍼, Qt·위젯 의존 제거:
+ - remove_duplicates(items) — list(dict.fromkeys(items)) (순서 유지)
+ - hierarchy_without_shapes(obj), make_hierarchy_list(objs, reverse=False, dedupe=True)
+ - filter_by_shape_types(objs, shape_types), filter_by_tokens(objs, tokens)
+ - order_by_tokens(objs, tokens) — 버그 수정: is "" → 빈 문자열은 if not token: continue
+ - move_up(items, indices), move_down(items, indices) — (new_items, new_indices) 반환
+
+ app/core/fkik_setup.py (← JUN_cmd_FKIKTool_setup_btn)
+
+ UI 호출/위젯 갱신을 제거하고 순수 입출력으로:
+ - resolve(selection) -> {"ok":bool, "targets":[...], "followers":[...], "message":str}
+   - 계층 수집 → BlendFKIKPos_grp 탐색 → pos(follicle/locator) 수집·NUM_POS 검증 → ctl(nurbsCurve)·토큰 필터·NUM_POS 검증 →
+ order_by_tokens로 정렬해 반환
+   - 실패 사유는 영어 message로(예: "Failed: BlendFKIKPos_grp not found", "Failed: position count mismatch (n/24)")
+
+ app/core/fkik_matcher.py (← match/bake 일체)
+
+ - match_transform(tgt, flw, rot_order=True, rot_axis=True, translate=True, rotate=True) — 단일 쌍 xform 복사(원본
+ JUN_MATCH_twoObjects 로직: 임시로 tgt의 rotateOrder 적용 후 복원)
+ - class FKIKMatcher:
+   - build_pairs(all_targets, all_followers, arm_l, arm_r, leg_l, leg_r, ik_to_fk) -> (tgt_list, flw_list)
+       - LIMB_GROUPS로 활성 부위 쌍 모으고, 실제 리스트와 교집합·order_by_tokens, 방향(IK/FK)별 토큰 순 정렬. (레거시의 변수명
+ 뒤바뀜은 데이터 흐름 유지하되 all_targets/all_followers로 정정)
+   - match(tgt_list, flw_list) — 쌍별 match_transform, undo chunk 로 감쌈
+   - bake(tgt_list, flw_list, start, end) — 프레임 루프 매칭+setKeyframe. 버그 수정: range(start, end+1)(마지막 프레임 포함),
+ undo chunk
+   - bake_constraint(tgt_list, flw_list) — 복원: parentConstraint+bakeSimulation(쌍 개수만큼, range(0,8) 하드코딩 → len()
+ 기반으로 일반화)
+
+ app/core/search_utils.py (← JUN_cmd_Search_By_Token, 복원)
+
+ - search_by_token(items, token, invert=False) -> [matched] — 순수. UI가 선택/하이라이트 처리.
+
+ app/ui/main_window.py — Qt UI (maya.cmds UI 대체)
+
+ from Framework.qt.qt import *, import maya.cmds as cmds. class MainWindow(QWidget), 제목 f"FKIK Tool v{VERSION}",
+ Qt.WindowStaysOnTopHint, "red" 테마.
+
+ 위젯 매핑 (원본 → Qt):
+ - Rig 선택 textScrollList → QListWidget lw_rig + QPushButton "Select Objects"(→ FKIKSetup.resolve)
+ - State text(bgc) → QLabel lbl_state (성공=초록/실패=빨강, setStyleSheet)
+ - Arm/Leg 체크박스 4개 → QCheckBox(arm L/R, leg L/R, 기본 체크)
+ - Targets/Followers textScrollList → QListWidget lw_targets, lw_followers (ExtendedSelection) + 각 Add/Del/Up/Down 버튼행
+ - 복원: Search QLineEdit le_search + QCheckBox cb_invert + QPushButton "Search"; Add type 옵션(메뉴/보조 버튼)
+ - Start/End 프레임 intFieldGrp → QSpinBox(초기값 playbackOptions min/max)
+ - Match 버튼: Match IK / Match FK (→ build_pairs+match)
+ - Bake 버튼: Bake IK / Bake FK (→ build_pairs+bake), 복원: Bake (Constraint)
+ - 로그: QTextEdit te_log(readOnly) — 상태/결과 메시지(영어)
+ - 리스트 항목 선택 시 cmds.select(← JUN_cmd_tsl_select): itemSelectionChanged 연결
+ - 핸들러는 위젯에서 plain 값 읽어 core 호출 → 리스트/라벨/로그 갱신. 모든 UI 문자 영어, 주석/docstring 한글 허용.
+
+ launch.py / config.py / __init__.py / requirements.txt
+
+ - A00110 의 동명 파일을 복제하고 식별자만 교체: 셸프 라벨 "FKIKTool", 셸프 명령 tools.A00120_FKIK.run(True), 중복 매칭 문자열
+ "A00120_FKIK.run(True)", SHELF_COMMAND의 ROOT는 JUN_All 경로.
+
+ - search_by_token(items, token, invert=False) -> [matched] — 순수. UI가 선택/하이라이트 처리.
+
+ app/ui/main_window.py — Qt UI (maya.cmds UI 대체)
+
+ from Framework.qt.qt import *, import maya.cmds as cmds. class MainWindow(QWidget), 제목 f"FKIK Tool v{VERSION}",
+ Qt.WindowStaysOnTopHint, "red" 테마.
+
+ 위젯 매핑 (원본 → Qt):
+ - Rig 선택 textScrollList → QListWidget lw_rig + QPushButton "Select Objects"(→ FKIKSetup.resolve)
+ - State text(bgc) → QLabel lbl_state (성공=초록/실패=빨강, setStyleSheet)
+ - Arm/Leg 체크박스 4개 → QCheckBox(arm L/R, leg L/R, 기본 체크)
+ - Targets/Followers textScrollList → QListWidget lw_targets, lw_followers (ExtendedSelection) + 각 Add/Del/Up/Down 버튼행
+ - 복원: Search QLineEdit le_search + QCheckBox cb_invert + QPushButton "Search"; Add type 옵션(메뉴/보조 버튼)
+ - Start/End 프레임 intFieldGrp → QSpinBox(초기값 playbackOptions min/max)
+ - Match 버튼: Match IK / Match FK (→ build_pairs+match)
+ - Bake 버튼: Bake IK / Bake FK (→ build_pairs+bake), 복원: Bake (Constraint)
+ - 로그: QTextEdit te_log(readOnly) — 상태/결과 메시지(영어)
+ - 리스트 항목 선택 시 cmds.select(← JUN_cmd_tsl_select): itemSelectionChanged 연결
+ - 핸들러는 위젯에서 plain 값 읽어 core 호출 → 리스트/라벨/로그 갱신. 모든 UI 문자 영어, 주석/docstring 한글 허용.
+
+ launch.py / config.py / __init__.py / requirements.txt
+
+ - A00110 의 동명 파일을 복제하고 식별자만 교체: 셸프 라벨 "FKIKTool", 셸프 명령 tools.A00120_FKIK.run(True), 중복 매칭 문자열
+ "A00120_FKIK.run(True)", SHELF_COMMAND의 ROOT는 JUN_All 경로.
+
+● User answered Claude's questions:
+  ⎿  · 리팩토링 충실도를 어느 수준으로 할까요? 분석 중 버그로 보이는 지점들이 있습니다(아래 설명). → 적극 개선(버그 수정 포함)
+     · UI 기능 범위는 어디까지 포팅할까요? 원본엔 정의되었지만 UI에 연결 안 된 기능들이 있습니다. → 미연결 기능까지 복원
+     · 코드 식별자(함수/변수명) 스타일은? → 신규 프레임워크 스타일로 현대화
+
+● 방향 확인 완료: 적극 개선(버그 수정 포함) + 미연결 기능 복원 + 신규 프레임워크 스타일 현대화. 이에 맞춰 계획서를
+  작성합니다(기존 A00110 플랜은 완료되었으므로 덮어씁니다).
+
+● Updated plan
+  ⎿  /plan to preview
+
+● 계획서를 작성했습니다. 핵심 요약입니다:
+
+  계획 요약 — A00120_FKIK
+
+  목표: 01_Modules/JUN_PY_FKIK_Tool_V02_01.py(964줄 단일 파일, 문자열 콜백 maya.cmds UI)를 JUN_All/tools/A00120_FKIK/로 모듈화
+  + Qt UI 이식. A00090/A00110 컨벤션 준용.
+
+  구조: app/config/naming.py(리그 네이밍 데이터 집약) + app/core/(selection_utils / fkik_setup / fkik_matcher / search_utils —
+  전부 UI 무관) + app/ui/main_window.py(Qt) + 셸프 드래그&드롭(config.py).
+
+  확정 방향 3가지 반영:
+  1. 적극 개선 — 7개 버그/개선(is ""→falsy, 베이크 range(start,end+1) 마지막 프레임 포함, undo chunk, 변수명 뒤바뀜 정정 등)
+  2. 미연결 기능 복원 — 토큰 검색, type별 Add, parentConstraint 기반 Bake를 UI에 노출
+  3. 현대화 — JUN_/BF_/str_/int_ 접두사 제거, snake_case, UI 문자 영어(메모리 규칙)
+
+  핵심 설계 포인트:
+  - 가장 중요한 건 naming.py — 리그 네이밍 토큰 문자열(*_xx_pos/*_xx_ctl/BlendFKIKPos_grp)은 원문 1:1 보존(현장 리그 의존, 오타
+  한 글자가 동작을 깸).
+  - core는 위젯 직접 갱신을 제거하고 plain 값만 반환, UI가 표시 담당.
+  - 레거시 원본은 보존(레거시 디렉터리 수정 금지 규칙 준수).
+
+  검증: 구문 검사(Maya 없이) → Maya에서 설치/Setup/Match/Bake/리스트편집·검색 수동 검증 + 원본과 트랜스폼 대조.
+
+  계획 검토 후 승인해 주세요.
+
+● User approved Claude's plan
+  ⎿  Plan saved to: ~\.claude\plans\jun-all-tools-flickering-hammock.md · /plan to edit
+     A00120_FKIK — 레거시 FKIK Tool 모듈화 / 리팩토링 + Qt UI 이식
+
+     Context (왜 만드는가)
+
+     01_Modules/JUN_PY_FKIK_Tool_V02_01.py(964줄, 단일 파일)는 현재도 사용 중인 FK/IK 매칭·베이크 툴이지만, 모듈화/리팩토링이
+     안 된 레거시다. 전역 함수 + maya.cmds 윈도우에 위젯명·콜백을 문자열로 박아 넘기는 옛 방식이라 유지보수가 어렵다.
+
+     이 코드를 JUN_All/tools/A00120_FKIK/ 로 옮겨, 저장소 현행 컨벤션(A00090 / A00110)에 맞춰 UI(app/ui)와 로직(app/core) 분리
+     + PySide(Qt) UI + 셸프 드래그&드롭 설치 구조로 재작성한다.
+
+     사용자 확정 방향
+
+     1. 적극 개선 — 1:1 유지가 아니라 분석 중 발견한 버그를 수정한다(아래 "버그 수정" 절).
+     2. 미연결 기능까지 복원 — 원본에 정의됐으나 UI에 안 붙은 기능(토큰 검색, 타입별 Add, parentConstraint 기반 Bake)도 UI에
+     노출.
+     3. 신규 프레임워크 스타일로 현대화 — JUN_/BF_/str_/int_ 접두사 제거, snake_case + 명확한 이름(A00090 ConnectionManager
+     스타일). UI 문자는 영어(메모리 규칙 ui-text-english-only).
+
+     ---
+     레거시 코드 분석 (도메인)
+
+     이 툴은 특정 리그 네이밍 컨벤션에 의존한다: 포지션 헬퍼는 *_xx_pos(follicle/locator), 컨트롤러는 *_xx_ctl(nurbsCurve),
+     묶음 그룹은 BlendFKIKPos_grp. Target(=_xx_pos)의 월드 트랜스폼을 Follower(=_xx_ctl 컨트롤러)로 복사하는 것이 매칭의 핵심.
+     베이크는 프레임마다 매칭+키.
+
+     ┌────────────────────────────────────────────────────────┬───────────────────────────────────────────────────────────────┐
+     │                      레거시 함수                       │                             역할                              │
+     ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+     │ BF_LIST_remove_repetitionArray                         │ 순서 유지 중복 제거                                           │
+     ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+     │ BF_SELECTION_makeList_hierarchy_withoutShape /         │ shape 제외 계층 수집, reverse/dedupe                          │
+     │ _hierarchy                                             │                                                               │
+     ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+     │ BF_LIST_moveUp_index / _moveDown_index                 │ 리스트 항목 위/아래 이동(+선택 인덱스 추적)                   │
+     ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+     │ JUN_get_list_by_shapes                                 │ 셰이프 타입(follicle/locator/nurbsCurve)으로 필터             │
+     ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+     │ JUN_get_set_by_token / _ordered_by_token               │ 이름 토큰 포함 필터 / 토큰 순서대로 정렬                      │
+     ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+     │ JUN_cmd_FKIKTool_setup_btn                             │ BlendFKIKPos_grp 찾고 24 pos / 24 ctl 검증 →                  │
+     │                                                        │ Targets·Followers 채움                                        │
+     ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+     │ JUN_MATCH_twoObjects                                   │ xform 복사(rotateOrder/Axis/translation/rotation)             │
+     ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+     │ JUN_matcher_FKIK / JUN_cmd_match_IK_and_FK             │ arm/leg L·R 플래그로 매칭 쌍 구성, IK↔FK 방향                 │
+     ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+     │ JUN_cmd_bake_IK_FK                                     │ 프레임 루프 매칭+setKeyframe                                  │
+     ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+     │ JUN_cmd_bake_IK_to_FK                                  │ parentConstraint + bakeSimulation (UI 미연결)                 │
+     ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+     │ CMD_ToolSel_b_add/_del/_up/_down, _add_type            │ TSL 편집 (_add_type UI 미연결)                                │
+     ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+     │ JUN_cmd_Search_By_Token                                │ 토큰 검색/선택 (UI 미연결)                                    │
+     ├────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+     │ PY_JUN_makeUI_FKIKTool                                 │ maya.cmds 윈도우(문자열 콜백)                                 │
+     └────────────────────────────────────────────────────────┴───────────────────────────────────────────────────────────────┘
+
+     ---
+     생성할 파일 구조 (A00110 패턴 준용)
+
+     JUN_All/tools/A00120_FKIK/
+     ├── __init__.py            # from .launch import run ; __all__=["run"]
+     ├── launch.py              # run(reload_module=True): DEV reload → MainWindow → "red" 테마 → show
+     ├── config.py              # 셸프 드래그&드롭 설치 (A00110 config.py 복제, 식별자 교체)
+     ├── requirements.txt       # PySide6 / pyinstaller
+     └── app/
+         ├── __init__.py
+         ├── config/
+         │   ├── __init__.py
+         │   ├── version.py     # VERSION="01.00", LAST_UPDATE="2026-06-10"
+         │   └── naming.py      # ★ 리그 네이밍 데이터(토큰/쌍 테이블/상수) 전부 집약
+         ├── core/
+         │   ├── __init__.py    # 매니저/유틸 export
+         │   ├── selection_utils.py   # 계층·중복·셰이프/토큰 필터·리스트 이동 (maya.cmds, UI 무관)
+         │   ├── fkik_setup.py        # FKIKSetup: 검증 후 (targets, followers, ok, msg) 반환
+         │   ├── fkik_matcher.py      # FKIKMatcher: 쌍 구성·match_transform·bake·bake_constraint
+         │   └── search_utils.py      # search_by_token (복원, 순수 함수)
+         └── ui/
+             ├── __init__.py
+             └── main_window.py       # Qt UI (QListWidget/QCheckBox/QSpinBox/QLineEdit)
+
+     ---
+     모듈별 설계
+
+     app/config/naming.py — ★ 리그 네이밍 데이터 집약 (가장 중요)
+
+     레거시에 흩어진 하드코딩 토큰/이름 리스트를 문자열 그대로 한 곳에 모은다(오타 한 글자가 동작을 깸 → 검증 용이).
+     - 상수: BLEND_GRP_TOKEN = "BlendFKIKPos_grp", NUM_POS = 24, POS_SHAPES = ["follicle","locator"], CTL_SHAPE =
+     ["nurbsCurve"]
+     - 정렬용 토큰 리스트: TGT_POS_TOKENS(ik+fk), CTL_TOKENS(ik+fk) — JUN_cmd_FKIKTool_setup_btn의 리스트들
+     - 매칭 쌍 테이블: FK_PAIRS(tgt↔flw), IK_PAIRS(tgt↔flw) — JUN_matcher_FKIK 의 fk/ik List
+     - 부위별 그룹: LIMB_GROUPS = {"arm_l": (tgt[...], flw[...]), "arm_r":..., "leg_l":..., "leg_r":...} — set_match_objs
+
+     app/core/selection_utils.py (← BF_*, JUN_get_*)
+
+     순수/maya.cmds 헬퍼, Qt·위젯 의존 제거:
+     - remove_duplicates(items) — list(dict.fromkeys(items)) (순서 유지)
+     - hierarchy_without_shapes(obj), make_hierarchy_list(objs, reverse=False, dedupe=True)
+     - filter_by_shape_types(objs, shape_types), filter_by_tokens(objs, tokens)
+     - order_by_tokens(objs, tokens) — 버그 수정: is "" → 빈 문자열은 if not token: continue
+     - move_up(items, indices), move_down(items, indices) — (new_items, new_indices) 반환
+
+     app/core/fkik_setup.py (← JUN_cmd_FKIKTool_setup_btn)
+
+     UI 호출/위젯 갱신을 제거하고 순수 입출력으로:
+     - resolve(selection) -> {"ok":bool, "targets":[...], "followers":[...], "message":str}
+       - 계층 수집 → BlendFKIKPos_grp 탐색 → pos(follicle/locator) 수집·NUM_POS 검증 → ctl(nurbsCurve)·토큰 필터·NUM_POS 검증 →
+     order_by_tokens로 정렬해 반환
+       - 실패 사유는 영어 message로(예: "Failed: BlendFKIKPos_grp not found", "Failed: position count mismatch (n/24)")
+
+     app/core/fkik_matcher.py (← match/bake 일체)
+
+     - match_transform(tgt, flw, rot_order=True, rot_axis=True, translate=True, rotate=True) — 단일 쌍 xform 복사(원본
+     JUN_MATCH_twoObjects 로직: 임시로 tgt의 rotateOrder 적용 후 복원)
+     - class FKIKMatcher:
+       - build_pairs(all_targets, all_followers, arm_l, arm_r, leg_l, leg_r, ik_to_fk) -> (tgt_list, flw_list)
+           - LIMB_GROUPS로 활성 부위 쌍 모으고, 실제 리스트와 교집합·order_by_tokens, 방향(IK/FK)별 토큰 순 정렬. (레거시의
+     변수명 뒤바뀜은 데이터 흐름 유지하되 all_targets/all_followers로 정정)
+       - match(tgt_list, flw_list) — 쌍별 match_transform, undo chunk 로 감쌈
+       - bake(tgt_list, flw_list, start, end) — 프레임 루프 매칭+setKeyframe. 버그 수정: range(start, end+1)(마지막 프레임
+     포함), undo chunk
+       - bake_constraint(tgt_list, flw_list) — 복원: parentConstraint+bakeSimulation(쌍 개수만큼, range(0,8) 하드코딩 → len()
+     기반으로 일반화)
+
+     app/core/search_utils.py (← JUN_cmd_Search_By_Token, 복원)
+
+     - search_by_token(items, token, invert=False) -> [matched] — 순수. UI가 선택/하이라이트 처리.
+
+     app/ui/main_window.py — Qt UI (maya.cmds UI 대체)
+
+     from Framework.qt.qt import *, import maya.cmds as cmds. class MainWindow(QWidget), 제목 f"FKIK Tool v{VERSION}",
+     Qt.WindowStaysOnTopHint, "red" 테마.
+
+     위젯 매핑 (원본 → Qt):
+     - Rig 선택 textScrollList → QListWidget lw_rig + QPushButton "Select Objects"(→ FKIKSetup.resolve)
+     - State text(bgc) → QLabel lbl_state (성공=초록/실패=빨강, setStyleSheet)
+     - Arm/Leg 체크박스 4개 → QCheckBox(arm L/R, leg L/R, 기본 체크)
+     - Targets/Followers textScrollList → QListWidget lw_targets, lw_followers (ExtendedSelection) + 각 Add/Del/Up/Down 버튼행
+     - 복원: Search QLineEdit le_search + QCheckBox cb_invert + QPushButton "Search"; Add type 옵션(메뉴/보조 버튼)
+     - Start/End 프레임 intFieldGrp → QSpinBox(초기값 playbackOptions min/max)
+     - Match 버튼: Match IK / Match FK (→ build_pairs+match)
+     - Bake 버튼: Bake IK / Bake FK (→ build_pairs+bake), 복원: Bake (Constraint)
+     - 로그: QTextEdit te_log(readOnly) — 상태/결과 메시지(영어)
+     - 리스트 항목 선택 시 cmds.select(← JUN_cmd_tsl_select): itemSelectionChanged 연결
+     - 핸들러는 위젯에서 plain 값 읽어 core 호출 → 리스트/라벨/로그 갱신. 모든 UI 문자 영어, 주석/docstring 한글 허용.
+
+     launch.py / config.py / __init__.py / requirements.txt
+
+     - A00110 의 동명 파일을 복제하고 식별자만 교체: 셸프 라벨 "FKIKTool", 셸프 명령 tools.A00120_FKIK.run(True), 중복 매칭
+     문자열 "A00120_FKIK.run(True)", SHELF_COMMAND의 ROOT는 JUN_All 경로.
+
+     ---
+     버그 수정 / 개선 목록 (적극 개선)
+
+     1. order_by_tokens 의 is "" 정체성 비교 → 빈 문자열 falsy 체크(if not token).
+     2. bake 프레임 루프 range(start, end) → range(start, end+1) (마지막 프레임 포함).
+     3. match/bake/bake_constraint 를 cmds.undoInfo(openChunk/closeChunk) 로 감싸 단일 undo.
+     4. 중복 제거를 dict.fromkeys 기반 순서 유지로 통일.
+     5. bake_constraint 의 range(0,8) 하드코딩 → 쌍 개수(len) 기반.
+     6. match/build_pairs 의 변수명 뒤바뀜(itemsAll_flw/itemsAll_tgt) → 데이터 흐름 유지하되 정확한 이름으로.
+     7. 로직에서 UI 직접 갱신(cmds.text/textScrollList) 제거 → core는 값만 반환, UI가 표시.
+
+     ▎ 주의: 리그 네이밍 토큰 문자열은 절대 변경 금지(현장 리그와 1:1). naming.py에 원문 그대로 보존.
+
+     ---
+     Verification (테스트 방법)
+
+     1. 구문 검사: python -m py_compile 로 전 파일 통과 확인(여기까지는 Maya 없이 가능).
+     2. 설치: Maya 뷰포트로 A00120_FKIK/config.py 드래그&드롭 → 셸프에 FKIKTool 버튼 생성.
+     3. 실행: 셸프 버튼(또는 import tools.A00120_FKIK as t; t.run(True)) → 빨강 테마 Qt 창.
+     4. Setup: 대상 리그(BlendFKIKPos_grp 포함) 선택 → Select Objects → State 초록 "Success", Targets/Followers 24/24 채워짐.
+     잘못된 선택 시 빨강 실패 메시지.
+     5. Match: Arm L/R·Leg L/R 체크 상태에서 Match IK / Match FK → 해당 컨트롤러가 반대 솔버 포즈로 스냅되는지 뷰포트 확인.
+     Ctrl+Z 단일 원복.
+     6. Bake: Start/End 설정 → Bake IK/Bake FK → 구간 전체(마지막 프레임 포함) 키 생성 확인. Bake (Constraint) 별도 동작 확인.
+     7. 리스트 편집/검색: Add/Del/Up/Down 동작, Search+invert 로 토큰 필터 선택 확인.
+     8. 레거시 대조: 동일 씬에서 원본 JUN_PY_FKIK_Tool_V02_01.py 결과와 매칭 트랜스폼이 일치하는지(버그 수정 항목 제외) 비교.
+
+     비고
+
+     - Maya 실행 환경이 없어 본 작업 산출물은 구문 검사까지만 자동 검증 가능. 실제 동작 검증은 위 4~8을 Maya에서 수동 수행.
+     - 레거시 원본(01_Modules/JUN_PY_FKIK_Tool_V02_01.py)은 그대로 보존(레거시 디렉터리 수정 금지 규칙).
+
+     생성 결과 (15개 파일)
+
+  A00120_FKIK/
+  ├── __init__.py / launch.py / config.py / requirements.txt   # 스캐폴딩(A00110 패턴)
+  └── app/
+      ├── config/
+      │   ├── version.py
+      │   └── naming.py          # ★ 리그 토큰/쌍/상수 원문 1:1 집약 (24/24 검증됨)
+      ├── core/                  # ── maya.cmds 로직, UI 무관 ──
+      │   ├── selection_utils.py # 계층·중복·셰이프/토큰 필터·리스트 이동
+      │   ├── fkik_setup.py      # FKIKSetup.resolve() → {ok, targets, followers, message}
+      │   ├── fkik_matcher.py    # match_transforms / FKIKMatcher.build_pairs·match·bake·bake_constraint
+      │   └── search_utils.py    # search_by_token
+      └── ui/
+          └── main_window.py     # Qt UI (QListWidget/QCheckBox/QSpinBox/QLineEdit)
+
+  확정 방향 3가지 반영
+
+  ① 적극 개선 (버그 수정) — order_by_tokens의 is ""→falsy, 베이크 range(start, end+1)(마지막 프레임 포함), match/bake를 undo
+  chunk로 단일화, bake_constraint의 range(0,8) 하드코딩→len() 기반 + 베이크 후 임시 컨스트레인트 삭제, 변수명
+  뒤바뀜(itemsAll_flw/tgt) 정정, hierarchy_without_shapes의 remove ValueError 가드.
+
+  ② 미연결 기능 복원 — Search(토큰+Invert), Type(타입별 Add), Bake (Constraint) 버튼을 UI에 노출.
+
+  ③ 현대화 — JUN_/BF_/str_/int_ 접두사 제거, snake_case + 명확한 이름, UI 문자 전부 영어(메모리 규칙 ui-text-english-only 준수,
+  주석/docstring은 한글 유지).
+
+  핵심 검증
+
+  - naming.py 순수 데이터로 직접 검증: TGT/CTL 각 24개·중복 없음, FK(14)·IK(10) 쌍 균형, 4개 부위 그룹 tgt↔flw 균형, 모든 부위
+  토큰이 정규 토큰 집합에 존재.
+  - 레거시 매칭 데이터 흐름을 정확히 보존: build_pairs가 부위 토큰으로 해석 → IK/FK 정규 순서로 재정렬해 tgt[i]↔flw[i] 대응을
+  맞추는 원본 로직을 그대로 따름.
+
+  남은 검증 (Maya 필요)
+
+  구문/데이터까지는 자동 검증했으나, 실제 Setup/Match/Bake 동작은 Maya에서 수동 확인이 필요합니다(플랜의 Verification 4~8).
+  특히 원본과 매칭 트랜스폼 결과 대조를 권장합니다. 레거시 원본은 그대로 보존했습니다.

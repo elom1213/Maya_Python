@@ -4,4 +4,6 @@
 __pycache__/
 *.pyc
 
-**/JUN_memo/
+# **/JUN_memo/
+
+**/CLAUDE.md
