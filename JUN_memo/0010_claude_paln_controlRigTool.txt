@@ -1,0 +1,70 @@
+Done. The refactored, modularized tool is built at JUN_All/tools/A00130_ControlRig/.
+
+  What was built
+
+  A00130_ControlRig/
+  ├── __init__.py            # from .launch import run
+  ├── launch.py              # run(reload_module=True) → PySide window + red theme
+  ├── CHANGELOG.md           # 원본 V01_07 이력 + 리펙토링 내역
+  ├── requirements.txt
+  └── app/
+      ├── config/version.py  # VERSION "01.00"
+      ├── core/
+      │   ├── constants.py        # 토큰(MSN_tkn_*) + 정수 ID 스킴
+      │   ├── maya_scene.py       # MayaScene: 모든 cmds.* 래핑 (어댑터)
+      │   ├── selection_utils.py  # BF_*/토큰/리스트 reorder 유틸
+      │   ├── ik_builder.py       # create_ik_with_polevector (is→== 교정)
+      │   ├── cage_model.py       # CageModel  (← JUN_cage)
+      │   ├── rig_matcher.py      # RigMatcher (← JUN_matcher_v02 + JUN_MATCH_twoObjects)
+      │   └── pose_connector.py   # setup_pose_objects (← JUN_CR_setUp_pose_objects)
+      └── ui/main_window.py  # QWidget UI + 슬롯
+
+  설계 요점
+
+  - 레이어 분리: UI(main_window.py)는 cmds.*를 직접 호출하지 않고, 모든 씬 조작은 MayaScene
+  어댑터를 경유. 매칭/IK 알고리즘은 RigMatcher/CageModel에 격리.
+  - PySide UI: maya.cmds 의 frameLayout/textScrollList/checkBoxGrp/button →
+  QGroupBox/QListWidget/QCheckBox/QPushButton. 8개 체크박스 순서는 cage 의 idx 순서와 일치하도록
+  유지. 모든 UI 문자열은 영어.
+  - Framework.qt.qt 추상화 + ThemeManager.load_theme_to_widget(window, "red"). dev reload 는
+  "tools" 와일드카드로 자동 등록.
+  - 깊은 재작성 정리: is 문자열 비교→==, State : Sucess→State : Success, 전역
+  JUN_cage_glo→self.cage 캡슐화, 미사용 import maya.mel 제거. 알고리즘(orient 축 순서·pole 축·joint
+  chain 인덱스·거리 attribute)은 동등하게 이식.
+  - 원본 보존: 01_Modules/JUN_PY_ControlRigTool_V01_07.py는 수정/삭제하지 않음.
+
+  검증 현황
+
+  - 11개 모듈 전부 py_compile 통과.
+  - maya.cmds를 스텁으로 주입해 core import + CageModel/RigMatcher 인스턴스화, idx
+  와이어링(is_spine/is_arm_left…), 리스트 identity 공유(get_rnm_lst(2) is MSN_rnm_lst_arm_l),
+  reorder/dedup 유틸까지 단정문으로 확인.
+
+  남은 검증 (사용자 — Maya 필요)
+
+  이 환경엔 Maya 런타임이 없어 실제 리깅 결과는 확인할 수 없습니다. 깊은 재작성이므로 Maya에서:
+  from JUN_All.tools.A00130_ControlRig import run
+  run(True)
+  로 띄운 뒤, 동일 테스트 씬에서 원본 V01_07과 신규 툴의 Select Objects → Set up Followers → Match
+  → Set up IK → Set up pose objects 결과(생성 조인트/매칭 transform/preferred angle/제약)가
+  일치하는지 대조해 주세요.
+
+  ==========================================
+
+   동작
+
+  - Maya 뷰포트로 config.py를 드래그&드롭 → onMayaDroppedPythonFile() 호출 → 현재 활성 셸프에
+  CtrlRig 버튼 설치.
+  - 버튼 클릭 시 실행되는 명령:
+  ROOT = r"<JUN_All 절대경로>"   # 드롭 시점에 자동 계산되어 박힘
+  sys.path 에 ROOT 추가
+  import tools.A00130_ControlRig
+  tools.A00130_ControlRig.run(True)
+  - A00110_animTool과 동일한 패턴: DEV_MODE 플래그, TOOL_ROOT/JUN_ALL_ROOT 경로 계산, raw
+  SHELF_COMMAND + .format(root=...), command 문자열 substring(A00130_ControlRig.run(True))으로 중복
+  버튼 제거, inViewMessage 설치 알림, image1="pythonFamily.png" / style="iconAndTextVertical".
+
+  차이점은 툴 식별자뿐입니다 — TOOL_LABEL = "CtrlRig", 임포트 대상 tools.A00130_ControlRig. 우리
+  launch.run(reload_module=True)가 run(True) 호출을 그대로 받습니다.
+
+  검증: py_compile 통과. 실제 셸프 설치/실행은 Maya에서 config.py를 드롭해 확인해 주세요.

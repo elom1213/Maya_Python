@@ -1,0 +1,40 @@
+ 완료했습니다. 계획대로 JUN_All/tools/A00110_animTool/에 11개 파일을 생성했고 전체 구문 검사를 통과했습니다.
+
+  생성 결과
+
+  A00110_animTool/
+  ├── __init__.py            # from .launch import run  (셸프가 호출하는 진입점)
+  ├── launch.py              # run(True): DEV 리로드 → MainWindow → 빨강 테마 → show
+  ├── config.py              # ★ 드래그&드롭 대상: onMayaDroppedPythonFile + 셸프 설치
+  ├── requirements.txt       # PySide6 / pyinstaller
+  └── app/
+      ├── config/version.py  # VERSION="01.00"
+      ├── core/keyframe_manager.py  # ★ maya.cmds 핵심 로직 (UI 비의존)
+      └── ui/main_window.py  # Qt UI (입력칸·방향버튼2·삭제·로그)
+
+  핵심 구현 포인트
+
+  성능 (keyframe_manager.py): 오브젝트 루프 없이 선택 전체를 단일 호출로 처리 —
+  - 이동: cmds.keyframe(sel, e=True, time=(start,end), relative=True, timeChange=offset, attribute=...)
+  - 삭제: cmds.cutKey(sel, time=(start,end), clear=True, attribute=...)
+  - 둘 다 undoInfo(openChunk/closeChunk)로 감싸 단일 undo + 오버헤드 최소화 (100+ 오브젝트 대응)
+
+  채널박스 우선: cmds.channelBox("mainChannelBox", q=True, selectedMainAttributes=True)로 선택 채널이 있으면 그 채널만, 없으면
+  attribute 플래그 생략 → 전체 커브.
+
+  UI: Start/End/Offset(QIntValidator 숫자 전용) + 방향 버튼 2개(◀ 앞으로(-) / 뒤로(+) ▶, 부호를 UI가 결정) + 구간 키 삭제 +
+  로그창. from Framework.qt.qt import *로 PySide2/6 무관.
+
+  계획과 1가지 조정 (사용자 표현 반영)
+
+  실제 repo에서 A00040는 드롭 설치 코드가 __dragDrop.py에, config.py엔 DEV_MODE만 있습니다. 하지만 사용자/CLAUDE.md
+  표현("config.py를 드래그&드롭")에 맞춰, 설치 코드(onMayaDroppedPythonFile + DEV_MODE)를 config.py에 통합했습니다. 또한 A00040
+  셸프 명령의 ROOT가 툴 폴더라 import tools.*가 깨지는 문제를 발견해, 이 툴은 **JUN_ALL_ROOT(JUN_All 경로)**를 sys.path에
+  넣도록 바로잡았습니다.
+
+  검증 방법
+
+  계획서의 Verification 섹션 참고 — Maya에서 config.py 드래그&드롭 → AnimKeyTool 셸프 버튼 클릭 → 큐브에 키 만들고 이동/삭제 +
+  채널박스 선택 동작 + Ctrl+Z 단일 원복 확인. (Maya 실행 환경이 없어 여기서는 구문 검사까지만 수행했습니다.)
+
+  커밋은 요청하지 않으셔서 진행하지 않았습니다 — 필요하면 말씀해 주세요.
