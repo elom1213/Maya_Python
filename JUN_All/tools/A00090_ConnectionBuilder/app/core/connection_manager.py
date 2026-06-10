@@ -43,13 +43,14 @@ class ConnectionManager:
                 connections.append(
                     (solver_attr, driver_attr)
                 )
-                # print("solver => driver  :  "+ str(solver_attr) + "   "+ str(driver_attr))
+                print("solver => driver  :  "+ str(solver_attr) + "   "+ str(driver_attr))
 
             if is_exist_driver_attr and is_exist_bs_attr:
                 connections.append(
                     (driver_attr, blendshape_attr)
                 )
-                # print("driver => bs  :  "+ str(driver_attr) + "   " +  str(blendshape_attr))
+                print("driver => bs  :  "+ str(driver_attr) + "   " +  str(blendshape_attr))
+        print(connections)
         return connections
 
 
