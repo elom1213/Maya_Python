@@ -33,10 +33,12 @@ class JUN_mod_tsl_qt_v01(QWidget):
                  show_select=True, show_add=True, show_del=True,
                  show_up=True, show_down=True, show_sort=True,
                  multi_select=True, list_min_height=None,
+                 select_label="Select Objects",
                  log_callback=None, parent=None):
         super(JUN_mod_tsl_qt_v01, self).__init__(parent)
 
         self.title = title
+        self.select_label = select_label
         self.show_select = show_select
         self.show_add = show_add
         self.show_del = show_del
@@ -58,9 +60,9 @@ class JUN_mod_tsl_qt_v01(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(2, 2, 2, 2)
 
-        # Select Objects 버튼 (현재 선택으로 리스트 교체)
+        # Select 버튼 (현재 선택으로 리스트 교체). 라벨은 select_label 로 커스텀 가능.
         if self.show_select:
-            self.btn_select = QPushButton("Select Objects")
+            self.btn_select = QPushButton(self.select_label)
             self.btn_select.clicked.connect(self._on_select)
             layout.addWidget(self.btn_select)
 
