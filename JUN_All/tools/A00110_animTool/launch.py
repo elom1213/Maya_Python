@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-10
+# last Update date : 2026-06-11
 # A00110_animTool - launch entry point (Qt)
 
 import sys, os
@@ -38,13 +38,22 @@ def run(reload_module=True):
         reload_all_v02()
 
     # 리로드 후 갱신된 클래스를 잡기 위해 지역 import (리로드 순서 문제 회피)
-    from tools.A00110_animTool.app.ui.main_window import MainWindow
+    from tools.A00110_animTool.app.ui.main_window import MainWindow, WINDOW_OBJECT_NAME
+    from Framework.qt.qt import QApplication
 
-    try:
-        window_instance.close()
-        window_instance.deleteLater()
-    except:
-        pass
+    # 기존 인스턴스 정리.
+    # reload 시 모듈 전역 window_instance 가 None 으로 초기화되므로 그것에 의존하지 않고
+    # objectName 으로 떠 있는 창을 모두 찾아 닫는다 (창이 여러 개 쌓이는 문제 방지).
+    for w in QApplication.topLevelWidgets():
+        if w.objectName() == WINDOW_OBJECT_NAME:
+            try:
+                # 닫기 전에 Shift+A 핫키 복원 (closeEvent 도 호출하지만 안전망, idempotent)
+                if hasattr(w, "hotkey_mgr"):
+                    w.hotkey_mgr.restore()
+                w.close()
+                w.deleteLater()
+            except:
+                pass
 
     window_instance = MainWindow()
 
