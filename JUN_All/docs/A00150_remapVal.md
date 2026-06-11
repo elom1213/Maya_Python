@@ -2,12 +2,18 @@
 
 ## 1. 개요
 
-여러 오브젝트(주로 조인트)의 어트리뷰트를 **마스터 remapValue 커브 하나로 보간(slerp ramp)** 하는
-셋업을 만드는 툴이다. 하나의 마스터 remapValue 가 여러 개의 remapValue 를 구동해서
-"multi-out 커브" 효과를 흉내낸다. 원래 트위스트 리본 IK용으로 작성됐지만, 임의의 어트리뷰트에
-적용할 수 있다.
+여러 오브젝트(주로 조인트)의 어트리뷰트를 remapValue 커브로 구동하는 셋업을 만드는 툴이다.
+**두 가지 빌드 모드**를 제공한다.
 
-- 원본 로직: `sample_01.py` 의 `build_slerp_ramp` (Chris Lesage, 2019).
+1. **Slerp Ramp** (기존) — 하나의 마스터 remapValue 가 여러 개의 remapValue 를 구동해서
+   "multi-out 커브" 효과를 흉내낸다. 원래 트위스트 리본 IK용으로 작성됐지만, 임의의
+   어트리뷰트에 적용할 수 있다.
+2. **Sine Wave** (신규, v01.01) — 오브젝트마다 `plusMinusAverage → animCurve → remapValue`
+   체인을 만들어 **위상이 어긋난 사인 웨이브를 전파**한다. 컨트롤러에 추가한 driver attr
+   하나로 전체 위상을 민다.
+
+- 원본 로직: `sample_01.py` 의 `build_slerp_ramp` (Chris Lesage, 2019). Sine Wave 모드는
+  `build_sine_wave` 로 추가됐다.
 - DCC: Autodesk Maya (PySide UI). 노드 생성은 **pymel** 사용.
 - UI는 `A00090_ConnectionBuilder`(QLineEdit+Get)와 `01_Modules/JUN_PY_numberTool`(소스+어트리뷰트 2-리스트)
   구성을 참고했다.
@@ -27,7 +33,8 @@ A00150_remapVal/
 └── app/
     ├── config/version.py  # VERSION / LAST_UPDATE
     ├── core/              # 로직
-    │   ├── slerp_ramp.py  # add_attr / build_slerp_ramp(원본 이식) + run_build(이름→PyNode 래퍼)
+    │   ├── slerp_ramp.py  # add_attr / build_slerp_ramp + run_build (Slerp Ramp 모드)
+    │   │                  #  + build_sine_wave + run_build_wave (Sine Wave 모드)
     │   └── maya_scene.py  # cmds 보조 래퍼 (selection / list_keyable_attrs / exists)
     └── ui/main_window.py  # 전체 UI
 ```
@@ -57,32 +64,38 @@ A00150_remapVal.run(True)
 ## 5. UI 구성
 
 ```
-┌ Help ───────────────────────────────────┐  ← 메뉴 바 (Help > About)
-│ Main Controller [ QLineEdit        ] [Get]│
-│ Prefix          [ twist            ]      │
-├ Set Up ──────────────────────────────────┤
-│ [Joints]                [Attributes]      │
-│ Select Objects          List Attributes   │
-│ ┌ QListWidget ┐         ┌ QListWidget ┐   │
-│ │  joints     │         │ rotateX...  │   │
-│ └─────────────┘         └─────────────┘   │
-│ Add|Del|Up|Down|Sort    Del|Up|Down|Sort  │
-│ Attr Search [ token        ] [Search]     │
-├──────────────────────────────────────────┤
-│                [   Build   ]              │
-├ Log ─────────────────────────────────────┤
-│ ┌ read-only 로그창 (영어 출력) ┐          │
-│ └────────────────────────────────┘        │
-└──────────────────────────────────────────┘
+┌ Help ───────────────────────────────────────┐  ← 메뉴 바 (Help > About)
+│ Main Controller [ QLineEdit        ] [Get]   │
+│ Prefix          [ twist            ]         │
+│ Driver Attr [ wave ]                         │  ← Sine Wave 모드 전용
+│ Range  In Min[0] In Max[0] Out Min[0] Out Max[1.000] │  ← Sine Wave 모드 전용
+├ Set Up ──────────────────────────────────────┤
+│ [Joints]                [Attributes]         │
+│ Select Objects          List Attributes      │
+│ ┌ QListWidget ┐         ┌ QListWidget ┐      │
+│ │  joints     │         │ rotateX...  │      │
+│ └─────────────┘         └─────────────┘      │
+│ Add|Del|Up|Down|Sort    Del|Up|Down|Sort     │
+│ Attr Search [ token        ] [Search]        │
+├──────────────────────────────────────────────┤
+│  [ Build (Slerp Ramp) ] [ Build (Sine Wave) ]│
+├ Log ─────────────────────────────────────────┤
+│ ┌ read-only 로그창 (영어 출력) ┐             │
+│ └────────────────────────────────┘           │
+└──────────────────────────────────────────────┘
 ```
 
 - **Help > About**: 툴 설명·사용법 팝업.
-- **Main Controller** = `build_slerp_ramp`의 `controlObj`. `Get`을 누르면 현재 Maya 선택의 첫 오브젝트가 채워진다. 보간을 제어하는 어트리뷰트들이 이 컨트롤러에 추가된다.
-- **Prefix** = 함수 첫 인자(기본 `twist`). 생성되는 노드/어트리뷰트 이름의 접두사로 쓰여 이름 충돌을 막는다.
-- **Joints** (좌측, 재사용 위젯 `JUN_mod_tsl_qt_v01`) = `oColl`. 보간 대상 오브젝트들. Select/Add/Del/Up/Down/Sort.
-- **Attributes** (우측, 재사용 위젯) = `twistAttrs`. **List Attributes** 버튼이 Joints 리스트 **첫 오브젝트**의 keyable 어트리뷰트(rotateX/Y/Z, scaleX/Y/Z 등)를 채운다. 여기서 **하나 또는 여러 개**를 선택한다.
+- **Main Controller** = `controlObj`. `Get`을 누르면 현재 Maya 선택의 첫 오브젝트가 채워진다. 제어용 어트리뷰트들이 이 컨트롤러에 추가된다.
+- **Prefix** = 첫 인자(기본 `twist`). 생성되는 노드/어트리뷰트 이름의 접두사로 쓰여 이름 충돌을 막는다.
+- **Driver Attr** (Sine Wave 모드 전용, 기본 `wave`) = 컨트롤러에 추가되는 keyable double 어트리뷰트 이름. 이 값이 모든 오브젝트의 **위상(phase)** 을 한 번에 민다. Slerp Ramp 모드에서는 사용하지 않는다.
+- **Range** (Sine Wave 모드 전용) = remapValue 의 4개 range(**In Min / In Max / Out Min / Out Max**) **기본값**. 빌드 시 컨트롤러에 `{prefix}_input_min` / `_input_max` / `_output_min` / `_output_max` 4개 어트리뷰트가 만들어지고, 그 값이 모든 remapValue 노드의 대응 어트리뷰트에 **connect** 된다. 따라서 빌드 후 **컨트롤러에서 이 값들을 조절하면 전체 remapValue 가 동시에 바뀐다**(Out Max = 웨이브 진폭). `In Max` 가 `0` 이면 자동으로 **오브젝트 개수 - 1** 이 기본값이 된다.
+- **Joints** (좌측, 재사용 위젯 `JUN_mod_tsl_qt_v01`) = `oColl`. 대상 오브젝트들. Select/Add/Del/Up/Down/Sort.
+- **Attributes** (우측, 재사용 위젯) = 적용할 어트리뷰트. **List Attributes** 버튼이 Joints 리스트 **첫 오브젝트**의 keyable 어트리뷰트(rotateX/Y/Z, scaleX/Y/Z 등)를 채운다. 여기서 **하나 또는 여러 개**를 선택한다.
 - **Attr Search**: 토큰(예: `rotate`)을 포함하는 어트리뷰트를 리스트에서 선택해 준다(어트리뷰트가 많을 때 편리).
-- **Build**: 셋업 생성 실행. 전체가 **하나의 Undo 청크**로 묶여 Ctrl+Z 한 번에 취소된다.
+- **Build (Slerp Ramp)**: 기존 마스터 remapValue 슬러프 램프 셋업 생성.
+- **Build (Sine Wave)**: 위상 사인 웨이브 셋업 생성. **Driver Attr 이름**이 필요하다.
+- 각 Build는 전체가 **하나의 Undo 청크**로 묶여 Ctrl+Z 한 번에 취소된다.
 - **Log**: 결과/경고를 영어로 출력하는 읽기 전용 창.
 
 ---
@@ -90,22 +103,45 @@ A00150_remapVal.run(True)
 ## 6. 사용 순서
 
 1. 컨트롤러로 쓸 오브젝트를 선택 → **Get** (Main Controller 채움).
-2. 보간할 조인트들을 선택 → Joints 리스트의 **Add**.
+2. 대상 조인트들을 선택 → Joints 리스트의 **Add**.
 3. **List Attributes** 클릭 → 채워진 어트리뷰트에서 적용할 것(예: `rotateY`)을 하나 이상 선택.
    (필요하면 Attr Search로 빠르게 선택)
-4. **Prefix** 입력(기본 `twist`).
-5. **Build** 클릭. 로그에 생성된 마스터 노드와 적용 결과가 출력된다.
+4. **Prefix** 입력(기본 `twist`). Sine Wave 모드면 **Driver Attr** 이름(기본 `wave`)과 **Range**(In/Out Min·Max) 기본값도 설정.
+5. 모드에 맞는 버튼 클릭:
+   - **Build (Slerp Ramp)** → 마스터 노드와 적용 결과가 로그에 출력.
+   - **Build (Sine Wave)** → 컨트롤러에 추가된 driver attr 경로와 적용 결과가 로그에 출력.
+     이후 컨트롤러의 driver attr 값을 조절하면 오브젝트들이 위상차를 두고 사인 형태로 움직인다.
 
 ---
 
 ## 7. 동작 규칙
 
+### 공통
+- Attributes는 **선택된 항목**만 적용된다(리스트에 있어도 선택 안 하면 미적용).
+- 각 Build 전체가 **단일 Undo 청크** — Ctrl+Z 한 번으로 생성 노드 전부 취소.
+
+### Slerp Ramp 모드
 - 생성되는 마스터 노드: `{prefix}_master_ribbon_lerp_MAP` (remapValue). 조인트 개수만큼
   `{prefix}_lerp_profile_{i}_MAP` 등이 생성되어 마스터 커브에 연결된다.
 - 컨트롤러에 추가되는 제어 어트리뷰트: `{prefix}_start`, `{prefix}_end`,
   `{prefix}_start_position`, `{prefix}_end_position`, `{prefix}_interpolation`.
-- Attributes는 **선택된 항목**만 적용된다(리스트에 있어도 선택 안 하면 미적용).
-- Build 전체가 **단일 Undo 청크** — Ctrl+Z 한 번으로 생성 노드 전부 취소.
+
+### Sine Wave 모드
+- 오브젝트가 `N`개일 때(인덱스 `i = 0 .. N-1`), 오브젝트마다 3개 노드를 생성한다:
+  - `{prefix}_wave_{i+1}_ADD` (plusMinusAverage, operation=sum):
+    `input1D[0]` ← 컨트롤러 driver attr, `input1D[1]` = **상수 `i`** (위상 offset; `_ADD1`=0 … `_ADD5`=4).
+  - `{prefix}_wave_curve_{i+1}` (animCurveUU): 키 `(0,0)`·`(N-1,N-1)` Linear,
+    **Pre/Post Infinity = Constant**(구간 밖 입력은 끝값 고정, 반복 안 함).
+  - `{prefix}_wave_{i+1}_MAP` (remapValue): Input/Output Min·Max 는 컨트롤러 제어 attr 에서 **connect**,
+    value 커브 = 3키 봉우리 `(0,0)(0.5,1)(1,0)` **spline** → 사인 반주기 형태. `outValue`를 오브젝트 attr에 연결.
+- 컨트롤러에 추가되는 제어 어트리뷰트(모두 double):
+  - **Driver Attr** 이름(기본 `wave`) — 전체 위상을 미는 값.
+  - `{prefix}_input_min`, `{prefix}_input_max`, `{prefix}_output_min`, `{prefix}_output_max` —
+    각각 모든 `*_MAP` 노드의 Input Min / Input Max / Output Min / Output Max 에 **connect** 된다.
+    빌드 후 컨트롤러에서 이 값을 바꾸면 모든 remapValue 가 동시에 반영된다(Output Max = 진폭).
+- 이 4개 attr 의 **기본값**은 UI 의 **Range**(In/Out Min·Max)에서 정한다. `In Max` 가 `0` 이하이면
+  `{prefix}_input_max` 기본값은 자동으로 **오브젝트 개수 - 1**(`N-1`)이 된다.
+- 메모: Pre/Post Infinity는 remapValue가 아니라 그 앞단 animCurve의 속성이다.
 
 ---
 
@@ -116,6 +152,9 @@ A00150_remapVal.run(True)
 --- Build Slerp Ramp ---
 Listed 18 keyable attribute(s) from joint1.
 Built: twist_master_ribbon_lerp_MAP | 5 joint(s) | attrs: rotateY
+
+--- Build Sine Wave ---
+Built sine wave: driver ctl.wave | 5 object(s) | range in[0.0,0.0] out[0.0,1.0] | attrs: translateY
 ```
 
 ### 경고/오류 메시지
@@ -124,6 +163,7 @@ Built: twist_master_ribbon_lerp_MAP | 5 joint(s) | attrs: rotateY
 - `[WARN] Main Controller is empty. ...` — 컨트롤러 미설정.
 - `[WARN] Controller not found in scene: <name>` — 입력한 컨트롤러가 씬에 없음.
 - `[WARN] No attribute selected. ...` — 어트리뷰트를 선택하지 않음.
+- `[WARN] Driver Attr name is empty.` — Sine Wave 빌드 시 Driver Attr 이름이 비어 있음.
 - `[ERROR] Build failed: <error>` — pymel 노드 생성 중 오류(이름 오타, 존재하지 않는 어트리뷰트 등).
 
 ### 자주 겪는 문제

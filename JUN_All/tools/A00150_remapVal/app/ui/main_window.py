@@ -18,7 +18,7 @@ from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 
 from tools.A00150_remapVal.app.config.version import VERSION, LAST_UPDATE
-from tools.A00150_remapVal.app.core import MayaScene, run_build
+from tools.A00150_remapVal.app.core import MayaScene, run_build, run_build_wave
 
 
 class MainWindow(QWidget):
@@ -49,6 +49,8 @@ class MainWindow(QWidget):
 
         root.addLayout(self._build_controller_row())
         root.addLayout(self._build_prefix_row())
+        root.addLayout(self._build_driver_attr_row())
+        root.addLayout(self._build_range_row())
         root.addWidget(self._build_list_group(), stretch=1)
         root.addLayout(self._build_attr_search_row())
         root.addWidget(self._build_build_button())
@@ -74,6 +76,54 @@ class MainWindow(QWidget):
         self.le_prefix = QLineEdit()
         self.le_prefix.setText("twist")
         row.addWidget(self.le_prefix)
+        return row
+
+    def _build_driver_attr_row(self):
+        # Sine Wave 모드 전용: 컨트롤러에 추가할 공통 driver attr 이름.
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Driver Attr"))
+        self.le_driver_attr = QLineEdit()
+        self.le_driver_attr.setText("wave")
+        self.le_driver_attr.setToolTip(
+            "Sine Wave mode: name of the keyable attribute added to the "
+            "Main Controller. Its value drives the phase of all objects.")
+        row.addWidget(self.le_driver_attr)
+        return row
+
+    def _make_range_spinbox(self, value, tooltip):
+        sb = QDoubleSpinBox()
+        sb.setRange(-1000000.0, 1000000.0)
+        sb.setDecimals(3)
+        sb.setValue(value)
+        sb.setFixedWidth(80)
+        sb.setToolTip(tooltip)
+        return sb
+
+    def _build_range_row(self):
+        # Sine Wave 모드 전용: remapValue range 4개. 컨트롤러 제어 attr 의 기본값이 된다.
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Range"))
+
+        row.addWidget(QLabel("In Min"))
+        self.dsb_input_min = self._make_range_spinbox(
+            0.0, "Default of the controller's {prefix}_input_min attr (remapValue Input Min).")
+        row.addWidget(self.dsb_input_min)
+
+        row.addWidget(QLabel("In Max"))
+        self.dsb_input_max = self._make_range_spinbox(
+            0.0, "Default of the controller's {prefix}_input_max attr (remapValue Input Max). "
+                 "0 = auto (object count - 1).")
+        row.addWidget(self.dsb_input_max)
+
+        row.addWidget(QLabel("Out Min"))
+        self.dsb_output_min = self._make_range_spinbox(
+            0.0, "Default of the controller's {prefix}_output_min attr (remapValue Output Min).")
+        row.addWidget(self.dsb_output_min)
+
+        row.addWidget(QLabel("Out Max"))
+        self.dsb_output_max = self._make_range_spinbox(
+            1.0, "Default of the controller's {prefix}_output_max attr (remapValue Output Max / amplitude).")
+        row.addWidget(self.dsb_output_max)
         return row
 
     def _build_list_group(self):
@@ -103,9 +153,22 @@ class MainWindow(QWidget):
         return row
 
     def _build_build_button(self):
-        self.btn_build = QPushButton("Build")
+        # 두 가지 빌드 모드: Slerp Ramp(기존) / Sine Wave(신규).
+        container = QWidget()
+        row = QHBoxLayout(container)
+        row.setContentsMargins(0, 0, 0, 0)
+
+        self.btn_build = QPushButton("Build (Slerp Ramp)")
         self.btn_build.setMinimumHeight(34)
-        return self.btn_build
+        self.btn_build.setToolTip("Master remapValue slerp ramp setup (original).")
+        row.addWidget(self.btn_build)
+
+        self.btn_build_wave = QPushButton("Build (Sine Wave)")
+        self.btn_build_wave.setMinimumHeight(34)
+        self.btn_build_wave.setToolTip(
+            "Phase-offset sine wave: plusMinusAverage -> animCurve -> remapValue per object.")
+        row.addWidget(self.btn_build_wave)
+        return container
 
     def _build_log_group(self):
         group = QGroupBox("Log")
@@ -121,6 +184,7 @@ class MainWindow(QWidget):
         self.btn_attr_search.clicked.connect(self.on_search_attrs)
         self.le_attr_search.returnPressed.connect(self.on_search_attrs)
         self.btn_build.clicked.connect(self.on_build)
+        self.btn_build_wave.clicked.connect(self.on_build_wave)
 
     # ================================================================
     # helpers
@@ -165,30 +229,36 @@ class MainWindow(QWidget):
         self.attr_tsl.select_by_texts(matches)
         self._log("Search '{0}' : {1} attribute(s) selected.".format(token, len(matches)))
 
-    def on_build(self):
+    def _collect_inputs(self):
+        """공통 입력 수집 + 검증. 유효하면 (prefix, controller, joints, attrs), 아니면 None."""
         prefix = self.le_prefix.text().strip()
         controller = self.le_controller.text().strip()
         joints = self.joints_tsl.get_all_items()
         attrs = self.attr_tsl.selected_items()
 
-        self._log("--- Build Slerp Ramp ---")
-
-        # 입력 검증
         if not prefix:
             self._log("[WARN] Prefix is empty.")
-            return
+            return None
         if not controller:
             self._log("[WARN] Main Controller is empty. Use Get to set it.")
-            return
+            return None
         if not MayaScene.exists(controller):
             self._log("[WARN] Controller not found in scene: {0}".format(controller))
-            return
+            return None
         if not joints:
             self._log("[WARN] Joints list is empty.")
-            return
+            return None
         if not attrs:
             self._log("[WARN] No attribute selected. List Attributes, then select one or more.")
+            return None
+        return prefix, controller, joints, attrs
+
+    def on_build(self):
+        self._log("--- Build Slerp Ramp ---")
+        collected = self._collect_inputs()
+        if collected is None:
             return
+        prefix, controller, joints, attrs = collected
 
         # Undo 청크: 전체 빌드를 한 번에 취소 가능하게.
         cmds.undoInfo(openChunk=True)
@@ -197,6 +267,42 @@ class MainWindow(QWidget):
             self._log(
                 "Built: {master} | {n} joint(s) | attrs: {attrs}".format(
                     master=master, n=len(joints), attrs=", ".join(attrs)
+                )
+            )
+        except Exception as exc:
+            self._log("[ERROR] Build failed: {0}".format(exc))
+        finally:
+            cmds.undoInfo(closeChunk=True)
+
+    def on_build_wave(self):
+        """Sine Wave 모드 빌드: 오브젝트마다 plusMinusAverage->animCurve->remapValue 체인 생성."""
+        self._log("--- Build Sine Wave ---")
+        collected = self._collect_inputs()
+        if collected is None:
+            return
+        prefix, controller, joints, attrs = collected
+
+        driver_attr = self.le_driver_attr.text().strip()
+        if not driver_attr:
+            self._log("[WARN] Driver Attr name is empty.")
+            return
+        input_min = self.dsb_input_min.value()
+        input_max = self.dsb_input_max.value()
+        output_min = self.dsb_output_min.value()
+        output_max = self.dsb_output_max.value()
+
+        # Undo 청크: 전체 빌드를 한 번에 취소 가능하게.
+        cmds.undoInfo(openChunk=True)
+        try:
+            driver = run_build_wave(
+                prefix, controller, joints, driver_attr, attrs,
+                input_min, input_max, output_min, output_max)
+            self._log(
+                "Built sine wave: driver {driver} | {n} object(s) | "
+                "range in[{imin},{imax}] out[{omin},{omax}] | attrs: {attrs}".format(
+                    driver=driver, n=len(joints),
+                    imin=input_min, imax=input_max, omin=output_min, omax=output_max,
+                    attrs=", ".join(attrs)
                 )
             )
         except Exception as exc:
@@ -213,15 +319,19 @@ class MainWindow(QWidget):
             "Remap Value (Slerp Ramp) Tool v{version}\n"
             "Update date: {update}\n"
             "\n"
-            "Interpolates a collection of objects' attributes along a master\n"
-            "remapValue curve (slerp ramp). Based on Chris Lesage's build_slerp_ramp.\n"
+            "Two build modes:\n"
+            "- Build (Slerp Ramp): interpolates attributes along a master remapValue\n"
+            "  curve. Based on Chris Lesage's build_slerp_ramp.\n"
+            "- Build (Sine Wave): per object a plusMinusAverage -> animCurve ->\n"
+            "  remapValue chain propagates a phase-offset sine wave. The Driver Attr\n"
+            "  added to the Main Controller drives the phase of all objects.\n"
             "\n"
             "How to use:\n"
             "1. Set Main Controller (select an object, press Get).\n"
             "2. Add joints to the Joints list.\n"
             "3. Press List Attributes, then select one or more attributes.\n"
-            "4. Set a Prefix (default 'twist').\n"
-            "5. Press Build. The whole setup is one undo step.\n"
+            "4. Set a Prefix (default 'twist'). For Sine Wave, set a Driver Attr name.\n"
+            "5. Press Build (Slerp Ramp) or Build (Sine Wave). Each build is one undo step.\n"
             "\n"
             "Written by Ji Hun Park."
         ).format(version=VERSION, update=LAST_UPDATE)
