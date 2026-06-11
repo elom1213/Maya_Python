@@ -1,0 +1,3 @@
+PySide6
+pyinstaller
+# pymel 은 Maya 가 제공한다(이 툴은 Maya 내에서만 노드를 생성·실행). 별도 설치 불필요.

@@ -8,6 +8,7 @@ PySide 로 재구성. 로직은 app/core 모듈에 위임하고, 이 모듈은 �
 """
 
 from Framework.qt.qt import *
+from Framework.qt import JUN_mod_tsl_qt
 
 from tools.A00130_ControlRig.app.config.version import VERSION
 from tools.A00130_ControlRig.app.core import (
@@ -103,64 +104,17 @@ class MainWindow(QWidget):
         group = QGroupBox("Set Up")
         layout = QHBoxLayout(group)
 
-        layout.addLayout(self._build_target_column())
-        layout.addLayout(self._build_follower_column())
+        # 기존 UI(Select 버튼 → 헤더 → 리스트 → Add/Del/Up/Down, Sort 없음)를 보존하기 위해
+        # 재사용 위젯을 select_label 커스텀 + show_sort=False 로 생성한다.
+        self.tgt_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Targets", select_label="Select targets", show_sort=False)
+        self.flw_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Followers", select_label="Select followers", show_sort=False)
+
+        layout.addWidget(self.tgt_tsl)
+        layout.addWidget(self.flw_tsl)
 
         return group
-
-    def _build_target_column(self):
-        col = QVBoxLayout()
-
-        self.btn_select_targets = QPushButton("Select targets")
-        col.addWidget(self.btn_select_targets)
-
-        header = QHBoxLayout()
-        header.addWidget(QLabel("Targets"))
-        self.lbl_tgt_num = QLabel("Number: ")
-        header.addWidget(self.lbl_tgt_num)
-        col.addLayout(header)
-
-        self.tgt_list = QListWidget()
-        self.tgt_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        col.addWidget(self.tgt_list)
-
-        btns = QHBoxLayout()
-        self.btn_tgt_add = QPushButton("Add")
-        self.btn_tgt_del = QPushButton("Del")
-        self.btn_tgt_up = QPushButton("Up")
-        self.btn_tgt_down = QPushButton("Down")
-        for b in (self.btn_tgt_add, self.btn_tgt_del, self.btn_tgt_up, self.btn_tgt_down):
-            btns.addWidget(b)
-        col.addLayout(btns)
-
-        return col
-
-    def _build_follower_column(self):
-        col = QVBoxLayout()
-
-        self.btn_select_followers = QPushButton("Select followers")
-        col.addWidget(self.btn_select_followers)
-
-        header = QHBoxLayout()
-        header.addWidget(QLabel("Followers"))
-        self.lbl_flw_num = QLabel("Number: ")
-        header.addWidget(self.lbl_flw_num)
-        col.addLayout(header)
-
-        self.flw_list = QListWidget()
-        self.flw_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        col.addWidget(self.flw_list)
-
-        btns = QHBoxLayout()
-        self.btn_flw_add = QPushButton("Add")
-        self.btn_flw_del = QPushButton("Del")
-        self.btn_flw_up = QPushButton("Up")
-        self.btn_flw_down = QPushButton("Down")
-        for b in (self.btn_flw_add, self.btn_flw_del, self.btn_flw_up, self.btn_flw_down):
-            btns.addWidget(b)
-        col.addLayout(btns)
-
-        return col
 
     def _build_match_group(self):
         group = QGroupBox("Tool : Match IK and FK")
@@ -179,23 +133,9 @@ class MainWindow(QWidget):
     def _connect_signals(self):
         self.btn_select_objects.clicked.connect(self.on_select_objects)
 
-        self.btn_select_targets.clicked.connect(lambda: self.on_select(self.tgt_list, self.lbl_tgt_num))
-        self.btn_select_followers.clicked.connect(lambda: self.on_select(self.flw_list, self.lbl_flw_num))
-
-        self.btn_tgt_add.clicked.connect(lambda: self.on_list_add(self.tgt_list, self.lbl_tgt_num))
-        self.btn_tgt_del.clicked.connect(lambda: self.on_list_del(self.tgt_list, self.lbl_tgt_num))
-        self.btn_tgt_up.clicked.connect(lambda: self.on_list_up(self.tgt_list))
-        self.btn_tgt_down.clicked.connect(lambda: self.on_list_down(self.tgt_list))
-
-        self.btn_flw_add.clicked.connect(lambda: self.on_list_add(self.flw_list, self.lbl_flw_num))
-        self.btn_flw_del.clicked.connect(lambda: self.on_list_del(self.flw_list, self.lbl_flw_num))
-        self.btn_flw_up.clicked.connect(lambda: self.on_list_up(self.flw_list))
-        self.btn_flw_down.clicked.connect(lambda: self.on_list_down(self.flw_list))
-
-        # 리스트 항목 클릭 시 Maya 에서 선택
+        # tgt/flw 리스트(Select/Add/Del/Up/Down, 항목 클릭 시 씬 선택)는 위젯이 자체 처리.
+        # name_list(Setup 입력 리스트)만 씬 선택 와이어링을 유지한다.
         self.name_list.itemSelectionChanged.connect(lambda: self._select_in_scene(self.name_list))
-        self.tgt_list.itemSelectionChanged.connect(lambda: self._select_in_scene(self.tgt_list))
-        self.flw_list.itemSelectionChanged.connect(lambda: self._select_in_scene(self.flw_list))
 
         self.btn_setup_followers.clicked.connect(self.on_setup_followers)
         self.btn_match.clicked.connect(self.on_match)
@@ -213,25 +153,6 @@ class MainWindow(QWidget):
     @staticmethod
     def _selected_items(list_widget):
         return [item.text() for item in list_widget.selectedItems()]
-
-    @staticmethod
-    def _selected_rows(list_widget):
-        return sorted(idx.row() for idx in list_widget.selectedIndexes())
-
-    @staticmethod
-    def _set_items(list_widget, items):
-        list_widget.clear()
-        if items:
-            list_widget.addItems(items)
-
-    @staticmethod
-    def _append_items(list_widget, items):
-        if not items:
-            return
-        list_widget.addItems(items)
-
-    def _update_number(self, label, list_widget):
-        label.setText("Number: {0}".format(list_widget.count()))
 
     def _select_in_scene(self, list_widget):
         items = self._selected_items(list_widget)
@@ -300,60 +221,6 @@ class MainWindow(QWidget):
         self._set_status("State : Success", "success")
 
     # ================================================================
-    # 슬롯 : target / follower 리스트 편집
-    # ================================================================
-
-    def on_select(self, list_widget, number_label):
-        """원본 JUN_cmd_toolSel_btn : 선택을 리스트로 대체."""
-        selection = MayaScene.selection() or []
-        self._set_items(list_widget, selection)
-        self._update_number(number_label, list_widget)
-
-    def on_list_add(self, list_widget, number_label):
-        """원본 CMD_ToolSel_b_add : 중복 없이 선택을 추가."""
-        existing = self._list_items(list_widget)
-        for item in MayaScene.selection() or []:
-            if item in existing:
-                print("{0} is already in the list.".format(item))
-            else:
-                list_widget.addItem(item)
-                existing.append(item)
-        self._update_number(number_label, list_widget)
-
-    def on_list_del(self, list_widget, number_label):
-        """원본 CMD_ToolSel_b_del : 선택된 항목 삭제."""
-        for row in reversed(self._selected_rows(list_widget)):
-            list_widget.takeItem(row)
-        self._update_number(number_label, list_widget)
-
-    def on_list_up(self, list_widget):
-        """원본 CMD_ToolSel_b_up."""
-        items = self._list_items(list_widget)
-        sel_index_1based = [r + 1 for r in self._selected_rows(list_widget)]
-        if not sel_index_1based:
-            return
-        moved_items, result_index = selection_utils.move_up_index(items, sel_index_1based)
-        self._set_items(list_widget, moved_items)
-        for ri in result_index:
-            self._select_row(list_widget, ri - 1)
-
-    def on_list_down(self, list_widget):
-        """원본 CMD_ToolSel_b_down."""
-        items = self._list_items(list_widget)
-        sel_index_1based = [r + 1 for r in self._selected_rows(list_widget)]
-        if not sel_index_1based:
-            return
-        moved_items, result_index = selection_utils.move_down_index(items, sel_index_1based)
-        self._set_items(list_widget, moved_items)
-        for ri in result_index:
-            self._select_row(list_widget, ri)
-
-    @staticmethod
-    def _select_row(list_widget, row):
-        if 0 <= row < list_widget.count():
-            list_widget.item(row).setSelected(True)
-
-    # ================================================================
     # 슬롯 : Match IK and FK
     # ================================================================
 
@@ -362,16 +229,18 @@ class MainWindow(QWidget):
 
     def on_setup_followers(self):
         """원본 JUN_CR_setUp_followers."""
-        self.flw_list.clear()
+        items = []
         for idx, is_checked in enumerate(self._checkbox_states()):
             if is_checked:
-                self._append_items(self.flw_list, self.cage.get_rnm_lst(idx))
-        self._update_number(self.lbl_flw_num, self.flw_list)
+                group = self.cage.get_rnm_lst(idx)
+                if group:
+                    items.extend(group)
+        self.flw_tsl.set_items(items)
 
     def on_match(self):
         """원본 JUN_CR_match."""
         mcr = RigMatcher()
-        mcr.set_matcher(self._list_items(self.tgt_list), self._list_items(self.flw_list))
+        mcr.set_matcher(self.tgt_tsl.get_all_items(), self.flw_tsl.get_all_items())
 
         cage = self.cage
         for idx, is_checked in enumerate(self._checkbox_states()):

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-10
+# last Update date : 2026-06-11
 # A00110_animTool - Qt UI
 
 from Framework.qt.qt import *
@@ -9,8 +9,13 @@ print("QT version  :  " + str(QT_VERSION))
 
 import maya.cmds as cmds
 
-from tools.A00110_animTool.app.config.version import VERSION
+from tools.A00110_animTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00110_animTool.app.core import KeyframeManager
+from tools.A00110_animTool.app.core import HotkeyManager
+
+
+# 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
+WINDOW_OBJECT_NAME = "JUN_A00110_animTool_window"
 
 
 class MainWindow(QWidget):
@@ -19,13 +24,19 @@ class MainWindow(QWidget):
 
         super().__init__()
 
+        self.setObjectName(WINDOW_OBJECT_NAME)
+
         self.win_width  = 380
-        self.win_height = 320
+        self.win_height = 460
         self.win_title  = f"Anim Key Tool v{VERSION}"
 
         self.resize(self.win_width, self.win_height)
 
         self.build_ui()
+
+        # 툴 실행 중 Shift+A 핫키 바인딩 (창 종료 시 closeEvent 에서 복원)
+        self.hotkey_mgr = HotkeyManager()
+        self._enable_hotkey(self.cb_hotkey.isChecked())
 
     # --------------------------------------------------
     # UI
@@ -41,6 +52,17 @@ class MainWindow(QWidget):
         )
 
         main_layout = QVBoxLayout(self)
+
+        # -------------------------
+        # 메뉴 바 (Help > About)
+        # jointTool 의 cmds.menu('Help') / cmds.menuItem('About') 패턴을 Qt 로 옮김
+        # -------------------------
+
+        self.menu_bar = QMenuBar()
+        help_menu = self.menu_bar.addMenu("Help")
+        act_about = help_menu.addAction("About")
+        act_about.triggered.connect(self.show_about)
+        main_layout.setMenuBar(self.menu_bar)
 
         # -------------------------
         # Frame range / offset 입력
@@ -92,6 +114,25 @@ class MainWindow(QWidget):
         main_layout.addWidget(self.btn_delete)
 
         # -------------------------
+        # Graph Editor 구간 유지(hold)
+        # -------------------------
+
+        grp = QGroupBox("Graph Editor")
+        grp_layout = QVBoxLayout(grp)
+
+        self.btn_hold = QPushButton("Hold Selected Range")
+        grp_layout.addWidget(self.btn_hold)
+
+        self.cb_hotkey = QCheckBox("Shift+A hotkey")
+        self.cb_hotkey.setChecked(True)
+        grp_layout.addWidget(self.cb_hotkey)
+
+        self.lbl_hotkey = QLabel("")
+        grp_layout.addWidget(self.lbl_hotkey)
+
+        main_layout.addWidget(grp)
+
+        # -------------------------
         # 로그
         # -------------------------
 
@@ -100,12 +141,22 @@ class MainWindow(QWidget):
         main_layout.addWidget(self.te_log)
 
         # -------------------------
+        # 저작권
+        # -------------------------
+
+        self.lbl_copyright = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
+        self.lbl_copyright.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(self.lbl_copyright)
+
+        # -------------------------
         # Signal
         # -------------------------
 
         self.btn_move_back.clicked.connect(lambda: self.on_move(-1))
         self.btn_move_fwd.clicked.connect(lambda: self.on_move(+1))
         self.btn_delete.clicked.connect(self.on_delete)
+        self.btn_hold.clicked.connect(self.on_hold)
+        self.cb_hotkey.toggled.connect(self.on_toggle_hotkey)
 
     # --------------------------------------------------
     # Helper
@@ -172,3 +223,47 @@ class MainWindow(QWidget):
 
         count, msg = KeyframeManager.delete_keys(start, end)
         self.log(msg)
+
+    def on_hold(self):
+
+        count, msg = KeyframeManager.hold_selected_keys()
+        self.log(msg)
+
+    def show_about(self, *args):
+        # jointTool 의 show_about(confirmDialog) 패턴을 Qt 로 옮김
+        QMessageBox.information(
+            self,
+            "About",
+            f"Written by Ji Hun Park.\nUpdate date: {LAST_UPDATE}",
+        )
+
+    # --------------------------------------------------
+    # Hotkey
+    # --------------------------------------------------
+
+    def on_toggle_hotkey(self, checked):
+        self._enable_hotkey(checked)
+
+    def _enable_hotkey(self, on):
+        """체크 상태에 따라 Shift+A 핫키를 설치/복원하고 상태 라벨을 갱신."""
+        if on:
+            ok, msg = self.hotkey_mgr.install()
+            self.lbl_hotkey.setText("Shift+A : ON" if ok else "Shift+A : unavailable")
+        else:
+            self.hotkey_mgr.restore()
+            msg = "Shift+A hotkey disabled."
+            self.lbl_hotkey.setText("Shift+A : OFF")
+
+        self.log(msg)
+
+    # --------------------------------------------------
+    # Teardown
+    # --------------------------------------------------
+
+    def closeEvent(self, event):
+        # 창이 닫힐 때 Shift+A 를 원래 바인딩으로 복원
+        try:
+            if getattr(self, "hotkey_mgr", None):
+                self.hotkey_mgr.restore()
+        finally:
+            super().closeEvent(event)
