@@ -1,0 +1,81 @@
+QWidget {
+    background-color: #eef3fa;
+    color: #3a3a3a;
+    font-size: 12px;
+}
+
+QLabel {
+    color: #3a3a3a;
+    background: transparent;
+}
+
+QPushButton {
+    background-color: #a9c8e8;
+    color: #3a3a3a;
+    border: 1px solid #8db4df;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+QPushButton:hover {
+    background-color: #bbd4ee;
+}
+
+QPushButton:pressed {
+    background-color: #93b7df;
+}
+
+QLineEdit, QTextEdit, QPlainTextEdit, QListWidget, QSpinBox, QComboBox {
+    background-color: #ffffff;
+    color: #3a3a3a;
+    border: 1px solid #8db4df;
+    padding: 4px;
+    border-radius: 3px;
+}
+
+QListWidget::item:selected {
+    background-color: #8db4df;
+    color: #ffffff;
+}
+
+QComboBox:hover {
+    border: 1px solid #8db4df;
+}
+
+QCheckBox {
+    color: #3a3a3a;
+    background: transparent;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #8db4df;
+    border: 1px solid #8db4df;
+}
+
+QMenuBar {
+    background-color: #eef3fa;
+    color: #3a3a3a;
+}
+
+QMenuBar::item:selected {
+    background-color: #8db4df;
+}
+
+QMenu {
+    background-color: #eef3fa;
+    color: #3a3a3a;
+}
+
+QMenu::item:selected {
+    background-color: #8db4df;
+}
+
+QGroupBox {
+    border: 1px solid #8db4df;
+    margin-top: 10px;
+    padding-top: 10px;
+}
+
+QGroupBox::title {
+    color: #5f87b0;
+}
