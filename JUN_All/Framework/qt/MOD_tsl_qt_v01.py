@@ -32,7 +32,8 @@ class JUN_mod_tsl_qt_v01(QWidget):
     def __init__(self, title="List",
                  show_select=True, show_add=True, show_del=True,
                  show_up=True, show_down=True, show_sort=True,
-                 multi_select=True, parent=None):
+                 multi_select=True, list_min_height=None,
+                 log_callback=None, parent=None):
         super(JUN_mod_tsl_qt_v01, self).__init__(parent)
 
         self.title = title
@@ -43,6 +44,9 @@ class JUN_mod_tsl_qt_v01(QWidget):
         self.show_down = show_down
         self.show_sort = show_sort
         self.multi_select = multi_select
+        self.list_min_height = list_min_height
+        # 중복 안내 등 메시지를 출력할 콜백. None 이면 print 사용(툴 로그창에 연결 가능).
+        self.log_callback = log_callback
 
         self._build_ui()
 
@@ -77,29 +81,31 @@ class JUN_mod_tsl_qt_v01(QWidget):
         mode = (QAbstractItemView.ExtendedSelection
                 if self.multi_select else QAbstractItemView.SingleSelection)
         self.list_widget.setSelectionMode(mode)
+        if self.list_min_height:
+            self.list_widget.setMinimumHeight(self.list_min_height)
         self.list_widget.itemSelectionChanged.connect(self._on_selection_changed)
         layout.addWidget(self.list_widget)
 
-        # 편집 버튼 행: Add / Del / Up / Down
-        edit_row = QHBoxLayout()
+        # 편집 버튼 행: Add / Del / Up / Down (+ add_button 으로 커스텀 버튼 추가 가능)
+        self.edit_row = QHBoxLayout()
         if self.show_add:
             btn = QPushButton("Add")
             btn.clicked.connect(self._on_add)
-            edit_row.addWidget(btn)
+            self.edit_row.addWidget(btn)
         if self.show_del:
             btn = QPushButton("Del")
             btn.clicked.connect(self._on_del)
-            edit_row.addWidget(btn)
+            self.edit_row.addWidget(btn)
         if self.show_up:
             btn = QPushButton("Up")
             btn.clicked.connect(self._on_up)
-            edit_row.addWidget(btn)
+            self.edit_row.addWidget(btn)
         if self.show_down:
             btn = QPushButton("Down")
             btn.clicked.connect(self._on_down)
-            edit_row.addWidget(btn)
-        if edit_row.count() > 0:
-            layout.addLayout(edit_row)
+            self.edit_row.addWidget(btn)
+        # add_button 으로 나중에 버튼을 끼워넣을 수 있도록 항상 레이아웃을 추가한다.
+        layout.addLayout(self.edit_row)
 
         # Sort 버튼
         if self.show_sort:
@@ -116,17 +122,20 @@ class JUN_mod_tsl_qt_v01(QWidget):
                 for i in range(self.list_widget.count())]
 
     def set_items(self, items):
+        # 프로그램적 채우기 중에는 시그널을 막아 불필요한 씬 선택을 방지한다.
+        self.list_widget.blockSignals(True)
         self.list_widget.clear()
         if items:
             self.list_widget.addItems(items)
+        self.list_widget.blockSignals(False)
         self._update_number()
 
     def append_unique(self, items):
-        """중복 없이 추가. 이미 있으면 print 로 안내(MOD_tsl 동작 보존)."""
+        """중복 없이 추가. 이미 있으면 로그 콜백(없으면 print)으로 안내."""
         existing = self.get_all_items()
         for item in items or []:
             if item in existing:
-                print("{0} is already in the list.".format(item))
+                self._log("{0} is already in the list.".format(item))
             else:
                 self.list_widget.addItem(item)
                 existing.append(item)
@@ -137,6 +146,26 @@ class JUN_mod_tsl_qt_v01(QWidget):
 
     def selected_rows(self):
         return sorted(idx.row() for idx in self.list_widget.selectedIndexes())
+
+    def select_by_texts(self, texts):
+        """주어진 텍스트와 일치하는 항목을 리스트에서 선택(씬 선택 시그널은 막음)."""
+        target = set(texts or [])
+        self.list_widget.blockSignals(True)
+        self.list_widget.clearSelection()
+        for i in range(self.list_widget.count()):
+            if self.list_widget.item(i).text() in target:
+                self.list_widget.item(i).setSelected(True)
+        self.list_widget.blockSignals(False)
+
+    def add_button(self, label, callback, index=None):
+        """편집 버튼 행에 커스텀 버튼을 추가한다. index=None 이면 맨 뒤에 붙인다."""
+        btn = QPushButton(label)
+        btn.clicked.connect(callback)
+        if index is None:
+            self.edit_row.addWidget(btn)
+        else:
+            self.edit_row.insertWidget(index, btn)
+        return btn
 
     def count(self):
         return self.list_widget.count()
@@ -151,6 +180,12 @@ class JUN_mod_tsl_qt_v01(QWidget):
 
     def _update_number(self):
         self.lbl_number.setText("Number: {0}".format(self.list_widget.count()))
+
+    def _log(self, message):
+        if callable(self.log_callback):
+            self.log_callback(message)
+        else:
+            print(message)
 
     def _maya_selection(self):
         cmds = _cmds()

@@ -4,6 +4,7 @@
 # A00120_FKIK - Qt UI (레거시 PY_JUN_makeUI_FKIKTool 대체)
 
 from Framework.qt.qt import *
+from Framework.qt import JUN_mod_tsl_qt
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -14,7 +15,6 @@ from tools.A00120_FKIK.app.core import (
     FKIKSetup,
     FKIKMatcher,
     search_by_token,
-    selection_utils,
 )
 
 
@@ -117,46 +117,20 @@ class MainWindow(QWidget):
 
         row = QHBoxLayout()
 
-        self.lw_targets = self._make_edit_list("Targets")
-        self.lw_followers = self._make_edit_list("Followers")
+        # 재사용 PySide tsl 위젯(Framework.qt.MOD_tsl_qt_v01) 사용.
+        # A00140_ConnectClosest 와 동일한 형식. Select/Add/Del/Up/Down/Sort/씬 선택은 위젯이 자체 처리한다.
+        self.tsl_targets = self._make_edit_list("Targets")
+        self.tsl_followers = self._make_edit_list("Followers")
 
-        row.addWidget(self.lw_targets["box"])
-        row.addWidget(self.lw_followers["box"])
+        row.addWidget(self.tsl_targets)
+        row.addWidget(self.tsl_followers)
 
         root.addLayout(row)
 
     def _make_edit_list(self, title):
-        """제목 + QListWidget + Add/Type/Del/Up/Down 버튼행 묶음 생성."""
+        """A00140_ConnectClosest 와 동일한 형식의 재사용 tsl 위젯(Select/Add/Del/Up/Down/Sort)."""
 
-        box = QGroupBox(title)
-        layout = QVBoxLayout(box)
-
-        lw = QListWidget()
-        lw.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        lw.setMinimumHeight(180)
-        lw.itemSelectionChanged.connect(lambda w=lw: self.on_list_selection(w))
-        layout.addWidget(lw)
-
-        btn_row = QHBoxLayout()
-
-        btn_add  = QPushButton("Add")
-        btn_type = QPushButton("Type")
-        btn_del  = QPushButton("Del")
-        btn_up   = QPushButton("Up")
-        btn_down = QPushButton("Down")
-
-        btn_add.clicked.connect(lambda _=False, w=lw: self.on_add_selected(w))
-        btn_type.clicked.connect(lambda _=False, w=lw: self.on_add_by_type(w))
-        btn_del.clicked.connect(lambda _=False, w=lw: self.on_del_selected(w))
-        btn_up.clicked.connect(lambda _=False, w=lw: self.on_move_up(w))
-        btn_down.clicked.connect(lambda _=False, w=lw: self.on_move_down(w))
-
-        for b in (btn_add, btn_type, btn_del, btn_up, btn_down):
-            btn_row.addWidget(b)
-
-        layout.addLayout(btn_row)
-
-        return {"box": box, "lw": lw}
+        return JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(title=title)
 
     # --------------------------------------------------
     # Search
@@ -266,37 +240,12 @@ class MainWindow(QWidget):
             color = "background-color: rgb(220, 220, 220); color: black;"
         self.lbl_state.setStyleSheet(color)
 
-    def _list_items(self, lw):
-        return [lw.item(i).text() for i in range(lw.count())]
-
-    def _selected_indices(self, lw):
-        return sorted(lw.row(item) for item in lw.selectedItems())
-
-    def _selected_texts(self, lw):
-        return [item.text() for item in lw.selectedItems()]
-
     def _set_list_items(self, lw, items):
+        # Setup 의 lw_rig(일반 QListWidget) 채우기용. (Targets/Followers 는 tsl 위젯 사용)
         lw.blockSignals(True)
         lw.clear()
         for it in items:
             lw.addItem(it)
-        lw.blockSignals(False)
-
-    def _select_rows(self, lw, indices):
-        lw.blockSignals(True)
-        lw.clearSelection()
-        for idx in indices:
-            if 0 <= idx < lw.count():
-                lw.item(idx).setSelected(True)
-        lw.blockSignals(False)
-
-    def _select_texts(self, lw, texts):
-        target = set(texts)
-        lw.blockSignals(True)
-        lw.clearSelection()
-        for i in range(lw.count()):
-            if lw.item(i).text() in target:
-                lw.item(i).setSelected(True)
         lw.blockSignals(False)
 
     # ==================================================
@@ -315,63 +264,14 @@ class MainWindow(QWidget):
             self.log(result["message"])
             return
 
-        self._set_list_items(self.lw_targets["lw"], result["targets"])
-        self._set_list_items(self.lw_followers["lw"], result["followers"])
+        self.tsl_targets.set_items(result["targets"])
+        self.tsl_followers.set_items(result["followers"])
 
         self._set_state("State : Success", ok=True)
         self.log(
             f"Setup success : {len(result['targets'])} targets / "
             f"{len(result['followers'])} followers"
         )
-
-    def on_list_selection(self, lw):
-        texts = self._selected_texts(lw)
-        if texts:
-            cmds.select(texts)
-
-    def on_add_selected(self, lw):
-        existing = set(self._list_items(lw))
-        sel = cmds.ls(sl=True, fl=True) or []
-        for obj in sel:
-            if obj in existing:
-                self.log(f"{obj} is already in the list.")
-                continue
-            lw.addItem(obj)
-            existing.add(obj)
-
-    def on_add_by_type(self, lw):
-        """현재 씬 선택의 각 objectType 별 첫 오브젝트만 추가. (레거시 add_type 정리)"""
-        existing = set(self._list_items(lw))
-        sel = cmds.ls(sl=True, fl=True) or []
-
-        seen_types = set()
-        for obj in sel:
-            obj_type = cmds.objectType(obj)
-            if obj_type in seen_types:
-                continue
-            seen_types.add(obj_type)
-            if obj in existing:
-                continue
-            lw.addItem(obj)
-            existing.add(obj)
-
-    def on_del_selected(self, lw):
-        for idx in sorted(self._selected_indices(lw), reverse=True):
-            lw.takeItem(idx)
-
-    def on_move_up(self, lw):
-        items = self._list_items(lw)
-        indices = self._selected_indices(lw)
-        new_items, new_indices = selection_utils.move_up(items, indices)
-        self._set_list_items(lw, new_items)
-        self._select_rows(lw, new_indices)
-
-    def on_move_down(self, lw):
-        items = self._list_items(lw)
-        indices = self._selected_indices(lw)
-        new_items, new_indices = selection_utils.move_down(items, indices)
-        self._set_list_items(lw, new_items)
-        self._select_rows(lw, new_indices)
 
     def on_search(self):
         token = self.le_search.text().strip()
@@ -382,10 +282,9 @@ class MainWindow(QWidget):
         invert = self.cb_invert.isChecked()
         matched_all = []
 
-        for entry in (self.lw_targets, self.lw_followers):
-            lw = entry["lw"]
-            matched = search_by_token(self._list_items(lw), token, invert)
-            self._select_texts(lw, matched)
+        for tsl in (self.tsl_targets, self.tsl_followers):
+            matched = search_by_token(tsl.get_all_items(), token, invert)
+            tsl.select_by_texts(matched)
             matched_all.extend(matched)
 
         if matched_all:
@@ -394,8 +293,8 @@ class MainWindow(QWidget):
         self.log(f"Search '{token}' (invert={invert}) : {len(matched_all)} matched")
 
     def on_match(self, ik_to_fk):
-        all_t = self._list_items(self.lw_targets["lw"])
-        all_f = self._list_items(self.lw_followers["lw"])
+        all_t = self.tsl_targets.get_all_items()
+        all_f = self.tsl_followers.get_all_items()
 
         tgt, flw = FKIKMatcher.build_pairs(
             all_t, all_f,
@@ -408,8 +307,8 @@ class MainWindow(QWidget):
             self.log("[Warning] No pairs to match. Run Setup and check limb options.")
             return
 
-        self._select_texts(self.lw_targets["lw"], tgt)
-        self._select_texts(self.lw_followers["lw"], flw)
+        self.tsl_targets.select_by_texts(tgt)
+        self.tsl_followers.select_by_texts(flw)
 
         count = FKIKMatcher.match(tgt, flw)
 
@@ -417,8 +316,8 @@ class MainWindow(QWidget):
         self.log(f"Match {mode} : {count} pairs matched")
 
     def on_bake(self, ik_to_fk):
-        all_t = self._list_items(self.lw_targets["lw"])
-        all_f = self._list_items(self.lw_followers["lw"])
+        all_t = self.tsl_targets.get_all_items()
+        all_f = self.tsl_followers.get_all_items()
 
         tgt, flw = FKIKMatcher.build_pairs(
             all_t, all_f,
@@ -438,8 +337,8 @@ class MainWindow(QWidget):
             self.log(f"[Warning] Start ({start}) is greater than End ({end}).")
             return
 
-        self._select_texts(self.lw_targets["lw"], tgt)
-        self._select_texts(self.lw_followers["lw"], flw)
+        self.tsl_targets.select_by_texts(tgt)
+        self.tsl_followers.select_by_texts(flw)
 
         frames = FKIKMatcher.bake(tgt, flw, start, end)
 
@@ -447,8 +346,8 @@ class MainWindow(QWidget):
         self.log(f"Bake {mode} : {frames} frames baked [{start}-{end}]")
 
     def on_bake_constraint(self):
-        tgt = self._selected_texts(self.lw_targets["lw"])
-        flw = self._selected_texts(self.lw_followers["lw"])
+        tgt = self.tsl_targets.selected_items()
+        flw = self.tsl_followers.selected_items()
 
         if not tgt or not flw:
             self.log("[Warning] Select matching items in both Targets and Followers.")
