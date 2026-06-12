@@ -126,9 +126,9 @@ class MainWindow(QWidget):
         self.btn_build_nodes = QPushButton("Build (Converge to Center)")
         self.btn_build_nodes.setMinimumHeight(34)
         self.btn_build_nodes.setToolTip(
-            "Converge mode (Maya 2023+ compatible). dilate (0..90) linearly moves every "
-            "joint from its rest position to the LAST (center) joint's position, and drives "
-            "scaleX/Y so each bound curve stays on a sphere of radius R: "
+            "Converge mode (Maya 2023+ compatible). dilate (-90..90) gathers every joint to "
+            "the LAST (center) joint when positive, or the FIRST (front) joint when negative, "
+            "and drives scaleX/Y so each bound curve stays on a sphere of radius R: "
             "scale = sqrt(R^2 - dist^2) / sqrt(R^2 - dist_rest^2).")
         row.addWidget(self.btn_build_nodes)
         return container
@@ -261,9 +261,9 @@ class MainWindow(QWidget):
         try:
             driver, skipped = run_build_nodes(prefix, controller, joints, driver_attr, radius)
             self._log(
-                "Built (converge): driver {driver} | {n} joint(s) -> center '{c}' | "
-                "sphere radius {r}".format(
-                    driver=driver, n=len(joints), c=joints[-1], r=radius
+                "Built (converge): driver {driver} | {n} joint(s) | +center '{c}' / "
+                "-front '{f}' | sphere radius {r}".format(
+                    driver=driver, n=len(joints), c=joints[-1], f=joints[0], r=radius
                 )
             )
             if skipped:
@@ -294,13 +294,14 @@ class MainWindow(QWidget):
             "    scaleX/Y   = 1      + driver * R * sin(offset)\n"
             "    translateZ = Zinit + driver * R * cos(offset)\n"
             "- Build (Converge to Center) - Maya 2023+ node network. dilate\n"
-            "  (0..90) moves every joint to the LAST (center) joint, and scales\n"
+            "  (-90..90) gathers every joint to the LAST (center) joint when\n"
+            "  positive, or the FIRST (front) joint when negative, and scales\n"
             "  each bound curve to stay on a sphere of radius R:\n"
-            "    translate_i = init_i + (dilate/90) * (center - init_i)\n"
+            "    translate_i = init + t_c*(center-init) + t_f*(front-init)\n"
             "    scaleX/Y_i  = sqrt(R^2 - dist^2) / sqrt(R^2 - dist_rest^2)\n"
             "\n"
             "At driver=0 every joint stays at its rest pose. Converge mode needs\n"
-            "at least 2 joints (the last one is the convergence target) and a\n"
+            "at least 2 joints (first = front target, last = center target) and a\n"
             "Radius R >= each joint's rest distance to the center joint.\n"
             "\n"
             "How to use:\n"

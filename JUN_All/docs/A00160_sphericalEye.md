@@ -18,7 +18,7 @@ rigmarolestudio "Rigging Spherical Eyes" 기법을 재현한다.
 | 모드 | 버튼 | 동작 | 특징 |
 |------|------|------|------|
 | **Baked** | `Build (Spherical Eye)` | 구면 dilation (scale + translateZ 를 sin/cos 로 구동) | sin/cos 를 빌드 시 파이썬 `math` 상수로 박음 |
-| **Converge** | `Build (Converge to Center)` | dilate 0→90 동안 전 조인트를 **center(마지막) 조인트로 수렴** + 커브를 구 표면에 맞춰 scale | **Maya 2023+** 호환(trig 노드 없음). translate=선형 lerp, scale=구 단면 √(R²−ζ²) |
+| **Converge** | `Build (Converge to Center)` | dilate −90~90 양방향: **+면 center(마지막), −면 front(첫) 조인트로 수렴** + 커브를 구 표면에 맞춰 scale | **Maya 2023+** 호환(trig 노드 없음). translate=2-타겟 lerp, scale=구 단면 √(R²−ζ²) |
 
 > 두 모드는 목적이 다르다. Baked 는 동공을 **구면으로 부풀리는** dilation, Converge 는 모든 조인트를
 > **한 점(center 조인트)으로 모으는** 수렴이다. 같은 컨트롤러·조인트에 둘을 동시에 빌드하지 말 것
@@ -81,7 +81,8 @@ A00160_sphericalEye.run(True)
 
 - **Main Controller** = 제어용 어트리뷰트가 추가될 컨트롤러. `Get` = 현재 선택의 첫 오브젝트.
 - **Prefix** = 생성 노드/어트리뷰트 이름 접두사(기본 `eye`).
-- **Driver Attr** = 컨트롤러에 추가되는 keyable double(기본 `dilate`). 전체 dilation 을 민다.
+- **Driver Attr** = 컨트롤러에 추가되는 keyable double(기본 `dilate`). Baked=dilation 강도,
+  Converge=양방향 수렴(−90~90, +면 center / −면 front).
 - **Radius (R)** = 구 반지름. Baked=dilation 강도(`{prefix}_radius` 기본값), Converge=커브가 맞춰질 구의
   반지름. **Joints 리스트가 바뀔 때(Select/Add/Del)마다 first→last(front→center) 조인트 거리로 자동 갱신**
   되며, 빌드 전 수동 override 도 가능하다.
@@ -123,54 +124,64 @@ translateZ_i = Zinit_i + driver * R * cos(offset_i)
 
 ### 5.2 Converge 모드 — `Build (Converge to Center)`  *(Maya 2023+)*
 
-`dilate`(0~90) 하나로 **모든 조인트를 center(리스트 마지막) 조인트 위치로 단조 수렴**시킨다.
-목표점 `T` = `oColl[-1]`(center 조인트)의 로컬 translate. 조인트 i(center 제외):
+`dilate`(−90~90) 하나로 **양방향 수렴**: dilate>0 이면 center(리스트 마지막), dilate<0 이면
+front(리스트 첫) 조인트 위치로 모인다. front=`oColl[0]`, center=`oColl[-1]` 의 로컬 translate. 전 조인트 i:
 
 ```
-t           = dilate / 90                       # dilate 0..90 → t 0..1 (선형, 단조)
-translate_i = init_i + t * (T - init_i)         # X,Y,Z 각 축 동시 보간(lerp)
+t_c         = clamp(dilate,  0, 90)/90          # center 방향 0..1 (dilate≥0)
+t_f         = clamp(dilate,-90,  0)/(-90)       # front  방향 0..1 (dilate≤0)
+translate_i = init_i + t_c*(center - init_i) + t_f*(front - init_i)
 ```
 
-- `dilate=0 → t=0` → 원위치(rest 정확히 유지). `dilate=90 → t=1` → 전 조인트가 `T` 로 수렴.
-- `init_i`, `T`, `(T - init_i)` 는 빌드 시 상수. **center 조인트(oColl[-1])는 앵커라 구동 안 함**.
-- 조인트가 Z축 일렬이면 X/Y delta=0 → 사실상 translateZ 만 변함(X/Y/Z lerp 와 호환·안전).
-- `dilate` 는 **min 0 / max 90 클램프** → 90 초과로 target 을 지나치는 overshoot 방지.
+- `dilate=0` → 양 항 0 → 원위치(rest). `dilate=+90` → center 로, `dilate=−90` → front 로 전부 수렴.
+- 두 항 중 항상 하나만 0 이 아니라 합으로 양방향이 된다(외삽이 아니라 두 타겟 보간이라 끝 조인트를
+  **뚫지 않고** 정확히 모인다).
+- **전 조인트 구동**한다. 각 끝 조인트는 한 방향의 앵커이자 반대 방향의 이동 대상:
+  - front(`oColl[0]`): center 로만 이동, front 방향엔 정지(앵커).
+  - center(`oColl[-1]`): front 로만 이동, center 방향엔 정지(앵커).
+- `dilate` 는 **min −90 / max 90 클램프** → 양 끝에서 완전 수렴, 초과 overshoot 방지.
 
 #### scale — 커브를 구 표면에 맞춤
 각 조인트에 바인드된 커브(단면 링, ref_02~04 의 빨간 링)가 반지름 `R`(= Radius 필드) 구의 표면에
 항상 놓이도록 scaleX/Y 를 구동한다. center 와의 현재 거리 ζ 에 대해 구 단면 반경 `ρ(ζ)=√(R²−ζ²)` 이므로:
 
 ```
-scaleX/Y_i(t) = √(R² − ζ_i(t)²) / √(R² − ζ_i,rest²)     # rest 단면 대비 비율(rest=1)
+scaleX/Y_i = √(R² − ζ_i(t)²) / √(R² − ζ_i,rest²)     # rest 단면 대비 비율(rest=1)
 ζ_i(t) = center 로부터 조인트 i 의 현재 거리(translate 출력에서 distanceBetween 으로 읽음)
 ```
 
-- `t=0 → scale=1`(rest 구 표면 유지). `t=1 → ζ=0 → scale=R/ρ_rest` → 전 커브가 적도 반경 R 로 일치(ref_04).
+- `distanceBetween`(center 기준)이 방향과 무관하게 현재 거리를 읽으므로 **center/front 양방향 모두**
+  구 표면을 따른다: center 로 갈수록 ρ→R(적도, ref_04), front 로 갈수록 ζ→R 이라 ρ→0(front 극점).
 - 항상 `ρ(t)² + ζ(t)² = R²` 이라 dilate 전 구간에서 커브가 구 표면에 정확히 놓인다.
-- **center 조인트는 ζ_rest=0 → scale 항상 1**(적도, 불변) → 구동 안 함.
-- **R 은 모든 조인트의 rest 거리 이상**이어야 한다(아니면 √음수). 작으면 그 조인트의 **scale 만 skip**
-  (translate 는 유지)하고 빌드 로그에 경고. front 가 정확히 pole(ρ_rest≈0, ÷0)이어도 skip.
+- **center 조인트도 이제 scale 구동**(front 로 갈 때 0 으로 수축). rest ζ=0 → scale 1 유지(center 방향).
+- **R 은 모든 조인트의 center 까지 거리 이상**이어야 한다(아니면 √음수). 작으면 그 조인트의 **scale 만
+  skip**(translate 는 유지)하고 빌드 로그에 경고. front 가 pole(ρ_rest≈0, ÷0)이어도 skip.
 
-노드 (조인트 i, center 제외. 공통 1개 + translate 2개 + scale 5개):
+노드 (공통 4개 + 조인트당 translate 3개 + scale 5개):
 
 | 노드명 | 타입 | 연결 / 값 |
 |--------|------|-----------|
-| `{prefix}_dilate_t_MLT` (공통) | multiplyDivide | input1X=`dilate`, **input2X=1/90** → outputX = t (0..1) |
-| `{prefix}_conv_{i}_MLT` | multiplyDivide | input1X/Y/Z = 공통 t, **input2=(Tx−ix, Ty−iy, Tz−iz)** → t·delta |
-| `{prefix}_conv_{i}_PMA` | plusMinusAverage(sum) | input3D[0]=conv_MLT.output, **input3D[1]=(ix,iy,iz)** → output3D → joint.translate |
-| `{prefix}_sc_{i}_DST` | distanceBetween | point1 ← conv_PMA.output3D, **point2=center(Tx,Ty,Tz)** → distance = ζ(t) |
+| `{prefix}_tc_CLP` (공통) | clamp | inputR=`dilate`, min/max=0/90 → outputR |
+| `{prefix}_tc_MLT` (공통) | multiplyDivide | input1X=tc_CLP.outputR, **×1/90** → t_c |
+| `{prefix}_tf_CLP` (공통) | clamp | inputR=`dilate`, min/max=−90/0 → outputR |
+| `{prefix}_tf_MLT` (공통) | multiplyDivide | input1X=tf_CLP.outputR, **×−1/90** → t_f |
+| `{prefix}_conv_{i}_cMLT` | multiplyDivide | input1X/Y/Z=t_c, **input2=(center−init)** → t_c·Δc |
+| `{prefix}_conv_{i}_fMLT` | multiplyDivide | input1X/Y/Z=t_f, **input2=(front−init)** → t_f·Δf |
+| `{prefix}_conv_{i}_PMA` | plusMinusAverage(sum) | input3D[0]=cMLT.out, [1]=fMLT.out, **[2]=init** → joint.translate |
+| `{prefix}_sc_{i}_DST` | distanceBetween | point1 ← conv_PMA.output3D, **point2=center** → distance = ζ(t) |
 | `{prefix}_sc_{i}_dsq_MLT` | multiplyDivide(power) | input1X=distance, **input2X=2** → ζ(t)² |
 | `{prefix}_sc_{i}_sub_PMA` | plusMinusAverage(subtract) | input1D[0]=**R²**, input1D[1]=ζ(t)² → R²−ζ(t)² |
 | `{prefix}_sc_{i}_sqrt_MLT` | multiplyDivide(power) | input1X=above, **input2X=0.5** → ρ(t) |
 | `{prefix}_sc_{i}_scl_MLT` | multiplyDivide(divide) | input1X=ρ(t), **input2X=ρ_rest** → scaleX, scaleY |
 
-> translate 는 선형 lerp, scale 은 구 단면(sqrt)이라 둘 다 trig 불필요(distanceBetween + multiplyDivide
-> power). 모두 Maya 2023 에 존재.
+> translate 는 두 타겟 선형 lerp + clamp, scale 은 구 단면(sqrt)이라 둘 다 trig 불필요
+> (clamp + distanceBetween + multiplyDivide power). 모두 Maya 2023 에 존재.
 
 ### 공통 거동
 **rest(driver=0)**: 모든 조인트가 원위치·rest scale 유지. **driver↑**:
 - Baked → 중심 조인트가 가장 부풀며 구가 팽창(dilation).
-- Converge → 전 조인트가 center 조인트로 모이고, 각 커브가 구 표면을 따라 적도 반경 R 까지 커짐.
+- Converge → dilate>0 이면 전 조인트가 center 로(커브 → 적도 반경 R), dilate<0 이면 front 로
+  (커브 → front 극점 scale 0) 모이며 구 표면을 따른다.
 
 ---
 
@@ -182,10 +193,11 @@ scaleX/Y_i(t) = √(R² − ζ_i(t)²) / √(R² − ζ_i,rest²)     # rest 단
    (필요하면 빌드 전 수동 조정). 참고: 자동값은 front 조인트 거리와 같아 front 조인트가 pole(ρ_rest≈0)이
    되어 그 조인트 scale 은 skip 된다. front 도 scale 시키려면 R 을 그보다 크게 키운다.
 4. **Build (Spherical Eye)**(Baked, 구면 dilation) 또는 **Build (Converge to Center)**
-   (Maya 2023+, center 조인트로 수렴 + 커브를 구 표면에 맞춤 / 조인트 ≥ 2개) 클릭.
+   (Maya 2023+, ±dilate 로 center/front 수렴 + 커브를 구 표면에 맞춤 / 조인트 ≥ 2개) 클릭.
 5. 컨트롤러의 `dilate` 를 조절:
    - Baked → `dilate`·`{prefix}_radius` 로 동공이 구면을 유지하며 부풂.
-   - Converge → `dilate` 0→90 으로 전 조인트가 center 조인트로 모이며, 커브가 구 표면을 따라 커짐.
+   - Converge → `dilate` 0→+90 이면 전 조인트가 center 로(커브 적도 반경 R), 0→−90 이면 front 로
+     (커브 front 극점 0) 모이며 구 표면을 따른다.
 
 > 어떤 모드를 쓸까? 동공을 **구면으로 부풀리는** 셋업이면 **Baked**, 모든 조인트를 **한 점(center
 > 조인트)으로 모으는** 셋업이면 **Converge**. 두 모드는 같은 컨트롤러·조인트에 동시에 빌드하지 말 것
@@ -201,7 +213,7 @@ scaleX/Y_i(t) = √(R² − ζ_i(t)²) / √(R² − ζ_i,rest²)     # rest 단
 Built (baked): driver eye_ctl.dilate | 5 joint(s) | radius 1.0
 
 --- Build Converge to Center ---
-Built (converge): driver eye_ctl.dilate | 6 joint(s) -> center 'eye_center_jnt' | sphere radius 2.0
+Built (converge): driver eye_ctl.dilate | 6 joint(s) | +center 'eye_center_jnt' / -front 'eye_front_jnt' | sphere radius 2.0
 ```
 
 > Radius(R)가 어떤 조인트의 center 까지 rest 거리보다 작으면 그 조인트의 **scale 만 skip**하고 경고:
@@ -220,7 +232,9 @@ Built (converge): driver eye_ctl.dilate | 6 joint(s) -> center 'eye_center_jnt' 
 - **(Baked) dilation 방향/형태가 이상** → Joints 순서가 **앞 → 중심**인지 확인(순서가 위도 분배 기준).
 - **(Converge) 엉뚱한 곳으로 모임** → 수렴 target 은 **리스트 마지막 조인트**다. center 가 맨 끝에
   오도록 **앞 → 중심 순서**로 넣었는지 확인.
-- **(Converge) dilate 를 90 초과로 못 올림** → 의도된 클램프(0..90). 90 에서 이미 완전 수렴.
+- **(Converge) dilate 를 ±90 밖으로 못 올림** → 의도된 클램프(−90..90). +90=center, −90=front 완전 수렴.
+- **(Converge) front(−) 방향이 안 되거나 조인트가 앞을 뚫고 나감** → 구버전(단일 center 타겟) 빌드.
+  최신 빌드(v01.05+)는 front 를 두 번째 타겟으로 잡아 정확히 모인다. 다시 빌드할 것.
 - **(Converge) 커브 크기가 안 변함 / scale 경고** → **Radius(R)** 가 너무 작다. R 은 **구의 반지름**이라
   모든 조인트의 center 까지 거리 이상이어야 한다. front 조인트 거리 이상으로 키울 것.
 - **(Converge) 커브가 구 표면에서 뜸** → R 이 실제 구(커브 바인드 시 형상)의 반지름과 맞는지, 조인트의

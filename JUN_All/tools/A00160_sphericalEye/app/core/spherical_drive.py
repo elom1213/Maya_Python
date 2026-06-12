@@ -97,66 +97,92 @@ _RHO_EPS = 1e-9
 
 
 def build_spherical_drive_nodes(prefix, controlObj, oColl, driverAttr='dilate', radius=1.0):
-    """dilate(0~90) 하나로 모든 조인트를 center(마지막) 조인트로 수렴 + 커브를 구 표면에 맞춘다.
+    """dilate(-90~90) 하나로 모든 조인트를 center(+) 또는 front(-) 조인트로 수렴 + 구 표면에 맞춘다.
 
-    translate: dilate 0 -> 90 동안 각 조인트를 원위치에서 oColl[-1](center 조인트)로 단조 보간.
-        t           = dilate / 90                       # 0..1
-        translate_i = init_i + t * (T - init_i)         # T = center 조인트 로컬 translate
+    translate (양방향): dilate>0 이면 center(oColl[-1]) 로, dilate<0 이면 front(oColl[0]) 로 수렴.
+        t_c = clamp(dilate,  0, 90)/90        # center 방향 0..1
+        t_f = clamp(dilate,-90,  0)/(-90)     # front 방향 0..1
+        translate_i = init_i + t_c*(center - init_i) + t_f*(front - init_i)
+    두 항 중 항상 하나만 0 이 아니므로 합으로 양방향이 된다. 모든 조인트를 구동한다(각 끝 조인트는
+    한 방향의 앵커이자 반대 방향의 이동 대상).
+
     scale: 각 조인트에 바인드된 커브(단면 링)가 반지름 R(=radius) 구의 표면에 항상 놓이도록
     scaleX/Y 를 구동한다. center 와의 현재 거리 ζ 에 대해 구 단면 반경 ρ(ζ)=√(R²−ζ²) 이므로
         scaleX/Y_i = √(R² − ζ_i(t)²) / √(R² − ζ_i,rest²)   # rest 단면 대비 비율(rest=1)
-    t=0 → 1(rest), t=1 → ζ=0 → R/ρ_rest(전 커브가 적도 반경 R). 구의 단면이라 sqrt 형태가 필요해
-    distanceBetween + multiplyDivide(power) 로 구현(sin/cos 불필요, Maya 2023 호환).
-    center 조인트(oColl[-1])는 ζ_rest=0 → scale 항상 1 이라 구동하지 않는다(앵커).
+    distanceBetween(center 기준)이 방향과 무관하게 현재 거리를 읽으므로 center/front 양방향 모두
+    구 표면을 따른다(front 극점에서 scale 0). sqrt 는 multiplyDivide(power)로 구현(Maya 2023 호환).
 
-    R(radius) 가 어떤 조인트의 rest 거리보다 작으면(√음수) 그 조인트의 scale 만 건너뛴다(translate 는
-    유지). oColl 은 앞(Z+) -> 중심 순서여야 한다(>= 2개).
-    Returns: scale 을 구동하지 못한 조인트 이름 리스트(R 이 너무 작거나 pole).
+    center 까지 rest 거리가 R 이상(√음수)이거나 ρ_rest≈0(front pole 등)인 조인트는 scale 만 skip
+    (translate 는 유지). oColl 은 앞(Z+) -> 중심 순서여야 한다(>= 2개).
+    Returns: scale 을 구동하지 못한 조인트 이름 리스트.
     """
     if len(oColl) < 2:
         raise ValueError('Need at least 2 joints (front .. center) to converge.')
 
     R = float(radius)
     Rsq = R * R
-    skipped = []                                   # scale 미구동 조인트(R <= rest 거리)
+    skipped = []                                   # scale 미구동 조인트
 
-    # dilate: 0..90 클램프. 90 에서 t=1(완전 수렴), 초과 시 target 을 지나치는 overshoot 방지.
-    driver = add_attr(controlObj, 'double', driverAttr, pMin=0.0, pMax=90.0, pDefault=0.0)
+    # dilate 양방향: +면 center, -면 front 로 수렴. -90..90 클램프(끝에서 완전 수렴, 초과 overshoot 방지).
+    driver = add_attr(controlObj, 'double', driverAttr, pMin=-90.0, pMax=90.0, pDefault=0.0)
 
-    # 공통 t = dilate / 90 (0..1). multiplyDivide 로 x(1/90).
-    tMlt = pm.createNode('multiplyDivide', n='{}_dilate_t_MLT'.format(prefix))
-    driver.connect(tMlt.input1X)
-    tMlt.input2X.set(1.0 / 90.0)                  # outputX = t
+    # t_c = clamp(dilate, 0, 90)/90  (center 방향 0..1)
+    tcClp = pm.createNode('clamp', n='{}_tc_CLP'.format(prefix))
+    driver.connect(tcClp.inputR)
+    tcClp.minR.set(0.0)
+    tcClp.maxR.set(90.0)
+    tcMlt = pm.createNode('multiplyDivide', n='{}_tc_MLT'.format(prefix))
+    tcClp.outputR.connect(tcMlt.input1X)
+    tcMlt.input2X.set(1.0 / 90.0)                 # outputX = t_c
 
-    target = oColl[-1]
-    tx, ty, tz = target.translate.get()           # center 조인트 로컬 translate(수렴 목표)
+    # t_f = clamp(dilate, -90, 0) * (-1/90)  (front 방향 0..1)
+    tfClp = pm.createNode('clamp', n='{}_tf_CLP'.format(prefix))
+    driver.connect(tfClp.inputR)
+    tfClp.minR.set(-90.0)
+    tfClp.maxR.set(0.0)
+    tfMlt = pm.createNode('multiplyDivide', n='{}_tf_MLT'.format(prefix))
+    tfClp.outputR.connect(tfMlt.input1X)
+    tfMlt.input2X.set(-1.0 / 90.0)                # outputX = t_f
 
-    for i, jnt in enumerate(oColl[:-1]):           # center(마지막)는 앵커 -> 제외
+    fx, fy, fz = oColl[0].translate.get()          # front(joint1) 수렴 타겟
+    cx, cy, cz = oColl[-1].translate.get()         # center(jointN) 수렴 타겟
+
+    for i, jnt in enumerate(oColl):                # 전 조인트 구동(각 끝은 반대 방향 앵커)
         ix, iy, iz = jnt.translate.get()           # 빌드 시 로컬 translate(원위치)
-        dx, dy, dz = tx - ix, ty - iy, tz - iz     # 수렴 벡터(상수)
+        cdx, cdy, cdz = cx - ix, cy - iy, cz - iz  # center 수렴 벡터(상수)
+        fdx, fdy, fdz = fx - ix, fy - iy, fz - iz  # front 수렴 벡터(상수)
 
-        # --- translate: init + t*delta -> joint.translate ---
-        mlt = pm.createNode('multiplyDivide', n='{}_conv_{}_MLT'.format(prefix, i + 1))
-        tMlt.outputX.connect(mlt.input1X)
-        tMlt.outputX.connect(mlt.input1Y)
-        tMlt.outputX.connect(mlt.input1Z)
-        mlt.input2X.set(dx)
-        mlt.input2Y.set(dy)
-        mlt.input2Z.set(dz)
+        # --- translate: init + t_c*(center-init) + t_f*(front-init) ---
+        cMlt = pm.createNode('multiplyDivide', n='{}_conv_{}_cMLT'.format(prefix, i + 1))
+        tcMlt.outputX.connect(cMlt.input1X)
+        tcMlt.outputX.connect(cMlt.input1Y)
+        tcMlt.outputX.connect(cMlt.input1Z)
+        cMlt.input2X.set(cdx)
+        cMlt.input2Y.set(cdy)
+        cMlt.input2Z.set(cdz)
+
+        fMlt = pm.createNode('multiplyDivide', n='{}_conv_{}_fMLT'.format(prefix, i + 1))
+        tfMlt.outputX.connect(fMlt.input1X)
+        tfMlt.outputX.connect(fMlt.input1Y)
+        tfMlt.outputX.connect(fMlt.input1Z)
+        fMlt.input2X.set(fdx)
+        fMlt.input2Y.set(fdy)
+        fMlt.input2Z.set(fdz)
 
         pma = pm.createNode('plusMinusAverage', n='{}_conv_{}_PMA'.format(prefix, i + 1))
         pma.operation.set(1)                       # sum
-        mlt.output.connect(pma.input3D[0])
-        pma.input3D[1].input3Dx.set(ix)
-        pma.input3D[1].input3Dy.set(iy)
-        pma.input3D[1].input3Dz.set(iz)
+        cMlt.output.connect(pma.input3D[0])
+        fMlt.output.connect(pma.input3D[1])
+        pma.input3D[2].input3Dx.set(ix)
+        pma.input3D[2].input3Dy.set(iy)
+        pma.input3D[2].input3Dz.set(iz)
         pma.output3D.connect(jnt.translate)
 
-        # --- scale: 커브를 구 표면에 맞춤 (scaleX/Y = ρ(현재거리) / ρ(rest거리)) ---
-        dist_rest_sq = dx * dx + dy * dy + dz * dz  # rest 시 center 와의 거리^2 = ζ_rest^2
+        # --- scale: 커브를 구 표면에 맞춤 (scaleX/Y = ρ(현재 center거리) / ρ(rest거리)) ---
+        dist_rest_sq = cdx * cdx + cdy * cdy + cdz * cdz  # center 까지 rest 거리^2 = ζ_rest^2
         rho_rest_sq = Rsq - dist_rest_sq            # rest 단면 반경^2
         if rho_rest_sq <= _RHO_EPS:
-            # R 이 rest 거리보다 작거나(구 밖) pole(ρ_rest≈0, ÷0) -> scale 만 skip, translate 는 유지.
+            # center 까지 거리 >= R(구 밖) 또는 pole(ρ_rest≈0, ÷0) -> scale 만 skip, translate 는 유지.
             skipped.append(jnt.name())
             continue
         rho_rest = math.sqrt(rho_rest_sq)
@@ -164,7 +190,7 @@ def build_spherical_drive_nodes(prefix, controlObj, oColl, driverAttr='dilate', 
         # distanceBetween: center 로부터 조인트의 현재 거리 ζ(t) (translate 출력 사용).
         dst = pm.createNode('distanceBetween', n='{}_sc_{}_DST'.format(prefix, i + 1))
         pma.output3D.connect(dst.point1)
-        dst.point2.set([tx, ty, tz])
+        dst.point2.set([cx, cy, cz])
 
         # ζ(t)^2
         dsq = pm.createNode('multiplyDivide', n='{}_sc_{}_dsq_MLT'.format(prefix, i + 1))
@@ -199,7 +225,7 @@ def run_build_nodes(prefix, controller_name, joint_names, driver_attr='dilate', 
     """이름(문자열) 입력을 PyNode 로 변환해 build_spherical_drive_nodes 를 실행한다.
 
     UI 는 pymel 을 직접 다루지 않고 이 함수만 호출한다.
-    joint_names 는 앞(Z+) -> 중심 순서여야 한다(마지막이 수렴 target).
+    joint_names 는 앞(Z+) -> 중심 순서여야 한다(첫=front 타겟, 마지막=center 타겟).
     Returns: (driver attr 전체 경로, scale 미구동 조인트 이름 리스트).
     """
     control = pm.PyNode(controller_name)
