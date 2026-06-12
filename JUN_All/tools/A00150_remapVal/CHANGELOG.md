@@ -1,5 +1,12 @@
 # Changelog
 
+## v01.02 (2026-06-12)
+- Unified both build modes on a **controller attr → master remapValue → child remapValue** fan-out (matches the intended Maya setup where one master remapValue drives the rest).
+- **Slerp Ramp**: the master now also connects its `outputMin`/`outputMax` to every child remapValue (previously only `value[0]`/`value[1]` were driven, so amplitude could not be set from one place). The values are exposed as new controller attrs `{prefix}_output_min` / `_output_max`; their defaults come from the UI **Out Min** / **Out Max** spin boxes.
+- **Sine Wave**: added a master node `{prefix}_wave_master_MAP`. The controller range attrs now drive the master, and the master drives every child's Input/Output Min·Max and peak curve (`value[0~2]`). The peak curve is set once on the master instead of being duplicated per child; `inputValue` stays per-node (its animCurve output).
+- The **master Input Max is now always (object count - 1)** in both modes, so the master input range is `0 .. N-1`, aligned with the animCurve output. The Sine Wave `_input_max` attr default is forced to N-1 (the UI In Max input is ignored).
+- UI: **In Max** is now **read-only** and updates live to `Joints count - 1` whenever the Joints list changes (Select / Add / Del / Sort) — wired via the Joints list model signals. **Out Min** / **Out Max** are shared by both modes (Slerp Ramp passes them to `run_build`); tooltips updated. No layout change.
+
 ## v01.01 (2026-06-11)
 - Added a second build mode **Sine Wave** (`build_sine_wave` / `run_build_wave`); the original Slerp Ramp build is unchanged.
 - Per object it creates a `plusMinusAverage -> animCurveUU -> remapValue` chain that propagates a phase-offset sine wave:

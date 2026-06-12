@@ -31,19 +31,24 @@ def add_attr(node, pDataType, pParamName, pMin=None, pMax=None, pDefault=0.0):
         return newAttr
 
 
-def build_slerp_ramp(prefix, controlObj, oColl, twistAttrs=['rotateX']):
+def build_slerp_ramp(prefix, controlObj, oColl, twistAttrs=['rotateX'],
+                     outputMin=0.0, outputMax=1.0):
     """
     Take a collection of objects and interpolate them along a curve.
     It uses a master remapValue that drives multiple remapValues
     to simulate the effect of a multi-out curve node.
     References to "twist", because it was originally written for twisting ribbon IK
     But it can interpolate any custom attributes you wish
+
+    master 의 outputMin/outputMax 도 컨트롤러 제어 attr(`{prefix}_output_min` 등)로
+    노출되어 master 를 driven 하고, master 가 다시 모든 자식 remapValue 의
+    outputMin/outputMax 를 driven 한다(진폭을 한 곳에서 조절).
     """
     # The master twist profile curve.
     masterName = '{}_master_ribbon_lerp_MAP'.format(prefix)
     masterRemap = pm.createNode('remapValue', n=masterName)
-    # set the range to the count of twist objects.
-    masterRemap.inputMax.set(len(oColl))
+    # 마스터 input 범위는 항상 0 .. (오브젝트 수 - 1). max(...,1) 은 N<=1 의 0 division 방지.
+    masterRemap.inputMax.set(max(len(oColl) - 1, 1))
     # set to smooth interpolation.
     masterRemap.value[0].value_Interp.set(2)
 
@@ -62,6 +67,12 @@ def build_slerp_ramp(prefix, controlObj, oColl, twistAttrs=['rotateX']):
     twistStart.connect(masterRemap.value[0].value_Position)
     twistEnd.connect(masterRemap.value[1].value_Position)
     twistType.connect(masterRemap.value[0].value_Interp)
+
+    # output range 제어 attr 2개 — 컨트롤러에 노출하고 master 의 outputMin/Max 를 driven.
+    outMinAttr = add_attr(controlObj, 'double', '{}_output_min'.format(prefix), pDefault=outputMin)
+    outMaxAttr = add_attr(controlObj, 'double', '{}_output_max'.format(prefix), pDefault=outputMax)
+    outMinAttr.connect(masterRemap.outputMin)
+    outMaxAttr.connect(masterRemap.outputMax)
 
     for i, twistNode in enumerate(oColl):
         # add a start and end twist parameter to the follicles.
@@ -91,6 +102,10 @@ def build_slerp_ramp(prefix, controlObj, oColl, twistAttrs=['rotateX']):
         masterRemap.value[1].value_FloatValue.connect(twistProfile.value[1].value_FloatValue)
         masterRemap.value[1].value_Interp.connect(twistProfile.value[1].value_Interp)
 
+        # master 의 outputMin/Max 로 각 자식의 진폭을 driven (한 곳에서 일괄 조절).
+        masterRemap.outputMin.connect(twistProfile.outputMin)
+        masterRemap.outputMax.connect(twistProfile.outputMax)
+
         # connect the profile remapValue to the multiplyDivide nodes
         twistProfile.outValue.connect(twistMLT.input2Y)
         twistProfile.outValue.connect(reverseProfile.input.inputX)
@@ -107,15 +122,18 @@ def build_slerp_ramp(prefix, controlObj, oColl, twistAttrs=['rotateX']):
             twistAdd.output2D.output2Dx.connect(twistNode.attr(twistAttr))
 
 
-def run_build(prefix, controller_name, joint_names, twist_attrs):
+def run_build(prefix, controller_name, joint_names, twist_attrs,
+              output_min=0.0, output_max=1.0):
     """이름(문자열)으로 받은 입력을 PyNode 로 변환해 build_slerp_ramp 를 실행한다.
 
     UI 는 pymel 을 직접 다루지 않고 이 함수만 호출한다.
+    output_min/output_max 는 컨트롤러 output 제어 attr 의 기본값이 된다.
     Returns: 생성된 master remapValue 노드명.
     """
     control = pm.PyNode(controller_name)
     coll = [pm.PyNode(n) for n in joint_names]
-    build_slerp_ramp(prefix, control, coll, twistAttrs=list(twist_attrs))
+    build_slerp_ramp(prefix, control, coll, twistAttrs=list(twist_attrs),
+                     outputMin=output_min, outputMax=output_max)
     return '{}_master_ribbon_lerp_MAP'.format(prefix)
 
 
@@ -130,26 +148,43 @@ def build_sine_wave(prefix, controlObj, oColl, driverAttr, objAttrs=['translateY
     plusMinusAverage.input1D[0] 에 연결, 전체 위상을 한 값으로 민다.
     각 plusMinusAverage 의 input1D[1] 은 인덱스 i(0,1,2,...) 만큼 위상이 어긋난다.
 
-    remapValue 의 4개 range(input min/max, output min/max)는 컨트롤러에 제어
-    어트리뷰트(`{prefix}_input_min` 등)로 추가되어 모든 remapValue 의 대응
-    어트리뷰트에 connect 된다(빌드 후 컨트롤러에서 라이브 조절 가능).
-    inputMin/inputMax/outputMin/outputMax 는 그 제어 어트리뷰트의 기본값이다.
-    inputMax 가 0 이하이면 자동으로 오브젝트 개수-1(span)을 기본값으로 쓴다.
+    remapValue 의 4개 range(input min/max, output min/max)와 봉우리 커브는 master
+    remapValue(`{prefix}_wave_master_MAP`) 가 들고 모든 자식 waveMap 을 driven 한다.
+    컨트롤러 제어 어트리뷰트(`{prefix}_input_min` 등)는 master 를 driven 하므로
+    컨트롤러 -> master -> 자식 체인으로 빌드 후 라이브 조절이 가능하다(ref_01 구조).
+    inputMin/outputMin/outputMax 는 그 제어 어트리뷰트의 기본값이다.
+    inputMax 는 항상 오브젝트 개수-1(span)로 고정한다(인자 inputMax 는 무시).
+    이렇게 하면 master 의 input 범위가 0 .. (오브젝트 수 - 1) 로 animCurve 출력과 정렬된다.
     """
     n = len(oColl)
     # span = 입력/커브 범위. N==1 일 때 0 division / 동일 키 생성을 막는다.
     span = max(n - 1, 1)
-    # inputMax 미지정(<=0)이면 오브젝트 개수-1 을 기본 input max 로 사용.
-    in_max_default = inputMax if inputMax > 0 else span
+    # inputMax 는 항상 오브젝트 수-1 로 고정(UI In Max 입력은 무시). master input 범위 = 0..span.
+    in_max_default = span
 
     # 컨트롤러에 공통 driver attr(위상 시작값) 추가. 이미 있으면 재사용.
     driver = add_attr(controlObj, 'double', driverAttr, pDefault=0.0)
 
-    # remapValue range 제어 attr 4개 — 컨트롤러에 노출하고 각 remapValue 에 connect.
+    # remapValue range 제어 attr 4개 — 컨트롤러에 노출하고 master remapValue 에 connect.
     inMinAttr = add_attr(controlObj, 'double', '{}_input_min'.format(prefix), pDefault=inputMin)
     inMaxAttr = add_attr(controlObj, 'double', '{}_input_max'.format(prefix), pDefault=in_max_default)
     outMinAttr = add_attr(controlObj, 'double', '{}_output_min'.format(prefix), pDefault=outputMin)
     outMaxAttr = add_attr(controlObj, 'double', '{}_output_max'.format(prefix), pDefault=outputMax)
+
+    # master remapValue: 컨트롤러 range attr 와 봉우리 커브를 들고, 모든 자식
+    # waveMap 의 range/커브를 driven(ref_01 의 fake multi-out curve 구조).
+    masterName = '{}_wave_master_MAP'.format(prefix)
+    masterMap = pm.createNode('remapValue', n=masterName)
+    inMinAttr.connect(masterMap.inputMin)
+    inMaxAttr.connect(masterMap.inputMax)
+    outMinAttr.connect(masterMap.outputMin)
+    outMaxAttr.connect(masterMap.outputMax)
+    # 봉우리(사인 반주기) 커브 spline 을 master 한 곳에만 set.
+    peak = [(0.0, 0.0), (0.5, 1.0), (1.0, 0.0)]
+    for idx, (pos, val) in enumerate(peak):
+        masterMap.value[idx].value_Position.set(pos)
+        masterMap.value[idx].value_FloatValue.set(val)
+        masterMap.value[idx].value_Interp.set(3)  # 0:none 1:linear 2:smooth 3:spline
 
     for i, obj in enumerate(oColl):
         # (1) plusMinusAverage : driver + i (오브젝트별 위상 offset)
@@ -166,18 +201,19 @@ def build_sine_wave(prefix, controlObj, oColl, driverAttr, objAttrs=['translateY
         pm.setInfinity(waveCurve, pri='constant', poi='constant')
         waveAdd.output1D.connect(waveCurve.input)
 
-        # (3) remapValue : input 0..span, 봉우리(사인 반주기) 커브 spline
+        # (3) remapValue : input 0..span, 봉우리 커브는 master 가 driven
         waveMap = pm.createNode('remapValue', n='{}_wave_{}_MAP'.format(prefix, i + 1))
-        # 4개 range 를 컨트롤러 제어 attr 에서 connect (set 이 아니라 연결).
-        inMinAttr.connect(waveMap.inputMin)
-        inMaxAttr.connect(waveMap.inputMax)
-        outMinAttr.connect(waveMap.outputMin)
-        outMaxAttr.connect(waveMap.outputMax)
-        peak = [(0.0, 0.0), (0.5, 1.0), (1.0, 0.0)]
-        for idx, (pos, val) in enumerate(peak):
-            waveMap.value[idx].value_Position.set(pos)
-            waveMap.value[idx].value_FloatValue.set(val)
-            waveMap.value[idx].value_Interp.set(3)  # 0:none 1:linear 2:smooth 3:spline
+        # 4개 range 를 master 경유로 connect (master <- 컨트롤러 attr <- 사용자).
+        masterMap.inputMin.connect(waveMap.inputMin)
+        masterMap.inputMax.connect(waveMap.inputMax)
+        masterMap.outputMin.connect(waveMap.outputMin)
+        masterMap.outputMax.connect(waveMap.outputMax)
+        # 봉우리 커브(value[0~2])도 master 에서 connect — 커브 모양을 한 곳에서 편집.
+        for idx in range(len(peak)):
+            masterMap.value[idx].value_Position.connect(waveMap.value[idx].value_Position)
+            masterMap.value[idx].value_FloatValue.connect(waveMap.value[idx].value_FloatValue)
+            masterMap.value[idx].value_Interp.connect(waveMap.value[idx].value_Interp)
+        # inputValue 는 각 노드 고유(animCurve 출력)이므로 master 와 연결하지 않는다.
         waveCurve.output.connect(waveMap.inputValue)
 
         # remapValue 출력을 선택된 모든 오브젝트 어트리뷰트에 연결.
