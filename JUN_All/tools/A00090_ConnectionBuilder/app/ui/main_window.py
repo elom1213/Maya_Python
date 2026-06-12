@@ -27,6 +27,7 @@ from tools.A00090_ConnectionBuilder.app.core import RuleLoader
 from tools.A00090_ConnectionBuilder.app.core import ConnectionManager
 from tools.A00090_ConnectionBuilder.app.core import AttributeManager
 from tools.A00090_ConnectionBuilder.app.core import BlendShapeManager
+from tools.A00090_ConnectionBuilder.app.core import IntermediateManager
 
 
 class MainWindow(QWidget):
@@ -212,6 +213,22 @@ class MainWindow(QWidget):
         main_layout.addLayout(row)
 
         # -------------------------
+        # Intermediate (solver outputs -> WRK_intermediate null)
+        # -------------------------
+
+        row = QHBoxLayout()
+
+        self.btn_connect_intermediate = QPushButton("Connect Intermediate")
+        self.btn_connect_intermediate.setToolTip(
+            "Connect every solver's outputs[i] to WRK_intermediate.<mapping[i]> "
+            "for all rules in rules_v01 (creates the null node and its attrs if missing)."
+        )
+
+        row.addWidget(self.btn_connect_intermediate)
+
+        main_layout.addLayout(row)
+
+        # -------------------------
         # Log
         # -------------------------
 
@@ -250,6 +267,8 @@ class MainWindow(QWidget):
         self.btn_connect.clicked.connect( self.on_connect)
         self.btn_disconnect.clicked.connect( self.on_disconnect)
         self.btn_validate.clicked.connect( self.on_validate)
+
+        self.btn_connect_intermediate.clicked.connect( self.on_connect_intermediate)
 
 
     def log(self, text):
@@ -304,6 +323,30 @@ class MainWindow(QWidget):
         self.connection_manager.connect(rule, is_solver)
 
         self.log("Connect Finished")
+
+    # -------------------------------------------------
+
+    def on_connect_intermediate(self):
+        """rules_v01 의 모든 solver outputs 를 WRK_intermediate null 노드로 연결.
+
+        디렉토리를 동적 스캔하므로 json 이 늘어나면 자동으로 포함된다.
+        """
+        rule_names = RuleLoader.find_all_json()
+
+        rules = [
+            RuleLoader.load_solver_rule(name)
+            for name in rule_names
+        ]
+
+        connected, skipped = IntermediateManager.connect(rules)
+
+        self.log(
+            f"Connect Intermediate Finished : "
+            f"{connected} connection(s) from {len(rules)} solver(s) -> WRK_intermediate"
+        )
+
+        if skipped:
+            self.log(f"  Skipped (solver not in scene) : {', '.join(skipped)}")
 
     # -------------------------------------------------
 
