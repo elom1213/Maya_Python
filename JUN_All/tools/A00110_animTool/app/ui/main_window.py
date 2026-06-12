@@ -12,6 +12,7 @@ import maya.cmds as cmds
 from tools.A00110_animTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00110_animTool.app.core import KeyframeManager
 from tools.A00110_animTool.app.core import HotkeyManager
+from tools.A00110_animTool.app.core import PoseKeyManager
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -27,7 +28,7 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
 
         self.win_width  = 380
-        self.win_height = 460
+        self.win_height = 540
         self.win_title  = f"Anim Key Tool v{VERSION}"
 
         self.resize(self.win_width, self.win_height)
@@ -65,6 +66,42 @@ class MainWindow(QWidget):
         main_layout.setMenuBar(self.menu_bar)
 
         # -------------------------
+        # 탭: Key Edit / Pose Key
+        # (참고로 든 BSTool 의 cmds.tabLayout 을 Qt QTabWidget 으로 대응)
+        # -------------------------
+
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self._build_key_edit_tab(), "Key Edit")
+        self.tabs.addTab(self._build_pose_key_tab(), "Pose Key")
+        main_layout.addWidget(self.tabs)
+
+        # -------------------------
+        # 로그 (두 탭 공유)
+        # -------------------------
+
+        self.te_log = QTextEdit()
+        self.te_log.setReadOnly(True)
+        main_layout.addWidget(self.te_log)
+
+        # -------------------------
+        # 저작권 (공통)
+        # -------------------------
+
+        self.lbl_copyright = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
+        self.lbl_copyright.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(self.lbl_copyright)
+
+    # --------------------------------------------------
+    # Tab builders
+    # --------------------------------------------------
+
+    def _build_key_edit_tab(self):
+        """기존 키 이동/삭제/hold 기능 탭."""
+
+        tab = QWidget()
+        tab_layout = QVBoxLayout(tab)
+
+        # -------------------------
         # Frame range / offset 입력
         # -------------------------
 
@@ -90,7 +127,7 @@ class MainWindow(QWidget):
         self.le_offset.setPlaceholderText("5")
         row.addWidget(self.le_offset)
 
-        main_layout.addLayout(row)
+        tab_layout.addLayout(row)
 
         # -------------------------
         # 이동 버튼
@@ -104,14 +141,14 @@ class MainWindow(QWidget):
         row.addWidget(self.btn_move_back)
         row.addWidget(self.btn_move_fwd)
 
-        main_layout.addLayout(row)
+        tab_layout.addLayout(row)
 
         # -------------------------
         # 삭제 버튼
         # -------------------------
 
         self.btn_delete = QPushButton("Delete Keys in Range")
-        main_layout.addWidget(self.btn_delete)
+        tab_layout.addWidget(self.btn_delete)
 
         # -------------------------
         # Graph Editor 구간 유지(hold)
@@ -130,23 +167,9 @@ class MainWindow(QWidget):
         self.lbl_hotkey = QLabel("")
         grp_layout.addWidget(self.lbl_hotkey)
 
-        main_layout.addWidget(grp)
+        tab_layout.addWidget(grp)
 
-        # -------------------------
-        # 로그
-        # -------------------------
-
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
-        main_layout.addWidget(self.te_log)
-
-        # -------------------------
-        # 저작권
-        # -------------------------
-
-        self.lbl_copyright = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
-        self.lbl_copyright.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(self.lbl_copyright)
+        tab_layout.addStretch(1)
 
         # -------------------------
         # Signal
@@ -157,6 +180,56 @@ class MainWindow(QWidget):
         self.btn_delete.clicked.connect(self.on_delete)
         self.btn_hold.clicked.connect(self.on_hold)
         self.cb_hotkey.toggled.connect(self.on_toggle_hotkey)
+
+        return tab
+
+    def _build_pose_key_tab(self):
+        """선택 오브젝트 현재 프레임에 6축 pose 키를 설정하는 탭.
+        축마다 체크박스가 있고, 체크된 축만 입력값으로 키를 설정한다.
+        기본 체크: rotate X, rotate Z, translate Y. (A00030 원본 3축)"""
+
+        tab = QWidget()
+        tab_layout = QVBoxLayout(tab)
+
+        grp = QGroupBox("Set Pose Key (current frame)")
+        grp_layout = QVBoxLayout(grp)
+
+        # 기본 체크 축
+        default_on = {"rx", "rz", "ty"}
+
+        # attr -> (checkbox, lineedit)
+        self.pose_rows = {}
+
+        for attr, label in PoseKeyManager.AXES:
+
+            row = QHBoxLayout()
+
+            cb = QCheckBox()
+            cb.setChecked(attr in default_on)
+            row.addWidget(cb)
+
+            lbl = QLabel(label)
+            lbl.setMinimumWidth(80)
+            row.addWidget(lbl)
+
+            le = QLineEdit("0")
+            le.setValidator(QDoubleValidator(-1000000.0, 1000000.0, 4, self))
+            row.addWidget(le)
+
+            grp_layout.addLayout(row)
+
+            self.pose_rows[attr] = (cb, le)
+
+        tab_layout.addWidget(grp)
+
+        self.btn_set_pose = QPushButton("Set Pose Key")
+        tab_layout.addWidget(self.btn_set_pose)
+
+        tab_layout.addStretch(1)
+
+        self.btn_set_pose.clicked.connect(self.on_set_pose)
+
+        return tab
 
     # --------------------------------------------------
     # Helper
@@ -227,6 +300,26 @@ class MainWindow(QWidget):
     def on_hold(self):
 
         count, msg = KeyframeManager.hold_selected_keys()
+        self.log(msg)
+
+    def on_set_pose(self):
+
+        # 체크된 축만 모은다. 체크됐는데 값이 비어 있으면 경고 후 중단.
+        axis_values = {}
+        for attr, (cb, le) in self.pose_rows.items():
+            if not cb.isChecked():
+                continue
+            txt = le.text().strip()
+            if txt == "":
+                self.log(f"[Warning] {attr} is checked but empty.")
+                return
+            axis_values[attr] = float(txt)
+
+        if not axis_values:
+            self.log("[Warning] No axis checked.")
+            return
+
+        count, msg = PoseKeyManager.set_pose_keys(axis_values)
         self.log(msg)
 
     def show_about(self, *args):

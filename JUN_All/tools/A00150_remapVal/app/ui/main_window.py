@@ -100,29 +100,34 @@ class MainWindow(QWidget):
         return sb
 
     def _build_range_row(self):
-        # Sine Wave 모드 전용: remapValue range 4개. 컨트롤러 제어 attr 의 기본값이 된다.
+        # remapValue range 4개. 컨트롤러 제어 attr 의 기본값이 된다.
+        # In Min/Max 는 Sine Wave 전용, Out Min/Max 는 두 모드 공용.
         row = QHBoxLayout()
         row.addWidget(QLabel("Range"))
 
         row.addWidget(QLabel("In Min"))
         self.dsb_input_min = self._make_range_spinbox(
-            0.0, "Default of the controller's {prefix}_input_min attr (remapValue Input Min).")
+            0.0, "Sine Wave only. Default of the controller's {prefix}_input_min attr (remapValue Input Min).")
         row.addWidget(self.dsb_input_min)
 
         row.addWidget(QLabel("In Max"))
         self.dsb_input_max = self._make_range_spinbox(
-            0.0, "Default of the controller's {prefix}_input_max attr (remapValue Input Max). "
-                 "0 = auto (object count - 1).")
+            0.0, "Sine Wave only. Auto = Joints count - 1 (master remapValue Input Max). "
+                 "Read-only: updates live as the Joints list changes.")
+        # In Max 는 항상 (오브젝트 수 - 1) 로 자동 세팅되므로 사용자 편집을 막는다.
+        self.dsb_input_max.setReadOnly(True)
+        self.dsb_input_max.setButtonSymbols(QAbstractSpinBox.NoButtons)
         row.addWidget(self.dsb_input_max)
 
         row.addWidget(QLabel("Out Min"))
         self.dsb_output_min = self._make_range_spinbox(
-            0.0, "Default of the controller's {prefix}_output_min attr (remapValue Output Min).")
+            0.0, "Both modes. Default of the controller's {prefix}_output_min attr (master remapValue Output Min).")
         row.addWidget(self.dsb_output_min)
 
         row.addWidget(QLabel("Out Max"))
         self.dsb_output_max = self._make_range_spinbox(
-            1.0, "Default of the controller's {prefix}_output_max attr (remapValue Output Max / amplitude).")
+            1.0, "Both modes. Default of the controller's {prefix}_output_max attr "
+                 "(master remapValue Output Max / amplitude).")
         row.addWidget(self.dsb_output_max)
         return row
 
@@ -186,12 +191,30 @@ class MainWindow(QWidget):
         self.btn_build.clicked.connect(self.on_build)
         self.btn_build_wave.clicked.connect(self.on_build_wave)
 
+        # Joints 리스트 항목 수가 바뀔 때마다 In Max 를 (오브젝트 수 - 1) 로 라이브 반영.
+        # Select/Add/Del/Sort 등 모든 변경은 내부 QListWidget 의 model 시그널로 잡는다
+        # (위젯의 blockSignals 는 위젯 시그널만 막고 model 시그널은 막지 않는다).
+        joints_model = self.joints_tsl.list_widget.model()
+        joints_model.rowsInserted.connect(self._sync_input_max)
+        joints_model.rowsRemoved.connect(self._sync_input_max)
+        joints_model.modelReset.connect(self._sync_input_max)
+        self._sync_input_max()  # 초기값 반영
+
     # ================================================================
     # helpers
     # ================================================================
 
     def _log(self, message):
         self.log_view.appendPlainText(message)
+
+    def _sync_input_max(self, *args):
+        """Joints 리스트 항목 수가 바뀌면 In Max 를 (오브젝트 수 - 1) 로 자동 반영.
+
+        Sine Wave 마스터 remapValue 의 Input Max 는 항상 오브젝트 수 - 1 이어야
+        animCurve 출력(0..N-1)과 input 범위가 정렬된다. max(...,1) 은 N<=1 보호용.
+        """
+        n = self.joints_tsl.count()
+        self.dsb_input_max.setValue(float(max(n - 1, 1)))
 
     # ================================================================
     # 슬롯
@@ -260,10 +283,14 @@ class MainWindow(QWidget):
             return
         prefix, controller, joints, attrs = collected
 
+        # Out Min/Out Max 스핀박스를 Slerp output 제어 attr 기본값으로 재사용.
+        output_min = self.dsb_output_min.value()
+        output_max = self.dsb_output_max.value()
+
         # Undo 청크: 전체 빌드를 한 번에 취소 가능하게.
         cmds.undoInfo(openChunk=True)
         try:
-            master = run_build(prefix, controller, joints, attrs)
+            master = run_build(prefix, controller, joints, attrs, output_min, output_max)
             self._log(
                 "Built: {master} | {n} joint(s) | attrs: {attrs}".format(
                     master=master, n=len(joints), attrs=", ".join(attrs)

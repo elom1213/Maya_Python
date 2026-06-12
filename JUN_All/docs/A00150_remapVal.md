@@ -8,9 +8,18 @@
 1. **Slerp Ramp** (기존) — 하나의 마스터 remapValue 가 여러 개의 remapValue 를 구동해서
    "multi-out 커브" 효과를 흉내낸다. 원래 트위스트 리본 IK용으로 작성됐지만, 임의의
    어트리뷰트에 적용할 수 있다.
-2. **Sine Wave** (신규, v01.01) — 오브젝트마다 `plusMinusAverage → animCurve → remapValue`
+2. **Sine Wave** (v01.01~) — 오브젝트마다 `plusMinusAverage → animCurve → remapValue`
    체인을 만들어 **위상이 어긋난 사인 웨이브를 전파**한다. 컨트롤러에 추가한 driver attr
    하나로 전체 위상을 민다.
+
+> **v01.02 — 마스터 remapValue 일괄 제어**: 두 모드 모두
+> **컨트롤러 attr → 마스터 remapValue → 자식 remapValue** 의 fan-out 구조로 통일했다.
+> - Slerp Ramp: 마스터의 `outputMin`/`outputMax` 가 모든 자식의 `outputMin`/`outputMax` 를
+>   구동하도록 연결을 추가했고, 그 값을 컨트롤러 `{prefix}_output_min`/`_output_max` 로 노출한다.
+> - Sine Wave: 없던 **마스터 노드 `{prefix}_wave_master_MAP`** 를 신설해, range 4개와
+>   봉우리 커브(`value[0~2]`)를 마스터가 들고 모든 자식 remapValue 를 구동한다.
+>
+> 즉 노드 하나(마스터)만 조절하면 진폭·커브 모양이 전체에 일괄 반영된다.
 
 - 원본 로직: `sample_01.py` 의 `build_slerp_ramp` (Chris Lesage, 2019). Sine Wave 모드는
   `build_sine_wave` 로 추가됐다.
@@ -68,7 +77,7 @@ A00150_remapVal.run(True)
 │ Main Controller [ QLineEdit        ] [Get]   │
 │ Prefix          [ twist            ]         │
 │ Driver Attr [ wave ]                         │  ← Sine Wave 모드 전용
-│ Range  In Min[0] In Max[0] Out Min[0] Out Max[1.000] │  ← Sine Wave 모드 전용
+│ Range  In Min[0] In Max[N-1, read-only] Out Min[0] Out Max[1.000] │  ← In: Sine Wave 전용 / Out: 두 모드 공용
 ├ Set Up ──────────────────────────────────────┤
 │ [Joints]                [Attributes]         │
 │ Select Objects          List Attributes      │
@@ -89,7 +98,14 @@ A00150_remapVal.run(True)
 - **Main Controller** = `controlObj`. `Get`을 누르면 현재 Maya 선택의 첫 오브젝트가 채워진다. 제어용 어트리뷰트들이 이 컨트롤러에 추가된다.
 - **Prefix** = 첫 인자(기본 `twist`). 생성되는 노드/어트리뷰트 이름의 접두사로 쓰여 이름 충돌을 막는다.
 - **Driver Attr** (Sine Wave 모드 전용, 기본 `wave`) = 컨트롤러에 추가되는 keyable double 어트리뷰트 이름. 이 값이 모든 오브젝트의 **위상(phase)** 을 한 번에 민다. Slerp Ramp 모드에서는 사용하지 않는다.
-- **Range** (Sine Wave 모드 전용) = remapValue 의 4개 range(**In Min / In Max / Out Min / Out Max**) **기본값**. 빌드 시 컨트롤러에 `{prefix}_input_min` / `_input_max` / `_output_min` / `_output_max` 4개 어트리뷰트가 만들어지고, 그 값이 모든 remapValue 노드의 대응 어트리뷰트에 **connect** 된다. 따라서 빌드 후 **컨트롤러에서 이 값들을 조절하면 전체 remapValue 가 동시에 바뀐다**(Out Max = 웨이브 진폭). `In Max` 가 `0` 이면 자동으로 **오브젝트 개수 - 1** 이 기본값이 된다.
+- **Range** = remapValue range의 **기본값**. **In Min / In Max** 는 Sine Wave 모드 전용,
+  **Out Min / Out Max** 는 **두 모드 공용**(마스터 remapValue 의 Output Min/Max 기본값).
+  - **In Max 는 항상 (Joints 개수 - 1)** 로 자동 세팅되는 **읽기 전용** 값이다. Joints 리스트가
+    바뀔 때마다(Select / Add / Del / Sort) **라이브로 자동 갱신**된다. 사용자가 직접 입력할 수 없다.
+    이렇게 해야 마스터 remapValue 의 input 범위가 `0 .. (오브젝트 수 - 1)` 로 animCurve 출력과 정렬된다.
+  - Sine Wave: 빌드 시 컨트롤러에 `{prefix}_input_min` / `_input_max` / `_output_min` / `_output_max` 4개가 만들어져 **마스터** remapValue 를 connect 하고, 마스터가 다시 모든 자식을 구동한다. `_input_max` 기본값은 위 규칙대로 **오브젝트 개수 - 1** 이다.
+  - Slerp Ramp: **Out Min / Out Max** 만 사용. 빌드 시 `{prefix}_output_min` / `_output_max` 가 만들어져 마스터의 Output Min/Max 를 connect 한다(In Min/Max 는 무시 — 마스터의 Input Max 는 조인트 개수 - 1 로 자동 설정).
+  - 빌드 후 **컨트롤러에서 이 값들을 조절하면 전체 remapValue 가 동시에 바뀐다**(Out Max = 진폭).
 - **Joints** (좌측, 재사용 위젯 `JUN_mod_tsl_qt_v01`) = `oColl`. 대상 오브젝트들. Select/Add/Del/Up/Down/Sort.
 - **Attributes** (우측, 재사용 위젯) = 적용할 어트리뷰트. **List Attributes** 버튼이 Joints 리스트 **첫 오브젝트**의 keyable 어트리뷰트(rotateX/Y/Z, scaleX/Y/Z 등)를 채운다. 여기서 **하나 또는 여러 개**를 선택한다.
 - **Attr Search**: 토큰(예: `rotate`)을 포함하는 어트리뷰트를 리스트에서 선택해 준다(어트리뷰트가 많을 때 편리).
@@ -123,8 +139,13 @@ A00150_remapVal.run(True)
 ### Slerp Ramp 모드
 - 생성되는 마스터 노드: `{prefix}_master_ribbon_lerp_MAP` (remapValue). 조인트 개수만큼
   `{prefix}_lerp_profile_{i}_MAP` 등이 생성되어 마스터 커브에 연결된다.
+- 마스터의 **Input Max 는 항상 (조인트 수 - 1)** 로 set 된다 → input 범위 `0 .. N-1`.
+- 마스터는 자식들의 `value[0]`/`value[1]`(position·floatValue·interp)에 더해
+  **`outputMin`/`outputMax` 도 connect** 한다(v01.02). 따라서 마스터의 Output Min/Max 를
+  바꾸면 모든 자식의 진폭이 함께 변한다.
 - 컨트롤러에 추가되는 제어 어트리뷰트: `{prefix}_start`, `{prefix}_end`,
-  `{prefix}_start_position`, `{prefix}_end_position`, `{prefix}_interpolation`.
+  `{prefix}_start_position`, `{prefix}_end_position`, `{prefix}_interpolation`,
+  `{prefix}_output_min`, `{prefix}_output_max`. 뒤 2개는 마스터의 Output Min/Max 를 구동한다.
 
 ### Sine Wave 모드
 - 오브젝트가 `N`개일 때(인덱스 `i = 0 .. N-1`), 오브젝트마다 3개 노드를 생성한다:
@@ -132,13 +153,20 @@ A00150_remapVal.run(True)
     `input1D[0]` ← 컨트롤러 driver attr, `input1D[1]` = **상수 `i`** (위상 offset; `_ADD1`=0 … `_ADD5`=4).
   - `{prefix}_wave_curve_{i+1}` (animCurveUU): 키 `(0,0)`·`(N-1,N-1)` Linear,
     **Pre/Post Infinity = Constant**(구간 밖 입력은 끝값 고정, 반복 안 함).
-  - `{prefix}_wave_{i+1}_MAP` (remapValue): Input/Output Min·Max 는 컨트롤러 제어 attr 에서 **connect**,
-    value 커브 = 3키 봉우리 `(0,0)(0.5,1)(1,0)` **spline** → 사인 반주기 형태. `outValue`를 오브젝트 attr에 연결.
+  - `{prefix}_wave_{i+1}_MAP` (remapValue): Input/Output Min·Max 와 value 커브(`value[0~2]`,
+    3키 봉우리 `(0,0)(0.5,1)(1,0)` **spline** → 사인 반주기)를 **마스터에서 connect** 받는다.
+    `inputValue` 만 각 노드 고유(앞단 animCurve 출력)이고, `outValue` 를 오브젝트 attr에 연결한다.
+- **마스터 노드 `{prefix}_wave_master_MAP`** (remapValue, v01.02 신설): range 4개와 봉우리
+  커브를 들고 모든 자식 `*_MAP` 의 Input Min/Max·Output Min/Max·`value[0~2]` 를 구동한다.
+  마스터의 커브 키 하나만 옮겨도 전체 자식 커브가 같이 변한다.
+- 마스터(→ 자식)의 **Input Max 는 항상 (오브젝트 수 - 1)** 이다. `_input_max` attr 기본값이
+  오브젝트 수 - 1 로 고정되며, UI 의 In Max 입력은 무시된다(In Max 는 읽기 전용 자동값).
 - 컨트롤러에 추가되는 제어 어트리뷰트(모두 double):
   - **Driver Attr** 이름(기본 `wave`) — 전체 위상을 미는 값.
   - `{prefix}_input_min`, `{prefix}_input_max`, `{prefix}_output_min`, `{prefix}_output_max` —
-    각각 모든 `*_MAP` 노드의 Input Min / Input Max / Output Min / Output Max 에 **connect** 된다.
-    빌드 후 컨트롤러에서 이 값을 바꾸면 모든 remapValue 가 동시에 반영된다(Output Max = 진폭).
+    **마스터** 노드의 Input Min / Input Max / Output Min / Output Max 에 **connect** 된다.
+    즉 컨트롤러 → 마스터 → 자식 체인이라, 빌드 후 컨트롤러 값을 바꾸면 모든 remapValue 가
+    동시에 반영된다(Output Max = 진폭). `_input_max` 의 빌드 기본값은 오브젝트 수 - 1 이다.
 - 이 4개 attr 의 **기본값**은 UI 의 **Range**(In/Out Min·Max)에서 정한다. `In Max` 가 `0` 이하이면
   `{prefix}_input_max` 기본값은 자동으로 **오브젝트 개수 - 1**(`N-1`)이 된다.
 - 메모: Pre/Post Infinity는 remapValue가 아니라 그 앞단 animCurve의 속성이다.
