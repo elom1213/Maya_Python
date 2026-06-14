@@ -49,8 +49,8 @@ def build_slerp_ramp(prefix, controlObj, oColl, twistAttrs=['rotateX'],
     masterRemap = pm.createNode('remapValue', n=masterName)
     # 마스터 input 범위는 항상 0 .. (오브젝트 수 - 1). max(...,1) 은 N<=1 의 0 division 방지.
     masterRemap.inputMax.set(max(len(oColl) - 1, 1))
-    # set to smooth interpolation.
-    masterRemap.value[0].value_Interp.set(2)
+    # set to linear interpolation.
+    masterRemap.value[0].value_Interp.set(1) # 0:none 1:linear 2:smooth 3:spline
 
     pStartName = '{}_start'.format(prefix)
     pEndName = '{}_end'.format(prefix)
@@ -63,10 +63,11 @@ def build_slerp_ramp(prefix, controlObj, oColl, twistAttrs=['rotateX'],
     twistStart = add_attr(controlObj, 'double', twistStartName, pMin=0.0, pMax=1.0, pDefault=0.0)
     twistEnd = add_attr(controlObj, 'double', twistEndName, pMin=0.0, pMax=1.0, pDefault=1.0)
     # twistType interpolation 0: none 1: linear 2: smooth 3: spline
-    twistType = add_attr(controlObj, 'long', twistTypeName, pMin=0, pMax=2, pDefault=2)
+    twistType = add_attr(controlObj, 'long', twistTypeName, pMin=0, pMax=2, pDefault=1)
     twistStart.connect(masterRemap.value[0].value_Position)
     twistEnd.connect(masterRemap.value[1].value_Position)
     twistType.connect(masterRemap.value[0].value_Interp)
+    twistType.connect(masterRemap.value[1].value_Interp)
 
     # output range 제어 attr 2개 — 컨트롤러에 노출하고 master 의 outputMin/Max 를 driven.
     outMinAttr = add_attr(controlObj, 'double', '{}_output_min'.format(prefix), pDefault=outputMin)
@@ -92,8 +93,11 @@ def build_slerp_ramp(prefix, controlObj, oColl, twistAttrs=['rotateX'],
 
         # connect masterRemap remapValue curve to the other remapValue nodes.
         # Then you can drive them all with one, faking a multi-out curve.
-        twistProfile.inputMax.set(len(oColl))
         twistProfile.inputValue.set(i)
+
+        masterRemap.inputMax.connect(twistProfile.inputMax)
+        masterRemap.inputMin.connect(twistProfile.inputMin)
+
         masterRemap.value[0].value_Position.connect(twistProfile.value[0].value_Position)
         masterRemap.value[0].value_FloatValue.connect(twistProfile.value[0].value_FloatValue)
         masterRemap.value[0].value_Interp.connect(twistProfile.value[0].value_Interp)
@@ -119,7 +123,12 @@ def build_slerp_ramp(prefix, controlObj, oColl, twistAttrs=['rotateX'],
         twistMLT.outputX.connect(twistAdd.input2D[0].input2Dx)
         twistMLT.outputY.connect(twistAdd.input2D[1].input2Dx)
         for twistAttr in twistAttrs:
-            twistAdd.output2D.output2Dx.connect(twistNode.attr(twistAttr))
+            twistOffset = pm.createNode('plusMinusAverage', n='{}_lerp_{}_OFFSET_{}'.format(prefix, i+1, twistAttr))
+            twistAdd.output2D.output2Dx.connect(twistOffset.input2D[0].input2Dx)
+
+            attrInit = pm.getAttr("{}.{}".format(twistNode,twistAttr))
+            twistOffset.input2D[1].input2Dx.set(attrInit)
+            twistOffset.output2D.output2Dx.connect(twistNode.attr(twistAttr))
 
 
 def run_build(prefix, controller_name, joint_names, twist_attrs,
