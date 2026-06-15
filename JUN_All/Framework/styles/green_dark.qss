@@ -47,6 +47,18 @@ QCheckBox {
     background: transparent;
 }
 
+QCheckBox::indicator {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #6f9e80;
+    border-radius: 3px;
+    background-color: #353835;
+}
+
+QCheckBox::indicator:hover {
+    border: 1px solid #6f9e80;
+}
+
 QCheckBox::indicator:checked {
     background-color: #6f9e80;
     border: 1px solid #6f9e80;
