@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-11
+# last Update date : 2026-06-15
 # A00110_animTool - Qt UI
 
 from Framework.qt.qt import *
+from Framework.qt import JUN_mod_tsl_qt
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -13,6 +14,7 @@ from tools.A00110_animTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00110_animTool.app.core import KeyframeManager
 from tools.A00110_animTool.app.core import HotkeyManager
 from tools.A00110_animTool.app.core import PoseKeyManager
+from tools.A00110_animTool.app.core import CopyKeyManager
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -27,8 +29,8 @@ class MainWindow(QWidget):
 
         self.setObjectName(WINDOW_OBJECT_NAME)
 
-        self.win_width  = 380
-        self.win_height = 540
+        self.win_width  = 520
+        self.win_height = 600
         self.win_title  = f"Anim Key Tool v{VERSION}"
 
         self.resize(self.win_width, self.win_height)
@@ -73,6 +75,7 @@ class MainWindow(QWidget):
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_key_edit_tab(), "Key Edit")
         self.tabs.addTab(self._build_pose_key_tab(), "Pose Key")
+        self.tabs.addTab(self._build_copy_key_tab(), "Copy Key")
         main_layout.addWidget(self.tabs)
 
         # -------------------------
@@ -231,6 +234,103 @@ class MainWindow(QWidget):
 
         return tab
 
+    def _build_copy_key_tab(self):
+        """Base -> Target 으로 시간 범위 애니메이션 키를 복사하고 축별로 값을 반전하는 탭.
+        레거시 JUN_PY_CopyPasteKey_V03_01 의 Copy Key Tool 을 Qt 로 포팅.
+        Base/Target 리스트는 재사용 위젯 JUN_mod_tsl_qt_v01 2개로 구성한다."""
+
+        tab = QWidget()
+        tab_layout = QVBoxLayout(tab)
+
+        # -------------------------
+        # Base / Target 리스트 (재사용 위젯, 가로 2분할)
+        # Select / Add / Del / Up / Down / Sort / 카운트 / 씬 선택은 위젯이 내장.
+        # -------------------------
+
+        self.base_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Base", select_label="Select Base", log_callback=self.log)
+        self.tgt_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Target", select_label="Select Targets", log_callback=self.log)
+
+        list_row = QHBoxLayout()
+        list_row.addWidget(self.base_tsl)
+        list_row.addWidget(self.tgt_tsl)
+        tab_layout.addLayout(list_row)
+
+        # -------------------------
+        # Time range (start / end). 기본값은 현재 playback 범위.
+        # -------------------------
+
+        validator = QIntValidator(-1000000, 1000000, self)
+
+        time_str = int(cmds.playbackOptions(query=True, minTime=True))
+        time_end = int(cmds.playbackOptions(query=True, maxTime=True))
+
+        range_row = QHBoxLayout()
+        range_row.addWidget(QLabel("Start"))
+        self.le_copy_start = QLineEdit(str(time_str))
+        self.le_copy_start.setValidator(validator)
+        range_row.addWidget(self.le_copy_start)
+
+        range_row.addWidget(QLabel("End"))
+        self.le_copy_end = QLineEdit(str(time_end))
+        self.le_copy_end.setValidator(validator)
+        range_row.addWidget(self.le_copy_end)
+        tab_layout.addLayout(range_row)
+
+        # -------------------------
+        # Paste Option (cmds.pasteKey option). 기본 "insert".
+        # -------------------------
+
+        option_row = QHBoxLayout()
+        option_row.addWidget(QLabel("Paste Option"))
+        self.cmb_paste_option = QComboBox()
+        self.cmb_paste_option.addItems(CopyKeyManager.PASTE_OPTIONS)
+        self.cmb_paste_option.setCurrentText("insert")
+        option_row.addWidget(self.cmb_paste_option)
+        option_row.addStretch(1)
+        tab_layout.addLayout(option_row)
+
+        # -------------------------
+        # Reverse 체크박스 (Translate X/Y/Z, Rotate X/Y/Z). 기본 모두 off.
+        # -------------------------
+
+        rev_grp = QGroupBox("Reverse")
+        rev_layout = QHBoxLayout(rev_grp)
+
+        # attr key -> checkbox. CopyKeyManager.AXES 키와 일치.
+        self.copy_reverse = {}
+
+        rev_layout.addWidget(QLabel("Translate"))
+        for key, label in (("tx", "X"), ("ty", "Y"), ("tz", "Z")):
+            cb = QCheckBox(label)
+            self.copy_reverse[key] = cb
+            rev_layout.addWidget(cb)
+
+        rev_layout.addSpacing(12)
+
+        rev_layout.addWidget(QLabel("Rotate"))
+        for key, label in (("rx", "X"), ("ry", "Y"), ("rz", "Z")):
+            cb = QCheckBox(label)
+            self.copy_reverse[key] = cb
+            rev_layout.addWidget(cb)
+
+        rev_layout.addStretch(1)
+        tab_layout.addWidget(rev_grp)
+
+        # -------------------------
+        # Copy 버튼
+        # -------------------------
+
+        self.btn_copy_key = QPushButton("Copy Key")
+        tab_layout.addWidget(self.btn_copy_key)
+
+        tab_layout.addStretch(1)
+
+        self.btn_copy_key.clicked.connect(self.on_copy_key)
+
+        return tab
+
     # --------------------------------------------------
     # Helper
     # --------------------------------------------------
@@ -320,6 +420,36 @@ class MainWindow(QWidget):
             return
 
         count, msg = PoseKeyManager.set_pose_keys(axis_values)
+        self.log(msg)
+
+    def on_copy_key(self):
+
+        base = self.base_tsl.get_all_items()
+        tgt = self.tgt_tsl.get_all_items()
+
+        if not base or not tgt:
+            self.log("[Warning] Fill both Base and Target lists.")
+            return
+
+        # Start / End 파싱 (Copy 탭 전용).
+        s_txt = self.le_copy_start.text().strip()
+        e_txt = self.le_copy_end.text().strip()
+
+        if s_txt == "" or e_txt == "":
+            self.log("[Warning] Enter Start / End.")
+            return
+
+        start = int(s_txt)
+        end = int(e_txt)
+
+        if start > end:
+            self.log(f"[Warning] Start ({start}) is greater than End ({end}).")
+            return
+
+        reverse_flags = {key: cb.isChecked() for key, cb in self.copy_reverse.items()}
+        paste_option = self.cmb_paste_option.currentText()
+
+        count, msg = CopyKeyManager.copy_keys(base, tgt, start, end, reverse_flags, paste_option)
         self.log(msg)
 
     def show_about(self, *args):
