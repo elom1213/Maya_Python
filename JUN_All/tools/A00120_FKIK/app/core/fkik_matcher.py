@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-10
+# last Update date : 2026-06-15
 # A00120_FKIK - 매칭 / 베이크 로직 (maya.cmds, UI 무관)
+#
+# 2026-06-15: bake() 를 Python 프레임 루프 -> native bakeResults 로 교체(대규모 구간 속도 개선).
 #
 # 레거시 JUN_MATCH_twoObjects / JUN_matcher_FKIK / JUN_cmd_match_IK_and_FK /
 #        JUN_cmd_bake_IK_FK / JUN_cmd_bake_IK_to_FK 를 현대화.
@@ -128,20 +130,60 @@ class FKIKMatcher:
     @staticmethod
     def bake(tgt_list, flw_list, start, end):
         """
-        [start, end] 구간을 프레임마다 매칭 + 키. (레거시 JUN_cmd_bake_IK_FK)
+        [start, end] 구간을 native bakeResults 로 베이크. (구 Python 프레임 루프 대체)
 
-        버그 수정: range(start, end + 1) 로 마지막 프레임 포함. undo chunk.
+        각 (tgt, flw) 쌍에 임시 parentConstraint(mo=False) 를 건 뒤 bakeResults 로
+        구간 전체를 일괄 샘플링하고, 베이크 후 컨스트레인트를 삭제한다.
+        world 결과는 기존 match_transforms 베이크와 동치이며 (rotateAxis≠0 인 특수
+        리그에서는 rotateAxis attr 자체는 복사하지 않음, 월드 포즈는 동일),
+        currentTime/xform 프레임 루프를 제거해 대규모 구간에서 수십 배 빠르다.
+
+        match_transforms 가 scale 을 건드리지 않으므로 translate/rotate 만 베이크한다.
+        시그니처/반환값(end - start + 1)은 기존과 동일하여 호출부 무수정.
+
+        Maya 2023(Python 3.9) 포함 동작 확인됨.
         """
         if not tgt_list or not flw_list:
             return 0
 
+        count = min(len(tgt_list), len(flw_list))
+        flw = flw_list[:count]
+        attrs = ["tx", "ty", "tz", "rx", "ry", "rz"]   # match_transforms 는 scale 미사용
+
+        cur = cmds.currentTime(q=True)
+
         cmds.undoInfo(openChunk=True)
+        cmds.refresh(suspend=True)
+        cons = []
         try:
-            for frame in range(start, end + 1):
-                cmds.currentTime(frame, edit=True)
-                match_transforms(tgt_list, flw_list, 1, 1, 1, 1)
-                cmds.setKeyframe(flw_list, t=frame)
+            for i in range(count):
+                try:
+                    cons += cmds.parentConstraint(
+                        tgt_list[i], flw[i], maintainOffset=False
+                    )
+                except Exception as e:
+                    # 락/연결된 attr 등으로 컨스트레인트 실패 -> 해당 쌍 skip
+                    cmds.warning(
+                        "FKIK bake: skip pair %s -> %s (%s)"
+                        % (tgt_list[i], flw[i], e)
+                    )
+
+            if cons:
+                cmds.bakeResults(
+                    flw,
+                    simulation=True,
+                    time=(start, end),
+                    sampleBy=1,
+                    attribute=attrs,
+                    disableImplicitControl=True,
+                    preserveOutsideKeys=True,
+                    sparseAnimCurveBake=False,
+                )
         finally:
+            if cons:
+                cmds.delete([c for c in cons if cmds.objExists(c)])
+            cmds.refresh(suspend=False)
+            cmds.currentTime(cur, edit=True)
             cmds.undoInfo(closeChunk=True)
 
         return end - start + 1
