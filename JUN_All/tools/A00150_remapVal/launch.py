@@ -24,7 +24,7 @@ if ROOT not in sys.path:
 from Framework.qt.qt import *  # noqa: F401,F403
 from Framework.themes.theme_manager import ThemeManager
 
-from .app.ui.main_window import MainWindow
+import config as jun_config
 
 
 window_instance = None
@@ -32,6 +32,15 @@ window_instance = None
 
 def run(reload_module=True):
     global window_instance
+
+    if reload_module and getattr(jun_config, "DEV_MODE", False):
+        # 전체 tools reload 는 다른 툴 launch 모듈의 window_instance 전역을 초기화해
+        # 떠 있던 다른 툴 창을 닫는다. 자기 자신 + Framework 만 reload 한다.
+        from dev.reloader_v02 import reload_for_tool
+        reload_for_tool("tools.A00150_remapVal")
+
+    # 리로드 후 갱신된 클래스를 잡기 위해 지역 import
+    from tools.A00150_remapVal.app.ui.main_window import MainWindow
 
     try:
         window_instance.close()

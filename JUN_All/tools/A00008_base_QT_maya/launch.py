@@ -12,20 +12,26 @@ if ROOT not in sys.path:
     sys.path.append(ROOT)
 
 
-# from Framework.qt.qt import QApplication 
-from Framework.qt.qt import * 
-
-from .app.ui.main_window import MainWindow
+import config as jun_config
 from Framework.themes.theme_manager import ThemeManager
 
 
 window_instance = None
 
 
-def run():
+def run(reload_module=True):
 
     global window_instance
 
+    if reload_module and getattr(jun_config, "DEV_MODE", False):
+        # 전체 tools reload(reload_all_v02) 는 다른 툴 launch 모듈의 window_instance
+        # 전역을 초기화해 떠 있던 다른 툴 창을 닫는다. 자기 자신 + Framework 만 reload 한다.
+        # 새 Qt 툴을 만들 때 "tools.A00008_base_QT_maya" 를 자기 패키지명으로 바꿀 것.
+        from dev.reloader_v02 import reload_for_tool
+        reload_for_tool("tools.A00008_base_QT_maya")
+
+    # 리로드 후 갱신된 클래스를 잡기 위해 지역 import (최상단 import 로 두면 reload 가 반영되지 않음)
+    from tools.A00008_base_QT_maya.app.ui.main_window import MainWindow
 
     try:
         window_instance.close()
@@ -35,7 +41,7 @@ def run():
 
     window_instance = MainWindow()
 
-    ThemeManager.load_theme_to_widget( window_instance, "red")
+    ThemeManager.load_theme_to_widget(window_instance, "red")
 
     window_instance.show()
 
