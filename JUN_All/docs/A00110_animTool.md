@@ -2,7 +2,7 @@
 
 ## 1. 개요
 
-애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **세 개의 탭**과 **공유 로그창**으로 구성된다.
+애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **네 개의 탭**과 **공유 로그창**으로 구성된다.
 
 1. **Key Edit** — 선택 오브젝트의 키를 시간 범위로 **이동(앞/뒤 offset)·삭제**하고, 그래프
    에디터에서 선택한 키 구간을 **평평하게 유지(Hold)** 한다. `Shift+A` 핫키로 Hold 를 호출할 수 있다.
@@ -10,6 +10,14 @@
    값을 키프레임으로 설정한다. 축마다 체크박스가 있어 체크된 축만 적용된다.
 3. **Copy Key** (v01.03~) — **Base → Target** 으로 시간 범위 애니메이션 키를 복사하고,
    축별로 값을 **반전(Reverse)** 한다. `cmds.pasteKey` 의 붙여넣기 모드를 콤보박스로 선택한다.
+4. **Mirror Key** (v01.04~) — 한쪽 컨트롤러의 키를 **반대쪽 컨트롤러로 좌우 미러**한다(언리얼
+   *Mirror Data Table* 과 동일한 결과). 좌/우 토큰(`_l/_r` 등, **JSON 으로 확장 가능**)으로 자동
+   페어링하거나 수동 리스트로 짝짓는다. **소스/타겟의 rotateOrder 가 달라도 정확**하다.
+
+> **v01.04 — Mirror Key 탭 신설**: 컨트롤 키를 좌우 대칭으로 반대쪽에 복사한다. 채널 부호 반전이
+> 아니라 **월드 매트릭스 반사 → 타겟 rotateOrder 재분해** 방식이라 rotateOrder/축 정렬에 무관하다.
+> 로직은 `app/core/mirror_key_manager.py`, 토큰 JSON 입출력은 `app/core/mirror_token_store.py`
+> (`app/config/mirror_tokens.json`)로 분리했다. 리스트 UI 는 재사용 위젯 `JUN_mod_tsl_qt_v01` 2개.
 
 > **v01.03 — Copy Key 탭 신설**: 레거시 단일 파일 툴
 > `01_Modules/JUN_PY_CopyPasteKey_V03_01.py`(maya.cmds 기반 "Copy Key Tool V03.01")의
@@ -19,6 +27,7 @@
 
 - DCC: Autodesk Maya (PySide UI). 키 조작은 `maya.cmds`(`keyframe`/`cutKey`/`copyKey`/
   `pasteKey`/`scaleKey`/`setKeyframe`/`keyTangent`) 표준 명령만 사용 → Maya 2023 호환.
+  Mirror Key 만 행렬 연산에 `maya.api.OpenMaya`(2.0) 의 `MMatrix`/`MTransformationMatrix` 사용.
 - 복사 알고리즘 원본: 레거시 `JUN_cmd_copyKey_V02`. Pose Key 는 `A00030_quickTool` 의
   `JUN_cmd_anim_rot_x_z_to_zero`(3축)를 6축으로 일반화한 것.
 
@@ -33,13 +42,17 @@ A00110_animTool/
 ├── config.py              # 셸프 버튼 설치 + 드래그&드롭 진입점
 ├── requirements.txt
 └── app/
-    ├── config/version.py  # VERSION / LAST_UPDATE
+    ├── config/
+    │   ├── version.py            # VERSION / LAST_UPDATE
+    │   └── mirror_tokens.json    # 좌/우 토큰 쌍 (Mirror Key, 확장 가능)
     ├── core/              # 로직 (UI 비의존, maya.cmds)
     │   ├── keyframe_manager.py   # 키 이동 / 삭제 / Hold (Key Edit 탭)
     │   ├── hotkey_manager.py     # Shift+A 핫키 설치 / 복원 → Hold 호출
     │   ├── pose_key_manager.py   # 현재 프레임 6축 pose 키 (Pose Key 탭)
-    │   └── copykey_manager.py    # Base→Target 키 복사 + 축 Reverse (Copy Key 탭)
-    └── ui/main_window.py  # 전체 UI (3개 탭 + 공유 로그창 + 메뉴 바)
+    │   ├── copykey_manager.py    # Base→Target 키 복사 + 축 Reverse (Copy Key 탭)
+    │   ├── mirror_key_manager.py # 컨트롤 키 좌우 미러 (Mirror Key 탭, OpenMaya)
+    │   └── mirror_token_store.py # mirror_tokens.json 입출력 + 폴백
+    └── ui/main_window.py  # 전체 UI (4개 탭 + 공유 로그창 + 메뉴 바)
 ```
 
 - 각 manager 는 **UI 비의존 정적 메서드**(`@staticmethod`)로 작성되고 `(count, msg)` 를 반환한다.
@@ -71,7 +84,7 @@ A00110_animTool.run(True)   # True = reload
 
 ```
 ┌ Help ────────────────────────────────────────────┐  ← 메뉴 바 (Help > About)
-│ [ Key Edit ] [ Pose Key ] [ Copy Key ]            │  ← 탭
+│ [ Key Edit ] [ Pose Key ] [ Copy Key ] [Mirror Key]│  ← 탭
 ├───────────────────────────────────────────────────┤
 │  (선택된 탭 내용)                                  │
 ├ Log (3개 탭 공유) ────────────────────────────────┤
@@ -159,6 +172,43 @@ A00110_animTool.run(True)   # True = reload
   Translate X/Y/Z, Rotate X/Y/Z 6개, 기본 모두 off.
 - **Copy Key**: 복사 실행. 결과(처리한 쌍 수 / 사용한 옵션 / 건너뛴 쌍 / 개수 불일치 경고)가 로그에 출력.
 
+### 5.4 Mirror Key 탭
+
+```
+┌───────────────────────────────────────────────────┐
+│ Mode  (•) Auto pair from selection  ( ) Manual list│
+│ [Source]                  [Target]                │  ← 재사용 위젯 2개
+│ ┌ QListWidget ┐           ┌ QListWidget ┐         │
+│ └─────────────┘           └─────────────┘         │
+│ [ Resolve Pairs from Selection ]                  │  ← Auto 모드에서 미리보기
+│ Mirror Axis (•)X ( )Y ( )Z   Channels [v]T [v]R   │
+│ Start [ 1 ] End [ 24 ]   Time (•)Source keys ( )Bake│
+│ ┌ L / R Tokens (mirror_tokens.json) [접이식] ────┐│
+│ │ ┌ Left │ Right ┐                                ││
+│ │ │ _l   │ _r    │  ...                           ││
+│ │ └──────┴───────┘                                ││
+│ │ [Add Row][Remove Row][Save][Reload]             ││
+│ └──────────────────────────────────────────────────┘│
+│ [ Mirror Selected ]                               │
+└───────────────────────────────────────────────────┘
+```
+
+- **Mode**:
+  - **Auto pair from selection**(기본): 씬에서 선택한 컨트롤을 토큰으로 자동 페어링한다.
+    선택한 쪽이 **소스**, 토큰으로 찾은 반대쪽이 **타겟**.
+  - **Manual list**: `Source[i] → Target[i]` 로 같은 인덱스끼리 직접 매칭(Copy Key 방식).
+- **Source / Target** (재사용 위젯 `JUN_mod_tsl_qt_v01`): 수동 매칭용. **Resolve Pairs** 로 자동
+  페어 결과를 여기에 채워 미리보기/수정할 수 있다.
+- **Mirror Axis**: 월드 반사축(기본 **X** = YZ 평면, 좌우 대칭). 보통 캐릭터 좌우축이 월드 X.
+- **Channels**: **Translate / Rotate** 그룹 토글(기본 둘 다 on). 회전만 미러하려면 Translate off.
+- **Start / End**: 미러 대상 시간 범위(기본 = 현재 playback 범위).
+- **Time**: **Source keys**(기본, 소스의 실제 키 시점에만 기록 → 곡선·타이밍 보존) /
+  **Bake**(범위 내 정수 프레임 전수 기록).
+- **L / R Tokens**: `app/config/mirror_tokens.json` 의 좌/우 토큰 쌍 편집 테이블.
+  **Add/Remove Row** 로 행 추가·삭제, **Save** 로 JSON 기록, **Reload** 로 다시 읽기.
+  기본 4쌍(`_l/_r`, `_L/_R`, `_lf/_rt`, `Left/Right`). 새 네이밍은 행 추가만으로 지원.
+- **Mirror Selected**: 미러 실행. 결과(처리한 페어 수 / 반사축 / 건너뛴 페어)가 로그에 출력.
+
 ---
 
 ## 6. 사용 순서
@@ -182,6 +232,23 @@ A00110_animTool.run(True)   # True = reload
    (Base[i] ↔ Target[i] 가 맞도록 **Sort/Up/Down 으로 순서 정렬**)
 3. **Start / End** 확인(기본 = 현재 playback 범위) → **Paste Option** 선택(기본 `insert`).
 4. 필요하면 **Reverse** 축 체크(예: 좌/우 대칭 복사 시 Rotate Y/Z 등) → **Copy Key**.
+
+### Mirror Key — 자동(Auto)
+1. 미러할 **소스 컨트롤(들)을 선택**(예: 왼팔 FK 컨트롤). 한쪽만 선택하면 된다.
+2. **Mirror Axis**(보통 X) / **Channels**(T·R) / **Start·End** / **Time** 확인.
+3. (선택) **Resolve Pairs** 로 페어 결과를 Source/Target 리스트에 미리보기.
+4. **Mirror Selected** → 토큰으로 찾은 반대쪽 컨트롤에 좌우 대칭 키가 기록된다.
+
+### Mirror Key — 수동(Manual)
+1. **Mode = Manual list** 선택.
+2. 소스들을 선택 → **Select Source**, 타겟들을 선택 → **Select Targets**
+   (`Source[i] ↔ Target[i]` 가 맞도록 Sort/Up/Down 으로 정렬).
+3. 옵션 확인 후 **Mirror Selected**.
+
+### Mirror Key — 토큰 확장
+1. **L / R Tokens** 그룹을 펼친다.
+2. **Add Row** → 새 좌/우 토큰 입력(예: `:left` / `:right`).
+3. **Save** → `mirror_tokens.json` 에 기록(다음 실행에도 유지). 파일을 직접 편집해도 된다.
 
 ---
 
@@ -219,6 +286,27 @@ A00110_animTool.run(True)   # True = reload
 - 키가 없거나 붙여넣기에 실패한 쌍은 **건너뛰고**(skip) 집계해 로그에 표시한다 → 일부 실패해도 중단되지 않는다.
 - **Paste Option** 이 유효값 목록 밖이면 `insert` 로 폴백(방어).
 
+### Mirror Key
+- **rotateOrder 무관**: 소스는 `worldMatrix`(오일러 무관)로 읽고, 결과는 `MTransformationMatrix`
+  로 분해 후 `MEulerRotation.reorderIt(타겟 rotateOrder)` 로 **타겟 order 에 맞춰** 기록한다.
+  채널 부호 반전을 쓰지 않으므로 양쪽 order 가 무엇이든 결과 월드 포즈가 동일하다.
+- **미러 수학**(`_mirror_one`): 프레임 `t` 마다
+  `local = (refl · worldMatrix · refl) · targetParentInverse` 를 계산한다. `refl` 은 반사축
+  대각 행렬(예: X → `diag(-1,1,1,1)`). `refl·M·refl` 은 위치를 해당 축으로 반사하고 회전을
+  켤레(conjugate)하므로 **det +1(정상 회전)** 을 유지한다. `getAttr(..., time=t)` 로 타임라인을
+  옮기지 않고 평가하며, 부모가 애니메이션돼도 `parentInverseMatrix` 를 t 시점으로 읽어 정확하다.
+- **월드 경유의 이점**: 타겟의 실제 부모 공간을 기준으로 로컬값을 역산하므로, 리그가 좌우
+  **behavior**(축 반전) 든 **orientation**(동일 축) 셋업이든 상관없이 동작한다(대칭 리그 전제).
+- **페어링**(`resolve_pairs`): 이름의 토큰을 양방향 치환해 후보를 만들고 **씬에 존재하는 첫 후보**를
+  페어로 삼는다(`objExists` 로 거르므로 `_l` 이 `arm_lower` 에 잘못 걸려도 무시됨).
+  토큰이 없으면 **센터 컨트롤**로 보고 self-mirror(같은 컨트롤 제자리 좌우 반전). 토큰은 있는데
+  반대쪽 노드가 없으면 **unpaired** 로 분류해 건너뛰고 로그에 표시한다.
+- **스왑 방지**: 좌·우를 모두 선택해도 한 방향만 처리한다(먼저 본 쪽이 소스). L→R 기록이 R→L
+  읽기를 오염시키는 문제를 피한다.
+- **채널 스킵**: 잠긴 채널(`getAttr lock`)은 제외하고, 연결/잠금으로 `setKeyframe` 이 실패하면
+  해당 키만 건너뛴다. 키를 하나도 못 넣은 페어는 skip 으로 집계.
+- **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
+
 ---
 
 ## 8. 로그 · 문제 해결
@@ -237,6 +325,13 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 # Copy Key
 5 pairs copied (option: insert).
 3 pairs copied (option: replace). 2 skipped (no keys / paste failed). [Warning] Base(5) / Target(3) count mismatch.
+
+# Mirror Key
+4 token pair(s) loaded.
+3 pair(s) resolved. 1 center (self-mirror). 1 unpaired: arm_l_ctrl
+4 pair(s) mirrored (axis: X).
+2 pair(s) mirrored (axis: X). 1 skipped (no keys / not settable).
+4 token pair(s) saved.
 ```
 
 ### 경고 메시지
@@ -248,6 +343,11 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 - `[Warning] Fill both Base and Target lists.` — (Copy Key) Base/Target 비어 있음.
 - `[Warning] Enter Start / End.` / `[Warning] Start (n) is greater than End (m).` — (Copy Key) 시간 범위 오류.
 - `[Warning] Base(n) / Target(m) count mismatch.` — (Copy Key) 두 리스트 개수 불일치(짧은 쪽만 복사).
+- `[Warning] Select source controllers first.` — (Mirror Key Auto) 선택된 컨트롤 없음.
+- `[Warning] No pairs resolved.` — (Mirror Key Auto) 토큰으로 페어를 못 찾음(unpaired 만 있음).
+- `[Warning] Enable Translate and/or Rotate.` — (Mirror Key) 채널 토글이 모두 off.
+- `[Warning] Source(n) / Target(m) count mismatch.` — (Mirror Key Manual) 두 리스트 개수 불일치.
+- `[Info] mirror_tokens.json not found. Using built-in defaults.` — JSON 없음(기본 토큰 사용).
 
 ### 자주 겪는 문제
 - **이동/삭제가 일부 채널에만 적용됨** → 채널박스에서 어트리뷰트가 선택돼 있으면 그 채널만 대상이 된다.
@@ -259,3 +359,12 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 - **(Copy Key) 엉뚱한 오브젝트끼리 복사됨** → Base/Target **순서**가 어긋남. Sort 또는 Up/Down 으로 인덱스를 맞춘다.
 - **(Copy Key) 붙여넣기 모드가 예상과 다름** → Paste Option 콤보 확인(기본 `insert`). `replace`/`replaceCompletely`
   는 타겟 기존 키를 덮어쓰고, `merge` 는 병합한다.
+- **(Mirror Key) 반대쪽을 못 찾음(unpaired)** → 컨트롤 네이밍이 토큰 테이블에 없을 수 있다.
+  L/R Tokens 에 해당 토큰 쌍을 추가(Save)하거나, Manual 모드로 직접 매칭한다.
+- **(Mirror Key) 미러 결과가 안 맞음** → ① Mirror Axis 가 캐릭터 좌우축인지(보통 X) 확인.
+  ② 리그가 좌우 대칭(타겟 부모가 소스 부모의 거울상)인지 확인. ③ 비대칭/오프셋 리그면 결과가
+  어긋날 수 있다.
+- **(Mirror Key) 일부 컨트롤이 skip 됨** → 소스에 해당 범위 키가 없거나 타겟 채널이 잠김/연결됨.
+  로그의 `skipped` 수를 확인.
+- **(Mirror Key) 센터 컨트롤이 미러 안 됨** → 좌/우 토큰이 이름에 없으면 self-mirror(제자리 반전)로
+  처리된다. 의도와 다르면 Manual 모드로 지정한다.
