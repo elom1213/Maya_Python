@@ -72,3 +72,29 @@ QGroupBox {
 QGroupBox::title {
     color: #d27a7a;
 }
+
+QRadioButton {
+    color: #dddddd;
+    background-color: #3a3a3a;
+    border: 1px solid #b85c5c;
+    border-radius: 4px;
+    padding: 4px 8px;
+    margin: 2px 0;
+}
+
+QRadioButton::indicator {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #b85c5c;
+    border-radius: 7px;
+    background-color: #3a3a3a;
+}
+
+QRadioButton::indicator:hover {
+    border: 1px solid #c76d6d;
+}
+
+QRadioButton::indicator:checked {
+    background-color: #b85c5c;
+    border: 1px solid #b85c5c;
+}
