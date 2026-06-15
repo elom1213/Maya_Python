@@ -25,7 +25,7 @@ maya_useNewAPI = True
 # 이 플러그인은 항상 실행 중인 툴(mesh_io.ensure_undo_plugin)에서 로드되므로
 # 그 시점에 JUN_All 이 이미 sys.path 에 있어 아래 import 가 성립한다.
 # (loadPlugin 으로 로드된 .py 에는 __file__ 이 정의되지 않으므로 경로 계산을 쓰지 않는다.)
-from tools.A00180_abSymMesh.core import undo_bridge
+from tools.A00180_abSymMesh.app.core import undo_bridge
 
 
 def _mfn_mesh(name):

@@ -2,16 +2,17 @@
 
 ## 1. 개요
 
-폴리곤 메시의 **대칭/비대칭 블렌드셰이프 제작**을 돕는 maya.cmds 툴이다. 메시의 대칭을
+폴리곤 메시의 **대칭/비대칭 블렌드셰이프 제작**을 돕는 **PySide(Qt) 툴**이다. 메시의 대칭을
 검사하고, 선택한 정점을 **미러 / 플립 / 리버트**하며, 두 블렌드셰이프를 **복사 / 더하기 / 빼기**할
 수 있다. Brendan Ross 의 고전 MEL 스크립트 `abSymMesh`(2008, `origin.mel`)를 동작은 유지하면서
-**속도를 크게 높여** Python / OpenMaya 2.0 으로 재구현했다.
+**속도를 크게 높여** Python / OpenMaya 2.0 으로 재구현했고, UI 는 PySide 로 작성했다.
 
 - **벌크 정점 입출력**: 정점마다 `xform` 을 호출하던 원본과 달리 `MFnMesh.getPoints/setPoints`
   로 전체 좌표를 한 번에 읽고 쓴다.
 - **대칭 테이블**: O(N²) 매칭 + 선형 탐색을 **공간 해시 O(N) + dict O(1) 조회**로 대체.
 - **Undo**: 모든 정점 편집은 Undo 가능 커맨드(`abSymSetPoints`)를 경유 → **Ctrl+Z** 정상.
-- **Maya 2023 호환** (Python 3.9 / OpenMaya 2.0). UI 문자열/로그는 모두 영어.
+- **UI**: PySide(`Framework.qt.qt` 가 PySide6→PySide2 폴백). 테마는 `ThemeManager` 의 `yellow_dark` qss.
+- **Maya 2023 호환** (Python 3.9 / PySide2 / OpenMaya 2.0). UI 문자열/로그는 모두 영어.
 
 > **전제**: 미러/플립/리버트는 **base 메시와 동일한 정점 순서(토폴로지)**를 가진 메시에서 동작한다.
 > 대칭 메시로 base 를 잡은 뒤, 그 복제본(블렌드셰이프 타겟)에 기능을 적용하는 방식이다.
@@ -23,28 +24,28 @@
 ```
 A00180_abSymMesh/
 ├── origin.mel            # 원본 MEL (참고용 보존, 미사용)
-├── __init__.py           # from .launcher import run
-├── launcher.py           # run(): 멀티모듈 reload + undo 플러그인 로드 → build__()
-├── config.py             # DEV_MODE
-├── __dragDrop.py         # 셸프 버튼 설치 + 드래그&드롭 진입점 (TOOL_LABEL = "abSymMesh")
-├── __maya_button.py      # 셸프 명령 스텁
-├── utility.py
-├── abSymMesh_v01.py      # 전체 UI (maya.cmds) + 핸들러, 진입점 build__()
-└── core/                 # 로직 (씬 비의존 + 씬 I/O 분리)
-    ├── mesh_io.py        # OpenMaya 벌크 getPoints/setPoints, 선택/좌표 유틸, 플러그인 로드
-    ├── sym_core.py       # 공간 해시 대칭 + 미러/플립/리버트/카피 수학 (순수 계산)
-    ├── undo_bridge.py    # 플러그인 ↔ 툴 staging (PENDING 페이로드 단일 객체 공유)
-    └── undo_cmd.py       # MPxCommand 플러그인 (abSymSetPoints, Undo 가능 setPoints)
+├── __init__.py           # from .launch import run
+├── launch.py             # run(): DEV reload + undo 플러그인 로드 → MainWindow show
+├── config.py             # DEV_MODE + 셸프 버튼 설치 / 드래그&드롭 진입점
+└── app/
+    ├── config/version.py # VERSION / LAST_UPDATE
+    ├── core/             # 로직 (씬 비의존 + 씬 I/O 분리) — UI 와 무관, 재사용
+    │   ├── mesh_io.py        # OpenMaya 벌크 getPoints/setPoints, 선택/좌표 유틸, 플러그인 로드
+    │   ├── sym_core.py       # 공간 해시 대칭 + 미러/플립/리버트/카피 수학 (순수 계산)
+    │   ├── undo_bridge.py    # 플러그인 ↔ 툴 staging (PENDING 페이로드 단일 객체 공유)
+    │   └── undo_cmd.py       # MPxCommand 플러그인 (abSymSetPoints, Undo 가능 setPoints)
+    └── ui/main_window.py # 전체 UI (PySide) + 핸들러 (MainWindow)
 ```
 
-- **로직(core)과 UI(abSymMesh_v01.py)를 분리**한다. 씬 접근(getPoints/setPoints, 선택 조회)은
-  `mesh_io` 한 곳에 모으고, 대칭/미러 수학은 `sym_core` 가 좌표 배열만으로 처리한다.
+- **로직(app/core)과 UI(app/ui/main_window.py)를 분리**한다. 씬 접근(getPoints/setPoints,
+  선택 조회)은 `mesh_io` 한 곳에 모으고, 대칭/미러 수학은 `sym_core` 가 좌표 배열만으로 처리한다.
+  UI 를 maya.cmds → PySide 로 재작업할 때 `app/core` 는 그대로 재사용했다.
 
 ---
 
 ## 3. 설치
 
-`A00180_abSymMesh/__dragDrop.py` 를 Maya 뷰포트로 **드래그&드롭**하면 현재 셸프에
+`A00180_abSymMesh/config.py` 를 Maya 뷰포트로 **드래그&드롭**하면 현재 셸프에
 "abSymMesh" 버튼이 설치된다(중복 버튼은 자동 제거).
 
 ---
@@ -54,9 +55,10 @@ A00180_abSymMesh/
 - 셸프 버튼 클릭, 또는 스크립트 에디터에서:
   ```python
   import tools.A00180_abSymMesh as A00180_abSymMesh
-  A00180_abSymMesh.run(True)   # True 면 DEV_MODE 에서 코어 모듈 reload 후 실행
+  A00180_abSymMesh.run(True)   # True 면 DEV_MODE 에서 자기 자신 + Framework reload 후 실행
   ```
-- 실행 시 Undo 커맨드 플러그인(`core/undo_cmd.py`)이 자동 로드된다. 미로드 상태에서
+- 창은 `objectName`(`JUN_A00180_abSymMesh_window`)으로 관리되어 재실행 시 중복 없이 교체된다.
+- 실행 시 Undo 커맨드 플러그인(`app/core/undo_cmd.py`)이 자동 로드된다. 미로드 상태에서
   편집을 시도해도 `mesh_io.ensure_undo_plugin()` 이 사용 직전에 자가 로드한다.
 
 ---
@@ -123,7 +125,7 @@ A00180_abSymMesh/
 - **"N vertex(es) ... have invalid (NaN/inf) coordinates ..."** — 깨진 정점 존재.
   **Check Symmetry** 로 해당 정점 위치를 확인하고 메시를 정리한다.
 - **"No Base Geometry Selected"** — 미러/플립/Selection Mirror 전에 Select Base 가 필요하다.
-- **"Failed to load the undo command plugin: ...core/undo_cmd.py"** — 플러그인 로드 실패.
+- **"Failed to load the undo command plugin: ...app/core/undo_cmd.py"** — 플러그인 로드 실패.
   새 씬에서 재실행하거나 메시지 전문을 확인한다. (참고: loadPlugin 으로 로드되는 `.py` 에는
   `__file__` 이 없으므로 플러그인은 경로를 `__file__` 로 계산하지 않는다.)
 - **속도** — 정점이 많은 메시(수천~수만)에서 원본 MEL 대비 Select Base / Mirror / Flip 이
