@@ -20,3 +20,11 @@
 - create template_engine
 
 ---
+
+## V01.03 (2026-06-15)
+
+### Add
+- Create combined file (base + setting + LD merged into one output, `A000_KWI_combined_out.py`)
+- Add "Also write individual files" checkbox (default on)
+
+---

@@ -110,6 +110,11 @@ class KWI_creator:
                                     "write",
                                     f"A003_KWI_LD_nodes_out.{self.extension}"
                                 ),
+
+                                write_combined_node     =   self.pm.path(
+                                    "write",
+                                    f"A000_KWI_combined_out.{self.extension}"
+                                ),
                             )
         
     @property
@@ -176,7 +181,22 @@ class KWI_creator:
         for key, val in repl.items():
             repl[key] = ""
 
-    def _create_multiple_nodes_impl(self):
+    def _write(self, path, text):
+        # ensure_dir + utf-8 쓰기를 묶은 작은 헬퍼 (중복 제거)
+        self.pm.ensure_dir(path)
+        with open(path, 'w', encoding="utf-8") as f:
+            f.write(text)
+
+    # ------------------------------------------------------------------
+    # build 헬퍼 : 텍스트만 반환 (파일 쓰기 없음). 합본/개별 생성이 공유한다.
+
+    def _build_base_text(self):
+        # 현재 모드(multiple/single)에 따라 base 노드 텍스트를 생성해 반환
+        if self._create_mode == "single":
+            return self._build_base_text_single()
+        return self._build_base_text_multiple()
+
+    def _build_base_text_multiple(self):
         text_new_lst = []
         text_lst = []
         read_base_node = []
@@ -200,22 +220,15 @@ class KWI_creator:
             self.replacements["LINKED_TO"] = linked_to
             self.replacements["NODE_POS_X"] = posX
             self.replacements["NODE_POS_Y"] = posY
-            
+
             text_lst = TemplateEngine.apply(read_base_node, self.replacements)
             self.clear_replacements(self.replacements)
 
             text_new_lst.append(text_lst)
 
-        text_new_string = join_list_with_newline(text_new_lst, True)
+        return join_list_with_newline(text_new_lst, True)
 
-        self.pm.ensure_dir(self.paths.write_base_node)
-        with open(self.paths.write_base_node, 'w', encoding="utf-8") as f:
-            f.write(text_new_string)
-
-
-    def _create_single_node_impl(self):
-
-        text_new_lst = []
+    def _build_base_text_single(self):
         read_base_node = []
         self.clear_replacements(self.replacements)
         with open(self.paths.read_base_node, 'r', encoding="utf-8") as f:
@@ -232,23 +245,17 @@ class KWI_creator:
         self.replacements["ROOT_BONE"] = self.tgtBones[0]
         self.replacements["ROOT_BONE_ADDITIONAL"] = additional_str
 
-        text_new_lst = TemplateEngine.apply(read_base_node, self.replacements)
+        return TemplateEngine.apply(read_base_node, self.replacements)
 
-        self.pm.ensure_dir(self.paths.write_base_node)
-        with open(self.paths.write_base_node, 'w', encoding="utf-8") as f:
-            f.write(text_new_lst)
-
-
-    def create_setting_nodes(self):
-
+    def _build_setting_text(self):
         setting_node = None
         text_new_lst = []
         self.clear_replacements(self.replacements_setting)
-        
+
         with open(self.paths.read_setting_node, 'r', encoding="utf-8") as f:
             setting_node = f.read()
-        lst_setting_node = get_keyword_linked_to(self._interval_setting_node, 
-                                                 self.tgt_node_num, 
+        lst_setting_node = get_keyword_linked_to(self._interval_setting_node,
+                                                 self.tgt_node_num,
                                                  self.id_PhysicsSettings,
                                                  self.node_name)
 
@@ -264,22 +271,17 @@ class KWI_creator:
 
             text_new_lst.append(text_lst)
 
-        text_new_string = join_list_with_newline(text_new_lst, True)
+        return join_list_with_newline(text_new_lst, True)
 
-        self.pm.ensure_dir(self.paths.write_setting_node)
-        with open(self.paths.write_setting_node, 'w', encoding="utf-8") as f:
-            f.write(text_new_string)
-
-    def create_LD_nodes(self):
-
+    def _build_LD_text(self):
         LD_node_base = None
         self.clear_replacements(self.replacements_LD)
 
         with open(self.paths.read_LD_node, 'r', encoding="utf-8") as f:
             LD_node_base = f.read()
 
-        LD_linked_to = get_keyword_linked_to(1, 
-                                             self.tgt_node_num, 
+        LD_linked_to = get_keyword_linked_to(1,
+                                             self.tgt_node_num,
                                              self.id_LD,
                                              self.node_name)
 
@@ -292,6 +294,37 @@ class KWI_creator:
         text_lst = TemplateEngine.apply(LD_node_base, self.replacements_setting)
         self.clear_replacements(self.replacements_LD)
 
-        self.pm.ensure_dir(self.paths.write_LD_node)
-        with open(self.paths.write_LD_node, 'w', encoding="utf-8") as f:
-            f.write(text_lst)
+        return text_lst
+
+    # ------------------------------------------------------------------
+    # 개별 생성 : build 헬퍼로 텍스트를 만들어 각 출력 파일에 쓴다.
+
+    def _create_multiple_nodes_impl(self):
+        self._write(self.paths.write_base_node, self._build_base_text_multiple())
+
+    def _create_single_node_impl(self):
+        self._write(self.paths.write_base_node, self._build_base_text_single())
+
+    def create_setting_nodes(self):
+        self._write(self.paths.write_setting_node, self._build_setting_text())
+
+    def create_LD_nodes(self):
+        self._write(self.paths.write_LD_node, self._build_LD_text())
+
+    # ------------------------------------------------------------------
+    # 합본 생성 : base -> setting -> LD 순서로 이어붙인 하나의 파일을 쓴다.
+
+    def create_combined_file(self, write_individual=True):
+        base_text    = self._build_base_text()
+        setting_text = self._build_setting_text()
+        ld_text      = self._build_LD_text()
+
+        if write_individual:
+            self._write(self.paths.write_base_node,    base_text)
+            self._write(self.paths.write_setting_node, setting_text)
+            self._write(self.paths.write_LD_node,      ld_text)
+
+        combined = join_list_with_newline([base_text, setting_text, ld_text], True)
+        self._write(self.paths.write_combined_node, combined)
+
+        return self.paths.write_combined_node

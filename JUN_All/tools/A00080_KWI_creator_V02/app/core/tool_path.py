@@ -12,6 +12,7 @@ class KWIPaths:
     write_base_node         : str
     write_setting_node      : str
     write_LD_node           : str
+    write_combined_node     : str
 
     def print_all(self):
         print(self.read_KWI_base_node)
@@ -21,4 +22,5 @@ class KWIPaths:
         print(self.write_base_node)
         print(self.write_setting_node)
         print(self.write_LD_node)
+        print(self.write_combined_node)
 
