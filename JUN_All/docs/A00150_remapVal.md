@@ -21,6 +21,12 @@
 >
 > 즉 노드 하나(마스터)만 조절하면 진폭·커브 모양이 전체에 일괄 반영된다.
 
+> **v01.03 — Slerp Ramp 개선**: ① 기본 보간을 **smooth → linear** 로 바꾸고,
+> `{prefix}_interpolation` 이 마스터의 **`value[0]`·`value[1]` 양쪽 키** interp 를 함께 구동한다.
+> ② 자식 remapValue 의 **Input Min/Max 도 마스터에서 connect**(하드코딩 제거 → 마스터 `N-1` 정렬).
+> ③ **어트리뷰트를 덮어쓰지 않고 초기값에 가산**한다 — 조인트·어트리뷰트마다
+> `{prefix}_lerp_{i}_OFFSET_{attr}`(plusMinusAverage)가 `빌드 시 초기값 + slerp` 를 합쳐 연결한다.
+
 - 원본 로직: `sample_01.py` 의 `build_slerp_ramp` (Chris Lesage, 2019). Sine Wave 모드는
   `build_sine_wave` 로 추가됐다.
 - DCC: Autodesk Maya (PySide UI). 노드 생성은 **pymel** 사용.
@@ -140,9 +146,18 @@ A00150_remapVal.run(True)
 - 생성되는 마스터 노드: `{prefix}_master_ribbon_lerp_MAP` (remapValue). 조인트 개수만큼
   `{prefix}_lerp_profile_{i}_MAP` 등이 생성되어 마스터 커브에 연결된다.
 - 마스터의 **Input Max 는 항상 (조인트 수 - 1)** 로 set 된다 → input 범위 `0 .. N-1`.
+- **기본 보간 = linear**(v01.03). 마스터 `value[0].value_Interp` 기본값이 `1`(linear)이고,
+  컨트롤러의 `{prefix}_interpolation` 이 마스터 **`value[0]`·`value[1]` 양쪽 키**의 interp 를
+  함께 구동한다(기존엔 `value[0]` 만, smooth 기본).
 - 마스터는 자식들의 `value[0]`/`value[1]`(position·floatValue·interp)에 더해
   **`outputMin`/`outputMax` 도 connect** 한다(v01.02). 따라서 마스터의 Output Min/Max 를
   바꾸면 모든 자식의 진폭이 함께 변한다.
+- **자식의 Input Min/Max 도 마스터에서 connect**(v01.03): `masterRemap.inputMin/inputMax →
+  `{prefix}_lerp_profile_{i}_MAP`.inputMin/inputMax`. 기존의 자식 Input Max 하드코딩(`= 조인트 수`)을
+  제거해, 자식 input 범위가 마스터(`N-1`)와 정렬된다.
+- **어트리뷰트 초기값 보존(v01.03)**: 조인트·어트리뷰트마다 `{prefix}_lerp_{i}_OFFSET_{attr}`
+  (plusMinusAverage)가 생성되어 **`빌드 시 어트리뷰트 초기값 + slerp 출력`** 을 합쳐 어트리뷰트에
+  연결한다. 즉 어트리뷰트를 덮어쓰지 않고 **rest 값 위에 가산**한다(기존엔 slerp 출력을 직접 연결해 덮어씀).
 - 컨트롤러에 추가되는 제어 어트리뷰트: `{prefix}_start`, `{prefix}_end`,
   `{prefix}_start_position`, `{prefix}_end_position`, `{prefix}_interpolation`,
   `{prefix}_output_min`, `{prefix}_output_max`. 뒤 2개는 마스터의 Output Min/Max 를 구동한다.
@@ -198,3 +213,5 @@ Built sine wave: driver ctl.wave | 5 object(s) | range in[0.0,0.0] out[0.0,1.0] 
 - **List Attributes에 아무것도 안 뜸** → Joints 리스트가 비었거나 첫 오브젝트가 씬에 없음.
 - **Build해도 아무 변화 없음** → 로그의 `[WARN]` 확인(컨트롤러/조인트/어트리뷰트/Prefix 중 빠진 것).
 - **어트리뷰트 연결 실패** → 선택한 어트리뷰트가 조인트들에 모두 존재하는지 확인.
+- **Slerp Ramp 결과가 예전과 다름(덮어쓰기 → 가산)** → v01.03 부터 Slerp Ramp 는 어트리뷰트를
+  덮어쓰지 않고 **초기값에 가산**한다(`{prefix}_lerp_{i}_OFFSET_{attr}`). 또 기본 보간이 linear 다.
