@@ -15,6 +15,8 @@ from tools.A00110_animTool.app.core import KeyframeManager
 from tools.A00110_animTool.app.core import HotkeyManager
 from tools.A00110_animTool.app.core import PoseKeyManager
 from tools.A00110_animTool.app.core import CopyKeyManager
+from tools.A00110_animTool.app.core import MirrorKeyManager
+from tools.A00110_animTool.app.core import MirrorTokenStore
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -68,6 +70,15 @@ class MainWindow(QWidget):
         main_layout.setMenuBar(self.menu_bar)
 
         # -------------------------
+        # 로그 (모든 탭 공유)
+        # 탭 빌더가 생성 중 self.log() 를 호출할 수 있으므로 탭보다 먼저 생성한다.
+        # (레이아웃 추가는 탭 아래에 한다)
+        # -------------------------
+
+        self.te_log = QTextEdit()
+        self.te_log.setReadOnly(True)
+
+        # -------------------------
         # 탭: Key Edit / Pose Key
         # (참고로 든 BSTool 의 cmds.tabLayout 을 Qt QTabWidget 으로 대응)
         # -------------------------
@@ -76,14 +87,10 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_key_edit_tab(), "Key Edit")
         self.tabs.addTab(self._build_pose_key_tab(), "Pose Key")
         self.tabs.addTab(self._build_copy_key_tab(), "Copy Key")
+        self.tabs.addTab(self._build_mirror_key_tab(), "Mirror Key")
         main_layout.addWidget(self.tabs)
 
-        # -------------------------
-        # 로그 (두 탭 공유)
-        # -------------------------
-
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        # 로그창을 탭 아래에 배치
         main_layout.addWidget(self.te_log)
 
         # -------------------------
@@ -331,6 +338,163 @@ class MainWindow(QWidget):
 
         return tab
 
+    def _build_mirror_key_tab(self):
+        """컨트롤러 키프레임을 반대쪽 컨트롤러로 좌우 미러하는 탭.
+        자동 페어링(토큰) + 수동 리스트 폴백. rotateOrder 무관 (worldMatrix 반사)."""
+
+        tab = QWidget()
+        tab_layout = QVBoxLayout(tab)
+
+        # -------------------------
+        # Mode : Auto pair / Manual list
+        # -------------------------
+
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Mode"))
+        self.mir_mode_grp = QButtonGroup(self)
+        self.rb_mir_auto = QRadioButton("Auto pair from selection")
+        self.rb_mir_manual = QRadioButton("Manual list")
+        self.rb_mir_auto.setChecked(True)
+        self.mir_mode_grp.addButton(self.rb_mir_auto)
+        self.mir_mode_grp.addButton(self.rb_mir_manual)
+        mode_row.addWidget(self.rb_mir_auto)
+        mode_row.addWidget(self.rb_mir_manual)
+        mode_row.addStretch(1)
+        tab_layout.addLayout(mode_row)
+
+        # -------------------------
+        # Base(Source) / Target 리스트 (수동 모드에서 노출). Copy Key 탭과 동일 위젯.
+        # Auto 모드에서도 Resolve Pairs 결과 미리보기/수정에 쓸 수 있다.
+        # -------------------------
+
+        self.mir_base_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Source", select_label="Select Source", log_callback=self.log)
+        self.mir_tgt_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Target", select_label="Select Targets", log_callback=self.log)
+
+        self.mir_list_row = QWidget()
+        list_row = QHBoxLayout(self.mir_list_row)
+        list_row.setContentsMargins(0, 0, 0, 0)
+        list_row.addWidget(self.mir_base_tsl)
+        list_row.addWidget(self.mir_tgt_tsl)
+        tab_layout.addWidget(self.mir_list_row)
+
+        self.btn_mir_resolve = QPushButton("Resolve Pairs from Selection")
+        tab_layout.addWidget(self.btn_mir_resolve)
+
+        # -------------------------
+        # Mirror Axis (X / Y / Z)
+        # -------------------------
+
+        axis_row = QHBoxLayout()
+        axis_row.addWidget(QLabel("Mirror Axis"))
+        self.mir_axis_grp = QButtonGroup(self)
+        self.mir_axis_btns = {}
+        for ax in ("X", "Y", "Z"):
+            rb = QRadioButton(ax)
+            self.mir_axis_grp.addButton(rb)
+            self.mir_axis_btns[ax.lower()] = rb
+            axis_row.addWidget(rb)
+        self.mir_axis_btns["x"].setChecked(True)
+        axis_row.addSpacing(12)
+
+        # Channels (Translate / Rotate)
+        axis_row.addWidget(QLabel("Channels"))
+        self.cb_mir_translate = QCheckBox("Translate")
+        self.cb_mir_rotate = QCheckBox("Rotate")
+        self.cb_mir_translate.setChecked(True)
+        self.cb_mir_rotate.setChecked(True)
+        axis_row.addWidget(self.cb_mir_translate)
+        axis_row.addWidget(self.cb_mir_rotate)
+        axis_row.addStretch(1)
+        tab_layout.addLayout(axis_row)
+
+        # -------------------------
+        # Time range + time mode. 기본값은 현재 playback 범위.
+        # -------------------------
+
+        validator = QIntValidator(-1000000, 1000000, self)
+        time_str = int(cmds.playbackOptions(query=True, minTime=True))
+        time_end = int(cmds.playbackOptions(query=True, maxTime=True))
+
+        range_row = QHBoxLayout()
+        range_row.addWidget(QLabel("Start"))
+        self.le_mir_start = QLineEdit(str(time_str))
+        self.le_mir_start.setValidator(validator)
+        range_row.addWidget(self.le_mir_start)
+        range_row.addWidget(QLabel("End"))
+        self.le_mir_end = QLineEdit(str(time_end))
+        self.le_mir_end.setValidator(validator)
+        range_row.addWidget(self.le_mir_end)
+
+        range_row.addSpacing(12)
+        range_row.addWidget(QLabel("Time"))
+        self.mir_time_grp = QButtonGroup(self)
+        self.rb_mir_srckeys = QRadioButton("Source keys")
+        self.rb_mir_bake = QRadioButton("Bake")
+        self.rb_mir_srckeys.setChecked(True)
+        self.mir_time_grp.addButton(self.rb_mir_srckeys)
+        self.mir_time_grp.addButton(self.rb_mir_bake)
+        range_row.addWidget(self.rb_mir_srckeys)
+        range_row.addWidget(self.rb_mir_bake)
+        tab_layout.addLayout(range_row)
+
+        # -------------------------
+        # Tokens (접이식) : 좌/우 토큰 쌍 편집 테이블 + Save/Reload -> mirror_tokens.json
+        # -------------------------
+
+        self.grp_mir_tokens = QGroupBox("L / R Tokens (mirror_tokens.json)")
+        self.grp_mir_tokens.setCheckable(True)
+        self.grp_mir_tokens.setChecked(False)
+        tok_layout = QVBoxLayout(self.grp_mir_tokens)
+
+        self.tbl_mir_tokens = QTableWidget(0, 2)
+        self.tbl_mir_tokens.setHorizontalHeaderLabels(["Left", "Right"])
+        self.tbl_mir_tokens.horizontalHeader().setStretchLastSection(True)
+        self.tbl_mir_tokens.verticalHeader().setVisible(False)
+        self.tbl_mir_tokens.setMaximumHeight(140)
+        tok_layout.addWidget(self.tbl_mir_tokens)
+
+        tok_btn_row = QHBoxLayout()
+        self.btn_tok_add = QPushButton("Add Row")
+        self.btn_tok_del = QPushButton("Remove Row")
+        self.btn_tok_save = QPushButton("Save")
+        self.btn_tok_reload = QPushButton("Reload")
+        for b in (self.btn_tok_add, self.btn_tok_del, self.btn_tok_save, self.btn_tok_reload):
+            tok_btn_row.addWidget(b)
+        tok_layout.addLayout(tok_btn_row)
+        tab_layout.addWidget(self.grp_mir_tokens)
+
+        # -------------------------
+        # Mirror 실행 버튼
+        # -------------------------
+
+        self.btn_mirror = QPushButton("Mirror Selected")
+        tab_layout.addWidget(self.btn_mirror)
+
+        tab_layout.addStretch(1)
+
+        # -------------------------
+        # 상태 초기화 : 토큰 로드, 모드에 따른 리스트 표시
+        # -------------------------
+
+        self._mir_load_tokens()
+        self._mir_update_mode()
+
+        # -------------------------
+        # Signal
+        # -------------------------
+
+        self.rb_mir_auto.toggled.connect(self._mir_update_mode)
+        self.btn_mir_resolve.clicked.connect(self.on_mir_resolve)
+        self.btn_mirror.clicked.connect(self.on_mirror_key)
+        self.btn_tok_add.clicked.connect(lambda: self._mir_add_token_row("", ""))
+        self.btn_tok_del.clicked.connect(self._mir_del_token_row)
+        self.btn_tok_save.clicked.connect(self.on_mir_save_tokens)
+        self.btn_tok_reload.clicked.connect(self._mir_load_tokens)
+
+        return tab
+
     # --------------------------------------------------
     # Helper
     # --------------------------------------------------
@@ -450,6 +614,147 @@ class MainWindow(QWidget):
         paste_option = self.cmb_paste_option.currentText()
 
         count, msg = CopyKeyManager.copy_keys(base, tgt, start, end, reverse_flags, paste_option)
+        self.log(msg)
+
+    # --------------------------------------------------
+    # Mirror Key
+    # --------------------------------------------------
+
+    def _mir_update_mode(self, *args):
+        """Auto/Manual 모드에 따라 Source/Target 리스트 표시를 토글."""
+        manual = self.rb_mir_manual.isChecked()
+        # Auto 모드에서도 Resolve 미리보기를 위해 리스트는 보이게 두되,
+        # Manual 일 때만 직접 입력이 주가 된다. 여기서는 항상 표시(미리보기 겸용).
+        self.mir_list_row.setVisible(True)
+        self.btn_mir_resolve.setVisible(not manual)
+
+    def _mir_axis(self):
+        for ax, rb in self.mir_axis_btns.items():
+            if rb.isChecked():
+                return ax
+        return "x"
+
+    def _mir_read_range(self):
+        """Mirror 탭 Start/End 파싱. 실패 시 None."""
+        s_txt = self.le_mir_start.text().strip()
+        e_txt = self.le_mir_end.text().strip()
+        if s_txt == "" or e_txt == "":
+            self.log("[Warning] Enter Start / End.")
+            return None
+        start = int(s_txt)
+        end = int(e_txt)
+        if start > end:
+            self.log(f"[Warning] Start ({start}) is greater than End ({end}).")
+            return None
+        return (start, end)
+
+    def _mir_token_pairs(self):
+        """현재 토큰 테이블의 (left, right) 쌍 목록(빈 행 제외)."""
+        pairs = []
+        for r in range(self.tbl_mir_tokens.rowCount()):
+            left_item = self.tbl_mir_tokens.item(r, 0)
+            right_item = self.tbl_mir_tokens.item(r, 1)
+            left = left_item.text().strip() if left_item else ""
+            right = right_item.text().strip() if right_item else ""
+            if left and right:
+                pairs.append((left, right))
+        return pairs
+
+    def _mir_add_token_row(self, left="", right=""):
+        r = self.tbl_mir_tokens.rowCount()
+        self.tbl_mir_tokens.insertRow(r)
+        self.tbl_mir_tokens.setItem(r, 0, QTableWidgetItem(left))
+        self.tbl_mir_tokens.setItem(r, 1, QTableWidgetItem(right))
+
+    def _mir_del_token_row(self):
+        rows = sorted({idx.row() for idx in self.tbl_mir_tokens.selectedIndexes()}, reverse=True)
+        if not rows:
+            r = self.tbl_mir_tokens.rowCount() - 1
+            if r >= 0:
+                rows = [r]
+        for r in rows:
+            self.tbl_mir_tokens.removeRow(r)
+
+    def _mir_load_tokens(self):
+        """mirror_tokens.json -> 테이블."""
+        pairs, msg = MirrorTokenStore.load()
+        self.tbl_mir_tokens.setRowCount(0)
+        for left, right in pairs:
+            self._mir_add_token_row(left, right)
+        self.log(msg)
+
+    def on_mir_save_tokens(self):
+        pairs = self._mir_token_pairs()
+        if not pairs:
+            self.log("[Warning] No valid token pairs to save.")
+            return
+        count, msg = MirrorTokenStore.save(pairs)
+        self.log(msg)
+
+    def on_mir_resolve(self):
+        """현재 선택으로 자동 페어링해 Source/Target 리스트를 채운다(미리보기)."""
+        sel = cmds.ls(sl=True) or []
+        if not sel:
+            self.log("[Warning] Select source controllers first.")
+            return
+
+        token_pairs = self._mir_token_pairs() or list(MirrorKeyManager.DEFAULT_TOKEN_PAIRS)
+        pairs, unpaired, center = MirrorKeyManager.resolve_pairs(sel, token_pairs)
+
+        self.mir_base_tsl.set_items([s for s, _ in pairs])
+        self.mir_tgt_tsl.set_items([t for _, t in pairs])
+
+        msg = f"{len(pairs)} pair(s) resolved."
+        if center:
+            msg += f" {len(center)} center (self-mirror)."
+        if unpaired:
+            msg += f" {len(unpaired)} unpaired: {', '.join(unpaired)}"
+        self.log(msg)
+
+    def on_mirror_key(self):
+
+        rng = self._mir_read_range()
+        if rng is None:
+            return
+        start, end = rng
+
+        do_t = self.cb_mir_translate.isChecked()
+        do_r = self.cb_mir_rotate.isChecked()
+        if not do_t and not do_r:
+            self.log("[Warning] Enable Translate and/or Rotate.")
+            return
+
+        axis = self._mir_axis()
+        time_mode = "bake" if self.rb_mir_bake.isChecked() else "source_keys"
+
+        if self.rb_mir_manual.isChecked():
+            # 수동: Source/Target 리스트를 인덱스 매칭.
+            base = self.mir_base_tsl.get_all_items()
+            tgt = self.mir_tgt_tsl.get_all_items()
+            if not base or not tgt:
+                self.log("[Warning] Fill both Source and Target lists.")
+                return
+            if len(base) != len(tgt):
+                self.log(f"[Warning] Source({len(base)}) / Target({len(tgt)}) count mismatch.")
+                return
+            pairs = list(zip(base, tgt))
+        else:
+            # 자동: 현재 선택으로 토큰 페어링.
+            sel = cmds.ls(sl=True) or []
+            if not sel:
+                self.log("[Warning] Select source controllers first.")
+                return
+            token_pairs = self._mir_token_pairs() or list(MirrorKeyManager.DEFAULT_TOKEN_PAIRS)
+            pairs, unpaired, center = MirrorKeyManager.resolve_pairs(sel, token_pairs)
+            if unpaired:
+                self.log(f"[Warning] {len(unpaired)} unpaired (skipped): {', '.join(unpaired)}")
+            if not pairs:
+                self.log("[Warning] No pairs resolved.")
+                return
+
+        count, msg = MirrorKeyManager.mirror_keys(
+            pairs, start, end, mirror_axis=axis,
+            do_translate=do_t, do_rotate=do_r, time_mode=time_mode)
         self.log(msg)
 
     def show_about(self, *args):
