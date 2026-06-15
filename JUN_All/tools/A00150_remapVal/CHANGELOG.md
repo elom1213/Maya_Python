@@ -1,5 +1,10 @@
 # Changelog
 
+## v01.04 (2026-06-15)
+- **Slerp Ramp**: the controller's `{prefix}_interpolation` control attr is now an **enum** (`Linear` / `Smooth` / `Spline`, default **Linear**) instead of a `long` (0–2). The enum's internal values are `1` / `2` / `3`, matching the remapValue `value_Interp`, so it connects directly with no extra node. This also makes **Spline** selectable (the old `long` max of 2 could only reach Smooth) and removes the `none` (0) option that could disable interpolation by accident.
+- UI: added an **Interpolation** combo box (Linear / Smooth / Spline) that sets the enum's default at build time; the build log now reports the chosen interpolation. Sine Wave mode is unchanged.
+- Note: rigs already built with the old `long` attr are not auto-converted — `add_attr` reuses an existing attr, so rebuilding on the same controller keeps the old `long`. New builds create the enum.
+
 ## v01.02 (2026-06-12)
 - Unified both build modes on a **controller attr → master remapValue → child remapValue** fan-out (matches the intended Maya setup where one master remapValue drives the rest).
 - **Slerp Ramp**: the master now also connects its `outputMin`/`outputMax` to every child remapValue (previously only `value[0]`/`value[1]` were driven, so amplitude could not be set from one place). The values are exposed as new controller attrs `{prefix}_output_min` / `_output_max`; their defaults come from the UI **Out Min** / **Out Max** spin boxes.

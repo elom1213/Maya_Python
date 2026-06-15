@@ -153,6 +153,19 @@ class MainWindow(QWidget):
         row.addWidget(self.rmp_dsb_output_max)
         root.addLayout(row)
 
+        # Interpolation : Slerp Ramp 전용. {prefix}_interpolation enum attr 기본값.
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Interpolation"))
+        self.rmp_cb_interp = QComboBox()
+        self.rmp_cb_interp.addItems(["Linear", "Smooth", "Spline"])
+        self.rmp_cb_interp.setCurrentIndex(0)
+        self.rmp_cb_interp.setToolTip(
+            "Slerp Ramp only. Interpolation of the master remapValue / the "
+            "controller's {prefix}_interpolation enum attr. Default Linear.")
+        row.addWidget(self.rmp_cb_interp)
+        row.addStretch(1)
+        root.addLayout(row)
+
         # Set Up : Joints(oColl) + Attributes(twistAttrs)
         group = QGroupBox("Set Up")
         group_layout = QHBoxLayout(group)
@@ -287,13 +300,17 @@ class MainWindow(QWidget):
         # Out Min/Out Max 스핀박스를 Slerp output 제어 attr 기본값으로 재사용.
         output_min = self.rmp_dsb_output_min.value()
         output_max = self.rmp_dsb_output_max.value()
+        # 콤보 index 0/1/2 -> enum value 1/2/3 (Linear/Smooth/Spline).
+        interp_index = self.rmp_cb_interp.currentIndex()
+        interp = interp_index + 1
+        interp_name = ["Linear", "Smooth", "Spline"][interp_index]
 
         cmds.undoInfo(openChunk=True)
         try:
-            master = run_build_slerp(prefix, controller, joints, attrs, output_min, output_max)
+            master = run_build_slerp(prefix, controller, joints, attrs, output_min, output_max, interp)
             self._log(
-                "Built: {master} | {n} joint(s) | attrs: {attrs}".format(
-                    master=master, n=len(joints), attrs=", ".join(attrs)
+                "Built: {master} | {n} joint(s) | interp: {interp} | attrs: {attrs}".format(
+                    master=master, n=len(joints), interp=interp_name, attrs=", ".join(attrs)
                 )
             )
         except Exception as exc:

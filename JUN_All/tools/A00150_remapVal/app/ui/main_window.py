@@ -51,6 +51,7 @@ class MainWindow(QWidget):
         root.addLayout(self._build_prefix_row())
         root.addLayout(self._build_driver_attr_row())
         root.addLayout(self._build_range_row())
+        root.addLayout(self._build_interp_row())
         root.addWidget(self._build_list_group(), stretch=1)
         root.addLayout(self._build_attr_search_row())
         root.addWidget(self._build_build_button())
@@ -129,6 +130,21 @@ class MainWindow(QWidget):
             1.0, "Both modes. Default of the controller's {prefix}_output_max attr "
                  "(master remapValue Output Max / amplitude).")
         row.addWidget(self.dsb_output_max)
+        return row
+
+    def _build_interp_row(self):
+        # Slerp Ramp 전용: master remapValue 의 보간 방식. enum 으로 빌드되는
+        # 컨트롤러 {prefix}_interpolation attr 의 기본값이 된다. 기본 Linear.
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Interpolation"))
+        self.cb_interp = QComboBox()
+        self.cb_interp.addItems(["Linear", "Smooth", "Spline"])
+        self.cb_interp.setCurrentIndex(0)
+        self.cb_interp.setToolTip(
+            "Slerp Ramp only. Interpolation of the master remapValue / the "
+            "controller's {prefix}_interpolation enum attr. Default Linear.")
+        row.addWidget(self.cb_interp)
+        row.addStretch(1)
         return row
 
     def _build_list_group(self):
@@ -286,14 +302,18 @@ class MainWindow(QWidget):
         # Out Min/Out Max 스핀박스를 Slerp output 제어 attr 기본값으로 재사용.
         output_min = self.dsb_output_min.value()
         output_max = self.dsb_output_max.value()
+        # 콤보 index 0/1/2 -> enum value 1/2/3 (Linear/Smooth/Spline).
+        interp_index = self.cb_interp.currentIndex()
+        interp = interp_index + 1
+        interp_name = ["Linear", "Smooth", "Spline"][interp_index]
 
         # Undo 청크: 전체 빌드를 한 번에 취소 가능하게.
         cmds.undoInfo(openChunk=True)
         try:
-            master = run_build(prefix, controller, joints, attrs, output_min, output_max)
+            master = run_build(prefix, controller, joints, attrs, output_min, output_max, interp)
             self._log(
-                "Built: {master} | {n} joint(s) | attrs: {attrs}".format(
-                    master=master, n=len(joints), attrs=", ".join(attrs)
+                "Built: {master} | {n} joint(s) | interp: {interp} | attrs: {attrs}".format(
+                    master=master, n=len(joints), interp=interp_name, attrs=", ".join(attrs)
                 )
             )
         except Exception as exc:

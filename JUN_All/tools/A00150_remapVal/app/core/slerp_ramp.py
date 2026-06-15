@@ -12,27 +12,38 @@ A00150_remapVal/sample_01.py (Chris Lesage, 2019) 의 add_attr / build_slerp_ram
 import pymel.core as pm
 
 
-def add_attr(node, pDataType, pParamName, pMin=None, pMax=None, pDefault=0.0):
+# remapValue value_Interp 매핑(1:linear 2:smooth 3:spline)에 맞춘 enum 정의.
+# enum 내부 값을 그대로 value_Interp 에 연결하므로 변환 노드가 필요 없다.
+INTERP_ENUM_NAME = "Linear=1:Smooth=2:Spline=3"
+
+
+def add_attr(node, pDataType, pParamName, pMin=None, pMax=None, pDefault=0.0, enumName=None):
     """
     adds an attribute that shows up in the channel box
     returns the newly created attribute
+
+    enumName 이 주어지면 enum 어트리뷰트로 만든다(min/max 는 의미가 없어 건너뛴다).
     """
     if node.hasAttr(pParamName):
         return node.attr(pParamName)
     else:
-        node.addAttr(pParamName, at=pDataType, keyable=True, dv=pDefault)
+        if enumName is not None:
+            node.addAttr(pParamName, at=pDataType, keyable=True, dv=pDefault, enumName=enumName)
+        else:
+            node.addAttr(pParamName, at=pDataType, keyable=True, dv=pDefault)
         newAttr = node.attr(pParamName)
-        if pMin != None:
-            newAttr.setMin(pMin)
-        if pMax != None:
-            newAttr.setMax(pMax)
+        if enumName is None:
+            if pMin != None:
+                newAttr.setMin(pMin)
+            if pMax != None:
+                newAttr.setMax(pMax)
         pm.setAttr(newAttr, e=True, channelBox=True)
         pm.setAttr(newAttr, e=True, keyable=True)
         return newAttr
 
 
 def build_slerp_ramp(prefix, controlObj, oColl, twistAttrs=['rotateX'],
-                     outputMin=0.0, outputMax=1.0):
+                     outputMin=0.0, outputMax=1.0, interpolation=1):
     """
     Take a collection of objects and interpolate them along a curve.
     It uses a master remapValue that drives multiple remapValues
@@ -62,8 +73,10 @@ def build_slerp_ramp(prefix, controlObj, oColl, twistAttrs=['rotateX'],
     pEnd = add_attr(controlObj, 'double', pEndName, pDefault=0.0)
     twistStart = add_attr(controlObj, 'double', twistStartName, pMin=0.0, pMax=1.0, pDefault=0.0)
     twistEnd = add_attr(controlObj, 'double', twistEndName, pMin=0.0, pMax=1.0, pDefault=1.0)
-    # twistType interpolation 0: none 1: linear 2: smooth 3: spline
-    twistType = add_attr(controlObj, 'long', twistTypeName, pMin=0, pMax=2, pDefault=1)
+    # twistType interpolation enum(Linear=1 / Smooth=2 / Spline=3). 기본 Linear.
+    # enum 값 1/2/3 이 그대로 value_Interp 로 연결된다(아래 connect).
+    twistType = add_attr(controlObj, 'enum', twistTypeName,
+                         pDefault=interpolation, enumName=INTERP_ENUM_NAME)
     twistStart.connect(masterRemap.value[0].value_Position)
     twistEnd.connect(masterRemap.value[1].value_Position)
     twistType.connect(masterRemap.value[0].value_Interp)
@@ -132,17 +145,19 @@ def build_slerp_ramp(prefix, controlObj, oColl, twistAttrs=['rotateX'],
 
 
 def run_build(prefix, controller_name, joint_names, twist_attrs,
-              output_min=0.0, output_max=1.0):
+              output_min=0.0, output_max=1.0, interpolation=1):
     """이름(문자열)으로 받은 입력을 PyNode 로 변환해 build_slerp_ramp 를 실행한다.
 
     UI 는 pymel 을 직접 다루지 않고 이 함수만 호출한다.
     output_min/output_max 는 컨트롤러 output 제어 attr 의 기본값이 된다.
+    interpolation 은 interpolation enum 의 기본값(1:Linear 2:Smooth 3:Spline).
     Returns: 생성된 master remapValue 노드명.
     """
     control = pm.PyNode(controller_name)
     coll = [pm.PyNode(n) for n in joint_names]
     build_slerp_ramp(prefix, control, coll, twistAttrs=list(twist_attrs),
-                     outputMin=output_min, outputMax=output_max)
+                     outputMin=output_min, outputMax=output_max,
+                     interpolation=interpolation)
     return '{}_master_ribbon_lerp_MAP'.format(prefix)
 
 
