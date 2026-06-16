@@ -1,0 +1,2 @@
+# Maya 내장 PySide(PySide2/PySide6) 와 maya.cmds 를 사용한다.
+# 별도 외부 패키지 의존성 없음. (참고용)

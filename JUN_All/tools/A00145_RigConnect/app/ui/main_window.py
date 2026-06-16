@@ -1,0 +1,504 @@
+# -*- coding: utf-8 -*-
+# Python Script by Ji Hun Park
+# last Update date : 2026-06-16
+# A00145_RigConnect - Qt UI
+#
+# MEL ConnectionTool V04.02 의 3탭(Constrain / Connect / List Connected)을 PySide 로
+# 포팅하고, A00140 ConnectClosest 기능을 Connect Closest 탭으로 추가한다(총 4탭).
+#
+# 로직은 app/core 에 위임하고 이 모듈은 위젯 구성/시그널 연결/로그 출력만 담당한다.
+# 모든 UI 문자열(버튼/라벨/로그)은 영어. (한국어는 주석/독스트링만)
+
+from Framework.qt.qt import *
+from Framework.qt import JUN_mod_tsl_qt
+
+print("QT version  :  " + str(QT_VERSION))
+
+import maya.cmds as cmds
+
+from tools.A00145_RigConnect.app.config.version import VERSION, LAST_UPDATE
+from tools.A00145_RigConnect.app.core import constrain_manager as con_mgr
+from tools.A00145_RigConnect.app.core import connect_manager as cnt_mgr
+from tools.A00145_RigConnect.app.core import stream_manager as stm_mgr
+from tools.A00145_RigConnect.app.core import CONSTRAINT_TYPES, connect_closest
+from tools.A00145_RigConnect.app.ui.collapsible import CollapsibleBox
+
+
+# 재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
+WINDOW_OBJECT_NAME = "JUN_A00145_RigConnect_window"
+
+
+class MainWindow(QWidget):
+
+    def __init__(self):
+        super(MainWindow, self).__init__()
+
+        self.setObjectName(WINDOW_OBJECT_NAME)
+
+        self.win_width = 560
+        self.win_height = 860
+        self.win_title = "RigConnect v{0}".format(VERSION)
+
+        # Connect 탭 src/dst 위젯 보관용. List Connected 의 stream 방향 상태.
+        self._connect_widgets = {}
+        self._stream_upstream = True
+
+        self.resize(self.win_width, self.win_height)
+
+        self.build_ui()
+
+    # ==============================================================
+    # UI
+    # ==============================================================
+
+    def build_ui(self):
+        self.setWindowTitle(self.win_title)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+
+        main_layout = QVBoxLayout(self)
+
+        # 메뉴 바 (Help > About)
+        self.menu_bar = QMenuBar()
+        help_menu = self.menu_bar.addMenu("Help")
+        act_about = help_menu.addAction("About")
+        act_about.triggered.connect(self.show_about)
+        main_layout.setMenuBar(self.menu_bar)
+
+        # 공유 로그창 (탭 빌더가 self.log 를 호출할 수 있어 탭보다 먼저 생성)
+        self.te_log = QTextEdit()
+        self.te_log.setReadOnly(True)
+        self.te_log.setMaximumHeight(120)
+
+        # 탭
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self._build_constrain_tab(), "Constrain")
+        self.tabs.addTab(self._build_connect_tab(), "Connect")
+        self.tabs.addTab(self._build_list_connected_tab(), "List Connected")
+        self.tabs.addTab(self._build_connect_closest_tab(), "Connect Closest")
+        main_layout.addWidget(self.tabs)
+
+        main_layout.addWidget(self.te_log)
+
+        self.lbl_copyright = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
+        self.lbl_copyright.setAlignment(Qt.AlignRight)
+        main_layout.addWidget(self.lbl_copyright)
+
+    # --------------------------------------------------------------
+    # Tab : Constrain
+    # --------------------------------------------------------------
+
+    def _build_constrain_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        self.tsl_targets = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Targets", select_label="Select",
+            show_sort=False, list_min_height=200, log_callback=self.log)
+        self.tsl_followers = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Followers", select_label="Select",
+            show_sort=False, list_min_height=200, log_callback=self.log)
+
+        list_row = QHBoxLayout()
+        list_row.addWidget(self.tsl_targets)
+        list_row.addWidget(self.tsl_followers)
+        layout.addLayout(list_row)
+
+        opt_box = QGroupBox("Options")
+        opt_layout = QVBoxLayout(opt_box)
+
+        # MEL checkBox 는 기본 unchecked.
+        self.cb_con_maintain = QCheckBox("Maintain Offset")
+        self.cb_con_maintain.setChecked(False)
+        opt_layout.addWidget(self.cb_con_maintain)
+
+        self.rb_con_group = QButtonGroup(self)
+        rb_row = QHBoxLayout()
+        for i, (key, label) in enumerate(con_mgr.CONSTRAIN_TYPES):
+            rb = QRadioButton(label)
+            if i == 0:
+                rb.setChecked(True)
+            self.rb_con_group.addButton(rb, i)
+            rb_row.addWidget(rb)
+        opt_layout.addLayout(rb_row)
+        layout.addWidget(opt_box)
+
+        btn = QPushButton("Constrain")
+        btn.setMinimumHeight(32)
+        btn.clicked.connect(self.on_constrain)
+        layout.addWidget(btn)
+
+        layout.addStretch(1)
+        return tab
+
+    # --------------------------------------------------------------
+    # Tab : Connect
+    # --------------------------------------------------------------
+
+    def _build_connect_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        layout.addWidget(self._build_connect_io("src", "Source Objects"))
+        layout.addWidget(self._build_connect_io("dst", "Destination Objects"))
+
+        btn_connect = QPushButton("Connect Source to Destination")
+        btn_connect.setMinimumHeight(32)
+        btn_connect.clicked.connect(self.on_connect_attrs)
+        layout.addWidget(btn_connect)
+
+        btn_facial = QPushButton("Connect 52 Facial Target")
+        btn_facial.clicked.connect(self.on_connect_52_facial)
+        layout.addWidget(btn_facial)
+
+        layout.addStretch(1)
+        return tab
+
+    def _build_connect_io(self, role, title):
+        """Connect 탭의 Source/Destination 한 섹션을 만든다 (접이식)."""
+        box = CollapsibleBox(title)
+
+        tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", select_label="Select",
+            show_sort=False, list_min_height=120, log_callback=self.log)
+
+        attr_list = QListWidget()
+        attr_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        attr_list.setMinimumHeight(120)
+
+        search = QLineEdit()
+        search.setPlaceholderText("search attribute")
+
+        btn_list = QPushButton("List Attributes")
+        btn_search = QPushButton("Search")
+
+        body = QHBoxLayout()
+
+        left = QVBoxLayout()
+        left.addWidget(tsl)
+        left.addWidget(btn_list)
+
+        right = QVBoxLayout()
+        right.addWidget(QLabel("Attributes"))
+        right.addWidget(attr_list)
+        search_row = QHBoxLayout()
+        search_row.addWidget(search)
+        search_row.addWidget(btn_search)
+        right.addLayout(search_row)
+
+        body.addLayout(left)
+        body.addLayout(right)
+        box.addLayout(body)
+
+        self._connect_widgets[role] = {
+            "tsl": tsl,
+            "attrs": attr_list,
+            "search": search,
+        }
+
+        btn_list.clicked.connect(lambda: self.on_list_attrs(role))
+        btn_search.clicked.connect(lambda: self.on_search_attrs(role))
+        search.returnPressed.connect(lambda: self.on_search_attrs(role))
+
+        return box
+
+    # --------------------------------------------------------------
+    # Tab : List Connected
+    # --------------------------------------------------------------
+
+    def _build_list_connected_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        row = QHBoxLayout()
+
+        # Objects
+        self.tsl_stream_objs = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", select_label="Select",
+            show_sort=False, list_min_height=220, log_callback=self.log)
+        row.addWidget(self.tsl_stream_objs)
+
+        # Types
+        types_box = QVBoxLayout()
+        types_box.addWidget(QLabel("Types"))
+        self.list_types = QListWidget()
+        self.list_types.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.list_types.setMinimumHeight(180)
+        types_box.addWidget(self.list_types)
+        btn_up = QPushButton("List UpStream")
+        btn_dn = QPushButton("List DownStream")
+        btn_up.clicked.connect(lambda: self.on_list_stream(True))
+        btn_dn.clicked.connect(lambda: self.on_list_stream(False))
+        types_box.addWidget(btn_up)
+        types_box.addWidget(btn_dn)
+        row.addLayout(types_box)
+
+        # Nodes
+        nodes_box = QVBoxLayout()
+        nodes_box.addWidget(QLabel("Nodes"))
+        self.list_nodes = QListWidget()
+        self.list_nodes.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.list_nodes.setMinimumHeight(180)
+        self.list_nodes.itemSelectionChanged.connect(self.on_nodes_selection_changed)
+        nodes_box.addWidget(self.list_nodes)
+        btn_search = QPushButton("Search")
+        btn_search.clicked.connect(self.on_search_nodes)
+        nodes_box.addWidget(btn_search)
+        row.addLayout(nodes_box)
+
+        layout.addLayout(row)
+        layout.addStretch(1)
+        return tab
+
+    # --------------------------------------------------------------
+    # Tab : Connect Closest  (A00140 ConnectClosest 이식)
+    # --------------------------------------------------------------
+
+    def _build_connect_closest_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        set_box = QGroupBox("Set Up")
+        set_layout = QHBoxLayout(set_box)
+        self.cc_driven = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Driven", show_sort=False,
+            list_min_height=200, log_callback=self.log)
+        self.cc_driver = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Driver", show_sort=False,
+            list_min_height=200, log_callback=self.log)
+        set_layout.addWidget(self.cc_driven)
+        set_layout.addWidget(self.cc_driver)
+        layout.addWidget(set_box)
+
+        opt_box = QGroupBox("Constraint Type")
+        opt_layout = QVBoxLayout(opt_box)
+        cb_row = QHBoxLayout()
+        self.cc_checkboxes = {}
+        for key, label, _method in CONSTRAINT_TYPES:
+            cb = QCheckBox(label)
+            self.cc_checkboxes[key] = cb
+            cb_row.addWidget(cb)
+        self.cc_checkboxes["parent"].setChecked(True)
+        opt_layout.addLayout(cb_row)
+        self.cc_maintain = QCheckBox("Maintain Offset")
+        self.cc_maintain.setChecked(True)
+        opt_layout.addWidget(self.cc_maintain)
+        layout.addWidget(opt_box)
+
+        btn = QPushButton("Connect")
+        btn.setMinimumHeight(32)
+        btn.clicked.connect(self.on_connect_closest)
+        layout.addWidget(btn)
+
+        layout.addStretch(1)
+        return tab
+
+    # ==============================================================
+    # UI helpers
+    # ==============================================================
+
+    def _selected_texts(self, list_widget):
+        return [it.text() for it in list_widget.selectedItems()]
+
+    def _all_texts(self, list_widget):
+        return [list_widget.item(i).text() for i in range(list_widget.count())]
+
+    def log(self, text):
+        self.te_log.append(text)
+
+    def show_about(self):
+        QMessageBox.information(
+            self, "About",
+            "RigConnect v{0}\n"
+            "Written by Ji Hun Park\n"
+            "Update date : {1}\n"
+            "\n"
+            "Constrain   : multi target -> follower constraints\n"
+            "Connect     : connect attributes (3 broadcast patterns) + 52 facial\n"
+            "List Conn.  : explore up/down stream nodes by type\n"
+            "Connect Closest : 1:1 closest matching constraints".format(
+                VERSION, LAST_UPDATE))
+
+    def _run(self, label, func):
+        """undo chunk 로 감싸 실행하고 결과를 로그에 남긴다."""
+        cmds.undoInfo(openChunk=True)
+        try:
+            func()
+            self.log("[OK] {0}".format(label))
+        except Exception as e:
+            self.log("[ERR] {0} : {1}".format(label, e))
+            cmds.warning(str(e))
+        finally:
+            cmds.undoInfo(closeChunk=True)
+
+    # ==============================================================
+    # Handlers : Constrain
+    # ==============================================================
+
+    def on_constrain(self):
+        targets = self.tsl_targets.get_all_items()
+        followers = self.tsl_followers.get_all_items()
+        con_type = con_mgr.CONSTRAIN_TYPES[self.rb_con_group.checkedId()][0]
+        maintain_offset = self.cb_con_maintain.isChecked()
+        self._run("Constrain",
+                  lambda: con_mgr.constrain(
+                      targets, followers, con_type, maintain_offset))
+
+    # ==============================================================
+    # Handlers : Connect
+    # ==============================================================
+
+    def on_list_attrs(self, role):
+        w = self._connect_widgets[role]
+        objs = w["tsl"].get_all_items()
+        if not objs:
+            self.log("[ERR] List Attributes : object list is empty")
+            return
+        try:
+            attrs = cnt_mgr.list_attrs(objs[0])
+        except Exception as e:
+            self.log("[ERR] List Attributes : {0}".format(e))
+            cmds.warning(str(e))
+            return
+        w["attrs"].clear()
+        w["attrs"].addItems(attrs)
+        self.log("[OK] List Attributes : {0} ({1} attrs)".format(objs[0], len(attrs)))
+
+    def on_search_attrs(self, role):
+        w = self._connect_widgets[role]
+        search = w["search"].text().strip()
+        attr_widget = w["attrs"]
+
+        all_items = self._all_texts(attr_widget)
+        matches = cnt_mgr.find_matching(all_items, search) if search else []
+
+        if matches:
+            # 현재 목록에서 매칭 항목을 선택 상태로 만든다.
+            attr_widget.clearSelection()
+            for i in range(attr_widget.count()):
+                if attr_widget.item(i).text() in matches:
+                    attr_widget.item(i).setSelected(True)
+            self.log("[OK] Search : {0} match(es) selected".format(len(matches)))
+        else:
+            # 매칭이 없으면 검색어로 다시 attr 목록을 질의해 채운다 (MEL 동작).
+            objs = w["tsl"].get_all_items()
+            if not objs:
+                self.log("[ERR] Search : object list is empty")
+                return
+            try:
+                attrs = cnt_mgr.list_attrs(objs[0], search)
+            except Exception as e:
+                self.log("[ERR] Search : {0}".format(e))
+                return
+            attr_widget.clear()
+            attr_widget.addItems(attrs)
+            self.log("[OK] Search : re-listed {0} attrs for '{1}'".format(
+                len(attrs), search))
+
+    def on_connect_attrs(self):
+        src = self._connect_widgets["src"]
+        dst = self._connect_widgets["dst"]
+        src_objs = src["tsl"].get_all_items()
+        dst_objs = dst["tsl"].get_all_items()
+        src_attrs = self._selected_texts(src["attrs"])
+        dst_attrs = self._selected_texts(dst["attrs"])
+
+        def _do():
+            count, mode = cnt_mgr.connect_attrs(
+                src_objs, dst_objs, src_attrs, dst_attrs)
+            self.log("       {0} connection(s) [{1}]".format(count, mode))
+
+        self._run("Connect Source to Destination", _do)
+
+    def on_connect_52_facial(self):
+        src = self._connect_widgets["src"]
+        dst = self._connect_widgets["dst"]
+        src_objs = src["tsl"].get_all_items()
+        dst_objs = dst["tsl"].get_all_items()
+
+        def _do():
+            connected, skipped = cnt_mgr.connect_52_facial(src_objs, dst_objs)
+            self.log("       {0} connected, {1} skipped".format(connected, skipped))
+
+        self._run("Connect 52 Facial Target", _do)
+
+    # ==============================================================
+    # Handlers : List Connected
+    # ==============================================================
+
+    def on_list_stream(self, upstream):
+        objs = self.tsl_stream_objs.get_all_items()
+        if not objs:
+            self.log("[ERR] List Stream : object list is empty")
+            return
+        self._stream_upstream = upstream
+        try:
+            types = stm_mgr.list_stream_types(objs, upstream)
+        except Exception as e:
+            self.log("[ERR] List Stream : {0}".format(e))
+            cmds.warning(str(e))
+            return
+        self.list_types.clear()
+        self.list_types.addItems(types)
+        self.list_nodes.clear()
+        self.log("[OK] List {0}Stream : {1} type(s)".format(
+            "Up" if upstream else "Down", len(types)))
+
+    def on_search_nodes(self):
+        objs = self.tsl_stream_objs.get_all_items()
+        types = self._selected_texts(self.list_types)
+        if not objs:
+            self.log("[ERR] Search Nodes : object list is empty")
+            return
+        if not types:
+            self.log("[ERR] Search Nodes : select one or more types")
+            return
+        try:
+            nodes = stm_mgr.nodes_by_types(objs, types, self._stream_upstream)
+        except Exception as e:
+            self.log("[ERR] Search Nodes : {0}".format(e))
+            cmds.warning(str(e))
+            return
+        self.list_nodes.clear()
+        self.list_nodes.addItems(nodes)
+        self.log("[OK] Search Nodes : {0} node(s)".format(len(nodes)))
+
+    def on_nodes_selection_changed(self):
+        sel = self._selected_texts(self.list_nodes)
+        try:
+            if sel:
+                cmds.select(sel)
+            else:
+                cmds.select(clear=True)
+        except Exception as e:
+            cmds.warning(str(e))
+
+    # ==============================================================
+    # Handlers : Connect Closest
+    # ==============================================================
+
+    def on_connect_closest(self):
+        drivers = self.cc_driver.get_all_items()
+        drivens = self.cc_driven.get_all_items()
+        keys = [key for key, cb in self.cc_checkboxes.items() if cb.isChecked()]
+        maintain_offset = self.cc_maintain.isChecked()
+
+        self.log("--- Connect Closest ---")
+
+        results, errors = connect_closest(
+            drivers, drivens, keys, maintain_offset)
+
+        for err in errors:
+            self.log("[WARN] {0}".format(err))
+
+        for r in results:
+            self.log(
+                "Connected: {driver} -> {driven} "
+                "(dist {dist:.3f}, {cons})".format(
+                    driver=r["driver"],
+                    driven=r["driven"],
+                    dist=r["distance"],
+                    cons=", ".join(r["constraints"]),
+                )
+            )
+
+        self.log("Done. {0} connection(s) made.".format(len(results)))
