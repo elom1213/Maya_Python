@@ -3,21 +3,6 @@ from Framework.qt.qt import *
 
 print("QT version  :  " + str(QT_VERSION))
 
-'''
-from PySide2.QtCore import Qt
-from PySide2.QtWidgets import (
-    QWidget,
-    QLabel,
-    QPushButton,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLineEdit,
-    QTextEdit,
-    QComboBox,
-    QFileDialog
-)
-'''
-
 import sys, os
 import maya.cmds as cmds
 from tools.A00090_ConnectionBuilder.app.config.version import VERSION

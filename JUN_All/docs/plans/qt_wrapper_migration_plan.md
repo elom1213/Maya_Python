@@ -1,8 +1,19 @@
 # 작업 계획서 — 하드코딩 PySide → Framework.qt.qt 래퍼 마이그레이션
 
 - **작성일**: 2026-06-16
-- **상태**: 계획 (미구현)
+- **상태**: ✅ 완료 (2026-06-16)
 - **관련 문서**: `JUN_All/docs/DEPENDENCIES.md`
+
+> **실제 결과**: 착수 후 확인 결과, 계획의 4개 대상 중 **A00008·A00090은 이미 래퍼를
+> 쓰고 있었다**(직접 import는 `'''...'''` 주석 블록 안의 죽은 코드였고, 초기 grep이 이를
+> 활성 import로 오인 → 계획서의 대상이 과대 집계되었다). 실제 교체가 필요했던 것은
+> **A00004·A00080** 두 곳이다.
+>
+> 적용 내역:
+> - `A00004_base_QT/launch.py`, `A00004_base_QT/app/ui/main_window.py`: `PySide6.QtWidgets` → `Framework.qt.qt` (명시적 이름 import 유지)
+> - `A00080_KWI_creator_V02/app/ui/main_window.py`: `PySide6.QtWidgets` → `Framework.qt.qt` (launch.py 는 이미 래퍼 사용)
+> - `A00008`·`A00090`: 오인을 유발하던 PySide2 죽은 주석 블록 제거 + requirements.txt 를 PySide2→PySide6(래퍼 우선)로 정정
+> - 검증: 변경 5개 파일 `py_compile` 통과, tools 전역에 활성 PySide 직접 import 0건 확인.
 
 ---
 

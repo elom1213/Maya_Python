@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import (
+from Framework.qt.qt import (
     QWidget,
     QPushButton,
     QTextEdit,
