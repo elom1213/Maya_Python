@@ -603,6 +603,23 @@ class MainWindow(QWidget):
         tab_layout.addWidget(self.cb_bake_sim)
 
         # -------------------------
+        # Smart bake : native bakeResults -smart (Maya 2020+). 허용오차 이내 중간 키를
+        # C++ 내부에서 제거해 키 수를 줄인다. 끄면 매 프레임 dense.
+        # -------------------------
+
+        self.cb_bake_smart = QCheckBox("Smart bake (reduce keys)")
+        self.cb_bake_smart.setChecked(False)
+        tab_layout.addWidget(self.cb_bake_smart)
+
+        smart_row = QHBoxLayout()
+        smart_row.addWidget(QLabel("Tolerance"))
+        self.le_bake_smart_tol = QLineEdit("0.5")
+        self.le_bake_smart_tol.setValidator(QDoubleValidator(0.0, 1000.0, 3, self))
+        smart_row.addWidget(self.le_bake_smart_tol)
+        smart_row.addStretch(1)
+        tab_layout.addLayout(smart_row)
+
+        # -------------------------
         # Bake 버튼
         # -------------------------
 
@@ -613,7 +630,9 @@ class MainWindow(QWidget):
 
         # 초기 활성 상태 동기화 + 시그널
         self._bake_update_range_mode()
+        self._bake_update_smart_mode()
         self.rb_bake_custom.toggled.connect(self._bake_update_range_mode)
+        self.cb_bake_smart.toggled.connect(self._bake_update_smart_mode)
         self.btn_bake.clicked.connect(self.on_bake)
 
         return tab
@@ -917,6 +936,10 @@ class MainWindow(QWidget):
         self.le_bake_start.setEnabled(custom)
         self.le_bake_end.setEnabled(custom)
 
+    def _bake_update_smart_mode(self, *args):
+        """Smart bake 체크 상태에 따라 Tolerance 입력 활성/비활성 토글."""
+        self.le_bake_smart_tol.setEnabled(self.cb_bake_smart.isChecked())
+
     def _bake_resolve_range(self):
         """라디오에 따라 (start, end) 결정. 실패 시 None.
         Current timeline = playback min/maxTime, Custom = QLineEdit 입력."""
@@ -960,10 +983,21 @@ class MainWindow(QWidget):
             self.log("[Warning] Enable at least one channel group.")
             return
 
+        smart = self.cb_bake_smart.isChecked()
+        smart_tol = BakeManager.DEFAULT_SMART_TOLERANCE
+        if smart:
+            tol_txt = self.le_bake_smart_tol.text().strip()
+            try:
+                smart_tol = float(tol_txt)
+            except ValueError:
+                self.log("[Warning] Invalid Tolerance, using {0}.".format(smart_tol))
+
         count, msg = BakeManager.bake(
             objs, start, end, channels=channels,
             simulation=self.cb_bake_sim.isChecked(),
             disable_implicit=not self.cb_bake_keep_con.isChecked(),  # 체크=유지 -> False
+            smart=smart,
+            smart_tolerance=smart_tol,
         )
         self.log(msg)
 
