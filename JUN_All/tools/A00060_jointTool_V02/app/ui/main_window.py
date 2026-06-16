@@ -5,6 +5,9 @@
 #
 # MEL JointTool V05.03 의 3탭(Curve / Divide / Aim)을 PySide 로 포팅하고,
 # A00060 jointTool 의 헤어 기능을 Hair 탭으로 추가한다(총 4탭).
+#
+# v01.01 : Aim 탭 개선 - Aim axis 드롭박스(X/Y/Z)로 pole tgt 을 향할 보조축 선택.
+#          aimConstraint(부모->자식 cycle) 대신 벡터 연산으로 jointOrient 직접 계산.
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
@@ -248,6 +251,14 @@ class MainWindow(QWidget):
         pair_row.addWidget(btn_add_se)
         layout.addLayout(pair_row)
 
+        # 옵션 : pole tgt 을 향할 보조축 (primary 는 +X down-bone 고정)
+        opt_row = QHBoxLayout()
+        opt_row.addWidget(QLabel("Aim axis :"))
+        self.cmb_aim_axis = self._axis_combo(["X", "Y", "Z"], "Y")
+        opt_row.addWidget(self.cmb_aim_axis)
+        opt_row.addStretch(1)
+        layout.addLayout(opt_row)
+
         btn_make_aim = QPushButton("Make Joint Aim")
         btn_make_aim.clicked.connect(self.on_make_aim)
         layout.addWidget(btn_make_aim)
@@ -459,8 +470,9 @@ class MainWindow(QWidget):
         starts = self.tsl_aim_start.get_all_items()
         ends = self.tsl_aim_end.get_all_items()
         poles = self.tsl_aim_pole.get_all_items()
+        aim_axis = self.cmb_aim_axis.currentIndex() + 1  # 1-base (1=X,2=Y,3=Z)
         self._run("Make Joint Aim",
-                  lambda: aim_mgr.make_joint_aim(starts, ends, poles))
+                  lambda: aim_mgr.make_joint_aim(starts, ends, poles, aim_axis))
 
     # ==============================================================
     # Handlers : Hair

@@ -75,11 +75,19 @@ A00060_jointTool_V02.run(True)   # True 면 DEV_MODE 에서 reload 후 실행
 - Start/End 리스트의 항목 수는 같아야 한다.
 
 ### 3.3 Aim 탭 (MEL Tab 3)
-조인트 체인의 시작/끝과 폴 타깃으로 ikHandle + poleVector 구속을 만든다.
+Start~End 조인트 체인을 **IK+pole 식으로 정렬**한다 — 회전만 바꾸고 **모든 joint 의 월드 위치는
+완전 보존**. 자식을 향하는 +X 는 그대로 두고, 선택한 **Aim axis** 가 폴 타깃을 향하도록
+X 둘레 트위스트만 적용한다. (구 ikHandle + poleVector 방식 대체)
 
 - `Start` / `End` / `pole tgt` 리스트(3분할)
 - `Select Start End` / `Add Start End` : Start·End 채우기(Divide 탭과 동일 규칙)
-- `Make Joint Aim` : 쌍마다 `ikHandle(sj=Start, ee=End)` 생성 후 폴 타깃으로 `poleVectorConstraint`
+- `Aim axis` (X/Y/Z, 기본 Y) : 폴 타깃을 향할 보조축. X 는 트위스트 축이라 보통 Y/Z.
+- `Make Joint Aim` : 각 쌍의 체인을 root→leaf(부모→자식) 순으로 처리. 부모 X 를 **자식의 원본
+  위치로 조준**(조준된 체인이면 X 불변=swing 보존)하고, 보조축이 pole 을 향하도록 X 둘레 트위스트를
+  부모 **jointOrient 에 기록**(rotate=0). **translate 는 건드리지 않으므로** 자식이 고정 거리만큼
+  새 X 위에 놓여 **월드 위치가 그대로 유지**된다(IK 가 위치를 핀으로 잡고 회전만 굽는 것과 동일).
+  `setAttr`(jointOrient)만 쓰므로 **레퍼런스 조인트에서도 동작**, `aimConstraint`/reparent 미사용 →
+  평가 cycle 없음.
 
 ### 3.4 Hair 탭 (기존 A00060_jointTool)
 헤어 커브 정리 및 조인트 편집 유틸.
