@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-15
+# last Update date : 2026-06-16
 # A00110_animTool - 컨트롤러 키프레임을 반대쪽 컨트롤러로 좌우 미러하는 핵심 로직 (maya.cmds + OpenMaya 2.0, UI 비의존)
 #
 # 언리얼 Mirror Data Table 과 동일하게, 한쪽 컨트롤의 애니메이션을 좌우 대칭으로 반대쪽에 복사한다.
@@ -161,6 +161,51 @@ class MirrorKeyManager:
         return (done, msg)
 
     @staticmethod
+    def _mirrored_values(src, tgt, t, refl, do_t, do_r):
+        """시점 t 에서 src 를 미러해 타겟 로컬 TRS(dict: attr -> value)를 반환.
+
+        소스는 worldMatrix(소스 rotateOrder 무관)로 읽고, 타겟 parentInverseMatrix(t 시점 평가)로
+        로컬화한 뒤 타겟 rotateOrder 로 오일러 재분해한다.
+        """
+        ms = om.MMatrix(cmds.getAttr(src + ".worldMatrix[0]", time=t))
+        mpi = om.MMatrix(cmds.getAttr(tgt + ".parentInverseMatrix[0]", time=t))
+
+        # 월드 반사(refl * ms * refl) 후 타겟 로컬로: local = world * parentInverse
+        tm = om.MTransformationMatrix((refl * ms * refl) * mpi)
+
+        values = {}
+        if do_t:
+            tr = tm.translation(om.MSpace.kTransform)
+            values["translateX"] = tr.x
+            values["translateY"] = tr.y
+            values["translateZ"] = tr.z
+        if do_r:
+            ro = cmds.getAttr(tgt + ".rotateOrder")
+            eul = tm.rotation(asQuaternion=True).asEulerRotation()
+            eul.reorderIt(MirrorKeyManager.RO_ENUM[ro])  # 타겟 rotateOrder 로 재정렬
+            # MEulerRotation 은 라디안 -> rotate attr 은 degree
+            values["rotateX"] = math.degrees(eul.x)
+            values["rotateY"] = math.degrees(eul.y)
+            values["rotateZ"] = math.degrees(eul.z)
+        return values
+
+    @staticmethod
+    def _settable_attrs(tgt, do_t, do_r):
+        """기록 대상 attr(잠긴 채널 제외)."""
+        attrs = []
+        if do_t:
+            attrs += [a for _, a in MirrorKeyManager.T_AXES]
+        if do_r:
+            attrs += [a for _, a in MirrorKeyManager.R_AXES]
+        return [a for a in attrs if MirrorKeyManager._is_settable(tgt, a)]
+
+    @staticmethod
+    def _has_time_anim(tgt, attr):
+        """attr 에 time 애니메이션 커브(animCurveT*)가 연결돼 있는지. set-driven-key(animCurveU*) 제외."""
+        curves = cmds.keyframe(tgt, attribute=attr, query=True, name=True) or []
+        return any(cmds.nodeType(c).startswith("animCurveT") for c in curves)
+
+    @staticmethod
     def _mirror_one(src, tgt, start, end, refl, do_t, do_r, time_mode):
         """src -> tgt 단일 페어 미러. 키 하나라도 기록했으면 True."""
 
@@ -168,44 +213,14 @@ class MirrorKeyManager:
         if not times:
             return False
 
-        # 기록할 attr(잠긴 채널 제외). 둘 다 없으면 처리 불가.
-        attrs = []
-        if do_t:
-            attrs += [a for _, a in MirrorKeyManager.T_AXES]
-        if do_r:
-            attrs += [a for _, a in MirrorKeyManager.R_AXES]
-        attrs = [a for a in attrs if MirrorKeyManager._is_settable(tgt, a)]
+        attrs = MirrorKeyManager._settable_attrs(tgt, do_t, do_r)
         if not attrs:
             return False
-
-        ro = cmds.getAttr(tgt + ".rotateOrder")
-        ro_enum = MirrorKeyManager.RO_ENUM[ro]
 
         any_set = False
 
         for t in times:
-            # 소스 월드 행렬(소스 rotateOrder 무관) / 타겟 부모 역행렬(t 시점 평가)
-            ms = om.MMatrix(cmds.getAttr(src + ".worldMatrix[0]", time=t))
-            mpi = om.MMatrix(cmds.getAttr(tgt + ".parentInverseMatrix[0]", time=t))
-
-            # 월드 반사(refl * ms * refl) 후 타겟 로컬로: local = world * parentInverse
-            local = (refl * ms * refl) * mpi
-            tm = om.MTransformationMatrix(local)
-
-            values = {}
-            if do_t:
-                tr = tm.translation(om.MSpace.kTransform)
-                values["translateX"] = tr.x
-                values["translateY"] = tr.y
-                values["translateZ"] = tr.z
-            if do_r:
-                eul = tm.rotation(asQuaternion=True).asEulerRotation()
-                eul.reorderIt(ro_enum)  # 타겟 rotateOrder 로 재정렬
-                # MEulerRotation 은 라디안 -> rotate attr 은 degree
-                values["rotateX"] = math.degrees(eul.x)
-                values["rotateY"] = math.degrees(eul.y)
-                values["rotateZ"] = math.degrees(eul.z)
-
+            values = MirrorKeyManager._mirrored_values(src, tgt, t, refl, do_t, do_r)
             for attr in attrs:
                 try:
                     cmds.setKeyframe(tgt + "." + attr, time=t, value=values[attr])
@@ -215,6 +230,93 @@ class MirrorKeyManager:
                     pass
 
         return any_set
+
+    # --------------------------------------------------
+    # 현재 프레임만 미러 (autoKeyframe 재현)
+    # --------------------------------------------------
+
+    @staticmethod
+    def mirror_current_frame(pairs, mirror_axis="x", do_translate=True, do_rotate=True,
+                             tol=1e-6, per_object=False):
+        """
+        현재 프레임의 포즈만 각 (src, tgt) 로 미러한다. (구간 베이크 아님)
+
+        키잉은 autoKeyframe 규칙을 재현한다(전역 autoKeyframe 상태는 건드리지 않음):
+          - per_object=False (기본, per-channel/auto-key):
+              채널에 time 애니메이션 커브가 있고 값이 바뀌면 -> 현재 프레임에 setKeyframe.
+              커브가 없던 채널 -> setAttr 로 포즈만(키 생성 안 함).
+          - per_object=True (per-object):
+              타겟의 대상 채널 중 하나라도 애니메이션이 있으면 -> 대상 채널 전부 현재 프레임에 키.
+              전혀 없으면 -> 전부 setAttr(포즈만).
+
+        mirror_axis  : "x" | "y" | "z"
+        tol          : 값 변경 판정 임계값(per-channel 모드에서 사용).
+        반환         : (처리한 페어 수, 메시지)
+        """
+        if not pairs:
+            return (0, "[Warning] No pairs to mirror.")
+        if not do_translate and not do_rotate:
+            return (0, "[Warning] Enable Translate and/or Rotate.")
+
+        refl = MirrorKeyManager._reflection_matrix(mirror_axis)
+        cur = cmds.currentTime(q=True)
+
+        done = skipped = keyed = posed = 0
+
+        cmds.undoInfo(openChunk=True)
+        try:
+            for src, tgt in pairs:
+                attrs = MirrorKeyManager._settable_attrs(tgt, do_translate, do_rotate)
+                if not attrs:
+                    skipped += 1
+                    continue
+
+                values = MirrorKeyManager._mirrored_values(
+                    src, tgt, cur, refl, do_translate, do_rotate)
+
+                # per-object 모드: 대상 채널 중 하나라도 애니가 있으면 오브젝트를 "keyed" 로 취급.
+                obj_anim = False
+                if per_object:
+                    obj_anim = any(
+                        MirrorKeyManager._has_time_anim(tgt, a) for a in attrs)
+
+                touched = False
+                for attr in attrs:
+                    v = values[attr]
+                    full = tgt + "." + attr
+                    try:
+                        if per_object:
+                            key_it = obj_anim
+                        else:
+                            key_it = (MirrorKeyManager._has_time_anim(tgt, attr)
+                                      and abs(cmds.getAttr(full) - v) > tol)
+
+                        if key_it:
+                            cmds.setKeyframe(tgt, attribute=attr, time=cur, value=v)
+                            keyed += 1
+                            touched = True
+                        elif not MirrorKeyManager._has_time_anim(tgt, attr):
+                            # 키 없던 채널 -> 포즈만(setAttr), 키 생성 안 함
+                            cmds.setAttr(full, v)
+                            posed += 1
+                            touched = True
+                        # per-channel 인데 has_anim 이고 값 미변경이면 no-op
+                    except Exception:
+                        # 잠금/연결 등으로 실패한 채널은 건너뜀
+                        pass
+
+                if touched:
+                    done += 1
+                else:
+                    skipped += 1
+        finally:
+            cmds.undoInfo(closeChunk=True)
+
+        msg = "{0} pair(s) mirrored at frame {1} (axis: {2}; keyed {3}, posed {4}).".format(
+            done, int(cur), mirror_axis.upper(), keyed, posed)
+        if skipped:
+            msg += " {0} skipped.".format(skipped)
+        return (done, msg)
 
     # --------------------------------------------------
     # 헬퍼

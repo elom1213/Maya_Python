@@ -17,6 +17,11 @@
    굽는다(bake)**. 구간은 **현재 타임라인(플레이백)** 또는 **직접 입력(Custom)** 중 선택한다.
    Maya 네이티브 `bakeResults`(C++)를 써서 **6000+프레임 × 50~100 컨트롤러** 같은 대규모도 빠르다.
 
+> **v01.06 — Mirror Key 에 "Mirror Current Frame" 추가**: 구간이 아니라 **현재 프레임 1곳만** 미러한다.
+> 키잉은 autoKeyframe 를 재현해 **키가 있던 채널만** 현재 프레임에 키를 갱신하고, **키가 없던 채널은
+> 포즈만(`setAttr`)** 미러한다(전역 autoKeyframe 상태는 건드리지 않음). Keying 옵션으로 **Per-channel**
+> (기본) / **Per-object**(애니 있는 오브젝트는 선택 채널 전부 키) 중 선택.
+
 > **v01.05 — Bake 탭 신설**: `A00120_FKIK` 의 native `bakeResults` 베이크(Python 프레임 루프 대체)를
 > 범용 bake 로 이식했다. 컨스트레인트로 묶지 않고 **리스트의 노드 자체**를 굽는다. 로직은
 > `app/core/bake_manager.py`, 대상 리스트는 재사용 위젯 `JUN_mod_tsl_qt_v01`. **Keep constraints**
@@ -198,7 +203,11 @@ A00110_animTool.run(True)   # True = reload
 │ │ └──────┴───────┘                                ││
 │ │ [Add Row][Remove Row][Save][Reload]             ││
 │ └──────────────────────────────────────────────────┘│
-│ [ Mirror Selected ]                               │
+│ [ Mirror Selected ]                               │  ← 구간 미러 (Start/End/Time 사용)
+│ ┌ Current Frame ─────────────────────────────────┐ │
+│ │ Keying (•) Per-channel (auto-key) ( ) Per-object│ │  ← 기본 Per-channel
+│ │ [ Mirror Current Frame ]                        │ │  ← 현재 프레임만 미러
+│ └─────────────────────────────────────────────────┘ │
 └───────────────────────────────────────────────────┘
 ```
 
@@ -210,13 +219,22 @@ A00110_animTool.run(True)   # True = reload
   페어 결과를 여기에 채워 미리보기/수정할 수 있다.
 - **Mirror Axis**: 월드 반사축(기본 **X** = YZ 평면, 좌우 대칭). 보통 캐릭터 좌우축이 월드 X.
 - **Channels**: **Translate / Rotate** 그룹 토글(기본 둘 다 on). 회전만 미러하려면 Translate off.
-- **Start / End**: 미러 대상 시간 범위(기본 = 현재 playback 범위).
-- **Time**: **Source keys**(기본, 소스의 실제 키 시점에만 기록 → 곡선·타이밍 보존) /
+- **Start / End**: (구간 미러 전용) 미러 대상 시간 범위(기본 = 현재 playback 범위).
+- **Time**: (구간 미러 전용) **Source keys**(기본, 소스의 실제 키 시점에만 기록 → 곡선·타이밍 보존) /
   **Bake**(범위 내 정수 프레임 전수 기록).
 - **L / R Tokens**: `app/config/mirror_tokens.json` 의 좌/우 토큰 쌍 편집 테이블.
   **Add/Remove Row** 로 행 추가·삭제, **Save** 로 JSON 기록, **Reload** 로 다시 읽기.
   기본 4쌍(`_l/_r`, `_L/_R`, `_lf/_rt`, `Left/Right`). 새 네이밍은 행 추가만으로 지원.
-- **Mirror Selected**: 미러 실행. 결과(처리한 페어 수 / 반사축 / 건너뛴 페어)가 로그에 출력.
+- **Mirror Selected**: **구간 미러** 실행(Start/End/Time 사용). 결과(처리한 페어 수 / 반사축 /
+  건너뛴 페어)가 로그에 출력.
+- **Current Frame (v01.06~)**: **현재 타임라인 프레임 1곳**만 미러하는 별도 동작
+  (Start/End/Time **미사용**). Mode·Mirror Axis·Channels 는 위 설정을 공유한다.
+  - **Keying**:
+    - **Per-channel (auto-key)**(기본): autoKeyframe 처럼 **키(애니메이션 커브)가 있는 채널만**
+      현재 프레임에 키를 갱신하고, **키가 없던 채널은 `setAttr` 로 포즈만**(키 생성 안 함).
+    - **Per-object**: 타겟의 대상 채널 중 **하나라도 애니가 있으면 선택 채널 전부** 현재 프레임에
+      키(없던 채널엔 커브 신규 생성). 애니가 전혀 없으면 전부 포즈만.
+  - **Mirror Current Frame**: 실행. 결과(`... at frame N (axis: X; keyed K, posed P).`)가 로그에 출력.
 
 ### 5.5 Bake 탭
 
@@ -288,6 +306,14 @@ A00110_animTool.run(True)   # True = reload
    (`Source[i] ↔ Target[i]` 가 맞도록 Sort/Up/Down 으로 정렬).
 3. 옵션 확인 후 **Mirror Selected**.
 
+### Mirror Key — 현재 프레임만 미러
+1. 타임라인을 미러할 프레임으로 이동.
+2. 소스 컨트롤(들) 선택(Auto) 또는 Source/Target 리스트 구성(Manual). Mirror Axis·Channels 확인.
+3. **Current Frame > Keying** 선택: **Per-channel**(기본, 키 있는 채널만 키) / **Per-object**(애니
+   있는 오브젝트는 선택 채널 전부 키).
+4. **Mirror Current Frame** → 현재 프레임의 포즈가 반대쪽으로 미러된다. 키가 있던 채널만 그 프레임에
+   키가 갱신되고, 키가 없던 채널은 포즈만 적용(키 생성 안 함).
+
 ### Mirror Key — 토큰 확장
 1. **L / R Tokens** 그룹을 펼친다.
 2. **Add Row** → 새 좌/우 토큰 입력(예: `:left` / `:right`).
@@ -356,6 +382,20 @@ A00110_animTool.run(True)   # True = reload
   해당 키만 건너뛴다. 키를 하나도 못 넣은 페어는 skip 으로 집계.
 - **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
 
+### Mirror Key — 현재 프레임만 미러(`mirror_current_frame`)
+- **대상 시점 = 현재 프레임 1곳**(`currentTime`). Start/End/Time(Source keys/Bake) 컨트롤은 미사용.
+  미러 수학·페어링·반사축은 구간 미러와 동일(`_mirrored_values` 공유).
+- **autoKeyframe 재현(전역 autoKeyframe 상태 미변경)** — 채널의 time 애니 커브 유무로 분기한다.
+  애니 판정은 `cmds.keyframe(... name=True)` 로 연결 커브를 받아 **`animCurveT*`(시간 기반)** 만
+  인정한다(set-driven-key 의 `animCurveU*` 는 "키 없음"으로 취급).
+  - **Per-channel (auto-key, 기본)**: 채널에 time 커브가 **있고 값이 바뀌면**(`|old-new| > tol`,
+    `tol=1e-6`) 현재 프레임에 `setKeyframe`. 커브가 **없던 채널은 `setAttr` 로 포즈만**(키 생성 안 함).
+    값이 안 바뀐 키 채널은 no-op.
+  - **Per-object**: 타겟의 대상 채널 중 **하나라도** time 커브가 있으면 **대상 채널 전부**
+    현재 프레임에 `setKeyframe`(없던 채널엔 커브 신규 생성). 전혀 없으면 전부 `setAttr`(포즈만).
+- **채널 스킵**: 잠긴/연결로 실패한 채널은 건너뛰고, 아무것도 못 건드린 페어는 skip 으로 집계.
+- **단일 Undo 청크** — 키+`setAttr` 가 Ctrl+Z 한 번으로 복원.
+
 ### Bake
 - **대상 = Bake List 항목**(`get_all_items()`). **씬 선택이 아니라 리스트업된 노드만** 굽는다.
   선택만 하고 리스트가 비어 있으면 `Add controllers to the Bake List first.` 경고 후 중단.
@@ -396,6 +436,7 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 4 pair(s) mirrored (axis: X).
 2 pair(s) mirrored (axis: X). 1 skipped (no keys / not settable).
 4 token pair(s) saved.
+3 pair(s) mirrored at frame 12 (axis: X; keyed 12, posed 6).
 
 # Bake
 60 object(s) baked over [1-6000] (6000 frames, constraints kept).
@@ -439,6 +480,11 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
   로그의 `skipped` 수를 확인.
 - **(Mirror Key) 센터 컨트롤이 미러 안 됨** → 좌/우 토큰이 이름에 없으면 self-mirror(제자리 반전)로
   처리된다. 의도와 다르면 Manual 모드로 지정한다.
+- **(Mirror Current Frame) 키가 안 찍히는데 포즈만 바뀜** → 정상이다. 그 채널에 **기존 키(time 커브)가
+  없으면** Per-channel 모드는 포즈만 적용한다(autoKeyframe 동일). 키를 강제로 찍으려면 **Per-object**
+  로 바꾸거나, 먼저 해당 채널에 키를 하나 만든다.
+- **(Mirror Current Frame) set-driven-key 채널이 "키 없음"으로 처리됨** → time 커브(`animCurveT*`)만
+  인정하므로 드리븐키(`animCurveU*`)는 포즈만(`setAttr`) 시도된다(드리븐 입력이 있으면 skip).
 - **(Bake) 아무것도 안 구워짐** → 씬에서 선택만 하고 **Bake List 에 안 넣었을** 수 있다. `Select Objects`
   로 리스트에 채운다(대상은 리스트 항목이지 씬 선택이 아니다).
 - **(Bake) 굽는 구간이 예상과 다름** → Range 가 **Current timeline**(재생 슬라이더 범위)인지

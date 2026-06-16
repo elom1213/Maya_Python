@@ -468,11 +468,37 @@ class MainWindow(QWidget):
         tab_layout.addWidget(self.grp_mir_tokens)
 
         # -------------------------
-        # Mirror 실행 버튼
+        # Mirror 실행 버튼 (구간 미러)
         # -------------------------
 
         self.btn_mirror = QPushButton("Mirror Selected")
         tab_layout.addWidget(self.btn_mirror)
+
+        # -------------------------
+        # Current Frame : 현재 프레임만 미러 (autoKeyframe 재현)
+        #   - Start/End/Time 과 무관. 키 있는 채널만 키 갱신, 없으면 포즈만(setAttr).
+        # -------------------------
+
+        cf_grp = QGroupBox("Current Frame")
+        cf_layout = QVBoxLayout(cf_grp)
+
+        key_row = QHBoxLayout()
+        key_row.addWidget(QLabel("Keying"))
+        self.mir_cf_key_grp = QButtonGroup(self)
+        self.rb_mir_cf_channel = QRadioButton("Per-channel (auto-key)")
+        self.rb_mir_cf_object = QRadioButton("Per-object")
+        self.rb_mir_cf_channel.setChecked(True)   # 기본 = per-channel (autoKeyframe 동일)
+        self.mir_cf_key_grp.addButton(self.rb_mir_cf_channel)
+        self.mir_cf_key_grp.addButton(self.rb_mir_cf_object)
+        key_row.addWidget(self.rb_mir_cf_channel)
+        key_row.addWidget(self.rb_mir_cf_object)
+        key_row.addStretch(1)
+        cf_layout.addLayout(key_row)
+
+        self.btn_mirror_current = QPushButton("Mirror Current Frame")
+        cf_layout.addWidget(self.btn_mirror_current)
+
+        tab_layout.addWidget(cf_grp)
 
         tab_layout.addStretch(1)
 
@@ -490,6 +516,7 @@ class MainWindow(QWidget):
         self.rb_mir_auto.toggled.connect(self._mir_update_mode)
         self.btn_mir_resolve.clicked.connect(self.on_mir_resolve)
         self.btn_mirror.clicked.connect(self.on_mirror_key)
+        self.btn_mirror_current.clicked.connect(self.on_mirror_current_frame)
         self.btn_tok_add.clicked.connect(lambda: self._mir_add_token_row("", ""))
         self.btn_tok_del.clicked.connect(self._mir_del_token_row)
         self.btn_tok_save.clicked.connect(self.on_mir_save_tokens)
@@ -807,6 +834,35 @@ class MainWindow(QWidget):
             msg += f" {len(unpaired)} unpaired: {', '.join(unpaired)}"
         self.log(msg)
 
+    def _mir_resolve_pairs(self):
+        """현재 모드(Auto/Manual)로 (src, tgt) 페어 리스트 반환. 실패 시 None(경고 로그).
+        on_mirror_key(구간) / on_mirror_current_frame(현재 프레임) 가 공유한다."""
+        if self.rb_mir_manual.isChecked():
+            # 수동: Source/Target 리스트를 인덱스 매칭.
+            base = self.mir_base_tsl.get_all_items()
+            tgt = self.mir_tgt_tsl.get_all_items()
+            if not base or not tgt:
+                self.log("[Warning] Fill both Source and Target lists.")
+                return None
+            if len(base) != len(tgt):
+                self.log(f"[Warning] Source({len(base)}) / Target({len(tgt)}) count mismatch.")
+                return None
+            return list(zip(base, tgt))
+
+        # 자동: 현재 선택으로 토큰 페어링.
+        sel = cmds.ls(sl=True) or []
+        if not sel:
+            self.log("[Warning] Select source controllers first.")
+            return None
+        token_pairs = self._mir_token_pairs() or list(MirrorKeyManager.DEFAULT_TOKEN_PAIRS)
+        pairs, unpaired, center = MirrorKeyManager.resolve_pairs(sel, token_pairs)
+        if unpaired:
+            self.log(f"[Warning] {len(unpaired)} unpaired (skipped): {', '.join(unpaired)}")
+        if not pairs:
+            self.log("[Warning] No pairs resolved.")
+            return None
+        return pairs
+
     def on_mirror_key(self):
 
         rng = self._mir_read_range()
@@ -823,34 +879,32 @@ class MainWindow(QWidget):
         axis = self._mir_axis()
         time_mode = "bake" if self.rb_mir_bake.isChecked() else "source_keys"
 
-        if self.rb_mir_manual.isChecked():
-            # 수동: Source/Target 리스트를 인덱스 매칭.
-            base = self.mir_base_tsl.get_all_items()
-            tgt = self.mir_tgt_tsl.get_all_items()
-            if not base or not tgt:
-                self.log("[Warning] Fill both Source and Target lists.")
-                return
-            if len(base) != len(tgt):
-                self.log(f"[Warning] Source({len(base)}) / Target({len(tgt)}) count mismatch.")
-                return
-            pairs = list(zip(base, tgt))
-        else:
-            # 자동: 현재 선택으로 토큰 페어링.
-            sel = cmds.ls(sl=True) or []
-            if not sel:
-                self.log("[Warning] Select source controllers first.")
-                return
-            token_pairs = self._mir_token_pairs() or list(MirrorKeyManager.DEFAULT_TOKEN_PAIRS)
-            pairs, unpaired, center = MirrorKeyManager.resolve_pairs(sel, token_pairs)
-            if unpaired:
-                self.log(f"[Warning] {len(unpaired)} unpaired (skipped): {', '.join(unpaired)}")
-            if not pairs:
-                self.log("[Warning] No pairs resolved.")
-                return
+        pairs = self._mir_resolve_pairs()
+        if pairs is None:
+            return
 
         count, msg = MirrorKeyManager.mirror_keys(
             pairs, start, end, mirror_axis=axis,
             do_translate=do_t, do_rotate=do_r, time_mode=time_mode)
+        self.log(msg)
+
+    def on_mirror_current_frame(self):
+        """현재 프레임의 포즈만 미러(autoKeyframe 재현). Start/End/Time 미사용."""
+        do_t = self.cb_mir_translate.isChecked()
+        do_r = self.cb_mir_rotate.isChecked()
+        if not do_t and not do_r:
+            self.log("[Warning] Enable Translate and/or Rotate.")
+            return
+
+        pairs = self._mir_resolve_pairs()
+        if pairs is None:
+            return
+
+        count, msg = MirrorKeyManager.mirror_current_frame(
+            pairs, mirror_axis=self._mir_axis(),
+            do_translate=do_t, do_rotate=do_r,
+            per_object=self.rb_mir_cf_object.isChecked(),
+        )
         self.log(msg)
 
     # --------------------------------------------------
