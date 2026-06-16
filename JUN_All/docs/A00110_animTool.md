@@ -2,7 +2,7 @@
 
 ## 1. 개요
 
-애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **네 개의 탭**과 **공유 로그창**으로 구성된다.
+애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **다섯 개의 탭**과 **공유 로그창**으로 구성된다.
 
 1. **Key Edit** — 선택 오브젝트의 키를 시간 범위로 **이동(앞/뒤 offset)·삭제**하고, 그래프
    에디터에서 선택한 키 구간을 **평평하게 유지(Hold)** 한다. `Shift+A` 핫키로 Hold 를 호출할 수 있다.
@@ -13,6 +13,14 @@
 4. **Mirror Key** (v01.04~) — 한쪽 컨트롤러의 키를 **반대쪽 컨트롤러로 좌우 미러**한다(언리얼
    *Mirror Data Table* 과 동일한 결과). 좌/우 토큰(`_l/_r` 등, **JSON 으로 확장 가능**)으로 자동
    페어링하거나 수동 리스트로 짝짓는다. **소스/타겟의 rotateOrder 가 달라도 정확**하다.
+5. **Bake** (v01.05~) — **리스트업한 컨트롤러/오브젝트**의 키를 구간 전체에 **정수 프레임 단위로
+   굽는다(bake)**. 구간은 **현재 타임라인(플레이백)** 또는 **직접 입력(Custom)** 중 선택한다.
+   Maya 네이티브 `bakeResults`(C++)를 써서 **6000+프레임 × 50~100 컨트롤러** 같은 대규모도 빠르다.
+
+> **v01.05 — Bake 탭 신설**: `A00120_FKIK` 의 native `bakeResults` 베이크(Python 프레임 루프 대체)를
+> 범용 bake 로 이식했다. 컨스트레인트로 묶지 않고 **리스트의 노드 자체**를 굽는다. 로직은
+> `app/core/bake_manager.py`, 대상 리스트는 재사용 위젯 `JUN_mod_tsl_qt_v01`. **Keep constraints**
+> 옵션(기본 ON)으로 컨스트레인트를 유지(`pairBlend` 공존)할지 정리(bake down)할지 고른다.
 
 > **v01.04 — Mirror Key 탭 신설**: 컨트롤 키를 좌우 대칭으로 반대쪽에 복사한다. 채널 부호 반전이
 > 아니라 **월드 매트릭스 반사 → 타겟 rotateOrder 재분해** 방식이라 rotateOrder/축 정렬에 무관하다.
@@ -51,13 +59,14 @@ A00110_animTool/
     │   ├── pose_key_manager.py   # 현재 프레임 6축 pose 키 (Pose Key 탭)
     │   ├── copykey_manager.py    # Base→Target 키 복사 + 축 Reverse (Copy Key 탭)
     │   ├── mirror_key_manager.py # 컨트롤 키 좌우 미러 (Mirror Key 탭, OpenMaya)
-    │   └── mirror_token_store.py # mirror_tokens.json 입출력 + 폴백
-    └── ui/main_window.py  # 전체 UI (4개 탭 + 공유 로그창 + 메뉴 바)
+    │   ├── mirror_token_store.py # mirror_tokens.json 입출력 + 폴백
+    │   └── bake_manager.py       # 리스트 노드 구간 bake (Bake 탭, native bakeResults)
+    └── ui/main_window.py  # 전체 UI (5개 탭 + 공유 로그창 + 메뉴 바)
 ```
 
 - 각 manager 는 **UI 비의존 정적 메서드**(`@staticmethod`)로 작성되고 `(count, msg)` 를 반환한다.
   작업 전체를 `cmds.undoInfo(openChunk/closeChunk)` 로 묶어 **Ctrl+Z 한 번**에 취소된다.
-- UI(`main_window.py`)는 manager 를 호출하고 결과 메시지를 **3개 탭 공유 로그창**에 출력한다.
+- UI(`main_window.py`)는 manager 를 호출하고 결과 메시지를 **모든 탭 공유 로그창**에 출력한다.
 
 ---
 
@@ -83,19 +92,19 @@ A00110_animTool.run(True)   # True = reload
 ## 5. UI 구성
 
 ```
-┌ Help ────────────────────────────────────────────┐  ← 메뉴 바 (Help > About)
-│ [ Key Edit ] [ Pose Key ] [ Copy Key ] [Mirror Key]│  ← 탭
-├───────────────────────────────────────────────────┤
-│  (선택된 탭 내용)                                  │
-├ Log (3개 탭 공유) ────────────────────────────────┤
-│ ┌ read-only 로그창 (영어 출력) ┐                  │
-│ └─────────────────────────────────┘               │
-│      Copyright (c) Park Ji Hun. ...               │
-└───────────────────────────────────────────────────┘
+┌ Help ────────────────────────────────────────────────────────┐  ← 메뉴 바 (Help > About)
+│ [Key Edit][Pose Key][Copy Key][Mirror Key][ Bake ]            │  ← 탭 (5개)
+├───────────────────────────────────────────────────────────────┤
+│  (선택된 탭 내용)                                             │
+├ Log (모든 탭 공유) ───────────────────────────────────────────┤
+│ ┌ read-only 로그창 (영어 출력) ┐                             │
+│ └─────────────────────────────────┘                          │
+│      Copyright (c) Park Ji Hun. ...                          │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 - **Help > About**: 작성자·업데이트 날짜 팝업.
-- 하단 **로그창**과 저작권 라벨은 세 탭이 **공유**한다(모든 결과/경고가 여기 출력).
+- 하단 **로그창**과 저작권 라벨은 **모든 탭이 공유**한다(모든 결과/경고가 여기 출력).
 
 ### 5.1 Key Edit 탭
 
@@ -209,6 +218,40 @@ A00110_animTool.run(True)   # True = reload
   기본 4쌍(`_l/_r`, `_L/_R`, `_lf/_rt`, `Left/Right`). 새 네이밍은 행 추가만으로 지원.
 - **Mirror Selected**: 미러 실행. 결과(처리한 페어 수 / 반사축 / 건너뛴 페어)가 로그에 출력.
 
+### 5.5 Bake 탭
+
+```
+┌───────────────────────────────────────────────────┐
+│ [Bake List]                                       │  ← 재사용 위젯 JUN_mod_tsl_qt_v01
+│ Select Objects                                    │     (Select/Add/Del/Up/Down/Sort 내장)
+│ ┌ QListWidget ┐                                   │
+│ │  ctrl objs  │                                   │
+│ └─────────────┘                                   │
+│ Range (•) Current timeline  ( ) Custom range      │  ← 라디오 2택 (기본 = Current timeline)
+│ Start [ 1 ]   End [ 24 ]                           │  ← Custom 일 때만 활성 (기본 playback 범위)
+│ Channels [v] Translate [v] Rotate [ ] Scale       │  ← 기본 T·R
+│ [v] Keep constraints (insert blend)               │  ← 기본 ON → 컨스트레인트 유지
+│ [v] Simulation                                    │  ← 기본 ON
+│ [ Bake List ]                                     │
+└───────────────────────────────────────────────────┘
+```
+
+- **Bake List** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `Select Objects` 로 현재 씬 선택을 리스트에
+  채운다. **베이크 대상은 이 리스트의 항목**이며 씬 선택이 아니다(리스트가 비면 아무것도 안 굽힌다).
+  Add/Del/Up/Down/Sort 와 "Number: N" 카운트, 항목 클릭 시 씬 자동 선택은 위젯이 내장한다.
+- **Range**: 베이크 구간 소스.
+  - **Current timeline**(기본): 현재 타임라인 플레이백 범위(`playbackOptions` min/maxTime)로 굽는다.
+    이때 Start/End 입력칸은 비활성.
+  - **Custom range**: Start/End 입력칸이 활성되고, 직접 입력한 구간으로 굽는다(기본값 = 현재 playback 범위).
+- **Channels**: 베이크할 채널 그룹(**Translate / Rotate / Scale**). 기본 T·R on, Scale off.
+- **Keep constraints (insert blend)** (기본 **ON**): 베이크 대상이 컨스트레인트로 구동 중일 때
+  동작을 정한다. **ON = 컨스트레인트 유지**(Maya 가 `pairBlend` 삽입 → `blendParent1` 로 컨스트레인트↔키
+  전환). **OFF = bake down**(구동을 끊고 키만 남김). 내부적으로 `bakeResults` 의
+  `disableImplicitControl` 에 반대로 매핑된다(ON → `False`).
+- **Simulation** (기본 ON): `bakeResults(simulation=True)` — 프레임 순차 평가(컨스트레인트/익스프레션
+  의존 리그에 안전). 순수 FK 라면 꺼서 가속할 수 있다.
+- **Bake List**: 베이크 실행. 결과(개수 / 구간 / 프레임 수 / 컨스트레인트 kept·baked down)가 로그에 출력.
+
 ---
 
 ## 6. 사용 순서
@@ -249,6 +292,12 @@ A00110_animTool.run(True)   # True = reload
 1. **L / R Tokens** 그룹을 펼친다.
 2. **Add Row** → 새 좌/우 토큰 입력(예: `:left` / `:right`).
 3. **Save** → `mirror_tokens.json` 에 기록(다음 실행에도 유지). 파일을 직접 편집해도 된다.
+
+### Bake
+1. 베이크할 컨트롤러(들)를 씬에서 선택 → **Select Objects** 로 **Bake List** 에 채운다(Add 로 추가도 가능).
+2. **Range** 선택: **Current timeline**(기본, 현재 재생 구간) 또는 **Custom range**(Start/End 직접 입력).
+3. **Channels**(기본 T·R) / **Keep constraints**(기본 ON=유지) / **Simulation**(기본 ON) 확인.
+4. **Bake List** → 리스트의 노드만 해당 구간에 정수 프레임 키로 구워진다(단일 Undo).
 
 ---
 
@@ -307,6 +356,21 @@ A00110_animTool.run(True)   # True = reload
   해당 키만 건너뛴다. 키를 하나도 못 넣은 페어는 skip 으로 집계.
 - **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
 
+### Bake
+- **대상 = Bake List 항목**(`get_all_items()`). **씬 선택이 아니라 리스트업된 노드만** 굽는다.
+  선택만 하고 리스트가 비어 있으면 `Add controllers to the Bake List first.` 경고 후 중단.
+- **구간**: **Current timeline** = `playbackOptions` 의 min/maxTime(재생 슬라이더 범위, 애니메이션 전체
+  범위가 아님). **Custom range** = Start/End 입력값(빈값/`Start>End` 면 경고).
+- **엔진**(`bake_manager.BakeManager.bake`): 프레임 루프 없이 `cmds.bakeResults` 단일 호출
+  (`sampleBy=1`, `preserveOutsideKeys=True`, `sparseAnimCurveBake=False`). 베이크 동안
+  `refresh(suspend=True)` 로 뷰포트 갱신을 막고, 끝나면 **현재 프레임 복원 + 뷰포트 해제**.
+  → currentTime/xform 반복이 없어 6000+프레임 × 50~100 컨트롤러에서 수십 배 빠르다.
+- **Keep constraints**(기본 ON) → `disableImplicitControl=False`: 컨스트레인트 구동 노드는
+  `pairBlend` 가 삽입되어 **컨스트레인트가 남고 키와 공존**한다(`blendParent1` 로 전환). OFF → `True`:
+  구동을 끊고 키만 남기는 **bake down**. (이 툴은 컨스트레인트를 만들거나 `delete` 하지 않는다.)
+- **Channels**: 체크한 그룹만(T=tx/ty/tz, R=rx/ry/rz, S=sx/sy/sz). 모두 끄면 경고.
+- **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
+
 ---
 
 ## 8. 로그 · 문제 해결
@@ -332,6 +396,10 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 4 pair(s) mirrored (axis: X).
 2 pair(s) mirrored (axis: X). 1 skipped (no keys / not settable).
 4 token pair(s) saved.
+
+# Bake
+60 object(s) baked over [1-6000] (6000 frames, constraints kept).
+60 object(s) baked over [1-6000] (6000 frames, constraints baked down).
 ```
 
 ### 경고 메시지
@@ -348,6 +416,9 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 - `[Warning] Enable Translate and/or Rotate.` — (Mirror Key) 채널 토글이 모두 off.
 - `[Warning] Source(n) / Target(m) count mismatch.` — (Mirror Key Manual) 두 리스트 개수 불일치.
 - `[Info] mirror_tokens.json not found. Using built-in defaults.` — JSON 없음(기본 토큰 사용).
+- `[Warning] Add controllers to the Bake List first.` — (Bake) Bake List 가 비어 있음(씬 선택만으론 안 됨).
+- `[Warning] Enter Start / End.` / `[Warning] Start (n) is greater than End (m).` — (Bake Custom) 시간 범위 오류.
+- `[Warning] Enable at least one channel group.` — (Bake) Translate/Rotate/Scale 모두 off.
 
 ### 자주 겪는 문제
 - **이동/삭제가 일부 채널에만 적용됨** → 채널박스에서 어트리뷰트가 선택돼 있으면 그 채널만 대상이 된다.
@@ -368,3 +439,10 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
   로그의 `skipped` 수를 확인.
 - **(Mirror Key) 센터 컨트롤이 미러 안 됨** → 좌/우 토큰이 이름에 없으면 self-mirror(제자리 반전)로
   처리된다. 의도와 다르면 Manual 모드로 지정한다.
+- **(Bake) 아무것도 안 구워짐** → 씬에서 선택만 하고 **Bake List 에 안 넣었을** 수 있다. `Select Objects`
+  로 리스트에 채운다(대상은 리스트 항목이지 씬 선택이 아니다).
+- **(Bake) 굽는 구간이 예상과 다름** → Range 가 **Current timeline**(재생 슬라이더 범위)인지
+  **Custom range**(입력값)인지 확인. Current 는 애니메이션 전체 범위가 아니라 현재 재생 구간이다.
+- **(Bake) 키를 구웠는데 컨트롤이 안 움직임처럼 보임** → **Keep constraints**(기본 ON)면 `pairBlend`
+  가 끼어 컨스트레인트가 우세할 수 있다. 컨트롤의 `blendParent1` 을 키 쪽으로 바꾸거나, 순수 키만
+  원하면 **Keep constraints 를 끄고**(bake down) 다시 굽는다.

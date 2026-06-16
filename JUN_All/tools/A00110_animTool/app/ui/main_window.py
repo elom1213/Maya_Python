@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-15
+# last Update date : 2026-06-16
 # A00110_animTool - Qt UI
 
 from Framework.qt.qt import *
@@ -17,6 +17,7 @@ from tools.A00110_animTool.app.core import PoseKeyManager
 from tools.A00110_animTool.app.core import CopyKeyManager
 from tools.A00110_animTool.app.core import MirrorKeyManager
 from tools.A00110_animTool.app.core import MirrorTokenStore
+from tools.A00110_animTool.app.core import BakeManager
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -88,6 +89,7 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_pose_key_tab(), "Pose Key")
         self.tabs.addTab(self._build_copy_key_tab(), "Copy Key")
         self.tabs.addTab(self._build_mirror_key_tab(), "Mirror Key")
+        self.tabs.addTab(self._build_bake_tab(), "Bake")
         main_layout.addWidget(self.tabs)
 
         # 로그창을 탭 아래에 배치
@@ -495,6 +497,100 @@ class MainWindow(QWidget):
 
         return tab
 
+    def _build_bake_tab(self):
+        """리스트업한 컨트롤러/오브젝트를 구간 dense 키로 굽는 탭.
+        A00120_FKIK 의 native bakeResults 베이크를 이식(컨스트레인트 없는 범용 bake).
+        대상은 씬 선택이 아니라 Bake List 위젯의 항목이다."""
+
+        tab = QWidget()
+        tab_layout = QVBoxLayout(tab)
+
+        # -------------------------
+        # Bake List (재사용 위젯). 리스트업된 항목만 베이크된다.
+        # -------------------------
+
+        self.bake_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Bake List", select_label="Select Objects", log_callback=self.log)
+        tab_layout.addWidget(self.bake_tsl)
+
+        # -------------------------
+        # Range : Current timeline / Custom range
+        # -------------------------
+
+        range_mode_row = QHBoxLayout()
+        range_mode_row.addWidget(QLabel("Range"))
+        self.bake_range_grp = QButtonGroup(self)
+        self.rb_bake_timeline = QRadioButton("Current timeline")
+        self.rb_bake_custom = QRadioButton("Custom range")
+        self.rb_bake_timeline.setChecked(True)   # 기본 = 현재 타임라인 구간
+        self.bake_range_grp.addButton(self.rb_bake_timeline)
+        self.bake_range_grp.addButton(self.rb_bake_custom)
+        range_mode_row.addWidget(self.rb_bake_timeline)
+        range_mode_row.addWidget(self.rb_bake_custom)
+        range_mode_row.addStretch(1)
+        tab_layout.addLayout(range_mode_row)
+
+        # Custom 구간 입력 (Custom 모드에서만 활성). 기본값 = 현재 playback 범위.
+        validator = QIntValidator(-1000000, 1000000, self)
+        time_str = int(cmds.playbackOptions(query=True, minTime=True))
+        time_end = int(cmds.playbackOptions(query=True, maxTime=True))
+
+        range_row = QHBoxLayout()
+        range_row.addWidget(QLabel("Start"))
+        self.le_bake_start = QLineEdit(str(time_str))
+        self.le_bake_start.setValidator(validator)
+        range_row.addWidget(self.le_bake_start)
+        range_row.addWidget(QLabel("End"))
+        self.le_bake_end = QLineEdit(str(time_end))
+        self.le_bake_end.setValidator(validator)
+        range_row.addWidget(self.le_bake_end)
+        tab_layout.addLayout(range_row)
+
+        # -------------------------
+        # Channels (Translate / Rotate / Scale). 기본 T·R on, S off.
+        # -------------------------
+
+        ch_row = QHBoxLayout()
+        ch_row.addWidget(QLabel("Channels"))
+        self.cb_bake_t = QCheckBox("Translate")
+        self.cb_bake_r = QCheckBox("Rotate")
+        self.cb_bake_s = QCheckBox("Scale")
+        self.cb_bake_t.setChecked(True)
+        self.cb_bake_r.setChecked(True)
+        ch_row.addWidget(self.cb_bake_t)
+        ch_row.addWidget(self.cb_bake_r)
+        ch_row.addWidget(self.cb_bake_s)
+        ch_row.addStretch(1)
+        tab_layout.addLayout(ch_row)
+
+        # -------------------------
+        # Options : Keep constraints (기본 ON -> disableImplicitControl=False), Simulation
+        # -------------------------
+
+        self.cb_bake_keep_con = QCheckBox("Keep constraints (insert blend)")
+        self.cb_bake_keep_con.setChecked(True)   # 기본 유지 -> dic=False
+        tab_layout.addWidget(self.cb_bake_keep_con)
+
+        self.cb_bake_sim = QCheckBox("Simulation")
+        self.cb_bake_sim.setChecked(True)
+        tab_layout.addWidget(self.cb_bake_sim)
+
+        # -------------------------
+        # Bake 버튼
+        # -------------------------
+
+        self.btn_bake = QPushButton("Bake List")
+        tab_layout.addWidget(self.btn_bake)
+
+        tab_layout.addStretch(1)
+
+        # 초기 활성 상태 동기화 + 시그널
+        self._bake_update_range_mode()
+        self.rb_bake_custom.toggled.connect(self._bake_update_range_mode)
+        self.btn_bake.clicked.connect(self.on_bake)
+
+        return tab
+
     # --------------------------------------------------
     # Helper
     # --------------------------------------------------
@@ -755,6 +851,66 @@ class MainWindow(QWidget):
         count, msg = MirrorKeyManager.mirror_keys(
             pairs, start, end, mirror_axis=axis,
             do_translate=do_t, do_rotate=do_r, time_mode=time_mode)
+        self.log(msg)
+
+    # --------------------------------------------------
+    # Bake
+    # --------------------------------------------------
+
+    def _bake_update_range_mode(self, *args):
+        """Range 모드에 따라 Custom Start/End 입력 활성/비활성 토글."""
+        custom = self.rb_bake_custom.isChecked()
+        self.le_bake_start.setEnabled(custom)
+        self.le_bake_end.setEnabled(custom)
+
+    def _bake_resolve_range(self):
+        """라디오에 따라 (start, end) 결정. 실패 시 None.
+        Current timeline = playback min/maxTime, Custom = QLineEdit 입력."""
+        if self.rb_bake_timeline.isChecked():
+            start = int(cmds.playbackOptions(q=True, minTime=True))
+            end = int(cmds.playbackOptions(q=True, maxTime=True))
+            return (start, end)
+
+        s_txt = self.le_bake_start.text().strip()
+        e_txt = self.le_bake_end.text().strip()
+        if s_txt == "" or e_txt == "":
+            self.log("[Warning] Enter Start / End.")
+            return None
+        start = int(s_txt)
+        end = int(e_txt)
+        if start > end:
+            self.log(f"[Warning] Start ({start}) is greater than End ({end}).")
+            return None
+        return (start, end)
+
+    def on_bake(self):
+
+        objs = self.bake_tsl.get_all_items()   # 리스트업된 항목만 (씬 선택 아님)
+        if not objs:
+            self.log("[Warning] Add controllers to the Bake List first.")
+            return
+
+        rng = self._bake_resolve_range()
+        if rng is None:
+            return
+        start, end = rng
+
+        channels = []
+        if self.cb_bake_t.isChecked():
+            channels += ["tx", "ty", "tz"]
+        if self.cb_bake_r.isChecked():
+            channels += ["rx", "ry", "rz"]
+        if self.cb_bake_s.isChecked():
+            channels += ["sx", "sy", "sz"]
+        if not channels:
+            self.log("[Warning] Enable at least one channel group.")
+            return
+
+        count, msg = BakeManager.bake(
+            objs, start, end, channels=channels,
+            simulation=self.cb_bake_sim.isChecked(),
+            disable_implicit=not self.cb_bake_keep_con.isChecked(),  # 체크=유지 -> False
+        )
         self.log(msg)
 
     def show_about(self, *args):
