@@ -1,0 +1,15 @@
+# JUN_All - external dependency manifest (single source of truth)
+# ---------------------------------------------------------------
+# 이 파일은 "standalone / exe 빌드" 맥락의 pip 의존성만 담는다.
+#
+#   pip install -r requirements.txt
+#
+# Maya 안에서 실행할 때는 설치할 필요가 없다 — PySide·pymel 은 Maya 가 직접 제공한다.
+# Maya 안에서 import 가능 여부를 검증하려면:  JUN_All/dev/check_dependencies.py 실행.
+# 자세한 의존성/버전 매트릭스는 JUN_All/docs/DEPENDENCIES.md 참고.
+#
+# 버전 핀은 하지 않는다(현재 코드는 PySide 버전 비의존). 재현 가능한 빌드가 필요해지면
+# 그때 '==' 로 고정한다.
+
+PySide6          # Qt GUI 바인딩 (standalone). Maya 안에서는 Maya 제공본 사용
+pyinstaller      # standalone .exe 패키징 (launch.spec / build_exe.bat)

@@ -1,2 +1,5 @@
-PySide6
+# Single source of truth: JUN_All/requirements.txt
+# 주의: 이 툴 코드는 PySide2 를 직접 import 한다(Maya 2023 호환). standalone 빌드 시 PySide2 필요.
+#       Maya 안에서 실행할 때는 Maya 가 PySide2 를 제공하므로 설치 불필요.
+PySide2
 pyinstaller
