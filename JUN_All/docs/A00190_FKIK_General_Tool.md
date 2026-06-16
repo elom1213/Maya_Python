@@ -25,7 +25,7 @@
 A00190_FKIK_General_Tool/
 ├── __init__.py           # from .launch import run
 ├── launch.py             # run(): DEV reload + MainWindow 생성/교체 → ThemeManager → show
-├── config.py             # DEV_MODE + 셸프 버튼 설치 / 드래그&드롭 진입점
+├── __dragDrop_A00190.py             # DEV_MODE + 셸프 버튼 설치 / 드래그&드롭 진입점
 └── app/
     ├── config/version.py # VERSION / LAST_UPDATE
     ├── core/             # 로직 (UI 비의존, list[str] 입출력)
@@ -45,7 +45,7 @@ A00190_FKIK_General_Tool/
 
 ## 3. 설치
 
-`A00190_FKIK_General_Tool/config.py` 를 Maya 뷰포트로 **드래그&드롭**하면 현재 셸프에
+`A00190_FKIK_General_Tool/__dragDrop_A00190.py` 를 Maya 뷰포트로 **드래그&드롭**하면 현재 셸프에
 "FKIK_Gen" 버튼이 설치된다(중복 버튼은 자동 제거).
 
 ---

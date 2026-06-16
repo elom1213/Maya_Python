@@ -18,7 +18,7 @@ driven이 따라 움직인다**.
 A00140_ConnectClosest/
 ├── __init__.py                 # from .launch import run
 ├── launch.py                   # run(): MainWindow 생성 → 테마 적용 → show()
-├── config.py                   # 셸프 버튼 설치 + 드래그&드롭 진입점
+├── __dragDrop_A00140.py                   # 셸프 버튼 설치 + 드래그&드롭 진입점
 ├── CHANGELOG.md
 ├── requirements.txt
 └── app/
@@ -39,7 +39,7 @@ A00140_ConnectClosest/
 
 ## 3. 설치
 
-`A00140_ConnectClosest/config.py` 파일을 **Maya 뷰포트로 드래그&드롭**한다.
+`A00140_ConnectClosest/__dragDrop_A00140.py` 파일을 **Maya 뷰포트로 드래그&드롭**한다.
 현재 셸프에 **`CnctClose`** 버튼이 설치된다(중복 버튼은 자동 제거 후 재설치).
 
 ---

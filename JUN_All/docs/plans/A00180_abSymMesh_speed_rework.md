@@ -71,8 +71,7 @@ A00180_abSymMesh/
 ├── origin.mel                 # 원본 보존(참고용, 미사용)
 ├── __init__.py                # from .launcher import run
 ├── launcher.py                # run(reload_module=False): DEV reload 후 build__()
-├── config.py                  # 셸프 설치 + onMayaDroppedPythonFile (A00000_base 복제)
-├── __dragDrop.py / __maya_button.py
+├── __dragDrop_A00180.py        # 셸프 설치 + onMayaDroppedPythonFile (A00000_base 복제)
 ├── abSymMesh_v01.py           # UI 본체: class ...UI__ + build() + build__()  ← maya.cmds
 ├── utility.py
 └── core/

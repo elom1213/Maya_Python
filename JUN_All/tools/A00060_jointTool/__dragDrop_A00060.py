@@ -9,7 +9,7 @@ import sys
 # =========================
 
 TOOL_ROOT = os.path.dirname(__file__)
-TOOL_PATH = "A00050_uvTool"
+TOOL_PATH = "A00040_file_exporter"
 
 
 # tools 폴더 import 가능하게 추가
@@ -21,7 +21,7 @@ if TOOL_ROOT not in sys.path:
 # TOOL INFO
 # =========================
 
-TOOL_LABEL = "uvTool"
+TOOL_LABEL = "FileExporter"
 
 ICON_NAME = "pythonFamily.png"
 
@@ -58,7 +58,7 @@ def install_shelf_button():
 
         cmd = cmds.shelfButton(btn, q=True, command=True)
 
-        if "A00050_uvTool.run(True)" in str(cmd):
+        if "A00040_file_exporter.run(True)" in str(cmd):
 
             cmds.deleteUI(btn)
 
@@ -88,4 +88,11 @@ def install_shelf_button():
 
 def onMayaDroppedPythonFile(*args):
 
-    install_shelf_button()
+    try:
+        install_shelf_button()
+    finally:
+        # 이 파일은 베이스네임으로 import 되어 sys.modules 에 캐시된다.
+        # 같은 이름이 다시 드롭될 때 캐시된(이전) 모듈이 실행되는 것을 막기 위해
+        # 자기 자신을 캐시에서 제거한다.
+        import sys
+        sys.modules.pop(__name__, None)

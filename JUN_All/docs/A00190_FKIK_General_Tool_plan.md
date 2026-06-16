@@ -66,7 +66,7 @@
 JUN_All/tools/A00190_FKIK_General_Tool/
 ├── __init__.py            # from .launch import run  →  run()만 노출
 ├── launch.py             # run(reload): DEV reload → MainWindow 생성/교체 → ThemeManager → show
-├── config.py             # DEV_MODE + 셸프 버튼 설치 / onMayaDroppedPythonFile (드래그&드롭)
+├── __dragDrop_A00190.py  # DEV_MODE + 셸프 버튼 설치 / onMayaDroppedPythonFile (드래그&드롭)
 └── app/
     ├── __init__.py
     ├── config/
@@ -187,7 +187,7 @@ JUN_All/tools/A00190_FKIK_General_Tool/
 
 ## 9. 검증 방법
 
-1. **설치**: `config.py` 를 Maya 2023 뷰포트로 드래그&드롭 → 셸프 버튼 생성 확인.
+1. **설치**: `__dragDrop_A00190.py` 를 Maya 2023 뷰포트로 드래그&드롭 → 셸프 버튼 생성 확인.
 2. **실행**: 셸프 버튼 또는 `import tools.A00190_FKIK_General_Tool as t; t.run(True)` → `blue_dark` 창,
    재실행 시 objectName 으로 중복 없이 교체되는지 확인.
 3. **기능 E2E** (FK/IK 컨트롤이 있는 테스트 리그에서):

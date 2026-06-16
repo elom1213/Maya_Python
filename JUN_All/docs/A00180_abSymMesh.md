@@ -26,7 +26,7 @@ A00180_abSymMesh/
 ├── origin.mel            # 원본 MEL (참고용 보존, 미사용)
 ├── __init__.py           # from .launch import run
 ├── launch.py             # run(): DEV reload + undo 플러그인 로드 → MainWindow show
-├── config.py             # DEV_MODE + 셸프 버튼 설치 / 드래그&드롭 진입점
+├── __dragDrop_A00180.py             # DEV_MODE + 셸프 버튼 설치 / 드래그&드롭 진입점
 └── app/
     ├── config/version.py # VERSION / LAST_UPDATE
     ├── core/             # 로직 (씬 비의존 + 씬 I/O 분리) — UI 와 무관, 재사용
@@ -45,7 +45,7 @@ A00180_abSymMesh/
 
 ## 3. 설치
 
-`A00180_abSymMesh/config.py` 를 Maya 뷰포트로 **드래그&드롭**하면 현재 셸프에
+`A00180_abSymMesh/__dragDrop_A00180.py` 를 Maya 뷰포트로 **드래그&드롭**하면 현재 셸프에
 "abSymMesh" 버튼이 설치된다(중복 버튼은 자동 제거).
 
 ---

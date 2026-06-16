@@ -1,10 +1,3 @@
-# Python Script by Ji Hun Park
-# last Update date : 2026-06-12
-# A00160_sphericalEye - 셸프 버튼 설치 + 드래그&드롭 진입점
-#
-# 이 파일을 Maya 뷰포트로 드래그&드롭하면 현재 셸프에 버튼이 설치된다.
-# 설치된 버튼은 tools.A00160_sphericalEye.run(True) 를 호출한다.
-
 import maya.cmds as cmds
 import maya.mel as mel
 import os
@@ -12,34 +5,26 @@ import sys
 
 
 # =========================
-# DEV
+# USER CONFIG
 # =========================
 
-DEV_MODE = True
+TOOL_ROOT = os.path.dirname(__file__)
+TOOL_PATH = "A00050_uvTool"
 
 
-# =========================
-# PATH
-# =========================
-
-TOOL_ROOT = os.path.dirname(__file__)              # .../tools/A00160_sphericalEye
-JUN_ALL_ROOT = os.path.dirname(os.path.dirname(TOOL_ROOT))  # .../JUN_All
-
-# JUN_All 을 sys.path 에 추가 (tools 패키지 import 가능하게)
-if JUN_ALL_ROOT not in sys.path:
-    sys.path.append(JUN_ALL_ROOT)
+# tools 폴더 import 가능하게 추가
+if TOOL_ROOT not in sys.path:
+    sys.path.append(TOOL_ROOT)
 
 
 # =========================
 # TOOL INFO
 # =========================
 
-TOOL_LABEL = "SphericalEye"
+TOOL_LABEL = "uvTool"
 
 ICON_NAME = "pythonFamily.png"
 
-# 셸프 버튼이 실행할 명령.
-# ROOT 는 JUN_All 경로여야 `import tools.A00160_sphericalEye` 가 동작한다.
 SHELF_COMMAND = r'''
 import sys
 
@@ -48,11 +33,12 @@ ROOT = r"{root}"
 if ROOT not in sys.path:
     sys.path.append(ROOT)
 
-import tools.A00160_sphericalEye as A00160_sphericalEye
+import tools.{tool_path} as {tool_path}
 
-A00160_sphericalEye.run(True)
+{tool_path}.run(True)
 '''.format(
-    root=JUN_ALL_ROOT.replace("\\", "/")
+    root=TOOL_ROOT.replace("\\", "/"),
+    tool_path = TOOL_PATH
 )
 
 
@@ -72,7 +58,7 @@ def install_shelf_button():
 
         cmd = cmds.shelfButton(btn, q=True, command=True)
 
-        if "A00160_sphericalEye.run(True)" in str(cmd):
+        if "A00050_uvTool.run(True)" in str(cmd):
 
             cmds.deleteUI(btn)
 
@@ -102,4 +88,11 @@ def install_shelf_button():
 
 def onMayaDroppedPythonFile(*args):
 
-    install_shelf_button()
+    try:
+        install_shelf_button()
+    finally:
+        # 이 파일은 베이스네임으로 import 되어 sys.modules 에 캐시된다.
+        # 같은 이름이 다시 드롭될 때 캐시된(이전) 모듈이 실행되는 것을 막기 위해
+        # 자기 자신을 캐시에서 제거한다.
+        import sys
+        sys.modules.pop(__name__, None)

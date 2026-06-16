@@ -32,7 +32,7 @@ rigmarolestudio "Rigging Spherical Eyes" 기법을 재현한다.
 A00160_sphericalEye/
 ├── __init__.py            # from .launch import run
 ├── launch.py              # run(): MainWindow → 테마 적용 → show()
-├── config.py              # 셸프 버튼 설치 + 드래그&드롭 진입점
+├── __dragDrop_A00160.py              # 셸프 버튼 설치 + 드래그&드롭 진입점
 └── app/
     ├── config/version.py  # VERSION / LAST_UPDATE
     ├── core/
@@ -49,7 +49,7 @@ A00160_sphericalEye/
 
 ## 3. 설치 / 실행
 
-- `A00160_sphericalEye/config.py` 를 Maya 뷰포트로 **드래그&드롭** → 셸프에 **`SphericalEye`** 버튼 생성.
+- `A00160_sphericalEye/__dragDrop_A00160.py` 를 Maya 뷰포트로 **드래그&드롭** → 셸프에 **`SphericalEye`** 버튼 생성.
 - 셸프 버튼 클릭, 또는 Script Editor 에서:
 
 ```python

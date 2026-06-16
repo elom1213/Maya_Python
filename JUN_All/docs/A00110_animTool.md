@@ -52,7 +52,7 @@
 A00110_animTool/
 ├── __init__.py            # from .launch import run
 ├── launch.py              # run(): MainWindow 생성 → 테마 적용 → show()
-├── config.py              # 셸프 버튼 설치 + 드래그&드롭 진입점
+├── __dragDrop_A00110.py              # 셸프 버튼 설치 + 드래그&드롭 진입점
 ├── requirements.txt
 └── app/
     ├── config/
@@ -77,7 +77,7 @@ A00110_animTool/
 
 ## 3. 설치
 
-`A00110_animTool/config.py` 를 Maya 뷰포트로 **드래그&드롭** → 셸프에 버튼 생성.
+`A00110_animTool/__dragDrop_A00110.py` 를 Maya 뷰포트로 **드래그&드롭** → 셸프에 버튼 생성.
 
 ---
 

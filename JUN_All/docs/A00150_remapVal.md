@@ -41,7 +41,7 @@
 A00150_remapVal/
 ├── __init__.py            # from .launch import run
 ├── launch.py              # run(): MainWindow 생성 → 테마 적용 → show()
-├── config.py              # 셸프 버튼 설치 + 드래그&드롭 진입점
+├── __dragDrop_A00150.py              # 셸프 버튼 설치 + 드래그&드롭 진입점
 ├── CHANGELOG.md
 ├── requirements.txt
 ├── sample_01.py           # 원본 참고 코드(보존)
@@ -61,7 +61,7 @@ A00150_remapVal/
 
 ## 3. 설치
 
-`A00150_remapVal/config.py` 를 Maya 뷰포트로 **드래그&드롭** → 셸프에 **`RemapVal`** 버튼 생성.
+`A00150_remapVal/__dragDrop_A00150.py` 를 Maya 뷰포트로 **드래그&드롭** → 셸프에 **`RemapVal`** 버튼 생성.
 
 ---
 

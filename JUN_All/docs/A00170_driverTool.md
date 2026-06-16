@@ -39,7 +39,7 @@
 A00170_driverTool/
 ├── __init__.py            # from .launch import run
 ├── launch.py              # run(): MainWindow 생성 → 테마(yellow_dark) → show()
-├── config.py              # 셸프 버튼 설치 + 드래그&드롭 진입점 (TOOL_LABEL = "DriverTool")
+├── __dragDrop_A00170.py              # 셸프 버튼 설치 + 드래그&드롭 진입점 (TOOL_LABEL = "DriverTool")
 └── app/
     ├── config/version.py  # VERSION / LAST_UPDATE
     ├── core/              # 로직 (UI 비의존)
@@ -58,7 +58,7 @@ A00170_driverTool/
 
 ## 3. 설치 / 실행
 
-- **설치**: `A00170_driverTool/config.py` 를 Maya 뷰포트로 **드래그&드롭**하면 현재 셸프에
+- **설치**: `A00170_driverTool/__dragDrop_A00170.py` 를 Maya 뷰포트로 **드래그&드롭**하면 현재 셸프에
   "DriverTool" 버튼이 설치된다(중복 버튼은 자동 제거).
 - **실행**: 셸프 버튼 클릭, 또는 스크립트 에디터에서
   ```python
