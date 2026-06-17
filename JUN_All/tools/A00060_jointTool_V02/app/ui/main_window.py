@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-16
+# last Update date : 2026-06-17
 # A00060_jointTool_V02 - Qt UI
 #
 # MEL JointTool V05.03 의 3탭(Curve / Divide / Aim)을 PySide 로 포팅하고,
@@ -10,6 +10,7 @@
 #          aimConstraint(부모->자식 cycle) 대신 벡터 연산으로 jointOrient 직접 계산.
 
 from Framework.qt.qt import *
+from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 
 print("QT version  :  " + str(QT_VERSION))
@@ -39,7 +40,7 @@ _POINT_TYPES = [
 class MainWindow(QWidget):
 
     def __init__(self):
-        super(MainWindow, self).__init__()
+        super(MainWindow, self).__init__(maya_main_window())
 
         self.setObjectName(WINDOW_OBJECT_NAME)
 
@@ -57,7 +58,7 @@ class MainWindow(QWidget):
 
     def build_ui(self):
         self.setWindowTitle(self.win_title)
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.Window)
 
         main_layout = QVBoxLayout(self)
 

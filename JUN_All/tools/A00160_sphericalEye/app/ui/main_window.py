@@ -10,6 +10,7 @@ Z축 일렬 조인트(앞 -> 중심)를 컨트롤러 driver 하나로 구면 dil
 import maya.cmds as cmds
 
 from Framework.qt.qt import *
+from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 
 from tools.A00160_sphericalEye.app.config.version import VERSION, LAST_UPDATE
@@ -19,10 +20,10 @@ from tools.A00160_sphericalEye.app.core import MayaScene, run_build, run_build_n
 class MainWindow(QWidget):
 
     def __init__(self):
-        super(MainWindow, self).__init__()
+        super(MainWindow, self).__init__(maya_main_window())
 
         self.setWindowTitle("Spherical Eye Tool v{0}".format(VERSION))
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.Window)
         self.resize(480, 560)
 
         self._build_ui()

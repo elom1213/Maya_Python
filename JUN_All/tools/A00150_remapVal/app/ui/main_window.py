@@ -15,6 +15,7 @@ sample_01.py 의 build_slerp_ramp(prefix, controlObj, oColl, twistAttrs) 를 GUI
 import maya.cmds as cmds
 
 from Framework.qt.qt import *
+from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 
 from tools.A00150_remapVal.app.config.version import VERSION, LAST_UPDATE
@@ -24,10 +25,10 @@ from tools.A00150_remapVal.app.core import MayaScene, run_build, run_build_wave
 class MainWindow(QWidget):
 
     def __init__(self):
-        super(MainWindow, self).__init__()
+        super(MainWindow, self).__init__(maya_main_window())
 
         self.setWindowTitle("Remap Value Tool v{0}".format(VERSION))
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.Window)
         self.resize(560, 720)
 
         self._build_ui()

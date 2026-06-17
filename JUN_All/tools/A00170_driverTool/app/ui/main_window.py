@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-15
+# last Update date : 2026-06-17
 # A00170_driverTool - Qt UI
 #
 # A00150_remapVal (Remap Value) + A00160_sphericalEye (Spherical Eye) 를
@@ -11,6 +11,7 @@
 import maya.cmds as cmds
 
 from Framework.qt.qt import *
+from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 
 from tools.A00170_driverTool.app.config.version import VERSION, LAST_UPDATE
@@ -28,12 +29,12 @@ WINDOW_OBJECT_NAME = "JUN_A00170_driverTool_window"
 class MainWindow(QWidget):
 
     def __init__(self):
-        super().__init__()
+        super().__init__(maya_main_window())
 
         self.setObjectName(WINDOW_OBJECT_NAME)
 
         self.setWindowTitle("Driver Tool v{0}".format(VERSION))
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.Window)
         self.resize(580, 780)
 
         self.build_ui()

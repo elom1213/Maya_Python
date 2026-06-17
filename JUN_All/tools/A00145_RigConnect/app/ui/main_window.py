@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-16
+# last Update date : 2026-06-17
 # A00145_RigConnect - Qt UI
 #
 # MEL ConnectionTool V04.02 의 3탭(Constrain / Connect / List Connected)을 PySide 로
@@ -10,6 +10,7 @@
 # 모든 UI 문자열(버튼/라벨/로그)은 영어. (한국어는 주석/독스트링만)
 
 from Framework.qt.qt import *
+from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 
 print("QT version  :  " + str(QT_VERSION))
@@ -31,7 +32,7 @@ WINDOW_OBJECT_NAME = "JUN_A00145_RigConnect_window"
 class MainWindow(QWidget):
 
     def __init__(self):
-        super(MainWindow, self).__init__()
+        super(MainWindow, self).__init__(maya_main_window())
 
         self.setObjectName(WINDOW_OBJECT_NAME)
 
@@ -53,7 +54,7 @@ class MainWindow(QWidget):
 
     def build_ui(self):
         self.setWindowTitle(self.win_title)
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.Window)
 
         main_layout = QVBoxLayout(self)
 

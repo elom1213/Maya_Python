@@ -8,6 +8,7 @@ PySide 로 재구성. 로직은 app/core 모듈에 위임하고, 이 모듈은 �
 """
 
 from Framework.qt.qt import *
+from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 
 from tools.A00130_ControlRig.app.config.version import VERSION
@@ -37,13 +38,13 @@ CHECKBOX_LABELS = [
 class MainWindow(QWidget):
 
     def __init__(self):
-        super(MainWindow, self).__init__()
+        super(MainWindow, self).__init__(maya_main_window())
 
         # 원본의 전역 cage 를 인스턴스 속성으로 캡슐화
         self.cage = CageModel()
 
         self.setWindowTitle("Control Rig Tool v{0}".format(VERSION))
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.Window)
         self.resize(480, 800)
 
         self._build_ui()

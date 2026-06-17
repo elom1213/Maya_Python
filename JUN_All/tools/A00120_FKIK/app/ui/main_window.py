@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-10
+# last Update date : 2026-06-17
 # A00120_FKIK - Qt UI (레거시 PY_JUN_makeUI_FKIKTool 대체)
 
 from Framework.qt.qt import *
+from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 
 print("QT version  :  " + str(QT_VERSION))
@@ -22,7 +23,7 @@ class MainWindow(QWidget):
 
     def __init__(self):
 
-        super().__init__()
+        super().__init__(maya_main_window())
 
         self.win_width  = 480
         self.win_height = 760
@@ -39,7 +40,7 @@ class MainWindow(QWidget):
     def build_ui(self):
 
         self.setWindowTitle(self.win_title)
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.Window)
 
         root = QVBoxLayout(self)
 

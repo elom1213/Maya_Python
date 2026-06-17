@@ -11,6 +11,7 @@ A00020_move_skineWeightTool 의 좌/우 2-리스트 UI 개념을 PySide 로 재�
 """
 
 from Framework.qt.qt import *
+from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 
 from tools.A00140_ConnectClosest.app.config.version import VERSION, LAST_UPDATE
@@ -23,10 +24,10 @@ from tools.A00140_ConnectClosest.app.core import (
 class MainWindow(QWidget):
 
     def __init__(self):
-        super(MainWindow, self).__init__()
+        super(MainWindow, self).__init__(maya_main_window())
 
         self.setWindowTitle("Connect Closest Tool v{0}".format(VERSION))
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.Window)
         self.resize(520, 640)
 
         self._build_ui()

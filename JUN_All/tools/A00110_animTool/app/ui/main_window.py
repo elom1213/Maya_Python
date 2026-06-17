@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-16
+# last Update date : 2026-06-17
 # A00110_animTool - Qt UI
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
+from Framework.qt.maya_window import maya_main_window
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -28,7 +29,9 @@ class MainWindow(QWidget):
 
     def __init__(self):
 
-        super().__init__()
+        # 마야 메인 윈도우에 parent. 뷰포트 위에는 떠 있되 다른 툴 창과는 정상 Z-order
+        # (밑의 창을 클릭하면 위로 올라온다). WindowStaysOnTopHint 의 대체.
+        super().__init__(maya_main_window())
 
         self.setObjectName(WINDOW_OBJECT_NAME)
 
@@ -52,10 +55,9 @@ class MainWindow(QWidget):
 
         self.setWindowTitle(self.win_title)
 
-        self.setWindowFlags(
-            self.windowFlags()
-            | Qt.WindowStaysOnTopHint
-        )
+        # parent(마야 메인 윈도우)가 있어도 임베드되지 않고 독립 창으로 유지.
+        # (isWindow()==True 이므로 launch.py 의 topLevelWidgets() 정리 로직도 그대로 동작)
+        self.setWindowFlags(Qt.Window)
 
         main_layout = QVBoxLayout(self)
 

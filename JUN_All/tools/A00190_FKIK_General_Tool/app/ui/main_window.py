@@ -13,6 +13,7 @@ UI 문자열/로그는 영어. 핸들러는 위젯에서 list[str] 를 뽑아 co
 import maya.cmds as cmds
 
 from Framework.qt.qt import *
+from Framework.qt.maya_window import maya_main_window
 
 from ..config.version import VERSION, LAST_UPDATE
 from ..core import matching
@@ -31,11 +32,11 @@ _LIMB_LABELS = ["Arm Left", "Arm Right", "Leg Left", "Leg Right"]
 class MainWindow(QWidget):
 
     def __init__(self):
-        super(MainWindow, self).__init__()
+        super(MainWindow, self).__init__(maya_main_window())
 
         self.setObjectName(WINDOW_OBJECT_NAME)
         self.setWindowTitle("FKIK General Tool v{0}".format(VERSION))
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.Window)
         self.resize(760, 1000)
 
         # slot_id -> tsl 위젯 (모든 그룹에서 집계)

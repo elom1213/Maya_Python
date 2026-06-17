@@ -1,5 +1,6 @@
 # from Framework.qt.qt import QApplication 
 from Framework.qt.qt import * 
+from Framework.qt.maya_window import maya_main_window
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -14,7 +15,7 @@ class MainWindow(QWidget):
 
     def __init__(self):
 
-        super().__init__()
+        super().__init__(maya_main_window())
 
         self.win_width      =  600
         self.win_height     =  400
@@ -32,10 +33,7 @@ class MainWindow(QWidget):
 
         self.setWindowTitle(self.win_title)
 
-        self.setWindowFlags(
-            self.windowFlags()
-            | Qt.WindowStaysOnTopHint
-        )
+        self.setWindowFlags(Qt.Window)
 
         # 버튼
         self.btn_open = QPushButton("Open File")
