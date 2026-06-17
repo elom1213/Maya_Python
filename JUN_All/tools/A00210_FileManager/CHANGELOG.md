@@ -2,6 +2,21 @@
 
 All notable changes to this tool are documented here.
 
+## [01.01] - 2026-06-17
+### Added
+- **Path Structure** tab: save a folder-structure template (subfolders of a base
+  folder) to JSON in the synced store, and recreate those folders on another PC.
+  - Base path is stored **relative to the project root**, so recreation rebuilds
+    under each PC's own project root (absolute paths may differ).
+  - **Recursive** checkbox: capture the full nested subfolder tree, or only the
+    immediate child folders.
+  - Multiple named structures (`<store_dir>/path_structures/<name>.json`); list,
+    preview, recreate, delete. Folders only — no files are created.
+  - Auto-synced by the existing Git Pull / Push (records / thumbnails / structures).
+### Changed
+- Main window reorganized into tabs (**File Manager**, **Path Structure**); the log
+  panel is shared below both tabs.
+
 ## [01.00] - 2026-06-17
 ### Added
 - Initial release. Standalone (Maya-independent) PySide6 Windows app.

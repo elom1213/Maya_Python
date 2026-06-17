@@ -13,6 +13,7 @@ import time
 
 from Framework.qt.qt import (
     QWidget,
+    QTabWidget,
     QVBoxLayout,
     QHBoxLayout,
     QGridLayout,
@@ -36,6 +37,7 @@ from app.core.git_sync import GitSync
 from app.core.models import FileRecord, LogEntry
 from app.ui.file_table import FileTable
 from app.ui.region_capture import RegionCapture
+from app.ui.path_structure_tab import PathStructureTab
 
 
 THUMB_W = 320
@@ -64,7 +66,31 @@ class MainWindow(QWidget):
     def _build_ui(self):
         root = QVBoxLayout(self)
 
-        root.addWidget(self._build_settings_group())
+        # 로그 위젯은 탭 밖(하단)에 두어 모든 탭에서 보이게 한다.
+        # 새 탭이 self.log 를 캡처하므로 탭보다 먼저 생성한다.
+        self.log_widget = QPlainTextEdit()
+        self.log_widget.setReadOnly(True)
+        self.log_widget.setMaximumHeight(120)
+
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self._build_file_manager_tab(), "File Manager")
+
+        self.path_structure_tab = PathStructureTab(
+            get_store=self._make_store,
+            get_project_root=self.get_project_root,
+            get_store_dir=self.get_store_dir,
+            log=self.log,
+        )
+        self.tabs.addTab(self.path_structure_tab, "Path Structure")
+
+        root.addWidget(self.tabs, stretch=1)
+        root.addWidget(self.log_widget)
+
+    def _build_file_manager_tab(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        layout.addWidget(self._build_settings_group())
 
         splitter = QSplitter(Qt.Horizontal)
         self.file_table = FileTable()
@@ -73,14 +99,11 @@ class MainWindow(QWidget):
         splitter.addWidget(self._build_detail_panel())
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
-        root.addWidget(splitter, stretch=1)
+        layout.addWidget(splitter, stretch=1)
 
-        root.addWidget(self._build_git_group())
+        layout.addWidget(self._build_git_group())
 
-        self.log_widget = QPlainTextEdit()
-        self.log_widget.setReadOnly(True)
-        self.log_widget.setMaximumHeight(120)
-        root.addWidget(self.log_widget)
+        return page
 
     def _build_settings_group(self):
         group = QGroupBox("Settings")
@@ -235,6 +258,12 @@ class MainWindow(QWidget):
         self.log(f"Settings saved: {path}")
 
     # ============================================================ helpers
+
+    def get_project_root(self):
+        return self.ipf_project_root.text().strip()
+
+    def get_store_dir(self):
+        return self.ipf_store_dir.text().strip()
 
     def _make_store(self):
         return MetaStore(
