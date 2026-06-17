@@ -411,6 +411,18 @@ class MainWindow(QWidget):
         axis_row.addStretch(1)
         tab_layout.addLayout(axis_row)
 
+        # Method: Behavior (preserve target local axes) vs world reflection (legacy)
+        method_row = QHBoxLayout()
+        self.cb_mir_behavior = QCheckBox("Behavior (keep target local axes)")
+        self.cb_mir_behavior.setChecked(True)  # 기본값 = 새 방식(behavior)
+        self.cb_mir_behavior.setToolTip(
+            "On: preserve the target controller's own forward/up axes,\n"
+            "like mirror-behavior joints (rest-relative mirror).\n"
+            "Off: pure world reflection (legacy).")
+        method_row.addWidget(self.cb_mir_behavior)
+        method_row.addStretch(1)
+        tab_layout.addLayout(method_row)
+
         # -------------------------
         # Time range + time mode. 기본값은 현재 playback 범위.
         # -------------------------
@@ -514,6 +526,7 @@ class MainWindow(QWidget):
         # -------------------------
 
         self.rb_mir_auto.toggled.connect(self._mir_update_mode)
+        self.cb_mir_behavior.toggled.connect(self._mir_update_method)
         self.btn_mir_resolve.clicked.connect(self.on_mir_resolve)
         self.btn_mirror.clicked.connect(self.on_mirror_key)
         self.btn_mirror_current.clicked.connect(self.on_mirror_current_frame)
@@ -521,6 +534,8 @@ class MainWindow(QWidget):
         self.btn_tok_del.clicked.connect(self._mir_del_token_row)
         self.btn_tok_save.clicked.connect(self.on_mir_save_tokens)
         self.btn_tok_reload.clicked.connect(self._mir_load_tokens)
+
+        self._mir_update_method()  # behavior 초기 상태를 Mirror Axis 활성/비활성에 반영
 
         return tab
 
@@ -770,6 +785,13 @@ class MainWindow(QWidget):
         self.mir_list_row.setVisible(True)
         self.btn_mir_resolve.setVisible(not manual)
 
+    def _mir_update_method(self, *args):
+        """Behavior(축 보존) 모드면 Mirror Axis 가 무의미하므로 X/Y/Z 라디오를 비활성화한다.
+        (behavior 미러의 좌우 대칭은 레스트 차이에 내장돼 있어 반사축에 무관하다.)"""
+        axis_enabled = not self.cb_mir_behavior.isChecked()
+        for rb in self.mir_axis_btns.values():
+            rb.setEnabled(axis_enabled)
+
     def _mir_axis(self):
         for ax, rb in self.mir_axis_btns.items():
             if rb.isChecked():
@@ -855,11 +877,13 @@ class MainWindow(QWidget):
 
     def _mir_resolve_pairs(self):
         """현재 모드(Auto/Manual)로 (src, tgt) 페어 리스트 반환. 실패 시 None(경고 로그).
-        on_mirror_key(구간) / on_mirror_current_frame(현재 프레임) 가 공유한다."""
+        on_mirror_key(구간) / on_mirror_current_frame(현재 프레임) 가 공유한다.
+        씬 선택과 무관하게 Source/Target 리스트의 오브젝트만 대상으로 한다."""
+        base = self.mir_base_tsl.get_all_items()
+        tgt = self.mir_tgt_tsl.get_all_items()
+
         if self.rb_mir_manual.isChecked():
             # 수동: Source/Target 리스트를 인덱스 매칭.
-            base = self.mir_base_tsl.get_all_items()
-            tgt = self.mir_tgt_tsl.get_all_items()
             if not base or not tgt:
                 self.log("[Warning] Fill both Source and Target lists.")
                 return None
@@ -868,13 +892,16 @@ class MainWindow(QWidget):
                 return None
             return list(zip(base, tgt))
 
-        # 자동: 현재 선택으로 토큰 페어링.
-        sel = cmds.ls(sl=True) or []
-        if not sel:
-            self.log("[Warning] Select source controllers first.")
+        # 자동: 씬 선택을 읽지 않고 Source 리스트를 기준으로 한다.
+        if not base:
+            self.log("[Warning] Source list is empty. Use 'Select Source' or 'Resolve Pairs'.")
             return None
+        if tgt and len(tgt) == len(base):
+            # 이미 페어가 채워져 있으면(Resolve 등) 그대로 사용.
+            return list(zip(base, tgt))
+        # Target 리스트가 비어 있으면 Source 리스트를 토큰으로 자동 페어링.
         token_pairs = self._mir_token_pairs() or list(MirrorKeyManager.DEFAULT_TOKEN_PAIRS)
-        pairs, unpaired, center = MirrorKeyManager.resolve_pairs(sel, token_pairs)
+        pairs, unpaired, center = MirrorKeyManager.resolve_pairs(base, token_pairs)
         if unpaired:
             self.log(f"[Warning] {len(unpaired)} unpaired (skipped): {', '.join(unpaired)}")
         if not pairs:
@@ -904,7 +931,8 @@ class MainWindow(QWidget):
 
         count, msg = MirrorKeyManager.mirror_keys(
             pairs, start, end, mirror_axis=axis,
-            do_translate=do_t, do_rotate=do_r, time_mode=time_mode)
+            do_translate=do_t, do_rotate=do_r, time_mode=time_mode,
+            behavior=self.cb_mir_behavior.isChecked())
         self.log(msg)
 
     def on_mirror_current_frame(self):
@@ -923,6 +951,7 @@ class MainWindow(QWidget):
             pairs, mirror_axis=self._mir_axis(),
             do_translate=do_t, do_rotate=do_r,
             per_object=self.rb_mir_cf_object.isChecked(),
+            behavior=self.cb_mir_behavior.isChecked(),
         )
         self.log(msg)
 

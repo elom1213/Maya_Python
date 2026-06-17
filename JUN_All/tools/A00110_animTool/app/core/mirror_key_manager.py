@@ -1,12 +1,19 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-16
+# last Update date : 2026-06-17
 # A00110_animTool - 컨트롤러 키프레임을 반대쪽 컨트롤러로 좌우 미러하는 핵심 로직 (maya.cmds + OpenMaya 2.0, UI 비의존)
 #
 # 언리얼 Mirror Data Table 과 동일하게, 한쪽 컨트롤의 애니메이션을 좌우 대칭으로 반대쪽에 복사한다.
 # rotateOrder 무관:  소스는 worldMatrix 로 읽고(오일러 무관), 결과는 타겟 rotateOrder 로 재분해해 기록한다.
 #   - 채널 부호 반전 방식은 rotateOrder/축 정렬에 의존하므로 쓰지 않는다.
 #   - 월드 매트릭스를 반사축 기준으로 반사(reflection conjugation)한 뒤 타겟 로컬로 변환한다.
+#
+# 두 가지 미러 모드:
+#   - behavior (기본): 소스의 로컬 채널 값(translate/rotate)을 타겟에 그대로 복사한다.
+#     Maya mirror joints 의 Behavior 세팅으로 만든 좌우 축 반전 리그는 컨트롤러 자체가 거울상으로
+#     정렬돼 있어, 로컬 채널 값을 그대로 복사하면 대칭 포즈가 된다(반사축 무관).
+#     예: rotateOrder zxy (-10,-3,-50) -> 타겟도 (-10,-3,-50).
+#   - orientation (기존): 순수 월드 반사(반사축 사용). Mt_world = refl * Ms * refl.
 
 import math
 
@@ -121,7 +128,8 @@ class MirrorKeyManager:
 
     @staticmethod
     def mirror_keys(pairs, start, end, mirror_axis="x",
-                    do_translate=True, do_rotate=True, time_mode="source_keys"):
+                    do_translate=True, do_rotate=True, time_mode="source_keys",
+                    behavior=True):
         """
         pairs 의 각 (src, tgt) 에 대해 [start, end] 구간 키를 미러한다.
 
@@ -129,6 +137,8 @@ class MirrorKeyManager:
         do_translate : translate 3축 미러 여부
         do_rotate    : rotate 3축 미러 여부
         time_mode    : "source_keys"(소스 키 시점에만 기록) | "bake"(정수 프레임 전수)
+        behavior     : True(기본) = 소스 로컬 채널 값을 타겟에 그대로 복사(반사 무관),
+                       False = 순수 월드 반사(orientation)
         반환         : (처리한 페어 수, 메시지)
         """
         if not pairs:
@@ -146,7 +156,8 @@ class MirrorKeyManager:
         try:
             for src, tgt in pairs:
                 ok = MirrorKeyManager._mirror_one(
-                    src, tgt, start, end, refl, do_translate, do_rotate, time_mode)
+                    src, tgt, start, end, refl, do_translate, do_rotate, time_mode,
+                    behavior)
                 if ok:
                     done += 1
                 else:
@@ -161,17 +172,34 @@ class MirrorKeyManager:
         return (done, msg)
 
     @staticmethod
-    def _mirrored_values(src, tgt, t, refl, do_t, do_r):
+    def _mirrored_values(src, tgt, t, refl, do_t, do_r, behavior=True):
         """시점 t 에서 src 를 미러해 타겟 로컬 TRS(dict: attr -> value)를 반환.
 
-        소스는 worldMatrix(소스 rotateOrder 무관)로 읽고, 타겟 parentInverseMatrix(t 시점 평가)로
-        로컬화한 뒤 타겟 rotateOrder 로 오일러 재분해한다.
+        behavior=True(기본): 소스의 로컬 채널 값을 타겟에 그대로 복사한다(반사·행렬 연산 없음).
+            Maya `mirror joints` 의 Behavior 세팅으로 만든 좌우 축 반전 리그는 컨트롤러 자체가
+            거울상으로 정렬돼 있어, 로컬 채널 값을 그대로 복사하면 대칭 포즈가 된다.
+            (예: rotateOrder zxy (-10,-3,-50) -> 타겟도 (-10,-3,-50)). 반사축에 무관.
+        behavior=False: 순수 월드 반사(반사축 사용). 소스는 worldMatrix(rotateOrder 무관)로 읽고,
+            refl * Ms * refl 후 타겟 parentInverseMatrix 로 로컬화, 타겟 rotateOrder 로 재분해한다.
         """
+        if behavior:
+            # 로컬 채널 값 그대로 복사. 좌우 대칭은 리그(컨트롤러 거울상 정렬)에 내장돼 있다.
+            values = {}
+            if do_t:
+                for _, attr in MirrorKeyManager.T_AXES:
+                    values[attr] = cmds.getAttr(src + "." + attr, time=t)
+            if do_r:
+                for _, attr in MirrorKeyManager.R_AXES:
+                    values[attr] = cmds.getAttr(src + "." + attr, time=t)
+            return values
+
         ms = om.MMatrix(cmds.getAttr(src + ".worldMatrix[0]", time=t))
+        world = refl * ms * refl
+
         mpi = om.MMatrix(cmds.getAttr(tgt + ".parentInverseMatrix[0]", time=t))
 
-        # 월드 반사(refl * ms * refl) 후 타겟 로컬로: local = world * parentInverse
-        tm = om.MTransformationMatrix((refl * ms * refl) * mpi)
+        # 타겟 로컬로: local = world * parentInverse
+        tm = om.MTransformationMatrix(world * mpi)
 
         values = {}
         if do_t:
@@ -206,7 +234,7 @@ class MirrorKeyManager:
         return any(cmds.nodeType(c).startswith("animCurveT") for c in curves)
 
     @staticmethod
-    def _mirror_one(src, tgt, start, end, refl, do_t, do_r, time_mode):
+    def _mirror_one(src, tgt, start, end, refl, do_t, do_r, time_mode, behavior=True):
         """src -> tgt 단일 페어 미러. 키 하나라도 기록했으면 True."""
 
         times = MirrorKeyManager._collect_times(src, start, end, time_mode)
@@ -220,7 +248,7 @@ class MirrorKeyManager:
         any_set = False
 
         for t in times:
-            values = MirrorKeyManager._mirrored_values(src, tgt, t, refl, do_t, do_r)
+            values = MirrorKeyManager._mirrored_values(src, tgt, t, refl, do_t, do_r, behavior)
             for attr in attrs:
                 try:
                     cmds.setKeyframe(tgt + "." + attr, time=t, value=values[attr])
@@ -237,7 +265,7 @@ class MirrorKeyManager:
 
     @staticmethod
     def mirror_current_frame(pairs, mirror_axis="x", do_translate=True, do_rotate=True,
-                             tol=1e-6, per_object=False):
+                             tol=1e-6, per_object=False, behavior=True):
         """
         현재 프레임의 포즈만 각 (src, tgt) 로 미러한다. (구간 베이크 아님)
 
@@ -272,7 +300,7 @@ class MirrorKeyManager:
                     continue
 
                 values = MirrorKeyManager._mirrored_values(
-                    src, tgt, cur, refl, do_translate, do_rotate)
+                    src, tgt, cur, refl, do_translate, do_rotate, behavior)
 
                 # per-object 모드: 대상 채널 중 하나라도 애니가 있으면 오브젝트를 "keyed" 로 취급.
                 obj_anim = False

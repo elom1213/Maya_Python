@@ -17,6 +17,18 @@
    굽는다(bake)**. 구간은 **현재 타임라인(플레이백)** 또는 **직접 입력(Custom)** 중 선택한다.
    Maya 네이티브 `bakeResults`(C++)를 써서 **6000+프레임 × 50~100 컨트롤러** 같은 대규모도 빠르다.
 
+> **v01.09 — Mirror Key 동작 기준/Behavior 수식 정리**: ① Mirror 실행(Mirror Selected·Mirror
+> Current Frame)이 **씬 선택과 무관하게 Source/Target 리스트의 오브젝트만** 대상으로 한다(선택 →
+> `Resolve Pairs`/`Select Source` 로 리스트 채우기 → 실행으로 단계 분리). ② Behavior 모드 수식에서
+> **반사를 제거**해 소스의 **로컬 채널 값이 타겟에 그대로 복사**되도록 했다(예: zxy `(-10,-3,-50)` →
+> 타겟도 `(-10,-3,-50)`). Behavior 는 반사축에 무관하므로 ON 이면 **Mirror Axis 라디오가 비활성**.
+
+> **v01.08 — Mirror Key 에 "Behavior" 모드 추가**: 반대쪽 컨트롤러의 **고유 forward/up 축 방향을
+> 보존**하며 미러한다(Maya `mirror joints` 의 **Behavior** 세팅처럼 좌우 축이 반전된 리그용). 각
+> 컨트롤의 **레스트(기준) 포즈**(채널 기본값 상태의 월드 행렬)를 기준으로 상대 미러하므로, 소스가
+> 레스트면 타겟도 자기 레스트가 된다. **Behavior 체크박스(기본 ON)** 로 켜고, 끄면 기존 **순수 월드
+> 반사(orientation)** 가 된다. 구간 미러(Mirror Selected)·현재 프레임(Mirror Current Frame) 모두 적용.
+
 > **v01.06 — Mirror Key 에 "Mirror Current Frame" 추가**: 구간이 아니라 **현재 프레임 1곳만** 미러한다.
 > 키잉은 autoKeyframe 를 재현해 **키가 있던 채널만** 현재 프레임에 키를 갱신하고, **키가 없던 채널은
 > 포즈만(`setAttr`)** 미러한다(전역 autoKeyframe 상태는 건드리지 않음). Keying 옵션으로 **Per-channel**
@@ -196,6 +208,7 @@ A00110_animTool.run(True)   # True = reload
 │ └─────────────┘           └─────────────┘         │
 │ [ Resolve Pairs from Selection ]                  │  ← Auto 모드에서 미리보기
 │ Mirror Axis (•)X ( )Y ( )Z   Channels [v]T [v]R   │
+│ [v] Behavior (keep target local axes)             │  ← 기본 ON (새 방식)
 │ Start [ 1 ] End [ 24 ]   Time (•)Source keys ( )Bake│
 │ ┌ L / R Tokens (mirror_tokens.json) [접이식] ────┐│
 │ │ ┌ Left │ Right ┐                                ││
@@ -211,14 +224,25 @@ A00110_animTool.run(True)   # True = reload
 └───────────────────────────────────────────────────┘
 ```
 
+- **실행 대상은 항상 Source/Target 리스트** (v01.09~): Mirror 실행은 **씬 선택을 읽지 않고**
+  리스트에 담긴 오브젝트만 처리한다. 먼저 **Select Source** 또는 **Resolve Pairs** 로 리스트를
+  채운 뒤 실행한다.
 - **Mode**:
-  - **Auto pair from selection**(기본): 씬에서 선택한 컨트롤을 토큰으로 자동 페어링한다.
-    선택한 쪽이 **소스**, 토큰으로 찾은 반대쪽이 **타겟**.
+  - **Auto pair from selection**(기본): **Source 리스트**의 컨트롤을 토큰으로 자동 페어링한다
+    (Source 가 소스, 토큰으로 찾은 반대쪽이 타겟). Target 리스트가 이미 채워져(Resolve 등) 개수가
+    맞으면 그 페어를 그대로 쓴다. **Resolve Pairs** 버튼은 현재 씬 선택을 토큰 페어링해 리스트를
+    채워주는 보조 기능(선택 → 리스트).
   - **Manual list**: `Source[i] → Target[i]` 로 같은 인덱스끼리 직접 매칭(Copy Key 방식).
-- **Source / Target** (재사용 위젯 `JUN_mod_tsl_qt_v01`): 수동 매칭용. **Resolve Pairs** 로 자동
-  페어 결과를 여기에 채워 미리보기/수정할 수 있다.
+- **Source / Target** (재사용 위젯 `JUN_mod_tsl_qt_v01`): 실행 대상 리스트. **Select Source/Targets**
+  로 씬 선택을 담거나, **Resolve Pairs** 로 자동 페어 결과를 채워 미리보기/수정할 수 있다.
 - **Mirror Axis**: 월드 반사축(기본 **X** = YZ 평면, 좌우 대칭). 보통 캐릭터 좌우축이 월드 X.
+  **Behavior 가 ON 이면 비활성**(behavior 모드는 반사축을 쓰지 않음).
 - **Channels**: **Translate / Rotate** 그룹 토글(기본 둘 다 on). 회전만 미러하려면 Translate off.
+- **Behavior (keep target local axes)** (기본 **ON**, v01.08~): 반대쪽 컨트롤러의 **고유 forward/up
+  축 방향을 보존**하며 미러한다(예: 왼쪽 위팔 up=+Y → 오른쪽 위팔이 자기 고유 up=−Y 를 유지).
+  소스의 **로컬 채널 값을 타겟에 그대로 전달**하므로(반사축 무관) Maya `mirror joints` 의
+  **Behavior** 세팅으로 만든 좌우 축 반전 리그에 맞는 결과다. **OFF** 면 기존 **순수 월드
+  반사(orientation)** — 타겟도 월드 기준으로 정렬된다(up=+Y). 구간·현재 프레임 미러 둘 다 적용.
 - **Start / End**: (구간 미러 전용) 미러 대상 시간 범위(기본 = 현재 playback 범위).
 - **Time**: (구간 미러 전용) **Source keys**(기본, 소스의 실제 키 시점에만 기록 → 곡선·타이밍 보존) /
   **Bake**(범위 내 정수 프레임 전수 기록).
@@ -362,16 +386,20 @@ A00110_animTool.run(True)   # True = reload
 - **Paste Option** 이 유효값 목록 밖이면 `insert` 로 폴백(방어).
 
 ### Mirror Key
-- **rotateOrder 무관**: 소스는 `worldMatrix`(오일러 무관)로 읽고, 결과는 `MTransformationMatrix`
-  로 분해 후 `MEulerRotation.reorderIt(타겟 rotateOrder)` 로 **타겟 order 에 맞춰** 기록한다.
-  채널 부호 반전을 쓰지 않으므로 양쪽 order 가 무엇이든 결과 월드 포즈가 동일하다.
-- **미러 수학**(`_mirror_one`): 프레임 `t` 마다
-  `local = (refl · worldMatrix · refl) · targetParentInverse` 를 계산한다. `refl` 은 반사축
-  대각 행렬(예: X → `diag(-1,1,1,1)`). `refl·M·refl` 은 위치를 해당 축으로 반사하고 회전을
-  켤레(conjugate)하므로 **det +1(정상 회전)** 을 유지한다. `getAttr(..., time=t)` 로 타임라인을
-  옮기지 않고 평가하며, 부모가 애니메이션돼도 `parentInverseMatrix` 를 t 시점으로 읽어 정확하다.
-- **월드 경유의 이점**: 타겟의 실제 부모 공간을 기준으로 로컬값을 역산하므로, 리그가 좌우
-  **behavior**(축 반전) 든 **orientation**(동일 축) 셋업이든 상관없이 동작한다(대칭 리그 전제).
+- **두 가지 미러 모드** (Behavior 체크박스, v01.08~). 둘 다 프레임 `t` 마다 `_mirrored_values` 가
+  타겟 로컬 TRS(dict)를 계산하고, `getAttr(..., time=t)` 로 타임라인을 옮기지 않고 평가한다:
+  - **Behavior (기본, ON)** (v01.09~): 소스의 **로컬 채널 값**(translate/rotate)을
+    `getAttr(src.attr, time=t)` 로 읽어 타겟에 **그대로 복사**한다(행렬·반사 연산 없음). Maya
+    `mirror joints` 의 **Behavior** 세팅으로 만든 좌우 축 반전 리그는 컨트롤러 자체가 거울상으로
+    정렬돼 있어, 로컬 채널 값 복사만으로 대칭 포즈가 된다. **반사축(Mirror Axis)에 무관**하므로
+    Behavior ON 이면 Axis 라디오가 비활성. 예: rotateOrder zxy `(-10,-3,-50)` → 타겟도
+    `(-10,-3,-50)`(소스 order 그대로). 값 자체를 복사하므로 rotateOrder 변환도 일어나지 않는다.
+  - **Orientation (OFF)**: 순수 월드 반사(반사축 사용). 소스를 `worldMatrix`(오일러 무관)로 읽고
+    `world = refl · Ms · refl` 후 `local = world · targetParentInverse` 로 타겟 로컬화,
+    `MEulerRotation.reorderIt(타겟 rotateOrder)` 로 **타겟 order 에 맞춰** 기록한다. `refl` 은
+    반사축 대각 행렬(예: X → `diag(-1,1,1,1)`)이라 위치를 반사하고 회전을 켤레(conjugate)하므로
+    **det +1(정상 회전)** 을 유지한다. 부모가 애니메이션돼도 `parentInverseMatrix` 를 t 시점으로
+    읽어 정확하고, 채널 부호 반전을 쓰지 않아 양쪽 order 가 무엇이든 결과 월드 포즈가 동일하다.
 - **페어링**(`resolve_pairs`): 이름의 토큰을 양방향 치환해 후보를 만들고 **씬에 존재하는 첫 후보**를
   페어로 삼는다(`objExists` 로 거르므로 `_l` 이 `arm_lower` 에 잘못 걸려도 무시됨).
   토큰이 없으면 **센터 컨트롤**로 보고 self-mirror(같은 컨트롤 제자리 좌우 반전). 토큰은 있는데
@@ -476,6 +504,9 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 - **(Mirror Key) 미러 결과가 안 맞음** → ① Mirror Axis 가 캐릭터 좌우축인지(보통 X) 확인.
   ② 리그가 좌우 대칭(타겟 부모가 소스 부모의 거울상)인지 확인. ③ 비대칭/오프셋 리그면 결과가
   어긋날 수 있다.
+- **(Mirror Key) 반대쪽 컨트롤러의 축 방향(up/forward)이 뒤집혀 보임** → **Behavior** 체크박스를
+  확인한다. **ON**(기본)이면 타겟 고유 축을 보존(예: 오른쪽 up=−Y 유지), **OFF**면 월드 기준으로
+  정렬(up=+Y)된다. 좌우 축이 반전된(behavior 미러) 리그는 ON, 양쪽 축이 동일한 리그는 OFF 가 맞다.
 - **(Mirror Key) 일부 컨트롤이 skip 됨** → 소스에 해당 범위 키가 없거나 타겟 채널이 잠김/연결됨.
   로그의 `skipped` 수를 확인.
 - **(Mirror Key) 센터 컨트롤이 미러 안 됨** → 좌/우 토큰이 이름에 없으면 self-mirror(제자리 반전)로
