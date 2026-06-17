@@ -10,3 +10,7 @@ __pycache__/
 
 # Obsidian vault 개인 설정
 **/.obsidian/
+
+# PyInstaller build output
+**/build/
+**/dist/

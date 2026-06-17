@@ -1,0 +1,4 @@
+# Single source of truth: JUN_All/requirements.txt
+PySide6
+pyinstaller
+# git sync 는 시스템 git(PATH) 을 subprocess 로 호출한다 (GitPython 미사용).
