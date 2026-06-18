@@ -1,0 +1,4 @@
+# Single source of truth: JUN_All/requirements.txt
+PySide6
+pyinstaller
+# 백업 로직은 표준 라이브러리(shutil/os/re/json)만 사용한다.
