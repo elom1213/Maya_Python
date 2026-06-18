@@ -117,3 +117,48 @@ QGroupBox {
 QGroupBox::title {
     color: #c0addf;
 }
+
+/* --- Tabs & headers: styled explicitly so Win10 native rendering keeps
+       readable contrast (match the Win11 look). --- */
+QTabWidget::pane {
+    border: 1px solid #9582b5;
+    background-color: #2b2b2b;
+    top: -1px;
+}
+
+QTabBar::tab {
+    background-color: #34373d;
+    color: #e6e6e6;
+    border: 1px solid #45484f;
+    border-bottom: none;
+    padding: 6px 14px;
+    margin-right: 2px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+}
+
+QTabBar::tab:selected {
+    background-color: #2b2b2b;
+    color: #ffffff;
+    border-color: #9582b5;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #3f444c;
+}
+
+QHeaderView::section {
+    background-color: #34373d;
+    color: #e6e6e6;
+    border: 1px solid #9582b5;
+    padding: 4px 6px;
+}
+
+QHeaderView::section:hover {
+    background-color: #3f444c;
+}
+
+QTableCornerButton::section {
+    background-color: #34373d;
+    border: 1px solid #9582b5;
+}
