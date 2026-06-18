@@ -19,6 +19,7 @@ from tools.A00110_animTool.app.core import CopyKeyManager
 from tools.A00110_animTool.app.core import MirrorKeyManager
 from tools.A00110_animTool.app.core import MirrorTokenStore
 from tools.A00110_animTool.app.core import BakeManager
+from tools.A00110_animTool.app.core import FollowMatchManager
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -92,6 +93,7 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_copy_key_tab(), "Copy Key")
         self.tabs.addTab(self._build_mirror_key_tab(), "Mirror Key")
         self.tabs.addTab(self._build_bake_tab(), "Bake")
+        self.tabs.addTab(self._build_follow_tab(), "Follow")
         main_layout.addWidget(self.tabs)
 
         # 로그창을 탭 아래에 배치
@@ -654,6 +656,98 @@ class MainWindow(QWidget):
 
         return tab
 
+    def _build_follow_tab(self):
+        """좌(Target) / 우(Follower) 리스트로, follower 가 같은 인덱스의 target 의 월드
+        위치/회전(/스케일)과 동일해지도록 구간 키를 굽는 탭. rotateOrder 무관.
+        blend(0..1) 로 원본 follower 애니메이션과 매치 결과를 섞고, 선택된 애니메이션
+        레이어에 키가 들어간다."""
+
+        tab = QWidget()
+        tab_layout = QVBoxLayout(tab)
+
+        # -------------------------
+        # Target / Follower 리스트 (재사용 위젯, 가로 2분할). Copy Key 탭과 동일 구성.
+        # -------------------------
+
+        self.follow_tgt_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Target", select_label="Select Targets", log_callback=self.log)
+        self.follow_flw_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Follower", select_label="Select Followers", log_callback=self.log)
+
+        list_row = QHBoxLayout()
+        list_row.addWidget(self.follow_tgt_tsl)
+        list_row.addWidget(self.follow_flw_tsl)
+        tab_layout.addLayout(list_row)
+
+        # -------------------------
+        # Time range (start / end). 기본값은 현재 playback 범위.
+        # -------------------------
+
+        validator = QIntValidator(-1000000, 1000000, self)
+        time_str = int(cmds.playbackOptions(query=True, minTime=True))
+        time_end = int(cmds.playbackOptions(query=True, maxTime=True))
+
+        range_row = QHBoxLayout()
+        range_row.addWidget(QLabel("Start"))
+        self.le_follow_start = QLineEdit(str(time_str))
+        self.le_follow_start.setValidator(validator)
+        range_row.addWidget(self.le_follow_start)
+        range_row.addWidget(QLabel("End"))
+        self.le_follow_end = QLineEdit(str(time_end))
+        self.le_follow_end.setValidator(validator)
+        range_row.addWidget(self.le_follow_end)
+        tab_layout.addLayout(range_row)
+
+        # -------------------------
+        # Channels (Translate / Rotate / Scale). 기본 T·R on, S off. (Bake 탭과 동일)
+        # -------------------------
+
+        ch_row = QHBoxLayout()
+        ch_row.addWidget(QLabel("Channels"))
+        self.cb_follow_t = QCheckBox("Translate")
+        self.cb_follow_r = QCheckBox("Rotate")
+        self.cb_follow_s = QCheckBox("Scale")
+        self.cb_follow_t.setChecked(True)
+        self.cb_follow_r.setChecked(True)
+        ch_row.addWidget(self.cb_follow_t)
+        ch_row.addWidget(self.cb_follow_r)
+        ch_row.addWidget(self.cb_follow_s)
+        ch_row.addStretch(1)
+        tab_layout.addLayout(ch_row)
+
+        # -------------------------
+        # Blend (0..1). LineEdit 와 Slider(0..100) 를 동기화. 기본 1.0(완전 매치).
+        # -------------------------
+
+        blend_row = QHBoxLayout()
+        blend_row.addWidget(QLabel("Blend (0..1)"))
+        self.le_follow_blend = QLineEdit("1.0")
+        self.le_follow_blend.setValidator(QDoubleValidator(0.0, 1.0, 3, self))
+        self.le_follow_blend.setMaximumWidth(60)
+        blend_row.addWidget(self.le_follow_blend)
+
+        self.sld_follow_blend = QSlider(Qt.Horizontal)
+        self.sld_follow_blend.setRange(0, 100)
+        self.sld_follow_blend.setValue(100)
+        blend_row.addWidget(self.sld_follow_blend)
+        tab_layout.addLayout(blend_row)
+
+        # -------------------------
+        # Match 버튼
+        # -------------------------
+
+        self.btn_follow = QPushButton("Match Follow")
+        tab_layout.addWidget(self.btn_follow)
+
+        tab_layout.addStretch(1)
+
+        # Slider <-> LineEdit 동기화 + 실행 시그널
+        self.sld_follow_blend.valueChanged.connect(self._follow_slider_to_le)
+        self.le_follow_blend.editingFinished.connect(self._follow_le_to_slider)
+        self.btn_follow.clicked.connect(self.on_follow_bake)
+
+        return tab
+
     # --------------------------------------------------
     # Helper
     # --------------------------------------------------
@@ -1030,6 +1124,69 @@ class MainWindow(QWidget):
             smart=smart,
             smart_tolerance=smart_tol,
         )
+        self.log(msg)
+
+    # --------------------------------------------------
+    # Follow (target match bake)
+    # --------------------------------------------------
+
+    def _follow_slider_to_le(self, value):
+        """Slider(0..100) 변경 -> Blend LineEdit(0..1) 동기화."""
+        self.le_follow_blend.setText("{0:.2f}".format(value / 100.0))
+
+    def _follow_le_to_slider(self):
+        """Blend LineEdit(0..1) 입력 확정 -> Slider(0..100) 동기화."""
+        txt = self.le_follow_blend.text().strip()
+        try:
+            v = max(0.0, min(1.0, float(txt)))
+        except ValueError:
+            return
+        self.sld_follow_blend.blockSignals(True)
+        self.sld_follow_blend.setValue(int(round(v * 100)))
+        self.sld_follow_blend.blockSignals(False)
+
+    def on_follow_bake(self):
+
+        targets = self.follow_tgt_tsl.get_all_items()
+        followers = self.follow_flw_tsl.get_all_items()
+
+        if not targets or not followers:
+            self.log("[Warning] Fill both Target and Follower lists.")
+            return
+        if len(targets) != len(followers):
+            self.log("[Warning] Target ({0}) / Follower ({1}) count mismatch.".format(
+                len(targets), len(followers)))
+            return
+
+        # Start / End 파싱.
+        s_txt = self.le_follow_start.text().strip()
+        e_txt = self.le_follow_end.text().strip()
+        if s_txt == "" or e_txt == "":
+            self.log("[Warning] Enter Start / End.")
+            return
+        start = int(s_txt)
+        end = int(e_txt)
+        if start > end:
+            self.log(f"[Warning] Start ({start}) is greater than End ({end}).")
+            return
+
+        do_t = self.cb_follow_t.isChecked()
+        do_r = self.cb_follow_r.isChecked()
+        do_s = self.cb_follow_s.isChecked()
+        if not (do_t or do_r or do_s):
+            self.log("[Warning] Enable at least one channel group.")
+            return
+
+        b_txt = self.le_follow_blend.text().strip()
+        try:
+            blend = float(b_txt)
+        except ValueError:
+            self.log("[Warning] Invalid Blend value.")
+            return
+
+        count, msg = FollowMatchManager.match_follow(
+            targets, followers, start, end, blend,
+            do_translate=do_t, do_rotate=do_r, do_scale=do_s)
         self.log(msg)
 
     def show_about(self, *args):

@@ -2,7 +2,7 @@
 
 ## 1. 개요
 
-애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **다섯 개의 탭**과 **공유 로그창**으로 구성된다.
+애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **여섯 개의 탭**과 **공유 로그창**으로 구성된다.
 
 1. **Key Edit** — 선택 오브젝트의 키를 시간 범위로 **이동(앞/뒤 offset)·삭제**하고, 그래프
    에디터에서 선택한 키 구간을 **평평하게 유지(Hold)** 한다. `Shift+A` 핫키로 Hold 를 호출할 수 있다.
@@ -16,6 +16,18 @@
 5. **Bake** (v01.05~) — **리스트업한 컨트롤러/오브젝트**의 키를 구간 전체에 **정수 프레임 단위로
    굽는다(bake)**. 구간은 **현재 타임라인(플레이백)** 또는 **직접 입력(Custom)** 중 선택한다.
    Maya 네이티브 `bakeResults`(C++)를 써서 **6000+프레임 × 50~100 컨트롤러** 같은 대규모도 빠르다.
+6. **Follow** (v01.11~) — 좌(**Target**)/우(**Follower**) 리스트로, 각 follower 가 같은 인덱스의
+   target 의 **월드 위치·회전(·스케일)과 동일**해지도록 구간 키를 굽는다(컨스트레인트 없이
+   `parentConstraint(maintainOffset=False)` 와 동등). **rotateOrder 가 달라도 정확**하고,
+   **blend(0~1)** 로 원본 follower 애니메이션과 매치 결과를 섞으며(0=원본 유지, 1=덮어쓰기,
+   0.5=반반), 선택된 **애니메이션 레이어**(override/additive)에 키가 들어간다.
+
+> **v01.11 — Follow 탭 신설**: follower 들을 인덱스로 매칭된 target 의 월드 transform 에 맞춰 구간
+> 키 베이크한다. target `worldMatrix` 를 follower `parentInverseMatrix` 로 로컬화한 뒤 **follower
+> 자신의 rotateOrder 로 재분해**(Mirror Key 의 검증된 경로 재사용)하므로 rotateOrder 무관이다.
+> **blend(0~1)** 는 위치/스케일 선형 lerp + 회전 쿼터니언 slerp 로 **키 값에 직접 베이크**(레이어
+> weight 는 1 유지)하고, 현재 선택된 애니 레이어가 override 면 `V=F`, additive 면 `V=F−base` 로
+> 기록한다. 로직은 `app/core/follow_match_manager.py`, 리스트 UI 는 재사용 위젯 `JUN_mod_tsl_qt_v01` 2개.
 
 > **v01.09 — Mirror Key 동작 기준/Behavior 수식 정리**: ① Mirror 실행(Mirror Selected·Mirror
 > Current Frame)이 **씬 선택과 무관하게 Source/Target 리스트의 오브젝트만** 대상으로 한다(선택 →
@@ -52,7 +64,8 @@
 
 - DCC: Autodesk Maya (PySide UI). 키 조작은 `maya.cmds`(`keyframe`/`cutKey`/`copyKey`/
   `pasteKey`/`scaleKey`/`setKeyframe`/`keyTangent`) 표준 명령만 사용 → Maya 2023 호환.
-  Mirror Key 만 행렬 연산에 `maya.api.OpenMaya`(2.0) 의 `MMatrix`/`MTransformationMatrix` 사용.
+  Mirror Key / Follow 만 행렬·회전 연산에 `maya.api.OpenMaya`(2.0) 의 `MMatrix`/
+  `MTransformationMatrix`/`MEulerRotation`/`MQuaternion` 사용.
 - 복사 알고리즘 원본: 레거시 `JUN_cmd_copyKey_V02`. Pose Key 는 `A00030_quickTool` 의
   `JUN_cmd_anim_rot_x_z_to_zero`(3축)를 6축으로 일반화한 것.
 
@@ -77,8 +90,9 @@ A00110_animTool/
     │   ├── copykey_manager.py    # Base→Target 키 복사 + 축 Reverse (Copy Key 탭)
     │   ├── mirror_key_manager.py # 컨트롤 키 좌우 미러 (Mirror Key 탭, OpenMaya)
     │   ├── mirror_token_store.py # mirror_tokens.json 입출력 + 폴백
-    │   └── bake_manager.py       # 리스트 노드 구간 bake (Bake 탭, native bakeResults)
-    └── ui/main_window.py  # 전체 UI (5개 탭 + 공유 로그창 + 메뉴 바)
+    │   ├── bake_manager.py       # 리스트 노드 구간 bake (Bake 탭, native bakeResults)
+    │   └── follow_match_manager.py # follower→target 월드 매치 베이크 (Follow 탭, OpenMaya + blend)
+    └── ui/main_window.py  # 전체 UI (6개 탭 + 공유 로그창 + 메뉴 바)
 ```
 
 - 각 manager 는 **UI 비의존 정적 메서드**(`@staticmethod`)로 작성되고 `(count, msg)` 를 반환한다.
@@ -110,7 +124,7 @@ A00110_animTool.run(True)   # True = reload
 
 ```
 ┌ Help ────────────────────────────────────────────────────────┐  ← 메뉴 바 (Help > About)
-│ [Key Edit][Pose Key][Copy Key][Mirror Key][ Bake ]            │  ← 탭 (5개)
+│ [Key Edit][Pose Key][Copy Key][Mirror Key][Bake][Follow]      │  ← 탭 (6개)
 ├───────────────────────────────────────────────────────────────┤
 │  (선택된 탭 내용)                                             │
 ├ Log (모든 탭 공유) ───────────────────────────────────────────┤
@@ -294,6 +308,38 @@ A00110_animTool.run(True)   # True = reload
   의존 리그에 안전). 순수 FK 라면 꺼서 가속할 수 있다.
 - **Bake List**: 베이크 실행. 결과(개수 / 구간 / 프레임 수 / 컨스트레인트 kept·baked down)가 로그에 출력.
 
+### 5.6 Follow 탭
+
+```
+┌───────────────────────────────────────────────────┐
+│ [Target]                  [Follower]              │  ← 재사용 위젯 2개 (가로 2분할)
+│ Select Targets            Select Followers        │
+│ ┌ QListWidget ┐           ┌ QListWidget ┐         │
+│ │  tgt objs   │           │  flw objs   │         │
+│ └─────────────┘           └─────────────┘         │
+│ Add|Del|Up|Down|Sort      Add|Del|Up|Down|Sort    │
+│ Start [ 1 ]   End [ 24 ]                           │  ← 기본값 = 현재 playback 범위
+│ Channels [v] Translate [v] Rotate [ ] Scale       │  ← 기본 T·R (Scale off)
+│ Blend (0..1) [ 1.0 ]  [====슬라이더 0..100====]   │  ← LineEdit ↔ Slider 동기화, 기본 1.0
+│ [ Match Follow ]                                  │
+└───────────────────────────────────────────────────┘
+```
+
+- **Target / Follower** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `Select Targets`/`Select Followers` 로
+  현재 Maya 선택을 리스트에 채운다. **Target[i] → Follower[i]** 로 같은 인덱스끼리 매칭하므로
+  **두 리스트의 개수와 순서를 맞춰야** 한다(개수가 다르면 경고 후 중단). Add/Del/Up/Down/Sort 와
+  "Number: N" 카운트, 항목 클릭 시 씬 자동 선택은 위젯이 내장한다.
+- **Start / End**: 매치 키를 구울 시간 범위(정수 프레임 전수). 기본값 = 현재 playback 범위.
+- **Channels**: 매치/블렌드할 채널 그룹(**Translate / Rotate / Scale**). 기본 **T·R on, Scale off**.
+- **Blend (0..1)**: 원본 follower 애니메이션과 매치 결과의 혼합 비율. **0 = 원본 유지(아무것도 안 함)**,
+  **1 = 매치로 완전히 덮어쓰기**(기본), **0.5 = 반반**. LineEdit 와 0~100 슬라이더가 동기화된다.
+  위치/스케일은 선형 보간, 회전은 쿼터니언 **slerp**(최단호)로 섞는다.
+- **애니메이션 레이어**: 현재 **선택된 애니 레이어**가 있으면 그 레이어에 키가 들어간다(override/additive
+  자동 판별). 선택된 레이어가 없거나 BaseAnimation 이면 베이스 커브에 키를 굽는다. blend 는 항상 **키
+  값에 베이크**되며(레이어 weight 는 1 유지), follower/프레임마다 독립적이다.
+- **Match Follow**: 실행. 결과(매치한 follower 수 / 구간 / 프레임 수 / blend / 사용 레이어 / skip)가
+  로그에 출력.
+
 ---
 
 ## 6. 사용 순서
@@ -348,6 +394,16 @@ A00110_animTool.run(True)   # True = reload
 2. **Range** 선택: **Current timeline**(기본, 현재 재생 구간) 또는 **Custom range**(Start/End 직접 입력).
 3. **Channels**(기본 T·R) / **Keep constraints**(기본 ON=유지) / **Simulation**(기본 ON) 확인.
 4. **Bake List** → 리스트의 노드만 해당 구간에 정수 프레임 키로 구워진다(단일 Undo).
+
+### Follow
+1. 따라갈 대상(**target**)들을 선택 → Target 의 **Select Targets**.
+2. 따라가는 컨트롤(**follower**)들을 선택 → Follower 의 **Select Followers**
+   (`Target[i] ↔ Follower[i]` 가 맞도록 **개수·순서를 Sort/Up/Down 으로 정렬**).
+3. **Start / End**(기본 = 현재 playback 범위) / **Channels**(기본 T·R) / **Blend**(기본 1.0) 확인.
+4. (선택) 키를 특정 **애니 레이어**에 굽고 싶으면 Channel Box / Anim Layer 에디터에서 **그 레이어를
+   선택**해 둔다.
+5. **Match Follow** → 각 follower 가 구간 내 매 프레임에서 target 의 월드 위치/회전(/스케일)에 맞춰
+   키가 구워진다(단일 Undo). blend < 1 이면 원본과 섞인다.
 
 ---
 
@@ -439,6 +495,33 @@ A00110_animTool.run(True)   # True = reload
 - **Channels**: 체크한 그룹만(T=tx/ty/tz, R=rx/ry/rz, S=sx/sy/sz). 모두 끄면 경고.
 - **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
 
+### Follow (`follow_match_manager.FollowMatchManager.match_follow`)
+- **인덱스 매칭**: `Target[i] → Follower[i]`. 개수가 다르면 **경고 후 중단**(Copy/Mirror 와 달리 짧은
+  쪽 처리 없이 막는다 — 추종 대상이 어긋나면 결과가 무의미하므로).
+- **매치 수학(rotateOrder 무관)**: 프레임 `t` 마다
+  `local = worldMatrix(target) · parentInverseMatrix(follower)` 를 `MTransformationMatrix` 로 분해해
+  위치(`translation`)·회전(`rotation` 쿼터니언)·스케일(`scale`)을 얻고, 회전은 **follower 자신의
+  rotateOrder** 로 재분해한다(`MEulerRotation.reorderIt`). `getAttr(..., time=t)` 로 타임라인을 옮기지
+  않고 평가하므로 부모가 애니메이션돼도 정확하다. **offset 0**(정확히 일치, maintainOffset=False).
+- **blend(0~1) 는 키 값에 베이크**(레이어 weight=1 유지): 원본 평가값 `O` 와 매치값 `M` 을 섞어 최종
+  `F` 를 만든다 — 위치/스케일 선형 lerp `F = O + (M−O)·b`, 회전 쿼터니언 **slerp**(최단호). `blend==0`
+  이면 아무것도 안 쓰고 반환(원본 유지), `blend==1` 이고 override(/베이스)면 `F=M` 단축 경로.
+- **2-pass(원본 오염 방지)**: 먼저 구간 전체의 원본 `O`(additive 면 레이어 뮤트로 base `B` 도)를
+  **모두 읽은 뒤** 키를 쓴다. 먼저 쓴 키가 이후 `O` 읽기를 오염시키는 문제를 피한다.
+- **애니메이션 레이어**: **선택된 레이어**의 첫 레이어에 키를 굽는다(여러 개면 첫 번째, 로그 표시).
+  `animLayer` 에는 선택 레이어 목록을 주는 전역 쿼리가 없으므로 `cmds.ls(type="animLayer")` 로 전체를
+  나열한 뒤 레이어마다 `animLayer(lyr, q=True, selected=True)` 로 검사한다. 채널을 레이어 멤버로
+  등록(`animLayer edit attribute`) 후
+  `setKeyframe(..., animLayer=layer)`. 모드별 기록값:
+  - **override**(weight 1): 평가값 = 레이어 값 → **`V = F`**(최종값 그대로).
+  - **additive**(weight 1): 평가값 = base + 레이어 값 → 위치/스케일 **`V = F − B`**(스케일은 `F / B`),
+    회전 **`V = B⁻¹ · F`**(회전 합성). base `B` 는 레이어를 잠시 뮤트해 읽고 끝나면 복원.
+  - 선택 레이어 없음 / **BaseAnimation** → 레이어 인자 없이 베이스 커브에 `V = F`.
+- **채널 스킵**: 잠긴 채널(`getAttr lock`)은 제외하고, 연결/잠금으로 `setKeyframe` 이 실패하면 해당
+  키만 건너뛴다. 키를 하나도 못 넣은 follower 는 skip 으로 집계.
+- **성능**: 베이크 동안 `refresh(suspend=True)` 로 뷰포트 갱신을 막고, 끝나면 현재 프레임 복원 +
+  뷰포트 해제. **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
+
 ---
 
 ## 8. 로그 · 문제 해결
@@ -469,6 +552,11 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 # Bake
 60 object(s) baked over [1-6000] (6000 frames, constraints kept).
 60 object(s) baked over [1-6000] (6000 frames, constraints baked down).
+
+# Follow
+4 follower(s) matched over [1-24] (24 frames, blend 1.0). No anim layer selected; keys on base curves.
+4 follower(s) matched over [1-24] (24 frames, blend 0.5). Layer 'AnimLayer1' (override).
+3 follower(s) matched over [1-24] (24 frames, blend 1.0). Layer 'AnimLayer2' (additive). 1 skipped (no settable channels / no node).
 ```
 
 ### 경고 메시지
@@ -487,7 +575,11 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 - `[Info] mirror_tokens.json not found. Using built-in defaults.` — JSON 없음(기본 토큰 사용).
 - `[Warning] Add controllers to the Bake List first.` — (Bake) Bake List 가 비어 있음(씬 선택만으론 안 됨).
 - `[Warning] Enter Start / End.` / `[Warning] Start (n) is greater than End (m).` — (Bake Custom) 시간 범위 오류.
-- `[Warning] Enable at least one channel group.` — (Bake) Translate/Rotate/Scale 모두 off.
+- `[Warning] Enable at least one channel group.` — (Bake/Follow) Translate/Rotate/Scale 모두 off.
+- `[Warning] Fill both Target and Follower lists.` — (Follow) Target/Follower 비어 있음.
+- `[Warning] Target(n) / Follower(m) count mismatch.` — (Follow) 두 리스트 개수 불일치(중단).
+- `[Warning] Invalid Blend value.` — (Follow) Blend 입력이 숫자가 아님.
+- `[Info] Blend is 0; follower animation unchanged.` — (Follow) blend=0 이라 아무것도 안 함.
 
 ### 자주 겪는 문제
 - **이동/삭제가 일부 채널에만 적용됨** → 채널박스에서 어트리뷰트가 선택돼 있으면 그 채널만 대상이 된다.
@@ -523,3 +615,16 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 - **(Bake) 키를 구웠는데 컨트롤이 안 움직임처럼 보임** → **Keep constraints**(기본 ON)면 `pairBlend`
   가 끼어 컨스트레인트가 우세할 수 있다. 컨트롤의 `blendParent1` 을 키 쪽으로 바꾸거나, 순수 키만
   원하면 **Keep constraints 를 끄고**(bake down) 다시 굽는다.
+- **(Follow) follower 가 target 과 정확히 안 겹침** → ① Channels 에 필요한 그룹(보통 T·R)이 켜져
+  있는지 확인. ② **Blend 가 1.0** 인지 확인(1 미만이면 원본과 섞여 덜 따라간다). ③ follower 채널이
+  잠겨/연결돼 있으면 그 채널은 skip 된다(로그의 `skipped` 확인).
+- **(Follow) 키가 엉뚱한 레이어/베이스에 들어감** → 실행 전에 원하는 **애니 레이어를 선택**해 둔다.
+  선택된 레이어가 없으면 베이스 커브에 들어간다. 로그 끝의 `Layer '...'` / `keys on base curves` 로
+  실제 대상 레이어를 확인할 수 있다.
+- **(Follow) additive 레이어인데 결과가 두 배로 더해진 듯 보임** → additive 레이어는 base + 레이어
+  값이라 base 를 빼고(`V=F−B`) 기록한다. 정상 동작이며, 레이어 weight 를 0 으로 내리면 base 로
+  돌아간다. blend 를 키로 베이크하므로 레이어 weight 는 1 로 두고 쓴다.
+- **(Follow) rotateOrder 가 다른데도 회전이 맞는다** → 정상이다. target 의 월드 회전을 follower
+  rotateOrder 로 재분해해 기록하므로 채널 값은 서로 달라도 월드 방향은 동일하다.
+- **(Follow) Blend=0 인데 아무 일도 안 일어남** → 의도된 동작이다(원본 유지). 효과를 보려면 Blend 를
+  0 보다 크게 올린다.
