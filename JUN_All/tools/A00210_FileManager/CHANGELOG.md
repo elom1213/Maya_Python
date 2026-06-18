@@ -2,6 +2,19 @@
 
 All notable changes to this tool are documented here.
 
+## [01.03] - 2026-06-18
+### Added
+- **Lineage** tab — manual relationship control: each node has a **Relation to
+  parent** (`Auto` / `Version-up (main line)` / `Branch (variation)`). A
+  `Version-up` child inherits the parent's lane color (same color = version line);
+  a `Branch` child is forced onto a new lane (different color). `Auto` keeps the
+  previous topology default (first child by creation order is the main line). Lets
+  you flip which child is the version-up vs the branch instead of relying on add
+  order.
+- **Lineage** canvas navigation: mouse-**wheel zoom** (anchored under the cursor,
+  0.15x–4.0x) and **pan via middle-mouse drag**. Left-click (select / node drag)
+  and Connect Mode are unaffected.
+
 ## [01.02] - 2026-06-18
 ### Added
 - **Lineage** tab: manually record branch / merge relationships between files

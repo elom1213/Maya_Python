@@ -60,6 +60,7 @@ class LineageNode:
     key: str = ""              # project_root 기준 POSIX 키 ("" 면 planned/루트밖)
     planned: bool = False      # 아직 안 만든 파일("제작 예정")
     label: str = ""            # 자유 주석
+    relation: str = ""         # primary parent 에 대한 관계: ""(auto)|"version"|"branch"
     parents: list = field(default_factory=list)   # 부모 노드 id 목록
     x: float = 0.0             # 저장된 캔버스 위치(사용자 드래그)
     y: float = 0.0
@@ -76,6 +77,7 @@ class LineageNode:
             key=data.get("key", ""),
             planned=bool(data.get("planned", False)),
             label=data.get("label", ""),
+            relation=data.get("relation", ""),
             parents=list(data.get("parents", [])),
             x=float(data.get("x", 0.0)),
             y=float(data.get("y", 0.0)),
@@ -363,12 +365,15 @@ def compute_lanes(graph):
     위→아래(토폴로지) 순서로 처리:
       - 자기 id 로 예약된 레인이 있으면 그 중 가장 왼쪽을 차지하고 나머지는 해제(병합 수렴).
       - 없으면 가장 왼쪽 빈 레인(없으면 새 컬럼).
-      - 자식들(seq 순) 중 '이 노드가 첫 부모인' 첫 자식이 트렁크(같은 레인)를 잇고,
-        나머지 자식은 새 레인(브랜치/병합선)을 받는다.
+      - 자식들(seq 순) 중 '이 노드가 첫 부모인' 자식 하나가 트렁크(같은 레인)를 잇고,
+        나머지 자식은 새 레인(브랜치/병합선)을 받는다. 트렁크 자식 선택은 relation 으로
+        제어한다: relation=="version" 자식이 최우선, "branch" 는 트렁크 제외, 미지정은
+        기존 기본(첫 자식). → "version-up"=부모와 같은 색, "branch"=다른 색.
     """
     order = _topo_order(graph)
     pmap = _parents_map(graph)
     seq_of = {n.id: n.seq for n in graph.nodes}
+    relation_of = {n.id: getattr(n, "relation", "") for n in graph.nodes}
 
     children = {nid: [] for nid in pmap}
     for nid, parents in pmap.items():
@@ -397,16 +402,21 @@ def compute_lanes(graph):
 
         # 2) 자식 레인 예약.
         kids = sorted(children.get(nid, []), key=lambda c: seq_of.get(c, 0))
-        trunk_used = False
+
+        # 트렁크(부모 레인 상속)를 이어받을 자식 1개 선택. 이 노드가 primary parent 인
+        # 자식만 후보. relation=="version" 최우선, 그다음 "branch" 가 아닌 첫 자식.
+        own = [c for c in kids if primary_parent.get(c) == nid]
+        trunk_child = next((c for c in own if relation_of.get(c) == "version"), None)
+        if trunk_child is None:
+            trunk_child = next((c for c in own if relation_of.get(c) != "branch"), None)
+
+        # 트렁크 레인을 먼저 예약(없으면 종료)해 나머지 자식이 그 레인을 뺏지 않게 한다.
+        active[lane] = trunk_child     # None 이면 이 노드에서 레인 종료(리프/전부 branch)
         for c in kids:
-            if primary_parent.get(c) == nid and not trunk_used:
-                active[lane] = c       # 트렁크 직진
-                trunk_used = True
-            else:
-                j = _leftmost_free(active)
-                active[j] = c          # 브랜치 / 병합 보조선
-        if not trunk_used:
-            active[lane] = None        # 이 노드에서 레인 종료(리프 등)
+            if c is trunk_child:
+                continue
+            j = _leftmost_free(active)
+            active[j] = c              # 브랜치 / 병합 보조선
 
     return lane_of, order
 

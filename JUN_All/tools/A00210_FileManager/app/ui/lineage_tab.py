@@ -26,6 +26,7 @@ from Framework.qt.qt import (
     QLineEdit,
     QPushButton,
     QCheckBox,
+    QComboBox,
     QListWidget,
     QListWidgetItem,
     QFileDialog,
@@ -236,6 +237,74 @@ class LineageScene(QGraphicsScene):
         super().mouseReleaseEvent(event)
 
 
+# ==================================================================== view
+
+class LineageView(QGraphicsView):
+    """줌(마우스 휠, 커서 기준) + 팬(중간 버튼 드래그)을 지원하는 캔버스 뷰."""
+
+    MIN_ZOOM = 0.15
+    MAX_ZOOM = 4.0
+    _STEP = 1.15
+
+    def __init__(self, scene):
+        super().__init__(scene)
+        self._panning = False
+        self._pan_last = None
+        # 휠 줌이 마우스 커서 아래 지점을 기준으로 확대/축소되게.
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.AnchorViewCenter)
+
+    @staticmethod
+    def _evt_pos(event):
+        # PySide6=position()(QPointF) / PySide2=pos()(QPoint) 모두 대응.
+        if hasattr(event, "position"):
+            return event.position().toPoint()
+        return event.pos()
+
+    def wheelEvent(self, event):
+        factor = self._STEP if event.angleDelta().y() > 0 else 1.0 / self._STEP
+        cur = self.transform().m11()            # 현재 배율(fitInView 후에도 정확)
+        target = cur * factor
+        if target < self.MIN_ZOOM:
+            factor = self.MIN_ZOOM / cur
+        elif target > self.MAX_ZOOM:
+            factor = self.MAX_ZOOM / cur
+        if abs(factor - 1.0) > 1e-6:
+            self.scale(factor, factor)
+        event.accept()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MiddleButton:
+            self._panning = True
+            self._pan_last = self._evt_pos(event)
+            self.setCursor(Qt.ClosedHandCursor)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._panning and self._pan_last is not None:
+            pos = self._evt_pos(event)
+            delta = pos - self._pan_last
+            self._pan_last = pos
+            hbar = self.horizontalScrollBar()
+            vbar = self.verticalScrollBar()
+            hbar.setValue(hbar.value() - delta.x())
+            vbar.setValue(vbar.value() - delta.y())
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MiddleButton and self._panning:
+            self._panning = False
+            self._pan_last = None
+            self.unsetCursor()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+
 # ============================================================ add-from-scan dialog
 
 class AddFromScanDialog(QDialog):
@@ -413,7 +482,7 @@ class LineageTab(QWidget):
         self.scene = LineageScene(self)
         self.scene.selectionChanged.connect(self._on_selection_changed)
 
-        self.view = QGraphicsView(self.scene)
+        self.view = LineageView(self.scene)
         self.view.setRenderHint(QPainter.Antialiasing, True)
         self.view.setDragMode(QGraphicsView.NoDrag)
         return self.view
@@ -430,6 +499,19 @@ class LineageTab(QWidget):
         self.chk_planned = QCheckBox("Planned (file not created yet)")
         self.chk_planned.toggled.connect(self._apply_node_planned)
         layout.addWidget(self.chk_planned)
+
+        # 부모에 대한 관계: version-up(부모와 같은 색=메인 라인) vs branch(다른 색=베리에이션).
+        layout.addWidget(QLabel("Relation to parent"))
+        self.cmb_relation = QComboBox()
+        self.cmb_relation.addItem("Auto", "")              # 토폴로지 기본(첫 자식이 메인)
+        self.cmb_relation.addItem("Version-up (main line)", "version")
+        self.cmb_relation.addItem("Branch (variation)", "branch")
+        self.cmb_relation.currentIndexChanged.connect(self._apply_node_relation)
+        layout.addWidget(self.cmb_relation)
+        self.lbl_relation_hint = QLabel("same color = version line, other color = branch")
+        self.lbl_relation_hint.setWordWrap(True)
+        self.lbl_relation_hint.setStyleSheet("color: #9aa; font-size: 11px;")
+        layout.addWidget(self.lbl_relation_hint)
 
         layout.addWidget(QLabel("Label / note"))
         self.ipf_node_label = QLineEdit()
@@ -466,6 +548,9 @@ class LineageTab(QWidget):
     def _set_inspector_enabled(self, enabled):
         for w in (self.ipf_node_name, self.chk_planned, self.ipf_node_label):
             w.setEnabled(enabled)
+        # 관계 콤보는 부모가 있는 노드에서만 의미가 있다(루트는 비활성).
+        node = self._selected_node()
+        self.cmb_relation.setEnabled(enabled and bool(node and node.parents))
 
     def _selected_node(self):
         if self._selected_id is None:
@@ -737,7 +822,8 @@ class LineageTab(QWidget):
             self._populate_inspector(None)
 
     def _populate_inspector(self, node):
-        block = (self.ipf_node_name, self.chk_planned, self.ipf_node_label)
+        block = (self.ipf_node_name, self.chk_planned,
+                 self.ipf_node_label, self.cmb_relation)
         for w in block:
             w.blockSignals(True)
 
@@ -745,6 +831,7 @@ class LineageTab(QWidget):
             self.ipf_node_name.clear()
             self.chk_planned.setChecked(False)
             self.ipf_node_label.clear()
+            self.cmb_relation.setCurrentIndex(0)
             self.lbl_node_key.setText("-")
             self.lbl_node_thumb.clear()
             self.lbl_node_thumb.setText("No thumbnail")
@@ -753,6 +840,8 @@ class LineageTab(QWidget):
             self.ipf_node_name.setText(node.file_name)
             self.chk_planned.setChecked(node.planned)
             self.ipf_node_label.setText(node.label)
+            idx = self.cmb_relation.findData(node.relation or "")
+            self.cmb_relation.setCurrentIndex(idx if idx >= 0 else 0)
             self.lbl_node_key.setText(node.key or "(planned / out of root)")
             self._refresh_node_thumb(node)
             self._set_inspector_enabled(True)
@@ -798,3 +887,11 @@ class LineageTab(QWidget):
         item = self._node_items.get(node.id)
         if item is not None:
             item.update()
+
+    def _apply_node_relation(self, *_):
+        node = self._selected_node()
+        if node is None:
+            return
+        node.relation = self.cmb_relation.currentData() or ""
+        # 관계는 레인/색 계산에 영향 → 재렌더(자동 트렁크 선택이 바뀜).
+        self._render_graph()
