@@ -86,6 +86,49 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 
 ---
 
+## 4-B. Lineage 탭 — 파일 브랜치/병합 관계 (v01.02)
+
+여러 리비전 폴더(예: `JP__Revision_00010`, `JP__Revision_00020_mgear`)에 흩어진 파일들 사이의
+**브랜치/병합 관계(DAG)** 를 **직접 기록**하고 `git log --graph` 스타일의 **색상 레인 트리**로 본다.
+예: `JP__LUN_rig_0140.mb` 에서 베리에이션 `JP__LUN_rig_0140_mgear_0010.mb` 를 만든 관계를 명시.
+**파일 포맷은 무관** — `.mb`/`.ma` 뿐 아니라 `.fbx`/`.obj`/ZBrush/텍스처 등 어떤 파일도 노드가 된다.
+
+```
+│ *  JP__LUN_rig_0140_mgear_0030.mb (planned)
+│ *  JP__LUN_rig_0140_mgear_0020.mb
+* │  JP__LUN_rig_0140_mgear_0010.mb
+│/
+* JP__LUN_rig_0140.mb
+* JP__LUN_rig_0130.mb
+```
+
+- **노드**: 마야 파일 1개(또는 **Planned** = 아직 안 만든 "제작 예정" placeholder). 캔버스에서 드래그로
+  자유 이동(위치 저장). **색상은 토폴로지 레인에서 자동 계산** — 브랜치는 다른 색 컬럼, 병합은 레인 수렴.
+- **관계 입력**: **Connect Mode** 를 켜고 노드(부모) → 노드(자식) 로 드래그해 선을 긋는다. 자기 연결·중복·
+  **순환은 자동 거부**.
+- **Auto Layout**: 레인(컬럼) × 토폴로지(행) 로 자동 정렬. 이후 드래그한 위치도 그대로 저장된다.
+- **저장 단위**: 에셋별 **이름 붙인 그래프** — `<store_dir>/lineage/<name>.json`. 목록에서 New/Save/
+  Delete. 기존 **Push/Pull 로 자동 git 동기화**(records/thumbs 와 함께).
+
+**사용 흐름**:
+1. (File Manager 탭에서) `Project Root`/`Store Repo` 설정.
+2. Lineage 탭 → **New** → 이름 입력(예: `LUN_rig`).
+3. 노드 추가 방법 3가지:
+   - **Add Node from Scan...**: 폴더를 재귀 스캔(**모든 포맷**)해 목록에서 골라 추가. 다이얼로그 상단
+     **Filter** 에 확장자(예: `mb ma fbx obj`)를 넣어 목록을 좁힐 수 있다(빈칸 = 전체). **Check/Uncheck
+     Visible** 로 보이는 항목 일괄 토글.
+   - **Add File...**: 임의의 단일 파일을 포맷 무관하게 바로 노드로 추가.
+   - **Add Planned Node**: 아직 없는 파일("제작 예정") placeholder 추가 후 **Node** 패널에서 이름 변경.
+   - 스캔/파일 추가 시 파일이 Project Root 안이면 기존 record/썸네일에 자동 링크된다(밖이면 링크 없이 추가).
+4. **Connect Mode** 로 부모 → 자식 선 긋기(0130→0140, 0140→0010, 0140→0020, 0020→0030…).
+5. **Auto Layout** → 색상 레인 트리 확인. 노드 선택 시 우측 **Node** 패널에서 이름/Planned/라벨/연결 키·
+   썸네일 미리보기.
+6. **Save** → **Push**(File Manager 탭) 로 다른 PC 와 공유.
+
+> 노드의 **File name 변경은 표시 전용** — 연결된 기록(key)은 그대로다.
+
+---
+
 ## 5. 구조 (개발자용)
 
 ```
@@ -102,11 +145,15 @@ A00210_FileManager/
     │   ├── store.py         # MetaStore: 키 산출, record JSON / 썸네일 read·write
     │   ├── scanner.py       # 디렉터리 .mb/.ma 수집 + 기록 조인
     │   ├── prefs.py         # PC 로컬 설정 저장/로드
-    │   └── git_sync.py      # GitSync: ensure/clone, pull, push (subprocess git)
+    │   ├── git_sync.py      # GitSync: ensure/clone, pull, push (subprocess git)
+    │   ├── path_structure.py# 폴더 구조 템플릿 캡처/재생성
+    │   └── lineage.py       # 브랜치/병합 DAG 모델 + 레인/색상 계산 (compute_lanes)
     └── ui/
         ├── main_window.py   # MainWindow(QWidget) 조립 + 핸들러
         ├── file_table.py    # 파일 목록 위젯
-        └── region_capture.py# 화면 영역 캡쳐 오버레이
+        ├── region_capture.py# 화면 영역 캡쳐 오버레이
+        ├── path_structure_tab.py # Path Structure 탭
+        └── lineage_tab.py   # Lineage 탭 (QGraphicsView 캔버스 + 노드/엣지 아이템)
 ```
 
 - **core 는 Qt/Maya 를 import 하지 않는다** → 단위 테스트·exe 빌드 용이. 화면 캡쳐만 Qt(`QScreen.grabWindow`)에 의존.

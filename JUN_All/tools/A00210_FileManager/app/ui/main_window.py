@@ -30,14 +30,15 @@ from Framework.qt.qt import (
     Qt,
 )
 
-from app.config.version import VERSION, LAST_UPDATE
-from app.core import scanner, prefs as prefs_mod
-from app.core.store import MetaStore, OutsideProjectRootError
-from app.core.git_sync import GitSync
-from app.core.models import FileRecord, LogEntry
-from app.ui.file_table import FileTable
-from app.ui.region_capture import RegionCapture
-from app.ui.path_structure_tab import PathStructureTab
+from ..config.version import VERSION, LAST_UPDATE
+from ..core import scanner, prefs as prefs_mod
+from ..core.store import MetaStore, OutsideProjectRootError
+from ..core.git_sync import GitSync
+from ..core.models import FileRecord, LogEntry
+from .file_table import FileTable
+from .region_capture import RegionCapture
+from .path_structure_tab import PathStructureTab
+from .lineage_tab import LineageTab
 
 
 THUMB_W = 320
@@ -82,6 +83,14 @@ class MainWindow(QWidget):
             log=self.log,
         )
         self.tabs.addTab(self.path_structure_tab, "Path Structure")
+
+        self.lineage_tab = LineageTab(
+            get_store=self._make_store,
+            get_project_root=self.get_project_root,
+            get_store_dir=self.get_store_dir,
+            log=self.log,
+        )
+        self.tabs.addTab(self.lineage_tab, "Lineage")
 
         root.addWidget(self.tabs, stretch=1)
         root.addWidget(self.log_widget)

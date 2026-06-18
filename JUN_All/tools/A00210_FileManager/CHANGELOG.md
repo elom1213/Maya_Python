@@ -2,6 +2,28 @@
 
 All notable changes to this tool are documented here.
 
+## [01.02] - 2026-06-18
+### Added
+- **Lineage** tab: manually record branch / merge relationships between files
+  (any format — `.mb`/`.ma`, `.fbx`, `.obj`, ZBrush, textures, …) and view them as
+  a git-graph-style colored tree.
+  - Interactive canvas (`QGraphicsView`): drag nodes to reposition; turn on
+    **Connect Mode** and drag node → node to set a parent link (self-links,
+    duplicates, and cycles are rejected).
+  - **Auto lane coloring** — lanes (columns) are computed from the DAG topology
+    like `git log --graph`; each lane cycles a color palette. Branches read as
+    distinct colors; merges (multi-parent) collapse lanes.
+  - **Auto Layout** arranges nodes into lanes (column = lane, row = topological
+    order); positions stay user-draggable afterward and are saved.
+  - **Planned** nodes ("제작 예정") for files not yet created (dashed, translucent).
+  - Add nodes from a folder **scan** (any format; filter the result list by
+    extension) or a single **Add File...**; both link to an existing
+    record/thumbnail by project-relative key when inside the project root.
+    Also add empty **planned** nodes. Node inspector to rename, mark planned,
+    annotate, and preview the linked thumbnail.
+  - Multiple named graphs per asset (`<store_dir>/lineage/<name>.json`); list,
+    load, save, delete. Auto-synced by the existing Git Pull / Push.
+
 ## [01.01] - 2026-06-17
 ### Added
 - **Path Structure** tab: save a folder-structure template (subfolders of a base
