@@ -1,0 +1,10 @@
+{
+  "open_missing": false,
+  "folders": [
+    { "path": "C:\\MANUSetup\\MANUProject", "enabled": true },
+    { "path": "C:\\Users\\USER\\Desktop\\JP\\0030_maya_python_JUN", "enabled": true },
+    { "path": "C:\\Users\\USER\\Desktop\\JP\\0001_PJ\\JP__02.Art\\JP__Asset\\JP__CH", "enabled": true },
+    // { "path": "%USERPROFILE%\\Documents", "enabled": true },
+    { "path": "D:\\Work\\Project", "enabled": false }
+  ]
+}
