@@ -2,6 +2,28 @@
 
 All notable changes to this tool are documented here.
 
+## [01.06] - 2026-06-18
+### Added
+- **One-click data-repo sync for distributed users.** The tool now ships a bundled
+  default data-repo config (`app/config/data_repo.py`: central repo URL, branch,
+  and a default local clone path `~/.jun_filemanager/JUN_FileManager_data`). When a
+  user who received the released tool clicks **Pull** and no store repo exists yet,
+  it auto-clones the central data repo to the default location and pulls — no
+  manual clone or path setup needed.
+- New **Remote URL** field in Settings, pre-filled from the bundled config
+  (editable for forks/relocated repos), persisted in prefs.
+### Fixed
+- Data sync never worked for distributed installs: the Pull/Push handlers read a
+  `remote_url` pref that was never set (missing from defaults and UI), so the store
+  was only ever `git init`-ed locally with no remote. The remote URL is now wired
+  end-to-end.
+- Default sync branch mismatch (`main`) vs the actual data repo (`master`); defaults
+  now come from the bundled config, and legacy prefs are migrated to the correct
+  branch on load.
+- Clone failures no longer silently fall back to a local `git init` (which created a
+  disconnected empty repo); the error is surfaced so auth/network/access issues are
+  visible.
+
 ## [01.05] - 2026-06-18
 ### Fixed
 - **Region capture** overlay showed a fully black screen, hiding what was being

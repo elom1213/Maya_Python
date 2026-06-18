@@ -84,6 +84,24 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
    - **Push**: `records`/`thumbs` 변경을 커밋 후 원격에 푸시. **원본 mb/ma 는 포함되지 않는다.**
    - **Pull**: 다른 PC 에서 같은 `Project Root` 를 지정하고 Pull 하면, 동일 상대경로 키로 기록·썸네일이 그대로 보인다.
 
+### 5-A. 배포받은 사용자: 원클릭 데이터 동기화 (v01.06)
+
+툴(릴리즈본)을 git 으로 받은 사용자는 **데이터 리포를 따로 clone/설정하지 않아도** 동기화된다.
+툴에 **중앙 데이터 리포의 URL·브랜치와 기본 clone 경로가 번들**돼 있기 때문이다
+(`app/config/data_repo.py`). 
+
+- **첫 Pull**: Store Repo 가 비어 있으면 번들된 **Remote URL** 을 기본 경로
+  `~/.jun_filemanager/JUN_FileManager_data` 에 **자동 clone** 한 뒤 pull 한다. 사용자는 **Pull 한 번**이면 된다.
+- **Settings** 의 `Store Repo`/`Remote`/`Branch`/`Remote URL` 은 번들 기본값으로 **미리 채워진다**(리포를
+  포크/이전했다면 `Remote URL`/`Branch` 만 바꿔 Save). 데이터 리포 기본 브랜치는 **`master`**.
+- 이후 Push/Pull 은 기존과 동일하게 같은 중앙 리포로 동기화된다.
+
+> **인증 주의**: 중앙 데이터 리포가 **private** 이면, clone 하려면 사용자에게 **그 GitHub 리포 접근 권한 +
+> 캐시된 git 자격증명**(시스템 git)이 있어야 한다. 권한/네트워크 문제로 clone 이 실패하면 **로컬 init 으로
+> 조용히 폴백하지 않고** 하단 로그에 오류를 표시한다(끊긴 빈 repo 가 생기지 않음).
+> `Project Root`(각 PC 의 Maya 파일 위치)는 데이터 동기화와 무관 — 미설정이어도 lineage/records 는 정상
+> pull 된다(로컬 파일/썸네일 링크 표시에만 영향).
+
 > 여러 PC 가 같은 파일 기록을 동시에 수정하면 git 충돌이 날 수 있다. **Push 전에 Pull** 하는 습관을 권장한다.
 
 ---
@@ -153,6 +171,7 @@ A00210_FileManager/
 ├── CHANGELOG.md
 └── app/
     ├── config/version.py    # VERSION, LAST_UPDATE
+    ├── config/data_repo.py  # 번들 데이터 리포 기본값(URL/branch/기본 clone 경로) — 배포에 포함
     ├── core/                # 순수 로직 (Qt/Maya 비의존)
     │   ├── models.py        # FileRecord, LogEntry
     │   ├── store.py         # MetaStore: 키 산출, record JSON / 썸네일 read·write

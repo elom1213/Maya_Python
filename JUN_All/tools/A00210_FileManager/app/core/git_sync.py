@@ -90,8 +90,13 @@ class GitSync:
             logs.append(out)
             if ok:
                 return True, "\n".join(logs)
-            # clone 실패 시 init 으로 폴백
-            logs.append("Clone failed, falling back to local init.")
+            # remote_url 이 있는데 clone 실패 → 로컬 init 으로 '조용히' 폴백하지 않는다.
+            # (인증/네트워크/권한 문제를 사용자가 인지하도록. 중앙 리포와 끊긴 빈 repo 생성 방지.)
+            logs.append(
+                "Clone failed. Check the Remote URL, your network, and git "
+                "credentials / repo access. No local repository was created."
+            )
+            return False, "\n".join([l for l in logs if l])
 
         ok, out = self._run("init")
         logs.append(out)

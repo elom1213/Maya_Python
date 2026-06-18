@@ -31,6 +31,7 @@ from Framework.qt.qt import (
 )
 
 from ..config.version import VERSION, LAST_UPDATE
+from ..config import data_repo
 from ..core import scanner, prefs as prefs_mod
 from ..core.store import MetaStore, OutsideProjectRootError
 from ..core.git_sync import GitSync
@@ -169,6 +170,13 @@ class MainWindow(QWidget):
         meta_row.addWidget(btn_save_settings)
         grid.addLayout(meta_row, 4, 0, 1, 3)
 
+        # Remote URL (중앙 데이터 리포 git URL). 보통 번들 기본값 그대로 — 첫 Pull 시
+        # Store Repo 가 비어 있으면 이 URL 을 기본 경로로 자동 clone 한다.
+        self.ipf_remote_url = QLineEdit()
+        self.ipf_remote_url.setPlaceholderText("data repo git URL (auto-clone on first Pull)")
+        grid.addWidget(QLabel("Remote URL"), 5, 0)
+        grid.addWidget(self.ipf_remote_url, 5, 1, 1, 2)
+
         return group
 
     def _build_detail_panel(self):
@@ -245,8 +253,9 @@ class MainWindow(QWidget):
         self.ipf_project_root.setText(self._prefs.get("project_root", ""))
         self.ipf_store_dir.setText(self._prefs.get("store_dir", ""))
         self.ipf_scan_dir.setText(self._prefs.get("scan_dir", ""))
-        self.ipf_remote.setText(self._prefs.get("remote", "origin"))
-        self.ipf_branch.setText(self._prefs.get("branch", "main"))
+        self.ipf_remote.setText(self._prefs.get("remote", data_repo.DATA_REPO_REMOTE))
+        self.ipf_branch.setText(self._prefs.get("branch", data_repo.DATA_REPO_BRANCH))
+        self.ipf_remote_url.setText(self._prefs.get("remote_url", data_repo.DATA_REPO_URL))
         self.ipf_author.setText(self._prefs.get("author", ""))
         self.chk_recursive.setChecked(bool(self._prefs.get("recursive", False)))
 
@@ -255,8 +264,9 @@ class MainWindow(QWidget):
             "project_root": self.ipf_project_root.text().strip(),
             "store_dir": self.ipf_store_dir.text().strip(),
             "scan_dir": self.ipf_scan_dir.text().strip(),
-            "remote": self.ipf_remote.text().strip() or "origin",
-            "branch": self.ipf_branch.text().strip() or "main",
+            "remote": self.ipf_remote.text().strip() or data_repo.DATA_REPO_REMOTE,
+            "branch": self.ipf_branch.text().strip() or data_repo.DATA_REPO_BRANCH,
+            "remote_url": self.ipf_remote_url.text().strip(),
             "author": self.ipf_author.text().strip(),
             "recursive": self.chk_recursive.isChecked(),
         }
@@ -283,9 +293,14 @@ class MainWindow(QWidget):
     def _make_git(self):
         return GitSync(
             self.ipf_store_dir.text().strip(),
-            self.ipf_remote.text().strip() or "origin",
-            self.ipf_branch.text().strip() or "main",
+            self.ipf_remote.text().strip() or data_repo.DATA_REPO_REMOTE,
+            self.ipf_branch.text().strip() or data_repo.DATA_REPO_BRANCH,
         )
+
+    def _ensure_default_store_dir(self):
+        """Store Repo 가 비어 있으면 번들 기본 경로로 채운다(배포 사용자 원클릭 Pull)."""
+        if not self.ipf_store_dir.text().strip():
+            self.ipf_store_dir.setText(data_repo.DEFAULT_STORE_DIR)
 
     def _browse_dir(self, line_edit):
         start = line_edit.text().strip() or os.path.expanduser("~")
@@ -496,14 +511,19 @@ class MainWindow(QWidget):
     # ================================================================ git
 
     def on_pull(self):
+        self._ensure_default_store_dir()
         git = self._make_git()
         if not git.store_dir:
             QMessageBox.warning(self, "Git", "Set Store Repo first.")
             return
 
         if not git.is_repo():
-            ok, out = git.ensure_repo(self._prefs.get("remote_url", ""))
+            # repo 가 없으면 Remote URL 로 자동 clone(빈 기본 경로에 받아온다).
+            ok, out = git.ensure_repo(self.ipf_remote_url.text().strip())
             self.log(out)
+            if not ok:
+                self.lbl_git_status.setText("Clone failed")
+                return
 
         ok, out = git.pull()
         self.log(out)
@@ -512,14 +532,18 @@ class MainWindow(QWidget):
             self.on_scan()
 
     def on_push(self):
+        self._ensure_default_store_dir()
         git = self._make_git()
         if not git.store_dir:
             QMessageBox.warning(self, "Git", "Set Store Repo first.")
             return
 
         if not git.is_repo():
-            ok, out = git.ensure_repo(self._prefs.get("remote_url", ""))
+            ok, out = git.ensure_repo(self.ipf_remote_url.text().strip())
             self.log(out)
+            if not ok:
+                self.lbl_git_status.setText("Clone failed")
+                return
 
         author = self.ipf_author.text().strip() or "unknown"
         message = f"Update records by {author} ({self._now_iso()})"
