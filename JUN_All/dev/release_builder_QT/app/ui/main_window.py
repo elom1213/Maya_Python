@@ -13,10 +13,11 @@ from Framework.qt.qt import (
     QLabel,
     QTextEdit,
     QFileDialog,
+    QCheckBox,
 )
 
-from app.config.version import VERSION
-from app.core.release_builder import ReleaseBuilder
+from ..config.version import VERSION
+from ..core.release_builder import ReleaseBuilder
 
 # 기존 dev/build_release.py 의 RELEASE_ROOT_PARENT 를 기본값으로 사용
 DEFAULT_DEST = r"G:/D_link_dir/02_Maya_python_Jun_Release/Maya_Tool_Release/tools"
@@ -77,6 +78,11 @@ class MainWindow(QWidget):
         row_dest.addWidget(self.btn_browse)
 
         self.layout.addLayout(row_dest)
+
+        # --- Options ---
+        self.chk_docs = QCheckBox("Include docs")
+        self.chk_docs.setChecked(True)
+        self.layout.addWidget(self.chk_docs)
 
         # --- Release ---
         self.btn_release = QPushButton("Release")
@@ -162,6 +168,7 @@ class MainWindow(QWidget):
             names,
             dest,
             include_framework=True,
+            include_docs=self.chk_docs.isChecked(),
             log=self.log,
         )
 

@@ -26,6 +26,7 @@ class ReleaseBuilder:
         self.dev_root = Path(__file__).resolve().parents[4]   # JUN_All
         self.tools_root = self.dev_root / "tools"
         self.framework_root = self.dev_root / "Framework"
+        self.docs_root = self.dev_root / "docs"
 
     def list_tools(self):
         # tools/ 하위 디렉터리 이름 목록 (__pycache__ 등 제외)
@@ -38,7 +39,17 @@ class ReleaseBuilder:
             if p.is_dir() and not p.name.startswith("__")
         )
 
-    def release(self, tool_names, dest_parent, include_framework=True, log=print):
+    def _match_docs(self, tool_name):
+        # 툴 번호 접두사(예: "A00110")로 시작하는 docs/*.md 전부 반환
+        if not self.docs_root.is_dir():
+            return []
+
+        prefix = tool_name.split("_")[0]
+
+        return sorted(self.docs_root.glob(f"{prefix}*.md"))
+
+    def release(self, tool_names, dest_parent, include_framework=True,
+                include_docs=True, log=print):
 
         results = []
 
@@ -71,6 +82,20 @@ class ReleaseBuilder:
                     dst / "Framework",
                     ignore=shutil.ignore_patterns(*IGNORE_PATTERNS),
                 )
+
+            # 안내 문서 동봉 (툴 폴더 안 docs/ 서브폴더)
+            if include_docs:
+                docs = self._match_docs(name)
+
+                if docs:
+                    docs_dst = dst / "docs"
+                    docs_dst.mkdir(parents=True, exist_ok=True)
+
+                    for md in docs:
+                        shutil.copy2(md, docs_dst / md.name)
+                        log(f"[doc] {md.name}")
+                else:
+                    log(f"[doc] none for {name}")
 
             log(f"[ok] {dst}")
             results.append(str(dst))
