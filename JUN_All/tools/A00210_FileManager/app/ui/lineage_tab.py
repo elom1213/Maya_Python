@@ -14,7 +14,9 @@
 # project_root / store_dir / 로그는 MainWindow 에서 콜러블로 주입받는다(단일 소스 유지).
 
 import os
+import sys
 import time
+import subprocess
 
 from Framework.qt.qt import (
     QWidget,
@@ -33,6 +35,7 @@ from Framework.qt.qt import (
     QMessageBox,
     QDialog,
     QDialogButtonBox,
+    QMenu,
     QGraphicsView,
     QGraphicsScene,
     QGraphicsObject,
@@ -135,6 +138,19 @@ class NodeItem(QGraphicsObject):
             if self.tab is not None:
                 self.tab._reroute_edges()
         return super().itemChange(change, value)
+
+    # --- context menu (우클릭)
+    def contextMenuEvent(self, event):
+        if self.tab is None:
+            return
+        menu = QMenu()
+        act_reveal = menu.addAction("Reveal in File Explorer")
+        # 실제 파일 경로를 해석할 수 있을 때만 활성(planned/루트 밖/없는 파일은 비활성).
+        act_reveal.setEnabled(bool(self.tab.node_abs_path(self.node)))
+        chosen = menu.exec(event.screenPos())
+        if chosen is act_reveal:
+            self.tab.reveal_node(self.node)
+        event.accept()
 
 
 class EdgeItem(QGraphicsPathItem):
@@ -736,6 +752,55 @@ class LineageTab(QWidget):
         self._render_graph()
         parent = self._graph.node_by_id(parent_id)
         self._log(f"Linked: {parent.file_name if parent else '?'} -> {child.file_name}")
+
+    # ============================================================ reveal in explorer
+
+    def node_abs_path(self, node):
+        """노드가 가리키는 실제 파일의 절대경로(존재할 때만). 없으면 "".
+
+        key 는 project_root 기준 상대경로이므로 root + key 로 복원한다. planned/루트 밖
+        (key="")/파일 없음/루트 미설정이면 경로가 없다.
+        """
+        if node is None or not node.key:
+            return ""
+        store = self._get_store()
+        root = getattr(store, "project_root", "") if store is not None else ""
+        if not root:
+            return ""
+        path = os.path.join(root, *node.key.split("/"))
+        return path if os.path.exists(path) else ""
+
+    def reveal_node(self, node):
+        """노드 파일을 탐색기에서 (폴더를 열고 파일을 선택해) 보여준다."""
+        path = self.node_abs_path(node)
+        if not path:
+            QMessageBox.information(
+                self, "Lineage",
+                "No file to reveal — this node is planned, out of the project root, "
+                "or the file no longer exists at its recorded path.",
+            )
+            self._log(f"Reveal skipped (no path): {node.file_name if node else '?'}")
+            return
+        if self._reveal_in_explorer(path):
+            self._log(f"Revealed in File Explorer: {path}")
+        else:
+            self._log(f"Failed to open File Explorer for: {path}")
+
+    @staticmethod
+    def _reveal_in_explorer(path):
+        """OS 파일 탐색기에서 파일을 선택 상태로 연다(Windows 우선)."""
+        path = os.path.normpath(path)
+        try:
+            if sys.platform.startswith("win"):
+                # explorer /select, 는 성공해도 비0 종료코드를 내므로 반환값을 보지 않는다.
+                subprocess.Popen(["explorer", "/select,", path])
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", "-R", path])
+            else:
+                subprocess.Popen(["xdg-open", os.path.dirname(path)])
+            return True
+        except OSError:
+            return False
 
     # ============================================================ layout / connect
 

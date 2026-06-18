@@ -2,6 +2,15 @@
 
 All notable changes to this tool are documented here.
 
+## [01.04] - 2026-06-18
+### Added
+- **Lineage** tab — node **right-click context menu**: **Reveal in File Explorer**
+  opens the folder containing that node's file with the file selected
+  (Windows `explorer /select,`; macOS/Linux fallbacks). Enabled only when the path
+  resolves (node has a project-relative key, project root is set, and the file
+  still exists); disabled for planned / out-of-root / missing files. Built to be
+  extended with more per-node actions later.
+
 ## [01.03] - 2026-06-18
 ### Added
 - **Lineage** tab — manual relationship control: each node has a **Relation to
