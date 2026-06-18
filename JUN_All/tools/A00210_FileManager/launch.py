@@ -19,15 +19,12 @@ ROOT = os.path.abspath(
 if ROOT not in sys.path:
     sys.path.append(ROOT)
 
-# 스크립트 디렉터리(이 툴 폴더)도 path 에 추가 → `import app...` 가능.
-TOOL_ROOT = os.path.dirname(os.path.abspath(__file__))
-if TOOL_ROOT not in sys.path:
-    sys.path.append(TOOL_ROOT)
-
-
+# 툴마다 고유한 패키지 경로(tools.<tool>.app...)로 import 한다.
+# 모든 standalone Qt 툴이 똑같이 최상위 `app` 으로 import 하면 한 인터프리터
+# (예: Maya·공용 런처)에서 두 툴을 동시에 띄울 때 sys.modules['app'] 가 충돌한다.
 from Framework.qt.qt import QApplication
 
-from app.ui.main_window import MainWindow
+from tools.A00210_FileManager.app.ui.main_window import MainWindow
 from Framework.themes.theme_manager import ThemeManager
 
 

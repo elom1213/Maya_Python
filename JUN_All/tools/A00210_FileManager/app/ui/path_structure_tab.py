@@ -26,8 +26,8 @@ from Framework.qt.qt import (
     QFont,
 )
 
-from app.core import path_structure as ps_mod
-from app.core.store import OutsideProjectRootError
+from ..core import path_structure as ps_mod
+from ..core.store import OutsideProjectRootError
 
 
 class PathStructureTab(QWidget):

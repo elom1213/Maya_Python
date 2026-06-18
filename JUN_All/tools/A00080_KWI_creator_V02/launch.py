@@ -14,7 +14,9 @@ if ROOT not in sys.path:
 
 from Framework.qt.qt import QApplication
 
-from app.ui.main_window import MainWindow
+# 툴 고유 패키지 경로로 import (내부 모듈도 동일). 최상위 `app` 으로 import 하면
+# 한 인터프리터에서 다른 standalone 툴과 sys.modules['app'] 가 충돌한다.
+from tools.A00080_KWI_creator_V02.app.ui.main_window import MainWindow
 from Framework.themes.theme_manager import ThemeManager
 
 
