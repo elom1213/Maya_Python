@@ -428,8 +428,11 @@ class LineageTab(QWidget):
         split = QSplitter(Qt.Horizontal)
         split.addWidget(self._build_canvas())
         split.addWidget(self._build_inspector())
-        split.setStretchFactor(0, 4)
+        # 좌(캔버스):우(Node 패널) = 3:1 → 캔버스가 가로의 약 3/4 를 차지.
+        # stretch 는 리사이즈 분배, setSizes 는 초기 비율(큰 비례값이면 가용폭에 맞춰 스케일).
+        split.setStretchFactor(0, 3)
         split.setStretchFactor(1, 1)
+        split.setSizes([3000, 1000])
         root.addWidget(split, stretch=1)
 
     def _build_saved_group(self):
