@@ -75,8 +75,10 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
    - `Thumb`/`Record` 열의 `O` 는 썸네일·기록 존재 표시. Project Root 밖 파일은 회색(`out of project root`)으로 비활성.
 3. **기록 작성**: 파일을 선택 → 우측에서 **Author** 입력, **New note** 작성 후 **Add Log Entry**(타임스탬프 자동) →
    **Save Record**. `records/<key>.json` 이 생성/갱신된다.
-4. **썸네일**: **Capture Region** → 화면이 어두워지면 드래그로 영역 선택(예: Maya 뷰포트, 뷰어 등 화면에 보이는 것).
-   선택 즉시 `thumbs/<key>.png` 로 저장되고 미리보기가 갱신된다. (`Esc` 취소)
+4. **썸네일**: **Capture Region** → 화면이 **살짝 어두워지며(실제 화면은 비쳐 보임)** 드래그로 영역 선택
+   (예: Maya 뷰포트, 뷰어 등 화면에 보이는 것). 드래그한 영역만 **또렷하게** 보여 캡쳐 범위를 확인할 수 있다
+   (Win+Shift+S 와 유사, Windows 10/11 공통). 선택 즉시 `thumbs/<key>.png` 로 저장되고 미리보기가
+   갱신된다. (`Esc` 취소)
    - 외부 이미지를 쓰려면 **Load Image...** 로 PNG/JPG 를 지정한다.
 5. **공유(Push/Pull)**:
    - **Push**: `records`/`thumbs` 변경을 커밋 후 원격에 푸시. **원본 mb/ma 는 포함되지 않는다.**
@@ -178,4 +180,7 @@ A00210_FileManager/
   죽지 않는다. 인증은 캐시된 git 자격증명에 의존한다.
 - Store Repo 는 **이 프로젝트 repo 와 별개**의 전용 데이터 리포를 쓴다(예: `JUN_FileManager_data`).
 - 화면 캡쳐는 멀티 모니터/DPI 환경의 좌표를 고려한다. 캡쳐 시 앱 오버레이는 잠깐 숨겨져 자기 창은 찍히지 않는다.
+  캡쳐 오버레이는 **투명 배경(`WA_TranslucentBackground`)** 으로 실제 화면을 비춰 보여준다 — 풀스크린 '상태'
+  대신 가상 데스크탑 geometry 로 전체 모니터를 덮는다(Windows 10/11 공통, 풀스크린+반투명의 단일모니터
+  스냅/합성 깨짐 회피). (v01.05)
 - UI 텍스트·로그·git 커밋 메시지는 영어, 주석/문서는 한국어(프로젝트 관례).

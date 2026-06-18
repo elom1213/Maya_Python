@@ -37,7 +37,11 @@ class RegionCapture(QWidget):
             | Qt.WindowStaysOnTopHint
             | Qt.Tool
         )
-        self.setWindowState(Qt.WindowFullScreen)
+        # 투명 배경: 어둡게 덮되 그 아래 실제 화면이 비쳐 캡쳐 범위가 보이게 한다.
+        # 이 속성이 없으면 위젯의 불투명 배경 때문에 화면이 전부 검게 보인다.
+        # Windows 10/11 모두 동작하도록 풀스크린 '상태' 대신 가상 데스크탑 geometry 로 덮는다
+        # (풀스크린 + 반투명 조합은 단일 모니터로 스냅되거나 합성이 깨질 수 있음).
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setCursor(Qt.CrossCursor)
 
         # 전체 가상 데스크탑(모든 모니터) 영역을 덮는다.
@@ -59,21 +63,30 @@ class RegionCapture(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-
-        # 전체를 어둡게 덮는다.
-        painter.fillRect(self.rect(), QColor(0, 0, 0, 110))
+        dim = QColor(0, 0, 0, 110)
+        full = self.rect()
 
         if self._origin and self._current:
-            sel = self._selection_rect_local()
+            sel = self._selection_rect_local().intersected(full)
 
-            # 선택 영역은 다시 비운다(밝게).
-            painter.setCompositionMode(QPainter.CompositionMode_Clear)
-            painter.fillRect(sel, Qt.transparent)
-            painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+            # 선택 영역을 '제외한' 둘레 4개 영역만 어둡게 칠한다. 선택 영역은 칠하지
+            # 않으므로 투명 배경 그대로 → 그 아래 실제 화면이 선명하게 보인다.
+            # (CompositionMode_Clear 는 드라이버별 편차가 있어 사용하지 않는다.)
+            painter.fillRect(QRect(full.left(), full.top(),
+                                   full.width(), sel.top() - full.top()), dim)      # 위
+            painter.fillRect(QRect(full.left(), sel.bottom() + 1,
+                                   full.width(), full.bottom() - sel.bottom()), dim)  # 아래
+            painter.fillRect(QRect(full.left(), sel.top(),
+                                   sel.left() - full.left(), sel.height()), dim)     # 왼쪽
+            painter.fillRect(QRect(sel.right() + 1, sel.top(),
+                                   full.right() - sel.right(), sel.height()), dim)   # 오른쪽
 
             pen = QPen(QColor(80, 170, 255), 2)
             painter.setPen(pen)
             painter.drawRect(sel)
+        else:
+            # 드래그 시작 전: 전체를 살짝 어둡게(화면은 비쳐 보임).
+            painter.fillRect(full, dim)
 
     def _selection_rect_local(self):
         """위젯 로컬 좌표 기준 선택 사각형."""

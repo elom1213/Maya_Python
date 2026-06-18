@@ -2,6 +2,20 @@
 
 All notable changes to this tool are documented here.
 
+## [01.05] - 2026-06-18
+### Fixed
+- **Region capture** overlay showed a fully black screen, hiding what was being
+  selected. The overlay widget was missing `WA_TranslucentBackground`, so the dim
+  layer was painted over an opaque (black) background instead of the live desktop.
+  Now the screen is only dimmed and the drag region stays clear (like Win+Shift+S).
+  - Enabled `WA_TranslucentBackground` so the actual screen shows through.
+  - Replaced fullscreen window **state** with explicit virtual-desktop **geometry**
+    (frameless / stay-on-top / tool) — fullscreen + translucency could snap to a
+    single monitor or break compositing. Works on Windows 10 and 11.
+  - Painted the dim as four rects around the selection instead of
+    `CompositionMode_Clear` (driver-dependent), so the selected region is reliably
+    transparent.
+
 ## [01.04] - 2026-06-18
 ### Added
 - **Lineage** tab — node **right-click context menu**: **Reveal in File Explorer**
