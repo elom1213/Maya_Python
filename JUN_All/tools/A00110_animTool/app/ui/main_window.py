@@ -5,6 +5,7 @@
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
+from Framework.qt import JUN_mod_collapsible_qt
 from Framework.qt.maya_window import maya_main_window
 
 print("QT version  :  " + str(QT_VERSION))
@@ -20,6 +21,7 @@ from tools.A00110_animTool.app.core import MirrorKeyManager
 from tools.A00110_animTool.app.core import MirrorTokenStore
 from tools.A00110_animTool.app.core import BakeManager
 from tools.A00110_animTool.app.core import FollowMatchManager
+from tools.A00110_animTool.app.core import OffsetHoldManager
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -81,6 +83,8 @@ class MainWindow(QWidget):
 
         self.te_log = QTextEdit()
         self.te_log.setReadOnly(True)
+        # 창이 콘텐츠에 맞춰 줄어들 때도 로그창이 쓸만한 높이를 유지하도록 최소 높이 지정.
+        self.te_log.setMinimumHeight(90)
 
         # -------------------------
         # 탭: Key Edit / Pose Key
@@ -96,6 +100,9 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_follow_tab(), "Follow")
         main_layout.addWidget(self.tabs)
 
+        # 탭 전환 시에도 창을 '현재 탭' 콘텐츠 높이에 맞춘다(섹션 접힘 상태 반영).
+        self.tabs.currentChanged.connect(self._fit_window_later)
+
         # 로그창을 탭 아래에 배치
         main_layout.addWidget(self.te_log)
 
@@ -108,23 +115,48 @@ class MainWindow(QWidget):
         main_layout.addWidget(self.lbl_copyright)
 
     # --------------------------------------------------
+    # Window sizing (접이식 섹션 토글 / 탭 전환 시 창 크기 자동 조정)
+    # --------------------------------------------------
+
+    def _fit_window_later(self, *args):
+        """레이아웃이 보임/숨김을 반영한 다음 이벤트 루프에서 창 높이를 콘텐츠에 맞춘다.
+        (토글/탭전환 시점엔 새 가시성이 아직 레이아웃에 반영되지 않을 수 있어 한 틱 미룬다.)"""
+        QTimer.singleShot(0, self._fit_window)
+
+    def _fit_window(self):
+        """현재 탭 콘텐츠 높이에 맞춰 창 높이를 조정(너비는 유지).
+        탭 페이지는 JUN_mod_fit_tab_page_v01 라 숨은 탭은 sizeHint 0 → 창이 현재 탭에만 맞춰진다.
+        page.adjustSize() 만으로는 QTabWidget 내부 QStackedLayout 의 캐시된 sizeHint 가
+        갱신되지 않으므로(섹션 접을 때 창이 안 줄어듦), tabs.adjustSize() 로 강제 재계산한다."""
+        page = self.tabs.currentWidget()
+        if page is not None:
+            page.adjustSize()
+        self.tabs.adjustSize()
+        self.tabs.updateGeometry()
+        self.layout().activate()
+        self.resize(self.width(), self.sizeHint().height())
+
+    # --------------------------------------------------
     # Tab builders
     # --------------------------------------------------
 
     def _build_key_edit_tab(self):
-        """기존 키 이동/삭제/hold 기능 탭."""
+        """키 이동/삭제 · Graph Editor(Hold) · Offset & Hold 를 접이식 섹션 3개로 구성한 탭.
+        각 섹션 헤더를 클릭하면 접고/펼칠 수 있고(레거시 frameLayout 패턴), 토글하면 창 크기가
+        콘텐츠에 맞춰 자동으로 줄고 늘어난다. Offset & Hold 는 기본 접힘."""
 
-        tab = QWidget()
+        tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
         tab_layout = QVBoxLayout(tab)
-
-        # -------------------------
-        # Frame range / offset 입력
-        # -------------------------
 
         validator = QIntValidator(-1000000, 1000000, self)
 
-        row = QHBoxLayout()
+        # =========================================================
+        # 섹션 1 : Move Keys (키 위치 이동 / 구간 삭제)
+        # =========================================================
 
+        sec_move = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01("Move Keys", expanded=True)
+
+        row = QHBoxLayout()
         row.addWidget(QLabel("Start"))
         self.le_start = QLineEdit()
         self.le_start.setValidator(validator)
@@ -142,48 +174,77 @@ class MainWindow(QWidget):
         self.le_offset.setValidator(QIntValidator(0, 1000000, self))
         self.le_offset.setPlaceholderText("5")
         row.addWidget(self.le_offset)
-
-        tab_layout.addLayout(row)
-
-        # -------------------------
-        # 이동 버튼
-        # -------------------------
+        sec_move.add_layout(row)
 
         row = QHBoxLayout()
-
         self.btn_move_back = QPushButton("◀ Earlier (-)")
         self.btn_move_fwd  = QPushButton("Later (+) ▶")
-
         row.addWidget(self.btn_move_back)
         row.addWidget(self.btn_move_fwd)
-
-        tab_layout.addLayout(row)
-
-        # -------------------------
-        # 삭제 버튼
-        # -------------------------
+        sec_move.add_layout(row)
 
         self.btn_delete = QPushButton("Delete Keys in Range")
-        tab_layout.addWidget(self.btn_delete)
+        sec_move.add_widget(self.btn_delete)
 
-        # -------------------------
-        # Graph Editor 구간 유지(hold)
-        # -------------------------
+        tab_layout.addWidget(sec_move)
 
-        grp = QGroupBox("Graph Editor")
-        grp_layout = QVBoxLayout(grp)
+        # =========================================================
+        # 섹션 2 : Graph Editor (선택 키 구간 Hold)
+        # =========================================================
+
+        sec_graph = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01("Graph Editor", expanded=True)
 
         self.btn_hold = QPushButton("Hold Selected Range")
-        grp_layout.addWidget(self.btn_hold)
+        sec_graph.add_widget(self.btn_hold)
 
         self.cb_hotkey = QCheckBox("Shift+A hotkey")
         self.cb_hotkey.setChecked(True)
-        grp_layout.addWidget(self.cb_hotkey)
+        sec_graph.add_widget(self.cb_hotkey)
 
         self.lbl_hotkey = QLabel("")
-        grp_layout.addWidget(self.lbl_hotkey)
+        sec_graph.add_widget(self.lbl_hotkey)
 
-        tab_layout.addWidget(grp)
+        tab_layout.addWidget(sec_graph)
+
+        # =========================================================
+        # 섹션 3 : Offset & Hold (기본 접힘)
+        #   리스트업한 컨트롤러 키를 hold(유지) + offset(보간) 구조로 재배치.
+        #   대상은 씬 선택이 아니라 리스트의 항목. 로직은 OffsetHoldManager.
+        # =========================================================
+
+        sec_offhold = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01("Offset & Hold", expanded=False)
+
+        self.oh_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Offset/Hold List", select_label="Select Objects", log_callback=self.log)
+        sec_offhold.add_widget(self.oh_tsl)
+
+        oh_nonneg = QIntValidator(0, 1000000, self)
+
+        oh_row = QHBoxLayout()
+        oh_row.addWidget(QLabel("Hold"))
+        self.le_oh_hold = QLineEdit()
+        self.le_oh_hold.setValidator(oh_nonneg)
+        self.le_oh_hold.setPlaceholderText("10")
+        oh_row.addWidget(self.le_oh_hold)
+
+        oh_row.addWidget(QLabel("Offset"))
+        self.le_oh_offset = QLineEdit()
+        self.le_oh_offset.setValidator(oh_nonneg)
+        self.le_oh_offset.setPlaceholderText("30")
+        oh_row.addWidget(self.le_oh_offset)
+
+        # Start: 비우면 오브젝트별 첫 키 프레임을 앵커로 사용.
+        oh_row.addWidget(QLabel("Start"))
+        self.le_oh_start = QLineEdit()
+        self.le_oh_start.setValidator(validator)
+        self.le_oh_start.setPlaceholderText("(first key)")
+        oh_row.addWidget(self.le_oh_start)
+        sec_offhold.add_layout(oh_row)
+
+        self.btn_oh_apply = QPushButton("Apply Offset & Hold")
+        sec_offhold.add_widget(self.btn_oh_apply)
+
+        tab_layout.addWidget(sec_offhold)
 
         tab_layout.addStretch(1)
 
@@ -191,11 +252,16 @@ class MainWindow(QWidget):
         # Signal
         # -------------------------
 
+        # 섹션 토글 -> 창 크기 자동 조정
+        for sec in (sec_move, sec_graph, sec_offhold):
+            sec.toggled.connect(self._fit_window_later)
+
         self.btn_move_back.clicked.connect(lambda: self.on_move(-1))
         self.btn_move_fwd.clicked.connect(lambda: self.on_move(+1))
         self.btn_delete.clicked.connect(self.on_delete)
         self.btn_hold.clicked.connect(self.on_hold)
         self.cb_hotkey.toggled.connect(self.on_toggle_hotkey)
+        self.btn_oh_apply.clicked.connect(self.on_offset_hold)
 
         return tab
 
@@ -204,7 +270,7 @@ class MainWindow(QWidget):
         축마다 체크박스가 있고, 체크된 축만 입력값으로 키를 설정한다.
         기본 체크: rotate X, rotate Z, translate Y. (A00030 원본 3축)"""
 
-        tab = QWidget()
+        tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
         tab_layout = QVBoxLayout(tab)
 
         grp = QGroupBox("Set Pose Key (current frame)")
@@ -252,7 +318,7 @@ class MainWindow(QWidget):
         레거시 JUN_PY_CopyPasteKey_V03_01 의 Copy Key Tool 을 Qt 로 포팅.
         Base/Target 리스트는 재사용 위젯 JUN_mod_tsl_qt_v01 2개로 구성한다."""
 
-        tab = QWidget()
+        tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
         tab_layout = QVBoxLayout(tab)
 
         # -------------------------
@@ -348,7 +414,7 @@ class MainWindow(QWidget):
         """컨트롤러 키프레임을 반대쪽 컨트롤러로 좌우 미러하는 탭.
         자동 페어링(토큰) + 수동 리스트 폴백. rotateOrder 무관 (worldMatrix 반사)."""
 
-        tab = QWidget()
+        tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
         tab_layout = QVBoxLayout(tab)
 
         # -------------------------
@@ -548,7 +614,7 @@ class MainWindow(QWidget):
         A00120_FKIK 의 native bakeResults 베이크를 이식(컨스트레인트 없는 범용 bake).
         대상은 씬 선택이 아니라 Bake List 위젯의 항목이다."""
 
-        tab = QWidget()
+        tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
         tab_layout = QVBoxLayout(tab)
 
         # -------------------------
@@ -662,7 +728,7 @@ class MainWindow(QWidget):
         blend(0..1) 로 원본 follower 애니메이션과 매치 결과를 섞고, 선택된 애니메이션
         레이어에 키가 들어간다."""
 
-        tab = QWidget()
+        tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
         tab_layout = QVBoxLayout(tab)
 
         # -------------------------
@@ -1189,6 +1255,36 @@ class MainWindow(QWidget):
             do_translate=do_t, do_rotate=do_r, do_scale=do_s)
         self.log(msg)
 
+    # --------------------------------------------------
+    # Offset & Hold
+    # --------------------------------------------------
+
+    def on_offset_hold(self):
+
+        objs = self.oh_tsl.get_all_items()   # 리스트업된 항목만 (씬 선택 아님)
+        if not objs:
+            self.log("[Warning] Add objects to the Offset/Hold List first.")
+            return
+
+        h_txt = self.le_oh_hold.text().strip()
+        o_txt = self.le_oh_offset.text().strip()
+        if h_txt == "" or o_txt == "":
+            self.log("[Warning] Enter Hold and Offset.")
+            return
+
+        hold = int(h_txt)
+        offset = int(o_txt)
+        if hold + offset <= 0:
+            self.log("[Warning] Hold + Offset must be greater than 0.")
+            return
+
+        # Start 비우면 None -> 오브젝트별 첫 키 프레임을 앵커로.
+        s_txt = self.le_oh_start.text().strip()
+        start = int(s_txt) if s_txt != "" else None
+
+        count, msg = OffsetHoldManager.apply_offset_hold(objs, offset, hold, start=start)
+        self.log(msg)
+
     def show_about(self, *args):
         # jointTool 의 show_about(confirmDialog) 패턴을 Qt 로 옮김
         QMessageBox.information(
@@ -1219,6 +1315,14 @@ class MainWindow(QWidget):
     # --------------------------------------------------
     # Teardown
     # --------------------------------------------------
+
+    def showEvent(self, event):
+        # 최초 표시 직후 한 번, 현재 탭(섹션 접힘 상태)에 맞춰 창 크기를 맞춘다.
+        # (표시 전에는 탭 페이지가 숨김 상태라 sizeHint 가 0 이므로 show 이후에 처리.)
+        super().showEvent(event)
+        if not getattr(self, "_initial_fit_done", False):
+            self._initial_fit_done = True
+            self._fit_window_later()
 
     def closeEvent(self, event):
         # 창이 닫힐 때 Shift+A 를 원래 바인딩으로 복원

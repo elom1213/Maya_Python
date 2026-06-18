@@ -4,8 +4,10 @@
 # 주의: qt.py 자체는 `from Framework.qt.qt import *` 로 계속 직접 import 한다.
 
 from Framework.qt import MOD_tsl_qt_v01 as JUN_mod_tsl_qt
+from Framework.qt import MOD_collapsible_qt_v01 as JUN_mod_collapsible_qt
 
 
 __all__ = [
     "JUN_mod_tsl_qt",
+    "JUN_mod_collapsible_qt",
 ]

@@ -4,8 +4,10 @@
 
 애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **여섯 개의 탭**과 **공유 로그창**으로 구성된다.
 
-1. **Key Edit** — 선택 오브젝트의 키를 시간 범위로 **이동(앞/뒤 offset)·삭제**하고, 그래프
-   에디터에서 선택한 키 구간을 **평평하게 유지(Hold)** 한다. `Shift+A` 핫키로 Hold 를 호출할 수 있다.
+1. **Key Edit** — (v01.14~) **접이식 섹션 3개**로 구성된다. **Move Keys**: 키를 시간 범위로
+   **이동(앞/뒤 offset)·삭제**. **Graph Editor**: 선택한 키 구간을 **평평하게 유지(Hold)**
+   (`Shift+A` 핫키 호출 가능). **Offset & Hold**(기본 접힘): **리스트업한 컨트롤러**의 키를
+   **포즈 유지(hold) + 보간(offset)** 구조로 재배치. 섹션을 접고 펼치면 **창 크기가 자동 조정**된다.
 2. **Pose Key** — 선택 오브젝트(들)의 **현재 프레임**에 6축(rotate X/Y/Z, translate X/Y/Z)
    값을 키프레임으로 설정한다. 축마다 체크박스가 있어 체크된 축만 적용된다.
 3. **Copy Key** (v01.03~) — **Base → Target** 으로 시간 범위 애니메이션 키를 복사하고,
@@ -21,6 +23,23 @@
    `parentConstraint(maintainOffset=False)` 와 동등). **rotateOrder 가 달라도 정확**하고,
    **blend(0~1)** 로 원본 follower 애니메이션과 매치 결과를 섞으며(0=원본 유지, 1=덮어쓰기,
    0.5=반반), 선택된 **애니메이션 레이어**(override/additive)에 키가 들어간다.
+
+> **v01.14 — Key Edit 탭을 접이식 섹션 3개로 분리**: Key Edit 탭을 **Move Keys / Graph Editor /
+> Offset & Hold** 세 개의 접이식(collapsible) 섹션으로 나눴다(레거시 `JUN_PY_SelectionTool` 의
+> `frameLayout(collapsable=True)` 패턴을 Qt 로 이식). 각 섹션 헤더를 클릭하면 접고/펼치며,
+> **Offset & Hold 는 기본 접힘**이다. 접고 펼칠 때(및 탭 전환 시) **창 크기가 현재 탭 콘텐츠에 맞춰
+> 자동으로 줄고 늘어난다**. 접이식 위젯은 재사용 모듈 `Framework/qt/MOD_collapsible_qt_v01.py`
+> (`JUN_mod_collapsible_qt_v01` 헤더형 섹션 + `JUN_mod_fit_tab_page_v01` 숨김 시 sizeHint 0 인 탭
+> 페이지)로 분리했고, 창 크기 조정은 `main_window` 의 `_fit_window`(섹션 `toggled` /
+> `QTabWidget.currentChanged` → 한 틱 뒤 `resize`)가 담당한다.
+
+> **v01.13 — Offset & Hold 를 Key Edit 탭으로 통합**: 별도 탭이던 Offset & Hold 를 없애고 **Key Edit
+> 탭의 "Offset && Hold" 그룹**으로 옮겼다(기능·로직 동일, UI 위치만 변경). 리스트의 각 오브젝트에서
+> **대상 커브들의 키 시점 합집합**을 '포즈 프레임'으로 삼아, 포즈마다 `[start+i·P, start+i·P+hold]`
+> (P=hold+offset) plateau 를 만들고 그 사이를 offset 길이로 보간한다. 포즈 프레임 값은 어트리뷰트를
+> 시점별로 평가(`getAttr time=`)해 샘플링하므로 그 시점에 키가 없던 커브도 보간값으로 잡힌다. plateau
+> 양 끝 안쪽 탄젠트는 **flat**, 보간 구간 바깥은 **spline** 이라 유지→가속→감속→유지가 된다. 로직은
+> `app/core/offset_hold_manager.py`, 리스트 UI 는 재사용 위젯 `JUN_mod_tsl_qt_v01`.
 
 > **v01.11 — Follow 탭 신설**: follower 들을 인덱스로 매칭된 target 의 월드 transform 에 맞춰 구간
 > 키 베이크한다. target `worldMatrix` 를 follower `parentInverseMatrix` 로 로컬화한 뒤 **follower
@@ -91,7 +110,8 @@ A00110_animTool/
     │   ├── mirror_key_manager.py # 컨트롤 키 좌우 미러 (Mirror Key 탭, OpenMaya)
     │   ├── mirror_token_store.py # mirror_tokens.json 입출력 + 폴백
     │   ├── bake_manager.py       # 리스트 노드 구간 bake (Bake 탭, native bakeResults)
-    │   └── follow_match_manager.py # follower→target 월드 매치 베이크 (Follow 탭, OpenMaya + blend)
+    │   ├── follow_match_manager.py # follower→target 월드 매치 베이크 (Follow 탭, OpenMaya + blend)
+    │   └── offset_hold_manager.py # 키를 hold+offset 구조로 재배치 (Key Edit 탭 > Offset & Hold)
     └── ui/main_window.py  # 전체 UI (6개 탭 + 공유 로그창 + 메뉴 바)
 ```
 
@@ -139,27 +159,66 @@ A00110_animTool.run(True)   # True = reload
 
 ### 5.1 Key Edit 탭
 
+**접이식 섹션 3개**(v01.14~)로 구성된다. 각 섹션 **헤더(▼/▶ + 제목)를 클릭하면 접고/펼칠 수 있고**
+(레거시 `frameLayout` 패턴), 토글하면 **창 전체 크기가 콘텐츠에 맞춰 자동으로 줄고 늘어난다**.
+**Offset & Hold 섹션은 기본 접힘**이다.
+
 ```
 ┌───────────────────────────────────────────────────┐
-│ Start [ 4 ]  End [ 10 ]  Offset [ 5 ]             │
-│ [ ◀ Earlier (-) ]        [ Later (+) ▶ ]          │
-│ [ Delete Keys in Range ]                          │
-│ ┌ Graph Editor ───────────────────────────────┐  │
-│ │ [ Hold Selected Range ]                      │  │
-│ │ [v] Shift+A hotkey      Shift+A : ON         │  │
-│ └──────────────────────────────────────────────┘  │
+│ ▼ Move Keys                                       │  ← 클릭하면 접힘/펼침
+│    Start [ 4 ]  End [ 10 ]  Offset [ 5 ]          │
+│    [ ◀ Earlier (-) ]      [ Later (+) ▶ ]         │
+│    [ Delete Keys in Range ]                       │
+│ ▼ Graph Editor                                    │
+│    [ Hold Selected Range ]                        │
+│    [v] Shift+A hotkey      Shift+A : ON           │
+│ ▶ Offset & Hold              (기본 접힘)          │  ← 펼치면 아래 내용 표시
+│    [Offset/Hold List]  (Select/Add/Del/Up/Down)   │
+│    Hold [ 10 ] Offset [ 30 ] Start [(first key)]  │
+│    [ Apply Offset & Hold ]                        │
 └───────────────────────────────────────────────────┘
 ```
+
+- **섹션 접기/펼치기**: 헤더 클릭으로 토글. 토글·탭 전환 시 창 높이가 **현재 탭 콘텐츠**에 맞춰
+  자동 조정된다(다른 탭은 숨김 페이지의 sizeHint 를 0 으로 보고하므로 창이 현재 탭에만 맞춰진다).
+
+#### Move Keys 섹션 (키 위치 이동 / 삭제)
 
 - **Start / End**: 작업할 시간 범위(프레임). **Offset**: 이동량(양수 입력, 부호는 버튼이 결정).
 - **◀ Earlier (-)** / **Later (+) ▶**: `[Start, End]` 구간의 키를 Offset 만큼 **앞/뒤로 상대 이동**.
 - **Delete Keys in Range**: `[Start, End]` 구간의 키를 **삭제**(클립보드 미사용).
 - **채널 스코프**: 채널박스(`mainChannelBox`)에서 **어트리뷰트를 선택해 두면 그 채널만**,
   선택이 없으면 **오브젝트의 모든 애니메이션 커브**가 대상이 된다(이동/삭제 공통).
-- **Graph Editor > Hold Selected Range**: 그래프 에디터에서 **선택한 키들**을 커브별로,
-  선택 구간의 시작 값으로 **평평하게(flat) 유지**한다(아래 7장 규칙 참고).
+
+#### Graph Editor 섹션 (Hold)
+
+- **Hold Selected Range**: 그래프 에디터에서 **선택한 키들**을 커브별로, 선택 구간의 시작 값으로
+  **평평하게(flat) 유지**한다(아래 7장 규칙 참고).
 - **Shift+A hotkey** 체크박스: 켜면 Shift+A 를 Hold 에 바인딩, 끄면 원래 바인딩으로 복원.
   옆 라벨에 `Shift+A : ON / OFF / unavailable` 상태를 표시한다.
+
+#### Offset & Hold 섹션 (v01.13~, v01.14~ 접이식·기본 접힘)
+
+리스트업한 컨트롤러의 키를 **포즈 유지(hold) + 보간(offset)** 구조로 재배치한다(위의 이동용 Offset 과는
+무관한 별도 기능). 대상은 씬 선택이 아니라 **그룹 안 리스트의 항목**이다.
+
+- **Offset/Hold List** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `Select Objects` 로 현재 씬 선택을 리스트에
+  채운다(Add/Del/Up/Down/Sort, "Number: N", 항목 클릭 시 씬 자동 선택 내장). 리스트가 비면 아무것도 안 한다.
+- **Hold**: 각 포즈를 평평하게 유지할 구간 길이(프레임, ≥0).
+- **Offset**: 인접 포즈 사이 보간 구간 길이(프레임, ≥0). Hold + Offset 은 0보다 커야 한다.
+- **Start**: 첫 plateau 시작 프레임. **비우면 오브젝트별 첫 키 프레임**을 앵커로 쓴다(`0` 을 넣으면 0부터).
+- **채널 스코프**: 채널박스 선택 어트리뷰트가 있으면 그 채널만, 없으면 모든 (시간 기반) 커브.
+- **Apply Offset & Hold**: 재배치 실행. 결과(오브젝트 수 / hold·offset / 스코프 / skip)가 로그에 출력.
+
+**배치 공식** (P = Hold + Offset, start = 앵커, i = 0…n−1, n = 포즈 개수):
+
+```
+plateau_start_i = start + i·P          (유지 시작)
+plateau_end_i   = start + i·P + Hold    (유지 끝)
+사이 구간 [plateau_end_i, plateau_start_{i+1}] = 길이 Offset 보간
+```
+
+예) Hold=10, Offset=30, 포즈 3개, Start=0 → `0~10 유지 / 10~40 보간 / 40~50 유지 / 50~80 보간 / 80~90 유지`.
 
 ### 5.2 Pose Key 탭
 
@@ -405,6 +464,14 @@ A00110_animTool.run(True)   # True = reload
 5. **Match Follow** → 각 follower 가 구간 내 매 프레임에서 target 의 월드 위치/회전(/스케일)에 맞춰
    키가 구워진다(단일 Undo). blend < 1 이면 원본과 섞인다.
 
+### Offset & Hold (Key Edit 탭 > Offset & Hold 그룹)
+1. 재배치할 컨트롤러(들)를 씬에서 선택 → **Select Objects** 로 **Offset/Hold List** 에 채운다.
+   (특정 채널만 작업하려면 채널박스에서 어트리뷰트 선택)
+2. **Hold**(포즈 유지 길이) / **Offset**(보간 길이)를 입력하고, 필요하면 **Start**(시작 프레임, 비우면
+   각 오브젝트의 첫 키) 입력.
+3. **Apply Offset & Hold** → 각 오브젝트의 포즈가 hold 만큼 유지되고 사이가 offset 으로 보간되도록
+   키가 재배치된다(단일 Undo).
+
 ---
 
 ## 7. 동작 규칙
@@ -522,6 +589,22 @@ A00110_animTool.run(True)   # True = reload
 - **성능**: 베이크 동안 `refresh(suspend=True)` 로 뷰포트 갱신을 막고, 끝나면 현재 프레임 복원 +
   뷰포트 해제. **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
 
+### Offset & Hold (`offset_hold_manager.OffsetHoldManager.apply_offset_hold`)
+- **대상 = Offset/Hold List 항목**. 씬 선택이 아니라 리스트업된 노드만 처리한다(리스트가 비면 경고).
+- **채널 스코프**: 채널박스 선택 어트리뷰트가 있으면 그 채널만(`attribute`), 없으면 오브젝트의 모든
+  애니메이션 플러그(`listAnimatable` 중 키가 1개 이상인 것). 시간 기반 키만 대상.
+- **포즈 프레임**: 오브젝트별로 **대상 플러그들의 키 시점 합집합**을 정렬·중복제거해 '포즈'로 삼는다.
+  모든 대상 채널이 같은 포즈 인덱스를 공유하므로 동일한 plateau 구조로 동기화된다.
+- **값 샘플링**: 각 포즈 프레임에서 `getAttr(plug, time=f)` 로 평가해 값을 확보한다(그 시점에 키가
+  없던 커브도 보간값으로 잡힘). **수정 전에 먼저 읽어** 재배치가 이후 읽기를 오염시키지 않는다.
+- **재배치**: 플러그별로 `cutKey(clear=True)` 로 기존 키를 지운 뒤, 포즈 i 마다
+  `start + i·P`(유지 시작)와 `start + i·P + Hold`(유지 끝, Hold>0 일 때)에 같은 값으로 키를 찍는다
+  (P = Hold + Offset). **앵커 start** 는 입력값, 비우면 포즈 프레임의 최솟값(첫 키).
+- **탄젠트**: plateau 시작 키 `in=spline, out=flat`, 끝 키 `in=flat, out=spline` → 유지 구간은 평평,
+  보간 구간은 spline 가속·감속(첫 키 in / 마지막 키 out 은 무의미하므로 영향 없음). Hold=0 이면
+  포즈당 키 1개(spline)로 순수 리타이밍.
+- **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
+
 ---
 
 ## 8. 로그 · 문제 해결
@@ -557,6 +640,10 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 4 follower(s) matched over [1-24] (24 frames, blend 1.0). No anim layer selected; keys on base curves.
 4 follower(s) matched over [1-24] (24 frames, blend 0.5). Layer 'AnimLayer1' (override).
 3 follower(s) matched over [1-24] (24 frames, blend 1.0). Layer 'AnimLayer2' (additive). 1 skipped (no settable channels / no node).
+
+# Offset & Hold
+3 object(s) re-timed (hold 10f / offset 30f)  (all curves)
+2 object(s) re-timed (hold 10f / offset 30f)  (channels: translateY)  (1 skipped: no keys)
 ```
 
 ### 경고 메시지
@@ -580,6 +667,10 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 - `[Warning] Target(n) / Follower(m) count mismatch.` — (Follow) 두 리스트 개수 불일치(중단).
 - `[Warning] Invalid Blend value.` — (Follow) Blend 입력이 숫자가 아님.
 - `[Info] Blend is 0; follower animation unchanged.` — (Follow) blend=0 이라 아무것도 안 함.
+- `[Warning] Add objects to the Offset/Hold List first.` — (Offset & Hold) 리스트가 비어 있음.
+- `[Warning] Enter Hold and Offset.` — (Offset & Hold) Hold/Offset 입력 누락.
+- `[Warning] Hold + Offset must be greater than 0.` — (Offset & Hold) 둘 다 0(주기 0).
+- `No animated objects to process. (n skipped: no keys)` — (Offset & Hold) 리스트 항목에 키가 없음.
 
 ### 자주 겪는 문제
 - **이동/삭제가 일부 채널에만 적용됨** → 채널박스에서 어트리뷰트가 선택돼 있으면 그 채널만 대상이 된다.
@@ -628,3 +719,14 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
   rotateOrder 로 재분해해 기록하므로 채널 값은 서로 달라도 월드 방향은 동일하다.
 - **(Follow) Blend=0 인데 아무 일도 안 일어남** → 의도된 동작이다(원본 유지). 효과를 보려면 Blend 를
   0 보다 크게 올린다.
+- **(Offset & Hold) 아무것도 안 바뀜** → 씬에서 선택만 하고 **Offset/Hold List 에 안 넣었을** 수 있다.
+  `Select Objects` 로 리스트에 채운다(대상은 리스트 항목이지 씬 선택이 아니다).
+- **(Offset & Hold) 일부 오브젝트가 skip 됨** → 그 오브젝트(또는 채널박스로 좁힌 채널)에 키가 없다.
+  로그의 `skipped` 수를 확인한다.
+- **(Offset & Hold) 일부 채널만 재배치됨** → 채널박스에서 어트리뷰트가 선택돼 있으면 그 채널만
+  대상이 된다. 전체 커브에 적용하려면 채널박스 선택을 해제한다.
+- **(Offset & Hold) 시작 프레임이 예상과 다름** → **Start** 가 비어 있으면 각 오브젝트의 **첫 키
+  프레임**을 앵커로 쓴다(오브젝트마다 다를 수 있음). 모두 같은 지점에서 시작하려면 Start 에 값을
+  입력한다(예: `0`).
+- **(Offset & Hold) 유지 구간이 평평하지 않고 미끄러짐** → Offset 이 0 이면 plateau 끝과 다음 plateau
+  시작이 같은 프레임이 되어 유지가 깨질 수 있다. 보간 구간을 주려면 Offset 을 1 이상으로 둔다.
