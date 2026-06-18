@@ -19,3 +19,5 @@ __pycache__/
 # 이 repo 트리 안에 들어와도 절대 추적/임베디드-repo 커밋하지 않는다.
 /JUN_FileManager_data/
 JUN_FileManager_data/
+
+*ref/
