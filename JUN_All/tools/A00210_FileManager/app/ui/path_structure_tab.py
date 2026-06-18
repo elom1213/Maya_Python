@@ -11,6 +11,7 @@ import os
 import time
 
 from Framework.qt.qt import (
+    Qt,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
@@ -20,6 +21,7 @@ from Framework.qt.qt import (
     QPushButton,
     QCheckBox,
     QListWidget,
+    QListWidgetItem,
     QPlainTextEdit,
     QFileDialog,
     QMessageBox,
@@ -41,6 +43,7 @@ class PathStructureTab(QWidget):
         self._log = log                            # (msg) -> None
 
         self._pending = None                       # Capture 했으나 아직 저장 안 한 PathStructure
+        self._scanned_base = None                   # 폴더 체크리스트를 마지막으로 스캔한 base 경로
 
         self._build_ui()
         self.on_refresh()
@@ -59,12 +62,34 @@ class PathStructureTab(QWidget):
         # Base folder + Browse
         base_row = QHBoxLayout()
         self.ipf_base = QLineEdit()
+        self.ipf_base.editingFinished.connect(self._scan_if_changed)
         btn_browse = QPushButton("Browse...")
-        btn_browse.clicked.connect(lambda: self._browse_dir(self.ipf_base))
+        btn_browse.clicked.connect(self._on_browse_base)
         base_row.addWidget(QLabel("Base Folder"))
         base_row.addWidget(self.ipf_base)
         base_row.addWidget(btn_browse)
         layout.addLayout(base_row)
+
+        # 기록할 최상위 폴더 체크리스트 (+ 전체 선택 / 다시 스캔)
+        # base 의 최상위 하위 폴더만 리스트업하고, 체크된 폴더만 기록한다.
+        folders_row = QHBoxLayout()
+        folders_row.addWidget(QLabel("Folders to record"))
+        folders_row.addStretch(1)
+        self.chk_all = QCheckBox("All")
+        self.chk_all.setChecked(True)
+        self.chk_all.setToolTip("Check to record every top-level folder.")
+        self.chk_all.clicked.connect(self._on_toggle_all)
+        btn_scan = QPushButton("Scan")
+        btn_scan.setToolTip("Re-list the base folder's top-level subfolders.")
+        btn_scan.clicked.connect(self._scan_folders)
+        folders_row.addWidget(self.chk_all)
+        folders_row.addWidget(btn_scan)
+        layout.addLayout(folders_row)
+
+        self.list_folders = QListWidget()
+        self.list_folders.setToolTip("Only checked folders are recorded.")
+        self.list_folders.itemChanged.connect(self._on_folder_item_changed)
+        layout.addWidget(self.list_folders)
 
         # Name
         name_row = QHBoxLayout()
@@ -127,6 +152,74 @@ class PathStructureTab(QWidget):
         if path:
             line_edit.setText(path)
 
+    def _on_browse_base(self):
+        self._browse_dir(self.ipf_base)
+        self._scan_folders()
+
+    # ---------------------------------------------------- folder checklist
+
+    def _all_names(self):
+        return [self.list_folders.item(i).text() for i in range(self.list_folders.count())]
+
+    def _checked_names(self):
+        return [
+            self.list_folders.item(i).text()
+            for i in range(self.list_folders.count())
+            if self.list_folders.item(i).checkState() == Qt.Checked
+        ]
+
+    def _scan_if_changed(self):
+        """base 경로가 마지막 스캔과 다를 때만 재스캔(포커스 이동만으로 선택이 초기화되지 않게)."""
+        if self.ipf_base.text().strip() != (self._scanned_base or ""):
+            self._scan_folders()
+
+    def _scan_folders(self):
+        """Base 폴더의 최상위 하위 폴더를 체크박스 리스트에 채운다.
+
+        다시 스캔해도 기존 체크 상태는 이름으로 보존하고, 새로 나타난 폴더는 체크 상태로 둔다.
+        (처음 스캔이면 모두 체크 = 기존 '전체 기록' 동작과 동일.)
+        """
+        base = self.ipf_base.text().strip()
+        prev_all = set(self._all_names())
+        prev_checked = set(self._checked_names())
+
+        names = ps_mod.list_top_level(base) if (base and os.path.isdir(base)) else []
+
+        self.list_folders.blockSignals(True)
+        self.list_folders.clear()
+        for name in names:
+            item = QListWidgetItem(name)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            # 기존 폴더는 이전 체크 상태 유지, 새 폴더(또는 첫 스캔)는 체크.
+            checked = (name not in prev_all) or (name in prev_checked)
+            item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+            self.list_folders.addItem(item)
+        self.list_folders.blockSignals(False)
+
+        self._scanned_base = base
+        self._sync_all_checkbox()
+
+    def _on_toggle_all(self, checked):
+        """'All' 체크박스 클릭 → 모든 항목을 같은 상태로."""
+        state = Qt.Checked if checked else Qt.Unchecked
+        self.list_folders.blockSignals(True)
+        for i in range(self.list_folders.count()):
+            self.list_folders.item(i).setCheckState(state)
+        self.list_folders.blockSignals(False)
+
+    def _on_folder_item_changed(self, *_):
+        self._sync_all_checkbox()
+
+    def _sync_all_checkbox(self):
+        """모든 항목이 체크됐을 때만 'All' 을 체크 상태로 반영(시그널 루프 방지)."""
+        n = self.list_folders.count()
+        all_checked = n > 0 and all(
+            self.list_folders.item(i).checkState() == Qt.Checked for i in range(n)
+        )
+        self.chk_all.blockSignals(True)
+        self.chk_all.setChecked(all_checked)
+        self.chk_all.blockSignals(False)
+
     def _selected_name(self):
         item = self.list_structs.currentItem()
         return item.text() if item is not None else ""
@@ -147,9 +240,21 @@ class PathStructureTab(QWidget):
             QMessageBox.warning(self, "Path Structure", "Set Project Root first (File Manager tab).")
             return
 
+        # base 가 바뀐 채 Scan 을 안 눌렀을 수 있으니 목록을 최신화한다.
+        self._scan_if_changed()
+
+        # 체크된 최상위 폴더만 기록. (폴더가 있는데 하나도 체크 안 했으면 경고)
+        include_top = self._checked_names()
+        if self._all_names() and not include_top:
+            QMessageBox.warning(
+                self, "Path Structure",
+                "No folders checked. Check the folders to record (or 'All').")
+            return
+
         store = self._get_store()
         try:
-            structure = ps_mod.capture(base, store, self.chk_recursive.isChecked())
+            structure = ps_mod.capture(
+                base, store, self.chk_recursive.isChecked(), include_top=include_top)
         except OutsideProjectRootError:
             QMessageBox.warning(self, "Path Structure", "Base folder is outside the project root.")
             return
@@ -161,7 +266,9 @@ class PathStructureTab(QWidget):
         self.list_structs.setCurrentRow(-1)
         self.list_structs.blockSignals(False)
         self._show_preview(structure, header="Captured (not saved yet)")
-        self._log(f"Captured {len(structure.folders)} folder(s) from {base}")
+        self._log(
+            f"Captured {len(structure.folders)} folder(s) from {base} "
+            f"({len(include_top)} top-level selected)")
 
     def on_save(self):
         if self._pending is None:

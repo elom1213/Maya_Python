@@ -70,34 +70,57 @@ def struct_path(store_dir, name):
 
 # ------------------------------------------------------------------- capture
 
-def _collect_folders(base_abs, recursive):
-    """base_abs 아래의 하위 폴더 상대경로(POSIX) 목록. 디렉터리만, 파일 무시."""
+def list_top_level(base_abs):
+    """base_abs 의 최상위 하위 폴더 이름 목록(정렬). 디렉터리만, 파일 무시.
+
+    UI 의 '기록할 폴더' 체크리스트를 채우는 데 쓴다.
+    """
+    if not os.path.isdir(base_abs):
+        return []
+    return sorted(
+        name
+        for name in os.listdir(base_abs)
+        if os.path.isdir(os.path.join(base_abs, name))
+    )
+
+
+def _collect_folders(base_abs, recursive, include_top=None):
+    """base_abs 아래의 하위 폴더 상대경로(POSIX) 목록. 디렉터리만, 파일 무시.
+
+    include_top : 기록할 최상위 폴더 이름의 컬렉션. None 이면 전체 최상위 폴더를 대상으로
+    한다(하위호환). 주어지면 그 최상위 폴더(및 recursive 시 그 하위 트리)만 수집한다.
+    """
     if not os.path.isdir(base_abs):
         return []
 
+    tops = list_top_level(base_abs)
+    if include_top is not None:
+        allow = set(include_top)
+        tops = [t for t in tops if t in allow]
+
     if not recursive:
-        return sorted(
-            name
-            for name in os.listdir(base_abs)
-            if os.path.isdir(os.path.join(base_abs, name))
-        )
+        return tops
 
     out = []
-    for root, dirs, _files in os.walk(base_abs):
-        for d in dirs:
-            rel = os.path.relpath(os.path.join(root, d), base_abs)
-            out.append(rel.replace("\\", "/"))
+    for top in tops:
+        out.append(top)   # 최상위 폴더 자신
+        top_abs = os.path.join(base_abs, top)
+        for root, dirs, _files in os.walk(top_abs):
+            for d in dirs:
+                rel = os.path.relpath(os.path.join(root, d), base_abs)
+                out.append(rel.replace("\\", "/"))
     return sorted(out)
 
 
-def capture(base_abs, store, recursive):
+def capture(base_abs, store, recursive, include_top=None):
     """베이스 폴더의 하위 구조를 PathStructure 로 캡처.
 
     store : MetaStore (project_root 보유). base 가 루트 밖이면 OutsideProjectRootError.
+    include_top : 기록할 최상위 폴더 이름의 컬렉션(체크된 것만). None 이면 전체(하위호환).
     name / created_* 는 호출자가 채운다.
     """
     base_rel = store.make_key(base_abs)   # project_root 상대 POSIX 키 (밖이면 예외)
-    folders = _collect_folders(base_abs, recursive)
+    folders = _collect_folders(base_abs, recursive, include_top)
     return PathStructure(base_rel=base_rel, recursive=recursive, folders=folders)
 
 
