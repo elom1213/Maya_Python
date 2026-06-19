@@ -83,3 +83,20 @@ QTableCornerButton::section {
     background-color: #3a3a3a;
     border: 1px solid #777777;
 }
+/* --- Tree / list rows: explicit dark base + subtle row alternation so Win10
+       native rendering does not paint bright rows (match the Win11 look). --- */
+QTreeView, QTreeWidget {
+    background-color: #2b2b2b;
+    alternate-background-color: #33363c;
+    color: #dddddd;
+    border: 1px solid #777777;
+}
+
+QTreeView::item:selected, QTreeWidget::item:selected {
+    background-color: #5a5a5a;
+    color: #ffffff;
+}
+
+QTreeView::item:hover:!selected, QTreeWidget::item:hover:!selected {
+    background-color: #484848;
+}
