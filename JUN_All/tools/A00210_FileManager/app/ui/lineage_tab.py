@@ -534,9 +534,9 @@ class LineageTab(QWidget):
 
         self.view = LineageView(self.scene)
         self.view.setRenderHint(QPainter.Antialiasing, True)
-        # 빈 곳 드래그 = 러버밴드 다중선택(범위 안에 완전히 든 노드 선택). 중간버튼 팬·휠 줌은 view 가 처리.
+        # 빈 곳 드래그 = 러버밴드 다중선택(범위에 일부라도 걸친 노드/엣지 선택). 중간버튼 팬·휠 줌은 view 가 처리.
         self.view.setDragMode(QGraphicsView.RubberBandDrag)
-        self.view.setRubberBandSelectionMode(Qt.ContainsItemShape)
+        self.view.setRubberBandSelectionMode(Qt.IntersectsItemShape)
         return self.view
 
     def _build_inspector(self):

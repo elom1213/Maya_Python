@@ -2,6 +2,12 @@
 
 All notable changes to this tool are documented here.
 
+## [01.10] - 2026-06-19
+### Changed
+- **Lineage** tab — rubber-band selection is now **intersect** mode: dragging a box
+  selects any node or connection the rectangle **touches**, instead of only the
+  ones fully enclosed by it (was `ContainsItemShape`, now `IntersectsItemShape`).
+
 ## [01.09] - 2026-06-19
 ### Added
 - **Lineage** tab — delete nodes **and connections**, with multi-select:
