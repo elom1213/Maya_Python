@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected)와 기존
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds` 로 작성되었다.
 
-- 버전: `v01.00` (`app/config/version.py`)
+- 버전: `v01.02` (`app/config/version.py`)
 - 위치: `JUN_All/tools/A00145_RigConnect`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴(`QTabWidget` 4탭)
 - 원본 `A00140_ConnectClosest` / MEL 파일은 그대로 보존(미수정)
@@ -28,6 +28,10 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
 ## 2. 탭 구성
 
 ### Constrain
+접이식 섹션 2개로 구성된다(`CollapsibleBox`). **`Constraint`(기본 펼침)** / **`Skin Weight to
+Constraint`(기본 접힘)**.
+
+#### Constraint
 타겟(드라이버) → 팔로워로 constraint 를 건다.
 
 - `Targets` / `Followers` 리스트에 오브젝트 추가(Select/Add/Del/Up/Down).
@@ -35,6 +39,20 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
   (`Parent` / `Scale` / `Point` / `Orient` / `Point On Poly`).
 - `Constrain` 클릭.
 - **브로드캐스트**: target 이 1개면 모든 follower 에 동일 target 적용, 아니면 인덱스 1:1.
+
+#### Skin Weight to Constraint
+선택한 버텍스의 **스킨 웨이트 비율**대로 영향 joint 들을 weight 로 follower 에
+`parentConstraint` 한다. (예: 버텍스 웨이트가 `hip:0.2 / spine_01:0.5 / spine_02:0.3` 이면
+세 joint 를 그 비율의 constraint weight 로 연결.)
+
+- `Vertices` 리스트: 선택한 버텍스 컴포넌트(`mesh.vtx[i]`)를 담는다. `Followers` 리스트: 구속될 오브젝트.
+- Options:
+  - `Max Influence`(정수, 0 = 제한 없음): 웨이트 상위 N개 joint 만 남기고 합=1 로 정규화.
+  - `Maintain Offset`.
+  - `Per-vertex (vertex[i] -> follower[i], 1:1)`:
+    - **해제(기본, average)**: 선택한 모든 버텍스의 joint 별 웨이트를 평균/정규화 → 모든 follower 에 동일 적용.
+    - **체크(per-vertex)**: `vertices[i]` 웨이트 → `followers[i]` 에 1:1 적용(개수 일치 필요).
+- `Skin Weight to Constraint` 클릭.
 
 ### Connect
 어트리뷰트를 source → destination 으로 연결한다.
@@ -76,6 +94,7 @@ A00145_RigConnect/
     ├── config/version.py
     ├── core/                       # UI 비의존 maya.cmds 로직
     │   ├── constrain_manager.py    # Constrain  (MEL 포팅)
+    │   ├── skin_constraint_manager.py # Skin Weight to Constraint (스킨 웨이트 → weighted parentConstraint)
     │   ├── connect_manager.py      # Connect    (MEL 포팅: attr 나열/검색/연결, 52 facial)
     │   ├── stream_manager.py       # List Connected (MEL 포팅: hyperShade up/down)
     │   ├── maya_scene.py           # Connect Closest (A00140 복사)

@@ -21,6 +21,7 @@ from tools.A00145_RigConnect.app.config.version import VERSION, LAST_UPDATE
 from tools.A00145_RigConnect.app.core import constrain_manager as con_mgr
 from tools.A00145_RigConnect.app.core import connect_manager as cnt_mgr
 from tools.A00145_RigConnect.app.core import stream_manager as stm_mgr
+from tools.A00145_RigConnect.app.core import skin_constraint_manager as skn_mgr
 from tools.A00145_RigConnect.app.core import CONSTRAINT_TYPES, connect_closest
 from tools.A00145_RigConnect.app.ui.collapsible import CollapsibleBox
 
@@ -92,6 +93,18 @@ class MainWindow(QWidget):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
+        # 기존 Constraint 기능은 펼쳐두고(collapsed=False),
+        # 새 Skin Weight to Constraint 기능은 접어둔다(collapsed=True).
+        layout.addWidget(self._build_constrain_basic_box())
+        layout.addWidget(self._build_skin_constraint_box())
+
+        layout.addStretch(1)
+        return tab
+
+    def _build_constrain_basic_box(self):
+        """기존 multi target -> follower constraint UI (접이식, 기본 펼침)."""
+        box = CollapsibleBox("Constraint", collapsed=False)
+
         self.tsl_targets = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Targets", select_label="Select",
             show_sort=False, list_min_height=200, log_callback=self.log)
@@ -102,7 +115,7 @@ class MainWindow(QWidget):
         list_row = QHBoxLayout()
         list_row.addWidget(self.tsl_targets)
         list_row.addWidget(self.tsl_followers)
-        layout.addLayout(list_row)
+        box.addLayout(list_row)
 
         opt_box = QGroupBox("Options")
         opt_layout = QVBoxLayout(opt_box)
@@ -121,15 +134,69 @@ class MainWindow(QWidget):
             self.rb_con_group.addButton(rb, i)
             rb_row.addWidget(rb)
         opt_layout.addLayout(rb_row)
-        layout.addWidget(opt_box)
+        box.addWidget(opt_box)
 
         btn = QPushButton("Constrain")
         btn.setMinimumHeight(32)
         btn.clicked.connect(self.on_constrain)
-        layout.addWidget(btn)
+        box.addWidget(btn)
 
-        layout.addStretch(1)
-        return tab
+        return box
+
+    def _build_skin_constraint_box(self):
+        """Skin Weight to Constraint UI (접이식, 기본 접힘).
+
+        선택 버텍스의 스킨 웨이트로 영향 joint 들을 그 비율의 weight 로
+        follower 에 parentConstraint 한다.
+        """
+        box = CollapsibleBox("Skin Weight to Constraint", collapsed=True)
+
+        # 어떤 버텍스를 선택했는지 리스트업하는 TSL + follower 리스트.
+        self.tsl_skin_verts = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Vertices", select_label="Select",
+            show_sort=False, list_min_height=180, log_callback=self.log)
+        self.tsl_skin_followers = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Followers", select_label="Select",
+            show_sort=False, list_min_height=180, log_callback=self.log)
+
+        list_row = QHBoxLayout()
+        list_row.addWidget(self.tsl_skin_verts)
+        list_row.addWidget(self.tsl_skin_followers)
+        box.addLayout(list_row)
+
+        opt_box = QGroupBox("Options")
+        opt_layout = QVBoxLayout(opt_box)
+
+        # Max Influence : 사용할 최대 joint 개수 (0 = 제한 없음).
+        mi_row = QHBoxLayout()
+        mi_row.addWidget(QLabel("Max Influence"))
+        self.sb_skin_max_inf = QSpinBox()
+        self.sb_skin_max_inf.setRange(0, 100)
+        self.sb_skin_max_inf.setValue(4)
+        self.sb_skin_max_inf.setToolTip("Max number of influences to use (0 = no limit)")
+        mi_row.addWidget(self.sb_skin_max_inf)
+        mi_row.addStretch(1)
+        opt_layout.addLayout(mi_row)
+
+        self.cb_skin_maintain = QCheckBox("Maintain Offset")
+        self.cb_skin_maintain.setChecked(True)
+        opt_layout.addWidget(self.cb_skin_maintain)
+
+        # 체크 시: vertices[i] 웨이트 -> followers[i] 1:1.
+        # 해제 시: 모든 버텍스 웨이트 평균 -> 모든 follower 에 동일 적용.
+        self.cb_skin_per_vertex = QCheckBox(
+            "Per-vertex (vertex[i] -> follower[i], 1:1)")
+        self.cb_skin_per_vertex.setChecked(False)
+        opt_layout.addWidget(self.cb_skin_per_vertex)
+
+        box.addWidget(opt_box)
+
+        btn = QPushButton("Skin Weight to Constraint")
+        btn.setMinimumHeight(32)
+        btn.clicked.connect(self.on_skin_weight_to_constraint)
+        box.addWidget(btn)
+
+        return box
 
     # --------------------------------------------------------------
     # Tab : Connect
@@ -314,6 +381,7 @@ class MainWindow(QWidget):
             "Update date : {1}\n"
             "\n"
             "Constrain   : multi target -> follower constraints\n"
+            "              + Skin Weight to Constraint (weighted parentConstraint)\n"
             "Connect     : connect attributes (3 broadcast patterns) + 52 facial\n"
             "List Conn.  : explore up/down stream nodes by type\n"
             "Connect Closest : 1:1 closest matching constraints".format(
@@ -343,6 +411,20 @@ class MainWindow(QWidget):
         self._run("Constrain",
                   lambda: con_mgr.constrain(
                       targets, followers, con_type, maintain_offset))
+
+    def on_skin_weight_to_constraint(self):
+        vertices = self.tsl_skin_verts.get_all_items()
+        followers = self.tsl_skin_followers.get_all_items()
+        max_influence = self.sb_skin_max_inf.value()
+        maintain_offset = self.cb_skin_maintain.isChecked()
+        per_vertex = self.cb_skin_per_vertex.isChecked()
+
+        def _do():
+            made = skn_mgr.skin_weight_to_constraint(
+                vertices, followers, max_influence, maintain_offset, per_vertex)
+            self.log("       {0} constraint(s) created".format(len(made)))
+
+        self._run("Skin Weight to Constraint", _do)
 
     # ==============================================================
     # Handlers : Connect
