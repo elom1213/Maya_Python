@@ -2,6 +2,16 @@
 
 All notable changes to this tool are documented here.
 
+## [01.02] - 2026-06-19
+### Added
+- **Tree** tab — show an input folder as a tree view. Options: **Depth** (how many
+  levels deep; 0 = All), **Show files** (off = folders only), **File Types**
+  checkable dropdown (show only chosen extensions, found after Build), **Expand**
+  (open the tree in a larger window), and **right-click → Reveal in File Explorer**
+  (folder opens; file is selected). Folders and files are distinguished by
+  folder/file icons. Build scans the path (cached); Show files / File Types
+  re-filter instantly without a re-scan. New `core/tree_scanner.py`.
+
 ## [01.01] - 2026-06-19
 ### Added
 - **ShortCut** tab — reorder categories. The category right-click menu now has

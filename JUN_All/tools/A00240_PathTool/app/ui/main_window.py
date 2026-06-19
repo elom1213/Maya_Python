@@ -14,6 +14,7 @@ from Framework.qt.qt import (
 
 from ..config.version import VERSION
 from .shortcut_tab import ShortcutTab
+from .tree_tab import TreeTab
 
 
 class MainWindow(QWidget):
@@ -31,8 +32,12 @@ class MainWindow(QWidget):
 
         self.tabs = QTabWidget()
 
-        # ShortCut 탭(현재 유일). 탭 추가 시 여기에 addTab 한 줄만 더하면 된다.
+        # ShortCut 탭. 탭 추가 시 여기에 addTab 한 줄만 더하면 된다.
         self.shortcut_tab = ShortcutTab()
         self.tabs.addTab(self.shortcut_tab, "ShortCut")
+
+        # Tree 탭: 입력 경로를 트리뷰로(깊이 제한·파일 토글·확장자 필터·Expand·우클릭 Reveal).
+        self.tree_tab = TreeTab()
+        self.tabs.addTab(self.tree_tab, "Tree")
 
         root.addWidget(self.tabs)

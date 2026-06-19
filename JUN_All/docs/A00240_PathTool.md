@@ -2,6 +2,7 @@
 
 자주 쓰는 **폴더 경로를 버튼으로 만들어 두고, 클릭하면 그 경로를 탐색기로 여는** 런처 툴.
 버튼을 **카테고리**로 묶고, 다시 집/회사처럼 환경별 **프로파일**로 나눠 관리한다.
+탭은 **ShortCut**(경로 버튼 런처)과 **Tree**(입력 경로를 트리뷰로 탐색, 10장)로 구성된다.
 
 > 이 툴은 Maya 안에서 도는 툴이 아니라 `A00210_FileManager`·`A00220_BackupTool` 처럼
 > **Windows 에서 독립 실행되는 PySide6 앱** 이다. Maya 설치/실행 없이 동작한다.
@@ -106,6 +107,39 @@
 
 ---
 
+## 10. Tree 탭 — 경로를 트리뷰로 보기
+
+입력한 폴더 경로를 **트리뷰**로 펼쳐 본다(A00210 Path Structure 의 트리 표시와 같은 취지의
+탐색용 뷰). 저장/동기화는 없고, 그때그때 경로를 훑어 보여준다.
+
+```
+┌ Path Tree ────────────────────────────────────────────┐
+│ Path [................................]  [Browse]      │
+│ Depth [3] [✓ Show files] [File Types ▾]  [Build][Expand]│
+└────────────────────────────────────────────────────────┘
+ 📁 assets
+   📁 textures
+       📄 wood.png
+   📄 readme.txt
+ 📁 scenes
+```
+
+- **Path / Build Tree**: 경로를 지정(Browse 또는 직접 입력)하고 **Build Tree**(또는 Enter)로
+  트리를 그린다. Browse 로 폴더를 고르면 바로 빌드된다.
+- **Depth**: 보여줄 깊이. `3` 이면 3단계까지, **`0`(= `All`)** 이면 전체. 값을 바꾸면 자동 재빌드.
+- **Show files**: 끄면 **폴더만**, 켜면 파일까지. (끄면 File Types 는 비활성.)
+- **File Types ▾**: 스캔에서 발견된 확장자 중 **표시할 것만 체크**(All 포함). 여러 개 연속 토글해도
+  메뉴가 닫히지 않고, 버튼 라벨에 선택 요약이 보인다. (A00210 File Manager 와 동일 동작.)
+- **폴더/파일 구분**: 폴더·파일에 각각 폴더/파일 **아이콘**이 붙어 한눈에 구분된다.
+- **Expand**: 창이 작을 때 **큰 창**(리사이즈 가능)에서 같은 트리를 본다.
+- **우클릭 → Reveal in File Explorer**: 트리 항목을 우클릭하면 그 경로를 **탐색기에서 연다**
+  (폴더는 폴더 열기, 파일은 폴더를 열고 파일 선택). 메인 트리와 Expand 창 모두 지원.
+
+> Show files / File Types 는 **재스캔 없이 즉시** 반영된다(Build 시 모든 파일을 캐시해 두고 거른다).
+> Depth·Path 변경만 다시 스캔한다.
+
+---
+
 ## 8. 저장 위치 (개발 참고)
 
 설정은 **툴 폴더 내부 `data/`** 에 저장된다(`%USERPROFILE%` 아님).
@@ -136,10 +170,12 @@ A00240_PathTool/
     ├── config/version.py     # VERSION / LAST_UPDATE
     ├── core/
     │   ├── prefs.py          # 프로파일 영속화(목록/로드/저장/이름변경/삭제/active)
-    │   └── path_opener.py    # 경로를 탐색기로 열기 (Win/mac/linux)
+    │   ├── path_opener.py    # 경로를 탐색기로 열기 (Win/mac/linux)
+    │   └── tree_scanner.py   # 경로를 깊이 제한으로 훑어 트리 노드(dict) 생성 (Tree 탭)
     └── ui/
-        ├── main_window.py    # QTabWidget (탭 확장 대비, 현재 ShortCut 1개)
-        └── shortcut_tab.py   # ShortCut 탭 본체 + AddPathDialog
+        ├── main_window.py    # QTabWidget (ShortCut + Tree)
+        ├── shortcut_tab.py   # ShortCut 탭 본체 + AddPathDialog
+        └── tree_tab.py       # Tree 탭 본체 (트리뷰 + 깊이/파일토글/확장자필터/Expand/Reveal)
 ```
 
 - `app/core`(로직)와 `app/ui`(화면)를 분리한다(`prefs`/`path_opener` 는 표준 라이브러리만 사용).
