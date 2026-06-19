@@ -137,6 +137,10 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
   탐색기로 열고 **파일을 선택(하이라이트)** 한다(Windows `explorer /select,`). 실제 경로가 해석될 때만
   활성(노드에 project-relative key 있음 + Project Root 설정됨 + 파일이 실제 존재) — **planned·루트 밖·
   경로에서 사라진 파일**은 비활성. 이후 우클릭 액션(Open File, Copy Path 등)을 계속 늘릴 수 있는 구조.
+- **로그 기록 표시(v01.08)**: 노드를 선택하면 **Node** 패널 아래 **Log history (from record)** 에 그 노드
+  파일의 작업 기록이 보인다 — **File Manager 탭의 Save Record 가 쓰는 `records/<key>.json` 을 그대로 읽어**
+  같은 내용을 표시(읽기 전용). 노드 선택 시·Lineage 탭으로 돌아올 때마다 디스크에서 다시 읽어 **File Manager
+  탭과 동기화**된다. record 가 매핑되는 노드에만 표시(planned·루트 밖 노드는 안내문).
 - **Auto Layout**: 레인(컬럼) × 토폴로지(행) 로 자동 정렬. 이후 드래그한 위치도 그대로 저장된다.
 - **저장 단위**: 에셋별 **이름 붙인 그래프** — `<store_dir>/lineage/<name>.json`. 목록에서 New/Save/
   Delete. 기존 **Push/Pull 로 자동 git 동기화**(records/thumbs 와 함께).

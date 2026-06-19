@@ -2,6 +2,14 @@
 
 All notable changes to this tool are documented here.
 
+## [01.08] - 2026-06-19
+### Added
+- **Lineage** tab — the **Node** panel now shows the selected node's **log history**
+  (read-only), loaded from the same record the File Manager tab's *Save Record*
+  writes (`records/<key>.json`). It is re-read from disk on node select and when
+  the Lineage tab regains focus, so entries stay in sync with the File Manager tab.
+  Shown only for nodes that map to a record (not for planned / out-of-root nodes).
+
 ## [01.06] - 2026-06-18
 ### Added
 - **One-click data-repo sync for distributed users.** The tool now ships a bundled

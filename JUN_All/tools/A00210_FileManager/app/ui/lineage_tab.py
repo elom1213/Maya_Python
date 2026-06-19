@@ -29,6 +29,7 @@ from Framework.qt.qt import (
     QPushButton,
     QCheckBox,
     QComboBox,
+    QPlainTextEdit,
     QListWidget,
     QListWidgetItem,
     QFileDialog,
@@ -550,7 +551,13 @@ class LineageTab(QWidget):
         self.lbl_node_thumb.setText("No thumbnail")
         layout.addWidget(self.lbl_node_thumb, alignment=Qt.AlignHCenter)
 
-        layout.addStretch(1)
+        # 이 노드 파일의 record 로그 기록(File Manager 탭의 Log history 와 동일 내용).
+        # 노드 선택 시 store 의 record JSON 에서 다시 읽어 항상 최신 기록을 보여준다.
+        layout.addWidget(QLabel("Log history (from record)"))
+        self.txt_node_logs = QPlainTextEdit()
+        self.txt_node_logs.setReadOnly(True)
+        layout.addWidget(self.txt_node_logs, stretch=1)
+
         self._set_inspector_enabled(False)
         return group
 
@@ -878,6 +885,15 @@ class LineageTab(QWidget):
         if not rect.isNull():
             self.view.fitInView(rect.adjusted(-40, -40, 40, 40), Qt.KeepAspectRatio)
 
+    def showEvent(self, event):
+        # 다른 탭(File Manager)에서 Save Record 후 돌아왔을 때, 선택된 노드의 로그/썸네일을
+        # 다시 읽어 최신 기록과 동기화한다(노드를 다시 클릭하지 않아도 갱신).
+        super().showEvent(event)
+        node = self._selected_node()
+        if node is not None:
+            self._refresh_node_logs(node)
+            self._refresh_node_thumb(node)
+
     # ============================================================ inspector
 
     def _on_selection_changed(self):
@@ -903,6 +919,7 @@ class LineageTab(QWidget):
             self.lbl_node_key.setText("-")
             self.lbl_node_thumb.clear()
             self.lbl_node_thumb.setText("No thumbnail")
+            self.txt_node_logs.clear()
             self._set_inspector_enabled(False)
         else:
             self.ipf_node_name.setText(node.file_name)
@@ -912,6 +929,7 @@ class LineageTab(QWidget):
             self.cmb_relation.setCurrentIndex(idx if idx >= 0 else 0)
             self.lbl_node_key.setText(node.key or "(planned / out of root)")
             self._refresh_node_thumb(node)
+            self._refresh_node_logs(node)
             self._set_inspector_enabled(True)
 
         for w in block:
@@ -929,6 +947,30 @@ class LineageTab(QWidget):
                 self.lbl_node_thumb.setPixmap(pix)
                 return
         self.lbl_node_thumb.setText("No thumbnail")
+
+    def _refresh_node_logs(self, node):
+        """노드 파일의 record 로그 기록 표시 — File Manager 탭 Log history 와 동일 포맷.
+
+        store 의 records/<key>.json 에서 매번 다시 읽으므로(Save Record 가 쓰는 곳),
+        File Manager 탭에서 기록한 내용이 그대로 동기화되어 보인다.
+        """
+        self.txt_node_logs.clear()
+        if not node or not node.key:
+            self.txt_node_logs.setPlaceholderText("No record (planned / out of project root).")
+            return
+
+        store = self._get_store()
+        record = store.load(node.key) if store is not None else None
+        if record is None or not record.logs:
+            self.txt_node_logs.setPlaceholderText("No log history recorded for this file.")
+            return
+
+        lines = []
+        for entry in record.logs:
+            lines.append(f"[{entry.timestamp}] {entry.author}")
+            lines.append(entry.note)
+            lines.append("")
+        self.txt_node_logs.setPlainText("\n".join(lines).strip())
 
     def _apply_node_name(self):
         node = self._selected_node()
