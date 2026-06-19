@@ -2,6 +2,12 @@
 
 All notable changes to this tool are documented here.
 
+## [01.01] - 2026-06-19
+### Added
+- **ShortCut** tab — reorder categories. The category right-click menu now has
+  **Move Up** / **Move Down** (disabled at the ends), so categories no longer
+  stay stuck in creation order; the new order is saved to the profile JSON.
+
 ## [01.00] - 2026-06-19
 ### Added
 - Initial release. Standalone (Maya-independent) PySide6 Windows app.

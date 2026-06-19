@@ -398,11 +398,24 @@ class ShortcutTab(QWidget):
 
     def _show_category_menu(self, cat_name, box, pos):
         menu = QMenu(box)
+        # 정렬 순서 변경(위/아래로 한 칸). 끝단에서는 비활성화한다.
+        act_up = menu.addAction("Move Up")
+        act_down = menu.addAction("Move Down")
+        menu.addSeparator()
         act_rename = menu.addAction("Rename Category")
         act_delete = menu.addAction("Delete Category")
 
+        cats = self._data.get("categories", [])
+        idx = next((i for i, c in enumerate(cats) if c["name"] == cat_name), -1)
+        act_up.setEnabled(idx > 0)
+        act_down.setEnabled(0 <= idx < len(cats) - 1)
+
         chosen = menu.exec_(box.mapToGlobal(pos))
-        if chosen == act_rename:
+        if chosen == act_up:
+            self._move_category(cat_name, -1)
+        elif chosen == act_down:
+            self._move_category(cat_name, +1)
+        elif chosen == act_rename:
             self._rename_category(cat_name)
         elif chosen == act_delete:
             self._delete_category(cat_name)
@@ -422,6 +435,23 @@ class ShortcutTab(QWidget):
             self._delete_button(cat_name, btn_name)
 
     # ============================================================ edit/delete
+
+    def _move_category(self, name, delta):
+        """카테고리를 목록에서 delta(-1=위, +1=아래)만큼 옮겨 정렬 순서를 바꾼다.
+
+        화면 순서는 곧 self._data["categories"] 의 리스트 순서이므로, 인접 항목과
+        자리를 바꾼 뒤 저장·재렌더하면 사용자가 원하는 순서를 만들 수 있다.
+        """
+        cats = self._data.get("categories", [])
+        idx = next((i for i, c in enumerate(cats) if c["name"] == name), -1)
+        if idx < 0:
+            return
+        new_idx = idx + delta
+        if new_idx < 0 or new_idx >= len(cats):
+            return
+
+        cats[idx], cats[new_idx] = cats[new_idx], cats[idx]
+        self._save_and_render()
 
     def _rename_category(self, old):
         new, ok = QInputDialog.getText(
