@@ -2,6 +2,13 @@
 
 All notable changes to this tool are documented here.
 
+## [01.12] - 2026-06-19
+### Changed
+- **File Manager** tab — *Load Image...* now opens in the Store Repo's `thumbs`
+  folder instead of the home directory, so a thumbnail already saved there can be
+  reused for several files. Falls back to home if the Store Repo is unset or its
+  `thumbs` folder does not exist yet.
+
 ## [01.11] - 2026-06-19
 ### Added
 - **File Manager** tab — **Show Recorded Only** checkbox next to *Recursive*. When

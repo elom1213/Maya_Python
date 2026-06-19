@@ -468,11 +468,24 @@ class MainWindow(QWidget):
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Image",
-            os.path.expanduser("~"),
+            self._thumbs_start_dir(),
             "Images (*.png *.jpg *.jpeg *.bmp)",
         )
         if path:
             self._apply_thumb(path)
+
+    def _thumbs_start_dir(self):
+        """Load Image 다이얼로그의 시작 경로 = Store Repo 의 thumbs 폴더.
+
+        여기 이미 저장된 썸네일을 여러 파일에 재사용하기 쉽도록 그 폴더에서 열리게
+        한다. Store Repo 미설정이거나 thumbs 폴더가 아직 없으면 홈으로 폴백한다.
+        """
+        store_dir = self.get_store_dir()
+        if store_dir:
+            thumbs = os.path.join(store_dir, MetaStore.THUMBS_DIR)
+            if os.path.isdir(thumbs):
+                return thumbs
+        return os.path.expanduser("~")
 
     def _apply_thumb(self, src_path):
         store = self._make_store()
