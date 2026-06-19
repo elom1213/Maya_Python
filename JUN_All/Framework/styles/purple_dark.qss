@@ -189,19 +189,15 @@ QSpinBox::up-button:hover, QSpinBox::down-button:hover {
 }
 
 QSpinBox::up-arrow {
-    width: 0;
-    height: 0;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-bottom: 5px solid #e6e6e6;
+    image: url(@STYLES@/sb_up_light.png);
+    width: 9px;
+    height: 9px;
 }
 
 QSpinBox::down-arrow {
-    width: 0;
-    height: 0;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 5px solid #e6e6e6;
+    image: url(@STYLES@/sb_down_light.png);
+    width: 9px;
+    height: 9px;
 }
 
 /* --- Tree / list rows: explicit dark base + subtle row alternation so Win10

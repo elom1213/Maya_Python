@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-18
+# last Update date : 2026-06-19
 # A00220_BackupTool - 백업 핵심 로직 (UI/DCC 비의존)
 #
 # 원본 파일을 같은 폴더의 backup 하위 폴더로 복사한다.
@@ -9,9 +9,13 @@
 import os
 import re
 import shutil
+from datetime import datetime
 
 # 버전 인덱스 자릿수 (예: _01, _02 ... 99 초과 시 자릿수 자동 확장).
 _PAD = 2
+
+# 백업 폴더에 누적되는 로그 파일 이름.
+_LOG_NAME = "log.txt"
 
 
 def backup_dir_for(source_path, folder_name):
@@ -41,6 +45,7 @@ def backup_one(source_path, folder_name="backup", suffix="BU",
         # 덮어쓰기: 단일 백업 파일을 매번 갱신.
         dst = os.path.join(backup_dir, f"{base}_{suffix}{ext}")
         shutil.copy2(source_path, dst)
+        _append_log(backup_dir, source_path, dst)
         return dst
 
     # 버전업: 다음 인덱스로 새 파일 생성 후 오래된 버전 정리.
@@ -50,7 +55,25 @@ def backup_one(source_path, folder_name="backup", suffix="BU",
     shutil.copy2(source_path, dst)
 
     _prune_versions(backup_dir, base, suffix, ext, max_versions)
+    _append_log(backup_dir, source_path, dst)
     return dst
+
+
+def _append_log(backup_dir, source_path, dst):
+    """백업 1회마다 log.txt 에 '시각 + 원본 → 백업본' 한 줄을 누적한다.
+
+    로그 기록 실패가 백업 자체를 막지 않도록 모든 IO 오류는 삼킨다.
+    """
+    stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = (
+        f"[{stamp}] saved: {os.path.basename(source_path)} "
+        f"-> {os.path.basename(dst)}\n"
+    )
+    try:
+        with open(os.path.join(backup_dir, _LOG_NAME), "a", encoding="utf-8") as fh:
+            fh.write(line)
+    except OSError:
+        pass
 
 
 def list_versions(backup_dir, base, suffix, ext):

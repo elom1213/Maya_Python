@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-18
+# last Update date : 2026-06-19
 # A00220_BackupTool - main window (Qt, standalone)
 #
 # 컴퓨터 비정상 종료에 대비해 지정 파일들을 주기적으로 자동 백업한다.
@@ -31,6 +31,8 @@ from Framework.qt.qt import (
     Qt,
 )
 
+from Framework.qt import JUN_mod_collapsible_qt
+
 from ..config.version import VERSION
 from ..core import backup_manager, prefs as prefs_mod
 
@@ -47,12 +49,16 @@ class MainWindow(QWidget):
         super().__init__()
 
         self.setWindowTitle(f"JUN Backup Tool  v{VERSION}")
-        self.resize(560, 620)
+        # 원본(560)보다 좁은 세로형 창. (좌우 나열 grid 구조라 정확히 절반까지는
+        # 못 줄지만, 라디오/분·초를 세로로 쌓아 최대한 좁혔다.)
+        self.resize(350, 680)
 
         self._prefs = prefs_mod.load()
         self._state = STATE_DEACTIVE
         self._dot_count = 1
         self._next_save_ts = 0.0     # 다음 저장 예정 시각(time.monotonic 기준)
+        # Settings 가 접혀 있을 때의 최신 창 높이(펼칠 때 정확히 복원하기 위함).
+        self._collapsed_h = None
 
         # 주기 백업 타이머
         self._backup_timer = QTimer(self)
@@ -87,6 +93,41 @@ class MainWindow(QWidget):
         self.log_widget.setMaximumHeight(140)
         root.addWidget(self.log_widget)
 
+    def _on_settings_toggled(self, expanded):
+        """Settings 를 접고/펼칠 때, 사라지거나 나타나는 본문 높이만큼만 '창'을
+        줄이거나 늘린다. 창을 sizeHint 로 다시 맞추면 늘어난 공간을 위쪽 파일 목록
+        (expanding)이 흡수해 크기가 변하므로, 그 대신 정확히 본문 높이만큼만 창을
+        움직여 파일 목록 등 다른 위젯의 크기는 그대로 유지한다.
+        (사용자가 직접 창 크기를 바꿀 때는 파일 목록이 expanding 으로 그에 맞춰 늘고
+        줄어드는 동작은 그대로다 — resizeEvent 가 접힘 상태 높이를 계속 추적한다.)
+
+        - 접을 때: 현재(펼친) 높이에서 본문 높이를 뺀다. 단, 본문을 숨긴 직후엔 창의
+          최소 높이가 아직 갱신되지 않아 곧바로 줄이면 옛 최소값에 막히므로(clamp),
+          invalidate()+activate() 로 레이아웃 최소 크기를 먼저 강제로 다시 계산한다.
+        - 펼칠 때: 본문을 보이는 순간 창이 새 최소 높이로 자동으로 커져버려 현재 높이를
+          그대로 쓰면 본문 높이를 두 번 더하게 된다. 그래서 '마지막 접힘 높이'에 본문
+          높이를 더해 복원한다."""
+        delta = self._settings_section.body_height()
+        if expanded:
+            base = self._collapsed_h if self._collapsed_h is not None \
+                else (self.height() - delta)
+            target_h = base + delta
+        else:
+            target_h = self.height() - delta
+
+        self._settings_section.updateGeometry()
+        self.layout().invalidate()
+        self.layout().activate()
+        self.resize(self.width(), target_h)
+
+    def resizeEvent(self, event):
+        """접힘 상태에서의 창 높이를 기억해 둔다(펼칠 때 그만큼 복원하기 위함).
+        사용자가 직접 창 크기를 바꿔도 이 값이 갱신되므로 파일 목록은 창에 맞춰 변한다."""
+        super().resizeEvent(event)
+        section = getattr(self, "_settings_section", None)
+        if section is not None and not section.is_expanded():
+            self._collapsed_h = self.height()
+
     def _build_files_group(self):
         group = QGroupBox("Target Files")
         layout = QVBoxLayout(group)
@@ -96,9 +137,9 @@ class MainWindow(QWidget):
         layout.addWidget(self.list_files)
 
         btn_row = QHBoxLayout()
-        btn_add = QPushButton("Add Files...")
+        btn_add = QPushButton("Add...")
         btn_add.clicked.connect(self.on_add_files)
-        btn_remove = QPushButton("Remove Selected")
+        btn_remove = QPushButton("Remove")
         btn_remove.clicked.connect(self.on_remove_selected)
         btn_clear = QPushButton("Clear")
         btn_clear.clicked.connect(self.on_clear_files)
@@ -110,11 +151,17 @@ class MainWindow(QWidget):
         return group
 
     def _build_settings_group(self):
-        group = QGroupBox("Settings")
-        grid = QGridLayout(group)
+        # 접이식 Settings 섹션(A00110 의 JUN_mod_collapsible_qt 패턴).
+        # 헤더 클릭으로 접고/펼치며, 토글 시 접힌/펼친 높이만큼 창을 줄이거나 늘린다.
+        section = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01(
+            "Settings", expanded=True)
+        self._settings_section = section
+        section.toggled.connect(self._on_settings_toggled)
+
+        grid = QGridLayout()
 
         # Backup folder name
-        grid.addWidget(QLabel("Backup Folder Name"), 0, 0)
+        grid.addWidget(QLabel("Folder Name"), 0, 0)
         self.ipf_folder = QLineEdit("backup")
         grid.addWidget(self.ipf_folder, 0, 1, 1, 3)
 
@@ -132,11 +179,11 @@ class MainWindow(QWidget):
         self._mode_group.addButton(self.rb_overwrite)
         self._mode_group.addButton(self.rb_version)
         self.rb_version.toggled.connect(self._on_mode_changed)
-        mode_row = QHBoxLayout()
-        mode_row.addWidget(self.rb_overwrite)
-        mode_row.addWidget(self.rb_version)
-        mode_row.addStretch(1)
-        grid.addLayout(mode_row, 2, 1, 1, 3)
+        # 라디오를 세로로 쌓아 가로폭을 줄인다(원본은 좌우 나열이었음).
+        mode_col = QVBoxLayout()
+        mode_col.addWidget(self.rb_overwrite)
+        mode_col.addWidget(self.rb_version)
+        grid.addLayout(mode_col, 2, 1, 1, 3)
 
         # Max versions
         grid.addWidget(QLabel("Max Versions"), 3, 0)
@@ -144,6 +191,7 @@ class MainWindow(QWidget):
         self.spn_max.setRange(1, 999)
         self.spn_max.setValue(10)
         self.spn_max.setEnabled(False)
+        self.spn_max.setFixedWidth(70)
         grid.addWidget(self.spn_max, 3, 1)
 
         # Interval (minutes / seconds)
@@ -151,18 +199,25 @@ class MainWindow(QWidget):
         self.spn_min = QSpinBox()
         self.spn_min.setRange(0, 999)
         self.spn_min.setValue(5)
+        self.spn_min.setFixedWidth(60)
         self.spn_sec = QSpinBox()
         self.spn_sec.setRange(0, 59)
         self.spn_sec.setValue(0)
-        interval_row = QHBoxLayout()
-        interval_row.addWidget(self.spn_min)
-        interval_row.addWidget(QLabel("min"))
-        interval_row.addWidget(self.spn_sec)
-        interval_row.addWidget(QLabel("sec"))
-        interval_row.addStretch(1)
-        grid.addLayout(interval_row, 4, 1, 1, 3)
+        self.spn_sec.setFixedWidth(56)
+        # 분/초를 두 줄로 나눠 가로폭을 줄인다(라디오 세로 배치와 같은 취지).
+        min_row = QHBoxLayout()
+        min_row.addWidget(self.spn_min)
+        min_row.addWidget(QLabel("min"))
+        min_row.addStretch(1)
+        grid.addLayout(min_row, 4, 1, 1, 3)
+        sec_row = QHBoxLayout()
+        sec_row.addWidget(self.spn_sec)
+        sec_row.addWidget(QLabel("sec"))
+        sec_row.addStretch(1)
+        grid.addLayout(sec_row, 5, 1, 1, 3)
 
-        return group
+        section.add_layout(grid)
+        return section
 
     def _build_control_group(self):
         group = QGroupBox("Control")
@@ -331,10 +386,10 @@ class MainWindow(QWidget):
     def _set_state(self, state):
         self._state = state
         if state == STATE_DEACTIVE:
-            self.lbl_status.setText("Stat : Deactive")
+            self.lbl_status.setText("Deactive")
             self.lbl_countdown.setText("Next save in  --:--")
         elif state == STATE_SAVING:
-            self.lbl_status.setText("Stat : Saving")
+            self.lbl_status.setText("Saving")
             self.lbl_countdown.setText("Next save in  00:00")
         else:
             self._dot_count = 1
@@ -348,7 +403,7 @@ class MainWindow(QWidget):
         self._render_active()
 
     def _render_active(self):
-        self.lbl_status.setText("Stat : Active" + "." * self._dot_count)
+        self.lbl_status.setText("Active" + "." * self._dot_count)
 
     def _tick_countdown(self):
         if self._state == STATE_DEACTIVE:

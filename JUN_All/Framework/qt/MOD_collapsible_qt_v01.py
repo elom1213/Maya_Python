@@ -68,6 +68,14 @@ class JUN_mod_collapsible_qt_v01(QWidget):
     def add_layout(self, layout):
         self.body.addLayout(layout)
 
+    def body_height(self):
+        """본문(접히는 영역)이 차지하는 높이를 돌려준다.
+
+        가시성과 무관하게 레이아웃 기준(sizeHint)으로 계산하므로, 접는 순간(본문이
+        이미 숨겨진 뒤)에 호출해도 '펼쳐졌을 때의 높이'를 얻을 수 있다. 토글 시 이
+        높이만큼만 창을 줄이거나 늘리면 다른 위젯 크기를 건드리지 않을 수 있다."""
+        return self._content.sizeHint().height()
+
     def is_expanded(self):
         return self.header.isChecked()
 

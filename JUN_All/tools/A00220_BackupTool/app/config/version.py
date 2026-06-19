@@ -1,6 +1,6 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-18
+# last Update date : 2026-06-19
 # A00220_BackupTool - version info
 
-VERSION = "01.01"
-LAST_UPDATE = "2026-06-18"
+VERSION = "01.03"
+LAST_UPDATE = "2026-06-19"

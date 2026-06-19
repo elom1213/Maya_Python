@@ -117,3 +117,40 @@ QGroupBox {
 QGroupBox::title {
     color: #8a6fb0;
 }
+
+/* --- QSpinBox up/down buttons: define sub-controls so the arrow
+       buttons keep a clickable hit-area + arrow cursor once the QSpinBox
+       border/padding above is styled (Qt drops native arrows otherwise). --- */
+QSpinBox::up-button {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 16px;
+    background-color: #ffffff;
+    border-left: 1px solid #b095d6;
+    border-top-right-radius: 3px;
+}
+
+QSpinBox::down-button {
+    subcontrol-origin: border;
+    subcontrol-position: bottom right;
+    width: 16px;
+    background-color: #ffffff;
+    border-left: 1px solid #b095d6;
+    border-bottom-right-radius: 3px;
+}
+
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: #b095d6;
+}
+
+QSpinBox::up-arrow {
+    image: url(@STYLES@/sb_up_dark.png);
+    width: 9px;
+    height: 9px;
+}
+
+QSpinBox::down-arrow {
+    image: url(@STYLES@/sb_down_dark.png);
+    width: 9px;
+    height: 9px;
+}
