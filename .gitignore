@@ -15,6 +15,9 @@ __pycache__/
 **/build/
 **/dist/
 
+# A00240_PathTool 사용자 데이터(프로파일 JSON)는 툴 폴더 내부 data/ 에 저장 — 추적 안 함.
+**/A00240_PathTool/data/
+
 # A00210_FileManager 데이터는 별도 원격 저장소(JUN_FileManager_data)로 관리됨.
 # 이 repo 트리 안에 들어와도 절대 추적/임베디드-repo 커밋하지 않는다.
 /JUN_FileManager_data/

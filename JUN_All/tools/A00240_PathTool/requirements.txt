@@ -1,0 +1,4 @@
+# Single source of truth: JUN_All/requirements.txt
+PySide6
+pyinstaller
+# 경로 열기/저장 로직은 표준 라이브러리(os/sys/subprocess/json)만 사용한다.
