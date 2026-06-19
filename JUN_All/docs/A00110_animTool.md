@@ -18,11 +18,23 @@
 5. **Bake** (v01.05~) — **리스트업한 컨트롤러/오브젝트**의 키를 구간 전체에 **정수 프레임 단위로
    굽는다(bake)**. 구간은 **현재 타임라인(플레이백)** 또는 **직접 입력(Custom)** 중 선택한다.
    Maya 네이티브 `bakeResults`(C++)를 써서 **6000+프레임 × 50~100 컨트롤러** 같은 대규모도 빠르다.
-6. **Follow** (v01.11~) — 좌(**Target**)/우(**Follower**) 리스트로, 각 follower 가 같은 인덱스의
-   target 의 **월드 위치·회전(·스케일)과 동일**해지도록 구간 키를 굽는다(컨스트레인트 없이
-   `parentConstraint(maintainOffset=False)` 와 동등). **rotateOrder 가 달라도 정확**하고,
-   **blend(0~1)** 로 원본 follower 애니메이션과 매치 결과를 섞으며(0=원본 유지, 1=덮어쓰기,
-   0.5=반반), 선택된 **애니메이션 레이어**(override/additive)에 키가 들어간다.
+6. **Follow** (v01.11~) — 좌(**Target**)/우(**Follower**) 리스트로, follower 가 target 의
+   **월드 위치·회전(·스케일)** 에 맞도록 구간 키를 굽는다(컨스트레인트 노드 없이 `parentConstraint`
+   와 동등한 행렬 연산). **rotateOrder 가 달라도 정확**하다. **Maintain Offset**(v01.15) 으로
+   start 프레임의 target↔follower **상대 거리·회전을 유지**(=`maintainOffset=True`), **1<-n**(v01.15)
+   으로 target 1개를 **모든 follower 가 추종**(off 면 인덱스 1:1 n<-n). **blend(0~1)** 로 원본
+   follower 애니메이션과 매치 결과를 섞으며(0=원본 유지, 1=덮어쓰기, 0.5=반반), 선택된
+   **애니메이션 레이어**(override/additive)에 키가 들어간다.
+
+> **v01.15 — Follow 탭: Maintain Offset · 1<-n · Get Current**: ① **Maintain Offset** 체크 시
+> start(구간 시작) 프레임에서 측정한 target↔follower 상대 행렬 `offset = worldMatrix(flw) ·
+> worldInverseMatrix(tgt)` 을 매 프레임 유지한다(`follower_world(t) = offset · worldMatrix(tgt,t)`).
+> 컨스트레인트 노드 없이 행렬 연산만 쓰므로 사이클/평가순서 오류가 없다(레거시
+> `JUN_PY_MatrixCon_01_01` 의 offsetMat 로직과 동일). 끄면 offset 0(정확히 일치, 기존 동작).
+> ② **1<-n** 체크 시 target 1개를 모든 follower 가 추종(target 이 1개가 아니면 경고 후 중단), 끄면
+> n<-n(인덱스 1:1, 개수 불일치 시 중단). ③ Start/End 옆 **Get Current** 버튼으로 현재 Maya 프레임을
+> 각 입력란에 채운다. 로그에 `mode`(1<-n/n<-n)·`offset`(offset/no-offset) 가 함께 표기된다.
+> `match_follow(..., maintain_offset, one_to_many)` 로 확장.
 
 > **v01.14 — Key Edit 탭을 접이식 섹션 3개로 분리**: Key Edit 탭을 **Move Keys / Graph Editor /
 > Offset & Hold** 세 개의 접이식(collapsible) 섹션으로 나눴다(레거시 `JUN_PY_SelectionTool` 의
@@ -110,7 +122,7 @@ A00110_animTool/
     │   ├── mirror_key_manager.py # 컨트롤 키 좌우 미러 (Mirror Key 탭, OpenMaya)
     │   ├── mirror_token_store.py # mirror_tokens.json 입출력 + 폴백
     │   ├── bake_manager.py       # 리스트 노드 구간 bake (Bake 탭, native bakeResults)
-    │   ├── follow_match_manager.py # follower→target 월드 매치 베이크 (Follow 탭, OpenMaya + blend)
+    │   ├── follow_match_manager.py # follower→target 월드 매치 베이크 (Follow 탭, OpenMaya + blend, maintain offset, 1<-n)
     │   └── offset_hold_manager.py # 키를 hold+offset 구조로 재배치 (Key Edit 탭 > Offset & Hold)
     └── ui/main_window.py  # 전체 UI (6개 탭 + 공유 로그창 + 메뉴 바)
 ```
@@ -377,19 +389,26 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 │ │  tgt objs   │           │  flw objs   │         │
 │ └─────────────┘           └─────────────┘         │
 │ Add|Del|Up|Down|Sort      Add|Del|Up|Down|Sort    │
-│ Start [ 1 ]   End [ 24 ]                           │  ← 기본값 = 현재 playback 범위
+│ Start [ 1 ] [Get Current]  End [ 24 ] [Get Current]│  ← 기본값 = 현재 playback 범위
 │ Channels [v] Translate [v] Rotate [ ] Scale       │  ← 기본 T·R (Scale off)
+│ Options [ ] Maintain Offset  [ ] 1 <- n           │  ← 기본 둘 다 off
 │ Blend (0..1) [ 1.0 ]  [====슬라이더 0..100====]   │  ← LineEdit ↔ Slider 동기화, 기본 1.0
 │ [ Match Follow ]                                  │
 └───────────────────────────────────────────────────┘
 ```
 
 - **Target / Follower** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `Select Targets`/`Select Followers` 로
-  현재 Maya 선택을 리스트에 채운다. **Target[i] → Follower[i]** 로 같은 인덱스끼리 매칭하므로
-  **두 리스트의 개수와 순서를 맞춰야** 한다(개수가 다르면 경고 후 중단). Add/Del/Up/Down/Sort 와
-  "Number: N" 카운트, 항목 클릭 시 씬 자동 선택은 위젯이 내장한다.
-- **Start / End**: 매치 키를 구울 시간 범위(정수 프레임 전수). 기본값 = 현재 playback 범위.
+  현재 Maya 선택을 리스트에 채운다. **n<-n(기본)** 은 **Target[i] → Follower[i]** 로 같은 인덱스끼리
+  매칭하므로 **두 리스트의 개수와 순서를 맞춰야** 한다(개수가 다르면 경고 후 중단). Add/Del/Up/Down/Sort
+  와 "Number: N" 카운트, 항목 클릭 시 씬 자동 선택은 위젯이 내장한다.
+- **Start / End**: 매치 키를 구울 시간 범위(정수 프레임 전수). 기본값 = 현재 playback 범위. 옆의
+  **Get Current** 버튼을 누르면 **현재 Maya 프레임**(`currentTime`)으로 해당 입력란을 갱신한다.
 - **Channels**: 매치/블렌드할 채널 그룹(**Translate / Rotate / Scale**). 기본 **T·R on, Scale off**.
+- **Maintain Offset**: 체크 시 **start 프레임에서 측정한 target↔follower 상대 거리·회전을 매 프레임
+  유지**한다(`parentConstraint maintainOffset=True` 와 동등, 컨스트레인트 노드 없는 행렬 연산). 끄면
+  offset 0 으로 target 과 정확히 일치한다(기본).
+- **1 <- n**: 체크 시 **target 1개를 모든 follower 가 추종**한다(target 이 정확히 1개가 아니면 경고 후
+  중단). 끄면 **n<-n**(인덱스 1:1, 기본). 체크하면 두 리스트 개수가 달라도 된다.
 - **Blend (0..1)**: 원본 follower 애니메이션과 매치 결과의 혼합 비율. **0 = 원본 유지(아무것도 안 함)**,
   **1 = 매치로 완전히 덮어쓰기**(기본), **0.5 = 반반**. LineEdit 와 0~100 슬라이더가 동기화된다.
   위치/스케일은 선형 보간, 회전은 쿼터니언 **slerp**(최단호)로 섞는다.
@@ -456,12 +475,16 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 
 ### Follow
 1. 따라갈 대상(**target**)들을 선택 → Target 의 **Select Targets**.
-2. 따라가는 컨트롤(**follower**)들을 선택 → Follower 의 **Select Followers**
-   (`Target[i] ↔ Follower[i]` 가 맞도록 **개수·순서를 Sort/Up/Down 으로 정렬**).
-3. **Start / End**(기본 = 현재 playback 범위) / **Channels**(기본 T·R) / **Blend**(기본 1.0) 확인.
-4. (선택) 키를 특정 **애니 레이어**에 굽고 싶으면 Channel Box / Anim Layer 에디터에서 **그 레이어를
+2. 따라가는 컨트롤(**follower**)들을 선택 → Follower 의 **Select Followers**.
+   - **n<-n(기본)**: `Target[i] ↔ Follower[i]` 가 맞도록 **개수·순서를 Sort/Up/Down 으로 정렬**.
+   - **1<-n**: **1 <- n** 체크. Target 에는 **1개만** 두고 Follower 에 여럿을 넣으면 모두 그 하나를 추종.
+3. **Start / End**(기본 = 현재 playback 범위, 옆 **Get Current** 로 현재 프레임 채움) /
+   **Channels**(기본 T·R) / **Blend**(기본 1.0) 확인.
+4. (선택) **Maintain Offset** 체크 → start 프레임의 target↔follower 거리·회전을 유지한 채 따라간다
+   (끄면 target 과 정확히 겹친다).
+5. (선택) 키를 특정 **애니 레이어**에 굽고 싶으면 Channel Box / Anim Layer 에디터에서 **그 레이어를
    선택**해 둔다.
-5. **Match Follow** → 각 follower 가 구간 내 매 프레임에서 target 의 월드 위치/회전(/스케일)에 맞춰
+6. **Match Follow** → 각 follower 가 구간 내 매 프레임에서 target 의 월드 위치/회전(/스케일)에 맞춰
    키가 구워진다(단일 Undo). blend < 1 이면 원본과 섞인다.
 
 ### Offset & Hold (Key Edit 탭 > Offset & Hold 그룹)
@@ -563,13 +586,22 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 - **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
 
 ### Follow (`follow_match_manager.FollowMatchManager.match_follow`)
-- **인덱스 매칭**: `Target[i] → Follower[i]`. 개수가 다르면 **경고 후 중단**(Copy/Mirror 와 달리 짧은
-  쪽 처리 없이 막는다 — 추종 대상이 어긋나면 결과가 무의미하므로).
+- **매칭 모드**:
+  - **n<-n**(`one_to_many=False`, 기본): `Target[i] → Follower[i]`. 개수가 다르면 **경고 후 중단**
+    (Copy/Mirror 와 달리 짧은 쪽 처리 없이 막는다 — 추종 대상이 어긋나면 결과가 무의미하므로).
+  - **1<-n**(`one_to_many=True`): target 이 **정확히 1개**여야 하며(아니면 경고 후 중단),
+    `pairs = [(target, flw) for flw in followers]` 로 모든 follower 가 그 하나를 추종.
 - **매치 수학(rotateOrder 무관)**: 프레임 `t` 마다
   `local = worldMatrix(target) · parentInverseMatrix(follower)` 를 `MTransformationMatrix` 로 분해해
   위치(`translation`)·회전(`rotation` 쿼터니언)·스케일(`scale`)을 얻고, 회전은 **follower 자신의
   rotateOrder** 로 재분해한다(`MEulerRotation.reorderIt`). `getAttr(..., time=t)` 로 타임라인을 옮기지
-  않고 평가하므로 부모가 애니메이션돼도 정확하다. **offset 0**(정확히 일치, maintainOffset=False).
+  않고 평가하므로 부모가 애니메이션돼도 정확하다.
+- **Maintain Offset**(`maintain_offset`, 행렬 연산으로 구현 — 컨스트레인트 노드 없음): 끄면 **offset 0**
+  (target 과 정확히 일치). 켜면 **start(구간 시작) 프레임**에서 페어마다 1회
+  `offset = worldMatrix(flw) · worldInverseMatrix(tgt)` 를 측정하고, 이후 매 프레임
+  `local = offset · worldMatrix(tgt) · parentInverseMatrix(flw)` 로 분해한다. `parentConstraint
+  maintainOffset=True` 와 동등하되 노드/사이클/평가순서 오류가 없다(레거시 `JUN_PY_MatrixCon_01_01`
+  의 offsetMat 로직과 동일).
 - **blend(0~1) 는 키 값에 베이크**(레이어 weight=1 유지): 원본 평가값 `O` 와 매치값 `M` 을 섞어 최종
   `F` 를 만든다 — 위치/스케일 선형 lerp `F = O + (M−O)·b`, 회전 쿼터니언 **slerp**(최단호). `blend==0`
   이면 아무것도 안 쓰고 반환(원본 유지), `blend==1` 이고 override(/베이스)면 `F=M` 단축 경로.
@@ -637,9 +669,10 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 60 object(s) baked over [1-6000] (6000 frames, constraints baked down).
 
 # Follow
-4 follower(s) matched over [1-24] (24 frames, blend 1.0). No anim layer selected; keys on base curves.
-4 follower(s) matched over [1-24] (24 frames, blend 0.5). Layer 'AnimLayer1' (override).
-3 follower(s) matched over [1-24] (24 frames, blend 1.0). Layer 'AnimLayer2' (additive). 1 skipped (no settable channels / no node).
+4 follower(s) matched over [1-24] (24 frames, blend 1.0, n<-n, no-offset). No anim layer selected; keys on base curves.
+4 follower(s) matched over [1-24] (24 frames, blend 0.5, n<-n, offset). Layer 'AnimLayer1' (override).
+5 follower(s) matched over [1-24] (24 frames, blend 1.0, 1<-n, offset). No anim layers; keys on base curves.
+3 follower(s) matched over [1-24] (24 frames, blend 1.0, n<-n, no-offset). Layer 'AnimLayer2' (additive). 1 skipped (no settable channels / no node).
 
 # Offset & Hold
 3 object(s) re-timed (hold 10f / offset 30f)  (all curves)
@@ -664,7 +697,8 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 - `[Warning] Enter Start / End.` / `[Warning] Start (n) is greater than End (m).` — (Bake Custom) 시간 범위 오류.
 - `[Warning] Enable at least one channel group.` — (Bake/Follow) Translate/Rotate/Scale 모두 off.
 - `[Warning] Fill both Target and Follower lists.` — (Follow) Target/Follower 비어 있음.
-- `[Warning] Target(n) / Follower(m) count mismatch.` — (Follow) 두 리스트 개수 불일치(중단).
+- `[Warning] Target(n) / Follower(m) count mismatch.` — (Follow, n<-n) 두 리스트 개수 불일치(중단).
+- `[Warning] 1<-n mode needs exactly 1 target (got n).` — (Follow, 1<-n) Target 이 1개가 아님(중단).
 - `[Warning] Invalid Blend value.` — (Follow) Blend 입력이 숫자가 아님.
 - `[Info] Blend is 0; follower animation unchanged.` — (Follow) blend=0 이라 아무것도 안 함.
 - `[Warning] Add objects to the Offset/Hold List first.` — (Offset & Hold) 리스트가 비어 있음.
@@ -707,8 +741,13 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
   가 끼어 컨스트레인트가 우세할 수 있다. 컨트롤의 `blendParent1` 을 키 쪽으로 바꾸거나, 순수 키만
   원하면 **Keep constraints 를 끄고**(bake down) 다시 굽는다.
 - **(Follow) follower 가 target 과 정확히 안 겹침** → ① Channels 에 필요한 그룹(보통 T·R)이 켜져
-  있는지 확인. ② **Blend 가 1.0** 인지 확인(1 미만이면 원본과 섞여 덜 따라간다). ③ follower 채널이
-  잠겨/연결돼 있으면 그 채널은 skip 된다(로그의 `skipped` 확인).
+  있는지 확인. ② **Blend 가 1.0** 인지 확인(1 미만이면 원본과 섞여 덜 따라간다). ③ **Maintain Offset
+  이 켜져 있으면** 정확히 겹치지 않고 start 프레임의 거리·회전을 유지하는 것이 정상(정확히 겹치려면
+  끈다). ④ follower 채널이 잠겨/연결돼 있으면 그 채널은 skip 된다(로그의 `skipped` 확인).
+- **(Follow, 1<-n) 실행이 막힘** → `1 <- n` 을 켰는데 Target 이 1개가 아니다(로그 `needs exactly 1
+  target`). Target 리스트에 정확히 1개만 남기거나, 인덱스 1:1 로 쓰려면 `1 <- n` 을 끈다.
+- **(Follow) Maintain Offset 의 기준이 헷갈림** → offset 은 **Start 프레임**에서 측정한다. 원하는
+  거리·회전이 되는 프레임을 Start 로 두고(필요하면 **Get Current**) 실행한다.
 - **(Follow) 키가 엉뚱한 레이어/베이스에 들어감** → 실행 전에 원하는 **애니 레이어를 선택**해 둔다.
   선택된 레이어가 없으면 베이스 커브에 들어간다. 로그 끝의 `Layer '...'` / `keys on base curves` 로
   실제 대상 레이어를 확인할 수 있다.

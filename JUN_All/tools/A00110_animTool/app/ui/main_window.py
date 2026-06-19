@@ -758,10 +758,14 @@ class MainWindow(QWidget):
         self.le_follow_start = QLineEdit(str(time_str))
         self.le_follow_start.setValidator(validator)
         range_row.addWidget(self.le_follow_start)
+        self.btn_follow_get_start = QPushButton("Get Current")
+        range_row.addWidget(self.btn_follow_get_start)
         range_row.addWidget(QLabel("End"))
         self.le_follow_end = QLineEdit(str(time_end))
         self.le_follow_end.setValidator(validator)
         range_row.addWidget(self.le_follow_end)
+        self.btn_follow_get_end = QPushButton("Get Current")
+        range_row.addWidget(self.btn_follow_get_end)
         tab_layout.addLayout(range_row)
 
         # -------------------------
@@ -780,6 +784,25 @@ class MainWindow(QWidget):
         ch_row.addWidget(self.cb_follow_s)
         ch_row.addStretch(1)
         tab_layout.addLayout(ch_row)
+
+        # -------------------------
+        # Options
+        #   Maintain Offset : start 프레임의 target↔follower 상대 거리/회전을 유지
+        #                     (parentConstraint maintainOffset=True, 행렬 연산 구현).
+        #   1<-n            : target 1개를 모든 follower 가 따름. off 면 n<-n(인덱스 1:1).
+        # -------------------------
+
+        opt_row = QHBoxLayout()
+        opt_row.addWidget(QLabel("Options"))
+        self.cb_follow_offset = QCheckBox("Maintain Offset")
+        self.cb_follow_one_to_many = QCheckBox("1 <- n")
+        self.cb_follow_one_to_many.setToolTip(
+            "On: every follower follows the single target (1<-n).\n"
+            "Off: index-matched, Target[i] -> Follower[i] (n<-n).")
+        opt_row.addWidget(self.cb_follow_offset)
+        opt_row.addWidget(self.cb_follow_one_to_many)
+        opt_row.addStretch(1)
+        tab_layout.addLayout(opt_row)
 
         # -------------------------
         # Blend (0..1). LineEdit 와 Slider(0..100) 를 동기화. 기본 1.0(완전 매치).
@@ -810,6 +833,10 @@ class MainWindow(QWidget):
         # Slider <-> LineEdit 동기화 + 실행 시그널
         self.sld_follow_blend.valueChanged.connect(self._follow_slider_to_le)
         self.le_follow_blend.editingFinished.connect(self._follow_le_to_slider)
+        self.btn_follow_get_start.clicked.connect(
+            lambda: self._follow_set_current_frame(self.le_follow_start))
+        self.btn_follow_get_end.clicked.connect(
+            lambda: self._follow_set_current_frame(self.le_follow_end))
         self.btn_follow.clicked.connect(self.on_follow_bake)
 
         return tab
@@ -1211,15 +1238,27 @@ class MainWindow(QWidget):
         self.sld_follow_blend.setValue(int(round(v * 100)))
         self.sld_follow_blend.blockSignals(False)
 
+    def _follow_set_current_frame(self, line_edit):
+        """Get Current 버튼: 현재 Maya 프레임으로 해당 Start/End LineEdit 을 갱신."""
+        frame = int(round(cmds.currentTime(query=True)))
+        line_edit.setText(str(frame))
+
     def on_follow_bake(self):
 
         targets = self.follow_tgt_tsl.get_all_items()
         followers = self.follow_flw_tsl.get_all_items()
+        one_to_many = self.cb_follow_one_to_many.isChecked()
+        maintain_offset = self.cb_follow_offset.isChecked()
 
         if not targets or not followers:
             self.log("[Warning] Fill both Target and Follower lists.")
             return
-        if len(targets) != len(followers):
+        if one_to_many:
+            if len(targets) != 1:
+                self.log("[Warning] 1<-n mode needs exactly 1 target "
+                         "(got {0}).".format(len(targets)))
+                return
+        elif len(targets) != len(followers):
             self.log("[Warning] Target ({0}) / Follower ({1}) count mismatch.".format(
                 len(targets), len(followers)))
             return
@@ -1252,7 +1291,8 @@ class MainWindow(QWidget):
 
         count, msg = FollowMatchManager.match_follow(
             targets, followers, start, end, blend,
-            do_translate=do_t, do_rotate=do_r, do_scale=do_s)
+            do_translate=do_t, do_rotate=do_r, do_scale=do_s,
+            maintain_offset=maintain_offset, one_to_many=one_to_many)
         self.log(msg)
 
     # --------------------------------------------------

@@ -1,12 +1,19 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-18
-# A00110_animTool - 여러 follower 를 인덱스로 매칭된 target 의 월드 transform 에 맞춰 구간 키 베이크
+# last Update date : 2026-06-19
+# A00110_animTool - 여러 follower 를 매칭된 target 의 월드 transform 에 맞춰 구간 키 베이크
 #                   (maya.cmds + OpenMaya 2.0, UI 비의존)
 #
-# parentConstraint(maintainOffset=False) 를 컨스트레인트 없이 키로 확정하는 것과 동등하다.
+# parentConstraint 를 컨스트레인트 노드 없이 행렬 연산만으로 키에 확정하는 것과 동등하다.
+# 컨스트레인트 노드/사이클/평가 순서에서 오는 오류를 원천 차단한다.
 #   - 각 (target, follower) 페어에 대해 [start, end] 정수 프레임마다 follower 가 target 의
 #     월드 위치/회전(/스케일)과 "동일"해지도록 follower 로컬 채널에 키를 굽는다.
+#   - maintain_offset(=parentConstraint maintainOffset=True 대응): start 프레임에서 측정한
+#     target↔follower 의 상대 행렬(offset)을 매 프레임 유지한다. 컨스트레인트가 아니라
+#       follower_world(t) = offset · target_world(t),  offset = follower_world(t0) · target_world(t0)^-1
+#     의 행렬 연산으로 구현한다(JUN_PY_MatrixCon_01_01 의 offsetMat 로직과 동일).
+#   - one_to_many(=1<-n): target 이 1개일 때 모든 follower 가 그 하나의 target 을 따른다.
+#     꺼져 있으면 n<-n(인덱스 1:1 매칭).
 #   - rotateOrder 무관: target worldMatrix 로 읽고, follower parentInverseMatrix 로 로컬화한 뒤
 #     follower 자신의 rotateOrder 로 재분해한다(mirror_key_manager 의 검증된 경로 재사용).
 #   - blend(0..1) 는 키 값에 직접 베이크한다(레이어 weight 는 1 유지).
@@ -43,21 +50,38 @@ class FollowMatchManager:
 
     @staticmethod
     def match_follow(targets, followers, start, end, blend,
-                     do_translate=True, do_rotate=True, do_scale=False):
+                     do_translate=True, do_rotate=True, do_scale=False,
+                     maintain_offset=False, one_to_many=False):
         """
-        targets[i] 의 월드 transform 에 followers[i] 를 맞춰 [start, end] 구간 키를 굽는다.
+        target 의 월드 transform 에 follower 를 맞춰 [start, end] 구간 키를 굽는다.
 
-        targets, followers : 같은 길이의 노드 이름 리스트(인덱스로 1:1 매칭).
+        targets, followers : 노드 이름 리스트.
+            one_to_many=False(n<-n) : 같은 길이여야 하며 인덱스로 1:1 매칭.
+            one_to_many=True (1<-n) : target 이 정확히 1개여야 하며, 모든 follower 가
+                                      그 하나의 target 을 따른다.
         start, end         : 정수 프레임 구간(포함).
         blend              : 0..1. 0=원본 유지, 1=매치 덮어쓰기, 0.5=반반.
         do_translate / do_rotate / do_scale : 매칭/블렌드 채널 그룹.
+        maintain_offset    : True 면 start 프레임의 target↔follower 상대 행렬을 유지
+                             (parentConstraint maintainOffset=True 와 동등, 행렬 연산).
+        one_to_many        : True 면 1<-n 매칭(위 참고).
         반환               : (matched_count, msg)
         """
         if not targets or not followers:
             return (0, "[Warning] Fill both Target and Follower lists.")
-        if len(targets) != len(followers):
-            return (0, "[Warning] Target ({0}) / Follower ({1}) count mismatch.".format(
-                len(targets), len(followers)))
+
+        # ---- target<->follower 페어 구성 (모드별) ----
+        if one_to_many:
+            if len(targets) != 1:
+                return (0, "[Warning] 1<-n mode needs exactly 1 target "
+                           "(got {0}).".format(len(targets)))
+            pairs = [(targets[0], flw) for flw in followers]
+        else:
+            if len(targets) != len(followers):
+                return (0, "[Warning] Target ({0}) / Follower ({1}) count mismatch.".format(
+                    len(targets), len(followers)))
+            pairs = list(zip(targets, followers))
+
         if start > end:
             return (0, "[Warning] Start ({0}) is greater than End ({1}).".format(start, end))
         if not (do_translate or do_rotate or do_scale):
@@ -74,6 +98,7 @@ class FollowMatchManager:
         layer, is_override, layer_msg = FollowMatchManager._resolve_layer()
 
         times = list(range(int(math.floor(start)), int(math.ceil(end)) + 1))
+        ref_time = times[0]   # maintain_offset 의 기준 프레임(구간 시작)
 
         done = 0
         skipped = 0
@@ -82,10 +107,10 @@ class FollowMatchManager:
         cmds.undoInfo(openChunk=True)
         cmds.refresh(suspend=True)
         try:
-            for tgt, flw in zip(targets, followers):
+            for tgt, flw in pairs:
                 ok = FollowMatchManager._match_one(
                     tgt, flw, times, blend, do_translate, do_rotate, do_scale,
-                    layer, is_override)
+                    layer, is_override, maintain_offset, ref_time)
                 if ok:
                     done += 1
                 else:
@@ -97,8 +122,10 @@ class FollowMatchManager:
             cmds.undoInfo(closeChunk=True)
 
         frames = len(times)
-        msg = "{0} follower(s) matched over [{1}-{2}] ({3} frames, blend {4}). {5}".format(
-            done, start, end, frames, blend, layer_msg)
+        mode = "1<-n" if one_to_many else "n<-n"
+        off = "offset" if maintain_offset else "no-offset"
+        msg = "{0} follower(s) matched over [{1}-{2}] ({3} frames, blend {4}, {5}, {6}). {7}".format(
+            done, start, end, frames, blend, mode, off, layer_msg)
         if skipped:
             msg += " {0} skipped (no settable channels / no node).".format(skipped)
         return (done, msg)
@@ -108,7 +135,8 @@ class FollowMatchManager:
     # --------------------------------------------------
 
     @staticmethod
-    def _match_one(tgt, flw, times, blend, do_t, do_r, do_s, layer, is_override):
+    def _match_one(tgt, flw, times, blend, do_t, do_r, do_s, layer, is_override,
+                   maintain_offset=False, ref_time=None):
         """단일 (tgt, flw) 페어를 굽는다. 키를 하나라도 기록했으면 True."""
         if not cmds.objExists(tgt) or not cmds.objExists(flw):
             return False
@@ -119,6 +147,11 @@ class FollowMatchManager:
         attrs = FollowMatchManager._settable_attrs(flw, do_t, do_r, do_s)
         if not attrs:
             return False
+
+        # maintain_offset: ref_time(구간 시작)에서 target↔follower 상대 행렬을 1회 측정.
+        offset = None
+        if maintain_offset:
+            offset = FollowMatchManager._offset_matrix(tgt, flw, ref_time)
 
         additive = (layer is not None) and (not is_override)
 
@@ -153,7 +186,8 @@ class FollowMatchManager:
         # ---- Pass 2: 매치 M 계산 -> blend -> 레이어 모드별 값 V 기록 ----
         any_set = False
         for t in times:
-            m_state = FollowMatchManager._matched_state(tgt, flw, t, do_t, do_r, do_s)
+            m_state = FollowMatchManager._matched_state(
+                tgt, flw, t, do_t, do_r, do_s, offset)
 
             if full:
                 values = FollowMatchManager._values_from_state(m_state, do_t, do_r, do_s, order)
@@ -214,12 +248,28 @@ class FollowMatchManager:
         return st
 
     @staticmethod
-    def _matched_state(tgt, flw, t, do_t, do_r, do_s):
+    def _offset_matrix(tgt, flw, t):
+        """ref 프레임 t 에서 follower 가 target 에 대해 갖는 상대 행렬을 측정.
+
+        offset = worldMatrix(flw) * worldInverseMatrix(tgt)  (행벡터 규약).
+        이후 follower_world(t) = offset * worldMatrix(tgt, t) 로 거리/회전이 유지된다.
+        (JUN_PY_MatrixCon_01_01 의 offsetMat: flw.worldMatrix * tgt.worldInverseMatrix 와 동일)
+        """
+        mf = om.MMatrix(cmds.getAttr(flw + ".worldMatrix[0]", time=t))
+        ms_inv = om.MMatrix(cmds.getAttr(tgt + ".worldInverseMatrix[0]", time=t))
+        return mf * ms_inv
+
+    @staticmethod
+    def _matched_state(tgt, flw, t, do_t, do_r, do_s, offset=None):
         """target 의 월드 transform 을 follower 로컬로 변환한 state. rotateOrder 무관.
 
-        local = worldMatrix(tgt) * parentInverseMatrix(flw). offset 0(정확히 일치).
+        offset=None : local = worldMatrix(tgt) * parentInverseMatrix(flw).  정확히 일치.
+        offset 지정 : local = offset * worldMatrix(tgt) * parentInverseMatrix(flw).
+                      start 프레임의 상대 거리/회전을 매 프레임 유지(maintain offset).
         """
         ms = om.MMatrix(cmds.getAttr(tgt + ".worldMatrix[0]", time=t))
+        if offset is not None:
+            ms = offset * ms
         mpi = om.MMatrix(cmds.getAttr(flw + ".parentInverseMatrix[0]", time=t))
         tm = om.MTransformationMatrix(ms * mpi)
 
