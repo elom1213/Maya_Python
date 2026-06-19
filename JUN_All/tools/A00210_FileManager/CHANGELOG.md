@@ -2,6 +2,14 @@
 
 All notable changes to this tool are documented here.
 
+## [01.11] - 2026-06-19
+### Added
+- **File Manager** tab — **Show Recorded Only** checkbox next to *Recursive*. When
+  checked, the file list keeps only files that have a saved record (created via
+  *Save Record*), so a recursive scan that lists every file can be narrowed to the
+  ones tracked through this tool. Re-filters instantly on toggle (no re-scan
+  needed) and the state is remembered in prefs.
+
 ## [01.10] - 2026-06-19
 ### Changed
 - **Lineage** tab — rubber-band selection is now **intersect** mode: dragging a box

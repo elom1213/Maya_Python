@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-17
+# last Update date : 2026-06-19
 # A00210_FileManager - main window (Qt, standalone)
 #
 # Maya 씬 파일(.mb/.ma)의 작업 기록을 관리한다.
@@ -59,6 +59,8 @@ class MainWindow(QWidget):
         self._current_entry = None      # 선택된 파일 entry dict
         self._current_record = None     # 편집 중인 FileRecord
         self._capture = None            # RegionCapture 참조 유지용
+        self._scanned_entries = []      # 마지막 scan 결과 원본(필터 전). "Show Recorded
+                                        # Only" 토글 시 재스캔 없이 다시 거르기 위함.
 
         self._build_ui()
         self._load_prefs_to_ui()
@@ -145,9 +147,16 @@ class MainWindow(QWidget):
 
         scan_row = QHBoxLayout()
         self.chk_recursive = QCheckBox("Recursive")
+        # 이 툴로 기록(Save Record)한 파일만 목록에 남긴다. Recursive 스캔에서 수많은
+        # 파일이 잡힐 때 '관리 중인 파일'만 추리는 용도. 재스캔 없이 즉시 재필터.
+        self.chk_recorded_only = QCheckBox("Show Recorded Only")
+        self.chk_recorded_only.setToolTip(
+            "List only files that have a saved record (created via Save Record).")
+        self.chk_recorded_only.stateChanged.connect(self._apply_file_filter)
         btn_scan = QPushButton("Scan")
         btn_scan.clicked.connect(self.on_scan)
         scan_row.addWidget(self.chk_recursive)
+        scan_row.addWidget(self.chk_recorded_only)
         scan_row.addStretch(1)
         scan_row.addWidget(btn_scan)
         grid.addLayout(scan_row, 3, 1, 1, 2)
@@ -258,6 +267,8 @@ class MainWindow(QWidget):
         self.ipf_remote_url.setText(self._prefs.get("remote_url", data_repo.DATA_REPO_URL))
         self.ipf_author.setText(self._prefs.get("author", ""))
         self.chk_recursive.setChecked(bool(self._prefs.get("recursive", False)))
+        self.chk_recorded_only.setChecked(
+            bool(self._prefs.get("show_recorded_only", False)))
 
     def _collect_prefs(self):
         return {
@@ -269,6 +280,7 @@ class MainWindow(QWidget):
             "remote_url": self.ipf_remote_url.text().strip(),
             "author": self.ipf_author.text().strip(),
             "recursive": self.chk_recursive.isChecked(),
+            "show_recorded_only": self.chk_recorded_only.isChecked(),
         }
 
     def on_save_settings(self):
@@ -340,13 +352,25 @@ class MainWindow(QWidget):
             QMessageBox.warning(self, "Scan", "Please set Project Root first.")
             return
 
-        entries = scanner.scan(
+        self._scanned_entries = scanner.scan(
             scan_dir,
             store,
             recursive=self.chk_recursive.isChecked(),
         )
+        self.log(f"Scanned {len(self._scanned_entries)} Maya file(s) in {scan_dir}")
+        self._apply_file_filter()
+
+    def _apply_file_filter(self):
+        """마지막 scan 결과에 'Show Recorded Only' 필터를 적용해 테이블을 다시 채운다.
+
+        체크 시 record(JSON)가 있는 파일만 남긴다 — Recursive 로 잡힌 다수 파일 중
+        이 툴로 기록한 것만 보기 위함. 체크박스 토글만으로(재스캔 없이) 즉시 반영된다.
+        """
+        entries = self._scanned_entries
+        if self.chk_recorded_only.isChecked():
+            entries = [e for e in entries if e.get("has_record")]
+            self.log(f"Showing {len(entries)} recorded file(s).")
         self.file_table.set_entries(entries)
-        self.log(f"Scanned {len(entries)} Maya file(s) in {scan_dir}")
 
     # ===================================================== file selection
 

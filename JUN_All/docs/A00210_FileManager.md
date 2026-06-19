@@ -47,7 +47,7 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 │ Project Root [............] [Browse]                   │
 │ Store Repo   [............] [Browse]                   │
 │ Scan Dir     [............] [Browse]                   │
-│                            [Recursive]      [ Scan ]   │
+│         [Recursive] [Show Recorded Only]    [ Scan ]   │
 │ Remote [..] Branch [..] Author [.....]  [Save Settings]│
 └────────────────────────────────────────────────────────┘
 ┌ 파일 목록 ───────────┐ ┌ 상세 ───────────────────────┐
@@ -73,6 +73,9 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
      `thumbs/`, `.gitignore`)을 만든다. 원격에서 받아오려면 Store Repo 를 비운 폴더로 두고 원격 URL 을 사용한다.
 2. **스캔**: `Scan Dir` 지정(보통 Project Root 하위) → **Scan**. `.mb`/`.ma` 목록이 뜬다.
    - `Thumb`/`Record` 열의 `O` 는 썸네일·기록 존재 표시. Project Root 밖 파일은 회색(`out of project root`)으로 비활성.
+   - **Recursive**: 하위 폴더까지 재귀 스캔. **Show Recorded Only**: 기록(Save Record)이 있는 파일만 목록에
+     남긴다 — Recursive 로 수많은 파일이 잡힐 때 이 툴로 관리 중인 파일만 추리는 용도. 체크박스 토글만으로(재스캔
+     없이) 즉시 반영되고 상태는 prefs 에 저장된다.
 3. **기록 작성**: 파일을 선택 → 우측에서 **Author** 입력, **New note** 작성 후 **Add Log Entry**(타임스탬프 자동) →
    **Save Record**. `records/<key>.json` 이 생성/갱신된다.
 4. **썸네일**: **Capture Region** → 화면이 **살짝 어두워지며(실제 화면은 비쳐 보임)** 드래그로 영역 선택
