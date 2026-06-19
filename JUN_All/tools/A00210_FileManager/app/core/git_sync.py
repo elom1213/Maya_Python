@@ -164,3 +164,39 @@ class GitSync:
         if not self.is_repo():
             return False, "Not a git repository."
         return self._run("status", "-s", "-b")
+
+    def list_branches(self):
+        """로컬 + 원격추적 브랜치의 짧은 이름 목록을 반환. (ok, names).
+
+        네트워크 fetch 없이 로컬 ref 만 읽는다(이미 clone/fetch 된 origin/* 포함).
+        예: 로컬 'master' + 원격 'origin/master' → ['master'] 로 합쳐 중복 제거.
+        """
+        if not self.is_repo():
+            return False, []
+
+        names = []
+
+        ok, out = self._run("branch", "--format=%(refname:short)")
+        if ok:
+            names += [ln.strip() for ln in out.splitlines() if ln.strip()]
+
+        ok_r, out_r = self._run("branch", "-r", "--format=%(refname:short)")
+        if ok_r:
+            for ln in out_r.splitlines():
+                ln = ln.strip()
+                # remote/branch 형태(슬래시 포함)만. 'origin'(= origin/HEAD 심볼릭의
+                # short)·'origin/HEAD -> ...' 류는 제외.
+                if not ln or "->" in ln or "/" not in ln:
+                    continue
+                short = ln.split("/", 1)[1]     # 'origin/master' → 'master'
+                if short and short != "HEAD":
+                    names.append(short)
+
+        # 순서 보존 중복 제거 후 정렬.
+        seen = set()
+        uniq = []
+        for n in names:
+            if n not in seen:
+                seen.add(n)
+                uniq.append(n)
+        return True, sorted(uniq)

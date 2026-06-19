@@ -97,6 +97,9 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
   `~/.jun_filemanager/JUN_FileManager_data` 에 **자동 clone** 한 뒤 pull 한다. 사용자는 **Pull 한 번**이면 된다.
 - **Settings** 의 `Store Repo`/`Remote`/`Branch`/`Remote URL` 은 번들 기본값으로 **미리 채워진다**(리포를
   포크/이전했다면 `Remote URL`/`Branch` 만 바꿔 Save). 데이터 리포 기본 브랜치는 **`master`**.
+- **Branch** 입력은 **편집 가능한 드롭다운** — 펼치면 Store Repo 의 실제 git 브랜치(로컬 + 원격추적, 중복
+  제거)를 보여줘 올바른 이름을 고를 수 있다(직접 타이핑도 가능). `main`/`master` 혼동 같은 브랜치명 불일치로
+  생기는 `src refspec ... does not match any` push 오류를 줄인다.
 - 이후 Push/Pull 은 기존과 동일하게 같은 중앙 리포로 동기화된다.
 
 > **인증 주의**: 중앙 데이터 리포가 **private** 이면, clone 하려면 사용자에게 **그 GitHub 리포 접근 권한 +

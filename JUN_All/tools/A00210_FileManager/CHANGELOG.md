@@ -2,6 +2,15 @@
 
 All notable changes to this tool are documented here.
 
+## [01.13] - 2026-06-19
+### Changed
+- **Settings** — the **Branch** field is now an editable dropdown. Opening it lists
+  the Store Repo's actual git branches (local + remote-tracking, deduped) so you can
+  pick a valid one instead of typing it. You can still type a branch name manually
+  (e.g. before the first clone/fetch). This avoids the common `src refspec <branch>
+  does not match any` push error caused by a branch-name mismatch (e.g. `main` vs
+  `master`). Backed by new `GitSync.list_branches()` (reads local refs, no network).
+
 ## [01.12] - 2026-06-19
 ### Changed
 - **File Manager** tab — *Load Image...* now opens in the Store Repo's `thumbs`

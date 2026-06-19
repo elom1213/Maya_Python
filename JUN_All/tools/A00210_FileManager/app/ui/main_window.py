@@ -21,11 +21,14 @@ from Framework.qt.qt import (
     QSplitter,
     QLabel,
     QLineEdit,
+    QComboBox,
     QPushButton,
     QCheckBox,
     QPlainTextEdit,
     QFileDialog,
     QMessageBox,
+    QDialog,
+    QDialogButtonBox,
     QPixmap,
     Qt,
 )
@@ -44,6 +47,40 @@ from .lineage_tab import LineageTab
 
 THUMB_W = 320
 THUMB_H = 180
+
+
+class _BranchComboBox(QComboBox):
+    """Branch 입력 콤보. 드롭다운을 열 때마다 현재 git 브랜치 목록으로 갱신한다.
+
+    editable 이라 목록에 없는 브랜치를 직접 타이핑할 수도 있다(기존 동작 유지).
+    fetch_branches 는 브랜치 이름 list 를 돌려주는 콜러블(보통 store repo 의 GitSync).
+    """
+
+    def __init__(self, fetch_branches, parent=None):
+        super().__init__(parent)
+        self._fetch = fetch_branches
+        self.setEditable(True)
+        self.setInsertPolicy(QComboBox.NoInsert)
+        self.setMinimumWidth(120)
+
+    def showPopup(self):
+        current = self.currentText()
+        names = []
+        try:
+            names = self._fetch() or []
+        except Exception:  # noqa: BLE001 - 목록 조회 실패해도 드롭다운은 떠야 한다
+            names = []
+
+        self.blockSignals(True)
+        self.clear()
+        self.addItems(names)
+        # 현재 입력값이 목록에 없으면 맨 위에 추가해 보존.
+        if current and current not in names:
+            self.insertItem(0, current)
+        self.setCurrentText(current)
+        self.blockSignals(False)
+
+        super().showPopup()
 
 
 class MainWindow(QWidget):
@@ -165,7 +202,8 @@ class MainWindow(QWidget):
         meta_row = QHBoxLayout()
         self.ipf_remote = QLineEdit()
         self.ipf_remote.setFixedWidth(120)
-        self.ipf_branch = QLineEdit()
+        # Branch: 드롭다운에서 현재 브랜치 중 고르거나 직접 입력(editable).
+        self.ipf_branch = _BranchComboBox(self._branch_names)
         self.ipf_branch.setFixedWidth(120)
         self.ipf_author = QLineEdit()
         btn_save_settings = QPushButton("Save Settings")
@@ -216,7 +254,16 @@ class MainWindow(QWidget):
         self.ipf_record_author = QLineEdit()
         layout.addWidget(self.ipf_record_author)
 
-        layout.addWidget(QLabel("Log history"))
+        # Log history 헤더 + Expand 버튼(좁은 패널에서 긴 로그를 큰 창으로 보기).
+        log_header = QHBoxLayout()
+        log_header.addWidget(QLabel("Log history"))
+        log_header.addStretch(1)
+        self.btn_expand_log = QPushButton("Expand")
+        self.btn_expand_log.setToolTip("Open the log history in a larger window")
+        self.btn_expand_log.clicked.connect(self.on_expand_log)
+        log_header.addWidget(self.btn_expand_log)
+        layout.addLayout(log_header)
+
         self.txt_log_history = QPlainTextEdit()
         self.txt_log_history.setReadOnly(True)
         layout.addWidget(self.txt_log_history, stretch=1)
@@ -263,7 +310,7 @@ class MainWindow(QWidget):
         self.ipf_store_dir.setText(self._prefs.get("store_dir", ""))
         self.ipf_scan_dir.setText(self._prefs.get("scan_dir", ""))
         self.ipf_remote.setText(self._prefs.get("remote", data_repo.DATA_REPO_REMOTE))
-        self.ipf_branch.setText(self._prefs.get("branch", data_repo.DATA_REPO_BRANCH))
+        self.ipf_branch.setCurrentText(self._prefs.get("branch", data_repo.DATA_REPO_BRANCH))
         self.ipf_remote_url.setText(self._prefs.get("remote_url", data_repo.DATA_REPO_URL))
         self.ipf_author.setText(self._prefs.get("author", ""))
         self.chk_recursive.setChecked(bool(self._prefs.get("recursive", False)))
@@ -276,7 +323,7 @@ class MainWindow(QWidget):
             "store_dir": self.ipf_store_dir.text().strip(),
             "scan_dir": self.ipf_scan_dir.text().strip(),
             "remote": self.ipf_remote.text().strip() or data_repo.DATA_REPO_REMOTE,
-            "branch": self.ipf_branch.text().strip() or data_repo.DATA_REPO_BRANCH,
+            "branch": self.ipf_branch.currentText().strip() or data_repo.DATA_REPO_BRANCH,
             "remote_url": self.ipf_remote_url.text().strip(),
             "author": self.ipf_author.text().strip(),
             "recursive": self.chk_recursive.isChecked(),
@@ -306,8 +353,16 @@ class MainWindow(QWidget):
         return GitSync(
             self.ipf_store_dir.text().strip(),
             self.ipf_remote.text().strip() or data_repo.DATA_REPO_REMOTE,
-            self.ipf_branch.text().strip() or data_repo.DATA_REPO_BRANCH,
+            self.ipf_branch.currentText().strip() or data_repo.DATA_REPO_BRANCH,
         )
+
+    def _branch_names(self):
+        """현재 Store Repo 의 git 브랜치 이름 목록(없으면 빈 목록). Branch 콤보용."""
+        git = self._make_git()
+        if not git.store_dir or not git.is_repo():
+            return []
+        ok, names = git.list_branches()
+        return names if ok else []
 
     def _ensure_default_store_dir(self):
         """Store Repo 가 비어 있으면 번들 기본 경로로 채운다(배포 사용자 원클릭 Pull)."""
@@ -328,6 +383,7 @@ class MainWindow(QWidget):
             self.txt_new_note,
             self.btn_add_log,
             self.btn_save_record,
+            self.btn_expand_log,
         ):
             w.setEnabled(enabled)
 
