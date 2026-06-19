@@ -1,12 +1,12 @@
 # A00145_RigConnect — RigConnect (사용 안내)
 
-MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected)와 기존
+MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match Tool V05.04` 와 기존
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
-**UI 는 PySide(Qt)**, 로직은 `maya.cmds` 로 작성되었다.
+**UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.02` (`app/config/version.py`)
+- 버전: `v01.03` (`app/config/version.py`)
 - 위치: `JUN_All/tools/A00145_RigConnect`
-- 형태: 아키텍처 (B) — Maya 내 PySide 툴(`QTabWidget` 4탭)
+- 형태: 아키텍처 (B) — Maya 내 PySide 툴(`QTabWidget` 5탭)
 - 원본 `A00140_ConnectClosest` / MEL 파일은 그대로 보존(미수정)
 
 ---
@@ -26,6 +26,24 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
 ---
 
 ## 2. 탭 구성
+
+### Match
+(MEL `Match Tool V05.04` 이식·리팩토링) follower 를 target 의 **위치/회전에 맞춘다**. 첫 번째 탭.
+
+- `Targets` / `Followers` 리스트(Select/Add/Del/Up/Down). 버텍스를 선택하면 `cmds.ls(fl=True)` 로
+  **각 버텍스가 개별 항목**(`mesh.vtx[i]`)으로 들어간다(`mesh.vtx[0:13]` 처럼 하나로 묶이지 않음).
+- **Match**: `Targets[i] → Followers[i]` 인덱스 1:1 매칭. **rotateOrder 가 달라도** 안전
+  (`cmds.matchTransform`, 임시 transform 경유). 개수가 다르면 적은 쪽만 매칭하고 경고.
+  target 종류별 동작:
+  - transform/joint/curve → 위치+회전 매칭.
+  - mesh(오브젝트 전체) → 월드 정점 평균(centroid)으로 위치만.
+  - clusterHandle → 월드 rotatePivot 으로 위치만.
+  - **vertex(`.vtx[i]`) → 정점 월드 위치로 이동 + follower 의 `+Y` 축을 정점 노말에 정렬**
+    (`maya.api.OpenMaya` 의 `MFnMesh.getVertexNormal`).
+- **Create (at target positions)** — `Locators` / `Sphere` / `Cube`: 타겟 **수만큼** 컨트롤을 만들어
+  **곧바로 타겟 위치/방향에 매칭**하고, 생성된 컨트롤을 **Followers 목록에 채운다**(씬에서도 선택).
+- **Swap**: Targets ↔ Followers 목록 교환.
+- (MEL 의 Blend Shape 버튼은 제거됨.)
 
 ### Constrain
 접이식 섹션 2개로 구성된다(`CollapsibleBox`). **`Constraint`(기본 펼침)** / **`Skin Weight to
@@ -93,6 +111,7 @@ A00145_RigConnect/
 └── app/
     ├── config/version.py
     ├── core/                       # UI 비의존 maya.cmds 로직
+    │   ├── match_manager.py        # Match (MEL Match Tool 포팅: 위치/회전 매칭·컨트롤 생성·버텍스 노말)
     │   ├── constrain_manager.py    # Constrain  (MEL 포팅)
     │   ├── skin_constraint_manager.py # Skin Weight to Constraint (스킨 웨이트 → weighted parentConstraint)
     │   ├── connect_manager.py      # Connect    (MEL 포팅: attr 나열/검색/연결, 52 facial)

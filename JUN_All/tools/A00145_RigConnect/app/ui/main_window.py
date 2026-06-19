@@ -18,6 +18,7 @@ print("QT version  :  " + str(QT_VERSION))
 import maya.cmds as cmds
 
 from tools.A00145_RigConnect.app.config.version import VERSION, LAST_UPDATE
+from tools.A00145_RigConnect.app.core import match_manager as mch_mgr
 from tools.A00145_RigConnect.app.core import constrain_manager as con_mgr
 from tools.A00145_RigConnect.app.core import connect_manager as cnt_mgr
 from tools.A00145_RigConnect.app.core import stream_manager as stm_mgr
@@ -73,6 +74,7 @@ class MainWindow(QWidget):
 
         # 탭
         self.tabs = QTabWidget()
+        self.tabs.addTab(self._build_match_tab(), "Match")
         self.tabs.addTab(self._build_constrain_tab(), "Constrain")
         self.tabs.addTab(self._build_connect_tab(), "Connect")
         self.tabs.addTab(self._build_list_connected_tab(), "List Connected")
@@ -84,6 +86,53 @@ class MainWindow(QWidget):
         self.lbl_copyright = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
         self.lbl_copyright.setAlignment(Qt.AlignRight)
         main_layout.addWidget(self.lbl_copyright)
+
+    # --------------------------------------------------------------
+    # Tab : Match  (MEL Match Tool V05.04 이식)
+    # --------------------------------------------------------------
+
+    def _build_match_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # Targets / Followers (TSL 위젯이 cmds.ls(fl=True) 로 버텍스를 개별 항목으로 펼친다)
+        self.tsl_match_tgt = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Targets", select_label="Select",
+            show_sort=False, list_min_height=200, log_callback=self.log)
+        self.tsl_match_flw = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Followers", select_label="Select",
+            show_sort=False, list_min_height=200, log_callback=self.log)
+
+        list_row = QHBoxLayout()
+        list_row.addWidget(self.tsl_match_tgt)
+        list_row.addWidget(self.tsl_match_flw)
+        layout.addLayout(list_row)
+
+        # Create : 타겟 수만큼 컨트롤을 만들어 타겟 위치/방향에 즉시 매칭(+ Followers 목록 채움).
+        create_box = QGroupBox("Create (at target positions)")
+        create_row = QHBoxLayout(create_box)
+        for label, ctl_type in (("Locators", "locator"),
+                                ("Sphere", "sphere"),
+                                ("Cube", "cube")):
+            btn = QPushButton(label)
+            btn.clicked.connect(
+                lambda _checked=False, t=ctl_type: self.on_match_create(t))
+            create_row.addWidget(btn)
+        layout.addWidget(create_box)
+
+        # Match / Swap
+        btn_row = QHBoxLayout()
+        btn_match = QPushButton("Match")
+        btn_match.setMinimumHeight(32)
+        btn_match.clicked.connect(self.on_match)
+        btn_swap = QPushButton("Swap")
+        btn_swap.clicked.connect(self.on_match_swap)
+        btn_row.addWidget(btn_match)
+        btn_row.addWidget(btn_swap)
+        layout.addLayout(btn_row)
+
+        layout.addStretch(1)
+        return tab
 
     # --------------------------------------------------------------
     # Tab : Constrain
@@ -380,6 +429,8 @@ class MainWindow(QWidget):
             "Written by Ji Hun Park\n"
             "Update date : {1}\n"
             "\n"
+            "Match       : match followers to targets (pos/rot, rotateOrder safe)\n"
+            "              + create locators/sphere/cube at targets + vertex normal (+Y)\n"
             "Constrain   : multi target -> follower constraints\n"
             "              + Skin Weight to Constraint (weighted parentConstraint)\n"
             "Connect     : connect attributes (3 broadcast patterns) + 52 facial\n"
@@ -398,6 +449,46 @@ class MainWindow(QWidget):
             cmds.warning(str(e))
         finally:
             cmds.undoInfo(closeChunk=True)
+
+    # ==============================================================
+    # Handlers : Match
+    # ==============================================================
+
+    def on_match(self):
+        targets = self.tsl_match_tgt.get_all_items()
+        followers = self.tsl_match_flw.get_all_items()
+        if len(targets) != len(followers):
+            self.log("[WARN] Match : target/follower counts differ "
+                     "({0} vs {1}) - matching {2} pair(s)".format(
+                         len(targets), len(followers),
+                         min(len(targets), len(followers))))
+
+        def _do():
+            matched, skipped = mch_mgr.match(targets, followers)
+            self.log("       {0} matched, {1} skipped".format(matched, skipped))
+
+        self._run("Match", _do)
+
+    def on_match_create(self, ctl_type):
+        targets = self.tsl_match_tgt.get_all_items()
+
+        def _do():
+            created = mch_mgr.create_and_match(targets, ctl_type)
+            # 생성한 컨트롤을 Followers 목록에 채우고 씬에서 선택.
+            self.tsl_match_flw.set_items(created)
+            if created:
+                cmds.select(created)
+            self.log("       created and matched {0} {1}(s)".format(
+                len(created), ctl_type))
+
+        self._run("Create {0}".format(ctl_type), _do)
+
+    def on_match_swap(self):
+        targets = self.tsl_match_tgt.get_all_items()
+        followers = self.tsl_match_flw.get_all_items()
+        self.tsl_match_tgt.set_items(followers)
+        self.tsl_match_flw.set_items(targets)
+        self.log("[OK] Swap : targets <-> followers")
 
     # ==============================================================
     # Handlers : Constrain

@@ -7,6 +7,7 @@ from .closest_connector import (
     find_closest,
     connect_closest,
 )
+from . import match_manager
 from . import constrain_manager
 from . import connect_manager
 from . import stream_manager
