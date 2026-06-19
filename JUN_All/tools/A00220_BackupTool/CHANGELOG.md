@@ -1,5 +1,15 @@
 # Changelog — A00220_BackupTool
 
+## [01.04] - 2026-06-19
+
+### Changed
+- **Control** — the status text (`Deactive` / `Active...` / `Saving`) is replaced
+  by a **Chrome-Dino style T-Rex animation**. When backup is running the dino runs
+  in place (alternating legs + scrolling ground) and jumps periodically; when
+  stopped it stands still; it does an extra hop on each save. Drawn with QPainter
+  from a code-embedded pixel bitmap (new `app/ui/dino_widget.py`) — no image assets,
+  theme-independent, nothing extra to bundle in the exe.
+
 ## [01.03] - 2026-06-19
 
 ### Changed

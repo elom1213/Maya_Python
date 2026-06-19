@@ -35,6 +35,7 @@ from Framework.qt import JUN_mod_collapsible_qt
 
 from ..config.version import VERSION
 from ..core import backup_manager, prefs as prefs_mod
+from .dino_widget import DinoWidget
 
 
 # 상태 상수
@@ -55,7 +56,6 @@ class MainWindow(QWidget):
 
         self._prefs = prefs_mod.load()
         self._state = STATE_DEACTIVE
-        self._dot_count = 1
         self._next_save_ts = 0.0     # 다음 저장 예정 시각(time.monotonic 기준)
         # Settings 가 접혀 있을 때의 최신 창 높이(펼칠 때 정확히 복원하기 위함).
         self._collapsed_h = None
@@ -64,10 +64,7 @@ class MainWindow(QWidget):
         self._backup_timer = QTimer(self)
         self._backup_timer.timeout.connect(self._do_backup_cycle)
 
-        # Active 상태 점(...) 애니메이션 타이머
-        self._dot_timer = QTimer(self)
-        self._dot_timer.setInterval(500)
-        self._dot_timer.timeout.connect(self._tick_dots)
+        # (상태 표시는 텍스트 대신 Chrome-Dino 애니메이션. 자체 타이머로 동작.)
 
         # 다음 저장까지 남은 시간 카운트다운 타이머(1초)
         self._countdown_timer = QTimer(self)
@@ -228,12 +225,12 @@ class MainWindow(QWidget):
         self.btn_toggle.setMinimumHeight(36)
         self.btn_toggle.clicked.connect(self.on_toggle)
         row.addWidget(self.btn_toggle)
-
-        self.lbl_status = QLabel()
-        self.lbl_status.setStyleSheet("font-weight: bold; font-size: 14px;")
-        self.lbl_status.setAlignment(Qt.AlignCenter)
-        row.addWidget(self.lbl_status, stretch=1)
         layout.addLayout(row)
+
+        # 상태 표시: 글자 대신 Chrome-Dino. Active 면 달리며 주기적으로 점프,
+        # 정지면 가만히 서 있는다. (Saving 순간엔 hop 으로 강조.)
+        self.dino = DinoWidget(px=3)
+        layout.addWidget(self.dino)
 
         # 다음 저장까지 남은 시간 카운트다운
         self.lbl_countdown = QLabel()
@@ -329,7 +326,6 @@ class MainWindow(QWidget):
         self.btn_toggle.setText("Stop")
 
         self._set_state(STATE_ACTIVE)
-        self._dot_timer.start()
         self._countdown_timer.start()
         self._backup_timer.start(interval)
 
@@ -341,7 +337,6 @@ class MainWindow(QWidget):
 
     def on_stop(self):
         self._backup_timer.stop()
-        self._dot_timer.stop()
         self._countdown_timer.stop()
         self.btn_toggle.setText("Start")
         self._set_settings_enabled(True)
@@ -386,24 +381,15 @@ class MainWindow(QWidget):
     def _set_state(self, state):
         self._state = state
         if state == STATE_DEACTIVE:
-            self.lbl_status.setText("Deactive")
+            self.dino.set_running(False)             # 공룡 정지(서 있음)
             self.lbl_countdown.setText("Next save in  --:--")
         elif state == STATE_SAVING:
-            self.lbl_status.setText("Saving")
+            self.dino.set_running(True)
+            self.dino.hop()                          # 저장 순간 점프로 강조
             self.lbl_countdown.setText("Next save in  00:00")
-        else:
-            self._dot_count = 1
-            self._render_active()
+        else:                                        # ACTIVE: 달리기 + 주기적 점프
+            self.dino.set_running(True)
             self._tick_countdown()
-
-    def _tick_dots(self):
-        if self._state != STATE_ACTIVE:
-            return
-        self._dot_count = self._dot_count % 3 + 1
-        self._render_active()
-
-    def _render_active(self):
-        self.lbl_status.setText("Active" + "." * self._dot_count)
 
     def _tick_countdown(self):
         if self._state == STATE_DEACTIVE:
@@ -432,7 +418,6 @@ class MainWindow(QWidget):
 
     def closeEvent(self, event):
         self._backup_timer.stop()
-        self._dot_timer.stop()
         try:
             self._save_prefs()
         finally:
