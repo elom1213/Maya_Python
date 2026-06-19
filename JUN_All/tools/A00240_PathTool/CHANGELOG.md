@@ -2,6 +2,13 @@
 
 All notable changes to this tool are documented here.
 
+## [01.03] - 2026-06-19
+### Added
+- **ShortCut** tab — a path button's right-click menu now has **Change Category**:
+  pick another category to move the button into (blocked if a button with the same
+  name already exists there). The button (path included) is moved to the end of the
+  target category and saved to the profile JSON.
+
 ## [01.02] - 2026-06-19
 ### Added
 - **Tree** tab — show an input folder as a tree view. Options: **Depth** (how many

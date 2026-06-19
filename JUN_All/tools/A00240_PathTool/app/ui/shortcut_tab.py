@@ -424,6 +424,7 @@ class ShortcutTab(QWidget):
         menu = QMenu(btn_widget)
         act_rename = menu.addAction("Rename")
         act_path = menu.addAction("Change Path")
+        act_category = menu.addAction("Change Category")
         act_delete = menu.addAction("Delete")
 
         chosen = menu.exec_(btn_widget.mapToGlobal(pos))
@@ -431,6 +432,8 @@ class ShortcutTab(QWidget):
             self._rename_button(cat_name, btn_name)
         elif chosen == act_path:
             self._change_button_path(cat_name, btn_name)
+        elif chosen == act_category:
+            self._change_button_category(cat_name, btn_name)
         elif chosen == act_delete:
             self._delete_button(cat_name, btn_name)
 
@@ -511,6 +514,46 @@ class ShortcutTab(QWidget):
             if b["name"] == btn_name:
                 b["name"] = new
                 break
+        self._save_and_render()
+
+    def _change_button_category(self, cat_name, btn_name):
+        """버튼을 다른 카테고리로 옮긴다(우클릭 → Change Category).
+
+        이동 대상은 현재 카테고리를 뺀 나머지 중에서 고른다. 대상에 같은 이름의 버튼이
+        있으면 막고, 아니면 원본에서 떼어 대상 끝에 붙인다(버튼 순서 보존).
+        """
+        src = self._find_category(cat_name)
+        if src is None:
+            return
+
+        others = [n for n in self._category_names() if n != cat_name]
+        if not others:
+            QMessageBox.information(
+                self, "Path Tool",
+                "There is no other category to move to. Create one first.")
+            return
+
+        target_name, ok = QInputDialog.getItem(
+            self, "Change Category",
+            f"Move '{btn_name}' to category:", others, 0, False)
+        if not ok or not target_name:
+            return
+
+        target = self._find_category(target_name)
+        if target is None:
+            return
+        if any(b["name"] == btn_name for b in target["buttons"]):
+            QMessageBox.warning(
+                self, "Path Tool",
+                f"Button '{btn_name}' already exists in '{target_name}'.")
+            return
+
+        moved = next((b for b in src["buttons"] if b["name"] == btn_name), None)
+        if moved is None:
+            return
+
+        src["buttons"] = [b for b in src["buttons"] if b["name"] != btn_name]
+        target["buttons"].append(moved)
         self._save_and_render()
 
     def _change_button_path(self, cat_name, btn_name):
