@@ -2,6 +2,26 @@
 
 All notable changes to this tool are documented here.
 
+## [01.14] - 2026-06-19
+### Added
+- **File Manager** tab — **right-click a file → Show in File Explorer**: opens the
+  file's folder with the file selected (Windows `explorer /select,`, macOS `open
+  -R`, Linux `xdg-open`).
+- **File Manager** tab — **Name filter** bar above the file list: a text field +
+  **Filter** button (or Enter). Empty shows all; a keyword shows only files whose
+  name contains it (case-insensitive). Stacks with the other filters.
+- **File Manager** tab — **File Types** checkable dropdown next to *Show Recorded
+  Only*: lists the extensions found in the last scan, each toggleable (plus
+  **All**), so you can show only chosen types. Re-filters instantly; the menu
+  stays open while toggling multiple types.
+- **File Manager** tab — **Expand** button by *Log history* opens the log in a
+  large, resizable read-only window (the side panel is narrow for long logs).
+
+### Changed
+- **File Manager** tab — **Scan now lists all file types**, not just `.mb`/`.ma`
+  (`.fbx`/`.obj`/`.png` etc. are included); narrow the result with the new
+  **File Types** / **Name filter** controls.
+
 ## [01.13] - 2026-06-19
 ### Changed
 - **Settings** — the **Branch** field is now an editable dropdown. Opening it lists

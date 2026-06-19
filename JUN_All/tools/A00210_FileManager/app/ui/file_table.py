@@ -12,6 +12,7 @@ from Framework.qt.qt import (
     QVBoxLayout,
     QTreeWidget,
     QTreeWidgetItem,
+    QMenu,
     Qt,
     Signal,
 )
@@ -19,7 +20,8 @@ from Framework.qt.qt import (
 
 class FileTable(QWidget):
 
-    file_selected = Signal(object)   # entry dict
+    file_selected = Signal(object)     # entry dict
+    reveal_requested = Signal(object)  # entry dict — "Show in File Explorer"
 
     HEADERS = ["File", "Author", "Thumb", "Record", "Modified"]
 
@@ -36,6 +38,10 @@ class FileTable(QWidget):
         self.tree.setAlternatingRowColors(True)
         self.tree.setSelectionBehavior(QTreeWidget.SelectRows)
         self.tree.currentItemChanged.connect(self._on_current_changed)
+
+        # 우클릭 컨텍스트 메뉴(파일 행에서 탐색기로 보기).
+        self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self._on_context_menu)
 
         layout.addWidget(self.tree)
 
@@ -79,3 +85,14 @@ class FileTable(QWidget):
             self.file_selected.emit(None)
             return
         self.file_selected.emit(current.data(0, Qt.UserRole))
+
+    def _on_context_menu(self, pos):
+        item = self.tree.itemAt(pos)
+        if item is None:
+            return
+
+        menu = QMenu(self.tree)
+        act_reveal = menu.addAction("Show in File Explorer")
+        chosen = menu.exec_(self.tree.viewport().mapToGlobal(pos))
+        if chosen == act_reveal:
+            self.reveal_requested.emit(item.data(0, Qt.UserRole))

@@ -47,16 +47,17 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 │ Project Root [............] [Browse]                   │
 │ Store Repo   [............] [Browse]                   │
 │ Scan Dir     [............] [Browse]                   │
-│         [Recursive] [Show Recorded Only]    [ Scan ]   │
+│  [Recursive] [Show Recorded Only] [File Types ▾]  [Scan]│
 │ Remote [..] Branch [..] Author [.....]  [Save Settings]│
 └────────────────────────────────────────────────────────┘
+ Name filter [................................]  [ Filter ]
 ┌ 파일 목록 ───────────┐ ┌ 상세 ───────────────────────┐
 │ File / Author /      │ │ [ thumbnail 320x180 ]        │
 │ Thumb / Record / 수정│ │ [Capture Region][Load Image] │
-│ ...                  │ │ Author [...........]         │
-│                      │ │ Log history (read only)      │
-│                      │ │ New note [...]               │
-│                      │ │ [Add Log Entry][Save Record] │
+│ (우클릭 →            │ │ Author [...........]         │
+│  Show in File        │ │ Log history (read only)[Expand]│
+│  Explorer)           │ │ New note [...]               │
+│ ...                  │ │ [Add Log Entry][Save Record] │
 └──────────────────────┘ └──────────────────────────────┘
 ┌ Git Sync ────────────────────────────────────────────┐
 │ [ Pull ] [ Push ]            status...                 │
@@ -71,11 +72,18 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 1. **설정**: `Project Root`, `Store Repo`, `Remote`/`Branch`, `Author` 를 채우고 **Save Settings**.
    - 처음이라면 **Pull**(또는 Push) 시 Store Repo 가 git repo 가 아니면 자동으로 `git init` + 스켈레톤(`records/`,
      `thumbs/`, `.gitignore`)을 만든다. 원격에서 받아오려면 Store Repo 를 비운 폴더로 두고 원격 URL 을 사용한다.
-2. **스캔**: `Scan Dir` 지정(보통 Project Root 하위) → **Scan**. `.mb`/`.ma` 목록이 뜬다.
+2. **스캔**: `Scan Dir` 지정(보통 Project Root 하위) → **Scan**. **모든 확장자**의 파일 목록이 뜬다
+   (`.mb`/`.ma` 뿐 아니라 `.fbx`/`.obj`/`.png` 등도 포함, v01.14).
    - `Thumb`/`Record` 열의 `O` 는 썸네일·기록 존재 표시. Project Root 밖 파일은 회색(`out of project root`)으로 비활성.
-   - **Recursive**: 하위 폴더까지 재귀 스캔. **Show Recorded Only**: 기록(Save Record)이 있는 파일만 목록에
-     남긴다 — Recursive 로 수많은 파일이 잡힐 때 이 툴로 관리 중인 파일만 추리는 용도. 체크박스 토글만으로(재스캔
-     없이) 즉시 반영되고 상태는 prefs 에 저장된다.
+   - **Recursive**: 하위 폴더까지 재귀 스캔.
+   - **Show Recorded Only**: 기록(Save Record)이 있는 파일만 남긴다 — 이 툴로 관리 중인 파일만 추리는 용도.
+   - **File Types ▾**: 스캔에서 발견된 확장자 목록 중 **표시할 것만 체크**(All 포함). 메뉴는 여러 개를 연속
+     토글해도 닫히지 않고, 버튼 라벨에 선택 요약(`File Types: mb, ma`)이 보인다.
+   - **Name filter**: 파일 목록 위 입력란에 키워드를 넣고 **Filter**(또는 Enter) — **제목에 키워드가 포함된
+     파일만** 표시(대소문자 무시), 비우면 전체.
+   - 위 필터들은 **재스캔 없이 즉시 중첩 적용**된다(Recorded/Types 상태는 prefs 에 저장).
+   - **우클릭 → Show in File Explorer**: 목록의 파일을 우클릭하면 그 파일을 **탐색기에서 선택 상태로** 연다.
+   - 파일 선택 후 상세 패널의 **Log history** 가 길면 **Expand** 로 큰 창에서 볼 수 있다.
 3. **기록 작성**: 파일을 선택 → 우측에서 **Author** 입력, **New note** 작성 후 **Add Log Entry**(타임스탬프 자동) →
    **Save Record**. `records/<key>.json` 이 생성/갱신된다.
 4. **썸네일**: **Capture Region** → 화면이 **살짝 어두워지며(실제 화면은 비쳐 보임)** 드래그로 영역 선택

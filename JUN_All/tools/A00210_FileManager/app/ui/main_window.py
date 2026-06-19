@@ -9,7 +9,9 @@
 #  - 기록(records/thumbs)을 git 으로 pull/push (원본 mb/ma 는 push 대상 아님)
 
 import os
+import sys
 import time
+import subprocess
 
 from Framework.qt.qt import (
     QWidget,
@@ -29,6 +31,8 @@ from Framework.qt.qt import (
     QMessageBox,
     QDialog,
     QDialogButtonBox,
+    QToolButton,
+    QMenu,
     QPixmap,
     Qt,
 )
@@ -83,6 +87,21 @@ class _BranchComboBox(QComboBox):
         super().showPopup()
 
 
+class _CheckableMenu(QMenu):
+    """체크 가능한 항목을 토글해도 닫히지 않는 메뉴.
+
+    기본 QMenu 는 항목 클릭 시 닫히므로 여러 확장자를 연속으로 체크/해제하기 불편하다.
+    체크 가능한 항목 위에서 마우스를 떼면 닫지 않고 그 항목만 토글(trigger)한다.
+    """
+
+    def mouseReleaseEvent(self, event):
+        action = self.activeAction()
+        if action is not None and action.isEnabled() and action.isCheckable():
+            action.trigger()   # 체크 토글 + triggered(bool) 방출, 메뉴는 유지
+            return
+        super().mouseReleaseEvent(event)
+
+
 class MainWindow(QWidget):
 
     def __init__(self):
@@ -97,7 +116,10 @@ class MainWindow(QWidget):
         self._current_record = None     # 편집 중인 FileRecord
         self._capture = None            # RegionCapture 참조 유지용
         self._scanned_entries = []      # 마지막 scan 결과 원본(필터 전). "Show Recorded
-                                        # Only" 토글 시 재스캔 없이 다시 거르기 위함.
+                                        # Only"·확장자 필터 토글 시 재스캔 없이 거르기 위함.
+        self._type_states = {}          # 확장자(ext, 점 없음) -> 체크 여부. 재스캔 간 유지.
+        self._type_actions = {}         # 확장자 -> File Types 메뉴의 QAction
+        self._name_filter = ""          # 적용 중인 이름(제목) 키워드. 빈 값=전체.
 
         self._build_ui()
         self._load_prefs_to_ui()
@@ -141,9 +163,25 @@ class MainWindow(QWidget):
 
         layout.addWidget(self._build_settings_group())
 
+        # 파일 목록 위 이름 필터 바 — 스캔된 파일 중 제목에 키워드가 든 것만 표시.
+        filter_row = QHBoxLayout()
+        filter_row.addWidget(QLabel("Name filter"))
+        self.ipf_name_filter = QLineEdit()
+        self.ipf_name_filter.setPlaceholderText(
+            "Name contains...  (empty = all files)")
+        self.ipf_name_filter.returnPressed.connect(self.on_apply_name_filter)
+        self.btn_name_filter = QPushButton("Filter")
+        self.btn_name_filter.setToolTip(
+            "Show only files whose name contains the keyword (empty = all).")
+        self.btn_name_filter.clicked.connect(self.on_apply_name_filter)
+        filter_row.addWidget(self.ipf_name_filter, stretch=1)
+        filter_row.addWidget(self.btn_name_filter)
+        layout.addLayout(filter_row)
+
         splitter = QSplitter(Qt.Horizontal)
         self.file_table = FileTable()
         self.file_table.file_selected.connect(self._on_file_selected)
+        self.file_table.reveal_requested.connect(self.on_reveal_in_explorer)
         splitter.addWidget(self.file_table)
         splitter.addWidget(self._build_detail_panel())
         splitter.setStretchFactor(0, 3)
@@ -190,10 +228,20 @@ class MainWindow(QWidget):
         self.chk_recorded_only.setToolTip(
             "List only files that have a saved record (created via Save Record).")
         self.chk_recorded_only.stateChanged.connect(self._apply_file_filter)
+        # 스캔된 파일들에서 발견된 확장자 중 어떤 것만 표시할지 고르는 체크 드롭다운.
+        # 메뉴는 scan 때마다 발견 확장자로 다시 채워진다(_rebuild_type_menu).
+        self.btn_file_types = QToolButton()
+        self.btn_file_types.setText("File Types")
+        self.btn_file_types.setToolTip(
+            "Choose which file extensions to list (populated after Scan).")
+        self.btn_file_types.setPopupMode(QToolButton.InstantPopup)
+        self._types_menu = _CheckableMenu(self.btn_file_types)
+        self.btn_file_types.setMenu(self._types_menu)
         btn_scan = QPushButton("Scan")
         btn_scan.clicked.connect(self.on_scan)
         scan_row.addWidget(self.chk_recursive)
         scan_row.addWidget(self.chk_recorded_only)
+        scan_row.addWidget(self.btn_file_types)
         scan_row.addStretch(1)
         scan_row.addWidget(btn_scan)
         grid.addLayout(scan_row, 3, 1, 1, 2)
@@ -408,25 +456,152 @@ class MainWindow(QWidget):
             QMessageBox.warning(self, "Scan", "Please set Project Root first.")
             return
 
+        # extensions=None → .mb/.ma 뿐 아니라 모든 확장자의 파일을 리스트업한다
+        # (.fbx/.obj/.png 등도 기록·썸네일 추적 대상이 될 수 있다).
         self._scanned_entries = scanner.scan(
             scan_dir,
             store,
             recursive=self.chk_recursive.isChecked(),
+            extensions=None,
         )
-        self.log(f"Scanned {len(self._scanned_entries)} Maya file(s) in {scan_dir}")
+        self.log(f"Scanned {len(self._scanned_entries)} file(s) in {scan_dir}")
+        self._rebuild_type_menu()
+        self._apply_file_filter()
+
+    # --------------------------------------------------- File Types 확장자 필터
+
+    def _rebuild_type_menu(self):
+        """마지막 scan 에서 발견된 확장자들로 File Types 메뉴를 다시 만든다.
+
+        이전에 사용자가 끄거나 켠 확장자 선택(self._type_states)은 이름 기준으로
+        보존하고(여전히 존재하면), 새로 등장한 확장자는 기본 체크(표시) 상태로 둔다.
+        """
+        exts = sorted({(e.get("ext") or "") for e in self._scanned_entries})
+        # 사라진 확장자는 버리고, 새 확장자는 기본 True 로 채운다.
+        self._type_states = {x: self._type_states.get(x, True) for x in exts}
+
+        self._types_menu.clear()
+        self._type_actions = {}
+
+        self.act_all_types = self._types_menu.addAction("All")
+        self.act_all_types.setCheckable(True)
+        self.act_all_types.triggered.connect(self._on_all_types_toggled)
+        self._types_menu.addSeparator()
+
+        for x in exts:
+            label = ("." + x) if x else "(no ext)"
+            act = self._types_menu.addAction(label)
+            act.setCheckable(True)
+            act.setChecked(self._type_states[x])
+            act.triggered.connect(
+                lambda checked, ex=x: self._on_type_toggled(ex, checked)
+            )
+            self._type_actions[x] = act
+
+        self._sync_all_types_action()
+        self._update_types_button_text()
+
+    def _on_type_toggled(self, ext, checked):
+        self._type_states[ext] = checked
+        self._sync_all_types_action()
+        self._update_types_button_text()
+        self._apply_file_filter()
+
+    def _on_all_types_toggled(self, checked):
+        for ext, act in self._type_actions.items():
+            act.setChecked(checked)
+            self._type_states[ext] = checked
+        self._update_types_button_text()
+        self._apply_file_filter()
+
+    def _sync_all_types_action(self):
+        """'All' 항목 체크 상태를 개별 확장자들이 모두 켜져 있는지로 맞춘다."""
+        all_on = all(self._type_states.values()) if self._type_states else True
+        self.act_all_types.setChecked(all_on)
+
+    def _update_types_button_text(self):
+        """버튼 라벨에 현재 선택 요약을 표시한다(예: 'File Types: mb, ma')."""
+        if not self._type_actions:
+            self.btn_file_types.setText("File Types")
+            return
+        selected = [x for x, on in self._type_states.items() if on]
+        if len(selected) == len(self._type_actions):
+            self.btn_file_types.setText("File Types: All")
+        elif not selected:
+            self.btn_file_types.setText("File Types: none")
+        else:
+            shown = ", ".join((x or "(no ext)") for x in selected[:3])
+            more = "" if len(selected) <= 3 else f" +{len(selected) - 3}"
+            self.btn_file_types.setText(f"File Types: {shown}{more}")
+
+    def on_reveal_in_explorer(self, entry):
+        """파일 목록 우클릭 'Show in File Explorer' — 그 파일을 탐색기에서 선택해 연다."""
+        if not entry:
+            return
+        path = entry.get("abs_path", "")
+        if not path or not os.path.exists(path):
+            QMessageBox.information(
+                self, "Show in File Explorer",
+                "File no longer exists at its scanned path.",
+            )
+            return
+        if self._reveal_in_explorer(path):
+            self.log(f"Shown in File Explorer: {path}")
+        else:
+            self.log(f"Failed to open File Explorer for: {path}")
+
+    @staticmethod
+    def _reveal_in_explorer(path):
+        """OS 파일 탐색기에서 파일을 선택 상태로 연다(Windows 우선)."""
+        path = os.path.normpath(path)
+        try:
+            if sys.platform.startswith("win"):
+                # explorer /select, 는 성공해도 비0 종료코드를 내므로 반환값을 보지 않는다.
+                subprocess.Popen(["explorer", "/select,", path])
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", "-R", path])
+            else:
+                subprocess.Popen(["xdg-open", os.path.dirname(path)])
+            return True
+        except OSError:
+            return False
+
+    def on_apply_name_filter(self):
+        """이름 필터 입력값을 '적용 중'으로 확정하고 목록을 다시 거른다.
+
+        비어 있으면 모든 파일, 키워드가 있으면 파일명(제목)에 그 키워드가 포함된
+        파일만 남긴다(대소문자 무시). Filter 버튼 클릭 또는 Enter 로 적용한다.
+        """
+        self._name_filter = self.ipf_name_filter.text().strip()
         self._apply_file_filter()
 
     def _apply_file_filter(self):
-        """마지막 scan 결과에 'Show Recorded Only' 필터를 적용해 테이블을 다시 채운다.
-
-        체크 시 record(JSON)가 있는 파일만 남긴다 — Recursive 로 잡힌 다수 파일 중
-        이 툴로 기록한 것만 보기 위함. 체크박스 토글만으로(재스캔 없이) 즉시 반영된다.
+        """마지막 scan 결과에 이름 + 확장자 + 'Show Recorded Only' 필터를 적용해
+        테이블을 다시 채운다. 세 필터 모두 재스캔 없이 즉시 반영된다.
         """
         entries = self._scanned_entries
+
+        # 0) 이름(제목) 키워드 필터 — 비어 있으면 전부.
+        if self._name_filter:
+            kw = self._name_filter.lower()
+            entries = [
+                e for e in entries if kw in e.get("file_name", "").lower()
+            ]
+
+        # 1) 확장자 필터 — 일부만 체크된 경우에만 거른다(전부 체크면 그대로).
+        if self._type_actions:
+            checked = {x for x, on in self._type_states.items() if on}
+            if len(checked) < len(self._type_actions):
+                entries = [e for e in entries if (e.get("ext") or "") in checked]
+
+        # 2) record(Save Record)가 있는 파일만 보기.
         if self.chk_recorded_only.isChecked():
             entries = [e for e in entries if e.get("has_record")]
-            self.log(f"Showing {len(entries)} recorded file(s).")
+
         self.file_table.set_entries(entries)
+        # 시작 시 prefs 로드로도 불릴 수 있어, 스캔 결과가 있을 때만 로그를 남긴다.
+        if self._scanned_entries:
+            self.log(f"Showing {len(entries)} file(s).")
 
     # ===================================================== file selection
 
@@ -469,13 +644,45 @@ class MainWindow(QWidget):
         self._refresh_log_history(record)
         self._refresh_thumb(record, store)
 
-    def _refresh_log_history(self, record):
+    @staticmethod
+    def _log_history_text(record):
+        """record.logs 를 'Log history' 표시용 텍스트로 만든다(인라인/Expand 팝업 공용)."""
         lines = []
         for entry in record.logs:
             lines.append(f"[{entry.timestamp}] {entry.author}")
             lines.append(entry.note)
             lines.append("")
-        self.txt_log_history.setPlainText("\n".join(lines).strip())
+        return "\n".join(lines).strip()
+
+    def _refresh_log_history(self, record):
+        self.txt_log_history.setPlainText(self._log_history_text(record))
+
+    def on_expand_log(self):
+        """현재 파일의 Log history 를 큰 읽기전용 창으로 띄운다.
+
+        상세 패널이 좁아 로그가 길어지면 보기 어렵기에, 전체 폭의 리사이즈 가능한
+        창에 같은 내용을 크게 보여준다(스냅샷 — 편집은 패널의 New note 로만).
+        """
+        record = self._current_record
+        if record is None:
+            QMessageBox.information(self, "Log history", "Select a file first.")
+            return
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Log history — {record.key}")
+        dlg.resize(720, 560)
+
+        v = QVBoxLayout(dlg)
+        viewer = QPlainTextEdit()
+        viewer.setReadOnly(True)
+        viewer.setPlainText(self._log_history_text(record))
+        v.addWidget(viewer, stretch=1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(dlg.reject)
+        v.addWidget(buttons)
+
+        dlg.exec_()
 
     def _refresh_thumb(self, record, store):
         thumb_path = store.thumb_abs(record.key)
