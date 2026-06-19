@@ -44,6 +44,7 @@ from Framework.qt.qt import (
     QGraphicsItem,
     QPainter,
     QPainterPath,
+    QPainterPathStroker,
     QPen,
     QBrush,
     QColor,
@@ -155,7 +156,7 @@ class NodeItem(QGraphicsObject):
 
 
 class EdgeItem(QGraphicsPathItem):
-    """부모 -> 자식 연결선. 색은 자식 레인 색."""
+    """부모 -> 자식 연결선. 색은 자식 레인 색. 클릭으로 선택(삭제 대상 표시)."""
 
     def __init__(self, parent_id, child_id):
         super().__init__()
@@ -164,15 +165,13 @@ class EdgeItem(QGraphicsPathItem):
         self.color_hex = "#888888"
         self.dashed = False
         self.setZValue(-1.0)
+        # 클릭으로 선택 가능(선택 시 paint 에서 강조). 노드보다 뒤(zValue) 라 빈 곳에서 선택.
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
 
     def set_style(self, color_hex, dashed):
         self.color_hex = color_hex
         self.dashed = dashed
-        pen = QPen(QColor(color_hex), 2.0)
-        pen.setCosmetic(False)
-        if dashed:
-            pen.setStyle(Qt.DashLine)
-        self.setPen(pen)
+        self.update()
 
     def route(self, p_anchor, c_anchor):
         path = QPainterPath(p_anchor)
@@ -188,6 +187,28 @@ class EdgeItem(QGraphicsPathItem):
         path.lineTo(c_anchor.x(), c_anchor.y())
         path.lineTo(c_anchor.x() + a, c_anchor.y() - a)
         self.setPath(path)
+
+    def boundingRect(self):
+        # 선택 시 두꺼운 펜(4px)을 고려해 여유를 둔다.
+        return self.path().boundingRect().adjusted(-6, -6, 6, 6)
+
+    def shape(self):
+        # 얇은 곡선을 클릭하기 쉽도록 hit 영역을 넓힌다.
+        stroker = QPainterPathStroker()
+        stroker.setWidth(10.0)
+        return stroker.createStroke(self.path())
+
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        if self.isSelected():
+            pen = QPen(QColor("#FFFFFF"), 4.0)     # 선택: 흰색 + 두껍게
+        else:
+            pen = QPen(QColor(self.color_hex), 2.0)
+        if self.dashed:
+            pen.setStyle(Qt.DashLine)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        painter.drawPath(self.path())
 
 
 class LineageScene(QGraphicsScene):
@@ -252,6 +273,15 @@ class LineageScene(QGraphicsScene):
             event.accept()
             return
         super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event):
+        # Delete/Backspace: 선택된 노드/연결(엣지)을 삭제.
+        if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
+            if self.tab is not None:
+                self.tab.delete_selection()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
 
 # ==================================================================== view
@@ -504,7 +534,9 @@ class LineageTab(QWidget):
 
         self.view = LineageView(self.scene)
         self.view.setRenderHint(QPainter.Antialiasing, True)
-        self.view.setDragMode(QGraphicsView.NoDrag)
+        # 빈 곳 드래그 = 러버밴드 다중선택(범위 안에 완전히 든 노드 선택). 중간버튼 팬·휠 줌은 view 가 처리.
+        self.view.setDragMode(QGraphicsView.RubberBandDrag)
+        self.view.setRubberBandSelectionMode(Qt.ContainsItemShape)
         return self.view
 
     def _build_inspector(self):
@@ -735,18 +767,47 @@ class LineageTab(QWidget):
         self._log("Added planned node. Rename it in the Node panel.")
 
     def on_delete_node(self):
-        node = self._selected_node()
-        if node is None:
-            QMessageBox.warning(self, "Lineage", "Select a node first.")
+        # 팝업 없이 선택된 노드를 바로 삭제(다중 선택 지원).
+        node_items = [it for it in self.scene.selectedItems()
+                      if isinstance(it, NodeItem)]
+        if not node_items:
+            self._log("No node selected to delete.")
             return
-        ok = QMessageBox.question(self, "Lineage", f"Delete node '{node.file_name}'?")
-        if ok != QMessageBox.Yes:
-            return
-        lin.remove_node(self._graph, node.id)
+        for it in node_items:
+            lin.remove_node(self._graph, it.node.id)
         self._selected_id = None
         self._render_graph()
         self._populate_inspector(None)
-        self._log(f"Deleted node: {node.file_name}")
+        self._log(f"Deleted {len(node_items)} node(s).")
+
+    def delete_selection(self):
+        """선택된 노드/연결(엣지)을 팝업 없이 삭제. Delete 키 공용."""
+        sel = self.scene.selectedItems()
+        node_items = [it for it in sel if isinstance(it, NodeItem)]
+        edge_items = [it for it in sel if isinstance(it, EdgeItem)]
+        if not node_items and not edge_items:
+            return
+
+        # 1) 선택된 연결(엣지) 제거 — 자식의 parents 에서 부모 id 제거.
+        for e in edge_items:
+            child = self._graph.node_by_id(e.child_id)
+            if child is not None and e.parent_id in child.parents:
+                child.parents = [p for p in child.parents if p != e.parent_id]
+
+        # 2) 선택된 노드 제거(다른 노드 parents 의 고아 참조도 정리).
+        for it in node_items:
+            lin.remove_node(self._graph, it.node.id)
+
+        self._selected_id = None
+        self._render_graph()
+        self._populate_inspector(None)
+
+        parts = []
+        if edge_items:
+            parts.append(f"{len(edge_items)} connection(s)")
+        if node_items:
+            parts.append(f"{len(node_items)} node(s)")
+        self._log("Deleted " + " and ".join(parts) + ".")
 
     def try_add_edge(self, parent_id, child_id):
         child = self._graph.node_by_id(child_id)
@@ -825,7 +886,10 @@ class LineageTab(QWidget):
     def on_toggle_connect(self, checked):
         self.scene.set_connect_mode(checked)
         self.btn_connect.setText("Connect Mode (ON)" if checked else "Connect Mode")
-        # connect 중에는 노드 드래그/선택을 막아 선 긋기에 집중.
+        # connect 중엔 러버밴드/노드 드래그를 끄고 선 긋기에 집중. 평소엔 러버밴드 다중선택.
+        self.view.setDragMode(
+            QGraphicsView.NoDrag if checked else QGraphicsView.RubberBandDrag
+        )
         for item in self._node_items.values():
             item.setFlag(QGraphicsItem.ItemIsMovable, not checked)
 

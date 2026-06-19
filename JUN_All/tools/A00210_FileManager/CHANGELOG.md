@@ -2,6 +2,21 @@
 
 All notable changes to this tool are documented here.
 
+## [01.09] - 2026-06-19
+### Added
+- **Lineage** tab — delete nodes **and connections**, with multi-select:
+  - **Click a connection (edge)** to select it (hit area widened so thin curves are
+    easy to hit; the selected edge is highlighted white/thick).
+  - **Delete / Backspace** removes the current selection — any mix of nodes and
+    connections — with no confirmation popup. Deleting a connection drops only that
+    parent link from the child; deleting a node also cleans up orphaned references.
+  - **Rubber-band multi-select**: drag on empty canvas to box-select nodes fully
+    inside the rectangle. Disabled while **Connect Mode** is on (so line-drawing is
+    unaffected); restored when Connect Mode turns off.
+### Changed
+- **Delete Node** button now deletes **all selected nodes at once** and no longer
+  shows a confirmation dialog (was: single node + Yes/No popup).
+
 ## [01.08] - 2026-06-19
 ### Added
 - **Lineage** tab — the **Node** panel now shows the selected node's **log history**
