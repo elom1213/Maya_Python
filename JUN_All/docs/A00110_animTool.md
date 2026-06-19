@@ -26,6 +26,17 @@
    follower 애니메이션과 매치 결과를 섞으며(0=원본 유지, 1=덮어쓰기, 0.5=반반), 선택된
    **애니메이션 레이어**(override/additive)에 키가 들어간다.
 
+> **v01.16 — 뷰포트 프리즈(refresh suspend 누수) 수정 + Force Refresh 버튼**: Bake/Follow 가
+> 쓰는 `cmds.refresh(suspend=True)` 는 **씬 전역 토글**이라, 복원(`suspend=False`)이 어떤 예외에도
+> 반드시 실행돼야 한다. A00120_FKIK `bake()` 의 `finally` 가 임시 컨스트레인트 `cmds.delete()` 를
+> `suspend=False` **보다 먼저** 실행해, delete 가 실패하면 복원이 건너뛰어져 **세션 전체가 프리즈**
+> (Graph Editor 커브 편집이 프레임 이동 전까지 반영 안 됨)되는 버그가 있었다. refresh suspend 가
+> 전역이라 한 번 누수되면 A00110 을 써도 멈춘 것처럼 보였다. 공용 컨텍스트 매니저
+> `Framework/core/maya_refresh.py` 의 **`suspend_refresh()`**(복원을 항상 먼저/무조건 보장)로 A00110
+> (`bake_manager`, `follow_match_manager`)·A00120(`fkik_matcher`)의 모든 suspend 사용처를 통일하고,
+> A00110·A00120 UI 에 **Force Refresh (Unfreeze Viewport)** 버튼(`force_refresh()` =
+> `refresh(suspend=False)` + `refresh()`)을 추가해 사용자가 멈춘 세션을 즉시 풀 수 있게 했다.
+
 > **v01.15 — Follow 탭: Maintain Offset · 1<-n · Get Current**: ① **Maintain Offset** 체크 시
 > start(구간 시작) 프레임에서 측정한 target↔follower 상대 행렬 `offset = worldMatrix(flw) ·
 > worldInverseMatrix(tgt)` 을 매 프레임 유지한다(`follower_world(t) = offset · worldMatrix(tgt,t)`).
@@ -748,6 +759,11 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
   target`). Target 리스트에 정확히 1개만 남기거나, 인덱스 1:1 로 쓰려면 `1 <- n` 을 끈다.
 - **(Follow) Maintain Offset 의 기준이 헷갈림** → offset 은 **Start 프레임**에서 측정한다. 원하는
   거리·회전이 되는 프레임을 Start 로 두고(필요하면 **Get Current**) 실행한다.
+- **뷰포트가 멈춤 — 커브를 편집해도 프레임을 옮겨야 반영됨** → 과거 베이크에서 `cmds.refresh(suspend)`
+  가 풀리지 않고 남은 것이다(전역 상태라 다른 툴을 써도 멈춰 보인다). 하단 **Force Refresh (Unfreeze
+  Viewport)** 버튼을 누르면 즉시 풀린다. 버튼이 없는 환경이면 Script Editor 에서
+  `import maya.cmds as cmds; cmds.refresh(suspend=False); cmds.refresh()`. (v01.16 에서 원인 수정,
+  공용 `suspend_refresh()` 로 재발 방지.)
 - **(Follow) 키가 엉뚱한 레이어/베이스에 들어감** → 실행 전에 원하는 **애니 레이어를 선택**해 둔다.
   선택된 레이어가 없으면 베이스 커브에 들어간다. 로그 끝의 `Layer '...'` / `keys on base curves` 로
   실제 대상 레이어를 확인할 수 있다.

@@ -11,6 +11,8 @@
 
 import maya.cmds as cmds
 
+from Framework.core.maya_refresh import suspend_refresh
+
 
 class BakeManager:
     """
@@ -70,20 +72,20 @@ class BakeManager:
         cur = cmds.currentTime(q=True)
 
         cmds.undoInfo(openChunk=True)
-        cmds.refresh(suspend=True)
         try:
-            try:
-                cmds.bakeResults(objects, **bake_kwargs)
-                used_smart = bool(smart)
-            except TypeError:
-                # 이 Maya 버전에 smart 플래그가 없는 경우: dense 로 다시 굽는다.
-                bake_kwargs.pop("smart", None)
-                bake_kwargs["sparseAnimCurveBake"] = False
-                cmds.bakeResults(objects, **bake_kwargs)
-                used_smart = False
+            # suspend_refresh: 블록 종료 시 refresh 복원이 항상 먼저/무조건 실행된다.
+            with suspend_refresh():
+                try:
+                    cmds.bakeResults(objects, **bake_kwargs)
+                    used_smart = bool(smart)
+                except TypeError:
+                    # 이 Maya 버전에 smart 플래그가 없는 경우: dense 로 다시 굽는다.
+                    bake_kwargs.pop("smart", None)
+                    bake_kwargs["sparseAnimCurveBake"] = False
+                    cmds.bakeResults(objects, **bake_kwargs)
+                    used_smart = False
         finally:
-            # 예외가 나도 뷰포트 억제 해제 / 프레임 복원 / undo 청크 닫기를 반드시 수행
-            cmds.refresh(suspend=False)
+            # 예외가 나도 프레임 복원 / undo 청크 닫기를 반드시 수행(refresh 는 위에서 복원됨).
             cmds.currentTime(cur, edit=True)
             cmds.undoInfo(closeChunk=True)
 

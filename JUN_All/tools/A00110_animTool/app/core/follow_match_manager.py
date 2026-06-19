@@ -26,6 +26,7 @@ import math
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
 
+from Framework.core.maya_refresh import suspend_refresh
 from .mirror_key_manager import MirrorKeyManager
 
 
@@ -105,19 +106,19 @@ class FollowMatchManager:
 
         cur = cmds.currentTime(q=True)
         cmds.undoInfo(openChunk=True)
-        cmds.refresh(suspend=True)
         try:
-            for tgt, flw in pairs:
-                ok = FollowMatchManager._match_one(
-                    tgt, flw, times, blend, do_translate, do_rotate, do_scale,
-                    layer, is_override, maintain_offset, ref_time)
-                if ok:
-                    done += 1
-                else:
-                    skipped += 1
+            # suspend_refresh: 블록 종료 시 refresh 복원이 항상 먼저/무조건 실행된다.
+            with suspend_refresh():
+                for tgt, flw in pairs:
+                    ok = FollowMatchManager._match_one(
+                        tgt, flw, times, blend, do_translate, do_rotate, do_scale,
+                        layer, is_override, maintain_offset, ref_time)
+                    if ok:
+                        done += 1
+                    else:
+                        skipped += 1
         finally:
-            # 예외가 나도 뷰포트 억제 해제 / 프레임 복원 / undo 청크 닫기를 반드시 수행
-            cmds.refresh(suspend=False)
+            # 예외가 나도 프레임 복원 / undo 청크 닫기를 반드시 수행(refresh 는 위에서 복원됨).
             cmds.currentTime(cur, edit=True)
             cmds.undoInfo(closeChunk=True)
 

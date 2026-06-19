@@ -7,6 +7,7 @@ from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_collapsible_qt
 from Framework.qt.maya_window import maya_main_window
+from Framework.core.maya_refresh import force_refresh
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -105,6 +106,18 @@ class MainWindow(QWidget):
 
         # 로그창을 탭 아래에 배치
         main_layout.addWidget(self.te_log)
+
+        # -------------------------
+        # Force Refresh : 뷰포트가 멈춰(커브 편집이 프레임 이동 전까지 반영 안 됨) 있을 때
+        # 막힌 전역 refresh suspend 를 풀고 한 번 다시 그린다.
+        # -------------------------
+
+        self.btn_force_refresh = QPushButton("Force Refresh (Unfreeze Viewport)")
+        self.btn_force_refresh.setToolTip(
+            "Clear a stuck viewport refresh-suspend and redraw once.\n"
+            "Use if Graph Editor edits don't show until you scrub frames.")
+        self.btn_force_refresh.clicked.connect(self.on_force_refresh)
+        main_layout.addWidget(self.btn_force_refresh)
 
         # -------------------------
         # 저작권 (공통)
@@ -847,6 +860,11 @@ class MainWindow(QWidget):
 
     def log(self, text):
         self.te_log.append(text)
+
+    def on_force_refresh(self):
+        """막힌 전역 refresh suspend 를 풀고 뷰포트를 한 번 강제로 그린다."""
+        force_refresh()
+        self.log("Viewport refresh restored.")
 
     def _read_range(self):
         """start, end 파싱. 실패 시 None."""

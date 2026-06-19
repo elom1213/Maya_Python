@@ -1,15 +1,19 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-15
+# last Update date : 2026-06-19
 # A00120_FKIK - 매칭 / 베이크 로직 (maya.cmds, UI 무관)
 #
 # 2026-06-15: bake() 를 Python 프레임 루프 -> native bakeResults 로 교체(대규모 구간 속도 개선).
+# 2026-06-19: bake() 의 refresh suspend 누수 수정 — suspend_refresh() 컨텍스트 매니저로
+#             감싸 복원이 항상 먼저/무조건 실행되도록 했다(임시 컨스트레인트 delete 가
+#             실패해도 뷰포트가 프리즈되지 않음). bake_constraint() 도 delete 를 finally 로.
 #
 # 레거시 JUN_MATCH_twoObjects / JUN_matcher_FKIK / JUN_cmd_match_IK_and_FK /
 #        JUN_cmd_bake_IK_FK / JUN_cmd_bake_IK_to_FK 를 현대화.
 
 import maya.cmds as cmds
 
+from Framework.core.maya_refresh import suspend_refresh
 from tools.A00120_FKIK.app.config import naming
 from tools.A00120_FKIK.app.core.selection_utils import order_by_tokens
 
@@ -153,36 +157,41 @@ class FKIKMatcher:
         cur = cmds.currentTime(q=True)
 
         cmds.undoInfo(openChunk=True)
-        cmds.refresh(suspend=True)
         cons = []
         try:
-            for i in range(count):
-                try:
-                    cons += cmds.parentConstraint(
-                        tgt_list[i], flw[i], maintainOffset=False
-                    )
-                except Exception as e:
-                    # 락/연결된 attr 등으로 컨스트레인트 실패 -> 해당 쌍 skip
-                    cmds.warning(
-                        "FKIK bake: skip pair %s -> %s (%s)"
-                        % (tgt_list[i], flw[i], e)
-                    )
+            # suspend_refresh: 블록 종료 시 refresh 복원이 "항상 먼저/무조건" 실행된다.
+            # 아래 finally 의 delete 가 실패해도 뷰포트가 프리즈되지 않는다(전역 누수 방지).
+            with suspend_refresh():
+                for i in range(count):
+                    try:
+                        cons += cmds.parentConstraint(
+                            tgt_list[i], flw[i], maintainOffset=False
+                        )
+                    except Exception as e:
+                        # 락/연결된 attr 등으로 컨스트레인트 실패 -> 해당 쌍 skip
+                        cmds.warning(
+                            "FKIK bake: skip pair %s -> %s (%s)"
+                            % (tgt_list[i], flw[i], e)
+                        )
 
-            if cons:
-                cmds.bakeResults(
-                    flw,
-                    simulation=True,
-                    time=(start, end),
-                    sampleBy=1,
-                    attribute=attrs,
-                    disableImplicitControl=True,
-                    preserveOutsideKeys=True,
-                    sparseAnimCurveBake=False,
-                )
+                if cons:
+                    cmds.bakeResults(
+                        flw,
+                        simulation=True,
+                        time=(start, end),
+                        sampleBy=1,
+                        attribute=attrs,
+                        disableImplicitControl=True,
+                        preserveOutsideKeys=True,
+                        sparseAnimCurveBake=False,
+                    )
         finally:
-            if cons:
-                cmds.delete([c for c in cons if cmds.objExists(c)])
-            cmds.refresh(suspend=False)
+            # 임시 컨스트레인트 정리는 독립적으로 감싼다(실패해도 이후 복원이 진행되도록).
+            try:
+                if cons:
+                    cmds.delete([c for c in cons if cmds.objExists(c)])
+            except Exception as e:
+                cmds.warning("FKIK bake: constraint cleanup failed (%s)" % e)
             cmds.currentTime(cur, edit=True)
             cmds.undoInfo(closeChunk=True)
 
@@ -206,8 +215,8 @@ class FKIKMatcher:
         time_end = cmds.playbackOptions(maxTime=True, q=True)
 
         cmds.undoInfo(openChunk=True)
+        constraints = []
         try:
-            constraints = []
             for i in range(count):
                 con = cmds.parentConstraint(
                     tgt_list[i], flw_list[i], maintainOffset=True
@@ -221,12 +230,12 @@ class FKIKMatcher:
                 at=sim_attrs,
                 hi="none",
             )
-
-            # 베이크 후 임시 컨스트레인트 정리 (레거시는 남겨뒀음 -> 개선)
+        finally:
+            # 베이크 후 임시 컨스트레인트 정리 (레거시는 남겨뒀음 -> 개선).
+            # finally 로 옮겨 bakeSimulation 이 실패해도 컨스트레인트가 남지 않게 한다.
             for con in constraints:
                 if cmds.objExists(con):
                     cmds.delete(con)
-        finally:
             cmds.undoInfo(closeChunk=True)
 
         return count

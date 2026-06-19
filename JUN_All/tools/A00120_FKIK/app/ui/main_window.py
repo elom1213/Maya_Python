@@ -6,6 +6,7 @@
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
+from Framework.core.maya_refresh import force_refresh
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -214,6 +215,19 @@ class MainWindow(QWidget):
         self.te_log.setReadOnly(True)
         self.te_log.setFixedHeight(90)
         root.addWidget(self.te_log)
+
+        # Force Refresh : 어떤 이유로든 뷰포트가 멈춰(커브 편집이 프레임 이동 전까지
+        # 반영 안 됨) 있을 때, 막힌 전역 refresh suspend 를 풀고 한 번 다시 그린다.
+        self.btn_force_refresh = QPushButton("Force Refresh (Unfreeze Viewport)")
+        self.btn_force_refresh.setToolTip(
+            "Clear a stuck viewport refresh-suspend and redraw once.\n"
+            "Use if Graph Editor edits don't show until you scrub frames.")
+        self.btn_force_refresh.clicked.connect(self.on_force_refresh)
+        root.addWidget(self.btn_force_refresh)
+
+    def on_force_refresh(self):
+        force_refresh()
+        self.log("Viewport refresh restored.")
 
     # ==================================================
     # Helpers
