@@ -18,6 +18,7 @@
 | **Suffix** | 백업 파일 이름 뒤에 붙는 표식(기본 `BU`). `scene.mb` → `scene_BU.mb`. |
 | **Save Mode** | `Overwrite`(기본) 또는 `Version Up`. |
 | **Interval** | 저장 주기(분 + 초). |
+| **Auto Backup** | 켜면 **파일을 저장하는 즉시**(디스크에서 바뀌는 순간) 그 파일만 백업한다. 끄면 매 `Interval` 마다 전 파일을 백업. |
 
 백업 파일은 확장자 **앞**에 접미사를 붙인다: `scene.mb` → `scene_BU.mb`(덮어쓰기) /
 `scene_BU_01.mb`, `scene_BU_02.mb` …(버전업).
@@ -86,14 +87,30 @@
 
 ---
 
+## 5-1. Auto Backup — 저장 즉시 백업 (v01.05)
+
+`Control` 의 **Auto Backup** 체크박스(기본 켜짐)는 백업을 *주기*가 아니라 *저장 시점*에 맞춘다.
+
+| Auto Backup | 동작 |
+|-------------|------|
+| **켜짐**(기본) | 대상 파일을 실시간 감시하다가 **저장되는 즉시** 그 파일만 백업한다(`QFileSystemWatcher`). 바뀌지 않은 파일은 건드리지 않는다. 카운트다운 대신 `Auto save` 표시. |
+| **꺼짐** | 매 `Interval` 마다 **전 파일**을 백업(고전적 주기 백업). |
+
+- 연속 저장이나 임시파일 교체식 저장(temp 쓰고 rename)도 다루도록 변경을 ~300ms 모았다가 처리한다.
+- `Interval` 타이머는 Auto Backup 이 켜져 있어도 **감시가 놓친 변경을 잡는 fallback** 으로 계속 돈다.
+- 실행 중에 Auto Backup 을 켜고/끄면 감시도 즉시 시작/정지된다.
+
+---
+
 ## 6. 사용 순서
 
 1. `Add Files...` 로 백업할 파일을 등록한다(여러 개 가능).
 2. `Backup Folder Name` / `Suffix` 를 원하면 바꾼다(기본 `backup` / `BU`).
 3. `Save Mode` 선택 — 보통 `Overwrite`. 이력을 남기려면 `Version Up` + `Max Versions`.
-4. `Interval` 에 저장 주기(분·초)를 넣는다.
-5. `Start` — 즉시 1회 백업 후 주기마다 반복. 상태가 `Active...` 로 바뀌고 카운트다운이 흐른다.
-6. `Stop` — 백업 중지(`Deactive`). 창을 닫으면 타이머가 멈추고 설정이 저장된다.
+4. `Auto Backup`(기본 켜짐) — 저장 즉시 백업할지(켜짐), 주기마다 전 파일을 백업할지(꺼짐) 고른다.
+5. `Interval` 에 주기(분·초)를 넣는다. Auto Backup 이 켜져 있으면 fallback 주기로 쓰인다.
+6. `Start` — 즉시 1회 백업 후, 저장할 때마다(또는 주기마다) 반복.
+7. `Stop` — 백업 중지(`Deactive`). 창을 닫으면 타이머·감시가 멈추고 설정이 저장된다.
 
 > 백업 도중 원본 파일이 사라지면 그 파일만 건너뛰고(로그에 표기) 나머지는 계속 백업한다.
 

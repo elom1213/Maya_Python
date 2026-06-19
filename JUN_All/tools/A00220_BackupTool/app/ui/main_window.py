@@ -20,6 +20,7 @@ from Framework.qt.qt import (
     QLineEdit,
     QListWidget,
     QPushButton,
+    QCheckBox,
     QRadioButton,
     QButtonGroup,
     QSpinBox,
@@ -27,6 +28,7 @@ from Framework.qt.qt import (
     QFileDialog,
     QMessageBox,
     QTimer,
+    QFileSystemWatcher,
     QApplication,
     Qt,
 )
@@ -59,10 +61,25 @@ class MainWindow(QWidget):
         self._next_save_ts = 0.0     # 다음 저장 예정 시각(time.monotonic 기준)
         # Settings 가 접혀 있을 때의 최신 창 높이(펼칠 때 정확히 복원하기 위함).
         self._collapsed_h = None
+        # Auto Backup 용: 파일별 '마지막으로 백업한 시점의 mtime'. 이 값과 달라졌을
+        # 때만(=사용자가 수정) 백업한다. 시작할 때 비우므로 첫 사이클은 전부 백업된다.
+        self._last_mtimes = {}
 
         # 주기 백업 타이머
         self._backup_timer = QTimer(self)
         self._backup_timer.timeout.connect(self._do_backup_cycle)
+
+        # Auto Backup 용 파일 감시자: 대상 파일이 디스크에서 바뀌는 즉시(=사용자가
+        # 저장하는 순간) 백업한다. 주기 타이머는 감시자가 놓친 변경을 잡는 fallback.
+        self._fs_watcher = QFileSystemWatcher(self)
+        self._fs_watcher.fileChanged.connect(self._on_fs_changed)
+        # 한 번의 저장이 fileChanged 를 여러 번 쏘거나(에디터마다 다름), 임시파일
+        # 교체식 저장은 변경 직후 잠깐 파일이 없으므로, 살짝 모았다가 처리한다.
+        self._pending_changes = set()
+        self._debounce_timer = QTimer(self)
+        self._debounce_timer.setSingleShot(True)
+        self._debounce_timer.setInterval(300)
+        self._debounce_timer.timeout.connect(self._flush_pending_changes)
 
         # (상태 표시는 텍스트 대신 Chrome-Dino 애니메이션. 자체 타이머로 동작.)
 
@@ -220,6 +237,16 @@ class MainWindow(QWidget):
         group = QGroupBox("Control")
         layout = QVBoxLayout(group)
 
+        # Auto Backup: 켜져 있으면 '마지막 백업 이후 수정된(변경된) 파일만' 백업하고,
+        # 변경이 없으면 아무 동작도 하지 않는다. 끄면 매 주기마다 전 파일을 백업.
+        self.chk_auto = QCheckBox("Auto Backup")
+        self.chk_auto.setChecked(True)
+        self.chk_auto.setToolTip(
+            "Back up each file the moment it is saved (changed on disk); idle "
+            "files are skipped. Off = back up every file each interval.")
+        self.chk_auto.toggled.connect(self._on_auto_toggled)
+        layout.addWidget(self.chk_auto)
+
         row = QHBoxLayout()
         self.btn_toggle = QPushButton("Start")
         self.btn_toggle.setMinimumHeight(36)
@@ -253,6 +280,7 @@ class MainWindow(QWidget):
         self.spn_max.setValue(int(self._prefs.get("max_versions", 10)))
         self.spn_min.setValue(int(self._prefs.get("minutes", 5)))
         self.spn_sec.setValue(int(self._prefs.get("seconds", 0)))
+        self.chk_auto.setChecked(bool(self._prefs.get("auto_backup", True)))
 
     def _collect_prefs(self):
         return {
@@ -263,6 +291,7 @@ class MainWindow(QWidget):
             "max_versions": self.spn_max.value(),
             "minutes": self.spn_min.value(),
             "seconds": self.spn_sec.value(),
+            "auto_backup": self.chk_auto.isChecked(),
         }
 
     def _save_prefs(self):
@@ -325,12 +354,22 @@ class MainWindow(QWidget):
         self._set_settings_enabled(False)
         self.btn_toggle.setText("Stop")
 
+        # 새 세션이므로 변경 추적을 초기화 → 첫 사이클은 전 파일을 백업(기준선).
+        self._last_mtimes = {}
+
         self._set_state(STATE_ACTIVE)
         self._countdown_timer.start()
         self._backup_timer.start(interval)
+        # Auto Backup 이면 저장 즉시 백업하도록 파일 감시 시작.
+        if self.chk_auto.isChecked():
+            self._start_watching()
 
         m, s = self.spn_min.value(), self.spn_sec.value()
-        self.log(f"Started. Backing up {self.list_files.count()} file(s) every {m}m {s}s.")
+        mode = "Auto Backup (on save)" if self.chk_auto.isChecked() \
+            else "every file"
+        self.log(
+            f"Started. Watching {self.list_files.count()} file(s), interval "
+            f"{m}m {s}s - {mode}.")
 
         # 즉각 피드백을 위해 시작 직후 1회 백업.
         self._do_backup_cycle()
@@ -338,6 +377,7 @@ class MainWindow(QWidget):
     def on_stop(self):
         self._backup_timer.stop()
         self._countdown_timer.stop()
+        self._stop_watching()
         self.btn_toggle.setText("Start")
         self._set_settings_enabled(True)
         self._set_state(STATE_DEACTIVE)
@@ -346,6 +386,23 @@ class MainWindow(QWidget):
     def _do_backup_cycle(self):
         # 다음 저장 예정 시각을 갱신(주기 타이머 fire 시점 기준).
         self._next_save_ts = time.monotonic() + self._interval_ms() / 1000.0
+
+        auto = self.chk_auto.isChecked()
+        files = self._files()
+        # Auto Backup: 마지막 백업 이후 수정된 파일만 대상으로. (변경 추적이 비어 있는
+        # 첫 사이클은 모든 파일이 '변경'으로 잡혀 전부 백업된다.)
+        targets = [f for f in files if self._is_changed(f)] if auto else files
+
+        if not targets:
+            # 변경된 파일이 없으면 아무 동작도 하지 않는다(방치 상태 = 명령 없음).
+            return
+
+        self._backup_targets(targets)
+
+    def _backup_targets(self, targets):
+        """주어진 파일들을 1회 백업한다(주기 사이클 / 저장 감지 공용)."""
+        if not targets:
+            return
 
         # Saving 상태를 화면에 보이게 갱신 후 복사.
         self._set_state(STATE_SAVING)
@@ -357,11 +414,13 @@ class MainWindow(QWidget):
         max_versions = self.spn_max.value()
 
         ok = 0
-        for src in self._files():
+        for src in targets:
             try:
                 dst = backup_manager.backup_one(
                     src, folder, suffix, versioned, max_versions
                 )
+                # 백업 성공한 파일의 mtime 을 기록해 다음부터 변경 여부를 비교.
+                self._last_mtimes[src] = self._safe_mtime(src)
                 self.log(f"Backed up: {os.path.basename(dst)}")
                 ok += 1
             except FileNotFoundError:
@@ -369,12 +428,82 @@ class MainWindow(QWidget):
             except Exception as exc:  # noqa: BLE001 - 어떤 IO 오류도 다음 파일로 진행
                 self.log(f"[error] {src}: {exc}")
 
-        self.log(f"Cycle done ({ok}/{self.list_files.count()}).")
+        self.log(f"Cycle done ({ok}/{len(targets)} backed up).")
 
         # 백업 종료 후 다시 Active 로(정지되지 않았다면).
         if self._backup_timer.isActive() or self._state == STATE_SAVING:
             if self.btn_toggle.text() == "Stop":
                 self._set_state(STATE_ACTIVE)
+
+    # ============================================================ file watch
+
+    def _on_auto_toggled(self, checked):
+        """실행 중에 Auto Backup 을 켜고/끌 때 파일 감시를 시작/정지한다."""
+        if self._state == STATE_DEACTIVE:
+            return
+        if checked:
+            self._start_watching()
+        else:
+            self._stop_watching()
+
+    def _start_watching(self):
+        """대상 파일들을 감시 목록에 올린다(기존 목록은 비우고 다시 등록)."""
+        current = self._fs_watcher.files()
+        if current:
+            self._fs_watcher.removePaths(current)
+        paths = [f for f in self._files() if os.path.isfile(f)]
+        if paths:
+            self._fs_watcher.addPaths(paths)
+
+    def _stop_watching(self):
+        self._debounce_timer.stop()
+        self._pending_changes.clear()
+        current = self._fs_watcher.files()
+        if current:
+            self._fs_watcher.removePaths(current)
+
+    def _on_fs_changed(self, path):
+        """감시 중인 파일이 디스크에서 바뀌면 호출된다(저장 순간). 곧바로 처리하지
+        않고 짧게 모은 뒤 _flush_pending_changes 가 백업한다."""
+        self._pending_changes.add(path)
+        self._debounce_timer.start()   # 재시작 → 연속된 변경을 한 번으로 묶음
+
+    def _flush_pending_changes(self):
+        """디바운스된 변경 파일들을 즉시 백업하고, 감시 목록을 복원한다."""
+        if self._state == STATE_DEACTIVE or not self.chk_auto.isChecked():
+            self._pending_changes.clear()
+            return
+
+        paths = list(self._pending_changes)
+        self._pending_changes.clear()
+
+        targets = [p for p in paths if os.path.isfile(p)]
+        self._backup_targets(targets)
+
+        # 임시파일 교체식 저장은 감시 경로를 떨궈내므로 다시 등록한다.
+        self._rewatch_files()
+
+    def _rewatch_files(self):
+        """현재 감시되지 않는 대상 파일을 다시 감시 목록에 올린다."""
+        watched = set(self._fs_watcher.files())
+        to_add = [f for f in self._files()
+                  if f not in watched and os.path.isfile(f)]
+        if to_add:
+            self._fs_watcher.addPaths(to_add)
+
+    def _is_changed(self, src):
+        """src 가 마지막 백업 이후 수정됐는지(mtime 변화). 접근 불가/없음이면 False."""
+        mtime = self._safe_mtime(src)
+        if mtime is None:
+            return False
+        return self._last_mtimes.get(src) != mtime
+
+    @staticmethod
+    def _safe_mtime(src):
+        try:
+            return os.path.getmtime(src)
+        except OSError:
+            return None
 
     # =============================================================== status
 
@@ -386,13 +515,19 @@ class MainWindow(QWidget):
         elif state == STATE_SAVING:
             self.dino.set_running(True)
             self.dino.hop()                          # 저장 순간 점프로 강조
-            self.lbl_countdown.setText("Next save in  00:00")
+            # Auto Backup 모드는 카운트다운 대신 'Auto save' 문구.
+            self.lbl_countdown.setText(
+                "Auto save" if self.chk_auto.isChecked() else "Next save in  00:00")
         else:                                        # ACTIVE: 달리기 + 주기적 점프
             self.dino.set_running(True)
             self._tick_countdown()
 
     def _tick_countdown(self):
         if self._state == STATE_DEACTIVE:
+            return
+        # Auto Backup 모드: 다음 저장까지 카운트다운 대신 'Auto save' 만 표시.
+        if self.chk_auto.isChecked():
+            self.lbl_countdown.setText("Auto save")
             return
         remaining = max(0, int(round(self._next_save_ts - time.monotonic())))
         m, s = divmod(remaining, 60)

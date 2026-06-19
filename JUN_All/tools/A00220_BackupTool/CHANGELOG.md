@@ -1,5 +1,16 @@
 # Changelog — A00220_BackupTool
 
+## [01.05] - 2026-06-19
+
+### Changed
+- **Auto Backup is now save-driven.** A file is backed up the moment it is saved
+  (changed on disk), instead of waiting for the next interval tick. Target files
+  are watched with `QFileSystemWatcher`; changes are debounced (~300ms) to
+  coalesce burst writes and tolerate temp-file replace saves, then re-added to
+  the watch list. The periodic interval timer now acts as a fallback that catches
+  any change the watcher missed. Toggling Auto Backup while running starts/stops
+  watching live.
+
 ## [01.04] - 2026-06-19
 
 ### Changed
