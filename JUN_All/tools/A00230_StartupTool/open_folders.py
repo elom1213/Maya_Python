@@ -2,19 +2,22 @@
 # last Update date : 2026-06-18
 # A00230_StartupTool - open configured folders on Windows boot
 #
-# 부팅(로그인) 시 config/folders.json 에 적힌 폴더들을 탐색기 창으로 팝업한다.
+# 부팅(로그인) 시 config/startup.json 의 폴더들을 탐색기 창으로 팝업한다.
 # 경로는 환경변수(%USERPROFILE% 등)를 쓰므로 PC 가 바뀌어도 동일하게 동작한다.
+# 폴더 + 툴을 함께 띄우는 부팅 진입점은 startup.py 이며, 이 파일은 폴더 로직 모듈로도 쓰인다.
 #
-#   python open_folders.py        (단독 실행 / 테스트)
-#   install.py 로 Startup 에 등록하면 부팅 시 자동 실행된다.
+#   python open_folders.py        (폴더만 단독 실행 / 테스트)
+#   python startup.py             (폴더 + 툴 실행)
+#   install.py 로 Startup 에 등록하면 부팅 시 startup.py 가 자동 실행된다.
 
 import os
 import sys
 import json
 
-# config/folders.json 위치는 이 스크립트 기준으로 해석 (repo 경로가 어디든 동작)
+# config/startup.json 위치는 이 스크립트 기준으로 해석 (repo 경로가 어디든 동작).
+# 폴더 목록만 읽으며, startup.py 가 추가하는 "tools" 키는 무시한다.
 HERE = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(HERE, "config", "folders.json")
+CONFIG_PATH = os.path.join(HERE, "config", "startup.json")
 
 
 def _strip_line_comments(text):

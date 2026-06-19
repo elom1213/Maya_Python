@@ -6,5 +6,12 @@
     { "path": "C:\\Users\\USER\\Desktop\\JP\\0001_PJ\\JP__02.Art\\JP__Asset\\JP__CH", "enabled": true },
     // { "path": "%USERPROFILE%\\Documents", "enabled": true },
     { "path": "D:\\Work\\Project", "enabled": false }
+  ],
+  "tools": [
+    { "tool": "A00210_FileManager", "enabled": true },
+    { "tool": "A00220_BackupTool", "enabled": true },
+    { "tool": "A00240_PathTool", "enabled": true }
+    // 새 툴 추가는 여기에 한 줄: { "tool": "A002NN_XXX", "enabled": true }
+    // 또는 커스텀 경로: { "launch": "%USERPROFILE%\\tools\\my\\launch.py", "enabled": true }
   ]
 }
