@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-18
+# last Update date : 2026-06-22
 # A00210_FileManager - "Lineage" tab (Qt)
 #
 # 파일들(.mb/.ma 뿐 아니라 .fbx/.obj 등 포맷 무관) 사이의 브랜치/병합 관계(DAG)를
@@ -334,13 +334,38 @@ class LineageView(QGraphicsView):
             pos = self._evt_pos(event)
             delta = pos - self._pan_last
             self._pan_last = pos
-            hbar = self.horizontalScrollBar()
-            vbar = self.verticalScrollBar()
-            hbar.setValue(hbar.value() - delta.x())
-            vbar.setValue(vbar.value() - delta.y())
+            self._pan_by(delta.x(), delta.y())
             event.accept()
             return
         super().mouseMoveEvent(event)
+
+    # 중간버튼 팬은 스크롤바를 움직이는 방식이라 이동 범위가 sceneRect 안에 갇힌다.
+    # 팬이 sceneRect 경계에 가까워지면 그 방향으로 sceneRect 를 넉넉히 키워, 콘텐츠
+    # 바깥으로도 계속 끌 수 있게 한다(사실상 무한 팬). _update_scene_rect 가 다음
+    # 렌더에서 콘텐츠 기준으로 다시 줄이므로 영구적으로 부풀지 않는다.
+    _PAN_MARGIN = 600     # 경계로부터 이만큼(px) 안에 들면 그 방향으로 키운다
+
+    def _pan_by(self, dx, dy):
+        hbar = self.horizontalScrollBar()
+        vbar = self.verticalScrollBar()
+        m = self._PAN_MARGIN
+
+        grow_l = m if hbar.value() - dx <= hbar.minimum() + m else 0.0
+        grow_r = m if hbar.value() - dx >= hbar.maximum() - m else 0.0
+        grow_t = m if vbar.value() - dy <= vbar.minimum() + m else 0.0
+        grow_b = m if vbar.value() - dy >= vbar.maximum() - m else 0.0
+
+        if grow_l or grow_r or grow_t or grow_b:
+            scale = self.transform().m11() or 1.0   # px(뷰) → scene 단위 변환
+            rect = self.sceneRect().adjusted(
+                -grow_l / scale, -grow_t / scale, grow_r / scale, grow_b / scale
+            )
+            self.setSceneRect(rect)
+            # sceneRect 를 키우면 Qt 가 화면을 유지하려고 스크롤바 값/범위를 옮기므로,
+            # 새 값 기준으로 다시 읽어 델타를 적용한다.
+
+        hbar.setValue(hbar.value() - dx)
+        vbar.setValue(vbar.value() - dy)
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MiddleButton and self._panning:
@@ -941,8 +966,15 @@ class LineageTab(QWidget):
         rect = self.scene.itemsBoundingRect()
         if rect.isNull():
             self.scene.setSceneRect(QRectF(0, 0, 400, 300))
-        else:
-            self.scene.setSceneRect(rect.adjusted(-200, -200, 200, 200))
+            return
+        # 중간버튼 팬 가능 범위 = sceneRect. 콘텐츠 둘레에 한 뷰포트 크기 이상의
+        # 여백을 둬서, 어느 노드든 화면 중앙까지 끌어올 수 있게 한다(줌 아웃 상태도
+        # 고려해 현재 배율로 환산). 경계에 더 닿으면 LineageView._pan_by 가 추가로 넓힌다.
+        scale = self.view.transform().m11() or 1.0
+        vp = self.view.viewport().rect()
+        mx = max(800.0, vp.width() / scale)
+        my = max(800.0, vp.height() / scale)
+        self.scene.setSceneRect(rect.adjusted(-mx, -my, mx, my))
 
     def _fit_view(self):
         rect = self.scene.itemsBoundingRect()

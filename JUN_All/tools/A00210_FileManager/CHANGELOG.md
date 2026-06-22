@@ -2,6 +2,16 @@
 
 All notable changes to this tool are documented here.
 
+## [01.15] - 2026-06-22
+### Fixed
+- **Lineage** tab — **middle-mouse pan no longer hits a wall**. Panning moves the
+  scrollbars, whose travel was bounded by the scene rect (content bounds + a small
+  200 px margin), so dragging stopped once you reached just past the nodes. The
+  pannable area is now a full viewport-worth of margin around the content, and the
+  scene rect grows on demand while you keep dragging toward an edge — so you can
+  pan freely well beyond the nodes (effectively unlimited). The margin resets to
+  the content on the next render, so it never bloats permanently.
+
 ## [01.14] - 2026-06-19
 ### Added
 - **File Manager** tab — **right-click a file → Show in File Explorer**: opens the
