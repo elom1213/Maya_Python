@@ -98,4 +98,11 @@ Connections:
 25일에 같은 금액 들어오면 이스트허그로 페이백 
 시화??
 
-금솔 의상 3일 하면 됨
+Begin Object Class=/Script/BlueprintGraph.K2Node_VariableGet Name="K2Node_VariableGet_28" ExportPath="/Script/BlueprintGraph.K2Node_VariableGet'/Game/MANU/Character/DHA/Basic/Rig/V03/ABP_MANU_CH_DHA_Basic_Hair_V03.ABP_MANU_CH_DHA_Basic_Hair_V03:KWI_hair.K2Node_VariableGet_28'"
+   VariableReference=(MemberName="LD_hair_fnt_01",MemberGuid=E46B380F4CD4A6057D0B3A86B1500D30,bSelfContext=True)
+   NodePosX=-2512
+   NodePosY=-2160
+   NodeGuid=30B7F1564B2FBB903B8750A27DC4D481
+   CustomProperties Pin (PinId=E2497EE44A0FBB54628CA3B7F0090699,PinName="LD_hair_fnt_01",Direction="EGPD_Output",PinType.PinCategory="object",PinType.PinSubCategory="",PinType.PinSubCategoryObject="/Script/CoreUObject.Class'/Script/KawaiiPhysics.KawaiiPhysicsLimitsDataAsset'",PinType.PinSubCategoryMemberReference=(),PinType.PinValueType=(),PinType.ContainerType=None,PinType.bIsReference=False,PinType.bIsConst=False,PinType.bIsWeakPointer=False,PinType.bIsUObjectWrapper=False,PinType.bSerializeAsSinglePrecisionFloat=False,LinkedTo=(AnimGraphNode_KawaiiPhysics_4 6222BDF34477D9F24F863390648BE4CA,),PersistentGuid=00000000000000000000000000000000,bHidden=False,bNotConnectable=False,bDefaultValueIsReadOnly=False,bDefaultValueIsIgnored=False,bAdvancedView=False,bOrphanedPin=False,)
+   CustomProperties Pin (PinId=DB2FD97C4D3B0BF11FFBB09DEE6424A9,PinName="self",PinFriendlyName=NSLOCTEXT("K2Node", "Target", "Target"),PinType.PinCategory="object",PinType.PinSubCategory="",PinType.PinSubCategoryObject="/Script/Engine.AnimBlueprintGeneratedClass'/Game/MANU/Character/DHA/Basic/Rig/V03/ABP_MANU_CH_DHA_Basic_Hair_V03.ABP_MANU_CH_DHA_Basic_Hair_V03_C'",PinType.PinSubCategoryMemberReference=(),PinType.PinValueType=(),PinType.ContainerType=None,PinType.bIsReference=False,PinType.bIsConst=False,PinType.bIsWeakPointer=False,PinType.bIsUObjectWrapper=False,PinType.bSerializeAsSinglePrecisionFloat=False,PersistentGuid=00000000000000000000000000000000,bHidden=True,bNotConnectable=False,bDefaultValueIsReadOnly=False,bDefaultValueIsIgnored=False,bAdvancedView=False,bOrphanedPin=False,)
+End Object
