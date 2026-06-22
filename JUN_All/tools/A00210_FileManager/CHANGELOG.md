@@ -2,6 +2,31 @@
 
 All notable changes to this tool are documented here.
 
+## [01.20] - 2026-06-22
+### Added
+- **File Manager** tab — **settings Profiles**. A new **Profile** group (combo +
+  **New / Rename / Delete**) saves every user setting — Project Root, Store Repo,
+  Scan Dir, Remote, Branch, Remote URL, Author, Recursive, Show Recorded Only — as
+  a named profile (one JSON each, under `~/.jun_filemanager/profiles/`). Switch
+  profiles to instantly load that environment's settings (e.g. Home / Work).
+  - Switching a profile **auto-saves the current fields** to the outgoing profile
+    first (no lost edits), then loads the new one and **refreshes the Lineage /
+    Path Structure** saved-lists against the new Store Repo. The window also saves
+    the active profile on close, and remembers it across launches (`active.json`).
+  - **Save Settings** now writes to the active profile. The old single
+    `prefs.json` is **migrated once** into a `Default` profile (original kept as
+    `prefs.json.bak`); `prefs.load()/save()` stay back-compatible (they target the
+    active profile), so A00211_RefLineage keeps working unchanged.
+
+## [01.19] - 2026-06-22
+### Changed
+- **Lineage** tab — node right-click **Reveal in File Explorer**: if the file
+  exists on this machine it is revealed in File Explorer as before (no popup). If
+  it doesn't (e.g. a graph generated on another machine by **A00211_RefLineage**),
+  the file's **path is popped up** in a dialog (selectable/copyable) instead of
+  silently failing. The menu item is enabled whenever the node has a `key` (no
+  longer greyed out just because the file is missing locally).
+
 ## [01.18] - 2026-06-22
 ### Added
 - **Lineage** tab — **convert an edge's type by selecting it and switching the

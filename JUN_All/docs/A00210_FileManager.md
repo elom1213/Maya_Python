@@ -27,8 +27,10 @@ JUN_FileManager_data/        # git repo
 └── thumbs/<key>.png         # thumbs/chars/charA_rig.mb.png
 ```
 
-PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **로컬 prefs** 에 저장한다:
-`%USERPROFILE%/.jun_filemanager/prefs.json` (push 대상 아님).
+PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **로컬 prefs** 에 저장한다.
+세팅은 **Profile(환경별 묶음)** 단위로 저장된다(v01.20): `%USERPROFILE%/.jun_filemanager/profiles/<name>.json`
++ `active.json`(마지막 활성 프로파일) — 모두 push 대상 아님. 구버전 단일 `prefs.json` 은 첫 실행 시
+`Default` 프로파일로 1회 마이그레이션된다(원본은 `prefs.json.bak` 보존).
 
 ---
 
@@ -43,6 +45,9 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 ## 3. 화면 구성
 
 ```
+┌ Profile ──────────────────────────────────────────────┐
+│ Profile [ Work        ▾]   [New] [Rename] [Delete]     │
+└────────────────────────────────────────────────────────┘
 ┌ Settings ─────────────────────────────────────────────┐
 │ Project Root [............] [Browse]                   │
 │ Store Repo   [............] [Browse]                   │
@@ -72,6 +77,11 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 1. **설정**: `Project Root`, `Store Repo`, `Remote`/`Branch`, `Author` 를 채우고 **Save Settings**.
    - 처음이라면 **Pull**(또는 Push) 시 Store Repo 가 git repo 가 아니면 자동으로 `git init` + 스켈레톤(`records/`,
      `thumbs/`, `.gitignore`)을 만든다. 원격에서 받아오려면 Store Repo 를 비운 폴더로 두고 원격 URL 을 사용한다.
+   - **Profile(v01.20)**: 상단 **Profile** 그룹의 콤보에서 환경(예: Home/Work)을 고르면 그 프로파일의 모든
+     세팅(Project Root·Store Repo·Scan Dir·Remote·Branch·Remote URL·Author·Recursive·Show Recorded Only)이
+     한 번에 로드된다. **New**(현재 세팅으로 새 프로파일)·**Rename**·**Delete**(최소 1개 유지). 프로파일을
+     전환하면 현재 입력값이 **자동 저장**된 뒤 새 프로파일이 로드되고, Lineage/Path Structure 목록도 새
+     Store Repo 기준으로 새로고침된다. 마지막 활성 프로파일은 다음 실행 때 복원된다.
 2. **스캔**: `Scan Dir` 지정(보통 Project Root 하위) → **Scan**. **모든 확장자**의 파일 목록이 뜬다
    (`.mb`/`.ma` 뿐 아니라 `.fbx`/`.obj`/`.png` 등도 포함, v01.14).
    - `Thumb`/`Record` 열의 `O` 는 썸네일·기록 존재 표시. Project Root 밖 파일은 회색(`out of project root`)으로 비활성.
@@ -168,10 +178,12 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
   - **팬 범위 무제한(v01.15)**: 예전엔 노드 영역 바깥 200px 에서 팬이 막혔다(스크롤바가 sceneRect 에 갇힘).
     이제 콘텐츠 둘레에 한 뷰포트 크기 이상의 여백을 두고, 가장자리로 끌수록 sceneRect 가 따라 넓어져
     노드 바깥으로도 자유롭게 이동할 수 있다(다음 렌더에서 콘텐츠 기준으로 다시 줄어 영구 부풀지 않음).
-- **노드 우클릭 메뉴(v01.04)**: 노드를 우클릭하면 **Reveal in File Explorer** — 그 노드 파일이 있는 폴더를
-  탐색기로 열고 **파일을 선택(하이라이트)** 한다(Windows `explorer /select,`). 실제 경로가 해석될 때만
-  활성(노드에 project-relative key 있음 + Project Root 설정됨 + 파일이 실제 존재) — **planned·루트 밖·
-  경로에서 사라진 파일**은 비활성. 이후 우클릭 액션(Open File, Copy Path 등)을 계속 늘릴 수 있는 구조.
+- **노드 우클릭 메뉴(v01.04, v01.19 갱신)**: 노드를 우클릭하면 **Reveal in File Explorer**. 파일이 **이
+  PC 에 실제로 있으면** 예전처럼 탐색기로 폴더를 열고 **파일을 선택(하이라이트)** 한다(Windows
+  `explorer /select,`, 팝업 없음). 파일이 **로컬에 없으면**(예: 다른 PC 에서 **A00211_RefLineage** 로 만든
+  그래프) 그냥 실패하지 않고 그 노드 파일의 **경로를 팝업**으로 보여준다(마우스/키보드로 선택·복사 가능).
+  메뉴는 노드에 **project-relative key 가 있으면 활성**(planned·루트 밖 노드만 비활성) — 이전처럼 "파일이
+  로컬에 없다"는 이유로 회색 처리되지 않는다.
 - **로그 기록 표시(v01.08)**: 노드를 선택하면 **Node** 패널 아래 **Log history (from record)** 에 그 노드
   파일의 작업 기록이 보인다 — **File Manager 탭의 Save Record 가 쓰는 `records/<key>.json` 을 그대로 읽어**
   같은 내용을 표시(읽기 전용). 노드 선택 시·Lineage 탭으로 돌아올 때마다 디스크에서 다시 읽어 **File Manager

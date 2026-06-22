@@ -29,6 +29,7 @@ from Framework.qt.qt import (
     QPlainTextEdit,
     QFileDialog,
     QMessageBox,
+    QInputDialog,
     QDialog,
     QDialogButtonBox,
     QToolButton,
@@ -110,7 +111,9 @@ class MainWindow(QWidget):
         self.setWindowTitle(f"JUN File Manager  v{VERSION}")
         self.resize(1080, 680)
 
-        self._prefs = prefs_mod.load()
+        # 활성 프로파일을 읽어 시작(집/회사 등 환경별 세팅 묶음 = JSON 1개).
+        self._profile = prefs_mod.get_active()
+        self._prefs = prefs_mod.load_profile(self._profile)
 
         self._current_entry = None      # 선택된 파일 entry dict
         self._current_record = None     # 편집 중인 FileRecord
@@ -123,6 +126,7 @@ class MainWindow(QWidget):
 
         self._build_ui()
         self._load_prefs_to_ui()
+        self._refresh_profiles()
 
     # ============================================================== build
 
@@ -161,6 +165,7 @@ class MainWindow(QWidget):
         page = QWidget()
         layout = QVBoxLayout(page)
 
+        layout.addWidget(self._build_profile_group())
         layout.addWidget(self._build_settings_group())
 
         # 파일 목록 위 이름 필터 바 — 스캔된 파일 중 제목에 키워드가 든 것만 표시.
@@ -191,6 +196,35 @@ class MainWindow(QWidget):
         layout.addWidget(self._build_git_group())
 
         return page
+
+    def _build_profile_group(self):
+        """세팅 묶음을 이름붙여 저장/전환하는 Profile 그룹(콤보 + New/Rename/Delete)."""
+        group = QGroupBox("Profile")
+        row = QHBoxLayout(group)
+
+        self.cmb_profile = QComboBox()
+        self.cmb_profile.setToolTip(
+            "Active settings profile (each is its own JSON in ~/.jun_filemanager/profiles).\n"
+            "Switching loads that profile's Project Root / Store Repo / Scan Dir / etc.")
+        self.cmb_profile.currentTextChanged.connect(self.on_profile_changed)
+
+        btn_new = QPushButton("New")
+        btn_new.setToolTip("Create a new profile from the current settings")
+        btn_new.clicked.connect(self.on_new_profile)
+        btn_rename = QPushButton("Rename")
+        btn_rename.setToolTip("Rename the current profile")
+        btn_rename.clicked.connect(self.on_rename_profile)
+        btn_delete = QPushButton("Delete")
+        btn_delete.setToolTip("Delete the current profile")
+        btn_delete.clicked.connect(self.on_delete_profile)
+
+        row.addWidget(QLabel("Profile"))
+        row.addWidget(self.cmb_profile, stretch=1)
+        row.addWidget(btn_new)
+        row.addWidget(btn_rename)
+        row.addWidget(btn_delete)
+
+        return group
 
     def _build_settings_group(self):
         group = QGroupBox("Settings")
@@ -380,8 +414,111 @@ class MainWindow(QWidget):
 
     def on_save_settings(self):
         self._prefs = self._collect_prefs()
-        path = prefs_mod.save(self._prefs)
-        self.log(f"Settings saved: {path}")
+        path = prefs_mod.save_profile(self._profile, self._prefs)
+        self.log(f"Settings saved to profile '{self._profile}': {path}")
+
+    def _save_current_to_active(self):
+        """현재 UI 값을 활성 프로파일에 silent 저장(전환/종료 시 편집 유실 방지)."""
+        self._prefs = self._collect_prefs()
+        prefs_mod.save_profile(self._profile, self._prefs)
+
+    # ============================================================ profiles
+
+    def _refresh_profiles(self):
+        """프로파일 콤보를 현재 목록으로 갱신하고 활성 프로파일을 선택한다."""
+        self.cmb_profile.blockSignals(True)
+        self.cmb_profile.clear()
+        self.cmb_profile.addItems(prefs_mod.list_profiles())
+        idx = self.cmb_profile.findText(self._profile)
+        if idx >= 0:
+            self.cmb_profile.setCurrentIndex(idx)
+        self.cmb_profile.blockSignals(False)
+
+    def on_profile_changed(self, name):
+        """콤보에서 다른 프로파일 선택 → 현재 값 자동저장 후 새 프로파일 로드."""
+        if not name or name == self._profile:
+            return
+        # 1) 떠나는 프로파일에 현재 UI 값을 자동 저장(유실 방지).
+        self._save_current_to_active()
+        # 2) 새 프로파일을 활성화하고 UI 에 로드.
+        self._profile = name
+        prefs_mod.set_active(name)
+        self._prefs = prefs_mod.load_profile(name)
+        self._load_prefs_to_ui()
+        # 3) Store Repo 가 바뀌었으니 다른 탭의 저장 목록도 새 기준으로 새로고침.
+        self._refresh_other_tabs()
+        self.log(f"Switched to profile '{name}'.")
+
+    def on_new_profile(self):
+        raw, ok = QInputDialog.getText(self, "New Profile", "Profile name:")
+        if not ok:
+            return
+        name = prefs_mod.sanitize_name(raw)
+        if not name:
+            QMessageBox.warning(self, "Profile", "Enter a valid profile name.")
+            return
+        if name in prefs_mod.list_profiles():
+            QMessageBox.warning(self, "Profile", f"Profile '{name}' already exists.")
+            return
+        # 떠나는 프로파일을 저장한 뒤, 현재 세팅을 그대로 담은 새 프로파일을 만든다.
+        self._save_current_to_active()
+        self._profile = name
+        prefs_mod.set_active(name)
+        prefs_mod.save_profile(name, self._collect_prefs())
+        self._refresh_profiles()
+        self.log(f"Created profile '{name}' (copied current settings).")
+
+    def on_rename_profile(self):
+        old = self._profile
+        raw, ok = QInputDialog.getText(self, "Rename Profile", "New name:", text=old)
+        if not ok:
+            return
+        new = prefs_mod.sanitize_name(raw)
+        if not new or new == old:
+            return
+        if new in prefs_mod.list_profiles():
+            QMessageBox.warning(self, "Profile", f"Profile '{new}' already exists.")
+            return
+        self._save_current_to_active()
+        prefs_mod.rename_profile(old, new)
+        self._profile = new
+        self._refresh_profiles()
+        self.log(f"Renamed profile '{old}' -> '{new}'.")
+
+    def on_delete_profile(self):
+        name = self._profile
+        if len(prefs_mod.list_profiles()) <= 1:
+            QMessageBox.warning(self, "Profile", "At least one profile must remain.")
+            return
+        ok = QMessageBox.question(
+            self, "Profile", f"Delete profile '{name}'?")
+        if ok != QMessageBox.Yes:
+            return
+        prefs_mod.delete_profile(name)
+        remaining = prefs_mod.list_profiles()
+        self._profile = remaining[0]
+        prefs_mod.set_active(self._profile)
+        self._prefs = prefs_mod.load_profile(self._profile)
+        self._refresh_profiles()
+        self._load_prefs_to_ui()
+        self._refresh_other_tabs()
+        self.log(f"Deleted profile '{name}'. Active is now '{self._profile}'.")
+
+    def _refresh_other_tabs(self):
+        """프로파일 전환으로 Store Repo 가 바뀌면 Lineage/Path Structure 목록을 갱신."""
+        try:
+            self.lineage_tab.on_refresh()
+            self.path_structure_tab.on_refresh()
+        except Exception as exc:  # noqa: BLE001 - 갱신 실패가 전환을 막지 않게
+            self.log(f"Tab refresh skipped: {exc}")
+
+    def closeEvent(self, event):
+        # 창을 닫을 때 현재 UI 값을 활성 프로파일에 저장(다음 실행에 복원).
+        try:
+            self._save_current_to_active()
+        except Exception:  # noqa: BLE001
+            pass
+        super().closeEvent(event)
 
     # ============================================================ helpers
 

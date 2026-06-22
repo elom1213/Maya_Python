@@ -157,8 +157,9 @@ class NodeItem(QGraphicsObject):
             return
         menu = QMenu()
         act_reveal = menu.addAction("Reveal in File Explorer")
-        # 실제 파일 경로를 해석할 수 있을 때만 활성(planned/루트 밖/없는 파일은 비활성).
-        act_reveal.setEnabled(bool(self.tab.node_abs_path(self.node)))
+        # key 가 있으면 경로를 팝업으로 보여줄 수 있다(파일이 로컬에 없어도 OK).
+        # planned/루트 밖(key="") 만 비활성.
+        act_reveal.setEnabled(bool(self.node.key))
         chosen = menu.exec(event.screenPos())
         if chosen is act_reveal:
             self.tab.reveal_node(self.node)
@@ -1003,36 +1004,50 @@ class LineageTab(QWidget):
 
     # ============================================================ reveal in explorer
 
-    def node_abs_path(self, node):
-        """노드가 가리키는 실제 파일의 절대경로(존재할 때만). 없으면 "".
+    def node_path_info(self, node):
+        """(보여줄 경로, 로컬 존재여부). key 가 없으면 ("", False).
 
-        key 는 project_root 기준 상대경로이므로 root + key 로 복원한다. planned/루트 밖
-        (key="")/파일 없음/루트 미설정이면 경로가 없다.
+        key 는 project_root 기준 상대경로. root 가 설정돼 있으면 root+key 절대경로와
+        실제 존재여부를 반환하고, root 미설정이면 상대 key 만이라도 반환한다(다른 PC 에서
+        만든 그래프 — 예: A00211_RefLineage 결과 — 도 경로를 볼 수 있게).
         """
         if node is None or not node.key:
-            return ""
+            return "", False
         store = self._get_store()
         root = getattr(store, "project_root", "") if store is not None else ""
         if not root:
-            return ""
-        path = os.path.join(root, *node.key.split("/"))
-        return path if os.path.exists(path) else ""
+            return node.key, False
+        path = os.path.normpath(os.path.join(root, *node.key.split("/")))
+        return path, os.path.exists(path)
 
     def reveal_node(self, node):
-        """노드 파일을 탐색기에서 (폴더를 열고 파일을 선택해) 보여준다."""
-        path = self.node_abs_path(node)
+        """파일이 로컬에 있으면 탐색기에서 조용히 연다(팝업 없음). 없으면 경로만 팝업으로 보여준다."""
+        path, exists = self.node_path_info(node)
         if not path:
             QMessageBox.information(
                 self, "Lineage",
-                "No file to reveal — this node is planned, out of the project root, "
-                "or the file no longer exists at its recorded path.",
+                "No path for this node — it is planned or out of the project root.",
             )
             self._log(f"Reveal skipped (no path): {node.file_name if node else '?'}")
             return
-        if self._reveal_in_explorer(path):
-            self._log(f"Revealed in File Explorer: {path}")
-        else:
-            self._log(f"Failed to open File Explorer for: {path}")
+
+        if exists:
+            # 파일이 실제로 있으면 탐색기로 열기만 하고 팝업은 띄우지 않는다.
+            if self._reveal_in_explorer(path):
+                self._log(f"Revealed in File Explorer: {path}")
+            else:
+                self._log(f"Failed to open File Explorer for: {path}")
+            return
+
+        # 파일이 로컬에 없을 때만 경로를 팝업으로(선택/복사 가능) 보여준다.
+        self._log(f"Path (file not present locally): {path}")
+        box = QMessageBox(self)
+        box.setWindowTitle("File Path")
+        box.setIcon(QMessageBox.Information)
+        box.setText(path)            # 경로를 본문으로(마우스로 선택/복사 가능)
+        box.setInformativeText("File not found on this machine — path shown only.")
+        box.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+        box.exec()
 
     @staticmethod
     def _reveal_in_explorer(path):
