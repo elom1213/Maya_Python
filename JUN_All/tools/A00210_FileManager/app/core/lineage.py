@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-18
+# last Update date : 2026-06-22
 # A00210_FileManager - lineage graph (UI/DCC 비의존)
 #
 # 마야 파일들 사이의 브랜치/병합 관계(DAG)를 사용자가 직접 기록하고, git-graph 스타일의
@@ -61,7 +61,12 @@ class LineageNode:
     planned: bool = False      # 아직 안 만든 파일("제작 예정")
     label: str = ""            # 자유 주석
     relation: str = ""         # primary parent 에 대한 관계: ""(auto)|"version"|"branch"
-    parents: list = field(default_factory=list)   # 부모 노드 id 목록
+    parents: list = field(default_factory=list)   # 부모 노드 id 목록(계보 DAG)
+    # 이 노드가 Maya reference 로 불러오는(참조하는) 대상 노드 id 목록.
+    # 계보(parents)와 의미가 달라 레인/색 계산에는 쓰지 않는다(순수 시각 표현).
+    # 화살표는 '참조 대상 -> 이 노드' 방향(점선)으로 그린다.
+    references: list = field(default_factory=list)
+    color: str = ""            # 수동 색 오버라이드 hex("" 면 레인 자동색)
     x: float = 0.0             # 저장된 캔버스 위치(사용자 드래그)
     y: float = 0.0
     seq: int = 0               # 생성 순서. 토폴로지 정렬 tie-break(결정적 레이아웃).
@@ -79,6 +84,8 @@ class LineageNode:
             label=data.get("label", ""),
             relation=data.get("relation", ""),
             parents=list(data.get("parents", [])),
+            references=list(data.get("references", [])),
+            color=data.get("color", ""),
             x=float(data.get("x", 0.0)),
             y=float(data.get("y", 0.0)),
             seq=int(data.get("seq", 0)),
@@ -91,6 +98,10 @@ class LineageGraph:
 
     name: str = ""
     nodes: list = field(default_factory=list)   # list[LineageNode]
+    # 엣지 색 오버라이드: edge_color_key(kind, src, dst) -> hex. 없으면 기본색
+    # (계보=자식 레인색, reference=회색). 엣지는 parents/references 에서 파생되므로
+    # 별도 dict 로 색만 따로 저장한다(스키마 호환).
+    edge_colors: dict = field(default_factory=dict)
     created_by: str = ""
     created_at: str = ""
 
@@ -98,6 +109,7 @@ class LineageGraph:
         return {
             "name": self.name,
             "nodes": [n.to_dict() for n in self.nodes],
+            "edge_colors": dict(self.edge_colors),
             "created_by": self.created_by,
             "created_at": self.created_at,
         }
@@ -106,6 +118,7 @@ class LineageGraph:
     def from_dict(data):
         graph = LineageGraph(
             name=data.get("name", ""),
+            edge_colors=dict(data.get("edge_colors", {})),
             created_by=data.get("created_by", ""),
             created_at=data.get("created_at", ""),
         )
@@ -120,6 +133,11 @@ class LineageGraph:
             if n.id == node_id:
                 return n
         return None
+
+
+def edge_color_key(kind, src_id, dst_id):
+    """엣지 색 오버라이드 dict 의 키. kind="lineage"|"ref", src->dst(화살표 방향)."""
+    return f"{kind}:{src_id}>{dst_id}"
 
 
 # --------------------------------------------------------------- name / path
@@ -244,11 +262,18 @@ def next_seq(graph):
 
 
 def remove_node(graph, node_id):
-    """노드를 삭제하고 다른 모든 노드의 parents 에서 해당 id 를 제거(고아 정리)."""
+    """노드를 삭제하고 parents/references/edge_colors 에서 관련 항목 제거(고아 정리)."""
     graph.nodes = [n for n in graph.nodes if n.id != node_id]
     for n in graph.nodes:
         if node_id in n.parents:
             n.parents = [p for p in n.parents if p != node_id]
+        if node_id in n.references:
+            n.references = [r for r in n.references if r != node_id]
+    # 이 노드를 끝점으로 갖는 엣지 색 오버라이드 제거("kind:src>dst").
+    graph.edge_colors = {
+        k: v for k, v in graph.edge_colors.items()
+        if node_id not in k.split(":", 1)[-1].split(">")
+    }
 
 
 # --------------------------------------------------------------- cycle guard
@@ -303,6 +328,38 @@ def would_create_cycle(graph, parent_id, child_id):
             continue
         seen.add(cur)
         stack.extend(pmap.get(cur, []))
+    return False
+
+
+def _references_map(graph):
+    """node_id -> 유효한(그래프에 존재하는) 참조 대상 id 목록."""
+    ids = {n.id for n in graph.nodes}
+    return {
+        n.id: [r for r in n.references if r in ids]
+        for n in graph.nodes
+    }
+
+
+def would_create_ref_cycle(graph, source_id, owner_id):
+    """reference 엣지(owner.references 에 source 추가)가 순환을 만들면 True.
+
+    엣지 방향은 source('참조 대상') -> owner('참조하는 노드'). reference 그래프는
+    계보(parents)와 독립이므로 references 만으로 순환을 검사한다.
+    """
+    if source_id == owner_id:
+        return True
+
+    rmap = _references_map(graph)
+    stack = list(rmap.get(source_id, []))
+    seen = set()
+    while stack:
+        cur = stack.pop()
+        if cur == owner_id:
+            return True
+        if cur in seen:
+            continue
+        seen.add(cur)
+        stack.extend(rmap.get(cur, []))
     return False
 
 

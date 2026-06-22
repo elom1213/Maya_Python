@@ -2,6 +2,51 @@
 
 All notable changes to this tool are documented here.
 
+## [01.18] - 2026-06-22
+### Added
+- **Lineage** tab — **convert an edge's type by selecting it and switching the
+  edge-type dropdown**. Select one or more edges, then change the
+  `Lineage (parent)` / `Reference (dashed)` dropdown beside *Connect Mode* — the
+  selected arrows switch type in place (solid open-V ↔ dashed filled-triangle),
+  keeping their direction. The underlying relationship moves between the lineage
+  DAG (`parents`) and the `references` list, any custom edge color carries over,
+  and a conversion that would create a cycle is rejected. (Previously the dropdown
+  only chose what a *new* node→node drag created.)
+
+## [01.17] - 2026-06-22
+### Added
+- **Lineage** tab — **edge colors are now editable too**. Select one or more edges
+  (lineage and/or reference) and use **Set Color...** to recolor them, or **Reset
+  Color** to revert to the default (lineage = child lane color, reference = gray).
+  `Set Color... / Reset Color` now act on the combined node + edge selection. The
+  per-edge override is stored in the graph JSON (`edge_colors`, keyed by
+  `kind:src>dst`; back-compatible) and cleaned up when an endpoint node is deleted.
+
+### Fixed
+- **Lineage** tab — **overlapping arrows between the same two nodes are fanned
+  apart**. When a node pair had both a lineage and a reference edge (or otherwise
+  shared endpoints), the arrows were drawn on top of each other. Edges sharing the
+  same node pair are now spread horizontally by a fixed spacing so each arrow (and
+  its arrowhead) is distinct.
+
+## [01.16] - 2026-06-22
+### Added
+- **Lineage** tab — **Reference edges (dashed)**: a node can now point a **gray
+  dashed arrow** at another node to show a Maya **reference** relationship
+  (referenced file → the file that loads it), separate from the solid
+  version/branch lineage. Drawn in **Connect Mode** via the new **edge-type
+  dropdown** (`Lineage (parent)` / `Reference (dashed)`) beside the *Connect Mode*
+  button — pick *Reference*, then drag from the referenced node to the referencing
+  node. Reference edges are independent of the lineage DAG, so they **do not affect
+  lane/color/auto-layout**; they have their own cycle guard and a filled-triangle
+  arrowhead to tell them apart from lineage's open V. Stored as a new per-node
+  `references` list in the graph JSON (back-compatible: older graphs load fine).
+- **Lineage** tab — **Set Color... / Reset Color**: rubber-band select one or more
+  nodes and set a **custom fill color** on all of them at once (`Set Color...`,
+  color picker), or **Reset Color** to revert the selection to the automatic lane
+  color. The manual color is stored per node (`color`); lineage edges keep their
+  lane color, so the git-graph lane reading is preserved.
+
 ## [01.15] - 2026-06-22
 ### Fixed
 - **Lineage** tab — **middle-mouse pan no longer hits a wall**. Panning moves the
