@@ -32,6 +32,7 @@ from Framework.qt.qt import (
     QInputDialog,
     QDialog,
     QDialogButtonBox,
+    QScrollArea,
     QToolButton,
     QMenu,
     QPixmap,
@@ -101,6 +102,91 @@ class _CheckableMenu(QMenu):
             action.trigger()   # 체크 토글 + triggered(bool) 방출, 메뉴는 유지
             return
         super().mouseReleaseEvent(event)
+
+
+class LogEditDialog(QDialog):
+    """Log history 의 각 항목(작업자/메모)을 편집하거나 삭제하는 다이얼로그.
+
+    timestamp 는 보존(읽기 전용 라벨), author/note 만 편집한다. 항목별 Delete 로 제거.
+    OK 시 남은 항목을 화면 순서대로 LogEntry 리스트(result_logs)로 돌려준다.
+    자유 텍스트 재파싱 대신 구조적으로 편집해 timestamp/구분이 깨지지 않게 한다.
+    """
+
+    def __init__(self, logs, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Edit Log History")
+        self.resize(640, 520)
+
+        self._rows = []   # [{"timestamp", "author"(QLineEdit), "note"(QPlainTextEdit), "widget"}]
+
+        outer = QVBoxLayout(self)
+        outer.addWidget(QLabel(
+            "Edit or delete past log entries. Timestamps are kept.\n"
+            "Press OK, then Save Record to persist the changes."
+        ))
+
+        # 항목이 많아도 보이도록 스크롤 영역에 항목 박스를 쌓는다.
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        host = QWidget()
+        self._vbox = QVBoxLayout(host)
+        self._vbox.addStretch(1)         # 항목은 이 stretch 앞에 끼워 넣는다
+        self._scroll.setWidget(host)
+        outer.addWidget(self._scroll, stretch=1)
+
+        for entry in logs:
+            self._add_row(entry)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        outer.addWidget(buttons)
+
+    def _add_row(self, entry):
+        box = QGroupBox()
+        v = QVBoxLayout(box)
+
+        head = QHBoxLayout()
+        head.addWidget(QLabel(f"[{entry.timestamp}]"))
+        author_edit = QLineEdit(entry.author)
+        author_edit.setPlaceholderText("author")
+        author_edit.setFixedWidth(160)
+        head.addWidget(author_edit)
+        head.addStretch(1)
+        btn_del = QPushButton("Delete")
+        head.addWidget(btn_del)
+        v.addLayout(head)
+
+        note_edit = QPlainTextEdit(entry.note)
+        note_edit.setMaximumHeight(80)
+        v.addWidget(note_edit)
+
+        row = {
+            "timestamp": entry.timestamp,
+            "author": author_edit,
+            "note": note_edit,
+            "widget": box,
+        }
+        # 끝의 stretch 앞에 삽입(추가 순서 = 표시 순서 유지).
+        self._vbox.insertWidget(self._vbox.count() - 1, box)
+        self._rows.append(row)
+        btn_del.clicked.connect(lambda: self._remove_row(row))
+
+    def _remove_row(self, row):
+        row["widget"].setParent(None)
+        row["widget"].deleteLater()
+        self._rows.remove(row)
+
+    def result_logs(self):
+        """현재 남아있는 항목들을 화면 순서대로 LogEntry 리스트로 반환."""
+        return [
+            LogEntry(
+                timestamp=r["timestamp"],
+                author=r["author"].text().strip(),
+                note=r["note"].toPlainText().strip(),
+            )
+            for r in self._rows
+        ]
 
 
 class MainWindow(QWidget):
@@ -340,6 +426,10 @@ class MainWindow(QWidget):
         log_header = QHBoxLayout()
         log_header.addWidget(QLabel("Log history"))
         log_header.addStretch(1)
+        self.btn_edit_log = QPushButton("Edit")
+        self.btn_edit_log.setToolTip("Edit or delete past log entries")
+        self.btn_edit_log.clicked.connect(self.on_edit_log)
+        log_header.addWidget(self.btn_edit_log)
         self.btn_expand_log = QPushButton("Expand")
         self.btn_expand_log.setToolTip("Open the log history in a larger window")
         self.btn_expand_log.clicked.connect(self.on_expand_log)
@@ -569,6 +659,7 @@ class MainWindow(QWidget):
             self.btn_add_log,
             self.btn_save_record,
             self.btn_expand_log,
+            self.btn_edit_log,
         ):
             w.setEnabled(enabled)
 
@@ -793,6 +884,26 @@ class MainWindow(QWidget):
 
     def _refresh_log_history(self, record):
         self.txt_log_history.setPlainText(self._log_history_text(record))
+
+    def on_edit_log(self):
+        """선택된 파일의 Log history 를 항목 단위로 편집/삭제한다(구조 보존).
+
+        OK 시 record.logs 를 새 목록으로 교체하고 인라인 표시를 갱신한다. 영속화는
+        Add Log Entry 와 동일하게 Save Record 로(메모리 반영 후 안내)."""
+        if not self._require_record():
+            return
+        record = self._current_record
+        if not record.logs:
+            QMessageBox.information(self, "Edit Log History", "No log entries to edit.")
+            return
+
+        dlg = LogEditDialog(record.logs, self)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        record.logs = dlg.result_logs()
+        self._refresh_log_history(record)
+        self.log("Log history edited (remember to Save Record).")
 
     def on_expand_log(self):
         """현재 파일의 Log history 를 큰 읽기전용 창으로 띄운다.

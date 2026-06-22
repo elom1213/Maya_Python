@@ -60,7 +60,7 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 │ File / Author /      │ │ [ thumbnail 320x180 ]        │
 │ Thumb / Record / 수정│ │ [Capture Region][Load Image] │
 │ (우클릭 →            │ │ Author [...........]         │
-│  Show in File        │ │ Log history (read only)[Expand]│
+│  Show in File        │ │ Log history (ro) [Edit][Expand]│
 │  Explorer)           │ │ New note [...]               │
 │ ...                  │ │ [Add Log Entry][Save Record] │
 └──────────────────────┘ └──────────────────────────────┘
@@ -94,6 +94,9 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
    - 위 필터들은 **재스캔 없이 즉시 중첩 적용**된다(Recorded/Types 상태는 prefs 에 저장).
    - **우클릭 → Show in File Explorer**: 목록의 파일을 우클릭하면 그 파일을 **탐색기에서 선택 상태로** 연다.
    - 파일 선택 후 상세 패널의 **Log history** 가 길면 **Expand** 로 큰 창에서 볼 수 있다.
+   - **Edit(v01.21)**: **Log history** 헤더의 **Edit** 버튼으로 *Edit Log History* 창을 열어 과거 기록의
+     **작업자/메모를 수정**하거나 항목을 **삭제**한다(타임스탬프는 보존). OK 후 **Save Record** 로 저장.
+     항목 단위 구조 편집이라 타임스탬프·항목 경계가 깨지지 않는다.
 3. **기록 작성**: 파일을 선택 → 우측에서 **Author** 입력, **New note** 작성 후 **Add Log Entry**(타임스탬프 자동) →
    **Save Record**. `records/<key>.json` 이 생성/갱신된다.
 4. **썸네일**: **Capture Region** → 화면이 **살짝 어두워지며(실제 화면은 비쳐 보임)** 드래그로 영역 선택

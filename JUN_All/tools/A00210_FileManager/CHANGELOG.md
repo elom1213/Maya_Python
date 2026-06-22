@@ -2,6 +2,15 @@
 
 All notable changes to this tool are documented here.
 
+## [01.21] - 2026-06-22
+### Added
+- **File Manager** tab — **Edit** button on the **Log history** header. Opens an
+  *Edit Log History* dialog where each past entry's **author** and **note** can be
+  edited and individual entries **deleted** (timestamps are kept). OK replaces the
+  record's logs in order; press **Save Record** to persist (same flow as Add Log
+  Entry). Editing is structured per-entry, so timestamps/entry boundaries can't be
+  corrupted by free-text edits.
+
 ## [01.20] - 2026-06-22
 ### Added
 - **File Manager** tab — **settings Profiles**. A new **Profile** group (combo +
