@@ -1,0 +1,3 @@
+# A00211_RefLineage runs inside Autodesk Maya (Python 3).
+# It uses maya.cmds (provided by Maya) and the shared JUN_All Framework (PySide2/6).
+# No external pip packages are required.
