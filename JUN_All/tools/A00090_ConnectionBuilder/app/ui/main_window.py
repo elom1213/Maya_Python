@@ -1,6 +1,7 @@
-# from Framework.qt.qt import QApplication 
-from Framework.qt.qt import * 
+# from Framework.qt.qt import QApplication
+from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
+from Framework.qt.MOD_tsl_qt_v01 import JUN_mod_tsl_qt_v01
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -27,11 +28,11 @@ class MainWindow(QWidget):
         self.win_title     =  f"MetaHuman Connection Builder v{VERSION}"
         self.btn_get_label = "Get"
         self.btn_width_01 = 70
-        
+
         self.connection_manager = ConnectionManager()
 
         APP_DIR = os.path.join(os.path.dirname(__file__),"." )
-        self.pm = PathManager(  APP_DIR, 
+        self.pm = PathManager(  APP_DIR,
                                 read_dir  = "rules_v01")
 
         self.rules_file_name =  self.get_rules_file_name()
@@ -47,7 +48,7 @@ class MainWindow(QWidget):
         self.setWindowFlags(Qt.Window)
 
         main_layout = QVBoxLayout(self)
-        
+
         # -------------------------
         # mesh to create blend shape
         # -------------------------
@@ -72,93 +73,47 @@ class MainWindow(QWidget):
         main_layout.addLayout(row)
 
         # -------------------------
-        # Solver
+        # Source(좌) / Target(우) 를 좌우로 배치.
+        # Source 컬럼 상단에 Is Solver 체크박스.
         # -------------------------
 
-        row = QHBoxLayout()
+        src_target_row = QHBoxLayout()
 
+        # --- Source 컬럼 (구 Base / solver) ---
+        src_col = QVBoxLayout()
+
+        is_solver_row = QHBoxLayout()
         self.cb_is_solver = QCheckBox('Is Solver')
         self.cb_is_solver.setChecked(True)
+        is_solver_row.addWidget(self.cb_is_solver)
+        is_solver_row.addStretch(1)
+        src_col.addLayout(is_solver_row)
 
-        row.addWidget(self.cb_is_solver)
-        
-        row.addWidget(QLabel("Base"))
+        self.tsl_source = JUN_mod_tsl_qt_v01(title="Source", log_callback=self.log)
+        self.tsl_source.add_button(
+            "Set Attr", lambda: self.create_attributes_for(self.tsl_source))
+        self.tsl_source.add_button(
+            "Del Attr", lambda: self.delete_attributes_for(self.tsl_source))
+        src_col.addWidget(self.tsl_source)
 
-        self.le_solver = QLineEdit()
+        src_target_row.addLayout(src_col)
 
-        row.addWidget(self.le_solver)
+        # --- Target 컬럼 (구 Driver) ---
+        tgt_col = QVBoxLayout()
 
+        # Source 의 Is Solver 행과 높이를 맞추기 위한 빈 행.
+        tgt_col.addWidget(QLabel(""))
 
-        self.btn_solver = QPushButton(self.btn_get_label)
-        self.btn_set_attr_solver = QPushButton("Set Attr")
-        self.btn_del_attr_solver = QPushButton("Del Attr")
+        self.tsl_target = JUN_mod_tsl_qt_v01(title="Target", log_callback=self.log)
+        self.tsl_target.add_button(
+            "Set Attr", lambda: self.create_attributes_for(self.tsl_target))
+        self.tsl_target.add_button(
+            "Del Attr", lambda: self.delete_attributes_for(self.tsl_target))
+        tgt_col.addWidget(self.tsl_target)
 
-        self.btn_solver.setFixedWidth(self.btn_width_01)
-        self.btn_set_attr_solver.setFixedWidth(self.btn_width_01)
-        self.btn_del_attr_solver.setFixedWidth(self.btn_width_01)
+        src_target_row.addLayout(tgt_col)
 
-        row.addWidget(self.btn_solver)
-        row.addWidget(self.btn_set_attr_solver)
-        row.addWidget(self.btn_del_attr_solver)
-
-
-        main_layout.addLayout(row)
-
-        # -------------------------
-        # Driver
-        # -------------------------
-
-        row = QHBoxLayout()
-
-        row.addWidget(QLabel("Driver"))
-
-        self.le_driver = QLineEdit()
-
-        row.addWidget(self.le_driver)
-
-
-        self.btn_driver = QPushButton(self.btn_get_label)
-        self.btn_set_attr_driver = QPushButton("Set Attr")
-        self.btn_del_attr_driver = QPushButton("Del Attr")
-
-        self.btn_driver.setFixedWidth(self.btn_width_01)
-        self.btn_set_attr_driver.setFixedWidth(self.btn_width_01)
-        self.btn_del_attr_driver.setFixedWidth(self.btn_width_01)
-
-        row.addWidget(self.btn_driver)
-        row.addWidget(self.btn_set_attr_driver)
-        row.addWidget(self.btn_del_attr_driver)
-
-
-        main_layout.addLayout(row)
-
-        # -------------------------
-        # BlendShape
-        # -------------------------
-
-        row = QHBoxLayout()
-
-        row.addWidget(QLabel("BlendShape"))
-
-        self.le_blendshape = QLineEdit()
-
-        row.addWidget(self.le_blendshape)
-
-        
-        self.btn_blendShape = QPushButton(self.btn_get_label)
-        self.btn_set_attr_blendShape = QPushButton("Set Attr")
-        self.btn_del_attr_blendShape = QPushButton("Del Attr")
-
-        self.btn_blendShape.setFixedWidth(self.btn_width_01)
-        self.btn_set_attr_blendShape.setFixedWidth(self.btn_width_01)
-        self.btn_del_attr_blendShape.setFixedWidth(self.btn_width_01)
-
-        row.addWidget(self.btn_blendShape)
-        row.addWidget(self.btn_set_attr_blendShape)
-        row.addWidget(self.btn_del_attr_blendShape)
-
-
-        main_layout.addLayout(row)
+        main_layout.addLayout(src_target_row)
 
         # -------------------------
         # Rule
@@ -182,11 +137,19 @@ class MainWindow(QWidget):
 
         row = QHBoxLayout()
 
+        # 체크 해제 = 1->n (broadcast), 체크 = n->n (index pair)
+        self.cb_pair_mode = QCheckBox("n->n (index pair)")
+        self.cb_pair_mode.setToolTip(
+            "Unchecked = 1->n broadcast (first Source to every Target).\n"
+            "Checked = n->n index pair (Source[i] -> Target[i], equal count required)."
+        )
+
         self.btn_connect_all = QPushButton("Connect All")
         self.btn_connect = QPushButton("Connect")
         self.btn_disconnect = QPushButton("Disconnect")
         self.btn_validate = QPushButton("Validate")
 
+        row.addWidget(self.cb_pair_mode)
         row.addWidget(self.btn_connect_all)
         row.addWidget(self.btn_connect)
         row.addWidget(self.btn_disconnect)
@@ -232,20 +195,6 @@ class MainWindow(QWidget):
         self.btn_mesh.clicked.connect( lambda: self.set_selected_node(self.le_mesh ))
         self.btn_create_targets.clicked.connect(lambda: self.on_create_target(self.le_mesh))
 
-        self.btn_solver.clicked.connect( lambda: self.set_selected_node(self.le_solver ))
-        self.btn_set_attr_solver.clicked.connect(lambda: self.create_attributes(self.le_solver))
-        self.btn_del_attr_solver.clicked.connect(lambda: self.create_attributes(self.le_solver))
-
-        self.btn_driver.clicked.connect( lambda: self.set_selected_node(self.le_driver ))
-        self.btn_set_attr_driver.clicked.connect( lambda:self.create_attributes(self.le_driver))
-        self.btn_del_attr_driver.clicked.connect( lambda:self.delete_attributes(self.le_driver))
-
-        self.btn_blendShape.clicked.connect( lambda: self.set_selected_node(self.le_blendshape ))
-        self.btn_set_attr_blendShape.clicked.connect( lambda:self.create_attributes(self.le_blendshape))
-        self.btn_del_attr_blendShape.clicked.connect( lambda:self.delete_attributes(self.le_blendshape))
-
-
-
         self.btn_connect_all.clicked.connect( self.on_connect_all)
         self.btn_connect.clicked.connect( self.on_connect)
         self.btn_disconnect.clicked.connect( self.on_disconnect)
@@ -253,11 +202,17 @@ class MainWindow(QWidget):
 
         self.btn_connect_intermediate.clicked.connect( self.on_connect_intermediate)
 
+        # -------------------------
+        # 모든 버튼을 조금 작게 (tsl 위젯 내부 버튼 포함).
+        # -------------------------
+        for btn in self.findChildren(QPushButton):
+            btn.setMaximumHeight(40)
+
 
     def log(self, text):
 
         self.te_log.append(text)
-    
+
     # -------------------------------------------------
 
     def get_rules_file_name(self):
@@ -265,45 +220,77 @@ class MainWindow(QWidget):
         directory = self.pm.path("read")
         return [os.path.splitext(f)[0] for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
 
-    def get_rule(self, rule_name=None):
+    def get_rule(self, rule_name=None, solver_node="", driver_node=""):
 
         if rule_name is None:
             rule_name = self.cb_rule.currentText()
 
         return RuleLoader.load(
             rule_name=rule_name,
-            solver_node=self.le_solver.text(),
-            driver_node=self.le_driver.text(),
-            blendshape_node=self.le_blendshape.text()
+            solver_node=solver_node,
+            driver_node=driver_node,
+            blendshape_node=""
         )
-        
-    def get_rule_all(self):
-        json_all = RuleLoader.find_all_json()
-        rules = []
-        for json_current in json_all:
-            rule = self.get_rule(json_current)
-            rules.append(rule)
-        return rules
 
+    # -------------------------------------------------
+    # Source / Target pairing
+    # -------------------------------------------------
+
+    def _build_pairs(self, sources, targets):
+        """모드에 따라 (source, target) 쌍 리스트 생성. 오류 시 [] 반환하고 로그."""
+        if self.cb_pair_mode.isChecked():          # n->n index pair
+            if len(sources) != len(targets):
+                self.log(
+                    "[ERROR] n->n requires equal Source/Target count "
+                    f"(Source {len(sources)}, Target {len(targets)})"
+                )
+                return []
+            return list(zip(sources, targets))
+
+        # 1->n broadcast : 첫 Source 를 모든 Target 으로
+        if not sources:
+            return []
+        if len(sources) > 1:
+            self.log(f"[Warn] 1->n uses first Source only : {sources[0]}")
+        return [(sources[0], t) for t in targets]
+
+    # -------------------------------------------------
 
     def on_connect_all(self):
-        rules = self.get_rule_all()
+
+        pairs = self._build_pairs(
+            self.tsl_source.get_all_items(),
+            self.tsl_target.get_all_items()
+        )
+
+        if not pairs:
+            return
 
         is_solver = self.cb_is_solver.isChecked()
 
-        for rule in rules:
-            self.connection_manager.connect(rule, is_solver)
+        for rule_name in RuleLoader.find_all_json():
+            for src, tgt in pairs:
+                rule = self.get_rule(rule_name, solver_node=src, driver_node=tgt)
+                self.connection_manager.connect(rule, is_solver)
 
         self.log("Connect All Finished")
 
 
     def on_connect(self):
 
-        rule = self.get_rule()
+        pairs = self._build_pairs(
+            self.tsl_source.get_all_items(),
+            self.tsl_target.get_all_items()
+        )
+
+        if not pairs:
+            return
 
         is_solver = self.cb_is_solver.isChecked()
 
-        self.connection_manager.connect(rule, is_solver)
+        for src, tgt in pairs:
+            rule = self.get_rule(solver_node=src, driver_node=tgt)
+            self.connection_manager.connect(rule, is_solver)
 
         self.log("Connect Finished")
 
@@ -335,9 +322,17 @@ class MainWindow(QWidget):
 
     def on_disconnect(self):
 
-        rule = self.get_rule()
+        pairs = self._build_pairs(
+            self.tsl_source.get_all_items(),
+            self.tsl_target.get_all_items()
+        )
 
-        self.connection_manager.disconnect(rule)
+        if not pairs:
+            return
+
+        for src, tgt in pairs:
+            rule = self.get_rule(solver_node=src, driver_node=tgt)
+            self.connection_manager.disconnect(rule)
 
         self.log("Disconnect Finished")
 
@@ -345,13 +340,20 @@ class MainWindow(QWidget):
 
     def on_validate(self):
 
-        rule = self.get_rule()
-
-        result = self.connection_manager.validate(rule)
-
-        self.log(
-            f"Validate Result : {result}"
+        pairs = self._build_pairs(
+            self.tsl_source.get_all_items(),
+            self.tsl_target.get_all_items()
         )
+
+        if not pairs:
+            return
+
+        for src, tgt in pairs:
+            rule = self.get_rule(solver_node=src, driver_node=tgt)
+            result = self.connection_manager.validate(rule)
+            self.log(
+                f"Validate Result ({src} -> {tgt}) : {result}"
+            )
 
     def set_selected_node(self, line_edit):
 
@@ -364,26 +366,25 @@ class MainWindow(QWidget):
             ", ".join(selection)
         )
 
-    def create_attributes(self, le_target):
-
+    def create_attributes_for(self, tsl):
+        """리스트 위젯의 모든 노드에 선택 rule mapping attr 생성."""
         rule = self.get_rule()
 
-        target = le_target.text()
+        for node in tsl.get_all_items():
+            try:
+                AttributeManager.create(rule, node)
+            except Exception as e:
+                self.log(f"[Set Attr] {node} : {e}")
 
-        AttributeManager.create(
-            rule,
-            target
-        )
-    def delete_attributes(self, le_target):
-
+    def delete_attributes_for(self, tsl):
+        """리스트 위젯의 모든 노드에서 선택 rule mapping attr 삭제."""
         rule = self.get_rule()
 
-        target = le_target.text()
-
-        AttributeManager.delete(
-            rule,
-            target
-        )
+        for node in tsl.get_all_items():
+            try:
+                AttributeManager.delete(rule, node)
+            except Exception as e:
+                self.log(f"[Del Attr] {node} : {e}")
 
 
     def on_create_target(self, le_mesh):
