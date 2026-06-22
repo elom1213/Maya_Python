@@ -1,5 +1,17 @@
 # Changelog — A00220_BackupTool
 
+## [01.06] - 2026-06-22
+
+### Changed
+- **The dino now spins a full 360° in the air whenever a file is actually backed
+  up**, so a successful backup is clearly visible. Previously the dino only did a
+  small hop on each save cycle, which was easy to miss and fired even when nothing
+  was copied. The spin (`DinoWidget.spin()`) is triggered from `_backup_targets`
+  only when at least one file was backed up (`ok > 0`), not merely on entering the
+  Saving state. The widget reserves a bit more height so the rotating sprite never
+  clips at its corners, and the spin suppresses the periodic auto-jump while it
+  plays. Running (jogging in place) and stopped (standing) states are unchanged.
+
 ## [01.05] - 2026-06-19
 
 ### Changed

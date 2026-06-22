@@ -1,11 +1,12 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-19
+# last Update date : 2026-06-22
 # A00220_BackupTool - main window (Qt, standalone)
 #
 # 컴퓨터 비정상 종료에 대비해 지정 파일들을 주기적으로 자동 백업한다.
 #  - 대상 파일 목록 / 백업 폴더명 / 접미사 / 분·초 주기 설정
 #  - 덮어쓰기 또는 버전업(최근 N개 유지) 모드
-#  - 상태 표시: Deactive / Active...(점 애니메이션) / Saving
+#  - 상태 표시: Chrome-Dino 애니메이션(정지=서있음 / 동작=달리기 /
+#    백업 성공=공중 360° 회전)
 
 import os
 import time
@@ -430,6 +431,10 @@ class MainWindow(QWidget):
 
         self.log(f"Cycle done ({ok}/{len(targets)} backed up).")
 
+        # 파일이 실제로 한 개라도 백업됐으면 공룡이 공중에서 360° 회전해 알린다.
+        if ok:
+            self.dino.spin()
+
         # 백업 종료 후 다시 Active 로(정지되지 않았다면).
         if self._backup_timer.isActive() or self._state == STATE_SAVING:
             if self.btn_toggle.text() == "Stop":
@@ -514,7 +519,7 @@ class MainWindow(QWidget):
             self.lbl_countdown.setText("Next save in  --:--")
         elif state == STATE_SAVING:
             self.dino.set_running(True)
-            self.dino.hop()                          # 저장 순간 점프로 강조
+            # 회전(360° spin)은 파일이 '실제로' 백업된 순간(_backup_targets)에 트리거한다.
             # Auto Backup 모드는 카운트다운 대신 'Auto save' 문구.
             self.lbl_countdown.setText(
                 "Auto save" if self.chk_auto.isChecked() else "Next save in  00:00")
