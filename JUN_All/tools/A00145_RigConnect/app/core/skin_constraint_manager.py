@@ -80,6 +80,9 @@ def _apply_weighted_constraint(influences_weights, follower, maintain_offset):
         raise ValueError("Follower not found in scene: {0}".format(follower))
 
     con = cmds.parentConstraint(*(joints + [follower]), mo=maintain_offset)[0]
+    # 회전 보간을 Shortest 로 강제(0=No Flip, 1=Average, 2=Shortest).
+    # 여러 joint 가 가중 평균될 때 No Flip/Average 는 짐벌 튐이 생길 수 있어 Shortest 로 고정.
+    cmds.setAttr("{0}.interpType".format(con), 2)
     # weightAliasList 는 target 추가 순서(=joints 순서)와 동일하다.
     aliases = cmds.parentConstraint(con, q=True, weightAliasList=True) or []
     for alias, (_, w) in zip(aliases, influences_weights):
@@ -130,3 +133,77 @@ def skin_weight_to_constraint(vertices, followers, max_influence=0,
             made.append(_apply_weighted_constraint(iw, flw, maintain_offset))
 
     return made
+
+
+# ----------------------------------------------------------------------
+# Locator 자동 생성 + constraint (UI 의 "Locators" 버튼)
+# ----------------------------------------------------------------------
+
+def _vertex_world_pos(vtx):
+    """버텍스의 월드 위치 (x, y, z)."""
+    return cmds.pointPosition(vtx, world=True)
+
+
+def _locator_name_from_vertex(vtx):
+    """'pMesh.vtx[5]' -> 'pMesh_vtx5_loc' 형태의 로케이터 이름."""
+    mesh, rest = vtx.split(".vtx[")
+    index = rest[:-1]
+    short = mesh.split("|")[-1].split(":")[-1]
+    return "{0}_vtx{1}_loc".format(short, index)
+
+
+def create_locators_and_constrain(vertices, max_influence=0,
+                                  maintain_offset=True, per_vertex=False):
+    """로케이터를 자동 생성해 스킨 웨이트 constraint 를 건다.
+
+    빈 follower 를 만들 필요 없이, 선택 버텍스만으로 동작한다.
+
+    - per_vertex=True : 버텍스마다 로케이터 1개를 그 버텍스 월드 위치에 생성하고,
+                        각 버텍스 웨이트로 1:1 구속한다(스킨 표면을 따라가는 로케이터들).
+    - per_vertex=False: 선택 버텍스 전체의 centroid 에 로케이터 1개를 생성하고,
+                        평균 웨이트로 구속한다.
+
+    생성한 로케이터들은 하나의 그룹("RigConnect_skinLoc_grp#")으로 묶는다.
+
+    Args:
+        vertices: 버텍스 컴포넌트 리스트("pMesh.vtx[i]").
+        max_influence: 사용할 최대 joint 개수(정수). 0 이면 제한 없음.
+        maintain_offset: parentConstraint 의 maintain offset 옵션.
+        per_vertex: True 면 버텍스당 로케이터 1개, False 면 centroid 에 1개.
+
+    Returns:
+        (created_locators, made_constraints) 튜플.
+    """
+    if not vertices:
+        raise ValueError(
+            "No vertices. Select skinned vertices and add them to the "
+            "Vertices list.")
+
+    # 1) 위치/이름을 먼저 계산 (loc, pos) 목록을 만든다.
+    if per_vertex:
+        specs = [(_locator_name_from_vertex(v), _vertex_world_pos(v))
+                 for v in vertices]
+    else:
+        pts = [_vertex_world_pos(v) for v in vertices]
+        n = len(pts)
+        centroid = (sum(p[0] for p in pts) / n,
+                    sum(p[1] for p in pts) / n,
+                    sum(p[2] for p in pts) / n)
+        mesh = vertices[0].split(".")[0].split("|")[-1].split(":")[-1]
+        specs = [("{0}_skinLoc".format(mesh), centroid)]
+
+    # 2) 로케이터를 그룹 아래에 생성하고 월드 위치에 배치한다.
+    #    (constrain 전에 그룹/배치를 끝내야 maintain offset 이 올바르게 계산된다)
+    grp = cmds.group(empty=True, name="RigConnect_skinLoc_grp#")
+    created = []
+    for name, pos in specs:
+        loc = cmds.spaceLocator(name=name)[0]
+        loc = cmds.parent(loc, grp)[0]
+        cmds.xform(loc, ws=True, translation=(pos[0], pos[1], pos[2]))
+        created.append(loc)
+
+    # 3) 생성한 로케이터를 follower 로 삼아 동일한 스킨 웨이트 constraint 적용.
+    made = skin_weight_to_constraint(
+        vertices, created, max_influence, maintain_offset, per_vertex)
+
+    return created, made

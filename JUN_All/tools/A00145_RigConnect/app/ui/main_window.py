@@ -243,10 +243,29 @@ class MainWindow(QWidget):
 
         box.addWidget(opt_box)
 
+        btn_row = QHBoxLayout()
+
         btn = QPushButton("Skin Weight to Constraint")
         btn.setMinimumHeight(32)
+        btn.setToolTip(
+            "Constrain the objects in the Followers list with the skin "
+            "weights of the selected vertices.")
         btn.clicked.connect(self.on_skin_weight_to_constraint)
-        box.addWidget(btn)
+        btn_row.addWidget(btn)
+
+        # Locators : follower 를 직접 만들 필요 없이, 로케이터를 자동 생성하고
+        # 동일한 스킨 웨이트 constraint 를 그 로케이터에 건다.
+        btn_loc = QPushButton("Locators")
+        btn_loc.setMinimumHeight(32)
+        btn_loc.setToolTip(
+            "Auto-create locators and run Skin Weight to Constraint on them "
+            "(no Followers needed).\n"
+            "Per-vertex: one locator per vertex at its position.\n"
+            "Average: one locator at the centroid of selected vertices.")
+        btn_loc.clicked.connect(self.on_skin_weight_to_locators)
+        btn_row.addWidget(btn_loc)
+
+        box.addLayout(btn_row)
 
         return box
 
@@ -436,6 +455,7 @@ class MainWindow(QWidget):
             "              + create locators/sphere/cube at targets + vertex normal (+Y)\n"
             "Constrain   : multi target -> follower constraints\n"
             "              + Skin Weight to Constraint (weighted parentConstraint)\n"
+            "              + Locators (auto-create locators and constrain them)\n"
             "Connect     : connect attributes (3 broadcast patterns) + 52 facial\n"
             "List Conn.  : explore up/down stream nodes by type\n"
             "Connect Closest : 1:1 closest matching constraints".format(
@@ -519,6 +539,24 @@ class MainWindow(QWidget):
             self.log("       {0} constraint(s) created".format(len(made)))
 
         self._run("Skin Weight to Constraint", _do)
+
+    def on_skin_weight_to_locators(self):
+        vertices = self.tsl_skin_verts.get_all_items()
+        max_influence = self.sb_skin_max_inf.value()
+        maintain_offset = self.cb_skin_maintain.isChecked()
+        per_vertex = self.cb_skin_per_vertex.isChecked()
+
+        def _do():
+            created, made = skn_mgr.create_locators_and_constrain(
+                vertices, max_influence, maintain_offset, per_vertex)
+            # 생성한 로케이터를 Followers 목록에 채우고 씬에서 선택.
+            self.tsl_skin_followers.set_items(created)
+            if created:
+                cmds.select(created)
+            self.log("       {0} locator(s) created, "
+                     "{1} constraint(s) applied".format(len(created), len(made)))
+
+        self._run("Skin Weight to Locators", _do)
 
     # ==============================================================
     # Handlers : Connect

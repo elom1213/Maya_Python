@@ -71,6 +71,13 @@ Constraint`(기본 접힘)**.
     - **해제(기본, average)**: 선택한 모든 버텍스의 joint 별 웨이트를 평균/정규화 → 모든 follower 에 동일 적용.
     - **체크(per-vertex)**: `vertices[i]` 웨이트 → `followers[i]` 에 1:1 적용(개수 일치 필요).
 - `Skin Weight to Constraint` 클릭.
+- 생성되는 `parentConstraint` 의 **Interp Type 은 항상 `Shortest`(2)** 로 설정된다(v01.05). 여러 joint 가
+  가중 평균될 때 기본 `Average` 가 일으키는 회전 튐(짐벌)을 피한다.
+- **`Locators` 버튼(v01.06)**: `Followers` 를 직접 만들 필요 없이 **로케이터를 자동 생성**해 동일한 스킨
+  웨이트 constraint 를 건다. 생성된 로케이터는 `RigConnect_skinLoc_grp#` 그룹으로 묶이고, `Followers`
+  목록에 자동으로 채워지며 씬에서 선택된다.
+    - **average(기본)**: 선택 버텍스 전체의 **centroid** 에 로케이터 1개를 만들어 평균 웨이트로 구속.
+    - **per-vertex 체크**: 버텍스마다 로케이터 1개를 그 **버텍스 월드 위치**(`mesh_vtxN_loc`)에 만들어 1:1 구속.
 
 ### Connect
 어트리뷰트를 source → destination 으로 연결한다.
