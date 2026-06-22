@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-17
+# last Update date : 2026-06-22
 # A00145_RigConnect - Qt UI
 #
 # MEL ConnectionTool V04.02 의 3탭(Constrain / Connect / List Connected)을 PySide 로
@@ -47,6 +47,9 @@ class MainWindow(QWidget):
         self._stream_upstream = True
 
         self.resize(self.win_width, self.win_height)
+        # 창이 의도치 않게 너무 작게 줄어들지 않도록 최소 크기를 보장한다.
+        # (리스트/로그가 쓸만한 높이를 유지하도록 콘텐츠보다 약간 낮은 바닥값)
+        self.setMinimumSize(480, 560)
 
         self.build_ui()
 

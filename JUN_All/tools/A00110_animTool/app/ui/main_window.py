@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-17
+# last Update date : 2026-06-22
 # A00110_animTool - Qt UI
 
 from Framework.qt.qt import *
@@ -85,7 +85,10 @@ class MainWindow(QWidget):
         self.te_log = QTextEdit()
         self.te_log.setReadOnly(True)
         # 창이 콘텐츠에 맞춰 줄어들 때도 로그창이 쓸만한 높이를 유지하도록 최소 높이 지정.
+        # 최대 높이도 막아, 창을 다시 키울 때 남는 공간을 로그가 독식해 비대해지는 걸 방지한다.
+        # (남는 공간은 탭/리스트 영역으로 간다)
         self.te_log.setMinimumHeight(90)
+        self.te_log.setMaximumHeight(160)
 
         # -------------------------
         # 탭: Key Edit / Pose Key
@@ -101,8 +104,10 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_follow_tab(), "Follow")
         main_layout.addWidget(self.tabs)
 
-        # 탭 전환 시에도 창을 '현재 탭' 콘텐츠 높이에 맞춘다(섹션 접힘 상태 반영).
-        self.tabs.currentChanged.connect(self._fit_window_later)
+        # 탭 전환 시에는 '현재 탭' 콘텐츠에 맞추되 줄이지 않고 필요할 때만 늘린다(grow_only).
+        # 사용자가 리스트업 후 창을 키워 둔 상태에서 탭을 눌렀다고 창이 갑자기 작아지지 않게 한다.
+        self.tabs.currentChanged.connect(
+            lambda *_: self._fit_window_later(grow_only=True))
 
         # 로그창을 탭 아래에 배치
         main_layout.addWidget(self.te_log)
@@ -131,23 +136,30 @@ class MainWindow(QWidget):
     # Window sizing (접이식 섹션 토글 / 탭 전환 시 창 크기 자동 조정)
     # --------------------------------------------------
 
-    def _fit_window_later(self, *args):
+    def _fit_window_later(self, *args, grow_only=False):
         """레이아웃이 보임/숨김을 반영한 다음 이벤트 루프에서 창 높이를 콘텐츠에 맞춘다.
-        (토글/탭전환 시점엔 새 가시성이 아직 레이아웃에 반영되지 않을 수 있어 한 틱 미룬다.)"""
-        QTimer.singleShot(0, self._fit_window)
+        (토글/탭전환 시점엔 새 가시성이 아직 레이아웃에 반영되지 않을 수 있어 한 틱 미룬다.)
+        grow_only=True 면 필요할 때만 늘리고 줄이지는 않는다(탭 전환용)."""
+        QTimer.singleShot(0, lambda: self._fit_window(grow_only=grow_only))
 
-    def _fit_window(self):
+    def _fit_window(self, grow_only=False):
         """현재 탭 콘텐츠 높이에 맞춰 창 높이를 조정(너비는 유지).
         탭 페이지는 JUN_mod_fit_tab_page_v01 라 숨은 탭은 sizeHint 0 → 창이 현재 탭에만 맞춰진다.
         page.adjustSize() 만으로는 QTabWidget 내부 QStackedLayout 의 캐시된 sizeHint 가
-        갱신되지 않으므로(섹션 접을 때 창이 안 줄어듦), tabs.adjustSize() 로 강제 재계산한다."""
+        갱신되지 않으므로(섹션 접을 때 창이 안 줄어듦), tabs.adjustSize() 로 강제 재계산한다.
+
+        grow_only=True 면 콘텐츠가 현재 창보다 클 때만 늘리고 줄이지는 않는다. 섹션 토글(접기)
+        때는 grow_only=False 로 호출해 빈 공간을 회수한다(접으면 창이 줄어드는 동작 유지)."""
         page = self.tabs.currentWidget()
         if page is not None:
             page.adjustSize()
         self.tabs.adjustSize()
         self.tabs.updateGeometry()
         self.layout().activate()
-        self.resize(self.width(), self.sizeHint().height())
+        target_h = self.sizeHint().height()
+        if grow_only:
+            target_h = max(self.height(), target_h)
+        self.resize(self.width(), target_h)
 
     # --------------------------------------------------
     # Tab builders

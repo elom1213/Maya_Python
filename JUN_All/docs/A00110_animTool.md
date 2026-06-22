@@ -26,6 +26,14 @@
    follower 애니메이션과 매치 결과를 섞으며(0=원본 유지, 1=덮어쓰기, 0.5=반반), 선택된
    **애니메이션 레이어**(override/additive)에 키가 들어간다.
 
+> **v01.17 — 리스트업 후 창/리스트가 작아지던 문제 수정**: select 로 오브젝트를 리스트에 채운 뒤
+> **탭을 전환하는 순간 창 세로가 갑자기 작아지던** 버그를 고쳤다. 원인은 `_fit_window` 가 탭 전환
+> 시에도 창을 현재 탭 콘텐츠 높이로 **줄이기까지** 했기 때문(콘텐츠가 짧은 탭을 누르면 급격히 축소).
+> 이제 **탭 전환은 grow_only**(필요할 때만 늘리고 줄이지 않음)로, **섹션 접기/펴기만 콘텐츠 높이로
+> 축소**한다. 더불어 공유 리스트 위젯(`MOD_tsl_qt_v01`)에 **최소 높이 바닥값 100px**(명시값 없는
+> 리스트), 공유 로그창에 **최대 높이 160px**(창을 다시 키울 때 로그가 빈 공간을 독식하지 않게)를
+> 추가했다.
+
 > **v01.16 — 뷰포트 프리즈(refresh suspend 누수) 수정 + Force Refresh 버튼**: Bake/Follow 가
 > 쓰는 `cmds.refresh(suspend=True)` 는 **씬 전역 토글**이라, 복원(`suspend=False`)이 어떤 예외에도
 > 반드시 실행돼야 한다. A00120_FKIK `bake()` 의 `finally` 가 임시 컨스트레인트 `cmds.delete()` 를
@@ -53,8 +61,9 @@
 > **Offset & Hold 는 기본 접힘**이다. 접고 펼칠 때(및 탭 전환 시) **창 크기가 현재 탭 콘텐츠에 맞춰
 > 자동으로 줄고 늘어난다**. 접이식 위젯은 재사용 모듈 `Framework/qt/MOD_collapsible_qt_v01.py`
 > (`JUN_mod_collapsible_qt_v01` 헤더형 섹션 + `JUN_mod_fit_tab_page_v01` 숨김 시 sizeHint 0 인 탭
-> 페이지)로 분리했고, 창 크기 조정은 `main_window` 의 `_fit_window`(섹션 `toggled` /
-> `QTabWidget.currentChanged` → 한 틱 뒤 `resize`)가 담당한다.
+> 페이지)로 분리했고, 창 크기 조정은 `main_window` 의 `_fit_window`(한 틱 뒤 `resize`)가 담당한다.
+> 섹션 `toggled` 는 콘텐츠 높이로 **줄이고 늘리며**, `QTabWidget.currentChanged` 는 **grow_only**
+> (늘리기만, v01.17)라 리스트업 후 탭을 눌러도 창이 작아지지 않는다.
 
 > **v01.13 — Offset & Hold 를 Key Edit 탭으로 통합**: 별도 탭이던 Offset & Hold 를 없애고 **Key Edit
 > 탭의 "Offset && Hold" 그룹**으로 옮겼다(기능·로직 동일, UI 위치만 변경). 리스트의 각 오브젝트에서
