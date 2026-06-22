@@ -9,7 +9,9 @@
 #    백업 성공=공중 360° 회전)
 
 import os
+import sys
 import time
+import subprocess
 
 from Framework.qt.qt import (
     QWidget,
@@ -20,6 +22,8 @@ from Framework.qt.qt import (
     QLabel,
     QLineEdit,
     QListWidget,
+    QListWidgetItem,
+    QMenu,
     QPushButton,
     QCheckBox,
     QRadioButton,
@@ -149,6 +153,10 @@ class MainWindow(QWidget):
 
         self.list_files = QListWidget()
         self.list_files.setSelectionMode(QListWidget.ExtendedSelection)
+        # 우클릭 → Reveal in File Explorer 컨텍스트 메뉴
+        self.list_files.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.list_files.customContextMenuRequested.connect(
+            self._on_files_context_menu)
         layout.addWidget(self.list_files)
 
         btn_row = QHBoxLayout()
@@ -272,7 +280,7 @@ class MainWindow(QWidget):
 
     def _load_prefs_to_ui(self):
         for path in self._prefs.get("files", []):
-            self.list_files.addItem(path)
+            self._add_file_item(path)
         self.ipf_folder.setText(self._prefs.get("folder_name", "backup"))
         self.ipf_suffix.setText(self._prefs.get("suffix", "BU"))
         versioned = bool(self._prefs.get("versioned", False))
@@ -301,8 +309,19 @@ class MainWindow(QWidget):
 
     # ============================================================ helpers
 
+    def _add_file_item(self, path):
+        """파일을 목록에 추가한다. 표시는 파일명만, 전체 경로는 UserRole 에 보관한다.
+
+        목록이 좁아도 이름만 보이게 하고, 실제 경로(백업·중복검사·탐색기 열기용)는
+        Qt.UserRole 로 들고 있는다. 같은 이름의 다른 폴더 파일을 구분할 수 있도록
+        전체 경로를 툴팁으로 보여준다."""
+        item = QListWidgetItem(os.path.basename(path))
+        item.setData(Qt.UserRole, path)
+        item.setToolTip(path)
+        self.list_files.addItem(item)
+
     def _files(self):
-        return [self.list_files.item(i).text()
+        return [self.list_files.item(i).data(Qt.UserRole)
                 for i in range(self.list_files.count())]
 
     def _interval_ms(self):
@@ -323,7 +342,7 @@ class MainWindow(QWidget):
         existing = set(self._files())
         for path in paths:
             if path not in existing:
-                self.list_files.addItem(path)
+                self._add_file_item(path)
                 existing.add(path)
 
     def on_remove_selected(self):
@@ -332,6 +351,47 @@ class MainWindow(QWidget):
 
     def on_clear_files(self):
         self.list_files.clear()
+
+    def _on_files_context_menu(self, pos):
+        """Target Files 우클릭 메뉴 — 'Reveal in File Explorer'.
+
+        클릭한 항목의 전체 경로(UserRole)를 탐색기에서 선택 상태로 연다."""
+        item = self.list_files.itemAt(pos)
+        if item is None:
+            return
+
+        menu = QMenu(self.list_files)
+        act_reveal = menu.addAction("Reveal in File Explorer")
+        chosen = menu.exec_(self.list_files.viewport().mapToGlobal(pos))
+        if chosen != act_reveal:
+            return
+
+        path = item.data(Qt.UserRole)
+        if not path or not os.path.exists(path):
+            QMessageBox.warning(
+                self, "Reveal in File Explorer",
+                "File not found:\n%s" % path)
+            return
+        if not self._reveal_in_explorer(path):
+            QMessageBox.warning(
+                self, "Reveal in File Explorer",
+                "Failed to open File Explorer for:\n%s" % path)
+
+    @staticmethod
+    def _reveal_in_explorer(path):
+        """OS 파일 탐색기에서 파일을 선택 상태로 연다(Windows 우선)."""
+        path = os.path.normpath(path)
+        try:
+            if sys.platform.startswith("win"):
+                # explorer /select, 는 성공해도 비0 종료코드를 내므로 반환값을 보지 않는다.
+                subprocess.Popen(["explorer", "/select,", path])
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", "-R", path])
+            else:
+                subprocess.Popen(["xdg-open", os.path.dirname(path)])
+            return True
+        except OSError:
+            return False
 
     # ============================================================== control
 

@@ -1,5 +1,19 @@
 # Changelog — A00220_BackupTool
 
+## [01.07] - 2026-06-22
+
+### Changed
+- **Target Files list now shows file names only**, not full paths. Each entry
+  displays `os.path.basename(path)` while the full path is kept on the item
+  (`Qt.UserRole`) and shown as a tooltip on hover. Backup, duplicate-checking and
+  prefs still use the full path, so behavior is unchanged — only the display is
+  shortened so long paths no longer overflow the narrow list.
+
+### Added
+- **Right-click → Reveal in File Explorer** on a Target Files entry. Opens the OS
+  file browser with the file selected (`explorer /select,` on Windows; `open -R`
+  on macOS; `xdg-open` of the parent on Linux). Warns if the file no longer exists.
+
 ## [01.06] - 2026-06-22
 
 ### Changed
