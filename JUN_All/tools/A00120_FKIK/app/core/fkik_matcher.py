@@ -1,12 +1,17 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-19
+# last Update date : 2026-06-22
 # A00120_FKIK - 매칭 / 베이크 로직 (maya.cmds, UI 무관)
 #
 # 2026-06-15: bake() 를 Python 프레임 루프 -> native bakeResults 로 교체(대규모 구간 속도 개선).
 # 2026-06-19: bake() 의 refresh suspend 누수 수정 — suspend_refresh() 컨텍스트 매니저로
 #             감싸 복원이 항상 먼저/무조건 실행되도록 했다(임시 컨스트레인트 delete 가
 #             실패해도 뷰포트가 프리즈되지 않음). bake_constraint() 도 delete 를 finally 로.
+# 2026-06-22: 구간 베이크 시 베이크 구간 밖의 기존 키가 사라지던 버그 수정. 임시
+#             parentConstraint 를 거는 순간 기존 animCurve 가 플러그에서 분리(pairBlend)
+#             되어 bakeResults 의 preserveOutsideKeys 가 바깥 키를 보존하지 못한다.
+#             -> 컨스트레인트를 걸기 전에 [start, end] 밖의 키(값/탄젠트)를 스냅샷하고
+#             베이크 후 복원하도록 했다(_snapshot_outside_keys / _restore_outside_keys).
 #
 # 레거시 JUN_MATCH_twoObjects / JUN_matcher_FKIK / JUN_cmd_match_IK_and_FK /
 #        JUN_cmd_bake_IK_FK / JUN_cmd_bake_IK_to_FK 를 현대화.
@@ -131,6 +136,102 @@ class FKIKMatcher:
 
         return min(len(tgt_list), len(flw_list))
 
+    # --------------------------------------------------
+    # 구간 밖 키 보존 (preserveOutsideKeys 보강)
+    # --------------------------------------------------
+    # 임시 parentConstraint 를 거는 순간 기존 animCurve 가 플러그에서 분리(pairBlend)
+    # 되므로, bakeResults 의 preserveOutsideKeys=True 만으로는 베이크 구간 밖의 원본 키가
+    # 보존되지 않는다. 컨스트레인트를 걸기 "전에" 바깥 키를 직접 스냅샷해 두었다가 베이크
+    # 후 다시 찍어 복원한다.
+
+    @staticmethod
+    def _snapshot_outside_keys(nodes, attrs, start, end):
+        """[start, end] 밖에 있는 키들을 (값 + 탄젠트) 단위로 스냅샷한다.
+
+        반드시 임시 컨스트레인트를 걸기 전에 호출해야 한다 (그 후에는 animCurve 가
+        플러그에서 분리되어 cmds.keyframe 로 조회되지 않는다).
+        반환: { (node, attr): {"weighted": bool, "keys": [ {...}, ... ]} }
+        """
+        snap = {}
+        for node in nodes:
+            for attr in attrs:
+                plug = "%s.%s" % (node, attr)
+                if not cmds.objExists(plug):
+                    continue
+                times = cmds.keyframe(plug, q=True, timeChange=True) or []
+                if not times:
+                    continue
+                values = cmds.keyframe(plug, q=True, valueChange=True) or []
+                in_types = cmds.keyTangent(plug, q=True, inTangentType=True) or []
+                out_types = cmds.keyTangent(plug, q=True, outTangentType=True) or []
+                in_ang = cmds.keyTangent(plug, q=True, inAngle=True) or []
+                out_ang = cmds.keyTangent(plug, q=True, outAngle=True) or []
+                in_wt = cmds.keyTangent(plug, q=True, inWeight=True) or []
+                out_wt = cmds.keyTangent(plug, q=True, outWeight=True) or []
+                wt_q = cmds.keyTangent(plug, q=True, weightedTangents=True)
+                weighted = bool(wt_q[0]) if wt_q else False
+
+                keys = []
+                for i, t in enumerate(times):
+                    if start <= t <= end:
+                        continue  # 베이크가 덮어쓸 구간은 보존하지 않는다.
+                    keys.append({
+                        "t": t,
+                        "v": values[i] if i < len(values) else 0.0,
+                        "it": in_types[i] if i < len(in_types) else "auto",
+                        "ot": out_types[i] if i < len(out_types) else "auto",
+                        "ia": in_ang[i] if i < len(in_ang) else None,
+                        "oa": out_ang[i] if i < len(out_ang) else None,
+                        "iw": in_wt[i] if i < len(in_wt) else None,
+                        "ow": out_wt[i] if i < len(out_wt) else None,
+                    })
+                if keys:
+                    snap[(node, attr)] = {"weighted": weighted, "keys": keys}
+        return snap
+
+    @staticmethod
+    def _restore_outside_keys(snap):
+        """_snapshot_outside_keys 로 떠 둔 구간 밖 키들을 다시 찍어 복원한다.
+
+        베이크가 만든 [start, end] 커브에 바깥 키를 더해 원래 애니메이션을 되살린다.
+        탄젠트 타입은 그대로, fixed 인 경우에만 각도/가중치까지 복원한다.
+        키가 많을 수 있으므로 suspend_refresh 로 감싸 프레임마다 리드로우하지 않는다.
+        """
+        with suspend_refresh():
+            for (node, attr), data in snap.items():
+                plug = "%s.%s" % (node, attr)
+                if not cmds.objExists(plug):
+                    continue
+                for k in data["keys"]:
+                    cmds.setKeyframe(plug, time=k["t"], value=k["v"])
+                if data["weighted"]:
+                    try:
+                        cmds.keyTangent(plug, edit=True, weightedTangents=True)
+                    except Exception:
+                        pass
+                for k in data["keys"]:
+                    t = k["t"]
+                    try:
+                        cmds.keyTangent(
+                            plug, time=(t, t), edit=True,
+                            inTangentType=k["it"], outTangentType=k["ot"],
+                        )
+                    except Exception:
+                        pass
+                    # fixed 탄젠트는 타입만으로 모양이 결정되지 않으므로 각도/가중치까지 복원.
+                    if k["it"] == "fixed" and k["ia"] is not None:
+                        try:
+                            cmds.keyTangent(plug, time=(t, t), edit=True,
+                                            inAngle=k["ia"], inWeight=k["iw"])
+                        except Exception:
+                            pass
+                    if k["ot"] == "fixed" and k["oa"] is not None:
+                        try:
+                            cmds.keyTangent(plug, time=(t, t), edit=True,
+                                            outAngle=k["oa"], outWeight=k["ow"])
+                        except Exception:
+                            pass
+
     @staticmethod
     def bake(tgt_list, flw_list, start, end):
         """
@@ -155,6 +256,10 @@ class FKIKMatcher:
         attrs = ["tx", "ty", "tz", "rx", "ry", "rz"]   # match_transforms 는 scale 미사용
 
         cur = cmds.currentTime(q=True)
+
+        # 컨스트레인트를 걸기 전에 [start, end] 밖의 기존 키를 스냅샷해 둔다.
+        # (컨스트레인트가 걸리면 animCurve 가 분리되어 조회·보존이 불가능해진다.)
+        snap = FKIKMatcher._snapshot_outside_keys(flw, attrs, start, end)
 
         cmds.undoInfo(openChunk=True)
         cons = []
@@ -192,6 +297,12 @@ class FKIKMatcher:
                     cmds.delete([c for c in cons if cmds.objExists(c)])
             except Exception as e:
                 cmds.warning("FKIK bake: constraint cleanup failed (%s)" % e)
+            # 베이크가 실제로 일어난 경우에만 구간 밖 키를 되살린다.
+            if cons and snap:
+                try:
+                    FKIKMatcher._restore_outside_keys(snap)
+                except Exception as e:
+                    cmds.warning("FKIK bake: outside-key restore failed (%s)" % e)
             cmds.currentTime(cur, edit=True)
             cmds.undoInfo(closeChunk=True)
 
@@ -208,11 +319,18 @@ class FKIKMatcher:
             return 0
 
         count = min(len(tgt_list), len(flw_list))
+        flw = flw_list[:count]
 
         sim_attrs = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz"]
 
         time_start = cmds.playbackOptions(minTime=True, q=True)
         time_end = cmds.playbackOptions(maxTime=True, q=True)
+
+        # 재생 범위 밖(타임라인 바깥)의 기존 키도 컨스트레인트로 분리되어 사라지므로
+        # bake() 와 동일하게 스냅샷 후 복원한다. preserveOutsideKeys 보강.
+        snap = FKIKMatcher._snapshot_outside_keys(
+            flw, sim_attrs, time_start, time_end
+        )
 
         cmds.undoInfo(openChunk=True)
         constraints = []
@@ -224,11 +342,12 @@ class FKIKMatcher:
                 constraints.extend(con)
 
             cmds.bakeSimulation(
-                flw_list[:count],
+                flw,
                 sb=1,
                 t=(time_start, time_end),
                 at=sim_attrs,
                 hi="none",
+                preserveOutsideKeys=True,
             )
         finally:
             # 베이크 후 임시 컨스트레인트 정리 (레거시는 남겨뒀음 -> 개선).
@@ -236,6 +355,13 @@ class FKIKMatcher:
             for con in constraints:
                 if cmds.objExists(con):
                     cmds.delete(con)
+            if constraints and snap:
+                try:
+                    FKIKMatcher._restore_outside_keys(snap)
+                except Exception as e:
+                    cmds.warning(
+                        "FKIK bake_constraint: outside-key restore failed (%s)" % e
+                    )
             cmds.undoInfo(closeChunk=True)
 
         return count
