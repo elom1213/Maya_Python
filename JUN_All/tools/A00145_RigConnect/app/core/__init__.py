@@ -9,6 +9,7 @@ from .closest_connector import (
 )
 from . import match_manager
 from . import constrain_manager
+from . import matrix_constraint_manager
 from . import connect_manager
 from . import stream_manager
 from . import skin_constraint_manager

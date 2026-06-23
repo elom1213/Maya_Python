@@ -21,6 +21,7 @@ from Framework.core.maya_undo import undo_chunk
 from tools.A00145_RigConnect.app.config.version import VERSION, LAST_UPDATE
 from tools.A00145_RigConnect.app.core import match_manager as mch_mgr
 from tools.A00145_RigConnect.app.core import constrain_manager as con_mgr
+from tools.A00145_RigConnect.app.core import matrix_constraint_manager as mtx_mgr
 from tools.A00145_RigConnect.app.core import connect_manager as cnt_mgr
 from tools.A00145_RigConnect.app.core import stream_manager as stm_mgr
 from tools.A00145_RigConnect.app.core import skin_constraint_manager as skn_mgr
@@ -187,6 +188,26 @@ class MainWindow(QWidget):
             self.rb_con_group.addButton(rb, i)
             rb_row.addWidget(rb)
         opt_layout.addLayout(rb_row)
+
+        # --- Matrix Constraint 모드 ---
+        # 체크 시 *Constraint 노드 대신 multMatrix/decomposeMatrix 네트워크로 구속한다.
+        self.cb_con_matrix = QCheckBox("Matrix Constraint")
+        self.cb_con_matrix.setChecked(False)
+        opt_layout.addWidget(self.cb_con_matrix)
+
+        # Matrix 모드 전용 채널 토글(기본 전부 on). 일반 모드에선 비활성.
+        mtx_row = QHBoxLayout()
+        self.cb_mtx_t = QCheckBox("Translate")
+        self.cb_mtx_r = QCheckBox("Rotate")
+        self.cb_mtx_s = QCheckBox("Scale")
+        for cb in (self.cb_mtx_t, self.cb_mtx_r, self.cb_mtx_s):
+            cb.setChecked(True)
+            mtx_row.addWidget(cb)
+        opt_layout.addLayout(mtx_row)
+
+        self.cb_con_matrix.toggled.connect(self._on_matrix_mode_toggled)
+        self._on_matrix_mode_toggled(False)
+
         box.addWidget(opt_box)
 
         btn = QPushButton("Constrain")
@@ -195,6 +216,17 @@ class MainWindow(QWidget):
         box.addWidget(btn)
 
         return box
+
+    def _on_matrix_mode_toggled(self, enabled):
+        """Matrix Constraint 모드 토글.
+
+        Matrix on  : 채널(T/R/S) 체크박스 활성, 컨스트레인트 타입 라디오 비활성.
+        Matrix off : 반대.
+        """
+        for cb in (self.cb_mtx_t, self.cb_mtx_r, self.cb_mtx_s):
+            cb.setEnabled(enabled)
+        for rb in self.rb_con_group.buttons():
+            rb.setEnabled(not enabled)
 
     def _build_skin_constraint_box(self):
         """Skin Weight to Constraint UI (접이식, 기본 접힘).
@@ -519,8 +551,26 @@ class MainWindow(QWidget):
     def on_constrain(self):
         targets = self.tsl_targets.get_all_items()
         followers = self.tsl_followers.get_all_items()
-        con_type = con_mgr.CONSTRAIN_TYPES[self.rb_con_group.checkedId()][0]
         maintain_offset = self.cb_con_maintain.isChecked()
+
+        if self.cb_con_matrix.isChecked():
+            translate = self.cb_mtx_t.isChecked()
+            rotate = self.cb_mtx_r.isChecked()
+            scale = self.cb_mtx_s.isChecked()
+
+            def _do():
+                made, errors = mtx_mgr.matrix_constraint(
+                    targets, followers, maintain_offset,
+                    translate, rotate, scale)
+                for err in errors:
+                    self.log("[WARN] {0}".format(err))
+                self.log("       {0} matrix constraint(s) created".format(
+                    len(made)))
+
+            self._run("Matrix Constraint", _do)
+            return
+
+        con_type = con_mgr.CONSTRAIN_TYPES[self.rb_con_group.checkedId()][0]
         self._run("Constrain",
                   lambda: con_mgr.constrain(
                       targets, followers, con_type, maintain_offset))

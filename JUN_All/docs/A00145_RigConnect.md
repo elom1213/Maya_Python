@@ -58,6 +58,24 @@ Constraint`(기본 접힘)**.
 - `Constrain` 클릭.
 - **브로드캐스트**: target 이 1개면 모든 follower 에 동일 target 적용, 아니면 인덱스 1:1.
 
+##### Matrix Constraint (v01.07)
+`Matrix Constraint` 체크 시 일반 `*Constraint` 노드 대신 **`multMatrix` + `decomposeMatrix`
+노드 네트워크**로 구속한다(레거시 `JUN_PY_MatrixCon_01_01.py` 이식). 컨스트레인트 노드가 쌓이지
+않아 가볍고 부모공간/오프셋을 명시적으로 제어한다.
+
+- 체크하면 **`Translate` / `Rotate` / `Scale` 채널 체크박스**(기본 전부 on)가 활성화되고,
+  일반 constraint 종류 라디오는 비활성된다. 연결할 채널을 자유 조합한다.
+- `Maintain Offset` 체크박스는 일반 모드와 **공유**한다.
+  - on: 현재 오프셋을 유지하며 추종(offset = `follower.worldMatrix * target.worldInverseMatrix`).
+  - off: follower 가 target 에 스냅.
+- 부모 공간은 `follower.parentInverseMatrix[0]` 로 처리한다(부모가 없으면 자동 단위행렬).
+- **jointOrient 보정**: follower 가 joint 면 `jointOrient` 역행렬로 rotate 출력만 보정해 회전이
+  어긋나지 않는다(translate/scale 은 보정 전 행렬에서 가져옴).
+- 구운 offset 행렬 그룹은 `JUN_matAll_grp` 아래로 정리된다.
+- 브로드캐스트 규칙은 일반 모드와 동일(target 1개 → 다수 follower).
+- 원본 대비 수정: scale 채널이 translate 플래그로 잘못 게이팅되던 버그, `Maintain Offset` 이 무시되던
+  버그를 고쳤다.
+
 #### Skin Weight to Constraint
 선택한 버텍스의 **스킨 웨이트 비율**대로 영향 joint 들을 weight 로 follower 에
 `parentConstraint` 한다. (예: 버텍스 웨이트가 `hip:0.2 / spine_01:0.5 / spine_02:0.3` 이면
