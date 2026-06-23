@@ -53,12 +53,10 @@ class BlendShapeManager:
 
         bs_name = f"{mesh}_blendShape"
 
+        # 이미 blendShape 가 있으면 새 target 만 추가한다.
+        # (여러 Rule 을 누적 생성하는 "Create All" 에서 모든 target 이 들어가도록.)
         if cmds.objExists(bs_name):
-
-            print(
-                f"[Skip] BlendShape Exists : {bs_name}"
-            )
-
+            BlendShapeManager._append_targets(bs_name, mesh, targets)
             return bs_name
 
         bs = cmds.blendShape(
@@ -73,3 +71,26 @@ class BlendShapeManager:
         )
 
         return bs
+
+    @staticmethod
+    def _append_targets(bs_name, mesh, targets):
+        """기존 blendShape 노드에 아직 없는 target 만 다음 인덱스로 추가한다."""
+        # blendShape weight alias 이름 = target 이름. 이미 있는 것은 건너뛴다.
+        existing = set(cmds.listAttr(bs_name + ".w", multi=True) or [])
+        next_idx = cmds.getAttr(bs_name + ".weight", size=True)
+
+        for tgt in targets:
+            alias = tgt.split("|")[-1]
+
+            if alias in existing:
+                print(f"[Skip] Target exists in blendShape : {alias}")
+                continue
+
+            cmds.blendShape(
+                bs_name,
+                edit=True,
+                target=(mesh, next_idx, tgt, 1.0)
+            )
+
+            print(f"[Append Target] {bs_name}.{alias} (idx {next_idx})")
+            next_idx += 1

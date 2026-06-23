@@ -10,11 +10,17 @@ import maya.cmds as cmds
 from tools.A00090_ConnectionBuilder.app.config.version import VERSION
 from Framework.core.path_manager import PathManager
 
+from Framework.core.maya_undo import undo_chunk
+
 from tools.A00090_ConnectionBuilder.app.core import RuleLoader
 from tools.A00090_ConnectionBuilder.app.core import ConnectionManager
 from tools.A00090_ConnectionBuilder.app.core import AttributeManager
-from tools.A00090_ConnectionBuilder.app.core import BlendShapeManager
+from tools.A00090_ConnectionBuilder.app.core import TargetBuilder
 from tools.A00090_ConnectionBuilder.app.core import IntermediateManager
+
+
+# 재실행 시 기존 창을 찾아 닫기 위한 고유 objectName (창 누적 방지).
+WINDOW_OBJECT_NAME = "JUN_A00090_ConnectionBuilder_window"
 
 
 class MainWindow(QWidget):
@@ -22,6 +28,8 @@ class MainWindow(QWidget):
     def __init__(self):
 
         super().__init__(maya_main_window())
+
+        self.setObjectName(WINDOW_OBJECT_NAME)
 
         self.win_width      =  700
         self.win_height     =  500
@@ -55,20 +63,29 @@ class MainWindow(QWidget):
 
         row = QHBoxLayout()
 
-        row.addWidget(QLabel("Mesh for blendShape"))
+        row.addWidget(QLabel("Mesh / Node"))
 
         self.le_mesh = QLineEdit()
+        self.le_mesh.setToolTip(
+            "mesh -> creates blendShape targets named by the Rule mapping.\n"
+            "other node (joint/transform/control) -> creates attributes "
+            "named by the Rule mapping."
+        )
 
         row.addWidget(self.le_mesh)
 
         self.btn_mesh = QPushButton(self.btn_get_label)
-        self.btn_create_targets = QPushButton("Create targets")
+        # Create = 선택된 Rule 만, Create All = 모든 Rule.
+        self.btn_create = QPushButton("Create")
+        self.btn_create_all = QPushButton("Create All")
 
         self.btn_mesh.setFixedWidth(self.btn_width_01)
-        self.btn_create_targets.setFixedWidth(self.btn_width_01*2 + 10)
+        self.btn_create.setFixedWidth(self.btn_width_01)
+        self.btn_create_all.setFixedWidth(self.btn_width_01 + 10)
 
         row.addWidget(self.btn_mesh)
-        row.addWidget(self.btn_create_targets)
+        row.addWidget(self.btn_create)
+        row.addWidget(self.btn_create_all)
 
         main_layout.addLayout(row)
 
@@ -193,7 +210,8 @@ class MainWindow(QWidget):
         # -------------------------
 
         self.btn_mesh.clicked.connect( lambda: self.set_selected_node(self.le_mesh ))
-        self.btn_create_targets.clicked.connect(lambda: self.on_create_target(self.le_mesh))
+        self.btn_create.clicked.connect( self.on_create)
+        self.btn_create_all.clicked.connect( self.on_create_all)
 
         self.btn_connect_all.clicked.connect( self.on_connect_all)
         self.btn_connect.clicked.connect( self.on_connect)
@@ -387,15 +405,42 @@ class MainWindow(QWidget):
                 self.log(f"[Del Attr] {node} : {e}")
 
 
-    def on_create_target(self, le_mesh):
-        mesh = self.le_mesh.text().strip()
+    def _nodes_from_field(self):
+        """Mesh / Node 필드의 텍스트를 콤마로 나눠 노드 리스트로 반환."""
+        text = self.le_mesh.text().strip()
+        if not text:
+            return []
+        return [n.strip() for n in text.split(",") if n.strip()]
 
-        if not mesh:
+    def _build_for(self, rules, label):
+        """nodes x rules 로 target/attribute 를 생성한다.
+
+        노드가 mesh 면 blendShape target, 그 외면 attribute (TargetBuilder 가 판단).
+        """
+        nodes = self._nodes_from_field()
+        if not nodes:
+            self.log(f"[{label}] No node. Enter a mesh/object in the field.")
             return
 
-        rule = self.get_rule()
+        with undo_chunk():
+            for node in nodes:
+                for rule in rules:
+                    try:
+                        kind, _ = TargetBuilder.build(rule, node)
+                        self.log(
+                            f"[{label}] {kind} : {node} "
+                            f"({len(rule.mapping)} name(s))"
+                        )
+                    except Exception as e:
+                        self.log(f"[{label}] {node} : {e}")
 
-        BlendShapeManager.create_blendshape(
-            rule,
-            mesh
-        )
+        self.log(f"{label} Finished")
+
+    def on_create(self):
+        """선택된 Rule 하나로만 생성."""
+        self._build_for([self.get_rule()], "Create")
+
+    def on_create_all(self):
+        """rules_v01 의 모든 Rule 로 생성(메시는 target 누적, 노드는 attr 누적)."""
+        rules = [self.get_rule(name) for name in RuleLoader.find_all_json()]
+        self._build_for(rules, "Create All")

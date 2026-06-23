@@ -29,13 +29,19 @@ def run(reload_module=True):
         reload_for_tool("tools.A00090_ConnectionBuilder")
 
     # 리로드 후 갱신된 클래스를 잡기 위해 지역 import
-    from tools.A00090_ConnectionBuilder.app.ui.main_window import MainWindow
+    from tools.A00090_ConnectionBuilder.app.ui.main_window import (
+        MainWindow, WINDOW_OBJECT_NAME)
+    from Framework.qt.qt import QApplication
 
-    try:
-        window_instance.close()
-        window_instance.deleteLater()
-    except:
-        pass
+    # objectName 으로 떠 있는 기존 창을 모두 닫는다 (창 누적 방지).
+    # 전역 window_instance 가 리셋된 뒤(리로드 등)에도 이전 창을 확실히 닫는다.
+    for w in QApplication.topLevelWidgets():
+        if w.objectName() == WINDOW_OBJECT_NAME:
+            try:
+                w.close()
+                w.deleteLater()
+            except:
+                pass
 
     window_instance = MainWindow()
 
