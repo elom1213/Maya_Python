@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+  <g stroke="#aeb8c8" stroke-width="2" stroke-linecap="round" fill="none">
+    <polyline points="6,7 11,13 8,20"/>
+  </g>
+  <g fill="#aeb8c8">
+    <circle cx="6" cy="7" r="1.8"/>
+    <circle cx="11" cy="13" r="1.8"/>
+    <circle cx="8" cy="20" r="1.8"/>
+  </g>
+  <g fill="#9aa6b8">
+    <g transform="rotate(0 21 19)"><rect x="20" y="11.5" width="2" height="3"/></g>
+    <g transform="rotate(45 21 19)"><rect x="20" y="11.5" width="2" height="3"/></g>
+    <g transform="rotate(90 21 19)"><rect x="20" y="11.5" width="2" height="3"/></g>
+    <g transform="rotate(135 21 19)"><rect x="20" y="11.5" width="2" height="3"/></g>
+    <g transform="rotate(180 21 19)"><rect x="20" y="11.5" width="2" height="3"/></g>
+    <g transform="rotate(225 21 19)"><rect x="20" y="11.5" width="2" height="3"/></g>
+    <g transform="rotate(270 21 19)"><rect x="20" y="11.5" width="2" height="3"/></g>
+    <g transform="rotate(315 21 19)"><rect x="20" y="11.5" width="2" height="3"/></g>
+  </g>
+  <circle cx="21" cy="19" r="5" fill="#7c8aa0" stroke="#5a6678" stroke-width="0.8"/>
+  <circle cx="21" cy="19" r="1.8" fill="#2d2d30"/>
+</svg>

@@ -67,6 +67,7 @@ def install_shelf_button():
         parent=current_tab,
         label=TOOL_LABEL,
         annotation=TOOL_LABEL,
+        imageOverlayLabel=TOOL_LABEL,
         image1=ICON_NAME,
         style="iconAndTextVertical",
         command=SHELF_COMMAND,

@@ -23,7 +23,8 @@ if TOOL_ROOT not in sys.path:
 
 TOOL_LABEL = "uvTool"
 
-ICON_NAME = "pythonFamily.png"
+_ICON_PATH = os.path.join(TOOL_ROOT, "icon", "A00050_uvTool.png")
+ICON_NAME = _ICON_PATH if os.path.exists(_ICON_PATH) else "pythonFamily.png"
 
 SHELF_COMMAND = r'''
 import sys
@@ -67,6 +68,7 @@ def install_shelf_button():
         parent=current_tab,
         label=TOOL_LABEL,
         annotation=TOOL_LABEL,
+        imageOverlayLabel=TOOL_LABEL,
         image1=ICON_NAME,
         style="iconAndTextVertical",
         command=SHELF_COMMAND,

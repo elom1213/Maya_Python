@@ -36,7 +36,8 @@ if JUN_ALL_ROOT not in sys.path:
 
 TOOL_LABEL = "FKIK_Gen"
 
-ICON_NAME = "pythonFamily.png"
+_ICON_PATH = os.path.join(TOOL_ROOT, "icon", "A00190_FKIK_General_Tool.png")
+ICON_NAME = _ICON_PATH if os.path.exists(_ICON_PATH) else "pythonFamily.png"
 
 # 셸프 버튼이 실행할 명령. ROOT 는 JUN_All 경로여야 import tools.A00190_FKIK_General_Tool 가 동작한다.
 SHELF_COMMAND = r'''
@@ -80,6 +81,7 @@ def install_shelf_button():
         parent=current_tab,
         label=TOOL_LABEL,
         annotation=TOOL_LABEL,
+        imageOverlayLabel=TOOL_LABEL,
         image1=ICON_NAME,
         style="iconAndTextVertical",
         command=SHELF_COMMAND,
