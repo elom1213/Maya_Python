@@ -10,6 +10,7 @@ origin.mel 의 핵심 병목(정점마다 `xform` 명령 1회)을 없앤다.
 Maya 2023(Python 3.9 / API 2.0)에서 동작하는 API 만 사용한다.
 """
 
+import math
 import os
 
 import maya.api.OpenMaya as om
@@ -97,6 +98,109 @@ def set_points_direct(name, points, world=True):
     for p in points:
         arr.append(om.MPoint(float(p[0]), float(p[1]), float(p[2])))
     fn.setPoints(arr, _space(world))
+
+
+# ----------------------------------------------------------------------
+# 표면 최근접점 (closest-point-on-surface) 질의
+# ----------------------------------------------------------------------
+
+def closest_surface_points(ref_mesh, query_points, world=True, progress=None):
+    """각 query 좌표에 대해 ref_mesh 표면의 최근접점 좌표를 반환한다.
+
+    MFnMesh.getClosestPoint 를 사용(정점이 아니라 표면상의 점이라 토폴로지가
+    달라도 매끄럽게 붙는다). query_points 와 같은 공간(world/object)으로 다룬다.
+
+    Args:
+        ref_mesh: 레퍼런스 메시명.
+        query_points: [(x, y, z), ...].
+        world: True 면 월드, False 면 오브젝트 공간.
+
+    Returns:
+        [(x, y, z), ...]  (query_points 와 같은 길이/순서)
+    """
+    fn = get_mfn_mesh(ref_mesh)
+    space = _space(world)
+    out = []
+    total = len(query_points)
+    step = max(1, total // 200)
+    for k, q in enumerate(query_points):
+        if progress is not None and k % step == 0:
+            progress(k, total)
+        closest, _face = fn.getClosestPoint(
+            om.MPoint(float(q[0]), float(q[1]), float(q[2])), space)
+        out.append((closest.x, closest.y, closest.z))
+    if progress is not None:
+        progress(total, total)
+    return out
+
+
+def closest_surface_offsets(base_mesh, query_points, offsets,
+                            world=True, power=2.0, progress=None):
+    """각 query 좌표에서 base_mesh 표면 최근접점을 찾고, 그 면 정점들의 offsets 를
+    역거리가중(IDW)으로 보간한 벡터를 반환한다.
+
+    정점 단위 스냅(nearpoint)과 달리 표면을 따라 부드럽게 보간되어 mesh-flow / wrap
+    식 변형 전이가 된다. offsets 는 base_mesh 정점 수와 같은 길이의 (dx,dy,dz) 리스트.
+
+    Args:
+        base_mesh: 대응을 찾을 메시(입력0).
+        query_points: [(x,y,z), ...] (보통 각 정점의 미러 위치).
+        offsets: base 정점별 변형 오프셋 [(dx,dy,dz), ...].
+        world: True 면 월드 공간.
+        power: IDW 거듭제곱(클수록 최근접 정점에 가깝게).
+
+    Returns:
+        query 별 보간 오프셋 [(dx,dy,dz), ...].
+    """
+    fn = get_mfn_mesh(base_mesh)
+    space = _space(world)
+    verts = fn.getPoints(space)   # 정점 위치(거리 계산용)
+    eps2 = 1e-18
+    half_p = power / 2.0
+    out = []
+    total = len(query_points)
+    step = max(1, total // 200)
+    for k, q in enumerate(query_points):
+        if progress is not None and k % step == 0:
+            progress(k, total)
+        if not (math.isfinite(q[0]) and math.isfinite(q[1])
+                and math.isfinite(q[2])):
+            out.append((0.0, 0.0, 0.0))
+            continue
+        closest, face = fn.getClosestPoint(
+            om.MPoint(float(q[0]), float(q[1]), float(q[2])), space)
+        face_verts = fn.getPolygonVertices(face)
+
+        # 최근접점이 어느 정점과 일치하면 그 오프셋을 그대로 사용.
+        snap = None
+        weights = []
+        for v in face_verts:
+            dv = verts[v] - closest          # MPoint - MPoint -> MVector
+            d2 = dv.x * dv.x + dv.y * dv.y + dv.z * dv.z
+            if d2 <= eps2:
+                snap = v
+                break
+            weights.append((v, 1.0 / (d2 ** half_p)))
+
+        if snap is not None:
+            o = offsets[snap]
+            out.append((o[0], o[1], o[2]))
+            continue
+
+        total_w = 0.0
+        for _v, w in weights:
+            total_w += w
+        ox = oy = oz = 0.0
+        for v, w in weights:
+            o = offsets[v]
+            f = w / total_w
+            ox += o[0] * f
+            oy += o[1] * f
+            oz += o[2] * f
+        out.append((ox, oy, oz))
+    if progress is not None:
+        progress(total, total)
+    return out
 
 
 # ----------------------------------------------------------------------

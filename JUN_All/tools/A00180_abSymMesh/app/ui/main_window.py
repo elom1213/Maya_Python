@@ -9,6 +9,9 @@ Framework.qt.qt 가 PySide6 -> PySide2 폴백을 처리하므로 Maya 2023(PySid
 UI 문자열/로그는 영어. 씬 선택/Undo 청크는 maya.cmds, 정점 I/O 는 app.core 가 담당.
 """
 
+import math
+from contextlib import contextmanager
+
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
@@ -18,9 +21,16 @@ from Framework.qt.maya_window import maya_main_window
 from ..config.version import VERSION, LAST_UPDATE
 from ..core import mesh_io
 from ..core import sym_core
+from ..core import snap_core
+from ..core import mesh_ops
 
 
 WINDOW_OBJECT_NAME = "JUN_A00180_abSymMesh_window"
+
+
+class _ProgressCancelled(Exception):
+    """진행률 팝업에서 Cancel 을 누르면 무거운 코어 루프를 빠져나오기 위한 신호."""
+    pass
 
 _AXIS_LETTER = ["X", "Y", "Z"]
 # revert 팝업 % 값(1111 은 divider).
@@ -36,7 +46,7 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
         self.setWindowTitle("abSymMesh v{0}".format(VERSION))
         self.setWindowFlags(Qt.Window)
-        self.resize(260, 560)
+        self.resize(300, 640)
 
         # 상태(원본 전역 대체)
         self.sbg = ""          # base geometry
@@ -66,6 +76,30 @@ class MainWindow(QWidget):
         root = QVBoxLayout(self)
 
         root.setMenuBar(self._build_menu_bar())
+
+        # 탭: abSymMesh(기존) / Snap to Sym(신규). 향후 기능은 새 탭으로 추가.
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self._build_absym_tab(), "abSymMesh")
+        self.tabs.addTab(self._build_snap_tab(), "Snap to Sym")
+        self.tabs.addTab(self._build_mirrordeform_tab(), "Mirror Deform")
+        root.addWidget(self.tabs)
+
+        # 로그 / 푸터는 탭 공용(항상 보임).
+        self.log_view = QPlainTextEdit()
+        self.log_view.setReadOnly(True)
+        self.log_view.setFixedHeight(90)
+        root.addWidget(self.log_view)
+
+        footer = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
+        footer.setAlignment(Qt.AlignCenter)
+        root.addWidget(footer)
+
+        self._set_dep_enabled(False)
+
+    def _build_absym_tab(self):
+        """기존 abSymMesh 기능 전체를 담는 탭."""
+        tab = QWidget()
+        root = QVBoxLayout(tab)
 
         root.addLayout(self._build_axis_row())
         root.addLayout(self._build_tol_row())
@@ -118,21 +152,213 @@ class MainWindow(QWidget):
         self.cb_usepiv.setChecked(True)
         root.addWidget(self.cb_usepiv)
 
-        btn_close = QPushButton("Close")
-        btn_close.clicked.connect(self.close)
-        root.addWidget(btn_close)
+        root.addStretch(1)
+        return tab
 
-        # 로그
-        self.log_view = QPlainTextEdit()
-        self.log_view.setReadOnly(True)
-        self.log_view.setFixedHeight(90)
-        root.addWidget(self.log_view)
+    # ------------------------------------------------------------------
+    # Snap to Sym 탭 (nearpoint 스냅 + 기하학적 대칭 레퍼런스 생성)
+    # ------------------------------------------------------------------
 
-        footer = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
-        footer.setAlignment(Qt.AlignCenter)
-        root.addWidget(footer)
+    def _build_snap_tab(self):
+        tab = QWidget()
+        root = QVBoxLayout(tab)
 
-        self._set_dep_enabled(False)
+        root.addWidget(QLabel(
+            "Snap an asymmetric mesh onto a symmetric reference\n"
+            "(Houdini nearpoint style). Topology need not match."))
+
+        # Source (수정 대상)
+        src_row = QHBoxLayout()
+        self.btn_snap_src = QPushButton("Set Source")
+        self.btn_snap_src.clicked.connect(self.on_snap_set_source)
+        self.le_snap_src = QLineEdit()
+        self.le_snap_src.setReadOnly(True)
+        self.le_snap_src.setPlaceholderText("Source (mesh to modify)")
+        src_row.addWidget(self.btn_snap_src)
+        src_row.addWidget(self.le_snap_src)
+        root.addLayout(src_row)
+
+        # Reference (대칭 레퍼런스)
+        ref_row = QHBoxLayout()
+        self.btn_snap_ref = QPushButton("Set Reference")
+        self.btn_snap_ref.clicked.connect(self.on_snap_set_reference)
+        self.le_snap_ref = QLineEdit()
+        self.le_snap_ref.setReadOnly(True)
+        self.le_snap_ref.setPlaceholderText("Reference (symmetric mesh)")
+        ref_row.addWidget(self.btn_snap_ref)
+        ref_row.addWidget(self.le_snap_ref)
+        root.addLayout(ref_row)
+
+        root.addWidget(self._hline())
+
+        # 스냅 모드 (기본: 최근접 정점)
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Snap to"))
+        self.snap_mode_group = QButtonGroup(self)
+        rb_vtx = QRadioButton("Nearest Vertex")
+        rb_srf = QRadioButton("Closest Surface")
+        rb_vtx.setChecked(True)
+        self.snap_mode_group.addButton(rb_vtx, 0)   # 0 = nearest vertex
+        self.snap_mode_group.addButton(rb_srf, 1)   # 1 = closest surface
+        mode_row.addWidget(rb_vtx)
+        mode_row.addWidget(rb_srf)
+        mode_row.addStretch(1)
+        root.addLayout(mode_row)
+
+        self.cb_snap_selected = QCheckBox("Selected vertices only")
+        root.addWidget(self.cb_snap_selected)
+
+        self.btn_snap_apply = QPushButton("Snap Source to Reference")
+        self.btn_snap_apply.clicked.connect(self.on_snap_apply)
+        root.addWidget(self.btn_snap_apply)
+
+        root.addWidget(self._hline())
+
+        # 대칭 레퍼런스 생성
+        root.addWidget(QLabel("Make Symmetric Reference"))
+        sym_row = QHBoxLayout()
+        sym_row.addWidget(QLabel("Mirror Axis"))
+        self.snap_axis_group = QButtonGroup(self)
+        for idx, label in enumerate(["X", "Y", "Z"]):
+            rb = QRadioButton(label)
+            self.snap_axis_group.addButton(rb, idx)   # 0/1/2 = X/Y/Z
+            sym_row.addWidget(rb)
+            if idx == 0:
+                rb.setChecked(True)
+        sym_row.addStretch(1)
+        root.addLayout(sym_row)
+
+        # Method(미러/평균) + 소스 면 방향
+        method_row = QHBoxLayout()
+        method_row.addWidget(QLabel("Method"))
+        self.cmb_sym_method = QComboBox()
+        # 0 = Mirror one side(정점 위치 복사), 1 = Average both(평균),
+        # 2 = Mirror geometry(반 잘라 미러, 토폴로지 재생성)
+        self.cmb_sym_method.addItems(
+            ["Mirror one side", "Average both", "Mirror geometry (cut)"])
+        method_row.addWidget(self.cmb_sym_method)
+        method_row.addWidget(QLabel("Source"))
+        self.cmb_sym_side = QComboBox()
+        # 0 = +to-, 1 = -to+ (Mirror one side 일 때만 의미)
+        self.cmb_sym_side.addItems(["+ to -", "- to +"])
+        method_row.addWidget(self.cmb_sym_side)
+        method_row.addStretch(1)
+        root.addLayout(method_row)
+        # Average 모드(1)에선 소스 면 선택이 의미 없으므로 비활성.
+        self.cmb_sym_method.currentIndexChanged.connect(
+            lambda i: self.cmb_sym_side.setEnabled(i != 1))
+
+        # 대칭 평면 원점 + 시임 허용오차(Mirror geometry 용)
+        origin_row = QHBoxLayout()
+        origin_row.addWidget(QLabel("Origin"))
+        self.cmb_sym_origin = QComboBox()
+        # 0 = Object Pivot, 1 = World 0, 2 = BBox Center
+        self.cmb_sym_origin.addItems(["Object Pivot", "World 0", "BBox Center"])
+        origin_row.addWidget(self.cmb_sym_origin)
+        origin_row.addWidget(QLabel("Seam tol"))
+        self.spin_seam_tol = QDoubleSpinBox()
+        self.spin_seam_tol.setDecimals(4)
+        self.spin_seam_tol.setRange(0.0, 1.0)
+        self.spin_seam_tol.setSingleStep(0.001)
+        self.spin_seam_tol.setValue(0.001)
+        self.spin_seam_tol.setToolTip(
+            "Mirror geometry: seam snap / merge tolerance "
+            "(verts within this distance of the plane are treated as the seam).")
+        origin_row.addWidget(self.spin_seam_tol)
+        origin_row.addStretch(1)
+        root.addLayout(origin_row)
+
+        self.btn_make_symref = QPushButton("Make Symmetric Reference from Source")
+        self.btn_make_symref.clicked.connect(self.on_make_symref)
+        root.addWidget(self.btn_make_symref)
+
+        root.addStretch(1)
+        return tab
+
+    # ------------------------------------------------------------------
+    # Mirror Deform 탭 (변형량을 미러 평면 건너편으로 반사)
+    # ------------------------------------------------------------------
+
+    def _build_mirrordeform_tab(self):
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+
+        root.addWidget(QLabel(
+            "Mirror a deformation across the plane (Houdini nearpoint style).\n"
+            "Base = original, Deformed = same mesh with one region changed.\n"
+            "Both must share topology (same vertex count/order)."))
+
+        # Base (input0)
+        base_row = QHBoxLayout()
+        self.btn_md_base = QPushButton("Set Base")
+        self.btn_md_base.clicked.connect(self.on_md_set_base)
+        self.le_md_base = QLineEdit()
+        self.le_md_base.setReadOnly(True)
+        self.le_md_base.setPlaceholderText("Base (input 0, original)")
+        base_row.addWidget(self.btn_md_base)
+        base_row.addWidget(self.le_md_base)
+        root.addLayout(base_row)
+
+        # Deformed (input1)
+        def_row = QHBoxLayout()
+        self.btn_md_def = QPushButton("Set Deformed")
+        self.btn_md_def.clicked.connect(self.on_md_set_deformed)
+        self.le_md_def = QLineEdit()
+        self.le_md_def.setReadOnly(True)
+        self.le_md_def.setPlaceholderText("Deformed (input 1, edited region)")
+        def_row.addWidget(self.btn_md_def)
+        def_row.addWidget(self.le_md_def)
+        root.addLayout(def_row)
+
+        root.addWidget(self._hline())
+
+        # Mirror axis + 대응 방식
+        axis_row = QHBoxLayout()
+        axis_row.addWidget(QLabel("Mirror Axis"))
+        self.md_axis_group = QButtonGroup(self)
+        for idx, label in enumerate(["X", "Y", "Z"]):
+            rb = QRadioButton(label)
+            self.md_axis_group.addButton(rb, idx)   # 0/1/2 = X/Y/Z
+            axis_row.addWidget(rb)
+            if idx == 0:
+                rb.setChecked(True)
+        axis_row.addWidget(QLabel("Match"))
+        self.cmb_md_match = QComboBox()
+        # 0 = Nearest Vertex(정점 스냅), 1 = Closest Surface(표면 보간, wrap 식)
+        self.cmb_md_match.addItems(["Nearest Vertex", "Closest Surface"])
+        self.cmb_md_match.setToolTip(
+            "Nearest Vertex: mirror partner = nearest base vertex (nearpoint).\n"
+            "Closest Surface: closest point on base surface + per-face IDW "
+            "interpolation (smooth, wrap/mesh-flow style).")
+        axis_row.addWidget(self.cmb_md_match)
+        axis_row.addStretch(1)
+        root.addLayout(axis_row)
+
+        # Apply onto + Origin
+        opt_row = QHBoxLayout()
+        opt_row.addWidget(QLabel("Apply onto"))
+        self.cmb_md_onto = QComboBox()
+        # 0 = Base(반사만, VEX 그대로), 1 = Deformed(대칭화: 원본 변형 유지 + 반대쪽 반사)
+        self.cmb_md_onto.addItems(["Base (reflect)", "Deformed (symmetrize)"])
+        self.cmb_md_onto.setToolTip(
+            "Base: reflect the deformation onto the opposite side on the base "
+            "(VEX behavior).\n"
+            "Deformed: keep the original deformation and add the mirrored one "
+            "(both sides).")
+        opt_row.addWidget(self.cmb_md_onto)
+        opt_row.addWidget(QLabel("Origin"))
+        self.cmb_md_origin = QComboBox()
+        self.cmb_md_origin.addItems(["Object Pivot", "World 0", "BBox Center"])
+        opt_row.addWidget(self.cmb_md_origin)
+        opt_row.addStretch(1)
+        root.addLayout(opt_row)
+
+        self.btn_md_apply = QPushButton("Mirror Deformation")
+        self.btn_md_apply.clicked.connect(self.on_mirror_deform)
+        root.addWidget(self.btn_md_apply)
+
+        root.addStretch(1)
+        return tab
 
     def _build_menu_bar(self):
         bar = QMenuBar()
@@ -185,6 +411,40 @@ class MainWindow(QWidget):
     def _set_dep_enabled(self, state):
         for w in self._dep_widgets:
             w.setEnabled(state)
+
+    # ==================================================================
+    # 진행률 팝업 (긴 작업용)
+    # ==================================================================
+
+    @contextmanager
+    def _progress(self, label, total):
+        """게이지바 팝업을 띄우고 (i, n) 콜백을 yield 한다.
+
+        - 짧은 작업(<400ms)에서는 팝업이 뜨지 않는다(setMinimumDuration).
+        - Cancel 을 누르면 콜백이 _ProgressCancelled 를 던져 코어 루프를 중단한다.
+        - 코어 함수에 progress=콜백 으로 넘겨서 쓴다.
+        """
+        dlg = QProgressDialog(label, "Cancel", 0, max(1, total), self)
+        dlg.setWindowTitle("abSymMesh")
+        dlg.setWindowModality(Qt.WindowModal)
+        dlg.setMinimumDuration(400)
+        dlg.setAutoClose(False)
+        dlg.setAutoReset(False)
+        dlg.setValue(0)
+
+        def cb(i, n):
+            if dlg.maximum() != n:
+                dlg.setMaximum(max(1, n))
+            dlg.setValue(i)
+            QApplication.processEvents()
+            if dlg.wasCanceled():
+                raise _ProgressCancelled()
+
+        try:
+            yield cb
+        finally:
+            dlg.reset()
+            dlg.deleteLater()
 
     # ==================================================================
     # 로그 / 경고
@@ -602,6 +862,276 @@ class MainWindow(QWidget):
         bias = self._slider_to_bias(self.slider.value())
         self._overshoot = checked
         self.slider.setValue(self._bias_to_slider(bias))
+
+    # ==================================================================
+    # 슬롯 : Snap to Sym 탭
+    # ==================================================================
+
+    def _selected_single_mesh(self):
+        """현재 선택에서 단일 폴리곤 메시명을 반환(아니면 "" + 경고)."""
+        sel = cmds.filterExpand(sm=12) or []
+        if len(sel) != 1:
+            self._warn("Select exactly one polygon mesh.")
+            return ""
+        return sel[0]
+
+    def _is_mesh(self, name):
+        return bool(name) and cmds.objExists(name) and \
+            cmds.listRelatives(name, type="mesh") is not None
+
+    def on_snap_set_source(self):
+        mesh = self._selected_single_mesh()
+        if mesh:
+            self.le_snap_src.setText(mesh)
+
+    def on_snap_set_reference(self):
+        mesh = self._selected_single_mesh()
+        if mesh:
+            self.le_snap_ref.setText(mesh)
+
+    def _snap_selected_indices(self, src):
+        """'Selected vertices only' 체크 시, src 의 선택 정점 인덱스(없으면 None=전체)."""
+        if not self.cb_snap_selected.isChecked():
+            return None
+        mesh, indices = mesh_io.selected_vertices()
+        if not indices:
+            self._warn("No vertices selected. Select source vertices or "
+                       "uncheck 'Selected vertices only'.")
+            return False
+        return indices
+
+    def on_snap_apply(self):
+        src = self.le_snap_src.text().strip()
+        ref = self.le_snap_ref.text().strip()
+        if not self._is_mesh(src):
+            self._warn("Source is not a valid mesh. Press 'Set Source'.")
+            return
+        if not self._is_mesh(ref):
+            self._warn("Reference is not a valid mesh. Press 'Set Reference'.")
+            return
+        if src == ref:
+            self._warn("Source and Reference must be different meshes.")
+            return
+
+        indices = self._snap_selected_indices(src)
+        if indices is False:
+            return
+
+        nearest_vertex = self.snap_mode_group.checkedId() == 0
+
+        try:
+            with undo_chunk(), self._progress(
+                    "Snap to Reference", mesh_io.vertex_count(src)) as prog:
+                src_pts = mesh_io.get_points(src, world=True)
+
+                bad = snap_core.count_invalid(src_pts)
+                if bad:
+                    self._warn("'{0}' has {1} NaN/inf vertex(es); they are left "
+                               "unchanged. Clean the mesh (Mesh > Cleanup)."
+                               .format(src, bad))
+
+                # 다른 메시의 정점이 선택돼 있어도 범위를 벗어난 인덱스는 버린다.
+                if indices is not None:
+                    indices = [i for i in indices if 0 <= i < len(src_pts)]
+                    if not indices:
+                        self._warn("Selected vertices are not on the Source mesh.")
+                        return
+
+                if nearest_vertex:
+                    ref_pts = mesh_io.get_points(ref, world=True)
+                    new, moved = snap_core.snap_to_nearest_vertex(
+                        src_pts, ref_pts, indices, progress=prog)
+                else:
+                    idx = range(len(src_pts)) if indices is None else indices
+                    idx = list(idx)
+                    query = [src_pts[i] for i in idx]
+                    closest = mesh_io.closest_surface_points(
+                        ref, query, world=True, progress=prog)
+                    new = [tuple(p) for p in src_pts]
+                    for k, i in enumerate(idx):
+                        new[i] = closest[k]
+                    moved = len(idx)
+
+                mesh_io.set_points_undoable(src, new, world=True)
+        except _ProgressCancelled:
+            self._info("Snap cancelled.")
+            return
+
+        mode = "nearest vertex" if nearest_vertex else "closest surface"
+        self._info("Snapped {0} vert(s) of '{1}' to '{2}' ({3}).".format(
+            moved, src, ref, mode))
+
+    def _sym_origin_mid(self, mesh, axis):
+        """Origin 콤보 선택대로 대칭 평면 원점(축 성분값)을 계산한다."""
+        choice = self.cmb_sym_origin.currentIndex()
+        if choice == 1:       # World 0
+            return 0.0
+        if choice == 2:       # BBox Center
+            return mesh_io.axis_bbox_mid(mesh, axis)
+        return mesh_io.axis_pivot(mesh, axis)   # 0 = Object Pivot
+
+    def on_make_symref(self):
+        src = self.le_snap_src.text().strip()
+        if not self._is_mesh(src):
+            src = self._selected_single_mesh()
+            if not self._is_mesh(src):
+                self._warn("Set a valid Source mesh first.")
+                return
+
+        axis = self.snap_axis_group.checkedId()
+        method_idx = self.cmb_sym_method.currentIndex()   # 0 mirror, 1 avg, 2 geometry
+        positive_source = self.cmb_sym_side.currentIndex() == 0   # "+ to -"
+        name = "{0}_symRef".format(src.split("|")[-1].split(":")[-1])
+
+        # 원점(mid)을 먼저 구해 검증한다. NaN 정점이 있는 메시는 bbox/pivot 이
+        # NaN 이 될 수 있고, 그러면 전 정점이 깨지므로 시작 전에 막는다.
+        mid = self._sym_origin_mid(src, axis)
+        if not math.isfinite(mid):
+            self._warn("Symmetry origin is invalid (NaN/inf) for '{0}'. The mesh "
+                       "likely has broken vertices; clean it (Mesh > Cleanup) or "
+                       "use Origin = World 0.".format(src))
+            return
+
+        # 모드 2: 반 잘라 미러(지오메트리 재생성).
+        if method_idx == 2:
+            seam = self.spin_seam_tol.value()
+            try:
+                with undo_chunk():
+                    dup = cmds.duplicate(src, name=name)[0]
+                    result = mesh_ops.mirror_geometry(
+                        dup, axis, mid, positive_source, seam, seam)
+                    result = cmds.rename(result, name)
+            except Exception as exc:
+                self._warn("Mirror geometry failed: {0}".format(exc))
+                return
+            self.le_snap_ref.setText(result)
+            cmds.select(result)
+            self._info("Created symmetric reference '{0}' (geometry mirror "
+                       "{1}, axis {2}).".format(
+                           result, "+to-" if positive_source else "-to+",
+                           _AXIS_LETTER[axis]))
+            return
+
+        # 모드 0/1: 정점 위치 기반(토폴로지 유지).
+        # 무거운 계산을 먼저 끝내고(취소 가능) 마지막에 복제+적용한다.
+        # (복제를 먼저 만들면 계산 중 Cancel 시 변형 안 된 복제본이 씬에 남는다.)
+        try:
+            with undo_chunk(), self._progress(
+                    "Make Symmetric Reference",
+                    mesh_io.vertex_count(src)) as prog:
+                pts = mesh_io.get_points(src, world=True)
+
+                bad = snap_core.count_invalid(pts)
+                if bad:
+                    self._warn("'{0}' has {1} NaN/inf vertex(es); they are left "
+                               "unchanged. Clean the mesh (Mesh > Cleanup)."
+                               .format(src, bad))
+
+                if method_idx == 0:
+                    new = snap_core.mirror_one_side_points(
+                        pts, axis, mid, positive_source, progress=prog)
+                else:
+                    new = snap_core.make_symmetric_points(
+                        pts, axis, mid, progress=prog)
+
+                dup = cmds.duplicate(src, name=name)[0]
+                mesh_io.set_points_undoable(dup, new, world=True)
+        except _ProgressCancelled:
+            self._info("Make Symmetric Reference cancelled.")
+            return
+
+        self.le_snap_ref.setText(dup)
+        cmds.select(dup)
+        method = ("mirror {0}".format("+to-" if positive_source else "-to+")
+                  if method_idx == 0 else "average")
+        self._info("Created symmetric reference '{0}' (axis {1}, {2}).".format(
+            dup, _AXIS_LETTER[axis], method))
+
+    # ==================================================================
+    # 슬롯 : Mirror Deform 탭
+    # ==================================================================
+
+    def on_md_set_base(self):
+        mesh = self._selected_single_mesh()
+        if mesh:
+            self.le_md_base.setText(mesh)
+
+    def on_md_set_deformed(self):
+        mesh = self._selected_single_mesh()
+        if mesh:
+            self.le_md_def.setText(mesh)
+
+    def _md_origin_mid(self, mesh, axis):
+        choice = self.cmb_md_origin.currentIndex()
+        if choice == 1:       # World 0
+            return 0.0
+        if choice == 2:       # BBox Center
+            return mesh_io.axis_bbox_mid(mesh, axis)
+        return mesh_io.axis_pivot(mesh, axis)   # 0 = Object Pivot
+
+    def on_mirror_deform(self):
+        base = self.le_md_base.text().strip()
+        deformed = self.le_md_def.text().strip()
+        if not self._is_mesh(base):
+            self._warn("Base is not a valid mesh. Press 'Set Base'.")
+            return
+        if not self._is_mesh(deformed):
+            self._warn("Deformed is not a valid mesh. Press 'Set Deformed'.")
+            return
+        if mesh_io.vertex_count(base) != mesh_io.vertex_count(deformed):
+            self._warn("Base and Deformed must share topology (vertex count "
+                       "differs). Deformed must be an edited copy of Base.")
+            return
+
+        axis = self.md_axis_group.checkedId()
+        onto_deformed = self.cmb_md_onto.currentIndex() == 1
+        surface_match = self.cmb_md_match.currentIndex() == 1
+
+        mid = self._md_origin_mid(base, axis)
+        if not math.isfinite(mid):
+            self._warn("Mirror origin is invalid (NaN/inf). Clean the mesh or "
+                       "use Origin = World 0.")
+            return
+
+        name = "{0}_mirrorDef".format(
+            base.split("|")[-1].split(":")[-1])
+        n = mesh_io.vertex_count(base)
+
+        try:
+            with undo_chunk(), self._progress("Mirror Deformation", n) as prog:
+                base_pts = mesh_io.get_points(base, world=True)
+                def_pts = mesh_io.get_points(deformed, world=True)
+
+                if surface_match:
+                    # 표면 최근접점 + 면 정점 IDW 보간(wrap/mesh-flow 식).
+                    offsets = [(d[0] - b[0], d[1] - b[1], d[2] - b[2])
+                               for b, d in zip(base_pts, def_pts)]
+                    mirror_pos = [snap_core.reflect(b, axis, mid)
+                                  for b in base_pts]
+                    interp = mesh_io.closest_surface_offsets(
+                        base, mirror_pos, offsets, world=True, progress=prog)
+                    new = snap_core.apply_mirrored_offsets(
+                        base_pts, def_pts, interp, axis, onto_deformed)
+                else:
+                    # 최근접 정점(nearpoint).
+                    new = snap_core.mirror_deformation(
+                        base_pts, def_pts, axis, mid, onto_deformed,
+                        progress=prog)
+
+                # 결과는 base 토폴로지의 새 메시로 출력(원본 둘 다 보존).
+                dup = cmds.duplicate(base, name=name)[0]
+                mesh_io.set_points_undoable(dup, new, world=True)
+        except _ProgressCancelled:
+            self._info("Mirror Deformation cancelled.")
+            return
+
+        self.le_snap_ref.setText(dup)   # 바로 스냅 레퍼런스로 쓸 수 있게 연계.
+        cmds.select(dup)
+        self._info(
+            "Mirrored deformation -> '{0}' (axis {1}, {2}, onto {3}).".format(
+                dup, _AXIS_LETTER[axis],
+                "surface" if surface_match else "vertex",
+                "deformed" if onto_deformed else "base"))
 
     # ==================================================================
     # Help

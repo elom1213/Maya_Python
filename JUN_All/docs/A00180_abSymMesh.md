@@ -11,11 +11,17 @@
   로 전체 좌표를 한 번에 읽고 쓴다.
 - **대칭 테이블**: O(N²) 매칭 + 선형 탐색을 **공간 해시 O(N) + dict O(1) 조회**로 대체.
 - **Undo**: 모든 정점 편집은 Undo 가능 커맨드(`abSymSetPoints`)를 경유 → **Ctrl+Z** 정상.
+- **진행률 팝업**(v02.03~): 정점 수가 많은 무거운 작업(Snap / Make Symmetric Reference / Mirror
+  Deformation)은 게이지바 팝업(`QProgressDialog`)으로 진행도를 보여주고 **Cancel** 로 중단할 수 있다
+  (짧은 작업은 ~0.4초 안에 끝나면 팝업이 뜨지 않는다). 중단하면 씬 편집 전에 빠져나와 변경이 남지 않는다.
 - **UI**: PySide(`Framework.qt.qt` 가 PySide6→PySide2 폴백). 테마는 `ThemeManager` 의 `yellow_dark` qss.
 - **Maya 2023 호환** (Python 3.9 / PySide2 / OpenMaya 2.0). UI 문자열/로그는 모두 영어.
 
 > **전제**: 미러/플립/리버트는 **base 메시와 동일한 정점 순서(토폴로지)**를 가진 메시에서 동작한다.
 > 대칭 메시로 base 를 잡은 뒤, 그 복제본(블렌드셰이프 타겟)에 기능을 적용하는 방식이다.
+
+UI 는 **탭** 구성이다(v02.02~). **`abSymMesh`** 탭(위 기존 기능 전부)과 **`Snap to Sym`** 탭(아래
+8장: 토폴로지가 달라도 동작하는 최근접 스냅 / 대칭 레퍼런스 생성). 로그/푸터는 두 탭 공용이다.
 
 ---
 
@@ -30,8 +36,10 @@ A00180_abSymMesh/
 └── app/
     ├── config/version.py # VERSION / LAST_UPDATE
     ├── core/             # 로직 (씬 비의존 + 씬 I/O 분리) — UI 와 무관, 재사용
-    │   ├── mesh_io.py        # OpenMaya 벌크 getPoints/setPoints, 선택/좌표 유틸, 플러그인 로드
+    │   ├── mesh_io.py        # OpenMaya 벌크 getPoints/setPoints, closest_surface_points, 유틸
     │   ├── sym_core.py       # 공간 해시 대칭 + 미러/플립/리버트/카피 수학 (순수 계산)
+    │   ├── snap_core.py      # 최근접 정점 스냅 + 기하 대칭화 (공간 격자, 토폴로지 무관, 순수 계산)
+    │   ├── mesh_ops.py       # 지오메트리 편집(반 잘라 미러 = Mirror geometry 모드, cmds)
     │   ├── undo_bridge.py    # 플러그인 ↔ 툴 staging (PENDING 페이로드 단일 객체 공유)
     │   └── undo_cmd.py       # MPxCommand 플러그인 (abSymSetPoints, Undo 가능 setPoints)
     └── ui/main_window.py # 전체 UI (PySide) + 핸들러 (MainWindow)
@@ -63,7 +71,7 @@ A00180_abSymMesh/
 
 ---
 
-## 5. UI 구성
+## 5. UI 구성 — `abSymMesh` 탭
 
 | 요소 | 의미 |
 |------|------|
@@ -80,9 +88,92 @@ A00180_abSymMesh/
 | (Revert 슬라이더) | 드래그로 선택 정점을 base 로 **실시간** 보간(0=base, 1=현위치). |
 | **Operate -X to +X** | 미러/플립 시 음(−)축 → 양(+)축 방향으로 소스 면을 잡는다. 라벨은 축에 따라 변함. |
 | **Use Pivot as Origin** | 체크(기본)면 오브젝트 pivot 을 대칭축 원점으로, 해제면 월드 원점/bbox 중앙을 쓴다. |
-| **Close** | 창 닫기. |
 | **Operations 메뉴** | Copy A→B / Add A→B / Subtract A from B (두 메시 선택). |
 | (Revert 슬라이더 우클릭) | Use Selected as Base / Use Original Base / Select Moved from Revert Base. |
+
+---
+
+## 5-1. UI 구성 — `Snap to Sym` 탭 (v02.02)
+
+비대칭 메시를 **대칭 레퍼런스 메시에 최근접 스냅**해 거의 대칭으로 만든다. Houdini point wrangle 의
+`nearpoint()` 스냅(0번=수정 대상, 1번=레퍼런스)을 옮긴 기능으로, **abSymMesh 탭과 달리 두 메시의
+정점 순서(토폴로지)가 같지 않아도 동작한다**(공간 격자 최근접 탐색, `app/core/snap_core.py`).
+
+| 요소 | 의미 |
+|------|------|
+| **Set Source** / (필드) | 수정 대상(비대칭) 메시를 현재 선택에서 지정. |
+| **Set Reference** / (필드) | 대칭 레퍼런스 메시를 현재 선택에서 지정. |
+| **Snap to: Nearest Vertex / Closest Surface** | 스냅 대상. **Nearest Vertex**(기본): 레퍼런스의 가장 가까운 **정점**으로(=VEX nearpoint). **Closest Surface**: 레퍼런스 **표면**의 최근접점(`MFnMesh.getClosestPoint`, 토폴로지 달라도 매끄럽게 붙음). |
+| **Selected vertices only** | 체크 시 source 의 **선택 정점**만 스냅(해제면 전체). |
+| **Snap Source to Reference** | 스냅 실행(월드 공간, Undo 가능). 로그에 이동 정점 수 출력. |
+| **Mirror Axis: X / Y / Z** | 대칭 레퍼런스 생성 시 미러 축. |
+| **Method: Mirror one side / Average both / Mirror geometry (cut)** | 대칭화 방식(아래). 기본 **Mirror one side**. |
+| **Source: + to − / − to +** | 어느 면을 소스로 반대쪽에 미러할지(Mirror one side · Mirror geometry 에서 사용). |
+| **Origin: Object Pivot / World 0 / BBox Center** | 대칭 평면의 축 원점. 메시가 원점에서 모델링되지 않았으면 **BBox Center** 가 안전. |
+| **Seam tol** | **Mirror geometry** 전용: 평면 근처 정점을 시임으로 보고 평면에 스냅/병합하는 허용 오차. |
+| **Make Symmetric Reference from Source** | Source 를 복제(`<source>_symRef`)해 대칭화한 레퍼런스를 만들고 Reference 필드에 자동 지정. 원본은 변하지 않는다. |
+
+**대칭화 방식 3가지**
+- **Mirror one side** (기본, 토폴로지 유지): 소스 면(+ 또는 −)의 **정점 위치**를 반대쪽 정점에 반사 복사
+  → 완전 대칭. 정점 수/순서가 양쪽 대칭인 메시에 적합. 토폴로지는 그대로.
+- **Average both** (토폴로지 유지): 각 정점 p 를 `p` 와 (미러 집합 최근접점)의 **평균**으로 옮긴다 →
+  양쪽의 중간 형상. 비대칭의 **절반만** 이동하므로 약한 비대칭은 변화가 미세할 수 있다.
+  (예: −X/+X 의 `1.0 / −1.2` → `±1.1`.)
+- **Mirror geometry (cut)** (**토폴로지 재생성**): 반대쪽 반 면을 **삭제** → 시임 정점을 평면으로 스냅
+  → 남은 반을 **반사 복제·병합**. Maya `Mesh > Mirror` 와 같은 고전적 방식으로, **원본 토폴로지가
+  비대칭이어도** 완전 대칭 메시를 만든다(정점 수/순서가 바뀜). 시임 edge 가 평면 근처에 있는
+  메시에 적합. (소스 면에 지오메트리가 없으면 — 원점이 메시 밖 — 경고 후 중단.)
+
+> **변화가 없어 보이면**: ① **Origin** 이 실제 대칭면과 맞는지 확인(원점에서 모델링 안 됐으면 `BBox
+> Center`), ② Average 모드는 절반만 이동하므로 확실한 대칭은 **Mirror one side** 사용, ③ 생성된
+> `_symRef` 가 원본과 겹쳐 보이는지 확인(생성 후 자동 선택됨).
+
+> **깨진 정점(NaN/inf)**: 좌표가 비정상인 정점은 스냅/대칭화에서 **건드리지 않고 건너뛰며** 로그에
+> 개수를 경고한다. Origin 이 NaN 으로 계산되면(메시 전체가 깨짐) 작업을 막는다. `Mesh > Cleanup`
+> 으로 정리하거나 Origin 을 `World 0` 으로 두면 된다.
+
+**권장 흐름**
+1. 비대칭 메시 선택 → **Set Source**.
+2. **Make Symmetric Reference from Source** (또는 별도 대칭 메시를 **Set Reference**).
+   - 외부의 깨끗한 대칭 메시(토폴로지 달라도 됨)를 레퍼런스로 써도 된다.
+3. (선택) 스냅 모드/범위 지정 → **Snap Source to Reference**. Source 가 레퍼런스 형상으로
+   대칭에 가깝게 정렬되며, **Source 의 원본 토폴로지/UV 는 유지**된다.
+
+> **기존 Maya 유사 기능**: `Mesh > Transfer Attributes`(Vertex Position + Closest point on surface),
+> `shrinkWrap` 디포머(Closest point), `closestPointOnMesh` 노드 — 모두 표면 최근접 전이라
+> Closest Surface 모드와 개념이 같다. Nearest Vertex 모드가 VEX `nearpoint` 와 가장 일치한다.
+
+---
+
+## 5-2. UI 구성 — `Mirror Deform` 탭 (v02.03)
+
+**변형(deformation)을 미러 평면 건너편으로 반사**한다. Houdini Attribute Wrangle 의 nearpoint 기반
+미러 오프셋(`@P += mirror_offset_P`)을 옮긴 기능. `app/core/snap_core.py: mirror_deformation`.
+
+- **Base**(입력0): 원본 메시(대칭 또는 비대칭).
+- **Deformed**(입력1): Base 의 **한 부위만 변형한 사본**. Base 와 **같은 토폴로지**(정점 수/순서)여야 한다.
+- 동작: 각 정점 i 에 대해 Base 에서 i 의 **미러 위치 최근접 정점 m**(nearpoint)을 찾고, m 의 변형량
+  `Deformed[m] − Base[m]` 을 축 기준으로 반사해 적용한다. 대칭 토폴로지가 아니어도 동작한다.
+
+| 요소 | 의미 |
+|------|------|
+| **Set Base** / (필드) | Base(입력0) 메시 지정. |
+| **Set Deformed** / (필드) | Deformed(입력1) 메시 지정. |
+| **Mirror Axis: X / Y / Z** | 미러 축. |
+| **Match: Nearest Vertex / Closest Surface** | 미러 짝을 찾는 방식(아래). 기본 **Nearest Vertex**(=VEX nearpoint). |
+| **Apply onto: Base / Deformed** | **Base(reflect)**: 변형을 반대쪽에 반사(원래 변형 쪽은 Base 로 복귀, VEX 동작). **Deformed(symmetrize)**: 원래 변형 유지 + 반대쪽에 반사 → 양쪽 대칭. |
+| **Origin: Object Pivot / World 0 / BBox Center** | 미러 평면 원점(Base 기준). 원점에서 모델링 안 됐으면 `BBox Center`. |
+| **Mirror Deformation** | 결과를 `<base>_mirrorDef` 새 메시로 출력(원본 둘 다 보존). 결과는 `Snap to Sym` 탭의 Reference 필드에도 자동 입력되어 바로 스냅에 쓸 수 있다. |
+
+**Match(미러 짝 찾기) 방식**
+- **Nearest Vertex** (기본): 미러 위치에서 base 의 **가장 가까운 정점**의 변형 오프셋을 인덱스로 읽는다
+  (VEX nearpoint 그대로). 정점 단위 스냅이라 빠르지만 정점 해상도에 좌우된다.
+- **Closest Surface**: 미러 위치에서 base **표면 최근접점**(`MFnMesh.getClosestPoint`)을 찾고, 그 면
+  정점들의 오프셋을 **역거리가중(IDW) 보간**한다(`mesh_io.closest_surface_offsets`). 표면을 따라
+  부드럽게 보간되어 **wrap / mesh-flow 식**으로 변형이 전이된다(정점 사이 위치도 매끄럽게).
+
+> 예: 머리 메시(Base)의 **왼쪽 귀만 조각**(Deformed)했을 때, **Apply onto = Base** 면 그 조각이
+> 오른쪽 귀로 반사된 메시가, **Deformed** 면 양쪽 귀에 대칭으로 들어간 메시가 나온다.
 
 ---
 
