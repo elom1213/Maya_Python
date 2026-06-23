@@ -249,7 +249,7 @@ class MainWindow(QWidget):
         oh_row.addWidget(QLabel("Hold"))
         self.le_oh_hold = QLineEdit()
         self.le_oh_hold.setValidator(oh_nonneg)
-        self.le_oh_hold.setPlaceholderText("10")
+        self.le_oh_hold.setPlaceholderText("20")
         oh_row.addWidget(self.le_oh_hold)
 
         oh_row.addWidget(QLabel("Offset"))
