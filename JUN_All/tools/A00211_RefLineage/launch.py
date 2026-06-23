@@ -52,7 +52,7 @@ def run(reload_module=True):
     window_instance = MainWindow()
 
     # A00210_FileManager 계열과 같은 테마.
-    ThemeManager.load_theme_to_widget(window_instance, "blue_dark")
+    ThemeManager.load_theme_to_widget(window_instance, "green_dark")
 
     window_instance.show()
 

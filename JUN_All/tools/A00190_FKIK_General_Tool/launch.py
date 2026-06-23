@@ -52,7 +52,7 @@ def run(reload_module=True):
 
     window_instance = MainWindow()
 
-    ThemeManager.load_theme_to_widget(window_instance, "blue_dark")
+    ThemeManager.load_theme_to_widget(window_instance, "coral_dark")
 
     window_instance.show()
 

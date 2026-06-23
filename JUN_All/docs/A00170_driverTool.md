@@ -38,7 +38,7 @@
 ```
 A00170_driverTool/
 ├── __init__.py            # from .launch import run
-├── launch.py              # run(): MainWindow 생성 → 테마(yellow_dark) → show()
+├── launch.py              # run(): MainWindow 생성 → 테마(coral_dark, 리깅 카테고리) → show()
 ├── __dragDrop_A00170.py              # 셸프 버튼 설치 + 드래그&드롭 진입점 (TOOL_LABEL = "DriverTool")
 └── app/
     ├── config/version.py  # VERSION / LAST_UPDATE

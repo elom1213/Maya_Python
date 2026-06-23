@@ -263,7 +263,7 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 
 ```
 A00210_FileManager/
-├── launch.py            # main(): QApplication → ThemeManager(blue_dark) → MainWindow → exec
+├── launch.py            # main(): QApplication → ThemeManager(green_dark, 파이프라인/유틸 카테고리) → MainWindow → exec
 ├── launch.spec          # PyInstaller
 ├── build_exe.bat
 ├── requirements.txt
@@ -288,7 +288,7 @@ A00210_FileManager/
 ```
 
 - **core 는 Qt/Maya 를 import 하지 않는다** → 단위 테스트·exe 빌드 용이. 화면 캡쳐만 Qt(`QScreen.grabWindow`)에 의존.
-- Qt 바인딩은 `Framework/qt/qt.py`(PySide6→2 폴백), 테마는 `Framework/themes/theme_manager.py`(`blue_dark.qss`) 재사용.
+- Qt 바인딩은 `Framework/qt/qt.py`(PySide6→2 폴백), 테마는 `Framework/themes/theme_manager.py`(`green_dark.qss`, 파이프라인/유틸 카테고리) 재사용.
 
 ---
 

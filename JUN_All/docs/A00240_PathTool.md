@@ -167,7 +167,7 @@ A00240_PathTool/data/
 
 ```
 A00240_PathTool/
-├── launch.py                 # standalone 진입점 (purple_dark 테마)
+├── launch.py                 # standalone 진입점 (green_dark 테마, 파이프라인/유틸 카테고리)
 └── app/
     ├── config/version.py     # VERSION / LAST_UPDATE
     ├── core/

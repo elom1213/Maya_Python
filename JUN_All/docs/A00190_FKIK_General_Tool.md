@@ -11,7 +11,7 @@
 
 - **로직/UI 분리**: 매칭·드라이버·세팅 로직은 `app/core`(씬 접근만 cmds/pymel), 화면은 `app/ui` 가 담당.
 - **중복 UI 제거**: 반복되던 textScrollList 블록을 `Framework.qt.JUN_mod_tsl_qt` 위젯으로 통일.
-- **UI**: PySide(`Framework.qt.qt` 가 PySide6→PySide2 폴백). 테마는 `ThemeManager` 의 `blue_dark` qss.
+- **UI**: PySide(`Framework.qt.qt` 가 PySide6→PySide2 폴백). 테마는 `ThemeManager` 의 `coral_dark` qss(리깅 카테고리).
 - **Maya 2023 호환** (Python 3.9 / PySide2). `pin_to_surface` 는 pymel 을 사용한다. UI 문자열/로그는 모두 영어.
 
 > **전제**: 매칭은 **pose object(타깃)** 와 **control(추종)** 의 쌍으로 동작한다. control 이 pose object 의

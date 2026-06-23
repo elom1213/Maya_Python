@@ -49,6 +49,6 @@ def run(reload_module=True):
         pass
 
     window_instance = MainWindow()
-    ThemeManager.load_theme_to_widget(window_instance, "yellow_dark")
+    ThemeManager.load_theme_to_widget(window_instance, "coral_dark")
     window_instance.show()
     return window_instance
