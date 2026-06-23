@@ -271,6 +271,23 @@ class MainWindow(QWidget):
 
         tab_layout.addWidget(sec_offhold)
 
+        # =========================================================
+        # 섹션 4 : Delete All Keys (기본 접힘)
+        #   리스트업한 오브젝트의 '모든' 키프레임을 일괄 삭제.
+        #   대상은 씬 선택이 아니라 리스트의 항목. 파괴적이라 확인 다이얼로그를 둔다.
+        # =========================================================
+
+        sec_delall = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01("Delete All Keys", expanded=False)
+
+        self.delall_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Delete-All List", select_label="List Selected Objects", log_callback=self.log)
+        sec_delall.add_widget(self.delall_tsl)
+
+        self.btn_delete_all = QPushButton("Delete All Keyframes of Listed")
+        sec_delall.add_widget(self.btn_delete_all)
+
+        tab_layout.addWidget(sec_delall)
+
         tab_layout.addStretch(1)
 
         # -------------------------
@@ -278,7 +295,7 @@ class MainWindow(QWidget):
         # -------------------------
 
         # 섹션 토글 -> 창 크기 자동 조정
-        for sec in (sec_move, sec_graph, sec_offhold):
+        for sec in (sec_move, sec_graph, sec_offhold, sec_delall):
             sec.toggled.connect(self._fit_window_later)
 
         self.btn_move_back.clicked.connect(lambda: self.on_move(-1))
@@ -287,6 +304,7 @@ class MainWindow(QWidget):
         self.btn_hold.clicked.connect(self.on_hold)
         self.cb_hotkey.toggled.connect(self.on_toggle_hotkey)
         self.btn_oh_apply.clicked.connect(self.on_offset_hold)
+        self.btn_delete_all.clicked.connect(self.on_delete_all)
 
         return tab
 
@@ -935,6 +953,28 @@ class MainWindow(QWidget):
         start, end = rng
 
         count, msg = KeyframeManager.delete_keys(start, end)
+        self.log(msg)
+
+    def on_delete_all(self):
+
+        objs = self.delall_tsl.get_all_items()   # 리스트업된 항목만 (씬 선택 아님)
+        if not objs:
+            self.log("[Warning] List objects first (List Selected Objects).")
+            return
+
+        # 파괴적: 전 구간·전 채널 키 삭제이므로 확인을 받는다(Undo 가능).
+        answer = QMessageBox.question(
+            self,
+            "Delete All Keyframes",
+            "Delete ALL keyframes of {0} listed object(s)?\n"
+            "This removes every animation curve on them (undoable).".format(len(objs)),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+
+        count, msg = KeyframeManager.delete_all_keys(objs)
         self.log(msg)
 
     def on_hold(self):

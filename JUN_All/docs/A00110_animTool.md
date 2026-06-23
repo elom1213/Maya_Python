@@ -4,10 +4,11 @@
 
 애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **여섯 개의 탭**과 **공유 로그창**으로 구성된다.
 
-1. **Key Edit** — (v01.14~) **접이식 섹션 3개**로 구성된다. **Move Keys**: 키를 시간 범위로
+1. **Key Edit** — (v01.14~) **접이식 섹션 4개**로 구성된다. **Move Keys**: 키를 시간 범위로
    **이동(앞/뒤 offset)·삭제**. **Graph Editor**: 선택한 키 구간을 **평평하게 유지(Hold)**
    (`Shift+A` 핫키 호출 가능). **Offset & Hold**(기본 접힘): **리스트업한 컨트롤러**의 키를
-   **포즈 유지(hold) + 보간(offset)** 구조로 재배치. 섹션을 접고 펼치면 **창 크기가 자동 조정**된다.
+   **포즈 유지(hold) + 보간(offset)** 구조로 재배치. **Delete All Keys**(v01.18~, 기본 접힘):
+   **리스트업한 오브젝트의 모든 키프레임을 일괄 삭제**. 섹션을 접고 펼치면 **창 크기가 자동 조정**된다.
 2. **Pose Key** — 선택 오브젝트(들)의 **현재 프레임**에 6축(rotate X/Y/Z, translate X/Y/Z)
    값을 키프레임으로 설정한다. 축마다 체크박스가 있어 체크된 축만 적용된다.
 3. **Copy Key** (v01.03~) — **Base → Target** 으로 시간 범위 애니메이션 키를 복사하고,
@@ -135,7 +136,7 @@ A00110_animTool/
     │   ├── version.py            # VERSION / LAST_UPDATE
     │   └── mirror_tokens.json    # 좌/우 토큰 쌍 (Mirror Key, 확장 가능)
     ├── core/              # 로직 (UI 비의존, maya.cmds)
-    │   ├── keyframe_manager.py   # 키 이동 / 삭제 / Hold (Key Edit 탭)
+    │   ├── keyframe_manager.py   # 키 이동 / 구간삭제 / 전체삭제 / Hold (Key Edit 탭)
     │   ├── hotkey_manager.py     # Shift+A 핫키 설치 / 복원 → Hold 호출
     │   ├── pose_key_manager.py   # 현재 프레임 6축 pose 키 (Pose Key 탭)
     │   ├── copykey_manager.py    # Base→Target 키 복사 + 축 Reverse (Copy Key 탭)
@@ -191,9 +192,9 @@ A00110_animTool.run(True)   # True = reload
 
 ### 5.1 Key Edit 탭
 
-**접이식 섹션 3개**(v01.14~)로 구성된다. 각 섹션 **헤더(▼/▶ + 제목)를 클릭하면 접고/펼칠 수 있고**
-(레거시 `frameLayout` 패턴), 토글하면 **창 전체 크기가 콘텐츠에 맞춰 자동으로 줄고 늘어난다**.
-**Offset & Hold 섹션은 기본 접힘**이다.
+**접이식 섹션 4개**(v01.14~, Delete All Keys 는 v01.18~)로 구성된다. 각 섹션 **헤더(▼/▶ + 제목)를
+클릭하면 접고/펼칠 수 있고**(레거시 `frameLayout` 패턴), 토글하면 **창 전체 크기가 콘텐츠에 맞춰 자동으로
+줄고 늘어난다**. **Offset & Hold / Delete All Keys 섹션은 기본 접힘**이다.
 
 ```
 ┌───────────────────────────────────────────────────┐
@@ -208,6 +209,9 @@ A00110_animTool.run(True)   # True = reload
 │    [Offset/Hold List]  (Select/Add/Del/Up/Down)   │
 │    Hold [ 10 ] Offset [ 30 ] Start [(first key)]  │
 │    [ Apply Offset & Hold ]                        │
+│ ▶ Delete All Keys            (기본 접힘)          │
+│    [Delete-All List]  (List Selected/Add/Del/...) │
+│    [ Delete All Keyframes of Listed ]             │
 └───────────────────────────────────────────────────┘
 ```
 
@@ -251,6 +255,18 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 ```
 
 예) Hold=10, Offset=30, 포즈 3개, Start=0 → `0~10 유지 / 10~40 보간 / 40~50 유지 / 50~80 보간 / 80~90 유지`.
+
+#### Delete All Keys 섹션 (v01.18~, 접이식·기본 접힘)
+
+리스트업한 오브젝트의 **모든 키프레임을 일괄 삭제**한다. 구간 삭제(`Delete Keys in Range`)와 달리
+**시간 범위·채널박스 스코프를 적용하지 않고** 대상 오브젝트에 연결된 애니메이션 커브의 키를 전부 지운다.
+대상은 씬 선택이 아니라 **그룹 안 리스트의 항목**이다.
+
+- **Delete-All List** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `List Selected Objects` 로 현재 씬 선택을
+  리스트에 채운다(Add/Del/Up/Down/Sort, "Number: N", 항목 클릭 시 씬 자동 선택 내장).
+- **Delete All Keyframes of Listed**: 클릭하면 **확인 다이얼로그** 후 리스트 전 항목의 키를 삭제한다
+  (`cmds.cutKey(clear=True)`, 전 구간·전 채널). 이미 씬에서 사라진(삭제/리네임) 항목은 건너뛴다.
+  **Undo 가능**(한 번의 Ctrl+Z). 리스트가 비면 경고만 남기고 아무것도 하지 않는다.
 
 ### 5.2 Pose Key 탭
 
@@ -450,6 +466,11 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 ### Key Edit — Hold
 1. 그래프 에디터에서 평평하게 만들 **키 구간을 선택**(커브마다 2개 이상).
 2. **Hold Selected Range** 클릭(또는 Shift+A) → 각 커브가 시작 값으로 평평하게 유지된다.
+
+### Key Edit — 모든 키 삭제 (Delete All Keys)
+1. **Delete All Keys** 섹션을 펼친다(기본 접힘).
+2. 키를 지울 오브젝트(들)를 씬에서 선택 → **List Selected Objects** 로 리스트에 채운다.
+3. **Delete All Keyframes of Listed** → 확인 후 리스트 항목의 **모든 키프레임**이 삭제된다(Ctrl+Z 가능).
 
 ### Pose Key
 1. 대상 오브젝트(들) 선택 → 타임라인을 키를 찍을 프레임으로 이동.

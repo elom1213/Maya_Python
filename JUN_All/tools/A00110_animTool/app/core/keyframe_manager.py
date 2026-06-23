@@ -110,6 +110,35 @@ class KeyframeManager:
             f"{len(sel)} objects : keys in [{start}-{end}f] deleted  ({scope})"
         )
 
+    @staticmethod
+    def delete_all_keys(objects=None):
+        """
+        오브젝트들의 '모든' 키프레임을 삭제한다(전 구간 · 전 어트리뷰트, 클립보드 미사용).
+
+        delete_keys 와 달리 시간 구간/채널박스 스코프를 적용하지 않고, 대상 오브젝트에
+        연결된 애니메이션 커브의 키를 전부 지운다. 리스트가 비어 있으면 씬 선택으로 폴백한다.
+        이미 씬에서 사라진(삭제/리네임) 항목은 건너뛴다.
+
+        반환: (처리한 오브젝트 수, 메시지)
+        """
+        sel = KeyframeManager._selection(objects)
+
+        if not sel:
+            return (0, "No objects in the list.")
+
+        sel = [o for o in sel if cmds.objExists(o)]
+        if not sel:
+            return (0, "Listed objects no longer exist in the scene.")
+
+        with undo_chunk():
+            # time 플래그를 생략하면 전 구간, attribute 를 생략하면 전 채널이 대상.
+            removed = cmds.cutKey(sel, clear=True) or 0
+
+        return (
+            len(sel),
+            f"{len(sel)} objects : all keyframes deleted ({removed} key(s))."
+        )
+
     # --------------------------------------------------
     # Hold (그래프 에디터 선택 구간 유지)
     # --------------------------------------------------
