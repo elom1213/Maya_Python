@@ -163,6 +163,7 @@ A00180_abSymMesh/
 | **Match: Nearest Vertex / Closest Surface** | 미러 짝을 찾는 방식(아래). 기본 **Nearest Vertex**(=VEX nearpoint). |
 | **Apply onto: Base / Deformed** | **Base(reflect)**: 변형을 반대쪽에 반사(원래 변형 쪽은 Base 로 복귀, VEX 동작). **Deformed(symmetrize)**: 원래 변형 유지 + 반대쪽에 반사 → 양쪽 대칭. |
 | **Origin: Object Pivot / World 0 / BBox Center** | 미러 평면 원점(Base 기준). 원점에서 모델링 안 됐으면 `BBox Center`. |
+| **Selected vertices only** (v02.04~) | 체크하면 **현재 선택한 정점에만** 미러 결과를 쓰고, 나머지 정점은 anchor(=`Apply onto` 가 Base 면 base, Deformed 면 deformed) 위치를 유지한다. 선택은 Base/Deformed 어느 쪽 정점이어도 되고(같은 토폴로지), 무거운 연산(특히 Closest Surface)도 선택 정점에 대해서만 돈다. 미선택 시 전체 적용. |
 | **Mirror Deformation** | 결과를 `<base>_mirrorDef` 새 메시로 출력(원본 둘 다 보존). 결과는 `Snap to Sym` 탭의 Reference 필드에도 자동 입력되어 바로 스냅에 쓸 수 있다. |
 
 **Match(미러 짝 찾기) 방식**

@@ -285,7 +285,7 @@ def mirror_one_side_points(points, axis, mid, positive_source, tol=1e-6,
 
 
 def mirror_deformation(base_points, deformed_points, axis, mid,
-                       onto_deformed=False, progress=None):
+                       onto_deformed=False, indices=None, progress=None):
     """변형(deformed - base)을 미러 평면 건너편으로 반사해 적용한다.
 
     Houdini Attribute Wrangle(nearpoint 기반) 이식:
@@ -303,6 +303,8 @@ def mirror_deformation(base_points, deformed_points, axis, mid,
         mid: 대칭 평면의 축 성분값.
         onto_deformed: False 면 base 에 적용(반사만 = VEX 그대로, 원래 변형 쪽은 base 로 복귀),
                        True  면 deformed 에 적용(원래 변형 유지 + 반대쪽에 반사 = 대칭화).
+        indices: 미러 결과를 쓸 정점 인덱스(None 이면 전체). 선택 안 된 정점은
+                 anchor(onto_deformed 면 deformed, 아니면 base) 위치를 유지한다.
 
     Returns:
         결과 좌표 리스트.
@@ -314,34 +316,36 @@ def mirror_deformation(base_points, deformed_points, axis, mid,
                 len(base_points), len(deformed_points)))
 
     g = build_grid(base_points)
-    out = []
-    total = len(base_points)
+    # 선택 안 된 정점은 anchor 그대로(전체일 땐 어차피 모두 덮어쓴다).
+    out = [tuple(deformed_points[i] if onto_deformed else base_points[i])
+           for i in range(len(base_points))]
+    targets = list(range(len(base_points))) if indices is None else list(indices)
+    total = len(targets)
     step = _tick_step(total)
-    for i, bp in enumerate(base_points):
-        if progress is not None and i % step == 0:
-            progress(i, total)
+    for k, i in enumerate(targets):
+        if progress is not None and k % step == 0:
+            progress(k, total)
+        bp = base_points[i]
         anchor = deformed_points[i] if onto_deformed else bp
         mp = reflect(bp, axis, mid)
         m = nearest_index(g, mp)
         if m < 0:
-            out.append(tuple(anchor))
-            continue
+            continue   # out[i] 는 이미 anchor.
         b = base_points[m]
         d = deformed_points[m]
         if not (_finite(b) and _finite(d) and _finite(anchor)):
-            out.append(tuple(anchor))
-            continue
+            continue   # out[i] 는 이미 anchor.
         # 오프셋은 '방향'이라 위치 반사(2*mid-..)가 아니라 축 성분 부호만 반전.
         off = [d[0] - b[0], d[1] - b[1], d[2] - b[2]]
         off[axis] = -off[axis]
-        out.append((anchor[0] + off[0], anchor[1] + off[1], anchor[2] + off[2]))
+        out[i] = (anchor[0] + off[0], anchor[1] + off[1], anchor[2] + off[2])
     if progress is not None:
         progress(total, total)
     return out
 
 
 def apply_mirrored_offsets(base_points, deformed_points, offsets, axis,
-                           onto_deformed=False):
+                           onto_deformed=False, indices=None):
     """이미 구한 per-vertex 미러 오프셋을 축 반사해 적용한다.
 
     Closest Surface 경로용 공통 적용기. offsets[i] = 정점 i 의 미러 위치에서
@@ -349,23 +353,25 @@ def apply_mirrored_offsets(base_points, deformed_points, offsets, axis,
 
     Args:
         base_points / deformed_points: 동일 토폴로지 좌표.
-        offsets: 정점별 미러 오프셋 [(dx,dy,dz), ...].
+        offsets: 정점별 미러 오프셋 [(dx,dy,dz), ...] (base 정점 인덱스 기준, 전체 길이).
         axis: 미러 축(0/1/2).
         onto_deformed: False 면 base, True 면 deformed 에 적용.
+        indices: 적용할 정점 인덱스(None 이면 전체). 선택 안 된 정점은 anchor 유지.
 
     Returns:
         결과 좌표 리스트.
     """
-    out = []
-    for i, b in enumerate(base_points):
-        anchor = deformed_points[i] if onto_deformed else b
+    out = [tuple(deformed_points[i] if onto_deformed else base_points[i])
+           for i in range(len(base_points))]
+    targets = range(len(base_points)) if indices is None else indices
+    for i in targets:
+        anchor = deformed_points[i] if onto_deformed else base_points[i]
         o = offsets[i]
         if not (_finite(o) and _finite(anchor)):
-            out.append(tuple(anchor))
-            continue
+            continue   # out[i] 는 이미 anchor.
         oo = [o[0], o[1], o[2]]
         oo[axis] = -oo[axis]
-        out.append((anchor[0] + oo[0], anchor[1] + oo[1], anchor[2] + oo[2]))
+        out[i] = (anchor[0] + oo[0], anchor[1] + oo[1], anchor[2] + oo[2])
     return out
 
 

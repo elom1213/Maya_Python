@@ -353,6 +353,13 @@ class MainWindow(QWidget):
         opt_row.addStretch(1)
         root.addLayout(opt_row)
 
+        self.cb_md_selected = QCheckBox("Selected vertices only")
+        self.cb_md_selected.setToolTip(
+            "Write the mirrored deformation only into the currently selected "
+            "vertices (on Base or Deformed). Other vertices keep their anchor "
+            "(base, or deformed when 'Apply onto = Deformed').")
+        root.addWidget(self.cb_md_selected)
+
         self.btn_md_apply = QPushButton("Mirror Deformation")
         self.btn_md_apply.clicked.connect(self.on_mirror_deform)
         root.addWidget(self.btn_md_apply)
@@ -1061,6 +1068,17 @@ class MainWindow(QWidget):
         if mesh:
             self.le_md_def.setText(mesh)
 
+    def _md_selected_indices(self):
+        """'Selected vertices only' 체크 시, 선택 정점 인덱스(없으면 None=전체)."""
+        if not self.cb_md_selected.isChecked():
+            return None
+        _mesh, indices = mesh_io.selected_vertices()
+        if not indices:
+            self._warn("No vertices selected. Select vertices (on Base or "
+                       "Deformed) or uncheck 'Selected vertices only'.")
+            return False
+        return indices
+
     def _md_origin_mid(self, mesh, axis):
         choice = self.cmb_md_origin.currentIndex()
         if choice == 1:       # World 0
@@ -1097,6 +1115,16 @@ class MainWindow(QWidget):
             base.split("|")[-1].split(":")[-1])
         n = mesh_io.vertex_count(base)
 
+        indices = self._md_selected_indices()
+        if indices is False:
+            return
+        if indices is not None:
+            # 다른 메시의 정점이 선택돼 있어도 범위를 벗어난 인덱스는 버린다.
+            indices = [i for i in indices if 0 <= i < n]
+            if not indices:
+                self._warn("Selected vertices are not on the Base/Deformed mesh.")
+                return
+
         try:
             with undo_chunk(), self._progress("Mirror Deformation", n) as prog:
                 base_pts = mesh_io.get_points(base, world=True)
@@ -1109,14 +1137,16 @@ class MainWindow(QWidget):
                     mirror_pos = [snap_core.reflect(b, axis, mid)
                                   for b in base_pts]
                     interp = mesh_io.closest_surface_offsets(
-                        base, mirror_pos, offsets, world=True, progress=prog)
+                        base, mirror_pos, offsets, world=True,
+                        indices=indices, progress=prog)
                     new = snap_core.apply_mirrored_offsets(
-                        base_pts, def_pts, interp, axis, onto_deformed)
+                        base_pts, def_pts, interp, axis, onto_deformed,
+                        indices=indices)
                 else:
                     # 최근접 정점(nearpoint).
                     new = snap_core.mirror_deformation(
                         base_pts, def_pts, axis, mid, onto_deformed,
-                        progress=prog)
+                        indices=indices, progress=prog)
 
                 # 결과는 base 토폴로지의 새 메시로 출력(원본 둘 다 보존).
                 dup = cmds.duplicate(base, name=name)[0]
@@ -1127,11 +1157,13 @@ class MainWindow(QWidget):
 
         self.le_snap_ref.setText(dup)   # 바로 스냅 레퍼런스로 쓸 수 있게 연계.
         cmds.select(dup)
+        scope = ("{0} selected vert(s)".format(len(indices))
+                 if indices is not None else "all verts")
         self._info(
-            "Mirrored deformation -> '{0}' (axis {1}, {2}, onto {3}).".format(
+            "Mirrored deformation -> '{0}' (axis {1}, {2}, onto {3}, {4}).".format(
                 dup, _AXIS_LETTER[axis],
                 "surface" if surface_match else "vertex",
-                "deformed" if onto_deformed else "base"))
+                "deformed" if onto_deformed else "base", scope))
 
     # ==================================================================
     # Help

@@ -135,7 +135,7 @@ def closest_surface_points(ref_mesh, query_points, world=True, progress=None):
 
 
 def closest_surface_offsets(base_mesh, query_points, offsets,
-                            world=True, power=2.0, progress=None):
+                            world=True, power=2.0, indices=None, progress=None):
     """각 query 좌표에서 base_mesh 표면 최근접점을 찾고, 그 면 정점들의 offsets 를
     역거리가중(IDW)으로 보간한 벡터를 반환한다.
 
@@ -144,29 +144,32 @@ def closest_surface_offsets(base_mesh, query_points, offsets,
 
     Args:
         base_mesh: 대응을 찾을 메시(입력0).
-        query_points: [(x,y,z), ...] (보통 각 정점의 미러 위치).
+        query_points: [(x,y,z), ...] (보통 각 정점의 미러 위치). 전체 길이.
         offsets: base 정점별 변형 오프셋 [(dx,dy,dz), ...].
         world: True 면 월드 공간.
         power: IDW 거듭제곱(클수록 최근접 정점에 가깝게).
+        indices: 보간을 수행할 query 인덱스(None 이면 전체). 나머지는 (0,0,0).
+                 (무거운 getClosestPoint 를 선택 정점에만 돌리기 위한 것.)
 
     Returns:
-        query 별 보간 오프셋 [(dx,dy,dz), ...].
+        query 별 보간 오프셋 [(dx,dy,dz), ...] (query_points 와 같은 길이).
     """
     fn = get_mfn_mesh(base_mesh)
     space = _space(world)
     verts = fn.getPoints(space)   # 정점 위치(거리 계산용)
     eps2 = 1e-18
     half_p = power / 2.0
-    out = []
-    total = len(query_points)
+    out = [(0.0, 0.0, 0.0)] * len(query_points)
+    targets = list(range(len(query_points))) if indices is None else list(indices)
+    total = len(targets)
     step = max(1, total // 200)
-    for k, q in enumerate(query_points):
+    for k, qi in enumerate(targets):
         if progress is not None and k % step == 0:
             progress(k, total)
+        q = query_points[qi]
         if not (math.isfinite(q[0]) and math.isfinite(q[1])
                 and math.isfinite(q[2])):
-            out.append((0.0, 0.0, 0.0))
-            continue
+            continue   # out[qi] 는 이미 (0,0,0).
         closest, face = fn.getClosestPoint(
             om.MPoint(float(q[0]), float(q[1]), float(q[2])), space)
         face_verts = fn.getPolygonVertices(face)
@@ -184,7 +187,7 @@ def closest_surface_offsets(base_mesh, query_points, offsets,
 
         if snap is not None:
             o = offsets[snap]
-            out.append((o[0], o[1], o[2]))
+            out[qi] = (o[0], o[1], o[2])
             continue
 
         total_w = 0.0
@@ -197,7 +200,7 @@ def closest_surface_offsets(base_mesh, query_points, offsets,
             ox += o[0] * f
             oy += o[1] * f
             oz += o[2] * f
-        out.append((ox, oy, oz))
+        out[qi] = (ox, oy, oz)
     if progress is not None:
         progress(total, total)
     return out
