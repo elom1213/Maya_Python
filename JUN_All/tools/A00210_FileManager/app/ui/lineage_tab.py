@@ -14,10 +14,9 @@
 # project_root / store_dir / 로그는 MainWindow 에서 콜러블로 주입받는다(단일 소스 유지).
 
 import os
-import sys
 import time
-import subprocess
 
+from Framework.core.file_opener import open_path
 from Framework.qt.qt import (
     QWidget,
     QVBoxLayout,
@@ -1051,18 +1050,11 @@ class LineageTab(QWidget):
 
     @staticmethod
     def _reveal_in_explorer(path):
-        """OS 파일 탐색기에서 파일을 선택 상태로 연다(Windows 우선)."""
-        path = os.path.normpath(path)
+        """OS 파일 탐색기에서 파일을 선택 상태로 연다(Framework.file_opener 위임)."""
         try:
-            if sys.platform.startswith("win"):
-                # explorer /select, 는 성공해도 비0 종료코드를 내므로 반환값을 보지 않는다.
-                subprocess.Popen(["explorer", "/select,", path])
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", "-R", path])
-            else:
-                subprocess.Popen(["xdg-open", os.path.dirname(path)])
+            open_path(path)
             return True
-        except OSError:
+        except (OSError, ValueError):
             return False
 
     # ============================================================ layout / connect

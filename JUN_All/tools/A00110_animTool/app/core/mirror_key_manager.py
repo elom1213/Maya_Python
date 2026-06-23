@@ -20,6 +20,7 @@ import math
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
 
+from Framework.core.maya_undo import undo_chunk
 from .mirror_token_store import MirrorTokenStore
 
 
@@ -152,8 +153,7 @@ class MirrorKeyManager:
         done = 0
         skipped = 0
 
-        cmds.undoInfo(openChunk=True)
-        try:
+        with undo_chunk():
             for src, tgt in pairs:
                 ok = MirrorKeyManager._mirror_one(
                     src, tgt, start, end, refl, do_translate, do_rotate, time_mode,
@@ -162,8 +162,6 @@ class MirrorKeyManager:
                     done += 1
                 else:
                     skipped += 1
-        finally:
-            cmds.undoInfo(closeChunk=True)
 
         msg = "{0} pair(s) mirrored (axis: {1}).".format(done, mirror_axis.upper())
         if skipped:
@@ -291,8 +289,7 @@ class MirrorKeyManager:
 
         done = skipped = keyed = posed = 0
 
-        cmds.undoInfo(openChunk=True)
-        try:
+        with undo_chunk():
             for src, tgt in pairs:
                 attrs = MirrorKeyManager._settable_attrs(tgt, do_translate, do_rotate)
                 if not attrs:
@@ -337,8 +334,6 @@ class MirrorKeyManager:
                     done += 1
                 else:
                     skipped += 1
-        finally:
-            cmds.undoInfo(closeChunk=True)
 
         msg = "{0} pair(s) mirrored at frame {1} (axis: {2}; keyed {3}, posed {4}).".format(
             done, int(cur), mirror_axis.upper(), keyed, posed)

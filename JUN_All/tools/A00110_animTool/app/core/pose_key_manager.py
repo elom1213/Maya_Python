@@ -6,6 +6,8 @@
 
 import maya.cmds as cmds
 
+from Framework.core.maya_undo import undo_chunk
+
 
 class PoseKeyManager:
     """
@@ -44,13 +46,10 @@ class PoseKeyManager:
         if not axis_values:
             return (0, "No axis checked.")
 
-        cmds.undoInfo(openChunk=True)
-        try:
+        with undo_chunk():
             for obj in sel:
                 for attr, val in axis_values.items():
                     cmds.setKeyframe(obj, at=attr, v=val)
-        finally:
-            cmds.undoInfo(closeChunk=True)
 
         axes = ", ".join(axis_values.keys())
         return (

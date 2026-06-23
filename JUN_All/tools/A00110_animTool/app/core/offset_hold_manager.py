@@ -5,6 +5,7 @@
 
 import maya.cmds as cmds
 
+from Framework.core.maya_undo import undo_chunk
 from .keyframe_manager import KeyframeManager
 
 
@@ -85,8 +86,7 @@ class OffsetHoldManager:
         done = 0
         skipped = 0
 
-        cmds.undoInfo(openChunk=True)
-        try:
+        with undo_chunk():
             for obj in sel:
 
                 plugs = OffsetHoldManager._target_plugs(obj, attrs)
@@ -146,8 +146,6 @@ class OffsetHoldManager:
                             )
 
                 done += 1
-        finally:
-            cmds.undoInfo(closeChunk=True)
 
         if done == 0:
             return (0, "No animated objects to process. ({0} skipped: no keys)".format(skipped))

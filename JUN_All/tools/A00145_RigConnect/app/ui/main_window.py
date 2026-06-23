@@ -17,6 +17,7 @@ print("QT version  :  " + str(QT_VERSION))
 
 import maya.cmds as cmds
 
+from Framework.core.maya_undo import undo_chunk
 from tools.A00145_RigConnect.app.config.version import VERSION, LAST_UPDATE
 from tools.A00145_RigConnect.app.core import match_manager as mch_mgr
 from tools.A00145_RigConnect.app.core import constrain_manager as con_mgr
@@ -463,15 +464,13 @@ class MainWindow(QWidget):
 
     def _run(self, label, func):
         """undo chunk 로 감싸 실행하고 결과를 로그에 남긴다."""
-        cmds.undoInfo(openChunk=True)
-        try:
-            func()
-            self.log("[OK] {0}".format(label))
-        except Exception as e:
-            self.log("[ERR] {0} : {1}".format(label, e))
-            cmds.warning(str(e))
-        finally:
-            cmds.undoInfo(closeChunk=True)
+        with undo_chunk():
+            try:
+                func()
+                self.log("[OK] {0}".format(label))
+            except Exception as e:
+                self.log("[ERR] {0} : {1}".format(label, e))
+                cmds.warning(str(e))
 
     # ==============================================================
     # Handlers : Match

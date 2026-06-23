@@ -19,6 +19,7 @@
 import maya.cmds as cmds
 
 from Framework.core.maya_refresh import suspend_refresh
+from Framework.core.maya_undo import undo_chunk
 from tools.A00120_FKIK.app.config import naming
 from tools.A00120_FKIK.app.core.selection_utils import order_by_tokens
 
@@ -128,11 +129,8 @@ class FKIKMatcher:
         if not tgt_list or not flw_list:
             return 0
 
-        cmds.undoInfo(openChunk=True)
-        try:
+        with undo_chunk():
             match_transforms(tgt_list, flw_list, 1, 1, 1, 1)
-        finally:
-            cmds.undoInfo(closeChunk=True)
 
         return min(len(tgt_list), len(flw_list))
 

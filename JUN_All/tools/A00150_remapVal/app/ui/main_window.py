@@ -14,6 +14,7 @@ sample_01.py 의 build_slerp_ramp(prefix, controlObj, oColl, twistAttrs) 를 GUI
 
 import maya.cmds as cmds
 
+from Framework.core.maya_undo import undo_chunk
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
@@ -309,18 +310,16 @@ class MainWindow(QWidget):
         interp_name = ["Linear", "Smooth", "Spline"][interp_index]
 
         # Undo 청크: 전체 빌드를 한 번에 취소 가능하게.
-        cmds.undoInfo(openChunk=True)
-        try:
-            master = run_build(prefix, controller, joints, attrs, output_min, output_max, interp)
-            self._log(
-                "Built: {master} | {n} joint(s) | interp: {interp} | attrs: {attrs}".format(
-                    master=master, n=len(joints), interp=interp_name, attrs=", ".join(attrs)
+        with undo_chunk():
+            try:
+                master = run_build(prefix, controller, joints, attrs, output_min, output_max, interp)
+                self._log(
+                    "Built: {master} | {n} joint(s) | interp: {interp} | attrs: {attrs}".format(
+                        master=master, n=len(joints), interp=interp_name, attrs=", ".join(attrs)
+                    )
                 )
-            )
-        except Exception as exc:
-            self._log("[ERROR] Build failed: {0}".format(exc))
-        finally:
-            cmds.undoInfo(closeChunk=True)
+            except Exception as exc:
+                self._log("[ERROR] Build failed: {0}".format(exc))
 
     def on_build_wave(self):
         """Sine Wave 모드 빌드: 오브젝트마다 plusMinusAverage->animCurve->remapValue 체인 생성."""
@@ -340,23 +339,21 @@ class MainWindow(QWidget):
         output_max = self.dsb_output_max.value()
 
         # Undo 청크: 전체 빌드를 한 번에 취소 가능하게.
-        cmds.undoInfo(openChunk=True)
-        try:
-            driver = run_build_wave(
-                prefix, controller, joints, driver_attr, attrs,
-                input_min, input_max, output_min, output_max)
-            self._log(
-                "Built sine wave: driver {driver} | {n} object(s) | "
-                "range in[{imin},{imax}] out[{omin},{omax}] | attrs: {attrs}".format(
-                    driver=driver, n=len(joints),
-                    imin=input_min, imax=input_max, omin=output_min, omax=output_max,
-                    attrs=", ".join(attrs)
+        with undo_chunk():
+            try:
+                driver = run_build_wave(
+                    prefix, controller, joints, driver_attr, attrs,
+                    input_min, input_max, output_min, output_max)
+                self._log(
+                    "Built sine wave: driver {driver} | {n} object(s) | "
+                    "range in[{imin},{imax}] out[{omin},{omax}] | attrs: {attrs}".format(
+                        driver=driver, n=len(joints),
+                        imin=input_min, imax=input_max, omin=output_min, omax=output_max,
+                        attrs=", ".join(attrs)
+                    )
                 )
-            )
-        except Exception as exc:
-            self._log("[ERROR] Build failed: {0}".format(exc))
-        finally:
-            cmds.undoInfo(closeChunk=True)
+            except Exception as exc:
+                self._log("[ERROR] Build failed: {0}".format(exc))
 
     # ================================================================
     # 슬롯 : Help > About

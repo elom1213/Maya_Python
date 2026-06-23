@@ -9,6 +9,7 @@ Z축 일렬 조인트(앞 -> 중심)를 컨트롤러 driver 하나로 구면 dil
 
 import maya.cmds as cmds
 
+from Framework.core.maya_undo import undo_chunk
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
@@ -233,18 +234,16 @@ class MainWindow(QWidget):
         prefix, controller, joints, driver_attr, radius = collected
 
         # Undo 청크: 전체 빌드를 한 번에 취소 가능하게.
-        cmds.undoInfo(openChunk=True)
-        try:
-            driver = run_build(prefix, controller, joints, driver_attr, radius)
-            self._log(
-                "Built (baked): driver {driver} | {n} joint(s) | radius {r}".format(
-                    driver=driver, n=len(joints), r=radius
+        with undo_chunk():
+            try:
+                driver = run_build(prefix, controller, joints, driver_attr, radius)
+                self._log(
+                    "Built (baked): driver {driver} | {n} joint(s) | radius {r}".format(
+                        driver=driver, n=len(joints), r=radius
+                    )
                 )
-            )
-        except Exception as exc:
-            self._log("[ERROR] Build failed: {0}".format(exc))
-        finally:
-            cmds.undoInfo(closeChunk=True)
+            except Exception as exc:
+                self._log("[ERROR] Build failed: {0}".format(exc))
 
     def on_build_nodes(self):
         """Converge 모드: dilate 0->90 동안 전 조인트를 center(마지막) 조인트 위치로 수렴."""
@@ -258,26 +257,24 @@ class MainWindow(QWidget):
             return
 
         # Undo 청크: 전체 빌드를 한 번에 취소 가능하게.
-        cmds.undoInfo(openChunk=True)
-        try:
-            driver, skipped = run_build_nodes(prefix, controller, joints, driver_attr, radius)
-            self._log(
-                "Built (converge): driver {driver} | {n} joint(s) | +center '{c}' / "
-                "-front '{f}' | sphere radius {r}".format(
-                    driver=driver, n=len(joints), c=joints[-1], f=joints[0], r=radius
-                )
-            )
-            if skipped:
+        with undo_chunk():
+            try:
+                driver, skipped = run_build_nodes(prefix, controller, joints, driver_attr, radius)
                 self._log(
-                    "[WARN] scale NOT driven for {n} joint(s) (radius {r} <= rest distance "
-                    "from center): {names}".format(
-                        n=len(skipped), r=radius, names=", ".join(skipped)
+                    "Built (converge): driver {driver} | {n} joint(s) | +center '{c}' / "
+                    "-front '{f}' | sphere radius {r}".format(
+                        driver=driver, n=len(joints), c=joints[-1], f=joints[0], r=radius
                     )
                 )
-        except Exception as exc:
-            self._log("[ERROR] Build failed: {0}".format(exc))
-        finally:
-            cmds.undoInfo(closeChunk=True)
+                if skipped:
+                    self._log(
+                        "[WARN] scale NOT driven for {n} joint(s) (radius {r} <= rest distance "
+                        "from center): {names}".format(
+                            n=len(skipped), r=radius, names=", ".join(skipped)
+                        )
+                    )
+            except Exception as exc:
+                self._log("[ERROR] Build failed: {0}".format(exc))
 
     # ================================================================
     # 슬롯 : Help > About

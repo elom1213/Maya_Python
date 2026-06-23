@@ -15,6 +15,8 @@
 import maya.cmds as cmds
 import maya.mel as mel
 
+from Framework.core.maya_undo import undo_chunk
+
 
 class HIKManager:
     """
@@ -73,8 +75,7 @@ class HIKManager:
         done = 0
         failed = 0
 
-        cmds.undoInfo(openChunk=True)
-        try:
+        with undo_chunk():
             for i in range(pair_count):
                 jnt = joints[i]
                 slot_id = slot_ids[i]
@@ -84,8 +85,6 @@ class HIKManager:
                 except Exception as e:
                     failed += 1
                     print("[HIK assign] FAILED {0} -> slot {1}: {2}".format(jnt, slot_id, e))
-        finally:
-            cmds.undoInfo(closeChunk=True)
 
         msg = "[{0}] {1} joint(s) assigned to '{2}'.".format(chain_label, done, hik_node)
         if failed:

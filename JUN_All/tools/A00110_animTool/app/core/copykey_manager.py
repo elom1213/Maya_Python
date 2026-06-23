@@ -6,6 +6,8 @@
 
 import maya.cmds as cmds
 
+from Framework.core.maya_undo import undo_chunk
+
 
 class CopyKeyManager:
     """
@@ -60,8 +62,7 @@ class CopyKeyManager:
         done = 0
         skipped = 0
 
-        cmds.undoInfo(openChunk=True)
-        try:
+        with undo_chunk():
             for i in range(pair_count):
                 base = base_list[i]
                 tgt = tgt_list[i]
@@ -83,8 +84,6 @@ class CopyKeyManager:
                 except Exception:
                     # 키가 없거나 붙여넣기 실패한 쌍은 건너뛴다.
                     skipped += 1
-        finally:
-            cmds.undoInfo(closeChunk=True)
 
         msg = "{0} pairs copied (option: {1}).".format(done, paste_option)
         if skipped:

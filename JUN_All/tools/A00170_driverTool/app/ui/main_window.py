@@ -10,6 +10,7 @@
 
 import maya.cmds as cmds
 
+from Framework.core.maya_undo import undo_chunk
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
@@ -306,18 +307,16 @@ class MainWindow(QWidget):
         interp = interp_index + 1
         interp_name = ["Linear", "Smooth", "Spline"][interp_index]
 
-        cmds.undoInfo(openChunk=True)
-        try:
-            master = run_build_slerp(prefix, controller, joints, attrs, output_min, output_max, interp)
-            self._log(
-                "Built: {master} | {n} joint(s) | interp: {interp} | attrs: {attrs}".format(
-                    master=master, n=len(joints), interp=interp_name, attrs=", ".join(attrs)
+        with undo_chunk():
+            try:
+                master = run_build_slerp(prefix, controller, joints, attrs, output_min, output_max, interp)
+                self._log(
+                    "Built: {master} | {n} joint(s) | interp: {interp} | attrs: {attrs}".format(
+                        master=master, n=len(joints), interp=interp_name, attrs=", ".join(attrs)
+                    )
                 )
-            )
-        except Exception as exc:
-            self._log("[ERROR] Build failed: {0}".format(exc))
-        finally:
-            cmds.undoInfo(closeChunk=True)
+            except Exception as exc:
+                self._log("[ERROR] Build failed: {0}".format(exc))
 
     def on_rmp_build_wave(self):
         """Sine Wave 모드 빌드: 오브젝트마다 plusMinusAverage->animCurve->remapValue 체인 생성."""
@@ -336,23 +335,21 @@ class MainWindow(QWidget):
         output_min = self.rmp_dsb_output_min.value()
         output_max = self.rmp_dsb_output_max.value()
 
-        cmds.undoInfo(openChunk=True)
-        try:
-            driver = run_build_wave(
-                prefix, controller, joints, driver_attr, attrs,
-                input_min, input_max, output_min, output_max)
-            self._log(
-                "Built sine wave: driver {driver} | {n} object(s) | "
-                "range in[{imin},{imax}] out[{omin},{omax}] | attrs: {attrs}".format(
-                    driver=driver, n=len(joints),
-                    imin=input_min, imax=input_max, omin=output_min, omax=output_max,
-                    attrs=", ".join(attrs)
+        with undo_chunk():
+            try:
+                driver = run_build_wave(
+                    prefix, controller, joints, driver_attr, attrs,
+                    input_min, input_max, output_min, output_max)
+                self._log(
+                    "Built sine wave: driver {driver} | {n} object(s) | "
+                    "range in[{imin},{imax}] out[{omin},{omax}] | attrs: {attrs}".format(
+                        driver=driver, n=len(joints),
+                        imin=input_min, imax=input_max, omin=output_min, omax=output_max,
+                        attrs=", ".join(attrs)
+                    )
                 )
-            )
-        except Exception as exc:
-            self._log("[ERROR] Build failed: {0}".format(exc))
-        finally:
-            cmds.undoInfo(closeChunk=True)
+            except Exception as exc:
+                self._log("[ERROR] Build failed: {0}".format(exc))
 
     # ================================================================
     # Tab : Spherical Eye  (A00160_sphericalEye 이식)
@@ -516,18 +513,16 @@ class MainWindow(QWidget):
             return
         prefix, controller, joints, driver_attr, radius = collected
 
-        cmds.undoInfo(openChunk=True)
-        try:
-            driver = run_build_spherical(prefix, controller, joints, driver_attr, radius)
-            self._log(
-                "Built (baked): driver {driver} | {n} joint(s) | radius {r}".format(
-                    driver=driver, n=len(joints), r=radius
+        with undo_chunk():
+            try:
+                driver = run_build_spherical(prefix, controller, joints, driver_attr, radius)
+                self._log(
+                    "Built (baked): driver {driver} | {n} joint(s) | radius {r}".format(
+                        driver=driver, n=len(joints), r=radius
+                    )
                 )
-            )
-        except Exception as exc:
-            self._log("[ERROR] Build failed: {0}".format(exc))
-        finally:
-            cmds.undoInfo(closeChunk=True)
+            except Exception as exc:
+                self._log("[ERROR] Build failed: {0}".format(exc))
 
     def on_sph_build_nodes(self):
         """Converge 모드: dilate 0->90 동안 전 조인트를 center(마지막) 조인트 위치로 수렴."""
@@ -540,26 +535,24 @@ class MainWindow(QWidget):
             self._log("[WARN] Need at least 2 joints (front .. center) to converge.")
             return
 
-        cmds.undoInfo(openChunk=True)
-        try:
-            driver, skipped = run_build_nodes(prefix, controller, joints, driver_attr, radius)
-            self._log(
-                "Built (converge): driver {driver} | {n} joint(s) | +center '{c}' / "
-                "-front '{f}' | sphere radius {r}".format(
-                    driver=driver, n=len(joints), c=joints[-1], f=joints[0], r=radius
-                )
-            )
-            if skipped:
+        with undo_chunk():
+            try:
+                driver, skipped = run_build_nodes(prefix, controller, joints, driver_attr, radius)
                 self._log(
-                    "[WARN] scale NOT driven for {n} joint(s) (radius {r} <= rest distance "
-                    "from center): {names}".format(
-                        n=len(skipped), r=radius, names=", ".join(skipped)
+                    "Built (converge): driver {driver} | {n} joint(s) | +center '{c}' / "
+                    "-front '{f}' | sphere radius {r}".format(
+                        driver=driver, n=len(joints), c=joints[-1], f=joints[0], r=radius
                     )
                 )
-        except Exception as exc:
-            self._log("[ERROR] Build failed: {0}".format(exc))
-        finally:
-            cmds.undoInfo(closeChunk=True)
+                if skipped:
+                    self._log(
+                        "[WARN] scale NOT driven for {n} joint(s) (radius {r} <= rest distance "
+                        "from center): {names}".format(
+                            n=len(skipped), r=radius, names=", ".join(skipped)
+                        )
+                    )
+            except Exception as exc:
+                self._log("[ERROR] Build failed: {0}".format(exc))
 
     # ================================================================
     # Helper / About

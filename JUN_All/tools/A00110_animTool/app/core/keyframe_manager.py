@@ -5,6 +5,8 @@
 
 import maya.cmds as cmds
 
+from Framework.core.maya_undo import undo_chunk
+
 
 class KeyframeManager:
     """
@@ -60,8 +62,7 @@ class KeyframeManager:
         attrs = KeyframeManager.get_target_channels()
         kw = {"attribute": attrs} if attrs else {}
 
-        cmds.undoInfo(openChunk=True)
-        try:
+        with undo_chunk():
             cmds.keyframe(
                 sel,
                 edit=True,
@@ -70,8 +71,6 @@ class KeyframeManager:
                 timeChange=offset,
                 **kw
             )
-        finally:
-            cmds.undoInfo(closeChunk=True)
 
         scope = ("channels: " + ", ".join(attrs)) if attrs else "all curves"
         return (
@@ -97,16 +96,13 @@ class KeyframeManager:
         attrs = KeyframeManager.get_target_channels()
         kw = {"attribute": attrs} if attrs else {}
 
-        cmds.undoInfo(openChunk=True)
-        try:
+        with undo_chunk():
             cmds.cutKey(
                 sel,
                 time=(start, end),
                 clear=True,
                 **kw
             )
-        finally:
-            cmds.undoInfo(closeChunk=True)
 
         scope = ("channels: " + ", ".join(attrs)) if attrs else "all curves"
         return (
@@ -144,8 +140,7 @@ class KeyframeManager:
         done = 0
         skipped = 0
 
-        cmds.undoInfo(openChunk=True)
-        try:
+        with undo_chunk():
             for crv in curves:
 
                 times = cmds.keyframe(
@@ -178,8 +173,6 @@ class KeyframeManager:
                 cmds.keyTangent(crv, edit=True, time=(end, end), inTangentType="flat")
 
                 done += 1
-        finally:
-            cmds.undoInfo(closeChunk=True)
 
         msg = f"{done} curve(s) held flat at start value."
         if skipped:

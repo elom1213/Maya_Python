@@ -31,6 +31,8 @@ import maya.cmds as cmds
 import maya.mel as mel
 import maya.OpenMayaUI as omui
 
+from Framework.core.maya_undo import undo_chunk
+
 # PySide2(2022~2024) / PySide6(2025+) 양쪽 지원
 try:
     from PySide2 import QtWidgets, QtCore
@@ -311,8 +313,7 @@ def import_facial(csv_path, bs_node, start_frame=1,
         out_frame = start_frame
         kept = 0
 
-        cmds.undoInfo(openChunk=True)
-        try:
+        with undo_chunk():
             for i, row in enumerate(reader):
                 if i % step != 0:          # 다운샘플: step 간격만 유지
                     continue
@@ -329,8 +330,6 @@ def import_facial(csv_path, bs_node, start_frame=1,
                     applied_shapes.add(col)
                 out_frame += 1
                 kept += 1
-        finally:
-            cmds.undoInfo(closeChunk=True)
 
     end_frame = start_frame + kept - 1 if kept else start_frame
 

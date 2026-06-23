@@ -5,37 +5,6 @@
 # 폴더면 그 폴더를 열고, 파일이면 폴더를 열어 그 파일을 선택한다.
 # Windows 우선(os.startfile / explorer), macOS·Linux 폴백 제공.
 
-import os
-import sys
-import subprocess
-
-
-def open_path(path):
-    """주어진 경로를 탐색기로 연다.
-
-    - 폴더: 그 폴더 창을 연다.
-    - 파일: 파일이 든 폴더를 열고 파일을 선택(하이라이트)한다.
-
-    경로가 비었거나 존재하지 않으면 예외를 던진다(호출부에서 안내).
-    """
-    if not path:
-        raise ValueError("Empty path.")
-
-    norm = os.path.normpath(os.path.expanduser(os.path.expandvars(path)))
-
-    if not os.path.exists(norm):
-        raise FileNotFoundError(norm)
-
-    is_dir = os.path.isdir(norm)
-
-    if sys.platform.startswith("win"):
-        if is_dir:
-            os.startfile(norm)  # type: ignore[attr-defined]  # Windows 전용
-        else:
-            # explorer /select 는 인자를 한 문자열로 받아야 안정적이다.
-            subprocess.run(f'explorer /select,"{norm}"')
-    elif sys.platform == "darwin":
-        subprocess.run(["open", norm] if is_dir else ["open", "-R", norm])
-    else:
-        folder = norm if is_dir else os.path.dirname(norm)
-        subprocess.run(["xdg-open", folder])
+# 구현은 Framework 로 승격됨(여러 툴이 공유). 기존 호출부(path_opener.open_path)가
+# 그대로 동작하도록 re-export 만 남긴다.
+from Framework.core.file_opener import open_path  # noqa: F401  (re-export)
