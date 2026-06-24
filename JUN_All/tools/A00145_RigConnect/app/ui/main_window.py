@@ -25,7 +25,8 @@ from tools.A00145_RigConnect.app.core import matrix_constraint_manager as mtx_mg
 from tools.A00145_RigConnect.app.core import connect_manager as cnt_mgr
 from tools.A00145_RigConnect.app.core import stream_manager as stm_mgr
 from tools.A00145_RigConnect.app.core import skin_constraint_manager as skn_mgr
-from tools.A00145_RigConnect.app.core import CONSTRAINT_TYPES, connect_closest
+from tools.A00145_RigConnect.app.core import (
+    CONSTRAINT_TYPES, connect_closest, find_closest_for_drivers)
 from tools.A00145_RigConnect.app.ui.collapsible import CollapsibleBox
 
 
@@ -437,6 +438,9 @@ class MainWindow(QWidget):
         self.cc_driver = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Driver", show_sort=False,
             list_min_height=200, log_callback=self.log)
+        # 각 Driver 에 가장 가까운 오브젝트를 찾아 Driven 을 driver 순서대로 채운다.
+        # 후보 풀: Driven 에 항목이 있으면 그걸, 없으면 현재 씬 선택.
+        self.cc_driver.add_button("Get Closest", self.on_get_closest)
         set_layout.addWidget(self.cc_driven)
         set_layout.addWidget(self.cc_driver)
         layout.addWidget(set_box)
@@ -491,7 +495,9 @@ class MainWindow(QWidget):
             "              + Locators (auto-create locators and constrain them)\n"
             "Connect     : connect attributes (3 broadcast patterns) + 52 facial\n"
             "List Conn.  : explore up/down stream nodes by type\n"
-            "Connect Closest : 1:1 closest matching constraints".format(
+            "Connect Closest : 1:1 closest matching constraints\n"
+            "              + Get Closest (fill Driven with each driver's "
+            "nearest object)".format(
                 VERSION, LAST_UPDATE))
 
     def _run(self, label, func):
@@ -739,6 +745,57 @@ class MainWindow(QWidget):
     # ==============================================================
     # Handlers : Connect Closest
     # ==============================================================
+
+    def on_get_closest(self):
+        """각 Driver 의 가장 가까운 오브젝트를 찾아 Driven 을 driver 순서대로 채운다.
+
+        후보 풀은 Driven 리스트에 항목이 있으면 그것을, 없으면 현재 씬 선택을 쓴다.
+        결과(찾은 오브젝트)는 뷰포트에서도 선택해 눈으로 확인할 수 있게 한다.
+        매칭 로직은 connect_closest 와 동일(greedy 1:1)이라 Connect 결과의 미리보기다.
+        """
+        drivers = self.cc_driver.get_all_items()
+        self.log("--- Get Closest ---")
+
+        if not drivers:
+            self.log("[WARN] Driver list is empty. Add objects to the Driver list.")
+            return
+
+        candidates = self.cc_driven.get_all_items()
+        source = "Driven list"
+        if not candidates:
+            candidates = cmds.ls(sl=True, fl=True) or []
+            source = "current selection"
+        if not candidates:
+            self.log("[WARN] No candidates. Fill the Driven list or "
+                     "select objects in the scene.")
+            return
+        self.log("Candidate pool: {0} ({1} object(s))".format(
+            source, len(candidates)))
+
+        pairs, errors = find_closest_for_drivers(drivers, candidates)
+
+        for err in errors:
+            self.log("[WARN] {0}".format(err))
+
+        if not pairs:
+            self.log("No closest match found.")
+            return
+
+        drivens = [driven for _driver, driven, _dist in pairs]
+        self.cc_driven.set_items(drivens)
+
+        for driver, driven, dist in pairs:
+            self.log("Closest: {0} -> {1} (dist {2:.3f})".format(
+                driver, driven, dist))
+
+        # 발견 검증용: 찾은 오브젝트를 뷰포트에서 선택.
+        try:
+            cmds.select(drivens, replace=True)
+        except Exception:
+            pass
+
+        self.log("Done. {0} closest object(s) listed in Driven.".format(
+            len(pairs)))
 
     def on_connect_closest(self):
         drivers = self.cc_driver.get_all_items()

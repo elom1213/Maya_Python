@@ -39,6 +39,88 @@ def find_closest(driver, driven_pool):
     return closest, closest_dist
 
 
+def match_closest_pairs(drivers, pool):
+    """driver 순서대로 greedy 1:1 최단 매칭. 쓰인 항목은 풀에서 제거(재사용 방지).
+
+    connect_closest(연결) 와 find_closest_for_drivers(Get Closest 미리채우기) 가
+    공유하는 매칭 로직 — 둘의 결과가 항상 일치하도록 단일 출처로 둔다.
+
+    Args:
+        drivers: driver 오브젝트 이름 리스트(순서 유지).
+        pool: 후보 오브젝트 이름 리스트(존재/유효성은 호출측에서 미리 거른다).
+
+    Returns:
+        [(driver, driven, dist), ...] — 풀이 먼저 비면 남은 driver 는 빠진다.
+    """
+    remaining = list(pool)
+    pairs = []
+    for driver in drivers:
+        if not remaining:
+            break
+        driven, dist = find_closest(driver, remaining)
+        remaining.remove(driven)
+        pairs.append((driver, driven, dist))
+    return pairs
+
+
+def find_closest_for_drivers(drivers, candidates):
+    """각 driver 의 가장 가까운 후보를 greedy 1:1 로 찾는다(Get Closest 버튼용).
+
+    "각 driver 에 가장 가까운 오브젝트가 무엇인지" 발견/미리채우기가 목적이다.
+    drivers 자신은 후보 풀에서 자동 제외(자기 자신은 거리 0 이라 최단이 되어버림).
+
+    Args:
+        drivers: driver 오브젝트 이름 리스트.
+        candidates: 후보 풀(예: Driven 리스트 또는 현재 씬 선택).
+
+    Returns:
+        (pairs, errors) 튜플.
+          pairs:  [(driver, driven, dist), ...] (driver 순서, 1:1).
+          errors: 영어 경고/에러 메시지 문자열 리스트.
+    """
+    errors = []
+
+    if not drivers:
+        errors.append("No driver objects. Add objects to the Driver list.")
+        return [], errors
+
+    # 존재하지 않는 driver 는 제외.
+    valid_drivers = []
+    for driver in drivers:
+        if MayaScene.exists(driver):
+            valid_drivers.append(driver)
+        else:
+            errors.append("Driver not found in scene, skipped: {0}".format(driver))
+
+    # 후보 풀: 존재하는 것만, driver 자신은 제외.
+    driver_set = set(valid_drivers)
+    pool = []
+    for cand in candidates:
+        if not MayaScene.exists(cand):
+            errors.append("Candidate not found in scene, skipped: {0}".format(cand))
+        elif cand in driver_set:
+            continue
+        else:
+            pool.append(cand)
+
+    if not pool:
+        errors.append(
+            "No candidate objects. Fill the Driven list or "
+            "select objects in the scene, then press Get Closest.")
+        return [], errors
+
+    pairs = match_closest_pairs(valid_drivers, pool)
+
+    if len(pairs) < len(valid_drivers):
+        errors.append(
+            "More drivers ({0}) than candidates ({1}); "
+            "{2} driver(s) left without a match.".format(
+                len(valid_drivers), len(pool),
+                len(valid_drivers) - len(pairs)))
+
+    return pairs, errors
+
+
 def connect_closest(drivers, drivens, constraint_keys, maintain_offset=True):
     """driver 들을 가장 가까운 driven 과 1:1 매칭 후 constraint 로 연결.
 
@@ -98,16 +180,15 @@ def connect_closest(drivers, drivens, constraint_keys, maintain_offset=True):
             )
         )
 
-    # 매칭 + 연결 -----------------------------------------------------
+    # 매칭 (driver 순서 greedy 1:1, Get Closest 와 동일 로직) -----------
+    pairs = match_closest_pairs(valid_drivers, driven_pool)
+    matched = {driver for driver, _, _ in pairs}
     for driver in valid_drivers:
-
-        if not driven_pool:
+        if driver not in matched:
             errors.append("No driven left for driver: {0}".format(driver))
-            continue
 
-        driven, dist = find_closest(driver, driven_pool)
-        # 1:1 매칭: 선택된 driven 은 풀에서 제거해 재사용 방지.
-        driven_pool.remove(driven)
+    # 연결 -----------------------------------------------------------
+    for driver, driven, dist in pairs:
 
         applied = []
         for key in constraint_keys:

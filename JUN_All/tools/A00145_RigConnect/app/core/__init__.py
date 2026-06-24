@@ -5,6 +5,8 @@ from .maya_scene import MayaScene
 from .closest_connector import (
     CONSTRAINT_TYPES,
     find_closest,
+    match_closest_pairs,
+    find_closest_for_drivers,
     connect_closest,
 )
 from . import match_manager
