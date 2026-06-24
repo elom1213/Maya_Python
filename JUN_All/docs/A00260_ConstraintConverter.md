@@ -4,7 +4,7 @@
 **클립보드에 복사**하는 PySide 툴. 언리얼 Control Rig 그래프에 그대로 `Ctrl+V` 붙여넣으면 노드가 생성된다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`A00110_animTool` 클론)
-- **버전**: `app/config/version.py` (v01.00)
+- **버전**: `app/config/version.py` (v01.03)
 - **설치**: `__dragDrop_A00260.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼(`CnsConv`) 생성 → `tools.A00260_ConstraintConverter.run(True)`
 - **참고 출력 포맷**: `ref_/smaple.py` (UE Control Rig 에서 Parent Constraint 노드를 복사한 원본 텍스트)
 
@@ -104,15 +104,18 @@ cc.run(True)   # DEV_MODE 면 자기 자신 + Framework 리로드 후 실행
   컨스트레인트를 수집한다. 지원 타입: `parentConstraint` / `pointConstraint` / `orientConstraint` / `scaleConstraint`
   (모두 UE Parent Constraint 노드 하나로 매핑).
 - 타겟이 없는 컨스트레인트는 건너뛴다.
+- **노드는 모두 닫힌(접힌) 형태로 출력**된다 — Filter / Parents / AdvancedSettings 드롭다운이 접혀 있어
+  노드 길이가 짧다(`ref_/sample_02_close.py` 기준). 펼친 형태(`sample_01_open.py`)와의 차이는 세 컨테이너 핀
+  (AdvancedSettings / Parents 배열 / Filter)의 `bIsExpanded=True` 유무뿐이다.
 - 여러 컨스트레인트를 변환하면 각 노드 이름은 `ParentConstraint_1`, `ParentConstraint_2`, … 로 고유화되고
-  세로로 간격을 두고 배치된다(Position Y 오프셋). 붙여넣을 때 UE 가 현재 그래프 경로로 다시 매핑하므로
-  내부 그래프 경로 상수의 실제 값은 결과에 영향이 없다.
+  **가로로 나열**된다(Position X 오프셋). 한 줄에 **4개**를 채우면 줄을 바꿔 아래로 내린다(Position Y 오프셋).
+  붙여넣을 때 UE 가 현재 그래프 경로로 다시 매핑하므로 내부 그래프 경로 상수의 실제 값은 결과에 영향이 없다.
 - 타겟 배열은 샘플의 UE 직렬화 형태를 그대로 재현한다 — 선언/정의는 인덱스 **내림차순**으로 나열,
   Parents 컨테이너 `SubPins` 는 **오름차순**, 정의 섹션의 `bIsDynamicArray=True` 는 **첫 parent 에만** 붙는다.
 - 본/대상의 `Type` 은 샘플과 동일하게 `Bone` 고정(현재 버전).
 
-> **검증**: 샘플 데이터(`clavicle_out_l` ← `clavicle_l` 0.6, `upperarm_l` 0.4, Translate 필터만,
-> Maintain Offset ON, Shortest)로 생성한 결과가 `ref_/smaple.py` 와 384줄 전부 동일함을 확인.
+> **검증**: 닫힘 샘플 데이터(`ball_l` ← `upperarm_twist_01_l` 0.764, `upperarm_twist_02_l` 0.236, Translate
+> 필터만, Maintain Offset ON, Shortest)로 생성한 결과가 `ref_/sample_02_close.py` 와 381줄 전부 동일함을 확인.
 
 ---
 

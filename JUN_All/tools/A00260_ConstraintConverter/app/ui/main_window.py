@@ -12,12 +12,13 @@ print("QT version  :  " + str(QT_VERSION))
 import maya.cmds as cmds
 
 from tools.A00260_ConstraintConverter.app.config.version import VERSION, LAST_UPDATE
-from tools.A00260_ConstraintConverter.app.core import (
-    ConstraintConverter,
-    ConvertOptions,
-    INTERP_TYPES,
-)
+from tools.A00260_ConstraintConverter.app.core import INTERP_TYPES
 from tools.A00260_ConstraintConverter.app.core import constraint_reader
+
+# 주의: ConstraintConverter / ConvertOptions 는 모듈 최상단에서 바인딩하지 않고
+# on_convert / _collect_options 안에서 '지역 import' 한다. DEV 리로드 시 같은 깊이의
+# 모듈 reload 순서 때문에 이 창이 옛 클래스를 잡는 것을 막아, 코드 변경(노드 배치 등)이
+# 항상 즉시 반영되게 한다. (launch.py 의 지역 import 패턴과 동일)
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -162,6 +163,10 @@ class MainWindow(QWidget):
         options = self._collect_options()
 
         try:
+            # 지역 import: 리로드 후 최신 클래스를 잡는다 (노드 배치 로직 변경 즉시 반영)
+            from tools.A00260_ConstraintConverter.app.core.constraint_converter import (
+                ConstraintConverter,
+            )
             converter = ConstraintConverter()
             combined, infos, out_path = converter.convert(nodes, options)
         except Exception as e:
@@ -183,6 +188,8 @@ class MainWindow(QWidget):
         self.log("Saved: {0}".format(out_path))
 
     def _collect_options(self):
+        # 지역 import: 리로드 후 최신 모듈을 잡는다 (constraint_converter 와 동일 이유)
+        from tools.A00260_ConstraintConverter.app.core.node_builder import ConvertOptions
         return ConvertOptions(
             trans_filter    = self.cb_trans.isChecked(),
             rot_filter      = self.cb_rot.isChecked(),

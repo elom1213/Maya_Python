@@ -19,10 +19,14 @@ class ConstraintConverter:
 
         self._set_path()
 
-        # 노드 배치 시작점/간격 (여러 컨스트레인트를 세로로 쌓는다)
+        # 노드 배치 시작점/간격.
+        # 여러 컨스트레인트를 가로로 나열하고, nodes_per_row(4) 개를 넘으면 줄을 바꿔 아래로 내린다.
+        # 간격은 ref_/sample_03.py 의 두 노드 가로 간격(X 약 307)을 참고해 닫힘 노드가 겹치지 않게 잡음.
         self.node_pos_start_x = 336.0
         self.node_pos_start_y = 16.0
-        self.node_pos_offset_y = 420.0
+        self.node_pos_offset_x = 340.0
+        self.node_pos_offset_y = 280.0
+        self.nodes_per_row = 4
 
         # UE 에서 붙여넣을 노드 이름 접두사
         self.node_name_prefix = "ParentConstraint_"
@@ -79,13 +83,18 @@ class ConstraintConverter:
                 continue
 
             node_name = "{0}{1}".format(self.node_name_prefix, idx + 1)
-            pos_y = self.node_pos_start_y + self.node_pos_offset_y * idx
+
+            # 가로로 나열 -> nodes_per_row 마다 다음 줄(아래)로 이동
+            col = idx % self.nodes_per_row
+            row = idx // self.nodes_per_row
+            pos_x = self.node_pos_start_x + self.node_pos_offset_x * col
+            pos_y = self.node_pos_start_y + self.node_pos_offset_y * row
 
             block = self.builder.build_node(
                 data,
                 options,
                 node_name = node_name,
-                pos_x = self.node_pos_start_x,
+                pos_x = pos_x,
                 pos_y = pos_y,
             )
             blocks.append(block)

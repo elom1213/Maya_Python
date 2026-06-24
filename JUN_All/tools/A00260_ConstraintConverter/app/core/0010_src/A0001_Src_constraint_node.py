@@ -135,7 +135,6 @@ Begin Object Class=/Script/RigVMDeveloper.RigVMUnitNode Name="{{NODE}}" ExportPa
          DefaultValue="{{INTERP_TYPE}}"
       End Object
       Direction=Input
-      bIsExpanded=True
       CPPType="FRigUnit_ParentConstraint_AdvancedSettings"
       CPPTypeObject="/Script/CoreUObject.ScriptStruct'/Script/ControlRig.RigUnit_ParentConstraint_AdvancedSettings'"
       CPPTypeObjectPath="/Script/ControlRig.RigUnit_ParentConstraint_AdvancedSettings"
@@ -145,7 +144,6 @@ Begin Object Class=/Script/RigVMDeveloper.RigVMUnitNode Name="{{NODE}}" ExportPa
    End Object
    Begin Object Name="Parents" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Parents'"
 {{PARENTS_DEF}}      Direction=Input
-      bIsExpanded=True
       bIsDynamicArray=True
       CPPType="TArray<FConstraintParent>"
       CPPTypeObject="/Script/CoreUObject.ScriptStruct'/Script/ControlRig.ConstraintParent'"
@@ -228,7 +226,6 @@ Begin Object Class=/Script/RigVMDeveloper.RigVMUnitNode Name="{{NODE}}" ExportPa
          SubPins(2)="/Script/RigVMDeveloper.RigVMPin'bZ'"
       End Object
       Direction=Input
-      bIsExpanded=True
       CPPType="FTransformFilter"
       CPPTypeObject="/Script/CoreUObject.ScriptStruct'/Script/AnimationCore.TransformFilter'"
       CPPTypeObjectPath="/Script/AnimationCore.TransformFilter"
