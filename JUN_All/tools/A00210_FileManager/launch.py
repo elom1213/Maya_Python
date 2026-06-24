@@ -32,7 +32,7 @@ def main():
 
     app = QApplication(sys.argv)
 
-    ThemeManager.load_theme_dev(app, "green_dark")
+    ThemeManager.load_theme_dev(app, "blue_dark")
 
     window = MainWindow()
 

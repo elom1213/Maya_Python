@@ -15,6 +15,11 @@ __pycache__/
 **/build/
 **/dist/
 
+# PyInstaller 가 build_exe.bat(--name <Tool>) 실행 시 자동 생성하는 spec.
+# 손으로 작성한 launch.spec 은 계속 추적한다.
+*.spec
+!launch.spec
+
 # A00240_PathTool 사용자 데이터(프로파일 JSON)는 툴 폴더 내부 data/ 에 저장 — 추적 안 함.
 **/A00240_PathTool/data/
 
