@@ -14,3 +14,4 @@
 | 주제 | 도메인 | 문서 |
 |------|--------|------|
 | 스킨 웨이트 전이 (Shrink Wrap + Blendshape 공간 정렬) | 리깅 / 스킨 | [skinWeight_transfer_workflow](skinWeight_transfer_workflow.md) |
+| SmartLayer Bake 알고리즘 분석 (서드파티 툴 `.pyc` 역분석) | 애니메이션 / 베이크 | [SmartLayer_bake_algorithm_analysis](SmartLayer_bake_algorithm_analysis.md) |
