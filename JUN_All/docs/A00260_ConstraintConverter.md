@@ -4,7 +4,7 @@
 **클립보드에 복사**하는 PySide 툴. 언리얼 Control Rig 그래프에 그대로 `Ctrl+V` 붙여넣으면 노드가 생성된다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`A00110_animTool` 클론)
-- **버전**: `app/config/version.py` (v01.03)
+- **버전**: `app/config/version.py` (v01.04)
 - **설치**: `__dragDrop_A00260.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼(`CnsConv`) 생성 → `tools.A00260_ConstraintConverter.run(True)`
 - **참고 출력 포맷**: `ref_/smaple.py` (UE Control Rig 에서 Parent Constraint 노드를 복사한 원본 텍스트)
 
@@ -46,10 +46,11 @@ A00260_ConstraintConverter/
         ├── constraint_converter.py  # 오케스트레이터 (PathManager, 0010_src→0020_out)
         ├── template_engine.py       # {{KEY}} 치환 (A00080_KWI_creator_V02 와 동일)
         ├── tool_path.py
-        └── 0010_src/                # {{}} 플레이스홀더 템플릿 3종
+        └── 0010_src/                # {{}} 플레이스홀더 템플릿 4종
             ├── A0001_Src_constraint_node.py   # 노드 전체 골격
             ├── A0002_Src_parent_decl.py        # parent 1개 선언(stub) 조각
-            └── A0003_Src_parent_def.py         # parent 1개 정의(값) 조각
+            ├── A0003_Src_parent_def.py         # parent 1개 정의(값) 조각
+            └── A0004_Src_link.py               # 노드 간 ExecutePin 연결(RigVMLink) 조각
 ```
 
 핵심 진입점: `ConstraintConverter().convert(constraint_nodes, ConvertOptions(...))`
@@ -110,6 +111,10 @@ cc.run(True)   # DEV_MODE 면 자기 자신 + Framework 리로드 후 실행
 - 여러 컨스트레인트를 변환하면 각 노드 이름은 `ParentConstraint_1`, `ParentConstraint_2`, … 로 고유화되고
   **가로로 나열**된다(Position X 오프셋). 한 줄에 **4개**를 채우면 줄을 바꿔 아래로 내린다(Position Y 오프셋).
   붙여넣을 때 UE 가 현재 그래프 경로로 다시 매핑하므로 내부 그래프 경로 상수의 실제 값은 결과에 영향이 없다.
+- **노드 간 연결(v01.04)**: 생성된 노드들을 **생성 순서대로 `ExecutePin` → `ExecutePin`** 으로 잇는
+  `RigVMLink` 블록(`A0004_Src_link.py`)을 노드 텍스트 뒤에 덧붙인다 — 붙여넣으면 노드들이 **실행 체인으로
+  연결된 상태**가 된다(`ref_/sample_04.py` 의 두 노드 연결 형태와 동일). 노드가 **1개면 링크 없음**,
+  N 개면 `RigVMLink_0 … RigVMLink_{N-2}` 로 N-1 개 생성. 빌더의 `NodeBuilder.build_links(graph, node_names)`.
 - 타겟 배열은 샘플의 UE 직렬화 형태를 그대로 재현한다 — 선언/정의는 인덱스 **내림차순**으로 나열,
   Parents 컨테이너 `SubPins` 는 **오름차순**, 정의 섹션의 `bIsDynamicArray=True` 는 **첫 parent 에만** 붙는다.
 - 본/대상의 `Type` 은 샘플과 동일하게 `Bone` 고정(현재 버전).

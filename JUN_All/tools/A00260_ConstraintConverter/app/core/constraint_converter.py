@@ -35,6 +35,7 @@ class ConstraintConverter:
             node_tmpl        = self._read(self.paths.read_node_tmpl),
             parent_decl_tmpl = self._read(self.paths.read_parent_decl),
             parent_def_tmpl  = self._read(self.paths.read_parent_def),
+            link_tmpl        = self._read(self.paths.read_link_tmpl),
         )
 
     # ------------------------------------------------------------------
@@ -51,6 +52,7 @@ class ConstraintConverter:
             read_node_tmpl   = self.pm.path("read",  "A0001_Src_constraint_node.{0}".format(ext)),
             read_parent_decl = self.pm.path("read",  "A0002_Src_parent_decl.{0}".format(ext)),
             read_parent_def  = self.pm.path("read",  "A0003_Src_parent_def.{0}".format(ext)),
+            read_link_tmpl   = self.pm.path("read",  "A0004_Src_link.{0}".format(ext)),
             write_out        = self.pm.path("write", "A001_constraint_nodes_out.{0}".format(ext)),
         )
 
@@ -75,6 +77,7 @@ class ConstraintConverter:
         """
         blocks = []
         infos = []
+        node_names = []
 
         idx = 0
         for cn in constraint_nodes:
@@ -83,6 +86,7 @@ class ConstraintConverter:
                 continue
 
             node_name = "{0}{1}".format(self.node_name_prefix, idx + 1)
+            node_names.append(node_name)
 
             # 가로로 나열 -> nodes_per_row 마다 다음 줄(아래)로 이동
             col = idx % self.nodes_per_row
@@ -101,7 +105,11 @@ class ConstraintConverter:
             infos.append((data.name, data.child, len(data.targets)))
             idx += 1
 
-        combined = "\n".join(blocks)
+        # 생성된 노드들을 생성 순서대로 ExecutePin -> ExecutePin 으로 연결한다.
+        # (sample_04.py 의 RigVMLink 참고. 노드가 2개 미만이면 링크 없음.)
+        links = self.builder.build_links(options.graph_path, node_names)
+
+        combined = "\n".join(blocks + links)
         return combined, infos
 
     def convert(self, constraint_nodes, options):

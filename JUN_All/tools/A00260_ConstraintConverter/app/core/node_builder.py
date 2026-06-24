@@ -38,10 +38,29 @@ def _ue_bool(value):
 class NodeBuilder:
     """세 개의 템플릿 문자열로 노드 텍스트를 만든다."""
 
-    def __init__(self, node_tmpl, parent_decl_tmpl, parent_def_tmpl):
+    def __init__(self, node_tmpl, parent_decl_tmpl, parent_def_tmpl, link_tmpl):
         self.node_tmpl = node_tmpl
         self.parent_decl_tmpl = parent_decl_tmpl
         self.parent_def_tmpl = parent_def_tmpl
+        self.link_tmpl = link_tmpl
+
+    # ------------------------------------------------------------------
+
+    def build_links(self, graph, node_names):
+        """노드들을 생성 순서대로 ExecutePin -> ExecutePin 으로 잇는 RigVMLink 블록 리스트.
+
+        node_names[i].ExecutePin -> node_names[i+1].ExecutePin 으로 체인을 만든다.
+        노드가 2개 미만이면 연결할 게 없으므로 빈 리스트를 반환한다.
+        """
+        links = []
+        for idx in range(len(node_names) - 1):
+            links.append(TemplateEngine.apply(self.link_tmpl, {
+                "GRAPH"       : graph,
+                "IDX"         : idx,
+                "SOURCE_NODE" : node_names[idx],
+                "TARGET_NODE" : node_names[idx + 1],
+            }))
+        return links
 
     # ------------------------------------------------------------------
 
