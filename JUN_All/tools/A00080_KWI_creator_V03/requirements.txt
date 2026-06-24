@@ -1,0 +1,3 @@
+# Single source of truth: JUN_All/requirements.txt
+# Runs inside Maya (PySide6 / PySide2 bundled with Maya).
+PySide6
