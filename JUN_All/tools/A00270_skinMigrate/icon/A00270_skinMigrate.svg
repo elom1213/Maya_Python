@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+
+  <!-- Mesh A (source) : skinned mesh with weight bars -->
+  <rect x="3.5" y="8" width="9" height="16" rx="2.5" fill="#54a0ff" stroke="#2f6fc0" stroke-width="1"/>
+  <g fill="#cfe6ff" opacity="0.9">
+    <rect x="5.2" y="10.6" width="5.6" height="1.5" rx="0.7"/>
+    <rect x="5.2" y="13.5" width="5.6" height="1.5" rx="0.7"/>
+    <rect x="5.2" y="16.4" width="5.6" height="1.5" rx="0.7"/>
+    <rect x="5.2" y="19.3" width="5.6" height="1.5" rx="0.7"/>
+  </g>
+
+  <!-- Mesh B (target) : same skin migrated onto different topology -->
+  <rect x="19.5" y="8" width="9" height="16" rx="2.5" fill="#5fd35f" stroke="#3a9e3a" stroke-width="1"/>
+  <g fill="#d8f6d8" opacity="0.9">
+    <rect x="21.2" y="10.6" width="5.6" height="1.5" rx="0.7"/>
+    <rect x="21.2" y="13.5" width="5.6" height="1.5" rx="0.7"/>
+    <rect x="21.2" y="16.4" width="5.6" height="1.5" rx="0.7"/>
+    <rect x="21.2" y="19.3" width="5.6" height="1.5" rx="0.7"/>
+  </g>
+
+  <!-- Migration arrow A -> B -->
+  <g stroke="#ffffff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="13" y1="16" x2="18.2" y2="16"/>
+    <polyline points="15.6,13.2 18.9,16 15.6,18.8"/>
+  </g>
+</svg>

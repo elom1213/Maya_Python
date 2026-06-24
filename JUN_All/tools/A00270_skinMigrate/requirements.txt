@@ -1,0 +1,6 @@
+# A00270_skinMigrate runs inside Autodesk Maya (Python 3).
+# No external pip dependencies. Uses maya.cmds / maya.api.OpenMaya(Anim).
+#
+# The default "Kangaroo" engine requires the Kangaroo Builder plugin
+# (kangarooTabTools) to be importable in the Maya session.
+# The "Native" engine has no plugin dependency (maya.cmds + maya.api only).
