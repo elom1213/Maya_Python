@@ -2,7 +2,7 @@
 title: A00080_KWI_creator_V03 사용법
 aliases: [KWI Creator V03, Kawaii Creator V03]
 tags: [tool, unreal, kawaii-physics, maya]
-updated: 2026-06-24
+updated: 2026-06-25
 ---
 
 # A00080_KWI_creator_V03 사용법
@@ -42,7 +42,7 @@ A00080_KWI_creator_V03/
     │   ├── template_engine.py       # {{KEY}} 치환
     │   ├── tool_path.py / utility.py / file_processor.py
     │   └── 0010_src/            # 소스 템플릿 + A0101_tgtBones.py(예시 본 목록)
-    └── ui/main_window.py        # PySide UI (본 TSL + 생성 버튼 + 로그 + Help)
+    └── ui/main_window.py        # PySide UI (메뉴바 Help + 본 TSL + 생성 버튼 + 로그)
 ```
 
 - `core` 는 DCC 비의존 텍스트 처리만 한다. `Add Selected` 만 `maya.cmds` 를 lazy import 한다.
@@ -72,8 +72,8 @@ A00080_KWI_creator_V03.run(True)   # True = reload
 ## 5. UI 구성
 
 ```
-┌──────────────────────────────────────────── [ Help ] ┐  ← 우상단 Help 버튼(팝업)
-│ Target bones (Root bones)                             │
+┌ Help ──────────────────────────────────────────────────┐  ← 메뉴바 (Help > How to use)
+│ Target bones (Root bones) : 3                          │  ← 라벨에 현재 본 개수 표시
 │ ┌ TSL (QListWidget) ─────────────────────────────────┐ │
 │ │  cv_spline_necklace_02_01                          │ │
 │ │  cv_spline_necklace_03_01  ...                     │ │
@@ -93,8 +93,9 @@ A00080_KWI_creator_V03.run(True)   # True = reload
 └────────────────────────────────────────────────────────┘
 ```
 
-- **Help** (우상단): 툴 사용 안내 팝업(`QMessageBox`)을 띄운다.
+- **Help** (메뉴바): `Help > How to use` 로 툴 사용 안내 팝업(`QMessageBox`)을 띄운다.
 - **Target bones (TSL)**: 노드를 만들 **루트 본 목록**. 위에서부터 노드 순서(체인)가 된다.
+  라벨 헤더에 현재 본 개수가 함께 표시된다(예: `Target bones (Root bones) : 3`).
   - **입력란 + Add** / Enter: 타이핑한 본 이름을 리스트에 추가(중복 무시).
   - **Add Selected**: 마야 씬에서 **선택한 노드들**을 리스트에 추가.
   - **Remove**: 리스트에서 선택 항목 삭제. **Clear**: 전체 비우기.
@@ -105,6 +106,8 @@ A00080_KWI_creator_V03.run(True)   # True = reload
 - **Setting nodes Number**: 세팅/LD 링크의 interval(정수).
 - **Create base / setting / LD nodes**: 각 부분을 **개별 파일**로 생성.
 - **Create combined file**: base + setting + LD 를 **하나의 파일**로 합쳐 생성.
+  - 합본 코드가 **클립보드에 자동 복사**되어 언리얼 AnimGraph 에 바로 붙여넣을 수 있다(Ctrl+V).
+    (합본만 복사되며, 개별 파일 내용은 복사되지 않는다.)
   - **Also write individual files**(기본 ON): 합본과 함께 개별 파일도 남긴다.
 - **로그창**: 결과/경고 메시지(영어) 출력.
 
@@ -142,4 +145,5 @@ A00080_KWI_creator_V03.run(True)   # True = reload
 - `Setting nodes Number must be integer` — 숫자만 입력.
 - `Nothing selected` / `maya.cmds not available (run inside Maya)` — `Add Selected` 는 마야 안에서,
   노드를 선택한 상태로 눌러야 한다.
-- `Combined file created : <path>` — 생성 완료. 해당 경로(`0020_out/`)의 파일을 복사해 사용한다.
+- `Combined file created : <path>` — 생성 완료. 합본 코드는 클립보드에도 복사된다
+  (`Copied combined code to clipboard...`). 언리얼 AnimGraph 에 Ctrl+V 로 붙여넣는다.

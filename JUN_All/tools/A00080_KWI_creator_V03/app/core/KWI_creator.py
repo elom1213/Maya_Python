@@ -339,4 +339,5 @@ class KWI_creator:
         combined = join_list_with_newline([base_text, setting_text, ld_text], True)
         self._write(self.paths.write_combined_node, combined)
 
-        return self.paths.write_combined_node
+        # 합본 텍스트와 출력 경로를 함께 반환 (UI 가 클립보드 복사에 사용)
+        return self.paths.write_combined_node, combined

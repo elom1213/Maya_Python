@@ -19,6 +19,8 @@ from Framework.qt.qt import (
     QListWidget,
     QAbstractItemView,
     QMessageBox,
+    QMenuBar,
+    QApplication,
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
@@ -56,20 +58,24 @@ class MainWindow(QWidget):
 
         self.layout = QVBoxLayout(self)
 
-        # --- Help (top) -----------------------------------------------
-        self.btn_help = QPushButton("Help")
-        self.btn_help.clicked.connect(self.show_help)
-
-        row_help = QHBoxLayout()
-        row_help.addStretch(1)
-        row_help.addWidget(self.btn_help)
-        self.layout.addLayout(row_help)
+        # --- Menu bar (Help) ------------------------------------------
+        self.menu_bar = QMenuBar()
+        help_menu = self.menu_bar.addMenu("Help")
+        help_menu.addAction("How to use").triggered.connect(self.show_help)
+        self.layout.setMenuBar(self.menu_bar)
 
         # --- Target bones (TSL) ---------------------------------------
-        self.label_bones = QLabel("Target bones (Root bones)")
+        # 라벨 헤더에 현재 본 개수를 함께 표시한다 (예: "Target bones (Root bones) : 3").
+        self._bones_label_base = "Target bones (Root bones)"
+        self.label_bones = QLabel(self._bones_label_base)
 
         self.tsl_bones = QListWidget()
         self.tsl_bones.setSelectionMode(QAbstractItemView.ExtendedSelection)
+
+        # 리스트가 어떤 경로로 바뀌든(추가/삭제/클리어) 개수 표시가 항상 동기화되도록
+        # 모델의 행 변경 시그널에 연결한다.
+        self.tsl_bones.model().rowsInserted.connect(self.update_bones_count)
+        self.tsl_bones.model().rowsRemoved.connect(self.update_bones_count)
 
         # bone 입력 줄 : 텍스트 입력 + Add
         self.ipf_bone_name = QLineEdit()
@@ -162,8 +168,17 @@ class MainWindow(QWidget):
         self.layout.addWidget(self.btn_create_combined)
         self.layout.addWidget(self.log_widget)
 
+        # 초기 개수 표시 (예: "Target bones (Root bones) : 0")
+        self.update_bones_count()
+
     # ------------------------------------------------------------------
     # TSL (target bones) helpers
+
+    def update_bones_count(self, *args):
+        # 라벨 헤더에 현재 TSL 의 본 개수를 갱신한다. (*args : 모델 시그널 인자 흡수)
+        self.label_bones.setText(
+            f"{self._bones_label_base} : {self.tsl_bones.count()}"
+        )
 
     def get_bones(self):
         return [
@@ -273,11 +288,15 @@ class MainWindow(QWidget):
         self.KWI_creator.interval_setting_node = interval
 
         write_individual = self.chk_write_individual.isChecked()
-        out_path = self.KWI_creator.create_combined_file(write_individual)
+        out_path, combined = self.KWI_creator.create_combined_file(write_individual)
+
+        # 합본 텍스트만 클립보드로 복사 -> UE AnimGraph 에 바로 붙여넣기 (Ctrl+V)
+        QApplication.clipboard().setText(combined)
 
         self.log(f"Combined file created : {out_path}")
         if write_individual:
             self.log("Individual files also written")
+        self.log("Copied combined code to clipboard. Paste into Unreal AnimGraph (Ctrl+V).")
 
     # ------------------------------------------------------------------
     # help

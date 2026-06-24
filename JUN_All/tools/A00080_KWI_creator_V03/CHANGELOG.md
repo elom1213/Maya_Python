@@ -1,5 +1,17 @@
 # Changelog
 
+## V01.01 (2026-06-25)
+
+### Added
+- "Create combined file" now copies the combined code to the clipboard so it can be
+  pasted straight into the Unreal AnimGraph (Ctrl+V). Only the combined output is copied.
+- Target bones label now shows a live count (e.g. `Target bones (Root bones) : 3`),
+  kept in sync via the list model's row signals.
+
+### Changed
+- Help moved from a top-right button to a menu bar (`Help > How to use`).
+- `KWI_creator.create_combined_file()` now returns `(out_path, combined_text)`.
+
 ## V01.00 (2026-06-24)
 
 ### Create
