@@ -3,7 +3,8 @@
 ## v01.01 (2026-06-25)
 - **Edit BS 탭에 `Copy every frame` 추가**: 정해진 `[Start, End]` 구간을 **1프레임마다** 현재 씬에서
   **선택한 메시**를 복제(visibility off)해 `<mesh>_f<frame>` 이름으로 추출하고 `<mesh>_frames` 그룹으로
-  묶는다. 키를 걸지 않고 현재 씬 애니메이션 상태를 그대로 캡처한다(`suspend_refresh` + 현재 프레임 원복).
+  묶는다. 프레임 번호는 구간 전체 동일 자릿수로 **0 패딩**(예: 5–120 → `_f005`…`_f120`).
+  키를 걸지 않고 현재 씬 애니메이션 상태를 그대로 캡처한다(`suspend_refresh` + 현재 프레임 원복).
   구간 입력 UI(Start/End + `Get Current`)는 A00110 Follow 탭 패턴을 따른다.
   로직 `edit_bs_manager.copy_every_frame(meshes, start, end)`.
 
