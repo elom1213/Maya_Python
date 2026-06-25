@@ -20,6 +20,14 @@
 #       0 = 원본 유지, 1 = 매치로 덮어쓰기, 0.5 = 원본과 매치를 반반.
 #       회전은 쿼터니언 slerp, 위치/스케일은 선형 lerp 로 섞는다.
 #   - 애니메이션 레이어가 선택돼 있으면 그 레이어에 키를 굽는다(override / additive 모두 처리).
+#   - 어떤 레이어에 구워도 "베이스에 구운 것과 동일한 월드 위치/회전"이 나오도록 한다.
+#       * setKeyframe(animLayer=L, value=V) 는 레이어 커브에 V 를 그대로 쓰는 게 아니라,
+#         '평가 결과(아래 레이어 + 이 레이어) = V' 가 되도록 레이어 기여를 역산해 기록한다.
+#         따라서 override/additive 구분 없이 항상 '원하는 절대 로컬값 F' 를 넘기면 Maya 가
+#         레이어 종류에 맞는 기여(additive 회전 합성 포함)를 알아서 계산한다.
+#         (과거: additive 에 델타 F-base 를 넘겨 평가값이 F-base 만큼 어긋나던 버그를 제거.)
+#   - 구간 밖은 경계(start-1 / end+1)에 follower '원본 절대값' 을 키 -> 그 프레임 레이어 기여 0,
+#     이어 레이어 커브 Infinity 를 constant 로 고정해 구간 밖에서 0 기여를 유지(원본 그대로).
 
 import math
 
@@ -138,7 +146,14 @@ class FollowMatchManager:
     @staticmethod
     def _match_one(tgt, flw, times, blend, do_t, do_r, do_s, layer, is_override,
                    maintain_offset=False, ref_time=None):
-        """단일 (tgt, flw) 페어를 굽는다. 키를 하나라도 기록했으면 True."""
+        """단일 (tgt, flw) 페어를 굽는다. 키를 하나라도 기록했으면 True.
+
+        핵심: setKeyframe(animLayer=L, value=V) 는 레이어 커브에 V 를 그대로 쓰는 게 아니라
+        '평가 결과(= 아래 레이어 + 이 레이어)가 V 가 되도록' 레이어 기여를 역산해 기록한다.
+        따라서 override/additive 구분 없이 항상 '원하는 절대 로컬값 F' 를 넘기면 Maya 가
+        레이어 종류에 맞는 기여(회전 합성 포함)를 알아서 계산한다. (델타 직접 계산/캘리브레이션
+        불필요 — 과거 additive 에 델타를 넘겨 F-base 만큼 어긋나던 버그를 제거.)
+        """
         if not cmds.objExists(tgt) or not cmds.objExists(flw):
             return False
 
@@ -154,59 +169,56 @@ class FollowMatchManager:
         if maintain_offset:
             offset = FollowMatchManager._offset_matrix(tgt, flw, ref_time)
 
-        additive = (layer is not None) and (not is_override)
+        is_layer = layer is not None
 
-        # 레이어 멤버십 보장 (override/additive 모두 멤버여야 키가 레이어로 들어간다)
-        if layer is not None:
+        # 레이어 베이크: 구간 밖이 원본과 같도록, 베이크 전에 경계 바깥(start-1 / end+1)의
+        # follower 원본 로컬 포즈를 레이어 뮤트 상태로 캡처(= 이 레이어가 없을 때의 값).
+        bnd_times = (times[0] - 1, times[-1] + 1)
+        boundary_orig = {}
+        if is_layer:
+            prev_mute = bool(cmds.animLayer(layer, q=True, mute=True))
+            try:
+                cmds.animLayer(layer, edit=True, mute=True)
+                for bt in bnd_times:
+                    boundary_orig[bt] = FollowMatchManager._read_state(
+                        flw, bt, do_t, do_r, do_s, order)
+            finally:
+                cmds.animLayer(layer, edit=True, mute=prev_mute)
+
+        # 레이어 멤버십 보장 (멤버여야 키가 레이어로 들어간다)
+        if is_layer:
             for a in attrs:
                 try:
                     cmds.animLayer(layer, edit=True, attribute=flw + "." + a)
                 except Exception:
                     pass
 
-        # blend==1 이고 override(=base 포함)면 원본 O 가 필요 없다 -> 단일 쓰기 패스.
-        full = (blend >= 1.0) and is_override
-
-        # ---- Pass 1: 원본 평가값 O (+ additive 면 base B) 읽기 ----
+        # blend<1 이면 원본 평가값 O(현재 follower) 가 필요(매치와 섞기 위함).
+        need_orig = blend < 1.0
         orig = {}
-        if not full:
+        if need_orig:
             for t in times:
                 orig[t] = FollowMatchManager._read_state(flw, t, do_t, do_r, do_s, order)
 
-        base = {}
-        if additive and not full:
-            # 레이어를 뮤트해 base(레이어 기여 제외) 를 읽는다. 끝나면 원상 복구.
-            prev_mute = bool(cmds.animLayer(layer, q=True, mute=True))
-            try:
-                cmds.animLayer(layer, edit=True, mute=True)
-                for t in times:
-                    base[t] = FollowMatchManager._read_state(flw, t, do_t, do_r, do_s, order)
-            finally:
-                cmds.animLayer(layer, edit=True, mute=prev_mute)
-
-        # ---- Pass 2: 매치 M 계산 -> blend -> 레이어 모드별 값 V 기록 ----
+        # ---- 매치 M(절대) -> (blend) -> 절대값 F 기록 ----
         any_set = False
         for t in times:
             m_state = FollowMatchManager._matched_state(
                 tgt, flw, t, do_t, do_r, do_s, offset)
 
-            if full:
-                values = FollowMatchManager._values_from_state(m_state, do_t, do_r, do_s, order)
-            else:
+            if need_orig:
                 f_state = FollowMatchManager._blend_state(
                     orig[t], m_state, blend, do_t, do_r, do_s)
-                if additive:
-                    values = FollowMatchManager._additive_values(
-                        base[t], f_state, do_t, do_r, do_s, order)
-                else:
-                    values = FollowMatchManager._values_from_state(
-                        f_state, do_t, do_r, do_s, order)
+            else:
+                f_state = m_state
+
+            values = FollowMatchManager._values_from_state(f_state, do_t, do_r, do_s, order)
 
             for a in attrs:
                 if a not in values:
                     continue
                 try:
-                    if layer is not None:
+                    if is_layer:
                         cmds.setKeyframe(flw, attribute=a, time=t, value=values[a],
                                          animLayer=layer)
                     else:
@@ -216,7 +228,66 @@ class FollowMatchManager:
                     # 잠금/연결 등으로 키 불가한 채널은 건너뜀
                     pass
 
+        # 레이어 베이크: 경계(start-1 / end+1)에 '원본 절대값' 을 키 -> 그 프레임 레이어 기여가
+        # 0(원본과 동일)이 되고, 구간 밖은 constant 로 그 0 을 유지 -> 원본 애니메이션 그대로.
+        if is_layer and any_set:
+            FollowMatchManager._key_boundary_original(
+                flw, layer, attrs, boundary_orig, do_t, do_r, do_s, order)
+
         return any_set
+
+    @staticmethod
+    def _key_boundary_original(flw, layer, attrs, boundary_orig, do_t, do_r, do_s, order):
+        """경계(start-1 / end+1)에 follower 의 '원본 절대 로컬 포즈' 를 레이어 키로 기록한다.
+
+        setKeyframe(animLayer) 의 역산 덕에 평가값 = 원본 -> 그 프레임 레이어 기여 = 0.
+        이어서 레이어 커브의 pre/post Infinity 를 constant 로 고정해, 구간 밖에서 그 0 기여가
+        유지되도록 한다(원본 애니메이션이 위치 변화 없이 그대로 재생). 경계 키 탄젠트는 flat.
+        """
+        for bt, st in boundary_orig.items():
+            if not st:
+                continue
+            values = FollowMatchManager._values_from_state(st, do_t, do_r, do_s, order)
+            for a in attrs:
+                if a not in values:
+                    continue
+                try:
+                    cmds.setKeyframe(flw, attribute=a, time=bt, value=values[a],
+                                     animLayer=layer)
+                except Exception:
+                    pass
+
+        # 레이어 커브만 타겟팅하려고 해당 레이어를 임시 선택 -> Infinity/탄젠트 고정 -> 복원.
+        bnd = list(boundary_orig.keys())
+        all_layers = cmds.ls(type="animLayer") or []
+        prev_sel = {}
+        for lyr in all_layers:
+            try:
+                prev_sel[lyr] = bool(cmds.animLayer(lyr, q=True, selected=True))
+            except Exception:
+                prev_sel[lyr] = False
+        try:
+            for lyr in all_layers:
+                cmds.animLayer(lyr, edit=True, selected=(lyr == layer))
+            for a in attrs:
+                curves = cmds.keyframe(flw, attribute=a, query=True, name=True) or []
+                for c in curves:
+                    try:
+                        cmds.setInfinity(c, preInfinite="constant", postInfinite="constant")
+                    except Exception:
+                        pass
+                for bt in bnd:
+                    try:
+                        cmds.keyTangent(flw, attribute=a, time=(bt, bt), animLayer=layer,
+                                        inTangentType="flat", outTangentType="flat")
+                    except Exception:
+                        pass
+        finally:
+            for lyr in all_layers:
+                try:
+                    cmds.animLayer(lyr, edit=True, selected=prev_sel.get(lyr, False))
+                except Exception:
+                    pass
 
     # --------------------------------------------------
     # 상태(state) 읽기 / 계산
@@ -314,31 +385,6 @@ class FollowMatchManager:
             values["rotateZ"] = math.degrees(eul.z)
         if do_s and "s" in st:
             values["scaleX"], values["scaleY"], values["scaleZ"] = st["s"]
-        return values
-
-    @staticmethod
-    def _additive_values(b_state, f_state, do_t, do_r, do_s, order):
-        """additive 레이어용 레이어-로컬 값. 평가값 = base(B) + layer(V) 가 최종 F 가 되도록.
-        translate = F - B, rotate = B^-1 * F(회전 합성), scale = F / B(스케일은 곱).
-        """
-        values = {}
-        if do_t:
-            bt, ft = b_state["t"], f_state["t"]
-            values["translateX"] = ft[0] - bt[0]
-            values["translateY"] = ft[1] - bt[1]
-            values["translateZ"] = ft[2] - bt[2]
-        if do_r:
-            q_layer = b_state["q"].inverse() * f_state["q"]
-            eul = q_layer.asEulerRotation()
-            eul.reorderIt(order)
-            values["rotateX"] = math.degrees(eul.x)
-            values["rotateY"] = math.degrees(eul.y)
-            values["rotateZ"] = math.degrees(eul.z)
-        if do_s:
-            bs, fs = b_state["s"], f_state["s"]
-            values["scaleX"] = fs[0] / bs[0] if bs[0] else fs[0]
-            values["scaleY"] = fs[1] / bs[1] if bs[1] else fs[1]
-            values["scaleZ"] = fs[2] / bs[2] if bs[2] else fs[2]
         return values
 
     # --------------------------------------------------
