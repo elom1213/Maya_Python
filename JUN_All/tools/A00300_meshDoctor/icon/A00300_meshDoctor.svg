@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- A00300_meshDoctor shelf icon: wireframe mesh + medical cross badge -->
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1"/>
+  <g stroke="#1dd1a1" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M15 4 L4 13 L15 22 L26 13 Z"/>
+    <path d="M15 4 L15 22"/>
+    <path d="M4 13 L26 13"/>
+  </g>
+  <g fill="#3fc1c9">
+    <circle cx="15" cy="4" r="1.5"/>
+    <circle cx="4" cy="13" r="1.5"/>
+    <circle cx="26" cy="13" r="1.5"/>
+    <circle cx="15" cy="22" r="1.5"/>
+    <circle cx="15" cy="13" r="1.5"/>
+  </g>
+  <g>
+    <circle cx="23.5" cy="23.5" r="6.3" fill="#ee5253" stroke="#2d2d30" stroke-width="1"/>
+    <rect x="19.9" y="22.6" width="7.2" height="1.8" rx="0.9" fill="#ffffff"/>
+    <rect x="22.6" y="19.9" width="1.8" height="7.2" rx="0.9" fill="#ffffff"/>
+  </g>
+</svg>
