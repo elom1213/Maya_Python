@@ -187,12 +187,14 @@ class MainWindow(QWidget):
         self.le_start.setValidator(validator)
         self.le_start.setPlaceholderText("4")
         row.addWidget(self.le_start)
+        row.addWidget(self._make_get_current_btn(self.le_start))
 
         row.addWidget(QLabel("End"))
         self.le_end = QLineEdit()
         self.le_end.setValidator(validator)
         self.le_end.setPlaceholderText("10")
         row.addWidget(self.le_end)
+        row.addWidget(self._make_get_current_btn(self.le_end))
 
         row.addWidget(QLabel("Offset"))
         self.le_offset = QLineEdit()
@@ -393,11 +395,13 @@ class MainWindow(QWidget):
         self.le_copy_start = QLineEdit(str(time_str))
         self.le_copy_start.setValidator(validator)
         range_row.addWidget(self.le_copy_start)
+        range_row.addWidget(self._make_get_current_btn(self.le_copy_start))
 
         range_row.addWidget(QLabel("End"))
         self.le_copy_end = QLineEdit(str(time_end))
         self.le_copy_end.setValidator(validator)
         range_row.addWidget(self.le_copy_end)
+        range_row.addWidget(self._make_get_current_btn(self.le_copy_end))
         tab_layout.addLayout(range_row)
 
         # -------------------------
@@ -549,10 +553,12 @@ class MainWindow(QWidget):
         self.le_mir_start = QLineEdit(str(time_str))
         self.le_mir_start.setValidator(validator)
         range_row.addWidget(self.le_mir_start)
+        range_row.addWidget(self._make_get_current_btn(self.le_mir_start))
         range_row.addWidget(QLabel("End"))
         self.le_mir_end = QLineEdit(str(time_end))
         self.le_mir_end.setValidator(validator)
         range_row.addWidget(self.le_mir_end)
+        range_row.addWidget(self._make_get_current_btn(self.le_mir_end))
 
         range_row.addSpacing(12)
         range_row.addWidget(QLabel("Time"))
@@ -695,10 +701,14 @@ class MainWindow(QWidget):
         self.le_bake_start = QLineEdit(str(time_str))
         self.le_bake_start.setValidator(validator)
         range_row.addWidget(self.le_bake_start)
+        self.btn_bake_get_start = self._make_get_current_btn(self.le_bake_start)
+        range_row.addWidget(self.btn_bake_get_start)
         range_row.addWidget(QLabel("End"))
         self.le_bake_end = QLineEdit(str(time_end))
         self.le_bake_end.setValidator(validator)
         range_row.addWidget(self.le_bake_end)
+        self.btn_bake_get_end = self._make_get_current_btn(self.le_bake_end)
+        range_row.addWidget(self.btn_bake_get_end)
         tab_layout.addLayout(range_row)
 
         # -------------------------
@@ -877,9 +887,9 @@ class MainWindow(QWidget):
         self.sld_follow_blend.valueChanged.connect(self._follow_slider_to_le)
         self.le_follow_blend.editingFinished.connect(self._follow_le_to_slider)
         self.btn_follow_get_start.clicked.connect(
-            lambda: self._follow_set_current_frame(self.le_follow_start))
+            lambda: self._set_current_frame(self.le_follow_start))
         self.btn_follow_get_end.clicked.connect(
-            lambda: self._follow_set_current_frame(self.le_follow_end))
+            lambda: self._set_current_frame(self.le_follow_end))
         self.btn_follow.clicked.connect(self.on_follow_bake)
 
         return tab
@@ -1223,6 +1233,8 @@ class MainWindow(QWidget):
         custom = self.rb_bake_custom.isChecked()
         self.le_bake_start.setEnabled(custom)
         self.le_bake_end.setEnabled(custom)
+        self.btn_bake_get_start.setEnabled(custom)
+        self.btn_bake_get_end.setEnabled(custom)
 
     def _bake_update_smart_mode(self, *args):
         """Smart bake 체크 상태에 따라 Tolerance 입력 활성/비활성 토글."""
@@ -1308,10 +1320,19 @@ class MainWindow(QWidget):
         self.sld_follow_blend.setValue(int(round(v * 100)))
         self.sld_follow_blend.blockSignals(False)
 
-    def _follow_set_current_frame(self, line_edit):
+    def _set_current_frame(self, line_edit):
         """Get Current 버튼: 현재 Maya 프레임으로 해당 Start/End LineEdit 을 갱신."""
         frame = int(round(cmds.currentTime(query=True)))
         line_edit.setText(str(frame))
+
+    def _make_get_current_btn(self, line_edit):
+        """현재 프레임으로 line_edit 을 채우는 'Get Current' 버튼 생성(모든 탭 공용).
+
+        Follow 탭의 Get Current 를 다른 탭의 Start/End 에도 동일하게 제공한다.
+        """
+        btn = QPushButton("Get Current")
+        btn.clicked.connect(lambda le=line_edit: self._set_current_frame(le))
+        return btn
 
     def on_follow_bake(self):
 

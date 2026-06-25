@@ -27,6 +27,12 @@
    follower 애니메이션과 매치 결과를 섞으며(0=원본 유지, 1=덮어쓰기, 0.5=반반), 선택된
    **애니메이션 레이어**(override/additive)에 키가 들어간다.
 
+> **v01.22 — `Get Current` 버튼을 시간범위가 있는 모든 탭으로 확장**: 기존에 **Follow 탭에만** 있던
+> `Get Current`(클릭 시 현재 Maya 프레임으로 Start/End 입력을 채움) 버튼을 **Key Edit(Move Keys) ·
+> Copy Key · Mirror Key · Bake** 탭의 Start/End 입력 옆에도 추가했다. Bake 탭은 **Custom range 모드일 때만**
+> 버튼이 활성화된다(입력 필드와 동일 토글). 구현은 공용 헬퍼 `_make_get_current_btn(line_edit)` 로 일원화하고,
+> 핸들러를 `_follow_set_current_frame` → `_set_current_frame`(범용)으로 바꿨다. `app/ui/main_window.py` 만 변경.
+
 > **v01.21 — Follow 탭: 비-베이스 레이어 베이크가 베이스와 동일한 월드 결과를 내도록 수정**: 비-베이스
 > 애니메이션 레이어(특히 **additive**)에 구울 때 ① 구간 안에서 위치가 어긋나고, ② 회전이 베이스와
 > 다르며, ③ **구간 밖 원본 애니메이션이 상수만큼 평행이동**하던 버그를 한 번에 고쳤다. 근본 원인은
