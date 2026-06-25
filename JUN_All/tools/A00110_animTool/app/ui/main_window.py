@@ -1331,7 +1331,10 @@ class MainWindow(QWidget):
         Follow 탭의 Get Current 를 다른 탭의 Start/End 에도 동일하게 제공한다.
         """
         btn = QPushButton("Get Current")
-        btn.clicked.connect(lambda le=line_edit: self._set_current_frame(le))
+        # NOTE: clicked 시그널은 checked(bool) 인자를 슬롯에 넘긴다. 슬롯이 위치
+        # 인자 1개를 받으면(예: lambda le=line_edit:) checked 값이 le 를 덮어써
+        # _set_current_frame(False) 로 호출돼 동작하지 않는다. *_ 로 흡수한다.
+        btn.clicked.connect(lambda *_a, le=line_edit: self._set_current_frame(le))
         return btn
 
     def on_follow_bake(self):

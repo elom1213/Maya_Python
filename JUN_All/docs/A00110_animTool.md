@@ -27,6 +27,13 @@
    follower 애니메이션과 매치 결과를 섞으며(0=원본 유지, 1=덮어쓰기, 0.5=반반), 선택된
    **애니메이션 레이어**(override/additive)에 키가 들어간다.
 
+> **v01.23 — 확장된 `Get Current` 버튼이 동작하지 않던 버그 수정**: v01.22 에서 추가한 (Follow 외)
+> 모든 `Get Current` 버튼이 눌러도 입력이 갱신되지 않았다. 원인은 `_make_get_current_btn` 의 슬롯이
+> `lambda le=line_edit:` 로 **위치 인자 1개를 받는** 형태였던 것 — PySide 의 `clicked` 시그널이 슬롯에
+> `checked`(bool) 인자를 넘기는데, 그 값이 `le` 기본값을 덮어써 `_set_current_frame(False)` 로 호출돼
+> 실패했다. `lambda *_a, le=line_edit:` 로 checked 인자를 흡수해 해결. Follow 탭 버튼은 무인자 람다라
+> 영향 없었다. `app/ui/main_window.py` 만 변경.
+
 > **v01.22 — `Get Current` 버튼을 시간범위가 있는 모든 탭으로 확장**: 기존에 **Follow 탭에만** 있던
 > `Get Current`(클릭 시 현재 Maya 프레임으로 Start/End 입력을 채움) 버튼을 **Key Edit(Move Keys) ·
 > Copy Key · Mirror Key · Bake** 탭의 Start/End 입력 옆에도 추가했다. Bake 탭은 **Custom range 모드일 때만**
