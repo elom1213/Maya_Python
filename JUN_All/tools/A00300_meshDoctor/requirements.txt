@@ -1,0 +1,2 @@
+# A00300_meshDoctor runs inside Maya (Python 3, maya.cmds + maya.api.OpenMaya).
+# No external pip dependencies. PySide6 / PySide2 ships with Maya.

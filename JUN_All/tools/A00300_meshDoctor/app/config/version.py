@@ -1,0 +1,3 @@
+# Mesh Doctor
+VERSION = "01.00"
+LAST_UPDATE = "2026-06-25"
