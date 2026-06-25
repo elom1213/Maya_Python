@@ -18,8 +18,14 @@
 | **Select BlendShape Nodes** / Add / Del / Up / Down / Sort | 씬 선택을 blendShape 리스트로 관리 (공용 `JUN_mod_tsl_qt`) |
 | **Key every target** | 각 타겟을 프레임 `i` 에서 `1`, `i-1`/`i+1` 에서 `0` 으로 키 → 타임라인을 넘기면 타겟이 하나씩 순차로 보인다 |
 | **Copy every target** | 위 키를 건 뒤, 프레임마다 베이스 메시를 복제해 각 타겟 모양을 **타겟 이름의 메시**로 추출(visibility off) → `<node>_targets` 그룹으로 묶음 |
+| **Copy every frame** (v01.01~) | `Start`/`End` 구간을 **1프레임마다** 씬에서 **선택한 메시**를 복제(visibility off)해 `<mesh>_f<frame>`(0 패딩) 으로 추출 → `<mesh>_frames` 그룹. **키를 걸지 않고** 현재 씬 애니메이션 상태를 그대로 캡처 |
 
 > 리스트에 담긴 노드의 이름/순서는 자유. blendShape 가 아닌 항목은 무시된다.
+
+> **Copy every frame** 의 구간 입력 UI(`Start`/`End` + `Get Current`)는 A00110 Follow 탭 패턴을 따른다.
+> `Get Current` 는 해당 입력을 현재 Maya 프레임으로 채운다. 대상은 blendShape 리스트가 아니라 **씬에서
+> 선택한 메시**다. `suspend_refresh` 로 빠르게 처리하고 끝나면 **현재 프레임을 원복**한다(전체 단일 undo).
+> 로직: `edit_bs_manager.copy_every_frame(meshes, start, end)`.
 
 ## 탭 2 — Base Shape  (신규)
 
@@ -67,7 +73,7 @@ A00290_BSTool/
     ├── config/version.py
     ├── core/
     │   ├── blendshape_utils.py   # 타겟 조회 / 인덱스 매핑 / 베이스 메시 / 선택→blendShape
-    │   ├── edit_bs_manager.py    # Edit BS 탭: key/copy every target
+    │   ├── edit_bs_manager.py    # Edit BS 탭: key/copy every target + copy every frame
     │   └── base_shape_manager.py # Base Shape 탭: 타겟 델타 스케일
     └── ui/main_window.py         # QTabWidget 2탭 + 공용 로그
 ```

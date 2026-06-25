@@ -11,6 +11,7 @@
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.core.maya_refresh import suspend_refresh
 
 from . import blendshape_utils as bsu
 
@@ -94,3 +95,61 @@ class EditBSManager:
 
         return total_dups, "[Copy every target] {0} mesh(es) extracted from {1} node(s).".format(
             total_dups, len(nodes))
+
+    # ==================================================
+    # Copy every frame
+    # ==================================================
+
+    @staticmethod
+    def _copy_every_frame_single(mesh, frames, pad):
+        # 그룹/이름 충돌 방지를 위해 메시의 짧은 이름(네임스페이스/경로 제거)을 쓴다.
+        short = mesh.split("|")[-1].split(":")[-1]
+
+        dup_list = []
+        for f in frames:
+            cmds.currentTime(f, edit=True)
+            dup = cmds.duplicate(mesh)[0]
+            cmds.setAttr(dup + ".visibility", False)
+            # 프레임 번호를 0 패딩(구간 전체 동일 자릿수 -> 아웃라이너 정렬도 자연스럽다).
+            dup = cmds.rename(dup, "{0}_f{1:0{2}d}".format(short, f, pad))
+            dup_list.append(dup)
+
+        if dup_list:
+            cmds.group(dup_list, world=True, name="{0}_frames".format(short))
+
+        return dup_list
+
+    @staticmethod
+    def copy_every_frame(meshes, start, end):
+        """선택한 메시를 [start, end] 구간 매 프레임마다 복제(visibility off)해 추출한다.
+
+        각 메시를 프레임마다 복제하고 <mesh>_f<frame> 으로 이름 붙여 <mesh>_frames 그룹에 묶는다.
+        key 를 걸지 않고 현재 씬 애니메이션 상태를 그대로 캡처한다.
+        반환: (추출한 메시 수, 메시지)
+        """
+        valid = [m for m in (meshes or []) if cmds.objExists(m) and bsu.is_mesh(m)]
+        if not valid:
+            return 0, "[Warning] Select mesh(es) in the scene first."
+        if start > end:
+            return 0, "[Warning] Start ({0}) is greater than End ({1}).".format(start, end)
+
+        frames = list(range(int(start), int(end) + 1))
+        # 0 패딩 폭: 구간 내 프레임 문자열 최대 길이(음수 부호 포함)에 맞춰 모두 동일 자릿수.
+        pad = max(len(str(f)) for f in frames)
+        cur = cmds.currentTime(query=True)
+
+        total_dups = 0
+        with undo_chunk():
+            try:
+                # suspend_refresh: 블록 종료 시 refresh 복원이 항상 먼저/무조건 실행된다.
+                with suspend_refresh():
+                    for mesh in valid:
+                        total_dups += len(
+                            EditBSManager._copy_every_frame_single(mesh, frames, pad))
+            finally:
+                # 예외가 나도 현재 프레임을 원복(refresh 는 위에서 복원됨).
+                cmds.currentTime(cur, edit=True)
+
+        return total_dups, (
+            "[Copy every frame] {0} mesh(es) extracted over [{1}-{2}] from {3} selected mesh(es).".format(
+                total_dups, int(start), int(end), len(valid)))

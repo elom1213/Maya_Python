@@ -106,6 +106,37 @@ class MainWindow(QWidget):
         btn_copy.clicked.connect(self.on_copy_every_target)
         layout.addWidget(btn_copy)
 
+        # --- Copy every frame (구간 베이크) ---------------------------------
+        # 정해진 [Start, End] 구간을 1프레임마다 베이스 메시를 복제(visibility off).
+        # 구간 입력 UI 는 A00110 Follow 탭의 Start/End + Get Current 패턴을 따른다.
+        validator = QIntValidator(-1000000, 1000000, self)
+        t_min = int(cmds.playbackOptions(query=True, minTime=True))
+        t_max = int(cmds.playbackOptions(query=True, maxTime=True))
+
+        range_row = QHBoxLayout()
+        range_row.addWidget(QLabel("Start"))
+        self.le_copy_start = QLineEdit(str(t_min))
+        self.le_copy_start.setValidator(validator)
+        range_row.addWidget(self.le_copy_start)
+        btn_get_start = QPushButton("Get Current")
+        btn_get_start.clicked.connect(lambda: self._set_current_frame(self.le_copy_start))
+        range_row.addWidget(btn_get_start)
+        range_row.addWidget(QLabel("End"))
+        self.le_copy_end = QLineEdit(str(t_max))
+        self.le_copy_end.setValidator(validator)
+        range_row.addWidget(self.le_copy_end)
+        btn_get_end = QPushButton("Get Current")
+        btn_get_end.clicked.connect(lambda: self._set_current_frame(self.le_copy_end))
+        range_row.addWidget(btn_get_end)
+        layout.addLayout(range_row)
+
+        btn_copy_frame = QPushButton("Copy every frame")
+        btn_copy_frame.setToolTip(
+            "Duplicate the SELECTED mesh(es) in the scene at every frame in\n"
+            "[Start, End] (visibility off), grouped under <mesh>_frames.")
+        btn_copy_frame.clicked.connect(self.on_copy_every_frame)
+        layout.addWidget(btn_copy_frame)
+
         layout.addStretch(1)
         return tab
 
@@ -207,6 +238,10 @@ class MainWindow(QWidget):
     def _update_target_number(self):
         self.lbl_tgt_number.setText("Number: {0}".format(self.lw_targets.count()))
 
+    def _set_current_frame(self, line_edit):
+        """Get Current 버튼: 현재 Maya 프레임으로 해당 Start/End LineEdit 을 갱신."""
+        line_edit.setText(str(int(round(cmds.currentTime(query=True)))))
+
     # --------------------------------------------------
     # Handlers : Edit BS
     # --------------------------------------------------
@@ -225,6 +260,26 @@ class MainWindow(QWidget):
             self.log("[Warning] Add blendShape nodes to the list first.")
             return
         _n, msg = EditBSManager.copy_every_target(nodes)
+        self.log(msg)
+
+    def on_copy_every_frame(self):
+        meshes = cmds.ls(selection=True, long=False) or []
+        if not meshes:
+            self.log("[Warning] Select mesh(es) in the scene first.")
+            return
+
+        s_txt = self.le_copy_start.text().strip()
+        e_txt = self.le_copy_end.text().strip()
+        if s_txt == "" or e_txt == "":
+            self.log("[Warning] Enter Start / End.")
+            return
+
+        start, end = int(s_txt), int(e_txt)
+        if start > end:
+            self.log("[Warning] Start ({0}) is greater than End ({1}).".format(start, end))
+            return
+
+        _n, msg = EditBSManager.copy_every_frame(meshes, start, end)
         self.log(msg)
 
     # --------------------------------------------------
