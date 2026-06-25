@@ -154,7 +154,7 @@ elif iMode in [2, 4, 5]:   # closestPoint / closestUVPoint / spikes
 **토폴로지 (증상 2)**
 - `non_manifold` — non-manifold edge/vertex (FAIL)
 - `lamina_faces` — 겹친 페이스 (FAIL)
-- `zero_area_faces` — 면적 0/퇴화 페이스 (FAIL)
+- `zero_area_faces` — 퇴화/슬라이버 페이스 (형상품질 q 기반, FAIL) · `tiny_faces` — 작지만 정상인 면 (INFO, 결함 아님)
 - `zero_length_edges` — 길이 0 엣지 (FAIL)
 - `coincident_vertices` — merge 거리 안의 미병합 정점쌍 (WARN)
 - `holed_faces` / `concave_faces` / `floating_vertices` / `border_edges`
@@ -197,6 +197,51 @@ elif iMode in [2, 4, 5]:   # closestPoint / closestUVPoint / spikes
 
 **Select Problem Components** (셀렉션만 변경, 지오메트리 불변): Non-Manifold / Zero-Area Faces / Stray·NaN Verts 를
 선택해 뷰포트에서 직접 확인할 수 있다.
+
+---
+
+## 진단 노트 — `polyCleanup` 후에도 `zero_area_faces` 가 남는 경우
+
+`polyCleanup` 을 돌려도 `zero_area_faces` 가 계속 FAIL 로 잡히고, 그 면을 선택하면 **육안으로 보이는 아주 작은
+면**이 나오는 사례가 있다. 원인과 판단 기준, 그리고 **v01.01 에서 적용한 개선**을 정리한다.
+
+### 왜 어긋났나 (v01.00 의 판정 기준)
+- **진단(`mesh_scan.py`)**: `it.zeroArea()` **또는** 오브젝트공간 `getArea() < 1e-10` 이면 FAIL.
+- **`polyCleanup`(`mesh_fix.py`)**: zeroGeom 허용치 **`1e-05`** 미만 면을 제거.
+- polyCleanup(1e-05)이 안 지웠는데 진단이 잡았다는 것은, 트리거가 **Maya 의 `it.zeroArea()`** 라는 뜻이다.
+  즉 Maya 는 그 면을 "면적 0" 으로 보지만 polyCleanup 기준으론 정리 대상이 아니어서 **둘이 어긋난** 상태다.
+  (오브젝트 공간에서 작게 모델링하고 트랜스폼 스케일로 키운 메시에서도 절대 면적이 작게 나와 잘 발생한다.)
+
+### 케이스 A — 진짜 슬라이버(퇴화) 면
+정점들이 거의 **일직선/겹침**이라 면적이 구조적으로 0 에 수렴. 육안엔 "얇은 선" 같아도 실제 면적은 ~0.
+- **Transfer 를 진짜로 깨뜨린다**(barycentric 가 면적으로 나눗셈 → ill-conditioned). → **계속 FAIL 로 잡는 게 맞다.**
+- 이 면이 필요해 토폴로지를 못 건드리면 → **Transfer 를 `closestVertex` 모드로**(면을 아예 안 봄, 위 섹션 참고).
+
+### 케이스 B — 작지만 멀쩡한 면 (오탐)
+정점이 서로 떨어져 있고 일직선이 아닌, **절대 크기만 작은** 정상 면.
+- barycentric 좌표는 **면적의 비율**(부분/전체)이라 면이 균일하게 작아도 수치적으로 멀쩡하다. → **FAIL 은 오탐.**
+  이건 메시가 아니라 **툴을 고쳐야** 하는 경우다.
+
+### 권고
+- **필요한 면은 삭제하지 않는다.** 필요한 면을 지우면 구멍/실루엣 변형으로 작은 면 하나보다 더 큰 문제가 생긴다.
+  삭제는 **불필요한 쓰레기 면**(겹친 중복면·붕괴 잔재)에만 적용한다.
+- **무조건 "zero_area 로 안 친다" 도 위험**하다 — 케이스 A 슬라이버는 실제로 Transfer 를 깨므로.
+
+### v01.01 적용 — 형상품질(q) 기반 판정
+절대 면적/`zeroArea()` 의존을 줄이고 **스케일 무관 형상품질**로 퇴화를 판정한다(`mesh_scan.face_quality`):
+
+```
+q = (4 · π · area) / perimeter²      # 등주지수. 원=1, 정사각형≈0.785, 정삼각형≈0.60, 슬라이버→0
+```
+
+- **후보 면** = `it.zeroArea()` 또는 `area < AREA_TINY(1e-5)`.
+- 후보 중 **`area < AREA_DEGEN(1e-10)` 또는 `q < QUALITY_EPS(1e-2)`** → `zero_area_faces`(**FAIL**, 케이스 A 슬라이버, Transfer 깨짐).
+- 그 외(작지만 형상 정상) → 신규 `tiny_faces`(**INFO**, 케이스 B, 결함 아님). FAIL 오탐 제거.
+- 임계치 `AREA_TINY` 는 polyCleanup zeroGeom(1e-05)과 정렬. 세 상수 모두 `mesh_scan.py` 상단에서 조정 가능.
+- 로그(JSON/TXT)의 `zero_area_faces`/`tiny_faces` 샘플에 면별 **`f<idx> a=<면적> q=<품질>`** 을 기록 → 케이스 A/B 를 눈으로 구분.
+- `Select Zero-Area Faces` 헬퍼도 같은 기준(슬라이버만 선택).
+
+> **케이스 A 인 면이 꼭 필요하면** 메시를 고치지 말고 **Transfer 를 `closestVertex` 모드로**(위 "메시를 수정하지 않고 Transfer 하는 법" 참고). 슬라이버 면이 무시되어 그대로 전이된다.
 
 ---
 

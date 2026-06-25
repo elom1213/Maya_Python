@@ -33,7 +33,9 @@ _RANK = {PASS: 0, INFO: 1, WARN: 2, FAIL: 3}
 STRAY_FACTOR = 50.0     # 정점 거리가 median 의 N 배를 넘으면 떠돌이 후보
 ABS_HUGE = 1.0e6        # 절대좌표가 이보다 크면 무조건 떠돌이
 BBOX_INFLATE = 3.0      # 실제 bbox 대각이 robust bbox 대각의 N 배 이상이면 팽창
-AREA_EPS = 1.0e-10      # 면적이 이보다 작으면 zero-area
+AREA_DEGEN = 1.0e-10    # 면적이 이보다 작으면 무조건 퇴화(구조적 zero-area)
+AREA_TINY = 1.0e-5      # 이보다 작으면 '작은 면' 후보 (polyCleanup zeroGeom 허용치와 정렬)
+QUALITY_EPS = 1.0e-2    # 형상품질 q(등주지수)가 이보다 작으면 슬라이버(퇴화)로 본다
 EDGE_EPS = 1.0e-7       # 길이가 이보다 작으면 zero-length edge
 MERGE_TOL = 1.0e-4      # 이 거리 안에서 떨어진(미병합) 정점쌍 후보
 SAMPLE_CAP = 30         # 로그에 남길 컴포넌트 인덱스 최대 개수
@@ -255,6 +257,29 @@ def _check_shapes_history(transform, shape):
     return out
 
 
+def face_quality(points, area):
+    """면 형상 품질(등주지수) q = (4*pi*area) / perimeter^2.
+
+    원=1, 정사각형≈0.785, 정삼각형≈0.60, 슬라이버(정점 일직선/겹침)→0. **스케일 무관**.
+    절대 면적과 달리, 면이 균일하게 작아도(케이스 B) q 는 정상값을 유지하고,
+    얇은 슬라이버(케이스 A)만 0 으로 떨어진다 -> Transfer barycentric 의 안정성 지표.
+
+    points: 해당 면의 정점들(MPointArray, 루프 순서). area: getArea 결과.
+    """
+    n = len(points)
+    if n < 3 or area <= 0.0:
+        return 0.0
+    perim = 0.0
+    for i in range(n):
+        a = points[i]
+        b = points[(i + 1) % n]
+        dx, dy, dz = a.x - b.x, a.y - b.y, a.z - b.z
+        perim += math.sqrt(dx * dx + dy * dy + dz * dz)
+    if perim <= 1e-12:
+        return 0.0
+    return (4.0 * math.pi * area) / (perim * perim)
+
+
 def _check_topology(shape):
     """non-manifold, lamina/holed/concave/zero-area face, zero-length edge,
     floating vertex (증상 2)."""
@@ -295,15 +320,31 @@ def _check_topology(shape):
     else:
         out.append(_check("lamina_faces", PASS, "No lamina faces.", 0))
 
-    # --- per-face: zero-area / holed / concave (MItMeshPolygon) ---
-    zero_area, holed, concave = [], [], []
+    # --- per-face: sliver(zero-area)/tiny/holed/concave (MItMeshPolygon) ---
+    # zero-area 판정은 절대 면적이 아니라 형상품질 q(face_quality)로 한다.
+    #   후보 = it.zeroArea() 또는 area < AREA_TINY
+    #   후보 중 area<AREA_DEGEN 또는 q<QUALITY_EPS -> 슬라이버/퇴화(FAIL, Transfer 깨짐)
+    #   그 외(작지만 형상 정상) -> tiny(INFO 강등; barycentric 비율은 정상이라 오탐 방지)
+    # 샘플은 "f<idx> a=<area> q=<quality>" 문자열로 남겨 로그에서 A/B 를 눈으로 구분.
+    sliver, tiny, holed, concave = [], [], [], []
     try:
         it = om.MItMeshPolygon(dag)
         while not it.isDone():
             idx = it.index()
             try:
-                if it.zeroArea() or it.getArea(om.MSpace.kObject) < AREA_EPS:
-                    zero_area.append(idx)
+                area = it.getArea(om.MSpace.kObject)
+                candidate = area < AREA_TINY
+                try:
+                    candidate = candidate or it.zeroArea()
+                except Exception:
+                    pass
+                if candidate:
+                    q = face_quality(it.getPoints(om.MSpace.kObject), area)
+                    label = "f{0} a={1:.2e} q={2:.3f}".format(idx, area, q)
+                    if area < AREA_DEGEN or q < QUALITY_EPS:
+                        sliver.append(label)
+                    else:
+                        tiny.append(label)
             except Exception:
                 pass
             try:
@@ -321,14 +362,24 @@ def _check_topology(shape):
         out.append(_check("face_iteration", INFO,
                           "Face iteration skipped: {0}".format(e), 0))
 
-    if zero_area:
+    if sliver:
         out.append(_check(
             "zero_area_faces", FAIL,
-            "Zero-area (degenerate) faces. Barycentric transfer falls back to garbage "
-            "weights here -> faces collapse/distort. Fix: polyCleanup.",
-            len(zero_area), zero_area))
+            "Degenerate / sliver faces (area ~0 or very thin -> low shape quality q). "
+            "Barycentric transfer breaks here -> faces collapse/distort. If the face is "
+            "NEEDED geometry, transfer with closestVertex mode instead of deleting it; "
+            "use polyCleanup only on junk faces.",
+            len(sliver), sliver))
     else:
-        out.append(_check("zero_area_faces", PASS, "No zero-area faces.", 0))
+        out.append(_check("zero_area_faces", PASS, "No degenerate/sliver faces.", 0))
+
+    if tiny:
+        out.append(_check(
+            "tiny_faces", INFO,
+            "Small but well-shaped faces (area < {0:g}, shape quality ok). Barycentric "
+            "ratios stay valid, so weight transfer is fine here -- not a defect.".format(
+                AREA_TINY),
+            len(tiny), tiny))
 
     if holed:
         out.append(_check(

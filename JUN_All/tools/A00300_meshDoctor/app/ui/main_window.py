@@ -82,6 +82,12 @@ class MainWindow(QWidget):
             pass
         root.addWidget(self.te_log, 1)
 
+        # --- 로그 Clear ---
+        self.btn_clear_log = QPushButton("Clear Log")
+        self.btn_clear_log.setToolTip("Clear the log view above.")
+        self.btn_clear_log.clicked.connect(lambda: self.te_log.clear())
+        root.addWidget(self.btn_clear_log)
+
         # --- Fixes (접이식) ---
         fixes = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01(
             "Safe One-Click Fixes  (undoable)", expanded=True)

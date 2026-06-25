@@ -13,7 +13,7 @@ import maya.api.OpenMaya as om
 
 from tools.A00300_meshDoctor.app.core.mesh_scan import (
     shape_of, get_object_points, find_nan_indices, find_stray_indices,
-    centroid_of,
+    centroid_of, face_quality, AREA_DEGEN, AREA_TINY, QUALITY_EPS,
 )
 
 
@@ -156,6 +156,7 @@ class MeshFixer:
 
     @staticmethod
     def select_zero_area_faces():
+        # mesh_scan 의 zero_area(슬라이버) 판정과 동일 기준: 형상품질 q 로 거른다.
         meshes = _selected_meshes()
         sel = []
         for tr, shp in meshes:
@@ -163,17 +164,25 @@ class MeshFixer:
                 it = om.MItMeshPolygon(_dag(shp))
                 while not it.isDone():
                     try:
-                        if it.zeroArea() or it.getArea(om.MSpace.kObject) < 1.0e-10:
-                            sel.append("{0}.f[{1}]".format(tr, it.index()))
+                        area = it.getArea(om.MSpace.kObject)
+                        candidate = area < AREA_TINY
+                        try:
+                            candidate = candidate or it.zeroArea()
+                        except Exception:
+                            pass
+                        if candidate:
+                            q = face_quality(it.getPoints(om.MSpace.kObject), area)
+                            if area < AREA_DEGEN or q < QUALITY_EPS:
+                                sel.append("{0}.f[{1}]".format(tr, it.index()))
                     except Exception:
                         pass
                     it.next()
             except Exception:
                 pass
         if not sel:
-            return "No zero-area faces."
+            return "No degenerate/sliver faces."
         cmds.select(sel, replace=True)
-        return "Selected {0} zero-area face(s).".format(len(sel))
+        return "Selected {0} degenerate/sliver face(s).".format(len(sel))
 
     @staticmethod
     def select_stray_verts():
