@@ -2,6 +2,12 @@
 
 All notable changes to this tool are documented here.
 
+## [01.05] - 2026-06-26
+### Added
+- **ShortCut** tab — reorder path buttons inside a category. A path button's
+  right-click menu now has **Move Up** / **Move Down** (disabled at the ends),
+  mirroring the category reordering; the new order is saved to the profile JSON.
+
 ## [01.03] - 2026-06-19
 ### Added
 - **ShortCut** tab — a path button's right-click menu now has **Change Category**:

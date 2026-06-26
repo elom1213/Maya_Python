@@ -8,8 +8,8 @@
 #       * Category: 새 카테고리(QGroupBox) 생성
 #       * Path    : 어느 카테고리에 넣을지 물은 뒤 경로 버튼 생성
 #   - 각 카테고리는 QGroupBox 로 구분, 그 안에 경로 버튼이 쌓인다.
-#   - 수정/삭제는 우클릭 컨텍스트 메뉴(카테고리: Rename/Delete,
-#     버튼: Rename/Change Path/Delete)로 한다. 화면을 깨끗하게 유지하고
+#   - 수정/삭제/정렬은 우클릭 컨텍스트 메뉴로 한다(카테고리·버튼 모두
+#     Move Up/Move Down 으로 순서 변경 가능). 화면을 깨끗하게 유지하고
 #     항목이 늘어나도 잘 확장된다.
 
 import os
@@ -422,13 +422,29 @@ class ShortcutTab(QWidget):
 
     def _show_button_menu(self, cat_name, btn_name, btn_widget, pos):
         menu = QMenu(btn_widget)
+        # 카테고리 안에서 버튼 순서 변경(위/아래로 한 칸). 끝단에서는 비활성화한다.
+        act_up = menu.addAction("Move Up")
+        act_down = menu.addAction("Move Down")
+        menu.addSeparator()
         act_rename = menu.addAction("Rename")
         act_path = menu.addAction("Change Path")
         act_category = menu.addAction("Change Category")
         act_delete = menu.addAction("Delete")
 
+        cat = self._find_category(cat_name)
+        buttons = cat.get("buttons", []) if cat else []
+        idx = next(
+            (i for i, b in enumerate(buttons) if b["name"] == btn_name), -1
+        )
+        act_up.setEnabled(idx > 0)
+        act_down.setEnabled(0 <= idx < len(buttons) - 1)
+
         chosen = menu.exec_(btn_widget.mapToGlobal(pos))
-        if chosen == act_rename:
+        if chosen == act_up:
+            self._move_button(cat_name, btn_name, -1)
+        elif chosen == act_down:
+            self._move_button(cat_name, btn_name, +1)
+        elif chosen == act_rename:
             self._rename_button(cat_name, btn_name)
         elif chosen == act_path:
             self._change_button_path(cat_name, btn_name)
@@ -454,6 +470,28 @@ class ShortcutTab(QWidget):
             return
 
         cats[idx], cats[new_idx] = cats[new_idx], cats[idx]
+        self._save_and_render()
+
+    def _move_button(self, cat_name, btn_name, delta):
+        """카테고리 안에서 버튼을 delta(-1=위, +1=아래)만큼 옮겨 순서를 바꾼다.
+
+        화면 순서는 곧 cat["buttons"] 의 리스트 순서이므로, 인접 버튼과 자리를
+        바꾼 뒤 저장·재렌더하면 사용자가 원하는 순서를 만들 수 있다.
+        """
+        cat = self._find_category(cat_name)
+        if cat is None:
+            return
+        buttons = cat.get("buttons", [])
+        idx = next(
+            (i for i, b in enumerate(buttons) if b["name"] == btn_name), -1
+        )
+        if idx < 0:
+            return
+        new_idx = idx + delta
+        if new_idx < 0 or new_idx >= len(buttons):
+            return
+
+        buttons[idx], buttons[new_idx] = buttons[new_idx], buttons[idx]
         self._save_and_render()
 
     def _rename_category(self, old):
