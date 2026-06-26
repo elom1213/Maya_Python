@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-22
+# last Update date : 2026-06-26
 # A00145_RigConnect - Qt UI
 #
 # MEL ConnectionTool V04.02 의 3탭(Constrain / Connect / List Connected)을 PySide 로
@@ -104,10 +104,10 @@ class MainWindow(QWidget):
         # Targets / Followers (TSL 위젯이 cmds.ls(fl=True) 로 버텍스를 개별 항목으로 펼친다)
         self.tsl_match_tgt = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Targets", select_label="Select",
-            show_sort=False, list_min_height=200, log_callback=self.log)
+            list_min_height=200, log_callback=self.log)
         self.tsl_match_flw = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Followers", select_label="Select",
-            show_sort=False, list_min_height=200, log_callback=self.log)
+            list_min_height=200, log_callback=self.log)
 
         list_row = QHBoxLayout()
         list_row.addWidget(self.tsl_match_tgt)
@@ -162,10 +162,10 @@ class MainWindow(QWidget):
 
         self.tsl_targets = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Targets", select_label="Select",
-            show_sort=False, list_min_height=200, log_callback=self.log)
+            list_min_height=200, log_callback=self.log)
         self.tsl_followers = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Followers", select_label="Select",
-            show_sort=False, list_min_height=200, log_callback=self.log)
+            list_min_height=200, log_callback=self.log)
 
         list_row = QHBoxLayout()
         list_row.addWidget(self.tsl_targets)
@@ -240,10 +240,10 @@ class MainWindow(QWidget):
         # 어떤 버텍스를 선택했는지 리스트업하는 TSL + follower 리스트.
         self.tsl_skin_verts = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Vertices", select_label="Select",
-            show_sort=False, list_min_height=180, log_callback=self.log)
+            list_min_height=180, log_callback=self.log)
         self.tsl_skin_followers = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Followers", select_label="Select",
-            show_sort=False, list_min_height=180, log_callback=self.log)
+            list_min_height=180, log_callback=self.log)
 
         list_row = QHBoxLayout()
         list_row.addWidget(self.tsl_skin_verts)
@@ -308,8 +308,11 @@ class MainWindow(QWidget):
     # --------------------------------------------------------------
 
     def _build_connect_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
+        # Source/Destination 두 섹션 + 큰 버튼들이 세로로 쌓여 창 높이를 넘기면
+        # 각 TSL 의 버튼이 창 경계를 침범한다. 내용을 스크롤 영역에 담아, 공간이
+        # 모자라면 위젯이 겹치는 대신 스크롤바가 생기도록 한다.
+        content = QWidget()
+        layout = QVBoxLayout(content)
 
         layout.addWidget(self._build_connect_io("src", "Source Objects"))
         layout.addWidget(self._build_connect_io("dst", "Destination Objects"))
@@ -324,7 +327,11 @@ class MainWindow(QWidget):
         layout.addWidget(btn_facial)
 
         layout.addStretch(1)
-        return tab
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(content)
+        return scroll
 
     def _build_connect_io(self, role, title):
         """Connect 탭의 Source/Destination 한 섹션을 만든다 (접이식)."""
@@ -332,7 +339,7 @@ class MainWindow(QWidget):
 
         tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Objects", select_label="Select",
-            show_sort=False, list_min_height=120, log_callback=self.log)
+            list_min_height=120, log_callback=self.log)
 
         attr_list = QListWidget()
         attr_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
@@ -387,7 +394,7 @@ class MainWindow(QWidget):
         # Objects
         self.tsl_stream_objs = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Objects", select_label="Select",
-            show_sort=False, list_min_height=220, log_callback=self.log)
+            list_min_height=220, log_callback=self.log)
         row.addWidget(self.tsl_stream_objs)
 
         # Types
@@ -433,10 +440,10 @@ class MainWindow(QWidget):
         set_box = QGroupBox("Set Up")
         set_layout = QHBoxLayout(set_box)
         self.cc_driven = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Driven", show_sort=False,
+            title="Driven",
             list_min_height=200, log_callback=self.log)
         self.cc_driver = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Driver", show_sort=False,
+            title="Driver",
             list_min_height=200, log_callback=self.log)
         # 각 Driver 에 가장 가까운 오브젝트를 찾아 Driven 을 driver 순서대로 채운다.
         # 후보 풀: Driven 에 항목이 있으면 그걸, 없으면 현재 씬 선택.
