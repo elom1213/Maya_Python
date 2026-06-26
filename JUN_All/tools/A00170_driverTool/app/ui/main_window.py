@@ -187,6 +187,10 @@ class MainWindow(QWidget):
         row.addWidget(QLabel("Attr Search"))
         self.rmp_le_attr_search = QLineEdit()
         self.rmp_le_attr_search.setPlaceholderText("token (e.g. rotate)")
+        self.rmp_le_attr_search.setToolTip(
+            "Select listed attributes containing this token. If none match, "
+            "re-query the first joint by this token to reveal attributes that "
+            "are not currently listed (e.g. 'worldMatrix').")
         row.addWidget(self.rmp_le_attr_search)
         self.rmp_btn_attr_search = QPushButton("Search")
         self.rmp_btn_attr_search.setFixedWidth(70)
@@ -247,7 +251,11 @@ class MainWindow(QWidget):
         self.rmp_le_controller.setText(selection[0])
 
     def on_rmp_list_attributes(self):
-        """joints 리스트 첫 오브젝트의 keyable 어트리뷰트를 Attributes 리스트에 채운다."""
+        """joints 리스트 첫 오브젝트의 어트리뷰트(전체)를 Attributes 리스트에 채운다.
+
+        keyable 만이 아니라 listAttr(obj) 전체 + multi/compound 자식까지 펼쳐 보여준다
+        (A00145_RigConnect Connect 탭 List Attributes 와 동일).
+        """
         joints = self.rmp_joints_tsl.get_all_items()
         if not joints:
             self._log("[WARN] Joints list is empty. Add joints first.")
@@ -256,19 +264,49 @@ class MainWindow(QWidget):
         if not MayaScene.exists(first):
             self._log("[WARN] Object not found in scene: {0}".format(first))
             return
-        attrs = MayaScene.list_keyable_attrs(first)
+        attrs = MayaScene.list_attrs(first)
         self.rmp_attr_tsl.set_items(attrs)
-        self._log("Listed {0} keyable attribute(s) from {1}.".format(len(attrs), first))
+        self._log("Listed {0} attribute(s) from {1}.".format(len(attrs), first))
 
     def on_rmp_search_attrs(self):
-        """토큰을 포함하는 어트리뷰트를 Attributes 리스트에서 선택."""
+        """토큰으로 어트리뷰트를 검색한다.
+
+        현재 리스트에 토큰을 포함하는 항목이 있으면 그것들을 선택하고, 없으면
+        토큰으로 다시 질의해 (리스트업되지 않았던) 어트리뷰트를 찾아 채운다
+        (A00145_RigConnect Connect 탭 Search 와 동일).
+        """
         token = self.rmp_le_attr_search.text().strip()
         if not token:
             self._log("[WARN] Enter a search token.")
             return
+
         matches = [a for a in self.rmp_attr_tsl.get_all_items() if token in a]
-        self.rmp_attr_tsl.select_by_texts(matches)
-        self._log("Search '{0}' : {1} attribute(s) selected.".format(token, len(matches)))
+        if matches:
+            self.rmp_attr_tsl.select_by_texts(matches)
+            self._log("Search '{0}' : {1} attribute(s) selected.".format(
+                token, len(matches)))
+            return
+
+        # 현재 목록에 없으면 토큰으로 재질의해 발견되는 어트리뷰트를 채운다.
+        joints = self.rmp_joints_tsl.get_all_items()
+        if not joints:
+            self._log("[WARN] Joints list is empty. Add joints first.")
+            return
+        first = joints[0]
+        if not MayaScene.exists(first):
+            self._log("[WARN] Object not found in scene: {0}".format(first))
+            return
+        try:
+            attrs = MayaScene.list_attrs(first, token)
+        except Exception as exc:
+            self._log("[WARN] No attribute matches '{0}': {1}".format(token, exc))
+            return
+        if not attrs:
+            self._log("Search '{0}' : no attribute found.".format(token))
+            return
+        self.rmp_attr_tsl.set_items(attrs)
+        self._log("Search '{0}' : re-listed {1} attribute(s) from {2}.".format(
+            token, len(attrs), first))
 
     def _rmp_collect_inputs(self):
         """공통 입력 수집 + 검증. 유효하면 (prefix, controller, joints, attrs), 아니면 None."""

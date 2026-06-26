@@ -87,9 +87,11 @@ A00170_driverTool/
 1. 오브젝트를 선택하고 **Get** → Main Controller 설정.
 2. **Joints** 리스트에 대상 오브젝트를 추가(`Select`/`Add`). Joints 수가 바뀌면 **In Max** 가
    자동으로 (개수 − 1)로 갱신된다(읽기 전용, Sine Wave 의 master input 범위).
-3. **List Attributes** → 첫 조인트의 keyable 어트리뷰트를 Attributes 리스트에 채운다.
-   **Attr Search** 토큰(예: `rotate`)으로 일치 항목을 일괄 선택할 수 있다. 빌드는 **선택된**
-   어트리뷰트에만 적용된다.
+3. **List Attributes** → 첫 조인트의 어트리뷰트를 Attributes 리스트에 채운다. keyable 뿐 아니라
+   `listAttr` 전체를 보여주며 multi/compound 어트리뷰트는 자식까지 펼친다(A00145_RigConnect Connect
+   탭과 동일). **Attr Search** 는 토큰(예: `rotate`)을 포함하는 항목을 일괄 선택하고, **일치 항목이
+   없으면** 그 토큰으로 다시 질의해 **리스트에 없던 어트리뷰트**(예: `worldMatrix`)를 찾아 채운다.
+   빌드는 **선택된** 어트리뷰트에만 적용된다.
 4. **Prefix**(기본 `twist`) 설정. Sine Wave 는 **Driver Attr**(기본 `wave`)도 설정.
    **Range** 의 Out Min/Max 는 두 모드 공용, In Min 은 Sine Wave 전용 기본값이다.
 5. **Build (Slerp Ramp)** 또는 **Build (Sine Wave)** 클릭.
