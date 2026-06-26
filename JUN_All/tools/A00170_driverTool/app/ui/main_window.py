@@ -20,6 +20,7 @@ from tools.A00170_driverTool.app.core import (
     MayaScene,
     run_build_slerp, run_build_wave,
     run_build_spherical, run_build_nodes,
+    run_attach_to_closest, AIM_AXES,
 )
 
 
@@ -71,6 +72,7 @@ class MainWindow(QWidget):
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_remap_tab(), "Remap Value")
         self.tabs.addTab(self._build_spherical_tab(), "Spherical Eye")
+        self.tabs.addTab(self._build_attach_tab(), "AttachCrv")
         main_layout.addWidget(self.tabs)
 
         # 로그창을 탭 아래에 배치
@@ -555,6 +557,129 @@ class MainWindow(QWidget):
                 self._log("[ERROR] Build failed: {0}".format(exc))
 
     # ================================================================
+    # Tab : AttachCrv  (ref/ref_01.mel attachDriverOnCurve 이식 + 동작 변경)
+    # ================================================================
+
+    def _build_attach_tab(self):
+        """TSL 에 나열된 오브젝트들을 커브에서 '가장 가까운 지점'에 라이브 어태치한다.
+
+        ref 는 커브에 일정 간격으로 새 로케이터를 어태치했지만, 여기서는 기존
+        오브젝트들을 각자 최근접 파라미터 지점에 붙인다(커브 변형을 따라감).
+        """
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+
+        # Attachment Curve
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Attachment Curve"))
+        self.atc_le_curve = QLineEdit()
+        row.addWidget(self.atc_le_curve)
+        self.atc_btn_get_curve = QPushButton("Get")
+        self.atc_btn_get_curve.setFixedWidth(70)
+        row.addWidget(self.atc_btn_get_curve)
+        root.addLayout(row)
+
+        # Objects (커브에 붙일 기존 오브젝트들)
+        group = QGroupBox("Objects (attach to closest point)")
+        group_layout = QVBoxLayout(group)
+        self.atc_objs_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(title="Objects")
+        group_layout.addWidget(self.atc_objs_tsl)
+        root.addWidget(group, stretch=1)
+
+        # Options : Orient to tangent + Aim Axis
+        row = QHBoxLayout()
+        self.atc_cb_orient = QCheckBox("Orient to curve tangent")
+        self.atc_cb_orient.setChecked(True)
+        self.atc_cb_orient.setToolTip(
+            "On: aim the chosen local axis along the curve tangent and drive "
+            "the object's rotate as well as translate. Off: drive translate "
+            "only (keeps each object's current rotation). Turn off for vertical "
+            "curves where the tangent is parallel to world up.")
+        row.addWidget(self.atc_cb_orient)
+        row.addWidget(QLabel("Aim Axis"))
+        self.atc_cb_aim = QComboBox()
+        self.atc_cb_aim.addItems(list(AIM_AXES))
+        self.atc_cb_aim.setToolTip(
+            "Which local axis of each object aims along the curve tangent.")
+        row.addWidget(self.atc_cb_aim)
+        row.addStretch(1)
+        root.addLayout(row)
+
+        # Collect the created pointOnCurveInfo nodes into one objectSet.
+        self.atc_cb_make_set = QCheckBox(
+            "Group pointOnCurveInfo nodes into a set")
+        self.atc_cb_make_set.setChecked(True)
+        self.atc_cb_make_set.setToolTip(
+            "Create one objectSet ('<curve>_atcPOCI_SET') containing every "
+            "pointOnCurveInfo node made by this build, for easy selection later.")
+        root.addWidget(self.atc_cb_make_set)
+
+        # Build
+        self.atc_btn_build = QPushButton("Attach to Closest Point")
+        self.atc_btn_build.setMinimumHeight(34)
+        self.atc_btn_build.setToolTip(
+            "For each listed object: find the closest parameter on the curve, "
+            "then drive it there with a pointOnCurveInfo -> matrix network "
+            "(parent-safe, live as the curve deforms).")
+        root.addWidget(self.atc_btn_build)
+
+        # Signals
+        self.atc_btn_get_curve.clicked.connect(self.on_atc_get_curve)
+        self.atc_btn_build.clicked.connect(self.on_atc_build)
+        self.atc_cb_orient.toggled.connect(self.atc_cb_aim.setEnabled)
+
+        return tab
+
+    def on_atc_get_curve(self):
+        """현재 선택의 첫 오브젝트를 Attachment Curve 로 설정."""
+        selection = MayaScene.selection()
+        if not selection:
+            self._log("[WARN] Nothing selected. Select a curve first.")
+            return
+        self.atc_le_curve.setText(selection[0])
+
+    def on_atc_build(self):
+        self._log("--- Attach to Closest Point ---")
+        curve = self.atc_le_curve.text().strip()
+        objects = self.atc_objs_tsl.get_all_items()
+
+        if not curve:
+            self._log("[WARN] Attachment Curve is empty. Use Get to set it.")
+            return
+        if not MayaScene.exists(curve):
+            self._log("[WARN] Curve not found in scene: {0}".format(curve))
+            return
+        if not objects:
+            self._log("[WARN] Objects list is empty. Add objects first.")
+            return
+
+        orient = self.atc_cb_orient.isChecked()
+        aim_axis = self.atc_cb_aim.currentText()
+        create_set = self.atc_cb_make_set.isChecked()
+
+        with undo_chunk():
+            try:
+                attached, failed, set_node = run_attach_to_closest(
+                    curve, objects, orient=orient, aim_axis=aim_axis,
+                    create_set=create_set)
+            except Exception as exc:
+                self._log("[ERROR] Attach failed: {0}".format(exc))
+                return
+
+        self._log(
+            "Attached {n} object(s) to '{c}' | orient: {o}{axis}".format(
+                n=len(attached), c=curve,
+                o="on" if orient else "off",
+                axis=" ({0})".format(aim_axis) if orient else ""))
+        for obj, param in attached:
+            self._log("  {0} -> param {1:.4f}".format(obj, param))
+        for obj, reason in failed:
+            self._log("[WARN] Skipped {0}: {1}".format(obj, reason))
+        if set_node:
+            self._log("pointOnCurveInfo nodes grouped into set: {0}".format(
+                set_node))
+
+    # ================================================================
     # Helper / About
     # ================================================================
 
@@ -579,6 +704,11 @@ class MainWindow(QWidget):
             "- Build (Converge to Center): Maya 2023+ node network. dilate (-90..90)\n"
             "  gathers joints to the center (+) or front (-) and keeps bound curves\n"
             "  on a sphere of radius R.\n"
+            "\n"
+            "[AttachCrv] (ported from ref attachDriverOnCurve, behavior changed)\n"
+            "- Attach to Closest Point: drives each listed object onto its closest\n"
+            "  parameter on the curve via a pointOnCurveInfo -> matrix network\n"
+            "  (parent-safe, live as the curve deforms). Optional orient to tangent.\n"
             "\n"
             "Each build is one undo step. All UI text is English.\n"
             "\n"

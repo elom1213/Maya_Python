@@ -4,7 +4,8 @@
 
 리깅 **드라이버 셋업**(메인 컨트롤러 어트리뷰트로 구동되는 노드 네트워크)을 만드는 PySide(Qt)
 툴이다. 워크플로가 거의 동일한 두 기존 툴(`A00150_remapVal`, `A00160_sphericalEye`)을
-`A00110_animTool` 과 같은 **하나의 창 + 탭** 구조로 통합했다. **두 개의 탭**과 **공유 로그창**으로 구성된다.
+`A00110_animTool` 과 같은 **하나의 창 + 탭** 구조로 통합하고, 커브 어태치 기능(`AttachCrv`)을 더했다.
+**세 개의 탭**과 **공유 로그창**으로 구성된다.
 
 1. **Remap Value** — 컨트롤러 어트리뷰트로 여러 오브젝트의 어트리뷰트를 `remapValue` 곡선을 따라
    보간/전파한다. (구 `A00150_remapVal`)
@@ -19,6 +20,13 @@
    - **Build (Converge to Center)**: Maya 2023+ 호환 노드 네트워크. `dilate(-90..90)` 가 모든
      조인트를 center(+) 또는 front(-) 조인트로 수렴시키고, 바인드된 곡선이 반지름 R 구 표면에
      놓이도록 `scaleX/Y` 를 구동한다.
+3. **AttachCrv** — TSL 에 나열된 **기존 오브젝트들**을 커브에서 **가장 가까운 지점**에 라이브
+   어태치한다. (`ref/ref_01.mel` 의 `attachDriverOnCurve` 이식이되 동작을 바꿈)
+   - 원본 ref 는 커브에 *일정 간격*으로 **새 로케이터**를 어태치했지만, 여기서는 오브젝트마다
+     `nearestPointOnCurve` 로 최근접 파라미터를 구해 그 지점에 붙인다.
+   - **Attach to Closest Point**: 오브젝트당 `pointOnCurveInfo(parameter=최근접) → fourByFourMatrix
+     → multMatrix(* parentInverseMatrix) → decomposeMatrix → translate`(옵션: `rotate`) 네트워크를
+     만든다. **부모 계층 안전**(parentInverse 사용)하고, 빌드 후 **커브가 변형되면 따라간다**.
 
 > **통합 방침**: 핵심 로직은 두 원본의 `app/core`(`slerp_ramp.py`, `spherical_drive.py`)를
 > **수정 없이 복사**해 재사용한다. 두 모듈이 모두 `run_build` 를 정의하므로 `app/core/__init__.py`
@@ -46,13 +54,16 @@ A00170_driverTool/
     │   ├── maya_scene.py       # 선택/존재/keyable attr/거리 (maya.cmds 어댑터)
     │   ├── slerp_ramp.py       # Slerp Ramp / Sine Wave 빌드 (pymel) — A00150 복사
     │   ├── spherical_drive.py  # Baked / Converge 빌드 (pymel) — A00160 복사
+    │   ├── attach_curve.py     # 커브 최근접 지점 어태치 (maya.cmds) — AttachCrv 탭
     │   └── __init__.py         # run_build_slerp / run_build_wave /
-    │                           #   run_build_spherical / run_build_nodes 재노출
-    └── ui/main_window.py  # 전체 UI (2개 탭 + 공유 로그창 + 메뉴 바)
+    │                           #   run_build_spherical / run_build_nodes /
+    │                           #   run_attach_to_closest 재노출
+    └── ui/main_window.py  # 전체 UI (3개 탭 + 공유 로그창 + 메뉴 바)
 ```
 
 - `main_window.py` 의 위젯/핸들러는 탭별 접두사로 분리한다: **Remap Value = `rmp_*`**,
-  **Spherical Eye = `sph_*`**. 공유하는 것은 `self._log()`(공용 로그창)뿐이다.
+  **Spherical Eye = `sph_*`**, **AttachCrv = `atc_*`**. 공유하는 것은 `self._log()`(공용 로그창)뿐이다.
+- `attach_curve.py` 는 노드 생성을 **maya.cmds** 로 한다(pymel 인 다른 두 빌드 모듈과 달리 자족적).
 
 ---
 
@@ -93,9 +104,27 @@ A00170_driverTool/
    - Converge 는 조인트가 **2개 이상** 필요(첫=front 타겟, 마지막=center 타겟)하고,
      center 까지 rest 거리가 R 이상인 조인트는 **scale 만 skip**(translate 는 유지)되며 로그에 경고한다.
 
+### 4.3 AttachCrv
+
+1. 커브를 선택하고 **Get** → **Attachment Curve** 설정.
+2. **Objects** 리스트에 커브에 붙일 오브젝트들을 추가(`Select`/`Add`).
+3. 옵션:
+   - **Orient to curve tangent**(기본 ON): 켜면 **Aim Axis**(`+X`/`-X`) 축을 커브 접선에 맞추고
+     오브젝트의 `rotate` 까지 구동한다. 끄면 `translate` 만 구동(현재 회전 유지).
+   - 접선이 월드 업(+Y)과 평행한 **수직 커브**에서는 방향 프레임이 무너질 수 있으니 그런 경우
+     Orient 를 끈다.
+   - **Group pointOnCurveInfo nodes into a set**(기본 ON): 이번 빌드로 생긴 `pointOnCurveInfo`
+     노드들을 모두 담는 objectSet 한 개(`<curve>_atcPOCI_SET`)를 만든다(나중에 한 번에 선택·관리용).
+4. **Attach to Closest Point** 클릭. 각 오브젝트가 자신과 가장 가까운 커브 파라미터 지점에 붙고,
+   로그에 오브젝트별 파라미터가 출력된다. 씬에 없는 항목은 skip 후 경고한다. 세트를 만들었으면
+   세트 이름도 로그에 표시된다.
+
+> 어태치는 오브젝트의 `translate`(옵션 `rotate`)에 노드를 **연결**한다. 이미 연결/잠금된 채널이
+> 있으면 해당 오브젝트만 실패 처리(로그 경고)하고 나머지는 계속한다.
+
 ---
 
 ## 5. 로그 / About
 
-- 두 탭의 모든 결과·경고(`[WARN]`)·오류(`[ERROR]`)는 창 하단의 **공유 로그창**에 누적된다.
-- **Help > About** 에 두 탭의 빌드 모드 설명이 함께 표기된다.
+- 세 탭의 모든 결과·경고(`[WARN]`)·오류(`[ERROR]`)는 창 하단의 **공유 로그창**에 누적된다.
+- **Help > About** 에 세 탭의 빌드 모드 설명이 함께 표기된다.

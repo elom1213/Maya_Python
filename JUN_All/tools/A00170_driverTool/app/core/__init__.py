@@ -6,9 +6,11 @@
 from .maya_scene import MayaScene
 from .slerp_ramp import run_build as run_build_slerp, run_build_wave
 from .spherical_drive import run_build as run_build_spherical, run_build_nodes
+from .attach_curve import build_attach_to_closest as run_attach_to_closest, AIM_AXES
 
 __all__ = [
     "MayaScene",
     "run_build_slerp", "run_build_wave",
     "run_build_spherical", "run_build_nodes",
+    "run_attach_to_closest", "AIM_AXES",
 ]
