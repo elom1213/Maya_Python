@@ -69,6 +69,18 @@ class MetaStore:
     def _ensure_parent(file_path):
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
+    def ensure_store(self):
+        """store_dir 아래 records/ thumbs/ 기본 폴더를 만들어 둔다(없으면 생성).
+
+        local(공유/NAS) 모드에서 빈 폴더를 처음 쓸 때 기본 구조가 한 번에 생기도록 한다
+        (records/thumbs 가 함께 보이게). git 모드에선 이미 스켈레톤이 있어 무해하다.
+        store_dir 미설정이면 아무것도 하지 않는다.
+        """
+        if not self.store_dir:
+            return
+        os.makedirs(os.path.join(self.store_dir, self.RECORDS_DIR), exist_ok=True)
+        os.makedirs(os.path.join(self.store_dir, self.THUMBS_DIR), exist_ok=True)
+
     # ------------------------------------------------------------- records
 
     def load(self, key):

@@ -37,7 +37,11 @@ _INVALID_CHARS = set('\\/:*?"<>|')
 # 동기화 기본값은 번들된 data_repo 설정에서 가져온다(배포받은 사용자도 바로 동기화되도록).
 DEFAULTS = {
     "project_root": "",
+    # 데이터 소스 방식: "git" = 중앙 git 데이터 리포(Pull/Push), "local" = 공유/NAS 폴더 직접 사용.
+    "source_mode": "git",
     "store_dir": data_repo.DEFAULT_STORE_DIR,
+    # local 모드에서 records/thumbs 를 직접 읽고 쓸 공유 폴더(NAS 등). git 미사용.
+    "local_dir": "",
     "scan_dir": "",
     "remote": data_repo.DATA_REPO_REMOTE,
     "branch": data_repo.DATA_REPO_BRANCH,

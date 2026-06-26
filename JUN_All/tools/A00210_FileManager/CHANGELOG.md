@@ -2,6 +2,22 @@
 
 All notable changes to this tool are documented here.
 
+## [01.23] - 2026-06-26
+### Added
+- **File Manager** tab — **Source Mode** selector (Settings group). Choose where
+  records/thumbnails are read from and written to:
+  - **Remote (Git)** — the existing behavior: a central git data-repo synced with
+    **Pull / Push** (uses the **Store Repo** clone path).
+  - **Local (Shared / NAS)** — a new **Shared Folder** path is read and written
+    **directly, with no git**. Intended for teams sharing a NAS, where the file
+    server keeps the data in sync instead of pushing/pulling a git remote each
+    time. In this mode the git inputs (Store Repo, Remote, Branch, Remote URL) and
+    the **Pull / Push** buttons are disabled; use **Scan** to refresh.
+  - The mode is saved **per profile** (alongside the new `local_dir`), so e.g. a
+    `Work (NAS)` profile can use Local mode while a `Home` profile stays on Git.
+    All tabs (File Manager / Path Structure / Lineage) follow the active mode's
+    folder automatically.
+
 ## [01.21] - 2026-06-22
 ### Added
 - **File Manager** tab — **Edit** button on the **Log history** header. Opens an

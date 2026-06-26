@@ -227,6 +227,10 @@ class MainWindow(QWidget):
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_file_manager_tab(), "File Manager")
 
+        # Source Mode 콤보는 settings·git 그룹이 모두 만들어진 지금 연결한다
+        # (빌드 중 addItem 으로 신호가 먼저 튀어 아직 없는 git 위젯을 건드리지 않도록).
+        self.cmb_source_mode.currentIndexChanged.connect(self._on_source_mode_changed)
+
         self.path_structure_tab = PathStructureTab(
             get_store=self._make_store,
             get_project_root=self.get_project_root,
@@ -315,29 +319,55 @@ class MainWindow(QWidget):
         group = QGroupBox("Settings")
         grid = QGridLayout(group)
 
+        # Source Mode — records/thumbnails 를 어디서 읽고 쓰는지 선택한다.
+        #   git   : 중앙 git 데이터 리포(Pull/Push) — 기존 동작.
+        #   local : 공유/NAS 폴더를 git 없이 직접 사용(폴더 동기화는 NAS 가 담당).
+        self.cmb_source_mode = QComboBox()
+        self.cmb_source_mode.addItem("Remote (Git)", "git")
+        self.cmb_source_mode.addItem("Local (Shared / NAS)", "local")
+        self.cmb_source_mode.setToolTip(
+            "Where records/thumbnails are read from and written to.\n"
+            "Remote (Git): sync a central git data-repo via Pull / Push.\n"
+            "Local (Shared / NAS): use a shared folder directly — no git;\n"
+            "the NAS keeps it in sync across the team.")
+        grid.addWidget(QLabel("Source Mode"), 0, 0)
+        grid.addWidget(self.cmb_source_mode, 0, 1)
+
         # Project Root
         self.ipf_project_root = QLineEdit()
         btn_root = QPushButton("Browse...")
         btn_root.clicked.connect(lambda: self._browse_dir(self.ipf_project_root))
-        grid.addWidget(QLabel("Project Root"), 0, 0)
-        grid.addWidget(self.ipf_project_root, 0, 1)
-        grid.addWidget(btn_root, 0, 2)
+        grid.addWidget(QLabel("Project Root"), 1, 0)
+        grid.addWidget(self.ipf_project_root, 1, 1)
+        grid.addWidget(btn_root, 1, 2)
 
-        # Store Repo
+        # Store Repo (git 모드 전용 — 중앙 데이터 리포의 로컬 clone)
+        self.lbl_store = QLabel("Store Repo")
         self.ipf_store_dir = QLineEdit()
-        btn_store = QPushButton("Browse...")
-        btn_store.clicked.connect(lambda: self._browse_dir(self.ipf_store_dir))
-        grid.addWidget(QLabel("Store Repo"), 1, 0)
-        grid.addWidget(self.ipf_store_dir, 1, 1)
-        grid.addWidget(btn_store, 1, 2)
+        self.btn_store = QPushButton("Browse...")
+        self.btn_store.clicked.connect(lambda: self._browse_dir(self.ipf_store_dir))
+        grid.addWidget(self.lbl_store, 2, 0)
+        grid.addWidget(self.ipf_store_dir, 2, 1)
+        grid.addWidget(self.btn_store, 2, 2)
+
+        # Shared Folder (local 모드 전용 — NAS 등 공유 폴더를 git 없이 직접 읽고 쓴다)
+        self.lbl_local = QLabel("Shared Folder")
+        self.ipf_local_dir = QLineEdit()
+        self.ipf_local_dir.setPlaceholderText(
+            "local / NAS folder used directly (no git)")
+        self.btn_local = QPushButton("Browse...")
+        self.btn_local.clicked.connect(lambda: self._browse_dir(self.ipf_local_dir))
+        grid.addWidget(self.lbl_local, 3, 0)
+        grid.addWidget(self.ipf_local_dir, 3, 1)
+        grid.addWidget(self.btn_local, 3, 2)
 
         # Scan Dir + Scan
         self.ipf_scan_dir = QLineEdit()
         btn_scan_browse = QPushButton("Browse...")
         btn_scan_browse.clicked.connect(lambda: self._browse_dir(self.ipf_scan_dir))
-        grid.addWidget(QLabel("Scan Dir"), 2, 0)
-        grid.addWidget(self.ipf_scan_dir, 2, 1)
-        grid.addWidget(btn_scan_browse, 2, 2)
+        grid.addWidget(QLabel("Scan Dir"), 4, 0)
+        grid.addWidget(self.ipf_scan_dir, 4, 1)
+        grid.addWidget(btn_scan_browse, 4, 2)
 
         scan_row = QHBoxLayout()
         self.chk_recursive = QCheckBox("Recursive")
@@ -363,7 +393,7 @@ class MainWindow(QWidget):
         scan_row.addWidget(self.btn_file_types)
         scan_row.addStretch(1)
         scan_row.addWidget(btn_scan)
-        grid.addLayout(scan_row, 3, 1, 1, 2)
+        grid.addLayout(scan_row, 5, 1, 1, 2)
 
         # Remote / Branch / Author / Save settings
         meta_row = QHBoxLayout()
@@ -382,14 +412,14 @@ class MainWindow(QWidget):
         meta_row.addWidget(QLabel("Author"))
         meta_row.addWidget(self.ipf_author)
         meta_row.addWidget(btn_save_settings)
-        grid.addLayout(meta_row, 4, 0, 1, 3)
+        grid.addLayout(meta_row, 6, 0, 1, 3)
 
         # Remote URL (중앙 데이터 리포 git URL). 보통 번들 기본값 그대로 — 첫 Pull 시
         # Store Repo 가 비어 있으면 이 URL 을 기본 경로로 자동 clone 한다.
         self.ipf_remote_url = QLineEdit()
         self.ipf_remote_url.setPlaceholderText("data repo git URL (auto-clone on first Pull)")
-        grid.addWidget(QLabel("Remote URL"), 5, 0)
-        grid.addWidget(self.ipf_remote_url, 5, 1, 1, 2)
+        grid.addWidget(QLabel("Remote URL"), 7, 0)
+        grid.addWidget(self.ipf_remote_url, 7, 1, 1, 2)
 
         return group
 
@@ -458,27 +488,29 @@ class MainWindow(QWidget):
         return panel
 
     def _build_git_group(self):
-        group = QGroupBox("Git Sync  (records / thumbnails only — originals are never pushed)")
-        row = QHBoxLayout(group)
+        self.git_group = QGroupBox(
+            "Git Sync  (records / thumbnails only — originals are never pushed)")
+        row = QHBoxLayout(self.git_group)
 
-        btn_pull = QPushButton("Pull")
-        btn_pull.clicked.connect(self.on_pull)
-        btn_push = QPushButton("Push")
-        btn_push.clicked.connect(self.on_push)
+        self.btn_pull = QPushButton("Pull")
+        self.btn_pull.clicked.connect(self.on_pull)
+        self.btn_push = QPushButton("Push")
+        self.btn_push.clicked.connect(self.on_push)
 
         self.lbl_git_status = QLabel("")
 
-        row.addWidget(btn_pull)
-        row.addWidget(btn_push)
+        row.addWidget(self.btn_pull)
+        row.addWidget(self.btn_push)
         row.addWidget(self.lbl_git_status, stretch=1)
 
-        return group
+        return self.git_group
 
     # ============================================================== prefs
 
     def _load_prefs_to_ui(self):
         self.ipf_project_root.setText(self._prefs.get("project_root", ""))
         self.ipf_store_dir.setText(self._prefs.get("store_dir", ""))
+        self.ipf_local_dir.setText(self._prefs.get("local_dir", ""))
         self.ipf_scan_dir.setText(self._prefs.get("scan_dir", ""))
         self.ipf_remote.setText(self._prefs.get("remote", data_repo.DATA_REPO_REMOTE))
         self.ipf_branch.setCurrentText(self._prefs.get("branch", data_repo.DATA_REPO_BRANCH))
@@ -488,10 +520,20 @@ class MainWindow(QWidget):
         self.chk_recorded_only.setChecked(
             bool(self._prefs.get("show_recorded_only", False)))
 
+        # Source Mode: 콤보 값 복원 후 git/local 위젯 활성 상태를 갱신한다.
+        mode = self._prefs.get("source_mode", "git")
+        idx = self.cmb_source_mode.findData(mode)
+        self.cmb_source_mode.blockSignals(True)
+        self.cmb_source_mode.setCurrentIndex(idx if idx >= 0 else 0)
+        self.cmb_source_mode.blockSignals(False)
+        self._apply_source_mode(self.cmb_source_mode.currentData())
+
     def _collect_prefs(self):
         return {
             "project_root": self.ipf_project_root.text().strip(),
+            "source_mode": self.cmb_source_mode.currentData() or "git",
             "store_dir": self.ipf_store_dir.text().strip(),
+            "local_dir": self.ipf_local_dir.text().strip(),
             "scan_dir": self.ipf_scan_dir.text().strip(),
             "remote": self.ipf_remote.text().strip() or data_repo.DATA_REPO_REMOTE,
             "branch": self.ipf_branch.currentText().strip() or data_repo.DATA_REPO_BRANCH,
@@ -614,14 +656,55 @@ class MainWindow(QWidget):
     def get_project_root(self):
         return self.ipf_project_root.text().strip()
 
-    def get_store_dir(self):
+    def _effective_store_dir(self):
+        """현재 Source Mode 에 따른 실제 데이터 폴더(records/thumbs 의 부모).
+
+        git 모드면 Store Repo(로컬 clone), local 모드면 Shared Folder(NAS 등)를 쓴다.
+        store/탭이 모두 이 경로를 통해 읽고 쓰므로 모드 전환이 자동으로 반영된다.
+        """
+        if self.cmb_source_mode.currentData() == "local":
+            return self.ipf_local_dir.text().strip()
         return self.ipf_store_dir.text().strip()
+
+    def get_store_dir(self):
+        return self._effective_store_dir()
 
     def _make_store(self):
         return MetaStore(
-            self.ipf_store_dir.text().strip(),
+            self._effective_store_dir(),
             self.ipf_project_root.text().strip(),
         )
+
+    def _on_source_mode_changed(self):
+        self._apply_source_mode(self.cmb_source_mode.currentData())
+        # 데이터 폴더 기준이 바뀌었으니 다른 탭의 저장 목록도 새 기준으로 새로고침.
+        self._refresh_other_tabs()
+
+    def _apply_source_mode(self, mode):
+        """Source Mode 에 맞춰 git/local 위젯의 활성 상태와 안내 문구를 갱신한다."""
+        is_git = (mode != "local")
+
+        # git 전용 입력/버튼.
+        for w in (
+            self.lbl_store, self.ipf_store_dir, self.btn_store,
+            self.ipf_remote, self.ipf_branch, self.ipf_remote_url,
+            self.btn_pull, self.btn_push,
+        ):
+            w.setEnabled(is_git)
+
+        # local 전용 입력.
+        for w in (self.lbl_local, self.ipf_local_dir, self.btn_local):
+            w.setEnabled(not is_git)
+
+        if is_git:
+            self.git_group.setTitle(
+                "Git Sync  (records / thumbnails only — originals are never pushed)")
+            self.lbl_git_status.setText("")
+        else:
+            self.git_group.setTitle("Git Sync  (disabled in Local mode)")
+            self.lbl_git_status.setText(
+                "Local mode — records/thumbnails are read/written directly under "
+                "the Shared Folder. No git; use Scan to refresh.")
 
     def _make_git(self):
         return GitSync(
@@ -1034,6 +1117,8 @@ class MainWindow(QWidget):
         self.log(f"Record saved: {record.key}")
 
     def _stamp_and_save(self, record, store):
+        # 빈 공유/NAS 폴더라도 첫 저장에서 records/thumbs 가 함께 생기도록 보장.
+        store.ensure_store()
         record.updated_by = self.ipf_author.text().strip()
         record.updated_at = self._now_iso()
         store.save(record)
@@ -1051,6 +1136,9 @@ class MainWindow(QWidget):
     # ================================================================ git
 
     def on_pull(self):
+        if self.cmb_source_mode.currentData() == "local":
+            self.log("Local mode: Pull is disabled. Use Scan to refresh.")
+            return
         self._ensure_default_store_dir()
         git = self._make_git()
         if not git.store_dir:
@@ -1072,6 +1160,9 @@ class MainWindow(QWidget):
             self.on_scan()
 
     def on_push(self):
+        if self.cmb_source_mode.currentData() == "local":
+            self.log("Local mode: Push is disabled. Data is written directly to the Shared Folder.")
+            return
         self._ensure_default_store_dir()
         git = self._make_git()
         if not git.store_dir:
