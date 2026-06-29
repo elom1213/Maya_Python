@@ -16,3 +16,4 @@
 | 스킨 웨이트 전이 (Shrink Wrap + Blendshape 공간 정렬) | 리깅 / 스킨 | [skinWeight_transfer_workflow](skinWeight_transfer_workflow.md) |
 | SmartLayer Bake 알고리즘 분석 (서드파티 툴 `.pyc` 역분석) | 애니메이션 / 베이크 | [SmartLayer_bake_algorithm_analysis](SmartLayer_bake_algorithm_analysis.md) |
 | 후디니 의상 주름 강조 (Wrinkle Exaggeration, 언샤프 마스크) | 시뮬레이션 / 후처리 | [houdini_wrinkle_exaggeration](houdini_wrinkle_exaggeration.md) |
+| 버텍스 노말 색(노랑/초록 = locked/unlocked)과 FBX 커스텀 노말 보존 | 모델링 / 셰이딩 / FBX | [vertex_normals_locked_vs_unlocked_fbx](vertex_normals_locked_vs_unlocked_fbx.md) |
