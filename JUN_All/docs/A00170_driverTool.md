@@ -113,13 +113,19 @@ A00170_driverTool/
 3. 옵션:
    - **Orient to curve tangent**(기본 ON): 켜면 **Aim Axis**(`+X`/`-X`) 축을 커브 접선에 맞추고
      오브젝트의 `rotate` 까지 구동한다. 끄면 `translate` 만 구동(현재 회전 유지).
-   - 접선이 월드 업(+Y)과 평행한 **수직 커브**에서는 방향 프레임이 무너질 수 있으니 그런 경우
-     Orient 를 끈다.
+   - **Create Normal Curve (norCrv)**(기본 ON, `ref_01.mel` 원본 방식): 켜면 attachCrv 밑에
+     직선 **norCrv** 커브 한 개를 만들어 그 자식으로 두고, 각 오브젝트의 **up(Y)/side(Z) 축을
+     norCrv 의 tangent/normal 에서** 가져온다(fourByFourMatrix : X=attachCrv 접선, Y=norCrv 접선,
+     Z=norCrv 노멀). **norCrv 를 회전/조정하면 어태치된 체인 전체의 up·트위스트가 바뀐다.**
+     **norCrv Length** 로 생성 길이를 정한다. 끄면 norCrv 없이 월드 +Y 시드의 자족 직교 프레임을 쓴다.
+     (이 옵션은 Orient 가 켜져 있을 때만 의미가 있다.)
+   - 자족 프레임(norCrv OFF)은 접선이 월드 업(+Y)과 평행한 **수직 커브**에서 프레임이 무너질 수
+     있으니 그런 경우 norCrv 를 쓰거나 Orient 를 끈다.
    - **Group pointOnCurveInfo nodes into a set**(기본 ON): 이번 빌드로 생긴 `pointOnCurveInfo`
      노드들을 모두 담는 objectSet 한 개(`<curve>_atcPOCI_SET`)를 만든다(나중에 한 번에 선택·관리용).
 4. **Attach to Closest Point** 클릭. 각 오브젝트가 자신과 가장 가까운 커브 파라미터 지점에 붙고,
-   로그에 오브젝트별 파라미터가 출력된다. 씬에 없는 항목은 skip 후 경고한다. 세트를 만들었으면
-   세트 이름도 로그에 표시된다.
+   로그에 오브젝트별 파라미터가 출력된다. norCrv 를 만들었으면 그 이름도 로그에 표시된다(이후
+   그 커브를 조정해 방향을 잡는다). 씬에 없는 항목은 skip 후 경고하고, 세트 이름도 로그에 표시된다.
 
 > 어태치는 오브젝트의 `translate`(옵션 `rotate`)에 노드를 **연결**한다. 이미 연결/잠금된 채널이
 > 있으면 해당 오브젝트만 실패 처리(로그 경고)하고 나머지는 계속한다.

@@ -643,6 +643,31 @@ class MainWindow(QWidget):
         row.addStretch(1)
         root.addLayout(row)
 
+        # Normal curve (norCrv) : ref-faithful up-vector source.
+        row = QHBoxLayout()
+        self.atc_cb_norcrv = QCheckBox("Create Normal Curve (norCrv)")
+        self.atc_cb_norcrv.setChecked(True)
+        self.atc_cb_norcrv.setToolTip(
+            "On (default, like the original ref tool): create one straight "
+            "'norCrv' curve parented under the attachment curve and drive each "
+            "object's up (Y) / side (Z) from it. Rotate or reshape the norCrv "
+            "to control the up direction and twist of the whole chain.\n"
+            "Off: use the self-contained world-up frame computed from the curve "
+            "tangent (no extra curve created).")
+        row.addWidget(self.atc_cb_norcrv)
+        row.addWidget(QLabel("norCrv Length"))
+        self.atc_dsb_norcrv_len = QDoubleSpinBox()
+        self.atc_dsb_norcrv_len.setRange(0.001, 100000.0)
+        self.atc_dsb_norcrv_len.setDecimals(3)
+        self.atc_dsb_norcrv_len.setSingleStep(0.1)
+        self.atc_dsb_norcrv_len.setValue(1.0)
+        self.atc_dsb_norcrv_len.setFixedWidth(90)
+        self.atc_dsb_norcrv_len.setToolTip(
+            "Length of the generated norCrv (visual size of the up reference).")
+        row.addWidget(self.atc_dsb_norcrv_len)
+        row.addStretch(1)
+        root.addLayout(row)
+
         # Collect the created pointOnCurveInfo nodes into one objectSet.
         self.atc_cb_make_set = QCheckBox(
             "Group pointOnCurveInfo nodes into a set")
@@ -664,9 +689,18 @@ class MainWindow(QWidget):
         # Signals
         self.atc_btn_get_curve.clicked.connect(self.on_atc_get_curve)
         self.atc_btn_build.clicked.connect(self.on_atc_build)
-        self.atc_cb_orient.toggled.connect(self.atc_cb_aim.setEnabled)
+        self.atc_cb_orient.toggled.connect(self._atc_sync_orient_enabled)
+        self.atc_cb_norcrv.toggled.connect(self._atc_sync_orient_enabled)
+        self._atc_sync_orient_enabled()
 
         return tab
+
+    def _atc_sync_orient_enabled(self, *args):
+        """Orient/norCrv 토글에 따라 종속 위젯의 활성 상태를 동기화한다."""
+        orient = self.atc_cb_orient.isChecked()
+        self.atc_cb_aim.setEnabled(orient)
+        self.atc_cb_norcrv.setEnabled(orient)
+        self.atc_dsb_norcrv_len.setEnabled(orient and self.atc_cb_norcrv.isChecked())
 
     def on_atc_get_curve(self):
         """현재 선택의 첫 오브젝트를 Attachment Curve 로 설정."""
@@ -693,22 +727,31 @@ class MainWindow(QWidget):
 
         orient = self.atc_cb_orient.isChecked()
         aim_axis = self.atc_cb_aim.currentText()
+        use_norcrv = self.atc_cb_norcrv.isChecked()
+        norcrv_len = self.atc_dsb_norcrv_len.value()
         create_set = self.atc_cb_make_set.isChecked()
 
         with undo_chunk():
             try:
-                attached, failed, set_node = run_attach_to_closest(
+                attached, failed, set_node, norcrv = run_attach_to_closest(
                     curve, objects, orient=orient, aim_axis=aim_axis,
+                    use_normal_curve=use_norcrv,
+                    normal_curve_length=norcrv_len,
                     create_set=create_set)
             except Exception as exc:
                 self._log("[ERROR] Attach failed: {0}".format(exc))
                 return
 
         self._log(
-            "Attached {n} object(s) to '{c}' | orient: {o}{axis}".format(
+            "Attached {n} object(s) to '{c}' | orient: {o}{axis}{nc}".format(
                 n=len(attached), c=curve,
                 o="on" if orient else "off",
-                axis=" ({0})".format(aim_axis) if orient else ""))
+                axis=" ({0})".format(aim_axis) if orient else "",
+                nc=" | norCrv" if (orient and use_norcrv) else ""))
+        if norcrv:
+            self._log(
+                "Normal curve created: {0} "
+                "(rotate/reshape it to control up & twist)".format(norcrv))
         for obj, param in attached:
             self._log("  {0} -> param {1:.4f}".format(obj, param))
         for obj, reason in failed:
@@ -747,6 +790,9 @@ class MainWindow(QWidget):
             "- Attach to Closest Point: drives each listed object onto its closest\n"
             "  parameter on the curve via a pointOnCurveInfo -> matrix network\n"
             "  (parent-safe, live as the curve deforms). Optional orient to tangent.\n"
+            "- Create Normal Curve (norCrv, default, ref-faithful): adds one straight\n"
+            "  norCrv under the curve; rotate/reshape it to control up & twist. Off:\n"
+            "  self-contained world-up frame.\n"
             "\n"
             "Each build is one undo step. All UI text is English.\n"
             "\n"
