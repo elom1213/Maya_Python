@@ -93,6 +93,86 @@ class SkinMigrateManager:
         return (1, head + ("  " + "  ".join(logs) if logs else ""))
 
     # ==================================================
+    # Classic ops (legacy JUN_PY_move_skinWeightTool_v01_04 의 원본 2버튼 이식)
+    # ==================================================
+
+    @staticmethod
+    def move_joints_in_mesh(joints_from, joints_to):
+        """Classic 'joints to joints in single mesh'.
+
+        현재 Maya 선택의 메시 위에서 joints_from[i] → joints_to[i] 로 스킨
+        웨이트를 이동한다(레거시 JUN_move_each_skin_weight 충실 이식). 메시는
+        호출 전 사용자가 선택해 둔 것을 그대로 쓴다(Kangaroo 가 selection 사용).
+        """
+        if not joints_from or not joints_to:
+            return (0, "[Warning] Fill both From and To joint lists.")
+        if len(joints_from) != len(joints_to):
+            return (0, "[Warning] From ({0}) / To ({1}) joint count mismatch.".format(
+                len(joints_from), len(joints_to)))
+
+        try:
+            ktw = SkinMigrateManager._import_kangaroo()
+        except RuntimeError as exc:
+            return (0, "[Error] {0}".format(exc))
+
+        # A00020 검증 포맷: 키/값을 list-literal 문자열로 주면 Kangaroo 가
+        # evalValueFromString 으로 풀어 본 이름으로 해석한다.
+        x_joints = {
+            "['{0}']".format(jf): "['{0}']".format(jt)
+            for jf, jt in zip(joints_from, joints_to)
+        }
+        try:
+            with undo_chunk():
+                ktw.moveSkinClusterWeights(
+                    xJoints=x_joints,
+                    bDisableIslandCheck=True,
+                    sChooseSkinCluster=None,
+                    iSmoothBorderMask=1,
+                )
+        except Exception as exc:
+            return (0, "[Error] {0}".format(exc))
+
+        return (1, "[classic] Moved weights for {0} joint pair(s) on the selected mesh.".format(
+            len(joints_from)))
+
+    @staticmethod
+    def transfer_meshes(meshes_from, meshes_to, transfer_mode=2):
+        """Classic 'meshes to meshes'.
+
+        각 쌍에 대해 meshes_from[i] 의 skinCluster 를 meshes_to[i] 로 전이한다
+        (레거시 JUN_transfer_meshes_to_meshes 충실 이식). 인덱스 순서로 짝짓는다.
+        """
+        if not meshes_from or not meshes_to:
+            return (0, "[Warning] Fill both From and To mesh lists.")
+        if len(meshes_from) != len(meshes_to):
+            return (0, "[Warning] From ({0}) / To ({1}) mesh count mismatch.".format(
+                len(meshes_from), len(meshes_to)))
+
+        try:
+            ktw = SkinMigrateManager._import_kangaroo()
+        except RuntimeError as exc:
+            return (0, "[Error] {0}".format(exc))
+
+        done = 0
+        try:
+            with undo_chunk():
+                for mesh_from, mesh_to in zip(meshes_from, meshes_to):
+                    cmds.select(clear=True)
+                    cmds.select(mesh_to)
+                    ktw.transferSkinCluster(
+                        iMode=transfer_mode,
+                        sChooseSkinCluster=None,
+                        iSmoothBorderMask=1,
+                        sFrom=[mesh_from],
+                    )
+                    done += 1
+        except Exception as exc:
+            return (0, "[Error] {0} (after {1} mesh(es))".format(exc, done))
+
+        return (1, "[classic] Transferred {0} mesh pair(s) (mode={1}).".format(
+            done, SkinMigrateManager.TRANSFER_MODES[transfer_mode]))
+
+    # ==================================================
     # Validation
     # ==================================================
 
@@ -145,12 +225,8 @@ class SkinMigrateManager:
     @staticmethod
     def _run_kangaroo(mesh_a, mesh_b, joints_a, joints_b, transfer_mode, logs):
 
-        try:
-            import kangarooTabTools.weights as ktw
-        except Exception:
-            raise RuntimeError(
-                "Kangaroo plugin not importable (kangarooTabTools). "
-                "Load Kangaroo Builder, or switch the engine to 'Native'.")
+        ktw = SkinMigrateManager._import_kangaroo(
+            extra=" or switch the engine to 'Native'")
 
         # --- Step 1 : Transfer A -> B (B 를 A 의 본으로 새로 바인드) ---
         ktw.transferSkinCluster(
@@ -280,6 +356,20 @@ class SkinMigrateManager:
     # ==================================================
     # Helpers
     # ==================================================
+
+    @staticmethod
+    def _import_kangaroo(extra=""):
+        """kangarooTabTools.weights 를 lazy import. 실패 시 RuntimeError.
+
+        외부 3rd-party Kangaroo Builder 플러그인이라 import 가능해야 한다.
+        """
+        try:
+            import kangarooTabTools.weights as ktw
+            return ktw
+        except Exception:
+            raise RuntimeError(
+                "Kangaroo plugin not importable (kangarooTabTools). "
+                "Load Kangaroo Builder first{0}.".format(extra))
 
     @staticmethod
     def _leaf(name):

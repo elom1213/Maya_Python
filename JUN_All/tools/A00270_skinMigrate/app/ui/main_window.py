@@ -1,7 +1,14 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-24
+# last Update date : 2026-06-29
 # A00270_skinMigrate - Qt UI
+#
+# 두 개의 탭:
+#   Tab 1 "Classic"      : 레거시 JUN_PY_move_skinWeightTool_v01_04 의 원본 2버튼 UI 이식.
+#                          From / To 리스트 + Transfer Mode + [Joints to Joints in single mesh]
+#                          / [Meshes to Meshes].
+#   Tab 2 "Migrate A->B" : 토폴로지가 다른 두 메시 A,B 사이 Transfer + Move 를 한 번에 처리하는
+#                          통합 마이그레이션(기존 A00270 v01.00 기능).
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
@@ -27,8 +34,8 @@ class MainWindow(QWidget):
 
         self.setObjectName(WINDOW_OBJECT_NAME)
 
-        self.win_width = 560
-        self.win_height = 620
+        self.win_width = 620
+        self.win_height = 680
         self.win_title = f"Skin Migrate v{VERSION}"
 
         self.resize(self.win_width, self.win_height)
@@ -52,6 +59,90 @@ class MainWindow(QWidget):
         act_about = help_menu.addAction("About")
         act_about.triggered.connect(self.show_about)
         main_layout.setMenuBar(self.menu_bar)
+
+        # 공유 로그 위젯을 먼저 만든다 (탭의 TSL 위젯이 log_callback=self.log 로 참조).
+        self.te_log = QTextEdit()
+        self.te_log.setReadOnly(True)
+        self.te_log.setMinimumHeight(90)
+        self.te_log.setMaximumHeight(160)
+
+        # 탭
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self._build_classic_tab(), "Classic")
+        self.tabs.addTab(self._build_migrate_tab(), "Migrate A -> B")
+        main_layout.addWidget(self.tabs)
+
+        # 공유 로그
+        main_layout.addWidget(self.te_log)
+
+        # 저작권
+        self.lbl_copyright = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
+        self.lbl_copyright.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(self.lbl_copyright)
+
+    # --------------------------------------------------
+    # Tab 1 : Classic (레거시 원본 2버튼 이식)
+    # --------------------------------------------------
+
+    def _build_classic_tab(self):
+
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        desc = QLabel(
+            "Classic move tool. From[i] / To[i] are paired by row order.\n"
+            "Both buttons use the Kangaroo Builder plugin.")
+        desc.setAlignment(Qt.AlignCenter)
+        layout.addWidget(desc)
+
+        # Transfer Mode (Meshes to Meshes 전용)
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Transfer Mode"))
+        self.cmb_classic_mode = QComboBox()
+        self.cmb_classic_mode.addItems(SkinMigrateManager.TRANSFER_MODES)
+        self.cmb_classic_mode.setCurrentIndex(SkinMigrateManager.DEFAULT_TRANSFER_MODE)
+        self.cmb_classic_mode.setToolTip("Used by 'Meshes to Meshes' only.")
+        mode_row.addWidget(self.cmb_classic_mode)
+        mode_row.addStretch(1)
+        layout.addLayout(mode_row)
+
+        # From / To 리스트 (joints 또는 meshes, 동작 버튼에 따라 의미가 달라진다)
+        self.tsl_classic_from = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="From", select_label="Select From", log_callback=self.log)
+        self.tsl_classic_to = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="To", select_label="Select To", log_callback=self.log)
+
+        lists_row = QHBoxLayout()
+        lists_row.addWidget(self.tsl_classic_from)
+        lists_row.addWidget(self.tsl_classic_to)
+        layout.addLayout(lists_row)
+
+        # 버튼: joints to joints (단일 메시) / meshes to meshes
+        self.btn_joints_to_joints = QPushButton("Joints to Joints (single mesh)")
+        self.btn_joints_to_joints.setMinimumHeight(34)
+        self.btn_joints_to_joints.setToolTip(
+            "Move skin weights From-joint[i] -> To-joint[i] on the currently\n"
+            "selected mesh. Select the bound mesh in the scene first.")
+        self.btn_joints_to_joints.clicked.connect(self.on_move_joints)
+        layout.addWidget(self.btn_joints_to_joints)
+
+        self.btn_meshes_to_meshes = QPushButton("Meshes to Meshes")
+        self.btn_meshes_to_meshes.setMinimumHeight(34)
+        self.btn_meshes_to_meshes.setToolTip(
+            "Transfer skinCluster From-mesh[i] -> To-mesh[i] using Transfer Mode.")
+        self.btn_meshes_to_meshes.clicked.connect(self.on_transfer_meshes)
+        layout.addWidget(self.btn_meshes_to_meshes)
+
+        return tab
+
+    # --------------------------------------------------
+    # Tab 2 : Migrate A -> B (기존 통합 마이그레이션)
+    # --------------------------------------------------
+
+    def _build_migrate_tab(self):
+
+        tab = QWidget()
+        main_layout = QVBoxLayout(tab)
 
         # -------------------------
         # Engine / Transfer Mode
@@ -161,20 +252,7 @@ class MainWindow(QWidget):
         self.btn_transfer.clicked.connect(self.on_transfer)
         main_layout.addWidget(self.btn_transfer)
 
-        # -------------------------
-        # Log
-        # -------------------------
-
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
-        self.te_log.setMinimumHeight(90)
-        self.te_log.setMaximumHeight(160)
-        main_layout.addWidget(self.te_log)
-
-        # 저작권
-        self.lbl_copyright = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
-        self.lbl_copyright.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(self.lbl_copyright)
+        return tab
 
     def _mesh_row(self, label, line_edit):
         """라벨 + QLineEdit + 'Set from selection' 버튼 행."""
@@ -209,7 +287,25 @@ class MainWindow(QWidget):
         line_edit.setText(node)
 
     # --------------------------------------------------
-    # Handlers
+    # Handlers : Classic
+    # --------------------------------------------------
+
+    def on_move_joints(self):
+        joints_from = self.tsl_classic_from.get_all_items()
+        joints_to = self.tsl_classic_to.get_all_items()
+        count, msg = SkinMigrateManager.move_joints_in_mesh(joints_from, joints_to)
+        self.log(msg)
+
+    def on_transfer_meshes(self):
+        meshes_from = self.tsl_classic_from.get_all_items()
+        meshes_to = self.tsl_classic_to.get_all_items()
+        count, msg = SkinMigrateManager.transfer_meshes(
+            meshes_from, meshes_to,
+            transfer_mode=self.cmb_classic_mode.currentIndex())
+        self.log(msg)
+
+    # --------------------------------------------------
+    # Handlers : Migrate A -> B
     # --------------------------------------------------
 
     def on_transfer(self):
