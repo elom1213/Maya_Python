@@ -21,12 +21,15 @@ from Framework.qt.qt import (
     QMessageBox,
     QMenuBar,
     QApplication,
+    QTabWidget,
+    QScrollArea,
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
 
 from tools.A00080_KWI_creator_V03.app.config.version import VERSION
 from tools.A00080_KWI_creator_V03.app.core.KWI_creator import KWI_creator
+from tools.A00080_KWI_creator_V03.app.core.constraint_creator import ConstraintCreator
 
 
 WINDOW_OBJECT_NAME = "JUN_KWI_creator_V03_window"
@@ -40,9 +43,10 @@ class MainWindow(QWidget):
 
         self.win_title = f"Kawaii Creator v{VERSION}"
         self.win_width = 600
-        self.win_hight = 560
+        self.win_hight = 600
 
         self.KWI_creator = KWI_creator()
+        self.constraint_creator = ConstraintCreator()
 
         self.setObjectName(WINDOW_OBJECT_NAME)
         self.setWindowFlags(Qt.Window)
@@ -148,28 +152,141 @@ class MainWindow(QWidget):
         self.log_widget = QTextEdit()
         self.log_widget.setReadOnly(True)
 
-        # --- assemble -------------------------------------------------
-        self.layout.addWidget(self.label_bones)
-        self.layout.addWidget(self.tsl_bones)
-        self.layout.addLayout(row_add)
-        self.layout.addLayout(row_ops)
+        # --- assemble : tabs + shared log -----------------------------
+        self.tabs = QTabWidget()
 
-        self.layout.addWidget(self.label_create_type)
-        self.layout.addWidget(self.radio_create_multiple_nodes)
-        self.layout.addWidget(self.radio_create_single_node)
+        # Tab 1 : KWI Nodes (기존 UI 를 그대로 탭 안으로 이동)
+        kwi_tab = QWidget()
+        kwi_layout = QVBoxLayout(kwi_tab)
+        kwi_layout.addWidget(self.label_bones)
+        kwi_layout.addWidget(self.tsl_bones)
+        kwi_layout.addLayout(row_add)
+        kwi_layout.addLayout(row_ops)
 
-        self.layout.addWidget(self.label_setting_nodes_num)
-        self.layout.addWidget(self.ipf_setting_nodes_interval)
+        kwi_layout.addWidget(self.label_create_type)
+        kwi_layout.addWidget(self.radio_create_multiple_nodes)
+        kwi_layout.addWidget(self.radio_create_single_node)
 
-        self.layout.addWidget(self.btn_create_base_nodes)
-        self.layout.addWidget(self.btn_create_setting_nodes)
-        self.layout.addWidget(self.btn_create_LD_nodes)
-        self.layout.addWidget(self.chk_write_individual)
-        self.layout.addWidget(self.btn_create_combined)
+        kwi_layout.addWidget(self.label_setting_nodes_num)
+        kwi_layout.addWidget(self.ipf_setting_nodes_interval)
+
+        kwi_layout.addWidget(self.btn_create_base_nodes)
+        kwi_layout.addWidget(self.btn_create_setting_nodes)
+        kwi_layout.addWidget(self.btn_create_LD_nodes)
+        kwi_layout.addWidget(self.chk_write_individual)
+        kwi_layout.addWidget(self.btn_create_combined)
+        self.tabs.addTab(kwi_tab, "KWI Nodes")
+
+        # Tab 2 : Constraints (신규)
+        self.tabs.addTab(self._build_constraint_tab(), "Constraints")
+
+        # 탭 아래에 로그를 공유로 둔다 (두 탭이 같은 로그를 쓴다)
+        self.layout.addWidget(self.tabs)
         self.layout.addWidget(self.log_widget)
 
         # 초기 개수 표시 (예: "Target bones (Root bones) : 0")
         self.update_bones_count()
+
+    # ------------------------------------------------------------------
+    # Constraints tab
+
+    def _build_constraint_tab(self):
+        # 언리얼 Kawaii Physics Bone Constraints Data Asset 내용 생성 탭.
+        # (Chain A, Chain B) 브래킷 패턴 쌍을 여러 개 입력 -> 인덱스 1:1 zip -> 합본 텍스트.
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        info = QLabel(
+            "Enter bracket patterns, e.g.  dyn_asset_side_0[1-7]_0[1-5]\n"
+            "Chain A and Chain B are paired index-by-index (1:1)."
+        )
+        layout.addWidget(info)
+
+        # --- 동적 패턴 쌍 행들 (스크롤) -------------------------------
+        self._pair_rows = []  # [(line_a, line_b, row_widget), ...]
+
+        self._rows_container = QWidget()
+        self._rows_layout = QVBoxLayout(self._rows_container)
+        self._rows_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(self._rows_container)
+        layout.addWidget(scroll)
+
+        # 첫 행은 예시값으로 프리필
+        self._add_pair_row(
+            "dyn_asset_side_0[1-7]_0[1-5]",
+            "dyn_asset_side_0[2-8]_0[1-5]",
+        )
+
+        btn_add_pair = QPushButton("+ Add pair")
+        btn_add_pair.clicked.connect(lambda: self._add_pair_row())
+        layout.addWidget(btn_add_pair)
+
+        btn_generate = QPushButton("Generate & Copy")
+        btn_generate.clicked.connect(self.generate_constraints_on_click)
+        layout.addWidget(btn_generate)
+
+        layout.addWidget(QLabel("Preview"))
+        self.constraint_preview = QTextEdit()
+        self.constraint_preview.setReadOnly(True)
+        layout.addWidget(self.constraint_preview)
+
+        return tab
+
+    def _add_pair_row(self, chain_a="", chain_b=""):
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+
+        line_a = QLineEdit()
+        line_a.setPlaceholderText("Chain A pattern")
+        line_a.setText(chain_a)
+
+        line_b = QLineEdit()
+        line_b.setPlaceholderText("Chain B pattern")
+        line_b.setText(chain_b)
+
+        btn_remove = QPushButton("-")
+        btn_remove.setFixedWidth(28)
+        btn_remove.clicked.connect(lambda: self._remove_pair_row(row))
+
+        row_layout.addWidget(line_a)
+        row_layout.addWidget(line_b)
+        row_layout.addWidget(btn_remove)
+
+        self._rows_layout.addWidget(row)
+        self._pair_rows.append((line_a, line_b, row))
+
+    def _remove_pair_row(self, row):
+        # 최소 한 행은 남긴다.
+        if len(self._pair_rows) <= 1:
+            self.log("At least one pair must remain.")
+            return
+        self._pair_rows = [r for r in self._pair_rows if r[2] is not row]
+        self._rows_layout.removeWidget(row)
+        row.setParent(None)
+        row.deleteLater()
+
+    def _get_pattern_rows(self):
+        # UI 의 모든 행을 (chain_a, chain_b) 튜플 리스트로 반환.
+        return [(a.text(), b.text()) for a, b, _row in self._pair_rows]
+
+    def generate_constraints_on_click(self):
+        try:
+            out_path, text = self.constraint_creator.create_file(
+                self._get_pattern_rows()
+            )
+        except ValueError as e:
+            self.log(f"Constraint error : {e}")
+            return
+
+        self.constraint_preview.setPlainText(text)
+        QApplication.clipboard().setText(text)
+
+        self.log(f"Constraint data written : {out_path}")
+        self.log("Copied constraint data to clipboard. Paste into the Unreal Data Asset.")
 
     # ------------------------------------------------------------------
     # TSL (target bones) helpers
@@ -330,6 +447,22 @@ class MainWindow(QWidget):
             "</ol>"
             "<p>Results are written under the tool's <code>0020_out/</code> folder. "
             "Open the generated file and copy its content into the Unreal AnimGraph.</p>"
+            "<hr>"
+            "<h3>Constraints tab</h3>"
+            "<p>Generates the <b>Bone Constraints</b> content for a KawaiiPhysics "
+            "<b>Data Asset</b> from bracket patterns, paired index-by-index (1:1).</p>"
+            "<ol>"
+            "<li>Type two bracket patterns per row, e.g. "
+            "<code>dyn_asset_side_0[1-7]_0[1-5]</code> (Chain A) and "
+            "<code>dyn_asset_side_0[2-8]_0[1-5]</code> (Chain B).</li>"
+            "<li><b>[a-b]</b> expands to integers a..b (left bracket is the outer loop). "
+            "A leading <code>0</code> is literal text, so values are <b>not</b> zero-padded "
+            "(single-digit indices only).</li>"
+            "<li>Chain A and Chain B must expand to the <b>same count</b> (1:1 pairing).</li>"
+            "<li><b>+ Add pair</b> adds more rows; all rows are merged into one output.</li>"
+            "<li><b>Generate &amp; Copy</b> builds the text, shows a preview and copies it to "
+            "the clipboard. Paste it into the Unreal Data Asset.</li>"
+            "</ol>"
         ).format(ver=VERSION)
 
         box = QMessageBox(self)

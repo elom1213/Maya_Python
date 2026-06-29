@@ -1,5 +1,23 @@
 # Changelog
 
+## V01.02 (2026-06-29)
+
+### Added
+- New **Constraints** tab: generates the **Bone Constraints** content for a KawaiiPhysics
+  **Data Asset** from bracket patterns. Two patterns (Chain A / Chain B) are paired
+  index-by-index (1:1), e.g. `dyn_asset_side_0[1-7]_0[1-5]` ↔ `dyn_asset_side_0[2-8]_0[1-5]`.
+  - `[a-b]` expands to integers a..b (leftmost bracket is the outer loop); a leading `0`
+    is literal, so values are not zero-padded (single-digit indices).
+  - **+ Add pair** adds more pattern rows; all rows are merged into one output wrapped in
+    a single outer `( )`.
+  - **Generate & Copy** writes `0020_out/A020_LDA_constraint_out.py`, shows a preview and
+    copies the text to the clipboard for pasting into the Unreal Data Asset.
+- New core `ConstraintCreator` (`app/core/constraint_creator.py`) and entry template
+  `app/core/0010_src/A0202_Src_LDA_constraint_entry.py`.
+
+### Changed
+- Main window is now **tabbed** (`KWI Nodes` / `Constraints`) with a shared log at the bottom.
+
 ## V01.01 (2026-06-25)
 
 ### Added

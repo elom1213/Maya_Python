@@ -1,0 +1,1 @@
+(BoneReference1=(BoneName="{{BONE_1}}"),BoneReference2=(BoneName="{{BONE_2}}"))
