@@ -12,6 +12,13 @@
 #             되어 bakeResults 의 preserveOutsideKeys 가 바깥 키를 보존하지 못한다.
 #             -> 컨스트레인트를 걸기 전에 [start, end] 밖의 키(값/탄젠트)를 스냅샷하고
 #             베이크 후 복원하도록 했다(_snapshot_outside_keys / _restore_outside_keys).
+# 2026-06-29: bake() 의 parentConstraint+bakeResults 방식을 완전히 폐기. 컨트롤러가 여러
+#             애니메이션 레이어에 키를 가지면 컨스트레인트가 만드는 pairBlend 머지가 베이크
+#             구간 "밖"의 포즈까지 바꿔버렸고(스냅샷 우회도 레이어를 인식 못함), 원본
+#             JUN_PY_FKIK_Tool_V02_01 에는 없던 현상이었다. -> 레거시처럼 컨스트레인트 없이
+#             프레임마다 matchTransform 매칭 후 키를 찍는 방식으로 되돌림. match_transforms 도
+#             xform rotateOrder 스왑 대신 cmds.matchTransform 으로 교체(A00145 Match 탭 방식).
+#             _snapshot/_restore 는 bake_constraint() 전용으로만 남는다.
 #
 # 레거시 JUN_MATCH_twoObjects / JUN_matcher_FKIK / JUN_cmd_match_IK_and_FK /
 #        JUN_cmd_bake_IK_FK / JUN_cmd_bake_IK_to_FK 를 현대화.
@@ -37,37 +44,24 @@ def match_transforms(
     rotate=True,
 ):
     """
-    tgt_list[i] 의 월드 트랜스폼을 flw_list[i] 로 복사. (레거시 JUN_MATCH_twoObjects)
+    tgt_list[i] 의 월드 트랜스폼을 flw_list[i] 로 복사. (레거시 JUN_MATCH_twoObjects 대체)
 
-    follower 의 원래 rotateOrder 는 작업 후 복원한다.
+    구현: `cmds.matchTransform`(position/rotation) 을 쓴다. A00145_RigConnect Match 탭과
+    동일한 방식으로 **컨스트레인트를 전혀 쓰지 않고**, follower 와 target 의 rotateOrder 가
+    서로 달라도 월드 포즈가 정확히 일치한다(matchTransform 이 rotateOrder 를 알아서 처리).
+
+    rot_order / rot_axis 인자는 레거시 시그니처 호환을 위해 남겨두며 무시한다 —
+    matchTransform 은 월드 트랜스폼을 맞추므로 rotateOrder/rotateAxis 를 건드릴 필요가 없다.
+    scale 은 건드리지 않는다.
     """
 
     count = min(len(tgt_list), len(flw_list))
 
     for i in range(count):
-        tgt = tgt_list[i]
-        flw = flw_list[i]
-
-        tgt_rot_order = cmds.xform(tgt, q=True, rotateOrder=True)
-        tgt_rot_axis  = cmds.xform(tgt, q=True, rotateAxis=True)
-        tgt_trs       = cmds.xform(tgt, q=True, worldSpace=True, translation=True)
-        tgt_rot       = cmds.xform(tgt, q=True, worldSpace=True, rotation=True)
-
-        flw_rot_order_ori = cmds.xform(flw, q=True, rotateOrder=True)
-
-        if rot_order:
-            cmds.xform(flw, rotateOrder=tgt_rot_order)
-
-        if rot_axis:
-            cmds.xform(flw, rotateAxis=tgt_rot_axis)
-
-        if translate:
-            cmds.xform(flw, worldSpace=True, translation=tgt_trs)
-
-        if rotate:
-            cmds.xform(flw, worldSpace=True, rotation=tgt_rot)
-
-        cmds.xform(flw, rotateOrder=flw_rot_order_ori)
+        cmds.matchTransform(
+            flw_list[i], tgt_list[i],
+            position=translate, rotation=rotate,
+        )
 
 
 # --------------------------------------------------
@@ -233,78 +227,72 @@ class FKIKMatcher:
     @staticmethod
     def bake(tgt_list, flw_list, start, end):
         """
-        [start, end] 구간을 native bakeResults 로 베이크. (구 Python 프레임 루프 대체)
+        [start, end] 구간을 **컨스트레인트 없이** 프레임마다 매칭+키 해서 베이크한다.
 
-        각 (tgt, flw) 쌍에 임시 parentConstraint(mo=False) 를 건 뒤 bakeResults 로
-        구간 전체를 일괄 샘플링하고, 베이크 후 컨스트레인트를 삭제한다.
-        world 결과는 기존 match_transforms 베이크와 동치이며 (rotateAxis≠0 인 특수
-        리그에서는 rotateAxis attr 자체는 복사하지 않음, 월드 포즈는 동일),
-        currentTime/xform 프레임 루프를 제거해 대규모 구간에서 수십 배 빠르다.
+        2026-06-29: 임시 parentConstraint + bakeResults 방식을 폐기하고 레거시
+        JUN_cmd_bake_IK_FK 의 per-frame 매칭 방식으로 되돌렸다. parentConstraint 를 거는
+        순간 Maya 가 pairBlend 를 끼워 기존 animCurve 를 플러그에서 분리하는데, 컨트롤러가
+        여러 애니메이션 레이어에 키를 가진 경우 이 분리/머지가 베이크 구간 "밖"의 포즈까지
+        바꿔버렸다(_snapshot/_restore 우회도 레이어를 인식하지 못해 실패). 컨스트레인트를
+        쓰지 않으면 이 문제가 원천적으로 사라진다.
 
-        match_transforms 가 scale 을 건드리지 않으므로 translate/rotate 만 베이크한다.
-        시그니처/반환값(end - start + 1)은 기존과 동일하여 호출부 무수정.
+        각 프레임에서:
+          1) currentTime(f) 로 이동,
+          2) 각 (tgt, flw) 쌍을 matchTransform(position+rotation)으로 매칭
+             (rotateOrder 가 서로 달라도 정확, A00145 Match 탭과 동일),
+          3) follower 의 translate/rotate 에만 그 프레임 키를 찍는다.
 
-        Maya 2023(Python 3.9) 포함 동작 확인됨.
+        setKeyframe 은 **현재 활성 애니메이션 레이어**에 키를 쓰므로, 베이크 구간 밖의 키와
+        다른 레이어의 키는 전혀 건드리지 않는다(원본 동작과 동일).
+
+        scale 은 매칭/키 대상이 아니다. 반환값(end - start + 1)은 기존과 동일.
+        Maya 2023(Python 3.9) 포함 동작.
         """
         if not tgt_list or not flw_list:
             return 0
 
         count = min(len(tgt_list), len(flw_list))
+        tgt = tgt_list[:count]
         flw = flw_list[:count]
-        attrs = ["tx", "ty", "tz", "rx", "ry", "rz"]   # match_transforms 는 scale 미사용
+
+        start_i = int(round(start))
+        end_i = int(round(end))
+        if start_i > end_i:
+            return 0
 
         cur = cmds.currentTime(q=True)
 
-        # 컨스트레인트를 걸기 전에 [start, end] 밖의 기존 키를 스냅샷해 둔다.
-        # (컨스트레인트가 걸리면 animCurve 가 분리되어 조회·보존이 불가능해진다.)
-        snap = FKIKMatcher._snapshot_outside_keys(flw, attrs, start, end)
-
-        cmds.undoInfo(openChunk=True)
-        cons = []
-        try:
-            # suspend_refresh: 블록 종료 시 refresh 복원이 "항상 먼저/무조건" 실행된다.
-            # 아래 finally 의 delete 가 실패해도 뷰포트가 프리즈되지 않는다(전역 누수 방지).
+        with undo_chunk():
+            # 프레임마다 리드로우하지 않도록 suspend_refresh 로 감싼다(블록 종료 시 복원).
             with suspend_refresh():
-                for i in range(count):
-                    try:
-                        cons += cmds.parentConstraint(
-                            tgt_list[i], flw[i], maintainOffset=False
-                        )
-                    except Exception as e:
-                        # 락/연결된 attr 등으로 컨스트레인트 실패 -> 해당 쌍 skip
-                        cmds.warning(
-                            "FKIK bake: skip pair %s -> %s (%s)"
-                            % (tgt_list[i], flw[i], e)
-                        )
+                for frame in range(start_i, end_i + 1):
+                    cmds.currentTime(frame, edit=True)
 
-                if cons:
-                    cmds.bakeResults(
-                        flw,
-                        simulation=True,
-                        time=(start, end),
-                        sampleBy=1,
-                        attribute=attrs,
-                        disableImplicitControl=True,
-                        preserveOutsideKeys=True,
-                        sparseAnimCurveBake=False,
-                    )
-        finally:
-            # 임시 컨스트레인트 정리는 독립적으로 감싼다(실패해도 이후 복원이 진행되도록).
-            try:
-                if cons:
-                    cmds.delete([c for c in cons if cmds.objExists(c)])
-            except Exception as e:
-                cmds.warning("FKIK bake: constraint cleanup failed (%s)" % e)
-            # 베이크가 실제로 일어난 경우에만 구간 밖 키를 되살린다.
-            if cons and snap:
-                try:
-                    FKIKMatcher._restore_outside_keys(snap)
-                except Exception as e:
-                    cmds.warning("FKIK bake: outside-key restore failed (%s)" % e)
+                    for i in range(count):
+                        try:
+                            cmds.matchTransform(
+                                flw[i], tgt[i], position=True, rotation=True
+                            )
+                        except Exception as e:
+                            cmds.warning(
+                                "FKIK bake: skip pair %s -> %s @%d (%s)"
+                                % (tgt[i], flw[i], frame, e)
+                            )
+
+                    # 매칭한 채널(translate/rotate)에만 현재 프레임 키를 찍는다.
+                    # 잠긴/연결된 채널은 건너뛰도록 compound 단위로 감싼다.
+                    for comp in ("translate", "rotate"):
+                        try:
+                            cmds.setKeyframe(flw, time=frame, attribute=comp)
+                        except Exception as e:
+                            cmds.warning(
+                                "FKIK bake: setKeyframe %s @%d failed (%s)"
+                                % (comp, frame, e)
+                            )
+
             cmds.currentTime(cur, edit=True)
-            cmds.undoInfo(closeChunk=True)
 
-        return end - start + 1
+        return end_i - start_i + 1
 
     @staticmethod
     def bake_constraint(tgt_list, flw_list):

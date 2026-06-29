@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-17
+# last Update date : 2026-06-29
 # A00120_FKIK - Qt UI (레거시 PY_JUN_makeUI_FKIKTool 대체)
 
 from Framework.qt.qt import *
@@ -12,7 +12,7 @@ print("QT version  :  " + str(QT_VERSION))
 
 import maya.cmds as cmds
 
-from tools.A00120_FKIK.app.config.version import VERSION
+from tools.A00120_FKIK.app.config.version import VERSION, LAST_UPDATE
 from tools.A00120_FKIK.app.core import (
     FKIKSetup,
     FKIKMatcher,
@@ -44,6 +44,13 @@ class MainWindow(QWidget):
         self.setWindowFlags(Qt.Window)
 
         root = QVBoxLayout(self)
+
+        # 맨 위 메뉴 바 (Help > About)
+        self.menu_bar = QMenuBar()
+        help_menu = self.menu_bar.addMenu("Help")
+        act_about = help_menu.addAction("About")
+        act_about.triggered.connect(self.show_about)
+        root.setMenuBar(self.menu_bar)
 
         self._build_setup_section(root)
         self._build_limb_section(root)
@@ -165,16 +172,18 @@ class MainWindow(QWidget):
         box = QGroupBox("Match / Bake")
         layout = QVBoxLayout(box)
 
-        # frame range
+        # frame range (각 칸 옆에 현재 프레임으로 채우는 Get Current 버튼)
         frame_row = QHBoxLayout()
         frame_row.addWidget(QLabel("Start"))
         self.sb_start = QSpinBox()
         self.sb_start.setRange(-1000000, 1000000)
         frame_row.addWidget(self.sb_start)
+        frame_row.addWidget(self._make_get_current_btn(self.sb_start))
         frame_row.addWidget(QLabel("End"))
         self.sb_end = QSpinBox()
         self.sb_end.setRange(-1000000, 1000000)
         frame_row.addWidget(self.sb_end)
+        frame_row.addWidget(self._make_get_current_btn(self.sb_end))
         layout.addLayout(frame_row)
 
         self._init_frame_range()
@@ -229,6 +238,28 @@ class MainWindow(QWidget):
         force_refresh()
         self.log("Viewport refresh restored.")
 
+    def show_about(self, *args):
+        message = (
+            "FKIK Tool v{version}\n"
+            "Update date: {update}\n"
+            "\n"
+            "Match and bake FK/IK controls on a rig.\n"
+            "\n"
+            "- Setup : resolve Targets / Followers from the selected rig.\n"
+            "- Match IK / Match FK : snap the pose once at the current frame.\n"
+            "- Bake IK / Bake FK : bake the Start-End range constraint-free,\n"
+            "  per frame via matchTransform (rotateOrder-safe, keeps keys on\n"
+            "  other ranges and animation layers untouched).\n"
+            "- Get Current : fill Start / End with the current frame.\n"
+            "- Bake (Constraint) : optional parentConstraint + bakeSimulation\n"
+            "  path for selected pairs over the playback range.\n"
+            "\n"
+            "All UI text is English.\n"
+            "\n"
+            "Written by Ji Hun Park."
+        ).format(version=VERSION, update=LAST_UPDATE)
+        QMessageBox.information(self, "About", message)
+
     # ==================================================
     # Helpers
     # ==================================================
@@ -244,6 +275,19 @@ class MainWindow(QWidget):
             self.sb_end.setValue(end)
         except Exception:
             pass
+
+    def _set_current_frame(self, spinbox):
+        """Get Current 버튼: 현재 Maya 프레임으로 해당 Start/End 스핀박스를 갱신."""
+        frame = int(round(cmds.currentTime(query=True)))
+        spinbox.setValue(frame)
+
+    def _make_get_current_btn(self, spinbox):
+        """현재 프레임으로 spinbox 를 채우는 'Get Current' 버튼 생성(A00110 패턴)."""
+        btn = QPushButton("Get Current")
+        # clicked 시그널은 checked(bool) 인자를 넘기므로 *_a 로 흡수한다
+        # (안 그러면 checked 가 spinbox 인자를 덮어써 동작하지 않는다).
+        btn.clicked.connect(lambda *_a, sb=spinbox: self._set_current_frame(sb))
+        return btn
 
     def _set_state(self, text, ok=None):
         self.lbl_state.setText(text)
