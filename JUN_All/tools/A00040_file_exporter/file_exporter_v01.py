@@ -39,7 +39,7 @@ class JUN_ToolUI_file_exporter:
         self.color_all = colorThem__.as_dict()
         # set color them (close)
 
-        self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 14-APR-2026\')".format(self.color_main)
+        self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 30-JUN-2026\')".format(self.color_main)
 
         # custom
 
