@@ -20,13 +20,18 @@
    - **Build (Converge to Center)**: Maya 2023+ 호환 노드 네트워크. `dilate(-90..90)` 가 모든
      조인트를 center(+) 또는 front(-) 조인트로 수렴시키고, 바인드된 곡선이 반지름 R 구 표면에
      놓이도록 `scaleX/Y` 를 구동한다.
-3. **AttachCrv** — TSL 에 나열된 **기존 오브젝트들**을 커브에서 **가장 가까운 지점**에 라이브
-   어태치한다. (`ref/ref_01.mel` 의 `attachDriverOnCurve` 이식이되 동작을 바꿈)
-   - 원본 ref 는 커브에 *일정 간격*으로 **새 로케이터**를 어태치했지만, 여기서는 오브젝트마다
-     `nearestPointOnCurve` 로 최근접 파라미터를 구해 그 지점에 붙인다.
-   - **Attach to Closest Point**: 오브젝트당 `pointOnCurveInfo(parameter=최근접) → fourByFourMatrix
-     → multMatrix(* parentInverseMatrix) → decomposeMatrix → translate`(옵션: `rotate`) 네트워크를
-     만든다. **부모 계층 안전**(parentInverse 사용)하고, 빌드 후 **커브가 변형되면 따라간다**.
+3. **AttachCrv** — 커브에 오브젝트를 라이브 어태치한다. **두 가지 모드**가 있다.
+   (`ref/ref_01.mel` 의 `attachDriverOnCurve` 이식)
+   - **Attach to Closest Point** (동작 변경): TSL 에 나열된 **기존 오브젝트들**을 각자
+     `nearestPointOnCurve` 로 구한 **최근접 파라미터** 지점에 붙인다. 오브젝트당
+     `pointOnCurveInfo(parameter=최근접) → fourByFourMatrix → multMatrix(* parentInverseMatrix)
+     → decomposeMatrix → translate`(옵션: `rotate`) 네트워크를 만든다. **부모 계층 안전**
+     (parentInverse 사용)하고, 빌드 후 **커브가 변형되면 따라간다**.
+   - **Distribute Drivers on Curve** (ref 원래 동작): **Count**(양의 정수)만큼 **새 드라이버**
+     (Locator/Null)를 만들어 커브의 시작~끝(`minValue`~`maxValue`) 사이에 **균일한 파라미터 간격**으로
+     배치·어태치한다. 파라미터는 ref 의 `makeParameterValueList` 그대로 구한다 — **Distribute across
+     full range** ON 이면 `division=count-1`(양 끝 정확히 포함, 열린 커브용), OFF 면 `division=count`
+     (마지막이 끝 직전에서 멈춤, 주기/닫힌 커브 seam 중복 방지). 어태치 네트워크는 Closest 모드와 동일하다.
 
 > **통합 방침**: 핵심 로직은 두 원본의 `app/core`(`slerp_ramp.py`, `spherical_drive.py`)를
 > **수정 없이 복사**해 재사용한다. 두 모듈이 모두 `run_build` 를 정의하므로 `app/core/__init__.py`
@@ -54,10 +59,10 @@ A00170_driverTool/
     │   ├── maya_scene.py       # 선택/존재/keyable attr/거리 (maya.cmds 어댑터)
     │   ├── slerp_ramp.py       # Slerp Ramp / Sine Wave 빌드 (pymel) — A00150 복사
     │   ├── spherical_drive.py  # Baked / Converge 빌드 (pymel) — A00160 복사
-    │   ├── attach_curve.py     # 커브 최근접 지점 어태치 (maya.cmds) — AttachCrv 탭
+    │   ├── attach_curve.py     # 커브 어태치 (maya.cmds) — Closest / Distribute 두 모드
     │   └── __init__.py         # run_build_slerp / run_build_wave /
     │                           #   run_build_spherical / run_build_nodes /
-    │                           #   run_attach_to_closest 재노출
+    │                           #   run_attach_to_closest / run_attach_uniform 재노출
     └── ui/main_window.py  # 전체 UI (3개 탭 + 공유 로그창 + 메뉴 바)
 ```
 
@@ -127,8 +132,21 @@ A00170_driverTool/
    로그에 오브젝트별 파라미터가 출력된다. norCrv 를 만들었으면 그 이름도 로그에 표시된다(이후
    그 커브를 조정해 방향을 잡는다). 씬에 없는 항목은 skip 후 경고하고, 세트 이름도 로그에 표시된다.
 
-> 어태치는 오브젝트의 `translate`(옵션 `rotate`)에 노드를 **연결**한다. 이미 연결/잠금된 채널이
-> 있으면 해당 오브젝트만 실패 처리(로그 경고)하고 나머지는 계속한다.
+#### Distribute (새 드라이버 균일 배치)
+
+위 옵션(Orient / Aim Axis / norCrv / set)을 그대로 공유하며, **Objects 리스트는 필요 없다**
+(드라이버를 새로 만든다). **Distribute new drivers uniformly** 그룹에서:
+
+- **Count**: 만들 드라이버 개수(양의 정수).
+- **Driver Type**: `Locator`(spaceLocator) 또는 `Null`(빈 그룹).
+- **Distribute across full range (open curve)**(기본 ON): 열린 커브면 켜서 양 끝에 정확히
+  드라이버를 둔다. 주기적/닫힌 커브면 꺼서 seam 에서 첫·마지막이 겹치지 않게 한다.
+
+**Distribute Drivers on Curve** 클릭 → `<curve>_1_drv`, `<curve>_2_drv` … (Count 자릿수만큼 0 패딩)
+드라이버가 생성되어 커브 시작~끝에 균일 배치된다. 로그에 드라이버별 파라미터가 출력된다.
+
+> 어태치는 오브젝트의 `translate`(옵션 `rotate`)에 노드를 **연결**한다. Closest 모드에서 이미
+> 연결/잠금된 채널이 있으면 해당 오브젝트만 실패 처리(로그 경고)하고 나머지는 계속한다.
 
 ---
 

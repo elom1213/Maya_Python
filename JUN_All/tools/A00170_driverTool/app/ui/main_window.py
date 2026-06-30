@@ -20,7 +20,7 @@ from tools.A00170_driverTool.app.core import (
     MayaScene,
     run_build_slerp, run_build_wave,
     run_build_spherical, run_build_nodes,
-    run_attach_to_closest, AIM_AXES,
+    run_attach_to_closest, run_attach_uniform, AIM_AXES, DRIVER_TYPES,
 )
 
 
@@ -677,7 +677,7 @@ class MainWindow(QWidget):
             "pointOnCurveInfo node made by this build, for easy selection later.")
         root.addWidget(self.atc_cb_make_set)
 
-        # Build
+        # Build : Attach the listed objects to their closest point.
         self.atc_btn_build = QPushButton("Attach to Closest Point")
         self.atc_btn_build.setMinimumHeight(34)
         self.atc_btn_build.setToolTip(
@@ -686,9 +686,52 @@ class MainWindow(QWidget):
             "(parent-safe, live as the curve deforms).")
         root.addWidget(self.atc_btn_build)
 
+        # Distribute : create N new drivers uniformly along the curve
+        # (ref attachDriverOnCurve original behaviour). Shares the orient / Aim
+        # Axis / norCrv / set options above.
+        dist_group = QGroupBox("Distribute new drivers uniformly")
+        dist_layout = QVBoxLayout(dist_group)
+
+        dist_row = QHBoxLayout()
+        dist_row.addWidget(QLabel("Count"))
+        self.atc_sb_count = QSpinBox()
+        self.atc_sb_count.setRange(1, 1000)
+        self.atc_sb_count.setValue(5)
+        self.atc_sb_count.setFixedWidth(70)
+        self.atc_sb_count.setToolTip(
+            "How many new drivers to create and spread evenly along the curve.")
+        dist_row.addWidget(self.atc_sb_count)
+        dist_row.addWidget(QLabel("Driver Type"))
+        self.atc_cb_drvtype = QComboBox()
+        self.atc_cb_drvtype.addItems(["Locator", "Null"])
+        self.atc_cb_drvtype.setToolTip(
+            "Locator: spaceLocator drivers (visible). Null: empty groups.")
+        dist_row.addWidget(self.atc_cb_drvtype)
+        dist_row.addStretch(1)
+        dist_layout.addLayout(dist_row)
+
+        self.atc_cb_fullrange = QCheckBox("Distribute across full range (open curve)")
+        self.atc_cb_fullrange.setChecked(True)
+        self.atc_cb_fullrange.setToolTip(
+            "On (open curves): the first and last drivers land exactly on the "
+            "curve ends (parameter min and max).\n"
+            "Off (periodic/closed curves): the last driver stops just before the "
+            "end so it does not overlap the first at the seam.")
+        dist_layout.addWidget(self.atc_cb_fullrange)
+
+        self.atc_btn_distribute = QPushButton("Distribute Drivers on Curve")
+        self.atc_btn_distribute.setMinimumHeight(34)
+        self.atc_btn_distribute.setToolTip(
+            "Create Count new drivers and attach them at evenly spaced "
+            "parameters from the curve start to its end (pointOnCurveInfo -> "
+            "matrix network, live as the curve deforms).")
+        dist_layout.addWidget(self.atc_btn_distribute)
+        root.addWidget(dist_group)
+
         # Signals
         self.atc_btn_get_curve.clicked.connect(self.on_atc_get_curve)
         self.atc_btn_build.clicked.connect(self.on_atc_build)
+        self.atc_btn_distribute.clicked.connect(self.on_atc_distribute)
         self.atc_cb_orient.toggled.connect(self._atc_sync_orient_enabled)
         self.atc_cb_norcrv.toggled.connect(self._atc_sync_orient_enabled)
         self._atc_sync_orient_enabled()
@@ -760,6 +803,57 @@ class MainWindow(QWidget):
             self._log("pointOnCurveInfo nodes grouped into set: {0}".format(
                 set_node))
 
+    def on_atc_distribute(self):
+        """커브에 새 드라이버 N 개를 균일 파라미터 간격으로 생성·어태치(ref 원래 동작)."""
+        self._log("--- Distribute Drivers on Curve ---")
+        curve = self.atc_le_curve.text().strip()
+
+        if not curve:
+            self._log("[WARN] Attachment Curve is empty. Use Get to set it.")
+            return
+        if not MayaScene.exists(curve):
+            self._log("[WARN] Curve not found in scene: {0}".format(curve))
+            return
+
+        count = self.atc_sb_count.value()
+        driver_type = self.atc_cb_drvtype.currentText().lower()
+        full_range = self.atc_cb_fullrange.isChecked()
+        orient = self.atc_cb_orient.isChecked()
+        aim_axis = self.atc_cb_aim.currentText()
+        use_norcrv = self.atc_cb_norcrv.isChecked()
+        norcrv_len = self.atc_dsb_norcrv_len.value()
+        create_set = self.atc_cb_make_set.isChecked()
+
+        with undo_chunk():
+            try:
+                created, set_node, norcrv = run_attach_uniform(
+                    curve, count, driver_type=driver_type, full_range=full_range,
+                    orient=orient, aim_axis=aim_axis,
+                    use_normal_curve=use_norcrv,
+                    normal_curve_length=norcrv_len,
+                    create_set=create_set)
+            except Exception as exc:
+                self._log("[ERROR] Distribute failed: {0}".format(exc))
+                return
+
+        self._log(
+            "Distributed {n} {t} driver(s) on '{c}' | range: {rng} | "
+            "orient: {o}{axis}{nc}".format(
+                n=len(created), t=driver_type, c=curve,
+                rng="full" if full_range else "open-ended",
+                o="on" if orient else "off",
+                axis=" ({0})".format(aim_axis) if orient else "",
+                nc=" | norCrv" if (orient and use_norcrv) else ""))
+        if norcrv:
+            self._log(
+                "Normal curve created: {0} "
+                "(rotate/reshape it to control up & twist)".format(norcrv))
+        for drv, param in created:
+            self._log("  {0} -> param {1:.4f}".format(drv, param))
+        if set_node:
+            self._log("pointOnCurveInfo nodes grouped into set: {0}".format(
+                set_node))
+
     # ================================================================
     # Helper / About
     # ================================================================
@@ -786,10 +880,13 @@ class MainWindow(QWidget):
             "  gathers joints to the center (+) or front (-) and keeps bound curves\n"
             "  on a sphere of radius R.\n"
             "\n"
-            "[AttachCrv] (ported from ref attachDriverOnCurve, behavior changed)\n"
+            "[AttachCrv] (ported from ref attachDriverOnCurve)\n"
             "- Attach to Closest Point: drives each listed object onto its closest\n"
             "  parameter on the curve via a pointOnCurveInfo -> matrix network\n"
             "  (parent-safe, live as the curve deforms). Optional orient to tangent.\n"
+            "- Distribute Drivers on Curve (ref original): create N new Locator/Null\n"
+            "  drivers spread evenly from the curve start to its end (Count, full /\n"
+            "  open-ended range), attached with the same matrix network.\n"
             "- Create Normal Curve (norCrv, default, ref-faithful): adds one straight\n"
             "  norCrv under the curve; rotate/reshape it to control up & twist. Off:\n"
             "  self-contained world-up frame.\n"

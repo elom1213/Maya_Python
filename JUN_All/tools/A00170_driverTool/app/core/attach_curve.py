@@ -28,6 +28,9 @@ import maya.cmds as cmds
 # Aim Axis 옵션(오브젝트의 로컬 어느 축을 커브 접선에 맞출지). ref 의 +X / -X 와 동일.
 AIM_AXES = ("+X", "-X")
 
+# Distribute 모드에서 생성할 드라이버 종류(ref 의 Locator / Null).
+DRIVER_TYPES = ("locator", "null")
+
 # 직교 프레임의 업벡터 시드(월드 +Y).
 _WORLD_UP = (0.0, 1.0, 0.0)
 
@@ -149,14 +152,17 @@ def _orient_rows_from_normal_curve(attach_poci, norcrv_poci, aim_axis):
     return x_row, y_row, z_row
 
 
-def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None):
-    """오브젝트 하나를 커브 최근접 지점에 라이브 어태치한다(노드 네트워크 구성).
+def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=None):
+    """오브젝트 하나를 커브 위 한 지점에 라이브 어태치한다(노드 네트워크 구성).
 
+    param 이 None 이면 오브젝트의 월드 위치에서 최근접 파라미터를 구해 쓰고(closest 모드),
+    값이 주어지면 그 파라미터 지점에 그대로 붙인다(distribute 모드).
     norcrv_shape 가 주어지면(use_normal_curve) up/side 를 그 norCrv 에서 가져오고(ref 원본),
     없으면 커브 접선 기반 자족 직교 프레임을 쓴다.
     """
-    world_pos = cmds.xform(obj, query=True, worldSpace=True, rotatePivot=True)
-    param = _closest_parameter(curve_shape, world_pos)
+    if param is None:
+        world_pos = cmds.xform(obj, query=True, worldSpace=True, rotatePivot=True)
+        param = _closest_parameter(curve_shape, world_pos)
 
     poci = cmds.createNode("pointOnCurveInfo", n="{0}_atc_POCI".format(obj))
     cmds.connectAttr(curve_shape + ".worldSpace[0]", poci + ".inputCurve",
@@ -258,3 +264,108 @@ def build_attach_to_closest(curve, objects, orient=True, aim_axis="+X",
         set_node = cmds.sets(pocis, name="{0}_atcPOCI_SET".format(base))
 
     return attached, failed, set_node, norcrv
+
+
+# ----------------------------------------------------------------------------
+# Distribute 모드 : 커브에 새 드라이버 N 개를 균일 파라미터 간격으로 어태치한다.
+# (ref_01.mel attachDriverOnCurve 의 원래 동작 — comd_M_b_create / makeParameterValueList)
+# ----------------------------------------------------------------------------
+
+def _curve_param_range(curve_shape):
+    """커브 shape 의 (minValue, maxValue) 파라미터 범위를 반환."""
+    return (cmds.getAttr(curve_shape + ".minValue"),
+            cmds.getAttr(curve_shape + ".maxValue"))
+
+
+def _uniform_parameters(count, start, end, full_range):
+    """ref 의 makeParameterValueList : start..end 사이에 count 개의 파라미터를 균일 분배.
+
+    full_range=True 면 division=count-1 이라 마지막 드라이버가 정확히 end 에 놓인다
+    (열린 커브용, 양 끝 포함). full_range=False 면 division=count 라 마지막이 end 직전에서
+    멈춘다(주기적 커브의 seam 중복 방지). count==1 이면 구간 중앙(start + (end-start)/2)에 둔다.
+    """
+    diff = end - start
+    if count == 1:
+        return [start + diff / 2.0]
+    division = (count - 1) if full_range else count
+    return [start + (diff / division) * i for i in range(count)]
+
+
+def _padded_number(count, n):
+    """ref 의 MF_increaseNumberListWithZero : count 자릿수만큼 0 패딩한 번호 문자열.
+
+    count=5 -> '1'..'5', count=12 -> '01'..'12'.
+    """
+    return str(n).zfill(len(str(count)))
+
+
+def _create_driver(driver_type):
+    """driver_type 에 맞는 새 드라이버 노드(transform 이름)를 만들어 반환."""
+    if driver_type == "null":
+        return cmds.group(empty=True)
+    return cmds.spaceLocator()[0]
+
+
+def build_attach_uniform(curve, count, driver_type="locator", name_prefix=None,
+                         start=None, end=None, full_range=True,
+                         orient=True, aim_axis="+X",
+                         use_normal_curve=True, normal_curve_length=1.0,
+                         create_set=True):
+    """커브 위에 새 드라이버 count 개를 균일한 파라미터 간격으로 생성·라이브 어태치한다.
+
+    ref_01.mel attachDriverOnCurve 의 원래 동작 이식 : Locator/Null 드라이버를 만들어
+    makeParameterValueList 로 구한 파라미터 지점마다 pointOnCurveInfo -> matrix 네트워크로
+    붙인다. closest 모드(build_attach_to_closest)와 같은 orient/norCrv/set 옵션을 공유한다.
+
+    start/end 가 None 이면 커브의 minValue/maxValue 를 쓴다(전 구간). full_range 는
+    _uniform_parameters 참고. name_prefix 가 None 이면 커브 이름을 접두사로 쓴다.
+
+    Returns (created, set_node, norcrv):
+      created   = [(driver, parameter), ...]  (생성 순서)
+      set_node  = 생성한 pointOnCurveInfo 세트 이름(미생성이면 None)
+      norcrv    = 생성한 norCrv transform 이름(미생성이면 None)
+    """
+    curve_shape = _shape_of_curve(curve)
+    if curve_shape is None:
+        raise ValueError("'{0}' is not a NURBS curve.".format(curve))
+    if count < 1:
+        raise ValueError("count must be a positive integer.")
+    if driver_type not in DRIVER_TYPES:
+        driver_type = "locator"
+    if aim_axis not in AIM_AXES:
+        aim_axis = "+X"
+
+    min_v, max_v = _curve_param_range(curve_shape)
+    if start is None:
+        start = min_v
+    if end is None:
+        end = max_v
+
+    base = _transform_of_curve(curve).split("|")[-1].split(":")[-1]
+    prefix = (name_prefix or base).split("|")[-1].split(":")[-1]
+
+    # ref 원본 : orient + use_normal_curve 면 norCrv 를 한 개 만들어 공유한다.
+    norcrv = None
+    norcrv_shape = None
+    if orient and use_normal_curve:
+        norcrv, norcrv_shape = _create_normal_curve(
+            _transform_of_curve(curve), aim_axis, normal_curve_length, base)
+
+    params = _uniform_parameters(count, start, end, full_range)
+
+    created = []
+    pocis = []
+    for i, param in enumerate(params):
+        drv = _create_driver(driver_type)
+        drv = cmds.rename(
+            drv, "{0}_{1}_drv".format(prefix, _padded_number(count, i + 1)))
+        _, poci = _attach_one(curve_shape, drv, orient, aim_axis,
+                              norcrv_shape, param=param)
+        created.append((drv, param))
+        pocis.append(poci)
+
+    set_node = None
+    if create_set and pocis:
+        set_node = cmds.sets(pocis, name="{0}_atcPOCI_SET".format(base))
+
+    return created, set_node, norcrv
