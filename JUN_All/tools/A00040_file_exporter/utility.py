@@ -145,7 +145,9 @@ def get_parents(objs):
     for obj__ in objs:
         cmds.select(obj__)
         sel_obj = cmds.ls(selection=True, long=True)
-        lst_prnt.append(cmds.listRelatives(sel_obj, parent = True)[0])
+        prnt = cmds.listRelatives(sel_obj, parent=True)
+        # 월드(최상위)에 있어 부모가 없으면 None 으로 표시
+        lst_prnt.append(prnt[0] if prnt else None)
     return lst_prnt
 
 def JUN_cmd_export(*args, **kwargs):
@@ -160,7 +162,7 @@ def JUN_cmd_export(*args, **kwargs):
 
     cmds.select(clear=True)
 
-    if len(export_path) is 0:
+    if len(export_path) == 0:
         print("Fail : Check export path")
         return
 
@@ -174,7 +176,7 @@ def JUN_cmd_export(*args, **kwargs):
             members.clear()
 
 
-        if len(members_for_export) is 0:
+        if len(members_for_export) == 0:
             print("Fail : no object for export")
             return
         
@@ -188,7 +190,16 @@ def JUN_cmd_export(*args, **kwargs):
         logs_all.append(log_export_obj)
         logs_all.append(log_export_path)
 
-        objs_out =  cmds.parent(members_for_export, world=True)
+        # 멤버를 하나씩 월드로 빼내며 (새 이름 ↔ 원래 부모) 짝을 유지한다.
+        # cmds.parent(world=True) 는 이미 월드 최상위인 오브젝트를 반환에서 제외하므로
+        # members 전체를 한 번에 넘기면 parents_origin 과 인덱스가 어긋난다.
+        objs_out = []
+        for member, prnt in zip(members_for_export, parents_origin):
+            if prnt is None:
+                # 이미 월드 최상위 → 옮길 필요 없이 그대로 사용
+                objs_out.append(member)
+            else:
+                objs_out.append(cmds.parent(member, world=True)[0])
 
         cmds.select(objs_out)
         cmds.file(mainpath, force=True, options="v=0;", typ="FBX export", pr=True, es=True)
@@ -196,8 +207,11 @@ def JUN_cmd_export(*args, **kwargs):
         print("obj out " + str(objs_out))
         print("parent ori " + str(parents_origin) + "\n")
 
-        for i in range(0, len(objs_out)):
-            cmds.parent(objs_out[i], parents_origin[i])
+        # 원래 부모로 복원 (월드 최상위였던 오브젝트는 그대로 둔다)
+        for obj_out, prnt in zip(objs_out, parents_origin):
+            if prnt is None:
+                continue
+            cmds.parent(obj_out, prnt)
 
         members_for_export.clear()
         parents_origin.clear()

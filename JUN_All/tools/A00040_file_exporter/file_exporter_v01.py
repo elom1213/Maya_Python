@@ -1,9 +1,10 @@
-# last Update date 2026. 05. 22
+# last Update date 2026. 06. 30
 # Python Script by Ji Hun Park
 
-# file_exporter_v01 V01.01
+# file_exporter_v01 V01.02
 # V01.00 : create
 # V01.01 : update unparent and parenting until
+# V01.02 : fix export error for world-root objects (no parent) + index alignment / comparison cleanup
 
 
 import maya.cmds as cmds;
@@ -18,7 +19,7 @@ from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod
 
 class JUN_ToolUI_file_exporter:
     def __init__(self):
-        self.str_headTitle = "File exporter Tool V01.00"
+        self.str_headTitle = "File exporter Tool V01.02"
         self.str_winName = "Junny_win_file_exporter_tool_V01_00"
         self.win_width = 500;
         self.win_height = 600;
