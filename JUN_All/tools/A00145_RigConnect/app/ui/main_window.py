@@ -126,6 +126,46 @@ class MainWindow(QWidget):
             create_row.addWidget(btn)
         layout.addWidget(create_box)
 
+        # Match Options (DOOTOOL_PY_TOOL_Match 의 체크박스 이식).
+        # Rotate Order / Rotate Axis 는 이 툴이 월드 행렬 기반 매칭이라 의미가 없어 제외.
+        # 기본 체크 상태는 DOOTOOL 을 따른다: Translation/Rotation ON, Scale/Parent OFF.
+        opt_box = QGroupBox("Match Options")
+        opt_layout = QVBoxLayout(opt_box)
+
+        tr_row = QHBoxLayout()
+        self.cb_mt_translate = QCheckBox("Translation")
+        self.cb_mt_translate.setChecked(True)
+        self.cb_mt_translate.setToolTip(
+            "Match the follower's world position to the target.")
+        self.cb_mt_rotate = QCheckBox("Rotation")
+        self.cb_mt_rotate.setChecked(True)
+        self.cb_mt_rotate.setToolTip(
+            "Match the follower's world rotation to the target (rotateOrder "
+            "safe). For a vertex target, aligns the follower to the vertex "
+            "normal instead.")
+        tr_row.addWidget(self.cb_mt_translate)
+        tr_row.addWidget(self.cb_mt_rotate)
+        tr_row.addStretch(1)
+        opt_layout.addLayout(tr_row)
+
+        self.cb_mt_scale = QCheckBox("Scale (world space)")
+        self.cb_mt_scale.setChecked(False)
+        self.cb_mt_scale.setToolTip(
+            "Match the follower's world scale to the target. Only meaningful "
+            "for transform/joint targets (ignored for mesh/cluster/component/"
+            "vertex targets).")
+        opt_layout.addWidget(self.cb_mt_scale)
+
+        self.cb_mt_parent = QCheckBox("Parent Followers to Targets")
+        self.cb_mt_parent.setChecked(False)
+        self.cb_mt_parent.setToolTip(
+            "After matching, parent each follower under its target (under the "
+            "owning object for a component target). Keeps the matched world "
+            "position.")
+        opt_layout.addWidget(self.cb_mt_parent)
+
+        layout.addWidget(opt_box)
+
         # Match / Swap
         btn_row = QHBoxLayout()
         btn_match = QPushButton("Match")
@@ -495,7 +535,8 @@ class MainWindow(QWidget):
             "Written by Ji Hun Park\n"
             "Update date : {1}\n"
             "\n"
-            "Match       : match followers to targets (pos/rot, rotateOrder safe)\n"
+            "Match       : match followers to targets (rotateOrder safe)\n"
+            "              options: Translation / Rotation / Scale (world) / Parent\n"
             "              + create locators/sphere/cube at targets + vertex normal (+Y)\n"
             "Constrain   : multi target -> follower constraints\n"
             "              + Skin Weight to Constraint (weighted parentConstraint)\n"
@@ -530,9 +571,25 @@ class MainWindow(QWidget):
                          len(targets), len(followers),
                          min(len(targets), len(followers))))
 
+        translate = self.cb_mt_translate.isChecked()
+        rotate = self.cb_mt_rotate.isChecked()
+        scale = self.cb_mt_scale.isChecked()
+        parent = self.cb_mt_parent.isChecked()
+        if not (translate or rotate or scale or parent):
+            self.log("[WARN] Match : no channel selected "
+                     "(Translation/Rotation/Scale/Parent all off)")
+            return
+
         def _do():
-            matched, skipped = mch_mgr.match(targets, followers)
-            self.log("       {0} matched, {1} skipped".format(matched, skipped))
+            matched, skipped = mch_mgr.match(
+                targets, followers,
+                translate=translate, rotate=rotate,
+                scale=scale, parent=parent)
+            self.log("       {0} matched, {1} skipped [{2}]".format(
+                matched, skipped,
+                "".join(c for c, on in (
+                    ("T", translate), ("R", rotate),
+                    ("S", scale), ("P", parent)) if on)))
 
         self._run("Match", _do)
 

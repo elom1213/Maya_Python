@@ -35,11 +35,20 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
 - **Match**: `Targets[i] → Followers[i]` 인덱스 1:1 매칭. **rotateOrder 가 달라도** 안전
   (`cmds.matchTransform`, 임시 transform 경유). 개수가 다르면 적은 쪽만 매칭하고 경고.
   target 종류별 동작:
-  - transform/joint/curve → 위치+회전 매칭.
+  - transform/joint/curve → 위치+회전(+옵션 스케일) 매칭.
   - mesh(오브젝트 전체) → 월드 정점 평균(centroid)으로 위치만.
   - clusterHandle → 월드 rotatePivot 으로 위치만.
   - **vertex(`.vtx[i]`) → 정점 월드 위치로 이동 + follower 의 `+Y` 축을 정점 노말에 정렬**
     (`maya.api.OpenMaya` 의 `MFnMesh.getVertexNormal`).
+- **Match Options** (레거시 `DOOTOOL_PY_TOOL_Match.py` 이식, v01.10). 기본 체크 상태는 원본을 따름:
+  - **Translation**(기본 ON) — follower 의 월드 위치를 타겟에 맞춘다.
+  - **Rotation**(기본 ON) — follower 의 월드 회전을 타겟에 맞춘다(vertex 타겟이면 노말 정렬).
+  - **Scale (world space)**(기본 OFF) — follower 의 **월드 스케일**을 타겟에 맞춘다. transform/joint
+    타겟에만 의미가 있고 mesh/cluster/component/vertex 타겟에는 무시된다.
+  - **Parent Followers to Targets**(기본 OFF) — 매칭 후 각 follower 를 타겟(컴포넌트면 소유
+    오브젝트) 아래로 `parent` 한다. 이미 그 자식이면 스킵, 매칭된 월드 위치는 유지된다.
+  - 원본의 **Rotate Order / Rotate Axis 는 제외**했다 — 이 툴은 월드 행렬 기반 매칭이라 두 옵션이
+    의미가 없다. 채널을 하나도 안 켜면 경고만 남기고 아무 동작도 하지 않는다.
 - **Create (at target positions)** — `Locators` / `Sphere` / `Cube`: 타겟 **수만큼** 컨트롤을 만들어
   **곧바로 타겟 위치/방향에 매칭**하고, 생성된 컨트롤을 **Followers 목록에 채운다**(씬에서도 선택).
 - **Swap**: Targets ↔ Followers 목록 교환.

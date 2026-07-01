@@ -1,13 +1,14 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-22
+# last Update date : 2026-07-01
 # A00220_BackupTool - Chrome-Dino style animation widget (Qt, standalone)
 #
 # 백업 상태 표시 자리에 쓰는 픽셀아트 T-Rex(Chrome Dino).
 #   - set_running(True): 제자리 달리기(다리 2프레임 교차) + 바닥 점선 스크롤 +
 #     주기적 점프.
 #   - set_running(False): 가만히 서 있음(정지).
-#   - hop(): 1회 점프 트리거(작은 강조용).
+#   - notify_save(): 강조색으로 짧게 톡 점프 1회(사용자가 파일을 저장한 순간을 알린다).
 #   - spin(): 공중에서 360° 1회전(파일이 실제로 백업된 순간을 또렷이 알린다).
+# 저장 순간(강조색 톡 점프)과 백업 순간(360° 스핀)을 눈으로 구분할 수 있게 두 표현을 나눈다.
 # 외부 에셋 없이 코드 내장 비트맵을 QPainter 로 그린다(테마 무관, exe 번들 불필요).
 
 import math
@@ -104,6 +105,10 @@ class DinoWidget(QWidget):
         # 백업이 실제로 일어난 순간 spin() 으로 트리거한다.
         self._spin_t = None
 
+        # 저장 펄스 상태: None=안 함, 아니면 0..(_SAVE_TICKS) 진행 틱.
+        # 사용자가 파일을 저장한 순간 notify_save() 로 트리거한다(강조색 톡 점프).
+        self._save_t = None
+
         # 애니메이션 타이머(~33fps)
         self._timer = QTimer(self)
         self._timer.setInterval(33)
@@ -125,6 +130,10 @@ class DinoWidget(QWidget):
     _SPIN_TICKS = 24          # ~0.8s 동안 한 바퀴
     _SPIN_LIFT_CELLS = 4      # 회전하며 살짝 떠오르는 높이(픽셀 칸)
 
+    # 저장 감지 강조색 톡 점프(자동 점프보다 짧고 낮게 → 색+리듬으로 구분)
+    _SAVE_TICKS = 12          # ~0.4s (자동 점프 18틱보다 스냅있게)
+    _SAVE_PEAK_CELLS = 5      # 톡 점프 높이(자동 점프 7칸보다 낮게)
+
     # --------------------------------------------------------------- control
 
     def set_running(self, on):
@@ -139,14 +148,23 @@ class DinoWidget(QWidget):
             self._timer.stop()
             self._jump_t = None
             self._spin_t = None
+            self._save_t = None
             self._leg = 0
         self.update()
 
-    def hop(self):
-        """점프 1회 트리거(이미 점프/회전 중이면 무시). 달리는 중에만 의미 있음."""
-        if self._running and self._jump_t is None and self._spin_t is None:
-            self._jump_t = 0
-            self._ticks_since_jump = 0
+    def notify_save(self):
+        """사용자가 파일을 저장한 순간 강조색으로 짧게 톡 점프 1회.
+
+        정지 상태면 먼저 달리기로 깨운다. 스핀(백업 강조)이 진행 중이면 무시한다
+        (백업 표현이 우선). 이미 저장 펄스 중이어도 처음부터 다시 재생해 연속 저장을 또렷이 알린다.
+        """
+        if self._spin_t is not None:
+            return
+        if not self._running:
+            self.set_running(True)
+        self._save_t = 0
+        self._jump_t = None
+        self._ticks_since_jump = 0
 
     def spin(self):
         """공중에서 360° 1회전(백업 성공 강조). 정지 상태면 먼저 달리기로 깨운다.
@@ -169,12 +187,19 @@ class DinoWidget(QWidget):
         if self._frame_count % self._LEG_SWAP_EVERY == 0:
             self._leg ^= 1
 
-        # 회전 진행(회전 중엔 일반 점프/자동 점프를 멈춘다)
+        # 우선순위: 회전(백업) > 저장 펄스 > 점프 > 자동 점프.
+        # 회전 진행(회전 중엔 저장/점프/자동 점프를 멈춘다)
         if self._spin_t is not None:
             self._spin_t += 1
             if self._spin_t >= self._SPIN_TICKS:
                 self._spin_t = None
                 self._ticks_since_jump = 0
+        # 저장 펄스 진행(자동 점프보다 짧은 톡 점프)
+        elif self._save_t is not None:
+            self._save_t += 1
+            if self._save_t >= self._SAVE_TICKS:
+                self._save_t = None
+                self._ticks_since_jump = 0   # 끝나고 자동 점프가 바로 안 튀도록
         # 점프 진행 / 자동 점프 스케줄
         elif self._jump_t is not None:
             self._jump_t += 1
@@ -196,13 +221,21 @@ class DinoWidget(QWidget):
         arc = 4.0 * x * (1.0 - x)                     # 0..1..0 (x=0.5 정점)
         return int(self._JUMP_PEAK_CELLS * self._px * arc)
 
+    def _save_offset_px(self):
+        """현재 저장 톡 점프의 세로 오프셋(px, 위로 +). 포물선(자동 점프보다 낮게)."""
+        if self._save_t is None:
+            return 0
+        x = self._save_t / float(self._SAVE_TICKS)   # 0..1
+        arc = 4.0 * x * (1.0 - x)                     # 0..1..0 (x=0.5 정점)
+        return int(self._SAVE_PEAK_CELLS * self._px * arc)
+
     # ----------------------------------------------------------------- paint
 
     def sizeHint(self):
         return QSize(_GRID_W * self._px + 60, _RESERVE_CELLS * self._px)
 
     def _current_legs(self):
-        if self._jump_t is not None:
+        if self._jump_t is not None or self._save_t is not None:
             return _LEGS_JUMP
         if self._running:
             return _LEGS_RUN_A if self._leg == 0 else _LEGS_RUN_B
@@ -227,8 +260,9 @@ class DinoWidget(QWidget):
 
         # 스프라이트 좌측 x(살짝 왼쪽에 배치)
         sprite_x = max(8, (w - sprite_w) // 4)
-        # 발이 ground_y 에 닿도록 top 계산 + 점프 오프셋
-        sprite_top = ground_y - sprite_h - self._jump_offset_px()
+        # 발이 ground_y 에 닿도록 top 계산 + 점프/저장 톡 점프 오프셋(둘 중 하나만 활성)
+        sprite_top = (ground_y - sprite_h
+                      - self._jump_offset_px() - self._save_offset_px())
 
         # --- 바닥선 + 점선(흐름) ---
         painter.setPen(Qt.NoPen)
@@ -273,6 +307,13 @@ class DinoWidget(QWidget):
                         )
             painter.restore()
         else:
+            # 저장 톡 점프 중이면 스프라이트를 강조색(테마 하이라이트)으로 그려
+            # 회색 자동 점프와 확실히 구분한다. 바닥선/점선은 기본색 유지.
+            draw_color = color
+            if self._save_t is not None:
+                accent = self.palette().highlight().color()
+                draw_color = accent if accent.isValid() else QColor("#4CAF50")
+
             rows = _BODY + self._current_legs()
             for r, line in enumerate(rows):
                 for c, ch in enumerate(line):
@@ -281,7 +322,7 @@ class DinoWidget(QWidget):
                             sprite_x + c * px,
                             sprite_top + r * px,
                             px, px,
-                            color,
+                            draw_color,
                         )
 
         painter.end()

@@ -186,12 +186,21 @@ def _basis_from_normal(normal, axis="y"):
 # apply
 # ======================================================================
 
-def _match_via_matrix(flw, x, y, z, pos):
+def _match_via_matrix(flw, x, y, z, pos, translate=True, rotate=True):
     """기저(x,y,z)+위치를 임시 transform 에 실어 matchTransform 으로 flw 에 적용한다.
 
     임시 노드를 거치므로 flw 의 rotateOrder 가 무엇이든 안전하고(매칭은 matchTransform 이 처리),
     flw 의 scale 도 보존된다(matchTransform pos+rot 은 scale 을 건드리지 않음).
+    translate/rotate 로 위치/회전 중 적용할 채널을 고른다(둘 다 False 면 아무것도 안 함).
     """
+    kwargs = {}
+    if translate:
+        kwargs["position"] = True
+    if rotate:
+        kwargs["rotation"] = True
+    if not kwargs:
+        return
+
     mat = [
         x.x, x.y, x.z, 0.0,
         y.x, y.y, y.z, 0.0,
@@ -201,7 +210,7 @@ def _match_via_matrix(flw, x, y, z, pos):
     tmp = cmds.createNode("transform")
     try:
         cmds.xform(tmp, ws=True, matrix=mat)
-        cmds.matchTransform(flw, tmp, position=True, rotation=True)
+        cmds.matchTransform(flw, tmp, **kwargs)
     finally:
         cmds.delete(tmp)
 
@@ -211,21 +220,57 @@ def _match_pos(flw, pos):
     cmds.xform(flw, ws=True, translation=(pos[0], pos[1], pos[2]))
 
 
-def _match_one(tgt, flw, normal_axis):
-    """target 종류에 따라 flw 를 tgt 에 매칭한다."""
+def _parent_one(flw, tgt):
+    """flw 를 tgt(컴포넌트면 그 소유 transform) 아래로 parent 한다.
+
+    DOOTOOL 'Parent Followers to Targets' 이식. cmds.parent 는 기본적으로 월드 위치를
+    보존하므로 매칭된 위치/회전을 유지한다. 자기 자신이거나 이미 그 자식이면 스킵한다.
+    """
+    node = tgt.split(".")[0] if "." in tgt else tgt   # 컴포넌트 -> 소유 오브젝트
+    if node == flw:
+        return
+    parents = cmds.listRelatives(flw, parent=True, fullPath=True) or []
+    node_full = (cmds.ls(node, long=True) or [node])[0]
+    if parents and parents[0] == node_full:
+        return
+    cmds.parent(flw, node)
+
+
+def _match_one(tgt, flw, normal_axis, translate=True, rotate=True, scale=False):
+    """target 종류에 따라 flw 를 tgt 에 매칭한다(채널: translate/rotate/scale).
+
+    - transform/joint/curve : matchTransform 으로 켜진 채널(pos/rot/scale)만 월드 매칭.
+    - vertex : 위치(translate) + 노말 정렬 회전(rotate). scale 은 의미 없어 무시.
+    - mesh(centroid)/cluster(pivot)/component : 위치만(translate). rotate/scale 무시.
+    scale 은 DOOTOOL 'Scale (Only in The World Space)' 이식 — matchTransform scale 은
+    flw 의 월드 스케일이 tgt 의 월드 스케일과 같아지도록 맞춘다(월드 기준).
+    """
     kind = _classify(tgt)
     if kind == "vertex":
-        pos, normal = _vertex_pos_normal(tgt)
-        x, y, z = _basis_from_normal(normal, normal_axis)
-        _match_via_matrix(flw, x, y, z, pos)
+        if translate or rotate:      # 둘 다 꺼졌으면 정점 샘플링 자체를 건너뛴다.
+            pos, normal = _vertex_pos_normal(tgt)
+            x, y, z = _basis_from_normal(normal, normal_axis)
+            _match_via_matrix(flw, x, y, z, pos,
+                              translate=translate, rotate=rotate)
     elif kind == "mesh":
-        _match_pos(flw, _mesh_centroid(tgt))
+        if translate:
+            _match_pos(flw, _mesh_centroid(tgt))
     elif kind == "cluster":
-        _match_pos(flw, _cluster_pivot(tgt))
+        if translate:
+            _match_pos(flw, _cluster_pivot(tgt))
     elif kind == "component":
-        _match_pos(flw, cmds.pointPosition(tgt, world=True))
-    else:  # transform/joint/curve : rotateOrder 안전한 위치+회전 매칭
-        cmds.matchTransform(flw, tgt, position=True, rotation=True)
+        if translate:
+            _match_pos(flw, cmds.pointPosition(tgt, world=True))
+    else:  # transform/joint/curve : rotateOrder 안전한 월드 매칭
+        kwargs = {}
+        if translate:
+            kwargs["position"] = True
+        if rotate:
+            kwargs["rotation"] = True
+        if scale:
+            kwargs["scale"] = True
+        if kwargs:
+            cmds.matchTransform(flw, tgt, **kwargs)
     return kind
 
 
@@ -233,13 +278,19 @@ def _match_one(tgt, flw, normal_axis):
 # public API
 # ======================================================================
 
-def match(targets, followers, normal_axis="y"):
+def match(targets, followers, normal_axis="y",
+          translate=True, rotate=True, scale=False, parent=False):
     """targets[i] 에 followers[i] 를 매칭한다(인덱스 1:1).
 
     Args:
         targets:   타겟 오브젝트/컴포넌트 리스트.
         followers: 따라갈 오브젝트 리스트.
         normal_axis: 버텍스 타겟일 때 노말에 정렬할 follower 축("x"/"y"/"z"). 기본 "y".
+        translate: 위치 매칭(기본 True). DOOTOOL 'Translation'.
+        rotate:    회전 매칭(기본 True). DOOTOOL 'Rotation'.
+        scale:     월드 스케일 매칭(기본 False). DOOTOOL 'Scale (Only in The World Space)'.
+        parent:    매칭 후 follower 를 target 아래로 parent(기본 False).
+                   DOOTOOL 'Parent Followers to Targets'.
 
     Returns:
         (matched_count, skipped_count). 개수가 다르면 min 만큼만 매칭하고 차이를 skipped 로 보고.
@@ -254,7 +305,12 @@ def match(targets, followers, normal_axis="y"):
 
     with suspend_refresh():
         for i in range(n):
-            _match_one(targets[i], followers[i], normal_axis)
+            _match_one(targets[i], followers[i], normal_axis,
+                       translate=translate, rotate=rotate, scale=scale)
+        # DOOTOOL 과 동일하게 매칭을 모두 마친 뒤 별도 패스로 parent 한다.
+        if parent:
+            for i in range(n):
+                _parent_one(followers[i], targets[i])
 
     return n, skipped
 

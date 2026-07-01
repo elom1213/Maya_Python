@@ -1,12 +1,12 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-22
+# last Update date : 2026-07-01
 # A00220_BackupTool - main window (Qt, standalone)
 #
 # 컴퓨터 비정상 종료에 대비해 지정 파일들을 주기적으로 자동 백업한다.
 #  - 대상 파일 목록 / 백업 폴더명 / 접미사 / 분·초 주기 설정
 #  - 덮어쓰기 또는 버전업(최근 N개 유지) 모드
 #  - 상태 표시: Chrome-Dino 애니메이션(정지=서있음 / 동작=달리기 /
-#    백업 성공=공중 360° 회전)
+#    저장 감지=강조색 톡 점프 / 백업 성공=공중 360° 회전)
 
 import os
 import time
@@ -283,7 +283,8 @@ class MainWindow(QWidget):
         layout.addLayout(row)
 
         # 상태 표시: 글자 대신 Chrome-Dino. Active 면 달리며 주기적으로 점프,
-        # 정지면 가만히 서 있는다. (Saving 순간엔 hop 으로 강조.)
+        # 정지면 가만히 서 있는다. 저장 감지 순간엔 강조색 톡 점프(notify_save),
+        # 실제 백업 순간엔 360° 스핀(spin)으로 구분해 알린다.
         self.dino = DinoWidget(px=3)
         layout.addWidget(self.dino)
 
@@ -552,6 +553,9 @@ class MainWindow(QWidget):
         self._pending_backup[path] = time.monotonic() + delay
         if not self._delay_timer.isActive():
             self._delay_timer.start()
+        # 사용자가 파일을 저장한 '순간' 을 공룡이 강조색 톡 점프로 알린다(실제 백업 순간의
+        # 360° 스핀과 눈으로 구분되게). 실제 백업은 Save Delay 뒤 _backup_targets 에서 일어난다.
+        self.dino.notify_save()
         # 임시파일 교체식 저장은 감시 경로를 떨궈내므로, 다음 저장을 놓치지 않도록
         # 지연을 기다리지 말고 곧바로 다시 등록한다.
         self._rewatch_files()

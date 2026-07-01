@@ -1,5 +1,23 @@
 # Changelog — A00220_BackupTool
 
+## [01.09] - 2026-07-01
+
+### Added
+- **The dino now marks the moment a user saves a watched file** with a short
+  accent-colored hop (`DinoWidget.notify_save()`), triggered from `_on_fs_changed`
+  the instant a save is detected on disk. This is visually distinct from the two
+  existing states — grey running/auto-jump (tool active) and the 360° spin (a
+  backup actually happened) — so you can now tell the *save* moment apart from the
+  *backup* moment, which the Save Delay (v01.08) separates by several seconds. The
+  hop is shorter and lower than the periodic auto-jump and is drawn in the theme
+  highlight color (falls back to `#4CAF50`). Priority ladder is spin > save-hop >
+  jump > auto-jump; a save-hop yields to an in-progress backup spin. Only appears
+  in Auto Backup mode (the periodic mode has no per-save detection).
+
+### Removed
+- Dead `DinoWidget.hop()` method (unused since v01.06 replaced it with `spin()`);
+  its role is now filled by the distinct `notify_save()` hop.
+
 ## [01.08] - 2026-07-01
 
 ### Changed
