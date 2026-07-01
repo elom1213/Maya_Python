@@ -73,17 +73,19 @@ class MainWindow(QWidget):
         self._backup_timer = QTimer(self)
         self._backup_timer.timeout.connect(self._do_backup_cycle)
 
-        # Auto Backup 용 파일 감시자: 대상 파일이 디스크에서 바뀌는 즉시(=사용자가
-        # 저장하는 순간) 백업한다. 주기 타이머는 감시자가 놓친 변경을 잡는 fallback.
+        # Auto Backup 용 파일 감시자: 대상 파일이 디스크에서 바뀌는 순간(=사용자가
+        # 저장하는 순간)을 감지한다. 주기 타이머는 감시자가 놓친 변경을 잡는 fallback.
         self._fs_watcher = QFileSystemWatcher(self)
         self._fs_watcher.fileChanged.connect(self._on_fs_changed)
-        # 한 번의 저장이 fileChanged 를 여러 번 쏘거나(에디터마다 다름), 임시파일
-        # 교체식 저장은 변경 직후 잠깐 파일이 없으므로, 살짝 모았다가 처리한다.
-        self._pending_changes = set()
-        self._debounce_timer = QTimer(self)
-        self._debounce_timer.setSingleShot(True)
-        self._debounce_timer.setInterval(300)
-        self._debounce_timer.timeout.connect(self._flush_pending_changes)
+        # 저장을 감지해도 '즉시' 백업하지 않고 파일별로 (지금 + Save Delay)초 뒤에
+        # 백업을 예약한다({path: due_monotonic}). PC 가 저장 직후 크래시로 종료되면
+        # 이 예약 백업도 프로세스와 함께 사라져 손상된 파일을 백업하지 않는다(직전의
+        # 정상 백업본이 보존됨). 지연 중 같은 파일이 다시 저장되면 그 파일만 재예약해
+        # '마지막 저장 + Delay' 시점에 settle 된 상태로 백업한다.
+        self._pending_backup = {}
+        self._delay_timer = QTimer(self)
+        self._delay_timer.setInterval(1000)   # 1초 폴링(예약이 있을 때만 동작)
+        self._delay_timer.timeout.connect(self._process_pending_backups)
 
         # (상태 표시는 텍스트 대신 Chrome-Dino 애니메이션. 자체 타이머로 동작.)
 
@@ -238,6 +240,24 @@ class MainWindow(QWidget):
         sec_row.addStretch(1)
         grid.addLayout(sec_row, 5, 1, 1, 3)
 
+        # Save Delay (Auto Backup 전용): 저장 감지 후 실제 백업까지의 지연.
+        grid.addWidget(QLabel("Save Delay"), 6, 0)
+        self.spn_delay = QSpinBox()
+        self.spn_delay.setRange(0, 600)
+        self.spn_delay.setValue(10)
+        self.spn_delay.setFixedWidth(60)
+        self.spn_delay.setToolTip(
+            "Auto Backup only. Wait this many seconds after a save is detected "
+            "before backing the file up. If the PC crashes within this window "
+            "the pending backup dies with the tool, so a corrupted half-saved "
+            "file is not copied over the last good backup. 0 = back up on the "
+            "next poll (~1s).")
+        delay_row = QHBoxLayout()
+        delay_row.addWidget(self.spn_delay)
+        delay_row.addWidget(QLabel("sec"))
+        delay_row.addStretch(1)
+        grid.addLayout(delay_row, 6, 1, 1, 3)
+
         section.add_layout(grid)
         return section
 
@@ -288,6 +308,7 @@ class MainWindow(QWidget):
         self.spn_max.setValue(int(self._prefs.get("max_versions", 10)))
         self.spn_min.setValue(int(self._prefs.get("minutes", 5)))
         self.spn_sec.setValue(int(self._prefs.get("seconds", 0)))
+        self.spn_delay.setValue(int(self._prefs.get("save_delay", 10)))
         self.chk_auto.setChecked(bool(self._prefs.get("auto_backup", True)))
 
     def _collect_prefs(self):
@@ -299,6 +320,7 @@ class MainWindow(QWidget):
             "max_versions": self.spn_max.value(),
             "minutes": self.spn_min.value(),
             "seconds": self.spn_sec.value(),
+            "save_delay": self.spn_delay.value(),
             "auto_backup": self.chk_auto.isChecked(),
         }
 
@@ -513,32 +535,50 @@ class MainWindow(QWidget):
             self._fs_watcher.addPaths(paths)
 
     def _stop_watching(self):
-        self._debounce_timer.stop()
-        self._pending_changes.clear()
+        self._delay_timer.stop()
+        self._pending_backup.clear()
         current = self._fs_watcher.files()
         if current:
             self._fs_watcher.removePaths(current)
 
     def _on_fs_changed(self, path):
-        """감시 중인 파일이 디스크에서 바뀌면 호출된다(저장 순간). 곧바로 처리하지
-        않고 짧게 모은 뒤 _flush_pending_changes 가 백업한다."""
-        self._pending_changes.add(path)
-        self._debounce_timer.start()   # 재시작 → 연속된 변경을 한 번으로 묶음
+        """감시 중인 파일이 디스크에서 바뀌면 호출된다(저장 순간). 곧바로 백업하지
+        않고 (지금 + Save Delay)초 뒤로 백업을 예약한다. 지연 중 같은 파일이 다시
+        저장되면 due 를 갱신해 '마지막 저장 + Delay' 시점으로 미룬다(settle).
 
-    def _flush_pending_changes(self):
-        """디바운스된 변경 파일들을 즉시 백업하고, 감시 목록을 복원한다."""
+        지연 중 PC 가 크래시로 종료되면 이 예약 백업도 함께 사라지므로, 크래시 시점에
+        손상된(반쯤 저장된) 파일이 정상 백업본을 덮어쓰는 사고를 막는다."""
+        delay = self.spn_delay.value()
+        self._pending_backup[path] = time.monotonic() + delay
+        if not self._delay_timer.isActive():
+            self._delay_timer.start()
+        # 임시파일 교체식 저장은 감시 경로를 떨궈내므로, 다음 저장을 놓치지 않도록
+        # 지연을 기다리지 말고 곧바로 다시 등록한다.
+        self._rewatch_files()
+
+    def _process_pending_backups(self):
+        """1초마다 폴링 — due 시각이 지난 예약 파일을 백업한다.
+
+        due 가 지난 파일만 골라 백업하고, 아직 남은 예약이 없으면 타이머를 멈춘다.
+        (예약이 있을 때만 타이머가 돈다.)"""
         if self._state == STATE_DEACTIVE or not self.chk_auto.isChecked():
-            self._pending_changes.clear()
+            self._pending_backup.clear()
+            self._delay_timer.stop()
             return
 
-        paths = list(self._pending_changes)
-        self._pending_changes.clear()
+        now = time.monotonic()
+        due = [p for p, due_ts in self._pending_backup.items() if due_ts <= now]
+        for p in due:
+            self._pending_backup.pop(p, None)
 
-        targets = [p for p in paths if os.path.isfile(p)]
-        self._backup_targets(targets)
+        targets = [p for p in due if os.path.isfile(p)]
+        if targets:
+            self._backup_targets(targets)
+            # 임시파일 교체식 저장 대비 감시 경로 복원.
+            self._rewatch_files()
 
-        # 임시파일 교체식 저장은 감시 경로를 떨궈내므로 다시 등록한다.
-        self._rewatch_files()
+        if not self._pending_backup:
+            self._delay_timer.stop()
 
     def _rewatch_files(self):
         """현재 감시되지 않는 대상 파일을 다시 감시 목록에 올린다."""
@@ -600,6 +640,7 @@ class MainWindow(QWidget):
             self.spn_max,
             self.spn_min,
             self.spn_sec,
+            self.spn_delay,
         ):
             w.setEnabled(enabled)
         # Max Versions 는 Version Up 일 때만 켠다.

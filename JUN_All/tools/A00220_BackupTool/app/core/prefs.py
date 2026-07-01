@@ -23,6 +23,10 @@ DEFAULTS = {
     "max_versions": 10,
     "minutes": 5,
     "seconds": 0,
+    "auto_backup": True,
+    # Auto Backup: 저장 감지 후 실제로 백업하기까지의 지연(초). 크래시로 인한
+    # 손상 파일 백업을 막기 위한 settle 시간(0 이면 다음 폴링에 곧바로 백업).
+    "save_delay": 10,
 }
 
 

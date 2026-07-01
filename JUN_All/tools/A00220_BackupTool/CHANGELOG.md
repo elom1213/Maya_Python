@@ -1,6 +1,22 @@
 # Changelog — A00220_BackupTool
 
-## [01.07] - 2026-06-22
+## [01.08] - 2026-07-01
+
+### Changed
+- **Auto Backup now waits a settle delay before backing up a saved file**, instead
+  of copying it almost immediately (~300ms debounce). When a save is detected, the
+  file's backup is scheduled for `now + Save Delay` seconds; if the same file is
+  saved again during the wait, its schedule is pushed to `last save + delay` (it
+  backs up only once it has been quiet). This guards against the PC crashing at
+  the moment of a save: the crash leaves the Maya file half-written/corrupted, but
+  because the pending backup is an in-process timer, a crash within the delay
+  window kills it too — so the corrupted file is **not** copied over the last good
+  backup. The scheduler is a per-file due-time map polled once a second (only runs
+  while backups are pending); the periodic interval timer is unchanged.
+
+### Added
+- **Save Delay (sec) setting** (Settings, default `10`, range `0–600`). Auto Backup
+  only. `0` backs up on the next poll (~1s). Persisted in prefs (`save_delay`).
 
 ### Changed
 - **Target Files list now shows file names only**, not full paths. Each entry
