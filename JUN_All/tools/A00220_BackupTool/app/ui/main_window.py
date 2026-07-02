@@ -87,6 +87,16 @@ class MainWindow(QWidget):
         self._delay_timer.setInterval(1000)   # 1초 폴링(예약이 있을 때만 동작)
         self._delay_timer.timeout.connect(self._process_pending_backups)
 
+        # 저장 감지 mtime 폴링(fallback). QFileSystemWatcher.fileChanged 는 Windows 10
+        # 이나 임시파일 교체식(atomic replace) 저장에서 안정적으로 발화하지 않아, 저장
+        # 순간을 놓치는 일이 있다. 감시 중인 파일의 mtime 을 주기적으로 직접 확인해
+        # 변화를 잡으면 OS/저장 방식과 무관하게 저장을 감지한다(공룡 톡 점프 + 백업 예약).
+        # {path: 마지막으로 관측한 mtime} — 저장 감지 전용 기준선(백업용 _last_mtimes 와 별개).
+        self._watch_mtimes = {}
+        self._save_poll_timer = QTimer(self)
+        self._save_poll_timer.setInterval(500)   # 0.5초 폴링(감시 중일 때만 동작)
+        self._save_poll_timer.timeout.connect(self._poll_saves)
+
         # (상태 표시는 텍스트 대신 Chrome-Dino 애니메이션. 자체 타이머로 동작.)
 
         # 다음 저장까지 남은 시간 카운트다운 타이머(1초)
@@ -535,20 +545,57 @@ class MainWindow(QWidget):
         if paths:
             self._fs_watcher.addPaths(paths)
 
+        # mtime 폴링 fallback 기준선을 현재 값으로 잡고(=지금은 '변경 없음') 폴링 시작.
+        self._watch_mtimes = {f: self._safe_mtime(f) for f in paths}
+        self._save_poll_timer.start()
+
     def _stop_watching(self):
         self._delay_timer.stop()
+        self._save_poll_timer.stop()
+        self._watch_mtimes = {}
         self._pending_backup.clear()
         current = self._fs_watcher.files()
         if current:
             self._fs_watcher.removePaths(current)
 
     def _on_fs_changed(self, path):
-        """감시 중인 파일이 디스크에서 바뀌면 호출된다(저장 순간). 곧바로 백업하지
-        않고 (지금 + Save Delay)초 뒤로 백업을 예약한다. 지연 중 같은 파일이 다시
-        저장되면 due 를 갱신해 '마지막 저장 + Delay' 시점으로 미룬다(settle).
+        """QFileSystemWatcher 가 파일 변경(저장 순간)을 알릴 때 호출된다."""
+        self._on_save_detected(path)
 
-        지연 중 PC 가 크래시로 종료되면 이 예약 백업도 함께 사라지므로, 크래시 시점에
-        손상된(반쯤 저장된) 파일이 정상 백업본을 덮어쓰는 사고를 막는다."""
+    def _poll_saves(self):
+        """mtime 폴링 fallback — 감시 중인 파일의 수정시각이 바뀌면 저장으로 감지한다.
+
+        QFileSystemWatcher 가 (특히 Windows 10 / 임시파일 교체식 저장에서) 놓치는 저장을
+        여기서 잡는다. 기준선(_watch_mtimes)과 달라진 파일만 저장으로 처리한다.
+        """
+        for f in self._files():
+            if not os.path.isfile(f):
+                continue
+            mtime = self._safe_mtime(f)
+            if mtime is None:
+                continue
+            if f not in self._watch_mtimes:
+                # 감시 중 새로 나타난 파일: 기준선만 잡고 이번엔 저장으로 치지 않는다.
+                self._watch_mtimes[f] = mtime
+                continue
+            if mtime != self._watch_mtimes[f]:
+                self._on_save_detected(f)
+
+    def _on_save_detected(self, path):
+        """파일이 디스크에서 바뀐(저장) 순간의 공통 처리. QFileSystemWatcher 와 mtime
+        폴링 양쪽에서 호출되며, 같은 저장이 양쪽에서 중복 발화해도 mtime 으로 한 번만 처리한다.
+
+        곧바로 백업하지 않고 (지금 + Save Delay)초 뒤로 백업을 예약한다. 지연 중 같은
+        파일이 다시 저장되면 due 를 갱신해 '마지막 저장 + Delay' 시점으로 미룬다(settle).
+        지연 중 PC 가 크래시로 종료되면 이 예약 백업도 함께 사라져, 손상된(반쯤 저장된)
+        파일이 정상 백업본을 덮어쓰는 사고를 막는다."""
+        # 중복 발화 방지: 이미 같은 mtime 을 처리했으면(watcher+폴링 동시 발화 등) 무시.
+        mtime = self._safe_mtime(path)
+        if mtime is not None:
+            if self._watch_mtimes.get(path) == mtime:
+                return
+            self._watch_mtimes[path] = mtime
+
         delay = self.spn_delay.value()
         self._pending_backup[path] = time.monotonic() + delay
         if not self._delay_timer.isActive():

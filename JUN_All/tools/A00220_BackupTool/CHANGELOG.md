@@ -1,6 +1,18 @@
 # Changelog — A00220_BackupTool
 
-## [01.09] - 2026-07-01
+## [01.10] - 2026-07-02
+
+### Fixed
+- **Save detection now works on Windows 10** (and for atomic/temp-file-replace
+  saves). Previously the save moment — the dino's accent-colored hop and the
+  scheduled per-save backup — relied solely on `QFileSystemWatcher.fileChanged`,
+  which does not fire reliably on Win10 or when apps save by writing a temp file
+  and replacing the original, so the hop never played there. Added an **mtime
+  polling fallback** (`_save_poll_timer`, 0.5s, active only while watching): it
+  checks each watched file's modified-time against a baseline and detects saves
+  regardless of the OS watcher. Both the watcher and the poll now funnel through a
+  shared `_on_save_detected()` that **de-duplicates by mtime**, so on Windows 11
+  (where the watcher fires) the hop still plays exactly once.
 
 ### Added
 - **The dino now marks the moment a user saves a watched file** with a short
