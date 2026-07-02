@@ -12,6 +12,7 @@ import time
 
 from Framework.qt.qt import (
     Qt,
+    QEvent,
     QTimer,
     QWidget,
     QVBoxLayout,
@@ -56,6 +57,7 @@ class PathStructureTab(QWidget):
         self._cur_base_abs = ""                     # 그 구조의 로컬 base 절대경로(파일 스캔용)
         self._excluded = set()                      # Recreate 에서 제외할 폴더 rel(체크 해제)
         self._syncing_checks = False                # 다중 선택 일괄 토글 중 재진입 방지
+        self._presel = None                         # (tree, [rel...]) 마우스 누름 직전 선택(붕괴 전)
 
         # 폴더/파일 아이콘(테마 무관, 1회 생성 후 재사용)
         self._icon_dir = self.style().standardIcon(QStyle.SP_DirIcon)
@@ -202,7 +204,19 @@ class PathStructureTab(QWidget):
         # Shift/Ctrl 로 여러 항목을 동시에 선택할 수 있게 한다(체크박스 일괄 토글용).
         tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         tree.itemChanged.connect(self._on_preview_item_changed)
+        # 마우스 누름 시점(선택이 한 행으로 붕괴되기 전) 선택을 캡처하기 위한 필터.
+        tree.viewport().installEventFilter(self)
         return tree
+
+    def eventFilter(self, obj, event):
+        # 트리 뷰포트에서 마우스가 눌리는 순간의 선택을 저장한다. 체크박스를 누르면
+        # Qt 가 선택을 그 한 행으로 되돌리는데, 그 전에(=여기서) 원래 선택을 확보해 둔다.
+        if event.type() == QEvent.MouseButtonPress:
+            tree = obj.parent()
+            if isinstance(tree, QTreeWidget):
+                self._presel = (
+                    tree, [it.data(0, Qt.UserRole) for it in tree.selectedItems()])
+        return super().eventFilter(obj, event)
 
     # ============================================================ helpers
 
@@ -485,31 +499,50 @@ class PathStructureTab(QWidget):
             return
 
         state = item.checkState(0)
-        self._set_excluded(item.data(0, Qt.UserRole), state)
+        item_rel = item.data(0, Qt.UserRole)
+        self._set_excluded(item_rel, state)
 
-        # 토글한 항목이 다중 선택에 포함돼 있으면, 선택된 다른 폴더도 같은 상태로 맞춘다.
         tree = item.treeWidget()
         if tree is None:
             return
+
+        # 토글한 항목이 다중 선택에 포함돼 있으면 선택된 폴더 전체를 같은 상태로 맞춘다.
+        # 키보드(스페이스) 토글이면 selectedItems() 가 온전하고, 마우스 클릭이면 이미 한 행으로
+        # 붕괴됐으므로 누름 직전에 캡처한 _presel 을 쓴다.
         selected = tree.selectedItems()
-        if item not in selected or len(selected) <= 1:
+        if len(selected) > 1 and item in selected:
+            target_rels = [it.data(0, Qt.UserRole) for it in selected]
+        elif (self._presel and self._presel[0] is tree
+              and len(self._presel[1]) > 1 and item_rel in self._presel[1]):
+            target_rels = self._presel[1]
+        else:
             return
 
-        sel_rels = [it.data(0, Qt.UserRole) for it in selected]
-
-        self._syncing_checks = True
-        tree.blockSignals(True)
-        for it in selected:
-            if it is item or not self._is_checkable_folder(it):
-                continue
-            it.setCheckState(0, state)
-            self._set_excluded(it.data(0, Qt.UserRole), state)
-        tree.blockSignals(False)
-        self._syncing_checks = False
+        self._apply_state_to_rels(tree, target_rels, state, skip_item=item)
 
         # 체크박스 클릭은 Qt 가 선택을 클릭한 한 행으로 되돌린다. 마우스 이벤트가 끝난 뒤
         # (singleShot 0) 원래 다중 선택을 복원해, 이어서 계속 토글할 수 있게 한다.
-        QTimer.singleShot(0, lambda: self._restore_selection(tree, sel_rels))
+        rels = list(target_rels)
+        QTimer.singleShot(0, lambda: self._restore_selection(tree, rels))
+
+    def _apply_state_to_rels(self, tree, rels, state, skip_item=None):
+        """rels 에 해당하는 폴더 항목들의 체크 상태를 state 로 맞추고 제외 목록도 갱신."""
+        relset = {r for r in rels if r}
+        self._syncing_checks = True
+        tree.blockSignals(True)
+
+        def walk(parent):
+            for i in range(parent.childCount()):
+                child = parent.child(i)
+                if (child is not skip_item and self._is_checkable_folder(child)
+                        and child.data(0, Qt.UserRole) in relset):
+                    child.setCheckState(0, state)
+                    self._set_excluded(child.data(0, Qt.UserRole), state)
+                walk(child)
+
+        walk(tree.invisibleRootItem())
+        tree.blockSignals(False)
+        self._syncing_checks = False
 
     def _restore_selection(self, tree, rels):
         relset = {r for r in rels if r}

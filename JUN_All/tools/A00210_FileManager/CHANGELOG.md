@@ -2,6 +2,14 @@
 
 All notable changes to this tool are documented here.
 
+## [01.25] - 2026-07-02
+### Fixed
+- **Path Structure** tab — multi-select checkbox toggle now **keeps the selection
+  across repeated clicks**. Previously the selected rows stayed selected only for
+  the first checkbox click and collapsed to a single row afterwards. The pre-click
+  selection is now captured on mouse-press (before Qt collapses it), so you can keep
+  toggling the same multi-selection over and over.
+
 ## [01.24] - 2026-07-02
 ### Changed
 - **Path Structure** tab — **Preview** is now an interactive **tree view**
