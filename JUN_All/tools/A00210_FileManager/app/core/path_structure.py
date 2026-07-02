@@ -30,7 +30,8 @@ class PathStructure:
 
     name: str = ""             # 표시 이름(파일명 생성의 원본)
     base_rel: str = ""         # project_root 기준 베이스 폴더 상대경로 (POSIX)
-    recursive: bool = False    # 캡처된 깊이(중첩 트리 여부)
+    recursive: bool = False    # 캡처된 깊이(중첩 트리 여부) — 하위호환용(max_depth 로 대체)
+    max_depth: int = 0         # 캡처 깊이(base 기준, top=1). 0 = 무제한(전체 트리)
     folders: list = field(default_factory=list)   # base_rel 기준 하위 폴더 상대경로(POSIX) 목록
     created_by: str = ""
     created_at: str = ""
@@ -40,10 +41,16 @@ class PathStructure:
 
     @staticmethod
     def from_dict(data):
+        recursive = bool(data.get("recursive", False))
+        max_depth = data.get("max_depth")
+        if max_depth is None:
+            # 구버전 JSON(max_depth 없음): recursive True → 전체(0), False → 최상위만(1).
+            max_depth = 0 if recursive else 1
         return PathStructure(
             name=data.get("name", ""),
             base_rel=data.get("base_rel", ""),
-            recursive=bool(data.get("recursive", False)),
+            recursive=recursive,
+            max_depth=int(max_depth),
             folders=list(data.get("folders", [])),
             created_by=data.get("created_by", ""),
             created_at=data.get("created_at", ""),
@@ -84,11 +91,13 @@ def list_top_level(base_abs):
     )
 
 
-def _collect_folders(base_abs, recursive, include_top=None):
+def _collect_folders(base_abs, max_depth, include_top=None):
     """base_abs 아래의 하위 폴더 상대경로(POSIX) 목록. 디렉터리만, 파일 무시.
 
+    max_depth : 캡처할 깊이(base 기준, 최상위 폴더 = 1). 0(또는 음수)이면 무제한.
+                1 이면 최상위 폴더만.
     include_top : 기록할 최상위 폴더 이름의 컬렉션. None 이면 전체 최상위 폴더를 대상으로
-    한다(하위호환). 주어지면 그 최상위 폴더(및 recursive 시 그 하위 트리)만 수집한다.
+    한다(하위호환). 주어지면 그 최상위 폴더(및 그 하위 트리)만 수집한다.
     """
     if not os.path.isdir(base_abs):
         return []
@@ -98,30 +107,49 @@ def _collect_folders(base_abs, recursive, include_top=None):
         allow = set(include_top)
         tops = [t for t in tops if t in allow]
 
-    if not recursive:
-        return tops
-
     out = []
     for top in tops:
-        out.append(top)   # 최상위 폴더 자신
+        out.append(top)   # 최상위 폴더 자신 (depth 1)
+        if max_depth == 1:
+            continue
         top_abs = os.path.join(base_abs, top)
         for root, dirs, _files in os.walk(top_abs):
+            rel_root = os.path.relpath(root, base_abs).replace("\\", "/")
+            root_depth = rel_root.count("/") + 1   # top_abs → "top" → depth 1
+            if max_depth and root_depth >= max_depth:
+                dirs[:] = []          # 더 깊이 내려가지 않음
+                continue
             for d in dirs:
-                rel = os.path.relpath(os.path.join(root, d), base_abs)
-                out.append(rel.replace("\\", "/"))
+                out.append(rel_root + "/" + d)
     return sorted(out)
 
 
-def capture(base_abs, store, recursive, include_top=None):
+def limit_depth(folders, max_depth):
+    """폴더 상대경로 목록에서 base 기준 깊이가 max_depth 이하인 것만 반환.
+
+    max_depth : 최상위 폴더 = 1. 0(또는 음수)이면 제한 없음(원본 그대로).
+    """
+    if not max_depth or max_depth < 0:
+        return list(folders)
+    return [f for f in folders if f.count("/") + 1 <= max_depth]
+
+
+def capture(base_abs, store, max_depth, include_top=None):
     """베이스 폴더의 하위 구조를 PathStructure 로 캡처.
 
     store : MetaStore (project_root 보유). base 가 루트 밖이면 OutsideProjectRootError.
+    max_depth : 캡처 깊이(최상위=1, 0=무제한).
     include_top : 기록할 최상위 폴더 이름의 컬렉션(체크된 것만). None 이면 전체(하위호환).
     name / created_* 는 호출자가 채운다.
     """
     base_rel = store.make_key(base_abs)   # project_root 상대 POSIX 키 (밖이면 예외)
-    folders = _collect_folders(base_abs, recursive, include_top)
-    return PathStructure(base_rel=base_rel, recursive=recursive, folders=folders)
+    folders = _collect_folders(base_abs, max_depth, include_top)
+    return PathStructure(
+        base_rel=base_rel,
+        recursive=(max_depth != 1),
+        max_depth=max_depth,
+        folders=folders,
+    )
 
 
 # --------------------------------------------------------------- save / load
@@ -219,14 +247,84 @@ def build_tree_lines(folders):
     return lines
 
 
-def recreate(structure, project_root):
+def build_structure_tree(structure, base_abs=None, show_files=False, max_depth=0):
+    """structure.folders 를 트리 노드(dict)로 변환. Preview 트리뷰의 데이터 소스.
+
+    노드: {"name", "rel"(base 기준 POSIX, 루트=""), "path"(절대경로 또는 ""),
+           "is_dir", "children"}
+    max_depth : 표시할 폴더 깊이(최상위=1, 0=무제한).
+    show_files: True 이고 base_abs 가 실재하면 각 폴더의 실제 파일도 자식으로 채운다
+                (구조 JSON 은 폴더만 담으므로 파일은 파일시스템에서 읽는다).
+    """
+    root_name = os.path.basename(structure.base_rel.rstrip("/")) or (
+        structure.base_rel or "(base)")
+    root = {"name": root_name, "rel": "", "path": base_abs or "",
+            "is_dir": True, "children": []}
+
+    nodes = {"": root}
+    for folder in sorted(structure.folders):
+        parts = [p for p in folder.split("/") if p]
+        parent = root
+        cur_rel = ""
+        for i, part in enumerate(parts):
+            if max_depth and (i + 1) > max_depth:
+                break
+            child_rel = part if not cur_rel else cur_rel + "/" + part
+            node = nodes.get(child_rel)
+            if node is None:
+                node = {
+                    "name": part,
+                    "rel": child_rel,
+                    "path": (os.path.join(base_abs, *child_rel.split("/"))
+                             if base_abs else ""),
+                    "is_dir": True,
+                    "children": [],
+                }
+                nodes[child_rel] = node
+                parent["children"].append(node)
+            parent = node
+            cur_rel = child_rel
+
+    if show_files and base_abs and os.path.isdir(base_abs):
+        _add_files(root)
+
+    return root
+
+
+def _add_files(node):
+    """node(폴더) 이하의 각 폴더에 실제 파일을 자식으로 추가(폴더 먼저 처리 후 파일 append)."""
+    for child in list(node["children"]):
+        if child["is_dir"]:
+            _add_files(child)
+
+    dir_path = node["path"]
+    if not dir_path or not os.path.isdir(dir_path):
+        return
+    try:
+        entries = sorted(os.scandir(dir_path), key=lambda e: e.name.lower())
+    except OSError:
+        return
+    for e in entries:
+        if e.is_file():
+            rel = (node["rel"] + "/" + e.name) if node["rel"] else e.name
+            node["children"].append({
+                "name": e.name, "rel": rel, "path": e.path,
+                "is_dir": False, "children": [],
+            })
+
+
+def recreate(structure, project_root, folders=None):
     """structure 의 폴더들을 로컬 project_root 아래에 생성한다.
 
     폴더만 생성(os.makedirs, exist_ok). 파일은 만들지 않는다.
+    folders : 생성할 폴더 상대경로(POSIX) 목록. None 이면 structure.folders 전체(하위호환).
+              지정하면 그 폴더들만 생성한다(깊이/포함 여부는 호출자가 이미 걸러 전달).
     반환: (created, existing) — 둘 다 절대경로 목록.
     """
     if not project_root:
         raise ValueError("Project root is not set")
+
+    selected = structure.folders if folders is None else folders
 
     base_abs = os.path.join(
         os.path.abspath(project_root),
@@ -235,11 +333,15 @@ def recreate(structure, project_root):
 
     targets = [base_abs] + [
         os.path.join(base_abs, *folder.split("/"))
-        for folder in structure.folders
+        for folder in selected
     ]
 
     created, existing = [], []
+    seen = set()
     for path in targets:
+        if path in seen:
+            continue
+        seen.add(path)
         if os.path.isdir(path):
             existing.append(path)
         else:

@@ -12,6 +12,7 @@ import time
 
 from Framework.qt.qt import (
     Qt,
+    QTimer,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
@@ -20,12 +21,17 @@ from Framework.qt.qt import (
     QLineEdit,
     QPushButton,
     QCheckBox,
+    QSpinBox,
     QListWidget,
     QListWidgetItem,
-    QPlainTextEdit,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QAbstractItemView,
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QMessageBox,
-    QFont,
+    QStyle,
 )
 
 from ..core import path_structure as ps_mod
@@ -44,6 +50,16 @@ class PathStructureTab(QWidget):
 
         self._pending = None                       # Capture 했으나 아직 저장 안 한 PathStructure
         self._scanned_base = None                   # 폴더 체크리스트를 마지막으로 스캔한 base 경로
+
+        # Preview(트리) 상태
+        self._cur_structure = None                  # 현재 Preview 중인 PathStructure
+        self._cur_base_abs = ""                     # 그 구조의 로컬 base 절대경로(파일 스캔용)
+        self._excluded = set()                      # Recreate 에서 제외할 폴더 rel(체크 해제)
+        self._syncing_checks = False                # 다중 선택 일괄 토글 중 재진입 방지
+
+        # 폴더/파일 아이콘(테마 무관, 1회 생성 후 재사용)
+        self._icon_dir = self.style().standardIcon(QStyle.SP_DirIcon)
+        self._icon_file = self.style().standardIcon(QStyle.SP_FileIcon)
 
         self._build_ui()
         self.on_refresh()
@@ -98,14 +114,21 @@ class PathStructureTab(QWidget):
         name_row.addWidget(self.ipf_name)
         layout.addLayout(name_row)
 
-        # Recursive + Capture + Save
+        # Capture Depth + Capture + Save
+        # Depth = base 기준 캡처 깊이(최상위 폴더 = 1, 0 = 전체 트리).
         action_row = QHBoxLayout()
-        self.chk_recursive = QCheckBox("Recursive (capture full nested tree)")
+        action_row.addWidget(QLabel("Capture Depth"))
+        self.spn_capture_depth = QSpinBox()
+        self.spn_capture_depth.setRange(0, 99)
+        self.spn_capture_depth.setValue(1)
+        self.spn_capture_depth.setSpecialValueText("All")   # 0 → 'All'
+        self.spn_capture_depth.setToolTip(
+            "How many levels deep to capture (1 = top-level only, 0 = All).")
+        action_row.addWidget(self.spn_capture_depth)
         btn_capture = QPushButton("Capture")
         btn_capture.clicked.connect(self.on_capture)
         btn_save = QPushButton("Save")
         btn_save.clicked.connect(self.on_save)
-        action_row.addWidget(self.chk_recursive)
         action_row.addStretch(1)
         action_row.addWidget(btn_capture)
         action_row.addWidget(btn_save)
@@ -119,12 +142,15 @@ class PathStructureTab(QWidget):
 
         self.list_structs = QListWidget()
         self.list_structs.currentItemChanged.connect(self.on_select_structure)
-        layout.addWidget(self.list_structs, stretch=1)
+        # 목록은 짧게(약 1/3), 나머지 세로 공간은 Preview 트리에 준다.
+        self.list_structs.setMaximumHeight(120)
+        layout.addWidget(self.list_structs, stretch=0)
 
         btn_row = QHBoxLayout()
         btn_refresh = QPushButton("Refresh")
         btn_refresh.clicked.connect(self.on_refresh)
         btn_recreate = QPushButton("Recreate")
+        btn_recreate.setToolTip("Create checked folders within the depth below.")
         btn_recreate.clicked.connect(self.on_recreate)
         btn_delete = QPushButton("Delete")
         btn_delete.clicked.connect(self.on_delete)
@@ -134,15 +160,49 @@ class PathStructureTab(QWidget):
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
 
-        layout.addWidget(QLabel("Preview"))
-        self.txt_preview = QPlainTextEdit()
-        self.txt_preview.setReadOnly(True)
-        # 트리뷰 정렬을 위해 고정폭 폰트 + 줄바꿈 끄기.
-        self.txt_preview.setFont(QFont("Consolas"))
-        self.txt_preview.setLineWrapMode(QPlainTextEdit.NoWrap)
-        layout.addWidget(self.txt_preview, stretch=1)
+        # Preview 옵션 행: Depth / Show files / Expand
+        prev_row = QHBoxLayout()
+        prev_row.addWidget(QLabel("Preview"))
+        prev_row.addStretch(1)
+
+        prev_row.addWidget(QLabel("Depth"))
+        # Depth = 표시/재생성할 폴더 깊이(최상위 = 1, 0 = All). Recreate 도 이 깊이만 생성.
+        self.spn_view_depth = QSpinBox()
+        self.spn_view_depth.setRange(0, 99)
+        self.spn_view_depth.setValue(0)
+        self.spn_view_depth.setSpecialValueText("All")
+        self.spn_view_depth.setToolTip(
+            "Show/recreate folders up to this depth (0 = All).")
+        self.spn_view_depth.valueChanged.connect(self._on_view_depth_changed)
+        prev_row.addWidget(self.spn_view_depth)
+
+        # 파일 표시 여부. 기본 OFF(폴더만). 파일은 로컬 파일시스템에서 읽어 보여만 준다.
+        self.chk_show_files = QCheckBox("Show files")
+        self.chk_show_files.setChecked(False)
+        self.chk_show_files.setToolTip(
+            "Off = folders only. Files are shown from disk (not recreated).")
+        self.chk_show_files.toggled.connect(self._on_show_files_toggled)
+        prev_row.addWidget(self.chk_show_files)
+
+        self.btn_expand = QPushButton("Expand")
+        self.btn_expand.setToolTip("Open the tree in a larger window")
+        self.btn_expand.clicked.connect(self.on_expand)
+        prev_row.addWidget(self.btn_expand)
+
+        layout.addLayout(prev_row)
+
+        self.tree_preview = self._make_preview_widget()
+        layout.addWidget(self.tree_preview, stretch=1)
 
         return group
+
+    def _make_preview_widget(self):
+        tree = QTreeWidget()
+        tree.setHeaderLabels(["Name"])
+        # Shift/Ctrl 로 여러 항목을 동시에 선택할 수 있게 한다(체크박스 일괄 토글용).
+        tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        tree.itemChanged.connect(self._on_preview_item_changed)
+        return tree
 
     # ============================================================ helpers
 
@@ -254,7 +314,7 @@ class PathStructureTab(QWidget):
         store = self._get_store()
         try:
             structure = ps_mod.capture(
-                base, store, self.chk_recursive.isChecked(), include_top=include_top)
+                base, store, self.spn_capture_depth.value(), include_top=include_top)
         except OutsideProjectRootError:
             QMessageBox.warning(self, "Path Structure", "Base folder is outside the project root.")
             return
@@ -265,7 +325,7 @@ class PathStructureTab(QWidget):
         self.list_structs.blockSignals(True)
         self.list_structs.setCurrentRow(-1)
         self.list_structs.blockSignals(False)
-        self._show_preview(structure, header="Captured (not saved yet)")
+        self._show_preview(structure, base_abs=base)
         self._log(
             f"Captured {len(structure.folders)} folder(s) from {base} "
             f"({len(include_top)} top-level selected)")
@@ -329,35 +389,170 @@ class PathStructureTab(QWidget):
         elif names:
             self.list_structs.setCurrentRow(0)
         else:
-            self.txt_preview.clear()
+            self._clear_preview()
 
     def on_select_structure(self, *_):
         name = self._selected_name()
         if not name:
-            self.txt_preview.clear()
+            self._clear_preview()
             return
 
         structure = ps_mod.load(self._get_store_dir(), name)
         if structure is None:
-            self.txt_preview.clear()
+            self._clear_preview()
             return
 
-        self._show_preview(structure)
+        self._show_preview(structure, base_abs=self._saved_base_abs(structure))
 
-    def _show_preview(self, structure, header=None):
-        lines = []
-        if header:
-            lines.append(header)
-        lines += [
-            f"Base (relative to project root): {structure.base_rel}",
-            f"Recursive: {structure.recursive}",
-            f"Folders ({len(structure.folders)}):",
-        ]
-        if structure.folders:
-            lines.extend(ps_mod.build_tree_lines(structure.folders))
+    # -------------------------------------------------------- preview (tree)
+
+    def _saved_base_abs(self, structure):
+        """저장된 구조의 로컬 base 절대경로(project_root/base_rel). 파일 표시/스캔용."""
+        project_root = self._get_project_root()
+        if not project_root or not structure.base_rel:
+            return ""
+        return os.path.join(
+            os.path.abspath(project_root), *structure.base_rel.split("/"))
+
+    def _clear_preview(self):
+        self._cur_structure = None
+        self._cur_base_abs = ""
+        self._excluded = set()
+        self.tree_preview.clear()
+
+    def _show_preview(self, structure, base_abs=""):
+        """새 구조를 Preview 대상으로 삼는다(제외 목록 초기화 후 트리 렌더)."""
+        self._cur_structure = structure
+        self._cur_base_abs = base_abs or ""
+        self._excluded = set()
+        self._fill_preview_tree(self.tree_preview)
+
+    def _view_depth(self):
+        return self.spn_view_depth.value()
+
+    def _fill_preview_tree(self, tree):
+        """현재 구조/옵션(Depth · Show files · 제외 목록)으로 트리 위젯을 채운다."""
+        tree.blockSignals(True)
+        tree.clear()
+        if self._cur_structure is not None:
+            node = ps_mod.build_structure_tree(
+                self._cur_structure,
+                base_abs=self._cur_base_abs,
+                show_files=self.chk_show_files.isChecked(),
+                max_depth=self._view_depth(),
+            )
+            root_item = self._make_preview_item(node)
+            tree.addTopLevelItem(root_item)
+            tree.expandAll()
+        tree.blockSignals(False)
+
+    def _make_preview_item(self, node):
+        """트리 노드(dict) → QTreeWidgetItem. 폴더는 체크 가능(파일은 표시만)."""
+        item = QTreeWidgetItem([node["name"]])
+        item.setData(0, Qt.UserRole, node["rel"])
+        item.setData(0, Qt.UserRole + 1, node["is_dir"])
+
+        if node["is_dir"]:
+            item.setIcon(0, self._icon_dir)
+            # 루트(base, rel="")는 항상 생성되므로 체크박스를 두지 않는다.
+            if node["rel"]:
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                checked = node["rel"] not in self._excluded
+                item.setCheckState(0, Qt.Checked if checked else Qt.Unchecked)
         else:
-            lines.append("(none - base folder only)")
-        self.txt_preview.setPlainText("\n".join(lines))
+            item.setIcon(0, self._icon_file)
+
+        for child in node["children"]:
+            item.addChild(self._make_preview_item(child))
+        return item
+
+    def _set_excluded(self, rel, state):
+        if state == Qt.Checked:
+            self._excluded.discard(rel)
+        else:
+            self._excluded.add(rel)
+
+    @staticmethod
+    def _is_checkable_folder(item):
+        """폴더(체크 가능)이고 루트(base)가 아닌 항목인지."""
+        return bool(item.data(0, Qt.UserRole + 1)) and bool(item.data(0, Qt.UserRole))
+
+    def _on_preview_item_changed(self, item, _col):
+        """폴더 체크 상태 변경 → 제외 목록 갱신 + 다중 선택 시 선택된 폴더 일괄 토글."""
+        if self._syncing_checks:
+            return
+        if not self._is_checkable_folder(item):     # 파일/루트는 무시
+            return
+
+        state = item.checkState(0)
+        self._set_excluded(item.data(0, Qt.UserRole), state)
+
+        # 토글한 항목이 다중 선택에 포함돼 있으면, 선택된 다른 폴더도 같은 상태로 맞춘다.
+        tree = item.treeWidget()
+        if tree is None:
+            return
+        selected = tree.selectedItems()
+        if item not in selected or len(selected) <= 1:
+            return
+
+        sel_rels = [it.data(0, Qt.UserRole) for it in selected]
+
+        self._syncing_checks = True
+        tree.blockSignals(True)
+        for it in selected:
+            if it is item or not self._is_checkable_folder(it):
+                continue
+            it.setCheckState(0, state)
+            self._set_excluded(it.data(0, Qt.UserRole), state)
+        tree.blockSignals(False)
+        self._syncing_checks = False
+
+        # 체크박스 클릭은 Qt 가 선택을 클릭한 한 행으로 되돌린다. 마우스 이벤트가 끝난 뒤
+        # (singleShot 0) 원래 다중 선택을 복원해, 이어서 계속 토글할 수 있게 한다.
+        QTimer.singleShot(0, lambda: self._restore_selection(tree, sel_rels))
+
+    def _restore_selection(self, tree, rels):
+        relset = {r for r in rels if r}
+        if not relset:
+            return
+        tree.clearSelection()
+
+        def walk(parent):
+            for i in range(parent.childCount()):
+                child = parent.child(i)
+                if child.data(0, Qt.UserRole) in relset:
+                    child.setSelected(True)
+                walk(child)
+
+        walk(tree.invisibleRootItem())
+
+    def _on_view_depth_changed(self, _value):
+        self._fill_preview_tree(self.tree_preview)
+
+    def _on_show_files_toggled(self, _checked):
+        self._fill_preview_tree(self.tree_preview)
+
+    def on_expand(self):
+        if self._cur_structure is None:
+            QMessageBox.information(self, "Path Structure", "Select a structure first.")
+            return
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Path Structure — {self._cur_structure.base_rel}")
+        dlg.resize(700, 600)
+
+        v = QVBoxLayout(dlg)
+        big = self._make_preview_widget()
+        self._fill_preview_tree(big)
+        v.addWidget(big, stretch=1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(dlg.reject)
+        v.addWidget(buttons)
+
+        dlg.exec_()
+        # 큰 창에서 바꾼 체크 상태를 메인 트리에 반영.
+        self._fill_preview_tree(self.tree_preview)
 
     # ============================================================== recreate
 
@@ -378,7 +573,11 @@ class PathStructureTab(QWidget):
             self.on_refresh()
             return
 
-        created, existing = ps_mod.recreate(structure, project_root)
+        # 현재 Preview 옵션(Depth 제한 + 체크 해제한 폴더 제외)만 생성한다.
+        folders = ps_mod.limit_depth(structure.folders, self._view_depth())
+        folders = [f for f in folders if f not in self._excluded]
+
+        created, existing = ps_mod.recreate(structure, project_root, folders=folders)
 
         self._log(f"Recreate '{name}': {len(created)} created, {len(existing)} already existed.")
         for path in created:

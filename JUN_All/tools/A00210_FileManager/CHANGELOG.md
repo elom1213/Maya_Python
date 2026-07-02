@@ -2,6 +2,30 @@
 
 All notable changes to this tool are documented here.
 
+## [01.24] - 2026-07-02
+### Changed
+- **Path Structure** tab — **Preview** is now an interactive **tree view**
+  (QTreeWidget) instead of plain text, like the A00240 PathTool *Tree* tab:
+  - **Show files** checkbox (default **off**) — folders only by default; when on,
+    files found on disk (under the local base folder) are shown too. Files are for
+    inspection only and are never recreated.
+  - **Expand** button — opens the same tree in a large window. Check-state changes
+    made there are reflected back into the tab.
+### Added
+- **Path Structure** tab — **depth + selective recreate** control:
+  - **Capture Depth** spinbox on the *Save Structure* group (1 = top-level only,
+    0 = All) replaces the old **Recursive** checkbox — capture the folder tree only
+    as deep as you want.
+  - **Depth** spinbox on the *Saved Structures* group limits how deep the preview
+    shows **and** how deep **Recreate** creates (0 = All).
+  - Each folder in the preview tree has a **checkbox**; unchecking excludes it from
+    **Recreate**. So you can recreate only the depth and paths you want. (Ancestor
+    folders needed by a checked child are still created.)
+  - **Multi-select** the tree rows with **Shift/Ctrl**, then toggle one of the
+    selected checkboxes to check/uncheck **all selected folders at once**.
+  - Older structures saved before this version load fine — `recursive: true` maps
+    to depth *All*, `recursive: false` to depth *top-level*.
+
 ## [01.23] - 2026-06-26
 ### Added
 - **File Manager** tab — **Source Mode** selector (Settings group). Choose where
