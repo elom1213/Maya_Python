@@ -4,7 +4,7 @@
 A00240_PathTool 처럼 버튼을 자유롭게 추가·삭제·순서변경 하고, Profile 로 원하는
 종류끼리 버튼 세트를 나눠 보관한다.
 
-- **버전**: v01.00 (2026-07-02)
+- **버전**: v01.01 (2026-07-02)
 - **아키텍처**: (B) Standalone/Qt 앱형 구조지만 마야 안에서 실행(PySide, `maya.cmds`).
 - **참고**: 구성/편집 흐름은 `A00240_PathTool`, 마야 연동(셸프 설치·창 parenting·리로드)은
   `A00310_SearchTool` 를 이식.
@@ -57,6 +57,9 @@ A00340_SelectionTool/data/
    - Category: Move Up/Down · Rename · Delete
    - Button: Move Up/Down · Rename · **Update Objects**(현재 선택으로 교체) ·
      **Add Objects**(현재 선택을 이어붙임) · Change Category · Delete
+6. **Always on Top** — 메뉴 바 우측 코너의 `Pin` 버튼(체크형). 켜면 창이 다른 마야
+   창들보다 항상 위에 유지되고(`Qt.WindowStaysOnTopHint`) 라벨이 `Pinned` 로 바뀐다.
+   다시 누르면 해제. (플래그 변경 후 창이 숨는 Qt 특성을 피하려 내부에서 `show()` 재호출)
 
 ---
 

@@ -17,6 +17,7 @@ from Framework.qt.qt import (
     QMenuBar,
     QPlainTextEdit,
     QMessageBox,
+    QPushButton,
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
@@ -50,6 +51,15 @@ class MainWindow(QWidget):
         help_menu = self.menu_bar.addMenu("Help")
         act_about = help_menu.addAction("About")
         act_about.triggered.connect(self.show_about)
+
+        # 항상 위(Always on Top) 토글 버튼 — 메뉴 바 우측 코너에 배치
+        self.pin_button = QPushButton("Pin")
+        self.pin_button.setCheckable(True)
+        self.pin_button.setToolTip("Keep this window above other Maya windows")
+        self.pin_button.setFixedHeight(20)
+        self.pin_button.toggled.connect(self.toggle_always_on_top)
+        self.menu_bar.setCornerWidget(self.pin_button, Qt.TopRightCorner)
+
         main_layout.setMenuBar(self.menu_bar)
 
         # 공용 로그창 (탭이 log_callback 으로 쓰므로 탭보다 먼저 생성)
@@ -78,6 +88,15 @@ class MainWindow(QWidget):
 
     def _log(self, message):
         self.log_view.appendPlainText(message)
+
+    def toggle_always_on_top(self, enabled):
+        # WindowStaysOnTopHint 를 켜고/끄고, 플래그 변경 후 다시 show() (안 하면 창이 사라짐)
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, enabled)
+        self.pin_button.setText("Pinned" if enabled else "Pin")
+        self.show()
+        self._log(
+            "Always on Top: {0}".format("ON" if enabled else "OFF")
+        )
 
     def show_about(self, *args):
         message = (
