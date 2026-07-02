@@ -4,9 +4,11 @@ All notable changes to this tool are documented here.
 
 ## v01.01 — 2026-07-02
 
-- **Always on Top toggle**: added a checkable `Pin` button in the menu bar's
-  top-right corner. When enabled, the window stays above other Maya windows
-  (`Qt.WindowStaysOnTopHint`); the button label switches to `Pinned`.
+- **Always on Top toggle**: added a checkable `Pin` button to the header row
+  (menu bar on the left, button on the right). When enabled, the window stays
+  above other Maya windows (`Qt.WindowStaysOnTopHint`); the button label
+  switches to `Pinned`. The button uses a fixed size so its position and size
+  stay constant when toggling between `Pin` / `Pinned`.
 
 ## v01.00 — 2026-07-02
 

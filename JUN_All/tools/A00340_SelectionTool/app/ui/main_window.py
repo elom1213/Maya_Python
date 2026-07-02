@@ -12,6 +12,7 @@
 from Framework.qt.qt import (
     QWidget,
     QVBoxLayout,
+    QHBoxLayout,
     QGroupBox,
     QLabel,
     QMenuBar,
@@ -46,21 +47,27 @@ class MainWindow(QWidget):
     def build_ui(self):
         main_layout = QVBoxLayout(self)
 
-        # 메뉴 바 (Help > About)
+        # 상단 헤더 행 : 메뉴 바(좌) + Always on Top 토글(우)
+        # 코너 위젯 대신 QHBoxLayout 으로 배치해 토글 시 위치/크기가 고정되도록 한다.
         self.menu_bar = QMenuBar()
         help_menu = self.menu_bar.addMenu("Help")
         act_about = help_menu.addAction("About")
         act_about.triggered.connect(self.show_about)
 
-        # 항상 위(Always on Top) 토글 버튼 — 메뉴 바 우측 코너에 배치
+        # 항상 위(Always on Top) 토글 버튼
         self.pin_button = QPushButton("Pin")
         self.pin_button.setCheckable(True)
         self.pin_button.setToolTip("Keep this window above other Maya windows")
-        self.pin_button.setFixedHeight(20)
+        # 고정 크기 — "Pin"/"Pinned" 토글 시 버튼 크기가 변하지 않도록 (넓은 라벨 기준)
+        # 높이는 글씨가 잘리지 않도록 넉넉히 (테마 qss padding 포함).
+        self.pin_button.setFixedSize(72, 28)
         self.pin_button.toggled.connect(self.toggle_always_on_top)
-        self.menu_bar.setCornerWidget(self.pin_button, Qt.TopRightCorner)
 
-        main_layout.setMenuBar(self.menu_bar)
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(0, 0, 6, 0)
+        header_row.addWidget(self.menu_bar, stretch=1)
+        header_row.addWidget(self.pin_button)
+        main_layout.addLayout(header_row)
 
         # 공용 로그창 (탭이 log_callback 으로 쓰므로 탭보다 먼저 생성)
         self.log_view = QPlainTextEdit()

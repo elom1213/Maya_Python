@@ -57,9 +57,10 @@ A00340_SelectionTool/data/
    - Category: Move Up/Down · Rename · Delete
    - Button: Move Up/Down · Rename · **Update Objects**(현재 선택으로 교체) ·
      **Add Objects**(현재 선택을 이어붙임) · Change Category · Delete
-6. **Always on Top** — 메뉴 바 우측 코너의 `Pin` 버튼(체크형). 켜면 창이 다른 마야
+6. **Always on Top** — 상단 헤더 행 오른쪽의 `Pin` 버튼(체크형). 켜면 창이 다른 마야
    창들보다 항상 위에 유지되고(`Qt.WindowStaysOnTopHint`) 라벨이 `Pinned` 로 바뀐다.
-   다시 누르면 해제. (플래그 변경 후 창이 숨는 Qt 특성을 피하려 내부에서 `show()` 재호출)
+   다시 누르면 해제. 버튼은 고정 크기라 토글해도 위치·크기가 변하지 않는다.
+   (플래그 변경 후 창이 숨는 Qt 특성을 피하려 내부에서 `show()` 재호출)
 
 ---
 
