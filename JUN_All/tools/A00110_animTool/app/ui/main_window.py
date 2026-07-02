@@ -66,15 +66,30 @@ class MainWindow(QWidget):
         main_layout = QVBoxLayout(self)
 
         # -------------------------
-        # 메뉴 바 (Help > About)
-        # jointTool 의 cmds.menu('Help') / cmds.menuItem('About') 패턴을 Qt 로 옮김
+        # 상단 헤더 행 : 메뉴 바(좌, Help > About) + Always on Top 토글(우)
+        # jointTool 의 cmds.menu('Help') / cmds.menuItem('About') 패턴을 Qt 로 옮김.
+        # 코너 위젯 대신 QHBoxLayout 으로 배치해 토글 시 위치/크기가 고정되도록 한다.
         # -------------------------
 
         self.menu_bar = QMenuBar()
         help_menu = self.menu_bar.addMenu("Help")
         act_about = help_menu.addAction("About")
         act_about.triggered.connect(self.show_about)
-        main_layout.setMenuBar(self.menu_bar)
+
+        # 항상 위(Always on Top) 토글 버튼 — 켜면 이 창이 다른 마야 창 위에 유지된다.
+        # (이 툴은 기본적으로 WindowStaysOnTopHint 를 쓰지 않는 정상 Z-order 라, 필요할 때만 켠다)
+        self.pin_button = QPushButton("Pin")
+        self.pin_button.setCheckable(True)
+        self.pin_button.setToolTip("Keep this window above other Maya windows")
+        # 고정 크기 — "Pin"/"Pinned" 토글 시 버튼 크기가 변하지 않도록 (넓은 라벨 기준)
+        self.pin_button.setFixedSize(72, 28)
+        self.pin_button.toggled.connect(self.toggle_always_on_top)
+
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(0, 0, 6, 0)
+        header_row.addWidget(self.menu_bar, stretch=1)
+        header_row.addWidget(self.pin_button)
+        main_layout.addLayout(header_row)
 
         # -------------------------
         # 로그 (모든 탭 공유)
@@ -1418,6 +1433,13 @@ class MainWindow(QWidget):
 
         count, msg = OffsetHoldManager.apply_offset_hold(objs, offset, hold, start=start)
         self.log(msg)
+
+    def toggle_always_on_top(self, enabled):
+        # WindowStaysOnTopHint 를 켜고/끄고, 플래그 변경 후 다시 show() (안 하면 창이 사라짐)
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, enabled)
+        self.pin_button.setText("Pinned" if enabled else "Pin")
+        self.show()
+        self.log("Always on Top: " + ("ON" if enabled else "OFF"))
 
     def show_about(self, *args):
         # jointTool 의 show_about(confirmDialog) 패턴을 Qt 로 옮김

@@ -27,6 +27,13 @@
    follower 애니메이션과 매치 결과를 섞으며(0=원본 유지, 1=덮어쓰기, 0.5=반반), 선택된
    **애니메이션 레이어**(override/additive)에 키가 들어간다.
 
+> **v01.24 — Always on Top(Pin) 토글 버튼 추가**: 상단 헤더 행 오른쪽에 체크형 `Pin` 버튼을 두었다.
+> 켜면 이 창이 다른 마야 창들보다 **항상 위**에 유지되고(`Qt.WindowStaysOnTopHint`) 라벨이 `Pinned`
+> 로 바뀐다. 다시 누르면 해제. 이 툴은 기본적으로 정상 Z-order(밑 창을 클릭하면 위로 올라옴)를 쓰므로,
+> 필요할 때만 켜는 방식이다. 버튼은 고정 크기라 토글해도 위치·크기가 변하지 않는다(A00340_SelectionTool
+> 과 동일 패턴). 플래그 변경 후 창이 숨는 Qt 특성을 피하려 내부에서 `show()` 를 재호출한다.
+> `app/ui/main_window.py` 만 변경.
+
 > **v01.23 — 확장된 `Get Current` 버튼이 동작하지 않던 버그 수정**: v01.22 에서 추가한 (Follow 외)
 > 모든 `Get Current` 버튼이 눌러도 입력이 갱신되지 않았다. 원인은 `_make_get_current_btn` 의 슬롯이
 > `lambda le=line_edit:` 로 **위치 인자 1개를 받는** 형태였던 것 — PySide 의 `clicked` 시그널이 슬롯에
