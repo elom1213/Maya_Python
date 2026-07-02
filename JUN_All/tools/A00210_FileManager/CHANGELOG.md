@@ -2,6 +2,15 @@
 
 All notable changes to this tool are documented here.
 
+## [01.26] - 2026-07-02
+### Changed
+- **Settings** — merged the separate **Store Repo** and **Shared Folder** rows into
+  a **single data-folder input** that adapts to the Source Mode. The label and hints
+  switch between *Store Repo* (Remote/Git) and *Shared Folder* (Local) as you change
+  the mode. Each mode still remembers its own path independently (kept in the profile
+  as `store_dir` / `local_dir`), so switching modes never clears the other path. No
+  profile migration needed — existing profiles load unchanged.
+
 ## [01.25] - 2026-07-02
 ### Fixed
 - **Path Structure** tab — multi-select checkbox toggle now **keeps the selection
