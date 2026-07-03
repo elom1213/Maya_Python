@@ -1,5 +1,19 @@
 # Changelog — A00040_file_exporter_V02
 
+## v02.05 (2026-07-03)
+- Fix/rediagnose: excluded meshes could stay in the FBX not because they were
+  *referenced*, but because their transforms are locked/connected/constrained
+  (common for rigged meshes), which makes `parent -world` fail. The v02.04 code
+  mislabeled this as "referenced".
+  - Shape-based excluded types (mesh, ...) are now excluded by flagging their
+    shapes `intermediateObject` as the **primary** method — no reparenting, so it
+    is immune to locked/connected/referenced/namespace situations. Only shapeless
+    types (joint) still use unparent.
+  - The leftover warning no longer says "referenced"; it now reads "no shape to
+    hide and cannot be unparented".
+  - Note: excluded descendant meshes leave an empty transform (null) in the FBX
+    since only the shape is hidden.
+
 ## v02.04 (2026-07-03)
 - Fix: excluded meshes that are **referenced** (nested under a group) stayed in
   the FBX (previously reported as `[WARN] could not exclude ... still in FBX`),

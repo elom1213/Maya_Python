@@ -90,10 +90,11 @@ A00040_file_exporter_V02/
 - **그룹 하위도 필터를 받는다**: 세트 멤버가 그룹이면 그 **계층 전체**를 훑어, 하위에 있는 제외 타입 노드(그룹 안 mesh 등)를
   내보내기 직전에 잠깐 계층 밖으로 빼냈다가(export 후 원위치 복원) 처리한다. 즉 그룹은 유지되고 그 안의 제외 타입만 FBX 에서 빠진다.
 - 제외 대상 타입 중 **하나라도** 걸리면: 세트에 **직접 든 멤버**면 그 멤버가 통째로 빠지고, **그룹 하위 노드**면 그 노드(및 그 자손)만 빠진다.
-- **레퍼런스 제외 대상 처리**: 계층에서 빼낼 수 없는(레퍼런스) 제외 노드는, 그 타입 **shape 를 `intermediateObject` 로
-  잠깐 숨겨** FBX 에서 제외한다(export 후 원복). FBX 는 intermediate shape 를 내보내지 않는다. 따라서 레퍼런스 메시도
-  정상 제외된다(단, transform 은 빈 노드로 남을 수 있다). shape 가 없는 타입(예: 레퍼런스 joint)만 제외 불가로 남아
-  `[WARN] could not exclude ...` 로 안내된다.
+- **제외 방식(중요)**: shape 기반 타입(mesh 등)은 해당 **shape 의 `intermediateObject` 를 잠깐 켜서** FBX 에서 제외한다
+  (export 후 원복). FBX 는 intermediate shape 를 내보내지 않는다. 이 방식은 **노드를 옮기지 않으므로**(reparent 불필요)
+  메시 transform 이 **잠김(locked)·연결(connected)·컨스트레인**되어 있거나, 레퍼런스이거나, 같은 이름이 네임스페이스로만
+  구분되는 상황에서도 항상 동작한다. 단, shape 만 숨기므로 그 **transform 은 빈 노드로 FBX 에 남을 수 있다**.
+  shape 가 없는 타입(joint)만 계층에서 빼내며, 그마저 잠김/연결 등으로 불가하면 `[WARN] could not exclude ...` 로 안내된다.
 
 ### 6.2 타입 추가하기 (확장)
 

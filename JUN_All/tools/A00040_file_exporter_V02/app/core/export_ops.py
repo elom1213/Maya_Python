@@ -187,17 +187,18 @@ def _path(uuid):
 
 
 def _safe_parent_to_world(node_path):
-    """node_path 를 월드(최상위)로 빼낸다. 성공하면 True.
+    """node_path 를 월드(최상위)로 빼낸다. 성공하면 True, 못 빼면 False.
 
-    레퍼런스 오브젝트가 레퍼런스 부모 밑에 있으면 Maya 가 reparent 를 금지한다
-    ("Referenced objects parented to referenced objects may not be reparented").
-    이 경우 예외를 삼키고 False 를 반환해, 해당 노드는 제자리에서 내보내도록 한다.
+    다음 경우 Maya 가 reparent 를 막는다(모두 예외를 삼키고 False):
+      - 레퍼런스 오브젝트가 레퍼런스 부모 밑에 있음
+      - transform 어트리뷰트가 잠김(locked)이거나 연결/컨스트레인(connected)되어 있음
+        → 월드 위치 보존을 위해 t/r/s 를 세팅할 수 없어 실패
     """
     cmds = _cmds()
     try:
         cmds.parent(node_path, world=True)
         return True
-    except RuntimeError:
+    except Exception:
         return False
 
 
@@ -259,12 +260,13 @@ def _export_fbx(members, filepath, excluded_keys, keep_hierarchy=False):
     - excluded_keys 가 있으면 (모드와 무관하게) 각 멤버 '계층 내부'의 제외 타입 노드(그룹 하위
       mesh/joint 등)를 export 직전에 월드로 빼냈다가 export 후 원부모로 복원한다.
     - 씬에 동일 이름이 있어도 안전하도록 노드/부모를 UUID 로 잡는다.
-    - 멤버가 레퍼런스라 월드로 뺄 수 없으면 제자리에서 내보낸다(복원 생략).
-    - 제외 대상이 레퍼런스라 계층에서 못 빼면, 그 타입 shape 를 intermediate 로 숨겨
-      FBX 에서 제외한다(export 후 원복). shape 가 없는 타입(joint 등)만 제외 불가로 남는다.
+    - 멤버가 (잠김/연결/레퍼런스 등으로) 월드로 뺄 수 없으면 제자리에서 내보낸다(복원 생략).
+    - 제외 타입 노드 처리: shape 기반(mesh 등)은 shape 의 intermediateObject 를 켜서 제외하고
+      (reparent 불필요 → 잠금/연결/레퍼런스와 무관하게 동작), shape 없는 타입(joint)만 월드로
+      빼낸다. 둘 다 안 되는 것만 제외 불가로 남는다. export 후 모두 원복.
     반환: (excluded_names, excluded_failed)
       excluded_names  : FBX 에서 실제로 제외된 하위 노드의 leaf 이름 리스트.
-      excluded_failed : 제외 대상이지만 shape 도 없고 뺄 수도 없어 FBX 에 남은 노드 이름.
+      excluded_failed : shape 도 없고 뺄 수도 없어 FBX 에 남은 제외 대상 이름.
     """
     cmds = _cmds()
 
@@ -287,8 +289,10 @@ def _export_fbx(members, filepath, excluded_keys, keep_hierarchy=False):
             moved_members.add(member_uuid)
 
     # 2) 각 멤버 계층 내부의 제외 타입 노드를 FBX 에서 뺀다.
-    #    a) 통째로 월드로 빼내기 시도(비레퍼런스면 transform 까지 깔끔히 제거).
-    #    b) 레퍼런스라 못 빼면 해당 타입 shape 를 intermediate 로 숨겨 제외(복원 시 해제).
+    #    a) shape 기반 타입(mesh 등): 해당 shape 의 intermediateObject 를 켜서 제외한다.
+    #       노드를 옮기지 않으므로(reparent 불필요) 잠금/연결/컨스트레인/레퍼런스/네임스페이스와
+    #       무관하게 항상 동작한다. FBX 는 intermediate shape 를 내보내지 않는다.
+    #    b) shape 가 없는 타입(joint 등): 통째로 월드로 빼낸다(안 되면 제외 불가로 남긴다).
     excluded_infos = []   # 월드로 빼낸 [(node_uuid, parent_uuid), ...]
     hidden_shapes = []    # intermediate 로 숨긴 shape uuid (복원용)
     excluded_names = []
@@ -302,17 +306,8 @@ def _export_fbx(members, filepath, excluded_keys, keep_hierarchy=False):
                 node_uuid = _uuid(node)
                 if not node_uuid:
                     continue
-                parents = cmds.listRelatives(node, parent=True, fullPath=True) or []
-                parent_uuid = _uuid(parents[0]) if parents else None
-                node_path = _path(node_uuid)
 
-                # a) 통째로 빼내기 (부모가 있어야 하고, 레퍼런스가 아니어야 성공)
-                if parent_uuid is not None and node_path and _safe_parent_to_world(node_path):
-                    excluded_infos.append((node_uuid, parent_uuid))
-                    excluded_names.append(short_name(node))
-                    continue
-
-                # b) 못 빼면 해당 타입 shape 를 intermediate 로 숨김 (레퍼런스 메시 대응)
+                # a) shape 기반: shape 를 intermediate 로 숨김 (가장 안전, reparent 없음)
                 hidden_any = False
                 for shape in _excluded_shapes_of(node, excluded_keys):
                     shape_uuid = _uuid(shape)
@@ -321,8 +316,17 @@ def _export_fbx(members, filepath, excluded_keys, keep_hierarchy=False):
                         hidden_any = True
                 if hidden_any:
                     excluded_names.append(short_name(node))
+                    continue
+
+                # b) shape 없는 타입(joint 등): 통째로 월드로 빼내기
+                parents = cmds.listRelatives(node, parent=True, fullPath=True) or []
+                parent_uuid = _uuid(parents[0]) if parents else None
+                node_path = _path(node_uuid)
+                if parent_uuid is not None and node_path and _safe_parent_to_world(node_path):
+                    excluded_infos.append((node_uuid, parent_uuid))
+                    excluded_names.append(short_name(node))
                 else:
-                    # shape 없는 타입(joint 등)이거나 attr 잠김 → 제외 불가
+                    # 옮길 수도 숨길 수도 없음(shape 없고 잠김/연결/레퍼런스 등) → 제외 불가
                     excluded_failed.append(short_name(node))
 
     # 3) 선택 후 export selected.
@@ -410,9 +414,10 @@ def export_sets(set_names, file_names, excluded_keys, export_path,
         if excluded_all:
             logs.append("     excluded {0} object(s): {1}".format(
                 len(excluded_all), ", ".join(excluded_all)))
-        # 레퍼런스 등으로 계층에서 뺄 수 없어 어쩔 수 없이 포함된 제외 대상
+        # shape 도 없고(joint 등) 계층에서도 뺄 수 없어 부득이 FBX 에 남은 제외 대상
         if excluded_failed:
-            logs.append("     [WARN] could not exclude {0} referenced object(s), "
+            logs.append("     [WARN] could not exclude {0} object(s) "
+                        "(no shape to hide and cannot be unparented), "
                         "still in FBX: {1}".format(
                             len(excluded_failed), ", ".join(excluded_failed)))
 
