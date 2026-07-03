@@ -1,5 +1,14 @@
 # Changelog — A00040_file_exporter_V02
 
+## v02.04 (2026-07-03)
+- Fix: excluded meshes that are **referenced** (nested under a group) stayed in
+  the FBX (previously reported as `[WARN] could not exclude ... still in FBX`),
+  because referenced nodes can't be unparented out of the hierarchy. Such nodes
+  now have their matching shapes flagged `intermediateObject` during export (FBX
+  skips intermediate shapes), then restored — so referenced meshes are excluded
+  without reparenting. Only shapeless excluded types (e.g. a referenced joint)
+  remain in the `could not exclude` warning.
+
 ## v02.03 (2026-07-03)
 - NEW **Move to scene root** checkbox (Export section, on by default).
   - On (default): each object is exported at the scene root (parents removed) —
