@@ -186,36 +186,92 @@ def _path(uuid):
     return paths[0] if paths else None
 
 
-def _export_fbx(members, filepath):
+def _collect_excluded_in_hierarchy(root, excluded_keys):
+    """root(포함) 이하 계층에서 excluded 타입에 해당하는 '최상위' 노드들을 반환한다.
+
+    세트 멤버가 그룹이면 그 하위에 있는 mesh/joint 등도 필터의 영향을 받아야 한다.
+    여기서 걸린 노드를 export 직전에 잠깐 계층 밖으로 빼내면(아래 _export_fbx),
+    그룹은 유지하되 하위의 제외 타입만 FBX 에서 빠진다.
+
+    이미 다른 제외 노드의 자손인 것은 뺀다(조상만 옮기면 자손도 함께 빠지므로 중복 방지).
+    """
+    cmds = _cmds()
+    descendants = cmds.listRelatives(
+        root, allDescendents=True, fullPath=True, type="transform") or []
+    hierarchy = [root] + descendants
+
+    matched = [n for n in hierarchy
+               if any(member_matches_type(n, key) for key in excluded_keys)]
+
+    tops = []
+    for node in matched:
+        # 조상 중 이미 matched 인 것이 있으면(= node 가 그 자손이면) 건너뛴다.
+        if any(other != node and node.startswith(other + "|") for other in matched):
+            continue
+        tops.append(node)
+    return tops
+
+
+def _export_fbx(members, filepath, excluded_keys):
     """members 를 FBX 로 내보낸다.
 
-    깔끔한 계층으로 내보내기 위해 각 멤버를 월드(최상위)로 빼냈다가 내보낸 뒤 원래
-    부모로 복원한다. 씬에 동일 이름이 있어도 안전하도록 노드/부모를 UUID 로 잡는다.
+    - 깔끔한 계층으로 내보내기 위해 각 멤버를 월드(최상위)로 빼냈다가 내보낸 뒤 원부모로 복원.
+    - excluded_keys 가 있으면 각 멤버 '계층 내부'의 제외 타입 노드(그룹 하위 mesh/joint 등)도
+      export 직전에 월드로 빼냈다가 export 후 원부모로 복원한다.
+    - 씬에 동일 이름이 있어도 안전하도록 노드/부모를 UUID 로 잡는다.
+    반환: FBX 에서 제외된 하위 노드의 leaf 이름 리스트.
     """
     cmds = _cmds()
 
-    # 원래 부모를 UUID 로 기록 (월드 최상위면 None).
-    infos = []  # [(member_uuid, parent_uuid|None), ...]
+    # 1) 멤버 원부모를 UUID 로 기록 (월드 최상위면 None) 후 월드로 빼내기.
+    member_infos = []  # [(member_uuid, parent_uuid|None), ...]
     for member in members:
         parents = cmds.listRelatives(member, parent=True, fullPath=True) or []
         parent_uuid = _uuid(parents[0]) if parents else None
         member_uuid = _uuid(member)
         if member_uuid:
-            infos.append((member_uuid, parent_uuid))
+            member_infos.append((member_uuid, parent_uuid))
 
-    # 월드로 빼내기 (이미 최상위면 그대로). UUID 는 reparent 후에도 유지된다.
-    for member_uuid, parent_uuid in infos:
+    for member_uuid, parent_uuid in member_infos:
         if parent_uuid is None:
             continue
         cmds.parent(_path(member_uuid), world=True)
 
-    # 선택 후 export selected.
-    cmds.select([_path(m) for m, _ in infos])
+    # 2) 각 멤버 계층 내부의 제외 타입 노드를 찾아 임시로 월드로 빼낸다(원부모 UUID 기록).
+    excluded_infos = []  # [(node_uuid, parent_uuid), ...]
+    excluded_names = []
+    if excluded_keys:
+        for member_uuid, _ in member_infos:
+            root = _path(member_uuid)
+            if not root:
+                continue
+            for node in _collect_excluded_in_hierarchy(root, excluded_keys):
+                parents = cmds.listRelatives(node, parent=True, fullPath=True) or []
+                parent_uuid = _uuid(parents[0]) if parents else None
+                node_uuid = _uuid(node)
+                # 부모가 없으면(=멤버 루트 자신) 계층에서 뺄 대상이 아니다.
+                if node_uuid and parent_uuid is not None:
+                    excluded_infos.append((node_uuid, parent_uuid))
+                    excluded_names.append(short_name(node))
+
+        for node_uuid, _ in excluded_infos:
+            node_path = _path(node_uuid)
+            if node_path:
+                cmds.parent(node_path, world=True)
+
+    # 3) 선택 후 export selected.
+    cmds.select([_path(m) for m, _ in member_infos])
     cmds.file(filepath, force=True, options="v=0;",
               typ="FBX export", pr=True, es=True)
 
-    # 원래 부모로 복원 (월드 최상위였던 것은 그대로 둔다).
-    for member_uuid, parent_uuid in infos:
+    # 4) 복원: 제외 노드 먼저 원부모로, 그다음 멤버를 원부모로.
+    for node_uuid, parent_uuid in excluded_infos:
+        node_path = _path(node_uuid)
+        parent_path = _path(parent_uuid)
+        if node_path and parent_path:
+            cmds.parent(node_path, parent_path)
+
+    for member_uuid, parent_uuid in member_infos:
         if parent_uuid is None:
             continue
         member_path = _path(member_uuid)
@@ -224,6 +280,7 @@ def _export_fbx(members, filepath):
             cmds.parent(member_path, parent_path)
 
     cmds.select(clear=True)
+    return excluded_names
 
 
 def export_sets(set_names, file_names, excluded_keys, export_path):
@@ -268,14 +325,16 @@ def export_sets(set_names, file_names, excluded_keys, export_path):
         mainpath = "{0}/{1}.fbx".format(export_path, file_name).replace("\\", "/")
         mainpath = get_unique_filepath(mainpath)
 
-        _export_fbx(kept, mainpath)
+        excluded_desc = _export_fbx(kept, mainpath, excluded_keys)
 
         logs.append("[OK] {0}  ->  {1}".format(set_name, mainpath))
-        logs.append("     exported {0} object(s): {1}".format(
+        logs.append("     exported {0} member(s): {1}".format(
             len(kept), ", ".join(short_name(k) for k in kept)))
-        if dropped:
+        # 필터로 빠진 것: 세트에 직접 든 멤버(dropped) + 그룹 하위 노드(excluded_desc)
+        excluded_all = [short_name(d) for d in dropped] + excluded_desc
+        if excluded_all:
             logs.append("     excluded {0} object(s): {1}".format(
-                len(dropped), ", ".join(short_name(d) for d in dropped)))
+                len(excluded_all), ", ".join(excluded_all)))
 
     if not logs:
         logs.append("[WARN] No sets to export. Add objectSets first.")
