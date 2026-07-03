@@ -1,5 +1,15 @@
 # Changelog — A00220_BackupTool
 
+## [01.11] - 2026-07-03
+
+### Fixed
+- **The save-moment dino hop now turns red on Windows 10 too.** The accent color
+  was taken from the OS palette highlight (`palette().highlight()`), which differs
+  by Windows version (red-ish on the Win11 setup, the system blue on Win10), so the
+  hop never looked red on Win10. The accent is now a **fixed red** (`#E53935`) drawn
+  directly, independent of the OS/theme palette, so the save hop is consistently red
+  on every OS. Timing/height of the hop are unchanged.
+
 ## [01.10] - 2026-07-02
 
 ### Fixed

@@ -134,6 +134,11 @@ class DinoWidget(QWidget):
     _SAVE_TICKS = 12          # ~0.4s (자동 점프 18틱보다 스냅있게)
     _SAVE_PEAK_CELLS = 5      # 톡 점프 높이(자동 점프 7칸보다 낮게)
 
+    # 저장 순간 강조색. OS 팔레트(highlight)는 Windows 버전마다 색이 달라
+    # (Win11=빨강 계열, Win10=시스템 파랑 등) 저장 표시가 빨갛게 안 나오는 문제가 있었다.
+    # 그래서 팔레트에 기대지 않고 명시적 빨강으로 고정해 모든 OS 에서 동일하게 보이게 한다.
+    _SAVE_ACCENT_COLOR = "#E53935"
+
     # --------------------------------------------------------------- control
 
     def set_running(self, on):
@@ -307,12 +312,12 @@ class DinoWidget(QWidget):
                         )
             painter.restore()
         else:
-            # 저장 톡 점프 중이면 스프라이트를 강조색(테마 하이라이트)으로 그려
+            # 저장 톡 점프 중이면 스프라이트를 강조색(고정 빨강)으로 그려
             # 회색 자동 점프와 확실히 구분한다. 바닥선/점선은 기본색 유지.
+            # OS 팔레트 하이라이트에 기대면 Windows 10 에서 빨강이 안 나와, 명시 색으로 고정한다.
             draw_color = color
             if self._save_t is not None:
-                accent = self.palette().highlight().color()
-                draw_color = accent if accent.isValid() else QColor("#4CAF50")
+                draw_color = QColor(self._SAVE_ACCENT_COLOR)
 
             rows = _BODY + self._current_legs()
             for r, line in enumerate(rows):
