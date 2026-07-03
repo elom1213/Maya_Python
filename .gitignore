@@ -32,3 +32,5 @@ __pycache__/
 JUN_FileManager_data/
 
 *ref/
+
+**/A00230_StartupTool/config/startup.json

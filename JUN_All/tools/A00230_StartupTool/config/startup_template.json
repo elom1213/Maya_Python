@@ -11,3 +11,6 @@
     // 또는 커스텀 경로: { "launch": "%USERPROFILE%\\tools\\my\\launch.py", "enabled": true }
   ]
 }
+
+// 부팅시 실행하는 경로, 툴 관련 템플릿 json 파일입니다. 원격 저장소에 공유됩니다.
+// pc 마다의 세팅은 startup.json 파일을 통해 적용되고 원격저장소에 공유되지 않습니다.
