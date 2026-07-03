@@ -1,5 +1,15 @@
 # Changelog — A00040_file_exporter_V02
 
+## v02.02 (2026-07-03)
+- Fix: exporting a set that contains **referenced objects** crashed with
+  `Referenced objects parented to referenced objects may not be reparented`
+  (the move-to-world step is forbidden for referenced-under-referenced nodes).
+  The unparent step is now guarded: nodes that cannot be moved to world are
+  exported in place and not restored. Handles scenes where reference namespaces
+  create same-named objects (`Test` + `namespace:Test`).
+- Excluded-type nodes that cannot be unparented (referenced) are reported with a
+  `[WARN] could not exclude ... still in FBX` log line instead of failing.
+
 ## v02.01 (2026-07-03)
 - Fix: Type Filter now also affects nodes **inside groups**. Previously an
   excluded type (e.g. Mesh) was only skipped when the set member itself was that
