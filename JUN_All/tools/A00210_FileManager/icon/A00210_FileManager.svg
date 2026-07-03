@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A00210_FileManager icon — file/version manager for Maya scene records.
+     blue_dark 테마에 맞춘 파랑 계열. 폴더 + 기록 카드(썸네일/버전) + 동기화 뱃지. -->
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#26374d"/>
+      <stop offset="1" stop-color="#161f2b"/>
+    </linearGradient>
+    <linearGradient id="folder" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4c8dff"/>
+      <stop offset="1" stop-color="#2f6bd6"/>
+    </linearGradient>
+    <linearGradient id="folderBack" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3d78e0"/>
+      <stop offset="1" stop-color="#2657b0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- rounded-square background -->
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#bg)"/>
+
+  <!-- folder back panel (tabbed) -->
+  <path d="M44 78 h52 l18 20 h98 a14 14 0 0 1 14 14 v78 a14 14 0 0 1 -14 14 H44
+           a14 14 0 0 1 -14 -14 V92 a14 14 0 0 1 14 -14 Z" fill="url(#folderBack)"/>
+
+  <!-- record card (thumbnail + log lines) peeking out of the folder -->
+  <g>
+    <rect x="74" y="86" width="108" height="86" rx="10" fill="#eef4ff"/>
+    <rect x="86" y="98" width="38" height="30" rx="5" fill="#8fb6ff"/>
+    <rect x="132" y="100" width="42" height="8" rx="4" fill="#3d78e0"/>
+    <rect x="132" y="116" width="34" height="7" rx="3.5" fill="#9db6d6"/>
+    <rect x="86" y="140" width="88" height="7" rx="3.5" fill="#9db6d6"/>
+    <rect x="86" y="154" width="66" height="7" rx="3.5" fill="#c2d2e8"/>
+  </g>
+
+  <!-- folder front (open) -->
+  <path d="M30 118 h196 a12 12 0 0 1 12 13 l-12 74 a16 16 0 0 1 -16 13 H50
+           a16 16 0 0 1 -16 -13 l-16 -74 a12 12 0 0 1 12 -13 Z" fill="url(#folder)"/>
+
+  <!-- sync / version badge (circular arrows) bottom-right -->
+  <g transform="translate(182,178)">
+    <circle cx="0" cy="0" r="34" fill="#161f2b"/>
+    <circle cx="0" cy="0" r="34" fill="none" stroke="#4c8dff" stroke-width="3"/>
+    <path d="M-14 -4 a15 15 0 0 1 27 -6" fill="none" stroke="#7fb0ff" stroke-width="6" stroke-linecap="round"/>
+    <path d="M13 -16 l1 12 l-12 -2 Z" fill="#7fb0ff"/>
+    <path d="M14 4 a15 15 0 0 1 -27 6" fill="none" stroke="#7fb0ff" stroke-width="6" stroke-linecap="round"/>
+    <path d="M-13 16 l-1 -12 l12 2 Z" fill="#7fb0ff"/>
+  </g>
+</svg>

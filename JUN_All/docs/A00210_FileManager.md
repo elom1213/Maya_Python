@@ -47,6 +47,10 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 - **개발 실행**: `python JUN_All/tools/A00210_FileManager/launch.py`
 - **exe 빌드**: 툴 폴더의 `build_exe.bat`(PyInstaller, `launch.spec`) → `dist/A00210_FileManager.exe`
 - 필요 패키지: `PySide6`, `pyinstaller`. git sync 는 **시스템 git(PATH)** 을 사용한다(별도 패키지 없음).
+- **작업표시줄 아이콘(v01.27)**: `icon/A00210_FileManager.ico`(16~256px 멀티 사이즈)를 앱/창 아이콘으로 쓴다.
+  터미널에서 `python launch.py` 로 띄우면 프로세스가 `python.exe` 라 기본으로 python 아이콘이 뜨는데,
+  `launch.py` 가 Windows **AppUserModelID**(`Dnable.JUN.A00210.FileManager`)를 지정해 **이 앱 아이콘**이
+  작업표시줄에 뜨도록 한다. 아이콘 경로 해석은 dev·exe 양쪽 대응(`app/config/app_meta.py`).
 
 ---
 

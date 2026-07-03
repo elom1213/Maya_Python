@@ -35,10 +35,12 @@ from Framework.qt.qt import (
     QToolButton,
     QMenu,
     QPixmap,
+    QIcon,
     Qt,
 )
 
 from ..config.version import VERSION, LAST_UPDATE
+from ..config.app_meta import icon_path
 from ..config import data_repo
 from ..core import scanner, prefs as prefs_mod
 from ..core.store import MetaStore, OutsideProjectRootError
@@ -195,6 +197,12 @@ class MainWindow(QWidget):
 
         self.setWindowTitle(f"JUN File Manager  v{VERSION}")
         self.resize(1080, 680)
+
+        # 창/작업표시줄 아이콘. launch.py 가 app 전역으로도 설정하지만, 다른 진입점으로
+        # 이 창을 직접 띄우는 경우까지 대비해 창 자체에도 지정한다(없으면 조용히 무시).
+        _sIcon = icon_path()
+        if _sIcon:
+            self.setWindowIcon(QIcon(_sIcon))
 
         # 활성 프로파일을 읽어 시작(집/회사 등 환경별 세팅 묶음 = JSON 1개).
         self._profile = prefs_mod.get_active()

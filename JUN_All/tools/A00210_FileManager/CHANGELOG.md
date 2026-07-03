@@ -2,7 +2,15 @@
 
 All notable changes to this tool are documented here.
 
-## [01.26] - 2026-07-02
+## [01.27] - 2026-07-03
+### Added
+- **App / taskbar icon.** Added a blue folder + record-card + sync-badge icon
+  (`icon/A00210_FileManager.svg` → `.png` + multi-size `.ico` 16–256px) matching the
+  blue_dark theme. `launch.py` now sets it as the application/window icon and — on
+  Windows — sets an explicit **AppUserModelID** (`Dnable.JUN.A00210.FileManager`) so
+  the taskbar shows this icon instead of the generic `python.exe` icon when the tool
+  is run from a terminal. Icon path resolves in both dev and PyInstaller builds
+  (`app/config/app_meta.py`); `build_exe.bat` embeds the `.ico` and bundles it.
 ### Changed
 - **Settings** — merged the separate **Store Repo** and **Shared Folder** rows into
   a **single data-folder input** that adapts to the Source Mode. The label and hints
