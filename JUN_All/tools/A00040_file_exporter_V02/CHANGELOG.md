@@ -1,5 +1,13 @@
 # Changelog — A00040_file_exporter_V02
 
+## v02.03 (2026-07-03)
+- NEW **Move to scene root** checkbox (Export section, on by default).
+  - On (default): each object is exported at the scene root (parents removed) —
+    `grp>joint_01` becomes `joint_01` (previous behavior).
+  - Off: the current scene hierarchy is kept — `grp>joint_01` stays
+    `grp>joint_01` (export in place; ancestors preserved, sibling branches not).
+  - Type filter (excluding mesh/joint at any depth) works in both modes.
+
 ## v02.02 (2026-07-03)
 - Fix: exporting a set that contains **referenced objects** crashed with
   `Referenced objects parented to referenced objects may not be reparented`

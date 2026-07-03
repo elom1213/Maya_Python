@@ -55,7 +55,7 @@ A00040_file_exporter_V02/
 | **Export Path** | `Browse` 로 FBX 를 저장할 폴더 선택(읽기 전용 필드에 표시) |
 | **Set Up** | 두 개의 TSL — `Set's Name`(내보낼 objectSet 목록, 씬 선택에서 Select/Add) / `File name`(각 세트의 결과 파일명) |
 | **Naming** | 토큰 6개(SK / MANU / CH / Name / Type / Version)로 파일명을 조립. 각 토큰은 `Custom`(직접 입력) 또는 `Set's Name`(세트 이름 사용) 모드. **Set Name** 버튼으로 File name 리스트 자동 생성 |
-| **Export** | **Type Filter** 드롭다운(포함/제외 타입 선택) + **Export** 버튼 |
+| **Export** | **Move to scene root** 체크박스 + **Type Filter** 드롭다운(포함/제외 타입 선택) + **Export** 버튼 |
 | **Log** | 모든 결과·경고(`[OK]`/`[SKIP]`/`[FAIL]`/`[WARN]`)가 누적 |
 
 ---
@@ -113,11 +113,17 @@ _TYPE_MATCHERS = {
 
 ---
 
-## 7. 내보내기 동작 (unparent → export → reparent)
+## 7. 내보내기 동작 (Move to scene root / Keep hierarchy)
 
-FBX 로 깔끔하게 내보내기 위해, 내보내기 직전 각 멤버를 **월드(최상위)로 빼냈다가**
-(`cmds.parent(world=True)`) 내보낸 뒤 **원래 부모로 복원**한다.
+**Move to scene root** 체크박스로 계층 처리 방식을 고른다(기본: **체크 = 씬 최상위로 빼기**).
 
+| 모드 | 동작 | `grp > joint_01`(joint_01 이 세트) 결과 |
+|------|------|------|
+| **체크 (기본)** | 멤버를 **월드(최상위)로 빼냈다가**(`cmds.parent(world=True)`) 내보낸 뒤 **원부모로 복원** | `joint_01` (부모 제거, 월드 위치 유지) |
+| **해제** | 멤버를 옮기지 않고 **제자리에서** 내보냄 | `grp > joint_01` (부모 유지) |
+
+- **해제(계층 유지)** 모드가 되는 이유: FBX *export selected* 는 선택 노드의 **조상(부모) 체인은 포함하되
+  형제 가지는 제외**한다. 그래서 빼내지 않고 그대로 내보내면 부모 경로만 보존된다.
 - 원래 부모/멤버를 **UUID** 로 기록해 두고 복원한다. 씬에 **같은 이름의 오브젝트**가 있어도, 또
   부모를 옮겨 경로가 바뀌어도 안전하다(참고: [노드 신원 - 이름/경로 vs UUID](study/maya_node_identity_name_vs_uuid.md)).
 - 이미 월드 최상위인(부모가 없는) 멤버는 옮기지 않고 그대로 내보낸 뒤 그대로 둔다.

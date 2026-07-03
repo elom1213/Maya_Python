@@ -159,7 +159,23 @@ class MainWindow(QWidget):
 
     def _build_export_group(self):
         group = QGroupBox("Export")
-        layout = QHBoxLayout(group)
+        outer = QVBoxLayout(group)
+
+        # 옵션 행: 씬 최상위로 빼기 토글 (기본 ON = 모두 월드 루트로)
+        opt_row = QHBoxLayout()
+        self.cb_move_to_root = QCheckBox("Move to scene root")
+        self.cb_move_to_root.setChecked(True)
+        self.cb_move_to_root.setToolTip(
+            "On (default): export each object at the scene root (parents removed) "
+            "-> 'grp>joint_01' becomes 'joint_01'.\n"
+            "Off: keep the current scene hierarchy -> 'grp>joint_01' stays "
+            "'grp>joint_01'.")
+        opt_row.addWidget(self.cb_move_to_root)
+        opt_row.addStretch(1)
+        outer.addLayout(opt_row)
+
+        # 실행 행: 타입 필터 + Export
+        layout = QHBoxLayout()
 
         layout.addWidget(QLabel("Type Filter :"))
         self.type_filter = TypeFilterButton(core.FILTER_TYPES)
@@ -174,6 +190,7 @@ class MainWindow(QWidget):
         btn_export.clicked.connect(self.on_export)
         layout.addWidget(btn_export, stretch=1)
 
+        outer.addLayout(layout)
         return group
 
     # ================================================================
@@ -213,13 +230,16 @@ class MainWindow(QWidget):
 
         file_names = self.name_tsl.get_all_items()
         excluded = self.type_filter.excluded_keys()
+        keep_hierarchy = not self.cb_move_to_root.isChecked()
 
         included = self.type_filter.included_keys()
-        self._log("--- Export start (include: {0}) ---".format(
-            ", ".join(included) if included else "none of the filtered types"))
+        self._log("--- Export start (include: {0} | hierarchy: {1}) ---".format(
+            ", ".join(included) if included else "none of the filtered types",
+            "keep" if keep_hierarchy else "scene root"))
 
         with core.undo_chunk():
-            logs = core.export_sets(set_names, file_names, excluded, export_path)
+            logs = core.export_sets(
+                set_names, file_names, excluded, export_path, keep_hierarchy)
         for line in logs:
             self._log(line)
 

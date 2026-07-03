@@ -227,12 +227,16 @@ def _collect_excluded_in_hierarchy(root, excluded_keys):
     return tops
 
 
-def _export_fbx(members, filepath, excluded_keys):
+def _export_fbx(members, filepath, excluded_keys, keep_hierarchy=False):
     """members 를 FBX 로 내보낸다.
 
-    - 깔끔한 계층으로 내보내기 위해 각 멤버를 월드(최상위)로 빼냈다가 내보낸 뒤 원부모로 복원.
-    - excluded_keys 가 있으면 각 멤버 '계층 내부'의 제외 타입 노드(그룹 하위 mesh/joint 등)도
-      export 직전에 월드로 빼냈다가 export 후 원부모로 복원한다.
+    - keep_hierarchy=False(기본): 각 멤버를 월드(최상위)로 빼냈다가 내보낸 뒤 원부모로 복원한다.
+      FBX 에는 멤버가 부모 없이 루트로 들어간다(예: 'grp>joint_01' -> 'joint_01').
+    - keep_hierarchy=True: 멤버를 옮기지 않고 제자리에서 내보낸다. FBX export selected 는
+      조상(부모) 체인은 유지하되 형제 가지는 제외하므로, 씬 계층이 보존된다
+      (예: 'grp>joint_01' -> 'grp>joint_01').
+    - excluded_keys 가 있으면 (모드와 무관하게) 각 멤버 '계층 내부'의 제외 타입 노드(그룹 하위
+      mesh/joint 등)를 export 직전에 월드로 빼냈다가 export 후 원부모로 복원한다.
     - 씬에 동일 이름이 있어도 안전하도록 노드/부모를 UUID 로 잡는다.
     - 레퍼런스 오브젝트처럼 월드로 뺄 수 없는 노드는 제자리에서 내보낸다(복원 생략).
     반환: (excluded_names, excluded_failed)
@@ -241,7 +245,7 @@ def _export_fbx(members, filepath, excluded_keys):
     """
     cmds = _cmds()
 
-    # 1) 멤버 원부모를 UUID 로 기록 (월드 최상위면 None) 후 월드로 빼내기.
+    # 1) 멤버 원부모를 UUID 로 기록 (월드 최상위면 None) 후 (기본 모드면) 월드로 빼내기.
     #    빼내기에 성공한 멤버만 moved 에 담아, 복원 대상을 그것으로 한정한다.
     member_infos = []  # [(member_uuid, parent_uuid|None), ...]
     for member in members:
@@ -252,7 +256,7 @@ def _export_fbx(members, filepath, excluded_keys):
             member_infos.append((member_uuid, parent_uuid))
 
     moved_members = set()
-    for member_uuid, parent_uuid in member_infos:
+    for member_uuid, parent_uuid in ([] if keep_hierarchy else member_infos):
         if parent_uuid is None:
             continue
         node_path = _path(member_uuid)
@@ -306,11 +310,14 @@ def _export_fbx(members, filepath, excluded_keys):
     return excluded_names, excluded_failed
 
 
-def export_sets(set_names, file_names, excluded_keys, export_path):
+def export_sets(set_names, file_names, excluded_keys, export_path,
+                keep_hierarchy=False):
     """Set's Name TSL 의 각 objectSet 을 하나의 FBX 로 내보낸다.
 
     - set_names[i] 의 멤버를 모아 타입 필터(excluded_keys) 적용 후 남은 것만 내보낸다.
     - 파일명은 file_names[i] (없으면 세트 leaf 이름), ':' 는 '_' 로 치환, 겹치면 고유화.
+    - keep_hierarchy=False(기본): 멤버를 씬 최상위로 빼서 내보낸다.
+      True: 씬 계층(부모)을 유지한 채 내보낸다. (자세한 동작은 _export_fbx 참고)
     반환: 로그 문자열 리스트.
     """
     cmds = _cmds()
@@ -348,7 +355,8 @@ def export_sets(set_names, file_names, excluded_keys, export_path):
         mainpath = "{0}/{1}.fbx".format(export_path, file_name).replace("\\", "/")
         mainpath = get_unique_filepath(mainpath)
 
-        excluded_desc, excluded_failed = _export_fbx(kept, mainpath, excluded_keys)
+        excluded_desc, excluded_failed = _export_fbx(
+            kept, mainpath, excluded_keys, keep_hierarchy)
 
         logs.append("[OK] {0}  ->  {1}".format(set_name, mainpath))
         logs.append("     exported {0} member(s): {1}".format(
