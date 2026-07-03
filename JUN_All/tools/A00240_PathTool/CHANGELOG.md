@@ -2,6 +2,16 @@
 
 All notable changes to this tool are documented here.
 
+## [01.06] - 2026-07-03
+### Added
+- **App / taskbar icon.** Added a purple folder-tree icon
+  (`icon/A00240_PathTool.svg` → `.png` + multi-size `.ico` 16–256px) matching the
+  purple_dark theme. `launch.py` now sets it as the application/window icon and — on
+  Windows — sets an explicit **AppUserModelID** (`Dnable.JUN.A00240.PathTool`) so the
+  taskbar shows this icon instead of the generic `python.exe` icon when run from a
+  terminal. Path resolves in dev and PyInstaller builds (`app/config/app_meta.py`);
+  `build_exe.bat` embeds/bundles the icon. (Method: `docs/taskbar_icon_guide.md`.)
+
 ## [01.05] - 2026-06-26
 ### Added
 - **ShortCut** tab — reorder path buttons inside a category. A path button's

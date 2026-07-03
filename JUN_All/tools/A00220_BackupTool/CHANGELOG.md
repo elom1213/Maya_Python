@@ -1,5 +1,16 @@
 # Changelog — A00220_BackupTool
 
+## [01.12] - 2026-07-03
+
+### Added
+- **App / taskbar icon.** Added a green document-stack + backup-cycle icon
+  (`icon/A00220_BackupTool.svg` → `.png` + multi-size `.ico` 16–256px) matching the
+  green_dark theme. `launch.py` now sets it as the application/window icon and — on
+  Windows — sets an explicit **AppUserModelID** (`Dnable.JUN.A00220.BackupTool`) so
+  the taskbar shows this icon instead of the generic `python.exe` icon when run from a
+  terminal. Path resolves in dev and PyInstaller builds (`app/config/app_meta.py`);
+  `build_exe.bat` embeds/bundles the icon. (Method: `docs/taskbar_icon_guide.md`.)
+
 ## [01.11] - 2026-07-03
 
 ### Fixed

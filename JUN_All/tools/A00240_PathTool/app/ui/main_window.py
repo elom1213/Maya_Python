@@ -10,9 +10,11 @@ from Framework.qt.qt import (
     QWidget,
     QVBoxLayout,
     QTabWidget,
+    QIcon,
 )
 
 from ..config.version import VERSION
+from ..config.app_meta import icon_path
 from .shortcut_tab import ShortcutTab
 from .tree_tab import TreeTab
 
@@ -24,6 +26,12 @@ class MainWindow(QWidget):
 
         self.setWindowTitle(f"JUN Path Tool  v{VERSION}")
         self.resize(360, 560)
+
+        # 창/작업표시줄 아이콘. launch.py 가 app 전역으로도 설정하지만, 다른 진입점으로
+        # 이 창을 직접 띄우는 경우까지 대비해 창 자체에도 지정한다(없으면 조용히 무시).
+        _sIcon = icon_path()
+        if _sIcon:
+            self.setWindowIcon(QIcon(_sIcon))
 
         self._build_ui()
 

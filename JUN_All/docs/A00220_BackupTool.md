@@ -34,6 +34,9 @@
 - **개발 실행**: `python JUN_All/tools/A00220_BackupTool/launch.py`
 - **exe 빌드**: 툴 폴더의 `build_exe.bat`(PyInstaller, `launch.spec`) → `dist/A00220_BackupTool.exe`
 - 필요 패키지: `PySide6`, `pyinstaller`. 백업 로직은 **표준 라이브러리**(shutil/os/re/json)만 쓴다.
+- **작업표시줄 아이콘(v01.12)**: 초록 문서 스택+백업 순환화살표 아이콘(`icon/A00220_BackupTool.ico`, 16~256px).
+  `launch.py` 가 Windows **AppUserModelID**(`Dnable.JUN.A00220.BackupTool`)를 지정해 터미널 실행 시에도
+  python 아이콘 대신 이 앱 아이콘이 작업표시줄에 뜬다. 방식: [taskbar_icon_guide.md](taskbar_icon_guide.md).
 
 ---
 

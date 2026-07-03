@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A00220_BackupTool icon — auto-backup of Maya scene files.
+     green_dark 테마에 맞춘 초록 계열. 문서 스택(백업 사본) + 순환 화살표(버전 백업). -->
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#20362a"/>
+      <stop offset="1" stop-color="#141f18"/>
+    </linearGradient>
+    <linearGradient id="sheet" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f2fbf5"/>
+      <stop offset="1" stop-color="#d7ecdd"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#54d17a"/>
+      <stop offset="1" stop-color="#33a85a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- rounded-square background -->
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#bg)"/>
+
+  <!-- back sheet (a previous backup copy) -->
+  <rect x="66" y="46" width="104" height="130" rx="12" fill="#2f6b47"/>
+  <rect x="78" y="58" width="104" height="130" rx="12" fill="#3f8a5c"/>
+
+  <!-- front sheet (current file) + folded corner + text lines -->
+  <path d="M92 70 h74 l30 30 v92 a12 12 0 0 1 -12 12 H92 a12 12 0 0 1 -12 -12 V82
+           a12 12 0 0 1 12 -12 Z" fill="url(#sheet)"/>
+  <path d="M166 70 v22 a8 8 0 0 0 8 8 h22 Z" fill="#bcdcc7"/>
+  <rect x="98" y="118" width="80" height="9" rx="4.5" fill="#8fb8a0"/>
+  <rect x="98" y="136" width="80" height="9" rx="4.5" fill="#a9cbb7"/>
+  <rect x="98" y="154" width="54" height="9" rx="4.5" fill="#c2dccb"/>
+
+  <!-- backup cycle badge (circular arrows) bottom-right -->
+  <g transform="translate(180,182)">
+    <circle cx="0" cy="0" r="36" fill="#141f18"/>
+    <circle cx="0" cy="0" r="36" fill="none" stroke="url(#badge)" stroke-width="3"/>
+    <path d="M-15 -5 a16 16 0 0 1 29 -6" fill="none" stroke="#7ee6a1" stroke-width="6.5" stroke-linecap="round"/>
+    <path d="M14 -18 l1 13 l-13 -2 Z" fill="#7ee6a1"/>
+    <path d="M15 5 a16 16 0 0 1 -29 6" fill="none" stroke="#7ee6a1" stroke-width="6.5" stroke-linecap="round"/>
+    <path d="M-14 18 l-1 -13 l13 2 Z" fill="#7ee6a1"/>
+  </g>
+</svg>

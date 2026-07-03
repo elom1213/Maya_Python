@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A00240_PathTool icon — folder path shortcuts + directory tree.
+     purple_dark 테마에 맞춘 보라 계열. 폴더 계층 트리(루트 + 자식 폴더 2개). -->
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b2340"/>
+      <stop offset="1" stop-color="#191325"/>
+    </linearGradient>
+    <linearGradient id="root" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b47cf0"/>
+      <stop offset="1" stop-color="#8e51d9"/>
+    </linearGradient>
+    <linearGradient id="child" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a066e8"/>
+      <stop offset="1" stop-color="#7b45c7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- rounded-square background -->
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#bg)"/>
+
+  <!-- tree connector lines (root → two children) -->
+  <g stroke="#7a6aa8" stroke-width="7" fill="none" stroke-linecap="round">
+    <path d="M78 96 V150 H126"/>
+    <path d="M78 150 V196 H126"/>
+  </g>
+  <circle cx="78" cy="96" r="7" fill="#c9b8ef"/>
+
+  <!-- root folder (top-left) -->
+  <path d="M40 60 h40 l14 16 h44 a12 12 0 0 1 12 12 v20 a12 12 0 0 1 -12 12 H40
+           a12 12 0 0 1 -12 -12 V72 a12 12 0 0 1 12 -12 Z" fill="url(#root)"/>
+
+  <!-- child folder 1 (middle-right) -->
+  <path d="M126 128 h30 l11 12 h33 a11 11 0 0 1 11 11 v15 a11 11 0 0 1 -11 11 H126
+           a11 11 0 0 1 -11 -11 v-27 a11 11 0 0 1 11 -11 Z" fill="url(#child)"/>
+
+  <!-- child folder 2 (bottom-right) -->
+  <path d="M126 174 h30 l11 12 h33 a11 11 0 0 1 11 11 v15 a11 11 0 0 1 -11 11 H126
+           a11 11 0 0 1 -11 -11 v-27 a11 11 0 0 1 11 -11 Z" fill="url(#child)"/>
+</svg>
