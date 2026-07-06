@@ -2,6 +2,20 @@
 
 All notable changes to this tool are documented here.
 
+## v01.03 — 2026-07-06
+
+- **Color Select mode (recolor across categories)**: replaced the per-category
+  bulk recolor with a free multi-select. A new `Color` bar adds a `Color Select`
+  toggle; while it is on, every button becomes checkable and clicking checks it
+  (instead of selecting objects). Check any buttons — across different categories —
+  then `Apply Color...` paints them all with one picked color, or `Clear Color`
+  resets them to the theme default. Checked buttons show a highlight border and
+  the checked set survives re-render. Turning the mode off clears the checks and
+  restores normal click-to-select.
+- Removed the category right-click `Set Buttons Color...` / `Reset Buttons Colors`
+  actions (superseded by Color Select mode). Per-button right-click
+  `Set Color...` / `Reset Color` stays.
+
 ## v01.02 — 2026-07-06
 
 - **Button colors**: give each selection button a custom color. Right-click a
