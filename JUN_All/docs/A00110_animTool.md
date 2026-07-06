@@ -2,7 +2,7 @@
 
 ## 1. 개요
 
-애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **여섯 개의 탭**과 **공유 로그창**으로 구성된다.
+애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **일곱 개의 탭**과 **공유 로그창**으로 구성된다.
 
 1. **Key Edit** — (v01.14~) **접이식 섹션 4개**로 구성된다. **Move Keys**: 키를 시간 범위로
    **이동(앞/뒤 offset)·삭제**. **Graph Editor**: 선택한 키 구간을 **평평하게 유지(Hold)**
@@ -26,6 +26,18 @@
    으로 target 1개를 **모든 follower 가 추종**(off 면 인덱스 1:1 n<-n). **blend(0~1)** 로 원본
    follower 애니메이션과 매치 결과를 섞으며(0=원본 유지, 1=덮어쓰기, 0.5=반반), 선택된
    **애니메이션 레이어**(override/additive)에 키가 들어간다.
+7. **Graph Focus** (v01.25~) — 컨트롤러를 선택하면 그 컨트롤러의 **전체 키 구간**(예: 0~6000f)을
+   다 보여주는 대신, **현재 프레임 기준 ± margin 프레임**만 그래프 에디터에 확대해서 보여준다
+   (예: 현재 500f, margin 80 → `420f~580f`). **Auto-Focus 토글**을 켜면 선택이 바뀔 때마다
+   자동으로 프레이밍하고, margin 값은 **스핀박스로 사용자가 지정**한다.
+
+> **v01.25 — Graph Focus 탭 신설**: 선택 시 그래프 에디터를 현재 프레임 ± margin 구간으로 프레이밍하는
+> 탭을 추가했다. **Auto-Focus 토글**(체크형 버튼)이 켜지면 `SelectionChanged` scriptJob 으로 선택 변경을
+> 감시하다가, 마야 자체 프레이밍 뒤(`evalDeferred`)에 `animView` 로 `[현재-margin, 현재+margin]` 을
+> 덮어쓴다. **Frame margin(±)** 스핀박스로 프레임 수를 정하고(기본 80), **Fit value** 체크 시 세로(값)
+> 축도 구간 내 키 값 범위에 맞춘다. **Focus Now** 버튼은 토글과 무관하게 즉시 1회 프레이밍. 창을 닫으면
+> `closeEvent` 에서 scriptJob 을 정리한다. 새 매니저 `graph_view_manager.py`(프레이밍 로직) +
+> `graph_focus_manager.py`(scriptJob 라이프사이클), `app/ui/main_window.py` 변경.
 
 > **v01.24 — Always on Top(Pin) 토글 버튼 추가**: 상단 헤더 행 오른쪽에 체크형 `Pin` 버튼을 두었다.
 > 켜면 이 창이 다른 마야 창들보다 **항상 위**에 유지되고(`Qt.WindowStaysOnTopHint`) 라벨이 `Pinned`
@@ -176,8 +188,10 @@ A00110_animTool/
     │   ├── mirror_token_store.py # mirror_tokens.json 입출력 + 폴백
     │   ├── bake_manager.py       # 리스트 노드 구간 bake (Bake 탭, native bakeResults)
     │   ├── follow_match_manager.py # follower→target 월드 매치 베이크 (Follow 탭, OpenMaya + blend, maintain offset, 1<-n)
-    │   └── offset_hold_manager.py # 키를 hold+offset 구조로 재배치 (Key Edit 탭 > Offset & Hold)
-    └── ui/main_window.py  # 전체 UI (6개 탭 + 공유 로그창 + 메뉴 바)
+    │   ├── offset_hold_manager.py # 키를 hold+offset 구조로 재배치 (Key Edit 탭 > Offset & Hold)
+    │   ├── graph_view_manager.py  # 그래프 에디터 현재±margin 프레이밍 로직 (Graph Focus 탭)
+    │   └── graph_focus_manager.py # SelectionChanged scriptJob 라이프사이클 (Graph Focus 탭)
+    └── ui/main_window.py  # 전체 UI (7개 탭 + 공유 로그창 + 메뉴 바)
 ```
 
 - 각 manager 는 **UI 비의존 정적 메서드**(`@staticmethod`)로 작성되고 `(count, msg)` 를 반환한다.
@@ -209,7 +223,8 @@ A00110_animTool.run(True)   # True = reload
 
 ```
 ┌ Help ────────────────────────────────────────────────────────┐  ← 메뉴 바 (Help > About)
-│ [Key Edit][Pose Key][Copy Key][Mirror Key][Bake][Follow]      │  ← 탭 (6개)
+│ [Key Edit][Pose Key][Copy Key][Mirror Key][Bake][Follow]      │  ← 탭 (7개)
+│ [Graph Focus]                                                 │
 ├───────────────────────────────────────────────────────────────┤
 │  (선택된 탭 내용)                                             │
 ├ Log (모든 탭 공유) ───────────────────────────────────────────┤
@@ -485,6 +500,34 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
   값에 베이크**되며(레이어 weight 는 1 유지), follower/프레임마다 독립적이다.
 - **Match Follow**: 실행. 결과(매치한 follower 수 / 구간 / 프레임 수 / blend / 사용 레이어 / skip)가
   로그에 출력.
+
+### 5.7 Graph Focus 탭 (v01.25~)
+
+```
+┌ Focus Graph Editor around Current Frame ──────────┐
+│ [ Auto-Focus on Selection : OFF ]                 │  ← 체크형 토글 버튼
+│ Frame margin (±) [ 80 f ]                         │  ← 스핀박스 (사용자 지정)
+│ [x] Fit value (vertical) axis too                 │
+│ [ Focus Now ]                                     │
+└───────────────────────────────────────────────────┘
+```
+
+컨트롤러를 선택했을 때, 그 컨트롤러에 걸린 **전체 키 구간**(예: 0~6000f)을 다 보여주는 마야 기본
+동작 대신 **현재 프레임 ± margin 프레임**만 그래프 에디터에 확대해서 보여준다.
+
+- **Auto-Focus on Selection**(토글): 켜면 `SelectionChanged` 를 감시하다가 선택이 바뀔 때마다
+  그래프 에디터를 `[현재프레임 - margin, 현재프레임 + margin]` 구간으로 프레이밍한다. 켠 순간의
+  현재 선택에도 즉시 1회 적용된다. 끄면 감시(scriptJob)를 중단한다. 창을 닫으면 자동 정리된다.
+- **Frame margin (±)**: 현재 프레임 앞/뒤로 몇 프레임을 보여줄지. 예) 현재 500f, margin 80 →
+  `420f ~ 580f`. 토글이 켜진 상태에서 값을 바꾸면 **즉시 다시 프레이밍**된다.
+- **Fit value (vertical) axis too**(기본 ON): 가로(시간) 구간 안에 있는 선택 오브젝트 키 값의
+  범위에 맞춰 **세로(값) 축**도 자동으로 프레이밍한다(구간에 키가 없으면 세로는 그대로 둔다).
+  끄면 세로 줌은 건드리지 않고 가로만 바꾼다.
+- **Focus Now**: 토글과 무관하게 **지금 한 번만** 현재 프레임 ± margin 으로 프레이밍한다.
+
+> 구현: 마야가 (Auto Frame 등으로) 선택 시 자체 프레이밍을 하므로, scriptJob 콜백은
+> `evalDeferred` 로 한 틱 미뤄 **마야 처리 뒤에 우리 `animView` 프레이밍이 마지막으로 적용**되게
+> 한다. 그래프 에디터가 열려 있지 않으면(패널 없음) 조용히 무시된다.
 
 ---
 

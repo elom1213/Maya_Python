@@ -23,6 +23,8 @@ from tools.A00110_animTool.app.core import MirrorTokenStore
 from tools.A00110_animTool.app.core import BakeManager
 from tools.A00110_animTool.app.core import FollowMatchManager
 from tools.A00110_animTool.app.core import OffsetHoldManager
+from tools.A00110_animTool.app.core import GraphViewManager
+from tools.A00110_animTool.app.core import GraphFocusManager
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -50,6 +52,9 @@ class MainWindow(QWidget):
         # 툴 실행 중 Shift+A 핫키 바인딩 (창 종료 시 closeEvent 에서 복원)
         self.hotkey_mgr = HotkeyManager()
         self._enable_hotkey(self.cb_hotkey.isChecked())
+
+        # 선택 시 그래프 에디터 자동 프레이밍 (기본 OFF, 창 종료 시 scriptJob 정리)
+        self.graph_focus_mgr = GraphFocusManager()
 
     # --------------------------------------------------
     # UI
@@ -117,6 +122,7 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_mirror_key_tab(), "Mirror Key")
         self.tabs.addTab(self._build_bake_tab(), "Bake")
         self.tabs.addTab(self._build_follow_tab(), "Follow")
+        self.tabs.addTab(self._build_graph_focus_tab(), "Graph Focus")
         main_layout.addWidget(self.tabs)
 
         # 탭 전환 시에는 '현재 탭' 콘텐츠에 맞추되 줄이지 않고 필요할 때만 늘린다(grow_only).
@@ -909,6 +915,85 @@ class MainWindow(QWidget):
 
         return tab
 
+    def _build_graph_focus_tab(self):
+        """선택한 컨트롤러의 전체 키 구간을 다 보여주는 대신, 현재 프레임 기준
+        ± margin 프레임만 그래프 에디터에 확대해서 보여주는 탭.
+
+        토글이 켜져 있으면 SelectionChanged 를 감시하다가 선택이 바뀔 때마다
+        그래프 에디터를 [현재프레임-margin, 현재프레임+margin] 구간으로 프레이밍한다.
+        margin(예: 80) 은 아래 스핀박스로 사용자가 지정한다."""
+
+        tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
+        tab_layout = QVBoxLayout(tab)
+
+        grp = QGroupBox("Focus Graph Editor around Current Frame")
+        grp_layout = QVBoxLayout(grp)
+
+        # -------------------------
+        # On/Off 토글 버튼 (선택 시 자동 프레이밍)
+        # -------------------------
+
+        self.btn_graph_focus = QPushButton("Auto-Focus on Selection : OFF")
+        self.btn_graph_focus.setCheckable(True)
+        self.btn_graph_focus.setToolTip(
+            "When ON, selecting a controller frames the Graph Editor to\n"
+            "[current frame - margin, current frame + margin] instead of its\n"
+            "whole keyed range.")
+        grp_layout.addWidget(self.btn_graph_focus)
+
+        # -------------------------
+        # margin(± 프레임) 입력. 사용자가 '80' 같은 값을 여기서 정한다.
+        # -------------------------
+
+        margin_row = QHBoxLayout()
+        margin_row.addWidget(QLabel("Frame margin (±)"))
+        self.sb_graph_margin = QSpinBox()
+        self.sb_graph_margin.setRange(1, 100000)
+        self.sb_graph_margin.setValue(80)
+        self.sb_graph_margin.setSuffix(" f")
+        self.sb_graph_margin.setToolTip(
+            "Frames to show before and after the current frame.\n"
+            "e.g. current 500f, margin 80  ->  shows 420f ~ 580f")
+        margin_row.addWidget(self.sb_graph_margin)
+        margin_row.addStretch(1)
+        grp_layout.addLayout(margin_row)
+
+        # -------------------------
+        # 세로(값) 축도 구간에 맞춰 자동으로 프레이밍할지 (기본 ON)
+        # -------------------------
+
+        self.cb_graph_fit_value = QCheckBox("Fit value (vertical) axis too")
+        self.cb_graph_fit_value.setChecked(True)
+        self.cb_graph_fit_value.setToolTip(
+            "Also fit the vertical (value) axis to the keys inside the\n"
+            "visible window. Off: keep the current vertical zoom.")
+        grp_layout.addWidget(self.cb_graph_fit_value)
+
+        # -------------------------
+        # 토글과 무관하게 지금 한 번만 프레이밍
+        # -------------------------
+
+        self.btn_graph_focus_now = QPushButton("Focus Now")
+        self.btn_graph_focus_now.setToolTip(
+            "Frame the Graph Editor around the current frame once, without\n"
+            "turning on the auto-focus toggle.")
+        grp_layout.addWidget(self.btn_graph_focus_now)
+
+        tab_layout.addWidget(grp)
+        tab_layout.addStretch(1)
+
+        # -------------------------
+        # Signal
+        # -------------------------
+
+        self.btn_graph_focus.toggled.connect(self.on_toggle_graph_focus)
+        self.btn_graph_focus_now.clicked.connect(self.on_graph_focus_now)
+        # margin / fit 값이 바뀌면, 토글이 켜져 있을 때 즉시 다시 프레이밍한다.
+        self.sb_graph_margin.valueChanged.connect(self._graph_focus_reapply)
+        self.cb_graph_fit_value.toggled.connect(self._graph_focus_reapply)
+
+        return tab
+
     # --------------------------------------------------
     # Helper
     # --------------------------------------------------
@@ -1469,6 +1554,43 @@ class MainWindow(QWidget):
         self.log(msg)
 
     # --------------------------------------------------
+    # Graph Focus (선택 시 그래프 에디터 자동 프레이밍)
+    # --------------------------------------------------
+
+    def _graph_margin(self):
+        """현재 margin 스핀박스 값(±프레임)."""
+        return self.sb_graph_margin.value()
+
+    def _graph_fit_value(self):
+        """세로(값) 축도 맞출지 여부."""
+        return self.cb_graph_fit_value.isChecked()
+
+    def on_toggle_graph_focus(self, checked):
+        """Auto-Focus 토글 ON/OFF. ON 이면 SelectionChanged 감시 시작 + 즉시 1회 적용."""
+        self.btn_graph_focus.setText(
+            "Auto-Focus on Selection : ON" if checked else "Auto-Focus on Selection : OFF")
+
+        if checked:
+            ok, msg = self.graph_focus_mgr.install(
+                self._graph_margin, self._graph_fit_value)
+            self.log(msg)
+        else:
+            self.graph_focus_mgr.uninstall()
+            self.log("Graph focus: OFF")
+
+    def on_graph_focus_now(self):
+        """토글과 무관하게 지금 한 번만 현재 프레임 ± margin 으로 프레이밍."""
+        count, msg = GraphViewManager.frame_around_current(
+            self._graph_margin(), fit_value=self._graph_fit_value())
+        self.log(msg)
+
+    def _graph_focus_reapply(self, *args):
+        """margin / fit 값이 바뀌면 토글이 켜져 있을 때만 즉시 다시 프레이밍(로그 없음)."""
+        if self.graph_focus_mgr.is_active():
+            GraphViewManager.frame_around_current(
+                self._graph_margin(), fit_value=self._graph_fit_value())
+
+    # --------------------------------------------------
     # Teardown
     # --------------------------------------------------
 
@@ -1481,9 +1603,11 @@ class MainWindow(QWidget):
             self._fit_window_later()
 
     def closeEvent(self, event):
-        # 창이 닫힐 때 Shift+A 를 원래 바인딩으로 복원
+        # 창이 닫힐 때 Shift+A 를 원래 바인딩으로 복원 + 그래프 포커스 scriptJob 정리
         try:
             if getattr(self, "hotkey_mgr", None):
                 self.hotkey_mgr.restore()
+            if getattr(self, "graph_focus_mgr", None):
+                self.graph_focus_mgr.uninstall()
         finally:
             super().closeEvent(event)
