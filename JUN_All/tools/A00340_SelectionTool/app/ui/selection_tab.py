@@ -14,6 +14,8 @@
 #   - 각 카테고리는 QGroupBox, 그 안에 선택 버튼이 쌓인다.
 #   - 버튼 클릭     : 저장된 오브젝트를 선택('Add' 체크 시 현재 선택에 누적).
 #   - 추가/삭제/정렬/이름변경/선택갱신 : 우클릭 컨텍스트 메뉴로 한다.
+#   - 색 지정       : 버튼 우클릭 'Set Color...'(팔레트+스포이드)로 개별 지정,
+#                     카테고리 우클릭 'Set Buttons Color...'로 여러 버튼 일괄 지정.
 
 from Framework.qt.qt import (
     QWidget,
@@ -31,6 +33,8 @@ from Framework.qt.qt import (
     QScrollArea,
     QInputDialog,
     QMessageBox,
+    QColorDialog,
+    QColor,
     QMenu,
     Qt,
 )
@@ -40,6 +44,31 @@ from ..core import maya_select
 
 
 TITLE = "Selection Tool"
+
+# 색이 지정되지 않은(=아직 한 번도 칠하지 않은) 버튼의 컬러 다이얼로그 시작값.
+DEFAULT_PICK_HEX = "#5a5a5a"
+
+
+def _contrast_text_hex(qcolor):
+    """배경색(qcolor) 위에서 잘 읽히는 글자색(검정/흰색) 을 밝기로 고른다."""
+    lum = (qcolor.red() * 299 + qcolor.green() * 587 + qcolor.blue() * 114) / 1000.0
+    return "#000000" if lum > 140 else "#FFFFFF"
+
+
+def _button_stylesheet(hex_str):
+    """버튼에 입힐 배경/글자/테두리/hover 스타일시트를 hex 색 하나로 만든다."""
+    bg = QColor(hex_str)
+    text = _contrast_text_hex(bg)
+    border = bg.darker(150).name()
+    hover = bg.lighter(115).name()
+    pressed = bg.darker(115).name()
+    return (
+        "QPushButton {{"
+        " background-color: {bg}; color: {text};"
+        " border: 1px solid {border}; border-radius: 3px; padding: 4px; }}"
+        "QPushButton:hover {{ background-color: {hover}; }}"
+        "QPushButton:pressed {{ background-color: {pressed}; }}"
+    ).format(bg=bg.name(), text=text, border=border, hover=hover, pressed=pressed)
 
 
 class AddSelectionDialog(QDialog):
@@ -221,6 +250,11 @@ class SelectionTab(QWidget):
         if len(objects) > 20:
             preview += "\n... (+{0} more)".format(len(objects) - 20)
         btn.setToolTip(preview or "(empty)")
+
+        # 사용자가 지정한 색이 있으면 입힌다(없으면 테마 기본 스타일 유지).
+        color_hex = btn_data.get("color")
+        if color_hex:
+            btn.setStyleSheet(_button_stylesheet(color_hex))
 
         name = btn_data["name"]
 
@@ -431,12 +465,22 @@ class SelectionTab(QWidget):
         act_down = menu.addAction("Move Down")
         menu.addSeparator()
         act_rename = menu.addAction("Rename Category")
+        menu.addSeparator()
+        # 카테고리 안 모든 버튼의 색을 한 번에 지정/해제(여러 버튼 일괄 편집).
+        act_set_colors = menu.addAction("Set Buttons Color...")
+        act_reset_colors = menu.addAction("Reset Buttons Colors")
+        menu.addSeparator()
         act_delete = menu.addAction("Delete Category")
 
         cats = self._data.get("categories", [])
         idx = next((i for i, c in enumerate(cats) if c["name"] == cat_name), -1)
         act_up.setEnabled(idx > 0)
         act_down.setEnabled(0 <= idx < len(cats) - 1)
+
+        cat = self._find_category(cat_name)
+        buttons = cat.get("buttons", []) if cat else []
+        act_set_colors.setEnabled(bool(buttons))
+        act_reset_colors.setEnabled(any(b.get("color") for b in buttons))
 
         chosen = menu.exec_(box.mapToGlobal(pos))
         if chosen == act_up:
@@ -445,6 +489,10 @@ class SelectionTab(QWidget):
             self._move_category(cat_name, +1)
         elif chosen == act_rename:
             self._rename_category(cat_name)
+        elif chosen == act_set_colors:
+            self._set_category_colors(cat_name)
+        elif chosen == act_reset_colors:
+            self._reset_category_colors(cat_name)
         elif chosen == act_delete:
             self._delete_category(cat_name)
 
@@ -457,6 +505,10 @@ class SelectionTab(QWidget):
         act_rename = menu.addAction("Rename")
         act_update = menu.addAction("Update Objects (replace with selection)")
         act_add = menu.addAction("Add Objects (append selection)")
+        menu.addSeparator()
+        act_set_color = menu.addAction("Set Color...")
+        act_reset_color = menu.addAction("Reset Color")
+        menu.addSeparator()
         act_category = menu.addAction("Change Category")
         act_delete = menu.addAction("Delete")
 
@@ -467,6 +519,9 @@ class SelectionTab(QWidget):
         )
         act_up.setEnabled(idx > 0)
         act_down.setEnabled(0 <= idx < len(buttons) - 1)
+        # 색이 지정된 버튼만 되돌리기 가능.
+        btn_data = self._find_button(cat_name, btn_name)
+        act_reset_color.setEnabled(bool(btn_data and btn_data.get("color")))
 
         chosen = menu.exec_(btn_widget.mapToGlobal(pos))
         if chosen == act_up:
@@ -479,6 +534,10 @@ class SelectionTab(QWidget):
             self._update_button_objects(cat_name, btn_name, append=False)
         elif chosen == act_add:
             self._update_button_objects(cat_name, btn_name, append=True)
+        elif chosen == act_set_color:
+            self._set_button_color(cat_name, btn_name)
+        elif chosen == act_reset_color:
+            self._reset_button_color(cat_name, btn_name)
         elif chosen == act_category:
             self._change_button_category(cat_name, btn_name)
         elif chosen == act_delete:
@@ -656,3 +715,79 @@ class SelectionTab(QWidget):
 
         cat["buttons"] = [b for b in cat["buttons"] if b["name"] != btn_name]
         self._save_and_render()
+
+    # =============================================================== color
+
+    def _pick_color(self, initial_hex, title):
+        """컬러 다이얼로그(팔레트 + 내장 'Pick Screen Color' 스포이드)를 띄운다.
+
+        유효한 색을 고르면 '#rrggbb' 문자열을, 취소하면 None 을 돌려준다.
+        """
+        initial = QColor(initial_hex or DEFAULT_PICK_HEX)
+        chosen = QColorDialog.getColor(initial, self, title)
+        if not chosen.isValid():
+            return None
+        return chosen.name()
+
+    def _set_button_color(self, cat_name, btn_name):
+        """버튼 하나의 색을 팔레트/스포이드로 지정한다."""
+        btn_data = self._find_button(cat_name, btn_name)
+        if btn_data is None:
+            return
+
+        hex_str = self._pick_color(btn_data.get("color"), "Pick Button Color")
+        if hex_str is None:
+            return
+
+        btn_data["color"] = hex_str
+        self._save_and_render()
+        self._log("Set color {0} on '{1}'.".format(hex_str, btn_name))
+
+    def _reset_button_color(self, cat_name, btn_name):
+        """버튼의 지정색을 지워 테마 기본 스타일로 되돌린다."""
+        btn_data = self._find_button(cat_name, btn_name)
+        if btn_data is None or not btn_data.get("color"):
+            return
+
+        btn_data.pop("color", None)
+        self._save_and_render()
+        self._log("Reset color on '{0}'.".format(btn_name))
+
+    def _set_category_colors(self, cat_name):
+        """카테고리 안 모든 버튼의 색을 한 번에 지정한다(여러 버튼 일괄 편집)."""
+        cat = self._find_category(cat_name)
+        if cat is None:
+            return
+        buttons = cat.get("buttons", [])
+        if not buttons:
+            QMessageBox.information(self, TITLE, "This category has no buttons.")
+            return
+
+        # 이미 색이 있는 버튼이 있으면 그 색을 시작값으로 삼는다.
+        current = next((b.get("color") for b in buttons if b.get("color")), None)
+        hex_str = self._pick_color(current, "Pick Color for All Buttons")
+        if hex_str is None:
+            return
+
+        for b in buttons:
+            b["color"] = hex_str
+        self._save_and_render()
+        self._log("Set color {0} on {1} button(s) in '{2}'."
+                  .format(hex_str, len(buttons), cat_name))
+
+    def _reset_category_colors(self, cat_name):
+        """카테고리 안 모든 버튼의 지정색을 한 번에 지운다."""
+        cat = self._find_category(cat_name)
+        if cat is None:
+            return
+
+        changed = 0
+        for b in cat.get("buttons", []):
+            if b.pop("color", None) is not None:
+                changed += 1
+        if not changed:
+            return
+
+        self._save_and_render()
+        self._log("Reset color on {0} button(s) in '{1}'."
+                  .format(changed, cat_name))

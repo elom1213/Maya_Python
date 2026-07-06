@@ -2,6 +2,19 @@
 
 All notable changes to this tool are documented here.
 
+## v01.02 — 2026-07-06
+
+- **Button colors**: give each selection button a custom color. Right-click a
+  button → `Set Color...` opens a color palette (with the OS eyedropper /
+  `Pick Screen Color` to copy any on-screen color) and applies it; the label
+  text auto-switches black/white for readability. `Reset Color` reverts the
+  button to the theme's default style.
+- **Recolor many at once**: right-click a category → `Set Buttons Color...`
+  applies one picked color to every button in that category in a single step;
+  `Reset Buttons Colors` clears them all.
+- Colors are stored per button (`"color"` hex) in the profile JSON, so they
+  persist across sessions.
+
 ## v01.01 — 2026-07-02
 
 - **Always on Top toggle**: added a checkable `Pin` button to the header row
