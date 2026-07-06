@@ -31,6 +31,18 @@
    (예: 현재 500f, margin 80 → `420f~580f`). **Auto-Focus 토글**을 켜면 선택이 바뀔 때마다
    자동으로 프레이밍하고, margin 값은 **스핀박스로 사용자가 지정**한다.
 
+> **v01.29 — Graph Focus: 세로 여백(Value margin %)을 UI 로 조절**: v01.28 에서 여백을 아예 없앴더니
+> 최댓값/최솟값이 뷰 위아래 가장자리에 딱 붙었는데, 살짝 여백을 두고 싶다는 요청에 따라 **`Value margin (%)`
+> 스핀박스**(기본 10%, 0~100)를 추가했다. 세로 값 범위에 이 퍼센트만큼 위/아래 여백을 두고 프레이밍한다
+> (5~10% 권장). `frame_around_current(..., value_pad_pct)` 로 전달되며, Auto-Focus·Focus Now 공통. 평평한
+> 구간은 값 크기에 비례한(또는 1.0) 여백을 유지. `graph_view_manager.py` · `graph_focus_manager.py` ·
+> `main_window.py` 변경.
+
+> **v01.28 — Graph Focus: Fit value 를 여백 없이 꽉 채우도록**: 세로 값 범위에 위아래 10% 여백을
+> 주던 것을 없애, 구간 내 **최댓값이 뷰 맨 위·최솟값이 맨 아래에 닿도록**(`animView` minValue/maxValue =
+> vmin/vmax) 값을 최대한 크게 보여준다(값이 줄어들어 잘 안 보이던 문제 해소). 평평한 구간(min==max)만
+> `animView` 가 범위를 만들 수 없어 예외로 최소 여백을 유지한다. `app/core/graph_view_manager.py` 만 변경.
+
 > **v01.27 — Graph Focus: 키 선택 후 `f`(Frame Selection)를 존중**: Auto-Focus 가 켜진 상태에서
 > 그래프 에디터의 **특정 키를 선택해 `f` 로 그 범위만 보려 하면**, 키 선택으로 발생한 `SelectionChanged`
 > 의 지연 콜백이 뒤늦게 **현재 프레임으로 덮어써** 원하는 프레임(예: 300f)이 아니라 현재 프레임(400f)으로
@@ -522,6 +534,7 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 │ [ Auto-Focus on Selection : OFF ]                 │  ← 체크형 토글 버튼
 │ Frame margin (±) [ 80 f ]                         │  ← 스핀박스 (사용자 지정)
 │ [x] Fit value (vertical) axis too                 │
+│ Value margin (%) [ 10 % ]                         │  ← 세로 위/아래 여백 (v01.29~)
 │ [ Focus Now ]                                     │
 └───────────────────────────────────────────────────┘
 ```
@@ -537,6 +550,9 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 - **Fit value (vertical) axis too**(기본 ON): 가로(시간) 구간에서 선택 오브젝트의 애니메이션 커브를
   실제로 평가한 값 범위에 맞춰 **세로(값) 축**도 자동으로 프레이밍한다(v01.26~ 구간에 키가 없어도
   맞는다). 끄면 세로 줌은 건드리지 않고 가로만 바꾼다.
+- **Value margin (%)**(v01.29~, 기본 10%): 세로 값 범위에 위/아래로 이 퍼센트만큼 여백을 두고
+  프레이밍한다. 최댓값/최솟값이 뷰 위아래 가장자리에 딱 붙지 않게 하는 값으로 **5~10% 정도 권장**.
+  `Fit value` 가 켜져 있을 때만 의미가 있다.
 - **Focus Now**: 토글과 무관하게 **지금 한 번만** 현재 프레임 ± margin 으로 프레이밍한다.
 
 > 구현: 마야가 (Auto Frame 등으로) 선택 시 자체 프레이밍을 하므로, scriptJob 콜백은

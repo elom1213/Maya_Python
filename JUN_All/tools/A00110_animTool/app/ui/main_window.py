@@ -965,9 +965,27 @@ class MainWindow(QWidget):
         self.cb_graph_fit_value = QCheckBox("Fit value (vertical) axis too")
         self.cb_graph_fit_value.setChecked(True)
         self.cb_graph_fit_value.setToolTip(
-            "Also fit the vertical (value) axis to the keys inside the\n"
-            "visible window. Off: keep the current vertical zoom.")
+            "Also fit the vertical (value) axis to the curve values inside\n"
+            "the visible window. Off: keep the current vertical zoom.")
         grp_layout.addWidget(self.cb_graph_fit_value)
+
+        # -------------------------
+        # 세로(값) 위/아래 여백(%) — 최댓값/최솟값이 뷰 가장자리에 딱 붙지 않도록.
+        # 사용자가 5~10% 정도로 조절한다(기본 10%).
+        # -------------------------
+
+        pad_row = QHBoxLayout()
+        pad_row.addWidget(QLabel("Value margin (%)"))
+        self.sb_graph_value_pad = QSpinBox()
+        self.sb_graph_value_pad.setRange(0, 100)
+        self.sb_graph_value_pad.setValue(10)
+        self.sb_graph_value_pad.setSuffix(" %")
+        self.sb_graph_value_pad.setToolTip(
+            "Top/bottom padding for the value axis, as a % of the value range.\n"
+            "e.g. 10% keeps the min/max a little inside the top/bottom edges.")
+        pad_row.addWidget(self.sb_graph_value_pad)
+        pad_row.addStretch(1)
+        grp_layout.addLayout(pad_row)
 
         # -------------------------
         # 토글과 무관하게 지금 한 번만 프레이밍
@@ -988,9 +1006,10 @@ class MainWindow(QWidget):
 
         self.btn_graph_focus.toggled.connect(self.on_toggle_graph_focus)
         self.btn_graph_focus_now.clicked.connect(self.on_graph_focus_now)
-        # margin / fit 값이 바뀌면, 토글이 켜져 있을 때 즉시 다시 프레이밍한다.
+        # margin / fit / 여백 값이 바뀌면, 토글이 켜져 있을 때 즉시 다시 프레이밍한다.
         self.sb_graph_margin.valueChanged.connect(self._graph_focus_reapply)
         self.cb_graph_fit_value.toggled.connect(self._graph_focus_reapply)
+        self.sb_graph_value_pad.valueChanged.connect(self._graph_focus_reapply)
 
         return tab
 
@@ -1565,6 +1584,10 @@ class MainWindow(QWidget):
         """세로(값) 축도 맞출지 여부."""
         return self.cb_graph_fit_value.isChecked()
 
+    def _graph_value_pad(self):
+        """세로(값) 위/아래 여백 퍼센트."""
+        return self.sb_graph_value_pad.value()
+
     def on_toggle_graph_focus(self, checked):
         """Auto-Focus 토글 ON/OFF. ON 이면 SelectionChanged 감시 시작 + 즉시 1회 적용."""
         self.btn_graph_focus.setText(
@@ -1572,7 +1595,7 @@ class MainWindow(QWidget):
 
         if checked:
             ok, msg = self.graph_focus_mgr.install(
-                self._graph_margin, self._graph_fit_value)
+                self._graph_margin, self._graph_fit_value, self._graph_value_pad)
             self.log(msg)
         else:
             self.graph_focus_mgr.uninstall()
@@ -1581,14 +1604,16 @@ class MainWindow(QWidget):
     def on_graph_focus_now(self):
         """토글과 무관하게 지금 한 번만 현재 프레임 ± margin 으로 프레이밍."""
         count, msg = GraphViewManager.frame_around_current(
-            self._graph_margin(), fit_value=self._graph_fit_value())
+            self._graph_margin(), fit_value=self._graph_fit_value(),
+            value_pad_pct=self._graph_value_pad())
         self.log(msg)
 
     def _graph_focus_reapply(self, *args):
-        """margin / fit 값이 바뀌면 토글이 켜져 있을 때만 즉시 다시 프레이밍(로그 없음)."""
+        """margin / fit / 여백 값이 바뀌면 토글이 켜져 있을 때만 즉시 다시 프레이밍(로그 없음)."""
         if self.graph_focus_mgr.is_active():
             GraphViewManager.frame_around_current(
-                self._graph_margin(), fit_value=self._graph_fit_value())
+                self._graph_margin(), fit_value=self._graph_fit_value(),
+                value_pad_pct=self._graph_value_pad())
 
     # --------------------------------------------------
     # Teardown

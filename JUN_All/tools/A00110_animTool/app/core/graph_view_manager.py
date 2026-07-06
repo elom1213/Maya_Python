@@ -92,9 +92,12 @@ class GraphViewManager:
         return (vmin, vmax)
 
     @staticmethod
-    def frame_around_current(margin, fit_value=True):
+    def frame_around_current(margin, fit_value=True, value_pad_pct=10.0):
         """그래프 에디터를 현재 프레임 ± margin 구간으로 프레이밍한다.
 
+        value_pad_pct : 세로(값) 축 위/아래 여백을 값 범위의 몇 %로 둘지(기본 10%).
+                        구간 내 최댓값/최솟값이 뷰 위/아래 가장자리에 딱 붙지 않고
+                        이만큼 여백을 두고 보이도록 한다.
         반환: (성공한 에디터 수, 메시지)
         """
         margin = abs(int(margin))
@@ -107,16 +110,19 @@ class GraphViewManager:
             return (0, "Graph Editor is not open.")
 
         # 세로(값) 범위 계산 (fit_value 이고 구간에 키가 있을 때만).
+        # 구간 내 최댓값/최솟값 범위에 위/아래로 value_pad_pct % 여백을 두고 프레이밍한다
+        # (값이 위아래 가장자리에 딱 붙지 않게). 평평한 구간(min==max)은 animView 가
+        # 범위를 만들 수 없어, 값 크기에 비례한(또는 1.0) 최소 여백을 준다.
         v_kw = {}
         if fit_value:
             v_range = GraphViewManager._value_range_in_window(start, end)
             if v_range is not None:
                 v_min, v_max = v_range
+                pad_frac = max(0.0, value_pad_pct) / 100.0
                 if v_min == v_max:
-                    # 평평한 구간 -> 위아래로 약간의 여백을 준다.
-                    pad = abs(v_min) * 0.1 or 1.0
+                    pad = abs(v_min) * pad_frac or 1.0
                 else:
-                    pad = (v_max - v_min) * 0.1
+                    pad = (v_max - v_min) * pad_frac
                 v_kw = {"minValue": v_min - pad, "maxValue": v_max + pad}
 
         applied = 0
