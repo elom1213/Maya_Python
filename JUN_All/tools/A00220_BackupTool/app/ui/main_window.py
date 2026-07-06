@@ -121,6 +121,24 @@ class MainWindow(QWidget):
     def _build_ui(self):
         root = QVBoxLayout(self)
 
+        # -------------------------
+        # 상단 헤더 행 : Always on Top(Pin) 토글(우측). A00110_animTool 과 동일 패턴 —
+        # 켜면 이 창이 다른 창들보다 항상 위에 유지된다(Qt.WindowStaysOnTopHint).
+        # 기본은 정상 Z-order 라, 필요할 때만 켠다.
+        # -------------------------
+        self.pin_button = QPushButton("Pin")
+        self.pin_button.setCheckable(True)
+        self.pin_button.setToolTip("Keep this window above other windows")
+        # 고정 크기 — "Pin"/"Pinned" 토글 시 버튼 크기가 변하지 않도록 (넓은 라벨 기준)
+        self.pin_button.setFixedSize(72, 28)
+        self.pin_button.toggled.connect(self.toggle_always_on_top)
+
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(0, 0, 0, 0)
+        header_row.addStretch(1)
+        header_row.addWidget(self.pin_button)
+        root.addLayout(header_row)
+
         root.addWidget(self._build_files_group())
         root.addWidget(self._build_settings_group())
         root.addWidget(self._build_control_group())
@@ -313,6 +331,16 @@ class MainWindow(QWidget):
         layout.addWidget(self.lbl_countdown)
 
         return group
+
+    # ========================================================== always-on-top
+
+    def toggle_always_on_top(self, enabled):
+        """Always on Top(Pin) 토글. WindowStaysOnTopHint 를 켜고/끄고, 플래그 변경 후
+        다시 show() 한다(플래그를 바꾸면 창이 숨는 Qt 특성 회피). A00110_animTool 과 동일."""
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, enabled)
+        self.pin_button.setText("Pinned" if enabled else "Pin")
+        self.show()
+        self.log(f"Always on Top: {'ON' if enabled else 'OFF'}")
 
     # ============================================================== prefs
 

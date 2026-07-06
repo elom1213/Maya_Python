@@ -1,5 +1,15 @@
 # Changelog — A00220_BackupTool
 
+## [01.13] - 2026-07-06
+
+### Added
+- **Always on Top (Pin) toggle.** Added a checkable `Pin` button at the top-right of
+  the window (header row). When on, the window stays above other windows
+  (`Qt.WindowStaysOnTopHint`) and the label switches to `Pinned`; press again to
+  release. The tool defaults to normal Z-order, so this is opt-in. Fixed-size button so
+  toggling doesn't change its size. Same pattern as `A00110_animTool` (v01.24).
+  `app/ui/main_window.py` only.
+
 ## [01.12] - 2026-07-03
 
 ### Added
