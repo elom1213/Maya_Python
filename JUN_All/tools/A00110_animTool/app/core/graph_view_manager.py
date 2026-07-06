@@ -28,19 +28,68 @@ class GraphViewManager:
         panels = cmds.getPanel(scriptType="graphEditor") or []
         return [p + "GraphEd" for p in panels]
 
+    # 값 범위를 구할 때 커브를 시간축으로 샘플링하는 총 평가 횟수 상한.
+    # (선택 오브젝트가 많아 커브 수가 많으면 커브당 샘플 수를 이 상한 안에서 줄인다.)
+    _MAX_VALUE_SAMPLES = 4000
+
     @staticmethod
     def _value_range_in_window(start, end):
-        """선택 오브젝트들의 애니메이션 커브 중 [start, end] 구간 키 값의 (min, max).
-        해당 구간에 키가 하나도 없으면 None."""
+        """선택 오브젝트들의 애니메이션 커브를 [start, end] 구간에서 '실제로 평가'해
+        얻은 값의 (min, max). 구간에 키가 없어도 유효한 범위를 반환한다.
+
+        키 값만 보던 이전 방식은 구간 안에 키가 없으면(현재 프레임이 멀리 떨어진 두 키
+        사이에 있을 때) 빈 값이 나와 세로축이 맞지 않았다. 여기서는 애니메이션 커브의
+        `.output` 을 구간에 걸쳐 시간별로 평가하고(탄젠트 오버슛 포함), 구간 내 키 값도
+        함께 반영해 항상 구간의 실제 상/하한을 얻는다. 커브가 하나도 없으면 None."""
         sel = cmds.ls(sl=True) or []
         if not sel:
             return None
 
-        vals = cmds.keyframe(sel, q=True, time=(start, end), valueChange=True) or []
-        if not vals:
+        # 선택 오브젝트에 물린 애니메이션 커브 노드(중복 제거).
+        curves = cmds.keyframe(sel, q=True, name=True) or []
+        curves = list(dict.fromkeys(curves))
+        if not curves:
             return None
 
-        return (min(vals), max(vals))
+        # 구간을 균일하게 샘플링(경계 포함). 커브가 많으면 커브당 샘플 수를 줄여
+        # 총 평가 횟수를 _MAX_VALUE_SAMPLES 이내로 유지한다.
+        span = end - start
+        steps = max(2, min(120, GraphViewManager._MAX_VALUE_SAMPLES // len(curves)))
+        if span > 0:
+            sample_times = [start + span * i / steps for i in range(steps + 1)]
+        else:
+            sample_times = [start]
+
+        vmin = None
+        vmax = None
+
+        def _acc(v):
+            nonlocal vmin, vmax
+            if v is None:
+                return
+            if vmin is None or v < vmin:
+                vmin = v
+            if vmax is None or v > vmax:
+                vmax = v
+
+        for crv in curves:
+            out = crv + ".output"
+
+            # 구간에 걸친 커브 값 (키가 없어도, 키 사이 오버슛도 커버).
+            for t in sample_times:
+                try:
+                    _acc(cmds.getAttr(out, time=t))
+                except (RuntimeError, ValueError):
+                    continue
+
+            # 샘플 사이에 낀 날카로운 키 값도 반영.
+            for v in (cmds.keyframe(crv, q=True, time=(start, end), valueChange=True) or []):
+                _acc(v)
+
+        if vmin is None:
+            return None
+
+        return (vmin, vmax)
 
     @staticmethod
     def frame_around_current(margin, fit_value=True):

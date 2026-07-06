@@ -81,8 +81,15 @@ class GraphFocusManager:
         cmds.evalDeferred(self._apply_silent, lowestPriority=True)
 
     def _apply_silent(self):
-        """scriptJob 경로: 로그 없이 조용히 프레이밍(그래프 에디터가 닫혀 있으면 무시)."""
+        """scriptJob 경로: 로그 없이 조용히 프레이밍(그래프 에디터가 닫혀 있으면 무시).
+
+        단, 그래프 에디터에서 '키가 선택돼 있으면' 자동 프레이밍을 건너뛴다.
+        사용자가 특정 키를 선택해 f(Frame Selection) 로 그 범위만 보려는 상황에서,
+        키 선택으로 발생한 SelectionChanged 의 지연 콜백이 뒤늦게 현재 프레임으로
+        덮어쓰는 것을 막기 위함이다. (컨트롤러만 새로 선택했을 땐 선택 키가 없어 정상 동작.)"""
         try:
+            if cmds.keyframe(q=True, selected=True, name=True):
+                return
             GraphViewManager.frame_around_current(self._margin(), fit_value=self._fit_value())
         except RuntimeError:
             pass
