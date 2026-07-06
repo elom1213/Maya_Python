@@ -25,6 +25,7 @@ from tools.A00145_RigConnect.app.core import matrix_constraint_manager as mtx_mg
 from tools.A00145_RigConnect.app.core import connect_manager as cnt_mgr
 from tools.A00145_RigConnect.app.core import stream_manager as stm_mgr
 from tools.A00145_RigConnect.app.core import skin_constraint_manager as skn_mgr
+from tools.A00145_RigConnect.app.core import group_create_manager as grp_mgr
 from tools.A00145_RigConnect.app.core import (
     CONSTRAINT_TYPES, connect_closest, find_closest_for_drivers)
 from tools.A00145_RigConnect.app.ui.collapsible import CollapsibleBox
@@ -189,9 +190,10 @@ class MainWindow(QWidget):
         layout = QVBoxLayout(tab)
 
         # 기존 Constraint 기능은 펼쳐두고(collapsed=False),
-        # 새 Skin Weight to Constraint 기능은 접어둔다(collapsed=True).
+        # 새 Skin Weight to Constraint / Group Create 기능은 접어둔다(collapsed=True).
         layout.addWidget(self._build_constrain_basic_box())
         layout.addWidget(self._build_skin_constraint_box())
+        layout.addWidget(self._build_group_create_box())
 
         layout.addStretch(1)
         return tab
@@ -340,6 +342,48 @@ class MainWindow(QWidget):
         btn_row.addWidget(btn_loc)
 
         box.addLayout(btn_row)
+
+        return box
+
+    def _build_group_create_box(self):
+        """Group Create UI (접이식, 기본 접힘).
+
+        리스트업된 각 오브젝트에, 그 오브젝트와 위치·회전이 같은 빈 그룹을
+        '오브젝트의 부모와 오브젝트 사이' 계층에 삽입한다. 그룹명은
+        <obj>_con_01(중첩이면 _con_02, ...). Count 로 오브젝트당 그룹 수 지정.
+        """
+        box = CollapsibleBox("Group Create", collapsed=True)
+
+        self.tsl_group_objs = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", select_label="Select",
+            list_min_height=180, log_callback=self.log)
+        box.addWidget(self.tsl_group_objs)
+
+        opt_box = QGroupBox("Options")
+        opt_layout = QVBoxLayout(opt_box)
+
+        # Count : 오브젝트당 만들 (중첩) 그룹 수. _con_01 이 오브젝트 바로 위.
+        cnt_row = QHBoxLayout()
+        cnt_row.addWidget(QLabel("Count"))
+        self.sb_group_count = QSpinBox()
+        self.sb_group_count.setRange(1, 50)
+        self.sb_group_count.setValue(1)
+        self.sb_group_count.setToolTip(
+            "How many nested groups to create per object.\n"
+            "_con_01 is the object's immediate parent, _con_02 is above it, ...")
+        cnt_row.addWidget(self.sb_group_count)
+        cnt_row.addStretch(1)
+        opt_layout.addLayout(cnt_row)
+
+        box.addWidget(opt_box)
+
+        btn = QPushButton("Create Groups")
+        btn.setMinimumHeight(32)
+        btn.setToolTip(
+            "Insert an offset group (same position/rotation) between each listed "
+            "object and its parent. Group name = <object>_con_01.")
+        btn.clicked.connect(self.on_group_create)
+        box.addWidget(btn)
 
         return box
 
@@ -676,6 +720,22 @@ class MainWindow(QWidget):
                      "{1} constraint(s) applied".format(len(created), len(made)))
 
         self._run("Skin Weight to Locators", _do)
+
+    def on_group_create(self):
+        objs = self.tsl_group_objs.get_all_items()
+        count = self.sb_group_count.value()
+
+        def _do():
+            created, warns = grp_mgr.create_groups(objs, count)
+            for w in warns:
+                self.log("[WARN] {0}".format(w))
+            self.log("       {0} group(s) created for {1} object(s)".format(
+                len(created), len(objs)))
+            # 생성한 그룹을 씬에서 선택.
+            if created:
+                cmds.select(created)
+
+        self._run("Group Create", _do)
 
     # ==============================================================
     # Handlers : Connect
