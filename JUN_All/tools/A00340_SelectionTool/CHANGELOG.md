@@ -2,6 +2,16 @@
 
 All notable changes to this tool are documented here.
 
+## v01.04 — 2026-07-06
+
+- **Split layout + one-click collapsible controls**: the window is now a vertical
+  splitter — the control panel (Profile / Create / Color / Log) sits on top, the
+  created button collection below, with a draggable handle to rebalance them. The
+  whole control panel is wrapped in a single collapsible `Controls` box: click its
+  title bar (▾/▸) to fold Profile/Create/Color/Log away **all at once**; the top
+  pane shrinks to the header and the button area takes the freed space (restored on
+  expand). The Log view moved from a fixed bottom group into the control panel.
+
 ## v01.03 — 2026-07-06
 
 - **Color Select mode (recolor across categories)**: replaced the per-category

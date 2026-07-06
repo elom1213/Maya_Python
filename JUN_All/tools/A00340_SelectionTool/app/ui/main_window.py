@@ -1,19 +1,21 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-02
+# last Update date : 2026-07-06
 # A00340_SelectionTool - Qt UI (in-Maya)
 #
 # 마야에서 선택된 오브젝트들을 버튼 하나로 빠르게 다시 선택하는 툴.
 #   - 버튼은 현재 선택을 캡처해 만든다. 클릭하면 그 오브젝트들이 씬에서 선택된다.
 #   - A00240_PathTool 처럼 카테고리/버튼을 자유롭게 추가·삭제·순서변경 하고,
 #     Profile 로 원하는 종류끼리 버튼 세트를 나눠 보관한다.
+#   - 화면은 상하 스플리터로 [컨트롤(Profile/Create/Color/Log)] / [버튼 모음] 분리.
+#     컨트롤 4칸은 하나의 접이식 'Controls' 박스로 묶여 한 번에 접힌다. 로그창도
+#     그 안에 들어가므로 log_view 를 탭에 넘겨준다.
 # 창은 마야 메인 윈도우에 parent 되어 뷰포트 위에 뜬다. 모든 UI 문자열/로그는 영어.
 
 from Framework.qt.qt import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QGroupBox,
     QLabel,
     QMenuBar,
     QPlainTextEdit,
@@ -69,20 +71,15 @@ class MainWindow(QWidget):
         header_row.addWidget(self.pin_button)
         main_layout.addLayout(header_row)
 
-        # 공용 로그창 (탭이 log_callback 으로 쓰므로 탭보다 먼저 생성)
+        # 공용 로그창. 탭이 상단 컨트롤의 접이식 'Log' 섹션에 담으므로 탭보다 먼저 생성.
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
         self.log_view.setFixedHeight(90)
 
-        # 선택 버튼 탭 (Profile / Category / Selection buttons)
-        self.selection_tab = SelectionTab(log_callback=self._log)
+        # 선택 버튼 탭 (컨트롤 pane + 버튼 pane 을 상하 스플리터로 분리, 로그도 그 안에)
+        self.selection_tab = SelectionTab(
+            log_callback=self._log, log_widget=self.log_view)
         main_layout.addWidget(self.selection_tab, stretch=1)
-
-        # 로그창
-        log_group = QGroupBox("Log")
-        log_layout = QVBoxLayout(log_group)
-        log_layout.addWidget(self.log_view)
-        main_layout.addWidget(log_group)
 
         # 저작권
         footer = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
@@ -124,6 +121,9 @@ class MainWindow(QWidget):
             "- Set Color uses a palette with an eyedropper (Pick Screen\n"
             "  Color). Turn on 'Color Select' to check multiple buttons\n"
             "  across categories and Apply one color to all of them.\n"
+            "- Layout : drag the splitter between the control panel and the\n"
+            "  button area; click the 'Controls' bar to collapse Profile /\n"
+            "  Create / Color / Log all at once.\n"
             "\n"
             "All UI text is English.\n"
             "\n"

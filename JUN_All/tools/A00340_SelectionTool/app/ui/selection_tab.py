@@ -31,7 +31,9 @@ from Framework.qt.qt import (
     QLineEdit,
     QCheckBox,
     QPushButton,
+    QToolButton,
     QScrollArea,
+    QSplitter,
     QInputDialog,
     QMessageBox,
     QColorDialog,
@@ -86,6 +88,48 @@ def _button_stylesheet(hex_str):
              pressed=pressed, check=CHECK_HILITE_HEX)
 
 
+class CollapsibleBox(QWidget):
+    """제목 바를 클릭하면 내용을 접었다 펼 수 있는 섹션.
+
+    상단 컨트롤(Profile/Create/Color/Log)을 각각 이 위젯으로 감싸, 필요 없는 칸을
+    접어 아래 버튼 모음에 공간을 더 내줄 수 있게 한다.
+    """
+
+    def __init__(self, title, content_layout=None, expanded=True, parent=None):
+        super().__init__(parent)
+
+        # 화살표(▾/▸) + 제목의 클릭형 헤더. 체크 상태 = 펼침 여부.
+        self._title = title
+        self._header = QToolButton()
+        self._header.setText(title)
+        self._header.setCheckable(True)
+        self._header.setChecked(expanded)
+        self._header.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self._header.setArrowType(Qt.DownArrow if expanded else Qt.RightArrow)
+        self._header.setAutoRaise(True)
+        self._header.setStyleSheet(
+            "QToolButton { border: none; font-weight: bold; padding: 2px; }")
+        self._header.toggled.connect(self._on_toggled)
+        # 외부에서 접힘/펼침을 감지할 수 있도록 헤더 토글 시그널을 그대로 노출.
+        self.toggled = self._header.toggled
+
+        self._content = QWidget()
+        if content_layout is not None:
+            self._content.setLayout(content_layout)
+        self._content.setVisible(expanded)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        outer.addWidget(self._header)
+        outer.addWidget(self._content)
+
+    def _on_toggled(self, expanded):
+        self._header.setArrowType(
+            Qt.DownArrow if expanded else Qt.RightArrow)
+        self._content.setVisible(expanded)
+
+
 class AddSelectionDialog(QDialog):
     """선택 버튼 생성: 카테고리 선택 → 버튼 이름 (오브젝트는 현재 선택을 캡처)."""
 
@@ -129,11 +173,14 @@ class AddSelectionDialog(QDialog):
 
 class SelectionTab(QWidget):
 
-    def __init__(self, log_callback=None, parent=None):
+    def __init__(self, log_callback=None, log_widget=None, parent=None):
         super().__init__(parent)
 
         # 로그/상태 보고용 콜백(없으면 무시). main_window 의 공용 로그로 흘려보낸다.
         self._log = log_callback or (lambda _msg: None)
+
+        # main_window 가 만든 로그 위젯. 있으면 상단 컨트롤의 접이식 'Log' 섹션에 담는다.
+        self._log_widget = log_widget
 
         # 활성 프로파일과 그 데이터를 읽는다(없으면 Default 자동 생성).
         self._profile = prefs_mod.get_active()
@@ -155,12 +202,67 @@ class SelectionTab(QWidget):
 
     def _build_ui(self):
         root = QVBoxLayout(self)
+        root.setContentsMargins(4, 4, 4, 4)
 
-        root.addWidget(self._build_profile_group())
-        root.addWidget(self._build_create_group())
-        root.addWidget(self._build_color_group())
+        # 컨트롤(위)과 버튼 모음(아래)을 드래그로 비율 조절하는 상하 스플리터로 나눈다.
+        splitter = QSplitter(Qt.Vertical)
+        self._splitter = splitter
 
-        # 카테고리가 계속 늘어나므로 스크롤 영역에 담는다.
+        splitter.addWidget(self._build_controls_pane())
+        splitter.addWidget(self._build_buttons_pane())
+
+        # 컨트롤은 필요한 만큼만, 버튼 모음이 남은 공간을 차지하도록.
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setCollapsible(0, False)
+        splitter.setCollapsible(1, False)
+        splitter.setSizes([230, 430])
+
+        root.addWidget(splitter)
+
+    def _build_controls_pane(self):
+        """상단 pane: Profile/Create/Color/Log 를 '하나의' 접이식 박스로 묶는다.
+
+        네 칸을 개별로 접는 대신 Controls 박스 헤더 하나로 전부 접었다 편다.
+        """
+        inner = QVBoxLayout()
+        inner.setContentsMargins(6, 2, 6, 6)
+        inner.setSpacing(4)
+
+        inner.addWidget(self._build_profile_group())
+        inner.addWidget(self._build_create_group())
+        inner.addWidget(self._build_color_group())
+        if self._log_widget is not None:
+            inner.addWidget(self._build_log_group())
+
+        self._controls_box = CollapsibleBox("Controls", inner)
+        # 접으면 스플리터의 위 pane 도 헤더 높이로 줄여 버튼 영역에 공간을 넘긴다.
+        self._controls_box.toggled.connect(self._on_controls_toggled)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(self._controls_box)
+        return scroll
+
+    def _on_controls_toggled(self, expanded):
+        """Controls 박스를 접으면 위 pane 을 헤더만 남기고 아래 pane 을 넓힌다."""
+        splitter = getattr(self, "_splitter", None)
+        if splitter is None:
+            return
+        sizes = splitter.sizes()
+        total = sum(sizes) or 1
+        if expanded:
+            # 접기 직전 높이로 복원(없으면 기본값).
+            top = getattr(self, "_controls_expanded_h", 230)
+            top = min(top, max(40, total - 40))
+            splitter.setSizes([top, max(40, total - top)])
+        else:
+            self._controls_expanded_h = sizes[0]
+            header_h = self._controls_box._header.sizeHint().height() + 6
+            splitter.setSizes([header_h, max(40, total - header_h)])
+
+    def _build_buttons_pane(self):
+        """하단 pane: 생성한 카테고리/버튼 모음(계속 늘어나므로 스크롤)."""
         self._cat_container = QWidget()
         self._cat_layout = QVBoxLayout(self._cat_container)
         self._cat_layout.setAlignment(Qt.AlignTop)
@@ -168,7 +270,14 @@ class SelectionTab(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(self._cat_container)
-        root.addWidget(scroll, stretch=1)
+        return scroll
+
+    def _build_log_group(self):
+        # main_window 의 로그 위젯을 'Log' 그룹에 담는다(컨트롤 박스와 함께 접힌다).
+        group = QGroupBox("Log")
+        lay = QVBoxLayout(group)
+        lay.addWidget(self._log_widget)
+        return group
 
     def _build_profile_group(self):
         # 프로파일(캐릭터/에셋처럼 JSON 별로 나뉜 선택 버튼 묶음) 선택 + 관리.
