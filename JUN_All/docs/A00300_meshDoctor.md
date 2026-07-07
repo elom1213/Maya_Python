@@ -4,7 +4,7 @@
 **안전한 원클릭 수정**(Undo 가능)을 제공하는 PySide 툴. 로그를 Claude 에게 주면 근본 원인 분석을 받을 수 있다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`A00110_animTool` 클론)
-- **버전**: `app/config/version.py` (v01.00)
+- **버전**: `app/config/version.py` (v01.02 — 배치 진단 + 요약 테이블)
 - **설치**: `__dragDrop_A00300.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 → `tools.A00300_meshDoctor.run(True)`
 - **의존**: 외부 pip 없음. `maya.cmds` + `maya.api.OpenMaya` 2.0 만 사용 (Maya 2023+).
 
@@ -168,16 +168,44 @@ elif iMode in [2, 4, 5]:   # closestPoint / closestUVPoint / spikes
 
 ---
 
+## 여러 메시 한 번에 진단 (v01.02)
+
+여러 메시를 **리스트업해 한 번에 진단하고, 메시당 결과를 간단히** 본다.
+
+- **Target Meshes**(창 상단 리스트): 진단할 메시를 담는다.
+  - **Add Selected**: 현재 선택한 폴리곤 메시를 리스트에 추가(중복 제외).
+  - **Remove**: 선택한 행 제거 · **Clear**: 전체 비우기.
+  - 항목은 **UUID 로 보관**(표시는 짧은 이름)하므로 **중복 이름·리페어런트에도** 정확히 그 메시를 가리킨다.
+- **Diagnose Listed**(기존 *Diagnose Selected* 대체): 리스트의 **모든 메시**를 진단한다.
+  **리스트가 비어 있으면 현재 Maya 선택**을 진단한다(기존 동작 그대로). 리스트 항목이 씬에서 사라졌으면
+  로그에 경고하고 건너뛴다.
+- **Summary 테이블**(`Mesh | Status | Issues`): 메시당 한 줄로 결과를 보여준다.
+  - **Status**: 그 메시의 최악 심각도를 색으로 — `● FAIL`(빨강) / `● WARN`(노랑) / `● INFO`(파랑) / `● PASS`(초록).
+  - **Issues**: WARN·FAIL 체크만 `이름(개수)` 로 요약(FAIL 먼저). 문제 없으면 `clean`.
+  - **행을 클릭하면** 그 메시의 **전체 상세 리포트가 아래 로그뷰에 출력**된다(근본 원인 + 체크별 메시지 + 샘플).
+- 진단하면 로그에도 **배치 요약**(메시별 한 줄)과 저장된 리포트 경로가 남고, JSON/TXT 리포트는 **배치 전체**를 저장한다.
+
+```
+┌ Summary ───────────────────────────────────────────┐
+│ Mesh      Status   Issues                           │
+│ head_geo  ● FAIL   non_manifold(3), zero_area_faces(5)│ ← 행 클릭 → 아래 로그에 상세
+│ body_geo  ● PASS   clean                            │
+│ hand_geo  ● WARN   coincident_vertices(2)           │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 사용 순서
 
 1. `__dragDrop_A00300.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프에 **MeshDoctor** 버튼 생성.
-2. 문제 메시 선택 → **Diagnose Selected**.
-   - 로그뷰에 색상별(FAIL=빨강 …) 요약 출력.
+2. 진단할 메시들을 선택 → **Add Selected** 로 **Target Meshes** 리스트에 담는다(한 개만 볼 땐 그냥 선택만 해도 됨).
+3. **Diagnose Listed** → **Summary 테이블**에 메시별 한 줄 결과. 문제 있는 행을 클릭하면 아래 로그뷰에 상세.
    - `tools/A00300_meshDoctor/0020_out/` 에 두 파일 저장:
      - `meshDoctor_<scene>_<timestamp>.json` — 구조화 데이터(**Claude 분석용**)
      - `..._summary.txt` — 사람이 읽는 요약
-3. **Open Log Folder** 로 폴더 열기 → `.json` 내용을 Claude 에게 전달 → 근본 원인·수정 순서 안내 받기.
-4. (권장: 복제본에서) **Safe One-Click Fixes** 버튼으로 수정 → 다시 **Diagnose** 로 PASS 확인 → Transfer 재시도.
+4. **Open Log Folder** 로 폴더 열기 → `.json` 내용을 Claude 에게 전달 → 근본 원인·수정 순서 안내 받기.
+5. (권장: 복제본에서) **Safe One-Click Fixes** 버튼으로 수정 → 다시 **Diagnose** 로 PASS 확인 → Transfer 재시도.
 
 ---
 
@@ -267,10 +295,10 @@ tools/A00300_meshDoctor/
 ├── app/
 │   ├── config/version.py
 │   ├── core/
-│   │   ├── mesh_scan.py     # 읽기 전용 진단 (핵심)
+│   │   ├── mesh_scan.py     # 읽기 전용 진단 (핵심). scan_nodes(nodes)/scan_selection()/scan_one()
 │   │   ├── report.py        # JSON + TXT 로그 출력 (PathManager → 0020_out/)
 │   │   └── mesh_fix.py      # 안전 원클릭 수정 (Undo 가능)
-│   └── ui/main_window.py    # Qt UI
+│   └── ui/main_window.py    # Qt UI (Target Meshes TSL + Summary 테이블 + 로그 + Fixes)
 └── 0020_out/                # 로그 출력 (.gitignore 대상)
 ```
 

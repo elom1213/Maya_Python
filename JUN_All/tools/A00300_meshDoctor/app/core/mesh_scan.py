@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-25
+# last Update date : 2026-07-07
 # A00300_meshDoctor - 읽기 전용 메시 진단 (maya.cmds + maya.api.OpenMaya 2.0)
 #
 # 메시를 절대 수정하지 않는다. 선택 메시의 토폴로지/정점 무결성을 검사해
@@ -564,13 +564,19 @@ def _check_transform_uv_skin(transform, shape):
 # ----------------------------------------------------------------------
 
 class MeshScanner:
-    """선택 메시 진단. 메시를 절대 수정하지 않는다."""
+    """선택/지정 메시 진단. 메시를 절대 수정하지 않는다."""
 
-    def scan_selection(self):
-        sel = cmds.ls(selection=True, long=True) or []
+    @staticmethod
+    def _resolve_meshes(nodes):
+        """노드 목록 -> [(transform_fullPath, shape_fullPath), ...] (중복 shape 제거)."""
         meshes = []
         seen = set()
-        for node in sel:
+        for node in nodes:
+            try:
+                if not cmds.objExists(node):
+                    continue
+            except Exception:
+                continue
             shp = shape_of(node)
             if shp and shp not in seen:
                 seen.add(shp)
@@ -580,7 +586,14 @@ class MeshScanner:
                 else:
                     tr = node
                 meshes.append((tr, shp))
-        return [self.scan_one(tr, shp) for tr, shp in meshes]
+        return meshes
+
+    def scan_nodes(self, nodes):
+        """주어진 노드 목록의 메시를 진단(현재 선택과 무관). 결과 dict 리스트 반환."""
+        return [self.scan_one(tr, shp) for tr, shp in self._resolve_meshes(nodes)]
+
+    def scan_selection(self):
+        return self.scan_nodes(cmds.ls(selection=True, long=True) or [])
 
     def scan_one(self, transform, shape):
         checks = []
