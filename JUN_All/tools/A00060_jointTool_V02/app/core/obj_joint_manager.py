@@ -13,9 +13,14 @@ _LIST_UPDWN = ["down", "up"]
 
 
 def _joint_at_obj(obj):
-    """MEL JUN_make_jnt_toObj - 오브젝트 위치에 joint 생성."""
+    """MEL JUN_make_jnt_toObj - 오브젝트의 '월드' 위치에 joint 생성.
+
+    오브젝트가 어떤 계층 아래에 있든 world-space 절대 위치(xform -q -ws -translation)로
+    생성한다. joint -p 는 생성 시점에 선택된 부모 joint 아래로 들어갈 수 있어(체인 모드),
+    생성 직후 xform(ws) 로 월드 위치를 다시 확정한다(부모/계층 무관 정확 배치)."""
     pos = cmds.xform(obj, q=True, ws=True, translation=True)
     jnt = cmds.joint(p=pos)
+    cmds.xform(jnt, ws=True, translation=pos)
     cmds.joint(jnt, edit=True, zso=True, oj="xyz", sao="yup")
     return jnt
 

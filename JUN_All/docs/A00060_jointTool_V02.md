@@ -3,7 +3,7 @@
 MEL `JointTool V05.03`(탭: Curve / Divide / Aim)와 기존 `A00060_jointTool`(헤어 커브용 조인트 유틸)을
 하나로 합친 툴이다. **UI 는 PySide(Qt)**, 로직은 `maya.cmds` 로 작성되었다.
 
-- 버전: `v01.00` (`app/config/version.py`)
+- 버전: `v01.03` (`app/config/version.py`) — 조인트 생성 위치를 월드 절대 좌표로 (§6)
 - 위치: `JUN_All/tools/A00060_jointTool_V02`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴(`QTabWidget` 4탭)
 - 원본 `A00060_jointTool` / MEL 파일은 그대로 보존(미수정)
@@ -139,7 +139,8 @@ A00060_jointTool_V02/
 | `JUN_cmd_make_jntAim` | `aim_manager` |
 | 리스트 Select/Add/Del/Up/Down (`JUN_cmd_*` TSL 군) | `JUN_mod_tsl_qt_v01` 내장 |
 
-> 동작은 MEL V05.03 과 동일하게 유지했다(좌표 보정·축 인덱스 계산 등 원본 로직 그대로 이식).
+> 축 인덱스 계산 등 축/orient 로직은 MEL V05.03 을 그대로 이식했다. 단, **조인트 생성 위치는 월드
+> 절대 좌표로 바로잡았다**(§6) — 원본의 object-space/이중 가산 좌표 처리는 계층 아래 오브젝트에서 오차를 냈다.
 
 ---
 
@@ -149,3 +150,22 @@ A00060_jointTool_V02/
 - Set Orient / Reverse 는 리스트 순서가 체인 순서(root→end)와 일치해야 한다.
 - 원본 `A00060_jointTool` 의 카피 흔적(`config.py`/dragDrop 의 `A00040_file_exporter` 식별자)은
   V02 에 가져오지 않았다 — 모든 식별자는 `A00060_jointTool_V02` 로 일관.
+
+---
+
+## 6. 월드 절대 위치로 조인트 생성 (v01.03)
+
+**증상**: 오브젝트/커브가 이동·회전·스케일된 **그룹 계층 아래**에 있으면 **Match to Obj**(Curve 탭)·
+**Make Joint Divided**(Divide 탭)·**Joints to Crv** 로 만든 조인트가 **엉뚱한 위치**에 생겼다.
+원인은 대상 좌표를 **월드 기준 절대값**으로 받지 않은 것.
+
+세 곳을 수정했다(모두 `app/core`):
+
+| 위치 | 문제 | 수정 |
+|------|------|------|
+| `divide_manager.curves_from_pairs` | `xform(q, translation)` = **오브젝트 로컬 좌표**로 커브 생성 | `ws=True` 추가 → 월드 좌표 |
+| `curve_joint_manager._joint_at_curve_point` | `pointPosition`(이미 월드)에 커브 world translation 을 **한 번 더 가산** → 커브가 원점이 아니면 위치 2배 오차 | 이중 가산 제거, 월드값 직접 사용 + `xform(ws)` 로 확정 |
+| `obj_joint_manager._joint_at_obj` (Match to Obj) | 월드값을 받지만 `joint -p` 가 부모 체인 아래로 들어갈 때 위치 미확정 | 생성 직후 `xform(jnt, ws=True, translation=pos)` 로 월드 위치 확정 |
+
+- `aim_manager` 는 원래부터 전 구간 `ws=True`(위치 보존형) 라 변경 없음.
+- 세 수정 모두 **원점/무계층 케이스는 동작 불변**(하위 호환), 계층 아래 오브젝트만 올바르게 교정된다.

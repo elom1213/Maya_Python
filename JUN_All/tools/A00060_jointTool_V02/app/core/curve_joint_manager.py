@@ -3,7 +3,9 @@
 #   JUN_make_jnt_toCurvePoint / make_jnts_toCurvePoint /
 #   JUN_cmd_create_joints_toCrv / JUN_cmd_create_clusters_toCrv
 #
-# 동작은 V05.03 과 동일하게 유지한다(좌표 보정 포함).
+# joint 는 항상 커브 포인트의 world-space 절대 위치에 생성한다(오브젝트/커브가 어떤
+# 계층 아래에 있어도 정확히 배치). 예전의 "pointPosition + 커브 translation" 좌표 보정은
+# 이중 가산 버그라 제거했다.
 
 import maya.cmds as cmds
 
@@ -21,12 +23,15 @@ def cv_indices_of_curve(curve):
 
 
 def _joint_at_curve_point(curve, cp_num, point_type):
-    """MEL JUN_make_jnt_toCurvePoint - 커브 포인트 위치에 joint 생성.
-    원본과 동일하게 pointPosition 에 커브 월드 translation 을 더한다."""
-    cp_pos = cmds.pointPosition("{0}.{1}[{2}]".format(curve, point_type, cp_num))
-    curve_pos = cmds.xform(curve, q=True, ws=True, translation=True)
-    pos = [cp_pos[i] + curve_pos[i] for i in range(3)]
+    """MEL JUN_make_jnt_toCurvePoint - 커브 포인트의 '월드' 위치에 joint 생성.
+
+    pointPosition 은 이미 world-space 절대 좌표(부모 계층의 이동/회전/스케일까지 반영)를
+    반환하므로 그대로 쓴다. (기존엔 여기에 커브의 world translation 을 한 번 더 더해서,
+    커브가 원점이 아니거나 계층 아래에 있으면 위치가 두 배로 어긋났다.) 생성 직후
+    xform(ws) 로 월드 위치를 확정해, joint 가 부모 체인 아래로 들어가도 정확히 배치한다."""
+    pos = cmds.pointPosition("{0}.{1}[{2}]".format(curve, point_type, cp_num))
     jnt = cmds.joint(p=pos)
+    cmds.xform(jnt, ws=True, translation=pos)
     cmds.joint(jnt, edit=True, zso=True, oj="xyz", sao="yup")
     return jnt
 

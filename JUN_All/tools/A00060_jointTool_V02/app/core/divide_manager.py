@@ -16,12 +16,15 @@ def _curve_between(pos_a, pos_b):
 
 def curves_from_pairs(starts, ends):
     """MEL JUN_get_curves_strEnd - 시작/끝 쌍마다 커브 생성.
-    원본과 동일하게 object-space translation(xform -q -translation)을 사용한다."""
+
+    오브젝트가 어떤 계층 아래에 있든 정확히 그 사이를 잇도록 world-space 절대 좌표
+    (xform -q -ws -translation)를 사용한다. (기존엔 object-space translation 을 써서
+    부모에 트랜스폼이 걸린 오브젝트를 넣으면 커브/분할 joint 가 엉뚱한 곳에 생겼다.)"""
     curves = []
     n = max(len(starts), len(ends))
     for i in range(n):
-        pos_a = cmds.xform(starts[i], q=True, translation=True)
-        pos_b = cmds.xform(ends[i], q=True, translation=True)
+        pos_a = cmds.xform(starts[i], q=True, ws=True, translation=True)
+        pos_b = cmds.xform(ends[i], q=True, ws=True, translation=True)
         curves.append(_curve_between(pos_a, pos_b))
     return curves
 
