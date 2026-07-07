@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-17
+# last Update date : 2026-07-07
 # A00210_FileManager - "Path Structure" tab (Qt)
 #
 # 베이스 폴더의 하위 폴더 구조를 캡처해 store_dir 에 JSON 으로 저장하고(다른 PC 와 git 동기화),
@@ -31,6 +31,7 @@ from Framework.qt.qt import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
+    QInputDialog,
     QMessageBox,
     QStyle,
 )
@@ -40,6 +41,16 @@ from ..core.store import OutsideProjectRootError
 
 
 class PathStructureTab(QWidget):
+
+    # Recreate 버튼(실제로 폴더를 생성하는 동작)을 다른 관리 버튼과 구분하기 위한 액센트.
+    _RECREATE_QSS = (
+        "QPushButton {"
+        " background-color: #2e7d32; color: #ffffff; font-weight: bold;"
+        " border: 1px solid #1b5e20; border-radius: 3px; padding: 4px 16px; }"
+        "QPushButton:hover { background-color: #388e3c; }"
+        "QPushButton:pressed { background-color: #1b5e20; }"
+        "QPushButton:disabled { background-color: #4b5b4c; color: #9aa; }"
+    )
 
     def __init__(self, get_store, get_project_root, get_store_dir, log):
         super().__init__()
@@ -148,19 +159,44 @@ class PathStructureTab(QWidget):
         self.list_structs.setMaximumHeight(120)
         layout.addWidget(self.list_structs, stretch=0)
 
+        # 관리 버튼(Refresh/Rename/Delete)은 왼쪽에, 실제로 폴더를 '생성'하는 Recreate 는
+        # 색을 달리해 오른쪽에 따로 둔다(파괴/생성 동작을 시각적으로 구분).
         btn_row = QHBoxLayout()
         btn_refresh = QPushButton("Refresh")
         btn_refresh.clicked.connect(self.on_refresh)
-        btn_recreate = QPushButton("Recreate")
-        btn_recreate.setToolTip("Create checked folders within the depth below.")
-        btn_recreate.clicked.connect(self.on_recreate)
+        btn_rename = QPushButton("Rename")
+        btn_rename.setToolTip("Rename the selected saved structure.")
+        btn_rename.clicked.connect(self.on_rename)
         btn_delete = QPushButton("Delete")
         btn_delete.clicked.connect(self.on_delete)
         btn_row.addWidget(btn_refresh)
-        btn_row.addWidget(btn_recreate)
+        btn_row.addWidget(btn_rename)
         btn_row.addWidget(btn_delete)
         btn_row.addStretch(1)
+
+        self.btn_recreate = QPushButton("Recreate")
+        self.btn_recreate.setToolTip(
+            "Create the checked folders (within the depth) directly inside 'Recreate To'.")
+        self.btn_recreate.clicked.connect(self.on_recreate)
+        self.btn_recreate.setStyleSheet(self._RECREATE_QSS)
+        btn_row.addWidget(self.btn_recreate)
         layout.addLayout(btn_row)
+
+        # Recreate 목적지: 체크된 폴더가 이 폴더 '바로 안'에 생성된다.
+        # 구조를 선택하면 <Project Root>/<base_rel> 로 자동 채워지고, 다른 곳으로 바꿀 수 있다.
+        recreate_row = QHBoxLayout()
+        recreate_row.addWidget(QLabel("Recreate To"))
+        self.ipf_recreate_to = QLineEdit()
+        self.ipf_recreate_to.setPlaceholderText("Destination base folder for Recreate")
+        self.ipf_recreate_to.setToolTip(
+            "Destination base folder. Checked folders are created directly inside it.\n"
+            "Auto-filled to <Project Root>/<base_rel> when a structure is selected; "
+            "edit or Browse to redirect anywhere.")
+        btn_recreate_browse = QPushButton("Browse...")
+        btn_recreate_browse.clicked.connect(lambda: self._browse_dir(self.ipf_recreate_to))
+        recreate_row.addWidget(self.ipf_recreate_to)
+        recreate_row.addWidget(btn_recreate_browse)
+        layout.addLayout(recreate_row)
 
         # Preview 옵션 행: Depth / Show files / Expand
         prev_row = QHBoxLayout()
@@ -433,12 +469,16 @@ class PathStructureTab(QWidget):
         self._cur_base_abs = ""
         self._excluded = set()
         self.tree_preview.clear()
+        self.ipf_recreate_to.clear()
 
     def _show_preview(self, structure, base_abs=""):
         """새 구조를 Preview 대상으로 삼는다(제외 목록 초기화 후 트리 렌더)."""
         self._cur_structure = structure
         self._cur_base_abs = base_abs or ""
         self._excluded = set()
+        # Recreate 목적지를 이 구조의 기본 경로(<Project Root>/<base_rel>, 또는 캡처 소스)로
+        # 자동 채운다. 사용자가 그대로 두면 기존 동작과 동일, 바꾸면 그 폴더에 생성된다.
+        self.ipf_recreate_to.setText(self._cur_base_abs)
         self._fill_preview_tree(self.tree_preview)
 
     def _view_depth(self):
@@ -595,9 +635,11 @@ class PathStructureTab(QWidget):
             QMessageBox.warning(self, "Path Structure", "Select a structure first.")
             return
 
-        project_root = self._get_project_root()
-        if not project_root:
-            QMessageBox.warning(self, "Path Structure", "Set Project Root first (File Manager tab).")
+        target = self.ipf_recreate_to.text().strip()
+        if not target:
+            QMessageBox.warning(
+                self, "Path Structure",
+                "Set the 'Recreate To' destination folder first.")
             return
 
         structure = ps_mod.load(self._get_store_dir(), name)
@@ -610,9 +652,20 @@ class PathStructureTab(QWidget):
         folders = ps_mod.limit_depth(structure.folders, self._view_depth())
         folders = [f for f in folders if f not in self._excluded]
 
-        created, existing = ps_mod.recreate(structure, project_root, folders=folders)
+        # 목적지가 아직 없으면 새로 만들 것임을 알린다(오타로 엉뚱한 곳에 생성 방지).
+        if not os.path.isdir(target):
+            ok = QMessageBox.question(
+                self,
+                "Path Structure",
+                f"'Recreate To' folder does not exist yet:\n{target}\n\nCreate it (and the structure) there?",
+            )
+            if ok != QMessageBox.Yes:
+                return
 
-        self._log(f"Recreate '{name}': {len(created)} created, {len(existing)} already existed.")
+        created, existing = ps_mod.recreate(structure, None, folders=folders, base_abs=target)
+
+        self._log(f"Recreate '{name}' -> {target}: "
+                  f"{len(created)} created, {len(existing)} already existed.")
         for path in created:
             self._log(f"  + {path}")
         QMessageBox.information(
@@ -620,6 +673,37 @@ class PathStructureTab(QWidget):
             "Path Structure",
             f"Created {len(created)} folder(s), {len(existing)} already existed.",
         )
+
+    # ================================================================ rename
+
+    def on_rename(self):
+        old = self._selected_name()
+        if not old:
+            QMessageBox.warning(self, "Path Structure", "Select a structure first.")
+            return
+
+        store_dir = self._get_store_dir()
+        if not store_dir:
+            QMessageBox.warning(self, "Path Structure", "Set Store Repo first (File Manager tab).")
+            return
+
+        new, ok = QInputDialog.getText(
+            self, "Rename Structure", "New name:", text=old)
+        if not ok:
+            return
+        new = new.strip()
+        if not new or new == old:
+            return
+
+        try:
+            ps_mod.rename(store_dir, old, new)
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Path Structure", f"Rename failed: {exc}")
+            return
+
+        self._log(f"Path structure renamed: {old} -> {new}")
+        self._log("Renamed locally - use Push on the File Manager tab to sync.")
+        self.on_refresh(select=new)
 
     # ================================================================ delete
 

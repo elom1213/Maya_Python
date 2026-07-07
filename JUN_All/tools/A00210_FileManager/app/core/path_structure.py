@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-17
+# last Update date : 2026-07-07
 # A00210_FileManager - path structure templates (UI/DCC 비의존)
 #
 # 어떤 베이스 폴더의 하위 폴더 구조를 JSON 으로 저장하고, 다른 PC 에서 그 구조를
@@ -208,6 +208,38 @@ def delete(store_dir, name):
     return False
 
 
+def rename(store_dir, old_name, new_name):
+    """저장된 구조의 표시 이름(및 JSON 파일명)을 바꾼다.
+
+    JSON 안의 name 필드도 새 이름으로 갱신한다. 두 이름이 서로 다른 파일로
+    정규화되는데 새 파일이 이미 있으면 ValueError(덮어쓰기 방지). 표시 이름만 달라
+    같은 파일로 정규화되면 name 필드만 갱신한다.
+    반환: 새 JSON 파일 경로.
+    """
+    old_path = struct_path(store_dir, old_name)
+    if not os.path.isfile(old_path):
+        raise ValueError("Structure not found")
+
+    new_path = struct_path(store_dir, new_name)
+    same_file = (os.path.normcase(os.path.abspath(new_path))
+                 == os.path.normcase(os.path.abspath(old_path)))
+    if not same_file and os.path.isfile(new_path):
+        raise ValueError("A structure with that name already exists")
+
+    with open(old_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    data["name"] = new_name
+
+    MetaStore._ensure_parent(new_path)
+    with open(new_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    if not same_file:
+        os.remove(old_path)
+
+    return new_path
+
+
 # ----------------------------------------------------------------- recreate
 
 def build_tree_lines(folders):
@@ -313,23 +345,28 @@ def _add_files(node):
             })
 
 
-def recreate(structure, project_root, folders=None):
-    """structure 의 폴더들을 로컬 project_root 아래에 생성한다.
+def recreate(structure, project_root, folders=None, base_abs=None):
+    """structure 의 폴더들을 목적지 베이스 폴더 아래에 생성한다.
 
     폴더만 생성(os.makedirs, exist_ok). 파일은 만들지 않는다.
+    base_abs : 목적지 베이스 폴더 절대경로. 주어지면 그 폴더 '바로 안'에 folders 를
+               생성한다(UI 의 'Recreate To' 칸). None 이면 하위호환으로
+               project_root + structure.base_rel 을 베이스로 계산한다.
     folders : 생성할 폴더 상대경로(POSIX) 목록. None 이면 structure.folders 전체(하위호환).
               지정하면 그 폴더들만 생성한다(깊이/포함 여부는 호출자가 이미 걸러 전달).
     반환: (created, existing) — 둘 다 절대경로 목록.
     """
-    if not project_root:
-        raise ValueError("Project root is not set")
-
     selected = structure.folders if folders is None else folders
 
-    base_abs = os.path.join(
-        os.path.abspath(project_root),
-        *structure.base_rel.split("/"),
-    )
+    if base_abs is None:
+        if not project_root:
+            raise ValueError("Project root is not set")
+        base_abs = os.path.join(
+            os.path.abspath(project_root),
+            *structure.base_rel.split("/"),
+        )
+    else:
+        base_abs = os.path.abspath(base_abs)
 
     targets = [base_abs] + [
         os.path.join(base_abs, *folder.split("/"))
