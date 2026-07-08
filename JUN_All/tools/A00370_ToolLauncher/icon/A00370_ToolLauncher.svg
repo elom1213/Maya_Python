@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+  <!-- launch button (the shortcut) -->
+  <rect x="5" y="19.5" width="9" height="7" rx="1.6" fill="#ff7a59" stroke="#c85a3c" stroke-width="1"/>
+  <polygon points="8.2,21.4 8.2,24.6 11.4,23 " fill="#2d2d30"/>
+  <!-- rocket (the tool being launched) -->
+  <path d="M20.5 5.5 C24 8 24.5 13 22.5 17 L18.5 17 C16.5 13 17 8 20.5 5.5 Z"
+        fill="#e8edf2" stroke="#1e2024" stroke-width="1"/>
+  <circle cx="20.5" cy="11" r="1.7" fill="#ff7a59"/>
+  <polygon points="18.5,17 16.7,20 19,18.6" fill="#ffb27a"/>
+  <polygon points="22.5,17 24.3,20 22,18.6" fill="#ffb27a"/>
+  <!-- exhaust -->
+  <polygon points="19.4,18 21.6,18 20.5,23.5" fill="#ff7a59"/>
+</svg>
