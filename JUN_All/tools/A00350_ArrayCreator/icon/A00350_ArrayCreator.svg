@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- A00350_ArrayCreator shelf icon: array brackets [ ] + element rows -->
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+  <!-- array brackets -->
+  <g stroke="#4ecdc4" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 7.5 L6.8 7.5 L6.8 24.5 L10 24.5"/>
+    <path d="M22 7.5 L25.2 7.5 L25.2 24.5 L22 24.5"/>
+  </g>
+  <!-- array element rows -->
+  <g fill="#e8edf2">
+    <rect x="11.5" y="10.4" width="9" height="2.4" rx="1.2"/>
+    <rect x="11.5" y="14.8" width="9" height="2.4" rx="1.2"/>
+    <rect x="11.5" y="19.2" width="9" height="2.4" rx="1.2"/>
+  </g>
+</svg>
