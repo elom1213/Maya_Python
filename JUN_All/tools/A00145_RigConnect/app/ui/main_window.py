@@ -26,6 +26,7 @@ from tools.A00145_RigConnect.app.core import connect_manager as cnt_mgr
 from tools.A00145_RigConnect.app.core import stream_manager as stm_mgr
 from tools.A00145_RigConnect.app.core import skin_constraint_manager as skn_mgr
 from tools.A00145_RigConnect.app.core import group_create_manager as grp_mgr
+from tools.A00145_RigConnect.app.core import constraint_transfer_manager as cxfer_mgr
 from tools.A00145_RigConnect.app.core import (
     CONSTRAINT_TYPES, connect_closest, find_closest_for_drivers)
 from tools.A00145_RigConnect.app.ui.collapsible import CollapsibleBox
@@ -194,6 +195,7 @@ class MainWindow(QWidget):
         layout.addWidget(self._build_constrain_basic_box())
         layout.addWidget(self._build_skin_constraint_box())
         layout.addWidget(self._build_group_create_box())
+        layout.addWidget(self._build_constraint_transfer_box())
 
         layout.addStretch(1)
         return tab
@@ -433,6 +435,41 @@ class MainWindow(QWidget):
             "Insert offset node(s) (same world position/rotation) on the parent\n"
             "and/or child side of each listed object. Name = <object>_<suffix>_01.")
         btn.clicked.connect(self.on_group_create)
+        box.addWidget(btn)
+
+        return box
+
+    def _build_constraint_transfer_box(self):
+        """Constraint Transfer UI (접이식, 기본 접힘).
+
+        왼쪽 목록의 constraint 를 오른쪽 목록의 오브젝트로 옮긴다(원본 삭제 + 동일
+        세팅 재생성, maintainOffset 유지로 양쪽 모두 위치/회전 불변). UUID 기반.
+        """
+        box = CollapsibleBox("Constraint Transfer", collapsed=True)
+
+        # 왼쪽: 옮길 constraint(또는 constraint 가 걸린 트랜스폼).
+        self.tsl_cxfer_cons = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Constraints", select_label="Select",
+            list_min_height=180, log_callback=self.log)
+        # 오른쪽: 새로 constraint 를 받을(driven) 오브젝트.
+        self.tsl_cxfer_objs = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Apply To", select_label="Select",
+            list_min_height=180, log_callback=self.log)
+
+        list_row = QHBoxLayout()
+        list_row.addWidget(self.tsl_cxfer_cons)
+        list_row.addWidget(self.tsl_cxfer_objs)
+        box.addLayout(list_row)
+
+        btn = QPushButton("Transfer Constraint")
+        btn.setMinimumHeight(32)
+        btn.setToolTip(
+            "Delete each listed constraint and re-create the same constraint\n"
+            "(type, targets, weights, maintain offset) on the right-side object.\n"
+            "Both the old and the new object keep their world position/rotation.\n"
+            "Left items may be constraint nodes or objects that carry constraints.\n"
+            "Mapping: 1 object -> all constraints go to it; equal counts -> 1:1.")
+        btn.clicked.connect(self.on_transfer_constraint)
         box.addWidget(btn)
 
         return box
@@ -793,6 +830,18 @@ class MainWindow(QWidget):
                 cmds.select(created)
 
         self._run("Group Create", _do)
+
+    def on_transfer_constraint(self):
+        cons = self.tsl_cxfer_cons.get_all_items()
+        objs = self.tsl_cxfer_objs.get_all_items()
+
+        def _do():
+            created, warns = cxfer_mgr.transfer_constraints(cons, objs)
+            for w in warns:
+                self.log("[WARN] {0}".format(w))
+            self.log("       {0} constraint(s) transferred".format(len(created)))
+
+        self._run("Constraint Transfer", _do)
 
     # ==============================================================
     # Handlers : Connect

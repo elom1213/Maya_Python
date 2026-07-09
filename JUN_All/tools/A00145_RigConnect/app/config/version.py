@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
 # A00145_RigConnect - version info
 
-VERSION = "01.13"
+VERSION = "01.14"
 LAST_UPDATE = "2026-07-09"
