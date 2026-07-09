@@ -348,9 +348,10 @@ class MainWindow(QWidget):
     def _build_group_create_box(self):
         """Group Create UI (접이식, 기본 접힘).
 
-        리스트업된 각 오브젝트에, 그 오브젝트와 위치·회전이 같은 빈 그룹을
-        '오브젝트의 부모와 오브젝트 사이' 계층에 삽입한다. 그룹명은
-        <obj>_con_01(중첩이면 _con_02, ...). Count 로 오브젝트당 그룹 수 지정.
+        리스트업된 각 오브젝트에, 그 오브젝트와 위치·회전이 같은 오프셋 노드를
+        부모 쪽/자식 쪽 계층에 삽입한다(zero-out). 노드명은 <obj>_<suffix>_01.
+        Suffix / Count / Padding / 노드 타입(Group·오브젝트 타입) / 방향(Parent·Child)
+        을 사용자가 지정한다.
         """
         box = CollapsibleBox("Group Create", collapsed=True)
 
@@ -362,26 +363,75 @@ class MainWindow(QWidget):
         opt_box = QGroupBox("Options")
         opt_layout = QVBoxLayout(opt_box)
 
-        # Count : 오브젝트당 만들 (중첩) 그룹 수. _con_01 이 오브젝트 바로 위.
-        cnt_row = QHBoxLayout()
-        cnt_row.addWidget(QLabel("Count"))
+        # Suffix / Count / Padding (한 줄).
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Suffix"))
+        self.le_group_suffix = QLineEdit("zro")
+        self.le_group_suffix.setMaximumWidth(80)
+        self.le_group_suffix.setToolTip(
+            "Name suffix for created nodes. Node name = <object>_<suffix>_01.")
+        row.addWidget(self.le_group_suffix)
+
+        row.addWidget(QLabel("Count"))
         self.sb_group_count = QSpinBox()
         self.sb_group_count.setRange(1, 50)
         self.sb_group_count.setValue(1)
         self.sb_group_count.setToolTip(
-            "How many nested groups to create per object.\n"
-            "_con_01 is the object's immediate parent, _con_02 is above it, ...")
-        cnt_row.addWidget(self.sb_group_count)
-        cnt_row.addStretch(1)
-        opt_layout.addLayout(cnt_row)
+            "How many nested nodes to create per object (per side).\n"
+            "_01 is the object's immediate parent (Parent) / child (Child).")
+        row.addWidget(self.sb_group_count)
+
+        row.addWidget(QLabel("Padding"))
+        self.sb_group_padding = QSpinBox()
+        self.sb_group_padding.setRange(1, 6)
+        self.sb_group_padding.setValue(2)
+        self.sb_group_padding.setToolTip(
+            "Zero-padding width of the number (2 -> 01, 02; 3 -> 001, 002).")
+        row.addWidget(self.sb_group_padding)
+        row.addStretch(1)
+        opt_layout.addLayout(row)
+
+        # Type : Group(기본) 또는 오브젝트와 동일 타입.
+        type_row = QHBoxLayout()
+        type_row.addWidget(QLabel("Type"))
+        self.rb_group_type = QButtonGroup(self)
+        rb_grp = QRadioButton("Group")
+        rb_grp.setChecked(True)
+        rb_grp.setToolTip("Created nodes are empty groups (transforms).")
+        rb_match = QRadioButton("Match object type")
+        rb_match.setToolTip(
+            "Created nodes use the object's own node type\n"
+            "(e.g. a joint object -> joint offset nodes).")
+        self.rb_group_type.addButton(rb_grp, 0)
+        self.rb_group_type.addButton(rb_match, 1)
+        type_row.addWidget(rb_grp)
+        type_row.addWidget(rb_match)
+        type_row.addStretch(1)
+        opt_layout.addLayout(type_row)
+
+        # Side : Parent(기본 on) / Child. 둘 다 켜면 양쪽 모두 삽입.
+        side_row = QHBoxLayout()
+        side_row.addWidget(QLabel("Side"))
+        self.cb_group_parent = QCheckBox("Parent")
+        self.cb_group_parent.setChecked(True)
+        self.cb_group_parent.setToolTip(
+            "Insert nodes between the object and its parent (object moves down).")
+        self.cb_group_child = QCheckBox("Child")
+        self.cb_group_child.setToolTip(
+            "Insert nodes between the object and its children\n"
+            "(existing children move down; none -> nodes hang under the object).")
+        side_row.addWidget(self.cb_group_parent)
+        side_row.addWidget(self.cb_group_child)
+        side_row.addStretch(1)
+        opt_layout.addLayout(side_row)
 
         box.addWidget(opt_box)
 
         btn = QPushButton("Create Groups")
         btn.setMinimumHeight(32)
         btn.setToolTip(
-            "Insert an offset group (same position/rotation) between each listed "
-            "object and its parent. Group name = <object>_con_01.")
+            "Insert offset node(s) (same world position/rotation) on the parent\n"
+            "and/or child side of each listed object. Name = <object>_<suffix>_01.")
         btn.clicked.connect(self.on_group_create)
         box.addWidget(btn)
 
@@ -724,14 +774,21 @@ class MainWindow(QWidget):
     def on_group_create(self):
         objs = self.tsl_group_objs.get_all_items()
         count = self.sb_group_count.value()
+        suffix = self.le_group_suffix.text().strip()
+        padding = self.sb_group_padding.value()
+        match_type = (self.rb_group_type.checkedId() == 1)
+        do_parent = self.cb_group_parent.isChecked()
+        do_child = self.cb_group_child.isChecked()
 
         def _do():
-            created, warns = grp_mgr.create_groups(objs, count)
+            created, warns = grp_mgr.create_offset_nodes(
+                objs, count=count, suffix=suffix, match_type=match_type,
+                create_parent=do_parent, create_child=do_child, padding=padding)
             for w in warns:
                 self.log("[WARN] {0}".format(w))
-            self.log("       {0} group(s) created for {1} object(s)".format(
+            self.log("       {0} node(s) created for {1} object(s)".format(
                 len(created), len(objs)))
-            # 생성한 그룹을 씬에서 선택.
+            # 생성한 노드를 씬에서 선택.
             if created:
                 cmds.select(created)
 

@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.12` (`app/config/version.py`)
+- 버전: `v01.13` (`app/config/version.py`)
 - 위치: `JUN_All/tools/A00145_RigConnect`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴(`QTabWidget` 5탭)
 - 원본 `A00140_ConnectClosest` / MEL 파일은 그대로 보존(미수정)
@@ -56,7 +56,7 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
 
 ### Constrain
 접이식 섹션 3개로 구성된다(`CollapsibleBox`). **`Constraint`(기본 펼침)** / **`Skin Weight to
-Constraint`(기본 접힘)** / **`Group Create`(기본 접힘, v01.12)**.
+Constraint`(기본 접힘)** / **`Group Create`(기본 접힘, v01.12, 옵션 확장 v01.13)**.
 
 #### Constraint
 타겟(드라이버) → 팔로워로 constraint 를 건다.
@@ -106,26 +106,42 @@ Constraint`(기본 접힘)** / **`Group Create`(기본 접힘, v01.12)**.
     - **average(기본)**: 선택 버텍스 전체의 **centroid** 에 로케이터 1개를 만들어 평균 웨이트로 구속.
     - **per-vertex 체크**: 버텍스마다 로케이터 1개를 그 **버텍스 월드 위치**(`mesh_vtxN_loc`)에 만들어 1:1 구속.
 
-#### Group Create (v01.12)
-리스트업된 각 오브젝트에 대해, **그 오브젝트와 위치·회전이 같은 빈 그룹**을 **오브젝트의 부모와
-오브젝트 사이 계층**에 삽입한다. 오프셋(zero) 그룹을 만드는 리깅 상용 패턴이다.
+#### Group Create (v01.12, 옵션 확장 v01.13)
+리스트업된 각 오브젝트에 대해, **그 오브젝트와 위치·회전이 같은 오프셋 노드**를 계층에 삽입한다.
+오프셋(zero-out) 노드를 만드는 리깅 상용 패턴이다. **부모 쪽(Parent)** 과 **자식 쪽(Child)** 을
+따로/함께 만들 수 있다.
 
 ```
-before:  parent ─ obj
-after :  parent ─ obj_con_01 ─ obj              (Count = 1)
-         parent ─ obj_con_02 ─ obj_con_01 ─ obj (Count = 2)
+Parent (기본):  parent 와 obj 사이에 삽입 (obj 가 아래로 밀린다)
+  before:  parent ─ obj
+  after :  parent ─ obj_zro_01 ─ obj               (Count = 1)
+           parent ─ obj_zro_02 ─ obj_zro_01 ─ obj  (Count = 2)
+
+Child       :  obj 와 그 자식들 사이에 삽입 (자식들이 아래로 밀린다)
+  before:  obj ─ child
+  after :  obj ─ obj_zro_01 ─ child                (Count = 1)
+           obj ─ obj_zro_01 ─ obj_zro_02 ─ child   (Count = 2)
+  (자식이 없으면 오프셋 노드 체인이 obj 아래에 그냥 매달린다.)
 ```
 
 - `Objects` 리스트에 대상 오브젝트 추가(Select/Add/Del/Up/Down).
-- Options: `Count`(1~50) — 오브젝트당 만들 **중첩** 그룹 수.
-- `Create Groups` 클릭 → 생성된 그룹들이 씬에서 선택된다.
-- **그룹 이름**: `<오브젝트>_con_01`(중첩이면 `_con_02`, `_con_03` …). **`_con_01` 이 오브젝트의
-  바로 위 부모**, 번호가 커질수록 더 바깥(위쪽) 그룹이다.
-- 그룹은 오브젝트의 **월드 위치·회전**을 가지며(**스케일은 1**, `matchTransform` position/rotation),
-  오브젝트의 **월드 트랜스폼과 기존 부모 계층은 그대로 유지**된다(그룹이 부모와 오브젝트 사이에만 삽입).
+- Options (v01.13):
+  - **`Suffix`**(기본 `zro`) — 노드 이름 접미사. 노드명 = `<오브젝트>_<suffix>_01`.
+  - **`Count`**(1~50) — **방향당** 만들 **중첩** 노드 수.
+  - **`Padding`**(1~6, 기본 2) — 번호 자릿수(`2` → `01, 02`; `3` → `001, 002`).
+  - **`Type`** — `Group`(기본, 빈 그룹=transform) 또는 `Match object type`(오브젝트와 **같은 타입**으로
+    생성). shape 없는 타입(joint 등)은 같은 nodeType 으로 `createNode`(**joint → joint**), shape 있는
+    타입(curve/mesh/locator 등)은 오브젝트를 **복제**해 하위 자식만 지우고 자신의 shape 만 남긴다
+    (**curve → curve, mesh → mesh**; 스케일은 1 로 초기화). 순수 그룹은 빈 그룹.
+  - **`Side`** — `Parent`(기본 on, 오브젝트 위) / `Child`(오브젝트 아래). 둘 다 켜면 양쪽 모두 삽입.
+- `Create Groups` 클릭 → 생성된 노드들이 씬에서 선택된다.
+- **노드 이름**: `<오브젝트>_<suffix>_01`(중첩이면 `_02`, `_03` …). Parent 쪽은 **`_01` 이 오브젝트의
+  바로 위 부모**, Child 쪽은 **`_01` 이 오브젝트의 바로 아래 자식**이다(번호가 커질수록 바깥/깊은 쪽).
+- 노드는 오브젝트의 **월드 위치·회전**을 가지며(**스케일은 1**, `matchTransform` position/rotation),
+  오브젝트·자식의 **월드 트랜스폼과 기존 계층은 그대로 유지**된다(노드가 사이에만 삽입).
 - **UUID 기반**: 씬에 같은 이름의 오브젝트가 여럿이거나 재부모(reparent)로 DAG 경로가 바뀌어도
-  안전하도록, 대상 오브젝트·부모·생성한 그룹을 **UUID 로 잡아두고 매번 UUID → 현재 경로로 해석**해
-  조작한다(중복 이름이면 경고를 남기고 첫 매치 사용).
+  안전하도록, 대상 오브젝트·부모·자식·생성한 노드를 **UUID 로 잡아두고 매번 UUID → 현재 경로로
+  해석**해 조작한다(중복 이름이면 경고를 남기고 첫 매치 사용).
 - 존재하지 않거나(이름 못 찾음) 잠금/참조 등으로 재부모가 실패한 오브젝트는 건너뛰고 경고를 로그에 남긴다.
 
 ### Connect
@@ -176,7 +192,7 @@ A00145_RigConnect/
     │   ├── match_manager.py        # Match (MEL Match Tool 포팅: 위치/회전 매칭·컨트롤 생성·버텍스 노말)
     │   ├── constrain_manager.py    # Constrain  (MEL 포팅)
     │   ├── skin_constraint_manager.py # Skin Weight to Constraint (스킨 웨이트 → weighted parentConstraint)
-    │   ├── group_create_manager.py # Group Create (부모↔오브젝트 사이 오프셋 그룹 _con_NN 삽입, UUID 기반)
+    │   ├── group_create_manager.py # Group Create (부모/자식 쪽 오프셋 노드 _<suffix>_NN 삽입, 그룹·오브젝트 타입, UUID 기반)
     │   ├── connect_manager.py      # Connect    (MEL 포팅: attr 나열/검색/연결, 52 facial)
     │   ├── stream_manager.py       # List Connected (MEL 포팅: hyperShade up/down)
     │   ├── maya_scene.py           # Connect Closest (A00140 복사)
