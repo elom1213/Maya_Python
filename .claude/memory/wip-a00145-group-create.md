@@ -1,0 +1,20 @@
+---
+name: wip-a00145-group-create
+description: A00145_RigConnect Constrain tab — Group Create collapsible (insert offset _<suffix>_NN nodes, parent/child side, group or match-type)
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: ba4273fe-f76d-4e80-a559-f9d7a6aeeb4c
+---
+
+IMPLEMENTED (Maya test + push pending): A00145_RigConnect v01.12 — new **Group Create** collapsible box (3rd section) in the **Constrain** tab (after Constraint + Skin Weight to Constraint), default collapsed. v01.12 made it UUID-based per [[uuid-safe-rename-duplicate-names]].
+
+**What:** for each object in its own TSL list, insert an empty offset group with the SAME world position/rotation between the object and its original parent. Group name = `<obj>_con_01` (nested: `_con_02`, `_con_03`…). `_con_01` is the object's immediate parent, higher numbers are further out. `Count` spinbox (1–50) = nested groups per object. Object's world transform + existing parent hierarchy preserved (group only inserted between parent and object).
+
+**How** (`app/core/group_create_manager.py`, `create_groups(objects, count)`): UUID-based — hold input objects, parent, and created groups by UUID (`_to_uuid`=ls uuid, `_path`=ls uuid long) and resolve UUID→current path before every op (safe across reparent + duplicate names). Per object: resolve node, get original parent's UUID; loop i=1..count: `cmds.group(empty, world, name=<base>_con_%02d)` → grab grp UUID, `matchTransform(_path(grp), _path(prev), position, rotation, scale=False)` (prev = object then previous group, all coincident), parent grp under original parent (world preserved), parent prev under grp, prev=grp. Return created resolved from UUIDs at end. Per-object try/except → warnings list, skips missing/locked/ambiguous. UI wraps in `_run` (undo chunk).
+
+**Files:** new `app/core/group_create_manager.py`; wired into `app/core/__init__.py`, `app/ui/main_window.py` (`_build_group_create_box`, `on_group_create`, import grp_mgr). version 01.11, docs `JUN_All/docs/A00145_RigConnect.md` (Constrain → Group Create). No CHANGELOG file in this tool. See [[push-includes-tool-guide-docs]], [[uuid-safe-rename-duplicate-names]] (dup-name handling: uses ls long + warns on ambiguity).
+
+**v01.13 extension (2026-07-09, DONE - Maya-verified + pushed to Dnable_repo/dev):** requested as a "zero-out" tool (was going to be new A00380_HierarchyTool, but this feature already existed here). `create_groups` → `create_offset_nodes(objects, count, suffix="zro", match_type=False, create_parent=True, create_child=False, padding=2)` (old `create_groups` kept as delegating wrapper). New: (1) **Suffix** user-set (default `zro`; name = `<obj>_<suffix>_<num>`), (2) **Padding** spinbox (1–6, default 2 → 01,02) via `{:0{}d}`, (3) **Type** = Group (empty transform) OR **Match object type**, (4) **Side** checkboxes Parent (default on) + Child.
+
+**Match-type node creation** (`_make_offset_node(source_node, match_type, name)`): a first cut using `nodeType(transform)` wrongly made GROUPS for curves/meshes (their transform's nodeType is 'transform'; type lives on the shape). Fixed: if source has a **shape** → `cmds.duplicate(source, returnRootsOnly, renameChildren)` then delete the dup's transform children (keep own shape), parent to world, reset scale to 1 → curve→curve, mesh→mesh, locator→locator. If source has **no shape** and nodeType!='transform' → `select(clear)` + `createNode(nodeType)` → joint→joint. Pure transform → empty group. Type source is always the ORIGINAL object (all nested nodes share obj's type). `_create_parent_chain` = old behavior (insert between obj and parent). `_create_child_chain` = mirror: insert between obj and its existing transform children (shapes stay on obj; existing transform children reparented under deepest node; `_01` = obj's immediate child). All nodes matchTransform pos/rot (scale off) to obj world → local zeroed. UI adds Suffix QLineEdit / Count / Padding row, Type radios (`rb_group_type` id 1=match), Side checkboxes (`cb_group_parent`/`cb_group_child`). version 01.13.
