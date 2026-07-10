@@ -36,8 +36,56 @@ EDIT_ON_TEXT = "Edit ON"
 EDIT_OFF_TEXT = "Edit"
 
 
+# Shape Editor 탭 인덱스 (weight 폴링을 이 탭이 보일 때만 돌리기 위해 필요)
+SHAPE_EDITOR_TAB = 0
+
+# 씬에서 weight 가 바뀌어도(채널박스, 어트리뷰트 에디터, 애니메이션 재생, 다른 스크립트 등)
+# Maya 는 Qt 에 알려 주지 않는다. 그래서 주기적으로 다시 읽어 스핀박스에 반영한다.
+SE_SYNC_INTERVAL_MS = 120
+
+# 스핀박스가 보여 주는 마지막 자리(decimals=3)의 절반. 이보다 작은 차이는 화면상 같은 값이라
+# 다시 써 봐야 소용이 없다.
+SE_WEIGHT_EPS = 0.0005
+
+
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
 WINDOW_OBJECT_NAME = "JUN_A00290_BSTool_window"
+
+
+class WeightSlider(QSlider):
+    """중앙이 0, 왼쪽 끝이 -1, 오른쪽 끝이 +1 인 가로 슬라이더.
+
+    QSlider 는 정수만 다루므로 weight 를 SCALE 배 한 정수로 담는다(0.001 해상도).
+    스핀박스(-10~10)보다 범위가 좁다. 범위를 벗어난 weight 는 슬라이더에서 끝에 붙고,
+    실제 값은 옆의 스핀박스가 보여 준다.
+    """
+
+    SCALE = 1000
+    MIN = -1.0
+    MAX = 1.0
+
+    def __init__(self, parent=None):
+        super().__init__(Qt.Horizontal, parent)
+        self.setRange(int(self.MIN * self.SCALE), int(self.MAX * self.SCALE))
+        # 양 끝과 중앙(0)에 눈금을 찍어 0 위치를 눈으로 찾을 수 있게 한다.
+        self.setTickPosition(QSlider.TicksBelow)
+        self.setTickInterval(int(self.MAX * self.SCALE))
+        self.setSingleStep(self.SCALE // 100)   # 방향키 0.01
+        self.setPageStep(self.SCALE // 10)      # PageUp/Down 0.1
+        self.setMinimumWidth(110)
+
+    def weight(self):
+        return self.value() / float(self.SCALE)
+
+    def _clamp(self, value):
+        return max(self.MIN, min(self.MAX, value))
+
+    def set_weight(self, value):
+        self.setValue(int(round(self._clamp(value) * self.SCALE)))
+
+    def shows(self, value, eps):
+        """이 슬라이더가 이미 그 weight 를(범위 밖이면 클램프한 값을) 가리키고 있는가."""
+        return abs(self.weight() - self._clamp(value)) < eps
 
 
 class MainWindow(QWidget):
@@ -52,7 +100,14 @@ class MainWindow(QWidget):
         self._se_rows = []
         self._se_rebuild_pending = False
 
-        self.win_width = 460
+        # 씬의 weight 를 스핀박스로 되비추는 폴링 타이머. Shape Editor 탭이 보일 때만 돈다.
+        # (build_ui 가 tabs.currentChanged 를 붙이며 이 타이머를 건드리므로 먼저 만든다.)
+        self._se_sync_timer = QTimer(self)
+        self._se_sync_timer.setInterval(SE_SYNC_INTERVAL_MS)
+        self._se_sync_timer.timeout.connect(self._sync_se_weights)
+
+        # 타겟 행이 Edit + 이름 + 슬라이더 + 스핀박스라 460 이면 슬라이더가 눌린다.
+        self.win_width = 580
         self.win_height = 720
         self.win_title = f"BS Tool v{VERSION}"
 
@@ -83,6 +138,7 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_shape_editor_tab(), "Shape Editor")
         self.tabs.addTab(self._build_edit_bs_tab(), "Edit BS")
         self.tabs.addTab(self._build_base_shape_tab(), "Base Shape")
+        self.tabs.currentChanged.connect(lambda *_a: self._update_se_timer())
         main_layout.addWidget(self.tabs)
 
         # 공용 로그
@@ -215,6 +271,14 @@ class MainWindow(QWidget):
         lbl.setToolTip("weight[{0}]".format(idx))
         row_layout.addWidget(lbl, 1)
 
+        enabled = target["settable"] and not is_editing
+
+        slider = WeightSlider()
+        slider.setToolTip("Drag to set the weight. Center is 0, right end +1, left end -1.")
+        slider.set_weight(target["weight"])
+        slider.setEnabled(enabled)
+        row_layout.addWidget(slider, 1)
+
         spin = QDoubleSpinBox()
         spin.setDecimals(3)
         spin.setRange(-10.0, 10.0)
@@ -222,19 +286,27 @@ class MainWindow(QWidget):
         spin.setFixedWidth(72)
         spin.setValue(target["weight"])
         # 구동/잠금된 weight 는 손대지 못하고, 편집 중에는 1.0 으로 고정된다.
-        spin.setEnabled(target["settable"] and not is_editing)
+        spin.setEnabled(enabled)
         if not target["settable"]:
-            spin.setToolTip("This weight is locked or driven by another node.")
-        # valueChanged 도 바인딩/버전에 따라 double 또는 문자열을 넘긴다. 스핀박스에서 직접 읽는다.
-        spin.valueChanged.connect(
-            lambda *_a, n=bs_node, i=idx, s=spin: self.on_se_weight_changed(n, i, s.value()))
+            tip = "This weight is locked or driven by another node."
+            spin.setToolTip(tip)
+            slider.setToolTip(tip)
         row_layout.addWidget(spin)
 
         self.se_body_layout.insertWidget(self.se_body_layout.count() - 1, row)
-        self._se_rows.append({
+        row_info = {
             "node": bs_node, "index": idx, "name": target["name"],
-            "row": row, "btn": btn, "spin": spin,
-        })
+            "row": row, "btn": btn, "spin": spin, "slider": slider,
+        }
+        self._se_rows.append(row_info)
+
+        # 슬라이더와 스핀박스는 같은 weight 를 가리키는 두 얼굴이다. 어느 쪽을 움직이든
+        # 씬에 쓰고 반대쪽을 맞춘다.
+        # valueChanged 는 바인딩/버전에 따라 double 또는 문자열을 넘긴다. 위젯에서 직접 읽는다.
+        spin.valueChanged.connect(
+            lambda *_a, r=row_info, s=spin: self.on_se_weight_changed(r, s.value()))
+        slider.valueChanged.connect(
+            lambda *_a, r=row_info, s=slider: self.on_se_weight_changed(r, s.weight()))
 
     def _style_edit_button(self, btn, on):
         """Edit 토글의 현재 상태(색 + 라벨)를 버튼에 반영한다."""
@@ -258,6 +330,7 @@ class MainWindow(QWidget):
 
         self.lbl_se_number.setText("Number: {0}".format(total))
         self._apply_se_filter(self.le_se_filter.text())
+        self._update_se_timer()
         return nodes, total
 
     def _apply_se_filter(self, text):
@@ -281,10 +354,66 @@ class MainWindow(QWidget):
             self._style_edit_button(row["btn"], on)
 
             settable = ShapeEditorManager.is_weight_settable(node, row["index"])
-            row["spin"].blockSignals(True)
-            row["spin"].setValue(ShapeEditorManager.get_weight(node, row["index"]))
+            self._show_weight(row, ShapeEditorManager.get_weight(node, row["index"]))
             row["spin"].setEnabled(settable and not on)
-            row["spin"].blockSignals(False)
+            row["slider"].setEnabled(settable and not on)
+
+    # --------------------------------------------------
+    # Shape Editor : 씬 -> UI weight 실시간 반영
+    # --------------------------------------------------
+
+    @staticmethod
+    def _show_weight(row, value):
+        """행의 슬라이더/스핀박스에 값을 표시한다.
+
+        setValue 는 valueChanged 를 발화해 on_se_weight_changed 로 되돌아온다. 그대로 두면
+        방금 씬에서 읽은 값을 씬에 다시 쓰고(잠긴/구동되는 weight 는 매 틱 경고 로그까지 남는다),
+        슬라이더 -> 스핀박스 -> 슬라이더 로 되울리기까지 한다. 그래서 시그널을 막고 쓴다.
+        """
+        for widget, setter in ((row["spin"], row["spin"].setValue),
+                               (row["slider"], row["slider"].set_weight)):
+            widget.blockSignals(True)
+            setter(value)
+            widget.blockSignals(False)
+
+    @staticmethod
+    def _user_is_dragging(row):
+        """사용자가 그 행의 위젯을 직접 만지는 중이면 밑에서 값을 바꾸지 않는다.
+
+        슬라이더는 '잡고 있는 동안'(isSliderDown)만 막는다. hasFocus 까지 막으면 한 번 클릭한
+        행은 포커스를 옮길 때까지 씬 변화를 영영 못 따라온다.
+        """
+        return row["spin"].hasFocus() or row["slider"].isSliderDown()
+
+    def _update_se_timer(self):
+        """폴링은 Shape Editor 탭이 실제로 보이고 표시할 행이 있을 때만 돌린다."""
+        active = (self.isVisible()
+                  and self.tabs.currentIndex() == SHAPE_EDITOR_TAB
+                  and bool(self._se_rows))
+        if active and not self._se_sync_timer.isActive():
+            self._se_sync_timer.start()
+        elif not active and self._se_sync_timer.isActive():
+            self._se_sync_timer.stop()
+
+    def _sync_se_weights(self):
+        """씬의 현재 weight 를 슬라이더/스핀박스에 반영한다(UI -> 씬 방향은 건드리지 않는다)."""
+        for row in self._se_rows:
+            node = row["node"]
+            if not cmds.objExists(node):
+                # 노드가 지워졌다. 행 자체는 Refresh(또는 노드 리스트 변경) 때 다시 만든다.
+                continue
+
+            if self._user_is_dragging(row):
+                continue
+
+            value = ShapeEditorManager.get_weight(node, row["index"])
+            # 두 위젯을 다 봐야 한다. 씬에 못 쓴 조작(잠긴/구동되는 weight 를 민 경우)은 한쪽만
+            # 어긋난 채 남으므로, 스핀박스만 보고 판단하면 그 행은 영영 되돌아오지 않는다.
+            if (abs(value - row["spin"].value()) < SE_WEIGHT_EPS
+                    and row["slider"].shows(value, SE_WEIGHT_EPS)):
+                continue
+
+            self._show_weight(row, value)
 
     # --------------------------------------------------
     # Handlers : Shape Editor
@@ -318,10 +447,14 @@ class MainWindow(QWidget):
         # 노드당 한 타겟만 편집할 수 있으므로 다른 행의 상태도 다시 맞춘다.
         self._sync_se_edit_states()
 
-    def on_se_weight_changed(self, bs_node, weight_idx, value):
-        ok, msg = ShapeEditorManager.set_weight(bs_node, weight_idx, value)
+    def on_se_weight_changed(self, row, value):
+        """슬라이더나 스핀박스를 움직였다. 씬에 쓰고 반대쪽 위젯을 같은 값으로 맞춘다."""
+        ok, msg = ShapeEditorManager.set_weight(row["node"], row["index"], value)
         if not ok:
+            # 씬에 못 썼다. 폴링이 곧 실제 값으로 되돌린다.
             self.log(msg)
+            return
+        self._show_weight(row, value)
 
     def on_se_exit_all(self):
         _n, msg = ShapeEditorManager.exit_all_edits()
@@ -576,10 +709,20 @@ class MainWindow(QWidget):
         self.log(msg)
 
     # --------------------------------------------------
-    # Close
+    # Show / Hide / Close
     # --------------------------------------------------
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._update_se_timer()
+
+    def hideEvent(self, event):
+        # 창이 가려진 동안 씬을 계속 훑을 이유가 없다.
+        self._se_sync_timer.stop()
+        super().hideEvent(event)
+
     def closeEvent(self, event):
+        self._se_sync_timer.stop()
         # 편집 모드를 켠 채 창을 닫으면 씬이 조용히 sculpt 상태로 남는다.
         # 닫을 때 해제해 편집 결과를 타겟에 확정시킨다(Maya 의 Edit off 와 동일).
         try:

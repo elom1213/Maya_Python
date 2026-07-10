@@ -52,7 +52,7 @@ Tool-by-tool documentation lives in [`JUN_All/docs/`](JUN_All/docs/).
 
 ### 애니메이션 · 모델링 · 메시
 - **`A00110_animTool`** — 키 복사/붙여넣기·미러·베이크(레거시 알고리즘 이식). · **`A00180_abSymMesh`** — 메쉬 대칭/블렌드셰이프.
-- **`A00290_BSTool`** — blendShape 편집(Edit BS · Base Shape 탭). · **`A00300_meshDoctor`** — 메시 **읽기전용 진단 + 안전 원클릭 수정**(JSON/TXT 로그).
+- **`A00290_BSTool`** — blendShape 편집(Shape Editor · Edit BS · Base Shape 탭). · **`A00300_meshDoctor`** — 메시 **읽기전용 진단 + 안전 원클릭 수정**(JSON/TXT 로그).
 - **`A00050_uvTool`**, **`A00040_file_exporter`**, **`A00200_CSV_tool`**.
 
 ### 씬 / 선택 유틸
