@@ -69,8 +69,11 @@ class MainWindow(QWidget):
         self.lst_targets = QListWidget()
         self.lst_targets.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.lst_targets.setToolTip(
-            "Meshes to diagnose. Empty = diagnose the current Maya selection.")
+            "Meshes to diagnose. Empty = diagnose the current Maya selection.\n"
+            "Selecting rows here selects the same meshes in the scene.")
         self.lst_targets.setMaximumHeight(110)
+        # MOD_tsl_qt_v01._on_selection_changed 와 같은 동작: 리스트 선택 -> 씬 선택.
+        self.lst_targets.itemSelectionChanged.connect(self._on_target_selection_changed)
         tg_layout.addWidget(self.lst_targets, 1)
 
         tg_btns = QVBoxLayout()
@@ -255,6 +258,32 @@ class MainWindow(QWidget):
             self.log("Added {0} mesh(es) to the list.".format(added), "INFO")
         else:
             self.log("No new polygon mesh in the selection to add.", "WARN")
+
+    def _on_target_selection_changed(self):
+        """리스트에서 고른 항목을 씬에서도 선택한다(공용 TSL 위젯과 같은 동작).
+
+        표시 이름이 아니라 UUID 로 노드를 되찾으므로 이름이 겹쳐도 정확히 그 메시가 잡힌다.
+        선택이 비면(Remove/Clear 직후 등) 씬 선택은 건드리지 않는다.
+        """
+        items = self.lst_targets.selectedItems()
+        if not items:
+            return
+
+        nodes, stale = [], []
+        for item in items:
+            found = cmds.ls(item.data(Qt.UserRole), long=True) or []
+            if found:
+                nodes.append(found[0])
+            else:
+                stale.append(item.text())
+
+        if nodes:
+            try:
+                cmds.select(nodes, replace=True)
+            except Exception as e:
+                self.log("Failed to select in the scene: {0}".format(e), "WARN")
+        if stale:
+            self.log("Not in the scene anymore: {0}".format(", ".join(stale)), "WARN")
 
     def on_remove_targets(self):
         for item in self.lst_targets.selectedItems():
