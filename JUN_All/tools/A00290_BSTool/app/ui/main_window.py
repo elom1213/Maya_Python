@@ -50,6 +50,42 @@ SE_WEIGHT_EPS = 0.0005
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
 WINDOW_OBJECT_NAME = "JUN_A00290_BSTool_window"
+TARGETS_WINDOW_OBJECT_NAME = "JUN_A00290_BSTool_targets_window"
+
+
+class TargetsWindow(QWidget):
+    """Shape Editor 의 타겟 영역을 크게 보는 별도 창(Expand).
+
+    타겟 행을 복제하지 않고 **스크롤 영역 자체를 옮겨 온다**. 그래서 Edit 토글 / 슬라이더 /
+    실시간 폴링이 그대로 동작하고, 두 벌을 동기화할 일이 없다. 창을 닫으면 탭의 제자리로
+    되돌아간다.
+    """
+
+    def __init__(self, owner):
+        super().__init__(owner, Qt.Window)
+        self._owner = owner
+        self.setObjectName(TARGETS_WINDOW_OBJECT_NAME)
+        self.setWindowTitle("BS Tool - Targets")
+        self.resize(640, 900)
+
+        layout = QVBoxLayout(self)
+
+        top = QHBoxLayout()
+        top.addWidget(QLabel("Filter"))
+        self.le_filter = QLineEdit()
+        self.le_filter.setPlaceholderText("Type to filter target names")
+        top.addWidget(self.le_filter, 1)
+        self.lbl_number = QLabel("Number: 0")
+        top.addWidget(self.lbl_number)
+        layout.addLayout(top)
+
+        # 탭에서 넘겨받은 스크롤 영역이 들어갈 자리
+        self.body = QVBoxLayout()
+        layout.addLayout(self.body, 1)
+
+    def closeEvent(self, event):
+        self._owner.on_se_collapse()
+        super().closeEvent(event)
 
 
 class WeightSlider(QSlider):
@@ -96,9 +132,12 @@ class MainWindow(QWidget):
 
         self.setObjectName(WINDOW_OBJECT_NAME)
 
-        # Shape Editor 탭의 타겟 행 정보: [{node, index, name, btn, spin}, ...]
+        # Shape Editor 탭의 타겟 행 정보: [{node, index, name, btn, spin, slider}, ...]
         self._se_rows = []
         self._se_rebuild_pending = False
+
+        # Expand 로 띄운 별도 타겟 창 (없으면 None)
+        self._se_window = None
 
         # 씬의 weight 를 스핀박스로 되비추는 폴링 타이머. Shape Editor 탭이 보일 때만 돈다.
         # (build_ui 가 tabs.currentChanged 를 붙이며 이 타이머를 건드리므로 먼저 만든다.)
@@ -184,6 +223,10 @@ class MainWindow(QWidget):
         btn_refresh.setToolTip("Re-read targets and weights from the listed blendShape nodes.")
         btn_refresh.clicked.connect(self.on_se_refresh)
         tool_row.addWidget(btn_refresh)
+        btn_expand = QPushButton("Expand")
+        btn_expand.setToolTip("Show the target list in a separate, resizable window.")
+        btn_expand.clicked.connect(self.on_se_expand)
+        tool_row.addWidget(btn_expand)
         layout.addLayout(tool_row)
 
         # 타겟 헤더
@@ -209,6 +252,17 @@ class MainWindow(QWidget):
         self.se_body_layout.addStretch(1)
         self.se_scroll.setWidget(self.se_body)
         layout.addWidget(self.se_scroll, 1)
+
+        # Expand 로 스크롤 영역을 별도 창에 넘겨준 동안 탭에서 그 자리를 지킨다.
+        # (숨긴 위젯은 레이아웃에서 자리를 차지하지 않으므로 평소엔 보이지 않는다.)
+        self.lbl_se_expanded = QLabel("Targets are shown in the expanded window.")
+        self.lbl_se_expanded.setAlignment(Qt.AlignCenter)
+        self.lbl_se_expanded.setVisible(False)
+        layout.addWidget(self.lbl_se_expanded, 1)
+
+        # 스크롤 영역을 되돌릴 때 쓸 원래 자리
+        self.se_tab_layout = layout
+        self.se_scroll_index = layout.indexOf(self.se_scroll)
 
         # 설명
         info = QLabel(
@@ -329,6 +383,8 @@ class MainWindow(QWidget):
             total += len(targets)
 
         self.lbl_se_number.setText("Number: {0}".format(total))
+        if self._se_window is not None:
+            self._se_window.lbl_number.setText(self.lbl_se_number.text())
         self._apply_se_filter(self.le_se_filter.text())
         self._update_se_timer()
         return nodes, total
@@ -337,6 +393,10 @@ class MainWindow(QWidget):
         needle = (text or "").strip().lower()
         for row in self._se_rows:
             row["row"].setVisible(needle in row["name"].lower())
+        # 필터는 하나지만 입력 칸은 탭과 확장 창에 하나씩 있다. 서로 맞춰 준다.
+        # (같을 때 쓰지 않으므로 textChanged 가 서로를 부르며 맴돌지 않는다.)
+        if self._se_window is not None and self._se_window.le_filter.text() != (text or ""):
+            self._se_window.le_filter.setText(text or "")
 
     def _sync_se_edit_states(self):
         """씬의 실제 sculptTargetIndex 를 읽어 Edit 버튼/스핀박스 상태를 맞춘다."""
@@ -386,10 +446,15 @@ class MainWindow(QWidget):
         return row["spin"].hasFocus() or row["slider"].isSliderDown()
 
     def _update_se_timer(self):
-        """폴링은 Shape Editor 탭이 실제로 보이고 표시할 행이 있을 때만 돌린다."""
-        active = (self.isVisible()
-                  and self.tabs.currentIndex() == SHAPE_EDITOR_TAB
-                  and bool(self._se_rows))
+        """폴링은 타겟 행이 실제로 화면에 있을 때만 돌린다.
+
+        확장 창이 떠 있으면 타겟은 그쪽에 있다. 이때는 본 창이 가려져 있거나 다른 탭이어도
+        계속 갱신해야 한다.
+        """
+        expanded = self._se_window is not None and self._se_window.isVisible()
+        active = bool(self._se_rows) and (
+            expanded
+            or (self.isVisible() and self.tabs.currentIndex() == SHAPE_EDITOR_TAB))
         if active and not self._se_sync_timer.isActive():
             self._se_sync_timer.start()
         elif not active and self._se_sync_timer.isActive():
@@ -455,6 +520,36 @@ class MainWindow(QWidget):
             self.log(msg)
             return
         self._show_weight(row, value)
+
+    def on_se_expand(self):
+        """타겟 스크롤 영역을 별도 창으로 옮긴다(이미 떠 있으면 앞으로 가져온다)."""
+        if self._se_window is not None:
+            self._se_window.raise_()
+            self._se_window.activateWindow()
+            return
+
+        win = TargetsWindow(self)
+        win.lbl_number.setText(self.lbl_se_number.text())
+        win.le_filter.setText(self.le_se_filter.text())
+        win.le_filter.textChanged.connect(self.le_se_filter.setText)
+        # addWidget 이 스크롤 영역을 탭 레이아웃에서 떼어 이 창으로 옮긴다.
+        win.body.addWidget(self.se_scroll)
+        self._se_window = win
+
+        self.lbl_se_expanded.setVisible(True)
+        win.show()
+        self._update_se_timer()
+
+    def on_se_collapse(self):
+        """확장 창이 닫혔다. 스크롤 영역을 탭의 원래 자리로 되돌린다."""
+        if self._se_window is None:
+            return
+
+        win, self._se_window = self._se_window, None
+        self.lbl_se_expanded.setVisible(False)
+        self.se_tab_layout.insertWidget(self.se_scroll_index, self.se_scroll, 1)
+        win.deleteLater()
+        self._update_se_timer()
 
     def on_se_exit_all(self):
         _n, msg = ShapeEditorManager.exit_all_edits()
@@ -717,11 +812,14 @@ class MainWindow(QWidget):
         self._update_se_timer()
 
     def hideEvent(self, event):
-        # 창이 가려진 동안 씬을 계속 훑을 이유가 없다.
-        self._se_sync_timer.stop()
+        # 본 창이 가려져도 확장 창이 떠 있으면 타겟은 보이므로 폴링을 이어 간다.
         super().hideEvent(event)
+        self._update_se_timer()
 
     def closeEvent(self, event):
+        # 확장 창을 먼저 닫아 스크롤 영역을 탭으로 되돌린다(고아 창이 남지 않게).
+        if self._se_window is not None:
+            self._se_window.close()
         self._se_sync_timer.stop()
         # 편집 모드를 켠 채 창을 닫으면 씬이 조용히 sculpt 상태로 남는다.
         # 닫을 때 해제해 편집 결과를 타겟에 확정시킨다(Maya 의 Edit off 와 동일).
