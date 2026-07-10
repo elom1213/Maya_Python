@@ -15,6 +15,7 @@
 - [Push target Dnable/dev](push-target-dnable-dev.md) — default git push goes to Dnable_repo remote, dev branch (not origin)
 - [Memory synced via repo](memory-synced-via-repo.md) — memory lives in repo `.claude/memory` (junctioned from ~/.claude/projects/<hash>/memory); commit+push memory changes to share across PCs
 - [Standalone taskbar icon method](standalone-taskbar-icon-method.md) — how to give a standalone PySide tool a Windows taskbar icon (SVG→QtSvg multi-size .ico + AppUserModelID before QApplication); guide in docs/taskbar_icon_guide.md
+- [TSL UUID selection](wip-tsl-uuid-selection.md) — branch dev_tsl (Maya check pending): MOD_tsl_qt_v01 stores (uuid, component) per item so list→scene selection survives rename/reparent/dup names; affects all 18 tools using the shared TSL
 - [Pin for maya.cmds tools](pin-for-maya-cmds-tools.md) — cmds.window has no always-on-top flag; use Framework.qt.maya_window.maya_ui_widget() to wrap it as a QWidget, then toggle WindowStaysOnTopHint + show()
 - [mayapy headless verify](mayapy-headless-verify.md) — test maya.cmds semantics with Maya2024/bin/mayapy.exe + maya.standalone instead of guessing from docs/mel
 - [undo_chunk by default](undo-chunk-by-default.md) — repeated Maya scene changes must be wrapped in Framework.core.maya_undo.undo_chunk() without being asked (one Ctrl+Z)

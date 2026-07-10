@@ -13,6 +13,22 @@ UI 순서 (MOD_tsl_01_01 과 동일):
 Maya 접근(현재 선택 가져오기 / 씬에서 선택)은 위젯이 직접 maya.cmds 를 호출한다.
 Maya 밖에서도 import / 위젯 생성이 가능하도록 cmds 는 메서드 내부에서 lazy import 하고,
 실패하면 조용히 무시한다.
+
+UUID 보관 (v01.01~)
+-------------------
+항목의 표시 텍스트는 예전처럼 노드 이름이지만, 씬 노드인 항목은 **UUID 도 함께** 보관한다
+(`Qt.UserRole + 1`). 리스트에서 항목을 고를 때는 이름이 아니라 UUID 로 현재 경로를 되찾아
+씬에서 선택한다. 이름 기반은 항목을 담은 뒤 씬이 바뀌면 조용히 실패했다:
+
+    - 오브젝트를 리네임/리페어런트  -> "No object matches name"
+    - 같은 이름 오브젝트가 하나 더 생김 -> "More than one object matches name"
+
+UUID 는 리네임·리페어런트·이름 충돌과 무관하므로 두 경우 모두 해결된다.
+
+노드가 아닌 항목(어트리뷰트 이름, 파일명, 노드 타입 이름 등)은 UUID 가 없으므로 예전처럼
+이름으로 동작하고, 씬에 없는 이름이면 조용히 건너뛴다.
+`pCube1Shape.vtx[0]` 같은 컴포넌트는 `<uuid>.vtx[0]` 를 cmds.ls 로 되돌릴 수 없어서,
+**노드 UUID + 컴포넌트 접미사**를 따로 보관했다가 선택할 때 다시 조립한다.
 """
 
 from Framework.qt.qt import *
@@ -23,6 +39,10 @@ from Framework.qt.qt import *
 # 안 주면 이 바닥값을 적용한다. (공간이 충분하면 위젯은 이보다 크게 늘어난다)
 DEFAULT_LIST_MIN_HEIGHT = 100
 
+# 항목에 (uuid, component) 를 보관하는 Qt 역할. 호출부가 Qt.UserRole 을 쓰는 경우와
+# 겹치지 않도록 +1 을 쓴다.
+UUID_ROLE = Qt.UserRole + 1
+
 
 def _cmds():
     """maya.cmds 를 lazy import. Maya 밖이면 None 반환."""
@@ -31,6 +51,34 @@ def _cmds():
         return cmds
     except Exception:
         return None
+
+
+def _split_component(name):
+    """'grpA|pCube1|pCube1Shape.vtx[0]' -> ('grpA|pCube1|pCube1Shape', 'vtx[0]').
+
+    DAG 이름에는 '.' 이 들어갈 수 없으므로, 첫 '.' 앞이 노드 / 뒤가 컴포넌트다.
+    """
+    node, _, comp = name.partition(".")
+    return node, comp
+
+
+def _uuid_of(name):
+    """이름 -> (uuid, component). 씬 노드가 아니거나 이름이 애매하면 (None, "").
+
+    담는 시점에 이름이 애매하면(같은 이름 노드가 여럿) 어느 것인지 알 수 없으므로
+    UUID 를 붙이지 않고 이름 폴백에 맡긴다.
+    """
+    cmds = _cmds()
+    if cmds is None or not name:
+        return None, ""
+
+    node, comp = _split_component(name)
+    try:
+        found = cmds.ls(node, uuid=True) or []
+    except Exception:
+        return None, ""
+
+    return (found[0], comp) if len(found) == 1 else (None, "")
 
 
 class JUN_mod_tsl_qt_v01(QWidget):
@@ -128,31 +176,71 @@ class JUN_mod_tsl_qt_v01(QWidget):
     # ================================================================
 
     def get_all_items(self):
+        """표시 텍스트(노드 이름) 목록. 하위호환을 위해 반환 타입은 그대로 문자열."""
         return [self.list_widget.item(i).text()
                 for i in range(self.list_widget.count())]
 
+    def get_all_nodes(self):
+        """UUID 로 해석한 **현재** 노드 경로 목록. 씬에서 사라진 항목은 제외한다.
+
+        get_all_items() 와 달리 리네임/리페어런트 이후에도 올바른 경로를 준다.
+        """
+        return [n for n in (self._node_of(self.list_widget.item(i))
+                            for i in range(self.list_widget.count()))
+                if n]
+
     def set_items(self, items):
         # 프로그램적 채우기 중에는 시그널을 막아 불필요한 씬 선택을 방지한다.
+        # addItems 로 한 번에 넣은 뒤 UUID 를 붙인다 — addItem 을 항목마다 부르면
+        # model 의 rowsInserted 가 항목 수만큼 발생해, 그걸 듣고 있는 툴들
+        # (A00150/A00160/A00170/A00290)의 훅이 불필요하게 여러 번 호출된다.
+        texts = list(items or [])
         self.list_widget.blockSignals(True)
         self.list_widget.clear()
-        if items:
-            self.list_widget.addItems(items)
+        if texts:
+            self.list_widget.addItems(texts)
+            self._attach_uuids(texts)
         self.list_widget.blockSignals(False)
         self._update_number()
 
     def append_unique(self, items):
-        """중복 없이 추가. 이미 있으면 로그 콜백(없으면 print)으로 안내."""
-        existing = self.get_all_items()
-        for item in items or []:
-            if item in existing:
-                self._log("{0} is already in the list.".format(item))
+        """중복 없이 추가. 이미 있으면 로그 콜백(없으면 print)으로 안내.
+
+        중복 판정은 **UUID 우선**이다. 이름이 같아도 다른 오브젝트면 함께 담긴다
+        (계층만 다른 동명 오브젝트를 양쪽에 담아야 하는 경우가 있다).
+        """
+        existing_uuids = set()
+        existing_texts = set()
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            uuid = self._uuid_of_item(item)
+            if uuid:
+                existing_uuids.add(uuid)
             else:
-                self.list_widget.addItem(item)
-                existing.append(item)
+                existing_texts.add(item.text())
+
+        for text in items or []:
+            uuid, _comp = _uuid_of(text)
+            duplicated = uuid in existing_uuids if uuid else text in existing_texts
+            if duplicated:
+                self._log("{0} is already in the list.".format(text))
+                continue
+
+            self._add_item(text)
+            if uuid:
+                existing_uuids.add(uuid)
+            else:
+                existing_texts.add(text)
+
         self._update_number()
 
     def selected_items(self):
         return [item.text() for item in self.list_widget.selectedItems()]
+
+    def selected_nodes(self):
+        """선택한 항목을 UUID 로 해석한 현재 노드 경로 목록(사라진 항목 제외)."""
+        return [n for n in (self._node_of(item)
+                            for item in self.list_widget.selectedItems()) if n]
 
     def selected_rows(self):
         return sorted(idx.row() for idx in self.list_widget.selectedIndexes())
@@ -188,6 +276,70 @@ class JUN_mod_tsl_qt_v01(QWidget):
     # 내부 슬롯 / 헬퍼
     # ================================================================
 
+    def _add_item(self, text):
+        """텍스트로 항목을 만들고, 씬 노드면 (uuid, component) 를 함께 보관한다."""
+        item = QListWidgetItem(text)
+        uuid, comp = _uuid_of(text)
+        if uuid:
+            item.setData(UUID_ROLE, (uuid, comp))
+        self.list_widget.addItem(item)
+        return item
+
+    def _attach_uuids(self, texts, offset=0):
+        """이미 들어간 항목들(offset 부터)에 UUID 를 붙인다."""
+        for i, text in enumerate(texts):
+            uuid, comp = _uuid_of(text)
+            if uuid:
+                self.list_widget.item(offset + i).setData(UUID_ROLE, (uuid, comp))
+
+    @staticmethod
+    def _uuid_of_item(item):
+        data = item.data(UUID_ROLE) if item is not None else None
+        return data[0] if data else None
+
+    def _node_of(self, item):
+        """항목이 가리키는 **현재** 노드 경로. 씬에 없으면 None.
+
+        UUID 가 있으면 그것으로 되찾고(리네임/리페어런트/동명 안전),
+        없으면(어트리뷰트 이름 등 노드가 아닌 항목) 텍스트를 그대로 쓴다.
+        """
+        cmds = _cmds()
+        if cmds is None or item is None:
+            return None
+
+        data = item.data(UUID_ROLE)
+        if data:
+            uuid, comp = data
+            found = cmds.ls(uuid, long=True) or []
+            if not found:
+                return None
+            return "{0}.{1}".format(found[0], comp) if comp else found[0]
+
+        text = item.text()
+        try:
+            return text if cmds.objExists(text) else None
+        except Exception:
+            return None
+
+    def _records(self):
+        """[(텍스트, uuid데이터), ...] — 재정렬 시 UUID 를 잃지 않기 위한 스냅샷."""
+        return [(self.list_widget.item(i).text(),
+                 self.list_widget.item(i).data(UUID_ROLE))
+                for i in range(self.list_widget.count())]
+
+    def _set_records(self, records):
+        # set_items 와 같은 이유로 addItems 한 번 + setData (rowsInserted 1회).
+        # 여기서는 UUID 를 다시 조회하지 않고 기존 값을 그대로 옮긴다.
+        self.list_widget.blockSignals(True)
+        self.list_widget.clear()
+        if records:
+            self.list_widget.addItems([text for text, _ in records])
+            for i, (_text, data) in enumerate(records):
+                if data:
+                    self.list_widget.item(i).setData(UUID_ROLE, data)
+        self.list_widget.blockSignals(False)
+        self._update_number()
+
     def _update_number(self):
         self.lbl_number.setText("Number: {0}".format(self.list_widget.count()))
 
@@ -218,7 +370,8 @@ class JUN_mod_tsl_qt_v01(QWidget):
 
     def _on_up(self):
         """선택 항목을 한 칸 위로 이동(MOD_tsl BF_LIST_moveUp_index 로직 이식)."""
-        items = self.get_all_items()
+        # 재정렬은 텍스트가 아니라 레코드로 옮긴다(항목의 UUID 를 잃지 않도록).
+        items = self._records()
         rows = self.selected_rows()
         if not rows:
             return
@@ -230,12 +383,12 @@ class JUN_mod_tsl_qt_v01(QWidget):
             moved = items.pop(r)
             items.insert(r - 1, moved)
             result_rows.append(r - 1)
-        self.set_items(items)
+        self._set_records(items)
         self._reselect_rows(result_rows)
 
     def _on_down(self):
         """선택 항목을 한 칸 아래로 이동(MOD_tsl BF_LIST_moveDown_index 로직 이식)."""
-        items = self.get_all_items()
+        items = self._records()
         rows = self.selected_rows()
         if not rows:
             return
@@ -247,23 +400,44 @@ class JUN_mod_tsl_qt_v01(QWidget):
             moved = items.pop(r)
             items.insert(r + 1, moved)
             result_rows.append(r + 1)
-        self.set_items(items)
+        self._set_records(items)
         self._reselect_rows(result_rows)
 
     def _on_sort(self):
-        self.set_items(sorted(self.get_all_items()))
+        self._set_records(sorted(self._records(), key=lambda rec: rec[0]))
 
     def _on_selection_changed(self):
-        """리스트 항목 선택 시 Maya 씬에서 선택."""
+        """리스트 항목 선택 시 Maya 씬에서 선택.
+
+        UUID 로 현재 경로를 되찾아 선택하므로, 담은 뒤 리네임/리페어런트 됐거나
+        같은 이름의 오브젝트가 늘어나도 정확히 그 오브젝트가 잡힌다.
+        노드가 아닌 항목(어트리뷰트 이름 등)은 조용히 건너뛴다.
+        """
         cmds = _cmds()
         if cmds is None:
             return
-        items = self.selected_items()
-        if items:
+
+        items = self.list_widget.selectedItems()
+        if not items:
+            return
+
+        nodes, missing = [], []
+        for item in items:
+            node = self._node_of(item)
+            if node:
+                nodes.append(node)
+            elif self._uuid_of_item(item):
+                # UUID 를 알고 있는데 못 찾는다 = 씬에서 삭제됨. 알릴 가치가 있다.
+                missing.append(item.text())
+
+        if nodes:
             try:
-                cmds.select(items)
-            except Exception:
-                pass
+                cmds.select(nodes, replace=True)
+            except Exception as e:
+                self._log("Failed to select in the scene: {0}".format(e))
+
+        if missing:
+            self._log("Not in the scene anymore: {0}".format(", ".join(missing)))
 
     def _reselect_rows(self, rows):
         for r in rows:
