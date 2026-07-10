@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-24
+# last Update date : 2026-07-10
 # A00290_BSTool - Qt UI (레거시 JUN_PY_BSTool_V01_01 의 PySide 재작성)
 #
 # 탭 구성:
-#   1) Edit BS     : blendShape 노드 리스트 → 모든 타겟 키 / 타겟 메시 추출
-#   2) Base Shape  : blendShape 의 타겟을 리스트업 → 선택 타겟의 weight=value 모양을
-#                    weight=1.0 기본 모양으로 재정의(델타 스케일)
+#   1) Shape Editor : blendShape 노드의 모든 타겟을 리스트업 → 타겟마다 Edit 토글
+#                     (Maya 기본 Shape Editor 대체)
+#   2) Edit BS      : blendShape 노드 리스트 → 모든 타겟 키 / 타겟 메시 추출
+#   3) Base Shape   : blendShape 의 타겟을 리스트업 → 선택 타겟의 weight=value 모양을
+#                     weight=1.0 기본 모양으로 재정의(델타 스케일)
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
@@ -17,8 +19,21 @@ print("QT version  :  " + str(QT_VERSION))
 import maya.cmds as cmds
 
 from tools.A00290_BSTool.app.config.version import VERSION, LAST_UPDATE
-from tools.A00290_BSTool.app.core import EditBSManager, BaseShapeManager
+from tools.A00290_BSTool.app.core import EditBSManager, BaseShapeManager, ShapeEditorManager
 from tools.A00290_BSTool.app.core import blendshape_utils as bsu
+
+
+# Edit 토글이 켜졌을 때의 버튼 색(Maya Shape Editor 의 활성 Edit 버튼과 같은 의미).
+# 테마 qss 의 QPushButton:hover / :pressed 는 pseudo-state 규칙이라, 색만 바꾸면
+# 마우스를 올리는 순간 테마 색으로 되돌아가 보인다. 그래서 hover/pressed 까지 함께 덮는다.
+EDIT_ON_STYLE = (
+    "QPushButton { background-color: #c85a28; color: #ffffff;"
+    " border: 1px solid #f09050; font-weight: bold; }"
+    "QPushButton:hover { background-color: #d96a34; }"
+    "QPushButton:pressed { background-color: #a8441c; }"
+)
+EDIT_ON_TEXT = "Edit ON"
+EDIT_OFF_TEXT = "Edit"
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -33,8 +48,12 @@ class MainWindow(QWidget):
 
         self.setObjectName(WINDOW_OBJECT_NAME)
 
+        # Shape Editor 탭의 타겟 행 정보: [{node, index, name, btn, spin}, ...]
+        self._se_rows = []
+        self._se_rebuild_pending = False
+
         self.win_width = 460
-        self.win_height = 640
+        self.win_height = 720
         self.win_title = f"BS Tool v{VERSION}"
 
         self.resize(self.win_width, self.win_height)
@@ -61,6 +80,7 @@ class MainWindow(QWidget):
 
         # 탭
         self.tabs = QTabWidget()
+        self.tabs.addTab(self._build_shape_editor_tab(), "Shape Editor")
         self.tabs.addTab(self._build_edit_bs_tab(), "Edit BS")
         self.tabs.addTab(self._build_base_shape_tab(), "Base Shape")
         main_layout.addWidget(self.tabs)
@@ -78,7 +98,238 @@ class MainWindow(QWidget):
         main_layout.addWidget(self.lbl_copyright)
 
     # ==================================================
-    # Tab 1 : Edit BS
+    # Tab 1 : Shape Editor
+    # ==================================================
+
+    def _build_shape_editor_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # blendShape 노드 리스트 (씬 선택 연동). 노드가 추가/삭제되면 타겟을 다시 훑는다.
+        self.tsl_se_nodes = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="BlendShape Nodes",
+            select_label="Select BlendShape Nodes",
+            list_min_height=70,
+            log_callback=self.log)
+        self.tsl_se_nodes.list_widget.model().rowsInserted.connect(
+            self._on_se_nodes_changed)
+        self.tsl_se_nodes.list_widget.model().rowsRemoved.connect(
+            self._on_se_nodes_changed)
+        layout.addWidget(self.tsl_se_nodes)
+
+        # 필터 + 새로고침
+        tool_row = QHBoxLayout()
+        tool_row.addWidget(QLabel("Filter"))
+        self.le_se_filter = QLineEdit()
+        self.le_se_filter.setPlaceholderText("Type to filter target names")
+        self.le_se_filter.textChanged.connect(self._apply_se_filter)
+        tool_row.addWidget(self.le_se_filter)
+        btn_refresh = QPushButton("Refresh")
+        btn_refresh.setToolTip("Re-read targets and weights from the listed blendShape nodes.")
+        btn_refresh.clicked.connect(self.on_se_refresh)
+        tool_row.addWidget(btn_refresh)
+        layout.addLayout(tool_row)
+
+        # 타겟 헤더
+        header = QHBoxLayout()
+        lbl_t = QLabel("Targets")
+        f = lbl_t.font()
+        f.setBold(True)
+        lbl_t.setFont(f)
+        header.addWidget(lbl_t)
+        header.addStretch(1)
+        self.lbl_se_number = QLabel("Number: 0")
+        header.addWidget(self.lbl_se_number)
+        layout.addLayout(header)
+
+        # 타겟 행 스크롤 영역 (blendShape 별 헤더 + 타겟마다 Edit 토글 / weight)
+        self.se_scroll = QScrollArea()
+        self.se_scroll.setWidgetResizable(True)
+        self.se_scroll.setMinimumHeight(260)
+        self.se_body = QWidget()
+        self.se_body_layout = QVBoxLayout(self.se_body)
+        self.se_body_layout.setContentsMargins(2, 2, 2, 2)
+        self.se_body_layout.setSpacing(2)
+        self.se_body_layout.addStretch(1)
+        self.se_scroll.setWidget(self.se_body)
+        layout.addWidget(self.se_scroll, 1)
+
+        # 설명
+        info = QLabel(
+            "Turn Edit on, sculpt the base mesh in the viewport, then turn Edit off\n"
+            "to bake the change into that target - same as Maya's Shape Editor.")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        btn_exit = QPushButton("Exit Edit Mode (all blendShapes)")
+        btn_exit.setToolTip("Turn off edit mode on every blendShape node in the scene.")
+        btn_exit.clicked.connect(self.on_se_exit_all)
+        layout.addWidget(btn_exit)
+
+        return tab
+
+    # --------------------------------------------------
+    # Shape Editor : 행 구성
+    # --------------------------------------------------
+
+    def _clear_se_rows(self):
+        self._se_rows = []
+        # 마지막 stretch 를 제외한 모든 위젯 제거
+        while self.se_body_layout.count() > 1:
+            item = self.se_body_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+
+    def _add_se_node_header(self, bs_node):
+        lbl = QLabel(bs_node)
+        f = lbl.font()
+        f.setBold(True)
+        lbl.setFont(f)
+        lbl.setContentsMargins(2, 6, 2, 2)
+        self.se_body_layout.insertWidget(self.se_body_layout.count() - 1, lbl)
+
+    def _add_se_target_row(self, bs_node, target, editing_idx):
+        idx = target["index"]
+        is_editing = (idx == editing_idx)
+
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(2, 0, 2, 0)
+
+        btn = QPushButton(EDIT_OFF_TEXT)
+        btn.setCheckable(True)
+        # "Edit ON" 으로 바뀌어도 폭이 흔들리지 않도록 고정.
+        btn.setFixedWidth(72)
+        btn.setToolTip("Toggle sculpt mode on this target (blendShape sculptTargetIndex).")
+        btn.setChecked(is_editing)
+        self._style_edit_button(btn, is_editing)
+        # clicked 는 clicked(bool checked=false) 라 인자 없이 발화될 수 있다.
+        # 시그널 인자에 기대지 말고 버튼에서 직접 체크 상태를 읽는다.
+        btn.clicked.connect(
+            lambda *_a, n=bs_node, i=idx, b=btn: self.on_se_edit_toggled(n, i, b.isChecked()))
+        row_layout.addWidget(btn)
+
+        lbl = QLabel(target["name"])
+        lbl.setToolTip("weight[{0}]".format(idx))
+        row_layout.addWidget(lbl, 1)
+
+        spin = QDoubleSpinBox()
+        spin.setDecimals(3)
+        spin.setRange(-10.0, 10.0)
+        spin.setSingleStep(0.1)
+        spin.setFixedWidth(72)
+        spin.setValue(target["weight"])
+        # 구동/잠금된 weight 는 손대지 못하고, 편집 중에는 1.0 으로 고정된다.
+        spin.setEnabled(target["settable"] and not is_editing)
+        if not target["settable"]:
+            spin.setToolTip("This weight is locked or driven by another node.")
+        # valueChanged 도 바인딩/버전에 따라 double 또는 문자열을 넘긴다. 스핀박스에서 직접 읽는다.
+        spin.valueChanged.connect(
+            lambda *_a, n=bs_node, i=idx, s=spin: self.on_se_weight_changed(n, i, s.value()))
+        row_layout.addWidget(spin)
+
+        self.se_body_layout.insertWidget(self.se_body_layout.count() - 1, row)
+        self._se_rows.append({
+            "node": bs_node, "index": idx, "name": target["name"],
+            "row": row, "btn": btn, "spin": spin,
+        })
+
+    def _style_edit_button(self, btn, on):
+        """Edit 토글의 현재 상태(색 + 라벨)를 버튼에 반영한다."""
+        btn.setStyleSheet(EDIT_ON_STYLE if on else "")
+        btn.setText(EDIT_ON_TEXT if on else EDIT_OFF_TEXT)
+
+    def _populate_shape_editor(self):
+        """리스트의 blendShape 노드들을 훑어 타겟 행을 다시 만든다."""
+        self._clear_se_rows()
+
+        nodes = [n for n in self.tsl_se_nodes.get_all_items() if bsu.is_blendshape(n)]
+        total = 0
+        for bs_node in nodes:
+            targets = ShapeEditorManager.list_targets(bs_node)
+            editing_idx = ShapeEditorManager.get_edit_target(bs_node)
+            if len(nodes) > 1 or not targets:
+                self._add_se_node_header(bs_node)
+            for target in targets:
+                self._add_se_target_row(bs_node, target, editing_idx)
+            total += len(targets)
+
+        self.lbl_se_number.setText("Number: {0}".format(total))
+        self._apply_se_filter(self.le_se_filter.text())
+        return nodes, total
+
+    def _apply_se_filter(self, text):
+        needle = (text or "").strip().lower()
+        for row in self._se_rows:
+            row["row"].setVisible(needle in row["name"].lower())
+
+    def _sync_se_edit_states(self):
+        """씬의 실제 sculptTargetIndex 를 읽어 Edit 버튼/스핀박스 상태를 맞춘다."""
+        editing = {}
+        for row in self._se_rows:
+            node = row["node"]
+            if node not in editing:
+                editing[node] = ShapeEditorManager.get_edit_target(node)
+
+            on = (editing[node] == row["index"])
+
+            row["btn"].blockSignals(True)
+            row["btn"].setChecked(on)
+            row["btn"].blockSignals(False)
+            self._style_edit_button(row["btn"], on)
+
+            settable = ShapeEditorManager.is_weight_settable(node, row["index"])
+            row["spin"].blockSignals(True)
+            row["spin"].setValue(ShapeEditorManager.get_weight(node, row["index"]))
+            row["spin"].setEnabled(settable and not on)
+            row["spin"].blockSignals(False)
+
+    # --------------------------------------------------
+    # Handlers : Shape Editor
+    # --------------------------------------------------
+
+    def _on_se_nodes_changed(self, *args):
+        # set_items 는 clear + add 로 rowsRemoved / rowsInserted 를 연달아 낸다.
+        # 이벤트 루프로 한 번 미뤄 재빌드를 1회로 합친다.
+        if self._se_rebuild_pending:
+            return
+        self._se_rebuild_pending = True
+        QTimer.singleShot(0, self._rebuild_se_now)
+
+    def _rebuild_se_now(self):
+        self._se_rebuild_pending = False
+        self._populate_shape_editor()
+
+    def on_se_refresh(self):
+        nodes, total = self._populate_shape_editor()
+        if not nodes:
+            self.log("[Warning] Add blendShape nodes to the list first.")
+            return
+        self.log("[Shape Editor] {0} node(s), {1} target(s).".format(len(nodes), total))
+
+    def on_se_edit_toggled(self, bs_node, weight_idx, checked):
+        if checked:
+            _ok, msg = ShapeEditorManager.begin_edit(bs_node, weight_idx)
+        else:
+            _ok, msg = ShapeEditorManager.end_edit(bs_node)
+        self.log(msg)
+        # 노드당 한 타겟만 편집할 수 있으므로 다른 행의 상태도 다시 맞춘다.
+        self._sync_se_edit_states()
+
+    def on_se_weight_changed(self, bs_node, weight_idx, value):
+        ok, msg = ShapeEditorManager.set_weight(bs_node, weight_idx, value)
+        if not ok:
+            self.log(msg)
+
+    def on_se_exit_all(self):
+        _n, msg = ShapeEditorManager.exit_all_edits()
+        self.log(msg)
+        self._sync_se_edit_states()
+
+    # ==================================================
+    # Tab 2 : Edit BS
     # ==================================================
 
     def _build_edit_bs_tab(self):
@@ -141,7 +392,7 @@ class MainWindow(QWidget):
         return tab
 
     # ==================================================
-    # Tab 2 : Base Shape
+    # Tab 3 : Base Shape
     # ==================================================
 
     def _build_base_shape_tab(self):
@@ -323,6 +574,19 @@ class MainWindow(QWidget):
         value = self.dsb_value.value()
         _done, msg = BaseShapeManager.apply_value_as_default(bs_node, target_names, value)
         self.log(msg)
+
+    # --------------------------------------------------
+    # Close
+    # --------------------------------------------------
+
+    def closeEvent(self, event):
+        # 편집 모드를 켠 채 창을 닫으면 씬이 조용히 sculpt 상태로 남는다.
+        # 닫을 때 해제해 편집 결과를 타겟에 확정시킨다(Maya 의 Edit off 와 동일).
+        try:
+            ShapeEditorManager.exit_all_edits()
+        except Exception:
+            pass
+        super().closeEvent(event)
 
     # --------------------------------------------------
     # About
