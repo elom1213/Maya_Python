@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-24
+# last Update date : 2026-07-10
 # A00260_ConstraintConverter - Qt UI (Maya constraint -> UE Control Rig)
+#
+# v01.05 : Constraint Type 드롭다운(Parent / Position / Rotation) + 축(X/Y/Z)별 필터
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
@@ -12,7 +14,9 @@ print("QT version  :  " + str(QT_VERSION))
 import maya.cmds as cmds
 
 from tools.A00260_ConstraintConverter.app.config.version import VERSION, LAST_UPDATE
-from tools.A00260_ConstraintConverter.app.core import INTERP_TYPES
+from tools.A00260_ConstraintConverter.app.core import (
+    INTERP_TYPES, NODE_TYPE_ORDER, CHANNELS, AXES, node_spec,
+)
 from tools.A00260_ConstraintConverter.app.core import constraint_reader
 
 # 주의: ConstraintConverter / ConvertOptions 는 모듈 최상단에서 바인딩하지 않고
@@ -23,6 +27,29 @@ from tools.A00260_ConstraintConverter.app.core import constraint_reader
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
 WINDOW_OBJECT_NAME = "JUN_A00260_ConstraintConverter_window"
+
+# 비활성(disabled) 위젯을 흐리게 보이도록 하는 스타일.
+#
+# Framework/styles/*.qss 는 QLabel/QCheckBox 등에 색을 평면적으로 지정하고 :disabled
+# 규칙이 없어서, setEnabled(False) 를 해도 Qt 기본 회색 처리가 덮여 그대로 밝게 보인다.
+# 옵션 그룹에만 :disabled 규칙을 덧대 "쓸 수 없는 항목"임이 눈에 보이게 한다.
+# (자식 위젯의 스타일시트는 나중에 적용되는 부모 테마 qss 보다 우선한다)
+DISABLED_QSS = """
+QLabel:disabled, QCheckBox:disabled, QComboBox:disabled {
+    color: #6e6e6e;
+}
+QComboBox:disabled {
+    border: 1px solid #4a4a4a;
+}
+QCheckBox::indicator:disabled {
+    border: 1px solid #4a4a4a;
+    background-color: #303030;
+}
+QCheckBox::indicator:checked:disabled {
+    background-color: #4a4a4a;
+    border: 1px solid #4a4a4a;
+}
+"""
 
 
 class MainWindow(QWidget):
@@ -103,22 +130,40 @@ class MainWindow(QWidget):
 
     def _build_options_group(self):
         group = QGroupBox("Convert Options")
+        group.setStyleSheet(DISABLED_QSS)
         layout = QVBoxLayout(group)
 
-        # Transform filter 체크박스 (기본: translate 만 체크)
-        filter_row = QHBoxLayout()
-        filter_row.addWidget(QLabel("Filter:"))
-        self.cb_trans = QCheckBox("Translate")
-        self.cb_trans.setChecked(True)
-        self.cb_rot = QCheckBox("Rotate")
-        self.cb_rot.setChecked(False)
-        self.cb_scale = QCheckBox("Scale")
-        self.cb_scale.setChecked(False)
-        filter_row.addWidget(self.cb_trans)
-        filter_row.addWidget(self.cb_rot)
-        filter_row.addWidget(self.cb_scale)
-        filter_row.addStretch(1)
-        layout.addLayout(filter_row)
+        # Constraint Type 드롭다운 (생성할 UE 노드 종류)
+        type_row = QHBoxLayout()
+        type_row.addWidget(QLabel("Constraint Type:"))
+        self.cmb_type = QComboBox()
+        self.cmb_type.addItems(list(NODE_TYPE_ORDER))
+        self.cmb_type.currentTextChanged.connect(self.on_type_changed)
+        type_row.addWidget(self.cmb_type)
+        type_row.addStretch(1)
+        layout.addLayout(type_row)
+
+        # 채널 x 축 필터 그리드 (기본: Translate 만 X/Y/Z 체크)
+        # self.cb_axis[(channel, axis)] = QCheckBox / self.lbl_channel[channel] = QLabel
+        self.cb_axis = {}
+        self.lbl_channel = {}
+
+        grid = QGridLayout()
+        grid.addWidget(QLabel("Filter:"), 0, 0)
+        for col, axis in enumerate(AXES):
+            grid.addWidget(QLabel(axis.upper()), 0, col + 1, Qt.AlignHCenter)
+
+        for row, (channel, label) in enumerate(CHANNELS, start=1):
+            lbl = QLabel(label)
+            self.lbl_channel[channel] = lbl
+            grid.addWidget(lbl, row, 0)
+            for col, axis in enumerate(AXES):
+                cb = QCheckBox()
+                cb.setChecked(channel == "trans")
+                self.cb_axis[(channel, axis)] = cb
+                grid.addWidget(cb, row, col + 1, Qt.AlignHCenter)
+        grid.setColumnStretch(len(AXES) + 1, 1)
+        layout.addLayout(grid)
 
         # Maintain Offset (기본 체크)
         self.cb_maintain = QCheckBox("Maintain Offset")
@@ -127,7 +172,8 @@ class MainWindow(QWidget):
 
         # InterpolationType 드롭다운 (기본 Shortest)
         interp_row = QHBoxLayout()
-        interp_row.addWidget(QLabel("Interpolation Type:"))
+        self.lbl_interp = QLabel("Interpolation Type:")
+        interp_row.addWidget(self.lbl_interp)
         self.cmb_interp = QComboBox()
         self.cmb_interp.addItems(list(INTERP_TYPES))
         default_idx = list(INTERP_TYPES).index("Shortest")
@@ -136,11 +182,46 @@ class MainWindow(QWidget):
         interp_row.addStretch(1)
         layout.addLayout(interp_row)
 
+        # 초기 활성/비활성 상태 반영
+        self._sync_option_widgets()
+
         return group
+
+    def _sync_option_widgets(self):
+        """선택된 Constraint Type 이 쓰지 않는 채널/옵션 위젯을 비활성화한다.
+
+        - Position 은 Translate 행만, Rotation 은 Rotate 행만 사용한다.
+        - Position 노드에는 AdvancedSettings(InterpolationType) 핀 자체가 없다.
+        """
+        spec = node_spec(self.cmb_type.currentText())
+        active = spec["channels"]
+
+        for channel, _label in CHANNELS:
+            enabled = channel in active
+            self.lbl_channel[channel].setEnabled(enabled)
+            for axis in AXES:
+                self.cb_axis[(channel, axis)].setEnabled(enabled)
+
+        self.lbl_interp.setEnabled(spec["interp"])
+        self.cmb_interp.setEnabled(spec["interp"])
 
     # --------------------------------------------------
     # 슬롯
     # --------------------------------------------------
+
+    def on_type_changed(self, type_name):
+        """Constraint Type 변경: 안 쓰는 채널을 끄고, 쓰는 채널이 전부 꺼져 있으면 켜 준다."""
+        self._sync_option_widgets()
+
+        spec = node_spec(type_name)
+        for channel in spec["channels"]:
+            boxes = [self.cb_axis[(channel, axis)] for axis in AXES]
+            if not any(cb.isChecked() for cb in boxes):
+                for cb in boxes:
+                    cb.setChecked(True)
+
+        self.log("Constraint type: {0} (filter: {1})".format(
+            type_name, ", ".join(spec["channels"])))
 
     def on_list_constraints(self):
         """선택에서 컨스트레인트를 찾아 리스트를 교체."""
@@ -161,6 +242,13 @@ class MainWindow(QWidget):
             return
 
         options = self._collect_options()
+
+        # 활성 채널의 축이 모두 꺼져 있으면 필터가 전부 false 라 노드가 아무 일도 하지 않는다.
+        spec = node_spec(options.constraint_type)
+        if not any(any(options.axes(ch)) for ch in spec["channels"]):
+            self.log("No axis checked for {0}. Check at least one of X / Y / Z.".format(
+                options.constraint_type))
+            return
 
         try:
             # 지역 import: 리로드 후 최신 클래스를 잡는다 (노드 배치 로직 변경 즉시 반영)
@@ -183,19 +271,25 @@ class MainWindow(QWidget):
         self.log("-" * 40)
         for name, child, n in infos:
             self.log("  {0} : {1} <- {2} target(s)".format(name, child, n))
-        self.log("Converted {0} constraint(s).".format(len(infos)))
+        self.log("Converted {0} constraint(s) -> {1} Constraint node(s).".format(
+            len(infos), options.constraint_type))
         self.log("Copied to clipboard. Paste into Control Rig graph (Ctrl+V).")
         self.log("Saved: {0}".format(out_path))
 
     def _collect_options(self):
         # 지역 import: 리로드 후 최신 모듈을 잡는다 (constraint_converter 와 동일 이유)
         from tools.A00260_ConstraintConverter.app.core.node_builder import ConvertOptions
+
+        axis_flags = {
+            "{0}_{1}".format(channel, axis): self.cb_axis[(channel, axis)].isChecked()
+            for channel, _label in CHANNELS
+            for axis in AXES
+        }
         return ConvertOptions(
-            trans_filter    = self.cb_trans.isChecked(),
-            rot_filter      = self.cb_rot.isChecked(),
-            scale_filter    = self.cb_scale.isChecked(),
+            constraint_type = self.cmb_type.currentText(),
             maintain_offset = self.cb_maintain.isChecked(),
             interp_type     = self.cmb_interp.currentText(),
+            **axis_flags
         )
 
     # --------------------------------------------------
@@ -212,7 +306,8 @@ class MainWindow(QWidget):
             "Constraint Converter\n"
             "Version {0}\n"
             "Last Update {1}\n\n"
-            "Maya constraint -> UE Control Rig Parent Constraint node.".format(
+            "Maya constraint -> UE Control Rig\n"
+            "Parent / Position / Rotation Constraint node.".format(
                 VERSION, LAST_UPDATE
             ),
         )

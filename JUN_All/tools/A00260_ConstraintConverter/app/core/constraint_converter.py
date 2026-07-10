@@ -9,7 +9,7 @@
 from Framework.core.path_manager import PathManager
 
 from .tool_path import ConverterPaths
-from .node_builder import NodeBuilder, ConvertOptions
+from .node_builder import NodeBuilder, ConvertOptions, node_spec
 from . import constraint_reader as reader
 
 
@@ -28,11 +28,14 @@ class ConstraintConverter:
         self.node_pos_offset_y = 280.0
         self.nodes_per_row = 4
 
-        # UE 에서 붙여넣을 노드 이름 접두사
-        self.node_name_prefix = "ParentConstraint_"
+        # UE 에서 붙여넣을 노드 이름 접두사는 노드 종류(NODE_TYPES)에서 가져온다.
 
         self.builder = NodeBuilder(
-            node_tmpl        = self._read(self.paths.read_node_tmpl),
+            node_tmpls = {
+                "Parent"   : self._read(self.paths.read_node_tmpl),
+                "Position" : self._read(self.paths.read_position_tmpl),
+                "Rotation" : self._read(self.paths.read_rotation_tmpl),
+            },
             parent_decl_tmpl = self._read(self.paths.read_parent_decl),
             parent_def_tmpl  = self._read(self.paths.read_parent_def),
             link_tmpl        = self._read(self.paths.read_link_tmpl),
@@ -49,11 +52,13 @@ class ConstraintConverter:
 
         ext = "py"
         self.paths = ConverterPaths(
-            read_node_tmpl   = self.pm.path("read",  "A0001_Src_constraint_node.{0}".format(ext)),
-            read_parent_decl = self.pm.path("read",  "A0002_Src_parent_decl.{0}".format(ext)),
-            read_parent_def  = self.pm.path("read",  "A0003_Src_parent_def.{0}".format(ext)),
-            read_link_tmpl   = self.pm.path("read",  "A0004_Src_link.{0}".format(ext)),
-            write_out        = self.pm.path("write", "A001_constraint_nodes_out.{0}".format(ext)),
+            read_node_tmpl     = self.pm.path("read",  "A0001_Src_constraint_node.{0}".format(ext)),
+            read_parent_decl   = self.pm.path("read",  "A0002_Src_parent_decl.{0}".format(ext)),
+            read_parent_def    = self.pm.path("read",  "A0003_Src_parent_def.{0}".format(ext)),
+            read_link_tmpl     = self.pm.path("read",  "A0004_Src_link.{0}".format(ext)),
+            read_position_tmpl = self.pm.path("read",  "A0005_Src_position_node.{0}".format(ext)),
+            read_rotation_tmpl = self.pm.path("read",  "A0006_Src_rotation_node.{0}".format(ext)),
+            write_out          = self.pm.path("write", "A001_constraint_nodes_out.{0}".format(ext)),
         )
 
     @staticmethod
@@ -79,13 +84,15 @@ class ConstraintConverter:
         infos = []
         node_names = []
 
+        prefix = node_spec(options.constraint_type)["prefix"]
+
         idx = 0
         for cn in constraint_nodes:
             data = reader.read_constraint(cn)
             if data is None or not data.targets:
                 continue
 
-            node_name = "{0}{1}".format(self.node_name_prefix, idx + 1)
+            node_name = "{0}{1}".format(prefix, idx + 1)
             node_names.append(node_name)
 
             # 가로로 나열 -> nodes_per_row 마다 다음 줄(아래)로 이동

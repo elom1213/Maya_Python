@@ -7,7 +7,9 @@ from dataclasses import dataclass
 
 @dataclass
 class ConverterPaths:
-    read_node_tmpl      : str   # 전체 노드 템플릿
+    read_node_tmpl      : str   # Parent Constraint 노드 템플릿
+    read_position_tmpl  : str   # Position Constraint 노드 템플릿
+    read_rotation_tmpl  : str   # Rotation Constraint 노드 템플릿
     read_parent_decl    : str   # parent 선언(stub) 조각
     read_parent_def     : str   # parent 정의 조각
     read_link_tmpl      : str   # 노드 간 ExecutePin 연결(RigVMLink) 조각

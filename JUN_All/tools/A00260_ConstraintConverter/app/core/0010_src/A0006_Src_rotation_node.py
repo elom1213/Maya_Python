@@ -24,29 +24,11 @@ Begin Object Class=/Script/RigVMDeveloper.RigVMUnitNode Name="{{NODE}}" ExportPa
    Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="Parents" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Parents'"
 {{PARENTS_DECL}}   End Object
    Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="Filter" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter'"
-      Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="ScaleFilter" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.ScaleFilter'"
-         Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="bZ" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.ScaleFilter.bZ'"
-         End Object
-         Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="bY" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.ScaleFilter.bY'"
-         End Object
-         Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="bX" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.ScaleFilter.bX'"
-         End Object
+      Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="bZ" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.bZ'"
       End Object
-      Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="RotationFilter" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.RotationFilter'"
-         Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="bZ" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.RotationFilter.bZ'"
-         End Object
-         Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="bY" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.RotationFilter.bY'"
-         End Object
-         Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="bX" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.RotationFilter.bX'"
-         End Object
+      Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="bY" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.bY'"
       End Object
-      Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="TranslationFilter" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.TranslationFilter'"
-         Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="bZ" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.TranslationFilter.bZ'"
-         End Object
-         Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="bY" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.TranslationFilter.bY'"
-         End Object
-         Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="bX" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.TranslationFilter.bX'"
-         End Object
+      Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="bX" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.bX'"
       End Object
    End Object
    Begin Object Class=/Script/RigVMDeveloper.RigVMPin Name="bMaintainOffset" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.bMaintainOffset'"
@@ -135,104 +117,46 @@ Begin Object Class=/Script/RigVMDeveloper.RigVMUnitNode Name="{{NODE}}" ExportPa
          DefaultValue="{{INTERP_TYPE}}"
       End Object
       Direction=Input
-      CPPType="FRigUnit_ParentConstraint_AdvancedSettings"
-      CPPTypeObject="/Script/CoreUObject.ScriptStruct'/Script/ControlRig.RigUnit_ParentConstraint_AdvancedSettings'"
-      CPPTypeObjectPath="/Script/ControlRig.RigUnit_ParentConstraint_AdvancedSettings"
+      CPPType="FRigUnit_RotationConstraint_AdvancedSettings"
+      CPPTypeObject="/Script/CoreUObject.ScriptStruct'/Script/ControlRig.RigUnit_RotationConstraint_AdvancedSettings'"
+      CPPTypeObjectPath="/Script/ControlRig.RigUnit_RotationConstraint_AdvancedSettings"
       DefaultValueType=Unset
       SubPins(0)="/Script/RigVMDeveloper.RigVMPin'InterpolationType'"
       SubPins(1)="/Script/RigVMDeveloper.RigVMPin'RotationOrderForFilter'"
    End Object
    Begin Object Name="Parents" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Parents'"
 {{PARENTS_DEF}}      Direction=Input
+      bIsExpanded=True
       bIsDynamicArray=True
       CPPType="TArray<FConstraintParent>"
       CPPTypeObject="/Script/CoreUObject.ScriptStruct'/Script/ControlRig.ConstraintParent'"
       CPPTypeObjectPath="/Script/ControlRig.ConstraintParent"
 {{PARENTS_SUBPINS}}   End Object
    Begin Object Name="Filter" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter'"
-      Begin Object Name="ScaleFilter" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.ScaleFilter'"
-         Begin Object Name="bZ" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.ScaleFilter.bZ'"
-            Direction=Input
-            CPPType="bool"
-            DefaultValue="{{SCALE_Z}}"
-         End Object
-         Begin Object Name="bY" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.ScaleFilter.bY'"
-            Direction=Input
-            CPPType="bool"
-            DefaultValue="{{SCALE_Y}}"
-         End Object
-         Begin Object Name="bX" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.ScaleFilter.bX'"
-            Direction=Input
-            CPPType="bool"
-            DefaultValue="{{SCALE_X}}"
-         End Object
+      Begin Object Name="bZ" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.bZ'"
          Direction=Input
-         bIsExpanded=True
-         CPPType="FFilterOptionPerAxis"
-         CPPTypeObject="/Script/CoreUObject.ScriptStruct'/Script/AnimationCore.FilterOptionPerAxis'"
-         CPPTypeObjectPath="/Script/AnimationCore.FilterOptionPerAxis"
-         SubPins(0)="/Script/RigVMDeveloper.RigVMPin'bX'"
-         SubPins(1)="/Script/RigVMDeveloper.RigVMPin'bY'"
-         SubPins(2)="/Script/RigVMDeveloper.RigVMPin'bZ'"
+         CPPType="bool"
+         DefaultValue="{{FILTER_Z}}"
       End Object
-      Begin Object Name="RotationFilter" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.RotationFilter'"
-         Begin Object Name="bZ" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.RotationFilter.bZ'"
-            Direction=Input
-            CPPType="bool"
-            DefaultValue="{{ROT_Z}}"
-         End Object
-         Begin Object Name="bY" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.RotationFilter.bY'"
-            Direction=Input
-            CPPType="bool"
-            DefaultValue="{{ROT_Y}}"
-         End Object
-         Begin Object Name="bX" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.RotationFilter.bX'"
-            Direction=Input
-            CPPType="bool"
-            DefaultValue="{{ROT_X}}"
-         End Object
+      Begin Object Name="bY" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.bY'"
          Direction=Input
-         bIsExpanded=True
-         CPPType="FFilterOptionPerAxis"
-         CPPTypeObject="/Script/CoreUObject.ScriptStruct'/Script/AnimationCore.FilterOptionPerAxis'"
-         CPPTypeObjectPath="/Script/AnimationCore.FilterOptionPerAxis"
-         SubPins(0)="/Script/RigVMDeveloper.RigVMPin'bX'"
-         SubPins(1)="/Script/RigVMDeveloper.RigVMPin'bY'"
-         SubPins(2)="/Script/RigVMDeveloper.RigVMPin'bZ'"
+         CPPType="bool"
+         DefaultValue="{{FILTER_Y}}"
       End Object
-      Begin Object Name="TranslationFilter" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.TranslationFilter'"
-         Begin Object Name="bZ" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.TranslationFilter.bZ'"
-            Direction=Input
-            CPPType="bool"
-            DefaultValue="{{TRANS_Z}}"
-         End Object
-         Begin Object Name="bY" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.TranslationFilter.bY'"
-            Direction=Input
-            CPPType="bool"
-            DefaultValue="{{TRANS_Y}}"
-         End Object
-         Begin Object Name="bX" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.TranslationFilter.bX'"
-            Direction=Input
-            CPPType="bool"
-            DefaultValue="{{TRANS_X}}"
-         End Object
+      Begin Object Name="bX" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Filter.bX'"
          Direction=Input
-         bIsExpanded=True
-         CPPType="FFilterOptionPerAxis"
-         CPPTypeObject="/Script/CoreUObject.ScriptStruct'/Script/AnimationCore.FilterOptionPerAxis'"
-         CPPTypeObjectPath="/Script/AnimationCore.FilterOptionPerAxis"
-         SubPins(0)="/Script/RigVMDeveloper.RigVMPin'bX'"
-         SubPins(1)="/Script/RigVMDeveloper.RigVMPin'bY'"
-         SubPins(2)="/Script/RigVMDeveloper.RigVMPin'bZ'"
+         CPPType="bool"
+         DefaultValue="{{FILTER_X}}"
       End Object
       Direction=Input
-      CPPType="FTransformFilter"
-      CPPTypeObject="/Script/CoreUObject.ScriptStruct'/Script/AnimationCore.TransformFilter'"
-      CPPTypeObjectPath="/Script/AnimationCore.TransformFilter"
+      bIsExpanded=True
+      CPPType="FFilterOptionPerAxis"
+      CPPTypeObject="/Script/CoreUObject.ScriptStruct'/Script/AnimationCore.FilterOptionPerAxis'"
+      CPPTypeObjectPath="/Script/AnimationCore.FilterOptionPerAxis"
       DefaultValueType=Unset
-      SubPins(0)="/Script/RigVMDeveloper.RigVMPin'TranslationFilter'"
-      SubPins(1)="/Script/RigVMDeveloper.RigVMPin'RotationFilter'"
-      SubPins(2)="/Script/RigVMDeveloper.RigVMPin'ScaleFilter'"
+      SubPins(0)="/Script/RigVMDeveloper.RigVMPin'bX'"
+      SubPins(1)="/Script/RigVMDeveloper.RigVMPin'bY'"
+      SubPins(2)="/Script/RigVMDeveloper.RigVMPin'bZ'"
    End Object
    Begin Object Name="bMaintainOffset" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.bMaintainOffset'"
       Direction=Input
@@ -270,8 +194,8 @@ Begin Object Class=/Script/RigVMDeveloper.RigVMUnitNode Name="{{NODE}}" ExportPa
       DefaultValue="()"
       DefaultValueType=Unset
    End Object
-   ResolvedFunctionName="FRigUnit_ParentConstraint::Execute"
-   NodeTitle="Parent Constraint"
+   ResolvedFunctionName="FRigUnit_RotationConstraintLocalSpaceOffset::Execute"
+   NodeTitle="Rotation Constraint"
    Position=(X={{POS_X}},Y={{POS_Y}})
    NodeColor=(R=0.000000,G=0.364706,B=1.000000,A=1.000000)
    Pins(0)="/Script/RigVMDeveloper.RigVMPin'ExecutePin'"
