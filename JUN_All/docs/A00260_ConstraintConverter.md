@@ -5,7 +5,7 @@
 언리얼 Control Rig 그래프에 그대로 `Ctrl+V` 붙여넣으면 노드가 생성된다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`A00110_animTool` 클론)
-- **버전**: `app/config/version.py` (v01.06)
+- **버전**: `app/config/version.py` (v01.07)
 - **설치**: `__dragDrop_A00260.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼(`CnsConv`) 생성 → `tools.A00260_ConstraintConverter.run(True)`
 - **참고 출력 포맷**: `ref_/sample_position.py`, `ref_/sample_position_close.py`, `ref_/sample_rotate.py`
   (UE Control Rig 에서 각 노드를 복사한 원본 텍스트. Parent 용 옛 샘플 `smaple.py` / `sample_01~04.py` 는 제거됨)
@@ -45,8 +45,8 @@
 - **Filter 는 축(X/Y/Z) 단위 3×3 그리드**다. `Parent` 는 Translate/Rotate/Scale 세 행을 모두 쓰고,
   `Position` 은 **Translate 행만**, `Rotation` 은 **Rotate 행만** 쓴다.
 - 안 쓰는 행(과 `Position` 의 `Interpolation Type`)은 **비활성 + 흐리게** 표시된다.
-  테마 qss 에 `:disabled` 규칙이 없어 그냥 `setEnabled(False)` 만으로는 색이 그대로라,
-  옵션 그룹박스에만 `DISABLED_QSS`(`main_window.py`)를 덧대 흐리게 만든다.
+  흐린 표현은 v01.07 부터 **`Framework/styles/*.qss` 의 `:disabled` 규칙**이 담당한다
+  (v01.05~01.06 에서 이 툴에만 두었던 로컬 `DISABLED_QSS` 는 제거).
 - 타입을 바꿨을 때 그 타입이 쓰는 채널의 축이 **전부 꺼져 있으면 X/Y/Z 를 자동으로 켠다**
   (필터가 전부 `false` 면 노드가 아무 일도 하지 않으므로). Convert 시에도 축이 하나도 없으면 막고 로그를 남긴다.
 

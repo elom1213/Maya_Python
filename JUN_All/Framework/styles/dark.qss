@@ -100,3 +100,47 @@ QTreeView::item:selected, QTreeWidget::item:selected {
 QTreeView::item:hover:!selected, QTreeWidget::item:hover:!selected {
     background-color: #484848;
 }
+
+
+/* ------------------------------------------------------------------
+   Disabled (비활성) 상태
+   위 규칙들이 색을 평면적으로 지정하면 Qt 기본 회색 처리가 덮여, setEnabled(False)
+   해도 그대로 밝게 보인다. 각 테마 팔레트를 배경 쪽으로 섞어 흐리게 표현한다.
+   ------------------------------------------------------------------ */
+
+QLabel:disabled,
+QCheckBox:disabled,
+QRadioButton:disabled,
+QGroupBox:disabled,
+QGroupBox::title:disabled {
+    color: #7b7b7b;
+}
+
+QPushButton:disabled {
+    background-color: #353535;
+    color: #848484;
+    border: 1px solid #353535;
+}
+
+QLineEdit:disabled,
+QTextEdit:disabled,
+QPlainTextEdit:disabled,
+QListWidget:disabled,
+QSpinBox:disabled,
+QComboBox:disabled {
+    background-color: #2b2b2b;
+    color: #7b7b7b;
+    border: 1px solid #353535;
+}
+
+/* 이 테마는 QCheckBox::indicator 를 스타일링하지 않는다.
+   비활성 상태에만 규칙을 주면 체크 표시가 사라지므로 Qt 네이티브 렌더링에 맡긴다. */
+QRadioButton::indicator:disabled {
+    background-color: #2b2b2b;
+    border: 1px solid #353535;
+}
+
+QRadioButton::indicator:checked:disabled {
+    background-color: #353535;
+    border: 1px solid #353535;
+}

@@ -154,3 +154,47 @@ QSpinBox::down-arrow {
     width: 9px;
     height: 9px;
 }
+
+
+/* ------------------------------------------------------------------
+   Disabled (비활성) 상태
+   위 규칙들이 색을 평면적으로 지정하면 Qt 기본 회색 처리가 덮여, setEnabled(False)
+   해도 그대로 밝게 보인다. 각 테마 팔레트를 배경 쪽으로 섞어 흐리게 표현한다.
+   ------------------------------------------------------------------ */
+
+QLabel:disabled,
+QCheckBox:disabled,
+QRadioButton:disabled,
+QGroupBox:disabled,
+QGroupBox::title:disabled {
+    color: #a19e9a;
+}
+
+QPushButton:disabled {
+    background-color: #e4d9ca;
+    color: #989492;
+    border: 1px solid #dbcebf;
+}
+
+QLineEdit:disabled,
+QTextEdit:disabled,
+QPlainTextEdit:disabled,
+QListWidget:disabled,
+QSpinBox:disabled,
+QComboBox:disabled {
+    background-color: #faf7f4;
+    color: #a19e9a;
+    border: 1px solid #dbcebf;
+}
+
+QCheckBox::indicator:disabled,
+QRadioButton::indicator:disabled {
+    background-color: #faf7f4;
+    border: 1px solid #dbcebf;
+}
+
+QCheckBox::indicator:checked:disabled,
+QRadioButton::indicator:checked:disabled {
+    background-color: #dbcebf;
+    border: 1px solid #dbcebf;
+}

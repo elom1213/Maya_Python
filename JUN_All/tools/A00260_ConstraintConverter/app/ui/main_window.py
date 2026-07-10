@@ -4,6 +4,7 @@
 # A00260_ConstraintConverter - Qt UI (Maya constraint -> UE Control Rig)
 #
 # v01.05 : Constraint Type 드롭다운(Parent / Position / Rotation) + 축(X/Y/Z)별 필터
+# v01.07 : 비활성 위젯의 흐린 표현을 Framework/styles/*.qss 의 :disabled 규칙으로 이관
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
@@ -28,28 +29,8 @@ from tools.A00260_ConstraintConverter.app.core import constraint_reader
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
 WINDOW_OBJECT_NAME = "JUN_A00260_ConstraintConverter_window"
 
-# 비활성(disabled) 위젯을 흐리게 보이도록 하는 스타일.
-#
-# Framework/styles/*.qss 는 QLabel/QCheckBox 등에 색을 평면적으로 지정하고 :disabled
-# 규칙이 없어서, setEnabled(False) 를 해도 Qt 기본 회색 처리가 덮여 그대로 밝게 보인다.
-# 옵션 그룹에만 :disabled 규칙을 덧대 "쓸 수 없는 항목"임이 눈에 보이게 한다.
-# (자식 위젯의 스타일시트는 나중에 적용되는 부모 테마 qss 보다 우선한다)
-DISABLED_QSS = """
-QLabel:disabled, QCheckBox:disabled, QComboBox:disabled {
-    color: #6e6e6e;
-}
-QComboBox:disabled {
-    border: 1px solid #4a4a4a;
-}
-QCheckBox::indicator:disabled {
-    border: 1px solid #4a4a4a;
-    background-color: #303030;
-}
-QCheckBox::indicator:checked:disabled {
-    background-color: #4a4a4a;
-    border: 1px solid #4a4a4a;
-}
-"""
+# 비활성(disabled) 위젯의 흐린 표현은 Framework/styles/*.qss 의 :disabled 규칙이 담당한다.
+# (v01.05 에서 이 툴에만 두었던 로컬 DISABLED_QSS 를 v01.07 에서 프레임워크로 옮김)
 
 
 class MainWindow(QWidget):
@@ -130,7 +111,6 @@ class MainWindow(QWidget):
 
     def _build_options_group(self):
         group = QGroupBox("Convert Options")
-        group.setStyleSheet(DISABLED_QSS)
         layout = QVBoxLayout(group)
 
         # Constraint Type 드롭다운 (생성할 UE 노드 종류)
