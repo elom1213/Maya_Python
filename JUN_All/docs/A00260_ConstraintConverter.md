@@ -5,7 +5,7 @@
 언리얼 Control Rig 그래프에 그대로 `Ctrl+V` 붙여넣으면 노드가 생성된다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`A00110_animTool` 클론)
-- **버전**: `app/config/version.py` (v01.05)
+- **버전**: `app/config/version.py` (v01.06)
 - **설치**: `__dragDrop_A00260.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼(`CnsConv`) 생성 → `tools.A00260_ConstraintConverter.run(True)`
 - **참고 출력 포맷**: `ref_/sample_position.py`, `ref_/sample_position_close.py`, `ref_/sample_rotate.py`
   (UE Control Rig 에서 각 노드를 복사한 원본 텍스트. Parent 용 옛 샘플 `smaple.py` / `sample_01~04.py` 는 제거됨)
@@ -137,11 +137,10 @@ cc.run(True)   # DEV_MODE 면 자기 자신 + Framework 리로드 후 실행
   마야 컨스트레인트의 **종류는 매핑에 쓰이지 않는다** — 어떤 타입이든 타겟/웨이트/child 만 읽고,
   생성할 UE 노드는 UI 의 **Constraint Type** 이 결정한다.
 - 타겟이 없는 컨스트레인트는 건너뛴다.
-- **Parent 노드는 닫힌(접힌) 형태로 출력**된다 — Filter / Parents / AdvancedSettings 드롭다운이 접혀 있어
-  노드 길이가 짧다. 펼친 형태와의 차이는 세 컨테이너 핀(AdvancedSettings / Parents 배열 / Filter)의
-  `bIsExpanded=True` 유무뿐이다.
-  단 **Position / Rotation 노드는 레퍼런스 샘플이 펼친 형태(`bIsExpanded=True`)라 그대로 펼쳐서 출력**된다.
-  접힌 형태는 `ref_/sample_position_close.py` 참고. (→ 후속 정리 대상)
+- **세 노드 모두 닫힌(접힌) 형태로 출력**된다(v01.06) — Filter / Parents / AdvancedSettings 드롭다운이 접혀
+  있어 노드 길이가 짧다. 펼친 형태와의 차이는 **컨테이너 핀의 `bIsExpanded=True` 유무뿐**이다
+  (`sample_position.py` ↔ `sample_position_close.py` 는 딱 두 줄 차이 — `Parents` 컨테이너와 `Filter` 컨테이너).
+  컨테이너 안쪽 `Parents.N` / `Child` 의 `bIsExpanded=True` 는 접힌 형태에도 그대로 남는다.
 - 여러 컨스트레인트를 변환하면 각 노드 이름은 `ParentConstraint_1`, `ParentConstraint_2`, … 로 고유화되고
   (접두사는 Constraint Type 에 따라 `PositionConstraint_` / `RotationConstraint_`)
   **가로로 나열**된다(Position X 오프셋). 한 줄에 **4개**를 채우면 줄을 바꿔 아래로 내린다(Position Y 오프셋).
@@ -158,10 +157,10 @@ cc.run(True)   # DEV_MODE 면 자기 자신 + Framework 리로드 후 실행
 > 필터만, Maintain Offset ON, Shortest)로 생성한 결과가 당시 레퍼런스(`ref_/sample_02_close.py`, 현재는 제거됨)와
 > 381줄 전부 동일함을 확인.
 >
-> **검증(Position / Rotation, v01.05)**: 샘플 데이터(`dyn_pants_btmL_01_01` ← `thigh_twist_02_l` 0.8,
+> **검증(Position / Rotation, v01.06)**: 샘플 데이터(`dyn_pants_btmL_01_01` ← `thigh_twist_02_l` 0.8,
 > `thigh_twist_01_l` 0.2, X 축만 필터, Maintain Offset ON, Average)로 `ConstraintConverter.build_text()` 가
-> 만든 텍스트가 `ref_/sample_position.py` / `ref_/sample_rotate.py` 와 **바이트 단위로 동일**함을 확인
-> (노드 이름 · Position 좌표 제외).
+> 만든 텍스트가 `ref_/sample_position_close.py`(접힌 형태) 및 `ref_/sample_rotate.py` 의 접힘 변환본과
+> **바이트 단위로 동일**함을 확인 (노드 이름 · Position 좌표 제외).
 
 ---
 

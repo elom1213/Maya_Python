@@ -97,7 +97,6 @@ Begin Object Class=/Script/RigVMDeveloper.RigVMUnitNode Name="{{NODE}}" ExportPa
    End Object
    Begin Object Name="Parents" ExportPath="/Script/RigVMDeveloper.RigVMPin'{{GRAPH}}.{{NODE}}.Parents'"
 {{PARENTS_DEF}}      Direction=Input
-      bIsExpanded=True
       bIsDynamicArray=True
       CPPType="TArray<FConstraintParent>"
       CPPTypeObject="/Script/CoreUObject.ScriptStruct'/Script/ControlRig.ConstraintParent'"
@@ -120,7 +119,6 @@ Begin Object Class=/Script/RigVMDeveloper.RigVMUnitNode Name="{{NODE}}" ExportPa
          DefaultValue="{{FILTER_X}}"
       End Object
       Direction=Input
-      bIsExpanded=True
       CPPType="FFilterOptionPerAxis"
       CPPTypeObject="/Script/CoreUObject.ScriptStruct'/Script/AnimationCore.FilterOptionPerAxis'"
       CPPTypeObjectPath="/Script/AnimationCore.FilterOptionPerAxis"

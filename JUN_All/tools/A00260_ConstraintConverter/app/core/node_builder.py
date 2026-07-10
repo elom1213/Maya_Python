@@ -4,6 +4,8 @@
 # A00260_ConstraintConverter - ConstraintData + 옵션 -> UE Control Rig Constraint 노드 텍스트
 #
 # v01.05 : Parent 외에 Position / Rotation 컨스트레인트 노드 지원 + 축(X/Y/Z)별 필터
+# v01.06 : Position / Rotation 노드도 Parent 와 같이 접힌(collapsed) 형태로 출력
+#          (Parents / Filter 컨테이너 핀의 bIsExpanded=True 제거)
 
 from dataclasses import dataclass
 
