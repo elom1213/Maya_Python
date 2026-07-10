@@ -11,6 +11,8 @@
         "upperarm_r_out_15",
         "upperarm_r_out_55",
         "upperarm_r_out_85",
-        "upperarm_r_out_110"
+        "upperarm_r_out_110",
+        "upperarm_r_in_90",
+        "upperarm_r_in_120"
     ]
 }
