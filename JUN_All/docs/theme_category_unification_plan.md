@@ -2,7 +2,7 @@
 title: 카테고리별 테마(qss) 통일 작업 계획서
 aliases: [theme-unification, qss-category, 테마통일]
 tags: [plan, framework, theme, qss]
-updated: 2026-06-23
+updated: 2026-07-10
 ---
 
 # 카테고리별 테마(qss) 통일 작업 계획서
@@ -216,3 +216,74 @@ A00000/10/20/30/40/50/60/70 은 qss 가 아니라 `ColorThemeRegistry.get("coral
 - `CLAUDE.md` "컨벤션" 절에 **카테고리↔테마색 표준**을 명문화해, 신규 Qt 툴(A00004 복제 시)이 자동으로
   올바른 색을 쓰도록 안내.
 - arch A(maya.cmds) 툴의 버튼색도 같은 카테고리 색으로 맞추는 후속 계획서.
+
+
+---
+
+## 12. 부록 — 비활성(disabled) 상태 규칙 (2026-07-10 적용, 완료)
+
+> 테마 색 통일과 별개로 **`Framework/styles/*.qss` 14 개 전부에 `:disabled` 규칙을 추가**했다.
+> 이 절은 계획이 아니라 **적용된 규약**이다.
+
+### 왜 필요했나
+
+qss 가 `QLabel { color: #e6e6e6 }` 처럼 **색을 평면적으로 지정**하면, 그 규칙이 비활성 상태에도 그대로
+적용되어 **Qt 기본 회색 처리를 덮어쓴다.** 결과적으로 `widget.setEnabled(False)` 를 해도 위젯이 **밝은
+그대로 보여** 사용자가 "쓸 수 없는 항목"임을 알 수 없다(클릭만 안 될 뿐).
+
+### 색 산출 방식 (하드코딩 금지)
+
+테마마다 팔레트가 다르므로 고정 회색을 쓰지 않고, **각 테마의 기존 색을 배경색 쪽으로 블렌딩**해서 만든다.
+
+| 대상 | 블렌딩 비율 (배경 쪽으로) |
+|------|---------------------------|
+| 텍스트 (`QWidget` 의 `color`) | 55% |
+| 버튼 배경 / 보더 | 60% |
+| 버튼 텍스트 | 50% |
+| 입력 위젯 배경 | 50% |
+
+예) `green_dark` : 텍스트 `#e6e6e6` → `#7f7f7f` / `yellow_light` : `#3a3a3a` → `#a4a29a`
+
+### 적용 셀렉터
+
+```
+QLabel:disabled, QCheckBox:disabled, QRadioButton:disabled,
+QGroupBox:disabled, QGroupBox::title:disabled          → color
+QPushButton:disabled                                    → background-color, color, border
+QLineEdit / QTextEdit / QPlainTextEdit / QListWidget /
+QSpinBox / QComboBox :disabled                          → background-color, color, border
+QCheckBox::indicator:disabled  (+ :checked:disabled)    → background-color, border
+QRadioButton::indicator:disabled (+ :checked:disabled)  → background-color, border
+```
+
+### ⚠ 함정 — `dark.qss` / `red.qss` 의 체크박스
+
+이 두 테마는 **`QCheckBox::indicator` 를 원래 스타일링하지 않는다**(Qt 네이티브 렌더링 사용).
+여기에 **비활성 상태에만** `::indicator` 규칙을 주면 Qt 가 네이티브 렌더링을 버리고 qss 로 그리는데,
+체크 이미지가 없으므로 **비활성 + 체크된 체크박스에서 체크 표시가 사라진다.**
+
+→ 두 파일은 **체크박스 인디케이터 규칙을 넣지 않고** 라디오 버튼만 넣었다(파일 내 주석으로 명시).
+`QRadioButton::indicator` 는 14 개 테마 전부 원래 스타일링돼 있어 안전하다.
+
+**신규 테마 추가 시**: 그 테마가 `QCheckBox::indicator` 를 스타일링하는지 먼저 확인하고,
+안 한다면 인디케이터 `:disabled` 규칙도 넣지 말 것.
+
+### 검증 방법
+
+`@STYLES@` 토큰(스핀박스 화살표 `url(...)` 경로) 때문에 **qss 원본 파일을 Qt 에 직접 먹이면
+`Could not parse stylesheet` 가 뜬다.** 반드시 `ThemeManager.load_theme_to_widget()` 을 거쳐야 한다.
+
+```python
+# PySide6 offscreen 기준
+from Framework.themes.theme_manager import ThemeManager
+ThemeManager.load_theme_to_widget(w, "green_dark")   # @STYLES@ 치환 포함
+# 활성/비활성 QLabel 을 렌더링해 픽셀 색이 서로 다른지 확인
+```
+
+14 개 테마 전부 파싱 OK + 비활성 라벨 색이 활성과 다름을 확인(14/14).
+
+### 툴 쪽 영향
+
+툴은 **`setEnabled(False)` 만 호출하면 된다.** 툴별로 `setStyleSheet()` 에 `:disabled` 색을 넣지 말 것
+— 색이 하드코딩되어 라이트 테마에서 어긋난다.
+(`A00260_ConstraintConverter` 가 v01.05~01.06 에 두었던 로컬 `DISABLED_QSS` 는 v01.07 에서 제거)
