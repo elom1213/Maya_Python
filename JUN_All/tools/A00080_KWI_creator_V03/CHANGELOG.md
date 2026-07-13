@@ -1,5 +1,19 @@
 # Changelog
 
+## V01.04 (2026-07-13)
+
+### Added
+- **Constraints tab — skip pairs missing from the scene**: a new checkbox
+  *"Only generate pairs whose objects exist in the scene"* (default **ON**). When on,
+  a bone pair is left out of the generated data if **either** object (Chain A or Chain B)
+  is not in the current Maya scene, so patterns like `dyn_necklace_n_[01-10]_0[1-4]` no
+  longer emit rows for bones that don't exist (e.g. a missing `dyn_necklace_n_01_04`).
+  Skipped pairs and which object was missing are listed in the log. Turn the checkbox off
+  to generate every pair the patterns expand to (previous behavior).
+  - Scene check is injected from the UI (`cmds.objExists`); the core
+    `ConstraintCreator.build_text` / `create_file` take an optional `exists_fn` and stay
+    DCC-independent (no filtering when run outside Maya).
+
 ## V01.03 (2026-07-13)
 
 ### Fixed

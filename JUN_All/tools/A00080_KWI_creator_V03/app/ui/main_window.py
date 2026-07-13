@@ -224,6 +224,16 @@ class MainWindow(QWidget):
         btn_add_pair.clicked.connect(lambda: self._add_pair_row())
         layout.addWidget(btn_add_pair)
 
+        # 씬에 실제로 존재하는 본 쌍만 생성한다(둘 중 하나라도 없으면 그 쌍은 제외).
+        # 기본 ON. 끄면 예전처럼 패턴이 펼치는 모든 쌍을 생성한다(씬 없어도).
+        self.chk_scene_only = QCheckBox(
+            "Only generate pairs whose objects exist in the scene")
+        self.chk_scene_only.setChecked(True)
+        self.chk_scene_only.setToolTip(
+            "Skip a bone pair if either object is missing from the current Maya "
+            "scene. Turn off to generate every pair the patterns expand to.")
+        layout.addWidget(self.chk_scene_only)
+
         btn_generate = QPushButton("Generate & Copy")
         btn_generate.clicked.connect(self.generate_constraints_on_click)
         layout.addWidget(btn_generate)
@@ -274,9 +284,12 @@ class MainWindow(QWidget):
         return [(a.text(), b.text()) for a, b, _row in self._pair_rows]
 
     def generate_constraints_on_click(self):
+        # 체크되어 있고 마야 안이면 씬 존재 판정 함수를 넘겨 없는 쌍을 제외한다.
+        exists_fn = self._scene_exists_fn() if self.chk_scene_only.isChecked() else None
+
         try:
-            out_path, text = self.constraint_creator.create_file(
-                self._get_pattern_rows()
+            out_path, text, skipped = self.constraint_creator.create_file(
+                self._get_pattern_rows(), exists_fn=exists_fn
             )
         except ValueError as e:
             self.log(f"Constraint error : {e}")
@@ -285,8 +298,35 @@ class MainWindow(QWidget):
         self.constraint_preview.setPlainText(text)
         QApplication.clipboard().setText(text)
 
+        # 씬에 없어 제외된 쌍이 있으면 몇 개인지 + 누가 없었는지 로그로 알린다.
+        if skipped:
+            self.log(
+                f"Skipped {len(skipped)} pair(s) with objects missing from the scene:"
+            )
+            for bone_a, bone_b, missing in skipped:
+                self.log(f"  - {bone_a} <-> {bone_b}  (missing: {', '.join(missing)})")
+
         self.log(f"Constraint data written : {out_path}")
         self.log("Copied constraint data to clipboard. Paste into the Unreal Data Asset.")
+
+    @staticmethod
+    def _scene_exists_fn():
+        """씬 존재 판정 함수(name -> bool). 마야 밖이면 None(필터 안 함).
+
+        cmds.objExists 로 판정하며, 조회 실패 시 '없음'으로 본다.
+        """
+        try:
+            import maya.cmds as cmds
+        except Exception:
+            return None
+
+        def _exists(name):
+            try:
+                return bool(name) and bool(cmds.objExists(name))
+            except Exception:
+                return False
+
+        return _exists
 
     # ------------------------------------------------------------------
     # TSL (target bones) helpers
@@ -462,6 +502,9 @@ class MainWindow(QWidget):
             "(<code>[1-10]</code> &rarr; <code>1,2,&hellip;,10</code>).</li>"
             "<li>Chain A and Chain B must expand to the <b>same count</b> (1:1 pairing).</li>"
             "<li><b>+ Add pair</b> adds more rows; all rows are merged into one output.</li>"
+            "<li><b>Only generate pairs whose objects exist in the scene</b> (default on): "
+            "skips a pair if either object is missing from the current Maya scene; the "
+            "skipped pairs are listed in the log. Turn it off to generate every pair.</li>"
             "<li><b>Generate &amp; Copy</b> builds the text, shows a preview and copies it to "
             "the clipboard. Paste it into the Unreal Data Asset.</li>"
             "</ol>"

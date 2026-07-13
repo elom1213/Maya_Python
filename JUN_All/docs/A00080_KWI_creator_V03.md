@@ -183,6 +183,10 @@ A00080_KWI_creator_V03.run(True)   # True = reload
 ### 페어링 / 출력
 
 - Chain A·B 확장 리스트를 **인덱스 1:1 zip** 한다(`A[i] ↔ B[i]`). 두 리스트 **개수가 다르면 에러**.
+- **씬 존재 필터 (v01.04~)**: 체크박스 **"Only generate pairs whose objects exist in the scene"**
+  (기본 **ON**). 켜면 쌍의 **두 본 중 하나라도** 현재 마야 씬에 없으면 그 쌍은 출력에서 **제외**한다.
+  예: `dyn_necklace_n_01_04` 가 씬에 없으면 그 본이 낀 쌍은 생성되지 않는다. 제외된 쌍과 없는 이름은
+  로그에 표시된다. 끄면 패턴이 펼치는 **모든 쌍**을 생성(예전 동작).
 - 출력은 한 줄 문자열(바깥을 `( )` 로 감싸고 각 항목 콤마 구분, 마지막 콤마 없음):
 
   ```
@@ -200,5 +204,7 @@ A00080_KWI_creator_V03.run(True)   # True = reload
 - `expand_pattern(pattern) -> list[str]` — `[a-b]` 브래킷 카테시안 확장. 경계에 리딩 0 이 있으면
   그 폭으로 제로패딩(`[01-10]`→`01..10`), 없으면 패딩 없음(`[1-10]`→`1..10`).
 - `build_pairs(a, b) -> list[(a,b)]` — 확장 후 길이 검증 + 1:1 zip.
-- `build_text(rows) -> str` — 여러 쌍을 순서대로 합쳐 한 줄 출력.
-- `create_file(rows) -> (out_path, text)` — `0020_out` 기록 + 텍스트 반환(클립보드용).
+- `build_text(rows, exists_fn=None) -> (text, skipped)` — 여러 쌍을 합쳐 한 줄 출력.
+  `exists_fn(name)->bool` 을 주면 씬에 없는 본이 낀 쌍을 제외하고 그 목록을 `skipped` 로 반환
+  (`None` 이면 필터 안 함 = DCC 비의존). `skipped = [(bone_a, bone_b, [없는 이름들]), ...]`.
+- `create_file(rows, exists_fn=None) -> (out_path, text, skipped)` — `0020_out` 기록 + 텍스트/제외목록 반환.

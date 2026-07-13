@@ -103,9 +103,14 @@ class ConstraintCreator:
     # ------------------------------------------------------------------
     # text build
 
-    def build_text(self, pattern_rows):
+    def build_text(self, pattern_rows, exists_fn=None):
         # pattern_rows : [(chain_a, chain_b), ...]  (여러 쌍을 순서대로 합친다)
-        # -> "((BoneReference1=...,BoneReference2=...),(...), ...)"
+        # -> ("((BoneReference1=...,BoneReference2=...),(...), ...)", skipped)
+        #
+        # exists_fn(name) -> bool 을 주면, 쌍의 두 본 중 하나라도 존재하지 않는(=씬에
+        # 없는) 쌍은 출력에서 제외한다. 제외한 목록은 skipped 로 함께 돌려준다.
+        # exists_fn 이 None 이면(예: 마야 밖) 필터하지 않는다 — 기존 동작.
+        #   skipped : [(bone_a, bone_b, [없는 이름들]), ...]
         with open(self.read_entry, "r", encoding="utf-8") as f:
             entry_tpl = f.read().strip()
 
@@ -119,16 +124,37 @@ class ConstraintCreator:
         if not all_pairs:
             raise ValueError("No bone pairs to generate. Fill at least one pair.")
 
+        kept, skipped = [], []
+        for a, b in all_pairs:
+            missing = self._missing_in_scene(a, b, exists_fn)
+            if missing:
+                skipped.append((a, b, missing))
+            else:
+                kept.append((a, b))
+
+        if not kept:
+            raise ValueError(
+                "Every bone pair was skipped because its object(s) are not in "
+                "the scene. Check the names or turn off the scene filter."
+            )
+
         entries = [
             TemplateEngine.apply(entry_tpl, {"BONE_1": a, "BONE_2": b})
-            for a, b in all_pairs
+            for a, b in kept
         ]
 
-        return "(" + ",".join(entries) + ")"
+        return "(" + ",".join(entries) + ")", skipped
 
-    def create_file(self, pattern_rows):
-        text = self.build_text(pattern_rows)
+    @staticmethod
+    def _missing_in_scene(bone_a, bone_b, exists_fn):
+        """쌍에서 씬에 없는 본 이름 목록. exists_fn 이 None 이면 필터 안 함([])."""
+        if exists_fn is None:
+            return []
+        return [name for name in (bone_a, bone_b) if not exists_fn(name)]
+
+    def create_file(self, pattern_rows, exists_fn=None):
+        text, skipped = self.build_text(pattern_rows, exists_fn=exists_fn)
         self.pm.ensure_dir(self.write_out)
         with open(self.write_out, "w", encoding="utf-8") as f:
             f.write(text)
-        return self.write_out, text
+        return self.write_out, text, skipped
