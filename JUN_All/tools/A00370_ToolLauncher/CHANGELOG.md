@@ -2,6 +2,24 @@
 
 All notable changes to this tool are documented here.
 
+## v01.03 — 2026-07-13
+
+- **Portable across PCs (JUN_All Root + Refresh Paths)**: buttons store an
+  absolute tool-folder path, so a profile made on one PC broke on another where
+  JUN_All lives elsewhere. New `Environment` box at the top of the controls:
+  - **JUN_All Root** field, pre-filled with the JUN_All this launcher is running
+    from (auto-detected from the tool's own location — always correct for the
+    current PC). `Browse...` to pick it, `Detect` to re-fill it.
+  - **Refresh Paths** re-points *every button in every profile* to that root:
+    each path's tail from its `tools/` segment (`tools/A000XX_name`) is re-joined
+    onto the new root. Buttons outside `JUN_All/tools` (no `tools` anchor) are
+    left untouched and reported as skipped. This is the one-click restore/share
+    when you open a profile on a different PC.
+- **Self-healing launch**: even before you press Refresh Paths, clicking a button
+  whose stored path is broken now tries the same path rebased onto this PC's
+  auto-detected JUN_All root, and launches from there if it exists — so shared
+  profiles mostly just work.
+
 ## v01.02 — 2026-07-08
 
 - **Larger icon beside the button**: the tool icon moved out of the button and

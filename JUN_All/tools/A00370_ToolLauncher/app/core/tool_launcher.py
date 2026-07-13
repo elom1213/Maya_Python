@@ -22,6 +22,58 @@ import sys
 import importlib
 
 
+# 버튼 경로 리베이스의 기준 앵커. 모든 JUN 툴은 <JUN_All>/tools/A000XX_name 아래에
+# 있으므로, 경로에서 'tools' 세그먼트 뒤쪽(A000XX_name/...)을 붙박이 꼬리로 보고
+# 새 루트에 다시 이어붙이면 PC 가 달라도 같은 툴을 가리키게 된다.
+_TOOLS_ANCHOR = "tools"
+
+
+def jun_all_root():
+    """이 툴이 실제로 실행되고 있는 PC 의 JUN_All 루트 경로를 반환한다.
+
+    A00370 자신이 <JUN_All>/tools/A00370_ToolLauncher/app/core/tool_launcher.py
+    에 있으므로, 이 파일 위치에서 거슬러 올라가면 '현재 PC 의' JUN_All 을 항상
+    알 수 있다 — 사용자가 아무것도 지정하지 않아도 되는 기본값이 된다.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))   # .../app/core
+    app_dir = os.path.dirname(here)                      # .../app
+    tool_dir = os.path.dirname(app_dir)                  # .../A00370_ToolLauncher
+    tools_dir = os.path.dirname(tool_dir)                # .../tools
+    return os.path.dirname(tools_dir)                    # .../JUN_All
+
+
+def rebase_to_root(path, new_root):
+    """버튼 경로를 새 JUN_All 루트로 옮긴 경로를 만든다.
+
+    경로에서 마지막 'tools' 세그먼트를 앵커로 잡아 그 뒤( A000XX_name/... )만
+    떼어내 `<new_root>/tools/<...>` 로 다시 잇는다. 즉 PC1 의
+    `.../PC1_root/JUN_All/tools/A00080_x` 를 `<new_root>/tools/A00080_x` 로 바꾼다.
+
+    'tools' 앵커를 못 찾으면(=JUN_All/tools 밖을 가리키는 버튼) None 을 돌려주어
+    호출측이 '건너뜀' 으로 처리하게 한다.
+    """
+    norm = normalize_path(path)
+    if not norm:
+        return None
+    root = normalize_path(new_root)
+    if not root:
+        return None
+
+    parts = norm.split(os.sep)
+    # 마지막 'tools' 세그먼트를 앵커로(대소문자 무시). 그 '뒤' 조각만 꼬리로 쓴다.
+    anchor = -1
+    for i, seg in enumerate(parts):
+        if seg.lower() == _TOOLS_ANCHOR:
+            anchor = i
+    if anchor < 0:
+        return None
+
+    tail = parts[anchor + 1:]           # ['A000XX_name', ...]
+    if not tail:
+        return None
+    return os.path.normpath(os.path.join(root, _TOOLS_ANCHOR, *tail))
+
+
 def normalize_path(path):
     """따옴표/공백을 정리하고 OS 표준 경로로 정규화한다(빈 값이면 '')."""
     if not path:
@@ -101,10 +153,18 @@ def launch(path, reload_module=True):
 
     reload_module 은 run() 에 그대로 전달된다(DEV_MODE 면 그 툴이 자기 자신을 리로드).
     셸프 버튼과 동일하게 기본값 True.
+
+    저장된 경로가 (다른 PC 에서 만든 절대경로라) 깨져 있으면, 현재 PC 의 JUN_All
+    루트로 리베이스한 경로가 실제로 있는지 먼저 확인해 그쪽으로 조용히 복구한다.
+    ('Refresh Paths' 로 영구 갱신하기 전에도 버튼이 바로 동작하도록.)
     """
     ok, msg = validate(path)
     if not ok:
-        return False, msg
+        healed = rebase_to_root(path, jun_all_root())
+        if healed and validate(healed)[0]:
+            path = healed
+        else:
+            return False, msg
 
     root, module_name = resolve_module(path)
     if root not in sys.path:

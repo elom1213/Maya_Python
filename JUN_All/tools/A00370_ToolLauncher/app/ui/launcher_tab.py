@@ -19,6 +19,8 @@
 #                     'Color Select' 모드를 켜면 카테고리를 넘나들며 여러 버튼을
 #                     체크해 'Apply Color...'로 한 번에 칠한다('Clear Color'로 해제).
 
+import os
+
 from Framework.qt.qt import (
     QWidget,
     QDialog,
@@ -247,6 +249,7 @@ class LauncherTab(QWidget):
         inner.setContentsMargins(6, 2, 6, 6)
         inner.setSpacing(4)
 
+        inner.addWidget(self._build_env_group())
         inner.addWidget(self._build_profile_group())
         inner.addWidget(self._build_create_group())
         inner.addWidget(self._build_color_group())
@@ -295,6 +298,51 @@ class LauncherTab(QWidget):
         group = QGroupBox("Log")
         lay = QVBoxLayout(group)
         lay.addWidget(self._log_widget)
+        return group
+
+    def _build_env_group(self):
+        # 환경(이 PC 의 JUN_All 루트) 지정 + 모든 버튼 경로 재설정(Refresh Paths).
+        # 버튼 경로는 PC 마다 다른 절대경로로 저장된다. 다른 PC 에서 프로파일을 열면
+        # 이 루트를 확인/지정하고 'Refresh Paths' 를 눌러 모든 버튼을 이 PC 기준으로
+        # 한 번에 복구/공유할 수 있다. 필드 기본값은 자동 감지한 현재 PC 의 JUN_All.
+        group = QGroupBox("Environment")
+        col = QVBoxLayout(group)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("JUN_All Root:"))
+
+        self.ipf_root = QLineEdit()
+        self.ipf_root.setText(tool_launcher.jun_all_root())
+        self.ipf_root.setToolTip(
+            "This PC's JUN_All folder. Buttons store absolute paths, so on a "
+            "different PC set this, then click 'Refresh Paths' to re-point "
+            "every button to this PC's tools.")
+
+        btn_browse = QPushButton("Browse...")
+        btn_browse.setToolTip("Pick this PC's JUN_All folder")
+        btn_browse.clicked.connect(self.on_browse_root)
+
+        row.addWidget(self.ipf_root, stretch=1)
+        row.addWidget(btn_browse)
+        col.addLayout(row)
+
+        action_row = QHBoxLayout()
+        btn_detect = QPushButton("Detect")
+        btn_detect.setToolTip(
+            "Fill the field with the JUN_All this launcher is running from")
+        btn_detect.clicked.connect(self.on_detect_root)
+
+        btn_refresh = QPushButton("Refresh Paths")
+        btn_refresh.setToolTip(
+            "Re-point every button in every profile to the JUN_All Root above "
+            "(fixes buttons made on another PC)")
+        btn_refresh.clicked.connect(self.on_refresh_paths)
+
+        action_row.addWidget(btn_detect)
+        action_row.addStretch(1)
+        action_row.addWidget(btn_refresh)
+        col.addLayout(action_row)
+
         return group
 
     def _build_profile_group(self):
@@ -594,6 +642,61 @@ class LauncherTab(QWidget):
         self._checked.clear()
         self._refresh_profiles()
         self._render_categories()
+
+    # ============================================================ environment
+
+    def on_detect_root(self):
+        """필드를 이 런처가 실행 중인 JUN_All 경로로 채운다(자동 감지)."""
+        self.ipf_root.setText(tool_launcher.jun_all_root())
+        self._log("Detected JUN_All Root: {0}".format(self.ipf_root.text()))
+
+    def on_browse_root(self):
+        """이 PC 의 JUN_All 폴더를 탐색기로 고른다."""
+        start = self.ipf_root.text().strip() or ""
+        folder = QFileDialog.getExistingDirectory(
+            self, "Select JUN_All Folder", start)
+        if folder:
+            self.ipf_root.setText(tool_launcher.normalize_path(folder))
+
+    def on_refresh_paths(self):
+        """JUN_All Root 필드 기준으로 모든 프로파일의 버튼 경로를 재설정한다.
+
+        다른 PC 에서 만든 절대경로 버튼들을 이 PC(또는 지정 루트) 기준으로 한 번에
+        복구/공유하기 위한 것. 'tools' 앵커가 없는 경로는 손대지 않는다.
+        """
+        root = self.ipf_root.text().strip()
+        if not root:
+            QMessageBox.warning(self, TITLE, "JUN_All Root is empty.")
+            return
+        if not os.path.isdir(root):
+            QMessageBox.warning(
+                self, TITLE, "Folder not found:\n{0}".format(root))
+            return
+        if not os.path.isdir(os.path.join(root, "tools")):
+            if QMessageBox.question(
+                self, TITLE,
+                "No 'tools' subfolder under:\n{0}\n\n"
+                "This may not be a JUN_All root. Refresh anyway?".format(root)
+            ) != QMessageBox.Yes:
+                return
+
+        stats = prefs_mod.rebase_all_profiles(root)
+
+        # 활성 프로파일 데이터도 디스크에서 바뀌었을 수 있으니 다시 읽고 그린다.
+        self._data = prefs_mod.load_profile(self._profile)
+        self._checked.clear()
+        self._render_categories()
+
+        self._log(
+            "Refresh Paths: {changed} re-pointed, {unchanged} already OK, "
+            "{skipped} skipped (no 'tools' anchor) across {profiles} "
+            "profile(s).".format(**stats))
+        QMessageBox.information(
+            self, TITLE,
+            "Re-pointed {changed} button(s) to:\n{root}\n\n"
+            "Already OK: {unchanged}\n"
+            "Skipped (outside JUN_All/tools): {skipped}\n"
+            "Profiles updated: {profiles}".format(root=root, **stats))
 
     # ============================================================== create
 

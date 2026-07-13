@@ -11,6 +11,21 @@ A00370_ToolLauncher v01.02 — DONE (Maya-confirmed by user + pushed, commit
 65cc69e on Dnable_repo/dev). User set UI theme to yellow_light. Ships Default +
 user's UE profile.
 
+v01.03 — IMPLEMENTED (headless-verified, Maya test + push pending): **PC
+portability**. Buttons store absolute tool paths, so profiles broke on a PC where
+JUN_All lives elsewhere (PC1 `G:\...\JUN_All`, PC2 `C:\...\Maya_Python\JUN_All`).
+Fix: new `Environment` group at top of controls (launcher_tab `_build_env_group`)
+with a **JUN_All Root** field (auto-filled via `tool_launcher.jun_all_root()` —
+the launcher lives inside JUN_All so it always knows the current PC's root),
+`Browse...`, `Detect`, and **Refresh Paths** button. Refresh calls
+`prefs.rebase_all_profiles(root)` which rewrites EVERY button in EVERY profile:
+`tool_launcher.rebase_to_root(path,new_root)` anchors on the last `tools` segment
+and re-joins `<new_root>/tools/<tail>` (no `tools` anchor → None = skipped, left
+untouched). Also `launch()` self-heals: broken stored path → try
+rebase_to_root(path, jun_all_root()) and launch if it exists. Profiles shared via
+repo → pull + one Refresh Paths restores on any PC. All headless-tested (rebase
+correctness, color preserved, skip external, same-root no-op writes 0 files).
+
 New in-Maya PySide tool. A shortcut/launcher UI: user creates buttons that each
 hold a **tool folder path**; clicking a button launches that tool (pops it up).
 Built to unify tools like A00080_KWI_creator_V03 + A00260_ConstraintConverter

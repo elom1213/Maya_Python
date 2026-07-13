@@ -26,6 +26,8 @@
 import os
 import json
 
+from . import tool_launcher
+
 
 def _base_dir():
     """데이터 저장 기준 폴더(툴 루트). this file: <tool>/app/core/prefs.py."""
@@ -155,3 +157,52 @@ def set_active(name):
     os.makedirs(PREFS_DIR, exist_ok=True)
     with open(ACTIVE_PATH, "w", encoding="utf-8") as f:
         json.dump({"active": name}, f, ensure_ascii=False, indent=2)
+
+
+# -------------------------------------------------------------- rebase paths
+
+def rebase_all_profiles(new_root):
+    """모든 프로파일의 모든 버튼 경로를 새 JUN_All 루트 기준으로 다시 잡는다.
+
+    다른 PC 에서 만든 절대경로 버튼들을 이 PC(또는 지정한) JUN_All 루트로 한 번에
+    복구/공유하기 위한 것. 각 버튼 경로는 tool_launcher.rebase_to_root 로 옮기며,
+    'tools' 앵커가 없어 옮길 수 없는 경로(=JUN_All/tools 밖)는 건너뛴다.
+
+    통계 dict 를 돌려준다:
+      changed  : 실제로 경로가 바뀐 버튼 수
+      unchanged: 리베이스했으나 결과가 같던 버튼 수(이미 이 루트였음)
+      skipped  : 'tools' 앵커가 없어 못 옮긴 버튼 수
+      total    : 전체 버튼 수
+      profiles : 파일이 실제로 저장된(=바뀐) 프로파일 수
+    """
+    changed = unchanged = skipped = total = files = 0
+
+    for name in list_profiles():
+        data = load_profile(name)
+        dirty = False
+
+        for cat in data.get("categories", []):
+            for btn in cat.get("buttons", []):
+                total += 1
+                old = btn.get("path", "")
+                new = tool_launcher.rebase_to_root(old, new_root)
+                if new is None:
+                    skipped += 1
+                elif new != tool_launcher.normalize_path(old):
+                    btn["path"] = new
+                    changed += 1
+                    dirty = True
+                else:
+                    unchanged += 1
+
+        if dirty:
+            save_profile(name, data)
+            files += 1
+
+    return {
+        "changed": changed,
+        "unchanged": unchanged,
+        "skipped": skipped,
+        "total": total,
+        "profiles": files,
+    }

@@ -2,7 +2,7 @@
 
 - [A00290 Shape Editor tab](wip-a00290-shape-editor-tab.md) — DONE (Maya-verified + pushed v01.02): A00290_BSTool "Shape Editor" tab replaces Maya's Shape Editor — lists ALL blendShape targets (aliasAttr) with per-target Edit toggle; must use `cmds.sculptTarget` (setAttr on sculptTargetIndex silently edits the base mesh)
 
-- [A00370 ToolLauncher (new)](wip-a00370-toollauncher.md) — DONE (Maya-verified + pushed v01.02): shortcut launcher UI — buttons hold a tool folder path, click pops up that tool (import tools.<folder>.run) + shows that tool's own icon as a big square tile left of the button; clone of A00340 (Profile/Category/color/layout) but launch instead of select; ships Default profile wired to A00080/A00260; core in app/core/tool_launcher.py
+- [A00370 ToolLauncher (new)](wip-a00370-toollauncher.md) — v01.02 pushed; v01.03 IMPLEMENTED (Maya test + push pending): shortcut launcher UI — buttons hold a tool folder path, click pops up that tool + shows its icon; clone of A00340 but launch instead of select. v01.03 adds PC portability: Environment box w/ auto-detected JUN_All Root + Refresh Paths rebases all buttons' absolute paths onto this PC's root (anchors on `tools` segment); launch() self-heals broken paths
 
 - [A00350 ArrayCreator (new)](wip-a00350-arraycreator.md) — DONE (verified + pushed v01.00): new in-Maya PySide tool, TSL objects → UE Control Rig Item Array node text (clipboard + 0020_out); global Element Type combo (default Bone) + Node Title; template-based (A00260 arch); round-trip byte-identical to reference v01
 

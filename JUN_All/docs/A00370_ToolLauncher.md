@@ -5,7 +5,7 @@
 `A00340_SelectionTool` 과 UI·기능(카테고리 / 프로파일 / 버튼 색)은 거의 같고, 버튼을
 누르면 **오브젝트 선택** 대신 **지정한 툴이 실행**되는 점만 다르다.
 
-- **버전**: v01.02 (2026-07-08)
+- **버전**: v01.03 (2026-07-13)
 - **아키텍처**: (B) Standalone/Qt 앱형 구조지만 마야 안에서 실행(PySide, `maya.cmds`).
 - **참고**: 프로파일/카테고리/색/레이아웃은 `A00340_SelectionTool` 을 이식.
   버튼 클릭이 툴을 실행하는 로직은 `app/core/tool_launcher.py`.
@@ -122,7 +122,26 @@ A00370_ToolLauncher/data/
 `Profile` 그룹에서 상황별 버튼 세트를 New / Rename / Delete 로 관리한다.
 콤보를 바꾸면 해당 세트로 즉시 전환된다.
 
-### 8) 레이아웃 / 기타
+### 8) PC 이식 — JUN_All Root + Refresh Paths
+버튼은 `path` 에 **절대경로**(`C:\...\JUN_All\tools\A000XX_name`)를 저장한다. 그래서
+JUN_All 위치가 다른 **다른 PC 에서 프로파일을 열면 경로가 깨진다**(PC1 은 `G:\...\JUN_All`,
+PC2 는 `C:\...\Maya_Python\JUN_All`). `Environment` 박스로 한 번에 복구/공유한다.
+
+- **JUN_All Root** 필드 — 이 런처가 실행 중인 위치에서 **자동 감지한** 현재 PC 의
+  JUN_All 경로가 기본값으로 채워진다(런처 자신이 `JUN_All/tools/A00370.../` 안에 있으므로
+  현재 PC 의 루트를 항상 정확히 안다). `Browse...` 로 직접 고르거나 `Detect` 로 다시 채운다.
+- **Refresh Paths** — **모든 프로파일의 모든 버튼**을 이 루트 기준으로 다시 잡는다.
+  각 경로의 `tools/` 세그먼트 뒤(`tools/A000XX_name`)를 떼어 새 루트에 다시 이어붙인다.
+  `JUN_All/tools` 밖을 가리키는(=`tools` 앵커가 없는) 버튼은 건드리지 않고 skip 으로 보고한다.
+  → 다른 PC 에서 프로파일을 받아 열었을 때의 **원클릭 복구/공유** 수단.
+- **자동 복구(self-heal)** — Refresh 를 누르지 않아도, 저장된 경로가 깨진 버튼을 클릭하면
+  같은 경로를 현재 PC 의 자동감지 루트로 리베이스해 그게 실제로 있으면 거기서 실행한다.
+  그래서 공유 프로파일이 대체로 그냥 동작한다.
+
+> 프로파일 JSON(`data/profiles/*.json`)은 repo 로 공유되므로, 한 PC 에서 세팅해 커밋하면
+> 다른 PC 에서 pull 후 `Refresh Paths` 한 번으로 그 PC 기준으로 복구된다.
+
+### 9) 레이아웃 / 기타
 - 컨트롤 패널과 버튼 영역 사이의 **스플리터**를 드래그해 비율 조절.
 - **Controls** 막대(▾/▸)를 클릭하면 Profile/Create/Color/Log 를 **한 번에 접어**
   버튼 영역을 넓힌다.
@@ -144,6 +163,17 @@ A00370_ToolLauncher/data/
 
 즉 셸프 버튼이 하던 `import tools.A000XX_name; run(True)` 를 **경로 기반으로 일반화**한
 것이다. 그래서 `run()` 진입점을 가진 JUN_All 의 모든 툴에 그대로 적용된다.
+
+경로 이식(PC 간 공유)용 헬퍼:
+
+- `jun_all_root()` — 이 파일 위치(`JUN_All/tools/A00370.../app/core/tool_launcher.py`)에서
+  거슬러 올라가 **현재 PC 의 JUN_All 루트**를 반환. 자동감지의 근거.
+- `rebase_to_root(path, new_root)` — 경로의 마지막 `tools` 세그먼트를 앵커로 잡아 그 뒤를
+  `<new_root>/tools/...` 로 다시 잇는다(`tools` 앵커 없으면 `None` = 건너뜀).
+- `prefs.rebase_all_profiles(new_root)` — 모든 프로파일의 모든 버튼에 위를 적용하고
+  바뀐 파일만 저장, 통계(changed/unchanged/skipped/total/profiles)를 반환.
+- `launch()` 는 저장 경로가 깨졌을 때 `rebase_to_root(path, jun_all_root())` 로 자동 복구를
+  한 번 시도한다.
 
 ---
 
