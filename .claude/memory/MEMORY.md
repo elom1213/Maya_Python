@@ -4,7 +4,7 @@
 
 - [A00370 ToolLauncher (new)](wip-a00370-toollauncher.md) — v01.02 pushed; v01.03 IMPLEMENTED (Maya test + push pending): shortcut launcher UI — buttons hold a tool folder path, click pops up that tool + shows its icon; clone of A00340 but launch instead of select. v01.03 adds PC portability: Environment box w/ auto-detected JUN_All Root + Refresh Paths rebases all buttons' absolute paths onto this PC's root (anchors on `tools` segment); launch() self-heals broken paths
 
-- [A00350 ArrayCreator (new)](wip-a00350-arraycreator.md) — DONE (verified + pushed v01.00): new in-Maya PySide tool, TSL objects → UE Control Rig Item Array node text (clipboard + 0020_out); global Element Type combo (default Bone) + Node Title; template-based (A00260 arch); round-trip byte-identical to reference v01
+- [A00350 ArrayCreator (new)](wip-a00350-arraycreator.md) — v01.00 pushed; v01.01 IMPLEMENTED (Maya test + push pending): new in-Maya PySide tool, TSL objects → UE Control Rig Item Array node text (clipboard + 0020_out); global Element Type combo (default Bone) + Node Title; template-based (A00260 arch). v01.01 adds optional Reverse button to shared TSL (`MOD_tsl_qt_v01` `show_reverse=False` default OFF; record-based so UUID data preserved) + turns it ON in A00350
 
 - [A00360 SortTool (new)](wip-a00360-sorttool.md) — DONE (verified + pushed v01.00): new in-Maya PySide tool, sort listed objects by world X/Y/Z / name / type, reorder outliner top→bottom (checkbox default ON) + TSL; works for any positioned node (joint/mesh/curve/cluster); slot-swap reorder ported from AriSortOutliner.mel
 

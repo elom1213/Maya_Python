@@ -63,10 +63,12 @@ class MainWindow(QWidget):
         self.te_log.setMaximumHeight(150)
 
         # 오브젝트 리스트 (TSL). Select/Add 는 현재 선택으로 채운다. 순서는 Up/Down 으로.
+        # Reverse 로 배열 순서를 한 번에 뒤집을 수 있다.
         self.tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Objects",
             select_label="Select Objects",
             show_sort=False,
+            show_reverse=True,
             list_min_height=200,
             log_callback=self.log,
         )

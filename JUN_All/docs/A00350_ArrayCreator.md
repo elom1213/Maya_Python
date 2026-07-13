@@ -2,7 +2,7 @@
 title: A00350_ArrayCreator 사용법
 aliases: [Array Creator, ArrayCreator, A00350]
 tags: [maya-python, tool-guide, unreal, control-rig, text-generator]
-updated: 2026-07-08
+updated: 2026-07-13
 ---
 
 # A00350_ArrayCreator 사용법
@@ -12,7 +12,7 @@ Maya 안에서 도는 **텍스트 생성** PySide 툴이다(arch B, in-Maya). TS
 **클립보드에 복사**(UE 그래프에 Ctrl+V) + `0020_out/` 에 파일로 저장한다. 마야가 아니라 **텍스트 처리 툴**이다
 (A00080_KWI_creator 계열).
 
-- **버전**: `app/config/version.py` (v01.00)
+- **버전**: `app/config/version.py` (v01.01)
 - **설치**: `__dragDrop_A00350.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **ArrayCreator** → `tools.A00350_ArrayCreator.run(True)`
 - **참고 아키텍처**: A00080_KWI_creator_V03 · A00260_ConstraintConverter (PathManager `0010_src`→`0020_out` + TemplateEngine `{{KEY}}` + NodeBuilder 조립 + 클립보드).
 
@@ -22,6 +22,8 @@ Maya 안에서 도는 **텍스트 생성** PySide 툴이다(arch B, in-Maya). TS
 
 1. Maya에서 오브젝트(조인트 등)를 선택 → **Select Objects**(리스트 교체) 또는 **Add**(중복 없이 추가)로
    **Objects** 리스트에 담는다. 순서가 곧 배열 요소 순서다(**Up/Down** 으로 조정, **Del** 로 제거).
+   - **Reverse**(v01.01~): 리스트에 올라온 순서를 **한 번에 통째로 뒤집는다**. 선택한 순서와 배열에
+     넣을 순서가 반대일 때(예: 체인을 끝→루트로 골랐을 때) 유용하다. (공용 TSL 위젯의 옵션 버튼)
    - 요소 이름은 오브젝트의 **leaf 이름**을 쓴다(DAG 경로 `|...` 는 제거).
 2. **Element Type**: 배열 요소의 `ERigElementType` 을 고른다 — None / Bone / Null / Control / Curve /
    Reference / Connector / Socket. **기본 Bone**. (모든 요소에 공통 적용)
