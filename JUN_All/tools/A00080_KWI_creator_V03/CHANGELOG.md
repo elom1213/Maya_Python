@@ -1,5 +1,14 @@
 # Changelog
 
+## V01.03 (2026-07-13)
+
+### Fixed
+- **Constraints tab — zero-padding in bracket patterns**: a bracket bound written with a
+  leading zero now zero-pads the expanded values to that width. `[01-10]` &rarr;
+  `01,02,…,10` (previously `1,2,…,10`), so `dyn_necklace_n_[01-10]_0[1-4]` expands to
+  `dyn_necklace_n_01_01 … dyn_necklace_n_10_04`. Bounds without a leading zero keep the
+  old behavior (`[1-10]` &rarr; `1..10`), so existing patterns are unaffected.
+
 ## V01.02 (2026-06-29)
 
 ### Added

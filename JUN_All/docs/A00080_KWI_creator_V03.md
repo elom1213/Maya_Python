@@ -2,7 +2,7 @@
 title: A00080_KWI_creator_V03 사용법
 aliases: [KWI Creator V03, Kawaii Creator V03]
 tags: [tool, unreal, kawaii-physics, maya]
-updated: 2026-06-29
+updated: 2026-07-13
 ---
 
 # A00080_KWI_creator_V03 사용법
@@ -174,8 +174,11 @@ A00080_KWI_creator_V03.run(True)   # True = reload
 
 - **`[a-b]`** → 정수 `a..b` 로 확장. 다중 브래킷은 **왼쪽이 바깥 루프**(카테시안 곱).
   - 예: `0[1-7]_0[1-5]` → `01_01, 01_02, …, 01_05, 02_01, …, 07_05` (35개).
-- 리딩 `0` 은 **리터럴 텍스트**다 → 값은 **제로패딩되지 않는다**(단일자리 인덱스 가정;
-  본 인덱스가 9 를 넘으면 맞지 않는다).
+- **제로패딩 (v01.03~)**: 브래킷 경계 중 한쪽이라도 **리딩 0 으로 쓰면** 그 폭으로 제로패딩한다.
+  - `[01-10]` → `01, 02, …, 10` (두 자리). 즉 `dyn_necklace_n_[01-10]_0[1-4]` →
+    `dyn_necklace_n_01_01 … dyn_necklace_n_10_04`.
+  - 리딩 0 이 없으면 **패딩하지 않는다**: `[1-10]` → `1, 2, …, 10` (기존 동작 유지).
+  - `0[1-4]` 처럼 **0 이 브래킷 밖**이면 예전처럼 리터럴 접두사로 붙는다(`01, 02, 03, 04`).
 
 ### 페어링 / 출력
 
@@ -194,7 +197,8 @@ A00080_KWI_creator_V03.run(True)   # True = reload
 
 ### 핵심 진입점 (`ConstraintCreator`)
 
-- `expand_pattern(pattern) -> list[str]` — `[a-b]` 브래킷 카테시안 확장(패딩 없음).
+- `expand_pattern(pattern) -> list[str]` — `[a-b]` 브래킷 카테시안 확장. 경계에 리딩 0 이 있으면
+  그 폭으로 제로패딩(`[01-10]`→`01..10`), 없으면 패딩 없음(`[1-10]`→`1..10`).
 - `build_pairs(a, b) -> list[(a,b)]` — 확장 후 길이 검증 + 1:1 zip.
 - `build_text(rows) -> str` — 여러 쌍을 순서대로 합쳐 한 줄 출력.
 - `create_file(rows) -> (out_path, text)` — `0020_out` 기록 + 텍스트 반환(클립보드용).

@@ -37,7 +37,9 @@ class ConstraintCreator:
     @staticmethod
     def expand_pattern(pattern):
         # "dyn_asset_side_0[1-7]_0[1-5]" -> ['dyn_asset_side_01_01', ... , 'dyn_asset_side_07_05']
-        # [a-b] 는 정수 a..b 로 리터럴 치환(자동 제로패딩 없음). 리딩 0 은 리터럴.
+        # [a-b] 는 정수 a..b 로 치환한다. 한쪽 경계에 리딩 0 이 있으면(예: [01-10])
+        # 두 경계 폭의 최대값으로 제로패딩한다([01-10] -> 01,02,...,10). 리딩 0 이
+        # 없으면 패딩 없음([1-10] -> 1..10) — 기존 동작 유지.
         # 다중 브래킷은 왼쪽이 바깥 루프(가장 느리게 변함) = itertools.product 기본 동작.
         pattern = (pattern or "").strip()
         if not pattern:
@@ -47,14 +49,21 @@ class ConstraintCreator:
         segs = re.split(r"(\[\d+-\d+\])", pattern)
 
         ranges = []
+        # 각 브래킷의 제로패딩 폭(0 = 패딩 없음). ranges 와 순서가 같다.
+        widths = []
         # template_parts: 리터럴 문자열 또는 None(브래킷 자리)
         template_parts = []
         for seg in segs:
             m = re.fullmatch(r"\[(\d+)-(\d+)\]", seg)
             if m:
-                a, b = int(m.group(1)), int(m.group(2))
+                a_str, b_str = m.group(1), m.group(2)
+                a, b = int(a_str), int(b_str)
                 step = 1 if a <= b else -1
                 ranges.append(range(a, b + step, step))
+                # 한쪽 경계라도 리딩 0 이 있으면 두 경계 폭의 최대값으로 패딩.
+                has_lead_zero = ((len(a_str) > 1 and a_str[0] == "0") or
+                                 (len(b_str) > 1 and b_str[0] == "0"))
+                widths.append(max(len(a_str), len(b_str)) if has_lead_zero else 0)
                 template_parts.append(None)
             else:
                 template_parts.append(seg)
@@ -64,10 +73,15 @@ class ConstraintCreator:
 
         results = []
         for combo in itertools.product(*ranges):
-            it = iter(combo)
-            results.append(
-                "".join(str(next(it)) if p is None else p for p in template_parts)
-            )
+            values = iter(zip(combo, widths))  # 브래킷 순서대로 (값, 패딩폭)
+            parts = []
+            for p in template_parts:
+                if p is None:
+                    val, width = next(values)
+                    parts.append(str(val).zfill(width))  # width=0 이면 그대로
+                else:
+                    parts.append(p)
+            results.append("".join(parts))
         return results
 
     def build_pairs(self, pattern_a, pattern_b):
