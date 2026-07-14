@@ -23,6 +23,7 @@ from tools.A00145_RigConnect.app.core import match_manager as mch_mgr
 from tools.A00145_RigConnect.app.core import constrain_manager as con_mgr
 from tools.A00145_RigConnect.app.core import matrix_constraint_manager as mtx_mgr
 from tools.A00145_RigConnect.app.core import connect_manager as cnt_mgr
+from tools.A00145_RigConnect.app.core import attribute_manager as att_mgr
 from tools.A00145_RigConnect.app.core import stream_manager as stm_mgr
 from tools.A00145_RigConnect.app.core import skin_constraint_manager as skn_mgr
 from tools.A00145_RigConnect.app.core import group_create_manager as grp_mgr
@@ -85,6 +86,7 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_match_tab(), "Match")
         self.tabs.addTab(self._build_constrain_tab(), "Constrain")
         self.tabs.addTab(self._build_connect_tab(), "Connect")
+        self.tabs.addTab(self._build_attribute_tab(), "Attribute")
         self.tabs.addTab(self._build_list_connected_tab(), "List Connected")
         self.tabs.addTab(self._build_connect_closest_tab(), "Connect Closest")
         main_layout.addWidget(self.tabs)
@@ -567,6 +569,118 @@ class MainWindow(QWidget):
         return box
 
     # --------------------------------------------------------------
+    # Tab : Attribute
+    # --------------------------------------------------------------
+
+    def _build_attribute_tab(self):
+        """소스 오브젝트의 어트리뷰트를 골라 타겟들에 같은 정의로 새로 만드는 탭.
+
+        이름은 그대로 두거나 Prefix / Suffix 를 붙일 수 있다.
+        """
+        content = QWidget()
+        layout = QVBoxLayout(content)
+
+        # --- Source : 오브젝트 1개 + 그 오브젝트의 어트리뷰트 목록 ---
+        src_box = QGroupBox("Source (attributes to copy)")
+        src_layout = QHBoxLayout(src_box)
+
+        self.tsl_attr_src = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Source Object", select_label="Select",
+            list_min_height=150, log_callback=self.log)
+
+        left = QVBoxLayout()
+        left.addWidget(self.tsl_attr_src)
+        btn_list = QPushButton("List Attributes")
+        btn_list.setToolTip(
+            "List the attributes of the first object in the Source list.")
+        btn_list.clicked.connect(self.on_attr_list)
+        left.addWidget(btn_list)
+
+        # 어트리뷰트는 여러 개를 골라 한 번에 복사한다.
+        self.lw_attr_src = QListWidget()
+        self.lw_attr_src.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lw_attr_src.setMinimumHeight(150)
+        self.lw_attr_src.itemSelectionChanged.connect(self._update_attr_preview)
+
+        right = QVBoxLayout()
+        right.addWidget(QLabel("Attributes"))
+        right.addWidget(self.lw_attr_src)
+
+        # 기본값 ON : 리깅에서 복사할 대상은 거의 항상 사용자 정의 어트리뷰트다.
+        # 끄면 translateX 같은 기본 어트리뷰트까지 전부 나온다.
+        self.cb_attr_user_only = QCheckBox("User defined only")
+        self.cb_attr_user_only.setChecked(True)
+        self.cb_attr_user_only.setToolTip(
+            "On  : only custom (user defined) attributes.\n"
+            "Off : every attribute, including built-ins like translateX.")
+        right.addWidget(self.cb_attr_user_only)
+
+        search_row = QHBoxLayout()
+        self.le_attr_search = QLineEdit()
+        self.le_attr_search.setPlaceholderText("search attribute")
+        self.le_attr_search.returnPressed.connect(self.on_attr_list)
+        search_row.addWidget(self.le_attr_search)
+        btn_all = QPushButton("Select All")
+        btn_all.clicked.connect(self.lw_attr_src.selectAll)
+        search_row.addWidget(btn_all)
+        right.addLayout(search_row)
+
+        src_layout.addLayout(left)
+        src_layout.addLayout(right)
+        layout.addWidget(src_box)
+
+        # --- Targets : 어트리뷰트를 새로 만들 오브젝트들 ---
+        self.tsl_attr_tgt = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Targets (new attributes here)", select_label="Select",
+            list_min_height=150, log_callback=self.log)
+        layout.addWidget(self.tsl_attr_tgt)
+
+        # --- Options : 새 이름 규칙 ---
+        opt_box = QGroupBox("New Attribute Name")
+        opt_layout = QVBoxLayout(opt_box)
+
+        name_row = QHBoxLayout()
+        name_row.addWidget(QLabel("Prefix"))
+        self.le_attr_prefix = QLineEdit()
+        self.le_attr_prefix.setPlaceholderText("e.g. L_")
+        self.le_attr_prefix.textChanged.connect(self._update_attr_preview)
+        name_row.addWidget(self.le_attr_prefix)
+        name_row.addWidget(QLabel("Suffix"))
+        self.le_attr_suffix = QLineEdit()
+        self.le_attr_suffix.setPlaceholderText("e.g. _ctrl")
+        self.le_attr_suffix.textChanged.connect(self._update_attr_preview)
+        name_row.addWidget(self.le_attr_suffix)
+        opt_layout.addLayout(name_row)
+
+        # 둘 다 비우면 소스와 같은 이름으로 만들어진다.
+        self.lbl_attr_preview = QLabel("Preview : -")
+        opt_layout.addWidget(self.lbl_attr_preview)
+
+        self.cb_attr_value = QCheckBox("Copy current value")
+        self.cb_attr_value.setChecked(True)
+        self.cb_attr_value.setToolTip(
+            "Also set the source's current value on the new attribute.")
+        opt_layout.addWidget(self.cb_attr_value)
+
+        layout.addWidget(opt_box)
+
+        btn_copy = QPushButton("Copy Attributes to Targets")
+        btn_copy.setMinimumHeight(32)
+        btn_copy.setToolTip(
+            "Create the selected attributes on every object in the Targets "
+            "list, keeping type / range / default / keyable.\n"
+            "Targets that already have the attribute are skipped.")
+        btn_copy.clicked.connect(self.on_attr_copy)
+        layout.addWidget(btn_copy)
+
+        layout.addStretch(1)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(content)
+        return scroll
+
+    # --------------------------------------------------------------
     # Tab : List Connected
     # --------------------------------------------------------------
 
@@ -688,6 +802,8 @@ class MainWindow(QWidget):
             "                Point/Orient constraint)\n"
             "              + Locators (auto-create locators and constrain them)\n"
             "Connect     : connect attributes (3 broadcast patterns) + 52 facial\n"
+            "Attribute   : copy selected attributes onto other objects,\n"
+            "              same name or with a Prefix / Suffix\n"
             "List Conn.  : explore up/down stream nodes by type\n"
             "Connect Closest : 1:1 closest matching constraints\n"
             "              + Get Closest (fill Driven with each driver's "
@@ -885,6 +1001,70 @@ class MainWindow(QWidget):
         w["attrs"].clear()
         w["attrs"].addItems(attrs)
         self.log("[OK] List Attributes : {0} ({1} attrs)".format(objs[0], len(attrs)))
+
+    # ==============================================================
+    # Handlers : Attribute
+    # ==============================================================
+
+    def _selected_src_attrs(self):
+        """Attribute 탭에서 선택된 어트리뷰트 이름들."""
+        return [i.text() for i in self.lw_attr_src.selectedItems()]
+
+    def _update_attr_preview(self):
+        """Prefix/Suffix 를 적용한 새 이름을 첫 선택 항목으로 미리 보여준다."""
+        selected = self._selected_src_attrs()
+        if not selected:
+            self.lbl_attr_preview.setText("Preview : -")
+            return
+        new_name = att_mgr.build_new_name(
+            selected[0],
+            self.le_attr_prefix.text().strip(),
+            self.le_attr_suffix.text().strip())
+        more = ""
+        if len(selected) > 1:
+            more = "   (+{0} more)".format(len(selected) - 1)
+        self.lbl_attr_preview.setText(
+            "Preview : {0}  ->  {1}{2}".format(selected[0], new_name, more))
+
+    def on_attr_list(self):
+        objs = self.tsl_attr_src.get_all_items()
+        if not objs:
+            self.log("[ERR] List Attributes : Source list is empty")
+            return
+
+        user_only = self.cb_attr_user_only.isChecked()
+        search = self.le_attr_search.text().strip()
+        try:
+            attrs = att_mgr.list_attributes(objs[0], user_only, search)
+        except Exception as e:
+            self.log("[ERR] List Attributes : {0}".format(e))
+            cmds.warning(str(e))
+            return
+
+        self.lw_attr_src.clear()
+        self.lw_attr_src.addItems(attrs)
+        self._update_attr_preview()
+        self.log("[OK] List Attributes : {0} ({1} attr(s){2})".format(
+            objs[0], len(attrs), ", user defined" if user_only else ""))
+
+    def on_attr_copy(self):
+        srcs = self.tsl_attr_src.get_all_items()
+        source = srcs[0] if srcs else ""
+        attrs = self._selected_src_attrs()
+        targets = self.tsl_attr_tgt.get_all_items()
+        prefix = self.le_attr_prefix.text().strip()
+        suffix = self.le_attr_suffix.text().strip()
+        copy_value = self.cb_attr_value.isChecked()
+
+        def _do():
+            created, skipped = att_mgr.copy_attributes(
+                source, attrs, targets, prefix, suffix, copy_value)
+            for target, name, reason in skipped:
+                self.log("[WARN] {0}.{1} : {2}".format(target, name, reason))
+            self.log("       {0} attribute(s) created on {1} target(s)".format(
+                len(created), len(targets)))
+
+        self._run("Copy Attributes", _do)
 
     def on_search_attrs(self, role):
         w = self._connect_widgets[role]
