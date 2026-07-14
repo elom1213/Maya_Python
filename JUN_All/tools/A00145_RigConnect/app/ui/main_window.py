@@ -277,7 +277,7 @@ class MainWindow(QWidget):
         """Skin Weight to Constraint UI (접이식, 기본 접힘).
 
         선택 버텍스의 스킨 웨이트로 영향 joint 들을 그 비율의 weight 로
-        follower 에 parentConstraint 한다.
+        follower 에 constraint 한다. constraint 타입은 라디오로 고른다.
         """
         box = CollapsibleBox("Skin Weight to Constraint", collapsed=True)
 
@@ -319,6 +319,19 @@ class MainWindow(QWidget):
         self.cb_skin_per_vertex.setChecked(False)
         opt_layout.addWidget(self.cb_skin_per_vertex)
 
+        # 생성할 constraint 타입. 위 Constraint 박스와 같은 라디오 패턴.
+        # (pointOnPoly 는 joint 가중 방식에 쓸 수 없어 목록에서 빠진다)
+        self.rb_skin_con_group = QButtonGroup(self)
+        rb_row = QHBoxLayout()
+        for i, (key, label) in enumerate(skn_mgr.SKIN_CONSTRAIN_TYPES):
+            rb = QRadioButton(label)
+            if i == 0:
+                rb.setChecked(True)
+            self.rb_skin_con_group.addButton(rb, i)
+            rb_row.addWidget(rb)
+        rb_row.addStretch(1)
+        opt_layout.addLayout(rb_row)
+
         box.addWidget(opt_box)
 
         btn_row = QHBoxLayout()
@@ -327,7 +340,8 @@ class MainWindow(QWidget):
         btn.setMinimumHeight(32)
         btn.setToolTip(
             "Constrain the objects in the Followers list with the skin "
-            "weights of the selected vertices.")
+            "weights of the selected vertices.\n"
+            "The constraint type is taken from the radio buttons above.")
         btn.clicked.connect(self.on_skin_weight_to_constraint)
         btn_row.addWidget(btn)
 
@@ -670,7 +684,8 @@ class MainWindow(QWidget):
             "              options: Translation / Rotation / Scale (world) / Parent\n"
             "              + create locators/sphere/cube at targets + vertex normal (+Y)\n"
             "Constrain   : multi target -> follower constraints\n"
-            "              + Skin Weight to Constraint (weighted parentConstraint)\n"
+            "              + Skin Weight to Constraint (weighted Parent/Scale/\n"
+            "                Point/Orient constraint)\n"
             "              + Locators (auto-create locators and constrain them)\n"
             "Connect     : connect attributes (3 broadcast patterns) + 52 facial\n"
             "List Conn.  : explore up/down stream nodes by type\n"
@@ -776,17 +791,24 @@ class MainWindow(QWidget):
                   lambda: con_mgr.constrain(
                       targets, followers, con_type, maintain_offset))
 
+    def _skin_con_type(self):
+        """Skin Weight to Constraint 박스에서 선택한 constraint 타입 key."""
+        return skn_mgr.SKIN_CONSTRAIN_TYPES[self.rb_skin_con_group.checkedId()][0]
+
     def on_skin_weight_to_constraint(self):
         vertices = self.tsl_skin_verts.get_all_items()
         followers = self.tsl_skin_followers.get_all_items()
         max_influence = self.sb_skin_max_inf.value()
         maintain_offset = self.cb_skin_maintain.isChecked()
         per_vertex = self.cb_skin_per_vertex.isChecked()
+        con_type = self._skin_con_type()
 
         def _do():
             made = skn_mgr.skin_weight_to_constraint(
-                vertices, followers, max_influence, maintain_offset, per_vertex)
-            self.log("       {0} constraint(s) created".format(len(made)))
+                vertices, followers, max_influence, maintain_offset, per_vertex,
+                con_type)
+            self.log("       {0} {1} constraint(s) created".format(
+                len(made), con_type))
 
         self._run("Skin Weight to Constraint", _do)
 
@@ -795,10 +817,11 @@ class MainWindow(QWidget):
         max_influence = self.sb_skin_max_inf.value()
         maintain_offset = self.cb_skin_maintain.isChecked()
         per_vertex = self.cb_skin_per_vertex.isChecked()
+        con_type = self._skin_con_type()
 
         def _do():
             created, made = skn_mgr.create_locators_and_constrain(
-                vertices, max_influence, maintain_offset, per_vertex)
+                vertices, max_influence, maintain_offset, per_vertex, con_type)
             # 생성한 로케이터를 Followers 목록에 채우고 씬에서 선택.
             self.tsl_skin_followers.set_items(created)
             if created:

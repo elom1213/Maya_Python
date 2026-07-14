@@ -3,10 +3,12 @@
 skin_constraint_manager - "Skin Weight to Constraint" 기능 로직.
 
 선택한 버텍스의 스킨 웨이트를 읽어, 영향(influence) joint 들을 그 웨이트만큼
-가중치로 follower 오브젝트에 parentConstraint 로 연결한다.
+가중치로 follower 오브젝트에 constraint 로 연결한다.
 
 예) 버텍스의 웨이트가 hip:0.2 / spine_01:0.5 / spine_02:0.3 이면
-    세 joint 를 그 비율의 weight 로 follower 에 parentConstraint.
+    세 joint 를 그 비율의 weight 로 follower 에 constraint.
+
+constraint 타입은 Parent / Scale / Point / Orient 중에서 고른다.
 
 aggregation 두 가지:
   - average  : 선택한 모든 버텍스의 joint 별 웨이트를 평균/정규화 → 모든 follower 에 동일 적용.
@@ -17,8 +19,15 @@ UI 비의존: 위젯에서 읽은 list/int/bool 값만 받는다. (app/core ↔ 
 
 import maya.cmds as cmds
 
+from tools.A00145_RigConnect.app.core import constrain_manager as con_mgr
+
 # weight 0 판정 임계값.
 _EPS = 1e-6
+
+# 스킨 웨이트 가중 방식으로 쓸 수 있는 constraint 타입만 노출한다.
+# pointOnPoly 는 mesh 를 타겟으로 삼으므로 joint 가중 constraint 에 쓸 수 없어 제외.
+_SKIN_KEYS = ("parent", "scale", "point", "orient")
+SKIN_CONSTRAIN_TYPES = [t for t in con_mgr.CONSTRAIN_TYPES if t[0] in _SKIN_KEYS]
 
 
 def get_skin_cluster(node):
@@ -65,12 +74,21 @@ def _top_normalized(weights, max_influence):
     return [(inf, w / total) for inf, w in items]
 
 
-def _apply_weighted_constraint(influences_weights, follower, maintain_offset):
-    """[(joint, weight), ...] 로 follower 에 parentConstraint 를 만들고 weight 를 설정한다.
+def _apply_weighted_constraint(influences_weights, follower, maintain_offset,
+                               con_type="parent"):
+    """[(joint, weight), ...] 로 follower 에 constraint 를 만들고 weight 를 설정한다.
+
+    Args:
+        influences_weights: [(joint, normalized_weight), ...].
+        follower: 구속될 오브젝트.
+        maintain_offset: constraint 의 maintain offset 옵션.
+        con_type: SKIN_CONSTRAIN_TYPES 의 key ("parent"/"scale"/"point"/"orient").
 
     Returns:
         생성된 constraint 노드명.
     """
+    con_func = con_mgr.get_constraint_func(con_type)
+
     joints = [inf for inf, _ in influences_weights]
     missing = [j for j in joints if not cmds.objExists(j)]
     if missing:
@@ -79,27 +97,31 @@ def _apply_weighted_constraint(influences_weights, follower, maintain_offset):
     if not cmds.objExists(follower):
         raise ValueError("Follower not found in scene: {0}".format(follower))
 
-    con = cmds.parentConstraint(*(joints + [follower]), mo=maintain_offset)[0]
+    con = con_func(*(joints + [follower]), mo=maintain_offset)[0]
     # 회전 보간을 Shortest 로 강제(0=No Flip, 1=Average, 2=Shortest).
     # 여러 joint 가 가중 평균될 때 No Flip/Average 는 짐벌 튐이 생길 수 있어 Shortest 로 고정.
-    cmds.setAttr("{0}.interpType".format(con), 2)
+    # interpType 은 회전을 다루는 parent/orient 에만 있다(point/scale 에는 없음).
+    if cmds.attributeQuery("interpType", node=con, exists=True):
+        cmds.setAttr("{0}.interpType".format(con), 2)
     # weightAliasList 는 target 추가 순서(=joints 순서)와 동일하다.
-    aliases = cmds.parentConstraint(con, q=True, weightAliasList=True) or []
+    aliases = con_func(con, q=True, weightAliasList=True) or []
     for alias, (_, w) in zip(aliases, influences_weights):
         cmds.setAttr("{0}.{1}".format(con, alias), w)
     return con
 
 
 def skin_weight_to_constraint(vertices, followers, max_influence=0,
-                              maintain_offset=True, per_vertex=False):
-    """선택 버텍스의 스킨 웨이트로 followers 에 parentConstraint 를 생성한다.
+                              maintain_offset=True, per_vertex=False,
+                              con_type="parent"):
+    """선택 버텍스의 스킨 웨이트로 followers 에 constraint 를 생성한다.
 
     Args:
         vertices: 버텍스 컴포넌트 리스트("pMesh.vtx[i]").
-        followers: 구속될(parentConstraint 가 걸릴) 오브젝트 리스트.
+        followers: 구속될(constraint 가 걸릴) 오브젝트 리스트.
         max_influence: 사용할 최대 joint 개수(정수). 0 이면 제한 없음.
-        maintain_offset: parentConstraint 의 maintain offset 옵션.
+        maintain_offset: constraint 의 maintain offset 옵션.
         per_vertex: True 면 vertices[i] -> followers[i] 1:1, False 면 평균을 전체에 적용.
+        con_type: SKIN_CONSTRAIN_TYPES 의 key ("parent"/"scale"/"point"/"orient").
 
     Returns:
         생성된 constraint 노드명 리스트.
@@ -119,7 +141,8 @@ def skin_weight_to_constraint(vertices, followers, max_influence=0,
                     len(vertices), len(followers)))
         for vtx, flw in zip(vertices, followers):
             iw = _top_normalized(get_vertex_weights(vtx), max_influence)
-            made.append(_apply_weighted_constraint(iw, flw, maintain_offset))
+            made.append(_apply_weighted_constraint(
+                iw, flw, maintain_offset, con_type))
     else:
         # 모든 버텍스의 joint 별 웨이트를 합산 → 평균 → 정규화.
         accum = {}
@@ -130,7 +153,8 @@ def skin_weight_to_constraint(vertices, followers, max_influence=0,
         avg = {inf: w / n for inf, w in accum.items()}
         iw = _top_normalized(avg, max_influence)
         for flw in followers:
-            made.append(_apply_weighted_constraint(iw, flw, maintain_offset))
+            made.append(_apply_weighted_constraint(
+                iw, flw, maintain_offset, con_type))
 
     return made
 
@@ -153,7 +177,8 @@ def _locator_name_from_vertex(vtx):
 
 
 def create_locators_and_constrain(vertices, max_influence=0,
-                                  maintain_offset=True, per_vertex=False):
+                                  maintain_offset=True, per_vertex=False,
+                                  con_type="parent"):
     """로케이터를 자동 생성해 스킨 웨이트 constraint 를 건다.
 
     빈 follower 를 만들 필요 없이, 선택 버텍스만으로 동작한다.
@@ -168,8 +193,9 @@ def create_locators_and_constrain(vertices, max_influence=0,
     Args:
         vertices: 버텍스 컴포넌트 리스트("pMesh.vtx[i]").
         max_influence: 사용할 최대 joint 개수(정수). 0 이면 제한 없음.
-        maintain_offset: parentConstraint 의 maintain offset 옵션.
+        maintain_offset: constraint 의 maintain offset 옵션.
         per_vertex: True 면 버텍스당 로케이터 1개, False 면 centroid 에 1개.
+        con_type: SKIN_CONSTRAIN_TYPES 의 key ("parent"/"scale"/"point"/"orient").
 
     Returns:
         (created_locators, made_constraints) 튜플.
@@ -204,6 +230,6 @@ def create_locators_and_constrain(vertices, max_influence=0,
 
     # 3) 생성한 로케이터를 follower 로 삼아 동일한 스킨 웨이트 constraint 적용.
     made = skin_weight_to_constraint(
-        vertices, created, max_influence, maintain_offset, per_vertex)
+        vertices, created, max_influence, maintain_offset, per_vertex, con_type)
 
     return created, made
