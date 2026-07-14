@@ -14,6 +14,8 @@ UI 비의존: 위젯에서 읽은 list/str 값만 받는다.
 import maya.cmds as cmds
 import maya.mel as mel
 
+from tools.A00145_RigConnect.app.core import blendshape_utils as bsu
+
 
 # MEL JUN_cmd_connect_52Facial 의 하드코딩 52 ARKit 페이셜 어트리뷰트(순서/철자 보존).
 # source / target 동일 이름으로 연결한다.
@@ -42,6 +44,8 @@ def list_attrs(obj, search=""):
     - 이름에 "." 가 들어간(중첩) 항목은 제외한다.
     - multi/compound 어트리뷰트는 getNextFreeMultiIndex 로 판정해
       listAttr -multi 로 자식 어트리뷰트까지 펼친다.
+    - **blendShape 노드면 `weight` 멀티를 타겟 이름(별칭)으로 펼친다.** 일반 멀티 확장은
+      인덱스 0 하나만 잡아 첫 타겟만 나오므로, 별칭 목록을 직접 쓴다.
 
     Args:
         obj: 대상 오브젝트 이름.
@@ -53,15 +57,27 @@ def list_attrs(obj, search=""):
     if not obj:
         return []
 
-    if search:
-        raw = cmds.listAttr(obj + "." + search) or []
-    else:
-        raw = cmds.listAttr(obj) or []
+    # blendShape 면 타겟(별칭) 이름을 맨 앞에 놓는다. 검색어가 있으면 그걸로 거른다.
+    bs_targets = bsu.get_blendshape_targets(obj)
+    result = [t for t in bs_targets if not search or search in t]
 
-    result = []
+    try:
+        if search:
+            raw = cmds.listAttr(obj + "." + search) or []
+        else:
+            raw = cmds.listAttr(obj) or []
+    except Exception:
+        # search 가 실제 어트리뷰트 이름이 아니면 listAttr 이 실패한다.
+        # blendShape 타겟 검색 결과는 그대로 살려서 돌려준다.
+        raw = []
+
     for attr in raw:
         # 중첩 어트리뷰트(이름에 ".") 는 건너뛴다.
         if "." in attr:
+            continue
+
+        # blendShape 의 weight 는 위에서 타겟 이름으로 이미 펼쳤다.
+        if bs_targets and attr == "weight":
             continue
 
         full = "{0}.{1}".format(obj, attr)
@@ -81,7 +97,14 @@ def list_attrs(obj, search=""):
                 "{0}.{1}[{2}]".format(obj, attr, idx), multi=True) or []
             result.extend(children)
 
-    return result
+    # 별칭이 raw 에도 섞여 나올 수 있어 순서를 유지한 채 중복을 제거한다.
+    seen = set()
+    unique = []
+    for attr in result:
+        if attr not in seen:
+            seen.add(attr)
+            unique.append(attr)
+    return unique
 
 
 def find_matching(attrs, search):

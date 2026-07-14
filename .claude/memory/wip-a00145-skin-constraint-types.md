@@ -8,8 +8,7 @@ metadata:
 ---
 
 A00145_RigConnect v01.16 — Constraint 탭의 "Skin Weight to Constraint" 가 parentConstraint 만
-만들던 것을 **Parent / Scale / Point / Orient 라디오 선택**으로 확장. IMPLEMENTED (Maya 실제 테스트 +
-push 대기).
+만들던 것을 **Parent / Scale / Point / Orient 라디오 선택**으로 확장. DONE (Maya 검증 + 푸시 완료).
 
 **Why:** 스킨 웨이트 비율로 joint 를 가중 구속하는 기능인데 parent 만 지원해서, 회전만/스케일만
 따라가게 하려면 만든 뒤 손으로 갈아끼워야 했다.
