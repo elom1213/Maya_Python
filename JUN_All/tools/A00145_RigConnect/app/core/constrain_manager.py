@@ -31,6 +31,20 @@ _CON_CMD = {
 }
 
 
+def get_constraint_func(con_type):
+    """CONSTRAIN_TYPES 의 key 에 대응하는 cmds.*Constraint 함수를 반환한다.
+
+    Args:
+        con_type: CONSTRAIN_TYPES 의 key ("parent"/"scale"/"point"/"orient"/"pointOnPoly").
+
+    Returns:
+        cmds 의 constraint 함수.
+    """
+    if con_type not in _CON_CMD:
+        raise ValueError("Unknown constraint type: {0}".format(con_type))
+    return getattr(cmds, _CON_CMD[con_type])
+
+
 def constrain(targets, followers, con_type, maintain_offset=True):
     """targets -> followers 로 constraint 연결.
 
@@ -52,10 +66,7 @@ def constrain(targets, followers, con_type, maintain_offset=True):
         raise ValueError("No target objects. Add objects to the Targets list.")
     if not followers:
         raise ValueError("No follower objects. Add objects to the Followers list.")
-    if con_type not in _CON_CMD:
-        raise ValueError("Unknown constraint type: {0}".format(con_type))
-
-    con_func = getattr(cmds, _CON_CMD[con_type])
+    con_func = get_constraint_func(con_type)
 
     made = []
     all_size = max(len(followers), len(targets))

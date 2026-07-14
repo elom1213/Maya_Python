@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.15` (`app/config/version.py`)
+- 버전: `v01.16` (`app/config/version.py`)
 - 위치: `JUN_All/tools/A00145_RigConnect`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴(`QTabWidget` 5탭)
 - 원본 `A00140_ConnectClosest` / MEL 파일은 그대로 보존(미수정)
@@ -87,11 +87,14 @@ Transfer`(기본 접힘, v01.14)**.
   버그를 고쳤다.
 
 #### Skin Weight to Constraint
-선택한 버텍스의 **스킨 웨이트 비율**대로 영향 joint 들을 weight 로 follower 에
-`parentConstraint` 한다. (예: 버텍스 웨이트가 `hip:0.2 / spine_01:0.5 / spine_02:0.3` 이면
-세 joint 를 그 비율의 constraint weight 로 연결.)
+선택한 버텍스의 **스킨 웨이트 비율**대로 영향 joint 들을 weight 로 follower 에 constraint 한다.
+(예: 버텍스 웨이트가 `hip:0.2 / spine_01:0.5 / spine_02:0.3` 이면 세 joint 를 그 비율의
+constraint weight 로 연결.)
 
 - `Vertices` 리스트: 선택한 버텍스 컴포넌트(`mesh.vtx[i]`)를 담는다. `Followers` 리스트: 구속될 오브젝트.
+- **constraint 타입 라디오(v01.16)**: `Parent`(기본) / `Scale` / `Point` / `Orient` 중 선택. 위
+  `Constraint` 박스와 같은 라디오 패턴이며, 어떤 타입이든 영향 joint 들의 **가중치(weight) 배분 방식은
+  동일**하다. `pointOnPoly` 는 mesh 를 타겟으로 삼아 joint 가중 방식에 쓸 수 없으므로 목록에서 빠진다.
 - Options:
   - `Max Influence`(정수, 0 = 제한 없음): 웨이트 상위 N개 joint 만 남기고 합=1 로 정규화.
   - `Maintain Offset`.
@@ -99,8 +102,9 @@ Transfer`(기본 접힘, v01.14)**.
     - **해제(기본, average)**: 선택한 모든 버텍스의 joint 별 웨이트를 평균/정규화 → 모든 follower 에 동일 적용.
     - **체크(per-vertex)**: `vertices[i]` 웨이트 → `followers[i]` 에 1:1 적용(개수 일치 필요).
 - `Skin Weight to Constraint` 클릭.
-- 생성되는 `parentConstraint` 의 **Interp Type 은 항상 `Shortest`(2)** 로 설정된다(v01.05). 여러 joint 가
-  가중 평균될 때 기본 `Average` 가 일으키는 회전 튐(짐벌)을 피한다.
+- 회전을 다루는 타입(`Parent` / `Orient`)은 **Interp Type 이 항상 `Shortest`(2)** 로 설정된다(v01.05).
+  여러 joint 가 가중 평균될 때 기본 `Average` 가 일으키는 회전 튐(짐벌)을 피한다.
+  (`Point` / `Scale` constraint 에는 `interpType` 어트리뷰트가 없으므로 건너뛴다.)
 - **`Locators` 버튼(v01.06)**: `Followers` 를 직접 만들 필요 없이 **로케이터를 자동 생성**해 동일한 스킨
   웨이트 constraint 를 건다. 생성된 로케이터는 `RigConnect_skinLoc_grp#` 그룹으로 묶이고, `Followers`
   목록에 자동으로 채워지며 씬에서 선택된다.
@@ -221,7 +225,7 @@ A00145_RigConnect/
     ├── core/                       # UI 비의존 maya.cmds 로직
     │   ├── match_manager.py        # Match (MEL Match Tool 포팅: 위치/회전 매칭·컨트롤 생성·버텍스 노말)
     │   ├── constrain_manager.py    # Constrain  (MEL 포팅)
-    │   ├── skin_constraint_manager.py # Skin Weight to Constraint (스킨 웨이트 → weighted parentConstraint)
+    │   ├── skin_constraint_manager.py # Skin Weight to Constraint (스킨 웨이트 → weighted Parent/Scale/Point/Orient constraint)
     │   ├── group_create_manager.py # Group Create (부모/자식 쪽 오프셋 노드 _<suffix>_NN 삽입, 그룹·오브젝트 타입, UUID 기반)
     │   ├── constraint_transfer_manager.py # Constraint Transfer (constraint 를 다른 오브젝트로 이관: 삭제+동일세팅 재생성, MO 유지, UUID 기반)
     │   ├── connect_manager.py      # Connect    (MEL 포팅: attr 나열/검색/연결, 52 facial)
