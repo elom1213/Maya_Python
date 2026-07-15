@@ -13,6 +13,7 @@
 - [UI text English-only](ui-text-english-only.md) — all UI-facing strings (buttons, logs, messages) must be English; Korean only in comments/docstrings
 - [Explain in Korean](explain-in-korean.md) — write explanations/conversational replies to the user in Korean (code/UI text stay English)
 - [Push target Dnable/dev](push-target-dnable-dev.md) — default git push goes to Dnable_repo remote, dev branch (not origin)
+- [Clean commit message (no stray chars)](clean-commit-message-no-stray-chars.md) — verify + fix commit msg before committing (recent commits leaked a leading `@` from using PowerShell `@'...'@` heredoc in the Bash tool); use tool-correct multiline syntax + check `git log -1`
 - [Memory synced via repo](memory-synced-via-repo.md) — memory lives in repo `.claude/memory` (junctioned from ~/.claude/projects/<hash>/memory); commit+push memory changes to share across PCs
 - [Standalone taskbar icon method](standalone-taskbar-icon-method.md) — how to give a standalone PySide tool a Windows taskbar icon (SVG→QtSvg multi-size .ico + AppUserModelID before QApplication); guide in docs/taskbar_icon_guide.md
 - [TSL UUID selection](wip-tsl-uuid-selection.md) — branch dev_tsl (Maya check pending): MOD_tsl_qt_v01 stores (uuid, component) per item so list→scene selection survives rename/reparent/dup names; affects all 18 tools using the shared TSL
