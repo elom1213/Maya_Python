@@ -1,15 +1,18 @@
 ---
 name: update-portfolio-on-tool-work
-description: "After tool/tool-related work, reflect portfolio-worthy content into JUN_All/docs/portfolio EN+KR docs"
+description: "\"포트폴리오 문서\" = portfolio_EN.md + portfolio_KR.md; \"포트폴리오 문서 갱신해\" means update BOTH. Also: reflect portfolio-worthy content after tool work."
 metadata: 
   node_type: memory
   type: feedback
   originSessionId: 91ab0dea-4b6f-4134-a5cd-3d3ccc44c43a
 ---
 
-툴 또는 툴 유관 작업을 진행할 때, 포트폴리오로 어필할 만한 내용이 생기면
-`JUN_All/docs/portfolio/portfolio_EN.md` 와 `portfolio_KR.md` **양쪽**을 기존 문서의
-구조·톤을 참고해 추가/업데이트할 것.
+**용어 정의:** 사용자가 말하는 **"포트폴리오 문서"** 는 항상
+`JUN_All/docs/portfolio/portfolio_EN.md` 와 `JUN_All/docs/portfolio/portfolio_KR.md`
+**두 파일**을 가리킨다. **"포트폴리오 문서 갱신해"** 같은 명시적 요청 = **두 문서 모두** 갱신하라는 뜻.
+
+툴 또는 툴 유관 작업을 진행할 때, 포트폴리오로 어필할 만한 내용이 생기면 (명시적 요청이 없어도)
+위 두 문서 **양쪽**을 기존 문서의 구조·톤을 참고해 추가/업데이트할 것.
 
 **Why:** 이 두 문서는 **3D 게임 업계(실사·카툰풍 게임 프로젝트) 지원용**이다. 사용자가 특히
 어필하고 싶어 하는 축:
