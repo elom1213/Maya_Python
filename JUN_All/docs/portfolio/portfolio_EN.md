@@ -27,7 +27,7 @@ updated: 2026-07-15
 
 ---
 
-## 1. MetaHuman · Facial / Correctives
+## 1. MetaHuman rig — Facial · Body RBF · Correctives
 
 ### 1-1. Per-joint garment wrinkle correctives via Unreal's Pose Driver (PoseWrangler)
 `A00280_correctiveFromCache`
@@ -57,6 +57,18 @@ updated: 2026-07-15
 - A blendShape's targets are not plain attributes — they live as **aliases on a `weight[]` multi**, so the usual attribute listing only surfaces the first one. I read them straight from `aliasAttr`, so **selecting a blendShape lists every target by name** in both the Attribute and Connect tabs.
 - Chosen targets are **copied onto a controller as named, keyable float attributes** (optional prefix/suffix, type/range/default preserved); the Connect tab then wires **controller → blendShape target**.
 - Turns "expose these dozens of face shapes as rig controls" into a pick-and-copy step instead of hand-adding attributes and connections one at a time — the everyday grind of building a facial control rig.
+
+### 1-5. Generalizing the MetaHuman skeleton + Unreal RBF setup to non-MetaHuman avatars
+`A00270_skinMigrate`, `A00130_ControlRig`, `A00060_jointTool_V02`, `A00145_RigConnect`, `A00090_ConnectionBuilder`
+
+- **Goal**: take the rig approach proven on MetaHuman — its **bone structure** and the **Unreal RBF (PoseWrangler) pose-driver** setup — and stand it up on **other avatars, both realistic and cartoon-style**, all the way into Unreal.
+- Because these scripts are **selection- and JSON-rule-driven rather than hardcoded to MetaHuman**, the same pipeline retargets to an arbitrary character:
+  - **Skeleton onto the custom mesh** — build and orient the joint structure (`A00060_jointTool_V02`, region-matched with `A00130_ControlRig`) and transfer skin across differing topology with **bone remapping** (`A00270_skinMigrate`).
+  - **Rig plumbing** — match / constrain / attribute-copy / connect-closest to align the new rig to the reference (`A00145_RigConnect`).
+  - **Body / joint RBF** — wire the **RBF solver → driver → corrective** attributes from source/target lists through JSON rules (`A00090_ConnectionBuilder`); its shipped rules are **body-limb** correctives (`WRK_thigh / calf / lowerarm_l/r`), i.e. the same RBF wiring **reused well beyond MetaHuman faces**.
+  - **Into Unreal** — author the RBF pose-driver in engine with **PoseWrangler**, so the pose-driven deformation runs live on the target skeleton in-engine.
+- **Result**: MetaHuman-grade **pose-driven deformation (RBF)** became **repeatable on non-MetaHuman realistic and cartoon avatars**, without writing an engine plugin or hand-rebuilding each RBF setup per character.
+- **Keywords**: RBF Pose Driver, PoseWrangler, skeleton retarget, cross-topology skin transfer, Control Rig, avatar-agnostic rig pipeline, Maya → Unreal
 
 ---
 
