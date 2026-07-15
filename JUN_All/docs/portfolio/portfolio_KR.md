@@ -1,14 +1,14 @@
 ---
-title: 포트폴리오 작업 내역 (2026-05-06 ~ 2026-07-14)
+title: 포트폴리오 작업 내역 (2026-05-06 ~ 2026-07-15)
 aliases: [Portfolio KR, 포트폴리오 국문]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-07-14
+updated: 2026-07-15
 ---
 
 # Technical Artist / Pipeline TD 작업 내역 — 국문
 
 > **작성자**: 박지훈 (Ji Hun Park / Junny)
-> **기간**: 2026-05-06 ~ 2026-07-14 (약 10주)
+> **기간**: 2026-05-06 ~ 2026-07-15 (약 10주)
 > **범위**: Autodesk Maya 툴 개발 · 언리얼 엔진 연동 자동화 · MetaHuman 페이셜 · 파이프라인 인프라
 > **규모**: 커밋 299건 · 사내 툴 40여 종 · 전 툴 공용 프레임워크 1식
 > **스택**: Python 3, `maya.cmds` / OpenMaya, PySide2·PySide6(Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF), Houdini Alembic 캐시 연동
@@ -51,6 +51,13 @@ updated: 2026-07-14
 - **CSV_tool** — ARKit 페이셜 캡처 CSV를 Maya로 임포트해 커브로 굽는 도구.
 - **ARKitCurveTool** — 언리얼의 `Add ARKit Curves to Skeleton` 동작을 분석해 **Maya 측에서 동일 결과를 재현**하는 코드/가이드로 정리.
 
+### 1-4. 페이셜 컨트롤 구성 — blendShape 타겟 → 컨트롤러 어트리뷰트
+`A00145_RigConnect` (Attribute 탭)
+
+- blendShape의 타겟은 일반 어트리뷰트가 아니라 **`weight[]` 멀티에 걸린 별칭(alias)** 이라, 보통의 어트리뷰트 나열로는 첫 타겟 하나만 잡힙니다. `aliasAttr`에서 직접 읽어, **blendShape를 선택하면 Attribute·Connect 탭 양쪽에서 모든 타겟이 이름으로 나열**되게 했습니다.
+- 고른 타겟을 **컨트롤러에 이름 있는 키어블 float 어트리뷰트로 복사**(접두/접미사 옵션, 타입·범위·기본값 보존)하고, Connect 탭으로 **컨트롤러 → blendShape 타겟**을 결선합니다.
+- "이 수십 개 표정 셰이프를 리그 컨트롤로 노출" 하는 작업을, 어트리뷰트와 연결을 하나씩 손으로 추가하는 대신 골라서 복사하는 단계로 바꿨습니다 — 페이셜 컨트롤 리그 구성의 일상적 반복 작업입니다.
+
 ---
 
 ## 2. 언리얼 엔진 노드 생성 툴 (Maya → UE 브릿지)
@@ -86,7 +93,7 @@ updated: 2026-07-14
 
 | 툴 | 내용 |
 |----|------|
-| `A00145_RigConnect` | **리깅 연결 작업 통합 툴**. 레거시 MEL 툴(ConnectionTool·Match Tool) 2종을 Qt로 흡수 통합. 매칭(T/R/S/Parent 옵션), 매트릭스 컨스트레인트, 최근접 오브젝트 연결, **스킨 웨이트 → 컨스트레인트 변환**, 오프셋(제로아웃) 그룹 일괄 생성, **기존 컨스트레인트를 다른 오브젝트로 이관**하는 Constraint Transfer 등 |
+| `A00145_RigConnect` | **리깅 연결 작업 통합 툴**. 레거시 MEL 툴(ConnectionTool·Match Tool) 2종을 Qt로 흡수 통합. 매칭(T/R/S/Parent 옵션), 매트릭스 컨스트레인트, 최근접 오브젝트 연결, **스킨 웨이트 → 컨스트레인트 변환**(Parent/Scale/Point/Orient), 오프셋(제로아웃) 그룹 일괄 생성, **기존 컨스트레인트를 다른 오브젝트로 이관**하는 Constraint Transfer, 그리고 선택한 어트리뷰트를 접두/접미사를 붙여 다른 오브젝트에 복제하는 **Attribute 탭**(타입·범위·기본값·키어블 보존, blendShape 타겟 포함 — 1-4 참고) 등 |
 | `A00270_skinMigrate` | **토폴로지가 다른 메시 간 스킨 웨이트 전이 + 본 재매핑**을 원클릭으로. 레거시 2버튼 UI도 Classic 탭으로 보존 |
 | `A00060_jointTool_V02` | 레거시 MEL JointTool을 Qt로 통합. 커브 기반/분할 조인트 생성(월드 절대좌표 기준), 트위스트 전용 Aim 리디자인, 미사용 조인트 선택기 |
 | `A00120_FKIK`, `A00190_FKIK_General_Tool` | FK/IK 스위칭 및 베이크. 네이티브 `bakeResults` 도입으로 프레임 루프 대비 성능 개선, **구간 밖 키·애님 레이어 포즈를 훼손하지 않는** 컨스트레인트리스 베이크로 수정 |

@@ -1,14 +1,14 @@
 ---
-title: Portfolio — Work Summary (2026-05-06 ~ 2026-07-14)
+title: Portfolio — Work Summary (2026-05-06 ~ 2026-07-15)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-07-14
+updated: 2026-07-15
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
 
 > **Author**: Ji Hun Park (Junny)
-> **Period**: 2026-05-06 – 2026-07-14 (~10 weeks)
+> **Period**: 2026-05-06 – 2026-07-15 (~10 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
 > **Volume**: 299 commits · 40+ in-house tools · one shared framework powering all of them
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
@@ -51,6 +51,13 @@ updated: 2026-07-14
 - **CSV_tool** — imports ARKit facial capture CSV into Maya as animation curves.
 - **ARKitCurveTool** — reverse-engineered Unreal's `Add ARKit Curves to Skeleton` and reproduced the same result on the Maya side (code + guide).
 
+### 1-4. Facial control authoring — blendShape targets → controller attributes
+`A00145_RigConnect` (Attribute tab)
+
+- A blendShape's targets are not plain attributes — they live as **aliases on a `weight[]` multi**, so the usual attribute listing only surfaces the first one. I read them straight from `aliasAttr`, so **selecting a blendShape lists every target by name** in both the Attribute and Connect tabs.
+- Chosen targets are **copied onto a controller as named, keyable float attributes** (optional prefix/suffix, type/range/default preserved); the Connect tab then wires **controller → blendShape target**.
+- Turns "expose these dozens of face shapes as rig controls" into a pick-and-copy step instead of hand-adding attributes and connections one at a time — the everyday grind of building a facial control rig.
+
 ---
 
 ## 2. Unreal Engine node generators (Maya → UE bridge)
@@ -85,7 +92,7 @@ updated: 2026-07-14
 
 | Tool | What it does |
 |------|--------------|
-| `A00145_RigConnect` | **Unified rig-connection tool**: absorbed two legacy MEL tools (ConnectionTool, Match Tool) into Qt. Match (T/R/S/Parent options), matrix constraints, connect-to-closest, **skin weight → constraint conversion**, batch offset/zero-out group creation, and **Constraint Transfer** (move an existing constraint onto another object, preserving world pose) |
+| `A00145_RigConnect` | **Unified rig-connection tool**: absorbed two legacy MEL tools (ConnectionTool, Match Tool) into Qt. Match (T/R/S/Parent options), matrix constraints, connect-to-closest, **skin weight → constraint conversion** (Parent / Scale / Point / Orient), batch offset/zero-out group creation, **Constraint Transfer** (move an existing constraint onto another object, preserving world pose), and an **Attribute tab** that copies chosen attributes onto other objects with a prefix/suffix (type/range/default/keyable preserved) — including a blendShape's targets (see 1-4) |
 | `A00270_skinMigrate` | One-click **skin weight transfer between meshes of different topology, with bone remapping**; the legacy two-button UI is preserved as a Classic tab |
 | `A00060_jointTool_V02` | Legacy MEL JointTool folded into Qt: curve-based / divided joint creation in **world space**, twist-only Aim redesign, unused-joint selector |
 | `A00120_FKIK`, `A00190_FKIK_General_Tool` | FK/IK switching and baking. Moved to native `bakeResults` for speed, then fixed to a constraint-free per-frame match bake so that **keys outside the range and anim-layer poses are no longer corrupted** |
