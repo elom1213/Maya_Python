@@ -1,14 +1,14 @@
 ---
-title: 포트폴리오 작업 내역 (2026-05-06 ~ 2026-07-14)
+title: 포트폴리오 작업 내역 (2026-05-06 ~ 2026-07-15)
 aliases: [Portfolio KR, 포트폴리오 국문]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-07-14
+updated: 2026-07-15
 ---
 
 # Technical Artist / Pipeline TD 작업 내역 — 국문
 
 > **작성자**: 박지훈 (Ji Hun Park / Junny)
-> **기간**: 2026-05-06 ~ 2026-07-14 (약 10주)
+> **기간**: 2026-05-06 ~ 2026-07-15 (약 10주)
 > **범위**: Autodesk Maya 툴 개발 · 언리얼 엔진 연동 자동화 · MetaHuman 페이셜 · 파이프라인 인프라
 > **규모**: 커밋 299건 · 사내 툴 40여 종 · 전 툴 공용 프레임워크 1식
 > **스택**: Python 3, `maya.cmds` / OpenMaya, PySide2·PySide6(Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF), Houdini Alembic 캐시 연동
@@ -27,7 +27,7 @@ updated: 2026-07-14
 
 ---
 
-## 1. MetaHuman · 페이셜 / 코렉티브 (실사·MetaHuman 파이프라인)
+## 1. MetaHuman 리그 — 페이셜 · 바디 RBF · 코렉티브 (실사·MetaHuman 파이프라인)
 
 ### 1-1. PoseWrangler(언리얼 Pose Driver) 기반 아바타 관절별 의상 주름 코렉티브 자동 생성
 `A00280_correctiveFromCache`
@@ -50,6 +50,25 @@ updated: 2026-07-14
 - **jsonEditor_MH** — MetaHuman 페이셜 정의 JSON의 정렬·편집 도구. RBF 솔버 세팅(보간 방식, 정규화 방식)을 데이터로 관리.
 - **CSV_tool** — ARKit 페이셜 캡처 CSV를 Maya로 임포트해 커브로 굽는 도구.
 - **ARKitCurveTool** — 언리얼의 `Add ARKit Curves to Skeleton` 동작을 분석해 **Maya 측에서 동일 결과를 재현**하는 코드/가이드로 정리.
+
+### 1-4. 페이셜 컨트롤 구성 — blendShape 타겟 → 컨트롤러 어트리뷰트
+`A00145_RigConnect` (Attribute 탭)
+
+- blendShape의 타겟은 일반 어트리뷰트가 아니라 **`weight[]` 멀티에 걸린 별칭(alias)** 이라, 보통의 어트리뷰트 나열로는 첫 타겟 하나만 잡힙니다. `aliasAttr`에서 직접 읽어, **blendShape를 선택하면 Attribute·Connect 탭 양쪽에서 모든 타겟이 이름으로 나열**되게 했습니다.
+- 고른 타겟을 **컨트롤러에 이름 있는 키어블 float 어트리뷰트로 복사**(접두/접미사 옵션, 타입·범위·기본값 보존)하고, Connect 탭으로 **컨트롤러 → blendShape 타겟**을 결선합니다.
+- "이 수십 개 표정 셰이프를 리그 컨트롤로 노출" 하는 작업을, 어트리뷰트와 연결을 하나씩 손으로 추가하는 대신 골라서 복사하는 단계로 바꿨습니다 — 페이셜 컨트롤 리그 구성의 일상적 반복 작업입니다.
+
+### 1-5. MetaHuman 스켈레톤 + 언리얼 RBF 세팅을 비(非)메타휴먼 아바타로 일반화
+`A00270_skinMigrate`, `A00130_ControlRig`, `A00060_jointTool_V02`, `A00145_RigConnect`, `A00090_ConnectionBuilder`
+
+- **목표**: MetaHuman에서 검증된 리그 접근 — 그 **본 구조**와 **언리얼 RBF(PoseWrangler) Pose Driver** 세팅 — 을 **다른 실사·카툰풍 아바타**에 그대로 세워, 언리얼까지 세팅합니다.
+- 이 스크립트들은 **선택·JSON 규칙 기반이라 메타휴먼에 하드코딩돼 있지 않으므로**, 동일 파이프라인을 임의 캐릭터로 리타겟할 수 있습니다.
+  - **커스텀 메시에 스켈레톤 얹기** — 조인트 구조를 생성·오리엔트(`A00060_jointTool_V02`, `A00130_ControlRig`의 부위별 매칭)하고, 토폴로지가 다른 메시로 **본 리매핑과 함께 스킨을 전이**(`A00270_skinMigrate`).
+  - **리그 결선** — 매칭 / 컨스트레인트 / 어트리뷰트 복사 / 최근접 연결로 새 리그를 레퍼런스에 정렬(`A00145_RigConnect`).
+  - **바디/관절 RBF** — 소스/타겟 리스트로부터 **RBF 솔버 → 드라이버 → 코렉티브** 어트리뷰트를 JSON 규칙으로 결선(`A00090_ConnectionBuilder`). 배포 규칙이 **바디-림**(`WRK_thigh / calf / lowerarm_l/r`) 코렉티브라, 동일한 RBF 결선을 **메타휴먼 얼굴을 넘어** 재사용합니다.
+  - **언리얼로** — 엔진에서 **PoseWrangler**로 RBF Pose Driver를 오소링해, 포즈 구동 변형이 대상 스켈레톤 위에서 엔진 내에서 살아 돌아가게 합니다.
+- **결과**: MetaHuman 수준의 **포즈 구동 변형(RBF)** 을 **비메타휴먼 실사·카툰 아바타에서 반복 가능**하게 만들었습니다. 엔진 플러그인을 짜거나 캐릭터마다 RBF를 손으로 다시 세팅할 필요가 없습니다.
+- **키워드**: RBF Pose Driver, PoseWrangler, 스켈레톤 리타겟, 토폴로지 간 스킨 전이, Control Rig, 아바타 비의존 리그 파이프라인, Maya → Unreal
 
 ---
 
@@ -86,7 +105,7 @@ updated: 2026-07-14
 
 | 툴 | 내용 |
 |----|------|
-| `A00145_RigConnect` | **리깅 연결 작업 통합 툴**. 레거시 MEL 툴(ConnectionTool·Match Tool) 2종을 Qt로 흡수 통합. 매칭(T/R/S/Parent 옵션), 매트릭스 컨스트레인트, 최근접 오브젝트 연결, **스킨 웨이트 → 컨스트레인트 변환**, 오프셋(제로아웃) 그룹 일괄 생성, **기존 컨스트레인트를 다른 오브젝트로 이관**하는 Constraint Transfer 등 |
+| `A00145_RigConnect` | **리깅 연결 작업 통합 툴**. 레거시 MEL 툴(ConnectionTool·Match Tool) 2종을 Qt로 흡수 통합. 매칭(T/R/S/Parent 옵션), 매트릭스 컨스트레인트, 최근접 오브젝트 연결, **스킨 웨이트 → 컨스트레인트 변환**(Parent/Scale/Point/Orient), 오프셋(제로아웃) 그룹 일괄 생성, **기존 컨스트레인트를 다른 오브젝트로 이관**하는 Constraint Transfer, 그리고 선택한 어트리뷰트를 접두/접미사를 붙여 다른 오브젝트에 복제하는 **Attribute 탭**(타입·범위·기본값·키어블 보존, blendShape 타겟 포함 — 1-4 참고) 등 |
 | `A00270_skinMigrate` | **토폴로지가 다른 메시 간 스킨 웨이트 전이 + 본 재매핑**을 원클릭으로. 레거시 2버튼 UI도 Classic 탭으로 보존 |
 | `A00060_jointTool_V02` | 레거시 MEL JointTool을 Qt로 통합. 커브 기반/분할 조인트 생성(월드 절대좌표 기준), 트위스트 전용 Aim 리디자인, 미사용 조인트 선택기 |
 | `A00120_FKIK`, `A00190_FKIK_General_Tool` | FK/IK 스위칭 및 베이크. 네이티브 `bakeResults` 도입으로 프레임 루프 대비 성능 개선, **구간 밖 키·애님 레이어 포즈를 훼손하지 않는** 컨스트레인트리스 베이크로 수정 |

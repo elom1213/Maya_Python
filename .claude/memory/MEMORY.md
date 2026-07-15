@@ -13,6 +13,7 @@
 - [UI text English-only](ui-text-english-only.md) — all UI-facing strings (buttons, logs, messages) must be English; Korean only in comments/docstrings
 - [Explain in Korean](explain-in-korean.md) — write explanations/conversational replies to the user in Korean (code/UI text stay English)
 - [Push target Dnable/dev](push-target-dnable-dev.md) — default git push goes to Dnable_repo remote, dev branch (not origin)
+- [Clean commit message (no stray chars)](clean-commit-message-no-stray-chars.md) — verify + fix commit msg before committing (recent commits leaked a leading `@` from using PowerShell `@'...'@` heredoc in the Bash tool); use tool-correct multiline syntax + check `git log -1`
 - [Memory synced via repo](memory-synced-via-repo.md) — memory lives in repo `.claude/memory` (junctioned from ~/.claude/projects/<hash>/memory); commit+push memory changes to share across PCs
 - [Standalone taskbar icon method](standalone-taskbar-icon-method.md) — how to give a standalone PySide tool a Windows taskbar icon (SVG→QtSvg multi-size .ico + AppUserModelID before QApplication); guide in docs/taskbar_icon_guide.md
 - [TSL UUID selection](wip-tsl-uuid-selection.md) — branch dev_tsl (Maya check pending): MOD_tsl_qt_v01 stores (uuid, component) per item so list→scene selection survives rename/reparent/dup names; affects all 18 tools using the shared TSL
@@ -25,6 +26,7 @@
 - [JUN_mgear vault](jun-mgear-vault.md) — mgear study notes in JUN_mgear Obsidian vault, synced to elom1213/JUN_mgear (main branch, pushes as cached elom1213 creds)
 - [Prefer PySide for new tools](prefer-pyside-for-new-tools.md) — user may require new/merged Maya tools use PySide(Qt) UI (arch B, clone A00110), not maya.cmds UI
 - [WORKLOG maintenance](worklog-maintenance.md) — daily git-derived work journal at JUN_All/docs/WORKLOG.md; how to update it (manual, newest-first, Obsidian+GitHub compatible)
+- [Update portfolio on tool work](update-portfolio-on-tool-work.md) — "포트폴리오 문서" = portfolio_EN.md + portfolio_KR.md; "포트폴리오 문서 갱신해" = update BOTH (synced EN/KR). Also reflect portfolio-worthy content after tool work; appeal axes: MetaHuman/character rigging, rigging/anim Python scripts, Maya↔Unreal rig data conversion; don't touch curated commit-count stat
 - [animLayer no global selected query](animlayer-no-global-selected-query.md) — cmds.animLayer(q,selected) needs a layer arg; iterate cmds.ls(type=animLayer) to find selected layers
 - [standalone app package collision](standalone-app-package-collision.md) — standalone Qt tools must import via tools.<tool>.app.* + relative imports, never bare `app`, or two tools collide in one interpreter
 - [UUID-safe rename (duplicate names)](uuid-safe-rename-duplicate-names.md) — rename/DAG tools break on duplicate scene names (TSL stores short names); hold nodes by UUID (_to_uuid/_rename_by_uuid). Invoke: "UUID 기반 리네임 패턴 적용해줘"
