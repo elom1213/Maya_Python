@@ -80,22 +80,26 @@ def list_attrs(obj, search=""):
         if bs_targets and attr == "weight":
             continue
 
-        full = "{0}.{1}".format(obj, attr)
-
-        # getNextFreeMultiIndex 는 multi 어트리뷰트에서만 성공한다.
-        # 성공하면 multi 로 보고 자식까지 펼치고, 실패(예외)하면 일반 어트리뷰트로 추가.
+        # multi 여부를 attributeQuery 로 조용히 판정한다. 예전엔 모든 어트리뷰트에
+        # getNextFreeMultiIndex 를 호출했는데, 그 MEL 은 non-multi(스칼라)에서 `attr[0]` 을
+        # 찾다 실패해 "No object matches name" 에러를 어트리뷰트 개수만큼 출력했다(catch 해도
+        # 출력은 남음). multi 로 확정된 것만 getNextFreeMultiIndex 로 펼치면 결과는 같고 조용하다.
         try:
-            idx = mel.eval('getNextFreeMultiIndex("{0}", 0)'.format(full))
-            is_multi = True
+            is_multi = bool(cmds.attributeQuery(attr, node=obj, multi=True))
         except Exception:
             is_multi = False
 
         if not is_multi:
             result.append(attr)
         else:
-            children = cmds.listAttr(
-                "{0}.{1}[{2}]".format(obj, attr, idx), multi=True) or []
-            result.extend(children)
+            full = "{0}.{1}".format(obj, attr)
+            try:
+                idx = mel.eval('getNextFreeMultiIndex("{0}", 0)'.format(full))
+                children = cmds.listAttr(
+                    "{0}[{1}]".format(full, idx), multi=True) or []
+            except Exception:
+                children = []
+            result.extend(children if children else [attr])
 
     # 별칭이 raw 에도 섞여 나올 수 있어 순서를 유지한 채 중복을 제거한다.
     seen = set()
