@@ -13,8 +13,9 @@ from .attach_curve import (
 )
 from .stretch import (
     build_stretch as run_build_stretch,
-    FUNCTIONS, FUNC_POS, FUNC_NEG,
+    FUNCTIONS, FUNC_POS, FUNC_NEG, FUNC_SIGMOID, FUNC_SIGMOID_REV, SIGMOID_FUNCTIONS,
     INFINITY_TYPES, DEFAULT_INFINITY,
+    DEFAULT_BASE, DEFAULT_THRESHOLD_MIN, DEFAULT_THRESHOLD_MAX,
 )
 
 __all__ = [
@@ -23,6 +24,8 @@ __all__ = [
     "run_build_spherical", "run_build_nodes",
     "run_attach_to_closest", "run_attach_uniform", "AIM_AXES", "DRIVER_TYPES",
     "run_build_stretch",
-    "FUNCTIONS", "FUNC_POS", "FUNC_NEG",
+    "FUNCTIONS", "FUNC_POS", "FUNC_NEG", "FUNC_SIGMOID", "FUNC_SIGMOID_REV",
+    "SIGMOID_FUNCTIONS",
     "INFINITY_TYPES", "DEFAULT_INFINITY",
+    "DEFAULT_BASE", "DEFAULT_THRESHOLD_MIN", "DEFAULT_THRESHOLD_MAX",
 ]

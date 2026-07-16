@@ -21,7 +21,8 @@ from tools.A00170_driverTool.app.core import (
     run_build_slerp, run_build_wave,
     run_build_spherical, run_build_nodes,
     run_attach_to_closest, run_attach_uniform, AIM_AXES, DRIVER_TYPES,
-    run_build_stretch, FUNCTIONS, INFINITY_TYPES, DEFAULT_INFINITY,
+    run_build_stretch, FUNCTIONS, SIGMOID_FUNCTIONS, INFINITY_TYPES, DEFAULT_INFINITY,
+    DEFAULT_BASE, DEFAULT_THRESHOLD_MIN, DEFAULT_THRESHOLD_MAX,
 )
 
 
@@ -891,42 +892,83 @@ class MainWindow(QWidget):
         self.stc_cb_func = QComboBox()
         self.stc_cb_func.addItems(list(FUNCTIONS))
         self.stc_cb_func.setToolTip(
-            "a = current value of the Default Distance attribute.\n"
-            "f(x) = x - a + 1 : slope +1 (output grows as the driver grows).\n"
-            "f(x) = -x + a + 1 : slope -1 (output shrinks as the driver grows).\n"
-            "Both pass through (a, 1) so the output is 1 at rest.")
+            "a = Default Distance attr value, original = Stretch attr value at build.\n"
+            "All modes keep the Stretch attr's original value at rest (driver = a).\n"
+            "f(x)=x-a+1 : slope +1 linear (grows as the driver grows).\n"
+            "f(x)=-x+a+1 : slope -1 linear (shrinks as the driver grows).\n"
+            "Sigmoid (x-:max, x+:min): S-curve; driver -> -inf converges to Threshold\n"
+            "   Max, driver -> +inf converges to Threshold Min (>=0). Passes (a, original).\n"
+            "Sigmoid rev: same but the two directions are swapped.")
+        self.stc_cb_func.currentIndexChanged.connect(self._stc_sync_func_enabled)
         row.addWidget(self.stc_cb_func, stretch=1)
         opt_layout.addLayout(row)
 
+        # Pre/Post Infinity (linear modes only)
         row = QHBoxLayout()
         row.addWidget(QLabel("Pre Infinity"))
         self.stc_cb_pre = QComboBox()
         self.stc_cb_pre.addItems(list(INFINITY_TYPES))
         self.stc_cb_pre.setCurrentText(DEFAULT_INFINITY)
         self.stc_cb_pre.setToolTip(
-            "Curve behaviour left of the first key (driver < a). "
-            "'Cycle with Offset' keeps the line straight (linear function).")
+            "Linear modes only. Curve behaviour left of the first key (driver < a). "
+            "'Cycle with Offset' keeps the line straight.")
         row.addWidget(self.stc_cb_pre)
         row.addWidget(QLabel("Post Infinity"))
         self.stc_cb_post = QComboBox()
         self.stc_cb_post.addItems(list(INFINITY_TYPES))
         self.stc_cb_post.setCurrentText(DEFAULT_INFINITY)
         self.stc_cb_post.setToolTip(
-            "Curve behaviour right of the last key (driver > a+1). "
-            "'Cycle with Offset' keeps the line straight (linear function).")
+            "Linear modes only. Curve behaviour right of the last key (driver > a+1). "
+            "'Cycle with Offset' keeps the line straight.")
         row.addWidget(self.stc_cb_post)
         row.addStretch(1)
         opt_layout.addLayout(row)
+
+        # Sigmoid params (sigmoid modes only)
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Sharpness"))
+        self.stc_dsb_base = QDoubleSpinBox()
+        self.stc_dsb_base.setDecimals(4)
+        self.stc_dsb_base.setRange(1.0001, 1000000.0)
+        self.stc_dsb_base.setValue(DEFAULT_BASE)
+        self.stc_dsb_base.setFixedWidth(90)
+        self.stc_dsb_base.setToolTip(
+            "Sigmoid only. Base of the exponent (the 'e' in 1/(1+e^-x)); higher = "
+            "sharper transition. Default e ~ 2.7183. Must be > 1.")
+        row.addWidget(self.stc_dsb_base)
+        row.addWidget(QLabel("Thresh Min"))
+        self.stc_dsb_tmin = QDoubleSpinBox()
+        self.stc_dsb_tmin.setDecimals(3)
+        self.stc_dsb_tmin.setRange(0.0, 1000000.0)
+        self.stc_dsb_tmin.setValue(DEFAULT_THRESHOLD_MIN)
+        self.stc_dsb_tmin.setFixedWidth(80)
+        self.stc_dsb_tmin.setToolTip(
+            "Sigmoid only. Plateau the output converges to on the 'min' side. "
+            "Min is 0 so the driven value never goes below 0.")
+        row.addWidget(self.stc_dsb_tmin)
+        row.addWidget(QLabel("Thresh Max"))
+        self.stc_dsb_tmax = QDoubleSpinBox()
+        self.stc_dsb_tmax.setDecimals(3)
+        self.stc_dsb_tmax.setRange(0.0, 1000000.0)
+        self.stc_dsb_tmax.setValue(DEFAULT_THRESHOLD_MAX)
+        self.stc_dsb_tmax.setFixedWidth(80)
+        self.stc_dsb_tmax.setToolTip(
+            "Sigmoid only. Plateau the output converges to on the 'max' side. "
+            "The Stretch attr's original value must lie strictly between Min and Max.")
+        row.addWidget(self.stc_dsb_tmax)
+        row.addStretch(1)
+        opt_layout.addLayout(row)
         root.addWidget(opt_group)
+
+        self._stc_sync_func_enabled()
 
         # Apply
         self.stc_btn_apply = QPushButton("Apply Stretch")
         self.stc_btn_apply.setMinimumHeight(34)
         self.stc_btn_apply.setToolTip(
-            "Create a set driven key per pair: Default Distance attr drives the "
-            "Stretch attr through the chosen linear function. An addDoubleLinear "
-            "offset node makes it additive on the Stretch attr's original value "
-            "(unchanged at rest). One undo step.")
+            "Build a driver network per pair: the Default Distance attr drives the "
+            "Stretch attr through the chosen function (linear or sigmoid). Every mode "
+            "keeps the Stretch attr's original value at rest (driver = a). One undo step.")
         self.stc_btn_apply.clicked.connect(self.on_stc_apply)
         root.addWidget(self.stc_btn_apply)
 
@@ -1018,6 +1060,15 @@ class MainWindow(QWidget):
         self._log("Search '{0}' : re-listed {1} attribute(s) from {2}.".format(
             token, len(attrs), first))
 
+    def _stc_sync_func_enabled(self, *args):
+        """선택한 Function 에 따라 infinity(선형 전용)/sigmoid 파라미터 활성 상태 토글."""
+        is_sigmoid = self.stc_cb_func.currentText() in SIGMOID_FUNCTIONS
+        self.stc_cb_pre.setEnabled(not is_sigmoid)
+        self.stc_cb_post.setEnabled(not is_sigmoid)
+        self.stc_dsb_base.setEnabled(is_sigmoid)
+        self.stc_dsb_tmin.setEnabled(is_sigmoid)
+        self.stc_dsb_tmax.setEnabled(is_sigmoid)
+
     def on_stc_apply(self):
         self._log("--- Apply Stretch ---")
         def_objs = self.stc_def_objs_tsl.get_all_nodes()
@@ -1049,26 +1100,36 @@ class MainWindow(QWidget):
         func = self.stc_cb_func.currentText()
         pre_inf = self.stc_cb_pre.currentText()
         post_inf = self.stc_cb_post.currentText()
+        is_sigmoid = func in SIGMOID_FUNCTIONS
+        base = self.stc_dsb_base.value()
+        tmin = self.stc_dsb_tmin.value()
+        tmax = self.stc_dsb_tmax.value()
 
         with undo_chunk():
             try:
                 built, skipped = run_build_stretch(
                     default_pairs, stretch_pairs, func=func,
-                    pre_infinity=pre_inf, post_infinity=post_inf)
+                    pre_infinity=pre_inf, post_infinity=post_inf,
+                    base=base, threshold_min=tmin, threshold_max=tmax)
             except Exception as exc:
                 self._log("[ERROR] Apply Stretch failed: {0}".format(exc))
                 return
 
         mode = "1:n" if len(default_pairs) == 1 else "n:n"
+        if is_sigmoid:
+            detail = "base {base:.4f} | thresholds [{tmin:g}, {tmax:g}]".format(
+                base=base, tmin=tmin, tmax=tmax)
+        else:
+            detail = "pre '{pre}' / post '{post}'".format(pre=pre_inf, post=post_inf)
         self._log(
-            "Stretch built: {n} driven key(s) | {mode} | {func} | "
-            "pre '{pre}' / post '{post}' | additive on original".format(
-                n=len(built), mode=mode, func=func, pre=pre_inf, post=post_inf))
-        for driver_plug, driven_plug, a, original, offset in built:
+            "Stretch built: {n} node network(s) | {mode} | {func} | {detail} | "
+            "rest = original".format(
+                n=len(built), mode=mode, func=func, detail=detail))
+        for driver_plug, driven_plug, a, original, node in built:
             self._log("  {driver} (a={a:.4f}) -> {driven} "
-                      "(rest={o:.4f}, +{offset})".format(
+                      "(rest={o:.4f}, {node})".format(
                           driver=driver_plug, a=a, driven=driven_plug,
-                          o=original, offset=offset))
+                          o=original, node=node))
         for driven_plug, reason in skipped:
             self._log("[WARN] Skipped {0}: {1}".format(driven_plug, reason))
 
@@ -1111,13 +1172,16 @@ class MainWindow(QWidget):
             "\n"
             "[Stretch] (ported from ref StretchTool.mel + refactor)\n"
             "- Apply Stretch: the Default Distance attr (value a) drives each Stretch\n"
-            "  attr through a set driven key. The animCurve is a straight line with\n"
-            "  linear tangents and user-set pre/post infinity (default Cycle w/ Offset\n"
-            "  both sides). Function: f(x)=x-a+1 (slope +1) or f(x)=-x+a+1 (slope -1),\n"
-            "  both through (a, 1). One Default -> all Stretch (1:n), else paired n:n.\n"
-            "  Additive: an addDoubleLinear offset node keeps the Stretch attr's\n"
-            "  original value at rest (driven = original + (x-a)), so the value\n"
-            "  grows/shrinks from where it already was instead of being overwritten.\n"
+            "  attr. Every mode keeps the Stretch attr's original value at rest\n"
+            "  (driver = a -> driven = original). One Default -> all Stretch (1:n),\n"
+            "  else paired n:n.\n"
+            "  - Linear f(x)=x-a+1 / -x+a+1: animCurveUU (linear tangents, user pre/post\n"
+            "    infinity, default Cycle w/ Offset) + an addDoubleLinear offset makes it\n"
+            "    additive: driven = original + (x-a) / (a-x).\n"
+            "  - Sigmoid / Sigmoid rev: analytic node network (multiplyDivide power etc.).\n"
+            "    An S-curve through (a, original) converging to Threshold Max / Min\n"
+            "    (Min >= 0 so it never goes below 0). Sharpness = exponent base (the 'e').\n"
+            "    Needs Threshold Min < original < Threshold Max.\n"
             "\n"
             "Each build is one undo step. All UI text is English.\n"
             "\n"

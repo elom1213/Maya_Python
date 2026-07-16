@@ -33,13 +33,15 @@
      full range** ON 이면 `division=count-1`(양 끝 정확히 포함, 열린 커브용), OFF 면 `division=count`
      (마지막이 끝 직전에서 멈춤, 주기/닫힌 커브 seam 중복 방지). 어태치 네트워크는 Closest 모드와 동일하다.
 4. **Stretch** — Default Distance 어트리뷰트 값(`a`)을 driver 로, Stretch 오브젝트 어트리뷰트를
-   driven 으로 하는 **set driven key** 를 만든다. driven 커브는 **linear 탄젠트 키 2개 + pre/post
-   infinity** 로 정의되는 1차 함수다. (`ref/ref_01_StretchTool.mel` 의 Stretch 기능 이식 + 리팩토링)
-   - 함수: `f(x)=x-a+1`(기울기 +1) 또는 `f(x)=-x+a+1`(기울기 -1). 둘 다 `(a, 1)` 을 지난다.
-   - **Additive(원래 값 보존)**: 커브를 어트리뷰트에 직접 연결하지 않고 사이에
-     `addDoubleLinear` 오프셋 노드를 끼워 **원래 값 기준으로 additive** 하게 구동한다 —
-     `driven = original + (x-a)`(POS) / `original + (a-x)`(NEG). rest 에서는 원래 값 그대로,
-     driver 가 `a` 에서 멀어질수록 그 값에서 늘거나 준다(예: `translateX` 가 원래 1.5 면 1.5 에서 증감).
+   driven 으로 구동하는 네트워크를 만든다. **모든 함수 모드는 rest(driver=`a`)에서 driven = 원래 값**
+   을 보존한다. (`ref/ref_01_StretchTool.mel` 의 Stretch 기능 이식 + 리팩토링)
+   - **선형** `f(x)=x-a+1`(기울기 +1) / `-x+a+1`(기울기 -1): `animCurveUU`(linear 탄젠트, pre/post
+     infinity) + `addDoubleLinear` 오프셋으로 additive — `driven = original + (x-a)` / `(a-x)`.
+     rest 에서 원래 값, driver 가 `a` 에서 멀어질수록 그 값에서 증감(예: `translateX` 원래 1.5 → 1.5 에서).
+   - **시그모이드** `Sigmoid` / `Sigmoid rev`: 해석적 **노드망**(`multiplyDivide` power 등). `(a, original)`
+     을 지나는 S 곡선으로 한쪽은 `Threshold Max`, 반대쪽은 `Threshold Min`(≥0 → 0 밑으로 안 감)에 수렴.
+     `Sharpness`(지수의 밑 = `1/(1+e^-x)` 의 e, 클수록 급격)·threshold 를 사용자가 지정.
+     `Threshold Min < 원래 값 < Threshold Max` 여야 한다.
    - Default 가 1개면 그 하나로 모든 Stretch 를 구동(1:n), 아니면 순서쌍 n:n(min 길이).
 
 > **통합 방침**: 핵심 로직은 두 원본의 `app/core`(`slerp_ramp.py`, `spherical_drive.py`)를
@@ -171,18 +173,28 @@ A00170_driverTool/
      driver 로 쓸 어트리뷰트 **하나를 선택**. 그 어트리뷰트의 **현재 값이 `a`**(빌드 시점 스냅샷)다.
 2. **Stretch Object** 그룹 — driven. 같은 방식으로 오브젝트와 어트리뷰트 하나를 지정.
 3. **Function / Infinity**:
-   - **Function**: `f(x)=x-a+1`(거리가 멀수록 값 증가) 또는 `f(x)=-x+a+1`(멀수록 감소).
-     둘 다 `(a, 1)` 을 지난다.
-   - **Pre Infinity / Post Infinity**(각각 기본 **Cycle with Offset**): driven 커브의 키 범위
-     바깥 동작. 양쪽 모두 **Cycle with Offset** 이면 함수가 전 구간 직선이 된다. `Constant`/`Linear`/
-     `Cycle`/`Oscillate` 도 선택 가능.
-4. **Apply Stretch** 클릭 → 짝마다 `driver.attr → animCurveUU → addDoubleLinear(+original-1) →
-   driven.attr` 를 만든다. **오프셋 노드 덕분에 driven 어트리뷰트의 원래 값이 rest 에서 보존**되고
-   그 값 기준으로 additive 하게 증감한다. Default 1개면 1:n, 아니면 n:n. 로그에
-   `driver (a=..) -> driven (rest=.., +offsetNode)` 와 skip 사유가 출력된다.
+   - **Function**: 네 가지.
+     - `f(x)=x-a+1` / `-x+a+1` — 선형(멀수록 증가/감소).
+     - `Sigmoid (x-:max, x+:min)` — driver 가 `-`쪽이면 `Threshold Max` 로 증가·수렴,
+       `+`쪽이면 `Threshold Min` 으로 감소·수렴.
+     - `Sigmoid rev (x-:min, x+:max)` — 위와 방향 반대.
+   - **Pre Infinity / Post Infinity**(선형 전용, 각각 기본 **Cycle with Offset**): driven 커브의 키
+     범위 밖 동작. 양쪽 모두 **Cycle with Offset** 이면 전 구간 직선. `Constant`/`Linear`/`Cycle`/
+     `Oscillate` 도 가능. *(시그모이드 선택 시 비활성)*
+   - **Sharpness / Thresh Min / Thresh Max**(시그모이드 전용): `Sharpness` 는 지수의 밑
+     (`1/(1+e^-x)` 의 e, 기본 `e≈2.7183`, 클수록 급격, `>1`). `Thresh Min`(≥0) / `Thresh Max` 는
+     수렴 plateau. **원래 값이 두 threshold 사이(strict)** 여야 한다. *(선형 선택 시 비활성)*
+4. **Apply Stretch** 클릭 → 짝마다 driver 로 driven 을 구동하는 네트워크를 만든다.
+   - 선형: `driver.attr → animCurveUU → addDoubleLinear(+original-1) → driven.attr`.
+   - 시그모이드: `driver.attr → (addDoubleLinear/multDoubleLinear/multiplyDivide[power·divide]) →
+     driven.attr` 로 `driven = tmin + (tmax-tmin)/(1 + base^(±(x-a)+L))`, `L = log_base((tmax-original)
+     /(original-tmin))` 로 `(a, original)` 통과 보장.
+   - 어느 모드든 **rest 에서 driven = 원래 값**. Default 1개면 1:n, 아니면 n:n. 로그에
+     `driver (a=..) -> driven (rest=.., 노드)` 와 skip 사유가 출력된다.
 
-> driven 어트리뷰트의 **원래 값은 커브를 연결하기 전에 스냅샷**한다(연결 후에는 구동값이라 못 읽음).
+> driven 어트리뷰트의 **원래 값은 네트워크를 연결하기 전에 스냅샷**한다(연결 후에는 구동값이라 못 읽음).
 > 컴파운드(예: `translate`)는 스칼라가 아니라 skip 하고 `[WARN]` — 리프 어트리뷰트(`translateX` 등)를 고른다.
+> 시그모이드에서 원래 값이 threshold 범위 밖이면 그 짝만 skip 하고 `[WARN]`(범위를 넓히거나 값을 조정).
 
 > **원본(`ref_01_StretchTool.mel`) 대비 개선**: ① pre/post infinity 를 **둘 다 사용자 지정**(원본은
 > post=Cycle w/ Offset, pre=Constant 고정이라 rest 이하가 직선이 아니었다). ② 탄젠트를 **auto→linear**.
