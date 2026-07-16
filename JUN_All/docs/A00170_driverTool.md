@@ -41,7 +41,9 @@
    - **시그모이드** `Sigmoid` / `Sigmoid rev`: 해석적 **노드망**(`multiplyDivide` power 등). `(a, original)`
      을 지나는 S 곡선으로 한쪽은 `Threshold Max`, 반대쪽은 `Threshold Min`(≥0 → 0 밑으로 안 감)에 수렴.
      `Sharpness`(지수의 밑 = `1/(1+e^-x)` 의 e, 클수록 급격)·threshold 를 사용자가 지정.
-     `Threshold Min < 원래 값 < Threshold Max` 여야 한다.
+     `Threshold Min < 원래 값 < Threshold Max` 여야 한다. **이 세 값은 Default Distance 오브젝트에
+     어트리뷰트(`stretchSharpness`/`stretchThreshMin`/`stretchThreshMax`)로 추가·연결되어 씬에서 실시간 조절**된다.
+   - **Stretch 어트리뷰트는 여러 개 선택 가능** — 선택한 모든 어트리뷰트에 동일하게 적용된다.
    - Default 가 1개면 그 하나로 모든 Stretch 를 구동(1:n), 아니면 순서쌍 n:n(min 길이).
 
 > **통합 방침**: 핵심 로직은 두 원본의 `app/core`(`slerp_ramp.py`, `spherical_drive.py`)를
@@ -171,7 +173,9 @@ A00170_driverTool/
    - **Objects** 리스트에 driver 오브젝트를 추가.
    - **List Attributes** 로 첫 오브젝트의 어트리뷰트를 채우고(또는 **Attr Search** 토큰으로 검색),
      driver 로 쓸 어트리뷰트 **하나를 선택**. 그 어트리뷰트의 **현재 값이 `a`**(빌드 시점 스냅샷)다.
-2. **Stretch Object** 그룹 — driven. 같은 방식으로 오브젝트와 어트리뷰트 하나를 지정.
+2. **Stretch Object** 그룹 — driven. 같은 방식으로 오브젝트와 **어트리뷰트를 하나 이상** 선택한다
+   (여러 개 선택하면 선택한 모든 어트리뷰트에 같은 함수가 적용된다). **Attr Search** 로 재질의해
+   여러 개가 발견되면 **발견된 것 모두 선택**된다.
 3. **Function / Infinity**:
    - **Function**: 네 가지.
      - `f(x)=x-a+1` / `-x+a+1` — 선형(멀수록 증가/감소).
@@ -184,17 +188,22 @@ A00170_driverTool/
    - **Sharpness / Thresh Min / Thresh Max**(시그모이드 전용): `Sharpness` 는 지수의 밑
      (`1/(1+e^-x)` 의 e, 기본 `e≈2.7183`, 클수록 급격, `>1`). `Thresh Min`(≥0) / `Thresh Max` 는
      수렴 plateau. **원래 값이 두 threshold 사이(strict)** 여야 한다. *(선형 선택 시 비활성)*
+     이 세 값은 **Default Distance 오브젝트에 어트리뷰트로 추가**되어(기본값=UI 값) 네트워크에 연결되므로
+     빌드 후 **씬(채널박스)에서 실시간으로 조절**할 수 있다(driver 오브젝트당 한 벌, 그 driver 의 모든
+     시그모이드가 공유).
 4. **Apply Stretch** 클릭 → 짝마다 driver 로 driven 을 구동하는 네트워크를 만든다.
    - 선형: `driver.attr → animCurveUU → addDoubleLinear(+original-1) → driven.attr`.
-   - 시그모이드: `driver.attr → (addDoubleLinear/multDoubleLinear/multiplyDivide[power·divide]) →
-     driven.attr` 로 `driven = tmin + (tmax-tmin)/(1 + base^(±(x-a)+L))`, `L = log_base((tmax-original)
-     /(original-tmin))` 로 `(a, original)` 통과 보장.
-   - 어느 모드든 **rest 에서 driven = 원래 값**. Default 1개면 1:n, 아니면 n:n. 로그에
-     `driver (a=..) -> driven (rest=.., 노드)` 와 skip 사유가 출력된다.
+   - 시그모이드: `driver.attr → 노드망 → driven.attr` 로
+     `driven = tmin + (tmax-tmin)/(1 + ratio·base^(±(x-a)))`, `ratio = (tmax-original)/(original-tmin)`.
+     `base^L = ratio` 라 로그 없이 `ratio` 를 곱해 `(a, original)` 통과를 보장하므로, `base`·`tmax`·`tmin`
+     을 상수로 굳히지 않고 **위 제어 어트리뷰트에 연결**해도 항상 `driven(a)=original` 이 유지된다.
+   - 어느 모드든 **rest 에서 driven = 원래 값**. Default 1개면 1:n, 아니면 n:n(선택한 어트리뷰트 수만큼
+     짝마다 반복). 로그에 `driver (a=..) -> driven (rest=.., 노드)` 와 skip 사유가 출력된다.
 
 > driven 어트리뷰트의 **원래 값은 네트워크를 연결하기 전에 스냅샷**한다(연결 후에는 구동값이라 못 읽음).
 > 컴파운드(예: `translate`)는 스칼라가 아니라 skip 하고 `[WARN]` — 리프 어트리뷰트(`translateX` 등)를 고른다.
 > 시그모이드에서 원래 값이 threshold 범위 밖이면 그 짝만 skip 하고 `[WARN]`(범위를 넓히거나 값을 조정).
+> 씬에서 제어 어트리뷰트를 원래 값이 범위를 벗어나도록 바꾸면 `(a, original)` 통과가 깨질 수 있으니 주의.
 
 > **원본(`ref_01_StretchTool.mel`) 대비 개선**: ① pre/post infinity 를 **둘 다 사용자 지정**(원본은
 > post=Cycle w/ Offset, pre=Constant 고정이라 rest 이하가 직선이 아니었다). ② 탄젠트를 **auto→linear**.
