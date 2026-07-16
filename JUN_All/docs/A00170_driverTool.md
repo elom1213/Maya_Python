@@ -4,8 +4,8 @@
 
 리깅 **드라이버 셋업**(메인 컨트롤러 어트리뷰트로 구동되는 노드 네트워크)을 만드는 PySide(Qt)
 툴이다. 워크플로가 거의 동일한 두 기존 툴(`A00150_remapVal`, `A00160_sphericalEye`)을
-`A00110_animTool` 과 같은 **하나의 창 + 탭** 구조로 통합하고, 커브 어태치 기능(`AttachCrv`)을 더했다.
-**세 개의 탭**과 **공유 로그창**으로 구성된다.
+`A00110_animTool` 과 같은 **하나의 창 + 탭** 구조로 통합하고, 커브 어태치(`AttachCrv`)와
+스트레치 드라이버(`Stretch`) 기능을 더했다. **네 개의 탭**과 **공유 로그창**으로 구성된다.
 
 1. **Remap Value** — 컨트롤러 어트리뷰트로 여러 오브젝트의 어트리뷰트를 `remapValue` 곡선을 따라
    보간/전파한다. (구 `A00150_remapVal`)
@@ -32,6 +32,15 @@
      배치·어태치한다. 파라미터는 ref 의 `makeParameterValueList` 그대로 구한다 — **Distribute across
      full range** ON 이면 `division=count-1`(양 끝 정확히 포함, 열린 커브용), OFF 면 `division=count`
      (마지막이 끝 직전에서 멈춤, 주기/닫힌 커브 seam 중복 방지). 어태치 네트워크는 Closest 모드와 동일하다.
+4. **Stretch** — Default Distance 어트리뷰트 값(`a`)을 driver 로, Stretch 오브젝트 어트리뷰트를
+   driven 으로 하는 **set driven key** 를 만든다. driven 커브는 **linear 탄젠트 키 2개 + pre/post
+   infinity** 로 정의되는 1차 함수다. (`ref/ref_01_StretchTool.mel` 의 Stretch 기능 이식 + 리팩토링)
+   - 함수: `f(x)=x-a+1`(기울기 +1) 또는 `f(x)=-x+a+1`(기울기 -1). 둘 다 `(a, 1)` 을 지난다.
+   - **Additive(원래 값 보존)**: 커브를 어트리뷰트에 직접 연결하지 않고 사이에
+     `addDoubleLinear` 오프셋 노드를 끼워 **원래 값 기준으로 additive** 하게 구동한다 —
+     `driven = original + (x-a)`(POS) / `original + (a-x)`(NEG). rest 에서는 원래 값 그대로,
+     driver 가 `a` 에서 멀어질수록 그 값에서 늘거나 준다(예: `translateX` 가 원래 1.5 면 1.5 에서 증감).
+   - Default 가 1개면 그 하나로 모든 Stretch 를 구동(1:n), 아니면 순서쌍 n:n(min 길이).
 
 > **통합 방침**: 핵심 로직은 두 원본의 `app/core`(`slerp_ramp.py`, `spherical_drive.py`)를
 > **수정 없이 복사**해 재사용한다. 두 모듈이 모두 `run_build` 를 정의하므로 `app/core/__init__.py`
@@ -63,11 +72,13 @@ A00170_driverTool/
     │   └── __init__.py         # run_build_slerp / run_build_wave /
     │                           #   run_build_spherical / run_build_nodes /
     │                           #   run_attach_to_closest / run_attach_uniform 재노출
-    └── ui/main_window.py  # 전체 UI (3개 탭 + 공유 로그창 + 메뉴 바)
+    └── ui/main_window.py  # 전체 UI (4개 탭 + 공유 로그창 + 메뉴 바)
 ```
 
 - `main_window.py` 의 위젯/핸들러는 탭별 접두사로 분리한다: **Remap Value = `rmp_*`**,
-  **Spherical Eye = `sph_*`**, **AttachCrv = `atc_*`**. 공유하는 것은 `self._log()`(공용 로그창)뿐이다.
+  **Spherical Eye = `sph_*`**, **AttachCrv = `atc_*`**, **Stretch = `stc_*`**.
+  공유하는 것은 `self._log()`(공용 로그창)뿐이다. Stretch 로직은 `app/core/stretch.py`
+  (`run_build_stretch`)에 있다.
 - `attach_curve.py` 는 노드 생성을 **maya.cmds** 로 한다(pymel 인 다른 두 빌드 모듈과 달리 자족적).
 
 ---
@@ -148,9 +159,44 @@ A00170_driverTool/
 > 어태치는 오브젝트의 `translate`(옵션 `rotate`)에 노드를 **연결**한다. Closest 모드에서 이미
 > 연결/잠금된 채널이 있으면 해당 오브젝트만 실패 처리(로그 경고)하고 나머지는 계속한다.
 
+### 4.4 Stretch
+
+거리(또는 임의의 driver 어트리뷰트)에 따라 다른 오브젝트의 어트리뷰트를 선형으로 구동한다.
+전형적으로 **Default Distance = `distanceDimension` 의 `distance`**, **Stretch = 조인트의
+`scale`/커스텀 attr** 로 쓴다.
+
+1. **Default Distance** 그룹 — driver.
+   - **Objects** 리스트에 driver 오브젝트를 추가.
+   - **List Attributes** 로 첫 오브젝트의 어트리뷰트를 채우고(또는 **Attr Search** 토큰으로 검색),
+     driver 로 쓸 어트리뷰트 **하나를 선택**. 그 어트리뷰트의 **현재 값이 `a`**(빌드 시점 스냅샷)다.
+2. **Stretch Object** 그룹 — driven. 같은 방식으로 오브젝트와 어트리뷰트 하나를 지정.
+3. **Function / Infinity**:
+   - **Function**: `f(x)=x-a+1`(거리가 멀수록 값 증가) 또는 `f(x)=-x+a+1`(멀수록 감소).
+     둘 다 `(a, 1)` 을 지난다.
+   - **Pre Infinity / Post Infinity**(각각 기본 **Cycle with Offset**): driven 커브의 키 범위
+     바깥 동작. 양쪽 모두 **Cycle with Offset** 이면 함수가 전 구간 직선이 된다. `Constant`/`Linear`/
+     `Cycle`/`Oscillate` 도 선택 가능.
+4. **Apply Stretch** 클릭 → 짝마다 `driver.attr → animCurveUU → addDoubleLinear(+original-1) →
+   driven.attr` 를 만든다. **오프셋 노드 덕분에 driven 어트리뷰트의 원래 값이 rest 에서 보존**되고
+   그 값 기준으로 additive 하게 증감한다. Default 1개면 1:n, 아니면 n:n. 로그에
+   `driver (a=..) -> driven (rest=.., +offsetNode)` 와 skip 사유가 출력된다.
+
+> driven 어트리뷰트의 **원래 값은 커브를 연결하기 전에 스냅샷**한다(연결 후에는 구동값이라 못 읽음).
+> 컴파운드(예: `translate`)는 스칼라가 아니라 skip 하고 `[WARN]` — 리프 어트리뷰트(`translateX` 등)를 고른다.
+
+> **원본(`ref_01_StretchTool.mel`) 대비 개선**: ① pre/post infinity 를 **둘 다 사용자 지정**(원본은
+> post=Cycle w/ Offset, pre=Constant 고정이라 rest 이하가 직선이 아니었다). ② 탄젠트를 **auto→linear**.
+> ③ 두 번째 키를 `2a`→`a+1` 로 바꿔 **실제로 `f(x)=x-a+1`** 이 되게 하고(원본은 기울기 `1/a`), `a=0`
+> 에서 두 키 입력이 겹쳐 커브가 깨지거나 `a<0` 에서 기울기 부호가 뒤집히던 문제를 없앴다.
+> ④ `setDrivenKeyframe` 2회로 커브를 직접 만들어 `connectionInfo` 재조회를 제거. ⑤ 존재/self-drive/
+> 스칼라 여부 **입력 검증** 추가(headless mayapy 로 함수 일치·infinity·탄젠트 검증 완료).
+>
+> 참고: 원본 MEL 의 **Distance 탭**(`distanceDimension` 생성)은 이식하지 않았다. 필요하면 Maya 의
+> 기본 Distance Tool 또는 별도 유틸을 쓴다.
+
 ---
 
 ## 5. 로그 / About
 
-- 세 탭의 모든 결과·경고(`[WARN]`)·오류(`[ERROR]`)는 창 하단의 **공유 로그창**에 누적된다.
-- **Help > About** 에 세 탭의 빌드 모드 설명이 함께 표기된다.
+- 네 탭의 모든 결과·경고(`[WARN]`)·오류(`[ERROR]`)는 창 하단의 **공유 로그창**에 누적된다.
+- **Help > About** 에 네 탭의 빌드 모드 설명이 함께 표기된다.

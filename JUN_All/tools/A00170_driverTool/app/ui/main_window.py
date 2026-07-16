@@ -21,6 +21,7 @@ from tools.A00170_driverTool.app.core import (
     run_build_slerp, run_build_wave,
     run_build_spherical, run_build_nodes,
     run_attach_to_closest, run_attach_uniform, AIM_AXES, DRIVER_TYPES,
+    run_build_stretch, FUNCTIONS, INFINITY_TYPES, DEFAULT_INFINITY,
 )
 
 
@@ -73,6 +74,7 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_remap_tab(), "Remap Value")
         self.tabs.addTab(self._build_spherical_tab(), "Spherical Eye")
         self.tabs.addTab(self._build_attach_tab(), "AttachCrv")
+        self.tabs.addTab(self._build_stretch_tab(), "Stretch")
         main_layout.addWidget(self.tabs)
 
         # 로그창을 탭 아래에 배치
@@ -855,6 +857,222 @@ class MainWindow(QWidget):
                 set_node))
 
     # ================================================================
+    # Tab : Stretch  (ref/ref_01_StretchTool.mel Stretch 기능 이식 + 리팩토링)
+    # ================================================================
+
+    def _build_stretch_tab(self):
+        """Default Distance 어트리뷰트(a)를 driver 로 Stretch 어트리뷰트를 구동하는 driven key.
+
+        f(x)=x-a+1 또는 -x+a+1 (linear 탄젠트, pre/post infinity 사용자 지정).
+        Default 가 1개면 1:n, 아니면 n:n 으로 짝짓는다(MEL 동작 유지).
+        """
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+
+        # Default Distance (driver) : Objects + Attributes
+        self.stc_def_objs_tsl, self.stc_def_attr_tsl, self.stc_def_search = \
+            self._stretch_obj_attr_group(
+                root, "Default Distance", "def",
+                "Driver objects. The chosen attribute's current value is 'a' "
+                "(the rest distance where the stretch output = 1).")
+
+        # Stretch Object (driven) : Objects + Attributes
+        self.stc_str_objs_tsl, self.stc_str_attr_tsl, self.stc_str_search = \
+            self._stretch_obj_attr_group(
+                root, "Stretch Object", "str",
+                "Driven objects. The chosen attribute receives f(driver).")
+
+        # Function + Infinity options
+        opt_group = QGroupBox("Function / Infinity")
+        opt_layout = QVBoxLayout(opt_group)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Function"))
+        self.stc_cb_func = QComboBox()
+        self.stc_cb_func.addItems(list(FUNCTIONS))
+        self.stc_cb_func.setToolTip(
+            "a = current value of the Default Distance attribute.\n"
+            "f(x) = x - a + 1 : slope +1 (output grows as the driver grows).\n"
+            "f(x) = -x + a + 1 : slope -1 (output shrinks as the driver grows).\n"
+            "Both pass through (a, 1) so the output is 1 at rest.")
+        row.addWidget(self.stc_cb_func, stretch=1)
+        opt_layout.addLayout(row)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Pre Infinity"))
+        self.stc_cb_pre = QComboBox()
+        self.stc_cb_pre.addItems(list(INFINITY_TYPES))
+        self.stc_cb_pre.setCurrentText(DEFAULT_INFINITY)
+        self.stc_cb_pre.setToolTip(
+            "Curve behaviour left of the first key (driver < a). "
+            "'Cycle with Offset' keeps the line straight (linear function).")
+        row.addWidget(self.stc_cb_pre)
+        row.addWidget(QLabel("Post Infinity"))
+        self.stc_cb_post = QComboBox()
+        self.stc_cb_post.addItems(list(INFINITY_TYPES))
+        self.stc_cb_post.setCurrentText(DEFAULT_INFINITY)
+        self.stc_cb_post.setToolTip(
+            "Curve behaviour right of the last key (driver > a+1). "
+            "'Cycle with Offset' keeps the line straight (linear function).")
+        row.addWidget(self.stc_cb_post)
+        row.addStretch(1)
+        opt_layout.addLayout(row)
+        root.addWidget(opt_group)
+
+        # Apply
+        self.stc_btn_apply = QPushButton("Apply Stretch")
+        self.stc_btn_apply.setMinimumHeight(34)
+        self.stc_btn_apply.setToolTip(
+            "Create a set driven key per pair: Default Distance attr drives the "
+            "Stretch attr through the chosen linear function. An addDoubleLinear "
+            "offset node makes it additive on the Stretch attr's original value "
+            "(unchanged at rest). One undo step.")
+        self.stc_btn_apply.clicked.connect(self.on_stc_apply)
+        root.addWidget(self.stc_btn_apply)
+
+        return tab
+
+    def _stretch_obj_attr_group(self, root, title, prefix, obj_tooltip):
+        """Objects TSL + Attributes TSL(List Attributes/Search) 한 쌍의 그룹을 만든다.
+
+        반환: (objs_tsl, attr_tsl, search_lineedit). prefix 는 List/Search 핸들러가
+        어느 쌍인지 구분하는 태그로만 쓴다(위젯 이름은 호출부가 보관).
+        """
+        group = QGroupBox(title)
+        g_layout = QVBoxLayout(group)
+
+        row = QHBoxLayout()
+        objs_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", log_callback=self._log)
+        objs_tsl.setToolTip(obj_tooltip)
+        attr_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Attributes", show_select=False, multi_select=False,
+            log_callback=self._log)
+        # List Attributes 버튼을 편집 버튼 행 맨 앞에 (Remap 탭과 동일 패턴).
+        attr_tsl.add_button(
+            "List Attributes",
+            lambda: self._stc_list_attrs(objs_tsl, attr_tsl), index=0)
+        row.addWidget(objs_tsl)
+        row.addWidget(attr_tsl)
+        g_layout.addLayout(row)
+
+        # Attr Search
+        search_row = QHBoxLayout()
+        search_row.addWidget(QLabel("Attr Search"))
+        search_le = QLineEdit()
+        search_le.setPlaceholderText("token (e.g. distance)")
+        search_le.setToolTip(
+            "Select listed attributes containing this token. If none match, "
+            "re-query the first object by this token to reveal attributes not "
+            "currently listed.")
+        search_le.returnPressed.connect(
+            lambda: self._stc_search_attrs(objs_tsl, attr_tsl, search_le))
+        search_row.addWidget(search_le)
+        btn_search = QPushButton("Search")
+        btn_search.setFixedWidth(70)
+        btn_search.clicked.connect(
+            lambda: self._stc_search_attrs(objs_tsl, attr_tsl, search_le))
+        search_row.addWidget(btn_search)
+        g_layout.addLayout(search_row)
+
+        root.addWidget(group, stretch=1)
+        return objs_tsl, attr_tsl, search_le
+
+    def _stc_list_attrs(self, objs_tsl, attr_tsl):
+        """objs_tsl 첫 오브젝트의 어트리뷰트 전체를 attr_tsl 에 채운다."""
+        objs = objs_tsl.get_all_nodes()
+        if not objs:
+            self._log("[WARN] Object list is empty. Add objects first.")
+            return
+        first = objs[0]
+        attrs = MayaScene.list_attrs(first)
+        attr_tsl.set_items(attrs)
+        self._log("Listed {0} attribute(s) from {1}.".format(len(attrs), first))
+
+    def _stc_search_attrs(self, objs_tsl, attr_tsl, search_le):
+        """토큰으로 어트리뷰트 검색(Remap 탭 Search 와 동일한 동작)."""
+        token = search_le.text().strip()
+        if not token:
+            self._log("[WARN] Enter a search token.")
+            return
+        matches = [a for a in attr_tsl.get_all_items() if token in a]
+        if matches:
+            attr_tsl.select_by_texts(matches)
+            self._log("Search '{0}' : {1} attribute(s) selected.".format(
+                token, len(matches)))
+            return
+        objs = objs_tsl.get_all_nodes()
+        if not objs:
+            self._log("[WARN] Object list is empty. Add objects first.")
+            return
+        first = objs[0]
+        try:
+            attrs = MayaScene.list_attrs(first, token)
+        except Exception as exc:
+            self._log("[WARN] No attribute matches '{0}': {1}".format(token, exc))
+            return
+        if not attrs:
+            self._log("Search '{0}' : no attribute found.".format(token))
+            return
+        attr_tsl.set_items(attrs)
+        self._log("Search '{0}' : re-listed {1} attribute(s) from {2}.".format(
+            token, len(attrs), first))
+
+    def on_stc_apply(self):
+        self._log("--- Apply Stretch ---")
+        def_objs = self.stc_def_objs_tsl.get_all_nodes()
+        str_objs = self.stc_str_objs_tsl.get_all_nodes()
+        def_attrs = self.stc_def_attr_tsl.selected_items()
+        str_attrs = self.stc_str_attr_tsl.selected_items()
+
+        if not def_objs:
+            self._log("[WARN] Default Distance object list is empty.")
+            return
+        if not str_objs:
+            self._log("[WARN] Stretch Object list is empty.")
+            return
+        if not def_attrs:
+            self._log("[WARN] Select one Default Distance attribute "
+                      "(List Attributes, then click one).")
+            return
+        if not str_attrs:
+            self._log("[WARN] Select one Stretch attribute "
+                      "(List Attributes, then click one).")
+            return
+
+        # MEL 과 동일: 각 리스트에 대해 단일 어트리뷰트를 모든 오브젝트에 적용.
+        def_attr = def_attrs[0]
+        str_attr = str_attrs[0]
+        default_pairs = [(obj, def_attr) for obj in def_objs]
+        stretch_pairs = [(obj, str_attr) for obj in str_objs]
+
+        func = self.stc_cb_func.currentText()
+        pre_inf = self.stc_cb_pre.currentText()
+        post_inf = self.stc_cb_post.currentText()
+
+        with undo_chunk():
+            try:
+                built, skipped = run_build_stretch(
+                    default_pairs, stretch_pairs, func=func,
+                    pre_infinity=pre_inf, post_infinity=post_inf)
+            except Exception as exc:
+                self._log("[ERROR] Apply Stretch failed: {0}".format(exc))
+                return
+
+        mode = "1:n" if len(default_pairs) == 1 else "n:n"
+        self._log(
+            "Stretch built: {n} driven key(s) | {mode} | {func} | "
+            "pre '{pre}' / post '{post}' | additive on original".format(
+                n=len(built), mode=mode, func=func, pre=pre_inf, post=post_inf))
+        for driver_plug, driven_plug, a, original, offset in built:
+            self._log("  {driver} (a={a:.4f}) -> {driven} "
+                      "(rest={o:.4f}, +{offset})".format(
+                          driver=driver_plug, a=a, driven=driven_plug,
+                          o=original, offset=offset))
+        for driven_plug, reason in skipped:
+            self._log("[WARN] Skipped {0}: {1}".format(driven_plug, reason))
+
+    # ================================================================
     # Helper / About
     # ================================================================
 
@@ -890,6 +1108,16 @@ class MainWindow(QWidget):
             "- Create Normal Curve (norCrv, default, ref-faithful): adds one straight\n"
             "  norCrv under the curve; rotate/reshape it to control up & twist. Off:\n"
             "  self-contained world-up frame.\n"
+            "\n"
+            "[Stretch] (ported from ref StretchTool.mel + refactor)\n"
+            "- Apply Stretch: the Default Distance attr (value a) drives each Stretch\n"
+            "  attr through a set driven key. The animCurve is a straight line with\n"
+            "  linear tangents and user-set pre/post infinity (default Cycle w/ Offset\n"
+            "  both sides). Function: f(x)=x-a+1 (slope +1) or f(x)=-x+a+1 (slope -1),\n"
+            "  both through (a, 1). One Default -> all Stretch (1:n), else paired n:n.\n"
+            "  Additive: an addDoubleLinear offset node keeps the Stretch attr's\n"
+            "  original value at rest (driven = original + (x-a)), so the value\n"
+            "  grows/shrinks from where it already was instead of being overwritten.\n"
             "\n"
             "Each build is one undo step. All UI text is English.\n"
             "\n"
