@@ -4,8 +4,8 @@
 
 리깅 **드라이버 셋업**(메인 컨트롤러 어트리뷰트로 구동되는 노드 네트워크)을 만드는 PySide(Qt)
 툴이다. 워크플로가 거의 동일한 두 기존 툴(`A00150_remapVal`, `A00160_sphericalEye`)을
-`A00110_animTool` 과 같은 **하나의 창 + 탭** 구조로 통합하고, 커브 어태치 기능(`AttachCrv`)을 더했다.
-**세 개의 탭**과 **공유 로그창**으로 구성된다.
+`A00110_animTool` 과 같은 **하나의 창 + 탭** 구조로 통합하고, 커브 어태치(`AttachCrv`)와
+스트레치 드라이버(`Stretch`) 기능을 더했다. **네 개의 탭**과 **공유 로그창**으로 구성된다.
 
 1. **Remap Value** — 컨트롤러 어트리뷰트로 여러 오브젝트의 어트리뷰트를 `remapValue` 곡선을 따라
    보간/전파한다. (구 `A00150_remapVal`)
@@ -32,6 +32,19 @@
      배치·어태치한다. 파라미터는 ref 의 `makeParameterValueList` 그대로 구한다 — **Distribute across
      full range** ON 이면 `division=count-1`(양 끝 정확히 포함, 열린 커브용), OFF 면 `division=count`
      (마지막이 끝 직전에서 멈춤, 주기/닫힌 커브 seam 중복 방지). 어태치 네트워크는 Closest 모드와 동일하다.
+4. **Stretch** — Default Distance 어트리뷰트 값(`a`)을 driver 로, Stretch 오브젝트 어트리뷰트를
+   driven 으로 구동하는 네트워크를 만든다. **모든 함수 모드는 rest(driver=`a`)에서 driven = 원래 값**
+   을 보존한다. (`ref/ref_01_StretchTool.mel` 의 Stretch 기능 이식 + 리팩토링)
+   - **선형** `f(x)=x-a+1`(기울기 +1) / `-x+a+1`(기울기 -1): `animCurveUU`(linear 탄젠트, pre/post
+     infinity) + `addDoubleLinear` 오프셋으로 additive — `driven = original + (x-a)` / `(a-x)`.
+     rest 에서 원래 값, driver 가 `a` 에서 멀어질수록 그 값에서 증감(예: `translateX` 원래 1.5 → 1.5 에서).
+   - **시그모이드** `Sigmoid` / `Sigmoid rev`: 해석적 **노드망**(`multiplyDivide` power 등). `(a, original)`
+     을 지나는 S 곡선으로 한쪽은 `Threshold Max`, 반대쪽은 `Threshold Min`(≥0 → 0 밑으로 안 감)에 수렴.
+     `Sharpness`(지수의 밑 = `1/(1+e^-x)` 의 e, 클수록 급격)·threshold 를 사용자가 지정.
+     `Threshold Min < 원래 값 < Threshold Max` 여야 한다. **이 세 값은 Default Distance 오브젝트에
+     어트리뷰트(`stretchSharpness`/`stretchThreshMin`/`stretchThreshMax`)로 추가·연결되어 씬에서 실시간 조절**된다.
+   - **Stretch 어트리뷰트는 여러 개 선택 가능** — 선택한 모든 어트리뷰트에 동일하게 적용된다.
+   - Default 가 1개면 그 하나로 모든 Stretch 를 구동(1:n), 아니면 순서쌍 n:n(min 길이).
 
 > **통합 방침**: 핵심 로직은 두 원본의 `app/core`(`slerp_ramp.py`, `spherical_drive.py`)를
 > **수정 없이 복사**해 재사용한다. 두 모듈이 모두 `run_build` 를 정의하므로 `app/core/__init__.py`
@@ -63,11 +76,13 @@ A00170_driverTool/
     │   └── __init__.py         # run_build_slerp / run_build_wave /
     │                           #   run_build_spherical / run_build_nodes /
     │                           #   run_attach_to_closest / run_attach_uniform 재노출
-    └── ui/main_window.py  # 전체 UI (3개 탭 + 공유 로그창 + 메뉴 바)
+    └── ui/main_window.py  # 전체 UI (4개 탭 + 공유 로그창 + 메뉴 바)
 ```
 
 - `main_window.py` 의 위젯/핸들러는 탭별 접두사로 분리한다: **Remap Value = `rmp_*`**,
-  **Spherical Eye = `sph_*`**, **AttachCrv = `atc_*`**. 공유하는 것은 `self._log()`(공용 로그창)뿐이다.
+  **Spherical Eye = `sph_*`**, **AttachCrv = `atc_*`**, **Stretch = `stc_*`**.
+  공유하는 것은 `self._log()`(공용 로그창)뿐이다. Stretch 로직은 `app/core/stretch.py`
+  (`run_build_stretch`)에 있다.
 - `attach_curve.py` 는 노드 생성을 **maya.cmds** 로 한다(pymel 인 다른 두 빌드 모듈과 달리 자족적).
 
 ---
@@ -148,9 +163,61 @@ A00170_driverTool/
 > 어태치는 오브젝트의 `translate`(옵션 `rotate`)에 노드를 **연결**한다. Closest 모드에서 이미
 > 연결/잠금된 채널이 있으면 해당 오브젝트만 실패 처리(로그 경고)하고 나머지는 계속한다.
 
+### 4.4 Stretch
+
+거리(또는 임의의 driver 어트리뷰트)에 따라 다른 오브젝트의 어트리뷰트를 선형으로 구동한다.
+전형적으로 **Default Distance = `distanceDimension` 의 `distance`**, **Stretch = 조인트의
+`scale`/커스텀 attr** 로 쓴다.
+
+1. **Default Distance** 그룹 — driver.
+   - **Objects** 리스트에 driver 오브젝트를 추가.
+   - **List Attributes** 로 첫 오브젝트의 어트리뷰트를 채우고(또는 **Attr Search** 토큰으로 검색),
+     driver 로 쓸 어트리뷰트 **하나를 선택**. 그 어트리뷰트의 **현재 값이 `a`**(빌드 시점 스냅샷)다.
+2. **Stretch Object** 그룹 — driven. 같은 방식으로 오브젝트와 **어트리뷰트를 하나 이상** 선택한다
+   (여러 개 선택하면 선택한 모든 어트리뷰트에 같은 함수가 적용된다). **Attr Search** 로 재질의해
+   여러 개가 발견되면 **발견된 것 모두 선택**된다.
+3. **Function / Infinity**:
+   - **Function**: 네 가지.
+     - `f(x)=x-a+1` / `-x+a+1` — 선형(멀수록 증가/감소).
+     - `Sigmoid (x-:max, x+:min)` — driver 가 `-`쪽이면 `Threshold Max` 로 증가·수렴,
+       `+`쪽이면 `Threshold Min` 으로 감소·수렴.
+     - `Sigmoid rev (x-:min, x+:max)` — 위와 방향 반대.
+   - **Pre Infinity / Post Infinity**(선형 전용, 각각 기본 **Cycle with Offset**): driven 커브의 키
+     범위 밖 동작. 양쪽 모두 **Cycle with Offset** 이면 전 구간 직선. `Constant`/`Linear`/`Cycle`/
+     `Oscillate` 도 가능. *(시그모이드 선택 시 비활성)*
+   - **Sharpness / Thresh Min / Thresh Max**(시그모이드 전용): `Sharpness` 는 지수의 밑
+     (`1/(1+e^-x)` 의 e, 기본 `e≈2.7183`, 클수록 급격, `>1`). `Thresh Min`(≥0) / `Thresh Max` 는
+     수렴 plateau. **원래 값이 두 threshold 사이(strict)** 여야 한다. *(선형 선택 시 비활성)*
+     이 세 값은 **Default Distance 오브젝트에 어트리뷰트로 추가**되어(기본값=UI 값) 네트워크에 연결되므로
+     빌드 후 **씬(채널박스)에서 실시간으로 조절**할 수 있다(driver 오브젝트당 한 벌, 그 driver 의 모든
+     시그모이드가 공유).
+4. **Apply Stretch** 클릭 → 짝마다 driver 로 driven 을 구동하는 네트워크를 만든다.
+   - 선형: `driver.attr → animCurveUU → addDoubleLinear(+original-1) → driven.attr`.
+   - 시그모이드: `driver.attr → 노드망 → driven.attr` 로
+     `driven = tmin + (tmax-tmin)/(1 + ratio·base^(±(x-a)))`, `ratio = (tmax-original)/(original-tmin)`.
+     `base^L = ratio` 라 로그 없이 `ratio` 를 곱해 `(a, original)` 통과를 보장하므로, `base`·`tmax`·`tmin`
+     을 상수로 굳히지 않고 **위 제어 어트리뷰트에 연결**해도 항상 `driven(a)=original` 이 유지된다.
+   - 어느 모드든 **rest 에서 driven = 원래 값**. Default 1개면 1:n, 아니면 n:n(선택한 어트리뷰트 수만큼
+     짝마다 반복). 로그에 `driver (a=..) -> driven (rest=.., 노드)` 와 skip 사유가 출력된다.
+
+> driven 어트리뷰트의 **원래 값은 네트워크를 연결하기 전에 스냅샷**한다(연결 후에는 구동값이라 못 읽음).
+> 컴파운드(예: `translate`)는 스칼라가 아니라 skip 하고 `[WARN]` — 리프 어트리뷰트(`translateX` 등)를 고른다.
+> 시그모이드에서 원래 값이 threshold 범위 밖이면 그 짝만 skip 하고 `[WARN]`(범위를 넓히거나 값을 조정).
+> 씬에서 제어 어트리뷰트를 원래 값이 범위를 벗어나도록 바꾸면 `(a, original)` 통과가 깨질 수 있으니 주의.
+
+> **원본(`ref_01_StretchTool.mel`) 대비 개선**: ① pre/post infinity 를 **둘 다 사용자 지정**(원본은
+> post=Cycle w/ Offset, pre=Constant 고정이라 rest 이하가 직선이 아니었다). ② 탄젠트를 **auto→linear**.
+> ③ 두 번째 키를 `2a`→`a+1` 로 바꿔 **실제로 `f(x)=x-a+1`** 이 되게 하고(원본은 기울기 `1/a`), `a=0`
+> 에서 두 키 입력이 겹쳐 커브가 깨지거나 `a<0` 에서 기울기 부호가 뒤집히던 문제를 없앴다.
+> ④ `setDrivenKeyframe` 2회로 커브를 직접 만들어 `connectionInfo` 재조회를 제거. ⑤ 존재/self-drive/
+> 스칼라 여부 **입력 검증** 추가(headless mayapy 로 함수 일치·infinity·탄젠트 검증 완료).
+>
+> 참고: 원본 MEL 의 **Distance 탭**(`distanceDimension` 생성)은 이식하지 않았다. 필요하면 Maya 의
+> 기본 Distance Tool 또는 별도 유틸을 쓴다.
+
 ---
 
 ## 5. 로그 / About
 
-- 세 탭의 모든 결과·경고(`[WARN]`)·오류(`[ERROR]`)는 창 하단의 **공유 로그창**에 누적된다.
-- **Help > About** 에 세 탭의 빌드 모드 설명이 함께 표기된다.
+- 네 탭의 모든 결과·경고(`[WARN]`)·오류(`[ERROR]`)는 창 하단의 **공유 로그창**에 누적된다.
+- **Help > About** 에 네 탭의 빌드 모드 설명이 함께 표기된다.

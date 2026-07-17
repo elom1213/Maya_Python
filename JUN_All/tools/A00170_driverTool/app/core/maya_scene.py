@@ -28,8 +28,14 @@ class MayaScene(object):
         - search 가 있으면 listAttr(obj.search) 로 (그 attr + 자식들) 질의 →
           현재 리스트업되지 않은 어트리뷰트도 이름으로 찾아 보여줄 수 있다.
         - 이름에 "." 가 든 중첩 항목은 건너뛴다.
-        - multi/compound 어트리뷰트는 getNextFreeMultiIndex 로 판정해
+        - multi/compound 어트리뷰트는 attributeQuery(multi=True) 로 조용히 판정하고,
+          multi 로 확정된 것만 getNextFreeMultiIndex 로 다음 free index 를 구해
           listAttr -multi 로 자식 어트리뷰트까지 펼친다.
+
+        NOTE: 예전엔 모든 어트리뷰트에 getNextFreeMultiIndex 를 호출해 multi 여부를 판정했는데,
+        그 MEL 프로시저는 non-multi(스칼라)에서 `attr[0]` 을 찾다 실패해
+        "No object matches name" 에러를 **어트리뷰트 개수만큼** 출력했다(catch 해도 출력은 남음).
+        attributeQuery 로 먼저 걸러 multi 에만 호출하면 결과는 동일하고 에러가 사라진다.
         """
         if not obj:
             return []
@@ -45,21 +51,25 @@ class MayaScene(object):
             if "." in attr:
                 continue
 
-            full = "{0}.{1}".format(obj, attr)
-
-            # getNextFreeMultiIndex 는 multi 어트리뷰트에서만 성공한다.
+            # multi 여부를 조용히 판정(getNextFreeMultiIndex 는 non-multi 에서 에러 출력).
             try:
-                idx = mel.eval('getNextFreeMultiIndex("{0}", 0)'.format(full))
-                is_multi = True
+                is_multi = bool(cmds.attributeQuery(attr, node=obj, multi=True))
             except Exception:
                 is_multi = False
 
             if not is_multi:
                 result.append(attr)
-            else:
+                continue
+
+            # multi 확정 → 다음 free index 의 (컴파운드) 자식까지 펼친다(여기선 에러 안 남).
+            full = "{0}.{1}".format(obj, attr)
+            try:
+                idx = mel.eval('getNextFreeMultiIndex("{0}", 0)'.format(full))
                 children = cmds.listAttr(
-                    "{0}.{1}[{2}]".format(obj, attr, idx), multi=True) or []
-                result.extend(children)
+                    "{0}[{1}]".format(full, idx), multi=True) or []
+            except Exception:
+                children = []
+            result.extend(children if children else [attr])
 
         return result
 

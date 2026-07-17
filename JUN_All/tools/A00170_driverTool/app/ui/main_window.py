@@ -21,6 +21,8 @@ from tools.A00170_driverTool.app.core import (
     run_build_slerp, run_build_wave,
     run_build_spherical, run_build_nodes,
     run_attach_to_closest, run_attach_uniform, AIM_AXES, DRIVER_TYPES,
+    run_build_stretch, FUNCTIONS, SIGMOID_FUNCTIONS, INFINITY_TYPES, DEFAULT_INFINITY,
+    DEFAULT_BASE, DEFAULT_THRESHOLD_MIN, DEFAULT_THRESHOLD_MAX,
 )
 
 
@@ -73,6 +75,7 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_remap_tab(), "Remap Value")
         self.tabs.addTab(self._build_spherical_tab(), "Spherical Eye")
         self.tabs.addTab(self._build_attach_tab(), "AttachCrv")
+        self.tabs.addTab(self._build_stretch_tab(), "Stretch")
         main_layout.addWidget(self.tabs)
 
         # 로그창을 탭 아래에 배치
@@ -855,6 +858,309 @@ class MainWindow(QWidget):
                 set_node))
 
     # ================================================================
+    # Tab : Stretch  (ref/ref_01_StretchTool.mel Stretch 기능 이식 + 리팩토링)
+    # ================================================================
+
+    def _build_stretch_tab(self):
+        """Default Distance 어트리뷰트(a)를 driver 로 Stretch 어트리뷰트를 구동하는 driven key.
+
+        f(x)=x-a+1 또는 -x+a+1 (linear 탄젠트, pre/post infinity 사용자 지정).
+        Default 가 1개면 1:n, 아니면 n:n 으로 짝짓는다(MEL 동작 유지).
+        """
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+
+        # Default Distance (driver) : Objects + Attributes
+        self.stc_def_objs_tsl, self.stc_def_attr_tsl, self.stc_def_search = \
+            self._stretch_obj_attr_group(
+                root, "Default Distance", "def",
+                "Driver objects. The chosen attribute's current value is 'a' "
+                "(the rest distance where the stretch output = 1).")
+
+        # Stretch Object (driven) : Objects + Attributes (multiple attrs allowed)
+        self.stc_str_objs_tsl, self.stc_str_attr_tsl, self.stc_str_search = \
+            self._stretch_obj_attr_group(
+                root, "Stretch Object", "str",
+                "Driven objects. Every selected attribute receives f(driver) "
+                "(select one or more).", multi_attr=True)
+
+        # Function + Infinity options
+        opt_group = QGroupBox("Function / Infinity")
+        opt_layout = QVBoxLayout(opt_group)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Function"))
+        self.stc_cb_func = QComboBox()
+        self.stc_cb_func.addItems(list(FUNCTIONS))
+        self.stc_cb_func.setToolTip(
+            "a = Default Distance attr value, original = Stretch attr value at build.\n"
+            "All modes keep the Stretch attr's original value at rest (driver = a).\n"
+            "f(x)=x-a+1 : slope +1 linear (grows as the driver grows).\n"
+            "f(x)=-x+a+1 : slope -1 linear (shrinks as the driver grows).\n"
+            "Sigmoid (x-:max, x+:min): S-curve; driver -> -inf converges to Threshold\n"
+            "   Max, driver -> +inf converges to Threshold Min (>=0). Passes (a, original).\n"
+            "Sigmoid rev: same but the two directions are swapped.")
+        self.stc_cb_func.currentIndexChanged.connect(self._stc_sync_func_enabled)
+        row.addWidget(self.stc_cb_func, stretch=1)
+        opt_layout.addLayout(row)
+
+        # Pre/Post Infinity (linear modes only) — 컨테이너로 묶어 라벨까지 함께 비활성화.
+        self.stc_infinity_box = QWidget()
+        row = QHBoxLayout(self.stc_infinity_box)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(QLabel("Pre Infinity"))
+        self.stc_cb_pre = QComboBox()
+        self.stc_cb_pre.addItems(list(INFINITY_TYPES))
+        self.stc_cb_pre.setCurrentText(DEFAULT_INFINITY)
+        self.stc_cb_pre.setToolTip(
+            "Linear modes only. Curve behaviour left of the first key (driver < a). "
+            "'Cycle with Offset' keeps the line straight.")
+        row.addWidget(self.stc_cb_pre)
+        row.addWidget(QLabel("Post Infinity"))
+        self.stc_cb_post = QComboBox()
+        self.stc_cb_post.addItems(list(INFINITY_TYPES))
+        self.stc_cb_post.setCurrentText(DEFAULT_INFINITY)
+        self.stc_cb_post.setToolTip(
+            "Linear modes only. Curve behaviour right of the last key (driver > a+1). "
+            "'Cycle with Offset' keeps the line straight.")
+        row.addWidget(self.stc_cb_post)
+        row.addStretch(1)
+        opt_layout.addWidget(self.stc_infinity_box)
+
+        # Sigmoid params (sigmoid modes only) — 컨테이너로 묶어 라벨까지 함께 비활성화.
+        self.stc_sigmoid_box = QWidget()
+        row = QHBoxLayout(self.stc_sigmoid_box)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(QLabel("Sharpness"))
+        self.stc_dsb_base = QDoubleSpinBox()
+        self.stc_dsb_base.setDecimals(4)
+        self.stc_dsb_base.setRange(1.0001, 1000000.0)
+        self.stc_dsb_base.setValue(DEFAULT_BASE)
+        self.stc_dsb_base.setFixedWidth(90)
+        self.stc_dsb_base.setToolTip(
+            "Sigmoid only. Base of the exponent (the 'e' in 1/(1+e^-x)); higher = "
+            "sharper transition. Default e ~ 2.7183. Must be > 1.\n"
+            "This value is added as a 'stretchSharpness' attribute on the Default "
+            "Distance object and wired to the network, so you can tweak it live in "
+            "the scene.")
+        row.addWidget(self.stc_dsb_base)
+        row.addWidget(QLabel("Thresh Min"))
+        self.stc_dsb_tmin = QDoubleSpinBox()
+        self.stc_dsb_tmin.setDecimals(3)
+        self.stc_dsb_tmin.setRange(0.0, 1000000.0)
+        self.stc_dsb_tmin.setValue(DEFAULT_THRESHOLD_MIN)
+        self.stc_dsb_tmin.setFixedWidth(80)
+        self.stc_dsb_tmin.setToolTip(
+            "Sigmoid only. Plateau the output converges to on the 'min' side. "
+            "Min is 0 so the driven value never goes below 0.\n"
+            "Added as a 'stretchThreshMin' attribute on the Default Distance object "
+            "and wired live.")
+        row.addWidget(self.stc_dsb_tmin)
+        row.addWidget(QLabel("Thresh Max"))
+        self.stc_dsb_tmax = QDoubleSpinBox()
+        self.stc_dsb_tmax.setDecimals(3)
+        self.stc_dsb_tmax.setRange(0.0, 1000000.0)
+        self.stc_dsb_tmax.setValue(DEFAULT_THRESHOLD_MAX)
+        self.stc_dsb_tmax.setFixedWidth(80)
+        self.stc_dsb_tmax.setToolTip(
+            "Sigmoid only. Plateau the output converges to on the 'max' side. "
+            "The Stretch attr's original value must lie strictly between Min and Max.\n"
+            "Added as a 'stretchThreshMax' attribute on the Default Distance object "
+            "and wired live.")
+        row.addWidget(self.stc_dsb_tmax)
+        row.addStretch(1)
+        opt_layout.addWidget(self.stc_sigmoid_box)
+        root.addWidget(opt_group)
+
+        self._stc_sync_func_enabled()
+
+        # Apply
+        self.stc_btn_apply = QPushButton("Apply Stretch")
+        self.stc_btn_apply.setMinimumHeight(34)
+        self.stc_btn_apply.setToolTip(
+            "Build a driver network per pair: the Default Distance attr drives the "
+            "Stretch attr through the chosen function (linear or sigmoid). Every mode "
+            "keeps the Stretch attr's original value at rest (driver = a). One undo step.")
+        self.stc_btn_apply.clicked.connect(self.on_stc_apply)
+        root.addWidget(self.stc_btn_apply)
+
+        return tab
+
+    def _stretch_obj_attr_group(self, root, title, prefix, obj_tooltip,
+                                multi_attr=False):
+        """Objects TSL + Attributes TSL(List Attributes/Search) 한 쌍의 그룹을 만든다.
+
+        반환: (objs_tsl, attr_tsl, search_lineedit). prefix 는 List/Search 핸들러가
+        어느 쌍인지 구분하는 태그로만 쓴다(위젯 이름은 호출부가 보관).
+        multi_attr=True 면 어트리뷰트를 여러 개 선택할 수 있다(Stretch Object 쪽).
+        """
+        group = QGroupBox(title)
+        g_layout = QVBoxLayout(group)
+
+        row = QHBoxLayout()
+        objs_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", log_callback=self._log)
+        objs_tsl.setToolTip(obj_tooltip)
+        attr_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Attributes", show_select=False, multi_select=multi_attr,
+            log_callback=self._log)
+        # List Attributes 버튼을 편집 버튼 행 맨 앞에 (Remap 탭과 동일 패턴).
+        attr_tsl.add_button(
+            "List Attributes",
+            lambda: self._stc_list_attrs(objs_tsl, attr_tsl), index=0)
+        row.addWidget(objs_tsl)
+        row.addWidget(attr_tsl)
+        g_layout.addLayout(row)
+
+        # Attr Search
+        search_row = QHBoxLayout()
+        search_row.addWidget(QLabel("Attr Search"))
+        search_le = QLineEdit()
+        search_le.setPlaceholderText("token (e.g. distance)")
+        search_le.setToolTip(
+            "Select listed attributes containing this token. If none match, "
+            "re-query the first object by this token to reveal attributes not "
+            "currently listed.")
+        search_le.returnPressed.connect(
+            lambda: self._stc_search_attrs(objs_tsl, attr_tsl, search_le))
+        search_row.addWidget(search_le)
+        btn_search = QPushButton("Search")
+        btn_search.setFixedWidth(70)
+        btn_search.clicked.connect(
+            lambda: self._stc_search_attrs(objs_tsl, attr_tsl, search_le))
+        search_row.addWidget(btn_search)
+        g_layout.addLayout(search_row)
+
+        root.addWidget(group, stretch=1)
+        return objs_tsl, attr_tsl, search_le
+
+    def _stc_list_attrs(self, objs_tsl, attr_tsl):
+        """objs_tsl 첫 오브젝트의 어트리뷰트 전체를 attr_tsl 에 채운다."""
+        objs = objs_tsl.get_all_nodes()
+        if not objs:
+            self._log("[WARN] Object list is empty. Add objects first.")
+            return
+        first = objs[0]
+        attrs = MayaScene.list_attrs(first)
+        attr_tsl.set_items(attrs)
+        self._log("Listed {0} attribute(s) from {1}.".format(len(attrs), first))
+
+    def _stc_search_attrs(self, objs_tsl, attr_tsl, search_le):
+        """토큰으로 어트리뷰트 검색(Remap 탭 Search 와 동일한 동작)."""
+        token = search_le.text().strip()
+        if not token:
+            self._log("[WARN] Enter a search token.")
+            return
+        matches = [a for a in attr_tsl.get_all_items() if token in a]
+        if matches:
+            attr_tsl.select_by_texts(matches)
+            self._log("Search '{0}' : {1} attribute(s) selected.".format(
+                token, len(matches)))
+            return
+        objs = objs_tsl.get_all_nodes()
+        if not objs:
+            self._log("[WARN] Object list is empty. Add objects first.")
+            return
+        first = objs[0]
+        try:
+            attrs = MayaScene.list_attrs(first, token)
+        except Exception as exc:
+            self._log("[WARN] No attribute matches '{0}': {1}".format(token, exc))
+            return
+        if not attrs:
+            self._log("Search '{0}' : no attribute found.".format(token))
+            return
+        attr_tsl.set_items(attrs)
+        # 발견된 어트리뷰트를 모두 선택한다(다중 선택 리스트면 전부, 단일이면 첫 항목).
+        attr_tsl.select_by_texts(attrs)
+        self._log("Search '{0}' : re-listed and selected {1} attribute(s) from {2}.".format(
+            token, len(attrs), first))
+
+    def _stc_sync_func_enabled(self, *args):
+        """선택한 Function 에 따라 infinity(선형 전용)/sigmoid 파라미터 박스 활성 상태 토글.
+
+        각 행을 컨테이너 위젯으로 묶어 통째로 setEnabled 하므로 라벨(Sharpness/Thresh Min/Max,
+        Pre/Post Infinity)까지 함께 회색 처리된다.
+        """
+        is_sigmoid = self.stc_cb_func.currentText() in SIGMOID_FUNCTIONS
+        self.stc_infinity_box.setEnabled(not is_sigmoid)
+        self.stc_sigmoid_box.setEnabled(is_sigmoid)
+
+    def on_stc_apply(self):
+        self._log("--- Apply Stretch ---")
+        def_objs = self.stc_def_objs_tsl.get_all_nodes()
+        str_objs = self.stc_str_objs_tsl.get_all_nodes()
+        def_attrs = self.stc_def_attr_tsl.selected_items()
+        str_attrs = self.stc_str_attr_tsl.selected_items()
+
+        if not def_objs:
+            self._log("[WARN] Default Distance object list is empty.")
+            return
+        if not str_objs:
+            self._log("[WARN] Stretch Object list is empty.")
+            return
+        if not def_attrs:
+            self._log("[WARN] Select one Default Distance attribute "
+                      "(List Attributes, then click one).")
+            return
+        if not str_attrs:
+            self._log("[WARN] Select one or more Stretch attribute(s) "
+                      "(List Attributes, then click).")
+            return
+
+        # 오브젝트 단위 페어링: driver 가 1개면 1:n(모든 stretch 를 그 하나가 구동),
+        # 아니면 n:n(순서쌍, min 길이).
+        def_attr = def_attrs[0]  # driver 는 단일 어트리뷰트.
+        if len(def_objs) == 1:
+            obj_pairs = [(def_objs[0], s_obj) for s_obj in str_objs]
+        else:
+            obj_pairs = list(zip(def_objs, str_objs))
+
+        # 선택한 모든 Stretch 어트리뷰트로 확장(오브젝트 바깥, 어트리뷰트 안쪽 순서로 정렬).
+        default_pairs = []
+        stretch_pairs = []
+        for d_obj, s_obj in obj_pairs:
+            for attr in str_attrs:
+                default_pairs.append((d_obj, def_attr))
+                stretch_pairs.append((s_obj, attr))
+
+        func = self.stc_cb_func.currentText()
+        pre_inf = self.stc_cb_pre.currentText()
+        post_inf = self.stc_cb_post.currentText()
+        is_sigmoid = func in SIGMOID_FUNCTIONS
+        base = self.stc_dsb_base.value()
+        tmin = self.stc_dsb_tmin.value()
+        tmax = self.stc_dsb_tmax.value()
+
+        with undo_chunk():
+            try:
+                built, skipped = run_build_stretch(
+                    default_pairs, stretch_pairs, func=func,
+                    pre_infinity=pre_inf, post_infinity=post_inf,
+                    base=base, threshold_min=tmin, threshold_max=tmax)
+            except Exception as exc:
+                self._log("[ERROR] Apply Stretch failed: {0}".format(exc))
+                return
+
+        mode = "1:n" if len(def_objs) == 1 else "n:n"
+        if is_sigmoid:
+            detail = ("base {base:.4f} | thresholds [{tmin:g}, {tmax:g}] | "
+                      "live attrs on driver".format(base=base, tmin=tmin, tmax=tmax))
+        else:
+            detail = "pre '{pre}' / post '{post}'".format(pre=pre_inf, post=post_inf)
+        self._log(
+            "Stretch built: {n} node network(s) | {mode} | {natt} attr(s) | {func} | "
+            "{detail} | rest = original".format(
+                n=len(built), mode=mode, natt=len(str_attrs), func=func, detail=detail))
+        for driver_plug, driven_plug, a, original, node in built:
+            self._log("  {driver} (a={a:.4f}) -> {driven} "
+                      "(rest={o:.4f}, {node})".format(
+                          driver=driver_plug, a=a, driven=driven_plug,
+                          o=original, node=node))
+        for driven_plug, reason in skipped:
+            self._log("[WARN] Skipped {0}: {1}".format(driven_plug, reason))
+
+    # ================================================================
     # Helper / About
     # ================================================================
 
@@ -890,6 +1196,21 @@ class MainWindow(QWidget):
             "- Create Normal Curve (norCrv, default, ref-faithful): adds one straight\n"
             "  norCrv under the curve; rotate/reshape it to control up & twist. Off:\n"
             "  self-contained world-up frame.\n"
+            "\n"
+            "[Stretch] (ported from ref StretchTool.mel + refactor)\n"
+            "- Apply Stretch: the Default Distance attr (value a) drives every selected\n"
+            "  Stretch attr. Every mode keeps the Stretch attr's original value at rest\n"
+            "  (driver = a -> driven = original). One Default -> all Stretch (1:n),\n"
+            "  else paired n:n. Select multiple Stretch attributes to drive them all.\n"
+            "  - Linear f(x)=x-a+1 / -x+a+1: animCurveUU (linear tangents, user pre/post\n"
+            "    infinity, default Cycle w/ Offset) + an addDoubleLinear offset makes it\n"
+            "    additive: driven = original + (x-a) / (a-x).\n"
+            "  - Sigmoid / Sigmoid rev: analytic node network (multiplyDivide power etc.).\n"
+            "    An S-curve through (a, original) converging to Threshold Max / Min\n"
+            "    (Min >= 0 so it never goes below 0). Needs Min < original < Max.\n"
+            "    Sharpness (base), Threshold Min/Max are added as attributes on the\n"
+            "    Default Distance object and wired to the network, so you can tune the\n"
+            "    sigmoid live in the scene.\n"
             "\n"
             "Each build is one undo step. All UI text is English.\n"
             "\n"
