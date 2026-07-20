@@ -42,36 +42,53 @@ def jun_all_root():
     return os.path.dirname(tools_dir)                    # .../JUN_All
 
 
-def rebase_to_root(path, new_root):
-    """버튼 경로를 새 JUN_All 루트로 옮긴 경로를 만든다.
+def _tools_tail(path):
+    """path 에서 마지막 'tools' 세그먼트 '뒤' 조각(리스트)을 반환. 없으면 None.
 
-    경로에서 마지막 'tools' 세그먼트를 앵커로 잡아 그 뒤( A000XX_name/... )만
-    떼어내 `<new_root>/tools/<...>` 로 다시 잇는다. 즉 PC1 의
-    `.../PC1_root/JUN_All/tools/A00080_x` 를 `<new_root>/tools/A00080_x` 로 바꾼다.
-
-    'tools' 앵커를 못 찾으면(=JUN_All/tools 밖을 가리키는 버튼) None 을 돌려주어
-    호출측이 '건너뜀' 으로 처리하게 한다.
+    상대(`tools/A000XX/...`)든 절대(`C:/.../tools/A000XX/...`)든, 어느 PC 의 절대경로든
+    동일하게 'tools' 앵커 뒤의 꼬리만 뽑는다. 이 꼬리가 PC 에 무관한 '툴 신원' 이다.
     """
     norm = normalize_path(path)
     if not norm:
         return None
-    root = normalize_path(new_root)
-    if not root:
-        return None
-
-    parts = norm.split(os.sep)
-    # 마지막 'tools' 세그먼트를 앵커로(대소문자 무시). 그 '뒤' 조각만 꼬리로 쓴다.
+    # normalize_path 는 OS 구분자로 바꾸지만, JSON 에 슬래시로 저장된 상대경로도 함께 받는다.
+    parts = [p for p in norm.replace("/", os.sep).split(os.sep) if p not in ("", ".")]
     anchor = -1
     for i, seg in enumerate(parts):
         if seg.lower() == _TOOLS_ANCHOR:
             anchor = i
     if anchor < 0:
         return None
-
     tail = parts[anchor + 1:]           # ['A000XX_name', ...]
-    if not tail:
-        return None
-    return os.path.normpath(os.path.join(root, _TOOLS_ANCHOR, *tail))
+    return tail or None
+
+
+def to_portable(path):
+    """저장용 '이식 가능' 경로를 만든다(프로파일 JSON 에 넣는 형태).
+
+    JUN_All/tools 안을 가리키면 `tools/A000XX_name/...`(슬래시 고정) 상대경로로 —
+    이 값은 **PC 가 달라도 동일**하므로 git 에서 프로파일이 흔들리지 않는다.
+    'tools' 앵커가 없으면(=JUN_All 밖 외부 절대경로) 정규화한 절대경로 그대로 둔다.
+    """
+    tail = _tools_tail(path)
+    if tail is None:
+        return normalize_path(path)
+    return "/".join([_TOOLS_ANCHOR] + tail)
+
+
+def resolve(stored, root):
+    """저장된 경로(상대/절대 혼용) → 이 PC(=root) 기준 실제 절대경로.
+
+    'tools' 앵커가 있으면(상대든, 다른 PC 에서 만든 절대든) 그 꼬리를 `root/tools/...` 로
+    다시 이어 이 PC 의 실제 경로로 만든다. 앵커가 없으면(외부 절대경로) 그대로 쓴다.
+    """
+    tail = _tools_tail(stored)
+    if tail is None:
+        return normalize_path(stored)
+    r = normalize_path(root)
+    if not r:
+        return normalize_path(stored)
+    return os.path.normpath(os.path.join(r, _TOOLS_ANCHOR, *tail))
 
 
 def normalize_path(path):
@@ -154,13 +171,13 @@ def launch(path, reload_module=True):
     reload_module 은 run() 에 그대로 전달된다(DEV_MODE 면 그 툴이 자기 자신을 리로드).
     셸프 버튼과 동일하게 기본값 True.
 
-    저장된 경로가 (다른 PC 에서 만든 절대경로라) 깨져 있으면, 현재 PC 의 JUN_All
-    루트로 리베이스한 경로가 실제로 있는지 먼저 확인해 그쪽으로 조용히 복구한다.
-    ('Refresh Paths' 로 영구 갱신하기 전에도 버튼이 바로 동작하도록.)
+    보통 호출측(UI)이 이미 resolve() 로 이 PC 절대경로를 넘기지만, 저장된 값(상대 or
+    다른 PC 절대경로)이 그대로 들어와 깨져 있어도, 현재 PC 의 JUN_All 루트로 resolve 한
+    경로가 실제로 있으면 그쪽으로 조용히 복구한다.
     """
     ok, msg = validate(path)
     if not ok:
-        healed = rebase_to_root(path, jun_all_root())
+        healed = resolve(path, jun_all_root())
         if healed and validate(healed)[0]:
             path = healed
         else:

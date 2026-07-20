@@ -5,19 +5,19 @@
       "buttons": [
         {
           "name": "jointTool_V02",
-          "path": "C:\\Users\\USER\\Desktop\\JP\\0030_maya_python_JUN\\Maya_Python\\JUN_All\\tools\\A00060_jointTool_V02"
+          "path": "tools/A00060_jointTool_V02"
         },
         {
           "name": "RigConnect",
-          "path": "C:\\Users\\USER\\Desktop\\JP\\0030_maya_python_JUN\\Maya_Python\\JUN_All\\tools\\A00145_RigConnect"
+          "path": "tools/A00145_RigConnect"
         },
         {
           "name": "driverTool",
-          "path": "C:\\Users\\USER\\Desktop\\JP\\0030_maya_python_JUN\\Maya_Python\\JUN_All\\tools\\A00170_driverTool"
+          "path": "tools/A00170_driverTool"
         },
         {
           "name": "skinMigrate",
-          "path": "C:\\Users\\USER\\Desktop\\JP\\0030_maya_python_JUN\\Maya_Python\\JUN_All\\tools\\A00270_skinMigrate"
+          "path": "tools/A00270_skinMigrate"
         }
       ]
     }

@@ -2,6 +2,27 @@
 
 All notable changes to this tool are documented here.
 
+## v01.04 — 2026-07-20
+
+- **Relative button paths — no more cross-PC git churn.** Buttons now store their
+  tool path **relative to the JUN_All root** (`tools/A000XX_name`) instead of an
+  absolute path. The relative form is **identical on every PC**, so profile JSONs
+  no longer change when different machines open/refresh them — the tracked
+  `data/profiles/` stays clean in git. The actual absolute path is resolved at
+  launch time from this PC's root (`tool_launcher.resolve`), and a foreign
+  absolute path (from an older commit) self-heals via its `tools/` anchor.
+- **Per-PC state moved out of git.** The JUN_All root is auto-detected from where
+  the launcher runs, so you normally set nothing. An optional root **override**
+  (to point at a different JUN_All) is saved to a **gitignored** `data/local_env.json`,
+  and `data/active.json` (last-open profile) is now gitignored too. Both are
+  per-PC, so they never conflict between machines.
+- **Environment box reworked**: `Detect` (reset to auto-detected root, clears
+  override), `Browse...` + `Apply Root` (save this PC's override, or clear it if
+  it equals the auto-detected root), and **`Make Paths Portable`** (one-time
+  migration that rewrites any old absolute button paths to relative — idempotent,
+  so it's safe and produces the same result on every PC). Replaces the old
+  `Refresh Paths`, which rewrote absolute paths per-PC and caused the churn.
+
 ## v01.03 — 2026-07-13
 
 - **Portable across PCs (JUN_All Root + Refresh Paths)**: buttons store an

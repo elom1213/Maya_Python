@@ -301,10 +301,10 @@ class LauncherTab(QWidget):
         return group
 
     def _build_env_group(self):
-        # 환경(이 PC 의 JUN_All 루트) 지정 + 모든 버튼 경로 재설정(Refresh Paths).
-        # 버튼 경로는 PC 마다 다른 절대경로로 저장된다. 다른 PC 에서 프로파일을 열면
-        # 이 루트를 확인/지정하고 'Refresh Paths' 를 눌러 모든 버튼을 이 PC 기준으로
-        # 한 번에 복구/공유할 수 있다. 필드 기본값은 자동 감지한 현재 PC 의 JUN_All.
+        # 환경(이 PC 의 JUN_All 루트). 버튼 경로는 이제 PC 무관 상대경로(tools/…)로 저장되고,
+        # 실행 시점에 이 루트로 resolve 된다. 그래서 보통은 아무것도 안 만져도 되고, 루트는
+        # 런처 실행 위치에서 자동 감지된다(Detect). 다른 JUN_All 을 가리키고 싶을 때만
+        # Browse 로 골라 'Apply Root' 로 오버라이드(로컬 파일에만 저장, git 추적 안 함).
         group = QGroupBox("Environment")
         col = QVBoxLayout(group)
 
@@ -312,14 +312,15 @@ class LauncherTab(QWidget):
         row.addWidget(QLabel("JUN_All Root:"))
 
         self.ipf_root = QLineEdit()
-        self.ipf_root.setText(tool_launcher.jun_all_root())
+        self.ipf_root.setText(prefs_mod.effective_root())
         self.ipf_root.setToolTip(
-            "This PC's JUN_All folder. Buttons store absolute paths, so on a "
-            "different PC set this, then click 'Refresh Paths' to re-point "
-            "every button to this PC's tools.")
+            "This PC's JUN_All folder, used to resolve each button's relative "
+            "path (tools/...). Auto-detected from where the launcher runs; only "
+            "override it (Apply Root) to point at a different JUN_All. The "
+            "override is saved to a gitignored local file, so PCs never conflict.")
 
         btn_browse = QPushButton("Browse...")
-        btn_browse.setToolTip("Pick this PC's JUN_All folder")
+        btn_browse.setToolTip("Pick a JUN_All folder")
         btn_browse.clicked.connect(self.on_browse_root)
 
         row.addWidget(self.ipf_root, stretch=1)
@@ -329,18 +330,26 @@ class LauncherTab(QWidget):
         action_row = QHBoxLayout()
         btn_detect = QPushButton("Detect")
         btn_detect.setToolTip(
-            "Fill the field with the JUN_All this launcher is running from")
+            "Reset to the JUN_All this launcher runs from (clears any override)")
         btn_detect.clicked.connect(self.on_detect_root)
 
-        btn_refresh = QPushButton("Refresh Paths")
-        btn_refresh.setToolTip(
-            "Re-point every button in every profile to the JUN_All Root above "
-            "(fixes buttons made on another PC)")
-        btn_refresh.clicked.connect(self.on_refresh_paths)
+        btn_apply = QPushButton("Apply Root")
+        btn_apply.setToolTip(
+            "Use the folder above as this PC's root override (gitignored). "
+            "If it equals the auto-detected root, the override is cleared.")
+        btn_apply.clicked.connect(self.on_apply_root)
+
+        btn_portable = QPushButton("Make Paths Portable")
+        btn_portable.setToolTip(
+            "One-time cleanup: rewrite any old absolute button paths in every "
+            "profile to relative 'tools/...' form (identical on every PC, so "
+            "they stop churning in git). Safe to click anytime.")
+        btn_portable.clicked.connect(self.on_make_portable)
 
         action_row.addWidget(btn_detect)
+        action_row.addWidget(btn_apply)
         action_row.addStretch(1)
-        action_row.addWidget(btn_refresh)
+        action_row.addWidget(btn_portable)
         col.addLayout(action_row)
 
         return group
@@ -475,8 +484,14 @@ class LauncherTab(QWidget):
 
         return box
 
+    def _abs_path(self, btn_data):
+        """버튼에 저장된 (상대) 경로를 이 PC 의 실제 절대경로로 resolve 한다."""
+        return tool_launcher.resolve(
+            btn_data.get("path", ""), prefs_mod.effective_root())
+
     def _build_tool_button(self, cat_name, btn_data):
-        path = btn_data.get("path", "")
+        # 저장은 'tools/…' 상대경로지만, 검증/아이콘/툴팁/실행은 이 PC 절대경로로 한다.
+        path = self._abs_path(btn_data)
         # 버튼은 고정 높이 — 왼쪽 정사각형 아이콘의 한 변과 같게 맞춘다.
         btn = QPushButton(btn_data["name"])
         btn.setFixedHeight(BUTTON_HEIGHT)
@@ -646,25 +661,27 @@ class LauncherTab(QWidget):
     # ============================================================ environment
 
     def on_detect_root(self):
-        """필드를 이 런처가 실행 중인 JUN_All 경로로 채운다(자동 감지)."""
+        """오버라이드를 지우고 필드를 자동 감지 루트(런처 실행 위치)로 되돌린다."""
+        prefs_mod.clear_root_override()
         self.ipf_root.setText(tool_launcher.jun_all_root())
-        self._log("Detected JUN_All Root: {0}".format(self.ipf_root.text()))
+        self._render_categories()   # 버튼 경로 resolve 기준이 바뀌었을 수 있으니 갱신
+        self._log("Using auto-detected JUN_All Root: {0}".format(
+            self.ipf_root.text()))
 
     def on_browse_root(self):
-        """이 PC 의 JUN_All 폴더를 탐색기로 고른다."""
+        """JUN_All 폴더를 탐색기로 고른다(선택만; 적용은 Apply Root)."""
         start = self.ipf_root.text().strip() or ""
         folder = QFileDialog.getExistingDirectory(
             self, "Select JUN_All Folder", start)
         if folder:
             self.ipf_root.setText(tool_launcher.normalize_path(folder))
 
-    def on_refresh_paths(self):
-        """JUN_All Root 필드 기준으로 모든 프로파일의 버튼 경로를 재설정한다.
+    def on_apply_root(self):
+        """필드 값을 이 PC 의 루트 오버라이드로 적용(gitignore 된 로컬 파일에만 저장).
 
-        다른 PC 에서 만든 절대경로 버튼들을 이 PC(또는 지정 루트) 기준으로 한 번에
-        복구/공유하기 위한 것. 'tools' 앵커가 없는 경로는 손대지 않는다.
+        자동 감지값과 같으면 오버라이드를 지운다(불필요한 로컬 파일을 안 남긴다).
         """
-        root = self.ipf_root.text().strip()
+        root = tool_launcher.normalize_path(self.ipf_root.text().strip())
         if not root:
             QMessageBox.warning(self, TITLE, "JUN_All Root is empty.")
             return
@@ -676,11 +693,27 @@ class LauncherTab(QWidget):
             if QMessageBox.question(
                 self, TITLE,
                 "No 'tools' subfolder under:\n{0}\n\n"
-                "This may not be a JUN_All root. Refresh anyway?".format(root)
+                "This may not be a JUN_All root. Use it anyway?".format(root)
             ) != QMessageBox.Yes:
                 return
 
-        stats = prefs_mod.rebase_all_profiles(root)
+        if root == tool_launcher.normalize_path(tool_launcher.jun_all_root()):
+            prefs_mod.clear_root_override()
+            self._log("Root equals auto-detected — override cleared.")
+        else:
+            prefs_mod.set_root_override(root)
+            self._log("Saved root override (gitignored local file): {0}".format(root))
+
+        self.ipf_root.setText(prefs_mod.effective_root())
+        self._render_categories()
+
+    def on_make_portable(self):
+        """모든 프로파일의 버튼 경로를 상대경로(tools/…)로 정규화한다(마이그레이션).
+
+        예전/다른 PC 의 절대경로 버튼을 PC 무관 상대경로로 한 번에 바꿔, git 에서 더는
+        흔들리지 않게 한다. 이미 상대경로면 파일이 안 바뀐다.
+        """
+        stats = prefs_mod.make_all_portable()
 
         # 활성 프로파일 데이터도 디스크에서 바뀌었을 수 있으니 다시 읽고 그린다.
         self._data = prefs_mod.load_profile(self._profile)
@@ -688,15 +721,15 @@ class LauncherTab(QWidget):
         self._render_categories()
 
         self._log(
-            "Refresh Paths: {changed} re-pointed, {unchanged} already OK, "
-            "{skipped} skipped (no 'tools' anchor) across {profiles} "
-            "profile(s).".format(**stats))
+            "Make Paths Portable: {changed} converted to relative, "
+            "{unchanged} already relative, {skipped} skipped (outside "
+            "JUN_All/tools) across {profiles} profile(s).".format(**stats))
         QMessageBox.information(
             self, TITLE,
-            "Re-pointed {changed} button(s) to:\n{root}\n\n"
-            "Already OK: {unchanged}\n"
+            "Converted {changed} button path(s) to relative 'tools/...'.\n\n"
+            "Already relative: {unchanged}\n"
             "Skipped (outside JUN_All/tools): {skipped}\n"
-            "Profiles updated: {profiles}".format(root=root, **stats))
+            "Profiles updated: {profiles}".format(**stats))
 
     # ============================================================== create
 
@@ -758,8 +791,9 @@ class LauncherTab(QWidget):
 
             break
 
+        # 저장은 PC 무관 상대경로(tools/…)로 — git 에서 프로파일이 PC 마다 흔들리지 않게.
         cat["buttons"].append(
-            {"name": label, "path": tool_launcher.normalize_path(path)})
+            {"name": label, "path": tool_launcher.to_portable(path)})
         self._save_and_render()
         self._log("Added tool button '{0}'.".format(label))
 
@@ -770,7 +804,7 @@ class LauncherTab(QWidget):
         if btn_data is None:
             return
 
-        path = btn_data.get("path", "")
+        path = self._abs_path(btn_data)
         reload_module = self.chk_reload.isChecked()
         ok, msg = tool_launcher.launch(path, reload_module=reload_module)
         self._log(msg if ok else "[!] " + msg)
@@ -957,7 +991,7 @@ class LauncherTab(QWidget):
             QMessageBox.warning(self, TITLE, msg)
             return
 
-        btn_data["path"] = tool_launcher.normalize_path(folder)
+        btn_data["path"] = tool_launcher.to_portable(folder)
         self._save_and_render()
         self._log("Set path of '{0}' to {1}.".format(
             btn_name, btn_data["path"]))
@@ -967,7 +1001,7 @@ class LauncherTab(QWidget):
         btn_data = self._find_button(cat_name, btn_name)
         if btn_data is None:
             return
-        ok, msg = tool_launcher.reveal_in_explorer(btn_data.get("path", ""))
+        ok, msg = tool_launcher.reveal_in_explorer(self._abs_path(btn_data))
         if not ok:
             self._log("[!] " + msg)
 

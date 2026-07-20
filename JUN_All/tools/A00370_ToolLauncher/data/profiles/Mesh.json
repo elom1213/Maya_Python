@@ -5,15 +5,15 @@
       "buttons": [
         {
           "name": "uvTool",
-          "path": "C:\\Users\\USER\\Desktop\\JP\\0030_maya_python_JUN\\Maya_Python\\JUN_All\\tools\\A00050_uvTool"
+          "path": "tools/A00050_uvTool"
         },
         {
           "name": "meshDoctor",
-          "path": "C:\\Users\\USER\\Desktop\\JP\\0030_maya_python_JUN\\Maya_Python\\JUN_All\\tools\\A00300_meshDoctor"
+          "path": "tools/A00300_meshDoctor"
         },
         {
           "name": "abSymMesh",
-          "path": "C:\\Users\\USER\\Desktop\\JP\\0030_maya_python_JUN\\Maya_Python\\JUN_All\\tools\\A00180_abSymMesh"
+          "path": "tools/A00180_abSymMesh"
         }
       ]
     }

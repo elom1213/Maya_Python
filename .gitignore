@@ -26,6 +26,13 @@ __pycache__/
 # A00340_SelectionTool 사용자 데이터(프로파일 JSON)도 툴 폴더 내부 data/ 에 저장 — 추적 안 함.
 **/A00340_SelectionTool/data/
 
+# A00370_ToolLauncher: 프로파일(버튼 세트)은 PC 무관 상대경로(tools/…)로 저장되어 PC 간 동일하므로
+# profiles/ 는 계속 추적·공유한다. 반면 아래 두 파일은 PC별 상태라 추적하지 않는다.
+#   local_env.json : 이 PC 의 JUN_All 루트 오버라이드
+#   active.json    : 이 PC 에서 마지막으로 연 프로파일
+**/A00370_ToolLauncher/data/local_env.json
+**/A00370_ToolLauncher/data/active.json
+
 # A00210_FileManager 데이터는 별도 원격 저장소(JUN_FileManager_data)로 관리됨.
 # 이 repo 트리 안에 들어와도 절대 추적/임베디드-repo 커밋하지 않는다.
 /JUN_FileManager_data/

@@ -5,15 +5,15 @@
       "buttons": [
         {
           "name": "KWI_creator_V03",
-          "path": "C:\\Users\\USER\\Desktop\\JP\\0030_maya_python_JUN\\Maya_Python\\JUN_All\\tools\\A00080_KWI_creator_V03"
+          "path": "tools/A00080_KWI_creator_V03"
         },
         {
           "name": "ConstraintConverter",
-          "path": "C:\\Users\\USER\\Desktop\\JP\\0030_maya_python_JUN\\Maya_Python\\JUN_All\\tools\\A00260_ConstraintConverter"
+          "path": "tools/A00260_ConstraintConverter"
         },
         {
           "name": "ArrayCreator",
-          "path": "C:\\Users\\USER\\Desktop\\JP\\0030_maya_python_JUN\\Maya_Python\\JUN_All\\tools\\A00350_ArrayCreator"
+          "path": "tools/A00350_ArrayCreator"
         }
       ]
     }

@@ -122,24 +122,28 @@ A00370_ToolLauncher/data/
 `Profile` 그룹에서 상황별 버튼 세트를 New / Rename / Delete 로 관리한다.
 콤보를 바꾸면 해당 세트로 즉시 전환된다.
 
-### 8) PC 이식 — JUN_All Root + Refresh Paths
-버튼은 `path` 에 **절대경로**(`C:\...\JUN_All\tools\A000XX_name`)를 저장한다. 그래서
-JUN_All 위치가 다른 **다른 PC 에서 프로파일을 열면 경로가 깨진다**(PC1 은 `G:\...\JUN_All`,
-PC2 는 `C:\...\Maya_Python\JUN_All`). `Environment` 박스로 한 번에 복구/공유한다.
+### 8) PC 이식 — 상대경로 저장(자동) + Environment
+버튼은 `path` 에 **JUN_All 루트 기준 상대경로**(`tools/A000XX_name`)를 저장한다. 이 값은
+**PC 가 달라도 동일**하므로, JUN_All 위치가 다른 다른 PC 에서 프로파일을 열어도 그냥 동작하고
+프로파일 JSON 도 흔들리지 않는다(= git 병합 충돌 없음). 실제 절대경로는 실행 시점에 이 PC 의
+JUN_All 루트로 resolve 한다.
 
-- **JUN_All Root** 필드 — 이 런처가 실행 중인 위치에서 **자동 감지한** 현재 PC 의
-  JUN_All 경로가 기본값으로 채워진다(런처 자신이 `JUN_All/tools/A00370.../` 안에 있으므로
-  현재 PC 의 루트를 항상 정확히 안다). `Browse...` 로 직접 고르거나 `Detect` 로 다시 채운다.
-- **Refresh Paths** — **모든 프로파일의 모든 버튼**을 이 루트 기준으로 다시 잡는다.
-  각 경로의 `tools/` 세그먼트 뒤(`tools/A000XX_name`)를 떼어 새 루트에 다시 이어붙인다.
-  `JUN_All/tools` 밖을 가리키는(=`tools` 앵커가 없는) 버튼은 건드리지 않고 skip 으로 보고한다.
-  → 다른 PC 에서 프로파일을 받아 열었을 때의 **원클릭 복구/공유** 수단.
-- **자동 복구(self-heal)** — Refresh 를 누르지 않아도, 저장된 경로가 깨진 버튼을 클릭하면
-  같은 경로를 현재 PC 의 자동감지 루트로 리베이스해 그게 실제로 있으면 거기서 실행한다.
-  그래서 공유 프로파일이 대체로 그냥 동작한다.
+- **자동 감지** — 런처 자신이 `JUN_All/tools/A00370.../` 안에 있으므로 현재 PC 의 JUN_All 루트를
+  항상 정확히 안다. 보통은 **아무것도 안 만져도 된다**.
+- **JUN_All Root 필드 / Browse / Apply Root** — 다른 JUN_All 을 가리키고 싶을 때만 쓴다.
+  `Browse...` 로 폴더를 고르고 **`Apply Root`** 를 누르면 그 루트가 이 PC 의 **오버라이드**로 저장된다
+  (자동 감지값과 같으면 오버라이드를 지운다). 오버라이드는 **gitignore 된 로컬 파일
+  (`data/local_env.json`)** 에만 저장되어 PC 간 충돌이 없다. `Detect` 는 오버라이드를 지우고 다시
+  자동 감지값으로 되돌린다.
+- **Make Paths Portable** — (일회성 마이그레이션) 예전 버전/다른 PC 에서 만든 **절대경로** 버튼이
+  섞여 있으면 모두 상대경로(`tools/…`)로 바꿔 저장한다. 이미 상대경로면 파일이 안 바뀐다(idempotent).
+  `JUN_All/tools` 밖을 가리키는(=`tools` 앵커가 없는) 외부 버튼은 상대화할 수 없어 skip 으로 보고한다.
+- **자동 복구(self-heal)** — 저장된 경로가 (구버전 절대경로라) 그대로 들어와도, 클릭 시 현재 PC 의
+  루트로 resolve 해 실제로 있으면 거기서 실행한다.
 
-> 프로파일 JSON(`data/profiles/*.json`)은 repo 로 공유되므로, 한 PC 에서 세팅해 커밋하면
-> 다른 PC 에서 pull 후 `Refresh Paths` 한 번으로 그 PC 기준으로 복구된다.
+> **git 추적 범위**: 프로파일(`data/profiles/*.json`, 버튼 세트)은 상대경로라 PC 간 동일하므로
+> **계속 추적·공유**한다. PC별 상태인 `data/local_env.json`(루트 오버라이드)와
+> `data/active.json`(마지막 연 프로파일)은 **gitignore** 되어 추적하지 않는다.
 
 ### 9) 레이아웃 / 기타
 - 컨트롤 패널과 버튼 영역 사이의 **스플리터**를 드래그해 비율 조절.

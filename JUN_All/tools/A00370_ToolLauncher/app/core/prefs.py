@@ -11,17 +11,24 @@
 #
 # 저장 위치는 툴 폴더 내부의 data/ 다.
 #   <A00370_ToolLauncher>/data/
-#     ├── profiles/<profile>.json   # 예: Default.json, Facial.json
-#     └── active.json               # {"active": "<현재 프로파일>"}
+#     ├── profiles/<profile>.json   # 예: Default.json, Facial.json   (git 추적 — PC 간 공유)
+#     ├── active.json               # {"active": "<현재 프로파일>"}     (gitignore — PC별)
+#     └── local_env.json            # {"root_override": "..."}         (gitignore — PC별)
 #
-# 프로파일 JSON 자료 구조:
+# 프로파일 JSON 자료 구조 (버튼 경로는 **JUN_All 루트 기준 상대경로**로 저장한다):
 #   {
 #     "categories": [
 #       {"name": "Maya to Unreal",
-#        "buttons": [{"name": "KWI Creator", "path": "C:/.../A00080_KWI_creator_V03"}]},
+#        "buttons": [{"name": "KWI Creator", "path": "tools/A00080_KWI_creator_V03"}]},
 #       ...
 #     ]
 #   }
+#
+# PC 간 동기화(중요): 예전엔 버튼이 PC 마다 다른 '절대경로' 를 담아, 다른 PC 에서 Refresh Paths 를
+# 누를 때마다 프로파일 JSON 이 통째로 바뀌어 git 병합 충돌이 났다. 이제 버튼은 'tools/…' 상대경로만
+# 저장하므로 프로파일은 모든 PC 에서 동일하다(= 추적/공유해도 흔들리지 않음). 실제 절대경로는 실행
+# 시점에 이 PC 의 JUN_All 루트(effective_root)로 resolve 한다. PC별로 다른 루트/활성프로파일은
+# gitignore 된 local_env.json / active.json 에만 둔다.
 
 import os
 import json
@@ -40,6 +47,8 @@ PREFS_DIR = os.path.join(_base_dir(), "data")
 
 PROFILES_DIR = os.path.join(PREFS_DIR, "profiles")
 ACTIVE_PATH = os.path.join(PREFS_DIR, "active.json")
+# PC별 로컬 설정(루트 오버라이드). gitignore 대상.
+LOCAL_ENV_PATH = os.path.join(PREFS_DIR, "local_env.json")
 
 DEFAULT_PROFILE = "Default"
 
@@ -159,21 +168,53 @@ def set_active(name):
         json.dump({"active": name}, f, ensure_ascii=False, indent=2)
 
 
-# -------------------------------------------------------------- rebase paths
+# --------------------------------------------------- local env (root override)
 
-def rebase_all_profiles(new_root):
-    """모든 프로파일의 모든 버튼 경로를 새 JUN_All 루트 기준으로 다시 잡는다.
+def get_root_override():
+    """PC별 JUN_All 루트 오버라이드(없거나 비어있으면 '')."""
+    data = _read_json(LOCAL_ENV_PATH, None)
+    if isinstance(data, dict):
+        return (data.get("root_override") or "").strip()
+    return ""
 
-    다른 PC 에서 만든 절대경로 버튼들을 이 PC(또는 지정한) JUN_All 루트로 한 번에
-    복구/공유하기 위한 것. 각 버튼 경로는 tool_launcher.rebase_to_root 로 옮기며,
-    'tools' 앵커가 없어 옮길 수 없는 경로(=JUN_All/tools 밖)는 건너뛴다.
 
-    통계 dict 를 돌려준다:
-      changed  : 실제로 경로가 바뀐 버튼 수
-      unchanged: 리베이스했으나 결과가 같던 버튼 수(이미 이 루트였음)
-      skipped  : 'tools' 앵커가 없어 못 옮긴 버튼 수
-      total    : 전체 버튼 수
-      profiles : 파일이 실제로 저장된(=바뀐) 프로파일 수
+def set_root_override(root):
+    """루트 오버라이드를 로컬 파일에 저장(gitignore 대상)."""
+    os.makedirs(PREFS_DIR, exist_ok=True)
+    with open(LOCAL_ENV_PATH, "w", encoding="utf-8") as f:
+        json.dump({"root_override": root or ""}, f, ensure_ascii=False, indent=2)
+
+
+def clear_root_override():
+    """루트 오버라이드를 지운다(다시 자동 감지 사용)."""
+    try:
+        os.remove(LOCAL_ENV_PATH)
+    except OSError:
+        pass
+
+
+def effective_root():
+    """버튼 경로를 resolve 할 이 PC 의 JUN_All 루트.
+
+    유효한 오버라이드가 있으면 그것을, 없으면 런처 실행 위치에서 자동 감지한 루트를 쓴다.
+    """
+    override = get_root_override()
+    if override and os.path.isdir(override):
+        return tool_launcher.normalize_path(override)
+    return tool_launcher.jun_all_root()
+
+
+# ------------------------------------------------------- make paths portable
+
+def make_all_portable():
+    """모든 프로파일의 버튼 경로를 이식 가능(상대) 형태로 바꿔 저장한다.
+
+    예전 버전(또는 다른 PC)에서 만든 '절대경로' 버튼을 `tools/A000XX/...` 상대경로로
+    한 번에 정규화하는 마이그레이션. 결과가 이미 상대경로면 그대로라 파일이 안 바뀐다
+    (= 어느 PC 에서 눌러도 같은 결과 → git churn 없음). 'tools' 앵커가 없는 외부 절대경로는
+    바꿀 수 없어 건너뛴다.
+
+    통계 dict: changed / unchanged / skipped / total / profiles.
     """
     changed = unchanged = skipped = total = files = 0
 
@@ -185,10 +226,10 @@ def rebase_all_profiles(new_root):
             for btn in cat.get("buttons", []):
                 total += 1
                 old = btn.get("path", "")
-                new = tool_launcher.rebase_to_root(old, new_root)
-                if new is None:
-                    skipped += 1
-                elif new != tool_launcher.normalize_path(old):
+                new = tool_launcher.to_portable(old)
+                if tool_launcher._tools_tail(old) is None:
+                    skipped += 1          # 외부 절대경로 — 상대화 불가
+                elif new != old:
                     btn["path"] = new
                     changed += 1
                     dirty = True
