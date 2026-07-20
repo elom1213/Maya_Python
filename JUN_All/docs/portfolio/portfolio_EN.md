@@ -2,7 +2,7 @@
 title: Portfolio — Work Summary (2026-05-06 ~ 2026-07-15)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-07-15
+updated: 2026-07-20
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
@@ -24,6 +24,7 @@ updated: 2026-07-15
 > - I focus on **removing artist repetition with tooling**: hundreds of manual passes (per-pose corrective matching, per-bone physics setup) collapsed into a single button.
 > - I automate the **Maya → Unreal bridge** by generating engine node text: rig data from Maya (joints, constraints, object arrays) becomes Control Rig / KawaiiPhysics nodes you literally **paste into the graph with Ctrl+V**.
 > - I build tools as a **pipeline, not as one-offs**: shared widgets, theming, path management, undo, drag-&-drop shelf install and a release builder — so a new tool ships in half a day.
+> - I **author rig behaviour as tunable math functions**: chain twist and deformation shaped by linear/sigmoid functions (beating the splineIK up-vector limit; art-directable and live-tunable vs. matrix constraints) to build **tentacle and snake** rigs that **import into Unreal and animate exactly as intended**.
 
 ---
 
@@ -102,6 +103,33 @@ updated: 2026-07-15
 
 ## 3. Rigging automation (character rig · skinning · shapes)
 
+### 3-1. Function-driven twist & deform rig asset — built with `A00170_driverTool`
+
+Not just the tool — I stood up real rig assets with it, such as **tentacle and snake** rigs.
+
+- **Idea — shaping a driver like signal processing**: a hierarchy of **driver nulls whose Translate / Rotate / Scale attributes are shaped by a chosen math function, as if processing a signal**. The drivers feed a joint chain, so the chain's deformation is expressed **per-function and additively (layered)**. The Stretch tab builds the linear/sigmoid function as a driven network and lays its output **additively on top of the original value**, so several functions can be **stacked on one chain** to compose complex behaviour.
+- **Chain twist — beating the splineIK limit**: the function specifies **how much twist is distributed from the root to the tip** of the chain. This overcomes the classic **splineIK limitation** — a single up-vector can't cleanly deliver progressive/large twist along the whole span — by distributing twist through the function instead. Especially effective for **long, coiling, twisting** rigs like tentacles and snakes.
+- **Edge over matrix constraints**: unlike a matrix (offsetParentMatrix) setup that rigidly copies/constrains a transform, here the **shape of how the value propagates along the chain is authored as a function**. The sigmoid carries convergence thresholds (upper/lower plateaus, never dropping below 0) and a sharpness, and those parameters are **exposed as scene attributes on the driver object**, so the falloff can be **tuned and animated live in the scene without rebuilding the rig**. The result is deformation that is **art-directable, layerable and live-tunable** rather than a rigid constraint.
+- **Unreal-import ready — plays as intended**: the setup drives a **real joint chain**, not Maya-only constructs, so the resulting skeletal animation **imports into Unreal and plays exactly as intended**. (It isn't ported to a live Control Rig, but the driver function network **bakes down to joint/skeleton animation**, so it stays alive in-engine.) An **engine-ready** rig from a game-pipeline standpoint.
+
+```
+Default Distance attribute (driver signal x)
+        │  A00170 Stretch:  f(x) = linear / sigmoid (threshold & sharpness = scene attrs)
+        ▼
+  driver null hierarchy  (T / R / S,  additive over the original value)
+   null_0 -> null_1 -> null_2 -> ... -> null_n   <- functions stack (layered)
+        │  drives
+        ▼
+  joint chain  jnt_0 -> jnt_1 -> ... -> jnt_n     -> progressive root->tip twist (beats splineIK up-vector)
+        │  bake to FBX skeletal animation
+        ▼
+  Unreal:  import -> animates as intended (engine-ready)
+```
+
+- **Keywords**: driven-function rig, additive function layering, chain twist distribution, beating the splineIK up-vector limit, sigmoid falloff, live attribute control, vs. matrix constraints, tentacle/snake rig, Unreal-import ready
+
+### 3-2. Rigging tool list
+
 | Tool | What it does |
 |------|--------------|
 | `A00145_RigConnect` | **Unified rig-connection tool**: absorbed two legacy MEL tools (ConnectionTool, Match Tool) into Qt. Match (T/R/S/Parent options), matrix constraints, connect-to-closest, **skin weight → constraint conversion** (Parent / Scale / Point / Orient), batch offset/zero-out group creation, **Constraint Transfer** (move an existing constraint onto another object, preserving world pose), and an **Attribute tab** that copies chosen attributes onto other objects with a prefix/suffix (type/range/default/keyable preserved) — including a blendShape's targets (see 1-4) |
@@ -111,7 +139,7 @@ updated: 2026-07-15
 | `A00130_ControlRig` | Control rig generation |
 | `A00180_abSymMesh` | Legacy abSymMesh **re-implemented on OpenMaya** for speed: snap-to-symmetry, mirror deform, selected-vertices-only mode |
 | `A00290_BSTool` | blendShape editing suite — a tab that **replaces Maya's native Shape Editor** (all targets listed, per-target edit toggle, live weight sync), Base Shape editing, per-frame shape copy |
-| `A00170_driverTool`, `A00150_remapVal`, `A00160_sphericalEye` | Driven keys / remapValue (master node driving child remaps, sine-wave and slerp-ramp build modes), closest-point curve attach with even distribution, spherical eye rig (pupil dilation, converge-to-center) |
+| `A00170_driverTool`, `A00150_remapVal`, `A00160_sphericalEye` | **Function-driven stretch** (linear/sigmoid functions as a driven network, laid additively over the original value; sigmoid thresholds & sharpness exposed as **live scene attributes on the driver object** — see 3-1), driven keys / remapValue (master node driving child remaps, sine-wave and slerp-ramp build modes), closest-point curve attach with even distribution, spherical eye rig (pupil dilation, converge-to-center) |
 
 ---
 
