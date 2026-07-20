@@ -155,6 +155,7 @@ Default Distance attribute (driver signal x)
 ## 5. Modeling / asset QC · export
 
 - **`A00300_meshDoctor`** — **read-only mesh diagnosis with safe one-click repair**. Detects non-manifold geometry, lamina faces, zero-area faces (judged by shape quality, not just area), n-gons, etc.; **batch-diagnoses many meshes into a colour-coded summary table**, and logs results to JSON/TXT.
+- **`A00380_MeshTool`** — **inflates / shrinks a mesh along its vertex normals** (the equivalent of Houdini's `peak` node), with a live slider preview, Range/Step controls for fine adjustment, and **soft-selection falloff** support. Maya's native route (Move tool with `axis = normal`) issues one command per vertex and is slow; writing **`shape.pnts` in one ranged `setAttr`** instead cut **19,462 vertices from ~7.2 s to 0.10 s (~70x)**. The real behaviour of Maya's tweak and undo stack was verified headlessly with `mayapy`, so previews leave no undo entries and **Apply reverts precisely with a single Ctrl+Z**.
 - **`A00040_file_exporter_V02`** — export automation: type filters (applied through group hierarchies), referenced-mesh handling, and a choice of flattening to scene root or preserving hierarchy.
 - **`A00050_uvTool`**, **`A00030_quickTool`**, **`A00330_NamingTool`** (legacy naming tool port + Quick Rename), **`A00310_SearchTool`** (select by type/name), **`A00360_SortTool`** (sort by world X/Y/Z, name or type and reorder the Outliner).
 

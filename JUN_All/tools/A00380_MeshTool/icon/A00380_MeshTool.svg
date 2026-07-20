@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- A00380_MeshTool shelf icon: mesh surface + normal-direction peak arrows -->
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+  <!-- mesh surface (quad strip seen edge-on) -->
+  <g stroke="#ff9e64" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M4 22 L11 18.5 L18 22 L25 18.5 L28 20"/>
+    <path d="M4 26 L11 22.5 L18 26 L25 22.5 L28 24"/>
+    <path d="M11 18.5 L11 22.5"/>
+    <path d="M18 22 L18 26"/>
+    <path d="M25 18.5 L25 22.5"/>
+  </g>
+  <!-- normal-direction peak arrows -->
+  <g stroke="#e8edf2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M11 15.5 L11 6.5"/>
+    <path d="M8 9.4 L11 6 L14 9.4"/>
+    <path d="M22.5 15.5 L22.5 9"/>
+    <path d="M20.2 11.4 L22.5 8.6 L24.8 11.4"/>
+  </g>
+</svg>

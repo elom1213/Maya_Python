@@ -156,6 +156,11 @@ Default Distance 어트리뷰트 (driver 신호 x)
 ## 5. 모델링 / 에셋 QC · 익스포트
 
 - **`A00300_meshDoctor`** — 메시 **읽기 전용 진단 + 안전 원클릭 수정** 툴. non-manifold, lamina, zero-area(형상 품질 기반 판정), N-gon 등을 검사하고 **여러 메시를 배치 진단해 색상 코드 요약 테이블**로 보여줍니다. 진단 결과는 JSON/TXT 로그로 남습니다.
+- **`A00380_MeshTool`** — 메시를 **노말 방향으로 팽창/수축**시키는 툴(후디니 `peak` 노드에 대응). 슬라이더
+  실시간 프리뷰 + Range/Step 기반 미세 조정, **소프트 셀렉션 falloff** 반영. 마야 기본 방식(Move 툴
+  `axis = normal`)은 버텍스마다 명령이 돌아 느린데, 이를 **`shape.pnts` 구간 `setAttr` 일괄 기록**으로
+  바꿔 **19,462 버텍스 기준 약 7.2초 → 0.10초(약 70배)** 로 줄였습니다. tweak·undo 스택의 실제 거동을
+  headless(mayapy)로 검증해, 미리보기는 undo 기록을 남기지 않고 **Apply 는 Ctrl+Z 한 번**에 정확히 되돌아갑니다.
 - **`A00040_file_exporter_V02`** — 익스포트 자동화. 타입 필터(그룹 하위까지 적용), 레퍼런스 메시 처리, 씬 최상위로 빼기/계층 유지 선택.
 - **`A00050_uvTool`**, **`A00030_quickTool`**, **`A00330_NamingTool`**(레거시 네이밍 툴 이식 + Quick Rename), **`A00310_SearchTool`**(타입·이름 기반 선택), **`A00360_SortTool`**(월드 X/Y/Z·이름·타입 기준 정렬 및 아웃라이너 재정렬).
 
