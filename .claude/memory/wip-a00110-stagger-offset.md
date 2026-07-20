@@ -5,11 +5,22 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 69c25012-610a-4113-b9c9-4458ca7059e9
-  modified: 2026-07-20T08:38:38.458Z
+  modified: 2026-07-20T08:59:44.398Z
 ---
 
-A00110_animTool v01.30→**01.31** — Key Edit 탭 5번째 접이식 섹션 **Stagger Offset** 추가.
-**DONE (headless 39-check 통과 + Maya 실기 확인 + pushed).**
+A00110_animTool v01.30→**01.32** — Key Edit 탭 5번째 접이식 섹션 **Stagger Offset** 추가.
+**DONE (headless 39+20 check 통과 + Maya 실기 확인 + pushed).**
+
+**v01.32 — Ctrl+Z 복구 + 슬라이더**: v01.31 은 미리보기를 undo 큐에 안 올려서 조절 후 **Ctrl+Z 가
+안 먹었다**(무관한 이전 작업이 취소됨). → **settle 모델**: 세션이 `applied`(씬에 보이는 값)와
+`settled`(undo 에 기록된 값)를 따로 들고, 조작이 멎으면(350ms 디바운스 / sliderReleased /
+editingFinished) **undo 끈 채 settled 로 되돌린 뒤** undo 청크로 `settled→현재값` 한 번에 이동.
+undo 는 *역연산을 현재 상태에 적용* 하므로 이 순서라야 Ctrl+Z 가 정확히 그 지점으로 온다.
+→ 조작 1회 = undo 1개, 첫 조작이면 **Ctrl+Z = Reset**. `restore()` = `settle(0)` 로 통일.
+**탐침(`scene_in_sync`)**: 사용자가 Ctrl+Z 를 누르면 씬≠세션 가정 → 첫 움직이는 항목(index>0)의
+구간 내 첫 키가 `probe_base + index*applied` 에 있는지 확인, 어긋나면 **되돌리기 시도 없이 세션만
+버린다**(잘못 알고 restore 하면 키가 엉뚱한 곳으로 밀림). UI 는 슬라이더+스핀박스
+(**A00290_BSTool Shape Editor 패턴** — 같은 값의 두 얼굴, blockSignals 로 반대쪽 동기화), 슬라이더 ±60f.
 
 리스트업한 컨트롤러의 `[Start, End]` 구간 키를 **리스트 순서 × Offset** 만큼 계단식으로 민다
 (0번 제자리 / 1번 +1배 / 2번 +2배 …). 팔로우스루·웨이브용. 사용자 예시: ctl_01/02/03 모두 0~5f 키,

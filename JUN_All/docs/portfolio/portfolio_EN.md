@@ -207,6 +207,10 @@ Default Distance attribute (driver signal x)
 
 - One window for the animator's repetitive work: key copy/paste (with axis reversal), **L/R controller key mirroring**, 6-axis pose keys, Offset & Hold, baking (including Smart bake), **Follow (target-match bake)**, and automatic Graph Editor framing (frames to current ± margin on selection).
 - I analysed and documented the bake algorithms of the legacy MEL / SmartLayer tools, then **ported them onto native Maya APIs**, verifying result parity while gaining speed.
+- **Stagger Offset — authoring follow-through / wave motion with a slider**: shifts the listed controllers' keys inside a chosen frame range by **list order × N frames**, producing the delayed, trailing motion of tails, hair and cloth. The value is **adjusted live with a slider** and is **never cumulative** (always recomputed from the original positions).
+  - **Live editing and Undo made to coexist**: nothing is written to the undo queue while dragging (so it doesn't fill with hundreds of entries); the moment the input **settles**, the result is committed as **a single entry**. Because undo *applies a command's inverse to the current state*, the tool always rewinds to the last committed state before recording — so **one Ctrl+Z lands exactly where the user started**.
+  - Keys are moved with **relative moves only**, never by rebuilding the curve, so **tangents, infinity and anim-layer membership survive**. It even detects the case where the user hits Undo in the scene and the session's assumptions go stale, via a **probe key**, rather than corrupting the timing.
+  - The behaviour is covered by **59 headless (mayapy) scenarios** — non-cumulative edits, keys outside the range, tangent preservation, undo restoration.
 
 ---
 

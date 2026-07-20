@@ -77,8 +77,16 @@ class StaggerOffsetSession(object):
         self.risky = list(risky or [])
         # 씬에 없거나 키가 없어 제외된 항목들
         self.skipped = list(skipped or [])
-        # 지금 씬에 적용돼 있는 offset (미리보기 포함)
+        # 지금 씬에 적용돼 있는 offset (미리보기 포함, undo 큐에 없을 수 있음)
         self.applied = 0
+        # undo 큐에 '기록까지 끝난' 마지막 offset. 미리보기는 항상 이 값을 기준으로
+        # 되돌린 뒤 다시 기록한다(그래야 Ctrl+Z 가 정확히 이 값으로 돌아온다).
+        self.settled = 0
+        # 씬이 세션의 가정과 어긋났는지(예: 사용자가 Ctrl+Z) 확인하는 탐침.
+        # 첫 '움직이는' 항목(index>0)의 구간 내 첫 키를 기준으로 삼는다.
+        self.probe_plug = ""
+        self.probe_index = 0
+        self.probe_base = 0.0
 
     @property
     def objects(self):
@@ -151,6 +159,7 @@ class StaggerOffsetSession(object):
             return (None, "No animated objects in the list. (missing in scene, or no keys)")
 
         session = cls(entries, start, end, attrs, risky, skipped)
+        session._set_probe()
 
         msg = "Stagger session: {0} object(s), range [{1}-{2}f].".format(
             len(entries), start, end)
@@ -161,6 +170,45 @@ class StaggerOffsetSession(object):
                     "shifted keys may overwrite them: {1}").format(
                         len(risky), ", ".join(risky[:5]) + (" ..." if len(risky) > 5 else ""))
         return (session, msg)
+
+    # ------------------------------------------------------- 씬 동기화 확인(탐침)
+
+    def _set_probe(self):
+        """세션의 가정이 아직 맞는지 확인할 '탐침 키' 를 잡아 둔다.
+
+        첫 번째로 '실제 움직이는' 항목(index > 0)의 **구간 안 첫 키**를 기준으로 삼는다.
+        (index 0 은 절대 안 움직이므로 탐침이 될 수 없다.)
+        """
+        for idx, obj in self.entries:
+            if idx <= 0:
+                continue
+            for plug in self._target_plugs(obj, self.attrs):
+                times = cmds.keyframe(
+                    plug, q=True, time=(self.start, self.end), timeChange=True) or []
+                if times:
+                    self.probe_plug = plug
+                    self.probe_index = idx
+                    self.probe_base = min(times)
+                    return
+
+    def scene_in_sync(self):
+        """씬이 세션의 가정(applied)과 일치하는가.
+
+        사용자가 Ctrl+Z 로 되돌리면 씬은 이전 상태인데 세션은 그걸 모른다. 그 상태로 계속
+        밀면 엉뚱한 구간을 건드리게 되므로, 탐침 키가 '있어야 할 자리' 에 있는지 확인한다.
+        어긋나면 호출측(UI)이 세션을 버리고 새로 만든다.
+        """
+        if not self.probe_plug:
+            return True
+        if not cmds.objExists(self.probe_plug):
+            return False
+
+        expected = self.probe_base + self.probe_index * self.applied
+        hits = cmds.keyframe(
+            self.probe_plug, q=True,
+            time=(expected - self.EPS, expected + self.EPS),
+            timeChange=True) or []
+        return bool(hits)
 
     # ------------------------------------------------------------------ 이동
 
@@ -204,33 +252,57 @@ class StaggerOffsetSession(object):
         return moved
 
     def preview(self, offset):
-        """미리보기. undo 큐에 안 올라간다."""
+        """슬라이더/스핀박스를 움직이는 동안의 즉시 반영. undo 큐에 안 올라간다.
+
+        조작이 멎으면 UI 가 settle() 을 불러 '한 덩어리' 로 undo 큐에 기록한다.
+        (드래그 한 번에 undo 항목 수백 개가 쌓이는 걸 막는다.)
+        """
         with _undo_disabled():
             return self._shift_to(offset)
 
-    def restore(self):
-        """미리보기를 세션 시작 상태(offset 0)로 되돌린다. undo 큐에 안 올라간다."""
-        with _undo_disabled():
-            return self._shift_to(0)
+    def settle(self, offset):
+        """지금까지의 미리보기를 undo 큐에 **한 항목으로** 기록한다. 반환: (이동 수, 메시지)
 
-    def commit(self, offset):
-        """확정 기록. Ctrl+Z 한 번으로 되돌아간다. 반환: (이동 수, 메시지)
+        핵심: undo 는 '그 명령의 역연산' 을 현재 상태에 적용한다. 그래서 기록 전에 반드시
+        **마지막으로 기록된 상태(settled)로 되돌린 뒤**(undo 미기록) 거기서 offset 까지
+        한 번에 이동시켜야, Ctrl+Z 가 정확히 settled 로 돌아온다.
+        (미리보기 값이 남은 채 기록하면 Ctrl+Z 가 미리보기 상태로 돌아가 버린다 —
+         A00380_MeshTool 에서 검증한 restore-before-commit 패턴)
 
-        미리보기로 이미 키가 옮겨져 있으면 그 상태가 undo 기준이 되어 Ctrl+Z 가 미리보기
-        상태로 돌아가 버린다. 그래서 **원위치로 되돌린 뒤** undo 청크 안에서 한 번에 적용한다.
-        (A00380_MeshTool 에서 검증한 restore-before-commit 패턴)
+        settled 가 0 인 첫 기록이면 Ctrl+Z = 원위치 = Reset 과 같은 결과가 된다.
         """
-        if offset == 0:
-            return (0, "Offset is 0, nothing to apply.")
+        if offset == self.settled:
+            # 기록할 변화가 없다. 혹시 미리보기가 떠 있으면 조용히 맞춰만 둔다.
+            if self.applied != self.settled:
+                with _undo_disabled():
+                    self._shift_to(self.settled)
+            return (0, "")
 
-        self.restore()
+        with _undo_disabled():
+            self._shift_to(self.settled)
 
         with undo_chunk():
             moved = self._shift_to(offset)
 
+        previous = self.settled
+        self.settled = offset
+
         scope = ("channels: " + ", ".join(self.attrs)) if self.attrs else "all curves"
         return (
             moved,
-            "Stagger offset {0:+d}f applied to {1} object(s) in [{2}-{3}f]  ({4})".format(
-                offset, len(self.entries), self.start, self.end, scope)
+            "Stagger offset {0:+d}f on {1} object(s) in [{2}-{3}f]  ({4})  "
+            "[Ctrl+Z -> {5:+d}f]".format(
+                offset, len(self.entries), self.start, self.end, scope, previous)
         )
+
+    def restore(self):
+        """세션 시작 상태(offset 0)로 되돌린다.
+
+        undo 큐에 이미 기록된 게 있으면(settled != 0) 이 되돌리기도 **기록해야** 큐가
+        어긋나지 않는다. 아무것도 기록된 적 없으면 settle(0) 은 미리보기만 되돌리고
+        undo 항목을 만들지 않는다.
+        """
+        return self.settle(0)
+
+    # 하위호환: 예전 이름(commit)으로도 부를 수 있게 둔다.
+    commit = settle

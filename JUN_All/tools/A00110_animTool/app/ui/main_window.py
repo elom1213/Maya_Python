@@ -31,6 +31,13 @@ from tools.A00110_animTool.app.core import GraphFocusManager
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
 WINDOW_OBJECT_NAME = "JUN_A00110_animTool_window"
 
+# Stagger Offset 슬라이더가 담당하는 프레임 범위(±). 더 큰 값은 옆 스핀박스로 넣는다.
+STAGGER_SLIDER_RANGE = 60
+
+# 슬라이더/스핀박스 조작이 이만큼 멎으면 그때까지의 미리보기를 undo 큐에 '한 항목' 으로
+# 기록한다. 드래그 중에는 기록하지 않아 undo 항목이 수백 개 쌓이는 걸 막는다.
+STAGGER_SETTLE_MS = 350
+
 
 class MainWindow(QWidget):
 
@@ -48,11 +55,18 @@ class MainWindow(QWidget):
 
         self.resize(self.win_width, self.win_height)
 
-        # Stagger Offset 라이브 세션. 스핀박스를 돌리는 동안만 살아 있고,
+        # Stagger Offset 라이브 세션. 슬라이더/스핀박스를 만지는 동안만 살아 있고,
         # Apply/Reset/리스트·구간 변경/창 닫기에서 정리된다. (build_ui 보다 먼저 —
         # 위젯 시그널이 곧바로 이 값을 참조한다)
         self._stagger_session = None
         self._stagger_updating = False
+
+        # 조작이 멎으면 그때까지의 미리보기를 undo 큐에 한 항목으로 기록하는 디바운스 타이머.
+        # (드래그 중 매 틱마다 기록하면 Ctrl+Z 를 수백 번 눌러야 원위치가 된다)
+        self._stagger_settle_timer = QTimer(self)
+        self._stagger_settle_timer.setSingleShot(True)
+        self._stagger_settle_timer.setInterval(STAGGER_SETTLE_MS)
+        self._stagger_settle_timer.timeout.connect(self._stagger_settle)
 
         self.build_ui()
 
@@ -334,18 +348,33 @@ class MainWindow(QWidget):
         st_row.addWidget(self._make_get_current_btn(self.le_st_end))
         sec_stagger.add_layout(st_row)
 
+        # 슬라이더 + 스핀박스 = 같은 값을 가리키는 두 얼굴(A00290_BSTool Shape Editor 패턴).
+        # 어느 쪽을 움직이든 즉시 씬에 반영하고 반대쪽 위젯을 맞춘다. 슬라이더는 손으로 훑기
+        # 좋은 범위(±STAGGER_SLIDER_RANGE)만 담당하고, 그보다 큰 값은 스핀박스로 넣는다.
         st_row2 = QHBoxLayout()
         st_row2.addWidget(QLabel("Offset per Item"))
-        # 스핀박스 = 실시간 조절. 값이 바뀔 때마다 '원래 위치 기준' 으로 다시 계산해 반영한다.
+
+        self.sld_stagger = QSlider(Qt.Horizontal)
+        self.sld_stagger.setRange(-STAGGER_SLIDER_RANGE, STAGGER_SLIDER_RANGE)
+        self.sld_stagger.setValue(0)
+        # 양 끝과 중앙(0)에 눈금을 찍어 0 위치를 눈으로 찾을 수 있게 한다.
+        self.sld_stagger.setTickPosition(QSlider.TicksBelow)
+        self.sld_stagger.setTickInterval(STAGGER_SLIDER_RANGE)
+        self.sld_stagger.setSingleStep(1)
+        self.sld_stagger.setPageStep(5)
+        self.sld_stagger.setMinimumWidth(140)
+        st_row2.addWidget(self.sld_stagger, 1)
+
         self.sb_stagger = QSpinBox()
         self.sb_stagger.setRange(-10000, 10000)
         self.sb_stagger.setValue(0)
         self.sb_stagger.setSuffix(" f")
+        self.sb_stagger.setFixedWidth(78)
         self.sb_stagger.setKeyboardTracking(False)   # 타이핑 도중 매 글자마다 반영되지 않게
         st_row2.addWidget(self.sb_stagger)
 
         self.btn_st_reset = QPushButton("Reset")
-        self.btn_st_reset.setToolTip("Undo the live preview and set offset back to 0.")
+        self.btn_st_reset.setToolTip("Move the keys back to their original frames (undoable).")
         st_row2.addWidget(self.btn_st_reset)
         sec_stagger.add_layout(st_row2)
 
@@ -391,8 +420,14 @@ class MainWindow(QWidget):
         self.btn_oh_apply.clicked.connect(self.on_offset_hold)
         self.btn_delete_all.clicked.connect(self.on_delete_all)
 
-        # Stagger Offset : 스핀박스 = 실시간 미리보기, Apply = 확정, Reset = 되돌리기.
-        self.sb_stagger.valueChanged.connect(self.on_stagger_value_changed)
+        # Stagger Offset : 슬라이더/스핀박스 = 실시간 미리보기(같은 값의 두 얼굴),
+        # 조작이 멎으면 자동으로 undo 큐에 기록(settle), Apply = 확정 후 세션 종료.
+        # valueChanged 는 바인딩/버전에 따라 인자 타입이 달라 위젯에서 직접 읽는다.
+        self.sld_stagger.valueChanged.connect(self.on_stagger_slider_changed)
+        self.sb_stagger.valueChanged.connect(self.on_stagger_spin_changed)
+        # 드래그를 놓거나 타이핑을 끝낸 순간은 기다릴 것 없이 바로 기록한다.
+        self.sld_stagger.sliderReleased.connect(self._stagger_settle)
+        self.sb_stagger.editingFinished.connect(self._stagger_settle)
         self.btn_st_reset.clicked.connect(self.on_stagger_reset)
         self.btn_st_apply.clicked.connect(self.on_stagger_apply)
 
@@ -1637,13 +1672,26 @@ class MainWindow(QWidget):
 
         return (start, end)
 
-    def _stagger_reset_spin(self):
-        """스핀박스를 0 으로 되돌린다(valueChanged 로 인한 재진입 없이)."""
+    def _stagger_show_value(self, value):
+        """슬라이더/스핀박스에 값을 표시한다(시그널을 막아 되울림·재진입 없이).
+
+        슬라이더는 담당 범위를 벗어나면 끝에 붙고, 실제 값은 스핀박스가 보여준다.
+        (A00290_BSTool Shape Editor 의 _show_weight 와 같은 처리)
+        """
+        clamped = max(-STAGGER_SLIDER_RANGE, min(STAGGER_SLIDER_RANGE, value))
         self._stagger_updating = True
         try:
-            self.sb_stagger.setValue(0)
+            for widget, new in ((self.sld_stagger, clamped), (self.sb_stagger, value)):
+                widget.blockSignals(True)
+                widget.setValue(new)
+                widget.blockSignals(False)
         finally:
             self._stagger_updating = False
+
+    def _stagger_reset_spin(self):
+        """오프셋 위젯을 0 으로 되돌린다(valueChanged 로 인한 재진입 없이)."""
+        self._stagger_settle_timer.stop()
+        self._stagger_show_value(0)
 
     def _stagger_begin(self):
         """세션이 없으면 현재 리스트/구간으로 만든다. 실패하면 None."""
@@ -1664,23 +1712,63 @@ class MainWindow(QWidget):
         self._stagger_session = session
         return session
 
+    def _stagger_drop_stale_session(self):
+        """씬이 세션의 가정과 어긋났으면(주로 사용자가 Ctrl+Z) 세션을 조용히 버린다.
+
+        이때 restore() 를 부르면 안 된다 — 세션은 이미 씬을 잘못 알고 있어서, 되돌리려는
+        시도가 오히려 키를 엉뚱한 곳으로 민다. 씬은 undo 가 만든 상태 그대로 두고 세션만
+        버린 뒤, 다음 조작에서 현재 상태를 기준으로 새 세션을 만든다.
+
+        반환: 버렸으면 True.
+        """
+        session = self._stagger_session
+        if session is None or session.scene_in_sync():
+            return False
+
+        self._stagger_session = None
+        self._stagger_reset_spin()
+        self.log("Stagger session dropped (scene changed outside the tool, e.g. undo).")
+        return True
+
     def _stagger_invalidate(self, *args):
-        """리스트/구간이 바뀌면 미리보기를 되돌리고 세션을 버린다.
+        """리스트/구간이 바뀌면 키를 원위치로 되돌리고 세션을 버린다.
 
         (세션은 시작 시점의 순서·구간을 고정하므로, 바뀐 채로 계속 쓰면 엉뚱한 구간을 민다.)
         """
         if self._stagger_session is None:
             return
+        if self._stagger_drop_stale_session():
+            return
 
+        self._stagger_settle_timer.stop()
         self._stagger_session.restore()
         self._stagger_session = None
         self._stagger_reset_spin()
-        self.log("Stagger preview reset (list or range changed).")
+        self.log("Stagger offset reset to 0 (list or range changed).")
 
-    def on_stagger_value_changed(self, value):
-        """스핀박스 실시간 반영. 값이 바뀔 때마다 '원래 위치 기준' 으로 다시 계산된다."""
+    def on_stagger_slider_changed(self, *_args):
+        """슬라이더 조작 -> 스핀박스를 맞추고 즉시 반영."""
         if self._stagger_updating:
             return
+        value = self.sld_stagger.value()
+        self._stagger_show_value(value)
+        self._stagger_apply_live(value)
+
+    def on_stagger_spin_changed(self, *_args):
+        """스핀박스 조작 -> 슬라이더를 맞추고 즉시 반영."""
+        if self._stagger_updating:
+            return
+        value = self.sb_stagger.value()
+        self._stagger_show_value(value)
+        self._stagger_apply_live(value)
+
+    def _stagger_apply_live(self, value):
+        """실시간 반영. 값이 바뀔 때마다 '원래 위치 기준' 으로 다시 계산된다(비누적).
+
+        기록(undo)은 여기서 하지 않는다. 조작이 멎으면 디바운스 타이머가 _stagger_settle 을
+        불러 그때까지의 결과를 **한 항목으로** 기록한다.
+        """
+        self._stagger_drop_stale_session()
 
         session = self._stagger_begin()
         if session is None:
@@ -1688,35 +1776,63 @@ class MainWindow(QWidget):
             return
 
         session.preview(value)
+        self._stagger_settle_timer.start()
 
-    def on_stagger_reset(self):
-        """미리보기를 원위치로 되돌리고 세션 종료."""
-        if self._stagger_session is None:
-            self._stagger_reset_spin()
-            self.log("No stagger preview to reset.")
+    def _stagger_settle(self):
+        """조작이 멎은 시점에 지금까지의 미리보기를 undo 큐에 한 항목으로 기록한다.
+
+        이 덕분에 슬라이더를 아무리 흔들어도 **Ctrl+Z 한 번이면 조작 직전 상태**로 돌아간다
+        (첫 조작이라면 곧 원위치 = Reset 과 같은 결과).
+        """
+        self._stagger_settle_timer.stop()
+
+        session = self._stagger_session
+        if session is None:
+            return
+        if self._stagger_drop_stale_session():
             return
 
+        count, msg = session.settle(self.sb_stagger.value())
+        if msg:
+            self.log(msg)
+
+    def on_stagger_reset(self):
+        """키를 원위치(offset 0)로 되돌리고 세션 종료."""
+        if self._stagger_session is None:
+            self._stagger_reset_spin()
+            self.log("No stagger offset to reset.")
+            return
+        if self._stagger_drop_stale_session():
+            return
+
+        self._stagger_settle_timer.stop()
         self._stagger_session.restore()
         self._stagger_session = None
         self._stagger_reset_spin()
-        self.log("Stagger preview reset to 0.")
+        self.log("Stagger offset reset to 0.")
 
     def on_stagger_apply(self):
-        """현재 미리보기를 확정한다(Ctrl+Z 한 번으로 전부 되돌아감)."""
+        """현재 값을 확정하고 세션을 닫는다.
+
+        조작이 멎으면 이미 자동으로 기록되므로, Apply 는 '여기까지' 를 못박는 버튼이다.
+        """
         value = self.sb_stagger.value()
         if value == 0:
-            self.log("[Warning] Set an offset first (spin box is 0).")
+            self.log("[Warning] Set an offset first (it is 0).")
             return
+
+        self._stagger_drop_stale_session()
 
         session = self._stagger_begin()
         if session is None:
             self._stagger_reset_spin()
             return
 
-        count, msg = session.commit(value)
-        self.log(msg)
+        self._stagger_settle_timer.stop()
+        count, msg = session.settle(value)
+        self.log(msg or "Stagger offset {0:+d}f already applied.".format(value))
 
-        # 확정된 뒤에는 키가 이미 옮겨져 있다. 스핀박스를 0 으로 되돌려 다음 조작이
+        # 확정된 뒤에는 키가 이미 옮겨져 있다. 위젯을 0 으로 되돌려 다음 조작이
         # '지금 상태 기준' 으로 다시 시작되게 한다(같은 값이 두 번 적용되는 사고 방지).
         self._stagger_session = None
         self._stagger_reset_spin()
@@ -1817,10 +1933,14 @@ class MainWindow(QWidget):
                 self.hotkey_mgr.restore()
             if getattr(self, "graph_focus_mgr", None):
                 self.graph_focus_mgr.uninstall()
-            # 확정(Apply)하지 않은 Stagger 미리보기가 남아 있으면 되돌린다.
+            # 아직 기록되지 않은 Stagger 미리보기가 남아 있으면 마지막으로 기록해 둔다.
             # (미리보기는 undo 큐에 없어서, 그냥 두면 Ctrl+Z 로도 못 되돌린다.)
-            if getattr(self, "_stagger_session", None):
-                self._stagger_session.restore()
+            session = getattr(self, "_stagger_session", None)
+            if session is not None:
+                if getattr(self, "_stagger_settle_timer", None):
+                    self._stagger_settle_timer.stop()
+                if session.scene_in_sync():
+                    session.settle(self.sb_stagger.value())
                 self._stagger_session = None
         finally:
             super().closeEvent(event)
