@@ -22,7 +22,7 @@ updated: 2026-07-20
 
 **Three lines**
 > - I focus on **removing artist repetition with tooling**: hundreds of manual passes (per-pose corrective matching, per-bone physics setup) collapsed into a single button.
-> - I automate the **Maya → Unreal bridge** by generating engine node text: rig data from Maya (joints, constraints, object arrays) becomes Control Rig / KawaiiPhysics nodes you literally **paste into the graph with Ctrl+V**.
+> - I automate the **Maya → Unreal bridge** by generating engine node text: rig data from Maya (joints, constraints, object arrays) becomes Control Rig / KawaiiPhysics nodes you literally **paste into the graph with Ctrl+V**. Chained together, these converters carried a **Maya splineIK rig into Unreal and drove it with runtime physics** (see 2-4).
 > - I build tools as a **pipeline, not as one-offs**: shared widgets, theming, path management, undo, drag-&-drop shelf install and a release builder — so a new tool ships in half a day.
 > - I **author rig behaviour as tunable math functions**: chain twist and deformation shaped by linear/sigmoid functions (beating the splineIK up-vector limit; art-directable and live-tunable vs. matrix constraints) to build **tentacle and snake** rigs that **import into Unreal and animate exactly as intended**.
 
@@ -98,6 +98,36 @@ updated: 2026-07-20
 
 - Turns a list of Maya objects, in order, into an Unreal Control Rig **Item Array node (`TArray<FRigElementKey>`)** and copies it to the clipboard.
 - Element type is selectable (Bone / Control / Null / Curve / Socket …) and the order is editable (Up / Down / **Reverse**). The Reverse action — for when you picked a chain tip-to-root — was implemented **in the shared list widget**, so every other tool inherits it.
+
+### 2-4. 【Case study】 Porting a Maya splineIK setup into Unreal, driven by runtime physics
+`A00350_ArrayCreator` + `A00260_ConstraintConverter` + `A00145_RigConnect`
+
+> A real production case where the converters above were **chained into one pipeline** rather than used individually.
+> The goal: take a splineIK rig authored in Maya and make it **come alive under physics in Unreal**.
+
+- **Problem**: a joint chain **whose two end points must stay pinned at all times** had to swing in Unreal. Putting physics (KawaiiPhysics / Physics Asset) directly on the chain bones **releases those end points**, so the motion is wrong. On top of that, rebuilding the Maya splineIK behaviour by hand in-engine is expensive.
+- **Approach — move what physics simulates from the chain onto the curve's control points**
+  1. **In Maya**: built the joint chain and the **splineIK curve** that drives it, then created **one joint at each of the curve's control vertex positions** (**CV joints**). Physics then acts on **a handful of CV joints instead of the whole chain**, so **pinning the two end CVs structurally guarantees the pinned end points**.
+  2. **Attaching the CV joints**: rather than eyeballing what each CV should follow, I constrained them using **`A00145_RigConnect`'s Skin Weight to Constraint** — **deriving the attachment targets and weights straight from the skin weights**, so each CV rides the bones the mesh actually follows.
+  3. **Into Unreal — data transfer**: **`A00350_ArrayCreator`** emitted the joint chain and the CV joint list as **Control Rig Item Array node text** (the ordered bone arrays the splineIK node needs), and **`A00260_ConstraintConverter`** converted the **constraints on the CV joints into Control Rig constraint nodes**. Nothing validated in Maya had to be re-wired by hand in-engine.
+  4. **In Unreal — driving it**: **KawaiiPhysics / a Physics Asset** makes the CV joints swing, and a **splineIK setup in Control Rig** makes the **joint chain bend to follow those CV joints**.
+- **Result**: the splineIK behaviour authored in Maya **runs as live physics in Unreal while both ends stay pinned**. It is **in-engine simulation, not baked animation**, so it reacts to any motion.
+- **Why it matters**: three self-built tools (**item array generation · constraint conversion · skin-weight-to-constraint**) combined to complete the path from **Maya rig data → Unreal Control Rig + physics** with **no manual rebuild**.
+
+```
+[Maya]                                       [Unreal]
+ joint chain ─┐                               joint chain (same skeleton)
+              │ splineIK                          ▲  splineIK (Control Rig)
+ splineIK crv ┘                                   │
+      │ control vertex positions                 CV joints
+      ▼                                           ▲  KawaiiPhysics / Physics Asset
+  CV joints ── A00145 Skin Weight to Constraint ──┤   (end CVs pinned → ends stay fixed)
+      │                                           │
+      └── A00350 Item Array ──────────────────────┤  ← chain / CV bone array text
+      └── A00260 Constraint Converter ────────────┘  ← constraint-relationship node text
+```
+
+- **Keywords**: splineIK, Control Rig, KawaiiPhysics, Physics Asset, runtime secondary motion, both-ends-pinned chain, skin-weight-driven attachment, Maya → Unreal rig data conversion
 
 ---
 
