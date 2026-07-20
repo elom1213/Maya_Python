@@ -4,10 +4,12 @@
 
 애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **일곱 개의 탭**과 **공유 로그창**으로 구성된다.
 
-1. **Key Edit** — (v01.14~) **접이식 섹션 4개**로 구성된다. **Move Keys**: 키를 시간 범위로
+1. **Key Edit** — (v01.14~) **접이식 섹션 5개**로 구성된다. **Move Keys**: 키를 시간 범위로
    **이동(앞/뒤 offset)·삭제**. **Graph Editor**: 선택한 키 구간을 **평평하게 유지(Hold)**
    (`Shift+A` 핫키 호출 가능). **Offset & Hold**(기본 접힘): **리스트업한 컨트롤러**의 키를
-   **포즈 유지(hold) + 보간(offset)** 구조로 재배치. **Delete All Keys**(v01.18~, 기본 접힘):
+   **포즈 유지(hold) + 보간(offset)** 구조로 재배치. **Stagger Offset**(v01.31~, 기본 접힘):
+   **리스트업한 컨트롤러**의 구간 키를 **리스트 순서 × Offset** 만큼 **계단식으로 밀어** 팔로우스루·웨이브를
+   만든다(스핀박스로 **실시간** 조절). **Delete All Keys**(v01.18~, 기본 접힘):
    **리스트업한 오브젝트의 모든 키프레임을 일괄 삭제**. 섹션을 접고 펼치면 **창 크기가 자동 조정**된다.
 2. **Pose Key** — 선택 오브젝트(들)의 **현재 프레임**에 6축(rotate X/Y/Z, translate X/Y/Z)
    값을 키프레임으로 설정한다. 축마다 체크박스가 있어 체크된 축만 적용된다.
@@ -30,6 +32,14 @@
    다 보여주는 대신, **현재 프레임 기준 ± margin 프레임**만 그래프 에디터에 확대해서 보여준다
    (예: 현재 500f, margin 80 → `420f~580f`). **Auto-Focus 토글**을 켜면 **컨트롤러(오브젝트)를
    새로 선택할 때만** 자동으로 프레이밍하고(v01.30~), margin 값은 **스핀박스로 사용자가 지정**한다.
+
+> **v01.31 — Key Edit: Stagger Offset 섹션 추가**: 리스트업한 컨트롤러들의 `[Start, End]` 구간 키를
+> **리스트 순서대로 Offset 배수만큼** 밀어 순차 지연(팔로우스루·웨이브)을 만든다. 0번은 제자리, 1번은
+> +1×Offset, 2번은 +2×Offset … 예) ctl_01/02/03 이 모두 0~5f 에 키가 있고 구간 0~5f, Offset 3 →
+> `[0,5] / [3,8] / [6,11]`. **스핀박스로 실시간 반영**되며 값이 **누적되지 않는다**(항상 원래 위치 기준
+> 재계산). 미리보기는 undo 큐에 올리지 않고, **Apply** 로 확정하면 **Ctrl+Z 한 번**에 전부 되돌아간다.
+> 키 이동은 `cmds.keyframe(relative=True)` **상대 이동만** 쓰므로 커브를 재생성하지 않아
+> **탄젠트·인피니티·애님 레이어가 보존**된다. `app/core/stagger_offset_manager.py` 신규.
 
 > **v01.30 — Graph Focus: 자동 확대를 오브젝트 선택에만 엄격히 한정**: Auto-Focus 가 켜진 상태에서
 > 그래프 에디터의 **키프레임을 찍었다 풀거나** undo(`z`) 를 해도 `SelectionChanged` 가 발생해 자동 확대가
@@ -223,6 +233,7 @@ A00110_animTool/
     │   ├── bake_manager.py       # 리스트 노드 구간 bake (Bake 탭, native bakeResults)
     │   ├── follow_match_manager.py # follower→target 월드 매치 베이크 (Follow 탭, OpenMaya + blend, maintain offset, 1<-n)
     │   ├── offset_hold_manager.py # 키를 hold+offset 구조로 재배치 (Key Edit 탭 > Offset & Hold)
+    │   ├── stagger_offset_manager.py # 리스트 순서대로 구간 키를 계단식 오프셋 (Key Edit 탭 > Stagger Offset)
     │   ├── graph_view_manager.py  # 그래프 에디터 현재±margin 프레이밍 로직 (Graph Focus 탭)
     │   └── graph_focus_manager.py # SelectionChanged scriptJob 라이프사이클 (Graph Focus 탭)
     └── ui/main_window.py  # 전체 UI (7개 탭 + 공유 로그창 + 메뉴 바)
@@ -273,9 +284,10 @@ A00110_animTool.run(True)   # True = reload
 
 ### 5.1 Key Edit 탭
 
-**접이식 섹션 4개**(v01.14~, Delete All Keys 는 v01.18~)로 구성된다. 각 섹션 **헤더(▼/▶ + 제목)를
-클릭하면 접고/펼칠 수 있고**(레거시 `frameLayout` 패턴), 토글하면 **창 전체 크기가 콘텐츠에 맞춰 자동으로
-줄고 늘어난다**. **Offset & Hold / Delete All Keys 섹션은 기본 접힘**이다.
+**접이식 섹션 5개**(v01.14~, Delete All Keys 는 v01.18~, Stagger Offset 은 v01.31~)로 구성된다.
+각 섹션 **헤더(▼/▶ + 제목)를 클릭하면 접고/펼칠 수 있고**(레거시 `frameLayout` 패턴), 토글하면
+**창 전체 크기가 콘텐츠에 맞춰 자동으로 줄고 늘어난다**.
+**Offset & Hold / Stagger Offset / Delete All Keys 섹션은 기본 접힘**이다.
 
 ```
 ┌───────────────────────────────────────────────────┐
@@ -290,6 +302,11 @@ A00110_animTool.run(True)   # True = reload
 │    [Offset/Hold List]  (Select/Add/Del/Up/Down)   │
 │    Hold [ 10 ] Offset [ 30 ] Start [(first key)]  │
 │    [ Apply Offset & Hold ]                        │
+│ ▶ Stagger Offset             (기본 접힘)          │
+│    [Stagger List]  (List Selected/Up/Down/Rev.)   │
+│    Start [ 0 ][Get Current] End [ 5 ][Get Current]│
+│    Offset per Item [ 3 f]▲▼   [ Reset ]           │
+│    [ Apply Stagger Offset ]                       │
 │ ▶ Delete All Keys            (기본 접힘)          │
 │    [Delete-All List]  (List Selected/Add/Del/...) │
 │    [ Delete All Keyframes of Listed ]             │
@@ -336,6 +353,31 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 ```
 
 예) Hold=10, Offset=30, 포즈 3개, Start=0 → `0~10 유지 / 10~40 보간 / 40~50 유지 / 50~80 보간 / 80~90 유지`.
+
+#### Stagger Offset 섹션 (v01.31~, 접이식·기본 접힘)
+
+리스트업한 컨트롤러의 `[Start, End]` 구간 키를 **리스트 순서 × Offset** 만큼 계단식으로 민다.
+캐릭터의 꼬리·촉수·머리카락·천처럼 **앞 요소를 뒤 요소가 지연해서 따라오는 움직임**(팔로우스루/웨이브)을
+만들 때 쓴다. 대상은 씬 선택이 아니라 **그룹 안 리스트의 항목**이다.
+
+- **Stagger List (order = offset step)** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `List Selected Objects` 로
+  현재 씬 선택을 채운다. **리스트 순서가 곧 오프셋 배수**이므로 Up/Down/Sort/**Reverse** 로 순서를 잡는다
+  (0번 = 제자리, 1번 = +1×Offset, 2번 = +2×Offset …).
+- **Start / End** (+ **Get Current**): 밀어낼 키가 들어 있는 구간. `Get Current` 는 현재 마야 프레임을 넣는다.
+  **이 구간 안의 키만** 움직이고, 구간 밖의 키는 제자리에 있는다.
+- **Offset per Item** (스핀박스): 항목당 오프셋 프레임. **값을 바꾸면 즉시 씬에 반영**되고, 값이
+  **누적되지 않는다**(3 → 5 로 바꾸면 8이 아니라 5 기준으로 다시 계산). 음수도 된다.
+- **Reset**: 미리보기를 **원위치(0)** 로 되돌리고 세션 종료.
+- **Apply Stagger Offset**: 현재 미리보기를 **확정**한다. **Ctrl+Z 한 번**으로 전부 되돌아간다.
+  확정 후 스핀박스는 0 으로 초기화된다(같은 값이 두 번 적용되는 사고 방지).
+
+예) `ctl_01 / ctl_02 / ctl_03` 이 모두 0~5f 에 키, 구간 `0~5`, Offset `3`
+→ `ctl_01 [0, 5]` / `ctl_02 [3, 8]` / `ctl_03 [6, 11]`
+
+> **주의**: 구간 **밖에도 키가 있는** 오브젝트는, 밀려온 키가 그 위에 얹히면서 원래 키를 **덮어쓸 수 있다**
+> (마야의 키 이동 기본 동작). 세션 시작 시 그런 오브젝트가 있으면 로그에 `WARNING ...` 으로 알린다.
+> **Apply 로 확정한 결과는 Ctrl+Z 로 전부 복구**되지만, 미리보기 상태에서 **Reset** 으로 되돌릴 때는
+> 덮어써 사라진 키까지는 복구되지 않는다.
 
 #### Delete All Keys 섹션 (v01.18~, 접이식·기본 접힘)
 
@@ -653,6 +695,18 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 3. **Apply Offset & Hold** → 각 오브젝트의 포즈가 hold 만큼 유지되고 사이가 offset 으로 보간되도록
    키가 재배치된다(단일 Undo).
 
+### Stagger Offset (Key Edit 탭 > Stagger Offset 그룹)
+1. 지연시킬 컨트롤러들을 **선두부터 순서대로** 씬에서 선택 → **List Selected Objects** 로
+   **Stagger List** 에 채운다. 순서가 반대면 **Reverse**, 개별 조정은 **Up/Down**.
+   (특정 채널만 작업하려면 채널박스에서 어트리뷰트 선택 — 세션 시작 시점의 선택이 고정된다)
+2. **Start / End** 로 밀어낼 키 구간을 정한다(**Get Current** 로 현재 프레임 입력).
+3. **Offset per Item** 스핀박스를 돌린다 → 값이 바뀔 때마다 **즉시 씬에 반영**되어 결과를 보면서 정할 수 있다.
+   마음에 안 들면 값을 다시 바꾸거나 **Reset**(원위치).
+4. **Apply Stagger Offset** → 확정(단일 Undo). 스핀박스는 0 으로 초기화된다.
+
+> 리스트나 Start/End 를 바꾸면 진행 중인 미리보기는 **자동으로 원위치**되고 세션이 새로 시작된다.
+> 창을 닫을 때도 확정하지 않은 미리보기는 되돌려진다.
+
 ---
 
 ## 7. 동작 규칙
@@ -794,6 +848,32 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
   보간 구간은 spline 가속·감속(첫 키 in / 마지막 키 out 은 무의미하므로 영향 없음). Hold=0 이면
   포즈당 키 1개(spline)로 순수 리타이밍.
 - **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
+
+### Stagger Offset (`stagger_offset_manager.StaggerOffsetSession`)
+
+- **배치 공식**: 리스트 i 번째 오브젝트의 `[Start, End]` 구간 키를 `i × Offset` 만큼 민다
+  (i = 0 은 제자리). 결과 구간은 `[Start + i·Offset, End + i·Offset]`.
+- **이동 방식**: `cmds.keyframe(..., time=(s, e), relative=True, timeChange=i·delta)` **상대 이동만**
+  쓴다. 커브를 `cutKey` 로 지웠다 `setKeyframe` 으로 재생성하지 않으므로 **탄젠트(타입/각도/weight)·
+  인피니티·애님 레이어 소속이 그대로 보존**된다. (재생성 방식은 커브 노드가 새로 만들어져 애님 레이어
+  소속이 바뀔 수 있어 쓰지 않는다.)
+- **세션 / 비누적**: 세션은 (리스트 순서 + 구간 + 채널 스코프)를 **시작 시점에 고정**하고, 지금 적용된
+  offset(`applied`)을 들고 있는다. 스핀박스가 바뀌면 **차이(delta)만** 이동시킨다 — i 번째 키는 항상
+  `[Start + i·applied, End + i·applied]` 에 있으므로 그 구간을 `i·delta` 만큼 밀면 정확히
+  `[Start + i·new, End + i·new]` 가 된다. 그래서 값을 왕복해도 **누적되지 않는다**.
+  리스트/구간이 바뀌면 세션을 버리고(미리보기는 원위치) 새로 만든다.
+- **인덱스 보존**: 리스트 항목 중 **씬에 없거나 키가 없는** 것은 제외되지만, 나머지 항목은
+  **리스트에서의 원래 위치**를 배수로 그대로 쓴다(제외된 항목 때문에 뒤 항목의 배수가 당겨지지 않음).
+  제외 개수는 로그에 `(N skipped: missing or no keys)` 로 표시.
+- **채널 스코프**: 세션 시작 시점의 채널박스 선택 어트리뷰트가 있으면 그 채널만, 없으면 모든 커브.
+  (도중에 채널박스 선택이 바뀌어도 진행 중인 세션은 흔들리지 않는다.)
+- **Undo**: 미리보기(`preview`/`restore`)는 `cmds.undoInfo(stateWithoutFlush=False)` 로 **undo 큐에
+  올리지 않는다**. `commit` 은 **원위치로 되돌린 뒤**(restore-before-commit) undo 청크 안에서 한 번에
+  적용하므로 **Ctrl+Z 한 번**으로 전부 복구된다. (미리보기 값이 남은 채 확정하면 Ctrl+Z 가 미리보기
+  상태로 돌아가 버린다 — A00380_MeshTool 에서 검증한 패턴.)
+- **덮어쓰기 주의**: 구간 밖에 키가 있는 오브젝트는 밀려온 키가 그 위를 덮을 수 있다. 세션 생성 시
+  이를 검사해 로그에 `WARNING ... may overwrite` 로 알린다. Apply 결과는 Ctrl+Z 로 복구되지만,
+  미리보기 중 **Reset** 은 덮여 사라진 키까지 되살리지 못한다.
 
 ---
 

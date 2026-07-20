@@ -23,6 +23,7 @@ from tools.A00110_animTool.app.core import MirrorTokenStore
 from tools.A00110_animTool.app.core import BakeManager
 from tools.A00110_animTool.app.core import FollowMatchManager
 from tools.A00110_animTool.app.core import OffsetHoldManager
+from tools.A00110_animTool.app.core import StaggerOffsetSession
 from tools.A00110_animTool.app.core import GraphViewManager
 from tools.A00110_animTool.app.core import GraphFocusManager
 
@@ -46,6 +47,12 @@ class MainWindow(QWidget):
         self.win_title  = f"Anim Key Tool v{VERSION}"
 
         self.resize(self.win_width, self.win_height)
+
+        # Stagger Offset 라이브 세션. 스핀박스를 돌리는 동안만 살아 있고,
+        # Apply/Reset/리스트·구간 변경/창 닫기에서 정리된다. (build_ui 보다 먼저 —
+        # 위젯 시그널이 곧바로 이 값을 참조한다)
+        self._stagger_session = None
+        self._stagger_updating = False
 
         self.build_ui()
 
@@ -295,7 +302,62 @@ class MainWindow(QWidget):
         tab_layout.addWidget(sec_offhold)
 
         # =========================================================
-        # 섹션 4 : Delete All Keys (기본 접힘)
+        # 섹션 4 : Stagger Offset (기본 접힘)
+        #   리스트업한 컨트롤러의 [Start, End] 구간 키를 '리스트 순서 x Offset' 만큼
+        #   계단식으로 민다(0번 제자리 / 1번 +1배 / 2번 +2배 ...). 팔로우스루·웨이브용.
+        #   스핀박스를 돌리면 즉시 반영되며(누적 안 됨), Apply 로 확정한다.
+        #   로직은 StaggerOffsetSession.
+        # =========================================================
+
+        sec_stagger = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01(
+            "Stagger Offset", expanded=False)
+
+        self.st_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Stagger List (order = offset step)",
+            select_label="List Selected Objects",
+            show_reverse=True, log_callback=self.log)
+        sec_stagger.add_widget(self.st_tsl)
+
+        st_row = QHBoxLayout()
+        st_row.addWidget(QLabel("Start"))
+        self.le_st_start = QLineEdit()
+        self.le_st_start.setValidator(validator)
+        self.le_st_start.setPlaceholderText("0")
+        st_row.addWidget(self.le_st_start)
+        st_row.addWidget(self._make_get_current_btn(self.le_st_start))
+
+        st_row.addWidget(QLabel("End"))
+        self.le_st_end = QLineEdit()
+        self.le_st_end.setValidator(validator)
+        self.le_st_end.setPlaceholderText("5")
+        st_row.addWidget(self.le_st_end)
+        st_row.addWidget(self._make_get_current_btn(self.le_st_end))
+        sec_stagger.add_layout(st_row)
+
+        st_row2 = QHBoxLayout()
+        st_row2.addWidget(QLabel("Offset per Item"))
+        # 스핀박스 = 실시간 조절. 값이 바뀔 때마다 '원래 위치 기준' 으로 다시 계산해 반영한다.
+        self.sb_stagger = QSpinBox()
+        self.sb_stagger.setRange(-10000, 10000)
+        self.sb_stagger.setValue(0)
+        self.sb_stagger.setSuffix(" f")
+        self.sb_stagger.setKeyboardTracking(False)   # 타이핑 도중 매 글자마다 반영되지 않게
+        st_row2.addWidget(self.sb_stagger)
+
+        self.btn_st_reset = QPushButton("Reset")
+        self.btn_st_reset.setToolTip("Undo the live preview and set offset back to 0.")
+        st_row2.addWidget(self.btn_st_reset)
+        sec_stagger.add_layout(st_row2)
+
+        self.btn_st_apply = QPushButton("Apply Stagger Offset")
+        self.btn_st_apply.setToolTip(
+            "Commit the current preview as one undoable step (Ctrl+Z restores everything).")
+        sec_stagger.add_widget(self.btn_st_apply)
+
+        tab_layout.addWidget(sec_stagger)
+
+        # =========================================================
+        # 섹션 5 : Delete All Keys (기본 접힘)
         #   리스트업한 오브젝트의 '모든' 키프레임을 일괄 삭제.
         #   대상은 씬 선택이 아니라 리스트의 항목. 파괴적이라 확인 다이얼로그를 둔다.
         # =========================================================
@@ -318,7 +380,7 @@ class MainWindow(QWidget):
         # -------------------------
 
         # 섹션 토글 -> 창 크기 자동 조정
-        for sec in (sec_move, sec_graph, sec_offhold, sec_delall):
+        for sec in (sec_move, sec_graph, sec_offhold, sec_stagger, sec_delall):
             sec.toggled.connect(self._fit_window_later)
 
         self.btn_move_back.clicked.connect(lambda: self.on_move(-1))
@@ -328,6 +390,19 @@ class MainWindow(QWidget):
         self.cb_hotkey.toggled.connect(self.on_toggle_hotkey)
         self.btn_oh_apply.clicked.connect(self.on_offset_hold)
         self.btn_delete_all.clicked.connect(self.on_delete_all)
+
+        # Stagger Offset : 스핀박스 = 실시간 미리보기, Apply = 확정, Reset = 되돌리기.
+        self.sb_stagger.valueChanged.connect(self.on_stagger_value_changed)
+        self.btn_st_reset.clicked.connect(self.on_stagger_reset)
+        self.btn_st_apply.clicked.connect(self.on_stagger_apply)
+
+        # 리스트/구간이 바뀌면 진행 중인 미리보기는 무효 -> 되돌리고 세션을 버린다.
+        self.le_st_start.textChanged.connect(self._stagger_invalidate)
+        self.le_st_end.textChanged.connect(self._stagger_invalidate)
+        st_model = self.st_tsl.list_widget.model()
+        st_model.rowsInserted.connect(self._stagger_invalidate)
+        st_model.rowsRemoved.connect(self._stagger_invalidate)
+        st_model.modelReset.connect(self._stagger_invalidate)
 
         return tab
 
@@ -1538,6 +1613,114 @@ class MainWindow(QWidget):
         count, msg = OffsetHoldManager.apply_offset_hold(objs, offset, hold, start=start)
         self.log(msg)
 
+    # --------------------------------------------------
+    # Stagger Offset
+    #   스핀박스를 돌리면 세션이 시작되어 '원래 위치 기준' 결과가 즉시 보인다(누적 안 됨).
+    #   Apply 로 확정(undo 1회), Reset 으로 원위치. 리스트/구간이 바뀌면 세션은 무효.
+    # --------------------------------------------------
+
+    def _stagger_read_range(self):
+        """Stagger 구간(start, end) 파싱. 실패 시 None."""
+        s_txt = self.le_st_start.text().strip()
+        e_txt = self.le_st_end.text().strip()
+
+        if s_txt == "" or e_txt == "":
+            self.log("[Warning] Enter Stagger Start / End.")
+            return None
+
+        start = int(s_txt)
+        end = int(e_txt)
+
+        if start > end:
+            self.log(f"[Warning] Start ({start}) is greater than End ({end}).")
+            return None
+
+        return (start, end)
+
+    def _stagger_reset_spin(self):
+        """스핀박스를 0 으로 되돌린다(valueChanged 로 인한 재진입 없이)."""
+        self._stagger_updating = True
+        try:
+            self.sb_stagger.setValue(0)
+        finally:
+            self._stagger_updating = False
+
+    def _stagger_begin(self):
+        """세션이 없으면 현재 리스트/구간으로 만든다. 실패하면 None."""
+        if self._stagger_session is not None:
+            return self._stagger_session
+
+        objs = self.st_tsl.get_all_nodes()   # 리스트업된 항목만 (씬 선택 아님)
+        if not objs:
+            self.log("[Warning] Add objects to the Stagger List first.")
+            return None
+
+        rng = self._stagger_read_range()
+        if rng is None:
+            return None
+
+        session, msg = StaggerOffsetSession.create(objs, rng[0], rng[1])
+        self.log(msg)
+        self._stagger_session = session
+        return session
+
+    def _stagger_invalidate(self, *args):
+        """리스트/구간이 바뀌면 미리보기를 되돌리고 세션을 버린다.
+
+        (세션은 시작 시점의 순서·구간을 고정하므로, 바뀐 채로 계속 쓰면 엉뚱한 구간을 민다.)
+        """
+        if self._stagger_session is None:
+            return
+
+        self._stagger_session.restore()
+        self._stagger_session = None
+        self._stagger_reset_spin()
+        self.log("Stagger preview reset (list or range changed).")
+
+    def on_stagger_value_changed(self, value):
+        """스핀박스 실시간 반영. 값이 바뀔 때마다 '원래 위치 기준' 으로 다시 계산된다."""
+        if self._stagger_updating:
+            return
+
+        session = self._stagger_begin()
+        if session is None:
+            self._stagger_reset_spin()
+            return
+
+        session.preview(value)
+
+    def on_stagger_reset(self):
+        """미리보기를 원위치로 되돌리고 세션 종료."""
+        if self._stagger_session is None:
+            self._stagger_reset_spin()
+            self.log("No stagger preview to reset.")
+            return
+
+        self._stagger_session.restore()
+        self._stagger_session = None
+        self._stagger_reset_spin()
+        self.log("Stagger preview reset to 0.")
+
+    def on_stagger_apply(self):
+        """현재 미리보기를 확정한다(Ctrl+Z 한 번으로 전부 되돌아감)."""
+        value = self.sb_stagger.value()
+        if value == 0:
+            self.log("[Warning] Set an offset first (spin box is 0).")
+            return
+
+        session = self._stagger_begin()
+        if session is None:
+            self._stagger_reset_spin()
+            return
+
+        count, msg = session.commit(value)
+        self.log(msg)
+
+        # 확정된 뒤에는 키가 이미 옮겨져 있다. 스핀박스를 0 으로 되돌려 다음 조작이
+        # '지금 상태 기준' 으로 다시 시작되게 한다(같은 값이 두 번 적용되는 사고 방지).
+        self._stagger_session = None
+        self._stagger_reset_spin()
+
     def toggle_always_on_top(self, enabled):
         # WindowStaysOnTopHint 를 켜고/끄고, 플래그 변경 후 다시 show() (안 하면 창이 사라짐)
         self.setWindowFlag(Qt.WindowStaysOnTopHint, enabled)
@@ -1634,5 +1817,10 @@ class MainWindow(QWidget):
                 self.hotkey_mgr.restore()
             if getattr(self, "graph_focus_mgr", None):
                 self.graph_focus_mgr.uninstall()
+            # 확정(Apply)하지 않은 Stagger 미리보기가 남아 있으면 되돌린다.
+            # (미리보기는 undo 큐에 없어서, 그냥 두면 Ctrl+Z 로도 못 되돌린다.)
+            if getattr(self, "_stagger_session", None):
+                self._stagger_session.restore()
+                self._stagger_session = None
         finally:
             super().closeEvent(event)
