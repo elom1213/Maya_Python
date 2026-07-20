@@ -165,12 +165,39 @@ Default Distance 어트리뷰트 (driver 신호 x)
 |----|------|
 | `A00145_RigConnect` | **리깅 연결 작업 통합 툴**. 레거시 MEL 툴(ConnectionTool·Match Tool) 2종을 Qt로 흡수 통합. 매칭(T/R/S/Parent 옵션), 매트릭스 컨스트레인트, 최근접 오브젝트 연결, **스킨 웨이트 → 컨스트레인트 변환**(Parent/Scale/Point/Orient), 오프셋(제로아웃) 그룹 일괄 생성, **기존 컨스트레인트를 다른 오브젝트로 이관**하는 Constraint Transfer, 그리고 선택한 어트리뷰트를 접두/접미사를 붙여 다른 오브젝트에 복제하는 **Attribute 탭**(타입·범위·기본값·키어블 보존, blendShape 타겟 포함 — 1-4 참고) 등 |
 | `A00270_skinMigrate` | **토폴로지가 다른 메시 간 스킨 웨이트 전이 + 본 재매핑**을 원클릭으로. 레거시 2버튼 UI도 Classic 탭으로 보존 |
+| `A00275_skinTool_V01` | 위 기능에 **Update Bind Pose**(마야에 없는 기능)를 더한 스킨 범용 툴 — 3-3 참고 |
 | `A00060_jointTool_V02` | 레거시 MEL JointTool을 Qt로 통합. 커브 기반/분할 조인트 생성(월드 절대좌표 기준), 트위스트 전용 Aim 리디자인, 미사용 조인트 선택기 |
 | `A00120_FKIK`, `A00190_FKIK_General_Tool` | FK/IK 스위칭 및 베이크. 네이티브 `bakeResults` 도입으로 프레임 루프 대비 성능 개선, **구간 밖 키·애님 레이어 포즈를 훼손하지 않는** 컨스트레인트리스 베이크로 수정 |
 | `A00130_ControlRig` | 컨트롤 리그 생성 |
 | `A00180_abSymMesh` | 레거시 abSymMesh를 **OpenMaya 기반으로 재구현**(속도 개선). 대칭 스냅 / 미러 디폼 / 선택 버텍스 한정 옵션 |
 | `A00290_BSTool` | blendShape 편집 툴. **Maya 기본 Shape Editor를 대체**하는 탭(전체 타겟 목록 + 타겟별 Edit 토글 + 라이브 웨이트 동기화), Base Shape 편집, 프레임 단위 셰이프 복사 |
 | `A00170_driverTool`, `A00150_remapVal`, `A00160_sphericalEye` | **함수 구동 스트레치**(선형·시그모이드 함수를 driven 네트워크로, 원래 값 위에 additive; 시그모이드 threshold·급격함을 드라이버 오브젝트의 **씬 어트리뷰트로 실시간 조절** — 3-1 참고), 드리븐 키·리맵 밸류(마스터 노드에서 자식 리맵 일괄 구동, 사인 웨이브/슬러프 램프 모드), 커브 최근접 어태치·균일 분배, 구형 눈 리그(동공 확장·중심 수렴) |
+
+### 3-3. Update Bind Pose — 마야에 없는 기능을 디포머 그래프를 직접 다뤄 구현
+`A00275_skinTool_V01`
+
+- **문제**: 바인드 후 조인트를 옮기거나 돌리면 메시가 따라 변형되는데, **그 상태를 새 바인드 포즈로
+  굳히는 기능이 마야에 없다.** `Go to Bind Pose` 는 항상 원래 포즈로 되돌아간다.
+- **네이티브 수단이 없음을 실측으로 확인**: `skinCluster -e -recacheBindMatrices` 는 `bindPreMatrix` 를
+  전혀 바꾸지 않고, `dagPose -reset` 은 bindPose 를 갱신하지 못한다.
+  `Move Skinned Joints Tool` 은 목적이 다르다("메시를 변형시키지 않고 조인트만 이동").
+- **한 일**: 스킨 디포머 그래프를 직접 다뤄 3단계로 구현 —
+  ① 인플루언스별 `bindPreMatrix` 를 현재 `worldInverseMatrix` 로 갱신,
+  ② `skinCluster 출력 − 입력` 델타를 **디포머 체인의 입력 셰이프**에 굽고,
+  ③ `bindPose`(dagPose) 노드를 재생성해 재연결.
+  blendShape 는 정적 델타를 더하는 **선형 연산**이라 `f(orig+d) = f(orig)+d` 가 성립함을 이용해,
+  **블렌드셰이프가 스킨 앞이든 뒤든 히스토리를 보존한 채** 동작하게 했다.
+- **실제 리그에서 드러난 문제를 진단 가능하게**: 22,644 버텍스 페이셜 메시에서
+  **`groupParts` 13개가 연쇄된 체인** 때문에 입력 셰이프 탐색이 멈추는 것을 발견하고 수정
+  (디포머는 `input[i].inputGeometry`, `groupParts` 류는 `inputGeometry` 스칼라).
+  더불어 **읽기 전용 Diagnose 리포트**(디포머 체인을 실제 연결 그대로 출력)를 넣어,
+  실패 시 어느 단계에서 막혔는지 사용자가 직접 확인할 수 있게 했다.
+- **정확성에 집착한 지점**: `bindPreMatrix` 인덱스는 `skinCluster -q -inf` **목록 순서가 아니라**
+  `matrix[]` 연결에서 읽어야 한다(인플루언스를 뺐다 넣은 리그는 인덱스가 성겨져
+  **엉뚱한 조인트 슬롯에 행렬이 들어가 더블 트랜스폼이 된다**). 델타를 구울 때 `MFnMesh.setPoints`
+  를 쓰면 **undo 큐에 안 올라가** Ctrl+Z 후 씬이 어긋난 채 남는다 → `pnts` 구간 `setAttr` 로 해결.
+  라이브 blendShape 타겟이 남아 있으면 구운 값이 **weight 에 정비례해 상쇄**됨을 실측해 경고에 반영.
+- **키워드**: skinCluster, `bindPreMatrix`, dagPose, 디포머 그래프 순회, OpenMaya, undo 안전성
 
 ---
 

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- A00275_skinTool_V01 shelf icon: joint chain inside a skinned surface + update-bind arrow -->
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+
+  <!-- skinned surface (bound mesh silhouette) -->
+  <path d="M8.6 5.5 C4.8 10.5, 4.8 21.5, 8.6 26.5 L14.6 26.5 C11.4 21.5, 11.4 10.5, 14.6 5.5 Z"
+        fill="#54a0ff" fill-opacity="0.28" stroke="#54a0ff" stroke-width="1.5"
+        stroke-linejoin="round"/>
+
+  <!-- joint chain -->
+  <line x1="11.4" y1="8.4" x2="11.4" y2="23.6"
+        stroke="#e8edf2" stroke-width="1.8" stroke-linecap="round"/>
+  <g fill="#e8edf2">
+    <circle cx="11.4" cy="8.4" r="2"/>
+    <circle cx="11.4" cy="16" r="2"/>
+    <circle cx="11.4" cy="23.6" r="2"/>
+  </g>
+
+  <!-- update / re-bind arrow -->
+  <g stroke="#5fd35f" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M19.4 21.6 A6.4 6.4 0 1 1 26.2 14.2"/>
+    <polyline points="22.1,13.1 26.5,13.6 26,18"/>
+  </g>
+</svg>

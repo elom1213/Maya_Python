@@ -164,12 +164,40 @@ Default Distance attribute (driver signal x)
 |------|--------------|
 | `A00145_RigConnect` | **Unified rig-connection tool**: absorbed two legacy MEL tools (ConnectionTool, Match Tool) into Qt. Match (T/R/S/Parent options), matrix constraints, connect-to-closest, **skin weight → constraint conversion** (Parent / Scale / Point / Orient), batch offset/zero-out group creation, **Constraint Transfer** (move an existing constraint onto another object, preserving world pose), and an **Attribute tab** that copies chosen attributes onto other objects with a prefix/suffix (type/range/default/keyable preserved) — including a blendShape's targets (see 1-4) |
 | `A00270_skinMigrate` | One-click **skin weight transfer between meshes of different topology, with bone remapping**; the legacy two-button UI is preserved as a Classic tab |
+| `A00275_skinTool_V01` | The above plus **Update Bind Pose**, a capability Maya does not provide — see 3-3 |
 | `A00060_jointTool_V02` | Legacy MEL JointTool folded into Qt: curve-based / divided joint creation in **world space**, twist-only Aim redesign, unused-joint selector |
 | `A00120_FKIK`, `A00190_FKIK_General_Tool` | FK/IK switching and baking. Moved to native `bakeResults` for speed, then fixed to a constraint-free per-frame match bake so that **keys outside the range and anim-layer poses are no longer corrupted** |
 | `A00130_ControlRig` | Control rig generation |
 | `A00180_abSymMesh` | Legacy abSymMesh **re-implemented on OpenMaya** for speed: snap-to-symmetry, mirror deform, selected-vertices-only mode |
 | `A00290_BSTool` | blendShape editing suite — a tab that **replaces Maya's native Shape Editor** (all targets listed, per-target edit toggle, live weight sync), Base Shape editing, per-frame shape copy |
 | `A00170_driverTool`, `A00150_remapVal`, `A00160_sphericalEye` | **Function-driven stretch** (linear/sigmoid functions as a driven network, laid additively over the original value; sigmoid thresholds & sharpness exposed as **live scene attributes on the driver object** — see 3-1), driven keys / remapValue (master node driving child remaps, sine-wave and slerp-ramp build modes), closest-point curve attach with even distribution, spherical eye rig (pupil dilation, converge-to-center) |
+
+### 3-3. Update Bind Pose — implementing a missing Maya capability by working the deformer graph directly
+`A00275_skinTool_V01`
+
+- **Problem**: once a mesh is bound, moving or rotating joints deforms it — but **Maya has no way to
+  freeze that state as the new bind pose**. `Go to Bind Pose` always returns to the original one.
+- **Confirmed there is no native route**, by measurement: `skinCluster -e -recacheBindMatrices` does not
+  touch `bindPreMatrix` at all, and `dagPose -reset` does not update the bind pose.
+  `Move Skinned Joints Tool` solves a different problem ("move joints without deforming the mesh").
+- **What I built**: a three-step operation on the skin deformer graph — ① set each influence's
+  `bindPreMatrix` to its current `worldInverseMatrix`, ② bake the `skinCluster output − input` delta into
+  the **input shape at the head of the deformer chain**, and ③ rebuild the `bindPose` (dagPose) node and
+  reconnect it. Because a blendShape adds static deltas — a **linear** operation where
+  `f(orig+d) = f(orig)+d` — this works **with the blendShape either before or after the skin, preserving
+  the existing history**.
+- **Made failures diagnosable on real rigs**: on a 22,644-vertex facial mesh the input-shape search stopped
+  at a **chain of 13 `groupParts` nodes**; deformers expose `input[i].inputGeometry` while `groupParts`
+  exposes a scalar `inputGeometry`. Alongside the fix I added a **read-only Diagnose report** that prints
+  the deformer chain exactly as connected, so a user can see where it stops.
+- **Where correctness had to be exact**: `bindPreMatrix` indices must be read from the `matrix[]`
+  connections, **not** from the order of `skinCluster -q -inf` — on a rig whose influences were removed and
+  re-added the indices are sparse, so enumerating them **writes matrices into the wrong joint slots and
+  looks like a double transform**. And baking with `MFnMesh.setPoints` leaves the scene inconsistent after
+  Ctrl+Z because it never enters the undo queue, so the bake goes through a ranged `setAttr` on `pnts`.
+  I also measured that a still-live blendShape target **cancels the baked offset in proportion to its
+  weight**, and surfaced that as a warning with the actual values.
+- **Keywords**: skinCluster, `bindPreMatrix`, dagPose, deformer graph traversal, OpenMaya, undo safety
 
 ---
 
