@@ -35,6 +35,34 @@ EDIT_ON_STYLE = (
 EDIT_ON_TEXT = "Edit ON"
 EDIT_OFF_TEXT = "Edit"
 
+# WeightSlider 전용 스타일.
+# 어떤 테마 qss 도 QSlider 를 스타일링하지 않아, 어두운 배경에선 Maya 네이티브 홈(groove)이
+# 배경에 묻혀 핸들만 보인다("가로 막대가 안 보임"). 그래서 위젯이 자체적으로 홈을 그린다.
+# 이 슬라이더는 중앙이 0 인 양방향이라, 한쪽에서 채워지는 sub-page fill 은 0 에서도 절반이
+# 찬 것처럼 보여 오해를 준다. 그래서 홈을 좌우 균일한 한 줄로만 그리고, 0 위치는 기존 중앙
+# 눈금(TicksBelow)이 표시한다. green_dark 테마 색(#6f9e80)에 맞췄다.
+SLIDER_STYLE = (
+    "QSlider:horizontal { min-height: 20px; }"
+    # 홈: 좌우 균일한 트랙 + accent 테두리 (sub/add-page 를 같은 색으로 덮어 방향성 제거)
+    "QSlider::groove:horizontal {"
+    " height: 6px; margin: 0 4px;"
+    " background: #353835; border: 1px solid #6f9e80; border-radius: 3px; }"
+    "QSlider::sub-page:horizontal, QSlider::add-page:horizontal {"
+    " background: #353835; border: 1px solid #6f9e80; border-radius: 3px; }"
+    # 핸들: 홈 위로 튀어나오게
+    "QSlider::handle:horizontal {"
+    " width: 12px; margin: -6px 0;"
+    " background: #cfe6d6; border: 1px solid #6f9e80; border-radius: 3px; }"
+    "QSlider::handle:horizontal:hover { background: #ffffff; }"
+    # 비활성(구동/잠긴 weight, 편집 중): 전체를 흐리게
+    "QSlider::groove:horizontal:disabled,"
+    " QSlider::sub-page:horizontal:disabled,"
+    " QSlider::add-page:horizontal:disabled {"
+    " background: #2f2f2f; border: 1px solid #454545; }"
+    "QSlider::handle:horizontal:disabled {"
+    " background: #5a5a5a; border: 1px solid #454545; }"
+)
+
 
 # Shape Editor 탭 인덱스 (weight 폴링을 이 탭이 보일 때만 돌리기 위해 필요)
 SHAPE_EDITOR_TAB = 0
@@ -109,6 +137,8 @@ class WeightSlider(QSlider):
         self.setSingleStep(self.SCALE // 100)   # 방향키 0.01
         self.setPageStep(self.SCALE // 10)      # PageUp/Down 0.1
         self.setMinimumWidth(110)
+        # 테마 qss 가 QSlider 를 스타일링하지 않아 홈이 배경에 묻히므로 직접 그린다.
+        self.setStyleSheet(SLIDER_STYLE)
 
     def weight(self):
         return self.value() / float(self.SCALE)
