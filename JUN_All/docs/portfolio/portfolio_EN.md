@@ -2,7 +2,7 @@
 title: Portfolio — Work Summary (2026-05-06 ~ 2026-07-15)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-07-20
+updated: 2026-07-21
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
@@ -169,7 +169,7 @@ Default Distance attribute (driver signal x)
 | `A00120_FKIK`, `A00190_FKIK_General_Tool` | FK/IK switching and baking. Moved to native `bakeResults` for speed, then fixed to a constraint-free per-frame match bake so that **keys outside the range and anim-layer poses are no longer corrupted** |
 | `A00130_ControlRig` | Control rig generation |
 | `A00180_abSymMesh` | Legacy abSymMesh **re-implemented on OpenMaya** for speed: snap-to-symmetry, mirror deform, selected-vertices-only mode |
-| `A00290_BSTool` | blendShape editing suite — a tab that **replaces Maya's native Shape Editor** (all targets listed, per-target edit toggle, live weight sync), Base Shape editing, per-frame shape copy |
+| `A00290_BSTool` | blendShape editing suite — a tab that **replaces Maya's native Shape Editor** (all targets listed, per-target edit toggle, live weight sync, **range/multi-select to drive many weights at once**, **editing keyed targets** so Auto Keyframe records keys, gesture-level undo), Base Shape editing, per-frame shape copy |
 | `A00170_driverTool`, `A00150_remapVal`, `A00160_sphericalEye` | **Function-driven stretch** (linear/sigmoid functions as a driven network, laid additively over the original value; sigmoid thresholds & sharpness exposed as **live scene attributes on the driver object** — see 3-1), driven keys / remapValue (master node driving child remaps, sine-wave and slerp-ramp build modes), closest-point curve attach with even distribution, spherical eye rig (pupil dilation, converge-to-center) |
 
 ### 3-3. Update Bind Pose — implementing a missing Maya capability by working the deformer graph directly

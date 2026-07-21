@@ -2,7 +2,7 @@
 title: 포트폴리오 작업 내역 (2026-05-06 ~ 2026-07-15)
 aliases: [Portfolio KR, 포트폴리오 국문]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-07-20
+updated: 2026-07-21
 ---
 
 # Technical Artist / Pipeline TD 작업 내역 — 국문
@@ -170,7 +170,7 @@ Default Distance 어트리뷰트 (driver 신호 x)
 | `A00120_FKIK`, `A00190_FKIK_General_Tool` | FK/IK 스위칭 및 베이크. 네이티브 `bakeResults` 도입으로 프레임 루프 대비 성능 개선, **구간 밖 키·애님 레이어 포즈를 훼손하지 않는** 컨스트레인트리스 베이크로 수정 |
 | `A00130_ControlRig` | 컨트롤 리그 생성 |
 | `A00180_abSymMesh` | 레거시 abSymMesh를 **OpenMaya 기반으로 재구현**(속도 개선). 대칭 스냅 / 미러 디폼 / 선택 버텍스 한정 옵션 |
-| `A00290_BSTool` | blendShape 편집 툴. **Maya 기본 Shape Editor를 대체**하는 탭(전체 타겟 목록 + 타겟별 Edit 토글 + 라이브 웨이트 동기화), Base Shape 편집, 프레임 단위 셰이프 복사 |
+| `A00290_BSTool` | blendShape 편집 툴. **Maya 기본 Shape Editor를 대체**하는 탭(전체 타겟 목록 + 타겟별 Edit 토글 + 라이브 웨이트 동기화, **타겟 범위/다중 선택으로 값 동시 조절**, **키가 걸린 타겟도 편집**해 Auto Keyframe 시 키로 반영, 제스처 단위 Undo), Base Shape 편집, 프레임 단위 셰이프 복사 |
 | `A00170_driverTool`, `A00150_remapVal`, `A00160_sphericalEye` | **함수 구동 스트레치**(선형·시그모이드 함수를 driven 네트워크로, 원래 값 위에 additive; 시그모이드 threshold·급격함을 드라이버 오브젝트의 **씬 어트리뷰트로 실시간 조절** — 3-1 참고), 드리븐 키·리맵 밸류(마스터 노드에서 자식 리맵 일괄 구동, 사인 웨이브/슬러프 램프 모드), 커브 최근접 어태치·균일 분배, 구형 눈 리그(동공 확장·중심 수렴) |
 
 ### 3-3. Update Bind Pose — 마야에 없는 기능을 디포머 그래프를 직접 다뤄 구현

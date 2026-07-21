@@ -81,11 +81,52 @@ class ShapeEditorManager:
 
     @staticmethod
     def is_weight_settable(bs_node, weight_idx):
-        """weight 가 잠기거나 다른 노드에 의해 구동되면 값을 바꿀 수 없다."""
+        """weight 를 setAttr 로 '직접' 쓸 수 있는가 (= free: 잠기지도 연결되지도 않음).
+
+        Edit(sculpt) 진입 시 weight 를 1.0 으로 올리는 내부용. 키가 걸린(animCurve) weight 는
+        여기서 False 다 — 슬라이더 편집 가능 여부(is_weight_editable)와는 다른 개념이다.
+        """
         plug = ShapeEditorManager.weight_plug(bs_node, weight_idx)
         if cmds.getAttr(plug, lock=True):
             return False
         return not cmds.connectionInfo(plug, isDestination=True)
+
+    @staticmethod
+    def weight_state(bs_node, weight_idx):
+        """weight 의 상태를 분류한다: 'free' | 'keyed' | 'driven' | 'locked'.
+
+        - free   : 잠기지도 연결되지도 않음 → setAttr 로 조절.
+        - keyed  : animCurve 로만 구동(= 키가 걸림) → 슬라이더 조절 가능(아래 set_weight 참고).
+        - driven : animCurve 가 아닌 노드에 연결(SDK/expression/직접 연결 등) → 조절 불가.
+        - locked : 어트리뷰트 잠김 → 조절 불가.
+        """
+        plug = ShapeEditorManager.weight_plug(bs_node, weight_idx)
+        try:
+            if cmds.getAttr(plug, lock=True):
+                return "locked"
+        except Exception:
+            return "driven"
+
+        # scn=True: animCurve 와 attr 사이의 unitConversion 등을 건너뛰어 실제 소스를 본다.
+        srcs = cmds.listConnections(plug, s=True, d=False, scn=True) or []
+        if not srcs:
+            return "free"
+        if all(cmds.nodeType(s).startswith("animCurve") for s in srcs):
+            return "keyed"
+        return "driven"
+
+    @staticmethod
+    def is_weight_editable(bs_node, weight_idx):
+        """슬라이더/스핀박스로 조절 가능한가 (free 또는 keyed)."""
+        return ShapeEditorManager.weight_state(bs_node, weight_idx) in ("free", "keyed")
+
+    @staticmethod
+    def is_autokey_on():
+        """마야 씬의 Auto Keyframe 토글 상태."""
+        try:
+            return bool(cmds.autoKeyframe(query=True, state=True))
+        except Exception:
+            return False
 
     # ==================================================
     # 타겟 목록
@@ -103,11 +144,15 @@ class ShapeEditorManager:
         result = []
         for name, idx in sorted(bsu.target_index_map(bs_node).items(),
                                 key=lambda kv: kv[1]):
+            state = ShapeEditorManager.weight_state(bs_node, idx)
             result.append({
                 "name": name,
                 "index": idx,
                 "weight": ShapeEditorManager.get_weight(bs_node, idx),
-                "settable": ShapeEditorManager.is_weight_settable(bs_node, idx),
+                "state": state,
+                "editable": state in ("free", "keyed"),
+                # 하위 호환: settable 은 "직접 setAttr 가능(free)" 의미로 남겨둔다.
+                "settable": state == "free",
             })
         return result
 
@@ -122,12 +167,46 @@ class ShapeEditorManager:
     # ==================================================
 
     @staticmethod
-    def set_weight(bs_node, weight_idx, value):
-        """타겟 weight 설정. 구동/잠금된 어트리뷰트면 (False, 사유) 반환."""
-        if not ShapeEditorManager.is_weight_settable(bs_node, weight_idx):
-            return False, "[Warning] weight[{0}] of '{1}' is locked or driven.".format(
+    def set_weight(bs_node, weight_idx, value, autokey=None):
+        """타겟 weight 를 설정한다. 슬라이더/스핀박스가 쓰는 경로.
+
+        상태별 동작:
+          - free   : setAttr.
+          - keyed  : Auto Keyframe 이 켜져 있으면 현재 프레임에 setKeyframe(= 값이 키로 반영),
+                     꺼져 있으면 setAttr(= 미리보기. 시간을 이동하면 커브 값으로 되돌아간다.
+                     Maya 채널박스에서 키 걸린 값을 autokey 없이 만지는 것과 동일).
+          - driven / locked : 조절 불가 → (False, 사유).
+
+        autokey 를 넘기지 않으면 씬의 현재 Auto Keyframe 상태를 조회한다(다중 편집 시 한 번만
+        조회해 넘겨 주면 매 틱 조회를 아낄 수 있다).
+
+        반환: (성공 여부, 메시지)
+        """
+        state = ShapeEditorManager.weight_state(bs_node, weight_idx)
+        plug = ShapeEditorManager.weight_plug(bs_node, weight_idx)
+
+        if state == "locked":
+            return False, "[Warning] weight[{0}] of '{1}' is locked.".format(
                 weight_idx, bs_node)
-        cmds.setAttr(ShapeEditorManager.weight_plug(bs_node, weight_idx), value)
+        if state == "driven":
+            return False, "[Warning] weight[{0}] of '{1}' is driven by another node.".format(
+                weight_idx, bs_node)
+
+        if state == "keyed":
+            if autokey is None:
+                autokey = ShapeEditorManager.is_autokey_on()
+            if autokey:
+                cmds.setKeyframe(plug, value=value)
+            else:
+                # 미리보기(재평가 시 커브로 복귀). 혹시 연결이 setAttr 를 막으면 키로 대체.
+                try:
+                    cmds.setAttr(plug, value)
+                except Exception:
+                    cmds.setKeyframe(plug, value=value)
+            return True, ""
+
+        # free
+        cmds.setAttr(plug, value)
         return True, ""
 
     # ==================================================
@@ -193,12 +272,13 @@ class ShapeEditorManager:
                 ShapeEditorManager._weight_backup[(bs_node, weight_idx)] = \
                     ShapeEditorManager.get_weight(bs_node, weight_idx)
 
-            ok, warn = ShapeEditorManager.set_weight(bs_node, weight_idx, 1.0)
-            if not ok:
-                # weight 가 구동/잠금이면 값을 못 올린다. 편집 자체는 가능하지만
-                # 현재 weight 에서의 모양이 보이므로 사용자에게 알린다.
+            # sculpt 진입은 free weight 만 1.0 으로 올린다. 키/구동/잠긴 weight 를 여기서
+            # 건드리면(특히 키를 찍으면) 예기치 않게 애니메이션이 바뀌므로 손대지 않는다.
+            if ShapeEditorManager.is_weight_settable(bs_node, weight_idx):
+                cmds.setAttr(ShapeEditorManager.weight_plug(bs_node, weight_idx), 1.0)
+            else:
                 ShapeEditorManager._weight_backup.pop((bs_node, weight_idx), None)
-                msgs.append("weight is locked/driven, could not set it to 1.0")
+                msgs.append("weight is keyed/driven/locked, left as-is (not set to 1.0)")
 
             ShapeEditorManager._set_sculpt_index(bs_node, weight_idx)
 

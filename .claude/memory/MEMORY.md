@@ -1,7 +1,7 @@
 # Memory Index
 
 - [list_attrs multi detection](list-attrs-multi-detection.md) — detect multi attrs with attributeQuery(multi=True), NOT getNextFreeMultiIndex on every attr (spams "No object matches name" per scalar attr); fixed in A00170 maya_scene.py + A00145 connect_manager.py
-- [A00290 Shape Editor tab](wip-a00290-shape-editor-tab.md) — DONE (Maya-verified + pushed v01.02): A00290_BSTool "Shape Editor" tab replaces Maya's Shape Editor — lists ALL blendShape targets (aliasAttr) with per-target Edit toggle; must use `cmds.sculptTarget` (setAttr on sculptTargetIndex silently edits the base mesh)
+- [A00290 Shape Editor tab](wip-a00290-shape-editor-tab.md) — A00290_BSTool "Shape Editor" tab replaces Maya's Shape Editor — lists ALL blendShape targets (aliasAttr) with per-target Edit toggle; must use `cmds.sculptTarget` (setAttr on sculptTargetIndex silently edits base mesh). v01.06 (pushed) slider groove style. **v01.10 (IMPLEMENTED, Maya test pending): target multi-edit via row CLICK-selection (TargetRow QFrame highlight; Shift+click=range, Ctrl+click=toggle) + keyed(animCurve) targets now editable (autokey ON→setKeyframe, OFF→setAttr preview) + undo grouped per gesture (slider press~release = one chunk, so Ctrl+Z restores ALL selected targets)**. v01.07 checkboxes→v01.08 click-select→v01.09 range/toggle→v01.10 undo-per-gesture. Testing: Qt+maya.standalone crashes headless → test logic with fake widget stand-ins
 
 - [A00370 ToolLauncher (new)](wip-a00370-toollauncher.md) — DONE (headless-verified + pushed v01.04): shortcut launcher UI — buttons hold a tool folder path, click pops up that tool + shows its icon; clone of A00340 but launch instead of select. **v01.04 fixes cross-PC git churn: buttons store paths RELATIVE to JUN_All root (`tools/A000XX`), resolved to abs at launch; per-PC root override (`local_env.json`) + `active.json` gitignored**; Environment box = Detect/Browse/Apply Root/Make Paths Portable
 
@@ -17,6 +17,7 @@
 
 - [UI text English-only](ui-text-english-only.md) — all UI-facing strings (buttons, logs, messages) must be English; Korean only in comments/docstrings
 - [Explain in Korean](explain-in-korean.md) — write explanations/conversational replies to the user in Korean (code/UI text stay English)
+- [Push only when asked](push-only-when-asked.md) — NEVER push to remote without an explicit user request in that turn; committing locally is fine
 - [Push target Dnable/dev](push-target-dnable-dev.md) — default git push goes to Dnable_repo remote, dev branch (not origin)
 - [Clean commit message (no stray chars)](clean-commit-message-no-stray-chars.md) — verify + fix commit msg before committing (recent commits leaked a leading `@` from using PowerShell `@'...'@` heredoc in the Bash tool); use tool-correct multiline syntax + check `git log -1`
 - [Memory synced via repo](memory-synced-via-repo.md) — memory lives in repo `.claude/memory` (junctioned from ~/.claude/projects/<hash>/memory); commit+push memory changes to share across PCs

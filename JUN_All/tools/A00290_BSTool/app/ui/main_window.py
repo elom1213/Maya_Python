@@ -154,6 +154,29 @@ class WeightSlider(QSlider):
         return abs(self.weight() - self._clamp(value)) < eps
 
 
+# 선택된 타겟 행 배경(다중 편집 대상 표시). green_dark accent 계열.
+ROW_SELECTED_STYLE = "QFrame#seTargetRow { background-color: #3f5c48; border-radius: 3px; }"
+
+
+class TargetRow(QFrame):
+    """Shape Editor 의 타겟 한 줄. 칸(빈 영역/이름)을 클릭하면 선택된다.
+
+    슬라이더/스핀박스/Edit 버튼은 자기 클릭을 소비하므로 편집을 방해하지 않는다.
+    QLabel 은 클릭을 무시(ignore)해 부모(이 행)로 전달되므로 이름 칸 클릭도 선택으로 잡힌다.
+    """
+
+    def __init__(self, owner, parent=None):
+        super().__init__(parent)
+        self._owner = owner
+        self.row_info = None            # _add_se_target_row 에서 연결
+        self.setObjectName("seTargetRow")
+
+    def mousePressEvent(self, event):
+        if self.row_info is not None:
+            self._owner._on_se_row_clicked(self.row_info, event.modifiers())
+        super().mousePressEvent(event)
+
+
 class MainWindow(QWidget):
 
     def __init__(self):
@@ -162,9 +185,19 @@ class MainWindow(QWidget):
 
         self.setObjectName(WINDOW_OBJECT_NAME)
 
-        # Shape Editor 탭의 타겟 행 정보: [{node, index, name, btn, spin, slider}, ...]
+        # Shape Editor 탭의 타겟 행 정보:
+        # [{node, index, name, row, btn, spin, slider, selected}, ...]
         self._se_rows = []
         self._se_rebuild_pending = False
+        # 다중 편집 중 위젯 setValue 가 다시 on_se_weight_changed 를 부르는 재귀를 막는다.
+        self._se_applying = False
+        # Shift 범위 선택의 기준점(직전 단일/토글 선택 행). 재빌드 때 초기화한다.
+        self._se_anchor = None
+        # 슬라이더 드래그 전체를 하나의 undo 로 묶기 위한 상태.
+        # 드래그는 매 틱 setAttr 을 내는데, 청크로 안 묶으면 Ctrl+Z 가 마지막 한 틱(한 타겟)만
+        # 되돌린다. press~release 를 한 청크로 감싼다.
+        self._se_dragging = False
+        self._se_undo_open = False
 
         # Expand 로 띄운 별도 타겟 창 (없으면 None)
         self._se_window = None
@@ -266,6 +299,18 @@ class MainWindow(QWidget):
         f.setBold(True)
         lbl_t.setFont(f)
         header.addWidget(lbl_t)
+
+        # 다중 선택: 선택한 여러 타겟을 슬라이더/스핀박스 하나로 동시에 조절한다.
+        # (행을 클릭하면 선택, Shift+클릭으로 여러 개 선택/해제.)
+        btn_select_all = QPushButton("Select All")
+        btn_select_all.setToolTip("Select all currently visible targets for multi-edit.")
+        btn_select_all.clicked.connect(lambda: self._se_select_all(True))
+        header.addWidget(btn_select_all)
+        btn_clear_sel = QPushButton("Clear")
+        btn_clear_sel.setToolTip("Clear the target selection.")
+        btn_clear_sel.clicked.connect(lambda: self._se_select_all(False))
+        header.addWidget(btn_clear_sel)
+
         header.addStretch(1)
         self.lbl_se_number = QLabel("Number: 0")
         header.addWidget(self.lbl_se_number)
@@ -297,7 +342,11 @@ class MainWindow(QWidget):
         # 설명
         info = QLabel(
             "Turn Edit on, sculpt the base mesh in the viewport, then turn Edit off\n"
-            "to bake the change into that target - same as Maya's Shape Editor.")
+            "to bake the change into that target - same as Maya's Shape Editor.\n"
+            "Click a target row to select it; Shift+click selects the range in between,\n"
+            "Ctrl+click toggles one. Then drag or type one value to change all selected.\n"
+            "Keyed targets are editable: with Auto Key on the change is keyed, "
+            "with it off it is a preview that reverts when you scrub time.")
         info.setWordWrap(True)
         layout.addWidget(info)
 
@@ -313,7 +362,13 @@ class MainWindow(QWidget):
     # --------------------------------------------------
 
     def _clear_se_rows(self):
+        # 드래그 청크가 열린 채 행이 재생성되면 청크가 누수된다. 안전하게 닫는다.
+        if self._se_undo_open:
+            cmds.undoInfo(closeChunk=True)
+            self._se_undo_open = False
+        self._se_dragging = False
         self._se_rows = []
+        self._se_anchor = None
         # 마지막 stretch 를 제외한 모든 위젯 제거
         while self.se_body_layout.count() > 1:
             item = self.se_body_layout.takeAt(0)
@@ -334,7 +389,7 @@ class MainWindow(QWidget):
         idx = target["index"]
         is_editing = (idx == editing_idx)
 
-        row = QWidget()
+        row = TargetRow(self)
         row_layout = QHBoxLayout(row)
         row_layout.setContentsMargins(2, 0, 2, 0)
 
@@ -355,10 +410,10 @@ class MainWindow(QWidget):
         lbl.setToolTip("weight[{0}]".format(idx))
         row_layout.addWidget(lbl, 1)
 
-        enabled = target["settable"] and not is_editing
+        # 편집 가능(free/keyed) 하고 sculpt 편집 중이 아니면 조절 가능.
+        enabled = target["editable"] and not is_editing
 
         slider = WeightSlider()
-        slider.setToolTip("Drag to set the weight. Center is 0, right end +1, left end -1.")
         slider.set_weight(target["weight"])
         slider.setEnabled(enabled)
         row_layout.addWidget(slider, 1)
@@ -369,19 +424,18 @@ class MainWindow(QWidget):
         spin.setSingleStep(0.1)
         spin.setFixedWidth(72)
         spin.setValue(target["weight"])
-        # 구동/잠금된 weight 는 손대지 못하고, 편집 중에는 1.0 으로 고정된다.
         spin.setEnabled(enabled)
-        if not target["settable"]:
-            tip = "This weight is locked or driven by another node."
-            spin.setToolTip(tip)
-            slider.setToolTip(tip)
         row_layout.addWidget(spin)
+
+        self._apply_se_row_tooltip(slider, spin, target["state"])
 
         self.se_body_layout.insertWidget(self.se_body_layout.count() - 1, row)
         row_info = {
             "node": bs_node, "index": idx, "name": target["name"],
             "row": row, "btn": btn, "spin": spin, "slider": slider,
+            "selected": False,
         }
+        row.row_info = row_info
         self._se_rows.append(row_info)
 
         # 슬라이더와 스핀박스는 같은 weight 를 가리키는 두 얼굴이다. 어느 쪽을 움직이든
@@ -391,6 +445,26 @@ class MainWindow(QWidget):
             lambda *_a, r=row_info, s=spin: self.on_se_weight_changed(r, s.value()))
         slider.valueChanged.connect(
             lambda *_a, r=row_info, s=slider: self.on_se_weight_changed(r, s.weight()))
+        # 드래그 전체를 한 undo 로 묶는다(press~release 한 청크).
+        slider.sliderPressed.connect(self._se_slider_pressed)
+        slider.sliderReleased.connect(self._se_slider_released)
+
+    @staticmethod
+    def _apply_se_row_tooltip(slider, spin, state):
+        """weight 상태에 맞는 툴팁을 슬라이더/스핀박스에 건다."""
+        base = "Drag to set the weight. Center is 0, right end +1, left end -1."
+        if state == "keyed":
+            tip = (base + "\nKeyed: with Auto Key on the change is keyframed at the "
+                   "current time; with it off it is a preview that reverts when you "
+                   "scrub time.")
+        elif state == "driven":
+            tip = "This weight is driven by another node and cannot be edited."
+        elif state == "locked":
+            tip = "This weight is locked and cannot be edited."
+        else:
+            tip = base
+        slider.setToolTip(tip)
+        spin.setToolTip(tip)
 
     def _style_edit_button(self, btn, on):
         """Edit 토글의 현재 상태(색 + 라벨)를 버튼에 반영한다."""
@@ -443,10 +517,12 @@ class MainWindow(QWidget):
             row["btn"].blockSignals(False)
             self._style_edit_button(row["btn"], on)
 
-            settable = ShapeEditorManager.is_weight_settable(node, row["index"])
+            state = ShapeEditorManager.weight_state(node, row["index"])
+            editable = state in ("free", "keyed")
             self._show_weight(row, ShapeEditorManager.get_weight(node, row["index"]))
-            row["spin"].setEnabled(settable and not on)
-            row["slider"].setEnabled(settable and not on)
+            row["spin"].setEnabled(editable and not on)
+            row["slider"].setEnabled(editable and not on)
+            self._apply_se_row_tooltip(row["slider"], row["spin"], state)
 
     # --------------------------------------------------
     # Shape Editor : 씬 -> UI weight 실시간 반영
@@ -542,14 +618,133 @@ class MainWindow(QWidget):
         # 노드당 한 타겟만 편집할 수 있으므로 다른 행의 상태도 다시 맞춘다.
         self._sync_se_edit_states()
 
+    def _co_edit_rows(self, row):
+        """이번 조작이 적용될 행들.
+
+        조작한 행이 다중 선택의 일부면 선택된 행 전체, 아니면 그 행 하나.
+        """
+        selected = [r for r in self._se_rows if r["selected"]]
+        if row in selected and len(selected) > 1:
+            return selected
+        return [row]
+
+    # --------------------------------------------------
+    # Shape Editor : 행 선택(칸 클릭 / Shift 다중)
+    # --------------------------------------------------
+
+    def _on_se_row_clicked(self, row, modifiers):
+        """타겟 칸 클릭.
+
+        - Shift+클릭 : 기준점(anchor)부터 이 행까지 **사이의 (보이는) 행 전체를 선택**(범위).
+        - Ctrl+클릭  : 이 행만 선택 토글(비연속 다중 선택).
+        - 그냥 클릭   : 이 행만 단일 선택. (Shift/Ctrl 이 아닐 때는 기준점을 이 행으로 갱신)
+        """
+        shift = bool(modifiers & Qt.ShiftModifier)
+        ctrl = bool(modifiers & Qt.ControlModifier)
+
+        anchor_alive = any(r is self._se_anchor for r in self._se_rows)
+        if shift and anchor_alive:
+            self._se_select_range(self._se_anchor, row)   # 기준점은 유지
+        elif ctrl:
+            row["selected"] = not row["selected"]
+            self._se_anchor = row
+        else:
+            for r in self._se_rows:
+                r["selected"] = (r is row)
+            self._se_anchor = row
+
+        self._refresh_se_selection_styles()
+
+    def _se_select_range(self, anchor, row):
+        """표시 순서로 anchor..row 구간을 선택하고 나머지는 해제한다.
+
+        필터로 보이는 행만 대상으로 한다(화면상 A~B 사이). 기준점/끝점이 숨겨진 예외
+        상황에서는 전체 순서로 폴백한다.
+        """
+        seq = [r for r in self._se_rows if r["row"].isVisible()]
+        if anchor not in seq or row not in seq:
+            seq = self._se_rows
+
+        # 행 정보는 dict(unhashable)이므로 정체성(id)으로 구간을 판별한다.
+        i = next(k for k, r in enumerate(seq) if r is anchor)
+        j = next(k for k, r in enumerate(seq) if r is row)
+        lo, hi = (i, j) if i <= j else (j, i)
+        in_range = {id(r) for r in seq[lo:hi + 1]}
+
+        for r in self._se_rows:
+            r["selected"] = (id(r) in in_range)
+
+    def _refresh_se_selection_styles(self):
+        """각 행의 배경을 선택 상태에 맞게 칠한다."""
+        for r in self._se_rows:
+            r["row"].setStyleSheet(ROW_SELECTED_STYLE if r["selected"] else "")
+
+    def _se_select_all(self, selected):
+        """현재 보이는(필터 통과) 행들의 선택 상태를 일괄 설정한다."""
+        for row in self._se_rows:
+            if row["row"].isVisible():
+                row["selected"] = selected
+            elif selected is False:
+                row["selected"] = False
+        # 일괄 조작 뒤에는 기준점을 지워, 다음 Shift+클릭이 엉뚱한 구간을 잡지 않게 한다.
+        self._se_anchor = None
+        self._refresh_se_selection_styles()
+
+    def _se_slider_pressed(self):
+        """슬라이더를 잡았다. 놓을 때까지의 변경을 한 undo 로 묶기 시작한다."""
+        self._se_dragging = True
+
+    def _se_slider_released(self):
+        """슬라이더를 놓았다. 드래그 청크를 닫는다."""
+        self._se_dragging = False
+        if self._se_undo_open:
+            cmds.undoInfo(closeChunk=True)
+            self._se_undo_open = False
+
     def on_se_weight_changed(self, row, value):
-        """슬라이더나 스핀박스를 움직였다. 씬에 쓰고 반대쪽 위젯을 같은 값으로 맞춘다."""
-        ok, msg = ShapeEditorManager.set_weight(row["node"], row["index"], value)
-        if not ok:
-            # 씬에 못 썼다. 폴링이 곧 실제 값으로 되돌린다.
-            self.log(msg)
+        """슬라이더나 스핀박스를 움직였다. 대상 행들에 값을 쓰고 위젯을 맞춘다.
+
+        다중 선택이면 같은 value 를 선택된 모든 타겟에 동시에 적용한다.
+
+        undo 는 **제스처 단위**로 묶는다:
+          - 슬라이더 드래그: press~release 전체를 한 청크로(첫 변경 때 lazy open). 매 틱마다
+            여러 타겟에 setAttr 을 내므로, 안 묶으면 Ctrl+Z 가 마지막 한 틱(한 타겟)만 되돌린다.
+          - 스핀박스/개별 변경: 그 한 번의 변경(선택된 모든 타겟)을 한 청크로 감싼다.
+        """
+        if self._se_applying:
             return
-        self._show_weight(row, value)
+
+        rows = self._co_edit_rows(row)
+        # Auto Keyframe 상태는 이번 조작에서 한 번만 조회해 모든 행에 같은 기준을 쓴다.
+        autokey = ShapeEditorManager.is_autokey_on()
+
+        own_chunk = False
+        if self._se_dragging:
+            # 드래그: 첫 변경에서 청크를 열고 release 에서 닫는다.
+            if not self._se_undo_open:
+                cmds.undoInfo(openChunk=True)
+                self._se_undo_open = True
+        else:
+            # 스핀박스 등 이산 변경: 이 한 번을 청크로 감싼다.
+            cmds.undoInfo(openChunk=True)
+            own_chunk = True
+
+        self._se_applying = True
+        try:
+            for r in rows:
+                ok, msg = ShapeEditorManager.set_weight(
+                    r["node"], r["index"], value, autokey=autokey)
+                if not ok:
+                    # 다중 편집에서 잠긴/구동 타겟이 섞여 있을 수 있다. 매 틱 로그를 쏟지 않도록
+                    # 조용히 건너뛴다(단일 편집이면 한 번 알린다).
+                    if len(rows) == 1:
+                        self.log(msg)
+                    continue
+                self._show_weight(r, value)
+        finally:
+            self._se_applying = False
+            if own_chunk:
+                cmds.undoInfo(closeChunk=True)
 
     def on_se_expand(self):
         """타겟 스크롤 영역을 별도 창으로 옮긴다(이미 떠 있으면 앞으로 가져온다)."""
