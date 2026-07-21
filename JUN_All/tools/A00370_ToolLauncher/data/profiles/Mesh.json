@@ -14,6 +14,10 @@
         {
           "name": "abSymMesh",
           "path": "tools/A00180_abSymMesh"
+        },
+        {
+          "name": "BSTool",
+          "path": "tools/A00290_BSTool"
         }
       ]
     }
