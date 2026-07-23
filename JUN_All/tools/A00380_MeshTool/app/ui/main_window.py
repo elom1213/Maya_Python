@@ -1,24 +1,29 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-20
+# last Update date : 2026-07-23
 # A00380_MeshTool - Qt UI
 #
 # Peak 탭: 선택한 메시/버텍스를 자기 노말 방향으로 팽창(+)·수축(-) 시킨다.
 # 후디니 peak 노드와 같은 개념이고, 마야 기본(Move 툴 axis=normal)보다 훨씬 빠르다.
 #
-# 흐름: Load Selection 으로 스냅샷 → 슬라이더를 끌면 실시간 미리보기(API 직접 쓰기)
+# Match 탭: 리스트업한 From 메시의 같은 인덱스 버텍스 위치로, 선택한 메시의 버텍스를
+# 이동시킨다(소프트 셀렉션 falloff 반영). Kangaroo Geometry>Match 를 Kangaroo 없이 재현.
+#
+# 흐름: Load 로 스냅샷 → 슬라이더를 끌면 실시간 미리보기(API 직접 쓰기)
 #       → Apply 로 확정(tweak 구간 setAttr, Ctrl+Z 한 번에 되돌아감).
 
 import time
 
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
+from Framework.qt.MOD_tsl_qt_v01 import JUN_mod_tsl_qt_v01
 
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
 from tools.A00380_MeshTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00380_MeshTool.app.core import peak_manager as peak_mgr
+from tools.A00380_MeshTool.app.core import match_manager as match_mgr
 
 
 WINDOW_OBJECT_NAME = "JUN_A00380_MeshTool_window"
@@ -48,6 +53,16 @@ class MainWindow(QWidget):
         self._last_preview_sec = 0.0   # 직전 미리보기 소요 시간 (스로틀 판단용)
         self._last_preview_at = 0.0
 
+        # 씬에 미확정 미리보기가 실제로 써져 있는지. 이게 False 면 되돌릴 게 없으므로
+        # restore 를 건너뛴다. (auto-load 가 선택 변경마다 restore 를 부르면, 슬라이더를
+        # 한 번도 안 건드렸어도 사용자가 손으로 옮긴 버텍스를 스냅샷으로 덮어써 버린다.)
+        self._preview_dirty = False
+
+        # Match 탭 상태 (Peak 과 독립된 세션/동기화 플래그)
+        self.match_session = None      # match_mgr.MatchSession
+        self._match_syncing = False
+        self._match_preview_dirty = False
+
         self.build_ui()
         self.update_state()
 
@@ -68,6 +83,8 @@ class MainWindow(QWidget):
 
         self.tabs = QTabWidget()
         self.tabs.addTab(self.build_peak_tab(), "Peak")
+        self.tabs.addTab(self.build_match_tab(), "Match")
+        self.tabs.currentChanged.connect(self.on_tab_changed)
         root.addWidget(self.tabs, 1)
 
         self.te_log = QTextEdit()
@@ -219,6 +236,100 @@ class MainWindow(QWidget):
 
         return page
 
+    # --------------------------------------------------------------
+    # Match 탭
+    #   리스트업한 From 메시의 같은 인덱스 버텍스 위치로, 선택한 메시의 버텍스를
+    #   이동시킨다(소프트 셀렉션 falloff 반영). Kangaroo Geometry>Match 를 재현.
+    # --------------------------------------------------------------
+
+    def build_match_tab(self):
+
+        page = QWidget()
+        lay = QVBoxLayout(page)
+
+        # ---- From 메시 (버텍스 인덱스 대응 원본) --------------------
+        box_from = QGroupBox("From Mesh  (vertex-index match)")
+        vf = QVBoxLayout(box_from)
+        self.tsl_from = JUN_mod_tsl_qt_v01(
+            title="From",
+            show_up=False, show_down=False, show_sort=False,
+            multi_select=False,
+            select_label="List From Mesh",
+            log_callback=self.log)
+        self.tsl_from.setMaximumHeight(120)
+        vf.addWidget(self.tsl_from)
+        lay.addWidget(box_from)
+
+        # 대상은 따로 로드하지 않는다 — 씬에서 메시/버텍스를 선택한 뒤 곧바로 Apply Match.
+        lb_hint = QLabel("Select the mesh / vertices to move, then Apply "
+                         "(or drag Weight to preview).")
+        lb_hint.setWordWrap(True)
+        lb_hint.setStyleSheet("color:#9aa0a6;")
+        lay.addWidget(lb_hint)
+
+        # ---- 옵션 -------------------------------------------------
+        box_opt = QGroupBox("Options")
+        vo = QVBoxLayout(box_opt)
+
+        self.chk_match_world = QCheckBox("World space")
+        self.chk_match_world.setChecked(True)
+        self.chk_match_world.setToolTip(
+            "On: target vertices land on the From vertices' WORLD positions.\n"
+            "Off: match the two meshes' local (object-space) coordinates.")
+        vo.addWidget(self.chk_match_world)
+
+        self.chk_match_soft = QCheckBox("Respect soft selection")
+        self.chk_match_soft.setChecked(True)
+        self.chk_match_soft.setToolTip(
+            "Use Maya's soft selection falloff as a per-vertex blend multiplier\n"
+            "(only when soft select is enabled).")
+        vo.addWidget(self.chk_match_soft)
+        lay.addWidget(box_opt)
+
+        # ---- Weight (0=원본, 1=완전 매칭) --------------------------
+        box_w = QGroupBox("Weight")
+        vw = QVBoxLayout(box_w)
+
+        self.sl_match = QSlider(Qt.Horizontal)
+        self.sl_match.setRange(0, SLIDER_TICKS)
+        self.sl_match.setValue(SLIDER_TICKS)      # 기본 1.0 (완전 매칭)
+        # 슬라이더를 '잡는 순간' 현재 선택으로 세션을 만든다(백그라운드 scriptJob 없이).
+        self.sl_match.sliderPressed.connect(self.on_match_slider_pressed)
+        self.sl_match.valueChanged.connect(self.on_match_slider_changed)
+        self.sl_match.sliderReleased.connect(self.match_preview)
+        vw.addWidget(self.sl_match)
+
+        row_w = QHBoxLayout()
+        row_w.addWidget(QLabel("Value"))
+        self.sp_match = QDoubleSpinBox()
+        self.sp_match.setDecimals(3)
+        self.sp_match.setRange(0.0, 1.0)
+        self.sp_match.setSingleStep(0.05)
+        self.sp_match.setValue(1.0)
+        self.sp_match.valueChanged.connect(self.on_match_spin_changed)
+        row_w.addWidget(self.sp_match, 1)
+        vw.addLayout(row_w)
+        lay.addWidget(box_w)
+
+        # ---- 확정 -------------------------------------------------
+        row_apply = QHBoxLayout()
+        self.btn_match_apply = QPushButton("Apply Match")
+        self.btn_match_apply.setMinimumHeight(38)
+        self.btn_match_apply.setToolTip("Commit the match (undoable with one Ctrl+Z).")
+        self.btn_match_apply.clicked.connect(self.on_match_apply)
+        row_apply.addWidget(self.btn_match_apply, 2)
+
+        self.btn_match_reset = QPushButton("Reset")
+        self.btn_match_reset.setMinimumHeight(38)
+        self.btn_match_reset.setToolTip("Back to the original (Weight 0), keep the target loaded.")
+        self.btn_match_reset.clicked.connect(self.on_match_reset)
+        row_apply.addWidget(self.btn_match_reset, 1)
+
+        lay.addLayout(row_apply)
+        lay.addStretch(1)
+
+        return page
+
     # ==============================================================
     # 상태
     # ==============================================================
@@ -289,6 +400,8 @@ class MainWindow(QWidget):
 
         self._last_preview_sec = time.time() - start
         self._last_preview_at = time.time()
+        # amount 이 0 이면 preview 가 스냅샷 그대로를 쓴 것 → 되돌릴 게 없다.
+        self._preview_dirty = abs(self.amount()) > 1e-9
 
     # ==============================================================
     # 이벤트
@@ -357,6 +470,7 @@ class MainWindow(QWidget):
             return
 
         self.session = session
+        self._preview_dirty = False   # 새 스냅샷 → 미리보기 없음
 
         self._syncing = True
         self.sp_amount.setValue(0.0)
@@ -385,15 +499,21 @@ class MainWindow(QWidget):
         self.log("Cleared.")
 
     def discard_preview(self):
-        """미리보기를 스냅샷 상태로 되돌린다 (확정 안 함)."""
+        """미확정 미리보기가 있을 때만 스냅샷 상태로 되돌린다.
 
-        if not self.has_session():
+        미리보기를 쓴 적이 없으면(_preview_dirty=False) restore 를 부르지 않는다.
+        안 그러면 auto-load 가 선택 변경마다 restore 를 불러, 슬라이더를 건드리지 않고
+        사용자가 손으로 옮긴 버텍스까지 스냅샷으로 되돌려 버린다(= 편집이 원상복구되는 버그).
+        """
+
+        if not self.has_session() or not self._preview_dirty:
             return
 
         try:
             self.session.restore()
         except Exception:
             pass
+        self._preview_dirty = False
 
     # ---- 확정 / 리셋 ----------------------------------------------
 
@@ -416,6 +536,8 @@ class MainWindow(QWidget):
             self.log("Apply failed: {0}".format(e), warn=True)
             return
 
+        self._preview_dirty = False   # 확정됨 → 씬이 곧 스냅샷(commit 이 갱신)
+
         self._syncing = True
         self.sp_amount.setValue(0.0)
         self.sl_amount.setValue(0)
@@ -432,6 +554,195 @@ class MainWindow(QWidget):
 
         self.set_amount(0.0)
         self.log("Preview reset.")
+
+    # ==============================================================
+    # Match 탭 로직
+    # ==============================================================
+
+    def has_match_session(self):
+        return self.match_session is not None
+
+    def match_weight(self):
+        return self.sp_match.value()
+
+    def set_match_weight(self, value):
+        """슬라이더/스핀박스를 함께 맞추고 (세션이 있으면) 미리보기를 갱신한다."""
+
+        value = max(0.0, min(1.0, value))
+
+        self._match_syncing = True
+        self.sp_match.setValue(value)
+        self.sl_match.setValue(int(round(value * SLIDER_TICKS)))
+        self._match_syncing = False
+
+        self.match_preview()
+
+    def _match_build(self):
+        """From(TSL 첫 항목) + '현재 선택' 으로 세션을 새로 만든다. 실패 시 None.
+
+        대상을 따로 로드하지 않는다 — 이 함수가 불릴 때(슬라이더 잡기/스핀 입력/Apply)의
+        씬 선택을 그대로 대상으로 삼는다. 만들기 전에 이전 미리보기는 되돌린다(dirty 가드).
+        """
+
+        self.discard_match_preview()
+
+        nodes = self.tsl_from.get_all_nodes()
+        if not nodes:
+            self.match_session = None
+            self.log("List a From mesh first (select it, then 'List From Mesh').",
+                     warn=True)
+            return None
+        if len(nodes) > 1:
+            self.log("Multiple From meshes listed; using the first ({0}).".format(
+                nodes[0].split("|")[-1]), warn=True)
+        from_node = nodes[0]
+
+        try:
+            session = match_mgr.MatchSession.from_selection(
+                from_node,
+                world=self.chk_match_world.isChecked(),
+                soft_select=self.chk_match_soft.isChecked())
+        except ValueError as e:
+            self.match_session = None
+            self.log(str(e), warn=True)
+            return None
+        except Exception as e:
+            self.match_session = None
+            self.log("Match build failed: {0}".format(e), warn=True)
+            return None
+
+        self.match_session = session
+        self._match_preview_dirty = False
+
+        if session is None:
+            self.log("Select the target mesh / vertices (not the From mesh), "
+                     "then Apply.", warn=True)
+            return None
+
+        if session.mismatch:
+            detail = ", ".join("{0}={1}v".format(n, c) for n, c in session.mismatch)
+            self.log("Warning: vertex count differs from From ({0}v): {1}. "
+                     "Matching is index-based; only overlapping indices move."
+                     .format(session.from_count, detail), warn=True)
+        if session.skipped_count:
+            self.log("{0} selected vertice(s) have no matching index on From "
+                     "and were skipped.".format(session.skipped_count), warn=True)
+
+        return session
+
+    def match_preview(self, throttle=False):
+        """Match 미리보기 갱신 (Peak 의 apply_preview 와 같은 스로틀 규칙)."""
+
+        if not self.has_match_session():
+            return
+
+        if throttle and self._last_preview_sec > _HEAVY_SEC:
+            if (time.time() - self._last_preview_at) < self._last_preview_sec:
+                return
+
+        start = time.time()
+        try:
+            self.match_session.preview(self.match_weight())
+        except Exception as e:
+            self.log("Match preview failed: {0}".format(e), warn=True)
+            return
+        self._last_preview_sec = time.time() - start
+        self._last_preview_at = time.time()
+        self._match_preview_dirty = self.match_weight() > 1e-9
+
+    def on_match_slider_pressed(self):
+        """슬라이더를 잡는 순간, 현재 선택으로 세션을 만들어 미리보기를 준비한다."""
+        if self._match_build() is not None:
+            self.match_preview()
+
+    def on_match_slider_changed(self, tick):
+
+        if self._match_syncing:
+            return
+
+        value = tick / float(SLIDER_TICKS)
+
+        self._match_syncing = True
+        self.sp_match.setValue(value)
+        self._match_syncing = False
+
+        # 슬라이더를 잡았을 때 만든 세션이 있으면 미리보기(없으면 조용히 무시).
+        if self.has_match_session():
+            self.match_preview(throttle=self.sl_match.isSliderDown())
+
+    def on_match_spin_changed(self, value):
+
+        if self._match_syncing:
+            return
+
+        self._match_syncing = True
+        self.sl_match.setValue(int(round(value * SLIDER_TICKS)))
+        self._match_syncing = False
+
+        # 스핀박스로 값을 넣으면 현재 선택으로 세션을 만들어 미리보기한다.
+        if not self.has_match_session():
+            self._match_build()
+        self.match_preview()
+
+    def discard_match_preview(self):
+        """미확정 Match 미리보기가 있을 때만 스냅샷 상태로 되돌린다.
+
+        Peak 의 discard_preview 와 같은 이유로 dirty 일 때만 restore 한다(수동 편집 보존).
+        """
+
+        if not self.has_match_session() or not self._match_preview_dirty:
+            return
+        try:
+            self.match_session.restore()
+        except Exception:
+            pass
+        self._match_preview_dirty = False
+
+    def on_match_apply(self):
+        """현재 선택한 메시/버텍스를 From 에 매칭해 확정한다(Ctrl+Z 한 번).
+
+        따로 로드할 필요 없다 — 미리보기 중이면 그 세션을, 아니면 지금 선택으로 만든다.
+        """
+
+        weight = self.match_weight()
+        if weight < 1e-9:
+            self.log("Weight is 0 - nothing to apply.", warn=True)
+            return
+
+        session = self.match_session or self._match_build()
+        if session is None:
+            return
+
+        try:
+            with undo_chunk():
+                moved = session.commit(weight)
+        except Exception as e:
+            self.log("Match apply failed: {0}".format(e), warn=True)
+            return
+
+        self.log("Matched {0} vertice(s) to {1} at weight {2:.3f}.".format(
+            moved, session.from_name, weight), ok=True)
+
+        # 확정 후에는 원본이 이미 이동했으므로 세션을 비운다(다음 Apply 는 새 선택으로).
+        self._match_preview_dirty = False
+        self.match_session = None
+
+    def on_match_reset(self):
+        """미리보기 중이면 원본(Weight 0)으로 되돌린다."""
+        if not self.has_match_session():
+            self.log("No match preview to reset.")
+            return
+        self.set_match_weight(0.0)
+        self.log("Match reset to 0.")
+
+    def on_tab_changed(self, index):
+        """탭을 옮기면, 떠나는 탭의 확정 안 한 미리보기를 되돌린다.
+
+        두 탭 모두 shape.pnts 에 쓰므로, 한쪽 미리보기가 남은 채 다른 탭에서 작업하면
+        결과가 겹쳐 보인다. 탭 전환 시 확정하지 않은 미리보기는 스냅샷으로 되돌린다.
+        """
+        self.discard_preview()
+        self.discard_match_preview()
 
     # ---- 자동 로드 -------------------------------------------------
 
@@ -488,6 +799,7 @@ class MainWindow(QWidget):
     def closeEvent(self, event):
         # 확정하지 않은 미리보기를 남긴 채 닫으면 씬이 어긋난 상태로 보인다.
         self.discard_preview()
+        self.discard_match_preview()
         self.kill_script_job()
         super(MainWindow, self).closeEvent(event)
 
@@ -519,6 +831,10 @@ class MainWindow(QWidget):
             self, "About",
             "Mesh Tool\nv{0}  ({1})\n\n"
             "Peak: inflate / shrink a mesh along its vertex normals,\n"
-            "like Houdini's peak node. Drag the slider for a live preview,\n"
-            "then Apply to commit it as a single undo step.\n"
+            "like Houdini's peak node.\n\n"
+            "Match: snap the selected mesh's vertices onto a From mesh's\n"
+            "same-index vertices (soft-selection falloff aware) - a\n"
+            "standalone take on Kangaroo's Geometry > Match.\n\n"
+            "Drag the slider for a live preview, then Apply to commit it\n"
+            "as a single undo step.\n"
             "by Ji Hun Park".format(VERSION, LAST_UPDATE))

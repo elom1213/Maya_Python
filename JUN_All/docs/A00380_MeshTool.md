@@ -1,19 +1,22 @@
 ---
 title: A00380_MeshTool 사용법
-aliases: [Mesh Tool, MeshTool, A00380, Peak]
-tags: [maya-python, tool-guide, mesh, modeling, peak, normal]
-updated: 2026-07-20
+aliases: [Mesh Tool, MeshTool, A00380, Peak, Match]
+tags: [maya-python, tool-guide, mesh, modeling, peak, normal, match, kangaroo]
+updated: 2026-07-23
 ---
 
 # A00380_MeshTool 사용법
 
-Maya 안에서 도는 **메시 편집** PySide 툴이다(arch B, in-Maya). v01.00 은 **Peak 탭** 하나로 시작한다.
+Maya 안에서 도는 **메시 편집** PySide 툴이다(arch B, in-Maya). **Peak / Match** 두 탭으로 구성된다.
 
-**Peak** = 선택한 메시/버텍스를 **각자의 노말 방향으로 팽창(+) · 수축(-)** 시킨다.
-후디니의 **peak 노드**와 같은 개념이고, 마야 기본 방식(컴포넌트 선택 → Move 툴 `axis = normal`)의
-느린 점을 해결하는 것이 목적이다.
+- **Peak** (v01.00~) = 선택한 메시/버텍스를 **각자의 노말 방향으로 팽창(+) · 수축(-)** 시킨다.
+  후디니의 **peak 노드**와 같은 개념이고, 마야 기본 방식(컴포넌트 선택 → Move 툴 `axis = normal`)의
+  느린 점을 해결하는 것이 목적이다.
+- **Match** (v01.01~) = 리스트업한 **From 메시의 같은 인덱스 버텍스 위치**로, 선택한 메시의 버텍스를
+  이동시킨다(소프트 셀렉션 falloff 반영). **Kangaroo 의 Geometry > Match** 기능을 Kangaroo 없이
+  재현한 것이다.
 
-- **버전**: `app/config/version.py` (v01.00)
+- **버전**: `app/config/version.py` (v01.03)
 - **설치**: `__dragDrop_A00380.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **MeshTool** → `tools.A00380_MeshTool.run(True)`
 
 ---
@@ -76,6 +79,55 @@ Maya 안에서 도는 **메시 편집** PySide 툴이다(arch B, in-Maya). v01.0
 
 ---
 
+## 3-2. Match 탭 (v01.01~)
+
+리스트업한 **From 메시**의 버텍스 위치로, 현재 선택한 메시의 버텍스를 **같은 인덱스끼리** 이동시킨다.
+버텍스 대응이 **인덱스 기준**이라, 두 메시는 **토폴로지(버텍스 순서·개수)가 같아야** 정확히 맞는다
+(예: 블렌드셰이프 타겟, 복제본, 스컬프트 전/후처럼 위상이 같은 메시). Kangaroo 의 `setModelVerts`
+(Geometry > Match) 와 같은 규칙이다.
+
+```
+┌ Match ─────────────────────────────┐
+│ ┌ From Mesh (vertex-index match) ─┐ │
+│ │ [ From 리스트 (TSL) ]           │ │  ← [List From Mesh] 로 선택을 등록
+│ └─────────────────────────────────┘ │
+│ Select the mesh/verts to move, then │  ← 대상은 그냥 씬에서 선택만
+│ Apply (or drag Weight to preview).  │
+│ ┌ Options ────────────────────────┐ │
+│ │ [x] World space                 │ │
+│ │ [x] Respect soft selection      │ │
+│ └─────────────────────────────────┘ │
+│ ┌ Weight ─────────────────────────┐ │
+│ │ --------------------[|]  (0~1)   │ │  ← 0=원본, 1=완전 매칭
+│ │ Value [ 1.000 ]                 │ │
+│ └─────────────────────────────────┘ │
+│ [    Apply Match    ] [ Reset ]     │
+└─────────────────────────────────────┘
+```
+
+**사용 순서** (v01.03~ 대상 로드 단계 제거)
+1. **From 메시를 선택**하고 **List From Mesh** 로 From 리스트에 등록한다(1개).
+2. 이동시킬 **대상 메시(또는 버텍스)를 씬에서 선택**한다. 소프트 셀렉션을 켜면 falloff 가 반영된다.
+3. **Apply Match** — 그 순간의 선택을 대상으로 삼아 매칭하고 확정한다(**Ctrl+Z 한 번**에 되돌아감).
+4. (선택) 확정 전에 결과를 보고 싶으면 **Weight 슬라이더를 끌어** 0(원본)~1(완전 매칭)을 실시간
+   미리보기한다. 슬라이더를 잡는 순간의 선택이 대상이 된다. **Reset** 은 미리보기를 원본으로 되돌린다.
+
+> 별도의 "Load Target" 버튼은 없다. Apply(또는 슬라이더를 잡는 순간)에 **현재 씬 선택**을 대상으로 읽는다.
+
+**옵션**
+
+| 옵션 | 설명 |
+|------|------|
+| **World space** (기본 켜짐) | 대상 버텍스가 From 버텍스의 **월드 위치**에 앉는다. 끄면 두 메시의 **로컬(오브젝트 공간) 좌표**를 맞춘다(둘의 트랜스폼이 달라도 로컬이 같으면 무변화). |
+| **Respect soft selection** (기본 켜짐) | 소프트 셀렉션 falloff 를 **버텍스별 블렌드 배율**로 쓴다. `final = 원본 + softw·weight·(타겟-원본)`. |
+
+> **인덱스 대응**: 대상 버텍스 `i` → From 버텍스 `i`. From 이 대상보다 버텍스가 적으면, 대응 인덱스가
+> 없는 대상 버텍스는 **건너뛰고 로그로 알린다**. 버텍스 수가 다르면 "토폴로지 불일치" 경고를 남기되
+> 겹치는 인덱스는 이동한다.
+> **From 은 대상에서 자동 제외**된다(From 을 함께 선택해도 자기 자신엔 매칭하지 않는다).
+
+---
+
 ## 4. 왜 마야 기본 방식보다 빠른가
 
 마야에서 버텍스를 노말 방향으로 옮기면 **버텍스마다 명령이 하나씩** 실행된다.
@@ -95,7 +147,18 @@ Maya 안에서 도는 **메시 편집** PySide 툴이다(arch B, in-Maya). v01.0
 
 ## 5. 구현 메모 (수정할 때 주의)
 
-`app/core/peak_manager.py` 에 정리돼 있다. mayapy 로 확인한 함정들:
+`app/core/peak_manager.py`(Peak) 와 `app/core/match_manager.py`(Match) 에 정리돼 있다.
+Match 는 Peak 의 공용 헬퍼(`_undo_disabled`, `_selection_map`, `_dag_path`, `_soft_weights`,
+`_contiguous_runs`, `_shape_of`)와 preview/restore/commit·`shape.pnts` 구간 setAttr 모델을
+**그대로 재사용**한다. Peak 과 다른 점은 이동량 계산뿐이다:
+- **대응은 버텍스 인덱스**(closest-point 아님). From 을 대상의 오브젝트 공간으로 옮긴 좌표
+  `from_local` 과 대상의 현재 좌표 `orig_local` 의 차 `(from_local - orig_local)` 를 로드 시점에
+  버텍스별로 미리 계산해 얼려두고, 미리보기에서 `weight × softw` 만 곱한다.
+- **World 모드**는 From 을 `getPoints(kWorld)` 로 읽고 대상의 `inclusiveMatrixInverse()` 로 역변환하므로,
+  결과적으로 대상 버텍스가 From 의 **월드 위치**에 앉는다. Object 모드는 각자의 로컬 좌표를 직접 맞춘다.
+- 나머지(undo off 미리보기, restore-before-commit, tweak 누적)는 아래 Peak 함정과 동일하다.
+
+mayapy 로 확인한 함정들:
 
 - **`MFnMesh.setPoints` 로 메시 데이터(vrts)를 직접 쓰지 말 것.**
   미리보기는 0.02 초로 더 빠르지만 **기존 tweak 이 쓸려 나가고**, 그 뒤 `setAttr` 이
@@ -115,9 +178,16 @@ Maya 안에서 도는 **메시 편집** PySide 툴이다(arch B, in-Maya). v01.0
   *"compound with mixed type elements"* 로 실패한다.
 - 히스토리 있는 메시 · 스킨 걸린 메시에서도 동작한다(스킨 메시는 마야가
   *"Tweaks can be undesirable on shapes with history"* 경고를 띄우지만 정상 동작).
+- **(v01.02) 미리보기 되돌리기(`restore`)는 "미리보기가 실제로 걸려 있을 때만" 한다.**
+  UI 의 `discard_preview` 를 `_preview_dirty` 플래그로 가드한다. 이걸 안 하면 **Auto load** 가
+  선택이 바뀔 때마다 `restore` 를 불러, 슬라이더를 한 번도 안 건드렸어도 **사용자가 손으로 옮긴
+  버텍스를 로드 시점 스냅샷으로 덮어써 원상복구**시킨다(툴만 띄워둬도 편집이 되돌려지던 버그).
+  `_preview_dirty` 는 amount≠0 미리보기를 쓸 때만 True, load/commit/restore 후 False. Match 탭도
+  같은 방식(`_match_preview_dirty`).
 
 ---
 
 ## 6. 앞으로
 
-Peak 은 첫 탭이고, 메시 관련 기능이 생기면 탭으로 추가한다.
+메시 관련 기능이 생기면 탭으로 추가한다(현재 Peak / Match). 새 탭도 Peak/Match 처럼
+`app/core/<name>_manager.py` 에 세션 모델(preview/restore/commit)을 두고, 공용 헬퍼를 재사용한다.
