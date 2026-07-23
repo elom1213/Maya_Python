@@ -1,0 +1,17 @@
+{
+  "categories": [
+    {
+      "name": "Main",
+      "buttons": [
+        {
+          "name": "AnimTool",
+          "path": "tools/A00110_animTool"
+        },
+        {
+          "name": "FKIK",
+          "path": "tools/A00120_FKIK"
+        }
+      ]
+    }
+  ]
+}
