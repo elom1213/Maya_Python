@@ -171,9 +171,9 @@ class MainWindow(QWidget):
         layout = QVBoxLayout(tab)
 
         desc = QLabel(
-            "Transfer skin weights from one or more SOURCE meshes to the mesh you\n"
-            "currently have selected in the scene (closest point).\n"
-            "Select vertices on the target to transfer only there; soft selection\n"
+            "Transfer skin weights from the SOURCE meshes (list below) to ALL meshes\n"
+            "you currently have selected in the scene (closest point).\n"
+            "Select vertices on a target to transfer only there; soft selection\n"
             "falloff is respected (Native engine).")
         desc.setAlignment(Qt.AlignCenter)
         layout.addWidget(desc)
@@ -228,11 +228,12 @@ class MainWindow(QWidget):
         layout.addWidget(opt_grp)
 
         hint = QLabel(
-            "Target = your current scene selection (a mesh, or vertices on it).")
+            "Targets = your current scene selection (one or more meshes, or "
+            "vertices on them).")
         hint.setAlignment(Qt.AlignCenter)
         layout.addWidget(hint)
 
-        self.btn_transfer_run = QPushButton("TRANSFER to selected mesh")
+        self.btn_transfer_run = QPushButton("TRANSFER to selected mesh(es)")
         self.btn_transfer_run.setMinimumHeight(40)
         self.btn_transfer_run.clicked.connect(self.on_transfer_to_mesh)
         layout.addWidget(self.btn_transfer_run)

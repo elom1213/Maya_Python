@@ -1,6 +1,6 @@
 ---
 name: wip-a00275-transfer-tab
-description: "A00275_skinTool_V01 v01.05 — Classic tab Engine(Kangaroo/Native) choice + new Transfer tab (many source meshes -> selected mesh/verts; Native soft-falloff + Kangaroo engine choice) — IMPLEMENTED, Maya test pending"
+description: "A00275_skinTool_V01 v01.06 — Classic Engine choice + Transfer tab (many source meshes -> ALL selected meshes/verts; Native soft-falloff + Kangaroo engine choice) — IMPLEMENTED, Maya test pending"
 metadata: 
   node_type: memory
   type: project
@@ -44,6 +44,14 @@ target), iMode=2 closestPoint, bAutoCreateNewSkinCluster=(target has no skin))`.
 handling follows Kangaroo; the soft-falloff checkbox is Native-only (disabled when Kangaroo is picked).
 Default = Native. Note: in this mayapy env `kangarooTabTools` imports but `report.report` is None so the
 call errors — the tool catches it as `[Error]` (no crash); works in real Maya with Kangaroo Builder loaded.
+
+**v01.06 (bug fix, user-reported): Transfer only hit ONE of several selected target meshes.** Root cause:
+`parse_target_selection()` returned just the first mesh. Added `parse_target_selections()` (plural) that
+groups the selection **by mesh** (whole-mesh → full transfer; verts on a mesh → partial on that mesh;
+soft per mesh). Native now loops all targets (`_transfer_one_native` per mesh) inside ONE undo_chunk;
+Kangaroo already handled multiple via `_pSelection=None`. Also fixed source-exclusion: TSL names (short)
+vs `ls -l` (full path) mismatched so a co-selected source wasn't filtered → it transferred onto itself
+and errored. Fix: `_mesh_transform` now normalizes to the **full DAG path** so the compare works.
 
 Testing: Qt+maya.standalone crashes headless → core tested with real meshes via mayapy (single/multi
 source, partial verts, soft falloff, Classic native move/transfer — all pass; Kangaroo branch routed

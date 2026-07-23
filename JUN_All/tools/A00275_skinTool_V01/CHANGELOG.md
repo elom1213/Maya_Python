@@ -1,5 +1,16 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.06 (2026-07-23)
+- **[Fix] Transfer 탭이 선택한 여러 대상 메시 중 하나에만 전이되던 문제** — 이제 **선택한 모든 메시**에
+  전이한다.
+  - 원인: 대상 파싱(`parse_target_selection`)이 선택에서 **첫 메시 하나만** 반환했다.
+  - 해결: `parse_target_selections`(복수) — 선택을 **대상 메시별로 그룹핑**해, 통째 선택된 메시는 각각
+    전체 전이, 버텍스가 선택된 메시는 그 메시만 부분 전이(소프트 falloff 는 메시별). Native 는 대상마다
+    copySkinWeights+마스킹을 돌리고 **전체를 한 undo 로** 묶는다. Kangaroo 는 `_pSelection=None` 이
+    이미 선택 전체를 처리한다.
+  - 소스로 쓰인 메시가 선택에 섞여 있으면 대상에서 제외한다. 이때 **풀 패스로 정규화해 비교**한다
+    (TSL 숏네임 vs `ls -l` 풀 패스가 달라 소스를 못 걸러 자기 자신에 전이하려다 실패하던 것도 함께 수정).
+
 ## v01.05 (2026-07-23)
 - **[Add] Transfer 탭에도 Engine(Kangaroo / Native) 선택** — Classic·Migrate 탭처럼 골라 쓴다.
   - **Native**(기본) — `weight_transfer_manager`(v01.04). 선택 버텍스·소프트 falloff 지원.
