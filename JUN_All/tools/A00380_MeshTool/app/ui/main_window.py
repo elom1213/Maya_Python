@@ -9,8 +9,8 @@
 # Match 탭: 리스트업한 From 메시의 같은 인덱스 버텍스 위치로, 선택한 메시의 버텍스를
 # 이동시킨다(소프트 셀렉션 falloff 반영). Kangaroo Geometry>Match 를 Kangaroo 없이 재현.
 #
-# 흐름: Load 로 스냅샷 → 슬라이더를 끌면 실시간 미리보기(API 직접 쓰기)
-#       → Apply 로 확정(tweak 구간 setAttr, Ctrl+Z 한 번에 되돌아감).
+# 흐름: Load 로 스냅샷 → 슬라이더를 끌면 실시간 미리보기(API 직접 쓰기) → 손을 떼는 순간
+#       그 상태를 그대로 확정(tweak 구간 setAttr, Ctrl+Z 한 번에 되돌아감). 별도 Apply 버튼 없음.
 
 import time
 
@@ -36,6 +36,30 @@ _OK_COLOR = "#7ddc7d"
 
 # 미리보기 한 번이 이 시간을 넘으면 "무거운 메시"로 보고 드래그 중 갱신을 솎아낸다.
 _HEAVY_SEC = 0.08
+
+# 슬라이더 스타일. 어떤 테마 qss 도 QSlider 를 스타일링하지 않아, 어두운 배경(#2b2b2b)에선
+# 네이티브 홈(groove)이 배경에 묻혀 구간이 안 보인다(핸들만 보임). A00290_BSTool 의 방식을
+# 참고해 홈·핸들·비활성 상태를 직접 그린다. Peak 슬라이더는 중앙이 0 인 양방향이라, 한쪽에서
+# 채워지는 fill 은 0 에서도 절반이 찬 것처럼 보여 오해를 준다 → 좌우 균일한 한 줄 홈으로만 그리고
+# 0 위치는 눈금(TicksBelow)이 표시한다. 색은 coral_dark 테마 accent(#d08778)에 맞췄다.
+SLIDER_STYLE = (
+    "QSlider:horizontal { min-height: 20px; }"
+    "QSlider::groove:horizontal {"
+    " height: 6px; margin: 0 4px;"
+    " background: #383534; border: 1px solid #d08778; border-radius: 3px; }"
+    "QSlider::sub-page:horizontal, QSlider::add-page:horizontal {"
+    " background: #383534; border: 1px solid #d08778; border-radius: 3px; }"
+    "QSlider::handle:horizontal {"
+    " width: 12px; margin: -6px 0;"
+    " background: #efcabf; border: 1px solid #d08778; border-radius: 3px; }"
+    "QSlider::handle:horizontal:hover { background: #ffffff; }"
+    "QSlider::groove:horizontal:disabled,"
+    " QSlider::sub-page:horizontal:disabled,"
+    " QSlider::add-page:horizontal:disabled {"
+    " background: #2f2f2f; border: 1px solid #454545; }"
+    "QSlider::handle:horizontal:disabled {"
+    " background: #5a5a5a; border: 1px solid #454545; }"
+)
 
 
 class MainWindow(QWidget):
@@ -168,9 +192,14 @@ class MainWindow(QWidget):
         self.sl_amount = QSlider(Qt.Horizontal)
         self.sl_amount.setRange(-SLIDER_TICKS, SLIDER_TICKS)
         self.sl_amount.setValue(0)
+        # 테마 qss 가 QSlider 를 안 꾸며 홈이 배경에 묻히므로 직접 스타일. 양 끝·중앙(0)에
+        # 눈금을 찍어 0 위치를 눈으로 찾는다.
+        self.sl_amount.setStyleSheet(SLIDER_STYLE)
+        self.sl_amount.setTickPosition(QSlider.TicksBelow)
+        self.sl_amount.setTickInterval(SLIDER_TICKS)
         self.sl_amount.valueChanged.connect(self.on_slider_changed)
-        # 드래그 중 갱신을 솎아냈을 수 있으므로, 손을 떼면 마지막 값으로 확실히 맞춘다.
-        self.sl_amount.sliderReleased.connect(self.apply_preview)
+        # 손을 떼면 그 상태를 그대로 최종 결과로 확정한다(별도 Apply 버튼 없음).
+        self.sl_amount.sliderReleased.connect(self.commit_stroke)
         va.addWidget(self.sl_amount)
 
         row_a = QHBoxLayout()
@@ -181,6 +210,8 @@ class MainWindow(QWidget):
         self.sp_amount.setSingleStep(0.01)
         self.sp_amount.setValue(0.0)
         self.sp_amount.valueChanged.connect(self.on_spin_changed)
+        # 값 입력을 마치면(Enter/포커스 아웃) 그 상태를 확정한다.
+        self.sp_amount.editingFinished.connect(self.commit_stroke)
         row_a.addWidget(self.sp_amount, 1)
 
         btn_zero = QPushButton("0")
@@ -203,35 +234,28 @@ class MainWindow(QWidget):
 
         self.btn_minus = QPushButton("-")
         self.btn_minus.setMaximumWidth(34)
-        self.btn_minus.setToolTip("Shrink by one step (preview).")
+        self.btn_minus.setToolTip("Shrink by one step (applied immediately).")
         self.btn_minus.clicked.connect(lambda: self.nudge(-1))
         row_n.addWidget(self.btn_minus)
 
         self.btn_plus = QPushButton("+")
         self.btn_plus.setMaximumWidth(34)
-        self.btn_plus.setToolTip("Inflate by one step (preview).")
+        self.btn_plus.setToolTip("Inflate by one step (applied immediately).")
         self.btn_plus.clicked.connect(lambda: self.nudge(1))
         row_n.addWidget(self.btn_plus)
         va.addLayout(row_n)
 
         lay.addWidget(box_amt)
 
-        # ---- 확정 -------------------------------------------------
-        row_apply = QHBoxLayout()
+        # Apply 버튼은 없앴다. 슬라이더/스핀박스/±로 조절한 상태가 손을 떼는(확정) 순간
+        # 그대로 최종 결과로 반영된다(각 조작이 Ctrl+Z 한 번 단위). '0' 으로 되돌리거나
+        # Ctrl+Z 로 취소한다.
+        hint = QLabel("Drag the slider (or use ± / Value) — the result is applied as\n"
+                      "you go. Each change is one Ctrl+Z. '0' returns to no offset.")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color:#9aa0a6;")
+        lay.addWidget(hint)
 
-        self.btn_apply = QPushButton("Apply")
-        self.btn_apply.setMinimumHeight(38)
-        self.btn_apply.setToolTip("Commit the preview (undoable with one Ctrl+Z).")
-        self.btn_apply.clicked.connect(self.on_apply)
-        row_apply.addWidget(self.btn_apply, 2)
-
-        self.btn_reset = QPushButton("Reset")
-        self.btn_reset.setMinimumHeight(38)
-        self.btn_reset.setToolTip("Discard the preview and go back to the snapshot.")
-        self.btn_reset.clicked.connect(self.on_reset)
-        row_apply.addWidget(self.btn_reset, 1)
-
-        lay.addLayout(row_apply)
         lay.addStretch(1)
 
         return page
@@ -293,6 +317,9 @@ class MainWindow(QWidget):
         self.sl_match = QSlider(Qt.Horizontal)
         self.sl_match.setRange(0, SLIDER_TICKS)
         self.sl_match.setValue(SLIDER_TICKS)      # 기본 1.0 (완전 매칭)
+        self.sl_match.setStyleSheet(SLIDER_STYLE)
+        self.sl_match.setTickPosition(QSlider.TicksBelow)
+        self.sl_match.setTickInterval(SLIDER_TICKS)
         # 슬라이더를 '잡는 순간' 현재 선택으로 세션을 만든다(백그라운드 scriptJob 없이).
         self.sl_match.sliderPressed.connect(self.on_match_slider_pressed)
         self.sl_match.valueChanged.connect(self.on_match_slider_changed)
@@ -342,7 +369,7 @@ class MainWindow(QWidget):
         on = self.has_session()
 
         for w in (self.sl_amount, self.sp_amount, self.sp_step, self.sp_range,
-                  self.btn_minus, self.btn_plus, self.btn_apply, self.btn_reset):
+                  self.btn_minus, self.btn_plus):
             w.setEnabled(on)
 
         if not on:
@@ -450,7 +477,9 @@ class MainWindow(QWidget):
         self.set_amount(self.amount())
 
     def nudge(self, sign):
+        # ± 한 번은 한 스텝을 곧바로 최종 결과로 확정한다(별도 Apply 없음).
         self.set_amount(self.amount() + sign * self.sp_step.value())
+        self.commit_stroke()
 
     # ---- 로드 / 클리어 --------------------------------------------
 
@@ -515,19 +544,22 @@ class MainWindow(QWidget):
             pass
         self._preview_dirty = False
 
-    # ---- 확정 / 리셋 ----------------------------------------------
+    # ---- 확정(자동) ----------------------------------------------
 
-    def on_apply(self):
+    def commit_stroke(self):
+        """현재 amount 를 그대로 최종 결과로 확정한다(undo 가능, 한 스텝).
+
+        Apply 버튼을 대신한다. 슬라이더를 놓거나(sliderReleased), 스핀박스 입력을
+        마치거나(editingFinished), ± 를 누르면 호출된다. 확정 후 amount 를 0 으로
+        되돌리고 세션을 새 스냅샷으로 삼아(commit 이 갱신), 이어서 계속 조절할 수 있다.
+        """
 
         if not self.has_session():
-            self.log("Nothing loaded.", warn=True)
             return
 
         value = self.amount()
-
         if abs(value) < 1e-9:
-            self.log("Amount is 0 - nothing to apply.", warn=True)
-            return
+            return   # 변화 없음 — 조용히 무시
 
         try:
             with undo_chunk():
@@ -546,14 +578,6 @@ class MainWindow(QWidget):
         verb = "Inflated" if value > 0 else "Shrunk"
         self.log("{0} {1} vertice(s) by {2:.4f}.".format(verb, moved, abs(value)),
                  ok=True)
-
-    def on_reset(self):
-
-        if not self.has_session():
-            return
-
-        self.set_amount(0.0)
-        self.log("Preview reset.")
 
     # ==============================================================
     # Match 탭 로직
@@ -835,6 +859,6 @@ class MainWindow(QWidget):
             "Match: snap the selected mesh's vertices onto a From mesh's\n"
             "same-index vertices (soft-selection falloff aware) - a\n"
             "standalone take on Kangaroo's Geometry > Match.\n\n"
-            "Drag the slider for a live preview, then Apply to commit it\n"
-            "as a single undo step.\n"
+            "Peak has no Apply button: dragging the slider applies the\n"
+            "result as you go (each change is one Ctrl+Z).\n"
             "by Ji Hun Park".format(VERSION, LAST_UPDATE))

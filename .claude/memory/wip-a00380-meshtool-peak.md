@@ -1,6 +1,6 @@
 ---
 name: wip-a00380-meshtool-peak
-description: "A00380_MeshTool v01.00 Peak tab (inflate/shrink along normals, Houdini peak-like) — DONE, Maya-verified + pushed"
+description: "A00380_MeshTool Peak tab (inflate/shrink along normals, Houdini peak-like); v01.04 removed Apply/Reset (slider settle auto-commits) + v01.05 slider groove style — IMPLEMENTED (Maya UI test pending)"
 metadata: 
   node_type: memory
   type: project
@@ -9,9 +9,25 @@ metadata:
 
 A00380_MeshTool v01.00 — new in-Maya PySide tool (arch B). Tab 1 "Peak": inflates(+)/shrinks(-)
 selected mesh/verts along their own vertex normals, like Houdini's peak node. Live slider preview,
-Range (slider limit, lower = finer) + Step `-`/`+` nudges for micro control, Apply commits as one
-Ctrl+Z. Options: angle-weighted normals, respect soft selection, auto-load on selection change.
+Range (slider limit, lower = finer) + Step `-`/`+` nudges for micro control. Options: angle-weighted
+normals, respect soft selection, auto-load on selection change.
 Core in `app/core/peak_manager.py`; guide in `JUN_All/docs/A00380_MeshTool.md`.
+
+**v01.04 (IMPLEMENTED, Maya UI test pending, per user request): removed the Apply and Reset buttons.**
+Now the slider adjustment IS the final result — `commit_stroke()` (extracted from old `on_apply`) is
+called on `sliderReleased` / spinbox `editingFinished` / nudge ±; it commits the current amount
+(undoable), then resets amount to 0 and re-snapshots so strokes accumulate. Model = drag shows live
+preview (undo-disabled), releasing bakes it as one Ctrl+Z. `0` button zeroes the offset; Ctrl+Z undoes
+a stroke. Core `peak_manager.commit()` unchanged (already restore→write→re-snapshot). Core flow
+verified headless (preview→commit repeated accumulates; undo per stroke). UI itself not run
+(Qt+maya.standalone crashes headless).
+
+**v01.05 (IMPLEMENTED, Maya UI test pending): gave both sliders (Peak + Match) a `SLIDER_STYLE`** (no
+theme qss styles QSlider so the groove blended into the dark bg — only the handle showed). Same
+approach as A00290's SLIDER_STYLE but colored for A00380's **coral_dark** theme (accent #d08778, track
+#383534, handle #efcabf). Peak slider is bipolar so groove is a uniform bar (sub/add-page same color,
+no directional fill) + TicksBelow(interval=SLIDER_TICKS) marks center 0 and both ends. Verified by
+pure-PySide render (groove visible; no maya needed for styling render).
 
 Status: DONE — core verified headless via mayapy (34 checks pass, incl. undo/redo, history +
 skinned meshes, existing tweaks, multi-mesh, soft select, undo_chunk combo), UI confirmed working

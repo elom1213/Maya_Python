@@ -221,7 +221,8 @@ Default Distance 어트리뷰트 (driver 신호 x)
   실시간 프리뷰 + Range/Step 기반 미세 조정, **소프트 셀렉션 falloff** 반영. 마야 기본 방식(Move 툴
   `axis = normal`)은 버텍스마다 명령이 돌아 느린데, 이를 **`shape.pnts` 구간 `setAttr` 일괄 기록**으로
   바꿔 **19,462 버텍스 기준 약 7.2초 → 0.10초(약 70배)** 로 줄였습니다. tweak·undo 스택의 실제 거동을
-  headless(mayapy)로 검증해, 미리보기는 undo 기록을 남기지 않고 **Apply 는 Ctrl+Z 한 번**에 정확히 되돌아갑니다.
+  headless(mayapy)로 검증해, **슬라이더로 조절한 상태가 손을 떼는 순간 그대로 최종 결과**가 되고(별도 Apply
+  버튼 없이) 각 조작이 **Ctrl+Z 한 번**에 정확히 되돌아갑니다.
 - **`A00040_file_exporter_V02`** — 익스포트 자동화. 타입 필터(그룹 하위까지 적용), 레퍼런스 메시 처리, 씬 최상위로 빼기/계층 유지 선택.
 - **`A00050_uvTool`**, **`A00030_quickTool`**, **`A00330_NamingTool`**(레거시 네이밍 툴 이식 + Quick Rename), **`A00310_SearchTool`**(타입·이름 기반 선택), **`A00360_SortTool`**(월드 X/Y/Z·이름·타입 기준 정렬 및 아웃라이너 재정렬).
 
