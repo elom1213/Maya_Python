@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-22
+# last Update date : 2026-07-23
 # A00110_animTool - Qt UI
 
 from Framework.qt.qt import *
@@ -37,6 +37,31 @@ STAGGER_SLIDER_RANGE = 60
 # 슬라이더/스핀박스 조작이 이만큼 멎으면 그때까지의 미리보기를 undo 큐에 '한 항목' 으로
 # 기록한다. 드래그 중에는 기록하지 않아 undo 항목이 수백 개 쌓이는 걸 막는다.
 STAGGER_SETTLE_MS = 350
+
+# Stagger 슬라이더 전용 스타일 (A00290_BSTool Shape Editor 슬라이더 참고).
+# 테마 qss 가 QSlider 를 스타일링하지 않아, 어두운 배경에선 Maya 네이티브 홈(groove)이 배경에
+# 묻혀 "가로 구간이 어디부터 어디까지인지 안 보인다". 그래서 홈을 직접 그린다. 이 슬라이더는
+# 중앙이 0 인 양방향이라, 한쪽만 채우는 sub-page fill 은 0 에서도 절반 찬 것처럼 보여 오해를 준다
+# → sub/add-page 를 같은 색으로 덮어 좌우 균일한 한 줄로만 그리고, 0 위치는 중앙 눈금(TicksBelow)이
+# 표시한다. blue_dark 테마 accent(#7f9ec8)에 맞췄다.
+STAGGER_SLIDER_STYLE = (
+    "QSlider:horizontal { min-height: 20px; }"
+    "QSlider::groove:horizontal {"
+    " height: 6px; margin: 0 4px;"
+    " background: #34373d; border: 1px solid #7f9ec8; border-radius: 3px; }"
+    "QSlider::sub-page:horizontal, QSlider::add-page:horizontal {"
+    " background: #34373d; border: 1px solid #7f9ec8; border-radius: 3px; }"
+    "QSlider::handle:horizontal {"
+    " width: 12px; margin: -6px 0;"
+    " background: #a9c4e6; border: 1px solid #7f9ec8; border-radius: 3px; }"
+    "QSlider::handle:horizontal:hover { background: #ffffff; }"
+    "QSlider::groove:horizontal:disabled,"
+    " QSlider::sub-page:horizontal:disabled,"
+    " QSlider::add-page:horizontal:disabled {"
+    " background: #2f2f2f; border: 1px solid #454545; }"
+    "QSlider::handle:horizontal:disabled {"
+    " background: #5a5a5a; border: 1px solid #454545; }"
+)
 
 
 class MainWindow(QWidget):
@@ -319,7 +344,8 @@ class MainWindow(QWidget):
         # 섹션 4 : Stagger Offset (기본 접힘)
         #   리스트업한 컨트롤러의 [Start, End] 구간 키를 '리스트 순서 x Offset' 만큼
         #   계단식으로 민다(0번 제자리 / 1번 +1배 / 2번 +2배 ...). 팔로우스루·웨이브용.
-        #   스핀박스를 돌리면 즉시 반영되며(누적 안 됨), Apply 로 확정한다.
+        #   슬라이더/스핀박스로 맞춘 값이 그대로 최종 결과다(별도 Apply 없음). 값이 멎으면
+        #   자동으로 undo 큐에 한 항목으로 기록된다(누적 안 됨). Reset 으로 원위치.
         #   로직은 StaggerOffsetSession.
         # =========================================================
 
@@ -363,6 +389,8 @@ class MainWindow(QWidget):
         self.sld_stagger.setSingleStep(1)
         self.sld_stagger.setPageStep(5)
         self.sld_stagger.setMinimumWidth(140)
+        # 테마 qss 가 홈을 안 그려 배경에 묻히므로 직접 그린다(구간이 보이게).
+        self.sld_stagger.setStyleSheet(STAGGER_SLIDER_STYLE)
         st_row2.addWidget(self.sld_stagger, 1)
 
         self.sb_stagger = QSpinBox()
@@ -378,10 +406,9 @@ class MainWindow(QWidget):
         st_row2.addWidget(self.btn_st_reset)
         sec_stagger.add_layout(st_row2)
 
-        self.btn_st_apply = QPushButton("Apply Stagger Offset")
-        self.btn_st_apply.setToolTip(
-            "Commit the current preview as one undoable step (Ctrl+Z restores everything).")
-        sec_stagger.add_widget(self.btn_st_apply)
+        # Apply 버튼 없음: 슬라이더/스핀박스로 맞춘 값이 곧 최종 결과다. 조작이 멎으면
+        # 자동으로 undo 큐에 기록된다(_stagger_settle: sliderReleased / editingFinished /
+        # 디바운스 타이머 / 창 닫기).
 
         tab_layout.addWidget(sec_stagger)
 
@@ -429,7 +456,6 @@ class MainWindow(QWidget):
         self.sld_stagger.sliderReleased.connect(self._stagger_settle)
         self.sb_stagger.editingFinished.connect(self._stagger_settle)
         self.btn_st_reset.clicked.connect(self.on_stagger_reset)
-        self.btn_st_apply.clicked.connect(self.on_stagger_apply)
 
         # 리스트/구간이 바뀌면 진행 중인 미리보기는 무효 -> 되돌리고 세션을 버린다.
         self.le_st_start.textChanged.connect(self._stagger_invalidate)
@@ -1650,8 +1676,9 @@ class MainWindow(QWidget):
 
     # --------------------------------------------------
     # Stagger Offset
-    #   스핀박스를 돌리면 세션이 시작되어 '원래 위치 기준' 결과가 즉시 보인다(누적 안 됨).
-    #   Apply 로 확정(undo 1회), Reset 으로 원위치. 리스트/구간이 바뀌면 세션은 무효.
+    #   슬라이더/스핀박스를 움직이면 '원래 위치 기준' 결과가 즉시 반영된다(누적 안 됨).
+    #   조작이 멎으면 그 값이 자동으로 undo 큐에 한 항목으로 기록된다(별도 Apply 없음).
+    #   Reset 으로 원위치. 리스트/구간이 바뀌면 세션은 무효.
     # --------------------------------------------------
 
     def _stagger_read_range(self):
@@ -1810,32 +1837,6 @@ class MainWindow(QWidget):
         self._stagger_session = None
         self._stagger_reset_spin()
         self.log("Stagger offset reset to 0.")
-
-    def on_stagger_apply(self):
-        """현재 값을 확정하고 세션을 닫는다.
-
-        조작이 멎으면 이미 자동으로 기록되므로, Apply 는 '여기까지' 를 못박는 버튼이다.
-        """
-        value = self.sb_stagger.value()
-        if value == 0:
-            self.log("[Warning] Set an offset first (it is 0).")
-            return
-
-        self._stagger_drop_stale_session()
-
-        session = self._stagger_begin()
-        if session is None:
-            self._stagger_reset_spin()
-            return
-
-        self._stagger_settle_timer.stop()
-        count, msg = session.settle(value)
-        self.log(msg or "Stagger offset {0:+d}f already applied.".format(value))
-
-        # 확정된 뒤에는 키가 이미 옮겨져 있다. 위젯을 0 으로 되돌려 다음 조작이
-        # '지금 상태 기준' 으로 다시 시작되게 한다(같은 값이 두 번 적용되는 사고 방지).
-        self._stagger_session = None
-        self._stagger_reset_spin()
 
     def toggle_always_on_top(self, enabled):
         # WindowStaysOnTopHint 를 켜고/끄고, 플래그 변경 후 다시 show() (안 하면 창이 사라짐)

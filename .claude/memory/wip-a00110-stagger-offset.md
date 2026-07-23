@@ -5,11 +5,21 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 69c25012-610a-4113-b9c9-4458ca7059e9
-  modified: 2026-07-20T08:59:44.398Z
+  modified: 2026-07-23T02:29:42.197Z
 ---
 
-A00110_animTool v01.30→**01.32** — Key Edit 탭 5번째 접이식 섹션 **Stagger Offset** 추가.
-**DONE (headless 39+20 check 통과 + Maya 실기 확인 + pushed).**
+A00110_animTool v01.30→**01.34** — Key Edit 탭 5번째 접이식 섹션 **Stagger Offset**.
+**v01.33/01.34 IMPLEMENTED (코어 headless 통과, Maya 실기 + push 대기).**
+
+**v01.34 — 슬라이더 홈(groove) 스타일**: 슬라이더 가로 구간이 어두운 배경에 묻혀 범위가 안 보이던 문제.
+테마 qss 가 QSlider 를 스타일링하지 않음 → `STAGGER_SLIDER_STYLE` 로 홈 직접 그림([[wip-a00290-shape-editor-tab]]
+A00290 SLIDER_STYLE 참고). 중앙 0 양방향이라 sub/add-page 같은 색으로 좌우 균일(0 은 TicksBelow 중앙 눈금),
+blue_dark accent #7f9ec8. 적용: `self.sld_stagger.setStyleSheet(STAGGER_SLIDER_STYLE)`.
+
+**v01.33 — Apply 버튼 제거(값이 곧 결과)**: "Apply Stagger Offset" 버튼 없이 슬라이더/스핀박스 값이
+그대로 최종 결과가 되게. settle 모델(v01.32)이 이미 조작이 멎으면(sliderReleased/editingFinished/350ms
+디바운스/close) 값을 undo 큐에 자동 커밋 → **버튼 + on_stagger_apply 핸들러만 제거**(코어 무변경).
+Reset·비누적·탐침 유지.
 
 **v01.32 — Ctrl+Z 복구 + 슬라이더**: v01.31 은 미리보기를 undo 큐에 안 올려서 조절 후 **Ctrl+Z 가
 안 먹었다**(무관한 이전 작업이 취소됨). → **settle 모델**: 세션이 `applied`(씬에 보이는 값)와
