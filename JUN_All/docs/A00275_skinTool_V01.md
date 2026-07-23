@@ -10,13 +10,13 @@ updated: 2026-07-23
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.04)
+- **버전**: `app/config/version.py` (v01.05)
 - **설치**: `__dragDrop_A00275.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **SkinTool** → `tools.A00275_skinTool_V01.run(True)`
 
 | 탭 | 내용 |
 |----|------|
 | **Classic** | 레거시 2버튼 UI — `Joints to Joints (single mesh)` / `Meshes to Meshes`. **Engine(Kangaroo/Native) 선택**(v01.04~) |
-| **Transfer** (v01.04~) | **여러 소스 메시 → 현재 선택한 하나의 메시**로 웨이트 전이(Kangaroo 무의존). 선택 버텍스에만/소프트 falloff 반영 |
+| **Transfer** (v01.04~) | **여러 소스 메시 → 현재 선택한 하나의 메시**로 웨이트 전이. **Engine(Native/Kangaroo) 선택**(v01.05~). 선택 버텍스에만/소프트 falloff 반영(Native) |
 | **Migrate A -> B** | 토폴로지가 다른 두 메시 사이 Transfer + Move 통합 마이그레이션 |
 | **Bind Pose** | **조인트를 이동·회전한 현재 상태를 새 바인드 포즈로** |
 
@@ -36,10 +36,14 @@ Migrate 탭 사용법은 [[A00270_skinMigrate]] 문서와 동일하다.
 
 ---
 
-## Transfer 탭 — 여러 소스 → 선택 메시 (v01.04~, Kangaroo 무의존)
+## Transfer 탭 — 여러 소스 → 선택 메시 (v01.04~)
 
-Kangaroo 의 *SkinCluster > Transfer* 를 흉내낸 기능이되 **Kangaroo 없이** 동작한다.
-**여러 소스 메시로부터 현재 선택한 하나의 메시**로 스킨 웨이트를 전이한다.
+Kangaroo 의 *SkinCluster > Transfer* 를 흉내낸 기능. **여러 소스 메시로부터 현재 선택한 하나의
+메시**로 스킨 웨이트를 전이한다. **Engine** 을 고를 수 있다(v01.05~):
+
+- **Native**(기본) — 플러그인 무의존. **선택 버텍스에만 전이 + 소프트 falloff** 를 지원한다(아래).
+- **Kangaroo** — Kangaroo `transferSkinCluster`(플러그인 필요). 컴포넌트/부분 전이는 Kangaroo 로직을
+  따른다. soft falloff 옵션은 Native 전용이라 Kangaroo 를 고르면 비활성된다.
 
 ### 사용법
 

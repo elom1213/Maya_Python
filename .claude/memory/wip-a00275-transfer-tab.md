@@ -1,6 +1,6 @@
 ---
 name: wip-a00275-transfer-tab
-description: "A00275_skinTool_V01 v01.04 — Classic tab Engine(Kangaroo/Native) choice + new Transfer tab (many source meshes -> selected mesh/verts, Kangaroo-free, soft-falloff) — IMPLEMENTED, Maya test pending"
+description: "A00275_skinTool_V01 v01.05 — Classic tab Engine(Kangaroo/Native) choice + new Transfer tab (many source meshes -> selected mesh/verts; Native soft-falloff + Kangaroo engine choice) — IMPLEMENTED, Maya test pending"
 metadata: 
   node_type: memory
   type: project
@@ -38,8 +38,16 @@ Kangaroo plugin at `C:\Users\USER\Desktop\JP\0020_maya_plugin\0010_kangaroo` is 
 (see [[kangaroo-plugin-external-readonly]]); the relevant funcs are `weights.transferSkinCluster` /
 `intTransferSkinCluster` (numpy/barycentric — NOT copied, only used as UI/behavior reference).
 
+**v01.05**: Transfer tab also got an **Engine(Native/Kangaroo) radio** (user request, matching Classic/
+Migrate). Kangaroo path = `ktw.transferSkinCluster(sFrom=sources, _pSelection=None (live selection =
+target), iMode=2 closestPoint, bAutoCreateNewSkinCluster=(target has no skin))`. Component/partial
+handling follows Kangaroo; the soft-falloff checkbox is Native-only (disabled when Kangaroo is picked).
+Default = Native. Note: in this mayapy env `kangarooTabTools` imports but `report.report` is None so the
+call errors — the tool catches it as `[Error]` (no crash); works in real Maya with Kangaroo Builder loaded.
+
 Testing: Qt+maya.standalone crashes headless → core tested with real meshes via mayapy (single/multi
-source, partial verts, soft falloff, Classic native move/transfer — all pass). UI not exercised.
+source, partial verts, soft falloff, Classic native move/transfer — all pass; Kangaroo branch routed
+gracefully). UI not exercised.
 
 Related: [[wip-a00275-skintool-bindpose]], [[kangaroo-plugin-external-readonly]], [[mayapy-headless-verify]],
 [[push-only-when-asked]], [[ui-text-english-only]]

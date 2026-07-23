@@ -191,14 +191,31 @@ def _prepare_target_skin(target, union_infs):
 # 메인 동작
 # =========================
 
-def transfer_to_mesh(source_meshes, respect_soft=True):
+def _import_kangaroo(extra=""):
+    """kangarooTabTools.weights 를 lazy import. 실패 시 RuntimeError."""
+    try:
+        import kangarooTabTools.weights as ktw
+        return ktw
+    except Exception:
+        raise RuntimeError(
+            "Kangaroo plugin not importable (kangarooTabTools). "
+            "Load Kangaroo Builder first{0}.".format(extra))
+
+
+def transfer_to_mesh(source_meshes, respect_soft=True, engine="native"):
     """소스 메시들 → 현재 선택한 타겟 메시(또는 그 선택 버텍스)로 웨이트를 전이한다.
+
+    engine="native"   : cmds.copySkinWeights + maya.api (플러그인 무의존, 소프트 falloff 지원).
+    engine="kangaroo" : Kangaroo transferSkinCluster (플러그인 필요).
 
     반환: (성공 여부 int, 메시지 str)
     """
     sources = [s for s in (source_meshes or []) if _is_mesh(s)]
     if not sources:
         return 0, "[Warning] Add one or more source meshes (with skinCluster) to the list."
+
+    if engine == "kangaroo":
+        return _transfer_to_mesh_kangaroo(sources)
 
     src_scs = []
     for s in sources:
@@ -287,6 +304,55 @@ def transfer_to_mesh(source_meshes, respect_soft=True):
     except Exception as exc:
         return 0, "[Error] {0}".format(exc)
 
-    return 1, "[Transfer] {0} source(s) -> {1} ({2}). {3}".format(
+    return 1, "[Transfer/native] {0} source(s) -> {1} ({2}). {3}".format(
         len(sources), _leaf(target), "; ".join(msgs),
         "(partial uses setWeights; undo is one step)").strip()
+
+
+# =========================
+# Kangaroo 엔진
+# =========================
+
+def _transfer_to_mesh_kangaroo(sources):
+    """Kangaroo transferSkinCluster 로 소스들 → 현재 선택(타겟)에 전이한다.
+
+    타겟(메시 또는 버텍스)은 씬의 현재 선택을 그대로 쓴다(_pSelection=None). 소스가
+    여럿이면 sFrom 에 함께 넘겨 Kangaroo 가 버텍스별 최근접 소스를 처리한다.
+    버텍스 선택/컴포넌트 처리·부분 전이는 Kangaroo 쪽 로직을 따른다.
+    """
+    for s in sources:
+        if not _skincluster(s):
+            return 0, "[Warning] Source '{0}' has no skinCluster.".format(_leaf(s))
+
+    target, vtx_ids, _soft = parse_target_selection()
+    if not target:
+        return 0, ("[Warning] Select the target mesh (or its vertices) in the scene "
+                   "before transferring.")
+    if not _is_mesh(target):
+        return 0, "[Warning] Target '{0}' is not a polygon mesh.".format(_leaf(target))
+    if _mesh_transform(target) in [_mesh_transform(s) for s in sources]:
+        return 0, "[Warning] Target mesh is also in the source list."
+
+    try:
+        ktw = _import_kangaroo(extra=" or switch the engine to 'Native'")
+    except RuntimeError as exc:
+        return 0, "[Error] {0}".format(exc)
+
+    # 타겟에 skinCluster 가 이미 있으면 그걸 쓰고, 없으면 새로 만들게 한다.
+    auto_create = _skincluster(target) is None
+
+    try:
+        with undo_chunk():
+            ktw.transferSkinCluster(
+                _pSelection=None,        # 현재 선택 = 타겟(메시/버텍스)
+                sFrom=list(sources),
+                iMode=2,                 # Closest Point
+                iSmoothBorderMask=1,
+                bAutoCreateNewSkinCluster=auto_create,
+            )
+    except Exception as exc:
+        return 0, "[Error] {0}".format(exc)
+
+    where = "{0} vert(s)".format(len(vtx_ids)) if vtx_ids else "whole mesh"
+    return 1, "[Transfer/kangaroo] {0} source(s) -> {1} ({2}, closestPoint).".format(
+        len(sources), _leaf(target), where)

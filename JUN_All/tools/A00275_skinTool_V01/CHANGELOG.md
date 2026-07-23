@@ -1,5 +1,15 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.05 (2026-07-23)
+- **[Add] Transfer 탭에도 Engine(Kangaroo / Native) 선택** — Classic·Migrate 탭처럼 골라 쓴다.
+  - **Native**(기본) — `weight_transfer_manager`(v01.04). 선택 버텍스·소프트 falloff 지원.
+  - **Kangaroo** — `transferSkinCluster`(sFrom=소스들, `_pSelection=None`=현재 선택 타겟,
+    iMode=Closest Point). 컴포넌트/부분 전이는 Kangaroo 로직을 따른다. 타겟에 skinCluster 가
+    없으면 새로 만들고(`bAutoCreateNewSkinCluster`), 있으면 기존 것을 쓴다.
+  - Kangaroo 를 고르면 **soft falloff 옵션은 Native 전용**이라 UI 에서 비활성된다.
+  - 라우팅은 headless 로 확인(모듈이 있어도 플러그인 런타임 미초기화면 crash 없이 `[Error]` 반환;
+    실제 Maya 에서 Kangaroo Builder 로드 시 동작).
+
 ## v01.04 (2026-07-23)
 - **[Add] Classic 탭에 Engine(Kangaroo / Native) 선택** — 예전엔 Classic 의 두 버튼이 Kangaroo
   전용이었다. 이제 Migrate 탭처럼 **Native**(플러그인 무의존)를 골라 쓸 수 있다.

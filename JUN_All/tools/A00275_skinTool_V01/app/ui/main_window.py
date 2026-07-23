@@ -172,9 +172,9 @@ class MainWindow(QWidget):
 
         desc = QLabel(
             "Transfer skin weights from one or more SOURCE meshes to the mesh you\n"
-            "currently have selected in the scene (closest point, no plugin).\n"
+            "currently have selected in the scene (closest point).\n"
             "Select vertices on the target to transfer only there; soft selection\n"
-            "falloff is respected when enabled.")
+            "falloff is respected (Native engine).")
         desc.setAlignment(Qt.AlignCenter)
         layout.addWidget(desc)
 
@@ -184,25 +184,46 @@ class MainWindow(QWidget):
             log_callback=self.log)
         layout.addWidget(self.tsl_transfer_src)
 
-        # 옵션 (Mode 는 Closest Point 고정 + soft selection)
+        # 옵션 (Engine + Mode + soft selection)
         opt_grp = QGroupBox("Options")
         opt_layout = QVBoxLayout(opt_grp)
 
-        mode_row = QHBoxLayout()
-        mode_row.addWidget(QLabel("Mode"))
+        eng_row = QHBoxLayout()
+        eng_row.addWidget(QLabel("Engine"))
+        self.transfer_eng_grp = QButtonGroup(self)
+        self.rb_transfer_native = QRadioButton("Native")
+        self.rb_transfer_kangaroo = QRadioButton("Kangaroo")
+        self.rb_transfer_native.setChecked(True)
+        self.rb_transfer_native.setToolTip(
+            "cmds.copySkinWeights + maya.api. No plugin.\n"
+            "Supports transfer to selected vertices with soft-selection falloff.")
+        self.rb_transfer_kangaroo.setToolTip(
+            "Kangaroo transferSkinCluster (plugin must be loaded).\n"
+            "Component/partial handling follows Kangaroo; soft falloff is Native-only.")
+        self.transfer_eng_grp.addButton(self.rb_transfer_native)
+        self.transfer_eng_grp.addButton(self.rb_transfer_kangaroo)
+        eng_row.addWidget(self.rb_transfer_native)
+        eng_row.addWidget(self.rb_transfer_kangaroo)
+        eng_row.addStretch(1)
+
+        eng_row.addWidget(QLabel("Mode"))
         cmb = QComboBox()
         cmb.addItem("Closest Point")
         cmb.setEnabled(False)
-        cmb.setToolTip("Native transfer uses closest point (like Kangaroo's Closest Point).")
-        mode_row.addWidget(cmb)
-        mode_row.addStretch(1)
-        opt_layout.addLayout(mode_row)
+        cmb.setToolTip("Closest point (like Kangaroo's Closest Point).")
+        eng_row.addWidget(cmb)
+        opt_layout.addLayout(eng_row)
 
         self.cb_transfer_soft = QCheckBox("Respect soft selection falloff")
         self.cb_transfer_soft.setChecked(True)
         self.cb_transfer_soft.setToolTip(
-            "When soft selection is on, blend the transferred weights by its falloff.")
+            "When soft selection is on, blend the transferred weights by its falloff.\n"
+            "Native engine only.")
         opt_layout.addWidget(self.cb_transfer_soft)
+
+        # Kangaroo 를 고르면 soft falloff 옵션은 Native 전용이라 비활성.
+        self.rb_transfer_kangaroo.toggled.connect(
+            lambda on: self.cb_transfer_soft.setEnabled(not on))
 
         layout.addWidget(opt_grp)
 
@@ -221,8 +242,9 @@ class MainWindow(QWidget):
 
     def on_transfer_to_mesh(self):
         sources = self.tsl_transfer_src.get_all_items()
+        engine = "kangaroo" if self.rb_transfer_kangaroo.isChecked() else "native"
         count, msg = wt_mgr.transfer_to_mesh(
-            sources, respect_soft=self.cb_transfer_soft.isChecked())
+            sources, respect_soft=self.cb_transfer_soft.isChecked(), engine=engine)
         self.log(msg)
 
     # --------------------------------------------------
