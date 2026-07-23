@@ -2,24 +2,68 @@
 title: A00275_skinTool_V01 사용법
 aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose]
 tags: [maya-python, tool-guide, skin, skincluster, bind-pose, rigging]
-updated: 2026-07-20
+updated: 2026-07-23
 ---
 
 # A00275_skinTool_V01 사용법
 
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
-**Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
+**Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.03)
+- **버전**: `app/config/version.py` (v01.04)
 - **설치**: `__dragDrop_A00275.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **SkinTool** → `tools.A00275_skinTool_V01.run(True)`
 
 | 탭 | 내용 |
 |----|------|
-| **Classic** | 레거시 2버튼 UI — `Joints to Joints (single mesh)` / `Meshes to Meshes` |
+| **Classic** | 레거시 2버튼 UI — `Joints to Joints (single mesh)` / `Meshes to Meshes`. **Engine(Kangaroo/Native) 선택**(v01.04~) |
+| **Transfer** (v01.04~) | **여러 소스 메시 → 현재 선택한 하나의 메시**로 웨이트 전이(Kangaroo 무의존). 선택 버텍스에만/소프트 falloff 반영 |
 | **Migrate A -> B** | 토폴로지가 다른 두 메시 사이 Transfer + Move 통합 마이그레이션 |
-| **Bind Pose** | **조인트를 이동·회전한 현재 상태를 새 바인드 포즈로** (신규) |
+| **Bind Pose** | **조인트를 이동·회전한 현재 상태를 새 바인드 포즈로** |
 
-Classic / Migrate 탭 사용법은 [[A00270_skinMigrate]] 문서와 동일하다.
+Migrate 탭 사용법은 [[A00270_skinMigrate]] 문서와 동일하다.
+
+---
+
+## Classic 탭 — Engine 선택 (v01.04~)
+
+`Joints to Joints (single mesh)` / `Meshes to Meshes` 두 버튼은 이제 **Engine** 을 고를 수 있다.
+
+- **Kangaroo** — Kangaroo Builder 플러그인 사용(로드돼 있어야 함).
+- **Native** — 플러그인 무의존.
+  - `Joints to Joints` = 선택 메시 skinCluster 에서 **From 본 컬럼 → To 본 컬럼**으로 이동(`maya.api`).
+  - `Meshes to Meshes` = rebind 후 `cmds.copySkinWeights`(Transfer Mode 의 surfaceAssociation).
+  - Native 이동은 `setWeights` 를 써서 undo 가 세밀하지 않다(전체가 한 스텝).
+
+---
+
+## Transfer 탭 — 여러 소스 → 선택 메시 (v01.04~, Kangaroo 무의존)
+
+Kangaroo 의 *SkinCluster > Transfer* 를 흉내낸 기능이되 **Kangaroo 없이** 동작한다.
+**여러 소스 메시로부터 현재 선택한 하나의 메시**로 스킨 웨이트를 전이한다.
+
+### 사용법
+
+1. 소스 메시들을 선택 → **Select Source Meshes** 로 `Source Meshes` 리스트에 담는다(여러 개 가능).
+2. 씬에서 **타겟 메시**를 선택한다. **버텍스를 선택하면 그 버텍스에만** 전이된다.
+   (소프트 셀렉션을 켜면 falloff 까지 반영된다.)
+3. **TRANSFER to selected mesh**.
+
+### 동작
+
+- **Mode = Closest Point** 고정. 소스가 여럿이면 **버텍스별로 가장 가까운 소스**를 자동 선택한다.
+- **선택 버텍스에만 전이** — 타겟의 버텍스를 골라두면 그 버텍스만 바뀌고 나머지는 원본 웨이트 유지.
+- **소프트 셀렉션 falloff** — `Respect soft selection falloff` 가 켜져 있고 소프트 셀렉션이 활성이면,
+  falloff 비율 `f` 로 `원본 ↔ 전이결과` 를 블렌드한다(중심 f=1, 가장자리 f→0).
+
+### 구현 메모 (mayapy 로 검증)
+
+- 무거운 최근접-점 계산(면 barycentric 샘플링)은 `cmds.copySkinWeights(surfaceAssociation="closestPoint")`
+  가 정확히 해 준다. **소스 메시 여러 개를 함께 선택하면 버텍스별 최근접 소스를 알아서 고른다**(검증됨).
+- 다만 `copySkinWeights` 는 **컴포넌트 제한을 지원하지 않아 항상 메시 전체**에 적용된다. 그래서
+  선택-버텍스/소프트 블렌드는 이렇게 처리한다: 전이 전 웨이트(before)와 전이 후(after)를 `maya.api`
+  로 bulk 로 읽어, **선택 버텍스는 falloff 로 lerp, 나머지는 before 로 복원**한 뒤 bulk `setWeights`.
+  버텍스 선택이 없으면(메시 전체) copySkinWeights 결과를 그대로 둔다(undo 깔끔).
+- 부분 전이는 `setWeights` 를 쓰므로 undo 가 세밀하지 않다(전체가 한 스텝).
 
 ---
 

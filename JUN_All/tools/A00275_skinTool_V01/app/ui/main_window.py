@@ -3,13 +3,15 @@
 # last Update date : 2026-06-29
 # A00275_skinTool_V01 - Qt UI
 #
-# 스킨 관련 범용 툴. 세 개의 탭:
+# 스킨 관련 범용 툴. 네 개의 탭:
 #   Tab 1 "Classic"      : 레거시 JUN_PY_move_skinWeightTool_v01_04 의 원본 2버튼 UI 이식.
-#                          From / To 리스트 + Transfer Mode + [Joints to Joints in single mesh]
-#                          / [Meshes to Meshes].
-#   Tab 2 "Migrate A->B" : 토폴로지가 다른 두 메시 A,B 사이 Transfer + Move 를 한 번에 처리하는
+#                          From / To 리스트 + Engine(Kangaroo/Native) + Transfer Mode +
+#                          [Joints to Joints in single mesh] / [Meshes to Meshes].
+#   Tab 2 "Transfer"     : 여러 소스 메시 → 현재 선택한 하나의 메시로 웨이트 전이(Kangaroo
+#                          무의존). 선택 버텍스에만/소프트 falloff 반영 (weight_transfer_manager).
+#   Tab 3 "Migrate A->B" : 토폴로지가 다른 두 메시 A,B 사이 Transfer + Move 를 한 번에 처리하는
 #                          통합 마이그레이션 (A00270_skinMigrate 기능 이식).
-#   Tab 3 "Bind Pose"    : 조인트를 이동·회전한 현재 상태를 새 바인드 포즈로 만든다.
+#   Tab 4 "Bind Pose"    : 조인트를 이동·회전한 현재 상태를 새 바인드 포즈로 만든다.
 #                          마야에 대응 기능이 없다(자세한 근거는 core/bind_pose_manager.py).
 
 from Framework.qt.qt import *
@@ -23,6 +25,7 @@ import maya.cmds as cmds
 from tools.A00275_skinTool_V01.app.config.version import VERSION, LAST_UPDATE
 from tools.A00275_skinTool_V01.app.core import SkinMigrateManager
 from tools.A00275_skinTool_V01.app.core import bind_pose_manager as bp_mgr
+from tools.A00275_skinTool_V01.app.core import weight_transfer_manager as wt_mgr
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -75,6 +78,7 @@ class MainWindow(QWidget):
         # 탭
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_classic_tab(), "Classic")
+        self.tabs.addTab(self._build_transfer_tab(), "Transfer")
         self.tabs.addTab(self._build_migrate_tab(), "Migrate A -> B")
         self.tabs.addTab(self._build_bind_pose_tab(), "Bind Pose")
         main_layout.addWidget(self.tabs)
@@ -98,20 +102,35 @@ class MainWindow(QWidget):
 
         desc = QLabel(
             "Classic move tool. From[i] / To[i] are paired by row order.\n"
-            "Both buttons use the Kangaroo Builder plugin.")
+            "Pick the engine: Kangaroo (plugin) or Native (no plugin).")
         desc.setAlignment(Qt.AlignCenter)
         layout.addWidget(desc)
 
-        # Transfer Mode (Meshes to Meshes 전용)
-        mode_row = QHBoxLayout()
-        mode_row.addWidget(QLabel("Transfer Mode"))
+        # Engine (Kangaroo / Native) + Transfer Mode
+        eng_grp = QGroupBox("Engine")
+        eng_layout = QHBoxLayout(eng_grp)
+        self.classic_eng_grp = QButtonGroup(self)
+        self.rb_classic_kangaroo = QRadioButton("Kangaroo")
+        self.rb_classic_native = QRadioButton("Native")
+        self.rb_classic_kangaroo.setChecked(True)
+        self.rb_classic_kangaroo.setToolTip(
+            "Kangaroo Builder plugin (must be loaded).")
+        self.rb_classic_native.setToolTip(
+            "cmds.copySkinWeights + maya.api. No plugin dependency.\n"
+            "Move is a 1:1 joint-column move; native setWeights undo is one step.")
+        self.classic_eng_grp.addButton(self.rb_classic_kangaroo)
+        self.classic_eng_grp.addButton(self.rb_classic_native)
+        eng_layout.addWidget(self.rb_classic_kangaroo)
+        eng_layout.addWidget(self.rb_classic_native)
+        eng_layout.addStretch(1)
+
+        eng_layout.addWidget(QLabel("Transfer Mode"))
         self.cmb_classic_mode = QComboBox()
         self.cmb_classic_mode.addItems(SkinMigrateManager.TRANSFER_MODES)
         self.cmb_classic_mode.setCurrentIndex(SkinMigrateManager.DEFAULT_TRANSFER_MODE)
         self.cmb_classic_mode.setToolTip("Used by 'Meshes to Meshes' only.")
-        mode_row.addWidget(self.cmb_classic_mode)
-        mode_row.addStretch(1)
-        layout.addLayout(mode_row)
+        eng_layout.addWidget(self.cmb_classic_mode)
+        layout.addWidget(eng_grp)
 
         # From / To 리스트 (joints 또는 meshes, 동작 버튼에 따라 의미가 달라진다)
         self.tsl_classic_from = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
@@ -143,7 +162,71 @@ class MainWindow(QWidget):
         return tab
 
     # --------------------------------------------------
-    # Tab 2 : Migrate A -> B (기존 통합 마이그레이션)
+    # Tab 2 : Transfer (여러 소스 -> 선택한 하나의 메시, Kangaroo 무의존)
+    # --------------------------------------------------
+
+    def _build_transfer_tab(self):
+
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        desc = QLabel(
+            "Transfer skin weights from one or more SOURCE meshes to the mesh you\n"
+            "currently have selected in the scene (closest point, no plugin).\n"
+            "Select vertices on the target to transfer only there; soft selection\n"
+            "falloff is respected when enabled.")
+        desc.setAlignment(Qt.AlignCenter)
+        layout.addWidget(desc)
+
+        # 소스 메시 리스트
+        self.tsl_transfer_src = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Source Meshes", select_label="Select Source Meshes",
+            log_callback=self.log)
+        layout.addWidget(self.tsl_transfer_src)
+
+        # 옵션 (Mode 는 Closest Point 고정 + soft selection)
+        opt_grp = QGroupBox("Options")
+        opt_layout = QVBoxLayout(opt_grp)
+
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Mode"))
+        cmb = QComboBox()
+        cmb.addItem("Closest Point")
+        cmb.setEnabled(False)
+        cmb.setToolTip("Native transfer uses closest point (like Kangaroo's Closest Point).")
+        mode_row.addWidget(cmb)
+        mode_row.addStretch(1)
+        opt_layout.addLayout(mode_row)
+
+        self.cb_transfer_soft = QCheckBox("Respect soft selection falloff")
+        self.cb_transfer_soft.setChecked(True)
+        self.cb_transfer_soft.setToolTip(
+            "When soft selection is on, blend the transferred weights by its falloff.")
+        opt_layout.addWidget(self.cb_transfer_soft)
+
+        layout.addWidget(opt_grp)
+
+        hint = QLabel(
+            "Target = your current scene selection (a mesh, or vertices on it).")
+        hint.setAlignment(Qt.AlignCenter)
+        layout.addWidget(hint)
+
+        self.btn_transfer_run = QPushButton("TRANSFER to selected mesh")
+        self.btn_transfer_run.setMinimumHeight(40)
+        self.btn_transfer_run.clicked.connect(self.on_transfer_to_mesh)
+        layout.addWidget(self.btn_transfer_run)
+
+        layout.addStretch(1)
+        return tab
+
+    def on_transfer_to_mesh(self):
+        sources = self.tsl_transfer_src.get_all_items()
+        count, msg = wt_mgr.transfer_to_mesh(
+            sources, respect_soft=self.cb_transfer_soft.isChecked())
+        self.log(msg)
+
+    # --------------------------------------------------
+    # Tab 3 : Migrate A -> B (기존 통합 마이그레이션)
     # --------------------------------------------------
 
     def _build_migrate_tab(self):
@@ -262,7 +345,7 @@ class MainWindow(QWidget):
         return tab
 
     # --------------------------------------------------
-    # Tab 3 : Bind Pose (현재 포즈를 새 바인드 포즈로)
+    # Tab 4 : Bind Pose (현재 포즈를 새 바인드 포즈로)
     # --------------------------------------------------
 
     def _build_bind_pose_tab(self):
@@ -449,10 +532,14 @@ class MainWindow(QWidget):
     # Handlers : Classic
     # --------------------------------------------------
 
+    def _classic_engine(self):
+        return "kangaroo" if self.rb_classic_kangaroo.isChecked() else "native"
+
     def on_move_joints(self):
         joints_from = self.tsl_classic_from.get_all_items()
         joints_to = self.tsl_classic_to.get_all_items()
-        count, msg = SkinMigrateManager.move_joints_in_mesh(joints_from, joints_to)
+        count, msg = SkinMigrateManager.move_joints_in_mesh(
+            joints_from, joints_to, engine=self._classic_engine())
         self.log(msg)
 
     def on_transfer_meshes(self):
@@ -460,7 +547,8 @@ class MainWindow(QWidget):
         meshes_to = self.tsl_classic_to.get_all_items()
         count, msg = SkinMigrateManager.transfer_meshes(
             meshes_from, meshes_to,
-            transfer_mode=self.cmb_classic_mode.currentIndex())
+            transfer_mode=self.cmb_classic_mode.currentIndex(),
+            engine=self._classic_engine())
         self.log(msg)
 
     # --------------------------------------------------
@@ -492,7 +580,9 @@ class MainWindow(QWidget):
             self,
             "About",
             f"Skin Tool v{VERSION}\n\n"
-            "Classic / Migrate A->B : skin weight move & transfer.\n"
+            "Classic : joint/mesh weight move (Kangaroo or Native engine).\n"
+            "Transfer : many source meshes -> selected mesh/vertices (no plugin).\n"
+            "Migrate A->B : cross-topology transfer + bone remap.\n"
             "Bind Pose : make the current joint pose the new bind pose.\n\n"
             f"Written by Ji Hun Park.\nUpdate date: {LAST_UPDATE}",
         )

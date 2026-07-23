@@ -2,7 +2,7 @@
 title: Portfolio — Work Summary (2026-05-06 ~ 2026-07-15)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-07-21
+updated: 2026-07-23
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
@@ -164,7 +164,7 @@ Default Distance attribute (driver signal x)
 |------|--------------|
 | `A00145_RigConnect` | **Unified rig-connection tool**: absorbed two legacy MEL tools (ConnectionTool, Match Tool) into Qt. Match (T/R/S/Parent options), matrix constraints, connect-to-closest, **skin weight → constraint conversion** (Parent / Scale / Point / Orient), batch offset/zero-out group creation, **Constraint Transfer** (move an existing constraint onto another object, preserving world pose), and an **Attribute tab** that copies chosen attributes onto other objects with a prefix/suffix (type/range/default/keyable preserved) — including a blendShape's targets (see 1-4) |
 | `A00270_skinMigrate` | One-click **skin weight transfer between meshes of different topology, with bone remapping**; the legacy two-button UI is preserved as a Classic tab |
-| `A00275_skinTool_V01` | The above plus **Update Bind Pose**, a capability Maya does not provide — see 3-3 |
+| `A00275_skinTool_V01` | The above plus **Update Bind Pose** (a capability Maya lacks, see 3-3) and a **Transfer tab** (weights from many source meshes → the selected mesh, **restricted to selected vertices with soft-selection falloff**, no third-party plugin) |
 | `A00060_jointTool_V02` | Legacy MEL JointTool folded into Qt: curve-based / divided joint creation in **world space**, twist-only Aim redesign, unused-joint selector |
 | `A00120_FKIK`, `A00190_FKIK_General_Tool` | FK/IK switching and baking. Moved to native `bakeResults` for speed, then fixed to a constraint-free per-frame match bake so that **keys outside the range and anim-layer poses are no longer corrupted** |
 | `A00130_ControlRig` | Control rig generation |

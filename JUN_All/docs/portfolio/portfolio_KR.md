@@ -2,7 +2,7 @@
 title: 포트폴리오 작업 내역 (2026-05-06 ~ 2026-07-15)
 aliases: [Portfolio KR, 포트폴리오 국문]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-07-21
+updated: 2026-07-23
 ---
 
 # Technical Artist / Pipeline TD 작업 내역 — 국문
@@ -165,7 +165,7 @@ Default Distance 어트리뷰트 (driver 신호 x)
 |----|------|
 | `A00145_RigConnect` | **리깅 연결 작업 통합 툴**. 레거시 MEL 툴(ConnectionTool·Match Tool) 2종을 Qt로 흡수 통합. 매칭(T/R/S/Parent 옵션), 매트릭스 컨스트레인트, 최근접 오브젝트 연결, **스킨 웨이트 → 컨스트레인트 변환**(Parent/Scale/Point/Orient), 오프셋(제로아웃) 그룹 일괄 생성, **기존 컨스트레인트를 다른 오브젝트로 이관**하는 Constraint Transfer, 그리고 선택한 어트리뷰트를 접두/접미사를 붙여 다른 오브젝트에 복제하는 **Attribute 탭**(타입·범위·기본값·키어블 보존, blendShape 타겟 포함 — 1-4 참고) 등 |
 | `A00270_skinMigrate` | **토폴로지가 다른 메시 간 스킨 웨이트 전이 + 본 재매핑**을 원클릭으로. 레거시 2버튼 UI도 Classic 탭으로 보존 |
-| `A00275_skinTool_V01` | 위 기능에 **Update Bind Pose**(마야에 없는 기능)를 더한 스킨 범용 툴 — 3-3 참고 |
+| `A00275_skinTool_V01` | 위 기능에 **Update Bind Pose**(마야에 없는 기능, 3-3 참고) + **Transfer 탭**(여러 소스 메시→선택 메시로 웨이트 전이, **선택 버텍스에만·소프트 falloff**, 서드파티 플러그인 무의존)을 더한 스킨 범용 툴 |
 | `A00060_jointTool_V02` | 레거시 MEL JointTool을 Qt로 통합. 커브 기반/분할 조인트 생성(월드 절대좌표 기준), 트위스트 전용 Aim 리디자인, 미사용 조인트 선택기 |
 | `A00120_FKIK`, `A00190_FKIK_General_Tool` | FK/IK 스위칭 및 베이크. 네이티브 `bakeResults` 도입으로 프레임 루프 대비 성능 개선, **구간 밖 키·애님 레이어 포즈를 훼손하지 않는** 컨스트레인트리스 베이크로 수정 |
 | `A00130_ControlRig` | 컨트롤 리그 생성 |

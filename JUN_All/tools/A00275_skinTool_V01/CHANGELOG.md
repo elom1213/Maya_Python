@@ -1,5 +1,22 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.04 (2026-07-23)
+- **[Add] Classic 탭에 Engine(Kangaroo / Native) 선택** — 예전엔 Classic 의 두 버튼이 Kangaroo
+  전용이었다. 이제 Migrate 탭처럼 **Native**(플러그인 무의존)를 골라 쓸 수 있다.
+  - `Joints to Joints` native = 선택 메시 skinCluster 에서 From 본 컬럼을 To 본 컬럼으로 이동(maya.api).
+  - `Meshes to Meshes` native = rebind + `cmds.copySkinWeights`(closestPoint).
+- **[Add] Transfer 탭 신설** — Kangaroo 의 *SkinCluster > Transfer* 를 흉내낸 기능이되 **Kangaroo 없이**
+  동작한다. **여러 소스 메시 → 현재 선택한 하나의 메시**로 웨이트를 전이한다(`copySkinWeights`
+  closestPoint; 소스가 여럿이면 버텍스별 최근접 소스 자동 선택).
+  - **선택 버텍스에만 전이**(필수) — 타겟의 버텍스를 선택하면 그 버텍스만 바뀌고 나머지는 원본 유지.
+  - **소프트 셀렉션 falloff 반영** — 소프트 셀렉션이 켜져 있으면 falloff 비율로 before~after 를 블렌드.
+  - Mode 는 Closest Point 고정(요구대로 단순화). 구현은 `app/core/weight_transfer_manager.py`.
+  - 구현 메모(mayapy 검증): `copySkinWeights` 는 컴포넌트 제한을 지원하지 않아 항상 메시 전체에
+    적용된다. 그래서 전체 전이 결과(after)와 원본(before)을 bulk 로 읽어, 선택 버텍스만 falloff
+    로 lerp 하고 나머지는 before 로 되돌린 뒤 bulk `setWeights` 로 마스킹한다. 버텍스 선택이
+    없으면 전체 전이 결과를 그대로 둔다(undo 깔끔). 다중 소스는 selection-based copySkinWeights 가
+    **버텍스별 최근접 소스**를 사용함을 확인해 그대로 활용.
+
 ## v01.03 (2026-07-20)
 실제 리그(`CHN_Face`, 22,644 verts)의 Diagnose 결과로 원인이 확정된 뒤의 후속 조치.
 

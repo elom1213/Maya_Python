@@ -97,12 +97,15 @@ class SkinMigrateManager:
     # ==================================================
 
     @staticmethod
-    def move_joints_in_mesh(joints_from, joints_to):
+    def move_joints_in_mesh(joints_from, joints_to, engine="kangaroo"):
         """Classic 'joints to joints in single mesh'.
 
         현재 Maya 선택의 메시 위에서 joints_from[i] → joints_to[i] 로 스킨
         웨이트를 이동한다(레거시 JUN_move_each_skin_weight 충실 이식). 메시는
-        호출 전 사용자가 선택해 둔 것을 그대로 쓴다(Kangaroo 가 selection 사용).
+        호출 전 사용자가 선택해 둔 것을 그대로 쓴다.
+
+        engine="kangaroo" : Kangaroo moveSkinClusterWeights (플러그인 필요).
+        engine="native"   : maya.api 로 본 컬럼 1:1 이동 (플러그인 무의존).
         """
         if not joints_from or not joints_to:
             return (0, "[Warning] Fill both From and To joint lists.")
@@ -110,8 +113,12 @@ class SkinMigrateManager:
             return (0, "[Warning] From ({0}) / To ({1}) joint count mismatch.".format(
                 len(joints_from), len(joints_to)))
 
+        if engine == "native":
+            return SkinMigrateManager._move_joints_native(joints_from, joints_to)
+
         try:
-            ktw = SkinMigrateManager._import_kangaroo()
+            ktw = SkinMigrateManager._import_kangaroo(
+                extra=" or switch the engine to 'Native'")
         except RuntimeError as exc:
             return (0, "[Error] {0}".format(exc))
 
@@ -132,15 +139,53 @@ class SkinMigrateManager:
         except Exception as exc:
             return (0, "[Error] {0}".format(exc))
 
-        return (1, "[classic] Moved weights for {0} joint pair(s) on the selected mesh.".format(
-            len(joints_from)))
+        return (1, "[classic/kangaroo] Moved weights for {0} joint pair(s) on the "
+                   "selected mesh.".format(len(joints_from)))
 
     @staticmethod
-    def transfer_meshes(meshes_from, meshes_to, transfer_mode=2):
+    def _move_joints_native(joints_from, joints_to):
+        """Native: 현재 선택 메시의 skinCluster 에서 From 본 컬럼을 To 본 컬럼으로 이동."""
+        sel = cmds.ls(sl=True, o=True, l=True) or []
+        mesh = next((SkinMigrateManager._as_mesh(s) for s in sel
+                     if SkinMigrateManager._as_mesh(s)), None)
+        if not mesh:
+            return (0, "[Warning] Select the skinned mesh in the scene first.")
+
+        sc = SkinMigrateManager._find_skincluster(mesh)
+        if not sc:
+            return (0, "[Warning] '{0}' has no skinCluster.".format(mesh))
+
+        missing = [j for j in (joints_from + joints_to)
+                   if not cmds.objExists(j) or "joint" not in cmds.nodeType(j)]
+        if missing:
+            return (0, "[Warning] Not existing joint(s): {0}".format(", ".join(missing)))
+
+        try:
+            with undo_chunk():
+                existing = set(SkinMigrateManager._leaf(n)
+                               for n in (cmds.skinCluster(sc, q=True, influence=True) or []))
+                for jt in joints_to:
+                    if SkinMigrateManager._leaf(jt) not in existing:
+                        cmds.skinCluster(sc, edit=True, addInfluence=jt, weight=0.0)
+                        existing.add(SkinMigrateManager._leaf(jt))
+                moved = SkinMigrateManager._native_move_columns(
+                    sc, mesh, list(zip(joints_from, joints_to)))
+        except Exception as exc:
+            return (0, "[Error] {0}".format(exc))
+
+        return (1, "[classic/native] Moved {0} joint pair(s) on '{1}'. "
+                   "(uses maya.api setWeights; undo is one step)".format(
+                       moved, SkinMigrateManager._leaf(mesh)))
+
+    @staticmethod
+    def transfer_meshes(meshes_from, meshes_to, transfer_mode=2, engine="kangaroo"):
         """Classic 'meshes to meshes'.
 
         각 쌍에 대해 meshes_from[i] 의 skinCluster 를 meshes_to[i] 로 전이한다
         (레거시 JUN_transfer_meshes_to_meshes 충실 이식). 인덱스 순서로 짝짓는다.
+
+        engine="kangaroo" : Kangaroo transferSkinCluster (플러그인 필요).
+        engine="native"   : rebind + cmds.copySkinWeights (플러그인 무의존).
         """
         if not meshes_from or not meshes_to:
             return (0, "[Warning] Fill both From and To mesh lists.")
@@ -148,8 +193,13 @@ class SkinMigrateManager:
             return (0, "[Warning] From ({0}) / To ({1}) mesh count mismatch.".format(
                 len(meshes_from), len(meshes_to)))
 
+        if engine == "native":
+            return SkinMigrateManager._transfer_meshes_native(
+                meshes_from, meshes_to, transfer_mode)
+
         try:
-            ktw = SkinMigrateManager._import_kangaroo()
+            ktw = SkinMigrateManager._import_kangaroo(
+                extra=" or switch the engine to 'Native'")
         except RuntimeError as exc:
             return (0, "[Error] {0}".format(exc))
 
@@ -169,8 +219,65 @@ class SkinMigrateManager:
         except Exception as exc:
             return (0, "[Error] {0} (after {1} mesh(es))".format(exc, done))
 
-        return (1, "[classic] Transferred {0} mesh pair(s) (mode={1}).".format(
+        return (1, "[classic/kangaroo] Transferred {0} mesh pair(s) (mode={1}).".format(
             done, SkinMigrateManager.TRANSFER_MODES[transfer_mode]))
+
+    @staticmethod
+    def _transfer_meshes_native(meshes_from, meshes_to, transfer_mode):
+        """Native: 각 쌍을 rebind + copySkinWeights 로 전이."""
+        done = 0
+        try:
+            with undo_chunk():
+                for mesh_from, mesh_to in zip(meshes_from, meshes_to):
+                    if not SkinMigrateManager._is_mesh(mesh_from):
+                        return (0, "[Warning] '{0}' is not a mesh.".format(mesh_from))
+                    if not SkinMigrateManager._is_mesh(mesh_to):
+                        return (0, "[Warning] '{0}' is not a mesh.".format(mesh_to))
+                    sc_from = SkinMigrateManager._find_skincluster(mesh_from)
+                    if not sc_from:
+                        return (0, "[Warning] '{0}' has no skinCluster.".format(mesh_from))
+                    SkinMigrateManager._native_transfer_mesh(
+                        mesh_from, mesh_to, transfer_mode)
+                    done += 1
+        except Exception as exc:
+            return (0, "[Error] {0} (after {1} mesh(es))".format(exc, done))
+
+        return (1, "[classic/native] Transferred {0} mesh pair(s) (mode={1}).".format(
+            done, SkinMigrateManager.TRANSFER_MODES[transfer_mode]))
+
+    @staticmethod
+    def _native_transfer_mesh(mesh_from, mesh_to, transfer_mode):
+        """mesh_from 의 skinCluster 를 mesh_to 로 전이(B 를 A 본으로 새로 바인드)."""
+        sc_from = SkinMigrateManager._find_skincluster(mesh_from)
+        inf_from = cmds.skinCluster(sc_from, q=True, influence=True) or []
+
+        sc_to_old = SkinMigrateManager._find_skincluster(mesh_to)
+        if sc_to_old:
+            cmds.delete(sc_to_old)
+
+        sc_to = cmds.skinCluster(
+            inf_from + [mesh_to], toSelectedBones=True,
+            name=SkinMigrateManager._leaf(mesh_to) + "_skinCluster")[0]
+
+        surface_assoc = SkinMigrateManager._NATIVE_SURFACE_ASSOC.get(
+            transfer_mode, "closestPoint")
+        cmds.copySkinWeights(
+            sourceSkin=sc_from, destinationSkin=sc_to,
+            noMirror=True, surfaceAssociation=surface_assoc,
+            influenceAssociation=["name", "closestJoint", "oneToOne"])
+        return sc_to
+
+    @staticmethod
+    def _as_mesh(node):
+        """노드가 메시(또는 메시 트랜스폼)면 트랜스폼을, 아니면 None."""
+        if not cmds.objExists(node):
+            return None
+        if cmds.objectType(node) == "mesh":
+            p = cmds.listRelatives(node, p=True, f=True)
+            return p[0] if p else node
+        if cmds.listRelatives(node, s=True, type="mesh", f=True):
+            return node
+        return None
 
     # ==================================================
     # Validation
