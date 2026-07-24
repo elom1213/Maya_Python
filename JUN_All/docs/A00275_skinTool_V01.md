@@ -2,7 +2,7 @@
 title: A00275_skinTool_V01 사용법
 aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose]
 tags: [maya-python, tool-guide, skin, skincluster, bind-pose, rigging]
-updated: 2026-07-23
+updated: 2026-07-24
 ---
 
 # A00275_skinTool_V01 사용법
@@ -10,7 +10,7 @@ updated: 2026-07-23
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.06)
+- **버전**: `app/config/version.py` (v01.07)
 - **설치**: `__dragDrop_A00275.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **SkinTool** → `tools.A00275_skinTool_V01.run(True)`
 
 | 탭 | 내용 |
@@ -54,22 +54,31 @@ Kangaroo 의 *SkinCluster > Transfer* 를 흉내낸 기능. **여러 소스 메�
 
 ### 동작
 
-- **여러 대상 메시** (v01.06~) — 선택한 메시를 **각각** 전이한다(대상별로 copySkinWeights + 마스킹).
-  소스로 쓴 메시가 선택에 섞여 있으면 자동으로 대상에서 제외한다.
+- **여러 대상 메시** (v01.06~) — 선택한 메시를 **각각** 전이한다. 소스로 쓴 메시가 선택에 섞여 있으면
+  자동으로 대상에서 제외한다.
 - **Mode = Closest Point** 고정. 소스가 여럿이면 **버텍스별로 가장 가까운 소스**를 자동 선택한다.
-- **선택 버텍스에만 전이** — 타겟의 버텍스를 골라두면 그 버텍스만 바뀌고 나머지는 원본 웨이트 유지.
+- **선택 버텍스에만 전이** — 타겟의 버텍스를 골라두면 **그 버텍스만** 바뀌고 나머지는 **아예 손대지 않는다**.
 - **소프트 셀렉션 falloff** — `Respect soft selection falloff` 가 켜져 있고 소프트 셀렉션이 활성이면,
   falloff 비율 `f` 로 `원본 ↔ 전이결과` 를 블렌드한다(중심 f=1, 가장자리 f→0).
+- **연결 shell 로 제한** (v01.07~) — 소프트 셀렉션은 **하드 선택이 속한 연결 shell(island)** 로 제한된다.
+  여러 조각이 하나로 **combine 된 메시**에서 소프트 셀렉션 **Volume** falloff 가 붙어 있지 않은 근접
+  shell 까지 범위로 잡더라도, 그 떨어진 shell 은 **전이 대상에서 제외(방치)** 된다.
 
 ### 구현 메모 (mayapy 로 검증)
 
 - 무거운 최근접-점 계산(면 barycentric 샘플링)은 `cmds.copySkinWeights(surfaceAssociation="closestPoint")`
   가 정확히 해 준다. **소스 메시 여러 개를 함께 선택하면 버텍스별 최근접 소스를 알아서 고른다**(검증됨).
-- 다만 `copySkinWeights` 는 **컴포넌트 제한을 지원하지 않아 항상 메시 전체**에 적용된다. 그래서
-  선택-버텍스/소프트 블렌드는 이렇게 처리한다: 전이 전 웨이트(before)와 전이 후(after)를 `maya.api`
-  로 bulk 로 읽어, **선택 버텍스는 falloff 로 lerp, 나머지는 before 로 복원**한 뒤 bulk `setWeights`.
-  버텍스 선택이 없으면(메시 전체) copySkinWeights 결과를 그대로 둔다(undo 깔끔).
-- 부분 전이는 `setWeights` 를 쓰므로 undo 가 세밀하지 않다(전체가 한 스텝).
+- **전체 전이**(버텍스 선택 없음)는 대상에 바로 copySkinWeights 한다(undo 깔끔, 빠름).
+- **부분 전이**(버텍스 선택)는 대상에 copySkinWeights(전체) 한 뒤, 선택 전/후 웨이트를 **maya.api 벌크
+  read** 로 읽어 선택 버텍스는 `before + (after-before)*f`(f=falloff) 로 블렌드하고 미선택은 `before`
+  로 되돌려 **한 번의 벌크 `setWeights`** 로 쓴다. 대용량 메시에서도 빠르다(3.1k 버텍스 combine 메시에서
+  약 0.05s). 단, 벌크 `setWeights` 라 **부분 전이의 undo 는 세밀하지 않다**(속도 우선).
+- **소프트 falloff 는 셰이프 MObject 노드로 매칭**한다(v01.07~). 리치 셀렉션 컴포넌트는 셰이프 DAG 를
+  주므로 문자열 경로로 비교하면 combine/rename 메시에서 틀어져 `kInvalidParameter` 로 이어졌다.
+  이제 컴포넌트의 셰이프 노드와 대상 셰이프 노드를 직접 비교한다(`_shape_node`).
+- **연결 shell 은 `MFnMesh.getVertices()` 한 번의 벌크 호출 + 파이썬 BFS**(`_connected_island`)로 구한다.
+  하드 선택에서 이어진 버텍스만 남겨, combine 메시의 떨어진 shell 을 소프트 셀렉션에서 걸러낸다
+  (버텍스별 반복 없이 빠름 — 3.1k 버텍스에서 0.007s).
 
 ---
 

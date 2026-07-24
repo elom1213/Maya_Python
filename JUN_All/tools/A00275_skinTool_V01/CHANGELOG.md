@@ -1,5 +1,24 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.07 (2026-07-24)
+Transfer 탭 소프트 셀렉션 관련 버그 수정(컴바인 메시 + Volume falloff).
+
+- **[Fix] `(kInvalidParameter): Object is incompatible with this method` 에러** — 소프트 셀렉션으로
+  전이 범위를 잡고 Transfer 하면 나던 에러.
+  - `_soft_weights` 가 리치 셀렉션 컴포넌트를 **문자열 경로**로 비교해 combine/rename 메시에서
+    매칭이 틀어졌다(리치 셀렉션은 **셰이프 DAG** 를 준다). 이제 컴포넌트의 **셰이프 MObject 노드**와
+    대상 셰이프 노드를 직접 비교하고(`_shape_node`), 컴포넌트 접근을 try/except 로 감싼다. 범위를
+    벗어난 버텍스 id 도 걸러낸다(방어).
+- **[Fix] 방치하고 싶은 부위까지 전이되던 문제** — 여러 조각이 하나로 **combine 된 메시**에서 소프트
+  셀렉션 **Volume** falloff 가 붙어 있지 않은 **근접 shell** 까지 범위로 잡아 함께 전이됐다.
+  - 이제 소프트 셀렉션을 **하드 선택이 속한 연결 shell(island)로 제한**한다(`_connected_island`).
+    떨어진 근접 shell 은 전이 대상에서 제외 → **방치**된다. island 계산은 `MFnMesh.getVertices()`
+    **한 번의 벌크 호출**로 면-버텍스 인접을 만들고 파이썬 BFS 로 확장한다(버텍스별 반복 없음 → 빠름).
+- **[Change] 부분 전이 방식(빠른 벌크 마스킹)** — 대상 메시에 copySkinWeights(전체) 한 뒤, 선택 전/후
+  웨이트를 **maya.api 벌크 read** 로 읽어 선택 버텍스는 `before + (after-before)*f`(f=falloff) 로
+  블렌드하고 미선택은 `before` 로 되돌려 **한 번의 벌크 `setWeights`** 로 쓴다. 대용량 메시에서도 빠르다
+  (3.1k 버텍스 combine 메시에서 island 0.007s + 전이 0.055s 측정).
+
 ## v01.06 (2026-07-23)
 - **[Fix] Transfer 탭이 선택한 여러 대상 메시 중 하나에만 전이되던 문제** — 이제 **선택한 모든 메시**에
   전이한다.

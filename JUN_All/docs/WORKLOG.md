@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-07-23
+updated: 2026-07-24
 ---
 
 # 작업 일지 (WORKLOG)
@@ -15,7 +15,28 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-07-23 (오늘)
+## 2026-07-24 (오늘)
+
+> [!summary] `A00275_skinTool_V01` **Transfer 탭: combine 메시 소프트 셀렉션 수정 + 근접 shell 방치** (v01.06→01.07)
+- **배경**: 여러 조각이 하나로 **combine 된 메시**에서 소프트 셀렉션(Volume falloff)으로 전이 범위를 잡으면
+  ⑴ `(kInvalidParameter): Object is incompatible with this method` 에러, ⑵ 붙어 있지 않은 **근접 shell**
+  까지 함께 전이(방치하고 싶은 부위가 전이됨).
+- **수정 ⑴ 소프트 매칭**: `_soft_weights` 가 리치 셀렉션 컴포넌트를 **문자열 경로**로 비교해 combine/rename
+  메시에서 매칭이 틀어졌다(리치 셀렉션은 셰이프 DAG 를 준다). 이제 컴포넌트의 **셰이프 MObject 노드**와
+  대상 셰이프 노드를 직접 비교(`_shape_node`) + 컴포넌트 접근 try/except + 범위 밖 vtx id 방어.
+- **수정 ⑵ 근접 shell 방치**: 소프트 셀렉션을 **하드 선택이 속한 연결 shell(island)로 제한**
+  (`_connected_island`). 떨어진 shell 은 전이 대상에서 제외 → **방치**.
+- **리그레션 재수정**(첫 v01.07 시도 피드백): 첫 시도가 **셰이프 풀패스 문자열** 비교(실 Maya 에서 여전히
+  빈 결과 → 소프트 범위 통째 무시, 하드 버텍스만 전이 = 소프트 안 한 것과 동일)와 **버텍스별 `MItMeshVertex`
+  island + 임시복제 `skinPercent`** 부분전이(매우 느림)였다. → **노드 비교** + island 을
+  `MFnMesh.getVertices()` **벌크 1회 + 파이썬 BFS** + 부분전이를 **maya.api 벌크 read/setWeights** 마스킹
+  으로 재작성.
+- **검증**: mayapy — 3,124 버텍스 combine 메시에서 island **0.007s**, 소프트 부분전이 **0.055s**(예전 대비
+  대폭 빠름); graded falloff(f=1→완전, 0.5→절반 0.500, 미선택→원본 1.000); 떨어진 shellB 제외; 멀티대상/
+  단일/Classic 재통과. 트레이드오프: 부분전이는 벌크 `setWeights` 라 **undo 가 세밀하지 않음**(속도 우선).
+  getRichSelection 이 헤들리스에서 비어 소프트 경로는 mock 검증 — 마야 실기 소프트 확인 대기.
+
+## 2026-07-23
 
 > [!summary] `A00275_skinTool_V01` **Transfer 탭: 선택한 여러 대상 메시 모두에 전이** (v01.05→01.06)
 - **버그**: Transfer 탭에서 소스를 리스트업하고 씬에서 **여러 메시를 선택**한 뒤 Transfer 를 누르면

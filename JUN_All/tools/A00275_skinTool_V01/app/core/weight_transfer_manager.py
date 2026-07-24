@@ -114,8 +114,20 @@ def parse_target_selections():
 
     for mesh, cs in comp_by_mesh.items():
         verts = cmds.ls(cmds.polyListComponentConversion(cs, tv=True), fl=True) or []
-        ids = sorted({int(v.split("[")[1].split("]")[0]) for v in verts})
-        result.append((mesh, ids or None, _soft_weights(mesh)))
+        hard_ids = sorted({int(v.split("[")[1].split("]")[0]) for v in verts})
+
+        soft = _soft_weights(mesh)
+        if soft:
+            # 소프트 셀렉션은 하드 선택이 속한 **연결 shell** 로 제한한다. 컴바인 메시에서
+            # 떨어진 근접 shell 이 Volume falloff 로 딸려 들어와 방치하고 싶은 부위까지
+            # 전이되는 것을 막는다.
+            island = _connected_island(mesh, hard_ids)
+            soft = {v: w for v, w in soft.items() if v in island}
+            ids = sorted(soft.keys()) or hard_ids
+        else:
+            ids = hard_ids
+
+        result.append((mesh, ids or None, soft or None))
         seen.add(mesh)
 
     # 통째 선택된 메시 → 전체 전이 (이미 부분으로 잡힌 메시는 건너뜀)
@@ -129,8 +141,25 @@ def parse_target_selections():
     return result
 
 
+def _shape_node(mesh):
+    """mesh(트랜스폼/셰이프)의 **셰이프 MObject**. 못 구하면 None."""
+    try:
+        sel = om.MSelectionList()
+        sel.add(mesh)
+        dag = sel.getDagPath(0)
+        dag.extendToShape()
+        return dag.node()
+    except Exception:
+        return None
+
+
 def _soft_weights(mesh):
-    """소프트 셀렉션이 켜져 있으면 {vtx id: falloff weight}, 아니면 None."""
+    """소프트 셀렉션이 켜져 있으면 {vtx id: falloff weight}, 아니면 None.
+
+    리치 셀렉션 컴포넌트의 소속 메시는 **셰이프 노드(MObject)** 로 비교한다. 경로 문자열
+    (트랜스폼 vs 셰이프, 인스턴스 등)로 비교하면 combine/rename 메시에서 틀어져 매칭이
+    실패하고, 그러면 소프트 셀렉션이 아예 안 먹은 것처럼(하드 선택만 전이) 된다.
+    """
     if not cmds.softSelect(q=True, softSelectEnabled=True):
         return None
 
@@ -140,22 +169,81 @@ def _soft_weights(mesh):
     except Exception:
         return None
 
-    short = _leaf(mesh)
+    target_node = _shape_node(mesh)
+    if target_node is None:
+        return None
+
     out = {}
     for i in range(sel.length()):
         try:
             dag, comp = sel.getComponent(i)
         except Exception:
             continue
-        if dag.fullPathName().split("|")[-1] != short:
+
+        # 컴포넌트가 속한 셰이프 노드를 구해 대상 셰이프와 노드로 비교한다.
+        try:
+            dag.extendToShape()
+        except Exception:
+            pass
+        try:
+            node = dag.node()
+        except Exception:
             continue
+        if node != target_node:
+            continue
+
         if comp.isNull() or not comp.hasFn(om.MFn.kMeshVertComponent):
             continue
-        fn = om.MFnSingleIndexedComponent(comp)
-        for e in range(fn.elementCount):
-            out[fn.element(e)] = fn.weight(e).influence if fn.hasWeights else 1.0
+        try:
+            fn = om.MFnSingleIndexedComponent(comp)
+            for e in range(fn.elementCount):
+                out[fn.element(e)] = fn.weight(e).influence if fn.hasWeights else 1.0
+        except Exception:
+            continue
 
     return out or None
+
+
+def _connected_island(mesh, seed_ids):
+    """seed_ids 버텍스에서 **면(face)으로 이어진 연결 shell(island)** 버텍스 집합.
+
+    여러 조각이 하나로 combine 된 메시에서, 소프트 셀렉션 Volume falloff 가 붙어 있지 않은
+    근접 shell 까지 물어오는 것을 걸러내는 데 쓴다(연결된 shell 만 남긴다).
+
+    성능: `MFnMesh.getVertices()` **한 번**으로 면-버텍스 목록을 받아 인접을 파이썬으로 만든다
+    (버텍스마다 API 호출하는 방식은 큰 메시에서 매우 느리다).
+    """
+    seed = set(seed_ids)
+    try:
+        sel = om.MSelectionList()
+        sel.add(mesh)
+        dag = sel.getDagPath(0)
+        dag.extendToShape()
+        fn = om.MFnMesh(dag)
+        counts, indices = fn.getVertices()   # 면별 버텍스 수 + 평면 인덱스 (bulk 1회)
+    except Exception:
+        return seed
+
+    adj = {}
+    idx = 0
+    for c in counts:
+        fverts = indices[idx:idx + c]
+        idx += c
+        for a in fverts:
+            bucket = adj.setdefault(a, set())
+            for b in fverts:
+                if b != a:
+                    bucket.add(b)
+
+    island = set(seed)
+    frontier = list(seed)
+    while frontier:
+        v = frontier.pop()
+        for c in adj.get(v, ()):
+            if c not in island:
+                island.add(c)
+                frontier.append(c)
+    return island
 
 
 # =========================
@@ -298,28 +386,34 @@ def _transfer_one_native(sources, union, target, vtx_ids, soft):
     """소스들 → 대상 메시 하나에 전이한다(부분/소프트 마스킹 포함). 짧은 설명 문자열 반환."""
 
     sc_t, created = _prepare_target_skin(target, union)
-    partial = bool(vtx_ids)   # 버텍스 선택이 있으면 부분 전이
 
-    before = idxs = None
-    n_inf = 0
-    if partial:
-        before, _n_v, idxs, n_inf = _get_all_weights(sc_t, target)
+    # ---- 전체 전이 --------------------------------------------------
+    # 버텍스 선택이 없으면 메시 전체를 copySkinWeights (undo 가능, 빠름).
+    if not vtx_ids:
+        cmds.select(list(sources) + [target], r=True)
+        cmds.copySkinWeights(
+            noMirror=True, surfaceAssociation="closestPoint",
+            influenceAssociation=["name", "closestJoint", "oneToOne"])
+        return "whole" + (", new sc" if created else "")
 
-    # 메시 전체 전이 (소스가 여럿이면 버텍스별 최근접 소스)
+    # ---- 부분 전이 --------------------------------------------------
+    # 선택 버텍스(소프트면 falloff 범위, island 로 제한됨)만 전이하고 나머지는 원본 유지.
+    # copySkinWeights 는 컴포넌트 제한을 지원하지 않으므로: 전이 전(before)/후(after) 웨이트를
+    # maya.api 로 **bulk** 로 읽어, 선택 버텍스는 falloff 로 lerp, 나머지는 before 로 되돌린 뒤
+    # **bulk setWeights** 한다. (bulk 라서 빠르다. 버텍스마다 skinPercent 로 쓰면 매우 느리다.)
+    before, n_v, idxs, n_inf = _get_all_weights(sc_t, target)
+    vtx_ids = [v for v in vtx_ids if 0 <= v < n_v]
+    if not vtx_ids:
+        return "no valid target vertices"
+
     cmds.select(list(sources) + [target], r=True)
     cmds.copySkinWeights(
         noMirror=True, surfaceAssociation="closestPoint",
         influenceAssociation=["name", "closestJoint", "oneToOne"])
 
-    if not partial:
-        return "whole" + (", new sc" if created else "")
-
-    # 부분 전이: 선택 버텍스만 남기고 나머지는 원복 + 소프트 블렌드
-    after, _n, _idxs2, n_inf2 = _get_all_weights(sc_t, target)
-
-    # copySkinWeights 가 예상 밖으로 인플루언스를 추가하면 before/after 컬럼이 어긋난다.
-    # 그 경우 마스킹을 포기하고 전체 전이 결과를 그대로 둔다(정합성 우선).
+    after, _n, _idx2, n_inf2 = _get_all_weights(sc_t, target)
     if n_inf2 != n_inf or len(after) != len(before):
+        # copySkinWeights 가 인플루언스를 바꿔 컬럼이 어긋나면 마스킹을 포기(전체 전이 유지).
         return "whole (masking skipped: influence set changed)"
 
     final = om.MDoubleArray(before)   # 기본은 원본(before) = 미선택 복원
@@ -336,7 +430,7 @@ def _transfer_one_native(sources, union, target, vtx_ids, soft):
     where = "{0}v".format(len(vtx_ids))
     if soft is not None:
         where += "+soft"
-    return where
+    return where + (", new sc" if created else "")
 
 
 # =========================

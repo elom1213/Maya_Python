@@ -1,6 +1,6 @@
 ---
 name: wip-a00275-transfer-tab
-description: "A00275_skinTool_V01 v01.06 — Classic Engine choice + Transfer tab (many source meshes -> ALL selected meshes/verts; Native soft-falloff + Kangaroo engine choice) — IMPLEMENTED, Maya test pending"
+description: "A00275_skinTool_V01 v01.07 — Classic Engine choice + Transfer tab (many source meshes -> ALL selected meshes/verts; Native soft-falloff + Kangaroo engine choice) — IMPLEMENTED, Maya test pending"
 metadata: 
   node_type: memory
   type: project
@@ -44,6 +44,27 @@ target), iMode=2 closestPoint, bAutoCreateNewSkinCluster=(target has no skin))`.
 handling follows Kangaroo; the soft-falloff checkbox is Native-only (disabled when Kangaroo is picked).
 Default = Native. Note: in this mayapy env `kangarooTabTools` imports but `report.report` is None so the
 call errors — the tool catches it as `[Error]` (no crash); works in real Maya with Kangaroo Builder loaded.
+
+**v01.07 (bug fix, user-reported): soft-selection on a COMBINED mesh — (a) `(kInvalidParameter): Object
+is incompatible with this method` error, (b) transfer bled into disconnected-but-near shells that Volume
+falloff picked up.** Fixes: `_soft_weights` matches the rich-selection component by **shape MObject node**
+(`_shape_node`) instead of string paths (rich sel gives a SHAPE dag; string compares failed on combine/
+rename) + try/except per component + out-of-range vtx guard. `_connected_island` restricts soft selection
+to the connected shell of the HARD selection so disconnected near shells are left alone; it builds face-
+vertex adjacency from **ONE `MFnMesh.getVertices()` bulk call** + Python BFS (no per-vertex iteration).
+Partial transfer = copySkinWeights whole → maya.api bulk read before/after → selected verts blended
+`before+(after-before)*f`, non-selected restored to before → **one bulk `setWeights`**.
+
+**v01.07 REGRESSION FIX (same version, not yet pushed — user feedback on first v01.07 attempt):** the
+first attempt used **shape full-path string** compare (still failed in real Maya → `_soft_weights`
+returned empty → soft range ignored, only hard verts transferred = "same as no soft"), and a **per-vertex
+`MItMeshVertex` island BFS + temp-duplicate `cmds.skinPercent`** partial (very slow). Reworked to the
+node-compare + bulk-getVertices island + bulk-setWeights partial above. Verified headless: island excludes
+shell B and is fast (0.007s on 3124-vert combine); graded falloff (f=1→full, 0.5→half, unsel→untouched);
+soft partial transfer 0.055s. Tradeoff: bulk `setWeights` partial is FAST but **not granularly undoable**
+(one Ctrl+Z may not fully revert partial) — accepted per user's speed priority. getRichSelection is empty
+headless so the soft path is tested via a `_soft_weights` mock; user verifies real soft in Maya. NOTE:
+couldn't reproduce the kInvalidParameter directly headless — fix inferred from the shape-name bug + guards.
 
 **v01.06 (bug fix, user-reported): Transfer only hit ONE of several selected target meshes.** Root cause:
 `parse_target_selection()` returned just the first mesh. Added `parse_target_selections()` (plural) that
