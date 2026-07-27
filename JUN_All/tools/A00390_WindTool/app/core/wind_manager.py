@@ -44,8 +44,31 @@ AXES = ["rotateX", "rotateY", "rotateZ", "translateX", "translateY", "translateZ
 MODE_CHAIN = "chain"
 MODE_ROOT = "root"
 
+# 출력 모드.
+#   curve : 조인트에 직접 키를 굽는다(씬 재생으로 애니메이션). 기존 동작.
+#   node  : Period/Amplitude/Offset/Speed 어트리뷰트를 가진 null(로케이터) 드라이버 +
+#           노드망으로 같은 파형을 '실시간' 재현. 어트리뷰트로 파형을, windSpeed 로
+#           재생 속도를 프레임마다 조절할 수 있다. Chain=드라이버 1개, Root=루트 수만큼.
+OUTPUT_CURVE = "curve"
+OUTPUT_NODE = "node"
+
+# node 모드 드라이버 어트리뷰트.
+#   windPeriod/Amplitude/Offset : 파형 파라미터(정적, 실시간 편집).
+#   windSpeed : **값 = 재생 속도**(1=보통, 상수로 둬도 계속 재생, 키로 프레임마다 속도 변경).
+#   windPhaseTime : 내부 위상 시계. 노드망이 읽는다. **표현식으로 windSpeed 를 시간 적분**한다:
+#       windPhaseTime(f) = startFrame + ∫_startFrame^f windSpeed dt   (프레임 사다리꼴)
+#     속도는 시간의 적분이므로(단순 time*speed 곱셈이 아니라), windSpeed 를 값으로 바꾸든
+#     키로 애니메이션하든 **버튼 없이 즉시 반영**되고, 속도가 변해도 **위상이 역행하지 않는다**
+#     (찰랑임이 뒤집히지 않음). windSpeed=1 상수면 windPhaseTime=frame 이라 curve 모드와 같은 위상.
+DRIVER_PARAMS = ("windPeriod", "windAmplitude", "windOffset")
+DRIVER_SPEED = "windSpeed"
+DRIVER_PHASE = "windPhaseTime"
+
 # 키 시간의 부동소수 잡음을 없애기 위한 반올림 자리.
 _TIME_ROUND = 5
+
+# node 모드 싸인 LUT 샘플 수(한 주기당). 많을수록 곡선이 매끈.
+_LUT_SAMPLES = 16
 
 
 def _key_times_values(index, start, end, period, amplitude, offset,
@@ -100,58 +123,205 @@ def _chain_from_root(root):
     return out
 
 
-def _resolve_targets(joints, mode):
-    """(joint, offset_index) 쌍 목록과 missing(없는 노드) 목록을 만든다.
+def _resolve_groups(joints, mode):
+    """드라이버 단위의 그룹 목록과 missing(없는 노드) 목록을 만든다.
 
-    chain: 리스트 순서가 offset 순번(index = 리스트 위치).
-    root : 각 리스트 항목을 체인 루트로 보고 그 아래 모든 조인트를 depth 를 index 로.
-           같은 조인트가 여러 루트에서 겹쳐 잡히면 처음 것만 쓴다(중복 키 방지).
+    각 그룹은 [(joint, offset_index), ...] 이고, node 모드에서 **그룹 하나당 드라이버 1개**가
+    생긴다(curve 모드는 그룹을 평탄화해 그냥 전부 키를 굽는다).
+
+    chain: 그룹 1개 — 리스트 순서가 offset 순번.
+    root : 그룹은 루트마다 1개 — 각 루트의 자손을 depth 를 순번으로. 같은 조인트가 여러
+           루트에서 겹쳐 잡히면 처음 것만 쓴다(중복 방지).
     """
     missing = []
 
     if mode == MODE_ROOT:
-        pairs = []
+        groups = []
         seen = set()
         for root in joints:
             if not cmds.objExists(root):
                 missing.append(root)
                 continue
+            grp = []
             for jnt, depth in _chain_from_root(root):
                 if jnt in seen:
                     continue
                 seen.add(jnt)
-                pairs.append((jnt, depth))
-        return pairs, missing
+                grp.append((jnt, depth))
+            if grp:
+                groups.append(grp)
+        return groups, missing
 
-    # chain
-    pairs = []
+    # chain: 그룹 1개
+    grp = []
     for i, jnt in enumerate(joints):
         if not cmds.objExists(jnt):
             missing.append(jnt)
             continue
-        pairs.append((jnt, i))
-    return pairs, missing
+        grp.append((jnt, i))
+    return ([grp] if grp else []), missing
+
+
+# --------------------------------------------------------------- node 모드 헬퍼
+
+def _leaf(name):
+    """풀패스/네임스페이스 제거한 짧은 이름."""
+    return name.split("|")[-1].split(":")[-1]
+
+
+def _safe(name):
+    """노드 이름에 쓰기 위해 '|' ':' 를 '_' 로."""
+    return name.replace("|", "_").replace(":", "_").strip("_")
+
+
+def _sine_lut(name):
+    """정규화 싸인 LUT animCurveUU: input u(주기 1) -> sin(2*pi*u), 무한 반복(cycle).
+
+    Maya 2023 에는 네이티브 sin 노드가 없으므로 한 주기 싸인을 담은 driven 커브를 LUT 로
+    쓴다. animCurveUU 는 setInfinity 가 안 먹으므로 preInfinity/postInfinity enum 을 직접
+    3(cycle)으로 준다(양끝 값이 모두 0 이라 offset 누적 없이 매끈히 반복).
+    """
+    crv = cmds.createNode("animCurveUU", name=name)
+    for k in range(_LUT_SAMPLES + 1):
+        u = k / float(_LUT_SAMPLES)
+        cmds.setKeyframe(crv, float=u, value=math.sin(2.0 * math.pi * u))
+    cmds.keyTangent(crv, edit=True, itt="spline", ott="spline")
+    cmds.setAttr(crv + ".preInfinity", 3)
+    cmds.setAttr(crv + ".postInfinity", 3)
+    return crv
+
+
+def _make_driver(name, period, amplitude, offset, speed):
+    """windPeriod/Amplitude/Offset(정적) + windSpeed(속도 knob) + windPhaseTime(내부 시계)."""
+    drv = cmds.spaceLocator(name=name)[0]
+    for attr, val in zip(DRIVER_PARAMS, (period, amplitude, offset)):
+        cmds.addAttr(drv, longName=attr, attributeType="double",
+                     defaultValue=val, keyable=True)
+        cmds.setAttr(drv + "." + attr, val)
+
+    # 값 = 속도(1=보통). 키로 프레임마다 속도 조절.
+    cmds.addAttr(drv, longName=DRIVER_SPEED, attributeType="double",
+                 defaultValue=speed, keyable=True)
+    cmds.setAttr(drv + "." + DRIVER_SPEED, speed)
+
+    # 내부 위상 시계 = windSpeed 의 시간 적분(표현식). 값/키 무엇을 바꿔도 라이브 반영.
+    cmds.addAttr(drv, longName=DRIVER_PHASE, attributeType="double", keyable=True)
+    _make_phase_expression(drv)
+    return drv
+
+
+def _make_phase_expression(drv):
+    """windPhaseTime = startFrame + ∫ windSpeed dt 를 표현식으로 라이브 계산한다.
+
+    매 프레임 windSpeed 를 startFrame..frame 에서 사다리꼴 적분한다. 상수 속도는 곱셈과
+    같고, 가변 속도(키 애니메이션)에서도 위상이 단조 전진해 역행이 없다. windSpeed 를 값으로
+    바꾸든 키를 편집하든 **버튼 없이 즉시** 반영된다(표현식이 매 프레임 재평가).
+    """
+    start = int(round(cmds.playbackOptions(query=True, minTime=True)))
+    expr = (
+        "float $cf = frame;\n"
+        "int $start = {start};\n"
+        "int $fend = (int)floor($cf);\n"
+        "float $acc = 0.0;\n"
+        "float $prev = `getAttr -time $start {drv}.{spd}`;\n"
+        "int $f;\n"
+        "for ($f = $start + 1; $f <= $fend; $f++) {{\n"
+        "  float $s = `getAttr -time $f {drv}.{spd}`;\n"
+        "  $acc += 0.5 * ($prev + $s);\n"
+        "  $prev = $s;\n"
+        "}}\n"
+        "float $frac = $cf - $fend;\n"    # 현재 프레임의 소수 잔여 구간
+        "if ($frac > 0.0) {{\n"
+        "  float $sf = `getAttr -time $cf {drv}.{spd}`;\n"
+        "  $acc += 0.5 * ($prev + $sf) * $frac;\n"
+        "}}\n"
+        "{drv}.{phase} = $start + $acc;\n"
+    ).format(start=start, drv=drv, spd=DRIVER_SPEED, phase=DRIVER_PHASE)
+    return cmds.expression(string=expr, alwaysEvaluate=True,
+                           unitConversion="all", name=drv + "_windInteg")
+
+
+def _clear_attr_input(jnt, attr):
+    """attr 의 기존 키/입력 연결을 끊는다(node 드라이버를 새로 연결하기 전에)."""
+    plug = "{0}.{1}".format(jnt, attr)
+    try:
+        cmds.cutKey(jnt, attribute=attr, clear=True)
+    except Exception:
+        pass
+    for src in (cmds.listConnections(plug, source=True, destination=False,
+                                     plugs=True) or []):
+        try:
+            cmds.disconnectAttr(src, plug)
+        except Exception:
+            pass
+
+
+def _wire_group(drv, pairs, attr, template_lut):
+    """드라이버 drv 에서 그룹의 각 조인트로 싸인 노드망을 연결한다.
+
+    조인트 j(순번 i) 에 대해:
+        value = windAmplitude * sineLUT( (windPhaseTime - i*windOffset) / windPeriod )
+    windPhaseTime 은 windSpeed 의 적분(재생 속도가 값에 반영됨, 위상 역행 없음).
+    """
+    wired = 0
+    for jnt, index in pairs:
+        if not cmds.attributeQuery(attr, node=jnt, exists=True):
+            continue
+
+        # shift = windPhaseTime - offset*index
+        if index != 0:
+            mdl_off = cmds.createNode("multDoubleLinear")
+            cmds.connectAttr(drv + ".windOffset", mdl_off + ".input1")
+            cmds.setAttr(mdl_off + ".input2", index)
+            pma = cmds.createNode("plusMinusAverage")
+            cmds.setAttr(pma + ".operation", 2)   # subtract
+            cmds.connectAttr(drv + "." + DRIVER_PHASE, pma + ".input1D[0]")
+            cmds.connectAttr(mdl_off + ".output", pma + ".input1D[1]")
+            shift = pma + ".output1D"
+        else:
+            shift = drv + "." + DRIVER_PHASE
+
+        # u = shift / period
+        div = cmds.createNode("multiplyDivide")
+        cmds.setAttr(div + ".operation", 2)       # divide
+        cmds.connectAttr(shift, div + ".input1X")
+        cmds.connectAttr(drv + ".windPeriod", div + ".input2X")
+
+        # s = sineLUT(u)  (템플릿 복제 — 조인트마다 입력이 달라 개별 커브 필요)
+        lut = cmds.duplicate(template_lut, name=drv + "_sine_" + _safe(jnt))[0]
+        cmds.connectAttr(div + ".outputX", lut + ".input")
+
+        # val = s * amplitude
+        mul_amp = cmds.createNode("multDoubleLinear")
+        cmds.connectAttr(lut + ".output", mul_amp + ".input1")
+        cmds.connectAttr(drv + ".windAmplitude", mul_amp + ".input2")
+
+        _clear_attr_input(jnt, attr)
+        cmds.connectAttr(mul_amp + ".output", "{0}.{1}".format(jnt, attr))
+        wired += 1
+
+    return wired
 
 
 def apply_wind(joints, attr, start, end, period, amplitude, offset,
                clear_range=True, tangent="spline", skip_zero_crossings=True,
-               mode=MODE_CHAIN):
-    """본 체인에 싸인 파형 키를 찍는다.
+               mode=MODE_CHAIN, output=OUTPUT_CURVE, speed=1.0):
+    """본 체인에 싸인 파형(바람 일렁임)을 적용한다.
 
     joints     : 조인트 이름 목록.
-    attr       : 키를 찍을 어트리뷰트('rotateX' 등, AXES 참고).
-    start, end : 키를 만들 프레임 구간(실수 허용).
+    attr       : 대상 어트리뷰트('rotateX' 등, AXES 참고).
+    start, end : (curve 모드) 키를 만들 프레임 구간(실수 허용).
     period     : 한 주기의 프레임 수(실수 허용, > 0).
     amplitude  : 진폭(피크 값).
     offset     : 순번마다 더해지는 위상 지연(프레임, 실수 허용). 순번 i -> i*offset.
-    clear_range: True 면 각 조인트의 attr 키를 [start, end] 에서 먼저 지운다(재적용 깔끔).
-    tangent    : 키 탄젠트 타입(기본 'spline' -> 싸인 유사 보간).
-    skip_zero_crossings: True(기본)면 구간 내부의 0 교차 키를 빼고 극값(±진폭)만 남긴다
-                 (양끝은 앵커로 유지) -> 커브가 더 부드럽다.
-    mode       : MODE_CHAIN(리스트 = 한 체인, 순번=리스트 순서) 또는
-                 MODE_ROOT(리스트 각 항목 = 체인 루트, 순번=root 로부터의 depth).
+    clear_range: (curve) True 면 각 조인트의 attr 키를 [start, end] 에서 먼저 지운다.
+    tangent    : (curve) 키 탄젠트 타입(기본 'spline').
+    skip_zero_crossings: (curve) True 면 구간 내부의 0 교차 키를 빼고 극값만 남긴다.
+    mode       : MODE_CHAIN(리스트=한 체인) 또는 MODE_ROOT(각 항목=체인 루트).
+    output     : OUTPUT_CURVE(조인트에 키 굽기) 또는 OUTPUT_NODE(드라이버 노드망 실시간).
+    speed      : (node) 드라이버 windSpeed 초기값(재생 속도 배수).
 
-    반환: (key_count, joint_count, message)
+    반환: (count, joint_count, message)  -- curve 면 count=키 수, node 면 count=드라이버 수.
     """
     if not joints:
         return 0, 0, "[Warning] Joint list is empty. Add joints first."
@@ -162,19 +332,26 @@ def apply_wind(joints, attr, start, end, period, amplitude, offset,
     if start > end:
         start, end = end, start
 
-    pairs, missing = _resolve_targets(joints, mode)
+    groups, missing = _resolve_groups(joints, mode)
 
+    if output == OUTPUT_NODE:
+        return _apply_nodes(groups, missing, attr, period, amplitude, offset, speed, mode)
+    return _apply_curve(groups, missing, attr, start, end, period, amplitude, offset,
+                        clear_range, tangent, skip_zero_crossings, mode)
+
+
+def _apply_curve(groups, missing, attr, start, end, period, amplitude, offset,
+                 clear_range, tangent, skip_zero_crossings, mode):
+    """curve 모드: 그룹을 평탄화해 각 조인트에 키를 굽는다(기존 동작)."""
     total_keys = 0
     keyed = set()
 
-    for jnt, index in pairs:
-        # 어트리뷰트가 존재하고 세팅 가능한지 확인.
+    for jnt, index in [p for grp in groups for p in grp]:
         if not cmds.attributeQuery(attr, node=jnt, exists=True):
             missing.append("{0}.{1}".format(jnt, attr))
             continue
 
         if clear_range:
-            # 기존 키를 구간에서 제거(없으면 조용히 넘어간다).
             try:
                 cmds.cutKey(jnt, attribute=attr, time=(start, end), clear=True)
             except Exception:
@@ -190,7 +367,7 @@ def apply_wind(joints, attr, start, end, period, amplitude, offset,
 
     if mode == MODE_ROOT:
         head = "Wind keys (root mode): {0} key(s) on {1} joint(s) from {2} root(s)".format(
-            total_keys, len(keyed), len(joints))
+            total_keys, len(keyed), len(groups))
     else:
         head = "Wind keys (chain mode): {0} key(s) on {1} joint(s)".format(
             total_keys, len(keyed))
@@ -199,3 +376,34 @@ def apply_wind(joints, attr, start, end, period, amplitude, offset,
     if missing:
         msg += " Skipped: {0}".format(", ".join(missing))
     return total_keys, len(keyed), msg
+
+
+def _apply_nodes(groups, missing, attr, period, amplitude, offset, speed, mode):
+    """node 모드: 그룹마다 드라이버 null 1개 + 싸인 노드망을 만든다."""
+    if not groups:
+        msg = "[Warning] No valid joints for node driver."
+        if missing:
+            msg += " Skipped: {0}".format(", ".join(missing))
+        return 0, 0, msg
+
+    drivers = []
+    wired = 0
+    for grp in groups:
+        root_jnt = grp[0][0]
+        drv = _make_driver(_leaf(root_jnt) + "_windDriver#",
+                           period, amplitude, offset, speed)
+        template = _sine_lut(drv + "_sineTemplate")
+        wired += _wire_group(drv, grp, attr, template)
+        cmds.delete(template)   # 조인트마다 복제본을 썼으므로 템플릿은 버린다.
+        drivers.append(drv)
+
+    mode_label = "root" if mode == MODE_ROOT else "chain"
+    head = "Wind node ({0} mode): {1} driver(s) on {2} joint(s)".format(
+        mode_label, len(drivers), wired)
+    msg = "{0} [{1}] period={2} amp={3} offset={4} speed={5}. " \
+          "Edit windPeriod/Amplitude/Offset/Speed live; keying windSpeed also " \
+          "updates the playback speed automatically (integrated, no reversal).".format(
+              head, attr, period, amplitude, offset, speed)
+    if missing:
+        msg += " Skipped: {0}".format(", ".join(missing))
+    return len(drivers), wired, msg

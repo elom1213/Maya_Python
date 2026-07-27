@@ -80,6 +80,29 @@ class MainWindow(QWidget):
         mode_row.addStretch(1)
         root.addWidget(mode_box)
 
+        # 출력: Curve(키 굽기) / Node(드라이버 노드망 실시간)
+        out_box = QGroupBox("Output")
+        out_row = QHBoxLayout(out_box)
+        self.out_group = QButtonGroup(self)
+        self.rb_curve = QRadioButton("Curve")
+        self.rb_curve.setChecked(True)
+        self.rb_curve.setToolTip(
+            "Bake keyframes onto the joints (scene playback plays it). Default.")
+        self.rb_node = QRadioButton("Node")
+        self.rb_node.setToolTip(
+            "Build a null driver with windPeriod / windAmplitude / windOffset /\n"
+            "windSpeed attributes that reproduce the animation LIVE (edit the attrs\n"
+            "to change it). windSpeed = playback speed (1 = normal); set OR key it to\n"
+            "vary the speed per frame - it updates automatically (integrated, no\n"
+            "reversal). Bone Chain -> 1 driver; Bone Root -> one driver per root.")
+        self.out_group.addButton(self.rb_curve)
+        self.out_group.addButton(self.rb_node)
+        out_row.addWidget(self.rb_curve)
+        out_row.addWidget(self.rb_node)
+        out_row.addStretch(1)
+        self.rb_curve.toggled.connect(self._on_output_changed)
+        root.addWidget(out_box)
+
         # 축(어트리뷰트) 선택
         axis_row = QHBoxLayout()
         axis_row.addWidget(QLabel("Axis"))
@@ -121,6 +144,19 @@ class MainWindow(QWidget):
             "Fractional frames allowed (unlike Stagger's integer offset).")
         form.addRow("Offset / joint (frames)", self.sb_offset)
 
+        # Speed: node 모드 드라이버 windSpeed 초기값(재생 속도 배수).
+        self.sb_speed = QDoubleSpinBox()
+        self.sb_speed.setDecimals(3)
+        self.sb_speed.setRange(-1000.0, 1000.0)
+        self.sb_speed.setValue(1.0)
+        self.sb_speed.setToolTip(
+            "Node output only: initial windSpeed value (playback speed).\n"
+            "1 = normal, 2 = double, 0 = frozen. Constant value keeps playing.\n"
+            "After building, set OR key windSpeed on the driver to change speed -\n"
+            "it updates automatically (integrated over time -> no reversal).")
+        self.lbl_speed = QLabel("Speed (Node)")
+        form.addRow(self.lbl_speed, self.sb_speed)
+
         root.addLayout(form)
 
         # 옵션
@@ -138,7 +174,7 @@ class MainWindow(QWidget):
             "On: also key every zero crossing (0, +A, 0, -A ...).")
         root.addWidget(self.chk_keep_zero)
 
-        # Apply
+        # Apply (Curve=키 굽기 / Node=드라이버 빌드)
         self.btn_apply = QPushButton("Apply Wind Keys")
         self.btn_apply.setMinimumHeight(38)
         self.btn_apply.clicked.connect(self.on_apply)
@@ -150,8 +186,24 @@ class MainWindow(QWidget):
         self.te_log.setMaximumHeight(120)
         root.addWidget(self.te_log)
 
-        self.log("Wind Tool v{0} ({1}) ready. List a bone chain, set range / "
-                 "period / amplitude / offset, then Apply.".format(VERSION, LAST_UPDATE))
+        self._on_output_changed()   # 초기 활성/비활성 + 버튼 라벨 맞추기
+        self.log("Wind Tool v{0} ({1}) ready. List a bone chain, pick Output "
+                 "(Curve / Node), set params, then Apply.".format(VERSION, LAST_UPDATE))
+
+    # ==============================================================
+    # output mode toggle
+    # ==============================================================
+
+    def _on_output_changed(self, *args):
+        """Curve/Node 전환 시 관련 없는 위젯을 비활성화하고 버튼 라벨을 바꾼다."""
+        curve = self.rb_curve.isChecked()
+        # 구간·clear·keep-zero 는 curve 전용, speed 는 node 전용.
+        self.range.setEnabled(curve)
+        self.chk_clear.setEnabled(curve)
+        self.chk_keep_zero.setEnabled(curve)
+        self.sb_speed.setEnabled(not curve)
+        self.lbl_speed.setEnabled(not curve)
+        self.btn_apply.setText("Apply Wind Keys" if curve else "Build Wind Node")
 
     # ==============================================================
     # actions
@@ -160,15 +212,21 @@ class MainWindow(QWidget):
     def on_apply(self):
         joints = self.tsl.get_all_nodes()   # UUID 로 해석한 현재 경로(리스트업 항목만)
         if not joints:
-            self.log("Bone chain list is empty. Select joints and click "
+            self.log("Joint list is empty. Select joints and click "
                      "'Select Joints'.", warn=True)
             return
 
-        rng = self.range.values()
-        if rng is None:
-            self.log("Enter valid Start / End frames.", warn=True)
-            return
-        start, end = rng
+        node_mode = self.rb_node.isChecked()
+
+        # 구간은 curve 모드에서만 필요(node 는 전체 타임라인을 실시간 구동).
+        if node_mode:
+            start, end = 0, 0
+        else:
+            rng = self.range.values()
+            if rng is None:
+                self.log("Enter valid Start / End frames.", warn=True)
+                return
+            start, end = rng
 
         attr = self.cmb_axis.currentText()
         period = self.sb_period.value()
@@ -177,13 +235,15 @@ class MainWindow(QWidget):
         clear_range = self.chk_clear.isChecked()
         skip_zero = not self.chk_keep_zero.isChecked()
         mode = wind_mgr.MODE_ROOT if self.rb_root.isChecked() else wind_mgr.MODE_CHAIN
+        output = wind_mgr.OUTPUT_NODE if node_mode else wind_mgr.OUTPUT_CURVE
+        speed = self.sb_speed.value()
 
         try:
             with undo_chunk():
                 count, jc, msg = wind_mgr.apply_wind(
                     joints, attr, start, end, period, amp, offset,
                     clear_range=clear_range, skip_zero_crossings=skip_zero,
-                    mode=mode)
+                    mode=mode, output=output, speed=speed)
         except Exception as e:
             self.log("Apply failed: {0}".format(e), warn=True)
             return
@@ -209,9 +269,10 @@ class MainWindow(QWidget):
         QMessageBox.information(
             self, "About",
             "Wind Tool\nv{0}  ({1})\n\n"
-            "Key a bone chain with a sine wave to fake wind sway.\n"
-            "value(t) = amplitude * sin(2*pi*(t - i*offset)/period)\n"
-            "Keys land every quarter period (fractional frames supported);\n"
-            "spline tangents give the sine-like shape. Per-joint offset\n"
-            "staggers the chain (fractional frames allowed).\n"
+            "Drive a bone chain with a sine wave to fake wind sway.\n"
+            "value(t) = amplitude * sin(2*pi*(t - i*offset)/period)\n\n"
+            "Output = Curve: bake keyframes (fractional-frame keys, spline).\n"
+            "Output = Node: a null driver (windPeriod/Amplitude/Offset/Speed)\n"
+            "reproduces it live; windSpeed = playback speed (set or key it, auto).\n"
+            "Bone Chain -> 1 driver; Bone Root -> one driver per root.\n"
             "by Ji Hun Park".format(VERSION, LAST_UPDATE))

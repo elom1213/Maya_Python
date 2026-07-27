@@ -1,5 +1,52 @@
 # Changelog — A00390_WindTool
 
+## v01.07 (2026-07-27)
+- **[Fix] windSpeed 를 '키로 애니메이션'해도 버튼 없이 자동 반영 + 위상 역행 제거** — v01.06 의
+  `time*windSpeed` 라이브 연결은 windSpeed 를 키로 애니(예: 0.25→0.05)하면 다시 위상이 역행해
+  찰랑임이 뒤집혔다(속도는 시간의 적분인데 곱셈이라서). 이제 `windPhaseTime` 을 **`∫windSpeed dt`
+  적분 표현식**(MEL expression, 프레임 사다리꼴 + 소수 프레임 잔여 구간)으로 라이브 계산한다.
+  - windSpeed 를 **값으로 바꾸든 키로 애니메이션하든 버튼 없이 즉시 반영**되고, 속도가 변해도
+    **위상이 단조 전진**해 역행이 없다. windSpeed=1 상수면 windPhaseTime=frame(curve 모드와 동일 위상).
+- **[Remove] `Apply Speed` 버튼** — 표현식이 자동 처리하므로 더 이상 필요 없다(core `bake_speed` 제거).
+
+## v01.06 (2026-07-27)
+- **[Change] windSpeed 값 조절이 Apply Speed 버튼 없이 실시간 반영되도록** — `windPhaseTime` 을
+  기본적으로 **`time * windSpeed` 라이브 연결**로 둔다. 상수 속도는 곱셈이 정확하므로, **windSpeed
+  값만 바꿔도 재생 속도가 즉시 갱신**된다(1=보통, 2=2배, 0=정지).
+- **Apply Speed 는 이제 '키로 조절한' 가변 속도 전용** — windSpeed 를 키로 주면 곱셈은 위상이
+  역행하므로, Apply Speed 로 windSpeed 를 **적분**해 windPhaseTime 애님커브로 구우면(라이브 연결은
+  끊김) 역행이 사라진다.
+
+## v01.05 (2026-07-27)
+- **[Change] Node 속도 제어를 '값=속도'인 `windSpeed` 로 되돌리되, 위상은 적분으로 굽는다** — v01.04 의
+  `windTime`(시간값)은 상수로 두면 애니가 멈춰(값=시간이라) 기대와 달랐다. 이제 드라이버에 **`windSpeed`
+  (값 = 재생 속도, 1=보통)** knob 을 두고, 내부 `windPhaseTime` = **windSpeed 의 시간 적분**으로 굽는다.
+  - windSpeed 를 **상수로 둬도 계속 재생**(1=보통, 2=2배, 0=정지)되고, 값을 바꾸면 속도가 바뀐다.
+  - windSpeed 를 **키로 조절**(예: 1→0.2→1)한 뒤 **Apply Speed** 버튼을 누르면 적분을 다시 구워
+    반영한다 — 적분이라 **위상 역행(찰랑임 뒤집힘)이 없다**. (곱셈 time*speed 는 가변 속도에서 역행,
+    windTime 시간값은 상수 정지 — 둘 다 해결.)
+- **[Add] `Apply Speed` 버튼**(Node 전용) — 선택한(없으면 전체) 드라이버의 windSpeed 를 적분해 반영.
+
+## v01.04 (2026-07-27)
+- **[Fix] Node 모드 재생 속도 제어를 `windSpeed` 곱셈 → `windTime` 리타임으로 교체** — 예전엔
+  위상 시계가 `time * windSpeed` 라, windSpeed 에 키를 줘 속도를 바꾸면(예: 1→0.2→1) 순간 주파수가
+  `speed + time*(dspeed/dt)` 가 되어 **속도가 내려가는 구간에서 위상이 역행(찰랑임이 뒤집힘)**하고
+  다시 1이 돼도 위상이 어긋났다. 이제 드라이버에 **`windTime`(위상 시계)** 어트리뷰트를 두고 씬 시간에
+  따라 기울기=speed 로 키를 찍는다. **이 커브를 리타임하면 기울기 = 재생 속도**가 되어(시간 자체를
+  워프 = 위상 적분) 느리게/빠르게가 **위상 역행 없이** 올바르게 재현된다. Speed 입력은 이제 windTime 의
+  초기 기울기를 정한다. (mayapy: 곱셈 방식 19프레임 역행 → 리타임 0 역행 확인.)
+
+## v01.03 (2026-07-27)
+- **[Add] Curve / Node 출력 선택** —
+  - **Curve**(기본, 기존 동작): 조인트에 키를 굽는다.
+  - **Node**: `windPeriod / windAmplitude / windOffset / windSpeed` 어트리뷰트를 가진 **null(로케이터)
+    드라이버** + 노드망으로 같은 파형을 **실시간** 재현한다. 어트리뷰트를 바꾸면 애니메이션이 즉시
+    갱신되고, **windSpeed** 로 재생 속도를 (키로) 프레임마다 조절할 수 있다.
+    - Bone Chain → 드라이버 **1개**, Bone Root → 루트 수만큼 드라이버.
+    - sin 은 정규화 싸인 `animCurveUU` LUT(주기 1, `preInfinity/postInfinity=3` 무한 반복)로 구현 —
+      Maya 2023 의 네이티브 sin 노드 부재 문제를 피한다(A00170 Remap 아이디어 응용).
+  - Node 출력용 **Speed** 입력 추가(드라이버 windSpeed 초기값).
+
 ## v01.02 (2026-07-27)
 - **[Add] Bone Chain / Bone Root 모드 선택** —
   - **Bone Chain**(기본, 기존 동작): 리스트업한 조인트들을 **하나의 체인**으로 보고 리스트 순서를

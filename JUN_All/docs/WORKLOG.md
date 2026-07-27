@@ -17,6 +17,24 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-07-27 (오늘)
 
+> [!summary] `A00390_WindTool` **Curve / Node 출력 + Node 재생속도(windSpeed) 제어** (v01.02→01.07)
+- **Curve / Node 출력 선택**(v01.03): Curve=조인트에 키 굽기(기존). Node=`windPeriod/Amplitude/Offset/
+  windSpeed` 어트리뷰트를 가진 **null(로케이터) 드라이버 + 노드망**으로 파형을 **실시간** 재현. 어트리뷰트
+  편집이 즉시 반영. **Bone Chain=드라이버 1개, Bone Root=루트 수만큼**. sin 은 정규화 싸인 `animCurveUU`
+  LUT(preInfinity/postInfinity enum=3 로 무한 반복)로 구현 — Maya 2023 sin 노드 부재 회피(A00170 Remap
+  아이디어). setInfinity 는 UU 커브에 안 먹어 enum 직접 setAttr 필요.
+- **재생 속도 제어 반복 수정**(v01.04~01.07, 사용자 피드백 3회):
+  - v01.04 `windTime`(시간값) 리타임 — 상수로 두면 애니가 멈춰 폐기.
+  - v01.05/06 `windSpeed`(값=속도) — 상수는 라이브(`time*windSpeed`), 키 애니는 위상 역행(찰랑임 뒤집힘).
+  - **v01.07 최종**: `windPhaseTime` 을 **`∫windSpeed dt` 적분 표현식**(MEL, 프레임 사다리꼴+소수 잔여
+    구간, `getAttr -time` 샘플 → 스크럽 안전)으로 라이브 계산. **windSpeed 를 값으로 바꾸든 키로
+    애니메이션하든 버튼 없이 즉시 반영 + 위상 역행 없음**(단조 전진). windSpeed=1 → phaseTime=frame
+    (curve 모드와 동일 위상). Apply Speed 버튼 제거(자동).
+  - 원리: 속도는 시간의 적분이라 단순 곱셈(time*speed)이면 가변 속도에서 순간 주파수가 음수가 돼 뒤집힌다
+    (mayapy: 곱셈 19프레임 역행 vs 적분 0 역행).
+- **검증**: mayapy — 사용자 예시 파형, Node 실시간 어트리뷰트/cycle, Bone Root 다중 드라이버, windSpeed
+  값·키 애니 자동 반영·역행 없음·소수 프레임 정확, Curve 무회귀. **마야 실기 확인됨(사용자, 단계별)**.
+
 > [!summary] `A00390_WindTool` **Bone Chain / Bone Root 모드 추가** (v01.01→01.02)
 - **요청**: 지금은 리스트업한 조인트들에만 적용된다. **Bone Root** 모드를 추가해, 리스트업한 각 조인트를
   체인 루트로 보고 그 조인트의 **자손들마다** Bone Chain 기능을 반복 수행하게.
