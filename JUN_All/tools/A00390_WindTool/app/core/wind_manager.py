@@ -63,6 +63,9 @@ OUTPUT_NODE = "node"
 DRIVER_PARAMS = ("windPeriod", "windAmplitude", "windOffset")
 DRIVER_SPEED = "windSpeed"
 DRIVER_PHASE = "windPhaseTime"
+#   windPhaseOffset : 이 드라이버(노드) **전체**의 위상 타이밍 offset(프레임). 드라이버마다
+#     다른 값을 주면(특히 Bone Root 모드) 루트들이 서로 다른 타이밍으로 찰랑인다.
+DRIVER_PHASE_OFFSET = "windPhaseOffset"
 
 # 키 시간의 부동소수 잡음을 없애기 위한 반올림 자리.
 _TIME_ROUND = 5
@@ -191,8 +194,8 @@ def _sine_lut(name):
     return crv
 
 
-def _make_driver(name, period, amplitude, offset, speed):
-    """windPeriod/Amplitude/Offset(정적) + windSpeed(속도 knob) + windPhaseTime(내부 시계)."""
+def _make_driver(name, period, amplitude, offset, speed, phase_offset=0.0):
+    """windPeriod/Amplitude/Offset + windSpeed + windPhaseOffset + windPhaseTime(내부 시계)."""
     drv = cmds.spaceLocator(name=name)[0]
     for attr, val in zip(DRIVER_PARAMS, (period, amplitude, offset)):
         cmds.addAttr(drv, longName=attr, attributeType="double",
@@ -203,6 +206,11 @@ def _make_driver(name, period, amplitude, offset, speed):
     cmds.addAttr(drv, longName=DRIVER_SPEED, attributeType="double",
                  defaultValue=speed, keyable=True)
     cmds.setAttr(drv + "." + DRIVER_SPEED, speed)
+
+    # 이 드라이버 전체의 위상 타이밍 offset(프레임). 드라이버마다 다르게 주면 서로 다른 타이밍.
+    cmds.addAttr(drv, longName=DRIVER_PHASE_OFFSET, attributeType="double",
+                 defaultValue=phase_offset, keyable=True)
+    cmds.setAttr(drv + "." + DRIVER_PHASE_OFFSET, phase_offset)
 
     # 내부 위상 시계 = windSpeed 의 시간 적분(표현식). 값/키 무엇을 바꿔도 라이브 반영.
     cmds.addAttr(drv, longName=DRIVER_PHASE, attributeType="double", keyable=True)
@@ -260,26 +268,34 @@ def _wire_group(drv, pairs, attr, template_lut):
     """드라이버 drv 에서 그룹의 각 조인트로 싸인 노드망을 연결한다.
 
     조인트 j(순번 i) 에 대해:
-        value = windAmplitude * sineLUT( (windPhaseTime - i*windOffset) / windPeriod )
+        value = windAmplitude * sineLUT( (base - i*windOffset) / windPeriod )
+        base  = windPhaseTime - windPhaseOffset   (드라이버 전체 타이밍 offset)
     windPhaseTime 은 windSpeed 의 적분(재생 속도가 값에 반영됨, 위상 역행 없음).
     """
+    # 드라이버 전체 위상 시계에서 전역 offset 을 뺀 base (그룹 내 모든 조인트 공용).
+    base_pma = cmds.createNode("plusMinusAverage", name=drv + "_phaseBase")
+    cmds.setAttr(base_pma + ".operation", 2)   # subtract
+    cmds.connectAttr(drv + "." + DRIVER_PHASE, base_pma + ".input1D[0]")
+    cmds.connectAttr(drv + "." + DRIVER_PHASE_OFFSET, base_pma + ".input1D[1]")
+    base = base_pma + ".output1D"
+
     wired = 0
     for jnt, index in pairs:
         if not cmds.attributeQuery(attr, node=jnt, exists=True):
             continue
 
-        # shift = windPhaseTime - offset*index
+        # shift = base - offset*index
         if index != 0:
             mdl_off = cmds.createNode("multDoubleLinear")
             cmds.connectAttr(drv + ".windOffset", mdl_off + ".input1")
             cmds.setAttr(mdl_off + ".input2", index)
             pma = cmds.createNode("plusMinusAverage")
             cmds.setAttr(pma + ".operation", 2)   # subtract
-            cmds.connectAttr(drv + "." + DRIVER_PHASE, pma + ".input1D[0]")
+            cmds.connectAttr(base, pma + ".input1D[0]")
             cmds.connectAttr(mdl_off + ".output", pma + ".input1D[1]")
             shift = pma + ".output1D"
         else:
-            shift = drv + "." + DRIVER_PHASE
+            shift = base
 
         # u = shift / period
         div = cmds.createNode("multiplyDivide")
@@ -305,7 +321,7 @@ def _wire_group(drv, pairs, attr, template_lut):
 
 def apply_wind(joints, attr, start, end, period, amplitude, offset,
                clear_range=True, tangent="spline", skip_zero_crossings=True,
-               mode=MODE_CHAIN, output=OUTPUT_CURVE, speed=1.0):
+               mode=MODE_CHAIN, output=OUTPUT_CURVE, speed=1.0, node_offset=0.0):
     """본 체인에 싸인 파형(바람 일렁임)을 적용한다.
 
     joints     : 조인트 이름 목록.
@@ -320,6 +336,8 @@ def apply_wind(joints, attr, start, end, period, amplitude, offset,
     mode       : MODE_CHAIN(리스트=한 체인) 또는 MODE_ROOT(각 항목=체인 루트).
     output     : OUTPUT_CURVE(조인트에 키 굽기) 또는 OUTPUT_NODE(드라이버 노드망 실시간).
     speed      : (node) 드라이버 windSpeed 초기값(재생 속도 배수).
+    node_offset: (node) 드라이버(노드)마다 순번 k 만큼 더해지는 전체 위상 offset 초기값
+                 (windPhaseOffset = k*node_offset). Root 모드에서 루트마다 다른 타이밍.
 
     반환: (count, joint_count, message)  -- curve 면 count=키 수, node 면 count=드라이버 수.
     """
@@ -335,7 +353,8 @@ def apply_wind(joints, attr, start, end, period, amplitude, offset,
     groups, missing = _resolve_groups(joints, mode)
 
     if output == OUTPUT_NODE:
-        return _apply_nodes(groups, missing, attr, period, amplitude, offset, speed, mode)
+        return _apply_nodes(groups, missing, attr, period, amplitude, offset,
+                            speed, mode, node_offset)
     return _apply_curve(groups, missing, attr, start, end, period, amplitude, offset,
                         clear_range, tangent, skip_zero_crossings, mode)
 
@@ -378,8 +397,13 @@ def _apply_curve(groups, missing, attr, start, end, period, amplitude, offset,
     return total_keys, len(keyed), msg
 
 
-def _apply_nodes(groups, missing, attr, period, amplitude, offset, speed, mode):
-    """node 모드: 그룹마다 드라이버 null 1개 + 싸인 노드망을 만든다."""
+def _apply_nodes(groups, missing, attr, period, amplitude, offset, speed, mode,
+                 node_offset=0.0):
+    """node 모드: 그룹마다 드라이버 null 1개 + 싸인 노드망을 만든다.
+
+    드라이버 순번 k 마다 windPhaseOffset = k*node_offset 로 초기화해, Root 모드에서 루트들이
+    서로 다른 타이밍으로 찰랑이게 한다(이후 각 드라이버의 windPhaseOffset 을 직접 조절 가능).
+    """
     if not groups:
         msg = "[Warning] No valid joints for node driver."
         if missing:
@@ -388,10 +412,11 @@ def _apply_nodes(groups, missing, attr, period, amplitude, offset, speed, mode):
 
     drivers = []
     wired = 0
-    for grp in groups:
+    for k, grp in enumerate(groups):
         root_jnt = grp[0][0]
         drv = _make_driver(_leaf(root_jnt) + "_windDriver#",
-                           period, amplitude, offset, speed)
+                           period, amplitude, offset, speed,
+                           phase_offset=k * node_offset)
         template = _sine_lut(drv + "_sineTemplate")
         wired += _wire_group(drv, grp, attr, template)
         cmds.delete(template)   # 조인트마다 복제본을 썼으므로 템플릿은 버린다.
@@ -400,10 +425,10 @@ def _apply_nodes(groups, missing, attr, period, amplitude, offset, speed, mode):
     mode_label = "root" if mode == MODE_ROOT else "chain"
     head = "Wind node ({0} mode): {1} driver(s) on {2} joint(s)".format(
         mode_label, len(drivers), wired)
-    msg = "{0} [{1}] period={2} amp={3} offset={4} speed={5}. " \
-          "Edit windPeriod/Amplitude/Offset/Speed live; keying windSpeed also " \
-          "updates the playback speed automatically (integrated, no reversal).".format(
-              head, attr, period, amplitude, offset, speed)
+    msg = "{0} [{1}] period={2} amp={3} offset={4} speed={5} node_offset={6}. " \
+          "Edit windPeriod/Amplitude/Offset/Speed live; windPhaseOffset sets each " \
+          "driver's overall timing (per-root).".format(
+              head, attr, period, amplitude, offset, speed, node_offset)
     if missing:
         msg += " Skipped: {0}".format(", ".join(missing))
     return len(drivers), wired, msg

@@ -80,6 +80,10 @@ value(t) = amplitude * sin( 2π * (t - i*offset) / period )
   - 성능: 표현식이 매 프레임 startFrame~현재프레임을 훑어 적분한다(구간이 매우 길고 드라이버가 많으면
     다소 무거울 수 있음).
 - 드라이버 개수: **Bone Chain → 1개**, **Bone Root → 루트 수만큼**.
+- **`windPhaseOffset`(전체 타이밍 offset, v01.08~)**: 드라이버(노드) **하나의 전체 타이밍**을 미는
+  어트리뷰트(`base = windPhaseTime − windPhaseOffset`, 그 드라이버의 모든 본에 공용). 드라이버마다
+  다른 값을 주면 서로 다른 타이밍으로 찰랑인다. UI 의 **Node Offset** 은 드라이버 순번 k 마다
+  `windPhaseOffset = k×값` 으로 초기화 → **Bone Root 모드에서 루트별로 자동 다른 타이밍**(0 이면 동일).
 - sin 은 정규화 싸인 `animCurveUU` LUT(한 주기, 무한 반복 cycle)로 만들어 Maya 2023 의 네이티브 sin 노드
   부재를 피한다(A00170 Remap Value 아이디어 응용). 다시 Build 하면 새 드라이버가 생기고 이전 연결은
   끊긴다(이전 드라이버는 수동 삭제 또는 undo).
@@ -93,7 +97,8 @@ value(t) = amplitude * sin( 2π * (t - i*offset) / period )
 3. **Output** 선택 — **Curve**(키 굽기) 또는 **Node**(드라이버 노드망 실시간).
 4. **Axis** 로 축 선택(rotateX/Y/Z · translateX/Y/Z).
 5. **Start / End** (Curve 전용) 로 키를 만들 구간 지정(Get Current / Get Sel Range 지원).
-6. **Period / Amplitude / Offset** 입력(모두 소수 허용). **Speed** 는 Node 전용(windSpeed 초기값).
+6. **Period / Amplitude / Offset** 입력(모두 소수 허용). **Speed**·**Node Offset** 은 Node 전용
+   (windSpeed 초기값 / 드라이버별 타이밍 스태거 = 루트마다 다른 타이밍).
 7. (Curve) **Clear existing keys in range**(기본 on) — 재적용 시 구간의 해당 축 키를 먼저 지운다.
 8. **Apply Wind Keys**(Curve) / **Build Wind Node**(Node) — 전체가 한 번의 undo 로 묶인다.
 9. (Node) 드라이버의 **windSpeed** 를 값으로 바꾸거나 키로 애니메이션하면 재생 속도가 **자동 반영**된다.

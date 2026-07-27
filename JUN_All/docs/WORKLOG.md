@@ -17,6 +17,18 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-07-27 (오늘)
 
+> [!summary] `A00390_WindTool` **Node 드라이버별 전체 타이밍 offset(windPhaseOffset)** (v01.07→01.08)
+- **요청**: Node 모드에서 노드 한 개당 그 본들이 싸인의 어느 타이밍 값을 갖는지(전체 offset) 조절하는
+  어트리뷰트. Bone Root 모드에서 루트들이 지금은 다 같은 타이밍인데 서로 다르게 하고 싶음.
+- **반영**: 드라이버에 **`windPhaseOffset`**(전체 위상 타이밍 offset) 어트리뷰트 추가. 노드망이
+  `base = windPhaseTime − windPhaseOffset` 를 그룹 공용으로 두고 각 조인트가 `base − i×windOffset`
+  사용 → 그 드라이버 전체 타이밍을 시프트. 드라이버마다 다른 값 = 서로 다른 타이밍.
+- **UI `Node Offset`**(Node 전용): 드라이버 순번 k 마다 `windPhaseOffset = k×값` 초기화 → **Root 모드
+  루트별 자동 다른 타이밍**(0 이면 동일=기존). 이후 각 드라이버 windPhaseOffset 직접 조절 가능.
+  (구분: `windOffset`=체인 내 본별 지연, `windPhaseOffset`=드라이버 전체 타이밍.)
+- **검증**: mayapy — windPhaseOffset=3 이면 피크 t=3→t=6, Root node_offset=3 이면 rootA/B/C 가 0/3/6 →
+  피크 t=3/6/9(서로 다른 타이밍), node_offset=0 동일(무회귀), Node/Curve 회귀 통과. **마야 실기 확인됨(사용자).**
+
 > [!summary] `A00390_WindTool` **Curve / Node 출력 + Node 재생속도(windSpeed) 제어** (v01.02→01.07)
 - **Curve / Node 출력 선택**(v01.03): Curve=조인트에 키 굽기(기존). Node=`windPeriod/Amplitude/Offset/
   windSpeed` 어트리뷰트를 가진 **null(로케이터) 드라이버 + 노드망**으로 파형을 **실시간** 재현. 어트리뷰트

@@ -25,6 +25,15 @@ start/end** (their true sine value) so the curve stays bounded to the range. UI 
 `Keep zero-crossing keys` (default OFF) restores the all-quarter behavior. `_key_times_values` returns a
 sorted `{time:value}` dict so a boundary landing on a grid extremum isn't duplicated.
 
+**v01.08 — per-driver global timing offset `windPhaseOffset`.** New driver attr (`DRIVER_PHASE_OFFSET`)
+shifts the WHOLE driver's phase: `_wire_group` now computes a shared `base = windPhaseTime -
+windPhaseOffset` (plusMinusAverage `<drv>_phaseBase`) and every joint uses `base - i*windOffset`. Different
+values per driver ⇒ different sway timing — the point is Bone Root mode where each root had identical
+timing. UI **Node Offset** field (node-only) → `apply_wind(node_offset=...)` → `_apply_nodes` sets driver k's
+`windPhaseOffset = k*node_offset` (auto-stagger roots; 0 = all same = old behavior; user can then edit each
+driver's windPhaseOffset). mayapy-verified: windPhaseOffset=3 shifts peak t=3→t=6; root A/B/C get 0/3/6 →
+peaks t=3/6/9 (distinct). Note: `windOffset`=per-joint step within a chain vs `windPhaseOffset`=whole-driver.
+
 **v01.07 — windSpeed is fully auto & correct via an integrating EXPRESSION.** v01.06's live
 `time*windSpeed` mult reversed again when windSpeed was KEYED (animated 0.25→0.05) — same phase-reversal
 (speed must be the time-integral, not a product). Fix: `windPhaseTime` is now driven by a MEL

@@ -157,6 +157,19 @@ class MainWindow(QWidget):
         self.lbl_speed = QLabel("Speed (Node)")
         form.addRow(self.lbl_speed, self.sb_speed)
 
+        # Node Offset: 드라이버(노드)마다 순번 k*값 만큼 전체 타이밍(windPhaseOffset)을 밀어,
+        # Bone Root 모드에서 루트들이 서로 다른 타이밍으로 찰랑이게 한다.
+        self.sb_node_offset = QDoubleSpinBox()
+        self.sb_node_offset.setDecimals(3)
+        self.sb_node_offset.setRange(-100000.0, 100000.0)
+        self.sb_node_offset.setValue(0.0)
+        self.sb_node_offset.setToolTip(
+            "Node output only: per-DRIVER timing offset (frames). Driver k gets\n"
+            "windPhaseOffset = k * this, so in Bone Root mode each root sways at a\n"
+            "different timing. Edit windPhaseOffset on a driver to retime it later.")
+        self.lbl_node_offset = QLabel("Node Offset (Node)")
+        form.addRow(self.lbl_node_offset, self.sb_node_offset)
+
         root.addLayout(form)
 
         # 옵션
@@ -203,6 +216,8 @@ class MainWindow(QWidget):
         self.chk_keep_zero.setEnabled(curve)
         self.sb_speed.setEnabled(not curve)
         self.lbl_speed.setEnabled(not curve)
+        self.sb_node_offset.setEnabled(not curve)
+        self.lbl_node_offset.setEnabled(not curve)
         self.btn_apply.setText("Apply Wind Keys" if curve else "Build Wind Node")
 
     # ==============================================================
@@ -237,13 +252,14 @@ class MainWindow(QWidget):
         mode = wind_mgr.MODE_ROOT if self.rb_root.isChecked() else wind_mgr.MODE_CHAIN
         output = wind_mgr.OUTPUT_NODE if node_mode else wind_mgr.OUTPUT_CURVE
         speed = self.sb_speed.value()
+        node_offset = self.sb_node_offset.value()
 
         try:
             with undo_chunk():
                 count, jc, msg = wind_mgr.apply_wind(
                     joints, attr, start, end, period, amp, offset,
                     clear_range=clear_range, skip_zero_crossings=skip_zero,
-                    mode=mode, output=output, speed=speed)
+                    mode=mode, output=output, speed=speed, node_offset=node_offset)
         except Exception as e:
             self.log("Apply failed: {0}".format(e), warn=True)
             return

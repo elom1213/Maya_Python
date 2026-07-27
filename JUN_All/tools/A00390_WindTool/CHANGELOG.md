@@ -1,5 +1,14 @@
 # Changelog — A00390_WindTool
 
+## v01.08 (2026-07-27)
+- **[Add] Node 드라이버마다 전체 위상 offset `windPhaseOffset` 어트리뷰트** — 노드(드라이버) 하나의
+  **전체 타이밍**(그 드라이버가 구동하는 본들이 싸인의 어느 지점 값을 갖는지)을 미는 어트리뷰트.
+  `base = windPhaseTime − windPhaseOffset` 로 그룹의 모든 조인트에 공용 적용된다. 드라이버마다 다른
+  값을 주면 서로 다른 타이밍으로 찰랑인다(특히 **Bone Root** 모드에서 루트별로 다르게).
+- **[Add] `Node Offset` 입력**(Node 전용) — 드라이버 순번 k 마다 `windPhaseOffset = k*값` 으로 초기화해,
+  Root 모드에서 루트들이 **자동으로 서로 다른 타이밍**이 되게 한다(0 이면 기존처럼 동일). 이후 각
+  드라이버의 windPhaseOffset 을 직접 조절해 개별 리타임 가능.
+
 ## v01.07 (2026-07-27)
 - **[Fix] windSpeed 를 '키로 애니메이션'해도 버튼 없이 자동 반영 + 위상 역행 제거** — v01.06 의
   `time*windSpeed` 라이브 연결은 windSpeed 를 키로 애니(예: 0.25→0.05)하면 다시 위상이 역행해
