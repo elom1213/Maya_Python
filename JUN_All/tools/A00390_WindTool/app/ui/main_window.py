@@ -110,6 +110,14 @@ class MainWindow(QWidget):
             "On: remove the axis' keys inside Start~End before writing (clean re-apply).")
         root.addWidget(self.chk_clear)
 
+        self.chk_keep_zero = QCheckBox("Keep zero-crossing keys")
+        self.chk_keep_zero.setChecked(False)
+        self.chk_keep_zero.setToolTip(
+            "Off (default): drop the interior 0-value keys (peaks only) so the\n"
+            "spline curve stays smooth; only Start/End keep anchor keys.\n"
+            "On: also key every zero crossing (0, +A, 0, -A ...).")
+        root.addWidget(self.chk_keep_zero)
+
         # Apply
         self.btn_apply = QPushButton("Apply Wind Keys")
         self.btn_apply.setMinimumHeight(38)
@@ -147,12 +155,13 @@ class MainWindow(QWidget):
         amp = self.sb_amp.value()
         offset = self.sb_offset.value()
         clear_range = self.chk_clear.isChecked()
+        skip_zero = not self.chk_keep_zero.isChecked()
 
         try:
             with undo_chunk():
                 count, jc, msg = wind_mgr.apply_wind(
                     joints, attr, start, end, period, amp, offset,
-                    clear_range=clear_range)
+                    clear_range=clear_range, skip_zero_crossings=skip_zero)
         except Exception as e:
             self.log("Apply failed: {0}".format(e), warn=True)
             return

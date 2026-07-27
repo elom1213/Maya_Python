@@ -14,9 +14,16 @@ Keys a listed bone chain with a sine periodic curve to fake **wind sway**. v01.0
 **Wave:** per joint `i` (list order), `value(t) = amplitude * sin(2π(t - i*offset)/period)`.
 Keys land **every quarter period** (grid `quarter = period/4`) → values `0, +A, 0, -A, …` via
 `_SIN_QUARTER=(0,1,0,-1)` indexed by `n % 4` (Python modulo handles negative grid so the wave is
-continuous even when the range starts before phase 0). **spline tangents** give the sine-like shape
-(flat at peaks, steep at zero-crossings). Fractional `quarter` → **fractional-frame keys** (period 10
-→ 2.5 max / 7.5 min). Per-joint `offset` is a **float** (unlike A00110 Stagger's integer).
+continuous even when the range starts before phase 0). **spline tangents** give the sine-like shape.
+Fractional `quarter` → **fractional-frame keys** (period 10 → 2.5 max / 7.5 min). Per-joint `offset`
+is a **float** (unlike A00110 Stagger's integer).
+
+**v01.01 — drop interior zero-crossing keys (smoother curve):** the 0-value keys between extrema (every
+half period, e.g. 6·12·18…f for period 12) made the spline flatten/kink at the crossings. Now
+`skip_zero_crossings=True` (default) keeps only the extrema (±A) and adds **anchor keys at exactly
+start/end** (their true sine value) so the curve stays bounded to the range. UI checkbox
+`Keep zero-crossing keys` (default OFF) restores the all-quarter behavior. `_key_times_values` returns a
+sorted `{time:value}` dict so a boundary landing on a grid extremum isn't duplicated.
 
 Core `app/core/wind_manager.py`: `apply_wind(joints, attr, start, end, period, amplitude, offset,
 clear_range=True, tangent="spline")`; `AXES = rotate/translate X/Y/Z`; key times `round(shift+n*quarter,5)`;
