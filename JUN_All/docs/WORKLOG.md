@@ -17,6 +17,18 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-07-27 (오늘)
 
+> [!summary] `A00110_animTool` **`Get Sel Range` 버튼 — 선택한 키프레임 구간으로 Start/End 한 번에 채우기** (v01.34→01.35)
+- **요청**: Get Current(현재 프레임 1칸) 외에, **지금 선택한 키프레임들 중 제일 앞/뒤 프레임**을 찾아
+  Start·End **두 칸을 함께** 채우는 버튼이 필요. 예: 어떤 컨트롤러의 6~15f 키를 선택 후 누르면
+  Start=6, End=15.
+- **반영**: Start/End 가 있는 **모든 탭**(Move Keys · Stagger · Copy · Mirror · Bake · Follow)에
+  `Get Sel Range` 버튼 추가. `_selected_key_range()`(`cmds.keyframe(q=True, sl=True)` 의 min/max, 여러
+  커브 걸쳐 선택해도 전체 앞/뒤) → `_set_selected_key_range()` 가 두 칸을 채움(선택 키 없으면 경고).
+  팩토리 `_make_get_selected_range_btn()` 은 Get Current 과 같은 `lambda *_a` 로 checked 인자 흡수.
+  Bake 탭은 `btn_bake_get_range` 로 보관해 **Custom range 모드에서만 활성**.
+- **검증**: mayapy — `selectKey(time=(6,15))` → (6,15), 선택 없음 → None. Qt UI 는 헤들리스 크래시라
+  로직만 확인. **마야 실기 동작 확인됨(사용자)**.
+
 > [!summary] `Framework/qt/MOD_tsl_qt_v01` **다중 레퍼런스(중복 UUID) 씬에서 리스트→씬 선택이 항상 같은 오브젝트로 잡히던 버그 수정** (공용 TSL, A00110 등 ~18툴 공유)
 - **증상**: A00110_animTool Follow 탭 TSL 에 여러 오브젝트를 리스트업하고 하나씩 클릭해도 씬에서는
   **계속 같은 오브젝트**가 선택됨. **단순 씬은 정상**, 같은 마야파일을 **네임스페이스만 달리해 여러 번

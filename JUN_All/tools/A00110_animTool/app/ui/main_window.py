@@ -262,6 +262,7 @@ class MainWindow(QWidget):
         self.le_end.setPlaceholderText("10")
         row.addWidget(self.le_end)
         row.addWidget(self._make_get_current_btn(self.le_end))
+        row.addWidget(self._make_get_selected_range_btn(self.le_start, self.le_end))
 
         row.addWidget(QLabel("Offset"))
         self.le_offset = QLineEdit()
@@ -372,6 +373,7 @@ class MainWindow(QWidget):
         self.le_st_end.setPlaceholderText("5")
         st_row.addWidget(self.le_st_end)
         st_row.addWidget(self._make_get_current_btn(self.le_st_end))
+        st_row.addWidget(self._make_get_selected_range_btn(self.le_st_start, self.le_st_end))
         sec_stagger.add_layout(st_row)
 
         # 슬라이더 + 스핀박스 = 같은 값을 가리키는 두 얼굴(A00290_BSTool Shape Editor 패턴).
@@ -559,6 +561,7 @@ class MainWindow(QWidget):
         self.le_copy_end.setValidator(validator)
         range_row.addWidget(self.le_copy_end)
         range_row.addWidget(self._make_get_current_btn(self.le_copy_end))
+        range_row.addWidget(self._make_get_selected_range_btn(self.le_copy_start, self.le_copy_end))
         tab_layout.addLayout(range_row)
 
         # -------------------------
@@ -716,6 +719,7 @@ class MainWindow(QWidget):
         self.le_mir_end.setValidator(validator)
         range_row.addWidget(self.le_mir_end)
         range_row.addWidget(self._make_get_current_btn(self.le_mir_end))
+        range_row.addWidget(self._make_get_selected_range_btn(self.le_mir_start, self.le_mir_end))
 
         range_row.addSpacing(12)
         range_row.addWidget(QLabel("Time"))
@@ -866,6 +870,9 @@ class MainWindow(QWidget):
         range_row.addWidget(self.le_bake_end)
         self.btn_bake_get_end = self._make_get_current_btn(self.le_bake_end)
         range_row.addWidget(self.btn_bake_get_end)
+        self.btn_bake_get_range = self._make_get_selected_range_btn(
+            self.le_bake_start, self.le_bake_end)
+        range_row.addWidget(self.btn_bake_get_range)
         tab_layout.addLayout(range_row)
 
         # -------------------------
@@ -976,6 +983,9 @@ class MainWindow(QWidget):
         range_row.addWidget(self.le_follow_end)
         self.btn_follow_get_end = QPushButton("Get Current")
         range_row.addWidget(self.btn_follow_get_end)
+        self.btn_follow_get_range = self._make_get_selected_range_btn(
+            self.le_follow_start, self.le_follow_end)
+        range_row.addWidget(self.btn_follow_get_range)
         tab_layout.addLayout(range_row)
 
         # -------------------------
@@ -1490,6 +1500,7 @@ class MainWindow(QWidget):
         self.le_bake_end.setEnabled(custom)
         self.btn_bake_get_start.setEnabled(custom)
         self.btn_bake_get_end.setEnabled(custom)
+        self.btn_bake_get_range.setEnabled(custom)
 
     def _bake_update_smart_mode(self, *args):
         """Smart bake 체크 상태에 따라 Tolerance 입력 활성/비활성 토글."""
@@ -1590,6 +1601,41 @@ class MainWindow(QWidget):
         # 인자 1개를 받으면(예: lambda le=line_edit:) checked 값이 le 를 덮어써
         # _set_current_frame(False) 로 호출돼 동작하지 않는다. *_ 로 흡수한다.
         btn.clicked.connect(lambda *_a, le=line_edit: self._set_current_frame(le))
+        return btn
+
+    def _selected_key_range(self):
+        """현재 선택된 키프레임들의 (최소, 최대) 프레임. 선택된 키가 없으면 None.
+
+        cmds.keyframe(q=True, sl=True) 은 그래프 에디터/타임슬라이더에서 선택된 모든 키의
+        시간을 오브젝트·어트리뷰트에 무관하게 전역으로 돌려준다. 여러 커브에 걸쳐 선택해도
+        전체의 앞/뒤 프레임을 잡는다.
+        """
+        times = cmds.keyframe(query=True, selected=True) or []
+        if not times:
+            return None
+        return int(round(min(times))), int(round(max(times)))
+
+    def _set_selected_key_range(self, le_start, le_end):
+        """선택 키의 제일 앞/뒤 프레임으로 Start·End 두 칸을 함께 채운다."""
+        rng = self._selected_key_range()
+        if rng is None:
+            self.log("[Warning] No keyframes selected. "
+                     "Select keys in the Graph Editor / Time Slider first.")
+            return
+        start, end = rng
+        le_start.setText(str(start))
+        le_end.setText(str(end))
+
+    def _make_get_selected_range_btn(self, le_start, le_end):
+        """선택된 키프레임의 첫/마지막 프레임으로 Start·End 를 한 번에 채우는 버튼.
+
+        Get Current(현재 프레임 1칸)와 달리, 지금 선택한 키들의 범위를 두 칸에 채운다.
+        """
+        btn = QPushButton("Get Sel Range")
+        btn.setToolTip("Fill Start/End from the first and last selected keyframe")
+        # Get Current 과 같은 이유로 checked(bool) 인자를 *_a 로 흡수한다.
+        btn.clicked.connect(
+            lambda *_a, s=le_start, e=le_end: self._set_selected_key_range(s, e))
         return btn
 
     def on_follow_bake(self):

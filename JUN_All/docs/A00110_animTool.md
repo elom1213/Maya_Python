@@ -34,6 +34,13 @@
    (예: 현재 500f, margin 80 → `420f~580f`). **Auto-Focus 토글**을 켜면 **컨트롤러(오브젝트)를
    새로 선택할 때만** 자동으로 프레이밍하고(v01.30~), margin 값은 **스핀박스로 사용자가 지정**한다.
 
+> **v01.35 — `Get Sel Range` 버튼(선택 키 구간으로 Start/End 한 번에 채우기)**: Start/End 가 있는 모든
+> 탭(Move Keys · Stagger · Copy · Mirror · Bake · Follow)에 `Get Sel Range` 버튼을 추가했다. `Get Current`
+> (현재 프레임 1칸)와 달리, **지금 선택한 키프레임들 중 제일 앞/뒤 프레임**을 찾아 **Start·End 두 칸을
+> 함께** 채운다(예: 어떤 커브의 6~15f 키를 선택하고 누르면 Start=6, End=15). 여러 커브에 걸쳐 선택해도
+> 전체의 앞/뒤를 잡는다(`cmds.keyframe(q=True, sl=True)` 의 min/max). 선택된 키가 없으면 경고 로그.
+> Bake 탭에서는 Custom range 모드에서만 활성.
+
 > **v01.34 — Stagger Offset: 슬라이더 홈(groove) 스타일**: 슬라이더의 가로 구간(홈)이 어두운 배경에
 > 묻혀 범위가 안 보이던 문제를 고쳤다(테마 qss 가 QSlider 를 스타일링하지 않음). A00290_BSTool Shape
 > Editor 슬라이더처럼 홈을 직접 그린다 — 중앙 0 양방향이라 sub/add-page 를 같은 색으로 덮어 좌우 균일한
