@@ -1,3 +1,3 @@
 # Wind Tool
-VERSION = "01.01"
+VERSION = "01.02"
 LAST_UPDATE = "2026-07-27"

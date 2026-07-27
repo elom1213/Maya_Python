@@ -8,6 +8,11 @@
 #     value(t) = amplitude * sin( 2*pi * (t - shift) / period )
 # 모양의 커브가 생기도록 키를 찍는다. shift 는 조인트 순번 * offset (계단식 위상 지연).
 #
+# 대상 해석 모드(mode):
+#   chain : 리스트업한 조인트들이 '하나의 체인' — 리스트 순서가 순번(index).
+#   root  : 리스트업한 각 조인트를 '체인의 루트' 로 보고, 그 조인트 + 모든 자손 조인트에
+#           root 로부터의 깊이(depth)를 순번으로 삼아 같은 파형을 반복 적용.
+#
 # 키는 **주기의 1/4 지점마다**(0, +A, 0, -A, 0 ...) 계산하되, 기본적으로 **구간 내부의
 # 0 교차 키는 빼고 극값(±A)만** 남긴다. spline 탄젠트는 극값만 있을 때 깔끔한 싸인으로
 # 보간되지만, 극값 사이 0 교차마다 키가 있으면 그 지점이 평평/각지게 되어 커브가 부드럽지
@@ -31,6 +36,13 @@ _SIN_QUARTER = (0.0, 1.0, 0.0, -1.0)
 
 # 지원 축(어트리뷰트). UI 콤보와 공유.
 AXES = ["rotateX", "rotateY", "rotateZ", "translateX", "translateY", "translateZ"]
+
+# 대상 해석 모드.
+#   chain : 리스트업한 조인트들이 '하나의 체인' — 리스트 순서가 offset 순번.
+#   root  : 리스트업한 각 조인트를 '체인의 루트' 로 보고, 그 조인트 + 모든 자손 조인트에
+#           대해 root 로부터의 깊이(depth)를 offset 순번으로 파형을 반복 적용.
+MODE_CHAIN = "chain"
+MODE_ROOT = "root"
 
 # 키 시간의 부동소수 잡음을 없애기 위한 반올림 자리.
 _TIME_ROUND = 5
@@ -69,25 +81,80 @@ def _key_times_values(index, start, end, period, amplitude, offset,
     return sorted(keys.items())
 
 
+def _chain_from_root(root):
+    """root 조인트와 그 아래 모든 조인트를 (joint_fullpath, depth) 로 반환(BFS).
+
+    depth 는 root 로부터의 거리(root=0, 자식=1, ...). 이 depth 를 offset 순번으로 써서,
+    바람이 체인을 따라 내려가며 아래 조인트일수록 위상이 더 밀린 것처럼 보이게 한다.
+    분기(자식이 여럿)면 같은 깊이의 형제는 같은 depth(같은 offset)를 갖는다.
+    """
+    out = [(root, 0)]
+    frontier = [(root, 0)]
+    while frontier:
+        node, d = frontier.pop(0)
+        children = cmds.listRelatives(
+            node, children=True, type="joint", fullPath=True) or []
+        for c in children:
+            out.append((c, d + 1))
+            frontier.append((c, d + 1))
+    return out
+
+
+def _resolve_targets(joints, mode):
+    """(joint, offset_index) 쌍 목록과 missing(없는 노드) 목록을 만든다.
+
+    chain: 리스트 순서가 offset 순번(index = 리스트 위치).
+    root : 각 리스트 항목을 체인 루트로 보고 그 아래 모든 조인트를 depth 를 index 로.
+           같은 조인트가 여러 루트에서 겹쳐 잡히면 처음 것만 쓴다(중복 키 방지).
+    """
+    missing = []
+
+    if mode == MODE_ROOT:
+        pairs = []
+        seen = set()
+        for root in joints:
+            if not cmds.objExists(root):
+                missing.append(root)
+                continue
+            for jnt, depth in _chain_from_root(root):
+                if jnt in seen:
+                    continue
+                seen.add(jnt)
+                pairs.append((jnt, depth))
+        return pairs, missing
+
+    # chain
+    pairs = []
+    for i, jnt in enumerate(joints):
+        if not cmds.objExists(jnt):
+            missing.append(jnt)
+            continue
+        pairs.append((jnt, i))
+    return pairs, missing
+
+
 def apply_wind(joints, attr, start, end, period, amplitude, offset,
-               clear_range=True, tangent="spline", skip_zero_crossings=True):
+               clear_range=True, tangent="spline", skip_zero_crossings=True,
+               mode=MODE_CHAIN):
     """본 체인에 싸인 파형 키를 찍는다.
 
-    joints     : 조인트 이름 목록(순서가 offset 의 순번을 정한다).
+    joints     : 조인트 이름 목록.
     attr       : 키를 찍을 어트리뷰트('rotateX' 등, AXES 참고).
     start, end : 키를 만들 프레임 구간(실수 허용).
     period     : 한 주기의 프레임 수(실수 허용, > 0).
     amplitude  : 진폭(피크 값).
-    offset     : 조인트마다 더해지는 위상 지연(프레임, 실수 허용). 순번 i -> i*offset.
+    offset     : 순번마다 더해지는 위상 지연(프레임, 실수 허용). 순번 i -> i*offset.
     clear_range: True 면 각 조인트의 attr 키를 [start, end] 에서 먼저 지운다(재적용 깔끔).
     tangent    : 키 탄젠트 타입(기본 'spline' -> 싸인 유사 보간).
     skip_zero_crossings: True(기본)면 구간 내부의 0 교차 키를 빼고 극값(±진폭)만 남긴다
                  (양끝은 앵커로 유지) -> 커브가 더 부드럽다.
+    mode       : MODE_CHAIN(리스트 = 한 체인, 순번=리스트 순서) 또는
+                 MODE_ROOT(리스트 각 항목 = 체인 루트, 순번=root 로부터의 depth).
 
     반환: (key_count, joint_count, message)
     """
     if not joints:
-        return 0, 0, "[Warning] Joint list is empty. Add a bone chain first."
+        return 0, 0, "[Warning] Joint list is empty. Add joints first."
     if attr not in AXES:
         return 0, 0, "[Warning] Unsupported axis: {0}".format(attr)
     if period <= 0:
@@ -95,14 +162,12 @@ def apply_wind(joints, attr, start, end, period, amplitude, offset,
     if start > end:
         start, end = end, start
 
-    total_keys = 0
-    done_joints = 0
-    missing = []
+    pairs, missing = _resolve_targets(joints, mode)
 
-    for index, jnt in enumerate(joints):
-        if not cmds.objExists(jnt):
-            missing.append(jnt)
-            continue
+    total_keys = 0
+    keyed = set()
+
+    for jnt, index in pairs:
         # 어트리뷰트가 존재하고 세팅 가능한지 확인.
         if not cmds.attributeQuery(attr, node=jnt, exists=True):
             missing.append("{0}.{1}".format(jnt, attr))
@@ -121,12 +186,16 @@ def apply_wind(joints, attr, start, end, period, amplitude, offset,
                              inTangentType=tangent, outTangentType=tangent)
             total_keys += 1
 
-        done_joints += 1
+        keyed.add(jnt)
 
-    msg = "Wind keys: {0} key(s) on {1} joint(s) [{2}] {3}~{4} " \
-          "period={5} amp={6} offset={7}.".format(
-              total_keys, done_joints, attr, start, end,
-              period, amplitude, offset)
+    if mode == MODE_ROOT:
+        head = "Wind keys (root mode): {0} key(s) on {1} joint(s) from {2} root(s)".format(
+            total_keys, len(keyed), len(joints))
+    else:
+        head = "Wind keys (chain mode): {0} key(s) on {1} joint(s)".format(
+            total_keys, len(keyed))
+    msg = "{0} [{1}] {2}~{3} period={4} amp={5} offset={6}.".format(
+        head, attr, start, end, period, amplitude, offset)
     if missing:
         msg += " Skipped: {0}".format(", ".join(missing))
-    return total_keys, done_joints, msg
+    return total_keys, len(keyed), msg

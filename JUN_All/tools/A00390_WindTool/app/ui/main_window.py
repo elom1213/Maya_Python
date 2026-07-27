@@ -53,12 +53,32 @@ class MainWindow(QWidget):
         help_menu.addAction("About").triggered.connect(self.show_about)
         root.setMenuBar(self.menu_bar)
 
-        # 본 체인 리스트(TSL). 순서가 offset 순번을 정하므로 Up/Down 으로 재정렬 가능.
+        # 조인트 리스트(TSL). Chain 모드에선 순서가 offset 순번을 정하므로 Up/Down 재정렬.
         self.tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Bone Chain (order = offset step)",
+            title="Joints",
             select_label="Select Joints",
             list_min_height=170, log_callback=self.log)
         root.addWidget(self.tsl, 1)
+
+        # 대상 해석 모드: Bone Chain / Bone Root
+        mode_box = QGroupBox("Mode")
+        mode_row = QHBoxLayout(mode_box)
+        self.mode_group = QButtonGroup(self)
+        self.rb_chain = QRadioButton("Bone Chain")
+        self.rb_chain.setChecked(True)
+        self.rb_chain.setToolTip(
+            "The listed joints are ONE chain; offset applies by list order\n"
+            "(reorder with Up/Down).")
+        self.rb_root = QRadioButton("Bone Root")
+        self.rb_root.setToolTip(
+            "Each listed joint is a chain ROOT: the wave runs down that joint\n"
+            "and all its descendant joints, offset by depth from the root.")
+        self.mode_group.addButton(self.rb_chain)
+        self.mode_group.addButton(self.rb_root)
+        mode_row.addWidget(self.rb_chain)
+        mode_row.addWidget(self.rb_root)
+        mode_row.addStretch(1)
+        root.addWidget(mode_box)
 
         # 축(어트리뷰트) 선택
         axis_row = QHBoxLayout()
@@ -156,12 +176,14 @@ class MainWindow(QWidget):
         offset = self.sb_offset.value()
         clear_range = self.chk_clear.isChecked()
         skip_zero = not self.chk_keep_zero.isChecked()
+        mode = wind_mgr.MODE_ROOT if self.rb_root.isChecked() else wind_mgr.MODE_CHAIN
 
         try:
             with undo_chunk():
                 count, jc, msg = wind_mgr.apply_wind(
                     joints, attr, start, end, period, amp, offset,
-                    clear_range=clear_range, skip_zero_crossings=skip_zero)
+                    clear_range=clear_range, skip_zero_crossings=skip_zero,
+                    mode=mode)
         except Exception as e:
             self.log("Apply failed: {0}".format(e), warn=True)
             return

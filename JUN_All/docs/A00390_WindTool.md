@@ -33,6 +33,18 @@ value(t) = amplitude * sin( 2π * (t - i*offset) / period )
 - 조인트 순번 `i` 는 위상을 `i*offset` 프레임만큼 미룬다 → 체인이 계단식으로 흔들린다.
   A00110 의 Stagger offset 과 달리 **offset 은 실수 프레임**을 쓸 수 있다.
 
+### 모드 (v01.02~)
+
+| 모드 | 순번(i)의 의미 | 대상 |
+|------|----------------|------|
+| **Bone Chain**(기본) | 리스트 순서 | 리스트업한 조인트들 **자체** (하나의 체인) |
+| **Bone Root** | root 로부터의 **깊이(depth)** | 리스트업한 각 조인트를 **루트로 보고 그 자손 조인트 전부** |
+
+- **Bone Root**: `jnt_01, jnt_02, jnt_03` 을 리스트업하면 각각을 체인 루트로 가정하고, 그 조인트 +
+  모든 자손 조인트에 Bone Chain 과 같은 파형을 반복 적용한다. offset 순번은 **루트마다 리셋**(root=0,
+  자식=1, …)되고, 분기 체인에서 **같은 깊이의 형제는 같은 offset** 을 갖는다. 같은 조인트가 여러
+  루트에서 겹쳐 잡히면 처음 것만 쓴다(중복 키 방지).
+
 ### 예시
 
 `rotateX`, Start=0, End=100, Period=12, Amplitude=40, Offset=10:
@@ -50,12 +62,13 @@ value(t) = amplitude * sin( 2π * (t - i*offset) / period )
 
 ## 사용법
 
-1. 씬에서 본 체인을 선택하고 **Select Joints** → TSL 에 리스트업(순서 = offset 순번, Up/Down 재정렬).
-2. **Axis** 로 축 선택(rotateX/Y/Z · translateX/Y/Z).
-3. **Start / End** 로 키를 만들 구간 지정(Get Current / Get Sel Range 지원).
-4. **Period / Amplitude / Offset** 입력(모두 소수 허용).
-5. **Clear existing keys in range**(기본 on) — 재적용 시 구간의 해당 축 키를 먼저 지운다.
-6. **Apply Wind Keys** — 전체가 한 번의 undo 로 묶인다.
+1. 씬에서 조인트를 선택하고 **Select Joints** → TSL 에 리스트업(Chain 모드는 순서 = offset 순번, Up/Down 재정렬).
+2. **Mode** 선택 — **Bone Chain**(리스트 = 한 체인) 또는 **Bone Root**(각 항목 = 체인 루트, 자손까지).
+3. **Axis** 로 축 선택(rotateX/Y/Z · translateX/Y/Z).
+4. **Start / End** 로 키를 만들 구간 지정(Get Current / Get Sel Range 지원).
+5. **Period / Amplitude / Offset** 입력(모두 소수 허용).
+6. **Clear existing keys in range**(기본 on) — 재적용 시 구간의 해당 축 키를 먼저 지운다.
+7. **Apply Wind Keys** — 전체가 한 번의 undo 로 묶인다.
 
 ---
 

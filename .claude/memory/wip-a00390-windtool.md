@@ -25,6 +25,15 @@ start/end** (their true sine value) so the curve stays bounded to the range. UI 
 `Keep zero-crossing keys` (default OFF) restores the all-quarter behavior. `_key_times_values` returns a
 sorted `{time:value}` dict so a boundary landing on a grid extremum isn't duplicated.
 
+**v01.02 — Bone Chain / Bone Root mode radio:** `apply_wind(..., mode=MODE_CHAIN|MODE_ROOT)`.
+**chain** (default, old behavior) = listed joints are ONE chain, offset index = list order.
+**root** = each listed joint is a chain ROOT; `_resolve_targets` expands it via `_chain_from_root` (BFS,
+`listRelatives type="joint" fullPath`) to (joint, depth) and keys every descendant with **offset index =
+depth from root** (offset resets per root; same-depth branch siblings share offset; joints seen under an
+earlier root are deduped). `_resolve_targets` returns (pairs, missing); apply loops pairs. Message reports
+"root mode: N key(s) on M joint(s) from R root(s)". mayapy-verified: rootA chain depths 0/1/2 → offset
+0/10/20, rootB resets, branch leaves same depth = same phase, chain mode still ignores descendants.
+
 Core `app/core/wind_manager.py`: `apply_wind(joints, attr, start, end, period, amplitude, offset,
 clear_range=True, tangent="spline")`; `AXES = rotate/translate X/Y/Z`; key times `round(shift+n*quarter,5)`;
 `cutKey` clears the range first when clear_range. UI `app/ui/main_window.py`: TSL(`JUN_mod_tsl_qt`,

@@ -17,6 +17,18 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-07-27 (오늘)
 
+> [!summary] `A00390_WindTool` **Bone Chain / Bone Root 모드 추가** (v01.01→01.02)
+- **요청**: 지금은 리스트업한 조인트들에만 적용된다. **Bone Root** 모드를 추가해, 리스트업한 각 조인트를
+  체인 루트로 보고 그 조인트의 **자손들마다** Bone Chain 기능을 반복 수행하게.
+- **반영**: `Mode` 라디오(Bone Chain 기본 / Bone Root).
+  - **Bone Chain**: 리스트 = 한 체인, 리스트 순서 = offset 순번(기존 동작).
+  - **Bone Root**: 리스트 각 항목 = 체인 루트 → 그 조인트 + **모든 자손 조인트**(BFS)에 **root 로부터의
+    깊이(depth)를 offset 순번**으로 파형 반복. offset 은 루트마다 리셋, 분기 형제(같은 depth)는 같은
+    offset, 겹치는 조인트는 처음 것만(중복 방지). 코어 `_chain_from_root`/`_resolve_targets` +
+    `apply_wind(mode=...)`.
+- **검증**: mayapy — rootA depth0/1/2 → offset 0/10/20, rootB offset 리셋, 분기 형제 동일 위상,
+  chain 모드는 자손 무시(무회귀), 내부 0 제거·양끝 앵커 root 모드에도 적용. **마야 실기 확인됨(사용자)**.
+
 > [!summary] `A00390_WindTool` **구간 내부 0 교차 키 제거로 커브 부드럽게** (v01.00→01.01)
 - **문제**: 극값 사이 0값 키(주기 절반마다, 예: period 12 → 6·12·18…f)가 있으면 spline 커브가 그
   지점에서 평평/각지게 되어 부드럽지 않다.
