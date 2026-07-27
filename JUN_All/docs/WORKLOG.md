@@ -17,6 +17,22 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-07-27 (오늘)
 
+> [!summary] `Framework/qt/MOD_timeRange_qt_v01` **Start/End 구간 입력 UI 를 공용 위젯으로 승격(모듈화)** + `A00110_animTool` 이 소비 (v01.35→01.36)
+- **요청**: A00110 의 `Start [값][Get Current]  End [값][Get Current]  [Get Sel Range]` UI 를
+  `Framework/qt` 로 승격해 MOD_tsl_qt 처럼 다른 툴에서도 편하게 쓰도록 모듈화.
+- **반영**: 새 위젯 `JUN_mod_timeRange_qt_v01`(별칭 `JUN_mod_timeRange_qt`, `Framework/qt/__init__.py`
+  등록). Get Current(현재 프레임 1칸) + Get Sel Range(선택 키 앞/뒤로 두 칸) 내장. maya.cmds 는 lazy
+  라 Maya 밖에서도 생성/단위테스트 가능(가짜 `_cmds` 주입). API: `start()/end()/values()`,
+  `set_range()`, `set_inputs_enabled()`, `changed` 시그널. 내부 `start_edit`/`end_edit` 를 노출해
+  마이그레이션 시 기존 `.text()/.setText()` 참조가 그대로 동작.
+- **A00110 리팩터링**: 6개 탭(Move Keys · Stagger · Copy · Mirror · Bake · Follow)이 이 위젯을 쓰도록
+  교체. `self.le_*_start = widget.start_edit` 별칭으로 하위 코드 무변경. 툴 내 중복 헬퍼 5개
+  (`_make_get_current_btn`/`_selected_key_range`/…) 제거. Bake Custom 모드 토글은
+  `bake_range.set_inputs_enabled(custom)` 로 단순화.
+- **검증**: 위젯 격리 테스트 21개 통과(Qt 를 mayapy 에서 maya.standalone 없이 offscreen 으로 — 이 조합은
+  크래시 없음; maya 경로는 가짜 `_cmds` 로). A00110 모듈 import + 별칭 경유 위젯 생성 OK, 잔여 참조 0.
+  MainWindow 전체는 Qt+cmds 동시 필요라 헤들리스 불가 → **A00110 실기 UI 확인 대기**.
+
 > [!summary] `A00110_animTool` **`Get Sel Range` 버튼 — 선택한 키프레임 구간으로 Start/End 한 번에 채우기** (v01.34→01.35)
 - **요청**: Get Current(현재 프레임 1칸) 외에, **지금 선택한 키프레임들 중 제일 앞/뒤 프레임**을 찾아
   Start·End **두 칸을 함께** 채우는 버튼이 필요. 예: 어떤 컨트롤러의 6~15f 키를 선택 후 누르면

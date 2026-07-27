@@ -34,6 +34,13 @@
    (예: 현재 500f, margin 80 → `420f~580f`). **Auto-Focus 토글**을 켜면 **컨트롤러(오브젝트)를
    새로 선택할 때만** 자동으로 프레이밍하고(v01.30~), margin 값은 **스핀박스로 사용자가 지정**한다.
 
+> **v01.36 — Start/End 구간 입력 UI 를 공용 위젯으로 승격(모듈화)**: `Start [값][Get Current]  End
+> [값][Get Current]  [Get Sel Range]` 묶음을 `Framework/qt/MOD_timeRange_qt_v01.py`
+> (`JUN_mod_timeRange_qt`)로 승격했다 — MOD_tsl_qt 처럼 여러 툴이 공용으로 쓴다. A00110 의 6개 탭
+> (Move Keys · Stagger · Copy · Mirror · Bake · Follow)이 이제 이 위젯을 쓴다. 내부 `start_edit` /
+> `end_edit` 를 노출하므로 기존 `le_*_start/end` 참조(.text() 등)는 그대로 동작한다. 값은 `start()` /
+> `end()` / `values()`, 설정은 `set_range()`. 툴 안의 중복 헬퍼(`_make_get_current_btn` 등 5개)는 제거.
+
 > **v01.35 — `Get Sel Range` 버튼(선택 키 구간으로 Start/End 한 번에 채우기)**: Start/End 가 있는 모든
 > 탭(Move Keys · Stagger · Copy · Mirror · Bake · Follow)에 `Get Sel Range` 버튼을 추가했다. `Get Current`
 > (현재 프레임 1칸)와 달리, **지금 선택한 키프레임들 중 제일 앞/뒤 프레임**을 찾아 **Start·End 두 칸을

@@ -6,6 +6,7 @@
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_collapsible_qt
+from Framework.qt import JUN_mod_timeRange_qt
 from Framework.qt.maya_window import maya_main_window
 from Framework.core.maya_refresh import force_refresh
 
@@ -249,20 +250,13 @@ class MainWindow(QWidget):
         sec_move = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01("Move Keys", expanded=True)
 
         row = QHBoxLayout()
-        row.addWidget(QLabel("Start"))
-        self.le_start = QLineEdit()
-        self.le_start.setValidator(validator)
-        self.le_start.setPlaceholderText("4")
-        row.addWidget(self.le_start)
-        row.addWidget(self._make_get_current_btn(self.le_start))
-
-        row.addWidget(QLabel("End"))
-        self.le_end = QLineEdit()
-        self.le_end.setValidator(validator)
-        self.le_end.setPlaceholderText("10")
-        row.addWidget(self.le_end)
-        row.addWidget(self._make_get_current_btn(self.le_end))
-        row.addWidget(self._make_get_selected_range_btn(self.le_start, self.le_end))
+        # Start/End 구간 입력 = 공용 위젯(JUN_mod_timeRange_qt). le_start/le_end 는
+        # 하위 코드가 그대로 .text() 를 읽도록 위젯의 내부 QLineEdit 을 가리키게 둔다.
+        self.move_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_placeholder="4", end_placeholder="10", log_callback=self.log)
+        self.le_start = self.move_range.start_edit
+        self.le_end = self.move_range.end_edit
+        row.addWidget(self.move_range)
 
         row.addWidget(QLabel("Offset"))
         self.le_offset = QLineEdit()
@@ -360,20 +354,11 @@ class MainWindow(QWidget):
         sec_stagger.add_widget(self.st_tsl)
 
         st_row = QHBoxLayout()
-        st_row.addWidget(QLabel("Start"))
-        self.le_st_start = QLineEdit()
-        self.le_st_start.setValidator(validator)
-        self.le_st_start.setPlaceholderText("0")
-        st_row.addWidget(self.le_st_start)
-        st_row.addWidget(self._make_get_current_btn(self.le_st_start))
-
-        st_row.addWidget(QLabel("End"))
-        self.le_st_end = QLineEdit()
-        self.le_st_end.setValidator(validator)
-        self.le_st_end.setPlaceholderText("5")
-        st_row.addWidget(self.le_st_end)
-        st_row.addWidget(self._make_get_current_btn(self.le_st_end))
-        st_row.addWidget(self._make_get_selected_range_btn(self.le_st_start, self.le_st_end))
+        self.st_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_placeholder="0", end_placeholder="5", log_callback=self.log)
+        self.le_st_start = self.st_range.start_edit
+        self.le_st_end = self.st_range.end_edit
+        st_row.addWidget(self.st_range)
         sec_stagger.add_layout(st_row)
 
         # 슬라이더 + 스핀박스 = 같은 값을 가리키는 두 얼굴(A00290_BSTool Shape Editor 패턴).
@@ -550,18 +535,11 @@ class MainWindow(QWidget):
         time_end = int(cmds.playbackOptions(query=True, maxTime=True))
 
         range_row = QHBoxLayout()
-        range_row.addWidget(QLabel("Start"))
-        self.le_copy_start = QLineEdit(str(time_str))
-        self.le_copy_start.setValidator(validator)
-        range_row.addWidget(self.le_copy_start)
-        range_row.addWidget(self._make_get_current_btn(self.le_copy_start))
-
-        range_row.addWidget(QLabel("End"))
-        self.le_copy_end = QLineEdit(str(time_end))
-        self.le_copy_end.setValidator(validator)
-        range_row.addWidget(self.le_copy_end)
-        range_row.addWidget(self._make_get_current_btn(self.le_copy_end))
-        range_row.addWidget(self._make_get_selected_range_btn(self.le_copy_start, self.le_copy_end))
+        self.copy_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_value=time_str, end_value=time_end, log_callback=self.log)
+        self.le_copy_start = self.copy_range.start_edit
+        self.le_copy_end = self.copy_range.end_edit
+        range_row.addWidget(self.copy_range)
         tab_layout.addLayout(range_row)
 
         # -------------------------
@@ -709,17 +687,11 @@ class MainWindow(QWidget):
         time_end = int(cmds.playbackOptions(query=True, maxTime=True))
 
         range_row = QHBoxLayout()
-        range_row.addWidget(QLabel("Start"))
-        self.le_mir_start = QLineEdit(str(time_str))
-        self.le_mir_start.setValidator(validator)
-        range_row.addWidget(self.le_mir_start)
-        range_row.addWidget(self._make_get_current_btn(self.le_mir_start))
-        range_row.addWidget(QLabel("End"))
-        self.le_mir_end = QLineEdit(str(time_end))
-        self.le_mir_end.setValidator(validator)
-        range_row.addWidget(self.le_mir_end)
-        range_row.addWidget(self._make_get_current_btn(self.le_mir_end))
-        range_row.addWidget(self._make_get_selected_range_btn(self.le_mir_start, self.le_mir_end))
+        self.mir_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_value=time_str, end_value=time_end, log_callback=self.log)
+        self.le_mir_start = self.mir_range.start_edit
+        self.le_mir_end = self.mir_range.end_edit
+        range_row.addWidget(self.mir_range)
 
         range_row.addSpacing(12)
         range_row.addWidget(QLabel("Time"))
@@ -858,21 +830,11 @@ class MainWindow(QWidget):
         time_end = int(cmds.playbackOptions(query=True, maxTime=True))
 
         range_row = QHBoxLayout()
-        range_row.addWidget(QLabel("Start"))
-        self.le_bake_start = QLineEdit(str(time_str))
-        self.le_bake_start.setValidator(validator)
-        range_row.addWidget(self.le_bake_start)
-        self.btn_bake_get_start = self._make_get_current_btn(self.le_bake_start)
-        range_row.addWidget(self.btn_bake_get_start)
-        range_row.addWidget(QLabel("End"))
-        self.le_bake_end = QLineEdit(str(time_end))
-        self.le_bake_end.setValidator(validator)
-        range_row.addWidget(self.le_bake_end)
-        self.btn_bake_get_end = self._make_get_current_btn(self.le_bake_end)
-        range_row.addWidget(self.btn_bake_get_end)
-        self.btn_bake_get_range = self._make_get_selected_range_btn(
-            self.le_bake_start, self.le_bake_end)
-        range_row.addWidget(self.btn_bake_get_range)
+        self.bake_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_value=time_str, end_value=time_end, log_callback=self.log)
+        self.le_bake_start = self.bake_range.start_edit
+        self.le_bake_end = self.bake_range.end_edit
+        range_row.addWidget(self.bake_range)
         tab_layout.addLayout(range_row)
 
         # -------------------------
@@ -971,21 +933,11 @@ class MainWindow(QWidget):
         time_end = int(cmds.playbackOptions(query=True, maxTime=True))
 
         range_row = QHBoxLayout()
-        range_row.addWidget(QLabel("Start"))
-        self.le_follow_start = QLineEdit(str(time_str))
-        self.le_follow_start.setValidator(validator)
-        range_row.addWidget(self.le_follow_start)
-        self.btn_follow_get_start = QPushButton("Get Current")
-        range_row.addWidget(self.btn_follow_get_start)
-        range_row.addWidget(QLabel("End"))
-        self.le_follow_end = QLineEdit(str(time_end))
-        self.le_follow_end.setValidator(validator)
-        range_row.addWidget(self.le_follow_end)
-        self.btn_follow_get_end = QPushButton("Get Current")
-        range_row.addWidget(self.btn_follow_get_end)
-        self.btn_follow_get_range = self._make_get_selected_range_btn(
-            self.le_follow_start, self.le_follow_end)
-        range_row.addWidget(self.btn_follow_get_range)
+        self.follow_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_value=time_str, end_value=time_end, log_callback=self.log)
+        self.le_follow_start = self.follow_range.start_edit
+        self.le_follow_end = self.follow_range.end_edit
+        range_row.addWidget(self.follow_range)
         tab_layout.addLayout(range_row)
 
         # -------------------------
@@ -1051,12 +1003,9 @@ class MainWindow(QWidget):
         tab_layout.addStretch(1)
 
         # Slider <-> LineEdit 동기화 + 실행 시그널
+        # (Get Current / Get Sel Range 은 follow_range 위젯이 내부에서 처리한다.)
         self.sld_follow_blend.valueChanged.connect(self._follow_slider_to_le)
         self.le_follow_blend.editingFinished.connect(self._follow_le_to_slider)
-        self.btn_follow_get_start.clicked.connect(
-            lambda: self._set_current_frame(self.le_follow_start))
-        self.btn_follow_get_end.clicked.connect(
-            lambda: self._set_current_frame(self.le_follow_end))
         self.btn_follow.clicked.connect(self.on_follow_bake)
 
         return tab
@@ -1496,11 +1445,7 @@ class MainWindow(QWidget):
     def _bake_update_range_mode(self, *args):
         """Range 모드에 따라 Custom Start/End 입력 활성/비활성 토글."""
         custom = self.rb_bake_custom.isChecked()
-        self.le_bake_start.setEnabled(custom)
-        self.le_bake_end.setEnabled(custom)
-        self.btn_bake_get_start.setEnabled(custom)
-        self.btn_bake_get_end.setEnabled(custom)
-        self.btn_bake_get_range.setEnabled(custom)
+        self.bake_range.set_inputs_enabled(custom)
 
     def _bake_update_smart_mode(self, *args):
         """Smart bake 체크 상태에 따라 Tolerance 입력 활성/비활성 토글."""
@@ -1585,58 +1530,6 @@ class MainWindow(QWidget):
         self.sld_follow_blend.blockSignals(True)
         self.sld_follow_blend.setValue(int(round(v * 100)))
         self.sld_follow_blend.blockSignals(False)
-
-    def _set_current_frame(self, line_edit):
-        """Get Current 버튼: 현재 Maya 프레임으로 해당 Start/End LineEdit 을 갱신."""
-        frame = int(round(cmds.currentTime(query=True)))
-        line_edit.setText(str(frame))
-
-    def _make_get_current_btn(self, line_edit):
-        """현재 프레임으로 line_edit 을 채우는 'Get Current' 버튼 생성(모든 탭 공용).
-
-        Follow 탭의 Get Current 를 다른 탭의 Start/End 에도 동일하게 제공한다.
-        """
-        btn = QPushButton("Get Current")
-        # NOTE: clicked 시그널은 checked(bool) 인자를 슬롯에 넘긴다. 슬롯이 위치
-        # 인자 1개를 받으면(예: lambda le=line_edit:) checked 값이 le 를 덮어써
-        # _set_current_frame(False) 로 호출돼 동작하지 않는다. *_ 로 흡수한다.
-        btn.clicked.connect(lambda *_a, le=line_edit: self._set_current_frame(le))
-        return btn
-
-    def _selected_key_range(self):
-        """현재 선택된 키프레임들의 (최소, 최대) 프레임. 선택된 키가 없으면 None.
-
-        cmds.keyframe(q=True, sl=True) 은 그래프 에디터/타임슬라이더에서 선택된 모든 키의
-        시간을 오브젝트·어트리뷰트에 무관하게 전역으로 돌려준다. 여러 커브에 걸쳐 선택해도
-        전체의 앞/뒤 프레임을 잡는다.
-        """
-        times = cmds.keyframe(query=True, selected=True) or []
-        if not times:
-            return None
-        return int(round(min(times))), int(round(max(times)))
-
-    def _set_selected_key_range(self, le_start, le_end):
-        """선택 키의 제일 앞/뒤 프레임으로 Start·End 두 칸을 함께 채운다."""
-        rng = self._selected_key_range()
-        if rng is None:
-            self.log("[Warning] No keyframes selected. "
-                     "Select keys in the Graph Editor / Time Slider first.")
-            return
-        start, end = rng
-        le_start.setText(str(start))
-        le_end.setText(str(end))
-
-    def _make_get_selected_range_btn(self, le_start, le_end):
-        """선택된 키프레임의 첫/마지막 프레임으로 Start·End 를 한 번에 채우는 버튼.
-
-        Get Current(현재 프레임 1칸)와 달리, 지금 선택한 키들의 범위를 두 칸에 채운다.
-        """
-        btn = QPushButton("Get Sel Range")
-        btn.setToolTip("Fill Start/End from the first and last selected keyframe")
-        # Get Current 과 같은 이유로 checked(bool) 인자를 *_a 로 흡수한다.
-        btn.clicked.connect(
-            lambda *_a, s=le_start, e=le_end: self._set_selected_key_range(s, e))
-        return btn
 
     def on_follow_bake(self):
 
