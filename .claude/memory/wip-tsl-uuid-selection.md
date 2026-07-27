@@ -27,6 +27,20 @@ a new same-named node → "More than one object matches name"). Silent either wa
   model signal
 - `get_all_items()` still returns text (all tools feed it to maya.cmds); new `get_all_nodes()` /
   `selected_nodes()` resolve via uuid
-- `append_unique` now dedupes by uuid, so same-named different objects can coexist
+- `append_unique` dedupes by the resolved current node PATH (not raw uuid), so same-named different
+  objects — and duplicate-UUID reference copies — can coexist
+
+**DUPLICATE-UUID FIX (2026-07-27, on `dev`; mayapy-verified, Maya UI test pending):** user hit "click any
+listed item → always selects the SAME scene object" in a scene where **one file was REFERENCED multiple
+times with only different namespaces**. Root cause (reproduced in mayapy): **`import` reassigns UUIDs
+(unique) but `reference` KEEPS the file's UUIDs**, so the same node across namespaces shares one UUID.
+`cmds.ls(uuid, long=True)` then returns MULTIPLE nodes (e.g. `['|B:ctrlA','|A:ctrlA']`) and `_node_of`
+took `found[0]` → every list row holding that shared UUID resolved to the first one. Simple scenes were
+fine because UUIDs were unique there. Fix in `_node_of`: when `ls(uuid)` returns >1, disambiguate by the
+item's stored display text (`_match_by_text`: `cmds.ls(node_name, long=True)` ∩ `found`; fall back to
+`found[0]` only if the name is still ambiguous). Unique-uuid path unchanged (rename/reparent still
+survive). Also fixed `append_unique` to dedupe by resolved path (shared-uuid namespace copies were wrongly
+rejected as dups by the old uuid-key dedupe). Verified: 3 referenced copies A/B/C:ctrlA now resolve to
+their own namespaces; unique-uuid rename+reparent still exact; append adds all 3 but rejects true dups.
 
 Related: [[uuid-safe-rename-duplicate-names]], [[mayapy-headless-verify]]

@@ -30,6 +30,16 @@ UUID 는 리네임·리페어런트·이름 충돌과 무관하므로 두 경우
 이름으로 동작하고, 씬에 없는 이름이면 조용히 건너뛴다.
 `pCube1Shape.vtx[0]` 같은 컴포넌트는 `<uuid>.vtx[0]` 를 cmds.ls 로 되돌릴 수 없어서,
 **노드 UUID + 컴포넌트 접미사**를 따로 보관했다가 선택할 때 다시 조립한다.
+
+중복 UUID (다중 레퍼런스)
+------------------------
+UUID 는 보통 씬에서 유일하지만 **항상** 그렇진 않다. 같은 파일을 **레퍼런스**로 여러 번
+걸면(네임스페이스만 다르게) 각 사본의 대응 노드가 **같은 UUID 를 공유**한다(import 는 UUID 를
+재할당하지만 reference 는 원본 UUID 를 유지). 이 경우 `cmds.ls(uuid, long=True)` 가 **여러 노드**를
+돌려주므로 `found[0]` 로 아무거나 고르면 안 된다(어느 항목을 눌러도 늘 첫 노드만 선택되는 버그).
+`_node_of` 는 UUID 가 여러 노드로 잡히면 **담을 때의 표시 이름으로 그중 하나를 좁혀** 고르고
+(`_match_by_text`), 이름으로도 못 좁히면 첫 번째로 폴백한다. UUID 가 유일할 때의 동작
+(리네임/리페어런트 안전)은 그대로다.
 """
 
 from Framework.qt.qt import *
@@ -217,31 +227,35 @@ class JUN_mod_tsl_qt_v01(QWidget):
     def append_unique(self, items):
         """중복 없이 추가. 이미 있으면 로그 콜백(없으면 print)으로 안내.
 
-        중복 판정은 **UUID 우선**이다. 이름이 같아도 다른 오브젝트면 함께 담긴다
-        (계층만 다른 동명 오브젝트를 양쪽에 담아야 하는 경우가 있다).
+        중복 판정은 **현재 씬 경로(실제 노드 정체)** 기준이다. 담긴 항목은 UUID 로 현재
+        경로를 되찾아 비교하므로 리네임/리페어런트 뒤에도 같은 오브젝트를 잡아낸다.
+        같은 파일을 여러 번 **레퍼런스**해 UUID 가 공유되는 씬에서도, 네임스페이스가 다른
+        복사본은 경로가 달라 **서로 다른 오브젝트로 취급**되어 둘 다 담긴다(UUID 만으로
+        판정하면 뒤엣것이 중복으로 잘못 걸러졌었다). 노드가 아닌 항목(어트리뷰트 이름 등)은
+        텍스트로 판정한다.
         """
-        existing_uuids = set()
-        existing_texts = set()
+        cmds = _cmds()
+        existing = set()
         for i in range(self.list_widget.count()):
             item = self.list_widget.item(i)
-            uuid = self._uuid_of_item(item)
-            if uuid:
-                existing_uuids.add(uuid)
-            else:
-                existing_texts.add(item.text())
+            existing.add(self._node_of(item) or item.text())
 
         for text in items or []:
-            uuid, _comp = _uuid_of(text)
-            duplicated = uuid in existing_uuids if uuid else text in existing_texts
-            if duplicated:
+            key = None
+            if cmds is not None:
+                try:
+                    found = cmds.ls(text, long=True) or []
+                    key = found[0] if len(found) == 1 else None
+                except Exception:
+                    key = None
+            if key is None:
+                key = text
+            if key in existing:
                 self._log("{0} is already in the list.".format(text))
                 continue
 
             self._add_item(text)
-            if uuid:
-                existing_uuids.add(uuid)
-            else:
-                existing_texts.add(text)
+            existing.add(key)
 
         self._update_number()
 
@@ -313,6 +327,11 @@ class JUN_mod_tsl_qt_v01(QWidget):
 
         UUID 가 있으면 그것으로 되찾고(리네임/리페어런트/동명 안전),
         없으면(어트리뷰트 이름 등 노드가 아닌 항목) 텍스트를 그대로 쓴다.
+
+        UUID 가 **여러 노드**로 잡히는 경우(같은 파일을 네임스페이스만 달리해 여러 번
+        **레퍼런스**하면 노드의 UUID 가 공유된다 — import 는 재할당되지만 reference 는 아님)
+        에는 `found[0]` 로 아무거나 고르면 안 된다. 이때는 담을 때의 표시 이름으로 그중
+        올바른 하나를 고른다.
         """
         cmds = _cmds()
         if cmds is None or item is None:
@@ -322,15 +341,39 @@ class JUN_mod_tsl_qt_v01(QWidget):
         if data:
             uuid, comp = data
             found = cmds.ls(uuid, long=True) or []
-            if not found:
-                return None
-            return "{0}.{1}".format(found[0], comp) if comp else found[0]
+            node = None
+            if len(found) == 1:
+                node = found[0]
+            elif len(found) > 1:
+                # 중복 UUID(다중 레퍼런스) — 이름으로 좁힌다.
+                node = self._match_by_text(cmds, found, item.text())
+            if node:
+                return "{0}.{1}".format(node, comp) if comp else node
+            return None
 
         text = item.text()
         try:
             return text if cmds.objExists(text) else None
         except Exception:
             return None
+
+    @staticmethod
+    def _match_by_text(cmds, found, text):
+        """중복 UUID 로 여러 노드가 잡힐 때, 담을 때의 표시 이름으로 하나를 고른다.
+
+        표시 이름(네임스페이스/부분 경로 포함)을 다시 조회해 `found` 와 교집합을 낸다.
+        정확히 하나로 좁혀지면 그것을, 이름이 여전히 애매(리네임됐거나 동명 다수)하면
+        첫 번째로 폴백해 예전 동작을 유지한다.
+        """
+        node_name, _ = _split_component(text)
+        try:
+            by_name = set(cmds.ls(node_name, long=True) or [])
+        except Exception:
+            by_name = set()
+        matches = [f for f in found if f in by_name]
+        if len(matches) == 1:
+            return matches[0]
+        return matches[0] if matches else found[0]
 
     def _records(self):
         """[(텍스트, uuid데이터), ...] — 재정렬 시 UUID 를 잃지 않기 위한 스냅샷."""
