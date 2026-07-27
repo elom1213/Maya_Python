@@ -17,6 +17,20 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-07-27 (오늘)
 
+> [!summary] `A00390_WindTool` **신규 — 본 체인에 싸인 파형 키를 찍어 '바람에 일렁이는' 애니메이션** (v01.00)
+- **기능**: 리스트업한 본 체인의 회전(또는 이동) 축에 `value(t) = amplitude * sin(2π(t - i*offset)/
+  period)` 파형을 키로 찍는다. 키는 **1/4 주기마다**(0, +A, 0, -A …) 찍고 **spline** 탄젠트로 보간해
+  싸인 파형을 만든다. `quarter = period/4` 가 소수면(예: period 10 → 2.5, 7.5) **소수 프레임에 키**.
+  조인트 순번 `i` 는 위상을 `i*offset` 프레임 미룬다 — A00110 Stagger 와 달리 **offset 은 실수 프레임**.
+- **구성**: in-Maya PySide(arch A, A00360 스켈레톤 복제). TSL(`JUN_mod_tsl_qt`) + 구간
+  (`JUN_mod_timeRange_qt`, A00110 외 첫 외부 소비처) + Axis 콤보(rotate/translate X/Y/Z) +
+  Period/Amplitude/Offset 스핀박스 + Clear-range 옵션. 로직 `app/core/wind_manager.py`(UI 비의존),
+  Apply 는 `undo_chunk` 로 한 번에 묶음. 아이콘 SVG→PNG(QtSvg offscreen 렌더).
+- **검증**: mayapy — 사용자 예시(rotateX 0~100 p12 a40 o10 → jnt_01 3=40/9=-40/0·6·12=0 매12f 반복,
+  jnt_02 +10f·jnt_03 +20f 밀림), period 10 → 2.5/7.5 소수키, 소수 offset 2.5, 재적용 시 키 안 쌓임,
+  spline 탄젠트 모두 통과. **마야 실기 확인됨(사용자)**. 참고: Maya 가 회전 키를 라디안으로 저장·복원
+  → 30° 가 29.9999996 로 돌아오는 미세오차(회전 키 툴 공통, 표시·동작상 동일).
+
 > [!summary] `Framework/qt/MOD_timeRange_qt_v01` **Start/End 구간 입력 UI 를 공용 위젯으로 승격(모듈화)** + `A00110_animTool` 이 소비 (v01.35→01.36)
 - **요청**: A00110 의 `Start [값][Get Current]  End [값][Get Current]  [Get Sel Range]` UI 를
   `Framework/qt` 로 승격해 MOD_tsl_qt 처럼 다른 툴에서도 편하게 쓰도록 모듈화.

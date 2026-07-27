@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- A00390_WindTool shelf icon: staggered sine (wind) waves -->
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+  <!-- three phase-shifted sine waves (bone chain swaying in wind) -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M3 11 C7 6, 11 6, 15 11 S23 16, 27 11" stroke="#ff9e64" stroke-width="2.2"/>
+    <path d="M3 17 C7 12, 11 12, 15 17 S23 22, 27 17" stroke="#f2a97e" stroke-width="2.2" opacity="0.8"/>
+    <path d="M3 23 C7 18, 11 18, 15 23 S23 28, 27 23" stroke="#e8edf2" stroke-width="2.2" opacity="0.65"/>
+  </g>
+</svg>
