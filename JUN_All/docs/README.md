@@ -31,6 +31,7 @@
 | `A00320_ARKitCurveTool` | 언리얼 / ARKit·스켈레톤 커브 (참조 코드) | [A00320_ARKitCurveTool](A00320_ARKitCurveTool.md) |
 | `A00330_NamingTool` | 네이밍 / 리네임 | [A00330_NamingTool](A00330_NamingTool.md) |
 | `A00340_SelectionTool` | 선택 / 리깅·애니 (오브젝트 재선택 버튼) | [A00340_SelectionTool](A00340_SelectionTool.md) |
+| `A00410_SecondaryMotion` | 애니메이션 / 2차 모션 (FK 체인 관성·찰랑임) | [A00410_SecondaryMotion](A00410_SecondaryMotion.md) |
 
 ### 공용 위젯 (Framework)
 

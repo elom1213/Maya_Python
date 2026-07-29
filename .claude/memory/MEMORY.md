@@ -1,71 +1,80 @@
 # Memory Index
 
-- [TSL selection order (Order toggle)](tsl-selection-order.md) — MOD_tsl_qt_v01 헤더에 `Order` 체크박스: `ls(sl=True)` 는 컴포넌트를 인덱스 순으로 주므로 `selectPref(trackSelectionOrder)` + `ls(orderedSelection=True)` 사용. 트랩 = pref off 면 `ls(os=True)` 도 **에러 없이** 인덱스 순서(반환값으로 판별 불가); pref 는 켠 시점부터 기록; 전역 refcount 로 원복. mayapy 에선 위젯 생성 불가(QGuiApplication 선점) → stub cmds + PySide6 로 검증
+한 줄 = 한 메모. 자세한 내용은 각 파일에 있으니 필요할 때 열어본다.
 
-- [A00400 CurveTool (new)](wip-a00400-curvetool.md) — new in-Maya PySide tool: (1) selected mesh edges → attached curve per connected edge group (polyToCurve per group; ref_01.mel made only ONE curve for whole selection), (2) Reverse Direction — flip curves by comparing cv[0]/cv[n] on world axis (A00360 style). Core mayapy-verified, Maya UI test pending
-- [A00390 WindTool (new)](wip-a00390-windtool.md) — new in-Maya PySide tool: keys a bone chain with a sine wave (wind sway), value=amp*sin(2π(t-i*offset)/period), keys every quarter-period (fractional frames), per-joint FLOAT offset; first consumer of timeRange widget besides A00110. **v01.01: drop interior zero-crossing keys (extrema only + start/end anchors) for a smoother spline; `Keep zero-crossing keys` checkbox restores old behavior. v01.02: Bone Chain / Bone Root mode radio — root mode treats each listed joint as a chain root, keys all descendants with offset index = depth from root (BFS). v01.03: Curve / Node output — Node builds a null driver (windPeriod/Amplitude/Offset + windTime attrs) + node net (animCurveUU sine LUT, cycle via setAttr preInfinity/postInfinity=3 since setInfinity doesn't work on UU) reproducing the wave LIVE; Chain=1 driver, Root=N drivers. **v01.07: Node speed = `windSpeed` attr (value=speed, 1=normal), driven fully-auto by an integrating MEL EXPRESSION: windPhaseTime = startFrame + ∫windSpeed dt (trapezoidal over int frames + fractional remainder for sub-frame accuracy; getAttr -time sampling = scrub-safe). Changing windSpeed by VALUE or KEYS updates instantly, no button, no reversal (monotonic). Removed Apply Speed button/bake_speed. (time*speed reverses when speed is keyed; windTime froze when constant; the integral expr fixes both.) Perf: expr walks start→frame each eval. v01.08: per-driver `windPhaseOffset` attr shifts a whole driver's timing (base=windPhaseTime-windPhaseOffset); UI Node Offset staggers driver k by k*offset so Bone Root roots sway at different timings.**. mayapy-verified, Maya UI test pending
-- [Framework timeRange widget](framework-timerange-widget.md) — Framework/qt/MOD_timeRange_qt_v01 (JUN_mod_timeRange_qt): reusable Start/End range input row (Get Current + Get Sel Range), lazy cmds, exposes start_edit/end_edit for drop-in migration; promoted from A00110 v01.36 (its 6 range tabs now use it)
-- [A00110 Get Sel Range button](wip-a00110-get-sel-range.md) — v01.35 (implemented, headless-verified, Maya test + push pending): new "Get Sel Range" button (beside Get Current) in all Start/End tabs fills BOTH fields from the first/last of selected keyframes via `cmds.keyframe(q,sl=True)` min/max
-- [list_attrs multi detection](list-attrs-multi-detection.md) — detect multi attrs with attributeQuery(multi=True), NOT getNextFreeMultiIndex on every attr (spams "No object matches name" per scalar attr); fixed in A00170 maya_scene.py + A00145 connect_manager.py
-- [A00290 Shape Editor tab](wip-a00290-shape-editor-tab.md) — A00290_BSTool "Shape Editor" tab replaces Maya's Shape Editor — lists ALL blendShape targets (aliasAttr) with per-target Edit toggle; must use `cmds.sculptTarget` (setAttr on sculptTargetIndex silently edits base mesh). v01.06 (pushed) slider groove style. **v01.10 (IMPLEMENTED, Maya test pending): target multi-edit via row CLICK-selection (TargetRow QFrame highlight; Shift+click=range, Ctrl+click=toggle) + keyed(animCurve) targets now editable (autokey ON→setKeyframe, OFF→setAttr preview) + undo grouped per gesture (slider press~release = one chunk, so Ctrl+Z restores ALL selected targets)**. v01.07 checkboxes→v01.08 click-select→v01.09 range/toggle→v01.10 undo-per-gesture. Testing: Qt+maya.standalone crashes headless → test logic with fake widget stand-ins
+## 작업 방식 · 사용자 선호
 
-- [A00370 ToolLauncher (new)](wip-a00370-toollauncher.md) — DONE (headless-verified + pushed v01.04): shortcut launcher UI — buttons hold a tool folder path, click pops up that tool + shows its icon; clone of A00340 but launch instead of select. **v01.04 fixes cross-PC git churn: buttons store paths RELATIVE to JUN_All root (`tools/A000XX`), resolved to abs at launch; per-PC root override (`local_env.json`) + `active.json` gitignored**; Environment box = Detect/Browse/Apply Root/Make Paths Portable
+- [Explain in Korean](explain-in-korean.md) — 설명/대화는 한국어로 (코드·UI 문자열은 영어)
+- [UI text English-only](ui-text-english-only.md) — UI 문자열·로그는 전부 영어, 한국어는 주석/독스트링만
+- [Push only when asked](push-only-when-asked.md) — 그 턴에 명시 요청 없으면 절대 push 금지 (로컬 커밋은 OK)
+- [Push target Dnable/dev](push-target-dnable-dev.md) — 기본 push 대상은 Dnable_repo 의 dev (origin 아님)
+- [Push includes tool guide docs](push-includes-tool-guide-docs.md) — 툴 push 시 docs/<툴>.md 가이드 + CHANGELOG/version/WORKLOG 함께
+- [Clean commit message](clean-commit-message-no-stray-chars.md) — 커밋 메시지에 이상문자 새지 않게(과거 `@` 유출), 커밋 후 `git log -1` 확인
+- [WORKLOG maintenance](worklog-maintenance.md) — docs/WORKLOG.md 갱신 규칙(최신이 위, 날짜 헤딩 중복 금지)
+- [Docs go in JUN_All/docs](docs-go-in-jun-all-docs.md) — 분석/설명 문서는 JUN_All/docs 아래
+- [Update portfolio on tool work](update-portfolio-on-tool-work.md) — portfolio_EN/KR 둘 다 동기 갱신, 커밋수 통계는 건드리지 않기
+- [Memory synced via repo](memory-synced-via-repo.md) — 메모리는 repo `.claude/memory`(정션), 커밋+푸시로 PC 간 공유
+- [Prefer PySide for new tools](prefer-pyside-for-new-tools.md) — 신규/병합 툴은 maya.cmds UI 말고 PySide(arch B)
+- [JUN_mgear vault](jun-mgear-vault.md) — mgear 학습 노트는 JUN_mgear Obsidian vault → elom1213/JUN_mgear
+- [kangaroo plugin read-only](kangaroo-plugin-external-readonly.md) — kangaroo 플러그인은 외부 3rd-party, 수정 금지
 
-- [A00275 SkinTool Transfer tab + Classic engine](wip-a00275-transfer-tab.md) — IMPLEMENTED (Maya test pending) v01.07: Classic Engine(Kangaroo/Native) radio; **Transfer tab** = N source meshes → **ALL selected meshes/verts** (v01.06 fixed: previously only 1 target — `parse_target_selections` groups selection by mesh, native loops all in one undo; also `_mesh_transform` normalizes to full path so a co-selected source is excluded, not transferred onto itself), Engine(Native/Kangaroo) choice. Key mayapy findings: multi-source `copySkinWeights` uses per-vertex nearest source automatically; copySkinWeights IGNORES component selection (whole-mesh always) → do before/after bulk read + soft-falloff lerp on selected verts + restore rest via setWeights. Kangaroo path = `transferSkinCluster(sFrom=sources, _pSelection=None, iMode=2)`, soft-falloff is Native-only
-- [A00275 SkinTool Bind Pose (new)](wip-a00275-skintool-bindpose.md) — DONE (Maya-verified + pushed v01.03): A00270 features + **Update Bind Pose** tab (freeze current joint pose as new bind pose; Maya has no native equivalent — `recacheBindMatrices` / `dagPose -reset` both proven useless). bindPreMatrix indices MUST come from `matrix[]` connections, not `enumerate(-q -inf)` (sparse indices → looks like a double transform); chain walk must handle groupParts' scalar `inputGeometry`; live blendShape targets cancel the bake ∝ weight
+## 검증 · 마야 공통 함정
 
-- [A00380 MeshTool Peak (new)](wip-a00380-meshtool-peak.md) — Maya-verified + pushed thru v01.00; Peak tab inflates/shrinks mesh along vertex normals (Houdini peak-like), live slider + Range/Step micro control; writes `shape.pnts` via ranged setAttr (~70x faster than Maya's move-along-normal); records 4 mayapy-verified traps (setPoints wipes tweaks, MPlug write is a no-op, stateWithoutFlush, restore-before-commit). **v01.04+v01.05 (IMPLEMENTED, Maya UI test pending): v01.04 removed Apply/Reset — slider settle (sliderReleased/spin editingFinished/nudge) auto-commits via `commit_stroke`, adjusted state IS the final result (each stroke = one Ctrl+Z, accumulates). v01.05 gave both sliders a `SLIDER_STYLE` (groove blended into dark bg) — A00290 approach colored for coral_dark theme (#d08778)**
-- [A00380 Match tab + auto-load fix](wip-a00380-match-tab.md) — DONE (코어 headless + Maya-verified + pushed v01.03): v01.01 Match 탭 — Kangaroo Geometry>Match 재현(From 메시 같은 인덱스 버텍스 위치로 대상 버텍스 이동, soft falloff); Peak 헬퍼/pnts setAttr 모델 재사용, World=inclusiveMatrixInverse 역변환, Weight 슬라이더 0~1. **v01.02 버그수정: 툴 띄워둔 채 손으로 버텍스 옮기면 원상복구되던 문제 — Peak Auto-load scriptJob 의 discard_preview 가 미리보기 없어도 restore 로 스냅샷 덮어씀 → `_preview_dirty` 가드(미리보기 있을 때만 restore)**
+- [mayapy headless verify](mayapy-headless-verify.md) — maya.cmds 동작은 추측 말고 Maya2024/bin/mayapy.exe + maya.standalone 으로 확인
+- [undo_chunk by default](undo-chunk-by-default.md) — 반복 씬 변경은 요청 없어도 `Framework.core.maya_undo.undo_chunk()` 로 묶기
+- [Maya 2023 compat](maya-2023-compat.md) — 2023 지원 필요할 수 있음, sin/cos 노드 없음(eulerToQuat 우회)
+- [Maya loadPlugin no __file__](maya-loadplugin-no-file.md) — loadPlugin 으로 뜬 .py 플러그인은 `__file__` 없음
+- [animLayer no global selected query](animlayer-no-global-selected-query.md) — `animLayer(q,selected)` 는 레이어 인자 필요, `ls(type=animLayer)` 순회
+- [list_attrs multi detection](list-attrs-multi-detection.md) — multi 판정은 `attributeQuery(multi=True)`, getNextFreeMultiIndex 남용 금지
+- [UUID-safe rename](uuid-safe-rename-duplicate-names.md) — 동명 노드 대비 UUID 로 노드 보관("UUID 기반 리네임 패턴 적용해줘")
+- [standalone app package collision](standalone-app-package-collision.md) — standalone Qt 툴은 `tools.<tool>.app.*` 로 import, 맨 `app` 금지
+- [Standalone taskbar icon](standalone-taskbar-icon-method.md) — SVG→다중크기 .ico + QApplication 전에 AppUserModelID
+- [Pin for maya.cmds tools](pin-for-maya-cmds-tools.md) — cmds.window 최상단 고정은 maya_ui_widget() 로 감싸 WindowStaysOnTopHint
 
-- [A00350 ArrayCreator (new)](wip-a00350-arraycreator.md) — v01.00 pushed; v01.01 IMPLEMENTED (Maya test + push pending): new in-Maya PySide tool, TSL objects → UE Control Rig Item Array node text (clipboard + 0020_out); global Element Type combo (default Bone) + Node Title; template-based (A00260 arch). v01.01 adds optional Reverse button to shared TSL (`MOD_tsl_qt_v01` `show_reverse=False` default OFF; record-based so UUID data preserved) + turns it ON in A00350
+## 공용 위젯 · 프레임워크
 
-- [A00360 SortTool (new)](wip-a00360-sorttool.md) — DONE (verified + pushed v01.00): new in-Maya PySide tool, sort listed objects by world X/Y/Z / name / type, reorder outliner top→bottom (checkbox default ON) + TSL; works for any positioned node (joint/mesh/curve/cluster); slot-swap reorder ported from AriSortOutliner.mel
+- [TSL UUID selection](wip-tsl-uuid-selection.md) — MOD_tsl_qt_v01 이 (uuid, component) 보관 → 리네임/동명/다중 레퍼런스 안전
+- [TSL selection order](tsl-selection-order.md) — `Order` 체크박스. `ls(sl)` 는 컴포넌트를 인덱스 순으로 줌 → `selectPref(trackSelectionOrder)`+`ls(orderedSelection)`. **함정: pref off 면 `ls(os)` 도 에러 없이 인덱스 순서**
+- [Framework timeRange widget](framework-timerange-widget.md) — MOD_timeRange_qt_v01: Start/End 입력 + Get Current / Get Sel Range 공용 위젯
 
-- [A00060 world-space joint pos](wip-a00060-world-space-joint-pos.md) — DONE (verified + pushed v01.03): Curve/Divide joint creation now uses world-space absolute positions (Divide used local xform; Curve double-counted curve translation; Match to Obj enforces world via xform) so joints land right when objects are parented
+## 툴 작업 (신규 · 큰 기능)
 
-- [UI text English-only](ui-text-english-only.md) — all UI-facing strings (buttons, logs, messages) must be English; Korean only in comments/docstrings
-- [Explain in Korean](explain-in-korean.md) — write explanations/conversational replies to the user in Korean (code/UI text stay English)
-- [Push only when asked](push-only-when-asked.md) — NEVER push to remote without an explicit user request in that turn; committing locally is fine
-- [Push target Dnable/dev](push-target-dnable-dev.md) — default git push goes to Dnable_repo remote, dev branch (not origin)
-- [Clean commit message (no stray chars)](clean-commit-message-no-stray-chars.md) — verify + fix commit msg before committing (recent commits leaked a leading `@` from using PowerShell `@'...'@` heredoc in the Bash tool); use tool-correct multiline syntax + check `git log -1`
-- [Memory synced via repo](memory-synced-via-repo.md) — memory lives in repo `.claude/memory` (junctioned from ~/.claude/projects/<hash>/memory); commit+push memory changes to share across PCs
-- [Standalone taskbar icon method](standalone-taskbar-icon-method.md) — how to give a standalone PySide tool a Windows taskbar icon (SVG→QtSvg multi-size .ico + AppUserModelID before QApplication); guide in docs/taskbar_icon_guide.md
-- [TSL UUID selection](wip-tsl-uuid-selection.md) — MOD_tsl_qt_v01 stores (uuid, component) per item so list→scene selection survives rename/reparent/dup names; affects all 18 tools using the shared TSL. **2026-07-27 fix (on dev, mayapy-verified): duplicate-UUID scenes (same file REFERENCED under many namespaces → shared UUIDs) made every row select the same object; `_node_of` now disambiguates ls(uuid)>1 by stored item text, append_unique dedupes by resolved path**
-- [Pin for maya.cmds tools](pin-for-maya-cmds-tools.md) — cmds.window has no always-on-top flag; use Framework.qt.maya_window.maya_ui_widget() to wrap it as a QWidget, then toggle WindowStaysOnTopHint + show()
-- [mayapy headless verify](mayapy-headless-verify.md) — test maya.cmds semantics with Maya2024/bin/mayapy.exe + maya.standalone instead of guessing from docs/mel
-- [undo_chunk by default](undo-chunk-by-default.md) — repeated Maya scene changes must be wrapped in Framework.core.maya_undo.undo_chunk() without being asked (one Ctrl+Z)
-- [Maya 2023 compat](maya-2023-compat.md) — tools may need Maya 2023 support; no native sin/cos nodes (use eulerToQuat)
-- [Maya loadPlugin no __file__](maya-loadplugin-no-file.md) — .py plugins loaded via loadPlugin have no __file__; don't compute paths from it
-- [Docs go in JUN_All/docs](docs-go-in-jun-all-docs.md) — analysis/comparison/explanation markdown docs are saved under JUN_All/docs
-- [JUN_mgear vault](jun-mgear-vault.md) — mgear study notes in JUN_mgear Obsidian vault, synced to elom1213/JUN_mgear (main branch, pushes as cached elom1213 creds)
-- [Prefer PySide for new tools](prefer-pyside-for-new-tools.md) — user may require new/merged Maya tools use PySide(Qt) UI (arch B, clone A00110), not maya.cmds UI
-- [WORKLOG maintenance](worklog-maintenance.md) — daily git-derived work journal at JUN_All/docs/WORKLOG.md; how to update it (manual, newest-first, Obsidian+GitHub compatible)
-- [Update portfolio on tool work](update-portfolio-on-tool-work.md) — "포트폴리오 문서" = portfolio_EN.md + portfolio_KR.md; "포트폴리오 문서 갱신해" = update BOTH (synced EN/KR). Also reflect portfolio-worthy content after tool work; appeal axes: MetaHuman/character rigging, rigging/anim Python scripts, Maya↔Unreal rig data conversion; don't touch curated commit-count stat
-- [animLayer no global selected query](animlayer-no-global-selected-query.md) — cmds.animLayer(q,selected) needs a layer arg; iterate cmds.ls(type=animLayer) to find selected layers
-- [standalone app package collision](standalone-app-package-collision.md) — standalone Qt tools must import via tools.<tool>.app.* + relative imports, never bare `app`, or two tools collide in one interpreter
-- [UUID-safe rename (duplicate names)](uuid-safe-rename-duplicate-names.md) — rename/DAG tools break on duplicate scene names (TSL stores short names); hold nodes by UUID (_to_uuid/_rename_by_uuid). Invoke: "UUID 기반 리네임 패턴 적용해줘"
-- [Push includes tool guide docs](push-includes-tool-guide-docs.md) — when pushing a tool, verify/refresh its JUN_All/docs/<tool>.md guide doc and include it in the push (with CHANGELOG/version/WORKLOG)
-- [A00280 cloth-corrective](metahuman-cloth-corrective-A00280.md) — A00280_correctiveFromCache v01.00 IMPLEMENTED (Maya test pending): batch-extracts MetaHuman RBF cloth-wrinkle correctives from Houdini Alembic cache via PoseWrangler invertShape; docs in JUN_All/docs/A00280_correctiveFromCache*.md
-- [kangaroo plugin external/read-only](kangaroo-plugin-external-readonly.md) — kangaroo Maya plugin (C:\...\0020_maya_plugin\0010_kangaroo) is an external 3rd-party tool: read-only reference, never modify; guide the user instead
-- [A00300 batch summary table](wip-a00300-batch-summary-table.md) — DONE (verified + pushed v01.02): Target Meshes TSL (Add/Remove/Clear, UUID-held) + Diagnose Listed scans all → color-coded Summary table (Mesh|Status|Issues), click row shows that mesh's full report in log; empty list falls back to selection
-- [WIP: A00300 zero-area quality rework](wip-a00300-zero-area-quality-rework.md) — IN-PROGRESS crash-recovery checkpoint: rework A00300_meshDoctor zero_area_faces to shape-quality (sliver vs tiny-valid) + add Clear Log button; mesh is Case A
-- [A00170 AttachCrv tab](wip-a00170-attachcrv-tab.md) — IMPLEMENTED (Maya test + push pending): AttachCrv tab in A00170_driverTool attaches TSL objects to closest point on a curve (ported/changed from ref_01.mel)
-- [A00170 Stretch tab](wip-a00170-stretch-tab.md) — DONE (Maya-verified + pushed v01.11): A00170 Stretch tab — Default Distance attr (a) drives Stretch attr(s); linear f(x)=x-a+1/-x+a+1 (animCurveUU+additive, rest=original) + **Sigmoid/Sigmoid rev** (analytic node net, passes (a,original), converges threshold_max/min≥0). v01.11 adds **multi-attribute select**, **sigmoid base/thresh as live keyable attrs on the driver object** (ratio=base^L form, no log node), **Attr Search selects all found**; ported+refactored from ref_01_StretchTool.mel
-- [A00120 FKIK constraint-free bake](wip-a00120-fkik-bake-constraintfree.md) — IMPLEMENTED (Maya test + push pending): fixed Bake IK/FK changing out-of-range poses (anim-layer case) by dropping parentConstraint for per-frame matchTransform bake; + Get Current buttons on Start/End
-- [A00170 Remap List Attributes](wip-a00170-remap-listattrs.md) — IMPLEMENTED (Maya test + push pending): A00170 Remap Value tab List Attributes shows all attrs + search-to-discover (ported A00145 Connect tab list_attrs behavior)
-- [A00310 SearchTool merge](wip-a00310-searchtool-merge.md) — IMPLEMENTED (Maya test + push pending): A00310_SearchTool merges legacy JUN_PY_SelectionTool_V02_01 + JUN_PY_SearchTool_V01_02 into one PySide tabbed tool (Selection + Search tabs, TSLs with Sort, icon made)
-- [A00270 Classic tab](wip-a00270-classic-tab.md) — IMPLEMENTED (Maya test + push pending): A00270_skinMigrate v01.01 — ported legacy move_skinWeightTool 2-button UI into a new "Classic" tab; existing migrate is tab 2
-- [A00145 Attribute tab + blendShape alias](a00145-attribute-tab-blendshape-alias.md) — DONE (Maya-verified + pushed v01.17): new Attribute tab copies attrs onto other objects w/ Prefix/Suffix; blendShape targets are `weight[]` aliases — read via aliasAttr, and attributeQuery resolves an alias to the parent `weight` multi (must override to name/multi=False)
-- [A00145 skin constraint types](wip-a00145-skin-constraint-types.md) — DONE (Maya-verified + pushed v01.16): Skin Weight to Constraint gets Parent/Scale/Point/Orient radio (was parentConstraint-only); interpType only exists on parent/orient so it's attributeQuery-guarded
-- [A00145 Constraint Transfer](wip-a00145-constraint-transfer.md) — DONE (Maya-verified + pushed v01.14): Constrain tab new box moves an existing constraint onto a different object — deletes original, re-creates same constraint (type/targets/weights/aim/interpType) on right-side object with maintainOffset so both old+new keep world pos/rot; left=constraints (or transforms→their constraints), right=new driven; UUID-based
-- [A00145 Group Create](wip-a00145-group-create.md) — DONE (Maya-verified + pushed v01.13): Constrain tab Group Create inserts same-pos/rot offset zero-out nodes `<obj>_<suffix>_NN` on Parent and/or Child side, user Suffix/Count/Padding, node Type = Group or Match object type (joint→joint, curve→curve via duplicate), UUID-based (dup-name/reparent safe)
-- [A00145 Match DOOTOOL options](wip-a00145-match-dootool-options.md) — IMPLEMENTED (Maya test + push pending): A00145_RigConnect v01.10 Match tab gains Translation/Rotation/Scale/Parent checkboxes ported from legacy DOOTOOL_PY_TOOL_Match.py (Rotate Order/Axis omitted — world-matrix based)
-- [A00220 Pin toggle](wip-a00220-pin.md) — DONE (verified + pushed v01.13): Always on Top (Pin) toggle button top-right, ported from A00110 pattern (WindowStaysOnTopHint + re-show)
-- [A00220 dino save pulse](wip-a00220-dino-save-pulse.md) — IMPLEMENTED (visual check + push pending): A00220_BackupTool v01.09 status dino does an accent-color hop the moment a user saves a watched file (notify_save), distinct from the 360° backup spin
-- [A00340 SelectionTool](wip-a00340-selectiontool.md) — DONE (Maya-verified + pushed v01.00): new in-Maya PySide tool, quick re-select saved object sets via add/remove/reorder buttons + profiles (A00240 structure + A00310 Maya integration)
-- [A00340 button colors](wip-a00340-button-colors.md) — DONE (Maya-verified + pushed v01.03): per-button custom colors via palette+eyedropper (QColorDialog) right-click, + Color Select mode to check & recolor many buttons across categories
-- [A00340 split layout](wip-a00340-split-layout.md) — DONE (Maya-verified + pushed v01.04): window split via vertical QSplitter — Profile/Create/Color/Log wrapped in ONE collapsible "Controls" box (one toggle folds all + shrinks splitter top pane) over the button pane; Log moved into control box
-- [A00110 Stagger Offset](wip-a00110-stagger-offset.md) — IMPLEMENTED v01.33/34 (코어 headless, Maya 실기+push 대기): Key Edit 탭 Stagger Offset — TSL 순서 × Offset 만큼 구간 키를 계단식 이동, 슬라이더+스핀박스 실시간(비누적), 상대이동만 써서 탄젠트/애님레이어 보존; **settle 모델**(조작 멎으면 undo 1항목 기록 → Ctrl+Z 1회 = Reset) + 탐침으로 외부 undo 감지. **v01.33: Apply 버튼 제거(값이 곧 결과, settle 자동 커밋). v01.34: 슬라이더 홈 스타일(A00290 참고, STAGGER_SLIDER_STYLE, 배경에 묻히던 groove 직접 그림)**
-- [A00110 Graph Focus tab](wip-a00110-graph-focus.md) — DONE (Maya-verified + pushed v01.30): frames Graph Editor to current±margin (user-set spinbox, default 80) on selection via SelectionChanged scriptJob + animView; Fit value samples curve .output with UI-set Value margin (%); v01.30 auto-frame fires ONLY on real object-selection change (caches last selection) so key select/deselect + undo(z) no longer trigger it
-- [A00210 Recreate To + Rename](wip-a00210-recreate-to-rename.md) — DONE (verified + pushed v01.28): Path Structure tab gets explicit "Recreate To" destination field (auto-filled ProjectRoot+base_rel, editable) + Rename button; Recreate button green + right-aligned
-- [A00210 PathStructure tree+depth](wip-a00210-pathstructure-tree-depth.md) — DONE (verified + pushed v01.24): A00210_FileManager Path Structure tab — Preview→QTreeWidget (Show files toggle default off + Expand), Capture Depth spinbox + per-folder checkbox + view Depth for selective/depth-limited Recreate, multi-select checkbox toggle
+- [A00410 SecondaryMotion](wip-a00410-secondarymotion.md) — **신규**: FK 체인 관성(KawaiiPhysics식)을 키로 굽기. nucleus 안 쓰는 이유, 전 구간 30ms 재계산→override 레이어, addKeys 74배, **joint `local=R*JO` / transform `local=RA*R`**, 부모를 앞 체인 노드로 가정하면 오프셋 그룹에서 깨짐
+- [A00400 CurveTool](wip-a00400-curvetool.md) — **신규**: 선택 엣지를 연결 성분별로 그룹지어 그룹마다 커브 1개 + Reverse Direction
+- [A00390 WindTool](wip-a00390-windtool.md) — **신규**: 본 체인에 싸인 파형 바람. Curve/Node 출력, windSpeed 적분 표현식, windPhaseOffset (v01.08)
+- [A00380 MeshTool Peak](wip-a00380-meshtool-peak.md) — **신규**: 노멀 방향 인플레이트. `shape.pnts` ranged setAttr(~70배), 슬라이더 settle 자동 커밋 (v01.05)
+- [A00380 Match tab](wip-a00380-match-tab.md) — Kangaroo Geometry>Match 재현 + Peak auto-load 가 수동 편집을 되돌리던 버그 수정 (v01.03)
+- [A00370 ToolLauncher](wip-a00370-toollauncher.md) — **신규**: 툴 바로가기 런처. 경로를 JUN_All 상대로 저장해 PC 간 git churn 제거 (v01.04)
+- [A00360 SortTool](wip-a00360-sorttool.md) — **신규**: 월드 XYZ/이름/타입 정렬 + 아웃라이너 재정렬 (v01.00)
+- [A00350 ArrayCreator](wip-a00350-arraycreator.md) — **신규**: TSL → UE Control Rig Item Array 텍스트. 공용 TSL 에 Reverse 버튼 옵션 추가
+- [A00340 SelectionTool](wip-a00340-selectiontool.md) — **신규**: 저장한 오브젝트 세트 빠른 재선택 + 프로파일 (v01.00)
+- [A00310 SearchTool](wip-a00310-searchtool-merge.md) — 레거시 Selection/Search 툴 2개를 탭 하나로 병합 (Maya 테스트 대기)
+- [A00300 batch summary](wip-a00300-batch-summary-table.md) — Target Meshes TSL + 색상 요약 테이블 (v01.02)
+- [A00300 zero-area rework](wip-a00300-zero-area-quality-rework.md) — **진행 중**: zero_area_faces 를 shape-quality 로 재작업 + Clear Log
+- [A00290 Shape Editor tab](wip-a00290-shape-editor-tab.md) — 마야 Shape Editor 대체. `cmds.sculptTarget` 필수, 행 클릭 다중 편집, 제스처당 undo 1회 (v01.10)
+- [A00280 cloth-corrective](metahuman-cloth-corrective-A00280.md) — Houdini 알렘빅 캐시 → MetaHuman RBF 코렉티브 일괄 추출(invertShape)
+- [A00275 SkinTool Bind Pose](wip-a00275-skintool-bindpose.md) — Update Bind Pose 탭. bindPreMatrix 인덱스는 `matrix[]` 연결에서 얻어야 함 (v01.03)
+- [A00275 Transfer tab](wip-a00275-transfer-tab.md) — N 소스 → 선택 메시/버텍스 전부. copySkinWeights 는 컴포넌트 선택 무시 (v01.07)
+- [A00270 Classic tab](wip-a00270-classic-tab.md) — 레거시 move_skinWeightTool 2버튼 UI 를 Classic 탭으로 이식
+
+## 툴 작업 (탭 · 기능 추가)
+
+- [A00220 Pin toggle](wip-a00220-pin.md) — Always on Top 토글 (v01.13)
+- [A00220 dino save pulse](wip-a00220-dino-save-pulse.md) — 저장 순간 상태 공룡이 accent 색으로 점프 (v01.09)
+- [A00210 PathStructure tree](wip-a00210-pathstructure-tree-depth.md) — Preview 를 QTreeWidget + Capture/View Depth 로 (v01.24)
+- [A00210 Recreate To + Rename](wip-a00210-recreate-to-rename.md) — 명시적 대상 경로 필드 + Rename 버튼 (v01.28)
+- [A00170 Stretch tab](wip-a00170-stretch-tab.md) — Default Distance 가 Stretch 구동, linear + Sigmoid 노드망 (v01.11)
+- [A00170 AttachCrv tab](wip-a00170-attachcrv-tab.md) — TSL 오브젝트를 커브 최근접점에 부착
+- [A00170 Remap List Attributes](wip-a00170-remap-listattrs.md) — Remap Value 탭에 전체 어트리뷰트 목록 + 검색
+- [A00145 Attribute tab](a00145-attribute-tab-blendshape-alias.md) — 어트리뷰트 복사 + blendShape 타깃은 `weight[]` 별칭(aliasAttr) (v01.17)
+- [A00145 skin constraint types](wip-a00145-skin-constraint-types.md) — Parent/Scale/Point/Orient 라디오, interpType 은 attributeQuery 가드 (v01.16)
+- [A00145 Constraint Transfer](wip-a00145-constraint-transfer.md) — 기존 컨스트레인트를 다른 오브젝트로 이전(재생성) (v01.14)
+- [A00145 Group Create](wip-a00145-group-create.md) — 동일 위치/회전 zero-out 노드 삽입, 타입 매칭 (v01.13)
+- [A00145 Match DOOTOOL options](wip-a00145-match-dootool-options.md) — Match 탭에 T/R/S/Parent 체크박스 이식 (v01.10)
+- [A00120 FKIK constraint-free bake](wip-a00120-fkik-bake-constraintfree.md) — parentConstraint 대신 프레임별 matchTransform (애님 레이어 포즈 깨짐 수정)
+- [A00110 Stagger Offset](wip-a00110-stagger-offset.md) — TSL 순서 × Offset 계단식 키 이동, settle 커밋 모델 (v01.34)
+- [A00110 Graph Focus tab](wip-a00110-graph-focus.md) — 선택 변경 시 그래프 에디터 자동 프레이밍 (v01.30)
+- [A00110 Get Sel Range](wip-a00110-get-sel-range.md) — 선택 키의 최소/최대로 Start/End 동시 채우기 (v01.35)
+- [A00340 button colors](wip-a00340-button-colors.md) — 버튼별 커스텀 색 + Color Select 모드 (v01.03)
+- [A00340 split layout](wip-a00340-split-layout.md) — QSplitter 로 Controls 박스 접기 (v01.04)
+- [A00060 world-space joint pos](wip-a00060-world-space-joint-pos.md) — Curve/Divide 조인트 생성을 월드 절대좌표로 (v01.03)
