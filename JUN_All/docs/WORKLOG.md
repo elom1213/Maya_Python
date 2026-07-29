@@ -17,6 +17,29 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-07-29 (오늘)
 
+> [!summary] `Framework/qt/MOD_tsl_qt_v01` **공용 TSL 에 선택 순서 유지(Order) 추가** — 모든 PySide 툴 공통
+- **요청**: 컴포넌트 모드로 버텍스를 여러 개 골라 `Select` 하면 **고른 순서와 무관하게** 리스트업된다.
+  선택한 순서를 기억해 그 순서대로 담게 할 것. 항상 켜기 어렵다면 **토글**로 하는 게 맞는지 판단해 제안.
+- **원인**: `cmds.ls(sl=True)` 는 컴포넌트를 **인덱스 순서**로 돌려준다(5→0→3→1 로 찍어도 0,1,3,5).
+  **오브젝트/트랜스폼은 원래부터 선택 순서를 유지**하므로, 깨지는 건 컴포넌트 한정.
+  순서를 얻으려면 Maya 전역 pref **Track Selection Order** 를 켜고 `ls(orderedSelection=True)` 로 읽어야 한다.
+- **반영**: 헤더 행(타이틀~Number 사이)에 **`Order` 체크박스** 추가 — **세로 공간 증가 0**.
+  ON = pref 를 켜고 Select/Add 가 `ls(orderedSelection=True, flatten=True)` 사용 / OFF = **우리가 켠 경우에만**
+  pref 원복(사용자가 원래 켜둔 설정은 보존). TSL 이 여러 개 떠 있어도 **전역 refcount** 로 관리하고,
+  위젯이 파괴되면 pref 자동 반납(전역 설정을 남기지 않음). 체크 시 "다시 선택하라" 로그 안내.
+- **토글로 한 이유**: ①전역 프리퍼런스라 말없이 켜두면 다른 작업까지 영향 ②pref 는 **켠 시점부터** 기록해서
+  항상 켜둬도 "다시 선택" 제약이 안 사라짐 ③순서가 필요 없는 리스트는 인덱스 순이 오히려 읽기 편함.
+  순서가 늘 중요한 툴은 `order_default=True`, 씬 노드가 아닌 리스트는 `show_order=False`.
+- **API**: `show_order` / `order_default` 생성 옵션, `set_order_tracking()` / `is_order_tracking()`.
+  기존 호출부 **75곳을 AST 로 전수 확인** — 위치 인자 2개 이상 사용처가 없어 파라미터 추가로 깨지는 툴 없음.
+- **검증**: mayapy 로 실제 Maya 의미론 확인(pref OFF 면 `ls(os=True)` 도 **에러 없이** 인덱스 순서 → 반환값이
+  아니라 pref 조회로 판별해야 함 / ON 이면 `vtx[5],0,3,1` 그대로 / 마퀴·해제후재선택·오브젝트+컴포넌트 혼합 정상).
+  위젯 배선은 **stub `maya.cmds` + PySide6** 로 26항목 전부 통과 — mayapy 안에서는 `maya.standalone` 이 이미
+  `QGuiApplication` 을 만들어 둬 `QWidget` 생성 자체가 불가. **마야 실기 테스트 대기**.
+- **문서**: 공용 위젯 문서 [Framework_MOD_tsl_qt](Framework_MOD_tsl_qt.md) 신규 작성(옵션·API·UUID 보관·
+  Order 동작·문제 해결), `docs/README.md` 에 **공용 위젯** 섹션 추가.
+  #Framework #TSL #selectionOrder #PySide #mayapy
+
 > [!summary] `A00400_CurveTool` **신규 툴 — 메시 엣지 → 커브(그룹별) + Reverse Direction** (v01.00)
 - **요청**: `ref_01.mel` 처럼 선택한 메시 엣지에 부착된 커브를 만들되, 여러 엣지 구간을 고르면 **구간마다 커브를
   따로** 만들 것(ref 는 선택 전체를 커브 1개로만 묶음). + TSL 에 담은 커브들의 `cv[0]`/`cv[n]` 위치를 축으로

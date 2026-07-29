@@ -6,11 +6,12 @@ Framework/ui/MOD_tsl_01_01.py (maya.cmds 버전 JUN_mod_tsl_v01) 의 PySide 대�
 UI 구성과 동작을 동일하게 맞추되 Qt 관용 생성자 방식으로 제공한다.
 
 UI 순서 (MOD_tsl_01_01 과 동일):
-    Select Objects 버튼 → 타이틀 + Number 라벨 → QListWidget(다중선택)
-    → Add / Del / Up / Down 버튼 → Sort 버튼 → (선택) Reverse 버튼
+    Select Objects 버튼 → 타이틀 + (선택) Order 체크박스 + Number 라벨
+    → QListWidget(다중선택) → Add / Del / Up / Down 버튼 → Sort 버튼 → (선택) Reverse 버튼
 
 각 버튼은 show_* 플래그로 개별 생성 여부를 제어한다.
 Reverse 버튼(show_reverse, 기본 꺼짐)은 리스트 항목의 정렬 순서를 통째로 뒤집는다.
+Order 체크박스(show_order, 기본 켬 / 체크 상태는 기본 꺼짐)는 아래 "선택 순서 유지" 참고.
 Maya 접근(현재 선택 가져오기 / 씬에서 선택)은 위젯이 직접 maya.cmds 를 호출한다.
 Maya 밖에서도 import / 위젯 생성이 가능하도록 cmds 는 메서드 내부에서 lazy import 하고,
 실패하면 조용히 무시한다.
@@ -40,6 +41,25 @@ UUID 는 보통 씬에서 유일하지만 **항상** 그렇진 않다. 같은 �
 `_node_of` 는 UUID 가 여러 노드로 잡히면 **담을 때의 표시 이름으로 그중 하나를 좁혀** 고르고
 (`_match_by_text`), 이름으로도 못 좁히면 첫 번째로 폴백한다. UUID 가 유일할 때의 동작
 (리네임/리페어런트 안전)은 그대로다.
+
+선택 순서 유지 (Order 토글)
+--------------------------
+`cmds.ls(sl=True)` 는 **컴포넌트**(vtx/edge/face)를 고른 순서가 아니라 **인덱스 순서**로
+돌려준다. 버텍스를 5→0→3→1 로 찍어도 리스트에는 0,1,3,5 로 올라온다는 뜻이다
+(오브젝트/트랜스폼은 pref 와 무관하게 이미 선택 순서를 유지한다 — 순서가 깨지는 건 컴포넌트뿐).
+
+선택 순서를 얻으려면 Maya 의 **Track Selection Order** 프리퍼런스가 켜져 있어야 하고
+(`cmds.selectPref(trackSelectionOrder=True)`), 그 뒤 `cmds.ls(orderedSelection=True)` 로 읽는다.
+pref 가 꺼져 있으면 `ls(orderedSelection=True)` 는 **에러 없이 조용히 인덱스 순서**를 돌려주므로
+"순서가 되는지"는 반환값이 아니라 pref 를 직접 조회해서 판단해야 한다.
+
+이 pref 는 **Maya 전역 설정**이라 항상 켜두는 대신 헤더의 **Order 체크박스**로 켤 때만 켠다:
+
+    - 체크 ON  : pref 를 켜고(원래 값 기억) Select/Add 가 `ls(orderedSelection=True, fl=True)` 사용
+    - 체크 OFF : 우리가 켠 경우에만 pref 를 원래대로 되돌리고 기존 동작(`ls(sl=True)`)으로 복귀
+
+pref 는 **켠 시점부터** 순서를 기록하므로, 체크한 뒤 **다시 선택해야** 순서가 잡힌다(로그로 안내).
+여러 TSL 위젯이 동시에 켜는 경우를 위해 모듈 전역 refcount(`_ORDER_REF`)로 pref 를 관리한다.
 """
 
 from Framework.qt.qt import *
@@ -62,6 +82,58 @@ def _cmds():
         return cmds
     except Exception:
         return None
+
+
+# Track Selection Order 프리퍼런스 refcount.
+#   count : 지금 이 pref 를 요구하고 있는 위젯 수
+#   prev  : 첫 위젯이 켜기 직전의 원래 pref 값(마지막 위젯이 끌 때 이 값으로 되돌린다)
+# 한 씬에 TSL 위젯이 여러 개 떠 있어도 하나가 꺼질 때 다른 위젯의 순서 추적이
+# 끊기지 않도록 전역으로 관리한다.
+_ORDER_REF = {"count": 0, "prev": None}
+
+
+def _get_track_order():
+    """Track Selection Order pref 값. Maya 밖이거나 조회 실패면 None."""
+    cmds = _cmds()
+    if cmds is None:
+        return None
+    try:
+        return bool(cmds.selectPref(q=True, trackSelectionOrder=True))
+    except Exception:
+        return None
+
+
+def _set_track_order(value):
+    cmds = _cmds()
+    if cmds is None:
+        return False
+    try:
+        cmds.selectPref(trackSelectionOrder=bool(value))
+        return True
+    except Exception:
+        return False
+
+
+def _acquire_order_tracking():
+    """순서 추적 사용을 선언. 첫 사용자면 pref 를 켜고 원래 값을 기억한다."""
+    if _ORDER_REF["count"] == 0:
+        prev = _get_track_order()
+        _ORDER_REF["prev"] = prev
+        if prev is False:
+            _set_track_order(True)
+    _ORDER_REF["count"] += 1
+
+
+def _release_order_tracking():
+    """사용 종료. 마지막 사용자면 우리가 켠 경우에 한해 pref 를 원래대로 되돌린다."""
+    if _ORDER_REF["count"] <= 0:
+        _ORDER_REF["count"] = 0
+        return
+    _ORDER_REF["count"] -= 1
+    if _ORDER_REF["count"] == 0:
+        if _ORDER_REF["prev"] is False:
+            _set_track_order(False)
+        _ORDER_REF["prev"] = None
 
 
 def _split_component(name):
@@ -97,7 +169,7 @@ class JUN_mod_tsl_qt_v01(QWidget):
     def __init__(self, title="List",
                  show_select=True, show_add=True, show_del=True,
                  show_up=True, show_down=True, show_sort=True,
-                 show_reverse=False,
+                 show_reverse=False, show_order=True, order_default=False,
                  multi_select=True, list_min_height=None,
                  select_label="Select Objects",
                  log_callback=None, parent=None):
@@ -113,12 +185,27 @@ class JUN_mod_tsl_qt_v01(QWidget):
         self.show_sort = show_sort
         # Reverse 버튼(리스트 순서 뒤집기). 기본 꺼짐 — 원하는 툴만 켠다.
         self.show_reverse = show_reverse
+        # Order 체크박스(선택 순서 유지). 헤더 행에 들어가므로 세로 공간을 더 먹지 않는다.
+        self.show_order = show_order
         self.multi_select = multi_select
         self.list_min_height = list_min_height
         # 중복 안내 등 메시지를 출력할 콜백. None 이면 print 사용(툴 로그창에 연결 가능).
         self.log_callback = log_callback
 
+        # 순서 추적 상태(체크박스가 없어도 set_order_tracking 으로 켤 수 있다).
+        # dict 로 두는 이유: destroyed 슬롯이 self 를 붙잡지 않도록 이 홀더만 캡처시킨다
+        # (C++ 위젯이 먼저 파괴된 뒤 self 속성에 접근하면 위험하다).
+        self._order_state = {"on": False}
+        self.chk_order = None
+
         self._build_ui()
+
+        # 위젯이 없어질 때 우리가 켠 pref 를 놓아준다(전역 설정을 남기지 않도록).
+        self.destroyed.connect(
+            lambda *_a, _s=self._order_state: _release_order_tracking() if _s["on"] else None)
+
+        if order_default:
+            self.set_order_tracking(True, quiet=True)
 
     # ================================================================
     # UI 구성
@@ -134,7 +221,7 @@ class JUN_mod_tsl_qt_v01(QWidget):
             self.btn_select.clicked.connect(self._on_select)
             layout.addWidget(self.btn_select)
 
-        # 헤더 행: 타이틀(bold) + Number 라벨
+        # 헤더 행: 타이틀(bold) + (선택) Order 체크박스 + Number 라벨
         header = QHBoxLayout()
         lbl_title = QLabel(self.title)
         font = lbl_title.font()
@@ -142,6 +229,17 @@ class JUN_mod_tsl_qt_v01(QWidget):
         lbl_title.setFont(font)
         header.addWidget(lbl_title)
         header.addStretch(1)
+        # Order 체크박스 — 켜면 Maya 에서 "고른 순서"대로 리스트에 담는다.
+        if self.show_order:
+            self.chk_order = QCheckBox("Order")
+            self.chk_order.setToolTip(
+                "List items in the order you picked them in Maya.\n"
+                "Vertices/edges/faces are otherwise listed by index, not by pick order.\n"
+                "While checked, Maya's 'Track Selection Order' preference is turned on\n"
+                "(restored when unchecked). Re-pick after checking it - the order is\n"
+                "only recorded from that point on.")
+            self.chk_order.toggled.connect(self._on_order_toggled)
+            header.addWidget(self.chk_order)
         self.lbl_number = QLabel("Number: 0")
         header.addWidget(self.lbl_number)
         layout.addLayout(header)
@@ -280,6 +378,39 @@ class JUN_mod_tsl_qt_v01(QWidget):
                 self.list_widget.item(i).setSelected(True)
         self.list_widget.blockSignals(False)
 
+    def is_order_tracking(self):
+        """선택 순서 유지가 켜져 있는지."""
+        return self._order_state["on"]
+
+    def set_order_tracking(self, enabled, quiet=False):
+        """선택 순서 유지 on/off (체크박스가 없어도 코드로 켤 수 있다).
+
+        켜면 Maya 의 Track Selection Order pref 를 켜고, 끄면 우리가 켠 경우에만
+        원래 값으로 되돌린다. pref 는 **켠 시점부터** 순서를 기록하므로 켠 뒤에 다시
+        선택해야 순서가 잡힌다.
+        """
+        enabled = bool(enabled)
+
+        # 체크박스와 상태를 동기화(코드에서 호출된 경우 시그널 루프 방지).
+        if self.chk_order is not None and self.chk_order.isChecked() != enabled:
+            self.chk_order.blockSignals(True)
+            self.chk_order.setChecked(enabled)
+            self.chk_order.blockSignals(False)
+
+        if enabled == self._order_state["on"]:
+            return
+
+        self._order_state["on"] = enabled
+        if enabled:
+            _acquire_order_tracking()
+            if not quiet:
+                self._log("Selection order: ON - pick your objects/components again "
+                          "so the order can be recorded.")
+        else:
+            _release_order_tracking()
+            if not quiet:
+                self._log("Selection order: OFF - items are listed in Maya's default order.")
+
     def add_button(self, label, callback, index=None):
         """편집 버튼 행에 커스텀 버튼을 추가한다. index=None 이면 맨 뒤에 붙인다."""
         btn = QPushButton(label)
@@ -403,10 +534,27 @@ class JUN_mod_tsl_qt_v01(QWidget):
         else:
             print(message)
 
+    def _on_order_toggled(self, checked):
+        self.set_order_tracking(checked)
+
     def _maya_selection(self):
+        """현재 Maya 선택. Order 가 켜져 있으면 **고른 순서**로 돌려준다.
+
+        `ls(orderedSelection=True)` 는 pref 가 꺼져 있으면 조용히 인덱스 순서를 주므로
+        pref 는 set_order_tracking 에서 미리 켜둔다. 혹시 비어 오면 기존 경로로 폴백.
+        """
         cmds = _cmds()
         if cmds is None:
             return []
+
+        if self._order_state["on"]:
+            try:
+                ordered = cmds.ls(orderedSelection=True, flatten=True) or []
+            except Exception:
+                ordered = []
+            if ordered:
+                return ordered
+
         return cmds.ls(sl=True, fl=True) or []
 
     def _on_select(self):

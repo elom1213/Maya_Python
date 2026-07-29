@@ -32,6 +32,15 @@
 | `A00330_NamingTool` | 네이밍 / 리네임 | [A00330_NamingTool](A00330_NamingTool.md) |
 | `A00340_SelectionTool` | 선택 / 리깅·애니 (오브젝트 재선택 버튼) | [A00340_SelectionTool](A00340_SelectionTool.md) |
 
+### 공용 위젯 (Framework)
+
+특정 툴이 아니라 **여러 툴이 함께 쓰는 위젯**의 동작·옵션 문서. 툴 문서는 "재사용 위젯 …" 이라고만 적고
+자세한 동작은 아래를 참조한다.
+
+| 모듈 | 내용 | 문서 |
+|------|------|------|
+| `Framework/qt/MOD_tsl_qt_v01.py` | 공용 리스트(TSL) 위젯 — Select/Add/Del/Up/Down/Sort, **Order(선택 순서 유지)**, UUID 보관 | [Framework_MOD_tsl_qt](Framework_MOD_tsl_qt.md) |
+
 ---
 
 ## 새 문서 추가 규칙
