@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- A00400_CurveTool shelf icon: NURBS curve with CV points + direction arrow -->
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+  <!-- the curve (S-shape, edge-attached curve) -->
+  <path d="M6 25 C 6 13, 26 19, 26 7"
+        fill="none" stroke="#ff9e64" stroke-width="2.4"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- CV points along the curve -->
+  <g fill="#2d2d30" stroke="#ff9e64" stroke-width="1.4">
+    <rect x="4.4" y="23.4" width="3.2" height="3.2" rx="0.6"/>
+    <rect x="14.4" y="14.4" width="3.2" height="3.2" rx="0.6"/>
+  </g>
+  <!-- start CV (filled) + direction arrow at the end (cv[0] end) -->
+  <rect x="24.4" y="5.4" width="3.2" height="3.2" rx="0.6" fill="#ff9e64"/>
+  <g stroke="#e8edf2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M22.4 9.6 L26 5.6 L29 8.4" transform="translate(-0.2 -0.2)"/>
+  </g>
+</svg>

@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-07-27
+updated: 2026-07-29
 ---
 
 # 작업 일지 (WORKLOG)
@@ -15,7 +15,25 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-07-27 (오늘)
+## 2026-07-29 (오늘)
+
+> [!summary] `A00400_CurveTool` **신규 툴 — 메시 엣지 → 커브(그룹별) + Reverse Direction** (v01.00)
+- **요청**: `ref_01.mel` 처럼 선택한 메시 엣지에 부착된 커브를 만들되, 여러 엣지 구간을 고르면 **구간마다 커브를
+  따로** 만들 것(ref 는 선택 전체를 커브 1개로만 묶음). + TSL 에 담은 커브들의 `cv[0]`/`cv[n]` 위치를 축으로
+  비교해 **Reverse Direction** 으로 방향 통일(A00360_SortTool 참고).
+- **반영**:
+  - **엣지 그룹핑**: 선택 엣지를 **정점 공유 연결 성분별로 그룹**(BFS)지어 그룹마다 `polyToCurve(form=2, degree,
+    ch=1)` 로 커브 1개 생성. `polyToCurve` 는 다중 그룹을 선택해도 커브 **1개**만 만들어 직접 그룹핑이 필수였다.
+    `ch=1` 이라 커브가 메시에 부착. Name Prefix / Smooth(degree 3) 옵션.
+  - **Reverse Direction**: `cv[0]`/`cv[n]` 월드 축값 비교 → `cv[0]` 을 Max end(기본)/Min end 에 오도록
+    `reverseCurve`. 이미 정렬/판단 불가(두 끝 동일)/커브 아님은 skip. 대상은 TSL `get_all_nodes()`(UUID-safe).
+  - A00360 구조(launch/__dragDrop/app.core/app.ui) 클론, coral_dark 테마. 아이콘 SVG→`dev/build_icons.py` PNG.
+- **검증**: mayapy — 떨어진 3 엣지 구간 → 정확히 3그룹/3커브, `reverseCurve` 실제 cv 반전(cv0 Y 0→3),
+  cv0_at_max/min 양방향·이미정렬 skip·커브아님 skip·빈선택 에러 전부 통과. **마야 실기 테스트 대기**.
+
+---
+
+## 2026-07-27
 
 > [!summary] `A00390_WindTool` **Node 드라이버별 전체 타이밍 offset(windPhaseOffset)** (v01.07→01.08)
 - **요청**: Node 모드에서 노드 한 개당 그 본들이 싸인의 어느 타이밍 값을 갖는지(전체 offset) 조절하는

@@ -1,0 +1,3 @@
+# Curve Tool
+VERSION = "01.00"
+LAST_UPDATE = "2026-07-29"
