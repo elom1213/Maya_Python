@@ -73,6 +73,7 @@ tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
 | `set_items(list)` / `append_unique(list)` / `clear()` / `count()` | 채우기·추가·비우기 |
 | `add_button(label, cb, index=None)` | 편집 버튼 행에 커스텀 버튼 끼워넣기 |
 | `set_order_tracking(bool, quiet=False)` / `is_order_tracking()` | 선택 순서 유지 on/off (3장) |
+| `maya_selection()` | **현재 Maya 선택**(flatten). Order 가 켜져 있으면 고른 순서 (3장 "리스트를 거치지 않는 버튼") |
 
 ---
 
@@ -118,13 +119,35 @@ tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
 순서가 **항상** 중요한 툴이라면 그 툴에서 `order_default=True` 로 열자마자 켜면 되고, 씬 노드가 아닌
 리스트(어트리뷰트·파일명 등)라면 `show_order=False` 로 체크박스를 숨긴다.
 
+### 리스트를 거치지 않는 버튼 — `maya_selection()`
+
+"리스트에 올리지 않고 **지금 선택한 것으로 바로 실행**" 하는 버튼을 툴에 둘 때는
+`ls(orderedSelection=...)` 를 호출부에서 다시 쓰지 말고 **`maya_selection()`** 을 쓴다.
+Order 판정(pref 조회) · `flatten` · pref 가 꺼졌을 때의 폴백이 이미 들어 있어서
+**Select / Add 버튼과 정확히 같은 규칙**이 보장된다 — 한 툴 안에서 두 경로의 순서가 어긋나지 않는다.
+
+```python
+objs = self.tsl.maya_selection()          # Order ON 이면 고른 순서
+if not objs:
+    self.log("[ERR] nothing selected in the scene")
+    return
+if not self.tsl.is_order_tracking() and len(objs) > 1:
+    self.log("[INFO] 'Order' is off - components come in index order.")
+```
+
+Order 가 꺼진 상태를 **조용히 넘기지 말고 로그로 알리는 것**이 중요하다. 사용자는 자기가 찍은
+순서대로 될 거라고 기대하는데, 컴포넌트는 인덱스 순서로 들어와도 에러가 나지 않는다.
+
+첫 적용: `A00060_jointTool_V02` 의 **`Match to Sel`** 버튼 (v01.04) — Curve 탭 `Match to Obj` 는
+리스트를, `Match to Sel` 은 현재 선택을 대상으로 같은 축 옵션으로 조인트를 만든다.
+
 ### 순서가 의미를 갖는 대표 사용처
 
 | 툴 | 순서가 결정하는 것 |
 |----|--------------------|
 | `A00350_ArrayCreator` | UE Control Rig Item Array 원소 순서 |
 | `A00390_WindTool` | 리스트 순번 = 조인트별 wind offset 인덱스 |
-| `A00060_jointTool_V02` (Curve/Divide) | 생성되는 조인트 체인 순서 |
+| `A00060_jointTool_V02` (Curve/Divide) | 생성되는 조인트 체인 순서 (`Match to Sel` 은 리스트 없이 선택 순서) |
 | `A00400_CurveTool` | 커브 CV·방향 순서 |
 | `A00110_animTool` (Stagger Offset) | 리스트 순서 = 스태거 단계 |
 | `A00090_ConnectionBuilder` / `A00145_RigConnect` | n→n 페어링에서 Source↔Target 짝 |

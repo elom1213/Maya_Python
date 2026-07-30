@@ -17,6 +17,40 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-07-30 (오늘)
 
+> [!summary] `A00060_jointTool_V02` **`Match to Sel` 버튼 추가** (v01.03→01.04)
+- **요청**: Curve 탭의 `Match to Obj` 는 **TSL 에 리스트업된** 오브젝트/버텍스만 대상으로 동작한다.
+  그 **오른쪽에 버튼을 하나 더** 만들어 **지금 선택한** 오브젝트/버텍스로 바로 Match to Obj 를 수행할 것.
+  `Order` 가 켜져 있고 버텍스를 여러 개 선택했다면 **고른 순서대로** 처리할 것.
+- **반영**
+  - `Tool : joint to obj` 의 버튼을 한 행(`QHBoxLayout`)으로: 왼쪽 **`Match to Obj`**(리스트) /
+    오른쪽 **`Match to Sel`**(현재 선택). 축 옵션(Connect·Separate, Foward/Secondary axis,
+    Secondary axis orient)은 **두 버튼이 공유**한다 — 핸들러를 `_match_to_objs(label, objs)` 로
+    묶어 대상만 갈아끼운다. `core` 는 **무변경**(`joints_to_objs` 가 이미 순서 있는 리스트를 받음).
+  - 선택 순서는 **공용 위젯에 이미 있는 판정을 재사용**했다. `JUN_mod_tsl_qt_v01._maya_selection()`
+    을 **`maya_selection()` 으로 public 노출**(Framework) → `Match to Sel` 은 이걸 호출만 한다.
+    Select/Add 버튼과 **정확히 같은 규칙**이라 두 경로가 어긋날 여지가 없다.
+  - 빈 선택은 만들지 않고 `[ERR] ... nothing selected`. Order 가 꺼진 채 2개 이상 선택하면
+    `[INFO] 'Order' is off` 로 **인덱스 순서로 간다고 미리 알린다**(조용히 다른 순서로 만들지 않음).
+- **함정(기록)**: `ls(sl=True)` 는 **컴포넌트를 고른 순서가 아니라 인덱스 순서**로 준다. 5→0→3→1 로
+  찍어도 0,1,3,5 다. 게다가 pref 가 꺼져 있으면 `ls(orderedSelection=True)` 도 **에러 없이 조용히**
+  인덱스 순서를 돌려주므로, "순서가 되는지"는 반환값이 아니라 **pref 를 조회해** 판단해야 한다.
+- **검증**: mayapy 8항목 전부 통과 — pref OFF 면 `ls(os)` 가 `[0,1,3,5]`(함정 재현) / pref ON 이면
+  `[5,0,3,1]`, 그 순서대로 **체인이 5,0,3,1 위치로** 생성(루트 1개·길이 4), `Separate` 는 전원 루트,
+  오프셋 그룹(+7Y) 아래 오브젝트도 **월드 위치 보존**. **마야 실기 UI 테스트 대기.**
+  #A00060 #MatchToSel #선택순서 #Framework
+
+> [!summary] `portfolio` **Epic PoseWrangler 플러그인 패치 내역 정리**(1-6 절 신설)
+- **요청**: `PoseDriverConnect/python` 의 git 기록에서 **최초 코드 ↔ 최신 코드** 차이를 분석해,
+  이력서 「MetaHuman 기반 캐릭터 리깅 및 커스터마이징 경험」 항목용 서술로 포트폴리오 두 문서에 추가.
+- **분석**: 커밋 4개(`699e71e` = 벤더 원본). 실질 변경은 `serializer_v1_2_0.deserialize()` 한 함수.
+  원본은 델타 모드 프리셋의 `driven_transforms`(헬퍼/트위스트 코렉티브 조인트)가 **씬에 전부 있다고 전제** —
+  rest 매트릭스 수집에서 예외, 델타 복원에서 `current_driven_transforms[name]` KeyError → 헬퍼가 하나만
+  없어도 **임포트 전체 실패**(= 커스텀 아바타에 프리셋 재사용 불가). 패치는 ① `cmds.objExists` 필터
+  ② 복원 루프 skip ③ driven 0개 솔버는 생성 스킵+로그(껍데기 솔버 방지).
+- **반영**: `portfolio_KR.md` / `portfolio_EN.md` 에 **1-6 절**을 1-5(비메타휴먼 아바타 일반화) 뒤에 배치
+  — 이 패치가 1-5 의 **전제 조건**이라는 인과가 드러나게. frontmatter `updated` 갱신, 메모리 기록.
+  플러그인 포크는 `JUN__PoseDriverConnect` (master=벤더 / dev=내 패치) 로 이미 동기화 상태. #portfolio #MetaHuman
+
 > [!summary] `A00410_SecondaryMotion` **Bone Chain / Bone Root 모드 + 출력 레지스트리** (v01.01→01.02)
 - **요청**: `A00390_WindTool` 에서 Bone Chain / Bone Root 를 나눈 것과 **같은 요청**. 기본(연속된 FK 계층)
   을 Chain 모드로 두고, **Root 모드**에서는 TSL 항목들을 각각 **임의의 체인의 최상위 부모**로 보고 자손마다

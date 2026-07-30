@@ -3,7 +3,7 @@
 MEL `JointTool V05.03`(탭: Curve / Divide / Aim)와 기존 `A00060_jointTool`(헤어 커브용 조인트 유틸)을
 하나로 합친 툴이다. **UI 는 PySide(Qt)**, 로직은 `maya.cmds` 로 작성되었다.
 
-- 버전: `v01.03` (`app/config/version.py`) — 조인트 생성 위치를 월드 절대 좌표로 (§6)
+- 버전: `v01.04` (`app/config/version.py`) — `Match to Sel` 버튼 추가 (§7)
 - 위치: `JUN_All/tools/A00060_jointTool_V02`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴(`QTabWidget` 4탭)
 - 원본 `A00060_jointTool` / MEL 파일은 그대로 보존(미수정)
@@ -57,7 +57,8 @@ A00060_jointTool_V02.run(True)   # True 면 DEV_MODE 에서 reload 후 실행
 - **Tool : joint to obj** — 리스트의 오브젝트 위치마다 조인트 생성
   - `Connect` : 조인트들을 체인으로 연결 / `Separate` : 각각 분리(루트)
   - `Foward axis` / `Secondary axis` / `Secondary axis orient` : orient 축 옵션
-  - `Match to Obj` : 실행
+  - `Match to Obj` : **리스트에 담긴 항목**으로 실행
+  - `Match to Sel` : **지금 씬에서 선택한** 오브젝트/버텍스로 바로 실행 (리스트 불필요, §7)
 - **Tool : joint orient and rotate** — 리스트 조인트에 대해
   - `joint orient to rotate` : jointOrient 값을 0으로, rotate 에 합산
   - `rotate to joint orient` : 반대로 합산
@@ -147,6 +148,7 @@ A00060_jointTool_V02/
 ## 5. 참고 / 주의
 
 - 작업 대상은 **씬 선택이 아니라 각 탭의 리스트에 담긴 항목**이다(먼저 Select/Add 로 리스트에 올릴 것).
+  **예외**: Curve 탭의 `Match to Sel` 만 리스트를 거치지 않고 현재 씬 선택으로 바로 동작한다(§7).
 - Set Orient / Reverse 는 리스트 순서가 체인 순서(root→end)와 일치해야 한다.
 - 원본 `A00060_jointTool` 의 카피 흔적(`config.py`/dragDrop 의 `A00040_file_exporter` 식별자)은
   V02 에 가져오지 않았다 — 모든 식별자는 `A00060_jointTool_V02` 로 일관.
@@ -169,3 +171,40 @@ A00060_jointTool_V02/
 
 - `aim_manager` 는 원래부터 전 구간 `ws=True`(위치 보존형) 라 변경 없음.
 - 세 수정 모두 **원점/무계층 케이스는 동작 불변**(하위 호환), 계층 아래 오브젝트만 올바르게 교정된다.
+
+---
+
+## 7. Match to Sel — 리스트 없이 현재 선택으로 바로 실행 (v01.04)
+
+Curve 탭 `Tool : joint to obj` 의 `Match to Obj` **오른쪽에 `Match to Sel` 버튼**이 추가됐다.
+
+| 버튼 | 대상 | 순서 |
+|------|------|------|
+| `Match to Obj` | **Selections 리스트**에 담긴 항목 | 리스트 순서 (Up/Down 으로 조정) |
+| `Match to Sel` | **지금 씬에서 선택한** 오브젝트/버텍스 | Maya 선택 순서 (아래 Order 참고) |
+
+축 옵션(`Connect`/`Separate`, Foward / Secondary axis, Secondary axis orient)은 **두 버튼이 공유**한다.
+버텍스 몇 개를 찍고 바로 조인트를 놓는 흐름에서 리스트에 올리는 단계를 생략할 수 있다.
+
+### 버텍스 선택 순서 (Order 체크박스)
+
+`cmds.ls(sl=True)` 는 **컴포넌트를 고른 순서가 아니라 인덱스 순서**로 돌려준다. 버텍스를
+5 → 0 → 3 → 1 로 찍어도 그냥 읽으면 0, 1, 3, 5 다. 그래서 `Match to Sel` 은 Selections 리스트
+헤더의 **`Order` 체크박스**를 그대로 따른다:
+
+- **Order ON** — Maya 의 `Track Selection Order` 프리퍼런스가 켜지고
+  `ls(orderedSelection=True, flatten=True)` 로 읽는다 → **찍은 순서대로** 체인이 생긴다.
+  pref 는 **켠 시점부터** 기록하므로 **체크한 뒤에 다시 선택**해야 순서가 잡힌다.
+- **Order OFF** — Maya 기본 순서(컴포넌트는 인덱스 순서). 2개 이상 선택 시 로그에
+  `[INFO] ... 'Order' is off` 로 알려준다.
+
+> **함정**: pref 가 꺼져 있으면 `ls(orderedSelection=True)` 는 **에러 없이 조용히 인덱스 순서**를
+> 돌려준다. "순서가 되는지"는 반환값이 아니라 pref 를 조회해서 판단해야 한다 —
+> 그 판정은 공용 위젯(`JUN_mod_tsl_qt_v01`)이 이미 하고 있어서, 이 버튼은 위젯의
+> **`maya_selection()`** (v01.04 에서 public 으로 노출) 을 호출만 한다. Select/Add 버튼과 정확히
+> 같은 규칙이라 두 경로가 어긋날 일이 없다.
+
+- 선택이 비어 있으면 아무것도 만들지 않고 `[ERR] Match to Sel : nothing selected in the scene`.
+- 전체 작업은 기존과 같이 **undo chunk** 로 묶인다(Ctrl+Z 한 번).
+- headless(mayapy) 검증: pref ON/OFF 순서 거동, 찍은 순서(5,0,3,1)대로 생기는 체인,
+  `Separate` 모드의 전원 루트 여부, 오프셋 그룹 아래 오브젝트의 월드 위치 보존.

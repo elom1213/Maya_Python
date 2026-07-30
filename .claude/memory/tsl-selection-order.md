@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 023af178-09b0-4514-8e85-069cf18e3ef9
-  modified: 2026-07-29T01:01:02.813Z
+  modified: 2026-07-30T06:16:11.721Z
 ---
 
 공용 TSL 위젯 `Framework/qt/MOD_tsl_qt_v01.py` (2026-07-29, 구현+헤드리스 검증+푸시, 마야 실기 대기)에
@@ -23,6 +23,10 @@ metadata:
   refcount(`_ORDER_REF`), 위젯 `destroyed` 시 자동 반납(람다가 self 대신 dict 홀더만 캡처).
 - 옵션: `show_order`(기본 True, 체크박스 표시) / `order_default`(기본 False) /
   `set_order_tracking()` / `is_order_tracking()`. 호출부 75곳 AST 확인 — 위치 인자 2개 이상 없음.
+- **"리스트 말고 지금 선택한 것으로 바로 실행" 버튼을 만들 땐 `maya_selection()`** (2026-07-30 public 노출,
+  내부 `_maya_selection()` 위임)을 호출한다. Order 판정 + `flatten` + 폴백이 이미 들어 있어 Select/Add
+  버튼과 **같은 규칙**이 보장된다 — 호출부에서 `ls(orderedSelection=...)` 를 다시 쓰지 말 것.
+  첫 적용: A00060_jointTool_V02 `Match to Sel` (v01.04).
 - **mayapy 로는 이 위젯을 못 띄운다**: `maya.standalone` 이 이미 `QGuiApplication` 을 만들어 둬
   `QWidget` 생성 실패. Maya 의미론은 mayapy 로, 위젯 배선은 **stub `maya.cmds` + 시스템 python PySide6** 로 검증.
 - 문서: `JUN_All/docs/Framework_MOD_tsl_qt.md` (공용 위젯 문서, docs/README.md 에 "공용 위젯" 섹션).

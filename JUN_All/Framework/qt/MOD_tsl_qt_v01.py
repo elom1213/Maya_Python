@@ -411,6 +411,15 @@ class JUN_mod_tsl_qt_v01(QWidget):
             if not quiet:
                 self._log("Selection order: OFF - items are listed in Maya's default order.")
 
+    def maya_selection(self):
+        """현재 Maya 선택(flatten). Order 가 켜져 있으면 **고른 순서**로 돌려준다.
+
+        Select/Add 버튼이 쓰는 것과 같은 규칙이므로, 호출부가 "리스트 대신 지금
+        선택한 것으로 바로 실행" 하는 버튼을 만들 때 순서 처리를 다시 구현하지 않아도
+        된다. Order 가 꺼져 있으면 `ls(sl=True)` 와 같다(컴포넌트는 인덱스 순서).
+        """
+        return self._maya_selection()
+
     def add_button(self, label, callback, index=None):
         """편집 버튼 행에 커스텀 버튼을 추가한다. index=None 이면 맨 뒤에 붙인다."""
         btn = QPushButton(label)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-17
+# last Update date : 2026-07-30
 # A00060_jointTool_V02 - Qt UI
 #
 # MEL JointTool V05.03 의 3탭(Curve / Divide / Aim)을 PySide 로 포팅하고,
@@ -8,6 +8,9 @@
 #
 # v01.01 : Aim 탭 개선 - Aim axis 드롭박스(X/Y/Z)로 pole tgt 을 향할 보조축 선택.
 #          aimConstraint(부모->자식 cycle) 대신 벡터 연산으로 jointOrient 직접 계산.
+# v01.04 : Curve 탭 joint to obj 에 "Match to Sel" 버튼 추가 - 리스트를 거치지 않고
+#          지금 씬에서 선택한 오브젝트/버텍스로 바로 실행. Order 가 켜져 있으면
+#          버텍스를 고른 순서대로 처리.
 
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
@@ -146,9 +149,20 @@ class MainWindow(QWidget):
         box_obj.addLayout(self._labeled("Secondary axis :", self.cmb_secd_axis))
         box_obj.addLayout(self._labeled("Secondary axis orient :", self.cmb_secd_ori))
 
+        # 왼쪽 = 리스트에 담긴 항목 / 오른쪽 = 지금 씬에서 선택한 것
+        match_btn_row = QHBoxLayout()
         btn_match = QPushButton("Match to Obj")
+        btn_match.setToolTip("Create joints at the objects/vertices listed above.")
         btn_match.clicked.connect(self.on_match_to_obj)
-        box_obj.addWidget(btn_match)
+        btn_match_sel = QPushButton("Match to Sel")
+        btn_match_sel.setToolTip(
+            "Create joints at the objects/vertices selected in the scene right now,\n"
+            "without listing them first.\n"
+            "With 'Order' checked, vertices are processed in the order you picked them.")
+        btn_match_sel.clicked.connect(self.on_match_to_sel)
+        match_btn_row.addWidget(btn_match)
+        match_btn_row.addWidget(btn_match_sel)
+        box_obj.addLayout(match_btn_row)
         layout.addWidget(box_obj)
 
         # frame : joint orient and rotate
@@ -391,14 +405,36 @@ class MainWindow(QWidget):
         curves = self.tsl_curve.get_all_items()
         self._run("Clusters", lambda: crv_mgr.clusters_to_curves(curves))
 
-    def on_match_to_obj(self):
-        objs = self.tsl_curve.get_all_items()
+    def _match_to_objs(self, label, objs):
+        """joint to obj 축 옵션을 읽어 objs 순서대로 조인트를 만든다."""
         separate = (self.rb_match_group.checkedId() == 1)
         fwd = self.cmb_fwd_axis.currentIndex() + 1
         secd = self.cmb_secd_axis.currentIndex() + 1
         secd_ori = self.cmb_secd_ori.currentIndex() + 1
-        self._run("Match to Obj",
+        self._run(label,
                   lambda: obj_mgr.joints_to_objs(objs, separate, fwd, secd, secd_ori))
+
+    def on_match_to_obj(self):
+        self._match_to_objs("Match to Obj", self.tsl_curve.get_all_items())
+
+    def on_match_to_sel(self):
+        """리스트를 거치지 않고 **지금 씬에서 선택한** 오브젝트/버텍스로 바로 실행.
+
+        Selections 리스트의 **Order** 체크박스가 켜져 있으면 `ls(orderedSelection=True)`
+        로 **고른 순서**를 그대로 쓴다(버텍스 여러 개를 찍은 순서대로 체인이 생긴다).
+        Order 가 꺼져 있으면 Maya 기본 순서 — 컴포넌트는 인덱스 순서다.
+        """
+        objs = self.tsl_curve.maya_selection()
+        if not objs:
+            self.log("[ERR] Match to Sel : nothing selected in the scene")
+            cmds.warning("Select objects or vertices first")
+            return
+
+        if not self.tsl_curve.is_order_tracking() and len(objs) > 1:
+            self.log("[INFO] Match to Sel : 'Order' is off - using Maya's default order "
+                     "(components come in index order).")
+
+        self._match_to_objs("Match to Sel ({0})".format(len(objs)), objs)
 
     def on_swap_ori_to_rot(self):
         joints = self.tsl_curve.get_all_items()
