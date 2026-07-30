@@ -4,6 +4,10 @@
       "name": "Main",
       "buttons": [
         {
+          "name": "MeshTool",
+          "path": "tools/A00380_MeshTool"
+        },
+        {
           "name": "uvTool",
           "path": "tools/A00050_uvTool"
         },
