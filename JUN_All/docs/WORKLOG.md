@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-07-29
+updated: 2026-07-30
 ---
 
 # 작업 일지 (WORKLOG)
@@ -15,7 +15,21 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-07-29 (오늘)
+## 2026-07-30 (오늘)
+
+> [!summary] `A00030_quickTool` **`Copy Scene Folder` 버튼 추가** (V01.13→V01.14)
+- **요청**: 버튼을 누르면 현재 씬 파일이 저장된 위치를 클립보드에 복사(이후 Ctrl+V 붙여넣기). 이어서
+  "파일 이름은 빼고 폴더까지만" 복사하도록 수정 + 창 세로가 짧아 마지막 버튼 아래 Copyright 가 잘림.
+- **반영**: 새 **`File` 섹션**에 **`Copy Scene Folder`** 버튼(콜백 `JUN_cmd_copy_scene_path`).
+  `cmds.file(q, sceneName)` 로 씬 경로를 얻어 **`os.path.dirname` 으로 파일명 제거 → 저장 폴더만**,
+  `os.path.normpath` 로 OS 네이티브(`\`) 경로로 변환 후 **Qt `QApplication.clipboard().setText`** 로
+  복사(Maya 밖에서도 붙여넣기). 미저장(untitled) 씬은 경고만. 섹션 추가로 창 높이 **300→360**(Copyright 노출).
+- **검증**: mayapy — `cmds.file(q, sceneName)` 미저장 `''` / 저장 시 전체 경로, `dirname`+`normpath` 폴더
+  네이티브 경로 확인. 모듈 컴파일 통과. **마야 실기 확인은 셸프 `run(True)` 로**.
+
+---
+
+## 2026-07-29
 
 > [!summary] `A00410_SecondaryMotion` **FK 컨트롤러 원본 포즈 보존 + 팁 회전(dummy bone)** (v01.00→01.01)
 - **요청(사용자 실기 테스트)**: ① `ctl_01/02/03` FK 체인에 적용하면 **ctl_02·ctl_03 과 그 하위의 원래

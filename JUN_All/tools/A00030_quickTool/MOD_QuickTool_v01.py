@@ -12,9 +12,11 @@
 # V01.11 : remove rename uv button
 # V01.12 : Create tool - add "Cluster Each" button (one cluster per selected object)
 # V01.13 : add Pin (always on top) toggle / remove Anim Tool UI
+# V01.14 : add "Copy Scene Folder" button (copy current scene folder path to clipboard)
 
 import maya.cmds as cmds;
 import maya.mel as mel
+import os
 from functools import partial
 
 import config
@@ -91,6 +93,34 @@ def JUN_cmd_create_cluster_each(*args, **kwargs):
     print("Created {0} cluster(s): {1}".format(len(handles), handles))
 
 
+def JUN_cmd_copy_scene_path(*args, **kwargs):
+    """현재 씬 파일이 저장된 '폴더' 경로를 클립보드에 복사한다 (이후 Ctrl+V 로 붙여넣기).
+
+    - 파일 이름은 빼고 폴더까지만 복사한다(os.path.dirname).
+    - 경로는 cmds.file(q, sceneName) 로 얻는다(미저장 씬이면 "" -> 경고만 낸다).
+    - Maya 는 슬래시(/) 경로를 주므로 os.path.normpath 로 OS 네이티브(Windows 는 \\)
+      형태로 바꿔 탐색기/파일 다이얼로그에 그대로 붙여넣을 수 있게 한다.
+    - 클립보드는 Qt(QApplication.clipboard)로 설정해 Maya 밖 다른 앱에서도 붙여넣기가 된다.
+    """
+    scene_path = cmds.file(q=True, sceneName=True)
+
+    if not scene_path:
+        cmds.warning("Current scene has not been saved yet (no file path to copy).")
+        return
+
+    # 파일 이름을 떼고 저장 폴더만 남긴다.
+    folder_path = os.path.normpath(os.path.dirname(scene_path))
+
+    from Framework.qt.qt import QApplication
+    clipboard = QApplication.clipboard()
+    if clipboard is None:
+        cmds.warning("Could not access the system clipboard.")
+        return
+    clipboard.setText(folder_path)
+
+    print("Copied scene folder to clipboard: {0}".format(folder_path))
+
+
 # call back functions (End)
 #====================================================================
 
@@ -98,11 +128,12 @@ def JUN_cmd_create_cluster_each(*args, **kwargs):
 class JUN_ToolUI_QuickTool:
     def __init__(self):
         # self.str_winTitle = "Quick Tool V01.06"
-        self.str_headTitle = "Quick Tool V01.13"
-        self.str_winName = "Junny_win_Quick_tool_V01_13"
+        self.str_headTitle = "Quick Tool V01.14"
+        self.str_winName = "Junny_win_Quick_tool_V01_14"
         self.win_width = 300;
-        # Anim Tool 섹션을 없앤 만큼 창을 줄인다. 버튼 높이는 기존 값(450/40)을 유지.
-        self.win_height = 300;
+        # File 섹션(Copy Scene Folder)을 추가한 만큼 창 세로를 늘려, 마지막 버튼 아래
+        # Copyright 문구까지 잘리지 않고 보이게 한다. 버튼 높이는 기존 값(450/40)을 유지.
+        self.win_height = 360;
         self.btn_hight = 11.25
 
         self.color_mainDark = [0.10, 0.12, 0.18]
@@ -115,6 +146,7 @@ class JUN_ToolUI_QuickTool:
         self.idx_printTool = 1
         self.idx_importFBX_nrm = 2
         self.idx_create_tex_file = 3
+        self.idx_file = 4
 
         self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 23-MAY-2026\')".format(self.color_main)
 
@@ -233,6 +265,20 @@ class JUN_ToolUI_QuickTool:
         cmds.setParent( '..' )
         # Create tool (close)
 
+        # File tool (open)
+        cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =self.color_sub );
+
+        cmds.text( align="left", label='File' );
+
+        cmds.setParent( '..' )
+
+        cmds.paneLayout( configuration= "vertical2", paneSize = ([1,50,100],[2,50,100]))
+
+        self.create_buttons(btn_specs[self.idx_file])
+
+        cmds.setParent( '..' )
+        # File tool (close)
+
         cmds.text( align="center", label='Copyright (c) Park Ji Hun. All rights reserved.' );
 
         cmds.showWindow(self.str_winName);
@@ -297,6 +343,13 @@ def JUN_PY_Quick_tool_v01_08():
                             "callback": JUN_cmd_create_cluster_each
                         }
 
+                    ],
+                    # idx_file : 4
+                    [
+                        {
+                            "label": "Copy Scene Folder",
+                            "callback": JUN_cmd_copy_scene_path
+                        }
                     ]
                 ]
     

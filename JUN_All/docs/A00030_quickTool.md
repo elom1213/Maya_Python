@@ -1,9 +1,9 @@
 # A00030_quickTool — Quick Tool (사용 안내)
 
 자주 쓰는 자잘한 작업을 버튼 하나로 처리하는 잡동사니 툴이다. 플레이백 갱신 범위 전환, 선택 출력,
-FBX 노멀 임포트 옵션, 텍스처 파일 노드 생성, 오브젝트별 클러스터 생성을 모아뒀다.
+FBX 노멀 임포트 옵션, 텍스처 파일 노드 생성, 오브젝트별 클러스터 생성, 씬 저장 폴더 복사를 모아뒀다.
 
-- 버전: `V01.13` (파일 헤더 주석 / `str_headTitle`)
+- 버전: `V01.14` (파일 헤더 주석 / `str_headTitle`)
 - 위치: `JUN_All/tools/A00030_quickTool`
 - 형태: 아키텍처 (A) — **maya.cmds UI** 툴
 
@@ -36,6 +36,7 @@ A00030_quickTool/
 | **Import option** — `Import FBX normal` | FBX 임포트 시 `OverrideNormalsLock` 을 켠다 |
 | **Create tool** — `Create texture file` | `file` + `place2dTexture` 를 만들고 UV 관련 어트리뷰트를 전부 연결 |
 | **Create tool** — `Cluster Each` (v01.12~) | 선택한 **오브젝트마다 클러스터를 하나씩** 만든다 |
+| **File** — `Copy Scene Folder` (v01.14~) | 현재 씬이 **저장된 폴더 경로**를 클립보드에 복사(이후 Ctrl+V 붙여넣기) |
 
 ## 4. 동작 규칙
 
@@ -52,10 +53,20 @@ A00030_quickTool/
 호출해야 하므로, 선택 목록을 돌며 `cmds.select(obj, replace=True)` → `cmds.cluster(relative=True)` 를
 반복한다. 여러 개여도 `undo_chunk()` 로 묶어 **Ctrl+Z 한 번**에 되돌아간다. 끝나면 생성된 핸들을 선택한다.
 
+### Copy Scene Folder
+현재 씬 파일의 전체 경로를 `cmds.file(q=True, sceneName=True)` 로 얻은 뒤, **파일 이름은 떼고**
+`os.path.dirname` 으로 **저장 폴더까지만** 남긴다. Maya 는 슬래시(`/`) 경로를 주므로
+`os.path.normpath` 로 OS 네이티브(Windows 는 `\`) 형태로 바꿔 탐색기/파일 다이얼로그에 그대로
+붙여넣을 수 있게 한다. 클립보드는 **Qt(`QApplication.clipboard().setText`)** 로 설정해 Maya 밖 다른
+앱에서도 **Ctrl+V** 로 붙여넣기가 된다. 아직 **저장 안 된(untitled) 씬**이면 경로가 없어 복사하지 않고
+경고만 낸다.
+
 ## 5. 로그 · 문제 해결
 
 - `Created 3 cluster(s): [...]` — `Cluster Each` 성공. 아무것도 선택하지 않으면
   `Select object(s) first.` 경고.
+- `Copied scene folder to clipboard: <경로>` — `Copy Scene Folder` 성공. 저장 안 된 씬이면
+  `Current scene has not been saved yet (no file path to copy).` 경고.
 - `Pin: could not access this window as a Qt widget.` — 창의 Qt 핸들을 못 찾은 경우.
   창을 닫았다 다시 열어본다.
 
@@ -70,3 +81,5 @@ A00030_quickTool/
   `JUN_cmd_anim_rot_x_z_to_zero`, `JUN_mod_tfg` 의존 제거). 섹션이 빠진 만큼 창 높이 450 → 300.
   > `Update window` 의 콜백 `JUN_cmd_update_window_for_anim` 은 이름에 anim 이 들어가지만
   > Anim Tool 이 아니라 `playbackOptions` 토글이므로 남아 있다.
+- `V01.14` — **`File` 섹션 + `Copy Scene Folder` 버튼 추가** (씬 저장 폴더 경로를 Qt 클립보드로 복사,
+  콜백 `JUN_cmd_copy_scene_path`). 섹션이 늘어난 만큼 창 높이 300 → 360 (Copyright 문구 잘림 방지).
