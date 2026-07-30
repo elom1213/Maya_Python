@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-29
+# last Update date : 2026-07-30
 # A00410_SecondaryMotion core - 샘플링 캐시 / 솔브 / 기록(프리뷰 레이어 · 확정) 오케스트레이션.
 #
 # 흐름
@@ -25,6 +25,7 @@ import maya.cmds as cmds
 from maya.api import OpenMaya as om, OpenMayaAnim as oma
 
 from tools.A00410_SecondaryMotion.app.core import chain_solver
+from tools.A00410_SecondaryMotion.app.core import outputs
 from tools.A00410_SecondaryMotion.app.core import pose_builder
 from tools.A00410_SecondaryMotion.app.core import scene_sampler
 
@@ -35,9 +36,10 @@ PREVIEW_LAYER = "SM_preview_LYR"
 # 결과를 쓰는 회전 어트리뷰트.
 ROT_ATTRS = ("rotateX", "rotateY", "rotateZ")
 
-# 출력 모드
-OUTPUT_LAYER = "layer"     # override 애님 레이어(기본) — 원본 보존 + weight 로 강도 조절
-OUTPUT_KEYS = "keys"       # 컨트롤러/조인트 커브에 직접 굽기
+# 출력 id — 실제 구현은 outputs.py 의 레지스트리에 있다(새 출력은 그쪽에만 추가).
+OUTPUT_LAYER = outputs.OUTPUT_LAYER
+OUTPUT_KEYS = outputs.OUTPUT_KEYS
+OUTPUT_NODE = outputs.OUTPUT_NODE
 
 
 def _layer_exists(name):
@@ -68,6 +70,7 @@ class SecondaryMotionSession(object):
         self._last_writes = {}     # node -> [(rx,ry,rz), ...]
         self.branched = []
         self.missing = []
+        self.empty_roots = []
 
     # ------------------------------------------------------------ helpers
 
@@ -94,10 +97,11 @@ class SecondaryMotionSession(object):
         # 프리뷰 레이어가 살아 있으면 자기 출력을 되먹으므로 먼저 지운다.
         self.clear_preview()
 
-        chains, missing, branched = scene_sampler.resolve_chains(
-            nodes, mode, target_type)
-        self.missing = missing
-        self.branched = branched
+        res = scene_sampler.resolve_chains(nodes, mode, target_type)
+        chains = res.chains
+        self.missing = res.missing
+        self.branched = res.branched
+        self.empty_roots = res.empty_roots
 
         if not chains:
             raise RuntimeError(
@@ -170,8 +174,8 @@ class SecondaryMotionSession(object):
         if not writes:
             return 0
 
-        layer = self._ensure_layer(PREVIEW_LAYER, writes.keys())
-        self._write_curves(layer, writes)
+        layer = self.ensure_layer(PREVIEW_LAYER, writes.keys())
+        self.write_curves(layer, writes)
         return len(writes)
 
     def clear_preview(self):
@@ -179,47 +183,49 @@ class SecondaryMotionSession(object):
         self._curves = {}
         return delete_layer(PREVIEW_LAYER)
 
+    def has_preview(self):
+        """프리뷰 레이어가 살아 있고 우리가 만든 커브를 알고 있는가."""
+        return bool(_layer_exists(PREVIEW_LAYER) and self._curves)
+
+    def promote_preview(self, name):
+        """프리뷰 레이어를 최종 이름으로 승격(재계산 없음). 반환: 실제 레이어 이름."""
+        final = cmds.rename(PREVIEW_LAYER, name)
+        self._curves = {}
+        return final
+
+    def forget_layer(self):
+        """레이어 커브 캐시를 버린다(다음 프리뷰가 레이어를 새로 만든다)."""
+        self._curves = {}
+
     # -------------------------------------------------------------- apply
 
-    def apply(self, params, output_mode, layer_name=None):
-        """결과 확정. 반환: (노드 수, 안내 메시지)"""
-        writes = self._last_writes or self.solve(params)
-        if not writes:
-            raise RuntimeError("Nothing to apply.")
+    def apply(self, params, output_id, **kw):
+        """결과 확정. 실제 기록은 outputs.py 의 spec 이 담당한다.
 
-        if output_mode == OUTPUT_LAYER:
-            name = layer_name or self._default_layer_name()
-            if _layer_exists(PREVIEW_LAYER) and self._curves:
-                # 프리뷰 레이어를 그대로 최종 레이어로 승격(다시 계산하지 않는다).
-                final = cmds.rename(PREVIEW_LAYER, name)
-                self._curves = {}
-                return len(writes), (
-                    "Applied to override anim layer '{0}' ({1} nodes). "
-                    "Use the layer weight to dial the amount.".format(final, len(writes)))
+        새 출력(예: A00390 처럼 라이브 노드망)을 붙일 때 이 함수는 손댈 필요가 없다 —
+        outputs.py 에 spec 을 register() 하면 된다.
 
-            final = self._ensure_layer(name, writes.keys(), unique=True)
-            self._write_curves(final, writes)
-            self._curves = {}
-            return len(writes), (
-                "Applied to override anim layer '{0}' ({1} nodes). "
-                "Use the layer weight to dial the amount.".format(final, len(writes)))
+        반환: (노드 수, 안내 메시지)
+        """
+        spec = outputs.get(output_id)
 
-        # keys: 컨트롤러/조인트 커브에 직접 굽는다.
-        self.clear_preview()
-        self._bake_keys(writes)
-        return len(writes), (
-            "Baked keys onto {0} nodes, frames {1}~{2}.".format(
-                len(writes), self.frames[0], self.frames[-1]))
+        writes = None
+        if spec.needs_solve:
+            writes = self._last_writes or self.solve(params)
+            if not writes:
+                raise RuntimeError("Nothing to apply.")
+
+        return spec.apply(self, params, writes, **kw)
 
     # ------------------------------------------------------ layer/curves
 
-    def _default_layer_name(self):
+    def default_layer_name(self):
         if not self.samples:
             return "SM_LYR"
         base = self.samples[0].nodes[0].split("|")[-1].split(":")[-1]
         return "SM_{0}_LYR".format(base)
 
-    def _ensure_layer(self, name, nodes, unique=False):
+    def ensure_layer(self, name, nodes, unique=False):
         """override 애님 레이어를 만들고 대상 회전 어트리뷰트를 등록한다.
 
         레이어 커브는 만들자마자 이름을 캐시해 둔다(이후 갱신은 값만 덮어쓴다).
@@ -252,7 +258,7 @@ class SecondaryMotionSession(object):
                     self._curves[(node, at)] = new[0]
         return layer
 
-    def _write_curves(self, layer, writes):
+    def write_curves(self, layer, writes):
         """프리뷰/최종 레이어 커브에 값 벌크 기록.
 
         키 개수가 이미 맞으면 값만 덮어쓰고(가장 빠름), 아니면 전부 다시 만든다.
@@ -282,7 +288,7 @@ class SecondaryMotionSession(object):
                         va.append(_rad(values[k][ai]))
                     fn.addKeys(times, va)
 
-    def _bake_keys(self, writes):
+    def bake_keys(self, writes):
         """base 커브에 직접 키를 굽는다(undo 가능한 cmds 경로)."""
         start, end = self.frames[0], self.frames[-1]
         for node, values in writes.items():

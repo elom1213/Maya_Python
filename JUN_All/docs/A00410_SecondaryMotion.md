@@ -2,7 +2,7 @@
 title: A00410_SecondaryMotion 사용법
 aliases: [Secondary Motion, SecondaryMotion, A00410, 찰랑이, 관성 툴]
 tags: [maya-python, tool-guide, animation, secondary-motion, physics, kawaiiphysics]
-updated: 2026-07-29
+updated: 2026-07-30
 ---
 
 # A00410_SecondaryMotion 사용법
@@ -14,7 +14,7 @@ FK 로 애니메이션된 **컨트롤러/조인트 체인**에 언리얼 **Kawai
 부모를 더 따라간다.** 마야의 시뮬레이션 솔버(nucleus/nHair/nCloth)를 **쓰지 않는다** — 게임 에셋
 작업에 맞춰 가볍고 빠르며, 스크럽/되감기가 자유롭다.
 
-- **버전**: `app/config/version.py` (v01.01)
+- **버전**: `app/config/version.py` (v01.02)
 - **설치**: `__dragDrop_A00410.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **SecondMotion** →
   `tools.A00410_SecondaryMotion.run(True)`
 - **설계 배경**: [plans/A00410_ChainPhysics_plan](plans/A00410_ChainPhysics_plan.md)
@@ -49,9 +49,9 @@ FK 로 애니메이션된 **컨트롤러/조인트 체인**에 언리얼 **Kawai
 │ │ ctrl_hair_02                          │ │
 │ └───────────────────────────────────────┘ │
 │ [Add][Del][Up][Down]                      │
-│ ┌ Chain From ──┐ ┌ Target ──────────────┐ │
-│ │ (o) List order│ │ (o) Controller       │ │
-│ │ ( ) Hierarchy │ │ ( ) Joint (direct)   │ │
+│ ┌ Mode ────────┐ ┌ Target ──────────────┐ │
+│ │ (o) Bone Chain│ │ (o) Controller       │ │
+│ │ ( ) Bone Root │ │ ( ) Joint (direct)   │ │
 │ └───────────────┘ └──────────────────────┘ │
 │ Start [1]  End [300]  [Get Current][Sel]  │
 │ ┌ Physics ──────────────────────────────┐ │
@@ -77,15 +77,36 @@ FK 로 애니메이션된 **컨트롤러/조인트 체인**에 언리얼 **Kawai
 
 ## 3. 사용 순서
 
-1. 씬에서 체인을 **루트부터 순서대로** 고르고 **Select Chain**.
-   - 순서가 중요하므로 리스트 헤더의 **`Order`** 체크박스를 켜고 고르면 클릭한 순서가 유지된다
+1. 씬에서 대상을 골라 **Select Chain**. 담는 방식은 **Mode** 에 따라 다르다(3.1 참고).
+   - **Bone Chain**: 체인을 **루트부터 순서대로** 담는다. 순서가 중요하므로 리스트 헤더의
+     **`Order`** 체크박스를 켜고 고르면 클릭한 순서가 유지된다
      ([Framework_MOD_tsl_qt](Framework_MOD_tsl_qt.md) 참고). Up/Down 으로 고칠 수도 있다.
-   - 루트 하나만 담고 **Chain From = Hierarchy** 로 두면 자손을 자동으로 따라간다.
+   - **Bone Root**: 체인들의 **최상위 부모만** 담는다(여러 개 담아도 된다). 순서는 상관없다.
 2. **Target** 을 고른다 — 컨트롤러에 구울지, **조인트에 직접** 구울지.
 3. **Start / End** 구간을 정한다.
 4. **Live Preview** 를 켠다 → 구간 전체가 계산되어 프리뷰 레이어에 들어간다. 재생해서 확인한다.
 5. 슬라이더로 느낌을 잡는다. **Falloff 가 관성 다이얼**이다.
 6. **Output** 을 고르고 **Apply**.
+
+### 3.1 Mode — Bone Chain / Bone Root
+
+`A00390_WindTool` 의 Bone Chain / Bone Root 와 같은 개념이다.
+
+| 모드 | 리스트에 담는 것 | 동작 |
+|------|------------------|------|
+| **Bone Chain** (기본) | 체인의 노드들을 **루트부터 순서대로** | 리스트업한 노드들이 **하나의 체인**. 리스트 순서가 곧 루트→팁 순서다 |
+| **Bone Root** | 각 체인의 **최상위 부모만** | 담은 노드마다 그 **자손을 따라 체인을 만든다** → 머리카락 여러 다발처럼 **여러 체인을 한 번에** 처리 |
+
+**Bone Root 의 규칙**
+
+- **컨트롤러 대상**: `ctl_01 > ctl_01_offset > ctl_02` 처럼 중간에 낀 **오프셋/제로 그룹은 지나가되
+  체인에 담지 않는다** — **셰이프를 가진 노드(컨트롤)만** 체인 노드가 된다. 그래서 그룹에 키가 찍히거나
+  체인 길이가 부풀어 falloff 가 어긋나는 일이 없다. (셰이프가 아예 없는 계층이면 필터를 끄고 한 번 더
+  시도하므로, 그룹만으로 된 체인도 그대로 동작한다.)
+- **조인트 대상**: 계층 탐색이 joint 로 제한된다.
+- **분기**: 자식이 여럿이면 **루트→말단 경로마다 체인**이 되고, 공유되는 앞 구간은 **가장 긴 체인이
+  소유**한다(중복 기록 없음). 로그로 알린다.
+- 담은 노드에 **자식이 없으면** 체인이 안 되므로 로그로 알린다(`No chain under: ...`).
 
 ---
 
@@ -121,6 +142,11 @@ FK 로 애니메이션된 **컨트롤러/조인트 체인**에 언리얼 **Kawai
 Live Preview 를 켠 상태에서 Apply 하면, 프리뷰 레이어가 그대로 최종 레이어로 **이름만 바뀌어**
 승격되므로 다시 계산하지 않는다.
 
+> **확장 지점**: 출력 방식은 `app/core/outputs.py` 의 **레지스트리**로 관리된다. 현재는 둘 다
+> "커브(키로 굽기)" 계열이고, 훗날 `A00390_WindTool` 처럼 **라이브 노드망 출력**을 붙일 수 있게
+> `Live Node` spec 이 예약돼 있다. spec 하나를 `register()` 하면 **UI Output 라디오에 자동으로
+> 나타나고**, 솔버·샘플러·회전 재구성은 손댈 필요가 없다.
+
 ---
 
 ## 6. 동작 규칙
@@ -138,8 +164,8 @@ Live Preview 를 켠 상태에서 Apply 하면, 프리뷰 레이어가 그대로
 - **트위스트(롤)가 보존된다.** 원본 방향 → 시뮬 방향의 **순수 스윙**만 얹기 때문에, 원본 애니의 롤이 남는다.
 - **조인트 직접 모드**는 `jointOrient` 를 벗겨내고 로컬 회전을 계산한다(`local = R * JO`). 컨트롤러 모드는
   `rotateAxis` 를 처리한다(`local = RA * R`). 노드마다 다른 **rotateOrder** 도 존중한다.
-- **분기 계층**: Hierarchy 모드에서 자식이 여럿이면 루트→말단 경로마다 체인으로 쪼갠다. 공유되는 앞부분은
-  **가장 긴 체인이 소유**하고 로그로 알린다.
+- **분기 계층**: Bone Root 모드에서 자식이 여럿이면 루트→말단 경로마다 체인으로 쪼갠다. 공유되는
+  앞부분은 **가장 긴 체인이 소유**하고 로그로 알린다.
 - **결정적**: 구간 시작에서 항상 정지 상태로 출발한다. 어느 프레임에서 재생하든 같은 결과가 나온다.
 
 ---
@@ -165,6 +191,7 @@ Live Preview 를 켠 상태에서 Apply 하면, 프리뷰 레이어가 그대로
 | `Sampled N chain(s), M nodes, F frames.` | 정상. 캐시가 만들어졌다 |
 | `No chain resolved...` | 체인은 **2개 이상**의 노드가 필요하다(루트 + 자식 하나) |
 | `Branching under: ...` | 분기가 있어 체인이 쪼개졌다. 공유 노드는 가장 긴 체인이 소유한다 |
+| `No chain under: ...` | Bone Root 로 담은 노드에 자식이 없다. Target(Controller/Joint)이 맞는지 확인 |
 | `Chain list is empty.` | 리스트에 담고 **Select Chain** 을 누른다 |
 | 흔들림이 거의 없다 | **Falloff** 를 올리거나 **Stiffness** 를 낮춘다. Blend 가 0 인지도 확인 |
 | 너무 출렁인다 | **Damping** 을 올린다. 빠른 모션이면 **Substeps** 를 2~4 로 |
@@ -187,6 +214,7 @@ tools/A00410_SecondaryMotion/
     │   ├── chain_solver.py      # ★ maya 비의존 순수 파이썬 스프링 솔버
     │   ├── scene_sampler.py     # 체인 해석 + 프레임별 원본 포즈 샘플링
     │   ├── pose_builder.py      # 시뮬 위치 -> 로컬 회전 키값(스윙/JO/RA/rotateOrder)
+    │   ├── outputs.py           # 출력 백엔드 레지스트리(Layer/Keys, Node 예약) ← 확장 지점
     │   └── bake_manager.py      # 캐시·프리뷰 레이어·확정 기록 오케스트레이션
     └── ui/main_window.py        # UI 전용
 ```
@@ -200,7 +228,8 @@ tools/A00410_SecondaryMotion/
 
 - 콜라이더(Sphere/Capsule/Plane) 미지원 — 다음 버전 예정.
 - 키 감축(Key Reduction) / Pre-roll settle 없음.
-- **List order 모드는 리스트가 실제 부모-자식(조상) 관계**라고 가정한다. 서로 계층으로 이어지지 않은
+- **Bone Chain 모드는 리스트가 실제 부모-자식(조상) 관계**라고 가정한다. 서로 계층으로 이어지지 않은
   노드를 나열하면 결과가 맞지 않는다.
+- 출력은 아직 **커브(키) 계열 2종**만 구현돼 있다. `Live Node` 는 예약 상태다.
 - 빠른 구동 + `Substeps=3` 에서 왕복 수치 오차 **4.7e-05**(리그 스케일 대비 약 3ppm) 관측 — 원인
   미특정, 실사용에서 보이는 수준은 아니다. 자세한 내용은 CHANGELOG v01.01 참고.

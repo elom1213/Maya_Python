@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-29
+# last Update date : 2026-07-30
 # A00410_SecondaryMotion core - 체인 수집 + 프레임별 원본 포즈 샘플링 (maya.cmds/API, UI 비의존).
 #
 # 왜 "한 번 샘플링해서 캐시" 인가
@@ -26,11 +26,15 @@ import maya.cmds as cmds
 from maya.api import OpenMaya as om
 
 
-# 대상 해석 모드
-#   list : 리스트업한 노드들이 '하나의 체인' — 리스트 순서가 루트→팁 순서다.
-#   root : 리스트업한 각 노드를 '체인의 루트' 로 보고 자손을 따라 내려가며 체인을 만든다.
-MODE_LIST = "list"
+# 대상 해석 모드 (A00390_WindTool 의 Bone Chain / Bone Root 와 같은 개념)
+#   chain : 리스트업한 노드들이 '하나의 체인' — 리스트 순서가 루트→팁 순서다.
+#   root  : 리스트업한 각 노드를 '임의의 체인의 최상위 부모' 로 보고, 그 자손을 따라
+#           내려가며 루트마다 체인을 만든다. 분기가 있으면 루트→말단 경로마다 체인이 된다.
+MODE_CHAIN = "chain"
 MODE_ROOT = "root"
+
+# 예전 이름(호환용). 새 코드는 MODE_CHAIN 을 쓴다.
+MODE_LIST = MODE_CHAIN
 
 # 대상 타입
 #   ctrl  : FK 컨트롤러(일반 transform). 계층 탐색 시 transform 을 따라간다.
@@ -51,67 +55,121 @@ def _long(name):
 
 
 def _children(node, target_type):
-    """계층 탐색 한 단계. joint 모드면 joint 만, ctrl 모드면 transform 전부."""
+    """계층 탐색 한 단계. joint 모드면 joint 만, ctrl 모드면 transform 전부(그룹 포함)."""
     kind = "joint" if target_type == TARGET_JOINT else "transform"
     return cmds.listRelatives(node, children=True, type=kind, fullPath=True) or []
 
 
-def _paths_from_root(root, target_type):
-    """root 에서 각 말단(leaf)까지의 **선형 경로** 목록.
+def _is_control(node):
+    """컨트롤러로 볼 노드인가 = **셰이프를 가진 transform**.
+
+    FK 리그는 보통 `ctl_01 > ctl_01_offset > ctl_02` 처럼 컨트롤 사이에 오프셋/제로
+    그룹이 낀다. 그룹까지 체인 노드로 잡으면 그룹에 키가 찍히고 체인 길이가 배로
+    늘어나 falloff 도 어긋난다. 그룹은 **지나가되 담지 않는다**.
+    셰이프 판정이라 nurbsCurve 컨트롤·로케이터·메시 컨트롤 모두 잡힌다.
+    """
+    try:
+        return bool(cmds.listRelatives(node, shapes=True, fullPath=True))
+    except Exception:
+        return False
+
+
+def _paths_from_root(root, target_type, control_filter=True):
+    """root 에서 각 말단까지의 **선형 경로** 목록.
 
     솔버는 "각 i 의 부모가 i-1" 인 선형 체인을 다루므로, 분기가 있으면 루트→말단
     경로마다 체인 하나로 쪼갠다. 공유되는 앞부분(분기 전 구간)은 여러 체인에 중복해서
-    들어가는데, 키를 쓸 때 **먼저 계산된 체인이 이긴다**(bake_manager 에서 중복 제거).
+    들어가는데, 키를 쓸 때 **먼저 계산된(가장 긴) 체인이 이긴다**(bake_manager 에서 중복 제거).
+
+    control_filter=True 이고 ctrl 모드면 **셰이프 없는 그룹은 건너뛰고**(계층은 계속
+    타고 내려가되 체인에 담지 않는다) 컨트롤만 모은다. root 는 사용자가 지정한
+    '최상위 부모' 이므로 셰이프가 없어도 항상 체인의 첫 노드로 담는다.
     """
+    skip_groups = control_filter and target_type != TARGET_JOINT
+
     out = []
-    stack = [[root]]
+    stack = [(root, [root])]
     while stack:
-        path = stack.pop()
-        kids = _children(path[-1], target_type)
+        node, path = stack.pop()
+        kids = _children(node, target_type)
         if not kids:
             out.append(path)
             continue
         for c in kids:
-            stack.append(path + [c])
+            # 그룹은 경로에 넣지 않고 통과만 한다.
+            nxt = path if (skip_groups and not _is_control(c)) else path + [c]
+            stack.append((c, nxt))
+
+    # 같은 경로가 여러 번 나올 수 있다(그룹만 있는 가지들) → 중복 제거.
+    uniq, seen = [], set()
+    for p in out:
+        key = tuple(p)
+        if key not in seen:
+            seen.add(key)
+            uniq.append(p)
+
     # 깊은 경로가 먼저 오도록(공유 구간을 긴 체인이 차지하게)
-    out.sort(key=len, reverse=True)
-    return out
+    uniq.sort(key=len, reverse=True)
+    return uniq
+
+
+class ChainResolveResult(object):
+    """체인 해석 결과. 항목이 늘어도 호출부가 깨지지 않도록 튜플 대신 객체로 둔다."""
+
+    def __init__(self):
+        self.chains = []        # [[root, ...], ...] 전부 풀패스
+        self.missing = []       # 씬에 없는 이름
+        self.branched = []      # 분기로 여러 체인이 된 루트(경고용)
+        self.empty_roots = []   # 자식이 없어 체인이 안 된 루트(경고용)
+
+    def __iter__(self):
+        # 예전 3-튜플 언패킹 호환.
+        return iter((self.chains, self.missing, self.branched))
 
 
 def resolve_chains(nodes, mode, target_type):
-    """UI 리스트 -> 체인 목록.
+    """UI 리스트 -> ChainResolveResult.
 
-    반환: (chains, missing, branched)
-        chains   : [[node0(root), node1, ...], ...]  전부 풀패스
-        missing  : 씬에 없는 이름
-        branched : 분기가 있어 여러 체인으로 쪼개진 루트 이름(경고용)
+    chain 모드: 리스트 순서 그대로 체인 1개.
+    root  모드: 리스트업한 각 노드를 최상위 부모로 보고 자손을 따라 체인을 만든다
+               (A00390_WindTool 의 Bone Root 와 같은 개념).
     """
-    missing, branched = [], []
+    res = ChainResolveResult()
 
     if mode == MODE_ROOT:
-        chains = []
         for n in nodes or []:
             full = _long(n)
             if not full:
-                missing.append(n)
+                res.missing.append(n)
                 continue
-            paths = _paths_from_root(full, target_type)
-            if len(paths) > 1:
-                branched.append(full.split("|")[-1])
-            for p in paths:
-                if len(p) >= 2:
-                    chains.append(p)
-        return chains, missing, branched
 
-    # list 모드: 리스트 순서 그대로 하나의 체인
+            paths = [p for p in _paths_from_root(full, target_type) if len(p) >= 2]
+            if not paths:
+                # 컨트롤 필터 때문에 아무것도 못 잡은 경우(조인트 계층에 ctrl 모드 등)
+                # 필터를 끄고 한 번 더 시도한다.
+                paths = [p for p in _paths_from_root(full, target_type,
+                                                     control_filter=False)
+                         if len(p) >= 2]
+            if not paths:
+                res.empty_roots.append(full.split("|")[-1])
+                continue
+
+            if len(paths) > 1:
+                res.branched.append(full.split("|")[-1])
+            res.chains.extend(paths)
+        return res
+
+    # chain 모드: 리스트 순서 그대로 하나의 체인
     chain = []
     for n in nodes or []:
         full = _long(n)
         if not full:
-            missing.append(n)
+            res.missing.append(n)
             continue
         chain.append(full)
-    return ([chain] if len(chain) >= 2 else []), missing, branched
+    if len(chain) >= 2:
+        res.chains.append(chain)
+    return res
 
 
 class ChainSample(object):

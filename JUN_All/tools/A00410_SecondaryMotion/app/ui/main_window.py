@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-29
+# last Update date : 2026-07-30
 # A00410_SecondaryMotion - Qt UI
 #
 # FK 로 애니메이션된 컨트롤러/조인트 체인에 KawaiiPhysics 식 관성(2차 모션)을 얹어
@@ -18,6 +18,7 @@ from Framework.core.maya_undo import undo_chunk
 from tools.A00410_SecondaryMotion.app.config.version import VERSION, LAST_UPDATE
 from tools.A00410_SecondaryMotion.app.core import bake_manager as bake_mgr
 from tools.A00410_SecondaryMotion.app.core import chain_solver
+from tools.A00410_SecondaryMotion.app.core import outputs
 from tools.A00410_SecondaryMotion.app.core import scene_sampler
 
 
@@ -150,18 +151,21 @@ class MainWindow(QWidget):
         # ---- 대상 해석 모드 / 대상 타입
         opt_row = QHBoxLayout()
 
-        mode_box = QGroupBox("Chain From")
+        mode_box = QGroupBox("Mode")
         mode_lay = QVBoxLayout(mode_box)
-        self.rb_list = QRadioButton("List order")
-        self.rb_list.setChecked(True)
-        self.rb_list.setToolTip(
-            "The listed nodes ARE the chain, in list order (root first).\n"
+        self.rb_chain = QRadioButton("Bone Chain")
+        self.rb_chain.setChecked(True)
+        self.rb_chain.setToolTip(
+            "The listed nodes ARE one chain, in list order (root first).\n"
             "Tip: turn on the list's 'Order' checkbox to keep your pick order.")
-        self.rb_root = QRadioButton("Hierarchy")
+        self.rb_root = QRadioButton("Bone Root")
         self.rb_root.setToolTip(
-            "Each listed node is a chain ROOT; the chain is built by walking\n"
-            "its descendants. Branches are split into separate chains.")
-        mode_lay.addWidget(self.rb_list)
+            "Each listed node is the TOP PARENT of its own chain: the chain is\n"
+            "built by walking that node's descendants, so you can do many chains\n"
+            "at once. Branches become separate chains.\n"
+            "Controller target: offset/zero groups are walked THROUGH, not keyed -\n"
+            "only shape-bearing nodes (the controls) become chain nodes.")
+        mode_lay.addWidget(self.rb_chain)
         mode_lay.addWidget(self.rb_root)
         opt_row.addWidget(mode_box)
 
@@ -181,7 +185,7 @@ class MainWindow(QWidget):
 
         root.addLayout(opt_row)
 
-        for rb in (self.rb_list, self.rb_root, self.rb_ctrl, self.rb_joint):
+        for rb in (self.rb_chain, self.rb_root, self.rb_ctrl, self.rb_joint):
             rb.toggled.connect(self._invalidate)
 
         # ---- 구간
@@ -284,19 +288,20 @@ class MainWindow(QWidget):
         prev_row.addWidget(self.btn_reset)
         root.addLayout(prev_row)
 
-        # ---- 출력
+        # ---- 출력. 라디오는 outputs 레지스트리에서 만든다 —
+        #      나중에 A00390 처럼 라이브 노드 출력이 추가되면 여기 손대지 않아도 나타난다.
         out_box = QGroupBox("Output")
         out_lay = QHBoxLayout(out_box)
-        self.rb_layer = QRadioButton("Override Layer")
-        self.rb_layer.setChecked(True)
-        self.rb_layer.setToolTip(
-            "Write absolute rotations into an override anim layer. The original\n"
-            "animation stays untouched and the layer weight dials the amount.")
-        self.rb_keys = QRadioButton("Bake Keys")
-        self.rb_keys.setToolTip(
-            "Replace the keys on the nodes themselves inside the range.")
-        out_lay.addWidget(self.rb_layer)
-        out_lay.addWidget(self.rb_keys)
+        self.out_group = QButtonGroup(self)
+        self._out_buttons = {}
+        for i, spec in enumerate(outputs.implemented_specs()):
+            rb = QRadioButton(spec.label)
+            if spec.tooltip:
+                rb.setToolTip(spec.tooltip)
+            rb.setChecked(i == 0)
+            self.out_group.addButton(rb)
+            out_lay.addWidget(rb)
+            self._out_buttons[rb] = spec.id
         out_lay.addStretch(1)
         root.addWidget(out_box)
 
@@ -341,7 +346,14 @@ class MainWindow(QWidget):
 
     def _mode(self):
         return (scene_sampler.MODE_ROOT if self.rb_root.isChecked()
-                else scene_sampler.MODE_LIST)
+                else scene_sampler.MODE_CHAIN)
+
+    def _output(self):
+        """선택된 출력 id. 라디오는 outputs 레지스트리에서 생성된다."""
+        for rb, oid in self._out_buttons.items():
+            if rb.isChecked():
+                return oid
+        return outputs.default_id()
 
     def _target(self):
         return (scene_sampler.TARGET_JOINT if self.rb_joint.isChecked()
@@ -375,6 +387,10 @@ class MainWindow(QWidget):
         if self.session.missing:
             self.log("Not in the scene: {0}".format(
                 ", ".join(self.session.missing)), warn=True)
+        if self.session.empty_roots:
+            self.log("No chain under: {0} - a root needs at least one child "
+                     "(check the Target type).".format(
+                         ", ".join(self.session.empty_roots)), warn=True)
         if self.session.branched:
             self.log("Branching under: {0} - split into separate chains; the "
                      "longest one owns the shared nodes.".format(
@@ -420,8 +436,7 @@ class MainWindow(QWidget):
         if not self._ensure_cache():
             return
 
-        output = (bake_mgr.OUTPUT_KEYS if self.rb_keys.isChecked()
-                  else bake_mgr.OUTPUT_LAYER)
+        output = self._output()
         params = self._params()
 
         try:
