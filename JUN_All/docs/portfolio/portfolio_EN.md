@@ -2,7 +2,7 @@
 title: Portfolio — Work Summary (2026-05-06 ~ 2026-07-15)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-07-23
+updated: 2026-07-30
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
@@ -70,6 +70,42 @@ updated: 2026-07-23
   - **Into Unreal** — author the RBF pose-driver in engine with **PoseWrangler**, so the pose-driven deformation runs live on the target skeleton in-engine.
 - **Result**: MetaHuman-grade **pose-driven deformation (RBF)** became **repeatable on non-MetaHuman realistic and cartoon avatars**, without writing an engine plugin or hand-rebuilding each RBF setup per character.
 - **Keywords**: RBF Pose Driver, PoseWrangler, skeleton retarget, cross-topology skin transfer, Control Rig, avatar-agnostic rig pipeline, Maya → Unreal
+
+### 1-6. Patching Epic's PoseWrangler (PoseDriverConnect) plugin source — importing RBF presets onto partial skeletons
+`PoseDriverConnect / epic_pose_wrangler` (fork of Epic Games' official Maya plugin)
+
+> This is the **prerequisite that actually made 1-5 possible**. I read the Python source of Unreal's
+> official plugin and patched its serializer so RBF presets can be reused on non-MetaHuman avatars.
+
+- **Problem**: Importing an RBF Pose Driver preset (JSON) authored on MetaHuman into **another character's scene
+  failed outright**. The cause sat in the delta-mode (`serializer_params.delta = true`) deserialization path:
+  `serializer_v1_2_0.Serializer.deserialize` **assumes every `driven_transforms` entry in the JSON exists in the
+  scene** (knee-back, thigh/calf twist correctives — i.e. **helper joints**), collects their current local
+  matrices, and then dereferences `current_driven_transforms[name]` unconditionally while un-deltaing each pose.
+  So a **custom skeleton missing even one helper joint** aborted the whole import — the preset could not be
+  applied even partially. It only worked on scenes carrying the full stock MetaHuman skeleton.
+- **What I did** — a **minimally invasive, three-part patch** that leaves the original behaviour intact:
+  1. **Filter non-existent driven transforms** — `driven_transforms` is filtered through `cmds.objExists` as the
+     solver data is read, keeping **only joints actually present in the scene**. This removes the exception raised
+     while gathering rest-pose matrices (`utils.get_local_matrix_without_joint_orient`).
+  2. **Guard the delta-restore loop** — the per-pose loop that rebuilds absolute matrices as `delta × rest` now
+     skips driven transforms absent from the scene, preventing the `KeyError`.
+  3. **Skip empty solvers** — solvers whose driven list filters down to **zero** are flagged and skipped at the
+     `RBFNode.create_from_data` step, logging which solver was ignored — so **hollow RBF solver nodes with nothing
+     to drive never pollute the scene**.
+- **Housekeeping**: tagged the window title with `[JUN]` so the custom build is obvious at a glance, added a
+  two-line launch snippet for the shelf, and committed a real lower-body preset (`calf_l_UERBFSolver` — five
+  knee/twist corrective driven joints) as a **regression-check sample JSON**. The vendor drop is the first commit
+  and my edits are tracked in git, so **my patch can be re-applied selectively when the engine plugin updates**.
+- **Result**: RBF setups proven on MetaHuman now **import directly onto non-MetaHuman avatars with a different
+  helper-joint layout**, rebuilding solvers **only for the joints that exist**. No more hand-trimming presets or
+  re-authoring RBF per character.
+- **Why it matters**: even a third-party (engine vendor) plugin can be adapted to the pipeline once you read the
+  source and understand the **matrix math behind its delta-serialized pose data** (rest-pose local matrix × pose
+  delta). Instead of treating it as a black box and working around it, I **located the exact failure point and
+  changed the minimum**.
+- **Keywords**: PoseWrangler / PoseDriverConnect, RBF Pose Driver, delta serializer, `cmds.objExists` guard,
+  MMatrix delta restore, third-party plugin fork & patch management, MetaHuman → custom avatar
 
 ---
 

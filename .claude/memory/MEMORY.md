@@ -17,6 +17,7 @@
 - [Prefer PySide for new tools](prefer-pyside-for-new-tools.md) — 신규/병합 툴은 maya.cmds UI 말고 PySide(arch B)
 - [JUN_mgear vault](jun-mgear-vault.md) — mgear 학습 노트는 JUN_mgear Obsidian vault → elom1213/JUN_mgear
 - [kangaroo plugin read-only](kangaroo-plugin-external-readonly.md) — kangaroo 플러그인은 외부 3rd-party, 수정 금지
+- [PoseWrangler fork patch](posewrangler-plugin-fork-patch.md) — Epic PoseDriverConnect 포크 위치 + serializer objExists 패치 3단계
 
 ## 검증 · 마야 공통 함정
 

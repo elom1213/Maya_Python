@@ -2,7 +2,7 @@
 title: 포트폴리오 작업 내역 (2026-05-06 ~ 2026-07-15)
 aliases: [Portfolio KR, 포트폴리오 국문]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-07-23
+updated: 2026-07-30
 ---
 
 # Technical Artist / Pipeline TD 작업 내역 — 국문
@@ -70,6 +70,41 @@ updated: 2026-07-23
   - **언리얼로** — 엔진에서 **PoseWrangler**로 RBF Pose Driver를 오소링해, 포즈 구동 변형이 대상 스켈레톤 위에서 엔진 내에서 살아 돌아가게 합니다.
 - **결과**: MetaHuman 수준의 **포즈 구동 변형(RBF)** 을 **비메타휴먼 실사·카툰 아바타에서 반복 가능**하게 만들었습니다. 엔진 플러그인을 짜거나 캐릭터마다 RBF를 손으로 다시 세팅할 필요가 없습니다.
 - **키워드**: RBF Pose Driver, PoseWrangler, 스켈레톤 리타겟, 토폴로지 간 스킨 전이, Control Rig, 아바타 비의존 리그 파이프라인, Maya → Unreal
+
+### 1-6. Epic PoseWrangler(PoseDriverConnect) 플러그인 소스 직접 수정 — 부분 스켈레톤에도 RBF 프리셋 임포트
+`PoseDriverConnect / epic_pose_wrangler` (Epic Games 공식 Maya 플러그인 포크)
+
+> 1-5 를 **실제로 가능하게 만든 전제 조건**입니다. 언리얼이 제공하는 공식 플러그인의 파이썬 소스를
+> 읽고, MetaHuman 이 아닌 아바타에서도 RBF 프리셋을 재사용할 수 있도록 직렬화 코드를 패치했습니다.
+
+- **문제**: MetaHuman 에서 오소링한 RBF Pose Driver 프리셋(JSON)을 **다른 캐릭터 씬에 임포트하면 통째로 실패**합니다.
+  원인은 델타 모드(`serializer_params.delta = true`)로 저장된 파일의 역직렬화 경로에 있었습니다 —
+  `serializer_v1_2_0.Serializer.deserialize` 는 JSON 에 적힌 `driven_transforms`(무릎 back, thigh/calf twist
+  corrective 같은 **헬퍼 조인트**) 목록을 **씬에 전부 존재한다고 전제**하고 현재 로컬 매트릭스를 수집한 뒤,
+  포즈별 델타를 되돌릴 때 `current_driven_transforms[name]` 을 무조건 참조합니다.
+  즉 **헬퍼 조인트가 하나라도 빠진 커스텀 스켈레톤**에서는 임포트가 예외로 중단되어, 프리셋을 부분적으로도
+  적용할 수 없었습니다. (MetaHuman 표준 스켈레톤 전체를 그대로 들고 있는 씬에서만 동작)
+- **한 일** — 원본 동작을 깨지 않는 **최소 침습 패치** 3단계:
+  1. **존재하지 않는 driven 필터링** — 솔버 데이터를 읽는 시점에 `driven_transforms` 를 `cmds.objExists` 로
+     걸러 **씬에 실존하는 조인트만** 남깁니다. → 현재 포즈 매트릭스 수집
+     (`utils.get_local_matrix_without_joint_orient`) 단계의 예외 제거.
+  2. **포즈 델타 재계산 루프 방어** — 포즈별로 `delta × rest` 를 곱해 절대 매트릭스를 복원하는 루프에서도
+     씬에 없는 driven 은 건너뛰어 `KeyError` 를 막습니다.
+  3. **빈 솔버 스킵** — 필터 결과 driven 이 **0 개가 된 솔버**를 표시해 두었다가 `RBFNode.create_from_data`
+     단계에서 건너뛰고 어떤 솔버를 무시했는지 로그로 남깁니다. → **구동 대상이 없는 껍데기 RBF 솔버 노드가
+     씬을 오염시키는 것**을 방지.
+- **부가 정비**: 커스텀 빌드임을 한눈에 알 수 있도록 창 타이틀에 `[JUN]` 태그를 붙이고, 셸프에 걸 수 있는
+  2줄짜리 실행 스니펫을 추가했으며, 실제 하체 RBF 프리셋(`calf_l_UERBFSolver` — 무릎/트위스트 코렉티브
+  5개 driven)을 **회귀 확인용 샘플 JSON** 으로 리포에 커밋했습니다. 벤더 원본을 첫 커밋으로 두고
+  수정 이력을 git 으로 관리해 **엔진 플러그인 업데이트 시 내 패치만 골라 재적용**할 수 있게 했습니다.
+- **결과**: MetaHuman 에서 검증한 RBF 세팅을 **헬퍼 조인트 구성이 다른 비메타휴먼 아바타에 그대로 임포트**해
+  **있는 조인트에 대해서만 솔버가 재구성**됩니다. 캐릭터마다 프리셋을 손으로 잘라내거나 RBF 를 다시
+  세팅할 필요가 없어졌습니다.
+- **의의**: 서드파티(엔진 벤더) 플러그인이라도 **소스를 읽고 델타 기반 포즈 데이터의 매트릭스 수학**
+  (rest 포즈 로컬 매트릭스 × 포즈 델타)을 이해하면 파이프라인에 맞게 고칠 수 있다는 사례입니다.
+  블랙박스로 두고 우회하는 대신 **원인 지점을 특정해 최소한으로 수정**했습니다.
+- **키워드**: PoseWrangler / PoseDriverConnect, RBF Pose Driver, 델타 직렬화(serializer), `cmds.objExists` 가드,
+  MMatrix 델타 복원, 서드파티 플러그인 포크·패치 관리, MetaHuman → 커스텀 아바타
 
 ---
 
