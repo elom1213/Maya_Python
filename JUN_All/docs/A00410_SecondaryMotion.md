@@ -200,7 +200,6 @@ tools/A00410_SecondaryMotion/
 
 - 콜라이더(Sphere/Capsule/Plane) 미지원 — 다음 버전 예정.
 - 키 감축(Key Reduction) / Pre-roll settle 없음.
-- 아이콘 없음(셸프 버튼은 기본 파이썬 아이콘으로 설치된다).
 - **List order 모드는 리스트가 실제 부모-자식(조상) 관계**라고 가정한다. 서로 계층으로 이어지지 않은
   노드를 나열하면 결과가 맞지 않는다.
 - 빠른 구동 + `Substeps=3` 에서 왕복 수치 오차 **4.7e-05**(리그 스케일 대비 약 3ppm) 관측 — 원인
