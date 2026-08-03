@@ -2,6 +2,40 @@
 
 All notable changes to this tool are documented here.
 
+## [01.29] - 2026-08-03
+### Added
+- **Path Structure — capture and recreate files, not just folders.** Two checkboxes,
+  **both on by default**:
+  - **Include files** (Save Structure) — Capture also records the file names it finds,
+    into a new `files` list in the structure JSON. Only *names* are stored, never file
+    contents. Depth and the "Folders to record" checklist apply to files exactly as they
+    do to folders, so `Capture Depth = 1` records only the files sitting directly in the
+    base folder. Files directly in the base are always included regardless of the
+    top-level checklist, because they belong to the base folder itself.
+  - **Create files** (Preview row, replaces the old *Show files*) — recorded files appear
+    in the Preview tree with checkboxes and are created by **Recreate**. What you see in
+    the tree is what gets created, which is the same rule Depth already followed; turning
+    it off hides *and* skips the files. Uncheck a single file to skip just that one.
+- Recreated files are **empty 0-byte files marked with `__`** appended to the full name —
+  `test.ma` → `test.ma__` — so a generated placeholder can never be mistaken for, or
+  opened as, a real scene. The suffix is not re-applied if the name already ends with it,
+  so capture-then-recreate round trips do not grow `____`.
+### Changed
+- `recreate()` now returns a **`RecreateResult`** (created/existing folders **and** files)
+  instead of a bare tuple. It still unpacks as `created, existing = recreate(...)`, so
+  existing callers keep working. The result message and log now report folder and file
+  counts separately.
+- Preview: when a structure has **no recorded files** (saved before this version, or with
+  *Include files* off), the tree falls back to listing the base folder's files from disk
+  as before — now **greyed out and without checkboxes**, making it obvious they are
+  reference only and are never created.
+### Fixed
+- An existing file at the target path is **never overwritten or truncated**. It is counted
+  as "already existed" and left untouched (exclusive `open(..., "x")`, so even a race
+  between the check and the write cannot clobber it).
+- Structures saved before this version load unchanged (`files` defaults to an empty list),
+  and recreate exactly as they did — folders only.
+
 ## [01.27] - 2026-07-03
 ### Added
 - **App / taskbar icon.** Added a blue folder + record-card + sync-badge icon

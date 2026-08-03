@@ -1,11 +1,15 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-07
+# last Update date : 2026-08-03
 # A00210_FileManager - "Path Structure" tab (Qt)
 #
 # 베이스 폴더의 하위 폴더 구조를 캡처해 store_dir 에 JSON 으로 저장하고(다른 PC 와 git 동기화),
-# 다른 PC 에서 그 PC 의 project_root 아래에 폴더만 재생성한다.
+# 다른 PC 에서 그 PC 의 project_root 아래에 재생성한다.
 #
 # project_root / store_dir / 로그는 MainWindow 에서 콜러블로 주입받는다(단일 소스 유지).
+#
+# v01.29 : 파일도 함께 캡처/재생성. 두 지점에 체크박스(둘 다 기본 켬) —
+#          저장 쪽 "Include files"(캡처가 파일 목록도 기록) / 재생성 쪽 "Create files"
+#          (기록된 파일을 0 바이트 빈 파일로 생성, 이름 끝에 "__" 표식).
 
 import os
 import time
@@ -34,6 +38,8 @@ from Framework.qt.qt import (
     QInputDialog,
     QMessageBox,
     QStyle,
+    QBrush,
+    QColor,
 )
 
 from ..core import path_structure as ps_mod
@@ -73,6 +79,8 @@ class PathStructureTab(QWidget):
         # 폴더/파일 아이콘(테마 무관, 1회 생성 후 재사용)
         self._icon_dir = self.style().standardIcon(QStyle.SP_DirIcon)
         self._icon_file = self.style().standardIcon(QStyle.SP_FileIcon)
+        # 구조에 기록되지 않은(=재생성 대상이 아닌) 디스크 파일을 흐리게 표시할 색.
+        self._brush_unrecorded = QBrush(QColor("#808080"))
 
         self._build_ui()
         self.on_refresh()
@@ -138,6 +146,18 @@ class PathStructureTab(QWidget):
         self.spn_capture_depth.setToolTip(
             "How many levels deep to capture (1 = top-level only, 0 = All).")
         action_row.addWidget(self.spn_capture_depth)
+
+        # 파일도 기록할지. 기본 켬 — 폴더만 원하면 끄면 된다.
+        # 기록하는 것은 **이름뿐**(내용은 담지 않는다). 재생성은 0 바이트 빈 파일.
+        self.chk_include_files = QCheckBox("Include files")
+        self.chk_include_files.setChecked(True)
+        self.chk_include_files.setToolTip(
+            "Record file names too, not just folders.\n"
+            "Only names are stored - never file contents.\n"
+            "Recreate makes them as empty 0-byte files marked with '{0}'.".format(
+                ps_mod.RECREATED_SUFFIX))
+        action_row.addWidget(self.chk_include_files)
+
         btn_capture = QPushButton("Capture")
         btn_capture.clicked.connect(self.on_capture)
         btn_save = QPushButton("Save")
@@ -214,13 +234,18 @@ class PathStructureTab(QWidget):
         self.spn_view_depth.valueChanged.connect(self._on_view_depth_changed)
         prev_row.addWidget(self.spn_view_depth)
 
-        # 파일 표시 여부. 기본 OFF(폴더만). 파일은 로컬 파일시스템에서 읽어 보여만 준다.
-        self.chk_show_files = QCheckBox("Show files")
-        self.chk_show_files.setChecked(False)
-        self.chk_show_files.setToolTip(
-            "Off = folders only. Files are shown from disk (not recreated).")
-        self.chk_show_files.toggled.connect(self._on_show_files_toggled)
-        prev_row.addWidget(self.chk_show_files)
+        # 파일 표시 + 재생성 여부(하나의 토글). Depth 와 같은 규칙 — **트리에 보이는 것이
+        # 만들어지는 것**이라, 안 보이는데 만들어지는 항목이 없다. 기본 켬.
+        self.chk_create_files = QCheckBox("Create files")
+        self.chk_create_files.setChecked(True)
+        self.chk_create_files.setToolTip(
+            "Show the structure's recorded files and create them on Recreate,\n"
+            "as empty 0-byte files marked with '{0}' (test.ma -> test.ma{0}).\n"
+            "Uncheck a file in the tree to skip just that one.\n"
+            "Structures saved without files instead show the base folder's files on disk, "
+            "greyed out (reference only - never created).".format(ps_mod.RECREATED_SUFFIX))
+        self.chk_create_files.toggled.connect(self._on_create_files_toggled)
+        prev_row.addWidget(self.chk_create_files)
 
         self.btn_expand = QPushButton("Expand")
         self.btn_expand.setToolTip("Open the tree in a larger window")
@@ -364,7 +389,9 @@ class PathStructureTab(QWidget):
         store = self._get_store()
         try:
             structure = ps_mod.capture(
-                base, store, self.spn_capture_depth.value(), include_top=include_top)
+                base, store, self.spn_capture_depth.value(),
+                include_top=include_top,
+                include_files=self.chk_include_files.isChecked())
         except OutsideProjectRootError:
             QMessageBox.warning(self, "Path Structure", "Base folder is outside the project root.")
             return
@@ -377,8 +404,8 @@ class PathStructureTab(QWidget):
         self.list_structs.blockSignals(False)
         self._show_preview(structure, base_abs=base)
         self._log(
-            f"Captured {len(structure.folders)} folder(s) from {base} "
-            f"({len(include_top)} top-level selected)")
+            f"Captured {len(structure.folders)} folder(s), {len(structure.files)} file(s) "
+            f"from {base} ({len(include_top)} top-level selected)")
 
     def on_save(self):
         if self._pending is None:
@@ -395,11 +422,12 @@ class PathStructureTab(QWidget):
             QMessageBox.warning(self, "Path Structure", "Set Store Repo first (File Manager tab).")
             return
 
-        if not self._pending.folders:
+        if not self._pending.folders and not self._pending.files:
             ok = QMessageBox.question(
                 self,
                 "Path Structure",
-                "No subfolders captured. Save anyway?\n(Recreate will only create the base folder.)",
+                "No subfolders or files captured. Save anyway?\n"
+                "(Recreate will only create the base folder.)",
             )
             if ok != QMessageBox.Yes:
                 return
@@ -417,7 +445,9 @@ class PathStructureTab(QWidget):
         self._pending.created_at = self._now_iso()
 
         path = ps_mod.save(store_dir, self._pending)
-        self._log(f"Path structure saved: {path}")
+        self._log(f"Path structure saved: {path} "
+                  f"({len(self._pending.folders)} folder(s), "
+                  f"{len(self._pending.files)} file(s))")
         self._log("Saved locally - use Push on the File Manager tab to sync.")
         self._pending = None
         self.on_refresh(select=name)
@@ -492,7 +522,7 @@ class PathStructureTab(QWidget):
             node = ps_mod.build_structure_tree(
                 self._cur_structure,
                 base_abs=self._cur_base_abs,
-                show_files=self.chk_show_files.isChecked(),
+                show_files=self.chk_create_files.isChecked(),
                 max_depth=self._view_depth(),
             )
             root_item = self._make_preview_item(node)
@@ -501,20 +531,36 @@ class PathStructureTab(QWidget):
         tree.blockSignals(False)
 
     def _make_preview_item(self, node):
-        """트리 노드(dict) → QTreeWidgetItem. 폴더는 체크 가능(파일은 표시만)."""
+        """트리 노드(dict) → QTreeWidgetItem.
+
+        **Recreate 대상(recorded)인 항목만 체크박스**를 갖는다 — 폴더, 그리고 구조에
+        기록된 파일. 기록되지 않은(디스크에서 참고용으로 읽어온) 파일은 회색으로 표시해
+        "이건 안 만들어진다"가 눈에 보이게 한다.
+        """
+        # 루트(base, rel="")는 항상 생성되므로 체크박스를 두지 않는다.
+        recorded = bool(node.get("recorded", True))
+        checkable = recorded and bool(node["rel"])
+
         item = QTreeWidgetItem([node["name"]])
         item.setData(0, Qt.UserRole, node["rel"])
         item.setData(0, Qt.UserRole + 1, node["is_dir"])
+        item.setData(0, Qt.UserRole + 2, recorded)
 
-        if node["is_dir"]:
-            item.setIcon(0, self._icon_dir)
-            # 루트(base, rel="")는 항상 생성되므로 체크박스를 두지 않는다.
-            if node["rel"]:
-                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                checked = node["rel"] not in self._excluded
-                item.setCheckState(0, Qt.Checked if checked else Qt.Unchecked)
+        item.setIcon(0, self._icon_dir if node["is_dir"] else self._icon_file)
+
+        if checkable:
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(0, Qt.Unchecked if node["rel"] in self._excluded
+                               else Qt.Checked)
         else:
-            item.setIcon(0, self._icon_file)
+            # QTreeWidgetItem 은 ItemIsUserCheckable 을 **기본으로 켠 채** 만들어진다.
+            # (체크 상태를 안 주면 체크박스가 그려지지 않을 뿐이다.) 판정이 헐거워지지
+            # 않도록 여기서 명시적으로 끈다.
+            item.setFlags(item.flags() & ~Qt.ItemIsUserCheckable)
+            if not recorded:
+                item.setForeground(0, self._brush_unrecorded)
+                item.setToolTip(0, "On disk in the base folder - not part of this "
+                                   "structure, so Recreate does not create it.")
 
         for child in node["children"]:
             item.addChild(self._make_preview_item(child))
@@ -527,15 +573,21 @@ class PathStructureTab(QWidget):
             self._excluded.add(rel)
 
     @staticmethod
-    def _is_checkable_folder(item):
-        """폴더(체크 가능)이고 루트(base)가 아닌 항목인지."""
-        return bool(item.data(0, Qt.UserRole + 1)) and bool(item.data(0, Qt.UserRole))
+    def _is_checkable(item):
+        """제외 대상이 될 수 있는 항목인지 — 체크박스가 달린 폴더/기록된 파일.
+
+        루트(base, rel="")와 기록되지 않은 디스크 파일(recorded=False)은 제외 대상이
+        아니므로 False. 플래그가 아니라 **저장해 둔 rel/recorded 로** 판정한다
+        (ItemIsUserCheckable 은 Qt 기본값이 켜져 있어 판정 근거로 못 쓴다).
+        """
+        return (bool(item.data(0, Qt.UserRole))
+                and bool(item.data(0, Qt.UserRole + 2)))
 
     def _on_preview_item_changed(self, item, _col):
-        """폴더 체크 상태 변경 → 제외 목록 갱신 + 다중 선택 시 선택된 폴더 일괄 토글."""
+        """체크 상태 변경 → 제외 목록 갱신 + 다중 선택 시 선택 항목 일괄 토글."""
         if self._syncing_checks:
             return
-        if not self._is_checkable_folder(item):     # 파일/루트는 무시
+        if not self._is_checkable(item):     # 루트/표시전용 파일은 무시
             return
 
         state = item.checkState(0)
@@ -566,7 +618,7 @@ class PathStructureTab(QWidget):
         QTimer.singleShot(0, lambda: self._restore_selection(tree, rels))
 
     def _apply_state_to_rels(self, tree, rels, state, skip_item=None):
-        """rels 에 해당하는 폴더 항목들의 체크 상태를 state 로 맞추고 제외 목록도 갱신."""
+        """rels 에 해당하는 항목들의 체크 상태를 state 로 맞추고 제외 목록도 갱신."""
         relset = {r for r in rels if r}
         self._syncing_checks = True
         tree.blockSignals(True)
@@ -574,7 +626,7 @@ class PathStructureTab(QWidget):
         def walk(parent):
             for i in range(parent.childCount()):
                 child = parent.child(i)
-                if (child is not skip_item and self._is_checkable_folder(child)
+                if (child is not skip_item and self._is_checkable(child)
                         and child.data(0, Qt.UserRole) in relset):
                     child.setCheckState(0, state)
                     self._set_excluded(child.data(0, Qt.UserRole), state)
@@ -602,7 +654,7 @@ class PathStructureTab(QWidget):
     def _on_view_depth_changed(self, _value):
         self._fill_preview_tree(self.tree_preview)
 
-    def _on_show_files_toggled(self, _checked):
+    def _on_create_files_toggled(self, _checked):
         self._fill_preview_tree(self.tree_preview)
 
     def on_expand(self):
@@ -648,9 +700,16 @@ class PathStructureTab(QWidget):
             self.on_refresh()
             return
 
-        # 현재 Preview 옵션(Depth 제한 + 체크 해제한 폴더 제외)만 생성한다.
-        folders = ps_mod.limit_depth(structure.folders, self._view_depth())
-        folders = [f for f in folders if f not in self._excluded]
+        # 현재 Preview 옵션(Depth 제한 + 체크 해제한 항목 제외)만 생성한다.
+        # 트리에 보이는 것 = 만들어지는 것. 'Create files' 를 끄면 파일은 트리에도 없고
+        # 만들어지지도 않는다(Depth 규칙과 동일).
+        depth = self._view_depth()
+        folders = [f for f in ps_mod.limit_depth(structure.folders, depth)
+                   if f not in self._excluded]
+        files = []
+        if self.chk_create_files.isChecked():
+            files = [f for f in ps_mod.limit_depth(structure.files, depth)
+                     if f not in self._excluded]
 
         # 목적지가 아직 없으면 새로 만들 것임을 알린다(오타로 엉뚱한 곳에 생성 방지).
         if not os.path.isdir(target):
@@ -662,17 +721,26 @@ class PathStructureTab(QWidget):
             if ok != QMessageBox.Yes:
                 return
 
-        created, existing = ps_mod.recreate(structure, None, folders=folders, base_abs=target)
+        result = ps_mod.recreate(
+            structure, None, folders=folders, base_abs=target, files=files)
 
-        self._log(f"Recreate '{name}' -> {target}: "
-                  f"{len(created)} created, {len(existing)} already existed.")
-        for path in created:
+        self._log(
+            f"Recreate '{name}' -> {target}: "
+            f"{len(result.created)} folder(s) created, {len(result.existing)} existed; "
+            f"{len(result.created_files)} file(s) created, "
+            f"{len(result.existing_files)} existed.")
+        for path in result.created:
             self._log(f"  + {path}")
-        QMessageBox.information(
-            self,
-            "Path Structure",
-            f"Created {len(created)} folder(s), {len(existing)} already existed.",
-        )
+        for path in result.created_files:
+            self._log(f"  + {path}")
+
+        msg = (f"Created {len(result.created)} folder(s), "
+               f"{len(result.existing)} already existed.")
+        if files:
+            msg += (f"\nCreated {len(result.created_files)} empty file(s) "
+                    f"marked '{ps_mod.RECREATED_SUFFIX}', "
+                    f"{len(result.existing_files)} already existed.")
+        QMessageBox.information(self, "Path Structure", msg)
 
     # ================================================================ rename
 
