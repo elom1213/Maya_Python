@@ -1,5 +1,47 @@
 # Changelog — A00290_BSTool
 
+## v01.12 (2026-08-03)
+- **[Add] Base Shape 탭 타겟 **Filter**(검색)** — 타겟 목록 위에 입력 칸이 생겼다.
+  **이름의 일부만 쳐도 잡힌다** — `Inner` → `browInnerUp`. **대소문자 무시**라 `inner` 도 같다.
+  Shape Editor 탭의 Filter 와 같은 규칙(부분 일치)이라 두 탭의 검색 감각이 같다.
+  - **`Clear`** 버튼으로 필터를 비운다.
+  - `Number` 라벨이 필터 중에는 **`보이는 수 / 전체 수`**(예: `Number: 2 / 9`)로 바뀌어
+    무엇이 가려졌는지 눈에 보인다.
+  - **`List Targets` 로 목록을 다시 채워도 필터가 유지**된다.
+- **[Changed] 필터가 걸린 동안 "보이는 것이 작업 대상"** — Qt 는 항목을 숨겨도 선택 상태를
+  유지하므로, 그대로 두면 **필터에 가려 안 보이는 타겟까지 Apply 가 먹는다.** 그래서:
+  - **`Select All`** 은 **지금 보이는 타겟만** 선택한다(가려진 것까지 잡는
+    `QListWidget.selectAll` 을 대체).
+  - **`Apply`** 는 **보이면서 선택된** 타겟에만 적용하고, 가려진 선택이 있으면
+    `[Info] N selected target(s) hidden by the filter were skipped.` 로 알린다.
+    선택이 전부 가려져 있으면 아무것도 하지 않고 필터를 지우라고 안내한다.
+- **[Verify]** stub `maya.cmds` + PySide6 로 17항목 — 부분 일치/대소문자 무시, 일치 없음,
+  Clear 복귀, Number 라벨, Select All 가시 항목 한정, 가려진 선택 제외, 목록 재구성 후 필터 유지.
+
+## v01.11 (2026-08-03)
+- **[Fix] Base Shape 의 Apply 가 "적용된 것처럼 보이다가 되돌아오던" 문제** — 이제 Apply 하는
+  **그 순간 타겟의 기본 모양이 실제로 바뀌고**, 씬을 저장하거나 Shape Editor 의 Edit 로 들어가도
+  유지된다.
+  - **원인**: 타겟 메시가 씬에 남아 `inputGeomTarget` 으로 **연결된(live) 타겟**에서는
+    `inputPointsTarget` 이 **연결된 메시로부터 매번 다시 계산되는 값**이다. 여기에 `setAttr` 을 하면
+    **에러도 경고도 없이** 다음 평가에서 원래 값으로 되돌아간다. v01.10 까지는 이 경우에도 포인트
+    수가 0 이 아니라는 이유로 "N target(s) rescaled" 라고 **성공 보고만** 하고 실제로는 아무 일도
+    하지 않았다. 뷰포트가 잠깐 바뀐 것처럼 보이다가 저장·Edit 등 재평가를 유발하는 순간 원복됐다.
+  - **해결**: 아이템마다 `inputGeomTarget` 연결 여부로 **live / baked 를 판정**해 —
+    baked 는 예전처럼 `inputPointsTarget` 을 스케일하고, **live 는 타겟 메시의 정점을 직접 이동**한다
+    (델타가 곧 타겟 메시이므로 이것이 기본 모양을 바꾸는 정공법). in-between 아이템은 각자 다른
+    메시에 연결될 수 있어 **아이템 단위로** 판정한다.
+  - **델타는 오브젝트 공간**이다 — `inputGeomTarget` 이 `worldMesh` 로 연결돼 있어도 그렇고,
+    base/target 의 transform 이 서로 달라도 그렇다(mayapy 실측). 그래서 정점은 오브젝트 공간에서
+    `(X − 1) × delta` 만큼 상대 이동시킨다. 월드 공간으로 옮기면 타겟에 회전·스케일이 있을 때 어긋난다.
+  - 이동은 **`shape.pnts`(tweak) 구간 setAttr** 로 한다. 메시 데이터(`vrts`)를 건드리지 않아 undo 가
+    정확히 맞고, 정점마다 `xform` 을 돌리는 것보다 빠르다(**19,462 정점 6.4초 → 0.17초**).
+  - 로그가 몇 개가 live 타겟이었는지("their target mesh was moved") 알려준다 — 씬의 타겟 메시가
+    실제로 움직이므로 감추지 않는다.
+- **[Verify]** mayapy 12항목 — live/baked 각각에서 `weight 1.0 모양 == 예전 weight X 모양`,
+  저장/재오픈 후 유지, `sculptTarget` Edit 진입·해제 후 유지, Ctrl+Z 1회 복귀, in-between 전 아이템
+  스케일, 19k 정점 속도.
+
 ## v01.10 (2026-07-21)
 - **[Fix] 다중 편집 후 Ctrl+Z 가 한 타겟의 마지막 한 틱(~0.01)만 되돌리던 문제** — 이제 **한 번의
   조작(제스처)이 통째로 원복**된다.

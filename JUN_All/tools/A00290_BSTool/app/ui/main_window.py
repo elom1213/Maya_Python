@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-10
+# last Update date : 2026-08-03
 # A00290_BSTool - Qt UI (레거시 JUN_PY_BSTool_V01_01 의 PySide 재작성)
 #
 # 탭 구성:
@@ -884,6 +884,23 @@ class MainWindow(QWidget):
         header.addWidget(self.lbl_tgt_number)
         layout.addLayout(header)
 
+        # 필터 — Shape Editor 탭의 Filter 와 같은 규칙(대소문자 무시 부분 일치).
+        # "Inner" 로 browInnerUp 이 잡힌다.
+        filter_row = QHBoxLayout()
+        filter_row.addWidget(QLabel("Filter"))
+        self.le_bs_filter = QLineEdit()
+        self.le_bs_filter.setPlaceholderText("Type any part of a target name (e.g. Inner)")
+        self.le_bs_filter.setToolTip(
+            "Show only targets whose name contains this text (case-insensitive).\n"
+            "Apply and Select All act on the visible targets only.")
+        self.le_bs_filter.textChanged.connect(self._apply_bs_filter)
+        filter_row.addWidget(self.le_bs_filter, 1)
+        btn_clear_filter = QPushButton("Clear")
+        btn_clear_filter.setToolTip("Clear the filter and show every target.")
+        btn_clear_filter.clicked.connect(self.le_bs_filter.clear)
+        filter_row.addWidget(btn_clear_filter)
+        layout.addLayout(filter_row)
+
         self.lw_targets = QListWidget()
         self.lw_targets.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.lw_targets.setMinimumHeight(220)
@@ -892,7 +909,8 @@ class MainWindow(QWidget):
         # 전체 선택 / 해제
         sel_row = QHBoxLayout()
         btn_all = QPushButton("Select All")
-        btn_all.clicked.connect(self.lw_targets.selectAll)
+        btn_all.setToolTip("Select every target currently visible in the list.")
+        btn_all.clicked.connect(self.on_select_all_targets)
         btn_none = QPushButton("Clear Selection")
         btn_none.clicked.connect(self.lw_targets.clearSelection)
         sel_row.addWidget(btn_all)
@@ -911,7 +929,9 @@ class MainWindow(QWidget):
         self.dsb_value.setValue(0.5)
         self.dsb_value.setToolTip(
             "The shape currently seen at this weight value becomes the new weight=1.0 shape.\n"
-            "Internally the target deltas are scaled by this factor (must be non-zero).")
+            "Internally the target deltas are scaled by this factor (must be non-zero).\n"
+            "If the target mesh is still connected to the blendShape, that mesh itself is\n"
+            "moved - that is the only way the new base shape survives a scene save or Edit.")
         val_row.addWidget(self.dsb_value)
         val_row.addStretch(1)
         layout.addLayout(val_row)
@@ -919,7 +939,8 @@ class MainWindow(QWidget):
         # 설명
         info = QLabel(
             "Make the shape at <Value> become the default (weight 1.0) shape\n"
-            "for the selected targets. e.g. Value 0.5 halves the target; 1.3 exaggerates it.")
+            "for the selected targets. e.g. Value 0.5 halves the target; 1.3 exaggerates it.\n"
+            "Targets whose mesh is still in the scene have that mesh edited in place.")
         info.setWordWrap(True)
         layout.addWidget(info)
 
@@ -940,7 +961,44 @@ class MainWindow(QWidget):
         self.te_log.append(text)
 
     def _update_target_number(self):
-        self.lbl_tgt_number.setText("Number: {0}".format(self.lw_targets.count()))
+        """필터 중이면 '보이는 수 / 전체 수' 로 표시(무엇이 가려졌는지 눈에 보이게)."""
+        total = self.lw_targets.count()
+        shown = sum(1 for i in range(total) if not self.lw_targets.item(i).isHidden())
+        if shown == total:
+            self.lbl_tgt_number.setText("Number: {0}".format(total))
+        else:
+            self.lbl_tgt_number.setText("Number: {0} / {1}".format(shown, total))
+
+    def _visible_selected_targets(self):
+        """선택된 항목 중 **지금 보이는** 것들의 이름 + 필터에 가려진 선택 수.
+
+        숨은 항목도 Qt 는 선택 상태를 유지한다. 필터로 안 보이는 타겟에까지 Apply 가
+        먹으면 "안 보이는데 바뀌는" 일이 생기므로, 보이는 것만 대상으로 삼고 가려진
+        선택이 있으면 호출부가 로그로 알린다.
+        """
+        names, hidden = [], 0
+        for item in self.lw_targets.selectedItems():
+            if item.isHidden():
+                hidden += 1
+            else:
+                names.append(item.text())
+        return names, hidden
+
+    def _apply_bs_filter(self, text):
+        """이름 부분 일치(대소문자 무시)로 타겟 리스트를 거른다."""
+        needle = (text or "").strip().lower()
+        for i in range(self.lw_targets.count()):
+            item = self.lw_targets.item(i)
+            item.setHidden(bool(needle) and needle not in item.text().lower())
+        self._update_target_number()
+
+    def on_select_all_targets(self):
+        """보이는 타겟만 전체 선택(가려진 항목까지 잡는 QListWidget.selectAll 대체)."""
+        self.lw_targets.clearSelection()
+        for i in range(self.lw_targets.count()):
+            item = self.lw_targets.item(i)
+            if not item.isHidden():
+                item.setSelected(True)
 
     def _set_current_frame(self, line_edit):
         """Get Current 버튼: 현재 Maya 프레임으로 해당 Start/End LineEdit 을 갱신."""
@@ -1010,8 +1068,16 @@ class MainWindow(QWidget):
         targets = BaseShapeManager.list_targets(bs_node)
         self.lw_targets.clear()
         self.lw_targets.addItems(targets)
-        self._update_target_number()
-        self.log("[List Targets] '{0}' : {1} target(s).".format(bs_node, len(targets)))
+        # 새로 채운 항목에도 현재 필터를 그대로 적용한다(_update_target_number 포함).
+        self._apply_bs_filter(self.le_bs_filter.text())
+
+        msg = "[List Targets] '{0}' : {1} target(s).".format(bs_node, len(targets))
+        needle = self.le_bs_filter.text().strip()
+        if needle:
+            shown = sum(1 for i in range(self.lw_targets.count())
+                        if not self.lw_targets.item(i).isHidden())
+            msg += " Filter '{0}' shows {1}.".format(needle, shown)
+        self.log(msg)
 
     def on_apply_base_shape(self):
         bs_node = self.le_bs_node.text().strip()
@@ -1019,10 +1085,18 @@ class MainWindow(QWidget):
             self.log("[Warning] '{0}' is not a valid blendShape node.".format(bs_node))
             return
 
-        target_names = [item.text() for item in self.lw_targets.selectedItems()]
+        target_names, hidden = self._visible_selected_targets()
         if not target_names:
-            self.log("[Warning] Select target(s) in the list first.")
+            if hidden:
+                self.log("[Warning] The {0} selected target(s) are hidden by the filter "
+                         "- clear the filter or select a visible target.".format(hidden))
+            else:
+                self.log("[Warning] Select target(s) in the list first.")
             return
+
+        if hidden:
+            self.log("[Info] {0} selected target(s) hidden by the filter were skipped.".format(
+                hidden))
 
         value = self.dsb_value.value()
         _done, msg = BaseShapeManager.apply_value_as_default(bs_node, target_names, value)
