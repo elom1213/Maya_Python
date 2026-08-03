@@ -17,6 +17,25 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-03 (오늘)
 
+> [!summary] `A00170_driverTool` **`Attr Search` 를 공용 Filter 로 대체** (v01.12→01.13)
+- **요청**: A00170 에도 `JUN_mod_filter_qt_v01` 로 대체할 수 있는 UI 가 있으면 대체.
+- **대상 3곳** — Remap Value 탭 Attributes, Stretch 탭의 **Default Distance / Stretch Object** 두 그룹.
+  전부 `Attr Search` 입력 + `Search` 버튼이라 같은 패턴이었다.
+- **TSL 안의 리스트에 붙였다**: 이 탭들의 Attributes 는 `QListWidget` 이 아니라 **TSL 위젯**이라,
+  내부 `tsl.list_widget` 을 공용 Filter 에 넘겼다. 세 곳 모두 빌드가 `selected_items()` 를 쓰므로
+  **"보이는 것이 작업 대상"이 그대로 성립** — `visible_selected()` 로 바꾸고 가려진 선택은 로그로 알린다.
+  (TSL 의 `get_all_items()` / `selected_items()` 는 숨김을 모른다는 걸 공용 문서에 주의로 적었다.)
+- **`Reveal` 버튼으로 기능 분리** — 옛 `Attr Search` 는 ① 일치 항목 **선택** ② 일치가 없으면
+  토큰으로 **재질의**(`listAttr(obj.<token>)`) 를 한 버튼이 겸했다. A00145 에서는 ②가 사실상 죽은
+  길이라 걷어냈지만, **여기서는 살아 있다** — Filter 는 이미 채워진 목록만 거르므로 애초에
+  리스트업되지 않은 `worldMatrix` 같은 어트리뷰트는 못 찾는다. 그래서 ②를 **`Reveal` 버튼으로
+  분리**해 기능을 보존했다(언제 재질의가 일어나는지 눈에 보인다). 드러낸 항목이 곧바로 가려지지
+  않도록 Reveal 후 필터는 자동으로 비운다.
+- **검증**: stub `maya.cmds` + PySide6(+pymel stub) 로 32항목 통과 — 세 곳 각각 부분 일치/대소문자
+  무시/일치 없음/Clear/가려진 선택 제외/목록 재구성 후 유지. **테스트가 잡은 것**: Stretch Default 쪽
+  TSL 은 **단일 선택**이라 두 개를 동시에 선택할 수 없다 → 선택 모드에 따라 기대값을 나눠 검증.
+  **마야 실기 UI 테스트 대기.** #A00170 #Filter #공용위젯 #Reveal
+
 > [!summary] `A00290_BSTool` **두 탭의 검색을 공용 Filter 위젯으로 이전** (v01.12→01.13)
 - **요청**: `JUN_mod_filter_qt_v01` 로 A00290 Base Shape 의 검색을 대신하고, 툴 전체를 공용 위젯으로 이전.
 - **Base Shape 탭**: `QListWidget` 이라 그대로 붙였다. 자체 구현(`_apply_bs_filter` /

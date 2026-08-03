@@ -109,9 +109,8 @@ A00170_driverTool/
    자동으로 (개수 − 1)로 갱신된다(읽기 전용, Sine Wave 의 master input 범위).
 3. **List Attributes** → 첫 조인트의 어트리뷰트를 Attributes 리스트에 채운다. keyable 뿐 아니라
    `listAttr` 전체를 보여주며 multi/compound 어트리뷰트는 자식까지 펼친다(A00145_RigConnect Connect
-   탭과 동일). **Attr Search** 는 토큰(예: `rotate`)을 포함하는 항목을 일괄 선택하고, **일치 항목이
-   없으면** 그 토큰으로 다시 질의해 **리스트에 없던 어트리뷰트**(예: `worldMatrix`)를 찾아 채운다.
-   빌드는 **선택된** 어트리뷰트에만 적용된다.
+   탭과 동일). 목록이 길면 **Filter** 로 좁힌다(§4.5). 빌드는 **보이면서 선택된** 어트리뷰트에만
+   적용된다.
 4. **Prefix**(기본 `twist`) 설정. Sine Wave 는 **Driver Attr**(기본 `wave`)도 설정.
    **Range** 의 Out Min/Max 는 두 모드 공용, In Min 은 Sine Wave 전용 기본값이다.
 5. **Build (Slerp Ramp)** 또는 **Build (Sine Wave)** 클릭.
@@ -171,11 +170,10 @@ A00170_driverTool/
 
 1. **Default Distance** 그룹 — driver.
    - **Objects** 리스트에 driver 오브젝트를 추가.
-   - **List Attributes** 로 첫 오브젝트의 어트리뷰트를 채우고(또는 **Attr Search** 토큰으로 검색),
+   - **List Attributes** 로 첫 오브젝트의 어트리뷰트를 채우고(길면 **Filter** 로 좁힌다, §4.5),
      driver 로 쓸 어트리뷰트 **하나를 선택**. 그 어트리뷰트의 **현재 값이 `a`**(빌드 시점 스냅샷)다.
 2. **Stretch Object** 그룹 — driven. 같은 방식으로 오브젝트와 **어트리뷰트를 하나 이상** 선택한다
-   (여러 개 선택하면 선택한 모든 어트리뷰트에 같은 함수가 적용된다). **Attr Search** 로 재질의해
-   여러 개가 발견되면 **발견된 것 모두 선택**된다.
+   (여러 개 선택하면 선택한 모든 어트리뷰트에 같은 함수가 적용된다).
 3. **Function / Infinity**:
    - **Function**: 네 가지.
      - `f(x)=x-a+1` / `-x+a+1` — 선형(멀수록 증가/감소).
@@ -214,6 +212,42 @@ A00170_driverTool/
 >
 > 참고: 원본 MEL 의 **Distance 탭**(`distanceDimension` 생성)은 이식하지 않았다. 필요하면 Maya 의
 > 기본 Distance Tool 또는 별도 유틸을 쓴다.
+
+### 4.5 Filter — 어트리뷰트 찾기 (v01.13, 기존 `Attr Search` 대체)
+
+Remap Value 탭과 Stretch 탭의 두 그룹, **세 곳의 Attributes 리스트**가 같은 검색 UI 를 쓴다.
+공용 위젯 [`Framework_MOD_filter_qt`](Framework_MOD_filter_qt.md) 이며 `A00145_RigConnect` ·
+`A00290_BSTool` 과 동작이 같다.
+
+```
+Attributes
+┌───────────────────────────────────┐
+│ rotateX                            │   ← 일치하는 것만 남고
+│ rotateY                            │      나머지는 숨는다
+│ rotateZ                            │
+└───────────────────────────────────┘
+Filter [ rotate             ] [Clear] [Reveal]
+```
+
+- **입력하는 즉시** 일치하는 항목만 남고 나머지는 **숨는다**(지우는 게 아니라 가리는 것).
+- **부분 일치**, **대소문자 무시**, 공백으로 나눈 **여러 단어는 AND**.
+- `List Attributes` 로 목록을 다시 채워도 **필터가 유지**된다.
+
+> **필터가 걸린 동안에는 "보이는 것이 작업 대상"이다.** Qt 는 항목을 숨겨도 선택 상태를 유지하므로,
+> 그대로 두면 **가려서 안 보이는 어트리뷰트까지 빌드에 들어간다.** 그래서 Build / Apply 는
+> **보이면서 선택된** 어트리뷰트만 쓰고, 가려진 선택이 있으면
+> `[INFO] ... hidden by the filter were skipped.` 로 알린다.
+
+#### `Reveal` — 목록에 없던 어트리뷰트 드러내기
+
+Filter 는 **이미 채워진 목록만** 거른다. 그래서 애초에 리스트업되지 않은 어트리뷰트
+(예: `worldMatrix`)는 Filter 로 찾을 수 없다. 그때만 쓰는 보조 버튼이 **`Reveal`** 이다 —
+Filter 에 적은 문구로 **첫 오브젝트를 다시 질의**(`listAttr(obj.<token>)`)해 그 결과로 목록을
+교체한다. 드러낸 항목이 곧바로 가려지지 않도록 **필터는 자동으로 비워진다.**
+
+> 예전 `Attr Search` 버튼은 ① 일치 항목 **선택** ② 일치가 없으면 **재질의** 를 한 버튼이 겸했다.
+> ①은 Filter 가 대신하고, ②는 별개의 동작이라 **`Reveal` 버튼으로 분리**했다 — 언제 재질의가
+> 일어나는지가 눈에 보인다.
 
 ---
 

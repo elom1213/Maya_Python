@@ -136,6 +136,11 @@ self.flt_se.filtered.connect(self._on_se_filtered)   # 개수 라벨 등 후처�
 | `A00145_RigConnect` | Connect 탭 Source/Destination, Attribute 탭 | `QListWidget` | v01.19 (실기 확인 완료) |
 | `A00290_BSTool` | Base Shape 탭 | `QListWidget` | v01.13 |
 | `A00290_BSTool` | Shape Editor 탭 | `rows_provider` | v01.13 |
+| `A00170_driverTool` | Remap Value 탭, Stretch 탭 2개 그룹 | `QListWidget`(TSL 내부) | v01.13 |
+
+> **TSL(`JUN_mod_tsl_qt_v01`) 안의 리스트에 붙일 때**는 `tsl.list_widget` 을 넘긴다.
+> 단, TSL 의 `get_all_items()` / `selected_items()` 는 **숨김을 모른다** — 작업 대상은
+> 반드시 위젯의 `visible_selected()` 로 고를 것.
 
 > 검색 기능을 새로 넣거나 기존 검색을 손볼 때는 **자체 구현하지 말고 이 위젯을 쓴다.**
 > 규칙(매칭 방식, "보이는 것이 작업 대상")이 바뀌면 여기 한 곳만 고치면 된다.

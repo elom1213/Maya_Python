@@ -14,6 +14,7 @@ from Framework.core.maya_undo import undo_chunk
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
+from Framework.qt import JUN_mod_filter_qt
 
 from tools.A00170_driverTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00170_driverTool.app.core import (
@@ -185,19 +186,18 @@ class MainWindow(QWidget):
         group_layout.addWidget(self.rmp_attr_tsl)
         root.addWidget(group, stretch=1)
 
-        # Attr Search
+        # Attr Filter — 공용 위젯. 입력 즉시 일치하는 어트리뷰트만 남는다.
         row = QHBoxLayout()
-        row.addWidget(QLabel("Attr Search"))
-        self.rmp_le_attr_search = QLineEdit()
-        self.rmp_le_attr_search.setPlaceholderText("token (e.g. rotate)")
-        self.rmp_le_attr_search.setToolTip(
-            "Select listed attributes containing this token. If none match, "
-            "re-query the first joint by this token to reveal attributes that "
-            "are not currently listed (e.g. 'worldMatrix').")
-        row.addWidget(self.rmp_le_attr_search)
-        self.rmp_btn_attr_search = QPushButton("Search")
-        self.rmp_btn_attr_search.setFixedWidth(70)
-        row.addWidget(self.rmp_btn_attr_search)
+        self.rmp_flt_attr = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.rmp_attr_tsl.list_widget,
+            placeholder="Type any part of an attribute name (e.g. rotate)")
+        row.addWidget(self.rmp_flt_attr, 1)
+        self.rmp_btn_attr_reveal = QPushButton("Reveal")
+        self.rmp_btn_attr_reveal.setFixedWidth(70)
+        self.rmp_btn_attr_reveal.setToolTip(
+            "Re-query the first joint by the filter text to reveal attributes that\n"
+            "are not currently listed (e.g. 'worldMatrix'), then list those instead.")
+        row.addWidget(self.rmp_btn_attr_reveal)
         root.addLayout(row)
 
         # Build buttons : Slerp Ramp / Sine Wave
@@ -217,8 +217,7 @@ class MainWindow(QWidget):
 
         # Signals
         self.rmp_btn_get_controller.clicked.connect(self.on_rmp_get_controller)
-        self.rmp_btn_attr_search.clicked.connect(self.on_rmp_search_attrs)
-        self.rmp_le_attr_search.returnPressed.connect(self.on_rmp_search_attrs)
+        self.rmp_btn_attr_reveal.clicked.connect(self.on_rmp_reveal_attrs)
         self.rmp_btn_build.clicked.connect(self.on_rmp_build)
         self.rmp_btn_build_wave.clicked.connect(self.on_rmp_build_wave)
 
@@ -269,33 +268,37 @@ class MainWindow(QWidget):
             return
         attrs = MayaScene.list_attrs(first)
         self.rmp_attr_tsl.set_items(attrs)
-        self._log("Listed {0} attribute(s) from {1}.".format(len(attrs), first))
+        self._log(self._relist_msg(self.rmp_flt_attr, len(attrs), first))
 
-    def on_rmp_search_attrs(self):
-        """토큰으로 어트리뷰트를 검색한다.
+    def _relist_msg(self, flt, total, obj):
+        """목록을 새로 채운 뒤 필터를 다시 먹이고, 로그 문구를 만든다."""
+        shown, _total = flt.refresh()
+        msg = "Listed {0} attribute(s) from {1}.".format(total, obj)
+        if shown != total:
+            msg += " Filter '{0}' shows {1}.".format(flt.text().strip(), shown)
+        return msg
 
-        현재 리스트에 토큰을 포함하는 항목이 있으면 그것들을 선택하고, 없으면
-        토큰으로 다시 질의해 (리스트업되지 않았던) 어트리뷰트를 찾아 채운다
-        (A00145_RigConnect Connect 탭 Search 와 동일).
+    def on_rmp_reveal_attrs(self):
+        """Filter 문구로 첫 조인트를 **재질의**해, 목록에 없던 어트리뷰트를 드러낸다.
+
+        Filter 는 이미 채워진 목록만 거르므로 애초에 리스트업되지 않은 어트리뷰트
+        (예: 'worldMatrix')는 찾을 수 없다. 그 경우에만 쓰는 보조 버튼이다.
+        예전 Search 버튼의 "일치 없으면 재질의" 동작을 명시적인 버튼으로 분리한 것.
         """
-        token = self.rmp_le_attr_search.text().strip()
+        self._reveal_attrs(self.rmp_joints_tsl, self.rmp_attr_tsl,
+                           self.rmp_flt_attr, "Joints")
+
+    def _reveal_attrs(self, objs_tsl, attr_tsl, flt, obj_label):
+        token = flt.text().strip()
         if not token:
-            self._log("[WARN] Enter a search token.")
+            self._log("[WARN] Enter a filter token first.")
             return
 
-        matches = [a for a in self.rmp_attr_tsl.get_all_items() if token in a]
-        if matches:
-            self.rmp_attr_tsl.select_by_texts(matches)
-            self._log("Search '{0}' : {1} attribute(s) selected.".format(
-                token, len(matches)))
+        objs = objs_tsl.get_all_items()
+        if not objs:
+            self._log("[WARN] {0} list is empty. Add objects first.".format(obj_label))
             return
-
-        # 현재 목록에 없으면 토큰으로 재질의해 발견되는 어트리뷰트를 채운다.
-        joints = self.rmp_joints_tsl.get_all_items()
-        if not joints:
-            self._log("[WARN] Joints list is empty. Add joints first.")
-            return
-        first = joints[0]
+        first = objs[0]
         if not MayaScene.exists(first):
             self._log("[WARN] Object not found in scene: {0}".format(first))
             return
@@ -305,18 +308,33 @@ class MainWindow(QWidget):
             self._log("[WARN] No attribute matches '{0}': {1}".format(token, exc))
             return
         if not attrs:
-            self._log("Search '{0}' : no attribute found.".format(token))
+            self._log("Reveal '{0}' : no attribute found.".format(token))
             return
-        self.rmp_attr_tsl.set_items(attrs)
-        self._log("Search '{0}' : re-listed {1} attribute(s) from {2}.".format(
+
+        attr_tsl.set_items(attrs)
+        # 드러낸 것을 곧바로 가리지 않도록 필터를 비운 뒤 다시 먹인다.
+        flt.clear()
+        self._log("Reveal '{0}' : re-listed {1} attribute(s) from {2}.".format(
             token, len(attrs), first))
+
+    def _visible_selected_attrs(self, flt, label):
+        """**보이면서 선택된** 어트리뷰트. 가려진 선택이 있으면 알린다.
+
+        Qt 는 항목을 숨겨도 선택을 유지하므로, 필터에 가려진 어트리뷰트까지
+        빌드에 들어가지 않도록 여기서 걸러 낸다.
+        """
+        names, hidden = flt.visible_selected()
+        if hidden:
+            self._log("[INFO] {0} : {1} selected attribute(s) hidden by the filter "
+                      "were skipped.".format(label, hidden))
+        return names
 
     def _rmp_collect_inputs(self):
         """공통 입력 수집 + 검증. 유효하면 (prefix, controller, joints, attrs), 아니면 None."""
         prefix = self.rmp_le_prefix.text().strip()
         controller = self.rmp_le_controller.text().strip()
         joints = self.rmp_joints_tsl.get_all_items()
-        attrs = self.rmp_attr_tsl.selected_items()
+        attrs = self._visible_selected_attrs(self.rmp_flt_attr, "Attributes")
 
         if not prefix:
             self._log("[WARN] Prefix is empty.")
@@ -871,14 +889,14 @@ class MainWindow(QWidget):
         root = QVBoxLayout(tab)
 
         # Default Distance (driver) : Objects + Attributes
-        self.stc_def_objs_tsl, self.stc_def_attr_tsl, self.stc_def_search = \
+        self.stc_def_objs_tsl, self.stc_def_attr_tsl, self.stc_def_flt = \
             self._stretch_obj_attr_group(
                 root, "Default Distance", "def",
                 "Driver objects. The chosen attribute's current value is 'a' "
                 "(the rest distance where the stretch output = 1).")
 
         # Stretch Object (driven) : Objects + Attributes (multiple attrs allowed)
-        self.stc_str_objs_tsl, self.stc_str_attr_tsl, self.stc_str_search = \
+        self.stc_str_objs_tsl, self.stc_str_attr_tsl, self.stc_str_flt = \
             self._stretch_obj_attr_group(
                 root, "Stretch Object", "str",
                 "Driven objects. Every selected attribute receives f(driver) "
@@ -988,9 +1006,9 @@ class MainWindow(QWidget):
 
     def _stretch_obj_attr_group(self, root, title, prefix, obj_tooltip,
                                 multi_attr=False):
-        """Objects TSL + Attributes TSL(List Attributes/Search) 한 쌍의 그룹을 만든다.
+        """Objects TSL + Attributes TSL(List Attributes/Filter) 한 쌍의 그룹을 만든다.
 
-        반환: (objs_tsl, attr_tsl, search_lineedit). prefix 는 List/Search 핸들러가
+        반환: (objs_tsl, attr_tsl, filter_widget). prefix 는 List 핸들러가
         어느 쌍인지 구분하는 태그로만 쓴다(위젯 이름은 호출부가 보관).
         multi_attr=True 면 어트리뷰트를 여러 개 선택할 수 있다(Stretch Object 쪽).
         """
@@ -1004,37 +1022,37 @@ class MainWindow(QWidget):
         attr_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Attributes", show_select=False, multi_select=multi_attr,
             log_callback=self._log)
+
+        # Attr Filter — 공용 위젯 (Remap 탭과 동일 패턴).
+        # List Attributes 버튼이 이 위젯을 참조하므로 먼저 만든다.
+        flt = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            attr_tsl.list_widget,
+            placeholder="Type any part of an attribute name (e.g. distance)")
+
         # List Attributes 버튼을 편집 버튼 행 맨 앞에 (Remap 탭과 동일 패턴).
         attr_tsl.add_button(
             "List Attributes",
-            lambda: self._stc_list_attrs(objs_tsl, attr_tsl), index=0)
+            lambda: self._stc_list_attrs(objs_tsl, attr_tsl, flt), index=0)
         row.addWidget(objs_tsl)
         row.addWidget(attr_tsl)
         g_layout.addLayout(row)
 
-        # Attr Search
         search_row = QHBoxLayout()
-        search_row.addWidget(QLabel("Attr Search"))
-        search_le = QLineEdit()
-        search_le.setPlaceholderText("token (e.g. distance)")
-        search_le.setToolTip(
-            "Select listed attributes containing this token. If none match, "
-            "re-query the first object by this token to reveal attributes not "
-            "currently listed.")
-        search_le.returnPressed.connect(
-            lambda: self._stc_search_attrs(objs_tsl, attr_tsl, search_le))
-        search_row.addWidget(search_le)
-        btn_search = QPushButton("Search")
-        btn_search.setFixedWidth(70)
-        btn_search.clicked.connect(
-            lambda: self._stc_search_attrs(objs_tsl, attr_tsl, search_le))
-        search_row.addWidget(btn_search)
+        search_row.addWidget(flt, 1)
+        btn_reveal = QPushButton("Reveal")
+        btn_reveal.setFixedWidth(70)
+        btn_reveal.setToolTip(
+            "Re-query the first object by the filter text to reveal attributes that\n"
+            "are not currently listed, then list those instead.")
+        btn_reveal.clicked.connect(
+            lambda: self._reveal_attrs(objs_tsl, attr_tsl, flt, "Object"))
+        search_row.addWidget(btn_reveal)
         g_layout.addLayout(search_row)
 
         root.addWidget(group, stretch=1)
-        return objs_tsl, attr_tsl, search_le
+        return objs_tsl, attr_tsl, flt
 
-    def _stc_list_attrs(self, objs_tsl, attr_tsl):
+    def _stc_list_attrs(self, objs_tsl, attr_tsl, flt):
         """objs_tsl 첫 오브젝트의 어트리뷰트 전체를 attr_tsl 에 채운다."""
         objs = objs_tsl.get_all_nodes()
         if not objs:
@@ -1043,38 +1061,7 @@ class MainWindow(QWidget):
         first = objs[0]
         attrs = MayaScene.list_attrs(first)
         attr_tsl.set_items(attrs)
-        self._log("Listed {0} attribute(s) from {1}.".format(len(attrs), first))
-
-    def _stc_search_attrs(self, objs_tsl, attr_tsl, search_le):
-        """토큰으로 어트리뷰트 검색(Remap 탭 Search 와 동일한 동작)."""
-        token = search_le.text().strip()
-        if not token:
-            self._log("[WARN] Enter a search token.")
-            return
-        matches = [a for a in attr_tsl.get_all_items() if token in a]
-        if matches:
-            attr_tsl.select_by_texts(matches)
-            self._log("Search '{0}' : {1} attribute(s) selected.".format(
-                token, len(matches)))
-            return
-        objs = objs_tsl.get_all_nodes()
-        if not objs:
-            self._log("[WARN] Object list is empty. Add objects first.")
-            return
-        first = objs[0]
-        try:
-            attrs = MayaScene.list_attrs(first, token)
-        except Exception as exc:
-            self._log("[WARN] No attribute matches '{0}': {1}".format(token, exc))
-            return
-        if not attrs:
-            self._log("Search '{0}' : no attribute found.".format(token))
-            return
-        attr_tsl.set_items(attrs)
-        # 발견된 어트리뷰트를 모두 선택한다(다중 선택 리스트면 전부, 단일이면 첫 항목).
-        attr_tsl.select_by_texts(attrs)
-        self._log("Search '{0}' : re-listed and selected {1} attribute(s) from {2}.".format(
-            token, len(attrs), first))
+        self._log(self._relist_msg(flt, len(attrs), first))
 
     def _stc_sync_func_enabled(self, *args):
         """선택한 Function 에 따라 infinity(선형 전용)/sigmoid 파라미터 박스 활성 상태 토글.
@@ -1090,8 +1077,10 @@ class MainWindow(QWidget):
         self._log("--- Apply Stretch ---")
         def_objs = self.stc_def_objs_tsl.get_all_nodes()
         str_objs = self.stc_str_objs_tsl.get_all_nodes()
-        def_attrs = self.stc_def_attr_tsl.selected_items()
-        str_attrs = self.stc_str_attr_tsl.selected_items()
+        def_attrs = self._visible_selected_attrs(
+            self.stc_def_flt, "Default Distance attributes")
+        str_attrs = self._visible_selected_attrs(
+            self.stc_str_flt, "Stretch Object attributes")
 
         if not def_objs:
             self._log("[WARN] Default Distance object list is empty.")

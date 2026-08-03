@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 85c8852e-52d8-4514-9afa-b44bf5d7ef96
-  modified: 2026-08-03T01:53:10.485Z
+  modified: 2026-08-03T02:03:42.188Z
 ---
 
 공용 검색/필터 위젯 **`Framework/qt/MOD_filter_qt_v01.py`** (`JUN_mod_filter_qt`, 2026-08-03 신설).
@@ -28,8 +28,14 @@ metadata:
   `() -> [(이름, 위젯), ...]` 콜러블을 넘기면 `setVisible()` 로 숨긴다. 이 모드엔 항목 선택
   개념이 없어 `visible_selected()` 대신 **`visible_rows()`**. 개수 라벨을 두 곳에 반영하는 등
   후처리가 필요하면 `number_label` 대신 **`filtered(shown, total)` 시그널**을 받는다.
+- **TSL(`JUN_mod_tsl_qt_v01`) 안의 리스트**에 붙일 땐 `tsl.list_widget` 을 넘긴다. 단 TSL 의
+  `get_all_items()` / `selected_items()` 는 **숨김을 모르므로** 작업 대상은 반드시 `visible_selected()`.
 - 적용 현황: **A00145_RigConnect v01.19**(Connect src/dst + Attribute, QListWidget),
-  **A00290_BSTool v01.13**(Base Shape=QListWidget, Shape Editor=rows_provider). 자체 구현은 전부 제거됨.
+  **A00290_BSTool v01.13**(Base Shape=QListWidget, Shape Editor=rows_provider),
+  **A00170_driverTool v01.13**(Remap + Stretch 2그룹, TSL 내부 리스트). 자체 구현은 전부 제거됨.
+- 옛 Search 가 "일치 없으면 토큰으로 재질의" 를 겸하던 툴이 있다. A00145 에선 죽은 길이라 제거했지만
+  **A00170 에선 살아 있어**(`worldMatrix` 처럼 애초에 리스트업 안 되는 attr) **`Reveal` 버튼으로 분리**해
+  보존했다 — 비슷한 툴을 이전할 때 재질의 경로가 실제로 쓸모 있는지 먼저 확인할 것.
 - 문서: `JUN_All/docs/Framework_MOD_filter_qt.md` (docs/README.md "공용 위젯" 섹션에 등록).
 
 관련: [[tsl-selection-order]], [[qtreewidgetitem-checkable-default-flag]], [[wip-a00290-shape-editor-tab]]
