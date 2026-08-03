@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.17` (`app/config/version.py`)
+- 버전: `v01.19` (`app/config/version.py`) — 검색을 공용 **Filter** 로 교체 (§Filter)
 - 위치: `JUN_All/tools/A00145_RigConnect`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴(`QTabWidget` 6탭)
 - 원본 `A00140_ConnectClosest` / MEL 파일은 그대로 보존(미수정)
@@ -173,12 +173,49 @@ after :  [targets] ─(parentConstraint, MO)→ objB     (원본 삭제, objB �
 - 어떤 종류의 constraint 든 동작한다(parent/point/orient/scale/aim/poleVector/geometry/pointOnPoly/
   normal/tangent). 읽기/재생성이 불가한 항목은 건너뛰고 경고를 남긴다.
 
+### Filter — 이름으로 어트리뷰트 찾기 (v01.19)
+
+Connect 탭의 Source/Destination 두 패널과 Attribute 탭의 어트리뷰트 목록이 **같은 검색 UI** 를 쓴다.
+공용 위젯 [`Framework_MOD_filter_qt`](Framework_MOD_filter_qt.md) 이며, A00290_BSTool 의 Filter 와
+동작이 같다.
+
+```
+Attributes                              Number: 2 / 47
+┌───────────────────────────────────┐
+│ browInnerUp                        │   ← 일치하는 것만 남고
+│ mouthInnerCorner                   │      나머지는 숨는다
+└───────────────────────────────────┘
+Filter [ inner              ] [Clear]   [Select All]
+```
+
+- **입력하는 즉시** 일치하는 항목만 남고 나머지는 **숨는다**(지우는 게 아니라 가리는 것 —
+  필터를 비우면 그대로 돌아온다).
+- **부분 일치**(`Inner` → `browInnerUp`), **대소문자 무시**.
+- 공백으로 나눈 **여러 단어는 AND**(`brow up` → `browInnerUp`, `browOuterUpLeft` …).
+- `Number` 라벨이 필터 중에는 **`보이는 수 / 전체 수`** 로 바뀐다.
+- `List Attributes` 로 목록을 다시 채워도 **필터가 유지**된다.
+
+> **필터가 걸린 동안에는 "보이는 것이 작업 대상"이다.** Qt 는 항목을 숨겨도 선택 상태를 유지하므로,
+> 그대로 두면 **가려서 안 보이는 어트리뷰트까지 연결·복사된다.** 그래서 —
+> - **`Select All`** 은 **지금 보이는 것만** 선택한다.
+> - **`Connect Source to Destination`** / **Attribute 탭의 복사**는 **보이면서 선택된** 것만 처리하고,
+>   가려진 선택이 있으면 `[INFO] ... hidden by the filter were skipped` 로 알린다.
+>
+> 여러 검색어를 오가며 고른 것을 **한 번에** 처리하려면 **필터를 비운 뒤** 실행하면 된다
+> (선택 자체는 지워지지 않는다).
+
+> **바뀐 점(v01.18 이전과 비교)**: 예전 `Search` 버튼은 ① 현재 목록에서 일치 항목을 **선택**하고,
+> ② 일치가 없으면 검색어로 어트리뷰트를 **다시 질의**했다(MEL 시절 동작). ①은 `Filter` + `Select All`
+> 로 대체됐고, ②는 부분 일치가 하나도 없을 때만 도는 경로라 실질적으로 쓰이지 않았다
+> (`List Attributes` 가 전체 재조회를 담당한다).
+
 ### Connect
 어트리뷰트를 source → destination 으로 연결한다.
 
 - Source/Destination 각 섹션:
   - `Objects` 리스트에 오브젝트 추가 → `List Attributes` 로 첫 오브젝트의 어트리뷰트를 우측 목록에 채움.
-  - `search` 입력 + `Search`: 현재 목록에서 일치 항목을 **선택**하고, 없으면 검색어로 어트리뷰트를 다시 질의.
+  - **`Filter`**(v01.19, 기존 `Search` 버튼 대체): 입력하는 즉시 **일치하는 것만 남고 나머지는 숨는다**.
+    `Select All` 은 **보이는 것만** 선택한다. → 아래 **Filter** 절 참고.
   - 우측 어트리뷰트 목록에서 연결할 항목을 **선택(다중 가능)**.
 - **blendShape 노드를 리스트업하면 `List Attributes` 가 타겟 이름을 나열한다(v01.17).**
   타겟은 `weight[i]` 멀티에 걸린 **별칭(alias)** 이라 일반 멀티 확장으로는 인덱스 0(첫 타겟) 하나만
@@ -203,7 +240,8 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
   오른쪽에 채운다. 목록에서 복사할 항목을 **다중 선택**(`Select All` 버튼 제공).
   - **`User defined only`**(기본 ON): 사용자 정의(커스텀) 어트리뷰트만 나열. 끄면 `translateX` 같은
     기본 어트리뷰트까지 전부 나온다.
-  - `search` 입력 후 Enter/`List Attributes`: 이름에 검색어가 든 것만(대소문자 무시) 나열.
+  - **`Filter`**(v01.19): 예전에는 검색어가 **조회 인자**여서 Enter/`List Attributes` 로 다시 질의해야
+    했는데, 이제는 이미 채워진 목록을 **입력하는 즉시** 거른다. → 아래 **Filter** 절 참고.
   - 컴파운드 **자식**(`tintR`/`translateX` 등)은 목록에서 제외된다. 부모를 복사하면 자식도 같이
     만들어지고, 자식만 따로는 `addAttr` 로 만들 수도 없다.
   - **blendShape 노드를 소스로 넣으면 타겟 이름들이 나열된다.** 타겟은 `weight[i]` 의 별칭이라

@@ -6,10 +6,12 @@
 from Framework.qt import MOD_tsl_qt_v01 as JUN_mod_tsl_qt
 from Framework.qt import MOD_collapsible_qt_v01 as JUN_mod_collapsible_qt
 from Framework.qt import MOD_timeRange_qt_v01 as JUN_mod_timeRange_qt
+from Framework.qt import MOD_filter_qt_v01 as JUN_mod_filter_qt
 
 
 __all__ = [
     "JUN_mod_tsl_qt",
     "JUN_mod_collapsible_qt",
     "JUN_mod_timeRange_qt",
+    "JUN_mod_filter_qt",
 ]

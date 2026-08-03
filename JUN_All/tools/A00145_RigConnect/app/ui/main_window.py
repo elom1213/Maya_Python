@@ -12,6 +12,7 @@
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
+from Framework.qt import JUN_mod_filter_qt
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -532,11 +533,7 @@ class MainWindow(QWidget):
         attr_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         attr_list.setMinimumHeight(120)
 
-        search = QLineEdit()
-        search.setPlaceholderText("search attribute")
-
         btn_list = QPushButton("List Attributes")
-        btn_search = QPushButton("Search")
 
         body = QHBoxLayout()
 
@@ -545,12 +542,24 @@ class MainWindow(QWidget):
         left.addWidget(btn_list)
 
         right = QVBoxLayout()
-        right.addWidget(QLabel("Attributes"))
+        head = QHBoxLayout()
+        head.addWidget(QLabel("Attributes"))
+        head.addStretch(1)
+        lbl_number = QLabel("Number: 0")
+        head.addWidget(lbl_number)
+        right.addLayout(head)
         right.addWidget(attr_list)
-        search_row = QHBoxLayout()
-        search_row.addWidget(search)
-        search_row.addWidget(btn_search)
-        right.addLayout(search_row)
+
+        # 검색 = 공용 Filter 위젯. 입력하는 즉시 일치하는 것만 남고 나머지는 숨는다.
+        flt = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            attr_list, placeholder="Type any part of an attribute name",
+            number_label=lbl_number)
+        right.addWidget(flt)
+
+        btn_all = QPushButton("Select All")
+        btn_all.setToolTip("Select every attribute currently visible in the list.")
+        btn_all.clicked.connect(flt.select_all_visible)
+        right.addWidget(btn_all)
 
         body.addLayout(left)
         body.addLayout(right)
@@ -559,12 +568,10 @@ class MainWindow(QWidget):
         self._connect_widgets[role] = {
             "tsl": tsl,
             "attrs": attr_list,
-            "search": search,
+            "filter": flt,
         }
 
         btn_list.clicked.connect(lambda: self.on_list_attrs(role))
-        btn_search.clicked.connect(lambda: self.on_search_attrs(role))
-        search.returnPressed.connect(lambda: self.on_search_attrs(role))
 
         return box
 
@@ -603,7 +610,12 @@ class MainWindow(QWidget):
         self.lw_attr_src.itemSelectionChanged.connect(self._update_attr_preview)
 
         right = QVBoxLayout()
-        right.addWidget(QLabel("Attributes"))
+        head = QHBoxLayout()
+        head.addWidget(QLabel("Attributes"))
+        head.addStretch(1)
+        self.lbl_attr_number = QLabel("Number: 0")
+        head.addWidget(self.lbl_attr_number)
+        right.addLayout(head)
         right.addWidget(self.lw_attr_src)
 
         # 기본값 ON : 리깅에서 복사할 대상은 거의 항상 사용자 정의 어트리뷰트다.
@@ -615,13 +627,16 @@ class MainWindow(QWidget):
             "Off : every attribute, including built-ins like translateX.")
         right.addWidget(self.cb_attr_user_only)
 
+        # Connect 탭과 같은 공용 Filter. 예전에는 검색어가 목록을 다시 질의하는
+        # 인자였는데(Enter -> 재조회), 이제는 이미 채워진 목록을 즉시 거른다.
         search_row = QHBoxLayout()
-        self.le_attr_search = QLineEdit()
-        self.le_attr_search.setPlaceholderText("search attribute")
-        self.le_attr_search.returnPressed.connect(self.on_attr_list)
-        search_row.addWidget(self.le_attr_search)
+        self.flt_attr_src = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_attr_src, placeholder="Type any part of an attribute name",
+            number_label=self.lbl_attr_number)
+        search_row.addWidget(self.flt_attr_src, 1)
         btn_all = QPushButton("Select All")
-        btn_all.clicked.connect(self.lw_attr_src.selectAll)
+        btn_all.setToolTip("Select every attribute currently visible in the list.")
+        btn_all.clicked.connect(self.flt_attr_src.select_all_visible)
         search_row.addWidget(btn_all)
         right.addLayout(search_row)
 
@@ -781,7 +796,7 @@ class MainWindow(QWidget):
     def _selected_texts(self, list_widget):
         return [it.text() for it in list_widget.selectedItems()]
 
-    def _all_texts(self, list_widget):
+    def _all_texts(self, list_widget):   # noqa: 유틸 (현재 호출부 없음)
         return [list_widget.item(i).text() for i in range(list_widget.count())]
 
     def log(self, text):
@@ -1000,15 +1015,30 @@ class MainWindow(QWidget):
             return
         w["attrs"].clear()
         w["attrs"].addItems(attrs)
-        self.log("[OK] List Attributes : {0} ({1} attrs)".format(objs[0], len(attrs)))
+        # 새로 채운 항목에도 현재 필터를 다시 먹인다(필터가 유지되도록).
+        shown, total = w["filter"].refresh()
+
+        msg = "[OK] List Attributes : {0} ({1} attrs)".format(objs[0], total)
+        if shown != total:
+            msg += " - filter '{0}' shows {1}".format(w["filter"].text().strip(), shown)
+        self.log(msg)
 
     # ==============================================================
     # Handlers : Attribute
     # ==============================================================
 
-    def _selected_src_attrs(self):
-        """Attribute 탭에서 선택된 어트리뷰트 이름들."""
-        return [i.text() for i in self.lw_attr_src.selectedItems()]
+    def _selected_src_attrs(self, warn=False):
+        """Attribute 탭에서 **보이면서 선택된** 어트리뷰트 이름들.
+
+        Qt 는 숨긴 항목의 선택을 유지하므로, 필터에 가려진 것까지 복사해 버리지
+        않도록 걸러 낸다. warn=True 면 가려진 선택 수를 로그로 알린다(미리보기처럼
+        자주 불리는 곳에서는 로그를 내지 않는다).
+        """
+        names, hidden = self.flt_attr_src.visible_selected()
+        if warn and hidden:
+            self.log("[INFO] {0} selected attribute(s) hidden by the filter "
+                     "were skipped".format(hidden))
+        return names
 
     def _update_attr_preview(self):
         """Prefix/Suffix 를 적용한 새 이름을 첫 선택 항목으로 미리 보여준다."""
@@ -1033,9 +1063,9 @@ class MainWindow(QWidget):
             return
 
         user_only = self.cb_attr_user_only.isChecked()
-        search = self.le_attr_search.text().strip()
         try:
-            attrs = att_mgr.list_attributes(objs[0], user_only, search)
+            # 검색은 더 이상 조회 인자가 아니다 — 전부 받아 와서 Filter 로 거른다.
+            attrs = att_mgr.list_attributes(objs[0], user_only)
         except Exception as e:
             self.log("[ERR] List Attributes : {0}".format(e))
             cmds.warning(str(e))
@@ -1043,14 +1073,21 @@ class MainWindow(QWidget):
 
         self.lw_attr_src.clear()
         self.lw_attr_src.addItems(attrs)
+        # 새로 채운 항목에도 현재 필터를 다시 먹인다(필터가 유지되도록).
+        shown, total = self.flt_attr_src.refresh()
         self._update_attr_preview()
-        self.log("[OK] List Attributes : {0} ({1} attr(s){2})".format(
-            objs[0], len(attrs), ", user defined" if user_only else ""))
+
+        msg = "[OK] List Attributes : {0} ({1} attr(s){2})".format(
+            objs[0], total, ", user defined" if user_only else "")
+        if shown != total:
+            msg += " - filter '{0}' shows {1}".format(
+                self.flt_attr_src.text().strip(), shown)
+        self.log(msg)
 
     def on_attr_copy(self):
         srcs = self.tsl_attr_src.get_all_items()
         source = srcs[0] if srcs else ""
-        attrs = self._selected_src_attrs()
+        attrs = self._selected_src_attrs(warn=True)
         targets = self.tsl_attr_tgt.get_all_items()
         prefix = self.le_attr_prefix.text().strip()
         suffix = self.le_attr_suffix.text().strip()
@@ -1066,44 +1103,25 @@ class MainWindow(QWidget):
 
         self._run("Copy Attributes", _do)
 
-    def on_search_attrs(self, role):
-        w = self._connect_widgets[role]
-        search = w["search"].text().strip()
-        attr_widget = w["attrs"]
+    def _filtered_attrs(self, role, label):
+        """Connect 탭 한쪽의 **보이면서 선택된** 어트리뷰트.
 
-        all_items = self._all_texts(attr_widget)
-        matches = cnt_mgr.find_matching(all_items, search) if search else []
-
-        if matches:
-            # 현재 목록에서 매칭 항목을 선택 상태로 만든다.
-            attr_widget.clearSelection()
-            for i in range(attr_widget.count()):
-                if attr_widget.item(i).text() in matches:
-                    attr_widget.item(i).setSelected(True)
-            self.log("[OK] Search : {0} match(es) selected".format(len(matches)))
-        else:
-            # 매칭이 없으면 검색어로 다시 attr 목록을 질의해 채운다 (MEL 동작).
-            objs = w["tsl"].get_all_items()
-            if not objs:
-                self.log("[ERR] Search : object list is empty")
-                return
-            try:
-                attrs = cnt_mgr.list_attrs(objs[0], search)
-            except Exception as e:
-                self.log("[ERR] Search : {0}".format(e))
-                return
-            attr_widget.clear()
-            attr_widget.addItems(attrs)
-            self.log("[OK] Search : re-listed {0} attrs for '{1}'".format(
-                len(attrs), search))
+        Qt 는 숨긴 항목의 선택을 유지하므로, 필터에 가려진 항목까지 연결해 버리지
+        않도록 여기서 걸러 낸다. 가려진 선택이 있으면 조용히 넘기지 않고 알린다.
+        """
+        names, hidden = self._connect_widgets[role]["filter"].visible_selected()
+        if hidden:
+            self.log("[INFO] {0} : {1} selected attribute(s) hidden by the filter "
+                     "were skipped".format(label, hidden))
+        return names
 
     def on_connect_attrs(self):
         src = self._connect_widgets["src"]
         dst = self._connect_widgets["dst"]
         src_objs = src["tsl"].get_all_items()
         dst_objs = dst["tsl"].get_all_items()
-        src_attrs = self._selected_texts(src["attrs"])
-        dst_attrs = self._selected_texts(dst["attrs"])
+        src_attrs = self._filtered_attrs("src", "Source")
+        dst_attrs = self._filtered_attrs("dst", "Destination")
 
         def _do():
             count, mode = cnt_mgr.connect_attrs(

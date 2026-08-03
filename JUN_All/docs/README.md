@@ -22,6 +22,7 @@
 | `A00080_KWI_creator_V03` | 언리얼 / KawaiiPhysics | [A00080_KWI_creator_V03](A00080_KWI_creator_V03.md) |
 | `A00110_animTool` | 애니메이션 | [A00110_animTool](A00110_animTool.md) |
 | `A00140_ConnectClosest` | 리깅 / 페이셜 | [A00140_ConnectClosest](A00140_ConnectClosest.md) |
+| `A00145_RigConnect` | 리깅 / 연결·매칭·컨스트레인트 통합 | [A00145_RigConnect](A00145_RigConnect.md) |
 | `A00150_remapVal` | 리깅 | [A00150_remapVal](A00150_remapVal.md) |
 | `A00160_sphericalEye` | 리깅 / 페이셜 | [A00160_sphericalEye](A00160_sphericalEye.md) |
 | `A00180_abSymMesh` | 모델링 / 블렌드셰이프 | [A00180_abSymMesh](A00180_abSymMesh.md) |
@@ -43,6 +44,7 @@
 | 모듈 | 내용 | 문서 |
 |------|------|------|
 | `Framework/qt/MOD_tsl_qt_v01.py` | 공용 리스트(TSL) 위젯 — Select/Add/Del/Up/Down/Sort, **Order(선택 순서 유지)**, UUID 보관 | [Framework_MOD_tsl_qt](Framework_MOD_tsl_qt.md) |
+| `Framework/qt/MOD_filter_qt_v01.py` | 공용 **검색/필터** 위젯 — 입력 즉시 일치 항목만 표시, "보이는 것이 작업 대상" 헬퍼 | [Framework_MOD_filter_qt](Framework_MOD_filter_qt.md) |
 
 ---
 

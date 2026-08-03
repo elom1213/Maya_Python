@@ -17,6 +17,32 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-03 (오늘)
 
+> [!summary] `Framework` **공용 Filter 위젯 신설** + `A00145_RigConnect` 적용 (v01.18→01.19)
+- **요청**: A00290 Base Shape 의 Filter 가 좋다 — **입력하면 일치하는 것만 남고 나머지는 안 보이는**
+  그 특성을 `A00145_RigConnect` 의 **Search 버튼** 자리에 적용할 것. 그리고 **앞으로 검색 기능이 있는
+  모든 툴을 같은 Filter 로 통일**하고 싶다. 일단 A00145 부터.
+- **먼저 공용 위젯으로 뽑았다** — `Framework/qt/MOD_filter_qt_v01.py`(`JUN_mod_filter_qt`).
+  A00145 에만 복사해 넣으면 세 번째 툴에서 또 복사하게 되고, "통일"이라는 요청의 목적 자체가 무너진다.
+  `attach()` / `refresh()` / `visible_selected()` / `select_all_visible()` + `filtered` 시그널,
+  `number_label` 을 주면 `Number: 보이는수 / 전체수` 자동 갱신.
+  매칭은 **부분 일치·대소문자 무시**에 **공백 여러 단어 = AND**(`brow up` → `browInnerUp`)까지 넓혔다.
+- **A00145 적용** — Connect 탭 **Source/Destination 두 패널** + **Attribute 탭**, 세 곳 모두 교체.
+  - 옛 `Search` 버튼은 ① 일치 항목을 **선택**하고 ② 일치가 없으면 검색어로 어트리뷰트를 **재질의**했다
+    (MEL 시절 동작). ①은 `Filter` + `Select All` 로 대체. ②는 **부분 일치가 하나도 없을 때만** 도는
+    경로라 실질적으로 죽은 길이었고(`List Attributes` 가 전체 재조회 담당) 그대로 걷어냈다.
+  - Attribute 탭의 검색은 원래 **조회 인자**(`list_attributes(obj, user_only, search)`)여서 Enter 를
+    쳐야 다시 질의됐다 → 이제 전부 받아 와서 **즉시 거른다**. core 시그니처는 그대로 두고 UI 만 안 넘긴다.
+- **"보이는 것이 작업 대상" 규칙을 여기서도**: Qt 는 숨겨도 선택을 유지하므로 `Select All` 은
+  `select_all_visible`, `Connect Source to Destination` 과 Attribute 복사는 `visible_selected()` 로
+  거르고 가려진 선택은 `[INFO] ... hidden by the filter were skipped` 로 알린다.
+  (A00210 → A00290 → A00145 로 같은 규칙을 세 번째 적용 — 공용 위젯 문서에 규칙으로 못 박았다.)
+- **검증**: stub `maya.cmds` + PySide6 로 32항목 통과 — 위젯 단독 16항목(부분 일치/대소문자/AND 토큰/
+  Clear/Number 라벨/`refresh` 전후/가려진 선택), A00145 16항목(src·dst·Attribute 세 곳 각각 필터 표시,
+  보이는 선택만 반환, 가려진 선택 제외, Preview 갱신). **마야 실기 확인 완료(2026-08-03).**
+- **다음**: A00290 Base Shape 를 공용 위젯으로 이전. Shape Editor 탭은 `QListWidget` 이 아니라
+  **행 위젯 목록**이라 그대로는 못 붙는다 — 위젯이 "무엇을 숨길지"를 콜백으로 받도록 확장해야 한다(문서에 기록).
+  #A00145 #Framework #Filter #공용위젯 #보이는것이대상
+
 > [!summary] `A00290_BSTool` **Base Shape 타겟 Filter(검색)** (v01.11→01.12)
 - **요청**: Base Shape 탭의 Targets 목록에서 **이름으로 타겟을 찾는 검색**. **일부만 쳐도** 잡히게
   (`Inner` → `browInnerUp`).
