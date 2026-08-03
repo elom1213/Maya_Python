@@ -13,6 +13,7 @@
 # V01.12 : Create tool - add "Cluster Each" button (one cluster per selected object)
 # V01.13 : add Pin (always on top) toggle / remove Anim Tool UI
 # V01.14 : add "Copy Scene Folder" button (copy current scene folder path to clipboard)
+# V01.15 : add "Local Axis ON / OFF" buttons (batch show/hide local rotation axes)
 
 import maya.cmds as cmds;
 import maya.mel as mel
@@ -93,6 +94,83 @@ def JUN_cmd_create_cluster_each(*args, **kwargs):
     print("Created {0} cluster(s): {1}".format(len(handles), handles))
 
 
+def JUN_fun_resolve_local_axis_node(node):
+    """`displayLocalAxis` 를 가진 노드(transform)를 돌려준다. 없으면 None.
+
+    - 컴포넌트를 선택하면 `ls(objectsOnly=True)` 가 shape 를 주는데, shape 에는
+      `displayLocalAxis` 가 없다(있는 척도 안 하고 toggle 도 조용히 무시된다).
+      그래서 shape 면 부모 transform 으로 올라간다.
+    """
+    if cmds.attributeQuery("displayLocalAxis", node=node, exists=True):
+        return node
+
+    parents = cmds.listRelatives(node, parent=True, fullPath=True) or []
+
+    for parent in parents:
+        if cmds.attributeQuery("displayLocalAxis", node=parent, exists=True):
+            return parent
+
+    return None
+
+
+def JUN_cmd_set_local_axis(state, *args, **kwargs):
+    """선택한 오브젝트의 로컬 축 표시를 한 번에 켜거나 끈다.
+
+    현재 상태(`displayLocalAxis`)를 먼저 진단해서, 목표 상태와 다른 오브젝트만
+    바꾼다. 이미 목표 상태인 것은 건드리지 않으므로 선택이 섞여 있어도(일부만
+    켜져 있어도) 전부 같은 상태로 맞춰진다.
+
+    `toggle -localAxis` 대신 `setAttr` 을 쓴다: MEL toggle 은 undo 큐에 아무것도
+    남기지 않아서(빈 청크) 실행 후 Ctrl+Z 를 누르면 로컬 축이 아니라 그 **이전**
+    작업이 취소된다. setAttr 은 정상적으로 undo 된다.
+
+    잠기거나 연결된 어트리뷰트는 setAttr 이 실패하므로 따로 모아서 보고한다.
+    """
+    state = bool(state)
+
+    # 컴포넌트 선택도 받아주되(objectsOnly), 노드는 중복 없이 한 번씩만 처리한다.
+    nodes = cmds.ls(sl=True, long=True, objectsOnly=True) or []
+
+    if not nodes:
+        cmds.warning("Select object(s) first.")
+        return
+
+    targets = []
+
+    for node in nodes:
+        resolved = JUN_fun_resolve_local_axis_node(node)
+
+        if resolved and resolved not in targets:
+            targets.append(resolved)
+
+    if not targets:
+        cmds.warning("No selected object has a local axis display attribute.")
+        return
+
+    changed = []
+    failed = []
+
+    # 여러 오브젝트를 한 번의 undo 로 되돌린다.
+    with undo_chunk():
+        for target in targets:
+            if bool(cmds.getAttr(target + ".displayLocalAxis")) == state:
+                continue
+
+            try:
+                cmds.setAttr(target + ".displayLocalAxis", state)
+            except RuntimeError:
+                failed.append(target)
+            else:
+                changed.append(target)
+
+    print("Local axis {0}: changed {1} of {2} object(s).".format(
+        "ON" if state else "OFF", len(changed), len(targets)))
+
+    if failed:
+        cmds.warning("Local axis could not be changed on {0} object(s) "
+                     "(locked or connected): {1}".format(len(failed), failed))
+
+
 def JUN_cmd_copy_scene_path(*args, **kwargs):
     """현재 씬 파일이 저장된 '폴더' 경로를 클립보드에 복사한다 (이후 Ctrl+V 로 붙여넣기).
 
@@ -128,12 +206,12 @@ def JUN_cmd_copy_scene_path(*args, **kwargs):
 class JUN_ToolUI_QuickTool:
     def __init__(self):
         # self.str_winTitle = "Quick Tool V01.06"
-        self.str_headTitle = "Quick Tool V01.14"
-        self.str_winName = "Junny_win_Quick_tool_V01_14"
+        self.str_headTitle = "Quick Tool V01.15"
+        self.str_winName = "Junny_win_Quick_tool_V01_15"
         self.win_width = 300;
-        # File 섹션(Copy Scene Folder)을 추가한 만큼 창 세로를 늘려, 마지막 버튼 아래
+        # File / Display 섹션을 추가한 만큼 창 세로를 늘려, 마지막 버튼 아래
         # Copyright 문구까지 잘리지 않고 보이게 한다. 버튼 높이는 기존 값(450/40)을 유지.
-        self.win_height = 360;
+        self.win_height = 420;
         self.btn_hight = 11.25
 
         self.color_mainDark = [0.10, 0.12, 0.18]
@@ -147,6 +225,7 @@ class JUN_ToolUI_QuickTool:
         self.idx_importFBX_nrm = 2
         self.idx_create_tex_file = 3
         self.idx_file = 4
+        self.idx_display = 5
 
         self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 23-MAY-2026\')".format(self.color_main)
 
@@ -279,6 +358,20 @@ class JUN_ToolUI_QuickTool:
         cmds.setParent( '..' )
         # File tool (close)
 
+        # Display tool (open)
+        cmds.columnLayout( adjustableColumn=True, columnAttach=('both', 5), rowSpacing=5,  bgc =self.color_sub );
+
+        cmds.text( align="left", label='Display' );
+
+        cmds.setParent( '..' )
+
+        cmds.paneLayout( configuration= "vertical2", paneSize = ([1,50,100],[2,50,100]))
+
+        self.create_buttons(btn_specs[self.idx_display])
+
+        cmds.setParent( '..' )
+        # Display tool (close)
+
         cmds.text( align="center", label='Copyright (c) Park Ji Hun. All rights reserved.' );
 
         cmds.showWindow(self.str_winName);
@@ -349,6 +442,19 @@ def JUN_PY_Quick_tool_v01_08():
                         {
                             "label": "Copy Scene Folder",
                             "callback": JUN_cmd_copy_scene_path
+                        }
+                    ],
+                    # idx_display : 5
+                    [
+                        {
+                            "label": "Local Axis ON",
+                            "callback": JUN_cmd_set_local_axis,
+                            "args": [True]
+                        },
+                        {
+                            "label": "Local Axis OFF",
+                            "callback": JUN_cmd_set_local_axis,
+                            "args": [False]
                         }
                     ]
                 ]

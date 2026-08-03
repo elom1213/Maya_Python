@@ -17,6 +17,66 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-03 (오늘)
 
+> [!summary] `A00290_BSTool` **Base Shape 타겟 Filter(검색)** (v01.11→01.12)
+- **요청**: Base Shape 탭의 Targets 목록에서 **이름으로 타겟을 찾는 검색**. **일부만 쳐도** 잡히게
+  (`Inner` → `browInnerUp`).
+- **반영**: 목록 위에 **`Filter`** 입력 칸 + **`Clear`** 버튼. 부분 일치·**대소문자 무시**.
+  Shape Editor 탭에 이미 있던 Filter 와 **같은 규칙**으로 맞춰 두 탭의 검색 감각을 통일했다.
+  `Number` 라벨은 필터 중 **`보이는 수 / 전체 수`**(`Number: 2 / 9`)로 바뀌고,
+  `List Targets` 로 목록을 다시 채워도 **필터가 유지**된다.
+- **함정 — Qt 는 항목을 숨겨도 선택을 유지한다**: 그대로 두면 **필터에 가려 안 보이는 타겟까지
+  Apply 가 먹는다.** A00210 에서 세운 규칙(**보이는 것이 작업 대상**)을 여기서도 지켰다 —
+  `Select All` 은 보이는 것만 선택(가려진 것까지 잡는 `QListWidget.selectAll` 대체),
+  `Apply` 는 **보이면서 선택된** 것에만 적용하고 가려진 선택은 `[Info] ... were skipped` 로 알린다.
+  선택이 전부 가려졌으면 아무것도 안 하고 필터를 지우라고 안내. 선택 자체는 지우지 않으므로
+  여러 필터를 오가며 고른 뒤 **필터만 비우면 한 번에** 적용된다.
+- **검증**: stub `maya.cmds` + PySide6 로 17항목 통과 — 부분 일치/대소문자 무시, 일치 없음,
+  Clear 복귀, Number 라벨, Select All 가시 한정, 가려진 선택 제외(그리고 "Qt 가 선택을 유지한다"는
+  전제 자체도 확인), 목록 재구성 후 필터 유지. **마야 실기 UI 테스트 대기.**
+  #A00290 #BaseShape #검색 #보이는것이대상
+
+> [!summary] `A00030_quickTool` **`Local Axis ON` / `OFF` 버튼 추가** (V01.14→V01.15)
+- **요청**: 그동안 `toggle -localAxis` 를 직접 쳐서 축을 봤는데, 선택한 오브젝트 **전부를 한 번에**
+  보이게/안 보이게 하는 버튼이 필요하다. 현재 상태를 진단한 뒤 필요한 것만 바꾸는 방식.
+- **`Display` 섹션 + 버튼 2개** — 콜백은 `JUN_cmd_set_local_axis(state)` 하나를 `args=[True/False]`
+  로 공유한다. 오브젝트마다 `displayLocalAxis` 를 먼저 읽어 **목표 상태와 다른 것만** 바꾸므로,
+  일부만 켜진 섞인 선택도 전부 같은 상태로 정렬된다(토글이 아니라 절대 상태).
+- **`toggle -localAxis` 는 쓰지 않았다(mayapy 실측)**: 값은 바뀌지만 **undo 큐에 아무것도 남기지
+  않는다.** 청크로 감싸도 빈 청크라서, 버튼을 누른 뒤 Ctrl+Z 를 치면 로컬 축이 아니라 **그 이전
+  작업이 취소된다**(테스트에서 joint 생성이 undo 됨). `setAttr` 은 정상적으로 undo 되어 이쪽 채택.
+- **선택 해석**: `ls(sl=True, objectsOnly=True)` 로 컴포넌트 선택도 받는데, 이때 나오는 shape 에는
+  `displayLocalAxis` 가 **없다**(shape 에 `toggle` 을 걸면 에러도 없이 무시됨). 그래서
+  `JUN_fun_resolve_local_axis_node()` 로 **부모 transform 까지 올라가서** 적용한다.
+- 여러 오브젝트는 `undo_chunk()` 로 묶어 Ctrl+Z 한 번에 복구. 잠기거나 연결된 어트리뷰트는
+  `setAttr` 이 실패하므로 노드 목록을 경고로 보고한다. 섹션이 늘어난 만큼 창 높이 360 → 420.
+
+> [!summary] `A00290_BSTool` **Base Shape Apply 가 되돌아오던 버그 수정** (v01.10→01.11)
+- **증상**: Base Shape 탭에서 Apply 로 타겟의 기본 모양을 바꾸면 **그 순간엔 바뀐 것처럼 보이는데**,
+  씬을 저장하거나 Shape Editor 탭의 Edit 로 들어가면 **Apply 전 모양으로 되돌아온다.** "어느 순간부터
+  안 된다"고 했다.
+- **원인(mayapy 로 재현)**: 타겟 메시가 씬에 남아 `inputGeomTarget` 으로 **연결된(live) 타겟**에서는
+  `inputPointsTarget` 이 **연결된 메시로부터 매번 다시 계산되는 값**이다. 여기에 `setAttr` 을 하면
+  **에러도 경고도 없이** 다음 평가에서 원래 값으로 돌아간다(실측: 99 로 써도 dgdirty 후 5.0 복귀).
+  v01.10 까지는 포인트 수가 0 이 아니라는 이유로 **"N target(s) rescaled" 성공 보고만 하고 실제로는
+  아무 일도 안 했다.** 뷰포트는 더티 캐시 때문에 잠깐 바뀐 것처럼 보이고, 저장·Edit 처럼 재평가를
+  유발하는 순간 원복 — 사용자가 본 그대로다. **baked 타겟(메시 삭제)에서는 정상 동작**이라
+  "어느 순간부터"는 타겟 메시를 남겨두는 씬을 쓰기 시작한 시점이었다.
+- **수정**: 아이템마다 `inputGeomTarget` 연결로 **live / baked 판정** →
+  baked 는 기존대로 `inputPointsTarget` 스케일, **live 는 타겟 메시 정점을 직접 이동**.
+  델타가 곧 타겟 메시이므로 이것이 기본 모양을 바꾸는 정공법. in-between 은 아이템마다 다른 메시에
+  연결될 수 있어 **아이템 단위**로 판정한다.
+- **델타는 오브젝트 공간**(실측): `inputGeomTarget` 이 `worldMesh` 로 연결돼 있어도,
+  base/target transform 이 서로 달라도 `delta = 타겟 로컬 − 베이스 원본 로컬` 이다.
+  → 정점을 **오브젝트 공간에서** `(X−1)×delta` 상대 이동. 월드로 옮기면 타겟에 회전·스케일이 있을 때
+  어긋난다(첫 시도에서 실제로 틀린 값이 나와 확인됨).
+- **이동은 `shape.pnts`(tweak) 구간 setAttr** — A00380 peak_manager 와 같은 방식.
+  메시 데이터(`vrts`)를 안 건드려 undo 정확, **19,462 정점 6.4초 → 0.17초(약 38배)**.
+  `getAttr(".pnts")` 통짜 조회는 "compound with mixed type elements" 로 실패하므로 기존 tweak 은
+  `MPlug.getExistingArrayAttributeIndices()` 로 읽는다.
+- **검증**: mayapy 12항목 통과 — live/baked 각각 `weight 1.0 모양 == 예전 weight X 모양`,
+  저장/재오픈 유지, `sculptTarget` Edit 진입·해제 유지, Ctrl+Z 1회 복귀, in-between 전 아이템 스케일,
+  19k 정점 0.166초. **마야 실기 UI 테스트 대기.** #A00290 #BaseShape #blendShape #liveTarget
+
 > [!summary] `A00210_FileManager` **Path Structure 가 파일도 캡처/재생성** (v01.28→01.29)
 - **요청**: 지금은 경로(폴더) 구조만 저장/생성한다. **감지된 파일도** 저장·생성할지 정하는 **체크박스**를
   두고 **기본은 체크**. 저장할 때와 생성할 때 모두 사용자가 정할 수 있게. 생성되는 파일은 **0바이트 빈
