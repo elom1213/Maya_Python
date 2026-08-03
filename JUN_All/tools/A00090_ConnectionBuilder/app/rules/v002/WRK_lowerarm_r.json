@@ -1,0 +1,16 @@
+{
+   "solver_node": "WRK_lowerarm_r_UERBFSolver",
+
+    "driver_node": "WRK_lowerarm_r__null__",
+
+    "blendshape_node": "",
+
+    "mapping":
+    [
+        "lowerarm_r_default",
+        "lowerarm_r_in_30",
+        "lowerarm_r_in_60",
+        "lowerarm_r_in_90",
+        "lowerarm_r_in_110"
+    ]
+}
