@@ -1,3 +1,3 @@
 #Connection Builder
-VERSION = "01.04"
-LAST_UPDATE = "2026-06-23"
+VERSION = "01.05"
+LAST_UPDATE = "2026-08-03"

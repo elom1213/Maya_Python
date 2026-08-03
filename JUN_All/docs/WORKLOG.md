@@ -17,6 +17,26 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-03 (오늘)
 
+> [!summary] `A00090_ConnectionBuilder` **규칙 json 을 버전 폴더로 분리 + UI 에서 버전 선택** (v01.04→01.05)
+- **요청**: 규칙 json 의 **버전이 다른 상황**에 대응. `v001`, `v002` … 폴더마다 수정된 json 을 두고
+  사용자가 UI 에서 버전을 고르게 한다.
+- **폴더 구조** — `app/rules_v01/*.json` → **`app/rules/<version>/*.json`**. 기존 8개 json 은
+  `git mv` 로 `rules/v001` 로 이동(이력 유지). 작업 폴더에 이미 만들어져 있던 동일 내용의
+  `app/rules/v001` 사본은 정리하고 추적본으로 대체. `rules_v01` 안에 `v001` 을 넣는 안도 있었지만
+  **이름 중복(v01 안의 v001)** 이라 `rules/` 를 루트로 잡았다.
+- **`RuleLoader` 에 버전 개념 추가** — `find_versions()` / `get_version()` / `set_version()` /
+  `rule_dir()`. `load` · `load_solver_rule` · `find_all_json` · `load_all` 은 **`version` 인자**를 받고,
+  생략하면 현재 선택 버전을 쓴다. 선택 버전이 사라져도 **첫 버전으로 자동 폴백**하도록 `get_version()`
+  이 매번 실제 폴더 목록을 확인한다(창을 열어둔 채 폴더를 지워도 죽지 않는다).
+- **UI** — Rule 행을 `[Version ▾][Rule ▾][Refresh]` 로 바꿨다. 버전을 바꾸면 Rule 콤보를 다시 채우고
+  (같은 이름이 있으면 **선택 유지**), `Create All` / `Connect All` / `Connect Intermediate` 는 전부
+  **선택 버전의 json 만** 순회한다. 로그에도 버전을 찍는다.
+- **함정 2개**: ① 콤보를 채우는 코드가 `self.log()` 를 부르는데 **로그 위젯이 아직 없으면 크래시** →
+  초기 채우기를 `build_ui` 맨 끝(시그널 연결 뒤)으로 옮겼다. ② 채우는 도중 `currentTextChanged` 가
+  튀어 재진입하므로 `blockSignals` 로 감쌌다.
+- **검증**: 스텁 `maya.cmds` 로 `RuleLoader` 단독 확인 — 버전 스캔/`rule_dir`/8개 rule 로드/
+  `load_solver_rule`/없는 버전 지정 시 `ValueError`. **마야 실기 UI 테스트 대기.** #A00090 #RuleVersion #JSON
+
 > [!summary] `A00170_driverTool` **`Attr Search` 를 공용 Filter 로 대체** (v01.12→01.13)
 - **요청**: A00170 에도 `JUN_mod_filter_qt_v01` 로 대체할 수 있는 UI 가 있으면 대체.
 - **대상 3곳** — Remap Value 탭 Attributes, Stretch 탭의 **Default Distance / Stretch Object** 두 그룹.

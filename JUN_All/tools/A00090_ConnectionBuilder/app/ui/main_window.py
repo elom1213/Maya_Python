@@ -8,7 +8,6 @@ print("QT version  :  " + str(QT_VERSION))
 import sys, os
 import maya.cmds as cmds
 from tools.A00090_ConnectionBuilder.app.config.version import VERSION
-from Framework.core.path_manager import PathManager
 
 from Framework.core.maya_undo import undo_chunk
 
@@ -38,12 +37,6 @@ class MainWindow(QWidget):
         self.btn_width_01 = 70
 
         self.connection_manager = ConnectionManager()
-
-        APP_DIR = os.path.join(os.path.dirname(__file__),"." )
-        self.pm = PathManager(  APP_DIR,
-                                read_dir  = "rules_v01")
-
-        self.rules_file_name =  self.get_rules_file_name()
 
         self.resize(self.win_width, self.win_height)
 
@@ -138,13 +131,30 @@ class MainWindow(QWidget):
 
         row = QHBoxLayout()
 
+        row.addWidget(QLabel("Version"))
+
+        self.cb_version = QComboBox()
+        self.cb_version.setToolTip(
+            "Rule set version folder (app/rules/<version>).\n"
+            "Add a new folder (v002, v003 ...) with edited json files and pick it here."
+        )
+        self.cb_version.setFixedWidth(90)
+
+        row.addWidget(self.cb_version)
+
         row.addWidget(QLabel("Rule"))
 
         self.cb_rule = QComboBox()
 
-        self.cb_rule.addItems(self.rules_file_name)
-
         row.addWidget(self.cb_rule)
+
+        self.btn_refresh_rules = QPushButton("Refresh")
+        self.btn_refresh_rules.setToolTip(
+            "Rescan app/rules for version folders and json files."
+        )
+        self.btn_refresh_rules.setFixedWidth(self.btn_width_01)
+
+        row.addWidget(self.btn_refresh_rules)
 
         main_layout.addLayout(row)
 
@@ -184,7 +194,8 @@ class MainWindow(QWidget):
         self.btn_connect_intermediate = QPushButton("Connect Intermediate")
         self.btn_connect_intermediate.setToolTip(
             "Connect every solver's outputs[i] to WRK_intermediate.<mapping[i]> "
-            "for all rules in rules_v01 (creates the null node and its attrs if missing)."
+            "for all rules of the selected version "
+            "(creates the null node and its attrs if missing)."
         )
 
         row.addWidget(self.btn_connect_intermediate)
@@ -220,11 +231,17 @@ class MainWindow(QWidget):
 
         self.btn_connect_intermediate.clicked.connect( self.on_connect_intermediate)
 
+        self.btn_refresh_rules.clicked.connect( self.on_refresh_rules)
+        self.cb_version.currentTextChanged.connect( self.on_version_changed)
+
         # -------------------------
         # 모든 버튼을 조금 작게 (tsl 위젯 내부 버튼 포함).
         # -------------------------
         for btn in self.findChildren(QPushButton):
             btn.setMaximumHeight(40)
+
+        # 로그 위젯이 준비된 뒤에 버전/룰 콤보를 채운다.
+        self.reload_versions()
 
 
     def log(self, text):
@@ -233,10 +250,86 @@ class MainWindow(QWidget):
 
     # -------------------------------------------------
 
-    def get_rules_file_name(self):
-        # return [f.name for f in self.pm.path("read").iterdir() if f.is_file()]
-        directory = self.pm.path("read")
-        return [os.path.splitext(f)[0] for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+    # -------------------------------------------------
+    # Rule version
+    # -------------------------------------------------
+
+    def current_version(self):
+        """콤보에서 선택된 rule 버전 폴더 이름."""
+        return self.cb_version.currentText() or RuleLoader.get_version()
+
+    def reload_versions(self):
+        """app/rules 를 다시 스캔해 Version 콤보를 채운다(선택은 최대한 유지)."""
+
+        keep = self.cb_version.currentText()
+
+        versions = RuleLoader.find_versions()
+
+        self.cb_version.blockSignals(True)
+        self.cb_version.clear()
+        self.cb_version.addItems(versions)
+
+        if keep in versions:
+            self.cb_version.setCurrentText(keep)
+        elif versions:
+            self.cb_version.setCurrentText(RuleLoader.get_version())
+
+        self.cb_version.blockSignals(False)
+
+        if not versions:
+            self.cb_rule.clear()
+            self.log(
+                f"[ERROR] No rule version folder in : {RuleLoader.RULES_ROOT}"
+            )
+            return
+
+        RuleLoader.set_version(self.cb_version.currentText())
+
+        self.reload_rules()
+
+    def reload_rules(self):
+        """현재 버전의 json 목록으로 Rule 콤보를 채운다(선택은 최대한 유지)."""
+
+        keep = self.cb_rule.currentText()
+
+        version = self.current_version()
+        rule_names = RuleLoader.find_all_json(version)
+
+        self.cb_rule.blockSignals(True)
+        self.cb_rule.clear()
+        self.cb_rule.addItems(rule_names)
+
+        if keep in rule_names:
+            self.cb_rule.setCurrentText(keep)
+
+        self.cb_rule.blockSignals(False)
+
+        self.log(
+            f"[Rule] {version} : {len(rule_names)} rule(s)"
+        )
+
+        if not rule_names:
+            self.log(
+                f"[Warn] No json in : {RuleLoader.rule_dir(version)}"
+            )
+
+    def on_version_changed(self, version):
+
+        if not version:
+            return
+
+        try:
+            RuleLoader.set_version(version)
+        except ValueError as e:
+            self.log(f"[ERROR] {e}")
+            return
+
+        self.reload_rules()
+
+    def on_refresh_rules(self):
+        self.reload_versions()
+
+    # -------------------------------------------------
 
     def get_rule(self, rule_name=None, solver_node="", driver_node=""):
 
@@ -247,7 +340,8 @@ class MainWindow(QWidget):
             rule_name=rule_name,
             solver_node=solver_node,
             driver_node=driver_node,
-            blendshape_node=""
+            blendshape_node="",
+            version=self.current_version()
         )
 
     # -------------------------------------------------
@@ -286,12 +380,14 @@ class MainWindow(QWidget):
 
         is_solver = self.cb_is_solver.isChecked()
 
-        for rule_name in RuleLoader.find_all_json():
+        version = self.current_version()
+
+        for rule_name in RuleLoader.find_all_json(version):
             for src, tgt in pairs:
                 rule = self.get_rule(rule_name, solver_node=src, driver_node=tgt)
                 self.connection_manager.connect(rule, is_solver)
 
-        self.log("Connect All Finished")
+        self.log(f"Connect All Finished ({version})")
 
 
     def on_connect(self):
@@ -315,21 +411,23 @@ class MainWindow(QWidget):
     # -------------------------------------------------
 
     def on_connect_intermediate(self):
-        """rules_v01 의 모든 solver outputs 를 WRK_intermediate null 노드로 연결.
+        """선택된 버전의 모든 solver outputs 를 WRK_intermediate null 노드로 연결.
 
         디렉토리를 동적 스캔하므로 json 이 늘어나면 자동으로 포함된다.
         """
-        rule_names = RuleLoader.find_all_json()
+        version = self.current_version()
+
+        rule_names = RuleLoader.find_all_json(version)
 
         rules = [
-            RuleLoader.load_solver_rule(name)
+            RuleLoader.load_solver_rule(name, version=version)
             for name in rule_names
         ]
 
         connected, skipped = IntermediateManager.connect(rules)
 
         self.log(
-            f"Connect Intermediate Finished : "
+            f"Connect Intermediate Finished ({version}) : "
             f"{connected} connection(s) from {len(rules)} solver(s) -> WRK_intermediate"
         )
 
@@ -441,6 +539,7 @@ class MainWindow(QWidget):
         self._build_for([self.get_rule()], "Create")
 
     def on_create_all(self):
-        """rules_v01 의 모든 Rule 로 생성(메시는 target 누적, 노드는 attr 누적)."""
-        rules = [self.get_rule(name) for name in RuleLoader.find_all_json()]
-        self._build_for(rules, "Create All")
+        """선택된 버전의 모든 Rule 로 생성(메시는 target 누적, 노드는 attr 누적)."""
+        version = self.current_version()
+        rules = [self.get_rule(name) for name in RuleLoader.find_all_json(version)]
+        self._build_for(rules, f"Create All ({version})")
