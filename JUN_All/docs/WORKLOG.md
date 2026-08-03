@@ -32,7 +32,7 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   여러 필터를 오가며 고른 뒤 **필터만 비우면 한 번에** 적용된다.
 - **검증**: stub `maya.cmds` + PySide6 로 17항목 통과 — 부분 일치/대소문자 무시, 일치 없음,
   Clear 복귀, Number 라벨, Select All 가시 한정, 가려진 선택 제외(그리고 "Qt 가 선택을 유지한다"는
-  전제 자체도 확인), 목록 재구성 후 필터 유지. **마야 실기 UI 테스트 대기.**
+  전제 자체도 확인), 목록 재구성 후 필터 유지. **마야 실기 확인 완료(2026-08-03).**
   #A00290 #BaseShape #검색 #보이는것이대상
 
 > [!summary] `A00030_quickTool` **`Local Axis ON` / `OFF` 버튼 추가** (V01.14→V01.15)
@@ -75,7 +75,7 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   `MPlug.getExistingArrayAttributeIndices()` 로 읽는다.
 - **검증**: mayapy 12항목 통과 — live/baked 각각 `weight 1.0 모양 == 예전 weight X 모양`,
   저장/재오픈 유지, `sculptTarget` Edit 진입·해제 유지, Ctrl+Z 1회 복귀, in-between 전 아이템 스케일,
-  19k 정점 0.166초. **마야 실기 UI 테스트 대기.** #A00290 #BaseShape #blendShape #liveTarget
+  19k 정점 0.166초. **마야 실기 확인 완료(2026-08-03).** #A00290 #BaseShape #blendShape #liveTarget
 
 > [!summary] `A00210_FileManager` **Path Structure 가 파일도 캡처/재생성** (v01.28→01.29)
 - **요청**: 지금은 경로(폴더) 구조만 저장/생성한다. **감지된 파일도** 저장·생성할지 정하는 **체크박스**를
