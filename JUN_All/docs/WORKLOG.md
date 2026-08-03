@@ -17,6 +17,25 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-03 (오늘)
 
+> [!summary] `A00290_BSTool` **두 탭의 검색을 공용 Filter 위젯으로 이전** (v01.12→01.13)
+- **요청**: `JUN_mod_filter_qt_v01` 로 A00290 Base Shape 의 검색을 대신하고, 툴 전체를 공용 위젯으로 이전.
+- **Base Shape 탭**: `QListWidget` 이라 그대로 붙였다. 자체 구현(`_apply_bs_filter` /
+  `_update_target_number` / `_visible_selected_targets` / `on_select_all_targets`)을 전부 걷어내고
+  위젯의 `refresh()` · `visible_selected()` · `select_all_visible()` 로 대체 — 동작은 동일.
+- **Shape Editor 탭**: 여기가 남겨 뒀던 확장 지점이었다. 목록이 `QListWidget` 이 아니라
+  **행 위젯을 쌓은 것**(행마다 Edit 버튼·슬라이더·스핀박스)이라 위젯에 **`rows_provider` 모드**를 추가했다 —
+  `() -> [(이름, 위젯), ...]` 콜러블을 넘기면 `setVisible()` 로 행을 숨긴다.
+  개수 라벨은 탭과 **확장(Expand) 창 두 곳**에 반영해야 해서 `number_label` 대신
+  **`filtered(shown, total)` 시그널**을 받아 직접 쓴다(양방향 필터 동기화도 여기서 유지).
+- **이전하면서 덤으로 얻은 것**: 두 탭 모두 **`Clear` 버튼**과 **공백 여러 단어 AND**
+  (`brow up` → `browInnerUp`)가 생겼고, Shape Editor 탭에 **`Number: 보이는수 / 전체수`** 가 붙었다
+  (예전엔 전체 수만). 공용화의 실익이 바로 나온 사례 — 한 곳을 고치니 두 탭이 같이 좋아졌다.
+- **검증**: stub `maya.cmds` + PySide6 로 28항목 통과 — Base Shape 16(부분 일치/대소문자/AND/Clear/
+  Number 라벨/가려진 선택 제외/목록 재구성 후 유지), Shape Editor 12(rows_provider 판정, 행 숨김,
+  시그널 경유 Number 라벨, `visible_rows`, 행 재구성 후 유지).
+  A00145 32항목 + Base Shape core 12항목도 회귀 통과. **마야 실기 UI 테스트 대기.**
+  #A00290 #Framework #Filter #공용위젯 #rowsProvider
+
 > [!summary] `Framework` **공용 Filter 위젯 신설** + `A00145_RigConnect` 적용 (v01.18→01.19)
 - **요청**: A00290 Base Shape 의 Filter 가 좋다 — **입력하면 일치하는 것만 남고 나머지는 안 보이는**
   그 특성을 `A00145_RigConnect` 의 **Search 버튼** 자리에 적용할 것. 그리고 **앞으로 검색 기능이 있는

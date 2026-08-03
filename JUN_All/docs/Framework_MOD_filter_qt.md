@@ -107,12 +107,35 @@ btn_all.clicked.connect(self.flt.select_all_visible)
 
 ---
 
-## 5. 적용 현황
+## 5. `QListWidget` 이 아닌 목록 — `rows_provider`
 
-| 툴 | 위치 | 버전 |
-|----|------|------|
-| `A00145_RigConnect` | Connect 탭 Source/Destination, Attribute 탭 | v01.19 (실기 확인 완료) |
-| `A00290_BSTool` | Base Shape 탭 (자체 구현 — 공용 위젯으로 이전 예정) | v01.12 |
+탭에 따라 목록이 `QListWidget` 이 아니라 **행 위젯을 쌓아 만든 것**일 때가 있다
+(예: `A00290_BSTool` Shape Editor 탭 — 행마다 Edit 버튼·슬라이더·스핀박스).
+이때는 `rows_provider` 로 **`(이름, 위젯)` 쌍의 목록을 돌려주는 콜러블**을 넘긴다.
+숨기기는 `widget.setVisible()` 로 한다.
 
-> `A00290_BSTool` 의 Shape Editor 탭은 `QListWidget` 이 아니라 **행 위젯 목록**이라 그대로는 못 붙인다.
-> 공용화하려면 위젯이 "무엇을 숨길지"를 콜백으로 받도록 확장해야 한다 — 다음 확장 지점.
+```python
+self.flt_se = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+    rows_provider=lambda: [(r["name"], r["row"]) for r in self._se_rows],
+    placeholder="Type any part of a target name")
+self.flt_se.filtered.connect(self._on_se_filtered)   # 개수 라벨 등 후처리
+```
+
+- 행을 새로 만들 때마다 `refresh()` 를 부르면 필터가 유지된다.
+- 이 모드에는 **리스트 항목 선택 개념이 없다**(각 행이 자체 선택 상태를 가진다) →
+  `visible_selected()` / `select_all_visible()` 대신 **`visible_rows()`** 를 쓴다.
+- 개수 라벨을 **두 곳**(탭 + 확장 창)에 반영해야 하는 등 후처리가 필요하면
+  `number_label` 대신 **`filtered(shown, total)` 시그널**을 받아 직접 쓴다.
+
+---
+
+## 6. 적용 현황
+
+| 툴 | 위치 | 모드 | 버전 |
+|----|------|------|------|
+| `A00145_RigConnect` | Connect 탭 Source/Destination, Attribute 탭 | `QListWidget` | v01.19 (실기 확인 완료) |
+| `A00290_BSTool` | Base Shape 탭 | `QListWidget` | v01.13 |
+| `A00290_BSTool` | Shape Editor 탭 | `rows_provider` | v01.13 |
+
+> 검색 기능을 새로 넣거나 기존 검색을 손볼 때는 **자체 구현하지 말고 이 위젯을 쓴다.**
+> 규칙(매칭 방식, "보이는 것이 작업 대상")이 바뀌면 여기 한 곳만 고치면 된다.

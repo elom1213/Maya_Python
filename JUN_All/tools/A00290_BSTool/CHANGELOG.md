@@ -1,5 +1,24 @@
 # Changelog — A00290_BSTool
 
+## v01.13 (2026-08-03)
+- **[Changed] 두 탭의 검색을 공용 위젯 `JUN_mod_filter_qt_v01` 로 이전** — 이 툴에만 있던
+  자체 구현을 걷어내고 `Framework/qt/MOD_filter_qt_v01.py` 를 쓴다. `A00145_RigConnect` 와
+  **완전히 같은 검색 동작**이 되고, 앞으로 규칙이 바뀌면 한 곳만 고치면 된다.
+  - **Base Shape 탭**: `QListWidget` 이므로 그대로 붙였다. `Select All` 은 위젯의
+    `select_all_visible`, Apply 대상은 `visible_selected()` 로 고른다(동작 동일).
+  - **Shape Editor 탭**: 목록이 `QListWidget` 이 아니라 **행 위젯을 쌓은 것**(행마다 Edit
+    버튼·슬라이더·스핀박스)이라 공용 위젯에 **`rows_provider` 모드**를 추가해 붙였다.
+    `() -> [(이름, 위젯), ...]` 콜러블을 넘기면 `setVisible()` 로 행을 숨긴다.
+  - **덤으로 얻은 것**: 두 탭 모두 **`Clear` 버튼**과 **공백 여러 단어 AND 매칭**
+    (`brow up` → `browInnerUp`)이 생겼다. Shape Editor 탭에는 `Number: 보이는수 / 전체수`
+    표시도 붙었다(예전에는 전체 수만 보였다).
+  - Shape Editor 의 **확장(Expand) 창 필터 칸과의 양방향 동기화**는 그대로 유지된다
+    (`filtered` 시그널에서 라벨·입력 칸을 함께 맞춘다).
+- **[Verify]** stub `maya.cmds` + PySide6 로 28항목 — Base Shape 16항목(부분 일치/대소문자/
+  AND 토큰/Clear/Number 라벨/가려진 선택 제외/목록 재구성 후 유지), Shape Editor 12항목
+  (rows_provider 모드 판정, 행 숨김, 시그널 경유 Number 라벨, `visible_rows`, 행 재구성 후 유지).
+  `A00145_RigConnect` 32항목과 Base Shape core 12항목도 회귀 통과.
+
 ## v01.12 (2026-08-03)
 - **[Add] Base Shape 탭 타겟 **Filter**(검색)** — 타겟 목록 위에 입력 칸이 생겼다.
   **이름의 일부만 쳐도 잡힌다** — `Inner` → `browInnerUp`. **대소문자 무시**라 `inner` 도 같다.

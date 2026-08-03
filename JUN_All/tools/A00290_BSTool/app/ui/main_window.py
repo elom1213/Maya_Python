@@ -12,6 +12,7 @@
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
+from Framework.qt import JUN_mod_filter_qt
 from Framework.qt.maya_window import maya_main_window
 
 print("QT version  :  " + str(QT_VERSION))
@@ -276,12 +277,14 @@ class MainWindow(QWidget):
         layout.addWidget(self.tsl_se_nodes)
 
         # 필터 + 새로고침
+        # 이 탭의 목록은 QListWidget 이 아니라 **행 위젯을 쌓은 것**이라(행마다
+        # Edit 버튼·슬라이더·스핀박스) 공용 Filter 를 rows_provider 모드로 쓴다.
         tool_row = QHBoxLayout()
-        tool_row.addWidget(QLabel("Filter"))
-        self.le_se_filter = QLineEdit()
-        self.le_se_filter.setPlaceholderText("Type to filter target names")
-        self.le_se_filter.textChanged.connect(self._apply_se_filter)
-        tool_row.addWidget(self.le_se_filter)
+        self.flt_se = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            rows_provider=lambda: [(r["name"], r["row"]) for r in self._se_rows],
+            placeholder="Type any part of a target name (e.g. Inner)")
+        self.flt_se.filtered.connect(self._on_se_filtered)
+        tool_row.addWidget(self.flt_se, 1)
         btn_refresh = QPushButton("Refresh")
         btn_refresh.setToolTip("Re-read targets and weights from the listed blendShape nodes.")
         btn_refresh.clicked.connect(self.on_se_refresh)
@@ -486,21 +489,27 @@ class MainWindow(QWidget):
                 self._add_se_target_row(bs_node, target, editing_idx)
             total += len(targets)
 
-        self.lbl_se_number.setText("Number: {0}".format(total))
-        if self._se_window is not None:
-            self._se_window.lbl_number.setText(self.lbl_se_number.text())
-        self._apply_se_filter(self.le_se_filter.text())
+        # 행을 새로 만들었으므로 필터를 다시 먹인다(Number 라벨은 filtered 시그널로 갱신).
+        self.flt_se.refresh()
         self._update_se_timer()
         return nodes, total
 
-    def _apply_se_filter(self, text):
-        needle = (text or "").strip().lower()
-        for row in self._se_rows:
-            row["row"].setVisible(needle in row["name"].lower())
+    def _on_se_filtered(self, shown, total):
+        """공용 Filter 가 다시 걸릴 때마다 Number 라벨과 확장 창을 맞춘다.
+
+        Number 라벨은 rows_provider 모드에서 위젯에 넘기지 않고 여기서 직접 쓴다 —
+        같은 문구를 확장 창의 라벨에도 함께 반영해야 하기 때문이다.
+        """
+        text = ("Number: {0}".format(total) if shown == total
+                else "Number: {0} / {1}".format(shown, total))
+        self.lbl_se_number.setText(text)
+
         # 필터는 하나지만 입력 칸은 탭과 확장 창에 하나씩 있다. 서로 맞춰 준다.
         # (같을 때 쓰지 않으므로 textChanged 가 서로를 부르며 맴돌지 않는다.)
-        if self._se_window is not None and self._se_window.le_filter.text() != (text or ""):
-            self._se_window.le_filter.setText(text or "")
+        if self._se_window is not None:
+            self._se_window.lbl_number.setText(text)
+            if self._se_window.le_filter.text() != self.flt_se.text():
+                self._se_window.le_filter.setText(self.flt_se.text())
 
     def _sync_se_edit_states(self):
         """씬의 실제 sculptTargetIndex 를 읽어 Edit 버튼/스핀박스 상태를 맞춘다."""
@@ -755,8 +764,8 @@ class MainWindow(QWidget):
 
         win = TargetsWindow(self)
         win.lbl_number.setText(self.lbl_se_number.text())
-        win.le_filter.setText(self.le_se_filter.text())
-        win.le_filter.textChanged.connect(self.le_se_filter.setText)
+        win.le_filter.setText(self.flt_se.text())
+        win.le_filter.textChanged.connect(self.flt_se.set_text)
         # addWidget 이 스크롤 영역을 탭 레이아웃에서 떼어 이 창으로 옮긴다.
         win.body.addWidget(self.se_scroll)
         self._se_window = win
@@ -884,33 +893,23 @@ class MainWindow(QWidget):
         header.addWidget(self.lbl_tgt_number)
         layout.addLayout(header)
 
-        # 필터 — Shape Editor 탭의 Filter 와 같은 규칙(대소문자 무시 부분 일치).
-        # "Inner" 로 browInnerUp 이 잡힌다.
-        filter_row = QHBoxLayout()
-        filter_row.addWidget(QLabel("Filter"))
-        self.le_bs_filter = QLineEdit()
-        self.le_bs_filter.setPlaceholderText("Type any part of a target name (e.g. Inner)")
-        self.le_bs_filter.setToolTip(
-            "Show only targets whose name contains this text (case-insensitive).\n"
-            "Apply and Select All act on the visible targets only.")
-        self.le_bs_filter.textChanged.connect(self._apply_bs_filter)
-        filter_row.addWidget(self.le_bs_filter, 1)
-        btn_clear_filter = QPushButton("Clear")
-        btn_clear_filter.setToolTip("Clear the filter and show every target.")
-        btn_clear_filter.clicked.connect(self.le_bs_filter.clear)
-        filter_row.addWidget(btn_clear_filter)
-        layout.addLayout(filter_row)
-
         self.lw_targets = QListWidget()
         self.lw_targets.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.lw_targets.setMinimumHeight(220)
         layout.addWidget(self.lw_targets)
 
+        # 검색 = 공용 Filter 위젯(Framework). "Inner" 로 browInnerUp 이 잡힌다.
+        self.flt_targets = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_targets,
+            placeholder="Type any part of a target name (e.g. Inner)",
+            number_label=self.lbl_tgt_number)
+        layout.addWidget(self.flt_targets)
+
         # 전체 선택 / 해제
         sel_row = QHBoxLayout()
         btn_all = QPushButton("Select All")
         btn_all.setToolTip("Select every target currently visible in the list.")
-        btn_all.clicked.connect(self.on_select_all_targets)
+        btn_all.clicked.connect(self.flt_targets.select_all_visible)
         btn_none = QPushButton("Clear Selection")
         btn_none.clicked.connect(self.lw_targets.clearSelection)
         sel_row.addWidget(btn_all)
@@ -960,45 +959,13 @@ class MainWindow(QWidget):
     def log(self, text):
         self.te_log.append(text)
 
-    def _update_target_number(self):
-        """필터 중이면 '보이는 수 / 전체 수' 로 표시(무엇이 가려졌는지 눈에 보이게)."""
-        total = self.lw_targets.count()
-        shown = sum(1 for i in range(total) if not self.lw_targets.item(i).isHidden())
-        if shown == total:
-            self.lbl_tgt_number.setText("Number: {0}".format(total))
-        else:
-            self.lbl_tgt_number.setText("Number: {0} / {1}".format(shown, total))
-
     def _visible_selected_targets(self):
-        """선택된 항목 중 **지금 보이는** 것들의 이름 + 필터에 가려진 선택 수.
+        """(보이면서 선택된 타겟 이름들, 필터에 가려진 선택 수).
 
-        숨은 항목도 Qt 는 선택 상태를 유지한다. 필터로 안 보이는 타겟에까지 Apply 가
-        먹으면 "안 보이는데 바뀌는" 일이 생기므로, 보이는 것만 대상으로 삼고 가려진
-        선택이 있으면 호출부가 로그로 알린다.
+        Qt 는 숨겨도 선택을 유지하므로, 안 보이는 타겟에까지 Apply 가 먹지 않도록
+        공용 Filter 위젯의 판정을 그대로 쓴다.
         """
-        names, hidden = [], 0
-        for item in self.lw_targets.selectedItems():
-            if item.isHidden():
-                hidden += 1
-            else:
-                names.append(item.text())
-        return names, hidden
-
-    def _apply_bs_filter(self, text):
-        """이름 부분 일치(대소문자 무시)로 타겟 리스트를 거른다."""
-        needle = (text or "").strip().lower()
-        for i in range(self.lw_targets.count()):
-            item = self.lw_targets.item(i)
-            item.setHidden(bool(needle) and needle not in item.text().lower())
-        self._update_target_number()
-
-    def on_select_all_targets(self):
-        """보이는 타겟만 전체 선택(가려진 항목까지 잡는 QListWidget.selectAll 대체)."""
-        self.lw_targets.clearSelection()
-        for i in range(self.lw_targets.count()):
-            item = self.lw_targets.item(i)
-            if not item.isHidden():
-                item.setSelected(True)
+        return self.flt_targets.visible_selected()
 
     def _set_current_frame(self, line_edit):
         """Get Current 버튼: 현재 Maya 프레임으로 해당 Start/End LineEdit 을 갱신."""
@@ -1068,15 +1035,13 @@ class MainWindow(QWidget):
         targets = BaseShapeManager.list_targets(bs_node)
         self.lw_targets.clear()
         self.lw_targets.addItems(targets)
-        # 새로 채운 항목에도 현재 필터를 그대로 적용한다(_update_target_number 포함).
-        self._apply_bs_filter(self.le_bs_filter.text())
+        # 새로 채운 항목에도 현재 필터를 다시 먹인다(Number 라벨 갱신 포함).
+        shown, total = self.flt_targets.refresh()
 
-        msg = "[List Targets] '{0}' : {1} target(s).".format(bs_node, len(targets))
-        needle = self.le_bs_filter.text().strip()
-        if needle:
-            shown = sum(1 for i in range(self.lw_targets.count())
-                        if not self.lw_targets.item(i).isHidden())
-            msg += " Filter '{0}' shows {1}.".format(needle, shown)
+        msg = "[List Targets] '{0}' : {1} target(s).".format(bs_node, total)
+        if shown != total:
+            msg += " Filter '{0}' shows {1}.".format(
+                self.flt_targets.text().strip(), shown)
         self.log(msg)
 
     def on_apply_base_shape(self):

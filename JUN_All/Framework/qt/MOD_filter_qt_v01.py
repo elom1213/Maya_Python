@@ -40,6 +40,22 @@ Qt 는 항목을 **숨겨도 선택 상태를 유지**한다. 그래서 필터�
 
 number_label 을 주면 `Number: N`(필터 없음) / `Number: 보이는수 / 전체수`(필터 중)로
 자동 갱신한다. 라벨을 안 쓰면 생략해도 된다.
+
+QListWidget 이 아닌 목록 (rows_provider)
+----------------------------------------
+탭에 따라 목록이 `QListWidget` 이 아니라 **행 위젯을 쌓아 만든 것**일 때가 있다
+(예: A00290_BSTool 의 Shape Editor 탭 — 행마다 버튼·슬라이더·스핀박스가 있다).
+그 경우 `rows_provider` 로 **(이름, 위젯) 쌍의 목록을 돌려주는 콜러블**을 넘긴다.
+숨기기는 `widget.setVisible()` 로 한다.
+
+    self.flt = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+        rows_provider=lambda: [(r["name"], r["row"]) for r in self._se_rows],
+        number_label=self.lbl_number)
+
+행이 새로 만들어질 때마다 `refresh()` 를 부르면 필터가 유지된다.
+이 모드에서는 리스트 항목 선택 개념이 없으므로 `visible_selected()` /
+`select_all_visible()` 은 쓰지 않는다(각 행이 자체 선택 상태를 갖는다).
+대신 `visible_rows()` 로 보이는 (이름, 위젯) 쌍을 얻는다.
 """
 
 from Framework.qt.qt import *
@@ -52,10 +68,13 @@ class JUN_mod_filter_qt_v01(QWidget):
 
     def __init__(self, list_widget=None, label="Filter",
                  placeholder="Type any part of a name (e.g. Inner)",
-                 show_clear=True, number_label=None, parent=None):
+                 show_clear=True, number_label=None, rows_provider=None,
+                 parent=None):
         super(JUN_mod_filter_qt_v01, self).__init__(parent)
 
         self.list_widget = None
+        # QListWidget 이 아닌 목록용 — () -> [(name, widget), ...]
+        self.rows_provider = rows_provider
         self.number_label = number_label
 
         row = QHBoxLayout(self)
@@ -110,25 +129,37 @@ class JUN_mod_filter_qt_v01(QWidget):
         low = name.lower()
         return all(t in low for t in tokens)
 
+    def _tokens(self):
+        return [t for t in self.le_filter.text().strip().lower().split() if t]
+
     def refresh(self):
-        """현재 입력값으로 목록을 다시 거른다.
+        """현재 입력값으로 목록을 다시 거른다. (보이는 수, 전체 수) 반환.
 
         목록을 새로 채운 뒤에 반드시 호출한다 — 새 항목은 숨김 상태가 초기화돼
         있으므로, 이걸 부르지 않으면 필터가 걸린 채로 전부 보이게 된다.
         """
-        if self.list_widget is None:
+        tokens = self._tokens()
+        shown = total = 0
+
+        if self.list_widget is not None:
+            total = self.list_widget.count()
+            for i in range(total):
+                item = self.list_widget.item(i)
+                hit = True if not tokens else self._matches(item.text(), tokens)
+                item.setHidden(not hit)
+                if hit:
+                    shown += 1
+
+        elif self.rows_provider is not None:
+            for name, widget in (self.rows_provider() or []):
+                total += 1
+                hit = True if not tokens else self._matches(name, tokens)
+                widget.setVisible(hit)
+                if hit:
+                    shown += 1
+
+        else:
             return 0, 0
-
-        tokens = [t for t in self.le_filter.text().strip().lower().split() if t]
-        total = self.list_widget.count()
-        shown = 0
-
-        for i in range(total):
-            item = self.list_widget.item(i)
-            hit = True if not tokens else self._matches(item.text(), tokens)
-            item.setHidden(not hit)
-            if hit:
-                shown += 1
 
         self._update_number(shown, total)
         self.filtered.emit(shown, total)
@@ -148,6 +179,12 @@ class JUN_mod_filter_qt_v01(QWidget):
     # ================================================================
     # "보이는 것이 작업 대상"
     # ================================================================
+
+    def visible_rows(self):
+        """rows_provider 모드에서 지금 보이는 (이름, 위젯) 쌍."""
+        if self.rows_provider is None:
+            return []
+        return [(n, w) for n, w in (self.rows_provider() or []) if w.isVisible()]
 
     def visible_items(self):
         """지금 보이는 항목들."""
