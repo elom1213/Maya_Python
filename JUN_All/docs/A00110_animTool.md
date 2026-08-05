@@ -2,7 +2,7 @@
 
 ## 1. 개요
 
-애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **일곱 개의 탭**과 **공유 로그창**으로 구성된다.
+애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **여덟 개의 탭**과 **공유 로그창**으로 구성된다.
 
 1. **Key Edit** — (v01.14~) **접이식 섹션 5개**로 구성된다. **Move Keys**: 키를 시간 범위로
    **이동(앞/뒤 offset)·삭제**. **Graph Editor**: 선택한 키 구간을 **평평하게 유지(Hold)**
@@ -29,10 +29,27 @@
    으로 target 1개를 **모든 follower 가 추종**(off 면 인덱스 1:1 n<-n). **blend(0~1)** 로 원본
    follower 애니메이션과 매치 결과를 섞으며(0=원본 유지, 1=덮어쓰기, 0.5=반반), 선택된
    **애니메이션 레이어**(override/additive)에 키가 들어간다.
-7. **Graph Focus** (v01.25~) — 컨트롤러를 선택하면 그 컨트롤러의 **전체 키 구간**(예: 0~6000f)을
+7. **Euler Filter** (v01.37~) — **리스트업한 컨트롤러**의 회전 키에 **[Start, End] 구간만**
+   오일러 필터를 적용한다. 마야 그래프 에디터의 `Curves > Euler Filter` 는 선택한 컨트롤러의
+   **키가 찍힌 전 구간**을 한꺼번에 처리해서, 뒤집힌 한 구간만 고치고 나머지는 그대로 두고 싶을 때
+   쓸 수 없었다. 이 탭은 TSL 로 대상을, `Start/End` 로 구간을 정해 **그 구간 안의 회전 키만** 편다.
+   **Anchor** 옵션(기본 ON)으로 Start **직전 키**를 기준으로 삼아 앞쪽 애니메이션과 매끄럽게 잇는다.
+8. **Graph Focus** (v01.25~) — 컨트롤러를 선택하면 그 컨트롤러의 **전체 키 구간**(예: 0~6000f)을
    다 보여주는 대신, **현재 프레임 기준 ± margin 프레임**만 그래프 에디터에 확대해서 보여준다
    (예: 현재 500f, margin 80 → `420f~580f`). **Auto-Focus 토글**을 켜면 **컨트롤러(오브젝트)를
    새로 선택할 때만** 자동으로 프레이밍하고(v01.30~), margin 값은 **스핀박스로 사용자가 지정**한다.
+
+> **v01.37 — `Euler Filter` 탭(구간 한정 오일러 필터)**: 마야 그래프 에디터의 `Curves > Euler Filter`
+> 는 선택한 컨트롤러의 **키가 찍힌 전 구간**을 한꺼번에 처리해서, **뒤집힌 한 구간만** 펴고 나머지는
+> 그대로 두는 게 불가능했다. 새 탭에서 **TSL 로 대상**을, **공용 timeRange 위젯(Start/End)** 으로
+> **구간**을 지정해 **그 구간 안의 회전 키만** 편다. 필터 자체는 마야 네이티브
+> `cmds.filterCurve(filter="euler", startTime=, endTime=)` 를 쓴다 — Maya 2024 headless 로 **구간 밖
+> 키가 바뀌지 않음**을 확인했고, `rotateOrder` 가 `xyz` 가 아니어도(예: `zxy`) 마야가 알아서 처리한다.
+> **Anchor to the key before Start**(기본 ON) 는 필터 구간을 **Start 직전 키까지 넓혀** 그 키를 기준으로
+> 삼는다 — 앵커 키는 값이 안 바뀌므로 "구간 밖은 그대로"를 지키면서 **앞쪽 애니메이션과 매끄럽게
+> 이어진다**(이게 없으면 플립이 Start 직전에서 시작할 때 아무것도 안 고쳐진다). 필터 전/후 값 스냅샷을
+> 비교해 **실제로 바뀐 키 수**를 세고, **End 경계 이음매**와 구간 밖 변경(방어 검사)을 경고로 알린다.
+> 로직은 `app/core/euler_filter_manager.py` 의 `EulerFilterManager.filter_range()`.
 
 > **v01.36 — Start/End 구간 입력 UI 를 공용 위젯으로 승격(모듈화)**: `Start [값][Get Current]  End
 > [값][Get Current]  [Get Sel Range]` 묶음을 `Framework/qt/MOD_timeRange_qt_v01.py`
@@ -271,9 +288,10 @@ A00110_animTool/
     │   ├── follow_match_manager.py # follower→target 월드 매치 베이크 (Follow 탭, OpenMaya + blend, maintain offset, 1<-n)
     │   ├── offset_hold_manager.py # 키를 hold+offset 구조로 재배치 (Key Edit 탭 > Offset & Hold)
     │   ├── stagger_offset_manager.py # 리스트 순서대로 구간 키를 계단식 오프셋 (Key Edit 탭 > Stagger Offset)
+    │   ├── euler_filter_manager.py # 구간 한정 오일러 필터 (Euler Filter 탭, native filterCurve)
     │   ├── graph_view_manager.py  # 그래프 에디터 현재±margin 프레이밍 로직 (Graph Focus 탭)
     │   └── graph_focus_manager.py # SelectionChanged scriptJob 라이프사이클 (Graph Focus 탭)
-    └── ui/main_window.py  # 전체 UI (7개 탭 + 공유 로그창 + 메뉴 바)
+    └── ui/main_window.py  # 전체 UI (8개 탭 + 공유 로그창 + 메뉴 바)
 ```
 
 - 각 manager 는 **UI 비의존 정적 메서드**(`@staticmethod`)로 작성되고 `(count, msg)` 를 반환한다.
@@ -305,8 +323,8 @@ A00110_animTool.run(True)   # True = reload
 
 ```
 ┌ Help ────────────────────────────────────────────────────────┐  ← 메뉴 바 (Help > About)
-│ [Key Edit][Pose Key][Copy Key][Mirror Key][Bake][Follow]      │  ← 탭 (7개)
-│ [Graph Focus]                                                 │
+│ [Key Edit][Pose Key][Copy Key][Mirror Key][Bake][Follow]      │  ← 탭 (8개)
+│ [Euler Filter][Graph Focus]                                   │
 ├───────────────────────────────────────────────────────────────┤
 │  (선택된 탭 내용)                                             │
 ├ Log (모든 탭 공유) ───────────────────────────────────────────┤
@@ -622,7 +640,50 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 - **Match Follow**: 실행. 결과(매치한 follower 수 / 구간 / 프레임 수 / blend / 사용 레이어 / skip)가
   로그에 출력.
 
-### 5.7 Graph Focus 탭 (v01.25~)
+### 5.7 Euler Filter 탭 (v01.37~)
+
+```
+┌───────────────────────────────────────────────────┐
+│ [Euler Filter List]                               │  ← 재사용 위젯 (JUN_mod_tsl_qt_v01)
+│ List Selected Objects                             │
+│ ┌ QListWidget ┐                                   │
+│ │  ctl objs   │                                   │
+│ └─────────────┘                                   │
+│ Add|Del|Up|Down|Sort                              │
+│ Start [ 1 ][Get Current] End [ 24 ][Get Current]  │  ← 공용 timeRange 위젯
+│                              [Get Sel Range]      │
+│ [x] Anchor to the key before Start (seamless)     │  ← 기본 ON
+│ Filters rotateX / Y / Z keys inside [Start, End]  │  ← 안내 라벨
+│ only. Keys outside the range keep their values... │
+│ [ Euler Filter in Range ]                         │
+└───────────────────────────────────────────────────┘
+```
+
+마야 그래프 에디터의 `Curves > Euler Filter` 는 **선택한 컨트롤러의 키가 찍힌 전 구간**을 한꺼번에
+처리한다. 뒤집힌(짐벌 점프) 구간 **하나만** 펴고 나머지 구간은 손대고 싶지 않을 때 쓸 수 없었다.
+이 탭은 **대상(TSL) + 구간(Start/End)** 을 지정해 **그 구간 안의 회전 키만** 편다.
+
+- **Euler Filter List** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `List Selected Objects` 로 현재 Maya
+  선택을 담는다. **씬 선택이 아니라 리스트에 담긴 항목만** 필터된다. 항목은 **UUID 로 추적**되므로
+  담은 뒤 리네임/리페어런트해도 같은 노드를 찾아간다.
+- **Start / End**: 필터할 구간(**양 끝 포함**). 기본값 = 현재 playback 범위. `Get Current` 로 한 칸씩,
+  `Get Sel Range` 로 **그래프 에디터에서 선택한 키의 앞/뒤 프레임**을 두 칸에 함께 채운다 —
+  구간을 눈으로 고르고 그대로 가져오는 게 가장 빠르다.
+- **Anchor to the key before Start** (기본 **ON**): 마야의 오일러 필터는 **구간 안 첫 키를 기준(앵커)**
+  으로 그 뒤 키들을 맞추고, 앵커 키 자체는 절대 바꾸지 않는다. 그래서 **플립 지점이 Start 바로 앞**에
+  있으면(예: 20f 에서 뒤집혔는데 구간을 `[20-40]` 으로 잡으면) 구간 안 키들끼리는 이미 일관돼 있어
+  **아무것도 고쳐지지 않는다**. 이 옵션은 필터 구간을 **Start 직전 키까지 뒤로 넓혀** 그 키를 앵커로
+  삼는다. 앵커 키는 값이 바뀌지 않으므로 **"구간 밖은 그대로"** 라는 약속을 지키면서 **구간 앞쪽이
+  기존 애니메이션과 매끄럽게 이어진다**. 끄면 구간 안 첫 키가 기준이 된다.
+- **Euler Filter in Range**: 실행. 처리한 오브젝트 수 / 값이 바뀐 키 수 / 구간 / 앵커 적용 수와
+  건너뛴 항목·경고가 로그에 출력된다.
+
+> **End 쪽 이음매(seam)**: 구간 뒤쪽 키는 요청대로 그대로 두므로, 구간 안 키가 ±360° 만큼 펴졌다면
+> **End 와 그 다음 키 사이에 점프가 생긴다**. 이건 "일부 구간만 필터" 의 필연적 결과라 막지 않고
+> 로그로 알린다(`... now step at the End boundary`). 이음매가 싫으면 **End 를 다음 플립 지점 이후로
+> 넓히거나**, 마지막 키까지 포함시키면 된다.
+
+### 5.8 Graph Focus 탭 (v01.25~)
 
 ```
 ┌ Focus Graph Editor around Current Frame ──────────┐
@@ -750,6 +811,17 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
    마음에 안 들면 값을 다시 바꾸거나, **Ctrl+Z**(조작 직전으로) 또는 **Reset**(원위치).
 
 > 리스트나 Start/End 를 바꾸면 세션이 원위치되고 새로 시작된다. 창을 닫을 때는 마지막 값이 기록된다.
+
+### Euler Filter (구간 한정 오일러 필터)
+1. 그래프 에디터에서 **회전이 뒤집힌(짐벌 점프) 구간**을 찾는다.
+2. 그 구간의 키를 **선택**하고 **Get Sel Range** 를 누르면 Start/End 가 한 번에 채워진다
+   (또는 직접 입력 / **Get Current**).
+3. 대상 컨트롤러를 씬에서 선택 → **List Selected Objects** 로 **Euler Filter List** 에 채운다.
+4. **Anchor to the key before Start** 는 켠 채로 둔다(구간 앞쪽과 매끄럽게 이어진다).
+5. **Euler Filter in Range** → 구간 안 회전 키만 펴진다. 구간 밖 키는 값이 그대로다.
+
+> 결과가 `0 key(s) changed` 면 구간 안 키들끼리는 이미 일관돼 있다는 뜻이다. 플립 지점이 Start
+> 앞쪽이라면 **Anchor 를 켜거나 Start 를 플립 앞 키까지 당겨** 다시 실행한다.
 
 ---
 
@@ -931,6 +1003,32 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
   이를 검사해 로그에 `WARNING ... may overwrite` 로 알린다. 기록된 결과는 Ctrl+Z 로 복구되지만,
   **Reset** 은 덮여 사라진 키까지 되살리지 못한다.
 
+### Euler Filter (`euler_filter_manager.EulerFilterManager.filter_range`)
+- **마야 네이티브 필터를 그대로 쓴다**: `cmds.filterCurve(curves, filter="euler",
+  startTime=..., endTime=...)`. 오일러 언와인딩(±360°)과 플립 표현
+  `(θ1+180, 180-θ2, θ3+180)` 선택은 마야가 하므로 **결과가 마야의 `Curves > Euler Filter` 와
+  정확히 일치**하고, `rotateOrder` 가 `xyz` 가 아니어도(예: `zxy`) 올바르게 처리된다.
+  Maya 2024 headless 로 확인 — **`startTime`/`endTime` 은 실제로 존중되어 구간 밖 키는 값이 바뀌지
+  않는다**. 메뉴 명령이 전 구간을 처리하는 건 필터에 구간 개념이 없어서가 아니라 **MEL 이 구간을
+  안 넘겨서**다.
+- **대상 커브**: 오브젝트마다 `rotateX / rotateY / rotateZ` 애님 커브 **3개를 한 묶음**으로 넘긴다
+  (오일러 필터는 회전 3축을 함께 봐야 의미가 있다). 세 축 중 하나라도 커브가 없으면 그 오브젝트는
+  건너뛰고 사유를 로그에 남긴다(`no animation curve on rotateX`). 씬에 없는 항목, 구간 안에 회전
+  키가 하나도 없는 항목도 마찬가지로 건너뛴다.
+- **앵커(`anchor_previous`, 기본 True)**: `filterCurve` 는 **구간 안 첫 키를 기준**으로 뒤 키들을
+  맞추고 그 키 자체는 바꾸지 않는다. 그래서 Start **직전 키**를 찾아(3축 중 Start 에 가장 가까운 것)
+  필터 구간을 그 프레임까지 뒤로 넓힌다. 넓힌 구간 안에는 그 앵커 키 하나뿐이고 앵커는 값이 바뀌지
+  않으므로, **구간 밖 키는 여전히 그대로**이면서 구간 앞쪽 이음매가 사라진다. Start 앞에 키가 없으면
+  넓히지 않는다.
+- **애니메이션 레이어**: `cmds.keyframe(plug, q=True, name=True)` 는 **현재 선택된 레이어의 커브
+  하나**만 돌려주므로(headless 확인), 마야의 오일러 필터와 같이 **작업 중인 레이어에만** 적용된다.
+  (혹시 커브가 여러 개 잡히면 첫 번째만 쓰고 `[Warning] ... animation layers` 로 알린다.)
+- **변화 집계**: 필터 전/후로 각 커브의 값 스냅샷을 떠서 **실제로 바뀐 키 수**를 센다. 이 비교로
+  ① 구간 밖 키가 바뀌었는지(마야 버전이 달라 동작이 바뀌는 경우를 대비한 방어 검사),
+  ② **End 경계에 이음매가 생겼는지**(구간 안 마지막 키가 바뀌었고 End 뒤에 키가 있으면) 를 함께
+  판정해 경고로 알린다.
+- 전체 작업은 **단일 undo 청크** — Ctrl+Z 한 번으로 모든 오브젝트가 복구된다.
+
 ---
 
 ## 8. 로그 · 문제 해결
@@ -971,6 +1069,13 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 # Offset & Hold
 3 object(s) re-timed (hold 10f / offset 30f)  (all curves)
 2 object(s) re-timed (hold 10f / offset 30f)  (channels: translateY)  (1 skipped: no keys)
+
+# Euler Filter
+Euler filter: 1 object(s), 9 key(s) changed in [20-40f].  Anchored to the key before Start on 1 object(s).
+Euler filter: 2 object(s), 18 key(s) changed in [20-40f].  Anchored to the key before Start on 2 object(s).  Skipped 2: noAnim_loc (no animation curve on rotateX), ghost_ctrl (missing in scene)
+Euler filter: 1 object(s), 3 key(s) changed in [0-20f].  [Warning] 1 object(s) now step at the End boundary (keys after End were left untouched, as requested): arm_l_ctrl
+Euler filter: 1 object(s), 0 key(s) changed in [20-40f].  Rotations were already continuous inside the range (nothing to unwind).
+Euler filter: nothing to do. (1 skipped: arm_l_ctrl (no rotation keys in range))
 ```
 
 ### 경고 메시지
@@ -999,6 +1104,15 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 - `[Warning] Enter Hold and Offset.` — (Offset & Hold) Hold/Offset 입력 누락.
 - `[Warning] Hold + Offset must be greater than 0.` — (Offset & Hold) 둘 다 0(주기 0).
 - `No animated objects to process. (n skipped: no keys)` — (Offset & Hold) 리스트 항목에 키가 없음.
+- `[Warning] Add controllers to the Euler Filter List first.` — (Euler Filter) 리스트가 비어 있음.
+- `End must be greater than or equal to Start.` — (Euler Filter) End < Start.
+- `Euler filter: nothing to do. (n skipped: ...)` — (Euler Filter) 대상이 전부 제외됨(회전 커브 없음 /
+  씬에 없음 / 구간 안에 회전 키 없음).
+- `... now step at the End boundary ...` — (Euler Filter) 구간 안 키가 펴지면서 End 뒤 키와 사이에
+  점프가 생김. 구간 한정 필터의 정상적인 결과다(End 를 넓히면 사라진다).
+- `... changed keys OUTSIDE the range - unexpected for this Maya version` — (Euler Filter) 방어 검사.
+  `filterCurve` 의 `startTime`/`endTime` 이 이 마야 버전에서 다르게 동작한다는 뜻이니 결과를 확인하고
+  필요하면 Ctrl+Z 한다.
 
 ### 자주 겪는 문제
 - **이동/삭제가 일부 채널에만 적용됨** → 채널박스에서 어트리뷰트가 선택돼 있으면 그 채널만 대상이 된다.
@@ -1069,3 +1183,14 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
   입력한다(예: `0`).
 - **(Offset & Hold) 유지 구간이 평평하지 않고 미끄러짐** → Offset 이 0 이면 plateau 끝과 다음 plateau
   시작이 같은 프레임이 되어 유지가 깨질 수 있다. 보간 구간을 주려면 Offset 을 1 이상으로 둔다.
+- **(Euler Filter) `0 key(s) changed` 로 아무것도 안 고쳐짐** → 구간 안 키들끼리는 이미 일관돼 있다는
+  뜻이다. 플립이 **Start 직전**에서 시작했다면 **Anchor** 를 켜거나, Start 를 **플립 앞 키까지** 당긴다.
+- **(Euler Filter) 오브젝트가 skip 됨** → `rotateX/Y/Z` 중 하나라도 애님 커브가 없으면 건너뛴다
+  (오일러 필터는 3축을 한 묶음으로 봐야 한다). 회전을 한 축만 키했다면 나머지 축에도 키를 하나 찍고
+  다시 실행한다. 구간 안에 회전 키가 없어도 건너뛴다.
+- **(Euler Filter) End 지점에서 회전이 툭 튐** → 구간 밖 키를 그대로 두라는 요청의 정상적인 결과다
+  (`now step at the End boundary` 경고). 이음매를 없애려면 **End 를 다음 플립 지점 이후 또는 마지막
+  키까지** 넓혀 다시 실행한다.
+- **(Euler Filter) 애니 레이어를 쓰는데 베이스가 안 고쳐짐** → 필터는 **현재 선택된 애니 레이어의
+  커브**에만 적용된다(마야 기본 오일러 필터와 동일). 베이스를 고치려면 BaseAnimation 을 선택하고
+  실행한다.

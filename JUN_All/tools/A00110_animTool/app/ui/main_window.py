@@ -25,6 +25,7 @@ from tools.A00110_animTool.app.core import BakeManager
 from tools.A00110_animTool.app.core import FollowMatchManager
 from tools.A00110_animTool.app.core import OffsetHoldManager
 from tools.A00110_animTool.app.core import StaggerOffsetSession
+from tools.A00110_animTool.app.core import EulerFilterManager
 from tools.A00110_animTool.app.core import GraphViewManager
 from tools.A00110_animTool.app.core import GraphFocusManager
 
@@ -169,6 +170,7 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_mirror_key_tab(), "Mirror Key")
         self.tabs.addTab(self._build_bake_tab(), "Bake")
         self.tabs.addTab(self._build_follow_tab(), "Follow")
+        self.tabs.addTab(self._build_euler_filter_tab(), "Euler Filter")
         self.tabs.addTab(self._build_graph_focus_tab(), "Graph Focus")
         main_layout.addWidget(self.tabs)
 
@@ -1010,6 +1012,80 @@ class MainWindow(QWidget):
 
         return tab
 
+    def _build_euler_filter_tab(self):
+        """리스트업한 컨트롤러의 회전 키에 **구간 한정 오일러 필터**를 적용하는 탭.
+
+        마야 그래프 에디터의 `Curves > Euler Filter` 는 선택한 컨트롤러의 **키가 찍힌 전 구간**을
+        한꺼번에 처리한다. 여기서는 TSL 로 대상을 고르고 Start/End 로 구간을 잡아 **그 구간 안의
+        회전 키만** 필터하고, 나머지 구간은 그대로 둔다. 로직은 EulerFilterManager."""
+
+        tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
+        tab_layout = QVBoxLayout(tab)
+
+        # -------------------------
+        # 대상 리스트 (재사용 위젯). 리스트업된 항목만 필터된다(씬 선택 아님).
+        # -------------------------
+
+        self.euler_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Euler Filter List", select_label="List Selected Objects",
+            log_callback=self.log)
+        tab_layout.addWidget(self.euler_tsl)
+
+        # -------------------------
+        # Time range (start / end). 기본값은 현재 playback 범위.
+        # -------------------------
+
+        time_str = int(cmds.playbackOptions(query=True, minTime=True))
+        time_end = int(cmds.playbackOptions(query=True, maxTime=True))
+
+        range_row = QHBoxLayout()
+        self.euler_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_value=time_str, end_value=time_end, log_callback=self.log)
+        self.le_euler_start = self.euler_range.start_edit
+        self.le_euler_end = self.euler_range.end_edit
+        range_row.addWidget(self.euler_range)
+        tab_layout.addLayout(range_row)
+
+        # -------------------------
+        # Anchor 옵션 (기본 ON)
+        #   마야의 오일러 필터는 '구간 안 첫 키' 를 기준으로 뒤 키들을 맞춘다. 그래서 플립이
+        #   Start 직전에서 시작하면 구간 안 키들끼리는 이미 일관돼 아무것도 고쳐지지 않는다.
+        #   이 옵션은 필터 구간을 Start 직전 키까지 넓혀 그 키를 기준으로 삼는다(그 키 값은
+        #   바뀌지 않으므로 구간 밖은 그대로다).
+        # -------------------------
+
+        self.cb_euler_anchor = QCheckBox("Anchor to the key before Start (seamless)")
+        self.cb_euler_anchor.setChecked(True)
+        self.cb_euler_anchor.setToolTip(
+            "On: use the last key before Start as the reference, so the filtered\n"
+            "range stays continuous with the animation in front of it.\n"
+            "That key keeps its value - keys outside the range are never changed.\n"
+            "Off: the first key inside the range is the reference.")
+        tab_layout.addWidget(self.cb_euler_anchor)
+
+        # -------------------------
+        # 안내 : 무엇을 건드리고 무엇을 안 건드리는지
+        # -------------------------
+
+        self.lbl_euler_hint = QLabel(
+            "Filters rotateX / Y / Z keys inside [Start, End] only.\n"
+            "Keys outside the range keep their values, so a step can appear at End.")
+        self.lbl_euler_hint.setWordWrap(True)
+        tab_layout.addWidget(self.lbl_euler_hint)
+
+        # -------------------------
+        # 실행 버튼
+        # -------------------------
+
+        self.btn_euler_filter = QPushButton("Euler Filter in Range")
+        tab_layout.addWidget(self.btn_euler_filter)
+
+        tab_layout.addStretch(1)
+
+        self.btn_euler_filter.clicked.connect(self.on_euler_filter)
+
+        return tab
+
     def _build_graph_focus_tab(self):
         """선택한 컨트롤러의 전체 키 구간을 다 보여주는 대신, 현재 프레임 기준
         ± margin 프레임만 그래프 에디터에 확대해서 보여주는 탭.
@@ -1581,6 +1657,31 @@ class MainWindow(QWidget):
             targets, followers, start, end, blend,
             do_translate=do_t, do_rotate=do_r, do_scale=do_s,
             maintain_offset=maintain_offset, one_to_many=one_to_many)
+        self.log(msg)
+
+    # --------------------------------------------------
+    # Euler Filter (구간 한정)
+    # --------------------------------------------------
+
+    def on_euler_filter(self):
+
+        objs = self.euler_tsl.get_all_nodes()   # 리스트업된 항목만 (씬 선택 아님)
+        if not objs:
+            self.log("[Warning] Add controllers to the Euler Filter List first.")
+            return
+
+        rng = self.euler_range.values()
+        if rng is None:
+            self.log("[Warning] Enter Start / End.")
+            return
+        start, end = rng
+        if start > end:
+            self.log(f"[Warning] Start ({start}) is greater than End ({end}).")
+            return
+
+        count, msg = EulerFilterManager.filter_range(
+            objs, start, end,
+            anchor_previous=self.cb_euler_anchor.isChecked())
         self.log(msg)
 
     # --------------------------------------------------
