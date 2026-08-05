@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-08-03
+updated: 2026-08-05
 ---
 
 # 작업 일지 (WORKLOG)
@@ -15,7 +15,28 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-08-03 (오늘)
+## 2026-08-05 (오늘)
+
+> [!summary] `A00120_FKIK` **베이크 구간 UI 를 공용 timeRange 위젯으로 교체** (v01.07→01.08)
+- **요청**: 베이크할 구간을 정하는 UI 를 `Framework/qt/MOD_timeRange_qt_v01.py`(`JUN_mod_timeRange_qt`)
+  로 교체.
+- **교체 대상** — Match / Bake 박스의 손수 만든 한 줄
+  `Start [QSpinBox][Get Current]  End [QSpinBox][Get Current]`. A00110 에서 뽑아낸 공용 위젯이
+  이미 같은 모양이라, 위젯 하나(`self.bake_range`)로 통째로 대체했다. 이제 A00110 · A00390 ·
+  A00410 과 같은 위젯을 쓴다.
+- **덤으로 얻은 것: `Get Sel Range`** — 그래프 에디터/타임슬라이더에서 **선택한 키들의 앞·뒤
+  프레임**으로 Start·End 를 한 번에 채운다. 구간을 손으로 두 번 입력하던 것이 클릭 한 번이 됐다.
+- **걷어낸 코드** — `_init_frame_range()` / `_set_current_frame()` / `_make_get_current_btn()`
+  세 헬퍼 제거. 초기값(현재 playback 범위)만 주는 `_playback_range()` 만 남겼다 — 창을 열었을 때
+  Start/End 가 재생 범위로 채워지는 동작은 그대로.
+- **주의 하나**: QSpinBox 는 **항상 숫자**를 주지만 공용 위젯은 QLineEdit 기반이라 **빈 칸/비숫자면
+  `values()` 가 `None`** 이다. `on_bake()` 에 가드를 넣어 그 경우
+  `[Warning] Enter a valid Start / End frame.` 만 남기고 아무것도 하지 않게 했다(구간 없이 베이크가
+  도는 사고 방지). 위젯 로그는 `log_callback=self.log` 로 툴 로그창에 연결.
+- **검증**: `ast.parse` 문법 확인 + 호출부 전수 확인(`sb_start`/`sb_end` 잔존 없음).
+  **마야 실기 UI 테스트 대기.** #A00120 #FKIK #timeRange #공용위젯
+
+## 2026-08-03
 
 > [!summary] `A00090_ConnectionBuilder` **규칙 json 을 버전 폴더로 분리 + UI 에서 버전 선택** (v01.04→01.05)
 - **요청**: 규칙 json 의 **버전이 다른 상황**에 대응. `v001`, `v002` … 폴더마다 수정된 json 을 두고

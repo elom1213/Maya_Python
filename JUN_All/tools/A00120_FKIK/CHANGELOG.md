@@ -2,6 +2,21 @@
 
 All notable changes to this tool are documented here.
 
+## [01.08] - 2026-08-05
+### Changed
+- **Bake range UI replaced with the shared time-range widget.** The hand-rolled
+  `Start [QSpinBox][Get Current]  End [QSpinBox][Get Current]` row in Match / Bake is
+  now `Framework.qt.JUN_mod_timeRange_qt` (`JUN_mod_timeRange_qt_v01`), the same
+  widget A00110 / A00390 / A00410 use.
+  - Adds **Get Sel Range** — fills Start and End from the first / last selected
+    keyframe in one click.
+  - Local helpers `_init_frame_range()` / `_set_current_frame()` /
+    `_make_get_current_btn()` dropped; `_playback_range()` only supplies the initial
+    values (current playback range, as before).
+  - `on_bake()` reads `self.bake_range.values()`. Unlike a spin box the fields can be
+    empty or non-numeric, so an invalid range now logs
+    `[Warning] Enter a valid Start / End frame.` and does nothing.
+
 ## [01.05] - 2026-06-22
 ### Fixed
 - **Partial-range bake no longer deletes keys outside the baked range.** Baking a

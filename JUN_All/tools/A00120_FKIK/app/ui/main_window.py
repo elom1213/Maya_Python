@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-29
+# last Update date : 2026-08-05
 # A00120_FKIK - Qt UI (레거시 PY_JUN_makeUI_FKIKTool 대체)
 
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
+from Framework.qt import JUN_mod_timeRange_qt
 from Framework.core.maya_refresh import force_refresh
 
 print("QT version  :  " + str(QT_VERSION))
@@ -172,21 +173,13 @@ class MainWindow(QWidget):
         box = QGroupBox("Match / Bake")
         layout = QVBoxLayout(box)
 
-        # frame range (각 칸 옆에 현재 프레임으로 채우는 Get Current 버튼)
-        frame_row = QHBoxLayout()
-        frame_row.addWidget(QLabel("Start"))
-        self.sb_start = QSpinBox()
-        self.sb_start.setRange(-1000000, 1000000)
-        frame_row.addWidget(self.sb_start)
-        frame_row.addWidget(self._make_get_current_btn(self.sb_start))
-        frame_row.addWidget(QLabel("End"))
-        self.sb_end = QSpinBox()
-        self.sb_end.setRange(-1000000, 1000000)
-        frame_row.addWidget(self.sb_end)
-        frame_row.addWidget(self._make_get_current_btn(self.sb_end))
-        layout.addLayout(frame_row)
-
-        self._init_frame_range()
+        # frame range - 공용 위젯(JUN_mod_timeRange_qt).
+        # Start/End 입력 + 칸별 Get Current + 선택 키에서 구간을 읽는 Get Sel Range 를
+        # 모두 제공한다. 기본값은 현재 playback 범위.
+        start, end = self._playback_range()
+        self.bake_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_value=start, end_value=end, log_callback=self.log)
+        layout.addWidget(self.bake_range)
 
         # match
         match_row = QHBoxLayout()
@@ -250,7 +243,9 @@ class MainWindow(QWidget):
             "- Bake IK / Bake FK : bake the Start-End range constraint-free,\n"
             "  per frame via matchTransform (rotateOrder-safe, keeps keys on\n"
             "  other ranges and animation layers untouched).\n"
-            "- Get Current : fill Start / End with the current frame.\n"
+            "- Get Current : fill that Start / End field with the current frame.\n"
+            "- Get Sel Range : fill Start and End from the first / last\n"
+            "  selected keyframe.\n"
             "- Bake (Constraint) : optional parentConstraint + bakeSimulation\n"
             "  path for selected pairs over the playback range.\n"
             "\n"
@@ -267,27 +262,13 @@ class MainWindow(QWidget):
     def log(self, text):
         self.te_log.append(text)
 
-    def _init_frame_range(self):
+    def _playback_range(self):
+        """Bake 구간 위젯의 초기값으로 쓸 현재 playback 범위(start, end)."""
         try:
-            start = int(cmds.playbackOptions(q=True, minTime=True))
-            end = int(cmds.playbackOptions(q=True, maxTime=True))
-            self.sb_start.setValue(start)
-            self.sb_end.setValue(end)
+            return (int(cmds.playbackOptions(q=True, minTime=True)),
+                    int(cmds.playbackOptions(q=True, maxTime=True)))
         except Exception:
-            pass
-
-    def _set_current_frame(self, spinbox):
-        """Get Current 버튼: 현재 Maya 프레임으로 해당 Start/End 스핀박스를 갱신."""
-        frame = int(round(cmds.currentTime(query=True)))
-        spinbox.setValue(frame)
-
-    def _make_get_current_btn(self, spinbox):
-        """현재 프레임으로 spinbox 를 채우는 'Get Current' 버튼 생성(A00110 패턴)."""
-        btn = QPushButton("Get Current")
-        # clicked 시그널은 checked(bool) 인자를 넘기므로 *_a 로 흡수한다
-        # (안 그러면 checked 가 spinbox 인자를 덮어써 동작하지 않는다).
-        btn.clicked.connect(lambda *_a, sb=spinbox: self._set_current_frame(sb))
-        return btn
+            return (None, None)
 
     def _set_state(self, text, ok=None):
         self.lbl_state.setText(text)
@@ -389,8 +370,12 @@ class MainWindow(QWidget):
             self.log("[Warning] No pairs to bake. Run Setup and check limb options.")
             return
 
-        start = self.sb_start.value()
-        end = self.sb_end.value()
+        # 공용 위젯은 칸이 비었거나 숫자가 아니면 None 을 준다(스핀박스와 달리 빈 값 가능).
+        rng = self.bake_range.values()
+        if rng is None:
+            self.log("[Warning] Enter a valid Start / End frame.")
+            return
+        start, end = rng
 
         if start > end:
             self.log(f"[Warning] Start ({start}) is greater than End ({end}).")
