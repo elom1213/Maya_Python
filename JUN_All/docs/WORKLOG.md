@@ -17,6 +17,34 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-05 (오늘)
 
+> [!summary] `A00110_animTool` **구간 한정 Euler Filter 탭 추가** (v01.36→01.37) — `c7cd7f2`
+- **요청**: 마야 그래프 에디터의 `Curves > Euler Filter` 는 선택한 컨트롤러의 **키가 찍힌 전 구간**을
+  한꺼번에 처리한다. 회전이 뒤집힌 **일부 구간만** 펴고 나머지는 그대로 두고 싶다.
+- **새 탭** — `Euler Filter`(Follow 와 Graph Focus 사이). **TSL 로 대상**을, **공용 timeRange
+  위젯(Start/End)** 으로 **구간**을 지정해 그 구간 안의 `rotateX/Y/Z` 키만 편다. 로직은
+  `app/core/euler_filter_manager.py` 의 `EulerFilterManager.filter_range()`.
+- **직접 구현 대신 마야 필터를 겨냥** — mayapy 2024 headless 로 확인한 결과
+  `cmds.filterCurve(filter="euler", startTime=, endTime=)` 는 **구간을 실제로 존중한다**(구간 밖 키가
+  안 바뀜). 메뉴 명령이 전 구간을 처리하는 건 필터에 구간 개념이 없어서가 아니라 **MEL 이 구간을
+  안 넘겨서**였다. 그래서 오일러 언와인딩(±360°)과 플립 표현 `(θ1+180, 180-θ2, θ3+180)` 선택을
+  직접 구현하지 않고 마야의 수식·탄젠트 처리를 그대로 쓴다 — `rotateOrder` 가 `zxy` 여도 결과가
+  마야와 일치한다.
+- **Anchor 옵션(기본 ON) 이 없으면 정작 원하는 케이스가 안 고쳐진다** — 필터의 기준(앵커)은
+  **구간 안 첫 키**이고 그 키는 절대 안 바뀐다. 즉 20f 에서 뒤집힌 걸 고치려고 구간을 `[20-40]` 으로
+  잡으면 구간 안 키들끼리는 이미 일관돼 **0 key changed** 가 나온다. 그래서 필터 구간을 **Start
+  직전 키까지 뒤로 넓혀** 그 키를 앵커로 삼는다 — 앵커는 값이 유지되므로 **"구간 밖은 그대로"** 를
+  지키면서 앞쪽 애니메이션과 매끄럽게 이어진다.
+- **결과 보고** — 필터 전/후 값 스냅샷을 비교해 **실제로 바뀐 키 수**를 세고, 구간 한정 필터의
+  필연적 결과인 **End 경계 이음매**(`now step at the End boundary`)와 구간 밖 변경(마야 버전 대비
+  방어 검사)을 경고로 알린다. 전체는 **단일 undo 청크**.
+- **제외 규칙** — `rotateX/Y/Z` 세 축이 다 애님 커브를 가져야 처리한다(오일러 필터는 3축을 한
+  묶음으로 봐야 한다). 없으면 사유와 함께 skip. 애님 레이어가 있으면
+  `cmds.keyframe(plug, q=True, name=True)` 가 **선택된 레이어 커브 하나만** 돌려주므로 마야 기본
+  필터처럼 **작업 중인 레이어에만** 적용된다.
+- **검증**: mayapy headless **9 시나리오 통과**(앵커 ON/OFF 차이 · 구간 밖 키 불변 · End 이음매 감지 ·
+  회전 커브 없는/씬에 없는 오브젝트 skip · `zxy` rotateOrder · 빈 구간 · undo 청크 · 가드).
+  **마야 실기 UI 테스트 대기.** #A00110 #animTool #EulerFilter #filterCurve
+
 > [!summary] `A00120_FKIK` **베이크 구간 UI 를 공용 timeRange 위젯으로 교체** (v01.07→01.08)
 - **요청**: 베이크할 구간을 정하는 UI 를 `Framework/qt/MOD_timeRange_qt_v01.py`(`JUN_mod_timeRange_qt`)
   로 교체.
