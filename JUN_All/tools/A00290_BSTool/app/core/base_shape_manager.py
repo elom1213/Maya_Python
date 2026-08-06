@@ -29,11 +29,25 @@
 #       -> 그래서 이제 **타겟 메시의 정점을 직접 옮긴다**. 델타가 곧 타겟 메시이므로
 #          타겟을 옮기는 것이 "기본 모양을 바꾸는" 유일한 정공법이다.
 #
-# 델타의 공간 (mayapy 로 실측):
-#   inputGeomTarget 이 worldMesh 로 연결돼 있어도 델타는 **오브젝트 공간**이다
-#   (delta = 타겟 로컬 좌표 - 베이스 원본 로컬 좌표). base/target 의 transform 이
-#   서로 달라도(위치·회전·스케일) 마찬가지다. 따라서 타겟 정점은 **오브젝트 공간에서**
-#   (X - 1) * delta 만큼 상대 이동시키면 새 델타가 정확히 X * delta 가 된다.
+# 델타의 공간 (mayapy 로 실측, v01.16 에서 정정):
+#   델타가 어느 공간에 있느냐는 blendShape 의 **origin** 어트리뷰트가 정한다.
+#
+#     origin = 1 (local, cmds.blendShape 기본) — 델타 = 타겟 로컬 좌표 - 베이스 로컬 좌표.
+#         두 오브젝트의 transform 이 달라도 순수 오브젝트 공간이다.
+#     origin = 0 (world) — 델타 = (타겟 로컬 * 타겟 worldMatrix * 베이스 worldInverse)
+#         - 베이스 로컬. 즉 **베이스 오브젝트 공간**이라, 타겟과 베이스의 transform 이
+#         다르면(회전 · 마이너스 스케일 · 비균등 스케일) 델타는 타겟 오브젝트 공간이 아니다.
+#
+#   타겟 정점은 (당연히) 자기 오브젝트 공간에서만 옮길 수 있으므로, world origin 이고
+#   transform 이 다르면 델타를 **타겟 오브젝트 공간으로 되돌린 뒤** 옮겨야 한다.
+#       local_offset = delta * (base.worldMatrix * target.worldMatrix^-1)   ← 3x3 부분만
+#   v01.15 까지는 이 변환 없이 델타를 그대로 썼다. 그래서 예컨대 타겟이 X 로 미러(scale -1)
+#   되어 있으면 X 성분만 반대로 움직여, 값 0.5 를 넣어도 그 정점들만 1.5 를 넣은 것처럼 보였다
+#   (= 정점마다 되기도 하고 반대로 되기도 하는 증상).
+#
+#   그래도 못 잡는 배치가 있을 수 있어(디포머가 낀 타겟 등), 적용 후 **델타가 정말 X 배가
+#   됐는지 검증**하고, 아니면 되돌린 뒤 타겟 정점을 실제로 흔들어 응답 행렬을 **직접 재서**
+#   다시 시도한다. 그래도 안 되면 원상복구하고 이유를 보고한다.
 
 import re
 
@@ -179,38 +193,170 @@ class BaseShapeManager:
     # ==================================================
 
     @staticmethod
-    def _scale_live_item(item_plug, shape, factor):
-        """연결된 타겟 메시를 옮겨 델타를 factor 배로 만든다.
+    def _read_item_deltas(item_plug):
+        """델타를 {정점: (dx, dy, dz)} 로 읽는다.
 
-        델타는 오브젝트 공간이므로 정점을 (factor - 1) * delta 만큼 상대 이동한다.
-        반환: (처리한 포인트 수, 실패 사유 또는 None)
+        컴포넌트 목록을 델타 개수만큼 펴지 못하면 None(호출부가 건너뛴다).
         """
         pts = cmds.getAttr(item_plug + ".inputPointsTarget") or []
         if not pts:
-            return 0, None
+            return {}
 
         comps = cmds.getAttr(item_plug + ".inputComponentsTarget") or []
         indices = _expand_components(comps, len(pts))
         if indices is None:
-            return 0, "component list did not match delta count"
+            return None
 
-        offset = factor - 1.0
-        tweaks = BaseShapeManager._read_tweaks(shape)
+        return {vtx: (pts[k][0], pts[k][1], pts[k][2])
+                for k, vtx in enumerate(indices)}
 
-        values = {}
-        for k, vtx in enumerate(indices):
-            d = pts[k]
-            bx, by, bz = tweaks.get(vtx, (0.0, 0.0, 0.0))
-            values[vtx] = (bx + d[0] * offset,
-                           by + d[1] * offset,
-                           bz + d[2] * offset)
+    @staticmethod
+    def _base_shape_for_geo(bs_node, geo_idx):
+        """이 inputTarget 인덱스가 디포밍하는 베이스 셰이프 이름."""
+        geos = cmds.blendShape(bs_node, query=True, geometry=True) or []
+        idxs = cmds.blendShape(bs_node, query=True, geometryIndices=True) or []
+        for geo, idx in zip(geos, idxs):
+            if idx == geo_idx:
+                return geo
+        return geos[0] if len(geos) == 1 else None
+
+    @staticmethod
+    def _delta_to_local_matrix(bs_node, geo_idx, shape):
+        """델타 공간의 변위를 **타겟 오브젝트 공간** 변위로 바꾸는 행렬(없으면 None).
+
+        origin=local 이면 델타가 이미 타겟 오브젝트 공간이라 변환이 필요 없다.
+        origin=world 면 델타가 베이스 오브젝트 공간이므로 base.world * target.world^-1 로
+        되돌린다. 두 transform 이 같으면(대개 그렇다) 항등이라 None 을 준다.
+        """
+        try:
+            if cmds.getAttr(bs_node + ".origin") != 0:      # 0 = world, 1 = local
+                return None
+        except Exception:
+            return None
+
+        base_shape = BaseShapeManager._base_shape_for_geo(bs_node, geo_idx)
+        if not base_shape:
+            return None
 
         try:
-            BaseShapeManager._write_tweaks(shape, values)
+            base_m = om.MMatrix(cmds.getAttr(base_shape + ".worldMatrix[0]"))
+            tgt_m = om.MMatrix(cmds.getAttr(shape + ".worldMatrix[0]"))
+        except Exception:
+            return None
+
+        mat = base_m * tgt_m.inverse()
+        return None if mat.isEquivalent(om.MMatrix.kIdentity, 1e-6) else mat
+
+    @staticmethod
+    def _measure_local_matrix(item_plug, shape, deltas, saved):
+        """타겟 정점을 실제로 흔들어 '로컬 변위 -> 델타 변위' 응답을 재고, 그 역행렬을 준다.
+
+        계산으로 못 맞추는 배치(타겟에 디포머가 끼어 있는 등)를 위한 폴백이다.
+        변환은 선형이라 정점 하나를 x/y/z 로 한 번씩 밀어 보면 3x3 이 그대로 나온다.
+        """
+        probe = max(deltas, key=lambda v: sum(c * c for c in deltas[v]))
+        origin = saved.get(probe, (0.0, 0.0, 0.0))
+        step = 1.0
+        rows = []
+
+        try:
+            for axis in range(3):
+                moved = list(origin)
+                moved[axis] += step
+                BaseShapeManager._write_tweaks(shape, {probe: tuple(moved)})
+
+                after = BaseShapeManager._read_item_deltas(item_plug)
+                if not after or probe not in after:
+                    return None
+                d0, d1 = deltas[probe], after[probe]
+                rows.append([(d1[i] - d0[i]) / step for i in range(3)])
+        finally:
+            BaseShapeManager._write_tweaks(shape, {probe: origin})
+
+        mat = om.MMatrix([rows[0][0], rows[0][1], rows[0][2], 0.0,
+                          rows[1][0], rows[1][1], rows[1][2], 0.0,
+                          rows[2][0], rows[2][1], rows[2][2], 0.0,
+                          0.0, 0.0, 0.0, 1.0])
+        if abs(mat.det3x3()) < 1e-9:
+            return None
+        return mat.inverse()
+
+    @staticmethod
+    def _offset_target_mesh(shape, deltas, saved, factor, mat):
+        """타겟 정점을 (factor - 1) * delta 만큼(필요하면 mat 로 공간을 되돌려) 옮긴다."""
+        offset = factor - 1.0
+        values = {}
+        for vtx, d in deltas.items():
+            vec = om.MVector(d[0], d[1], d[2])
+            if mat is not None:
+                vec = vec * mat
+            bx, by, bz = saved.get(vtx, (0.0, 0.0, 0.0))
+            values[vtx] = (bx + vec.x * offset,
+                           by + vec.y * offset,
+                           bz + vec.z * offset)
+        BaseShapeManager._write_tweaks(shape, values)
+
+    @staticmethod
+    def _deltas_scaled_ok(item_plug, before, factor):
+        """델타가 정말 factor 배가 됐는지 확인한다(정점 단위로 대조).
+
+        스케일 뒤 아주 작아진 델타는 마야가 목록에서 걷어낼 수 있으므로 위치가 아니라
+        **정점 번호로** 대조하고, 없는 정점은 0 으로 본다.
+        """
+        after = BaseShapeManager._read_item_deltas(item_plug)
+        if after is None:
+            return False
+
+        for vtx, d in before.items():
+            got = after.get(vtx, (0.0, 0.0, 0.0))
+            for i in range(3):
+                expected = d[i] * factor
+                if abs(got[i] - expected) > 1e-4 * max(1.0, abs(expected)):
+                    return False
+        return True
+
+    @staticmethod
+    def _scale_live_item(bs_node, geo_idx, item_plug, shape, factor):
+        """연결된 타겟 메시를 옮겨 델타를 factor 배로 만든다.
+
+        델타 공간(= blendShape 의 origin 과 두 오브젝트의 worldMatrix)을 되돌려 옮기고,
+        정말 factor 배가 됐는지 확인한다. 아니면 되돌린 뒤 응답 행렬을 직접 재서 한 번 더
+        시도하고, 그래도 아니면 원상복구한다.
+
+        반환: (처리한 포인트 수, 실패 사유 또는 None)
+        """
+        deltas = BaseShapeManager._read_item_deltas(item_plug)
+        if deltas is None:
+            return 0, "component list did not match delta count"
+        if not deltas:
+            return 0, None
+
+        tweaks = BaseShapeManager._read_tweaks(shape)
+        saved = {vtx: tweaks.get(vtx, (0.0, 0.0, 0.0)) for vtx in deltas}
+
+        try:
+            mat = BaseShapeManager._delta_to_local_matrix(bs_node, geo_idx, shape)
+            BaseShapeManager._offset_target_mesh(shape, deltas, saved, factor, mat)
+            if BaseShapeManager._deltas_scaled_ok(item_plug, deltas, factor):
+                return len(deltas), None
+
+            # 공간 가정이 틀렸다. 되돌리고 응답을 직접 재서 다시.
+            BaseShapeManager._write_tweaks(shape, saved)
+            measured = BaseShapeManager._measure_local_matrix(
+                item_plug, shape, deltas, saved)
+            if measured is not None:
+                BaseShapeManager._offset_target_mesh(
+                    shape, deltas, saved, factor, measured)
+                if BaseShapeManager._deltas_scaled_ok(item_plug, deltas, factor):
+                    return len(deltas), None
+
+            BaseShapeManager._write_tweaks(shape, saved)
         except Exception as exc:
             return 0, "could not move target mesh '{0}' ({1})".format(shape, exc)
 
-        return len(values), None
+        return 0, ("'{0}' left unchanged - moving its vertices does not scale the"
+                   " deltas as expected (target mesh may be deformed or"
+                   " constrained)".format(shape))
 
     # ==================================================
     # 델타 스케일 (그룹 단위)
@@ -239,7 +385,7 @@ class BaseShapeManager:
 
             if shape:
                 pts, problem = BaseShapeManager._scale_live_item(
-                    item_plug, shape, factor)
+                    bs_node, geo_idx, item_plug, shape, factor)
                 points_done += pts
                 if pts:
                     live_items += 1
