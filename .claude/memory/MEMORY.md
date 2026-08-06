@@ -27,6 +27,7 @@
 - [Maya loadPlugin no __file__](maya-loadplugin-no-file.md) — loadPlugin 으로 뜬 .py 플러그인은 `__file__` 없음
 - [animLayer no global selected query](animlayer-no-global-selected-query.md) — `animLayer(q,selected)` 는 레이어 인자 필요, `ls(type=animLayer)` 순회
 - [blendShape live target deltas](blendshape-live-target-inputpointstarget.md) — inputGeomTarget 연결 시 inputPointsTarget setAttr 은 조용히 무시, 타겟 메시를 옮겨야 함
+- [animated attr: key + setAttr](animated-attr-setkeyframe-plus-setattr.md) — 키/레이어 걸린 attr 은 `setKeyframe` 만으론 값이 안 바뀜(뒤에 `setAttr` 까지), 레이어면 소스가 `animBlendNode*`
 - [cmds.toggle not undoable](maya-toggle-cmd-not-undoable.md) — `toggle -localAxis` 는 undo 를 안 남겨 Ctrl+Z 가 이전 작업을 지움 → `setAttr` 사용
 - [list_attrs multi detection](list-attrs-multi-detection.md) — multi 판정은 `attributeQuery(multi=True)`, getNextFreeMultiIndex 남용 금지
 - [UUID-safe rename](uuid-safe-rename-duplicate-names.md) — 동명 노드 대비 UUID 로 노드 보관("UUID 기반 리네임 패턴 적용해줘")
