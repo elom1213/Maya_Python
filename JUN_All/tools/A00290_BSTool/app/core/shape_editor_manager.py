@@ -33,6 +33,9 @@ from . import blendshape_utils as bsu
 # 기본 타겟(in-between 아님)을 가리키는 sculptInbetweenWeight 값
 FULL_WEIGHT = 1.0
 
+# 슬라이더/스핀박스로 조절 가능한 weight 상태(weight_state 참고)
+EDITABLE_STATES = ("free", "keyed", "layered")
+
 
 class ShapeEditorManager:
 
@@ -93,12 +96,15 @@ class ShapeEditorManager:
 
     @staticmethod
     def weight_state(bs_node, weight_idx):
-        """weight 의 상태를 분류한다: 'free' | 'keyed' | 'driven' | 'locked'.
+        """weight 의 상태를 분류한다: 'free' | 'keyed' | 'layered' | 'driven' | 'locked'.
 
-        - free   : 잠기지도 연결되지도 않음 → setAttr 로 조절.
-        - keyed  : animCurve 로만 구동(= 키가 걸림) → 슬라이더 조절 가능(아래 set_weight 참고).
-        - driven : animCurve 가 아닌 노드에 연결(SDK/expression/직접 연결 등) → 조절 불가.
-        - locked : 어트리뷰트 잠김 → 조절 불가.
+        - free    : 잠기지도 연결되지도 않음 → setAttr 로 조절.
+        - keyed   : animCurve 로만 구동(= 키가 걸림) → 조절 가능(아래 set_weight 참고).
+        - layered : 애니메이션 레이어의 블렌드 노드(animBlendNode*)로 구동 → 조절 가능.
+                    레이어에 넣는 순간 attr 의 직접 소스가 animCurve 에서 블렌드 노드로 바뀌므로
+                    이걸 구분하지 않으면 "키가 걸린 타겟"이 통째로 driven(비활성)이 된다.
+        - driven  : 그 밖의 노드에 연결(SDK/expression/직접 연결 등) → 조절 불가.
+        - locked  : 어트리뷰트 잠김 → 조절 불가.
         """
         plug = ShapeEditorManager.weight_plug(bs_node, weight_idx)
         try:
@@ -111,14 +117,17 @@ class ShapeEditorManager:
         srcs = cmds.listConnections(plug, s=True, d=False, scn=True) or []
         if not srcs:
             return "free"
-        if all(cmds.nodeType(s).startswith("animCurve") for s in srcs):
+        types = [cmds.nodeType(s) for s in srcs]
+        if all(t.startswith("animCurve") for t in types):
             return "keyed"
+        if any(t.startswith("animBlendNode") for t in types):
+            return "layered"
         return "driven"
 
     @staticmethod
     def is_weight_editable(bs_node, weight_idx):
-        """슬라이더/스핀박스로 조절 가능한가 (free 또는 keyed)."""
-        return ShapeEditorManager.weight_state(bs_node, weight_idx) in ("free", "keyed")
+        """슬라이더/스핀박스로 조절 가능한가 (free / keyed / layered)."""
+        return ShapeEditorManager.weight_state(bs_node, weight_idx) in EDITABLE_STATES
 
     @staticmethod
     def is_autokey_on():
@@ -150,7 +159,7 @@ class ShapeEditorManager:
                 "index": idx,
                 "weight": ShapeEditorManager.get_weight(bs_node, idx),
                 "state": state,
-                "editable": state in ("free", "keyed"),
+                "editable": state in EDITABLE_STATES,
                 # 하위 호환: settable 은 "직접 setAttr 가능(free)" 의미로 남겨둔다.
                 "settable": state == "free",
             })
@@ -171,14 +180,26 @@ class ShapeEditorManager:
         """타겟 weight 를 설정한다. 슬라이더/스핀박스가 쓰는 경로.
 
         상태별 동작:
-          - free   : setAttr.
-          - keyed  : Auto Keyframe 이 켜져 있으면 현재 프레임에 setKeyframe(= 값이 키로 반영),
-                     꺼져 있으면 setAttr(= 미리보기. 시간을 이동하면 커브 값으로 되돌아간다.
-                     Maya 채널박스에서 키 걸린 값을 autokey 없이 만지는 것과 동일).
+          - free            : setAttr.
+          - keyed / layered : Auto Keyframe 이 켜져 있으면 현재 프레임에 키를 찍고(= 조절한 값이
+                              그 프레임의 키값이 된다), 어느 쪽이든 setAttr 로 **값을 즉시 반영**
+                              한다. Auto Keyframe 이 꺼져 있으면 키 없이 미리보기만 되고,
+                              시간을 이동하면 커브 값으로 되돌아간다(Maya 채널박스에서 키 걸린
+                              값을 autokey 없이 만지는 것과 동일).
           - driven / locked : 조절 불가 → (False, 사유).
 
         autokey 를 넘기지 않으면 씬의 현재 Auto Keyframe 상태를 조회한다(다중 편집 시 한 번만
         조회해 넘겨 주면 매 틱 조회를 아낄 수 있다).
+
+        키(또는 레이어)가 걸린 weight 에서 **setKeyframe 과 setAttr 을 둘 다** 내는 이유
+        (mayapy 실측):
+          - `setKeyframe` 만 하면 커브에는 키가 들어가지만 **plug 값은 그 자리에서 갱신되지
+            않는다**(시간이 다시 흐르거나 강제 재평가가 있어야 반영). 그래서 드래그하는 동안
+            메시가 꿈쩍도 하지 않고, 폴링이 옛 값을 되읽어 슬라이더가 제자리로 튕겼다.
+          - 키 걸린 plug 에 대한 `setAttr` 은 **에러를 내지 않고**(연결돼 있어도) 값을 즉시
+            바꿔 준다 — 다음 재평가 전까지 유효한 미리보기. 애니메이션 레이어(animBlendNode)로
+            구동되는 plug 도 마찬가지다.
+          → 키를 먼저 찍고 setAttr 로 화면을 맞추면 두 값이 같으므로 서로 싸우지 않는다.
 
         반환: (성공 여부, 메시지)
         """
@@ -192,17 +213,20 @@ class ShapeEditorManager:
             return False, "[Warning] weight[{0}] of '{1}' is driven by another node.".format(
                 weight_idx, bs_node)
 
-        if state == "keyed":
+        if state in ("keyed", "layered"):
             if autokey is None:
                 autokey = ShapeEditorManager.is_autokey_on()
             if autokey:
+                # 현재 프레임의 키를 이 값으로 만든다(레이어가 있으면 활성 레이어에 찍힌다).
                 cmds.setKeyframe(plug, value=value)
-            else:
-                # 미리보기(재평가 시 커브로 복귀). 혹시 연결이 setAttr 를 막으면 키로 대체.
-                try:
-                    cmds.setAttr(plug, value)
-                except Exception:
-                    cmds.setKeyframe(plug, value=value)
+            try:
+                cmds.setAttr(plug, value)
+            except Exception:
+                if not autokey:
+                    return False, (
+                        "[Warning] weight[{0}] of '{1}' is animated and could not be "
+                        "previewed - turn Auto Keyframe on to key it.".format(
+                            weight_idx, bs_node))
             return True, ""
 
         # free

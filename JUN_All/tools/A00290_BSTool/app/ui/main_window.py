@@ -20,7 +20,8 @@ print("QT version  :  " + str(QT_VERSION))
 import maya.cmds as cmds
 
 from tools.A00290_BSTool.app.config.version import VERSION, LAST_UPDATE
-from tools.A00290_BSTool.app.core import EditBSManager, BaseShapeManager, ShapeEditorManager
+from tools.A00290_BSTool.app.core import (EditBSManager, BaseShapeManager,
+                                          ShapeEditorManager, EDITABLE_STATES)
 from tools.A00290_BSTool.app.core import blendshape_utils as bsu
 
 
@@ -348,7 +349,8 @@ class MainWindow(QWidget):
             "to bake the change into that target - same as Maya's Shape Editor.\n"
             "Click a target row to select it; Shift+click selects the range in between,\n"
             "Ctrl+click toggles one. Then drag or type one value to change all selected.\n"
-            "Keyed targets are editable: with Auto Key on the change is keyed, "
+            "Animated targets (keyed or on an animation layer) are editable too: with\n"
+            "Auto Key on, the value you settle on becomes the key at the current frame;\n"
             "with it off it is a preview that reverts when you scrub time.")
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -456,10 +458,11 @@ class MainWindow(QWidget):
     def _apply_se_row_tooltip(slider, spin, state):
         """weight 상태에 맞는 툴팁을 슬라이더/스핀박스에 건다."""
         base = "Drag to set the weight. Center is 0, right end +1, left end -1."
-        if state == "keyed":
-            tip = (base + "\nKeyed: with Auto Key on the change is keyframed at the "
-                   "current time; with it off it is a preview that reverts when you "
-                   "scrub time.")
+        if state in ("keyed", "layered"):
+            what = "Keyed" if state == "keyed" else "On an animation layer"
+            tip = (base + "\n{0}: the value changes right away. With Auto Key on the "
+                   "value you settle on becomes the key at the current time; with it "
+                   "off it is a preview that reverts when you scrub time.".format(what))
         elif state == "driven":
             tip = "This weight is driven by another node and cannot be edited."
         elif state == "locked":
@@ -527,7 +530,7 @@ class MainWindow(QWidget):
             self._style_edit_button(row["btn"], on)
 
             state = ShapeEditorManager.weight_state(node, row["index"])
-            editable = state in ("free", "keyed")
+            editable = state in EDITABLE_STATES
             self._show_weight(row, ShapeEditorManager.get_weight(node, row["index"]))
             row["spin"].setEnabled(editable and not on)
             row["slider"].setEnabled(editable and not on)
@@ -715,10 +718,19 @@ class MainWindow(QWidget):
 
         다중 선택이면 같은 value 를 선택된 모든 타겟에 동시에 적용한다.
 
+        키(또는 애니메이션 레이어)가 걸린 타겟도 그대로 조절된다. Auto Keyframe 이 켜져 있으면
+        매 변경이 **현재 프레임의 키**가 되므로, 조절을 마친 값이 그 프레임의 키값으로 남는다.
+
         undo 는 **제스처 단위**로 묶는다:
           - 슬라이더 드래그: press~release 전체를 한 청크로(첫 변경 때 lazy open). 매 틱마다
             여러 타겟에 setAttr 을 내므로, 안 묶으면 Ctrl+Z 가 마지막 한 틱(한 타겟)만 되돌린다.
           - 스핀박스/개별 변경: 그 한 번의 변경(선택된 모든 타겟)을 한 청크로 감싼다.
+
+        드래그 중에는 키를 미루고 놓을 때 한 번만 찍고 싶어지지만, 그러면 오히려 손해다
+        (mayapy 실측): Auto Keyframe 이 켜져 있으면 **마야가 setAttr 마다 자체적으로 키를
+        찍는데**, 그 키는 우리 undo 청크 밖에 별도 항목으로 쌓여 Ctrl+Z 가 두 번 필요해진다.
+        키를 우리가 먼저 찍어 두면 setAttr 이 같은 값이라 마야의 자동 키가 개입하지 않아
+        제스처 하나가 undo 하나로 남는다.
         """
         if self._se_applying:
             return
