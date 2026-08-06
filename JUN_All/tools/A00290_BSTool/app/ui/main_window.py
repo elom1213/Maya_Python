@@ -9,6 +9,8 @@
 #   2) Edit BS      : blendShape 노드 리스트 → 모든 타겟 키 / 타겟 메시 추출
 #   3) Base Shape   : blendShape 의 타겟을 리스트업 → 선택 타겟의 weight=value 모양을
 #                     weight=1.0 기본 모양으로 재정의(델타 스케일)
+#   4) Mix Targets  : 소스 타겟 몇 개를 원하는 배율로 섞은 만큼, 체크한 다른 타겟들의
+#                     모양을 한꺼번에 변형(델타 가중합을 더한다)
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
@@ -21,7 +23,8 @@ import maya.cmds as cmds
 
 from tools.A00290_BSTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00290_BSTool.app.core import (EditBSManager, BaseShapeManager,
-                                          ShapeEditorManager, EDITABLE_STATES)
+                                          MixManager, ShapeEditorManager,
+                                          EDITABLE_STATES)
 from tools.A00290_BSTool.app.core import blendshape_utils as bsu
 
 
@@ -204,6 +207,9 @@ class MainWindow(QWidget):
         # Expand 로 띄운 별도 타겟 창 (없으면 None)
         self._se_window = None
 
+        # Mix Targets 탭: 체크 상태를 코드가 바꾸는 동안 itemChanged 로 되돌아오는 것을 막는다.
+        self._mix_updating = False
+
         # 씬의 weight 를 스핀박스로 되비추는 폴링 타이머. Shape Editor 탭이 보일 때만 돈다.
         # (build_ui 가 tabs.currentChanged 를 붙이며 이 타이머를 건드리므로 먼저 만든다.)
         self._se_sync_timer = QTimer(self)
@@ -211,7 +217,8 @@ class MainWindow(QWidget):
         self._se_sync_timer.timeout.connect(self._sync_se_weights)
 
         # 타겟 행이 Edit + 이름 + 슬라이더 + 스핀박스라 460 이면 슬라이더가 눌린다.
-        self.win_width = 580
+        # Mix Targets 탭은 목록이 좌우 두 개라 조금 더 넓어야 이름이 잘리지 않는다.
+        self.win_width = 660
         self.win_height = 720
         self.win_title = f"BS Tool v{VERSION}"
 
@@ -242,6 +249,7 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_shape_editor_tab(), "Shape Editor")
         self.tabs.addTab(self._build_edit_bs_tab(), "Edit BS")
         self.tabs.addTab(self._build_base_shape_tab(), "Base Shape")
+        self.tabs.addTab(self._build_mix_tab(), "Mix Targets")
         self.tabs.currentChanged.connect(lambda *_a: self._update_se_timer())
         main_layout.addWidget(self.tabs)
 
@@ -975,6 +983,227 @@ class MainWindow(QWidget):
         layout.addStretch(1)
         return tab
 
+    # ==================================================
+    # Tab 4 : Mix Targets
+    # ==================================================
+
+    def _build_mix_tab(self):
+        """소스 타겟들을 원하는 비율로 섞어 다른 타겟들에 한꺼번에 더하는 탭.
+
+        왼쪽에서 **섞을 소스 + 배율**을, 오른쪽에서 **바꿀 타겟들**을 체크한다.
+        두 목록 모두 체크박스라, 다른 탭의 "선택"과 달리 필터를 바꿔도 상태가 남는다.
+        """
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # blendShape 노드 지정 행 (Base Shape 탭과 같은 방식이지만 탭마다 따로 둔다)
+        node_row = QHBoxLayout()
+        lbl = QLabel("BlendShape Node")
+        lbl.setMinimumWidth(110)
+        node_row.addWidget(lbl)
+        self.le_mix_node = QLineEdit()
+        self.le_mix_node.setPlaceholderText("Pick a blendShape node or a mesh, then <- Set")
+        node_row.addWidget(self.le_mix_node)
+        btn_set = QPushButton("<- Set")
+        btn_set.setToolTip("Set the blendShape from the current selection (node or mesh).")
+        btn_set.clicked.connect(self.on_mix_set_node)
+        node_row.addWidget(btn_set)
+        layout.addLayout(node_row)
+
+        btn_list = QPushButton("List Targets")
+        btn_list.setToolTip("Fill both lists below with this blendShape's targets.")
+        btn_list.clicked.connect(self.on_mix_list_targets)
+        layout.addWidget(btn_list)
+
+        # 소스 | 대상 두 패널. 이름이 길어(browInnerUpLeft ...) 폭을 직접 조절할 수 있게 스플리터.
+        split = QSplitter(Qt.Horizontal)
+        split.addWidget(self._build_mix_source_panel())
+        split.addWidget(self._build_mix_dest_panel())
+        split.setSizes([320, 320])
+        layout.addWidget(split, 1)
+
+        layout.addLayout(self._build_mix_base_row())
+
+        info = QLabel(
+            "Deform the checked targets by the mix of the checked sources.\n"
+            "e.g. sources [a x1.0, b x0.5, c x0.8] -> every checked target is reshaped\n"
+            "by exactly what those three add up to at those amounts.\n"
+            "Whatever you check is deformed; whatever you do not check keeps its shape.\n"
+            "Sources themselves are never modified. In-between shapes are left alone.")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        btn_apply = QPushButton("Apply Mix")
+        btn_apply.setMinimumHeight(36)
+        btn_apply.setToolTip(
+            "Add the source mix to every checked target.\n"
+            "Targets whose mesh is still in the scene have that mesh moved,\n"
+            "so the change survives a scene save. One Ctrl+Z undoes all of it.")
+        btn_apply.clicked.connect(self.on_apply_mix)
+        layout.addWidget(btn_apply)
+
+        return tab
+
+    def _build_mix_base_row(self):
+        """베이스(최종) 메시를 어떻게 할지 고르는 줄.
+
+        타겟은 "베이스로부터의 오프셋"으로 저장되므로 베이스를 옮기면 타겟이 따라 움직인다.
+        그래서 세 갈래를 명시적으로 고르게 한다(자세한 셈은 mix_manager 헤더 주석).
+        """
+        row = QHBoxLayout()
+        lbl = QLabel("Base mesh")
+        f = lbl.font()
+        f.setBold(True)
+        lbl.setFont(f)
+        row.addWidget(lbl)
+
+        self.grp_mix_base = QButtonGroup(self)
+
+        self.rb_mix_base_none = QRadioButton("Leave it alone")
+        self.rb_mix_base_none.setToolTip(
+            "Only the checked targets change. The neutral mesh you see with every\n"
+            "weight at 0 stays exactly as it is.")
+        self.rb_mix_base_none.setChecked(True)
+
+        self.rb_mix_base_edit = QRadioButton("Deform it too")
+        self.rb_mix_base_edit.setToolTip(
+            "The final mesh is deformed by the same mix - the neutral (bind) shape\n"
+            "is moved, so a skinned rig keeps working and the change survives a save.\n"
+            "Checked targets move with it; unchecked targets are compensated so their\n"
+            "shape stays exactly where it was.\n"
+            "Needs the blendShape to sit in front of the other deformers.")
+
+        self.rb_mix_base_new = QRadioButton("New mesh")
+        self.rb_mix_base_new.setToolTip(
+            "Leave the rig untouched and build a separate mesh that looks like the\n"
+            "neutral shape with the mix applied (named <base>_mixed).")
+
+        for i, rb in enumerate((self.rb_mix_base_none, self.rb_mix_base_edit,
+                                self.rb_mix_base_new)):
+            self.grp_mix_base.addButton(rb, i)
+            row.addWidget(rb)
+        row.addStretch(1)
+        return row
+
+    def _mix_base_mode(self):
+        if self.rb_mix_base_edit.isChecked():
+            return MixManager.BASE_EDIT
+        if self.rb_mix_base_new.isChecked():
+            return MixManager.BASE_NEW
+        return MixManager.BASE_NONE
+
+    def _build_mix_source_panel(self):
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 4, 0)
+
+        header = QHBoxLayout()
+        lbl = QLabel("Mix Sources")
+        f = lbl.font()
+        f.setBold(True)
+        lbl.setFont(f)
+        header.addWidget(lbl)
+        header.addStretch(1)
+        self.lbl_mix_src_count = QLabel("Checked: 0")
+        header.addWidget(self.lbl_mix_src_count)
+        layout.addLayout(header)
+
+        self.lw_mix_src = QListWidget()
+        self.lw_mix_src.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lw_mix_src.setMinimumHeight(200)
+        self.lw_mix_src.setToolTip(
+            "Check the targets to mix, then give each one an amount below.\n"
+            "The checked amounts are what the other targets get deformed by.")
+        self.lw_mix_src.itemChanged.connect(self._on_mix_src_item_changed)
+        layout.addWidget(self.lw_mix_src, 1)
+
+        self.flt_mix_src = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_mix_src,
+            placeholder="Filter sources (e.g. jaw)")
+        layout.addWidget(self.flt_mix_src)
+
+        # 배율 지정: 목록에서 고른(하이라이트) 행에 값을 찍어 준다. 소스마다 다른 값을
+        # 주려면 한 행씩, 같은 값이면 여러 행을 골라 한 번에.
+        amount_row = QHBoxLayout()
+        amount_row.addWidget(QLabel("Amount"))
+        self.dsb_mix_amount = QDoubleSpinBox()
+        self.dsb_mix_amount.setDecimals(3)
+        self.dsb_mix_amount.setRange(-10.0, 10.0)
+        self.dsb_mix_amount.setSingleStep(0.1)
+        self.dsb_mix_amount.setValue(1.0)
+        self.dsb_mix_amount.setKeyboardTracking(False)
+        self.dsb_mix_amount.setToolTip(
+            "How much of that source goes into the other targets.\n"
+            "1.0 = the whole shape, 0.5 = half of it, negative = the opposite way.")
+        amount_row.addWidget(self.dsb_mix_amount)
+        btn_set_amount = QPushButton("Set to Selected")
+        btn_set_amount.setToolTip(
+            "Give this amount to the highlighted rows and check them as sources.")
+        btn_set_amount.clicked.connect(self.on_mix_set_amount)
+        amount_row.addWidget(btn_set_amount, 1)
+        layout.addLayout(amount_row)
+
+        btn_row = QHBoxLayout()
+        btn_scene = QPushButton("Use Scene Weights")
+        btn_scene.setToolTip(
+            "Read each checked source's current weight from the scene and use it\n"
+            "as the amount - dial the shape in Maya, then bake exactly that.")
+        btn_scene.clicked.connect(self.on_mix_use_scene_weights)
+        btn_row.addWidget(btn_scene)
+        btn_clear = QPushButton("Uncheck All")
+        btn_clear.clicked.connect(lambda: self._mix_check_all(self.lw_mix_src, False))
+        btn_row.addWidget(btn_clear)
+        layout.addLayout(btn_row)
+
+        return panel
+
+    def _build_mix_dest_panel(self):
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(4, 0, 0, 0)
+
+        header = QHBoxLayout()
+        lbl = QLabel("Targets to Modify")
+        f = lbl.font()
+        f.setBold(True)
+        lbl.setFont(f)
+        header.addWidget(lbl)
+        header.addStretch(1)
+        self.lbl_mix_dest_number = QLabel("Number: 0")
+        header.addWidget(self.lbl_mix_dest_number)
+        layout.addLayout(header)
+
+        self.lw_mix_dest = QListWidget()
+        self.lw_mix_dest.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lw_mix_dest.setMinimumHeight(200)
+        self.lw_mix_dest.setToolTip(
+            "Check every target that should be deformed by the source mix.\n"
+            "Rows checked as a source are greyed out here - a source is never modified.")
+        self.lw_mix_dest.itemChanged.connect(self._on_mix_dest_item_changed)
+        layout.addWidget(self.lw_mix_dest, 1)
+
+        self.flt_mix_dest = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_mix_dest,
+            placeholder="Filter targets (e.g. brow)",
+            number_label=self.lbl_mix_dest_number)
+        layout.addWidget(self.flt_mix_dest)
+
+        # 전체 체크 하나로 지금 보이는 행을 모두 켜고 끈다(필터를 걸어 두면 그 안에서만).
+        all_row = QHBoxLayout()
+        self.chk_mix_all = QCheckBox("Check All (visible)")
+        self.chk_mix_all.setTristate(True)
+        self.chk_mix_all.setToolTip(
+            "Check or uncheck every target currently visible in this list.\n"
+            "Partially filled means some are checked.")
+        self.chk_mix_all.clicked.connect(self.on_mix_all_clicked)
+        all_row.addWidget(self.chk_mix_all)
+        all_row.addStretch(1)
+        self.lbl_mix_dest_count = QLabel("Checked: 0")
+        all_row.addWidget(self.lbl_mix_dest_count)
+        layout.addLayout(all_row)
+
+        return panel
+
     # --------------------------------------------------
     # Helpers
     # --------------------------------------------------
@@ -1088,6 +1317,245 @@ class MainWindow(QWidget):
 
         value = self.dsb_value.value()
         _done, msg = BaseShapeManager.apply_value_as_default(bs_node, target_names, value)
+        self.log(msg)
+
+    # --------------------------------------------------
+    # Handlers : Mix Targets
+    # --------------------------------------------------
+    #
+    # 이 탭은 선택(하이라이트)이 아니라 **체크박스**가 작업 대상이다. 다른 탭은 "보이는 것이
+    # 작업 대상"(가려진 선택은 제외)이지만, 체크는 사용자가 명시적으로 남긴 상태이고 두 목록의
+    # 필터를 번갈아 쓰다 보면 쉽게 가려진다. 체크를 조용히 버리면 오히려 사고이므로 **가려져
+    # 있어도 체크된 것은 모두 적용**하고, 가려진 개수를 로그로 알려 준다.
+
+    @staticmethod
+    def _mix_name(item):
+        """행의 실제 타겟 이름(표시 텍스트에는 배율이 붙을 수 있다)."""
+        return item.data(Qt.UserRole) or item.text()
+
+    @staticmethod
+    def _mix_amount(item):
+        value = item.data(Qt.UserRole + 1)
+        return 1.0 if value is None else float(value)
+
+    def _mix_src_label(self, item):
+        """소스 행 표시 텍스트: 체크된 것만 배율을 함께 보여 준다."""
+        name = self._mix_name(item)
+        if item.checkState() == Qt.Checked:
+            return "{0}    x{1:g}".format(name, self._mix_amount(item))
+        return name
+
+    def _mix_items(self, list_widget):
+        return [list_widget.item(i) for i in range(list_widget.count())]
+
+    def _mix_checked(self, list_widget):
+        """(체크된 항목들, 그 중 필터에 가려진 수)."""
+        checked = [it for it in self._mix_items(list_widget)
+                   if it.checkState() == Qt.Checked]
+        hidden = sum(1 for it in checked if it.isHidden())
+        return checked, hidden
+
+    def _mix_check_all(self, list_widget, checked, visible_only=False):
+        state = Qt.Checked if checked else Qt.Unchecked
+        self._mix_updating = True
+        try:
+            for it in self._mix_items(list_widget):
+                if visible_only and it.isHidden():
+                    continue
+                if it.flags() & Qt.ItemIsEnabled:
+                    it.setCheckState(state)
+                    if list_widget is self.lw_mix_src:
+                        it.setText(self._mix_src_label(it))
+        finally:
+            self._mix_updating = False
+        self._mix_refresh_counts()
+        if list_widget is self.lw_mix_src:
+            self._mix_sync_dest_enabled()
+
+    def _mix_refresh_counts(self):
+        """양쪽 'Checked: N' 라벨과 전체 체크박스 상태를 지금 상태에 맞춘다."""
+        for list_widget, label in ((self.lw_mix_src, self.lbl_mix_src_count),
+                                   (self.lw_mix_dest, self.lbl_mix_dest_count)):
+            checked, hidden = self._mix_checked(list_widget)
+            text = "Checked: {0}".format(len(checked))
+            if hidden:
+                text += " ({0} hidden)".format(hidden)
+            label.setText(text)
+
+        # 전체 체크박스는 **보이는 행** 기준으로 상태를 표시한다(동작 범위와 같게).
+        visible = [it for it in self._mix_items(self.lw_mix_dest)
+                   if not it.isHidden() and (it.flags() & Qt.ItemIsEnabled)]
+        checked = [it for it in visible if it.checkState() == Qt.Checked]
+        if not visible or not checked:
+            state = Qt.Unchecked
+        elif len(checked) == len(visible):
+            state = Qt.Checked
+        else:
+            state = Qt.PartiallyChecked
+        self.chk_mix_all.blockSignals(True)
+        self.chk_mix_all.setCheckState(state)
+        self.chk_mix_all.blockSignals(False)
+
+    def _mix_sync_dest_enabled(self):
+        """소스로 체크된 타겟은 대상 목록에서 회색으로 잠근다(자기 자신에 더할 수 없다)."""
+        sources = {self._mix_name(it) for it in self._mix_items(self.lw_mix_src)
+                   if it.checkState() == Qt.Checked}
+        self._mix_updating = True
+        try:
+            for it in self._mix_items(self.lw_mix_dest):
+                is_source = self._mix_name(it) in sources
+                flags = it.flags()
+                if is_source:
+                    it.setFlags(flags & ~Qt.ItemIsEnabled)
+                    if it.checkState() == Qt.Checked:
+                        it.setCheckState(Qt.Unchecked)
+                else:
+                    it.setFlags(flags | Qt.ItemIsEnabled)
+        finally:
+            self._mix_updating = False
+
+    def _on_mix_src_item_changed(self, item):
+        if self._mix_updating:
+            return
+        self._mix_updating = True
+        try:
+            item.setText(self._mix_src_label(item))
+        finally:
+            self._mix_updating = False
+        self._mix_sync_dest_enabled()
+        self._mix_refresh_counts()
+
+    def _on_mix_dest_item_changed(self, _item):
+        if self._mix_updating:
+            return
+        self._mix_refresh_counts()
+
+    def on_mix_all_clicked(self, _checked=False):
+        """전체 체크박스: 지금 보이는 대상 행을 모두 켜거나 끈다.
+
+        Qt 의 3-state 는 클릭할 때마다 부분 체크까지 순환하지만, 사용자가 원하는 것은
+        "전부 켜기 / 전부 끄기" 뿐이다. 그래서 부분 상태에서 누르면 전부 켠다.
+        """
+        turn_on = self.chk_mix_all.checkState() != Qt.Unchecked
+        self._mix_check_all(self.lw_mix_dest, turn_on, visible_only=True)
+
+    def on_mix_set_node(self):
+        found = bsu.find_blendshapes_from_selection()
+        if not found:
+            self.log("[Warning] Select a blendShape node or a mesh driven by one.")
+            return
+        self.le_mix_node.setText(found[0])
+        if len(found) > 1:
+            self.log("[Info] {0} blendShapes found; using '{1}'.".format(
+                len(found), found[0]))
+        self.on_mix_list_targets()
+
+    def on_mix_list_targets(self):
+        bs_node = self.le_mix_node.text().strip()
+        if not bsu.is_blendshape(bs_node):
+            self.log("[Warning] '{0}' is not a valid blendShape node.".format(bs_node))
+            return
+
+        targets = MixManager.list_targets(bs_node)
+        self._mix_updating = True
+        try:
+            for list_widget in (self.lw_mix_src, self.lw_mix_dest):
+                list_widget.clear()
+                for name in targets:
+                    item = QListWidgetItem(name)
+                    item.setData(Qt.UserRole, name)
+                    item.setData(Qt.UserRole + 1, 1.0)
+                    item.setCheckState(Qt.Unchecked)
+                    list_widget.addItem(item)
+        finally:
+            self._mix_updating = False
+
+        # 목록을 새로 채웠으니 두 필터를 다시 먹인다(숨김 상태가 초기화돼 있다).
+        self.flt_mix_src.refresh()
+        self.flt_mix_dest.refresh()
+        self._mix_refresh_counts()
+
+        self.log("[Mix Targets] '{0}' : {1} target(s) listed.".format(
+            bs_node, len(targets)))
+
+    def on_mix_set_amount(self):
+        """하이라이트된 소스 행에 Amount 를 찍고 소스로 체크한다."""
+        items = [it for it in self.lw_mix_src.selectedItems() if not it.isHidden()]
+        if not items:
+            self.log("[Warning] Highlight the source row(s) in the left list first, "
+                     "then press Set to Selected.")
+            return
+
+        amount = self.dsb_mix_amount.value()
+        self._mix_updating = True
+        try:
+            for it in items:
+                it.setData(Qt.UserRole + 1, amount)
+                it.setCheckState(Qt.Checked)
+                it.setText(self._mix_src_label(it))
+        finally:
+            self._mix_updating = False
+
+        self._mix_sync_dest_enabled()
+        self._mix_refresh_counts()
+        self.log("[Mix Targets] Amount {0:g} set on {1} source(s): {2}".format(
+            amount, len(items), ", ".join(self._mix_name(it) for it in items)))
+
+    def on_mix_use_scene_weights(self):
+        """체크된 소스의 배율을 씬의 현재 weight 값으로 채운다."""
+        bs_node = self.le_mix_node.text().strip()
+        if not bsu.is_blendshape(bs_node):
+            self.log("[Warning] '{0}' is not a valid blendShape node.".format(bs_node))
+            return
+
+        checked, _hidden = self._mix_checked(self.lw_mix_src)
+        if not checked:
+            self.log("[Warning] Check the source target(s) first.")
+            return
+
+        filled = []
+        self._mix_updating = True
+        try:
+            for it in checked:
+                name = self._mix_name(it)
+                weight = MixManager.current_weight(bs_node, name)
+                if weight is None:
+                    continue
+                it.setData(Qt.UserRole + 1, float(weight))
+                it.setText(self._mix_src_label(it))
+                filled.append("{0} x{1:g}".format(name, weight))
+        finally:
+            self._mix_updating = False
+
+        self._mix_refresh_counts()
+        self.log("[Mix Targets] Amounts read from the scene: {0}".format(
+            ", ".join(filled) if filled else "none"))
+
+    def on_apply_mix(self):
+        bs_node = self.le_mix_node.text().strip()
+        if not bsu.is_blendshape(bs_node):
+            self.log("[Warning] '{0}' is not a valid blendShape node.".format(bs_node))
+            return
+
+        src_items, src_hidden = self._mix_checked(self.lw_mix_src)
+        if not src_items:
+            self.log("[Warning] Check at least one target in Mix Sources and give it "
+                     "an amount.")
+            return
+
+        base_mode = self._mix_base_mode()
+        dest_items, dest_hidden = self._mix_checked(self.lw_mix_dest)
+        if not dest_items and base_mode == MixManager.BASE_NONE:
+            self.log("[Warning] Check at least one target in Targets to Modify.")
+            return
+
+        if src_hidden or dest_hidden:
+            self.log("[Info] Checked entries hidden by a filter are included: "
+                     "{0} source(s), {1} target(s).".format(src_hidden, dest_hidden))
+
+        sources = [(self._mix_name(it), self._mix_amount(it)) for it in src_items]
+        targets = [self._mix_name(it) for it in dest_items]
+        _done, msg = MixManager.mix_into_targets(bs_node, sources, targets, base_mode)
         self.log(msg)
 
     # --------------------------------------------------
