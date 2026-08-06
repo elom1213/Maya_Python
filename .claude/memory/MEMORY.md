@@ -22,6 +22,7 @@
 ## 검증 · 마야 공통 함정
 
 - [mayapy headless verify](mayapy-headless-verify.md) — maya.cmds 동작은 추측 말고 Maya2024/bin/mayapy.exe + maya.standalone 으로 확인
+- [QApplication before standalone](qapplication-before-maya-standalone.md) — mayapy Qt 테스트는 `QApplication` 을 `standalone.initialize()` **앞에** (뒤면 QWidget 에서 무단 종료)
 - [undo_chunk by default](undo-chunk-by-default.md) — 반복 씬 변경은 요청 없어도 `Framework.core.maya_undo.undo_chunk()` 로 묶기
 - [Maya 2023 compat](maya-2023-compat.md) — 2023 지원 필요할 수 있음, sin/cos 노드 없음(eulerToQuat 우회)
 - [Maya loadPlugin no __file__](maya-loadplugin-no-file.md) — loadPlugin 으로 뜬 .py 플러그인은 `__file__` 없음
@@ -60,6 +61,7 @@
 - [A00310 SearchTool](wip-a00310-searchtool-merge.md) — 레거시 Selection/Search 툴 2개를 탭 하나로 병합 (Maya 테스트 대기)
 - [A00300 batch summary](wip-a00300-batch-summary-table.md) — Target Meshes TSL + 색상 요약 테이블 (v01.02)
 - [A00300 zero-area rework](wip-a00300-zero-area-quality-rework.md) — **진행 중**: zero_area_faces 를 shape-quality 로 재작업 + Clear Log
+- [A00290 Mix Targets tab](wip-a00290-mix-targets-tab.md) — **신규**: 소스 가중합을 다른 타겟 + 최종(리깅) 메시에 일괄 반영. Base mesh 3모드, 공용 `delta_utils` (v01.17)
 - [A00290 Shape Editor tab](wip-a00290-shape-editor-tab.md) — 마야 Shape Editor 대체. `cmds.sculptTarget` 필수, 행 클릭 다중 편집, 제스처당 undo 1회 (v01.10)
 - [A00280 cloth-corrective](metahuman-cloth-corrective-A00280.md) — Houdini 알렘빅 캐시 → MetaHuman RBF 코렉티브 일괄 추출(invertShape)
 - [A00275 SkinTool Bind Pose](wip-a00275-skintool-bindpose.md) — Update Bind Pose 탭. bindPreMatrix 인덱스는 `matrix[]` 연결에서 얻어야 함 (v01.03)
