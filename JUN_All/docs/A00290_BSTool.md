@@ -337,6 +337,10 @@ in-between 아이템과 다중 출력 지오메트리도 함께 스케일한다.
 ### 사용 흐름
 
 1. **`<- Set`** — 씬에서 blendShape(또는 그 메시)을 고르고 누르면 노드가 잡히고 목록이 채워진다.
+   바로 밑 **Base mesh 라벨**(v01.18~)에 **어떤 메시가 베이스이고 중립이 어디에 있는지** 표시된다:
+   `Base mesh: head_geo (neutral: head_geoShapeOrig)`. 중립까지 가는 길에 오프셋을 통과시키지
+   못할 디포머가 있으면 주황색으로 `- skinCluster1 in between, 'Deform it too' may not reach it;
+   'New mesh' always works` 라고 알려 준다.
 2. **Mix Sources**(왼쪽) — 섞을 타겟을 목록에서 고르고(하이라이트) `Amount` 를 정한 뒤
    **`Set to Selected`**. 그 행이 **체크되고 배율이 이름 옆에 표시**된다(`shp_b    x0.5`).
    소스마다 값이 다르면 한 행씩, 같으면 여러 행을 골라 한 번에.
@@ -391,15 +395,40 @@ new_delta  = old_delta + mix        (Base mesh = Leave it alone 일 때)
 |------|---------|
 | **Leave it alone** (기본) | 베이스는 그대로. 체크한 타겟의 델타에 믹스를 더한다 |
 | **Deform it too** | **중립(바인드) 셰이프**를 믹스만큼 옮긴다. 체크한 타겟은 델타를 유지해 따라 움직이고(live 타겟은 씬의 메시도 함께 이동), 체크 안 한 타겟은 **델타에서 믹스를 빼 제자리에 남긴다**(보정). 소스도 여기 해당 |
-| **New mesh** | 리그는 전혀 건드리지 않고 `'중립 + 믹스'` 모양의 **새 메시**(`<base>_mixed`)를 하나 만든다 |
+| **New mesh** | 리그는 전혀 건드리지 않고 `'중립 + 믹스'` 모양의 **새 메시**(`<base>_mixed`)를 하나 만든다. 히스토리·인터미디어트 없이 월드에 놓이고(위치는 그대로), 토폴로지·UV 는 베이스 메시에서 온다 |
 
 > [!tip] 스킨이 칠해진 리깅 메시
-> blendShape 이 체인 앞(front of chain)이면 입력은 언제나 **바인드 셰이프**(`<base>ShapeOrig`)라,
+> blendShape 이 체인 앞(front of chain)이면 입력은 결국 **바인드 셰이프**(`<base>ShapeOrig`)라,
 > 그것을 옮기면 된다 — **skinCluster 는 그대로 살아 있고** 그 위에서 계속 동작한다.
 > 실측: 바인드 포즈에서는 보이는 메시가 정확히 믹스만큼 움직이고, 포즈된 상태에서는 그 오프셋이
 > 스킨을 타고 변형된다(리깅 관점에서 올바른 동작).
-> blendShape 이 다른 디포머 **뒤**에 있으면 중립이 계산 결과라 옮길 수 없다 — 그때는 로그로
-> 알리고 `New mesh` 를 쓰라고 안내한다.
+
+### 중립에 닿는 법 (v01.18 에서 고침)
+
+`New mesh` 는 **언제나 만들어진다.** blendShape 입력 플러그가 들고 있는 메시 **데이터**를 직접
+읽기 때문이다(`MPlug.asMObject()` → `MFnMesh`) — 상류가 무엇이든 상관없다.
+
+`Deform it too` 는 **옮길 수 있는 셰이프**가 필요하다. 상류를 **한 단계만 보면 안 된다**:
+
+| blendShape 앞 상황 | `input[0].inputGeometry` 상류 |
+|---|---|
+| 아무것도 없음 | `baseShapeOrig.worldMesh` (mesh) |
+| **`tweak` 노드** — 정점을 한 번이라도 건드리면 생긴다 | `tweak1.outputGeometry[0]` |
+| skinCluster 가 앞 | `skinCluster1.outputGeometry[0]` |
+| 래티스가 앞 | `LAT.outputGeometry[0]` |
+
+geometryFilter 는 모두 `input[N].inputGeometry` 로 거슬러 오를 수 있으므로 **메시가 나올 때까지
+따라간다.** `tweak` 은 정점마다 값을 더하기만 하므로 상류에서 옮긴 만큼이 그대로 내려온다 —
+그래서 tweak 이 낀 흔한 리그에서도 그대로 동작한다.
+
+옮긴 뒤에는 **blendShape 이 실제로 받는 중립을 다시 읽어** 믹스만큼 움직였는지 검증한다.
+사이에 낀 디포머가 오프셋을 바꿔 버리면(포즈된 스킨, 휘어진 래티스 …) **되돌리고** 이유와 함께
+`New mesh` 를 안내한다 — 로그의 주장과 실제가 어긋나지 않는다.
+
+> [!bug] v01.17 까지 — 리깅 메시에서 `New mesh` 가 아무것도 만들지 않았다
+> 상류가 **메시일 때만** 중립으로 인정해서, `tweak`·스킨·래티스가 앞에 있으면 그대로 실패하고
+> `could not reach the base (neutral) mesh ... Use the 'new mesh' option instead` (이미 New mesh 를
+> 고른 상태인데도) 만 남겼다. 실측 4종 중 3종에서 못 찾았다.
 
 > [!info] 델타 공간은 왜 신경 쓰지 않아도 되는가
 > 베이스 포인트에는 **변환 없이** 그대로 더한다. blendShape 이 `output = base_point + Σ(w×delta)`

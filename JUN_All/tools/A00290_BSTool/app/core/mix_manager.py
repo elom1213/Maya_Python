@@ -52,10 +52,16 @@
 #   BASE_NEW — 리그는 전혀 건드리지 않고 '중립 + M' 모양의 **새 메시**를 하나 만든다.
 #              타겟 처리는 BASE_NONE 과 같다. 스킨/바인드 셰이프를 손대기 부담스러울 때.
 #
-# 스킨이 칠해진 리깅 메시여도 blendShape 이 체인 앞(front of chain)이면 입력은 언제나
-# 바인드 셰이프('<base>ShapeOrig')이므로 그것을 옮기면 된다 — 스킨은 그 위에서 그대로
-# 동작한다. blendShape 이 다른 디포머 뒤에 있으면 중립이 계산 결과라 옮길 수 없고,
-# 그때는 BASE_NEW 를 쓰라고 알린다.
+# 중립에 닿는 법 (v01.18 에서 고침):
+#   · BASE_NEW 는 blendShape 입력 플러그의 메시 **데이터**를 그대로 읽는다. 상류가 무엇이든
+#     (orig 셰이프 · tweak · skinCluster · 래티스 …) 언제나 읽히므로 **항상 만들 수 있다**.
+#   · BASE_EDIT 는 옮길 수 있는 셰이프가 필요하다. 상류를 **한 단계만 보면 안 된다** —
+#     정점을 한 번이라도 건드린 메시에는 tweak 노드가 끼어 있어 `tweak1.outputGeometry[0]`
+#     이 잡힌다(v01.17 이 여기서 실패했다). geometryFilter 는 모두 input[N].inputGeometry 로
+#     거슬러 올라갈 수 있으므로 메시가 나올 때까지 따라간다.
+#   · 옮긴 뒤에는 blendShape 이 **실제로 받는 중립**을 다시 읽어 M 만큼 움직였는지 확인한다.
+#     사이에 낀 디포머가 오프셋을 바꿔 버리면(스킨이 앞에 있는 경우 등) 되돌리고 BASE_NEW 를
+#     쓰라고 알린다. tweak 처럼 오프셋을 그대로 통과시키는 노드면 그대로 성공한다.
 
 import maya.cmds as cmds
 
@@ -71,6 +77,11 @@ BASE_EDIT = "edit"      # 중립(바인드) 셰이프를 함께 옮긴다
 BASE_NEW = "new"        # '중립 + 믹스' 새 메시를 만든다 (리그는 그대로)
 
 BASE_MODES = (BASE_NONE, BASE_EDIT, BASE_NEW)
+
+#: 중립 셰이프와 blendShape 사이에 있어도 **오프셋을 그대로 통과시키는** 노드.
+#  tweak 은 정점마다 값을 더하기만 하므로 상류에서 옮긴 만큼이 그대로 내려온다.
+#  (정점을 한 번이라도 건드린 메시에는 거의 항상 이 노드가 끼어 있다.)
+PASS_THROUGH_TYPES = ("tweak",)
 
 
 class MixManager:
@@ -96,6 +107,58 @@ class MixManager:
             return cmds.getAttr("{0}.{1}".format(bs_node, target_name))
         except Exception:
             return None
+
+    @staticmethod
+    def _short(name):
+        return (name or "").split("|")[-1]
+
+    @staticmethod
+    def _new_mesh_name(bs_node, geo_idx):
+        """새로 만들 메시 이름. 베이스 메시 이름을 따르고, 여러 지오메트리면 번호를 붙인다."""
+        base = du.base_shape_for_geo(bs_node, geo_idx)
+        parents = cmds.listRelatives(base, parent=True) or [] if base else []
+        stem = MixManager._short(parents[0] if parents else (base or bs_node))
+        geos = cmds.getAttr(bs_node + ".inputTarget", multiIndices=True) or [0]
+        return "{0}_mixed{1}".format(stem, geo_idx if len(geos) > 1 else "")
+
+    @staticmethod
+    def base_mesh_info(bs_node):
+        """UI 라벨용 — blendShape 이 물고 있는 베이스 메시와 중립을 옮길 수 있는지.
+
+        반환: (표시 문자열, 중립을 직접 옮길 수 있는가)
+        """
+        if not bsu.is_blendshape(bs_node):
+            return "Base mesh: -", False
+
+        geo_indices = cmds.getAttr(bs_node + ".inputTarget", multiIndices=True) or [0]
+        parts = []
+        editable_all = True
+
+        for geo_idx in geo_indices:
+            shape = du.base_shape_for_geo(bs_node, geo_idx)
+            parents = cmds.listRelatives(shape, parent=True) or [] if shape else []
+            name = MixManager._short(parents[0] if parents else (shape or "?"))
+
+            neutral, between = du.base_input_chain(bs_node, geo_idx)
+            # 오프셋을 그대로 통과시키지 못할 수 있는 디포머만 걸러 보여 준다.
+            blockers = [n for n in between
+                        if cmds.nodeType(n) not in PASS_THROUGH_TYPES]
+
+            if neutral is None:
+                editable_all = False
+                parts.append("{0} - neutral not reachable, use 'New mesh'".format(name))
+            elif blockers:
+                # 바인드 포즈처럼 아무 변형도 안 걸린 상태면 되기도 한다. 실제로 되는지는
+                # Apply 때 검증하므로 여기서는 주의만 준다.
+                editable_all = False
+                parts.append("{0} (neutral: {1}) - {2} in between, 'Deform it too' may"
+                             " not reach it; 'New mesh' always works".format(
+                                 name, MixManager._short(neutral), ", ".join(blockers)))
+            else:
+                parts.append("{0} (neutral: {1})".format(
+                    name, MixManager._short(neutral)))
+
+        return "Base mesh: " + " | ".join(parts), editable_all
 
     # ==================================================
     # 소스 믹스
@@ -272,6 +335,7 @@ class MixManager:
         done = 0
         live_targets = 0
         compensated = 0
+        base_edited = False
         inbetween_targets = []
         unknown = [n for n in target_names if n not in name_to_idx]
         unreadable_sources = []
@@ -289,29 +353,48 @@ class MixManager:
                 if not offsets:
                     continue
 
+                # 이 지오메트리에서 실제로 성립한 모드. 중립을 못 옮기면 타겟만 처리한다.
+                geo_mode = base_mode
+
                 # --- 베이스(최종) 메시 ---------------------------------
-                if base_mode in (BASE_EDIT, BASE_NEW):
-                    base_shape = du.base_input_shape(bs_node, geo_idx)
+                if base_mode == BASE_NEW:
+                    # 중립을 지오메트리 **데이터**에서 읽으므로 상류가 무엇이든 만들 수 있다.
+                    made, why = du.new_mesh_with_offsets(
+                        bs_node, geo_idx, offsets,
+                        MixManager._new_mesh_name(bs_node, geo_idx))
+                    if made:
+                        new_meshes.append(made)
+                    else:
+                        base_notes.append(
+                            "could not build a new mesh for geometry {0} ({1})".format(
+                                geo_idx, why))
+
+                elif base_mode == BASE_EDIT:
+                    base_shape, between = du.base_input_chain(bs_node, geo_idx)
                     if base_shape is None:
                         base_notes.append(
-                            "could not reach the base (neutral) mesh of geometry {0}"
-                            " - the blendShape sits behind another deformer, so its"
-                            " neutral is a computed result. Use the 'new mesh' option"
-                            " instead".format(geo_idx))
-                    elif base_mode == BASE_EDIT:
-                        du.offset_base_mesh(base_shape, offsets)
+                            "could not reach the neutral mesh of geometry {0}"
+                            " - use the 'New mesh' option instead".format(geo_idx))
+                        geo_mode = BASE_NONE           # 타겟은 종전 방식으로 처리
                     else:
-                        name = "{0}_mixed".format(
-                            base_shape.split("|")[-1].replace("ShapeOrig", ""))
-                        made = du.duplicate_with_offsets(base_shape, offsets, name)
-                        if made:
-                            new_meshes.append(made)
-                        else:
+                        before = du.input_geometry_points(bs_node, geo_idx)
+                        saved = du.offset_base_mesh(base_shape, offsets)
+                        if not du.neutral_moved_by(bs_node, geo_idx, before, offsets):
+                            # 사이에 낀 디포머가 오프셋을 바꿔 버렸다. 되돌린다.
+                            du.write_tweaks(base_shape, saved)
                             base_notes.append(
-                                "could not build a new mesh from '{0}'".format(base_shape))
+                                "the neutral of geometry {0} could not be moved -"
+                                " '{1}' sits between '{2}' and the blendShape and"
+                                " changes the offset. Use the 'New mesh' option"
+                                " instead".format(geo_idx,
+                                                  ", ".join(between) or "a deformer",
+                                                  base_shape))
+                            geo_mode = BASE_NONE
+                        else:
+                            base_edited = True
 
                 # --- 타겟 ----------------------------------------------
-                if base_mode == BASE_EDIT:
+                if geo_mode == BASE_EDIT:
                     # 베이스가 이미 움직였다. 모든 타겟의 **모양**을 원하는 자리에 둔다.
                     for name, grp_idx in name_to_idx.items():
                         touched, live, problem = MixManager._follow_base(
@@ -344,13 +427,13 @@ class MixManager:
         recipe = ", ".join("{0} x{1:g}".format(n, a) for n, a in sources)
         msg = "[Mix Targets] '{0}' : {1} target(s) modified by [{2}].".format(
             bs_node, done, recipe)
-        if base_mode == BASE_EDIT:
+        if base_edited:
             msg += (" The base (neutral) mesh was deformed too, so the checked targets"
                     " move with it.")
             if compensated:
                 msg += (" {0} unchecked target(s) were compensated so their shape stays"
                         " exactly where it was.".format(compensated))
-        elif base_mode == BASE_NEW and new_meshes:
+        elif new_meshes:
             msg += " New mesh with the mix applied: {0}.".format(", ".join(new_meshes))
         if live_targets:
             msg += (" {0} live target mesh(es) were moved so the change sticks.".format(

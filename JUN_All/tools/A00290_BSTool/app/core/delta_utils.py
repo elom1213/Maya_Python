@@ -135,20 +135,64 @@ def live_target_shape(plug):
     return srcs[0] if srcs else None
 
 
-def base_input_shape(bs_node, geo_idx):
-    """blendShape 에 **들어오는** 베이스 지오메트리 셰이프 = 중립 모양을 들고 있는 노드.
+def input_geometry_plug(bs_node, geo_idx):
+    return "{0}.input[{1}].inputGeometry".format(bs_node, geo_idx)
 
-    보통 '<base>ShapeOrig' 인터미디어트 셰이프다(스킨이 걸린 리깅 메시도 마찬가지 —
-    blendShape 이 체인 앞에 있으면 입력은 언제나 바인드 셰이프다).
-    상류가 메시가 아니면(다른 디포머 뒤에 blendShape 이 있는 경우) None — 그 중립은
-    계산 결과라 정적으로 옮길 수 없다.
+
+def input_geometry_points(bs_node, geo_idx):
+    """blendShape 에 **실제로 들어오는** 중립 지오메트리의 포인트(오브젝트 공간).
+
+    플러그가 들고 있는 메시 **데이터**를 직접 읽으므로 상류가 무엇이든(orig 셰이프 ·
+    tweak · skinCluster · 래티스 …) 언제나 얻을 수 있다. 델타는 이 포인트에 그대로
+    더해지므로, 이것이 곧 "weight 를 전부 0 으로 뒀을 때의 모양"이다.
+
+    반환: [(x, y, z), ...] 또는 None
     """
-    srcs = cmds.listConnections(
-        "{0}.input[{1}].inputGeometry".format(bs_node, geo_idx),
-        source=True, destination=False, shapes=True) or []
-    if srcs and cmds.objectType(srcs[0]) == "mesh":
-        return srcs[0]
-    return None
+    try:
+        sel = om.MSelectionList()
+        sel.add(input_geometry_plug(bs_node, geo_idx))
+        data = sel.getPlug(0).asMObject()
+        return [(p.x, p.y, p.z)
+                for p in om.MFnMesh(data).getPoints(om.MSpace.kObject)]
+    except Exception:
+        return None
+
+
+def base_input_chain(bs_node, geo_idx, max_steps=32):
+    """중립을 들고 있는 **메시 셰이프**를 상류로 거슬러 찾는다.
+
+    tweak · skinCluster · 래티스 같은 지오메트리 필터는 모두 `input[N].inputGeometry` 로
+    한 단계씩 더 거슬러 올라갈 수 있다. 정점을 한 번이라도 건드린 메시에는 tweak 노드가
+    끼어 있으므로 **한 단계만 보면 대개 놓친다**.
+
+    반환: (메시 셰이프 또는 None, 사이에 낀 노드 이름들)
+    """
+    plug = input_geometry_plug(bs_node, geo_idx)
+    between = []
+
+    for _ in range(max_steps):
+        srcs = cmds.listConnections(plug, source=True, destination=False,
+                                    plugs=True) or []
+        if not srcs:
+            return None, between
+
+        node, _sep, attr = srcs[0].partition(".")
+        if cmds.objectType(node) == "mesh":
+            return node, between
+
+        between.append(node)
+        match = re.search(r"\[(\d+)\]", attr)
+        nxt = "{0}.input[{1}].inputGeometry".format(node, match.group(1) if match else "0")
+        if not cmds.objExists(nxt):
+            return None, between
+        plug = nxt
+
+    return None, between
+
+
+def base_input_shape(bs_node, geo_idx):
+    """중립 모양을 들고 있는 메시 셰이프(보통 '<base>ShapeOrig'). 못 찾으면 None."""
+    return base_input_chain(bs_node, geo_idx)[0]
 
 
 def base_shape_for_geo(bs_node, geo_idx):
@@ -371,65 +415,100 @@ def deltas_match(plug, expected):
 
 
 def offset_base_mesh(shape, offsets):
-    """중립(베이스) 셰이프의 정점을 offsets 만큼 옮긴다. 반환: 옮긴 정점 수.
+    """중립(베이스) 셰이프의 정점을 offsets 만큼 옮긴다.
 
     **공간 변환이 필요 없다** — blendShape 은 output = base_point + Σ(weight * delta) 로
     델타를 베이스 포인트에 그대로 더한다. 즉 델타와 베이스 포인트는 정의상 같은 공간이다.
     (mayapy 실측: 스킨 유무 · origin local/world · 베이스 회전 8조합에서, 중립을 V 만큼
     옮기면 안 움직인 live 타겟의 델타가 정확히 -V 만큼 변한다 = 같은 공간.)
 
-    타겟 메시 쪽(apply_live_offsets)과 달리 여기서는 검증이 필요 없다. 저장된 포인트를
-    직접 옮기는 것이라 재계산되지 않기 때문이다.
+    반환: 되돌릴 때 쓸 원래 tweak 값 {정점: (x, y, z)}
     """
     tweaks = read_tweaks(shape)
+    saved = {}
     values = {}
     for vtx, off in offsets.items():
-        bx, by, bz = tweaks.get(vtx, (0.0, 0.0, 0.0))
-        values[vtx] = (bx + off[0], by + off[1], bz + off[2])
+        base = tweaks.get(vtx, (0.0, 0.0, 0.0))
+        saved[vtx] = base
+        values[vtx] = (base[0] + off[0], base[1] + off[1], base[2] + off[2])
     if values:
         write_tweaks(shape, values)
-    return len(values)
+    return saved
 
 
-def duplicate_with_offsets(shape, offsets, name):
-    """중립 셰이프를 복제해 offsets 를 적용한 **새 메시**를 만든다(리그는 건드리지 않는다).
+def neutral_moved_by(bs_node, geo_idx, before, offsets):
+    """중립이 정말 offsets 만큼 움직였는지 확인한다.
 
-    복제본의 포인트를 하나하나 명시적으로 세팅하므로, duplicate 가 무엇을 가져왔든
-    결과는 '중립 + offsets' 로 확정된다. 반환: 새 transform 이름(실패하면 None).
+    셰이프를 옮겨도 그 사이에 낀 디포머(스킨 · 래티스 …)가 변형을 바꿔 버리면 blendShape
+    이 받는 중립은 offsets 와 다르게 움직인다. 그래서 **blendShape 이 실제로 받는 포인트**를
+    다시 읽어 대조한다.
     """
-    sel = om.MSelectionList()
-    sel.add(shape)
-    src_fn = om.MFnMesh(sel.getDagPath(0))
-    points = src_fn.getPoints(om.MSpace.kObject)
+    after = input_geometry_points(bs_node, geo_idx)
+    if before is None or after is None or len(before) != len(after):
+        return False
 
-    for vtx, off in offsets.items():
-        if 0 <= vtx < len(points):
-            p = points[vtx]
-            points[vtx] = om.MPoint(p.x + off[0], p.y + off[1], p.z + off[2])
+    for i in range(len(after)):
+        off = offsets.get(i, (0.0, 0.0, 0.0))
+        for k in range(3):
+            if abs((after[i][k] - before[i][k]) - off[k]) > _TOL * max(1.0, abs(off[k])):
+                return False
+    return True
 
-    parents = cmds.listRelatives(shape, parent=True, fullPath=True) or []
+
+def new_mesh_with_offsets(bs_node, geo_idx, offsets, name):
+    """'중립 + offsets' 모양의 **새 메시**를 만든다(리그는 전혀 건드리지 않는다).
+
+    중립 포인트는 blendShape 이 받는 지오메트리 **데이터**에서 읽으므로 상류에 무엇이
+    있든(tweak · 스킨 · 래티스 …) 항상 만들 수 있다. 토폴로지/UV 는 베이스 메시를 복제해
+    가져오고, 포인트는 하나하나 명시적으로 세팅해 결과를 확정한다.
+
+    반환: (새 transform 이름 또는 None, 실패 사유 또는 None)
+    """
+    points = input_geometry_points(bs_node, geo_idx)
+    if points is None:
+        return None, "could not read the neutral geometry"
+
+    base_shape = base_shape_for_geo(bs_node, geo_idx)
+    if not base_shape:
+        return None, "could not find the deformed base mesh"
+    parents = cmds.listRelatives(base_shape, parent=True, fullPath=True) or []
     if not parents:
-        return None
+        return None, "base mesh '{0}' has no transform".format(base_shape)
+
+    moved = []
+    for i, p in enumerate(points):
+        off = offsets.get(i)
+        moved.append(om.MPoint(p[0] + off[0], p[1] + off[1], p[2] + off[2])
+                     if off else om.MPoint(p[0], p[1], p[2]))
 
     dup = cmds.duplicate(parents[0], name=name, upstreamNodes=False,
                          returnRootsOnly=True)[0]
+    # 리그 계층 안에 끼워 두지 않는다(월드 위치는 그대로 유지된다).
+    if cmds.listRelatives(dup, parent=True):
+        dup = cmds.parent(dup, world=True)[0]
     # 히스토리와 인터미디어트 셰이프를 걷어내 순수한 메시 하나만 남긴다.
     try:
         cmds.delete(dup, constructionHistory=True)
     except Exception:
         pass
-    shapes = cmds.listRelatives(dup, shapes=True, fullPath=True) or []
-    for s in shapes:
+    for s in cmds.listRelatives(dup, shapes=True, fullPath=True) or []:
         if cmds.getAttr(s + ".intermediateObject"):
             cmds.delete(s)
-    shapes = cmds.listRelatives(dup, shapes=True, fullPath=True) or []
+
+    shapes = cmds.listRelatives(dup, shapes=True, fullPath=True, noIntermediate=True) or []
     if not shapes:
-        return None
+        cmds.delete(dup)
+        return None, "the duplicated mesh had no shape"
 
     dst = om.MSelectionList()
     dst.add(shapes[0])
-    om.MFnMesh(dst.getDagPath(0)).setPoints(points, om.MSpace.kObject)
-    return dup
+    fn = om.MFnMesh(dst.getDagPath(0))
+    if fn.numVertices != len(moved):
+        cmds.delete(dup)
+        return None, "vertex count mismatch ({0} vs {1})".format(
+            fn.numVertices, len(moved))
+    fn.setPoints(moved, om.MSpace.kObject)
+    return dup, None
 
 
 def apply_live_offsets(bs_node, geo_idx, plug, shape, offsets, expected):

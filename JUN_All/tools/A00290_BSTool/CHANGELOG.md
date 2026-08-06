@@ -1,5 +1,36 @@
 # Changelog — A00290_BSTool
 
+## v01.18 (2026-08-06)
+Mix Targets 탭 — **리깅 메시에서 `New mesh` 가 아무것도 만들지 않던 문제** 수정 + **Base mesh 라벨** 추가.
+
+- **[Fix] `New mesh` 를 골라도 새 메시가 안 생기던 문제** — 리깅 메시에서
+  `could not reach the base (neutral) mesh ... Use the 'new mesh' option instead`
+  (이미 New mesh 를 고른 상태인데도) 라고만 찍히고 끝났다.
+  - **원인**: 중립을 `input[g].inputGeometry` 의 **상류 노드**로만 찾았고, 그것이 메시일 때만
+    인정했다. 그런데 **정점을 한 번이라도 건드린 메시에는 `tweak` 노드가 끼어 있어**
+    `tweak1.outputGeometry[0]` 이 잡힌다(스킨/래티스가 앞에 있으면 그 노드가 잡힌다).
+    실측: `orig 셰이프 / tweak / skinCluster / 래티스` 4종 중 **3종에서 못 찾음**.
+  - **해결**: `New mesh` 는 이제 그 플러그가 들고 있는 메시 **데이터**를 직접 읽는다
+    (`MPlug.asMObject()` → `MFnMesh`). 상류가 무엇이든 중립을 얻을 수 있어 **항상 만들어진다**.
+    토폴로지·UV 는 베이스 메시를 복제해 가져오고, 포인트는 명시적으로 세팅해 결과를 확정한다.
+    새 메시는 히스토리/인터미디어트 없이 **월드로 빼서** 만든다(월드 위치는 유지).
+  - **[Improve] `Deform it too` 도 상류를 끝까지 따라간다** — geometryFilter 는 모두
+    `input[N].inputGeometry` 로 거슬러 오를 수 있으므로 메시가 나올 때까지 따라간다.
+    그래서 **tweak 노드가 낀 흔한 리그에서도 이제 동작한다**(v01.17 은 여기서도 실패).
+    옮긴 뒤에는 blendShape 이 **실제로 받는 중립**을 다시 읽어 믹스만큼 움직였는지 검증하고,
+    사이에 낀 디포머가 오프셋을 바꿔 버리면(포즈된 스킨, 휘어진 래티스 …) **되돌리고**
+    `New mesh` 를 쓰라고 알린다 — 로그의 주장과 실제가 어긋나지 않는다.
+- **[Add] Base mesh 라벨** — 노드를 잡으면 `Base mesh: head_geo (neutral: head_geoShapeOrig)`
+  처럼 **어떤 메시가 베이스이고 중립이 어디에 있는지** 바로 보여 준다. 중립까지 가는 길에
+  오프셋을 통과시키지 못할 디포머가 있으면 `- skinCluster1 in between, 'Deform it too' may not
+  reach it; 'New mesh' always works` 로 **주황색 경고**를 띄운다(`tweak` 은 그대로 통과시키므로
+  경고하지 않는다).
+- **[Verify]** mayapy 2024 실측 — 리그 형태 7종(기본 / tweak / 스킨 먼저 / **포즈된** 스킨 먼저 /
+  래티스 먼저 / **휘어진** 래티스 / 회전 그룹 밑):
+  - `New mesh` 는 **7종 모두 생성**되고 정점 단위로 `중립 + 믹스` 와 일치, 히스토리 없음.
+  - `Deform it too` 는 **주장과 실제가 항상 일치**(가능하면 이동, 불가능하면 원상복구 + 안내).
+  - 기존 회귀(Base Shape 15종, Mix 코어 26종, 베이스 모드 8종, UI 23종) 전부 통과.
+
 ## v01.17 (2026-08-06)
 **Mix Targets 탭 신규** — 소스 타겟 몇 개를 원하는 비율로 섞은 만큼, 체크한 다른 타겟들
 (과 원하면 최종 메시까지)을 한꺼번에 변형한다.

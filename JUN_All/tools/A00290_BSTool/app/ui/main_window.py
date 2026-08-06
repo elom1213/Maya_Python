@@ -1015,6 +1015,17 @@ class MainWindow(QWidget):
         btn_list.clicked.connect(self.on_mix_list_targets)
         layout.addWidget(btn_list)
 
+        # 어떤 메시가 베이스로 잡혔는지, 그 중립을 직접 옮길 수 있는지 바로 보여 준다.
+        # (Base mesh 옵션을 고르기 전에 알아야 하는 정보다.)
+        self.lbl_mix_base_mesh = QLabel("Base mesh: -")
+        self.lbl_mix_base_mesh.setWordWrap(True)
+        self.lbl_mix_base_mesh.setToolTip(
+            "The mesh this blendShape deforms, and the shape that holds its neutral\n"
+            "(weight 0) form. 'through ...' lists the deformers in between.\n"
+            "If the neutral cannot be reached, only the 'New mesh' option can build\n"
+            "the mixed result.")
+        layout.addWidget(self.lbl_mix_base_mesh)
+
         # 소스 | 대상 두 패널. 이름이 길어(browInnerUpLeft ...) 폭을 직접 조절할 수 있게 스플리터.
         split = QSplitter(Qt.Horizontal)
         split.addWidget(self._build_mix_source_panel())
@@ -1450,12 +1461,24 @@ class MainWindow(QWidget):
                 len(found), found[0]))
         self.on_mix_list_targets()
 
+    def _mix_refresh_base_label(self, bs_node):
+        """Base mesh 라벨을 지금 노드 기준으로 갱신한다.
+
+        중립을 직접 옮길 수 없으면(다른 디포머가 앞에 있는 리그) 눈에 띄게 표시해,
+        Base mesh 옵션을 고르기 전에 New mesh 를 써야 한다는 걸 알 수 있게 한다.
+        """
+        text, editable = MixManager.base_mesh_info(bs_node)
+        self.lbl_mix_base_mesh.setText(text)
+        self.lbl_mix_base_mesh.setStyleSheet("" if editable else "color: #e0a030;")
+
     def on_mix_list_targets(self):
         bs_node = self.le_mix_node.text().strip()
         if not bsu.is_blendshape(bs_node):
+            self.lbl_mix_base_mesh.setText("Base mesh: -")
             self.log("[Warning] '{0}' is not a valid blendShape node.".format(bs_node))
             return
 
+        self._mix_refresh_base_label(bs_node)
         targets = MixManager.list_targets(bs_node)
         self._mix_updating = True
         try:
