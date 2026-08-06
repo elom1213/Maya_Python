@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 8214290d-2633-4d40-9048-e0b22634a4b7
-  modified: 2026-08-05T01:23:13.468Z
+  modified: 2026-08-06T00:41:18.737Z
 ---
 
 A00110_animTool 에 **Euler Filter 탭**(v01.37, `app/core/euler_filter_manager.py`) 추가 — TSL 대상 +
@@ -22,6 +22,13 @@ headless(mayapy 2024)로 확인한, 문서에 잘 안 나오는 두 가지:
    (20f 에서 뒤집혔는데 구간 `[20-40]`) 구간 안 키들끼리는 이미 일관돼 **아무것도 안 고쳐진다**.
    → `anchor_previous` 옵션(기본 ON)은 필터 구간을 **Start 직전 키까지 뒤로 넓혀** 실행한다.
    그 키가 앵커가 되어 값이 유지되므로 "구간 밖은 그대로"를 지키면서 앞쪽 이음매가 사라진다.
+
+**v01.38 — `Euler Filter from Selection` 원버튼**: 대상·구간을 툴에 옮겨 담지 않고 씬에서 바로 감지한다.
+`EulerFilterManager.selected_objects()`(=`ls(sl=True)`) + `selected_key_range()`(=`keyframe(q, selected=True)`
+의 min/max). **그래프 에디터의 키 선택은 오브젝트 선택과 별개**라 박스 드래그 뒤에도 컨트롤러 선택이
+남고, `keyframe(q, sl=True)` 는 선택 키 시간을 오브젝트·어트리뷰트 무관하게 전역으로 준다. 감지값은
+TSL/Start·End 에 되채워 확인 가능하게 하고, **키 미선택이면 실행하지 않는다**(전 구간을 조용히
+처리하면 '구간 한정' 약속이 깨진다). 씬 선택이 비면 리스트로 폴백.
 
 기타: 애님 레이어가 있으면 `cmds.keyframe(plug, q=True, name=True)` 는 **선택된 레이어 커브 하나만**
 돌려준다 → 마야 기본 필터처럼 작업 중 레이어에만 적용됨. 변경 집계는 필터 전/후 값 스냅샷 비교로
