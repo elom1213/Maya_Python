@@ -1,3 +1,3 @@
 # BS Tool (Qt)
-VERSION = "01.14"
+VERSION = "01.15"
 LAST_UPDATE = "2026-08-06"

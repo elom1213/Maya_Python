@@ -428,6 +428,11 @@ class MainWindow(QWidget):
         spin.setRange(-10.0, 10.0)
         spin.setSingleStep(0.1)
         spin.setFixedWidth(72)
+        # 키를 누를 때마다 값을 확정하지 않는다(기본값은 확정한다).
+        # 켜져 있으면 "0.1" 까지 친 순간 valueChanged 가 나가고, 되돌아온 setValue 가
+        # 편집 중인 텍스트를 "0.100" 으로 다시 써 버려 뒤 자릿수를 이어 칠 수 없다.
+        # 끄면 Enter 또는 포커스 아웃에서 한 번만 확정된다.
+        spin.setKeyboardTracking(False)
         spin.setValue(target["weight"])
         spin.setEnabled(enabled)
         row_layout.addWidget(spin)
@@ -547,9 +552,15 @@ class MainWindow(QWidget):
         setValue 는 valueChanged 를 발화해 on_se_weight_changed 로 되돌아온다. 그대로 두면
         방금 씬에서 읽은 값을 씬에 다시 쓰고(잠긴/구동되는 weight 는 매 틱 경고 로그까지 남는다),
         슬라이더 -> 스핀박스 -> 슬라이더 로 되울리기까지 한다. 그래서 시그널을 막고 쓴다.
+
+        포커스가 있는 스핀박스는 사용자가 지금 타이핑하는 칸이므로 건드리지 않는다.
+        setValue 는 편집 중인 텍스트를 소수점 자릿수에 맞춰 다시 쓰고(예: "0." -> "0.000")
+        커서까지 옮기므로 입력이 끊긴다. 그 칸의 값은 포커스가 떠날 때 다시 맞춰진다.
         """
         for widget, setter in ((row["spin"], row["spin"].setValue),
                                (row["slider"], row["slider"].set_weight)):
+            if widget is row["spin"] and widget.hasFocus():
+                continue
             widget.blockSignals(True)
             setter(value)
             widget.blockSignals(False)
