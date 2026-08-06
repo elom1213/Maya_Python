@@ -34,11 +34,23 @@
    **키가 찍힌 전 구간**을 한꺼번에 처리해서, 뒤집힌 한 구간만 고치고 나머지는 그대로 두고 싶을 때
    쓸 수 없었다. 이 탭은 TSL 로 대상을, `Start/End` 로 구간을 정해 **그 구간 안의 회전 키만** 편다.
    **Anchor** 옵션(기본 ON)으로 Start **직전 키**를 기준으로 삼아 앞쪽 애니메이션과 매끄럽게 잇는다.
+   **Euler Filter from Selection**(v01.38~)은 리스트·구간을 채우는 단계 없이 **씬 선택(대상)** 과
+   **그래프 에디터에서 선택한 키(구간)** 를 스스로 감지해 **버튼 하나로** 실행한다.
 8. **Graph Focus** (v01.25~) — 컨트롤러를 선택하면 그 컨트롤러의 **전체 키 구간**(예: 0~6000f)을
    다 보여주는 대신, **현재 프레임 기준 ± margin 프레임**만 그래프 에디터에 확대해서 보여준다
    (예: 현재 500f, margin 80 → `420f~580f`). **Auto-Focus 토글**을 켜면 **컨트롤러(오브젝트)를
    새로 선택할 때만** 자동으로 프레이밍하고(v01.30~), margin 값은 **스핀박스로 사용자가 지정**한다.
 
+> **v01.38 — `Euler Filter from Selection` 원버튼**: 실제 작업은 "컨트롤러 몇 개를 고르고 그래프
+> 에디터에서 문제 구간을 드래그로 선택" 으로 끝나는데, 기존 버튼은 그걸 다시 `List Selected Objects`
+> + `Get Sel Range` 로 옮겨 담아야 했다. 새 버튼은 **씬 선택 = 대상**, **선택한 키의 앞/뒤 프레임 =
+> 구간**으로 **두 감지를 한 번에** 해서 바로 필터한다(Anchor 체크박스는 그대로 적용). 감지한 값은
+> **리스트와 Start/End 칸에도 채워 넣어**, 무엇을 어느 구간으로 처리했는지 눈으로 확인되고 이어서
+> Anchor 만 바꿔 아래 버튼으로 다시 돌려볼 수 있다. **선택한 키가 없으면 실행하지 않고 경고**만
+> 남긴다 — 전 구간을 조용히 처리하는 건 이 탭의 '구간 한정' 약속을 깨기 때문이다(씬 선택이 비어
+> 있을 때는 리스트 항목으로 폴백). 감지는 `EulerFilterManager.selected_objects()` /
+> `selected_key_range()`(= `cmds.keyframe(q=True, selected=True)` 의 min/max).
+>
 > **v01.37 — `Euler Filter` 탭(구간 한정 오일러 필터)**: 마야 그래프 에디터의 `Curves > Euler Filter`
 > 는 선택한 컨트롤러의 **키가 찍힌 전 구간**을 한꺼번에 처리해서, **뒤집힌 한 구간만** 펴고 나머지는
 > 그대로 두는 게 불가능했다. 새 탭에서 **TSL 로 대상**을, **공용 timeRange 위젯(Start/End)** 으로
@@ -655,7 +667,8 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 │ [x] Anchor to the key before Start (seamless)     │  ← 기본 ON
 │ Filters rotateX / Y / Z keys inside [Start, End]  │  ← 안내 라벨
 │ only. Keys outside the range keep their values... │
-│ [ Euler Filter in Range ]                         │
+│ [ Euler Filter from Selection ]                   │  ← v01.38~ 원버튼 (감지 후 실행)
+│ [ Euler Filter in Range ]                         │  ← 리스트 + Start/End 로 실행
 └───────────────────────────────────────────────────┘
 ```
 
@@ -675,6 +688,14 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
   **아무것도 고쳐지지 않는다**. 이 옵션은 필터 구간을 **Start 직전 키까지 뒤로 넓혀** 그 키를 앵커로
   삼는다. 앵커 키는 값이 바뀌지 않으므로 **"구간 밖은 그대로"** 라는 약속을 지키면서 **구간 앞쪽이
   기존 애니메이션과 매끄럽게 이어진다**. 끄면 구간 안 첫 키가 기준이 된다.
+- **Euler Filter from Selection** (v01.38~): **한 번에 실행**. 대상은 **지금 씬에서 선택한 오브젝트**,
+  구간은 **지금 선택한 키의 앞/뒤 프레임**이다. 즉 컨트롤러 3개를 고르고 그래프 에디터에서 문제
+  구간의 키를 박스 드래그로 선택한 뒤 이 버튼만 누르면 된다(리스트에 담고 `Get Sel Range` 를 누르는
+  두 단계를 대신한다). 감지한 대상·구간은 **리스트와 Start/End 칸에도 채워지므로** 무엇이 처리됐는지
+  바로 보이고, 이어서 Anchor 만 바꿔 아래 버튼으로 다시 돌릴 수 있다.
+  - 키를 하나도 선택하지 않았으면 **실행하지 않고 경고**한다(전 구간을 조용히 처리하지 않는다).
+  - 씬 선택이 비어 있으면 **리스트에 담긴 항목**으로 폴백한다(이때 리스트는 덮어쓰지 않는다).
+  - 그래프 에디터의 키 선택은 오브젝트 선택과 별개라, 키를 드래그로 골라도 컨트롤러 선택은 유지된다.
 - **Euler Filter in Range**: 실행. 처리한 오브젝트 수 / 값이 바뀐 키 수 / 구간 / 앵커 적용 수와
   건너뛴 항목·경고가 로그에 출력된다.
 
@@ -813,6 +834,14 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 > 리스트나 Start/End 를 바꾸면 세션이 원위치되고 새로 시작된다. 창을 닫을 때는 마지막 값이 기록된다.
 
 ### Euler Filter (구간 한정 오일러 필터)
+
+**빠른 방법 (v01.38~)**
+1. 대상 컨트롤러(예: 3개)를 **씬에서 선택**한다.
+2. 그래프 에디터에서 **회전이 뒤집힌(짐벌 점프) 구간**의 키를 **박스 드래그로 선택**한다.
+3. **Euler Filter from Selection** → 선택한 키의 **최소~최대 프레임** 구간에 대해, **선택한
+   컨트롤러들**의 회전 키가 펴진다. 사용한 대상·구간은 리스트와 Start/End 칸에 채워져 남는다.
+
+**직접 지정 (리스트 + Start/End)**
 1. 그래프 에디터에서 **회전이 뒤집힌(짐벌 점프) 구간**을 찾는다.
 2. 그 구간의 키를 **선택**하고 **Get Sel Range** 를 누르면 Start/End 가 한 번에 채워진다
    (또는 직접 입력 / **Get Current**).
@@ -1004,6 +1033,11 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
   **Reset** 은 덮여 사라진 키까지 되살리지 못한다.
 
 ### Euler Filter (`euler_filter_manager.EulerFilterManager.filter_range`)
+- **원버튼 감지(v01.38)**: `selected_objects()` = `cmds.ls(selection=True)`(그래프 에디터의 키 선택은
+  오브젝트 선택과 별개라 드래그 후에도 유지된다), `selected_key_range()` =
+  `cmds.keyframe(q=True, selected=True)` 의 **min/max**(선택된 모든 키의 시간을 오브젝트·어트리뷰트에
+  무관하게 전역으로 돌려주므로 여러 커브에 걸친 박스 선택도 한 번에 잡힌다). 둘 다 순수 조회라
+  UI 없이도 쓸 수 있고, 씬 변경은 하지 않는다.
 - **마야 네이티브 필터를 그대로 쓴다**: `cmds.filterCurve(curves, filter="euler",
   startTime=..., endTime=...)`. 오일러 언와인딩(±360°)과 플립 표현
   `(θ1+180, 180-θ2, θ3+180)` 선택은 마야가 하므로 **결과가 마야의 `Curves > Euler Filter` 와
@@ -1076,6 +1110,10 @@ Euler filter: 2 object(s), 18 key(s) changed in [20-40f].  Anchored to the key b
 Euler filter: 1 object(s), 3 key(s) changed in [0-20f].  [Warning] 1 object(s) now step at the End boundary (keys after End were left untouched, as requested): arm_l_ctrl
 Euler filter: 1 object(s), 0 key(s) changed in [20-40f].  Rotations were already continuous inside the range (nothing to unwind).
 Euler filter: nothing to do. (1 skipped: arm_l_ctrl (no rotation keys in range))
+
+# Euler Filter from Selection (v01.38~)
+[From Selection] 3 target(s) from scene selection, range [20-40f] from the selected keys.
+Euler filter: 3 object(s), 27 key(s) changed in [20-40f].  Anchored to the key before Start on 3 object(s).
 ```
 
 ### 경고 메시지
@@ -1105,6 +1143,10 @@ Euler filter: nothing to do. (1 skipped: arm_l_ctrl (no rotation keys in range))
 - `[Warning] Hold + Offset must be greater than 0.` — (Offset & Hold) 둘 다 0(주기 0).
 - `No animated objects to process. (n skipped: no keys)` — (Offset & Hold) 리스트 항목에 키가 없음.
 - `[Warning] Add controllers to the Euler Filter List first.` — (Euler Filter) 리스트가 비어 있음.
+- `[Warning] Select controllers in the scene (or add them to the Euler Filter List) first.` —
+  (Euler Filter from Selection) 씬 선택도 리스트도 비어 있음.
+- `[Warning] No keyframes selected. Drag-select the keys of the range in the Graph Editor / Time Slider first.`
+  — (Euler Filter from Selection) 선택한 키가 없어 구간을 알 수 없음(전 구간을 처리하지 않는다).
 - `End must be greater than or equal to Start.` — (Euler Filter) End < Start.
 - `Euler filter: nothing to do. (n skipped: ...)` — (Euler Filter) 대상이 전부 제외됨(회전 커브 없음 /
   씬에 없음 / 구간 안에 회전 키 없음).

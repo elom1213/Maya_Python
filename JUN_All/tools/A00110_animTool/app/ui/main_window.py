@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-23
+# last Update date : 2026-08-06
 # A00110_animTool - Qt UI
 
 from Framework.qt.qt import *
@@ -1075,13 +1075,27 @@ class MainWindow(QWidget):
 
         # -------------------------
         # 실행 버튼
+        #   위 : 원버튼. 리스트/구간을 채우는 단계 없이 **씬 선택 + 선택한 키**를 그대로 읽어
+        #        바로 실행한다(그래프 에디터에서 구간을 드래그로 고르는 실제 작업 흐름).
+        #   아래: 기존 버튼. 리스트업한 대상 + 위 Start/End 칸의 구간으로 실행한다.
         # -------------------------
 
+        self.btn_euler_filter_sel = QPushButton("Euler Filter from Selection")
+        self.btn_euler_filter_sel.setToolTip(
+            "One click: targets = objects selected in the scene,\n"
+            "range = first / last frame of the keys selected in the\n"
+            "Graph Editor or Time Slider.\n"
+            "The list and Start / End above are filled with what was used.")
+        tab_layout.addWidget(self.btn_euler_filter_sel)
+
         self.btn_euler_filter = QPushButton("Euler Filter in Range")
+        self.btn_euler_filter.setToolTip(
+            "Use the objects in the list above and the Start / End values.")
         tab_layout.addWidget(self.btn_euler_filter)
 
         tab_layout.addStretch(1)
 
+        self.btn_euler_filter_sel.clicked.connect(self.on_euler_filter_from_selection)
         self.btn_euler_filter.clicked.connect(self.on_euler_filter)
 
         return tab
@@ -1678,6 +1692,50 @@ class MainWindow(QWidget):
         if start > end:
             self.log(f"[Warning] Start ({start}) is greater than End ({end}).")
             return
+
+        count, msg = EulerFilterManager.filter_range(
+            objs, start, end,
+            anchor_previous=self.cb_euler_anchor.isChecked())
+        self.log(msg)
+
+    def on_euler_filter_from_selection(self):
+        """원버튼 — **씬 선택**(대상) + **선택한 키의 앞/뒤 프레임**(구간)을 스스로 감지해 실행.
+
+        실제 작업은 "컨트롤러 몇 개를 고르고 그래프 에디터에서 문제 구간을 드래그로 선택" 으로
+        끝나는데, 기존 버튼은 그걸 다시 List Selected Objects + Get Sel Range 로 옮겨야 했다.
+        이 버튼은 그 두 단계를 대신한다.
+
+        감지한 값은 **위젯에도 채워 넣는다** — 무엇을 대상으로 어느 구간을 처리했는지 눈으로
+        확인되고, 이어서 Anchor 를 바꿔 아래 버튼으로 다시 돌려볼 수도 있다.
+
+        씬 선택이 비어 있으면 리스트에 담긴 항목으로 폴백한다(구간은 항상 선택 키에서 온다).
+        선택한 키가 없으면 조용히 전 구간을 처리하지 않고 경고만 남긴다 — '구간 한정' 이라는
+        이 탭의 약속을 어기는 쪽이 더 위험하기 때문이다."""
+
+        objs = EulerFilterManager.selected_objects()
+        from_selection = bool(objs)
+        if not objs:
+            objs = self.euler_tsl.get_all_nodes()   # 폴백: 리스트업된 항목
+            if not objs:
+                self.log("[Warning] Select controllers in the scene "
+                         "(or add them to the Euler Filter List) first.")
+                return
+
+        rng = EulerFilterManager.selected_key_range()
+        if rng is None:
+            self.log("[Warning] No keyframes selected. Drag-select the keys of the "
+                     "range in the Graph Editor / Time Slider first.")
+            return
+        start, end = rng
+
+        if from_selection:
+            self.euler_tsl.set_items(objs)
+        self.euler_range.set_range(start, end)
+
+        source = ("scene selection" if from_selection
+                  else "the list (nothing selected in the scene)")
+        self.log("[From Selection] {0} target(s) from {1}, range [{2}-{3}f] "
+                 "from the selected keys.".format(len(objs), source, start, end))
 
         count, msg = EulerFilterManager.filter_range(
             objs, start, end,

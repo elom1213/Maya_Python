@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-05
+# last Update date : 2026-08-06
 # A00110_animTool - 구간 한정 오일러 필터 핵심 로직 (maya.cmds, UI 비의존)
 #
 # 마야 그래프 에디터의 `Curves > Euler Filter` 는 선택한 컨트롤러의 **키가 찍힌 전 구간**을
@@ -103,6 +103,34 @@ class EulerFilterManager:
             latest = max(before)
             best = latest if best is None else max(best, latest)
         return best
+
+    # --------------------------------------------------- 씬에서 대상/구간 감지
+
+    @staticmethod
+    def selected_objects():
+        """현재 씬에서 선택한 오브젝트 목록. 없으면 빈 리스트.
+
+        원버튼("from Selection") 실행에서 **대상**을 얻는 통로다. 그래프 에디터에서 키를
+        드래그 선택해도 오브젝트 선택은 유지되므로(키 선택은 별개다), 이 값이 곧
+        "지금 작업 중인 컨트롤러들" 이다.
+        """
+        return cmds.ls(selection=True, long=False) or []
+
+    @classmethod
+    def selected_key_range(cls):
+        """선택한 키프레임들의 (최소, 최대) 프레임(int). 선택 키가 없으면 None.
+
+        `cmds.keyframe(q=True, selected=True)` 는 그래프 에디터/타임 슬라이더에서 선택된
+        **모든** 키의 시간을 오브젝트·어트리뷰트에 무관하게 전역으로 돌려준다. 그래서 여러
+        컨트롤러의 커브에 걸쳐 박스 드래그로 골라도 그 묶음 전체의 앞/뒤 프레임이 잡힌다.
+        """
+        try:
+            times = cmds.keyframe(query=True, selected=True) or []
+        except Exception:
+            return None
+        if not times:
+            return None
+        return (int(round(min(times))), int(round(max(times))))
 
     # ------------------------------------------------------------- 변화 집계
 
