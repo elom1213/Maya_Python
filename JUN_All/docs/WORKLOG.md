@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-08-06
+updated: 2026-08-07
 ---
 
 # 작업 일지 (WORKLOG)
@@ -15,7 +15,33 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-08-06 (오늘)
+## 2026-08-07 (오늘)
+
+> [!summary] `A00145_RigConnect` **Constrain 탭 Target Replace — 컨스트레인트의 타깃(드라이버) 일괄 교체** (v01.19→01.20)
+- **요청**: 여러 컨스트레인트가 쓰는 타깃들을 리스트업하고, 그중 하나(`tgt_A_02`)를 씬의 다른
+  오브젝트(`tgt_B_02`)로 바꾸는 기능. 그 타깃을 가진 컨스트레인트만 교체되고, 없는 것은 방치.
+- **`List Targets`** — 리스트업한 컨스트레인트들의 타깃 **합집합**을 보여 준다. 항목 뒤 `[n/m]` =
+  *m개 중 n개가 이 타깃을 쓴다*, 툴팁에 어떤 컨스트레인트인지 나열. 검색은 공용 Filter.
+- **재생성이 아니라 연결 rewire** — 컨스트레인트를 지웠다 다시 만들면 노드 이름, **weight 에 물린
+  연결(IK/FK 스위치 등)**, 커스텀 어트리뷰트가 날아간다. 그래서 노드는 그대로 두고 `target[i]` 의
+  **입력 연결만** 새 오브젝트로 갈아끼웠다. weight 값·연결·노드 이름·다른 타깃 전부 보존.
+- **함정 1** — `listConnections("con.target[0]")` 는 컴파운드 배열 원소에 대해 **None** 을 준다.
+  노드 단위로 받아 dest 플러그를 직접 파싱해야 한다. 멀티 인덱스도 `targetList` 순서에 기대지 않고
+  들어오는 연결에서 역추적. `targetWeight` 와 컨스트레인트 자신이 소스인 연결(pointOnPoly 의
+  `targetU/V`)은 타깃 판정에서 제외.
+- **함정 2 (Keep in place)** — offset 규약을 mayapy 로 전부 실측했다. `parentConstraint` 의
+  **`targetOffsetTranslate` 는 타깃 스케일을 포함한 전체 행렬**, **`targetOffsetRotate` 는 스케일을 뺀
+  순수 회전** — 서로 다른 공간에 산다. 한 행렬로 같이 옮기면 스케일 걸린 타깃에서 driven 이 튄다.
+  오일러 순서는 둘 다 **driven 의 `rotateOrder`**. 타깃별 offset 이라 **weight 가 섞여 있어도 정확**.
+  나머지는 `point` 덧셈 / `scale` 곱셈 / `orient`·`aim` 은 `O_new = R_before * R_after⁻¹ * O_old`.
+  보정 후 driven 월드 행렬을 다시 읽어 검증하고 어긋나면 경고.
+- **joint ↔ 트랜스폼** 교체 시 `targetJointOrient`/`targetInverseScale`/`targetScaleCompensate` 를
+  끊고 기본값으로 되돌리거나 새로 연결. 셰이프 기반(geometry/normal/tangent/pointOnPoly)은 같은 타입
+  셰이프로. 대응 입력을 못 만들면 **아무것도 건드리지 않고** 경고만(부분 파괴 방지).
+- 검증: mayapy 헤드리스 — 타입 5종 × rotateOrder 3종 keep-in-place, weight 연결 보존, joint 왕복,
+  셰이프 교체, 동명 노드, 방어 케이스 + UI 스모크 테스트까지 전부 통과. (`1d18764`) #A00145
+
+## 2026-08-06
 
 > [!summary] `A00290_BSTool` **Mix Targets — 리깅 메시에서 New mesh 가 안 만들어지던 문제 + Base mesh 라벨** (v01.17→01.18)
 - **요청**: 웨이트가 칠해진 리깅 메시에서 `New mesh` 를 골라도 새 메시가 안 생기고
