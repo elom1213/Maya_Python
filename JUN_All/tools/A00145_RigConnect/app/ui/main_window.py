@@ -29,6 +29,7 @@ from tools.A00145_RigConnect.app.core import stream_manager as stm_mgr
 from tools.A00145_RigConnect.app.core import skin_constraint_manager as skn_mgr
 from tools.A00145_RigConnect.app.core import group_create_manager as grp_mgr
 from tools.A00145_RigConnect.app.core import constraint_transfer_manager as cxfer_mgr
+from tools.A00145_RigConnect.app.core import constraint_target_manager as ctgt_mgr
 from tools.A00145_RigConnect.app.core import (
     CONSTRAINT_TYPES, connect_closest, find_closest_for_drivers)
 from tools.A00145_RigConnect.app.ui.collapsible import CollapsibleBox
@@ -190,18 +191,25 @@ class MainWindow(QWidget):
     # --------------------------------------------------------------
 
     def _build_constrain_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
+        # 접이식 박스가 여럿이라 전부 펼치면 창 높이를 넘긴다. Connect 탭과 같이
+        # 스크롤 영역에 담아 위젯이 겹치는 대신 스크롤바가 생기도록 한다.
+        content = QWidget()
+        layout = QVBoxLayout(content)
 
         # 기존 Constraint 기능은 펼쳐두고(collapsed=False),
-        # 새 Skin Weight to Constraint / Group Create 기능은 접어둔다(collapsed=True).
+        # 나머지 기능 박스는 접어둔다(collapsed=True).
         layout.addWidget(self._build_constrain_basic_box())
         layout.addWidget(self._build_skin_constraint_box())
         layout.addWidget(self._build_group_create_box())
         layout.addWidget(self._build_constraint_transfer_box())
+        layout.addWidget(self._build_target_replace_box())
 
         layout.addStretch(1)
-        return tab
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(content)
+        return scroll
 
     def _build_constrain_basic_box(self):
         """기존 multi target -> follower constraint UI (접이식, 기본 펼침)."""
@@ -487,6 +495,106 @@ class MainWindow(QWidget):
             "Left items may be constraint nodes or objects that carry constraints.\n"
             "Mapping: 1 object -> all constraints go to it; equal counts -> 1:1.")
         btn.clicked.connect(self.on_transfer_constraint)
+        box.addWidget(btn)
+
+        return box
+
+    def _build_target_replace_box(self):
+        """Target Replace UI (접이식, 기본 접힘).
+
+        리스트업한 constraint 들이 쓰고 있는 타깃(드라이버)을 모아 보여 주고, 고른
+        타깃을 씬의 다른 오브젝트로 갈아끼운다. 그 타깃을 쓰지 않는 constraint 는
+        건드리지 않는다. constraint 노드는 그대로 두고 입력 연결만 바꾸므로 weight /
+        노드 이름 / 다른 타깃은 보존된다.
+        """
+        box = CollapsibleBox("Target Replace", collapsed=True)
+
+        # 왼쪽: 대상 constraint(또는 constraint 가 걸린 트랜스폼).
+        self.tsl_trep_cons = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Constraints", select_label="Select",
+            list_min_height=160, log_callback=self.log)
+
+        # 오른쪽: 위 constraint 들이 쓰고 있는 타깃 목록.
+        targets_col = QVBoxLayout()
+        head = QHBoxLayout()
+        lbl = QLabel("Targets")
+        font = lbl.font()
+        font.setBold(True)
+        lbl.setFont(font)
+        head.addWidget(lbl)
+        head.addStretch(1)
+        self.lbl_trep_number = QLabel("Number: 0")
+        head.addWidget(self.lbl_trep_number)
+        targets_col.addLayout(head)
+
+        self.lw_trep_targets = QListWidget()
+        self.lw_trep_targets.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lw_trep_targets.setMinimumHeight(160)
+        self.lw_trep_targets.setToolTip(
+            "Targets used by the constraints on the left.\n"
+            "[n/m] = used by n of the m constraints (hover for the list).")
+        targets_col.addWidget(self.lw_trep_targets)
+
+        self.flt_trep = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_trep_targets, placeholder="Type any part of a target name",
+            number_label=self.lbl_trep_number)
+        targets_col.addWidget(self.flt_trep)
+
+        btn_row = QHBoxLayout()
+        btn_list = QPushButton("List Targets")
+        btn_list.setToolTip(
+            "Collect every target used by the constraints on the left.")
+        btn_list.clicked.connect(self.on_trep_list)
+        btn_row.addWidget(btn_list)
+        btn_pick = QPushButton("Select")
+        btn_pick.setToolTip("Select the picked targets in the scene.")
+        btn_pick.clicked.connect(self.on_trep_select)
+        btn_row.addWidget(btn_pick)
+        targets_col.addLayout(btn_row)
+
+        list_row = QHBoxLayout()
+        list_row.addWidget(self.tsl_trep_cons)
+        list_row.addLayout(targets_col)
+        box.addLayout(list_row)
+
+        # 아래: 대신 들어갈 오브젝트.
+        self.tsl_trep_new = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="New Target (replaces the picked target)", select_label="Select",
+            list_min_height=110, log_callback=self.log)
+        box.addWidget(self.tsl_trep_new)
+
+        opt_box = QGroupBox("Options")
+        opt_layout = QVBoxLayout(opt_box)
+
+        self.cb_trep_keep = QCheckBox("Keep driven objects in place")
+        self.cb_trep_keep.setChecked(True)
+        self.cb_trep_keep.setToolTip(
+            "On  : recompute the constraint offset so nothing moves when the "
+            "new target sits somewhere else.\n"
+            "Off : keep the original offset, so the driven object follows the "
+            "new target the same way it followed the old one (it will jump).")
+        opt_layout.addWidget(self.cb_trep_keep)
+
+        self.cb_trep_rename = QCheckBox("Rename the weight attribute to the new target")
+        self.cb_trep_rename.setChecked(False)
+        self.cb_trep_rename.setToolTip(
+            "Rename the target weight attribute (tgt_A_02W0 -> tgt_B_02W0).\n"
+            "Only auto-generated names are touched. Leave off if scripts refer "
+            "to the weight by name.")
+        opt_layout.addWidget(self.cb_trep_rename)
+
+        box.addWidget(opt_box)
+
+        btn = QPushButton("Replace Target")
+        btn.setMinimumHeight(32)
+        btn.setToolTip(
+            "Swap the picked target for the New Target on every constraint that "
+            "uses it.\n"
+            "Constraints without that target are left untouched.\n"
+            "Weights, weight connections and the constraint node itself are kept.\n"
+            "Mapping: 1 new target -> used for every picked target; equal counts "
+            "-> 1:1.")
+        btn.clicked.connect(self.on_replace_target)
         box.addWidget(btn)
 
         return box
@@ -816,6 +924,9 @@ class MainWindow(QWidget):
             "              + Skin Weight to Constraint (weighted Parent/Scale/\n"
             "                Point/Orient constraint)\n"
             "              + Locators (auto-create locators and constrain them)\n"
+            "              + Group Create / Constraint Transfer\n"
+            "              + Target Replace (swap a constraint target for\n"
+            "                another object, offset kept)\n"
             "Connect     : connect attributes (3 broadcast patterns) + 52 facial\n"
             "Attribute   : copy selected attributes onto other objects,\n"
             "              same name or with a Prefix / Suffix\n"
@@ -996,6 +1107,96 @@ class MainWindow(QWidget):
             self.log("       {0} constraint(s) transferred".format(len(created)))
 
         self._run("Constraint Transfer", _do)
+
+    # ==============================================================
+    # Handlers : Target Replace
+    # ==============================================================
+
+    def _trep_picked_targets(self, warn=False):
+        """Targets 목록에서 **보이면서 선택된** 타깃 이름들.
+
+        Qt 는 필터로 숨긴 항목의 선택도 유지하므로, 가려진 것까지 교체해 버리지
+        않도록 걸러 낸다. 표시 텍스트에는 '[2/3]' 같은 사용 횟수가 붙으므로 실제
+        노드 이름은 항목 데이터에서 꺼낸다.
+        """
+        names = []
+        hidden = 0
+        for item in self.lw_trep_targets.selectedItems():
+            if item.isHidden():
+                hidden += 1
+                continue
+            names.append(item.data(Qt.UserRole) or item.text())
+        if warn and hidden:
+            self.log("[INFO] {0} picked target(s) hidden by the filter were "
+                     "skipped".format(hidden))
+        return names
+
+    def on_trep_list(self):
+        cons = self.tsl_trep_cons.get_all_items()
+        if not cons:
+            self.log("[ERR] List Targets : constraint list is empty")
+            return
+        try:
+            rows, warns = ctgt_mgr.list_targets(cons)
+        except Exception as e:
+            self.log("[ERR] List Targets : {0}".format(e))
+            cmds.warning(str(e))
+            return
+
+        for w in warns:
+            self.log("[WARN] {0}".format(w))
+
+        self.lw_trep_targets.clear()
+        for row in rows:
+            item = QListWidgetItem("{0}   [{1}/{2}]".format(
+                row["name"], len(row["constraints"]), row["total"]))
+            item.setData(Qt.UserRole, row["name"])
+            item.setToolTip("Used by:\n  {0}".format(
+                "\n  ".join(row["constraints"])))
+            self.lw_trep_targets.addItem(item)
+
+        shown, total = self.flt_trep.refresh()
+        msg = "[OK] List Targets : {0} target(s)".format(total)
+        if shown != total:
+            msg += " - filter '{0}' shows {1}".format(
+                self.flt_trep.text().strip(), shown)
+        self.log(msg)
+
+    def on_trep_select(self):
+        picked = self._trep_picked_targets(warn=True)
+        if not picked:
+            self.log("[ERR] Select : pick target(s) in the Targets list")
+            return
+        try:
+            cmds.select(picked, replace=True)
+        except Exception as e:
+            self.log("[ERR] Select : {0}".format(e))
+            cmds.warning(str(e))
+            return
+        self.log("[OK] Select : {0} target(s)".format(len(picked)))
+
+    def on_replace_target(self):
+        cons = self.tsl_trep_cons.get_all_items()
+        picked = self._trep_picked_targets(warn=True)
+        new_targets = self.tsl_trep_new.get_all_items()
+        maintain_offset = self.cb_trep_keep.isChecked()
+        rename_weight = self.cb_trep_rename.isChecked()
+
+        def _do():
+            results, warns = ctgt_mgr.replace_targets(
+                cons, picked, new_targets, maintain_offset, rename_weight)
+            for w in warns:
+                self.log("[WARN] {0}".format(w))
+            for r in results:
+                self.log("       {0} : {1} -> {2}{3}".format(
+                    r["constraint"], r["old"], r["new"],
+                    "  ({0})".format(r["note"]) if r["note"] else ""))
+            self.log("       {0} target slot(s) replaced".format(len(results)))
+
+        self._run("Replace Target", _do)
+        # 교체 결과가 바로 보이도록 목록을 다시 채운다.
+        if self.tsl_trep_cons.get_all_items():
+            self.on_trep_list()
 
     # ==============================================================
     # Handlers : Connect

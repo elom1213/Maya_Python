@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.19` (`app/config/version.py`) — 검색을 공용 **Filter** 로 교체 (§Filter)
+- 버전: `v01.20` (`app/config/version.py`) — Constrain 탭에 **Target Replace** 추가 (§Target Replace)
 - 위치: `JUN_All/tools/A00145_RigConnect`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴(`QTabWidget` 6탭)
 - 원본 `A00140_ConnectClosest` / MEL 파일은 그대로 보존(미수정)
@@ -55,9 +55,10 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
 - (MEL 의 Blend Shape 버튼은 제거됨.)
 
 ### Constrain
-접이식 섹션 4개로 구성된다(`CollapsibleBox`). **`Constraint`(기본 펼침)** / **`Skin Weight to
+접이식 섹션 5개로 구성된다(`CollapsibleBox`). **`Constraint`(기본 펼침)** / **`Skin Weight to
 Constraint`(기본 접힘)** / **`Group Create`(기본 접힘, v01.12, 옵션 확장 v01.13)** / **`Constraint
-Transfer`(기본 접힘, v01.14)**.
+Transfer`(기본 접힘, v01.14)** / **`Target Replace`(기본 접힘, v01.20)**.
+섹션이 늘어나 전부 펼치면 창 높이를 넘기므로 탭 전체가 스크롤 영역에 담겨 있다(v01.20).
 
 #### Constraint
 타겟(드라이버) → 팔로워로 constraint 를 건다.
@@ -172,6 +173,56 @@ after :  [targets] ─(parentConstraint, MO)→ objB     (원본 삭제, objB �
   여럿이어도** 안전하게 동작한다(중복 이름이면 경고 후 첫 매치 사용).
 - 어떤 종류의 constraint 든 동작한다(parent/point/orient/scale/aim/poleVector/geometry/pointOnPoly/
   normal/tangent). 읽기/재생성이 불가한 항목은 건너뛰고 경고를 남긴다.
+
+#### Target Replace (v01.20)
+Constraint Transfer 가 **driven(구속당하는 쪽)** 을 옮긴다면, 이쪽은 **타깃(드라이버)** 을 바꾼다.
+여러 constraint 가 공통으로 쓰는 타깃 하나를 씬의 다른 오브젝트로 **일괄 교체**한다.
+
+```
+before:  con_01 : [tgt_A_01, tgt_A_02]     con_02 : [tgt_A_02, tgt_A_03]     con_03 : [tgt_A_04]
+replace: tgt_A_02  →  tgt_B_02
+after :  con_01 : [tgt_A_01, tgt_B_02]     con_02 : [tgt_B_02, tgt_A_03]     con_03 : [tgt_A_04]  (방치)
+```
+
+- 왼쪽 `Constraints` 리스트: 대상 **constraint 노드**(또는 constraint 가 걸린 **트랜스폼** — 그 오브젝트의
+  자식 constraint 로 자동 확장). Constraint Transfer 와 같은 규칙이다.
+- **`List Targets`** → 오른쪽 `Targets` 목록에 위 constraint 들이 쓰고 있는 **모든 타깃의 합집합**이
+  처음 나온 순서대로 채워진다. 각 항목 뒤의 **`[n/m]`** 은 *m개 중 n개의 constraint 가 이 타깃을 쓴다*는
+  뜻이고, 항목에 마우스를 올리면 어떤 constraint 인지 목록이 뜬다.
+  검색은 공용 [Filter](Framework_MOD_filter_qt.md), `Select` 는 고른 타깃을 씬에서 선택한다.
+- 아래 `New Target` 리스트에 대신 들어갈 오브젝트를 넣고 **`Replace Target`**.
+  **그 타깃을 쓰지 않는 constraint 는 손대지 않는다.**
+- **매핑**: New Target 이 **1개면 고른 모든 타깃이 그것으로**, 개수가 **같으면 인덱스 1:1**, 그 외에는 적은
+  쪽 개수만큼 1:1 하고 경고.
+
+**재생성이 아니라 연결 교체** — constraint 를 지웠다 다시 만들면 노드 이름, weight 에 물려 있는 연결
+(IK/FK 스위치 등), 커스텀 어트리뷰트가 날아간다. 그래서 constraint 노드는 그대로 두고 `target[i]` 로
+들어오는 **입력 연결만** 새 오브젝트 쪽으로 갈아끼운다. **weight 값·weight 연결·노드 이름·다른 타깃은
+그대로 보존된다.** `target[i]` 의 실제 멀티 인덱스는 들어오는 연결에서 역추적하므로 `targetList` 순서에
+의존하지 않는다.
+
+**옵션**
+
+| 옵션 | 기본 | 동작 |
+|------|------|------|
+| `Keep driven objects in place` | ON | 새 타깃이 다른 위치에 있어도 driven 이 **제자리에 남도록** constraint offset 을 다시 계산한다. |
+| | OFF | 원래 offset 을 유지 → driven 이 옛 타깃에 대해 가졌던 **상대 관계 그대로** 새 타깃을 따라간다(그만큼 튄다). |
+| `Rename the weight attribute to the new target` | OFF | weight 어트리뷰트 이름을 `tgt_A_02W0` → `tgt_B_02W0` 로. Maya 가 자동 생성한 이름일 때만 손댄다. |
+
+- **Keep in place 정확도** — Maya 2024 에서 실측한 offset 규약대로 계산한다.
+  - `parentConstraint` : **타깃별** offset(`targetOffsetTranslate/Rotate`). 위치는 전체 월드 행렬로,
+    회전은 스케일을 뺀 순수 회전으로 각각 옮긴다(두 오프셋이 서로 다른 공간에 산다 — 타깃에 스케일이
+    걸려 있어도 맞는다). 타깃이 여러 개이고 **weight 가 섞여 있어도 정확**하다(타깃별 기여도만 유지되므로).
+  - `pointConstraint` 덧셈 / `scaleConstraint` 곱셈 / `orient`·`aim` 회전 합성(오일러 순서 = driven 의
+    `rotateOrder`).
+  - `geometry`/`normal`/`tangent`/`pointOnPoly`/`poleVector` 는 보정할 offset 이 없어 그대로 둔다(로그로 알림).
+  - 보정 후 driven 의 월드 행렬을 **다시 읽어 검증**하고, 어긋나면 오차를 경고로 남긴다.
+- **joint ↔ 일반 트랜스폼** 교체도 처리한다. joint → 트랜스폼이면 `targetJointOrient`/`targetInverseScale`/
+  `targetScaleCompensate` 연결을 끊고 기본값으로, 반대면 새로 연결한다.
+- **셰이프 기반 constraint**(geometry/normal/tangent/pointOnPoly)는 새 타깃의 **같은 타입 셰이프**로 연결을
+  옮긴다. 새 타깃에 대응하는 입력이 없으면(예: 셰이프 없는 로케이터) **아무것도 건드리지 않고** 경고만 남긴다.
+- 고른 타깃이 이미 그 constraint 의 타깃이거나 새 타깃과 같은 오브젝트면 건너뛴다(중복 타깃 방지).
+- **UUID 기반** — 같은 이름의 오브젝트가 여럿이어도 안전하다.
 
 ### Filter — 이름으로 어트리뷰트 찾기 (v01.19)
 
@@ -309,6 +360,7 @@ A00145_RigConnect/
     │   ├── skin_constraint_manager.py # Skin Weight to Constraint (스킨 웨이트 → weighted Parent/Scale/Point/Orient constraint)
     │   ├── group_create_manager.py # Group Create (부모/자식 쪽 오프셋 노드 _<suffix>_NN 삽입, 그룹·오브젝트 타입, UUID 기반)
     │   ├── constraint_transfer_manager.py # Constraint Transfer (constraint 를 다른 오브젝트로 이관: 삭제+동일세팅 재생성, MO 유지, UUID 기반)
+    │   ├── constraint_target_manager.py # Target Replace (타깃(드라이버) 교체: target[i] 입력 연결만 rewire, offset 재계산, UUID 기반)
     │   ├── connect_manager.py      # Connect    (MEL 포팅: attr 나열/검색/연결, 52 facial)
     │   ├── attribute_manager.py    # Attribute  (어트리뷰트 정의를 읽어 다른 오브젝트에 재생성, prefix/suffix)
     │   ├── blendshape_utils.py     # blendShape 타겟(weight 별칭) 조회 — Attribute / Connect 탭 공용
@@ -317,7 +369,7 @@ A00145_RigConnect/
     │   └── closest_connector.py    # Connect Closest (A00140 복사)
     └── ui/
         ├── collapsible.py          # CollapsibleBox
-        └── main_window.py          # QTabWidget 4탭 + 공유 로그 + Help>About
+        └── main_window.py          # QTabWidget 6탭 + 공유 로그 + Help>About
 ```
 
 - 모든 textScrollList 는 `Framework.qt.JUN_mod_tsl_qt_v01` 위젯으로 대체.
