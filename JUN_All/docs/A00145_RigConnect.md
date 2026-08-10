@@ -4,9 +4,10 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.22` (`app/config/version.py`) — Constrain 탭의 접이식 섹션을 **하위 탭**으로 전환 (§Constrain)
+- 버전: `v01.23` (`app/config/version.py`) — Connect / List Connected / Connect Closest 를 **Connect 탭의 하위 탭**으로 통합 (§Connect)
 - 위치: `JUN_All/tools/A00145_RigConnect`
-- 형태: 아키텍처 (B) — Maya 내 PySide 툴(`QTabWidget` 6탭)
+- 형태: 아키텍처 (B) — Maya 내 PySide 툴. **최상위 4탭**(Match / Constrain / Connect / Attribute),
+  Constrain·Connect 는 다시 **중첩 탭**으로 나뉜다
 - 원본 `A00140_ConnectClosest` / MEL 파일은 그대로 보존(미수정)
 
 ---
@@ -58,7 +59,7 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
 기능별 **하위 탭 5개**로 나뉜다(v01.22).
 
 ```
-[ Match ][ Constrain ][ Connect ][ Attribute ][ List Connected ][ Connect Closest ]
+[ Match ][ Constrain ][ Connect ][ Attribute ]
           └─ [ Constraint ][ Skin Weight ][ Group Create ][ Transfer ][ Target Replace ]
 ```
 
@@ -278,9 +279,28 @@ Filter [ inner              ] [Clear]   [Select All]
 > (`List Attributes` 가 전체 재조회를 담당한다).
 
 ### Connect
+"연결" 작업을 묶은 상위 탭. **하위 탭 3개**로 나뉜다(v01.23).
+
+```
+[ Match ][ Constrain ][ Connect ][ Attribute ]
+                       └─ [ Connect ][ List Connected ][ Connect Closest ]
+```
+
+| 하위 탭 | 내용 |
+|---------|------|
+| **Connect** | 어트리뷰트 source → destination 연결 (+ Match from Source, 52 facial) |
+| **List Connected** | 오브젝트의 up/down stream 노드를 타입별로 탐색 |
+| **Connect Closest** | 각 driver 에 가장 가까운 오브젝트를 1:1 로 constraint (A00140 이식) |
+
+Constrain 탭과 같은 방식이다(§Constrain 참고) — 짧은 라벨 + 툴팁, `ElideRight`, **하위 탭별 스크롤**.
+
+> **v01.23 이전**: 이 셋은 최상위 탭이었다(최상위 6탭). 모두 "연결" 작업이라 최상위에 따로 있을
+> 이유가 없어 하나로 묶었고, 최상위는 **Match / Constrain / Connect / Attribute 4탭**이 됐다.
+
+#### Connect — 어트리뷰트 연결
 어트리뷰트를 source → destination 으로 연결한다.
 
-- Source/Destination 각 섹션:
+- Source/Destination 각 섹션(이 둘은 **동시에** 봐야 해서 탭이 아니라 접이식이다):
   - `Objects` 리스트에 오브젝트 추가 → `List Attributes` 로 첫 오브젝트의 어트리뷰트를 우측 목록에 채움.
   - **`Filter`**(v01.19, 기존 `Search` 버튼 대체): 입력하는 즉시 **일치하는 것만 남고 나머지는 숨는다**.
     `Select All` 은 **보이는 것만** 선택한다. → 아래 **Filter** 절 참고.
@@ -295,7 +315,7 @@ Filter [ inner              ] [Clear]   [Select All]
   3. src/dst attr 수 동일 → obj 쌍 × attr 모두
 - `Connect 52 Facial Target`: 52 ARKit 페이셜 어트리뷰트를 같은 이름끼리 obj 쌍 1:1 로 일괄 연결(없는 attr 은 스킵).
 
-#### Match from Source — 이름이 비슷한 어트리뷰트 찾기 (v01.21)
+##### Match from Source — 이름이 비슷한 어트리뷰트 찾기 (v01.21)
 
 Destination 패널의 **`Match from Source`** 는 소스에서 고른 어트리뷰트 각각에 대해 **이름이 가장
 비슷한** destination 어트리뷰트를 찾아, **소스 순서 그대로** 목록 맨 위로 올리고 선택한다.
@@ -427,7 +447,7 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
   `L_tint_ctrlR/G/B`).
 - 전체가 하나의 **undo chunk** 라 `Ctrl+Z` 한 번으로 되돌아간다.
 
-### List Connected
+#### List Connected
 노드 그래프(up/down stream)를 타입별로 탐색한다.
 
 - `Objects` 리스트에 오브젝트 추가.
@@ -435,7 +455,7 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
 - `Types` 에서 타입 선택 후 `Search`: 해당 타입의 **노드들**을 `Nodes` 에 표시.
 - `Nodes` 목록에서 항목을 선택하면 씬에서도 선택된다.
 
-### Connect Closest
+#### Connect Closest
 각 driver 에 대해 가장 가까운 driven 을 1:1 매칭해 constraint 로 연결한다(A00140 이식).
 
 - `Driven` / `Driver` 리스트 구성.
@@ -479,7 +499,7 @@ A00145_RigConnect/
     │   └── closest_connector.py    # Connect Closest (A00140 복사)
     └── ui/
         ├── collapsible.py          # CollapsibleBox
-        └── main_window.py          # QTabWidget 6탭(Constrain 은 하위 탭 5개) + 공유 로그 + Help>About
+        └── main_window.py          # QTabWidget 최상위 4탭(Constrain 5 / Connect 3 하위 탭) + 공유 로그 + Help>About
 ```
 
 - 모든 textScrollList 는 `Framework.qt.JUN_mod_tsl_qt_v01` 위젯으로 대체.

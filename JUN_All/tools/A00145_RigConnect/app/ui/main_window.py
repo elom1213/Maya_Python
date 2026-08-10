@@ -4,7 +4,13 @@
 # A00145_RigConnect - Qt UI
 #
 # MEL ConnectionTool V04.02 의 3탭(Constrain / Connect / List Connected)을 PySide 로
-# 포팅하고, A00140 ConnectClosest 기능을 Connect Closest 탭으로 추가한다(총 4탭).
+# 포팅하고, A00140 ConnectClosest 기능과 Match / Attribute 를 더한 것이다.
+#
+# 최상위 탭은 4개이고, 기능이 여럿인 탭은 **중첩 탭**으로 나눈다:
+#   Match
+#   Constrain : Constraint / Skin Weight / Group Create / Transfer / Target Replace
+#   Connect   : Connect / List Connected / Connect Closest
+#   Attribute
 #
 # 로직은 app/core 에 위임하고 이 모듈은 위젯 구성/시그널 연결/로그 출력만 담당한다.
 # 모든 UI 문자열(버튼/라벨/로그)은 영어. (한국어는 주석/독스트링만)
@@ -90,8 +96,6 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_constrain_tab(), "Constrain")
         self.tabs.addTab(self._build_connect_tab(), "Connect")
         self.tabs.addTab(self._build_attribute_tab(), "Attribute")
-        self.tabs.addTab(self._build_list_connected_tab(), "List Connected")
-        self.tabs.addTab(self._build_connect_closest_tab(), "Connect Closest")
         main_layout.addWidget(self.tabs)
 
         main_layout.addWidget(self.te_log)
@@ -214,15 +218,22 @@ class MainWindow(QWidget):
         늘면서 원하는 것을 찾으려면 접었다 폈다 해야 했다. 이제 탭 하나에 기능 하나만
         보인다. 각 페이지는 따로 스크롤되므로 창을 줄여도 위젯이 겹치지 않는다.
         """
+        self.constrain_tabs = self._build_sub_tabs(self.CONSTRAIN_PAGES)
+        return self.constrain_tabs
+
+    def _build_sub_tabs(self, pages):
+        """(라벨, 툴팁, 빌더 메서드 이름) 목록을 중첩 탭 위젯으로 만든다.
+
+        상위 탭 하나가 여러 기능을 품을 때 쓰는 공통 골격(Constrain / Connect).
+        """
         tabs = QTabWidget()
         # 폭이 모자라면 라벨을 자른다(스크롤 화살표만 뜨는 것보다 읽기 쉽다).
         tabs.tabBar().setElideMode(Qt.ElideRight)
 
-        for label, tip, builder in self.CONSTRAIN_PAGES:
+        for label, tip, builder in pages:
             index = tabs.addTab(self._scrolled(getattr(self, builder)()), label)
             tabs.setTabToolTip(index, tip)
 
-        self.constrain_tabs = tabs
         return tabs
 
     def _scrolled(self, widget):
@@ -626,15 +637,33 @@ class MainWindow(QWidget):
         return page
 
     # --------------------------------------------------------------
-    # Tab : Connect
+    # Tab : Connect  (하위 탭 : Connect / List Connected / Connect Closest)
     # --------------------------------------------------------------
 
+    # Connect 하위 탭: (탭 라벨, 툴팁 = 설명, 빌더 메서드 이름).
+    CONNECT_PAGES = (
+        ("Connect", "Connect attributes from the source objects to the "
+         "destination objects (+ Match from Source, 52 facial)",
+         "_build_connect_page"),
+        ("List Connected", "Explore the nodes up / down stream of the listed "
+         "objects, by node type", "_build_list_connected_page"),
+        ("Connect Closest", "Constrain each driver to its nearest object (1:1)",
+         "_build_connect_closest_page"),
+    )
+
     def _build_connect_tab(self):
-        # Source/Destination 두 섹션 + 큰 버튼들이 세로로 쌓여 창 높이를 넘기면
-        # 각 TSL 의 버튼이 창 경계를 침범한다. 내용을 스크롤 영역에 담아, 공간이
-        # 모자라면 위젯이 겹치는 대신 스크롤바가 생기도록 한다.
-        content = QWidget()
-        layout = QVBoxLayout(content)
+        """Connect 탭 — 어트리뷰트/노드 연결 기능을 하나로 묶은 **중첩 탭**.
+
+        Connect / List Connected / Connect Closest 는 모두 "연결" 작업이라 최상위에
+        따로 있을 이유가 없었다. Constrain 탭과 같은 방식으로 하위 탭에 모은다.
+        """
+        self.connect_tabs = self._build_sub_tabs(self.CONNECT_PAGES)
+        return self.connect_tabs
+
+    def _build_connect_page(self):
+        """소스 → 대상 어트리뷰트 연결 UI (Connect 하위 탭)."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
 
         layout.addWidget(self._build_connect_io("src", "Source Objects"))
         layout.addWidget(self._build_connect_io("dst", "Destination Objects"))
@@ -649,14 +678,13 @@ class MainWindow(QWidget):
         layout.addWidget(btn_facial)
 
         layout.addStretch(1)
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(content)
-        return scroll
+        return page
 
     def _build_connect_io(self, role, title):
-        """Connect 탭의 Source/Destination 한 섹션을 만든다 (접이식)."""
+        """Connect 하위 탭의 Source/Destination 한 섹션을 만든다 (접이식).
+
+        이 둘은 나란히 놓고 **동시에** 봐야 해서 탭이 아니라 접이식으로 둔다.
+        """
         box = CollapsibleBox(title)
 
         tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
@@ -881,10 +909,10 @@ class MainWindow(QWidget):
         return scroll
 
     # --------------------------------------------------------------
-    # Tab : List Connected
+    # Connect > List Connected
     # --------------------------------------------------------------
 
-    def _build_list_connected_tab(self):
+    def _build_list_connected_page(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
@@ -929,10 +957,10 @@ class MainWindow(QWidget):
         return tab
 
     # --------------------------------------------------------------
-    # Tab : Connect Closest  (A00140 ConnectClosest 이식)
+    # Connect > Connect Closest  (A00140 ConnectClosest 이식)
     # --------------------------------------------------------------
 
-    def _build_connect_closest_tab(self):
+    def _build_connect_closest_page(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
@@ -1004,15 +1032,16 @@ class MainWindow(QWidget):
             "              Group Create : zero-out offset nodes\n"
             "              Transfer     : move a constraint onto another object\n"
             "              Target Repl. : swap a constraint target, offset kept\n"
-            "Connect     : connect attributes (3 broadcast patterns) + 52 facial\n"
-            "              + Match from Source (find the destination attributes\n"
-            "                whose names look like the source ones, in order)\n"
+            "Connect     : sub-tabs -\n"
+            "              Connect      : connect attributes (3 broadcast\n"
+            "                             patterns) + 52 facial + Match from\n"
+            "                             Source (find look-alike destination\n"
+            "                             attributes, in source order)\n"
+            "              List Conn.   : explore up/down stream nodes by type\n"
+            "              Conn. Closest: 1:1 closest matching constraints\n"
+            "                             + Get Closest\n"
             "Attribute   : copy selected attributes onto other objects,\n"
-            "              same name or with a Prefix / Suffix\n"
-            "List Conn.  : explore up/down stream nodes by type\n"
-            "Connect Closest : 1:1 closest matching constraints\n"
-            "              + Get Closest (fill Driven with each driver's "
-            "nearest object)".format(
+            "              same name or with a Prefix / Suffix".format(
                 VERSION, LAST_UPDATE))
 
     def _run(self, label, func):
