@@ -13,6 +13,8 @@
 #                          통합 마이그레이션 (A00270_skinMigrate 기능 이식).
 #   Tab 4 "Bind Pose"    : 조인트를 이동·회전한 현재 상태를 새 바인드 포즈로 만든다.
 #                          마야에 대응 기능이 없다(자세한 근거는 core/bind_pose_manager.py).
+#   Tab 5 "Move Joints"  : Edit 토글 방식. 켜면 조인트를 옮겨도 메시가 변형되지 않고,
+#                          다시 끄면 그 자리에서 재바인드된다(웨이트 불변).
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
@@ -26,10 +28,23 @@ from tools.A00275_skinTool_V01.app.config.version import VERSION, LAST_UPDATE
 from tools.A00275_skinTool_V01.app.core import SkinMigrateManager
 from tools.A00275_skinTool_V01.app.core import bind_pose_manager as bp_mgr
 from tools.A00275_skinTool_V01.app.core import weight_transfer_manager as wt_mgr
+from tools.A00275_skinTool_V01.app.core import joint_edit_manager as je_mgr
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
 WINDOW_OBJECT_NAME = "JUN_A00275_skinTool_V01_window"
+
+# Edit 토글이 켜졌을 때의 버튼 색 (A00290_BSTool 의 Shape Editor Edit 버튼과 같은 의미).
+# 테마 qss 의 :hover / :pressed 는 pseudo-state 규칙이라 배경색만 바꾸면 마우스를 올리는
+# 순간 테마 색으로 되돌아가 보인다. 그래서 그 두 상태까지 함께 덮는다.
+EDIT_ON_STYLE = (
+    "QPushButton { background-color: #c85a28; color: #ffffff;"
+    " border: 1px solid #f09050; font-weight: bold; }"
+    "QPushButton:hover { background-color: #d96a34; }"
+    "QPushButton:pressed { background-color: #a8441c; }"
+)
+EDIT_ON_TEXT = "EDIT ON  -  move the joints, then press again"
+EDIT_OFF_TEXT = "EDIT JOINTS"
 
 
 class MainWindow(QWidget):
@@ -46,6 +61,9 @@ class MainWindow(QWidget):
 
         # Bind Pose 탭이 잡아둔 대상 skinCluster 목록
         self.bp_targets = []
+
+        # Move Joints 탭이 잡아둔 대상 skinCluster 목록
+        self.je_targets = []
 
         self.resize(self.win_width, self.win_height)
 
@@ -81,6 +99,10 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_transfer_tab(), "Transfer")
         self.tabs.addTab(self._build_migrate_tab(), "Migrate A -> B")
         self.tabs.addTab(self._build_bind_pose_tab(), "Bind Pose")
+        self.je_tab_index = self.tabs.addTab(
+            self._build_move_joints_tab(), "Move Joints")
+        # 편집 상태는 UI 가 아니라 씬(노드)에 있다. 탭을 열 때마다 씬을 다시 읽어 맞춘다.
+        self.tabs.currentChanged.connect(self._on_tab_changed)
         main_layout.addWidget(self.tabs)
 
         # 공유 로그
@@ -519,6 +541,228 @@ class MainWindow(QWidget):
         self.log(f"[Done] {count} skinCluster(s) updated "
                  f"({'shape kept' if keep else 'snapped to rest'}).")
 
+    # --------------------------------------------------
+    # Tab 5 : Move Joints (Edit 토글 - 메시를 건드리지 않고 조인트 이동)
+    # --------------------------------------------------
+
+    def _build_move_joints_tab(self):
+
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        desc = QLabel(
+            "Move or rotate the bound joints without deforming the mesh.\n"
+            "Press EDIT JOINTS, move / rotate the joints in the viewport, then press\n"
+            "the button again to re-bind at the new joint positions.\n"
+            "Per-vertex weights are never touched - they stay exactly the same.")
+        desc.setAlignment(Qt.AlignCenter)
+        layout.addWidget(desc)
+
+        # ---- 대상 ----
+        tgt_grp = QGroupBox("Target")
+        tgt_layout = QVBoxLayout(tgt_grp)
+
+        self.lbl_je_target = QLabel("Nothing loaded.")
+        self.lbl_je_target.setWordWrap(True)
+        tgt_layout.addWidget(self.lbl_je_target)
+
+        row = QHBoxLayout()
+        self.btn_je_load = QPushButton("Load Selection")
+        self.btn_je_load.setMinimumHeight(30)
+        self.btn_je_load.setToolTip(
+            "Pick up skinClusters from the current selection.\n"
+            "Select the bound mesh, or just its joints.")
+        self.btn_je_load.clicked.connect(self.on_je_load)
+        row.addWidget(self.btn_je_load, 2)
+
+        self.btn_je_clear = QPushButton("Clear")
+        self.btn_je_clear.clicked.connect(self.on_je_clear)
+        row.addWidget(self.btn_je_clear, 1)
+        tgt_layout.addLayout(row)
+
+        self.btn_je_select_inf = QPushButton("Select Influences")
+        self.btn_je_select_inf.setToolTip(
+            "Select every influence joint of the loaded skinClusters,\n"
+            "so you can grab them in the viewport right away.")
+        self.btn_je_select_inf.clicked.connect(self.on_je_select_influences)
+        tgt_layout.addWidget(self.btn_je_select_inf)
+
+        layout.addWidget(tgt_grp)
+
+        # ---- 옵션 ----
+        opt_grp = QGroupBox("Options")
+        opt_layout = QVBoxLayout(opt_grp)
+
+        self.cb_je_rebuild = QCheckBox("Rebuild bindPose node (Go to Bind Pose)")
+        self.cb_je_rebuild.setChecked(True)
+        self.cb_je_rebuild.setToolTip(
+            "Recreate the dagPose node when you finish, so Maya's Go to Bind Pose\n"
+            "returns to the new joint positions.")
+        opt_layout.addWidget(self.cb_je_rebuild)
+
+        layout.addWidget(opt_grp)
+
+        # ---- Edit 토글 ----
+        self.btn_je_edit = QPushButton(EDIT_OFF_TEXT)
+        self.btn_je_edit.setCheckable(True)
+        self.btn_je_edit.setMinimumHeight(44)
+        self.btn_je_edit.setToolTip(
+            "ON  : the mesh is held in place - moving the joints does not deform it.\n"
+            "OFF : the current joint positions become the new bind state.\n"
+            "Each press is a single undo step.")
+        self.btn_je_edit.clicked.connect(self.on_je_edit_clicked)
+        layout.addWidget(self.btn_je_edit)
+
+        self.btn_je_cancel = QPushButton("Cancel Edit (restore joints)")
+        self.btn_je_cancel.setToolTip(
+            "Leave edit mode and put the joints and bind matrices back where they\n"
+            "were when you pressed EDIT JOINTS.")
+        self.btn_je_cancel.clicked.connect(self.on_je_cancel)
+        layout.addWidget(self.btn_je_cancel)
+
+        self.lbl_je_state = QLabel("")
+        self.lbl_je_state.setAlignment(Qt.AlignCenter)
+        self.lbl_je_state.setWordWrap(True)
+        layout.addWidget(self.lbl_je_state)
+
+        layout.addStretch(1)
+
+        self._update_je_state()
+
+        return tab
+
+    def _update_je_state(self):
+        """씬의 실제 편집 상태를 읽어 버튼/라벨을 맞춘다.
+
+        편집 상태는 씬(노드)에 있으므로, 툴을 닫았다 열거나 다른 곳에서 바꿔도
+        화면이 씬을 따라가야 한다.
+        """
+
+        editing = je_mgr.editing_of(self.je_targets)
+        on = bool(editing)
+
+        self.btn_je_edit.setChecked(on)
+        self.btn_je_edit.setText(EDIT_ON_TEXT if on else EDIT_OFF_TEXT)
+        self.btn_je_edit.setStyleSheet(EDIT_ON_STYLE if on else "")
+        self.btn_je_edit.setEnabled(bool(self.je_targets))
+
+        self.btn_je_cancel.setEnabled(on)
+        # 편집 중에 대상을 바꾸면 임시 노드가 씬에 남는다. 끝낼 때까지 잠근다.
+        self.btn_je_load.setEnabled(not on)
+        self.btn_je_clear.setEnabled(not on)
+
+        self.lbl_je_target.setText(je_mgr.describe(self.je_targets))
+
+        if on:
+            self.lbl_je_state.setText(
+                "Edit mode is ON - move / rotate the joints, then press the button "
+                "again to re-bind.")
+        elif self.je_targets:
+            self.lbl_je_state.setText("Ready.")
+        else:
+            self.lbl_je_state.setText(
+                "Select a bound mesh (or its joints) and press Load Selection.")
+
+    def _adopt_scene_edits(self):
+        """툴 밖(다른 세션/재실행)에서 시작된 편집을 되찾는다."""
+
+        if self.je_targets:
+            return
+
+        editing = je_mgr.find_editing_in_scene()
+        if editing:
+            self.je_targets = editing
+            self.log(f"[Info] Found {len(editing)} skinCluster(s) still in joint edit "
+                     f"mode: {', '.join(editing)}")
+
+    def _on_tab_changed(self, index):
+        # Move Joints 탭이 보일 때만 씬 상태를 다시 읽는다.
+        if index == self.je_tab_index:
+            self._adopt_scene_edits()
+            self._update_je_state()
+
+    # --------------------------------------------------
+    # Handlers : Move Joints
+    # --------------------------------------------------
+
+    def on_je_load(self):
+
+        try:
+            self.je_targets = je_mgr.resolve_targets()
+        except Exception as e:
+            self.je_targets = []
+            self.log(f"[Error] {e}")
+
+        self._update_je_state()
+
+        if not self.je_targets:
+            self.log("[Warning] No skinCluster found. "
+                     "Select a bound mesh or its joints.")
+        else:
+            self.log(f"[OK] Loaded {len(self.je_targets)} skinCluster(s): "
+                     f"{', '.join(self.je_targets)}")
+
+    def on_je_clear(self):
+        self.je_targets = []
+        self._update_je_state()
+        self.log("Move Joints target cleared.")
+
+    def on_je_select_influences(self):
+
+        if not self.je_targets:
+            self.log("[Warning] Nothing loaded. Press 'Load Selection' first.")
+            return
+
+        influences = je_mgr.influences_of(self.je_targets)
+        if not influences:
+            self.log("[Warning] No influence found on the loaded skinCluster(s).")
+            return
+
+        try:
+            cmds.select(influences, replace=True)
+        except Exception as e:
+            self.log(f"[Error] {e}")
+            return
+
+        self.log(f"[OK] Selected {len(influences)} influence(s).")
+
+    def on_je_edit_clicked(self):
+
+        if not self.je_targets:
+            self.log("[Warning] Nothing loaded. Press 'Load Selection' first.")
+            self._update_je_state()
+            return
+
+        # 버튼의 체크 상태가 아니라 **씬의 실제 상태**로 방향을 정한다.
+        if je_mgr.editing_of(self.je_targets):
+            count, messages = je_mgr.end_edit(
+                self.je_targets, rebuild_dag_pose=self.cb_je_rebuild.isChecked())
+            done = f"[Done] {count} skinCluster(s) re-bound at the new joint positions."
+        else:
+            count, messages = je_mgr.begin_edit(self.je_targets)
+            done = (f"[Done] {count} skinCluster(s) held - move the joints now, "
+                    f"then press the button again.")
+
+        for m in messages:
+            self.log(m)
+        self.log(done)
+
+        self._update_je_state()
+
+    def on_je_cancel(self):
+
+        if not je_mgr.editing_of(self.je_targets):
+            self.log("[Warning] Not in edit mode.")
+            self._update_je_state()
+            return
+
+        count, messages = je_mgr.cancel_edit(self.je_targets)
+        for m in messages:
+            self.log(m)
+        self.log(f"[Done] {count} skinCluster(s) restored.")
+
+        self._update_je_state()
+
     def _mesh_row(self, label, line_edit):
         """라벨 + QLineEdit + 'Set from selection' 버튼 행."""
         row = QHBoxLayout()
@@ -606,6 +850,8 @@ class MainWindow(QWidget):
             "Classic : joint/mesh weight move (Kangaroo or Native engine).\n"
             "Transfer : many source meshes -> selected mesh/vertices (no plugin).\n"
             "Migrate A->B : cross-topology transfer + bone remap.\n"
-            "Bind Pose : make the current joint pose the new bind pose.\n\n"
+            "Bind Pose : make the current joint pose the new bind pose.\n"
+            "Move Joints : Edit toggle - move joints without deforming the mesh,\n"
+            "              then re-bind at the new positions (weights unchanged).\n\n"
             f"Written by Ji Hun Park.\nUpdate date: {LAST_UPDATE}",
         )

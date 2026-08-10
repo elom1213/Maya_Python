@@ -1,8 +1,8 @@
 ---
 title: A00275_skinTool_V01 사용법
-aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose]
+aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose, Move Joints]
 tags: [maya-python, tool-guide, skin, skincluster, bind-pose, rigging]
-updated: 2026-07-24
+updated: 2026-08-10
 ---
 
 # A00275_skinTool_V01 사용법
@@ -10,7 +10,7 @@ updated: 2026-07-24
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.07)
+- **버전**: `app/config/version.py` (v01.08)
 - **설치**: `__dragDrop_A00275.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **SkinTool** → `tools.A00275_skinTool_V01.run(True)`
 
 | 탭 | 내용 |
@@ -19,8 +19,17 @@ updated: 2026-07-24
 | **Transfer** (v01.04~) | **여러 소스 메시 → 현재 선택한 하나의 메시**로 웨이트 전이. **Engine(Native/Kangaroo) 선택**(v01.05~). 선택 버텍스에만/소프트 falloff 반영(Native) |
 | **Migrate A -> B** | 토폴로지가 다른 두 메시 사이 Transfer + Move 통합 마이그레이션 |
 | **Bind Pose** | **조인트를 이동·회전한 현재 상태를 새 바인드 포즈로** |
+| **Move Joints** (v01.08~) | **Edit 토글** — 켜면 조인트를 옮겨도 메시가 변형되지 않고, 다시 끄면 그 자리에서 재바인드. **웨이트 불변** |
 
 Migrate 탭 사용법은 [[A00270_skinMigrate]] 문서와 동일하다.
+
+> **Bind Pose 와 Move Joints 의 차이**
+> 둘 다 "조인트를 옮기고 다시 바인드" 지만 **순서가 반대**다.
+> - **Bind Pose** : 먼저 조인트를 옮긴다(메시가 변형된다) → 버튼을 눌러 **그 결과를 굳힌다**.
+> - **Move Joints** : 먼저 Edit 을 켠다 → **메시가 전혀 안 변하는 상태로** 조인트를 옮긴다 → Edit 을 끈다.
+>
+> 스켈레톤 배치를 손보는 게 목적이면 **Move Joints** 가 맞다. 형상 델타를 굽지 않으므로
+> Orig 셰이프도 blendShape 도 건드리지 않는다.
 
 ---
 
@@ -182,6 +191,64 @@ blendShape의 **타겟 메시가 아직 씬에 남아 연결돼 있고** 그 wei
 
 ---
 
+## 1-B. Move Joints 탭 — 메시를 건드리지 않고 조인트만 옮기기 (v01.08~)
+
+바인드된 메시는 그대로 둔 채 **스켈레톤 배치만 고치고 싶을 때** 쓴다. 조인트 위치를 잘못 잡아
+바인드했거나, 리깅 후에 관절 피벗을 조금 옮겨야 할 때가 대표적이다.
+
+### 사용법
+
+1. 바인드된 메시(또는 그 조인트)를 선택하고 **`Load Selection`**.
+2. **`EDIT JOINTS`** 를 누른다. 버튼이 주황색 **`EDIT ON`** 으로 바뀐다.
+   → 이제 조인트를 아무리 옮기고 돌려도 **메시는 화면에서 1픽셀도 움직이지 않는다.**
+3. 뷰포트에서 조인트를 옮긴다. (`Select Influences` 버튼으로 인플루언스 전체를 한 번에 선택할 수 있다)
+4. 버튼을 **다시 누른다** → 지금 조인트 배치가 새 바인드 상태로 굳는다.
+   메시 형상도 그대로, **버텍스별 웨이트도 편집 전과 완전히 동일**하다.
+
+A00290_BSTool 의 Shape Editor Edit 토글과 같은 조작감이다(켜고 → 고치고 → 다시 꺼서 반영).
+
+- **`Cancel Edit (restore joints)`** — 편집을 버리고 조인트와 바인드 행렬을 **Edit 을 켠 시점으로**
+  되돌린다. 시작 시점의 값을 skinCluster 의 `JUN_jointEditBackup` 문자열 어트리뷰트에 JSON 으로
+  저장해 두므로, 씬을 저장했다 열어도 취소할 수 있다.
+- **`Rebuild bindPose node`**(기본 ON) — 끝낼 때 dagPose 를 다시 만들어 마야의 **Go to Bind Pose** 가
+  새 조인트 배치로 돌아오게 한다.
+- 편집 중에는 `Load Selection` / `Clear` 가 잠긴다(대상을 바꾸면 임시 노드가 씬에 남기 때문).
+- 툴을 닫았다 다시 열어도 **씬을 훑어 편집 중이던 skinCluster 를 되찾는다**(상태는 UI 가 아니라
+  노드에 있다). 탭을 열 때마다 씬 상태로 버튼을 맞춘다.
+
+### 원리
+
+skinCluster 의 인플루언스별 스킨 행렬은 `bindPreMatrix[i] * matrix[i]` 다(`matrix[i]` = 조인트의
+`worldMatrix`). 편집 중 **이 곱을 상수로 유지**하면 조인트가 어디로 가든 출력이 변하지 않는다.
+편집 시작 시점의 값을 `C_i` 로 잡고
+
+```
+C_i                = bindPreMatrix_i(0) * worldMatrix_i(0)      (상수)
+bindPreMatrix_i(t) = C_i * worldInverseMatrix_i(t)              (라이브)
+```
+
+를 인플루언스마다 **multMatrix 노드 하나**로 걸어 준다(`matrixIn[0]` = `C_i`,
+`matrixIn[1]` ← 조인트의 `worldInverseMatrix[0]`). `t = 0` 이면 원래 값 그대로라 **켜는 순간에도
+무변화**다. Edit 을 끄면 multMatrix 의 현재 출력을 `bindPreMatrix` 에 정적으로 굽고 임시 노드를 지운다.
+
+> **`worldInverseMatrix` 를 `bindPreMatrix` 에 그냥 직결하면 안 된다.**
+> 그러면 스킨 행렬이 항등이 되어 메시가 **rest 셰이프로 튄다.** 리그가 바인드 포즈에 있을 때만
+> 우연히 결과가 같고, **포즈된 리그에서는 눈에 띄게 점프한다**(실측 3.6 유닛). 위 `C_i` 보정은
+> 포즈와 무관하게 항상 무변화다(실측 오차 1e-16).
+
+**웨이트는 어느 단계에서도 건드리지 않는다** — `weightList` 를 읽지도 쓰지도 않으므로 버텍스별
+웨이트 동일성은 정의상 보장된다(테스트에서도 배열 전체를 비교해 확인).
+
+### 한계
+
+- `bindPreMatrix` 가 **잠겨 있거나 이미 다른 노드에 연결된** 인플루언스는 잡아둘 수 없다.
+  그 조인트(및 그 조인트를 자식으로 갖는 부모)를 움직이면 메시가 따라 변형된다. 어떤 조인트가
+  빠졌는지 로그로 알려 준다.
+- 조인트를 옮기는 것이지 **웨이트를 다시 계산하지는 않는다.** 관절 위치를 크게 바꾸면 웨이트가
+  그 자리에 맞지 않을 수 있고, 그건 의도된 동작이다(웨이트 보존이 요구사항).
+
+---
+
 ## 2. 왜 툴이 필요한가 — 마야 네이티브로는 안 된다
 
 mayapy 로 직접 검증한 결과다.
@@ -190,7 +257,7 @@ mayapy 로 직접 검증한 결과다.
 |------|------|
 | `skinCluster -e -recacheBindMatrices` | **`bindPreMatrix` 가 전혀 바뀌지 않는다.** 무효 |
 | `dagPose -reset` | **bindPose 가 갱신되지 않는다.** Go to Bind Pose 가 여전히 옛 포즈로 감 |
-| `Move Skinned Joints Tool` | 목적이 다르다 — "메시를 변형시키지 않고 조인트만 이동". 이미 변형된 상태를 굳히지는 못한다 |
+| `Move Skinned Joints Tool` | 목적이 다르다 — "메시를 변형시키지 않고 조인트만 이동". 이미 변형된 상태를 굳히지는 못한다. (그 목적이라면 v01.08 의 **Move Joints 탭**을 쓴다 — 마야 툴과 달리 다중 skinCluster·취소·bindPose 재생성을 함께 처리한다) |
 
 그래서 3단계를 직접 수행한다 (`app/core/bind_pose_manager.py`).
 
@@ -257,3 +324,16 @@ v01.01 회귀 테스트(실제 리그에서 보고된 버그):
 - `bindPreMatrix` 가 연결/잠긴 인플루언스가 있어도 죽지 않고 어떤 조인트가 빠졌는지 안내
 - 3회 반복 실행해도 **`bindPose` 이름 유지 + dagPose 노드 개수 불변**
 - 지오가 2개인 skinCluster 에서 두 번째 지오의 논리 인덱스(=1)를 정확히 찾음
+
+Move Joints 탭 (v01.08):
+
+- 리그가 **바인드 포즈일 때 / 이미 포즈된 상태일 때** 모두 Edit ON·조인트 이동·확정 전 구간 무변화(오차 1e-16)
+- `skinMethod` **linear / dual quaternion / blended** 세 방식 모두
+- **버텍스별 웨이트 배열 전체 비교** — 편집 전후 완전 동일
+- 확정 후 새 배치에서 정상 디폼되고, 확정 시점 포즈로 되돌리면 형상도 복귀
+- `Cancel` 이 조인트 트랜스폼·`bindPreMatrix`·메시 형상을 모두 시작 시점으로 복원
+- **인덱스가 성긴 skinCluster**(`[0,1,2,4]`), **여러 skinCluster 동시** 편집
+- `bindPreMatrix` 가 잠긴 인플루언스는 경고 후 나머지만 홀드(잠긴 조인트를 움직이면 변형됨을 명시)
+- Edit ON 중복 호출 / 편집 아닌 대상 확정은 조용한 no-op, 임시 multMatrix 노드 잔류 없음
+- **툴을 새로 띄워도** 씬을 훑어 편집 중이던 skinCluster 를 되찾고 그 창에서 확정 가능
+- 확정 후 `Go to Bind Pose` 가 새 조인트 배치로 복귀
