@@ -17,6 +17,21 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-10 (오늘)
 
+> [!summary] `A00145_RigConnect` **Constrain 탭의 접이식 섹션을 하위 탭으로 전환** (v01.21→01.22)
+- **요청**: Constrain 탭 안의 `Constraint` / `Skin Weight to Constraint` / `Group Create` 등이 접이식으로
+  위에서 아래로 쌓여 있는데, 이걸 **하위 탭으로 옆에 나열**되게.
+- 기능이 5개로 늘면서 원하는 것을 보려면 접었다 폈다 해야 했다. 이제 `QTabWidget` 중첩으로
+  `Constraint / Skin Weight / Group Create / Transfer / Target Replace` 5개 하위 탭이 되고, 탭 하나에
+  기능 하나만 보인다.
+- 빌더 5개를 `CollapsibleBox` → 일반 탭 페이지(`QWidget` + `QVBoxLayout`)로 바꿨다. 이 파일의 다른 탭
+  빌더와 같은 관용구가 됐고 이름도 `_build_*_box` → `_build_*_page` 로 정리. `CollapsibleBox` 자체는
+  Connect 탭의 Source/Destination 이 계속 쓰므로 남는다.
+- 탭 라벨은 창 폭(560)에 맞춰 줄이고 **전체 이름은 탭 툴팁**으로, 폭이 모자라면 `ElideRight` 로 말줄임.
+  탭 전체를 감싸던 스크롤 영역은 **하위 탭별 스크롤**로 옮겨, 창을 줄여도 위젯이 겹치지 않는다.
+- 검증: 하위 탭 구조/라벨/툴팁/개별 스크롤 · 전 탭 전환 · **5개 페이지의 위젯 속성 전수 존재 확인** ·
+  Matrix 모드 토글 연동 · Constrain/Group Create/Target Replace 실제 동작 회귀 + 기존 A00145 스위트
+  4종(target replace, match from source, attr_match, UI) 전부 통과. #A00145
+
 > [!summary] `A00420_Wrapper` **Add Source / Add Target — 소스와 타깃을 따로 리스트업** (v01.01→01.02)
 - **요청**: `Add Source` / `Add Target` 버튼을 만들어 소스와 타깃을 **따로** 담을 수 있게.
 - **담는 규칙** — "**비어 있는 칸을 위에서 아래로 먼저 채우고, 남으면 그만큼 행을 새로 만든다**".

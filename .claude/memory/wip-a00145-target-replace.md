@@ -26,7 +26,8 @@ A00145_RigConnect **Constrain 탭 5번째 접이식 박스 `Target Replace`** (v
 
 Maya 쪽 함정(연결 열거 / offset 공간·오일러 순서)은 [[constraint-target-plugs-and-offset-spaces]] 참고.
 
-부수 변경: Constrain 탭이 접이식 박스 5개로 늘어 **QScrollArea** 로 감쌌다.
+부수 변경: Constrain 탭이 접이식 박스 5개로 늘어 QScrollArea 로 감쌌다.
+→ **v01.22 에서 접이식을 걷어내고 하위 탭 5개로 바꿨다** ([[prefer-subtabs-over-stacked-collapsibles]]). 스크롤도 하위 탭별로 옮김.
 
 검증: mayapy 헤드리스 — 타입 5종 × rotateOrder 3종 keep-in-place, weight 연결 보존, joint 왕복,
 셰이프 교체, 동명 노드, 방어 케이스 + UI 스모크 전부 통과 ([[mayapy-headless-verify]]).
