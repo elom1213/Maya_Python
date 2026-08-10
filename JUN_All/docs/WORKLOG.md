@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-08-07
+updated: 2026-08-10
 ---
 
 # 작업 일지 (WORKLOG)
@@ -15,7 +15,29 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-08-07 (오늘)
+## 2026-08-10 (오늘)
+
+> [!summary] `A00275_skinTool_V01` **Move Joints 탭 — 메시를 건드리지 않고 조인트 이동 후 재바인드** (v01.07→01.08)
+- **요청**: 바인드된 메시에 영향 없이 조인트를 이동·회전한 뒤, 그 자리에서 다시 바인드되게 하는 기능.
+  UI 는 A00290_BSTool 의 Edit 토글 방식(켜고 → 고치고 → 다시 눌러 반영). **버텍스별 웨이트는 불변.**
+- **원리** — 인플루언스별 스킨 행렬은 `bindPreMatrix[i] * matrix[i]`. 편집 중 이 곱을 **상수로 유지**하면
+  조인트가 어디로 가든 출력이 안 변한다. 시작 시점의 `C_i = bindPre_i(0) * world_i(0)` 를 상수로 잡고
+  `bindPre_i(t) = C_i * worldInverse_i(t)` 를 인플루언스마다 **multMatrix 한 개**로 건다.
+  Edit OFF 는 현재 출력을 정적으로 굽고 임시 노드를 제거 + bindPose 재생성.
+- **함정** — `worldInverseMatrix` 를 `bindPreMatrix` 에 **직결하면 안 된다.** 스킨 행렬이 항등이 되어
+  메시가 rest 로 튄다. 리그가 바인드 포즈일 때만 우연히 같고 **포즈된 리그에서는 3.6 유닛 점프**(실측).
+  위 `C_i` 보정은 포즈와 무관하게 항상 무변화(오차 1e-16).
+- **웨이트 불변은 정의상 보장** — `weightList` 를 읽지도 쓰지도 않는다(테스트에서 배열 전체 비교로 확인).
+- Cancel 은 시작 시점의 `bindPreMatrix` + 조인트 트랜스폼을 skinCluster 의 `JUN_jointEditBackup`
+  문자열 어트리뷰트(JSON)에 저장해 복원. 편집 상태는 UI 가 아니라 **씬(노드)** 에 있어, 툴을 새로 띄워도
+  씬을 훑어 편집 중이던 skinCluster 를 되찾는다.
+- 기존 **Bind Pose 탭과 순서가 반대**인 기능이라 문서에 차이를 명시(Bind Pose = 변형된 결과를 굳힌다 /
+  Move Joints = 변형 없이 옮긴다). Move Joints 는 형상 델타를 굽지 않아 Orig·blendShape 를 안 건드린다.
+- 검증: mayapy 헤드리스 — 바인드/포즈 상태 양쪽, skinMethod 3종, 웨이트 배열 전체 동일, Cancel 복원,
+  성긴 인덱스, 다중 skinCluster, 잠긴 bindPreMatrix, 노드 잔류 없음, Go to Bind Pose + UI 스모크 전부 통과.
+  (`9d1db12`) #A00275
+
+## 2026-08-07
 
 > [!summary] `A00145_RigConnect` **Constrain 탭 Target Replace — 컨스트레인트의 타깃(드라이버) 일괄 교체** (v01.19→01.20)
 - **요청**: 여러 컨스트레인트가 쓰는 타깃들을 리스트업하고, 그중 하나(`tgt_A_02`)를 씬의 다른
