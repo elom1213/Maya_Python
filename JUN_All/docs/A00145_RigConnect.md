@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.21` (`app/config/version.py`) — Connect 탭에 **Match from Source**(이름 유사 어트리뷰트 찾기) 추가 (§Match from Source)
+- 버전: `v01.22` (`app/config/version.py`) — Constrain 탭의 접이식 섹션을 **하위 탭**으로 전환 (§Constrain)
 - 위치: `JUN_All/tools/A00145_RigConnect`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴(`QTabWidget` 6탭)
 - 원본 `A00140_ConnectClosest` / MEL 파일은 그대로 보존(미수정)
@@ -55,10 +55,27 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
 - (MEL 의 Blend Shape 버튼은 제거됨.)
 
 ### Constrain
-접이식 섹션 5개로 구성된다(`CollapsibleBox`). **`Constraint`(기본 펼침)** / **`Skin Weight to
-Constraint`(기본 접힘)** / **`Group Create`(기본 접힘, v01.12, 옵션 확장 v01.13)** / **`Constraint
-Transfer`(기본 접힘, v01.14)** / **`Target Replace`(기본 접힘, v01.20)**.
-섹션이 늘어나 전부 펼치면 창 높이를 넘기므로 탭 전체가 스크롤 영역에 담겨 있다(v01.20).
+기능별 **하위 탭 5개**로 나뉜다(v01.22).
+
+```
+[ Match ][ Constrain ][ Connect ][ Attribute ][ List Connected ][ Connect Closest ]
+          └─ [ Constraint ][ Skin Weight ][ Group Create ][ Transfer ][ Target Replace ]
+```
+
+| 하위 탭 | 내용 |
+|---------|------|
+| **Constraint** | 타겟 → 팔로워 constraint (+ Matrix Constraint, v01.07) |
+| **Skin Weight** | Skin Weight to Constraint — 선택 버텍스의 스킨 웨이트로 구속 (+ Locators) |
+| **Group Create** | 오프셋(zero-out) 노드 삽입 (v01.12, 옵션 확장 v01.13) |
+| **Transfer** | Constraint Transfer — 기존 constraint 를 다른 오브젝트로 이관 (v01.14) |
+| **Target Replace** | 타깃(드라이버)을 다른 오브젝트로 일괄 교체 (v01.20) |
+
+탭 라벨은 창 폭(기본 560)에 맞춰 줄였고 **전체 이름은 탭 툴팁**에 있다. 폭이 모자라면 라벨이
+말줄임(`ElideRight`)된다. **각 하위 탭은 따로 스크롤**되므로 창을 줄여도 위젯이 겹치지 않는다.
+
+> **v01.22 이전**: 접이식 박스(`CollapsibleBox`)를 위에서 아래로 쌓고 탭 전체를 스크롤 영역에
+> 담았다. 기능이 5개로 늘면서 원하는 것을 보려면 접었다 폈다 해야 해서 하위 탭으로 바꿨다.
+> (Connect 탭의 Source/Destination 섹션은 여전히 접이식이다.)
 
 #### Constraint
 타겟(드라이버) → 팔로워로 constraint 를 건다.
@@ -87,7 +104,7 @@ Transfer`(기본 접힘, v01.14)** / **`Target Replace`(기본 접힘, v01.20)**
 - 원본 대비 수정: scale 채널이 translate 플래그로 잘못 게이팅되던 버그, `Maintain Offset` 이 무시되던
   버그를 고쳤다.
 
-#### Skin Weight to Constraint
+#### Skin Weight — Skin Weight to Constraint
 선택한 버텍스의 **스킨 웨이트 비율**대로 영향 joint 들을 weight 로 follower 에 constraint 한다.
 (예: 버텍스 웨이트가 `hip:0.2 / spine_01:0.5 / spine_02:0.3` 이면 세 joint 를 그 비율의
 constraint weight 로 연결.)
@@ -150,7 +167,7 @@ Child       :  obj 와 그 자식들 사이에 삽입 (자식들이 아래로 �
   해석**해 조작한다(중복 이름이면 경고를 남기고 첫 매치 사용).
 - 존재하지 않거나(이름 못 찾음) 잠금/참조 등으로 재부모가 실패한 오브젝트는 건너뛰고 경고를 로그에 남긴다.
 
-#### Constraint Transfer (v01.14)
+#### Transfer — Constraint Transfer (v01.14)
 이미 걸려 있는 constraint 를 **다른 오브젝트에 걸리도록 옮긴다**. 원본 constraint 를 지우고, **세팅이
 같은** constraint 를 오른쪽(대상) 오브젝트에 새로 만든다.
 
@@ -462,7 +479,7 @@ A00145_RigConnect/
     │   └── closest_connector.py    # Connect Closest (A00140 복사)
     └── ui/
         ├── collapsible.py          # CollapsibleBox
-        └── main_window.py          # QTabWidget 6탭 + 공유 로그 + Help>About
+        └── main_window.py          # QTabWidget 6탭(Constrain 은 하위 탭 5개) + 공유 로그 + Help>About
 ```
 
 - 모든 textScrollList 는 `Framework.qt.JUN_mod_tsl_qt_v01` 위젯으로 대체.

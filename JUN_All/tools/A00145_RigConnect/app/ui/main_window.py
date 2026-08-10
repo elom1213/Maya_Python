@@ -191,30 +191,51 @@ class MainWindow(QWidget):
     # Tab : Constrain
     # --------------------------------------------------------------
 
+    # Constrain 하위 탭: (탭 라벨, 툴팁 = 전체 이름/설명, 빌더 메서드 이름).
+    # 라벨을 짧게 두는 이유는 탭 바가 창 폭(기본 560)을 넘기지 않게 하기 위해서다.
+    # 전체 이름은 툴팁에 싣는다.
+    CONSTRAIN_PAGES = (
+        ("Constraint", "Multi target -> follower constraints (+ Matrix Constraint)",
+         "_build_constraint_page"),
+        ("Skin Weight", "Skin Weight to Constraint - constrain by the skin weights "
+         "of the selected vertices", "_build_skin_constraint_page"),
+        ("Group Create", "Insert zero-out offset nodes above / below each object",
+         "_build_group_create_page"),
+        ("Transfer", "Constraint Transfer - move an existing constraint onto "
+         "another object", "_build_constraint_transfer_page"),
+        ("Target Replace", "Swap a constraint target (driver) for another object",
+         "_build_target_replace_page"),
+    )
+
     def _build_constrain_tab(self):
-        # 접이식 박스가 여럿이라 전부 펼치면 창 높이를 넘긴다. Connect 탭과 같이
-        # 스크롤 영역에 담아 위젯이 겹치는 대신 스크롤바가 생기도록 한다.
-        content = QWidget()
-        layout = QVBoxLayout(content)
+        """Constrain 탭 — 기능별 **중첩 탭**.
 
-        # 기존 Constraint 기능은 펼쳐두고(collapsed=False),
-        # 나머지 기능 박스는 접어둔다(collapsed=True).
-        layout.addWidget(self._build_constrain_basic_box())
-        layout.addWidget(self._build_skin_constraint_box())
-        layout.addWidget(self._build_group_create_box())
-        layout.addWidget(self._build_constraint_transfer_box())
-        layout.addWidget(self._build_target_replace_box())
+        예전에는 접이식 박스(CollapsibleBox)를 위에서 아래로 쌓았는데, 기능이 5개로
+        늘면서 원하는 것을 찾으려면 접었다 폈다 해야 했다. 이제 탭 하나에 기능 하나만
+        보인다. 각 페이지는 따로 스크롤되므로 창을 줄여도 위젯이 겹치지 않는다.
+        """
+        tabs = QTabWidget()
+        # 폭이 모자라면 라벨을 자른다(스크롤 화살표만 뜨는 것보다 읽기 쉽다).
+        tabs.tabBar().setElideMode(Qt.ElideRight)
 
-        layout.addStretch(1)
+        for label, tip, builder in self.CONSTRAIN_PAGES:
+            index = tabs.addTab(self._scrolled(getattr(self, builder)()), label)
+            tabs.setTabToolTip(index, tip)
 
+        self.constrain_tabs = tabs
+        return tabs
+
+    def _scrolled(self, widget):
+        """위젯을 스크롤 영역에 담아 돌려준다 (창이 작아도 겹치지 않도록)."""
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setWidget(content)
+        scroll.setWidget(widget)
         return scroll
 
-    def _build_constrain_basic_box(self):
-        """기존 multi target -> follower constraint UI (접이식, 기본 펼침)."""
-        box = CollapsibleBox("Constraint", collapsed=False)
+    def _build_constraint_page(self):
+        """기존 multi target -> follower constraint UI (Constrain 하위 탭)."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
 
         self.tsl_targets = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Targets", select_label="Select",
@@ -226,7 +247,7 @@ class MainWindow(QWidget):
         list_row = QHBoxLayout()
         list_row.addWidget(self.tsl_targets)
         list_row.addWidget(self.tsl_followers)
-        box.addLayout(list_row)
+        layout.addLayout(list_row)
 
         opt_box = QGroupBox("Options")
         opt_layout = QVBoxLayout(opt_box)
@@ -265,14 +286,14 @@ class MainWindow(QWidget):
         self.cb_con_matrix.toggled.connect(self._on_matrix_mode_toggled)
         self._on_matrix_mode_toggled(False)
 
-        box.addWidget(opt_box)
+        layout.addWidget(opt_box)
 
         btn = QPushButton("Constrain")
         btn.setMinimumHeight(32)
         btn.clicked.connect(self.on_constrain)
-        box.addWidget(btn)
+        layout.addWidget(btn)
 
-        return box
+        return page
 
     def _on_matrix_mode_toggled(self, enabled):
         """Matrix Constraint 모드 토글.
@@ -285,13 +306,14 @@ class MainWindow(QWidget):
         for rb in self.rb_con_group.buttons():
             rb.setEnabled(not enabled)
 
-    def _build_skin_constraint_box(self):
-        """Skin Weight to Constraint UI (접이식, 기본 접힘).
+    def _build_skin_constraint_page(self):
+        """Skin Weight to Constraint UI (Constrain 하위 탭).
 
         선택 버텍스의 스킨 웨이트로 영향 joint 들을 그 비율의 weight 로
         follower 에 constraint 한다. constraint 타입은 라디오로 고른다.
         """
-        box = CollapsibleBox("Skin Weight to Constraint", collapsed=True)
+        page = QWidget()
+        layout = QVBoxLayout(page)
 
         # 어떤 버텍스를 선택했는지 리스트업하는 TSL + follower 리스트.
         self.tsl_skin_verts = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
@@ -304,7 +326,7 @@ class MainWindow(QWidget):
         list_row = QHBoxLayout()
         list_row.addWidget(self.tsl_skin_verts)
         list_row.addWidget(self.tsl_skin_followers)
-        box.addLayout(list_row)
+        layout.addLayout(list_row)
 
         opt_box = QGroupBox("Options")
         opt_layout = QVBoxLayout(opt_box)
@@ -344,7 +366,7 @@ class MainWindow(QWidget):
         rb_row.addStretch(1)
         opt_layout.addLayout(rb_row)
 
-        box.addWidget(opt_box)
+        layout.addWidget(opt_box)
 
         btn_row = QHBoxLayout()
 
@@ -369,24 +391,25 @@ class MainWindow(QWidget):
         btn_loc.clicked.connect(self.on_skin_weight_to_locators)
         btn_row.addWidget(btn_loc)
 
-        box.addLayout(btn_row)
+        layout.addLayout(btn_row)
 
-        return box
+        return page
 
-    def _build_group_create_box(self):
-        """Group Create UI (접이식, 기본 접힘).
+    def _build_group_create_page(self):
+        """Group Create UI (Constrain 하위 탭).
 
         리스트업된 각 오브젝트에, 그 오브젝트와 위치·회전이 같은 오프셋 노드를
         부모 쪽/자식 쪽 계층에 삽입한다(zero-out). 노드명은 <obj>_<suffix>_01.
         Suffix / Count / Padding / 노드 타입(Group·오브젝트 타입) / 방향(Parent·Child)
         을 사용자가 지정한다.
         """
-        box = CollapsibleBox("Group Create", collapsed=True)
+        page = QWidget()
+        layout = QVBoxLayout(page)
 
         self.tsl_group_objs = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Objects", select_label="Select",
             list_min_height=180, log_callback=self.log)
-        box.addWidget(self.tsl_group_objs)
+        layout.addWidget(self.tsl_group_objs)
 
         opt_box = QGroupBox("Options")
         opt_layout = QVBoxLayout(opt_box)
@@ -453,7 +476,7 @@ class MainWindow(QWidget):
         side_row.addStretch(1)
         opt_layout.addLayout(side_row)
 
-        box.addWidget(opt_box)
+        layout.addWidget(opt_box)
 
         btn = QPushButton("Create Groups")
         btn.setMinimumHeight(32)
@@ -461,17 +484,18 @@ class MainWindow(QWidget):
             "Insert offset node(s) (same world position/rotation) on the parent\n"
             "and/or child side of each listed object. Name = <object>_<suffix>_01.")
         btn.clicked.connect(self.on_group_create)
-        box.addWidget(btn)
+        layout.addWidget(btn)
 
-        return box
+        return page
 
-    def _build_constraint_transfer_box(self):
-        """Constraint Transfer UI (접이식, 기본 접힘).
+    def _build_constraint_transfer_page(self):
+        """Constraint Transfer UI (Constrain 하위 탭).
 
         왼쪽 목록의 constraint 를 오른쪽 목록의 오브젝트로 옮긴다(원본 삭제 + 동일
         세팅 재생성, maintainOffset 유지로 양쪽 모두 위치/회전 불변). UUID 기반.
         """
-        box = CollapsibleBox("Constraint Transfer", collapsed=True)
+        page = QWidget()
+        layout = QVBoxLayout(page)
 
         # 왼쪽: 옮길 constraint(또는 constraint 가 걸린 트랜스폼).
         self.tsl_cxfer_cons = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
@@ -485,7 +509,7 @@ class MainWindow(QWidget):
         list_row = QHBoxLayout()
         list_row.addWidget(self.tsl_cxfer_cons)
         list_row.addWidget(self.tsl_cxfer_objs)
-        box.addLayout(list_row)
+        layout.addLayout(list_row)
 
         btn = QPushButton("Transfer Constraint")
         btn.setMinimumHeight(32)
@@ -496,19 +520,20 @@ class MainWindow(QWidget):
             "Left items may be constraint nodes or objects that carry constraints.\n"
             "Mapping: 1 object -> all constraints go to it; equal counts -> 1:1.")
         btn.clicked.connect(self.on_transfer_constraint)
-        box.addWidget(btn)
+        layout.addWidget(btn)
 
-        return box
+        return page
 
-    def _build_target_replace_box(self):
-        """Target Replace UI (접이식, 기본 접힘).
+    def _build_target_replace_page(self):
+        """Target Replace UI (Constrain 하위 탭).
 
         리스트업한 constraint 들이 쓰고 있는 타깃(드라이버)을 모아 보여 주고, 고른
         타깃을 씬의 다른 오브젝트로 갈아끼운다. 그 타깃을 쓰지 않는 constraint 는
         건드리지 않는다. constraint 노드는 그대로 두고 입력 연결만 바꾸므로 weight /
         노드 이름 / 다른 타깃은 보존된다.
         """
-        box = CollapsibleBox("Target Replace", collapsed=True)
+        page = QWidget()
+        layout = QVBoxLayout(page)
 
         # 왼쪽: 대상 constraint(또는 constraint 가 걸린 트랜스폼).
         self.tsl_trep_cons = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
@@ -556,13 +581,13 @@ class MainWindow(QWidget):
         list_row = QHBoxLayout()
         list_row.addWidget(self.tsl_trep_cons)
         list_row.addLayout(targets_col)
-        box.addLayout(list_row)
+        layout.addLayout(list_row)
 
         # 아래: 대신 들어갈 오브젝트.
         self.tsl_trep_new = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="New Target (replaces the picked target)", select_label="Select",
             list_min_height=110, log_callback=self.log)
-        box.addWidget(self.tsl_trep_new)
+        layout.addWidget(self.tsl_trep_new)
 
         opt_box = QGroupBox("Options")
         opt_layout = QVBoxLayout(opt_box)
@@ -584,7 +609,7 @@ class MainWindow(QWidget):
             "to the weight by name.")
         opt_layout.addWidget(self.cb_trep_rename)
 
-        box.addWidget(opt_box)
+        layout.addWidget(opt_box)
 
         btn = QPushButton("Replace Target")
         btn.setMinimumHeight(32)
@@ -596,9 +621,9 @@ class MainWindow(QWidget):
             "Mapping: 1 new target -> used for every picked target; equal counts "
             "-> 1:1.")
         btn.clicked.connect(self.on_replace_target)
-        box.addWidget(btn)
+        layout.addWidget(btn)
 
-        return box
+        return page
 
     # --------------------------------------------------------------
     # Tab : Connect
@@ -972,13 +997,13 @@ class MainWindow(QWidget):
             "Match       : match followers to targets (rotateOrder safe)\n"
             "              options: Translation / Rotation / Scale (world) / Parent\n"
             "              + create locators/sphere/cube at targets + vertex normal (+Y)\n"
-            "Constrain   : multi target -> follower constraints\n"
-            "              + Skin Weight to Constraint (weighted Parent/Scale/\n"
-            "                Point/Orient constraint)\n"
-            "              + Locators (auto-create locators and constrain them)\n"
-            "              + Group Create / Constraint Transfer\n"
-            "              + Target Replace (swap a constraint target for\n"
-            "                another object, offset kept)\n"
+            "Constrain   : sub-tabs -\n"
+            "              Constraint   : multi target -> follower (+ Matrix)\n"
+            "              Skin Weight  : constrain by the selected vertices'\n"
+            "                             skin weights (+ auto Locators)\n"
+            "              Group Create : zero-out offset nodes\n"
+            "              Transfer     : move a constraint onto another object\n"
+            "              Target Repl. : swap a constraint target, offset kept\n"
             "Connect     : connect attributes (3 broadcast patterns) + 52 facial\n"
             "              + Match from Source (find the destination attributes\n"
             "                whose names look like the source ones, in order)\n"
