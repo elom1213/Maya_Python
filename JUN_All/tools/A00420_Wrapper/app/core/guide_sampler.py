@@ -188,6 +188,16 @@ class GuidePair(object):
         return bool(s and t and cmds.objExists(s.split(".")[0])
                     and cmds.objExists(t.split(".")[0]))
 
+    def swap(self):
+        """소스 <-> 타깃을 맞바꾼다 (거꾸로 리스트업했을 때 되돌리기).
+
+        이름과 UUID 를 함께 바꾸고, 이전 샘플링에서 계산해 둔 방향/시작점 정보는 더 이상
+        유효하지 않으므로 지운다. flip/enabled 는 행의 성질이라 그대로 둔다.
+        """
+        self.source, self.target = self.target, self.source
+        self.source_uuid, self.target_uuid = self.target_uuid, self.source_uuid
+        self.resolved = ""
+
 
 def sample_pair(pair, default_samples, auto_align=True,
                 src_finder=None, tgt_finder=None):

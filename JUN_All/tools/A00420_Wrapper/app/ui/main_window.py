@@ -176,6 +176,9 @@ class MainWindow(QWidget):
         for label, slot, tip in (
             ("Curve from Edges", self.on_curve_from_edges,
              "Build a guide curve along the selected mesh edges (A00400_CurveTool)."),
+            ("Swap", self.on_swap_pair,
+             "Swap Source and Target on the selected rows,\n"
+             "for pairs that were listed the wrong way round."),
             ("Remove", self.on_remove_pair, "Remove the selected rows."),
             ("Clear", self.on_clear_pairs, "Remove every guide pair."),
         ):
@@ -369,12 +372,18 @@ class MainWindow(QWidget):
         try:
             item = QTreeWidgetItem(self.tree)
             item.setCheckState(COL_ON, Qt.Checked if pair.enabled else Qt.Unchecked)
-            item.setText(COL_SOURCE, pair.source.split("|")[-1])
-            item.setText(COL_TARGET, pair.target.split("|")[-1])
             item.setCheckState(COL_FLIP, Qt.Checked if pair.flip else Qt.Unchecked)
-            item.setText(COL_INFO, "point" if pair.kind == guide_mod.KIND_POINT else "curve")
+            self._fill_row(item, pair)
         finally:
             self._updating = False
+
+    @staticmethod
+    def _fill_row(item, pair):
+        """행의 이름/종류 칸을 pair 의 현재 값으로 채운다 (UUID 로 되찾은 실제 이름)."""
+        item.setText(COL_SOURCE, pair.source_name().split("|")[-1])
+        item.setText(COL_TARGET, pair.target_name().split("|")[-1])
+        item.setText(COL_INFO, pair.resolved or
+                     ("point" if pair.kind == guide_mod.KIND_POINT else "curve"))
 
     def on_item_changed(self, item, column):
         if self._updating:
@@ -441,6 +450,31 @@ class MainWindow(QWidget):
         self.log("Created {0} guide curve(s) from {1} edge group(s): {2}".format(
             len(created), groups, ", ".join(created)))
         self.log("Pair them up with 'Add Curve Pair' once both sides exist.")
+
+    def on_swap_pair(self):
+        """선택한 행의 Source / Target 을 맞바꾼다 (거꾸로 리스트업했을 때)."""
+        rows = sorted(self.tree.indexOfTopLevelItem(i)
+                      for i in self.tree.selectedItems())
+        rows = [r for r in rows if 0 <= r < len(self.pairs)]
+
+        if not rows:
+            self.log("Select the rows to swap first.", warn=True)
+            return
+
+        self._updating = True
+        try:
+            for row in rows:
+                pair = self.pairs[row]
+                pair.swap()
+                self._fill_row(self.tree.topLevelItem(row), pair)
+        finally:
+            self._updating = False
+
+        self.log("Swapped Source / Target on {0} guide pair(s): {1}".format(
+            len(rows),
+            ", ".join("{0} -> {1}".format(
+                self.pairs[r].source_name().split("|")[-1],
+                self.pairs[r].target_name().split("|")[-1]) for r in rows)))
 
     def on_remove_pair(self):
         rows = sorted((self.tree.indexOfTopLevelItem(i)

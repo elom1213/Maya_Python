@@ -1,3 +1,3 @@
 # Wrapper
-VERSION = "01.00"
+VERSION = "01.01"
 LAST_UPDATE = "2026-08-10"
