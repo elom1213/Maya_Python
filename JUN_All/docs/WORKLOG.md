@@ -17,6 +17,22 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-10 (오늘)
 
+> [!summary] `A00145_RigConnect` **Connect / List Connected / Connect Closest 를 Connect 탭의 하위 탭으로** (v01.22→01.23)
+- **요청**: 앞선 Constrain 탭처럼, 이 세 탭도 상위 `Connect` 탭의 하위 탭이 되도록.
+- 세 탭 모두 "연결" 작업이라 최상위에 따로 있을 이유가 없었다. 최상위가 **6탭 → 4탭**
+  (`Match / Constrain / Connect / Attribute`)으로 줄고, Connect 안에 `Connect / List Connected /
+  Connect Closest` 가 들어간다.
+- Constrain 것과 골격이 같아 **`_build_sub_tabs(pages)` 공통 헬퍼로 추출**했다. 두 그룹 모두
+  `CONSTRAIN_PAGES` / `CONNECT_PAGES` 테이블 + 이 헬퍼로 만들어진다.
+- 빌더 이름을 `_build_*_tab` → `_build_*_page` 로 정리. 기존 `_build_connect_tab` 은 그룹 빌더가
+  되고, 어트리뷰트 연결 화면은 `_build_connect_page` 가 됐다.
+- **이중 스크롤 주의** — 기존 Connect 화면은 스스로 `QScrollArea` 를 반환했다. 하위 탭은 `_scrolled()`
+  로 한 번 더 감싸므로, 페이지는 평범한 `QWidget` 을 반환하도록 고쳤다(테스트로 이중 스크롤 없음 확인).
+- Source/Destination 섹션은 **동시에 봐야 하는 짝**이라 접이식 그대로 뒀다.
+- 검증: 최상위 4탭 · Connect 하위 3탭 구조/툴팁/개별 스크롤/이중 스크롤 없음 · 전 탭 전환 ·
+  위젯 속성 전수 존재 확인 · Connect(Match from Source→연결) / List Connected / Connect Closest /
+  Attribute 실제 동작 회귀 + 기존 A00145 스위트 5종 전부 통과. #A00145
+
 > [!summary] `A00145_RigConnect` **Constrain 탭의 접이식 섹션을 하위 탭으로 전환** (v01.21→01.22)
 - **요청**: Constrain 탭 안의 `Constraint` / `Skin Weight to Constraint` / `Group Create` 등이 접이식으로
   위에서 아래로 쌓여 있는데, 이걸 **하위 탭으로 옆에 나열**되게.

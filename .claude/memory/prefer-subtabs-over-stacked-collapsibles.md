@@ -24,4 +24,14 @@ metadata:
 - 접이식이 여전히 맞는 곳: 한 화면에서 **동시에** 봐야 하는 보조 섹션(예: A00145 Connect 탭의
   Source/Destination) — 이건 그대로 `CollapsibleBox` 를 쓴다.
 
-적용 사례: A00145_RigConnect Constrain 탭 v01.22 ([[wip-a00145-target-replace]] 의 부수 변경 갱신).
+**관련 요청(2026-08-10, 같은 날)**: 최상위 탭이 많아도 같은 정리를 원한다 — "Connect,
+List Connected, Connect Closest 도 하나의 탭의 하위탭이 되도록". 성격이 같은 최상위 탭들은
+상위 탭 하나로 묶고 하위 탭으로 내린다.
+
+**이중 스크롤 주의**: 원래 최상위 탭이던 화면은 스스로 `QScrollArea` 를 반환하는 경우가 있다.
+하위 탭으로 내릴 때 `_scrolled()` 로 또 감싸면 스크롤이 겹치므로, 페이지는 평범한 `QWidget` 을
+반환하게 고칠 것.
+
+적용 사례: A00145_RigConnect — Constrain 탭 v01.22(접이식 5개 → 하위 탭),
+Connect 탭 v01.23(최상위 3탭 → 하위 탭, 최상위 6→4탭). 두 그룹 모두
+`CONSTRAIN_PAGES` / `CONNECT_PAGES` 테이블 + 공통 `_build_sub_tabs(pages)` 헬퍼로 만든다.
