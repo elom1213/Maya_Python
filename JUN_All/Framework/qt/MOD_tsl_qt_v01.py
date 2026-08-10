@@ -136,6 +136,26 @@ def _release_order_tracking():
         _ORDER_REF["prev"] = None
 
 
+# ---- 공개 API ----------------------------------------------------------
+# TSL 위젯을 쓰지 않는 툴(예: A00420_Wrapper 의 Guide Pairs 트리)도 **같은 refcount 를
+# 공유**해야 한다. 각자 selectPref 를 직접 켜고 끄면, 한 창이 닫힐 때 다른 창의 순서
+# 추적까지 꺼져 버린다. 그래서 위 내부 헬퍼를 이 이름들로 열어 둔다.
+
+def acquire_order_tracking():
+    """Track Selection Order pref 사용을 선언(필요하면 켠다)."""
+    _acquire_order_tracking()
+
+
+def release_order_tracking():
+    """사용 종료. 마지막 사용자면 우리가 켠 경우에 한해 원래 값으로 되돌린다."""
+    _release_order_tracking()
+
+
+def is_order_tracking():
+    """지금 Track Selection Order pref 가 켜져 있는지(누가 켰든). 조회 실패면 False."""
+    return bool(_get_track_order())
+
+
 def _split_component(name):
     """'grpA|pCube1|pCube1Shape.vtx[0]' -> ('grpA|pCube1|pCube1Shape', 'vtx[0]').
 

@@ -128,17 +128,56 @@ def snap_to_surface(points, finder):
     return snapped
 
 
+# ============================================================ 가이드 종류 판정
+
+def detect_kind(name):
+    """가이드로 쓸 수 있는 대상인지 판정한다.
+
+    KIND_CURVE : NURBS 커브 (transform 또는 shape)
+    KIND_POINT : 버텍스 `.vtx[]` / CV `.cv[]` / 격자점 `.pt[]`, 로케이터·조인트처럼
+                 shape 없이 위치만 쓰는 트랜스폼
+    None       : 가이드로 못 쓰는 것 (메시 오브젝트 자체, 엣지·페이스 등)
+
+    메시 **오브젝트**를 통째로 고른 경우를 일부러 막는다. 그대로 받으면 피벗 한 점이
+    가이드로 조용히 들어가 결과가 이상해지는데, 원인을 찾기 어렵기 때문이다.
+    """
+    if not name:
+        return None
+
+    if "." in name:
+        component = name.split(".", 1)[1]
+        if component.startswith(("vtx[", "cv[", "pt[")):
+            return KIND_POINT
+        return None
+
+    if not cmds.objExists(name):
+        return None
+
+    if curve_shape_of(name):
+        return KIND_CURVE
+
+    shapes = cmds.listRelatives(name, shapes=True, noIntermediate=True,
+                                fullPath=True) or []
+    if not shapes or all(cmds.nodeType(s) == "locator" for s in shapes):
+        return KIND_POINT
+
+    return None
+
+
 # ============================================================ 가이드 -> 컨트롤 포인트
 
 class GuidePair(object):
-    """가이드 한 쌍. 커브 쌍이거나 포인트 쌍이다.
+    """가이드 한 쌍. 커브 쌍이거나 포인트(버텍스/CV/로케이터) 쌍이다.
+
+    종류를 **양쪽 따로** 들고 있다. Source 와 Target 을 따로 리스트업하면 한쪽은 커브,
+    다른 쪽은 버텍스인 행이 생길 수 있는데, 커브(샘플 N 개)와 점(샘플 1 개)은 대응
+    개수가 달라 짝을 지을 수 없다. 그런 행은 샘플링에서 사유와 함께 건너뛴다.
 
     노드는 UUID 로 보관한다(리네임/동명 노드에도 안전, repo 공통 규칙).
     """
 
     def __init__(self, kind, source, target, flip=False, samples=0, enabled=True):
 
-        self.kind = kind
         self.flip = bool(flip)
         self.samples = int(samples)      # 0 이면 전역 설정을 따른다
         self.enabled = bool(enabled)
@@ -147,9 +186,24 @@ class GuidePair(object):
         self.target = target
         self.source_uuid = self._uuid_of(source)
         self.target_uuid = self._uuid_of(target)
+        self.source_kind = kind if source else ""
+        self.target_kind = kind if target else ""
 
         # 마지막 샘플링에서 실제로 쓰인 값(UI 표시용)
         self.resolved = ""
+
+    @property
+    def kind(self):
+        """행의 대표 종류. 양쪽이 다르면 소스 쪽을 따른다."""
+        return self.source_kind or self.target_kind or KIND_CURVE
+
+    def kind_of(self, side):
+        return self.source_kind if side == "source" else self.target_kind
+
+    def kind_mismatch(self):
+        """양쪽이 다른 종류(커브 vs 점)로 채워졌는지."""
+        return bool(self.source_kind and self.target_kind
+                    and self.source_kind != self.target_kind)
 
     # ---- UUID 보관 --------------------------------------------------
 
@@ -206,24 +260,30 @@ class GuidePair(object):
         return bool(cmds.objExists(s.split(".")[0])
                     and cmds.objExists(t.split(".")[0]))
 
-    def set_side(self, side, name):
-        """한쪽(source/target)만 채운다. UUID 도 같이 잡고 이전 샘플링 정보는 지운다."""
+    def set_side(self, side, name, kind=None):
+        """한쪽(source/target)만 채운다. UUID·종류도 같이 잡고 샘플링 정보는 지운다."""
+        if kind is None:
+            kind = detect_kind(name)
+
         if side == "source":
             self.source = name
             self.source_uuid = self._uuid_of(name)
+            self.source_kind = kind or ""
         else:
             self.target = name
             self.target_uuid = self._uuid_of(name)
+            self.target_kind = kind or ""
         self.resolved = ""
 
     def swap(self):
         """소스 <-> 타깃을 맞바꾼다 (거꾸로 리스트업했을 때 되돌리기).
 
-        이름과 UUID 를 함께 바꾸고, 이전 샘플링에서 계산해 둔 방향/시작점 정보는 더 이상
+        이름·UUID·종류를 함께 바꾸고, 이전 샘플링에서 계산해 둔 방향/시작점 정보는 더 이상
         유효하지 않으므로 지운다. flip/enabled 는 행의 성질이라 그대로 둔다.
         """
         self.source, self.target = self.target, self.source
         self.source_uuid, self.target_uuid = self.target_uuid, self.source_uuid
+        self.source_kind, self.target_kind = self.target_kind, self.source_kind
         self.resolved = ""
 
 
@@ -236,6 +296,12 @@ def sample_pair(pair, default_samples, auto_align=True,
     """
     src_name = pair.source_name()
     tgt_name = pair.target_name()
+
+    # 커브(샘플 N 개)와 점(샘플 1 개)은 대응 개수가 달라 짝을 지을 수 없다.
+    if pair.kind_mismatch():
+        raise ValueError(
+            "source is a {0} but target is a {1} - a guide pair must be the "
+            "same kind".format(pair.source_kind, pair.target_kind))
 
     if pair.kind == KIND_POINT:
         src = world_position(src_name).reshape(1, 3)

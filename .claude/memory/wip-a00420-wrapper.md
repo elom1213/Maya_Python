@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: f046a986-cc50-4648-8721-90b85713abbb
-  modified: 2026-08-10T02:33:54.620Z
+  modified: 2026-08-10T08:44:05.039Z
 ---
 
 **신규 툴 (2026-08-10, v01.00)**: `A00420_Wrapper` — 토폴로지가 다른 두 메시에서 소스의 토폴로지는
@@ -29,3 +29,7 @@ metadata:
   [[wip-a00400-curvetool]] 재사용. numpy 는 Maya 2022+ 내장(2024=2.2.6), 없으면 UI 가 기능을 막는다.
 - 성능: 소스 32,222 / 타깃 39,802 정점, 투영 8 회 → 총 0.98 초.
 - **Maya 실사용 확인 완료** (2026-08-10, 사용자 확인). 기본값 Samples 24 / Projection 5 / Relax 0.3 유지.
+- UI 추가분(v01.01~01.03): **Swap**(선택 행의 소스/타깃 맞바꾸기) · **Add Source / Add Target**
+  (한쪽씩 담기, "빈 칸부터 채우고 남으면 행 추가" 규칙) · **버텍스/CV/로케이터 가이드**(메시 오브젝트는
+  피벗 사고 방지를 위해 거부) · **목록→씬 선택**(누른 칸이 소스/타깃/양쪽을 정하고, On/Flip 칸은 제외) ·
+  **Order** 체크박스([[tsl-selection-order]] 의 공개 refcount 헬퍼 공유).

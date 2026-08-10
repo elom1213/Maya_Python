@@ -12,6 +12,7 @@
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_collapsible_qt
+from Framework.qt import JUN_mod_tsl_qt
 
 import maya.cmds as cmds
 
@@ -58,7 +59,16 @@ class MainWindow(QWidget):
         self.pairs = []
         self._updating = False
 
+        # 선택 순서 추적 상태. dict 로 두는 이유는 destroyed 슬롯이 self 를 붙잡지
+        # 않게 하기 위함이다(공용 TSL 위젯과 같은 패턴).
+        self._order_state = {"on": False}
+
         self.build_ui()
+
+        # 창이 없어질 때 우리가 켠 pref 를 놓아준다(전역 설정을 남기지 않도록).
+        self.destroyed.connect(
+            lambda *_a, _s=self._order_state:
+            JUN_mod_tsl_qt.release_order_tracking() if _s["on"] else None)
 
     # ==============================================================
     # UI
@@ -154,6 +164,7 @@ class MainWindow(QWidget):
         self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tree.setMinimumHeight(150)
         self.tree.itemChanged.connect(self.on_item_changed)
+        self.tree.itemSelectionChanged.connect(self.on_tree_selection_changed)
 
         header = self.tree.header()
         self.tree.setColumnWidth(COL_ON, 34)
@@ -176,6 +187,20 @@ class MainWindow(QWidget):
             btn.setToolTip(tip)
             btn.clicked.connect(slot)
             row1.addWidget(btn)
+
+        # 버텍스를 여러 개 담을 때는 고른 순서가 곧 짝짓기 순서다. 그런데 컴포넌트는
+        # Maya 가 기본적으로 인덱스 순서로 돌려주므로, 공용 TSL 위젯과 같은 refcount 를
+        # 통해 Track Selection Order pref 를 켠다.
+        self.chk_order = QCheckBox("Order")
+        self.chk_order.setToolTip(
+            "Keep the order in which you pick things.\n"
+            "Whole objects (curves) already come in pick order, but vertices and CVs\n"
+            "come in index order unless this is on - and that order decides which\n"
+            "source pairs with which target.\n"
+            "Turning it on records from that moment, so pick again afterwards.")
+        self.chk_order.toggled.connect(self._on_order_toggled)
+        row1.addWidget(self.chk_order)
+
         lay.addLayout(row1)
 
         row2 = QHBoxLayout()
@@ -408,10 +433,52 @@ class MainWindow(QWidget):
         missing = pair.missing_side()
         if missing:
             info = "waiting for {0}".format(missing)
+        elif pair.kind_mismatch():
+            info = "{0} / {1} mismatch".format(pair.source_kind, pair.target_kind)
         else:
-            info = pair.resolved or (
-                "point" if pair.kind == guide_mod.KIND_POINT else "curve")
+            info = pair.resolved or pair.kind
         item.setText(COL_INFO, info)
+
+    def on_tree_selection_changed(self):
+        """행을 고르면 그 행이 가리키는 커브/버텍스를 씬에서도 고른다.
+
+        **어느 칸을 눌렀는지**로 무엇을 고를지 정한다.
+          Source 칸 -> 소스만, Target 칸 -> 타깃만, Info 칸 -> 양쪽.
+        On / Flip 은 체크박스 칸이라 씬 선택을 건드리지 않는다(체크하려다 선택이
+        바뀌면 곧바로 Add Source 가 엉뚱한 것을 담게 된다).
+        """
+        if self._updating:
+            return
+
+        column = self.tree.currentColumn()
+        if column in (COL_ON, COL_FLIP):
+            return
+
+        names = []
+        for item in self.tree.selectedItems():
+            row = self.tree.indexOfTopLevelItem(item)
+            if row < 0 or row >= len(self.pairs):
+                continue
+
+            pair = self.pairs[row]
+            if column == COL_SOURCE:
+                sides = [pair.source_name()]
+            elif column == COL_TARGET:
+                sides = [pair.target_name()]
+            else:
+                sides = [pair.source_name(), pair.target_name()]
+
+            names.extend(n for n in sides if n)
+
+        # 지워졌거나 이름이 안 맞는 것은 뺀다(선택 자체가 실패하지 않도록).
+        alive = [n for n in names if cmds.objExists(n.split(".")[0])]
+        if not alive:
+            return
+
+        try:
+            cmds.select(alive, replace=True)
+        except Exception:
+            pass
 
     def on_item_changed(self, item, column):
         if self._updating:
@@ -427,26 +494,73 @@ class MainWindow(QWidget):
         elif column == COL_FLIP:
             pair.flip = item.checkState(COL_FLIP) == Qt.Checked
 
-    def _selected_curves(self):
-        """선택에서 커브만 선택 순서대로. 커브가 없으면 None 을 돌려주고 알린다."""
-        from tools.A00420_Wrapper.app.core.mesh_utils import curve_shape_of
+    def _on_order_toggled(self, checked):
+        """Order 체크박스. 공용 refcount 를 통해 Maya 의 pref 를 켜고 되돌린다."""
+        checked = bool(checked)
+        if checked == self._order_state["on"]:
+            return
 
-        sel = cmds.ls(sl=True, long=True) or []
-        curves = [s for s in sel if curve_shape_of(s)]
+        self._order_state["on"] = checked
+        if checked:
+            JUN_mod_tsl_qt.acquire_order_tracking()
+            self.log("Selection order: ON - pick your curves / vertices again so the "
+                     "order can be recorded.")
+        else:
+            JUN_mod_tsl_qt.release_order_tracking()
+            self.log("Selection order: OFF - components come in index order.")
 
-        if not curves:
-            self.log("Select one or more NURBS curves first. "
-                     "(For vertices or locators use 'Add Point Pair'.)", warn=True)
+    def _maya_selection(self):
+        """현재 선택. Order 가 켜져 있으면 **고른 순서**로 돌려준다.
+
+        오브젝트(커브)는 `ls(sl)` 도 선택 순서를 지키지만 **컴포넌트(버텍스)는 인덱스
+        순서**로 나온다. `ls(orderedSelection)` 은 pref 가 꺼져 있으면 에러 없이 인덱스
+        순서를 주므로(조용한 함정), pref 상태를 보고 판단한다.
+        반환: (이름 리스트, 순서 추적 여부)
+        """
+        tracked = self._order_state["on"] or JUN_mod_tsl_qt.is_order_tracking()
+
+        if tracked:
+            ordered = cmds.ls(orderedSelection=True, long=True, flatten=True) or []
+            if ordered:
+                return ordered, True
+
+        return (cmds.ls(sl=True, long=True, flatten=True) or []), tracked
+
+    def _selected_guides(self):
+        """선택에서 가이드로 쓸 수 있는 것만 (이름, 종류) 로. 없으면 None 을 돌려준다.
+
+        커브 · 버텍스 · CV · 로케이터를 받는다. 메시 오브젝트를 통째로 고른 경우는
+        (피벗 한 점이 조용히 가이드가 되는 사고를 막으려고) 받지 않는다.
+        """
+        sel, tracked = self._maya_selection()
+
+        guides = []
+        for name in sel:
+            kind = guide_mod.detect_kind(name)
+            if kind:
+                guides.append((name, kind))
+
+        if not guides:
+            self.log("Nothing usable selected. Pick NURBS curves, mesh vertices, "
+                     "curve CVs or locators.", warn=True)
             return None
 
-        skipped = len(sel) - len(curves)
+        skipped = len(sel) - len(guides)
         if skipped:
-            self.log("Ignored {0} non-curve selection(s).".format(skipped))
+            self.log("Ignored {0} selection(s) that cannot be a guide "
+                     "(mesh objects, edges, faces).".format(skipped))
 
-        return curves
+        # 버텍스를 여러 개 담을 때 순서가 곧 짝짓기 순서가 된다.
+        components = sum(1 for name, _ in guides if "." in name)
+        if components > 1 and not tracked:
+            self.log("{0} components came in index order, not pick order. Tick "
+                     "'Order' and pick them again if the pairing matters.".format(
+                         components), warn=True)
 
-    def _add_side(self, side, curves):
-        """커브들을 한쪽 칸(source/target)에 담는다.
+        return guides
+
+    def _add_side(self, side, guides):
+        """가이드들을 한쪽 칸(source/target)에 담는다.
 
         비어 있는 칸을 위에서 아래로 먼저 채우고, 남으면 그만큼 행을 새로 만든다.
         그래서 소스 N 개를 담고 타깃 N 개를 담으면 **선택 순서대로 행마다 짝**이 맺힌다.
@@ -459,19 +573,20 @@ class MainWindow(QWidget):
         try:
             index = 0
             for row, pair in enumerate(self.pairs):
-                if index >= len(curves):
+                if index >= len(guides):
                     break
                 if getattr(pair, side):
                     continue
-                pair.set_side(side, curves[index])
+                name, kind = guides[index]
+                pair.set_side(side, name, kind)
                 self._fill_row(self.tree.topLevelItem(row), pair)
                 index += 1
                 filled += 1
 
-            for name in curves[index:]:
+            for name, kind in guides[index:]:
                 source = name if side == "source" else ""
                 target = name if side == "target" else ""
-                pair = guide_mod.GuidePair(guide_mod.KIND_CURVE, source, target)
+                pair = guide_mod.GuidePair(kind, source, target)
                 self.pairs.append(pair)
                 self._append_row(pair)
                 added += 1
@@ -480,25 +595,41 @@ class MainWindow(QWidget):
 
         return filled, added
 
+    def _log_added(self, side, guides, filled, added):
+        curves = sum(1 for _, k in guides if k == guide_mod.KIND_CURVE)
+        points = len(guides) - curves
+
+        what = []
+        if curves:
+            what.append("{0} curve(s)".format(curves))
+        if points:
+            what.append("{0} point(s)".format(points))
+
+        self.log("Listed {0} as {1} ({2} filled an empty row, {3} added a new "
+                 "row).".format(" + ".join(what), side.capitalize(), filled, added))
+
+        mismatched = sum(1 for p in self.pairs if p.kind_mismatch())
+        if mismatched:
+            self.log("{0} row(s) mix a curve with a point - a guide pair must be the "
+                     "same kind on both sides.".format(mismatched), warn=True)
+
     def on_add_source(self):
-        """선택한 커브들을 Source 칸에 담는다."""
-        curves = self._selected_curves()
-        if curves is None:
+        """선택한 커브/버텍스를 Source 칸에 담는다."""
+        guides = self._selected_guides()
+        if guides is None:
             return
 
-        filled, added = self._add_side("source", curves)
-        self.log("Listed {0} curve(s) as Source ({1} filled an empty row, "
-                 "{2} added a new row).".format(len(curves), filled, added))
+        filled, added = self._add_side("source", guides)
+        self._log_added("source", guides, filled, added)
 
     def on_add_target(self):
-        """선택한 커브들을 Target 칸에 담는다."""
-        curves = self._selected_curves()
-        if curves is None:
+        """선택한 커브/버텍스를 Target 칸에 담는다."""
+        guides = self._selected_guides()
+        if guides is None:
             return
 
-        filled, added = self._add_side("target", curves)
-        self.log("Listed {0} curve(s) as Target ({1} filled an empty row, "
-                 "{2} added a new row).".format(len(curves), filled, added))
+        filled, added = self._add_side("target", guides)
+        self._log_added("target", guides, filled, added)
 
         if added:
             self.log("{0} target(s) had no Source row to pair with - add the sources "
@@ -588,15 +719,24 @@ class MainWindow(QWidget):
             self.log("Select rows to remove.", warn=True)
             return
 
-        for row in rows:
-            self.tree.takeTopLevelItem(row)
-            del self.pairs[row]
+        # 행을 지우는 동안 selectionChanged 가 돌면 이미 사라진 행을 씬에서 고르려 한다.
+        self._updating = True
+        try:
+            for row in rows:
+                self.tree.takeTopLevelItem(row)
+                del self.pairs[row]
+        finally:
+            self._updating = False
 
         self.log("Removed {0} guide pair(s).".format(len(rows)))
 
     def on_clear_pairs(self):
-        self.tree.clear()
-        self.pairs = []
+        self._updating = True
+        try:
+            self.tree.clear()
+            self.pairs = []
+        finally:
+            self._updating = False
         self.log("Guide pair list cleared.")
 
     # ==============================================================

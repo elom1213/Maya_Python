@@ -109,6 +109,26 @@ tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
 > [!important] pref 는 **켠 시점부터** 순서를 기록한다. 체크하기 **전에** 해둔 선택은 순서 정보가 없어서
 > 그대로 Select 하면 여전히 인덱스 순서로 담긴다. 반드시 체크한 뒤 다시 고른다.
 
+> [!warning] 컴포넌트의 순서는 **"선택 이벤트" 단위**로만 기록된다. pref 를 켜 두어도
+> `cmds.select([vtx70, vtx10, vtx40])` 처럼 **한 번에 리스트로** 고르면 `ls(orderedSelection=True)` 이
+> **인덱스 순서**를 준다. 하나씩 클릭(= `select(..., add=True)` 를 차례로)해야 순서가 잡힌다.
+> 실제 사용자 조작은 하나씩 찍는 것이라 문제가 없지만, **헤드리스 테스트에서는 `add=True` 로 나눠
+> 골라야** 한다. 오브젝트(커브·트랜스폼)는 한 번에 리스트로 골라도 순서가 유지된다.
+
+### 위젯 없이 쓰기 — 공개 헬퍼
+
+TSL 위젯을 쓰지 않는 툴도 **같은 refcount 를 공유**해야 한다. 각자 `selectPref` 를 직접 켜고 끄면
+한 창이 닫힐 때 다른 창의 순서 추적까지 꺼진다. 그래서 모듈 레벨에 공개 함수를 둔다.
+
+| 함수 | 하는 일 |
+|------|---------|
+| `acquire_order_tracking()` | 사용 선언(필요하면 pref 를 켠다) |
+| `release_order_tracking()` | 사용 종료(마지막 사용자면 우리가 켠 경우에 한해 되돌린다) |
+| `is_order_tracking()` | 지금 pref 가 켜져 있는지(누가 켰든) |
+
+`A00420_Wrapper` 의 Guide Pairs 트리(QTreeWidget)가 이 방식으로 자체 **Order** 체크박스를 붙여 쓴다.
+반납은 위젯의 `destroyed` 시그널에 걸고, 슬롯이 `self` 를 붙잡지 않도록 상태 dict 만 캡처시킨다.
+
 ### 왜 항상 켜두지 않는가
 
 1. `trackSelectionOrder` 는 툴 설정이 아니라 **Maya 전역 프리퍼런스**(userPrefs 에 저장)라, 툴이 말없이
