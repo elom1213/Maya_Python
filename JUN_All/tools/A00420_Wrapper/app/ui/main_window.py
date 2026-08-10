@@ -34,6 +34,9 @@ WINDOW_OBJECT_NAME = "JUN_A00420_Wrapper_window"
 _WARN_COLOR = "#ffb454"
 _OK_COLOR = "#8bd450"
 
+# 한쪽만 담긴 행에서 아직 안 채워진 칸 표시
+_EMPTY_CELL = "< empty >"
+
 # Guide Pairs 트리 컬럼
 COL_ON = 0
 COL_SOURCE = 1
@@ -158,13 +161,16 @@ class MainWindow(QWidget):
         header.setStretchLastSection(True)
         lay.addWidget(self.tree, 1)
 
+        # 소스와 타깃을 따로 담는다. 빈 칸부터 위에서 아래로 채우고, 남으면 행을 늘린다.
+        # 소스 N 개를 담고 타깃 N 개를 담으면 선택 순서대로 행마다 짝이 맺힌다.
         row1 = QHBoxLayout()
         for label, slot, tip in (
-            ("Add Curve Pair", self.on_add_curve_pair,
-             "Select the source curve first, then the target curve.\n"
-             "Selecting 4, 6, ... curves adds them as consecutive pairs."),
-            ("Add Point Pair", self.on_add_point_pair,
-             "Select a source point (vertex / locator / transform), then a target point."),
+            ("Add Source", self.on_add_source,
+             "List the selected curves in the Source column.\n"
+             "They fill the empty Source cells top-down, adding rows when needed."),
+            ("Add Target", self.on_add_target,
+             "List the selected curves in the Target column.\n"
+             "Add the sources first, then the targets in the same order."),
         ):
             btn = QPushButton(label)
             btn.setToolTip(tip)
@@ -173,6 +179,20 @@ class MainWindow(QWidget):
         lay.addLayout(row1)
 
         row2 = QHBoxLayout()
+        for label, slot, tip in (
+            ("Add Curve Pair", self.on_add_curve_pair,
+             "Add both sides at once: select the source curve first, then the target.\n"
+             "Selecting 4, 6, ... curves adds them as consecutive pairs."),
+            ("Add Point Pair", self.on_add_point_pair,
+             "Select a source point (vertex / locator / transform), then a target point."),
+        ):
+            btn = QPushButton(label)
+            btn.setToolTip(tip)
+            btn.clicked.connect(slot)
+            row2.addWidget(btn)
+        lay.addLayout(row2)
+
+        row2b = QHBoxLayout()
         for label, slot, tip in (
             ("Curve from Edges", self.on_curve_from_edges,
              "Build a guide curve along the selected mesh edges (A00400_CurveTool)."),
@@ -185,8 +205,8 @@ class MainWindow(QWidget):
             btn = QPushButton(label)
             btn.setToolTip(tip)
             btn.clicked.connect(slot)
-            row2.addWidget(btn)
-        lay.addLayout(row2)
+            row2b.addWidget(btn)
+        lay.addLayout(row2b)
 
         row3 = QHBoxLayout()
         btn_prev = QPushButton("Show Guide Links")
@@ -380,10 +400,18 @@ class MainWindow(QWidget):
     @staticmethod
     def _fill_row(item, pair):
         """행의 이름/종류 칸을 pair 의 현재 값으로 채운다 (UUID 로 되찾은 실제 이름)."""
-        item.setText(COL_SOURCE, pair.source_name().split("|")[-1])
-        item.setText(COL_TARGET, pair.target_name().split("|")[-1])
-        item.setText(COL_INFO, pair.resolved or
-                     ("point" if pair.kind == guide_mod.KIND_POINT else "curve"))
+        item.setText(COL_SOURCE,
+                     pair.source_name().split("|")[-1] if pair.source else _EMPTY_CELL)
+        item.setText(COL_TARGET,
+                     pair.target_name().split("|")[-1] if pair.target else _EMPTY_CELL)
+
+        missing = pair.missing_side()
+        if missing:
+            info = "waiting for {0}".format(missing)
+        else:
+            info = pair.resolved or (
+                "point" if pair.kind == guide_mod.KIND_POINT else "curve")
+        item.setText(COL_INFO, info)
 
     def on_item_changed(self, item, column):
         if self._updating:
@@ -398,6 +426,83 @@ class MainWindow(QWidget):
             pair.enabled = item.checkState(COL_ON) == Qt.Checked
         elif column == COL_FLIP:
             pair.flip = item.checkState(COL_FLIP) == Qt.Checked
+
+    def _selected_curves(self):
+        """선택에서 커브만 선택 순서대로. 커브가 없으면 None 을 돌려주고 알린다."""
+        from tools.A00420_Wrapper.app.core.mesh_utils import curve_shape_of
+
+        sel = cmds.ls(sl=True, long=True) or []
+        curves = [s for s in sel if curve_shape_of(s)]
+
+        if not curves:
+            self.log("Select one or more NURBS curves first. "
+                     "(For vertices or locators use 'Add Point Pair'.)", warn=True)
+            return None
+
+        skipped = len(sel) - len(curves)
+        if skipped:
+            self.log("Ignored {0} non-curve selection(s).".format(skipped))
+
+        return curves
+
+    def _add_side(self, side, curves):
+        """커브들을 한쪽 칸(source/target)에 담는다.
+
+        비어 있는 칸을 위에서 아래로 먼저 채우고, 남으면 그만큼 행을 새로 만든다.
+        그래서 소스 N 개를 담고 타깃 N 개를 담으면 **선택 순서대로 행마다 짝**이 맺힌다.
+        반환: (채운 기존 행 수, 새로 만든 행 수)
+        """
+        filled = 0
+        added = 0
+
+        self._updating = True
+        try:
+            index = 0
+            for row, pair in enumerate(self.pairs):
+                if index >= len(curves):
+                    break
+                if getattr(pair, side):
+                    continue
+                pair.set_side(side, curves[index])
+                self._fill_row(self.tree.topLevelItem(row), pair)
+                index += 1
+                filled += 1
+
+            for name in curves[index:]:
+                source = name if side == "source" else ""
+                target = name if side == "target" else ""
+                pair = guide_mod.GuidePair(guide_mod.KIND_CURVE, source, target)
+                self.pairs.append(pair)
+                self._append_row(pair)
+                added += 1
+        finally:
+            self._updating = False
+
+        return filled, added
+
+    def on_add_source(self):
+        """선택한 커브들을 Source 칸에 담는다."""
+        curves = self._selected_curves()
+        if curves is None:
+            return
+
+        filled, added = self._add_side("source", curves)
+        self.log("Listed {0} curve(s) as Source ({1} filled an empty row, "
+                 "{2} added a new row).".format(len(curves), filled, added))
+
+    def on_add_target(self):
+        """선택한 커브들을 Target 칸에 담는다."""
+        curves = self._selected_curves()
+        if curves is None:
+            return
+
+        filled, added = self._add_side("target", curves)
+        self.log("Listed {0} curve(s) as Target ({1} filled an empty row, "
+                 "{2} added a new row).".format(len(curves), filled, added))
+
+        if added:
+            self.log("{0} target(s) had no Source row to pair with - add the sources "
+                     "or use Swap.".format(added), warn=True)
 
     def on_add_curve_pair(self):
         from tools.A00420_Wrapper.app.core.mesh_utils import curve_shape_of
@@ -531,8 +636,8 @@ class MainWindow(QWidget):
         try:
             for row, pair in enumerate(self.pairs):
                 item = self.tree.topLevelItem(row)
-                if item is not None and pair.resolved:
-                    item.setText(COL_INFO, pair.resolved)
+                if item is not None:
+                    self._fill_row(item, pair)
         finally:
             self._updating = False
 

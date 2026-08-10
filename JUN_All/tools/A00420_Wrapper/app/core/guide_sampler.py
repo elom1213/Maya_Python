@@ -183,10 +183,38 @@ class GuidePair(object):
     def target_name(self):
         return self._resolve(self.target, self.target_uuid)
 
+    def is_complete(self):
+        """소스와 타깃이 둘 다 채워져 있는지.
+
+        Source / Target 을 따로 리스트업하면 한쪽만 찬 행이 생긴다. 그런 행은 대응을
+        만들 수 없으므로 샘플링에서 건너뛴다.
+        """
+        return bool(self.source and self.target)
+
+    def missing_side(self):
+        """비어 있는 쪽 이름 ("source" / "target"). 둘 다 차 있으면 ""."""
+        if not self.source:
+            return "source"
+        if not self.target:
+            return "target"
+        return ""
+
     def is_valid(self):
+        if not self.is_complete():
+            return False
         s, t = self.source_name(), self.target_name()
-        return bool(s and t and cmds.objExists(s.split(".")[0])
+        return bool(cmds.objExists(s.split(".")[0])
                     and cmds.objExists(t.split(".")[0]))
+
+    def set_side(self, side, name):
+        """한쪽(source/target)만 채운다. UUID 도 같이 잡고 이전 샘플링 정보는 지운다."""
+        if side == "source":
+            self.source = name
+            self.source_uuid = self._uuid_of(name)
+        else:
+            self.target = name
+            self.target_uuid = self._uuid_of(name)
+        self.resolved = ""
 
     def swap(self):
         """소스 <-> 타깃을 맞바꾼다 (거꾸로 리스트업했을 때 되돌리기).
@@ -268,8 +296,18 @@ def build_control_points(pairs, default_samples, auto_align=True,
     tgt_all = []
     used = 0
 
-    for pair in pairs:
+    for index, pair in enumerate(pairs):
         if not pair.enabled:
+            continue
+
+        # Source / Target 을 따로 담다 보면 한쪽만 찬 행이 남는다. 조용히 넘기지 않고
+        # 몇 번째 행의 어느 쪽이 비었는지 알린다.
+        missing = pair.missing_side()
+        if missing:
+            pair.resolved = "no {0}".format(missing)
+            if log:
+                log("Guide row {0} has no {1} - skipped.".format(index + 1, missing),
+                    warn=True)
             continue
 
         try:

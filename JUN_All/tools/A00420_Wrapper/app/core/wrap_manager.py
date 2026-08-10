@@ -288,6 +288,14 @@ def build_preview(source_node, target_node, pairs, options, every=1, log=None):
         if not pair.enabled:
             continue
 
+        missing = pair.missing_side()
+        if missing:
+            pair.resolved = "no {0}".format(missing)
+            if log:
+                log("Guide row {0} has no {1} - skipped.".format(index + 1, missing),
+                    warn=True)
+            continue
+
         try:
             src, tgt, note = sample_pair(pair, options.samples, options.auto_align,
                                          src_finder, tgt_finder)
