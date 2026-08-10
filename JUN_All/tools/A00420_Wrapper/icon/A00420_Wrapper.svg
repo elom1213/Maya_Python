@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- A00420_Wrapper shelf icon: a guide curve pair with correspondence links -->
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+
+  <!-- correspondence links (source sample -> target sample) -->
+  <g stroke="#e8edf2" stroke-width="1.1" stroke-linecap="round" opacity="0.75">
+    <path d="M8.6 8.5 L22.9 8.5"/>
+    <path d="M10.4 14 L20.6 14"/>
+    <path d="M10.4 19 L20.6 19"/>
+    <path d="M8.8 24 L22.6 24"/>
+  </g>
+
+  <!-- source guide curve (still to be wrapped) -->
+  <path d="M8 5 C 5 11, 13 21, 8.5 27"
+        fill="none" stroke="#8a8f98" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- target guide curve (the shape to match) -->
+  <path d="M23.5 5 C 27 12, 19.5 20, 23 27"
+        fill="none" stroke="#ff9e64" stroke-width="2.4"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- first sample marker (start point) on each curve -->
+  <circle cx="8" cy="5.2" r="1.7" fill="#8a8f98"/>
+  <circle cx="23.5" cy="5.2" r="1.9" fill="#ff9e64"/>
+</svg>

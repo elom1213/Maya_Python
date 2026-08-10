@@ -1,0 +1,3 @@
+# Wrapper
+VERSION = "01.00"
+LAST_UPDATE = "2026-08-10"
