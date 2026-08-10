@@ -259,6 +259,23 @@ Default Distance attribute (driver signal x)
 
 - **`A00300_meshDoctor`** — **read-only mesh diagnosis with safe one-click repair**. Detects non-manifold geometry, lamina faces, zero-area faces (judged by shape quality, not just area), n-gons, etc.; **batch-diagnoses many meshes into a colour-coded summary table**, and logs results to JSON/TXT.
 - **`A00380_MeshTool`** — **inflates / shrinks a mesh along its vertex normals** (the equivalent of Houdini's `peak` node), with a live slider preview, Range/Step controls for fine adjustment, and **soft-selection falloff** support. Maya's native route (Move tool with `axis = normal`) issues one command per vertex and is slow; writing **`shape.pnts` in one ranged `setAttr`** instead cut **19,462 vertices from ~7.2 s to 0.10 s (~70x)**. The real behaviour of Maya's tweak and undo stack was verified headlessly with `mayapy`, so the **slider adjustment is itself the committed result** (no separate Apply button) and each stroke **reverts precisely with a single Ctrl+Z**.
+- **`A00420_Wrapper`** — **wraps a mesh onto another mesh of different topology, guided by curves** (the equivalent
+  of Wrap3D's `SelectPointPairs` + `Wrapping`). The source keeps its own topology; only its vertices move until its
+  shape matches the target. Wrap3D builds that correspondence by picking **points** one at a time, but on a face the
+  features that actually matter — lips, eye rims, the nose line — are **lines**, so the guides here are **curve pairs**:
+  one curve becomes dozens of correspondence points, which is far less hand-work.
+  - **A two-stage pipeline**: ① the curve correspondences drive a **thin plate spline** that warps the whole source
+    and **lines the features up**, then ② the warped mesh is iteratively projected onto the closest points of the
+    target surface (non-rigid ICP) to **pick up the detail**. Projection alone drags upper-lip vertices onto the lower
+    lip; warping alone leaves the unguided cheeks and forehead off the surface — the two stages are a pair.
+  - **The two mistakes curve pairs always produce are fixed automatically**: curves running in opposite **directions**,
+    and closed curves (eye/mouth loops) whose **start point (seam)** differs so the whole loop comes out rotated.
+    Both curves are normalised by their own centre and scale (so meshes of different size and position still compare)
+    and the best of the forward/reversed × start-point candidates is chosen. Whether the correspondence is right is
+    **shown as lines drawn between matching samples** before anything is wrapped.
+  - Headless benchmarking picked `MMeshIntersector` for the closest-point queries — **8x faster** than
+    `MFnMesh.getClosestPoint` over 20,000 queries — and moving the coordinate transforms out of the Python loop into
+    numpy gets **32,222 source vertices against 39,802 target vertices, 8 projection passes, done in 0.98 s**.
 - **`A00040_file_exporter_V02`** — export automation: type filters (applied through group hierarchies), referenced-mesh handling, and a choice of flattening to scene root or preserving hierarchy.
 - **`A00050_uvTool`**, **`A00030_quickTool`**, **`A00330_NamingTool`** (legacy naming tool port + Quick Rename), **`A00310_SearchTool`** (select by type/name), **`A00360_SortTool`** (sort by world X/Y/Z, name or type and reorder the Outliner).
 

@@ -34,8 +34,11 @@ JUN_All의 모든 툴을 쓴다고 가정했을 때 필요한 외부 코드와 �
 | **pymel** | Maya 내장 | ❌ (Maya 제공) | A00150, A00160, A00170, A00190 |
 | **maya.cmds / maya.mel / maya.api** | Maya 내장 | ❌ | in-DCC 툴 공통 |
 | **pyinstaller** | standalone venv | ✅ (빌드 시) | A00004/08/80/90 (.exe 빌드) |
+| **numpy** | Maya 2022+ 내장 | ❌ (Maya 제공) | A00420_Wrapper (TPS 워프·표면 투영 벡터 연산) |
 
-그 외(numpy·scipy·requests 등) 외부 의존성은 **없다**.
+그 외(scipy·requests 등) 외부 의존성은 **없다**. numpy 는 Maya 가 번들로 제공하므로(Maya 2024 기준
+2.2.6) in-DCC 툴에서는 추가 설치가 필요 없다. `A00420_Wrapper` 는 numpy 가 없으면 창은 뜨되 기능을
+막고 이유를 로그에 적는다.
 
 ## 3. Maya 버전 → Python / Qt 바인딩 (대략)
 
