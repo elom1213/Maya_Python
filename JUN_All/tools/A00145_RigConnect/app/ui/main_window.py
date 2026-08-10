@@ -30,6 +30,7 @@ from tools.A00145_RigConnect.app.core import skin_constraint_manager as skn_mgr
 from tools.A00145_RigConnect.app.core import group_create_manager as grp_mgr
 from tools.A00145_RigConnect.app.core import constraint_transfer_manager as cxfer_mgr
 from tools.A00145_RigConnect.app.core import constraint_target_manager as ctgt_mgr
+from tools.A00145_RigConnect.app.core import attr_match
 from tools.A00145_RigConnect.app.core import (
     CONSTRAINT_TYPES, connect_closest, find_closest_for_drivers)
 from tools.A00145_RigConnect.app.ui.collapsible import CollapsibleBox
@@ -669,6 +670,11 @@ class MainWindow(QWidget):
         btn_all.clicked.connect(flt.select_all_visible)
         right.addWidget(btn_all)
 
+        # Destination 쪽에만: 소스에서 고른 어트리뷰트와 **이름이 비슷한** 것을 찾아
+        # 소스 순서 그대로 목록 맨 위에 정렬 + 선택한다. 곧바로 Connect 로 이어진다.
+        if role == "dst":
+            right.addLayout(self._build_match_row())
+
         body.addLayout(left)
         body.addLayout(right)
         box.addLayout(body)
@@ -682,6 +688,52 @@ class MainWindow(QWidget):
         btn_list.clicked.connect(lambda: self.on_list_attrs(role))
 
         return box
+
+    def _build_match_row(self):
+        """Destination 패널의 'Match from Source' 행 (버튼 + 옵션)."""
+        row = QHBoxLayout()
+
+        btn = QPushButton("Match from Source")
+        btn.setToolTip(
+            "Find the destination attribute whose NAME is most similar to each "
+            "source attribute.\n"
+            "The matches are moved to the top of this list IN SOURCE ORDER and "
+            "selected,\n"
+            "so 'Connect Source to Destination' pairs them up right away.\n"
+            "\n"
+            "Example: source brow_up / brow_down against\n"
+            "  lod0_mesh_body_eye_L_up, lod0_mesh_body_eye_L_down,\n"
+            "  lod0_mesh_body_brow_up,  lod0_mesh_body_brow_down\n"
+            "  ->  lod0_mesh_body_brow_up, lod0_mesh_body_brow_down\n"
+            "\n"
+            "Names are compared by tokens (brow_up == browUp), so a shared "
+            "boilerplate\n"
+            "prefix like lod0_mesh_body_ is ignored automatically.")
+        btn.clicked.connect(self.on_match_from_source)
+        row.addWidget(btn, 1)
+
+        self.cb_match_unique = QCheckBox("Unique")
+        self.cb_match_unique.setChecked(True)
+        self.cb_match_unique.setToolTip(
+            "On  : one destination attribute is never used twice.\n"
+            "Off : two source attributes may match the same destination.")
+        row.addWidget(self.cb_match_unique)
+
+        row.addWidget(QLabel("Min"))
+        self.sb_match_min = QDoubleSpinBox()
+        self.sb_match_min.setRange(0.0, 1.0)
+        self.sb_match_min.setSingleStep(0.05)
+        self.sb_match_min.setDecimals(2)
+        self.sb_match_min.setValue(attr_match.DEFAULT_MIN_SCORE)
+        self.sb_match_min.setKeyboardTracking(False)
+        self.sb_match_min.setMaximumWidth(70)
+        self.sb_match_min.setToolTip(
+            "How much of the source name must be explained by the match (0-1).\n"
+            "1.00 = every distinctive word of the source appears in the match.\n"
+            "Raise it to reject loose matches, lower it to force a best guess.")
+        row.addWidget(self.sb_match_min)
+
+        return row
 
     # --------------------------------------------------------------
     # Tab : Attribute
@@ -928,6 +980,8 @@ class MainWindow(QWidget):
             "              + Target Replace (swap a constraint target for\n"
             "                another object, offset kept)\n"
             "Connect     : connect attributes (3 broadcast patterns) + 52 facial\n"
+            "              + Match from Source (find the destination attributes\n"
+            "                whose names look like the source ones, in order)\n"
             "Attribute   : copy selected attributes onto other objects,\n"
             "              same name or with a Prefix / Suffix\n"
             "List Conn.  : explore up/down stream nodes by type\n"
@@ -1315,6 +1369,94 @@ class MainWindow(QWidget):
             self.log("[INFO] {0} : {1} selected attribute(s) hidden by the filter "
                      "were skipped".format(label, hidden))
         return names
+
+    def on_match_from_source(self):
+        """소스에서 고른 어트리뷰트와 이름이 가장 비슷한 destination 어트리뷰트를 찾는다.
+
+        찾은 것들을 **소스 순서 그대로** destination 목록 맨 위로 옮기고 선택한다.
+        connect_attrs 가 `src[i] <-> dst[i]` 를 순서로 짝짓기 때문에, 이 상태에서 바로
+        'Connect Source to Destination' 을 누르면 그대로 연결된다.
+        """
+        src = self._connect_widgets["src"]
+        dst = self._connect_widgets["dst"]
+
+        # 소스: 고른 게 있으면 그것, 없으면 지금 보이는 전체.
+        sources, hidden = src["filter"].visible_selected()
+        if hidden:
+            self.log("[INFO] Match : {0} selected source attribute(s) hidden by the "
+                     "filter were skipped".format(hidden))
+        if not sources:
+            sources = src["filter"].visible_texts()
+            if sources:
+                self.log("[INFO] Match : nothing selected in Source - using all "
+                         "{0} visible attribute(s)".format(len(sources)))
+
+        if not sources:
+            self.log("[ERR] Match from Source : source attribute list is empty. "
+                     "Press 'List Attributes' on the Source side first.")
+            return
+
+        dst_list = dst["attrs"]
+        candidates = [dst_list.item(i).text() for i in range(dst_list.count())]
+        if not candidates:
+            self.log("[ERR] Match from Source : destination attribute list is empty. "
+                     "Press 'List Attributes' on the Destination side first.")
+            return
+
+        unique = self.cb_match_unique.isChecked()
+        min_score = self.sb_match_min.value()
+
+        try:
+            matches, unmatched = attr_match.match_attributes(
+                sources, candidates, unique=unique, min_score=min_score)
+        except Exception as e:
+            self.log("[ERR] Match from Source : {0}".format(e))
+            cmds.warning(str(e))
+            return
+
+        # 매칭된 것을 소스 순서대로 앞에, 나머지는 원래 순서대로 뒤에 놓는다.
+        matched_rows = [m["index"] for m in matches]
+        taken = set(matched_rows)
+        ordered = ([candidates[i] for i in matched_rows]
+                   + [c for i, c in enumerate(candidates) if i not in taken])
+
+        # 선택이 필터에 가려지면 연결 대상에서 빠지므로 필터를 비운다.
+        if dst["filter"].text().strip():
+            self.log("[INFO] Match : destination filter cleared so the matched "
+                     "attributes are all visible.")
+            dst["filter"].clear()
+
+        dst_list.clear()
+        dst_list.addItems(ordered)
+        dst["filter"].refresh()
+
+        dst_list.clearSelection()
+        for row in range(len(matches)):
+            dst_list.item(row).setSelected(True)
+        if matches:
+            dst_list.scrollToItem(dst_list.item(0))
+
+        self.log("[OK] Match from Source : {0}/{1} matched ({2}, min {3:.2f})".format(
+            len(matches), len(sources),
+            "unique" if unique else "duplicates allowed", min_score))
+        for m in matches:
+            self.log("       {0}  ->  {1}   ({2:.2f}{3})".format(
+                m["source"], m["target"], m["score"],
+                ", ambiguous" if m["ambiguous"] else ""))
+        for u in unmatched:
+            if u["best"]:
+                self.log("[WARN] no match for '{0}' - closest was '{1}' "
+                         "({2:.2f} < {3:.2f})".format(
+                             u["source"], u["best"], u["score"], min_score))
+            else:
+                self.log("[WARN] no match for '{0}' - nothing similar in the "
+                         "destination list.".format(u["source"]))
+
+        if unmatched:
+            self.log("[INFO] Match : source and destination selections no longer "
+                     "line up 1:1 ({0} source attribute(s) unmatched). Deselect "
+                     "those on the Source side before connecting.".format(
+                         len(unmatched)))
 
     def on_connect_attrs(self):
         src = self._connect_widgets["src"]

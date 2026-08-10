@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.20` (`app/config/version.py`) — Constrain 탭에 **Target Replace** 추가 (§Target Replace)
+- 버전: `v01.21` (`app/config/version.py`) — Connect 탭에 **Match from Source**(이름 유사 어트리뷰트 찾기) 추가 (§Match from Source)
 - 위치: `JUN_All/tools/A00145_RigConnect`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴(`QTabWidget` 6탭)
 - 원본 `A00140_ConnectClosest` / MEL 파일은 그대로 보존(미수정)
@@ -278,6 +278,98 @@ Filter [ inner              ] [Clear]   [Select All]
   3. src/dst attr 수 동일 → obj 쌍 × attr 모두
 - `Connect 52 Facial Target`: 52 ARKit 페이셜 어트리뷰트를 같은 이름끼리 obj 쌍 1:1 로 일괄 연결(없는 attr 은 스킵).
 
+#### Match from Source — 이름이 비슷한 어트리뷰트 찾기 (v01.21)
+
+Destination 패널의 **`Match from Source`** 는 소스에서 고른 어트리뷰트 각각에 대해 **이름이 가장
+비슷한** destination 어트리뷰트를 찾아, **소스 순서 그대로** 목록 맨 위로 올리고 선택한다.
+
+```
+Source (A)  : brow_up, brow_down
+Destination : lod0_mesh_body_eye_L_up,  lod0_mesh_body_eye_L_down,
+              lod0_mesh_body_brow_up,   lod0_mesh_body_brow_down
+                              │ Match from Source
+                              ▼
+Destination : lod0_mesh_body_brow_up    ← 선택됨 (brow_up 에 대응)
+              lod0_mesh_body_brow_down  ← 선택됨 (brow_down 에 대응)
+              lod0_mesh_body_eye_L_up      (나머지는 원래 순서대로 뒤에)
+              lod0_mesh_body_eye_L_down
+```
+
+`Connect Source to Destination` 이 `src[i] ↔ dst[i]` 를 **순서로** 짝짓기 때문에, 이 상태에서 곧바로
+연결 버튼을 누르면 그대로 연결된다. 수백 개 페이셜 타겟을 손으로 하나씩 짝지어 고르던 작업이
+버튼 한 번이 된다.
+
+- 소스에서 **아무것도 선택 안 했으면** 지금 보이는 소스 어트리뷰트 **전체**를 쓴다.
+- 후보는 destination 목록의 **전체 항목**이다. 매칭 후 destination 필터는 **자동으로 비운다**
+  (선택이 필터에 가려지면 연결 대상에서 빠지기 때문).
+- **`Unique`**(기본 ON): destination 어트리뷰트 하나가 두 번 쓰이지 않는다. 소스 순서대로 선점한다.
+- **`Min`**(기본 0.40): 아래 *coverage* 하한. 못 넘으면 "못 찾음" 으로 보고, 가장 가까웠던 후보와
+  그 점수를 로그에 남긴다. 1.00 이면 소스 이름의 변별 단어가 **전부** 들어 있는 후보만 통과한다.
+- 로그에 `source -> target (점수)` 가 한 줄씩 남는다. 같은 점수의 후보가 더 있었으면 `ambiguous`
+  가 붙는다(이름만으로는 못 가렸다는 뜻).
+
+##### 어떻게 찾는가
+
+문자열을 통째로 비교하지 않고 **토큰(단어) 단위**로 비교한다.
+
+1. **토큰화** — 구분자(`_`, `-`, `.`)와 **camelCase 경계** 양쪽에서 자른다.
+   `lod0_mesh_body_brow_up` → `[lod0, mesh, body, brow, up]`, `browInnerUp` → `[brow, inner, up]`.
+   덕분에 **표기 스타일이 달라도**(`browUp` ↔ `brow_up`) 매칭된다.
+2. **역색인(inverted index)** — destination 전체를 **한 번만** 훑어 `토큰 → 후보 목록` 을 만든다.
+   질의마다 후보 전체를 훑지 않는 이유가 이것이다.
+3. **IDF 가중치** `log(1 + m/df)` — `lod0` `mesh` `body` 처럼 **모든 후보에 나오는 토큰은 가중치가
+   0 에 가깝고**, `brow` 처럼 드문 토큰이 점수를 지배한다.
+   → **공통 접두어를 사람이 지정할 필요가 없다. 자동으로 무시된다.**
+4. **coverage** = (후보가 설명하는 질의 토큰의 IDF) / (질의 토큰 IDF 총합), 0~1.
+   이게 로그에 찍히는 점수이자 `Min` 의 기준이다.
+5. **동점 가르기** — precision(후보 쪽도 질의로 설명되는가) · 토큰 연속 등장 · 접미 일치 ·
+   부분 문자열 · 길이 근접을 **작은 가산점**으로 얹는다. 전부 coverage 보다 작아 순위를 뒤집지 못한다.
+   (예: `translateX` 질의는 `rotatePivotTranslateX` 와 coverage 가 똑같이 1.0 이지만, 가산점 덕에
+   정확히 `translateX` 를 고른다.)
+6. **폴백** — 토큰이 하나도 안 겹칠 때만 `difflib` 문자 단위 비교로 구제한다(`browup` ↔ `browsup`).
+   difflib 비율은 coverage 와 척도가 달라(무관한 이름도 0.45 가 흔하다) **0.5→0, 1.0→1 로 다시
+   스케일**해서 같은 문턱값이 양쪽에서 같은 뜻을 갖게 한다.
+
+##### 속도 — O 표기법
+
+기호: **n** = 소스(질의) 어트리뷰트 수, **m** = destination(후보) 어트리뷰트 수,
+**t** = 이름당 토큰 수(작은 상수, 보통 2~6), **L** = 이름 길이,
+**g** = *질의와 토큰을 공유해 실제로 점수를 계산한 후보 수* (핵심 값, 보통 g ≪ m),
+**k** = 질의당 보관하는 상위 후보 수(상수 8).
+
+| 단계 | 복잡도 | 비고 |
+|------|--------|------|
+| 토큰화 + 역색인 구축 | **O(m · L)** | destination 목록당 **한 번만** |
+| 질의 1개: 후보 수집 | **O(g)** | 포스팅 리스트 병합 |
+| 질의 1개: 점수 계산 | **O(g · t)** | 후보마다 토큰 집합 교집합(해시 조회 t 회) |
+| 질의 1개: 상위 k 선별 | **O(g · log k)** | `heapq.nlargest` |
+| **전체** | **O(m · L + n · (g · t + g · log k))** | t, k 는 상수 → 실질 **O(m·L + n·g)** |
+
+- **최악의 경우**: 모든 후보가 모든 질의와 드문 토큰을 공유하면 g → m 이라 **O(n · m · t)**.
+  브루트포스와 차수는 같지만, 쌍마다 하는 일이 편집 거리(O(L²))가 아니라 **해시 조회 t 회**라
+  상수가 훨씬 작다.
+- **정확한 가지치기**: 포스팅 리스트를 **드문 토큰부터** 읽다가, *아직 안 읽은* 토큰들의 IDF 합이
+  `Min × (질의 IDF 총합)` 에 못 미치면 멈춘다. 그 뒤 토큰만 공유하는 후보는 coverage 가 문턱을
+  넘을 **수 없으므로** 버려도 정답을 놓치지 않는다(휴리스틱이 아니라 증명 가능한 가지치기).
+  → `lod0` `mesh` `body` 같은 보일러플레이트 토큰의 **거대한 포스팅 리스트는 아예 읽지 않는다.**
+  실측에서 g 가 341 → 121 로 줄고 전체 시간이 절반이 됐다.
+- **브루트포스 비교**: 모든 (질의, 후보) 쌍의 편집 거리/`difflib` 는 **O(n · m · L²)**.
+  n = m = 1000, L ≈ 25 면 약 6억 회 문자 연산 — 파이썬에서 분 단위다.
+
+**실측** (mayapy, 1 코어. 이름 = `<part>_<dir>_<NNN>`, destination 은 `lod0_mesh_body_` 접두어):
+
+| n = m | 색인 구축 | 전체 | 질의당 | 평균 g |
+|-------|-----------|------|--------|--------|
+| 1,000 | 0.005 s | **0.15 s** | 0.12 ms | 121 |
+| 2,000 | 0.009 s | **0.46 s** | 0.23 ms | 243 |
+| 5,000 | 0.023 s | **2.63 s** | 0.53 ms | 546 |
+
+같은 1,000 × 1,000 을 브루트포스 `difflib` 로 하면 **약 22 초** — **≈ 145 배** 차이다.
+(질의당 시간이 n 에 따라 조금씩 느는 것은 g 가 m 에 비례해 늘기 때문으로, 위 식과 일치한다.)
+
+> 구현: `app/core/attr_match.py`. **maya import 가 없는 순수 파이썬 모듈**이라 DCC 없이
+> 단독으로 테스트·벤치마크할 수 있다. `attr_match.complexity_notes()` 가 위 요약을 문자열로 돌려준다.
+
 ### Attribute (v01.17)
 **소스 오브젝트의 어트리뷰트를 골라, 다른 오브젝트들에 같은 정의로 새로 만든다.**
 이름은 그대로 쓰거나 **Prefix / Suffix** 를 붙일 수 있다.
@@ -361,6 +453,7 @@ A00145_RigConnect/
     │   ├── group_create_manager.py # Group Create (부모/자식 쪽 오프셋 노드 _<suffix>_NN 삽입, 그룹·오브젝트 타입, UUID 기반)
     │   ├── constraint_transfer_manager.py # Constraint Transfer (constraint 를 다른 오브젝트로 이관: 삭제+동일세팅 재생성, MO 유지, UUID 기반)
     │   ├── constraint_target_manager.py # Target Replace (타깃(드라이버) 교체: target[i] 입력 연결만 rewire, offset 재계산, UUID 기반)
+    │   ├── attr_match.py           # Match from Source (이름 유사 어트리뷰트 검색: 토큰 역색인 + IDF, maya 비의존 순수 파이썬)
     │   ├── connect_manager.py      # Connect    (MEL 포팅: attr 나열/검색/연결, 52 facial)
     │   ├── attribute_manager.py    # Attribute  (어트리뷰트 정의를 읽어 다른 오브젝트에 재생성, prefix/suffix)
     │   ├── blendshape_utils.py     # blendShape 타겟(weight 별칭) 조회 — Attribute / Connect 탭 공용
