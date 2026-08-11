@@ -640,6 +640,9 @@ class MainWindow(QWidget):
     # Tab : Connect  (하위 탭 : Connect / List Connected / Connect Closest)
     # --------------------------------------------------------------
 
+    # Connect 페이지의 두 패널 역할 -> 화면에 쓰는 이름. 연결 방향 로그/라벨에 쓴다.
+    ROLE_LABELS = {"src": "Source", "dst": "Destination"}
+
     # Connect 하위 탭: (탭 라벨, 툴팁 = 설명, 빌더 메서드 이름).
     CONNECT_PAGES = (
         ("Connect", "Connect attributes from the source objects to the "
@@ -661,19 +664,38 @@ class MainWindow(QWidget):
         return self.connect_tabs
 
     def _build_connect_page(self):
-        """소스 → 대상 어트리뷰트 연결 UI (Connect 하위 탭)."""
+        """어트리뷰트 연결 UI (Connect 하위 탭). 양방향 모두 지원한다."""
         page = QWidget()
         layout = QVBoxLayout(page)
 
         layout.addWidget(self._build_connect_io("src", "Source Objects"))
         layout.addWidget(self._build_connect_io("dst", "Destination Objects"))
 
-        btn_connect = QPushButton("Connect Source to Destination")
+        # 두 방향을 나란히 둔다. 어느 쪽이 드라이버인지 화살표로 바로 읽힌다.
+        dir_row = QHBoxLayout()
+
+        btn_connect = QPushButton("Source  ->  Destination")
         btn_connect.setMinimumHeight(32)
+        btn_connect.setToolTip(
+            "Connect the selected Source attributes to the selected Destination\n"
+            "attributes (Source drives Destination).")
         btn_connect.clicked.connect(self.on_connect_attrs)
-        layout.addWidget(btn_connect)
+        dir_row.addWidget(btn_connect)
+
+        btn_connect_rev = QPushButton("Destination  ->  Source")
+        btn_connect_rev.setMinimumHeight(32)
+        btn_connect_rev.setToolTip(
+            "The other way round: connect the selected Destination attributes to\n"
+            "the selected Source attributes (Destination drives Source).\n"
+            "Same pairing rules, only the direction is flipped.")
+        btn_connect_rev.clicked.connect(self.on_connect_attrs_reverse)
+        dir_row.addWidget(btn_connect_rev)
+
+        layout.addLayout(dir_row)
 
         btn_facial = QPushButton("Connect 52 Facial Target")
+        btn_facial.setToolTip(
+            "Connect the 52 ARKit facial attributes by name, Source -> Destination.")
         btn_facial.clicked.connect(self.on_connect_52_facial)
         layout.addWidget(btn_facial)
 
@@ -1033,10 +1055,11 @@ class MainWindow(QWidget):
             "              Transfer     : move a constraint onto another object\n"
             "              Target Repl. : swap a constraint target, offset kept\n"
             "Connect     : sub-tabs -\n"
-            "              Connect      : connect attributes (3 broadcast\n"
-            "                             patterns) + 52 facial + Match from\n"
-            "                             Source (find look-alike destination\n"
-            "                             attributes, in source order)\n"
+            "              Connect      : connect attributes BOTH ways\n"
+            "                             (Source -> Destination and back),\n"
+            "                             3 broadcast patterns + 52 facial\n"
+            "                             + Match from Source (find look-alike\n"
+            "                             destination attributes, in order)\n"
             "              List Conn.   : explore up/down stream nodes by type\n"
             "              Conn. Closest: 1:1 closest matching constraints\n"
             "                             + Get Closest\n"
@@ -1513,19 +1536,38 @@ class MainWindow(QWidget):
                          len(unmatched)))
 
     def on_connect_attrs(self):
-        src = self._connect_widgets["src"]
-        dst = self._connect_widgets["dst"]
-        src_objs = src["tsl"].get_all_items()
-        dst_objs = dst["tsl"].get_all_items()
-        src_attrs = self._filtered_attrs("src", "Source")
-        dst_attrs = self._filtered_attrs("dst", "Destination")
+        """Source 어트리뷰트 -> Destination 어트리뷰트."""
+        self._connect_in_direction("src", "dst")
+
+    def on_connect_attrs_reverse(self):
+        """Destination 어트리뷰트 -> Source 어트리뷰트 (역방향)."""
+        self._connect_in_direction("dst", "src")
+
+    def _connect_in_direction(self, from_role, to_role):
+        """한쪽 패널을 드라이버로, 다른 쪽을 구동 대상으로 연결한다.
+
+        두 방향의 차이는 `connect_attrs` 에 넘기는 **인자 순서뿐**이다. 브로드캐스트
+        패턴(오브젝트 1개 -> 다수 등)도 그대로 뒤집혀 적용된다.
+
+        버튼 두 개를 각각 이 메서드로 감싼 이유: `clicked` 시그널은 `checked`(bool)를
+        넘기므로, 방향을 기본 인자로 받는 단일 슬롯에 직접 연결하면 그 bool 이 방향
+        인자로 들어갈 수 있다.
+        """
+        from_label = self.ROLE_LABELS[from_role]
+        to_label = self.ROLE_LABELS[to_role]
+
+        from_objs = self._connect_widgets[from_role]["tsl"].get_all_items()
+        to_objs = self._connect_widgets[to_role]["tsl"].get_all_items()
+        from_attrs = self._filtered_attrs(from_role, from_label)
+        to_attrs = self._filtered_attrs(to_role, to_label)
 
         def _do():
             count, mode = cnt_mgr.connect_attrs(
-                src_objs, dst_objs, src_attrs, dst_attrs)
-            self.log("       {0} connection(s) [{1}]".format(count, mode))
+                from_objs, to_objs, from_attrs, to_attrs)
+            self.log("       {0} connection(s) [{1}]  {2} -> {3}".format(
+                count, mode, from_label, to_label))
 
-        self._run("Connect Source to Destination", _do)
+        self._run("Connect {0} to {1}".format(from_label, to_label), _do)
 
     def on_connect_52_facial(self):
         src = self._connect_widgets["src"]

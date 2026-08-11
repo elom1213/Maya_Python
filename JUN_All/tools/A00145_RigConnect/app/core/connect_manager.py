@@ -175,9 +175,12 @@ def connect_attrs(src_objs, dst_objs, src_attrs, dst_attrs):
         mode = "#objs -> #objs, #attr -> #attr"
 
     else:
+        # 이 함수는 양방향으로 쓰인다(Source->Destination / Destination->Source).
+        # 그래서 메시지는 src/dst 대신 driver/driven 으로 쓴다 — 역방향에서 "src" 가
+        # Destination 개수를 가리켜 읽는 사람을 헷갈리게 하기 때문.
         raise ValueError(
             "Connection fail: attribute counts do not match "
-            "(src {0}, dst {1}).".format(len(src_attrs), len(dst_attrs)))
+            "(driver {0}, driven {1}).".format(len(src_attrs), len(dst_attrs)))
 
     return count, mode
 

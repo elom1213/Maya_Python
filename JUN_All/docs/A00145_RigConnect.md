@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.23` (`app/config/version.py`) — Connect / List Connected / Connect Closest 를 **Connect 탭의 하위 탭**으로 통합 (§Connect)
+- 버전: `v01.24` (`app/config/version.py`) — Connect 하위 탭에 **역방향 연결**(Destination → Source) 추가 (§연결 방향)
 - 위치: `JUN_All/tools/A00145_RigConnect`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴. **최상위 4탭**(Match / Constrain / Connect / Attribute),
   Constrain·Connect 는 다시 **중첩 탭**으로 나뉜다
@@ -288,7 +288,7 @@ Filter [ inner              ] [Clear]   [Select All]
 
 | 하위 탭 | 내용 |
 |---------|------|
-| **Connect** | 어트리뷰트 source → destination 연결 (+ Match from Source, 52 facial) |
+| **Connect** | 어트리뷰트 **양방향** 연결(Source ↔ Destination) (+ Match from Source, 52 facial) |
 | **List Connected** | 오브젝트의 up/down stream 노드를 타입별로 탐색 |
 | **Connect Closest** | 각 driver 에 가장 가까운 오브젝트를 1:1 로 constraint (A00140 이식) |
 
@@ -298,7 +298,7 @@ Constrain 탭과 같은 방식이다(§Constrain 참고) — 짧은 라벨 + 툴
 > 이유가 없어 하나로 묶었고, 최상위는 **Match / Constrain / Connect / Attribute 4탭**이 됐다.
 
 #### Connect — 어트리뷰트 연결
-어트리뷰트를 source → destination 으로 연결한다.
+어트리뷰트를 **양방향으로** 연결한다(v01.24부터 역방향 추가).
 
 - Source/Destination 각 섹션(이 둘은 **동시에** 봐야 해서 탭이 아니라 접이식이다):
   - `Objects` 리스트에 오브젝트 추가 → `List Attributes` 로 첫 오브젝트의 어트리뷰트를 우측 목록에 채움.
@@ -309,11 +309,33 @@ Constrain 탭과 같은 방식이다(§Constrain 참고) — 짧은 라벨 + 툴
   타겟은 `weight[i]` 멀티에 걸린 **별칭(alias)** 이라 일반 멀티 확장으로는 인덱스 0(첫 타겟) 하나만
   잡혔다. 이제 `aliasAttr` 에서 별칭을 직접 읽어 **weight 인덱스 순으로 전부** 목록 맨 앞에 놓는다.
   → 컨트롤러 어트리뷰트 → 블렌드셰이프 타겟 연결을 목록에서 바로 고를 수 있다.
-- `Connect Source to Destination`: 선택된 src/dst 어트리뷰트 수에 따라 3가지 패턴으로 연결.
-  1. src obj 1개 & src/dst attr 수 동일 → 한 src 를 각 dst obj 의 attr 별로
-  2. src/dst attr 각각 1개 → obj 쌍 1:1
-  3. src/dst attr 수 동일 → obj 쌍 × attr 모두
-- `Connect 52 Facial Target`: 52 ARKit 페이셜 어트리뷰트를 같은 이름끼리 obj 쌍 1:1 로 일괄 연결(없는 attr 은 스킵).
+##### 연결 방향 (v01.24)
+
+두 방향 버튼이 나란히 있다. **어느 쪽이 드라이버인지 화살표가 그대로 알려 준다.**
+
+| 버튼 | 방향 |
+|------|------|
+| **`Source  ->  Destination`** | Source 어트리뷰트가 Destination 어트리뷰트를 구동 (기존 동작) |
+| **`Destination  ->  Source`** | 그 반대. Destination 어트리뷰트가 Source 어트리뷰트를 구동 |
+
+- **두 버튼의 차이는 방향뿐이다.** 아래 브로드캐스트 패턴도 **그대로 뒤집혀** 적용된다
+  (예: 역방향에서 Destination 오브젝트가 1개면 그것이 모든 Source 오브젝트로 브로드캐스트).
+- 로그에 `... 6 connection(s) [패턴]  Destination -> Source` 처럼 **방향이 함께** 찍힌다.
+- 리스트를 다시 채울 필요 없이 버튼만 바꿔 누르면 된다. 한쪽에서 `List Attributes` /
+  `Match from Source` 로 짝을 맞춰 놓고 방향만 고르는 흐름이 된다.
+
+**브로드캐스트 패턴** — 선택된 드라이버/구동 대상 어트리뷰트 수에 따라 3가지:
+
+1. 드라이버 obj 1개 & 양쪽 attr 수 동일 → 한 드라이버를 각 대상 obj 의 attr 별로
+2. 양쪽 attr 각각 1개 → obj 쌍 1:1
+3. 양쪽 attr 수 동일 → obj 쌍 × attr 모두
+
+어디에도 안 맞으면 연결하지 않고 `attribute counts do not match (driver N, driven M)` 로 알린다.
+(메시지가 `src/dst` 가 아니라 **driver/driven** 인 이유: 역방향에서는 "src" 가 Destination 을
+가리켜 헷갈리기 때문.)
+
+- `Connect 52 Facial Target`: 52 ARKit 페이셜 어트리뷰트를 같은 이름끼리 obj 쌍 1:1 로 일괄 연결(없는
+  attr 은 스킵). 이 버튼은 **Source → Destination 한 방향**이다.
 
 ##### Match from Source — 이름이 비슷한 어트리뷰트 찾기 (v01.21)
 
