@@ -17,6 +17,24 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-11 (오늘)
 
+> [!summary] `A00110_animTool` **Key Edit 탭의 접이식 섹션을 하위 탭으로** (v01.38→01.39)
+- **요청**: Key Edit 탭의 하위 접이식 항목들을 모두 하위 탭으로. A00145_RigConnect 의 Constrain 탭 참고.
+- 접이식 섹션 5개(Move Keys / Graph Editor / Offset & Hold / Stagger Offset / Delete All Keys)를
+  중첩 `QTabWidget` 으로 바꿨다. A00145 와 같이 `KEY_EDIT_PAGES` 테이블 + `_build_sub_tabs()` 구성,
+  짧은 라벨 + 전체 이름은 탭 툴팁 + `ElideRight`.
+- **A00145 를 그대로 베끼면 안 되는 지점이 하나 있었다** — 이 툴은 창 높이를 콘텐츠에 맞춰 자동으로
+  늘리고 줄인다(`_fit_window`). A00145 처럼 각 페이지를 `QScrollArea` 로 감싸면 스크롤 영역이
+  콘텐츠와 무관한 sizeHint 를 가져 그 자동 맞춤이 깨진다. 그래서 스크롤 대신 상위/하위 페이지를
+  **모두 `JUN_mod_fit_tab_page_v01`** 로 뒀다 — 숨은 페이지가 sizeHint 0 을 보고해야
+  `QStackedLayout` 의 "모든 페이지 중 최댓값" 규칙에 안 걸린다.
+- 하위 탭 전환에도 상위 탭 전환과 같은 규칙(`grow_only=True`)으로 창을 맞춘다.
+- 섹션별 시그널 연결을 각 페이지 빌더 안으로 옮겨 페이지가 자기 완결적이 됐다.
+  위젯 이름(`le_start`, `sld_stagger`, `delall_tsl` …)은 그대로라 핸들러/매니저는 손대지 않았다.
+- 검증: 하위 탭 구조/라벨/툴팁 · **5개 페이지 위젯 속성 전수 존재 확인** · 전 탭 전환 ·
+  Move Keys 실제 키 이동 · Stagger 슬라이더 구동 · 핫키 토글 ·
+  **창 자동 맞춤(438→749→420 실측)** 전부 통과. #A00110
+
+
 > [!summary] `A00145_RigConnect` **개수가 달라도 되는 만큼 연결 — 에러로 중단하지 않음** (v01.24→01.25)
 - **요청**: Source/Destination 어트리뷰트 개수가 서로 달라도 오류 때문에 연결이 도중에 막히는 일이
   없게. 개수가 다르면 **적은 쪽만큼만 연결하고 남는 어트리뷰트는 방치**.

@@ -32,6 +32,16 @@ List Connected, Connect Closest 도 하나의 탭의 하위탭이 되도록". �
 하위 탭으로 내릴 때 `_scrolled()` 로 또 감싸면 스크롤이 겹치므로, 페이지는 평범한 `QWidget` 을
 반환하게 고칠 것.
 
-적용 사례: A00145_RigConnect — Constrain 탭 v01.22(접이식 5개 → 하위 탭),
-Connect 탭 v01.23(최상위 3탭 → 하위 탭, 최상위 6→4탭). 두 그룹 모두
-`CONSTRAIN_PAGES` / `CONNECT_PAGES` 테이블 + 공통 `_build_sub_tabs(pages)` 헬퍼로 만든다.
+**창이 콘텐츠에 맞춰 자동 리사이즈되는 툴에서는 스크롤 영역을 쓰면 안 된다.**
+A00110_animTool 은 `_fit_window` 로 창 높이를 현재 탭 내용에 맞춘다. 이 방식은 숨은 페이지가
+sizeHint 0 을 보고해야 성립하는데(`QStackedLayout` 은 모든 페이지 sizeHint 의 **최댓값**을 쓴다),
+`QScrollArea` 는 콘텐츠와 무관한 sizeHint 를 가져 그 규칙을 깨뜨린다. 이런 툴에서는 스크롤 대신
+**상위 페이지도 하위 페이지도 `Framework/qt/MOD_collapsible_qt_v01.JUN_mod_fit_tab_page_v01`** 로
+둔다. 하위 탭 전환에도 상위 탭 전환과 같은 규칙으로 창을 맞춘다(`_fit_window_later(grow_only=True)`).
+
+적용 사례:
+- A00145_RigConnect — Constrain 탭 v01.22(접이식 5개 → 하위 탭),
+  Connect 탭 v01.23(최상위 3탭 → 하위 탭, 최상위 6→4탭). 페이지는 `QScrollArea` 로 감싼다.
+- A00110_animTool — Key Edit 탭 v01.39(접이식 5개 → 하위 탭). **스크롤 없이 fit page** 사용.
+
+모두 `<GROUP>_PAGES` 테이블 + 공통 `_build_sub_tabs(pages)` 헬퍼로 만든다.
