@@ -11,10 +11,11 @@ from .stagger_offset_manager import StaggerOffsetSession
 from .euler_filter_manager import EulerFilterManager
 from .graph_view_manager import GraphViewManager
 from .graph_focus_manager import GraphFocusManager
+from .fill_key_manager import FillKeyManager, CURRENT_LAYER
 
 __all__ = [
     "KeyframeManager", "HotkeyManager", "PoseKeyManager", "CopyKeyManager",
     "MirrorKeyManager", "MirrorTokenStore", "BakeManager", "FollowMatchManager",
     "OffsetHoldManager", "StaggerOffsetSession", "EulerFilterManager",
-    "GraphViewManager", "GraphFocusManager",
+    "GraphViewManager", "GraphFocusManager", "FillKeyManager", "CURRENT_LAYER",
 ]

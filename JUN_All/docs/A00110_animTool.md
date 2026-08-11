@@ -2,9 +2,10 @@
 
 ## 1. 개요
 
-애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **여덟 개의 탭**과 **공유 로그창**으로 구성된다.
+애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **여섯 개의 탭**과 **공유 로그창**으로 구성된다.
+키 편집 기능은 **Key Edit 탭의 하위 탭 8개**에 모여 있다(v01.40~).
 
-1. **Key Edit** — (v01.39~) **하위 탭 5개**로 구성된다. **Move Keys**: 키를 시간 범위로
+1. **Key Edit** — (v01.40~) **하위 탭 8개**로 구성된다. **Move Keys**: 키를 시간 범위로
    **이동(앞/뒤 offset)·삭제**. **Graph Editor**: 선택한 키 구간을 **평평하게 유지(Hold)**
    (`Shift+A` 핫키 호출 가능). **Offset & Hold**: **리스트업한 컨트롤러**의 키를
    **포즈 유지(hold) + 보간(offset)** 구조로 재배치. **Stagger Offset**(v01.31~):
@@ -98,6 +99,13 @@
 > (되돌리려 들지 않는다 — 그래야 키가 엉뚱한 곳으로 밀리지 않는다).
 > 또 **Offset per Item 을 슬라이더 + 스핀박스**로 바꿨다(A00290_BSTool Shape Editor 패턴 — 같은 값의
 > 두 얼굴, 어느 쪽을 움직이든 즉시 반영하고 반대쪽을 맞춘다). 슬라이더는 ±60f, 그보다 큰 값은 스핀박스로.
+
+> **v01.40 — Key Edit 하위 탭 재편 + Fill Keys 추가**: 최상위였던 **Pose Key / Euler Filter** 를
+> Key Edit 하위 탭으로 내리고(최상위 8→6탭), **Fill Keys** 하위 탭을 새로 추가했다.
+> Fill Keys 는 고른 채널의 `[Start, End]` **모든 프레임**에 키를 채우되 **이미 있는 키는 방치**하고
+> 빈 프레임만 현재 값으로 채운다(애니메이션 불변). 어트리뷰트 목록 UI 는 A00145_RigConnect 의
+> Connect 탭 구성을 따랐고, 구간은 공용 `MOD_timeRange_qt_v01`, **키를 찍을 애니메이션 레이어**를
+> 콤보로 고를 수 있다. 하위 탭이 8개가 되어 창 기본 폭을 520 → 620 으로 늘렸다.
 
 > **v01.39 — Key Edit 탭을 하위 탭 5개로**: 접이식 섹션 5개(Move Keys / Graph Editor /
 > Offset & Hold / Stagger Offset / Delete All Keys)를 **중첩 `QTabWidget`** 으로 바꿨다
@@ -342,7 +350,7 @@ A00110_animTool.run(True)   # True = reload
 
 ```
 ┌ Help ────────────────────────────────────────────────────────┐  ← 메뉴 바 (Help > About)
-│ [Key Edit][Pose Key][Copy Key][Mirror Key][Bake][Follow]      │  ← 탭 (8개)
+│ [Key Edit][Copy Key][Mirror Key][Bake][Follow][Graph Focus]   │  ← 탭 (6개)
 │ [Euler Filter][Graph Focus]                                   │
 ├───────────────────────────────────────────────────────────────┤
 │  (선택된 탭 내용)                                             │
@@ -363,8 +371,8 @@ A00110_animTool.run(True)   # True = reload
 
 ```
 ┌───────────────────────────────────────────────────┐
-│ [Move Keys][Graph Editor][Offset & Hold][Stagger] │  ← Key Edit 하위 탭
-│ [Delete All]                                      │
+│ [Move Keys][Fill Keys][Pose Key][Graph][Offset &  │  ← Key Edit 하위 탭
+│  Hold][Stagger][Euler][Delete All]                │
 │ ┌───────────────────────────────────────────────┐ │
 │ │ Start [ 4 ]  End [ 10 ]  Offset [ 5 ]         │ │  ← Move Keys 선택 시
 │ │ [ ◀ Earlier (-) ]      [ Later (+) ▶ ]        │ │
@@ -376,9 +384,12 @@ A00110_animTool.run(True)   # True = reload
 | 하위 탭 | 내용 |
 |---------|------|
 | **Move Keys** | 구간 키 이동(앞/뒤) · 구간 삭제 |
-| **Graph Editor** | 선택 키 구간 Hold (+ `Shift+A` 핫키) |
+| **Fill Keys** | **구간의 모든 프레임에 키 채우기** (v01.40~, 아래 참고) |
+| **Pose Key** | 현재 프레임에 6축 pose 키 (v01.40~ 상위 탭에서 이동) |
+| **Graph** | Graph Editor — 선택 키 구간 Hold (+ `Shift+A` 핫키) |
 | **Offset & Hold** | 리스트업한 컨트롤러 키를 hold + offset 구조로 재배치 (v01.13~) |
 | **Stagger** | Stagger Offset — 리스트 순서 × Offset 계단식 이동 (v01.31~) |
+| **Euler** | Euler Filter — 구간 한정 오일러 필터 (v01.40~ 상위 탭에서 이동) |
 | **Delete All** | 리스트업한 오브젝트의 모든 키 일괄 삭제 (v01.18~) |
 
 탭 라벨은 창 폭(기본 520)에 맞춰 줄였고 **전체 이름은 탭 툴팁**에 있다(예: `Stagger` →
@@ -403,6 +414,72 @@ A00110_animTool.run(True)   # True = reload
 - **Delete Keys in Range**: `[Start, End]` 구간의 키를 **삭제**(클립보드 미사용).
 - **채널 스코프**: 채널박스(`mainChannelBox`)에서 **어트리뷰트를 선택해 두면 그 채널만**,
   선택이 없으면 **오브젝트의 모든 애니메이션 커브**가 대상이 된다(이동/삭제 공통).
+
+#### Fill Keys 하위 탭 — 구간의 모든 프레임에 키 채우기 (v01.40~)
+
+`[Start, End]` 의 **모든 프레임**에 키가 있게 만든다. **이미 키가 있는 프레임은 그대로 두고**,
+비어 있는 프레임만 **지금 보이는 값 그대로** 키를 찍는다 — 즉 **애니메이션은 전혀 바뀌지 않고**
+키만 촘촘해진다.
+
+```
+┌ Fill Keys ────────────────────────────────────────┐
+│ [Objects]            │ Attributes      Number: 12 │
+│  (List Selected...)  │ [ translateX             ] │
+│  ...                 │ [ translateY             ] │
+│ [List Attributes]    │ [ rotateZ  ...           ] │
+│                      │ [Filter ................] │
+│                      │ [Select All]              │
+│ Start [ 1 ][Get Current] End [ 24 ][Get Current]  │
+│ Anim Layer [ (current) ▾ ]            [ Refresh ] │
+│ [           Fill Keys in Range           ]        │
+└───────────────────────────────────────────────────┘
+```
+
+어트리뷰트 목록 UI 는 [A00145_RigConnect](A00145_RigConnect.md) 의 **Connect 탭과 같은 구성**이다
+(왼쪽 오브젝트 리스트 + `List Attributes`, 오른쪽 목록 + `Filter` + `Select All`).
+
+**사용 순서**
+
+1. 오브젝트를 선택하고 `List Selected Objects` → **`List Attributes`**.
+2. 채울 채널을 목록에서 **다중 선택**(`Filter` 로 좁히고 `Select All` 가능).
+3. **Start / End** 입력(`Get Current` 로 현재 프레임 채우기).
+4. **Anim Layer** 선택 → **`Fill Keys in Range`**. 전체가 **한 번의 Ctrl+Z** 로 되돌아간다.
+
+**나열되는 어트리뷰트**
+
+**키를 찍을 수 있고 · 채널박스에 노출되고 · 잠기지 않은** 채널만 나열한다
+(`listAttr -keyable -visible -unlocked`). 채널박스에만 보이고 키는 못 찍는 채널
+(`setAttr -k false -cb true`)은 제외된다. 여러 오브젝트를 넣으면 **합집합**을 첫 등장 순서로
+보여 주고, 실행할 때 그 채널이 없는 오브젝트는 조용히 건너뛴다(개수만 알림).
+
+**애니메이션 레이어**
+
+| 선택 | 동작 |
+|------|------|
+| **`(current)`**(기본) | 레이어 인자를 넘기지 않는다 → 마야가 평소대로(애니메이션 레이어 에디터에서 **선택된 레이어**) 처리 |
+| 레이어 이름 | 그 레이어에 키를 찍는다. 그 채널이 아직 레이어에 없으면 **자동으로 넣어 준다** |
+
+`Refresh` 로 씬의 레이어 목록을 다시 읽는다(처음 열 때는 **선택된 레이어**가 기본값).
+
+**동작 원리 (mayapy 실측으로 갈랐다)**
+
+- 대상 커브가 **이미 있으면** `setKeyframe(insert=True)` — 커브 모양을 그대로 보존한 채 키만 꽂는다.
+  값을 계산할 필요도 없고 오차도 없다(실측 1.8e-15).
+- 대상 커브가 **없으면**(아직 애니메이션이 없거나, 고른 레이어에 그 채널 커브가 없으면)
+  `insert` 는 **조용히 아무것도 하지 않는다**(실측: 반환 0, 커브 미생성). 그래서 이 경우엔
+  `getAttr(plug, time=f)` 로 프레임별 평가값을 읽어 값으로 키를 찍는다.
+  **값은 반드시 쓰기 전에 전부 미리 구한다** — 레이어 커브에 키가 하나라도 생기면 그 레이어의
+  기여가 달라져 이후 프레임의 평가값이 흔들릴 수 있기 때문이다.
+- `setKeyframe(animLayer=L, value=V)` 는 레이어 커브에 V 를 그대로 쓰는 게 아니라 **최종 평가값이
+  V 가 되도록** 레이어 기여분을 역산해 넣는다. 그래서 평가값을 그대로 넘기면 레이어에서도 모양이 유지된다.
+
+**로그 예시**
+
+```
+Fill Keys: 18 key(s) added, 2 frame(s) already keyed (left alone)  [1-10f, 1 channel(s) x 2 object(s), layer: (current)]
+```
+
+잠긴 채널, 없는 채널은 건너뛰고 로그로 알린다.
 
 #### Graph Editor 하위 탭 (Hold)
 
@@ -480,7 +557,7 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
   (`cmds.cutKey(clear=True)`, 전 구간·전 채널). 이미 씬에서 사라진(삭제/리네임) 항목은 건너뛴다.
   **Undo 가능**(한 번의 Ctrl+Z). 리스트가 비면 경고만 남기고 아무것도 하지 않는다.
 
-### 5.2 Pose Key 탭
+#### Pose Key 하위 탭 (v01.40~ Key Edit 하위로 이동)
 
 ```
 ┌ Set Pose Key (current frame) ─────────────────────┐
@@ -499,7 +576,59 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 - **Set Pose Key**: 선택 오브젝트(들)의 **현재 타임라인 프레임**에 **체크된 축만** 입력값으로
   `setKeyframe`. 체크됐는데 값이 비어 있으면 경고 후 중단.
 
-### 5.3 Copy Key 탭
+#### Euler 하위 탭 — Euler Filter (v01.37~, v01.40~ Key Edit 하위로 이동)
+
+```
+┌───────────────────────────────────────────────────┐
+│ [Euler Filter List]                               │  ← 재사용 위젯 (JUN_mod_tsl_qt_v01)
+│ List Selected Objects                             │
+│ ┌ QListWidget ┐                                   │
+│ │  ctl objs   │                                   │
+│ └─────────────┘                                   │
+│ Add|Del|Up|Down|Sort                              │
+│ Start [ 1 ][Get Current] End [ 24 ][Get Current]  │  ← 공용 timeRange 위젯
+│                              [Get Sel Range]      │
+│ [x] Anchor to the key before Start (seamless)     │  ← 기본 ON
+│ Filters rotateX / Y / Z keys inside [Start, End]  │  ← 안내 라벨
+│ only. Keys outside the range keep their values... │
+│ [ Euler Filter from Selection ]                   │  ← v01.38~ 원버튼 (감지 후 실행)
+│ [ Euler Filter in Range ]                         │  ← 리스트 + Start/End 로 실행
+└───────────────────────────────────────────────────┘
+```
+
+마야 그래프 에디터의 `Curves > Euler Filter` 는 **선택한 컨트롤러의 키가 찍힌 전 구간**을 한꺼번에
+처리한다. 뒤집힌(짐벌 점프) 구간 **하나만** 펴고 나머지 구간은 손대고 싶지 않을 때 쓸 수 없었다.
+이 탭은 **대상(TSL) + 구간(Start/End)** 을 지정해 **그 구간 안의 회전 키만** 편다.
+
+- **Euler Filter List** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `List Selected Objects` 로 현재 Maya
+  선택을 담는다. **씬 선택이 아니라 리스트에 담긴 항목만** 필터된다. 항목은 **UUID 로 추적**되므로
+  담은 뒤 리네임/리페어런트해도 같은 노드를 찾아간다.
+- **Start / End**: 필터할 구간(**양 끝 포함**). 기본값 = 현재 playback 범위. `Get Current` 로 한 칸씩,
+  `Get Sel Range` 로 **그래프 에디터에서 선택한 키의 앞/뒤 프레임**을 두 칸에 함께 채운다 —
+  구간을 눈으로 고르고 그대로 가져오는 게 가장 빠르다.
+- **Anchor to the key before Start** (기본 **ON**): 마야의 오일러 필터는 **구간 안 첫 키를 기준(앵커)**
+  으로 그 뒤 키들을 맞추고, 앵커 키 자체는 절대 바꾸지 않는다. 그래서 **플립 지점이 Start 바로 앞**에
+  있으면(예: 20f 에서 뒤집혔는데 구간을 `[20-40]` 으로 잡으면) 구간 안 키들끼리는 이미 일관돼 있어
+  **아무것도 고쳐지지 않는다**. 이 옵션은 필터 구간을 **Start 직전 키까지 뒤로 넓혀** 그 키를 앵커로
+  삼는다. 앵커 키는 값이 바뀌지 않으므로 **"구간 밖은 그대로"** 라는 약속을 지키면서 **구간 앞쪽이
+  기존 애니메이션과 매끄럽게 이어진다**. 끄면 구간 안 첫 키가 기준이 된다.
+- **Euler Filter from Selection** (v01.38~): **한 번에 실행**. 대상은 **지금 씬에서 선택한 오브젝트**,
+  구간은 **지금 선택한 키의 앞/뒤 프레임**이다. 즉 컨트롤러 3개를 고르고 그래프 에디터에서 문제
+  구간의 키를 박스 드래그로 선택한 뒤 이 버튼만 누르면 된다(리스트에 담고 `Get Sel Range` 를 누르는
+  두 단계를 대신한다). 감지한 대상·구간은 **리스트와 Start/End 칸에도 채워지므로** 무엇이 처리됐는지
+  바로 보이고, 이어서 Anchor 만 바꿔 아래 버튼으로 다시 돌릴 수 있다.
+  - 키를 하나도 선택하지 않았으면 **실행하지 않고 경고**한다(전 구간을 조용히 처리하지 않는다).
+  - 씬 선택이 비어 있으면 **리스트에 담긴 항목**으로 폴백한다(이때 리스트는 덮어쓰지 않는다).
+  - 그래프 에디터의 키 선택은 오브젝트 선택과 별개라, 키를 드래그로 골라도 컨트롤러 선택은 유지된다.
+- **Euler Filter in Range**: 실행. 처리한 오브젝트 수 / 값이 바뀐 키 수 / 구간 / 앵커 적용 수와
+  건너뛴 항목·경고가 로그에 출력된다.
+
+> **End 쪽 이음매(seam)**: 구간 뒤쪽 키는 요청대로 그대로 두므로, 구간 안 키가 ±360° 만큼 펴졌다면
+> **End 와 그 다음 키 사이에 점프가 생긴다**. 이건 "일부 구간만 필터" 의 필연적 결과라 막지 않고
+> 로그로 알린다(`... now step at the End boundary`). 이음매가 싫으면 **End 를 다음 플립 지점 이후로
+> 넓히거나**, 마지막 키까지 포함시키면 된다.
+
+### 5.2 Copy Key 탭
 
 ```
 ┌───────────────────────────────────────────────────┐
@@ -531,7 +660,7 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
   Translate X/Y/Z, Rotate X/Y/Z 6개, 기본 모두 off.
 - **Copy Key**: 복사 실행. 결과(처리한 쌍 수 / 사용한 옵션 / 건너뛴 쌍 / 개수 불일치 경고)가 로그에 출력.
 
-### 5.4 Mirror Key 탭
+### 5.3 Mirror Key 탭
 
 ```
 ┌───────────────────────────────────────────────────┐
@@ -593,7 +722,7 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
       키(없던 채널엔 커브 신규 생성). 애니가 전혀 없으면 전부 포즈만.
   - **Mirror Current Frame**: 실행. 결과(`... at frame N (axis: X; keyed K, posed P).`)가 로그에 출력.
 
-### 5.5 Bake 탭
+### 5.4 Bake 탭
 
 ```
 ┌───────────────────────────────────────────────────┐
@@ -627,7 +756,7 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
   의존 리그에 안전). 순수 FK 라면 꺼서 가속할 수 있다.
 - **Bake List**: 베이크 실행. 결과(개수 / 구간 / 프레임 수 / 컨스트레인트 kept·baked down)가 로그에 출력.
 
-### 5.6 Follow 탭
+### 5.5 Follow 탭
 
 ```
 ┌───────────────────────────────────────────────────┐
@@ -666,59 +795,7 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 - **Match Follow**: 실행. 결과(매치한 follower 수 / 구간 / 프레임 수 / blend / 사용 레이어 / skip)가
   로그에 출력.
 
-### 5.7 Euler Filter 탭 (v01.37~)
-
-```
-┌───────────────────────────────────────────────────┐
-│ [Euler Filter List]                               │  ← 재사용 위젯 (JUN_mod_tsl_qt_v01)
-│ List Selected Objects                             │
-│ ┌ QListWidget ┐                                   │
-│ │  ctl objs   │                                   │
-│ └─────────────┘                                   │
-│ Add|Del|Up|Down|Sort                              │
-│ Start [ 1 ][Get Current] End [ 24 ][Get Current]  │  ← 공용 timeRange 위젯
-│                              [Get Sel Range]      │
-│ [x] Anchor to the key before Start (seamless)     │  ← 기본 ON
-│ Filters rotateX / Y / Z keys inside [Start, End]  │  ← 안내 라벨
-│ only. Keys outside the range keep their values... │
-│ [ Euler Filter from Selection ]                   │  ← v01.38~ 원버튼 (감지 후 실행)
-│ [ Euler Filter in Range ]                         │  ← 리스트 + Start/End 로 실행
-└───────────────────────────────────────────────────┘
-```
-
-마야 그래프 에디터의 `Curves > Euler Filter` 는 **선택한 컨트롤러의 키가 찍힌 전 구간**을 한꺼번에
-처리한다. 뒤집힌(짐벌 점프) 구간 **하나만** 펴고 나머지 구간은 손대고 싶지 않을 때 쓸 수 없었다.
-이 탭은 **대상(TSL) + 구간(Start/End)** 을 지정해 **그 구간 안의 회전 키만** 편다.
-
-- **Euler Filter List** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `List Selected Objects` 로 현재 Maya
-  선택을 담는다. **씬 선택이 아니라 리스트에 담긴 항목만** 필터된다. 항목은 **UUID 로 추적**되므로
-  담은 뒤 리네임/리페어런트해도 같은 노드를 찾아간다.
-- **Start / End**: 필터할 구간(**양 끝 포함**). 기본값 = 현재 playback 범위. `Get Current` 로 한 칸씩,
-  `Get Sel Range` 로 **그래프 에디터에서 선택한 키의 앞/뒤 프레임**을 두 칸에 함께 채운다 —
-  구간을 눈으로 고르고 그대로 가져오는 게 가장 빠르다.
-- **Anchor to the key before Start** (기본 **ON**): 마야의 오일러 필터는 **구간 안 첫 키를 기준(앵커)**
-  으로 그 뒤 키들을 맞추고, 앵커 키 자체는 절대 바꾸지 않는다. 그래서 **플립 지점이 Start 바로 앞**에
-  있으면(예: 20f 에서 뒤집혔는데 구간을 `[20-40]` 으로 잡으면) 구간 안 키들끼리는 이미 일관돼 있어
-  **아무것도 고쳐지지 않는다**. 이 옵션은 필터 구간을 **Start 직전 키까지 뒤로 넓혀** 그 키를 앵커로
-  삼는다. 앵커 키는 값이 바뀌지 않으므로 **"구간 밖은 그대로"** 라는 약속을 지키면서 **구간 앞쪽이
-  기존 애니메이션과 매끄럽게 이어진다**. 끄면 구간 안 첫 키가 기준이 된다.
-- **Euler Filter from Selection** (v01.38~): **한 번에 실행**. 대상은 **지금 씬에서 선택한 오브젝트**,
-  구간은 **지금 선택한 키의 앞/뒤 프레임**이다. 즉 컨트롤러 3개를 고르고 그래프 에디터에서 문제
-  구간의 키를 박스 드래그로 선택한 뒤 이 버튼만 누르면 된다(리스트에 담고 `Get Sel Range` 를 누르는
-  두 단계를 대신한다). 감지한 대상·구간은 **리스트와 Start/End 칸에도 채워지므로** 무엇이 처리됐는지
-  바로 보이고, 이어서 Anchor 만 바꿔 아래 버튼으로 다시 돌릴 수 있다.
-  - 키를 하나도 선택하지 않았으면 **실행하지 않고 경고**한다(전 구간을 조용히 처리하지 않는다).
-  - 씬 선택이 비어 있으면 **리스트에 담긴 항목**으로 폴백한다(이때 리스트는 덮어쓰지 않는다).
-  - 그래프 에디터의 키 선택은 오브젝트 선택과 별개라, 키를 드래그로 골라도 컨트롤러 선택은 유지된다.
-- **Euler Filter in Range**: 실행. 처리한 오브젝트 수 / 값이 바뀐 키 수 / 구간 / 앵커 적용 수와
-  건너뛴 항목·경고가 로그에 출력된다.
-
-> **End 쪽 이음매(seam)**: 구간 뒤쪽 키는 요청대로 그대로 두므로, 구간 안 키가 ±360° 만큼 펴졌다면
-> **End 와 그 다음 키 사이에 점프가 생긴다**. 이건 "일부 구간만 필터" 의 필연적 결과라 막지 않고
-> 로그로 알린다(`... now step at the End boundary`). 이음매가 싫으면 **End 를 다음 플립 지점 이후로
-> 넓히거나**, 마지막 키까지 포함시키면 된다.
-
-### 5.8 Graph Focus 탭 (v01.25~)
+### 5.6 Graph Focus 탭 (v01.25~)
 
 ```
 ┌ Focus Graph Editor around Current Frame ──────────┐

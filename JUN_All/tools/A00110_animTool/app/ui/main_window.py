@@ -7,6 +7,7 @@ from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_collapsible_qt
 from Framework.qt import JUN_mod_timeRange_qt
+from Framework.qt import JUN_mod_filter_qt
 from Framework.qt.maya_window import maya_main_window
 from Framework.core.maya_refresh import force_refresh
 
@@ -28,6 +29,8 @@ from tools.A00110_animTool.app.core import StaggerOffsetSession
 from tools.A00110_animTool.app.core import EulerFilterManager
 from tools.A00110_animTool.app.core import GraphViewManager
 from tools.A00110_animTool.app.core import GraphFocusManager
+from tools.A00110_animTool.app.core import FillKeyManager
+from tools.A00110_animTool.app.core import CURRENT_LAYER
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -76,7 +79,7 @@ class MainWindow(QWidget):
 
         self.setObjectName(WINDOW_OBJECT_NAME)
 
-        self.win_width  = 520
+        self.win_width  = 620
         self.win_height = 600
         self.win_title  = f"Anim Key Tool v{VERSION}"
 
@@ -165,12 +168,10 @@ class MainWindow(QWidget):
 
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_key_edit_tab(), "Key Edit")
-        self.tabs.addTab(self._build_pose_key_tab(), "Pose Key")
         self.tabs.addTab(self._build_copy_key_tab(), "Copy Key")
         self.tabs.addTab(self._build_mirror_key_tab(), "Mirror Key")
         self.tabs.addTab(self._build_bake_tab(), "Bake")
         self.tabs.addTab(self._build_follow_tab(), "Follow")
-        self.tabs.addTab(self._build_euler_filter_tab(), "Euler Filter")
         self.tabs.addTab(self._build_graph_focus_tab(), "Graph Focus")
         main_layout.addWidget(self.tabs)
 
@@ -241,13 +242,20 @@ class MainWindow(QWidget):
     KEY_EDIT_PAGES = (
         ("Move Keys", "Move Keys - shift the keys in a frame range, or delete "
          "that range", "_build_move_keys_page"),
-        ("Graph Editor", "Graph Editor - hold the key range selected in the "
-         "Graph Editor (+ Shift+A hotkey)", "_build_graph_editor_page"),
+        ("Fill Keys", "Fill Keys - put a key on every frame of a range for the "
+         "chosen channels, leaving the existing keys alone",
+         "_build_fill_keys_page"),
+        ("Pose Key", "Pose Key - set a 6-axis pose key on the selected objects "
+         "at the current frame", "_build_pose_key_page"),
+        ("Graph", "Graph Editor - hold the key range selected in the Graph "
+         "Editor (+ Shift+A hotkey)", "_build_graph_editor_page"),
         ("Offset & Hold", "Offset & Hold - rebuild the listed controllers' keys "
          "as a hold + offset structure", "_build_offset_hold_page"),
         ("Stagger", "Stagger Offset - shift each listed controller by "
          "'list order x offset' (follow-through / wave)",
          "_build_stagger_offset_page"),
+        ("Euler", "Euler Filter - run an euler filter on the listed controllers, "
+         "limited to a frame range", "_build_euler_filter_page"),
         ("Delete All", "Delete All Keys - delete every keyframe of the listed "
          "objects", "_build_delete_all_page"),
     )
@@ -330,6 +338,101 @@ class MainWindow(QWidget):
         self.btn_move_fwd.clicked.connect(lambda: self.on_move(+1))
         self.btn_delete.clicked.connect(self.on_delete)
 
+        return page
+
+    # ---------------- Key Edit > Fill Keys ----------------
+
+    def _build_fill_keys_page(self):
+        """구간의 모든 프레임에 키를 채우는 페이지 (Key Edit 하위 탭).
+
+        어트리뷰트 목록 UI 는 A00145_RigConnect 의 Connect 탭과 같은 구성이다 —
+        왼쪽에 오브젝트 리스트 + `List Attributes`, 오른쪽에 어트리뷰트 목록 + Filter +
+        `Select All`.
+        """
+        page, layout = self._sub_page()
+
+        body = QHBoxLayout()
+
+        # --- 왼쪽: 대상 오브젝트 ---
+        left = QVBoxLayout()
+        self.fill_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", select_label="List Selected Objects",
+            list_min_height=130, log_callback=self.log)
+        left.addWidget(self.fill_tsl)
+
+        btn_list = QPushButton("List Attributes")
+        btn_list.setToolTip(
+            "List the keyable channels of the listed objects (union).\n"
+            "Only channels that are keyable, shown in the channel box and "
+            "unlocked are listed.")
+        btn_list.clicked.connect(self.on_fill_list_attrs)
+        left.addWidget(btn_list)
+        body.addLayout(left)
+
+        # --- 오른쪽: 어트리뷰트 목록 ---
+        right = QVBoxLayout()
+        head = QHBoxLayout()
+        head.addWidget(QLabel("Attributes"))
+        head.addStretch(1)
+        self.lbl_fill_number = QLabel("Number: 0")
+        head.addWidget(self.lbl_fill_number)
+        right.addLayout(head)
+
+        self.lw_fill_attrs = QListWidget()
+        self.lw_fill_attrs.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lw_fill_attrs.setMinimumHeight(130)
+        right.addWidget(self.lw_fill_attrs)
+
+        self.flt_fill = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_fill_attrs, placeholder="Type any part of a channel name",
+            number_label=self.lbl_fill_number)
+        right.addWidget(self.flt_fill)
+
+        btn_all = QPushButton("Select All")
+        btn_all.setToolTip("Select every channel currently visible in the list.")
+        btn_all.clicked.connect(self.flt_fill.select_all_visible)
+        right.addWidget(btn_all)
+
+        body.addLayout(right)
+        layout.addLayout(body)
+
+        # --- 구간 ---
+        self.fill_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_placeholder="1", end_placeholder="24", log_callback=self.log)
+        layout.addWidget(self.fill_range)
+
+        # --- 애니메이션 레이어 ---
+        layer_row = QHBoxLayout()
+        layer_row.addWidget(QLabel("Anim Layer"))
+        self.cmb_fill_layer = QComboBox()
+        self.cmb_fill_layer.setToolTip(
+            "Which animation layer the new keys go on.\n"
+            "'(current)' leaves it to Maya - the layer selected in the Anim Layer "
+            "editor.")
+        layer_row.addWidget(self.cmb_fill_layer, 1)
+
+        btn_layers = QPushButton("Refresh")
+        btn_layers.setToolTip("Re-scan the scene for animation layers.")
+        btn_layers.clicked.connect(self.on_fill_refresh_layers)
+        layer_row.addWidget(btn_layers)
+        layout.addLayout(layer_row)
+
+        self.on_fill_refresh_layers(quiet=True)
+
+        # --- 실행 ---
+        self.btn_fill_keys = QPushButton("Fill Keys in Range")
+        self.btn_fill_keys.setMinimumHeight(32)
+        self.btn_fill_keys.setToolTip(
+            "Put a key on every frame of [Start, End] for the selected channels.\n"
+            "Frames that already have a key are left untouched; empty frames get "
+            "a key\n"
+            "holding the value they already show, so the animation does not "
+            "change.\n"
+            "Runs as a single undo step.")
+        self.btn_fill_keys.clicked.connect(self.on_fill_keys)
+        layout.addWidget(self.btn_fill_keys)
+
+        layout.addStretch(1)
         return page
 
     # ---------------- Key Edit > Graph Editor ----------------
@@ -505,7 +608,7 @@ class MainWindow(QWidget):
 
         return page
 
-    def _build_pose_key_tab(self):
+    def _build_pose_key_page(self):
         """선택 오브젝트 현재 프레임에 6축 pose 키를 설정하는 탭.
         축마다 체크박스가 있고, 체크된 축만 입력값으로 키를 설정한다.
         기본 체크: rotate X, rotate Z, translate Y. (A00030 원본 3축)"""
@@ -1061,7 +1164,7 @@ class MainWindow(QWidget):
 
         return tab
 
-    def _build_euler_filter_tab(self):
+    def _build_euler_filter_page(self):
         """리스트업한 컨트롤러의 회전 키에 **구간 한정 오일러 필터**를 적용하는 탭.
 
         마야 그래프 에디터의 `Curves > Euler Filter` 는 선택한 컨트롤러의 **키가 찍힌 전 구간**을
@@ -1290,6 +1393,113 @@ class MainWindow(QWidget):
     # --------------------------------------------------
     # Handlers
     # --------------------------------------------------
+
+    # --------------------------------------------------
+    # Handlers : Key Edit > Fill Keys
+    # --------------------------------------------------
+
+    def on_fill_list_attrs(self):
+        """리스트업한 오브젝트들의 키 가능 채널을 합집합으로 나열한다."""
+        objs = self.fill_tsl.get_all_items()
+        if not objs:
+            self.log("[Warning] Add objects to the Objects list first.")
+            return
+
+        attrs = FillKeyManager.list_keyable_attrs(objs)
+
+        self.lw_fill_attrs.clear()
+        self.lw_fill_attrs.addItems(attrs)
+        shown, total = self.flt_fill.refresh()
+
+        if not attrs:
+            self.log("[Warning] No keyable channel found on the listed objects.")
+            return
+
+        msg = "{0} channel(s) from {1} object(s).".format(total, len(objs))
+        if shown != total:
+            msg += " Filter '{0}' shows {1}.".format(
+                self.flt_fill.text().strip(), shown)
+        self.log(msg)
+
+    def on_fill_refresh_layers(self, quiet=False):
+        """씬의 애니메이션 레이어를 다시 훑어 콤보를 채운다.
+
+        지금 고른 항목은 최대한 유지하고, 처음 채울 때는 **선택된 레이어**를 기본값으로 쓴다.
+        """
+        keep = self.cmb_fill_layer.currentText() if self.cmb_fill_layer.count() else ""
+
+        layers, selected = FillKeyManager.list_anim_layers()
+
+        self.cmb_fill_layer.blockSignals(True)
+        self.cmb_fill_layer.clear()
+        self.cmb_fill_layer.addItem(CURRENT_LAYER)
+        self.cmb_fill_layer.addItems(layers)
+
+        target = keep if keep in ([CURRENT_LAYER] + layers) else (
+            selected or CURRENT_LAYER)
+        self.cmb_fill_layer.setCurrentText(target)
+        self.cmb_fill_layer.blockSignals(False)
+
+        if not quiet:
+            if layers:
+                self.log("Anim layers: {0}  (using '{1}')".format(
+                    ", ".join(layers), self.cmb_fill_layer.currentText()))
+            else:
+                self.log("No anim layer in the scene; keys go on the base curves.")
+
+    def _fill_selected_attrs(self):
+        """**보이면서 선택된** 채널 이름들.
+
+        Qt 는 필터로 숨긴 항목의 선택도 유지하므로, 가려진 채널까지 키를 찍지 않도록 거른다.
+        """
+        names, hidden = self.flt_fill.visible_selected()
+        if hidden:
+            self.log("[Info] {0} selected channel(s) hidden by the filter were "
+                     "skipped.".format(hidden))
+        return names
+
+    def on_fill_keys(self):
+        objs = self.fill_tsl.get_all_items()
+        if not objs:
+            self.log("[Warning] Add objects to the Objects list first.")
+            return
+
+        attrs = self._fill_selected_attrs()
+        if not attrs:
+            self.log("[Warning] Select the channels to fill "
+                     "(press 'List Attributes', then pick them).")
+            return
+
+        rng = self.fill_range.values()
+        if rng is None:
+            self.log("[Warning] Enter Start / End.")
+            return
+        start, end = rng
+
+        layer = self.cmb_fill_layer.currentText()
+        layer = None if layer == CURRENT_LAYER else layer
+        if layer and not cmds.objExists(layer):
+            self.log("[Warning] Anim layer '{0}' is gone; refreshing the "
+                     "list.".format(layer))
+            self.on_fill_refresh_layers()
+            return
+
+        try:
+            added, skipped, messages = FillKeyManager.fill_keys(
+                objs, attrs, start, end, layer=layer)
+        except Exception as e:
+            self.log("[Error] {0}".format(e))
+            cmds.warning(str(e))
+            return
+
+        for m in messages:
+            self.log(m)
+
+        self.log("Fill Keys: {0} key(s) added, {1} frame(s) already keyed "
+                 "(left alone)  [{2}-{3}f, {4} channel(s) x {5} object(s), "
+                 "layer: {6}]".format(
+                     added, skipped, min(start, end), max(start, end),
+                     len(attrs), len(objs), layer or CURRENT_LAYER))
 
     def on_move(self, sign):
 
