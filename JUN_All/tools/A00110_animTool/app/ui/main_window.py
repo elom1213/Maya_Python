@@ -235,21 +235,68 @@ class MainWindow(QWidget):
     # Tab builders
     # --------------------------------------------------
 
+    # Key Edit 하위 탭: (탭 라벨, 툴팁 = 전체 이름/설명, 빌더 메서드 이름).
+    # A00145_RigConnect 의 Constrain 탭과 같은 구성. 라벨을 짧게 두는 이유는 탭 바가
+    # 창 폭(기본 520)을 넘기지 않게 하기 위해서다 — 전체 이름은 툴팁에 싣는다.
+    KEY_EDIT_PAGES = (
+        ("Move Keys", "Move Keys - shift the keys in a frame range, or delete "
+         "that range", "_build_move_keys_page"),
+        ("Graph Editor", "Graph Editor - hold the key range selected in the "
+         "Graph Editor (+ Shift+A hotkey)", "_build_graph_editor_page"),
+        ("Offset & Hold", "Offset & Hold - rebuild the listed controllers' keys "
+         "as a hold + offset structure", "_build_offset_hold_page"),
+        ("Stagger", "Stagger Offset - shift each listed controller by "
+         "'list order x offset' (follow-through / wave)",
+         "_build_stagger_offset_page"),
+        ("Delete All", "Delete All Keys - delete every keyframe of the listed "
+         "objects", "_build_delete_all_page"),
+    )
+
     def _build_key_edit_tab(self):
-        """키 이동/삭제 · Graph Editor(Hold) · Offset & Hold 를 접이식 섹션 3개로 구성한 탭.
-        각 섹션 헤더를 클릭하면 접고/펼칠 수 있고(레거시 frameLayout 패턴), 토글하면 창 크기가
-        콘텐츠에 맞춰 자동으로 줄고 늘어난다. Offset & Hold 는 기본 접힘."""
+        """Key Edit 탭 — 기능별 **중첩 탭**.
 
-        tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
-        tab_layout = QVBoxLayout(tab)
+        예전에는 접이식 섹션 5개를 위에서 아래로 쌓았는데, 원하는 기능을 보려면 접었다
+        폈다 해야 했다. 이제 탭 하나에 기능 하나만 보인다.
 
-        validator = QIntValidator(-1000000, 1000000, self)
+        A00145_RigConnect 의 Constrain 탭과 같은 구성이지만 **스크롤 영역은 쓰지 않는다** —
+        이 툴은 창을 콘텐츠 높이에 맞춰 자동으로 늘리고 줄이기 때문이다(`_fit_window`).
+        그래서 바깥 페이지도 하위 페이지도 `JUN_mod_fit_tab_page_v01` 로 둔다. 숨은 페이지가
+        sizeHint 0 을 보고해야 창이 '지금 보이는' 페이지에만 맞춰진다.
+        """
+        page = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
+        layout = QVBoxLayout(page)
 
-        # =========================================================
-        # 섹션 1 : Move Keys (키 위치 이동 / 구간 삭제)
-        # =========================================================
+        self.key_edit_tabs = self._build_sub_tabs(self.KEY_EDIT_PAGES)
+        layout.addWidget(self.key_edit_tabs)
 
-        sec_move = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01("Move Keys", expanded=True)
+        return page
+
+    def _build_sub_tabs(self, pages):
+        """(라벨, 툴팁, 빌더 메서드 이름) 목록을 중첩 탭 위젯으로 만든다."""
+        tabs = QTabWidget()
+        # 폭이 모자라면 라벨을 자른다(스크롤 화살표만 뜨는 것보다 읽기 쉽다).
+        tabs.tabBar().setElideMode(Qt.ElideRight)
+
+        for label, tip, builder in pages:
+            index = tabs.addTab(getattr(self, builder)(), label)
+            tabs.setTabToolTip(index, tip)
+
+        # 하위 탭을 바꿔도 창을 내용에 맞춘다(상위 탭 전환과 같은 규칙: 줄이지는 않는다).
+        tabs.currentChanged.connect(
+            lambda *_: self._fit_window_later(grow_only=True))
+
+        return tabs
+
+    def _sub_page(self):
+        """하위 탭 페이지 하나를 만든다. (페이지 위젯, 세로 레이아웃)"""
+        page = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
+        return page, QVBoxLayout(page)
+
+    # ---------------- Key Edit > Move Keys ----------------
+
+    def _build_move_keys_page(self):
+        """키 위치 이동 / 구간 삭제 (Key Edit 하위 탭)."""
+        page, layout = self._sub_page()
 
         row = QHBoxLayout()
         # Start/End 구간 입력 = 공용 위젯(JUN_mod_timeRange_qt). le_start/le_end 는
@@ -265,49 +312,61 @@ class MainWindow(QWidget):
         self.le_offset.setValidator(QIntValidator(0, 1000000, self))
         self.le_offset.setPlaceholderText("5")
         row.addWidget(self.le_offset)
-        sec_move.add_layout(row)
+        layout.addLayout(row)
 
         row = QHBoxLayout()
         self.btn_move_back = QPushButton("◀ Earlier (-)")
-        self.btn_move_fwd  = QPushButton("Later (+) ▶")
+        self.btn_move_fwd = QPushButton("Later (+) ▶")
         row.addWidget(self.btn_move_back)
         row.addWidget(self.btn_move_fwd)
-        sec_move.add_layout(row)
+        layout.addLayout(row)
 
         self.btn_delete = QPushButton("Delete Keys in Range")
-        sec_move.add_widget(self.btn_delete)
+        layout.addWidget(self.btn_delete)
 
-        tab_layout.addWidget(sec_move)
+        layout.addStretch(1)
 
-        # =========================================================
-        # 섹션 2 : Graph Editor (선택 키 구간 Hold)
-        # =========================================================
+        self.btn_move_back.clicked.connect(lambda: self.on_move(-1))
+        self.btn_move_fwd.clicked.connect(lambda: self.on_move(+1))
+        self.btn_delete.clicked.connect(self.on_delete)
 
-        sec_graph = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01("Graph Editor", expanded=True)
+        return page
+
+    # ---------------- Key Edit > Graph Editor ----------------
+
+    def _build_graph_editor_page(self):
+        """그래프 에디터에서 선택한 키 구간 Hold (Key Edit 하위 탭)."""
+        page, layout = self._sub_page()
 
         self.btn_hold = QPushButton("Hold Selected Range")
-        sec_graph.add_widget(self.btn_hold)
+        layout.addWidget(self.btn_hold)
 
         self.cb_hotkey = QCheckBox("Shift+A hotkey")
         self.cb_hotkey.setChecked(True)
-        sec_graph.add_widget(self.cb_hotkey)
+        layout.addWidget(self.cb_hotkey)
 
         self.lbl_hotkey = QLabel("")
-        sec_graph.add_widget(self.lbl_hotkey)
+        layout.addWidget(self.lbl_hotkey)
 
-        tab_layout.addWidget(sec_graph)
+        layout.addStretch(1)
 
-        # =========================================================
-        # 섹션 3 : Offset & Hold (기본 접힘)
-        #   리스트업한 컨트롤러 키를 hold(유지) + offset(보간) 구조로 재배치.
-        #   대상은 씬 선택이 아니라 리스트의 항목. 로직은 OffsetHoldManager.
-        # =========================================================
+        self.btn_hold.clicked.connect(self.on_hold)
+        self.cb_hotkey.toggled.connect(self.on_toggle_hotkey)
 
-        sec_offhold = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01("Offset & Hold", expanded=False)
+        return page
+
+    # ---------------- Key Edit > Offset & Hold ----------------
+
+    def _build_offset_hold_page(self):
+        """리스트업한 컨트롤러 키를 hold(유지) + offset(보간) 구조로 재배치.
+
+        대상은 씬 선택이 아니라 리스트의 항목. 로직은 OffsetHoldManager.
+        """
+        page, layout = self._sub_page()
 
         self.oh_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Offset/Hold List", select_label="Select Objects", log_callback=self.log)
-        sec_offhold.add_widget(self.oh_tsl)
+        layout.addWidget(self.oh_tsl)
 
         oh_nonneg = QIntValidator(0, 1000000, self)
 
@@ -327,33 +386,37 @@ class MainWindow(QWidget):
         # Start: 비우면 오브젝트별 첫 키 프레임을 앵커로 사용.
         oh_row.addWidget(QLabel("Start"))
         self.le_oh_start = QLineEdit()
-        self.le_oh_start.setValidator(validator)
+        self.le_oh_start.setValidator(QIntValidator(-1000000, 1000000, self))
         self.le_oh_start.setPlaceholderText("(first key)")
         oh_row.addWidget(self.le_oh_start)
-        sec_offhold.add_layout(oh_row)
+        layout.addLayout(oh_row)
 
         self.btn_oh_apply = QPushButton("Apply Offset & Hold")
-        sec_offhold.add_widget(self.btn_oh_apply)
+        layout.addWidget(self.btn_oh_apply)
 
-        tab_layout.addWidget(sec_offhold)
+        layout.addStretch(1)
 
-        # =========================================================
-        # 섹션 4 : Stagger Offset (기본 접힘)
-        #   리스트업한 컨트롤러의 [Start, End] 구간 키를 '리스트 순서 x Offset' 만큼
-        #   계단식으로 민다(0번 제자리 / 1번 +1배 / 2번 +2배 ...). 팔로우스루·웨이브용.
-        #   슬라이더/스핀박스로 맞춘 값이 그대로 최종 결과다(별도 Apply 없음). 값이 멎으면
-        #   자동으로 undo 큐에 한 항목으로 기록된다(누적 안 됨). Reset 으로 원위치.
-        #   로직은 StaggerOffsetSession.
-        # =========================================================
+        self.btn_oh_apply.clicked.connect(self.on_offset_hold)
 
-        sec_stagger = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01(
-            "Stagger Offset", expanded=False)
+        return page
+
+    # ---------------- Key Edit > Stagger Offset ----------------
+
+    def _build_stagger_offset_page(self):
+        """리스트업한 컨트롤러의 [Start, End] 구간 키를 '리스트 순서 x Offset' 만큼
+        계단식으로 민다(0번 제자리 / 1번 +1배 / 2번 +2배 ...). 팔로우스루·웨이브용.
+
+        슬라이더/스핀박스로 맞춘 값이 그대로 최종 결과다(별도 Apply 없음). 값이 멎으면
+        자동으로 undo 큐에 한 항목으로 기록된다(누적 안 됨). Reset 으로 원위치.
+        로직은 StaggerOffsetSession.
+        """
+        page, layout = self._sub_page()
 
         self.st_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Stagger List (order = offset step)",
             select_label="List Selected Objects",
             show_reverse=True, log_callback=self.log)
-        sec_stagger.add_widget(self.st_tsl)
+        layout.addWidget(self.st_tsl)
 
         st_row = QHBoxLayout()
         self.st_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
@@ -361,7 +424,7 @@ class MainWindow(QWidget):
         self.le_st_start = self.st_range.start_edit
         self.le_st_end = self.st_range.end_edit
         st_row.addWidget(self.st_range)
-        sec_stagger.add_layout(st_row)
+        layout.addLayout(st_row)
 
         # 슬라이더 + 스핀박스 = 같은 값을 가리키는 두 얼굴(A00290_BSTool Shape Editor 패턴).
         # 어느 쪽을 움직이든 즉시 씬에 반영하고 반대쪽 위젯을 맞춘다. 슬라이더는 손으로 훑기
@@ -393,51 +456,15 @@ class MainWindow(QWidget):
         self.btn_st_reset = QPushButton("Reset")
         self.btn_st_reset.setToolTip("Move the keys back to their original frames (undoable).")
         st_row2.addWidget(self.btn_st_reset)
-        sec_stagger.add_layout(st_row2)
+        layout.addLayout(st_row2)
 
         # Apply 버튼 없음: 슬라이더/스핀박스로 맞춘 값이 곧 최종 결과다. 조작이 멎으면
         # 자동으로 undo 큐에 기록된다(_stagger_settle: sliderReleased / editingFinished /
         # 디바운스 타이머 / 창 닫기).
 
-        tab_layout.addWidget(sec_stagger)
+        layout.addStretch(1)
 
-        # =========================================================
-        # 섹션 5 : Delete All Keys (기본 접힘)
-        #   리스트업한 오브젝트의 '모든' 키프레임을 일괄 삭제.
-        #   대상은 씬 선택이 아니라 리스트의 항목. 파괴적이라 확인 다이얼로그를 둔다.
-        # =========================================================
-
-        sec_delall = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01("Delete All Keys", expanded=False)
-
-        self.delall_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Delete-All List", select_label="List Selected Objects", log_callback=self.log)
-        sec_delall.add_widget(self.delall_tsl)
-
-        self.btn_delete_all = QPushButton("Delete All Keyframes of Listed")
-        sec_delall.add_widget(self.btn_delete_all)
-
-        tab_layout.addWidget(sec_delall)
-
-        tab_layout.addStretch(1)
-
-        # -------------------------
-        # Signal
-        # -------------------------
-
-        # 섹션 토글 -> 창 크기 자동 조정
-        for sec in (sec_move, sec_graph, sec_offhold, sec_stagger, sec_delall):
-            sec.toggled.connect(self._fit_window_later)
-
-        self.btn_move_back.clicked.connect(lambda: self.on_move(-1))
-        self.btn_move_fwd.clicked.connect(lambda: self.on_move(+1))
-        self.btn_delete.clicked.connect(self.on_delete)
-        self.btn_hold.clicked.connect(self.on_hold)
-        self.cb_hotkey.toggled.connect(self.on_toggle_hotkey)
-        self.btn_oh_apply.clicked.connect(self.on_offset_hold)
-        self.btn_delete_all.clicked.connect(self.on_delete_all)
-
-        # Stagger Offset : 슬라이더/스핀박스 = 실시간 미리보기(같은 값의 두 얼굴),
-        # 조작이 멎으면 자동으로 undo 큐에 기록(settle), Apply = 확정 후 세션 종료.
+        # 슬라이더/스핀박스 = 실시간 미리보기(같은 값의 두 얼굴), 조작이 멎으면 자동 기록.
         # valueChanged 는 바인딩/버전에 따라 인자 타입이 달라 위젯에서 직접 읽는다.
         self.sld_stagger.valueChanged.connect(self.on_stagger_slider_changed)
         self.sb_stagger.valueChanged.connect(self.on_stagger_spin_changed)
@@ -454,7 +481,29 @@ class MainWindow(QWidget):
         st_model.rowsRemoved.connect(self._stagger_invalidate)
         st_model.modelReset.connect(self._stagger_invalidate)
 
-        return tab
+        return page
+
+    # ---------------- Key Edit > Delete All Keys ----------------
+
+    def _build_delete_all_page(self):
+        """리스트업한 오브젝트의 '모든' 키프레임을 일괄 삭제.
+
+        대상은 씬 선택이 아니라 리스트의 항목. 파괴적이라 확인 다이얼로그를 둔다.
+        """
+        page, layout = self._sub_page()
+
+        self.delall_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Delete-All List", select_label="List Selected Objects", log_callback=self.log)
+        layout.addWidget(self.delall_tsl)
+
+        self.btn_delete_all = QPushButton("Delete All Keyframes of Listed")
+        layout.addWidget(self.btn_delete_all)
+
+        layout.addStretch(1)
+
+        self.btn_delete_all.clicked.connect(self.on_delete_all)
+
+        return page
 
     def _build_pose_key_tab(self):
         """선택 오브젝트 현재 프레임에 6축 pose 키를 설정하는 탭.

@@ -4,14 +4,14 @@
 
 애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **여덟 개의 탭**과 **공유 로그창**으로 구성된다.
 
-1. **Key Edit** — (v01.14~) **접이식 섹션 5개**로 구성된다. **Move Keys**: 키를 시간 범위로
+1. **Key Edit** — (v01.39~) **하위 탭 5개**로 구성된다. **Move Keys**: 키를 시간 범위로
    **이동(앞/뒤 offset)·삭제**. **Graph Editor**: 선택한 키 구간을 **평평하게 유지(Hold)**
-   (`Shift+A` 핫키 호출 가능). **Offset & Hold**(기본 접힘): **리스트업한 컨트롤러**의 키를
-   **포즈 유지(hold) + 보간(offset)** 구조로 재배치. **Stagger Offset**(v01.31~, 기본 접힘):
+   (`Shift+A` 핫키 호출 가능). **Offset & Hold**: **리스트업한 컨트롤러**의 키를
+   **포즈 유지(hold) + 보간(offset)** 구조로 재배치. **Stagger Offset**(v01.31~):
    **리스트업한 컨트롤러**의 구간 키를 **리스트 순서 × Offset** 만큼 **계단식으로 밀어** 팔로우스루·웨이브를
    만든다(**슬라이더 + 스핀박스**로 실시간 조절, 조작이 멎으면 자동 기록되어 **Ctrl+Z 한 번**으로 복귀).
-   **Delete All Keys**(v01.18~, 기본 접힘):
-   **리스트업한 오브젝트의 모든 키프레임을 일괄 삭제**. 섹션을 접고 펼치면 **창 크기가 자동 조정**된다.
+   **Delete All Keys**(v01.18~):
+   **리스트업한 오브젝트의 모든 키프레임을 일괄 삭제**. 하위 탭을 바꾸면 **창 크기가 자동 조정**된다.
 2. **Pose Key** — 선택 오브젝트(들)의 **현재 프레임**에 6축(rotate X/Y/Z, translate X/Y/Z)
    값을 키프레임으로 설정한다. 축마다 체크박스가 있어 체크된 축만 적용된다.
 3. **Copy Key** (v01.03~) — **Base → Target** 으로 시간 범위 애니메이션 키를 복사하고,
@@ -98,6 +98,13 @@
 > (되돌리려 들지 않는다 — 그래야 키가 엉뚱한 곳으로 밀리지 않는다).
 > 또 **Offset per Item 을 슬라이더 + 스핀박스**로 바꿨다(A00290_BSTool Shape Editor 패턴 — 같은 값의
 > 두 얼굴, 어느 쪽을 움직이든 즉시 반영하고 반대쪽을 맞춘다). 슬라이더는 ±60f, 그보다 큰 값은 스핀박스로.
+
+> **v01.39 — Key Edit 탭을 하위 탭 5개로**: 접이식 섹션 5개(Move Keys / Graph Editor /
+> Offset & Hold / Stagger Offset / Delete All Keys)를 **중첩 `QTabWidget`** 으로 바꿨다
+> (A00145_RigConnect Constrain 탭과 같은 구성). 탭 하나에 기능 하나만 보이고, 라벨은 짧게 두되
+> **전체 이름은 탭 툴팁**에 싣는다. **창 크기 자동 조정은 그대로** — 상위/하위 페이지를 모두
+> `JUN_mod_fit_tab_page_v01` 로 두어 숨은 페이지가 sizeHint 0 을 보고하게 했다(스크롤 영역을
+> 쓰지 않는 이유이기도 하다). 위젯 이름과 시그널은 그대로라 동작은 이전과 같다.
 
 > **v01.31 — Key Edit: Stagger Offset 섹션 추가**: 리스트업한 컨트롤러들의 `[Start, End]` 구간 키를
 > **리스트 순서대로 Offset 배수만큼** 밀어 순차 지연(팔로우스루·웨이브)을 만든다. 0번은 제자리, 1번은
@@ -351,38 +358,45 @@ A00110_animTool.run(True)   # True = reload
 
 ### 5.1 Key Edit 탭
 
-**접이식 섹션 5개**(v01.14~, Delete All Keys 는 v01.18~, Stagger Offset 은 v01.31~)로 구성된다.
-각 섹션 **헤더(▼/▶ + 제목)를 클릭하면 접고/펼칠 수 있고**(레거시 `frameLayout` 패턴), 토글하면
-**창 전체 크기가 콘텐츠에 맞춰 자동으로 줄고 늘어난다**.
-**Offset & Hold / Stagger Offset / Delete All Keys 섹션은 기본 접힘**이다.
+**하위 탭 5개**(v01.39~)로 구성된다. 기능 하나가 한 화면을 차지하므로, 원하는 기능을 보려고
+섹션을 접었다 폈다 할 필요가 없다.
 
 ```
 ┌───────────────────────────────────────────────────┐
-│ ▼ Move Keys                                       │  ← 클릭하면 접힘/펼침
-│    Start [ 4 ]  End [ 10 ]  Offset [ 5 ]          │
-│    [ ◀ Earlier (-) ]      [ Later (+) ▶ ]         │
-│    [ Delete Keys in Range ]                       │
-│ ▼ Graph Editor                                    │
-│    [ Hold Selected Range ]                        │
-│    [v] Shift+A hotkey      Shift+A : ON           │
-│ ▶ Offset & Hold              (기본 접힘)          │  ← 펼치면 아래 내용 표시
-│    [Offset/Hold List]  (Select/Add/Del/Up/Down)   │
-│    Hold [ 10 ] Offset [ 30 ] Start [(first key)]  │
-│    [ Apply Offset & Hold ]                        │
-│ ▶ Stagger Offset             (기본 접힘)          │
-│    [Stagger List]  (List Selected/Up/Down/Rev.)   │
-│    Start [ 0 ][Get Current] End [ 5 ][Get Current]│
-│    Offset per Item [==|===슬라이더==][ 3 f]▲▼[Reset]│  ← 값이 곧 결과(Apply 없음)
-│ ▶ Delete All Keys            (기본 접힘)          │
-│    [Delete-All List]  (List Selected/Add/Del/...) │
-│    [ Delete All Keyframes of Listed ]             │
+│ [Move Keys][Graph Editor][Offset & Hold][Stagger] │  ← Key Edit 하위 탭
+│ [Delete All]                                      │
+│ ┌───────────────────────────────────────────────┐ │
+│ │ Start [ 4 ]  End [ 10 ]  Offset [ 5 ]         │ │  ← Move Keys 선택 시
+│ │ [ ◀ Earlier (-) ]      [ Later (+) ▶ ]        │ │
+│ │ [ Delete Keys in Range ]                      │ │
+│ └───────────────────────────────────────────────┘ │
 └───────────────────────────────────────────────────┘
 ```
 
-- **섹션 접기/펼치기**: 헤더 클릭으로 토글. 토글·탭 전환 시 창 높이가 **현재 탭 콘텐츠**에 맞춰
-  자동 조정된다(다른 탭은 숨김 페이지의 sizeHint 를 0 으로 보고하므로 창이 현재 탭에만 맞춰진다).
+| 하위 탭 | 내용 |
+|---------|------|
+| **Move Keys** | 구간 키 이동(앞/뒤) · 구간 삭제 |
+| **Graph Editor** | 선택 키 구간 Hold (+ `Shift+A` 핫키) |
+| **Offset & Hold** | 리스트업한 컨트롤러 키를 hold + offset 구조로 재배치 (v01.13~) |
+| **Stagger** | Stagger Offset — 리스트 순서 × Offset 계단식 이동 (v01.31~) |
+| **Delete All** | 리스트업한 오브젝트의 모든 키 일괄 삭제 (v01.18~) |
 
-#### Move Keys 섹션 (키 위치 이동 / 삭제)
+탭 라벨은 창 폭(기본 520)에 맞춰 줄였고 **전체 이름은 탭 툴팁**에 있다(예: `Stagger` →
+"Stagger Offset - shift each listed controller by 'list order x offset'").
+폭이 모자라면 라벨이 말줄임(`ElideRight`)된다.
+
+- **창 크기 자동 조정 유지**: 하위 탭을 바꾸거나 상위 탭을 바꾸면 창 높이가 **지금 보이는 페이지**에
+  맞춰 조정된다. 이를 위해 상위 Key Edit 페이지도, 하위 5개 페이지도 모두
+  `JUN_mod_fit_tab_page_v01` 이다 — 숨은 페이지가 sizeHint 를 0 으로 보고해야 `QStackedLayout`
+  의 "모든 페이지 중 최댓값" 규칙에 걸리지 않는다.
+  (그래서 A00145_RigConnect 의 하위 탭과 달리 **스크롤 영역은 쓰지 않는다**. 스크롤 영역은
+  콘텐츠와 무관한 sizeHint 를 가져 이 자동 맞춤을 깨뜨린다.)
+
+> **v01.39 이전**: 같은 5개가 **접이식 섹션**(`MOD_collapsible_qt_v01`)으로 위아래에 쌓여 있었고
+> Offset & Hold / Stagger Offset / Delete All Keys 는 기본 접힘이었다. 섹션이 늘면서 원하는 것을
+> 보려면 접었다 폈다 해야 해서 하위 탭으로 바꿨다(A00145_RigConnect Constrain 탭과 같은 구성).
+
+#### Move Keys 하위 탭 (키 위치 이동 / 삭제)
 
 - **Start / End**: 작업할 시간 범위(프레임). **Offset**: 이동량(양수 입력, 부호는 버튼이 결정).
 - **◀ Earlier (-)** / **Later (+) ▶**: `[Start, End]` 구간의 키를 Offset 만큼 **앞/뒤로 상대 이동**.
@@ -390,14 +404,14 @@ A00110_animTool.run(True)   # True = reload
 - **채널 스코프**: 채널박스(`mainChannelBox`)에서 **어트리뷰트를 선택해 두면 그 채널만**,
   선택이 없으면 **오브젝트의 모든 애니메이션 커브**가 대상이 된다(이동/삭제 공통).
 
-#### Graph Editor 섹션 (Hold)
+#### Graph Editor 하위 탭 (Hold)
 
 - **Hold Selected Range**: 그래프 에디터에서 **선택한 키들**을 커브별로, 선택 구간의 시작 값으로
   **평평하게(flat) 유지**한다(아래 7장 규칙 참고).
 - **Shift+A hotkey** 체크박스: 켜면 Shift+A 를 Hold 에 바인딩, 끄면 원래 바인딩으로 복원.
   옆 라벨에 `Shift+A : ON / OFF / unavailable` 상태를 표시한다.
 
-#### Offset & Hold 섹션 (v01.13~, v01.14~ 접이식·기본 접힘)
+#### Offset & Hold 하위 탭 (v01.13~)
 
 리스트업한 컨트롤러의 키를 **포즈 유지(hold) + 보간(offset)** 구조로 재배치한다(위의 이동용 Offset 과는
 무관한 별도 기능). 대상은 씬 선택이 아니라 **그룹 안 리스트의 항목**이다.
@@ -420,7 +434,7 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 
 예) Hold=10, Offset=30, 포즈 3개, Start=0 → `0~10 유지 / 10~40 보간 / 40~50 유지 / 50~80 보간 / 80~90 유지`.
 
-#### Stagger Offset 섹션 (v01.31~, 접이식·기본 접힘)
+#### Stagger 하위 탭 — Stagger Offset (v01.31~)
 
 리스트업한 컨트롤러의 `[Start, End]` 구간 키를 **리스트 순서 × Offset** 만큼 계단식으로 민다.
 캐릭터의 꼬리·촉수·머리카락·천처럼 **앞 요소를 뒤 요소가 지연해서 따라오는 움직임**(팔로우스루/웨이브)을
@@ -454,7 +468,7 @@ plateau_end_i   = start + i·P + Hold    (유지 끝)
 > **기록된 결과는 Ctrl+Z 로 전부 복구**되지만, **Reset** 으로 되돌릴 때는 덮어써 사라진 키까지는
 > 복구되지 않는다.
 
-#### Delete All Keys 섹션 (v01.18~, 접이식·기본 접힘)
+#### Delete All 하위 탭 — Delete All Keys (v01.18~)
 
 리스트업한 오브젝트의 **모든 키프레임을 일괄 삭제**한다. 구간 삭제(`Delete Keys in Range`)와 달리
 **시간 범위·채널박스 스코프를 적용하지 않고** 대상 오브젝트에 연결된 애니메이션 커브의 키를 전부 지운다.
