@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-08-10
+updated: 2026-08-11
 ---
 
 # 작업 일지 (WORKLOG)
@@ -15,7 +15,25 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-08-10 (오늘)
+## 2026-08-11 (오늘)
+
+> [!summary] `A00145_RigConnect` **Connect 하위 탭에 역방향 연결 추가 (Destination → Source)** (v01.23→01.24)
+- **요청**: Connect 하위 탭이 Source 어트리뷰트 → Destination 어트리뷰트 한 방향뿐인데, **반대 방향
+  (Destination → Source)** 연결도 있어야 한다.
+- 두 방향 버튼을 **나란히** 두어 어느 쪽이 드라이버인지 화살표로 읽히게 했다
+  (`Source  ->  Destination` / `Destination  ->  Source`). 로그에도 방향을 함께 찍는다.
+- 코어(`connect_attrs`)는 손대지 않았다 — **인자 순서만 뒤집으면** 3가지 브로드캐스트 패턴까지
+  그대로 뒤집혀 적용된다. UI 에 `_connect_in_direction(from_role, to_role)` 하나만 두고 두 슬롯이
+  그것을 감싼다.
+- **함정**: 방향을 기본 인자로 받는 단일 슬롯에 `clicked` 를 직접 연결하면, `clicked` 가 넘기는
+  `checked`(bool)가 방향 인자로 들어갈 수 있다. 그래서 방향별 얇은 슬롯 2개로 감쌌다.
+- 역방향에서는 코어의 실패 메시지 `(src N, dst M)` 이 헷갈린다("src" 가 Destination 개수를 가리킴).
+  **`(driver N, driven M)`** 으로 바꿔 방향 중립으로 만들었다.
+- `Connect 52 Facial Target` 은 요청 범위가 아니라 Source → Destination 한 방향 그대로 두고 문서에 명시.
+- 검증: 버튼/툴팁 · 정방향 · **역방향(값이 실제로 반대로 흐르는지 getAttr 로 확인)** · 브로드캐스트
+  반전 · 로그 방향 표기 · 개수 불일치 방어 + 기존 A00145 스위트 6종 전부 통과. #A00145
+
+## 2026-08-10
 
 > [!summary] `A00420_Wrapper` **버텍스 가이드 + 목록↔씬 선택 연동 + Order** (v01.02→01.03)
 - **요청**: ① `Add Source` / `Add Target` 이 커브뿐 아니라 **버텍스**도 받게, ② 목록에서 소스/타깃을
