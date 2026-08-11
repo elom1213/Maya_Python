@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.24` (`app/config/version.py`) — Connect 하위 탭에 **역방향 연결**(Destination → Source) 추가 (§연결 방향)
+- 버전: `v01.25` (`app/config/version.py`) — 어트리뷰트 개수가 달라도 **적은 쪽만큼 부분 연결**(에러로 중단하지 않음) (§개수가 달라도 멈추지 않는다)
 - 위치: `JUN_All/tools/A00145_RigConnect`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴. **최상위 4탭**(Match / Constrain / Connect / Attribute),
   Constrain·Connect 는 다시 **중첩 탭**으로 나뉜다
@@ -298,7 +298,8 @@ Constrain 탭과 같은 방식이다(§Constrain 참고) — 짧은 라벨 + 툴
 > 이유가 없어 하나로 묶었고, 최상위는 **Match / Constrain / Connect / Attribute 4탭**이 됐다.
 
 #### Connect — 어트리뷰트 연결
-어트리뷰트를 **양방향으로** 연결한다(v01.24부터 역방향 추가).
+어트리뷰트를 **양방향으로** 연결한다(v01.24부터 역방향 추가). 개수가 안 맞아도 멈추지 않고
+**되는 만큼** 연결한다(v01.25).
 
 - Source/Destination 각 섹션(이 둘은 **동시에** 봐야 해서 탭이 아니라 접이식이다):
   - `Objects` 리스트에 오브젝트 추가 → `List Attributes` 로 첫 오브젝트의 어트리뷰트를 우측 목록에 채움.
@@ -324,15 +325,38 @@ Constrain 탭과 같은 방식이다(§Constrain 참고) — 짧은 라벨 + 툴
 - 리스트를 다시 채울 필요 없이 버튼만 바꿔 누르면 된다. 한쪽에서 `List Attributes` /
   `Match from Source` 로 짝을 맞춰 놓고 방향만 고르는 흐름이 된다.
 
-**브로드캐스트 패턴** — 선택된 드라이버/구동 대상 어트리뷰트 수에 따라 3가지:
+**브로드캐스트 패턴** — 3가지:
 
-1. 드라이버 obj 1개 & 양쪽 attr 수 동일 → 한 드라이버를 각 대상 obj 의 attr 별로
+1. 드라이버 obj **1개** → 한 드라이버를 **각 대상 obj** 의 attr 인덱스별로 (브로드캐스트)
 2. 양쪽 attr 각각 1개 → obj 쌍 1:1
-3. 양쪽 attr 수 동일 → obj 쌍 × attr 모두
+3. 그 외 → obj 쌍 × attr 인덱스 모두
 
-어디에도 안 맞으면 연결하지 않고 `attribute counts do not match (driver N, driven M)` 로 알린다.
-(메시지가 `src/dst` 가 아니라 **driver/driven** 인 이유: 역방향에서는 "src" 가 Destination 을
-가리켜 헷갈리기 때문.)
+##### 개수가 달라도 멈추지 않는다 (v01.25)
+
+예전에는 어트리뷰트 수가 서로 다르면 **아무것도 연결하지 않고 에러**를 냈다. 이제는 그러지 않는다.
+
+| 상황 | 동작 |
+|------|------|
+| 어트리뷰트 수가 다름 (예: 5 vs 3) | **적은 쪽 개수만큼**(앞에서부터 3쌍) 연결. 남는 2개는 **건드리지 않고 그대로** |
+| 오브젝트 수가 다름 | 같은 규칙. 단 패턴 1(드라이버 1개)은 원래 **모든** 대상 obj 에 브로드캐스트한다 |
+| 개별 연결이 실패 (잠김·타입 불일치·읽기 전용 등) | **거기서 멈추지 않고** 나머지를 계속 연결한 뒤, 실패한 것만 따로 보고 |
+
+남은 항목과 실패는 로그로 **이름까지** 알려 준다 — 조용히 넘기면 "왜 일부만 연결됐지?" 가 되기 때문.
+
+```
+       2 connection(s) [1 obj -> #objs, attr set matched]  Source -> Destination
+[INFO] 1 Source attribute(s) had no counterpart and were left untouched: s2
+[WARN] could not connect A.s1 -> B.d1 : The attribute 'B.d1' is locked and cannot be connected.
+```
+
+여전히 에러가 나는 경우는 **입력이 아예 비었을 때뿐**이다(오브젝트 목록이 비었거나 어트리뷰트를
+하나도 안 골랐을 때).
+
+> `connect_attrs` 는 `(개수, 패턴, report)` 를 돌려주고 `report` 에 남은 항목
+> (`unused_driver_attrs` / `unused_driven_attrs` / `unused_driver_objs` /
+> `unused_driven_objs`)과 `failed` 목록이 담긴다. 키가 `src/dst` 가 아니라
+> **driver/driven** 인 이유: 이 함수는 양방향으로 쓰여서 역방향에서는 "src" 가 Destination 을
+> 가리켜 헷갈리기 때문.
 
 - `Connect 52 Facial Target`: 52 ARKit 페이셜 어트리뷰트를 같은 이름끼리 obj 쌍 1:1 로 일괄 연결(없는
   attr 은 스킵). 이 버튼은 **Source → Destination 한 방향**이다.

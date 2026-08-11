@@ -1562,12 +1562,35 @@ class MainWindow(QWidget):
         to_attrs = self._filtered_attrs(to_role, to_label)
 
         def _do():
-            count, mode = cnt_mgr.connect_attrs(
+            count, mode, report = cnt_mgr.connect_attrs(
                 from_objs, to_objs, from_attrs, to_attrs)
             self.log("       {0} connection(s) [{1}]  {2} -> {3}".format(
                 count, mode, from_label, to_label))
+            self._log_connect_report(report, from_label, to_label)
 
         self._run("Connect {0} to {1}".format(from_label, to_label), _do)
+
+    def _log_connect_report(self, report, from_label, to_label):
+        """개수가 안 맞아 남겨 둔 항목과 실패한 연결을 로그로 알린다.
+
+        조용히 넘기면 "왜 일부만 연결됐지?" 가 되므로, 무엇이 남았는지 이름까지 찍는다.
+        """
+        for key, label in (("unused_driver_attrs", from_label + " attribute"),
+                           ("unused_driven_attrs", to_label + " attribute"),
+                           ("unused_driver_objs", from_label + " object"),
+                           ("unused_driven_objs", to_label + " object")):
+            left = report.get(key) or []
+            if not left:
+                continue
+            shown = ", ".join(left[:8])
+            if len(left) > 8:
+                shown += ", ... (+{0})".format(len(left) - 8)
+            self.log("[INFO] {0} {1}(s) had no counterpart and were left "
+                     "untouched: {2}".format(len(left), label, shown))
+
+        for src_plug, dst_plug, reason in (report.get("failed") or []):
+            self.log("[WARN] could not connect {0} -> {1} : {2}".format(
+                src_plug, dst_plug, reason))
 
     def on_connect_52_facial(self):
         src = self._connect_widgets["src"]
