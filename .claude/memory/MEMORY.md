@@ -32,6 +32,7 @@
 - [constraint target plugs & offset spaces](constraint-target-plugs-and-offset-spaces.md) — `listConnections("con.target[0]")` 는 None(노드 단위로 열거), parentConstraint 의 offsetT/offsetR 은 **다른 공간**, 오일러 순서는 driven `rotateOrder`
 - [blendShape delta space = origin](blendshape-delta-space-origin.md) — 델타 공간은 `origin` 이 정함(0=world→베이스 공간). 미러/회전 타겟에서 일부 축만 반대로 가는 원인
 - [blendShape live target deltas](blendshape-live-target-inputpointstarget.md) — inputGeomTarget 연결 시 inputPointsTarget setAttr 은 조용히 무시, 타겟 메시를 옮겨야 함
+- [setKeyframe insert needs a curve](setkeyframe-insert-needs-existing-curve.md) — `insert=True` 는 커브가 없으면 **조용히 no-op**(레이어에 채널 커브 없을 때 특히). 값 경로는 쓰기 전에 전부 미리 계산
 - [animated attr: key + setAttr](animated-attr-setkeyframe-plus-setattr.md) — 키/레이어 걸린 attr 은 `setKeyframe` 만으론 값이 안 바뀜(뒤에 `setAttr` 까지), 레이어면 소스가 `animBlendNode*`
 - [cmds.toggle not undoable](maya-toggle-cmd-not-undoable.md) — `toggle -localAxis` 는 undo 를 안 남겨 Ctrl+Z 가 이전 작업을 지움 → `setAttr` 사용
 - [list_attrs multi detection](list-attrs-multi-detection.md) — multi 판정은 `attributeQuery(multi=True)`, getNextFreeMultiIndex 남용 금지
@@ -94,6 +95,7 @@
 - [A00145 Group Create](wip-a00145-group-create.md) — 동일 위치/회전 zero-out 노드 삽입, 타입 매칭 (v01.13)
 - [A00145 Match DOOTOOL options](wip-a00145-match-dootool-options.md) — Match 탭에 T/R/S/Parent 체크박스 이식 (v01.10)
 - [A00120 FKIK constraint-free bake](wip-a00120-fkik-bake-constraintfree.md) — parentConstraint 대신 프레임별 matchTransform (애님 레이어 포즈 깨짐 수정)
+- [A00110 Fill Keys](wip-a00110-fill-keys.md) — 구간 전 프레임 키 채우기(기존 키 방치) + 애니 레이어 지정, Key Edit 하위 8탭 재편 (v01.40)
 - [A00110 Stagger Offset](wip-a00110-stagger-offset.md) — TSL 순서 × Offset 계단식 키 이동, settle 커밋 모델 (v01.34)
 - [A00110 Graph Focus tab](wip-a00110-graph-focus.md) — 선택 변경 시 그래프 에디터 자동 프레이밍 (v01.30)
 - [A00110 Get Sel Range](wip-a00110-get-sel-range.md) — 선택 키의 최소/최대로 Start/End 동시 채우기 (v01.35)

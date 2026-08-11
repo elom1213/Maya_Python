@@ -17,6 +17,32 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-11 (오늘)
 
+> [!summary] `A00110_animTool` **Key Edit 하위 탭 재편 + Fill Keys(구간 전 프레임 키 채우기)** (v01.39→01.40)
+- **요청**: ① Pose Key · Euler Filter 를 Key Edit 하위 탭으로. ② 선택 오브젝트의 **키 가능 + 채널박스
+  노출** 어트리뷰트를 나열하고, 고른 채널의 구간 모든 프레임에 키를 찍는 탭 추가. 이미 키가 있으면
+  방치, 없으면 지금 값으로. **키를 찍을 애니메이션 레이어도 고를 수 있게.** UI 는 A00145 Connect 참고.
+- 최상위 8→**6탭**(Key Edit / Copy Key / Mirror Key / Bake / Follow / Graph Focus), Key Edit 하위는
+  **8탭**(Move Keys / Fill Keys / Pose Key / Graph / Offset & Hold / Stagger / Euler / Delete All).
+  하위 탭이 늘어 창 기본 폭 520→620.
+- **Fill Keys** — 어트리뷰트 목록은 `listAttr -keyable -visible -unlocked`(채널박스에만 보이고 키는
+  못 찍는 채널은 제외). 여러 오브젝트는 합집합, 실행 시 없는 채널은 조용히 건너뛴다.
+  구간은 공용 `MOD_timeRange_qt_v01`, 레이어는 콤보(`(current)` = 마야가 평소대로).
+- **핵심 함정 (mayapy 실측)** — 대상 커브가 이미 있으면 `setKeyframe(insert=True)` 가 모양을 그대로
+  보존해 완벽하다(오차 1.8e-15). 그런데 **커브가 없으면 insert 는 조용히 아무것도 안 한다**
+  (반환 0, 커브 미생성). 특히 "레이어는 있는데 그 채널 커브가 아직 없는" 흔한 상황이 여기 걸린다.
+  그래서 그 경우엔 `getAttr(plug, time=f)` 평가값으로 키를 찍는다.
+- **값은 쓰기 전에 전부 미리 구한다** — 레이어 커브에 키가 하나 생기면 그 레이어 기여가 달라져 이후
+  프레임 평가값이 흔들릴 수 있다. 계산과 쓰기를 번갈아 하면 흔들린 값을 그대로 굳히게 된다.
+- `setKeyframe(animLayer=L, value=V)` 는 레이어 커브에 V 를 그대로 쓰는 게 아니라 **최종 평가값이 V**
+  가 되도록 역산해 넣는다 → 평가값을 그대로 넘기면 레이어에서도 모양 유지. 채널이 레이어에 아직
+  없으면 `animLayer(e=True, attribute=)` 로 먼저 넣는다.
+- 성능: insert 경로는 프레임 단위로 여러 plug 를 한 번에 넘겨 호출 수를 (프레임×채널)이 아니라
+  (프레임)으로 줄였다. 전체는 `undo_chunk` + `suspend_refresh`.
+- 검증: 코어 10개 그룹(어트리뷰트 필터·insert 경로·값 경로·구간 밖 보존·레이어 3종·다중 오브젝트·
+  방어·레이어 목록) + UI 6개 그룹(탭 구성·위젯·목록/필터·실행/재실행·레이어 지정·방어) 전부 통과.
+  기존 하위 탭 테스트도 갱신해 통과. #A00110
+
+
 > [!summary] `A00110_animTool` **Key Edit 탭의 접이식 섹션을 하위 탭으로** (v01.38→01.39)
 - **요청**: Key Edit 탭의 하위 접이식 항목들을 모두 하위 탭으로. A00145_RigConnect 의 Constrain 탭 참고.
 - 접이식 섹션 5개(Move Keys / Graph Editor / Offset & Hold / Stagger Offset / Delete All Keys)를
