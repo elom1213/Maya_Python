@@ -17,6 +17,34 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-11 (오늘)
 
+> [!summary] `study` **AdvancedSkeleton MetaHuman Animator 의 Connect / Bake 알고리즘 분석** (문서)
+- **동기**: UE 5.7 에서 커브가 베이크된 MetaHuman 페이셜 애니메이션을 마야 페이셜 컨트롤러에 옮기려고
+  `Connect Face Animation` + `Bake to standard Face Controls` 를 썼는데 의도대로 안 붙는 경우가 있어,
+  두 버튼의 동작을 먼저 알아야 했다. 대상: `0020_maya_plugin/0040_AdvancedSkeleton` (AS **6.801**).
+- **Connect** — 씬의 `root_CTRL_expressions_*` **애님커브 노드를 복제**해 MetaHuman ControlPanel 컨트롤
+  (`CTRL_L_brow_down` 등)의 `translateY/X` 에 `connectAttr`. 매핑은 **하드코딩 104개 × L/R** 이 전부.
+- **Bake** — 패널 → SDK → `blendWeighted` 그래프를 역추적해 **상류가 `bwCTRL_*`/Emotions/Phonemes 인
+  애님커브만** 새 blendWeighted 로 합산 → 임시 transform `.tx` 에 물려 `bakeResults` → **이름을 역파싱**해
+  AS 표준 컨트롤(`ctrlBrow_R.translateX`)에 `pasteKey`.
+- **정확히 안 되는 이유 3층** — ① MetaHuman 의 board→raw 가 다대다라 **역매핑 자체가 근사**,
+  ② 커버리지 104개(주석이 명시적으로 버리는 항목: `eyeLowerLid*`, `eyeUpperLidUp`, `eyeWiden`,
+  `jawClench`, 목/삼킴, 치아, 혀 roll 등), ③ **양방향(±) 병합 휴리스틱의 손실** —
+  `|v|<0.001` 키 제거 → 탄젠트 전부 선형화 → 음수쪽 ×(-1) → `pasteKey -option merge`.
+  **0 구간이 사라져 선형 보간**되므로 **UE 압축 커브처럼 키가 듬성하면 치명적**(MHA 원본은 매 프레임 키라 영향 작음).
+  루프가 `$z=1` 부터라 **첫 키는 절대 안 지워져** 첫 프레임 값이 0으로 덮이는 경우도 있다.
+- **코드 버그 확인** — `tongueTwistRight` 가 음수 분기(`*Right*`)에는 들어가는데 `$target` 지정 줄이 없어,
+  proc 스코프 변수에 남은 직전 값(`CTRL_C_tongue_bendTwist_translateY`)으로 pasteKey 된다 →
+  **혀 twist 키가 혀 bend 커브를 오염**시킨다. 올바른 값은 `..._translateX`.
+- **조용히 실패하는 지점**(로그 없음) — 베이크 범위가 `playbackOptions min/max` 라 타임라인 밖은 잘림 /
+  목적지 이름을 `<컨트롤>_<사이드>_<어트리뷰트>` **3토큰 역파싱** 후 `getAttr -settable` 실패 시 무음 skip /
+  애님 레이어·컨스트레인트·락이면 무음 skip / `delete -staticChannels` 로 상수 채널 소실 /
+  **Bake 가 내부에서 `DeleteAnimation` 을 불러 머리 애니메이션까지 지운다**(머리 연결은 Bake 이후에) /
+  끝나고 `ctrlBox.limits` 가 0 으로 남는다. → `// N copied` / `// N baked` 두 숫자가 유일한 검증 수단.
+- 문서에 진단용 MEL 스니펫 8종, 권장 작업 순서 11단계, **전체 104행 매핑표**, 자체 툴 설계 메모
+  (양방향은 잘라 붙이지 말고 `up - down` 을 매 프레임 합성)를 정리.
+  같은 코드가 `AdvancedSkeleton.mel` / `panel.mel` / `picker.mel` **3곳에 바이트 동일 사본**으로 있다.
+  [study/AdvancedSkeleton_MetaHumanAnimator_connect_bake_분석](study/AdvancedSkeleton_MetaHumanAnimator_connect_bake_분석.md) #study #MetaHuman
+
 > [!summary] `A00110_animTool` **Key Edit 하위 탭 재편 + Fill Keys(구간 전 프레임 키 채우기)** (v01.39→01.40)
 - **요청**: ① Pose Key · Euler Filter 를 Key Edit 하위 탭으로. ② 선택 오브젝트의 **키 가능 + 채널박스
   노출** 어트리뷰트를 나열하고, 고른 채널의 구간 모든 프레임에 키를 찍는 탭 추가. 이미 키가 있으면
