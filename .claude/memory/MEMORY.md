@@ -85,7 +85,7 @@
 - [A00170 Stretch tab](wip-a00170-stretch-tab.md) — Default Distance 가 Stretch 구동, linear + Sigmoid 노드망 (v01.11)
 - [A00170 AttachCrv tab](wip-a00170-attachcrv-tab.md) — TSL 오브젝트를 커브 최근접점에 부착
 - [A00170 Remap List Attributes](wip-a00170-remap-listattrs.md) — Remap Value 탭에 전체 어트리뷰트 목록 + 검색
-- [A00145 Connect both directions](wip-a00145-connect-both-directions.md) — 역방향 연결(Destination→Source). 코어는 그대로, 인자 순서만 뒤집으면 브로드캐스트까지 반전 (v01.24)
+- [A00145 Connect both directions](wip-a00145-connect-both-directions.md) — 역방향 연결(인자 순서만 뒤집기) + 개수 달라도 적은 쪽만큼 부분 연결·실패해도 계속 (v01.24~01.25)
 - [A00145 Match from Source](wip-a00145-attr-name-matching.md) — 이름 유사 어트리뷰트를 소스 순서대로 찾아 Connect 로 연결. 1000x1000 = 0.15s (v01.21)
 - [A00145 Target Replace](wip-a00145-target-replace.md) — 컨스트레인트의 타깃(드라이버)을 다른 오브젝트로 일괄 교체. 재생성 대신 `target[i]` 연결만 rewire → weight/이름 보존 (v01.20)
 - [A00145 Attribute tab](a00145-attribute-tab-blendshape-alias.md) — 어트리뷰트 복사 + blendShape 타깃은 `weight[]` 별칭(aliasAttr) (v01.17)
