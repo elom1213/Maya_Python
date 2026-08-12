@@ -35,6 +35,7 @@
 - [setKeyframe insert needs a curve](setkeyframe-insert-needs-existing-curve.md) — `insert=True` 는 커브가 없으면 **조용히 no-op**(레이어에 채널 커브 없을 때 특히). 값 경로는 쓰기 전에 전부 미리 계산
 - [animated attr: key + setAttr](animated-attr-setkeyframe-plus-setattr.md) — 키/레이어 걸린 attr 은 `setKeyframe` 만으론 값이 안 바뀜(뒤에 `setAttr` 까지), 레이어면 소스가 `animBlendNode*`
 - [cmds.toggle not undoable](maya-toggle-cmd-not-undoable.md) — `toggle -localAxis` 는 undo 를 안 남겨 Ctrl+Z 가 이전 작업을 지움 → `setAttr` 사용
+- [extendToShape picks wrong shape](extendtoshape-picks-wrong-shape.md) — `kInvalidParameter: Object is incompatible` 1순위 원인. 새 코드는 `extendToShape` 금지, **공용 `Framework.core.maya_shape`** 사용. `polyEvaluate`/`copySkinWeights` 도 셰이프에 걸 것
 - [list_attrs multi detection](list-attrs-multi-detection.md) — multi 판정은 `attributeQuery(multi=True)`, getNextFreeMultiIndex 남용 금지
 - [UUID-safe rename](uuid-safe-rename-duplicate-names.md) — 동명 노드 대비 UUID 로 노드 보관("UUID 기반 리네임 패턴 적용해줘")
 - [standalone app package collision](standalone-app-package-collision.md) — standalone Qt 툴은 `tools.<tool>.app.*` 로 import, 맨 `app` 금지
@@ -71,6 +72,7 @@
 - [A00290 Mix Targets tab](wip-a00290-mix-targets-tab.md) — **신규**: 소스 가중합을 다른 타겟 + 최종(리깅) 메시에 일괄 반영. Base mesh 3모드, 공용 `delta_utils` (v01.17)
 - [A00290 Shape Editor tab](wip-a00290-shape-editor-tab.md) — 마야 Shape Editor 대체. `cmds.sculptTarget` 필수, 행 클릭 다중 편집, 제스처당 undo 1회 (v01.10)
 - [A00280 cloth-corrective](metahuman-cloth-corrective-A00280.md) — Houdini 알렘빅 캐시 → MetaHuman RBF 코렉티브 일괄 추출(invertShape)
+- [A00275 Expand Bind](wip-a00275-expand-bind.md) — 루프 위 조인트에 측지 거리 기반 균등 바인드(Kangaroo ClosestExpand 대체). **엣지 루프를 주면** 밴드 전 줄이 루프 비율 유지, coverage 없이 정규화만 하면 커브가 무의미, falloff 커브 위젯 자작 (v01.10)
 - [A00275 Move Joints](wip-a00275-move-joints.md) — Edit 토글로 메시 변형 없이 조인트 이동 → 재바인드, 웨이트 불변 (v01.08)
 - [A00275 SkinTool Bind Pose](wip-a00275-skintool-bindpose.md) — Update Bind Pose 탭. bindPreMatrix 인덱스는 `matrix[]` 연결에서 얻어야 함 (v01.03)
 - [A00275 Transfer tab](wip-a00275-transfer-tab.md) — N 소스 → 선택 메시/버텍스 전부. copySkinWeights 는 컴포넌트 선택 무시 (v01.07)
