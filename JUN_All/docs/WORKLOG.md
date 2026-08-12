@@ -17,6 +17,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-12 (오늘)
 
+> [!summary] `A00145_RigConnect` **Constraint 탭 `Maintain Offset` 기본 ON** (v01.27→01.28)
+- MEL 원본을 따라 기본 unchecked 였으나, 실제 리깅 작업은 거의 항상 오프셋 유지가 전제라
+  매번 체크하는 손이 갔다. `Constrain > Constraint` 하위 탭의 체크박스만 기본값을 ON 으로 바꿨다.
+- 다른 탭의 동명 옵션(`Skin Weight`, `Connect Closest`)은 손대지 않았다. #A00145
+
 > [!summary] `A00170_driverTool` **AttachCrv 하위 탭 — 엣지 루프에서 드라이버 셋업 한 번에** (v01.13→01.14)
 - **요청**: AttachCrv 를 하위 탭 둘로 나눠 `Default` 는 기존 기능 그대로 두고, 새 탭에서
   ① 엣지 루프 집합 저장 ② 버텍스 집합 저장 ③ 루프→커브 + 버텍스 자리에 널 생성 + 커브에 어태치를

@@ -4,7 +4,8 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.27` (`app/config/version.py`) — Target Replace 하위 탭이 **Target Edit** 으로 확장(타깃 **추가 / 삭제** 추가) (§Target Edit)
+- 버전: `v01.28` (`app/config/version.py`) — Constrain > Constraint 하위 탭의 `Maintain Offset` 기본값을 **ON** 으로 변경 (§Constraint)
+  · v01.27 은 Target Replace 하위 탭이 **Target Edit** 으로 확장(타깃 **추가 / 삭제** 추가) (§Target Edit)
   · v01.27 은 Match 탭의 셰이프 해석을 공용 [`Framework.core.maya_shape`](Framework_maya_shape.md) 로 교체(동작 변화 없음, 다중 셰이프 메시 안전)
 - 위치: `JUN_All/tools/A00145_RigConnect`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴. **최상위 4탭**(Match / Constrain / Connect / Attribute),
@@ -83,7 +84,7 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
 타겟(드라이버) → 팔로워로 constraint 를 건다.
 
 - `Targets` / `Followers` 리스트에 오브젝트 추가(Select/Add/Del/Up/Down).
-- Options: `Maintain Offset` 체크 + constraint 종류 라디오
+- Options: `Maintain Offset` 체크(**기본 ON**, v01.28) + constraint 종류 라디오
   (`Parent` / `Scale` / `Point` / `Orient` / `Point On Poly`).
 - `Constrain` 클릭.
 - **브로드캐스트**: target 이 1개면 모든 follower 에 동일 target 적용, 아니면 인덱스 1:1.

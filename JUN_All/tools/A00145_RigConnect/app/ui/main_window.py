@@ -263,9 +263,9 @@ class MainWindow(QWidget):
         opt_box = QGroupBox("Options")
         opt_layout = QVBoxLayout(opt_box)
 
-        # MEL checkBox 는 기본 unchecked.
+        # 대부분의 리깅 작업이 오프셋 유지를 전제로 해 기본 체크 상태로 둔다.
         self.cb_con_maintain = QCheckBox("Maintain Offset")
-        self.cb_con_maintain.setChecked(False)
+        self.cb_con_maintain.setChecked(True)
         opt_layout.addWidget(self.cb_con_maintain)
 
         self.rb_con_group = QButtonGroup(self)
