@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-08-11
+updated: 2026-08-12
 ---
 
 # 작업 일지 (WORKLOG)
@@ -15,7 +15,35 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-08-11 (오늘)
+## 2026-08-12 (오늘)
+
+> [!summary] `A00145_RigConnect` **Target Replace → Target Edit : constraint 타깃 추가 / 삭제** (v01.25→01.26)
+- **요청**: 임의의 parent/point/scale constraint 의 **타깃을 나열**해 고른 것을 **삭제**하고, 씬에서 고른
+  오브젝트를 다른 리스트에 담아 **원하는 constraint 에만 타깃으로 추가**하는 기능.
+- 새 탭을 만들지 않고 **`Target Replace` 하위 탭을 `Target Edit` 으로 확장**했다 — 교체·추가·삭제가
+  `Constraints` + `Targets` + `New Target` 이라는 **같은 입력 세 개**를 쓰기 때문. 탭이 6개로 늘면
+  560px 창에서 탭 바가 더 좁아지고, 같은 리스트를 두 벌 채워야 했을 것이다.
+- **작업 범위 = Constraints 리스트에서 고른 항목**(아무것도 안 고르면 전체). "원하는 constraint 만"
+  요구를 세 동작 공통 규칙으로 두고, `[INFO] using n picked constraint(s) of m` 로 범위를 로그에 남긴다.
+  `List Targets` 와 편집 후 자동 갱신도 같은 범위를 따라 **목록 = 지금 버튼이 건드릴 범위**가 된다.
+- **연결을 직접 끊지 않고 Maya 명령을 쓴다** — `cmds.<type>Constraint(tgt, driven, e=True, remove=True)` /
+  `cmds.<type>Constraint(newTgt, driven, mo=True)`. 손으로 `target[i]` 연결을 끊으면 weight 별칭과 빈 멀티
+  인덱스가 남는다. (교체는 기존대로 연결만 rewire — 노드 이름·weight 연결 보존이 목적이라 결이 다르다.)
+- **마지막 타깃을 지우면 Maya 가 constraint 노드까지 지운다**(실측). 기본은 *건너뛰고 경고*,
+  `Delete the constraint when its last target is removed` 를 켜야 실제로 지운다. driven 은 마지막 값 유지.
+- **Keep in place (remove)** — 옛→새 타깃 델타가 없어 기존 교체 로직을 못 쓴다. 남은 타깃들의 offset 을
+  **현재 포즈 기준으로 다시 굽는다**: 각 타깃이 *혼자서도* 삭제 전 월드 행렬을 만들게 맞추면 weight 가
+  어떻게 섞이든 블렌드 결과가 같은 행렬이라 정확하다. point/scale/orient 는 공유 `.offset` 을 쓰는 기존
+  보정 함수를 재사용. **Add 는 Maya 의 `maintainOffset` 이 이미 같은 일을 한다**(실측 확인).
+- 추가 시 `Added target weight` 스핀박스 값으로 weight 지정, 이미 있는 타깃/driven 자신은 건너뛰고 경고.
+  `maintainOffset`/`weight` 를 안 받는 타입(geometry/poleVector)은 플래그를 떼고 재시도 후 로그로 알림.
+- 검증(mayapy 2024 headless): 코어 30항목(추가·중복·트랜스폼 확장 / 삭제 후 제자리 유지 — parent·point·
+  scale·orient·aim·geometry / 마지막 타깃 가드·삭제 / 무관 constraint 방치 / 다중 삭제 / 예외 3종) +
+  UI 14항목(탭 라벨, 선택 범위 한정 추가, 스핀박스 weight, 목록 자동 갱신, 필터로 가려진 선택 제외) 전부 통과. #A00145
+
+---
+
+## 2026-08-11
 
 > [!summary] `study` **AdvancedSkeleton MetaHuman Animator 의 Connect / Bake 알고리즘 분석** (문서)
 - **동기**: UE 5.7 에서 커브가 베이크된 MetaHuman 페이셜 애니메이션을 마야 페이셜 컨트롤러에 옮기려고

@@ -88,6 +88,7 @@
 - [A00170 Remap List Attributes](wip-a00170-remap-listattrs.md) — Remap Value 탭에 전체 어트리뷰트 목록 + 검색
 - [A00145 Connect both directions](wip-a00145-connect-both-directions.md) — 역방향 연결(인자 순서만 뒤집기) + 개수 달라도 적은 쪽만큼 부분 연결·실패해도 계속 (v01.24~01.25)
 - [A00145 Match from Source](wip-a00145-attr-name-matching.md) — 이름 유사 어트리뷰트를 소스 순서대로 찾아 Connect 로 연결. 1000x1000 = 0.15s (v01.21)
+- [A00145 Target Edit](wip-a00145-target-edit.md) — 타깃 추가/삭제. Maya 명령의 add/remove, 마지막 타깃 삭제 = 노드 삭제, remove 후 offset 재베이크 (v01.26)
 - [A00145 Target Replace](wip-a00145-target-replace.md) — 컨스트레인트의 타깃(드라이버)을 다른 오브젝트로 일괄 교체. 재생성 대신 `target[i]` 연결만 rewire → weight/이름 보존 (v01.20)
 - [A00145 Attribute tab](a00145-attribute-tab-blendshape-alias.md) — 어트리뷰트 복사 + blendShape 타깃은 `weight[]` 별칭(aliasAttr) (v01.17)
 - [A00145 skin constraint types](wip-a00145-skin-constraint-types.md) — Parent/Scale/Point/Orient 라디오, interpType 은 attributeQuery 가드 (v01.16)
