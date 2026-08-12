@@ -15,6 +15,9 @@
 #                          마야에 대응 기능이 없다(자세한 근거는 core/bind_pose_manager.py).
 #   Tab 5 "Move Joints"  : Edit 토글 방식. 켜면 조인트를 옮겨도 메시가 변형되지 않고,
 #                          다시 끄면 그 자리에서 재바인드된다(웨이트 불변).
+#   Tab 6 "Expand Bind"  : 저장한 버텍스 집합을 저장한 조인트들에 바인드. 조인트 사이가
+#                          엣지 길이(측지 거리)에 비례해 고르게 분배된다
+#                          (Kangaroo ClosestExpand 대체 — core/expand_bind_manager.py).
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
@@ -24,11 +27,15 @@ print("QT version  :  " + str(QT_VERSION))
 
 import maya.cmds as cmds
 
+from Framework.core.maya_undo import undo_chunk
 from tools.A00275_skinTool_V01.app.config.version import VERSION, LAST_UPDATE
 from tools.A00275_skinTool_V01.app.core import SkinMigrateManager
 from tools.A00275_skinTool_V01.app.core import bind_pose_manager as bp_mgr
 from tools.A00275_skinTool_V01.app.core import weight_transfer_manager as wt_mgr
 from tools.A00275_skinTool_V01.app.core import joint_edit_manager as je_mgr
+from tools.A00275_skinTool_V01.app.core import expand_bind_manager as eb_mgr
+from tools.A00275_skinTool_V01.app.core import falloff
+from tools.A00275_skinTool_V01.app.ui.falloff_curve_widget import FalloffCurveWidget
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -64,6 +71,15 @@ class MainWindow(QWidget):
 
         # Move Joints 탭이 잡아둔 대상 skinCluster 목록
         self.je_targets = []
+
+        # Expand Bind 탭이 저장해 둔 버텍스 집합 (메시 롱네임, 버텍스 id 리스트).
+        # 리스트 위젯으로 펼치지 않는다 — 수천 개가 예사라 UI 가 바로 느려진다.
+        # 대신 요약 라벨 + Select 버튼으로 확인한다.
+        self.eb_mesh = None
+        self.eb_vertices = []
+        # 조인트가 앉아 있는 엣지 루프(선택 입력). 순서대로 정렬된 id + 닫힘 여부.
+        self.eb_loop = []
+        self.eb_loop_closed = False
 
         self.resize(self.win_width, self.win_height)
 
@@ -101,6 +117,11 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_bind_pose_tab(), "Bind Pose")
         self.je_tab_index = self.tabs.addTab(
             self._build_move_joints_tab(), "Move Joints")
+        index = self.tabs.addTab(self._build_expand_bind_tab(), "Expand Bind")
+        self.tabs.setTabToolTip(
+            index,
+            "Bind a stored vertex set to stored joints, spreading the weights "
+            "evenly by edge length (replaces Kangaroo's ClosestExpand).")
         # 편집 상태는 UI 가 아니라 씬(노드)에 있다. 탭을 열 때마다 씬을 다시 읽어 맞춘다.
         self.tabs.currentChanged.connect(self._on_tab_changed)
         main_layout.addWidget(self.tabs)
@@ -763,6 +784,412 @@ class MainWindow(QWidget):
 
         self._update_je_state()
 
+    # --------------------------------------------------
+    # Tab 6 : Expand Bind (Kangaroo ClosestExpand 대체)
+    # --------------------------------------------------
+
+    # 콤보 표시 이름 -> core 의 Falloff mode.
+    EB_MODES = (
+        ("Surface (edge length)", eb_mgr.MODE_SURFACE),
+        ("Topology (edge count)", eb_mgr.MODE_TOPOLOGY),
+        ("Volume (straight line)", eb_mgr.MODE_VOLUME),
+    )
+
+    def _build_expand_bind_tab(self):
+
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        desc = QLabel(
+            "Store the vertices to bind and the joints to bind them to, then "
+            "press BIND.\nBetween two joints the weights are spread by the real "
+            "edge lengths, so\nevenly spaced loops stay even (Kangaroo "
+            "ClosestExpand does not).")
+        desc.setAlignment(Qt.AlignCenter)
+        layout.addWidget(desc)
+
+        # ---------------- 버텍스 집합 (리스트로 펼치지 않는다)
+        vtx_grp = QGroupBox("Vertices to bind")
+        vtx_layout = QVBoxLayout(vtx_grp)
+
+        self.lbl_eb_verts = QLabel("Stored: none")
+        self.lbl_eb_verts.setToolTip(
+            "The stored vertex set is kept as ids, not as a list widget - a "
+            "lip/eye region is easily thousands of vertices and a list that "
+            "long makes the window crawl.")
+        vtx_layout.addWidget(self.lbl_eb_verts)
+
+        vtx_row = QHBoxLayout()
+        btn_store_v = QPushButton("Store Vertices from Selection")
+        btn_store_v.setToolTip(
+            "Store the selected vertices (edges/faces are converted).\n"
+            "Selecting a whole mesh stores all of its vertices.")
+        btn_store_v.clicked.connect(self.on_eb_store_vertices)
+        vtx_row.addWidget(btn_store_v)
+        btn_sel_v = QPushButton("Select")
+        btn_sel_v.setToolTip("Re-select the stored vertices in the scene.")
+        btn_sel_v.clicked.connect(self.on_eb_select_vertices)
+        vtx_row.addWidget(btn_sel_v)
+        btn_clr_v = QPushButton("Clear")
+        btn_clr_v.clicked.connect(self.on_eb_clear_vertices)
+        vtx_row.addWidget(btn_clr_v)
+        vtx_layout.addLayout(vtx_row)
+
+        # ---------------- 조인트가 앉아 있는 엣지 루프 (선택 입력이지만 권장)
+        self.lbl_eb_loop = QLabel("Edge loop: none (optional)")
+        self.lbl_eb_loop.setToolTip(
+            "The edge loop the joints sit on - a loop inside the stored vertex "
+            "set.\n"
+            "With it, the joint split is measured ALONG the loop and the "
+            "distance away from\n"
+            "the loop only fades the amount, so every row keeps the loop's "
+            "ratio.\n"
+            "Without it the ratio smears toward the nearest joint as you move "
+            "off the loop.")
+        vtx_layout.addWidget(self.lbl_eb_loop)
+
+        loop_row = QHBoxLayout()
+        btn_store_l = QPushButton("Store Edge Loop from Selection")
+        btn_store_l.setToolTip(
+            "Store the selected edge loop (pick the edges, or the vertices "
+            "along it).\n"
+            "It must be one unbroken loop - open or closed, no branches.")
+        btn_store_l.clicked.connect(self.on_eb_store_loop)
+        loop_row.addWidget(btn_store_l)
+        btn_sel_l = QPushButton("Select")
+        btn_sel_l.setToolTip("Re-select the stored edge loop in the scene.")
+        btn_sel_l.clicked.connect(self.on_eb_select_loop)
+        loop_row.addWidget(btn_sel_l)
+        btn_clr_l = QPushButton("Clear")
+        btn_clr_l.clicked.connect(self.on_eb_clear_loop)
+        loop_row.addWidget(btn_clr_l)
+        vtx_layout.addLayout(loop_row)
+
+        layout.addWidget(vtx_grp)
+
+        # ---------------- 조인트 집합 (개수가 적어 리스트로 보여도 가볍다)
+        self.tsl_eb_joints = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Joints to bind to", select_label="Store Joints from Selection",
+            list_min_height=90, log_callback=self.log)
+        self.tsl_eb_joints.setToolTip(
+            "Influences for the bind, in any order. Usually the joints sitting "
+            "on the loop.")
+        layout.addWidget(self.tsl_eb_joints)
+
+        # ---------------- Falloff (ref/ref_01.png 구성을 따른다)
+        fall_grp = QGroupBox("Falloff")
+        fall_layout = QVBoxLayout(fall_grp)
+
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Falloff mode"))
+        self.cmb_eb_mode = QComboBox()
+        for label, _mode in self.EB_MODES:
+            self.cmb_eb_mode.addItem(label)
+        self.cmb_eb_mode.setToolTip(
+            "Surface  : distance along the mesh edges (edge lengths) - use this "
+            "for loops.\n"
+            "Topology : number of edge steps, ignoring how long they are.\n"
+            "Volume   : straight world distance, ignoring the topology (can "
+            "bleed across a gap).")
+        self.cmb_eb_mode.currentIndexChanged.connect(self._on_eb_mode_changed)
+        mode_row.addWidget(self.cmb_eb_mode)
+        mode_row.addStretch(1)
+        fall_layout.addLayout(mode_row)
+
+        radius_row = QHBoxLayout()
+        radius_row.addWidget(QLabel("Soft Select"))
+        self.sb_eb_radius = QDoubleSpinBox()
+        self.sb_eb_radius.setDecimals(4)
+        self.sb_eb_radius.setRange(0.0001, 1000000.0)
+        self.sb_eb_radius.setSingleStep(0.1)
+        self.sb_eb_radius.setValue(1.0)
+        self.sb_eb_radius.setKeyboardTracking(False)
+        self.sb_eb_radius.setToolTip(
+            "How far the bind reaches, measured from the vertex closest to each "
+            "joint.\nScene units for Surface / Volume, edge steps for Topology.")
+        radius_row.addWidget(self.sb_eb_radius)
+        btn_fit = QPushButton("Fit to Joints")
+        btn_fit.setToolTip(
+            "Set the radius so each joint's falloff just reaches its nearest "
+            "neighbouring joint\n(measured with the current falloff mode, along "
+            "the edge loop when one is stored).")
+        btn_fit.clicked.connect(self.on_eb_fit_radius)
+        radius_row.addWidget(btn_fit)
+        radius_row.addStretch(1)
+        fall_layout.addLayout(radius_row)
+
+        across_row = QHBoxLayout()
+        across_row.addWidget(QLabel("Across width"))
+        self.sb_eb_across = QDoubleSpinBox()
+        self.sb_eb_across.setDecimals(4)
+        self.sb_eb_across.setRange(0.0, 1000000.0)
+        self.sb_eb_across.setSingleStep(0.1)
+        self.sb_eb_across.setValue(0.0)
+        self.sb_eb_across.setSpecialValueText("same as Soft Select")
+        self.sb_eb_across.setKeyboardTracking(False)
+        self.sb_eb_across.setToolTip(
+            "Edge loop only: how far the bind reaches AWAY from the loop.\n"
+            "The joint split never changes here - this only fades how much the "
+            "stored joints take.\n"
+            "0 = use the Soft Select value (which is the reach ALONG the loop).")
+        across_row.addWidget(self.sb_eb_across)
+        across_row.addStretch(1)
+        fall_layout.addLayout(across_row)
+
+        curve_row = QHBoxLayout()
+        lbl_curve = QLabel("Falloff curve")
+        lbl_curve.setAlignment(Qt.AlignTop)
+        curve_row.addWidget(lbl_curve)
+        self.eb_curve = FalloffCurveWidget()
+        curve_row.addWidget(self.eb_curve, 1)
+        fall_layout.addLayout(curve_row)
+
+        interp_row = QHBoxLayout()
+        interp_row.addWidget(QLabel("Interpolation"))
+        self.cmb_eb_interp = QComboBox()
+        for name in falloff.INTERPOLATIONS:
+            self.cmb_eb_interp.addItem(name.capitalize())
+        self.cmb_eb_interp.setCurrentIndex(
+            list(falloff.INTERPOLATIONS).index(self.eb_curve.interpolation()))
+        self.cmb_eb_interp.currentIndexChanged.connect(
+            lambda i: self.eb_curve.set_interpolation(falloff.INTERPOLATIONS[i]))
+        # 프리셋은 보간 방식까지 바꾼다. 커브가 바뀔 때마다 콤보를 맞춰 두어야
+        # 화면 표기와 실제 계산이 어긋나지 않는다(어느 경로로 바뀌든).
+        self.eb_curve.changed.connect(self._sync_eb_interp_combo)
+        interp_row.addWidget(self.cmb_eb_interp)
+        interp_row.addStretch(1)
+        fall_layout.addLayout(interp_row)
+
+        preset_row = QHBoxLayout()
+        preset_row.addWidget(QLabel("Curve presets"))
+        for label, _points, _interp in falloff.PRESETS:
+            btn = QPushButton(label)
+            btn.setToolTip("Load the '{0}' falloff curve.".format(label))
+            btn.clicked.connect(
+                lambda _checked=False, name=label: self._eb_apply_preset(name))
+            preset_row.addWidget(btn)
+        preset_row.addStretch(1)
+        fall_layout.addLayout(preset_row)
+
+        layout.addWidget(fall_grp)
+
+        # ---------------- Blend
+        blend_row = QHBoxLayout()
+        blend_row.addWidget(QLabel("Blend"))
+        self.sb_eb_blend = QDoubleSpinBox()
+        self.sb_eb_blend.setDecimals(3)
+        self.sb_eb_blend.setRange(0.0, 1.0)
+        self.sb_eb_blend.setSingleStep(0.05)
+        self.sb_eb_blend.setValue(1.0)
+        self.sb_eb_blend.setKeyboardTracking(False)
+        self.sb_eb_blend.setToolTip(
+            "How much of a vertex the stored joints may take when that vertex "
+            "is already\nbound to OTHER influences: 0.6 leaves 0.4 to them.\n"
+            "A vertex with no other influence always ends up at 1.0, whatever "
+            "Blend says.")
+        blend_row.addWidget(self.sb_eb_blend)
+        blend_row.addStretch(1)
+        layout.addLayout(blend_row)
+
+        self.btn_eb_bind = QPushButton("BIND stored vertices to stored joints")
+        self.btn_eb_bind.setMinimumHeight(40)
+        self.btn_eb_bind.clicked.connect(self.on_eb_bind)
+        layout.addWidget(self.btn_eb_bind)
+
+        layout.addStretch(1)
+        self._on_eb_mode_changed(0)
+        return tab
+
+    # ---------------- Expand Bind : 상태/헬퍼
+
+    def _eb_mode(self):
+        return self.EB_MODES[self.cmb_eb_mode.currentIndex()][1]
+
+    def _on_eb_mode_changed(self, _index):
+        """Topology 모드는 반경 단위가 '엣지 개수' 라 스핀박스 표기를 바꾼다."""
+        if self._eb_mode() == eb_mgr.MODE_TOPOLOGY:
+            self.sb_eb_radius.setSuffix("  edges")
+            self.sb_eb_radius.setSingleStep(1.0)
+        else:
+            self.sb_eb_radius.setSuffix("")
+            self.sb_eb_radius.setSingleStep(0.1)
+
+    def _eb_apply_preset(self, name):
+        self.eb_curve.set_preset(name)
+
+    def _sync_eb_interp_combo(self):
+        """커브 위젯의 보간 방식을 콤보에 반영(시그널 루프는 blockSignals 로 차단)."""
+        index = list(falloff.INTERPOLATIONS).index(self.eb_curve.interpolation())
+        if self.cmb_eb_interp.currentIndex() == index:
+            return
+        self.cmb_eb_interp.blockSignals(True)
+        self.cmb_eb_interp.setCurrentIndex(index)
+        self.cmb_eb_interp.blockSignals(False)
+
+    def _eb_update_label(self):
+        if not self.eb_vertices:
+            self.lbl_eb_verts.setText("Stored: none")
+        else:
+            self.lbl_eb_verts.setText("Stored: {0} vertices  ({1})".format(
+                len(self.eb_vertices), self.eb_mesh.split("|")[-1]))
+
+        if not self.eb_loop:
+            self.lbl_eb_loop.setText("Edge loop: none (optional)")
+        else:
+            self.lbl_eb_loop.setText("Edge loop: {0} vertices, {1}".format(
+                len(self.eb_loop), "closed" if self.eb_loop_closed else "open"))
+
+    def _eb_vertex_names(self, ids=None):
+        """저장된 id 를 연속 구간으로 묶어 컴포넌트 이름으로 만든다(선택이 빨라진다)."""
+        names = []
+        ids = sorted(self.eb_vertices if ids is None else ids)
+        start = 0
+        while start < len(ids):
+            end = start
+            while end + 1 < len(ids) and ids[end + 1] == ids[end] + 1:
+                end += 1
+            if end == start:
+                names.append("{0}.vtx[{1}]".format(self.eb_mesh, ids[start]))
+            else:
+                names.append("{0}.vtx[{1}:{2}]".format(
+                    self.eb_mesh, ids[start], ids[end]))
+            start = end + 1
+        return names
+
+    # ---------------- Expand Bind : 핸들러
+
+    def on_eb_store_vertices(self):
+        try:
+            mesh, ids = eb_mgr.parse_selected_vertices()
+        except Exception as e:
+            self.log("[Error] Store Vertices : {0}".format(e))
+            return
+        self.eb_mesh = mesh
+        self.eb_vertices = ids
+        self._eb_update_label()
+        self.log("[OK] Stored {0} vertices on {1}.".format(
+            len(ids), mesh.split("|")[-1]))
+
+    def on_eb_select_vertices(self):
+        if not self.eb_vertices:
+            self.log("[Warning] No vertices stored yet.")
+            return
+        if not cmds.objExists(self.eb_mesh or ""):
+            self.log("[Error] Stored mesh is gone. Store the vertices again.")
+            return
+        try:
+            cmds.select(self._eb_vertex_names(), r=True)
+        except Exception as e:
+            self.log("[Error] Select : {0}".format(e))
+            return
+        self.log("[OK] Selected {0} stored vertices.".format(len(self.eb_vertices)))
+
+    def on_eb_clear_vertices(self):
+        self.eb_mesh = None
+        self.eb_vertices = []
+        self.eb_loop = []
+        self.eb_loop_closed = False
+        self._eb_update_label()
+        self.log("[OK] Cleared the stored vertices (and the edge loop).")
+
+    def on_eb_store_loop(self):
+        try:
+            mesh, order, closed = eb_mgr.parse_selected_loop()
+        except Exception as e:
+            self.log("[Error] Store Edge Loop : {0}".format(e))
+            return
+
+        if self.eb_vertices and mesh != self.eb_mesh:
+            self.log("[Error] Store Edge Loop : that loop is on '{0}', but the "
+                     "stored vertices are on '{1}'.".format(
+                         mesh.split("|")[-1], (self.eb_mesh or "").split("|")[-1]))
+            return
+
+        outside = [v for v in order if v not in set(self.eb_vertices)]
+        self.eb_mesh = mesh
+        self.eb_loop = order
+        self.eb_loop_closed = closed
+        self._eb_update_label()
+        self.log("[OK] Stored {0} edge loop of {1} vertices.".format(
+            "a closed" if closed else "an open", len(order)))
+        if self.eb_vertices and outside:
+            self.log("[Warning] {0} loop vertices are not in the stored vertex "
+                     "set - they will be bound too.".format(len(outside)))
+
+    def on_eb_select_loop(self):
+        if not self.eb_loop:
+            self.log("[Warning] No edge loop stored yet.")
+            return
+        if not cmds.objExists(self.eb_mesh or ""):
+            self.log("[Error] Stored mesh is gone. Store the loop again.")
+            return
+        try:
+            cmds.select(self._eb_vertex_names(self.eb_loop), r=True)
+        except Exception as e:
+            self.log("[Error] Select : {0}".format(e))
+            return
+        self.log("[OK] Selected the stored edge loop ({0} vertices).".format(
+            len(self.eb_loop)))
+
+    def on_eb_clear_loop(self):
+        self.eb_loop = []
+        self.eb_loop_closed = False
+        self._eb_update_label()
+        self.log("[OK] Cleared the stored edge loop.")
+
+    def on_eb_fit_radius(self):
+        try:
+            radius = eb_mgr.suggest_radius(
+                self.eb_mesh, self.eb_vertices,
+                self.tsl_eb_joints.get_all_items(), mode=self._eb_mode(),
+                loop_ids=self.eb_loop, loop_closed=self.eb_loop_closed)
+        except Exception as e:
+            self.log("[Error] Fit to Joints : {0}".format(e))
+            return
+        self.sb_eb_radius.setValue(radius)
+        self.log("[OK] Radius set to {0:.4f} (widest gap between neighbouring "
+                 "joints).".format(radius))
+
+    def on_eb_bind(self):
+        joints = self.tsl_eb_joints.get_all_items()
+        try:
+            with undo_chunk():
+                report = eb_mgr.expand_bind(
+                    self.eb_mesh, self.eb_vertices, joints,
+                    radius=self.sb_eb_radius.value(),
+                    blend=self.sb_eb_blend.value(),
+                    mode=self._eb_mode(),
+                    curve_points=self.eb_curve.points(),
+                    curve_interp=self.eb_curve.interpolation(),
+                    loop_ids=self.eb_loop,
+                    loop_closed=self.eb_loop_closed,
+                    across_radius=self.sb_eb_across.value())
+        except Exception as e:
+            self.log("[Error] Bind : {0}".format(e))
+            cmds.warning(str(e))
+            return
+
+        if report["loop_added"]:
+            self.log("[Warning] {0} loop vertices were not in the stored set - "
+                     "they were bound as well.".format(report["loop_added"]))
+        if report["created_skin"]:
+            self.log("[Warning] {0} had no skinCluster - a new one was created, "
+                     "so the vertices outside the stored set carry Maya's "
+                     "default bind.".format(report["mesh"].split("|")[-1]))
+        if report["skipped"]:
+            self.log("[Warning] {0} stored vertices were out of range and left "
+                     "untouched (raise Soft Select to reach them).".format(
+                         report["skipped"]))
+        loop_note = ""
+        if report["loop"]:
+            loop_note = ", loop {0} verts / across {1:.4f}".format(
+                report["loop"], report["across_radius"])
+        self.log("[OK] Bound {0} vertices to {1} joints  (mode {2}, radius "
+                 "{3:.4f}{4}, blend {5:.3f}, max weight {6:.3f}).".format(
+                     report["affected"], len(report["joints"]), report["mode"],
+                     report["radius"], loop_note, report["blend"],
+                     report["max_weight"]))
+
     def _mesh_row(self, label, line_edit):
         """라벨 + QLineEdit + 'Set from selection' 버튼 행."""
         row = QHBoxLayout()
@@ -852,6 +1279,8 @@ class MainWindow(QWidget):
             "Migrate A->B : cross-topology transfer + bone remap.\n"
             "Bind Pose : make the current joint pose the new bind pose.\n"
             "Move Joints : Edit toggle - move joints without deforming the mesh,\n"
-            "              then re-bind at the new positions (weights unchanged).\n\n"
+            "              then re-bind at the new positions (weights unchanged).\n"
+            "Expand Bind : bind a stored vertex set to stored joints with a\n"
+            "              falloff curve; weights spread by real edge length.\n\n"
             f"Written by Ji Hun Park.\nUpdate date: {LAST_UPDATE}",
         )
