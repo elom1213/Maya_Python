@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.25` (`app/config/version.py`) — 어트리뷰트 개수가 달라도 **적은 쪽만큼 부분 연결**(에러로 중단하지 않음) (§개수가 달라도 멈추지 않는다)
+- 버전: `v01.26` (`app/config/version.py`) — Target Replace 하위 탭이 **Target Edit** 으로 확장(타깃 **추가 / 삭제** 추가) (§Target Edit)
 - 위치: `JUN_All/tools/A00145_RigConnect`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴. **최상위 4탭**(Match / Constrain / Connect / Attribute),
   Constrain·Connect 는 다시 **중첩 탭**으로 나뉜다
@@ -60,7 +60,7 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
 
 ```
 [ Match ][ Constrain ][ Connect ][ Attribute ]
-          └─ [ Constraint ][ Skin Weight ][ Group Create ][ Transfer ][ Target Replace ]
+          └─ [ Constraint ][ Skin Weight ][ Group Create ][ Transfer ][ Target Edit ]
 ```
 
 | 하위 탭 | 내용 |
@@ -69,7 +69,7 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
 | **Skin Weight** | Skin Weight to Constraint — 선택 버텍스의 스킨 웨이트로 구속 (+ Locators) |
 | **Group Create** | 오프셋(zero-out) 노드 삽입 (v01.12, 옵션 확장 v01.13) |
 | **Transfer** | Constraint Transfer — 기존 constraint 를 다른 오브젝트로 이관 (v01.14) |
-| **Target Replace** | 타깃(드라이버)을 다른 오브젝트로 일괄 교체 (v01.20) |
+| **Target Edit** | 타깃(드라이버) **교체**(v01.20) / **추가 · 삭제**(v01.26) |
 
 탭 라벨은 창 폭(기본 560)에 맞춰 줄였고 **전체 이름은 탭 툴팁**에 있다. 폭이 모자라면 라벨이
 말줄임(`ElideRight`)된다. **각 하위 탭은 따로 스크롤**되므로 창을 줄여도 위젯이 겹치지 않는다.
@@ -192,8 +192,27 @@ after :  [targets] ─(parentConstraint, MO)→ objB     (원본 삭제, objB �
 - 어떤 종류의 constraint 든 동작한다(parent/point/orient/scale/aim/poleVector/geometry/pointOnPoly/
   normal/tangent). 읽기/재생성이 불가한 항목은 건너뛰고 경고를 남긴다.
 
-#### Target Replace (v01.20)
-Constraint Transfer 가 **driven(구속당하는 쪽)** 을 옮긴다면, 이쪽은 **타깃(드라이버)** 을 바꾼다.
+#### Target Edit (v01.20 교체 · v01.26 추가/삭제)
+Constraint Transfer 가 **driven(구속당하는 쪽)** 을 옮긴다면, 이쪽은 **타깃(드라이버)** 을 다룬다.
+이미 걸려 있는 constraint 의 타깃을 **교체 / 추가 / 삭제**한다.
+
+```
+Constraints        Targets                     ← List Targets 로 채움
+[ con_01 ]         [ tgt_A_01   [1/3] ]
+[ con_02 ]         [ tgt_A_02   [2/3] ]        ← 여기서 고른 것이 Replace/Remove 대상
+[ con_03 ]         [ tgt_A_04   [1/3] ]
+
+New Target (used by Replace / Add)             ← Replace 의 대체 / Add 로 붙일 오브젝트
+
+[ Replace Target ]
+[ Add Target ][ Remove Target ]
+```
+
+세 동작 모두 **`Constraints` 리스트에서 고른 항목만** 대상으로 한다(아무것도 고르지 않으면 리스트 전체).
+`[INFO] using n picked constraint(s) of m` 로 어느 범위로 동작했는지 로그에 남는다.
+`List Targets` 도 같은 범위를 따르므로, 편집 뒤 자동 갱신되는 목록은 항상 "지금 버튼이 건드릴 범위"를 보여 준다.
+
+##### Replace — 타깃 교체
 여러 constraint 가 공통으로 쓰는 타깃 하나를 씬의 다른 오브젝트로 **일괄 교체**한다.
 
 ```
@@ -219,13 +238,56 @@ after :  con_01 : [tgt_A_01, tgt_B_02]     con_02 : [tgt_B_02, tgt_A_03]     con
 그대로 보존된다.** `target[i]` 의 실제 멀티 인덱스는 들어오는 연결에서 역추적하므로 `targetList` 순서에
 의존하지 않는다.
 
-**옵션**
+- **joint ↔ 일반 트랜스폼** 교체도 처리한다. joint → 트랜스폼이면 `targetJointOrient`/`targetInverseScale`/
+  `targetScaleCompensate` 연결을 끊고 기본값으로, 반대면 새로 연결한다.
+- **셰이프 기반 constraint**(geometry/normal/tangent/pointOnPoly)는 새 타깃의 **같은 타입 셰이프**로 연결을
+  옮긴다. 새 타깃에 대응하는 입력이 없으면(예: 셰이프 없는 로케이터) **아무것도 건드리지 않고** 경고만 남긴다.
+- 고른 타깃이 이미 그 constraint 의 타깃이거나 새 타깃과 같은 오브젝트면 건너뛴다(중복 타깃 방지).
 
-| 옵션 | 기본 | 동작 |
-|------|------|------|
-| `Keep driven objects in place` | ON | 새 타깃이 다른 위치에 있어도 driven 이 **제자리에 남도록** constraint offset 을 다시 계산한다. |
-| | OFF | 원래 offset 을 유지 → driven 이 옛 타깃에 대해 가졌던 **상대 관계 그대로** 새 타깃을 따라간다(그만큼 튄다). |
-| `Rename the weight attribute to the new target` | OFF | weight 어트리뷰트 이름을 `tgt_A_02W0` → `tgt_B_02W0` 로. Maya 가 자동 생성한 이름일 때만 손댄다. |
+##### Add — 타깃 추가 (v01.26)
+`New Target` 리스트의 오브젝트를 씬에서 골라 담고 **`Add Target`** → 대상 constraint들에 **새 드라이버로
+추가**된다. 대상 constraint × New Target **모든 조합**으로 붙는다.
+
+```
+before:  con_01 : [tgt_A_01]                 con_02 : [tgt_A_02]
+add   : + tgt_B_01
+after :  con_01 : [tgt_A_01, tgt_B_01]       con_02 : [tgt_A_02, tgt_B_01]
+```
+
+- **이미 그 타깃을 쓰는 constraint** 는 건너뛰고 경고한다(중복 슬롯이 생기지 않는다).
+  constraint 자신의 **driven 오브젝트**를 타깃으로 넣으려는 경우도 막는다.
+- `Added target weight` 스핀박스 값이 새 타깃의 constraint weight 가 된다(기본 `1.0`).
+  weight 어트리뷰트(`<타깃>W<n>`)는 Maya 가 만들고, **기존 타깃과 그 weight 는 그대로**다.
+- `Keep driven objects in place` 가 켜져 있으면 `maintainOffset` 으로 붙여 driven 이 움직이지 않는다.
+- 어떤 타입이든 붙는다. `maintainOffset`/`weight` 를 받지 않는 타입(geometry/poleVector 등)은 그 플래그를
+  떼고 다시 시도하며, 무엇이 빠졌는지 로그에 남는다.
+
+##### Remove — 타깃 삭제 (v01.26)
+`Targets` 목록에서 고르고 **`Remove Target`** → 대상 constraint들에서 그 타깃 슬롯을 **지운다**.
+**그 타깃을 쓰지 않는 constraint 는 손대지 않는다.**
+
+```
+before:  con_01 : [tgt_A_01, tgt_A_02]       con_02 : [tgt_A_02, tgt_A_03]     con_03 : [tgt_A_04]
+remove: tgt_A_02
+after :  con_01 : [tgt_A_01]                 con_02 : [tgt_A_03]               con_03 : [tgt_A_04]  (방치)
+```
+
+- 여러 타깃을 한 번에 골라 지울 수 있다. 필터로 **가려진** 선택은 제외된다(Replace 와 동일).
+- **마지막 타깃을 지우면 Maya 가 constraint 노드까지 지운다**(실측). 실수로 리그를 잃지 않도록 기본값은
+  *건너뛰고 경고*이며, `Delete the constraint when its last target is removed` 를 켜야 실제로 지워진다.
+  이때 driven 오브젝트는 **마지막 값을 그대로 유지**한 채 연결만 끊긴다.
+- 연결을 손으로 끊지 않고 `cmds.<type>Constraint(tgt, driven, e=True, remove=True)` 를 쓴다 — 직접 끊으면
+  weight 별칭과 빈 멀티 인덱스가 남아 지저분해지기 때문이다.
+
+##### 옵션 (Replace / Add / Remove 공용)
+
+| 옵션 | 기본 | 적용 | 동작 |
+|------|------|------|------|
+| `Keep driven objects in place` | ON | 공통 | 타깃이 바뀌어도 driven 이 **제자리에 남도록** constraint offset 을 다시 계산한다. |
+| | OFF | 공통 | 원래 offset 을 유지 → driven 이 예전에 가졌던 **상대 관계 그대로** 바뀐 타깃을 따라간다(그만큼 튄다). |
+| `Rename the weight attribute to the new target` | OFF | Replace | weight 어트리뷰트 이름을 `tgt_A_02W0` → `tgt_B_02W0` 로. Maya 가 자동 생성한 이름일 때만 손댄다. |
+| `Delete the constraint when its last target is removed` | OFF | Remove | 마지막 타깃 삭제(= constraint 노드 삭제)를 허용. 꺼져 있으면 그 constraint 는 건너뛰고 경고. |
+| `Added target weight` | 1.0 | Add | 새로 붙는 타깃의 constraint weight. |
 
 - **Keep in place 정확도** — Maya 2024 에서 실측한 offset 규약대로 계산한다.
   - `parentConstraint` : **타깃별** offset(`targetOffsetTranslate/Rotate`). 위치는 전체 월드 행렬로,
@@ -234,12 +296,12 @@ after :  con_01 : [tgt_A_01, tgt_B_02]     con_02 : [tgt_B_02, tgt_A_03]     con
   - `pointConstraint` 덧셈 / `scaleConstraint` 곱셈 / `orient`·`aim` 회전 합성(오일러 순서 = driven 의
     `rotateOrder`).
   - `geometry`/`normal`/`tangent`/`pointOnPoly`/`poleVector` 는 보정할 offset 이 없어 그대로 둔다(로그로 알림).
+  - **Remove 의 `parentConstraint`** 는 옛 타깃 → 새 타깃 델타가 없으므로, 남은 타깃들의 offset 을 **현재
+    포즈 기준으로 다시 굽는다**. 각 타깃이 *혼자서도* 삭제 전 월드 행렬을 만들도록 맞추면, weight 가 어떻게
+    섞이든 블렌드 결과가 같은 행렬이 되어 정확하다(= maintainOffset 으로 다시 건 상태와 동일).
+  - **Add** 는 Maya 의 `maintainOffset` 플래그가 같은 일을 해 준다(실측 확인 — parent 는 새 타깃 offset 만,
+    point/scale/orient 는 공유 `.offset` 을 재계산해 driven 이 움직이지 않는다).
   - 보정 후 driven 의 월드 행렬을 **다시 읽어 검증**하고, 어긋나면 오차를 경고로 남긴다.
-- **joint ↔ 일반 트랜스폼** 교체도 처리한다. joint → 트랜스폼이면 `targetJointOrient`/`targetInverseScale`/
-  `targetScaleCompensate` 연결을 끊고 기본값으로, 반대면 새로 연결한다.
-- **셰이프 기반 constraint**(geometry/normal/tangent/pointOnPoly)는 새 타깃의 **같은 타입 셰이프**로 연결을
-  옮긴다. 새 타깃에 대응하는 입력이 없으면(예: 셰이프 없는 로케이터) **아무것도 건드리지 않고** 경고만 남긴다.
-- 고른 타깃이 이미 그 constraint 의 타깃이거나 새 타깃과 같은 오브젝트면 건너뛴다(중복 타깃 방지).
 - **UUID 기반** — 같은 이름의 오브젝트가 여럿이어도 안전하다.
 
 ### Filter — 이름으로 어트리뷰트 찾기 (v01.19)
@@ -535,7 +597,7 @@ A00145_RigConnect/
     │   ├── skin_constraint_manager.py # Skin Weight to Constraint (스킨 웨이트 → weighted Parent/Scale/Point/Orient constraint)
     │   ├── group_create_manager.py # Group Create (부모/자식 쪽 오프셋 노드 _<suffix>_NN 삽입, 그룹·오브젝트 타입, UUID 기반)
     │   ├── constraint_transfer_manager.py # Constraint Transfer (constraint 를 다른 오브젝트로 이관: 삭제+동일세팅 재생성, MO 유지, UUID 기반)
-    │   ├── constraint_target_manager.py # Target Replace (타깃(드라이버) 교체: target[i] 입력 연결만 rewire, offset 재계산, UUID 기반)
+    │   ├── constraint_target_manager.py # Target Edit (타깃(드라이버) 교체 = target[i] 입력 연결만 rewire / 추가·삭제 = constraint 명령의 add·remove, offset 재계산, UUID 기반)
     │   ├── attr_match.py           # Match from Source (이름 유사 어트리뷰트 검색: 토큰 역색인 + IDF, maya 비의존 순수 파이썬)
     │   ├── connect_manager.py      # Connect    (MEL 포팅: attr 나열/검색/연결, 52 facial)
     │   ├── attribute_manager.py    # Attribute  (어트리뷰트 정의를 읽어 다른 오브젝트에 재생성, prefix/suffix)

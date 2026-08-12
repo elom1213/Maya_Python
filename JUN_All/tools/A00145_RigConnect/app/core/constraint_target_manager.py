@@ -1,15 +1,29 @@
 # -*- coding: utf-8 -*-
 """
-constraint_target_manager - Constrain 탭 'Target Replace' 로직.
+constraint_target_manager - Constrain 탭 'Target Edit' 로직 (replace / add / remove).
 
 주어진 constraint 들이 쓰고 있는 **타깃(드라이버) 오브젝트**를 모아서 보여 주고,
-그중 하나를 씬의 다른 오브젝트로 갈아끼운다.
+그 타깃을 **교체 / 추가 / 삭제**한다.
 
   before:  con_01 : [tgt_A_01, tgt_A_02]      con_02 : [tgt_A_02, tgt_A_03]
   replace: tgt_A_02  ->  tgt_B_02
   after :  con_01 : [tgt_A_01, tgt_B_02]      con_02 : [tgt_B_02, tgt_A_03]
 
 해당 타깃을 갖고 있지 않은 constraint 는 손대지 않는다.
+
+## 세 동작의 구현 방식이 다른 이유
+
+- **replace** : constraint 노드를 그대로 두고 `target[i]` 입력 연결만 갈아끼운다
+  (아래 '왜 재생성이 아니라 연결 교체인가').
+- **add / remove** : Maya 의 constraint 명령이 그대로 지원한다 —
+  `cmds.<type>Constraint(newTgt, driven, mo=True)` 는 **기존 노드에 타깃을 추가**하고
+  (Maya 2024 실측: 노드 재사용, weight alias `<tgt>W<n>` 자동 생성, `mo=True` 면 driven
+  이 움직이지 않음), `cmds.<type>Constraint(tgt, driven, e=True, remove=True)` 는
+  타깃 슬롯을 지운다. 손으로 연결을 끊으면 weight alias 와 멀티 인덱스가 남아 지저분해
+  지므로 여기서는 명령을 쓴다.
+- **마지막 타깃을 지우면 Maya 가 constraint 노드까지 지운다**(실측). driven 의 채널은
+  마지막 값 그대로 남는다. 실수 방지를 위해 기본값은 '건너뛰고 경고'이고,
+  `delete_empty_constraint=True` 일 때만 허용한다.
 
 ## 왜 '재생성'이 아니라 '연결 교체'인가
 
@@ -40,6 +54,12 @@ constraint 노드를 그대로 두고 `target[i]` 로 들어오는 입력 연결
 
 보정 후에는 driven 의 월드 행렬을 다시 읽어 실제로 제자리인지 검증하고, 어긋나면
 경고를 남긴다(타깃 스케일 차이 등으로 offset 이 표현할 수 없는 경우).
+
+**타깃을 지울 때(remove)의 parentConstraint** 는 옛 타깃 -> 새 타깃 델타가 없으므로
+남은 타깃들의 offset 을 *현재 포즈 기준으로 다시 굽는다*. 각 타깃이 **혼자서도**
+지우기 전 월드 행렬을 만들어 내도록 맞추면, weight 가 어떻게 섞이든 그 값들의 블렌드는
+같은 행렬이 되므로 결과가 정확하다(= maintainOffset 으로 다시 건 것과 같은 상태).
+`add` 는 Maya 의 `maintainOffset` 플래그가 이미 같은 일을 해 준다(실측 확인).
 
 UI 비의존: 위젯에서 읽은 이름 리스트만 받는다. (app/core <-> app/ui 분리)
 """
@@ -382,8 +402,13 @@ def _rotate_order(cn, driven):
     return 0
 
 
-def _capture(cn, ctype, driven, index, old_node):
-    """교체 전 상태(오프셋 복원에 필요한 값)를 기록한다."""
+def _capture(cn, ctype, driven, index=None, old_node=None):
+    """편집 전 상태(오프셋 복원에 필요한 값)를 기록한다.
+
+    `index`/`old_node` 는 replace 전용이다(그 슬롯의 옛 타깃 기준 델타를 계산하려고
+    쓴다). remove 는 넘기지 않는다 — 남은 타깃 offset 을 현재 포즈로 다시 굽기 때문에
+    driven 의 월드 행렬만 있으면 된다.
+    """
     data = {"rotate_order": _rotate_order(cn, driven), "matrix": None}
 
     if driven:
@@ -398,14 +423,16 @@ def _capture(cn, ctype, driven, index, old_node):
                 data[key] = None
 
     if ctype == "parentConstraint":
-        try:
-            data["target_world"] = _world_matrix(old_node)
-            data["offset_t"] = list(cmds.getAttr(
-                "{0}.target[{1}].targetOffsetTranslate".format(cn, index))[0])
-            data["offset_r"] = list(cmds.getAttr(
-                "{0}.target[{1}].targetOffsetRotate".format(cn, index))[0])
-        except Exception:
-            data["target_world"] = None
+        data["target_world"] = None
+        if old_node is not None and index is not None:
+            try:
+                data["target_world"] = _world_matrix(old_node)
+                data["offset_t"] = list(cmds.getAttr(
+                    "{0}.target[{1}].targetOffsetTranslate".format(cn, index))[0])
+                data["offset_r"] = list(cmds.getAttr(
+                    "{0}.target[{1}].targetOffsetRotate".format(cn, index))[0])
+            except Exception:
+                data["target_world"] = None
     else:
         try:
             data["offset"] = list(cmds.getAttr("{0}.offset".format(cn))[0])
@@ -439,6 +466,46 @@ def _restore_parent_offset(cn, index, before, new_node):
                  point.x, point.y, point.z, type="double3")
     cmds.setAttr("{0}.target[{1}].targetOffsetRotate".format(cn, index),
                  rotate[0], rotate[1], rotate[2], type="double3")
+    return ""
+
+
+def _rebake_parent_offsets(cn, before):
+    """parentConstraint 의 **남은 모든 타깃** offset 을 현재 포즈 기준으로 다시 굽는다.
+
+    타깃을 지우고 나면 옛 타깃 -> 새 타깃 델타가 없으므로 `_restore_parent_offset` 을
+    쓸 수 없다. 대신 각 타깃이 *혼자서도* 지우기 전 월드 행렬(`before["matrix"]`)을
+    만들도록 offset 을 맞춘다. 모든 타깃이 같은 결과를 내면 weight 가 어떻게 섞이든
+    블렌드 결과도 그 행렬이므로 정확하다.
+
+    offset 두 개가 서로 다른 공간에 산다는 규약은 `_restore_parent_offset` 과 같다.
+    """
+    if not before.get("matrix"):
+        return "offset not restored (could not read the driven object)"
+
+    order = before["rotate_order"]
+    world = om.MMatrix(before["matrix"])
+    failed = []
+
+    for entry in _target_entries(cn):
+        index = entry["index"]
+        node = entry["node"]
+        if node is None:
+            failed.append("target[{0}]".format(index))
+            continue
+        target_world = _world_matrix(node)
+        translate, _r = _decompose(world * target_world.inverse(), order)
+        _t, rotate = _decompose(
+            _rotation_only(world) * _rotation_only(target_world).inverse(), order)
+        try:
+            cmds.setAttr("{0}.target[{1}].targetOffsetTranslate".format(cn, index),
+                         translate[0], translate[1], translate[2], type="double3")
+            cmds.setAttr("{0}.target[{1}].targetOffsetRotate".format(cn, index),
+                         rotate[0], rotate[1], rotate[2], type="double3")
+        except Exception as e:
+            failed.append("target[{0}] ({1})".format(index, e))
+
+    if failed:
+        return "offset not restored for {0}".format(", ".join(failed))
     return ""
 
 
@@ -478,32 +545,48 @@ def _restore_rotate_offset(cn, driven, before):
     return ""
 
 
+def _verify_in_place(driven, before):
+    """driven 이 실제로 제자리에 남았는지 검증. 어긋나면 메시지 반환."""
+    if not driven or not before.get("matrix"):
+        return ""
+    try:
+        now = cmds.xform(driven, q=True, ws=True, matrix=True)
+    except Exception:
+        return ""
+    error = max(abs(now[i] - before["matrix"][i]) for i in range(16))
+    if error > OFFSET_TOLERANCE:
+        return ("'{0}' moved (max error {1:.4f}) - the offset cannot express "
+                "this change".format(_nice(driven), error))
+    return ""
+
+
+def _restore_shared_offset(cn, ctype, driven, before):
+    """`.offset` 하나를 공유하는 타입(point/scale/orient/aim)의 offset 보정."""
+    if ctype == "pointConstraint":
+        return _restore_point_offset(cn, driven, before)
+    if ctype == "scaleConstraint":
+        return _restore_scale_offset(cn, driven, before)
+    if ctype in ("orientConstraint", "aimConstraint"):
+        return _restore_rotate_offset(cn, driven, before)
+    return "offset not restored ({0} has no offset to compensate)".format(ctype)
+
+
 def _restore_offset(cn, ctype, driven, index, before, new_node):
-    """driven 이 제자리에 남도록 offset 을 다시 계산한다. 문제가 있으면 메시지 반환."""
+    """replace 후 driven 이 제자리에 남도록 offset 을 다시 계산한다."""
     if ctype == "parentConstraint":
         note = _restore_parent_offset(cn, index, before, new_node)
-    elif ctype == "pointConstraint":
-        note = _restore_point_offset(cn, driven, before)
-    elif ctype == "scaleConstraint":
-        note = _restore_scale_offset(cn, driven, before)
-    elif ctype in ("orientConstraint", "aimConstraint"):
-        note = _restore_rotate_offset(cn, driven, before)
     else:
-        return "offset not restored ({0} has no offset to compensate)".format(ctype)
-    if note:
-        return note
+        note = _restore_shared_offset(cn, ctype, driven, before)
+    return note or _verify_in_place(driven, before)
 
-    # 실제로 제자리인지 검증.
-    if driven and before.get("matrix"):
-        try:
-            now = cmds.xform(driven, q=True, ws=True, matrix=True)
-        except Exception:
-            return ""
-        error = max(abs(now[i] - before["matrix"][i]) for i in range(16))
-        if error > OFFSET_TOLERANCE:
-            return ("'{0}' moved (max error {1:.4f}) - the offset cannot express "
-                    "this change".format(_nice(driven), error))
-    return ""
+
+def _restore_offset_after_remove(cn, ctype, driven, before):
+    """remove 후 driven 이 제자리에 남도록 offset 을 다시 계산한다."""
+    if ctype == "parentConstraint":
+        note = _rebake_parent_offsets(cn, before)
+    else:
+        note = _restore_shared_offset(cn, ctype, driven, before)
+    return note or _verify_in_place(driven, before)
 
 
 def _replace_entry(cn, entry, old_node, new_node, maintain_offset, rename_weight):
@@ -666,5 +749,263 @@ def replace_targets(constraint_names, old_targets, new_targets,
                     "index": entry["index"],
                     "note": note,
                 })
+
+    return results, warnings
+
+
+# ====================================================== 추가/삭제 : 공통 헬퍼
+
+def _constraint_command(cn):
+    """constraint 노드에 대응하는 `cmds.<type>Constraint` 함수. 없으면 None."""
+    return getattr(cmds, cmds.nodeType(cn), None)
+
+
+def _entry_uuids(entries):
+    """target 슬롯 목록 -> 타깃 UUID 집합(해석 가능한 것만)."""
+    uuids = set()
+    for entry in entries:
+        if entry["node"]:
+            uuid = _to_uuid(entry["node"])
+            if uuid:
+                uuids.add(uuid)
+    return uuids
+
+
+def _prepare(constraint_names, targets, targets_label, empty_targets_message):
+    """add/remove 가 공유하는 입력 해석. (constraint UUID 목록, 타깃 UUID 목록, 경고)"""
+    if not constraint_names:
+        raise ValueError("No constraints. Add constraints to the list.")
+    if not targets:
+        raise ValueError(empty_targets_message)
+
+    con_uuids, warnings = _collect_constraint_uuids(constraint_names)
+    if not con_uuids:
+        raise ValueError("No valid constraints found in the list.")
+
+    target_uuids = _resolve_uuids(targets, targets_label, warnings)
+    if not target_uuids:
+        raise ValueError("None of the picked {0}s exist in the scene.".format(
+            targets_label))
+    return con_uuids, target_uuids, warnings
+
+
+# =========================================================== 공개 API : 추가
+
+def _add_flag_sets(maintain_offset, weight):
+    """시도할 플래그 조합(앞에서부터 시도). 지원하지 않는 플래그가 있는 타입 대비.
+
+    poleVector/geometry 처럼 `maintainOffset` 이나 `weight` 를 받지 않는 타입이 있어,
+    전부 붙여 보고 실패하면 하나씩 떨어뜨린다. (constraint_transfer_manager 와 같은 전략)
+    """
+    sets = []
+    full = {}
+    if maintain_offset:
+        full["maintainOffset"] = True
+    if weight is not None:
+        full["weight"] = weight
+    for kw in (full,
+               {"maintainOffset": True} if maintain_offset else {},
+               {"weight": weight} if weight is not None else {},
+               {}):
+        if kw not in sets:
+            sets.append(kw)
+    return sets
+
+
+def _add_one(cmd, cn, con_uuid, new_node, driven, maintain_offset, weight):
+    """타깃 하나를 constraint 에 붙인다. (성공 여부, 메시지)"""
+    attempts = _add_flag_sets(maintain_offset, weight)
+    error = None
+    used = None
+    result = None
+
+    for kw in attempts:
+        try:
+            result = cmd(new_node, driven, **kw)
+            used = kw
+            break
+        except Exception as e:
+            error = e
+
+    if used is None:
+        return False, "{0} : could not add '{1}' - {2}".format(
+            _nice(cn), _nice(new_node), error)
+
+    notes = []
+    dropped = [flag for flag in attempts[0] if flag not in used]
+    if dropped:
+        notes.append("{0} not supported by {1}".format(
+            ", ".join(sorted(dropped)), cmds.nodeType(cn)))
+
+    # Maya 는 같은 타입의 constraint 가 이미 있으면 그 노드에 타깃을 더한다. 그렇지
+    # 않은 배치(constraint 노드가 driven 의 자식이 아닌 경우 등)라면 새 노드가 생긴다.
+    new_cn = result[0] if isinstance(result, (list, tuple)) else result
+    if new_cn and _to_uuid(new_cn) != con_uuid:
+        notes.append("added to a different node '{0}'".format(_nice(new_cn)))
+
+    return True, "; ".join(notes)
+
+
+def add_targets(constraint_names, new_targets, maintain_offset=True, weight=1.0):
+    """constraint 들에 타깃(드라이버)을 추가한다.
+
+    리스트에 담긴 **모든 constraint × 모든 새 타깃** 조합으로 붙인다(교차). 이미
+    그 타깃을 쓰고 있는 constraint 는 건너뛴다.
+
+    Args:
+        constraint_names: constraint 노드 또는 constraint 가 걸린 트랜스폼 이름들.
+        new_targets: 타깃으로 추가할 오브젝트들.
+        maintain_offset: True 면 driven 이 현재 자리에서 움직이지 않도록 offset 계산.
+        weight: 새 타깃의 constraint weight (None 이면 Maya 기본값).
+
+    Returns:
+        (results, warnings)
+        results: [{"constraint": ..., "target": ..., "note": ...}, ...]
+    """
+    con_uuids, new_uuids, warnings = _prepare(
+        constraint_names, new_targets, "new target",
+        "No new target. Add the object(s) to add to the New Target list.")
+
+    results = []
+
+    for con_uuid in con_uuids:
+        cn = _path(con_uuid)
+        if cn is None:
+            continue
+        cmd = _constraint_command(cn)
+        if cmd is None:
+            warnings.append("Skipped {0} - no command for node type '{1}'.".format(
+                _nice(cn), cmds.nodeType(cn)))
+            continue
+        driven = _driven(cn)
+        if driven is None:
+            warnings.append("Skipped {0} - could not resolve the driven "
+                            "object.".format(_nice(cn)))
+            continue
+
+        existing = _entry_uuids(_target_entries(cn))
+        driven_uuid = _to_uuid(driven)
+
+        for new_uuid in new_uuids:
+            new_node = _path(new_uuid)
+            if new_node is None:
+                warnings.append("Skipped a new target (no longer in scene).")
+                continue
+            if new_uuid in existing:
+                warnings.append("Skipped {0} - '{1}' is already a target of "
+                                "it.".format(_nice(cn), _nice(new_node)))
+                continue
+            if new_uuid == driven_uuid:
+                warnings.append("Skipped {0} - '{1}' is the driven object of "
+                                "it.".format(_nice(cn), _nice(new_node)))
+                continue
+
+            ok, note = _add_one(cmd, cn, con_uuid, new_node, driven,
+                                maintain_offset, weight)
+            if not ok:
+                warnings.append(note)
+                continue
+            existing.add(new_uuid)
+            results.append({
+                "constraint": _nice(cn),
+                "target": _nice(new_node),
+                "note": note,
+            })
+
+    return results, warnings
+
+
+# =========================================================== 공개 API : 삭제
+
+def remove_targets(constraint_names, targets, maintain_offset=True,
+                   delete_empty_constraint=False):
+    """constraint 들에서 고른 타깃(드라이버)을 지운다.
+
+    그 타깃을 쓰지 않는 constraint 는 손대지 않는다. 한 constraint 의 타깃을 전부
+    지우면 Maya 가 constraint 노드까지 지우므로, `delete_empty_constraint` 가 꺼져
+    있으면 그런 constraint 는 건너뛰고 경고한다.
+
+    Args:
+        constraint_names: constraint 노드 또는 constraint 가 걸린 트랜스폼 이름들.
+        targets: 지울 타깃 이름들(list_targets 결과에서 고른 것).
+        maintain_offset: True 면 남은 타깃의 offset 을 다시 계산해 driven 을 제자리에.
+        delete_empty_constraint: True 면 마지막 타깃 삭제(= constraint 노드 삭제)도 허용.
+
+    Returns:
+        (results, warnings)
+        results: [{"constraint": ..., "removed": [이름], "deleted": bool,
+                   "note": ...}, ...]
+    """
+    con_uuids, target_uuids, warnings = _prepare(
+        constraint_names, targets, "target",
+        "No target picked. Select the target(s) to remove in the Targets list.")
+    wanted = set(target_uuids)
+
+    results = []
+
+    for con_uuid in con_uuids:
+        cn = _path(con_uuid)
+        if cn is None:
+            continue
+        name = _nice(cn)          # 노드가 지워질 수 있으니 미리 확보.
+        ctype = cmds.nodeType(cn)
+        cmd = _constraint_command(cn)
+        if cmd is None:
+            warnings.append(
+                "Skipped {0} - no command for node type '{1}'.".format(name, ctype))
+            continue
+
+        entries = _target_entries(cn)
+        hits = [e for e in entries
+                if e["node"] and _to_uuid(e["node"]) in wanted]
+        # 그 타깃을 쓰지 않는 constraint 는 방치한다.
+        if not hits:
+            continue
+
+        driven = _driven(cn)
+        if driven is None:
+            warnings.append(
+                "Skipped {0} - could not resolve the driven object.".format(name))
+            continue
+
+        empties = len(hits) >= len(entries)
+        if empties and not delete_empty_constraint:
+            warnings.append(
+                "Skipped {0} - that would remove its last target and Maya would "
+                "delete the constraint. Turn on 'Delete the constraint when its "
+                "last target is removed' to allow it.".format(name))
+            continue
+
+        before = _capture(cn, ctype, driven) if maintain_offset else None
+
+        removed = []
+        for entry in hits:
+            node = entry["node"]
+            label = _nice(node)
+            try:
+                cmd(node, driven, edit=True, remove=True)
+            except Exception as e:
+                warnings.append("{0} : could not remove '{1}' - {2}".format(
+                    name, label, e))
+                continue
+            removed.append(label)
+        if not removed:
+            continue
+
+        # 마지막 타깃을 지우면 Maya 가 노드를 지운다. driven 채널은 마지막 값 유지.
+        deleted = _path(con_uuid) is None
+        note = ""
+        if deleted:
+            note = "constraint deleted (last target removed)"
+        elif before is not None:
+            note = _restore_offset_after_remove(
+                _path(con_uuid), ctype, driven, before)
+
+        results.append({
+            "constraint": name,
+            "removed": removed,
+            "deleted": deleted,
+            "note": note,
+        })
 
     return results, warnings

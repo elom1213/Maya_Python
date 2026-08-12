@@ -8,7 +8,7 @@
 #
 # 최상위 탭은 4개이고, 기능이 여럿인 탭은 **중첩 탭**으로 나눈다:
 #   Match
-#   Constrain : Constraint / Skin Weight / Group Create / Transfer / Target Replace
+#   Constrain : Constraint / Skin Weight / Group Create / Transfer / Target Edit
 #   Connect   : Connect / List Connected / Connect Closest
 #   Attribute
 #
@@ -207,8 +207,8 @@ class MainWindow(QWidget):
          "_build_group_create_page"),
         ("Transfer", "Constraint Transfer - move an existing constraint onto "
          "another object", "_build_constraint_transfer_page"),
-        ("Target Replace", "Swap a constraint target (driver) for another object",
-         "_build_target_replace_page"),
+        ("Target Edit", "Replace / add / remove the targets (drivers) of existing "
+         "constraints", "_build_target_edit_page"),
     )
 
     def _build_constrain_tab(self):
@@ -535,21 +535,30 @@ class MainWindow(QWidget):
 
         return page
 
-    def _build_target_replace_page(self):
-        """Target Replace UI (Constrain 하위 탭).
+    def _build_target_edit_page(self):
+        """Target Edit UI (Constrain 하위 탭) - 타깃 교체 / 추가 / 삭제.
 
         리스트업한 constraint 들이 쓰고 있는 타깃(드라이버)을 모아 보여 주고, 고른
-        타깃을 씬의 다른 오브젝트로 갈아끼운다. 그 타깃을 쓰지 않는 constraint 는
-        건드리지 않는다. constraint 노드는 그대로 두고 입력 연결만 바꾸므로 weight /
-        노드 이름 / 다른 타깃은 보존된다.
+        타깃을 씬의 다른 오브젝트로 갈아끼우거나(Replace), 지우거나(Remove), New
+        Target 리스트의 오브젝트를 새 타깃으로 붙인다(Add). 그 타깃을 쓰지 않는
+        constraint 는 건드리지 않는다.
+
+        세 동작 모두 **Constraints 리스트에서 고른 항목만** 대상으로 한다(아무것도
+        고르지 않으면 리스트 전체). 한 페이지에 모은 이유는 셋 다 같은 입력
+        (constraint 목록 + 타깃 목록 + 새 타깃 목록)을 쓰기 때문이다.
         """
         page = QWidget()
         layout = QVBoxLayout(page)
 
         # 왼쪽: 대상 constraint(또는 constraint 가 걸린 트랜스폼).
-        self.tsl_trep_cons = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+        self.tsl_tedit_cons = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Constraints", select_label="Select",
             list_min_height=160, log_callback=self.log)
+        self.tsl_tedit_cons.setToolTip(
+            "Constraint nodes, or objects that carry constraints (expanded to "
+            "their constraint children).\n"
+            "Pick rows to work on a subset - with nothing picked the whole list "
+            "is used.")
 
         # 오른쪽: 위 constraint 들이 쓰고 있는 타깃 목록.
         targets_col = QVBoxLayout()
@@ -560,79 +569,135 @@ class MainWindow(QWidget):
         lbl.setFont(font)
         head.addWidget(lbl)
         head.addStretch(1)
-        self.lbl_trep_number = QLabel("Number: 0")
-        head.addWidget(self.lbl_trep_number)
+        self.lbl_tedit_number = QLabel("Number: 0")
+        head.addWidget(self.lbl_tedit_number)
         targets_col.addLayout(head)
 
-        self.lw_trep_targets = QListWidget()
-        self.lw_trep_targets.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.lw_trep_targets.setMinimumHeight(160)
-        self.lw_trep_targets.setToolTip(
+        self.lw_tedit_targets = QListWidget()
+        self.lw_tedit_targets.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lw_tedit_targets.setMinimumHeight(160)
+        self.lw_tedit_targets.setToolTip(
             "Targets used by the constraints on the left.\n"
-            "[n/m] = used by n of the m constraints (hover for the list).")
-        targets_col.addWidget(self.lw_trep_targets)
+            "[n/m] = used by n of the m constraints (hover for the list).\n"
+            "Pick rows here to replace or remove those targets.")
+        targets_col.addWidget(self.lw_tedit_targets)
 
-        self.flt_trep = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
-            self.lw_trep_targets, placeholder="Type any part of a target name",
-            number_label=self.lbl_trep_number)
-        targets_col.addWidget(self.flt_trep)
+        self.flt_tedit = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_tedit_targets, placeholder="Type any part of a target name",
+            number_label=self.lbl_tedit_number)
+        targets_col.addWidget(self.flt_tedit)
 
         btn_row = QHBoxLayout()
         btn_list = QPushButton("List Targets")
         btn_list.setToolTip(
             "Collect every target used by the constraints on the left.")
-        btn_list.clicked.connect(self.on_trep_list)
+        btn_list.clicked.connect(self.on_tedit_list)
         btn_row.addWidget(btn_list)
         btn_pick = QPushButton("Select")
         btn_pick.setToolTip("Select the picked targets in the scene.")
-        btn_pick.clicked.connect(self.on_trep_select)
+        btn_pick.clicked.connect(self.on_tedit_select)
         btn_row.addWidget(btn_pick)
         targets_col.addLayout(btn_row)
 
         list_row = QHBoxLayout()
-        list_row.addWidget(self.tsl_trep_cons)
+        list_row.addWidget(self.tsl_tedit_cons)
         list_row.addLayout(targets_col)
         layout.addLayout(list_row)
 
-        # 아래: 대신 들어갈 오브젝트.
-        self.tsl_trep_new = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="New Target (replaces the picked target)", select_label="Select",
+        # 아래: 대신 들어갈 / 새로 붙일 오브젝트 (Replace 와 Add 가 공유).
+        self.tsl_tedit_new = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="New Target (used by Replace / Add)", select_label="Select",
             list_min_height=110, log_callback=self.log)
-        layout.addWidget(self.tsl_trep_new)
+        self.tsl_tedit_new.setToolTip(
+            "Replace : the object(s) that take the picked target's place.\n"
+            "Add     : the object(s) added as extra targets.")
+        layout.addWidget(self.tsl_tedit_new)
 
         opt_box = QGroupBox("Options")
         opt_layout = QVBoxLayout(opt_box)
 
-        self.cb_trep_keep = QCheckBox("Keep driven objects in place")
-        self.cb_trep_keep.setChecked(True)
-        self.cb_trep_keep.setToolTip(
+        self.cb_tedit_keep = QCheckBox("Keep driven objects in place")
+        self.cb_tedit_keep.setChecked(True)
+        self.cb_tedit_keep.setToolTip(
             "On  : recompute the constraint offset so nothing moves when the "
-            "new target sits somewhere else.\n"
+            "targets change.\n"
             "Off : keep the original offset, so the driven object follows the "
-            "new target the same way it followed the old one (it will jump).")
-        opt_layout.addWidget(self.cb_trep_keep)
+            "new target set the same way it did before (it will jump).")
+        opt_layout.addWidget(self.cb_tedit_keep)
 
-        self.cb_trep_rename = QCheckBox("Rename the weight attribute to the new target")
-        self.cb_trep_rename.setChecked(False)
-        self.cb_trep_rename.setToolTip(
-            "Rename the target weight attribute (tgt_A_02W0 -> tgt_B_02W0).\n"
+        self.cb_tedit_rename = QCheckBox("Rename the weight attribute to the new target")
+        self.cb_tedit_rename.setChecked(False)
+        self.cb_tedit_rename.setToolTip(
+            "Replace only. Rename the target weight attribute "
+            "(tgt_A_02W0 -> tgt_B_02W0).\n"
             "Only auto-generated names are touched. Leave off if scripts refer "
             "to the weight by name.")
-        opt_layout.addWidget(self.cb_trep_rename)
+        opt_layout.addWidget(self.cb_tedit_rename)
+
+        self.cb_tedit_delete_empty = QCheckBox(
+            "Delete the constraint when its last target is removed")
+        self.cb_tedit_delete_empty.setChecked(False)
+        self.cb_tedit_delete_empty.setToolTip(
+            "Remove only. Maya deletes a constraint node once its last target "
+            "goes away\n"
+            "(the driven object keeps the values it had).\n"
+            "Off : such a constraint is skipped with a warning instead.")
+        opt_layout.addWidget(self.cb_tedit_delete_empty)
+
+        weight_row = QHBoxLayout()
+        lbl_weight = QLabel("Added target weight")
+        self.sb_tedit_weight = QDoubleSpinBox()
+        self.sb_tedit_weight.setRange(0.0, 100.0)
+        self.sb_tedit_weight.setSingleStep(0.1)
+        self.sb_tedit_weight.setDecimals(3)
+        self.sb_tedit_weight.setValue(1.0)
+        self.sb_tedit_weight.setKeyboardTracking(False)
+        self.sb_tedit_weight.setToolTip(
+            "Add only. Constraint weight given to each added target.")
+        weight_row.addWidget(lbl_weight)
+        weight_row.addWidget(self.sb_tedit_weight)
+        weight_row.addStretch(1)
+        opt_layout.addLayout(weight_row)
 
         layout.addWidget(opt_box)
 
-        btn = QPushButton("Replace Target")
-        btn.setMinimumHeight(32)
-        btn.setToolTip(
+        btn_replace = QPushButton("Replace Target")
+        btn_replace.setMinimumHeight(32)
+        btn_replace.setToolTip(
             "Swap the picked target for the New Target on every constraint that "
             "uses it.\n"
             "Constraints without that target are left untouched.\n"
             "Weights, weight connections and the constraint node itself are kept.\n"
             "Mapping: 1 new target -> used for every picked target; equal counts "
             "-> 1:1.")
-        btn.clicked.connect(self.on_replace_target)
-        layout.addWidget(btn)
+        btn_replace.clicked.connect(self.on_replace_target)
+        layout.addWidget(btn_replace)
+
+        edit_row = QHBoxLayout()
+
+        btn_add = QPushButton("Add Target")
+        btn_add.setMinimumHeight(32)
+        btn_add.setToolTip(
+            "Add every object in the New Target list as an extra target of every "
+            "listed constraint.\n"
+            "Targets a constraint already has are skipped.\n"
+            "Weight aliases are created by Maya, so existing targets and their "
+            "weights are kept.")
+        btn_add.clicked.connect(self.on_add_target)
+        edit_row.addWidget(btn_add)
+
+        btn_remove = QPushButton("Remove Target")
+        btn_remove.setMinimumHeight(32)
+        btn_remove.setToolTip(
+            "Remove the targets picked in the Targets list from the listed "
+            "constraints.\n"
+            "Constraints without those targets are left untouched.\n"
+            "Removing a constraint's last target deletes the constraint - see "
+            "the option above.")
+        btn_remove.clicked.connect(self.on_remove_target)
+        edit_row.addWidget(btn_remove)
+
+        layout.addLayout(edit_row)
 
         return page
 
@@ -1243,7 +1308,7 @@ class MainWindow(QWidget):
     # Handlers : Target Replace
     # ==============================================================
 
-    def _trep_picked_targets(self, warn=False):
+    def _tedit_picked_targets(self, warn=False):
         """Targets 목록에서 **보이면서 선택된** 타깃 이름들.
 
         Qt 는 필터로 숨긴 항목의 선택도 유지하므로, 가려진 것까지 교체해 버리지
@@ -1252,7 +1317,7 @@ class MainWindow(QWidget):
         """
         names = []
         hidden = 0
-        for item in self.lw_trep_targets.selectedItems():
+        for item in self.lw_tedit_targets.selectedItems():
             if item.isHidden():
                 hidden += 1
                 continue
@@ -1262,8 +1327,22 @@ class MainWindow(QWidget):
                      "skipped".format(hidden))
         return names
 
-    def on_trep_list(self):
-        cons = self.tsl_trep_cons.get_all_items()
+    def _tedit_constraints(self, warn=False):
+        """작업 대상 constraint 이름들 — 리스트에서 **고른 항목**, 없으면 전체.
+
+        한 리스트로 여러 constraint 를 다루다 보면 그중 일부에만 타깃을 붙이고 싶을
+        때가 많다. 고른 게 없으면 예전처럼 리스트 전체를 쓴다.
+        """
+        picked = self.tsl_tedit_cons.selected_items()
+        if picked:
+            if warn:
+                self.log("[INFO] using {0} picked constraint(s) of {1}".format(
+                    len(picked), self.tsl_tedit_cons.count()))
+            return picked
+        return self.tsl_tedit_cons.get_all_items()
+
+    def on_tedit_list(self):
+        cons = self._tedit_constraints(warn=True)
         if not cons:
             self.log("[ERR] List Targets : constraint list is empty")
             return
@@ -1277,24 +1356,24 @@ class MainWindow(QWidget):
         for w in warns:
             self.log("[WARN] {0}".format(w))
 
-        self.lw_trep_targets.clear()
+        self.lw_tedit_targets.clear()
         for row in rows:
             item = QListWidgetItem("{0}   [{1}/{2}]".format(
                 row["name"], len(row["constraints"]), row["total"]))
             item.setData(Qt.UserRole, row["name"])
             item.setToolTip("Used by:\n  {0}".format(
                 "\n  ".join(row["constraints"])))
-            self.lw_trep_targets.addItem(item)
+            self.lw_tedit_targets.addItem(item)
 
-        shown, total = self.flt_trep.refresh()
+        shown, total = self.flt_tedit.refresh()
         msg = "[OK] List Targets : {0} target(s)".format(total)
         if shown != total:
             msg += " - filter '{0}' shows {1}".format(
-                self.flt_trep.text().strip(), shown)
+                self.flt_tedit.text().strip(), shown)
         self.log(msg)
 
-    def on_trep_select(self):
-        picked = self._trep_picked_targets(warn=True)
+    def on_tedit_select(self):
+        picked = self._tedit_picked_targets(warn=True)
         if not picked:
             self.log("[ERR] Select : pick target(s) in the Targets list")
             return
@@ -1306,12 +1385,17 @@ class MainWindow(QWidget):
             return
         self.log("[OK] Select : {0} target(s)".format(len(picked)))
 
+    def _tedit_refresh(self):
+        """편집 결과가 바로 보이도록 Targets 목록을 다시 채운다."""
+        if self.tsl_tedit_cons.count():
+            self.on_tedit_list()
+
     def on_replace_target(self):
-        cons = self.tsl_trep_cons.get_all_items()
-        picked = self._trep_picked_targets(warn=True)
-        new_targets = self.tsl_trep_new.get_all_items()
-        maintain_offset = self.cb_trep_keep.isChecked()
-        rename_weight = self.cb_trep_rename.isChecked()
+        cons = self._tedit_constraints(warn=True)
+        picked = self._tedit_picked_targets(warn=True)
+        new_targets = self.tsl_tedit_new.get_all_items()
+        maintain_offset = self.cb_tedit_keep.isChecked()
+        rename_weight = self.cb_tedit_rename.isChecked()
 
         def _do():
             results, warns = ctgt_mgr.replace_targets(
@@ -1325,9 +1409,53 @@ class MainWindow(QWidget):
             self.log("       {0} target slot(s) replaced".format(len(results)))
 
         self._run("Replace Target", _do)
-        # 교체 결과가 바로 보이도록 목록을 다시 채운다.
-        if self.tsl_trep_cons.get_all_items():
-            self.on_trep_list()
+        self._tedit_refresh()
+
+    def on_add_target(self):
+        cons = self._tedit_constraints(warn=True)
+        new_targets = self.tsl_tedit_new.get_all_items()
+        maintain_offset = self.cb_tedit_keep.isChecked()
+        weight = self.sb_tedit_weight.value()
+
+        def _do():
+            results, warns = ctgt_mgr.add_targets(
+                cons, new_targets, maintain_offset, weight)
+            for w in warns:
+                self.log("[WARN] {0}".format(w))
+            for r in results:
+                self.log("       {0} : + {1}{2}".format(
+                    r["constraint"], r["target"],
+                    "  ({0})".format(r["note"]) if r["note"] else ""))
+            self.log("       {0} target(s) added".format(len(results)))
+
+        self._run("Add Target", _do)
+        self._tedit_refresh()
+
+    def on_remove_target(self):
+        cons = self._tedit_constraints(warn=True)
+        picked = self._tedit_picked_targets(warn=True)
+        maintain_offset = self.cb_tedit_keep.isChecked()
+        delete_empty = self.cb_tedit_delete_empty.isChecked()
+
+        def _do():
+            results, warns = ctgt_mgr.remove_targets(
+                cons, picked, maintain_offset, delete_empty)
+            for w in warns:
+                self.log("[WARN] {0}".format(w))
+            removed = 0
+            for r in results:
+                removed += len(r["removed"])
+                self.log("       {0} : - {1}{2}".format(
+                    r["constraint"], ", ".join(r["removed"]),
+                    "  ({0})".format(r["note"]) if r["note"] else ""))
+            deleted = len([r for r in results if r["deleted"]])
+            self.log("       {0} target(s) removed from {1} constraint(s)"
+                     "{2}".format(removed, len(results),
+                                  ", {0} constraint(s) deleted".format(deleted)
+                                  if deleted else ""))
+
+        self._run("Remove Target", _do)
+        self._tedit_refresh()
 
     # ==============================================================
     # Handlers : Connect
