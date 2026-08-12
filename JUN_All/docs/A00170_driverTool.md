@@ -194,14 +194,32 @@ A00170_driverTool/
 |------|------|
 | `<prefix>_crv_01`, `_02` … | 엣지 루프마다 커브 1개. `polyToCurve(form=2, ch=True)` 라 **닫힌 루프는 주기적 커브**가 되고, 히스토리가 남아 **메시가 변형되면 커브도 따라간다** |
 | `<prefix>_null_grp` / `_null_01` … | 저장한 버텍스 **자리마다** 널(빈 그룹). 만든 뒤 커브에 어태치되므로 커브 위 최근접 지점으로 끌려간다(버텍스가 커브 위면 그 자리 그대로) |
-| `<prefix>_jnt_grp` / `_jnt_01` … | (체크 시) 널마다 조인트 1개. **`parentConstraint` 로 널을 따라간다** |
+| `<prefix>_null_01_con` / `_ctl` / `_tgt` | (체크 시, 기본 ON) 널 밑 컨트롤러 계층 — 아래 참고 |
+| `<prefix>_jnt_grp` / `_jnt_01` … | (체크 시) 널마다 조인트 1개. **`parentConstraint`** 로 `_tgt`(컨트롤러 계층이 없으면 널)를 따라간다 |
 | `<curve>_norCrv` / `<curve>_atcPOCI_SET` | Default 탭과 동일(커브마다 하나씩) |
 
 - **커브가 여럿이면 널은 각자 가장 가까운 커브**에 붙는다(`nearestPointOnCurve` 로 거리 비교).
   위/아래 입술 루프를 한 번에 처리해도 섞이지 않는다.
-- **Create joints that follow the nulls**(기본 **ON**) — 조인트는 널 밑으로 parent 하지 않고
-  **`parentConstraint`** 로 묶는다. 스켈레톤 계층(`<prefix>_jnt_grp`)을 따로 두어 그대로 스킨·익스포트
-  할 수 있게 하기 위해서다. **Joint Radius** 로 표시 크기를 정한다.
+- **Insert a controller under each null**(기본 **ON**, v01.15~) — 널과 조인트 사이에 zero-out +
+  컨트롤러 계층을 넣는다. 애니메이터가 `ctl` 을 움직이면 **커브가 준 위치 위에 오프셋**이 얹힌다.
+
+  ```
+  <prefix>_null_01            ← 커브에 어태치된 널
+  └── <prefix>_null_01_con    ← zero-out 널 그룹
+      └── <prefix>_null_01_ctl    ← Sphere 커브 컨트롤러 (A00145 Match 탭과 같은 모양)
+          └── <prefix>_null_01_tgt    ← **이 노드가 조인트를 컨스트레인트한다**
+  ```
+
+  세 노드 모두 로컬 트랜스폼 0(`parent -relative`)이라 널 자리에 정확히 겹친다.
+  컨트롤러 크기는 **Joint Radius × 1.5** — 조인트보다 조금 크게 그려진다.
+  끄면 예전처럼 **널이 조인트를 직접** 컨스트레인트한다.
+- **Create joints that follow the nulls**(기본 **ON**) — 조인트는 널(또는 `_tgt`) 밑으로 parent 하지
+  않고 **`parentConstraint`** 로 묶는다. 스켈레톤 계층(`<prefix>_jnt_grp`)을 따로 두어 그대로
+  스킨·익스포트할 수 있게 하기 위해서다.
+- **Joint Radius** — 조인트의 **`.radius` 어트리뷰트가 이 값이 되도록** 생성 후 명시적으로 설정한다.
+  컨트롤러 크기(×1.5)도 이 값에서 나오므로, 조인트를 끄고 컨트롤러만 만들 때도 활성이다.
+  > 뷰포트에 **그려지는** 크기는 여기에 마야의 전역 배율(`Display > Animation > Joint Size`)이
+  > 곱해진 값이다. 화면에서 커/작아 보여도 어트리뷰트는 입력한 수치가 맞다.
 - 어태치 옵션(Orient / Aim Axis / norCrv / POCI 세트)은 Default 탭과 **같은 의미**이며 이 탭 전용 위젯이다.
 - 커브 생성 방식은 [`A00400_CurveTool`](A00400_CurveTool.md) 과 같다(연결 성분별 `polyToCurve`).
   A00400 을 import 하지는 않는다 — 툴 하나를 릴리스할 때 다른 툴이 딸려가지 않게 하기 위해서다.

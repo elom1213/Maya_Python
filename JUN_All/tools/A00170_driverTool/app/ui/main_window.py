@@ -23,7 +23,7 @@ from tools.A00170_driverTool.app.core import (
     run_build_spherical, run_build_nodes,
     run_attach_to_closest, run_attach_uniform, AIM_AXES, DRIVER_TYPES,
     run_build_loop_drivers, loop_parse_edges, loop_parse_vertices, loop_alive,
-    group_loop_edges, CURVE_DEGREES, LOOP_DEFAULT_PREFIX,
+    group_loop_edges, CURVE_DEGREES, LOOP_DEFAULT_PREFIX, LOOP_CONTROL_SCALE,
     run_build_stretch, FUNCTIONS, SIGMOID_FUNCTIONS, INFINITY_TYPES, DEFAULT_INFINITY,
     DEFAULT_BASE, DEFAULT_THRESHOLD_MIN, DEFAULT_THRESHOLD_MAX,
 )
@@ -929,6 +929,28 @@ class MainWindow(QWidget):
         attach_layout.addWidget(self.lp_cb_make_set)
         root.addWidget(attach_group)
 
+        # ---- 컨트롤러 계층 옵션 (기본 체크)
+        ctl_group = QGroupBox("Controllers")
+        ctl_layout = QVBoxLayout(ctl_group)
+
+        self.lp_cb_controls = QCheckBox(
+            "Insert a controller under each null (null > con > ctl > tgt)")
+        self.lp_cb_controls.setChecked(True)
+        self.lp_cb_controls.setToolTip(
+            "On (default): build this hierarchy under every null and let the "
+            "TGT drive the joint,\n"
+            "so moving the controller offsets the joint on top of what the "
+            "curve gives it.\n\n"
+            "    <prefix>_null_01\n"
+            "    +-- <prefix>_null_01_con      (zero-out null group)\n"
+            "        +-- <prefix>_null_01_ctl  (sphere curve controller)\n"
+            "            +-- <prefix>_null_01_tgt  (constrains the joint)\n\n"
+            "Off: the null constrains the joint directly.\n"
+            "The controller is drawn slightly larger than the joint "
+            "(Joint Radius x {0}).".format(LOOP_CONTROL_SCALE))
+        ctl_layout.addWidget(self.lp_cb_controls)
+        root.addWidget(ctl_group)
+
         # ---- 조인트 옵션 (기본 체크)
         joint_group = QGroupBox("Joints")
         joint_layout = QVBoxLayout(joint_group)
@@ -945,6 +967,12 @@ class MainWindow(QWidget):
         row = QHBoxLayout()
         row.addWidget(QLabel("Joint Radius"))
         self.lp_dsb_joint_radius = QDoubleSpinBox()
+        self.lp_dsb_joint_radius.setToolTip(
+            "Sets the joint's .radius attribute to exactly this value.\n"
+            "The size drawn in the viewport is this value multiplied by Maya's "
+            "global joint size\n(Display > Animation > Joint Size), so it can "
+            "look different - the attribute is what you typed.\n"
+            "It also sizes the controller (x {0}).".format(LOOP_CONTROL_SCALE))
         self.lp_dsb_joint_radius.setRange(0.001, 10000.0)
         self.lp_dsb_joint_radius.setDecimals(3)
         self.lp_dsb_joint_radius.setSingleStep(0.1)
@@ -970,6 +998,7 @@ class MainWindow(QWidget):
         self.lp_cb_orient.toggled.connect(self._lp_sync_enabled)
         self.lp_cb_norcrv.toggled.connect(self._lp_sync_enabled)
         self.lp_cb_joints.toggled.connect(self._lp_sync_enabled)
+        self.lp_cb_controls.toggled.connect(self._lp_sync_enabled)
         self._lp_sync_enabled()
         self._lp_update_labels()
         return page
@@ -981,7 +1010,9 @@ class MainWindow(QWidget):
         self.lp_cb_aim.setEnabled(orient)
         self.lp_cb_norcrv.setEnabled(orient)
         self.lp_dsb_norcrv_len.setEnabled(orient and self.lp_cb_norcrv.isChecked())
-        self.lp_dsb_joint_radius.setEnabled(self.lp_cb_joints.isChecked())
+        # 반경은 조인트 크기이자 컨트롤러 크기라, 둘 중 하나만 켜져도 쓴다.
+        self.lp_dsb_joint_radius.setEnabled(
+            self.lp_cb_joints.isChecked() or self.lp_cb_controls.isChecked())
 
     def _lp_update_labels(self):
         if not self.lp_edges:
@@ -1067,7 +1098,8 @@ class MainWindow(QWidget):
                     normal_curve_length=self.lp_dsb_norcrv_len.value(),
                     create_set=self.lp_cb_make_set.isChecked(),
                     create_joints=self.lp_cb_joints.isChecked(),
-                    joint_radius=self.lp_dsb_joint_radius.value())
+                    joint_radius=self.lp_dsb_joint_radius.value(),
+                    create_controls=self.lp_cb_controls.isChecked())
             except Exception as exc:
                 self._log("[ERROR] Build failed: {0}".format(exc))
                 return
@@ -1080,10 +1112,15 @@ class MainWindow(QWidget):
             self._log("  {0} -> {1} @ param {2:.4f}".format(null, curve, param))
         for obj, reason in report["failed"]:
             self._log("[WARN] Skipped {0}: {1}".format(obj, reason))
+        if report["controls"]:
+            self._log("Controllers: {0} (null > con > ctl > tgt; the TGT drives "
+                      "the joint)".format(len(report["controls"])))
         if report["joints"]:
             self._log("Joints: {0} under {1} (parentConstrained to the "
-                      "nulls)".format(len(report["joints"]),
-                                      report["joint_group"]))
+                      "{2})".format(len(report["joints"]),
+                                    report["joint_group"],
+                                    "tgt nodes" if report["controls"]
+                                    else "nulls"))
         for norcrv in report["norcrvs"]:
             self._log("Normal curve created: {0} (rotate it to control "
                       "twist)".format(norcrv))

@@ -18,6 +18,7 @@ from .loop_rig import (
     alive as loop_alive,
     group_edges as group_loop_edges,
     CURVE_DEGREES, DEFAULT_PREFIX as LOOP_DEFAULT_PREFIX,
+    CONTROL_SCALE as LOOP_CONTROL_SCALE,
 )
 from .stretch import (
     build_stretch as run_build_stretch,
@@ -33,6 +34,7 @@ __all__ = [
     "run_attach_to_closest", "run_attach_uniform", "AIM_AXES", "DRIVER_TYPES",
     "run_build_loop_drivers", "loop_parse_edges", "loop_parse_vertices",
     "loop_alive", "group_loop_edges", "CURVE_DEGREES", "LOOP_DEFAULT_PREFIX",
+    "LOOP_CONTROL_SCALE",
     "run_build_stretch",
     "FUNCTIONS", "FUNC_POS", "FUNC_NEG", "FUNC_SIGMOID", "FUNC_SIGMOID_REV",
     "SIGMOID_FUNCTIONS",

@@ -11,6 +11,15 @@
 #   [버텍스 저장]    --그 자리에-->  널 --가장 가까운 커브에 어태치--> 커브를 따라 움직임
 #                                     └(옵션) 조인트가 널을 따라감
 #
+# 컨트롤러 옵션(기본 켬)을 쓰면 널과 조인트 사이에 zero-out + 컨트롤러 계층이 들어간다:
+#
+#   <prefix>_null_01            <- 커브에 어태치된 널
+#   └── <prefix>_null_01_con    <- zero-out 널 그룹
+#       └── <prefix>_null_01_ctl    <- Sphere 커브 컨트롤러(A00145 Match 탭 모양)
+#           └── <prefix>_null_01_tgt    <- 이 노드가 조인트를 컨스트레인트한다
+#
+# 그래서 애니메이터가 ctl 을 움직이면 커브가 준 위치 **위에 오프셋**이 얹힌다.
+#
 # 세 조각의 출처:
 #   - 커브 생성   : A00400_CurveTool `curve_manager` 의 방식(엣지를 **연결 성분별로 묶어**
 #     그룹마다 `polyToCurve(form=2, ch=True)`). 루프가 여러 개면 커브도 그 수만큼 나온다.
@@ -30,6 +39,42 @@ from .attach_curve import build_attach_to_closest
 CURVE_DEGREES = (1, 3)
 
 DEFAULT_PREFIX = "loopDrv"
+
+# 컨트롤러 크기 = 조인트 반경 x 이 값("조금 크게").
+CONTROL_SCALE = 1.5
+
+# 컨트롤러 모양 : A00145_RigConnect Match 탭의 Sphere 와 같은 커브(3개의 원을 한 붓으로
+# 그린 degree 1 커브). 원본은 반지름 0.505239 라, 여기서는 **반지름 1 로 정규화**해 두고
+# 쓸 때 곱한다. (A00145 를 import 하지 않는 이유는 위 모듈 주석 참고 — 툴끼리 물리면
+# 릴리스 패키지가 깨진다.)
+_SPHERE_POINTS = [
+    (0, 0, 0), (0, 1, 0), (0, 0.965925, 0.258818), (0, 0.866024, 0.499999),
+    (0, 0.707107, 0.707107), (0, 0.499999, 0.866024), (0, 0.258818, 0.965925),
+    (0, 0, 1), (0, -0.258818, 0.965925), (0, -0.499999, 0.866024),
+    (0, -0.707107, 0.707107), (0, -0.866024, 0.499999), (0, -0.965925, 0.258818),
+    (0, -1, 0), (0, -0.965925, -0.258818), (0, -0.866024, -0.499999),
+    (0, -0.707107, -0.707107), (0, -0.499999, -0.866024), (0, -0.258818, -0.965925),
+    (0, 0, -1), (0, 0.258818, -0.965925), (0, 0.499999, -0.866024),
+    (0, 0.707107, -0.707107), (0, 0.866024, -0.499999), (0, 0.965925, -0.258818),
+    (0, 1, 0), (0.258818, 0.965925, 0), (0.499999, 0.866024, 0),
+    (0.707107, 0.707107, 0), (0.866024, 0.499999, 0), (0.965925, 0.258818, 0),
+    (1, 0, 0), (0.965925, -0.258818, 0), (0.866024, -0.499999, 0),
+    (0.707107, -0.707107, 0), (0.499999, -0.866024, 0), (0.258818, -0.965925, 0),
+    (0, -1, 0), (-0.258818, -0.965925, 0), (-0.499999, -0.866024, 0),
+    (-0.707107, -0.707107, 0), (-0.866024, -0.499999, 0), (-0.965925, -0.258818, 0),
+    (-1, 0, 0), (-0.965925, 0.258818, 0), (-0.866024, 0.499999, 0),
+    (-0.707107, 0.707107, 0), (-0.499999, 0.866024, 0), (-0.258818, 0.965925, 0),
+    (0, 1, 0), (0, 0, 0), (0, -1, 0), (0, 0, 0), (1, 0, 0), (0.965925, 0, -0.258818),
+    (0.866024, 0, -0.499999), (0.707107, 0, -0.707107), (0.499999, 0, -0.866024),
+    (0.258818, 0, -0.965925), (0, 0, -1), (-0.258818, 0, -0.965925),
+    (-0.499999, 0, -0.866024), (-0.707107, 0, -0.707107), (-0.866024, 0, -0.499999),
+    (-0.965925, 0, -0.258818), (-1, 0, 0), (-0.965925, 0, 0.258818),
+    (-0.866024, 0, 0.499999), (-0.707107, 0, 0.707107), (-0.499999, 0, 0.866024),
+    (-0.258818, 0, 0.965925), (0, 0, 1), (0.258818, 0, 0.965925),
+    (0.499999, 0, 0.866024), (0.707107, 0, 0.707107), (0.866024, 0, 0.499999),
+    (0.965925, 0, 0.258818), (1, 0, 0), (0, 0, 0), (0, 0, -1), (0, 0, 1), (0, 0, 0),
+    (-1, 0, 0),
+]
 
 
 # ============================================================ 선택 파싱
@@ -180,12 +225,54 @@ def _create_null(name, position):
     return null
 
 
+# ============================================================ 컨트롤러 계층
+
+def _sphere_control(name, radius):
+    """A00145 Match 탭의 Sphere 모양 커브 컨트롤러(반지름 = radius)."""
+    points = [(x * radius, y * radius, z * radius) for x, y, z in _SPHERE_POINTS]
+    crv = cmds.curve(degree=1, point=points, knot=list(range(len(points))))
+    return cmds.rename(crv, name)
+
+
+def _zeroed_child(node, parent):
+    """node 를 parent 밑으로 넣되 **로컬 트랜스폼을 0 으로** 둔다(zero-out 노드).
+
+    `relative=True` 라 월드 위치를 보존하지 않고 지금의 로컬 값(=원점에서 만들었으니 0)을
+    그대로 유지한다. 결과적으로 부모(널) 자리에 정확히 겹친다.
+    """
+    return cmds.parent(node, parent, relative=True)[0]
+
+
+def build_control_chain(null, radius, scale=CONTROL_SCALE):
+    """널 밑에 `_con -> _ctl -> _tgt` 계층을 만들고 (con, ctl, tgt) 을 돌려준다.
+
+        <null>
+        └── <null>_con   (zero-out 널 그룹)
+            └── <null>_ctl   (Sphere 커브 컨트롤러 — 조인트보다 조금 크게)
+                └── <null>_tgt   (조인트를 컨스트레인트할 널 그룹)
+
+    셋 다 로컬 트랜스폼 0 이라 컨트롤러를 움직인 만큼이 곧 널 대비 오프셋이 된다.
+    """
+    base = null.split("|")[-1]
+
+    con = cmds.group(empty=True, name="{0}_con".format(base))
+    con = _zeroed_child(con, null)
+
+    ctl = _sphere_control("{0}_ctl".format(base), radius * scale)
+    ctl = _zeroed_child(ctl, con)
+
+    tgt = cmds.group(empty=True, name="{0}_tgt".format(base))
+    tgt = _zeroed_child(tgt, ctl)
+    return con, ctl, tgt
+
+
 # ============================================================ 메인 동작
 
 def build_loop_drivers(edges, vertices, prefix=DEFAULT_PREFIX, degree=1,
                        orient=True, aim_axis="+X", use_normal_curve=True,
                        normal_curve_length=1.0, create_set=True,
-                       create_joints=True, joint_radius=1.0):
+                       create_joints=True, joint_radius=1.0,
+                       create_controls=True, control_scale=CONTROL_SCALE):
     """저장한 엣지 루프 -> 커브, 저장한 버텍스 자리 -> 널, 널 -> 커브 어태치 (+조인트).
 
     Args:
@@ -196,11 +283,14 @@ def build_loop_drivers(edges, vertices, prefix=DEFAULT_PREFIX, degree=1,
         orient, aim_axis, use_normal_curve, normal_curve_length, create_set:
             어태치 옵션 — `attach_curve.build_attach_to_closest` 와 같은 의미.
         create_joints: True 면 널마다 조인트를 만들어 `parentConstraint` 로 따라가게 한다.
-        joint_radius: 만들 조인트의 표시 반경.
+        joint_radius: 만들 조인트의 `.radius`(생성 후 명시적으로 다시 set 한다).
+        create_controls: True 면 널 밑에 `_con -> _ctl -> _tgt` 계층을 만들고, 조인트는
+            널이 아니라 **`_tgt`** 가 컨스트레인트한다(컨트롤러로 오프셋을 줄 수 있다).
+        control_scale: 컨트롤러 반지름 = `joint_radius * control_scale`.
 
     Returns:
-        report dict — curves / nulls / joints / attached / failed / sets /
-        norcrvs / null_group / joint_group.
+        report dict — curves / nulls / controls / targets / joints / attached /
+        failed / sets / norcrvs / null_group / joint_group.
 
     널은 **버텍스 위치에 만든 뒤** 커브에 어태치하므로, 커브 위 최근접 지점으로 끌려간다
     (버텍스가 커브 위에 있으면 그 자리 그대로). 커브가 여러 개면 널마다 **가장 가까운
@@ -257,7 +347,19 @@ def build_loop_drivers(edges, vertices, prefix=DEFAULT_PREFIX, degree=1,
         if norcrv:
             norcrvs.append(norcrv)
 
-    # 4) (옵션) 조인트 — 어태치가 끝난 **널의 현재 자리**에 만들어 따라가게 한다.
+    # 4) (옵션) 컨트롤러 계층 — 널 밑에 con -> ctl -> tgt.
+    controls = []
+    targets = []
+    drivers = {}                       # 널 -> 조인트를 실제로 끌 노드
+    if create_controls:
+        for null in nulls:
+            _con, ctl, tgt = build_control_chain(null, joint_radius,
+                                                 control_scale)
+            controls.append(ctl)
+            targets.append(tgt)
+            drivers[null] = tgt
+
+    # 5) (옵션) 조인트 — 어태치가 끝난 **널의 현재 자리**에 만들어 따라가게 한다.
     joints = []
     joint_group = None
     if create_joints and attached:
@@ -266,17 +368,25 @@ def build_loop_drivers(edges, vertices, prefix=DEFAULT_PREFIX, degree=1,
             position = cmds.xform(null, query=True, worldSpace=True,
                                   rotatePivot=True)
             cmds.select(clear=True)
-            jnt = cmds.joint(position=position, radius=joint_radius,
+            jnt = cmds.joint(position=position,
                              name="{0}_jnt_{1:02d}".format(prefix, i + 1))
             jnt = cmds.parent(jnt, joint_group)[0]
-            # 널이 커브를 따라 움직이면 조인트도 그대로 따라간다.
-            cmds.parentConstraint(null, jnt, maintainOffset=False)
+            # `joint -radius` 로도 들어가지만, 만들어진 조인트의 `.radius` 가 입력값과
+            # 정확히 같도록 부모까지 잡은 뒤 한 번 더 못 박는다.
+            # (뷰포트에 그려지는 크기는 Display > Animation > Joint Size 배율이 곱해진
+            #  값이라 이 수치와 달라 보일 수 있다 — 어트리뷰트는 이 값이 맞다.)
+            cmds.setAttr(jnt + ".radius", joint_radius)
+            # 컨트롤러를 만들었으면 tgt 가, 아니면 널이 직접 조인트를 끈다.
+            cmds.parentConstraint(drivers.get(null, null), jnt,
+                                  maintainOffset=False)
             joints.append(jnt)
 
     return {
         "curves": curves,
         "loops": group_count,
         "nulls": nulls,
+        "controls": controls,
+        "targets": targets,
         "joints": joints,
         "attached": attached,
         "failed": failed,
