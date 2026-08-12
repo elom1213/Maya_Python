@@ -11,6 +11,14 @@ from .attach_curve import (
     build_attach_uniform as run_attach_uniform,
     AIM_AXES, DRIVER_TYPES,
 )
+from .loop_rig import (
+    build_loop_drivers as run_build_loop_drivers,
+    parse_selected_edges as loop_parse_edges,
+    parse_selected_vertices as loop_parse_vertices,
+    alive as loop_alive,
+    group_edges as group_loop_edges,
+    CURVE_DEGREES, DEFAULT_PREFIX as LOOP_DEFAULT_PREFIX,
+)
 from .stretch import (
     build_stretch as run_build_stretch,
     FUNCTIONS, FUNC_POS, FUNC_NEG, FUNC_SIGMOID, FUNC_SIGMOID_REV, SIGMOID_FUNCTIONS,
@@ -23,6 +31,8 @@ __all__ = [
     "run_build_slerp", "run_build_wave",
     "run_build_spherical", "run_build_nodes",
     "run_attach_to_closest", "run_attach_uniform", "AIM_AXES", "DRIVER_TYPES",
+    "run_build_loop_drivers", "loop_parse_edges", "loop_parse_vertices",
+    "loop_alive", "group_loop_edges", "CURVE_DEGREES", "LOOP_DEFAULT_PREFIX",
     "run_build_stretch",
     "FUNCTIONS", "FUNC_POS", "FUNC_NEG", "FUNC_SIGMOID", "FUNC_SIGMOID_REV",
     "SIGMOID_FUNCTIONS",

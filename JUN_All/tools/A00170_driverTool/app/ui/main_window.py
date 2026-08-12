@@ -22,6 +22,8 @@ from tools.A00170_driverTool.app.core import (
     run_build_slerp, run_build_wave,
     run_build_spherical, run_build_nodes,
     run_attach_to_closest, run_attach_uniform, AIM_AXES, DRIVER_TYPES,
+    run_build_loop_drivers, loop_parse_edges, loop_parse_vertices, loop_alive,
+    group_loop_edges, CURVE_DEGREES, LOOP_DEFAULT_PREFIX,
     run_build_stretch, FUNCTIONS, SIGMOID_FUNCTIONS, INFINITY_TYPES, DEFAULT_INFINITY,
     DEFAULT_BASE, DEFAULT_THRESHOLD_MIN, DEFAULT_THRESHOLD_MAX,
 )
@@ -41,6 +43,12 @@ class MainWindow(QWidget):
         self.setWindowTitle("Driver Tool v{0}".format(VERSION))
         self.setWindowFlags(Qt.Window)
         self.resize(580, 780)
+
+        # AttachCrv > Edge Loop 탭이 저장해 둔 선택. 리스트 위젯으로 펼치지 않는다
+        # (루프 하나가 수십~수백 엣지라 창이 무거워진다) — 요약 라벨로만 보여 준다.
+        self.lp_edges = []
+        self.lp_loop_count = 0
+        self.lp_verts = []
 
         self.build_ui()
 
@@ -620,6 +628,24 @@ class MainWindow(QWidget):
     # ================================================================
 
     def _build_attach_tab(self):
+        """AttachCrv 는 하위 탭 2개다.
+
+        - Default   : 기존 기능 그대로(커브를 지정해 오브젝트를 최근접 지점에 어태치 /
+                      균일 분배). 아래 `_build_attach_default_page`.
+        - Edge Loop : 엣지 루프 -> 커브 -> 버텍스 자리 널 -> 어태치(+조인트)를 한 번에.
+        """
+        tabs = QTabWidget()
+        tabs.addTab(self._build_attach_default_page(), "Default")
+        index = tabs.addTab(self._build_attach_loop_page(), "Edge Loop")
+        tabs.setTabToolTip(
+            index,
+            "Build curves from stored edge loops, put a null at each stored "
+            "vertex, attach the nulls to the nearest curve, and optionally "
+            "create joints that follow the nulls.")
+        self.atc_tabs = tabs
+        return tabs
+
+    def _build_attach_default_page(self):
         """TSL 에 나열된 오브젝트들을 커브에서 '가장 가까운 지점'에 라이브 어태치한다.
 
         ref 는 커브에 일정 간격으로 새 로케이터를 어태치했지만, 여기서는 기존
@@ -765,6 +791,305 @@ class MainWindow(QWidget):
         self.atc_cb_aim.setEnabled(orient)
         self.atc_cb_norcrv.setEnabled(orient)
         self.atc_dsb_norcrv_len.setEnabled(orient and self.atc_cb_norcrv.isChecked())
+
+    # ----------------------------------------------------------------
+    # AttachCrv > Edge Loop : 루프 -> 커브 -> 널 -> 어태치 (+ 조인트)
+    # ----------------------------------------------------------------
+
+    def _build_attach_loop_page(self):
+        """저장한 엣지 루프와 버텍스로 드라이버 셋업을 한 번에 만든다.
+
+        엣지/버텍스는 **리스트 위젯으로 펼치지 않는다** — 루프 하나가 수십~수백 개라
+        리스트가 창을 무겁게 만든다. 요약 라벨 + Select / Clear 로 다룬다.
+        """
+        page = QWidget()
+        root = QVBoxLayout(page)
+
+        desc = QLabel(
+            "Store the edge loop(s) and the vertices, then press Build:\n"
+            "loops -> curves, a null at each vertex, nulls attached to the "
+            "nearest curve (+ joints).")
+        desc.setAlignment(Qt.AlignCenter)
+        root.addWidget(desc)
+
+        # ---- 저장 : 엣지 루프
+        store = QGroupBox("Stored selection")
+        store_layout = QVBoxLayout(store)
+
+        self.lp_lbl_edges = QLabel("Edge loops: none")
+        self.lp_lbl_edges.setToolTip(
+            "Edges are kept as component names, not as a list widget - one loop "
+            "is easily hundreds of edges.")
+        store_layout.addWidget(self.lp_lbl_edges)
+
+        edge_row = QHBoxLayout()
+        btn_store_edges = QPushButton("Store Edge Loops from Selection")
+        btn_store_edges.setToolTip(
+            "Store the selected mesh edges. Several separate loops at once are "
+            "fine - each connected group becomes its own curve.")
+        btn_store_edges.clicked.connect(self.on_lp_store_edges)
+        edge_row.addWidget(btn_store_edges)
+        btn_sel_edges = QPushButton("Select")
+        btn_sel_edges.clicked.connect(self.on_lp_select_edges)
+        edge_row.addWidget(btn_sel_edges)
+        btn_clr_edges = QPushButton("Clear")
+        btn_clr_edges.clicked.connect(self.on_lp_clear_edges)
+        edge_row.addWidget(btn_clr_edges)
+        store_layout.addLayout(edge_row)
+
+        # ---- 저장 : 버텍스
+        self.lp_lbl_verts = QLabel("Vertices: none")
+        self.lp_lbl_verts.setToolTip(
+            "One null (and optionally one joint) is created per stored vertex.")
+        store_layout.addWidget(self.lp_lbl_verts)
+
+        vert_row = QHBoxLayout()
+        btn_store_verts = QPushButton("Store Vertices from Selection")
+        btn_store_verts.setToolTip(
+            "Store the vertices where the drivers should sit (edges/faces are "
+            "converted to vertices).")
+        btn_store_verts.clicked.connect(self.on_lp_store_verts)
+        vert_row.addWidget(btn_store_verts)
+        btn_sel_verts = QPushButton("Select")
+        btn_sel_verts.clicked.connect(self.on_lp_select_verts)
+        vert_row.addWidget(btn_sel_verts)
+        btn_clr_verts = QPushButton("Clear")
+        btn_clr_verts.clicked.connect(self.on_lp_clear_verts)
+        vert_row.addWidget(btn_clr_verts)
+        store_layout.addLayout(vert_row)
+        root.addWidget(store)
+
+        # ---- 커브 옵션
+        curve_group = QGroupBox("Curve")
+        curve_layout = QVBoxLayout(curve_group)
+
+        name_row = QHBoxLayout()
+        name_row.addWidget(QLabel("Name Prefix"))
+        self.lp_le_prefix = QLineEdit(LOOP_DEFAULT_PREFIX)
+        self.lp_le_prefix.setToolTip(
+            "Names everything this build makes: <prefix>_crv_01 / _null_01 / "
+            "_jnt_01, plus the _null_grp and _jnt_grp groups.")
+        name_row.addWidget(self.lp_le_prefix)
+        name_row.addWidget(QLabel("Degree"))
+        self.lp_cb_degree = QComboBox()
+        self.lp_cb_degree.addItems(["1 (polyline)", "3 (smooth)"])
+        self.lp_cb_degree.setToolTip(
+            "1: the curve follows the edges exactly.\n"
+            "3: a smooth curve through the loop.")
+        name_row.addWidget(self.lp_cb_degree)
+        curve_layout.addLayout(name_row)
+
+        hint = QLabel(
+            "One curve per connected edge group (polyToCurve, history kept so "
+            "the curve follows the mesh).")
+        hint.setWordWrap(True)
+        curve_layout.addWidget(hint)
+        root.addWidget(curve_group)
+
+        # ---- 어태치 옵션 (Default 탭과 같은 의미. 이 탭 전용 위젯이다)
+        attach_group = QGroupBox("Attach")
+        attach_layout = QVBoxLayout(attach_group)
+
+        row = QHBoxLayout()
+        self.lp_cb_orient = QCheckBox("Orient to curve tangent")
+        self.lp_cb_orient.setChecked(True)
+        self.lp_cb_orient.setToolTip(
+            "On: aim the chosen local axis along the curve tangent and drive "
+            "rotate as well as translate. Off: translate only.")
+        row.addWidget(self.lp_cb_orient)
+        row.addWidget(QLabel("Aim Axis"))
+        self.lp_cb_aim = QComboBox()
+        self.lp_cb_aim.addItems(list(AIM_AXES))
+        row.addWidget(self.lp_cb_aim)
+        row.addStretch(1)
+        attach_layout.addLayout(row)
+
+        row = QHBoxLayout()
+        self.lp_cb_norcrv = QCheckBox("Create Normal Curve (norCrv)")
+        self.lp_cb_norcrv.setChecked(True)
+        self.lp_cb_norcrv.setToolTip(
+            "Create one straight 'norCrv' under each attachment curve and take "
+            "the up (Y) / side (Z) from it - rotate it to control the twist of "
+            "the whole chain.")
+        row.addWidget(self.lp_cb_norcrv)
+        row.addWidget(QLabel("norCrv Length"))
+        self.lp_dsb_norcrv_len = QDoubleSpinBox()
+        self.lp_dsb_norcrv_len.setRange(0.001, 100000.0)
+        self.lp_dsb_norcrv_len.setDecimals(3)
+        self.lp_dsb_norcrv_len.setSingleStep(0.1)
+        self.lp_dsb_norcrv_len.setValue(1.0)
+        self.lp_dsb_norcrv_len.setFixedWidth(90)
+        self.lp_dsb_norcrv_len.setKeyboardTracking(False)
+        row.addWidget(self.lp_dsb_norcrv_len)
+        row.addStretch(1)
+        attach_layout.addLayout(row)
+
+        self.lp_cb_make_set = QCheckBox("Group pointOnCurveInfo nodes into a set")
+        self.lp_cb_make_set.setChecked(True)
+        attach_layout.addWidget(self.lp_cb_make_set)
+        root.addWidget(attach_group)
+
+        # ---- 조인트 옵션 (기본 체크)
+        joint_group = QGroupBox("Joints")
+        joint_layout = QVBoxLayout(joint_group)
+
+        self.lp_cb_joints = QCheckBox("Create joints that follow the nulls")
+        self.lp_cb_joints.setChecked(True)
+        self.lp_cb_joints.setToolTip(
+            "On (default): after attaching, create one joint at each null and "
+            "parentConstrain it to that null, so the joints ride the curve.\n"
+            "The joints go under <prefix>_jnt_grp - a hierarchy of their own, "
+            "so they can be bound and exported independently.")
+        joint_layout.addWidget(self.lp_cb_joints)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Joint Radius"))
+        self.lp_dsb_joint_radius = QDoubleSpinBox()
+        self.lp_dsb_joint_radius.setRange(0.001, 10000.0)
+        self.lp_dsb_joint_radius.setDecimals(3)
+        self.lp_dsb_joint_radius.setSingleStep(0.1)
+        self.lp_dsb_joint_radius.setValue(1.0)
+        self.lp_dsb_joint_radius.setFixedWidth(90)
+        self.lp_dsb_joint_radius.setKeyboardTracking(False)
+        row.addWidget(self.lp_dsb_joint_radius)
+        row.addStretch(1)
+        joint_layout.addLayout(row)
+        root.addWidget(joint_group)
+
+        self.lp_btn_build = QPushButton("Build Curve + Nulls (+ Joints)")
+        self.lp_btn_build.setMinimumHeight(34)
+        self.lp_btn_build.setToolTip(
+            "Curves from the stored edge loops, a null at each stored vertex, "
+            "each null attached to its nearest curve, and (if checked) a joint "
+            "per null. All of it is one undo step.")
+        self.lp_btn_build.clicked.connect(self.on_lp_build)
+        root.addWidget(self.lp_btn_build)
+
+        root.addStretch(1)
+
+        self.lp_cb_orient.toggled.connect(self._lp_sync_enabled)
+        self.lp_cb_norcrv.toggled.connect(self._lp_sync_enabled)
+        self.lp_cb_joints.toggled.connect(self._lp_sync_enabled)
+        self._lp_sync_enabled()
+        self._lp_update_labels()
+        return page
+
+    # ---- Edge Loop : 상태/헬퍼
+
+    def _lp_sync_enabled(self, *args):
+        orient = self.lp_cb_orient.isChecked()
+        self.lp_cb_aim.setEnabled(orient)
+        self.lp_cb_norcrv.setEnabled(orient)
+        self.lp_dsb_norcrv_len.setEnabled(orient and self.lp_cb_norcrv.isChecked())
+        self.lp_dsb_joint_radius.setEnabled(self.lp_cb_joints.isChecked())
+
+    def _lp_update_labels(self):
+        if not self.lp_edges:
+            self.lp_lbl_edges.setText("Edge loops: none")
+        else:
+            self.lp_lbl_edges.setText(
+                "Edge loops: {0} edge(s) in {1} loop(s)  ({2})".format(
+                    len(self.lp_edges), self.lp_loop_count,
+                    self.lp_edges[0].split(".")[0].split("|")[-1]))
+        if not self.lp_verts:
+            self.lp_lbl_verts.setText("Vertices: none")
+        else:
+            self.lp_lbl_verts.setText(
+                "Vertices: {0} stored  ({1})".format(
+                    len(self.lp_verts),
+                    self.lp_verts[0].split(".")[0].split("|")[-1]))
+
+    def _lp_select(self, names, label):
+        alive_names = loop_alive(names)
+        if not alive_names:
+            self._log("[WARN] Nothing stored for {0}.".format(label))
+            return
+        try:
+            cmds.select(alive_names, replace=True)
+        except Exception as exc:
+            self._log("[ERROR] Select {0}: {1}".format(label, exc))
+            return
+        self._log("Selected {0} stored {1}.".format(len(alive_names), label))
+
+    # ---- Edge Loop : 핸들러
+
+    def on_lp_store_edges(self):
+        try:
+            edges = loop_parse_edges()
+        except Exception as exc:
+            self._log("[WARN] Store Edge Loops: {0}".format(exc))
+            return
+        self.lp_edges = edges
+        self.lp_loop_count = len(group_loop_edges(edges))
+        self._lp_update_labels()
+        self._log("Stored {0} edge(s) forming {1} loop(s).".format(
+            len(edges), self.lp_loop_count))
+
+    def on_lp_select_edges(self):
+        self._lp_select(self.lp_edges, "edges")
+
+    def on_lp_clear_edges(self):
+        self.lp_edges = []
+        self.lp_loop_count = 0
+        self._lp_update_labels()
+        self._log("Cleared the stored edge loops.")
+
+    def on_lp_store_verts(self):
+        try:
+            verts = loop_parse_vertices()
+        except Exception as exc:
+            self._log("[WARN] Store Vertices: {0}".format(exc))
+            return
+        self.lp_verts = verts
+        self._lp_update_labels()
+        self._log("Stored {0} vertex(es).".format(len(verts)))
+
+    def on_lp_select_verts(self):
+        self._lp_select(self.lp_verts, "vertices")
+
+    def on_lp_clear_verts(self):
+        self.lp_verts = []
+        self._lp_update_labels()
+        self._log("Cleared the stored vertices.")
+
+    def on_lp_build(self):
+        self._log("--- Build from Edge Loops ---")
+        prefix = self.lp_le_prefix.text().strip() or LOOP_DEFAULT_PREFIX
+        degree = CURVE_DEGREES[self.lp_cb_degree.currentIndex()]
+
+        with undo_chunk():
+            try:
+                report = run_build_loop_drivers(
+                    self.lp_edges, self.lp_verts, prefix=prefix, degree=degree,
+                    orient=self.lp_cb_orient.isChecked(),
+                    aim_axis=self.lp_cb_aim.currentText(),
+                    use_normal_curve=self.lp_cb_norcrv.isChecked(),
+                    normal_curve_length=self.lp_dsb_norcrv_len.value(),
+                    create_set=self.lp_cb_make_set.isChecked(),
+                    create_joints=self.lp_cb_joints.isChecked(),
+                    joint_radius=self.lp_dsb_joint_radius.value())
+            except Exception as exc:
+                self._log("[ERROR] Build failed: {0}".format(exc))
+                return
+
+        self._log("Curves: {0} (from {1} loop(s)) -> {2}".format(
+            len(report["curves"]), report["loops"], ", ".join(report["curves"])))
+        self._log("Nulls: {0} under {1}".format(
+            len(report["nulls"]), report["null_group"]))
+        for null, curve, param in report["attached"]:
+            self._log("  {0} -> {1} @ param {2:.4f}".format(null, curve, param))
+        for obj, reason in report["failed"]:
+            self._log("[WARN] Skipped {0}: {1}".format(obj, reason))
+        if report["joints"]:
+            self._log("Joints: {0} under {1} (parentConstrained to the "
+                      "nulls)".format(len(report["joints"]),
+                                      report["joint_group"]))
+        for norcrv in report["norcrvs"]:
+            self._log("Normal curve created: {0} (rotate it to control "
+                      "twist)".format(norcrv))
+        for set_node in report["sets"]:
+            self._log("pointOnCurveInfo nodes grouped into set: {0}".format(
+                set_node))
 
     def on_atc_get_curve(self):
         """현재 선택의 첫 오브젝트를 Attachment Curve 로 설정."""

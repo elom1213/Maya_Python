@@ -20,7 +20,10 @@
    - **Build (Converge to Center)**: Maya 2023+ 호환 노드 네트워크. `dilate(-90..90)` 가 모든
      조인트를 center(+) 또는 front(-) 조인트로 수렴시키고, 바인드된 곡선이 반지름 R 구 표면에
      놓이도록 `scaleX/Y` 를 구동한다.
-3. **AttachCrv** — 커브에 오브젝트를 라이브 어태치한다. **두 가지 모드**가 있다.
+3. **AttachCrv** — 커브에 오브젝트를 라이브 어태치한다. **하위 탭 2개**로 나뉜다(v01.14).
+   - **Default** — 아래 두 모드(기존 기능 그대로).
+   - **Edge Loop** — 엣지 루프 → 커브 → 버텍스 자리 널 → 어태치(+조인트)를 **버튼 하나로**. (§4.3.1)
+
    (`ref/ref_01.mel` 의 `attachDriverOnCurve` 이식)
    - **Attach to Closest Point** (동작 변경): TSL 에 나열된 **기존 오브젝트들**을 각자
      `nearestPointOnCurve` 로 구한 **최근접 파라미터** 지점에 붙인다. 오브젝트당
@@ -80,7 +83,7 @@ A00170_driverTool/
 ```
 
 - `main_window.py` 의 위젯/핸들러는 탭별 접두사로 분리한다: **Remap Value = `rmp_*`**,
-  **Spherical Eye = `sph_*`**, **AttachCrv = `atc_*`**, **Stretch = `stc_*`**.
+  **Spherical Eye = `sph_*`**, **AttachCrv = `atc_*`**(Edge Loop 하위 탭은 `lp_*`), **Stretch = `stc_*`**.
   공유하는 것은 `self._log()`(공용 로그창)뿐이다. Stretch 로직은 `app/core/stretch.py`
   (`run_build_stretch`)에 있다.
 - `attach_curve.py` 는 노드 생성을 **maya.cmds** 로 한다(pymel 인 다른 두 빌드 모듈과 달리 자족적).
@@ -127,6 +130,10 @@ A00170_driverTool/
 
 ### 4.3 AttachCrv
 
+**하위 탭 2개** — `Default`(아래) / `Edge Loop`(§4.3.1).
+
+#### Default
+
 1. 커브를 선택하고 **Get** → **Attachment Curve** 설정.
 2. **Objects** 리스트에 커브에 붙일 오브젝트들을 추가(`Select`/`Add`).
 3. 옵션:
@@ -161,6 +168,44 @@ A00170_driverTool/
 
 > 어태치는 오브젝트의 `translate`(옵션 `rotate`)에 노드를 **연결**한다. Closest 모드에서 이미
 > 연결/잠금된 채널이 있으면 해당 오브젝트만 실패 처리(로그 경고)하고 나머지는 계속한다.
+
+#### 4.3.1 Edge Loop — 루프에서 드라이버 셋업 한 번에 (v01.14~)
+
+입술·눈꺼풀처럼 **엣지 루프를 커브로 뽑아 몇 개의 드라이버로 제어**하는 셋업을 버튼 하나로 만든다.
+
+```
+[Store Edge Loops] --polyToCurve--> 커브(루프마다 1개)
+[Store Vertices]   --그 자리에-->  널 --가장 가까운 커브에 어태치--> 커브를 따라 움직임
+                                    └(옵션, 기본 ON) 조인트가 널을 따라감
+```
+
+1. 엣지 루프를 선택 → **Store Edge Loops from Selection**. 떨어진 루프를 **여러 개 한 번에** 골라도
+   된다 — 붙어 있는 엣지 덩어리(연결 성분)마다 커브가 하나씩 나온다.
+2. 드라이버를 놓을 **버텍스**를 선택 → **Store Vertices from Selection**(엣지/페이스는 버텍스로 변환).
+3. **Name Prefix** / **Degree**(1=폴리라인, 3=부드러운 곡선)와 어태치·조인트 옵션을 정하고
+   **Build Curve + Nulls (+ Joints)**.
+
+> 저장한 엣지/버텍스는 **리스트 위젯으로 펼치지 않는다** — 루프 하나가 수십~수백 개라 창이 무거워진다.
+> 요약 라벨(`Edge loops: 96 edge(s) in 2 loop(s)`)과 `Select` / `Clear` 로 다룬다.
+
+**만들어지는 것**
+
+| 이름 | 내용 |
+|------|------|
+| `<prefix>_crv_01`, `_02` … | 엣지 루프마다 커브 1개. `polyToCurve(form=2, ch=True)` 라 **닫힌 루프는 주기적 커브**가 되고, 히스토리가 남아 **메시가 변형되면 커브도 따라간다** |
+| `<prefix>_null_grp` / `_null_01` … | 저장한 버텍스 **자리마다** 널(빈 그룹). 만든 뒤 커브에 어태치되므로 커브 위 최근접 지점으로 끌려간다(버텍스가 커브 위면 그 자리 그대로) |
+| `<prefix>_jnt_grp` / `_jnt_01` … | (체크 시) 널마다 조인트 1개. **`parentConstraint` 로 널을 따라간다** |
+| `<curve>_norCrv` / `<curve>_atcPOCI_SET` | Default 탭과 동일(커브마다 하나씩) |
+
+- **커브가 여럿이면 널은 각자 가장 가까운 커브**에 붙는다(`nearestPointOnCurve` 로 거리 비교).
+  위/아래 입술 루프를 한 번에 처리해도 섞이지 않는다.
+- **Create joints that follow the nulls**(기본 **ON**) — 조인트는 널 밑으로 parent 하지 않고
+  **`parentConstraint`** 로 묶는다. 스켈레톤 계층(`<prefix>_jnt_grp`)을 따로 두어 그대로 스킨·익스포트
+  할 수 있게 하기 위해서다. **Joint Radius** 로 표시 크기를 정한다.
+- 어태치 옵션(Orient / Aim Axis / norCrv / POCI 세트)은 Default 탭과 **같은 의미**이며 이 탭 전용 위젯이다.
+- 커브 생성 방식은 [`A00400_CurveTool`](A00400_CurveTool.md) 과 같다(연결 성분별 `polyToCurve`).
+  A00400 을 import 하지는 않는다 — 툴 하나를 릴리스할 때 다른 툴이 딸려가지 않게 하기 위해서다.
+- 전체가 **한 번의 undo** 로 묶인다.
 
 ### 4.4 Stretch
 
