@@ -26,7 +26,17 @@ A00170_driverTool `AttachCrv` 를 **하위 탭 2개**로 나눴다 (v01.13→**0
 - 저장한 엣지/버텍스는 리스트 위젯 없이 요약 라벨 + Select/Clear ([[wip-a00275-expand-bind]] 와 같은
   이유 — 루프 하나가 수십~수백 컴포넌트).
 
+**컨트롤러 계층** (v01.15, 체크박스 기본 ON): 널 밑에 `_con > _ctl > _tgt` 를 만들고 **`_tgt` 가
+조인트를 컨스트레인트**한다. `_ctl` 은 A00145 Match 탭의 Sphere 커브(반지름 1 로 정규화해 복사,
+조인트 반경 ×1.5). 세 노드는 `cmds.parent(..., relative=True)` 로 **로컬 0** — 원점에서 만들고
+relative 로 넣으면 월드 보존 없이 부모 자리에 겹친다. 이름은 널 인덱스를 물려받아야 충돌하지 않는다
+(`loopDrv_null_01_con`).
+
+**조인트 반경 함정**: `joint -radius` 로 준 값은 `.radius` 에 그대로 들어간다(단위·부모 스케일 무관,
+실측). 화면 크기가 달라 보이는 건 **`Display > Animation > Joint Size` 전역 배율**이 곱해지기 때문 —
+어트리뷰트 문제로 오해하기 쉽다. 그래도 생성 후 `setAttr(.radius)` 로 한 번 더 못 박아 둔다.
+
 **마야 메모**: `cmds.polyToCurve` 가 만드는 히스토리 노드 타입은 `polyToCurve` 가 아니라
 **`polyEdgeToCurve`** 다(실측). 닫힌 엣지 루프면 `form=2` 로 주기적 커브가 나온다.
 
-검증: 코어 34 + UI 27 항목 headless 통과([[mayapy-headless-verify]]), 기존 Default 탭 회귀 포함.
+검증: 코어 34+24 + UI 30 항목 headless 통과([[mayapy-headless-verify]]), 기존 Default 탭 회귀 포함.
