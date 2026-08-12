@@ -7,6 +7,7 @@
 # viewport 비의존(MFnMesh) 이라 refresh suspend / 배치 상황에서도 안전.
 
 from maya.api import OpenMaya as om
+from Framework.core import maya_shape
 
 # 캐시와 의상의 트랜스폼이 다를 수 있으므로 코렉티브 추출은 월드 공간으로 복사한다
 # (PoseWrangler EDIT 메시가 포즈된 월드 위치의 복제라는 가정과 일치).
@@ -15,12 +16,8 @@ OBJECT = om.MSpace.kObject
 
 
 def _shape_dag(mesh):
-    """transform/shape 이름 -> shape MDagPath."""
-    sel = om.MSelectionList()
-    sel.add(mesh)
-    dag = sel.getDagPath(0)
-    dag.extendToShape()
-    return dag
+    """transform/shape 이름 -> shape MDagPath (셰이프가 여럿이어도 안전)."""
+    return maya_shape.shape_dag(mesh)
 
 
 def topo_signature(mesh):

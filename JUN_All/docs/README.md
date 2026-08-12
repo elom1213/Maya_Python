@@ -37,15 +37,16 @@
 | `A00410_SecondaryMotion` | 애니메이션 / 2차 모션 (FK 체인 관성·찰랑임) | [A00410_SecondaryMotion](A00410_SecondaryMotion.md) |
 | `A00420_Wrapper` | 모델링·페이셜 / 커브 가이드 래핑 (다른 토폴로지 메시 맞추기) | [A00420_Wrapper](A00420_Wrapper.md) |
 
-### 공용 위젯 (Framework)
+### 공용 위젯 · 헬퍼 (Framework)
 
-특정 툴이 아니라 **여러 툴이 함께 쓰는 위젯**의 동작·옵션 문서. 툴 문서는 "재사용 위젯 …" 이라고만 적고
+특정 툴이 아니라 **여러 툴이 함께 쓰는 위젯/헬퍼**의 동작·옵션 문서. 툴 문서는 "재사용 위젯 …" 이라고만 적고
 자세한 동작은 아래를 참조한다.
 
 | 모듈 | 내용 | 문서 |
 |------|------|------|
 | `Framework/qt/MOD_tsl_qt_v01.py` | 공용 리스트(TSL) 위젯 — Select/Add/Del/Up/Down/Sort, **Order(선택 순서 유지)**, UUID 보관 | [Framework_MOD_tsl_qt](Framework_MOD_tsl_qt.md) |
 | `Framework/qt/MOD_filter_qt_v01.py` | 공용 **검색/필터** 위젯 — 입력 즉시 일치 항목만 표시, "보이는 것이 작업 대상" 헬퍼 | [Framework_MOD_filter_qt](Framework_MOD_filter_qt.md) |
+| `Framework/core/maya_shape.py` | **트랜스폼 → 셰이프 확정** 헬퍼 — `extendToShape()` 가 엉뚱한 셰이프를 집는 함정을 막는다(`kInvalidParameter` 원인) | [Framework_maya_shape](Framework_maya_shape.md) |
 
 ---
 

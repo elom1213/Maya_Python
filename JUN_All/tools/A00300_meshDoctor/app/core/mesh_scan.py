@@ -16,6 +16,7 @@ import math
 
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
+from Framework.core import maya_shape
 
 
 # ----------------------------------------------------------------------
@@ -76,12 +77,8 @@ def shape_of(node):
 
 
 def _shape_dag(node):
-    sel = om.MSelectionList()
-    sel.add(node)
-    dag = sel.getDagPath(0)
-    if dag.apiType() == om.MFn.kTransform:
-        dag.extendToShape()
-    return dag
+    # 셰이프가 여럿인 트랜스폼에서 엉뚱한 셰이프를 검사하지 않도록 공용 헬퍼로 확정.
+    return maya_shape.shape_dag(node)
 
 
 def get_object_points(node):

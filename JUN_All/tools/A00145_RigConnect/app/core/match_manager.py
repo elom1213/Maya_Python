@@ -26,6 +26,7 @@ import maya.cmds as cmds
 import maya.api.OpenMaya as om
 
 from Framework.core.maya_refresh import suspend_refresh
+from Framework.core import maya_shape
 
 _EPS = 1e-6
 
@@ -97,13 +98,12 @@ def _make_control(ctl_type):
 # ======================================================================
 
 def _mfn_mesh(name):
-    """transform 또는 mesh shape 이름 -> MFnMesh (mesh_io 패턴과 동일)."""
-    sel = om.MSelectionList()
-    sel.add(name)
-    dag = sel.getDagPath(0)
-    if dag.apiType() == om.MFn.kTransform:
-        dag.extendToShape()
-    return om.MFnMesh(dag)
+    """transform 또는 mesh shape 이름 -> MFnMesh.
+
+    셰이프가 여럿인 트랜스폼에서도 **디포머가 변형하는 셰이프**를 고른다
+    (extendToShape 는 첫 non-intermediate 셰이프를 집을 뿐이다 — maya_shape 참고).
+    """
+    return om.MFnMesh(maya_shape.shape_dag(name))
 
 
 def _shape_type(node):

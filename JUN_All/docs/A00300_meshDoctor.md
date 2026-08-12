@@ -4,7 +4,7 @@
 **안전한 원클릭 수정**(Undo 가능)을 제공하는 PySide 툴. 로그를 Claude 에게 주면 근본 원인 분석을 받을 수 있다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`A00110_animTool` 클론)
-- **버전**: `app/config/version.py` (v01.02 — 배치 진단 + 요약 테이블)
+- **버전**: `app/config/version.py` (v01.04 — 배치 진단 + 요약 테이블, 셰이프 해석은 공용 [`maya_shape`](Framework_maya_shape.md))
 - **설치**: `__dragDrop_A00300.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 → `tools.A00300_meshDoctor.run(True)`
 - **의존**: 외부 pip 없음. `maya.cmds` + `maya.api.OpenMaya` 2.0 만 사용 (Maya 2023+).
 

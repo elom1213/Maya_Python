@@ -1,5 +1,15 @@
 # Changelog — A00270_skinMigrate
 
+## v01.02 (2026-08-12)
+- **[Fix] 한 트랜스폼에 메시 셰이프가 여럿일 때 엉뚱한 셰이프를 잡던 문제** — `MDagPath.extendToShape()`
+  는 **첫 번째 non-intermediate 셰이프**를 고를 뿐이라, blendShape 타겟 셰이프를 같은 트랜스폼에 정리해
+  둔 리그·머지/임포트 잔재 씬에서 원하는 셰이프가 아닌 것이 나왔다. 웨이트 API 에 넘기면
+  `(kInvalidParameter): Object is incompatible with this method` 로 죽고, 지오메트리 읽기/쓰기는
+  **조용히 다른 셰이프**를 만졌다.
+- 공용 헬퍼 **`Framework.core.maya_shape`** 로 통일했다 — 셰이프를 추측하지 않고 **디포머가 실제로
+  변형하는 셰이프**(`cmds.deformer -q -g`)로 확정한다.
+- 네이티브 조인트 이동(`_native_move_columns`)의 dagPath / 버텍스 수를 셰이프 기준으로 잡는다.
+
 ## v01.01 (2026-06-29)
 - **두 개 탭 구조로 개편** — 레거시 `JUN_PY_move_skinWeightTool_v01_04` 의 원본 UI 를 이식.
   - **Tab 1 "Classic"** — 레거시 원본 2버튼 충실 이식:

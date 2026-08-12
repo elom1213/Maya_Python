@@ -10,6 +10,7 @@
 import maya.cmds as cmds
 import maya.mel as mel
 import maya.api.OpenMaya as om
+from Framework.core import maya_shape
 
 from tools.A00300_meshDoctor.app.core.mesh_scan import (
     shape_of, get_object_points, find_nan_indices, find_stray_indices,
@@ -199,9 +200,4 @@ class MeshFixer:
 
 
 def _dag(node):
-    sel = om.MSelectionList()
-    sel.add(node)
-    dag = sel.getDagPath(0)
-    if dag.apiType() == om.MFn.kTransform:
-        dag.extendToShape()
-    return dag
+    return maya_shape.shape_dag(node)

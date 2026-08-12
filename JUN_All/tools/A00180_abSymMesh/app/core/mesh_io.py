@@ -15,6 +15,7 @@ import os
 
 import maya.api.OpenMaya as om
 import maya.cmds as cmds
+from Framework.core import maya_shape
 
 from . import undo_bridge
 
@@ -42,14 +43,12 @@ def ensure_undo_plugin():
 # ----------------------------------------------------------------------
 
 def get_mfn_mesh(name):
-    """transform 또는 mesh shape 이름 -> MFnMesh."""
-    sel = om.MSelectionList()
-    sel.add(name)
-    dag = sel.getDagPath(0)
-    # transform 이 넘어오면 첫 shape 로 확장.
-    if dag.apiType() == om.MFn.kTransform:
-        dag.extendToShape()
-    return om.MFnMesh(dag)
+    """transform 또는 mesh shape 이름 -> MFnMesh.
+
+    셰이프 확정은 공용 헬퍼에 맡긴다. 여기서 잘못된 셰이프를 잡으면 정점을 **엉뚱한
+    셰이프에 써 넣는다**(조용히 틀린다 — maya_shape 참고).
+    """
+    return om.MFnMesh(maya_shape.shape_dag(name))
 
 
 def vertex_count(name):

@@ -29,6 +29,7 @@ import maya.api.OpenMaya as om
 import maya.api.OpenMayaAnim as oma
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.core import maya_shape
 
 
 # =========================
@@ -142,13 +143,13 @@ def parse_target_selections():
 
 
 def _shape_node(mesh):
-    """mesh(트랜스폼/셰이프)의 **셰이프 MObject**. 못 구하면 None."""
+    """mesh(트랜스폼/셰이프)의 **셰이프 MObject**. 못 구하면 None.
+
+    셰이프 확정은 공용 헬퍼에 맡긴다(셰이프가 여럿인 트랜스폼에서 엉뚱한 셰이프를
+    집으면 소프트 셀렉션 매칭이 조용히 실패한다 — maya_shape 참고).
+    """
     try:
-        sel = om.MSelectionList()
-        sel.add(mesh)
-        dag = sel.getDagPath(0)
-        dag.extendToShape()
-        return dag.node()
+        return maya_shape.shape_dag(mesh, deformer=_skincluster(mesh)).node()
     except Exception:
         return None
 
@@ -180,16 +181,18 @@ def _soft_weights(mesh):
         except Exception:
             continue
 
-        # 컴포넌트가 속한 셰이프 노드를 구해 대상 셰이프와 노드로 비교한다.
+        # 컴포넌트가 속한 셰이프를 대상 셰이프와 **노드로** 비교한다.
+        # dag 가 트랜스폼으로 오면 extendToShape 로 하나를 고르지 않고, 그 아래 메시
+        # 셰이프 **전부**와 대조한다(셰이프가 여럿이면 하나만 골라선 빗나간다).
         try:
-            dag.extendToShape()
-        except Exception:
-            pass
-        try:
-            node = dag.node()
+            if dag.apiType() == om.MFn.kTransform:
+                nodes = [dag.child(k) for k in range(dag.childCount())]
+                nodes = [n for n in nodes if n.hasFn(om.MFn.kMesh)]
+            else:
+                nodes = [dag.node()]
         except Exception:
             continue
-        if node != target_node:
+        if target_node not in nodes:
             continue
 
         if comp.isNull() or not comp.hasFn(om.MFn.kMeshVertComponent):
@@ -215,11 +218,7 @@ def _connected_island(mesh, seed_ids):
     """
     seed = set(seed_ids)
     try:
-        sel = om.MSelectionList()
-        sel.add(mesh)
-        dag = sel.getDagPath(0)
-        dag.extendToShape()
-        fn = om.MFnMesh(dag)
+        fn = om.MFnMesh(maya_shape.shape_dag(mesh, deformer=_skincluster(mesh)))
         counts, indices = fn.getVertices()   # 면별 버텍스 수 + 평면 인덱스 (bulk 1회)
     except Exception:
         return seed
@@ -256,12 +255,12 @@ def _sc_fn(sc):
     return oma.MFnSkinCluster(sel.getDependNode(0))
 
 
-def _mesh_dag_comp(mesh):
-    sel = om.MSelectionList()
-    sel.add(mesh)
-    dag = sel.getDagPath(0)
-    dag.extendToShape()
-    n = cmds.polyEvaluate(mesh, v=True)
+def _mesh_dag_comp(mesh, sc=None):
+    # 웨이트를 읽고 쓸 dagPath 는 **그 skinCluster 가 변형하는 셰이프**여야 한다.
+    # 아니면 getWeights 가 "(kInvalidParameter): Object is incompatible with this
+    # method" 로 죽는다. 버텍스 수도 셰이프 기준으로 센다(트랜스폼이면 문자열 반환).
+    dag = maya_shape.shape_dag(mesh, deformer=sc or _skincluster(mesh))
+    n = maya_shape.vertex_count(mesh, deformer=sc or _skincluster(mesh))
     comp_fn = om.MFnSingleIndexedComponent()
     comp = comp_fn.create(om.MFn.kMeshVertComponent)
     comp_fn.addElements(list(range(n)))
@@ -271,7 +270,7 @@ def _mesh_dag_comp(mesh):
 def _get_all_weights(sc, mesh):
     """(flat MDoubleArray, n_verts, influence 논리인덱스 MIntArray, n_inf)."""
     fn = _sc_fn(sc)
-    dag, comp, n = _mesh_dag_comp(mesh)
+    dag, comp, n = _mesh_dag_comp(mesh, sc)
     weights, n_inf = fn.getWeights(dag, comp)
     infl_dags = fn.influenceObjects()
     idxs = om.MIntArray()
@@ -282,7 +281,7 @@ def _get_all_weights(sc, mesh):
 
 def _set_all_weights(sc, mesh, weights, idxs):
     fn = _sc_fn(sc)
-    dag, comp, _n = _mesh_dag_comp(mesh)
+    dag, comp, _n = _mesh_dag_comp(mesh, sc)
     fn.setWeights(dag, comp, idxs, weights, False)
 
 
@@ -382,6 +381,20 @@ def transfer_to_mesh(source_meshes, respect_soft=True, engine="native"):
         len(sources), done, ", ".join(detail))
 
 
+def _copy_selection(sources, target):
+    """copySkinWeights 에 넘길 선택 목록 — **셰이프로 확정**해서 넣는다.
+
+    트랜스폼을 그대로 선택하면 셰이프가 여럿일 때 마야가 어느 skinCluster 로 보낼지
+    못 정하고 `A skinCluster node should be specified with the -destinationSkin/-ds
+    flag.` 로 실패한다(실측). 셰이프를 직접 선택하면 그대로 동작한다.
+    """
+    picked = []
+    for node in list(sources) + [target]:
+        picked.append(maya_shape.shape_path(node, deformer=_skincluster(node))
+                      or node)
+    return picked
+
+
 def _transfer_one_native(sources, union, target, vtx_ids, soft):
     """소스들 → 대상 메시 하나에 전이한다(부분/소프트 마스킹 포함). 짧은 설명 문자열 반환."""
 
@@ -390,7 +403,7 @@ def _transfer_one_native(sources, union, target, vtx_ids, soft):
     # ---- 전체 전이 --------------------------------------------------
     # 버텍스 선택이 없으면 메시 전체를 copySkinWeights (undo 가능, 빠름).
     if not vtx_ids:
-        cmds.select(list(sources) + [target], r=True)
+        cmds.select(_copy_selection(sources, target), r=True)
         cmds.copySkinWeights(
             noMirror=True, surfaceAssociation="closestPoint",
             influenceAssociation=["name", "closestJoint", "oneToOne"])
@@ -406,7 +419,7 @@ def _transfer_one_native(sources, union, target, vtx_ids, soft):
     if not vtx_ids:
         return "no valid target vertices"
 
-    cmds.select(list(sources) + [target], r=True)
+    cmds.select(_copy_selection(sources, target), r=True)
     cmds.copySkinWeights(
         noMirror=True, surfaceAssociation="closestPoint",
         influenceAssociation=["name", "closestJoint", "oneToOne"])

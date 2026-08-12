@@ -18,6 +18,7 @@
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.core import maya_shape
 
 
 class SkinMigrateManager:
@@ -421,13 +422,13 @@ class SkinMigrateManager:
         sel.add(sc_name)
         fn = oma.MFnSkinCluster(sel.getDependNode(0))
 
-        # 메시 dagPath + 전체 버텍스 컴포넌트
-        msel = om.MSelectionList()
-        msel.add(mesh)
-        dag = msel.getDagPath(0)
-        dag.extendToShape()
+        # 메시 dagPath + 전체 버텍스 컴포넌트.
+        # 셰이프는 **그 skinCluster 가 변형하는 것**으로 확정한다. extendToShape 로
+        # 잡으면 셰이프가 여럿인 트랜스폼에서 엉뚱한 셰이프가 나와 getWeights 가
+        # "(kInvalidParameter): Object is incompatible with this method" 로 죽는다.
+        dag = maya_shape.shape_dag(mesh, deformer=sc_name)
 
-        n_verts = cmds.polyEvaluate(mesh, vertex=True)
+        n_verts = maya_shape.vertex_count(mesh, deformer=sc_name)
         comp_fn = om.MFnSingleIndexedComponent()
         comp = comp_fn.create(om.MFn.kMeshVertComponent)
         comp_fn.addElements(list(range(n_verts)))

@@ -29,12 +29,9 @@ from tools.A00180_abSymMesh.app.core import undo_bridge
 
 
 def _mfn_mesh(name):
-    sel = om.MSelectionList()
-    sel.add(name)
-    dag = sel.getDagPath(0)
-    if dag.apiType() == om.MFn.kTransform:
-        dag.extendToShape()
-    return om.MFnMesh(dag)
+    # 셰이프 확정은 mesh_io 와 같은 공용 헬퍼로(엉뚱한 셰이프에 쓰기 방지).
+    from Framework.core import maya_shape
+    return om.MFnMesh(maya_shape.shape_dag(name))
 
 
 class AbSymSetPointsCmd(om.MPxCommand):
