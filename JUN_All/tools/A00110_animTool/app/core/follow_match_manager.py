@@ -19,6 +19,8 @@
 #   - blend(0..1) 는 키 값에 직접 베이크한다(레이어 weight 는 1 유지).
 #       0 = 원본 유지, 1 = 매치로 덮어쓰기, 0.5 = 원본과 매치를 반반.
 #       회전은 쿼터니언 slerp, 위치/스케일은 선형 lerp 로 섞는다.
+#   - target 은 오브젝트뿐 아니라 **메시 버텍스 같은 컴포넌트**도 된다. 컴포넌트에는
+#     worldMatrix 가 없어 위치(+메시 버텍스면 노말)로 월드 행렬을 만들어 쓴다(_target_matrix).
 #   - 애니메이션 레이어가 선택돼 있으면 그 레이어에 키를 굽는다(override / additive 모두 처리).
 #   - 어떤 레이어에 구워도 "베이스에 구운 것과 동일한 월드 위치/회전"이 나오도록 한다.
 #       * setKeyframe(animLayer=L, value=V) 는 레이어 커브에 V 를 그대로 쓰는 게 아니라,
@@ -52,6 +54,103 @@ class FollowMatchManager:
     T_ATTRS = ["translateX", "translateY", "translateZ"]
     R_ATTRS = ["rotateX", "rotateY", "rotateZ"]
     S_ATTRS = ["scaleX", "scaleY", "scaleZ"]
+
+    # --------------------------------------------------
+    # 컴포넌트(버텍스 등) 타겟 지원
+    #
+    # target 에 `mesh.vtx[5]` 같은 **컴포넌트**를 넣어도 오브젝트와 똑같이 동작하게 한다.
+    # 컴포넌트에는 worldMatrix 가 없으므로(`getAttr("mesh.vtx[5].worldMatrix[0]")` 는
+    # ValueError) 위치·방향으로 월드 행렬을 만들어 준다.
+    #
+    #   메시 버텍스 : 위치 = 그 정점의 월드 좌표, 방향 = **정점 노말**을 +Y 로 삼는 직교
+    #                프레임(A00145_RigConnect Match 탭과 같은 규약), 스케일 = 1.
+    #   그 밖의 컴포넌트(커브 CV 등) : 위치만 컴포넌트에서 가져오고 방향/스케일은
+    #                **소유 오브젝트의 월드 행렬**을 쓴다(노말이 없다).
+    #
+    # 또 하나 중요한 차이: 컴포넌트 위치는 `getAttr(..., time=t)` 로 시점 조회가 안 된다.
+    # 그래서 컴포넌트 타겟이 하나라도 있으면 프레임마다 **currentTime 을 옮겨** 읽는다
+    # (디폼되는 메시의 정점을 따라가려면 이 방법뿐이다). 원래 시간은 호출부에서 복원한다.
+    # --------------------------------------------------
+
+    @staticmethod
+    def _is_component(name):
+        """'mesh.vtx[5]' 처럼 컴포넌트 이름인가."""
+        return isinstance(name, str) and "[" in name and "." in name
+
+    @staticmethod
+    def _component_exists(name):
+        """컴포넌트가 실제로 존재하는가(인덱스 범위까지 확인).
+
+        `cmds.objExists("mesh.vtx[99999]")` 는 True 를 준다. `cmds.ls` 는 범위를 벗어난
+        인덱스를 **마지막 유효 컴포넌트로 조용히 클램프**해 돌려준다(실측:
+        `vtx[99999]` -> `vtx[13]`). 그래서 돌려받은 이름이 요청한 것과 같은지까지 본다 —
+        토폴로지가 바뀌어 인덱스가 사라진 경우를 엉뚱한 정점으로 대체하지 않기 위해서다.
+        """
+        try:
+            resolved = cmds.ls(name, flatten=True) or []
+        except Exception:
+            return False
+        if not resolved:
+            return False
+        return resolved[0].split(".")[-1] == name.split(".")[-1]
+
+    @staticmethod
+    def _mesh_vertex_frame(vtx):
+        """메시 버텍스의 (월드 위치, +Y=노말 직교기저). A00145 Match 탭과 같은 규약."""
+        node, rest = vtx.split(".vtx[", 1)
+        index = int(rest.split("]", 1)[0])
+
+        sel = om.MSelectionList()
+        sel.add(node)
+        dag = sel.getDagPath(0)
+        dag.extendToShape()
+        fn = om.MFnMesh(dag)
+
+        p = fn.getPoint(index, om.MSpace.kWorld)
+        n = fn.getVertexNormal(index, True, om.MSpace.kWorld).normal()
+
+        # 노말을 +Y 로 삼는 직교기저. reference up 은 world Z(노말과 평행하면 world X).
+        ref = om.MVector(0.0, 0.0, 1.0)
+        if abs(ref * n) > 0.9999:
+            ref = om.MVector(1.0, 0.0, 0.0)
+        y = n
+        x = (y ^ ref).normal()
+        z = (x ^ y).normal()
+        return om.MPoint(p.x, p.y, p.z), (x, y, z)
+
+    @staticmethod
+    def _component_world_matrix(tgt):
+        """컴포넌트의 월드 행렬을 만든다(**현재 프레임** 기준).
+
+        메시 버텍스면 노말 기반 프레임, 그 밖의 컴포넌트면 소유 오브젝트의 회전/스케일에
+        컴포넌트 위치만 얹는다.
+        """
+        if ".vtx[" in tgt:
+            pos, (x, y, z) = FollowMatchManager._mesh_vertex_frame(tgt)
+            return om.MMatrix([
+                x.x, x.y, x.z, 0.0,
+                y.x, y.y, y.z, 0.0,
+                z.x, z.y, z.z, 0.0,
+                pos.x, pos.y, pos.z, 1.0,
+            ])
+
+        # 커브 CV 등 : 위치만 컴포넌트에서, 방향/스케일은 소유 오브젝트에서.
+        pos = cmds.pointPosition(tgt, world=True)
+        owner = tgt.split(".")[0]
+        base = om.MMatrix(cmds.getAttr(owner + ".worldMatrix[0]"))
+        values = list(base)
+        values[12], values[13], values[14] = pos[0], pos[1], pos[2]
+        return om.MMatrix(values)
+
+    @staticmethod
+    def _target_matrix(tgt, t):
+        """시점 t 의 target 월드 행렬. 오브젝트/컴포넌트 모두 처리한다."""
+        if FollowMatchManager._is_component(tgt):
+            # 컴포넌트는 시점 지정 조회가 안 되므로 프레임을 옮겨서 읽는다.
+            if cmds.currentTime(q=True) != t:
+                cmds.currentTime(t, edit=True)
+            return FollowMatchManager._component_world_matrix(tgt)
+        return om.MMatrix(cmds.getAttr(tgt + ".worldMatrix[0]", time=t))
 
     # --------------------------------------------------
     # 공개 진입점
@@ -154,7 +253,13 @@ class FollowMatchManager:
         레이어 종류에 맞는 기여(회전 합성 포함)를 알아서 계산한다. (델타 직접 계산/캘리브레이션
         불필요 — 과거 additive 에 델타를 넘겨 F-base 만큼 어긋나던 버그를 제거.)
         """
-        if not cmds.objExists(tgt) or not cmds.objExists(flw):
+        if not cmds.objExists(flw):
+            return False
+        # objExists 는 범위를 벗어난 컴포넌트('mesh.vtx[9999]')도 True 를 준다 -> ls 로 확인.
+        if FollowMatchManager._is_component(tgt):
+            if not FollowMatchManager._component_exists(tgt):
+                return False
+        elif not cmds.objExists(tgt):
             return False
 
         ro = cmds.getAttr(flw + ".rotateOrder")
@@ -167,7 +272,11 @@ class FollowMatchManager:
         # maintain_offset: ref_time(구간 시작)에서 target↔follower 상대 행렬을 1회 측정.
         offset = None
         if maintain_offset:
-            offset = FollowMatchManager._offset_matrix(tgt, flw, ref_time)
+            try:
+                offset = FollowMatchManager._offset_matrix(tgt, flw, ref_time)
+            except Exception:
+                # 타겟을 못 읽으면 이 페어만 건너뛴다(다른 페어는 계속 굽는다).
+                return False
 
         is_layer = layer is not None
 
@@ -203,8 +312,12 @@ class FollowMatchManager:
         # ---- 매치 M(절대) -> (blend) -> 절대값 F 기록 ----
         any_set = False
         for t in times:
-            m_state = FollowMatchManager._matched_state(
-                tgt, flw, t, do_t, do_r, do_s, offset)
+            try:
+                m_state = FollowMatchManager._matched_state(
+                    tgt, flw, t, do_t, do_r, do_s, offset)
+            except Exception:
+                # 프레임 중간에 타겟이 사라지는 등 예외 -> 이 페어만 포기.
+                return any_set
 
             if need_orig:
                 f_state = FollowMatchManager._blend_state(
@@ -328,7 +441,8 @@ class FollowMatchManager:
         (JUN_PY_MatrixCon_01_01 의 offsetMat: flw.worldMatrix * tgt.worldInverseMatrix 와 동일)
         """
         mf = om.MMatrix(cmds.getAttr(flw + ".worldMatrix[0]", time=t))
-        ms_inv = om.MMatrix(cmds.getAttr(tgt + ".worldInverseMatrix[0]", time=t))
+        # 컴포넌트 타겟은 worldInverseMatrix 가 없으므로 만든 행렬을 뒤집어 쓴다.
+        ms_inv = FollowMatchManager._target_matrix(tgt, t).inverse()
         return mf * ms_inv
 
     @staticmethod
@@ -339,7 +453,7 @@ class FollowMatchManager:
         offset 지정 : local = offset * worldMatrix(tgt) * parentInverseMatrix(flw).
                       start 프레임의 상대 거리/회전을 매 프레임 유지(maintain offset).
         """
-        ms = om.MMatrix(cmds.getAttr(tgt + ".worldMatrix[0]", time=t))
+        ms = FollowMatchManager._target_matrix(tgt, t)
         if offset is not None:
             ms = offset * ms
         mpi = om.MMatrix(cmds.getAttr(flw + ".parentInverseMatrix[0]", time=t))
