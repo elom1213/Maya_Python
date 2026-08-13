@@ -26,3 +26,5 @@ A00400_CurveTool — 신규 in-Maya PySide 툴 (v01.00, 코어 mayapy-verified, 
   mesh/locator 에는 없다.
 - 슬라이더 라이브 반영 + **드래그 한 번 = undo 한 스텝** — `sliderPressed` 에서
   `cmds.undoInfo(openChunk=True)`, `sliderReleased` 에서 close(값 변경마다 청크를 열면 undo 도배).
+- v01.02: **Apply 버튼 없이 슬라이더를 놓는 순간 자동 적용**. 이때 **확정 적용을 청크 안에서**
+  해야 한다 — 닫은 뒤에 쓰면 드래그 하나가 undo 두 스텝으로 갈라져 Ctrl+Z 를 두 번 눌러야 한다.

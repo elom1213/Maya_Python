@@ -178,6 +178,7 @@ class MainWindow(QWidget):
 
         desc = QLabel(
             "Thicker curves are easier to see and to click in the viewport.\n"
+            "Drag the slider - it is applied as soon as you let go.\n"
             "This only changes how the curve is drawn - shape and history are "
             "untouched.")
         desc.setAlignment(Qt.AlignCenter)
@@ -198,8 +199,10 @@ class MainWindow(QWidget):
                                 int(curve_mgr.LINE_WIDTH_MAX * 10))
         self.sld_width.setValue(20)
         self.sld_width.setToolTip(
-            "Drag to set the drawn thickness of every listed curve "
-            "(live).\nThe whole drag is one undo step.")
+            "Drag to set the drawn thickness of every listed curve.\n"
+            "It updates live while you drag and is applied for good the moment "
+            "you let go\n(no Apply button needed). The whole drag is one undo "
+            "step.")
         row.addWidget(self.sld_width, 1)
 
         self.dsb_width = QDoubleSpinBox()
@@ -213,12 +216,6 @@ class MainWindow(QWidget):
         width_lay.addLayout(row)
 
         btn_row = QHBoxLayout()
-        self.btn_width_apply = QPushButton("Apply")
-        self.btn_width_apply.setToolTip(
-            "Apply the value above to the listed curves.")
-        self.btn_width_apply.clicked.connect(self.on_width_apply)
-        btn_row.addWidget(self.btn_width_apply)
-
         self.btn_width_get = QPushButton("Get")
         self.btn_width_get.setToolTip(
             "Read the line width of the first listed curve into the slider.")
@@ -343,17 +340,19 @@ class MainWindow(QWidget):
     def _on_width_slider(self, value):
         width = value / 10.0
         self._set_width_widgets(width)
-        # 드래그 중에는 undo 청크가 열려 있으므로 그대로 쓴다(라이브 피드백).
         if self._width_dragging:
+            # 드래그 중 — undo 청크가 열려 있고, 커밋/로그는 손을 뗄 때 한 번만 한다.
             self._apply_width(width, log=False)
         else:
+            # 화살표 키·홈그루브 클릭처럼 한 번에 끝나는 변경은 그 자리에서 적용.
             with undo_chunk():
-                self._apply_width(width, log=False)
+                self._apply_width(width)
 
     def _on_width_spin(self, value):
+        # keyboardTracking=False 라 Enter/포커스 아웃에서 한 번 들어온다 = 그 자체로 settle.
         self._set_width_widgets(value)
         with undo_chunk():
-            self._apply_width(value, log=False)
+            self._apply_width(value)
 
     def _width_drag_start(self):
         """드래그 시작 — 여기서 연 undo 청크를 놓을 때 닫는다."""
@@ -361,15 +360,19 @@ class MainWindow(QWidget):
         cmds.undoInfo(openChunk=True)
 
     def _width_drag_end(self):
-        self._width_dragging = False
-        cmds.undoInfo(closeChunk=True)
-        # 드래그가 끝났을 때만 결과를 한 줄 남긴다(끄는 동안 로그가 도배되지 않게).
-        self.log("Line width {0:.1f} -> {1} curve shape(s).".format(
-            self.dsb_width.value(), len(self._width_curves())))
+        """슬라이더에서 손을 떼는 순간이 곧 **자동 적용(commit)** 이다.
 
-    def on_width_apply(self):
-        with undo_chunk():
+        드래그 중에도 라이브로 반영하지만, 마지막 값을 한 번 더 확실히 써서 놓친 이벤트가
+        없게 하고 그때만 로그를 남긴다(드래그 내내 로그가 도배되지 않도록). 별도의 Apply
+        버튼은 두지 않는다.
+        """
+        self._width_dragging = False
+        # 마지막 값 확정은 **청크를 닫기 전에** 해야 드래그 전체가 undo 한 스텝으로 남는다
+        # (닫은 뒤에 쓰면 커밋이 별도 스텝이 되어 Ctrl+Z 를 두 번 눌러야 한다).
+        try:
             self._apply_width(self.dsb_width.value())
+        finally:
+            cmds.undoInfo(closeChunk=True)
 
     def on_width_get(self):
         curves = self._width_curves()
