@@ -87,6 +87,7 @@
 - [A00210 PathStructure tree](wip-a00210-pathstructure-tree-depth.md) — Preview 를 QTreeWidget + Capture/View Depth 로 (v01.24)
 - [A00210 Recreate To + Rename](wip-a00210-recreate-to-rename.md) — 명시적 대상 경로 필드 + Rename 버튼 (v01.28)
 - [A00210 PathStructure files](wip-a00210-pathstructure-files.md) — 파일도 캡처/재생성, 0바이트 + `__` 표식 (v01.29)
+- [A00170 Lip Seal](wip-a00170-lip-seal.md) — Seal 탭(입술 지퍼). `pairBlend` 를 커브 구동 사이에 끼움, `u` 는 POCI 파라미터에서(생성 순서 아님), Remove 로 원복 (v01.16)
 - [A00170 Edge Loop drivers](wip-a00170-edge-loop-drivers.md) — AttachCrv 하위 탭. 루프→커브→널→(con/ctl/tgt 컨트롤러)→조인트. joint `.radius` 는 맞고 화면 크기만 Joint Size 배율 (v01.15)
 - [A00170 Stretch tab](wip-a00170-stretch-tab.md) — Default Distance 가 Stretch 구동, linear + Sigmoid 노드망 (v01.11)
 - [A00170 AttachCrv tab](wip-a00170-attachcrv-tab.md) — TSL 오브젝트를 커브 최근접점에 부착
