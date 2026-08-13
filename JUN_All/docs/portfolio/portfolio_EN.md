@@ -43,6 +43,7 @@ updated: 2026-08-07
 
 - Automates the **RBF solver → driver node → blendshape** attribute wiring of a MetaHuman facial rig, driven by **JSON rule files**.
 - Supports **1→n and n→n batch connection** from source/target lists, routing through intermediate nodes (`WRK_intermediate`), plus `validate` and `disconnect` passes.
+- It also **batch-creates the blendshape corrective targets** named by the rule's mapping. Those names are *pose* names — identical for every garment — while Maya node names must be **unique in the scene**. So each target mesh is created as `<mesh>_<pose>` and only the blendshape's **weight alias** is renamed back to the pose name: one rule set applies to any number of garments while the address the wiring uses (`<blendShape>.<pose>`) stays the same (aliases are per-node, so every blendshape can carry the same one).
 - Hundreds of hand-made attribute connections became **reproducible and verifiable** data.
 
 ### 1-3. MetaHuman facial data utilities

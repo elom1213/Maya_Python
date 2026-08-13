@@ -17,6 +17,28 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-13 (오늘)
 
+> [!summary] `A00090_ConnectionBuilder` **blendShape 타겟이 안 만들어지거나 일부만 만들어지던 버그 수정** (v01.05→01.06)
+- **증상**: 메시를 지정하고 Create 를 누르면
+  `Target calf_l_defaultShape does not match with base SIN_Set007_Top2Shape.` +
+  `No deformable objects selected.` 가 뜨며 타겟이 안 생기거나 일부만 생겼다. rule 종류와 무관.
+- **원인**: rule 의 mapping 이름(`calf_l_default` 등)은 **포즈 이름이라 모든 메시가 공유**하는데,
+  그 이름을 **타겟 메시의 노드 이름으로 그대로** 썼다. 노드 이름은 씬에서 유일해야 하므로 옷 A 에
+  타겟을 만든 뒤 옷 B 에 같은 rule 을 돌리면 `objExists` 가 True → **A 의 타겟을 B 것으로 재사용** →
+  토폴로지 불일치로 `cmds.blendShape` 호출이 통째로 실패. 이름이 조인트 등에 이미 쓰였으면
+  `More than one object matches name` 으로 죽었다. 헤드리스로 두 줄 오류까지 그대로 재현했다.
+- **해결**: **타겟 메시 노드 이름과 blendShape 웨이트 alias 는 다른 것**이라는 점을 이용했다.
+  타겟은 `<메시>_<mapping이름>` 으로 유일하게 만들고, 붙인 뒤 `cmds.aliasAttr` 로 alias 를
+  mapping 이름으로 되돌린다. alias 는 노드 단위라 blendShape 가 여럿이어도 각각 `calf_l_default` 를
+  가질 수 있고, **Connect 가 쓰는 주소(`<blendShape>.<mapping이름>`)는 그대로**다.
+- 함께 고친 것: ① 타겟을 지워 인덱스가 듬성해진 blendShape 에 append 할 때 `getAttr(size=True)` 를
+  다음 인덱스로 쓰다 **기존 타겟을 덮어쓰던 것**(→ `max(인덱스)+1`) ② 이름이 중복된 메시를 조용히
+  잘못 잡던 것(→ 거부) ③ 셰이프 해석을 공용 `Framework.core.maya_shape` 로 ④ 타겟 하나가 실패해도
+  나머지는 진행하고 **생성/재사용/실패를 각각 로그로** 보고(예전엔 부분 실패가 성공처럼 보였다).
+- 기존 타겟은 **토폴로지가 base 와 맞을 때만** 재사용해 손으로 조각해 둔 타겟을 보존한다.
+- 함께: **`Is Solver` 체크박스 기본값을 꺼짐으로** 변경(출처를 `Source.<attr>` 로 본다).
+- 검증: mayapy 헤드리스 코어 24항목 + UI 8항목 통과(원 신고 시나리오 재현→해결 포함). #A00090
+
+
 > [!summary] `A00400_CurveTool` **Line Width — Apply 버튼 제거, 슬라이더 놓으면 자동 적용** (v01.01→01.02)
 - **피드백**: 굵기를 바꿀 때마다 `Apply` 를 누르는 게 번거롭다 → 버튼을 없애고 **슬라이더를 놓는 순간
   자동 적용**. 스핀박스는 Enter/포커스 아웃이 곧 확정, 화살표 키·그루브 클릭도 그 자리에서 적용.

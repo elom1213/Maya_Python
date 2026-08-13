@@ -94,7 +94,8 @@ class MainWindow(QWidget):
 
         is_solver_row = QHBoxLayout()
         self.cb_is_solver = QCheckBox('Is Solver')
-        self.cb_is_solver.setChecked(True)
+        # 기본 꺼짐 - Source 를 `Source.<attr>` 로 본다. 켜면 `Source.outputs[i]`.
+        self.cb_is_solver.setChecked(False)
         is_solver_row.addWidget(self.cb_is_solver)
         is_solver_row.addStretch(1)
         src_col.addLayout(is_solver_row)
@@ -524,15 +525,37 @@ class MainWindow(QWidget):
             for node in nodes:
                 for rule in rules:
                     try:
-                        kind, _ = TargetBuilder.build(rule, node)
-                        self.log(
-                            f"[{label}] {kind} : {node} "
-                            f"({len(rule.mapping)} name(s))"
-                        )
+                        kind, result, report = TargetBuilder.build(rule, node)
+                        self._log_build(label, node, kind, result, report,
+                                        len(rule.mapping))
                     except Exception as e:
                         self.log(f"[{label}] {node} : {e}")
 
         self.log(f"{label} Finished")
+
+    def _log_build(self, label, node, kind, result, report, expected):
+        """무엇이 실제로 만들어졌는지 보고한다.
+
+        예전에는 성공/실패만 알 수 있어서, 타겟이 일부만 붙어도 정상처럼 보였다.
+        """
+        if report is None:
+            self.log(f"[{label}] {kind} : {node} ({expected} name(s))")
+            return
+
+        parts = []
+        if report["created"]:
+            parts.append(f"{report['created']} created")
+        if report["reused"]:
+            parts.append(f"{report['reused']} reused")
+        if report["skipped"]:
+            parts.append(f"{report['skipped']} already there")
+        summary = ", ".join(parts) if parts else "nothing to do"
+
+        self.log(f"[{label}] {node} -> {result} : {summary} "
+                 f"(of {expected} name(s))")
+
+        for alias, reason in report["failed"]:
+            self.log(f"[{label}] {node} -> {alias} FAILED : {reason}")
 
     def on_create(self):
         """선택된 Rule 하나로만 생성."""

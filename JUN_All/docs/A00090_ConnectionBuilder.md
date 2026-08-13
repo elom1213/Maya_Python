@@ -17,7 +17,7 @@ MetaHuman 페이셜 셋업에서 **RBF solver 의 출력을 driver 노드(그리
 | **Version** | 규칙 세트의 버전 폴더(`app/rules/v001`, `v002` …). 콤보에서 고른 버전의 json 만 쓴다. |
 | **Rule** | `rules/<version>/<name>.json`. `mapping`(attr 이름 배열)이 어떤 어트리뷰트를 연결할지 정한다. |
 | **Pair mode** | Source/Target 리스트를 어떻게 짝지을지. `1→n`(broadcast) 또는 `n→n`(index pair). |
-| **Is Solver** | 켜짐(기본): 출처를 `Source.outputs[i]` 로 본다. 꺼짐: `Source.<attr>` 로 본다. |
+| **Is Solver** | 꺼짐(기본): 출처를 `Source.<attr>` 로 본다. 켜면 `Source.outputs[i]` 로 본다. |
 
 규칙 JSON 예시(`rules/v001/WRK_calf_l.json`):
 
@@ -64,7 +64,7 @@ app/rules/
 ┌───────────────────────────────────────────────────────────┐
 │ Mesh / Node [__________]  [Get] [Create] [Create All]      │
 ├──────────────────────────┬────────────────────────────────┤
-│ [x] Is Solver            │                                 │
+│ [ ] Is Solver            │                                 │
 │ Source                   │ Target                          │
 │  [Select Objects]        │  [Select Objects]               │
 │  ┌────────────────────┐  │  ┌───────────────────────────┐  │
@@ -106,7 +106,7 @@ n→n 일 때도 mapping 은 **콤보박스에서 선택한 rule 1개**를 모�
 | 버튼 | 동작 |
 |------|------|
 | **Get** (Mesh / Node) | 현재 Maya 선택을 Mesh / Node 칸에 넣는다(콤마 구분 다중 가능). |
-| **Create** | 칸의 노드 + **선택한 rule 1개**로 생성. 노드가 **mesh** 면 `mapping` 이름으로 target 복제 + blendShape, **그 외(joint/transform/control)** 면 `mapping` 이름의 double attr 생성(`TargetBuilder` 가 타입 판단). |
+| **Create** | 칸의 노드 + **선택한 rule 1개**로 생성. 노드가 **mesh** 면 `mapping` 이름으로 target 복제 + blendShape(§4-1), **그 외(joint/transform/control)** 면 `mapping` 이름의 double attr 생성(`TargetBuilder` 가 타입 판단). |
 | **Create All** | 칸의 노드 + **선택 버전의 모든 rule** 로 생성. mesh 는 모든 rule 의 target 을 한 blendShape 에 누적, 노드는 모든 rule 의 attr 를 누적 생성. |
 | **Set Attr** (Source/Target) | 해당 리스트의 **모든 노드**에 선택 rule mapping 의 double attr 를 생성. |
 | **Del Attr** (Source/Target) | 해당 리스트의 **모든 노드**에서 mapping attr 를 삭제. |
@@ -116,6 +116,35 @@ n→n 일 때도 mapping 은 **콤보박스에서 선택한 rule 1개**를 모�
 | **Validate** | 선택 rule + 짝의 연결 상태를 로그로 보고(`[OK]`/`[ERROR]`). 짝마다 결과 출력. |
 | **Refresh** | `app/rules` 를 다시 스캔해 Version / Rule 콤보를 갱신. |
 | **Connect Intermediate** | **선택 버전의** 모든 solver `outputs[i]` 를 공통 null `WRK_intermediate.<mapping[i]>` 로 연결(없으면 `WRK_All` 아래에 null·attr 생성). |
+
+### 4-1. blendShape target 이 만들어지는 방식 (v01.06)
+
+여기에는 **꼭 구분해야 하는 두 가지 이름**이 있다.
+
+| | 무엇 | 예 |
+|---|------|-----|
+| **타겟 메시의 노드 이름** | 씬에서 **유일**해야 한다 | `SIN_Set007_Top2_calf_l_default` |
+| **blendShape 웨이트 별칭(alias)** | `Connect` 가 쓰는 주소. **rule 의 mapping 이름 그대로** | `calf_l_default` |
+
+rule 의 mapping 이름은 **포즈 이름**이라 옷이 몇 벌이든 똑같다. 그래서 타겟 메시 이름에는
+**메시 이름을 접두사로** 붙여 유일하게 만들고, blendShape 의 alias 는 mapping 이름으로 되돌린다.
+alias 는 노드 단위라 blendShape 가 여럿이어도 각각 `calf_l_default` 를 가질 수 있고,
+`Connect` 가 쓰는 주소(`<blendShape>.<mapping이름>`)는 예전과 똑같이 유지된다.
+
+- **기존 타겟 재사용**: `<메시>_<이름>` 또는 예전 방식의 `<이름>` 노드가 있고 **토폴로지가 base 와
+  같으면** 그것을 그대로 쓴다(손으로 조각해 둔 타겟이 보존된다). 토폴로지가 다르면 건드리지 않고
+  새로 만든다.
+- **부분 실패를 감춘 채 넘어가지 않는다**: 타겟 하나가 실패해도 나머지는 계속 진행하고,
+  로그에 `N created, M reused, K already there` 와 실패한 이름·이유가 남는다.
+
+> **v01.05 이하에서 나던 오류** — 타겟 메시 이름을 mapping 이름 그대로 썼기 때문에, 옷 A 에
+> 타겟을 만든 뒤 옷 B 에 같은 rule 을 돌리면 **A 의 타겟을 B 것으로 재사용**해 이렇게 죽었다:
+> ```
+> [Create] SIN_Set007_Top2 : Target calf_l_defaultShape does not match with base SIN_Set007_Top2Shape.
+> No deformable objects selected.
+> ```
+> 그 이름이 조인트 등 다른 노드에 이미 쓰이고 있으면 `More than one object matches name` 이 됐다.
+> 어느 쪽이든 `blendShape` 호출 하나가 통째로 실패해 **타겟이 아예 안 생기거나 일부만 생겼다.**
 
 ---
 
@@ -156,6 +185,14 @@ A00090_ConnectionBuilder/
 ---
 
 ## 7. 변경 이력 (요약)
+
+- **v01.06** — **`Is Solver` 기본값을 꺼짐으로** 변경(출처를 `Source.<attr>` 로 본다).
+  **blendShape target 생성 버그 수정**(§4-1). 타겟 메시를 `<메시>_<mapping이름>` 으로
+  유일하게 만들고 blendShape **alias 를 mapping 이름으로 되돌려**, 메시가 여러 개여도 같은 rule 을
+  각각 적용할 수 있다(`Connect` 주소는 그대로). 기존 타겟은 **토폴로지가 맞을 때만** 재사용.
+  추가 수정: 타겟을 지워 웨이트 인덱스가 듬성해진 blendShape 에 append 할 때 `size` 를 다음 인덱스로
+  쓰다 **기존 타겟을 덮어쓰던 것**을 `max(인덱스)+1` 로, 이름이 중복된 메시를 조용히 잘못 잡던 것을
+  거부로, 셰이프 해석을 공용 `Framework.core.maya_shape` 로. 로그가 생성/재사용/실패를 각각 보고한다.
 
 - **v01.05** — **규칙 버전 폴더 지원**. `app/rules_v01/*.json` → `app/rules/<version>/*.json`
   (기존 규칙은 `rules/v001` 로 이동). Rule 행에 **`Version` 콤보 + `Refresh`** 추가 —

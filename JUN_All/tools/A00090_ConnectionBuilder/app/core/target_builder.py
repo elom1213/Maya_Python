@@ -38,15 +38,16 @@ class TargetBuilder:
             node: 대상 노드명.
 
         Returns:
-            ("blendshape" | "attribute", result) 튜플.
+            ("blendshape" | "attribute", result, report) 튜플.
             result 는 blendShape 노드명 또는 node 명.
+            report 는 무엇이 만들어지고 무엇이 실패했는지(blendShape 만, 아니면 None).
         """
         if not cmds.objExists(node):
             raise RuntimeError(f"Node not found : {node}")
 
         if TargetBuilder.is_mesh(node):
-            bs = BlendShapeManager.create_blendshape(rule, node)
-            return ("blendshape", bs)
+            bs, report = BlendShapeManager.create_blendshape(rule, node)
+            return ("blendshape", bs, report)
 
         AttributeManager.create(rule, node)
-        return ("attribute", node)
+        return ("attribute", node, None)
