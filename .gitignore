@@ -40,6 +40,11 @@ JUN_FileManager_data/
 
 *ref/
 
+# A00430_DemBone: ref/ 는 원본 Dem Bones(EA, BSD 3-Clause) 배포본 사본 — 사전 컴파일 exe 포함 47MB.
+# 이 툴은 ref/ 에 **런타임 의존이 전혀 없다**(순수 파이썬 재구현). 참고용 로컬 사본이라 추적하지 않는다.
+# 원본: https://github.com/electronicarts/dem-bones
+**/A00430_DemBone/ref/
+
 **/A00230_StartupTool/config/startup.json
 # Claude Code: 메모리(.claude/memory)는 PC 간 공유를 위해 추적한다.
 # 반면 settings.local.json 은 PC별 개인 설정이므로 추적하지 않는다.
