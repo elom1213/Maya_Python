@@ -5,6 +5,7 @@
 #
 # A00150_remapVal (Remap Value) + A00160_sphericalEye (Spherical Eye) 를
 # 하나의 창 + QTabWidget 으로 통합한다(A00110_animTool 패턴).
+# 여기에 AttachCrv(커브 어태치) / Stretch(거리 구동) / Seal(입술 지퍼) 탭을 더했다.
 # 두 탭의 위젯/핸들러는 접두사(rmp_ / sph_)로 분리하고, 로그/메뉴/푸터는 공유한다.
 # 핵심 로직은 app/core 에 그대로 위임한다. 모든 UI 문자열/로그는 영어.
 
@@ -24,6 +25,8 @@ from tools.A00170_driverTool.app.core import (
     run_attach_to_closest, run_attach_uniform, AIM_AXES, DRIVER_TYPES,
     run_build_loop_drivers, loop_parse_edges, loop_parse_vertices, loop_alive,
     group_loop_edges, CURVE_DEGREES, LOOP_DEFAULT_PREFIX, LOOP_CONTROL_SCALE,
+    run_build_seal, run_remove_seal, seal_collect_drivers, seal_orient_u,
+    seal_pair_drivers, seal_set_name, SEAL_AXES, SEAL_DEFAULT_PREFIX,
     run_build_stretch, FUNCTIONS, SIGMOID_FUNCTIONS, INFINITY_TYPES, DEFAULT_INFINITY,
     DEFAULT_BASE, DEFAULT_THRESHOLD_MIN, DEFAULT_THRESHOLD_MAX,
 )
@@ -85,6 +88,11 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_spherical_tab(), "Spherical Eye")
         self.tabs.addTab(self._build_attach_tab(), "AttachCrv")
         self.tabs.addTab(self._build_stretch_tab(), "Stretch")
+        index = self.tabs.addTab(self._build_seal_tab(), "Seal")
+        self.tabs.setTabToolTip(
+            index,
+            "Lip zip: close the lips from a corner toward the centre, with the "
+            "two directions driven independently.")
         main_layout.addWidget(self.tabs)
 
         # 로그창을 탭 아래에 배치
@@ -1514,6 +1522,256 @@ class MainWindow(QWidget):
     # ================================================================
     # Helper / About
     # ================================================================
+
+    # ================================================================
+    # Tab : Seal  (입술 지퍼 — docs/plans/A00170_Seal_plan.md)
+    # ================================================================
+
+    def _build_seal_tab(self):
+        """커브에 어태치된 위/아래 입술 리그를 '끝에서 중앙으로' 다물린다.
+
+        AttachCrv > Edge Loop 로 만든 널(또는 그 조인트)을 위/아래로 나눠 담고 Build 하면
+        컨트롤러의 `sealR` / `sealL` 로 양 방향을 **독립적으로** 닫을 수 있다.
+        """
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+
+        desc = QLabel(
+            "Close the lips from a corner toward the centre (lip zip).\n"
+            "sealR and sealL are independent, so both corners can zip in at once.\n"
+            "List the curve-attached nulls (or their joints) of each lip line.")
+        desc.setAlignment(Qt.AlignCenter)
+        root.addWidget(desc)
+
+        list_row = QHBoxLayout()
+        self.seal_up_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Upper", select_label="Select", list_min_height=120)
+        self.seal_lo_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Lower", select_label="Select", list_min_height=120)
+        list_row.addWidget(self.seal_up_tsl)
+        list_row.addWidget(self.seal_lo_tsl)
+        root.addLayout(list_row)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Controller"))
+        self.seal_le_ctrl = QLineEdit()
+        self.seal_le_ctrl.setToolTip(
+            "The control that gets sealR / sealL / sealBias / sealBand.")
+        row.addWidget(self.seal_le_ctrl)
+        btn_ctrl = QPushButton("Get")
+        btn_ctrl.setFixedWidth(70)
+        btn_ctrl.clicked.connect(self.on_seal_get_ctrl)
+        row.addWidget(btn_ctrl)
+        root.addLayout(row)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Name Prefix"))
+        self.seal_le_prefix = QLineEdit(SEAL_DEFAULT_PREFIX)
+        self.seal_le_prefix.setToolTip(
+            "Names the created nodes and the tracking set "
+            "(<prefix>_seal_SET) that Remove uses.")
+        row.addWidget(self.seal_le_prefix)
+        root.addLayout(row)
+
+        # ---- 지퍼 방향 / 짝짓기
+        pair_box = QGroupBox("Zip direction && pairing")
+        pair_lay = QVBoxLayout(pair_box)
+
+        axis_row = QHBoxLayout()
+        axis_row.addWidget(QLabel("Corner Axis"))
+        self.seal_axis_group = QButtonGroup(self)
+        for i, axis in enumerate(SEAL_AXES):
+            rb = QRadioButton("World " + axis.upper())
+            rb.setProperty("axis", axis)
+            if axis == "x":
+                rb.setChecked(True)
+            self.seal_axis_group.addButton(rb, i)
+            axis_row.addWidget(rb)
+        axis_row.addStretch(1)
+        pair_lay.addLayout(axis_row)
+
+        start_row = QHBoxLayout()
+        start_row.addWidget(QLabel("sealR starts at"))
+        self.seal_start_group = QButtonGroup(self)
+        self.seal_rb_min = QRadioButton("Min end (-)")
+        self.seal_rb_min.setChecked(True)
+        self.seal_rb_max = QRadioButton("Max end (+)")
+        self.seal_start_group.addButton(self.seal_rb_min, 0)
+        self.seal_start_group.addButton(self.seal_rb_max, 1)
+        self.seal_rb_min.setToolTip(
+            "Which end of the chosen axis sealR zips from. sealL always starts "
+            "at the other end.\nCurve direction does not matter - the position "
+            "on the axis decides.")
+        start_row.addWidget(self.seal_rb_min)
+        start_row.addWidget(self.seal_rb_max)
+        start_row.addStretch(1)
+        pair_lay.addLayout(start_row)
+
+        self.seal_cb_corners = QCheckBox("Skip the corner joints")
+        self.seal_cb_corners.setChecked(True)
+        self.seal_cb_corners.setToolTip(
+            "The mouth corners are shared by both lip lines and are always "
+            "closed - sealing them only adds jitter.")
+        pair_lay.addWidget(self.seal_cb_corners)
+
+        btn_preview = QPushButton("Preview Pairing")
+        btn_preview.setToolTip(
+            "Show which upper driver pairs with which lower one, and the "
+            "position along the lip (u).")
+        btn_preview.clicked.connect(self.on_seal_preview)
+        pair_lay.addWidget(btn_preview)
+
+        self.seal_pair_view = QListWidget()
+        self.seal_pair_view.setMinimumHeight(90)
+        pair_lay.addWidget(self.seal_pair_view)
+        root.addWidget(pair_box)
+
+        # ---- 초기값
+        value_row = QHBoxLayout()
+        value_row.addWidget(QLabel("Seal Bias"))
+        self.seal_dsb_bias = QDoubleSpinBox()
+        self.seal_dsb_bias.setRange(0.0, 1.0)
+        self.seal_dsb_bias.setSingleStep(0.05)
+        self.seal_dsb_bias.setDecimals(3)
+        self.seal_dsb_bias.setValue(0.5)
+        self.seal_dsb_bias.setKeyboardTracking(False)
+        self.seal_dsb_bias.setToolTip(
+            "Where the lips meet: 0 = the lower line, 0.5 = halfway, 1 = the "
+            "upper line.")
+        value_row.addWidget(self.seal_dsb_bias)
+        value_row.addWidget(QLabel("Band"))
+        self.seal_dsb_band = QDoubleSpinBox()
+        self.seal_dsb_band.setRange(0.02, 1.0)
+        self.seal_dsb_band.setSingleStep(0.05)
+        self.seal_dsb_band.setDecimals(3)
+        self.seal_dsb_band.setValue(0.35)
+        self.seal_dsb_band.setKeyboardTracking(False)
+        self.seal_dsb_band.setToolTip(
+            "How soft the zip front is. Small = joints snap shut one by one, "
+            "large = many close together.\nBoth values stay live on the "
+            "controller and can be tuned there afterwards.")
+        value_row.addWidget(self.seal_dsb_band)
+        value_row.addStretch(1)
+        root.addLayout(value_row)
+
+        btn_row = QHBoxLayout()
+        self.seal_btn_build = QPushButton("Build Seal")
+        self.seal_btn_build.setMinimumHeight(34)
+        self.seal_btn_build.setToolTip(
+            "Insert the zip network. Building again on the same prefix rebuilds "
+            "it (no stacking). One undo step.")
+        self.seal_btn_build.clicked.connect(self.on_seal_build)
+        btn_row.addWidget(self.seal_btn_build)
+        self.seal_btn_remove = QPushButton("Remove Seal")
+        self.seal_btn_remove.setMinimumHeight(34)
+        self.seal_btn_remove.setToolTip(
+            "Delete the network and restore the original curve connections. "
+            "The controller attributes are kept (they may be keyed).")
+        self.seal_btn_remove.clicked.connect(self.on_seal_remove)
+        btn_row.addWidget(self.seal_btn_remove)
+        root.addLayout(btn_row)
+
+        root.addStretch(1)
+        return tab
+
+    # ---- Seal : 헬퍼 / 핸들러
+
+    def _seal_axis(self):
+        btn = self.seal_axis_group.checkedButton()
+        return btn.property("axis") if btn else "x"
+
+    def _seal_inputs(self):
+        return (self.seal_up_tsl.get_all_items(),
+                self.seal_lo_tsl.get_all_items(),
+                self.seal_le_ctrl.text().strip(),
+                (self.seal_le_prefix.text().strip() or SEAL_DEFAULT_PREFIX))
+
+    def on_seal_get_ctrl(self):
+        selection = MayaScene.selection()
+        if not selection:
+            self._log("[WARN] Nothing selected. Select the controller first.")
+            return
+        self.seal_le_ctrl.setText(selection[0])
+
+    def on_seal_preview(self):
+        """짝짓기 결과를 미리 보여 준다(씬은 건드리지 않는다)."""
+        upper, lower, _ctrl, _prefix = self._seal_inputs()
+        self.seal_pair_view.clear()
+
+        up = seal_collect_drivers(upper)
+        lo = seal_collect_drivers(lower)
+        if not up or not lo:
+            self._log("[WARN] Upper/Lower need curve-attached drivers "
+                      "(found {0} / {1}).".format(len(up), len(lo)))
+            return
+
+        axis = self._seal_axis()
+        start_min = self.seal_rb_min.isChecked()
+        flipped = (seal_orient_u(up, axis, start_min),
+                   seal_orient_u(lo, axis, start_min))
+        pairs, skipped = seal_pair_drivers(up, lo,
+                                           self.seal_cb_corners.isChecked())
+
+        for u_entry, l_entry, u in pairs:
+            self.seal_pair_view.addItem(
+                "{0}   <->   {1}      u = {2:.3f}".format(
+                    u_entry["node"].split("|")[-1],
+                    l_entry["node"].split("|")[-1], u))
+        self._log("Pairing: {0} pair(s), {1} skipped.{2}".format(
+            len(pairs), len(skipped),
+            "  (u flipped to match the axis)" if any(flipped) else ""))
+        for node, why in skipped:
+            self._log("  skip {0} ({1})".format(node.split("|")[-1], why))
+
+    def on_seal_build(self):
+        self._log("--- Build Seal ---")
+        upper, lower, ctrl, prefix = self._seal_inputs()
+        if not ctrl:
+            self._log("[WARN] Controller is empty. Use Get to set it.")
+            return
+        if not MayaScene.exists(ctrl):
+            self._log("[WARN] Controller not found in scene: {0}".format(ctrl))
+            return
+
+        with undo_chunk():
+            try:
+                report = run_build_seal(
+                    upper, lower, ctrl, prefix=prefix, axis=self._seal_axis(),
+                    start_at_min=self.seal_rb_min.isChecked(),
+                    skip_corners=self.seal_cb_corners.isChecked(),
+                    bias=self.seal_dsb_bias.value(),
+                    band=self.seal_dsb_band.value())
+            except Exception as exc:
+                self._log("[ERROR] Build Seal failed: {0}".format(exc))
+                return
+
+        self._log("Sealed {0} pair(s) | nodes: {1} | set: {2}".format(
+            len(report["pairs"]), len(report["nodes"]), report["set"]))
+        if report["attrs"]:
+            self._log("Added on '{0}': {1}".format(
+                ctrl, ", ".join(report["attrs"])))
+        for up, lo, u in report["pairs"]:
+            self._log("  {0} <-> {1}   u = {2:.3f}".format(up, lo, u))
+        for node, why in report["skipped"]:
+            self._log("[WARN] Skipped {0} ({1})".format(node.split("|")[-1], why))
+        self._log("Drive '{0}.sealR' / '.sealL' (0-1) to zip the lips shut."
+                  .format(ctrl))
+
+    def on_seal_remove(self):
+        self._log("--- Remove Seal ---")
+        _u, _l, _c, prefix = self._seal_inputs()
+        with undo_chunk():
+            try:
+                restored, deleted = run_remove_seal(prefix)
+            except Exception as exc:
+                self._log("[ERROR] Remove Seal failed: {0}".format(exc))
+                return
+        if not deleted:
+            self._log("[WARN] Nothing to remove for prefix '{0}' "
+                      "({1}).".format(prefix, seal_set_name(prefix)))
+            return
+        self._log("Removed {0} node(s); {1} curve connection(s) restored. "
+                  "Controller attributes kept.".format(deleted, restored))
 
     def _log(self, message):
         self.log_view.appendPlainText(message)
