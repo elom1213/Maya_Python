@@ -25,8 +25,11 @@ from tools.A00170_driverTool.app.core import (
     run_attach_to_closest, run_attach_uniform, AIM_AXES, DRIVER_TYPES,
     run_build_loop_drivers, loop_parse_edges, loop_parse_vertices, loop_alive,
     group_loop_edges, CURVE_DEGREES, LOOP_DEFAULT_PREFIX, LOOP_CONTROL_SCALE,
-    run_build_seal, run_remove_seal, seal_collect_drivers, seal_orient_u,
+    run_build_seal, run_remove_seal, run_seal_recapture_rest,
+    seal_rest_space_warnings,
+    seal_collect_drivers, seal_orient_u, seal_prepare_sides,
     seal_pair_drivers, seal_set_name, SEAL_AXES, SEAL_DEFAULT_PREFIX,
+    SEAL_METRIC_PARAM, SEAL_METRIC_DISTANCE, seal_pair_cost,
     run_build_stretch, FUNCTIONS, SIGMOID_FUNCTIONS, INFINITY_TYPES, DEFAULT_INFINITY,
     DEFAULT_BASE, DEFAULT_THRESHOLD_MIN, DEFAULT_THRESHOLD_MAX,
 )
@@ -1539,7 +1542,9 @@ class MainWindow(QWidget):
         desc = QLabel(
             "Close the lips from a corner toward the centre (lip zip).\n"
             "sealR and sealL are independent, so both corners can zip in at once.\n"
-            "List the curve-attached nulls (or their joints) of each lip line.")
+            "List the curve-attached nulls (or their joints) of each lip line.\n"
+            "Build with the lips in their closed (neutral) pose - that pose IS "
+            "the shape they seal to.")
         desc.setAlignment(Qt.AlignCenter)
         root.addWidget(desc)
 
@@ -1548,6 +1553,13 @@ class MainWindow(QWidget):
             title="Upper", select_label="Select", list_min_height=120)
         self.seal_lo_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Lower", select_label="Select", list_min_height=120)
+        hint = ("Anything on the lip line works: the nulls, their controllers "
+                "(_ctl / _tgt), the joints, the whole null group, or even "
+                "just the attach curve.\n"
+                "One curve per lip or a single closed curve wrapping both - "
+                "either way, just split its nulls into Upper and Lower.")
+        self.seal_up_tsl.setToolTip(hint)
+        self.seal_lo_tsl.setToolTip(hint)
         list_row.addWidget(self.seal_up_tsl)
         list_row.addWidget(self.seal_lo_tsl)
         root.addLayout(list_row)
@@ -1556,12 +1568,36 @@ class MainWindow(QWidget):
         row.addWidget(QLabel("Controller"))
         self.seal_le_ctrl = QLineEdit()
         self.seal_le_ctrl.setToolTip(
-            "The control that gets sealR / sealL / sealBias / sealBand.")
+            "The control that gets sealR / sealL / sealBias / sealBand / "
+            "sealMerge.")
         row.addWidget(self.seal_le_ctrl)
         btn_ctrl = QPushButton("Get")
         btn_ctrl.setFixedWidth(70)
         btn_ctrl.clicked.connect(self.on_seal_get_ctrl)
         row.addWidget(btn_ctrl)
+        root.addLayout(row)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Reference"))
+        self.seal_le_ref = QLineEdit()
+        self.seal_le_ref.setPlaceholderText("optional - the head joint")
+        self.seal_le_ref.setToolTip(
+            "The space the closed pose is stored in, so the lips still meet in "
+            "the right place\nwhen the head turns or the character walks away.\n"
+            "Leave it empty to use each null's own parent - that is enough when "
+            "the null group\nalready follows the head. Fill it in when the "
+            "nulls sit outside the head hierarchy.\n"
+            "Preview Pairing and Build check this and say so when the nulls do "
+            "not follow\nwhatever moves the attach curve.")
+        row.addWidget(self.seal_le_ref)
+        btn_ref = QPushButton("Get")
+        btn_ref.setFixedWidth(70)
+        btn_ref.clicked.connect(self.on_seal_get_ref)
+        row.addWidget(btn_ref)
+        btn_ref_clear = QPushButton("Clear")
+        btn_ref_clear.setFixedWidth(70)
+        btn_ref_clear.clicked.connect(lambda: self.seal_le_ref.clear())
+        row.addWidget(btn_ref_clear)
         root.addLayout(row)
 
         row = QHBoxLayout()
@@ -1607,6 +1643,36 @@ class MainWindow(QWidget):
         start_row.addStretch(1)
         pair_lay.addLayout(start_row)
 
+        metric_row = QHBoxLayout()
+        metric_row.addWidget(QLabel("Pair by"))
+        self.seal_cmb_metric = QComboBox()
+        self.seal_cmb_metric.addItems(["Curve parameter", "World distance"])
+        self.seal_cmb_metric.setToolTip(
+            "How 'closest' is measured when matching an upper driver with a "
+            "lower one.\n"
+            "Curve parameter (default): same progress along the lip - works "
+            "even if the two\nlines have different joint counts or lengths.\n"
+            "World distance: straight distance between the drivers - use it "
+            "when the two\nlines are spaced very differently.\n"
+            "Either way the positions do NOT have to match exactly; the "
+            "closest pair wins,\nand each driver is used only once.")
+        metric_row.addWidget(self.seal_cmb_metric)
+        metric_row.addWidget(QLabel("Max"))
+        self.seal_dsb_tol = QDoubleSpinBox()
+        self.seal_dsb_tol.setRange(0.0, 100000.0)
+        self.seal_dsb_tol.setDecimals(3)
+        self.seal_dsb_tol.setSingleStep(0.05)
+        self.seal_dsb_tol.setValue(0.0)
+        self.seal_dsb_tol.setSpecialValueText("no limit")
+        self.seal_dsb_tol.setKeyboardTracking(False)
+        self.seal_dsb_tol.setToolTip(
+            "Refuse a pair that is further apart than this (0 = no limit).\n"
+            "Unmatched drivers are reported instead of being paired with "
+            "something far away.")
+        metric_row.addWidget(self.seal_dsb_tol)
+        metric_row.addStretch(1)
+        pair_lay.addLayout(metric_row)
+
         self.seal_cb_corners = QCheckBox("Skip the corner joints")
         self.seal_cb_corners.setChecked(True)
         self.seal_cb_corners.setToolTip(
@@ -1627,6 +1693,16 @@ class MainWindow(QWidget):
         root.addWidget(pair_box)
 
         # ---- 초기값
+        self.seal_cb_rotate = QCheckBox("Restore the closed-pose rotation")
+        self.seal_cb_rotate.setChecked(True)
+        self.seal_cb_rotate.setToolTip(
+            "On (default): a sealed driver ends up with exactly the orientation it had when\n"
+            "the seal was built - closing the lips never twists a null into a new direction.\n"
+            "Only applies where the curve drives rotation too (Edge Loop built with Orient);\n"
+            "drivers without a rotation connection already keep their rotation and are skipped.\n"
+            "Off: rotation is left to the curve while the lips close.")
+        root.addWidget(self.seal_cb_rotate)
+
         value_row = QHBoxLayout()
         value_row.addWidget(QLabel("Seal Bias"))
         self.seal_dsb_bias = QDoubleSpinBox()
@@ -1651,6 +1727,21 @@ class MainWindow(QWidget):
             "large = many close together.\nBoth values stay live on the "
             "controller and can be tuned there afterwards.")
         value_row.addWidget(self.seal_dsb_band)
+        value_row.addWidget(QLabel("Merge"))
+        self.seal_dsb_merge = QDoubleSpinBox()
+        self.seal_dsb_merge.setRange(0.0, 1.0)
+        self.seal_dsb_merge.setSingleStep(0.1)
+        self.seal_dsb_merge.setDecimals(3)
+        self.seal_dsb_merge.setValue(0.0)
+        self.seal_dsb_merge.setKeyboardTracking(False)
+        self.seal_dsb_merge.setToolTip(
+            "sealMerge - how much the two lips collapse onto each other.\n"
+            "0 (default): they meet keeping the gap they had in the closed "
+            "pose (lip thickness).\n"
+            "1: upper and lower land on exactly the same point, as in v01.19 "
+            "and earlier.\n"
+            "Live on the controller, so it can be dialled or keyed per shot.")
+        value_row.addWidget(self.seal_dsb_merge)
         value_row.addStretch(1)
         root.addLayout(value_row)
 
@@ -1671,6 +1762,17 @@ class MainWindow(QWidget):
         btn_row.addWidget(self.seal_btn_remove)
         root.addLayout(btn_row)
 
+        self.seal_btn_rest = QPushButton("Update Rest Pose")
+        self.seal_btn_rest.setToolTip(
+            "Take the pose the lips are in right now as the new closed shape, "
+            "without rebuilding.\n"
+            "Pose the lips the way they should look when sealed, then press "
+            "this.\n"
+            "sealR / sealL are dropped to 0 while reading and put back "
+            "afterwards.")
+        self.seal_btn_rest.clicked.connect(self.on_seal_recapture)
+        root.addWidget(self.seal_btn_rest)
+
         root.addStretch(1)
         return tab
 
@@ -1680,11 +1782,22 @@ class MainWindow(QWidget):
         btn = self.seal_axis_group.checkedButton()
         return btn.property("axis") if btn else "x"
 
+    def _seal_metric(self):
+        return (SEAL_METRIC_DISTANCE if self.seal_cmb_metric.currentIndex() == 1
+                else SEAL_METRIC_PARAM)
+
+    def _seal_tolerance(self):
+        value = self.seal_dsb_tol.value()
+        return value if value > 0.0 else None
+
     def _seal_inputs(self):
         return (self.seal_up_tsl.get_all_items(),
                 self.seal_lo_tsl.get_all_items(),
                 self.seal_le_ctrl.text().strip(),
                 (self.seal_le_prefix.text().strip() or SEAL_DEFAULT_PREFIX))
+
+    def _seal_reference(self):
+        return self.seal_le_ref.text().strip() or None
 
     def on_seal_get_ctrl(self):
         selection = MayaScene.selection()
@@ -1693,35 +1806,60 @@ class MainWindow(QWidget):
             return
         self.seal_le_ctrl.setText(selection[0])
 
+    def on_seal_get_ref(self):
+        selection = MayaScene.selection()
+        if not selection:
+            self._log("[WARN] Nothing selected. Select the head (or whatever "
+                      "the lips should travel with) first.")
+            return
+        self.seal_le_ref.setText(selection[0])
+
     def on_seal_preview(self):
         """짝짓기 결과를 미리 보여 준다(씬은 건드리지 않는다)."""
         upper, lower, _ctrl, _prefix = self._seal_inputs()
         self.seal_pair_view.clear()
 
-        up = seal_collect_drivers(upper)
-        lo = seal_collect_drivers(lower)
-        if not up or not lo:
-            self._log("[WARN] Upper/Lower need curve-attached drivers "
-                      "(found {0} / {1}).".format(len(up), len(lo)))
-            return
-
         axis = self._seal_axis()
         start_min = self.seal_rb_min.isChecked()
-        flipped = (seal_orient_u(up, axis, start_min),
-                   seal_orient_u(lo, axis, start_min))
-        pairs, skipped = seal_pair_drivers(up, lo,
-                                           self.seal_cb_corners.isChecked())
+        # Build 과 같은 준비 과정을 거친다(닫힌 커브 재정규화 포함).
+        up, lo, info = seal_prepare_sides(upper, lower, axis, start_min)
+        if not up or not lo:
+            if info["dropped"]:
+                self._log("[WARN] Upper and Lower resolve to the same {0} "
+                          "driver(s).".format(len(info["dropped"])))
+                self._log("       One curve around both lips? Then list each "
+                          "lip's nulls separately, not the whole curve in both.")
+                return
+            self._log("[WARN] Upper/Lower need curve-attached drivers "
+                      "(found {0} / {1}).".format(len(up), len(lo)))
+            self._log("       List the nulls, their _ctl / _tgt, the joints, "
+                      "the null group, or the attach curve - anything that "
+                      "traces back to a pointOnCurveInfo.")
+            return
+
+        if info["shared_curve"]:
+            self._log("One shared {0} curve - each lip re-spanned to its own "
+                      "0-1 arc.".format("closed" if info["closed"] else "open"))
+        flipped = info["flipped"]
+        metric = self._seal_metric()
+        pairs, skipped = seal_pair_drivers(
+            up, lo, self.seal_cb_corners.isChecked(), metric=metric,
+            tolerance=self._seal_tolerance())
+        skipped = list(info["dropped"]) + skipped
 
         for u_entry, l_entry, u in pairs:
             self.seal_pair_view.addItem(
-                "{0}   <->   {1}      u = {2:.3f}".format(
+                "{0}   <->   {1}      u = {2:.3f}   gap = {3:.3f}".format(
                     u_entry["node"].split("|")[-1],
-                    l_entry["node"].split("|")[-1], u))
+                    l_entry["node"].split("|")[-1], u,
+                    seal_pair_cost(u_entry, l_entry, metric)))
         self._log("Pairing: {0} pair(s), {1} skipped.{2}".format(
             len(pairs), len(skipped),
             "  (u flipped to match the axis)" if any(flipped) else ""))
         for node, why in skipped:
             self._log("  skip {0} ({1})".format(node.split("|")[-1], why))
+        for warning in seal_rest_space_warnings(up + lo, self._seal_reference()):
+            self._log("[WARN] " + warning)
 
     def on_seal_build(self):
         self._log("--- Build Seal ---")
@@ -1732,6 +1870,10 @@ class MainWindow(QWidget):
         if not MayaScene.exists(ctrl):
             self._log("[WARN] Controller not found in scene: {0}".format(ctrl))
             return
+        reference = self._seal_reference()
+        if reference and not MayaScene.exists(reference):
+            self._log("[WARN] Reference not found in scene: {0}".format(reference))
+            return
 
         with undo_chunk():
             try:
@@ -1740,13 +1882,36 @@ class MainWindow(QWidget):
                     start_at_min=self.seal_rb_min.isChecked(),
                     skip_corners=self.seal_cb_corners.isChecked(),
                     bias=self.seal_dsb_bias.value(),
-                    band=self.seal_dsb_band.value())
+                    band=self.seal_dsb_band.value(),
+                    metric=self._seal_metric(),
+                    tolerance=self._seal_tolerance(),
+                    blend_rotation=self.seal_cb_rotate.isChecked(),
+                    reference=reference,
+                    merge=self.seal_dsb_merge.value())
             except Exception as exc:
                 self._log("[ERROR] Build Seal failed: {0}".format(exc))
                 return
 
         self._log("Sealed {0} pair(s) | nodes: {1} | set: {2}".format(
             len(report["pairs"]), len(report["nodes"]), report["set"]))
+        if report["shared_curve"]:
+            self._log("Upper and Lower share one {0} curve - each lip was "
+                      "re-spanned to its own 0-1 arc.".format(
+                          "closed" if report["closed"] else "open"))
+        self._log("Closed pose captured from the current scene pose, in {0} "
+                  "space.".format(
+                      "'" + report["reference"].split("|")[-1] + "'"
+                      if report["reference"] else "each null's parent"))
+        for warning in report["space_warnings"]:
+            self._log("[WARN] " + warning)
+        if self.seal_cb_rotate.isChecked():
+            total = len(report["pairs"]) * 2
+            self._log("Rotation restored to the closed pose on {0} of {1} "
+                      "driver(s).{2}".format(
+                          report["rotated"], total,
+                          "  (the rest are not rotation-driven by their curve, "
+                          "so they already keep it)"
+                          if report["rotated"] < total else ""))
         if report["attrs"]:
             self._log("Added on '{0}': {1}".format(
                 ctrl, ", ".join(report["attrs"])))
@@ -1756,6 +1921,8 @@ class MainWindow(QWidget):
             self._log("[WARN] Skipped {0} ({1})".format(node.split("|")[-1], why))
         self._log("Drive '{0}.sealR' / '.sealL' (0-1) to zip the lips shut."
                   .format(ctrl))
+        self._log("'{0}.sealMerge' 0 = keep the closed-pose gap, 1 = upper and "
+                  "lower land on the same point.".format(ctrl))
 
     def on_seal_remove(self):
         self._log("--- Remove Seal ---")
@@ -1772,6 +1939,22 @@ class MainWindow(QWidget):
             return
         self._log("Removed {0} node(s); {1} curve connection(s) restored. "
                   "Controller attributes kept.".format(deleted, restored))
+
+    def on_seal_recapture(self):
+        """지금 씬 포즈를 새 '다물린 자리'로 다시 잡는다(리빌드 없이)."""
+        self._log("--- Update Rest Pose ---")
+        _u, _l, _c, prefix = self._seal_inputs()
+        with undo_chunk():
+            try:
+                count, ctrl = run_seal_recapture_rest(prefix)
+            except Exception as exc:
+                self._log("[ERROR] Update Rest Pose failed: {0}".format(exc))
+                return
+        self._log("The pose the lips are in now is the new closed shape "
+                  "({0} driver(s) updated).".format(count))
+        if ctrl:
+            self._log("Read with '{0}.sealR' / '.sealL' at 0; both were put "
+                      "back afterwards.".format(ctrl.split("|")[-1]))
 
     def _log(self, message):
         self.log_view.appendPlainText(message)
@@ -1820,6 +2003,15 @@ class MainWindow(QWidget):
             "    Sharpness (base), Threshold Min/Max are added as attributes on the\n"
             "    Default Distance object and wired to the network, so you can tune the\n"
             "    sigmoid live in the scene.\n"
+            "\n"
+            "[Seal] (lip zip on a curve-attached lip rig)\n"
+            "- Build Seal: sealR / sealL close each lip from a corner toward the\n"
+            "  centre, independently. The pose the lips are in at build time is the\n"
+            "  shape they seal to, stored in the Reference (head) space - so a sealed\n"
+            "  driver keeps its closed-pose rotation and the two lips keep their\n"
+            "  closed-pose gap instead of collapsing onto one point.\n"
+            "  sealMerge 1 brings back the old 'exactly the same point' behaviour.\n"
+            "- Update Rest Pose: re-take the closed shape from the current pose.\n"
             "\n"
             "Each build is one undo step. All UI text is English.\n"
             "\n"
