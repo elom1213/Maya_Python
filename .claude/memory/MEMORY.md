@@ -58,7 +58,7 @@
 - [A00090 rule versions](wip-a00090-rule-versions.md) — 규칙 json 을 `app/rules/<version>` 폴더로 분리 + UI Version 콤보 (v01.05)
 - [A00420 Wrapper](wip-a00420-wrapper.md) — **신규**: 커브 가이드로 다른 토폴로지 메시 래핑(Wrap3D 대응). TPS 워프 + 표면 투영 2단계, MMeshIntersector 는 월드 행렬을 줘도 결과가 오브젝트 공간 (v01.00)
 - [A00410 SecondaryMotion](wip-a00410-secondarymotion.md) — **신규**: FK 체인 관성(KawaiiPhysics식)을 키로 굽기. nucleus 안 쓰는 이유, 전 구간 30ms 재계산→override 레이어, addKeys 74배, **joint `local=R*JO` / transform `local=RA*R`**, 부모를 앞 체인 노드로 가정하면 오프셋 그룹에서 깨짐. v01.02 Bone Chain/Root + 출력 레지스트리(`outputs.py`) 확장 지점
-- [A00400 CurveTool](wip-a00400-curvetool.md) — **신규**: 선택 엣지를 연결 성분별로 그룹지어 그룹마다 커브 1개 + Reverse Direction
+- [A00400 CurveTool](wip-a00400-curvetool.md) — 선택 엣지를 연결 성분별로 그룹지어 커브 1개 + Reverse Direction, **Line Width 탭**(lineWidth 슬라이더, 드래그=undo 1스텝) (v01.01)
 - [A00390 WindTool](wip-a00390-windtool.md) — **신규**: 본 체인에 싸인 파형 바람. Curve/Node 출력, windSpeed 적분 표현식, windPhaseOffset (v01.08)
 - [A00380 MeshTool Peak](wip-a00380-meshtool-peak.md) — **신규**: 노멀 방향 인플레이트. `shape.pnts` ranged setAttr(~70배), 슬라이더 settle 자동 커밋 (v01.05)
 - [A00380 Match tab](wip-a00380-match-tab.md) — Kangaroo Geometry>Match 재현 + Peak auto-load 가 수동 편집을 되돌리던 버그 수정 (v01.03)

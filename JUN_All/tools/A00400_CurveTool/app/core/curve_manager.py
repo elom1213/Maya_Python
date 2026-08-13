@@ -25,6 +25,11 @@ MODE_Z = "z"
 
 _AXIS_INDEX = {MODE_X: 0, MODE_Y: 1, MODE_Z: 2}
 
+# 커브 굵기(nurbsCurve.lineWidth). -1 = 마야 전역 설정을 그대로 쓴다(기본값).
+LINE_WIDTH_DEFAULT = -1.0
+LINE_WIDTH_MIN = 0.0
+LINE_WIDTH_MAX = 10.0
+
 
 # ============================================================ 엣지 그룹핑
 
@@ -123,6 +128,66 @@ def _cv_count(curve):
 def _cv_axis(curve, index, axis_index):
     """curve.cv[index] 의 월드 위치 중 axis_index(0=x,1=y,2=z) 성분."""
     return cmds.pointPosition("{0}.cv[{1}]".format(curve, index), world=True)[axis_index]
+
+
+def curve_shapes(node):
+    """transform/shape 이름 -> 그 아래 nurbsCurve shape 롱네임 리스트(없으면 빈 리스트)."""
+    if not node or not cmds.objExists(node):
+        return []
+    if cmds.objectType(node, isType="nurbsCurve"):
+        found = cmds.ls(node, l=True) or []
+        return found[:1]
+    return cmds.listRelatives(node, shapes=True, type="nurbsCurve", fullPath=True,
+                              noIntermediate=True) or []
+
+
+def get_line_width(node):
+    """첫 nurbsCurve shape 의 lineWidth. 커브가 아니거나 못 읽으면 None."""
+    for shape in curve_shapes(node):
+        try:
+            return cmds.getAttr(shape + ".lineWidth")
+        except Exception:
+            return None
+    return None
+
+
+def set_line_width(curves, width):
+    """리스트업된 커브들의 **뷰포트 표시 굵기**(`nurbsCurve.lineWidth`)를 바꾼다.
+
+    굵게 하면 씬에서 커브가 잘 보이고 클릭으로 집기도 쉬워진다. 형상·히스토리는 전혀
+    건드리지 않는 **표시 전용** 어트리뷰트다.
+
+    `-1`(LINE_WIDTH_DEFAULT)은 마야의 전역 라인 굵기 설정을 그대로 쓴다는 뜻이다.
+
+    Returns (changed, skipped)
+      changed : 실제로 값을 쓴 shape 이름 리스트
+      skipped : (이름, 사유) 리스트 — 커브가 아님 / 어트리뷰트 없음(구버전) /
+                잠기거나 연결됨
+    """
+    width = float(width)
+    changed = []
+    skipped = []
+
+    for name in curves or []:
+        shapes = curve_shapes(name)
+        if not shapes:
+            skipped.append((name, "not a curve"))
+            continue
+        for shape in shapes:
+            # lineWidth 는 Maya 2019+ 에서만 있다.
+            if not cmds.attributeQuery("lineWidth", node=shape, exists=True):
+                skipped.append((shape, "no lineWidth attribute (Maya 2019+)"))
+                continue
+            plug = shape + ".lineWidth"
+            if not cmds.getAttr(plug, settable=True):
+                skipped.append((shape, "locked or connected"))
+                continue
+            try:
+                cmds.setAttr(plug, width)
+                changed.append(shape)
+            except Exception as exc:                       # noqa: BLE001
+                skipped.append((shape, str(exc)))
+    return changed, skipped
 
 
 def reverse_curves_by_axis(curves, mode, cv0_at_max=True):

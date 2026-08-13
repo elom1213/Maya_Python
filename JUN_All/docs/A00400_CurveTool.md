@@ -1,18 +1,20 @@
 ---
 title: A00400_CurveTool 사용법
 aliases: [Curve Tool, CurveTool, A00400]
-tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve]
-updated: 2026-07-29
+tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve, lineWidth]
+updated: 2026-08-13
 ---
 
 # A00400_CurveTool 사용법
 
-Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya). 두 가지를 한다.
+Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya). **탭 2개**로 나뉜다(v01.01).
 
-1. **선택한 메시 엣지에 부착된 커브 생성** — 떨어져 있는 엣지 덩어리(연결 성분)마다 **커브를 따로** 만든다.
-2. **Reverse Direction** — 리스트업한 커브들의 `cv[0]`/`cv[n]` 월드 위치를 지정 축으로 비교해 **방향을 통일**한다.
+| 탭 | 내용 |
+|----|------|
+| **Create / Direction** | ① 선택한 메시 엣지에 부착된 커브 생성(엣지 덩어리마다 커브 하나) ② Reverse Direction(방향 통일) |
+| **Line Width** (v01.01~) | 리스트업한 커브의 **뷰포트 표시 굵기**를 슬라이더로 조절 — 씬에서 **잘 보이고 잘 집히게** |
 
-- **버전**: `app/config/version.py` (v01.00)
+- **버전**: `app/config/version.py` (v01.01)
 - **설치**: `__dragDrop_A00400.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **CurveTool** → `tools.A00400_CurveTool.run(True)`
 - **참고**: 엣지→커브 생성은 `ref/ref_01.mel`(`duplicateCurve`+`attachCurve`)의 아이디어를, 축 비교 방식은 `A00360_SortTool` 을 이식/응용.
 
@@ -109,3 +111,35 @@ tools/A00400_CurveTool/
   - `curve_manager.reverse_curves_by_axis(curves, mode, cv0_at_max)` → `(reversed_names, skipped)`
     - `mode` = `MODE_X/Y/Z`, `cv0_at_max=True` 면 `cv[0]` 을 축 최대 끝에.
   - `curve_manager.group_edges(edges)` → 연결 성분별 엣지 그룹 리스트.
+
+---
+
+## Line Width 탭 (v01.01~) — 커브를 잘 보이고 잘 집히게
+
+씬에 커브가 많아지면 얇은 선은 **눈에 잘 안 띄고 클릭으로 집기도 어렵다.** 이 탭은 리스트업한
+커브의 `nurbsCurve.lineWidth`(뷰포트에 그려지는 선 굵기)를 한 번에 바꾼다.
+
+> **표시 전용이다.** 커브의 형상·CV·히스토리는 전혀 건드리지 않는다. 렌더에도 영향이 없다.
+
+### 사용법
+
+1. 씬에서 커브를 고르고 **List Selected Curves** 로 리스트에 담는다(이 탭 전용 리스트).
+2. **슬라이더를 드래그**하면 리스트의 모든 커브에 **실시간**으로 반영된다.
+   오른쪽 스핀박스로 정확한 값(0.1 단위)을 넣어도 된다 — 둘은 항상 같이 움직인다.
+3. 필요하면 **Apply**(현재 값 다시 적용) / **Get**(첫 커브의 값 읽어오기) /
+   **Use Maya Default (-1)**.
+
+| 버튼·값 | 뜻 |
+|---------|-----|
+| 슬라이더 · 스핀박스 | 0.0 ~ 10.0. 숫자가 클수록 굵게 그려진다 |
+| **Use Maya Default (-1)** | `lineWidth = -1` — **마야 전역 라인 굵기 설정을 따른다**(커브의 원래 기본값) |
+| **Get** | 리스트 첫 커브의 현재 값을 슬라이더로 가져온다. `-1` 이면 로그로 알려 주고 슬라이더는 최솟값에 둔다 |
+
+### 알아둘 것
+
+- **드래그 한 번이 undo 한 스텝**이다(누를 때 청크를 열고 놓을 때 닫는다). 드래그 중 수십 번
+  값이 바뀌어도 `Ctrl+Z` 한 번이면 원래대로 돌아온다.
+- 커브가 아닌 항목, `lineWidth` 어트리뷰트가 없는 **구버전(Maya 2019 미만)**, 잠기거나 연결된
+  어트리뷰트는 **사유와 함께 건너뛰고** 나머지는 계속 처리한다.
+- 리스트는 UUID 로 현재 경로를 되찾으므로 **리네임·리페어런트 후에도** 같은 커브를 잡는다.
+- 커브 하나에 셰이프가 여럿이면 **모든 nurbsCurve 셰이프**에 적용한다.

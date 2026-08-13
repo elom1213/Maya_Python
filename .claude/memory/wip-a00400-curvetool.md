@@ -17,3 +17,12 @@ A00400_CurveTool — 신규 in-Maya PySide 툴 (v01.00, 코어 mayapy-verified, 
 핵심 검증 사실: `polyToCurve`는 여러 그룹 선택해도 커브 1개만 만듦 → 그룹핑 필수(BFS로 정점 공유 엣지 묶음, `group_edges`). `reverseCurve`가 cv 순서 실제로 뒤집음(cv0 Y 0→3). 서로 다른 메시 엣지는 정점 공유 안 해 자동으로 다른 그룹.
 
 파일: tools/A00400_CurveTool/{launch.py, __dragDrop_A00400.py, app/core/curve_manager.py, app/ui/main_window.py, app/config/version.py}. 아이콘: icon/A00400_CurveTool.svg(코랄 S-커브+CV사각형+방향화살표, house style) → dev/build_icons.py(mayapy PySide2 QtSvg)로 32x32 png 생성 완료. 관련: [[wip-a00360-sorttool]], [[framework-timerange-widget]], [[prefer-pyside-for-new-tools]]
+
+**Line Width 탭** (v01.01, 2026-08-13): 탭 2개로 나누고(`Create / Direction` = 기존 그대로,
+`Line Width` = 신규) 리스트업한 커브의 `nurbsCurve.lineWidth` 를 슬라이더로 조절한다.
+목적은 **씬에서 커브가 잘 보이고 잘 집히는 것**(표시 전용, 형상 무관).
+
+- `lineWidth` 실측: float, 기본 **-1 = 마야 전역 설정을 따름**, min/max 없음, **Maya 2019+**,
+  mesh/locator 에는 없다.
+- 슬라이더 라이브 반영 + **드래그 한 번 = undo 한 스텝** — `sliderPressed` 에서
+  `cmds.undoInfo(openChunk=True)`, `sliderReleased` 에서 close(값 변경마다 청크를 열면 undo 도배).
