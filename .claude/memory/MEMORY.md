@@ -87,7 +87,7 @@
 - [A00210 PathStructure tree](wip-a00210-pathstructure-tree-depth.md) — Preview 를 QTreeWidget + Capture/View Depth 로 (v01.24)
 - [A00210 Recreate To + Rename](wip-a00210-recreate-to-rename.md) — 명시적 대상 경로 필드 + Rename 버튼 (v01.28)
 - [A00210 PathStructure files](wip-a00210-pathstructure-files.md) — 파일도 캡처/재생성, 0바이트 + `__` 표식 (v01.29)
-- [A00170 Lip Seal](wip-a00170-lip-seal.md) — Seal 탭(입술 지퍼). `pairBlend` 를 커브 구동 사이에 끼움, `u` 는 POCI 파라미터에서(생성 순서 아님), Remove 로 원복 (v01.16)
+- [A00170 Lip Seal](wip-a00170-lip-seal.md) — Seal 탭(입술 지퍼). 다물리는 목표는 **빌드 시점 포즈(rest)를 머리 공간에** 저장한 것 — 두 널을 같은 행렬에 붙이면 위치가 겹치고 회전이 90° 틀어진다 (v01.21)
 - [A00170 Edge Loop drivers](wip-a00170-edge-loop-drivers.md) — AttachCrv 하위 탭. 루프→커브→널→(con/ctl/tgt 컨트롤러)→조인트. joint `.radius` 는 맞고 화면 크기만 Joint Size 배율 (v01.15)
 - [A00170 Stretch tab](wip-a00170-stretch-tab.md) — Default Distance 가 Stretch 구동, linear + Sigmoid 노드망 (v01.11)
 - [A00170 AttachCrv tab](wip-a00170-attachcrv-tab.md) — TSL 오브젝트를 커브 최근접점에 부착
@@ -95,7 +95,7 @@
 - [A00145 Connect both directions](wip-a00145-connect-both-directions.md) — 역방향 연결(인자 순서만 뒤집기) + 개수 달라도 적은 쪽만큼 부분 연결·실패해도 계속 (v01.24~01.25)
 - [A00145 Match from Source](wip-a00145-attr-name-matching.md) — 이름 유사 어트리뷰트를 소스 순서대로 찾아 Connect 로 연결. 1000x1000 = 0.15s (v01.21)
 - [A00145 Target Edit](wip-a00145-target-edit.md) — 타깃 추가/삭제. Maya 명령의 add/remove, 마지막 타깃 삭제 = 노드 삭제, remove 후 offset 재베이크 (v01.26)
-- [A00145 Target Replace](wip-a00145-target-replace.md) — 컨스트레인트의 타깃(드라이버)을 다른 오브젝트로 일괄 교체. 재생성 대신 `target[i]` 연결만 rewire → weight/이름 보존 (v01.20)
+- [A00145 Target Replace](wip-a00145-target-replace.md) — 컨스트레인트의 타깃(드라이버)을 다른 오브젝트로 일괄 교체. 재생성 대신 `target[i]` 연결만 rewire → weight/이름 보존 (v01.21)
 - [A00145 Attribute tab](a00145-attribute-tab-blendshape-alias.md) — 어트리뷰트 복사 + blendShape 타깃은 `weight[]` 별칭(aliasAttr) (v01.17)
 - [A00145 skin constraint types](wip-a00145-skin-constraint-types.md) — Parent/Scale/Point/Orient 라디오, interpType 은 attributeQuery 가드 (v01.16)
 - [A00145 Constraint Transfer](wip-a00145-constraint-transfer.md) — 기존 컨스트레인트를 다른 오브젝트로 이전(재생성) (v01.14)
