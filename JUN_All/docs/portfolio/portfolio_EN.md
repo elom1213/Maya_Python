@@ -1,16 +1,16 @@
 ---
-title: Portfolio — Work Summary (2026-05-06 ~ 2026-07-15)
+title: Portfolio — Work Summary (2026-05-06 ~ 2026-08-14)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-08-07
+updated: 2026-08-14
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
 
 > **Author**: Ji Hun Park (Junny)
-> **Period**: 2026-05-06 – 2026-07-15 (~10 weeks)
+> **Period**: 2026-05-06 – 2026-08-14 (~14 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
-> **Volume**: 299 commits · 40+ in-house tools · one shared framework powering all of them
+> **Volume**: 40+ in-house tools (50 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
 
 ---
@@ -18,7 +18,7 @@ updated: 2026-08-07
 ## 0. One-liner / Three-liner (for the top of a résumé)
 
 **One line**
-> Technical Artist building the rigging & facial pipeline that connects Maya, Unreal Engine and MetaHuman — 40+ in-house tools and the shared framework behind them, built over 10 weeks.
+> Technical Artist building the rigging & facial pipeline that connects Maya, Unreal Engine and MetaHuman — 40+ in-house tools and the shared framework behind them, built over 14 weeks.
 
 **Three lines**
 > - I focus on **removing artist repetition with tooling**: hundreds of manual passes (per-pose corrective matching, per-bone physics setup) collapsed into a single button.
@@ -199,7 +199,7 @@ Default Distance attribute (driver signal x)
 
 | Tool | What it does |
 |------|--------------|
-| `A00145_RigConnect` | **Unified rig-connection tool**: absorbed two legacy MEL tools (ConnectionTool, Match Tool) into Qt. Match (T/R/S/Parent options), matrix constraints, connect-to-closest, **skin weight → constraint conversion** (Parent / Scale / Point / Orient), batch offset/zero-out group creation, **Constraint Transfer** (move an existing constraint onto another object, preserving world pose), **Target Edit** (replace / add / remove the targets (drivers) of many constraints at once — replace rewires only the `target[i]` input connections instead of rebuilding the constraint, so weight values, IK/FK switch connections wired into those weights and the node name all survive; add and remove apply only to the constraints picked in the list; all three recompute the offsets so the driven objects stay put), and an **Attribute tab** that copies chosen attributes onto other objects with a prefix/suffix (type/range/default/keyable preserved) — including a blendShape's targets (see 1-4) |
+| `A00145_RigConnect` | **Unified rig-connection tool**: absorbed two legacy MEL tools (ConnectionTool, Match Tool) into Qt. Match (T/R/S/Parent options), matrix constraints, connect-to-closest, **skin weight → constraint conversion** (Parent / Scale / Point / Orient), batch offset/zero-out group creation, **Constraint Transfer** (move an existing constraint onto another object, preserving world pose), **Target Edit** (replace / add / remove the targets (drivers) of many constraints at once — replace rewires only the `target[i]` input connections instead of rebuilding the constraint, so weight values, IK/FK switch connections wired into those weights and the node name all survive; add and remove apply only to the constraints picked in the list; all three recompute the offsets so the driven objects stay put), an **Attribute tab** that copies chosen attributes onto other objects with a prefix/suffix (type/range/default/keyable preserved) — including a blendShape's targets (see 1-4) — and **Match from Source**, which pairs up two objects' attributes **by name similarity** so hundreds of facial controls can be wired in one pass; comparing every name against every name is quadratic, so it scores through a **token inverted index weighted by IDF** (rare tokens such as `browRaiseInner` count for more than `L`/`R`), matching **1000 × 1000 attributes in 0.15 s** |
 | `A00270_skinMigrate` | One-click **skin weight transfer between meshes of different topology, with bone remapping**; the legacy two-button UI is preserved as a Classic tab |
 | `A00275_skinTool_V01` | The above plus **Update Bind Pose** (a capability Maya lacks, see 3-3), a **Transfer tab** (weights from many source meshes → the selected mesh, **restricted to selected vertices with soft-selection falloff**, no third-party plugin), and an **Expand Bind tab** (binding a ring of joints around lips/eyes spreads the weights by **geodesic edge-length distance** — the equivalent feature in a commercial plugin steps evenly in topology, so uneven spacing skews the weights; **taking the edge loop as input separates the split along the loop from the falloff away from it**, so every row of a multi-row band keeps the loop's ratio; includes a hand-built falloff-curve editor widget) |
 | `A00430_DemBone` | **Solves skinning weights backwards out of an animated mesh.** A **numpy reimplementation** of EA's Dem Bones (*Smooth Skinning Decomposition with Rigid Bones*, SIGGRAPH Asia 2012): give it an alembic cache plus an animated skeleton and it answers "what would the weights have to be for these joints to reproduce that cache", then **paints them**. It also runs the other way — fixed weights, solve the **bone animation** — or alternates the two. Maya ships no scipy, so the **constrained least-squares solver** (non-negative + sums-to-one, active set with a null-space projection) and the **laplacian weight smoothing** (a Jacobi iteration that always converges, in place of the reference's direct sparse solve) are hand-built, and the reference's Eigen column-vector convention was carried over to **Maya's row-vector convention** — the relative bone transform turns out to be exactly Maya's `bindPreMatrix × matrix`. It also builds **the skeleton itself** when no joints exist at all, clustering the mesh into bones (turning a Houdini sim or blendshape result into a game-engine LBS rig). Porting the paper's clustering verbatim collapsed back to two clusters every round; fixing it meant enlarging the **split seed** and changing the label-flood priority from absolute error to **how much worse a bone is than the best one for that vertex** — 20 bones out of 20,100 vertices in 32.6 s. **20,100 vertices / 40 joints / 100 frames in 17 s**, 0.19% error relative to model size. It **always reports the reconstruction error (RMSE)** so the result can be judged: deformation that linear blend skinning cannot express — cloth, muscle, volume preservation — is unmatchable in principle, and the tool says so rather than quietly returning a bad fit |
@@ -237,10 +237,40 @@ Default Distance attribute (driver signal x)
   weight**, and surfaced that as a warning with the actual values.
 - **Keywords**: skinCluster, `bindPreMatrix`, dagPose, deformer graph traversal, OpenMaya, undo safety
 
+### 3-4. Lip zip (seal) — closing the lips from the corners, on a curve-driven facial rig
+`A00170_driverTool` (Seal tab)
+
+- **Problem**: on a lip rig whose drivers ride on curves, "close the mouth" is not one control — an
+  animator hand-poses every null on both lips, and a *zip* (corners closing first, meeting last in the
+  middle) has to be timed by hand for each pair.
+- **What I built**: two independent attributes, `sealR` / `sealL`, each closing one lip from its corner
+  toward the centre; raised together they zip in from both corners at once. Each driver's timing comes
+  from its **curve parameter `u`**, not from creation order — measured on a real rig, the nulls named
+  `01..09` ran **backwards** along the curve. A `pairBlend` is inserted between the existing curve network
+  and the null, so **Remove restores the original connections exactly**. One curve per lip or a single
+  closed curve wrapping both behaves the same: each lip's **arc is found and re-normalised** to 0-1.
+- **The bug worth reporting**: the first version blended the two lips' curve matrices into **one target
+  matrix** and drove both nulls with it. Two consequences — the lips **collapsed onto the same point**,
+  and where the upper and lower curve frames **oppose** (routine on a closed lip curve) the averaged
+  rotation is **90° off**: a null whose x-axis pointed down world X ended up pointing down world
+  **Z**, and the mesh twisted. Measured: `x=(1,0,0)` blended with `x=(-1,0,0)` gives `x≈(0,0,1)`.
+- **Fix**: the seal target is now the **pose captured at build time (rest)**, stored in a **head-space
+  reference**, with the *pair* translated together to the live meeting point. The rotation after closing
+  is therefore **exactly** the rotation before it, the two lips keep their closed-pose gap (lip thickness),
+  and the contact point follows the head when it turns or the character moves. The old "one point"
+  behaviour was kept as a live `sealMerge` attribute rather than deleted.
+- **The optional input tells you when it is needed**: the tool finds what actually moves the attach curve
+  (skin influences, constraint targets) and warns — naming the joint — when the drivers do not live under
+  it, because that is exactly when leaving Reference empty goes silently wrong.
+- Behaviour covered by **81 headless (mayapy) checks**, including a rebuilt reproduction of the 90° case.
+- **Keywords**: curve attach, `pointOnCurveInfo`, `pairBlend`, rest pose in head space, quaternion rotation
+  blend, lip / eyelid zip
+
 ---
 
 ## 4. Animation tooling
 
+### 4-1. The animator's repetitive work in one window
 `A00110_animTool`
 
 - One window for the animator's repetitive work: key copy/paste (with axis reversal), **L/R controller key mirroring**, 6-axis pose keys, Offset & Hold, baking (including Smart bake), **Follow (target-match bake)**, and automatic Graph Editor framing (frames to current ± margin on selection).
@@ -254,6 +284,32 @@ Default Distance attribute (driver signal x)
   - **An Anchor option that removes the seam at the front**: Maya's filter uses the *first key inside the range* as its reference, so a flip that starts just before Start gets **nothing fixed at all**. Extending the filter range back to the key before Start makes that key the reference — and since a reference key is never modified, the promise that **keys outside the range stay untouched** still holds while the range joins seamlessly onto the animation in front of it.
   - Value snapshots taken before and after the filter give an exact count of **keys that actually changed**, and surface the **step at the End boundary** — the unavoidable consequence of a range-limited filter — as an up-front warning.
   - **One button that matches how animators actually work**: the real gesture is "select a few controllers, drag a box over the bad section in the Graph Editor" — re-entering that as a list plus Start/End was busywork. A single button now derives both at once: **scene selection = targets**, **first / last selected key = range**. What it detected is written back into the list and the range fields, so the operation stays visible, and it **refuses to run when no keys are selected** — silently filtering the whole shot would break the tab's range-limited promise.
+- **Fill Keys** puts a key on **every frame of a range** — on a chosen animation layer — while leaving the existing keys where they are, so a hand-animated pass can be locked down frame by frame before it is edited further.
+- **Follow accepts mesh vertices as targets**, not just transforms: a component has no `worldMatrix`, so the tool builds a frame from the vertex **position plus its normal**. Reading a component's position at an arbitrary time is not possible either (`getAttr(time=)` does not apply), so the evaluation walks the frames instead.
+
+### 4-2. Baking inertia instead of simulating it
+`A00410_SecondaryMotion`
+
+- **Problem**: tails, hair and cloth need follow-through, but Maya's simulation solvers
+  (`nucleus` / nHair / nCloth) must be **played from the start frame** to produce a result — you cannot
+  scrub, every parameter tweak means replaying the shot, and a game asset still needs a separate bake.
+- **What I built**: the inertia model of Unreal's **KawaiiPhysics** (children further from the moving
+  parent lag more, nearer children follow more), computed per frame across the range and written as
+  **keys**. Live Preview computes the whole range into a preview layer so it can be scrubbed immediately;
+  Apply promotes that same layer to the final **override animation layer**, leaving the original animation
+  intact and letting the **layer weight dial the strength** (0 = original, 1 = full) — or be deleted outright.
+- **Where the maths had to be exact**: a joint's local rotation is `R × jointOrient` while a plain
+  transform's is `rotateAxis × R` — composing them the same way breaks one of the two. Assuming a chain
+  node's parent is the previous chain node also breaks on rigs with offset groups in between, so the real
+  parent is resolved per node.
+
+### 4-3. Wind sway from a periodic function
+`A00390_WindTool`
+
+- The same sine waveform is applied to every joint in a chain with the **phase delayed by chain index**, so
+  the chain sways in sequence. Two outputs: **Curve** bakes keys, **Node** builds a driver null plus a node
+  network that plays live, exposing `windPeriod / windAmplitude / windOffset / windSpeed` as attributes —
+  so the look is tuned in the scene instead of re-baked.
 
 ---
 
@@ -278,6 +334,7 @@ Default Distance attribute (driver signal x)
   - Headless benchmarking picked `MMeshIntersector` for the closest-point queries — **8x faster** than
     `MFnMesh.getClosestPoint` over 20,000 queries — and moving the coordinate transforms out of the Python loop into
     numpy gets **32,222 source vertices against 39,802 target vertices, 8 projection passes, done in 0.98 s**.
+- **`A00400_CurveTool`** — builds a curve along the **selected mesh edges**, one curve per connected run of edges, with direction unified across them; a second tab adjusts curve **line width** live (one undo step per drag).
 - **`A00040_file_exporter_V02`** — export automation: type filters (applied through group hierarchies), referenced-mesh handling, and a choice of flattening to scene root or preserving hierarchy.
 - **`A00050_uvTool`**, **`A00030_quickTool`**, **`A00330_NamingTool`** (legacy naming tool port + Quick Rename), **`A00310_SearchTool`** (select by type/name), **`A00360_SortTool`** (sort by world X/Y/Z, name or type and reorder the Outliner).
 
@@ -292,6 +349,7 @@ I designed the common foundation alongside the tools, not as an afterthought.
   - **UUID-backed object lists** — list↔scene selection survives duplicate names, renames and reparenting; rolled into the shared widget and inherited by 18 tools at once.
   - A shared `undo_chunk` convention so repeated scene edits collapse into **a single Ctrl+Z**.
   - `PathManager` (read/write path separation), Maya main-window parenting, module reloader.
+  - Recurring Maya traps are fixed **once, in the framework, for every tool**: a shared shape-resolution helper replaced the `extendToShape` pattern across **6 tools** in one pass, removing the `kInvalidParameter: Object is incompatible` failures it caused on meshes carrying more than one shape node.
 - **Deployment / install system**
   - **Drag-&-drop shelf install** — drop a `.py` onto the Maya viewport and an icon shelf button appears. Solved the `sys.modules` cache collision between tools with a per-tool unique install-file convention.
   - **PyInstaller `.exe` builds**, a release builder (tool + framework + docs packaged automatically), and Windows taskbar icon handling.
