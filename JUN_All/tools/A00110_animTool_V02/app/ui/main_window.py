@@ -41,6 +41,35 @@ from tools.A00110_animTool_V02.app.core import (
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
 WINDOW_OBJECT_NAME = "JUN_A00110_animTool_V02_window"
 
+# Curve > Filters 를 따로 띄우는 창(Expand)의 objectName
+CURVE_FILTERS_WINDOW_OBJECT_NAME = "JUN_A00110_animTool_V02_curveFilters_window"
+
+
+class CurveFiltersWindow(QWidget):
+    """Curve > Filters 를 크게 보는 **별도 창**(Expand).
+
+    위젯을 **복제하지 않고 통째로 옮겨 온다**(A00290_BSTool 의 Shape Editor Expand 와 같은
+    방식). 그래서 슬라이더 · 세션 · undo 규칙이 그대로 살아 있고 두 벌을 동기화할 일이 없다.
+    창을 닫으면 탭의 원래 자리로 되돌아간다.
+    """
+
+    def __init__(self, owner):
+        super().__init__(owner, Qt.Window)
+        self._owner = owner
+        self.setObjectName(CURVE_FILTERS_WINDOW_OBJECT_NAME)
+        self.setWindowTitle("Anim Key Tool - Curve Filters")
+        self.resize(420, 460)
+
+        layout = QVBoxLayout(self)
+        # 탭에서 넘겨받은 본문이 들어갈 자리
+        self.body = QVBoxLayout()
+        layout.addLayout(self.body, 1)
+
+    def closeEvent(self, event):
+        self._owner.on_cf_collapse()
+        super().closeEvent(event)
+
+
 # Stagger Offset 슬라이더가 담당하는 프레임 범위(±). 더 큰 값은 옆 스핀박스로 넣는다.
 STAGGER_SLIDER_RANGE = 60
 
@@ -1392,7 +1421,41 @@ class MainWindow(QWidget):
     def _build_curve_filters_page(self):
         """Smooth / Intensity / Interpolate 를 한 화면에 담은 페이지."""
         page = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
-        layout = QVBoxLayout(page)
+        page_layout = QVBoxLayout(page)
+
+        # ---- Expand : 본문을 별도 창으로 (A00290_BSTool Shape Editor 와 같은 방식)
+        top_row = QHBoxLayout()
+        top_row.addStretch(1)
+        self.btn_cf_expand = QPushButton("Expand")
+        self.btn_cf_expand.setFixedWidth(90)
+        self.btn_cf_expand.setToolTip(
+            "Show these filters in a separate, resizable window.\n"
+            "The panel is moved, not copied - sliders and undo behave exactly the "
+            "same.\n"
+            "Close that window (or press Expand again) to bring it back here.")
+        self.btn_cf_expand.clicked.connect(self.on_cf_expand)
+        top_row.addWidget(self.btn_cf_expand)
+        page_layout.addLayout(top_row)
+
+        # 본문을 별도 창으로 넘긴 동안 탭에서 그 자리를 지킨다.
+        self.lbl_cf_expanded = QLabel("Curve Filters are shown in the expanded window.")
+        self.lbl_cf_expanded.setAlignment(Qt.AlignCenter)
+        self.lbl_cf_expanded.setWordWrap(True)
+        self.lbl_cf_expanded.setVisible(False)
+        page_layout.addWidget(self.lbl_cf_expanded)
+
+        # 필터 종류별 세션/타이머는 페이지와 수명을 같이한다(지연 생성하면 아직 없는
+        # 상태를 호출측이 신경 써야 한다).
+        self._cf_sessions = {}
+        self._cf_timers = {}
+
+        # ---- 본문(통째로 옮겨 다니는 위젯)
+        self.cf_body = QWidget()
+        layout = QVBoxLayout(self.cf_body)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.cf_page_layout = page_layout
+        self.cf_body_index = page_layout.count()
+        page_layout.addWidget(self.cf_body)
 
         # ---- 대상 안내 + 공통 옵션
         hint = QLabel(
@@ -1472,7 +1535,7 @@ class MainWindow(QWidget):
         layout.addWidget(sec_interp)
         self.cf_sec_interp = sec_interp
 
-        layout.addStretch(1)
+        page_layout.addStretch(1)
 
         # ---- 배선
         self._cf_connect("smooth", self.cf_smooth_slider)
@@ -2492,6 +2555,39 @@ class MainWindow(QWidget):
     # Handlers : Curve > Smooth / Intensity / Interp
     # --------------------------------------------------
 
+    def on_cf_expand(self):
+        """Curve Filters 본문을 별도 창으로 옮긴다(이미 떠 있으면 앞으로 가져온다).
+
+        A00290_BSTool 의 Shape Editor Expand 와 같은 방식 — **위젯을 복제하지 않고 옮긴다**.
+        그래서 슬라이더·세션·undo 규칙이 그대로 살아 있고 두 벌을 맞출 일이 없다.
+        """
+        window = getattr(self, "_cf_window", None)
+        if window is not None:
+            window.raise_()
+            window.activateWindow()
+            return
+
+        window = CurveFiltersWindow(self)
+        # addWidget 이 본문을 탭 레이아웃에서 떼어 이 창으로 옮긴다.
+        window.body.addWidget(self.cf_body)
+        self._cf_window = window
+
+        self.lbl_cf_expanded.setVisible(True)
+        window.show()
+        self._fit_window_later()
+
+    def on_cf_collapse(self):
+        """확장 창이 닫혔다. 본문을 탭의 원래 자리로 되돌린다."""
+        window = getattr(self, "_cf_window", None)
+        if window is None:
+            return
+
+        self._cf_window = None
+        self.lbl_cf_expanded.setVisible(False)
+        self.cf_page_layout.insertWidget(self.cf_body_index, self.cf_body)
+        window.deleteLater()
+        self._fit_window_later()
+
     def _cf_settle_timer(self, kind):
         """조작이 멎으면 확정하는 타이머(종류별로 하나). 없으면 만든다."""
         timers = getattr(self, "_cf_timers", None)
@@ -2696,6 +2792,10 @@ class MainWindow(QWidget):
     def closeEvent(self, event):
         # 창이 닫힐 때 Shift+A 를 원래 바인딩으로 복원 + 그래프 포커스 scriptJob 정리
         try:
+            # Expand 로 띄운 Curve Filters 창이 남아 떠 있지 않게 함께 닫는다.
+            # (본문 위젯이 그 창에 가 있으므로 먼저 제자리로 돌려놓는다.)
+            if getattr(self, "_cf_window", None) is not None:
+                self._cf_window.close()
             if getattr(self, "hotkey_mgr", None):
                 self.hotkey_mgr.restore()
             if getattr(self, "graph_focus_mgr", None):
