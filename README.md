@@ -4,6 +4,7 @@
 독립 실행(standalone) Qt 앱을 직접 설계·개발한 포트폴리오 저장소입니다.
 
 > 작성자: **Ji Hun Park (Junny)** · Technical Artist / Rigging & Pipeline Tools Developer
+> 최근 갱신: 2026-08 · 툴 폴더 **50개**(구버전 포함, 현행 40여 종) · 공용 프레임워크 1개
 
 ---
 
@@ -12,18 +13,39 @@
 A portfolio of **production-grade Python tooling for Autodesk Maya and game pipelines**, written and
 maintained by **Ji Hun Park (Junny)**, a Technical Artist focused on rigging, facial, and pipeline automation.
 
-It contains **40+ in-house tools** spanning two architectures — **in-Maya `maya.cmds` / PySide UIs** and
-**standalone PySide (Qt) desktop apps** — built on a **shared framework** (reusable widgets, theming,
-path management, undo handling, drag-&-drop installers). Domains include character **rigging** (FKIK,
-control rigs, skin weight transfer, constraint conversion), **facial / MetaHuman** setup (RBF solver →
-blendshape auto-connection, PoseWrangler corrective extraction from Houdini cloth caches), **modeling**
-(blendshape editing, mesh diagnostics/repair), **Maya → Unreal Engine bridging** (KawaiiPhysics,
-Control Rig constraint & item-array node generation), and **standalone pipeline utilities**
-(file/version manager, auto-backup, path launcher, startup automation, CSV tools).
+It contains **50 tool folders (40+ actively maintained)** spanning two architectures — **in-Maya
+`maya.cmds` / PySide UIs** and **standalone PySide (Qt) desktop apps** — built on a **shared framework**
+(reusable widgets, theming, path management, undo handling, drag-&-drop installers).
+
+Domains include character **rigging** (FKIK, control rigs, skin weight transfer & geodesic binding,
+constraint conversion, curve-driven lip/eyelid setups), **facial / MetaHuman** (RBF solver → blendshape
+auto-connection, PoseWrangler corrective extraction from Houdini cloth caches, blendshape authoring),
+**deformation R&D** (skinning decomposition ported from EA's *Dem Bones* paper, TPS/RBF mesh wrapping
+across different topologies, baked secondary motion), **modeling & mesh** (blendshape editor, mesh
+diagnostics/repair, normal-space inflate), **Maya → Unreal Engine bridging** (KawaiiPhysics, Control Rig
+constraint & item-array node text generation), and **standalone pipeline utilities** (file/version
+manager with reference-lineage graphs, auto-backup, path launcher, startup automation).
+
+Every Maya-side behaviour is verified **headlessly with `mayapy`** before it ships, and each tool carries
+its own usage guide in [`JUN_All/docs/`](JUN_All/docs/) alongside a dated [`WORKLOG.md`](JUN_All/docs/WORKLOG.md).
 
 👉 **New here? Start in [`JUN_All/`](JUN_All/)** — the active framework and all current tools.
-Tool-by-tool documentation lives in [`JUN_All/docs/`](JUN_All/docs/), and a narrative work summary in
+A narrative work summary lives in
 [`JUN_All/docs/portfolio/portfolio_EN.md`](JUN_All/docs/portfolio/portfolio_EN.md).
+
+---
+
+## 💡 이런 문제를 풉니다 (What these tools solve)
+
+| 아티스트의 반복 작업 | 툴이 만든 결과 |
+|---|---|
+| RBF 포즈마다 의상 주름 코렉티브를 손으로 맞추기 **(포즈 × 관절)** | 후디니 캐시에서 **일괄 추출 + RBF 자동 연결** (`A00280`) |
+| 마야 리그를 언리얼로 옮기려 노드를 하나씩 만들기 | 리그 데이터를 읽어 **UE 노드 텍스트 생성 → 그래프에 `Ctrl+V`** (`A00080` · `A00260` · `A00350`) |
+| 본마다 물리 세팅을 반복 입력 | KawaiiPhysics 노드 · 데이터 에셋 **대량 생성** (`A00080`) |
+| 입술·눈꺼풀을 프레임마다 손으로 다물리기 | 어트리뷰트 두 개로 **끝에서 중앙으로 지퍼처럼** 다무는 셋업 (`A00170` Seal) |
+| 애니메이션 메시(알렘빅)를 보고 스킨 웨이트를 손으로 추정 | 논문 알고리즘을 이식해 **웨이트·본 애니메이션을 수치로 분해** (`A00430`) |
+| 토폴로지가 다른 메시에 형태를 옮기려 정점을 수동 이동 | 커브 가이드 기반 **TPS 래핑 + 표면 투영** (`A00420`) |
+| 찰랑임을 잡으려 시뮬레이션 세팅·캐시·리타게팅 | 솔버 없이 **관성을 키로 굽기**(게임 에셋 친화) (`A00410`) |
 
 ---
 
@@ -36,6 +58,8 @@ Tool-by-tool documentation lives in [`JUN_All/docs/`](JUN_All/docs/), and a narr
   어트리뷰트 연결을 규칙(JSON) 기반으로 자동화. PySide 앱, core/ui 분리 설계.
 - **`A00280_correctiveFromCache`** — MetaHuman **RBF(PoseWrangler) 의상 주름 코렉티브**를 후디니
   Alembic 캐시에서 **일괄 추출**. (타겟수 × 관절수) 수동 반복을 버튼 하나로 대체.
+- **`A00290_BSTool`** — blendShape 편집(**마야 기본 Shape Editor 대체**). 소스 가중합을 다른 타겟과
+  최종 리깅 메시에 일괄 반영하는 **Mix Targets** 탭 포함.
 - **`A00100_jsonEditor_MH`** — MetaHuman용 JSON 정렬·편집 도구.
 
 <!-- ![ConnectionBuilder](JUN_All/docs/assets/A00090_ConnectionBuilder.png) -->
@@ -55,15 +79,35 @@ Tool-by-tool documentation lives in [`JUN_All/docs/`](JUN_All/docs/), and a narr
 
 ### 리깅 (Rigging)
 - **`A00145_RigConnect`** — 리깅 연결 통합 툴(Match · Matrix Constraint · Connect Closest ·
-  스킨 웨이트→컨스트레인트 · 오프셋 그룹 생성 · **Constraint Transfer**).
+  스킨 웨이트→컨스트레인트 · 오프셋 그룹 생성 · **Constraint Transfer / Target Edit** ·
+  이름이 비슷한 어트리뷰트를 찾아 잇는 **Match from Source**).
+- **`A00170_driverTool`** — 드라이버 셋업 통합 툴. **Remap Value · Spherical Eye · AttachCrv · Stretch ·
+  Seal** 탭. 엣지 루프에서 커브·널·컨트롤러·조인트를 한 번에 만드는 **Edge Loop 드라이버 셋업**,
+  함수(선형/시그모이드) 기반 **Stretch**, 입술을 끝에서 중앙으로 다무는 **Seal(지퍼)** 를 포함.
+- **`A00275_skinTool_V01`** — 스킨 범용 툴. **Expand Bind**(엣지 루프 기준 측지 거리 균등 바인드) ·
+  **Move Joints**(메시 변형 없이 조인트 이동 후 재바인드) · **Transfer** · **Update Bind Pose**.
+- **`A00270_skinMigrate` / `A00020_move_skineWeightTool`** — 스킨 웨이트 이동·전이(토폴로지 다른 메시).
 - **`A00130_ControlRig`** — 컨트롤 리그 생성. · **`A00120_FKIK` / `A00190_FKIK_General_Tool`** — FK/IK 스위칭·베이크.
-- **`A00020_move_skineWeightTool` / `A00270_skinMigrate`** — 스킨 웨이트 이동·전이(토폴로지 다른 메시 마이그레이션).
 - **`A00060_jointTool_V02`** — 조인트 작업(커브/분할 생성 · 트위스트 Aim). · **`A00010_humanIKTool_V02`** — HumanIK 세팅.
-- **`A00170_driverTool`**(Remap·Spherical·AttachCrv 탭), **`A00150_remapVal`**, **`A00160_sphericalEye`** — 드리븐 키/리맵/아이 리그.
+
+### 디폼 R&D (알고리즘 이식)
+- **`A00430_DemBone`** — EA SEED 의 **Dem Bones**(*Smooth Skinning Decomposition with Rigid Bones*,
+  Le & Deng 2012) 를 마야로 이식. 애니메이션 메시와 조인트를 비교해 **스킨 웨이트 / 본 애니메이션**을
+  풀어 준다(Solve Weights · Solve Transforms · Refine · Decompose 4모드, numpy 솔버).
+  **원본 코드에 의존하지 않고 논문·알고리즘만 읽어 새로 작성.**
+- **`A00420_Wrapper`** — 토폴로지가 다른 두 메시를, **커브 쌍 가이드**를 근거로 래핑(Wrap3D 대응).
+  **TPS 워프 + 표면 투영** 2단계.
+- **`A00410_SecondaryMotion`** — FK 체인의 **관성(찰랑임)** 을 언리얼 KawaiiPhysics 방식으로 계산해
+  **키 애니메이션으로 굽는다**. 마야 시뮬레이션 솔버(nucleus/nHair)를 쓰지 않아 게임 에셋에 그대로 사용.
 
 ### 애니메이션 · 모델링 · 메시
-- **`A00110_animTool`** — 키 복사/미러/베이크·Follow·Graph Focus(레거시 알고리즘 이식). · **`A00180_abSymMesh`** — 메쉬 대칭/블렌드셰이프(OpenMaya 재구현).
-- **`A00290_BSTool`** — blendShape 편집(**마야 기본 Shape Editor 대체** · Edit BS · Base Shape 탭). · **`A00300_meshDoctor`** — 메시 **읽기전용 진단 + 안전 원클릭 수정**(배치 진단 요약 테이블, JSON/TXT 로그).
+- **`A00110_animTool`** — 키 복사/미러/베이크 · Follow · Fill Keys · 구간 한정 Euler Filter ·
+  Stagger Offset · Graph Focus(레거시 알고리즘 이식).
+- **`A00180_abSymMesh`** — 메쉬 대칭/블렌드셰이프(OpenMaya 재구현).
+- **`A00300_meshDoctor`** — 메시 **읽기전용 진단 + 안전 원클릭 수정**(배치 진단 요약 테이블, JSON/TXT 로그).
+- **`A00380_MeshTool`** — **Peak**(노말 방향 팽창/수축, 후디니 peak 노드 개념) · **Match** 탭.
+- **`A00400_CurveTool`** — 선택 엣지 덩어리마다 커브 생성 · 방향 통일 · **Line Width** 조절.
+- **`A00390_WindTool`** — 본 체인에 위상이 어긋난 싸인 파형을 넣어 **바람에 일렁이는** 애니메이션 생성.
 - **`A00040_file_exporter_V02`** — 타입 필터 기반 익스포트 자동화. · **`A00050_uvTool`**, **`A00030_quickTool`**, **`A00200_CSV_tool`**.
 
 ### 씬 / 선택 · 네이밍 유틸
@@ -78,10 +122,27 @@ Tool-by-tool documentation lives in [`JUN_All/docs/`](JUN_All/docs/), and a narr
 - **`A00230_StartupTool`** — Windows 로그인 시 폴더 팝업 + standalone 툴 자동 실행.
 - PySide 앱은 **PyInstaller로 `.exe` 빌드** 가능.
 
-📖 각 툴의 상세 사용법·구조 문서: **[`JUN_All/docs/`](JUN_All/docs/)** (예: [animTool](JUN_All/docs/A00110_animTool.md),
-[RigConnect](JUN_All/docs/A00145_RigConnect.md), [meshDoctor](JUN_All/docs/A00300_meshDoctor.md),
-[FileManager](JUN_All/docs/A00210_FileManager.md))
+📖 각 툴의 상세 사용법·구조 문서: **[`JUN_All/docs/`](JUN_All/docs/)** (예: [driverTool](JUN_All/docs/A00170_driverTool.md),
+[skinTool](JUN_All/docs/A00275_skinTool_V01.md), [DemBone](JUN_All/docs/A00430_DemBone.md),
+[Wrapper](JUN_All/docs/A00420_Wrapper.md), [RigConnect](JUN_All/docs/A00145_RigConnect.md),
+[animTool](JUN_All/docs/A00110_animTool.md), [FileManager](JUN_All/docs/A00210_FileManager.md))
 📝 작업 내역 요약(포트폴리오 문구): **[국문](JUN_All/docs/portfolio/portfolio_KR.md)** · **[English](JUN_All/docs/portfolio/portfolio_EN.md)**
+
+---
+
+## 🕒 최근 작업 (Recent highlights)
+
+날짜별 상세 내역은 **[`JUN_All/docs/WORKLOG.md`](JUN_All/docs/WORKLOG.md)** 에 있습니다.
+
+| 시기 | 내용 |
+|------|------|
+| 2026-08 | **`A00170` Seal** — 입술을 끝에서 중앙으로 다무는 지퍼 셋업. 다물린 자리를 **머리 공간에 저장한 rest 포즈**로 잡아 머리가 회전·이동해도 접촉 위치가 유지되고, 위/아래 입술이 한 점으로 뭉개지지 않는다 |
+| 2026-08 | **`A00430_DemBone` 신규** — 스키닝 분해(논문 이식, numpy 솔버) · **`A00420_Wrapper`** 기능 확장 |
+| 2026-08 | **`A00275` Expand Bind / Move Joints** — 엣지 루프 기준 균등 바인드, 메시 변형 없는 조인트 이동 |
+| 2026-08 | **`A00170` Edge Loop 드라이버 셋업** — 루프 → 커브 → 널 → 컨트롤러 → 조인트를 한 번에 |
+| 2026-08 | **`A00145` Target Edit / Match from Source**, **`A00110` Fill Keys / Follow 컴포넌트 타깃** |
+| 2026-08 | **Framework** — 셰이프 확정 공용 헬퍼(`maya_shape`)로 툴 6종 일괄 정리 |
+| 2026-07 | **`A00410_SecondaryMotion` · `A00400_CurveTool` · `A00390_WindTool` · `A00380_MeshTool` 신규** |
 
 ---
 
@@ -89,12 +150,14 @@ Tool-by-tool documentation lives in [`JUN_All/docs/`](JUN_All/docs/), and a narr
 
 | 분류 | 내용 |
 |------|------|
-| 언어 | Python 3 |
+| 언어 | Python 3 (+ **numpy** — 수치 솔버) |
 | DCC API | Autodesk Maya `maya.cmds` · **OpenMaya**, Unreal Engine 노드 텍스트 생성, Houdini Alembic 캐시 연동 |
 | UI | `maya.cmds` 네이티브 위젯, **PySide2 & PySide6** (Qt), qss 컬러 테마 14종 |
 | 빌드/배포 | **PyInstaller** (`.exe`), 드래그&드롭 셸프 설치 시스템, 릴리스 빌더(툴+Framework+문서 패키징) |
 | 아키텍처 | 공용 **Framework**(재사용 위젯 · 테마 · `PathManager` · 공용 `undo_chunk` · **UUID 기반 오브젝트 리스트**), **core/ui 분리**, 모듈 리로더 |
-| 도메인 | 캐릭터 리깅, 페이셜/MetaHuman(RBF·PoseWrangler 코렉티브), 스킨 웨이트 전이, 블렌드셰이프·메시 진단, UE KawaiiPhysics·Control Rig 연동, 파이프라인 유틸 |
+| 알고리즘 | **Dem Bones**(스키닝 분해) · **TPS/RBF** 워프 · 측지 거리 기반 웨이트 · KawaiiPhysics 관성 모델 — 논문·레퍼런스를 읽고 파이썬으로 재구현 |
+| 품질 | 마야 동작은 **`mayapy` 헤드리스 검증** 후 반영 · 툴마다 사용 가이드 문서 · 날짜별 `WORKLOG` · 변경마다 버전 기록 |
+| 도메인 | 캐릭터 리깅, 페이셜/MetaHuman(RBF·PoseWrangler 코렉티브), 스킨 웨이트·바인딩, 블렌드셰이프·메시 진단, UE KawaiiPhysics·Control Rig 연동, 파이프라인 유틸 |
 
 ---
 
@@ -105,7 +168,7 @@ Tool-by-tool documentation lives in [`JUN_All/docs/`](JUN_All/docs/), and a narr
 | **[`JUN_All/`](JUN_All/)** | **현행 (active)** — 공용 프레임워크 + 모든 신규 툴. **여기부터 보세요.** |
 | [`JUN_All/tools/`](JUN_All/tools/) | 개별 툴 (번호 접두사 `A000XX`로 정렬) |
 | [`JUN_All/Framework/`](JUN_All/Framework/) | 모든 툴이 공유하는 공용 인프라(위젯·테마·경로 관리) |
-| [`JUN_All/docs/`](JUN_All/docs/) | 툴별 상세 사용법·설계 문서 + 작업 로그(`WORKLOG.md`) + 학습 노트(`study/`) |
+| [`JUN_All/docs/`](JUN_All/docs/) | 툴별 상세 사용법·설계 문서 + 작업 로그(`WORKLOG.md`) + 설계 계획서(`plans/`) + 학습 노트(`study/`) |
 | [`JUN_All/docs/portfolio/`](JUN_All/docs/portfolio/) | 작업 내역 요약 (국문 · English) |
 | [`_archive/`](_archive/) | 동결된 옛 세대 코드와 학습 메모 — **성장 과정·리팩터링 이력** (참고용) |
 | `JUN_memo/` | 개인 메모 (저장소 추적 제외) |
@@ -129,8 +192,11 @@ JUN_All/
 ├── Framework/        # 공용 위젯 · 테마 · 경로 관리 (모든 툴이 import)
 ├── tools/A000XX_*/   # 개별 툴 (위 (A)/(B) 두 아키텍처)
 ├── dev/              # 리로더 · 릴리스 빌더 (배포 제외)
-└── docs/             # 툴별 문서 · WORKLOG
+└── docs/             # 툴별 문서 · 설계 계획서 · WORKLOG
 ```
+
+새 툴은 템플릿(`A00000_base` / `A00004_base_QT` / `A00008_base_QT_maya`)을 복제해 시작하므로,
+**공용 인프라 위에서 반나절이면 새 툴이 배포 가능한 형태로 올라옵니다.**
 
 ---
 
