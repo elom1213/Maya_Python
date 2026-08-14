@@ -31,6 +31,11 @@ from tools.A00110_animTool_V02.app.core import GraphViewManager
 from tools.A00110_animTool_V02.app.core import GraphFocusManager
 from tools.A00110_animTool_V02.app.core import FillKeyManager
 from tools.A00110_animTool_V02.app.core import CURRENT_LAYER
+from tools.A00110_animTool_V02.app.core import CurveFilterSession
+from tools.A00110_animTool_V02.app.core import (
+    CF_EASE_IN, CF_EASE_OUT, CF_LINEAR, CF_EASE_IN_OUT,
+    cf_selected_channel_attrs,
+)
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -281,6 +286,8 @@ class MainWindow(QWidget):
     CURVE_PAGES = (
         ("Euler", "Euler Filter - run an euler filter on the listed controllers, "
          "limited to a frame range", "_build_euler_filter_page"),
+        ("Filters", "Curve Filters - Smooth / Intensity / Interpolate on the keys "
+         "you selected in the Graph Editor", "_build_curve_filters_page"),
     )
 
     # 아래 넷은 v01.41 까지 **상위 탭**이었다. 빌더가 이미
@@ -1315,6 +1322,154 @@ class MainWindow(QWidget):
 
         return tab
 
+    # ---------------- Curve > Filters (Smooth / Intensity / Interp) ----------------
+    #
+    # 세 필터를 **한 화면**에 접이식 섹션으로 담는다(ref/ref_01.png 의 원본 UI 구성과 같다).
+    # 보통 이 저장소는 섹션이 3개를 넘으면 하위 탭으로 가지만([[prefer-subtabs...]]), 여기서는
+    # 섹션 하나가 슬라이더 한 줄 + 버튼 한 줄이라 작고, **셋을 번갈아 눌러 가며** 다듬는 작업이라
+    # 탭을 오가는 편이 오히려 번거롭다.
+    #
+    # 대상은 **리스트도 Start/End 도 아니다** — 지금 **그래프 에디터에서 고른 키**(없으면 타임
+    # 슬라이더 구간 + 씬 선택)다. 고른 것이 없으면 아무것도 하지 않는다.
+    #
+    # 조작 모델(A00110 Stagger Offset · A00380 Peak 에서 검증한 settle 커밋):
+    #   드래그 중  : undo 를 기록하지 않고 **원본 스냅샷에서 다시 계산**해 미리보기(누적 없음)
+    #   놓는 순간  : 그때까지의 결과를 **undo 한 항목**으로 확정하고 슬라이더를 0 으로 되돌린다
+
+    def _cf_slider(self, left, right):
+        """가운데가 0(변화 없음)인 양방향 슬라이더 한 줄. (row, slider)"""
+        row = QHBoxLayout()
+        lbl_left = QLabel(left)
+        lbl_left.setMinimumWidth(58)
+        row.addWidget(lbl_left)
+
+        slider = QSlider(Qt.Horizontal)
+        slider.setRange(-100, 100)
+        slider.setValue(0)
+        slider.setTickPosition(QSlider.TicksBelow)
+        slider.setTickInterval(100)
+        slider.setPageStep(10)
+        slider.setMinimumWidth(150)
+        slider.setStyleSheet(STAGGER_SLIDER_STYLE)
+        slider.setToolTip(
+            "Drag to apply live; the middle (0) is 'no change'.\n"
+            "Let go and the result is committed as ONE undo step and the slider\n"
+            "returns to the middle - push again to apply another pass.")
+        row.addWidget(slider, 1)
+
+        lbl_right = QLabel(right)
+        lbl_right.setAlignment(Qt.AlignRight)
+        lbl_right.setMinimumWidth(72)
+        row.addWidget(lbl_right)
+        return row, slider
+
+    def _cf_buttons(self, kind, entries):
+        """원클릭 버튼 한 줄. entries = [(라벨, amount, shape), ...]"""
+        row = QHBoxLayout()
+        for label, amount, shape in entries:
+            btn = QPushButton(label)
+            btn.setToolTip("Apply in one click (one undo step).")
+            btn.clicked.connect(
+                lambda _checked=False, k=kind, a=amount, sh=shape:
+                self._cf_apply_once(k, a, shape=sh))
+            row.addWidget(btn)
+        return row
+
+    def _build_curve_filters_page(self):
+        """Smooth / Intensity / Interpolate 를 한 화면에 담은 페이지."""
+        page = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
+        layout = QVBoxLayout(page)
+
+        # ---- 대상 안내 + 공통 옵션
+        hint = QLabel(
+            "Works on the keys selected in the Graph Editor.\n"
+            "Nothing selected? Highlight a range in the Time Slider and select the "
+            "objects instead.")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        self.cf_quat = QCheckBox("Use Quaternions")
+        self.cf_quat.setChecked(True)
+        self.cf_quat.setToolTip(
+            "On (default): rotateX / Y / Z are filtered together as a quaternion, so the\n"
+            "three axes cannot drift apart near gimbal lock. Converted back to the euler\n"
+            "values nearest the originals, so no +-360 jump appears.\n"
+            "Objects whose rotate keys sit on different frames fall back to per-channel\n"
+            "and are reported.\n"
+            "Off: every channel is filtered on its own.")
+        layout.addWidget(self.cf_quat)
+
+        # ---- Smooth
+        sec_smooth = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01(
+            title="Smooth", expanded=True)
+
+        opt = QHBoxLayout()
+        opt.addWidget(QLabel("Iterations"))
+        self.cf_smooth_iter = QSpinBox()
+        self.cf_smooth_iter.setRange(1, 20)
+        self.cf_smooth_iter.setValue(3)
+        self.cf_smooth_iter.setKeyboardTracking(False)
+        self.cf_smooth_iter.setToolTip(
+            "How many smoothing passes. More passes reach further along the curve.")
+        opt.addWidget(self.cf_smooth_iter)
+        opt.addWidget(QLabel("Strength"))
+        self.cf_smooth_strength = QSpinBox()
+        self.cf_smooth_strength.setRange(0, 100)
+        self.cf_smooth_strength.setValue(100)
+        self.cf_smooth_strength.setSuffix(" %")
+        self.cf_smooth_strength.setKeyboardTracking(False)
+        self.cf_smooth_strength.setToolTip(
+            "Overall scale on the slider amount. 100% = the slider means what it says.")
+        opt.addWidget(self.cf_smooth_strength)
+        opt.addStretch(1)
+        sec_smooth.add_layout(opt)
+
+        row, self.cf_smooth_slider = self._cf_slider("Rough", "Smooth")
+        sec_smooth.add_layout(row)
+        sec_smooth.add_layout(self._cf_buttons(
+            "smooth", [("-100", -100, None), ("-50", -50, None),
+                       ("50", 50, None), ("100", 100, None)]))
+        layout.addWidget(sec_smooth)
+        self.cf_sec_smooth = sec_smooth
+
+        # ---- Intensity
+        sec_intensity = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01(
+            title="Intensity", expanded=True)
+        row, self.cf_intensity_slider = self._cf_slider("Minus", "Plus")
+        sec_intensity.add_layout(row)
+        sec_intensity.add_layout(self._cf_buttons(
+            "intensity", [("-50", -50, None), ("-25", -25, None),
+                          ("25", 25, None), ("50", 50, None)]))
+        layout.addWidget(sec_intensity)
+        self.cf_sec_intensity = sec_intensity
+
+        # ---- Interpolate
+        sec_interp = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01(
+            title="Interpolate", expanded=True)
+        row_a, self.cf_interp_slider_a = self._cf_slider("Ease-In", "Ease-Out")
+        sec_interp.add_layout(row_a)
+        row_b, self.cf_interp_slider_b = self._cf_slider("Linear", "Ease-In-Out")
+        sec_interp.add_layout(row_b)
+        sec_interp.add_layout(self._cf_buttons(
+            "interpolate", [("Ease-In", 100, CF_EASE_IN),
+                            ("Ease-Out", 100, CF_EASE_OUT),
+                            ("Linear", 100, CF_LINEAR),
+                            ("Ease-In-Out", 100, CF_EASE_IN_OUT)]))
+        layout.addWidget(sec_interp)
+        self.cf_sec_interp = sec_interp
+
+        layout.addStretch(1)
+
+        # ---- 배선
+        self._cf_connect("smooth", self.cf_smooth_slider)
+        self._cf_connect("intensity", self.cf_intensity_slider)
+        self._cf_connect("interpolate", self.cf_interp_slider_a)
+        self._cf_connect("interpolate", self.cf_interp_slider_b)
+        for section in (sec_smooth, sec_intensity, sec_interp):
+            section.toggled.connect(self._fit_window_later)
+
+        return page
+
     def _build_graph_focus_tab(self):
         """선택한 컨트롤러의 전체 키 구간을 다 보여주는 대신, 현재 프레임 기준
         ± margin 프레임만 그래프 에디터에 확대해서 보여주는 탭.
@@ -2276,6 +2431,141 @@ class MainWindow(QWidget):
     # --------------------------------------------------
     # Hotkey
     # --------------------------------------------------
+
+    # --------------------------------------------------
+    # Handlers : Curve > Smooth / Intensity / Interp
+    # --------------------------------------------------
+
+    def _cf_settle_timer(self, kind):
+        """조작이 멎으면 확정하는 타이머(종류별로 하나). 없으면 만든다."""
+        timers = getattr(self, "_cf_timers", None)
+        if timers is None:
+            timers = {}
+            self._cf_timers = timers
+        timer = timers.get(kind)
+        if timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(STAGGER_SETTLE_MS)
+            timer.timeout.connect(lambda k=kind: self._cf_finish(k))
+            timers[kind] = timer
+        return timer
+
+    def _cf_connect(self, kind, slider):
+        slider.valueChanged.connect(lambda _v, k=kind: self._cf_changed(k))
+        slider.sliderReleased.connect(lambda k=kind: self._cf_finish(k))
+
+    def _cf_sliders(self, kind):
+        if kind == "interpolate":
+            return (self.cf_interp_slider_a, self.cf_interp_slider_b)
+        return (getattr(self, "cf_%s_slider" % kind),)
+
+    def _cf_params(self, kind, amount=None, shape=None):
+        """지금 위젯 상태에서 필터 파라미터를 읽는다. (kind, params) 또는 (kind, None)."""
+        if kind == "smooth":
+            if amount is None:
+                amount = self.cf_smooth_slider.value()
+            return {"amount": amount,
+                    "iterations": self.cf_smooth_iter.value(),
+                    "strength": float(self.cf_smooth_strength.value())}
+        if kind == "intensity":
+            if amount is None:
+                amount = self.cf_intensity_slider.value()
+            return {"amount": amount}
+
+        # interpolate : 두 슬라이더 중 **0 이 아닌 쪽**이 모양과 세기를 함께 정한다.
+        # (가운데 = 변화 없음. 왼쪽으로 밀면 왼쪽 라벨의 이징, 오른쪽이면 오른쪽 라벨.)
+        if amount is not None:
+            return {"amount": abs(amount), "shape": shape or CF_LINEAR}
+        a = self.cf_interp_slider_a.value()
+        b = self.cf_interp_slider_b.value()
+        value, pair = (a, (CF_EASE_IN, CF_EASE_OUT)) if abs(a) >= abs(b) \
+            else (b, (CF_LINEAR, CF_EASE_IN_OUT))
+        return {"amount": abs(value), "shape": pair[0] if value < 0 else pair[1]}
+
+    def _cf_session(self, kind, create=True):
+        """종류별 세션. create 면 없을 때 **지금 선택한 키**로 새로 만든다.
+
+        대상은 리스트가 아니라 씬 상태다 — 그래프 에디터에서 고른 키가 1순위,
+        없으면 타임 슬라이더 구간 + 씬 선택. 아무것도 고르지 않았으면 만들지 않는다.
+        """
+        sessions = getattr(self, "_cf_sessions", None)
+        if sessions is None:
+            sessions = {}
+            self._cf_sessions = sessions
+
+        session = sessions.get(kind)
+        if session is not None or not create:
+            return session
+
+        session, message = CurveFilterSession.from_selection(
+            quaternion=self.cf_quat.isChecked())
+        if session is None:
+            self.log("[Warning] " + message)
+            return None
+
+        sessions[kind] = session
+        return session
+
+    def _cf_changed(self, kind):
+        """슬라이더가 움직이는 동안 — undo 기록 없이 미리보기."""
+        if getattr(self, "_cf_updating", False):
+            return
+        params = self._cf_params(kind)
+        session = self._cf_session(kind)
+        if session is None:
+            self._cf_reset_sliders(kind)
+            return
+        session.preview(kind, **params)
+        self._cf_settle_timer(kind).start()
+
+    def _cf_finish(self, kind):
+        """조작이 끝났다 — 한 번의 undo 로 확정하고 슬라이더를 가운데로 되돌린다."""
+        self._cf_settle_timer(kind).stop()
+        session = self._cf_session(kind, create=False)
+        if session is None:
+            return
+        params = self._cf_params(kind)
+        if abs(params["amount"]) < 1e-9:
+            session.restore()
+        else:
+            session.settle(kind, **params)
+            self.log("{0}: {1}  {2}".format(
+                kind.capitalize(), self._cf_describe(kind, params),
+                session.summary()))
+        self._cf_sessions[kind] = None
+        self._cf_reset_sliders(kind)
+
+    def _cf_apply_once(self, kind, amount, shape=None):
+        """버튼 한 번 = 세션 생성 + 확정 + 정리 (undo 한 스텝)."""
+        session = self._cf_session(kind)
+        if session is None:
+            return
+        params = self._cf_params(kind, amount=amount, shape=shape)
+        session.settle(kind, **params)
+        self.log("{0}: {1}  {2}".format(
+            kind.capitalize(), self._cf_describe(kind, params), session.summary()))
+        self._cf_sessions[kind] = None
+        self._cf_reset_sliders(kind)
+
+    @staticmethod
+    def _cf_describe(kind, params):
+        if kind == "smooth":
+            return "amount {0:+d}, {1} iteration(s), strength {2:g}%".format(
+                int(params["amount"]), params["iterations"], params["strength"])
+        if kind == "intensity":
+            return "amount {0:+d}".format(int(params["amount"]))
+        return "{0} {1:g}%".format(params["shape"], params["amount"])
+
+    def _cf_reset_sliders(self, kind):
+        self._cf_updating = True
+        try:
+            for slider in self._cf_sliders(kind):
+                slider.blockSignals(True)
+                slider.setValue(0)
+                slider.blockSignals(False)
+        finally:
+            self._cf_updating = False
 
     def on_toggle_hotkey(self, checked):
         self._enable_hotkey(checked)

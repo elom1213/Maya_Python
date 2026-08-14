@@ -1,3 +1,3 @@
 # Anim Key Tool
-VERSION = "02.00"
+VERSION = "02.01"
 LAST_UPDATE = "2026-08-14"
