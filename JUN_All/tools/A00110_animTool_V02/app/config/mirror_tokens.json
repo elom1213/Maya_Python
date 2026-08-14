@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "token_pairs": [
+    {"left": "_l", "right": "_r", "enabled": true},
+    {"left": "_L", "right": "_R", "enabled": true},
+    {"left": "_lf", "right": "_rt", "enabled": true},
+    {"left": "Left", "right": "Right", "enabled": true}
+  ]
+}
