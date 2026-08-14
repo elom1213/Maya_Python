@@ -1,0 +1,1401 @@
+# A00110_animTool_V02 사용법
+
+> **V01(`A00110_animTool`, v01.41) 에서 갈라져 나온 버전이다.** 폴더가 V02 이므로 버전도 **02.xx** 로 센다
+> (`A00010_humanIKTool_V02` = 02.00 과 같은 규칙). 기능은 V01 v01.41 과 **완전히 같고**,
+> **탭 분류만** 다시 했다(상위 탭을 전부 카테고리로). V01 은 재분류 전 상태 그대로 남아 있다.
+> 옛↔새 위치 대응은 §5 표, 설계 근거는 [계획서](plans/A00110_animTool_tab_reorg_plan.md).
+
+## 1. 개요
+
+애니메이션 키 작업을 돕는 PySide(Qt) 툴이다. **여섯 개의 상위 탭**과 **공유 로그창**으로 구성된다.
+**상위 탭은 전부 카테고리**(Key / Timing / Curve / Transfer / Bake / View)이고,
+**기능은 그 아래 하위 탭**에 하나씩 들어간다(전체 13개).
+
+1. **Key** — 키의 **존재**를 다룬다.
+   **Pose Key**: 선택 오브젝트(들)의 **현재 프레임**에 6축(rotate X/Y/Z, translate X/Y/Z) 값을
+   키프레임으로 설정한다(축마다 체크박스). **Fill Keys**(v01.40~): 지정 구간의 **모든 프레임**에
+   키를 채운다(기존 키는 그대로, 애니메이션 레이어 지정 가능). **Delete All Keys**(v01.18~):
+   **리스트업한 오브젝트의 모든 키프레임을 일괄 삭제**.
+2. **Timing** — 키의 **시점**을 다룬다(값은 그대로 두고 언제 일어나는지를 바꾼다).
+   **Move**: 키를 시간 범위로 **이동(앞/뒤 offset)·삭제**. **Hold**: 그래프 에디터에서 선택한
+   키 구간을 **평평하게 유지**(`Shift+A` 핫키 호출 가능). **Offset**(Offset & Hold, v01.13~):
+   **리스트업한 컨트롤러**의 키를 **포즈 유지(hold) + 보간(offset)** 구조로 재배치.
+   **Stagger**(Stagger Offset, v01.31~): 구간 키를 **리스트 순서 × Offset** 만큼 **계단식으로 밀어**
+   팔로우스루·웨이브를 만든다(**슬라이더 + 스핀박스** 실시간 조절, 조작이 멎으면 자동 기록되어
+   **Ctrl+Z 한 번**으로 복귀).
+3. **Curve** — 커브의 **값·형태**를 다듬는다.
+   **Euler**(Euler Filter, v01.37~): **리스트업한 컨트롤러**의 회전 키에 **[Start, End] 구간만**
+   오일러 필터를 적용한다. 마야 그래프 에디터의 `Curves > Euler Filter` 는 선택한 컨트롤러의
+   **키가 찍힌 전 구간**을 한꺼번에 처리해서, 뒤집힌 한 구간만 고치고 나머지는 그대로 두고 싶을 때
+   쓸 수 없었다. **Anchor** 옵션(기본 ON)으로 Start **직전 키**를 기준 삼아 앞쪽 애니메이션과
+   매끄럽게 잇는다. **Euler Filter from Selection**(v01.38~)은 **씬 선택(대상)** 과 **그래프
+   에디터에서 선택한 키(구간)** 를 스스로 감지해 **버튼 하나로** 실행한다.
+   → SmartLayer 의 **Curve Filters**(Smooth / Intensity / Interpolate)를 이식하면 여기로 들어온다.
+4. **Transfer** — 애니메이션을 **다른 오브젝트로** 옮긴다.
+   **Copy Key**(v01.03~): **Base → Target** 으로 시간 범위 키를 복사하고 축별로 값을
+   **반전(Reverse)** 한다(`cmds.pasteKey` 붙여넣기 모드 선택).
+   **Mirror Key**(v01.04~): 한쪽 컨트롤러의 키를 **반대쪽 컨트롤러로 좌우 미러**한다(언리얼
+   *Mirror Data Table* 과 동일한 결과). 좌/우 토큰(`_l/_r` 등, **JSON 으로 확장 가능**)으로 자동
+   페어링하거나 수동 리스트로 짝짓는다. **소스/타겟의 rotateOrder 가 달라도 정확**하다.
+   **Follow**(v01.11~): 좌(**Target**)/우(**Follower**) 리스트로, follower 가 target 의 **월드
+   위치·회전(·스케일)** 에 맞도록 구간 키를 굽는다(컨스트레인트 노드 없이 `parentConstraint` 와
+   동등한 행렬 연산, **rotateOrder 무관**). **Maintain Offset**(v01.15) 으로 start 프레임의
+   상대 거리·회전 유지, **1<-n**(v01.15) 으로 target 1개를 **모든 follower 가 추종**, **blend(0~1)**
+   로 원본과 매치 결과를 섞으며(0=원본, 1=덮어쓰기) 선택된 **애니메이션 레이어**에 키가 들어간다.
+   **Target 에는 메시 버텍스(`mesh.vtx[i]`) 같은 컴포넌트도 넣을 수 있다**(v01.41~) — 디폼되는
+   메시의 정점도 프레임마다 따라간다(아래 §Follow: 컴포넌트 타겟).
+5. **Bake** — 결과를 **키로 굽는다**.
+   **Bake**(v01.05~): **리스트업한 컨트롤러/오브젝트**의 키를 구간 전체에 **정수 프레임 단위로**
+   굽는다. 구간은 **현재 타임라인(플레이백)** 또는 **직접 입력(Custom)** 중 선택. Maya 네이티브
+   `bakeResults`(C++)를 써서 **6000+프레임 × 50~100 컨트롤러** 같은 대규모도 빠르다.
+6. **View** — **보기**를 돕는다(씬을 바꾸지 않는 유일한 카테고리).
+   **Graph Focus**(v01.25~): 컨트롤러를 선택하면 그 컨트롤러의 **전체 키 구간**(예: 0~6000f)을
+   다 보여주는 대신, **현재 프레임 기준 ± margin 프레임**만 그래프 에디터에 확대해서 보여준다
+   (예: 현재 500f, margin 80 → `420f~580f`). **Auto-Focus 토글**을 켜면 **컨트롤러(오브젝트)를
+   새로 선택할 때만** 자동으로 프레이밍하고(v01.30~), margin 값은 **스핀박스로 사용자가 지정**한다.
+
+하위 탭이나 상위 탭을 바꾸면 **창 크기가 지금 보이는 페이지에 맞춰 자동 조정**된다.
+
+> **V02 v02.00 — 탭 재분류(기능 변경 없음)**: 상위 탭을 전부 **카테고리**로 통일했다 —
+> **Key / Timing / Curve / Transfer / Bake / View**. V01 에서는 `Key Edit` 만 하위 탭 8개를 가진
+> 카테고리이고 나머지 5개(Copy Key / Mirror Key / Bake / Follow / Graph Focus)는 기능 하나짜리
+> 상위 탭이라, 새 기능이 전부 `Key Edit` 로 들어가 비대해지고(Euler·Pose Key 가 실제로 그렇게
+> 내려왔다) 정작 같은 개념인 Copy/Mirror/Follow 는 흩어져 있었다. 분류 기준은 **"사용자가 무엇을
+> 바꾸려 하는가"** 하나다(키의 존재 / 키의 시점 / 커브의 값 / 오브젝트 간 이동 / 굽기 / 보기).
+> **기능·단축키·위젯은 그대로**이고 자리만 옮겼다 — 옛↔새 위치 대응은 §5 표 참고.
+> 페이지 빌더는 손대지 않았고(이미 전부 `JUN_mod_fit_tab_page_v01` 반환), 바뀐 것은 분류 표와
+> 상위 탭 구성뿐이다. 검증: 재분류 전후 **위젯 속성 109/110 보존**(사라진 것은 옛 하위 탭 컨테이너
+> `key_edit_tabs` 뿐), 기능 13개 전부 존재, 대표 동작 실행 결과 동일 — headless 20항목.
+>
+> **아래는 V01 에서 물려받은 이력이다.**
+>
+> **v01.41 — Follow 탭: Target 에 메시 버텍스(컴포넌트)를 넣어도 동작**: 예전에는 Target 에
+> `mesh.vtx[5]` 를 넣으면 `getAttr("mesh.vtx[5].worldMatrix[0]")` 가 **ValueError** 로 죽어
+> 베이크 자체가 실패했다(오브젝트일 때와 결과가 달랐다). 이제 컴포넌트면 **위치·방향으로 월드
+> 행렬을 만들어** 오브젝트와 동일하게 처리한다. **메시 버텍스**는 위치 = 정점 월드 좌표, 회전 =
+> **정점 노말을 +Y 로 삼는 직교 프레임**(A00145 Match 탭과 같은 규약), 스케일 = 1. **커브 CV 등**
+> 다른 컴포넌트는 위치만 컴포넌트에서 가져오고 회전/스케일은 소유 오브젝트를 따른다.
+> 컴포넌트 위치는 `getAttr(time=)` 로 시점 조회가 안 되므로 **프레임을 옮겨가며 읽고**(디폼되는
+> 메시의 정점도 정확히 추종) 원래 시간은 복원한다. 범위를 벗어난 인덱스(`vtx[99999]`)는
+> **그 페어만 건너뛴다** — `cmds.ls` 가 조용히 마지막 정점으로 클램프하는 것을 이름 비교로 걸러낸다.
+>
+> **v01.38 — `Euler Filter from Selection` 원버튼**: 실제 작업은 "컨트롤러 몇 개를 고르고 그래프
+> 에디터에서 문제 구간을 드래그로 선택" 으로 끝나는데, 기존 버튼은 그걸 다시 `List Selected Objects`
+> + `Get Sel Range` 로 옮겨 담아야 했다. 새 버튼은 **씬 선택 = 대상**, **선택한 키의 앞/뒤 프레임 =
+> 구간**으로 **두 감지를 한 번에** 해서 바로 필터한다(Anchor 체크박스는 그대로 적용). 감지한 값은
+> **리스트와 Start/End 칸에도 채워 넣어**, 무엇을 어느 구간으로 처리했는지 눈으로 확인되고 이어서
+> Anchor 만 바꿔 아래 버튼으로 다시 돌려볼 수 있다. **선택한 키가 없으면 실행하지 않고 경고**만
+> 남긴다 — 전 구간을 조용히 처리하는 건 이 탭의 '구간 한정' 약속을 깨기 때문이다(씬 선택이 비어
+> 있을 때는 리스트 항목으로 폴백). 감지는 `EulerFilterManager.selected_objects()` /
+> `selected_key_range()`(= `cmds.keyframe(q=True, selected=True)` 의 min/max).
+>
+> **v01.37 — `Euler Filter` 탭(구간 한정 오일러 필터)**: 마야 그래프 에디터의 `Curves > Euler Filter`
+> 는 선택한 컨트롤러의 **키가 찍힌 전 구간**을 한꺼번에 처리해서, **뒤집힌 한 구간만** 펴고 나머지는
+> 그대로 두는 게 불가능했다. 새 탭에서 **TSL 로 대상**을, **공용 timeRange 위젯(Start/End)** 으로
+> **구간**을 지정해 **그 구간 안의 회전 키만** 편다. 필터 자체는 마야 네이티브
+> `cmds.filterCurve(filter="euler", startTime=, endTime=)` 를 쓴다 — Maya 2024 headless 로 **구간 밖
+> 키가 바뀌지 않음**을 확인했고, `rotateOrder` 가 `xyz` 가 아니어도(예: `zxy`) 마야가 알아서 처리한다.
+> **Anchor to the key before Start**(기본 ON) 는 필터 구간을 **Start 직전 키까지 넓혀** 그 키를 기준으로
+> 삼는다 — 앵커 키는 값이 안 바뀌므로 "구간 밖은 그대로"를 지키면서 **앞쪽 애니메이션과 매끄럽게
+> 이어진다**(이게 없으면 플립이 Start 직전에서 시작할 때 아무것도 안 고쳐진다). 필터 전/후 값 스냅샷을
+> 비교해 **실제로 바뀐 키 수**를 세고, **End 경계 이음매**와 구간 밖 변경(방어 검사)을 경고로 알린다.
+> 로직은 `app/core/euler_filter_manager.py` 의 `EulerFilterManager.filter_range()`.
+
+> **v01.36 — Start/End 구간 입력 UI 를 공용 위젯으로 승격(모듈화)**: `Start [값][Get Current]  End
+> [값][Get Current]  [Get Sel Range]` 묶음을 `Framework/qt/MOD_timeRange_qt_v01.py`
+> (`JUN_mod_timeRange_qt`)로 승격했다 — MOD_tsl_qt 처럼 여러 툴이 공용으로 쓴다. A00110 의 6개 탭
+> (Move Keys · Stagger · Copy · Mirror · Bake · Follow)이 이제 이 위젯을 쓴다. 내부 `start_edit` /
+> `end_edit` 를 노출하므로 기존 `le_*_start/end` 참조(.text() 등)는 그대로 동작한다. 값은 `start()` /
+> `end()` / `values()`, 설정은 `set_range()`. 툴 안의 중복 헬퍼(`_make_get_current_btn` 등 5개)는 제거.
+
+> **v01.35 — `Get Sel Range` 버튼(선택 키 구간으로 Start/End 한 번에 채우기)**: Start/End 가 있는 모든
+> 탭(Move Keys · Stagger · Copy · Mirror · Bake · Follow)에 `Get Sel Range` 버튼을 추가했다. `Get Current`
+> (현재 프레임 1칸)와 달리, **지금 선택한 키프레임들 중 제일 앞/뒤 프레임**을 찾아 **Start·End 두 칸을
+> 함께** 채운다(예: 어떤 커브의 6~15f 키를 선택하고 누르면 Start=6, End=15). 여러 커브에 걸쳐 선택해도
+> 전체의 앞/뒤를 잡는다(`cmds.keyframe(q=True, sl=True)` 의 min/max). 선택된 키가 없으면 경고 로그.
+> Bake 탭에서는 Custom range 모드에서만 활성.
+
+> **v01.34 — Stagger Offset: 슬라이더 홈(groove) 스타일**: 슬라이더의 가로 구간(홈)이 어두운 배경에
+> 묻혀 범위가 안 보이던 문제를 고쳤다(테마 qss 가 QSlider 를 스타일링하지 않음). A00290_BSTool Shape
+> Editor 슬라이더처럼 홈을 직접 그린다 — 중앙 0 양방향이라 sub/add-page 를 같은 색으로 덮어 좌우 균일한
+> 한 줄로만 그리고(0 은 중앙 눈금이 표시), blue_dark 테마 accent(#7f9ec8)에 맞췄다. `STAGGER_SLIDER_STYLE`.
+
+> **v01.33 — Stagger Offset: Apply 버튼 제거(값이 곧 결과)**: "Apply Stagger Offset" 버튼을 없앴다.
+> 이제 **슬라이더/스핀박스로 맞춘 값이 그대로 최종 결과**다. 값을 조절하고 손을 떼면(sliderReleased /
+> 스핀박스 editingFinished / 350ms 디바운스 / 창 닫기) 그 값이 자동으로 undo 큐에 기록되므로, 따로
+> 확정할 필요가 없다. settle 모델(v01.32)이 이미 값을 커밋하고 있었으므로 동작은 그대로이고 버튼만
+> 사라진 것이다. Reset(원위치)은 유지.
+
+> **v01.32 — Stagger Offset: Ctrl+Z 로 되돌아가게 + 슬라이더 추가**: v01.31 은 미리보기를 undo 큐에
+> 전혀 올리지 않아, 값을 조절한 뒤 **Ctrl+Z 를 눌러도 되돌아가지 않았다**(엉뚱한 이전 작업이 취소됨).
+> 이제 조작이 **멎으면**(`STAGGER_SETTLE_MS` = 350ms, 슬라이더를 놓거나 스핀박스 편집을 끝내면 즉시)
+> 그때까지의 결과를 **undo 큐에 한 항목으로 기록(settle)** 한다 → **Ctrl+Z 한 번이면 조작 직전 상태**로
+> 돌아간다(첫 조작이면 원위치 = **Reset 과 같은 결과**). 드래그 중에는 기록하지 않아 undo 항목이
+> 쌓이지 않는다. 기록 직전 항상 **마지막 기록 상태로 되돌린 뒤** 기록하므로 Ctrl+Z 가 정확히 그 지점으로
+> 온다. 사용자가 Ctrl+Z 를 눌러 씬이 세션의 가정과 어긋나면 **탐침 키로 감지해 세션을 버린다**
+> (되돌리려 들지 않는다 — 그래야 키가 엉뚱한 곳으로 밀리지 않는다).
+> 또 **Offset per Item 을 슬라이더 + 스핀박스**로 바꿨다(A00290_BSTool Shape Editor 패턴 — 같은 값의
+> 두 얼굴, 어느 쪽을 움직이든 즉시 반영하고 반대쪽을 맞춘다). 슬라이더는 ±60f, 그보다 큰 값은 스핀박스로.
+
+> **v01.40 — Key Edit 하위 탭 재편 + Fill Keys 추가**: 최상위였던 **Pose Key / Euler Filter** 를
+> Key Edit 하위 탭으로 내리고(최상위 8→6탭), **Fill Keys** 하위 탭을 새로 추가했다.
+> Fill Keys 는 고른 채널의 `[Start, End]` **모든 프레임**에 키를 채우되 **이미 있는 키는 방치**하고
+> 빈 프레임만 현재 값으로 채운다(애니메이션 불변). 어트리뷰트 목록 UI 는 A00145_RigConnect 의
+> Connect 탭 구성을 따랐고, 구간은 공용 `MOD_timeRange_qt_v01`, **키를 찍을 애니메이션 레이어**를
+> 콤보로 고를 수 있다. 하위 탭이 8개가 되어 창 기본 폭을 520 → 620 으로 늘렸다.
+
+> **v01.39 — Key Edit 탭을 하위 탭 5개로**: 접이식 섹션 5개(Move Keys / Graph Editor /
+> Offset & Hold / Stagger Offset / Delete All Keys)를 **중첩 `QTabWidget`** 으로 바꿨다
+> (A00145_RigConnect Constrain 탭과 같은 구성). 탭 하나에 기능 하나만 보이고, 라벨은 짧게 두되
+> **전체 이름은 탭 툴팁**에 싣는다. **창 크기 자동 조정은 그대로** — 상위/하위 페이지를 모두
+> `JUN_mod_fit_tab_page_v01` 로 두어 숨은 페이지가 sizeHint 0 을 보고하게 했다(스크롤 영역을
+> 쓰지 않는 이유이기도 하다). 위젯 이름과 시그널은 그대로라 동작은 이전과 같다.
+
+> **v01.31 — Key Edit: Stagger Offset 섹션 추가**: 리스트업한 컨트롤러들의 `[Start, End]` 구간 키를
+> **리스트 순서대로 Offset 배수만큼** 밀어 순차 지연(팔로우스루·웨이브)을 만든다. 0번은 제자리, 1번은
+> +1×Offset, 2번은 +2×Offset … 예) ctl_01/02/03 이 모두 0~5f 에 키가 있고 구간 0~5f, Offset 3 →
+> `[0,5] / [3,8] / [6,11]`. **스핀박스로 실시간 반영**되며 값이 **누적되지 않는다**(항상 원래 위치 기준
+> 재계산). 미리보기는 undo 큐에 올리지 않고, **Apply** 로 확정하면 **Ctrl+Z 한 번**에 전부 되돌아간다.
+> 키 이동은 `cmds.keyframe(relative=True)` **상대 이동만** 쓰므로 커브를 재생성하지 않아
+> **탄젠트·인피니티·애님 레이어가 보존**된다. `app/core/stagger_offset_manager.py` 신규.
+
+> **v01.30 — Graph Focus: 자동 확대를 오브젝트 선택에만 엄격히 한정**: Auto-Focus 가 켜진 상태에서
+> 그래프 에디터의 **키프레임을 찍었다 풀거나** undo(`z`) 를 해도 `SelectionChanged` 가 발생해 자동 확대가
+> 걸리던 문제를 고쳤다. 마야의 `SelectionChanged` 는 씬 오브젝트 선택뿐 아니라 **키 선택/해제·undo** 로도
+> 발생하는데, v01.27 의 "선택된 키가 있으면 건너뛰기"는 키를 **해제한** 순간(선택 키가 0개)을 막지 못했다.
+> 이제 **직전에 프레이밍한 오브젝트 선택 목록을 캐시**해두고, `cmds.ls(sl=True, long=True)` 가 실제로
+> **달라졌을 때만** 프레이밍한다(선택이 비면 무시). 키 선택/해제·undo 는 오브젝트 선택이 그대로라 무시되고,
+> 컨트롤러를 새로 선택했을 때만 확대된다. `app/core/graph_focus_manager.py` 만 변경.
+
+> **v01.29 — Graph Focus: 세로 여백(Value margin %)을 UI 로 조절**: v01.28 에서 여백을 아예 없앴더니
+> 최댓값/최솟값이 뷰 위아래 가장자리에 딱 붙었는데, 살짝 여백을 두고 싶다는 요청에 따라 **`Value margin (%)`
+> 스핀박스**(기본 10%, 0~100)를 추가했다. 세로 값 범위에 이 퍼센트만큼 위/아래 여백을 두고 프레이밍한다
+> (5~10% 권장). `frame_around_current(..., value_pad_pct)` 로 전달되며, Auto-Focus·Focus Now 공통. 평평한
+> 구간은 값 크기에 비례한(또는 1.0) 여백을 유지. `graph_view_manager.py` · `graph_focus_manager.py` ·
+> `main_window.py` 변경.
+
+> **v01.28 — Graph Focus: Fit value 를 여백 없이 꽉 채우도록**: 세로 값 범위에 위아래 10% 여백을
+> 주던 것을 없애, 구간 내 **최댓값이 뷰 맨 위·최솟값이 맨 아래에 닿도록**(`animView` minValue/maxValue =
+> vmin/vmax) 값을 최대한 크게 보여준다(값이 줄어들어 잘 안 보이던 문제 해소). 평평한 구간(min==max)만
+> `animView` 가 범위를 만들 수 없어 예외로 최소 여백을 유지한다. `app/core/graph_view_manager.py` 만 변경.
+
+> **v01.27 — Graph Focus: 키 선택 후 `f`(Frame Selection)를 존중**: Auto-Focus 가 켜진 상태에서
+> 그래프 에디터의 **특정 키를 선택해 `f` 로 그 범위만 보려 하면**, 키 선택으로 발생한 `SelectionChanged`
+> 의 지연 콜백이 뒤늦게 **현재 프레임으로 덮어써** 원하는 프레임(예: 300f)이 아니라 현재 프레임(400f)으로
+> 튀던 문제를 고쳤다. 이제 자동 프레이밍 콜백은 **그래프 에디터에 선택된 키가 있으면 건너뛴다**
+> (`cmds.keyframe(q, selected, name)` 로 감지). 컨트롤러만 새로 선택했을 땐 선택 키가 없어 정상 동작하고,
+> `Focus Now`·토글 ON 같은 명시적 조작은 영향받지 않는다. `app/core/graph_focus_manager.py` 만 변경.
+
+> **v01.26 — Graph Focus: Fit value 세로축이 항상 맞도록 수정**: 이전(v01.25)에는 세로 값 범위를
+> **구간 안에 있는 키 값**만으로 구해서, 현재 프레임 ±margin 구간 **안에 키가 없으면**(멀리 떨어진
+> 두 키 사이를 볼 때) 세로축을 못 맞췄다 — Focus Now 가 프레임 위치에 따라 "맞을 때/안 맞을 때"로 갈렸다.
+> 이제 애니메이션 커브의 `.output` 을 **구간에 걸쳐 시간별로 평가**해(탄젠트 오버슛 포함) min/max 를 구하고
+> 구간 내 키 값도 함께 반영하므로, 키 유무와 무관하게 세로축이 구간의 실제 상/하한에 맞는다. 커브가 많으면
+> 커브당 샘플 수를 줄여 총 평가 횟수를 상한(4000) 이내로 유지한다. `app/core/graph_view_manager.py` 만 변경.
+
+> **v01.25 — Graph Focus 탭 신설**: 선택 시 그래프 에디터를 현재 프레임 ± margin 구간으로 프레이밍하는
+> 탭을 추가했다. **Auto-Focus 토글**(체크형 버튼)이 켜지면 `SelectionChanged` scriptJob 으로 선택 변경을
+> 감시하다가, 마야 자체 프레이밍 뒤(`evalDeferred`)에 `animView` 로 `[현재-margin, 현재+margin]` 을
+> 덮어쓴다. **Frame margin(±)** 스핀박스로 프레임 수를 정하고(기본 80), **Fit value** 체크 시 세로(값)
+> 축도 구간 내 키 값 범위에 맞춘다. **Focus Now** 버튼은 토글과 무관하게 즉시 1회 프레이밍. 창을 닫으면
+> `closeEvent` 에서 scriptJob 을 정리한다. 새 매니저 `graph_view_manager.py`(프레이밍 로직) +
+> `graph_focus_manager.py`(scriptJob 라이프사이클), `app/ui/main_window.py` 변경.
+
+> **v01.24 — Always on Top(Pin) 토글 버튼 추가**: 상단 헤더 행 오른쪽에 체크형 `Pin` 버튼을 두었다.
+> 켜면 이 창이 다른 마야 창들보다 **항상 위**에 유지되고(`Qt.WindowStaysOnTopHint`) 라벨이 `Pinned`
+> 로 바뀐다. 다시 누르면 해제. 이 툴은 기본적으로 정상 Z-order(밑 창을 클릭하면 위로 올라옴)를 쓰므로,
+> 필요할 때만 켜는 방식이다. 버튼은 고정 크기라 토글해도 위치·크기가 변하지 않는다(A00340_SelectionTool
+> 과 동일 패턴). 플래그 변경 후 창이 숨는 Qt 특성을 피하려 내부에서 `show()` 를 재호출한다.
+> `app/ui/main_window.py` 만 변경.
+
+> **v01.23 — 확장된 `Get Current` 버튼이 동작하지 않던 버그 수정**: v01.22 에서 추가한 (Follow 외)
+> 모든 `Get Current` 버튼이 눌러도 입력이 갱신되지 않았다. 원인은 `_make_get_current_btn` 의 슬롯이
+> `lambda le=line_edit:` 로 **위치 인자 1개를 받는** 형태였던 것 — PySide 의 `clicked` 시그널이 슬롯에
+> `checked`(bool) 인자를 넘기는데, 그 값이 `le` 기본값을 덮어써 `_set_current_frame(False)` 로 호출돼
+> 실패했다. `lambda *_a, le=line_edit:` 로 checked 인자를 흡수해 해결. Follow 탭 버튼은 무인자 람다라
+> 영향 없었다. `app/ui/main_window.py` 만 변경.
+
+> **v01.22 — `Get Current` 버튼을 시간범위가 있는 모든 탭으로 확장**: 기존에 **Follow 탭에만** 있던
+> `Get Current`(클릭 시 현재 Maya 프레임으로 Start/End 입력을 채움) 버튼을 **Key Edit(Move Keys) ·
+> Copy Key · Mirror Key · Bake** 탭의 Start/End 입력 옆에도 추가했다. Bake 탭은 **Custom range 모드일 때만**
+> 버튼이 활성화된다(입력 필드와 동일 토글). 구현은 공용 헬퍼 `_make_get_current_btn(line_edit)` 로 일원화하고,
+> 핸들러를 `_follow_set_current_frame` → `_set_current_frame`(범용)으로 바꿨다. `app/ui/main_window.py` 만 변경.
+
+> **v01.21 — Follow 탭: 비-베이스 레이어 베이크가 베이스와 동일한 월드 결과를 내도록 수정**: 비-베이스
+> 애니메이션 레이어(특히 **additive**)에 구울 때 ① 구간 안에서 위치가 어긋나고, ② 회전이 베이스와
+> 다르며, ③ **구간 밖 원본 애니메이션이 상수만큼 평행이동**하던 버그를 한 번에 고쳤다. 근본 원인은
+> `setKeyframe(animLayer=L, value=V)` 가 레이어 커브에 V 를 **그대로 쓰는 게 아니라 '평가 결과 = V'
+> 가 되도록 레이어 기여를 역산**한다는 점이다. 그래서 override 는 절대값 `V=F` 를 넘겨 정상이었지만,
+> additive 는 **델타 `V=F−base`** 를 넘겨 평가값이 `F−base` 만큼 어긋났다(중립 0 키도 `additive=−base`
+> 로 역산돼 구간 밖 오프셋으로 유지). **수정**: override/additive 구분 없이 항상 **절대 로컬값 F** 만
+> 기록 → Maya 가 레이어 종류에 맞는 기여(additive 회전 합성 포함)를 자동 계산. 델타 계산·base 읽기·
+> 회전 합성 캘리브레이션·base-pin 을 **모두 제거**(코드 단순화). 구간 밖은 경계(`start-1`/`end+1`)에
+> **원본 절대값**을 키 → 그 프레임 레이어 기여 0, 레이어 커브 **Infinity=constant** 로 고정해 구간
+> 밖에서 0 기여를 유지(원본 애니메이션이 위치 변화 없이 그대로 재생). `follow_match_manager.py` 만 변경.
+
+> **v01.17 — 리스트업 후 창/리스트가 작아지던 문제 수정**: select 로 오브젝트를 리스트에 채운 뒤
+> **탭을 전환하는 순간 창 세로가 갑자기 작아지던** 버그를 고쳤다. 원인은 `_fit_window` 가 탭 전환
+> 시에도 창을 현재 탭 콘텐츠 높이로 **줄이기까지** 했기 때문(콘텐츠가 짧은 탭을 누르면 급격히 축소).
+> 이제 **탭 전환은 grow_only**(필요할 때만 늘리고 줄이지 않음)로, **섹션 접기/펴기만 콘텐츠 높이로
+> 축소**한다. 더불어 공유 리스트 위젯(`MOD_tsl_qt_v01`)에 **최소 높이 바닥값 100px**(명시값 없는
+> 리스트), 공유 로그창에 **최대 높이 160px**(창을 다시 키울 때 로그가 빈 공간을 독식하지 않게)를
+> 추가했다.
+
+> **v01.16 — 뷰포트 프리즈(refresh suspend 누수) 수정 + Force Refresh 버튼**: Bake/Follow 가
+> 쓰는 `cmds.refresh(suspend=True)` 는 **씬 전역 토글**이라, 복원(`suspend=False`)이 어떤 예외에도
+> 반드시 실행돼야 한다. A00120_FKIK `bake()` 의 `finally` 가 임시 컨스트레인트 `cmds.delete()` 를
+> `suspend=False` **보다 먼저** 실행해, delete 가 실패하면 복원이 건너뛰어져 **세션 전체가 프리즈**
+> (Graph Editor 커브 편집이 프레임 이동 전까지 반영 안 됨)되는 버그가 있었다. refresh suspend 가
+> 전역이라 한 번 누수되면 A00110 을 써도 멈춘 것처럼 보였다. 공용 컨텍스트 매니저
+> `Framework/core/maya_refresh.py` 의 **`suspend_refresh()`**(복원을 항상 먼저/무조건 보장)로 A00110
+> (`bake_manager`, `follow_match_manager`)·A00120(`fkik_matcher`)의 모든 suspend 사용처를 통일하고,
+> A00110·A00120 UI 에 **Force Refresh (Unfreeze Viewport)** 버튼(`force_refresh()` =
+> `refresh(suspend=False)` + `refresh()`)을 추가해 사용자가 멈춘 세션을 즉시 풀 수 있게 했다.
+
+> **v01.15 — Follow 탭: Maintain Offset · 1<-n · Get Current**: ① **Maintain Offset** 체크 시
+> start(구간 시작) 프레임에서 측정한 target↔follower 상대 행렬 `offset = worldMatrix(flw) ·
+> worldInverseMatrix(tgt)` 을 매 프레임 유지한다(`follower_world(t) = offset · worldMatrix(tgt,t)`).
+> 컨스트레인트 노드 없이 행렬 연산만 쓰므로 사이클/평가순서 오류가 없다(레거시
+> `JUN_PY_MatrixCon_01_01` 의 offsetMat 로직과 동일). 끄면 offset 0(정확히 일치, 기존 동작).
+> ② **1<-n** 체크 시 target 1개를 모든 follower 가 추종(target 이 1개가 아니면 경고 후 중단), 끄면
+> n<-n(인덱스 1:1, 개수 불일치 시 중단). ③ Start/End 옆 **Get Current** 버튼으로 현재 Maya 프레임을
+> 각 입력란에 채운다. 로그에 `mode`(1<-n/n<-n)·`offset`(offset/no-offset) 가 함께 표기된다.
+> `match_follow(..., maintain_offset, one_to_many)` 로 확장.
+
+> **v01.14 — Key Edit 탭을 접이식 섹션 3개로 분리**: Key Edit 탭을 **Move Keys / Graph Editor /
+> Offset & Hold** 세 개의 접이식(collapsible) 섹션으로 나눴다(레거시 `JUN_PY_SelectionTool` 의
+> `frameLayout(collapsable=True)` 패턴을 Qt 로 이식). 각 섹션 헤더를 클릭하면 접고/펼치며,
+> **Offset & Hold 는 기본 접힘**이다. 접고 펼칠 때(및 탭 전환 시) **창 크기가 현재 탭 콘텐츠에 맞춰
+> 자동으로 줄고 늘어난다**. 접이식 위젯은 재사용 모듈 `Framework/qt/MOD_collapsible_qt_v01.py`
+> (`JUN_mod_collapsible_qt_v01` 헤더형 섹션 + `JUN_mod_fit_tab_page_v01` 숨김 시 sizeHint 0 인 탭
+> 페이지)로 분리했고, 창 크기 조정은 `main_window` 의 `_fit_window`(한 틱 뒤 `resize`)가 담당한다.
+> 섹션 `toggled` 는 콘텐츠 높이로 **줄이고 늘리며**, `QTabWidget.currentChanged` 는 **grow_only**
+> (늘리기만, v01.17)라 리스트업 후 탭을 눌러도 창이 작아지지 않는다.
+
+> **v01.13 — Offset & Hold 를 Key Edit 탭으로 통합**: 별도 탭이던 Offset & Hold 를 없애고 **Key Edit
+> 탭의 "Offset && Hold" 그룹**으로 옮겼다(기능·로직 동일, UI 위치만 변경). 리스트의 각 오브젝트에서
+> **대상 커브들의 키 시점 합집합**을 '포즈 프레임'으로 삼아, 포즈마다 `[start+i·P, start+i·P+hold]`
+> (P=hold+offset) plateau 를 만들고 그 사이를 offset 길이로 보간한다. 포즈 프레임 값은 어트리뷰트를
+> 시점별로 평가(`getAttr time=`)해 샘플링하므로 그 시점에 키가 없던 커브도 보간값으로 잡힌다. plateau
+> 양 끝 안쪽 탄젠트는 **flat**, 보간 구간 바깥은 **spline** 이라 유지→가속→감속→유지가 된다. 로직은
+> `app/core/offset_hold_manager.py`, 리스트 UI 는 재사용 위젯 `JUN_mod_tsl_qt_v01`.
+
+> **v01.11 — Follow 탭 신설**: follower 들을 인덱스로 매칭된 target 의 월드 transform 에 맞춰 구간
+> 키 베이크한다. target `worldMatrix` 를 follower `parentInverseMatrix` 로 로컬화한 뒤 **follower
+> 자신의 rotateOrder 로 재분해**(Mirror Key 의 검증된 경로 재사용)하므로 rotateOrder 무관이다.
+> **blend(0~1)** 는 위치/스케일 선형 lerp + 회전 쿼터니언 slerp 로 **키 값에 직접 베이크**(레이어
+> weight 는 1 유지)하고, 현재 선택된 애니 레이어가 override 면 `V=F`, additive 면 `V=F−base` 로
+> 기록한다. 로직은 `app/core/follow_match_manager.py`, 리스트 UI 는 재사용 위젯 `JUN_mod_tsl_qt_v01` 2개.
+
+> **v01.09 — Mirror Key 동작 기준/Behavior 수식 정리**: ① Mirror 실행(Mirror Selected·Mirror
+> Current Frame)이 **씬 선택과 무관하게 Source/Target 리스트의 오브젝트만** 대상으로 한다(선택 →
+> `Resolve Pairs`/`Select Source` 로 리스트 채우기 → 실행으로 단계 분리). ② Behavior 모드 수식에서
+> **반사를 제거**해 소스의 **로컬 채널 값이 타겟에 그대로 복사**되도록 했다(예: zxy `(-10,-3,-50)` →
+> 타겟도 `(-10,-3,-50)`). Behavior 는 반사축에 무관하므로 ON 이면 **Mirror Axis 라디오가 비활성**.
+
+> **v01.08 — Mirror Key 에 "Behavior" 모드 추가**: 반대쪽 컨트롤러의 **고유 forward/up 축 방향을
+> 보존**하며 미러한다(Maya `mirror joints` 의 **Behavior** 세팅처럼 좌우 축이 반전된 리그용). 각
+> 컨트롤의 **레스트(기준) 포즈**(채널 기본값 상태의 월드 행렬)를 기준으로 상대 미러하므로, 소스가
+> 레스트면 타겟도 자기 레스트가 된다. **Behavior 체크박스(기본 ON)** 로 켜고, 끄면 기존 **순수 월드
+> 반사(orientation)** 가 된다. 구간 미러(Mirror Selected)·현재 프레임(Mirror Current Frame) 모두 적용.
+
+> **v01.06 — Mirror Key 에 "Mirror Current Frame" 추가**: 구간이 아니라 **현재 프레임 1곳만** 미러한다.
+> 키잉은 autoKeyframe 를 재현해 **키가 있던 채널만** 현재 프레임에 키를 갱신하고, **키가 없던 채널은
+> 포즈만(`setAttr`)** 미러한다(전역 autoKeyframe 상태는 건드리지 않음). Keying 옵션으로 **Per-channel**
+> (기본) / **Per-object**(애니 있는 오브젝트는 선택 채널 전부 키) 중 선택.
+
+> **v01.05 — Bake 탭 신설**: `A00120_FKIK` 의 native `bakeResults` 베이크(Python 프레임 루프 대체)를
+> 범용 bake 로 이식했다. 컨스트레인트로 묶지 않고 **리스트의 노드 자체**를 굽는다. 로직은
+> `app/core/bake_manager.py`, 대상 리스트는 재사용 위젯 `JUN_mod_tsl_qt_v01`. **Keep constraints**
+> 옵션(기본 ON)으로 컨스트레인트를 유지(`pairBlend` 공존)할지 정리(bake down)할지 고른다.
+
+> **v01.04 — Mirror Key 탭 신설**: 컨트롤 키를 좌우 대칭으로 반대쪽에 복사한다. 채널 부호 반전이
+> 아니라 **월드 매트릭스 반사 → 타겟 rotateOrder 재분해** 방식이라 rotateOrder/축 정렬에 무관하다.
+> 로직은 `app/core/mirror_key_manager.py`, 토큰 JSON 입출력은 `app/core/mirror_token_store.py`
+> (`app/config/mirror_tokens.json`)로 분리했다. 리스트 UI 는 재사용 위젯 `JUN_mod_tsl_qt_v01` 2개.
+
+> **v01.03 — Copy Key 탭 신설**: 레거시 단일 파일 툴
+> `01_Modules/JUN_PY_CopyPasteKey_V03_01.py`(maya.cmds 기반 "Copy Key Tool V03.01")의
+> "키 복사 + 축 Reverse" 기능을 현행 Qt 툴의 세 번째 탭으로 이식했다. 리스트 UI 는 직접
+> 만들지 않고 재사용 위젯 `JUN_mod_tsl_qt_v01` 2개로 구성하고, 복사 로직은
+> `app/core/copykey_manager.py` 로 분리했다. 레거시의 Match Name(접두/접미 제거)은 생략했다.
+
+- DCC: Autodesk Maya (PySide UI). 키 조작은 `maya.cmds`(`keyframe`/`cutKey`/`copyKey`/
+  `pasteKey`/`scaleKey`/`setKeyframe`/`keyTangent`) 표준 명령만 사용 → Maya 2023 호환.
+  Mirror Key / Follow 만 행렬·회전 연산에 `maya.api.OpenMaya`(2.0) 의 `MMatrix`/
+  `MTransformationMatrix`/`MEulerRotation`/`MQuaternion` 사용.
+- 복사 알고리즘 원본: 레거시 `JUN_cmd_copyKey_V02`. Pose Key 는 `A00030_quickTool` 의
+  `JUN_cmd_anim_rot_x_z_to_zero`(3축)를 6축으로 일반화한 것.
+
+---
+
+## 2. 폴더 구조
+
+```
+A00110_animTool_V02/
+├── __init__.py            # from .launch import run
+├── launch.py              # run(): MainWindow 생성 → 테마 적용 → show()
+├── __dragDrop_A00110_V02.py              # 셸프 버튼 설치 + 드래그&드롭 진입점
+├── requirements.txt
+└── app/
+    ├── config/
+    │   ├── version.py            # VERSION / LAST_UPDATE
+    │   └── mirror_tokens.json    # 좌/우 토큰 쌍 (Mirror Key, 확장 가능)
+    ├── core/              # 로직 (UI 비의존, maya.cmds)
+    │   ├── keyframe_manager.py   # 키 이동 / 구간삭제 / 전체삭제 / Hold (Timing · Key 탭)
+    │   ├── hotkey_manager.py     # Shift+A 핫키 설치 / 복원 → Hold 호출
+    │   ├── pose_key_manager.py   # 현재 프레임 6축 pose 키 (Pose Key 탭)
+    │   ├── copykey_manager.py    # Base→Target 키 복사 + 축 Reverse (Copy Key 탭)
+    │   ├── mirror_key_manager.py # 컨트롤 키 좌우 미러 (Mirror Key 탭, OpenMaya)
+    │   ├── mirror_token_store.py # mirror_tokens.json 입출력 + 폴백
+    │   ├── bake_manager.py       # 리스트 노드 구간 bake (Bake 탭, native bakeResults)
+    │   ├── follow_match_manager.py # follower→target 월드 매치 베이크 (Follow 탭, OpenMaya + blend, maintain offset, 1<-n)
+    │   ├── offset_hold_manager.py # 키를 hold+offset 구조로 재배치 (Timing > Offset)
+    │   ├── stagger_offset_manager.py # 리스트 순서대로 구간 키를 계단식 오프셋 (Timing > Stagger)
+    │   ├── euler_filter_manager.py # 구간 한정 오일러 필터 (Euler Filter 탭, native filterCurve)
+    │   ├── graph_view_manager.py  # 그래프 에디터 현재±margin 프레이밍 로직 (Graph Focus 탭)
+    │   └── graph_focus_manager.py # SelectionChanged scriptJob 라이프사이클 (Graph Focus 탭)
+    └── ui/main_window.py  # 전체 UI (8개 탭 + 공유 로그창 + 메뉴 바)
+```
+
+- 각 manager 는 **UI 비의존 정적 메서드**(`@staticmethod`)로 작성되고 `(count, msg)` 를 반환한다.
+  작업 전체를 `cmds.undoInfo(openChunk/closeChunk)` 로 묶어 **Ctrl+Z 한 번**에 취소된다.
+- UI(`main_window.py`)는 manager 를 호출하고 결과 메시지를 **모든 탭 공유 로그창**에 출력한다.
+
+---
+
+## 3. 설치
+
+`A00110_animTool_V02/__dragDrop_A00110_V02.py` 를 Maya 뷰포트로 **드래그&드롭** → 셸프에 버튼 생성.
+
+---
+
+## 4. 실행
+
+- 셸프 버튼 클릭, 또는 Script Editor에서:
+
+```python
+import tools.A00110_animTool_V02 as A00110_animTool_V02
+A00110_animTool_V02.run(True)   # True = reload
+```
+
+- 창은 항상 위(`WindowStaysOnTopHint`)로 뜨고, 재실행 시 기존 창을 닫고 다시 연다.
+
+---
+
+## 5. UI 구성
+
+```
+┌ Help ────────────────────────────────────────────────────────┐  ← 메뉴 바 (Help > About)
+│ [Key][Timing][Curve][Transfer][Bake][View]                    │  ← 상위 탭 = 카테고리 (6개)
+│  ├ [Pose Key][Fill Keys][Delete All]                          │  ← 하위 탭 = 기능 (Key 선택 시)
+├───────────────────────────────────────────────────────────────┤
+│  (선택된 기능 내용)                                           │
+├ Log (모든 탭 공유) ───────────────────────────────────────────┤
+│ ┌ read-only 로그창 (영어 출력) ┐                             │
+│ └─────────────────────────────────┘                          │
+│      Copyright (c) Park Ji Hun. ...                          │
+└───────────────────────────────────────────────────────────────┘
+```
+
+| 상위 탭 | 무엇을 바꾸나 | 하위 탭 (기능) |
+|---------|--------------|----------------|
+| **Key** | 키의 **존재** | Pose Key · Fill Keys · Delete All |
+| **Timing** | 키의 **시점** | Move · Hold · Offset · Stagger |
+| **Curve** | 커브의 **값·형태** | Euler |
+| **Transfer** | **다른 오브젝트로** 옮기기 | Copy Key · Mirror Key · Follow |
+| **Bake** | 결과를 **키로 굽기** | Bake |
+| **View** | **보기**(씬 불변) | Graph Focus |
+
+- **Help > About**: 작성자·업데이트 날짜 팝업.
+- 하단 **로그창**과 저작권 라벨은 **모든 탭이 공유**한다(모든 결과/경고가 여기 출력).
+
+> **V01 v01.41 → V02 v02.00 에서 탭을 재분류했다.** 기능은 하나도 바뀌지 않았고 **자리만** 옮겼다.
+> 설계 근거는 [계획서](plans/A00110_animTool_tab_reorg_plan.md).
+
+| V01 v01.41 (옛 위치) | V02 v02.00 (새 위치) |
+|---|---|
+| Key Edit > Pose Key | **Key > Pose Key** |
+| Key Edit > Fill Keys | **Key > Fill Keys** |
+| Key Edit > Delete All | **Key > Delete All** |
+| Key Edit > Move Keys | **Timing > Move** |
+| Key Edit > **Graph** | **Timing > Hold** (라벨 변경 — 하는 일이 Hold 이고 `Graph Focus` 와 헷갈렸다) |
+| Key Edit > Offset & Hold | **Timing > Offset** |
+| Key Edit > Stagger | **Timing > Stagger** |
+| Key Edit > Euler | **Curve > Euler** |
+| **Copy Key** (상위 탭) | **Transfer > Copy Key** |
+| **Mirror Key** (상위 탭) | **Transfer > Mirror Key** |
+| **Follow** (상위 탭) | **Transfer > Follow** |
+| **Bake** (상위 탭) | **Bake > Bake** |
+| **Graph Focus** (상위 탭) | **View > Graph Focus** |
+
+기능·단축키(`Shift+A`)·위젯 배치는 그대로다.
+
+### 5.1 탭 구성 규칙
+
+- **상위 탭 = 카테고리 / 하위 탭 = 기능**. 예외를 두지 않는다 — 하위가 하나뿐인 카테고리
+  (Curve · Bake · View)도 하위 탭 바를 그대로 둔다. 그래야 기능 이름이 화면에 남고
+  (Euler · Bake 페이지에는 제목 그룹박스가 없다), 나중에 기능이 늘어도 구조가 그대로다.
+- **한 화면 = 한 기능**. 접이식 섹션을 쌓지 않는다.
+- 탭 라벨은 창 폭(기본 520)에 맞춰 줄이고 **전체 이름은 탭 툴팁**에 싣는다
+  (예: `Stagger` → "Stagger Offset - shift each listed controller by 'list order x offset'").
+  폭이 모자라면 라벨이 말줄임(`ElideRight`)된다.
+- 각 카테고리의 **첫 하위 탭이 대표 기능**이다(Key→Pose Key, Timing→Move, Transfer→Copy Key).
+- **창 크기 자동 조정**: 하위 탭을 바꾸거나 상위 탭을 바꾸면 창 높이가 **지금 보이는 페이지**에
+  맞춰 조정된다. 이를 위해 상위 카테고리 페이지도, 하위 기능 페이지도 모두
+  `JUN_mod_fit_tab_page_v01` 이다 — 숨은 페이지가 sizeHint 를 0 으로 보고해야 `QStackedLayout`
+  의 "모든 페이지 중 최댓값" 규칙에 걸리지 않는다.
+  (그래서 A00145_RigConnect 의 하위 탭과 달리 **스크롤 영역은 쓰지 않는다**. 스크롤 영역은
+  콘텐츠와 무관한 sizeHint 를 가져 이 자동 맞춤을 깨뜨린다.)
+
+> **이력**: V01 의 v01.39 에서 접이식 섹션을 하위 탭으로 바꿨고(A00145_RigConnect Constrain 탭과
+> 같은 구성), **V02 에서 상위 탭 전체를 카테고리로** 재분류했다. 그전에는 `Key Edit` 만 하위 탭
+> 8개를 가진 카테고리이고 나머지 5개(Copy Key / Mirror Key / Bake / Follow / Graph Focus)는
+> 기능 하나짜리 상위 탭이라, 새 기능이 전부 `Key Edit` 로 들어가 비대해졌다.
+
+### 5.2 Key 탭 — 키를 만들고 지운다
+
+키의 **존재**를 다루는 카테고리다. 무엇을 언제 찍고 지울지가 여기에 모여 있다.
+
+#### Pose Key — 현재 프레임 6축 포즈 키
+
+```
+┌ Set Pose Key (current frame) ─────────────────────┐
+│ [v] rotate X     [ 0 ]                            │
+│ [ ] rotate Y     [ 0 ]                            │
+│ [v] rotate Z     [ 0 ]                            │
+│ [ ] translate X  [ 0 ]                            │
+│ [v] translate Y  [ 0 ]                            │
+│ [ ] translate Z  [ 0 ]                            │
+└───────────────────────────────────────────────────┘
+[ Set Pose Key ]
+```
+
+- 6축(rotate X/Y/Z, translate X/Y/Z)마다 **체크박스 + 값 입력**.
+- **기본 체크 축**: rotate X / rotate Z / translate Y (원본 A00030 의 3축).
+- **Set Pose Key**: 선택 오브젝트(들)의 **현재 타임라인 프레임**에 **체크된 축만** 입력값으로
+  `setKeyframe`. 체크됐는데 값이 비어 있으면 경고 후 중단.
+
+#### Fill Keys — 구간의 모든 프레임에 키 채우기 (v01.40~)
+
+`[Start, End]` 의 **모든 프레임**에 키가 있게 만든다. **이미 키가 있는 프레임은 그대로 두고**,
+비어 있는 프레임만 **지금 보이는 값 그대로** 키를 찍는다 — 즉 **애니메이션은 전혀 바뀌지 않고**
+키만 촘촘해진다.
+
+```
+┌ Fill Keys ────────────────────────────────────────┐
+│ [Objects]            │ Attributes      Number: 12 │
+│  (List Selected...)  │ [ translateX             ] │
+│  ...                 │ [ translateY             ] │
+│ [List Attributes]    │ [ rotateZ  ...           ] │
+│                      │ [Filter ................] │
+│                      │ [Select All]              │
+│ Start [ 1 ][Get Current] End [ 24 ][Get Current]  │
+│ Anim Layer [ (current) ▾ ]            [ Refresh ] │
+│ [           Fill Keys in Range           ]        │
+└───────────────────────────────────────────────────┘
+```
+
+어트리뷰트 목록 UI 는 [A00145_RigConnect](A00145_RigConnect.md) 의 **Connect 탭과 같은 구성**이다
+(왼쪽 오브젝트 리스트 + `List Attributes`, 오른쪽 목록 + `Filter` + `Select All`).
+
+**사용 순서**
+
+1. 오브젝트를 선택하고 `List Selected Objects` → **`List Attributes`**.
+2. 채울 채널을 목록에서 **다중 선택**(`Filter` 로 좁히고 `Select All` 가능).
+3. **Start / End** 입력(`Get Current` 로 현재 프레임 채우기).
+4. **Anim Layer** 선택 → **`Fill Keys in Range`**. 전체가 **한 번의 Ctrl+Z** 로 되돌아간다.
+
+**나열되는 어트리뷰트**
+
+**키를 찍을 수 있고 · 채널박스에 노출되고 · 잠기지 않은** 채널만 나열한다
+(`listAttr -keyable -visible -unlocked`). 채널박스에만 보이고 키는 못 찍는 채널
+(`setAttr -k false -cb true`)은 제외된다. 여러 오브젝트를 넣으면 **합집합**을 첫 등장 순서로
+보여 주고, 실행할 때 그 채널이 없는 오브젝트는 조용히 건너뛴다(개수만 알림).
+
+**애니메이션 레이어**
+
+| 선택 | 동작 |
+|------|------|
+| **`(current)`**(기본) | 레이어 인자를 넘기지 않는다 → 마야가 평소대로(애니메이션 레이어 에디터에서 **선택된 레이어**) 처리 |
+| 레이어 이름 | 그 레이어에 키를 찍는다. 그 채널이 아직 레이어에 없으면 **자동으로 넣어 준다** |
+
+`Refresh` 로 씬의 레이어 목록을 다시 읽는다(처음 열 때는 **선택된 레이어**가 기본값).
+
+**동작 원리 (mayapy 실측으로 갈랐다)**
+
+- 대상 커브가 **이미 있으면** `setKeyframe(insert=True)` — 커브 모양을 그대로 보존한 채 키만 꽂는다.
+  값을 계산할 필요도 없고 오차도 없다(실측 1.8e-15).
+- 대상 커브가 **없으면**(아직 애니메이션이 없거나, 고른 레이어에 그 채널 커브가 없으면)
+  `insert` 는 **조용히 아무것도 하지 않는다**(실측: 반환 0, 커브 미생성). 그래서 이 경우엔
+  `getAttr(plug, time=f)` 로 프레임별 평가값을 읽어 값으로 키를 찍는다.
+  **값은 반드시 쓰기 전에 전부 미리 구한다** — 레이어 커브에 키가 하나라도 생기면 그 레이어의
+  기여가 달라져 이후 프레임의 평가값이 흔들릴 수 있기 때문이다.
+- `setKeyframe(animLayer=L, value=V)` 는 레이어 커브에 V 를 그대로 쓰는 게 아니라 **최종 평가값이
+  V 가 되도록** 레이어 기여분을 역산해 넣는다. 그래서 평가값을 그대로 넘기면 레이어에서도 모양이 유지된다.
+
+**로그 예시**
+
+```
+Fill Keys: 18 key(s) added, 2 frame(s) already keyed (left alone)  [1-10f, 1 channel(s) x 2 object(s), layer: (current)]
+```
+
+잠긴 채널, 없는 채널은 건너뛰고 로그로 알린다.
+
+#### Delete All — Delete All Keys (v01.18~)
+
+리스트업한 오브젝트의 **모든 키프레임을 일괄 삭제**한다. 구간 삭제(`Delete Keys in Range`)와 달리
+**시간 범위·채널박스 스코프를 적용하지 않고** 대상 오브젝트에 연결된 애니메이션 커브의 키를 전부 지운다.
+대상은 씬 선택이 아니라 **그룹 안 리스트의 항목**이다.
+
+- **Delete-All List** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `List Selected Objects` 로 현재 씬 선택을
+  리스트에 채운다(Add/Del/Up/Down/Sort, "Number: N", 항목 클릭 시 씬 자동 선택 내장).
+- **Delete All Keyframes of Listed**: 클릭하면 **확인 다이얼로그** 후 리스트 전 항목의 키를 삭제한다
+  (`cmds.cutKey(clear=True)`, 전 구간·전 채널). 이미 씬에서 사라진(삭제/리네임) 항목은 건너뛴다.
+  **Undo 가능**(한 번의 Ctrl+Z). 리스트가 비면 경고만 남기고 아무것도 하지 않는다.
+
+### 5.3 Timing 탭 — 키를 시간축에서 재배치한다
+
+키의 **시점**을 다루는 카테고리다. 값은 그대로 두고 언제 일어나는지를 바꾼다.
+
+#### Move — 키 위치 이동 / 구간 삭제
+
+- **Start / End**: 작업할 시간 범위(프레임). **Offset**: 이동량(양수 입력, 부호는 버튼이 결정).
+- **◀ Earlier (-)** / **Later (+) ▶**: `[Start, End]` 구간의 키를 Offset 만큼 **앞/뒤로 상대 이동**.
+- **Delete Keys in Range**: `[Start, End]` 구간의 키를 **삭제**(클립보드 미사용).
+- **채널 스코프**: 채널박스(`mainChannelBox`)에서 **어트리뷰트를 선택해 두면 그 채널만**,
+  선택이 없으면 **오브젝트의 모든 애니메이션 커브**가 대상이 된다(이동/삭제 공통).
+
+#### Hold — 그래프 에디터에서 고른 키 구간 Hold
+
+- **Hold Selected Range**: 그래프 에디터에서 **선택한 키들**을 커브별로, 선택 구간의 시작 값으로
+  **평평하게(flat) 유지**한다(아래 7장 규칙 참고).
+- **Shift+A hotkey** 체크박스: 켜면 Shift+A 를 Hold 에 바인딩, 끄면 원래 바인딩으로 복원.
+  옆 라벨에 `Shift+A : ON / OFF / unavailable` 상태를 표시한다.
+
+#### Offset — Offset & Hold (v01.13~)
+
+리스트업한 컨트롤러의 키를 **포즈 유지(hold) + 보간(offset)** 구조로 재배치한다(위의 이동용 Offset 과는
+무관한 별도 기능). 대상은 씬 선택이 아니라 **그룹 안 리스트의 항목**이다.
+
+- **Offset/Hold List** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `Select Objects` 로 현재 씬 선택을 리스트에
+  채운다(Add/Del/Up/Down/Sort, "Number: N", 항목 클릭 시 씬 자동 선택 내장). 리스트가 비면 아무것도 안 한다.
+- **Hold**: 각 포즈를 평평하게 유지할 구간 길이(프레임, ≥0).
+- **Offset**: 인접 포즈 사이 보간 구간 길이(프레임, ≥0). Hold + Offset 은 0보다 커야 한다.
+- **Start**: 첫 plateau 시작 프레임. **비우면 오브젝트별 첫 키 프레임**을 앵커로 쓴다(`0` 을 넣으면 0부터).
+- **채널 스코프**: 채널박스 선택 어트리뷰트가 있으면 그 채널만, 없으면 모든 (시간 기반) 커브.
+- **Apply Offset & Hold**: 재배치 실행. 결과(오브젝트 수 / hold·offset / 스코프 / skip)가 로그에 출력.
+
+**배치 공식** (P = Hold + Offset, start = 앵커, i = 0…n−1, n = 포즈 개수):
+
+```
+plateau_start_i = start + i·P          (유지 시작)
+plateau_end_i   = start + i·P + Hold    (유지 끝)
+사이 구간 [plateau_end_i, plateau_start_{i+1}] = 길이 Offset 보간
+```
+
+예) Hold=10, Offset=30, 포즈 3개, Start=0 → `0~10 유지 / 10~40 보간 / 40~50 유지 / 50~80 보간 / 80~90 유지`.
+
+#### Stagger — Stagger Offset (v01.31~)
+
+리스트업한 컨트롤러의 `[Start, End]` 구간 키를 **리스트 순서 × Offset** 만큼 계단식으로 민다.
+캐릭터의 꼬리·촉수·머리카락·천처럼 **앞 요소를 뒤 요소가 지연해서 따라오는 움직임**(팔로우스루/웨이브)을
+만들 때 쓴다. 대상은 씬 선택이 아니라 **그룹 안 리스트의 항목**이다.
+
+- **Stagger List (order = offset step)** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `List Selected Objects` 로
+  현재 씬 선택을 채운다. **리스트 순서가 곧 오프셋 배수**이므로 Up/Down/Sort/**Reverse** 로 순서를 잡는다
+  (0번 = 제자리, 1번 = +1×Offset, 2번 = +2×Offset …).
+- **Start / End** (+ **Get Current**): 밀어낼 키가 들어 있는 구간. `Get Current` 는 현재 마야 프레임을 넣는다.
+  **이 구간 안의 키만** 움직이고, 구간 밖의 키는 제자리에 있는다.
+- **Offset per Item** (v01.32~ **슬라이더 + 스핀박스**): 항목당 오프셋 프레임. 둘은 **같은 값의 두 얼굴**로,
+  어느 쪽을 움직이든 **즉시 씬에 반영**되고 반대쪽이 따라온다(A00290_BSTool Shape Editor 와 같은 방식).
+  슬라이더는 **±60f** 를 담당하고, 그보다 큰 값은 스핀박스로 넣는다(슬라이더는 끝에 붙는다).
+  값은 **누적되지 않는다**(3 → 5 로 바꾸면 8이 아니라 5 기준으로 다시 계산). 음수도 된다.
+- **값이 곧 최종 결과 (v01.33~, 별도 Apply 없음)**: 슬라이더/스핀박스로 맞춘 값이 그대로 씬에 남는 결과다.
+  조작이 **멎은 시점**(약 350ms, 슬라이더를 놓거나 스핀박스 편집을 끝내면 즉시, 창을 닫아도)에 그 값이
+  **undo 큐에 한 항목으로 기록**된다. 그래서 슬라이더를 아무리 흔들어도 **Ctrl+Z 한 번이면 조작 직전
+  상태**로 돌아간다 — 첫 조작이라면 **Reset 을 누른 것과 같은 결과**. 두 번 조절했다면 Ctrl+Z 는 한 번에
+  한 단계씩 되짚는다.
+- **Reset**: 키를 **원위치(0)** 로 되돌리고 세션 종료. (이 되돌리기 자체도 undo 가능)
+
+> 툴 밖에서 씬이 바뀌면(주로 **사용자가 Ctrl+Z**) 세션의 가정이 깨진다. 이때는 **탐침 키로 감지해 세션을
+> 버리고** 로그에 알린다(키를 되돌리려 들지 않는다 — 잘못 알고 되돌리면 오히려 엉뚱한 곳으로 밀린다).
+> 이어서 슬라이더를 움직이면 **현재 상태를 기준으로 새 세션**이 시작된다.
+
+예) `ctl_01 / ctl_02 / ctl_03` 이 모두 0~5f 에 키, 구간 `0~5`, Offset `3`
+→ `ctl_01 [0, 5]` / `ctl_02 [3, 8]` / `ctl_03 [6, 11]`
+
+> **주의**: 구간 **밖에도 키가 있는** 오브젝트는, 밀려온 키가 그 위에 얹히면서 원래 키를 **덮어쓸 수 있다**
+> (마야의 키 이동 기본 동작). 세션 시작 시 그런 오브젝트가 있으면 로그에 `WARNING ...` 으로 알린다.
+> **기록된 결과는 Ctrl+Z 로 전부 복구**되지만, **Reset** 으로 되돌릴 때는 덮어써 사라진 키까지는
+> 복구되지 않는다.
+
+### 5.4 Curve 탭 — 커브의 값·형태를 다듬는다
+
+커브의 **값**을 다루는 카테고리다. SmartLayer 의 Curve Filters(Smooth / Intensity /
+Interpolate)를 이식하면 여기로 들어온다.
+
+#### Euler — Euler Filter, 구간 한정 (v01.37~)
+
+```
+┌───────────────────────────────────────────────────┐
+│ [Euler Filter List]                               │  ← 재사용 위젯 (JUN_mod_tsl_qt_v01)
+│ List Selected Objects                             │
+│ ┌ QListWidget ┐                                   │
+│ │  ctl objs   │                                   │
+│ └─────────────┘                                   │
+│ Add|Del|Up|Down|Sort                              │
+│ Start [ 1 ][Get Current] End [ 24 ][Get Current]  │  ← 공용 timeRange 위젯
+│                              [Get Sel Range]      │
+│ [x] Anchor to the key before Start (seamless)     │  ← 기본 ON
+│ Filters rotateX / Y / Z keys inside [Start, End]  │  ← 안내 라벨
+│ only. Keys outside the range keep their values... │
+│ [ Euler Filter from Selection ]                   │  ← v01.38~ 원버튼 (감지 후 실행)
+│ [ Euler Filter in Range ]                         │  ← 리스트 + Start/End 로 실행
+└───────────────────────────────────────────────────┘
+```
+
+마야 그래프 에디터의 `Curves > Euler Filter` 는 **선택한 컨트롤러의 키가 찍힌 전 구간**을 한꺼번에
+처리한다. 뒤집힌(짐벌 점프) 구간 **하나만** 펴고 나머지 구간은 손대고 싶지 않을 때 쓸 수 없었다.
+이 탭은 **대상(TSL) + 구간(Start/End)** 을 지정해 **그 구간 안의 회전 키만** 편다.
+
+- **Euler Filter List** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `List Selected Objects` 로 현재 Maya
+  선택을 담는다. **씬 선택이 아니라 리스트에 담긴 항목만** 필터된다. 항목은 **UUID 로 추적**되므로
+  담은 뒤 리네임/리페어런트해도 같은 노드를 찾아간다.
+- **Start / End**: 필터할 구간(**양 끝 포함**). 기본값 = 현재 playback 범위. `Get Current` 로 한 칸씩,
+  `Get Sel Range` 로 **그래프 에디터에서 선택한 키의 앞/뒤 프레임**을 두 칸에 함께 채운다 —
+  구간을 눈으로 고르고 그대로 가져오는 게 가장 빠르다.
+- **Anchor to the key before Start** (기본 **ON**): 마야의 오일러 필터는 **구간 안 첫 키를 기준(앵커)**
+  으로 그 뒤 키들을 맞추고, 앵커 키 자체는 절대 바꾸지 않는다. 그래서 **플립 지점이 Start 바로 앞**에
+  있으면(예: 20f 에서 뒤집혔는데 구간을 `[20-40]` 으로 잡으면) 구간 안 키들끼리는 이미 일관돼 있어
+  **아무것도 고쳐지지 않는다**. 이 옵션은 필터 구간을 **Start 직전 키까지 뒤로 넓혀** 그 키를 앵커로
+  삼는다. 앵커 키는 값이 바뀌지 않으므로 **"구간 밖은 그대로"** 라는 약속을 지키면서 **구간 앞쪽이
+  기존 애니메이션과 매끄럽게 이어진다**. 끄면 구간 안 첫 키가 기준이 된다.
+- **Euler Filter from Selection** (v01.38~): **한 번에 실행**. 대상은 **지금 씬에서 선택한 오브젝트**,
+  구간은 **지금 선택한 키의 앞/뒤 프레임**이다. 즉 컨트롤러 3개를 고르고 그래프 에디터에서 문제
+  구간의 키를 박스 드래그로 선택한 뒤 이 버튼만 누르면 된다(리스트에 담고 `Get Sel Range` 를 누르는
+  두 단계를 대신한다). 감지한 대상·구간은 **리스트와 Start/End 칸에도 채워지므로** 무엇이 처리됐는지
+  바로 보이고, 이어서 Anchor 만 바꿔 아래 버튼으로 다시 돌릴 수 있다.
+  - 키를 하나도 선택하지 않았으면 **실행하지 않고 경고**한다(전 구간을 조용히 처리하지 않는다).
+  - 씬 선택이 비어 있으면 **리스트에 담긴 항목**으로 폴백한다(이때 리스트는 덮어쓰지 않는다).
+  - 그래프 에디터의 키 선택은 오브젝트 선택과 별개라, 키를 드래그로 골라도 컨트롤러 선택은 유지된다.
+- **Euler Filter in Range**: 실행. 처리한 오브젝트 수 / 값이 바뀐 키 수 / 구간 / 앵커 적용 수와
+  건너뛴 항목·경고가 로그에 출력된다.
+
+> **End 쪽 이음매(seam)**: 구간 뒤쪽 키는 요청대로 그대로 두므로, 구간 안 키가 ±360° 만큼 펴졌다면
+> **End 와 그 다음 키 사이에 점프가 생긴다**. 이건 "일부 구간만 필터" 의 필연적 결과라 막지 않고
+> 로그로 알린다(`... now step at the End boundary`). 이음매가 싫으면 **End 를 다음 플립 지점 이후로
+> 넓히거나**, 마지막 키까지 포함시키면 된다.
+
+### 5.5 Transfer 탭 — 애니메이션을 다른 오브젝트로 옮긴다
+
+**오브젝트 사이**로 애니메이션을 옮기는 카테고리다. 셋 다 "어느 것을 어느 것에" 라는
+같은 형태(소스 리스트 / 타깃 리스트)를 쓴다.
+
+#### Copy Key
+
+```
+┌───────────────────────────────────────────────────┐
+│ [Base]                    [Target]                │  ← 재사용 위젯 2개 (가로 2분할)
+│ Select Base               Select Targets          │
+│ ┌ QListWidget ┐           ┌ QListWidget ┐         │
+│ │  src objs   │           │  tgt objs   │         │
+│ └─────────────┘           └─────────────┘         │
+│ Add|Del|Up|Down|Sort      Add|Del|Up|Down|Sort    │
+│ Start [ 1 ]   End [ 24 ]                           │  ← 기본값 = 현재 playback 범위
+│ Paste Option [ insert ▼ ]                         │  ← 기본 insert
+│ ┌ Reverse ─────────────────────────────────────┐ │
+│ │ Translate [X][Y][Z]   Rotate [X][Y][Z]       │ │  ← 기본 모두 off
+│ └──────────────────────────────────────────────┘ │
+│ [ Copy Key ]                                      │
+└───────────────────────────────────────────────────┘
+```
+
+- **Base / Target** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `Select Base`/`Select Targets` 로 현재
+  Maya 선택을 리스트에 채운다. Add/Del/Up/Down/Sort 와 "Number: N" 카운트, 리스트 항목 클릭 시
+  씬 자동 선택까지 위젯이 내장한다. **Base[i] → Target[i]** 로 같은 인덱스끼리 복사하므로
+  **두 리스트의 순서를 맞춰야** 한다(Up/Down/Sort 로 정렬).
+- **Start / End**: 복사할 시간 범위(`cmds.copyKey time=(start,end)`). 빌드 시 현재 playback
+  범위(`minTime`/`maxTime`)로 채워진다.
+- **Paste Option**: `cmds.pasteKey` 의 `option` 인자. **기본 `insert`**. 선택 가능값(10개):
+  `insert`, `replace`, `replaceCompletely`, `merge`, `scaleInsert`, `scaleReplace`,
+  `scaleMerge`, `fitInsert`, `fitReplace`, `fitMerge`.
+- **Reverse**: 체크한 축은 붙여넣은 뒤 `timePivot=Start` 기준으로 값을 반전(`valueScale=-1`).
+  Translate X/Y/Z, Rotate X/Y/Z 6개, 기본 모두 off.
+- **Copy Key**: 복사 실행. 결과(처리한 쌍 수 / 사용한 옵션 / 건너뛴 쌍 / 개수 불일치 경고)가 로그에 출력.
+
+#### Mirror Key
+
+```
+┌───────────────────────────────────────────────────┐
+│ Mode  (•) Auto pair from selection  ( ) Manual list│
+│ [Source]                  [Target]                │  ← 재사용 위젯 2개
+│ ┌ QListWidget ┐           ┌ QListWidget ┐         │
+│ └─────────────┘           └─────────────┘         │
+│ [ Resolve Pairs from Selection ]                  │  ← Auto 모드에서 미리보기
+│ Mirror Axis (•)X ( )Y ( )Z   Channels [v]T [v]R   │
+│ [v] Behavior (keep target local axes)             │  ← 기본 ON (새 방식)
+│ Start [ 1 ] End [ 24 ]   Time (•)Source keys ( )Bake│
+│ ┌ L / R Tokens (mirror_tokens.json) [접이식] ────┐│
+│ │ ┌ Left │ Right ┐                                ││
+│ │ │ _l   │ _r    │  ...                           ││
+│ │ └──────┴───────┘                                ││
+│ │ [Add Row][Remove Row][Save][Reload]             ││
+│ └──────────────────────────────────────────────────┘│
+│ [ Mirror Selected ]                               │  ← 구간 미러 (Start/End/Time 사용)
+│ ┌ Current Frame ─────────────────────────────────┐ │
+│ │ Keying (•) Per-channel (auto-key) ( ) Per-object│ │  ← 기본 Per-channel
+│ │ [ Mirror Current Frame ]                        │ │  ← 현재 프레임만 미러
+│ └─────────────────────────────────────────────────┘ │
+└───────────────────────────────────────────────────┘
+```
+
+- **실행 대상은 항상 Source/Target 리스트** (v01.09~): Mirror 실행은 **씬 선택을 읽지 않고**
+  리스트에 담긴 오브젝트만 처리한다. 먼저 **Select Source** 또는 **Resolve Pairs** 로 리스트를
+  채운 뒤 실행한다.
+- **Mode**:
+  - **Auto pair from selection**(기본): **Source 리스트**의 컨트롤을 토큰으로 자동 페어링한다
+    (Source 가 소스, 토큰으로 찾은 반대쪽이 타겟). Target 리스트가 이미 채워져(Resolve 등) 개수가
+    맞으면 그 페어를 그대로 쓴다. **Resolve Pairs** 버튼은 현재 씬 선택을 토큰 페어링해 리스트를
+    채워주는 보조 기능(선택 → 리스트).
+  - **Manual list**: `Source[i] → Target[i]` 로 같은 인덱스끼리 직접 매칭(Copy Key 방식).
+- **Source / Target** (재사용 위젯 `JUN_mod_tsl_qt_v01`): 실행 대상 리스트. **Select Source/Targets**
+  로 씬 선택을 담거나, **Resolve Pairs** 로 자동 페어 결과를 채워 미리보기/수정할 수 있다.
+- **Mirror Axis**: 월드 반사축(기본 **X** = YZ 평면, 좌우 대칭). 보통 캐릭터 좌우축이 월드 X.
+  **Behavior 가 ON 이면 비활성**(behavior 모드는 반사축을 쓰지 않음).
+- **Channels**: **Translate / Rotate** 그룹 토글(기본 둘 다 on). 회전만 미러하려면 Translate off.
+- **Behavior (keep target local axes)** (기본 **ON**, v01.08~): 반대쪽 컨트롤러의 **고유 forward/up
+  축 방향을 보존**하며 미러한다(예: 왼쪽 위팔 up=+Y → 오른쪽 위팔이 자기 고유 up=−Y 를 유지).
+  소스의 **로컬 채널 값을 타겟에 그대로 전달**하므로(반사축 무관) Maya `mirror joints` 의
+  **Behavior** 세팅으로 만든 좌우 축 반전 리그에 맞는 결과다. **OFF** 면 기존 **순수 월드
+  반사(orientation)** — 타겟도 월드 기준으로 정렬된다(up=+Y). 구간·현재 프레임 미러 둘 다 적용.
+- **Start / End**: (구간 미러 전용) 미러 대상 시간 범위(기본 = 현재 playback 범위).
+- **Time**: (구간 미러 전용) **Source keys**(기본, 소스의 실제 키 시점에만 기록 → 곡선·타이밍 보존) /
+  **Bake**(범위 내 정수 프레임 전수 기록).
+- **L / R Tokens**: `app/config/mirror_tokens.json` 의 좌/우 토큰 쌍 편집 테이블.
+  **Add/Remove Row** 로 행 추가·삭제, **Save** 로 JSON 기록, **Reload** 로 다시 읽기.
+  기본 4쌍(`_l/_r`, `_L/_R`, `_lf/_rt`, `Left/Right`). 새 네이밍은 행 추가만으로 지원.
+- **Mirror Selected**: **구간 미러** 실행(Start/End/Time 사용). 결과(처리한 페어 수 / 반사축 /
+  건너뛴 페어)가 로그에 출력.
+- **Current Frame (v01.06~)**: **현재 타임라인 프레임 1곳**만 미러하는 별도 동작
+  (Start/End/Time **미사용**). Mode·Mirror Axis·Channels 는 위 설정을 공유한다.
+  - **Keying**:
+    - **Per-channel (auto-key)**(기본): autoKeyframe 처럼 **키(애니메이션 커브)가 있는 채널만**
+      현재 프레임에 키를 갱신하고, **키가 없던 채널은 `setAttr` 로 포즈만**(키 생성 안 함).
+    - **Per-object**: 타겟의 대상 채널 중 **하나라도 애니가 있으면 선택 채널 전부** 현재 프레임에
+      키(없던 채널엔 커브 신규 생성). 애니가 전혀 없으면 전부 포즈만.
+  - **Mirror Current Frame**: 실행. 결과(`... at frame N (axis: X; keyed K, posed P).`)가 로그에 출력.
+
+#### Follow
+
+```
+┌───────────────────────────────────────────────────┐
+│ [Target]                  [Follower]              │  ← 재사용 위젯 2개 (가로 2분할)
+│ Select Targets            Select Followers        │
+│ ┌ QListWidget ┐           ┌ QListWidget ┐         │
+│ │  tgt objs   │           │  flw objs   │         │
+│ └─────────────┘           └─────────────┘         │
+│ Add|Del|Up|Down|Sort      Add|Del|Up|Down|Sort    │
+│ Start [ 1 ] [Get Current]  End [ 24 ] [Get Current]│  ← 기본값 = 현재 playback 범위
+│ Channels [v] Translate [v] Rotate [ ] Scale       │  ← 기본 T·R (Scale off)
+│ Options [ ] Maintain Offset  [ ] 1 <- n           │  ← 기본 둘 다 off
+│ Blend (0..1) [ 1.0 ]  [====슬라이더 0..100====]   │  ← LineEdit ↔ Slider 동기화, 기본 1.0
+│ [ Match Follow ]                                  │
+└───────────────────────────────────────────────────┘
+```
+
+- **Target / Follower** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `Select Targets`/`Select Followers` 로
+  현재 Maya 선택을 리스트에 채운다. **n<-n(기본)** 은 **Target[i] → Follower[i]** 로 같은 인덱스끼리
+  매칭하므로 **두 리스트의 개수와 순서를 맞춰야** 한다(개수가 다르면 경고 후 중단). Add/Del/Up/Down/Sort
+  와 "Number: N" 카운트, 항목 클릭 시 씬 자동 선택은 위젯이 내장한다.
+- **Start / End**: 매치 키를 구울 시간 범위(정수 프레임 전수). 기본값 = 현재 playback 범위. 옆의
+  **Get Current** 버튼을 누르면 **현재 Maya 프레임**(`currentTime`)으로 해당 입력란을 갱신한다.
+- **Channels**: 매치/블렌드할 채널 그룹(**Translate / Rotate / Scale**). 기본 **T·R on, Scale off**.
+- **Maintain Offset**: 체크 시 **start 프레임에서 측정한 target↔follower 상대 거리·회전을 매 프레임
+  유지**한다(`parentConstraint maintainOffset=True` 와 동등, 컨스트레인트 노드 없는 행렬 연산). 끄면
+  offset 0 으로 target 과 정확히 일치한다(기본).
+- **1 <- n**: 체크 시 **target 1개를 모든 follower 가 추종**한다(target 이 정확히 1개가 아니면 경고 후
+  중단). 끄면 **n<-n**(인덱스 1:1, 기본). 체크하면 두 리스트 개수가 달라도 된다.
+- **Blend (0..1)**: 원본 follower 애니메이션과 매치 결과의 혼합 비율. **0 = 원본 유지(아무것도 안 함)**,
+  **1 = 매치로 완전히 덮어쓰기**(기본), **0.5 = 반반**. LineEdit 와 0~100 슬라이더가 동기화된다.
+  위치/스케일은 선형 보간, 회전은 쿼터니언 **slerp**(최단호)로 섞는다.
+- **애니메이션 레이어**: 현재 **선택된 애니 레이어**가 있으면 그 레이어에 키가 들어간다(override/additive
+  자동 판별). 선택된 레이어가 없거나 BaseAnimation 이면 베이스 커브에 키를 굽는다. blend 는 항상 **키
+  값에 베이크**되며(레이어 weight 는 1 유지), follower/프레임마다 독립적이다.
+- **Match Follow**: 실행. 결과(매치한 follower 수 / 구간 / 프레임 수 / blend / 사용 레이어 / skip)가
+  로그에 출력.
+
+### 5.6 Bake 탭 — 결과를 키로 굽는다
+
+구동(컨스트레인트·리그)을 **키로 확정**하는 카테고리다.
+
+#### Bake
+
+```
+┌───────────────────────────────────────────────────┐
+│ [Bake List]                                       │  ← 재사용 위젯 JUN_mod_tsl_qt_v01
+│ Select Objects                                    │     (Select/Add/Del/Up/Down/Sort 내장)
+│ ┌ QListWidget ┐                                   │
+│ │  ctrl objs  │                                   │
+│ └─────────────┘                                   │
+│ Range (•) Current timeline  ( ) Custom range      │  ← 라디오 2택 (기본 = Current timeline)
+│ Start [ 1 ]   End [ 24 ]                           │  ← Custom 일 때만 활성 (기본 playback 범위)
+│ Channels [v] Translate [v] Rotate [ ] Scale       │  ← 기본 T·R
+│ [v] Keep constraints (insert blend)               │  ← 기본 ON → 컨스트레인트 유지
+│ [v] Simulation                                    │  ← 기본 ON
+│ [ Bake List ]                                     │
+└───────────────────────────────────────────────────┘
+```
+
+- **Bake List** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `Select Objects` 로 현재 씬 선택을 리스트에
+  채운다. **베이크 대상은 이 리스트의 항목**이며 씬 선택이 아니다(리스트가 비면 아무것도 안 굽힌다).
+  Add/Del/Up/Down/Sort 와 "Number: N" 카운트, 항목 클릭 시 씬 자동 선택은 위젯이 내장한다.
+- **Range**: 베이크 구간 소스.
+  - **Current timeline**(기본): 현재 타임라인 플레이백 범위(`playbackOptions` min/maxTime)로 굽는다.
+    이때 Start/End 입력칸은 비활성.
+  - **Custom range**: Start/End 입력칸이 활성되고, 직접 입력한 구간으로 굽는다(기본값 = 현재 playback 범위).
+- **Channels**: 베이크할 채널 그룹(**Translate / Rotate / Scale**). 기본 T·R on, Scale off.
+- **Keep constraints (insert blend)** (기본 **ON**): 베이크 대상이 컨스트레인트로 구동 중일 때
+  동작을 정한다. **ON = 컨스트레인트 유지**(Maya 가 `pairBlend` 삽입 → `blendParent1` 로 컨스트레인트↔키
+  전환). **OFF = bake down**(구동을 끊고 키만 남김). 내부적으로 `bakeResults` 의
+  `disableImplicitControl` 에 반대로 매핑된다(ON → `False`).
+- **Simulation** (기본 ON): `bakeResults(simulation=True)` — 프레임 순차 평가(컨스트레인트/익스프레션
+  의존 리그에 안전). 순수 FK 라면 꺼서 가속할 수 있다.
+- **Bake List**: 베이크 실행. 결과(개수 / 구간 / 프레임 수 / 컨스트레인트 kept·baked down)가 로그에 출력.
+
+### 5.7 View 탭 — 보기 보조 (씬을 바꾸지 않는다)
+
+**씬을 전혀 바꾸지 않는** 유일한 카테고리다. 그래서 다른 탭과 섞지 않았다.
+
+#### Graph Focus (v01.25~)
+
+```
+┌ Focus Graph Editor around Current Frame ──────────┐
+│ [ Auto-Focus on Selection : OFF ]                 │  ← 체크형 토글 버튼
+│ Frame margin (±) [ 80 f ]                         │  ← 스핀박스 (사용자 지정)
+│ [x] Fit value (vertical) axis too                 │
+│ Value margin (%) [ 10 % ]                         │  ← 세로 위/아래 여백 (v01.29~)
+│ [ Focus Now ]                                     │
+└───────────────────────────────────────────────────┘
+```
+
+컨트롤러를 선택했을 때, 그 컨트롤러에 걸린 **전체 키 구간**(예: 0~6000f)을 다 보여주는 마야 기본
+동작 대신 **현재 프레임 ± margin 프레임**만 그래프 에디터에 확대해서 보여준다.
+
+- **Auto-Focus on Selection**(토글): 켜면 `SelectionChanged` 를 감시하다가 **컨트롤러(오브젝트)
+  선택이 실제로 바뀔 때마다** 그래프 에디터를 `[현재프레임 - margin, 현재프레임 + margin]` 구간으로
+  프레이밍한다. 켠 순간의 현재 선택에도 즉시 1회 적용된다. 끄면 감시(scriptJob)를 중단한다. 창을
+  닫으면 자동 정리된다. (v01.30~) 그래프 에디터의 **키프레임 선택/해제나 undo(`z`)** 로도
+  `SelectionChanged` 가 발생하지만, 이때는 씬 오브젝트 선택이 그대로라 **자동 확대되지 않는다**.
+- **Frame margin (±)**: 현재 프레임 앞/뒤로 몇 프레임을 보여줄지. 예) 현재 500f, margin 80 →
+  `420f ~ 580f`. 토글이 켜진 상태에서 값을 바꾸면 **즉시 다시 프레이밍**된다.
+- **Fit value (vertical) axis too**(기본 ON): 가로(시간) 구간에서 선택 오브젝트의 애니메이션 커브를
+  실제로 평가한 값 범위에 맞춰 **세로(값) 축**도 자동으로 프레이밍한다(v01.26~ 구간에 키가 없어도
+  맞는다). 끄면 세로 줌은 건드리지 않고 가로만 바꾼다.
+- **Value margin (%)**(v01.29~, 기본 10%): 세로 값 범위에 위/아래로 이 퍼센트만큼 여백을 두고
+  프레이밍한다. 최댓값/최솟값이 뷰 위아래 가장자리에 딱 붙지 않게 하는 값으로 **5~10% 정도 권장**.
+  `Fit value` 가 켜져 있을 때만 의미가 있다.
+- **Focus Now**: 토글과 무관하게 **지금 한 번만** 현재 프레임 ± margin 으로 프레이밍한다.
+
+> 구현: 마야가 (Auto Frame 등으로) 선택 시 자체 프레이밍을 하므로, scriptJob 콜백은
+> `evalDeferred` 로 한 틱 미뤄 **마야 처리 뒤에 우리 `animView` 프레이밍이 마지막으로 적용**되게
+> 한다. 그래프 에디터가 열려 있지 않으면(패널 없음) 조용히 무시된다. (v01.30~) 콜백은 직전에
+> 프레이밍한 **오브젝트 선택 목록**(`cmds.ls(sl=True, long=True)`)을 캐시해두고, 목록이 실제로
+> 달라졌을 때만 프레이밍한다 — 키 선택/해제·undo 로 온 `SelectionChanged` 는 목록이 그대로라 무시된다.
+
+---
+
+## 6. 사용 순서
+
+### Timing > Move — 키 이동 / 삭제
+1. 대상 오브젝트(들)를 씬에서 선택. (특정 채널만 작업하려면 채널박스에서 어트리뷰트 선택)
+2. **Start / End** 입력(이동이면 **Offset** 도).
+3. **◀ Earlier (-)** / **Later (+) ▶** 로 이동, 또는 **Delete Keys in Range** 로 삭제.
+
+### Timing > Hold
+1. 그래프 에디터에서 평평하게 만들 **키 구간을 선택**(커브마다 2개 이상).
+2. **Hold Selected Range** 클릭(또는 Shift+A) → 각 커브가 시작 값으로 평평하게 유지된다.
+
+### Key > Delete All — 모든 키 삭제
+1. **Delete All Keys** 섹션을 펼친다(기본 접힘).
+2. 키를 지울 오브젝트(들)를 씬에서 선택 → **List Selected Objects** 로 리스트에 채운다.
+3. **Delete All Keyframes of Listed** → 확인 후 리스트 항목의 **모든 키프레임**이 삭제된다(Ctrl+Z 가능).
+
+### Key > Pose Key
+1. 대상 오브젝트(들) 선택 → 타임라인을 키를 찍을 프레임으로 이동.
+2. 적용할 축 체크 + 값 입력 → **Set Pose Key**.
+
+### Transfer > Copy Key
+1. 복사 **원본** 오브젝트들을 선택 → Base 의 **Select Base**.
+2. 복사 **대상** 오브젝트들을 선택 → Target 의 **Select Targets**.
+   (Base[i] ↔ Target[i] 가 맞도록 **Sort/Up/Down 으로 순서 정렬**)
+3. **Start / End** 확인(기본 = 현재 playback 범위) → **Paste Option** 선택(기본 `insert`).
+4. 필요하면 **Reverse** 축 체크(예: 좌/우 대칭 복사 시 Rotate Y/Z 등) → **Copy Key**.
+
+### Transfer > Mirror Key — 자동(Auto)
+1. 미러할 **소스 컨트롤(들)을 선택**(예: 왼팔 FK 컨트롤). 한쪽만 선택하면 된다.
+2. **Mirror Axis**(보통 X) / **Channels**(T·R) / **Start·End** / **Time** 확인.
+3. (선택) **Resolve Pairs** 로 페어 결과를 Source/Target 리스트에 미리보기.
+4. **Mirror Selected** → 토큰으로 찾은 반대쪽 컨트롤에 좌우 대칭 키가 기록된다.
+
+### Transfer > Mirror Key — 수동(Manual)
+1. **Mode = Manual list** 선택.
+2. 소스들을 선택 → **Select Source**, 타겟들을 선택 → **Select Targets**
+   (`Source[i] ↔ Target[i]` 가 맞도록 Sort/Up/Down 으로 정렬).
+3. 옵션 확인 후 **Mirror Selected**.
+
+### Transfer > Mirror Key — 현재 프레임만 미러
+1. 타임라인을 미러할 프레임으로 이동.
+2. 소스 컨트롤(들) 선택(Auto) 또는 Source/Target 리스트 구성(Manual). Mirror Axis·Channels 확인.
+3. **Current Frame > Keying** 선택: **Per-channel**(기본, 키 있는 채널만 키) / **Per-object**(애니
+   있는 오브젝트는 선택 채널 전부 키).
+4. **Mirror Current Frame** → 현재 프레임의 포즈가 반대쪽으로 미러된다. 키가 있던 채널만 그 프레임에
+   키가 갱신되고, 키가 없던 채널은 포즈만 적용(키 생성 안 함).
+
+### Transfer > Mirror Key — 토큰 확장
+1. **L / R Tokens** 그룹을 펼친다.
+2. **Add Row** → 새 좌/우 토큰 입력(예: `:left` / `:right`).
+3. **Save** → `mirror_tokens.json` 에 기록(다음 실행에도 유지). 파일을 직접 편집해도 된다.
+
+### Bake > Bake
+1. 베이크할 컨트롤러(들)를 씬에서 선택 → **Select Objects** 로 **Bake List** 에 채운다(Add 로 추가도 가능).
+2. **Range** 선택: **Current timeline**(기본, 현재 재생 구간) 또는 **Custom range**(Start/End 직접 입력).
+3. **Channels**(기본 T·R) / **Keep constraints**(기본 ON=유지) / **Simulation**(기본 ON) 확인.
+4. **Bake List** → 리스트의 노드만 해당 구간에 정수 프레임 키로 구워진다(단일 Undo).
+
+### Transfer > Follow
+1. 따라갈 대상(**target**)들을 선택 → Target 의 **Select Targets**.
+2. 따라가는 컨트롤(**follower**)들을 선택 → Follower 의 **Select Followers**.
+   - **n<-n(기본)**: `Target[i] ↔ Follower[i]` 가 맞도록 **개수·순서를 Sort/Up/Down 으로 정렬**.
+   - **1<-n**: **1 <- n** 체크. Target 에는 **1개만** 두고 Follower 에 여럿을 넣으면 모두 그 하나를 추종.
+3. **Start / End**(기본 = 현재 playback 범위, 옆 **Get Current** 로 현재 프레임 채움) /
+   **Channels**(기본 T·R) / **Blend**(기본 1.0) 확인.
+4. (선택) **Maintain Offset** 체크 → start 프레임의 target↔follower 거리·회전을 유지한 채 따라간다
+   (끄면 target 과 정확히 겹친다).
+5. (선택) 키를 특정 **애니 레이어**에 굽고 싶으면 Channel Box / Anim Layer 에디터에서 **그 레이어를
+   선택**해 둔다.
+6. **Match Follow** → 각 follower 가 구간 내 매 프레임에서 target 의 월드 위치/회전(/스케일)에 맞춰
+   키가 구워진다(단일 Undo). blend < 1 이면 원본과 섞인다.
+
+### Timing > Offset (Offset & Hold)
+1. 재배치할 컨트롤러(들)를 씬에서 선택 → **Select Objects** 로 **Offset/Hold List** 에 채운다.
+   (특정 채널만 작업하려면 채널박스에서 어트리뷰트 선택)
+2. **Hold**(포즈 유지 길이) / **Offset**(보간 길이)를 입력하고, 필요하면 **Start**(시작 프레임, 비우면
+   각 오브젝트의 첫 키) 입력.
+3. **Apply Offset & Hold** → 각 오브젝트의 포즈가 hold 만큼 유지되고 사이가 offset 으로 보간되도록
+   키가 재배치된다(단일 Undo).
+
+### Timing > Stagger (Stagger Offset)
+1. 지연시킬 컨트롤러들을 **선두부터 순서대로** 씬에서 선택 → **List Selected Objects** 로
+   **Stagger List** 에 채운다. 순서가 반대면 **Reverse**, 개별 조정은 **Up/Down**.
+   (특정 채널만 작업하려면 채널박스에서 어트리뷰트 선택 — 세션 시작 시점의 선택이 고정된다)
+2. **Start / End** 로 밀어낼 키 구간을 정한다(**Get Current** 로 현재 프레임 입력).
+3. **Offset per Item** 슬라이더를 끌거나 스핀박스를 돌린다 → **즉시 씬에 반영**되고, 그 값이 곧
+   최종 결과다. **별도의 Apply 는 없다** — 조작을 멈추면 자동으로 undo 큐에 기록된다(Ctrl+Z 한 번에 복구).
+   마음에 안 들면 값을 다시 바꾸거나, **Ctrl+Z**(조작 직전으로) 또는 **Reset**(원위치).
+
+> 리스트나 Start/End 를 바꾸면 세션이 원위치되고 새로 시작된다. 창을 닫을 때는 마지막 값이 기록된다.
+
+### Curve > Euler (구간 한정 오일러 필터)
+
+**빠른 방법 (v01.38~)**
+1. 대상 컨트롤러(예: 3개)를 **씬에서 선택**한다.
+2. 그래프 에디터에서 **회전이 뒤집힌(짐벌 점프) 구간**의 키를 **박스 드래그로 선택**한다.
+3. **Euler Filter from Selection** → 선택한 키의 **최소~최대 프레임** 구간에 대해, **선택한
+   컨트롤러들**의 회전 키가 펴진다. 사용한 대상·구간은 리스트와 Start/End 칸에 채워져 남는다.
+
+**직접 지정 (리스트 + Start/End)**
+1. 그래프 에디터에서 **회전이 뒤집힌(짐벌 점프) 구간**을 찾는다.
+2. 그 구간의 키를 **선택**하고 **Get Sel Range** 를 누르면 Start/End 가 한 번에 채워진다
+   (또는 직접 입력 / **Get Current**).
+3. 대상 컨트롤러를 씬에서 선택 → **List Selected Objects** 로 **Euler Filter List** 에 채운다.
+4. **Anchor to the key before Start** 는 켠 채로 둔다(구간 앞쪽과 매끄럽게 이어진다).
+5. **Euler Filter in Range** → 구간 안 회전 키만 펴진다. 구간 밖 키는 값이 그대로다.
+
+> 결과가 `0 key(s) changed` 면 구간 안 키들끼리는 이미 일관돼 있다는 뜻이다. 플립 지점이 Start
+> 앞쪽이라면 **Anchor 를 켜거나 Start 를 플립 앞 키까지 당겨** 다시 실행한다.
+
+---
+
+## 7. 동작 규칙
+
+### 공통
+- 각 작업은 **단일 Undo 청크** — Ctrl+Z 한 번으로 취소된다.
+- manager 는 결과를 `(개수, 메시지)` 로 돌려주고 메시지는 로그창에 영어로 출력된다.
+
+### Timing / Key (키 이동 · 채우기 · 삭제)
+- **이동**(`move_keys`): `cmds.keyframe(..., relative=True, timeChange=offset)`. Offset 은 **절댓값**으로
+  입력하고 버튼이 부호를 정한다(Earlier = `-`, Later = `+`). Offset 이 0이면 `Offset is 0.`.
+- **삭제**(`delete_keys`): `cmds.cutKey(..., clear=True)` 로 구간 키 제거.
+- **채널 스코프**(이동/삭제 공통): 채널박스 선택 어트리뷰트가 있으면 **그 채널만**(`attribute` 플래그),
+  없으면 **모든 커브**(`all curves`). 선택 리스트 전체를 한 번에 넘겨 Maya 네이티브로 일괄 처리(100+ 대응).
+- **Hold**(`hold_selected_keys`): 오브젝트가 아니라 **그래프 에디터에서 선택된 키** 기준.
+  커브마다 `start`(선택 최소 프레임) 값을 읽어 `(start, end]` 구간을 삭제하고 `end` 에 start 값을
+  재삽입, start out / end in 탄젠트를 **flat** 으로 만들어 구간을 평평하게 유지한다. 선택 키가
+  2개 미만이거나 값이 없는 커브는 건너뛴다.
+- **Shift+A 핫키**(`hotkey_manager`): 툴이 열려 있는 동안만 Shift+A 를 Hold 에 바인딩하고, 창을
+  닫으면(`closeEvent`) 원래 바인딩으로 복원한다. **현재 핫키 세트(메모리)만** 수정하며 `.mhk`
+  원본은 건드리지 않는다. 활성 세트가 잠긴 경우(예: Maya Default)에는 **경고만** 하고 전역 상태를
+  바꾸지 않는다(이때도 Hold 버튼은 동작).
+
+### Key > Pose Key
+- `cmds.setKeyframe(obj, at=attr, v=value)` 를 선택 오브젝트 전체 × 체크된 축에 적용.
+- 선택이 없으면 `No objects selected.`, 체크 축이 없으면 `No axis checked.`.
+
+### Transfer > Copy Key
+- **인덱스 매칭**: `Base[i] → Target[i]`. 개수가 다르면 **짧은 쪽 기준**으로만 복사하고
+  로그에 `count mismatch` 경고를 남긴다.
+- 각 쌍: `cmds.copyKey(base, time=(start,end))` → `cmds.pasteKey(tgt, option=<선택값>)`.
+- **Reverse**: 체크된 축만 `cmds.scaleKey(tgt.attr, timeScale=0, timePivot=start, valueScale=-1, valuePivot=0)`.
+  체크 안 한 축은 scaleKey 자체를 건너뛴다(원본값 그대로).
+- 키가 없거나 붙여넣기에 실패한 쌍은 **건너뛰고**(skip) 집계해 로그에 표시한다 → 일부 실패해도 중단되지 않는다.
+- **Paste Option** 이 유효값 목록 밖이면 `insert` 로 폴백(방어).
+
+### Transfer > Mirror Key
+- **두 가지 미러 모드** (Behavior 체크박스, v01.08~). 둘 다 프레임 `t` 마다 `_mirrored_values` 가
+  타겟 로컬 TRS(dict)를 계산하고, `getAttr(..., time=t)` 로 타임라인을 옮기지 않고 평가한다:
+  - **Behavior (기본, ON)** (v01.09~): 소스의 **로컬 채널 값**(translate/rotate)을
+    `getAttr(src.attr, time=t)` 로 읽어 타겟에 **그대로 복사**한다(행렬·반사 연산 없음). Maya
+    `mirror joints` 의 **Behavior** 세팅으로 만든 좌우 축 반전 리그는 컨트롤러 자체가 거울상으로
+    정렬돼 있어, 로컬 채널 값 복사만으로 대칭 포즈가 된다. **반사축(Mirror Axis)에 무관**하므로
+    Behavior ON 이면 Axis 라디오가 비활성. 예: rotateOrder zxy `(-10,-3,-50)` → 타겟도
+    `(-10,-3,-50)`(소스 order 그대로). 값 자체를 복사하므로 rotateOrder 변환도 일어나지 않는다.
+  - **Orientation (OFF)**: 순수 월드 반사(반사축 사용). 소스를 `worldMatrix`(오일러 무관)로 읽고
+    `world = refl · Ms · refl` 후 `local = world · targetParentInverse` 로 타겟 로컬화,
+    `MEulerRotation.reorderIt(타겟 rotateOrder)` 로 **타겟 order 에 맞춰** 기록한다. `refl` 은
+    반사축 대각 행렬(예: X → `diag(-1,1,1,1)`)이라 위치를 반사하고 회전을 켤레(conjugate)하므로
+    **det +1(정상 회전)** 을 유지한다. 부모가 애니메이션돼도 `parentInverseMatrix` 를 t 시점으로
+    읽어 정확하고, 채널 부호 반전을 쓰지 않아 양쪽 order 가 무엇이든 결과 월드 포즈가 동일하다.
+- **페어링**(`resolve_pairs`): 이름의 토큰을 양방향 치환해 후보를 만들고 **씬에 존재하는 첫 후보**를
+  페어로 삼는다(`objExists` 로 거르므로 `_l` 이 `arm_lower` 에 잘못 걸려도 무시됨).
+  토큰이 없으면 **센터 컨트롤**로 보고 self-mirror(같은 컨트롤 제자리 좌우 반전). 토큰은 있는데
+  반대쪽 노드가 없으면 **unpaired** 로 분류해 건너뛰고 로그에 표시한다.
+- **스왑 방지**: 좌·우를 모두 선택해도 한 방향만 처리한다(먼저 본 쪽이 소스). L→R 기록이 R→L
+  읽기를 오염시키는 문제를 피한다.
+- **채널 스킵**: 잠긴 채널(`getAttr lock`)은 제외하고, 연결/잠금으로 `setKeyframe` 이 실패하면
+  해당 키만 건너뛴다. 키를 하나도 못 넣은 페어는 skip 으로 집계.
+- **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
+
+### Transfer > Mirror Key — 현재 프레임만 미러(`mirror_current_frame`)
+- **대상 시점 = 현재 프레임 1곳**(`currentTime`). Start/End/Time(Source keys/Bake) 컨트롤은 미사용.
+  미러 수학·페어링·반사축은 구간 미러와 동일(`_mirrored_values` 공유).
+- **autoKeyframe 재현(전역 autoKeyframe 상태 미변경)** — 채널의 time 애니 커브 유무로 분기한다.
+  애니 판정은 `cmds.keyframe(... name=True)` 로 연결 커브를 받아 **`animCurveT*`(시간 기반)** 만
+  인정한다(set-driven-key 의 `animCurveU*` 는 "키 없음"으로 취급).
+  - **Per-channel (auto-key, 기본)**: 채널에 time 커브가 **있고 값이 바뀌면**(`|old-new| > tol`,
+    `tol=1e-6`) 현재 프레임에 `setKeyframe`. 커브가 **없던 채널은 `setAttr` 로 포즈만**(키 생성 안 함).
+    값이 안 바뀐 키 채널은 no-op.
+  - **Per-object**: 타겟의 대상 채널 중 **하나라도** time 커브가 있으면 **대상 채널 전부**
+    현재 프레임에 `setKeyframe`(없던 채널엔 커브 신규 생성). 전혀 없으면 전부 `setAttr`(포즈만).
+- **채널 스킵**: 잠긴/연결로 실패한 채널은 건너뛰고, 아무것도 못 건드린 페어는 skip 으로 집계.
+- **단일 Undo 청크** — 키+`setAttr` 가 Ctrl+Z 한 번으로 복원.
+
+### Bake > Bake
+- **대상 = Bake List 항목**(`get_all_items()`). **씬 선택이 아니라 리스트업된 노드만** 굽는다.
+  선택만 하고 리스트가 비어 있으면 `Add controllers to the Bake List first.` 경고 후 중단.
+- **구간**: **Current timeline** = `playbackOptions` 의 min/maxTime(재생 슬라이더 범위, 애니메이션 전체
+  범위가 아님). **Custom range** = Start/End 입력값(빈값/`Start>End` 면 경고).
+- **엔진**(`bake_manager.BakeManager.bake`): 프레임 루프 없이 `cmds.bakeResults` 단일 호출
+  (`sampleBy=1`, `preserveOutsideKeys=True`, `sparseAnimCurveBake=False`). 베이크 동안
+  `refresh(suspend=True)` 로 뷰포트 갱신을 막고, 끝나면 **현재 프레임 복원 + 뷰포트 해제**.
+  → currentTime/xform 반복이 없어 6000+프레임 × 50~100 컨트롤러에서 수십 배 빠르다.
+- **Keep constraints**(기본 ON) → `disableImplicitControl=False`: 컨스트레인트 구동 노드는
+  `pairBlend` 가 삽입되어 **컨스트레인트가 남고 키와 공존**한다(`blendParent1` 로 전환). OFF → `True`:
+  구동을 끊고 키만 남기는 **bake down**. (이 툴은 컨스트레인트를 만들거나 `delete` 하지 않는다.)
+- **Channels**: 체크한 그룹만(T=tx/ty/tz, R=rx/ry/rz, S=sx/sy/sz). 모두 끄면 경고.
+- **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
+
+### Transfer > Follow (`follow_match_manager.FollowMatchManager.match_follow`)
+- **매칭 모드**:
+  - **n<-n**(`one_to_many=False`, 기본): `Target[i] → Follower[i]`. 개수가 다르면 **경고 후 중단**
+    (Copy/Mirror 와 달리 짧은 쪽 처리 없이 막는다 — 추종 대상이 어긋나면 결과가 무의미하므로).
+  - **1<-n**(`one_to_many=True`): target 이 **정확히 1개**여야 하며(아니면 경고 후 중단),
+    `pairs = [(target, flw) for flw in followers]` 로 모든 follower 가 그 하나를 추종.
+- **매치 수학(rotateOrder 무관)**: 프레임 `t` 마다
+  `local = worldMatrix(target) · parentInverseMatrix(follower)` 를 `MTransformationMatrix` 로 분해해
+  위치(`translation`)·회전(`rotation` 쿼터니언)·스케일(`scale`)을 얻고, 회전은 **follower 자신의
+  rotateOrder** 로 재분해한다(`MEulerRotation.reorderIt`). `getAttr(..., time=t)` 로 타임라인을 옮기지
+  않고 평가하므로 부모가 애니메이션돼도 정확하다.
+- **Maintain Offset**(`maintain_offset`, 행렬 연산으로 구현 — 컨스트레인트 노드 없음): 끄면 **offset 0**
+  (target 과 정확히 일치). 켜면 **start(구간 시작) 프레임**에서 페어마다 1회
+  `offset = worldMatrix(flw) · worldInverseMatrix(tgt)` 를 측정하고, 이후 매 프레임
+  `local = offset · worldMatrix(tgt) · parentInverseMatrix(flw)` 로 분해한다. `parentConstraint
+  maintainOffset=True` 와 동등하되 노드/사이클/평가순서 오류가 없다(레거시 `JUN_PY_MatrixCon_01_01`
+  의 offsetMat 로직과 동일).
+- **blend(0~1) 는 키 값에 베이크**(레이어 weight=1 유지): 원본 평가값 `O` 와 매치값 `M` 을 섞어 최종
+  `F` 를 만든다 — 위치/스케일 선형 lerp `F = O + (M−O)·b`, 회전 쿼터니언 **slerp**(최단호). `blend==0`
+  이면 아무것도 안 쓰고 반환(원본 유지), `blend==1` 이고 override(/베이스)면 `F=M` 단축 경로.
+- **2-pass(원본 오염 방지)**: 먼저 구간 전체의 원본 `O`(additive 면 레이어 뮤트로 base `B` 도)를
+  **모두 읽은 뒤** 키를 쓴다. 먼저 쓴 키가 이후 `O` 읽기를 오염시키는 문제를 피한다.
+- **애니메이션 레이어**: **선택된 레이어**의 첫 레이어에 키를 굽는다(여러 개면 첫 번째, 로그 표시).
+  `animLayer` 에는 선택 레이어 목록을 주는 전역 쿼리가 없으므로 `cmds.ls(type="animLayer")` 로 전체를
+  나열한 뒤 레이어마다 `animLayer(lyr, q=True, selected=True)` 로 검사한다. 채널을 레이어 멤버로
+  등록(`animLayer edit attribute`) 후
+  `setKeyframe(..., animLayer=layer)`. 모드별 기록값:
+  - **override**(weight 1): 평가값 = 레이어 값 → **`V = F`**(최종값 그대로).
+  - **additive**(weight 1): 평가값 = base + 레이어 값 → 위치/스케일 **`V = F − B`**(스케일은 `F / B`),
+    회전 **`V = B⁻¹ · F`**(회전 합성). base `B` 는 레이어를 잠시 뮤트해 읽고 끝나면 복원.
+  - 선택 레이어 없음 / **BaseAnimation** → 레이어 인자 없이 베이스 커브에 `V = F`.
+- **채널 스킵**: 잠긴 채널(`getAttr lock`)은 제외하고, 연결/잠금으로 `setKeyframe` 이 실패하면 해당
+  키만 건너뛴다. 키를 하나도 못 넣은 follower 는 skip 으로 집계.
+- **성능**: 베이크 동안 `refresh(suspend=True)` 로 뷰포트 갱신을 막고, 끝나면 현재 프레임 복원 +
+  뷰포트 해제. **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
+
+### Timing > Offset (`offset_hold_manager.OffsetHoldManager.apply_offset_hold`)
+- **대상 = Offset/Hold List 항목**. 씬 선택이 아니라 리스트업된 노드만 처리한다(리스트가 비면 경고).
+- **채널 스코프**: 채널박스 선택 어트리뷰트가 있으면 그 채널만(`attribute`), 없으면 오브젝트의 모든
+  애니메이션 플러그(`listAnimatable` 중 키가 1개 이상인 것). 시간 기반 키만 대상.
+- **포즈 프레임**: 오브젝트별로 **대상 플러그들의 키 시점 합집합**을 정렬·중복제거해 '포즈'로 삼는다.
+  모든 대상 채널이 같은 포즈 인덱스를 공유하므로 동일한 plateau 구조로 동기화된다.
+- **값 샘플링**: 각 포즈 프레임에서 `getAttr(plug, time=f)` 로 평가해 값을 확보한다(그 시점에 키가
+  없던 커브도 보간값으로 잡힘). **수정 전에 먼저 읽어** 재배치가 이후 읽기를 오염시키지 않는다.
+- **재배치**: 플러그별로 `cutKey(clear=True)` 로 기존 키를 지운 뒤, 포즈 i 마다
+  `start + i·P`(유지 시작)와 `start + i·P + Hold`(유지 끝, Hold>0 일 때)에 같은 값으로 키를 찍는다
+  (P = Hold + Offset). **앵커 start** 는 입력값, 비우면 포즈 프레임의 최솟값(첫 키).
+- **탄젠트**: plateau 시작 키 `in=spline, out=flat`, 끝 키 `in=flat, out=spline` → 유지 구간은 평평,
+  보간 구간은 spline 가속·감속(첫 키 in / 마지막 키 out 은 무의미하므로 영향 없음). Hold=0 이면
+  포즈당 키 1개(spline)로 순수 리타이밍.
+- **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
+
+### Timing > Stagger (`stagger_offset_manager.StaggerOffsetSession`)
+
+- **배치 공식**: 리스트 i 번째 오브젝트의 `[Start, End]` 구간 키를 `i × Offset` 만큼 민다
+  (i = 0 은 제자리). 결과 구간은 `[Start + i·Offset, End + i·Offset]`.
+- **이동 방식**: `cmds.keyframe(..., time=(s, e), relative=True, timeChange=i·delta)` **상대 이동만**
+  쓴다. 커브를 `cutKey` 로 지웠다 `setKeyframe` 으로 재생성하지 않으므로 **탄젠트(타입/각도/weight)·
+  인피니티·애님 레이어 소속이 그대로 보존**된다. (재생성 방식은 커브 노드가 새로 만들어져 애님 레이어
+  소속이 바뀔 수 있어 쓰지 않는다.)
+- **세션 / 비누적**: 세션은 (리스트 순서 + 구간 + 채널 스코프)를 **시작 시점에 고정**하고, 지금 적용된
+  offset(`applied`)을 들고 있는다. 스핀박스가 바뀌면 **차이(delta)만** 이동시킨다 — i 번째 키는 항상
+  `[Start + i·applied, End + i·applied]` 에 있으므로 그 구간을 `i·delta` 만큼 밀면 정확히
+  `[Start + i·new, End + i·new]` 가 된다. 그래서 값을 왕복해도 **누적되지 않는다**.
+  리스트/구간이 바뀌면 세션을 버리고(미리보기는 원위치) 새로 만든다.
+- **인덱스 보존**: 리스트 항목 중 **씬에 없거나 키가 없는** 것은 제외되지만, 나머지 항목은
+  **리스트에서의 원래 위치**를 배수로 그대로 쓴다(제외된 항목 때문에 뒤 항목의 배수가 당겨지지 않음).
+  제외 개수는 로그에 `(N skipped: missing or no keys)` 로 표시.
+- **채널 스코프**: 세션 시작 시점의 채널박스 선택 어트리뷰트가 있으면 그 채널만, 없으면 모든 커브.
+  (도중에 채널박스 선택이 바뀌어도 진행 중인 세션은 흔들리지 않는다.)
+- **Undo (v01.32~, settle 모델)**: 세션은 두 값을 들고 있다 — `applied`(지금 씬에 보이는 값)와
+  `settled`(undo 큐에 기록까지 끝난 값).
+  - `preview()` 는 `cmds.undoInfo(stateWithoutFlush=False)` 로 **undo 큐에 올리지 않고** 즉시 반영만 한다
+    (드래그 중 undo 항목이 수백 개 쌓이는 걸 막는다). `state=False` 는 히스토리를 통째로 날리므로 쓰지 않는다.
+  - 조작이 멎으면 UI 가 `settle(v)` 를 부른다: **undo 를 끈 채 `settled` 로 되돌린 뒤**, undo 청크 안에서
+    `settled → v` 를 한 번에 이동시키고 `settled = v` 로 갱신한다. undo 는 '그 명령의 역연산' 을 현재
+    상태에 적용하므로, 이렇게 해야 **Ctrl+Z 가 정확히 이전 `settled` 로** 돌아온다
+    (restore-before-commit — A00380_MeshTool 에서 검증한 패턴).
+  - 그 결과 **슬라이더를 아무리 흔들어도 조작 한 번 = undo 항목 한 개**이고, 첫 조작이면
+    Ctrl+Z = 원위치 = **Reset 과 동일**하다.
+  - `restore()` = `settle(0)`. 이미 기록된 게 있으면 되돌리기도 **기록해야** 큐가 어긋나지 않기 때문이다
+    (기록된 적이 없으면 undo 항목을 만들지 않는다).
+- **씬 동기화 탐침(`scene_in_sync`)**: 사용자가 Ctrl+Z 를 누르면 씬은 이전 상태인데 세션은 그걸 모른다.
+  그 상태로 계속 밀면 엉뚱한 구간을 건드리므로, **첫 움직이는 항목(index>0)의 구간 내 첫 키**를 탐침으로
+  잡아 두고 "있어야 할 자리(`probe_base + index*applied`)에 키가 있는가" 를 확인한다. 어긋나면 UI 가
+  **세션을 버리고**(되돌리기 시도 없이) 로그로 알린 뒤, 다음 조작에서 현재 상태 기준으로 새 세션을 만든다.
+- **덮어쓰기 주의**: 구간 밖에 키가 있는 오브젝트는 밀려온 키가 그 위를 덮을 수 있다. 세션 생성 시
+  이를 검사해 로그에 `WARNING ... may overwrite` 로 알린다. 기록된 결과는 Ctrl+Z 로 복구되지만,
+  **Reset** 은 덮여 사라진 키까지 되살리지 못한다.
+
+### Curve > Euler (`euler_filter_manager.EulerFilterManager.filter_range`)
+- **원버튼 감지(v01.38)**: `selected_objects()` = `cmds.ls(selection=True)`(그래프 에디터의 키 선택은
+  오브젝트 선택과 별개라 드래그 후에도 유지된다), `selected_key_range()` =
+  `cmds.keyframe(q=True, selected=True)` 의 **min/max**(선택된 모든 키의 시간을 오브젝트·어트리뷰트에
+  무관하게 전역으로 돌려주므로 여러 커브에 걸친 박스 선택도 한 번에 잡힌다). 둘 다 순수 조회라
+  UI 없이도 쓸 수 있고, 씬 변경은 하지 않는다.
+- **마야 네이티브 필터를 그대로 쓴다**: `cmds.filterCurve(curves, filter="euler",
+  startTime=..., endTime=...)`. 오일러 언와인딩(±360°)과 플립 표현
+  `(θ1+180, 180-θ2, θ3+180)` 선택은 마야가 하므로 **결과가 마야의 `Curves > Euler Filter` 와
+  정확히 일치**하고, `rotateOrder` 가 `xyz` 가 아니어도(예: `zxy`) 올바르게 처리된다.
+  Maya 2024 headless 로 확인 — **`startTime`/`endTime` 은 실제로 존중되어 구간 밖 키는 값이 바뀌지
+  않는다**. 메뉴 명령이 전 구간을 처리하는 건 필터에 구간 개념이 없어서가 아니라 **MEL 이 구간을
+  안 넘겨서**다.
+- **대상 커브**: 오브젝트마다 `rotateX / rotateY / rotateZ` 애님 커브 **3개를 한 묶음**으로 넘긴다
+  (오일러 필터는 회전 3축을 함께 봐야 의미가 있다). 세 축 중 하나라도 커브가 없으면 그 오브젝트는
+  건너뛰고 사유를 로그에 남긴다(`no animation curve on rotateX`). 씬에 없는 항목, 구간 안에 회전
+  키가 하나도 없는 항목도 마찬가지로 건너뛴다.
+- **앵커(`anchor_previous`, 기본 True)**: `filterCurve` 는 **구간 안 첫 키를 기준**으로 뒤 키들을
+  맞추고 그 키 자체는 바꾸지 않는다. 그래서 Start **직전 키**를 찾아(3축 중 Start 에 가장 가까운 것)
+  필터 구간을 그 프레임까지 뒤로 넓힌다. 넓힌 구간 안에는 그 앵커 키 하나뿐이고 앵커는 값이 바뀌지
+  않으므로, **구간 밖 키는 여전히 그대로**이면서 구간 앞쪽 이음매가 사라진다. Start 앞에 키가 없으면
+  넓히지 않는다.
+- **애니메이션 레이어**: `cmds.keyframe(plug, q=True, name=True)` 는 **현재 선택된 레이어의 커브
+  하나**만 돌려주므로(headless 확인), 마야의 오일러 필터와 같이 **작업 중인 레이어에만** 적용된다.
+  (혹시 커브가 여러 개 잡히면 첫 번째만 쓰고 `[Warning] ... animation layers` 로 알린다.)
+- **변화 집계**: 필터 전/후로 각 커브의 값 스냅샷을 떠서 **실제로 바뀐 키 수**를 센다. 이 비교로
+  ① 구간 밖 키가 바뀌었는지(마야 버전이 달라 동작이 바뀌는 경우를 대비한 방어 검사),
+  ② **End 경계에 이음매가 생겼는지**(구간 안 마지막 키가 바뀌었고 End 뒤에 키가 있으면) 를 함께
+  판정해 경고로 알린다.
+- 전체 작업은 **단일 undo 청크** — Ctrl+Z 한 번으로 모든 오브젝트가 복구된다.
+
+---
+
+## 8. 로그 · 문제 해결
+
+### 정상 로그 예시
+```
+# Timing / Key
+5 objects : keys in [4-10f] moved +5f  (all curves)
+3 objects : keys in [4-10f] deleted  (channels: translateX, translateY)
+2 curve(s) held flat at start value.
+Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
+
+# Pose Key
+4 objects : pose key set on current frame  (rx, rz, ty)
+
+# Copy Key
+5 pairs copied (option: insert).
+3 pairs copied (option: replace). 2 skipped (no keys / paste failed). [Warning] Base(5) / Target(3) count mismatch.
+
+# Mirror Key
+4 token pair(s) loaded.
+3 pair(s) resolved. 1 center (self-mirror). 1 unpaired: arm_l_ctrl
+4 pair(s) mirrored (axis: X).
+2 pair(s) mirrored (axis: X). 1 skipped (no keys / not settable).
+4 token pair(s) saved.
+3 pair(s) mirrored at frame 12 (axis: X; keyed 12, posed 6).
+
+# Bake
+60 object(s) baked over [1-6000] (6000 frames, constraints kept).
+60 object(s) baked over [1-6000] (6000 frames, constraints baked down).
+
+# Follow
+4 follower(s) matched over [1-24] (24 frames, blend 1.0, n<-n, no-offset). No anim layer selected; keys on base curves.
+4 follower(s) matched over [1-24] (24 frames, blend 0.5, n<-n, offset). Layer 'AnimLayer1' (override).
+5 follower(s) matched over [1-24] (24 frames, blend 1.0, 1<-n, offset). No anim layers; keys on base curves.
+3 follower(s) matched over [1-24] (24 frames, blend 1.0, n<-n, no-offset). Layer 'AnimLayer2' (additive). 1 skipped (no settable channels / no node).
+
+# Offset & Hold
+3 object(s) re-timed (hold 10f / offset 30f)  (all curves)
+2 object(s) re-timed (hold 10f / offset 30f)  (channels: translateY)  (1 skipped: no keys)
+
+# Euler Filter
+Euler filter: 1 object(s), 9 key(s) changed in [20-40f].  Anchored to the key before Start on 1 object(s).
+Euler filter: 2 object(s), 18 key(s) changed in [20-40f].  Anchored to the key before Start on 2 object(s).  Skipped 2: noAnim_loc (no animation curve on rotateX), ghost_ctrl (missing in scene)
+Euler filter: 1 object(s), 3 key(s) changed in [0-20f].  [Warning] 1 object(s) now step at the End boundary (keys after End were left untouched, as requested): arm_l_ctrl
+Euler filter: 1 object(s), 0 key(s) changed in [20-40f].  Rotations were already continuous inside the range (nothing to unwind).
+Euler filter: nothing to do. (1 skipped: arm_l_ctrl (no rotation keys in range))
+
+# Euler Filter from Selection (v01.38~)
+[From Selection] 3 target(s) from scene selection, range [20-40f] from the selected keys.
+Euler filter: 3 object(s), 27 key(s) changed in [20-40f].  Anchored to the key before Start on 3 object(s).
+```
+
+### 경고 메시지
+- `No objects selected.` — (Timing > Move / Key > Pose Key) 선택된 오브젝트 없음.
+- `Offset is 0.` — (Timing > Move) Offset 이 0.
+- `No keys selected in Graph Editor.` — (Timing > Hold) 그래프 에디터에 선택된 키 없음.
+- `Shift+A not bound: active hotkey set is locked. ...` — 핫키 세트가 잠김(커스텀 세트로 전환 필요).
+- `No axis checked.` / `[Warning] <attr> is checked but empty.` — (Key > Pose Key) 축 미체크 / 값 비어 있음.
+- `[Warning] Fill both Base and Target lists.` — (Transfer > Copy Key) Base/Target 비어 있음.
+- `[Warning] Enter Start / End.` / `[Warning] Start (n) is greater than End (m).` — (Copy Key) 시간 범위 오류.
+- `[Warning] Base(n) / Target(m) count mismatch.` — (Copy Key) 두 리스트 개수 불일치(짧은 쪽만 복사).
+- `[Warning] Select source controllers first.` — (Mirror Key Auto) 선택된 컨트롤 없음.
+- `[Warning] No pairs resolved.` — (Mirror Key Auto) 토큰으로 페어를 못 찾음(unpaired 만 있음).
+- `[Warning] Enable Translate and/or Rotate.` — (Mirror Key) 채널 토글이 모두 off.
+- `[Warning] Source(n) / Target(m) count mismatch.` — (Mirror Key Manual) 두 리스트 개수 불일치.
+- `[Info] mirror_tokens.json not found. Using built-in defaults.` — JSON 없음(기본 토큰 사용).
+- `[Warning] Add controllers to the Bake List first.` — (Bake) Bake List 가 비어 있음(씬 선택만으론 안 됨).
+- `[Warning] Enter Start / End.` / `[Warning] Start (n) is greater than End (m).` — (Bake Custom) 시간 범위 오류.
+- `[Warning] Enable at least one channel group.` — (Bake/Follow) Translate/Rotate/Scale 모두 off.
+- `[Warning] Fill both Target and Follower lists.` — (Follow) Target/Follower 비어 있음.
+- `[Warning] Target(n) / Follower(m) count mismatch.` — (Follow, n<-n) 두 리스트 개수 불일치(중단).
+- `[Warning] 1<-n mode needs exactly 1 target (got n).` — (Follow, 1<-n) Target 이 1개가 아님(중단).
+- `[Warning] Invalid Blend value.` — (Follow) Blend 입력이 숫자가 아님.
+- `[Info] Blend is 0; follower animation unchanged.` — (Follow) blend=0 이라 아무것도 안 함.
+- `[Warning] Add objects to the Offset/Hold List first.` — (Offset & Hold) 리스트가 비어 있음.
+- `[Warning] Enter Hold and Offset.` — (Offset & Hold) Hold/Offset 입력 누락.
+- `[Warning] Hold + Offset must be greater than 0.` — (Offset & Hold) 둘 다 0(주기 0).
+- `No animated objects to process. (n skipped: no keys)` — (Offset & Hold) 리스트 항목에 키가 없음.
+- `[Warning] Add controllers to the Euler Filter List first.` — (Euler Filter) 리스트가 비어 있음.
+- `[Warning] Select controllers in the scene (or add them to the Euler Filter List) first.` —
+  (Euler Filter from Selection) 씬 선택도 리스트도 비어 있음.
+- `[Warning] No keyframes selected. Drag-select the keys of the range in the Graph Editor / Time Slider first.`
+  — (Euler Filter from Selection) 선택한 키가 없어 구간을 알 수 없음(전 구간을 처리하지 않는다).
+- `End must be greater than or equal to Start.` — (Euler Filter) End < Start.
+- `Euler filter: nothing to do. (n skipped: ...)` — (Euler Filter) 대상이 전부 제외됨(회전 커브 없음 /
+  씬에 없음 / 구간 안에 회전 키 없음).
+- `... now step at the End boundary ...` — (Euler Filter) 구간 안 키가 펴지면서 End 뒤 키와 사이에
+  점프가 생김. 구간 한정 필터의 정상적인 결과다(End 를 넓히면 사라진다).
+- `... changed keys OUTSIDE the range - unexpected for this Maya version` — (Euler Filter) 방어 검사.
+  `filterCurve` 의 `startTime`/`endTime` 이 이 마야 버전에서 다르게 동작한다는 뜻이니 결과를 확인하고
+  필요하면 Ctrl+Z 한다.
+
+### 자주 겪는 문제
+- **이동/삭제가 일부 채널에만 적용됨** → 채널박스에서 어트리뷰트가 선택돼 있으면 그 채널만 대상이 된다.
+  전체 커브에 적용하려면 채널박스 선택을 해제한다.
+- **Shift+A 가 안 먹힘** → 활성 핫키 세트가 잠겨 있을 수 있다. 커스텀 핫키 세트로 전환하면 된다(Hold 버튼은 항상 동작).
+- **Hold 가 커브를 건너뜀** → 해당 커브에 선택된 키가 2개 미만이다(구간을 만들려면 2개 이상 선택).
+- **Pose Key 가 안 찍힘** → 오브젝트 선택 여부와 축 체크/값 입력을 확인.
+- **(Copy Key) 타겟에 키가 안 붙음** → 로그의 `skipped` 확인. 원본에 해당 범위 키가 없거나 타겟 이름이 씬에 없을 수 있음.
+- **(Copy Key) 엉뚱한 오브젝트끼리 복사됨** → Base/Target **순서**가 어긋남. Sort 또는 Up/Down 으로 인덱스를 맞춘다.
+- **(Copy Key) 붙여넣기 모드가 예상과 다름** → Paste Option 콤보 확인(기본 `insert`). `replace`/`replaceCompletely`
+  는 타겟 기존 키를 덮어쓰고, `merge` 는 병합한다.
+- **(Mirror Key) 반대쪽을 못 찾음(unpaired)** → 컨트롤 네이밍이 토큰 테이블에 없을 수 있다.
+  L/R Tokens 에 해당 토큰 쌍을 추가(Save)하거나, Manual 모드로 직접 매칭한다.
+- **(Mirror Key) 미러 결과가 안 맞음** → ① Mirror Axis 가 캐릭터 좌우축인지(보통 X) 확인.
+  ② 리그가 좌우 대칭(타겟 부모가 소스 부모의 거울상)인지 확인. ③ 비대칭/오프셋 리그면 결과가
+  어긋날 수 있다.
+- **(Mirror Key) 반대쪽 컨트롤러의 축 방향(up/forward)이 뒤집혀 보임** → **Behavior** 체크박스를
+  확인한다. **ON**(기본)이면 타겟 고유 축을 보존(예: 오른쪽 up=−Y 유지), **OFF**면 월드 기준으로
+  정렬(up=+Y)된다. 좌우 축이 반전된(behavior 미러) 리그는 ON, 양쪽 축이 동일한 리그는 OFF 가 맞다.
+- **(Mirror Key) 일부 컨트롤이 skip 됨** → 소스에 해당 범위 키가 없거나 타겟 채널이 잠김/연결됨.
+  로그의 `skipped` 수를 확인.
+- **(Mirror Key) 센터 컨트롤이 미러 안 됨** → 좌/우 토큰이 이름에 없으면 self-mirror(제자리 반전)로
+  처리된다. 의도와 다르면 Manual 모드로 지정한다.
+- **(Mirror Current Frame) 키가 안 찍히는데 포즈만 바뀜** → 정상이다. 그 채널에 **기존 키(time 커브)가
+  없으면** Per-channel 모드는 포즈만 적용한다(autoKeyframe 동일). 키를 강제로 찍으려면 **Per-object**
+  로 바꾸거나, 먼저 해당 채널에 키를 하나 만든다.
+- **(Mirror Current Frame) set-driven-key 채널이 "키 없음"으로 처리됨** → time 커브(`animCurveT*`)만
+  인정하므로 드리븐키(`animCurveU*`)는 포즈만(`setAttr`) 시도된다(드리븐 입력이 있으면 skip).
+- **(Bake) 아무것도 안 구워짐** → 씬에서 선택만 하고 **Bake List 에 안 넣었을** 수 있다. `Select Objects`
+  로 리스트에 채운다(대상은 리스트 항목이지 씬 선택이 아니다).
+- **(Bake) 굽는 구간이 예상과 다름** → Range 가 **Current timeline**(재생 슬라이더 범위)인지
+  **Custom range**(입력값)인지 확인. Current 는 애니메이션 전체 범위가 아니라 현재 재생 구간이다.
+- **(Bake) 키를 구웠는데 컨트롤이 안 움직임처럼 보임** → **Keep constraints**(기본 ON)면 `pairBlend`
+  가 끼어 컨스트레인트가 우세할 수 있다. 컨트롤의 `blendParent1` 을 키 쪽으로 바꾸거나, 순수 키만
+  원하면 **Keep constraints 를 끄고**(bake down) 다시 굽는다.
+- **(Follow) follower 가 target 과 정확히 안 겹침** → ① Channels 에 필요한 그룹(보통 T·R)이 켜져
+  있는지 확인. ② **Blend 가 1.0** 인지 확인(1 미만이면 원본과 섞여 덜 따라간다). ③ **Maintain Offset
+  이 켜져 있으면** 정확히 겹치지 않고 start 프레임의 거리·회전을 유지하는 것이 정상(정확히 겹치려면
+  끈다). ④ follower 채널이 잠겨/연결돼 있으면 그 채널은 skip 된다(로그의 `skipped` 확인).
+- **(Follow, 1<-n) 실행이 막힘** → `1 <- n` 을 켰는데 Target 이 1개가 아니다(로그 `needs exactly 1
+  target`). Target 리스트에 정확히 1개만 남기거나, 인덱스 1:1 로 쓰려면 `1 <- n` 을 끈다.
+- **(Follow) Maintain Offset 의 기준이 헷갈림** → offset 은 **Start 프레임**에서 측정한다. 원하는
+  거리·회전이 되는 프레임을 Start 로 두고(필요하면 **Get Current**) 실행한다.
+- **뷰포트가 멈춤 — 커브를 편집해도 프레임을 옮겨야 반영됨** → 과거 베이크에서 `cmds.refresh(suspend)`
+  가 풀리지 않고 남은 것이다(전역 상태라 다른 툴을 써도 멈춰 보인다). 하단 **Force Refresh (Unfreeze
+  Viewport)** 버튼을 누르면 즉시 풀린다. 버튼이 없는 환경이면 Script Editor 에서
+  `import maya.cmds as cmds; cmds.refresh(suspend=False); cmds.refresh()`. (v01.16 에서 원인 수정,
+  공용 `suspend_refresh()` 로 재발 방지.)
+- **(Follow) 키가 엉뚱한 레이어/베이스에 들어감** → 실행 전에 원하는 **애니 레이어를 선택**해 둔다.
+  선택된 레이어가 없으면 베이스 커브에 들어간다. 로그 끝의 `Layer '...'` / `keys on base curves` 로
+  실제 대상 레이어를 확인할 수 있다.
+- **(Follow) 비-베이스 레이어 결과가 베이스와 다르거나 구간 밖이 평행이동함** → v01.21 에서 수정됨.
+  과거엔 additive 레이어에 델타를 넘겨 평가값이 `F−base` 만큼 어긋났다(`setKeyframe(animLayer)` 는
+  값을 역산해 평가값을 맞추므로 항상 **절대값**을 넘겨야 함). 이제 어느 레이어에 구워도 베이스와 같은
+  월드 결과가 나오고, 구간 밖은 원본이 그대로 유지된다. 단 **레이어 weight 는 1** 로 두고 쓴다(가정).
+- **(Follow) rotateOrder 가 다른데도 회전이 맞는다** → 정상이다. target 의 월드 회전을 follower
+  rotateOrder 로 재분해해 기록하므로 채널 값은 서로 달라도 월드 방향은 동일하다.
+- **(Follow) Blend=0 인데 아무 일도 안 일어남** → 의도된 동작이다(원본 유지). 효과를 보려면 Blend 를
+  0 보다 크게 올린다.
+- **(Offset & Hold) 아무것도 안 바뀜** → 씬에서 선택만 하고 **Offset/Hold List 에 안 넣었을** 수 있다.
+  `Select Objects` 로 리스트에 채운다(대상은 리스트 항목이지 씬 선택이 아니다).
+- **(Offset & Hold) 일부 오브젝트가 skip 됨** → 그 오브젝트(또는 채널박스로 좁힌 채널)에 키가 없다.
+  로그의 `skipped` 수를 확인한다.
+- **(Offset & Hold) 일부 채널만 재배치됨** → 채널박스에서 어트리뷰트가 선택돼 있으면 그 채널만
+  대상이 된다. 전체 커브에 적용하려면 채널박스 선택을 해제한다.
+- **(Offset & Hold) 시작 프레임이 예상과 다름** → **Start** 가 비어 있으면 각 오브젝트의 **첫 키
+  프레임**을 앵커로 쓴다(오브젝트마다 다를 수 있음). 모두 같은 지점에서 시작하려면 Start 에 값을
+  입력한다(예: `0`).
+- **(Offset & Hold) 유지 구간이 평평하지 않고 미끄러짐** → Offset 이 0 이면 plateau 끝과 다음 plateau
+  시작이 같은 프레임이 되어 유지가 깨질 수 있다. 보간 구간을 주려면 Offset 을 1 이상으로 둔다.
+- **(Euler Filter) `0 key(s) changed` 로 아무것도 안 고쳐짐** → 구간 안 키들끼리는 이미 일관돼 있다는
+  뜻이다. 플립이 **Start 직전**에서 시작했다면 **Anchor** 를 켜거나, Start 를 **플립 앞 키까지** 당긴다.
+- **(Euler Filter) 오브젝트가 skip 됨** → `rotateX/Y/Z` 중 하나라도 애님 커브가 없으면 건너뛴다
+  (오일러 필터는 3축을 한 묶음으로 봐야 한다). 회전을 한 축만 키했다면 나머지 축에도 키를 하나 찍고
+  다시 실행한다. 구간 안에 회전 키가 없어도 건너뛴다.
+- **(Euler Filter) End 지점에서 회전이 툭 튐** → 구간 밖 키를 그대로 두라는 요청의 정상적인 결과다
+  (`now step at the End boundary` 경고). 이음매를 없애려면 **End 를 다음 플립 지점 이후 또는 마지막
+  키까지** 넓혀 다시 실행한다.
+- **(Euler Filter) 애니 레이어를 쓰는데 베이스가 안 고쳐짐** → 필터는 **현재 선택된 애니 레이어의
+  커브**에만 적용된다(마야 기본 오일러 필터와 동일). 베이스를 고치려면 BaseAnimation 을 선택하고
+  실행한다.

@@ -103,6 +103,7 @@
 - [A00145 Match DOOTOOL options](wip-a00145-match-dootool-options.md) — Match 탭에 T/R/S/Parent 체크박스 이식 (v01.10)
 - [A00120 FKIK constraint-free bake](wip-a00120-fkik-bake-constraintfree.md) — parentConstraint 대신 프레임별 matchTransform (애님 레이어 포즈 깨짐 수정)
 - [A00110 Follow: component target](wip-a00110-follow-component-target.md) — Follow Target 에 메시 버텍스 지원. 컴포넌트는 worldMatrix 가 없다 → 위치+노말로 행렬, `getAttr(time=)` 불가라 프레임 이동, `ls` 는 범위 밖 인덱스를 클램프 (v01.41)
+- [A00110_V02 tab taxonomy](wip-a00110-tab-taxonomy.md) — **신규 V02**: 상위 탭 = 카테고리(Key/Timing/Curve/Transfer/Bake/View), 하위 탭 = 기능. V01 은 재분류 전으로 방치 + 툴 복제 체크리스트 (V02 v02.00)
 - [A00110 Fill Keys](wip-a00110-fill-keys.md) — 구간 전 프레임 키 채우기(기존 키 방치) + 애니 레이어 지정, Key Edit 하위 8탭 재편 (v01.40)
 - [A00110 Stagger Offset](wip-a00110-stagger-offset.md) — TSL 순서 × Offset 계단식 키 이동, settle 커밋 모델 (v01.34)
 - [A00110 Graph Focus tab](wip-a00110-graph-focus.md) — 선택 변경 시 그래프 에디터 자동 프레이밍 (v01.30)
