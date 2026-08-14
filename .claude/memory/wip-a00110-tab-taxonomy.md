@@ -23,7 +23,7 @@ metadata:
 
 | 카테고리 | 무엇이 바뀌나 | 기능 |
 |---|---|---|
-| **Key** | 키의 존재 | Pose Key · Fill Keys · Delete All |
+| **Key** | 키의 존재 | Pose Key · Fill Keys(+from Selection) · Delete All |
 | **Timing** | 키의 시점 | Move · Hold · Offset · Stagger |
 | **Curve** | 커브의 값·형태 | Euler · **Filters**(Smooth·Intensity·Interp 한 화면, v02.01) |
 | **Transfer** | 오브젝트 간 이동 | Copy Key · Mirror Key · Follow |
@@ -68,5 +68,11 @@ json 으로 스냅샷 → 재분류 후 다시 떠서 **diff**. 109/110 보존(�
   몇 홉 따라가 찾는다(애님 레이어면 animBlendNode 경유).
 - 세 필터는 **한 화면 접이식**(원본 UI 와 같은 구성). 섹션이 작고 번갈아 쓰는 작업이면
   [[prefer-subtabs-over-stacked-collapsibles]] 의 예외가 된다.
+
+**"from Selection" 원버튼 패턴** (Euler v01.38 → Curve Filters v02.01 → Fill Keys v02.02):
+리스트업·구간 입력 단계를 **그래프 에디터에서 고른 키** 하나로 대신한다. 고른 키가 오브젝트·채널·
+구간을 다 말해 준다(커브 → `driven_plug` 로 역추적). 규칙 두 가지 —
+① 감지한 값을 **위젯에 되채워** 무엇을 처리했는지 보이게 하고(필터가 켜져 있으면 비운다),
+② **고른 키가 없으면 실행하지 않는다**(전 구간을 조용히 건드리는 쪽이 위험). 새 기능에도 이대로 적용.
 - 쿼터니언 되돌리기는 **원래 값에 가장 가까운 해**를 골라 ±360 점프를 없앤다. 축별 키 시간이
   다르면 그 오브젝트만 채널별 폴백.
