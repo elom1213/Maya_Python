@@ -15,6 +15,7 @@
 - [Update portfolio on tool work](update-portfolio-on-tool-work.md) — portfolio_EN/KR 둘 다 동기 갱신, 커밋수 통계는 건드리지 않기
 - [Memory synced via repo](memory-synced-via-repo.md) — 메모리는 repo `.claude/memory`(정션), 커밋+푸시로 PC 간 공유
 - [Prefer PySide for new tools](prefer-pyside-for-new-tools.md) — 신규/병합 툴은 maya.cmds UI 말고 PySide(arch B)
+- [JUN_UE plugin repo](jun-ue-plugin-repo.md) — 언리얼 툴은 별도 repo JUN_UE (루트=플러그인 JUNTools, elom1213/JUN_UE, main)
 - [JUN_mgear vault](jun-mgear-vault.md) — mgear 학습 노트는 JUN_mgear Obsidian vault → elom1213/JUN_mgear
 - [kangaroo plugin read-only](kangaroo-plugin-external-readonly.md) — kangaroo 플러그인은 외부 3rd-party, 수정 금지
 - [PoseWrangler fork patch](posewrangler-plugin-fork-patch.md) — Epic PoseDriverConnect 포크 위치 + serializer objExists 패치 3단계
@@ -22,6 +23,7 @@
 ## 검증 · 마야 공통 함정
 
 - [mayapy headless verify](mayapy-headless-verify.md) — maya.cmds 동작은 추측 말고 Maya2024/bin/mayapy.exe + maya.standalone 으로 확인
+- [UE python verify](unreal-python-tool-verify.md) — 언리얼은 `UnrealEditor-Cmd -run=pythonscript` 로 확인. 플러그인 Content/Python 자동 실행, EnabledByDefault 로 자동 마운트, EditorDialog 는 EditorScriptingUtilities
 - [QApplication before standalone](qapplication-before-maya-standalone.md) — mayapy Qt 테스트는 `QApplication` 을 `standalone.initialize()` **앞에** (뒤면 QWidget 에서 무단 종료)
 - [undo_chunk by default](undo-chunk-by-default.md) — 반복 씬 변경은 요청 없어도 `Framework.core.maya_undo.undo_chunk()` 로 묶기
 - [Maya 2023 compat](maya-2023-compat.md) — 2023 지원 필요할 수 있음, sin/cos 노드 없음(eulerToQuat 우회)

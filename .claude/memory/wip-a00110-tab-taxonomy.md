@@ -25,7 +25,7 @@ metadata:
 |---|---|---|
 | **Key** | 키의 존재 | Pose Key · Fill Keys · Delete All |
 | **Timing** | 키의 시점 | Move · Hold · Offset · Stagger |
-| **Curve** | 커브의 값·형태 | Euler (+ SmartLayer Curve Filters 이식 예정) |
+| **Curve** | 커브의 값·형태 | Euler · **Filters**(Smooth·Intensity·Interp 한 화면, v02.01) |
 | **Transfer** | 오브젝트 간 이동 | Copy Key · Mirror Key · Follow |
 | **Bake** | 키로 굽기 | Bake |
 | **View** | 보기(**씬 불변**) | Graph Focus |
@@ -53,7 +53,20 @@ json 으로 스냅샷 → 재분류 후 다시 떠서 **diff**. 109/110 보존(�
 **함정**: `Delete All` 은 확인 대화상자를 띄워서 headless 검증에서 기본값 `No` 로 아무것도 안 지운다
 — 버그가 아니다. `QMessageBox.question` 을 Yes 로 스텁해야 실제 경로가 돈다.
 
-**SmartLayer Curve Filters 이식은 아직 안 했다**(자리만 마련). 실제 UI 확인 결과 대상은
-**Smooth / Intensity / Interpolate 3종 + Use Quaternions** — `curve_retime_widget` ·
-`remove_spikes_widget` · `curve_bake_widget` 은 **파일만 있고 UI 에 없다**(파일명으로 기능을 추정하면
-안 된다는 실례). 소스는 컴파일 `.pyc` 라 디컴파일하지 않고 **UI 관찰 + 실측으로 재구현**한다.
+**SmartLayer Curve Filters 이식 완료** (v02.01): **Smooth / Intensity / Interp + Use Quaternions**.
+- 대상은 UI 로 확인해야 했다 — `curve_retime_widget` · `remove_spikes_widget` · `curve_bake_widget` 은
+  **파일만 있고 UI 에 없다**. **파일명으로 기능을 추정하면 안 된다**(계획서 결정 2개가 무효가 됐다).
+- 소스는 컴파일 `.pyc` + 라이선스가 리버스 엔지니어링 금지 → **디컴파일하지 않고 직접 구현**.
+  사용자가 허락해도 라이선스 당사자는 벤더이고, 이 저장소는 공개 포트폴리오라 위험이 크다.
+- 수식: Smooth = 가우시안 `[1 2 1]/4`×N, `원본 + t·(스무딩-원본)`(t<0 = Rough) /
+  Intensity = **구간 평균** 기준 스케일(평균 불변) / Interp = 양 끝 키를 잇는 이징으로 끌어당김.
+- 조작은 **settle 커밋 재사용**(Stagger·Peak): 드래그 중 원본에서 재계산, 놓으면 undo 한 항목 +
+  슬라이더 0 복귀(→ 반복 적용). 값 쓰기는 `keyframe -e -valueChange` 라 탄젠트/레이어 보존.
+- **대상은 TSL 이 아니라 씬 선택**: 그래프 에디터 선택 키(`keyframe -q -sl -name` + 커브별
+  `-indexValue`)가 1순위, 없으면 타임 슬라이더 구간(`timeControl -q -rangeArray`, 폭 1프레임
+  이하면 "안 고름")+ 씬 선택. 둘 다 없으면 실행 안 함. 커브→구동 플러그는 `listConnections` 로
+  몇 홉 따라가 찾는다(애님 레이어면 animBlendNode 경유).
+- 세 필터는 **한 화면 접이식**(원본 UI 와 같은 구성). 섹션이 작고 번갈아 쓰는 작업이면
+  [[prefer-subtabs-over-stacked-collapsibles]] 의 예외가 된다.
+- 쿼터니언 되돌리기는 **원래 값에 가장 가까운 해**를 골라 ±360 점프를 없앤다. 축별 키 시간이
+  다르면 그 오브젝트만 채널별 폴백.

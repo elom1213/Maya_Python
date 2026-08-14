@@ -16,7 +16,9 @@ updated: 2026-08-14
 > 결정된 것: 상위 탭 이름은 **Key / Timing / Curve / Transfer / Bake / View**(6-3 권장안),
 > `Graph` → **`Hold`** 라벨 변경 적용. 6-1(Retime) · 6-2(Curve Bake) 는 **대상이 없어 무효** —
 > SmartLayer UI 를 실제로 확인하니 Curve Filters 는 **Smooth / Intensity / Interpolate 3종 +
-> Use Quaternions** 가 전부다(12장 갱신). 남은 것은 11장 6단계, **Curve Filters 이식**.
+> Use Quaternions** 가 전부다(12장 갱신).
+> **11장 6단계(Curve Filters 이식)도 완료 — V02 v02.01.** 세 필터를 직접 구현해 `Curve` 탭에
+> 더했다(Smooth / Intensity / Interp). 구현·검증 내용은 `docs/A00110_animTool_V02.md` §5.4.
 
 ---
 
