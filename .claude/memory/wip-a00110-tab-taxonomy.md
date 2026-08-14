@@ -69,6 +69,13 @@ json 으로 스냅샷 → 재분류 후 다시 떠서 **diff**. 109/110 보존(�
 - 세 필터는 **한 화면 접이식**(원본 UI 와 같은 구성). 섹션이 작고 번갈아 쓰는 작업이면
   [[prefer-subtabs-over-stacked-collapsibles]] 의 예외가 된다.
 
+**Expand(별도 창) 패턴** (A00290_BSTool Shape Editor → A00110 Curve Filters, v02.03):
+패널을 **복제하지 말고 통째로 옮긴다** — `win.body.addWidget(위젯)` 이 기존 레이아웃에서 떼어 온다.
+그래야 세션·슬라이더·undo 가 한 벌뿐이라 동기화 문제가 아예 없다. 되돌릴 자리는
+`layout.indexOf` 로 미리 저장해 두고 `insertWidget` 로 복귀. 확장 창은 `QWidget(owner, Qt.Window)`
++ 고유 objectName, `closeEvent` 에서 owner 의 collapse 호출. **본 창 closeEvent 에서 확장 창도
+닫아** 미아 창을 막는다(본문을 제자리로 돌린 뒤 닫힌다).
+
 **"from Selection" 원버튼 패턴** (Euler v01.38 → Curve Filters v02.01 → Fill Keys v02.02):
 리스트업·구간 입력 단계를 **그래프 에디터에서 고른 키** 하나로 대신한다. 고른 키가 오브젝트·채널·
 구간을 다 말해 준다(커브 → `driven_plug` 로 역추적). 규칙 두 가지 —
