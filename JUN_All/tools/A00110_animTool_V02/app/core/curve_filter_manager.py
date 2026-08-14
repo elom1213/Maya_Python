@@ -265,6 +265,41 @@ def interpolate_quats(times, triples, order, shape, amount):
     return _to_eulers(result, order, triples)
 
 
+# ============================================================ 커브 -> 구동 플러그
+
+def driven_plug(curve):
+    """그 애님 커브가 결국 무엇을 구동하나 -> (오브젝트, 어트리뷰트).
+
+    애니메이션 레이어가 끼면 커브 -> animBlendNode* -> 대상 이므로 몇 홉 따라간다.
+    못 찾으면 (None, None).
+
+    (Fill Keys 의 'from Selection' 도 같은 역추적이 필요해 모듈 레벨로 뒀다.)
+    """
+    node, attr = curve, "output"
+    for _ in range(4):
+        found = cmds.listConnections("{0}.{1}".format(node, attr), source=False,
+                                     destination=True, plugs=True) or []
+        if not found:
+            return (None, None)
+        target = found[0]
+        target_node, target_attr = target.split(".", 1)
+        if cmds.objectType(target_node, isAType="transform"):
+            return (target_node, target_attr)
+        node, attr = target_node, "output"
+    return (None, None)
+
+
+def selected_key_curves():
+    """그래프 에디터에서 **선택된 키**가 있는 커브들. (커브, 오브젝트, 어트리뷰트, 시간들)"""
+    out = []
+    for curve in (cmds.keyframe(query=True, selected=True, name=True) or []):
+        obj, attr = driven_plug(curve)
+        times = cmds.keyframe(curve, query=True, selected=True,
+                              timeChange=True) or []
+        out.append((curve, obj, attr, list(times)))
+    return out
+
+
 # ============================================================ 세션
 
 class CurveFilterSession(object):
@@ -397,25 +432,7 @@ class CurveFilterSession(object):
             })
         return out
 
-    @staticmethod
-    def _driven_plug(curve):
-        """그 애님 커브가 결국 무엇을 구동하나 -> (오브젝트, 어트리뷰트).
-
-        애니메이션 레이어가 끼면 커브 -> animBlendNode* -> 대상 이므로 몇 홉 따라간다.
-        못 찾으면 (None, None) — 쿼터니언 묶음에서만 빠지고 나머지는 그대로 동작한다.
-        """
-        node, attr = curve, "output"
-        for _ in range(4):
-            found = cmds.listConnections("{0}.{1}".format(node, attr), source=False,
-                                         destination=True, plugs=True) or []
-            if not found:
-                return (None, None)
-            target = found[0]
-            target_node, target_attr = target.split(".", 1)
-            if cmds.objectType(target_node, isAType="transform"):
-                return (target_node, target_attr)
-            node, attr = target_node, "output"
-        return (None, None)
+    _driven_plug = staticmethod(lambda curve: driven_plug(curve))
 
     @classmethod
     def _group_rotations(cls, entries, quaternion):

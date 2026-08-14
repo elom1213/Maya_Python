@@ -490,6 +490,20 @@ class MainWindow(QWidget):
         self.on_fill_refresh_layers(quiet=True)
 
         # --- 실행 ---
+        # 실행 버튼 2개 — Curve > Euler 탭과 같은 구성.
+        #   위 : 원버튼. 리스트업·채널 고르기·구간 입력 없이 **그래프 에디터에서 고른 키**를
+        #        그대로 읽어 실행한다(고른 키가 곧 오브젝트·채널·구간을 다 말해 준다).
+        #   아래: 기존 버튼. 리스트 + 고른 채널 + Start/End 로 실행한다.
+        self.btn_fill_keys_sel = QPushButton("Fill Keys from Selection")
+        self.btn_fill_keys_sel.setMinimumHeight(32)
+        self.btn_fill_keys_sel.setToolTip(
+            "One click: objects, channels and range all come from the keys you\n"
+            "selected in the Graph Editor - no listing, no Start / End typing.\n"
+            "What it used is written back into the list, the channels and the\n"
+            "range above, so you can see it and re-run with the button below.")
+        self.btn_fill_keys_sel.clicked.connect(self.on_fill_keys_from_selection)
+        layout.addWidget(self.btn_fill_keys_sel)
+
         self.btn_fill_keys = QPushButton("Fill Keys in Range")
         self.btn_fill_keys.setMinimumHeight(32)
         self.btn_fill_keys.setToolTip(
@@ -1675,6 +1689,48 @@ class MainWindow(QWidget):
             self.log("[Info] {0} selected channel(s) hidden by the filter were "
                      "skipped.".format(hidden))
         return names
+
+    def on_fill_keys_from_selection(self):
+        """원버튼 — **그래프 에디터에서 고른 키**가 대상·채널·구간을 모두 정한다.
+
+        Curve > Euler 탭의 `Euler Filter from Selection` 과 같은 원리다. 실제 작업은
+        "그래프 에디터에서 채울 구간의 키를 드래그로 고른다" 로 끝나는데, 기존 버튼은 그걸
+        다시 List Selected Objects -> List Attributes -> 채널 고르기 -> Start/End 네 단계로
+        옮겨 담아야 했다.
+
+        감지한 값은 **위젯에도 채워 넣는다** — 무엇을 어느 구간으로 처리했는지 눈으로 확인되고,
+        이어서 채널이나 레이어만 바꿔 아래 버튼으로 다시 돌릴 수 있다.
+
+        고른 키가 없으면 **실행하지 않는다.** 대상을 못 정한 채 전 구간을 찍는 쪽이 위험하다
+        (Euler 탭에서 세운 것과 같은 규칙).
+        """
+        objs, attrs, start, end, message = FillKeyManager.targets_from_selection()
+        if message:
+            self.log(("[Warning] " if objs is None else "") + message)
+        if objs is None:
+            return
+
+        # 감지 결과를 위젯에 되채운다(리스트 -> 채널 목록 -> 채널 선택 -> 구간).
+        self.fill_tsl.set_items(objs)
+        self.on_fill_list_attrs()
+        self.flt_fill.clear()          # 필터에 가려 선택이 무시되지 않도록 비운다
+        selected = 0
+        for i in range(self.lw_fill_attrs.count()):
+            item = self.lw_fill_attrs.item(i)
+            picked = item.text() in attrs
+            item.setSelected(picked)
+            selected += 1 if picked else 0
+        self.fill_range.set_range(start, end)
+
+        if not selected:
+            self.log("[Warning] The selected keys drive channels that are not in "
+                     "the list ({0}).".format(", ".join(attrs)))
+            return
+
+        self.log("[From Selection] {0} object(s) x {1} channel(s), range "
+                 "[{2}-{3}f] from the selected keys.".format(
+                     len(objs), selected, start, end))
+        self.on_fill_keys()
 
     def on_fill_keys(self):
         objs = self.fill_tsl.get_all_items()

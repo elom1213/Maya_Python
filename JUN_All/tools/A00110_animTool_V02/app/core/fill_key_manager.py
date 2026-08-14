@@ -33,6 +33,8 @@
 
 import maya.cmds as cmds
 
+from .curve_filter_manager import selected_key_curves
+
 from Framework.core.maya_undo import undo_chunk
 from Framework.core.maya_refresh import suspend_refresh
 
@@ -144,6 +146,50 @@ class FillKeyManager:
     # ==================================================
     # 메인 동작
     # ==================================================
+
+    @staticmethod
+    def targets_from_selection():
+        """**그래프 에디터에서 고른 키**로 대상을 정한다.
+
+        고른 키가 곧 "어느 오브젝트의 어느 채널을 어느 구간에" 인지 다 말해 준다:
+          오브젝트 · 채널 = 그 키가 놓인 커브가 구동하는 것,
+          구간          = 고른 키의 첫/마지막 프레임.
+
+        리스트업(List Selected Objects -> List Attributes -> 채널 고르기 -> Start/End)
+        네 단계를 한 번에 대신한다. Euler 탭의 `Euler Filter from Selection` 과 같은 원리다.
+
+        Returns:
+            (objects, attrs, start, end, message)
+            고른 키가 없으면 objects 가 None 이고 message 에 사유가 담긴다.
+        """
+        found = selected_key_curves()
+        if not found:
+            return (None, None, None, None,
+                    "No keyframes selected. Drag-select the keys to fill in the "
+                    "Graph Editor / Time Slider first.")
+
+        objects, attrs, times = [], [], []
+        unknown = 0
+        for _curve, obj, attr, curve_times in found:
+            times.extend(curve_times)
+            if not obj:
+                unknown += 1
+                continue
+            if obj not in objects:
+                objects.append(obj)
+            if attr not in attrs:
+                attrs.append(attr)
+
+        if not objects or not times:
+            return (None, None, None, None,
+                    "Could not tell which objects those keys drive.")
+
+        message = ""
+        if unknown:
+            message = ("[Info] {0} selected curve(s) do not drive a transform "
+                       "and were skipped.".format(unknown))
+        return (objects, attrs, int(round(min(times))), int(round(max(times))),
+                message)
 
     @staticmethod
     def fill_keys(objects, attrs, start, end, layer=None, step=1):
