@@ -22,6 +22,7 @@ from Framework.core.maya_undo import undo_chunk
 from tools.A00400_CurveTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00400_CurveTool.app.core import curve_manager as curve_mgr
 from tools.A00400_CurveTool.app.core import wrap_manager as wrap_mgr
+from tools.A00400_CurveTool.app.core import points_manager as points_mgr
 
 
 WINDOW_OBJECT_NAME = "JUN_A00400_CurveTool_window"
@@ -80,6 +81,11 @@ class MainWindow(QWidget):
             index,
             "Make one curve take the shape of another, even when the two have "
             "different CV counts.")
+        index = self.tabs.addTab(self._build_points_tab(), "Points to Curve")
+        self.tabs.setTabToolTip(
+            index,
+            "Draw one curve through the world positions of the listed objects, "
+            "joints or components, in list order.")
         root.addWidget(self.tabs, 1)
 
         root.addWidget(self.te_log)
@@ -435,6 +441,157 @@ class MainWindow(QWidget):
         self.sld_wrap_env.sliderReleased.connect(self._wrap_env_drag_end)
 
         return tab
+
+    # --------------------------------------------------------------
+    # Tab 4 : Points to Curve
+    # --------------------------------------------------------------
+
+    def _build_points_tab(self):
+        """리스트에 담은 오브젝트/조인트/컴포넌트의 **월드 위치**를 순서대로 잇는 커브.
+
+        Exact 는 `cmds.curve(ep=...)` 로 모든 위치를 정확히 지나고, Smoothed 는 그 커브의
+        CV 를 라플라시안으로 이완한다(양 끝은 고정). 자세한 근거는 core/points_manager.py.
+        """
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+
+        desc = QLabel(
+            "Draw one curve through the world positions of the listed items,\n"
+            "in list order. Objects, joints and components all work.")
+        desc.setAlignment(Qt.AlignCenter)
+        root.addWidget(desc)
+
+        # 순서가 결과를 결정하므로 Order 를 기본으로 켜 둔다(고른 순서대로 담긴다).
+        self.tsl_points = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects / Components", select_label="List Selected",
+            show_sort=False, show_reverse=True, show_order=True, order_default=True,
+            list_min_height=170, log_callback=self.log)
+        root.addWidget(self.tsl_points, 1)
+
+        opt_box = QGroupBox("Curve")
+        opt_lay = QVBoxLayout(opt_box)
+
+        deg_row = QHBoxLayout()
+        deg_row.addWidget(QLabel("Degree"))
+        self.cmb_points_degree = QComboBox()
+        for degree in points_mgr.DEGREES:
+            self.cmb_points_degree.addItem(
+                "{0}{1}".format(degree, "  (straight lines)" if degree == 1 else ""), degree)
+        self.cmb_points_degree.setCurrentIndex(points_mgr.DEGREES.index(
+            points_mgr.DEFAULT_DEGREE))
+        self.cmb_points_degree.setToolTip(
+            "1 connects the points with straight lines. 3 is the usual smooth curve.\n"
+            "If there are not enough points for the degree, it is lowered automatically.")
+        deg_row.addWidget(self.cmb_points_degree, 1)
+        opt_lay.addLayout(deg_row)
+
+        self.rb_points_exact = QRadioButton("Through the points (exact)")
+        self.rb_points_exact.setToolTip(
+            "The curve passes through every listed position exactly.")
+        self.rb_points_exact.setChecked(True)
+        opt_lay.addWidget(self.rb_points_exact)
+
+        self.rb_points_smooth = QRadioButton("Smoothed (relaxed)")
+        self.rb_points_smooth.setToolTip(
+            "The curve no longer passes through every position, but it is smoother.\n"
+            "The first and last positions are always kept.")
+        opt_lay.addWidget(self.rb_points_smooth)
+
+        smooth_row = QHBoxLayout()
+        self.lbl_points_smooth = QLabel("Smoothness")
+        smooth_row.addWidget(self.lbl_points_smooth)
+
+        self.sld_points_smooth = QSlider(Qt.Horizontal)
+        # 슬라이더는 정수라 0.01 단위로 쓰려고 100 배로 잡는다.
+        self.sld_points_smooth.setRange(0, 100)
+        self.sld_points_smooth.setValue(50)
+        self.sld_points_smooth.setToolTip(
+            "0 is the same as exact, 1 is fully relaxed.\n"
+            "The distance from the points grows in step with this value.")
+        smooth_row.addWidget(self.sld_points_smooth, 1)
+
+        self.dsb_points_smooth = QDoubleSpinBox()
+        self.dsb_points_smooth.setDecimals(2)
+        self.dsb_points_smooth.setSingleStep(0.05)
+        self.dsb_points_smooth.setRange(0.0, 1.0)
+        self.dsb_points_smooth.setValue(0.5)
+        self.dsb_points_smooth.setFixedWidth(70)
+        self.dsb_points_smooth.setKeyboardTracking(False)
+        smooth_row.addWidget(self.dsb_points_smooth)
+        opt_lay.addLayout(smooth_row)
+
+        name_row = QHBoxLayout()
+        name_row.addWidget(QLabel("Name"))
+        self.le_points_name = QLineEdit()
+        self.le_points_name.setPlaceholderText("leave empty for Maya's default name")
+        name_row.addWidget(self.le_points_name, 1)
+        opt_lay.addLayout(name_row)
+
+        root.addWidget(opt_box)
+
+        self.btn_points_create = QPushButton("Create Curve from List")
+        self.btn_points_create.setMinimumHeight(30)
+        self.btn_points_create.clicked.connect(self.on_points_create)
+        root.addWidget(self.btn_points_create)
+
+        # 슬라이더 <-> 스핀박스 동기화, 모드에 따라 활성/비활성.
+        self.sld_points_smooth.valueChanged.connect(
+            lambda value: self._set_points_smooth_widgets(value / 100.0))
+        self.dsb_points_smooth.valueChanged.connect(self._set_points_smooth_widgets)
+        self.rb_points_smooth.toggled.connect(self._on_points_mode)
+        self._on_points_mode(False)
+
+        return tab
+
+    # ==============================================================
+    # actions : Points to Curve
+    # ==============================================================
+
+    def _on_points_mode(self, smoothed):
+        """Smoothness 위젯은 Smoothed 모드일 때만 쓸 수 있게 한다."""
+        for widget in (self.lbl_points_smooth, self.sld_points_smooth,
+                       self.dsb_points_smooth):
+            widget.setEnabled(bool(smoothed))
+
+    def _set_points_smooth_widgets(self, value):
+        """슬라이더/스핀박스를 값에 맞춘다(서로 신호를 되쏘지 않게 막고)."""
+        for widget, scaled in ((self.sld_points_smooth, int(round(value * 100))),
+                               (self.dsb_points_smooth, value)):
+            widget.blockSignals(True)
+            widget.setValue(scaled)
+            widget.blockSignals(False)
+
+    def on_points_create(self):
+        items = self.tsl_points.get_all_nodes() or self.tsl_points.get_all_items()
+
+        if not items:
+            self.log("The list is empty. Select objects or components and click "
+                     "'List Selected'.", warn=True)
+            return
+
+        smoothness = (self.dsb_points_smooth.value()
+                      if self.rb_points_smooth.isChecked() else 0.0)
+
+        # 생성과 선택을 **같은 청크**로 묶는다. 선택을 청크 밖에서 하면 그것이 별도 undo
+        # 항목이 되어, Ctrl+Z 한 번이 커브가 아니라 선택만 되돌린다.
+        with undo_chunk():
+            result = points_mgr.create_curve(
+                items,
+                degree=self.cmb_points_degree.currentData(),
+                smoothness=smoothness,
+                name=self.le_points_name.text().strip() or None)
+
+            if result["ok"]:
+                cmds.select(result["curve"], replace=True)
+
+        for item, why in (result.get("skipped") or []):
+            self.log("Skipped {0} ({1}).".format(item.split("|")[-1], why), warn=True)
+
+        if not result["ok"]:
+            self.log(result["message"], warn=True)
+            return
+
+        self.log(result["message"])
 
     # ==============================================================
     # actions : Wrap
