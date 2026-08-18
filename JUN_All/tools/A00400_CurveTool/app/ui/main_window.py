@@ -21,6 +21,7 @@ import maya.cmds as cmds
 from Framework.core.maya_undo import undo_chunk
 from tools.A00400_CurveTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00400_CurveTool.app.core import curve_manager as curve_mgr
+from tools.A00400_CurveTool.app.core import wrap_manager as wrap_mgr
 
 
 WINDOW_OBJECT_NAME = "JUN_A00400_CurveTool_window"
@@ -74,6 +75,11 @@ class MainWindow(QWidget):
             index,
             "Make the listed curves thicker in the viewport so they are easier "
             "to see and to click on.")
+        index = self.tabs.addTab(self._build_wrap_tab(), "Wrap")
+        self.tabs.setTabToolTip(
+            index,
+            "Make one curve take the shape of another, even when the two have "
+            "different CV counts.")
         root.addWidget(self.tabs, 1)
 
         root.addWidget(self.te_log)
@@ -299,6 +305,278 @@ class MainWindow(QWidget):
         if skipped:
             details = ", ".join("{0} ({1})".format(n, why) for n, why in skipped)
             self.log("Skipped {0}: {1}".format(len(skipped), details))
+
+    # --------------------------------------------------------------
+    # Tab 3 : Wrap
+    # --------------------------------------------------------------
+
+    def _build_wrap_tab(self):
+        """CV 개수가 다른 두 커브에서, 한쪽이 다른 쪽의 모양을 그대로 따르게 한다.
+
+        마야 기본 `wrap` 디포머로도 커브끼리 묶을 수는 있지만 결과가 불안정하다.
+        여기서는 디포머 대신 `rebuildCurve` + `blendShape` 노드 네트워크를 만든다
+        (자세한 이유와 실측은 core/wrap_manager.py 참고).
+        """
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+
+        desc = QLabel(
+            "Make the driven curve take the driver's shape, even with a different "
+            "CV count.\nThe driven curve gets a 0-1 attribute that blends between "
+            "its own shape and\nthe wrapped one, like a blendShape envelope.")
+        desc.setAlignment(Qt.AlignCenter)
+        root.addWidget(desc)
+
+        pick_box = QGroupBox("Curves")
+        pick_lay = QVBoxLayout(pick_box)
+
+        self.le_wrap_driver = QLineEdit()
+        self.le_wrap_driver.setPlaceholderText("driver - the shape to copy")
+        self.le_wrap_driven = QLineEdit()
+        self.le_wrap_driven.setPlaceholderText("driven - the curve that gets deformed")
+
+        for label, field, tip in (
+                ("Driver", self.le_wrap_driver, "The curve whose shape is copied."),
+                ("Driven", self.le_wrap_driven,
+                 "The curve that is deformed. It keeps its own CVs and history.")):
+            row = QHBoxLayout()
+            caption = QLabel(label)
+            caption.setFixedWidth(46)
+            row.addWidget(caption)
+            field.setToolTip(tip)
+            row.addWidget(field, 1)
+            button = QPushButton("<<")
+            button.setFixedWidth(34)
+            button.setToolTip("Put the first selected curve here.")
+            button.clicked.connect(lambda _checked=False, f=field: self._wrap_pick(f))
+            row.addWidget(button)
+            pick_lay.addLayout(row)
+
+        root.addWidget(pick_box)
+
+        opt_box = QGroupBox("Options")
+        opt_lay = QVBoxLayout(opt_box)
+
+        self.chk_wrap_offset = QCheckBox("Preserve offset (follow the driver's change only)")
+        self.chk_wrap_offset.setToolTip(
+            "Off : at envelope 1 the driven curve becomes the driver's shape.\n"
+            "On  : the driven curve keeps its own shape and only follows how the "
+            "driver changes\n      from the moment the wrap was made.")
+        opt_lay.addWidget(self.chk_wrap_offset)
+
+        self.chk_wrap_uniform = QCheckBox("Uniform-rebuild the driven curve")
+        self.chk_wrap_uniform.setToolTip(
+            "Only matters when the driven curve has non-uniform knots - then an exact "
+            "match is\nimpossible. Turning this on rebuilds it evenly first, which "
+            "changes the driven\ncurve's own shape a little but makes the wrap far "
+            "more accurate.")
+        opt_lay.addWidget(self.chk_wrap_uniform)
+
+        attr_row = QHBoxLayout()
+        attr_row.addWidget(QLabel("Envelope attr"))
+        self.le_wrap_attr = QLineEdit(wrap_mgr.DEFAULT_ENVELOPE_ATTR)
+        self.le_wrap_attr.setToolTip(
+            "Name of the 0-1 attribute added to the driven curve.")
+        attr_row.addWidget(self.le_wrap_attr, 1)
+        opt_lay.addLayout(attr_row)
+
+        root.addWidget(opt_box)
+
+        btn_row = QHBoxLayout()
+        self.btn_wrap_check = QPushButton("Check")
+        self.btn_wrap_check.setToolTip(
+            "Report what the two curves look like and whether they can be wrapped, "
+            "without changing anything.")
+        self.btn_wrap_check.clicked.connect(self.on_wrap_check)
+        btn_row.addWidget(self.btn_wrap_check)
+
+        self.btn_wrap_create = QPushButton("Create Wrap")
+        self.btn_wrap_create.clicked.connect(self.on_wrap_create)
+        btn_row.addWidget(self.btn_wrap_create, 1)
+
+        self.btn_wrap_remove = QPushButton("Remove Wrap")
+        self.btn_wrap_remove.setToolTip(
+            "Delete the wrap setup from the driven curve and give it its own shape back.")
+        self.btn_wrap_remove.clicked.connect(self.on_wrap_remove)
+        btn_row.addWidget(self.btn_wrap_remove)
+        root.addLayout(btn_row)
+
+        env_box = QGroupBox("Envelope")
+        env_lay = QVBoxLayout(env_box)
+
+        env_row = QHBoxLayout()
+        self.sld_wrap_env = QSlider(Qt.Horizontal)
+        # 슬라이더는 정수라 0.01 단위로 쓰려고 100 배로 잡는다.
+        self.sld_wrap_env.setRange(0, 100)
+        self.sld_wrap_env.setValue(100)
+        self.sld_wrap_env.setToolTip(
+            "0 = the driven curve's own shape, 1 = wrapped.\n"
+            "This writes the attribute on the driven curve - the same value you can "
+            "key or\nconnect anywhere else.")
+        env_row.addWidget(self.sld_wrap_env, 1)
+
+        self.dsb_wrap_env = QDoubleSpinBox()
+        self.dsb_wrap_env.setDecimals(2)
+        self.dsb_wrap_env.setSingleStep(0.05)
+        self.dsb_wrap_env.setRange(0.0, 1.0)
+        self.dsb_wrap_env.setValue(1.0)
+        self.dsb_wrap_env.setFixedWidth(70)
+        self.dsb_wrap_env.setKeyboardTracking(False)
+        env_row.addWidget(self.dsb_wrap_env)
+        env_lay.addLayout(env_row)
+
+        root.addWidget(env_box)
+        root.addStretch(1)
+
+        self._wrap_env_dragging = False
+        self.sld_wrap_env.valueChanged.connect(self._on_wrap_env_slider)
+        self.dsb_wrap_env.valueChanged.connect(self._on_wrap_env_spin)
+        self.sld_wrap_env.sliderPressed.connect(self._wrap_env_drag_start)
+        self.sld_wrap_env.sliderReleased.connect(self._wrap_env_drag_end)
+
+        return tab
+
+    # ==============================================================
+    # actions : Wrap
+    # ==============================================================
+
+    def _wrap_pick(self, field):
+        """씬에서 고른 첫 커브를 필드에 넣는다."""
+        selection = cmds.ls(selection=True, long=True) or []
+
+        for node in selection:
+            if wrap_mgr.curve_shape(node):
+                field.setText(node)
+                return
+
+        self.log("Select a NURBS curve first.", warn=True)
+
+    def _wrap_pair(self):
+        driver = self.le_wrap_driver.text().strip()
+        driven = self.le_wrap_driven.text().strip()
+
+        if not driver or not driven:
+            self.log("Set both Driver and Driven first (use the << buttons).", warn=True)
+            return None, None
+
+        return driver, driven
+
+    def _wrap_report(self, warnings):
+        for warning in warnings:
+            self.log(warning, warn=True)
+
+    def on_wrap_check(self):
+        driver, driven = self._wrap_pair()
+
+        if not driver:
+            return
+
+        error, warnings, info = wrap_mgr.check(driver, driven)
+
+        if info:
+            for role in ("driver", "driven"):
+                data = info[role]
+                self.log("{0} : {1} CVs, {2} spans, degree {3}, {4}{5}".format(
+                    role, data["cvs"], data["spans"], data["degree"],
+                    wrap_mgr.form_name(data["form"]),
+                    "" if wrap_mgr.is_uniform(data) else ", non-uniform knots"))
+
+        self._wrap_report(warnings)
+
+        if error:
+            self.log(error, warn=True)
+        else:
+            self.log("These two curves can be wrapped.")
+
+    def on_wrap_create(self):
+        driver, driven = self._wrap_pair()
+
+        if not driver:
+            return
+
+        result = wrap_mgr.create_wrap(
+            driver, driven,
+            attr_name=self.le_wrap_attr.text().strip() or wrap_mgr.DEFAULT_ENVELOPE_ATTR,
+            preserve_offset=self.chk_wrap_offset.isChecked(),
+            uniform_rebuild=self.chk_wrap_uniform.isChecked())
+
+        self._wrap_report(result.get("warnings") or [])
+
+        if not result["ok"]:
+            self.log(result["message"], warn=True)
+            return
+
+        self.log(result["message"])
+        self._set_wrap_env_widgets(1.0)
+
+    def on_wrap_remove(self):
+        driven = self.le_wrap_driven.text().strip()
+
+        if not driven:
+            self.log("Set the Driven curve first.", warn=True)
+            return
+
+        error = wrap_mgr.remove_wrap(driven)
+
+        if error:
+            self.log(error, warn=True)
+            return
+
+        self.log("Removed the curve wrap from {0}.".format(driven.split("|")[-1]))
+
+    def _set_wrap_env_widgets(self, value):
+        """슬라이더/스핀박스를 값에 맞춘다(서로 신호를 되쏘지 않게 막고)."""
+        for widget, scaled in ((self.sld_wrap_env, int(round(value * 100))),
+                               (self.dsb_wrap_env, value)):
+            widget.blockSignals(True)
+            widget.setValue(scaled)
+            widget.blockSignals(False)
+
+    def _apply_wrap_env(self, value, log=True):
+        driven = self.le_wrap_driven.text().strip()
+
+        if not driven:
+            if log:
+                self.log("Set the Driven curve first.", warn=True)
+            return False
+
+        if not wrap_mgr.set_envelope(driven, value):
+            if log:
+                self.log("{0} has no curve wrap.".format(driven.split("|")[-1]), warn=True)
+            return False
+
+        if log:
+            self.log("Envelope {0:.2f} -> {1}".format(value, driven.split("|")[-1]))
+
+        return True
+
+    def _on_wrap_env_slider(self, value):
+        env = value / 100.0
+        self._set_wrap_env_widgets(env)
+
+        if self._wrap_env_dragging:
+            # 드래그 중 — undo 청크가 열려 있고, 로그는 손을 뗄 때 한 번만.
+            self._apply_wrap_env(env, log=False)
+        else:
+            with undo_chunk():
+                self._apply_wrap_env(env)
+
+    def _on_wrap_env_spin(self, value):
+        self._set_wrap_env_widgets(value)
+        with undo_chunk():
+            self._apply_wrap_env(value)
+
+    def _wrap_env_drag_start(self):
+        self._wrap_env_dragging = True
+        cmds.undoInfo(openChunk=True)
+
+    def _wrap_env_drag_end(self):
+        """손을 떼는 순간이 커밋. 청크를 닫기 전에 마지막 값을 확정한다."""
+        self._wrap_env_dragging = False
+        try:
+            self._apply_wrap_env(self.dsb_wrap_env.value())
+        finally:
+            cmds.undoInfo(closeChunk=True)
 
     # ==============================================================
     # actions : Line Width

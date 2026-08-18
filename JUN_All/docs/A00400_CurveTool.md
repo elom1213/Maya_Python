@@ -1,20 +1,21 @@
 ---
 title: A00400_CurveTool 사용법
 aliases: [Curve Tool, CurveTool, A00400]
-tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve, lineWidth]
-updated: 2026-08-13
+tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve, lineWidth, wrap, blendShape]
+updated: 2026-08-18
 ---
 
 # A00400_CurveTool 사용법
 
-Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya). **탭 2개**로 나뉜다(v01.01).
+Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya). **탭 3개**로 나뉜다(v01.03).
 
 | 탭 | 내용 |
 |----|------|
 | **Create / Direction** | ① 선택한 메시 엣지에 부착된 커브 생성(엣지 덩어리마다 커브 하나) ② Reverse Direction(방향 통일) |
 | **Line Width** (v01.01~) | 리스트업한 커브의 **뷰포트 표시 굵기**를 슬라이더로 조절 — 씬에서 **잘 보이고 잘 집히게** |
+| **Wrap** (v01.03~) | **CV 개수가 달라도** 한 커브가 다른 커브의 모양을 따르게 한다. 0~1 envelope 어트리뷰트로 라이브 블렌드 |
 
-- **버전**: `app/config/version.py` (v01.02)
+- **버전**: `app/config/version.py` (v01.03)
 - **설치**: `__dragDrop_A00400.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **CurveTool** → `tools.A00400_CurveTool.run(True)`
 - **참고**: 엣지→커브 생성은 `ref/ref_01.mel`(`duplicateCurve`+`attachCurve`)의 아이디어를, 축 비교 방식은 `A00360_SortTool` 을 이식/응용.
 
@@ -145,3 +146,73 @@ tools/A00400_CurveTool/
   어트리뷰트는 **사유와 함께 건너뛰고** 나머지는 계속 처리한다.
 - 리스트는 UUID 로 현재 경로를 되찾으므로 **리네임·리페어런트 후에도** 같은 커브를 잡는다.
 - 커브 하나에 셰이프가 여럿이면 **모든 nurbsCurve 셰이프**에 적용한다.
+
+---
+
+## 탭 3 — Wrap (v01.03~)
+
+**CV 개수가 다른 두 커브**에서, 한쪽(driven)이 다른 쪽(driver)의 모양을 그대로 따르게 한다.
+
+마야 기본 `wrap` 디포머로도 커브끼리 묶을 수는 있지만 변형이 불안정해 실무에 쓰기 어렵다.
+이 탭은 디포머를 쓰지 않고, **마야가 이미 정확히 계산해 주는 것**을 노드로 엮는다.
+
+```
+driverShape.local ─▶ rebuildCurve ─▶ transformGeometry ─▶ wrapTarget 커브
+                     (driven 의 span/degree 로)  (driver world × driven worldInverse)
+                                                        │
+                         wrapTarget ─▶ blendShape(driven) 타깃,  weight = envelope
+```
+
+핵심은 **`rebuildCurve`** 다. "같은 모양을 다른 CV 개수로 다시 표현"하는 노드이므로,
+driven 의 span/degree 로 driver 를 재구성하면 **CV 개수가 driven 과 정확히 같아진다.**
+그러면 blendShape 의 타깃으로 그대로 쓸 수 있고, 노드로 남으니 **라이브**다.
+
+### 사용법
+
+1. driver 커브를 고르고 **Driver** 옆 `<<`
+2. driven 커브를 고르고 **Driven** 옆 `<<`
+3. (선택) **Check** — 두 커브의 CV/span/degree/form 을 보고 걸 수 있는지 알려 준다. 씬은 안 건드린다.
+4. **Create Wrap**
+
+driven 커브에 **`wrapEnvelope`** 어트리뷰트(0~1, 키 가능)가 붙는다.
+**0 = 원래 모양 / 1 = wrap 된 모양**, blendShape 의 envelope 과 같은 감각이다.
+탭 아래 슬라이더로 바로 돌려볼 수 있고(드래그 한 번 = undo 한 스텝), 채널박스에서 키를 걸거나
+다른 어트리뷰트에 연결해도 된다. 이름은 **Envelope attr** 필드로 바꿀 수 있다.
+
+**Remove Wrap** 을 누르면 셋업(blendShape · rebuildCurve · transformGeometry · multMatrix ·
+타깃 그룹 · envelope 어트리뷰트)이 전부 지워지고 driven 은 원래 모양으로 돌아온다.
+
+### 옵션
+
+| 옵션 | 뜻 |
+|------|-----|
+| **Preserve offset** | 끄면(기본) envelope 1 에서 driven 이 **driver 의 모양 그대로** 된다. 켜면 driven 이 **자기 모양을 유지한 채** driver 의 **변화량만** 따라간다(타깃 2개 — 라이브 `+env`, 바인드 스냅샷 `-env`) |
+| **Uniform-rebuild the driven curve** | driven 의 노트가 불균등할 때만 의미가 있다. 켜면 균등하게 먼저 재구성한다 — driven 자체 모양이 조금 바뀌는 대신 정확도가 크게 오른다(실측 0.264 → 0.088) |
+| **Envelope attr** | driven 에 붙는 0~1 어트리뷰트 이름 (기본 `wrapEnvelope`). 같은 이름이 이미 있으면 뒤에 번호를 붙인다 |
+
+### 정확도
+
+Create 직후 **얼마나 잘 맞았는지 로그에 찍는다** — 최대 편차, driver 길이 대비 %, 평균 편차.
+(두 커브를 호 길이 등간격으로 60점 샘플해 월드 좌표로 잰다.)
+
+| 상황 | 실측 최대 편차 |
+|------|----------------|
+| driven 12 CV ← driver 4 CV (둘 다 균등) | **0.0013** — 사실상 정확히 일치 |
+| driven 이 driver 보다 CV 가 적을 때 | CV 개수만큼만 근사된다. 경고와 함께 편차를 보고한다 |
+| driven 의 노트가 불균등 | 0.264 (→ Uniform-rebuild 켜면 0.088) |
+
+### 알아둘 것 (mayapy 로 확인)
+
+- **노트 벡터의 범위(0~1 vs 0~9)가 달라도 결과는 같다.** 균등 간격이기만 하면 무관하다.
+  반대로 **간격이 불균등하면** driver 를 아무리 잘 재구성해도 driven 의 노트로 다시 해석될 때
+  모양이 어긋난다 → 그래서 Check/Create 가 경고하고 Uniform-rebuild 옵션을 둔다.
+- **form(open / periodic)이 다르면 결과가 망가진다**(실측 편차 10.77). CV 개수가 우연히 같으면
+  blendShape 이 **에러도 없이** 만들어지므로, 이 툴은 form 이 다르면 **아예 거절한다.**
+- **`rebuildCurve` 노드는 소스의 CV 변화만 따라가고 트랜스폼 이동은 무시한다**
+  (기본적으로 `worldSpace` 에 연결돼 있는데도 그렇다). 그래서 지오메트리는 driver 의 `local` 을
+  먹이고, 공간 변환은 `driver.worldMatrix × driven.worldInverseMatrix` 를 `multMatrix` →
+  `transformGeometry` 로 따로 건다. **행렬은 평범한 어트리뷰트라 전파가 확실하다.**
+  덕분에 두 커브의 트랜스폼이 각각 움직여도(회전 포함) 어긋나지 않는다.
+- blendShape weight 는 **음수를 받는다** — Preserve offset 이 타깃 2개로 되는 이유다.
+- 생성 전체가 **undo 한 스텝**이다. envelope 슬라이더 드래그도 한 스텝.
+- 중간 타깃 커브는 `<driven>_wrapGrp` 그룹에 담아 숨긴다. 셋업을 지우면 함께 사라진다.
