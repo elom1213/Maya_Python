@@ -23,6 +23,7 @@ from tools.A00400_CurveTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00400_CurveTool.app.core import curve_manager as curve_mgr
 from tools.A00400_CurveTool.app.core import wrap_manager as wrap_mgr
 from tools.A00400_CurveTool.app.core import points_manager as points_mgr
+from tools.A00400_CurveTool.app.core import smooth_manager as smooth_mgr
 
 
 WINDOW_OBJECT_NAME = "JUN_A00400_CurveTool_window"
@@ -86,6 +87,11 @@ class MainWindow(QWidget):
             index,
             "Draw one curve through the world positions of the listed objects, "
             "joints or components, in list order.")
+        index = self.tabs.addTab(self._build_smooth_tab(), "Smooth")
+        self.tabs.setTabToolTip(
+            index,
+            "Smooth or roughen the selected curve CVs with a live slider. "
+            "Soft selection falloff is respected.")
         root.addWidget(self.tabs, 1)
 
         root.addWidget(self.te_log)
@@ -542,6 +548,288 @@ class MainWindow(QWidget):
         self._on_points_mode(False)
 
         return tab
+
+    # --------------------------------------------------------------
+    # Tab 5 : Smooth
+    # --------------------------------------------------------------
+
+    def _build_smooth_tab(self):
+        """씬에서 고른 CV 를 슬라이더로 실시간 Smooth / Rough.
+
+        마야 기본 `Curves > Smooth`(`cmds.smoothCurve`)의 결과를 그대로 쓰되,
+        그 명령이 못 하는 Rough(음수)와 **소프트 셀렉션 폴오프**를 얹는다.
+        자세한 근거는 core/smooth_manager.py.
+        """
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+
+        desc = QLabel(
+            "Select curve CVs in the scene, then drag the slider.\n"
+            "Left roughens, right smooths - it updates live and is applied when you "
+            "let go.\nSoft selection falloff is used if it is turned on.")
+        desc.setAlignment(Qt.AlignCenter)
+        root.addWidget(desc)
+
+        amount_box = QGroupBox("Amount")
+        amount_lay = QVBoxLayout(amount_box)
+
+        slider_row = QHBoxLayout()
+        lbl_rough = QLabel("Rough")
+        lbl_rough.setFixedWidth(46)
+        slider_row.addWidget(lbl_rough)
+
+        self.sld_smooth = QSlider(Qt.Horizontal)
+        # 슬라이더는 정수라 0.01 단위로 쓰려고 100 배로 잡는다. 가운데(0)가 "변화 없음".
+        self.sld_smooth.setRange(-100, 100)
+        self.sld_smooth.setValue(0)
+        self.sld_smooth.setToolTip(
+            "Drag right to smooth, left to roughen.\n"
+            "The value is multiplied by the Multiplier below and handed to Maya's own\n"
+            "smoothCurve. It updates live while you drag and is applied for good the\n"
+            "moment you let go - the whole drag is one undo step, and the slider then\n"
+            "returns to 0 so you can go again.")
+        slider_row.addWidget(self.sld_smooth, 1)
+
+        lbl_smooth = QLabel("Smooth")
+        lbl_smooth.setFixedWidth(46)
+        lbl_smooth.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        slider_row.addWidget(lbl_smooth)
+        amount_lay.addLayout(slider_row)
+
+        mult_row = QHBoxLayout()
+        mult_row.addWidget(QLabel("Multiplier"))
+        self.dsb_smooth_mult = QDoubleSpinBox()
+        self.dsb_smooth_mult.setDecimals(2)
+        self.dsb_smooth_mult.setSingleStep(0.5)
+        self.dsb_smooth_mult.setRange(0.01, 100.0)
+        self.dsb_smooth_mult.setValue(1.0)
+        self.dsb_smooth_mult.setFixedWidth(80)
+        self.dsb_smooth_mult.setKeyboardTracking(False)
+        self.dsb_smooth_mult.setToolTip(
+            "The slider value is multiplied by this before it is applied.\n"
+            "At 1 the slider value is used as it is; above 1 the same slider travel "
+            "reaches\na much stronger smooth.")
+        mult_row.addWidget(self.dsb_smooth_mult)
+
+        self.lbl_smooth_amount = QLabel("")
+        mult_row.addWidget(self.lbl_smooth_amount, 1)
+        amount_lay.addLayout(mult_row)
+
+        root.addWidget(amount_box)
+
+        self.lbl_smooth_state = QLabel("")
+        self.lbl_smooth_state.setWordWrap(True)
+        root.addWidget(self.lbl_smooth_state)
+
+        self.btn_smooth_check = QPushButton("Check Selection")
+        self.btn_smooth_check.setToolTip(
+            "Report what is selected and whether soft selection is on. Changes nothing.")
+        self.btn_smooth_check.clicked.connect(self.on_smooth_check)
+        root.addWidget(self.btn_smooth_check)
+
+        root.addStretch(1)
+
+        # 드래그 한 번 동안 살아 있는 세션(원본 스냅샷 + 가중치 + 임시 커브).
+        self._smooth_session = None
+        self._smooth_dragging = False
+
+        self.sld_smooth.valueChanged.connect(self._on_smooth_slider)
+        self.dsb_smooth_mult.valueChanged.connect(lambda _v: self._update_smooth_amount())
+        self.sld_smooth.sliderPressed.connect(self._smooth_drag_start)
+        self.sld_smooth.sliderReleased.connect(self._smooth_drag_end)
+
+        self._update_smooth_amount()
+
+        return tab
+
+    # ==============================================================
+    # actions : Smooth
+    # ==============================================================
+
+    def _smooth_amount(self):
+        """슬라이더 값 x 배수. 이 값이 그대로 smoothCurve 의 smoothness 로 간다."""
+        return (self.sld_smooth.value() / 100.0) * self.dsb_smooth_mult.value()
+
+    def _update_smooth_amount(self):
+        amount = self._smooth_amount()
+        self.lbl_smooth_amount.setText(
+            "{0:+.2f}  ({1})".format(
+                amount, "smooth" if amount > 0 else ("rough" if amount < 0 else "no change")))
+
+    def _reset_smooth_slider(self):
+        """적용을 확정한 뒤 가운데로 되돌린다.
+
+        **신호를 막고** 되돌려야 한다 - 막지 않으면 valueChanged 가 0 으로 다시 적용되어
+        방금 확정한 결과가 그대로 지워진다.
+        """
+        self.sld_smooth.blockSignals(True)
+        self.sld_smooth.setValue(0)
+        self.sld_smooth.blockSignals(False)
+        self._update_smooth_amount()
+
+    def _smooth_report(self, session):
+        for shape, why in (session.skipped or []):
+            self.log("Skipped {0} ({1}).".format(shape.split("|")[-1], why), warn=True)
+
+    def _smooth_drag_start(self):
+        """드래그 시작 — 여기서 선택을 붙잡고 undo 청크를 연다.
+
+        임시 커브를 만드는 capture() 까지 청크 안에 있어야 Ctrl+Z 한 번으로 전부 되돌아간다.
+        """
+        self._smooth_dragging = True
+        self._smooth_refreshing = False
+        cmds.undoInfo(openChunk=True)
+
+        session, error = smooth_mgr.capture()
+
+        if session is None:
+            self._smooth_session = None
+            self.log(error, warn=True)
+            return
+
+        self._smooth_session = session
+        self._smooth_report(session)
+
+        # 폴오프를 못 읽고 평범한 선택으로 돌아갔다면 조용히 넘어가지 않는다.
+        if session.note:
+            self.log(session.note, warn=True)
+
+        enabled, distance = smooth_mgr.soft_select_state()
+        self.lbl_smooth_state.setText(
+            "{0} CV(s) on {1} curve(s)  -  from {2}{3}".format(
+                session.cv_count, len(session.targets), session.source,
+                "  (soft radius {0})".format(distance) if enabled else ""))
+
+    def _on_smooth_slider(self, _value):
+        self._update_smooth_amount()
+        amount = self._smooth_amount()
+
+        if self._smooth_dragging:
+            # 드래그 중 — 세션이 원본을 들고 있으므로 매번 원본에서 다시 계산된다(누적 없음).
+            if self._smooth_session is not None:
+                self._smooth_session.apply(amount)
+
+                # **여기서 화면을 직접 다시 그려야 한다.**
+                # Qt 슬라이더를 붙잡고 있는 동안에는 마야가 스스로 뷰포트를 갱신할 틈을
+                # 얻지 못해, CV 는 바뀌는데 화면은 그대로여서 "드래그해도 반응이 없다"로
+                # 보인다(마우스를 놓는 순간에야 한꺼번에 그려진다).
+                self._refresh_viewport()
+            return
+
+        # 화살표 키·홈그루브 클릭처럼 한 번에 끝나는 변경은 그 자리에서 적용하고 되돌린다.
+        result = smooth_mgr.apply_once(amount)
+
+        if not result["ok"]:
+            self.log(result["message"], warn=True)
+        else:
+            if result.get("note"):
+                self.log(result["note"], warn=True)
+            self.log(result["message"])
+            self._warn_if_nothing_moved(result.get("moved", 0), amount)
+
+        self._reset_smooth_slider()
+
+    def _smooth_drag_end(self):
+        """손을 떼는 순간이 곧 확정이다. 청크를 닫기 전에 마지막 값을 한 번 더 쓴다."""
+        self._smooth_dragging = False
+        session = self._smooth_session
+        amount = self._smooth_amount()
+
+        try:
+            if session is not None:
+                _applied, failed, moved = session.apply(amount)
+                session.close()
+
+                self.log("{0} {1:.3f} -> {2} curve(s), {3} of {4} CV(s) moved".format(
+                    "Smooth" if amount >= 0 else "Rough", abs(amount),
+                    len(session.targets), moved, session.cv_count))
+
+                if failed:
+                    self.log("Maya's smoothCurve failed on: {0}".format(
+                        ", ".join(f.split("|")[-1] for f in failed)), warn=True)
+
+                self._warn_if_nothing_moved(moved, amount)
+        finally:
+            self._smooth_session = None
+            cmds.undoInfo(closeChunk=True)
+
+        self._reset_smooth_slider()
+
+    def _refresh_viewport(self):
+        """드래그 중 뷰포트를 즉시 다시 그린다.
+
+        refresh 는 이벤트를 처리하므로 슬롯이 재진입할 수 있다 → 플래그로 막는다.
+        무거운 씬에서 실패해도 조작이 끊기면 안 되므로 예외는 삼킨다.
+        """
+        if getattr(self, "_smooth_refreshing", False):
+            return
+
+        self._smooth_refreshing = True
+        try:
+            cmds.refresh()
+        except Exception:
+            pass
+        finally:
+            self._smooth_refreshing = False
+
+    def _warn_if_nothing_moved(self, moved, amount):
+        """아무 CV 도 안 움직였으면 이유를 알린다 - 조용한 무동작이 제일 나쁘다."""
+        if moved or abs(amount) < 1e-6:
+            return
+
+        self.log("Nothing moved. Maya's smooth keeps the first and last CVs of a curve "
+                 "(2 at each end for degree 3), so a selection made only of end CVs "
+                 "cannot change. Use 'Check Selection' to see which CVs can move.",
+                 warn=True)
+
+    def on_smooth_check(self):
+        """무엇이 잡히는지 그대로 보여 준다. 안 되는 상황의 원인을 찾는 창구다."""
+        selection, source, note = smooth_mgr.cv_selection()
+        enabled, distance = smooth_mgr.soft_select_state()
+
+        if note:
+            self.log(note, warn=True)
+
+        if not selection:
+            self.lbl_smooth_state.setText("Nothing selected.")
+            self.log("Select some curve CVs first "
+                     "(component mode on a NURBS curve).", warn=True)
+            self.log("  scene selection : {0}".format(
+                cmds.ls(selection=True) or "empty"), warn=True)
+            return
+
+        total = sum(len(w) for w in selection.values())
+        text = "{0} CV(s) on {1} curve(s)  -  from {2}{3}".format(
+            total, len(selection), source,
+            "  (soft radius {0})".format(distance) if enabled else "  (soft selection off)")
+        self.lbl_smooth_state.setText(text)
+        self.log(text)
+
+        self.log("  scene selection : {0}".format(cmds.ls(selection=True)))
+
+        for shape, weights in selection.items():
+            degree = cmds.getAttr(shape + ".degree")
+            total = cmds.getAttr(shape + ".spans") + degree
+            pinned = smooth_mgr.pinned_indices(total, degree)
+            usable = sorted(set(weights) - set(pinned))
+
+            self.log("  {0} : degree {1}, {2} CVs   picked [{3}]".format(
+                shape.split("|")[-1], degree, total,
+                smooth_mgr.summarize_indices(weights)))
+
+            if smooth_mgr.has_falloff({shape: weights}):
+                self.log("    falloff : {0}".format(
+                    ", ".join("cv[{0}]={1:.2f}".format(i, weights[i])
+                              for i in sorted(weights))))
+
+            if not usable:
+                self.log("    none of these can move - Maya's smooth keeps the first/last "
+                         "CVs of a curve (here cv {0}).".format(
+                             smooth_mgr.summarize_indices(pinned)), warn=True)
+            elif len(usable) != len(weights):
+                self.log("    cv {0} will not move - Maya's smooth keeps the first/last "
+                         "CVs of a curve.".format(
+                             smooth_mgr.summarize_indices(set(weights) - set(usable))))
 
     # ==============================================================
     # actions : Points to Curve
