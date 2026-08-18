@@ -9,6 +9,12 @@
 #   리스트 1번 : +1 * offset
 #   리스트 2번 : +2 * offset   ...
 #
+# 같은 배수 규칙을 **키 값**에도 쓸 수 있다(value offset, v01.43~). 시간은 그대로 두고 값만
+# 계단식으로 올리거나, 둘을 함께 줄 수도 있다.
+#
+#   예) 세 컨트롤러의 구간 키 값이 모두 0, value offset = 1
+#       ctl_01(0번) 0 0 0  /  ctl_02(1번) 1 1 1  /  ctl_03(2번) 2 2 2
+#
 # 예) ctl_01/02/03 모두 0~5f 에 키, 구간 0~5f, offset 3
 #     -> [0, 5] / [3, 8] / [6, 11]
 #
@@ -82,6 +88,9 @@ class StaggerOffsetSession(object):
         # undo 큐에 '기록까지 끝난' 마지막 offset. 미리보기는 항상 이 값을 기준으로
         # 되돌린 뒤 다시 기록한다(그래야 Ctrl+Z 가 정확히 이 값으로 돌아온다).
         self.settled = 0
+        # 값(value) 쪽도 같은 방식으로 따로 들고 다닌다(시간과 독립적으로 조절 가능).
+        self.applied_value = 0.0
+        self.settled_value = 0.0
         # 씬이 세션의 가정과 어긋났는지(예: 사용자가 Ctrl+Z) 확인하는 탐침.
         # 첫 '움직이는' 항목(index>0)의 구간 내 첫 키를 기준으로 삼는다.
         self.probe_plug = ""
@@ -212,17 +221,25 @@ class StaggerOffsetSession(object):
 
     # ------------------------------------------------------------------ 이동
 
-    def _shift_to(self, new_offset):
-        """지금 적용값(applied) 에서 new_offset 으로 '차이만큼' 이동한다.
+    def _shift_to(self, new_offset, new_value=None):
+        """지금 적용값에서 목표값으로 '차이만큼' 이동한다(시간 · 값 둘 다).
 
         i 번째 오브젝트의 키는 [start + i*applied, end + i*applied] 에 있으므로,
         그 구간을 i*delta 만큼 밀면 정확히 [start + i*new, end + i*new] 가 된다.
-        (원래 위치에서 다시 계산하므로 스핀박스를 왕복해도 값이 누적되지 않는다.)
+        값도 같은 배수 규칙으로 i*delta_value 만큼 더한다.
+        (원래 상태에서 다시 계산하므로 스핀박스를 왕복해도 누적되지 않는다.)
 
-        반환: 실제로 이동시킨 오브젝트 수
+        시간과 값을 **한 번의 keyframe 호출**로 함께 옮긴다. 두 번 나눠 부르면 첫 호출이
+        키를 옮긴 뒤 두 번째 호출의 시간 구간이 어긋난다.
+
+        반환: 실제로 건드린 오브젝트 수
         """
+        if new_value is None:
+            new_value = self.applied_value
+
         delta = new_offset - self.applied
-        if delta == 0:
+        delta_value = new_value - self.applied_value
+        if delta == 0 and abs(delta_value) < 1e-12:
             return 0
 
         kw = {"attribute": self.attrs} if self.attrs else {}
@@ -230,7 +247,8 @@ class StaggerOffsetSession(object):
         moved = 0
         for i, obj in self.entries:
             step = i * delta
-            if step == 0:              # 0번 오브젝트는 언제나 제자리
+            step_value = i * delta_value
+            if step == 0 and step_value == 0:   # 0번 오브젝트는 언제나 제자리
                 continue
             if not cmds.objExists(obj):
                 continue
@@ -238,29 +256,35 @@ class StaggerOffsetSession(object):
             cur_start = self.start + i * self.applied
             cur_end = self.end + i * self.applied
 
+            change = {}
+            if step:
+                change["timeChange"] = step
+            if step_value:
+                change["valueChange"] = step_value
+
             cmds.keyframe(
                 obj,
                 edit=True,
                 time=(cur_start, cur_end),
                 relative=True,
-                timeChange=step,
-                **kw
+                **dict(change, **kw)
             )
             moved += 1
 
         self.applied = new_offset
+        self.applied_value = new_value
         return moved
 
-    def preview(self, offset):
+    def preview(self, offset, value_offset=None):
         """슬라이더/스핀박스를 움직이는 동안의 즉시 반영. undo 큐에 안 올라간다.
 
         조작이 멎으면 UI 가 settle() 을 불러 '한 덩어리' 로 undo 큐에 기록한다.
         (드래그 한 번에 undo 항목 수백 개가 쌓이는 걸 막는다.)
         """
         with _undo_disabled():
-            return self._shift_to(offset)
+            return self._shift_to(offset, value_offset)
 
-    def settle(self, offset):
+    def settle(self, offset, value_offset=None):
         """지금까지의 미리보기를 undo 큐에 **한 항목으로** 기록한다. 반환: (이동 수, 메시지)
 
         핵심: undo 는 '그 명령의 역연산' 을 현재 상태에 적용한다. 그래서 기록 전에 반드시
@@ -271,38 +295,44 @@ class StaggerOffsetSession(object):
 
         settled 가 0 인 첫 기록이면 Ctrl+Z = 원위치 = Reset 과 같은 결과가 된다.
         """
-        if offset == self.settled:
+        if value_offset is None:
+            value_offset = self.settled_value
+
+        if offset == self.settled and abs(value_offset - self.settled_value) < 1e-12:
             # 기록할 변화가 없다. 혹시 미리보기가 떠 있으면 조용히 맞춰만 둔다.
-            if self.applied != self.settled:
+            if (self.applied != self.settled
+                    or abs(self.applied_value - self.settled_value) > 1e-12):
                 with _undo_disabled():
-                    self._shift_to(self.settled)
+                    self._shift_to(self.settled, self.settled_value)
             return (0, "")
 
         with _undo_disabled():
-            self._shift_to(self.settled)
+            self._shift_to(self.settled, self.settled_value)
 
         with undo_chunk():
-            moved = self._shift_to(offset)
+            moved = self._shift_to(offset, value_offset)
 
-        previous = self.settled
+        previous, previous_value = self.settled, self.settled_value
         self.settled = offset
+        self.settled_value = value_offset
 
         scope = ("channels: " + ", ".join(self.attrs)) if self.attrs else "all curves"
         return (
             moved,
-            "Stagger offset {0:+d}f on {1} object(s) in [{2}-{3}f]  ({4})  "
-            "[Ctrl+Z -> {5:+d}f]".format(
-                offset, len(self.entries), self.start, self.end, scope, previous)
+            "Stagger offset {0:+d}f / value {6:+g} on {1} object(s) in [{2}-{3}f]  "
+            "({4})  [Ctrl+Z -> {5:+d}f / {7:+g}]".format(
+                offset, len(self.entries), self.start, self.end, scope, previous,
+                value_offset, previous_value)
         )
 
     def restore(self):
-        """세션 시작 상태(offset 0)로 되돌린다.
+        """세션 시작 상태(시간·값 offset 0)로 되돌린다.
 
         undo 큐에 이미 기록된 게 있으면(settled != 0) 이 되돌리기도 **기록해야** 큐가
         어긋나지 않는다. 아무것도 기록된 적 없으면 settle(0) 은 미리보기만 되돌리고
         undo 항목을 만들지 않는다.
         """
-        return self.settle(0)
+        return self.settle(0, 0.0)
 
     # 하위호환: 예전 이름(commit)으로도 부를 수 있게 둔다.
     commit = settle

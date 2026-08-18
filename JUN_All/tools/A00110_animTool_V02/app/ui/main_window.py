@@ -50,6 +50,11 @@ CURVE_FILTERS_WINDOW_OBJECT_NAME = "JUN_A00110_animTool_V02_curveFilters_window"
 # Stagger Offset 슬라이더가 담당하는 프레임 범위(±). 더 큰 값은 옆 스핀박스로 넣는다.
 STAGGER_SLIDER_RANGE = 60
 
+# 값(value) 오프셋 슬라이더: QSlider 는 정수만 다루므로 SCALE 배로 담는다(0.01 해상도).
+# 담당 범위는 ±STAGGER_VALUE_SLIDER_STEPS/SCALE = ±10.0, 그보다 큰 값은 스핀박스로 넣는다.
+STAGGER_VALUE_SLIDER_SCALE = 100
+STAGGER_VALUE_SLIDER_STEPS = 1000
+
 # 슬라이더/스핀박스 조작이 이만큼 멎으면 그때까지의 미리보기를 undo 큐에 '한 항목' 으로
 # 기록한다. 드래그 중에는 기록하지 않아 undo 항목이 수백 개 쌓이는 걸 막는다.
 STAGGER_SETTLE_MS = 350
@@ -646,10 +651,48 @@ class MainWindow(QWidget):
         self.sb_stagger.setKeyboardTracking(False)   # 타이핑 도중 매 글자마다 반영되지 않게
         st_row2.addWidget(self.sb_stagger)
 
-        self.btn_st_reset = QPushButton("Reset")
-        self.btn_st_reset.setToolTip("Move the keys back to their original frames (undoable).")
-        st_row2.addWidget(self.btn_st_reset)
+        st_row2.addWidget(QLabel("f"))
         layout.addLayout(st_row2)
+
+        # 값(value) 쪽 계단식 오프셋. 시간과 **같은 배수 규칙**(리스트 순서 x 값)이라
+        # 0번은 제자리, 1번 +1x, 2번 +2x ... 로 값이 올라간다. 시간과 독립적으로 쓸 수
+        # 있어(한쪽만 0) '값만 계단식으로' 도 된다.
+        st_row3 = QHBoxLayout()
+        st_row3.addWidget(QLabel("Value per Item"))
+
+        self.sld_stagger_value = QSlider(Qt.Horizontal)
+        self.sld_stagger_value.setRange(-STAGGER_VALUE_SLIDER_STEPS,
+                                        STAGGER_VALUE_SLIDER_STEPS)
+        self.sld_stagger_value.setValue(0)
+        self.sld_stagger_value.setTickPosition(QSlider.TicksBelow)
+        self.sld_stagger_value.setTickInterval(STAGGER_VALUE_SLIDER_STEPS)
+        self.sld_stagger_value.setSingleStep(1)
+        self.sld_stagger_value.setPageStep(10)
+        self.sld_stagger_value.setMinimumWidth(140)
+        self.sld_stagger_value.setStyleSheet(STAGGER_SLIDER_STYLE)
+        self.sld_stagger_value.setToolTip(
+            "Stagger the key VALUES the same way as the frames:\n"
+            "item 0 stays, item 1 gets +1x, item 2 gets +2x ...\n"
+            "Works on its own - leave the frame offset at 0 to shift values only.")
+        st_row3.addWidget(self.sld_stagger_value, 1)
+
+        self.sb_stagger_value = QDoubleSpinBox()
+        self.sb_stagger_value.setRange(-100000.0, 100000.0)
+        self.sb_stagger_value.setDecimals(3)
+        self.sb_stagger_value.setSingleStep(0.1)
+        self.sb_stagger_value.setValue(0.0)
+        self.sb_stagger_value.setFixedWidth(88)
+        self.sb_stagger_value.setKeyboardTracking(False)
+        self.sb_stagger_value.setToolTip(
+            "Value added per list step. Applies to the same channels as the frame\n"
+            "offset (channel box selection, else every animated curve).")
+        st_row3.addWidget(self.sb_stagger_value)
+
+        self.btn_st_reset = QPushButton("Reset")
+        self.btn_st_reset.setToolTip(
+            "Put the keys back to their original frames AND values (undoable).")
+        st_row3.addWidget(self.btn_st_reset)
+        layout.addLayout(st_row3)
 
         # Apply 버튼 없음: 슬라이더/스핀박스로 맞춘 값이 곧 최종 결과다. 조작이 멎으면
         # 자동으로 undo 큐에 기록된다(_stagger_settle: sliderReleased / editingFinished /
@@ -661,6 +704,12 @@ class MainWindow(QWidget):
         # valueChanged 는 바인딩/버전에 따라 인자 타입이 달라 위젯에서 직접 읽는다.
         self.sld_stagger.valueChanged.connect(self.on_stagger_slider_changed)
         self.sb_stagger.valueChanged.connect(self.on_stagger_spin_changed)
+        self.sld_stagger_value.valueChanged.connect(
+            self.on_stagger_value_slider_changed)
+        self.sb_stagger_value.valueChanged.connect(
+            self.on_stagger_value_spin_changed)
+        self.sld_stagger_value.sliderReleased.connect(self._stagger_settle)
+        self.sb_stagger_value.editingFinished.connect(self._stagger_settle)
         # 드래그를 놓거나 타이핑을 끝낸 순간은 기다릴 것 없이 바로 기록한다.
         self.sld_stagger.sliderReleased.connect(self._stagger_settle)
         self.sb_stagger.editingFinished.connect(self._stagger_settle)
@@ -2371,10 +2420,31 @@ class MainWindow(QWidget):
         finally:
             self._stagger_updating = False
 
+    def _stagger_show_value_offset(self, value):
+        """값 오프셋 위젯 두 개를 같은 값으로 맞춘다(시그널 차단).
+
+        슬라이더는 정수라 STAGGER_VALUE_SLIDER_SCALE 배로 담고, 담당 범위를 벗어나면
+        끝에 붙는다(실제 값은 스핀박스가 보여준다).
+        """
+        ticks = int(round(value * STAGGER_VALUE_SLIDER_SCALE))
+        clamped = max(-STAGGER_VALUE_SLIDER_STEPS,
+                      min(STAGGER_VALUE_SLIDER_STEPS, ticks))
+        self._stagger_updating = True
+        try:
+            self.sld_stagger_value.blockSignals(True)
+            self.sld_stagger_value.setValue(clamped)
+            self.sld_stagger_value.blockSignals(False)
+            self.sb_stagger_value.blockSignals(True)
+            self.sb_stagger_value.setValue(value)
+            self.sb_stagger_value.blockSignals(False)
+        finally:
+            self._stagger_updating = False
+
     def _stagger_reset_spin(self):
         """오프셋 위젯을 0 으로 되돌린다(valueChanged 로 인한 재진입 없이)."""
         self._stagger_settle_timer.stop()
         self._stagger_show_value(0)
+        self._stagger_show_value_offset(0.0)
 
     def _stagger_begin(self):
         """세션이 없으면 현재 리스트/구간으로 만든다. 실패하면 None."""
@@ -2445,6 +2515,21 @@ class MainWindow(QWidget):
         self._stagger_show_value(value)
         self._stagger_apply_live(value)
 
+    def on_stagger_value_slider_changed(self, *_args):
+        """값 슬라이더 조작 -> 스핀박스를 맞추고 즉시 반영."""
+        if self._stagger_updating:
+            return
+        value = self.sld_stagger_value.value() / float(STAGGER_VALUE_SLIDER_SCALE)
+        self._stagger_show_value_offset(value)
+        self._stagger_apply_live(self.sb_stagger.value())
+
+    def on_stagger_value_spin_changed(self, *_args):
+        """값 스핀박스 조작 -> 슬라이더를 맞추고 즉시 반영."""
+        if self._stagger_updating:
+            return
+        self._stagger_show_value_offset(self.sb_stagger_value.value())
+        self._stagger_apply_live(self.sb_stagger.value())
+
     def _stagger_apply_live(self, value):
         """실시간 반영. 값이 바뀔 때마다 '원래 위치 기준' 으로 다시 계산된다(비누적).
 
@@ -2458,7 +2543,7 @@ class MainWindow(QWidget):
             self._stagger_reset_spin()
             return
 
-        session.preview(value)
+        session.preview(value, self.sb_stagger_value.value())
         self._stagger_settle_timer.start()
 
     def _stagger_settle(self):
@@ -2475,7 +2560,8 @@ class MainWindow(QWidget):
         if self._stagger_drop_stale_session():
             return
 
-        count, msg = session.settle(self.sb_stagger.value())
+        count, msg = session.settle(self.sb_stagger.value(),
+                                    self.sb_stagger_value.value())
         if msg:
             self.log(msg)
 
