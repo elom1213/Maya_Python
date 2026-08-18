@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- A00440_SetTool shelf icon: two overlapping sets (Venn) with the intersection lit -->
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+  <!-- A n B : the lens is spelled out as two arcs (no clip-path - QtSvg support is spotty) -->
+  <path d="M16 10.274 A7 7 0 0 1 16 22.726 A7 7 0 0 1 16 10.274 Z" fill="#feca57"/>
+  <!-- set A (left) / set B (right) -->
+  <circle cx="12.8" cy="16.5" r="7" fill="none" stroke="#3fc1c9" stroke-width="2.2"/>
+  <circle cx="19.2" cy="16.5" r="7" fill="none" stroke="#ff6bd6" stroke-width="2.2"/>
+</svg>
