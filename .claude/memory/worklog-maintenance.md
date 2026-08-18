@@ -5,10 +5,14 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 8d1aa5aa-0636-4c1c-9528-1b7a254c8130
+  modified: 2026-08-14T03:43:09.275Z
 ---
 
-작업 일지는 `JUN_All/docs/WORKLOG.md` (단일 누적 파일, 최신 날짜가 위). 수동 갱신 — 사용자가
-"일지/WORKLOG 갱신" 류 요청 시 git 기록을 읽어 해당 날짜 섹션을 추가/갱신한다.
+작업 일지는 **저장소마다 따로**다 (단일 누적 파일, 최신 날짜가 위). 수동 갱신 — 사용자가
+"일지/WORKLOG 갱신" 류 요청 시 그 저장소의 git 기록을 읽어 해당 날짜 섹션을 추가/갱신한다.
+
+- 마야: `JUN_All/docs/WORKLOG.md`
+- 언리얼: `JUN_UE/Docs/WORKLOG.md` (2026-08-14 신설, 같은 포맷) — [[jun-ue-plugin-repo]]
 
 **How to apply:**
 - 추출: `git log --since="YYYY-MM-DD 00:00" --until="(다음날) 00:00" --pretty=format:"%h | %s"` (머지 커밋 제외).
