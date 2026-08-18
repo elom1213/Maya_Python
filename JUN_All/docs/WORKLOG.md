@@ -17,6 +17,24 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-14 (오늘)
 
+> [!summary] `Framework` **공용 위젯 신규 — `JUN_mod_expand_qt_v01`(Expand / 별도 창)** + `A00110_animTool_V02` 적용 (v02.03→02.04)
+- "Expand 로 창을 빼는 건 다른 툴에서도 쓸 기능" 이라는 요청. `A00290_BSTool` Shape Editor 와
+  `A00110_animTool_V02` Curve Filters 에서 두 번 같은 코드를 쓴 시점이라 **공용으로 올렸다**.
+  문서: [Framework_MOD_expand_qt](Framework_MOD_expand_qt.md).
+- **핵심은 복제가 아니라 이동**이다. 본문 위젯을 새 창으로 그대로 옮기므로 슬라이더·세션·undo 가
+  **한 벌뿐**이고 두 화면의 값이 어긋날 여지가 없다. 툴 코드는 위젯 참조를 그대로 쓰면 된다.
+  되돌릴 자리는 `layout.indexOf` 로 저장해 두었다가 `insertWidget` 으로 복귀 — 원래 순서를 지킨다.
+- **공용화하며 좋아진 점**: 툴 창이 닫힐 때의 정리를 **위젯이 스스로** 한다(`eventFilter` 로 호스트
+  창의 Close 감시). 예전엔 각 툴의 `closeEvent` 에 "확장 창을 닫아라" 를 수동으로 넣어야 했고,
+  빠뜨리면 본문 위젯이 함께 파괴됐다.
+- API 는 기존 접이식 위젯과 맞췄다(`add_widget` / `add_layout` / `expanded_changed`), 생성 인자로
+  제목·버튼 라벨·안내 문구·objectName·초기 크기·버튼 위치를 준다.
+- `A00110_animTool_V02` 를 이 위젯으로 교체 — 툴에서 창 클래스와 상태 변수, closeEvent 정리 코드가
+  사라졌다(동작은 동일, 기존 23항목 그대로 통과).
+- 검증(mayapy 2024): 위젯 단독 **28항목**(마야 없이 import, 이동 확인, 재클릭 시 앞으로, 닫으면
+  원래 순서 복귀, 호스트 닫힘 시 자동 접힘, 인자별 동작, 패널 2개 독립) + 툴 쪽 23항목.
+  전체 회귀 165항목 통과. #Framework #A00110
+
 > [!summary] `A00110_animTool_V02` **Curve Filters 를 별도 창으로 (`Expand`)** (v02.02→02.03)
 - 그래프 에디터를 크게 띄워 놓고 **필터 창을 그 옆에** 두고 싶다는 요청. `A00290_BSTool` 의
   Shape Editor `Expand` 와 같은 방식으로 만들었다.

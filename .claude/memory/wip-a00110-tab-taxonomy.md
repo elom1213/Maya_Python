@@ -69,12 +69,17 @@ json 으로 스냅샷 → 재분류 후 다시 떠서 **diff**. 109/110 보존(�
 - 세 필터는 **한 화면 접이식**(원본 UI 와 같은 구성). 섹션이 작고 번갈아 쓰는 작업이면
   [[prefer-subtabs-over-stacked-collapsibles]] 의 예외가 된다.
 
-**Expand(별도 창) 패턴** (A00290_BSTool Shape Editor → A00110 Curve Filters, v02.03):
-패널을 **복제하지 말고 통째로 옮긴다** — `win.body.addWidget(위젯)` 이 기존 레이아웃에서 떼어 온다.
-그래야 세션·슬라이더·undo 가 한 벌뿐이라 동기화 문제가 아예 없다. 되돌릴 자리는
-`layout.indexOf` 로 미리 저장해 두고 `insertWidget` 로 복귀. 확장 창은 `QWidget(owner, Qt.Window)`
-+ 고유 objectName, `closeEvent` 에서 owner 의 collapse 호출. **본 창 closeEvent 에서 확장 창도
-닫아** 미아 창을 막는다(본문을 제자리로 돌린 뒤 닫힌다).
+**Expand(별도 창)는 공용 위젯을 쓴다**([[framework-expand-widget]]) — `Framework.qt` 의 `JUN_mod_expand_qt_v01`
+(v02.04 에 승격, 문서 `docs/Framework_MOD_expand_qt.md`). 새로 만들지 말 것:
+
+    panel = JUN_mod_expand_qt.JUN_mod_expand_qt_v01(title=..., object_name=..., size=...)
+    panel.add_widget(...) / panel.add_layout(...)
+    panel.expanded_changed.connect(lambda *_: self._fit_window_later())
+
+핵심은 **복제가 아니라 이동**(레이아웃에 add 하면 이전 부모에서 떨어진다) — 세션·슬라이더·undo 가
+한 벌뿐이라 동기화 문제가 없다. 복귀 자리는 `layout.indexOf` 로 저장. **호스트 창의 Close 는
+위젯이 eventFilter 로 감시해 자동으로 접는다**(툴 closeEvent 에 정리 코드 불필요 — 빠뜨리면 본문
+위젯이 함께 파괴된다). `A00290_BSTool` 은 아직 자체 구현(공용화 이전)이라 옮길 수 있다.
 
 **"from Selection" 원버튼 패턴** (Euler v01.38 → Curve Filters v02.01 → Fill Keys v02.02):
 리스트업·구간 입력 단계를 **그래프 에디터에서 고른 키** 하나로 대신한다. 고른 키가 오브젝트·채널·

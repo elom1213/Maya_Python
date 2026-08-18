@@ -50,6 +50,7 @@
 - [TSL UUID selection](wip-tsl-uuid-selection.md) — MOD_tsl_qt_v01 이 (uuid, component) 보관 → 리네임/동명/다중 레퍼런스 안전
 - [TSL selection order](tsl-selection-order.md) — `Order` 체크박스. `ls(sl)` 는 컴포넌트를 인덱스 순으로 줌 → `selectPref(trackSelectionOrder)`+`ls(orderedSelection)`. **함정: pref off 면 `ls(os)` 도 에러 없이 인덱스 순서**
 - [Sub-tabs over collapsibles](prefer-subtabs-over-stacked-collapsibles.md) — 기능 섹션이 3~4개 넘으면 접이식 대신 **중첩 탭**. 하위 탭마다 개별 스크롤(이중 스크롤 주의), 단 **창 자동 리사이즈 툴은 스크롤 대신 fit page**
+- [Framework expand widget](framework-expand-widget.md) — MOD_expand_qt_v01: 본문을 별도 창으로 빼는 Expand 패널. **복제 말고 이동**, 호스트 창 Close 는 위젯이 감시
 - [Framework filter widget](framework-filter-widget.md) — MOD_filter_qt_v01: 검색 있는 툴은 전부 이 공용 Filter 로 통일 중
 - [Framework timeRange widget](framework-timerange-widget.md) — MOD_timeRange_qt_v01: Start/End 입력 + Get Current / Get Sel Range 공용 위젯
 - [QTreeWidgetItem checkable default](qtreewidgetitem-checkable-default-flag.md) — ItemIsUserCheckable 은 기본 ON, 플래그로 체크 가능 판정 금지
@@ -59,6 +60,7 @@
 ## 툴 작업 (신규 · 큰 기능)
 
 - [A00090 rule versions](wip-a00090-rule-versions.md) — 규칙 json 을 `app/rules/<version>` 폴더로 분리 + UI Version 콤보 (v01.05). v01.06 에서 blendShape 타겟 이름 버그 수정([[blendshape-target-name-vs-alias]])
+- [A00510 Bone Viewport (UE)](wip-a00510-bone-viewport.md) — **JUN_UE**: PersonaOptions CDO 로 본 draw mode, `BoneDrawSize` 는 리플렉션이 없어 C++ 아니면 불가
 - [A00430 DemBone](wip-a00430-dembone.md) — **신규 v01.03**: EA Dem Bones(스키닝 분해) 마야 이식 4모드(조인트 생성 포함). ref/ 는 git 제외·런타임 무의존, 공분산 4×4 질량 함정, 라벨 확산은 절대오차 말고 최선 대비 열위
 - [A00420 Wrapper](wip-a00420-wrapper.md) — **신규**: 커브 가이드로 다른 토폴로지 메시 래핑(Wrap3D 대응). TPS 워프 + 표면 투영 2단계, MMeshIntersector 는 월드 행렬을 줘도 결과가 오브젝트 공간 (v01.00)
 - [A00410 SecondaryMotion](wip-a00410-secondarymotion.md) — **신규**: FK 체인 관성(KawaiiPhysics식)을 키로 굽기. nucleus 안 쓰는 이유, 전 구간 30ms 재계산→override 레이어, addKeys 74배, **joint `local=R*JO` / transform `local=RA*R`**, 부모를 앞 체인 노드로 가정하면 오프셋 그룹에서 깨짐. v01.02 Bone Chain/Root + 출력 레지스트리(`outputs.py`) 확장 지점
