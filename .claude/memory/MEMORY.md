@@ -64,9 +64,13 @@
 
 - [A00090 rule versions](wip-a00090-rule-versions.md) — 규칙 json 을 `app/rules/<version>` 폴더로 분리 + UI Version 콤보 (v01.05). v01.06 에서 blendShape 타겟 이름 버그 수정([[blendshape-target-name-vs-alias]])
 - [A00510 Bone Viewport (UE)](wip-a00510-bone-viewport.md) — **JUN_UE**: PersonaOptions CDO 로 본 draw mode, `BoneDrawSize` 는 리플렉션이 없어 C++ 아니면 불가
+- [A00440 SetTool](wip-a00440-settool.md) — **신규**: 컴포넌트 세트 집합연산(∪∩∖ + Split). 이름 정규화가 전부, **`cmds.select(세트)` 는 멤버를 펼쳐 선택**한다
 - [A00430 DemBone](wip-a00430-dembone.md) — **신규 v01.03**: EA Dem Bones(스키닝 분해) 마야 이식 4모드(조인트 생성 포함). ref/ 는 git 제외·런타임 무의존, 공분산 4×4 질량 함정, 라벨 확산은 절대오차 말고 최선 대비 열위
 - [A00420 Wrapper](wip-a00420-wrapper.md) — **신규**: 커브 가이드로 다른 토폴로지 메시 래핑(Wrap3D 대응). TPS 워프 + 표면 투영 2단계, MMeshIntersector 는 월드 행렬을 줘도 결과가 오브젝트 공간 (v01.00)
 - [A00410 SecondaryMotion](wip-a00410-secondarymotion.md) — **신규**: FK 체인 관성(KawaiiPhysics식)을 키로 굽기. nucleus 안 쓰는 이유, 전 구간 30ms 재계산→override 레이어, addKeys 74배, **joint `local=R*JO` / transform `local=RA*R`**, 부모를 앞 체인 노드로 가정하면 오프셋 그룹에서 깨짐. v01.02 Bone Chain/Root + 출력 레지스트리(`outputs.py`) 확장 지점
+- [A00400 Smooth tab](wip-a00400-smooth-tab.md) — 고른 CV 실시간 Smooth/Rough. `smoothCurve` 는 **음수를 무시하고 주기 커브에서 실패**, 소프트셀렉션은 `getRichSelection()`(빈 선택이면 **예외**) (v01.05)
+- [A00400 Points to Curve](wip-a00400-points-to-curve.md) — 월드 위치를 순서대로 잇는 커브(EP 커브=정확 통과). 완화는 **라플라시안 결과와 선형보간**(세기 비례/rebuild span 은 감각이 나쁨), 엣지·페이스는 xform 이 여러 점을 준다 (v01.04)
+- [A00400 Wrap tab](wip-a00400-curve-wrap.md) — CV 수 다른 커브 라이브 wrap(rebuildCurve+blendShape, envelope 0~1). **rebuildCurve 는 소스 트랜스폼 이동을 안 따라간다** → 공간 변환은 행렬로 따로 (v01.03)
 - [A00400 CurveTool](wip-a00400-curvetool.md) — 선택 엣지를 연결 성분별로 그룹지어 커브 1개 + Reverse Direction, **Line Width 탭**(lineWidth 슬라이더, 드래그=undo 1스텝) (v01.01)
 - [A00390 Chain Wave](wip-a00390-chain-wave.md) — 체인이 **회전만으로** 싸인 파형을 따라간다(ikSpline + CV 구동). **FK 컨트롤러는 프록시 조인트**로. `rootOnCurve=False`, rest 는 셋업 전에 캡처 (v01.10)
 - [A00390 WindTool](wip-a00390-windtool.md) — **신규**: 본 체인에 싸인 파형 바람. Curve/Node 출력, windSpeed 적분 표현식, windPhaseOffset (v01.08)
