@@ -1,14 +1,14 @@
 ---
-title: Portfolio — Work Summary (2026-05-06 ~ 2026-08-14)
+title: Portfolio — Work Summary (2026-05-06 ~ 2026-08-18)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-08-14
+updated: 2026-08-18
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
 
 > **Author**: Ji Hun Park (Junny)
-> **Period**: 2026-05-06 – 2026-08-14 (~14 weeks)
+> **Period**: 2026-05-06 – 2026-08-18 (~15 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
 > **Volume**: 40+ in-house tools (50 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
@@ -335,8 +335,44 @@ Default Distance attribute (driver signal x)
   - Headless benchmarking picked `MMeshIntersector` for the closest-point queries — **8x faster** than
     `MFnMesh.getClosestPoint` over 20,000 queries — and moving the coordinate transforms out of the Python loop into
     numpy gets **32,222 source vertices against 39,802 target vertices, 8 projection passes, done in 0.98 s**.
-- **`A00400_CurveTool`** — builds a curve along the **selected mesh edges**, one curve per connected run of edges, with direction unified across them; a second tab adjusts curve **line width** live (one undo step per drag).
+- **`A00400_CurveTool`** — **five tabs of curve work**. Builds a curve along the **selected mesh edges** (one
+  curve per connected run of edges, direction unified across them) and adjusts curve **line width** live (one
+  undo step per drag). Three tabs were added on top.
+  - **Wrap** — makes one curve take the shape of another **even when the two have different CV counts**. Maya's
+    stock `wrap` deformer is too unstable between curves to be usable in production, so instead of a deformer
+    this wires up **`rebuildCurve` + `blendShape`**: rebuilding the driver at the driven curve's span/degree
+    yields exactly the driven curve's CV count, which makes it a valid blendShape target — and it stays a node
+    graph, so it is **live** (max deviation **0.0013** for a 12-CV curve following a 4-CV one). The driven curve
+    gets a **0–1 envelope attribute** that blends between its own shape and the wrapped one. A trap found by
+    measurement: the `rebuildCurve` node **does not follow the source transform** (only its CV edits), so the
+    geometry is fed in local space and the space change is applied separately as
+    `driver.worldMatrix × driven.worldInverseMatrix`. Mismatched forms (open vs periodic) build a blendShape
+    **without any error** yet produce a broken shape, so they are refused up front, and the achieved accuracy
+    (max/avg deviation) is always reported.
+  - **Points to Curve** — draws one curve through the **world positions of listed objects, joints or
+    components**, in list order. It can pass **exactly through** every position (edit-point curve) or **relax**
+    them with a Laplacian. The relaxation is built as "compute the fully relaxed result once, then interpolate
+    linearly" so the deviation tracks the slider **proportionally** — scaling the strength directly makes the
+    iterations compound so that most of the change happens in the first 25 % of travel, and reducing
+    `rebuildCurve` spans turned out not to be monotonic at all (both measured).
+  - **Smooth** — smooths or roughens the selected CVs with a **live slider**. It reuses the result of Maya's own
+    `Curves > Smooth` (at multiplier 1 the result is **identical** to it) and adds what that command cannot do:
+    **Rough** (the command silently ignores a negative smoothness) and **soft-selection falloff**. A field report
+    of "the curve stops responding while I drag" led to the real cause: **`cmds.smoothCurve` clears the active
+    selection** — even when run on a throwaway curve — so after the first tick there was nothing left to apply
+    to. The selection is now saved and restored around the command. Related: Maya never moves the **end CVs** of
+    a curve, so the tool counts and reports **how many CVs actually moved** and explains why when that is zero
+    (no silent no-ops).
 - **`A00040_file_exporter_V02`** — export automation: type filters (applied through group hierarchies), referenced-mesh handling, and a choice of flattening to scene root or preserving hierarchy.
+- **`A00440_SetTool`** — **set algebra between Maya object sets whose elements are components**: union `∪`,
+  intersection `∩` and difference `∖`, folded over any number of sets in list order. On top of those it can
+  **split a set in two** using the current scene selection — in set-theoretic terms `{A∖S, A∩S}` is the
+  **partition of A induced by S**, with `A = (A∖S) ⊔ (A∩S)`. The whole thing hinges on **name
+  canonicalisation**: Maya calls the same component `pCube1.vtx[0:2]`, `pCube1Shape.vtx[1]` or
+  `|grp1|pCube1.vtx[1]` depending on where it comes from, so every read is normalised to one form before any
+  string-set operation (verified headless that picking through the shape still normalises to the transform's
+  long name). The algebra itself is kept **free of Maya** so it can be tested on its own, and mixed component
+  types are allowed rather than blocked — a vertex set `∩` an edge set is simply empty — with a warning instead.
 - **`A00050_uvTool`**, **`A00030_quickTool`**, **`A00330_NamingTool`** (legacy naming tool port + Quick Rename), **`A00310_SearchTool`** (select by type/name), **`A00360_SortTool`** (sort by world X/Y/Z, name or type and reorder the Outliner).
 
 ---
