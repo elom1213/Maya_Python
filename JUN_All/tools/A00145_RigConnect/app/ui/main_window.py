@@ -61,7 +61,7 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
 
         self.win_width = 560
-        self.win_height = 860
+        self.win_height = 900
         self.win_title = "RigConnect v{0}".format(VERSION)
 
         # Connect 탭 src/dst 위젯 보관용. List Connected 의 stream 방향 상태.
@@ -103,7 +103,9 @@ class MainWindow(QWidget):
 
         # 탭
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._build_match_tab(), "Match")
+        # Match 만 스크롤에 안 담겨 있어, 창이 모자라면 TSL 리스트와 Add/Del/Up/Down
+        # 버튼이 겹쳐 보였다(하위 탭들은 _nested_tabs 에서 이미 _scrolled 로 담긴다).
+        self.tabs.addTab(self._scrolled(self._build_match_tab()), "Match")
         self.tabs.addTab(self._build_constrain_tab(), "Constrain")
         self.tabs.addTab(self._build_connect_tab(), "Connect")
         self.tabs.addTab(self._build_attribute_tab(), "Attribute")
