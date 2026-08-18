@@ -19,6 +19,7 @@ import maya.cmds as cmds
 from Framework.core.maya_undo import undo_chunk
 from tools.A00390_WindTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00390_WindTool.app.core import wind_manager as wind_mgr
+from tools.A00390_WindTool.app.core import wave_manager as wave_mgr
 
 
 WINDOW_OBJECT_NAME = "JUN_A00390_WindTool_window"
@@ -33,7 +34,7 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
 
         self.win_title = "Wind Tool v{0}".format(VERSION)
-        self.resize(360, 620)
+        self.resize(380, 700)
 
         self.build_ui()
 
@@ -80,6 +81,12 @@ class MainWindow(QWidget):
         mode_row.addStretch(1)
         root.addWidget(mode_box)
 
+        # ---- 탭 : Sine(기존) / Chain Wave(신규)
+        self.tabs = QTabWidget()
+
+        sine_page = QWidget()
+        sine = QVBoxLayout(sine_page)
+
         # 출력: Curve(키 굽기) / Node(드라이버 노드망 실시간)
         out_box = QGroupBox("Output")
         out_row = QHBoxLayout(out_box)
@@ -101,7 +108,7 @@ class MainWindow(QWidget):
         out_row.addWidget(self.rb_node)
         out_row.addStretch(1)
         self.rb_curve.toggled.connect(self._on_output_changed)
-        root.addWidget(out_box)
+        sine.addWidget(out_box)
 
         # 축(어트리뷰트) 선택
         axis_row = QHBoxLayout()
@@ -109,14 +116,14 @@ class MainWindow(QWidget):
         self.cmb_axis = QComboBox()
         self.cmb_axis.addItems(wind_mgr.AXES)   # rotateX 기본(첫 항목)
         axis_row.addWidget(self.cmb_axis, 1)
-        root.addLayout(axis_row)
+        sine.addLayout(axis_row)
 
         # 시간 구간 (Start / End) - 공용 위젯. 기본값은 현재 playback 범위.
         time_str = int(cmds.playbackOptions(query=True, minTime=True))
         time_end = int(cmds.playbackOptions(query=True, maxTime=True))
         self.range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
             start_value=time_str, end_value=time_end, log_callback=self.log)
-        root.addWidget(self.range)
+        sine.addWidget(self.range)
 
         # 파라미터: 주기 / 진폭 / offset
         form = QFormLayout()
@@ -170,14 +177,14 @@ class MainWindow(QWidget):
         self.lbl_node_offset = QLabel("Node Offset (Node)")
         form.addRow(self.lbl_node_offset, self.sb_node_offset)
 
-        root.addLayout(form)
+        sine.addLayout(form)
 
         # 옵션
         self.chk_clear = QCheckBox("Clear existing keys in range")
         self.chk_clear.setChecked(True)
         self.chk_clear.setToolTip(
             "On: remove the axis' keys inside Start~End before writing (clean re-apply).")
-        root.addWidget(self.chk_clear)
+        sine.addWidget(self.chk_clear)
 
         self.chk_keep_zero = QCheckBox("Keep zero-crossing keys")
         self.chk_keep_zero.setChecked(False)
@@ -185,13 +192,23 @@ class MainWindow(QWidget):
             "Off (default): drop the interior 0-value keys (peaks only) so the\n"
             "spline curve stays smooth; only Start/End keep anchor keys.\n"
             "On: also key every zero crossing (0, +A, 0, -A ...).")
-        root.addWidget(self.chk_keep_zero)
+        sine.addWidget(self.chk_keep_zero)
 
         # Apply (Curve=키 굽기 / Node=드라이버 빌드)
         self.btn_apply = QPushButton("Apply Wind Keys")
         self.btn_apply.setMinimumHeight(38)
         self.btn_apply.clicked.connect(self.on_apply)
-        root.addWidget(self.btn_apply)
+        sine.addWidget(self.btn_apply)
+        sine.addStretch(1)
+        self.tabs.addTab(sine_page, "Sine")
+        self.tabs.setTabToolTip(
+            0, "Sine - drive ONE attribute per joint with a phase-shifted sine.")
+        self.tabs.addTab(self._build_wave_tab(), "Chain Wave")
+        self.tabs.setTabToolTip(
+            1, "Chain Wave - the chain follows a travelling sine wave using "
+               "ROTATION ONLY (bone lengths kept, each joint aims at its child).")
+        root.addWidget(self.tabs)
+
 
         # 로그
         self.te_log = QTextEdit()
@@ -202,6 +219,179 @@ class MainWindow(QWidget):
         self._on_output_changed()   # 초기 활성/비활성 + 버튼 라벨 맞추기
         self.log("Wind Tool v{0} ({1}) ready. List a bone chain, pick Output "
                  "(Curve / Node), set params, then Apply.".format(VERSION, LAST_UPDATE))
+
+
+    # ==============================================================
+    # Chain Wave 탭
+    # ==============================================================
+
+    def _wave_spin(self, value, mn, mx, step, decimals=2):
+        sb = QDoubleSpinBox()
+        sb.setRange(mn, mx)
+        sb.setSingleStep(step)
+        sb.setDecimals(decimals)
+        sb.setValue(value)
+        sb.setKeyboardTracking(False)
+        return sb
+
+    def _build_wave_tab(self):
+        """체인이 **회전만으로** 진행하는 싸인 파형을 따라가게 한다.
+
+        Sine 탭은 조인트마다 어트리뷰트 하나에 위상만 밀린 싸인을 넣는다. 그래서
+        translate 축을 고르면 월드 위치는 파도처럼 보여도 **뼈가 늘었다 줄고 조인트가
+        자식을 향하지 않으며**, rotate 축을 고르면 회전이 자손에 누적돼 체인이 말린다.
+
+        이 탭은 마야 기본 **ikSplineSolver** 로 그 문제를 푼다 - 조인트 rest 위치에 CV 를
+        둔 커브를 만들고 CV 를 노드망으로 흔들면, 체인이 **회전만으로** 그 커브를 따라간다
+        (뼈 길이 유지 · 각 조인트가 자식을 향함 · 루트 고정).
+        """
+        page = QWidget()
+        wave = QVBoxLayout(page)
+
+        note = QLabel(
+            "The chain follows a travelling wave using ROTATION ONLY.\n"
+            "Bone lengths are kept, each joint aims at its child, the root stays put.")
+        note.setWordWrap(True)
+        wave.addWidget(note)
+
+        out_box = QGroupBox("Output")
+        out_row = QHBoxLayout(out_box)
+        self.wave_out_group = QButtonGroup(self)
+        self.rb_wave_node = QRadioButton("Node")
+        self.rb_wave_node.setChecked(True)
+        self.rb_wave_node.setToolTip(
+            "Build the live rig (curve + ikSpline + driver locator).\n"
+            "Edit windAmplitude / windWavelength / windPeriod / windSpeed /\n"
+            "windRootRamp on the driver and the wave updates immediately.")
+        self.rb_wave_curve = QRadioButton("Curve")
+        self.rb_wave_curve.setToolTip(
+            "Build the rig, bake the joint ROTATIONS over Start/End, then delete\n"
+            "the rig - the scene is left with rotation keys only.")
+        self.wave_out_group.addButton(self.rb_wave_node)
+        self.wave_out_group.addButton(self.rb_wave_curve)
+        out_row.addWidget(self.rb_wave_node)
+        out_row.addWidget(self.rb_wave_curve)
+        out_row.addStretch(1)
+        self.rb_wave_curve.toggled.connect(self._on_wave_output_changed)
+        wave.addWidget(out_box)
+
+        axis_row = QHBoxLayout()
+        axis_row.addWidget(QLabel("Sway Axis (world)"))
+        self.cmb_wave_axis = QComboBox()
+        self.cmb_wave_axis.addItems(wave_mgr.UP_AXES)
+        self.cmb_wave_axis.setCurrentText("Y")
+        self.cmb_wave_axis.setToolTip(
+            "Which WORLD axis the wave pushes the chain along.\n"
+            "A chain lying along X with Y up normally sways in Y.")
+        axis_row.addWidget(self.cmb_wave_axis, 1)
+        wave.addLayout(axis_row)
+
+        self.wave_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_value=int(cmds.playbackOptions(query=True, minTime=True)),
+            end_value=int(cmds.playbackOptions(query=True, maxTime=True)),
+            log_callback=self.log)
+        wave.addWidget(self.wave_range)
+
+        grid = QGridLayout()
+        self.sb_wave_amp = self._wave_spin(1.0, 0.0, 100000.0, 0.1)
+        self.sb_wave_amp.setToolTip(
+            "How far the wave pushes the curve, in WORLD units.\n"
+            "The visible sway is a little smaller - a degree-3 curve does not pass\n"
+            "through its control points. Too large for the wavelength and the curve\n"
+            "gets longer than the chain, so the tip cannot reach the end.")
+        self.sb_wave_len = self._wave_spin(10.0, 0.001, 100000.0, 1.0)
+        self.sb_wave_len.setToolTip(
+            "Length of ONE wave along the chain, in WORLD units.")
+        self.sb_wave_period = self._wave_spin(24.0, 0.001, 100000.0, 1.0)
+        self.sb_wave_period.setToolTip("Frames for one cycle to pass.")
+        self.sb_wave_speed = self._wave_spin(1.0, -100.0, 100.0, 0.1)
+        self.sb_wave_speed.setToolTip(
+            "Playback speed (1 = normal). Set or key windSpeed on the driver later;\n"
+            "it is integrated over time so the phase never runs backwards.")
+        self.sb_wave_ramp = self._wave_spin(1.0, 0.0, 1.0, 0.1)
+        self.sb_wave_ramp.setToolTip(
+            "0 = the same amplitude all the way from the root.\n"
+            "1 = starts at zero on the root and grows toward the tip (default).")
+        self.sb_wave_node_offset = self._wave_spin(0.0, -100000.0, 100000.0, 1.0)
+        self.sb_wave_node_offset.setToolTip(
+            "Per-CHAIN timing offset (frames). Chain k starts with\n"
+            "windPhaseOffset = k * this, so in Bone Root mode each chain sways\n"
+            "at its own time.")
+        rows = (("Amplitude", self.sb_wave_amp),
+                ("Wavelength", self.sb_wave_len),
+                ("Period", self.sb_wave_period),
+                ("Speed", self.sb_wave_speed),
+                ("Root Ramp", self.sb_wave_ramp),
+                ("Chain Offset", self.sb_wave_node_offset))
+        for r, (label, widget) in enumerate(rows):
+            grid.addWidget(QLabel(label), r, 0)
+            grid.addWidget(widget, r, 1)
+        wave.addLayout(grid)
+
+        self.btn_wave_apply = QPushButton("Build Chain Wave")
+        self.btn_wave_apply.setMinimumHeight(38)
+        self.btn_wave_apply.clicked.connect(self.on_wave_apply)
+        wave.addWidget(self.btn_wave_apply)
+
+        self.btn_wave_remove = QPushButton("Remove Chain Wave")
+        self.btn_wave_remove.setToolTip(
+            "Delete the rig this tab built (curve, ikSpline, driver, node network)\n"
+            "and reset the joint rotations. Baked keys are not touched.")
+        self.btn_wave_remove.clicked.connect(self.on_wave_remove)
+        wave.addWidget(self.btn_wave_remove)
+
+        wave.addStretch(1)
+        self._on_wave_output_changed()
+        return page
+
+    def _on_wave_output_changed(self, *args):
+        node = self.rb_wave_node.isChecked()
+        self.wave_range.setEnabled(not node)
+        self.btn_wave_apply.setText(
+            "Build Chain Wave" if node else "Bake Chain Wave")
+
+    def on_wave_apply(self):
+        joints = self.tsl.get_all_nodes()
+        if not joints:
+            self.log("Joint list is empty. Select joints and click "
+                     "'Select Joints'.", warn=True)
+            return
+
+        mode = wind_mgr.MODE_ROOT if self.rb_root.isChecked() else wind_mgr.MODE_CHAIN
+        node = self.rb_wave_node.isChecked()
+        rng = self.wave_range.values()
+        if not node and rng is None:
+            self.log("Enter Start / End for the bake.", warn=True)
+            return
+        start, end = rng if rng else (0.0, 0.0)
+
+        with undo_chunk():
+            try:
+                chains, drivers, msg = wave_mgr.build_wave(
+                    joints, mode=mode, axis=self.cmb_wave_axis.currentText(),
+                    amplitude=self.sb_wave_amp.value(),
+                    wavelength=self.sb_wave_len.value(),
+                    period=self.sb_wave_period.value(),
+                    speed=self.sb_wave_speed.value(),
+                    ramp=self.sb_wave_ramp.value(),
+                    node_offset=self.sb_wave_node_offset.value(),
+                    output=(wind_mgr.OUTPUT_NODE if node
+                            else wind_mgr.OUTPUT_CURVE),
+                    start=start, end=end)
+            except Exception as exc:                      # noqa: BLE001
+                self.log("[Error] {0}".format(exc), warn=True)
+                cmds.warning(str(exc))
+                return
+        self.log(msg, warn=msg.startswith("[Warning]"))
+
+    def on_wave_remove(self):
+        with undo_chunk():
+            try:
+                count, msg = wave_mgr.remove_wave()
+            except Exception as exc:                      # noqa: BLE001
+                self.log("[Error] {0}".format(exc), warn=True)
+                return
+        self.log(msg, warn=msg.startswith("[Warning]"))
 
     # ==============================================================
     # output mode toggle
