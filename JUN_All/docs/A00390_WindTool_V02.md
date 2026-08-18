@@ -1,7 +1,7 @@
 ---
 title: A00390_WindTool_V02 사용법
 aliases: [Wind Tool V02, Chain Wave Lite]
-tags: [maya-python, tool-guide, wind, chain-wave, ikSpline, performance]
+tags: [maya-python, tool-guide, wind, chain-wave, ikSpline, performance, envelope]
 updated: 2026-08-18
 ---
 
@@ -16,7 +16,10 @@ updated: 2026-08-18
 | **Chain Wave** | (V01 과 동일) 커브 + ikSpline 으로 체인이 회전만으로 파형을 따라감 |
 | **Chain Wave Lite** (신규) | **커브·ikHandle·프록시 없이** 각도만으로 같은 종류의 파형 |
 
-- **버전**: `app/config/version.py` (v02.00)
+세 탭 모두 **Output = `Node`** 를 고르면 드라이버 노드로 파형을 실시간 통제할 수 있고,
+그 드라이버에는 **`windEnvelope` [0, 1]** 영향력 어트리뷰트가 붙는다(→ [7장](#7-envelope-영향력-0-1)).
+
+- **버전**: `app/config/version.py` (v02.01)
 - **위치**: `JUN_All/tools/A00390_WindTool_V02`
 - **설치**: `__dragDrop_A00390_V02.py` 드래그&드롭 → 셸프 버튼 **`WindToolV2`**
 - 근거·측정: [계획서](plans/A00390_ChainWave_no_ik_plan.md)
@@ -84,6 +87,7 @@ rotateOrder 가 어떻든** 안전하다.
 | `windSpeed` | 재생 속도(적분되므로 키를 걸어도 위상이 뒤로 안 간다) |
 | `windRootRamp` | 0 = 루트부터 같은 각도 · 1 = 루트 고정, 끝으로 갈수록 커짐 |
 | `windPhaseOffset` | 그 체인만의 타이밍 차이 |
+| `windEnvelope` | **영향력 [0, 1]** — 0 = 영향 없음 · 0.5 = 절반 · 1 = 완전 적용 |
 
 `Chain Offset` 을 주면 체인 k 가 `windPhaseOffset = k × 값` 으로 시작해, 여러 체인이
 한꺼번에 같은 모양으로 움직이지 않는다.
@@ -146,3 +150,49 @@ NURBS 커브가 CV 를 통과하지 않고 안쪽으로 당겨지기 때문인�
 
 > 헤드리스라 **뷰포트에서 실제로 어떻게 보이는지는 확인하지 못했다.**
 > 기존 탭과 나란히 걸어 눈으로 비교해 볼 것.
+
+---
+
+## 7. Envelope (영향력) [0, 1]
+
+세 탭(`Sine` · `Chain Wave` · `Chain Wave Lite`) 전부 **Output = `Node`** 로 만든 드라이버에
+`windEnvelope` 어트리뷰트가 붙는다. 디포머의 `envelope` 과 같은 뜻이다.
+
+| 값 | 결과 |
+|----|------|
+| `0` | 노드가 **아무 영향도 주지 않는다** (셋업이 없는 것과 같은 자세) |
+| `0.5` | **절반**의 영향력 |
+| `1` | **완전히** 적용 (기본값) |
+
+UI 의 `Envelope` 스핀박스는 **빌드 시 초기값**이고, 만든 뒤에는 드라이버에서 직접 만지거나
+**키를 걸 수 있다** — 진폭을 건드리지 않고 바람을 페이드 인/아웃 시키는 용도다.
+`Sine` 탭의 스핀박스는 Node 전용이라 `Curve` 출력에서는 `Speed` 처럼 비활성된다.
+
+### 구현 — 노드 하나로 끝난다
+
+파형 값이 **진폭에 정비례**하므로 envelope 를 진폭에 **한 번만** 곱하면 그 아래 조인트·CV 가
+전부 같은 비율로 줄어든다. 드라이버당 `multDoubleLinear` 1개 이상은 필요하지 않다.
+
+| 탭 | 실효값 | 만드는 노드 |
+|----|--------|-------------|
+| Sine | `windAmplitude × windEnvelope` | `<드라이버>_ampEnvelope` |
+| Chain Wave | `windAmplitude × windEnvelope` | `<드라이버>_ampEnvelope` |
+| Chain Wave Lite | `windSwingAngle × windEnvelope` | `<체인>_liteSwingEnv` |
+
+Chain Wave / Lite 는 이 노드도 제거용 세트에 들어가므로 **Remove 로 함께 지워진다.**
+
+### ⚠️ 알아둘 것
+
+- **범위는 마야가 강제한다.** `addAttr` 의 `minValue`/`maxValue` 때문에 `setAttr` 로 `1.5` 를
+  넣으면 잘리는 게 아니라 **`RuntimeError` 가 난다**(`past its maximum value of 1`).
+  툴이 넘기는 초기값은 파이썬에서 먼저 클램프하므로 UI 로는 이 에러를 볼 일이 없다.
+- **Chain Wave 는 CV 변위가 정확히 절반이지, 회전각이 절반은 아니다.** ikSpline 이 커브를
+  푸는 과정이 비선형이라 `0.5` 에서 조인트 회전 비율이 0.47~1.08 로 흩어진다(변위가 0 근처인
+  조인트에서 특히 크게). "절반" 은 **파동의 세기**가 절반이라는 뜻이다.
+  각도를 직접 다루는 **Lite 탭은 회전각까지 정확히 절반**이다.
+- `0` 일 때 rest 자세로 정확히 돌아오는지는 세 탭 모두 실측했다 —
+  Lite 는 `1e-8` 미만, Chain Wave 는 `0.000000`(1e-3 기준) 차이.
+
+### 검증
+
+`mayapy` (Maya 2024) 헤드리스 **35항목 통과** (코어 21 + UI 14). 위 표의 값이 그 결과다.

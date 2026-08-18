@@ -50,7 +50,7 @@ import maya.cmds as cmds
 from maya.api import OpenMaya as om
 
 from .wind_manager import (
-    DRIVER_SPEED, DRIVER_PHASE, DRIVER_PHASE_OFFSET,
+    DRIVER_SPEED, DRIVER_PHASE, DRIVER_PHASE_OFFSET, DRIVER_ENVELOPE,
     MODE_CHAIN, MODE_ROOT, OUTPUT_CURVE, OUTPUT_NODE,
     _make_phase_expression, _sine_lut, _leaf, _safe,
 )
@@ -62,6 +62,12 @@ from .wave_manager import (
 
 # Lite 전용 드라이버 어트리뷰트. 진폭이 **각도(도)** 라는 점만 기존과 다르다.
 LITE_SWING = "windSwingAngle"
+
+# windEnvelope([0,1], wind_manager 의 DRIVER_ENVELOPE)은 **실효 스윙 각도**에 곱해진다:
+#     effSwing = windSwingAngle * windEnvelope
+# theta_k 가 스윙 각도에 정비례하고 로컬 회전이 theta 의 차분이므로, 스윙에 한 번만 곱하면
+# 체인 전체가 같은 비율로 줄어든다. 0 이면 모든 theta 가 0 -> 로컬 회전 0 -> **rest 자세**,
+# 0.5 면 절반, 1 이면 완전 적용. 체인당 multDoubleLinear 1개면 끝난다.
 
 LITE_SET_SUFFIX = "_waveLiteSET"
 LITE_REST_ATTR = "waveRestRotate"
@@ -127,7 +133,8 @@ def _rotate_order(node):
 
 # --------------------------------------------------------------- 드라이버
 
-def _make_lite_driver(name, swing, wavelength, period, speed, ramp, phase_offset=0.0):
+def _make_lite_driver(name, swing, wavelength, period, speed, ramp, phase_offset=0.0,
+                      envelope=1.0):
     """Lite 드라이버 로케이터. 진폭만 **각도(도)** 이고 나머지는 기존과 같다."""
     drv = cmds.spaceLocator(name=name)[0]
 
@@ -149,6 +156,11 @@ def _make_lite_driver(name, swing, wavelength, period, speed, ramp, phase_offset
     cmds.addAttr(drv, longName=DRIVER_PHASE_OFFSET, attributeType="double",
                  defaultValue=phase_offset, keyable=True)
     cmds.setAttr(drv + "." + DRIVER_PHASE_OFFSET, phase_offset)
+
+    # 영향력 [0, 1]. 0 = 흔들리지 않음(rest 자세), 0.5 = 절반, 1 = 완전 적용.
+    cmds.addAttr(drv, longName=DRIVER_ENVELOPE, attributeType="double",
+                 defaultValue=1.0, minValue=0.0, maxValue=1.0, keyable=True)
+    cmds.setAttr(drv + "." + DRIVER_ENVELOPE, max(0.0, min(1.0, envelope)))
 
     # windPhaseTime = windSpeed 의 시간 적분 (Sine 탭과 같은 표현식 재사용)
     cmds.addAttr(drv, longName=DRIVER_PHASE, attributeType="double", keyable=True)
@@ -206,7 +218,7 @@ def _apply_angle(node, angle_plug, world_axis, rest, tag):
 # --------------------------------------------------------------- 체인 하나
 
 def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
-                      phase_offset):
+                      phase_offset, envelope=1.0):
     """체인 하나에 각도 노드망을 만든다. (드라이버, 만든 노드들, rest 회전, 정보)"""
     name = _safe(_leaf(chain[0]))
     points = _chain_positions(chain)
@@ -229,8 +241,14 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
     rest_rotate = {node: list(cmds.getAttr(node + ".rotate")[0]) for node in chain}
 
     drv = _make_lite_driver(name + "_liteDriver#", swing, wavelength, period,
-                            speed, ramp, phase_offset)
+                            speed, ramp, phase_offset, envelope)
     made = [drv]
+
+    # 실효 스윙 = windSwingAngle * windEnvelope (체인 전체가 공유, 노드 1개).
+    swing_env = cmds.createNode("multDoubleLinear", name=name + "_liteSwingEnv#")
+    cmds.connectAttr(drv + "." + LITE_SWING, swing_env + ".input1")
+    cmds.connectAttr(drv + "." + DRIVER_ENVELOPE, swing_env + ".input2")
+    made.append(swing_env)
 
     # ---- 체인 전체가 공유하는 시간 위상 : (windPhaseTime - windPhaseOffset) / windPeriod
     phase_sub = cmds.createNode("plusMinusAverage", name=name + "_litePhase#")
@@ -274,9 +292,9 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
         cmds.connectAttr(ramp_mul + ".output", ramp_add + ".input1")
         cmds.setAttr(ramp_add + ".input2", 1.0)
 
-        # theta_k = swing * ramp_k * sin(u_k)
+        # theta_k = effSwing * ramp_k * sin(u_k)   (effSwing = swing * envelope)
         swing_k = cmds.createNode("multDoubleLinear", name=tag + "_swing")
-        cmds.connectAttr(drv + "." + LITE_SWING, swing_k + ".input1")
+        cmds.connectAttr(swing_env + ".output", swing_k + ".input1")
         cmds.connectAttr(ramp_add + ".output", swing_k + ".input2")
 
         theta = cmds.createNode("multDoubleLinear", name=tag + "_theta")
@@ -311,10 +329,13 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
 
 def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.0,
                     period=24.0, speed=1.0, ramp=1.0, node_offset=0.0,
-                    output=OUTPUT_NODE, start=0.0, end=100.0, prefix=None):
+                    output=OUTPUT_NODE, start=0.0, end=100.0, prefix=None,
+                    envelope=1.0):
     """커브·ikHandle 없이 체인이 파형을 따라가게 한다.
 
     swing : **뼈가 흔들리는 각도(도)**. 기존 Chain Wave 의 windAmplitude(거리)와 뜻이 다르다.
+    envelope : 드라이버 windEnvelope 초기값 [0, 1]. 0 = 전혀 흔들리지 않음(rest 자세),
+               0.5 = 절반, 1 = 완전 적용. 빌드 뒤에도 드라이버에서 라이브 조절/키잉.
     나머지 인자는 기존 build_wave 와 같다.
 
     Returns: (체인 수, 드라이버 수, 메시지)
@@ -335,7 +356,8 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
 
     for k, chain in enumerate(chains):
         drv, made, rest, info = _build_chain_lite(
-            chain, axis, swing, wavelength, period, speed, ramp, k * node_offset)
+            chain, axis, swing, wavelength, period, speed, ramp, k * node_offset,
+            envelope)
 
         if drv is None:
             failed.append("{0} ({1})".format(_leaf(chain[0]), info))
@@ -373,8 +395,11 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
         msg = ("Chain Wave Lite: {0} chain(s), {1} maya node(s), "
                "no curve / ikHandle / proxy. Direct-axis {2}/{3} node(s). "
                "Edit windSwingAngle (degrees) / windWavelength / windPeriod / "
-               "windSpeed / windRootRamp live. Remove with the '{4}' set.".format(
-                   len(drivers), len(made_all), cardinal_total, node_total, set_name))
+               "windSpeed / windRootRamp live; windEnvelope [0-1] scales the whole "
+               "effect (0 = off, 0.5 = half, now {5:g}). "
+               "Remove with the '{4}' set.".format(
+                   len(drivers), len(made_all), cardinal_total, node_total, set_name,
+                   envelope))
 
     if failed:
         msg += " Failed: {0}.".format(", ".join(failed[:5]))

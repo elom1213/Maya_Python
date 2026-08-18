@@ -27,6 +27,7 @@
 - [QApplication before standalone](qapplication-before-maya-standalone.md) — mayapy Qt 테스트는 `QApplication` 을 `standalone.initialize()` **앞에** (뒤면 QWidget 에서 무단 종료)
 - [undo_chunk by default](undo-chunk-by-default.md) — 반복 씬 변경은 요청 없어도 `Framework.core.maya_undo.undo_chunk()` 로 묶기
 - [Maya 2023 compat](maya-2023-compat.md) — 2023 지원 필요할 수 있음, sin/cos 노드 없음(eulerToQuat 우회)
+- [addAttr min/max raises](addattr-min-max-raises-not-clamps.md) — `minValue`/`maxValue` 는 범위 밖 `setAttr` 을 **잘라내지 않고 RuntimeError**. 초기값은 파이썬에서 먼저 클램프
 - [Maya loadPlugin no __file__](maya-loadplugin-no-file.md) — loadPlugin 으로 뜬 .py 플러그인은 `__file__` 없음
 - [animLayer no global selected query](animlayer-no-global-selected-query.md) — `animLayer(q,selected)` 는 레이어 인자 필요, `ls(type=animLayer)` 순회
 - [name matching: token index](attr-name-matching-token-index.md) — 이름 대량 유사도 매칭은 편집 거리 말고 토큰 역색인+IDF. **difflib 비율은 coverage 와 척도가 다르다**
@@ -73,6 +74,7 @@
 - [A00400 Points to Curve](wip-a00400-points-to-curve.md) — 월드 위치를 순서대로 잇는 커브(EP 커브=정확 통과). 완화는 **라플라시안 결과와 선형보간**(세기 비례/rebuild span 은 감각이 나쁨), 엣지·페이스는 xform 이 여러 점을 준다 (v01.04)
 - [A00400 Wrap tab](wip-a00400-curve-wrap.md) — CV 수 다른 커브 라이브 wrap(rebuildCurve+blendShape, envelope 0~1). **rebuildCurve 는 소스 트랜스폼 이동을 안 따라간다** → 공간 변환은 행렬로 따로 (v01.03)
 - [A00400 CurveTool](wip-a00400-curvetool.md) — 선택 엣지를 연결 성분별로 그룹지어 커브 1개 + Reverse Direction, **Line Width 탭**(lineWidth 슬라이더, 드래그=undo 1스텝) (v01.01)
+- [A00390_V02 Envelope](wip-a00390-v02-envelope.md) — Node 드라이버에 `windEnvelope` [0,1]. 드라이버당 곱셈 노드 1개(진폭에 한 번만 곱하면 끝), **Chain Wave 는 CV 변위만 정확히 절반이고 회전각은 아니다**(ikSpline 비선형)
 - [A00390 Chain Wave](wip-a00390-chain-wave.md) — 체인이 **회전만으로** 싸인 파형을 따라간다(ikSpline + CV 구동). **FK 컨트롤러는 프록시 조인트**로. `rootOnCurve=False`, rest 는 셋업 전에 캡처 (v01.10)
 - [A00390 WindTool](wip-a00390-windtool.md) — **신규**: 본 체인에 싸인 파형 바람. Curve/Node 출력, windSpeed 적분 표현식, windPhaseOffset (v01.08)
 - [A00380 MeshTool Peak](wip-a00380-meshtool-peak.md) — **신규**: 노멀 방향 인플레이트. `shape.pnts` ranged setAttr(~70배), 슬라이더 settle 자동 커밋 (v01.05)

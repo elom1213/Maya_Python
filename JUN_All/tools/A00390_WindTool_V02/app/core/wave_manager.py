@@ -47,7 +47,7 @@ import maya.cmds as cmds
 from maya.api import OpenMaya as om
 
 from .wind_manager import (
-    DRIVER_SPEED, DRIVER_PHASE, DRIVER_PHASE_OFFSET,
+    DRIVER_SPEED, DRIVER_PHASE, DRIVER_PHASE_OFFSET, DRIVER_ENVELOPE,
     MODE_CHAIN, MODE_ROOT, OUTPUT_CURVE, OUTPUT_NODE,
     _make_phase_expression, _sine_lut, _leaf, _safe,
 )
@@ -58,6 +58,11 @@ WAVE_AMPLITUDE = "windAmplitude"      # CV 를 미는 양(월드 단위)
 WAVE_WAVELENGTH = "windWavelength"    # 한 파장의 월드 길이
 WAVE_PERIOD = "windPeriod"            # 한 주기의 프레임 수
 WAVE_ROOT_RAMP = "windRootRamp"       # 0=루트부터 같은 진폭, 1=루트 0 -> 끝 1 로 커짐
+# windEnvelope([0,1], wind_manager 의 DRIVER_ENVELOPE)은 **실효 진폭**에 곱해진다:
+#     effAmplitude = windAmplitude * windEnvelope
+# 0 이면 CV 가 rest 위치 그대로라 커브가 rest 체인을 그대로 지나가고(= 셋업이 없는 것과
+# 같은 자세), 0.5 면 절반만 밀리고, 1 이면 완전히 적용된다. 진폭 하나에만 곱하면 되는
+# 이유는 CV 변위가 진폭에 정비례하기 때문이다 — 드라이버당 multDoubleLinear 1개면 끝.
 
 # 파동이 흔드는 월드 축.
 UP_AXES = ("X", "Y", "Z")
@@ -299,7 +304,7 @@ def _mat_mul(a, b):
 # --------------------------------------------------------------- 드라이버 / 노드망
 
 def _make_wave_driver(name, amplitude, wavelength, period, speed, ramp,
-                      phase_offset=0.0):
+                      phase_offset=0.0, envelope=1.0):
     """Chain Wave 드라이버 로케이터. 파라미터는 전부 **월드 단위 / 프레임**."""
     drv = cmds.spaceLocator(name=name)[0]
     for attr, val, mn in ((WAVE_AMPLITUDE, amplitude, None),
@@ -320,16 +325,22 @@ def _make_wave_driver(name, amplitude, wavelength, period, speed, ramp,
                  defaultValue=phase_offset, keyable=True)
     cmds.setAttr(drv + "." + DRIVER_PHASE_OFFSET, phase_offset)
 
+    # 영향력 [0, 1]. 0 = 파동 없음(rest), 0.5 = 절반, 1 = 완전 적용.
+    cmds.addAttr(drv, longName=DRIVER_ENVELOPE, attributeType="double",
+                 defaultValue=1.0, minValue=0.0, maxValue=1.0, keyable=True)
+    cmds.setAttr(drv + "." + DRIVER_ENVELOPE, max(0.0, min(1.0, envelope)))
+
     # windPhaseTime = windSpeed 의 시간 적분 (Sine 탭과 같은 표현식 재사용)
     cmds.addAttr(drv, longName=DRIVER_PHASE, attributeType="double", keyable=True)
     _make_phase_expression(drv)
     return drv
 
 
-def _wire_cv(drv, crv, index, arc, total, rest_value, axis, template_lut):
-    """CV 하나를 흔든다.
+def _wire_cv(drv, crv, index, arc, total, rest_value, axis, template_lut,
+            amp_plug):
+    """CV 하나를 흔든다. amp_plug 는 windAmplitude * windEnvelope 실효 진폭 플러그.
 
-        value = rest + windAmplitude * ramp_k * sineLUT( arc/windWavelength - phase )
+        value = rest + effAmplitude * ramp_k * sineLUT( arc/windWavelength - phase )
         phase = (windPhaseTime - windPhaseOffset) / windPeriod
         ramp_k = 1 + windRootRamp * (arc/total - 1)      # ramp 0 -> 1, ramp 1 -> arc/total
 
@@ -378,7 +389,7 @@ def _wire_cv(drv, crv, index, arc, total, rest_value, axis, template_lut):
     # ---- value = rest + amp * ramp * s
     amp = cmds.createNode("multDoubleLinear", name=_safe(_leaf(crv)) + "_cvAmp%d" % index)
     cmds.connectAttr(lut + ".output", amp + ".input1")
-    cmds.connectAttr(drv + "." + WAVE_AMPLITUDE, amp + ".input2")
+    cmds.connectAttr(amp_plug, amp + ".input2")
 
     scaled = cmds.createNode("multDoubleLinear", name=_safe(_leaf(crv)) + "_cvVal%d" % index)
     cmds.connectAttr(amp + ".output", scaled + ".input1")
@@ -411,7 +422,7 @@ def _nudge_eval():
 # --------------------------------------------------------------- 빌드 / 제거
 
 def _build_one(chain, axis, amplitude, wavelength, period, speed, ramp,
-               phase_offset):
+               phase_offset, envelope=1.0):
     """체인 하나에 커브 + ikSpline + 노드망을 만든다. (드라이버, 생성 노드들, rest 회전)
 
     체인이 **조인트가 아니면**(FK 컨트롤러) 같은 자리에 숨긴 **프록시 조인트 체인**을 세워
@@ -453,10 +464,15 @@ def _build_one(chain, axis, amplitude, wavelength, period, speed, ramp,
         parentCurve=False, rootOnCurve=False)[:2]
 
     drv = _make_wave_driver(root_name + "_waveDriver#", amplitude, wavelength,
-                            period, speed, ramp, phase_offset)
+                            period, speed, ramp, phase_offset, envelope)
     template = _sine_lut(drv + "_sineTemplate")
 
-    made = [crv, handle, effector, drv]
+    # 실효 진폭 = windAmplitude * windEnvelope (커브의 모든 CV 가 공유, 노드 1개).
+    amp_env = cmds.createNode("multDoubleLinear", name=drv + "_ampEnvelope")
+    cmds.connectAttr(drv + "." + WAVE_AMPLITUDE, amp_env + ".input1")
+    cmds.connectAttr(drv + "." + DRIVER_ENVELOPE, amp_env + ".input2")
+
+    made = [crv, handle, effector, drv, amp_env]
     n_cv = cmds.getAttr(crv + ".spans") + cmds.getAttr(crv + ".degree")
     axis_index = {"X": 0, "Y": 1, "Z": 2}[axis.upper()]
     for k in range(n_cv):
@@ -464,7 +480,7 @@ def _build_one(chain, axis, amplitude, wavelength, period, speed, ramp,
         cv_rest = cmds.pointPosition("{0}.cv[{1}]".format(crv, k), world=True)
         arc = arcs[k] if k < len(arcs) else total
         made += _wire_cv(drv, crv, k, arc, total, cv_rest[axis_index], axis,
-                         template)
+                         template, amp_env + ".output")
     cmds.delete(template)
 
     made.append(proxy_grp)
@@ -479,7 +495,8 @@ def _build_one(chain, axis, amplitude, wavelength, period, speed, ramp,
 
 def build_wave(joints, mode=MODE_ROOT, axis="Y", amplitude=1.0, wavelength=10.0,
                period=24.0, speed=1.0, ramp=1.0, node_offset=0.0,
-               output=OUTPUT_NODE, start=0.0, end=100.0, prefix=None):
+               output=OUTPUT_NODE, start=0.0, end=100.0, prefix=None,
+               envelope=1.0):
     """조인트 체인이 **회전만으로** 싸인 파형을 따라가게 만든다.
 
     joints     : 체인(리스트 순서) 또는 체인 루트들.
@@ -492,6 +509,8 @@ def build_wave(joints, mode=MODE_ROOT, axis="Y", amplitude=1.0, wavelength=10.0,
     node_offset: 드라이버 k 의 windPhaseOffset = k * node_offset (루트마다 타이밍 차이).
     output     : OUTPUT_NODE(라이브 노드망) / OUTPUT_CURVE(회전 키로 굽고 셋업은 지운다).
     start, end : (curve 출력) 구울 구간.
+    envelope   : 드라이버 windEnvelope 초기값 [0, 1]. 0 = 파동이 전혀 적용되지 않음(rest),
+                 0.5 = 절반, 1 = 완전 적용. 빌드 뒤에도 드라이버에서 라이브 조절/키잉.
 
     Returns: (chains, drivers, message)
     """
@@ -509,7 +528,7 @@ def build_wave(joints, mode=MODE_ROOT, axis="Y", amplitude=1.0, wavelength=10.0,
     rest_all = {}
     for k, chain in enumerate(chains):
         drv, made, rest = _build_one(chain, axis, amplitude, wavelength, period,
-                                     speed, ramp, k * node_offset)
+                                     speed, ramp, k * node_offset, envelope)
         drivers.append(drv)
         made_all += made
         rest_all.update(rest)
@@ -539,9 +558,11 @@ def build_wave(joints, mode=MODE_ROOT, axis="Y", amplitude=1.0, wavelength=10.0,
         kind = "joint" if all(is_joint(c[0]) for c in chains) else "controller"
         msg = ("Chain Wave [{3}]: {0} chain(s), driver(s) {1}. Edit windAmplitude / "
                "windWavelength / windPeriod / windSpeed / windRootRamp live; "
-               "windPhaseOffset shifts one chain's timing. Remove with the "
-               "'{2}' set.".format(len(chains), ", ".join(_leaf(d) for d in drivers),
-                                   set_name, kind))
+               "windPhaseOffset shifts one chain's timing; windEnvelope [0-1] "
+               "scales the whole effect (0 = off, 0.5 = half, now {4:g}). "
+               "Remove with the '{2}' set.".format(
+                   len(chains), ", ".join(_leaf(d) for d in drivers),
+                   set_name, kind, envelope))
 
     if branched:
         msg += " Branching chain(s) followed the first child: {0}.".format(

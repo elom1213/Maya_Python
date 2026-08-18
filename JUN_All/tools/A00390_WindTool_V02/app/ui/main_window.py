@@ -102,7 +102,9 @@ class MainWindow(QWidget):
             "windSpeed attributes that reproduce the animation LIVE (edit the attrs\n"
             "to change it). windSpeed = playback speed (1 = normal); set OR key it to\n"
             "vary the speed per frame - it updates automatically (integrated, no\n"
-            "reversal). Bone Chain -> 1 driver; Bone Root -> one driver per root.")
+            "reversal). Bone Chain -> 1 driver; Bone Root -> one driver per root.\n"
+            "The driver also carries windEnvelope [0-1]: 0 = the node does nothing,\n"
+            "0.5 = half the effect, 1 = full.")
         self.out_group.addButton(self.rb_curve)
         self.out_group.addButton(self.rb_node)
         out_row.addWidget(self.rb_curve)
@@ -177,6 +179,21 @@ class MainWindow(QWidget):
             "different timing. Edit windPhaseOffset on a driver to retime it later.")
         self.lbl_node_offset = QLabel("Node Offset (Node)")
         form.addRow(self.lbl_node_offset, self.sb_node_offset)
+
+        # Envelope: 드라이버 windEnvelope 초기값. 0 = 노드가 아무 영향도 주지 않음.
+        self.sb_envelope = QDoubleSpinBox()
+        self.sb_envelope.setDecimals(3)
+        self.sb_envelope.setRange(0.0, 1.0)
+        self.sb_envelope.setSingleStep(0.1)
+        self.sb_envelope.setValue(1.0)
+        self.sb_envelope.setKeyboardTracking(False)
+        self.sb_envelope.setToolTip(
+            "Node output only: initial windEnvelope value - how much of the wind\n"
+            "the node applies. 0 = nothing at all, 0.5 = half the swing, 1 = full.\n"
+            "Set or key windEnvelope on the driver afterwards to fade the wind in\n"
+            "and out without touching the amplitude.")
+        self.lbl_envelope = QLabel("Envelope (Node)")
+        form.addRow(self.lbl_envelope, self.sb_envelope)
 
         sine.addLayout(form)
 
@@ -268,7 +285,8 @@ class MainWindow(QWidget):
         self.rb_wave_node.setToolTip(
             "Build the live rig (curve + ikSpline + driver locator).\n"
             "Edit windAmplitude / windWavelength / windPeriod / windSpeed /\n"
-            "windRootRamp on the driver and the wave updates immediately.")
+            "windRootRamp / windEnvelope on the driver and the wave updates\n"
+            "immediately.")
         self.rb_wave_curve = QRadioButton("Curve")
         self.rb_wave_curve.setToolTip(
             "Build the rig, bake the joint ROTATIONS over Start/End, then delete\n"
@@ -323,11 +341,18 @@ class MainWindow(QWidget):
             "Per-CHAIN timing offset (frames). Chain k starts with\n"
             "windPhaseOffset = k * this, so in Bone Root mode each chain sways\n"
             "at its own time.")
+        self.sb_wave_envelope = self._wave_spin(1.0, 0.0, 1.0, 0.1, decimals=3)
+        self.sb_wave_envelope.setToolTip(
+            "How much of the wave the driver applies - windEnvelope on the driver.\n"
+            "0 = nothing at all (the chain stays at rest), 0.5 = half, 1 = full.\n"
+            "Set or key windEnvelope afterwards to fade the wave in and out\n"
+            "without touching the amplitude.")
         rows = (("Amplitude", self.sb_wave_amp),
                 ("Wavelength", self.sb_wave_len),
                 ("Period", self.sb_wave_period),
                 ("Speed", self.sb_wave_speed),
                 ("Root Ramp", self.sb_wave_ramp),
+                ("Envelope", self.sb_wave_envelope),
                 ("Chain Offset", self.sb_wave_node_offset))
         for r, (label, widget) in enumerate(rows):
             grid.addWidget(QLabel(label), r, 0)
@@ -381,6 +406,7 @@ class MainWindow(QWidget):
                     speed=self.sb_wave_speed.value(),
                     ramp=self.sb_wave_ramp.value(),
                     node_offset=self.sb_wave_node_offset.value(),
+                    envelope=self.sb_wave_envelope.value(),
                     output=(wind_mgr.OUTPUT_NODE if node
                             else wind_mgr.OUTPUT_CURVE),
                     start=start, end=end)
@@ -433,7 +459,8 @@ class MainWindow(QWidget):
         self.rb_lite_node.setToolTip(
             "Build the live node network (driver locator + per-joint nodes).\n"
             "Edit windSwingAngle / windWavelength / windPeriod / windSpeed /\n"
-            "windRootRamp on the driver and the wave updates immediately.")
+            "windRootRamp / windEnvelope on the driver and the wave updates\n"
+            "immediately.")
         self.rb_lite_curve = QRadioButton("Curve")
         self.rb_lite_curve.setToolTip(
             "Build it, bake the ROTATIONS over Start/End, then delete the setup -\n"
@@ -487,12 +514,19 @@ class MainWindow(QWidget):
         self.sb_lite_node_offset.setToolTip(
             "Per-CHAIN timing offset (frames). Chain k starts with\n"
             "windPhaseOffset = k * this, so many chains do not move in lockstep.")
+        self.sb_lite_envelope = self._wave_spin(1.0, 0.0, 1.0, 0.1, decimals=3)
+        self.sb_lite_envelope.setToolTip(
+            "How much of the swing the driver applies - windEnvelope on the driver.\n"
+            "0 = nothing at all (the chain stays at rest), 0.5 = half, 1 = full.\n"
+            "Set or key windEnvelope afterwards to fade the wind in and out\n"
+            "without touching the swing angle.")
 
         rows = (("Swing Angle", self.sb_lite_swing),
                 ("Wavelength", self.sb_lite_len),
                 ("Period", self.sb_lite_period),
                 ("Speed", self.sb_lite_speed),
                 ("Root Ramp", self.sb_lite_ramp),
+                ("Envelope", self.sb_lite_envelope),
                 ("Chain Offset", self.sb_lite_node_offset))
         for r, (label, widget) in enumerate(rows):
             grid.addWidget(QLabel(label), r, 0)
@@ -547,6 +581,7 @@ class MainWindow(QWidget):
                     speed=self.sb_lite_speed.value(),
                     ramp=self.sb_lite_ramp.value(),
                     node_offset=self.sb_lite_node_offset.value(),
+                    envelope=self.sb_lite_envelope.value(),
                     output=(wind_mgr.OUTPUT_NODE if node
                             else wind_mgr.OUTPUT_CURVE),
                     start=start, end=end)
@@ -580,6 +615,8 @@ class MainWindow(QWidget):
         self.lbl_speed.setEnabled(not curve)
         self.sb_node_offset.setEnabled(not curve)
         self.lbl_node_offset.setEnabled(not curve)
+        self.sb_envelope.setEnabled(not curve)
+        self.lbl_envelope.setEnabled(not curve)
         self.btn_apply.setText("Apply Wind Keys" if curve else "Build Wind Node")
 
     # ==============================================================
@@ -615,13 +652,15 @@ class MainWindow(QWidget):
         output = wind_mgr.OUTPUT_NODE if node_mode else wind_mgr.OUTPUT_CURVE
         speed = self.sb_speed.value()
         node_offset = self.sb_node_offset.value()
+        envelope = self.sb_envelope.value()
 
         try:
             with undo_chunk():
                 count, jc, msg = wind_mgr.apply_wind(
                     joints, attr, start, end, period, amp, offset,
                     clear_range=clear_range, skip_zero_crossings=skip_zero,
-                    mode=mode, output=output, speed=speed, node_offset=node_offset)
+                    mode=mode, output=output, speed=speed, node_offset=node_offset,
+                    envelope=envelope)
         except Exception as e:
             self.log("Apply failed: {0}".format(e), warn=True)
             return
@@ -652,5 +691,7 @@ class MainWindow(QWidget):
             "Output = Curve: bake keyframes (fractional-frame keys, spline).\n"
             "Output = Node: a null driver (windPeriod/Amplitude/Offset/Speed)\n"
             "reproduces it live; windSpeed = playback speed (set or key it, auto).\n"
+            "Every driver also carries windEnvelope [0-1] - 0 = the node has no\n"
+            "effect, 0.5 = half, 1 = full. Set or key it to fade the wind in/out.\n"
             "Bone Chain -> 1 driver; Bone Root -> one driver per root.\n"
             "by Ji Hun Park".format(VERSION, LAST_UPDATE))

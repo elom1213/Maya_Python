@@ -311,6 +311,9 @@ Default Distance attribute (driver signal x)
   the chain sways in sequence. Two outputs: **Curve** bakes keys, **Node** builds a driver null plus a node
   network that plays live, exposing `windPeriod / windAmplitude / windOffset / windSpeed` as attributes —
   so the look is tuned in the scene instead of re-baked.
+- Every driver also carries a deformer-style **`windEnvelope` [0, 1]** — 0 = no effect, 0.5 = half,
+  1 = full — which can be keyed to **fade the wind in and out**. Because the waveform is exactly
+  proportional to the amplitude, this is **one multiply node per driver**, not one per joint or CV.
 
 ---
 
