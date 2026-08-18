@@ -48,6 +48,7 @@
 ## 공용 위젯 · 프레임워크
 
 - [TSL UUID selection](wip-tsl-uuid-selection.md) — MOD_tsl_qt_v01 이 (uuid, component) 보관 → 리네임/동명/다중 레퍼런스 안전
+- [TSL list_limit summary](framework-tsl-list-limit.md) — 500개 이상은 리스트 대신 요약 + `List All`. 느린 원인은 줄 수가 아니라 **항목별 UUID 조회**
 - [TSL selection order](tsl-selection-order.md) — `Order` 체크박스. `ls(sl)` 는 컴포넌트를 인덱스 순으로 줌 → `selectPref(trackSelectionOrder)`+`ls(orderedSelection)`. **함정: pref off 면 `ls(os)` 도 에러 없이 인덱스 순서**
 - [Sub-tabs over collapsibles](prefer-subtabs-over-stacked-collapsibles.md) — 기능 섹션이 3~4개 넘으면 접이식 대신 **중첩 탭**. 하위 탭마다 개별 스크롤(이중 스크롤 주의), 단 **창 자동 리사이즈 툴은 스크롤 대신 fit page**
 - [Framework expand widget](framework-expand-widget.md) — MOD_expand_qt_v01: 본문을 별도 창으로 빼는 Expand 패널. **복제 말고 이동**, 호스트 창 Close 는 위젯이 감시

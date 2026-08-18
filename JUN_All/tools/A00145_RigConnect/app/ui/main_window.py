@@ -45,6 +45,12 @@ from tools.A00145_RigConnect.app.ui.collapsible import CollapsibleBox
 # 재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
 WINDOW_OBJECT_NAME = "JUN_A00145_RigConnect_window"
 
+# Match 탭 리스트의 요약 전환 기준. Targets/Followers 는 버텍스를 통째로 담는 일이 잦아
+# 수천 개가 올라오는데, 그때 리스트를 채우는 비용(항목마다 UUID 조회)이 매칭 자체보다 크다.
+# 이 수 **이상**이면 리스트에 펼치지 않고 개수 요약만 보여준다(공용 TSL 위젯의 list_limit).
+# 다 보고 싶으면 리스트 아래 'List All' 버튼을 누른다.
+MATCH_LIST_LIMIT = 500
+
 
 class MainWindow(QWidget):
 
@@ -113,12 +119,16 @@ class MainWindow(QWidget):
         layout = QVBoxLayout(tab)
 
         # Targets / Followers (TSL 위젯이 cmds.ls(fl=True) 로 버텍스를 개별 항목으로 펼친다)
+        # list_limit : MATCH_LIST_LIMIT 이상이면 항목을 펼치지 않고 개수만 요약한다.
+        #              담긴 항목은 그대로 쓰이고(Match/Create/Swap 동일), 'List All' 로 펼친다.
         self.tsl_match_tgt = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Targets", select_label="Select",
-            list_min_height=200, log_callback=self.log)
+            list_min_height=200, list_limit=MATCH_LIST_LIMIT,
+            log_callback=self.log)
         self.tsl_match_flw = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Followers", select_label="Select",
-            list_min_height=200, log_callback=self.log)
+            list_min_height=200, list_limit=MATCH_LIST_LIMIT,
+            log_callback=self.log)
 
         list_row = QHBoxLayout()
         list_row.addWidget(self.tsl_match_tgt)
@@ -1112,6 +1122,7 @@ class MainWindow(QWidget):
             "Match       : match followers to targets (rotateOrder safe)\n"
             "              options: Translation / Rotation / Scale (world) / Parent\n"
             "              + create locators/sphere/cube at targets + vertex normal (+Y)\n"
+            "              {2}+ items are summarized instead of listed ('List All')\n"
             "Constrain   : sub-tabs -\n"
             "              Constraint   : multi target -> follower (+ Matrix)\n"
             "              Skin Weight  : constrain by the selected vertices'\n"
@@ -1130,7 +1141,7 @@ class MainWindow(QWidget):
             "                             + Get Closest\n"
             "Attribute   : copy selected attributes onto other objects,\n"
             "              same name or with a Prefix / Suffix".format(
-                VERSION, LAST_UPDATE))
+                VERSION, LAST_UPDATE, MATCH_LIST_LIMIT))
 
     def _run(self, label, func):
         """undo chunk 로 감싸 실행하고 결과를 로그에 남긴다."""

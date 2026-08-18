@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-08-13
+updated: 2026-08-18
 ---
 
 # 작업 일지 (WORKLOG)
@@ -15,7 +15,36 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-08-14 (오늘)
+## 2026-08-18 (오늘)
+
+> [!summary] `A00145_RigConnect` **Match 탭 — 500개 이상은 리스트업하지 않고 요약** (+ 매칭 속도) (v01.28→01.29)
+- "오브젝트가 많으면 리스트업만으로 툴이 느려진다. 500개 이상이면 개수 메시지만 띄우고, 다 보고
+  싶을 때 누를 버튼을 달아 달라" 는 요청. 표현 방식은 `A00170_driverTool` 의 AttachCrv > Edge Loop
+  **Stored selection**(엣지/버텍스를 펼치지 않고 요약)을 참고했다.
+- **느렸던 진짜 이유는 줄 수가 아니라 마야 호출 수**였다. 공용 TSL 은 담은 항목마다
+  `cmds.ls(name, uuid=True)` 로 UUID 를 붙인다(리네임/동명 안전을 위해). 즉 4천 개를 `Select` 하면
+  **마야 호출이 4천 번** 나간다 — 정작 하려던 매칭보다 오래 걸렸다.
+- 그래서 **공용 위젯**(`JUN_mod_tsl_qt_v01`)에 `list_limit` 옵션을 넣었다. 이 수 **이상**이면 리스트를
+  채우지 않고 표시 텍스트만 파이썬 리스트로 들고 요약 라벨 + `List All (N)` 버튼을 보여준다.
+  `get_all_items()` / `count()` / `set_items()` 는 그대로 동작하므로 **호출부는 바꿀 것이 없다** —
+  Match / Create / Swap / Sort 가 펼쳐져 있을 때와 완전히 동일하다. 스텁 측정 1000개 기준
+  `cmds.ls` **1000회 → 0회**. `List All` 은 그때 리스트를 채우고 UUID 를 붙인다(느린 경로를
+  사용자가 명시적으로 고르는 셈).
+- 트레이드오프를 문서에 박아 뒀다: **요약 상태에는 UUID 가 없다.** 담은 뒤 리네임하면 그 항목은
+  이름으로 못 찾는다. 리네임 안전성이 필요하면 `List All` 로 펼쳐 둔다.
+- "요청 전보다 **모든 기능이** 빨라야 한다" 는 조건이 있어 매칭 자체도 손봤다. `match_manager` 에
+  호출 1회 동안 사는 `_Ctx` 를 두고 ① 회전 매칭용 임시 transform 을 항목마다
+  `createNode`/`delete` 하지 않고 **하나만 돌려 쓰고** ② `MFnMesh` 와 ③ `_classify` 의 shape 타입을
+  **캐시**했다. 버텍스 1000개 매칭 **0.330s → 0.059s (5.6배)**.
+- 검증: 위젯은 stub `maya.cmds` + PySide6 로 **11묶음**(요약 전환/경계 500/Add 병합/Sort·Reverse/
+  Del 차단/`List All` 왕복/`list_limit` 없는 위젯 회귀), 매칭은 mayapy 2024 로 vertex·mesh·
+  transform 타겟 결과 동일 + 임시 노드 잔존 없음 + 속도. 문서:
+  [A00145_RigConnect](A00145_RigConnect.md) · [Framework_MOD_tsl_qt](Framework_MOD_tsl_qt.md).
+  #A00145 #Framework
+
+---
+
+## 2026-08-14
 
 > [!summary] `Framework` **공용 위젯 신규 — `JUN_mod_expand_qt_v01`(Expand / 별도 창)** + `A00110_animTool_V02` 적용 (v02.03→02.04)
 - "Expand 로 창을 빼는 건 다른 툴에서도 쓸 기능" 이라는 요청. `A00290_BSTool` Shape Editor 와

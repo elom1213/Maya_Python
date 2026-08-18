@@ -20,6 +20,18 @@ MEL 대비 개선/버그 수정:
   - `catch(nodeType ...)` 의 취약한 shape 판별을 listRelatives(shapes=True)+nodeType 으로 교체.
   - Blend Shape 기능 제거.
   - Locators/Sphere/Cube 는 "생성 후 즉시 매칭"으로 동작(create_and_match).
+
+대량 매칭 (_Ctx)
+----------------
+버텍스 수천 개를 한 번에 매칭하는 일이 흔해서, 항목마다 반복되던 마야 호출을 호출 1회 동안
+공유하는 `_Ctx` 로 묶었다:
+
+  - 회전 매칭에 쓰는 **임시 transform** 을 항목마다 createNode/delete 하지 않고 하나만 만들어
+    돌려 쓰고 끝에 지운다.
+  - 같은 메시의 버텍스가 이어지면 **MFnMesh 를 캐시**한다(항목마다 shape 를 다시 찾지 않는다).
+  - `_classify` 의 shape 타입 조회도 노드 이름으로 캐시한다.
+
+셰이프 캐시는 **한 번의 match() 호출 안에서만** 산다 — 그 사이에 씬 토폴로지가 바뀌지 않는다.
 """
 
 import maya.cmds as cmds
@@ -97,28 +109,75 @@ def _make_control(ctl_type):
 # target classification / sampling
 # ======================================================================
 
-def _mfn_mesh(name):
+class _Ctx(object):
+    """한 번의 매칭 호출 동안 공유하는 캐시 + 임시 노드.
+
+    항목 수가 많을 때 같은 질의를 항목마다 반복하지 않기 위한 것이다. 캐시는 이 객체와
+    함께 죽으므로 호출 사이에 씬이 바뀌어도 낡은 값이 남지 않는다.
+    """
+
+    def __init__(self):
+        self._tmp = None            # 회전 매칭용 임시 transform (필요할 때 1개만 생성)
+        self._mesh_fns = {}         # 이름 -> MFnMesh
+        self._shape_types = {}      # 노드 이름 -> 첫 shape 의 nodeType
+
+    def tmp_transform(self):
+        if self._tmp is None:
+            self._tmp = cmds.createNode("transform")
+        return self._tmp
+
+    def mesh_fn(self, name):
+        fn = self._mesh_fns.get(name)
+        if fn is None:
+            fn = om.MFnMesh(maya_shape.shape_dag(name))
+            self._mesh_fns[name] = fn
+        return fn
+
+    def shape_type(self, node):
+        st = self._shape_types.get(node)
+        if st is None:
+            shapes = cmds.listRelatives(node, shapes=True, fullPath=True) or []
+            st = cmds.nodeType(shapes[0]) if shapes else cmds.nodeType(node)
+            self._shape_types[node] = st
+        return st
+
+    def dispose(self):
+        """임시 노드를 정리한다(캐시는 객체와 함께 버려진다)."""
+        if self._tmp is not None:
+            try:
+                cmds.delete(self._tmp)
+            except Exception:
+                pass
+            self._tmp = None
+
+
+def _mfn_mesh(name, ctx=None):
     """transform 또는 mesh shape 이름 -> MFnMesh.
 
     셰이프가 여럿인 트랜스폼에서도 **디포머가 변형하는 셰이프**를 고른다
     (extendToShape 는 첫 non-intermediate 셰이프를 집을 뿐이다 — maya_shape 참고).
+    ctx 를 주면 같은 메시를 다시 찾지 않는다(같은 메시의 버텍스가 여럿일 때).
     """
+    if ctx is not None:
+        return ctx.mesh_fn(name)
     return om.MFnMesh(maya_shape.shape_dag(name))
 
 
-def _shape_type(node):
+def _shape_type(node, ctx=None):
     """node 의 첫 shape nodeType. shape 가 없으면 node 자신의 nodeType."""
+    if ctx is not None:
+        return ctx.shape_type(node)
     shapes = cmds.listRelatives(node, shapes=True, fullPath=True) or []
     return cmds.nodeType(shapes[0]) if shapes else cmds.nodeType(node)
 
 
-def _classify(tgt):
+def _classify(tgt, ctx=None):
     """target 종류 판별: vertex/component/cluster/mesh/transform."""
     if ".vtx[" in tgt:
         return "vertex"
     if "[" in tgt:                       # edge/face/cv 등 그 외 component
         return "component"
-    st = _shape_type(tgt)
+    st = _shape_type(tgt, ctx)
     if st == "clusterHandle":
         return "cluster"
     if st == "mesh":
@@ -126,19 +185,19 @@ def _classify(tgt):
     return "transform"
 
 
-def _vertex_pos_normal(vtx):
+def _vertex_pos_normal(vtx, ctx=None):
     """버텍스의 (월드 위치 MVector, 월드 노말 MVector) 반환."""
     mesh, rest = vtx.split(".vtx[")
     index = int(rest[:-1])
-    fn = _mfn_mesh(mesh)
+    fn = _mfn_mesh(mesh, ctx)
     p = fn.getPoint(index, om.MSpace.kWorld)
     n = fn.getVertexNormal(index, True, om.MSpace.kWorld)  # angleWeighted=True
     return om.MVector(p.x, p.y, p.z), n.normal()
 
 
-def _mesh_centroid(mesh):
+def _mesh_centroid(mesh, ctx=None):
     """메시 전체 정점의 월드 평균 좌표 (x, y, z)."""
-    pts = _mfn_mesh(mesh).getPoints(om.MSpace.kWorld)
+    pts = _mfn_mesh(mesh, ctx).getPoints(om.MSpace.kWorld)
     n = len(pts)
     if not n:
         raise ValueError("Mesh has no vertices: {0}".format(mesh))
@@ -186,12 +245,15 @@ def _basis_from_normal(normal, axis="y"):
 # apply
 # ======================================================================
 
-def _match_via_matrix(flw, x, y, z, pos, translate=True, rotate=True):
+def _match_via_matrix(flw, x, y, z, pos, translate=True, rotate=True, ctx=None):
     """기저(x,y,z)+위치를 임시 transform 에 실어 matchTransform 으로 flw 에 적용한다.
 
     임시 노드를 거치므로 flw 의 rotateOrder 가 무엇이든 안전하고(매칭은 matchTransform 이 처리),
     flw 의 scale 도 보존된다(matchTransform pos+rot 은 scale 을 건드리지 않음).
     translate/rotate 로 위치/회전 중 적용할 채널을 고른다(둘 다 False 면 아무것도 안 함).
+
+    ctx 를 주면 임시 노드를 **한 개만 만들어 돌려 쓴다**(정리는 ctx.dispose()).
+    항목마다 createNode/delete 를 부르면 버텍스 수천 개에서 그 비용이 매칭보다 커진다.
     """
     kwargs = {}
     if translate:
@@ -207,6 +269,12 @@ def _match_via_matrix(flw, x, y, z, pos, translate=True, rotate=True):
         z.x, z.y, z.z, 0.0,
         pos.x, pos.y, pos.z, 1.0,
     ]
+    if ctx is not None:
+        tmp = ctx.tmp_transform()
+        cmds.xform(tmp, ws=True, matrix=mat)
+        cmds.matchTransform(flw, tmp, **kwargs)
+        return
+
     tmp = cmds.createNode("transform")
     try:
         cmds.xform(tmp, ws=True, matrix=mat)
@@ -236,7 +304,8 @@ def _parent_one(flw, tgt):
     cmds.parent(flw, node)
 
 
-def _match_one(tgt, flw, normal_axis, translate=True, rotate=True, scale=False):
+def _match_one(tgt, flw, normal_axis, translate=True, rotate=True, scale=False,
+               ctx=None):
     """target 종류에 따라 flw 를 tgt 에 매칭한다(채널: translate/rotate/scale).
 
     - transform/joint/curve : matchTransform 으로 켜진 채널(pos/rot/scale)만 월드 매칭.
@@ -245,16 +314,16 @@ def _match_one(tgt, flw, normal_axis, translate=True, rotate=True, scale=False):
     scale 은 DOOTOOL 'Scale (Only in The World Space)' 이식 — matchTransform scale 은
     flw 의 월드 스케일이 tgt 의 월드 스케일과 같아지도록 맞춘다(월드 기준).
     """
-    kind = _classify(tgt)
+    kind = _classify(tgt, ctx)
     if kind == "vertex":
         if translate or rotate:      # 둘 다 꺼졌으면 정점 샘플링 자체를 건너뛴다.
-            pos, normal = _vertex_pos_normal(tgt)
+            pos, normal = _vertex_pos_normal(tgt, ctx)
             x, y, z = _basis_from_normal(normal, normal_axis)
             _match_via_matrix(flw, x, y, z, pos,
-                              translate=translate, rotate=rotate)
+                              translate=translate, rotate=rotate, ctx=ctx)
     elif kind == "mesh":
         if translate:
-            _match_pos(flw, _mesh_centroid(tgt))
+            _match_pos(flw, _mesh_centroid(tgt, ctx))
     elif kind == "cluster":
         if translate:
             _match_pos(flw, _cluster_pivot(tgt))
@@ -303,14 +372,19 @@ def match(targets, followers, normal_axis="y",
     n = min(len(targets), len(followers))
     skipped = abs(len(targets) - len(followers))
 
-    with suspend_refresh():
-        for i in range(n):
-            _match_one(targets[i], followers[i], normal_axis,
-                       translate=translate, rotate=rotate, scale=scale)
-        # DOOTOOL 과 동일하게 매칭을 모두 마친 뒤 별도 패스로 parent 한다.
-        if parent:
+    ctx = _Ctx()
+    try:
+        with suspend_refresh():
             for i in range(n):
-                _parent_one(followers[i], targets[i])
+                _match_one(targets[i], followers[i], normal_axis,
+                           translate=translate, rotate=rotate, scale=scale,
+                           ctx=ctx)
+            # DOOTOOL 과 동일하게 매칭을 모두 마친 뒤 별도 패스로 parent 한다.
+            if parent:
+                for i in range(n):
+                    _parent_one(followers[i], targets[i])
+    finally:
+        ctx.dispose()
 
     return n, skipped
 
@@ -330,10 +404,14 @@ def create_and_match(targets, ctl_type, normal_axis="y"):
         raise ValueError("No targets. Add objects to the Targets list.")
 
     created = []
-    with suspend_refresh():
-        for _ in targets:
-            created.append(_make_control(ctl_type))
-        for tgt, flw in zip(targets, created):
-            _match_one(tgt, flw, normal_axis)
+    ctx = _Ctx()
+    try:
+        with suspend_refresh():
+            for _ in targets:
+                created.append(_make_control(ctl_type))
+            for tgt, flw in zip(targets, created):
+                _match_one(tgt, flw, normal_axis, ctx=ctx)
+    finally:
+        ctx.dispose()
 
     return created

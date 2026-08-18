@@ -4,7 +4,8 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.28` (`app/config/version.py`) — Constrain > Constraint 하위 탭의 `Maintain Offset` 기본값을 **ON** 으로 변경 (§Constraint)
+- 버전: `v01.29` (`app/config/version.py`) — Match 탭이 **500개 이상**이면 리스트업하지 않고 개수만 요약 + `List All` 버튼, 대량 매칭 속도 개선 (§대량 선택)
+  · v01.28 은 Constrain > Constraint 하위 탭의 `Maintain Offset` 기본값을 **ON** 으로 변경 (§Constraint)
   · v01.27 은 Target Replace 하위 탭이 **Target Edit** 으로 확장(타깃 **추가 / 삭제** 추가) (§Target Edit)
   · v01.27 은 Match 탭의 셰이프 해석을 공용 [`Framework.core.maya_shape`](Framework_maya_shape.md) 로 교체(동작 변화 없음, 다중 셰이프 메시 안전)
 - 위치: `JUN_All/tools/A00145_RigConnect`
@@ -56,6 +57,54 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
   **곧바로 타겟 위치/방향에 매칭**하고, 생성된 컨트롤을 **Followers 목록에 채운다**(씬에서도 선택).
 - **Swap**: Targets ↔ Followers 목록 교환.
 - (MEL 의 Blend Shape 버튼은 제거됨.)
+
+#### 대량 선택 — 500개 이상은 리스트업하지 않는다 (v01.29)
+
+버텍스 수천 개를 Targets 에 담는 일이 잦은데, 예전에는 **항목 수만큼 리스트에 줄을 만들고 줄마다
+UUID 를 조회**(`cmds.ls(name, uuid=True)`)해서 **Select 를 누르는 순간이 매칭 자체보다 오래 걸렸다**.
+
+이제 `Targets` / `Followers` 는 항목이 **500개 이상**이면 리스트에 펼치지 않고 요약만 보여준다.
+
+```
+Targets                       Number: 4212
+┌──────────────────────────────────────┐
+│  4212 item(s) stored, not listed.    │   ← 리스트 대신 요약 라벨
+│  First: body_mesh.vtx[0]             │
+│  They are used exactly as if they    │
+│  were listed.                        │
+└──────────────────────────────────────┘
+[        List All (4212)         ]   ← 필요하면 여기서 전부 펼친다
+[Add][Del][Up][Down]
+[              Sort              ]
+```
+
+- **담긴 항목은 그대로 쓰인다.** `Match` / `Create (Locators/Sphere/Cube)` / `Swap` / `Sort` 는
+  요약 상태에서도 **리스트에 펼쳐져 있을 때와 완전히 동일**하게 동작한다(개수·순서 모두 유지).
+  헤더의 `Number:` 도 실제 개수를 보여준다.
+- **`List All (N)`** — 다 보고 싶을 때 누르면 그때 리스트를 채운다(항목마다 UUID 를 붙이는 느린
+  경로를 **사용자가 명시적으로 고르는** 셈이다). 펼친 뒤에는 항목 클릭 → 씬 선택, `Del`/`Up`/`Down`
+  같은 편집이 전부 예전처럼 동작한다. 다시 `Select` 로 목록을 채우면 개수에 따라 요약으로 돌아간다.
+- 요약 상태에서 `Del`/`Up`/`Down` 을 누르면 고를 항목이 없으므로
+  `Items are not listed - press 'List All' to edit them.` 안내만 남는다. `Sort` 는 요약 상태에서도
+  보관 목록을 정렬한다.
+- 요약 상태에서는 **UUID 를 붙이지 않는다** — 담은 뒤 오브젝트를 **리네임**하면 그 항목은 이름으로
+  찾지 못한다(리네임 안전성이 필요하면 `List All` 로 펼쳐 둔다). 기준값은 `main_window.py` 의
+  `MATCH_LIST_LIMIT = 500`.
+- 기능 자체는 공용 TSL 위젯의 `list_limit` 옵션이다 → [공용 리스트 위젯 문서](Framework_MOD_tsl_qt.md)
+
+##### 매칭 자체도 빨라졌다 (v01.29)
+
+`match_manager` 가 **한 번의 호출 동안 공유하는 `_Ctx`** 를 쓴다. 항목마다 반복되던 마야 호출을
+없앤 것이다.
+
+| 항목마다 하던 일 | 이제 |
+|------------------|------|
+| 회전 매칭용 임시 transform 을 `createNode` → `delete` | **하나만 만들어 돌려 쓰고** 끝에 지운다 |
+| `MFnMesh` 를 다시 만들며 셰이프 재탐색 | 메시 이름으로 **캐시** |
+| `_classify` 의 shape 타입 조회 | 노드 이름으로 **캐시** |
+
+버텍스 1000개 매칭 기준 **약 5.6배** 빨라졌다(mayapy 측정: 0.330s → 0.059s). 캐시는 호출 하나가
+끝나면 함께 버려지므로 씬이 바뀌어도 낡은 값이 남지 않는다.
 
 ### Constrain
 기능별 **하위 탭 5개**로 나뉜다(v01.22).
@@ -594,7 +643,7 @@ A00145_RigConnect/
 └── app/
     ├── config/version.py
     ├── core/                       # UI 비의존 maya.cmds 로직
-    │   ├── match_manager.py        # Match (MEL Match Tool 포팅: 위치/회전 매칭·컨트롤 생성·버텍스 노말)
+    │   ├── match_manager.py        # Match (MEL Match Tool 포팅: 위치/회전 매칭·컨트롤 생성·버텍스 노말, 대량 매칭용 _Ctx 캐시)
     │   ├── constrain_manager.py    # Constrain  (MEL 포팅)
     │   ├── skin_constraint_manager.py # Skin Weight to Constraint (스킨 웨이트 → weighted Parent/Scale/Point/Orient constraint)
     │   ├── group_create_manager.py # Group Create (부모/자식 쪽 오프셋 노드 _<suffix>_NN 삽입, 그룹·오브젝트 타입, UUID 기반)
@@ -613,5 +662,6 @@ A00145_RigConnect/
 ```
 
 - 모든 textScrollList 는 `Framework.qt.JUN_mod_tsl_qt_v01` 위젯으로 대체.
+  Match 탭의 두 리스트만 `list_limit=MATCH_LIST_LIMIT`(500) 으로 **요약 모드**를 켠다.
 - `app/core`(로직) ↔ `app/ui`(화면) 분리. 위젯은 값만 읽어 매니저에 전달.
 - UI 문자열은 영어, 한국어는 주석/독스트링만.

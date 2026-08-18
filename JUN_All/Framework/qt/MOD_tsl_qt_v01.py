@@ -42,6 +42,20 @@ UUID 는 보통 씬에서 유일하지만 **항상** 그렇진 않다. 같은 �
 (`_match_by_text`), 이름으로도 못 좁히면 첫 번째로 폴백한다. UUID 가 유일할 때의 동작
 (리네임/리페어런트 안전)은 그대로다.
 
+요약 모드 (list_limit)
+----------------------
+`list_limit` 을 주면 항목이 그 수 **이상**일 때 리스트에 펼치지 않고 **요약 라벨 + List All 버튼**만
+보여준다(기본 0 = 언제나 펼침). 수천 개를 QListWidget 에 넣는 것도 느리지만 진짜 비용은 항목마다
+`cmds.ls(name, uuid=True)` 를 부르는 UUID 부착이다 — 항목 수만큼 마야 호출이 나간다.
+
+요약 모드에서는 표시 텍스트만 파이썬 리스트로 들고 있으므로 Select/Add/Sort/set_items 가 항목 수와
+거의 무관하게 끝난다. `get_all_items()` / `count()` / `set_items()` 는 그대로 동작하니 호출부는
+바꿀 것이 없다. 대신 **UUID 를 붙이지 않는다** — 요약 모드의 `get_all_nodes()` 는 이름으로 해석하므로
+담은 뒤 리네임된 항목은 빠진다. 전부 보고 싶으면(또는 UUID 이점이 필요하면) **List All** 을 누른다.
+그때 리스트를 채우고 UUID 를 붙인다 — 느린 경로를 사용자가 명시적으로 고르는 셈이다.
+(다시 Select 하면 항목 수에 따라 요약 모드로 돌아간다)
+
+
 선택 순서 유지 (Order 토글)
 --------------------------
 `cmds.ls(sl=True)` 는 **컴포넌트**(vtx/edge/face)를 고른 순서가 아니라 **인덱스 순서**로
@@ -190,7 +204,7 @@ class JUN_mod_tsl_qt_v01(QWidget):
                  show_select=True, show_add=True, show_del=True,
                  show_up=True, show_down=True, show_sort=True,
                  show_reverse=False, show_order=True, order_default=False,
-                 multi_select=True, list_min_height=None,
+                 multi_select=True, list_min_height=None, list_limit=0,
                  select_label="Select Objects",
                  log_callback=None, parent=None):
         super(JUN_mod_tsl_qt_v01, self).__init__(parent)
@@ -209,6 +223,8 @@ class JUN_mod_tsl_qt_v01(QWidget):
         self.show_order = show_order
         self.multi_select = multi_select
         self.list_min_height = list_min_height
+        # 항목이 이 수 **이상**이면 리스트에 펼치지 않고 요약만 보여준다(0 = 언제나 펼침).
+        self.list_limit = int(list_limit or 0)
         # 중복 안내 등 메시지를 출력할 콜백. None 이면 print 사용(툴 로그창에 연결 가능).
         self.log_callback = log_callback
 
@@ -217,6 +233,9 @@ class JUN_mod_tsl_qt_v01(QWidget):
         # (C++ 위젯이 먼저 파괴된 뒤 self 속성에 접근하면 위험하다).
         self._order_state = {"on": False}
         self.chk_order = None
+
+        # 요약 모드에서 보관 중인 표시 텍스트들. None 이면 리스트에 그대로 펼쳐져 있다.
+        self._deferred = None
 
         self._build_ui()
 
@@ -276,6 +295,31 @@ class JUN_mod_tsl_qt_v01(QWidget):
         self.list_widget.itemSelectionChanged.connect(self._on_selection_changed)
         layout.addWidget(self.list_widget)
 
+        # 요약 모드용 위젯 — list_limit 을 준 툴에서만 만든다(다른 툴의 레이아웃은 그대로).
+        # 리스트 대신 이 라벨이 보이고, List All 을 누르면 그때 실제로 리스트를 채운다.
+        self.lbl_summary = None
+        self.btn_list_all = None
+        if self.list_limit:
+            self.lbl_summary = QLabel("")
+            self.lbl_summary.setAlignment(Qt.AlignCenter)
+            self.lbl_summary.setWordWrap(True)
+            self.lbl_summary.setFrameShape(QFrame.StyledPanel)
+            self.lbl_summary.setMinimumHeight(
+                self.list_min_height or DEFAULT_LIST_MIN_HEIGHT)
+            self.lbl_summary.hide()
+            layout.addWidget(self.lbl_summary)
+
+            self.btn_list_all = QPushButton("List All")
+            self.btn_list_all.setToolTip(
+                "List every stored item in the box above.\n"
+                "Large selections are kept summarized because filling the list "
+                "(and looking up a UUID for every item) is slow.\n"
+                "The items are used by the tool either way - this only changes "
+                "what you see.")
+            self.btn_list_all.clicked.connect(self.show_all)
+            self.btn_list_all.hide()
+            layout.addWidget(self.btn_list_all)
+
         # 편집 버튼 행: Add / Del / Up / Down (+ add_button 으로 커스텀 버튼 추가 가능)
         self.edit_row = QHBoxLayout()
         if self.show_add:
@@ -315,7 +359,12 @@ class JUN_mod_tsl_qt_v01(QWidget):
     # ================================================================
 
     def get_all_items(self):
-        """표시 텍스트(노드 이름) 목록. 하위호환을 위해 반환 타입은 그대로 문자열."""
+        """표시 텍스트(노드 이름) 목록. 하위호환을 위해 반환 타입은 그대로 문자열.
+
+        요약 모드면 리스트 위젯이 비어 있어도 **보관 중인 전체 목록**을 돌려준다.
+        """
+        if self._deferred is not None:
+            return list(self._deferred)
         return [self.list_widget.item(i).text()
                 for i in range(self.list_widget.count())]
 
@@ -323,24 +372,21 @@ class JUN_mod_tsl_qt_v01(QWidget):
         """UUID 로 해석한 **현재** 노드 경로 목록. 씬에서 사라진 항목은 제외한다.
 
         get_all_items() 와 달리 리네임/리페어런트 이후에도 올바른 경로를 준다.
+        요약 모드는 UUID 를 붙이지 않으므로 **이름으로** 해석한다(리네임된 항목은 빠진다).
         """
+        if self._deferred is not None:
+            return self._nodes_by_name(self._deferred)
         return [n for n in (self._node_of(self.list_widget.item(i))
                             for i in range(self.list_widget.count()))
                 if n]
 
     def set_items(self, items):
-        # 프로그램적 채우기 중에는 시그널을 막아 불필요한 씬 선택을 방지한다.
-        # addItems 로 한 번에 넣은 뒤 UUID 를 붙인다 — addItem 을 항목마다 부르면
-        # model 의 rowsInserted 가 항목 수만큼 발생해, 그걸 듣고 있는 툴들
-        # (A00150/A00160/A00170/A00290)의 훅이 불필요하게 여러 번 호출된다.
+        """리스트를 items 로 교체. list_limit 이상이면 펼치지 않고 요약 모드로 보관한다."""
         texts = list(items or [])
-        self.list_widget.blockSignals(True)
-        self.list_widget.clear()
-        if texts:
-            self.list_widget.addItems(texts)
-            self._attach_uuids(texts)
-        self.list_widget.blockSignals(False)
-        self._update_number()
+        if self.list_limit and len(texts) >= self.list_limit:
+            self._defer(texts)
+            return
+        self._fill_list(texts)
 
     def append_unique(self, items):
         """중복 없이 추가. 이미 있으면 로그 콜백(없으면 print)으로 안내.
@@ -352,13 +398,23 @@ class JUN_mod_tsl_qt_v01(QWidget):
         판정하면 뒤엣것이 중복으로 잘못 걸러졌었다). 노드가 아닌 항목(어트리뷰트 이름 등)은
         텍스트로 판정한다.
         """
+        incoming = list(items or [])
+
+        # 요약 모드이거나 합쳐서 한계를 넘길 목록이면 **텍스트 기준**으로 합친다.
+        # 아래의 기본 경로는 항목마다 cmds.ls 를 부르므로 큰 목록에서 느리다.
+        if self._deferred is not None or (
+                self.list_limit
+                and self.list_widget.count() + len(incoming) >= self.list_limit):
+            self._append_texts(incoming)
+            return
+
         cmds = _cmds()
         existing = set()
         for i in range(self.list_widget.count()):
             item = self.list_widget.item(i)
             existing.add(self._node_of(item) or item.text())
 
-        for text in items or []:
+        for text in incoming:
             key = None
             if cmds is not None:
                 try:
@@ -451,15 +507,115 @@ class JUN_mod_tsl_qt_v01(QWidget):
         return btn
 
     def count(self):
+        if self._deferred is not None:
+            return len(self._deferred)
         return self.list_widget.count()
 
     def clear(self):
+        self._deferred = None
         self.list_widget.clear()
+        self._sync_summary()
         self._update_number()
+
+    def is_deferred(self):
+        """지금 요약 모드인지 — 항목은 들고 있지만 리스트에 펼치지는 않은 상태."""
+        return self._deferred is not None
+
+    def show_all(self):
+        """요약 모드로 보관 중인 항목을 리스트에 모두 펼친다(느린 경로, 버튼/호출부용).
+
+        여기서 처음으로 UUID 를 붙이므로 항목 수만큼 마야 호출이 나간다. 다음 Select 로
+        목록이 다시 채워지면 항목 수에 따라 요약 모드로 돌아간다.
+        """
+        if self._deferred is None:
+            return
+        texts = list(self._deferred)
+        self._log("Listing all {0} item(s) - this can take a moment.".format(
+            len(texts)))
+        self._fill_list(texts)
 
     # ================================================================
     # 내부 슬롯 / 헬퍼
     # ================================================================
+
+    def _fill_list(self, texts):
+        """리스트 위젯을 texts 로 채운다(요약 모드 해제). list_limit 을 보지 않는다.
+
+        프로그램적 채우기 중에는 시그널을 막아 불필요한 씬 선택을 방지한다.
+        addItems 로 한 번에 넣은 뒤 UUID 를 붙인다 — addItem 을 항목마다 부르면
+        model 의 rowsInserted 가 항목 수만큼 발생해, 그걸 듣고 있는 툴들
+        (A00150/A00160/A00170/A00290)의 훅이 불필요하게 여러 번 호출된다.
+        """
+        self._deferred = None
+        self.list_widget.blockSignals(True)
+        self.list_widget.clear()
+        if texts:
+            self.list_widget.addItems(texts)
+            self._attach_uuids(texts)
+        self.list_widget.blockSignals(False)
+        self._sync_summary()
+        self._update_number()
+
+    def _defer(self, texts):
+        """요약 모드로 들어간다 — 리스트는 비우고 텍스트만 보관(UUID 조회 없음)."""
+        self._deferred = list(texts)
+        self.list_widget.blockSignals(True)
+        self.list_widget.clear()
+        self.list_widget.blockSignals(False)
+        self._sync_summary()
+        self._update_number()
+        self._log("{0} item(s) stored, not listed (limit {1}) - "
+                  "press 'List All' to show them.".format(
+                      len(self._deferred), self.list_limit))
+
+    def _sync_summary(self):
+        """요약 라벨 / List All 버튼 / 리스트 위젯의 표시 상태를 맞춘다."""
+        if self.lbl_summary is None:
+            return
+        deferred = self._deferred is not None
+        self.list_widget.setVisible(not deferred)
+        self.lbl_summary.setVisible(deferred)
+        self.btn_list_all.setVisible(deferred)
+        if not deferred:
+            return
+        total = len(self._deferred)
+        first = self._deferred[0].split("|")[-1] if total else ""
+        self.lbl_summary.setText(
+            "{0} item(s) stored, not listed.\n"
+            "First: {1}\n"
+            "They are used exactly as if they were listed.".format(total, first))
+        self.btn_list_all.setText("List All ({0})".format(total))
+
+    def _append_texts(self, incoming):
+        """텍스트 기준으로 중복 없이 합친 뒤 set_items 로 되돌린다(요약 모드의 빠른 경로)."""
+        merged = self.get_all_items()
+        seen = set(merged)
+        dupes = 0
+        for text in incoming:
+            if text in seen:
+                dupes += 1
+                continue
+            seen.add(text)
+            merged.append(text)
+        if dupes:
+            self._log("{0} item(s) already in the list were skipped.".format(dupes))
+        self.set_items(merged)
+
+    @staticmethod
+    def _nodes_by_name(texts):
+        """이름으로 현재 경로를 해석한다(요약 모드용). 씬에 없거나 애매하면 건너뛴다."""
+        cmds = _cmds()
+        if cmds is None:
+            return []
+        nodes = []
+        for text in texts:
+            try:
+                found = cmds.ls(text, long=True) or []
+            except Exception:
+                found = []
+            if found:
+                nodes.append(found[0])
+        return nodes
 
     def _add_item(self, text):
         """텍스트로 항목을 만들고, 씬 노드면 (uuid, component) 를 함께 보관한다."""
@@ -555,7 +711,7 @@ class JUN_mod_tsl_qt_v01(QWidget):
         self._update_number()
 
     def _update_number(self):
-        self.lbl_number.setText("Number: {0}".format(self.list_widget.count()))
+        self.lbl_number.setText("Number: {0}".format(self.count()))
 
     def _log(self, message):
         if callable(self.log_callback):
@@ -594,13 +750,24 @@ class JUN_mod_tsl_qt_v01(QWidget):
         """현재 Maya 선택을 중복 없이 추가."""
         self.append_unique(self._maya_selection())
 
+    def _edit_blocked(self):
+        """요약 모드에서는 고를 항목이 없으니 편집 버튼을 막고 안내만 한다."""
+        if self._deferred is None:
+            return False
+        self._log("Items are not listed - press 'List All' to edit them.")
+        return True
+
     def _on_del(self):
+        if self._edit_blocked():
+            return
         for row in reversed(self.selected_rows()):
             self.list_widget.takeItem(row)
         self._update_number()
 
     def _on_up(self):
         """선택 항목을 한 칸 위로 이동(MOD_tsl BF_LIST_moveUp_index 로직 이식)."""
+        if self._edit_blocked():
+            return
         # 재정렬은 텍스트가 아니라 레코드로 옮긴다(항목의 UUID 를 잃지 않도록).
         items = self._records()
         rows = self.selected_rows()
@@ -619,6 +786,8 @@ class JUN_mod_tsl_qt_v01(QWidget):
 
     def _on_down(self):
         """선택 항목을 한 칸 아래로 이동(MOD_tsl BF_LIST_moveDown_index 로직 이식)."""
+        if self._edit_blocked():
+            return
         items = self._records()
         rows = self.selected_rows()
         if not rows:
@@ -635,10 +804,19 @@ class JUN_mod_tsl_qt_v01(QWidget):
         self._reselect_rows(result_rows)
 
     def _on_sort(self):
+        # 요약 모드에서는 위젯을 건드리지 않고 보관 목록만 정렬한다(항목 수와 무관하게 즉시).
+        if self._deferred is not None:
+            self._deferred.sort()
+            self._sync_summary()
+            return
         self._set_records(sorted(self._records(), key=lambda rec: rec[0]))
 
     def _on_reverse(self):
         """리스트 항목의 순서를 통째로 뒤집는다(레코드로 옮겨 UUID 유지)."""
+        if self._deferred is not None:
+            self._deferred.reverse()
+            self._sync_summary()
+            return
         self._set_records(list(reversed(self._records())))
 
     def _on_selection_changed(self):
