@@ -373,6 +373,19 @@ Default Distance attribute (driver signal x)
   string-set operation (verified headless that picking through the shape still normalises to the transform's
   long name). The algebra itself is kept **free of Maya** so it can be tested on its own, and mixed component
   types are allowed rather than blocked — a vertex set `∩` an edge set is simply empty — with a warning instead.
+- **`A00450_manipulatorTool`** — **live control over the axis thickness of the Move / Rotate / Scale
+  manipulators** (three per-tool sliders plus a master that drives all three, and a `Reset`). I measured what
+  Maya actually exposes before designing it: everything lives on a single `manipOptions` command, and
+  **`lineSize` clamps anything below 1.0 up to 1.0** (0 and −1 both land on 1.0), so every write is **read
+  back** before it reaches the UI — the value you set is not always the value you get. The more important
+  finding is that **per-tool thickness does not exist in Maya**: `manipMoveContext` and friends carry no size
+  flags and `manipOptions` is global, so all three tools share one value. The tool therefore keeps three
+  values and **pushes the right one into the global setting the moment the tool changes**
+  (`scriptJob(ToolChanged)`), with the currently applied row marked in the UI so the workaround is visible
+  rather than magic. Finally, since the point of the request was "easier to grab", I verified that **thickness
+  and hit-testing are separate** — `lineSize` is what is drawn, `linePick` is what is hit — and exposed
+  `Pick Radius` alongside it with that distinction written into the UI, because thickness alone does not
+  actually achieve what was asked for.
 - **`A00050_uvTool`**, **`A00030_quickTool`**, **`A00330_NamingTool`** (legacy naming tool port + Quick Rename), **`A00310_SearchTool`** (select by type/name), **`A00360_SortTool`** (sort by world X/Y/Z, name or type and reorder the Outliner).
 
 ---

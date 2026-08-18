@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- A00450_manipulatorTool shelf icon: move manipulator whose axes get thicker -->
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+  <!-- Z axis (blue) : down-left, thin -->
+  <path d="M13 17 L6.5 23.5" fill="none" stroke="#5b8cff" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M5 25 L9.4 23.6 L8 22.2 Z" fill="#5b8cff"/>
+  <!-- X axis (red) : right, medium -->
+  <path d="M13 17 L23 17" fill="none" stroke="#ff5f56" stroke-width="2.8" stroke-linecap="round"/>
+  <path d="M27 17 L22 19.4 L22 14.6 Z" fill="#ff5f56"/>
+  <!-- Y axis (green) : up, thick - the "thicker axis" the tool is about -->
+  <path d="M13 17 L13 8" fill="none" stroke="#4fd76a" stroke-width="4.2" stroke-linecap="round"/>
+  <path d="M13 4 L15.8 9.5 L10.2 9.5 Z" fill="#4fd76a"/>
+  <!-- center handle -->
+  <circle cx="13" cy="17" r="2.4" fill="#f2f2f2"/>
+</svg>
