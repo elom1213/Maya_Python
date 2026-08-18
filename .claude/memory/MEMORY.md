@@ -40,6 +40,7 @@
 - [cmds.toggle not undoable](maya-toggle-cmd-not-undoable.md) — `toggle -localAxis` 는 undo 를 안 남겨 Ctrl+Z 가 이전 작업을 지움 → `setAttr` 사용
 - [extendToShape picks wrong shape](extendtoshape-picks-wrong-shape.md) — `kInvalidParameter: Object is incompatible` 1순위 원인. 새 코드는 `extendToShape` 금지, **공용 `Framework.core.maya_shape`** 사용. `polyEvaluate`/`copySkinWeights` 도 셰이프에 걸 것
 - [pointPosition: points only](pointposition-points-only.md) — 엣지/페이스는 `RuntimeError`. 컴포넌트 중심은 `xform -q -ws -t` 평균(점이면 값 동일)
+- [skin weights: physical index](skincluster-weight-index-physical.md) — `get/setWeights` 는 **물리** 인덱스. `indexForInfluenceObject`(논리)를 넘기면 **undo 뒤** `kInvalidParameter`
 - [list_attrs multi detection](list-attrs-multi-detection.md) — multi 판정은 `attributeQuery(multi=True)`, getNextFreeMultiIndex 남용 금지
 - [UUID-safe rename](uuid-safe-rename-duplicate-names.md) — 동명 노드 대비 UUID 로 노드 보관("UUID 기반 리네임 패턴 적용해줘")
 - [standalone app package collision](standalone-app-package-collision.md) — standalone Qt 툴은 `tools.<tool>.app.*` 로 import, 맨 `app` 금지

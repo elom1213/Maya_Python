@@ -17,6 +17,31 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-18 (오늘)
 
+> [!summary] `A00275` **Expand Bind — Ctrl+Z 뒤 재바인드 실패 수정** + 같은 실수 5곳 정리 (v01.12→01.13)
+- **증상**: Expand Bind 로 바인드 → Ctrl+Z → 같은 버튼을 다시 누르면
+  `# Warning: (kInvalidParameter): Object is incompatible with this method` 만 뜨고 바인드가 안 된다.
+- 이 문구는 [[extendtoshape-picks-wrong-shape]] 로 여러 번 겪은 것이라 셰이프 문제로 짐작하기 쉬운데,
+  이번엔 **인플루언스 인덱스**였다. mayapy 로 재현해 보니 셰이프는 멀쩡했고 `getWeights` 도 통과,
+  **`setWeights` 만** 죽었다.
+- **원인**: `MFnSkinCluster.get/setWeights` 는 `influenceObjects()` 에서의 자리(**물리** 인덱스)를
+  받는데, 툴은 `indexForInfluenceObject` 가 주는 **논리** 인덱스(`.matrix[]` 첨자)를 넘기고 있었다.
+  **둘은 보통 같아서** 아무 문제가 없다가, 인플루언스를 추가한 뒤 undo 하면 논리 인덱스가 회수되지
+  않아 듬성해지고(`matrix mi` `[0,1,2]` → undo → `[0]` → 재추가 → **`[0,3,4]`**) 그 순간부터 죽는다.
+  그래서 **이미 스킨이 있는 메시**에서만 재현된다(새 메시는 undo 로 skinCluster 자체가 사라져
+  다음 바인드가 처음부터 새로 만들어지므로 멀쩡하다) — 사용자의 실제 사용 상황이 딱 그쪽이었다.
+- 듬성한 상태에 **물리** 인덱스로 값을 써 넣고 `skinPercent` 로 되읽어, 마야가 올바른 논리 슬롯
+  (`weightList[0].weights` = `{0:0.2, 3:0.3, 4:0.5}`)에 넣는 것까지 확인하고 고쳤다.
+- 같은 실수가 **4개 툴 5곳**에 복붙돼 있어서 [[extendtoshape-picks-wrong-shape]] 때처럼 공용 헬퍼
+  **`Framework/core/maya_skin.py`** 로 올렸다(`weight_indices` = 물리 / `logical_indices` = 논리).
+  적용: A00275 `expand_bind_manager` · `weight_transfer_manager` · `skin_migrate_manager`,
+  A00270 `skin_migrate_manager`, A00430 `skin_writer`(쓰기·읽기).
+  A00430 `scene_sampler.bind_pre_from_skin` 은 `.bindPreMatrix[i]` 플러그를 직접 읽으므로
+  **논리 인덱스가 맞다** — 그대로 두었다. 문서: [Framework_maya_skin](Framework_maya_skin.md).
+- 검증(mayapy 2024): 헬퍼 4항목 + **바인드 → Ctrl+Z → 재바인드** 가 되는지(스킨 있는 메시 /
+  새 메시 / 2번 바인드 후 2번 undo) + 재바인드 결과가 **첫 바인드와 완전히 같은 웨이트**인지
+  (조인트 이름 기준 비교라 인덱스와 무관하게 판정) + 나머지 4곳이 듬성한 skinCluster 에서
+  도는지(A00430 은 numpy 경로 포함). #A00275 #A00270 #A00430 #Framework
+
 > [!summary] `A00390_WindTool` **[Fix] Chain Wave — 체인의 맨 끝 노드가 회전하지 않던 문제** (v01.10→01.11)
 - **증상**(사용자 보고): FK 컨트롤러에 걸면 **맨 끝 컨트롤러의 회전값이 계속 0** 이다.
 - **원인**: `ikSpline` 은 **엔드 이펙터 조인트를 회전시키지 않는다.** 팁은 부모 방향을 그냥

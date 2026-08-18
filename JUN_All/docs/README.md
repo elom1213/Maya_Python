@@ -48,6 +48,7 @@
 | `Framework/qt/MOD_filter_qt_v01.py` | 공용 **검색/필터** 위젯 — 입력 즉시 일치 항목만 표시, "보이는 것이 작업 대상" 헬퍼 | [Framework_MOD_filter_qt](Framework_MOD_filter_qt.md) |
 | `Framework/qt/MOD_expand_qt_v01.py` | 공용 **Expand(별도 창)** 패널 — 본문을 독립 창으로 빼고 되돌린다. **복제가 아니라 이동**이라 값이 어긋날 여지가 없다 | [Framework_MOD_expand_qt](Framework_MOD_expand_qt.md) |
 | `Framework/core/maya_shape.py` | **트랜스폼 → 셰이프 확정** 헬퍼 — `extendToShape()` 가 엉뚱한 셰이프를 집는 함정을 막는다(`kInvalidParameter` 원인) | [Framework_maya_shape](Framework_maya_shape.md) |
+| `Framework/core/maya_skin.py` | skinCluster 웨이트 **인덱스 함정**(물리 vs 논리) — `get/setWeights` 는 물리 인덱스. undo 뒤 재바인드가 죽던 원인 | [Framework_maya_skin](Framework_maya_skin.md) |
 
 ---
 

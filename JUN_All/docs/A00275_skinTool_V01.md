@@ -2,7 +2,7 @@
 title: A00275_skinTool_V01 사용법
 aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose, Move Joints, Expand Bind]
 tags: [maya-python, tool-guide, skin, skincluster, bind-pose, rigging]
-updated: 2026-08-12
+updated: 2026-08-18
 ---
 
 # A00275_skinTool_V01 사용법
@@ -10,7 +10,7 @@ updated: 2026-08-12
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.12)
+- **버전**: `app/config/version.py` (v01.13 — Expand Bind 를 **Ctrl+Z 뒤에 다시 눌러도** 바인드되도록 수정, §Expand Bind 문제 해결)
 - **설치**: `__dragDrop_A00275.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **SkinTool** → `tools.A00275_skinTool_V01.run(True)`
 
 | 탭 | 내용 |
@@ -251,6 +251,21 @@ bindPreMatrix_i(t) = C_i * worldInverseMatrix_i(t)              (라이브)
 ---
 
 ## 1-C. Expand Bind 탭 — 루프 위 조인트에 고르게 바인드 (v01.09~)
+
+> [!bug] **v01.13 수정 — Ctrl+Z 뒤 재바인드 실패**
+> `Bind stored vertices to stored joints` 로 바인드한 뒤 **Ctrl+Z** 로 되돌리고 같은 버튼을 다시
+> 누르면 아래 로그만 나오고 바인드가 되지 않았다.
+> ```
+> # Warning: (kInvalidParameter): Object is incompatible with this method
+> ```
+> 원인은 셰이프가 아니라 **인플루언스 인덱스**였다. `MFnSkinCluster.setWeights` 는
+> `influenceObjects()` 에서의 자리(**물리** 인덱스)를 받는데, 툴은 `indexForInfluenceObject` 가 주는
+> **논리** 인덱스를 넘기고 있었다. 둘은 보통 같아서 문제가 없다가, 인플루언스를 추가한 뒤 undo 하면
+> 논리 인덱스가 듬성해져서(`[0,1,2]` → undo → `[0]` → 재추가 → **`[0,3,4]`**) 그 순간부터 죽는다.
+> 그래서 **이미 스킨이 있는 메시**에서만(= Expand Bind 의 정상 사용 상황) 재현됐다.
+> 자세한 내용과 공용 헬퍼: [Framework.core.maya_skin](Framework_maya_skin.md).
+> 되돌린 뒤 다시 눌러도 **첫 바인드와 완전히 같은 웨이트**가 나오는 것까지 확인했다.
+
 
 입술·눈처럼 **한 중심에서 원을 그리며 밖으로 퍼지는 엣지 루프**에 조인트를 죽 늘어놓고 바인드하는
 작업 전용 탭이다. Kangaroo 의 `SkinCluster > ClosestExpand` 를 대신한다.

@@ -30,6 +30,7 @@ import maya.api.OpenMayaAnim as oma
 
 from Framework.core.maya_undo import undo_chunk
 from Framework.core import maya_shape
+from Framework.core import maya_skin
 
 
 # =========================
@@ -268,14 +269,16 @@ def _mesh_dag_comp(mesh, sc=None):
 
 
 def _get_all_weights(sc, mesh):
-    """(flat MDoubleArray, n_verts, influence 논리인덱스 MIntArray, n_inf)."""
+    """(flat MDoubleArray, n_verts, get/setWeights 용 influence 인덱스, n_inf).
+
+    인덱스는 **물리**다(`Framework.core.maya_skin` 참고) — `indexForInfluenceObject` 의
+    논리 인덱스를 넘기면 undo 로 인덱스가 듬성해진 skinCluster 에서 setWeights 가
+    kInvalidParameter 로 죽는다.
+    """
     fn = _sc_fn(sc)
     dag, comp, n = _mesh_dag_comp(mesh, sc)
     weights, n_inf = fn.getWeights(dag, comp)
-    infl_dags = fn.influenceObjects()
-    idxs = om.MIntArray()
-    for d in infl_dags:
-        idxs.append(int(fn.indexForInfluenceObject(d)))
+    idxs = maya_skin.weight_indices(len(fn.influenceObjects()))
     return weights, n, idxs, n_inf
 
 

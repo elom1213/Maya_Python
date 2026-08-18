@@ -7,8 +7,12 @@
 # `MFnSkinCluster.setWeights` 로 **전체를 한 번에** 쓴다 (실측: 20k x 20 인플루언스 = 0.04초).
 #
 # 인플루언스 순서 함정: setWeights 에 넘기는 웨이트 배열은
-# `[v0_i0, v0_i1, ..., v1_i0, ...]` 순서이고, 여기서 i 는 우리가 넘긴 **logical index 배열의
-# 순서**다. logical index 는 `indexForInfluenceObject` 로 얻는다(배열 위치를 가정하면 안 된다).
+# `[v0_i0, v0_i1, ..., v1_i0, ...]` 순서이고, 여기서 i 는 우리가 넘긴 **인덱스 배열의 순서**다.
+# 그 인덱스는 `influenceObjects()` 에서의 자리인 **물리 인덱스**여야 한다 —
+# `indexForInfluenceObject` 의 logical index 를 넘기면 undo 등으로 인덱스가 듬성해진
+# skinCluster 에서 `kInvalidParameter` 로 죽는다(`Framework.core.maya_skin` 참고).
+# 반대로 `matrix[]`/`bindPreMatrix[]` 플러그를 직접 다룰 때는 logical index 가 맞다
+# (`scene_sampler.bind_pre_from_skin`).
 
 import numpy as np
 
@@ -16,6 +20,7 @@ import maya.api.OpenMaya as om
 import maya.cmds as cmds
 
 from Framework.core import maya_shape
+from Framework.core import maya_skin
 
 from . import mesh_utils
 from . import scene_sampler
@@ -102,7 +107,9 @@ def apply_weights(mesh, joints, W, skin_cluster=None, max_influences=8,
 
     fn = scene_sampler.skin_fn(skin_cluster)
     influences = fn.influenceObjects()
-    logical = om.MIntArray([fn.indexForInfluenceObject(d) for d in influences])
+    # get/setWeights 는 **물리** 인덱스를 받는다(Framework.core.maya_skin 참고).
+    # logical index 를 넘기면 undo 등으로 인덱스가 듬성해진 skinCluster 에서 죽는다.
+    inf_indices = maya_skin.weight_indices(len(influences))
 
     # 인플루언스 -> W 의 열 매핑. skinCluster 에만 있는 조인트는 0 이 된다.
     wanted = {}
@@ -125,7 +132,8 @@ def apply_weights(mesh, joints, W, skin_cluster=None, max_influences=8,
             flat[:, slot] = W[:, col]
 
     comp = _complete_component(n_v)
-    fn.setWeights(dag, comp, logical, om.MDoubleArray(flat.ravel().tolist()), False)
+    fn.setWeights(dag, comp, inf_indices,
+                  om.MDoubleArray(flat.ravel().tolist()), False)
     return skin_cluster
 
 
@@ -142,11 +150,11 @@ def read_weights(mesh, joints, skin_cluster=None):
     dag = maya_shape.shape_dag(mesh, deformer=skin_cluster, type_="mesh")
     fn = scene_sampler.skin_fn(skin_cluster)
     influences = fn.influenceObjects()
-    logical = om.MIntArray([fn.indexForInfluenceObject(d) for d in influences])
+    inf_indices = maya_skin.weight_indices(len(influences))   # 물리 인덱스
 
     n_v = mesh_utils.vertex_count(mesh, deformer=skin_cluster)
     comp = _complete_component(n_v)
-    flat = fn.getWeights(dag, comp, logical)
+    flat = fn.getWeights(dag, comp, inf_indices)
     table = np.asarray(flat, dtype=float).reshape(n_v, len(influences))
 
     slot_of = {}

@@ -6,7 +6,12 @@
 - **Tab 2 "Migrate A → B"** — 토폴로지가 다른 두 메시 사이 **Transfer + Move 를 한 번에**(통합 마이그레이션).
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`A00110_animTool` 클론)
-- **버전**: `app/config/version.py`
+- **버전**: `app/config/version.py` (v01.03)
+> [!bug] v01.03 — 웨이트를 쓸 때 `MFnSkinCluster.setWeights` 에 **논리** 인플루언스 인덱스를
+> 넘기고 있었다. 인플루언스를 추가한 뒤 undo 한 씬처럼 인덱스가 듬성해지면
+> `(kInvalidParameter): Object is incompatible with this method` 로 죽는다 → **물리** 인덱스로 수정.
+> [Framework.core.maya_skin](Framework_maya_skin.md) 참고.
+
 - **설치**: `__dragDrop_A00270.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 생성 → `tools.A00270_skinMigrate.run(True)`
 
 ---

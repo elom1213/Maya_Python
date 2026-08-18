@@ -4,7 +4,12 @@ EA SEED 의 **Dem Bones**(*Smooth Skinning Decomposition with Rigid Bones*, Le &
 마야로 이식한 툴이다. **애니메이션되는 메시(알렘빅 캐시 등)**와 **조인트**를 비교해,
 그 움직임을 가장 잘 재현하는 **스킨 웨이트**나 **본 애니메이션**을 풀어 준다.
 
-- 버전: `v01.03` (`app/config/version.py`) — Solve Weights / Solve Transforms / Refine / **Decompose** 4모드
+- 버전: `v01.04` (`app/config/version.py`) — Solve Weights / Solve Transforms / Refine / **Decompose** 4모드
+> [!bug] v01.04 — 웨이트를 쓸 때 `MFnSkinCluster.setWeights` 에 **논리** 인플루언스 인덱스를
+> 넘기고 있었다. 인플루언스를 추가한 뒤 undo 한 씬처럼 인덱스가 듬성해지면
+> `(kInvalidParameter): Object is incompatible with this method` 로 죽는다 → **물리** 인덱스로 수정.
+> [Framework.core.maya_skin](Framework_maya_skin.md) 참고.
+
 - 위치: `JUN_All/tools/A00430_DemBone`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴. 로직은 numpy(솔버) + `maya.cmds`(취득·적용)
 - **원본 코드에 의존하지 않는다.** 알고리즘만 읽고 파이썬으로 새로 작성했으며, 런타임에

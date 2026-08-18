@@ -65,6 +65,7 @@ import maya.api.OpenMaya as om
 import maya.api.OpenMayaAnim as oma
 
 from Framework.core import maya_shape
+from Framework.core import maya_skin
 from tools.A00275_skinTool_V01.app.core import falloff
 
 
@@ -596,14 +597,17 @@ def _check_skin_drives(sc, mesh):
 
 
 def _influence_columns(sc, joints):
-    """(모든 인플루언스의 논리 인덱스 MIntArray, 대상 조인트의 열 번호, 인플루언스 수)."""
+    """(get/setWeights 용 인플루언스 인덱스, 대상 조인트의 열 번호, 인플루언스 수).
+
+    인덱스는 **물리**(= `influenceObjects()` 에서의 자리 = getWeights 의 열 순서)다.
+    `indexForInfluenceObject` 가 주는 **논리** 인덱스를 넘기면 안 된다 — 둘은 보통 같아서
+    잘 되는 것처럼 보이지만, 인플루언스를 추가한 뒤 **Ctrl+Z** 로 되돌리면 논리 인덱스가
+    듬성해져(`matrix mi` 가 `[0,1,2]` → undo → `[0]` → 재추가 → `[0,3,4]`) 그때부터
+    `setWeights` 가 `kInvalidParameter` 로 죽는다(`Framework.core.maya_skin` 참고).
+    """
     fn = _sc_fn(sc)
-    dags = fn.influenceObjects()
-    logical = om.MIntArray()
-    paths = []
-    for dag in dags:
-        logical.append(int(fn.indexForInfluenceObject(dag)))
-        paths.append(dag.fullPathName())
+    paths = maya_skin.influence_paths(fn)
+    indices = maya_skin.weight_indices(len(paths))
 
     wanted = [_long(j) for j in joints]
     columns = []
@@ -613,7 +617,7 @@ def _influence_columns(sc, joints):
         else:
             raise RuntimeError(
                 "'{0}' is not an influence of {1}.".format(_leaf(path or ""), sc))
-    return fn, logical, columns, len(paths)
+    return fn, indices, columns, len(paths)
 
 
 # =========================
@@ -810,7 +814,7 @@ def expand_bind(mesh, vtx_ids, joints, radius, blend=1.0, mode=MODE_SURFACE,
     # 어긋난 채로 MFnSkinCluster.getWeights 를 부르면 마야가
     # "(kInvalidParameter): Object is incompatible with this method" 로 죽는다.
     shape = _check_skin_drives(sc, mesh)
-    fn, logical, columns, n_inf = _influence_columns(sc, joints)
+    fn, inf_indices, columns, n_inf = _influence_columns(sc, joints)
     dag, comp = _dag_and_component(shape, touched)
 
     weights = fn.getWeights(dag, comp)[0]
@@ -852,7 +856,7 @@ def expand_bind(mesh, vtx_ids, joints, radius, blend=1.0, mode=MODE_SURFACE,
             if value > max_weight:
                 max_weight = value
 
-    fn.setWeights(dag, comp, logical, new_weights, False)
+    fn.setWeights(dag, comp, inf_indices, new_weights, False)
 
     return {
         "mesh": mesh,

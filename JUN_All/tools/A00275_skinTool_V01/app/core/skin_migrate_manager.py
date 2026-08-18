@@ -19,6 +19,7 @@ import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
 from Framework.core import maya_shape
+from Framework.core import maya_skin
 
 
 class SkinMigrateManager:
@@ -433,14 +434,15 @@ class SkinMigrateManager:
         comp = comp_fn.create(om.MFn.kMeshVertComponent)
         comp_fn.addElements(list(range(n_verts)))
 
-        # influenceObjects() 순서(=getWeights 컬럼 순서)와 logical index 매핑
+        # influenceObjects() 순서 = getWeights 의 컬럼 순서 = get/setWeights 에 넘길
+        # **물리** 인덱스. logical index(indexForInfluenceObject)를 넘기면 undo 등으로
+        # 인덱스가 듬성해진 skinCluster 에서 죽는다(Framework.core.maya_skin 참고).
         infl_dags = fn.influenceObjects()
         inf_count = len(infl_dags)
         leaf_to_col = {}
-        infl_indices = om.MIntArray()
         for i in range(inf_count):
             leaf_to_col[infl_dags[i].partialPathName().split("|")[-1].split(":")[-1]] = i
-            infl_indices.append(int(fn.indexForInfluenceObject(infl_dags[i])))
+        infl_indices = maya_skin.weight_indices(inf_count)
 
         weights, _ = fn.getWeights(dag, comp)   # MDoubleArray, 길이 = n_verts * inf_count
 
