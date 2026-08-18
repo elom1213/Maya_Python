@@ -40,9 +40,11 @@
 # 흔들림은 그보다 조금 작다(위 조건에서 약 0.85배). 파장 대비 진폭이 커지면 커브가 체인보다
 # 길어져 체인이 커브 끝까지 못 간다 — 그때는 진폭을 줄이거나 파장을 늘린다.
 
+import json
 import math
 
 import maya.cmds as cmds
+from maya.api import OpenMaya as om
 
 from .wind_manager import (
     DRIVER_SPEED, DRIVER_PHASE, DRIVER_PHASE_OFFSET,
@@ -63,32 +65,66 @@ UP_AXES = ("X", "Y", "Z")
 # 생성물을 담는 세트 접미사(Remove 가 이걸로 찾는다).
 WAVE_SET_SUFFIX = "_waveSET"
 
+# 빌드 시점의 rest 회전을 적어 두는 세트 어트리뷰트(Remove 가 그 값으로 되돌린다).
+WAVE_REST_ATTR = "waveRestRotate"
+
 
 # --------------------------------------------------------------- 체인 해석
 
-def _linear_chain(root, limit=200):
-    """root 에서 **첫 자식만 따라 내려간** 조인트 목록. (chain, branched)
+def is_joint(node):
+    return cmds.objectType(node, isType="joint")
 
-    ikSpline 은 갈래가 없는 한 줄 체인이어야 한다. 갈래가 있으면 첫 자식 쪽을 쓰고
-    branched=True 로 알려 호출측이 경고할 수 있게 한다.
+
+def _has_shape(node):
+    """컨트롤러인가(셰이프가 달린 트랜스폼). 오프셋 그룹은 셰이프가 없다."""
+    return bool(cmds.listRelatives(node, shapes=True, fullPath=True))
+
+
+def _linear_chain(root, limit=200):
+    """root 에서 **첫 자식만 따라 내려간** 체인 목록. (chain, branched)
+
+    조인트면 자식 조인트를, **컨트롤러(셰이프 달린 트랜스폼)면 자손 중 셰이프가 있는
+    트랜스폼**을 따라간다. FK 리그는 보통 `ctrl > offsetGrp > ctrl > ...` 처럼 중간에
+    오프셋 그룹이 끼는데, 그룹은 건너뛰고 컨트롤러만 체인으로 잡는다.
+
+    ikSpline(또는 프록시 조인트)은 갈래 없는 한 줄이어야 하므로, 갈래가 있으면 첫 자식
+    쪽을 쓰고 branched=True 로 알려 호출측이 경고할 수 있게 한다.
     """
+    joints_mode = is_joint(root)
     chain = [root]
     branched = False
     node = root
     for _ in range(limit):
-        children = cmds.listRelatives(node, children=True, type="joint",
-                                      fullPath=True) or []
-        if not children:
+        if joints_mode:
+            found = cmds.listRelatives(node, children=True, type="joint",
+                                       fullPath=True) or []
+        else:
+            # 셰이프가 달린 첫 자손 트랜스폼(오프셋 그룹은 건너뛴다)
+            found = []
+            frontier = cmds.listRelatives(node, children=True, type="transform",
+                                          fullPath=True) or []
+            while frontier:
+                cur = frontier.pop(0)
+                if _has_shape(cur):
+                    found.append(cur)
+                else:
+                    frontier = (cmds.listRelatives(cur, children=True,
+                                                   type="transform",
+                                                   fullPath=True) or []) + frontier
+        if not found:
             break
-        if len(children) > 1:
+        if len(found) > 1:
             branched = True
-        node = children[0]
+        node = found[0]
         chain.append(node)
     return chain, branched
 
 
 def resolve_chains(joints, mode):
-    """(chains, missing, branched) — chains 는 [[관절...], ...] 각각이 한 줄 체인."""
+    """(chains, missing, branched) — chains 는 [[노드...], ...] 각각이 한 줄 체인.
+
+    조인트 체인과 **FK 컨트롤러 체인** 둘 다 받는다(무엇인지는 `_linear_chain` 이 판별).
+    """
     missing, branched = [], []
     chains = []
 
@@ -99,7 +135,7 @@ def resolve_chains(joints, mode):
                 continue
             chain, is_branched = _linear_chain(root)
             if len(chain) < 2:
-                missing.append(root + " (no child joint)")
+                missing.append(root + " (no child in the chain)")
                 continue
             if is_branched:
                 branched.append(_leaf(root))
@@ -131,6 +167,134 @@ def _arc_positions(points):
         out.append(out[-1] + math.sqrt(sum((a[k] - b[k]) ** 2 for k in range(3))))
     return out
 
+
+# --------------------------------------------------------------- 컨트롤러(FK) 대응
+#
+# ikSpline 은 **조인트에만** 걸린다. FK 컨트롤러 체인은 그래서 이렇게 처리한다:
+#
+#   1. 컨트롤러 위치에 **프록시 조인트 체인**을 만들고(숨김),
+#   2. 그 프록시에 지금까지의 파동 셋업(커브 + ikSpline + CV 노드망)을 그대로 걸고,
+#   3. 프록시의 **월드 회전 변화량**을 컨트롤러의 rotate 로 옮긴다.
+#
+# 3번을 행렬로 쓰면:
+#
+#     ctrlWorld_desired = restCtrlWorld × restProxyWorld⁻¹ × proxyWorld
+#     ctrlLocal         = ctrlWorld_desired × ctrl.parentInverseMatrix
+#
+# 앞 두 항은 빌드 시점에 고정이므로 상수 행렬 하나로 접어 넣는다. 곱의 3×3 블록은 각
+# 3×3 블록의 곱이라 **이동 성분이 섞여 있어도 회전은 정확**하다. 그래서 decomposeMatrix 의
+# outputRotate 만 쓰고 translate/scale 은 버린다 — 컨트롤러의 위치는 계층이 정한다.
+#
+# 사이클이 없다: ctrl.rotate 는 **조상**의 parentInverseMatrix 와 프록시에만 의존한다.
+
+def _make_proxy_chain(controls, name, dummy_tip=True):
+    """대상 위치에 숨긴 프록시 조인트 체인을 만든다. (joints, group, rest 행렬)
+
+    `dummy_tip=True` 면 **마지막 뼈를 같은 방향·길이로 한 번 더 연장한 가상 조인트**를 끝에
+    붙인다. ikSpline 은 **엔드 이펙터 조인트를 회전시키지 않으므로**, 가상 점이 없으면
+    체인의 **마지막 노드가 영영 회전값 0** 으로 남는다(실측: 마지막 두 노드의 월드 회전이
+    31.6°로 똑같았다 — 팁이 부모 방향을 그냥 물려받은 것). 가상 점을 붙이면 그것이 엔드
+    이펙터가 되고 진짜 마지막 노드도 파형을 따라 회전한다.
+    (`A00410_SecondaryMotion` 의 `Rotate last node` / KawaiiPhysics 의 dummy bone 과 같은 방식.)
+    """
+    grp = cmds.group(empty=True, name=name + "_waveProxyGrp#")
+    cmds.setAttr(grp + ".visibility", 0)
+
+    points = [cmds.xform(c, query=True, worldSpace=True, translation=True)
+              for c in controls]
+    if dummy_tip and len(points) >= 2:
+        last, prev = points[-1], points[-2]
+        points.append([last[k] + (last[k] - prev[k]) for k in range(3)])
+
+    joints = []
+    cmds.select(clear=True)
+    for i, pos in enumerate(points):
+        jnt = cmds.joint(name="{0}_waveProxyJnt{1:02d}#".format(name, i),
+                         position=pos)
+        joints.append(cmds.ls(jnt, long=True)[0])
+    cmds.select(clear=True)
+
+    # 각 조인트가 자식을 향하도록(마지막은 부모 방향을 물려받는다)
+    cmds.joint(joints[0], edit=True, orientJoint="xyz", secondaryAxisOrient="yup",
+               children=True, zeroScaleOrient=True)
+    joints[0] = cmds.ls(cmds.parent(joints[0], grp)[0], long=True)[0]
+    # 부모가 바뀌었으니 자손 경로를 다시 읽는다.
+    chain, _ = _linear_chain(joints[0])
+
+    # **rest 월드 행렬은 지금 읽어 둔다.** 파동 셋업(ikSpline + CV 노드망)을 건 뒤에 읽으면
+    # 이미 휘어진 자세가 rest 로 잡혀 컨트롤러가 엉뚱한 각도로 간다(실측: 루트부터 어긋남).
+    rest = [cmds.getAttr(j + ".worldMatrix[0]") for j in chain]
+    return chain, grp, rest
+
+
+def _connect_control(proxy, ctl, name, rest_ctl, rest_proxy_inv):
+    """프록시의 월드 회전 변화량을 대상(컨트롤러/조인트) rotate 로 옮긴다. (만든 노드들)
+
+    rest 행렬은 **파동을 걸기 전에** 캡처한 것을 받는다(호출측 책임).
+
+    대상이 **조인트면 `jointOrient` 를 벗겨낸다.** 조인트의 로컬 행렬은 `R × JO` 라,
+    구한 로컬 행렬을 그대로 rotate 에 넣으면 JO 가 두 번 먹는다.
+    """
+    const = _mat_mul(rest_ctl, rest_proxy_inv)     # restCtrlWorld × restProxyWorld⁻¹
+
+    mmx = cmds.createNode("multMatrix", name=name + "_ctlMmx")
+    cmds.setAttr(mmx + ".matrixIn[0]", const, type="matrix")
+    cmds.connectAttr(proxy + ".worldMatrix[0]", mmx + ".matrixIn[1]")
+    cmds.connectAttr(ctl + ".parentInverseMatrix[0]", mmx + ".matrixIn[2]")
+    if is_joint(ctl):
+        # jointOrient 는 빌드 시점에 고정이라 **상수 행렬**로 넣는다(노드를 더 만들 필요가 없다).
+        cmds.setAttr(mmx + ".matrixIn[3]",
+                     _mat_inverse(_joint_orient_matrix(ctl)), type="matrix")
+
+    dcm = cmds.createNode("decomposeMatrix", name=name + "_ctlDcm")
+    cmds.connectAttr(mmx + ".matrixSum", dcm + ".inputMatrix")
+    # 컨트롤러의 회전 순서를 그대로 따른다(xyz 가 아닐 수 있다).
+    cmds.connectAttr(ctl + ".rotateOrder", dcm + ".inputRotateOrder")
+
+    for axis in "XYZ":
+        plug = "{0}.rotate{1}".format(ctl, axis)
+        for src in (cmds.listConnections(plug, source=True, destination=False,
+                                         plugs=True) or []):
+            cmds.disconnectAttr(src, plug)
+    cmds.connectAttr(dcm + ".outputRotate", ctl + ".rotate", force=True)
+    return [mmx, dcm]
+
+
+def _joint_orient_matrix(jnt):
+    """조인트의 jointOrient 를 4x4 행렬로. (오일러 순서는 XYZ 고정)"""
+    orient = cmds.getAttr(jnt + ".jointOrient")[0]
+    euler = om.MEulerRotation(
+        *[om.MAngle(v, om.MAngle.kDegrees).asRadians() for v in orient])
+    return list(euler.asMatrix())
+
+
+def _mat_inverse(m):
+    """4x4 일반 역행렬(가우스-조던). 스케일이 섞여 있어도 안전하다."""
+    a = [list(m[r * 4:r * 4 + 4]) + [1.0 if c == r else 0.0 for c in range(4)]
+         for r in range(4)]
+    for col in range(4):
+        pivot = max(range(col, 4), key=lambda r: abs(a[r][col]))
+        if abs(a[pivot][col]) < 1e-12:
+            raise ValueError("Matrix is not invertible.")
+        a[col], a[pivot] = a[pivot], a[col]
+        div = a[col][col]
+        a[col] = [v / div for v in a[col]]
+        for r in range(4):
+            if r == col:
+                continue
+            factor = a[r][col]
+            if factor:
+                a[r] = [v - factor * w for v, w in zip(a[r], a[col])]
+    return [v for row in a for v in row[4:]]
+
+
+def _mat_mul(a, b):
+    """4x4 행렬 곱(마야와 같은 행벡터 규약)."""
+    out = [0.0] * 16
+    for r in range(4):
+        for c in range(4):
+            out[r * 4 + c] = sum(a[r * 4 + k] * b[k * 4 + c] for k in range(4))
+    return out
 
 # --------------------------------------------------------------- 드라이버 / 노드망
 
@@ -248,11 +412,31 @@ def _nudge_eval():
 
 def _build_one(chain, axis, amplitude, wavelength, period, speed, ramp,
                phase_offset):
-    """체인 하나에 커브 + ikSpline + 노드망을 만든다. (드라이버, 생성 노드들)"""
+    """체인 하나에 커브 + ikSpline + 노드망을 만든다. (드라이버, 생성 노드들, rest 회전)
+
+    체인이 **조인트가 아니면**(FK 컨트롤러) 같은 자리에 숨긴 **프록시 조인트 체인**을 세워
+    거기에 파동을 걸고, 프록시의 월드 회전 변화량을 컨트롤러 rotate 로 옮긴다.
+    ikSpline 이 조인트에만 걸리기 때문이다.
+    """
+    # 조인트든 컨트롤러든 **프록시 체인**에 파동을 걸고 회전만 옮긴다.
+    #   - ikSpline 은 조인트에만 걸린다(컨트롤러는 애초에 프록시가 필요하다).
+    #   - 조인트도 프록시를 쓰면 사용자의 체인에 ikHandle·가상 조인트가 끼지 않는다.
+    #   - 프록시 끝의 **가상 조인트(dummy tip)** 덕분에 **마지막 노드도 회전**한다.
+    controls = list(chain)
+    rest_rotate = {}
+    rest_ctl_world = {}
+    for node in controls:
+        rest_rotate[node] = list(cmds.getAttr(node + ".rotate")[0])
+        rest_ctl_world[node] = cmds.getAttr(node + ".worldMatrix[0]")
+    chain, proxy_grp, proxy_rest = _make_proxy_chain(
+        controls, _safe(_leaf(controls[0])))
+
+    # 노드 이름은 프록시가 아니라 **원본 체인 루트**(컨트롤러/조인트) 기준으로 짓는다.
+    root_name = _safe(_leaf(controls[0] if controls else chain[0]))
+
     points = _chain_positions(chain)
     arcs = _arc_positions(points)
     total = arcs[-1]
-    root_name = _safe(_leaf(chain[0]))
 
     # 조인트 rest 위치를 CV 로 하는 커브(3차. 조인트가 적으면 차수를 낮춘다).
     degree = min(3, len(points) - 1)
@@ -282,7 +466,15 @@ def _build_one(chain, axis, amplitude, wavelength, period, speed, ramp,
         made += _wire_cv(drv, crv, k, arc, total, cv_rest[axis_index], axis,
                          template)
     cmds.delete(template)
-    return drv, made
+
+    made.append(proxy_grp)
+    for i, node in enumerate(controls):
+        if i >= len(chain):
+            break
+        made += _connect_control(
+            chain[i], node, "{0}_ctl{1:02d}".format(root_name, i),
+            rest_ctl_world[node], _mat_inverse(proxy_rest[i]))
+    return drv, made, rest_rotate
 
 
 def build_wave(joints, mode=MODE_ROOT, axis="Y", amplitude=1.0, wavelength=10.0,
@@ -314,17 +506,23 @@ def build_wave(joints, mode=MODE_ROOT, axis="Y", amplitude=1.0, wavelength=10.0,
         return 0, 0, "[Warning] Wavelength and Period must be greater than 0."
 
     drivers, made_all = [], []
+    rest_all = {}
     for k, chain in enumerate(chains):
-        drv, made = _build_one(chain, axis, amplitude, wavelength, period,
-                               speed, ramp, k * node_offset)
+        drv, made, rest = _build_one(chain, axis, amplitude, wavelength, period,
+                                     speed, ramp, k * node_offset)
         drivers.append(drv)
         made_all += made
+        rest_all.update(rest)
 
     set_name = (prefix or "chainWave") + WAVE_SET_SUFFIX
     node_set = cmds.sets(made_all, name=set_name)
+    # Remove 가 회전을 **rest 값**으로 되돌릴 수 있도록 세트에 적어 둔다(0 이 아닐 수 있다).
+    cmds.addAttr(node_set, longName=WAVE_REST_ATTR, dataType="string")
+    cmds.setAttr(node_set + "." + WAVE_REST_ATTR, json.dumps(rest_all),
+                 type="string")
 
     if output == OUTPUT_CURVE:
-        joints_all = [j for chain in chains for j in chain]
+        joints_all = sorted(rest_all.keys())
         cmds.bakeResults(joints_all, time=(min(start, end), max(start, end)),
                          simulation=True, attribute=["rotateX", "rotateY", "rotateZ"],
                          sampleBy=1, disableImplicitControl=True,
@@ -338,11 +536,12 @@ def build_wave(joints, mode=MODE_ROOT, axis="Y", amplitude=1.0, wavelength=10.0,
         drivers = []
     else:
         _nudge_eval()
-        msg = ("Chain Wave: {0} chain(s), driver(s) {1}. Edit windAmplitude / "
+        kind = "joint" if all(is_joint(c[0]) for c in chains) else "controller"
+        msg = ("Chain Wave [{3}]: {0} chain(s), driver(s) {1}. Edit windAmplitude / "
                "windWavelength / windPeriod / windSpeed / windRootRamp live; "
                "windPhaseOffset shifts one chain's timing. Remove with the "
                "'{2}' set.".format(len(chains), ", ".join(_leaf(d) for d in drivers),
-                                   set_name))
+                                   set_name, kind))
 
     if branched:
         msg += " Branching chain(s) followed the first child: {0}.".format(
@@ -363,28 +562,34 @@ def remove_wave(prefix=None):
 
     members = [n for n in (cmds.sets(set_name, query=True) or [])
                if cmds.objExists(n)]
-    # ikSpline 이 물려 있던 조인트는 회전이 남으므로 0 으로 되돌린다.
-    joints = set()
-    for node in members:
-        if cmds.objectType(node, isAType="ikHandle"):
-            start = cmds.ikHandle(node, query=True, startJoint=True)
-            end = cmds.ikHandle(node, query=True, endEffector=True)
-            chain, _ = _linear_chain(cmds.ls(start, long=True)[0])
-            joints.update(chain)
+
+    # 빌드할 때 적어 둔 rest 회전(컨트롤러는 0 이 아닐 수 있다).
+    rest = {}
+    if cmds.attributeQuery(WAVE_REST_ATTR, node=set_name, exists=True):
+        try:
+            rest = json.loads(cmds.getAttr(set_name + "." + WAVE_REST_ATTR) or "{}")
+        except ValueError:
+            rest = {}
+
     if members:
         cmds.delete(members)
     if cmds.objExists(set_name):
         cmds.delete(set_name)
-    for jnt in joints:
-        if not cmds.objExists(jnt):
+
+    restored = 0
+    for node, values in rest.items():
+        if not cmds.objExists(node):
             continue
-        for attr in ("rotateX", "rotateY", "rotateZ"):
-            plug = "{0}.{1}".format(jnt, attr)
-            if not cmds.listConnections(plug, source=True, destination=False):
-                try:
-                    cmds.setAttr(plug, 0)
-                except Exception:
-                    pass
+        for attr, value in zip(("rotateX", "rotateY", "rotateZ"), values):
+            plug = "{0}.{1}".format(node, attr)
+            if cmds.listConnections(plug, source=True, destination=False):
+                continue
+            try:
+                cmds.setAttr(plug, value)
+            except Exception:
+                pass
+        restored += 1
+    joints = rest
     _nudge_eval()
-    return len(members), "Chain Wave removed: {0} node(s); {1} joint(s) reset.".format(
-        len(members), len(joints))
+    return len(members), ("Chain Wave removed: {0} node(s); {1} target(s) put back "
+                          "to their rest rotation.".format(len(members), restored))
