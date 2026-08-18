@@ -1,0 +1,263 @@
+QWidget {
+    background-color: #2b2b2b;
+    color: #e6e6e6;
+    font-size: 12px;
+}
+
+QLabel {
+    color: #e6e6e6;
+    background: transparent;
+}
+
+QPushButton {
+    background-color: #5f8d8d;
+    color: #ffffff;
+    border: 1px solid #6f9e9e;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+QPushButton:hover {
+    background-color: #6f9e9e;
+}
+
+QPushButton:pressed {
+    background-color: #527d7d;
+}
+
+QLineEdit, QTextEdit, QPlainTextEdit, QListWidget, QSpinBox, QComboBox {
+    background-color: #353838;
+    color: #e6e6e6;
+    border: 1px solid #6f9e9e;
+    padding: 4px;
+    border-radius: 3px;
+}
+
+QListWidget::item:selected {
+    background-color: #6f9e9e;
+    color: #ffffff;
+}
+
+QComboBox:hover {
+    border: 1px solid #6f9e9e;
+}
+
+QCheckBox {
+    color: #e6e6e6;
+    background: transparent;
+}
+
+QCheckBox::indicator {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #6f9e9e;
+    border-radius: 3px;
+    background-color: #353838;
+}
+
+QCheckBox::indicator:hover {
+    border: 1px solid #6f9e9e;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #6f9e9e;
+    border: 1px solid #6f9e9e;
+}
+
+QRadioButton {
+    color: #e6e6e6;
+    background-color: #353838;
+    border: 1px solid #6f9e9e;
+    border-radius: 4px;
+    padding: 4px 8px;
+    margin: 2px 0;
+}
+
+QRadioButton::indicator {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #6f9e9e;
+    border-radius: 7px;
+    background-color: #353838;
+}
+
+QRadioButton::indicator:hover {
+    border: 1px solid #6f9e9e;
+}
+
+QRadioButton::indicator:checked {
+    background-color: #6f9e9e;
+    border: 1px solid #6f9e9e;
+}
+
+QMenuBar {
+    background-color: #2b2b2b;
+    color: #e6e6e6;
+}
+
+QMenuBar::item:selected {
+    background-color: #6f9e9e;
+}
+
+QMenu {
+    background-color: #2b2b2b;
+    color: #e6e6e6;
+}
+
+QMenu::item:selected {
+    background-color: #6f9e9e;
+}
+
+QGroupBox {
+    border: 1px solid #6f9e9e;
+    margin-top: 10px;
+    padding-top: 10px;
+}
+
+QGroupBox::title {
+    color: #9ccfcf;
+}
+
+/* --- Tabs & headers: styled explicitly so Win10 native rendering keeps
+       readable contrast (match the Win11 look). --- */
+QTabWidget::pane {
+    border: 1px solid #6f9e9e;
+    background-color: #2b2b2b;
+    top: -1px;
+}
+
+QTabBar::tab {
+    background-color: #34373d;
+    color: #e6e6e6;
+    border: 1px solid #45484f;
+    border-bottom: none;
+    padding: 6px 14px;
+    margin-right: 2px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+}
+
+QTabBar::tab:selected {
+    background-color: #2b2b2b;
+    color: #ffffff;
+    border-color: #6f9e9e;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #3f444c;
+}
+
+QHeaderView::section {
+    background-color: #34373d;
+    color: #e6e6e6;
+    border: 1px solid #6f9e9e;
+    padding: 4px 6px;
+}
+
+QHeaderView::section:hover {
+    background-color: #3f444c;
+}
+
+QTableCornerButton::section {
+    background-color: #34373d;
+    border: 1px solid #6f9e9e;
+}
+
+/* --- QSpinBox up/down buttons: define sub-controls so the arrow
+       buttons keep a clickable hit-area + arrow cursor once the QSpinBox
+       border/padding above is styled (Qt drops native arrows otherwise). --- */
+QSpinBox::up-button {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 16px;
+    background-color: #353838;
+    border-left: 1px solid #6f9e9e;
+    border-top-right-radius: 3px;
+}
+
+QSpinBox::down-button {
+    subcontrol-origin: border;
+    subcontrol-position: bottom right;
+    width: 16px;
+    background-color: #353838;
+    border-left: 1px solid #6f9e9e;
+    border-bottom-right-radius: 3px;
+}
+
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: #6f9e9e;
+}
+
+QSpinBox::up-arrow {
+    image: url(@STYLES@/sb_up_light.png);
+    width: 9px;
+    height: 9px;
+}
+
+QSpinBox::down-arrow {
+    image: url(@STYLES@/sb_down_light.png);
+    width: 9px;
+    height: 9px;
+}
+
+/* --- Tree / list rows: explicit dark base + subtle row alternation so Win10
+       native rendering does not paint bright rows (match the Win11 look). --- */
+QTreeView, QTreeWidget {
+    background-color: #2b2b2b;
+    alternate-background-color: #33363c;
+    color: #e6e6e6;
+    border: 1px solid #6f9e9e;
+}
+
+QTreeView::item:selected, QTreeWidget::item:selected {
+    background-color: #6f9e9e;
+    color: #ffffff;
+}
+
+QTreeView::item:hover:!selected, QTreeWidget::item:hover:!selected {
+    background-color: #3f444c;
+}
+
+
+/* ------------------------------------------------------------------
+   Disabled (비활성) 상태
+   위 규칙들이 색을 평면적으로 지정하면 Qt 기본 회색 처리가 덮여, setEnabled(False)
+   해도 그대로 밝게 보인다. 각 테마 팔레트를 배경 쪽으로 섞어 흐리게 표현한다.
+   ------------------------------------------------------------------ */
+
+QLabel:disabled,
+QCheckBox:disabled,
+QRadioButton:disabled,
+QGroupBox:disabled,
+QGroupBox::title:disabled {
+    color: #7f7f7f;
+}
+
+QPushButton:disabled {
+    background-color: #405252;
+    color: #959595;
+    border: 1px solid #465959;
+}
+
+QLineEdit:disabled,
+QTextEdit:disabled,
+QPlainTextEdit:disabled,
+QListWidget:disabled,
+QSpinBox:disabled,
+QComboBox:disabled {
+    background-color: #303232;
+    color: #7f7f7f;
+    border: 1px solid #465959;
+}
+
+QCheckBox::indicator:disabled,
+QRadioButton::indicator:disabled {
+    background-color: #303232;
+    border: 1px solid #465959;
+}
+
+QCheckBox::indicator:checked:disabled,
+QRadioButton::indicator:checked:disabled {
+    background-color: #465959;
+    border: 1px solid #465959;
+}

@@ -51,7 +51,7 @@ def run(reload_module=True):
     window_instance = MainWindow()
 
     # 리깅 카테고리 색상 (joint / FKIK / rig 툴과 통일)
-    ThemeManager.load_theme_to_widget(window_instance, "coral_dark")
+    ThemeManager.load_theme_to_widget(window_instance, "green_dark")
 
     window_instance.show()
 

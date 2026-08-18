@@ -24,7 +24,7 @@ def main():
 
     app = QApplication(sys.argv)
 
-    ThemeManager.load_theme_dev(app, "purple_dark")
+    ThemeManager.load_theme_dev(app, "purple_mid")
 
     window = MainWindow()
 

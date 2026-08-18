@@ -57,7 +57,7 @@ def run(reload_module=True):
     window_instance = MainWindow()
 
     # 레거시 네이밍 툴의 green 정체성을 잇는 테마.
-    ThemeManager.load_theme_to_widget(window_instance, "green_dark")
+    ThemeManager.load_theme_to_widget(window_instance, "brown_dark")
 
     window_instance.show()
 

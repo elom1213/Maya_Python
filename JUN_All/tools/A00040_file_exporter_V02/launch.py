@@ -57,7 +57,7 @@ def run(reload_module=True):
     window_instance = MainWindow()
 
     # 레거시 file exporter 의 blue 정체성을 잇는 테마.
-    ThemeManager.load_theme_to_widget(window_instance, "blue_dark")
+    ThemeManager.load_theme_to_widget(window_instance, "slate_dark")
 
     window_instance.show()
 

@@ -57,7 +57,7 @@ def main():
     if sIcon:
         app.setWindowIcon(QIcon(sIcon))
 
-    ThemeManager.load_theme_dev(app, "green_dark")
+    ThemeManager.load_theme_dev(app, "green_mid")
 
     window = MainWindow()
 
