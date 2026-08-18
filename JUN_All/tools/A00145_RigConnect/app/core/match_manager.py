@@ -32,6 +32,17 @@ MEL 대비 개선/버그 수정:
   - `_classify` 의 shape 타입 조회도 노드 이름으로 캐시한다.
 
 셰이프 캐시는 **한 번의 match() 호출 안에서만** 산다 — 그 사이에 씬 토폴로지가 바뀌지 않는다.
+
+스냅샷 타겟 (추상 캐시)
+-----------------------
+`capture()` 로 타겟의 월드 T/R/S 를 값으로 떠서 `SnapshotCache` 에 담아 두면, 그 스냅샷 키를
+**타겟처럼** 쓸 수 있다(`snapshot_manager` 참고). "오브젝트를 잠깐 옮겼다 되돌리려고 로케이터를
+수천 개 만들던" 흐름을 노드 없이 대신한다.
+
+되돌릴 때는 샘플링이 필요 없다 — 행렬이 이미 메모리에 있으므로 타겟 쪽 마야 호출(`_classify`,
+`xform` 질의, `MFnMesh`)이 통째로 빠진다. T/R/S 를 모두 켠 경우에는 임시 노드도 거치지 않고
+`cmds.xform(flw, ws=True, matrix=...)` **한 번**으로 끝난다(부모 있는 트랜스폼 · rotateOrder ·
+jointOrient 조인트에서 `matchTransform` 과 결과가 같음을 mayapy 로 확인, 오차 ~1e-15).
 """
 
 import maya.cmds as cmds
@@ -39,6 +50,7 @@ import maya.api.OpenMaya as om
 
 from Framework.core.maya_refresh import suspend_refresh
 from Framework.core import maya_shape
+from tools.A00145_RigConnect.app.core import snapshot_manager as snap
 
 _EPS = 1e-6
 
@@ -172,7 +184,13 @@ def _shape_type(node, ctx=None):
 
 
 def _classify(tgt, ctx=None):
-    """target 종류 판별: vertex/component/cluster/mesh/transform."""
+    """target 종류 판별: snapshot/vertex/component/cluster/mesh/transform.
+
+    스냅샷(추상 캐시)은 씬 노드가 아니므로 **가장 먼저** 걸러낸다 — 표시 텍스트에 `.` 이나
+    `[` 가 들어 있어도(예: `@cache body.vtx[3]`) 컴포넌트로 오해하지 않도록.
+    """
+    if snap.is_snapshot(tgt):
+        return "snapshot"
     if ".vtx[" in tgt:
         return "vertex"
     if "[" in tgt:                       # edge/face/cv 등 그 외 component
@@ -212,6 +230,21 @@ def _cluster_pivot(handle):
     return cmds.xform(handle, q=True, ws=True, rotatePivot=True)
 
 
+def _component_center(comp):
+    """컴포넌트(vtx/cv/edge/face/uv)의 월드 중심 (x, y, z).
+
+    `cmds.pointPosition` 은 **점 컴포넌트만** 받는다 — 엣지·페이스를 주면
+    `RuntimeError` 다(예전에는 edge/face 타겟이 여기서 조용히 실패했다).
+    `xform -q -ws -t` 는 컴포넌트가 걸친 점들의 좌표를 전부 돌려주므로 그 평균을 쓴다.
+    점 컴포넌트(vtx/cv)면 값이 3개뿐이라 pointPosition 과 정확히 같은 결과다.
+    """
+    pts = cmds.xform(comp, q=True, ws=True, translation=True) or []
+    n = len(pts) // 3
+    if not n:
+        raise ValueError("Cannot read a position from '{0}'.".format(comp))
+    return (sum(pts[0::3]) / n, sum(pts[1::3]) / n, sum(pts[2::3]) / n)
+
+
 # ======================================================================
 # orientation from normal
 # ======================================================================
@@ -242,15 +275,39 @@ def _basis_from_normal(normal, axis="y"):
 
 
 # ======================================================================
+# world matrix helpers
+# ======================================================================
+
+def _matrix_from_basis(x, y, z, pos):
+    """기저(x, y, z) + 위치 -> 월드 행렬 16개(row-major)."""
+    return [
+        x.x, x.y, x.z, 0.0,
+        y.x, y.y, y.z, 0.0,
+        z.x, z.y, z.z, 0.0,
+        pos[0], pos[1], pos[2], 1.0,
+    ]
+
+
+def _matrix_from_pos(pos):
+    """위치만 있는 항목(mesh centroid / cluster pivot / component)의 월드 행렬."""
+    return [
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        pos[0], pos[1], pos[2], 1.0,
+    ]
+
+
+# ======================================================================
 # apply
 # ======================================================================
 
-def _match_via_matrix(flw, x, y, z, pos, translate=True, rotate=True, ctx=None):
-    """기저(x,y,z)+위치를 임시 transform 에 실어 matchTransform 으로 flw 에 적용한다.
+def _apply_matrix(flw, mat, translate=True, rotate=True, scale=False, ctx=None):
+    """월드 행렬을 임시 transform 에 실어 matchTransform 으로 flw 에 적용한다.
 
     임시 노드를 거치므로 flw 의 rotateOrder 가 무엇이든 안전하고(매칭은 matchTransform 이 처리),
-    flw 의 scale 도 보존된다(matchTransform pos+rot 은 scale 을 건드리지 않음).
-    translate/rotate 로 위치/회전 중 적용할 채널을 고른다(둘 다 False 면 아무것도 안 함).
+    끄지 않은 채널은 건드리지 않는다(예: scale=False 면 flw 의 scale 이 그대로 남는다).
+    채널을 하나도 켜지 않으면 아무것도 하지 않는다.
 
     ctx 를 주면 임시 노드를 **한 개만 만들어 돌려 쓴다**(정리는 ctx.dispose()).
     항목마다 createNode/delete 를 부르면 버텍스 수천 개에서 그 비용이 매칭보다 커진다.
@@ -260,15 +317,11 @@ def _match_via_matrix(flw, x, y, z, pos, translate=True, rotate=True, ctx=None):
         kwargs["position"] = True
     if rotate:
         kwargs["rotation"] = True
+    if scale:
+        kwargs["scale"] = True
     if not kwargs:
         return
 
-    mat = [
-        x.x, x.y, x.z, 0.0,
-        y.x, y.y, y.z, 0.0,
-        z.x, z.y, z.z, 0.0,
-        pos.x, pos.y, pos.z, 1.0,
-    ]
     if ctx is not None:
         tmp = ctx.tmp_transform()
         cmds.xform(tmp, ws=True, matrix=mat)
@@ -283,9 +336,72 @@ def _match_via_matrix(flw, x, y, z, pos, translate=True, rotate=True, ctx=None):
         cmds.delete(tmp)
 
 
+def _match_via_basis(flw, x, y, z, pos, translate=True, rotate=True, ctx=None):
+    """기저(x, y, z) + 위치로 매칭(버텍스 타겟의 노말 정렬 경로)."""
+    _apply_matrix(flw, _matrix_from_basis(x, y, z, (pos.x, pos.y, pos.z)),
+                  translate=translate, rotate=rotate, ctx=ctx)
+
+
 def _match_pos(flw, pos):
     """위치만 매칭(월드)."""
     cmds.xform(flw, ws=True, translation=(pos[0], pos[1], pos[2]))
+
+
+def _apply_snapshot(flw, shot, translate=True, rotate=True, scale=False, ctx=None):
+    """캐시해 둔 스냅샷을 flw 에 적용한다. 채널 의미는 원본 타겟 종류를 그대로 따른다.
+
+    - transform : T/R/S. **셋 다 켜져 있으면** 임시 노드도 거치지 않고 `xform -ws -matrix`
+      한 번으로 끝낸다(가장 흔한 "원래 자리로 되돌리기" 경로).
+    - vertex    : 위치 + 노말 정렬 회전. scale 은 의미가 없어 무시(원본 동작과 동일).
+    - 그 외     : 위치만.
+    """
+    if shot.kind == "transform":
+        if translate and rotate and scale:
+            cmds.xform(flw, ws=True, matrix=shot.matrix)
+            return
+        _apply_matrix(flw, shot.matrix, translate=translate, rotate=rotate,
+                      scale=scale, ctx=ctx)
+    elif shot.kind == "vertex":
+        if translate or rotate:
+            _apply_matrix(flw, shot.matrix, translate=translate, rotate=rotate,
+                          scale=False, ctx=ctx)
+    else:                                   # component (위치만 있는 항목)
+        if translate:
+            _match_pos(flw, shot.position())
+
+
+def _capture_kind(tgt):
+    """캡처할 때의 종류 판별 — 매칭의 `_classify` 와 **일부러 다르다**.
+
+    캡처의 목적은 "이 대상을 원래 자리로 되돌리는 것" 이라, 오브젝트는 종류를 가리지 않고
+    **자기 월드 행렬**(T/R/S 전부)을 기억한다. 즉 메시 오브젝트도 centroid 가 아니라 자기
+    행렬을 담는다 — 라이브 메시 타겟의 centroid 규칙(`_classify` 의 "mesh")과 다른 점이다.
+    centroid/피벗은 "다른 것을 이 메시 가운데로 보내는" 규칙이지 그 메시의 정체가 아니다.
+
+    덤으로 셰이프 조회(`listRelatives` + `nodeType`)가 통째로 빠져서 캡처가 더 빠르다.
+    """
+    if ".vtx[" in tgt:
+        return "vertex"
+    if "[" in tgt:                       # cv/edge/face/uv 등 그 외 component
+        return "component"
+    return "transform"
+
+
+def _sample(tgt, normal_axis="y", ctx=None):
+    """타겟 하나에서 (종류, 월드 행렬) 을 뽑는다 — 캡처가 쓰는 경로.
+
+    - transform : 월드 행렬 그대로(스케일·shear 포함).
+    - vertex    : 노말 정렬 기저 + 위치(라이브 버텍스 타겟과 같은 해석).
+    - component : 컴포넌트 중심 위치(회전은 단위행렬).
+    """
+    kind = _capture_kind(tgt)
+    if kind == "vertex":
+        pos, normal = _vertex_pos_normal(tgt, ctx)
+        x, y, z = _basis_from_normal(normal, normal_axis)
+        return kind, _matrix_from_basis(x, y, z, (pos.x, pos.y, pos.z))
+    if kind == "component":
+        return kind, _matrix_from_pos(_component_center(tgt))
+    return kind, cmds.xform(tgt, q=True, ws=True, matrix=True)
 
 
 def _parent_one(flw, tgt):
@@ -293,19 +409,23 @@ def _parent_one(flw, tgt):
 
     DOOTOOL 'Parent Followers to Targets' 이식. cmds.parent 는 기본적으로 월드 위치를
     보존하므로 매칭된 위치/회전을 유지한다. 자기 자신이거나 이미 그 자식이면 스킵한다.
+    스냅샷(추상 캐시)은 씬에 없으니 부모가 될 수 없다 — 조용히 건너뛴다(호출부가 보고한다).
     """
+    if snap.is_snapshot(tgt):
+        return False
     node = tgt.split(".")[0] if "." in tgt else tgt   # 컴포넌트 -> 소유 오브젝트
     if node == flw:
-        return
+        return True
     parents = cmds.listRelatives(flw, parent=True, fullPath=True) or []
     node_full = (cmds.ls(node, long=True) or [node])[0]
     if parents and parents[0] == node_full:
-        return
+        return True
     cmds.parent(flw, node)
+    return True
 
 
 def _match_one(tgt, flw, normal_axis, translate=True, rotate=True, scale=False,
-               ctx=None):
+               ctx=None, cache=None):
     """target 종류에 따라 flw 를 tgt 에 매칭한다(채널: translate/rotate/scale).
 
     - transform/joint/curve : matchTransform 으로 켜진 채널(pos/rot/scale)만 월드 매칭.
@@ -315,12 +435,20 @@ def _match_one(tgt, flw, normal_axis, translate=True, rotate=True, scale=False,
     flw 의 월드 스케일이 tgt 의 월드 스케일과 같아지도록 맞춘다(월드 기준).
     """
     kind = _classify(tgt, ctx)
-    if kind == "vertex":
+    if kind == "snapshot":
+        shot = cache.get(tgt) if cache is not None else None
+        if shot is None:
+            raise ValueError(
+                "No cached transform for '{0}' - it was cleared or the tool "
+                "was reloaded.".format(tgt))
+        _apply_snapshot(flw, shot, translate=translate, rotate=rotate,
+                        scale=scale, ctx=ctx)
+    elif kind == "vertex":
         if translate or rotate:      # 둘 다 꺼졌으면 정점 샘플링 자체를 건너뛴다.
             pos, normal = _vertex_pos_normal(tgt, ctx)
             x, y, z = _basis_from_normal(normal, normal_axis)
-            _match_via_matrix(flw, x, y, z, pos,
-                              translate=translate, rotate=rotate, ctx=ctx)
+            _match_via_basis(flw, x, y, z, pos,
+                             translate=translate, rotate=rotate, ctx=ctx)
     elif kind == "mesh":
         if translate:
             _match_pos(flw, _mesh_centroid(tgt, ctx))
@@ -329,7 +457,7 @@ def _match_one(tgt, flw, normal_axis, translate=True, rotate=True, scale=False,
             _match_pos(flw, _cluster_pivot(tgt))
     elif kind == "component":
         if translate:
-            _match_pos(flw, cmds.pointPosition(tgt, world=True))
+            _match_pos(flw, _component_center(tgt))
     else:  # transform/joint/curve : rotateOrder 안전한 월드 매칭
         kwargs = {}
         if translate:
@@ -347,12 +475,69 @@ def _match_one(tgt, flw, normal_axis, translate=True, rotate=True, scale=False,
 # public API
 # ======================================================================
 
+def _note(notes, message, limit=5):
+    """진행을 멈추지 않고 남기는 메모. 같은 이야기가 길어지지 않도록 앞의 몇 줄만 남긴다."""
+    if notes is None:
+        return
+    if len(notes) < limit:
+        notes.append(message)
+    elif len(notes) == limit:
+        notes.append("... (more of the same, only the first {0} are shown)".format(limit))
+
+
+def capture(targets, cache, normal_axis="y", notes=None):
+    """targets 의 **월드 T/R/S 를 값으로** 떠서 cache 에 담고 스냅샷 키 목록을 돌려준다.
+
+    로케이터를 만들어 위치를 기억하던 자리를 대신한다 — 씬에 노드를 만들지 않고,
+    되돌릴 때 타겟 쪽 마야 호출이 통째로 빠진다.
+
+    Args:
+        targets:   오브젝트 / 컴포넌트(버텍스·CV·엣지·페이스) 이름 리스트.
+                   이미 스냅샷인 항목은 그대로 통과시킨다(다시 캡처해도 안전).
+        cache:     `snapshot_manager.SnapshotCache`.
+        normal_axis: 버텍스 타겟의 노말을 실을 축. 매칭 때와 같은 값을 준다(기본 "y").
+        notes:     실패 사유를 담을 리스트(선택). 하나가 실패해도 나머지는 계속 캡처한다.
+
+    Returns:
+        입력과 **길이·순서가 같은** 리스트. 캡처한 항목은 스냅샷 키로, 실패한 항목은 원래
+        이름 그대로 들어간다 — Match 는 인덱스로 짝을 짓기 때문에 여기서 항목이 빠지면
+        그 뒤의 짝이 통째로 어긋난다(실패해도 라이브 타겟으로는 계속 쓸 수 있다).
+
+    오브젝트는 종류를 가리지 않고 **자기 월드 행렬**을 기억한다(`_capture_kind` 참고).
+    """
+    if not targets:
+        raise ValueError("No targets. Add objects to the Targets list.")
+
+    keys = []
+    ctx = _Ctx()
+    try:
+        for tgt in targets:
+            if snap.is_snapshot(tgt):
+                # 이미 캐시된 항목 — 데이터가 남아 있으면 그대로 통과.
+                if cache.get(tgt) is None:
+                    _note(notes, "no cached transform for {0}".format(tgt))
+                keys.append(tgt)
+                continue
+            try:
+                kind, matrix = _sample(tgt, normal_axis, ctx)
+            except Exception as exc:
+                _note(notes, "{0} : {1}".format(tgt, exc))
+                keys.append(tgt)          # 자리를 비우지 않는다(짝이 밀리지 않도록)
+                continue
+            keys.append(cache.add(tgt, kind, matrix))
+    finally:
+        ctx.dispose()
+
+    return keys
+
+
 def match(targets, followers, normal_axis="y",
-          translate=True, rotate=True, scale=False, parent=False):
+          translate=True, rotate=True, scale=False, parent=False,
+          cache=None, notes=None):
     """targets[i] 에 followers[i] 를 매칭한다(인덱스 1:1).
 
     Args:
-        targets:   타겟 오브젝트/컴포넌트 리스트.
+        targets:   타겟 오브젝트/컴포넌트/**스냅샷 키** 리스트.
         followers: 따라갈 오브젝트 리스트.
         normal_axis: 버텍스 타겟일 때 노말에 정렬할 follower 축("x"/"y"/"z"). 기본 "y".
         translate: 위치 매칭(기본 True). DOOTOOL 'Translation'.
@@ -360,9 +545,12 @@ def match(targets, followers, normal_axis="y",
         scale:     월드 스케일 매칭(기본 False). DOOTOOL 'Scale (Only in The World Space)'.
         parent:    매칭 후 follower 를 target 아래로 parent(기본 False).
                    DOOTOOL 'Parent Followers to Targets'.
+        cache:     스냅샷 타겟을 해석할 `SnapshotCache`(선택).
+        notes:     건너뛴 사유를 담을 리스트(선택).
 
     Returns:
-        (matched_count, skipped_count). 개수가 다르면 min 만큼만 매칭하고 차이를 skipped 로 보고.
+        (matched_count, skipped_count). 개수가 다르면 min 만큼만 매칭하고 차이를 skipped 에 더한다.
+        한 쌍이 실패해도 **멈추지 않고** 나머지를 계속 매칭한다(사유는 notes 로).
     """
     if not targets:
         raise ValueError("No targets. Add objects to the Targets list.")
@@ -370,32 +558,57 @@ def match(targets, followers, normal_axis="y",
         raise ValueError("No followers. Add objects to the Followers list.")
 
     n = min(len(targets), len(followers))
-    skipped = abs(len(targets) - len(followers))
+    skipped = abs(len(targets) - len(followers))   # 개수 차이는 호출부가 안내한다
 
+    matched = 0
     ctx = _Ctx()
     try:
         with suspend_refresh():
             for i in range(n):
-                _match_one(targets[i], followers[i], normal_axis,
-                           translate=translate, rotate=rotate, scale=scale,
-                           ctx=ctx)
+                tgt, flw = targets[i], followers[i]
+                if snap.is_snapshot(flw):
+                    # 추상 캐시는 씬에 없으니 움직일 수 없다(타겟으로만 쓴다).
+                    _note(notes, "follower {0} is a cached item - nothing to move".format(flw))
+                    skipped += 1
+                    continue
+                try:
+                    _match_one(tgt, flw, normal_axis,
+                               translate=translate, rotate=rotate, scale=scale,
+                               ctx=ctx, cache=cache)
+                except Exception as exc:
+                    _note(notes, "{0} -> {1} : {2}".format(tgt, flw, exc))
+                    skipped += 1
+                    continue
+                matched += 1
             # DOOTOOL 과 동일하게 매칭을 모두 마친 뒤 별도 패스로 parent 한다.
             if parent:
+                unparented = 0
                 for i in range(n):
-                    _parent_one(followers[i], targets[i])
+                    if snap.is_snapshot(followers[i]):
+                        continue
+                    try:
+                        if not _parent_one(followers[i], targets[i]):
+                            unparented += 1
+                    except Exception as exc:
+                        _note(notes, "parent {0} : {1}".format(followers[i], exc))
+                if unparented:
+                    _note(notes, "{0} follower(s) not parented - a cached item "
+                                 "cannot be a parent".format(unparented))
     finally:
         ctx.dispose()
 
-    return n, skipped
+    return matched, skipped
 
 
-def create_and_match(targets, ctl_type, normal_axis="y"):
+def create_and_match(targets, ctl_type, normal_axis="y", cache=None):
     """targets 수만큼 컨트롤(ctl_type)을 만들어 각 타겟 위치/방향에 즉시 매칭한다.
 
     Args:
-        targets:   타겟 오브젝트/컴포넌트 리스트.
+        targets:   타겟 오브젝트/컴포넌트/스냅샷 키 리스트.
         ctl_type:  "locator" / "sphere" / "cube".
         normal_axis: 버텍스 타겟일 때 노말 정렬 축. 기본 "y".
+        cache:     스냅샷 타겟을 해석할 `SnapshotCache`(선택) — 캐시해 둔 자리에
+                   실제 컨트롤을 세우고 싶을 때 쓴다.
 
     Returns:
         생성된 컨트롤 transform 이름 리스트(타겟과 인덱스 1:1).
@@ -410,7 +623,7 @@ def create_and_match(targets, ctl_type, normal_axis="y"):
             for _ in targets:
                 created.append(_make_control(ctl_type))
             for tgt, flw in zip(targets, created):
-                _match_one(tgt, flw, normal_axis, ctx=ctx)
+                _match_one(tgt, flw, normal_axis, ctx=ctx, cache=cache)
     finally:
         ctx.dispose()
 

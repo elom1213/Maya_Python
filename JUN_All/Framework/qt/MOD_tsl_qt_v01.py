@@ -28,7 +28,10 @@ UUID 보관 (v01.01~)
 UUID 는 리네임·리페어런트·이름 충돌과 무관하므로 두 경우 모두 해결된다.
 
 노드가 아닌 항목(어트리뷰트 이름, 파일명, 노드 타입 이름 등)은 UUID 가 없으므로 예전처럼
-이름으로 동작하고, 씬에 없는 이름이면 조용히 건너뛴다.
+이름으로 동작하고, 씬에 없는 이름이면 조용히 건너뛴다. **애초에 노드 이름이 될 수 없는 모양**
+(공백·`@` 처럼 마야가 이름에 허용하지 않는 글자, 숫자로 시작 등)이면 마야에 묻지도 않는다
+(`_looks_like_node`) — 헛도는 마야 호출을 줄이고, `cmds.ls` 가 그런 문자열에 예외를 던지는
+경우(예: `@cache pCube1`)도 피한다. A00145 의 스냅샷 항목이 이 경로로 리스트에 얹힌다.
 `pCube1Shape.vtx[0]` 같은 컴포넌트는 `<uuid>.vtx[0]` 를 cmds.ls 로 되돌릴 수 없어서,
 **노드 UUID + 컴포넌트 접미사**를 따로 보관했다가 선택할 때 다시 조립한다.
 
@@ -75,6 +78,8 @@ pref 가 꺼져 있으면 `ls(orderedSelection=True)` 는 **에러 없이 조용
 pref 는 **켠 시점부터** 순서를 기록하므로, 체크한 뒤 **다시 선택해야** 순서가 잡힌다(로그로 안내).
 여러 TSL 위젯이 동시에 켜는 경우를 위해 모듈 전역 refcount(`_ORDER_REF`)로 pref 를 관리한다.
 """
+
+import re
 
 from Framework.qt.qt import *
 
@@ -170,6 +175,17 @@ def is_order_tracking():
     return bool(_get_track_order())
 
 
+# 마야 노드/컴포넌트 이름이 될 수 있는 모양인가. 노드 이름은 글자나 `_` 로 시작하고
+# (롱네임이면 `|`), 그 뒤로 글자/숫자/`_` 와 경로·네임스페이스·컴포넌트 구분자만 온다.
+# 공백이나 `@` 같은 글자는 마야가 이름에 허용하지 않으므로 그런 문자열은 노드일 수 없다.
+_NODE_NAME_RE = re.compile(r"^[|A-Za-z_][A-Za-z0-9_|:.\[\]]*$")
+
+
+def _looks_like_node(name):
+    """이 텍스트가 씬 노드 이름일 수 있는가. 아니면 마야에 물어볼 필요조차 없다."""
+    return bool(name) and bool(_NODE_NAME_RE.match(name))
+
+
 def _split_component(name):
     """'grpA|pCube1|pCube1Shape.vtx[0]' -> ('grpA|pCube1|pCube1Shape', 'vtx[0]').
 
@@ -186,7 +202,7 @@ def _uuid_of(name):
     UUID 를 붙이지 않고 이름 폴백에 맡긴다.
     """
     cmds = _cmds()
-    if cmds is None or not name:
+    if cmds is None or not _looks_like_node(name):
         return None, ""
 
     node, comp = _split_component(name)
@@ -416,7 +432,7 @@ class JUN_mod_tsl_qt_v01(QWidget):
 
         for text in incoming:
             key = None
-            if cmds is not None:
+            if cmds is not None and _looks_like_node(text):
                 try:
                     found = cmds.ls(text, long=True) or []
                     key = found[0] if len(found) == 1 else None
@@ -609,6 +625,8 @@ class JUN_mod_tsl_qt_v01(QWidget):
             return []
         nodes = []
         for text in texts:
+            if not _looks_like_node(text):
+                continue
             try:
                 found = cmds.ls(text, long=True) or []
             except Exception:
@@ -668,6 +686,8 @@ class JUN_mod_tsl_qt_v01(QWidget):
             return None
 
         text = item.text()
+        if not _looks_like_node(text):
+            return None
         try:
             return text if cmds.objExists(text) else None
         except Exception:

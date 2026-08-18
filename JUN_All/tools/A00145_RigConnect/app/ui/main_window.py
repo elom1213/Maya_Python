@@ -37,6 +37,7 @@ from tools.A00145_RigConnect.app.core import group_create_manager as grp_mgr
 from tools.A00145_RigConnect.app.core import constraint_transfer_manager as cxfer_mgr
 from tools.A00145_RigConnect.app.core import constraint_target_manager as ctgt_mgr
 from tools.A00145_RigConnect.app.core import attr_match
+from tools.A00145_RigConnect.app.core import snapshot_manager as snap_mgr
 from tools.A00145_RigConnect.app.core import (
     CONSTRAINT_TYPES, connect_closest, find_closest_for_drivers)
 from tools.A00145_RigConnect.app.ui.collapsible import CollapsibleBox
@@ -66,6 +67,10 @@ class MainWindow(QWidget):
         # Connect 탭 src/dst 위젯 보관용. List Connected 의 stream 방향 상태.
         self._connect_widgets = {}
         self._stream_upstream = True
+
+        # Match 탭의 추상 캐시(스냅샷). 로케이터 없이 월드 T/R/S 만 기억한다.
+        # 창이 들고 있는 세션 데이터라 창을 닫거나 reload 하면 사라진다.
+        self.snapshots = snap_mgr.SnapshotCache()
 
         self.resize(self.win_width, self.win_height)
         # 창이 의도치 않게 너무 작게 줄어들지 않도록 최소 크기를 보장한다.
@@ -147,6 +152,41 @@ class MainWindow(QWidget):
             create_row.addWidget(btn)
         layout.addWidget(create_box)
 
+        # Cache : 노드를 만들지 않고 타겟의 월드 T/R/S 만 값으로 기억한다.
+        # "잠깐 옮겼다 되돌리려고" 로케이터를 수천 개 만들던 자리를 대신한다.
+        cache_box = QGroupBox("Cache (remember without creating nodes)")
+        cache_layout = QVBoxLayout(cache_box)
+
+        cache_row = QHBoxLayout()
+        btn_cache = QPushButton("Cache Targets")
+        btn_cache.setToolTip(
+            "Remember the world position / rotation / scale of every target and "
+            "put the cached items in the Followers list -\n"
+            "like the Create buttons, but nothing is added to the scene.\n\n"
+            "Use it to put objects back where they were:\n"
+            "  Targets = the objects -> Cache Targets -> Swap -> (move them "
+            "around) -> Match\n\n"
+            "Components work too (a vertex keeps its position and normal).\n"
+            "Cached items are listed as '@cache <name>'. They are not scene "
+            "objects, so they cost nothing\n"
+            "and survive even if the original object is deleted - but they are "
+            "lost when this window closes.")
+        btn_cache.clicked.connect(self.on_match_cache)
+        cache_row.addWidget(btn_cache)
+
+        btn_cache_clear = QPushButton("Clear Cache")
+        btn_cache_clear.setToolTip(
+            "Throw away every cached transform and remove the cached items from "
+            "the two lists above.")
+        btn_cache_clear.clicked.connect(self.on_match_cache_clear)
+        cache_row.addWidget(btn_cache_clear)
+
+        self.lbl_match_cache = QLabel("")
+        self.lbl_match_cache.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        cache_row.addWidget(self.lbl_match_cache)
+        cache_layout.addLayout(cache_row)
+        layout.addWidget(cache_box)
+
         # Match Options (DOOTOOL_PY_TOOL_Match 의 체크박스 이식).
         # Rotate Order / Rotate Axis 는 이 툴이 월드 행렬 기반 매칭이라 의미가 없어 제외.
         # 기본 체크 상태는 DOOTOOL 을 따른다: Translation/Rotation ON, Scale/Parent OFF.
@@ -199,6 +239,7 @@ class MainWindow(QWidget):
         layout.addLayout(btn_row)
 
         layout.addStretch(1)
+        self._update_cache_label()
         return tab
 
     # --------------------------------------------------------------
@@ -1123,6 +1164,8 @@ class MainWindow(QWidget):
             "              options: Translation / Rotation / Scale (world) / Parent\n"
             "              + create locators/sphere/cube at targets + vertex normal (+Y)\n"
             "              {2}+ items are summarized instead of listed ('List All')\n"
+            "              Cache Targets: remember world T/R/S with no nodes,\n"
+            "                             then Swap + Match to put things back\n"
             "Constrain   : sub-tabs -\n"
             "              Constraint   : multi target -> follower (+ Matrix)\n"
             "              Skin Weight  : constrain by the selected vertices'\n"
@@ -1175,24 +1218,88 @@ class MainWindow(QWidget):
                      "(Translation/Rotation/Scale/Parent all off)")
             return
 
+        # 캐시(스냅샷) 타겟은 씬을 읽지 않으므로 몇 개인지 알려 준다.
+        pairs = min(len(targets), len(followers))
+        cached = sum(1 for t in targets[:pairs] if snap_mgr.is_snapshot(t))
+
         def _do():
+            notes = []
             matched, skipped = mch_mgr.match(
                 targets, followers,
                 translate=translate, rotate=rotate,
-                scale=scale, parent=parent)
+                scale=scale, parent=parent,
+                cache=self.snapshots, notes=notes)
             self.log("       {0} matched, {1} skipped [{2}]".format(
                 matched, skipped,
                 "".join(c for c, on in (
                     ("T", translate), ("R", rotate),
                     ("S", scale), ("P", parent)) if on)))
+            if cached:
+                self.log("       {0} cached target(s) - restored from memory, "
+                         "no scene nodes read".format(cached))
+                if not scale:
+                    # 캐시는 스케일도 들고 있는데 채널이 꺼져 있으면 그대로 남는다.
+                    self.log("       [note] Scale is off - the cached scale was "
+                             "not restored. Tick Scale for an exact restore "
+                             "(it is also the fastest path).")
+            for note in notes:
+                self.log("       [skip] {0}".format(note))
 
         self._run("Match", _do)
+
+    # ---- Cache (추상 스냅샷)
+
+    def _update_cache_label(self):
+        count = len(self.snapshots)
+        self.lbl_match_cache.setText(
+            "Cached: {0}".format(count) if count else "Cached: none")
+
+    def on_match_cache(self):
+        """Targets 의 월드 T/R/S 를 값으로 기억하고 Followers 에 캐시 항목을 채운다.
+
+        씬을 바꾸지 않으므로(값만 읽는다) undo chunk 로 감싸지 않는다.
+        """
+        targets = self.tsl_match_tgt.get_all_items()
+        if not targets:
+            self.log("[WARN] Cache Targets : the Targets list is empty")
+            return
+
+        notes = []
+        try:
+            keys = mch_mgr.capture(targets, self.snapshots, notes=notes)
+        except Exception as e:
+            self.log("[ERR] Cache Targets : {0}".format(e))
+            cmds.warning(str(e))
+            return
+
+        self.tsl_match_flw.set_items(keys)
+        self._update_cache_label()
+        self.log("[OK] Cache Targets")
+        self.log("       cached {0} item(s) - no nodes created. Swap, move "
+                 "things, then Match to put them back.".format(len(keys)))
+        for note in notes:
+            self.log("       [skip] {0}".format(note))
+
+    def on_match_cache_clear(self):
+        """캐시를 비우고, 두 리스트에 남은 캐시 항목도 함께 걷어낸다."""
+        removed = self.snapshots.clear()
+        dropped = 0
+        for tsl in (self.tsl_match_tgt, self.tsl_match_flw):
+            items = tsl.get_all_items()
+            kept = [t for t in items if not snap_mgr.is_snapshot(t)]
+            if len(kept) != len(items):
+                dropped += len(items) - len(kept)
+                tsl.set_items(kept)
+        self._update_cache_label()
+        self.log("[OK] Clear Cache : {0} cached transform(s) dropped, "
+                 "{1} list item(s) removed".format(removed, dropped))
 
     def on_match_create(self, ctl_type):
         targets = self.tsl_match_tgt.get_all_items()
 
         def _do():
-            created = mch_mgr.create_and_match(targets, ctl_type)
+            created = mch_mgr.create_and_match(
+                targets, ctl_type, cache=self.snapshots)
             # 생성한 컨트롤을 Followers 목록에 채우고 씬에서 선택.
             self.tsl_match_flw.set_items(created)
             if created:

@@ -4,7 +4,8 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.29` (`app/config/version.py`) — Match 탭이 **500개 이상**이면 리스트업하지 않고 개수만 요약 + `List All` 버튼, 대량 매칭 속도 개선 (§대량 선택)
+- 버전: `v01.30` (`app/config/version.py`) — Match 탭에 **Cache**(노드를 만들지 않고 월드 T/R/S 만 기억) 추가 (§Cache)
+  · v01.29 는 Match 탭이 **500개 이상**이면 리스트업하지 않고 개수만 요약 + `List All` 버튼, 대량 매칭 속도 개선 (§대량 선택)
   · v01.28 은 Constrain > Constraint 하위 탭의 `Maintain Offset` 기본값을 **ON** 으로 변경 (§Constraint)
   · v01.27 은 Target Replace 하위 탭이 **Target Edit** 으로 확장(타깃 **추가 / 삭제** 추가) (§Target Edit)
   · v01.27 은 Match 탭의 셰이프 해석을 공용 [`Framework.core.maya_shape`](Framework_maya_shape.md) 로 교체(동작 변화 없음, 다중 셰이프 메시 안전)
@@ -44,6 +45,10 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
   - clusterHandle → 월드 rotatePivot 으로 위치만.
   - **vertex(`.vtx[i]`) → 정점 월드 위치로 이동 + follower 의 `+Y` 축을 정점 노말에 정렬**
     (`maya.api.OpenMaya` 의 `MFnMesh.getVertexNormal`).
+  - 그 외 컴포넌트(CV/엣지/페이스) → 컴포넌트 **중심** 위치. v01.30 부터 엣지·페이스도 된다 —
+    예전에는 `cmds.pointPosition` 을 썼는데 이 명령은 **점 컴포넌트만** 받아서 엣지/페이스 타겟이
+    조용히 실패했다. 지금은 `xform -q -ws -t` 로 컴포넌트가 걸친 점들을 받아 평균을 낸다
+    (점 컴포넌트면 결과가 `pointPosition` 과 동일).
 - **Match Options** (레거시 `DOOTOOL_PY_TOOL_Match.py` 이식, v01.10). 기본 체크 상태는 원본을 따름:
   - **Translation**(기본 ON) — follower 의 월드 위치를 타겟에 맞춘다.
   - **Rotation**(기본 ON) — follower 의 월드 회전을 타겟에 맞춘다(vertex 타겟이면 노말 정렬).
@@ -55,8 +60,57 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
     의미가 없다. 채널을 하나도 안 켜면 경고만 남기고 아무 동작도 하지 않는다.
 - **Create (at target positions)** — `Locators` / `Sphere` / `Cube`: 타겟 **수만큼** 컨트롤을 만들어
   **곧바로 타겟 위치/방향에 매칭**하고, 생성된 컨트롤을 **Followers 목록에 채운다**(씬에서도 선택).
+- **Cache (remember without creating nodes)** — 타겟의 월드 T/R/S 를 **값으로만** 기억한다(아래).
 - **Swap**: Targets ↔ Followers 목록 교환.
 - (MEL 의 Blend Shape 버튼은 제거됨.)
+
+#### Cache — 로케이터 없이 "원래 자리" 기억하기 (v01.30)
+
+오브젝트를 잠깐 옮겼다가 되돌리려고 **로케이터를 수천 개 만들던** 흐름을 대신한다.
+씬에 아무것도 만들지 않고 월드 위치/회전/스케일만 들고 있는다.
+
+```
+Targets 에 오브젝트/컴포넌트 리스트업
+  → [Cache Targets]      Followers 에 '@cache <이름>' 항목이 채워진다 (노드 생성 없음)
+  → [Swap]               Targets = 캐시,  Followers = 오브젝트
+  → 마음대로 옮긴다
+  → [Match]              원래 자리로 복구
+```
+
+`Locators` 버튼 자리에 그대로 대응하므로 손에 익은 순서(만들기 → Swap → Match)가 같다.
+
+| | 로케이터 방식 | Cache |
+|---|---|---|
+| 씬에 남는 것 | 로케이터 N 개(뷰포트·아웃라이너·undo) | **없음** |
+| 되돌린 뒤 정리 | 로케이터를 지워야 함 | 필요 없음 |
+| 스케일 | 로케이터가 못 들고 있음 → 복구 불가 | **복구됨**(Scale 체크) |
+| 메시 오브젝트 | centroid 규칙이라 **회전이 사라짐** | 그 오브젝트의 행렬 그대로 |
+| 원본이 지워지면 | 로케이터는 남아 있음 | 캐시도 남아 있음 |
+| 1000개 왕복(mayapy) | 0.161s | **0.065s** (기억 단계만 보면 5배) |
+
+- **컴포넌트도 된다.** 메시 버텍스는 위치 + **노말**(라이브 버텍스 타겟과 같은 해석), 커브 CV ·
+  엣지 · 페이스는 컴포넌트 중심 위치를 기억한다.
+- **캐시 항목은 씬 오브젝트가 아니다.** 리스트에는 `@cache pCube1` 처럼 한 줄로 보이지만
+  `@` 는 마야 이름에 쓸 수 없는 글자라 실제 노드와 겹치지 않고, 리스트 위젯도 이 항목을 씬에서
+  찾으려 하지 않는다(마야 호출 0회). 클릭해도 씬 선택이 바뀌지 않는다.
+- **Clear Cache** — 기억한 값을 전부 버리고, 두 리스트에 남은 `@cache` 항목도 함께 걷어낸다
+  (가리킬 데이터가 없는 항목을 남기지 않기 위해).
+- **수명**: 캐시는 **창이 들고 있는 세션 데이터**다. 창을 닫거나 툴을 reload 하면 사라지고
+  씬 파일에도 저장되지 않는다. 반대로 **원본 오브젝트를 지워도 캐시는 살아 있다**(값만 들고 있으므로).
+
+> [!tip] 정확히 되돌리려면 **Scale 도 체크**한다. 캐시는 스케일까지 들고 있는데 채널이 꺼져 있으면
+> 옮길 때 바뀐 스케일이 그대로 남는다(로그가 알려 준다). T/R/S 를 모두 켠 복구는 임시 노드도 거치지
+> 않고 `xform -ws -matrix` 한 번으로 끝나는 **가장 빠른 경로**이기도 하다.
+
+> [!warning] **캐시가 오브젝트를 보는 방식은 라이브 타겟과 한 군데 다르다.** 라이브 매칭에서
+> 메시 오브젝트 타겟은 "정점 평균(centroid) 위치"로 해석되지만, 캐시는 그 **오브젝트의 월드 행렬**을
+> 기억한다. 캐시의 목적이 "이 오브젝트를 제자리로 되돌리는 것"이기 때문이다(centroid 는 *다른* 것을
+> 메시 가운데로 보내는 규칙이지 그 메시의 정체가 아니다). 덕분에 메시를 로케이터로 되돌릴 때
+> 회전이 사라지던 문제가 캐시에는 없다.
+
+- 예외 상황은 멈추지 않고 로그에 남긴다: follower 자리에 캐시 항목이 있으면(움직일 대상이 없음)
+  건너뛰고, `Parent` 옵션은 캐시 항목을 부모로 삼을 수 없어 그 짝만 건너뛰며, 캐시를 비운 뒤
+  옛 항목으로 Match 하면 그 짝만 실패하고 나머지는 계속 매칭된다.
 
 #### 대량 선택 — 500개 이상은 리스트업하지 않는다 (v01.29)
 
@@ -643,7 +697,8 @@ A00145_RigConnect/
 └── app/
     ├── config/version.py
     ├── core/                       # UI 비의존 maya.cmds 로직
-    │   ├── match_manager.py        # Match (MEL Match Tool 포팅: 위치/회전 매칭·컨트롤 생성·버텍스 노말, 대량 매칭용 _Ctx 캐시)
+    │   ├── match_manager.py        # Match (MEL Match Tool 포팅: 위치/회전 매칭·컨트롤 생성·버텍스 노말, 대량 매칭용 _Ctx 캐시, capture())
+    │   ├── snapshot_manager.py     # Match > Cache (노드 없이 월드 T/R/S 만 기억하는 추상 스냅샷, maya 비의존)
     │   ├── constrain_manager.py    # Constrain  (MEL 포팅)
     │   ├── skin_constraint_manager.py # Skin Weight to Constraint (스킨 웨이트 → weighted Parent/Scale/Point/Orient constraint)
     │   ├── group_create_manager.py # Group Create (부모/자식 쪽 오프셋 노드 _<suffix>_NN 삽입, 그룹·오브젝트 타입, UUID 기반)
