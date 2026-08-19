@@ -315,6 +315,18 @@ Default Distance attribute (driver signal x)
   1 = full — which can be keyed to **fade the wind in and out**. Because the waveform is exactly
   proportional to the amplitude, this is **one multiply node per driver**, not one per joint or CV.
 
+- **`A00390_WindTool_V02` — Chain Wave Lite** produces the same kind of motion **with no curve, no ikHandle
+  and no proxy joints**, from angles alone (for scenes with hundreds of chain roots). The rotation axis can be
+  chosen two ways: a **world `Sway Axis`** (derived from chain direction × world axis, independent of joint
+  orientation) or an **object-space `Rotate Axis`** that drives **exactly one `rotate` channel** per node.
+  Turning the latter on removes the former **from the computation itself**, not just from the UI — I did not
+  want a control that looks disabled while still feeding the result, and I verified that switching
+  `Sway Axis` through X/Y/Z leaves the resulting rotations **bit-for-bit identical**. As a side effect it is
+  **cheaper** (a skew axis costs three quaternion nodes per node; one signed multiply here — 102→84 nodes on a
+  9-joint skew chain) and it **leaves the other two axes free for the animator**. The trade-off is that the
+  angle differencing only accumulates into a world angle when the chain nodes **share an orientation**, so that
+  limit is spelled out in the tooltip and the guide.
+
 ---
 
 ## 5. Modeling / asset QC · export

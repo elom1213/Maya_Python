@@ -604,8 +604,10 @@ class MainWindow(QWidget):
         """리스트업한 컨트롤러의 [Start, End] 구간 키를 '리스트 순서 x Offset' 만큼
         계단식으로 민다(0번 제자리 / 1번 +1배 / 2번 +2배 ...). 팔로우스루·웨이브용.
 
-        슬라이더/스핀박스로 맞춘 값이 그대로 최종 결과다(별도 Apply 없음). 값이 멎으면
-        자동으로 undo 큐에 한 항목으로 기록된다(누적 안 됨). Reset 으로 원위치.
+        슬라이더/스핀박스로 맞춘 값이 그대로 최종 결과다(별도 Apply 없음). 슬라이더에서
+        손을 떼면 그 값이 undo 큐에 한 항목으로 기록되고 **거기서 확정된다** — 그 뒤
+        리스트를 다시 담거나 구간을 고쳐도 되돌아가지 않는다(v02.07~). 되돌리려면
+        Reset 이나 Ctrl+Z. 값은 누적되지 않는다(세션 안에서는 늘 시작 상태 기준 재계산).
         로직은 StaggerOffsetSession.
         """
         page, layout = self._sub_page()
@@ -641,6 +643,10 @@ class MainWindow(QWidget):
         self.sld_stagger.setMinimumWidth(140)
         # 테마 qss 가 홈을 안 그려 배경에 묻히므로 직접 그린다(구간이 보이게).
         self.sld_stagger.setStyleSheet(STAGGER_SLIDER_STYLE)
+        self.sld_stagger.setToolTip(
+            "Stagger the key FRAMES: item 0 stays, item 1 moves +1x, item 2 +2x ...\n"
+            "Releasing the slider commits that value - re-listing objects or editing\n"
+            "Start/End no longer takes it back. Use Reset or Ctrl+Z to undo it.")
         st_row2.addWidget(self.sld_stagger, 1)
 
         self.sb_stagger = QSpinBox()
@@ -673,7 +679,9 @@ class MainWindow(QWidget):
         self.sld_stagger_value.setToolTip(
             "Stagger the key VALUES the same way as the frames:\n"
             "item 0 stays, item 1 gets +1x, item 2 gets +2x ...\n"
-            "Works on its own - leave the frame offset at 0 to shift values only.")
+            "Works on its own - leave the frame offset at 0 to shift values only.\n"
+            "Releasing the slider commits that value - re-listing objects or editing\n"
+            "Start/End no longer takes it back. Use Reset or Ctrl+Z to undo it.")
         st_row3.addWidget(self.sld_stagger_value, 1)
 
         self.sb_stagger_value = QDoubleSpinBox()
@@ -690,7 +698,9 @@ class MainWindow(QWidget):
 
         self.btn_st_reset = QPushButton("Reset")
         self.btn_st_reset.setToolTip(
-            "Put the keys back to their original frames AND values (undoable).")
+            "Put the keys back to their original frames AND values (undoable).\n"
+            "This undoes the CURRENT session only - offsets committed before the list\n"
+            "or range last changed are already final, so use Ctrl+Z for those.")
         st_row3.addWidget(self.btn_st_reset)
         layout.addLayout(st_row3)
 
@@ -715,7 +725,8 @@ class MainWindow(QWidget):
         self.sb_stagger.editingFinished.connect(self._stagger_settle)
         self.btn_st_reset.clicked.connect(self.on_stagger_reset)
 
-        # 리스트/구간이 바뀌면 진행 중인 미리보기는 무효 -> 되돌리고 세션을 버린다.
+        # 리스트/구간이 바뀌면 세션의 전제(순서·구간)가 깨지므로 세션을 닫는다.
+        # **씬에 적용된 offset 은 그대로 둔다** — 손을 뗀 순간 이미 확정된 결과다.
         self.le_st_start.textChanged.connect(self._stagger_invalidate)
         self.le_st_end.textChanged.connect(self._stagger_invalidate)
         st_model = self.st_tsl.list_widget.model()
@@ -2399,8 +2410,9 @@ class MainWindow(QWidget):
     # --------------------------------------------------
     # Stagger Offset
     #   슬라이더/스핀박스를 움직이면 '원래 위치 기준' 결과가 즉시 반영된다(누적 안 됨).
-    #   조작이 멎으면 그 값이 자동으로 undo 큐에 한 항목으로 기록된다(별도 Apply 없음).
-    #   Reset 으로 원위치. 리스트/구간이 바뀌면 세션은 무효.
+    #   조작이 멎으면(슬라이더에서 손을 떼면) 그 값이 자동으로 undo 큐에 한 항목으로
+    #   기록되고 **그대로 확정된다**(별도 Apply 없음).
+    #   Reset 으로 원위치. 리스트/구간이 바뀌면 세션만 닫히고 적용된 값은 남는다.
     # --------------------------------------------------
 
     def _stagger_read_range(self):
@@ -2501,9 +2513,22 @@ class MainWindow(QWidget):
         return True
 
     def _stagger_invalidate(self, *args):
-        """리스트/구간이 바뀌면 키를 원위치로 되돌리고 세션을 버린다.
+        """리스트/구간이 바뀌면 세션만 닫는다. **씬에 적용된 offset 은 건드리지 않는다.**
 
-        (세션은 시작 시점의 순서·구간을 고정하므로, 바뀐 채로 계속 쓰면 엉뚱한 구간을 민다.)
+        예전에는 여기서 `restore()` 를 불러 키를 원위치로 되돌렸다. 그래서 슬라이더로
+        offset 을 준 뒤 다른 오브젝트를 골라 **List Selected Objects** 를 누르면(리스트
+        모델이 바뀌면서 이 훅이 돌아) **방금 준 offset 이 통째로 사라졌다**. 시간(Offset
+        per Item)·값(Value per Item) 둘 다 같은 증상이었다 — `restore()` 가 둘을 함께
+        0 으로 되돌리기 때문이다.
+
+        슬라이더에서 손을 떼는 순간 값은 이미 undo 큐에 기록된 **확정된 결과**다.
+        리스트가 바뀌었다는 이유로 조용히 되돌리는 것은 사용자가 한 작업을 지우는 셈이라
+        더 이상 하지 않는다. 되돌리고 싶으면 **Reset** 이나 **Ctrl+Z** 를 쓰면 된다.
+
+        세션을 닫는 것은 그대로다 — 세션은 시작 시점의 순서·구간을 고정하므로 바뀐 채로
+        계속 쓰면 엉뚱한 구간을 민다. 다음 조작은 **지금 씬 상태를 기준**으로 새 세션을
+        만들고, 슬라이더는 0 에서 다시 시작한다(그래서 두 번째 조작은 남아 있는 offset
+        **위에 쌓인다**).
         """
         if self._stagger_session is None:
             return
@@ -2511,10 +2536,24 @@ class MainWindow(QWidget):
             return
 
         self._stagger_settle_timer.stop()
-        self._stagger_session.restore()
+
+        # 아직 기록되지 않은 미리보기가 떠 있을 수 있다(디바운스 타이머가 돌기 전에
+        # 리스트가 바뀐 경우). 세션을 닫기 전에 확정해 둬야 씬에 남는 결과가 undo 큐에도
+        # 남는다 — 안 그러면 Ctrl+Z 로 되돌릴 수 없는 변경이 씬에 남는다.
+        session = self._stagger_session
+        _moved, msg = session.settle(self.sb_stagger.value(),
+                                     self.sb_stagger_value.value())
+        if msg:
+            self.log(msg)
+
+        kept_time, kept_value = session.settled, session.settled_value
         self._stagger_session = None
         self._stagger_reset_spin()
-        self.log("Stagger offset reset to 0 (list or range changed).")
+
+        if kept_time or abs(kept_value) > 1e-12:
+            self.log("Stagger session closed (list or range changed). "
+                     "The applied offset ({0:+d}f / {1:+g}) stays - the sliders "
+                     "start from 0 again.".format(kept_time, kept_value))
 
     def on_stagger_slider_changed(self, *_args):
         """슬라이더 조작 -> 스핀박스를 맞추고 즉시 반영."""
@@ -2846,7 +2885,11 @@ class MainWindow(QWidget):
                 if getattr(self, "_stagger_settle_timer", None):
                     self._stagger_settle_timer.stop()
                 if session.scene_in_sync():
-                    session.settle(self.sb_stagger.value())
+                    # 시간과 **값** 을 함께 넘겨야 한다. 값을 빼먹으면 settle 이 그 인자를
+                    # settled_value 로 채워, 아직 기록되지 않은 Value per Item 미리보기를
+                    # 조용히 되돌려 버린다(시간만 남고 값은 사라진다).
+                    session.settle(self.sb_stagger.value(),
+                                   self.sb_stagger_value.value())
                 self._stagger_session = None
         finally:
             super().closeEvent(event)

@@ -6,7 +6,7 @@
 
 - [Explain in Korean](explain-in-korean.md) — 설명/대화는 한국어로 (코드·UI 문자열은 영어)
 - [UI text English-only](ui-text-english-only.md) — UI 문자열·로그는 전부 영어, 한국어는 주석/독스트링만
-- [Push only when asked](push-only-when-asked.md) — 그 턴에 명시 요청 없으면 절대 push 금지 (로컬 커밋은 OK)
+- [Push only when asked](push-only-when-asked.md) — **그 턴 메시지에** 명시 요청 없으면 절대 push 금지(로컬 커밋은 OK). 앞 턴의 "푸시해" 는 이어지지 않는다 — 이 착각으로 2회 위반(2026-08-10, 08-19)
 - [Push target Dnable/dev](push-target-dnable-dev.md) — 기본 push 대상은 Dnable_repo 의 dev (origin 아님)
 - [Push includes tool guide docs](push-includes-tool-guide-docs.md) — 툴 push 시 docs/<툴>.md 가이드 + CHANGELOG/version/WORKLOG 함께
 - [Clean commit message](clean-commit-message-no-stray-chars.md) — 커밋 메시지에 이상문자 새지 않게(과거 `@` 유출), 커밋 후 `git log -1` 확인
@@ -74,6 +74,7 @@
 - [A00400 Points to Curve](wip-a00400-points-to-curve.md) — 월드 위치를 순서대로 잇는 커브(EP 커브=정확 통과). 완화는 **라플라시안 결과와 선형보간**(세기 비례/rebuild span 은 감각이 나쁨), 엣지·페이스는 xform 이 여러 점을 준다 (v01.04)
 - [A00400 Wrap tab](wip-a00400-curve-wrap.md) — CV 수 다른 커브 라이브 wrap(rebuildCurve+blendShape, envelope 0~1). **rebuildCurve 는 소스 트랜스폼 이동을 안 따라간다** → 공간 변환은 행렬로 따로 (v01.03)
 - [A00400 CurveTool](wip-a00400-curvetool.md) — 선택 엣지를 연결 성분별로 그룹지어 커브 1개 + Reverse Direction, **Line Width 탭**(lineWidth 슬라이더, 드래그=undo 1스텝) (v01.01)
+- [A00390_V02 axis & driver](wip-a00390-v02-axis-driver.md) — Lite 오브젝트 축 회전(끈 옵션은 **계산에서도 빼야** 한다) + Node 드라이버를 체인 최상단에(3탭 공통). quatNodes 플러그인 선로드 (v02.02)
 - [A00390_V02 Envelope](wip-a00390-v02-envelope.md) — Node 드라이버에 `windEnvelope` [0,1]. 드라이버당 곱셈 노드 1개(진폭에 한 번만 곱하면 끝), **Chain Wave 는 CV 변위만 정확히 절반이고 회전각은 아니다**(ikSpline 비선형)
 - [A00390 Chain Wave](wip-a00390-chain-wave.md) — 체인이 **회전만으로** 싸인 파형을 따라간다(ikSpline + CV 구동). **FK 컨트롤러는 프록시 조인트**로. `rootOnCurve=False`, rest 는 셋업 전에 캡처 (v01.10)
 - [A00390 WindTool](wip-a00390-windtool.md) — **신규**: 본 체인에 싸인 파형 바람. Curve/Node 출력, windSpeed 적분 표현식, windPhaseOffset (v01.08)
@@ -122,7 +123,7 @@
 - [A00110 Copy Key 1->n](wip-a00110-copykey-one-to-many.md) — Base 1개면 Target 전부에 복사(기본 ON). **Follow 의 `1<-n` 은 에러, 여기는 조용히 n->n 폴백** (v02.06)
 - [A00110_V02 tab taxonomy](wip-a00110-tab-taxonomy.md) — **신규 V02**: 상위 탭 = 카테고리(Key/Timing/Curve/Transfer/Bake/View), 하위 탭 = 기능. V01 은 재분류 전으로 방치 + 툴 복제 체크리스트 (V02 v02.00)
 - [A00110 Fill Keys](wip-a00110-fill-keys.md) — 구간 전 프레임 키 채우기(기존 키 방치) + 애니 레이어 지정, Key Edit 하위 8탭 재편 (v01.40)
-- [A00110 Stagger Offset](wip-a00110-stagger-offset.md) — TSL 순서 × Offset 계단식 키 이동, settle 커밋 모델 (v01.34)
+- [A00110 Stagger Offset](wip-a00110-stagger-offset.md) — TSL 순서 × Offset 계단식 키 이동, settle 커밋 모델. **v02.07: 손 뗀 값은 확정** — 리스트/구간이 바뀌어도 안 되돌린다
 - [A00110 Graph Focus tab](wip-a00110-graph-focus.md) — 선택 변경 시 그래프 에디터 자동 프레이밍 (v01.30)
 - [A00110 Get Sel Range](wip-a00110-get-sel-range.md) — 선택 키의 최소/최대로 Start/End 동시 채우기 (v01.35)
 - [A00110 Euler Filter range](wip-a00110-euler-filter-range.md) — 구간 한정 오일러 필터. filterCurve 는 start/endTime 을 존중, 앵커 = 구간 안 첫 키 (v01.37) + 씬/키 선택 감지 원버튼 (v01.38)

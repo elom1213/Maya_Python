@@ -1,12 +1,24 @@
 ---
 name: wip-a00110-stagger-offset
-description: "A00110_animTool v01.31 Stagger Offset — 리스트 순서대로 구간 키를 계단식 오프셋(스핀박스 실시간), Maya 실기 테스트 대기"
+description: "A00110 Stagger Offset — 리스트 순서대로 구간 키를 계단식 오프셋. v02.07 부터 손 뗀 값은 확정(리스트/구간이 바뀌어도 안 되돌림)"
 metadata: 
   node_type: memory
   type: project
   originSessionId: 69c25012-610a-4113-b9c9-4458ca7059e9
   modified: 2026-07-23T02:29:42.197Z
 ---
+
+**v02.07 — 손을 뗀 offset 은 확정된다(되돌리지 않는다).** `_stagger_invalidate`(리스트 모델
+`rowsInserted`/`rowsRemoved`/`modelReset`, Start/End `textChanged`)가 세션을 버리기 전에
+`restore()` 를 불러 **키를 offset 0 으로 되돌렸다.** 그래서 슬라이더로 값을 준 뒤
+`List Selected Objects` 를 누르면 방금 준 offset 이 사라졌다. `restore()` = `settle(0, 0.0)` 이라
+**시간·값 슬라이더 둘 다** 같은 증상이었다.
+→ 이제 **씬은 건드리지 않고 세션만 닫는다.** 닫기 전에 아직 기록되지 않은 미리보기가 있으면
+`settle()` 로 먼저 확정한다 — 안 하면 **씬에는 남았는데 Ctrl+Z 로는 못 되돌리는** 변경이 생긴다.
+슬라이더는 0 에서 다시 시작하고 다음 조작은 남은 offset **위에 쌓인다**. Reset/Ctrl+Z 는 그대로.
+같이 고친 것: `closeEvent` 의 `session.settle(self.sb_stagger.value())` 가 **값 인자를 빼먹어**,
+창을 닫으면 기록 안 된 `Value per Item` 미리보기가 조용히 되돌아갔다(`settle` 이 빠진 인자를
+`settled_value` 로 채운다). **`settle` 은 항상 시간·값 둘 다 넘길 것.**
 
 **값(value)도 계단식** (V02 v02.05): 시간과 **같은 배수 규칙**(리스트 순서 × 값)으로 키 값도
 민다. 0번 제자리, 1번 +1배, 2번 +2배. 시간과 **독립**이라 값만 줄 수도 있다.
@@ -61,8 +73,11 @@ undo 는 *역연산을 현재 상태에 적용* 하므로 이 순서라야 Ctrl+
 - 세션 무효화 훅은 `st_tsl.list_widget.model().rowsInserted/rowsRemoved/modelReset` —
   TSL 의 `set_items` 가 거는 `blockSignals` 는 **위젯 레벨이라 모델 시그널은 그대로 온다**.
 
-**한계**: Qt 위젯 구성은 mayapy 스탠드얼론에서 **크래시(exit 127)** 라 헤들리스 검증 불가.
-UI 배선(스핀박스 실시간/Reset/Apply/무효화/close 복원)은 마야에서 직접 확인했고 정상 동작.
+**헤드리스 검증은 이제 된다** (2026-08-19). 예전 "mayapy 에서 크래시(exit 127)" 는
+`QApplication` 을 `standalone.initialize()` **뒤에** 만들었기 때문이다 — 순서를 지키면
+`MainWindow` 가 뜨고 슬라이더·리스트 배선까지 전부 헤드리스로 검증된다
+([[qapplication-before-maya-standalone]]). TSL 은 `set_items([...])` 로 채우고,
+`List Selected Objects` 는 `cmds.select(...)` + `st_tsl._on_select()` 로 재현한다.
 
 관련: [[undo-chunk-by-default]], [[mayapy-headless-verify]], [[ui-text-english-only]],
 [[push-includes-tool-guide-docs]].
