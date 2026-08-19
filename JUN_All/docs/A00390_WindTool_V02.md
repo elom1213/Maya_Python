@@ -19,7 +19,7 @@ updated: 2026-08-19
 세 탭 모두 **Output = `Node`** 를 고르면 드라이버 노드로 파형을 실시간 통제할 수 있고,
 그 드라이버에는 **`windEnvelope` [0, 1]** 영향력 어트리뷰트가 붙는다(→ [7장](#7-envelope-영향력-0-1)).
 
-- **버전**: `app/config/version.py` (v02.02)
+- **버전**: `app/config/version.py` (v02.03)
 - **위치**: `JUN_All/tools/A00390_WindTool_V02`
 - **설치**: `__dragDrop_A00390_V02.py` 드래그&드롭 → 셸프 버튼 **`WindToolV2`**
 - 근거·측정: [계획서](plans/A00390_ChainWave_no_ik_plan.md)
@@ -89,6 +89,9 @@ rotateOrder 가 어떻든** 안전하다.
 | `windRootRamp` | 0 = 루트부터 같은 각도 · 1 = 루트 고정, 끝으로 갈수록 커짐 |
 | `windPhaseOffset` | 그 체인만의 타이밍 차이 |
 | `windEnvelope` | **영향력 [0, 1]** — 0 = 영향 없음 · 0.5 = 절반 · 1 = 완전 적용 |
+
+**Debug Curve**(체크박스, 기본 ON) — 체인이 어떻게 흔들리는지 보여 주는 커브를 체인마다
+하나 만든다. 표시 전용이라 아무것도 구동하지 않는다 (→ [9장](#9-debug-curve-흔들림을-눈으로-확인)).
 
 `Chain Offset` 을 주면 체인 k 가 `windPhaseOffset = k × 값` 으로 시작해, 여러 체인이
 한꺼번에 같은 모양으로 움직이지 않는다.
@@ -257,3 +260,48 @@ orient 돼 있어야 한다.** 보통의 조인트 체인·FK 컨트롤러 체�
 `mayapy` (Maya 2024) 헤드리스 **24 + 6 항목 통과** — 축 모드별 연결 채널, `Sway Axis` 무시 여부,
 월드 모드 회귀, 노드 수, Bone Root 에서 루트별 드라이버 위치, FK 컨트롤러 체인, Remove 복구,
 UI 활성/비활성 배선. 위 숫자가 그 결과다.
+
+---
+
+## 9. Debug Curve (흔들림을 눈으로 확인)
+
+`Chain Wave Lite` 는 각도만 다루기 때문에 "지금 이 체인이 어떤 파형을 그리고 있는지" 가
+눈에 잘 들어오지 않는다. **`Debug Curve`**(기본 ON)를 켜면 체인마다 커브를 하나 그려 준다.
+조인트 체인이든 **FK 컨트롤러 체인**이든 똑같이 동작한다.
+
+**Chain Wave 탭이 만드는 커브와 같은 방식**이다 — 체인 노드 위치를 CV 로 하는 **degree 3
+NURBS**, CV k ↔ 체인 노드 k. 다른 것은 **구동 방향뿐**이다.
+
+| | Chain Wave | **Chain Wave Lite 의 Debug Curve** |
+|---|---|---|
+| 방향 | 커브가 ikSpline 으로 체인을 **구동** | 체인이 움직이고 커브가 **따라감** |
+| 역할 | 리그의 일부 | **표시 전용** (아무것도 구동 안 함) |
+| 선택 | 보통 커브 | 셰이프가 `reference` — 뷰포트에서 **안 잡힌다** |
+| CV 수 | 노드 수 **+1** (ikSpline 가상 조인트) | 노드 수 |
+
+```
+CV k  ←  multMatrix( node_k.worldMatrix , curve.worldInverseMatrix )
+         → decomposeMatrix.outputTranslate → controlPoints[k]
+```
+
+`worldInverseMatrix` 로 커브의 오브젝트 공간으로 되돌리므로 **커브나 그 부모를 옮겨도 CV 는
+조인트에 그대로 붙어 있다.** `worldInverseMatrix` 는 CV 에 의존하지 않아 **사이클이 없다**(실측).
+`Remove Chain Wave Lite` 로 셋업과 함께 지워진다.
+
+### 왜 "Chain Wave 가 만들었을 커브" 를 계산해 그리지 않나
+
+두 모드는 **값이 같지 않다**(§4). 진폭의 뜻이 거리 ↔ 각도이고, 실제/접선식 비율이 파장에 따라
+0.41~0.75 로 변해 **상수 보정이 불가능**하다. 그 커브를 계산해 그리면 **실제 흔들림과 다른
+그림**을 보여 주게 되어 디버그용으로 오히려 해롭다. 지금 방식은 **실제 결과**를 그린다.
+
+### ⚠️ Chain Wave 의 커브보다 CV 가 하나 적다
+
+조인트 9개 체인에서 **Lite 9 CV / Chain Wave 10 CV** 다. Chain Wave 는 커브를 **프록시
+체인**에서 만드는데, ikSpline 이 엔드 이펙터를 필요로 해 끝에 **가상 조인트(dummy tip)** 를
+하나 더 붙이기 때문이다. 디버그 커브는 실제 노드만 그리므로 그 하나가 없다.
+
+### 검증
+
+`mayapy` (Maya 2024) 헤드리스 **33항목 통과** (코어 26 + UI 7). 5개 프레임에서 **모든 CV 가
+체인 노드 위에 오차 `0.00000000`** 으로 놓였고, 사이클 없음 · 하류 연결 없음 · Remove 후 잔여 0 ·
+체크 OFF 면 `nurbsCurve` 0개 · Bone Root 3개 → 커브 3개 · FK 컨트롤러 체인도 동일.

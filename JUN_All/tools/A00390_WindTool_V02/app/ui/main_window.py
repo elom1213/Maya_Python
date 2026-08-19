@@ -463,10 +463,11 @@ class MainWindow(QWidget):
         lite = QVBoxLayout(page)
 
         note = QLabel(
-            "Same kind of motion as Chain Wave, but with NO curve, NO ikHandle and\n"
-            "NO proxy joints - the bone angle itself is the sine wave.\n"
+            "Same kind of motion as Chain Wave, but with NO ikHandle and NO proxy\n"
+            "joints - the bone angle itself is the sine wave.\n"
             "Amplitude is an ANGLE here, so the numbers are not interchangeable\n"
-            "with the Chain Wave tab. Match it by eye.")
+            "with the Chain Wave tab. Match it by eye.\n"
+            "Debug Curve draws the result; it drives nothing and can be turned off.")
         note.setWordWrap(True)
         lite.addWidget(note)
 
@@ -590,6 +591,20 @@ class MainWindow(QWidget):
             grid.addWidget(widget, r, 1)
         lite.addLayout(grid)
 
+        # 흔들림을 눈으로 확인하는 커브. Chain Wave 탭이 만드는 커브와 같은 방식이지만
+        # 구동 방향이 반대라(체인 -> 커브) 실제 결과를 그린다. 아무것도 구동하지 않는다.
+        self.chk_lite_debug = QCheckBox("Debug Curve")
+        self.chk_lite_debug.setChecked(True)
+        self.chk_lite_debug.setToolTip(
+            "On (default): draw one curve per chain showing how it sways.\n"
+            "It is built the same way as the Chain Wave tab's curve - a degree 3\n"
+            "NURBS with one CV per chain node - but it is DRIVEN BY the chain\n"
+            "instead of driving it, so it always sits exactly on the result.\n\n"
+            "Display only: it moves nothing, it is set to reference so it cannot be\n"
+            "picked in the viewport, and Remove Chain Wave Lite deletes it with the\n"
+            "rest of the setup.")
+        lite.addWidget(self.chk_lite_debug)
+
         self.btn_lite_apply = QPushButton("Build Chain Wave Lite")
         self.btn_lite_apply.setMinimumHeight(38)
         self.btn_lite_apply.clicked.connect(self.on_lite_apply)
@@ -652,6 +667,7 @@ class MainWindow(QWidget):
                     local_axis=(self.cmb_lite_local_axis.currentText()
                                 if self.chk_lite_local.isChecked() else None),
                     driver_at_root=self.chk_lite_driver_root.isChecked(),
+                    debug_curve=self.chk_lite_debug.isChecked(),
                     output=(wind_mgr.OUTPUT_NODE if node
                             else wind_mgr.OUTPUT_CURVE),
                     start=start, end=end)

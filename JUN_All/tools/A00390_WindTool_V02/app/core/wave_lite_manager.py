@@ -43,6 +43,24 @@
 # 조인트든 FK 컨트롤러든 **같은 경로**로 처리한다. 기존 모드에서 컨트롤러 때문에 필요했던
 # 프록시 체인이 통째로 사라진다.
 #
+# ## 디버그 커브 (선택, 기본 ON)
+#
+# 각도만 다루다 보니 "이 체인이 지금 어떤 파형을 그리고 있는지" 가 눈에 잘 안 들어온다.
+# 그래서 **Chain Wave 탭이 만드는 커브와 같은 방식**(체인 노드 위치를 CV 로 하는 degree 3
+# NURBS)으로 커브를 하나 만들어 흔들림을 보여 준다. 다른 것은 **방향뿐**이다:
+#
+#   Chain Wave : 커브가 ikSpline 으로 체인을 **구동**한다  (커브 -> 체인)
+#   Lite       : 체인이 각도로 움직이고 커브가 **따라간다** (체인 -> 커브)
+#
+# CV k 는 `multMatrix(node_k.worldMatrix, curve.worldInverseMatrix) -> decomposeMatrix
+# -> controlPoints[k]` 로 노드 k 의 월드 위치에 붙는다. 그래서 커브가 **늘 체인 위에 정확히**
+# 놓이고(실측 일치), 커브나 그 부모를 옮겨도 CV 는 조인트를 따라간다. 사이클은 없다 —
+# `worldInverseMatrix` 는 CV 에 의존하지 않는다.
+#
+# 굳이 "Chain Wave 가 만들었을 커브" 를 계산해 그리지 않는 이유: 두 모드는 **값이 같지 않다**
+# (위 참고, 파장에 따라 비율이 0.41~0.75 로 변한다). 그런 커브를 그리면 실제 흔들림과 다른
+# 그림을 보여 주게 되어 디버그용으로 오히려 해롭다. 지금 방식은 **실제 결과**를 그린다.
+#
 # ## 회전축을 정하는 두 가지 방법
 #
 # 1) **Sway Axis (월드)** — 기본. `world_axis = chain_dir x up` 으로 구한 **월드 축** 둘레로
@@ -85,6 +103,8 @@ LITE_SWING = "windSwingAngle"
 # 0.5 면 절반, 1 이면 완전 적용. 체인당 multDoubleLinear 1개면 끝난다.
 
 LITE_SET_SUFFIX = "_waveLiteSET"
+# 디버그 커브 이름 접미사(제거 세트에 함께 담기므로 Remove 로 같이 지워진다).
+LITE_DEBUG_SUFFIX = "_liteDebugCrv"
 LITE_REST_ATTR = "waveRestRotate"
 
 # Rotate Axis (오브젝트 공간) 로 쓸 수 있는 축. 노드의 rotateX/Y/Z 채널에 그대로 대응한다.
@@ -259,15 +279,64 @@ def _apply_angle(node, angle_plug, world_axis, rest, tag, local_index=None):
     return [a2q, prod, q2e]
 
 
+# --------------------------------------------------------------- 디버그 커브
+
+def _make_debug_curve(chain, points, name):
+    """체인이 어떻게 흔들리는지 보여 주는 커브. (transform 또는 None, 만든 노드들)
+
+    **Chain Wave 탭이 만드는 커브와 같은 방식**으로 만든다 — 체인 노드 위치를 CV 로 하는
+    degree 3 NURBS(노드가 적으면 차수를 낮춘다). 그래서 CV k 가 체인 노드 k 와 1:1 이다.
+
+    다만 구동 방향이 반대다. Chain Wave 는 커브가 체인을 끌지만, 여기서는 체인이 먼저
+    움직이고 커브가 그 결과를 따라 그린다 — CV 를 노드의 월드 위치에 연결해 둔다.
+    커브(또는 그 부모)를 옮겨도 CV 가 조인트에 그대로 붙어 있도록 `worldInverseMatrix` 로
+    커브의 오브젝트 공간으로 되돌린다. `worldInverseMatrix` 는 CV 에 의존하지 않으므로
+    사이클이 생기지 않는다(실측 확인).
+
+    ※ Chain Wave 의 커브보다 **CV 가 정확히 하나 적다.** 그쪽은 커브를 프록시 체인에서
+      만드는데 ikSpline 이 엔드 이펙터를 필요로 해 끝에 가상 조인트(dummy tip)를 하나 더
+      붙이기 때문이다(조인트 9 -> CV 10). 디버그 커브는 실제 노드만 그리므로 그 하나가 없다.
+    """
+    if len(points) < 2:
+        return None, []
+
+    degree = min(3, len(points) - 1)
+    crv = cmds.curve(name=name + "#", degree=degree, point=points)
+    crv = cmds.ls(crv, long=True)[0]
+    shape = (cmds.listRelatives(crv, shapes=True, fullPath=True) or [None])[0]
+    if shape is None:
+        return None, [crv]
+
+    # 디버그 표시라 뷰포트 클릭에 걸리지 않게 reference 로 둔다(보이지만 선택되지 않음).
+    cmds.setAttr(shape + ".overrideEnabled", 1)
+    cmds.setAttr(shape + ".overrideDisplayType", 2)
+
+    made = [crv]
+    for k, node in enumerate(chain):
+        tag = "{0}_cv{1:02d}".format(name, k)
+        mmx = cmds.createNode("multMatrix", name=tag + "Mmx")
+        cmds.connectAttr(node + ".worldMatrix[0]", mmx + ".matrixIn[0]")
+        cmds.connectAttr(crv + ".worldInverseMatrix[0]", mmx + ".matrixIn[1]")
+
+        dcm = cmds.createNode("decomposeMatrix", name=tag + "Dcm")
+        cmds.connectAttr(mmx + ".matrixSum", dcm + ".inputMatrix")
+        cmds.connectAttr(dcm + ".outputTranslate",
+                         "{0}.controlPoints[{1}]".format(shape, k))
+        made += [mmx, dcm]
+
+    return crv, made
+
+
 # --------------------------------------------------------------- 체인 하나
 
 def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
                       phase_offset, envelope=1.0, local_axis=None,
-                      driver_at_root=True):
+                      driver_at_root=True, debug_curve=True):
     """체인 하나에 각도 노드망을 만든다. (드라이버, 만든 노드들, rest 회전, 정보)
 
     local_axis : "X"/"Y"/"Z" 를 주면 각 노드의 **오브젝트 공간** 축으로만 돌린다.
                  이때 `axis`(Sway Axis) 는 **전혀 쓰이지 않는다**.
+    debug_curve: True 면 흔들림을 보여 주는 커브를 하나 만든다(`_make_debug_curve`).
     """
     name = _safe(_leaf(chain[0]))
     points = _chain_positions(chain)
@@ -380,6 +449,12 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
 
     cmds.delete(template)
 
+    # 디버그 커브는 각도 노드망을 다 건 뒤에 붙인다 — CV 가 노드의 월드 위치를 읽으므로
+    # 순서가 결과를 바꾸지는 않지만, 커브가 만들어지지 않아도 파형은 그대로여야 한다.
+    if debug_curve:
+        _crv, crv_made = _make_debug_curve(chain, points, name + LITE_DEBUG_SUFFIX)
+        made += crv_made
+
     return drv, made, rest_rotate, (cardinal_count, len(chain))
 
 
@@ -388,7 +463,8 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
 def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.0,
                     period=24.0, speed=1.0, ramp=1.0, node_offset=0.0,
                     output=OUTPUT_NODE, start=0.0, end=100.0, prefix=None,
-                    envelope=1.0, local_axis=None, driver_at_root=True):
+                    envelope=1.0, local_axis=None, driver_at_root=True,
+                    debug_curve=True):
     """커브·ikHandle 없이 체인이 파형을 따라가게 한다.
 
     swing : **뼈가 흔들리는 각도(도)**. 기존 Chain Wave 의 windAmplitude(거리)와 뜻이 다르다.
@@ -399,6 +475,9 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
                  **`axis` 는 무시된다**.
     driver_at_root : True 면 드라이버 로케이터를 체인 최상단(루트) 월드 위치에 놓는다.
                      False 면 예전처럼 원점에 만든다.
+    debug_curve : True(기본)면 체인마다 **흔들림을 보여 주는 커브**를 하나 만든다.
+                  Chain Wave 탭의 커브와 같은 방식(노드 위치 = CV, degree 3)이지만 구동
+                  방향이 반대라 **실제 결과**를 그린다. Remove 로 함께 지워진다.
     나머지 인자는 기존 build_wave 와 같다.
 
     Returns: (체인 수, 드라이버 수, 메시지)
@@ -423,7 +502,8 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
     for k, chain in enumerate(chains):
         drv, made, rest, info = _build_chain_lite(
             chain, axis, swing, wavelength, period, speed, ramp, k * node_offset,
-            envelope, local_axis=local_axis, driver_at_root=driver_at_root)
+            envelope, local_axis=local_axis, driver_at_root=driver_at_root,
+            debug_curve=debug_curve)
 
         if drv is None:
             failed.append("{0} ({1})".format(_leaf(chain[0]), info))
@@ -465,8 +545,13 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
                    len(chains), len(targets), min(start, end), max(start, end),
                    axis_note))
     else:
+        # 디버그 커브는 "이 탭은 커브를 만들지 않는다" 는 원래 문장과 어긋나므로, 켠 경우에는
+        # 그 문장 대신 커브가 몇 개 생겼는지 알린다(끄면 예전 문장 그대로).
+        shape_note = ("{0} debug curve(s) - display only, they follow the chain "
+                      "and drive nothing".format(len(drivers)) if debug_curve
+                      else "no curve / ikHandle / proxy")
         msg = ("Chain Wave Lite: {0} chain(s), {1} maya node(s), "
-               "no curve / ikHandle / proxy. {6}. Direct-axis {2}/{3} node(s). "
+               "{8}. {6}. Direct-axis {2}/{3} node(s). "
                "Driver locator at {7}. "
                "Edit windSwingAngle (degrees) / windWavelength / windPeriod / "
                "windSpeed / windRootRamp live; windEnvelope [0-1] scales the whole "
@@ -474,7 +559,8 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
                "Remove with the '{4}' set.".format(
                    len(drivers), len(made_all), cardinal_total, node_total, set_name,
                    envelope, axis_note,
-                   "the chain root" if driver_at_root else "the origin"))
+                   "the chain root" if driver_at_root else "the origin",
+                   shape_note))
 
     if failed:
         msg += " Failed: {0}.".format(", ".join(failed[:5]))

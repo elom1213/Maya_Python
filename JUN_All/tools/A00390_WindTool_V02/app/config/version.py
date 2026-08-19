@@ -9,6 +9,8 @@
 #                          켜면 Sway Axis(월드)는 UI 에서 비활성 + 계산에서도 제외.
 #        Place driver at chain root - Node 출력 드라이버 로케이터를 체인 최상단 위치에
 #                          만든다(기본 ON). Sine / Chain Wave / Chain Wave Lite 세 탭 전부.
+# 02.03  Chain Wave Lite 디버그 커브 - 체인이 어떻게 흔들리는지 보여 주는 커브(기본 ON).
+#                          Chain Wave 탭의 커브와 같은 방식이지만 체인이 커브를 구동한다.
 
-VERSION = "02.02"
+VERSION = "02.03"
 LAST_UPDATE = "2026-08-19"

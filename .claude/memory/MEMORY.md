@@ -76,6 +76,7 @@
 - [A00400 Points to Curve](wip-a00400-points-to-curve.md) — 월드 위치를 순서대로 잇는 커브(EP 커브=정확 통과). 완화는 **라플라시안 결과와 선형보간**(세기 비례/rebuild span 은 감각이 나쁨), 엣지·페이스는 xform 이 여러 점을 준다 (v01.04)
 - [A00400 Wrap tab](wip-a00400-curve-wrap.md) — CV 수 다른 커브 라이브 wrap(rebuildCurve+blendShape, envelope 0~1). **rebuildCurve 는 소스 트랜스폼 이동을 안 따라간다** → 공간 변환은 행렬로 따로 (v01.03)
 - [A00400 CurveTool](wip-a00400-curvetool.md) — 선택 엣지를 연결 성분별로 그룹지어 커브 1개 + Reverse Direction, **Line Width 탭**(lineWidth 슬라이더, 드래그=undo 1스텝) (v01.01)
+- [A00390 Lite debug curve](wip-a00390-lite-debug-curve.md) — Lite 흔들림을 보여 주는 커브(기본 ON). Chain Wave 커브와 같은 구성이지만 **체인이 커브를 구동**, CV 는 하나 적다(ikSpline dummy tip) (v02.03)
 - [A00390_V02 axis & driver](wip-a00390-v02-axis-driver.md) — Lite 오브젝트 축 회전(끈 옵션은 **계산에서도 빼야** 한다) + Node 드라이버를 체인 최상단에(3탭 공통). quatNodes 플러그인 선로드 (v02.02)
 - [A00390_V02 Envelope](wip-a00390-v02-envelope.md) — Node 드라이버에 `windEnvelope` [0,1]. 드라이버당 곱셈 노드 1개(진폭에 한 번만 곱하면 끝), **Chain Wave 는 CV 변위만 정확히 절반이고 회전각은 아니다**(ikSpline 비선형)
 - [A00390 Chain Wave](wip-a00390-chain-wave.md) — 체인이 **회전만으로** 싸인 파형을 따라간다(ikSpline + CV 구동). **FK 컨트롤러는 프록시 조인트**로. `rootOnCurve=False`, rest 는 셋업 전에 캡처 (v01.10)
