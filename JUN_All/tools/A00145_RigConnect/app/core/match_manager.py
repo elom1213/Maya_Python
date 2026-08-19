@@ -33,6 +33,13 @@ MEL 대비 개선/버그 수정:
 
 셰이프 캐시는 **한 번의 match() 호출 안에서만** 산다 — 그 사이에 씬 토폴로지가 바뀌지 않는다.
 
+타겟↔팔로워 짝짓기 (resolve_pairs)
+----------------------------------
+기본은 **인덱스 1:1** (`targets[i]` ← `followers[i]`, `n <- n`). 여기에 `one_to_many`(기본 True)
+가 붙는다 — 타겟이 **정확히 하나**면 그 하나에 **모든 팔로워**를 맞춘다(`1 <- n`).
+타겟이 2개 이상이면 이 값과 무관하게 `n <- n` 이라, 켜 둔 채로도 평소 작업이 달라지지 않는다.
+`match()` 와 UI 가 **같은 `resolve_pairs()`** 를 쓰므로 로그에 찍히는 모드와 실제 동작이 어긋나지 않는다.
+
 스냅샷 타겟 (추상 캐시)
 -----------------------
 `capture()` 로 타겟의 월드 T/R/S 를 값으로 떠서 `SnapshotCache` 에 담아 두면, 그 스냅샷 키를
@@ -485,6 +492,31 @@ def _note(notes, message, limit=5):
         notes.append("... (more of the same, only the first {0} are shown)".format(limit))
 
 
+def resolve_pairs(targets, followers, one_to_many=True):
+    """(pairs, fan_out, unpaired) — 타겟↔팔로워 짝을 정한다.
+
+    pairs    : [(target, follower), ...] 실제로 매칭할 짝.
+    fan_out  : True 면 `1 <- n` (타겟 하나에 팔로워 전부), False 면 `n <- n` (인덱스 1:1).
+    unpaired : `n <- n` 에서 짝을 못 찾고 남은 항목 수(개수 차이). `1 <- n` 이면 0 —
+               타겟 1 / 팔로워 4 는 **정상**이라 경고할 일이 아니다.
+
+    `one_to_many=True` 여도 타겟이 2개 이상이면 `n <- n` 으로 **조용히 폴백**한다.
+    (A00110 Follow 탭의 `1<-n` 은 개수가 안 맞으면 에러를 내지만, 여기는 폴백이 요구 사항이다.)
+
+    match() 와 UI 가 이 함수를 함께 쓴다 — 모드 판정이 두 군데로 갈라지면 로그에 찍히는
+    모드와 실제 동작이 어긋난다.
+    """
+    if not targets or not followers:
+        return [], False, 0
+
+    if one_to_many and len(targets) == 1:
+        return [(targets[0], flw) for flw in followers], True, 0
+
+    n = min(len(targets), len(followers))
+    return (list(zip(targets[:n], followers[:n])), False,
+            abs(len(targets) - len(followers)))
+
+
 def capture(targets, cache, normal_axis="y", notes=None):
     """targets 의 **월드 T/R/S 를 값으로** 떠서 cache 에 담고 스냅샷 키 목록을 돌려준다.
 
@@ -533,8 +565,8 @@ def capture(targets, cache, normal_axis="y", notes=None):
 
 def match(targets, followers, normal_axis="y",
           translate=True, rotate=True, scale=False, parent=False,
-          cache=None, notes=None):
-    """targets[i] 에 followers[i] 를 매칭한다(인덱스 1:1).
+          cache=None, notes=None, one_to_many=True):
+    """타겟에 팔로워를 매칭한다. 기본은 인덱스 1:1, 타겟이 하나면 전부 그 하나에.
 
     Args:
         targets:   타겟 오브젝트/컴포넌트/**스냅샷 키** 리스트.
@@ -547,9 +579,13 @@ def match(targets, followers, normal_axis="y",
                    DOOTOOL 'Parent Followers to Targets'.
         cache:     스냅샷 타겟을 해석할 `SnapshotCache`(선택).
         notes:     건너뛴 사유를 담을 리스트(선택).
+        one_to_many: True(기본)이고 **타겟이 정확히 하나**면 그 하나에 **모든 팔로워**를
+                   매칭한다(`1 <- n`). 타겟이 2개 이상이면 이 값과 무관하게 `n <- n`.
+                   짝짓기는 `resolve_pairs()` 가 정한다.
 
     Returns:
-        (matched_count, skipped_count). 개수가 다르면 min 만큼만 매칭하고 차이를 skipped 에 더한다.
+        (matched_count, skipped_count). `n <- n` 에서 개수가 다르면 min 만큼만 매칭하고 차이를
+        skipped 에 더한다(`1 <- n` 은 개수가 달라도 정상이라 더하지 않는다).
         한 쌍이 실패해도 **멈추지 않고** 나머지를 계속 매칭한다(사유는 notes 로).
     """
     if not targets:
@@ -557,15 +593,14 @@ def match(targets, followers, normal_axis="y",
     if not followers:
         raise ValueError("No followers. Add objects to the Followers list.")
 
-    n = min(len(targets), len(followers))
-    skipped = abs(len(targets) - len(followers))   # 개수 차이는 호출부가 안내한다
+    pairs, _fan_out, unpaired = resolve_pairs(targets, followers, one_to_many)
+    skipped = unpaired                             # 개수 차이는 호출부가 안내한다
 
     matched = 0
     ctx = _Ctx()
     try:
         with suspend_refresh():
-            for i in range(n):
-                tgt, flw = targets[i], followers[i]
+            for tgt, flw in pairs:
                 if snap.is_snapshot(flw):
                     # 추상 캐시는 씬에 없으니 움직일 수 없다(타겟으로만 쓴다).
                     _note(notes, "follower {0} is a cached item - nothing to move".format(flw))
@@ -581,16 +616,17 @@ def match(targets, followers, normal_axis="y",
                     continue
                 matched += 1
             # DOOTOOL 과 동일하게 매칭을 모두 마친 뒤 별도 패스로 parent 한다.
+            # 같은 짝(pairs)을 쓴다 — 1 <- n 이면 팔로워 전부가 그 하나의 타겟 아래로 간다.
             if parent:
                 unparented = 0
-                for i in range(n):
-                    if snap.is_snapshot(followers[i]):
+                for tgt, flw in pairs:
+                    if snap.is_snapshot(flw):
                         continue
                     try:
-                        if not _parent_one(followers[i], targets[i]):
+                        if not _parent_one(flw, tgt):
                             unparented += 1
                     except Exception as exc:
-                        _note(notes, "parent {0} : {1}".format(followers[i], exc))
+                        _note(notes, "parent {0} : {1}".format(flw, exc))
                 if unparented:
                     _note(notes, "{0} follower(s) not parented - a cached item "
                                  "cannot be a parent".format(unparented))

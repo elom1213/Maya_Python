@@ -227,6 +227,18 @@ class MainWindow(QWidget):
             "position.")
         opt_layout.addWidget(self.cb_mt_parent)
 
+        # 1 <- n : 타겟이 하나면 팔로워 전부를 그 하나에. 타겟이 여럿이면 켜져 있어도
+        #          평소대로 n <- n (인덱스 1:1) 이라 늘 켜 둬도 된다.
+        self.cb_mt_one_to_many = QCheckBox("1 <- n")
+        self.cb_mt_one_to_many.setChecked(True)
+        self.cb_mt_one_to_many.setToolTip(
+            "On (default): when Targets holds exactly ONE object, EVERY follower "
+            "is matched to it (1 <- n).\n"
+            "With 2 or more targets this does nothing - the match stays "
+            "index-paired, Targets[i] <- Followers[i] (n <- n),\n"
+            "so it is safe to leave on.")
+        opt_layout.addWidget(self.cb_mt_one_to_many)
+
         layout.addWidget(opt_box)
 
         # Match / Swap
@@ -1205,11 +1217,23 @@ class MainWindow(QWidget):
     def on_match(self):
         targets = self.tsl_match_tgt.get_all_items()
         followers = self.tsl_match_flw.get_all_items()
-        if len(targets) != len(followers):
+        one_to_many = self.cb_mt_one_to_many.isChecked()
+
+        # 모드 판정은 코어와 **같은 함수**로 한다(두 군데로 갈라지면 로그와 동작이 어긋난다).
+        pairs, fan_out, unpaired = mch_mgr.resolve_pairs(
+            targets, followers, one_to_many)
+
+        if fan_out:
+            self.log("       1 <- n : {0} follower(s) -> 1 target".format(
+                len(pairs)))
+        elif unpaired:
+            # 개수 불일치 경고는 n <- n 일 때만 뜻이 있다(1 <- n 은 달라도 정상).
             self.log("[WARN] Match : target/follower counts differ "
                      "({0} vs {1}) - matching {2} pair(s)".format(
-                         len(targets), len(followers),
-                         min(len(targets), len(followers))))
+                         len(targets), len(followers), len(pairs)))
+            if one_to_many and len(targets) > 1:
+                self.log("       (1 <- n needs exactly 1 target, got {0})".format(
+                    len(targets)))
 
         translate = self.cb_mt_translate.isChecked()
         rotate = self.cb_mt_rotate.isChecked()
@@ -1221,8 +1245,7 @@ class MainWindow(QWidget):
             return
 
         # 캐시(스냅샷) 타겟은 씬을 읽지 않으므로 몇 개인지 알려 준다.
-        pairs = min(len(targets), len(followers))
-        cached = sum(1 for t in targets[:pairs] if snap_mgr.is_snapshot(t))
+        cached = sum(1 for tgt, _flw in pairs if snap_mgr.is_snapshot(tgt))
 
         def _do():
             notes = []
@@ -1230,12 +1253,14 @@ class MainWindow(QWidget):
                 targets, followers,
                 translate=translate, rotate=rotate,
                 scale=scale, parent=parent,
-                cache=self.snapshots, notes=notes)
-            self.log("       {0} matched, {1} skipped [{2}]".format(
+                cache=self.snapshots, notes=notes,
+                one_to_many=one_to_many)
+            self.log("       {0} matched, {1} skipped [{2}] ({3})".format(
                 matched, skipped,
                 "".join(c for c, on in (
                     ("T", translate), ("R", rotate),
-                    ("S", scale), ("P", parent)) if on)))
+                    ("S", scale), ("P", parent)) if on),
+                "1 <- n" if fan_out else "n <- n"))
             if cached:
                 self.log("       {0} cached target(s) - restored from memory, "
                          "no scene nodes read".format(cached))

@@ -4,7 +4,9 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.30` (`app/config/version.py`) — Match 탭에 **Cache**(노드를 만들지 않고 월드 T/R/S 만 기억) 추가 (§Cache)
+- 버전: `v01.32` (`app/config/version.py`) — Match 탭에 **`1 <- n`** 체크박스(기본 ON):
+  Targets 가 **하나면** Followers 전부가 그 하나에 매칭 (§Match)
+  · v01.30 은 Match 탭에 **Cache**(노드를 만들지 않고 월드 T/R/S 만 기억) 추가 (§Cache)
   · v01.29 는 Match 탭이 **500개 이상**이면 리스트업하지 않고 개수만 요약 + `List All` 버튼, 대량 매칭 속도 개선 (§대량 선택)
   · v01.28 은 Constrain > Constraint 하위 탭의 `Maintain Offset` 기본값을 **ON** 으로 변경 (§Constraint)
   · v01.27 은 Target Replace 하위 탭이 **Target Edit** 으로 확장(타깃 **추가 / 삭제** 추가) (§Target Edit)
@@ -37,8 +39,8 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
 
 - `Targets` / `Followers` 리스트(Select/Add/Del/Up/Down). 버텍스를 선택하면 `cmds.ls(fl=True)` 로
   **각 버텍스가 개별 항목**(`mesh.vtx[i]`)으로 들어간다(`mesh.vtx[0:13]` 처럼 하나로 묶이지 않음).
-- **Match**: `Targets[i] → Followers[i]` 인덱스 1:1 매칭. **rotateOrder 가 달라도** 안전
-  (`cmds.matchTransform`, 임시 transform 경유). 개수가 다르면 적은 쪽만 매칭하고 경고.
+- **Match**: 기본은 `Targets[i] → Followers[i]` 인덱스 1:1 매칭(`n <- n`). **rotateOrder 가 달라도**
+  안전(`cmds.matchTransform`, 임시 transform 경유). 개수가 다르면 적은 쪽만 매칭하고 경고.
   target 종류별 동작:
   - transform/joint/curve → 위치+회전(+옵션 스케일) 매칭.
   - mesh(오브젝트 전체) → 월드 정점 평균(centroid)으로 위치만.
@@ -56,6 +58,16 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
     타겟에만 의미가 있고 mesh/cluster/component/vertex 타겟에는 무시된다.
   - **Parent Followers to Targets**(기본 OFF) — 매칭 후 각 follower 를 타겟(컴포넌트면 소유
     오브젝트) 아래로 `parent` 한다. 이미 그 자식이면 스킵, 매칭된 월드 위치는 유지된다.
+  - **`1 <- n`**(v01.32~, **기본 ON**) — Targets 에 오브젝트가 **정확히 하나**일 때 Followers
+    **전부**를 그 하나에 매칭한다. 컨트롤러 여러 개를 한 자리에 모으거나, 한 버텍스/캐시 위치로
+    모두 보낼 때 쓴다.
+    - **Targets 가 2개 이상이면 켜져 있어도 아무 일도 하지 않는다** — 평소대로 `Targets[i] →
+      Followers[i]`(`n <- n`). 그래서 늘 켜 둬도 기존 작업 방식이 달라지지 않는다.
+    - `1 <- n` 에서는 개수가 달라도 **정상**이라 개수 불일치 경고를 띄우지 않는다.
+    - 타겟 종류별 규칙은 그대로다 — 메시 타겟이면 팔로워 전부가 centroid 로 **위치만**,
+      버텍스 타겟이면 전부가 같은 노말 정렬 회전까지 받는다. `Parent Followers to Targets` 를
+      켜면 **팔로워 전부가 그 하나의 타겟 아래로** 들어간다.
+    - 로그에 `1 <- n` / `n <- n` 중 무엇으로 처리했는지 찍는다.
   - 원본의 **Rotate Order / Rotate Axis 는 제외**했다 — 이 툴은 월드 행렬 기반 매칭이라 두 옵션이
     의미가 없다. 채널을 하나도 안 켜면 경고만 남기고 아무 동작도 하지 않는다.
 - **Create (at target positions)** — `Locators` / `Sphere` / `Cube`: 타겟 **수만큼** 컨트롤을 만들어
@@ -702,7 +714,7 @@ A00145_RigConnect/
 └── app/
     ├── config/version.py
     ├── core/                       # UI 비의존 maya.cmds 로직
-    │   ├── match_manager.py        # Match (MEL Match Tool 포팅: 위치/회전 매칭·컨트롤 생성·버텍스 노말, 대량 매칭용 _Ctx 캐시, capture())
+    │   ├── match_manager.py        # Match (MEL Match Tool 포팅: 위치/회전 매칭·컨트롤 생성·버텍스 노말, 대량 매칭용 _Ctx 캐시, capture(), resolve_pairs())
     │   ├── snapshot_manager.py     # Match > Cache (노드 없이 월드 T/R/S 만 기억하는 추상 스냅샷, maya 비의존)
     │   ├── constrain_manager.py    # Constrain  (MEL 포팅)
     │   ├── skin_constraint_manager.py # Skin Weight to Constraint (스킨 웨이트 → weighted Parent/Scale/Point/Orient constraint)

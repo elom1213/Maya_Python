@@ -7,6 +7,7 @@
 - [Explain in Korean](explain-in-korean.md) — 설명/대화는 한국어로 (코드·UI 문자열은 영어)
 - [UI text English-only](ui-text-english-only.md) — UI 문자열·로그는 전부 영어, 한국어는 주석/독스트링만
 - [Push only when asked](push-only-when-asked.md) — **그 턴 메시지에** 명시 요청 없으면 절대 push 금지(로컬 커밋은 OK). 앞 턴의 "푸시해" 는 이어지지 않는다 — 이 착각으로 2회 위반(2026-08-10, 08-19)
+- [Push only own session work](push-only-own-session-work.md) — 푸시에는 **이 세션이 한 것만**. 다른 세션 변경은 "푸시해" 여도 제외, `git add -A` 금지(경로 지정), 섞인 공용 문서는 물어보기
 - [Push target Dnable/dev](push-target-dnable-dev.md) — 기본 push 대상은 Dnable_repo 의 dev (origin 아님)
 - [Push includes tool guide docs](push-includes-tool-guide-docs.md) — 툴 push 시 docs/<툴>.md 가이드 + CHANGELOG/version/WORKLOG 함께
 - [Clean commit message](clean-commit-message-no-stray-chars.md) — 커밋 메시지에 이상문자 새지 않게(과거 `@` 유출), 커밋 후 `git log -1` 확인
@@ -109,6 +110,7 @@
 - [A00170 Stretch tab](wip-a00170-stretch-tab.md) — Default Distance 가 Stretch 구동, linear + Sigmoid 노드망 (v01.11)
 - [A00170 AttachCrv tab](wip-a00170-attachcrv-tab.md) — TSL 오브젝트를 커브 최근접점에 부착
 - [A00170 Remap List Attributes](wip-a00170-remap-listattrs.md) — Remap Value 탭에 전체 어트리뷰트 목록 + 검색
+- [A00145 Match 1<-n](wip-a00145-match-one-to-many.md) — Targets 1개면 Followers 전부 매칭(기본 ON). 짝짓기는 **공용 `resolve_pairs()` 하나로** (로그/동작 어긋남 방지), parent 패스도 같은 pairs (v01.32)
 - [A00145 Match Cache](wip-a00145-match-cache.md) — 노드 없이 월드 T/R/S 만 기억하는 `@cache` 항목. `@` 는 마야 이름에 못 쓴다, 적용은 undo 되는 `xform`
 - [A00145 Connect both directions](wip-a00145-connect-both-directions.md) — 역방향 연결(인자 순서만 뒤집기) + 개수 달라도 적은 쪽만큼 부분 연결·실패해도 계속 (v01.24~01.25)
 - [A00145 Match from Source](wip-a00145-attr-name-matching.md) — 이름 유사 어트리뷰트를 소스 순서대로 찾아 Connect 로 연결. 1000x1000 = 0.15s (v01.21)

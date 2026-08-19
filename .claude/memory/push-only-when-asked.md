@@ -41,8 +41,10 @@ push word in **it** ("푸시해", "push", "올려"). No push word in the current
 stop. Do not accept "the previous turn said push", "the work is finished", "docs are updated", or
 "it is the same task as the turn that authorized a push" as substitutes.
 
-When a push IS requested, follow [[push-target-dnable-dev]] for the target and
-[[push-includes-tool-guide-docs]] for what to include. If work is done and no push was requested,
+When a push IS requested, follow [[push-target-dnable-dev]] for the target,
+[[push-includes-tool-guide-docs]] for what to include, and
+[[push-only-own-session-work]] for what must be **left out** — a push carries only this
+session's work, never another session's changes sitting in the working tree. If work is done and no push was requested,
 end by saying it is committed locally and ready to push when they say so — do not push, and do not
 undo a past push on your own initiative either (that is also a remote-facing action; offer options
 and let the user choose, as on 2026-08-19).
