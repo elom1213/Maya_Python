@@ -11,9 +11,16 @@ from Framework.core.maya_undo import undo_chunk
 
 class CopyKeyManager:
     """
-    Base 리스트의 각 오브젝트 애니메이션 키를 같은 인덱스의 Target 오브젝트로 복사한다.
+    Base 리스트의 각 오브젝트 애니메이션 키를 Target 오브젝트로 복사한다.
     시간 범위(start, end)로 copyKey 한 뒤 paste_option 모드로 pasteKey 하고,
     체크된 축은 timePivot=start 기준으로 값을 반전(valueScale=-1)한다.
+
+    매칭은 두 가지다.
+      n->n (기본 동작) : Base[i] -> Target[i], 같은 인덱스끼리. 짧은 쪽 길이만큼만.
+      1->n             : Base 가 **정확히 1개**일 때 그 하나를 **모든** Target 에 복사.
+    `one_to_many=True`(기본) 여도 Base 가 1개가 아니면 **그냥 n->n 으로 간다** —
+    옵션이 켜져 있다고 해서 여러 Base 를 가진 평소 작업이 막히지는 않는다.
+    (Follow 탭의 1<-n 은 개수가 안 맞으면 에러를 내지만, 여기는 폴백이 요구 사항이다.)
 
     레거시 JUN_cmd_copyKey_V02 를 UI 비의존 정적 메서드로 옮긴 것.
     pose_key_manager.PoseKeyManager 와 동일한 스타일(정적 메서드 + undoInfo 청크 + (count, msg)).
@@ -37,14 +44,17 @@ class CopyKeyManager:
     ]
 
     @staticmethod
-    def copy_keys(base_list, tgt_list, start, end, reverse_flags, paste_option="insert"):
+    def copy_keys(base_list, tgt_list, start, end, reverse_flags, paste_option="insert",
+                  one_to_many=True):
         """
-        base_list[i] -> tgt_list[i] 로 time=(start, end) 키를 복사한다.
+        Base -> Target 으로 time=(start, end) 키를 복사한다.
 
-        base_list, tgt_list : 오브젝트 이름 리스트. 같은 인덱스끼리 매칭.
+        base_list, tgt_list : 오브젝트 이름 리스트.
         start, end          : copyKey 시간 범위.
         reverse_flags       : {"tx": bool, "ty": bool, ...}. 체크된 축은 valueScale=-1 로 반전.
         paste_option        : cmds.pasteKey option (PASTE_OPTIONS 중 하나, 기본 "insert").
+        one_to_many         : True(기본)이고 **Base 가 정확히 1개**면 그 하나를 모든 Target 에
+                              복사한다(1->n). Base 가 2개 이상이면 이 값과 무관하게 n->n.
         반환                : (처리한 쌍 수, 메시지)
         """
         if not base_list:
@@ -56,17 +66,21 @@ class CopyKeyManager:
         if paste_option not in CopyKeyManager.PASTE_OPTIONS:
             paste_option = "insert"
 
-        # 매칭 가능한 쌍 수(짧은 쪽 기준). 불일치는 메시지에 집계.
-        pair_count = min(len(base_list), len(tgt_list))
+        # ---- 매칭 구성 ----
+        # 1->n 은 Base 가 정확히 1개일 때만 성립한다. 옵션이 켜져 있어도 Base 가 여러 개면
+        # 평소대로 n->n(같은 인덱스, 짧은 쪽 기준)으로 간다.
+        fan_out = bool(one_to_many) and len(base_list) == 1
+        if fan_out:
+            pairs = [(base_list[0], tgt) for tgt in tgt_list]
+        else:
+            pair_count = min(len(base_list), len(tgt_list))
+            pairs = list(zip(base_list[:pair_count], tgt_list[:pair_count]))
 
         done = 0
         skipped = 0
 
         with undo_chunk():
-            for i in range(pair_count):
-                base = base_list[i]
-                tgt = tgt_list[i]
-
+            for base, tgt in pairs:
                 try:
                     cmds.copyKey(base, time=(start, end))
                     cmds.pasteKey(tgt, option=paste_option)
@@ -85,11 +99,15 @@ class CopyKeyManager:
                     # 키가 없거나 붙여넣기 실패한 쌍은 건너뛴다.
                     skipped += 1
 
-        msg = "{0} pairs copied (option: {1}).".format(done, paste_option)
+        mode = "1->n" if fan_out else "n->n"
+        msg = "{0} pairs copied ({1}, option: {2}).".format(done, mode, paste_option)
         if skipped:
             msg += " {0} skipped (no keys / paste failed).".format(skipped)
-        if len(base_list) != len(tgt_list):
+        # 개수 불일치 경고는 n->n 에서만 뜻이 있다(1->n 은 개수가 달라도 정상).
+        if not fan_out and len(base_list) != len(tgt_list):
             msg += " [Warning] Base({0}) / Target({1}) count mismatch.".format(
                 len(base_list), len(tgt_list))
+            if one_to_many:
+                msg += " (1->n needs exactly 1 Base, got {0}.)".format(len(base_list))
 
         return (done, msg)

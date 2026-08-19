@@ -39,7 +39,8 @@
    → SmartLayer 의 **Curve Filters**(Smooth / Intensity / Interpolate)를 이식하면 여기로 들어온다.
 4. **Transfer** — 애니메이션을 **다른 오브젝트로** 옮긴다.
    **Copy Key**(v01.03~): **Base → Target** 으로 시간 범위 키를 복사하고 축별로 값을
-   **반전(Reverse)** 한다(`cmds.pasteKey` 붙여넣기 모드 선택).
+   **반전(Reverse)** 한다(`cmds.pasteKey` 붙여넣기 모드 선택). **1 → n**(v02.06~, 기본 ON)
+   을 켜면 Base 가 **하나일 때** 그 키가 **모든** Target 으로 간다.
    **Mirror Key**(v01.04~): 한쪽 컨트롤러의 키를 **반대쪽 컨트롤러로 좌우 미러**한다(언리얼
    *Mirror Data Table* 과 동일한 결과). 좌/우 토큰(`_l/_r` 등, **JSON 으로 확장 가능**)으로 자동
    페어링하거나 수동 리스트로 짝짓는다. **소스/타겟의 rotateOrder 가 달라도 정확**하다.
@@ -62,6 +63,20 @@
 
 하위 탭이나 상위 탭을 바꾸면 **창 크기가 지금 보이는 페이지에 맞춰 자동 조정**된다.
 
+> **V02 v02.06 — Copy Key: `1 -> n` 옵션(기본 ON)**: `Transfer > Copy Key` 에 체크박스를
+> 하나 더했다. Base 에 오브젝트가 **정확히 하나**면 그 키를 **Target 전부**에 복사한다.
+> 예전에는 `Base[i] → Target[i]` 뿐이라 Base 가 1개면 **Target 첫 항목 하나만** 받고 나머지는
+> 조용히 남았다(개수 불일치 경고만 떴다) — 컨트롤러 하나의 애니메이션을 여러 개에 뿌리는
+> 흔한 작업이 한 번에 안 됐다.
+> **켜져 있어도 Base 가 2개 이상이면 평소대로 `n→n`** 이라 늘 켜 둬도 기존 작업이 달라지지
+> 않는다(그래서 기본 ON). Follow 탭의 `1<-n` 은 개수가 안 맞으면 **에러**를 내지만, 여기는
+> **조용히 폴백**하는 것이 요구 사항이라 동작이 다르다. 로그에 `1->n` / `n->n` 중 무엇으로
+> 처리했는지 찍고, 개수 불일치 경고는 **`n→n` 일 때만** 띄운다(1→n 은 개수가 달라도 정상).
+> `copykey_manager.copy_keys(..., one_to_many=True)` + `app/ui/main_window.py`.
+> 검증(mayapy 2024) 38항목(코어 30 + UI 8): 1→n 로 전 타깃이 같은 키를 받는지, 옵션 OFF 면 옛 동작 그대로,
+> Base 3개면 켜져 있어도 인덱스 매칭, Reverse 축이 1→n 에서도 먹는지, **undo 한 번에 전 타깃
+> 복귀**, 빈 리스트·잘못된 paste option 가드 유지.
+>
 > **V02 v02.05 — Stagger 가 값(value)도 계단식으로**: `Timing > Stagger` 에 `Value per Item`
 > 을 더했다. 시간 offset 과 **정확히 같은 배수 규칙**(리스트 순서 × 값)이라 0번은 제자리,
 > 1번 +1배, 2번 +2배로 키 값이 올라간다. 시간과 **독립**이라 한쪽만 써도 된다(값만 계단식).
@@ -906,7 +921,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 │ └─────────────┘           └─────────────┘         │
 │ Add|Del|Up|Down|Sort      Add|Del|Up|Down|Sort    │
 │ Start [ 1 ]   End [ 24 ]                           │  ← 기본값 = 현재 playback 범위
-│ Paste Option [ insert ▼ ]                         │  ← 기본 insert
+│ Paste Option [ insert ▼ ]   [x] 1 -> n            │  ← insert / 1→n 기본 ON
 │ ┌ Reverse ─────────────────────────────────────┐ │
 │ │ Translate [X][Y][Z]   Rotate [X][Y][Z]       │ │  ← 기본 모두 off
 │ └──────────────────────────────────────────────┘ │
@@ -917,15 +932,23 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 - **Base / Target** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `Select Base`/`Select Targets` 로 현재
   Maya 선택을 리스트에 채운다. Add/Del/Up/Down/Sort 와 "Number: N" 카운트, 리스트 항목 클릭 시
   씬 자동 선택까지 위젯이 내장한다. **Base[i] → Target[i]** 로 같은 인덱스끼리 복사하므로
-  **두 리스트의 순서를 맞춰야** 한다(Up/Down/Sort 로 정렬).
+  **두 리스트의 순서를 맞춰야** 한다(Up/Down/Sort 로 정렬). 단, 아래 **1 → n** 이 켜져 있고
+  Base 가 하나면 순서를 맞출 필요가 없다.
 - **Start / End**: 복사할 시간 범위(`cmds.copyKey time=(start,end)`). 빌드 시 현재 playback
   범위(`minTime`/`maxTime`)로 채워진다.
 - **Paste Option**: `cmds.pasteKey` 의 `option` 인자. **기본 `insert`**. 선택 가능값(10개):
   `insert`, `replace`, `replaceCompletely`, `merge`, `scaleInsert`, `scaleReplace`,
   `scaleMerge`, `fitInsert`, `fitReplace`, `fitMerge`.
+- **1 → n** (v02.06~, **기본 ON**): Base 에 오브젝트가 **정확히 하나**일 때 그 키를
+  **모든 Target** 에 복사한다. 컨트롤러 하나의 애니메이션을 여러 개에 뿌릴 때 쓴다.
+  - **Base 가 2개 이상이면 켜져 있어도 아무 일도 하지 않는다** — 평소대로 `Base[i] → Target[i]`
+    (`n→n`). 그래서 늘 켜 둬도 기존 작업 방식이 달라지지 않는다.
+  - `1→n` 에서는 Base/Target **개수가 달라도 정상**이라 불일치 경고를 띄우지 않는다.
+  - Reverse 축은 `1→n` 에서도 타깃마다 그대로 적용된다.
 - **Reverse**: 체크한 축은 붙여넣은 뒤 `timePivot=Start` 기준으로 값을 반전(`valueScale=-1`).
   Translate X/Y/Z, Rotate X/Y/Z 6개, 기본 모두 off.
-- **Copy Key**: 복사 실행. 결과(처리한 쌍 수 / 사용한 옵션 / 건너뛴 쌍 / 개수 불일치 경고)가 로그에 출력.
+- **Copy Key**: 복사 실행. 결과(처리한 쌍 수 / **매칭 모드(`1->n` · `n->n`)** / 사용한 옵션 /
+  건너뛴 쌍 / 개수 불일치 경고)가 로그에 출력.
 
 #### Mirror Key
 
@@ -1134,6 +1157,9 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
    (Base[i] ↔ Target[i] 가 맞도록 **Sort/Up/Down 으로 순서 정렬**)
 3. **Start / End** 확인(기본 = 현재 playback 범위) → **Paste Option** 선택(기본 `insert`).
 4. 필요하면 **Reverse** 축 체크(예: 좌/우 대칭 복사 시 Rotate Y/Z 등) → **Copy Key**.
+
+> **원본 하나를 여러 대상에 뿌릴 때**: Base 에 오브젝트를 **하나만** 담고 **1 → n**(기본 ON)을
+> 켠 채로 Copy Key. 순서를 맞출 필요도, Base 를 대상 수만큼 복제할 필요도 없다.
 
 ### Transfer > Mirror Key — 자동(Auto)
 1. 미러할 **소스 컨트롤(들)을 선택**(예: 왼팔 FK 컨트롤). 한쪽만 선택하면 된다.

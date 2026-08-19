@@ -837,6 +837,8 @@ class MainWindow(QWidget):
 
         # -------------------------
         # Paste Option (cmds.pasteKey option). 기본 "insert".
+        #   1 -> n : Base 가 1개일 때 그 하나를 **모든** Target 에 복사(기본 ON).
+        #            Base 가 2개 이상이면 켜져 있어도 평소대로 n->n 이라 늘 켜 둬도 된다.
         # -------------------------
 
         option_row = QHBoxLayout()
@@ -845,6 +847,17 @@ class MainWindow(QWidget):
         self.cmb_paste_option.addItems(CopyKeyManager.PASTE_OPTIONS)
         self.cmb_paste_option.setCurrentText("insert")
         option_row.addWidget(self.cmb_paste_option)
+
+        option_row.addSpacing(12)
+        self.cb_copy_one_to_many = QCheckBox("1 -> n")
+        self.cb_copy_one_to_many.setChecked(True)
+        self.cb_copy_one_to_many.setToolTip(
+            "On (default): when Base holds exactly ONE object, its keys go to\n"
+            "EVERY object in Target (1->n).\n"
+            "With 2 or more objects in Base this does nothing - the copy stays\n"
+            "index-matched, Base[i] -> Target[i] (n->n).")
+        option_row.addWidget(self.cb_copy_one_to_many)
+
         option_row.addStretch(1)
         tab_layout.addLayout(option_row)
 
@@ -1950,7 +1963,11 @@ class MainWindow(QWidget):
         reverse_flags = {key: cb.isChecked() for key, cb in self.copy_reverse.items()}
         paste_option = self.cmb_paste_option.currentText()
 
-        count, msg = CopyKeyManager.copy_keys(base, tgt, start, end, reverse_flags, paste_option)
+        one_to_many = self.cb_copy_one_to_many.isChecked()
+
+        count, msg = CopyKeyManager.copy_keys(
+            base, tgt, start, end, reverse_flags, paste_option,
+            one_to_many=one_to_many)
         self.log(msg)
 
     # --------------------------------------------------
