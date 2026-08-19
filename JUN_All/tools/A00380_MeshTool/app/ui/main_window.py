@@ -279,8 +279,14 @@ class MainWindow(QWidget):
             show_up=False, show_down=False, show_sort=False,
             multi_select=False,
             select_label="List From Mesh",
+            list_min_height=44,
             log_callback=self.log)
-        self.tsl_from.setMaximumHeight(120)
+
+        # From 은 메시 **한 개**만 담으므로 리스트를 짧게 두고 싶다. 다만 위젯 전체에
+        # setMaximumHeight 를 걸면 안 된다 — 리스트의 최소 높이(100)는 줄지 않으므로 레이아웃이
+        # 모자란 높이를 **버튼에서 빼앗아** 'List From Mesh' / Add / Del 이 필요한 30px 대신
+        # 25px 로 눌리고 글자가 잘린다(실측). 높이 제한은 **리스트에만** 건다.
+        self.tsl_from.list_widget.setMaximumHeight(70)
         vf.addWidget(self.tsl_from)
         lay.addWidget(box_from)
 

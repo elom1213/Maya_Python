@@ -1,8 +1,8 @@
 ---
 title: A00380_MeshTool 사용법
 aliases: [Mesh Tool, MeshTool, A00380, Peak, Match]
-tags: [maya-python, tool-guide, mesh, modeling, peak, normal, match, kangaroo]
-updated: 2026-07-23
+tags: [maya-python, tool-guide, mesh, modeling, peak, normal, match, kangaroo, layout]
+updated: 2026-08-19
 ---
 
 # A00380_MeshTool 사용법
@@ -189,6 +189,29 @@ mayapy 로 확인한 함정들:
   버텍스를 로드 시점 스냅샷으로 덮어써 원상복구**시킨다(툴만 띄워둬도 편집이 되돌려지던 버그).
   `_preview_dirty` 는 amount≠0 미리보기를 쓸 때만 True, load/commit/restore 후 False. Match 탭도
   같은 방식(`_match_preview_dirty`).
+
+
+### UI 레이아웃 함정 (v01.06)
+
+**공용 TSL 위젯 **전체**에 `setMaximumHeight` 를 걸지 말 것.**
+Match 탭의 From 리스트가 `tsl_from.setMaximumHeight(120)` 으로 묶여 있었는데,
+TSL 안에는 `List From Mesh` 버튼 + 헤더 + 리스트 + `Add`/`Del` 행이 들어 있고
+**리스트의 최소 높이는 줄지 않는다**(`DEFAULT_LIST_MIN_HEIGHT = 100`).
+그래서 모자란 높이를 레이아웃이 **버튼에서 빼앱가** 글자가 잘렸다.
+
+실측(테마 qss 적용 상태, `mayapy`) — 버튼이 필요로 하는 높이는 **30px** 인데 **25px** 로 눌렸고,
+TSL 자체도 sizeHint 290 을 111 에 집어넣고 있었다. 테마를 안 입히면 버튼이 23px 로
+작아져 증상이 안 나타난다 — **qss 패딩이 더해진 상태로 재야 보인다.**
+
+고친 방법: 높이 제한을 **리스트에만** 건다.
+
+```python
+JUN_mod_tsl_qt_v01(..., list_min_height=44)     # 리스트 바닥값을 낮추고
+self.tsl_from.list_widget.setMaximumHeight(70)  # 천장은 리스트에만
+```
+
+버튼은 제 크기(30px)를 지키고, 창을 380x380 까지 줄여도 눌리지 않는다(리스트가 대신 줄어든다).
+대가는 From 박스가 111 → 159px 로 커져 **창 최소 높이가 573 → 595px** 로 늘어난 것이다.
 
 ---
 

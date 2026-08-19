@@ -1,14 +1,14 @@
 ---
-title: 포트폴리오 작업 내역 (2026-05-06 ~ 2026-08-18)
+title: 포트폴리오 작업 내역 (2026-05-06 ~ 2026-08-19)
 aliases: [Portfolio KR, 포트폴리오 국문]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-08-18
+updated: 2026-08-19
 ---
 
 # Technical Artist / Pipeline TD 작업 내역 — 국문
 
 > **작성자**: 박지훈 (Ji Hun Park / Junny)
-> **기간**: 2026-05-06 ~ 2026-08-18 (약 15주)
+> **기간**: 2026-05-06 ~ 2026-08-19 (약 15주)
 > **범위**: Autodesk Maya 툴 개발 · 언리얼 엔진 연동 자동화 · MetaHuman 페이셜 · 파이프라인 인프라
 > **규모**: 사내 툴 40여 종(툴 폴더 50개) · 전 툴 공용 프레임워크 1식 · 커밋 299건(2026-07-15 기준 집계)
 > **스택**: Python 3, `maya.cmds` / OpenMaya, PySide2·PySide6(Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF), Houdini Alembic 캐시 연동
