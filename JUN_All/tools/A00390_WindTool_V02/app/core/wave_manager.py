@@ -304,9 +304,16 @@ def _mat_mul(a, b):
 # --------------------------------------------------------------- 드라이버 / 노드망
 
 def _make_wave_driver(name, amplitude, wavelength, period, speed, ramp,
-                      phase_offset=0.0, envelope=1.0):
-    """Chain Wave 드라이버 로케이터. 파라미터는 전부 **월드 단위 / 프레임**."""
+                      phase_offset=0.0, envelope=1.0, place_at=None):
+    """Chain Wave 드라이버 로케이터. 파라미터는 전부 **월드 단위 / 프레임**.
+
+    place_at : 월드 좌표 (x, y, z). 주면 로케이터를 그 자리로 옷긴다(체인 최상단 위에 두기).
+               None 이면 원점에 만든다(예전 동작).
+    """
     drv = cmds.spaceLocator(name=name)[0]
+
+    if place_at is not None:
+        cmds.xform(drv, worldSpace=True, translation=place_at)
     for attr, val, mn in ((WAVE_AMPLITUDE, amplitude, None),
                           (WAVE_WAVELENGTH, wavelength, 0.001),
                           (WAVE_PERIOD, period, 0.001),
@@ -422,7 +429,7 @@ def _nudge_eval():
 # --------------------------------------------------------------- 빌드 / 제거
 
 def _build_one(chain, axis, amplitude, wavelength, period, speed, ramp,
-               phase_offset, envelope=1.0):
+               phase_offset, envelope=1.0, driver_at_root=True):
     """체인 하나에 커브 + ikSpline + 노드망을 만든다. (드라이버, 생성 노드들, rest 회전)
 
     체인이 **조인트가 아니면**(FK 컨트롤러) 같은 자리에 숨긴 **프록시 조인트 체인**을 세워
@@ -434,6 +441,11 @@ def _build_one(chain, axis, amplitude, wavelength, period, speed, ramp,
     #   - 조인트도 프록시를 쓰면 사용자의 체인에 ikHandle·가상 조인트가 끼지 않는다.
     #   - 프록시 끝의 **가상 조인트(dummy tip)** 덕분에 **마지막 노드도 회전**한다.
     controls = list(chain)
+
+    # 드라이버를 놓을 자리는 **아무것도 만들기 전**에 재 둔다(셀업이 체인을 건드리기 전 rest 위치).
+    root_pos = (cmds.xform(controls[0], query=True, worldSpace=True, translation=True)
+                if driver_at_root else None)
+
     rest_rotate = {}
     rest_ctl_world = {}
     for node in controls:
@@ -464,7 +476,8 @@ def _build_one(chain, axis, amplitude, wavelength, period, speed, ramp,
         parentCurve=False, rootOnCurve=False)[:2]
 
     drv = _make_wave_driver(root_name + "_waveDriver#", amplitude, wavelength,
-                            period, speed, ramp, phase_offset, envelope)
+                            period, speed, ramp, phase_offset, envelope,
+                            place_at=root_pos)
     template = _sine_lut(drv + "_sineTemplate")
 
     # 실효 진폭 = windAmplitude * windEnvelope (커브의 모든 CV 가 공유, 노드 1개).
@@ -496,7 +509,7 @@ def _build_one(chain, axis, amplitude, wavelength, period, speed, ramp,
 def build_wave(joints, mode=MODE_ROOT, axis="Y", amplitude=1.0, wavelength=10.0,
                period=24.0, speed=1.0, ramp=1.0, node_offset=0.0,
                output=OUTPUT_NODE, start=0.0, end=100.0, prefix=None,
-               envelope=1.0):
+               envelope=1.0, driver_at_root=True):
     """조인트 체인이 **회전만으로** 싸인 파형을 따라가게 만든다.
 
     joints     : 체인(리스트 순서) 또는 체인 루트들.
@@ -511,6 +524,8 @@ def build_wave(joints, mode=MODE_ROOT, axis="Y", amplitude=1.0, wavelength=10.0,
     start, end : (curve 출력) 구울 구간.
     envelope   : 드라이버 windEnvelope 초기값 [0, 1]. 0 = 파동이 전혀 적용되지 않음(rest),
                  0.5 = 절반, 1 = 완전 적용. 빌드 뒤에도 드라이버에서 라이브 조절/키잉.
+    driver_at_root : True 면 드라이버 로케이터를 체인 최상단(루트) 월드 위치에 놓는다.
+                     False 면 예전처럼 원점에 만든다.
 
     Returns: (chains, drivers, message)
     """
@@ -528,7 +543,8 @@ def build_wave(joints, mode=MODE_ROOT, axis="Y", amplitude=1.0, wavelength=10.0,
     rest_all = {}
     for k, chain in enumerate(chains):
         drv, made, rest = _build_one(chain, axis, amplitude, wavelength, period,
-                                     speed, ramp, k * node_offset, envelope)
+                                     speed, ramp, k * node_offset, envelope,
+                                     driver_at_root=driver_at_root)
         drivers.append(drv)
         made_all += made
         rest_all.update(rest)
@@ -556,13 +572,14 @@ def build_wave(joints, mode=MODE_ROOT, axis="Y", amplitude=1.0, wavelength=10.0,
     else:
         _nudge_eval()
         kind = "joint" if all(is_joint(c[0]) for c in chains) else "controller"
-        msg = ("Chain Wave [{3}]: {0} chain(s), driver(s) {1}. Edit windAmplitude / "
-               "windWavelength / windPeriod / windSpeed / windRootRamp live; "
-               "windPhaseOffset shifts one chain's timing; windEnvelope [0-1] "
-               "scales the whole effect (0 = off, 0.5 = half, now {4:g}). "
-               "Remove with the '{2}' set.".format(
+        msg = ("Chain Wave [{3}]: {0} chain(s), driver(s) {1} at {5}. Edit "
+               "windAmplitude / windWavelength / windPeriod / windSpeed / "
+               "windRootRamp live; windPhaseOffset shifts one chain's timing; "
+               "windEnvelope [0-1] scales the whole effect (0 = off, 0.5 = half, "
+               "now {4:g}). Remove with the '{2}' set.".format(
                    len(chains), ", ".join(_leaf(d) for d in drivers),
-                   set_name, kind, envelope))
+                   set_name, kind, envelope,
+                   "the chain root" if driver_at_root else "the origin"))
 
     if branched:
         msg += " Branching chain(s) followed the first child: {0}.".format(

@@ -201,9 +201,16 @@ def _sine_lut(name):
 
 
 def _make_driver(name, period, amplitude, offset, speed, phase_offset=0.0,
-                 envelope=1.0):
-    """windPeriod/Amplitude/Offset + windSpeed + windPhaseOffset + windEnvelope + windPhaseTime."""
+                 envelope=1.0, place_at=None):
+    """windPeriod/Amplitude/Offset + windSpeed + windPhaseOffset + windEnvelope + windPhaseTime.
+
+    place_at : 월드 좌표 (x, y, z). 주면 로케이터를 그 자리로 옮긴다(그룹 최상단 위에 두기).
+               None 이면 원점에 만든다(예전 동작).
+    """
     drv = cmds.spaceLocator(name=name)[0]
+
+    if place_at is not None:
+        cmds.xform(drv, worldSpace=True, translation=place_at)
     for attr, val in zip(DRIVER_PARAMS, (period, amplitude, offset)):
         cmds.addAttr(drv, longName=attr, attributeType="double",
                      defaultValue=val, keyable=True)
@@ -341,7 +348,7 @@ def _wire_group(drv, pairs, attr, template_lut):
 def apply_wind(joints, attr, start, end, period, amplitude, offset,
                clear_range=True, tangent="spline", skip_zero_crossings=True,
                mode=MODE_CHAIN, output=OUTPUT_CURVE, speed=1.0, node_offset=0.0,
-               envelope=1.0):
+               envelope=1.0, driver_at_root=True):
     """본 체인에 싸인 파형(바람 일렁임)을 적용한다.
 
     joints     : 조인트 이름 목록.
@@ -360,6 +367,8 @@ def apply_wind(joints, attr, start, end, period, amplitude, offset,
                  (windPhaseOffset = k*node_offset). Root 모드에서 루트마다 다른 타이밍.
     envelope   : (node) 드라이버 windEnvelope 초기값 [0, 1]. 0 = 영향 없음, 0.5 = 절반,
                  1 = 완전 적용. 만든 뒤에도 드라이버에서 라이브로 조절/키잉할 수 있다.
+    driver_at_root: (node) True 면 드라이버 로케이터를 그 그룹 **최상단 노드의 위치**에
+                 놓는다. False 면 예전처럼 원점에 만든다.
 
     반환: (count, joint_count, message)  -- curve 면 count=키 수, node 면 count=드라이버 수.
     """
@@ -376,7 +385,7 @@ def apply_wind(joints, attr, start, end, period, amplitude, offset,
 
     if output == OUTPUT_NODE:
         return _apply_nodes(groups, missing, attr, period, amplitude, offset,
-                            speed, mode, node_offset, envelope)
+                            speed, mode, node_offset, envelope, driver_at_root)
     return _apply_curve(groups, missing, attr, start, end, period, amplitude, offset,
                         clear_range, tangent, skip_zero_crossings, mode)
 
@@ -420,11 +429,13 @@ def _apply_curve(groups, missing, attr, start, end, period, amplitude, offset,
 
 
 def _apply_nodes(groups, missing, attr, period, amplitude, offset, speed, mode,
-                 node_offset=0.0, envelope=1.0):
+                 node_offset=0.0, envelope=1.0, driver_at_root=True):
     """node 모드: 그룹마다 드라이버 null 1개 + 싸인 노드망을 만든다.
 
     드라이버 순번 k 마다 windPhaseOffset = k*node_offset 로 초기화해, Root 모드에서 루트들이
     서로 다른 타이밍으로 찰랑이게 한다(이후 각 드라이버의 windPhaseOffset 을 직접 조절 가능).
+
+    driver_at_root=True 면 드라이버 로케이터를 그 그룹 최상단 노드의 월드 위치에 놓는다.
     """
     if not groups:
         msg = "[Warning] No valid joints for node driver."
@@ -436,9 +447,12 @@ def _apply_nodes(groups, missing, attr, period, amplitude, offset, speed, mode,
     wired = 0
     for k, grp in enumerate(groups):
         root_jnt = grp[0][0]
+        place_at = (cmds.xform(root_jnt, query=True, worldSpace=True,
+                               translation=True) if driver_at_root else None)
         drv = _make_driver(_leaf(root_jnt) + "_windDriver#",
                            period, amplitude, offset, speed,
-                           phase_offset=k * node_offset, envelope=envelope)
+                           phase_offset=k * node_offset, envelope=envelope,
+                           place_at=place_at)
         template = _sine_lut(drv + "_sineTemplate")
         wired += _wire_group(drv, grp, attr, template)
         cmds.delete(template)   # 조인트마다 복제본을 썼으므로 템플릿은 버린다.
@@ -448,11 +462,13 @@ def _apply_nodes(groups, missing, attr, period, amplitude, offset, speed, mode,
     head = "Wind node ({0} mode): {1} driver(s) on {2} joint(s)".format(
         mode_label, len(drivers), wired)
     msg = "{0} [{1}] period={2} amp={3} offset={4} speed={5} node_offset={6} " \
-          "envelope={7}. Edit windPeriod/Amplitude/Offset/Speed live; " \
+          "envelope={7}. Driver(s) placed at {8}. " \
+          "Edit windPeriod/Amplitude/Offset/Speed live; " \
           "windPhaseOffset sets each driver's overall timing (per-root); " \
           "windEnvelope [0-1] scales the whole effect (0 = off, 0.5 = half)." \
           .format(head, attr, period, amplitude, offset, speed, node_offset,
-                  envelope)
+                  envelope,
+                  "the chain root" if driver_at_root else "the origin")
     if missing:
         msg += " Skipped: {0}".format(", ".join(missing))
     return len(drivers), wired, msg

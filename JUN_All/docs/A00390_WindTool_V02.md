@@ -1,8 +1,8 @@
 ---
 title: A00390_WindTool_V02 사용법
 aliases: [Wind Tool V02, Chain Wave Lite]
-tags: [maya-python, tool-guide, wind, chain-wave, ikSpline, performance, envelope]
-updated: 2026-08-18
+tags: [maya-python, tool-guide, wind, chain-wave, ikSpline, performance, envelope, axis]
+updated: 2026-08-19
 ---
 
 # A00390_WindTool_V02 사용법
@@ -19,7 +19,7 @@ updated: 2026-08-18
 세 탭 모두 **Output = `Node`** 를 고르면 드라이버 노드로 파형을 실시간 통제할 수 있고,
 그 드라이버에는 **`windEnvelope` [0, 1]** 영향력 어트리뷰트가 붙는다(→ [7장](#7-envelope-영향력-0-1)).
 
-- **버전**: `app/config/version.py` (v02.01)
+- **버전**: `app/config/version.py` (v02.02)
 - **위치**: `JUN_All/tools/A00390_WindTool_V02`
 - **설치**: `__dragDrop_A00390_V02.py` 드래그&드롭 → 셸프 버튼 **`WindToolV2`**
 - 근거·측정: [계획서](plans/A00390_ChainWave_no_ik_plan.md)
@@ -74,7 +74,8 @@ rotateOrder 가 어떻든** 안전하다.
 ## 3. 사용법
 
 1. 체인을 리스트에 담는다(`Bone Chain` = 리스트가 한 체인 / `Bone Root` = 항목마다 체인 루트).
-2. **Chain Wave Lite** 탭에서 `Sway Axis` 와 파라미터를 정한다.
+2. **Chain Wave Lite** 탭에서 회전축(`Sway Axis` 또는 `Rotate Axis (object)`, → [8장](#8-회전축을-정하는-두-가지-방법))과
+   파라미터를 정한다.
 3. **Build Chain Wave Lite**
 
 드라이버 로케이터에 붙는 어트리뷰트를 라이브로 만지면 즉시 반영된다.
@@ -196,3 +197,63 @@ Chain Wave / Lite 는 이 노드도 제거용 세트에 들어가므로 **Remove
 ### 검증
 
 `mayapy` (Maya 2024) 헤드리스 **35항목 통과** (코어 21 + UI 14). 위 표의 값이 그 결과다.
+
+---
+
+## 8. 회전축을 정하는 두 가지 방법
+
+**Chain Wave Lite** 탭은 체인을 어느 축 둘레로 돌릴지 두 가지로 정할 수 있다.
+
+| | `Sway Axis (world)` (기본) | `Rotate Axis (object)` (신규) |
+|---|---|---|
+| 회전축 | `체인 방향 × 월드 축` 으로 **계산한 월드 축** | 노드가 **자기 오브젝트 축** 하나 (X/Y/Z) |
+| 쓰는 채널 | 세 `rotate` 채널 전부 (축이 기울면) | **고른 채널 하나만** |
+| 조인트 orient | 결과가 orient 와 **무관** | orient 를 **그대로 따른다** |
+| 만드는 노드 | 노드당 최대 3개(`axisAngleToQuat`/`quatProd`/`quatToEuler`) | 노드당 1개(부호 곱셈) |
+
+`Rotate Axis (object)` 체크박스를 켜면 위의 `Sway Axis` 콤보는 **비활성되고, 계산에서도 완전히
+빠진다**(월드 축을 아예 구하지 않는다). 실측으로 확인한 것 —
+
+- `Sway Axis` 를 X/Y/Z 어느 것으로 바꿔도 결과 회전값이 **완전히 동일**했다.
+- 고른 축의 `rotate` 채널 **하나에만** 연결이 들어가고 나머지 둘은 비어 있다
+  → 애니메이터가 남은 두 축을 계속 쓸 수 있다.
+- 비스듬한 체인(조인트 9)에서 노드 수가 **102 → 84** 로 줄었다(쿼터니언 경로가 사라져서).
+
+### ⚠️ 언제 쓰면 안 되나
+
+`theta_k − theta_(k-1)` 차분이 **월드 각도로 정확히 누적되려면 체인의 노드들이 같은 방향으로
+orient 돼 있어야 한다.** 보통의 조인트 체인·FK 컨트롤러 체인은 그렇다. 축이 노드마다 제각각인
+체인에 쓰면 파형이 아니라 "각자 자기 축으로 흔들리는" 그림이 된다 — 그때는 `Sway Axis` 를 쓴다.
+
+> `Curve` 출력(굽기)에도 똑같이 적용된다. 어느 쪽으로 만들었든 구운 결과는 회전 키다.
+
+### 곁가지로 고친 것
+
+월드 축 경로는 축이 로컬 기본축과 어긋나면 `axisAngleToQuat` / `quatProd` / `quatToEuler` 를
+만드는데, 이 노드들은 **`quatNodes` 플러그인 소속**이다. 플러그인이 안 올라와 있으면
+`createNode` 가 `No object matches name` 으로 죽는다(헤드리스에서 실제로 만났다).
+이제 이 경로에 들어가기 전에 `loadPlugin("quatNodes", quiet=True)` 로 확실히 올린다.
+
+---
+
+## 9. 드라이버 로케이터를 체인 최상단에 놓기
+
+`Output = Node` 로 만드는 드라이버 로케이터는 예전에는 **항상 월드 원점**에 생겼다. 체인이
+원점에서 멀면 어느 로케이터가 어느 체인의 것인지 찾기 어렵고, 여러 개가 원점에 겹쳐 쌓였다.
+
+**`Place driver at chain root`** 체크박스(**기본 켜짐**)를 켜면 드라이버를 그 체인
+**최상단 노드(루트 본/컨트롤러)의 월드 위치**에 만든다. 세 탭 전부(`Sine` · `Chain Wave` ·
+`Chain Wave Lite`)에 있고, `Curve` 출력에서는 셋업이 지워지므로 **비활성**된다.
+
+- `Bone Root` 모드에서는 **루트마다 드라이버가 하나씩** 생기므로, 각자 자기 루트 위에 놓인다.
+- 로케이터는 **어트리뷰트를 담고 있을 뿐**이라 위치가 결과에 영향을 주지 않는다 —
+  만든 뒤 아무 데로나 옮겨도 회전값이 바뀌지 않는 것을 실측으로 확인했다.
+  (그래서 체크를 꺼도 결과는 같고, 원점에 생길 뿐이다.)
+- 체인에 붙이는 것이 아니라 **그 자리에 두는 것**이다(부모 관계 없음). 체인이 애니메이션으로
+  움직여도 로케이터는 따라가지 않는다.
+
+### 검증
+
+`mayapy` (Maya 2024) 헤드리스 **24 + 6 항목 통과** — 축 모드별 연결 채널, `Sway Axis` 무시 여부,
+월드 모드 회귀, 노드 수, Bone Root 에서 루트별 드라이버 위치, FK 컨트롤러 체인, Remove 복구,
+UI 활성/비활성 배선. 위 숫자가 그 결과다.

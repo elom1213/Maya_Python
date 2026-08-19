@@ -42,6 +42,21 @@
 #
 # 조인트든 FK 컨트롤러든 **같은 경로**로 처리한다. 기존 모드에서 컨트롤러 때문에 필요했던
 # 프록시 체인이 통째로 사라진다.
+#
+# ## 회전축을 정하는 두 가지 방법
+#
+# 1) **Sway Axis (월드)** — 기본. `world_axis = chain_dir x up` 으로 구한 **월드 축** 둘레로
+#    돌린다. 체인이 어떻게 orient 돼 있든 결과가 월드 기준으로 같다. 대신 그 축이 노드의
+#    로컬 기본축과 어긋나면 조인트마다 쿼터니언 노드 3개가 붙고, 세 rotate 채널이 전부 물린다.
+#
+# 2) **Rotate Axis (오브젝트)** — `local_axis="X"/"Y"/"Z"`. 각 노드의 **자기 rotate 채널 하나만**
+#    쓴다(`rotateX` 등). 채널 직결이라 노드가 가장 적고, 다른 두 채널은 손대지 않아 애니메이터가
+#    남은 축을 계속 쓸 수 있다. 이때 **Sway Axis 는 계산에 전혀 들어가지 않는다**(월드 축을
+#    구하지 않으므로 "체인이 축과 평행" 실패도 없다).
+#
+#    주의: theta 차분(`theta_k - theta_(k-1)`)이 월드 각도로 정확히 누적되려면 체인의 각 노드가
+#    **같은 방향으로 orient** 돼 있어야 한다. 보통의 FK 체인·조인트 체인은 그렇다. 축이 노드마다
+#    제각각인 체인이라면 파형이 아니라 "각자 자기 축으로 흔들리는" 그림이 되므로 (1) 을 쓴다.
 
 import json
 import math
@@ -72,9 +87,20 @@ LITE_SWING = "windSwingAngle"
 LITE_SET_SUFFIX = "_waveLiteSET"
 LITE_REST_ATTR = "waveRestRotate"
 
+# Rotate Axis (오브젝트 공간) 로 쓸 수 있는 축. 노드의 rotateX/Y/Z 채널에 그대로 대응한다.
+LOCAL_AXES = ("X", "Y", "Z")
+
 # 회전축이 로컬 기본축(+-X/Y/Z)과 이만큼 가까우면 rotate 채널에 바로 연결한다.
 # 그러면 조인트당 쿼터니언 노드 3개를 아낀다.
 _CARDINAL_TOL = 1e-4
+
+
+def _ensure_quat_nodes():
+    """쿼터니언 노드(quatNodes 플러그인)를 확실히 올린다. 이미 올라와 있으면 아무 일도 없다."""
+    try:
+        cmds.loadPlugin("quatNodes", quiet=True)
+    except Exception:
+        pass
 
 
 # --------------------------------------------------------------- 회전축 계산
@@ -134,9 +160,16 @@ def _rotate_order(node):
 # --------------------------------------------------------------- 드라이버
 
 def _make_lite_driver(name, swing, wavelength, period, speed, ramp, phase_offset=0.0,
-                      envelope=1.0):
-    """Lite 드라이버 로케이터. 진폭만 **각도(도)** 이고 나머지는 기존과 같다."""
+                      envelope=1.0, place_at=None):
+    """Lite 드라이버 로케이터. 진폭만 **각도(도)** 이고 나머지는 기존과 같다.
+
+    place_at : 월드 좌표 (x, y, z). 주면 로케이터를 그 자리로 옮긴다(체인 최상단 위에 두기).
+               None 이면 원점에 만든다(예전 동작).
+    """
     drv = cmds.spaceLocator(name=name)[0]
+
+    if place_at is not None:
+        cmds.xform(drv, worldSpace=True, translation=place_at)
 
     for attr, val, minimum in ((LITE_SWING, swing, None),
                                (WAVE_WAVELENGTH, wavelength, 0.001),
@@ -170,10 +203,17 @@ def _make_lite_driver(name, swing, wavelength, period, speed, ramp, phase_offset
 
 # --------------------------------------------------------------- 각도 적용
 
-def _apply_angle(node, angle_plug, world_axis, rest, tag):
-    """각도를 노드의 rotate 로 넣는다. 축이 기본축이면 채널 직결, 아니면 쿼터니언 경로."""
-    axis = _local_axis(node, world_axis)
-    card = _cardinal(axis)
+def _apply_angle(node, angle_plug, world_axis, rest, tag, local_index=None):
+    """각도를 노드의 rotate 로 넣는다. 축이 기본축이면 채널 직결, 아니면 쿼터니언 경로.
+
+    local_index : 0/1/2 를 주면 **오브젝트 공간** 축으로 보고 그 rotate 채널에 바로 넣는다
+                  (world_axis 는 쓰지 않는다). None 이면 월드 축을 노드 공간으로 옮겨 쓴다.
+    """
+    if local_index is not None:
+        axis, card = None, (local_index, 1.0)
+    else:
+        axis = _local_axis(node, world_axis)
+        card = _cardinal(axis)
 
     if card is not None:
         index, sign = card
@@ -194,6 +234,10 @@ def _apply_angle(node, angle_plug, world_axis, rest, tag):
         return [scale]
 
     # 임의 축 : rest 회전에 축-각 회전을 곱해 오일러로 되돌린다.
+    # axisAngleToQuat / quatProd / quatToEuler 는 **quatNodes 플러그인** 소속이다. 로드돼 있지
+    # 않으면 createNode 가 "No object matches name" 으로 죽으므로 먼저 확실히 올린다.
+    _ensure_quat_nodes()
+
     a2q = cmds.createNode("axisAngleToQuat", name=tag + "_a2q")
     for i in range(3):
         cmds.setAttr(a2q + ".inputAxis" + "XYZ"[i], axis[i])
@@ -218,30 +262,43 @@ def _apply_angle(node, angle_plug, world_axis, rest, tag):
 # --------------------------------------------------------------- 체인 하나
 
 def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
-                      phase_offset, envelope=1.0):
-    """체인 하나에 각도 노드망을 만든다. (드라이버, 만든 노드들, rest 회전, 정보)"""
+                      phase_offset, envelope=1.0, local_axis=None,
+                      driver_at_root=True):
+    """체인 하나에 각도 노드망을 만든다. (드라이버, 만든 노드들, rest 회전, 정보)
+
+    local_axis : "X"/"Y"/"Z" 를 주면 각 노드의 **오브젝트 공간** 축으로만 돌린다.
+                 이때 `axis`(Sway Axis) 는 **전혀 쓰이지 않는다**.
+    """
     name = _safe(_leaf(chain[0]))
     points = _chain_positions(chain)
     arcs = _arc_positions(points)
     total = arcs[-1] if arcs[-1] > 1e-9 else 1.0
 
-    # 파동 평면 : 체인 방향 x 월드 진동축. 양의 각도가 진동축 쪽으로 뻗도록 이 순서다.
     chain_dir = om.MVector(*points[-1]) - om.MVector(*points[0])
     if chain_dir.length() < 1e-6:
         return None, [], {}, "chain length is 0"
 
-    up = om.MVector(0.0, 0.0, 0.0)
-    up[UP_AXES.index(axis.upper())] = 1.0
+    if local_axis is not None:
+        # 오브젝트 공간 축 : 노드마다 자기 rotate 채널 하나만 쓴다. 월드 축은 구하지 않는다.
+        local_index = LOCAL_AXES.index(local_axis.upper())
+        world_axis = None
+    else:
+        # 파동 평면 : 체인 방향 x 월드 진동축. 양의 각도가 진동축 쪽으로 뻗도록 이 순서다.
+        local_index = None
 
-    world_axis = chain_dir.normal() ^ up
-    if world_axis.length() < 1e-4:
-        return None, [], {}, "chain is parallel to the wave axis"
-    world_axis = world_axis.normal()
+        up = om.MVector(0.0, 0.0, 0.0)
+        up[UP_AXES.index(axis.upper())] = 1.0
+
+        world_axis = chain_dir.normal() ^ up
+        if world_axis.length() < 1e-4:
+            return None, [], {}, "chain is parallel to the wave axis"
+        world_axis = world_axis.normal()
 
     rest_rotate = {node: list(cmds.getAttr(node + ".rotate")[0]) for node in chain}
 
     drv = _make_lite_driver(name + "_liteDriver#", swing, wavelength, period,
-                            speed, ramp, phase_offset, envelope)
+                            speed, ramp, phase_offset, envelope,
+                            place_at=(points[0] if driver_at_root else None))
     made = [drv]
 
     # 실효 스윙 = windSwingAngle * windEnvelope (체인 전체가 공유, 노드 1개).
@@ -316,9 +373,10 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
 
         thetas.append(theta)
 
-        if _cardinal(_local_axis(node, world_axis)) is not None:
+        if local_index is not None or _cardinal(_local_axis(node, world_axis)) is not None:
             cardinal_count += 1
-        made += _apply_angle(node, local_plug, world_axis, rest_rotate[node], tag)
+        made += _apply_angle(node, local_plug, world_axis, rest_rotate[node], tag,
+                             local_index=local_index)
 
     cmds.delete(template)
 
@@ -330,16 +388,24 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
 def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.0,
                     period=24.0, speed=1.0, ramp=1.0, node_offset=0.0,
                     output=OUTPUT_NODE, start=0.0, end=100.0, prefix=None,
-                    envelope=1.0):
+                    envelope=1.0, local_axis=None, driver_at_root=True):
     """커브·ikHandle 없이 체인이 파형을 따라가게 한다.
 
     swing : **뼈가 흔들리는 각도(도)**. 기존 Chain Wave 의 windAmplitude(거리)와 뜻이 다르다.
     envelope : 드라이버 windEnvelope 초기값 [0, 1]. 0 = 전혀 흔들리지 않음(rest 자세),
                0.5 = 절반, 1 = 완전 적용. 빌드 뒤에도 드라이버에서 라이브 조절/키잉.
+    local_axis : None 이면 `axis`(Sway Axis, 월드)로 회전축을 구한다(기본).
+                 "X"/"Y"/"Z" 를 주면 각 노드의 **오브젝트 공간** 축 하나만 돌리고,
+                 **`axis` 는 무시된다**.
+    driver_at_root : True 면 드라이버 로케이터를 체인 최상단(루트) 월드 위치에 놓는다.
+                     False 면 예전처럼 원점에 만든다.
     나머지 인자는 기존 build_wave 와 같다.
 
     Returns: (체인 수, 드라이버 수, 메시지)
     """
+    if local_axis is not None and local_axis.upper() not in LOCAL_AXES:
+        return 0, 0, "[Warning] Rotate axis must be one of X / Y / Z."
+
     chains, missing, branched = resolve_chains(joints, mode)
 
     if not chains:
@@ -357,7 +423,7 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
     for k, chain in enumerate(chains):
         drv, made, rest, info = _build_chain_lite(
             chain, axis, swing, wavelength, period, speed, ramp, k * node_offset,
-            envelope)
+            envelope, local_axis=local_axis, driver_at_root=driver_at_root)
 
         if drv is None:
             failed.append("{0} ({1})".format(_leaf(chain[0]), info))
@@ -371,6 +437,12 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
 
     if not drivers:
         return 0, 0, "[Warning] Nothing built. {0}".format("; ".join(failed))
+
+    if local_axis is not None:
+        axis_note = ("Rotate axis: object {0} (rotate{0} only, Sway Axis "
+                     "ignored)".format(local_axis.upper()))
+    else:
+        axis_note = "Sway axis: world {0}".format(axis.upper())
 
     set_name = (prefix or "chainWaveLite") + LITE_SET_SUFFIX
     node_set = cmds.sets(made_all, name=set_name)
@@ -389,17 +461,20 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
             cmds.delete(node_set)
         drivers = []
         msg = ("Chain Wave Lite baked: {0} chain(s), {1} node(s) over [{2:g}-{3:g}f]. "
-               "Rotation keys only - the setup was removed.".format(
-                   len(chains), len(targets), min(start, end), max(start, end)))
+               "{4}. Rotation keys only - the setup was removed.".format(
+                   len(chains), len(targets), min(start, end), max(start, end),
+                   axis_note))
     else:
         msg = ("Chain Wave Lite: {0} chain(s), {1} maya node(s), "
-               "no curve / ikHandle / proxy. Direct-axis {2}/{3} node(s). "
+               "no curve / ikHandle / proxy. {6}. Direct-axis {2}/{3} node(s). "
+               "Driver locator at {7}. "
                "Edit windSwingAngle (degrees) / windWavelength / windPeriod / "
                "windSpeed / windRootRamp live; windEnvelope [0-1] scales the whole "
                "effect (0 = off, 0.5 = half, now {5:g}). "
                "Remove with the '{4}' set.".format(
                    len(drivers), len(made_all), cardinal_total, node_total, set_name,
-                   envelope))
+                   envelope, axis_note,
+                   "the chain root" if driver_at_root else "the origin"))
 
     if failed:
         msg += " Failed: {0}.".format(", ".join(failed[:5]))

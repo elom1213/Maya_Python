@@ -113,6 +113,15 @@ class MainWindow(QWidget):
         self.rb_curve.toggled.connect(self._on_output_changed)
         sine.addWidget(out_box)
 
+        self.chk_driver_root = QCheckBox("Place driver at chain root")
+        self.chk_driver_root.setChecked(True)
+        self.chk_driver_root.setToolTip(
+            "Node output only. On (default): each driver locator is created at the\n"
+            "world position of the TOP node of the group it drives (the chain root)\n"
+            "instead of at the origin.\n"
+            "It is only a locator holding attributes - moving it changes nothing.")
+        sine.addWidget(self.chk_driver_root)
+
         # 축(어트리뷰트) 선택
         axis_row = QHBoxLayout()
         axis_row.addWidget(QLabel("Axis"))
@@ -299,6 +308,14 @@ class MainWindow(QWidget):
         self.rb_wave_curve.toggled.connect(self._on_wave_output_changed)
         wave.addWidget(out_box)
 
+        self.chk_wave_driver_root = QCheckBox("Place driver at chain root")
+        self.chk_wave_driver_root.setChecked(True)
+        self.chk_wave_driver_root.setToolTip(
+            "Node output only. On (default): the driver locator is created at the\n"
+            "world position of the TOP node of that chain instead of at the origin.\n"
+            "It is only a locator holding attributes - moving it changes nothing.")
+        wave.addWidget(self.chk_wave_driver_root)
+
         axis_row = QHBoxLayout()
         axis_row.addWidget(QLabel("Sway Axis (world)"))
         self.cmb_wave_axis = QComboBox()
@@ -378,6 +395,7 @@ class MainWindow(QWidget):
     def _on_wave_output_changed(self, *args):
         node = self.rb_wave_node.isChecked()
         self.wave_range.setEnabled(not node)
+        self.chk_wave_driver_root.setEnabled(node)
         self.btn_wave_apply.setText(
             "Build Chain Wave" if node else "Bake Chain Wave")
 
@@ -407,6 +425,7 @@ class MainWindow(QWidget):
                     ramp=self.sb_wave_ramp.value(),
                     node_offset=self.sb_wave_node_offset.value(),
                     envelope=self.sb_wave_envelope.value(),
+                    driver_at_root=self.chk_wave_driver_root.isChecked(),
                     output=(wind_mgr.OUTPUT_NODE if node
                             else wind_mgr.OUTPUT_CURVE),
                     start=start, end=end)
@@ -473,17 +492,55 @@ class MainWindow(QWidget):
         self.rb_lite_curve.toggled.connect(self._on_lite_output_changed)
         lite.addWidget(out_box)
 
+        self.chk_lite_driver_root = QCheckBox("Place driver at chain root")
+        self.chk_lite_driver_root.setChecked(True)
+        self.chk_lite_driver_root.setToolTip(
+            "Node output only. On (default): the driver locator is created at the\n"
+            "world position of the TOP node of that chain, so it sits on the bone /\n"
+            "controller it drives instead of at the origin.\n"
+            "Off: the locator is left at the origin (the old behaviour).\n"
+            "It is only a locator holding attributes - moving it changes nothing.")
+        lite.addWidget(self.chk_lite_driver_root)
+
         axis_row = QHBoxLayout()
-        axis_row.addWidget(QLabel("Sway Axis (world)"))
+        self.lbl_lite_sway = QLabel("Sway Axis (world)")
+        axis_row.addWidget(self.lbl_lite_sway)
         self.cmb_lite_axis = QComboBox()
         self.cmb_lite_axis.addItems(wave_mgr.UP_AXES)
         self.cmb_lite_axis.setCurrentText("Y")
         self.cmb_lite_axis.setToolTip(
             "Which WORLD axis the chain sways along.\n"
             "The rotation axis is worked out from the chain direction and this axis,\n"
-            "so joint orientation and rotate order do not matter.")
+            "so joint orientation and rotate order do not matter.\n"
+            "Ignored while 'Rotate Axis (object)' below is on.")
         axis_row.addWidget(self.cmb_lite_axis, 1)
         lite.addLayout(axis_row)
+
+        # 오브젝트 공간 축으로만 돌리기. 켜면 위의 Sway Axis 는 계산에 전혀 들어가지 않는다.
+        local_row = QHBoxLayout()
+        self.chk_lite_local = QCheckBox("Rotate Axis (object)")
+        self.chk_lite_local.setToolTip(
+            "On: every node rotates about ONE of its OWN axes only - the wave is\n"
+            "written straight into that rotate channel (rotateX / rotateY / rotateZ)\n"
+            "and the other two channels are left untouched.\n"
+            "Sway Axis (world) above is IGNORED while this is on.\n\n"
+            "Off (default): the rotation axis is derived from the chain direction and\n"
+            "the world Sway Axis, so the result is the same in world space whatever\n"
+            "the joint orientation is.\n\n"
+            "Use this when the rig is meant to bend on one specific local axis.\n"
+            "It assumes the chain nodes share an orientation (a normal FK / joint\n"
+            "chain does); on a chain whose nodes are oriented every which way the\n"
+            "bones swing on their own axes instead of forming one wave.")
+        self.chk_lite_local.toggled.connect(self._on_lite_axis_mode_changed)
+        local_row.addWidget(self.chk_lite_local)
+
+        self.cmb_lite_local_axis = QComboBox()
+        self.cmb_lite_local_axis.addItems(lite_mgr.LOCAL_AXES)
+        self.cmb_lite_local_axis.setCurrentText("Z")
+        self.cmb_lite_local_axis.setToolTip(
+            "Which rotate channel of each node carries the wave (object space).")
+        local_row.addWidget(self.cmb_lite_local_axis, 1)
+        lite.addLayout(local_row)
 
         self.lite_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
             start_value=int(cmds.playbackOptions(query=True, minTime=True)),
@@ -548,13 +605,23 @@ class MainWindow(QWidget):
 
         lite.addStretch(1)
         self._on_lite_output_changed()
+        self._on_lite_axis_mode_changed()
         return page
 
     def _on_lite_output_changed(self, *args):
         node = self.rb_lite_node.isChecked()
         self.lite_range.setEnabled(not node)
+        # 드라이버 위치는 node 출력에만 의미가 있다(curve 는 구운 뒤 셋업을 지운다).
+        self.chk_lite_driver_root.setEnabled(node)
         self.btn_lite_apply.setText(
             "Build Chain Wave Lite" if node else "Bake Chain Wave Lite")
+
+    def _on_lite_axis_mode_changed(self, *args):
+        """오브젝트 축 모드면 Sway Axis 를 통째로 비활성화한다(계산에도 안 들어간다)."""
+        local = self.chk_lite_local.isChecked()
+        self.lbl_lite_sway.setEnabled(not local)
+        self.cmb_lite_axis.setEnabled(not local)
+        self.cmb_lite_local_axis.setEnabled(local)
 
     def on_lite_apply(self):
         joints = self.tsl.get_all_nodes()
@@ -582,6 +649,9 @@ class MainWindow(QWidget):
                     ramp=self.sb_lite_ramp.value(),
                     node_offset=self.sb_lite_node_offset.value(),
                     envelope=self.sb_lite_envelope.value(),
+                    local_axis=(self.cmb_lite_local_axis.currentText()
+                                if self.chk_lite_local.isChecked() else None),
+                    driver_at_root=self.chk_lite_driver_root.isChecked(),
                     output=(wind_mgr.OUTPUT_NODE if node
                             else wind_mgr.OUTPUT_CURVE),
                     start=start, end=end)
@@ -617,6 +687,7 @@ class MainWindow(QWidget):
         self.lbl_node_offset.setEnabled(not curve)
         self.sb_envelope.setEnabled(not curve)
         self.lbl_envelope.setEnabled(not curve)
+        self.chk_driver_root.setEnabled(not curve)
         self.btn_apply.setText("Apply Wind Keys" if curve else "Build Wind Node")
 
     # ==============================================================
@@ -660,7 +731,8 @@ class MainWindow(QWidget):
                     joints, attr, start, end, period, amp, offset,
                     clear_range=clear_range, skip_zero_crossings=skip_zero,
                     mode=mode, output=output, speed=speed, node_offset=node_offset,
-                    envelope=envelope)
+                    envelope=envelope,
+                    driver_at_root=self.chk_driver_root.isChecked())
         except Exception as e:
             self.log("Apply failed: {0}".format(e), warn=True)
             return
