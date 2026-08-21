@@ -8,9 +8,13 @@
 # 2) 리스트업한 커브들의 cv[0]/cv[n] 월드 위치를 지정 축으로 비교해 방향을 통일한다
 #    (Reverse Direction). 축 비교 방식은 A00360_SortTool 을 참고했다.
 #
-# 위 두 기능은 "Create / Direction" 탭이고, "Line Width" 탭은 리스트업한 커브의 뷰포트
-# 표시 굵기(nurbsCurve.lineWidth)를 슬라이더로 조절한다 — 씬에서 커브를 눈으로 찾고
-# 클릭으로 집기 쉽게 하려는 용도다(형상은 건드리지 않는다).
+# 탭은 상위 = 카테고리, 하위 = 기능으로 두 단계다 (A00110_animTool_V02 과 같은 규칙).
+#   Create  > From Edges / From Points   - 씬에 새 커브를 만든다
+#   Edit    > Smooth / Wrap              - 기존 커브의 형상(CV)을 바꾼다
+#   Display > Line Width                 - 그려지는 방식만 바꾼다(형상 불변)
+# 위 1)2) 는 Create > From Edges 이고, Line Width 는 리스트업한 커브의 뷰포트 표시
+# 굵기(nurbsCurve.lineWidth)를 조절한다 — 씬에서 커브를 눈으로 찾고 클릭으로 집기
+# 쉽게 하려는 용도다(형상은 건드리지 않는다). 분류 근거는 MainWindow.CATEGORIES 주석 참고.
 
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
@@ -39,6 +43,66 @@ _WARN_COLOR = "#ffb454"
 
 
 class MainWindow(QWidget):
+
+    # ==================================================================
+    # 탭 분류표 — 상위 탭 = 카테고리, 하위 탭 = 기능
+    #
+    # A00110_animTool_V02 와 같은 규칙이다. 기준은 "씬에 무엇을 하는가" 다.
+    #   Create  : 씬에 **새 커브를 만든다**
+    #   Edit    : **기존 커브의 형상(CV 위치)** 을 바꾼다
+    #   Display : **그려지는 방식만** 바꾼다 — 커브 형상은 그대로다
+    #
+    # Line Width 를 Edit 이 아니라 Display 에 둔 이유: nurbsCurve.lineWidth 는
+    # 뷰포트 표시 굵기일 뿐 커브 데이터를 건드리지 않는다. 커브를 바꾸는 기능과
+    # 보이는 방식만 바꾸는 기능을 같은 상자에 두면 분류가 흐려진다.
+    #
+    # Reverse Direction 은 성격상 Edit 이지만 Create 의 "From Edges" 에 남겨 둔다 —
+    # 생성 버튼과 **같은 커브 리스트(self.tsl)** 를 공유하기 때문이다. 떼어내면
+    # 커브를 두 번 리스트업해야 해서 실사용이 나빠진다.
+    #
+    # 하위 페이지가 하나뿐인 Display 도 하위 탭 바를 그대로 둔다. 탭 하나짜리 탭 바가
+    # 낭비처럼 보이지만 ① 기능 이름이 화면에 남고 ② 나중에 커브 색상 · CV 크기 같은
+    # 표시 기능이 늘어도 구조가 그대로다. (A00110_V02 와 같은 판단)
+    # ==================================================================
+
+    CREATE_PAGES = (
+        ("From Edges",
+         "From Edges - build one curve per connected edge group from the "
+         "selected mesh edges, then unify the curve directions.",
+         "_build_create_tab"),
+        ("From Points",
+         "From Points - draw one curve through the world positions of the "
+         "listed objects, joints or components, in list order.",
+         "_build_points_tab"),
+    )
+
+    EDIT_PAGES = (
+        ("Smooth",
+         "Smooth or roughen the selected curve CVs with a live slider. "
+         "Soft selection falloff is respected.",
+         "_build_smooth_tab"),
+        ("Wrap",
+         "Make one curve take the shape of another, even when the two have "
+         "different CV counts.",
+         "_build_wrap_tab"),
+    )
+
+    DISPLAY_PAGES = (
+        ("Line Width",
+         "Make the listed curves thicker in the viewport so they are easier "
+         "to see and to click on. The curve shape is not changed.",
+         "_build_width_tab"),
+    )
+
+    CATEGORIES = (
+        ("Create", "Create - build new curves in the scene",
+         CREATE_PAGES, "create_tabs"),
+        ("Edit", "Edit - change the shape of existing curves",
+         EDIT_PAGES, "edit_tabs"),
+        ("Display", "Display - how curves are drawn in the viewport; "
+         "the curve shape is not changed",
+         DISPLAY_PAGES, "display_tabs"),
+    )
 
     def __init__(self):
         super(MainWindow, self).__init__(maya_main_window())
@@ -70,28 +134,11 @@ class MainWindow(QWidget):
         self.te_log.setReadOnly(True)
         self.te_log.setMaximumHeight(110)
 
+        # 상위 탭 = 카테고리, 하위 탭 = 기능. 분류는 위 CATEGORIES 표가 정한다.
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._build_create_tab(), "Create / Direction")
-        index = self.tabs.addTab(self._build_width_tab(), "Line Width")
-        self.tabs.setTabToolTip(
-            index,
-            "Make the listed curves thicker in the viewport so they are easier "
-            "to see and to click on.")
-        index = self.tabs.addTab(self._build_wrap_tab(), "Wrap")
-        self.tabs.setTabToolTip(
-            index,
-            "Make one curve take the shape of another, even when the two have "
-            "different CV counts.")
-        index = self.tabs.addTab(self._build_points_tab(), "Points to Curve")
-        self.tabs.setTabToolTip(
-            index,
-            "Draw one curve through the world positions of the listed objects, "
-            "joints or components, in list order.")
-        index = self.tabs.addTab(self._build_smooth_tab(), "Smooth")
-        self.tabs.setTabToolTip(
-            index,
-            "Smooth or roughen the selected curve CVs with a live slider. "
-            "Soft selection falloff is respected.")
+        for label, tip, pages, attr in self.CATEGORIES:
+            index = self.tabs.addTab(self._build_category_tab(pages, attr), label)
+            self.tabs.setTabToolTip(index, tip)
         root.addWidget(self.tabs, 1)
 
         root.addWidget(self.te_log)
@@ -100,7 +147,40 @@ class MainWindow(QWidget):
                  "'Create Curves from Selected Edges'.".format(VERSION, LAST_UPDATE))
 
     # --------------------------------------------------------------
-    # Tab 1 : Create / Direction  (기존 기능 그대로)
+    # 카테고리 상위 탭 / 기능 하위 탭
+    # --------------------------------------------------------------
+
+    def _build_category_tab(self, pages, attr):
+        """카테고리 상위 탭 하나 — 기능들을 **하위 탭**으로 담는다.
+
+        하위 탭 위젯은 `attr` 이름으로 self 에 붙여 둔다(예: self.edit_tabs).
+        나중에 특정 기능 탭으로 전환시켜야 할 때 잡을 수 있게 하기 위한 것이다.
+        """
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        # 상위/하위 탭이 겹쳐 안쪽 여백이 두 번 들어가면 폭이 아까워진다.
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        tabs = self._build_sub_tabs(pages)
+        setattr(self, attr, tabs)
+        layout.addWidget(tabs)
+
+        return page
+
+    def _build_sub_tabs(self, pages):
+        """(라벨, 툴팁, 빌더 메서드 이름) 목록을 하위 탭 위젯으로 만든다."""
+        tabs = QTabWidget()
+        # 폭이 모자라면 라벨을 자른다(스크롤 화살표만 뜨는 것보다 읽기 쉽다).
+        tabs.tabBar().setElideMode(Qt.ElideRight)
+
+        for label, tip, builder in pages:
+            index = tabs.addTab(getattr(self, builder)(), label)
+            tabs.setTabToolTip(index, tip)
+
+        return tabs
+
+    # --------------------------------------------------------------
+    # Create > From Edges  (엣지 -> 커브 생성 + Reverse Direction)
     # --------------------------------------------------------------
 
     def _build_create_tab(self):
@@ -182,7 +262,7 @@ class MainWindow(QWidget):
         return tab
 
     # --------------------------------------------------------------
-    # Tab 2 : Line Width  (뷰포트에서 잘 보이고 잘 집히도록)
+    # Display > Line Width  (뷰포트에서 잘 보이고 잘 집히도록 — 형상은 불변)
     # --------------------------------------------------------------
 
     def _build_width_tab(self):
@@ -319,7 +399,7 @@ class MainWindow(QWidget):
             self.log("Skipped {0}: {1}".format(len(skipped), details))
 
     # --------------------------------------------------------------
-    # Tab 3 : Wrap
+    # Edit > Wrap
     # --------------------------------------------------------------
 
     def _build_wrap_tab(self):
@@ -449,7 +529,7 @@ class MainWindow(QWidget):
         return tab
 
     # --------------------------------------------------------------
-    # Tab 4 : Points to Curve
+    # Create > From Points
     # --------------------------------------------------------------
 
     def _build_points_tab(self):
@@ -550,7 +630,7 @@ class MainWindow(QWidget):
         return tab
 
     # --------------------------------------------------------------
-    # Tab 5 : Smooth
+    # Edit > Smooth
     # --------------------------------------------------------------
 
     def _build_smooth_tab(self):

@@ -2,22 +2,37 @@
 title: A00400_CurveTool 사용법
 aliases: [Curve Tool, CurveTool, A00400]
 tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve, lineWidth, wrap, blendShape, editPoint, laplacian, smoothCurve, softSelect]
-updated: 2026-08-18
+updated: 2026-08-21
 ---
 
 # A00400_CurveTool 사용법
 
-Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya). **탭 5개**로 나뉜다(v01.05).
+Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya).
+**v01.06 부터 탭이 두 단계**다 — **상위 탭 = 카테고리, 하위 탭 = 기능**
+(`A00110_animTool_V02` 과 같은 규칙).
 
-| 탭 | 내용 |
-|----|------|
-| **Create / Direction** | ① 선택한 메시 엣지에 부착된 커브 생성(엣지 덩어리마다 커브 하나) ② Reverse Direction(방향 통일) |
-| **Line Width** (v01.01~) | 리스트업한 커브의 **뷰포트 표시 굵기**를 슬라이더로 조절 — 씬에서 **잘 보이고 잘 집히게** |
-| **Wrap** (v01.03~) | **CV 개수가 달라도** 한 커브가 다른 커브의 모양을 따르게 한다. 0~1 envelope 어트리뷰트로 라이브 블렌드 |
-| **Points to Curve** (v01.04~) | 리스트에 담은 오브젝트·조인트·컴포넌트의 **월드 위치**를 **순서대로** 잇는 커브 하나. 정확히 통과 / 완화 선택 |
-| **Smooth** (v01.05~) | 씬에서 고른 **CV** 를 슬라이더로 실시간 Smooth / Rough. **소프트 셀렉션 폴오프**를 그대로 쓴다 |
+| 상위 탭 | 하위 탭 | 내용 |
+|---------|---------|------|
+| **Create**<br>씬에 **새 커브를 만든다** | **From Edges** | ① 선택한 메시 엣지에 부착된 커브 생성(엣지 덩어리마다 커브 하나) ② Reverse Direction(방향 통일) |
+| | **From Points** (v01.04~) | 리스트에 담은 오브젝트·조인트·컴포넌트의 **월드 위치**를 **순서대로** 잇는 커브 하나. 정확히 통과 / 완화 선택 |
+| **Edit**<br>기존 커브의 **형상(CV)** 을 바꾼다 | **Smooth** (v01.05~) | 씬에서 고른 **CV** 를 슬라이더로 실시간 Smooth / Rough. **소프트 셀렉션 폴오프**를 그대로 쓴다 |
+| | **Wrap** (v01.03~) | **CV 개수가 달라도** 한 커브가 다른 커브의 모양을 따르게 한다. 0~1 envelope 어트리뷰트로 라이브 블렌드 |
+| **Display**<br>**그려지는 방식만** 바꾼다 | **Line Width** (v01.01~) | 리스트업한 커브의 **뷰포트 표시 굵기**를 슬라이더로 조절 — 씬에서 **잘 보이고 잘 집히게**. 형상은 불변 |
 
-- **버전**: `app/config/version.py` (v01.05)
+### 분류 기준 (v01.06)
+
+기준은 **"씬에 무엇을 하는가"** 하나다.
+
+- **Line Width 는 Edit 이 아니라 Display** — `nurbsCurve.lineWidth` 는 **뷰포트 표시 굵기**일 뿐
+  커브 데이터를 건드리지 않는다. 커브를 바꾸는 기능과 보이는 방식만 바꾸는 기능이 한 상자에 섞이면 분류가 흐려진다.
+- **Reverse Direction 은 성격상 Edit 이지만 `Create > From Edges` 에 남겼다** —
+  생성 버튼과 **같은 커브 리스트(`self.tsl`)** 를 공유하기 때문이다. 떼어내면 커브를 두 번 리스트업해야 한다.
+- **하위 페이지가 하나뿐인 Display 도 하위 탭 바를 그대로 둔다** — ① 기능 이름이 화면에 남고
+  ② 나중에 커브 색상·CV 크기 같은 표시 기능이 늘어도 구조가 그대로다.
+
+> 분류표는 코드에서 `MainWindow.CATEGORIES` 한 곳이 정한다. 탭을 추가·이동하려면 그 표만 고치면 된다.
+
+- **버전**: `app/config/version.py` (v01.06)
 - **설치**: `__dragDrop_A00400.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **CurveTool** → `tools.A00400_CurveTool.run(True)`
 - **참고**: 엣지→커브 생성은 `ref/ref_01.mel`(`duplicateCurve`+`attachCurve`)의 아이디어를, 축 비교 방식은 `A00360_SortTool` 을 이식/응용.
 
@@ -28,6 +43,8 @@ Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya). **탭 5개**
 ```
 ┌ Curve Tool ─────────────────────────┐
 │ Help                                │
+│ [ Create ][ Edit ][ Display ]       │  ← 상위 탭 (카테고리)
+│ [ From Edges ][ From Points ]       │  ← 하위 탭 (기능)
 │ ┌ Create Curves from Mesh Edges ──┐ │
 │ │ Name Prefix [ edgeCurve       ] │ │
 │ │ [ ] Smooth curve (degree 3)     │ │
@@ -106,8 +123,28 @@ tools/A00400_CurveTool/
 └── app/
     ├── config/version.py
     ├── core/curve_manager.py   # 엣지 그룹핑 + polyToCurve + reverseCurve (maya.cmds, UI 비의존)
-    └── ui/main_window.py       # PySide UI (생성 박스 + TSL + Reverse 박스 + 로그)
+    └── ui/main_window.py       # PySide UI (카테고리 상위 탭 + 기능 하위 탭 + 로그)
 ```
+
+**탭 구조 (v01.06~)** — `MainWindow` 안의 표가 분류를 정한다.
+
+```python
+CREATE_PAGES  = (("From Edges", tip, "_build_create_tab"),
+                 ("From Points", tip, "_build_points_tab"))
+EDIT_PAGES    = (("Smooth", tip, "_build_smooth_tab"),
+                 ("Wrap",   tip, "_build_wrap_tab"))
+DISPLAY_PAGES = (("Line Width", tip, "_build_width_tab"),)
+
+CATEGORIES = (("Create",  tip, CREATE_PAGES,  "create_tabs"),
+              ("Edit",    tip, EDIT_PAGES,    "edit_tabs"),
+              ("Display", tip, DISPLAY_PAGES, "display_tabs"))
+```
+
+- `_build_category_tab(pages, attr)` — 카테고리 상위 탭 하나를 만들고 하위 탭 위젯을
+  `self.<attr>` (예: `self.edit_tabs`) 로 붙인다.
+- `_build_sub_tabs(pages)` — `(라벨, 툴팁, 빌더 메서드 이름)` 목록을 하위 탭 위젯으로 만든다.
+  라벨이 길면 `ElideRight` 로 자른다(스크롤 화살표만 뜨는 것보다 읽기 쉽다).
+- **기능 빌더(`_build_*_tab`)는 손대지 않았다.** 탭 재배치는 위 표만 바꾸면 된다.
 
 - 핵심 API:
   - `curve_manager.curves_from_selected_edges(prefix, degree)` → `(created_curves, group_count)`
@@ -117,7 +154,7 @@ tools/A00400_CurveTool/
 
 ---
 
-## Line Width 탭 (v01.01~) — 커브를 잘 보이고 잘 집히게
+## Display > Line Width (v01.01~) — 커브를 잘 보이고 잘 집히게
 
 씬에 커브가 많아지면 얇은 선은 **눈에 잘 안 띄고 클릭으로 집기도 어렵다.** 이 탭은 리스트업한
 커브의 `nurbsCurve.lineWidth`(뷰포트에 그려지는 선 굵기)를 한 번에 바꾼다.
@@ -151,7 +188,7 @@ tools/A00400_CurveTool/
 
 ---
 
-## 탭 3 — Wrap (v01.03~)
+## Edit > Wrap (v01.03~)
 
 **CV 개수가 다른 두 커브**에서, 한쪽(driven)이 다른 쪽(driver)의 모양을 그대로 따르게 한다.
 
@@ -221,7 +258,7 @@ Create 직후 **얼마나 잘 맞았는지 로그에 찍는다** — 최대 편�
 
 ---
 
-## 탭 4 — Points to Curve (v01.04~)
+## Create > From Points (v01.04~)
 
 리스트에 담은 것들의 **월드 위치**를 **리스트 순서대로** 잇는 **커브 하나**를 만든다.
 오브젝트든 조인트든 컴포넌트든 위치 하나로 환원해서 다룬다.
@@ -276,7 +313,7 @@ Create 직후 **얼마나 잘 맞았는지 로그에 찍는다** — 최대 편�
 
 ---
 
-## 탭 5 — Smooth (v01.05~)
+## Edit > Smooth (v01.05~)
 
 씬에서 고른 **커브 CV** 를 슬라이더로 실시간 **Smooth / Rough** 한다.
 마야 기본 `Curves > Smooth`(`cmds.smoothCurve`)의 **결과를 그대로 쓰되**, 그 명령이 못 하는
