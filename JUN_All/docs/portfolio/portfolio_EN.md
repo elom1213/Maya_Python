@@ -412,6 +412,17 @@ Default Distance attribute (driver signal x)
   and hit-testing are separate** — `lineSize` is what is drawn, `linePick` is what is hit — and exposed
   `Pick Radius` alongside it with that distinction written into the UI, because thickness alone does not
   actually achieve what was asked for.
+- **`A00460_ControllerTool`** — **a tool for building keyframe-animation controllers**; the first feature is
+  **FK**. For every listed joint it builds a `zro > con > ctl > tgt` stack and links the stacks along the joint
+  hierarchy, so rotating a control carries every joint below it the way FK should. Only the **top of each stack
+  is `matchTransform`ed onto the joint while the rest stay at local zero**, so all four nodes overlap exactly —
+  that is what makes "how far you moved the control" equal "the offset against the joint". The null types
+  (`zro`/`con`/`tgt`) can each be turned off, and because the constraint driver is defined as **"the last node in
+  the stack"**, switching `tgt` off hands that job to `_ctl` automatically (the descent is recursive, so a joint
+  with several children branches into one stack per child). Constraints can be parent/point/orient/scale, but I
+  verified headlessly that **parent together with point/orient makes two constraints fight over the same
+  channels** — Maya rejects the second with `Object is already connected` — so the tool warns instead of
+  blocking; the combination that is actually useful is `parent + scale`.
 - **`A00050_uvTool`**, **`A00030_quickTool`**, **`A00330_NamingTool`** (legacy naming tool port + Quick Rename), **`A00310_SearchTool`** (select by type/name), **`A00360_SortTool`** (sort by world X/Y/Z, name or type and reorder the Outliner).
 
 ---
