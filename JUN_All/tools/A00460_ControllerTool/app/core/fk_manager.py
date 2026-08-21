@@ -68,12 +68,30 @@ def _short(node):
     return node.split("|")[-1]
 
 
+def _is_constraint(node):
+    """컨스트레인트 노드인가.
+
+    마야의 컨스트레인트는 **트랜스폼이고 구동 대상의 자식으로** 생긴다
+    (`locator1` 을 걸면 `locator1|locator1_parentConstraint1`). 상속 타입에 `constraint`
+    가 들어 있는지로 판별하면 parent/point/orient/scale/aim 등을 전부 잡는다.
+    """
+    try:
+        return "constraint" in (cmds.nodeType(node, inherited=True) or [])
+    except Exception:
+        return False
+
+
 def _children_of(node):
     """ROOT 모드에서 따라 내려갈 자식 목록.
 
     루트가 조인트면 **조인트 자식만** 본다 — 조인트에 붙은 지오메트리나 이미 만들어 둔
     컨트롤러까지 끌려 들어오는 것을 막기 위해서다. 루트가 조인트가 아니면 트랜스폼 자식을
     본다(joint 도 transform 이라 함께 잡힌다).
+
+    ⚠️ **컨스트레인트 노드는 제외한다.** 이 함수는 스택을 만들고 컨스트레인트를 건 *뒤에*
+    불리므로, 거르지 않으면 방금 만든 컨스트레인트를 '체인의 다음 뼈'로 착각해
+    `locator1_parentConstraint1_zro` 같은 계층을 또 만든다. 대상에 예전 컨스트레인트가
+    이미 걸려 있던 경우도 같은 이유로 걸러진다.
     """
     try:
         is_joint = cmds.nodeType(node) == "joint"
@@ -81,7 +99,8 @@ def _children_of(node):
         is_joint = False
 
     kind = "joint" if is_joint else "transform"
-    return cmds.listRelatives(node, children=True, type=kind, fullPath=True) or []
+    kids = cmds.listRelatives(node, children=True, type=kind, fullPath=True) or []
+    return [k for k in kids if not _is_constraint(k)]
 
 
 def _cube_control(name, size):
