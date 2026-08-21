@@ -188,6 +188,7 @@ joint_A_01_zro
 ```
 tools/A00460_ControllerTool/
 ├── launch.py / __init__.py / __dragDrop_A00460.py
+├── icon/A00460_ControllerTool.svg (+ .png)   # 셸프 아이콘(본 체인 + FK 컨트롤 링)
 └── app/
     ├── config/version.py
     ├── core/fk_manager.py   # 계층 생성 + 컨스트레인트 (maya.cmds, UI 비의존)

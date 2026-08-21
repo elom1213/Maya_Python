@@ -49,6 +49,7 @@
 - [list_attrs multi detection](list-attrs-multi-detection.md) — multi 판정은 `attributeQuery(multi=True)`, getNextFreeMultiIndex 남용 금지
 - [UUID-safe rename](uuid-safe-rename-duplicate-names.md) — 동명 노드 대비 UUID 로 노드 보관("UUID 기반 리네임 패턴 적용해줘")
 - [standalone app package collision](standalone-app-package-collision.md) — standalone Qt 툴은 `tools.<tool>.app.*` 로 import, 맨 `app` 금지
+- [New tool needs icon](new-tool-needs-icon.md) — **새 툴 만들면 아이콘도 함께**(icon/TOOL.svg+.png, 32px, 공통 다크 배경틀). 256+32 둘 다 눈으로 확인
 - [Standalone taskbar icon](standalone-taskbar-icon-method.md) — SVG→다중크기 .ico + QApplication 전에 AppUserModelID
 - [Pin for maya.cmds tools](pin-for-maya-cmds-tools.md) — cmds.window 최상단 고정은 maya_ui_widget() 로 감싸 WindowStaysOnTopHint
 
