@@ -17,7 +17,7 @@ v01.00 의 첫 기능은 **FK** 다.
 |---------|---------|------|
 | **Create** | **FK** (v01.00~) | 리스트업한 조인트/오브젝트에 `zro > con > ctl > tgt` 계층을 만들고, 조인트가 그 계층을 따라오게 컨스트레인트 |
 
-- **버전**: `app/config/version.py` (v01.01)
+- **버전**: `app/config/version.py` (v01.02)
 - **설치**: `__dragDrop_A00460.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **CtrlTool** → `tools.A00460_ControllerTool.run(True)`
 - **참고**: `con/ctl/tgt` 계층 관례는 `A00170_driverTool` 의 Edge Loop 드라이버,
   Bone Chain / Bone Root 모드는 `A00390_WindTool_V02` 를 이식/응용.
@@ -53,7 +53,7 @@ joint_A_01_zro
                       joint_A_03_tgt
 ```
 
-- **`_ctl` 만 커브**(nurbsCurve)이고 나머지 셋은 **셰이프 없는 널 그룹**이다.
+- **`_ctl` 만 커브**(정육면체 테두리 nurbsCurve)이고 나머지 셋은 **셰이프 없는 널 그룹**이다.
 - 조인트는 **스택의 마지막 노드**를 따라간다. 기본 구성에서는 `_tgt` 다.
 - **스택 최상단만** `matchTransform` 으로 조인트 자리(위치 + 회전)에 맞추고
   나머지는 **로컬 0** 으로 부모 밑에 넣는다. 그래서 넷이 정확히 겹치고,
@@ -80,8 +80,8 @@ joint_A_01_zro
 │ └─────────────────────────────────┘ │
 │ ┌ Nodes to Build ─────────────────┐ │
 │ │ [v] zro  [v] con  [v] tgt       │ │
-│ │ ctl (control curve) is always.. │ │
-│ │ Control Size [1.000] Axis [X v] │ │
+│ │ ctl (cube control curve) is a.. │ │
+│ │ Control Size [1.000]            │ │
 │ └─────────────────────────────────┘ │
 │ ┌ Constraint ─────────────────────┐ │
 │ │ [v]Parent [ ]Point [ ]Orient    │ │
@@ -133,8 +133,11 @@ joint_A_01_zro
 
 | 항목 | 뜻 |
 |------|-----|
-| **Control Size** | 컨트롤러 원의 반지름 |
-| **Shape Axis** | 원의 법선 축. 마야 조인트는 보통 **X 로 뻗으므로 X 가 기본** — 원이 뼈를 가로지르게 놓인다 |
+| **Control Size** | 큐브 **반변길이**(반지름 감각). `1.0` 이면 조인트에서 사방 1유닛까지 뻗는 큐브 |
+
+> **컨트롤러 모양은 정육면체 테두리 고정**이다(v01.02~). `A00145_RigConnect` 의 Match 탭이 쓰는
+> cube 컨트롤과 **같은 CV 데이터**(degree 1, CV 17개로 12모서리를 한 붓에 그린다).
+> 큐브는 90° 회전 대칭이라 축을 골라도 결과가 같으므로 **Shape Axis 옵션은 없다.**
 
 ### Constraint — 조인트가 무엇을 따라가나
 
@@ -204,7 +207,7 @@ tools/A00460_ControllerTool/
 build_fk_controls(nodes, mode=MODE_ROOT,
                   use_zro=True, use_con=True, use_tgt=True,
                   constraints=(CON_PARENT,),
-                  size=1.0, axis="X")
+                  size=1.0)
 ```
 
 반환 dict:

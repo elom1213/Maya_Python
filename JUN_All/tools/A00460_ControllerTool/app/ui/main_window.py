@@ -181,11 +181,13 @@ class MainWindow(QWidget):
         node_row.addStretch(1)
         node_lay.addLayout(node_row)
 
-        lbl_ctl = QLabel("ctl (control curve) is always created.")
+        lbl_ctl = QLabel("ctl (cube control curve) is always created.")
         lbl_ctl.setStyleSheet("color: {0};".format(_WARN_COLOR))
         node_lay.addWidget(lbl_ctl)
 
-        # 컨트롤러 커브 모양
+        # 컨트롤러 커브 크기.
+        # 모양은 **정육면체 테두리** 고정이다(A00145_RigConnect Match 탭과 같은 CV 데이터).
+        # 큐브는 90도 회전 대칭이라 축을 골라도 결과가 같으므로 Shape Axis 는 두지 않는다.
         shape_row = QHBoxLayout()
         shape_row.addWidget(QLabel("Control Size"))
         self.sb_size = QDoubleSpinBox()
@@ -195,17 +197,10 @@ class MainWindow(QWidget):
         self.sb_size.setValue(fk_mgr.DEFAULT_SIZE)
         # 값을 되쓰지 않아도 타이핑 중 잘리는 것을 막는다.
         self.sb_size.setKeyboardTracking(False)
+        self.sb_size.setToolTip(
+            "Half the cube edge length - so 1.0 gives a cube reaching 1 unit\n"
+            "from the joint in every direction (same feel as a radius).")
         shape_row.addWidget(self.sb_size)
-
-        shape_row.addSpacing(10)
-        shape_row.addWidget(QLabel("Shape Axis"))
-        self.cb_axis = QComboBox()
-        self.cb_axis.addItems(["X", "Y", "Z"])
-        self.cb_axis.setCurrentText(fk_mgr.DEFAULT_AXIS)
-        self.cb_axis.setToolTip(
-            "Normal axis of the control circle. Maya joints usually aim down X,\n"
-            "so X makes the circle sit across the bone.")
-        shape_row.addWidget(self.cb_axis)
         shape_row.addStretch(1)
         node_lay.addLayout(shape_row)
 
@@ -286,7 +281,6 @@ class MainWindow(QWidget):
                 use_tgt=self.chk_tgt.isChecked(),
                 constraints=self._selected_constraints(),
                 size=self.sb_size.value(),
-                axis=self.cb_axis.currentText(),
             )
             if result["roots"]:
                 cmds.select(result["roots"], replace=True)
@@ -335,5 +329,6 @@ class MainWindow(QWidget):
             "Version {0}\n"
             "Last update {1}\n\n"
             "Build animation controllers.\n"
-            "FK: <joint>_zro > _con > _ctl > _tgt, joint follows _tgt.\n\n"
+            "FK: <joint>_zro > _con > _ctl > _tgt, joint follows _tgt.\n"
+            "Controls are cube outline curves.\n\n"
             "Python Script by Ji Hun Park".format(VERSION, LAST_UPDATE))

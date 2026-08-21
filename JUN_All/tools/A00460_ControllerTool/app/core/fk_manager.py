@@ -45,13 +45,19 @@ SUFFIX_CON = "_con"
 SUFFIX_CTL = "_ctl"
 SUFFIX_TGT = "_tgt"
 
-# 컨트롤러 커브(원)의 법선 축. 조인트가 X 로 뻗는 마야 기본을 따라 X 가 기본이다.
-AXIS_VECTORS = {
-    "X": (1.0, 0.0, 0.0),
-    "Y": (0.0, 1.0, 0.0),
-    "Z": (0.0, 0.0, 1.0),
-}
-DEFAULT_AXIS = "X"
+# 컨트롤러 커브 = **정육면체 테두리**(degree 1). A00145_RigConnect 의 Match 탭이 쓰는
+# cube 컨트롤(MEL JUN_get_cubeCtl 이식)과 같은 CV 데이터다. 한 붓 그리기로 12개 모서리를
+# 모두 지나가며, 좌표는 ±0.5(한 변 1) 단위 큐브다.
+_CUBE_POINTS = [
+    (-0.5, 0.5, 0.5), (0.5, 0.5, 0.5), (0.5, 0.5, -0.5), (-0.5, 0.5, -0.5),
+    (-0.5, 0.5, 0.5), (-0.5, -0.5, 0.5), (0.5, -0.5, 0.5), (0.5, 0.5, 0.5),
+    (0.5, 0.5, -0.5), (0.5, -0.5, -0.5), (-0.5, -0.5, -0.5), (-0.5, 0.5, -0.5),
+    (-0.5, 0.5, 0.5), (-0.5, -0.5, 0.5), (-0.5, -0.5, -0.5), (0.5, -0.5, -0.5),
+    (0.5, -0.5, 0.5),
+]
+
+# Control Size 는 **반지름 감각**(큐브 반변길이)이다. 원 컨트롤을 쓰던 때와 같은 숫자로
+# 비슷한 크기가 나오도록, ±0.5 인 원본 좌표에 size*2 를 곱한다 → 반변길이 = size.
 DEFAULT_SIZE = 1.0
 
 
@@ -78,12 +84,12 @@ def _children_of(node):
     return cmds.listRelatives(node, children=True, type=kind, fullPath=True) or []
 
 
-def _circle_control(name, size, axis):
-    """FK 컨트롤러 커브 하나(원). 이름이 겹치면 마야가 뒤에 번호를 붙인다."""
-    normal = AXIS_VECTORS.get(axis, AXIS_VECTORS[DEFAULT_AXIS])
-    crv = cmds.circle(name=name, normal=normal, radius=float(size),
-                      constructionHistory=False)[0]
-    return crv
+def _cube_control(name, size):
+    """FK 컨트롤러 커브 하나(정육면체 테두리). 이름이 겹치면 마야가 뒤에 번호를 붙인다."""
+    scale = float(size) * 2.0          # ±0.5 원본 → 반변길이 = size
+    points = [(x * scale, y * scale, z * scale) for x, y, z in _CUBE_POINTS]
+    crv = cmds.curve(degree=1, point=points, knot=list(range(len(points))))
+    return cmds.rename(crv, name)
 
 
 def _reparent(node, parent):
@@ -111,7 +117,7 @@ def _stack_plan(use_zro, use_con, use_tgt):
     return plan
 
 
-def _create_stack(joint, parent_node, plan, size, axis, result):
+def _create_stack(joint, parent_node, plan, size, result):
     """조인트 하나에 대한 노드 스택을 만들고 (최상단, 최하단, 컨트롤러) 를 돌려준다."""
     base = _short(joint)
     cur_parent = parent_node
@@ -122,7 +128,7 @@ def _create_stack(joint, parent_node, plan, size, axis, result):
         name = "{0}{1}".format(base, suffix)
 
         if kind == "curve":
-            node = _circle_control(name, size, axis)
+            node = _cube_control(name, size)
         else:
             node = cmds.group(empty=True, name=name)
 
@@ -170,9 +176,9 @@ def _apply_constraints(driver, driven, types, result):
 
 # --------------------------------------------------------------- 빌드
 
-def _build_one(joint, parent_node, plan, types, size, axis, result):
+def _build_one(joint, parent_node, plan, types, size, result):
     """조인트 하나: 스택 생성 + 컨스트레인트. 스택의 **최하단**을 돌려준다."""
-    top, last, ctl = _create_stack(joint, parent_node, plan, size, axis, result)
+    top, last, ctl = _create_stack(joint, parent_node, plan, size, result)
 
     result["controls"].append(ctl)
     if parent_node is None:
@@ -184,23 +190,23 @@ def _build_one(joint, parent_node, plan, types, size, axis, result):
     return last
 
 
-def _build_root_recursive(joint, parent_node, plan, types, size, axis,
+def _build_root_recursive(joint, parent_node, plan, types, size,
                           result, seen):
     """ROOT 모드 — 조인트와 그 자손을 계층 그대로 따라 내려가며 스택을 잇는다."""
     if joint in seen:
         return
     seen.add(joint)
 
-    last = _build_one(joint, parent_node, plan, types, size, axis, result)
+    last = _build_one(joint, parent_node, plan, types, size, result)
 
     for child in _children_of(joint):
-        _build_root_recursive(child, last, plan, types, size, axis, result, seen)
+        _build_root_recursive(child, last, plan, types, size, result, seen)
 
 
 def build_fk_controls(nodes, mode=MODE_ROOT,
                       use_zro=True, use_con=True, use_tgt=True,
                       constraints=DEFAULT_CONSTRAINTS,
-                      size=DEFAULT_SIZE, axis=DEFAULT_AXIS):
+                      size=DEFAULT_SIZE):
     """리스트업한 노드들에 FK 컨트롤러 계층을 만든다.
 
     nodes       : 조인트/오브젝트 이름 목록(리스트 순서 그대로 쓴다).
@@ -208,7 +214,7 @@ def build_fk_controls(nodes, mode=MODE_ROOT,
                   MODE_CHAIN(리스트 전체가 한 체인, 리스트 순서로 이음).
     use_zro/con/tgt : 만들 널 그룹 종류. _ctl 은 항상 만든다.
     constraints : CON_* 목록. 조인트는 스택의 마지막 노드(보통 _tgt)를 따라간다.
-    size, axis  : 컨트롤러 원의 반지름과 법선 축.
+    size        : 컨트롤러 큐브의 반변길이(반지름 감각).
 
     반환 dict:
         roots       계층 최상단 노드들
@@ -252,12 +258,12 @@ def build_fk_controls(nodes, mode=MODE_ROOT,
     if mode == MODE_ROOT:
         seen = set()
         for root in valid:
-            _build_root_recursive(root, None, plan, types, size, axis,
+            _build_root_recursive(root, None, plan, types, size,
                                   result, seen)
     else:
         parent_node = None
         for node in valid:
             parent_node = _build_one(node, parent_node, plan, types,
-                                     size, axis, result)
+                                     size, result)
 
     return result
