@@ -17,8 +17,8 @@ Unreal Content Browser 에서 **Skeleton 을 우클릭하면 나타나는 "Add A
   2. **빌드-프리** — 커브 포함 애니 임포트 / `unreal.AnimationLibrary` 경로(컴파일 0, 단 버전별 실측 필요).
 
 상세 설계·분석은 학습 노트 참고:
-[00400_Add_ARKit_Curves_to_Skeleton_analysis](study/00400_Add_ARKit_Curves_to_Skeleton_analysis.md) ·
-[00500_Add_ARKit_Curves_plan_B_implementation_guide](study/00500_Add_ARKit_Curves_plan_B_implementation_guide.md)
+[00400_Add_ARKit_Curves_to_Skeleton_analysis](https://github.com/elom1213/JUN_Study/blob/master/04000_Add_ARKit_Curves_to_Skeleton_analysis.md) ·
+[00500_Add_ARKit_Curves_plan_B_implementation_guide](https://github.com/elom1213/JUN_Study/blob/master/04100_Add_ARKit_Curves_plan_B_implementation_guide.md)
 
 ---
 

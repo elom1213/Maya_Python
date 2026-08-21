@@ -4,8 +4,8 @@ UE 5.5 — Content Browser 에서 **Skeleton 우클릭 → "Add ARKit Curves to 
 **B-2(하이브리드) 방식**으로 구현한 코드 모음.
 
 > 원본 분석/설계 문서:
-> `../../docs/study/00400_Add_ARKit_Curves_to_Skeleton_analysis.md`
-> `../../docs/study/00500_Add_ARKit_Curves_plan_B_implementation_guide.md`
+> `JUN_Study/04000_Add_ARKit_Curves_to_Skeleton_analysis.md`
+> `JUN_Study/04100_Add_ARKit_Curves_plan_B_implementation_guide.md`
 
 ⚠️ 이 폴더의 파일들은 **참고/이식용 원본**입니다.
 실제 적용은 `C:\MANUSetup` 프로젝트에 **사용자가 직접 복사·빌드**하셔야 합니다.

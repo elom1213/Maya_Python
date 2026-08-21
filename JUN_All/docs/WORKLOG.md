@@ -1167,7 +1167,7 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 문서에 진단용 MEL 스니펫 8종, 권장 작업 순서 11단계, **전체 104행 매핑표**, 자체 툴 설계 메모
   (양방향은 잘라 붙이지 말고 `up - down` 을 매 프레임 합성)를 정리.
   같은 코드가 `AdvancedSkeleton.mel` / `panel.mel` / `picker.mel` **3곳에 바이트 동일 사본**으로 있다.
-  [study/00600_AdvancedSkeleton_MetaHumanAnimator_connect_bake_analysis](study/00600_AdvancedSkeleton_MetaHumanAnimator_connect_bake_analysis.md) #study #MetaHuman
+  [JUN_Study/04200_AdvancedSkeleton_MetaHumanAnimator_connect_bake_analysis](https://github.com/elom1213/JUN_Study/blob/master/04200_AdvancedSkeleton_MetaHumanAnimator_connect_bake_analysis.md) #study #MetaHuman
 
 > [!summary] `A00110_animTool` **Key Edit 하위 탭 재편 + Fill Keys(구간 전 프레임 키 채우기)** (v01.39→01.40)
 - **요청**: ① Pose Key · Euler Filter 를 Key Edit 하위 탭으로. ② 선택 오브젝트의 **키 가능 + 채널박스
@@ -3134,8 +3134,8 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   넓이기반) → **numpy 벡터화**, 멀티소스 per-vertex 최근접 선택, **이름 기반 인플루언스 union/매핑**,
   경계 스무딩·prune·normalize·skinCluster 자동생성 후처리 통합 ③ Maya `copySkinWeights` 와 대응
   원리는 같으나 쿼드 정확도·멀티소스·이름 통합·후처리 통합·본→본 Move 로 차별화.
-- **산출물**: [00300_kangaroo_skinWeight_transfer_analysis.md](study/00300_kangaroo_skinWeight_transfer_analysis.md)
-  (파일·라인 참조 포함). 기존 [00200_skinWeight_transfer_workflow.md](study/00200_skinWeight_transfer_workflow.md)
+- **산출물**: [02100_kangaroo_skinWeight_transfer_analysis.md](https://github.com/elom1213/JUN_Study/blob/master/02100_kangaroo_skinWeight_transfer_analysis.md)
+  (파일·라인 참조 포함). 기존 [02000_skinWeight_transfer_workflow.md](https://github.com/elom1213/JUN_Study/blob/master/02000_skinWeight_transfer_workflow.md)
   는 워크플로우 관점, 이번 문서는 코드 레벨 심층 분석으로 상호 링크.
   #Kangaroo #skinWeights #Transfer #barycentric #copySkinWeights #코드분석 #docs
 
@@ -3323,8 +3323,8 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   `add_arkit_curves.py`(실행) + `init_unreal.py`(ToolMenus 우클릭 메뉴 자동 등록). ② **빌드-프리** —
   `nobuild_arkit_curves.py`(API discover + 커브 포함 애니 임포트 / `unreal.AnimationLibrary` 경로, 컴파일 0).
 - **바닐라 호환**: 스톡 `unreal` API 만 사용 — 커스텀 엔진 비의존(바닐라 UE 5.5 동작).
-- **문서**: 학습 노트 [분석](study/00400_Add_ARKit_Curves_to_Skeleton_analysis.md) ·
-  [B안 구현가이드](study/00500_Add_ARKit_Curves_plan_B_implementation_guide.md), 가이드 [A00320_ARKitCurveTool](A00320_ARKitCurveTool.md)
+- **문서**: 학습 노트 [분석](https://github.com/elom1213/JUN_Study/blob/master/04000_Add_ARKit_Curves_to_Skeleton_analysis.md) ·
+  [B안 구현가이드](https://github.com/elom1213/JUN_Study/blob/master/04100_Add_ARKit_Curves_plan_B_implementation_guide.md), 가이드 [A00320_ARKitCurveTool](A00320_ARKitCurveTool.md)
   신규 작성, README 인덱스 등록.
   #ARKit #Unreal #스켈레톤커브 #LiveLink #이식 #참조코드
 
@@ -3743,7 +3743,7 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - **배경**: `JUN_All/docs/` 루트는 **툴 사용법 안내 문서만** 두기로 정리. 특정 툴 안내가 아닌
   **작업 방법론·기법 학습 노트**를 담을 별도 경로가 필요해 **`docs/study/`** 를 신설(기존 `docs/plans/`
   =개발 계획 과 대칭). 이제 docs 는 3분할 — `docs/*.md`=툴 안내, `docs/plans/`=개발 계획, `docs/study/`=학습 노트.
-- **신규 학습 문서** `docs/study/00200_skinWeight_transfer_workflow.md`: 잘 웨이트된 메시 A 의 스킨 웨이트를
+- **신규 학습 문서** `JUN_Study/02000_skinWeight_transfer_workflow.md`: 잘 웨이트된 메시 A 의 스킨 웨이트를
   토폴로지가 다른 메시 B 로 옮기는 작업 방식 정리. **Shrink Wrap + Blendshape 로 A 를 B 표면에 공간 정렬 →
   Kangaroo Transfer → 다듬기** 흐름의 원리("전이 정확도 = 공간 오버랩", closest-point 대응)와 우려 지점
   (투영 실패 구역·갭 누출·바인드 포즈·인플루언스 이름 매핑), 개선책(게임용 maxInf/prune/normalize 후처리,

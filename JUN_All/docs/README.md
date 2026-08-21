@@ -6,10 +6,11 @@
 > **하위 폴더 `plans/`** — 사용법이 아니라 **기능 개발 계획 · 설계 결정 기록**(개발 문서)을 모은다.
 > 파일명은 `<툴 폴더명>_<기능>.md` 규칙(예: `A00150_remapVal_sine_wave_mode.md`).
 >
-> **하위 폴더 `study/`** — 특정 툴 안내가 아닌 **작업 방법론 · 기법 학습 노트**(공부용 문서)를 모은다.
-> 예: `study/00200_skinWeight_transfer_workflow.md`. 목록은 [study/README.md](study/README.md) 참고.
+> **학습 노트는 별도 저장소로 이전됨** — 특정 툴 안내가 아닌 **작업 방법론 · 기법 학습 노트**는
+> 2026-08-21 부로 [`elom1213/JUN_Study`](https://github.com/elom1213/JUN_Study) 로 옮겼다
+> (로컬: `JP/0030_maya_python_JUN/JUN_Study/`). 자세한 사유는 [study/README.md](study/README.md) 참고.
 
-> 정리하면 — `docs/*.md`=툴 안내, `docs/plans/`=개발 계획, `docs/study/`=학습 노트.
+> 정리하면 — `docs/*.md`=툴 안내, `docs/plans/`=개발 계획, 학습 노트=별도 저장소 `JUN_Study`.
 
 ---
 
