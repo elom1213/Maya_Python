@@ -61,6 +61,24 @@
 # (위 참고, 파장에 따라 비율이 0.41~0.75 로 변한다). 그런 커브를 그리면 실제 흔들림과 다른
 # 그림을 보여 주게 되어 디버그용으로 오히려 해롭다. 지금 방식은 **실제 결과**를 그린다.
 #
+# ## 아웃라이너 - 로케이터 그룹 / 커브 그룹
+#
+# 빌드 하나가 그룹 **둘**을 만든다: `<prefix>_liteDriverGrp` (드라이버 로케이터) 와
+# `<prefix>_liteCurveGrp` (디버그 커브). 예전에는 체인마다 (드라이버, 커브) 를 이어서
+# 만들어 아웃라이너에 **번갈아** 쌓였다. 그룹은 원점·단위행렬이고 `parent -relative` 로
+# 옮기므로 월드 위치가 변하지 않는다(드라이버는 이 시점에 translate 가 연결돼 있어
+# 기본 parent 의 "월드 유지" setAttr 이 불가능하다는 실제 이유도 있다).
+#
+# ## 드라이버가 루트를 따라간다 (node 출력)
+#
+#   multMatrix(root.worldMatrix, driver.parentInverseMatrix)
+#       -> decomposeMatrix.outputTranslate -> driver.translate
+#
+# constraint 없이 위치만 따라간다(회전은 그대로 둔다). `parentInverseMatrix` 는 **부모**의
+# 월드 역행렬이라 드라이버 자신의 translate 에 의존하지 않아 사이클이 없다. 유일하게
+# 사이클이 되는 배치(드라이버가 루트의 조상)는 연결하지 않고 로그에 사유를 남긴다.
+# 자세한 근거는 `wind_manager.follow_root_position` 의 독스트링에 있다.
+#
 # ## 회전축을 정하는 두 가지 방법
 #
 # 1) **Sway Axis (월드)** — 기본. `world_axis = chain_dir x up` 으로 구한 **월드 축** 둘레로
@@ -85,7 +103,7 @@ from maya.api import OpenMaya as om
 from .wind_manager import (
     DRIVER_SPEED, DRIVER_PHASE, DRIVER_PHASE_OFFSET, DRIVER_ENVELOPE,
     MODE_CHAIN, MODE_ROOT, OUTPUT_CURVE, OUTPUT_NODE,
-    _make_phase_expression, _sine_lut, _leaf, _safe,
+    _make_phase_expression, _sine_lut, _leaf, _safe, follow_root_position,
 )
 from .wave_manager import (
     WAVE_WAVELENGTH, WAVE_PERIOD, WAVE_ROOT_RAMP, UP_AXES,
@@ -106,6 +124,11 @@ LITE_SET_SUFFIX = "_waveLiteSET"
 # 디버그 커브 이름 접미사(제거 세트에 함께 담기므로 Remove 로 같이 지워진다).
 LITE_DEBUG_SUFFIX = "_liteDebugCrv"
 LITE_REST_ATTR = "waveRestRotate"
+
+# 아웃라이너 정리용 그룹. 드라이버 로케이터와 디버그 커브가 **서로 섞이지 않게** 각각
+# 자기 그룹으로 모인다(예전에는 체인 순서대로 로케이터/커브가 번갈아 쌓였다).
+LITE_DRIVER_GRP_SUFFIX = "_liteDriverGrp"
+LITE_CURVE_GRP_SUFFIX = "_liteCurveGrp"
 
 # Rotate Axis (오브젝트 공간) 로 쓸 수 있는 축. 노드의 rotateX/Y/Z 채널에 그대로 대응한다.
 LOCAL_AXES = ("X", "Y", "Z")
@@ -327,16 +350,44 @@ def _make_debug_curve(chain, points, name):
     return crv, made
 
 
+# --------------------------------------------------------------- 아웃라이너 정리
+
+def _group_nodes(nodes, name):
+    """nodes 를 새 그룹 하나에 모은다. (그룹 풀패스 or None, {옛 이름: 새 풀패스})
+
+    `parent -relative` 로 옮긴다. 이유가 둘이다:
+
+    1. 그룹을 **원점·단위행렬**로 만들므로 로컬을 그대로 둬도 월드 위치가 안 변한다.
+    2. 드라이버는 이 시점에 이미 `translate` 가 **연결**돼 있다. 기본 parent 는 월드
+       위치를 유지하려고 translate 를 setAttr 하는데, 연결된 채널에는 쓸 수 없다.
+       `-relative` 는 로컬을 건드리지 않으므로 그 충돌이 없다.
+    """
+    nodes = [n for n in nodes if n and cmds.objExists(n)]
+    if not nodes:
+        return None, {}
+
+    grp = cmds.ls(cmds.createNode("transform", name=name), long=True)[0]
+    renamed = {}
+    for node in nodes:
+        moved = cmds.parent(node, grp, relative=True)[0]
+        renamed[node] = cmds.ls(moved, long=True)[0]
+    return grp, renamed
+
+
 # --------------------------------------------------------------- 체인 하나
 
 def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
                       phase_offset, envelope=1.0, local_axis=None,
-                      driver_at_root=True, debug_curve=True):
-    """체인 하나에 각도 노드망을 만든다. (드라이버, 만든 노드들, rest 회전, 정보)
+                      driver_at_root=True, debug_curve=True, follow_root=True):
+    """체인 하나에 각도 노드망을 만든다. (드라이버, 만든 노드들, rest 회전, 정보, 커브)
 
     local_axis : "X"/"Y"/"Z" 를 주면 각 노드의 **오브젝트 공간** 축으로만 돌린다.
                  이때 `axis`(Sway Axis) 는 **전혀 쓰이지 않는다**.
     debug_curve: True 면 흔들림을 보여 주는 커브를 하나 만든다(`_make_debug_curve`).
+    follow_root: True 면 드라이버가 체인 루트의 **월드 위치**를 계속 따라간다.
+
+    실패하면 (None, [], {}, 사유문자열, None) 을 돌려준다.
+    성공하면 정보는 (직결 노드 수, 체인 노드 수, 루트추종 건너뛴 사유 or None) 이다.
     """
     name = _safe(_leaf(chain[0]))
     points = _chain_positions(chain)
@@ -345,7 +396,7 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
 
     chain_dir = om.MVector(*points[-1]) - om.MVector(*points[0])
     if chain_dir.length() < 1e-6:
-        return None, [], {}, "chain length is 0"
+        return None, [], {}, "chain length is 0", None
 
     if local_axis is not None:
         # 오브젝트 공간 축 : 노드마다 자기 rotate 채널 하나만 쓴다. 월드 축은 구하지 않는다.
@@ -360,7 +411,7 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
 
         world_axis = chain_dir.normal() ^ up
         if world_axis.length() < 1e-4:
-            return None, [], {}, "chain is parallel to the wave axis"
+            return None, [], {}, "chain is parallel to the wave axis", None
         world_axis = world_axis.normal()
 
     rest_rotate = {node: list(cmds.getAttr(node + ".rotate")[0]) for node in chain}
@@ -369,6 +420,13 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
                             speed, ramp, phase_offset, envelope,
                             place_at=(points[0] if driver_at_root else None))
     made = [drv]
+
+    # 놓기만 하는 게 아니라 **따라다니게** 한다 - 루트 뼈/컨트롤러가 움직이면(리그 전체
+    # 이동 포함) 드라이버도 같이 간다. 위치만이고 constraint 는 쓰지 않는다.
+    follow_skip = None
+    if follow_root:
+        follow_made, follow_skip = follow_root_position(drv, chain[0])
+        made += follow_made
 
     # 실효 스윙 = windSwingAngle * windEnvelope (체인 전체가 공유, 노드 1개).
     swing_env = cmds.createNode("multDoubleLinear", name=name + "_liteSwingEnv#")
@@ -451,11 +509,12 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
 
     # 디버그 커브는 각도 노드망을 다 건 뒤에 붙인다 — CV 가 노드의 월드 위치를 읽으므로
     # 순서가 결과를 바꾸지는 않지만, 커브가 만들어지지 않아도 파형은 그대로여야 한다.
+    crv = None
     if debug_curve:
-        _crv, crv_made = _make_debug_curve(chain, points, name + LITE_DEBUG_SUFFIX)
+        crv, crv_made = _make_debug_curve(chain, points, name + LITE_DEBUG_SUFFIX)
         made += crv_made
 
-    return drv, made, rest_rotate, (cardinal_count, len(chain))
+    return drv, made, rest_rotate, (cardinal_count, len(chain), follow_skip), crv
 
 
 # --------------------------------------------------------------- 공개 API
@@ -473,8 +532,9 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
     local_axis : None 이면 `axis`(Sway Axis, 월드)로 회전축을 구한다(기본).
                  "X"/"Y"/"Z" 를 주면 각 노드의 **오브젝트 공간** 축 하나만 돌리고,
                  **`axis` 는 무시된다**.
-    driver_at_root : True 면 드라이버 로케이터를 체인 최상단(루트) 월드 위치에 놓는다.
-                     False 면 예전처럼 원점에 만든다.
+    driver_at_root : True 면 드라이버 로케이터를 체인 최상단(루트) 월드 위치에 놓고,
+                     node 출력이면 그 자리를 **계속 따라가게** 한다(위치만, constraint 없이
+                     `multMatrix + decomposeMatrix` 직결). False 면 예전처럼 원점에 만든다.
     debug_curve : True(기본)면 체인마다 **흔들림을 보여 주는 커브**를 하나 만든다.
                   Chain Wave 탭의 커브와 같은 방식(노드 위치 = CV, degree 3)이지만 구동
                   방향이 반대라 **실제 결과**를 그린다. Remove 로 함께 지워진다.
@@ -496,27 +556,48 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
     if wavelength <= 0 or period <= 0:
         return 0, 0, "[Warning] Wavelength and Period must be greater than 0."
 
-    drivers, made_all, rest_all, failed = [], [], {}, []
+    drivers, curves, made_all, rest_all, failed = [], [], [], {}, []
     cardinal_total, node_total = 0, 0
+    no_follow = []
+    # 루트 추종은 라이브 노드망일 때만 뜻이 있다 - curve 출력은 구운 뒤 셋업을 지운다.
+    follow_root = driver_at_root and output != OUTPUT_CURVE
 
     for k, chain in enumerate(chains):
-        drv, made, rest, info = _build_chain_lite(
+        drv, made, rest, info, crv = _build_chain_lite(
             chain, axis, swing, wavelength, period, speed, ramp, k * node_offset,
             envelope, local_axis=local_axis, driver_at_root=driver_at_root,
-            debug_curve=debug_curve)
+            debug_curve=debug_curve, follow_root=follow_root)
 
         if drv is None:
             failed.append("{0} ({1})".format(_leaf(chain[0]), info))
             continue
 
         drivers.append(drv)
+        if crv:
+            curves.append(crv)
         made_all += made
         rest_all.update(rest)
         cardinal_total += info[0]
         node_total += info[1]
+        if info[2]:
+            no_follow.append("{0} ({1})".format(_leaf(chain[0]), info[2]))
 
     if not drivers:
         return 0, 0, "[Warning] Nothing built. {0}".format("; ".join(failed))
+
+    # ---- 아웃라이너 정리 : 로케이터는 로케이터끼리, 커브는 커브끼리.
+    # 예전에는 체인마다 (드라이버, 커브) 를 이어서 만들어 둘이 **번갈아** 쌓였다.
+    base = prefix or "chainWaveLite"
+    groups = []
+    for nodes, suffix in ((drivers, LITE_DRIVER_GRP_SUFFIX),
+                          (curves, LITE_CURVE_GRP_SUFFIX)):
+        grp, renamed = _group_nodes(nodes, base + suffix + "#")
+        if grp is None:
+            continue
+        groups.append(grp)
+        made_all = [renamed.get(n, n) for n in made_all]
+        nodes[:] = [renamed.get(n, n) for n in nodes]
+    made_all += groups
 
     if local_axis is not None:
         axis_note = ("Rotate axis: object {0} (rotate{0} only, Sway Axis "
@@ -550,17 +631,26 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
         shape_note = ("{0} debug curve(s) - display only, they follow the chain "
                       "and drive nothing".format(len(drivers)) if debug_curve
                       else "no curve / ikHandle / proxy")
+        if follow_root:
+            place_note = "the chain root and follows its world position"
+        elif driver_at_root:
+            place_note = "the chain root"
+        else:
+            place_note = "the origin"
+
         msg = ("Chain Wave Lite: {0} chain(s), {1} maya node(s), "
                "{8}. {6}. Direct-axis {2}/{3} node(s). "
-               "Driver locator at {7}. "
+               "Driver locator at {7}. Grouped as {9}. "
                "Edit windSwingAngle (degrees) / windWavelength / windPeriod / "
                "windSpeed / windRootRamp live; windEnvelope [0-1] scales the whole "
                "effect (0 = off, 0.5 = half, now {5:g}). "
                "Remove with the '{4}' set.".format(
                    len(drivers), len(made_all), cardinal_total, node_total, set_name,
-                   envelope, axis_note,
-                   "the chain root" if driver_at_root else "the origin",
-                   shape_note))
+                   envelope, axis_note, place_note, shape_note,
+                   " + ".join(_leaf(g) for g in groups) or "no group"))
+        if no_follow:
+            msg += " Root-follow skipped (would cycle): {0}.".format(
+                ", ".join(no_follow[:5]))
 
     if failed:
         msg += " Failed: {0}.".format(", ".join(failed[:5]))

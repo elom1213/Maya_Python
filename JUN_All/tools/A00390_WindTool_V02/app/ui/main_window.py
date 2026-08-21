@@ -113,13 +113,17 @@ class MainWindow(QWidget):
         self.rb_curve.toggled.connect(self._on_output_changed)
         sine.addWidget(out_box)
 
-        self.chk_driver_root = QCheckBox("Place driver at chain root")
+        self.chk_driver_root = QCheckBox("Place driver at chain root (follow)")
         self.chk_driver_root.setChecked(True)
         self.chk_driver_root.setToolTip(
             "Node output only. On (default): each driver locator is created at the\n"
             "world position of the TOP node of the group it drives (the chain root)\n"
-            "instead of at the origin.\n"
-            "It is only a locator holding attributes - moving it changes nothing.")
+            "instead of at the origin, and KEEPS FOLLOWING that world position.\n\n"
+            "Position only - rotation is not followed. No constraint is used: the\n"
+            "root's worldMatrix goes through multMatrix + decomposeMatrix straight\n"
+            "into the locator's translate, so there is no cycle.\n"
+            "Its translate is therefore driven and can no longer be moved by hand;\n"
+            "it is still only a holder for the wind attributes.")
         sine.addWidget(self.chk_driver_root)
 
         # 축(어트리뷰트) 선택
@@ -308,12 +312,17 @@ class MainWindow(QWidget):
         self.rb_wave_curve.toggled.connect(self._on_wave_output_changed)
         wave.addWidget(out_box)
 
-        self.chk_wave_driver_root = QCheckBox("Place driver at chain root")
+        self.chk_wave_driver_root = QCheckBox("Place driver at chain root (follow)")
         self.chk_wave_driver_root.setChecked(True)
         self.chk_wave_driver_root.setToolTip(
             "Node output only. On (default): the driver locator is created at the\n"
-            "world position of the TOP node of that chain instead of at the origin.\n"
-            "It is only a locator holding attributes - moving it changes nothing.")
+            "world position of the TOP node of that chain instead of at the origin,\n"
+            "and KEEPS FOLLOWING that world position.\n\n"
+            "Position only - rotation is not followed. No constraint is used: the\n"
+            "root's worldMatrix goes through multMatrix + decomposeMatrix straight\n"
+            "into the locator's translate, so there is no cycle.\n"
+            "Its translate is therefore driven and can no longer be moved by hand;\n"
+            "it is still only a holder for the wind attributes.")
         wave.addWidget(self.chk_wave_driver_root)
 
         axis_row = QHBoxLayout()
@@ -493,14 +502,21 @@ class MainWindow(QWidget):
         self.rb_lite_curve.toggled.connect(self._on_lite_output_changed)
         lite.addWidget(out_box)
 
-        self.chk_lite_driver_root = QCheckBox("Place driver at chain root")
+        self.chk_lite_driver_root = QCheckBox("Place driver at chain root (follow)")
         self.chk_lite_driver_root.setChecked(True)
         self.chk_lite_driver_root.setToolTip(
             "Node output only. On (default): the driver locator is created at the\n"
             "world position of the TOP node of that chain, so it sits on the bone /\n"
-            "controller it drives instead of at the origin.\n"
-            "Off: the locator is left at the origin (the old behaviour).\n"
-            "It is only a locator holding attributes - moving it changes nothing.")
+            "controller it drives instead of at the origin, and KEEPS FOLLOWING\n"
+            "that world position - move the root bone / root controller / the whole\n"
+            "rig and the locator goes with it.\n\n"
+            "Position only - rotation is not followed. No constraint is used: the\n"
+            "root's worldMatrix goes through multMatrix + decomposeMatrix straight\n"
+            "into the locator's translate, so there is no cycle.\n"
+            "Its translate is therefore driven and can no longer be moved by hand;\n"
+            "it is still only a holder for the wind attributes.\n\n"
+            "Off: the locator is left at the origin and does not follow (the old\n"
+            "behaviour).")
         lite.addWidget(self.chk_lite_driver_root)
 
         axis_row = QHBoxLayout()
@@ -602,7 +618,10 @@ class MainWindow(QWidget):
             "instead of driving it, so it always sits exactly on the result.\n\n"
             "Display only: it moves nothing, it is set to reference so it cannot be\n"
             "picked in the viewport, and Remove Chain Wave Lite deletes it with the\n"
-            "rest of the setup.")
+            "rest of the setup.\n\n"
+            "The curves are collected in their own '*_liteCurveGrp' group, separate\n"
+            "from the driver locators in '*_liteDriverGrp', so the outliner does not\n"
+            "alternate locator / curve / locator / curve.")
         lite.addWidget(self.chk_lite_debug)
 
         self.btn_lite_apply = QPushButton("Build Chain Wave Lite")

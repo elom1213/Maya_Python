@@ -17,6 +17,39 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-21 (오늘)
 
+> [!summary] `A00390_WindTool_V02` **아웃라이너 그룹 분리 + 드라이버가 루트를 따라간다** (v02.03→02.04)
+- **요청 2가지**: (1) Chain Wave Lite 로 Node + Debug Curve 를 만들면 아웃라이너에 로케이터와
+  커브가 **번갈아** 쌓이니 종류별로 그룹을 나눠 달라. (2) Node 모드에서 생성되는 노드가
+  **루트 본/컨트롤러의 월드 위치를 따라다니게** 해 달라 — 회전은 빼고, 되도록 constraint 없이
+  월드 매트릭스 직결로, 사이클이 나는 경우는 제외.
+- **(1)** 빌드 하나가 그룹 둘(`<prefix>_liteDriverGrp` / `<prefix>_liteCurveGrp`)을 만들고 종류별로
+  담는다. `Debug Curve` 를 끄면 커브 그룹은 아예 안 만들고, 둘 다 제거 세트에 들어가 Remove 로
+  함께 지워진다(prefix 별로 자기 것만).
+- **그룹 이동을 `parent -relative` 로 한 데는 실제 이유가 있다.** 이 시점에 드라이버의
+  `translate` 는 이미 **연결**돼 있어서, 기본 `parent` 가 월드 위치를 유지하려고 하는
+  `translate` setAttr 이 **불가능하다**. 그룹이 단위행렬이라 로컬을 그대로 둬도 월드가 안 변한다.
+- **(2)** `multMatrix(root.worldMatrix, driver.parentInverseMatrix) → decomposeMatrix.outputTranslate
+  → driver.translate`. constraint 없이 **드라이버당 노드 2개**, **위치만**(`driver.rotate` 는 비워
+  둔다). 기존 체크박스를 `Place driver at chain root (follow)` 로 바꿔 그대로 쓰고, **세 탭 전부**
+  (Sine / Chain Wave / Chain Wave Lite)에 적용했다. `Curve` 출력은 구운 뒤 셋업을 지우므로 제외.
+- **`worldInverseMatrix` 가 아니라 `parentInverseMatrix` 인 것이 핵심이다.** 전자는 드라이버
+  **자신의** translate 를 되읽어 진짜 사이클이 된다. 후자는 **부모**의 월드 역행렬이라 자기
+  translate 에 의존하지 않는다. 드라이버 `wind*` → `root.rotate` → `root.worldMatrix` →
+  `driver.translate` 경로도 되돌아오지 않아 닫히지 않는다.
+- 실제로 사이클이 되는 배치는 **드라이버가 루트의 조상**인 경우 **하나뿐**이라, 풀패스 접두
+  비교로 그 경우만 걸러 **연결을 거부하고 사유를 로그에 남긴다**
+  (`Root-follow skipped (would cycle): ... (driver is an ancestor of the root)`).
+- **⚠️ 부작용을 문서·툴팁에 명시했다** — `translate` 가 구동되므로 드라이버를 **손으로 옮길 수
+  없게 된다**. 원래도 위치가 결과에 영향 없는 어트리뷰트 홀더였고, 체크를 끄면 예전처럼 원점에
+  자유롭게 남는다. 옛 툴팁의 "moving it changes nothing" 문구는 더 이상 사실이 아니라 고쳤다.
+- 검증(mayapy 2024, **코어 43 + UI 22** + 이중 빌드 스모크): 그룹 각 1개·자기 종류만 담김·최상위에
+  흩어진 로케이터/커브 0개, 리그 그룹 이동과 루트 조인트 이동 둘 다 오차 `< 1e-6`, 루트를
+  회전시켜도 `driver.rotate` 연결 없음, 씬에 `constraint` 0개이고 `cycleCheck` 가 빌드 직후·이동
+  후·컨트롤러 체인 전부에서 비어 있음, 리그를 옮긴 뒤에도 디버그 커브 CV 오차 `0.0000000000`,
+  Remove 후 `*rootFollow*` 잔여 0, `Curve` 출력 잔여물 0. **뷰포트 확인은 못 했다**(헤드리스). #A00390
+
+---
+
 > [!summary] `A00110_animTool_V02` **Copy Key: 복사할 어트리뷰트 선택(9개 체크박스)** (v02.07→02.08)
 - **요청**: `Transfer > Copy Key` 가 Translate/Rotate/Scale 을 무조건 다 복사하니, 세 어트리뷰트를
   **선택적으로** 복사·붙여넣게 해 달라. 축별 X/Y/Z 까지 **9개 체크박스**, 기본은 모두 체크.

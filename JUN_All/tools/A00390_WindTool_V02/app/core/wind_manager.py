@@ -183,6 +183,61 @@ def _safe(name):
     return name.replace("|", "_").replace(":", "_").strip("_")
 
 
+def _long(node):
+    """풀패스. 없는 노드면 None."""
+    return (cmds.ls(node, long=True) or [None])[0]
+
+
+def _is_ancestor(maybe_ancestor, node):
+    """maybe_ancestor 가 node 의 조상이면 True (풀패스 접두 비교)."""
+    a, n = _long(maybe_ancestor), _long(node)
+    if not a or not n:
+        return False
+    return n.startswith(a + "|")
+
+
+def follow_root_position(driver, root):
+    """드라이버 로케이터가 root 의 **월드 위치**를 따라다니게 한다. (만든 노드들, 건너뛴 사유)
+
+    **constraint 를 쓰지 않는다.** root 의 월드 행렬을 드라이버의 부모 공간으로 되돌려
+    translate 에 그대로 넣는다:
+
+        multMatrix(root.worldMatrix[0], driver.parentInverseMatrix[0])
+            -> decomposeMatrix.outputTranslate -> driver.translate
+
+    회전·스케일은 건드리지 않는다(요청대로 **위치만**). 그래서 드라이버는 리그를 씬에서
+    옮기거나 루트 컨트롤러를 움직여도 늘 자기가 구동하는 뼈 위에 붙어 있다.
+
+    ## 왜 사이클이 안 나는가
+
+    `parentInverseMatrix` 는 **부모**의 월드 역행렬이라 드라이버 **자신의** translate 에
+    의존하지 않는다(`worldInverseMatrix` 를 쓰면 자기 translate 를 읽어 진짜 사이클이 된다 —
+    디버그 커브가 커브 자신이 아니라 CV 를 쓰기 때문에 거기서는 안전했던 것과 같은 이유다).
+
+    드라이버의 wind* 어트리뷰트 -> ... -> root.rotate -> root.worldMatrix -> driver.translate
+    는 driver.translate 로 되돌아오지 않으므로 경로가 닫히지 않는다.
+
+    사이클이 되는 배치는 하나뿐이다 — **드라이버가 root 의 조상**인 경우(그러면
+    root.worldMatrix 가 드라이버의 translate 에 의존한다). 그때는 연결하지 않고 사유를
+    돌려준다.
+    """
+    if not (cmds.objExists(driver) and cmds.objExists(root)):
+        return [], "node missing"
+
+    if _is_ancestor(driver, root):
+        return [], "driver is an ancestor of the root"
+
+    tag = _safe(_leaf(driver)) + "_rootFollow"
+    mmx = cmds.createNode("multMatrix", name=tag + "Mmx")
+    cmds.connectAttr(root + ".worldMatrix[0]", mmx + ".matrixIn[0]")
+    cmds.connectAttr(driver + ".parentInverseMatrix[0]", mmx + ".matrixIn[1]")
+
+    dcm = cmds.createNode("decomposeMatrix", name=tag + "Dcm")
+    cmds.connectAttr(mmx + ".matrixSum", dcm + ".inputMatrix")
+    cmds.connectAttr(dcm + ".outputTranslate", driver + ".translate", force=True)
+    return [mmx, dcm], None
+
+
 def _sine_lut(name):
     """정규화 싸인 LUT animCurveUU: input u(주기 1) -> sin(2*pi*u), 무한 반복(cycle).
 
@@ -445,6 +500,7 @@ def _apply_nodes(groups, missing, attr, period, amplitude, offset, speed, mode,
 
     drivers = []
     wired = 0
+    no_follow = []
     for k, grp in enumerate(groups):
         root_jnt = grp[0][0]
         place_at = (cmds.xform(root_jnt, query=True, worldSpace=True,
@@ -456,6 +512,13 @@ def _apply_nodes(groups, missing, attr, period, amplitude, offset, speed, mode,
         template = _sine_lut(drv + "_sineTemplate")
         wired += _wire_group(drv, grp, attr, template)
         cmds.delete(template)   # 조인트마다 복제본을 썼으므로 템플릿은 버린다.
+
+        # 놓기만 하는 게 아니라 **따라다니게** 한다 - 루트가 움직이면 드라이버도 같이 간다.
+        if driver_at_root:
+            _made, why = follow_root_position(drv, root_jnt)
+            if why:
+                no_follow.append("{0} ({1})".format(_leaf(root_jnt), why))
+
         drivers.append(drv)
 
     mode_label = "root" if mode == MODE_ROOT else "chain"
@@ -468,7 +531,11 @@ def _apply_nodes(groups, missing, attr, period, amplitude, offset, speed, mode,
           "windEnvelope [0-1] scales the whole effect (0 = off, 0.5 = half)." \
           .format(head, attr, period, amplitude, offset, speed, node_offset,
                   envelope,
-                  "the chain root" if driver_at_root else "the origin")
+                  "the chain root (and follows it)" if driver_at_root
+                  else "the origin")
+    if no_follow:
+        msg += " Root-follow skipped (would cycle): {0}.".format(
+            ", ".join(no_follow[:5]))
     if missing:
         msg += " Skipped: {0}".format(", ".join(missing))
     return len(drivers), wired, msg

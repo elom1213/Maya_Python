@@ -326,6 +326,12 @@ Default Distance attribute (driver signal x)
   9-joint skew chain) and it **leaves the other two axes free for the animator**. The trade-off is that the
   angle differencing only accumulates into a world angle when the chain nodes **share an orientation**, so that
   limit is spelled out in the tooltip and the guide.
+- The driver locator **follows the root bone / controller's world position without a constraint**. Using
+  `worldInverseMatrix` would read the locator's own `translate` back and close a cycle, so
+  **`parentInverseMatrix`** cancels the parent space instead — `multMatrix → decomposeMatrix → translate`,
+  **two nodes**. Exactly one arrangement can still cycle (the driver being an ancestor of the root), and that
+  case alone is **refused with the reason logged**. Build output is split into per-kind groups (locators /
+  debug curves) so the outliner no longer alternates between them.
 
 ---
 

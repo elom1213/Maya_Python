@@ -1,5 +1,68 @@
 # CHANGELOG - A00390_WindTool_V02
 
+## v02.04 (2026-08-21) - 아웃라이너 그룹 분리 + 드라이버가 루트를 따라간다
+
+### Changed
+- **Chain Wave Lite 의 생성물을 종류별로 그룹에 담는다.** 예전에는 체인마다
+  `(드라이버 로케이터, 디버그 커브)` 를 이어서 만들어 아웃라이너에 **번갈아** 쌓였다.
+  이제 빌드 하나가 그룹 **둘**을 만든다.
+
+  | 그룹 | 담는 것 |
+  |------|---------|
+  | `<prefix>_liteDriverGrp` | 드라이버 로케이터 전부 |
+  | `<prefix>_liteCurveGrp` | 디버그 커브 전부 |
+
+  - `Debug Curve` 를 끄면 커브 그룹은 **아예 만들지 않는다**.
+  - 두 그룹 모두 제거 세트에 들어가 `Remove Chain Wave Lite` 로 함께 지워진다.
+  - 그룹은 **원점·단위행렬**이고 `parent -relative` 로 옮긴다. 로컬을 그대로 두므로
+    월드 위치가 변하지 않고, **드라이버의 `translate` 가 이미 연결돼 있어**(아래 참고)
+    기본 parent 의 "월드 유지" setAttr 이 불가능하다는 실제 이유도 있다.
+
+### Added
+- **드라이버 로케이터가 루트 본/컨트롤러의 월드 위치를 계속 따라간다** (Node 출력).
+  **Sine / Chain Wave / Chain Wave Lite 세 탭 전부**. 기존 체크박스를
+  `Place driver at chain root (follow)` 로 바꿔 그대로 켜고 끈다(기본 ON).
+
+  ```
+  multMatrix(root.worldMatrix[0], driver.parentInverseMatrix[0])
+      -> decomposeMatrix.outputTranslate -> driver.translate
+  ```
+
+  - **constraint 를 쓰지 않는다** — 월드 행렬 직결이다(요청대로).
+  - **위치만.** 회전은 연결하지 않는다 — `driver.rotate` 는 그대로 비어 있다.
+  - 루트 조인트를 옮기든, 루트 컨트롤러를 움직이든, **리그 그룹째 옮기든** 따라온다.
+  - 대신 드라이버의 `translate` 가 구동되므로 **손으로 옮길 수 없게 된다**
+    (원래도 위치는 의미가 없는 "어트리뷰트 홀더" 였다).
+  - `Curve` 출력에서는 걸지 않는다 — 구운 뒤 셋업을 통째로 지우기 때문.
+
+### 왜 사이클이 안 나는가 (`parentInverseMatrix` 를 쓴 이유)
+`worldInverseMatrix` 를 쓰면 드라이버 **자신의** translate 를 읽어 진짜 사이클이 된다.
+`parentInverseMatrix` 는 **부모**의 월드 역행렬이라 자기 translate 에 의존하지 않는다.
+드라이버 `wind*` → … → `root.rotate` → `root.worldMatrix` → `driver.translate` 경로도
+`driver.translate` 로 되돌아오지 않으므로 닫히지 않는다.
+
+사이클이 되는 배치는 **하나뿐**이다 — 드라이버가 root 의 **조상**인 경우
+(그때는 `root.worldMatrix` 가 드라이버의 translate 에 의존한다).
+그 경우는 **연결하지 않고** 로그에 사유를 남긴다:
+`Root-follow skipped (would cycle): <root> (driver is an ancestor of the root)`.
+
+### 검증
+`mayapy` (Maya 2024) 헤드리스 — **코어 43 + UI 22 항목 전부 통과** + 이중 빌드 스모크 테스트.
+
+- 로케이터 그룹 1개 / 커브 그룹 1개, 각 그룹에 **자기 종류만** 3개씩,
+  아웃라이너 최상위에 흩어진 로케이터·커브 **0개**
+- 리그 그룹 이동 · 루트 조인트 이동 둘 다에서 드라이버 위치 오차 `< 1e-6`
+- 루트를 **회전**시켜도 `driver.rotate` 는 연결 없음(위치만 따라감)
+- 씬에 `constraint` 노드 **0개**, `cycleCheck` **비어 있음**(빌드 직후·이동 후·컨트롤러 체인)
+- 드라이버가 조상인 배치는 **연결 거부** + 노드도 만들지 않음
+- 리그를 옮긴 뒤에도 디버그 커브 CV 가 체인 위에 **오차 `0.0000000000`**
+- `Debug Curve` OFF → 커브 그룹 없음 / `nurbsCurve` 0개, 드라이버 그룹은 그대로
+- 체크박스 OFF → 원점에 그대로, `translate` 연결 없음, 그룹 분리는 유지
+- Sine · Chain Wave 탭에서도 추종 동작, Remove 후 `*rootFollow*` 잔여 0
+- `Curve` 출력은 예전대로 구운 뒤 잔여물 0
+
+---
+
 ## v02.03 (2026-08-19) - Chain Wave Lite 디버그 커브
 
 ### Added

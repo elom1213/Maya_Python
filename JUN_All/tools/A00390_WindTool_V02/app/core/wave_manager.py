@@ -49,7 +49,7 @@ from maya.api import OpenMaya as om
 from .wind_manager import (
     DRIVER_SPEED, DRIVER_PHASE, DRIVER_PHASE_OFFSET, DRIVER_ENVELOPE,
     MODE_CHAIN, MODE_ROOT, OUTPUT_CURVE, OUTPUT_NODE,
-    _make_phase_expression, _sine_lut, _leaf, _safe,
+    _make_phase_expression, _sine_lut, _leaf, _safe, follow_root_position,
 )
 
 
@@ -429,8 +429,9 @@ def _nudge_eval():
 # --------------------------------------------------------------- 빌드 / 제거
 
 def _build_one(chain, axis, amplitude, wavelength, period, speed, ramp,
-               phase_offset, envelope=1.0, driver_at_root=True):
-    """체인 하나에 커브 + ikSpline + 노드망을 만든다. (드라이버, 생성 노드들, rest 회전)
+               phase_offset, envelope=1.0, driver_at_root=True,
+               follow_root=True):
+    """체인 하나에 커브 + ikSpline + 노드망을 만든다. (드라이버, 생성 노드들, rest 회전, 미추종)
 
     체인이 **조인트가 아니면**(FK 컨트롤러) 같은 자리에 숨긴 **프록시 조인트 체인**을 세워
     거기에 파동을 걸고, 프록시의 월드 회전 변화량을 컨트롤러 rotate 로 옮긴다.
@@ -478,6 +479,13 @@ def _build_one(chain, axis, amplitude, wavelength, period, speed, ramp,
     drv = _make_wave_driver(root_name + "_waveDriver#", amplitude, wavelength,
                             period, speed, ramp, phase_offset, envelope,
                             place_at=root_pos)
+
+    # 놓기만 하는 게 아니라 **따라다니게** 한다(위치만, constraint 없이 월드 행렬 직결).
+    # 프록시가 아니라 **원본 체인 루트**를 따라간다 - 프록시는 숨은 내부 노드다.
+    follow_made, follow_skip = ([], None)
+    if follow_root:
+        follow_made, follow_skip = follow_root_position(drv, controls[0])
+
     template = _sine_lut(drv + "_sineTemplate")
 
     # 실효 진폭 = windAmplitude * windEnvelope (커브의 모든 CV 가 공유, 노드 1개).
@@ -485,7 +493,7 @@ def _build_one(chain, axis, amplitude, wavelength, period, speed, ramp,
     cmds.connectAttr(drv + "." + WAVE_AMPLITUDE, amp_env + ".input1")
     cmds.connectAttr(drv + "." + DRIVER_ENVELOPE, amp_env + ".input2")
 
-    made = [crv, handle, effector, drv, amp_env]
+    made = [crv, handle, effector, drv, amp_env] + follow_made
     n_cv = cmds.getAttr(crv + ".spans") + cmds.getAttr(crv + ".degree")
     axis_index = {"X": 0, "Y": 1, "Z": 2}[axis.upper()]
     for k in range(n_cv):
@@ -503,7 +511,7 @@ def _build_one(chain, axis, amplitude, wavelength, period, speed, ramp,
         made += _connect_control(
             chain[i], node, "{0}_ctl{1:02d}".format(root_name, i),
             rest_ctl_world[node], _mat_inverse(proxy_rest[i]))
-    return drv, made, rest_rotate
+    return drv, made, rest_rotate, follow_skip
 
 
 def build_wave(joints, mode=MODE_ROOT, axis="Y", amplitude=1.0, wavelength=10.0,
@@ -524,8 +532,9 @@ def build_wave(joints, mode=MODE_ROOT, axis="Y", amplitude=1.0, wavelength=10.0,
     start, end : (curve 출력) 구울 구간.
     envelope   : 드라이버 windEnvelope 초기값 [0, 1]. 0 = 파동이 전혀 적용되지 않음(rest),
                  0.5 = 절반, 1 = 완전 적용. 빌드 뒤에도 드라이버에서 라이브 조절/키잉.
-    driver_at_root : True 면 드라이버 로케이터를 체인 최상단(루트) 월드 위치에 놓는다.
-                     False 면 예전처럼 원점에 만든다.
+    driver_at_root : True 면 드라이버 로케이터를 체인 최상단(루트) 월드 위치에 놓고,
+                     node 출력이면 그 자리를 **계속 따라가게** 한다(위치만, constraint 없이
+                     `multMatrix + decomposeMatrix` 직결). False 면 예전처럼 원점에 만든다.
 
     Returns: (chains, drivers, message)
     """
@@ -541,13 +550,19 @@ def build_wave(joints, mode=MODE_ROOT, axis="Y", amplitude=1.0, wavelength=10.0,
 
     drivers, made_all = [], []
     rest_all = {}
+    no_follow = []
+    # 루트 추종은 라이브 노드망일 때만 뜻이 있다 - curve 출력은 구운 뒤 셋업을 지운다.
+    follow_root = driver_at_root and output != OUTPUT_CURVE
     for k, chain in enumerate(chains):
-        drv, made, rest = _build_one(chain, axis, amplitude, wavelength, period,
-                                     speed, ramp, k * node_offset, envelope,
-                                     driver_at_root=driver_at_root)
+        drv, made, rest, follow_skip = _build_one(
+            chain, axis, amplitude, wavelength, period,
+            speed, ramp, k * node_offset, envelope,
+            driver_at_root=driver_at_root, follow_root=follow_root)
         drivers.append(drv)
         made_all += made
         rest_all.update(rest)
+        if follow_skip:
+            no_follow.append("{0} ({1})".format(_leaf(chain[0]), follow_skip))
 
     set_name = (prefix or "chainWave") + WAVE_SET_SUFFIX
     node_set = cmds.sets(made_all, name=set_name)
@@ -579,7 +594,11 @@ def build_wave(joints, mode=MODE_ROOT, axis="Y", amplitude=1.0, wavelength=10.0,
                "now {4:g}). Remove with the '{2}' set.".format(
                    len(chains), ", ".join(_leaf(d) for d in drivers),
                    set_name, kind, envelope,
-                   "the chain root" if driver_at_root else "the origin"))
+                   "the chain root (and follows it)" if follow_root
+                   else ("the chain root" if driver_at_root else "the origin")))
+        if no_follow:
+            msg += " Root-follow skipped (would cycle): {0}.".format(
+                ", ".join(no_follow[:5]))
 
     if branched:
         msg += " Branching chain(s) followed the first child: {0}.".format(
