@@ -12,6 +12,8 @@ from .euler_filter_manager import EulerFilterManager
 from .graph_view_manager import GraphViewManager
 from .graph_focus_manager import GraphFocusManager
 from .fill_key_manager import FillKeyManager, CURRENT_LAYER
+from .noise_node_manager import NoiseNodeManager, NoiseSession
+from . import noise_generator
 from .curve_filter_manager import (
     CurveFilterSession,
     EASE_IN as CF_EASE_IN, EASE_OUT as CF_EASE_OUT,
@@ -26,4 +28,5 @@ __all__ = [
     "GraphViewManager", "GraphFocusManager", "FillKeyManager", "CURRENT_LAYER",
     "CurveFilterSession", "CF_EASE_IN", "CF_EASE_OUT", "CF_LINEAR",
     "CF_EASE_IN_OUT", "cf_selected_channel_attrs",
+    "NoiseNodeManager", "NoiseSession", "noise_generator",
 ]

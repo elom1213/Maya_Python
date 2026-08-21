@@ -37,6 +37,8 @@ from tools.A00110_animTool_V02.app.core import (
     CF_EASE_IN, CF_EASE_OUT, CF_LINEAR, CF_EASE_IN_OUT,
     cf_selected_channel_attrs,
 )
+from tools.A00110_animTool_V02.app.core import NoiseNodeManager, NoiseSession
+from tools.A00110_animTool_V02.app.core import noise_generator as noise_gen
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -58,6 +60,20 @@ STAGGER_VALUE_SLIDER_STEPS = 1000
 # 슬라이더/스핀박스 조작이 이만큼 멎으면 그때까지의 미리보기를 undo 큐에 '한 항목' 으로
 # 기록한다. 드래그 중에는 기록하지 않아 undo 항목이 수백 개 쌓이는 걸 막는다.
 STAGGER_SETTLE_MS = 350
+
+
+# ---- Create > Noise ----------------------------------------------------------
+# 슬라이더는 정수만 다루므로 SCALE 배로 담는다. 요청상 Smoothness/Offset 에는 최소·최대가
+# 없어야 하므로, **슬라이더는 '자주 쓰는 구간' 만 담당**하고 그 밖의 값은 옆 스핀박스로 넣는다
+# (Stagger 와 같은 구성).
+#   Smoothness: ±3.0 (0.01 해상도). 실효 구간이 대략 -1 ~ +2 라 이 정도면 충분하다.
+#   Offset    : ±500 프레임 (0.1 해상도).
+NOISE_SMOOTH_SLIDER_SCALE = 100
+NOISE_SMOOTH_SLIDER_STEPS = 300
+NOISE_OFFSET_SLIDER_SCALE = 10
+NOISE_OFFSET_SLIDER_STEPS = 5000
+
+NOISE_SETTLE_MS = 350
 
 # Stagger 슬라이더 전용 스타일 (A00290_BSTool Shape Editor 슬라이더 참고).
 # 테마 qss 가 QSlider 를 스타일링하지 않아, 어두운 배경에선 Maya 네이티브 홈(groove)이 배경에
@@ -301,6 +317,15 @@ class MainWindow(QWidget):
          "you selected in the Graph Editor", "_build_curve_filters_page"),
     )
 
+    # Create 는 다른 카테고리와 성격이 다르다 — 기존 애니메이션을 손보는 게 아니라
+    # **없던 애니메이션 소스를 씬에 새로 만든다.** 입주 기준을 좁게 못 박아 둔다:
+    # "씬에 새 노드를 만들어 애니메이션 소스를 공급하는 기능" 만 여기 들어온다.
+    # (Key Edit 이 잡동사니 서랍이 됐던 전례를 반복하지 않기 위한 규칙 — 탭 재분류 계획서 §1)
+    CREATE_PAGES = (
+        ("Noise", "Noise - create nodes whose 'output' plays deterministic, "
+         "seamless noise over time", "_build_noise_tab"),
+    )
+
     # 아래 넷은 v01.41 까지 **상위 탭**이었다. 빌더가 이미
     # JUN_mod_fit_tab_page_v01 을 반환하므로 그대로 하위 탭 페이지로 쓴다.
     TRANSFER_PAGES = (
@@ -331,6 +356,8 @@ class MainWindow(QWidget):
          TIMING_PAGES, "timing_tabs"),
         ("Curve", "Curve - clean up the shape and the values of the curves",
          CURVE_PAGES, "curve_tabs"),
+        ("Create", "Create - build new animation sources in the scene",
+         CREATE_PAGES, "create_tabs"),
         ("Transfer", "Transfer - move animation onto other objects",
          TRANSFER_PAGES, "transfer_tabs"),
         ("Bake", "Bake - bake the result down to keys", BAKE_PAGES, "bake_tabs"),
@@ -805,6 +832,289 @@ class MainWindow(QWidget):
         self.btn_set_pose.clicked.connect(self.on_set_pose)
 
         return tab
+
+    # ---------------- Create > Noise ----------------
+
+    def _build_noise_tab(self):
+        """프레임에 따라 결정론적 · 심리스 노이즈를 내보내는 노드를 만드는 탭.
+
+        노이즈 유닛 하나 = 노드 2개(설정을 담은 transform + 그걸 구동하는 animCurveTU).
+        **animCurve 인 것이 핵심**이다 — 마야 그래프 에디터는 animCurve 만 그리므로,
+        표현식이나 플러그인 노드로 계산하면 결과를 눈으로 볼 수 없다.
+        설계 전체는 docs/plans/A00110_animTool_V02_noise_tab_plan.md 참고.
+        """
+        page, layout = self._sub_page()
+
+        # 슬라이더 세션(NoiseSession). 선택이 바뀌거나 씬이 어긋나면 새로 만든다.
+        self._noise_sess = None
+        # 위젯을 노드 값으로 채우는 동안 시그널이 되먹임되는 걸 막는 가드.
+        self._noise_updating = False
+
+        self._noise_settle_timer = QTimer(self)
+        self._noise_settle_timer.setSingleShot(True)
+        self._noise_settle_timer.setInterval(NOISE_SETTLE_MS)
+        self._noise_settle_timer.timeout.connect(self._noise_settle)
+
+        # -------------------------
+        # 노이즈 노드 목록
+        # 공용 TSL 대신 평범한 QListWidget 을 쓴다 — 이 리스트는 '씬 선택을 담는 곳' 이
+        # 아니라 **툴이 만든 노드의 목록**이라 Select/Add/Del 동선이 맞지 않는다.
+        # 대신 TSL 과 같은 이유로 **이름이 아니라 UUID 를 들고 있는다**(리네임/동명 안전).
+        # -------------------------
+
+        list_grp = QGroupBox("Noise Nodes")
+        list_layout = QVBoxLayout(list_grp)
+
+        self.noise_list = QListWidget()
+        self.noise_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.noise_list.setMinimumHeight(90)
+        self.noise_list.setToolTip(
+            "Every noise node in the scene.\n"
+            "Pick one to edit its settings below. Each node keeps its own\n"
+            "waveform, so you can drive many channels with different noise.")
+        list_layout.addWidget(self.noise_list)
+
+        btn_row = QHBoxLayout()
+        self.btn_noise_create = QPushButton("Create Noise Node")
+        self.btn_noise_create.setToolTip(
+            "Create a new noise node. Its 'output' attribute plays deterministic,\n"
+            "seamless noise and is visible in the Graph Editor like any curve.")
+        btn_row.addWidget(self.btn_noise_create)
+
+        self.btn_noise_delete = QPushButton("Delete")
+        self.btn_noise_delete.setToolTip("Delete the selected noise node(s) and their curves.")
+        btn_row.addWidget(self.btn_noise_delete)
+
+        self.btn_noise_reload = QPushButton("Refresh")
+        self.btn_noise_reload.setToolTip(
+            "Re-read the scene. Use it after opening a file, or after editing the\n"
+            "settings straight in the Channel Box.")
+        btn_row.addWidget(self.btn_noise_reload)
+
+        self.btn_noise_select = QPushButton("Select")
+        self.btn_noise_select.setToolTip("Select the highlighted noise node(s) in the scene.")
+        btn_row.addWidget(self.btn_noise_select)
+
+        list_layout.addLayout(btn_row)
+        layout.addWidget(list_grp)
+
+        # -------------------------
+        # 선택 노드의 설정
+        # -------------------------
+
+        self.noise_set_grp = QGroupBox("Settings")
+        set_layout = QVBoxLayout(self.noise_set_grp)
+
+        # --- Type ---
+        type_row = QHBoxLayout()
+        type_row.addWidget(QLabel("Type"))
+        self.cmb_noise_type = QComboBox()
+        self.cmb_noise_type.addItems(list(noise_gen.NOISE_TYPES))
+        self.cmb_noise_type.setToolTip(
+            "Value    - random values per cell, smoothly interpolated. Good default.\n"
+            "Perlin   - gradient noise; evenly paced, crosses zero at the cells.\n"
+            "Simplex  - like Perlin with fewer grid artefacts.\n"
+            "Worley   - distance to feature points; spiky, pulsing motion.\n"
+            "Ridged   - folded Value noise; sharp peaks.")
+        type_row.addWidget(self.cmb_noise_type, 1)
+        set_layout.addLayout(type_row)
+
+        # --- Smoothness ---
+        sm_row = QHBoxLayout()
+        sm_row.addWidget(QLabel("Smoothness"))
+
+        self.sld_noise_smooth = QSlider(Qt.Horizontal)
+        self.sld_noise_smooth.setRange(-NOISE_SMOOTH_SLIDER_STEPS, NOISE_SMOOTH_SLIDER_STEPS)
+        self.sld_noise_smooth.setValue(int(noise_gen.DEFAULT_SMOOTHNESS * NOISE_SMOOTH_SLIDER_SCALE))
+        self.sld_noise_smooth.setTickPosition(QSlider.TicksBelow)
+        self.sld_noise_smooth.setTickInterval(NOISE_SMOOTH_SLIDER_STEPS)
+        self.sld_noise_smooth.setMinimumWidth(140)
+        self.sld_noise_smooth.setToolTip(
+            "How much the value changes from one frame to the next.\n"
+            "Positive = smoother, negative = rougher. There is no hard limit, but\n"
+            "the effect saturates outside roughly -1 .. +2 (past that the noise is\n"
+            "already a single slow wave, or already as rough as one key per frame allows).\n"
+            "This is the spectral exponent: 0 = white, +1 = pink, +2 = brown, -1 = blue.")
+        sm_row.addWidget(self.sld_noise_smooth, 1)
+
+        self.sb_noise_smooth = QDoubleSpinBox()
+        self.sb_noise_smooth.setRange(-1000.0, 1000.0)
+        self.sb_noise_smooth.setDecimals(3)
+        self.sb_noise_smooth.setSingleStep(0.05)
+        self.sb_noise_smooth.setValue(noise_gen.DEFAULT_SMOOTHNESS)
+        self.sb_noise_smooth.setFixedWidth(88)
+        # 값을 되쓰는 스핀박스는 keyboardTracking 을 꺼야 타이핑 중에 값이 잘리지 않는다.
+        self.sb_noise_smooth.setKeyboardTracking(False)
+        sm_row.addWidget(self.sb_noise_smooth)
+        set_layout.addLayout(sm_row)
+
+        # --- Offset ---
+        of_row = QHBoxLayout()
+        of_row.addWidget(QLabel("Offset"))
+
+        self.sld_noise_offset = QSlider(Qt.Horizontal)
+        self.sld_noise_offset.setRange(-NOISE_OFFSET_SLIDER_STEPS, NOISE_OFFSET_SLIDER_STEPS)
+        self.sld_noise_offset.setValue(0)
+        self.sld_noise_offset.setTickPosition(QSlider.TicksBelow)
+        self.sld_noise_offset.setTickInterval(NOISE_OFFSET_SLIDER_STEPS)
+        self.sld_noise_offset.setMinimumWidth(140)
+        self.sld_noise_offset.setToolTip(
+            "Slide the noise along time, in frames. The waveform loops, so any\n"
+            "offset stays seamless - use it to give two nodes the same character\n"
+            "without them moving in step.")
+        of_row.addWidget(self.sld_noise_offset, 1)
+
+        self.sb_noise_offset = QDoubleSpinBox()
+        self.sb_noise_offset.setRange(-1000000.0, 1000000.0)
+        self.sb_noise_offset.setDecimals(3)
+        self.sb_noise_offset.setSingleStep(1.0)
+        self.sb_noise_offset.setValue(0.0)
+        self.sb_noise_offset.setFixedWidth(88)
+        self.sb_noise_offset.setKeyboardTracking(False)
+        of_row.addWidget(self.sb_noise_offset)
+        set_layout.addLayout(of_row)
+
+        # --- Min / Max ---
+        mm_row = QHBoxLayout()
+        mm_row.addWidget(QLabel("Min / Max"))
+
+        self.sb_noise_min = QDoubleSpinBox()
+        self.sb_noise_min.setRange(-1000000.0, 1000000.0)
+        self.sb_noise_min.setDecimals(3)
+        self.sb_noise_min.setSingleStep(0.1)
+        self.sb_noise_min.setValue(noise_gen.DEFAULT_MIN)
+        self.sb_noise_min.setKeyboardTracking(False)
+        self.sb_noise_min.setToolTip(
+            "Lowest value the output reaches. The noise is stretched to fill\n"
+            "[Min, Max] exactly, so it really does touch both ends.\n"
+            "Min above Max is allowed - it simply flips the noise.\n"
+            "On a rotation channel these are degrees, as you would expect.")
+        mm_row.addWidget(self.sb_noise_min)
+
+        self.sb_noise_max = QDoubleSpinBox()
+        self.sb_noise_max.setRange(-1000000.0, 1000000.0)
+        self.sb_noise_max.setDecimals(3)
+        self.sb_noise_max.setSingleStep(0.1)
+        self.sb_noise_max.setValue(noise_gen.DEFAULT_MAX)
+        self.sb_noise_max.setKeyboardTracking(False)
+        self.sb_noise_max.setToolTip("Highest value the output reaches.")
+        mm_row.addWidget(self.sb_noise_max)
+
+        mm_row.addStretch(1)
+        set_layout.addLayout(mm_row)
+
+        # --- Seed / Loop Length ---
+        sl_row = QHBoxLayout()
+        sl_row.addWidget(QLabel("Seed"))
+
+        self.sb_noise_seed = QSpinBox()
+        self.sb_noise_seed.setRange(0, 999999)
+        self.sb_noise_seed.setValue(0)
+        self.sb_noise_seed.setKeyboardTracking(False)
+        self.sb_noise_seed.setToolTip(
+            "Picks the waveform. The same seed always gives the same noise, on any\n"
+            "machine - nothing here depends on a random number generator.")
+        sl_row.addWidget(self.sb_noise_seed)
+
+        self.btn_noise_seed = QPushButton("Randomize")
+        self.btn_noise_seed.setToolTip("Jump to another waveform.")
+        sl_row.addWidget(self.btn_noise_seed)
+
+        sl_row.addSpacing(12)
+        sl_row.addWidget(QLabel("Loop Length"))
+
+        self.cmb_noise_length = QComboBox()
+        for value in noise_gen.LOOP_LENGTHS:
+            self.cmb_noise_length.addItem("{0} f".format(value), value)
+        self.cmb_noise_length.setCurrentText("{0} f".format(noise_gen.DEFAULT_LOOP_LENGTH))
+        self.cmb_noise_length.setToolTip(
+            "How many frames pass before the noise repeats. It loops seamlessly,\n"
+            "so playback never shows a seam - 1000 f is 33.3 s at 30 fps.")
+        sl_row.addWidget(self.cmb_noise_length)
+
+        self.btn_noise_reset = QPushButton("Reset")
+        self.btn_noise_reset.setToolTip(
+            "Put the settings back to what they were when this node was selected\n"
+            "(undoable).")
+        sl_row.addWidget(self.btn_noise_reset)
+
+        sl_row.addStretch(1)
+        set_layout.addLayout(sl_row)
+
+        layout.addWidget(self.noise_set_grp)
+
+        # -------------------------
+        # 보기 / 출력
+        # -------------------------
+
+        self.btn_noise_graph = QPushButton("Show in Graph Editor")
+        self.btn_noise_graph.setToolTip(
+            "Select the node and frame its 'output' curve in the Graph Editor,\n"
+            "so you can see exactly what the noise does.")
+        layout.addWidget(self.btn_noise_graph)
+
+        out_grp = QGroupBox("Output")
+        out_layout = QVBoxLayout(out_grp)
+
+        self.lbl_noise_targets = QLabel("Not connected.")
+        self.lbl_noise_targets.setWordWrap(True)
+        out_layout.addWidget(self.lbl_noise_targets)
+
+        out_row = QHBoxLayout()
+        self.btn_noise_connect = QPushButton("Connect output -> selected channel(s)")
+        self.btn_noise_connect.setToolTip(
+            "Select objects in the scene, highlight the attributes you want in the\n"
+            "Channel Box, then press this. The node's output drives every one of them.")
+        out_row.addWidget(self.btn_noise_connect)
+
+        self.btn_noise_disconnect = QPushButton("Disconnect")
+        self.btn_noise_disconnect.setToolTip("Break every connection this node's output drives.")
+        out_row.addWidget(self.btn_noise_disconnect)
+        out_layout.addLayout(out_row)
+
+        layout.addWidget(out_grp)
+        layout.addStretch(1)
+
+        # -------------------------
+        # 시그널
+        # -------------------------
+
+        self.btn_noise_create.clicked.connect(self.on_noise_create)
+        self.btn_noise_delete.clicked.connect(self.on_noise_delete)
+        self.btn_noise_reload.clicked.connect(self.on_noise_reload)
+        self.btn_noise_select.clicked.connect(self.on_noise_select)
+        self.noise_list.itemSelectionChanged.connect(self._noise_selection_changed)
+
+        # 슬라이더/스핀박스 = 같은 값의 두 얼굴. 조작 중에는 미리보기, 멎으면 자동 기록.
+        self.sld_noise_smooth.valueChanged.connect(self._noise_smooth_slider_changed)
+        self.sb_noise_smooth.valueChanged.connect(self._noise_smooth_spin_changed)
+        self.sld_noise_offset.valueChanged.connect(self._noise_offset_slider_changed)
+        self.sb_noise_offset.valueChanged.connect(self._noise_offset_spin_changed)
+        self.sb_noise_min.valueChanged.connect(self._noise_range_changed)
+        self.sb_noise_max.valueChanged.connect(self._noise_range_changed)
+
+        # 드래그를 놓거나 타이핑을 끝낸 순간은 기다릴 것 없이 바로 기록한다.
+        for widget in (self.sld_noise_smooth, self.sld_noise_offset):
+            widget.sliderReleased.connect(self._noise_settle)
+        for widget in (self.sb_noise_smooth, self.sb_noise_offset,
+                       self.sb_noise_min, self.sb_noise_max):
+            widget.editingFinished.connect(self._noise_settle)
+
+        # 콤보/시드는 한 번에 끝나는 조작이라 미리보기 없이 곧장 확정한다.
+        # (loopLength 는 키 개수가 달라져 제자리 갱신 경로를 쓸 수 없기도 하다.)
+        self.cmb_noise_type.currentIndexChanged.connect(self._noise_commit_combo)
+        self.cmb_noise_length.currentIndexChanged.connect(self._noise_commit_combo)
+        self.sb_noise_seed.valueChanged.connect(self._noise_commit_seed)
+        self.btn_noise_seed.clicked.connect(self.on_noise_randomize)
+        self.btn_noise_reset.clicked.connect(self.on_noise_reset)
+
+        self.btn_noise_graph.clicked.connect(self.on_noise_show_graph)
+        self.btn_noise_connect.clicked.connect(self.on_noise_connect)
+        self.btn_noise_disconnect.clicked.connect(self.on_noise_disconnect)
+
+        self._noise_fill_list()
+
+        return page
 
     def _build_copy_key_tab(self):
         """Base -> Target 으로 시간 범위 애니메이션 키를 복사하고 축별로 값을 반전하는 탭.
@@ -1941,6 +2251,17 @@ class MainWindow(QWidget):
             self.log("[Warning] List objects first (List Selected Objects).")
             return
 
+        # Create > Noise 로 만든 노드는 기본적으로 뺀다. 이 노드들의 '키' 는 애니메이션이
+        # 아니라 **노이즈 그 자체**라, 여기서 지우면 커브가 통째로 날아가고 output 연결까지
+        # 끊긴다. 지우고 싶으면 Noise 탭의 Delete 를 쓰는 게 맞다.
+        noise_nodes = [o for o in objs if NoiseNodeManager.is_noise_node(o)]
+        if noise_nodes:
+            objs = [o for o in objs if o not in noise_nodes]
+            self.log("[Warning] Skipping {0} noise node(s) - use Create > Noise > Delete "
+                     "for those: {1}".format(len(noise_nodes), ", ".join(noise_nodes[:4])))
+            if not objs:
+                return
+
         # 파괴적: 전 구간·전 채널 키 삭제이므로 확인을 받는다(Undo 가능).
         answer = QMessageBox.question(
             self,
@@ -1980,6 +2301,398 @@ class MainWindow(QWidget):
 
         count, msg = PoseKeyManager.set_pose_keys(axis_values)
         self.log(msg)
+
+    # --------------------------------------------------
+    # Create > Noise
+    # --------------------------------------------------
+
+    def _noise_fill_list(self, keep=None):
+        """씬의 노이즈 노드로 리스트를 다시 채운다. keep 은 다시 고를 노드 이름."""
+        if keep is None:
+            keep = self._noise_current()
+
+        self._noise_updating = True
+        try:
+            self.noise_list.clear()
+            for node in NoiseNodeManager.find_all():
+                item = QListWidgetItem(NoiseNodeManager.summary(node))
+                # 이름이 아니라 UUID 를 들고 있는다 — 리네임이나 동명 노드에도 안전하다.
+                item.setData(Qt.UserRole, cmds.ls(node, uuid=True)[0])
+                self.noise_list.addItem(item)
+
+            if keep:
+                for row in range(self.noise_list.count()):
+                    if self._noise_node_of(self.noise_list.item(row)) == keep:
+                        self.noise_list.setCurrentRow(row)
+                        break
+            elif self.noise_list.count():
+                self.noise_list.setCurrentRow(0)
+        finally:
+            self._noise_updating = False
+
+        self._noise_load_settings()
+
+    @staticmethod
+    def _noise_node_of(item):
+        """리스트 항목이 가리키는 노드의 **현재** 이름. 사라졌으면 None."""
+        if item is None:
+            return None
+        uuid = item.data(Qt.UserRole)
+        names = cmds.ls(uuid) if uuid else []
+        return names[0] if names else None
+
+    def _noise_current(self):
+        """지금 편집 대상인 노드 하나(리스트에서 마지막으로 고른 것)."""
+        return self._noise_node_of(self.noise_list.currentItem())
+
+    def _noise_selected(self):
+        """리스트에서 고른 노드 전부(삭제/선택용)."""
+        found = []
+        for item in self.noise_list.selectedItems():
+            node = self._noise_node_of(item)
+            if node and node not in found:
+                found.append(node)
+        return found
+
+    def _noise_session(self):
+        """지금 노드의 슬라이더 세션. 씬이 세션의 가정과 어긋나면 새로 만든다.
+
+        사용자가 Ctrl+Z 를 눌렀거나 채널박스에서 값을 직접 고치면 세션의 전제가 깨진다.
+        그 상태로 계속 밀면 엉뚱한 값을 기준으로 되돌리게 되므로 세션을 버린다.
+        """
+        node = self._noise_current()
+        if not node:
+            self._noise_sess = None
+            return None
+
+        sess = self._noise_sess
+        if sess is None or sess.node != node or not sess.valid() or not sess.in_sync():
+            sess = NoiseSession(node)
+            self._noise_sess = sess
+        return sess
+
+    def _noise_load_settings(self):
+        """선택 노드의 설정을 위젯에 채운다. 노드가 없으면 설정 영역을 비활성화."""
+        node = self._noise_current()
+        has = bool(node)
+
+        self.noise_set_grp.setEnabled(has)
+        self.btn_noise_graph.setEnabled(has)
+        self.btn_noise_connect.setEnabled(has)
+        self.btn_noise_disconnect.setEnabled(has)
+        self.btn_noise_delete.setEnabled(bool(self._noise_selected()))
+
+        if not has:
+            self.lbl_noise_targets.setText("No noise node selected.")
+            self._noise_sess = None
+            return
+
+        s = NoiseNodeManager.read_settings(node)
+
+        self._noise_updating = True
+        try:
+            self.cmb_noise_type.setCurrentText(s["kind"])
+            self.sb_noise_smooth.setValue(s["smoothness"])
+            self.sld_noise_smooth.setValue(self._noise_clamp_slider(
+                s["smoothness"] * NOISE_SMOOTH_SLIDER_SCALE, NOISE_SMOOTH_SLIDER_STEPS))
+            self.sb_noise_offset.setValue(s["offset"])
+            self.sld_noise_offset.setValue(self._noise_clamp_slider(
+                s["offset"] * NOISE_OFFSET_SLIDER_SCALE, NOISE_OFFSET_SLIDER_STEPS))
+            self.sb_noise_min.setValue(s["out_min"])
+            self.sb_noise_max.setValue(s["out_max"])
+            self.sb_noise_seed.setValue(s["seed"])
+            self.cmb_noise_length.setCurrentText("{0} f".format(s["length"]))
+        finally:
+            self._noise_updating = False
+
+        self._noise_sess = NoiseSession(node)
+        self._noise_update_targets()
+
+    @staticmethod
+    def _noise_clamp_slider(value, steps):
+        """슬라이더가 담당하는 구간 밖의 값은 끝에 붙여 둔다(값 자체는 스핀박스가 들고 있다)."""
+        return int(max(-steps, min(steps, round(value))))
+
+    def _noise_update_targets(self):
+        """output 이 무엇을 구동 중인지 라벨에 적는다."""
+        node = self._noise_current()
+        targets = NoiseNodeManager.output_targets(node) if node else []
+        if not targets:
+            self.lbl_noise_targets.setText("Not connected.")
+            return
+        shown = ", ".join(targets[:6])
+        if len(targets) > 6:
+            shown += " (+{0} more)".format(len(targets) - 6)
+        self.lbl_noise_targets.setText("Driving {0}: {1}".format(len(targets), shown))
+
+    def _noise_widget_params(self):
+        """위젯이 들고 있는 미리보기 대상 값들."""
+        return {
+            "smoothness": self.sb_noise_smooth.value(),
+            "offset": self.sb_noise_offset.value(),
+            "out_min": self.sb_noise_min.value(),
+            "out_max": self.sb_noise_max.value(),
+        }
+
+    # ---------------- 리스트 조작 ----------------
+
+    def on_noise_create(self):
+        node, msg = NoiseNodeManager.create()
+        self.log(msg)
+        self._noise_fill_list(keep=node)
+
+    def on_noise_delete(self):
+        nodes = self._noise_selected()
+        if not nodes:
+            self.log("[Warning] Select a noise node in the list first.")
+            return
+
+        answer = QMessageBox.question(
+            self, "Delete Noise Node",
+            "Delete {0} noise node(s)?\n"
+            "Anything they drive stops being animated (undoable).".format(len(nodes)),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            return
+
+        self._noise_settle_timer.stop()
+        self._noise_sess = None
+        _count, msg = NoiseNodeManager.delete(nodes)
+        self.log(msg)
+        self._noise_fill_list(keep=None)
+
+    def on_noise_reload(self):
+        self._noise_settle_timer.stop()
+        self._noise_sess = None
+        self._noise_fill_list()
+        self.log("{0} noise node(s) in the scene.".format(self.noise_list.count()))
+
+    def on_noise_select(self):
+        nodes = self._noise_selected()
+        if not nodes:
+            self.log("[Warning] Select a noise node in the list first.")
+            return
+        cmds.select(nodes, replace=True)
+        self.log("Selected {0} noise node(s).".format(len(nodes)))
+
+    def _noise_selection_changed(self):
+        if self._noise_updating:
+            return
+        # 다른 노드로 넘어가기 전에, 아직 기록되지 않은 미리보기를 확정한다.
+        self._noise_settle_timer.stop()
+        self._noise_settle()
+        self._noise_sess = None
+        self._noise_load_settings()
+
+    # ---------------- 슬라이더 / 스핀박스 ----------------
+
+    def _noise_preview(self):
+        """위젯 값으로 즉시 반영(undo 미기록) + 확정 타이머 재시작."""
+        sess = self._noise_session()
+        if sess is None:
+            return
+        sess.preview(**self._noise_widget_params())
+        self._noise_settle_timer.start()
+
+    def _noise_smooth_slider_changed(self, *_a):
+        if self._noise_updating:
+            return
+        self._noise_updating = True
+        try:
+            self.sb_noise_smooth.setValue(
+                self.sld_noise_smooth.value() / float(NOISE_SMOOTH_SLIDER_SCALE))
+        finally:
+            self._noise_updating = False
+        self._noise_preview()
+
+    def _noise_smooth_spin_changed(self, *_a):
+        if self._noise_updating:
+            return
+        self._noise_updating = True
+        try:
+            self.sld_noise_smooth.setValue(self._noise_clamp_slider(
+                self.sb_noise_smooth.value() * NOISE_SMOOTH_SLIDER_SCALE,
+                NOISE_SMOOTH_SLIDER_STEPS))
+        finally:
+            self._noise_updating = False
+        self._noise_preview()
+
+    def _noise_offset_slider_changed(self, *_a):
+        if self._noise_updating:
+            return
+        self._noise_updating = True
+        try:
+            self.sb_noise_offset.setValue(
+                self.sld_noise_offset.value() / float(NOISE_OFFSET_SLIDER_SCALE))
+        finally:
+            self._noise_updating = False
+        self._noise_preview()
+
+    def _noise_offset_spin_changed(self, *_a):
+        if self._noise_updating:
+            return
+        self._noise_updating = True
+        try:
+            self.sld_noise_offset.setValue(self._noise_clamp_slider(
+                self.sb_noise_offset.value() * NOISE_OFFSET_SLIDER_SCALE,
+                NOISE_OFFSET_SLIDER_STEPS))
+        finally:
+            self._noise_updating = False
+        self._noise_preview()
+
+    def _noise_range_changed(self, *_a):
+        if self._noise_updating:
+            return
+        self._noise_preview()
+
+    def _noise_settle(self):
+        """미리보기를 undo 큐에 한 항목으로 기록한다(조작이 멎었거나 손을 뗐을 때)."""
+        self._noise_settle_timer.stop()
+
+        sess = self._noise_sess
+        if sess is None or not sess.valid():
+            return
+
+        _count, msg = sess.settle(**self._noise_widget_params())
+        if msg:
+            self.log(msg)
+            self._noise_refresh_row()
+
+    def _noise_refresh_row(self):
+        """리스트에서 지금 노드의 요약 줄만 다시 쓴다(선택 상태를 건드리지 않는다)."""
+        item = self.noise_list.currentItem()
+        node = self._noise_node_of(item)
+        if item and node:
+            self._noise_updating = True
+            try:
+                item.setText(NoiseNodeManager.summary(node))
+            finally:
+                self._noise_updating = False
+
+    # ---------------- 콤보 / 시드 / 리셋 ----------------
+
+    def _noise_commit_combo(self, *_a):
+        """Type · Loop Length 변경. 한 번에 끝나는 조작이라 곧장 확정한다."""
+        if self._noise_updating:
+            return
+        sess = self._noise_session()
+        if sess is None:
+            return
+
+        self._noise_settle_timer.stop()
+        params = self._noise_widget_params()
+        params["kind"] = self.cmb_noise_type.currentText()
+        params["length"] = self.cmb_noise_length.currentData()
+
+        _count, msg = sess.settle(**params)
+        if msg:
+            self.log(msg)
+        self._noise_refresh_row()
+
+    def _noise_commit_seed(self, *_a):
+        if self._noise_updating:
+            return
+        sess = self._noise_session()
+        if sess is None:
+            return
+
+        self._noise_settle_timer.stop()
+        params = self._noise_widget_params()
+        params["seed"] = self.sb_noise_seed.value()
+
+        _count, msg = sess.settle(**params)
+        if msg:
+            self.log(msg)
+        self._noise_refresh_row()
+
+    def on_noise_randomize(self):
+        node = self._noise_current()
+        if not node:
+            self.log("[Warning] Select a noise node in the list first.")
+            return
+        # setValue 가 _noise_commit_seed 를 부르므로 여기서 따로 확정하지 않는다.
+        self.sb_noise_seed.setValue(NoiseNodeManager.seed_from_name(node))
+
+    def on_noise_reset(self):
+        sess = self._noise_sess
+        if sess is None or not sess.valid():
+            self.log("[Warning] Select a noise node in the list first.")
+            return
+
+        self._noise_settle_timer.stop()
+        _count, msg = sess.restore()
+        self.log(msg or "Noise settings restored.")
+        self._noise_load_settings()
+        self._noise_refresh_row()
+
+    # ---------------- 보기 / 출력 ----------------
+
+    def on_noise_show_graph(self):
+        """노드를 선택하고 그래프 에디터에 output 커브를 띄운다."""
+        node = self._noise_current()
+        if not node:
+            self.log("[Warning] Select a noise node in the list first.")
+            return
+
+        cmds.select(node, replace=True)
+
+        editors = GraphViewManager.graph_editors()
+        if not editors:
+            try:
+                import maya.mel as mel
+                mel.eval("GraphEditor;")
+            except Exception as exc:
+                self.log("[Warning] Could not open the Graph Editor: {0}".format(exc))
+            editors = GraphViewManager.graph_editors()
+
+        length = NoiseNodeManager.read_settings(node)["length"]
+        for editor in editors:
+            try:
+                cmds.animView(editor, edit=True, startTime=0, endTime=length)
+            except Exception:
+                pass
+
+        self.log("'{0}.output' selected - the Graph Editor shows the noise curve "
+                 "over [0, {1}f].".format(node, length))
+
+    def on_noise_connect(self):
+        node = self._noise_current()
+        if not node:
+            self.log("[Warning] Select a noise node in the list first.")
+            return
+
+        plugs = self._noise_target_plugs()
+        _count, msg = NoiseNodeManager.connect_output(node, plugs)
+        self.log(msg)
+        self._noise_update_targets()
+
+    def on_noise_disconnect(self):
+        node = self._noise_current()
+        if not node:
+            self.log("[Warning] Select a noise node in the list first.")
+            return
+        _count, msg = NoiseNodeManager.disconnect_output(node)
+        self.log(msg)
+        self._noise_update_targets()
+
+    @staticmethod
+    def _noise_target_plugs():
+        """채널박스에서 고른 어트리뷰트 x 씬 선택 오브젝트 = 연결 대상 플러그들.
+
+        노이즈 노드 자신은 뺀다 — 자기 output 을 자기한테 물릴 수는 없고,
+        'Select' 로 노드를 고른 직후 실수로 누르는 경우를 막는다.
+        """
+        attrs = cf_selected_channel_attrs() or []
+        objs = cmds.ls(selection=True) or []
+        objs = [o for o in objs if not NoiseNodeManager.is_noise_node(o)]
+
+        plugs = []
+        for obj in objs:
+            for attr in attrs:
+                plug = "{0}.{1}".format(obj, attr)
+                if cmds.objExists(plug) and plug not in plugs:
+                    plugs.append(plug)
+        return plugs
 
     def on_copy_key(self):
 
@@ -2926,5 +3639,14 @@ class MainWindow(QWidget):
                     session.settle(self.sb_stagger.value(),
                                    self.sb_stagger_value.value())
                 self._stagger_session = None
+
+            # 같은 이유로 Noise 미리보기도 마지막으로 확정한다.
+            noise_sess = getattr(self, "_noise_sess", None)
+            if noise_sess is not None:
+                if getattr(self, "_noise_settle_timer", None):
+                    self._noise_settle_timer.stop()
+                if noise_sess.valid() and noise_sess.in_sync():
+                    noise_sess.settle(**self._noise_widget_params())
+                self._noise_sess = None
         finally:
             super().closeEvent(event)
