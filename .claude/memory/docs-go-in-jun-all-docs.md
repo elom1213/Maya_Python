@@ -13,9 +13,11 @@ metadata:
 `JUN_All/docs/` 내부는 3분할이다:
 - `docs/*.md` = **툴 사용법 안내 문서** (`A000XX_*.md`).
 - `docs/plans/` = **기능 개발 계획·설계 결정** 문서.
-- `docs/study/` = **작업 방법론·기법 학습 노트**(특정 툴 안내 아님). 주제 기반 파일명, 인덱스는 `docs/study/README.md`.
+- `docs/study/` = **작업 방법론·기법 학습 노트**(특정 툴 안내 아님). 파일명은 `00100_영문주제.md`
+  (5자리 번호 접두사, **간격 100**), 인덱스는 `docs/study/README.md`. → [[study-docs-number-prefix]]
 
 **Why:** 사용자가 SmartLayer bake 분석 문서를 외부 툴 폴더 대신 `JUN_All/docs`로 옮기라고 직접 지시했고,
 이후 "docs 루트는 툴 안내만, 공부용 문서는 별도 경로로" 라고 분리를 요청해 `docs/study/`를 신설함.
 **How to apply:** 새 문서를 만들 때 종류로 경로를 고른다 — 툴 사용법=`docs/`, 개발 계획=`docs/plans/`,
 방법론/기법 학습 노트=`docs/study/`. 새 문서는 해당 폴더의 README 목록 표에 한 줄 등록한다.
+study 새 문서는 **주제가 가장 가까운 문서 옆 번호**를 골라 붙인다(끝에 +100 이 아니라).
