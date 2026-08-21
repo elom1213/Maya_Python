@@ -274,7 +274,10 @@ class MainWindow(QWidget):
 
         mode = fk_mgr.MODE_ROOT if self.rb_root.isChecked() else fk_mgr.MODE_CHAIN
 
-        with undo_chunk("A00460 Create FK Controls"):
+        # 공용 undo_chunk 는 인자를 받지 않는다(Framework/core/maya_undo.py).
+        # 마지막 select 도 **chunk 안에서** 한다 — 밖에서 하면 select 가 별도 undo
+        # 스텝이 되어 Ctrl+Z 를 한 번 눌렀을 때 선택만 되돌아가고 컨트롤러는 남는다.
+        with undo_chunk():
             result = fk_mgr.build_fk_controls(
                 nodes,
                 mode=mode,
@@ -285,6 +288,8 @@ class MainWindow(QWidget):
                 size=self.sb_size.value(),
                 axis=self.cb_axis.currentText(),
             )
+            if result["roots"]:
+                cmds.select(result["roots"], replace=True)
 
         self._report(result, mode)
 
@@ -310,9 +315,6 @@ class MainWindow(QWidget):
                 "Bone Root" if mode == fk_mgr.MODE_ROOT else "Bone Chain",
                 len(controls), len(result["driven"]),
                 len(result["roots"]), len(result["constraints"])))
-
-        if result["roots"]:
-            cmds.select(result["roots"], replace=True)
 
     # ==============================================================
     # 공용

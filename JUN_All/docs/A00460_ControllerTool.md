@@ -17,7 +17,7 @@ v01.00 의 첫 기능은 **FK** 다.
 |---------|---------|------|
 | **Create** | **FK** (v01.00~) | 리스트업한 조인트/오브젝트에 `zro > con > ctl > tgt` 계층을 만들고, 조인트가 그 계층을 따라오게 컨스트레인트 |
 
-- **버전**: `app/config/version.py` (v01.00)
+- **버전**: `app/config/version.py` (v01.01)
 - **설치**: `__dragDrop_A00460.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **CtrlTool** → `tools.A00460_ControllerTool.run(True)`
 - **참고**: `con/ctl/tgt` 계층 관례는 `A00170_driverTool` 의 Edge Loop 드라이버,
   Bone Chain / Bone Root 모드는 `A00390_WindTool_V02` 를 이식/응용.
@@ -168,6 +168,9 @@ joint_A_01_zro
 
 결과로 만들어진 **루트 계층들이 선택된 상태**로 남는다. 그대로 리그 그룹으로 옮기면 된다.
 전체가 **undo 한 스텝**이라 마음에 안 들면 `Ctrl+Z` 한 번으로 되돌아간다.
+
+> 마지막 `select` 까지 **undo chunk 안에서** 한다. 밖에서 하면 select 가 별도 undo 스텝이 되어
+> `Ctrl+Z` 를 한 번 눌렀을 때 **선택만 되돌아가고 컨트롤러는 남는다**(v01.01 에서 고침).
 
 ---
 
