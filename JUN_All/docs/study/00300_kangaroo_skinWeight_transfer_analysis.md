@@ -10,7 +10,7 @@
 > - `...\kangarooTools\patch.py` — `setSkinClusterWeights`(L320), enum(`BorderEdges`/`MissingInfluencesOptions`/`JointLocks`)
 > - `kt_findClosestPoints.mll` — 최근접점 질의를 담당하는 **C++ 컴파일 플러그인**(소스 비공개)
 >
-> 관련 문서: [skinWeight_transfer_workflow.md](skinWeight_transfer_workflow.md)(작업 워크플로우 관점),
+> 관련 문서: [00200_skinWeight_transfer_workflow.md](00200_skinWeight_transfer_workflow.md)(작업 워크플로우 관점),
 > 연계 툴: `JUN_All/tools/A00020_move_skineWeightTool`, 계획: `A00270_skinMigrate`.
 
 ---
@@ -195,7 +195,7 @@ Move라는 별도 도구**다. 즉 "더 똑똑한 대응"이라기보다 **파�
 
 ## 5. 게임 파이프라인 관점 시사점 (이 repo 연계)
 
-- [skinWeight_transfer_workflow.md](skinWeight_transfer_workflow.md)의 "Shrink Wrap 정렬 → 전이 → 정리"
+- [00200_skinWeight_transfer_workflow.md](00200_skinWeight_transfer_workflow.md)의 "Shrink Wrap 정렬 → 전이 → 정리"
   워크플로우에서, **전이 단계**가 바로 `transferSkinCluster(closestPoint)`이다. 정렬이 좋을수록
   최근접점이 올바른 면에 찍혀 무게중심 보간이 정확해진다 — **정렬 = 대응 오차 최소화**라는 그 문서의
   통찰이 코드로 확인된다.
