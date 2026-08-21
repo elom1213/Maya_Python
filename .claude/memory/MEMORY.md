@@ -9,6 +9,7 @@
 - [Push only when asked](push-only-when-asked.md) — **그 턴 메시지에** 명시 요청 없으면 절대 push 금지(로컬 커밋은 OK). 앞 턴의 "푸시해" 는 이어지지 않는다 — 이 착각으로 2회 위반(2026-08-10, 08-19)
 - [Push only own session work](push-only-own-session-work.md) — 푸시에는 **이 세션이 한 것만**. 다른 세션 변경은 "푸시해" 여도 제외, `git add -A` 금지(경로 지정), 섞인 공용 문서는 물어보기
 - [Push target Dnable/dev](push-target-dnable-dev.md) — 기본 push 대상은 Dnable_repo 의 dev (origin 아님)
+- [No history rewrite / master on request](no-history-rewrite-master-on-request.md) — 히스토리 재작성 금지, dev→master 최신화는 **그 턴에 요청할 때만**(dev 가 master 보다 100+ 앞선 건 정상)
 - [Push includes tool guide docs](push-includes-tool-guide-docs.md) — 툴 push 시 docs/<툴>.md 가이드 + CHANGELOG/version/WORKLOG 함께
 - [Clean commit message](clean-commit-message-no-stray-chars.md) — 커밋 메시지에 이상문자 새지 않게(과거 `@` 유출), 커밋 후 `git log -1` 확인
 - [WORKLOG maintenance](worklog-maintenance.md) — docs/WORKLOG.md 갱신 규칙(최신이 위, 날짜 헤딩 중복 금지)

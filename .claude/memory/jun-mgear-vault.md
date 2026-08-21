@@ -8,8 +8,17 @@ metadata:
 ---
 
 > **2026-08-21 — mgear 노트는 `JUN_Study` 저장소로 흡수됨** ([[study-docs-number-prefix]]).
-> 새 mgear 노트는 JUN_Study 의 **03000 대역**(`03000_mgear_MOC.md` 등)에 만든다.
-> 원본 `JUN_mgear` repo 는 **채용 담당자용 공개 저장소**(README 가 소개문)라 삭제하지 않고 그대로 뒀다.
+>
+> **JUN_mgear 는 방치한다(frozen).** 사용자가 명시적으로 정한 규칙:
+> - **모든 학습 노트는 `JUN_Study` 에서 만든다.** mgear 관련도 JUN_Study 의 **03000 대역**
+>   (`03000_mgear_MOC.md` 등)에 쓴다. JUN_mgear 에 직접 새 노트를 만들지 않는다.
+> - JUN_mgear 는 **채용 담당자용 공개 창구**(README 가 소개문, repo 가 public)이므로 삭제하지 않는다.
+>   JUN_Study 는 private 이라 이 역할을 대신할 수 없다.
+> - **필요한 문서만 골라 JUN_Study → JUN_mgear 로 이전**한다. 요청이 있을 때만, 선별해서.
+>   자동 동기화나 전량 미러링은 하지 않는다.
+> - 이전할 때 JUN_Study 의 `01000_` 대역 번호를 그대로 가져갈지, JUN_mgear 의 `00_`~`99_`
+>   체계에 맞출지는 그때 확인한다.
+>
 > 아래는 흡수 전 기록.
 
 ~~mgear(리깅 프레임워크) 공부 노트는 `C:\Users\USER\Desktop\JP\0030_maya_python_JUN\JUN_mgear` 폴더에 **Obsidian vault**로 관리한다 (작업 repo `Maya_Python` 밖의 형제 폴더). MOC + 분할 노트 구조, 한국어 본문, `[[위키링크]]` 연결.~~ (JUN_Study 로 옮기며 표준 마크다운 링크로 변환됨) 노트는 번호 접두사(`00_MOC_mgear`, `01`~`05`, `99_참고링크`).
