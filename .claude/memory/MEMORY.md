@@ -15,6 +15,7 @@
 - [WORKLOG maintenance](worklog-maintenance.md) — docs/WORKLOG.md 갱신 규칙(최신이 위, 날짜 헤딩 중복 금지)
 - [Docs go in JUN_All/docs](docs-go-in-jun-all-docs.md) — 분석/설명 문서는 JUN_All/docs 아래
 - [JUN_Study 학습 노트 repo](study-docs-number-prefix.md) — 공부 노트는 **별도 private repo JUN_Study**(master). `01000_영문주제.md` 도메인 대역 번호, 번호 근접 = 주제 관련
+- ["공부용 문서" 작성 레시피](study-doc-request-recipe.md) — 공부 문서 요청 = 논문 직접 찾아 정의/역사/원리(수식)/사례/함께볼주제/참고문헌 구조로, JUN_Study 에
 - [Update portfolio on tool work](update-portfolio-on-tool-work.md) — portfolio_EN/KR 둘 다 동기 갱신, 커밋수 통계는 건드리지 않기
 - [Memory synced via repo](memory-synced-via-repo.md) — 메모리는 repo `.claude/memory`(정션), 커밋+푸시로 PC 간 공유
 - [Prefer PySide for new tools](prefer-pyside-for-new-tools.md) — 신규/병합 툴은 maya.cmds UI 말고 PySide(arch B)
