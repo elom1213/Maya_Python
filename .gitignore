@@ -26,6 +26,9 @@ __pycache__/
 # A00340_SelectionTool 사용자 데이터(프로파일 JSON)도 툴 폴더 내부 data/ 에 저장 — 추적 안 함.
 **/A00340_SelectionTool/data/
 
+# A00145_RigConnect > Attribute > Create 의 어트리뷰트 프로파일 JSON 도 마찬가지.
+**/A00145_RigConnect/data/
+
 # A00370_ToolLauncher: 프로파일(버튼 세트)은 PC 무관 상대경로(tools/…)로 저장되어 PC 간 동일하므로
 # profiles/ 는 계속 추적·공유한다. 반면 아래 두 파일은 PC별 상태라 추적하지 않는다.
 #   local_env.json : 이 PC 의 JUN_All 루트 오버라이드

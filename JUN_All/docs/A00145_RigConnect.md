@@ -4,8 +4,9 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.32` (`app/config/version.py`) — Match 탭에 **`1 <- n`** 체크박스(기본 ON):
-  Targets 가 **하나면** Followers 전부가 그 하나에 매칭 (§Match)
+- 버전: `v01.33` (`app/config/version.py`) — **Attribute 탭이 하위 탭 3개로** (`Copy` / `Create` / `Delete`):
+  `Create` 는 **프로파일에 적어 둔 정의**로 어트리뷰트를 만들고, `Delete` 는 사용자 정의 어트리뷰트를 지운다 (§Attribute)
+  · v01.32 는 Match 탭에 **`1 <- n`** 체크박스(기본 ON): Targets 가 **하나면** Followers 전부가 그 하나에 매칭 (§Match)
   · v01.30 은 Match 탭에 **Cache**(노드를 만들지 않고 월드 T/R/S 만 기억) 추가 (§Cache)
   · v01.29 는 Match 탭이 **500개 이상**이면 리스트업하지 않고 개수만 요약 + `List All` 버튼, 대량 매칭 속도 개선 (§대량 선택)
   · v01.28 은 Constrain > Constraint 하위 탭의 `Maintain Offset` 기본값을 **ON** 으로 변경 (§Constraint)
@@ -13,7 +14,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
   · v01.27 은 Match 탭의 셰이프 해석을 공용 [`Framework.core.maya_shape`](Framework_maya_shape.md) 로 교체(동작 변화 없음, 다중 셰이프 메시 안전)
 - 위치: `JUN_All/tools/A00145_RigConnect`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴. **최상위 4탭**(Match / Constrain / Connect / Attribute),
-  Constrain·Connect 는 다시 **중첩 탭**으로 나뉜다
+  Constrain·Connect·Attribute 는 다시 **중첩 탭**으로 나뉜다
 - 원본 `A00140_ConnectClosest` / MEL 파일은 그대로 보존(미수정)
 
 ---
@@ -637,7 +638,18 @@ Destination : lod0_mesh_body_brow_up    ← 선택됨 (brow_up 에 대응)
 > 구현: `app/core/attr_match.py`. **maya import 가 없는 순수 파이썬 모듈**이라 DCC 없이
 > 단독으로 테스트·벤치마크할 수 있다. `attr_match.complexity_notes()` 가 위 요약을 문자열로 돌려준다.
 
-### Attribute (v01.17)
+### Attribute (v01.33 부터 **하위 탭 3개**)
+
+어트리뷰트를 다루는 세 가지 작업을 중첩 탭으로 나눴다. 셋 다 "어트리뷰트" 지만 **입력이
+서로 달라**(원본 오브젝트 / 저장해 둔 정의 / 지울 대상) 한 화면에 쌓으면 읽기 어렵다.
+
+| 하위 탭 | 하는 일 | 원본이 필요한가 |
+|---------|---------|-----------------|
+| **Copy** (v01.17~) | 씬에 있는 **소스 오브젝트의 어트리뷰트를 복제** | 필요 |
+| **Create** (v01.33) | **프로파일에 적어 둔 정의**로 새로 만든다 | 불필요 |
+| **Delete** (v01.33) | 사용자 정의 어트리뷰트를 **지운다** | — |
+
+#### Copy (v01.17)
 **소스 오브젝트의 어트리뷰트를 골라, 다른 오브젝트들에 같은 정의로 새로 만든다.**
 이름은 그대로 쓰거나 **Prefix / Suffix** 를 붙일 수 있다.
 
@@ -675,6 +687,107 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
   short name 은 Maya 가 새로 만들게 둔다(그대로 쓰면 다른 어트리뷰트와 **충돌**).
 - 컴파운드 자식 이름은 부모의 새 이름을 따라간다(`tint`→`L_tint_ctrl` 이면 자식은
   `L_tint_ctrlR/G/B`).
+- 전체가 하나의 **undo chunk** 라 `Ctrl+Z` 한 번으로 되돌아간다.
+
+#### Create (v01.33)
+**씬에 원본이 없어도** 어트리뷰트를 만든다. 정의를 **프로파일**에 적어 두고, 컨트롤러를
+고른 뒤 `Create` 한 번이면 끝이다. 리그마다 늘 같은 어트리뷰트를 손으로 `addAttr` 하던
+일을 없애는 것이 목적이다.
+
+```
+왼쪽 : Objects              오른쪽 : ┌ Profile ────────────────┐
+       (새로 만들 대상)                │ [ UpperArm         ▼ ] │
+       [Select][Add][Del]              │ [New] [Rename] [Delete]│
+       [Sort]                          └────────────────────────┘
+                                       ☑ World      float [0,1] default 0
+                                       ☑ Root       float [0,1] default 0
+                                       ☐ Shoulder   float [0,1] default 0
+                                       [Filter ...]
+                                       ☑ Check All (visible)   Checked: 2
+                                       [Add] [Edit] [Remove]
+                 [ Create Checked Attributes ]
+```
+
+> **폭에 대해**: 이 탭은 좌우로 나뉘어 있어 한쪽이 넓어지면 곧바로 오른쪽이 잘린다.
+> 그래서 두 가지를 줄였다 — 왼쪽 TSL 에서 **`Up`/`Down`/`Order` 를 뺐고**(여기서는 순서가
+> 아무 뜻도 없다. 체크한 어트리뷰트를 리스트의 **모든** 오브젝트에 똑같이 만든다),
+> 프로파일 그룹의 버튼을 **콤보 아래 줄로** 내렸다.
+> 실측 최소 폭 **675 → 441px** 로, 창 최소 폭(480)과 기본 폭(560) 안에 들어온다
+> (`Copy` 604 · `Delete` 503 보다도 좁다).
+
+**프로파일**
+- 콤보에서 고른다. `New` / `Rename` / `Delete` 로 관리한다
+  (구성은 [A00340_SelectionTool](A00340_SelectionTool.md) 의 프로파일 UI 와 같다).
+- 프로파일 하나 = **JSON 파일 하나**. `<툴>/data/attr_profiles/<이름>.json` 에 저장되고
+  마지막으로 쓰던 프로파일은 `attr_profiles_active.json` 에 기억된다.
+  **git 에는 올라가지 않는다**(사용자 데이터).
+- 프로파일이 하나도 없으면 `Default` 를 자동으로 만든다. **마지막 하나는 지울 수 없다.**
+
+**어트리뷰트 정의**
+- `Add` / `Edit`(행 더블클릭도 가능) 로 작은 편집 창이 뜬다.
+
+  | 항목 | 내용 |
+  |------|------|
+  | `Name` | 어트리뷰트 롱네임. 영문자/밑줄로 시작, 영숫자/밑줄만 |
+  | `Type` | `float`(double) · `int`(long) · `bool` |
+  | `Min` / `Max` | **체크박스로 켜고 끈다** — 끄면 "제한 없음" |
+  | `Default` | 기본값 (bool 은 On/Off 체크박스) |
+  | `Keyable` | 끄면 채널 박스에 안 보이게 만든다 |
+
+- **`Min`/`Max` 를 체크박스로 둔 이유**: 마야에서 "범위 없음" 과 "범위가 0" 은 다른데,
+  스핀박스만 두면 그 둘을 구분해 넣을 방법이 없다.
+- `Remove` 는 **프로파일에서만** 지운다(씬의 어트리뷰트는 건드리지 않는다).
+- `min > max` 로 적으면 **서로 바꿔** 저장한다(거꾸로 넣는 일이 흔하다).
+
+**⚠️ 범위 밖 기본값은 마야가 조용히 버린다**
+`addAttr` 에 범위 밖 `defaultValue` 를 주면 **에러가 아니라 경고만 내고 기본값을 무시한다**
+(실측: `Specified default value '5' is out of the range ...; defaultValue ignored`).
+그래서 이 툴은 저장할 때 **기본값을 범위 안으로 자른다**. 편집 창에서도 벗어나 있으면
+`Default is outside the range - it will be clamped into it.` 라고 미리 알려 준다.
+(같은 상황에서 `setAttr` 은 **에러를 던진다** — 두 명령의 반응이 다르다.)
+
+**체크박스와 생성**
+- 각 행 왼쪽 체크박스가 **만들 대상**을 정한다. 선택(하이라이트)은 `Edit`/`Remove` 대상이라
+  서로 다른 뜻이다. UI 방식은 [A00290_BSTool](A00290_BSTool.md) 의 `Mix Targets` 탭을 따랐다.
+- **`Check All (visible)`** — 지금 **보이는 행**만 켜고 끈다(필터를 걸면 그 안에서만).
+  보이는 행이 전부 켜져 있으면 끄고, 아니면 전부 켠다.
+- 프로파일을 새로 고르면 **전부 체크된 상태**로 시작한다. 프로파일은 사용자가 직접 골라 담은
+  묶음이라 "이 프로파일을 만든다" 가 기본 의도이기 때문이다.
+- 필터에 **가려진 체크는 그대로 만든다.** 체크는 명시적인 의사표시라 필터에 가렸다고 없던 일로
+  하면 오히려 놀랍다 — 대신 몇 개가 가려져 있었는지 로그로 알린다.
+  (`Delete` 탭의 **선택**은 반대로 "보이는 것이 작업 대상" 규칙을 따른다. 체크는 남고 선택은
+  스쳐 가는 상태라 규칙이 다르다.)
+- `Create Checked Attributes`: 왼쪽 리스트의 **모든 오브젝트**에 만든다.
+  **이미 있으면 건너뛴다** — 타입이나 범위가 달라도 손대지 않는다. 기존 어트리뷰트를 고치면
+  거기 걸린 연결·키가 깨지기 때문이다. 건너뛴 것은 `[WARN]` 으로 남는다.
+
+#### Delete (v01.33)
+오브젝트들이 가진 **지울 수 있는** 어트리뷰트를 골라 지운다. 구성은 `Connect` 하위 탭과 같다
+(왼쪽 오브젝트 리스트 + 오른쪽 어트리뷰트 목록 + 검색 + 다중 선택).
+
+- `List Attributes`: 왼쪽 리스트의 **모든 오브젝트**를 훑어 **합집합**을 보여준다. 좌우 컨트롤러에
+  같은 이름을 나란히 만들어 두는 일이 흔해, 하나씩 지우는 것보다 "이 이름을 가진 것 전부"를
+  지우는 쪽이 실제 작업에 맞는다. 몇 개가 가졌는지는 **항목 툴팁**에 나온다.
+- **무엇이 목록에 오르나** — 마야에서 지울 수 있는 것은 **사용자 정의 어트리뷰트의 최상위 항목**
+  뿐이다. 실측(Maya 2024):
+
+  | 대상 | `deleteAttr` 결과 |
+  |------|-------------------|
+  | `translateX` 같은 기본 어트리뷰트 | ❌ `Cannot delete child 'translateX' of compound attribute 'translate'.` |
+  | 컴파운드 **자식**(`vecX`) | ❌ 같은 에러 — 자식만 따로는 못 지운다 |
+  | 컴파운드 **부모**(`vec`) | ✅ 지워지고 **자식도 함께** 사라진다 |
+  | **잠긴** 어트리뷰트 | ❌ `'node.attr' is locked and may not be removed.` |
+  | **연결/키가 걸린** 어트리뷰트 | ✅ 지워진다 |
+
+  그래서 목록에는 기본 어트리뷰트와 컴파운드 자식이 **아예 오르지 않는다**.
+- **잠긴 어트리뷰트는 주황색**으로 표시되고 툴팁에 `LOCKED` 라고 나온다. 목록에는 올리되
+  **이 툴이 몰래 잠금을 풀지는 않는다** — 잠금은 "건드리지 말라" 는 의사표시다. 눌러 보면
+  `[WARN] node.attr : locked - unlock it first` 로 사유가 남으므로 풀고 다시 누르면 된다.
+- `Filter` 로 걸러 `Select All` 로 보이는 것만 전체 선택할 수 있다. **가려진 선택은 제외**되고
+  몇 개였는지 로그에 남는다("보이는 것이 작업 대상" 규칙).
+- `Delete Selected Attributes`: 확인 창을 한 번 거친 뒤 지운다. 그 어트리뷰트가 **없는
+  오브젝트는 조용히 넘어간다**(합집합 목록에서 고른 것이라 "원래 없음" 은 알릴 일이 아니다).
+  지운 뒤 목록을 자동으로 다시 읽는다.
 - 전체가 하나의 **undo chunk** 라 `Ctrl+Z` 한 번으로 되돌아간다.
 
 #### List Connected
@@ -723,14 +836,21 @@ A00145_RigConnect/
     │   ├── constraint_target_manager.py # Target Edit (타깃(드라이버) 교체 = target[i] 입력 연결만 rewire / 추가·삭제 = constraint 명령의 add·remove, offset 재계산, UUID 기반)
     │   ├── attr_match.py           # Match from Source (이름 유사 어트리뷰트 검색: 토큰 역색인 + IDF, maya 비의존 순수 파이썬)
     │   ├── connect_manager.py      # Connect    (MEL 포팅: attr 나열/검색/연결, 52 facial)
-    │   ├── attribute_manager.py    # Attribute  (어트리뷰트 정의를 읽어 다른 오브젝트에 재생성, prefix/suffix)
+    │   ├── attribute_manager.py    # Attribute > Copy   (어트리뷰트 정의를 읽어 다른 오브젝트에 재생성, prefix/suffix)
+    │   ├── attr_profile_prefs.py   # Attribute > Create (프로파일 JSON 저장 + 스펙 정규화, maya 비의존)
+    │   ├── attr_create_manager.py  # Attribute > Create (프로파일 스펙 -> addAttr, 이미 있으면 건너뜀)
+    │   ├── attr_delete_manager.py  # Attribute > Delete (지울 수 있는 어트리뷰트 나열 + deleteAttr, 잠김 보고)
     │   ├── blendshape_utils.py     # blendShape 타겟(weight 별칭) 조회 — Attribute / Connect 탭 공용
     │   ├── stream_manager.py       # List Connected (MEL 포팅: hyperShade up/down)
     │   ├── maya_scene.py           # Connect Closest (A00140 복사)
     │   └── closest_connector.py    # Connect Closest (A00140 복사)
+    ├── data/                        # 사용자 데이터 (git 제외)
+    │   ├── attr_profiles/<이름>.json   # Attribute > Create 프로파일
+    │   └── attr_profiles_active.json   # 마지막으로 쓰던 프로파일
     └── ui/
         ├── collapsible.py          # CollapsibleBox
-        └── main_window.py          # QTabWidget 최상위 4탭(Constrain 5 / Connect 3 하위 탭) + 공유 로그 + Help>About
+        ├── attr_spec_dialog.py     # Attribute > Create 의 어트리뷰트 정의 편집 창
+        └── main_window.py          # QTabWidget 최상위 4탭(Constrain 5 / Connect 3 / Attribute 3 하위 탭) + 공유 로그 + Help>About
 ```
 
 - 모든 textScrollList 는 `Framework.qt.JUN_mod_tsl_qt_v01` 위젯으로 대체.

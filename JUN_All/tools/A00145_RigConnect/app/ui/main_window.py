@@ -10,7 +10,7 @@
 #   Match
 #   Constrain : Constraint / Skin Weight / Group Create / Transfer / Target Edit
 #   Connect   : Connect / List Connected / Connect Closest
-#   Attribute
+#   Attribute : Copy / Create / Delete
 #
 # 로직은 app/core 에 위임하고 이 모듈은 위젯 구성/시그널 연결/로그 출력만 담당한다.
 # 모든 UI 문자열(버튼/라벨/로그)은 영어. (한국어는 주석/독스트링만)
@@ -38,9 +38,13 @@ from tools.A00145_RigConnect.app.core import constraint_transfer_manager as cxfe
 from tools.A00145_RigConnect.app.core import constraint_target_manager as ctgt_mgr
 from tools.A00145_RigConnect.app.core import attr_match
 from tools.A00145_RigConnect.app.core import snapshot_manager as snap_mgr
+from tools.A00145_RigConnect.app.core import attr_profile_prefs as aprefs
+from tools.A00145_RigConnect.app.core import attr_create_manager as acreate_mgr
+from tools.A00145_RigConnect.app.core import attr_delete_manager as adel_mgr
 from tools.A00145_RigConnect.app.core import (
     CONSTRAINT_TYPES, connect_closest, find_closest_for_drivers)
 from tools.A00145_RigConnect.app.ui.collapsible import CollapsibleBox
+from tools.A00145_RigConnect.app.ui.attr_spec_dialog import AttrSpecDialog
 
 
 # 재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -71,6 +75,13 @@ class MainWindow(QWidget):
         # Match 탭의 추상 캐시(스냅샷). 로케이터 없이 월드 T/R/S 만 기억한다.
         # 창이 들고 있는 세션 데이터라 창을 닫거나 reload 하면 사라진다.
         self.snapshots = snap_mgr.SnapshotCache()
+
+        # Attribute > Create 탭의 프로파일 상태. 프로파일은 JSON 으로 남으므로
+        # 창을 닫아도 살아 있다(세션 데이터인 snapshots 와 다르다).
+        # _acr_updating 은 리스트를 코드로 채우는 동안 itemChanged 를 무시하는 빗장.
+        self._acr_profile = ""
+        self._acr_data = {"attributes": []}
+        self._acr_updating = False
 
         self.resize(self.win_width, self.win_height)
         # 창이 의도치 않게 너무 작게 줄어들지 않도록 최소 크기를 보장한다.
@@ -944,7 +955,27 @@ class MainWindow(QWidget):
     # Tab : Attribute
     # --------------------------------------------------------------
 
+    # Attribute 하위 탭: (탭 라벨, 툴팁 = 설명, 빌더 메서드 이름).
+    ATTRIBUTE_PAGES = (
+        ("Copy", "Copy attributes from one source object onto other objects, "
+         "same name or with a Prefix / Suffix", "_build_attribute_copy_page"),
+        ("Create", "Create attributes from a saved profile (name / type / range) "
+         "on the listed objects", "_build_attribute_create_page"),
+        ("Delete", "Delete user defined attributes from the listed objects",
+         "_build_attribute_delete_page"),
+    )
+
     def _build_attribute_tab(self):
+        """Attribute 탭 — 어트리뷰트를 다루는 세 가지 작업을 **중첩 탭**으로 나눈다.
+
+        Copy 는 씬에 있는 원본을 복제하고, Create 는 원본 없이 프로파일에 적어 둔
+        정의로 만들고, Delete 는 지운다. 셋 다 "어트리뷰트" 이지만 입력이 서로 달라
+        한 화면에 쌓으면 읽기 어렵다 — Constrain / Connect 탭과 같은 방식으로 나눈다.
+        """
+        self.attribute_tabs = self._build_sub_tabs(self.ATTRIBUTE_PAGES)
+        return self.attribute_tabs
+
+    def _build_attribute_copy_page(self):
         """소스 오브젝트의 어트리뷰트를 골라 타겟들에 같은 정의로 새로 만드는 탭.
 
         이름은 그대로 두거나 Prefix / Suffix 를 붙일 수 있다.
@@ -1055,10 +1086,218 @@ class MainWindow(QWidget):
 
         layout.addStretch(1)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(content)
-        return scroll
+        # 바깥 스크롤은 _build_sub_tabs 의 _scrolled 가 씌운다(예전에는 여기서 씌웠다).
+        return content
+
+    # --------------------------------------------------------------
+    # Attribute > Create   (프로파일에 적어 둔 정의로 새로 만들기)
+    # --------------------------------------------------------------
+
+    def _build_attribute_create_page(self):
+        """왼쪽 = 대상 오브젝트, 오른쪽 = 프로파일에 저장해 둔 어트리뷰트 정의.
+
+        Copy 탭과 달리 **씬에 원본이 없어도** 된다. 리그마다 늘 같은 어트리뷰트
+        (World / Root / Shoulder 같은 [0,1] 실수)를 손으로 addAttr 하던 일을 없애는
+        것이 목적이라, 정의는 프로파일 JSON 에 남아 다음 씬에서도 그대로 쓰인다.
+        """
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        body = QHBoxLayout()
+        layout.addLayout(body)
+
+        # --- 왼쪽 : 어트리뷰트를 만들 오브젝트들
+        # Up/Down/Order 를 끈 이유는 폭 때문만이 아니다 — 여기서는 **순서가 아무 뜻도
+        # 없다**(체크한 어트리뷰트를 리스트의 모든 오브젝트에 똑같이 만든다). 그리고 그
+        # 버튼 행이 TSL 최소 폭의 대부분이라(실측 322 -> 179px), 좌우로 나란히 놓는 이
+        # 탭에서는 켜 두면 창 폭을 넘겨 오른쪽이 잘린다.
+        # 제목이 길면 그 라벨이 TSL 최소 폭을 그대로 밀어 올린다(실측 263 -> 160px).
+        # 설명은 툴팁으로 옮긴다.
+        self.tsl_acr_objs = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", select_label="Select",
+            show_up=False, show_down=False, show_order=False,
+            list_min_height=220, log_callback=self.log)
+        self.tsl_acr_objs.setToolTip(
+            "Objects to create the checked attributes on.\n"
+            "Order does not matter - every object in the list gets the same set.")
+        body.addWidget(self.tsl_acr_objs, 1)
+
+        # --- 오른쪽 : 프로파일 + 그 프로파일의 어트리뷰트 목록
+        right = QVBoxLayout()
+        body.addLayout(right, 1)
+
+        right.addWidget(self._build_attr_profile_group())
+
+        head = QHBoxLayout()
+        head.addWidget(QLabel("Attributes"))
+        head.addStretch(1)
+        self.lbl_acr_number = QLabel("Number: 0")
+        head.addWidget(self.lbl_acr_number)
+        right.addLayout(head)
+
+        # 체크박스로 만들 것을 고른다(A00290_BSTool 의 Mix Targets 와 같은 방식).
+        # 선택(하이라이트)은 Edit / Remove 대상이고, 체크는 Create 대상이다.
+        self.lw_acr_attrs = QListWidget()
+        self.lw_acr_attrs.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lw_acr_attrs.setMinimumHeight(160)
+        self.lw_acr_attrs.setToolTip(
+            "Check the attributes to create.\n"
+            "Select (highlight) a row and use Edit / Remove to change the profile.\n"
+            "Double-click a row to edit it.")
+        self.lw_acr_attrs.itemChanged.connect(self._acr_on_item_changed)
+        self.lw_acr_attrs.itemDoubleClicked.connect(
+            lambda _item: self.on_acr_edit_attr())
+        right.addWidget(self.lw_acr_attrs, 1)
+
+        self.flt_acr = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_acr_attrs, placeholder="Type any part of an attribute name",
+            number_label=self.lbl_acr_number)
+        right.addWidget(self.flt_acr)
+
+        all_row = QHBoxLayout()
+        self.chk_acr_all = QCheckBox("Check All (visible)")
+        self.chk_acr_all.setTristate(True)
+        self.chk_acr_all.setToolTip(
+            "Check or uncheck every attribute currently visible in this list.\n"
+            "Partially filled means some are checked.")
+        self.chk_acr_all.clicked.connect(self.on_acr_check_all)
+        all_row.addWidget(self.chk_acr_all)
+        all_row.addStretch(1)
+        self.lbl_acr_checked = QLabel("Checked: 0")
+        all_row.addWidget(self.lbl_acr_checked)
+        right.addLayout(all_row)
+
+        edit_row = QHBoxLayout()
+        for label, tip, slot in (
+                ("Add", "Add a new attribute definition to this profile",
+                 self.on_acr_add_attr),
+                ("Edit", "Edit the selected attribute definition",
+                 self.on_acr_edit_attr),
+                ("Remove", "Remove the selected attribute definitions from "
+                 "this profile", self.on_acr_remove_attr)):
+            btn = QPushButton(label)
+            btn.setToolTip(tip)
+            btn.clicked.connect(slot)
+            edit_row.addWidget(btn)
+        right.addLayout(edit_row)
+
+        btn_create = QPushButton("Create Checked Attributes")
+        btn_create.setMinimumHeight(32)
+        btn_create.setToolTip(
+            "Create every CHECKED attribute on every object in the list on the "
+            "left.\nObjects that already have the attribute are skipped - "
+            "nothing is overwritten.")
+        btn_create.clicked.connect(self.on_acr_create)
+        layout.addWidget(btn_create)
+
+        # 창을 열 때 마지막으로 쓰던 프로파일을 그대로 불러온다.
+        self._acr_profile = aprefs.get_active()
+        self._acr_data = aprefs.load_profile(self._acr_profile)
+        self._acr_refresh_profiles()
+        self._acr_render_attrs()
+
+        return page
+
+    def _build_attr_profile_group(self):
+        """프로파일 콤보 + New / Rename / Delete (A00340_SelectionTool 과 같은 구성).
+
+        A00340 은 넷을 **한 줄**에 놓지만 여기서는 **두 줄**로 나눈다. 이 탭은 좌우로
+        나뉘어 있어 이 그룹이 창 폭의 절반만 쓰는데, 한 줄이면 그룹 하나가 최소 363px 를
+        요구해(실측) 오른쪽이 잘린다. 두 줄이면 261px 로 내려간다 — 콤보가 길어질수록
+        (프로파일 이름이 길수록) 이득이 커진다.
+        """
+        group = QGroupBox("Profile")
+        outer = QVBoxLayout(group)
+
+        self.cmb_acr_profile = QComboBox()
+        # 긴 프로파일 이름 때문에 콤보가 통째로 넓어지지 않도록 줄여서 보여 준다.
+        self.cmb_acr_profile.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.cmb_acr_profile.setMinimumContentsLength(8)
+        self.cmb_acr_profile.setToolTip(
+            "Active profile - a saved set of attribute definitions\n"
+            "(each profile is its own JSON under the tool's data folder).")
+        self.cmb_acr_profile.currentTextChanged.connect(self.on_acr_profile_changed)
+        outer.addWidget(self.cmb_acr_profile)
+
+        row = QHBoxLayout()
+        for label, tip, slot in (
+                ("New", "Create a new profile", self.on_acr_new_profile),
+                ("Rename", "Rename the current profile", self.on_acr_rename_profile),
+                ("Delete", "Delete the current profile", self.on_acr_delete_profile)):
+            btn = QPushButton(label)
+            btn.setToolTip(tip)
+            btn.clicked.connect(slot)
+            row.addWidget(btn)
+        outer.addLayout(row)
+
+        return group
+
+    # --------------------------------------------------------------
+    # Attribute > Delete
+    # --------------------------------------------------------------
+
+    def _build_attribute_delete_page(self):
+        """왼쪽 = 오브젝트, 오른쪽 = 그 오브젝트들이 가진 지울 수 있는 어트리뷰트.
+
+        구성은 Connect 하위 탭과 같게 뒀다(왼쪽 TSL + 오른쪽 목록 + 검색 + 다중 선택).
+        """
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        body = QHBoxLayout()
+        layout.addLayout(body)
+
+        left = QVBoxLayout()
+        self.tsl_adel_objs = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", select_label="Select",
+            list_min_height=220, log_callback=self.log)
+        left.addWidget(self.tsl_adel_objs)
+
+        btn_list = QPushButton("List Attributes")
+        btn_list.setToolTip(
+            "List the user defined attributes of every object in the list.\n"
+            "Built-in attributes (translateX ...) and compound children cannot be\n"
+            "deleted in Maya, so they are not listed.")
+        btn_list.clicked.connect(self.on_adel_list)
+        left.addWidget(btn_list)
+        body.addLayout(left, 1)
+
+        right = QVBoxLayout()
+        head = QHBoxLayout()
+        head.addWidget(QLabel("Attributes"))
+        head.addStretch(1)
+        self.lbl_adel_number = QLabel("Number: 0")
+        head.addWidget(self.lbl_adel_number)
+        right.addLayout(head)
+
+        self.lw_adel_attrs = QListWidget()
+        self.lw_adel_attrs.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lw_adel_attrs.setMinimumHeight(220)
+        self.lw_adel_attrs.setToolTip(
+            "Select the attributes to delete (multi-select).\n"
+            "Hover a row to see which objects carry it.")
+        right.addWidget(self.lw_adel_attrs, 1)
+
+        self.flt_adel = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_adel_attrs, placeholder="Type any part of an attribute name",
+            number_label=self.lbl_adel_number)
+        right.addWidget(self.flt_adel)
+
+        btn_all = QPushButton("Select All")
+        btn_all.setToolTip("Select every attribute currently visible in the list.")
+        btn_all.clicked.connect(self.flt_adel.select_all_visible)
+        right.addWidget(btn_all)
+        body.addLayout(right, 1)
+
+        btn_delete = QPushButton("Delete Selected Attributes")
+        btn_delete.setMinimumHeight(32)
+        btn_delete.setToolTip(
+            "Delete the selected attributes from every object in the list that\n"
+            "has them. Locked attributes are reported, not force-unlocked.")
+        btn_delete.clicked.connect(self.on_adel_delete)
+        layout.addWidget(btn_delete)
+
+        return page
 
     # --------------------------------------------------------------
     # Connect > List Connected
@@ -1196,8 +1435,11 @@ class MainWindow(QWidget):
             "              List Conn.   : explore up/down stream nodes by type\n"
             "              Conn. Closest: 1:1 closest matching constraints\n"
             "                             + Get Closest\n"
-            "Attribute   : copy selected attributes onto other objects,\n"
-            "              same name or with a Prefix / Suffix".format(
+            "Attribute   : Copy   : copy attributes off one source object,\n"
+            "                       same name or with a Prefix / Suffix\n"
+            "              Create : create attributes from a saved profile\n"
+            "                       (name / type / range), checkbox per attr\n"
+            "              Delete : delete user defined attributes".format(
                 VERSION, LAST_UPDATE, MATCH_LIST_LIMIT))
 
     def _run(self, label, func):
@@ -1707,6 +1949,389 @@ class MainWindow(QWidget):
                 len(created), len(targets)))
 
         self._run("Copy Attributes", _do)
+
+    # ==============================================================
+    # Handlers : Attribute > Create
+    # ==============================================================
+
+    def _acr_items(self):
+        return [self.lw_acr_attrs.item(i)
+                for i in range(self.lw_acr_attrs.count())]
+
+    def _acr_specs(self):
+        """현재 프로파일의 스펙 리스트(리스트 위젯이 아니라 데이터가 원본)."""
+        return self._acr_data.get("attributes", [])
+
+    def _acr_save(self):
+        aprefs.save_profile(self._acr_profile, self._acr_data)
+
+    def _acr_render_attrs(self, keep_checked=True):
+        """프로파일 데이터를 리스트 위젯에 그린다.
+
+        keep_checked=True (같은 프로파일 안에서 Add/Edit/Remove 한 뒤)면 체크 상태를
+        **이름 기준**으로 이어받는다 — Edit 로 정의만 바꿨는데 체크가 풀리면 Create 를
+        다시 눌러야 하는 걸 잊기 쉽다.
+
+        keep_checked=False (프로파일을 새로 불러올 때)면 **전부 체크**된 상태로 시작한다.
+        프로파일은 사용자가 직접 골라 담은 묶음이라 "이 프로파일을 만든다" 가 기본
+        의도이고, 매번 전체 체크를 다시 누르게 하는 것은 군더더기다.
+        """
+        carry = set()
+        if keep_checked:
+            carry = {it.data(Qt.UserRole) for it in self._acr_items()
+                     if it.checkState() == Qt.Checked}
+
+        self._acr_updating = True
+        try:
+            self.lw_acr_attrs.clear()
+            for spec in self._acr_specs():
+                item = QListWidgetItem("{0}      {1}".format(
+                    spec["name"], aprefs.describe_spec(spec)))
+                item.setData(Qt.UserRole, spec["name"])
+                on = (spec["name"] in carry) if keep_checked else True
+                item.setCheckState(Qt.Checked if on else Qt.Unchecked)
+                self.lw_acr_attrs.addItem(item)
+        finally:
+            self._acr_updating = False
+
+        # 목록을 새로 채웠으니 필터를 다시 먹인다(숨김 상태가 초기화돼 있다).
+        self.flt_acr.refresh()
+        self._acr_refresh_counts()
+
+    def _acr_refresh_counts(self):
+        checked = [it for it in self._acr_items()
+                   if it.checkState() == Qt.Checked]
+        hidden = sum(1 for it in checked if it.isHidden())
+        text = "Checked: {0}".format(len(checked))
+        if hidden:
+            text += " ({0} hidden)".format(hidden)
+        self.lbl_acr_checked.setText(text)
+
+        # 전체 체크박스는 **보이는 행** 기준(동작 범위와 같게).
+        visible = [it for it in self._acr_items() if not it.isHidden()]
+        visible_checked = [it for it in visible if it.checkState() == Qt.Checked]
+        if not visible or not visible_checked:
+            state = Qt.Unchecked
+        elif len(visible_checked) == len(visible):
+            state = Qt.Checked
+        else:
+            state = Qt.PartiallyChecked
+        self.chk_acr_all.blockSignals(True)
+        self.chk_acr_all.setCheckState(state)
+        self.chk_acr_all.blockSignals(False)
+
+    def _acr_on_item_changed(self, _item):
+        if getattr(self, "_acr_updating", False):
+            return
+        self._acr_refresh_counts()
+
+    def on_acr_check_all(self, _checked=False):
+        """전체 체크박스: 지금 보이는 행을 모두 켜거나 끈다.
+
+        판단 기준은 **체크박스의 상태가 아니라 리스트의 상태**다. 3-state 체크박스는
+        클릭할 때마다 부분 체크까지 순환하는데, 그 순환에 기대면 "부분 상태에서 누르면
+        전부 켠다" 는 의도가 위젯 내부 동작에 딸려 다닌다(코드로 부르면 다르게 동작하고,
+        그래서 테스트도 못 한다). 보이는 행이 **전부 켜져 있으면 끄고, 아니면 전부 켠다** —
+        결과는 사용자가 기대하는 것과 같으면서 상태가 어디서 오든 똑같이 동작한다.
+        """
+        visible = [it for it in self._acr_items() if not it.isHidden()]
+        turn_on = not (visible and
+                       all(it.checkState() == Qt.Checked for it in visible))
+        state = Qt.Checked if turn_on else Qt.Unchecked
+        self._acr_updating = True
+        try:
+            for item in self._acr_items():
+                if not item.isHidden():
+                    item.setCheckState(state)
+        finally:
+            self._acr_updating = False
+        self._acr_refresh_counts()
+
+    def _acr_selected_names(self):
+        """보이면서 선택된 행의 어트리뷰트 이름(표시 텍스트가 아니라 UserRole)."""
+        names = []
+        for item in self.lw_acr_attrs.selectedItems():
+            if not item.isHidden():
+                names.append(item.data(Qt.UserRole))
+        return names
+
+    # --- 프로파일
+
+    def _acr_refresh_profiles(self):
+        self.cmb_acr_profile.blockSignals(True)
+        self.cmb_acr_profile.clear()
+        self.cmb_acr_profile.addItems(aprefs.list_profiles())
+        index = self.cmb_acr_profile.findText(self._acr_profile)
+        if index >= 0:
+            self.cmb_acr_profile.setCurrentIndex(index)
+        self.cmb_acr_profile.blockSignals(False)
+
+    def on_acr_profile_changed(self, name):
+        if not name or name == self._acr_profile:
+            return
+        self._acr_profile = name
+        aprefs.set_active(name)
+        self._acr_data = aprefs.load_profile(name)
+        # 프로파일이 바뀌면 어트리뷰트도 통째로 바뀌므로 체크를 이어받지 않는다.
+        self._acr_render_attrs(keep_checked=False)
+        self.log("[OK] Attribute profile : switched to '{0}' ({1} attr(s))".format(
+            name, len(self._acr_specs())))
+
+    def on_acr_new_profile(self):
+        raw, ok = QInputDialog.getText(self, "New Profile", "Profile name:")
+        if not ok:
+            return
+        name = aprefs.sanitize_name(raw)
+        if not name:
+            return
+        if name in aprefs.list_profiles():
+            QMessageBox.warning(
+                self, "Attribute", "Profile '{0}' already exists.".format(name))
+            return
+
+        aprefs.save_profile(name, {"attributes": []})
+        aprefs.set_active(name)
+        self._acr_profile = name
+        self._acr_data = aprefs.load_profile(name)
+        self._acr_refresh_profiles()
+        self._acr_render_attrs(keep_checked=False)
+        self.log("[OK] Attribute profile : created '{0}'".format(name))
+
+    def on_acr_rename_profile(self):
+        old = self._acr_profile
+        raw, ok = QInputDialog.getText(
+            self, "Rename Profile", "New name:", text=old)
+        if not ok:
+            return
+        new = aprefs.sanitize_name(raw)
+        if not new or new == old:
+            return
+        if new in aprefs.list_profiles():
+            QMessageBox.warning(
+                self, "Attribute", "Profile '{0}' already exists.".format(new))
+            return
+
+        aprefs.rename_profile(old, new)
+        self._acr_profile = new
+        self._acr_refresh_profiles()
+        self.log("[OK] Attribute profile : renamed '{0}' -> '{1}'".format(old, new))
+
+    def on_acr_delete_profile(self):
+        name = self._acr_profile
+        if len(aprefs.list_profiles()) <= 1:
+            QMessageBox.information(
+                self, "Attribute", "At least one profile must remain.")
+            return
+        if QMessageBox.question(
+                self, "Attribute",
+                "Delete profile '{0}' and its {1} attribute(s)?".format(
+                    name, len(self._acr_specs()))) != QMessageBox.Yes:
+            return
+
+        aprefs.delete_profile(name)
+        remaining = aprefs.list_profiles()
+        self._acr_profile = remaining[0]
+        aprefs.set_active(self._acr_profile)
+        self._acr_data = aprefs.load_profile(self._acr_profile)
+        self._acr_refresh_profiles()
+        self._acr_render_attrs(keep_checked=False)
+        self.log("[OK] Attribute profile : deleted '{0}'".format(name))
+
+    # --- 어트리뷰트 정의 편집
+
+    def on_acr_add_attr(self):
+        dialog = AttrSpecDialog(self, title="New Attribute")
+        if dialog.exec_() != QDialog.Accepted:
+            return
+        spec = dialog.spec()
+
+        if any(s["name"] == spec["name"] for s in self._acr_specs()):
+            QMessageBox.warning(
+                self, "Attribute",
+                "'{0}' is already in this profile.".format(spec["name"]))
+            return
+
+        self._acr_specs().append(spec)
+        self._acr_save()
+        self._acr_render_attrs()
+        # 방금 적은 것은 만들 생각으로 적은 것이다 — 체크해 둔다(carry 에는 없다).
+        self._acr_set_checked(spec["name"], True)
+        self.log("[OK] Attribute profile : added '{0}' ({1})".format(
+            spec["name"], aprefs.describe_spec(spec)))
+
+    def _acr_set_checked(self, name, checked):
+        for item in self._acr_items():
+            if item.data(Qt.UserRole) == name:
+                item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+                break
+
+    def on_acr_edit_attr(self):
+        names = self._acr_selected_names()
+        if not names:
+            self.log("[ERR] Edit Attribute : select one attribute in the list")
+            return
+        if len(names) > 1:
+            self.log("[INFO] Edit Attribute : editing the first of {0} selected "
+                     "({1})".format(len(names), names[0]))
+
+        specs = self._acr_specs()
+        index = next((i for i, s in enumerate(specs) if s["name"] == names[0]), -1)
+        if index < 0:
+            return
+
+        old_name = specs[index]["name"]
+        dialog = AttrSpecDialog(self, spec=specs[index], title="Edit Attribute")
+        if dialog.exec_() != QDialog.Accepted:
+            return
+        spec = dialog.spec()
+
+        if spec["name"] != old_name and any(
+                s["name"] == spec["name"] for s in specs):
+            QMessageBox.warning(
+                self, "Attribute",
+                "'{0}' is already in this profile.".format(spec["name"]))
+            return
+
+        specs[index] = spec
+        self._acr_save()
+        # 이름이 바뀌었으면 체크 상태를 그 이름으로 옮겨 준다(이름 기준으로 잇기 때문).
+        if spec["name"] != old_name:
+            for item in self._acr_items():
+                if item.data(Qt.UserRole) == old_name:
+                    item.setData(Qt.UserRole, spec["name"])
+        self._acr_render_attrs()
+        self.log("[OK] Attribute profile : edited '{0}' -> '{1}' ({2})".format(
+            old_name, spec["name"], aprefs.describe_spec(spec)))
+
+    def on_acr_remove_attr(self):
+        names = self._acr_selected_names()
+        if not names:
+            self.log("[ERR] Remove Attribute : select attributes in the list")
+            return
+        if QMessageBox.question(
+                self, "Attribute",
+                "Remove {0} attribute(s) from profile '{1}'?\n\n{2}".format(
+                    len(names), self._acr_profile,
+                    ", ".join(names[:8]))) != QMessageBox.Yes:
+            return
+
+        drop = set(names)
+        self._acr_data["attributes"] = [
+            s for s in self._acr_specs() if s["name"] not in drop]
+        self._acr_save()
+        self._acr_render_attrs()
+        self.log("[OK] Attribute profile : removed {0} attribute(s) - {1}".format(
+            len(names), ", ".join(names[:8])))
+
+    # --- 생성
+
+    def _acr_checked_specs(self):
+        """체크된 스펙들 + 필터에 가려진 체크 수.
+
+        가려진 것도 **체크돼 있으면 만든다** — 체크는 명시적인 의사표시라 필터에
+        가렸다고 없던 일로 하면 오히려 놀랍다. 대신 몇 개가 가려져 있었는지 알린다.
+        """
+        by_name = {s["name"]: s for s in self._acr_specs()}
+        specs, hidden = [], 0
+        for item in self._acr_items():
+            if item.checkState() != Qt.Checked:
+                continue
+            spec = by_name.get(item.data(Qt.UserRole))
+            if spec is None:
+                continue
+            specs.append(spec)
+            if item.isHidden():
+                hidden += 1
+        return specs, hidden
+
+    def on_acr_create(self):
+        objects = self.tsl_acr_objs.get_all_items()
+        specs, hidden = self._acr_checked_specs()
+        if hidden:
+            self.log("[INFO] {0} checked attribute(s) are hidden by the filter - "
+                     "they are created too".format(hidden))
+
+        def _do():
+            created, skipped = acreate_mgr.create_attributes(objects, specs)
+            for obj, name, reason in skipped:
+                self.log("[WARN] {0}.{1} : {2}".format(obj, name, reason))
+            self.log("       {0} attribute(s) created on {1} object(s) "
+                     "from profile '{2}'".format(
+                         len(created), len(objects), self._acr_profile))
+
+        self._run("Create Attributes", _do)
+
+    # ==============================================================
+    # Handlers : Attribute > Delete
+    # ==============================================================
+
+    def on_adel_list(self):
+        objects = self.tsl_adel_objs.get_all_items()
+        try:
+            rows, missing = adel_mgr.list_deletable(objects)
+        except Exception as e:
+            self.log("[ERR] List Attributes : {0}".format(e))
+            cmds.warning(str(e))
+            return
+
+        total_objs = len(objects) - len(missing)
+        self.lw_adel_attrs.clear()
+        for row in rows:
+            # 표시 텍스트는 **어트리뷰트 이름 그대로** 둔다. 공용 Filter 위젯의
+            # visible_selected() 가 item.text() 를 돌려주므로, 여기에 개수나 표식을
+            # 붙이면 그 이름으로 삭제를 시도하게 된다. 부가 정보는 툴팁으로.
+            item = QListWidgetItem(row["name"])
+            tip = "on {0} of {1} object(s):\n  {2}".format(
+                len(row["owners"]), total_objs, "\n  ".join(row["owners"][:12]))
+            if row["locked"]:
+                tip += "\n\nLOCKED on {0} object(s) - unlock before deleting".format(
+                    len(row["locked"]))
+            if row["referenced"]:
+                tip += "\n\nOn {0} referenced object(s) - Maya may refuse".format(
+                    len(row["referenced"]))
+            item.setToolTip(tip)
+            if row["locked"]:
+                item.setForeground(QBrush(QColor("#e0a030")))
+            self.lw_adel_attrs.addItem(item)
+
+        shown, total = self.flt_adel.refresh()
+
+        for obj in missing:
+            self.log("[WARN] {0} : object not found in scene".format(obj))
+        msg = "[OK] List Attributes : {0} deletable attr(s) on {1} object(s)".format(
+            total, total_objs)
+        if shown != total:
+            msg += " - filter '{0}' shows {1}".format(
+                self.flt_adel.text().strip(), shown)
+        locked = sum(1 for r in rows if r["locked"])
+        if locked:
+            msg += " ({0} locked, shown in orange)".format(locked)
+        self.log(msg)
+
+    def on_adel_delete(self):
+        objects = self.tsl_adel_objs.get_all_items()
+        attrs, hidden = self.flt_adel.visible_selected()
+        if hidden:
+            self.log("[INFO] {0} selected attribute(s) hidden by the filter "
+                     "were skipped".format(hidden))
+        if attrs and QMessageBox.question(
+                self, "Attribute",
+                "Delete {0} attribute(s) from {1} object(s)?\n\n{2}".format(
+                    len(attrs), len(objects),
+                    ", ".join(attrs[:8]))) != QMessageBox.Yes:
+            return
+
+        def _do():
+            deleted, failed = adel_mgr.delete_attributes(objects, attrs)
+            for obj, name, reason in failed:
+                self.log("[WARN] {0}.{1} : {2}".format(obj, name, reason))
+            self.log("       {0} attribute(s) deleted from {1} object(s)".format(
+                len(deleted), len(objects)))
+
+        self._run("Delete Attributes", _do)
+        # 지운 뒤에는 목록이 실제와 어긋나므로 다시 읽는다.
+        if objects:
+            self.on_adel_list()
 
     def _filtered_attrs(self, role, label):
         """Connect 탭 한쪽의 **보이면서 선택된** 어트리뷰트.
