@@ -40,7 +40,8 @@
 4. **Transfer** — 애니메이션을 **다른 오브젝트로** 옮긴다.
    **Copy Key**(v01.03~): **Base → Target** 으로 시간 범위 키를 복사하고 축별로 값을
    **반전(Reverse)** 한다(`cmds.pasteKey` 붙여넣기 모드 선택). **1 → n**(v02.06~, 기본 ON)
-   을 켜면 Base 가 **하나일 때** 그 키가 **모든** Target 으로 간다.
+   을 켜면 Base 가 **하나일 때** 그 키가 **모든** Target 으로 간다. **Attributes**(v02.08~,
+   기본 모두 ON)로 **Translate / Rotate / Scale × X/Y/Z 9축** 중 복사할 채널만 골라낼 수 있다.
    **Mirror Key**(v01.04~): 한쪽 컨트롤러의 키를 **반대쪽 컨트롤러로 좌우 미러**한다(언리얼
    *Mirror Data Table* 과 동일한 결과). 좌/우 토큰(`_l/_r` 등, **JSON 으로 확장 가능**)으로 자동
    페어링하거나 수동 리스트로 짝짓는다. **소스/타겟의 rotateOrder 가 달라도 정확**하다.
@@ -63,6 +64,24 @@
 
 하위 탭이나 상위 탭을 바꾸면 **창 크기가 지금 보이는 페이지에 맞춰 자동 조정**된다.
 
+> **V02 v02.08 — Copy Key: 복사할 어트리뷰트 선택(Attributes 9개, 기본 모두 ON)**:
+> `Transfer > Copy Key` 에 **Attributes** 그룹을 더해 **Translate / Rotate / Scale × X/Y/Z**
+> 총 **9개 체크박스**로 복사할 채널을 골라낸다. 예전에는 `cmds.copyKey` 가 Base 의
+> 애니메이션된 어트리뷰트를 **무조건 전부** 복사해서, 회전만 가져오고 싶어도 이동이
+> 따라오는 것을 막을 수 없었다.
+> **기본값(9개 모두 ON)은 예전과 완전히 같다** — 전부 켜져 있으면 `attribute` 필터를
+> **아예 걸지 않기 때문**이다. 이게 중요한 것이, 9축을 일일이 넘기는 식으로 만들었다면
+> `ikBlend` · 페이셜 슬라이더 같은 **커스텀 어트리뷰트의 키가 조용히 빠졌을** 것이다.
+> 하나라도 체크를 풀었을 때만 `cmds.copyKey(attribute=[...])` 로 좌혀진다.
+> 결들머로 **Reverse 는 복사한 축에만** 적용된다(복사도 안 한 축의 타깃 기존 키를
+> 뒤집어 버리던 경우를 막는다), 고른 어트리뷰트에 Base 키가 없어 클립보드가 비면
+> 예외로 흘리지 않고 **skipped 로 세서 로그에 적는다**. 로그에 복사한 어트리뷰트
+> (`all attrs` 또는 이름 목록)도 함께 찍는다.
+> 변경: `app/core/copykey_manager.py`(`COPY_ATTRS` · `resolve_attrs()` · `attr_flags` 인자),
+> `app/ui/main_window.py`(Attributes 그룹). 검증(mayapy 2024): 전체 체크 시 커스텀 어트리뷰트까지
+> 복사, 일부만 체크 시 나머지 채널 무변, 복사 안 한 축은 Reverse 에서 제외, 키 없는
+> 축만 고르면 skipped, 아무것도 안 고르면 경고, 인자 생략 시 기존 동작 유지 — 6항목.
+>
 > **V02 v02.07 — [Fix] Stagger: 확정한 offset 이 리스트를 다시 담으면 사라지던 문제**:
 > 슬라이더로 `Value per Item` (또는 `Offset per Item`) 을 준 뒤, 다른 오브젝트를 골라
 > **List Selected Objects** 를 누르면 **방금 준 offset 이 통째로 원위치로 돌아갔다.**
@@ -950,6 +969,9 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 │ Add|Del|Up|Down|Sort      Add|Del|Up|Down|Sort    │
 │ Start [ 1 ]   End [ 24 ]                           │  ← 기본값 = 현재 playback 범위
 │ Paste Option [ insert ▼ ]   [x] 1 -> n            │  ← insert / 1→n 기본 ON
+│ ┌ Attributes ──────────────────────────────────┐ │
+│ │ T [X][Y][Z]  R [X][Y][Z]  S [X][Y][Z]        │ │  ← v02.08~, T/R/S · 기본 모두 on
+│ └──────────────────────────────────────────────┘ │
 │ ┌ Reverse ─────────────────────────────────────┐ │
 │ │ Translate [X][Y][Z]   Rotate [X][Y][Z]       │ │  ← 기본 모두 off
 │ └──────────────────────────────────────────────┘ │
@@ -973,10 +995,20 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
     (`n→n`). 그래서 늘 켜 둬도 기존 작업 방식이 달라지지 않는다.
   - `1→n` 에서는 Base/Target **개수가 달라도 정상**이라 불일치 경고를 띄우지 않는다.
   - Reverse 축은 `1→n` 에서도 타깃마다 그대로 적용된다.
+- **Attributes** (v02.08~, **기본 모두 ON**): 복사할 어트리뷰트를 축 단위로 고른다.
+  Translate X/Y/Z · Rotate X/Y/Z · Scale X/Y/Z **9개**.
+  - **9개가 모두 켜져 있으면 필터를 아예 걸지 않는다** — 예전처럼 Base 의 **애니메이션된
+    어트리뷰트를 전부**(커스텀 어트리뷰트 포함) 복사한다. 그래서 기본값은 이전 동작 그대로다.
+  - 하나라도 체크를 풀면 **체크한 어트리뷰트만** `cmds.copyKey(attribute=[...])` 로 복사한다
+    (커스텀 어트리뷰트는 빠진다). 타깃의 **나머지 채널은 손대지 않는다**.
+  - 고른 어트리뷰트에 Base 키가 하나도 없으면 클립보드가 비어 붙여넣기가 실패하므로
+    그 쌍은 **건너뛰고** 로그에 skipped 로 적는다. 하나도 체크하지 않으면 경고만 띄운다.
 - **Reverse**: 체크한 축은 붙여넣은 뒤 `timePivot=Start` 기준으로 값을 반전(`valueScale=-1`).
   Translate X/Y/Z, Rotate X/Y/Z 6개, 기본 모두 off.
+  **위 Attributes 에서 체크를 푸른 축은 반전에서도 빠진다** — 복사하지도 않은 타깃의 기존 키를
+  뒤집어 버리지 않도록.
 - **Copy Key**: 복사 실행. 결과(처리한 쌍 수 / **매칭 모드(`1->n` · `n->n`)** / 사용한 옵션 /
-  건너뛴 쌍 / 개수 불일치 경고)가 로그에 출력.
+  **복사한 어트리뷰트(`all attrs` 또는 이름 목록)** / 건너뛴 쌍 / 개수 불일치 경고)가 로그에 출력.
 
 #### Mirror Key
 
@@ -1184,7 +1216,8 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 2. 복사 **대상** 오브젝트들을 선택 → Target 의 **Select Targets**.
    (Base[i] ↔ Target[i] 가 맞도록 **Sort/Up/Down 으로 순서 정렬**)
 3. **Start / End** 확인(기본 = 현재 playback 범위) → **Paste Option** 선택(기본 `insert`).
-4. 필요하면 **Reverse** 축 체크(예: 좌/우 대칭 복사 시 Rotate Y/Z 등) → **Copy Key**.
+4. 특정 채널만 옮기려면 **Attributes** 에서 필요 없는 축의 체크를 푸다(기본은 9개 모두 ON = 전부 복사).
+5. 필요하면 **Reverse** 축 체크(예: 좌/우 대칭 복사 시 Rotate Y/Z 등) → **Copy Key**.
 
 > **원본 하나를 여러 대상에 뿌릴 때**: Base 에 오브젝트를 **하나만** 담고 **1 → n**(기본 ON)을
 > 켠 채로 Copy Key. 순서를 맞출 필요도, Base 를 대상 수만큼 복제할 필요도 없다.
@@ -1303,8 +1336,17 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 - **인덱스 매칭**: `Base[i] → Target[i]`. 개수가 다르면 **짧은 쪽 기준**으로만 복사하고
   로그에 `count mismatch` 경고를 남긴다.
 - 각 쌍: `cmds.copyKey(base, time=(start,end))` → `cmds.pasteKey(tgt, option=<선택값>)`.
+- **Attributes** (v02.08~): `CopyKeyManager.resolve_attrs(attr_flags)` 가 체크 상태를 해석한다.
+  - **9개 모두 ON → `None`(필터 없음)**. `copyKey` 가 예전처럼 애니메이션된 어트리뷰트를 전부
+    복사한다. **일부러 이렇게 했다** — 9축을 명시적으로 넘기면 `ikBlend` 같은 커스텀
+    어트리뷰트의 키가 조용히 빠져 기본 동작이 바뀜다.
+  - **일부만 ON → `cmds.copyKey(base, time=..., attribute=[...])`**. 타깃의 나머지 채널은 그대로 둔다.
+  - **모두 OFF → 경고 후 중단**(`[Warning] No attribute checked ...`).
+  - `copyKey` 반환값이 0 이면(고른 축에 Base 키가 없음) 빈 클립보드로 `pasteKey` 를 부르지 않고
+    **skipped 로 세고** 다음 쌍으로 넘어간다.
 - **Reverse**: 체크된 축만 `cmds.scaleKey(tgt.attr, timeScale=0, timePivot=start, valueScale=-1, valuePivot=0)`.
   체크 안 한 축은 scaleKey 자체를 건너뛴다(원본값 그대로).
+  **Attributes 에서 빠진 축도 건너뛴다** — 복사하지도 않은 타깃의 기존 키를 뒤집지 않도록.
 - 키가 없거나 붙여넣기에 실패한 쌍은 **건너뛰고**(skip) 집계해 로그에 표시한다 → 일부 실패해도 중단되지 않는다.
 - **Paste Option** 이 유효값 목록 밖이면 `insert` 로 폴백(방어).
 
@@ -1499,8 +1541,10 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 4 objects : pose key set on current frame  (rx, rz, ty)
 
 # Copy Key
-5 pairs copied (option: insert).
-3 pairs copied (option: replace). 2 skipped (no keys / paste failed). [Warning] Base(5) / Target(3) count mismatch.
+5 pairs copied (n->n, option: insert, attrs: all attrs).
+4 pairs copied (1->n, option: insert, attrs: rotateX+rotateY+rotateZ).
+3 pairs copied (n->n, option: replace, attrs: all attrs). 2 skipped (no keys / paste failed). [Warning] Base(5) / Target(3) count mismatch.
+[Warning] No attribute checked (Translate / Rotate / Scale).
 
 # Mirror Key
 4 token pair(s) loaded.
@@ -1543,6 +1587,8 @@ Euler filter: 3 object(s), 27 key(s) changed in [20-40f].  Anchored to the key b
 - `Shift+A not bound: active hotkey set is locked. ...` — 핫키 세트가 잠김(커스텀 세트로 전환 필요).
 - `No axis checked.` / `[Warning] <attr> is checked but empty.` — (Key > Pose Key) 축 미체크 / 값 비어 있음.
 - `[Warning] Fill both Base and Target lists.` — (Transfer > Copy Key) Base/Target 비어 있음.
+- `[Warning] No attribute checked (Translate / Rotate / Scale).` — (Transfer > Copy Key)
+  Attributes 9개를 모두 꺼 둔 채 실행.
 - `[Warning] Enter Start / End.` / `[Warning] Start (n) is greater than End (m).` — (Copy Key) 시간 범위 오류.
 - `[Warning] Base(n) / Target(m) count mismatch.` — (Copy Key) 두 리스트 개수 불일치(짧은 쪽만 복사).
 - `[Warning] Select source controllers first.` — (Mirror Key Auto) 선택된 컨트롤 없음.

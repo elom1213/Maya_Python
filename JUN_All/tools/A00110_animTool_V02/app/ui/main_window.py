@@ -873,7 +873,41 @@ class MainWindow(QWidget):
         tab_layout.addLayout(option_row)
 
         # -------------------------
+        # Attributes 체크박스 (Translate/Rotate/Scale X/Y/Z, 9개). 기본 모두 on.
+        # 전부 켜져 있으면 필터를 걸지 않아 예전처럼 애니메이션된 어트리뷰트를 전부 복사한다.
+        # -------------------------
+
+        attr_grp = QGroupBox("Attributes")
+        attr_layout = QHBoxLayout(attr_grp)
+
+        # attr key -> checkbox. CopyKeyManager.COPY_ATTRS 키와 일치.
+        self.copy_attrs = {}
+
+        for group_label, keys in (
+            ("Translate", (("tx", "X"), ("ty", "Y"), ("tz", "Z"))),
+            ("Rotate", (("rx", "X"), ("ry", "Y"), ("rz", "Z"))),
+            ("Scale", (("sx", "X"), ("sy", "Y"), ("sz", "Z"))),
+        ):
+            if self.copy_attrs:
+                attr_layout.addSpacing(12)
+            attr_layout.addWidget(QLabel(group_label))
+            for key, label in keys:
+                cb = QCheckBox(label)
+                cb.setChecked(True)
+                self.copy_attrs[key] = cb
+                attr_layout.addWidget(cb)
+
+        attr_grp.setToolTip(
+            "Attributes to copy. All checked (default) copies EVERY animated\n"
+            "attribute of Base - custom attributes included - like before.\n"
+            "Uncheck any axis to copy only the checked ones.")
+
+        attr_layout.addStretch(1)
+        tab_layout.addWidget(attr_grp)
+
+        # -------------------------
         # Reverse 체크박스 (Translate X/Y/Z, Rotate X/Y/Z). 기본 모두 off.
+        # 복사하지 않는(위에서 체크를 푼) 축은 반전에서도 빠진다.
         # -------------------------
 
         rev_grp = QGroupBox("Reverse")
@@ -1972,13 +2006,14 @@ class MainWindow(QWidget):
             return
 
         reverse_flags = {key: cb.isChecked() for key, cb in self.copy_reverse.items()}
+        attr_flags = {key: cb.isChecked() for key, cb in self.copy_attrs.items()}
         paste_option = self.cmb_paste_option.currentText()
 
         one_to_many = self.cb_copy_one_to_many.isChecked()
 
         count, msg = CopyKeyManager.copy_keys(
             base, tgt, start, end, reverse_flags, paste_option,
-            one_to_many=one_to_many)
+            one_to_many=one_to_many, attr_flags=attr_flags)
         self.log(msg)
 
     # --------------------------------------------------

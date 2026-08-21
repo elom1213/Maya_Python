@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-08-19
+updated: 2026-08-21
 ---
 
 # 작업 일지 (WORKLOG)
@@ -15,7 +15,27 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-08-19 (오늘)
+## 2026-08-21 (오늘)
+
+> [!summary] `A00110_animTool_V02` **Copy Key: 복사할 어트리뷰트 선택(9개 체크박스)** (v02.07→02.08)
+- **요청**: `Transfer > Copy Key` 가 Translate/Rotate/Scale 을 무조건 다 복사하니, 세 어트리뷰트를
+  **선택적으로** 복사·붙여넣게 해 달라. 축별 X/Y/Z 까지 **9개 체크박스**, 기본은 모두 체크.
+- UI 에 **Attributes** 그룹을 Reverse 그룹 위에 달았다(`self.copy_attrs`, 9개 전부 ON).
+  코어는 `CopyKeyManager.COPY_ATTRS` + `resolve_attrs()` + `copy_keys(attr_flags=...)`.
+- **핵심 판단: "9개 모두 체크" 를 `attribute=[9축]` 으로 넘기면 안 된다.** 그러면 기본값이
+  기존 동작과 **달라진다** — 지금까지 `cmds.copyKey(base, time=...)` 는 필터가 없어 `ikBlend`,
+  페이셜 슬라이더 같은 **커스텀 어트리뷰트의 키까지** 가져왔다. 그래서 `resolve_attrs()` 는
+  전부 켜져 있으면 **None(= 필터 없음)** 을 돌려준다. 무엇을 안 복사할지 고를 때만 필터가 걸린다.
+- 결들린 것 2가지: **Reverse 는 복사한 축에만** 걸린다(안 복사한 축의 타깃 기존 키를
+  `scaleKey` 가 뒤집는 걸 막음), 그리고 고른 축에 Base 키가 없을 때는 `copyKey` 반환값 0 으로
+  알아채 **skipped 로 세고** 넘어간다(예전에는 빈 클립보드로 `pasteKey` 가 예외를 던졌다).
+- 검증(mayapy 2024, 6항목): 전체 체크=커스텀 어트리뷰트까지 복사 / 일부 체크=나머지 채널 무변 /
+  복사 안 한 축은 Reverse 제외(타깃 tx 가 200 그대로) / 키 없는 축만 고르면 skipped /
+  무체크는 경고 / 인자 생략 시 기존 동작. UI 빌드도 체크박스 9개 전부 ON 으로 확인. #A00110
+
+---
+
+## 2026-08-19
 
 > [!summary] `docs` **AdvancedSkeleton `lowerLipJoint10_R` 빌드 에러 원인 분석** (신규 문서)
 - 외부 플러그인(AdvancedSkeleton 6.801) `Build AdvancedFace` 중 `AdvancedSkeleton.mel:34482`
