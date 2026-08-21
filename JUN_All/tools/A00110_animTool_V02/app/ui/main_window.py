@@ -2484,6 +2484,13 @@ class MainWindow(QWidget):
         self._noise_sess = None
         self._noise_load_settings()
 
+        # 리스트에서 고른 노드를 **씬에서도 고른다**. 공용 TSL 위젯이 하는 것과 같은 동작이라
+        # 이 툴 안에서 리스트를 다루는 감각이 일관된다(아래 Select 버튼은 그대로 둔다 —
+        # 프로그램이 리스트를 다시 채우는 경우처럼 자동 선택이 일어나지 않는 길도 있어서다).
+        nodes = self._noise_selected()
+        if nodes:
+            cmds.select(nodes, replace=True)
+
     # ---------------- 슬라이더 / 스핀박스 ----------------
 
     def _noise_preview(self):
