@@ -130,7 +130,7 @@ _TYPE_MATCHERS = {
 - **해제(계층 유지)** 모드가 되는 이유: FBX *export selected* 는 선택 노드의 **조상(부모) 체인은 포함하되
   형제 가지는 제외**한다. 그래서 빼내지 않고 그대로 내보내면 부모 경로만 보존된다.
 - 원래 부모/멤버를 **UUID** 로 기록해 두고 복원한다. 씬에 **같은 이름의 오브젝트**가 있어도, 또
-  부모를 옮겨 경로가 바뀌어도 안전하다(참고: [노드 신원 - 이름/경로 vs UUID](https://github.com/elom1213/JUN_Study/blob/master/08000_maya_node_identity_name_vs_uuid.md)).
+  부모를 옮겨 경로가 바뀌어도 안전하다(참고: [노드 신원 - 이름/경로 vs UUID](https://github.com/elom1213/JUN_Study/blob/master/008000_maya_node_identity_name_vs_uuid.md)).
 - 이미 월드 최상위인(부모가 없는) 멤버는 옮기지 않고 그대로 내보낸 뒤 그대로 둔다.
 - **타입 필터로 제외된 그룹 하위 노드**도 같은 방식으로 export 직전에 월드로 빼냈다가 원부모로 복원한다(§6).
 - **레퍼런스 오브젝트**(레퍼런스 부모 밑의 레퍼런스 노드)는 Maya 가 월드로 빼내는 것을 금지한다. 이 경우

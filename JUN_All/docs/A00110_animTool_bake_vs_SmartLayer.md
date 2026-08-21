@@ -1,6 +1,6 @@
 # A00110_animTool Bake vs SmartLayer Bake — 비교와 Smart bake 이식
 
-> 관련 문서: [05000_SmartLayer_bake_algorithm_analysis.md](https://github.com/elom1213/JUN_Study/blob/master/05000_SmartLayer_bake_algorithm_analysis.md)
+> 관련 문서: [005000_SmartLayer_bake_algorithm_analysis.md](https://github.com/elom1213/JUN_Study/blob/master/005000_SmartLayer_bake_algorithm_analysis.md)
 > 대상 코드: `JUN_All/tools/A00110_animTool/app/core/bake_manager.py`, `app/ui/main_window.py`
 
 ---
