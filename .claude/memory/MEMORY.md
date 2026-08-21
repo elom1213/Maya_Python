@@ -13,12 +13,12 @@
 - [Clean commit message](clean-commit-message-no-stray-chars.md) — 커밋 메시지에 이상문자 새지 않게(과거 `@` 유출), 커밋 후 `git log -1` 확인
 - [WORKLOG maintenance](worklog-maintenance.md) — docs/WORKLOG.md 갱신 규칙(최신이 위, 날짜 헤딩 중복 금지)
 - [Docs go in JUN_All/docs](docs-go-in-jun-all-docs.md) — 분석/설명 문서는 JUN_All/docs 아래
-- [study docs number prefix](study-docs-number-prefix.md) — docs/study 는 `00100_영문주제.md` 5자리 번호(간격 100), 번호 근접 = 주제 관련
+- [JUN_Study 학습 노트 repo](study-docs-number-prefix.md) — 공부 노트는 **별도 private repo JUN_Study**(master). `01000_영문주제.md` 도메인 대역 번호, 번호 근접 = 주제 관련
 - [Update portfolio on tool work](update-portfolio-on-tool-work.md) — portfolio_EN/KR 둘 다 동기 갱신, 커밋수 통계는 건드리지 않기
 - [Memory synced via repo](memory-synced-via-repo.md) — 메모리는 repo `.claude/memory`(정션), 커밋+푸시로 PC 간 공유
 - [Prefer PySide for new tools](prefer-pyside-for-new-tools.md) — 신규/병합 툴은 maya.cmds UI 말고 PySide(arch B)
 - [JUN_UE plugin repo](jun-ue-plugin-repo.md) — 언리얼 툴은 별도 repo JUN_UE (루트=플러그인 JUNTools, elom1213/JUN_UE, main)
-- [JUN_mgear vault](jun-mgear-vault.md) — mgear 학습 노트는 JUN_mgear Obsidian vault → elom1213/JUN_mgear
+- [JUN_mgear vault](jun-mgear-vault.md) — mgear 노트는 JUN_Study 03000 대역으로 흡수됨. JUN_mgear repo 는 채용용 공개 저장소로 보존
 - [kangaroo plugin read-only](kangaroo-plugin-external-readonly.md) — kangaroo 플러그인은 외부 3rd-party, 수정 금지
 - [PoseWrangler fork patch](posewrangler-plugin-fork-patch.md) — Epic PoseDriverConnect 포크 위치 + serializer objExists 패치 3단계
 
