@@ -1023,14 +1023,24 @@ class MainWindow(QWidget):
         sl_row.addSpacing(12)
         sl_row.addWidget(QLabel("Loop Length"))
 
-        self.cmb_noise_length = QComboBox()
-        for value in noise_gen.LOOP_LENGTHS:
-            self.cmb_noise_length.addItem("{0} f".format(value), value)
-        self.cmb_noise_length.setCurrentText("{0} f".format(noise_gen.DEFAULT_LOOP_LENGTH))
-        self.cmb_noise_length.setToolTip(
-            "How many frames pass before the noise repeats. It loops seamlessly,\n"
-            "so playback never shows a seam - 1000 f is 33.3 s at 30 fps.")
-        sl_row.addWidget(self.cmb_noise_length)
+        self.sb_noise_length = QSpinBox()
+        self.sb_noise_length.setRange(noise_gen.MIN_LOOP_LENGTH, noise_gen.MAX_LOOP_LENGTH)
+        self.sb_noise_length.setValue(noise_gen.DEFAULT_LOOP_LENGTH)
+        self.sb_noise_length.setSingleStep(100)
+        self.sb_noise_length.setSuffix(" f")
+        self.sb_noise_length.setKeyboardTracking(False)
+        self.sb_noise_length.setToolTip(
+            "How many frames pass before the noise repeats - type any value you want.\n"
+            "It loops seamlessly, so playback never shows a seam.\n"
+            "Longer loops cost proportionally more: the sliders run at about 280 fps\n"
+            "on a 1000 frame loop and about 33 fps on a 10000 frame one, which is why\n"
+            "{0} is the ceiling.".format(noise_gen.MAX_LOOP_LENGTH))
+        sl_row.addWidget(self.sb_noise_length)
+
+        # 프레임 수만 보면 얼마나 긴 루프인지 감이 안 온다. 씬 fps 기준 초를 옆에 적어 준다.
+        self.lbl_noise_seconds = QLabel("")
+        self.lbl_noise_seconds.setToolTip("Loop length in seconds at the scene's frame rate.")
+        sl_row.addWidget(self.lbl_noise_seconds)
 
         self.btn_noise_reset = QPushButton("Reset")
         self.btn_noise_reset.setToolTip(
@@ -1100,11 +1110,16 @@ class MainWindow(QWidget):
                        self.sb_noise_min, self.sb_noise_max):
             widget.editingFinished.connect(self._noise_settle)
 
-        # 콤보/시드는 한 번에 끝나는 조작이라 미리보기 없이 곧장 확정한다.
-        # (loopLength 는 키 개수가 달라져 제자리 갱신 경로를 쓸 수 없기도 하다.)
+        # 타입/시드는 한 번에 끝나는 조작이라 미리보기 없이 곧장 확정한다.
         self.cmb_noise_type.currentIndexChanged.connect(self._noise_commit_combo)
-        self.cmb_noise_length.currentIndexChanged.connect(self._noise_commit_combo)
         self.sb_noise_seed.valueChanged.connect(self._noise_commit_seed)
+
+        # Loop Length 는 **미리보기 경로를 쓸 수 없다** — 키 개수가 달라지면 커브를 다시
+        # 만들어야 하는데, 미리보기는 undo 를 끈 채 돌아 되돌릴 수 없는 변경이 남는다.
+        # 그래서 확정만 하되, 화살표를 연타하거나 숫자를 고칠 때 undo 항목이 우수수 쌓이지
+        # 않도록 슬라이더와 같은 디바운스를 태운다(Enter/포커스 이동은 즉시 확정).
+        self.sb_noise_length.valueChanged.connect(self._noise_length_changed)
+        self.sb_noise_length.editingFinished.connect(self._noise_settle)
         self.btn_noise_seed.clicked.connect(self.on_noise_randomize)
         self.btn_noise_reset.clicked.connect(self.on_noise_reset)
 
@@ -2401,9 +2416,11 @@ class MainWindow(QWidget):
             self.sb_noise_min.setValue(s["out_min"])
             self.sb_noise_max.setValue(s["out_max"])
             self.sb_noise_seed.setValue(s["seed"])
-            self.cmb_noise_length.setCurrentText("{0} f".format(s["length"]))
+            self.sb_noise_length.setValue(noise_gen.clamp_length(s["length"]))
         finally:
             self._noise_updating = False
+
+        self._noise_update_seconds()
 
         self._noise_sess = NoiseSession(node)
         self._noise_update_targets()
@@ -2426,13 +2443,26 @@ class MainWindow(QWidget):
         self.lbl_noise_targets.setText("Driving {0}: {1}".format(len(targets), shown))
 
     def _noise_widget_params(self):
-        """위젯이 들고 있는 미리보기 대상 값들."""
+        """위젯이 들고 있는 설정 전부.
+
+        `kind` 와 `length` 도 함께 넘긴다 — 확정(settle)은 이 값들도 기록해야 하고,
+        미리보기(preview)는 `NoiseSession.PREVIEW_KEYS` 밖이라 알아서 무시한다.
+        """
         return {
             "smoothness": self.sb_noise_smooth.value(),
             "offset": self.sb_noise_offset.value(),
             "out_min": self.sb_noise_min.value(),
             "out_max": self.sb_noise_max.value(),
+            "kind": self.cmb_noise_type.currentText(),
+            "length": self.sb_noise_length.value(),
         }
+
+    def _noise_update_seconds(self):
+        """Loop Length 옆에 씬 fps 기준 길이를 적는다."""
+        frames = self.sb_noise_length.value()
+        seconds = NoiseNodeManager.frames_to_seconds(frames)
+        self.lbl_noise_seconds.setText(
+            "= {0:.1f} s @ {1:g} fps".format(seconds, NoiseNodeManager.scene_fps()))
 
     # ---------------- 리스트 조작 ----------------
 
@@ -2579,7 +2609,7 @@ class MainWindow(QWidget):
     # ---------------- 콤보 / 시드 / 리셋 ----------------
 
     def _noise_commit_combo(self, *_a):
-        """Type · Loop Length 변경. 한 번에 끝나는 조작이라 곧장 확정한다."""
+        """Type 변경. 한 번에 끝나는 조작이라 곧장 확정한다."""
         if self._noise_updating:
             return
         sess = self._noise_session()
@@ -2587,14 +2617,19 @@ class MainWindow(QWidget):
             return
 
         self._noise_settle_timer.stop()
-        params = self._noise_widget_params()
-        params["kind"] = self.cmb_noise_type.currentText()
-        params["length"] = self.cmb_noise_length.currentData()
-
-        _count, msg = sess.settle(**params)
+        _count, msg = sess.settle(**self._noise_widget_params())
         if msg:
             self.log(msg)
         self._noise_refresh_row()
+
+    def _noise_length_changed(self, *_a):
+        """Loop Length 입력. 초 표시는 즉시 갱신하고, 확정은 조작이 멎은 뒤로 미룬다."""
+        self._noise_update_seconds()
+        if self._noise_updating:
+            return
+        if self._noise_session() is None:
+            return
+        self._noise_settle_timer.start()
 
     def _noise_commit_seed(self, *_a):
         if self._noise_updating:

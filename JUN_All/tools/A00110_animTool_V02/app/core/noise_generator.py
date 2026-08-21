@@ -68,10 +68,38 @@ def type_from_index(index):
     except (IndexError, ValueError, TypeError):
         return VALUE
 
-# 루프 길이 선택지(프레임). 30fps 기준 6.7s / 16.7s / 33.3s / 66.7s.
-LOOP_LENGTHS = (200, 500, 1000, 2000)
+
+# ------------------------------------------------------------------ 루프 길이
+
+# 루프 길이(프레임)는 사용자가 자유롭게 정한다. 아래는 **계산이 감당하는 범위**일 뿐이다.
+#
+#   하한 2  : 1프레임짜리 루프는 파형이 될 수 없다(옥타브 하나도 못 만든다).
+#   상한 10000 : 비용이 길이에 선형으로 붙는다. 실측(mayapy 2024, 슬라이더 1틱 기준)
+#       1000f  3.6ms(279fps) / 2000f  6.1ms(164fps) / 5000f 15.5ms(64fps)
+#       10000f 30.1ms(33fps) / 20000f 64.3ms(16fps)
+#     10000 이 **슬라이더가 아직 따라오는 마지막 지점**이다(그 위는 눈에 띄게 끊긴다).
+#     30fps 기준 5.5분이라 어떤 샷보다도 길다.
+MIN_LOOP_LENGTH = 2
+MAX_LOOP_LENGTH = 10000
 
 DEFAULT_LOOP_LENGTH = 1000
+
+
+def clamp_length(length):
+    """루프 길이를 계산이 감당하는 범위로 자른다.
+
+    UI 도 같은 범위를 쓰지만, 씬에서 직접 `loopLength` 를 고쳤거나 옛 파일을 열었을 때를
+    대비해 **코어에서도 한 번 더** 자른다.
+    """
+    try:
+        value = int(length)
+    except (TypeError, ValueError):
+        return DEFAULT_LOOP_LENGTH
+    return max(MIN_LOOP_LENGTH, min(MAX_LOOP_LENGTH, value))
+
+
+# ------------------------------------------------------------------ 그 밖의 기본값
+
 DEFAULT_SMOOTHNESS = 1.0
 DEFAULT_MIN = -1.0
 DEFAULT_MAX = 1.0
@@ -375,7 +403,7 @@ def generate(kind=VALUE, seed=0, length=DEFAULT_LOOP_LENGTH,
     키를 length 개만 깔면 주기가 length-1 이 되어 **한 바퀴마다 1프레임씩 밀린다**.
     (계획서 §7-1 / T2. 눈에 잘 안 띄어서 더 나쁜 종류의 버그다.)
     """
-    length = max(2, int(length))
+    length = clamp_length(length)
     if kind not in _BASIS:
         kind = VALUE
 

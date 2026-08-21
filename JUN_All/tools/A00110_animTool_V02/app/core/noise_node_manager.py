@@ -129,7 +129,8 @@ class NoiseNodeManager(object):
         if seed is not None:
             cmds.setAttr(node + "." + ATTR_SEED, int(seed))
         if length is not None:
-            cmds.setAttr(node + "." + ATTR_LENGTH, int(length))
+            # 길이는 사용자가 자유롭게 넣는 값이라 여기서 한 번 자른다(코어도 다시 자른다).
+            cmds.setAttr(node + "." + ATTR_LENGTH, ng.clamp_length(length))
 
     # ============================================================== 생성
 
@@ -143,6 +144,11 @@ class NoiseNodeManager(object):
             # 노드마다 다른 파형이 나오도록 기존 개수에서 시드를 뽑는다.
             # (결정론은 '같은 시드 -> 같은 파형' 이면 되고, 시드 자체는 달라야 한다.)
             seed = (len(NoiseNodeManager.find_all()) + 1) * 7919 % 100000
+
+        # 길이는 여기서 잘라 둔다. addAttr 의 defaultValue 로 곧장 들어가는 값이라
+        # write_settings 의 클램프를 타지 않는다 — 안 자르면 **어트리뷰트는 50000 인데
+        # 커브는 10001키** 인 어긋난 상태가 만들어진다(생성기는 자기 몫을 자르므로).
+        length = ng.clamp_length(length)
 
         with undo_chunk():
             node = cmds.createNode("transform", name=name or DEFAULT_NAME)
@@ -408,6 +414,27 @@ class NoiseNodeManager(object):
     # ============================================================== UI 보조
 
     @staticmethod
+    def scene_fps():
+        """지금 씬의 fps. 커스텀 타임 유닛(23.976 등)에서도 맞는 값이 나온다.
+
+        `currentUnit(q=True, time=True)` 는 "film" / "ntsc" 같은 **이름**을 주고 커스텀 값도
+        있어서 표로 매핑하면 틀린다. 1프레임이 몇 초인지 직접 물어보는 쪽이 정확하다.
+        """
+        try:
+            one_frame = om.MTime(1.0, om.MTime.uiUnit()).asUnits(om.MTime.kSeconds)
+            if one_frame > 0.0:
+                return 1.0 / one_frame
+        except Exception:
+            pass
+        return 24.0
+
+    @staticmethod
+    def frames_to_seconds(frames):
+        """프레임 수를 지금 씬 fps 기준 초로."""
+        fps = NoiseNodeManager.scene_fps()
+        return float(frames) / fps if fps else 0.0
+
+    @staticmethod
     def summary(node):
         """리스트에 한 줄로 보여줄 요약 문자열."""
         if not NoiseNodeManager.is_noise_node(node):
@@ -520,11 +547,18 @@ class NoiseSession(object):
     # ---------------------------------------------------------------- 조작
 
     def preview(self, **changes):
-        """슬라이더를 움직이는 동안의 즉시 반영. undo 큐에 안 올라간다. 반환: 다시 채운 키 수"""
+        """슬라이더를 움직이는 동안의 즉시 반영. undo 큐에 안 올라간다. 반환: 다시 채운 키 수
+
+        **PREVIEW_KEYS 밖의 항목은 조용히 무시한다.** 호출측(UI)은 위젯 값을 통째로 넘기는데,
+        거기엔 `kind`/`length` 도 섞여 있다. `length` 가 미리보기로 새면 키 개수가 달라져
+        `refresh()` 가 커브를 다시 만드는 경로를 타는데, 그 경로는 **undo 가 꺼진 채로**
+        커브를 지우고 만들어 되돌릴 수 없는 변경을 남긴다. 그래서 여기서 걸러 낸다.
+        """
         if not self.valid():
             return 0
 
-        params = self._merged(self.applied, changes)
+        allowed = dict((k, v) for k, v in changes.items() if k in self.PREVIEW_KEYS)
+        params = self._merged(self.applied, allowed)
         if self._same(params, self.applied):
             return 0
 
