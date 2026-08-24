@@ -48,7 +48,9 @@
    **Copy Key**(v01.03~): **Base → Target** 으로 시간 범위 키를 복사하고 축별로 값을
    **반전(Reverse)** 한다(`cmds.pasteKey` 붙여넣기 모드 선택). **1 → n**(v02.06~, 기본 ON)
    을 켜면 Base 가 **하나일 때** 그 키가 **모든** Target 으로 간다. **Attributes**(v02.08~,
-   기본 모두 ON)로 **Translate / Rotate / Scale × X/Y/Z 9축** 중 복사할 채널만 골라낼 수 있다.
+   기본 모두 ON)로 **Translate / Rotate / Scale × X/Y/Z 9축** 중 복사할 채널만 골라낼 수 있고,
+   그 아래 **Custom Channels**(v02.12~)로 `ikBlend` · 페이셜 슬라이더 같은 **사용자 어트리뷰트**를
+   **9축과 함께** 골라 복사한다(`List Attributes` 가 Base 의 채널박스 채널을 나열).
    **Mirror Key**(v01.04~): 한쪽 컨트롤러의 키를 **반대쪽 컨트롤러로 좌우 미러**한다(언리얼
    *Mirror Data Table* 과 동일한 결과). 좌/우 토큰(`_l/_r` 등, **JSON 으로 확장 가능**)으로 자동
    페어링하거나 수동 리스트로 짝짓는다. **소스/타겟의 rotateOrder 가 달라도 정확**하다.
@@ -71,6 +73,38 @@
 
 하위 탭이나 상위 탭을 바꾸면 **창 크기가 지금 보이는 페이지에 맞춰 자동 조정**된다.
 
+> **V02 v02.12 — Copy Key: 커스텀(채널박스) 어트리뷰트도 복사**:
+> `Transfer > Copy Key` 가 **위치·회전·스케일만** 복사하는 것 같다는 제보를 받고 짚어 보니,
+> 원인은 v02.08 에서 넣은 **Attributes 9축 체크박스**였다. 9축이 **전부 켜져 있을 때만**
+> `cmds.copyKey` 에 `attribute` 필터를 **아예 걸지 않아** `ikBlend` · 페이셜 슬라이더 같은
+> 커스텀 채널까지 통째로 따라왔고, **하나라도 체크를 풀면** 필터가 `translateX ... scaleZ`
+> 9개로 좁혀져 **커스텀 채널이 조용히 빠졌다.** 즉 "회전 + `ikBlend`" 처럼 **TRS 일부와
+> 커스텀을 함께** 고를 방법이 아예 없었다.
+>
+> **Attributes 그룹 안에 `Custom Channels` 목록을 붙였다.** `List Attributes` 를 누르면
+> Base 오브젝트들의 **채널박스에 노출된 키 가능 채널**(9축 제외 — `visibility` 와 사용자 정의
+> 어트리뷰트)을 합집합으로 나열하고, 거기서 고른 채널이 **체크된 9축과 합쳐져** 복사 대상이
+> 된다. 공용 Filter 위젯으로 검색하고 `Select All` / `Clear` 로 한 번에 다룬다. 채널 판정은
+> Fill Keys 와 **같은 규칙**(`listAttr(keyable, visible, unlocked)`)이라 툴 안에서 "채널박스에서
+> 키 찍을 수 있는 것" 의 뜻이 하나로 통한다. **아무것도 안 고르면 예전과 완전히 같다** —
+> 9축 전부 + 커스텀 미선택이면 필터 없는 옛 경로로 그대로 간다.
+>
+> **붙여넣기는 채널(plug) 단위로 돌린다.** 노드 단위로 `pasteKey(attribute=[...])` 를 쓰는 게
+> 짧지만, 마야가 클립보드 커브를 **이름이 아니라 순서로** 맞춰 버린다 — 클립보드에 `myFloat`
+> 커브 하나만 있는데 `attribute=["translateY", "myFloat"]` 을 주면 그 커브가 **`translateY` 에
+> 들어간다**(mayapy 2024 확인). 키가 없는 채널이 목록에 섞이는 건 흔한 일이라 이 뒤섞임은
+> 실제로 터진다. 채널 하나씩 `copyKey`/`pasteKey` 하면 그 일이 없고, **일부 채널이 없거나
+> 잠겨 있어도 나머지는 그대로 붙는다**(로그에 `No key in range` / `Channel missing or locked`
+> 로 따로 적는다 — 이름이 8개를 넘으면 나머지는 개수로만). Reverse 도 **실제로 붙여넣은
+> 채널에만** 걸리므로, 복사하지 않은 축에 타깃이 원래 갖고 있던 키가 뒤집히지 않는다.
+> 변경: `app/core/copykey_manager.py`(`list_custom_attrs()` · `resolve_attrs(custom_attrs)` ·
+> plug 단위 `_copy_pair_attrs()` · `_apply_reverse()` · `_brief()`),
+> `app/ui/main_window.py`(Custom Channels 목록 + `on_copy_list_custom_attrs()`).
+> 검증(mayapy 2024): 채널 나열 규칙 10 · `resolve_attrs` 8 · 기본 경로 회귀 6 · 부분 축+커스텀 6 ·
+> 커스텀만 2 · 순서 뒤섞임 방지 3 · 없는/잠긴 채널 3 · Reverse 범위 3 · 1->n 2 · 경고 2 ·
+> undo 2 · 구 시그니처 1 = **48항목**. UI 스모크(창 생성 → 목록 → 필터 → 버튼 클릭) **14항목**
+> 별도 통과.
+>
 > **V02 v02.11 — Noise: Loop Length 를 자유 입력으로**:
 > `Create > Noise` 의 Loop Length 가 `200 / 500 / 1000 / 2000` **미리 정해진 값 4개**뿐이라
 > 원하는 길이를 쓸 수 없었다. **콤보를 스핀박스로 바꿔 프레임 수를 직접 입력**하게 했다.

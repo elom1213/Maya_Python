@@ -17,6 +17,29 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-24 (오늘)
 
+> [!summary] `A00110_animTool_V02` **Copy Key 가 커스텀(채널박스) 어트리뷰트를 복사하게** (v02.11→02.12)
+- **요청**: `Transfer > Copy Key` 가 사용자가 만든 임의의 어트리뷰트에 걸린 키를 복사하지
+  못하는 것 같다 — 위치·회전·스케일만 오간다. 진단한 뒤 **채널박스에 노출된, 키를 찍을 수
+  있는 어트리뷰트**도 복사/붙여넣기 되게 해 달라.
+- **진단**: 범인은 v02.08 의 **Attributes 9축 체크박스**였다. `resolve_attrs()` 가 9축이
+  **전부 켜져 있을 때만** `None`(= 필터 없음)을 돌려주고, 그때만 `cmds.copyKey` 가 애니메이션된
+  채널을 통째로 가져온다. **하나라도 체크를 풀면** 필터가 `translateX ... scaleZ` 9개로
+  좁혀져 **커스텀 채널이 조용히 빠졌다.** "회전 + `ikBlend`" 처럼 **TRS 일부와 커스텀을
+  함께** 고르는 길이 아예 없었던 것.
+- **수정**: Attributes 그룹에 **`Custom Channels` 목록**을 붙였다. `List Attributes` 가 Base
+  오브젝트들의 채널박스 키 가능 채널(9축 제외 — `visibility` + 사용자 정의)을 합집합으로
+  나열하고, 고른 것이 **체크된 9축과 합쳐져** 복사 대상이 된다. 공용 Filter 위젯 + `Select All`
+  / `Clear`. 채널 판정은 Fill Keys 와 같은 `listAttr(keyable, visible, unlocked)` 규칙으로 맞췄다.
+  **아무것도 안 고르면 예전 경로 그대로**라 기존 사용감은 안 바뀐다.
+- **함정 하나**: 노드 단위 `pasteKey(attribute=[...])` 는 클립보드 커브를 **이름이 아니라
+  순서로** 맞춘다. 클립보드에 `myFloat` 커브 하나만 있는데 `attribute=["translateY","myFloat"]`
+  을 주면 그 커브가 **`translateY` 에 들어간다**(mayapy 2024 확인). 키 없는 채널이 목록에
+  섞이는 건 흔해서 실제로 터진다 → **채널(plug) 하나씩** `copyKey`/`pasteKey` 하도록 바꿨다.
+  덤으로 일부 채널이 없거나 잠겨 있어도 나머지는 붙고, 로그에 `No key in range` /
+  `Channel missing or locked` 로 남는다. Reverse 도 **실제로 붙여넣은 채널에만** 적용된다.
+- 변경: `app/core/copykey_manager.py`, `app/ui/main_window.py`, `docs/A00110_animTool_V02.md`.
+- 검증(mayapy 2024 헤드리스): 코어 48항목 + UI 스모크 14항목 통과.
+
 > [!summary] `A00390_WindTool_V02` **Chain Wave Lite 에 Auto Period — 체인 길이로 파장을 잡는다** (v02.04→02.05)
 - **요청**: Chain Wave Lite 가 만드는 사인 커브의 주기가 체인 길이와 무관하게 미리 정해진 값으로
   고정된다. 체인마다 **처음부터 끝까지 딱 한 주기**가 되게 하고 싶다(진폭의 최댓값·최솟값이

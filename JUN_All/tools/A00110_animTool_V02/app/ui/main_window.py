@@ -1203,7 +1203,9 @@ class MainWindow(QWidget):
         # -------------------------
 
         attr_grp = QGroupBox("Attributes")
-        attr_layout = QHBoxLayout(attr_grp)
+        attr_box = QVBoxLayout(attr_grp)
+
+        attr_layout = QHBoxLayout()
 
         # attr key -> checkbox. CopyKeyManager.COPY_ATTRS 키와 일치.
         self.copy_attrs = {}
@@ -1223,11 +1225,73 @@ class MainWindow(QWidget):
                 attr_layout.addWidget(cb)
 
         attr_grp.setToolTip(
-            "Attributes to copy. All checked (default) copies EVERY animated\n"
-            "attribute of Base - custom attributes included - like before.\n"
-            "Uncheck any axis to copy only the checked ones.")
+            "Channels to copy. With all 9 boxes checked and nothing picked in\n"
+            "Custom Channels, EVERY animated attribute of Base is copied -\n"
+            "custom attributes included - exactly like before.\n"
+            "Uncheck an axis, or pick custom channels below, to copy only those.")
 
         attr_layout.addStretch(1)
+        attr_box.addLayout(attr_layout)
+
+        # -------------------------
+        # Custom Channels : 채널박스에 노출된 키 가능 채널(9축 제외) 중 복사할 것을 고른다.
+        # 예: ikBlend, 페이셜 슬라이더, visibility. 하나라도 고르면 명시 필터 경로로 간다
+        # (= 체크된 9축 + 고른 커스텀 채널만 복사).
+        # -------------------------
+
+        custom_head = QHBoxLayout()
+        custom_head.addWidget(QLabel("Custom Channels"))
+        custom_head.addStretch(1)
+        self.lbl_copy_custom_number = QLabel("Number: 0")
+        custom_head.addWidget(self.lbl_copy_custom_number)
+        attr_box.addLayout(custom_head)
+
+        custom_body = QHBoxLayout()
+
+        self.lw_copy_custom = QListWidget()
+        self.lw_copy_custom.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        # 세로는 옆 버튼 3개와 같은 정도로 묶어 둔다. QListWidget 의 기본 sizeHint(192px)를
+        # 그대로 두면 이 탭만 창이 200px 가까이 길어진다(탭을 바꿀 때마다 창이 늘었다 준다).
+        self.lw_copy_custom.setMinimumHeight(90)
+        self.lw_copy_custom.setMaximumHeight(110)
+        self.lw_copy_custom.setToolTip(
+            "Keyable channels of the Base objects that the 9 axis boxes do not\n"
+            "cover - custom attributes such as ikBlend or facial sliders, plus\n"
+            "visibility. Select the ones to copy; selecting none keeps the old\n"
+            "behaviour driven by the 9 axis boxes alone.")
+        custom_body.addWidget(self.lw_copy_custom, 1)
+
+        custom_btns = QVBoxLayout()
+
+        btn_copy_custom_list = QPushButton("List Attributes")
+        btn_copy_custom_list.setToolTip(
+            "List the keyable channel-box attributes of the Base objects\n"
+            "(union), excluding translate / rotate / scale.")
+        btn_copy_custom_list.clicked.connect(self.on_copy_list_custom_attrs)
+        custom_btns.addWidget(btn_copy_custom_list)
+
+        btn_copy_custom_all = QPushButton("Select All")
+        btn_copy_custom_all.setToolTip(
+            "Select every channel currently visible in the list.")
+        btn_copy_custom_all.clicked.connect(self.on_copy_select_all_custom)
+        custom_btns.addWidget(btn_copy_custom_all)
+
+        btn_copy_custom_clear = QPushButton("Clear")
+        btn_copy_custom_clear.setToolTip(
+            "Clear the selection, so only the 9 axis boxes decide what is copied.")
+        btn_copy_custom_clear.clicked.connect(
+            self.lw_copy_custom.clearSelection)
+        custom_btns.addWidget(btn_copy_custom_clear)
+
+        custom_btns.addStretch(1)
+        custom_body.addLayout(custom_btns)
+        attr_box.addLayout(custom_body)
+
+        self.flt_copy_custom = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_copy_custom, placeholder="Type any part of a channel name",
+            number_label=self.lbl_copy_custom_number)
+        attr_box.addWidget(self.flt_copy_custom)
+
         tab_layout.addWidget(attr_grp)
 
         # -------------------------
@@ -2736,6 +2800,58 @@ class MainWindow(QWidget):
                     plugs.append(plug)
         return plugs
 
+    def on_copy_list_custom_attrs(self):
+        """Base 오브젝트들의 채널박스 키 가능 채널(9축 제외)을 합집합으로 나열한다.
+
+        Fill Keys 탭의 `List Attributes` 와 같은 구성이다. 이미 고른 채널은 목록을 다시
+        채운 뒤에도 이름이 남아 있으면 선택을 유지한다.
+        """
+        objs = self.base_tsl.get_all_items()
+        if not objs:
+            self.log("[Warning] Add objects to the Base list first.")
+            return
+
+        keep = set(self._copy_custom_attrs(quiet=True))
+
+        attrs = CopyKeyManager.list_custom_attrs(objs)
+
+        self.lw_copy_custom.clear()
+        self.lw_copy_custom.addItems(attrs)
+
+        for i in range(self.lw_copy_custom.count()):
+            item = self.lw_copy_custom.item(i)
+            if item.text() in keep:
+                item.setSelected(True)
+
+        shown, total = self.flt_copy_custom.refresh()
+
+        if not attrs:
+            self.log("[Warning] No custom keyable channel on the Base objects "
+                     "(translate / rotate / scale are handled by the 9 boxes).")
+            return
+
+        msg = "{0} custom channel(s) from {1} Base object(s).".format(
+            total, len(objs))
+        if shown != total:
+            msg += " Filter '{0}' shows {1}.".format(
+                self.flt_copy_custom.text().strip(), shown)
+        self.log(msg)
+
+    def on_copy_select_all_custom(self):
+        """필터로 보이는 커스텀 채널을 전부 선택한다."""
+        self.flt_copy_custom.select_all_visible()
+
+    def _copy_custom_attrs(self, quiet=False):
+        """**보이면서 선택된** 커스텀 채널 이름들.
+
+        Qt 는 필터로 숨긴 항목의 선택도 유지하므로, 가려진 채널까지 복사하지 않도록 거른다.
+        """
+        names, hidden = self.flt_copy_custom.visible_selected()
+        if hidden and not quiet:
+            self.log("[Info] {0} selected channel(s) hidden by the filter were "
+                     "skipped.".format(hidden))
+        return names
+
     def on_copy_key(self):
 
         base = self.base_tsl.get_all_items()
@@ -2762,13 +2878,15 @@ class MainWindow(QWidget):
 
         reverse_flags = {key: cb.isChecked() for key, cb in self.copy_reverse.items()}
         attr_flags = {key: cb.isChecked() for key, cb in self.copy_attrs.items()}
+        custom_attrs = self._copy_custom_attrs()
         paste_option = self.cmb_paste_option.currentText()
 
         one_to_many = self.cb_copy_one_to_many.isChecked()
 
         count, msg = CopyKeyManager.copy_keys(
             base, tgt, start, end, reverse_flags, paste_option,
-            one_to_many=one_to_many, attr_flags=attr_flags)
+            one_to_many=one_to_many, attr_flags=attr_flags,
+            custom_attrs=custom_attrs)
         self.log(msg)
 
     # --------------------------------------------------

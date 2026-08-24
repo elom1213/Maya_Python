@@ -41,6 +41,7 @@
 - [blendShape target name vs alias](blendshape-target-name-vs-alias.md) — 타겟 **노드 이름**과 **웨이트 alias** 는 다른 것. 포즈 이름을 노드 이름으로 쓰면 메시 2개째부터 남의 타겟을 재사용해 깨짐. 다음 인덱스는 `size` 말고 `max(multiIndices)+1`
 - [blendShape live target deltas](blendshape-live-target-inputpointstarget.md) — inputGeomTarget 연결 시 inputPointsTarget setAttr 은 조용히 무시, 타겟 메시를 옮겨야 함
 - [setKeyframe insert needs a curve](setkeyframe-insert-needs-existing-curve.md) — `insert=True` 는 커브가 없으면 **조용히 no-op**(레이어에 채널 커브 없을 때 특히). 값 경로는 쓰기 전에 전부 미리 계산
+- [pasteKey attribute = order match](pastekey-attribute-matches-by-order.md) — 노드 단위 `pasteKey(attribute=[...])` 는 클립보드 커브를 **이름이 아니라 순서로** 맞춘다 → 채널(plug) 단위로 돌릴 것
 - [animated attr: key + setAttr](animated-attr-setkeyframe-plus-setattr.md) — 키/레이어 걸린 attr 은 `setKeyframe` 만으론 값이 안 바뀜(뒤에 `setAttr` 까지), 레이어면 소스가 `animBlendNode*`
 - [cmds.toggle not undoable](maya-toggle-cmd-not-undoable.md) — `toggle -localAxis` 는 undo 를 안 남겨 Ctrl+Z 가 이전 작업을 지움 → `setAttr` 사용
 - [extendToShape picks wrong shape](extendtoshape-picks-wrong-shape.md) — `kInvalidParameter: Object is incompatible` 1순위 원인. 새 코드는 `extendToShape` 금지, **공용 `Framework.core.maya_shape`** 사용. `polyEvaluate`/`copySkinWeights` 도 셰이프에 걸 것
@@ -128,6 +129,7 @@
 - [A00145 Match DOOTOOL options](wip-a00145-match-dootool-options.md) — Match 탭에 T/R/S/Parent 체크박스 이식 (v01.10)
 - [A00120 FKIK constraint-free bake](wip-a00120-fkik-bake-constraintfree.md) — parentConstraint 대신 프레임별 matchTransform (애님 레이어 포즈 깨짐 수정)
 - [A00110 Follow: component target](wip-a00110-follow-component-target.md) — Follow Target 에 메시 버텍스 지원. 컴포넌트는 worldMatrix 가 없다 → 위치+노말로 행렬, `getAttr(time=)` 불가라 프레임 이동, `ls` 는 범위 밖 인덱스를 클램프 (v01.41)
+- [A00110 Copy Key custom attrs](wip-a00110-copykey-custom-attrs.md) — 9축 필터가 커스텀 어트리뷰트를 조용히 버리던 문제 → Custom Channels 목록 (v02.12)
 - [A00110 Copy Key 1->n](wip-a00110-copykey-one-to-many.md) — Base 1개면 Target 전부에 복사(기본 ON). **Follow 의 `1<-n` 은 에러, 여기는 조용히 n->n 폴백** (v02.06)
 - [A00110_V02 tab taxonomy](wip-a00110-tab-taxonomy.md) — **신규 V02**: 상위 탭 = 카테고리(Key/Timing/Curve/Transfer/Bake/View), 하위 탭 = 기능. V01 은 재분류 전으로 방치 + 툴 복제 체크리스트 (V02 v02.00)
 - [A00110 Fill Keys](wip-a00110-fill-keys.md) — 구간 전 프레임 키 채우기(기존 키 방치) + 애니 레이어 지정, Key Edit 하위 8탭 재편 (v01.40)
