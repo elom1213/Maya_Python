@@ -2,32 +2,33 @@
 
 한 줄 = 한 메모. 자세한 내용은 각 파일에 있으니 필요할 때 열어본다.
 
+> **이 저장소 고유 규칙은 루트 `CLAUDE.md` 에 있다.**
+> 모든 세션 공통 규칙(한국어 소통 · 푸시 · 커밋 · 저장소 라우팅)은 `JUN_Claude/CLAUDE.md` 가
+> 전역으로 로드한다 — 그래서 여기엔 없다. 2026-08-24 에 아래 메모들이 옮겨 갔다.
+>
+> | 옮긴 곳 | 메모 |
+> |---|---|
+> | `JUN_Claude/CLAUDE.md` (전역) | 한국어 소통 · 푸시 2종 · 커밋 메시지 · UI 영어 · 메모리 구조 |
+> | `JUN_Study/.claude/memory/` | 학습 노트 번호 규칙 · "공부용 문서" 레시피 · JUN_mgear 동결 |
+> | `JUN_UE/.claude/memory/` | JUN_UE 저장소 · UE 파이썬 검증 · A00510 Bone Viewport |
+>
+> 본문에 남아 있는 `[[push-only-when-asked]]` 같은 링크는 전역 규칙으로 옮겨진 것들이다.
+
 ## 작업 방식 · 사용자 선호
 
-- [Explain in Korean](explain-in-korean.md) — 설명/대화는 한국어로 (코드·UI 문자열은 영어)
-- [UI text English-only](ui-text-english-only.md) — UI 문자열·로그는 전부 영어, 한국어는 주석/독스트링만
-- [Push only when asked](push-only-when-asked.md) — **그 턴 메시지에** 명시 요청 없으면 절대 push 금지(로컬 커밋은 OK). 앞 턴의 "푸시해" 는 이어지지 않는다 — 이 착각으로 2회 위반(2026-08-10, 08-19)
-- [Push only own session work](push-only-own-session-work.md) — 푸시에는 **이 세션이 한 것만**. 다른 세션 변경은 "푸시해" 여도 제외, `git add -A` 금지(경로 지정), 섞인 공용 문서는 물어보기
 - [Push target Dnable/dev](push-target-dnable-dev.md) — 기본 push 대상은 Dnable_repo 의 dev (origin 아님)
 - [No history rewrite / master on request](no-history-rewrite-master-on-request.md) — 히스토리 재작성 금지, dev→master 최신화는 **그 턴에 요청할 때만**(dev 가 master 보다 100+ 앞선 건 정상)
 - [Push includes tool guide docs](push-includes-tool-guide-docs.md) — 툴 push 시 docs/<툴>.md 가이드 + CHANGELOG/version/WORKLOG 함께
-- [Clean commit message](clean-commit-message-no-stray-chars.md) — 커밋 메시지에 이상문자 새지 않게(과거 `@` 유출), 커밋 후 `git log -1` 확인
 - [WORKLOG maintenance](worklog-maintenance.md) — docs/WORKLOG.md 갱신 규칙(최신이 위, 날짜 헤딩 중복 금지)
 - [Docs go in JUN_All/docs](docs-go-in-jun-all-docs.md) — 분석/설명 문서는 JUN_All/docs 아래
-- [JUN_Study 학습 노트 repo](study-docs-number-prefix.md) — 공부 노트는 **별도 private repo JUN_Study**(master). `001000_영문주제.md` **6자리** 도메인 대역 번호, 번호 근접 = 주제 관련
-- ["공부용 문서" 작성 레시피](study-doc-request-recipe.md) — 공부 문서 요청 = 논문 직접 찾아 정의/역사/원리(수식)/사례/함께볼주제/참고문헌 구조로, JUN_Study 에
 - [Update portfolio on tool work](update-portfolio-on-tool-work.md) — portfolio_EN/KR 둘 다 동기 갱신, 커밋수 통계는 건드리지 않기
-- [Memory synced via repo](memory-synced-via-repo.md) — 메모리는 repo `.claude/memory`(정션), 커밋+푸시로 PC 간 공유
 - [Prefer PySide for new tools](prefer-pyside-for-new-tools.md) — 신규/병합 툴은 maya.cmds UI 말고 PySide(arch B)
-- [JUN_UE plugin repo](jun-ue-plugin-repo.md) — 언리얼 툴은 별도 repo JUN_UE (루트=플러그인 JUNTools, elom1213/JUN_UE, main)
-- [JUN_mgear vault](jun-mgear-vault.md) — mgear 노트는 JUN_Study 03000 대역으로 흡수됨. JUN_mgear repo 는 채용용 공개 저장소로 보존
 - [kangaroo plugin read-only](kangaroo-plugin-external-readonly.md) — kangaroo 플러그인은 외부 3rd-party, 수정 금지
 - [PoseWrangler fork patch](posewrangler-plugin-fork-patch.md) — Epic PoseDriverConnect 포크 위치 + serializer objExists 패치 3단계
 
 ## 검증 · 마야 공통 함정
 
 - [mayapy headless verify](mayapy-headless-verify.md) — maya.cmds 동작은 추측 말고 Maya2024/bin/mayapy.exe + maya.standalone 으로 확인
-- [UE python verify](unreal-python-tool-verify.md) — 언리얼은 `UnrealEditor-Cmd -run=pythonscript` 로 확인. 플러그인 Content/Python 자동 실행, EnabledByDefault 로 자동 마운트, EditorDialog 는 EditorScriptingUtilities
 - [QApplication before standalone](qapplication-before-maya-standalone.md) — mayapy Qt 테스트는 `QApplication` 을 `standalone.initialize()` **앞에** (뒤면 QWidget 에서 무단 종료)
 - [undo_chunk by default](undo-chunk-by-default.md) — 반복 씬 변경은 요청 없어도 `Framework.core.maya_undo.undo_chunk()` 로 묶기
 - [Maya 2023 compat](maya-2023-compat.md) — 2023 지원 필요할 수 있음, sin/cos 노드 없음(eulerToQuat 우회)
@@ -71,7 +72,6 @@
 ## 툴 작업 (신규 · 큰 기능)
 
 - [A00090 rule versions](wip-a00090-rule-versions.md) — 규칙 json 을 `app/rules/<version>` 폴더로 분리 + UI Version 콤보 (v01.05). v01.06 에서 blendShape 타겟 이름 버그 수정([[blendshape-target-name-vs-alias]])
-- [A00510 Bone Viewport (UE)](wip-a00510-bone-viewport.md) — **JUN_UE**: PersonaOptions CDO 로 본 draw mode, `BoneDrawSize` 는 리플렉션이 없어 C++ 아니면 불가
 - [A00450 ManipulatorTool](wip-a00450-manipulatortool.md) — **신규**: 매니퓰레이터 축 굵기 슬라이더. `manipOptions` 는 전역 하나뿐(도구별 굵기 없음), 굵기(lineSize)와 클릭 히트(linePick)는 별개
 - [A00440 SetTool](wip-a00440-settool.md) — **신규**: 컴포넌트 세트 집합연산(∪∩∖ + Split). 이름 정규화가 전부, **`cmds.select(세트)` 는 멤버를 펼쳐 선택**한다
 - [A00430 DemBone](wip-a00430-dembone.md) — **신규 v01.03**: EA Dem Bones(스키닝 분해) 마야 이식 4모드(조인트 생성 포함). ref/ 는 git 제외·런타임 무의존, 공분산 4×4 질량 함정, 라벨 확산은 절대오차 말고 최선 대비 열위
