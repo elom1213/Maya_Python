@@ -349,6 +349,29 @@ Default Distance attribute (driver signal x)
   sets where it starts. Verified headless in mayapy: a bent chain receives **11.0 (path)** rather than 8.544
   (straight line), and the sampled waveform ends on the value it started at with one max and one min.
 
+- **Chasing a playback slowdown to its real cause, then making it 144-202x faster**
+  (`A00390_WindTool_V03`). Past ~30 chains, playback fell below 30fps. The obvious guess was
+  "too many nodes", but **isolating each part in headless mayapy showed the node network was
+  not the problem at all** - the single `expression` attached to every driver was calling
+  `getAttr -time` once per frame from the start frame up to the current one, and that was
+  **99.8% of the playback cost** (30 chains: 58.7ms, 0.10ms with the expressions deleted).
+  It explained every symptom at once: the slowdown growing as playback advanced, the cost
+  tracking chain COUNT rather than joint count, and Evaluation mode making no difference.
+- The fix uses the fact that **integrating a constant speed is a single multiply**, so the
+  expression became three nodes - which means **existing scenes keep their exact rotation
+  values** (measured `0.000e+00`). Where the speed IS keyed, live behaviour is preserved by
+  reading the curve's **key data directly** and integrating per interval. Measuring that path
+  turned up something worth knowing: **an expression costs by count, not by content**
+  (one per driver = 5.84ms; the same maths merged into one = 1.38ms), so the scene now holds
+  exactly one. Result: **144-202x** across 20-200 chains, and the frame-dependent slowdown is gone.
+- The **chain mute** built alongside it makes a distinction explicit: *zeroing a value is not
+  the same as stopping evaluation*. The existing `windEnvelope = 0` only multiplies the swing
+  by zero and changed nothing (62.97 -> 63.18ms); real muting needs `nodeState = Blocking`
+  after posing the chain at rest. Measurement also settled `Blocking` vs `HasNoEffect` - the
+  latter passes input through and cannot produce a rest pose. Notably, once the root cause was
+  fixed this feature only bought 1.3x, so it is **positioned as a workflow convenience -
+  "let only the chain I am looking at move" - rather than as a performance fix**.
+
 
 ---
 

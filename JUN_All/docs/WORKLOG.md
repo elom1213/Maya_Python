@@ -17,6 +17,50 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-24 (오늘)
 
+> [!summary] `A00390_WindTool_V03` **신규 — 재생 속도 144~202배 (windPhaseTime 표현식 제거)** (V02 v02.05 → V03 v03.00)
+- **요청**: 앞선 진단([계획서](plans/A00390_WindTool_V02_playback_speed_plan.md))대로
+  `A00390_WindTool_V03` 경로에 구현. V02 코드를 복사해 시작해도 좋다.
+- V02 를 통째로 복제한 뒤 **위상 시계(windPhaseTime) 만드는 방식**과 그 위에 얹은
+  **Playback 탭**만 바꿨다. 세 탭의 기능·사용법은 V02 와 동일하다.
+- **상수 속도는 노드 3개로**(`time1.outTime → -start → ×speed → +start`). 상수의 적분은
+  곱셈 한 번이라 **결과 회전값이 V02 와 완전히 같다**(실측 `0.000e+00`, speed 1.0/2.5/-0.7).
+  기존 씬의 룩이 변하지 않는 것이 이 방식의 핵심 장점.
+- **키 걸린 속도는 `keyframe -q` 로 키 데이터를 직접 읽어 구간 적분**하는 표현식.
+  DG 평가가 아니라 커브 조회라 싸고, 비용이 키 개수에만 붙어 **프레임 번호와 무관**하며
+  키를 고치면 즉시 반영되는 **진짜 라이브**다.
+- **표현식은 내용보다 개수가 비용이라는 것**이 이번 구현의 결정적 발견. 30체인 전부 키
+  걸린 최악에서 드라이버마다 표현식을 두면 5.84ms 인데 **하나로 합치면 1.38ms** 였다
+  (계산이 없는 빈 표현식 30개만으로 0.65ms). 그래서 씬에 `windPhaseEngine` 표현식을
+  **하나만** 두고 키 걸린 드라이버 전부를 그 안에서 계산한다.
+- **실측(중앙값 5회, 워밍업 2회)**: 20체인 41.28→**0.29ms**(144×) · 50체인 104.64→**0.61ms**
+  (172×) · 200체인 429.85→**2.13ms**(202×). 재생 구간에 따라 느려지던 것도 사라졌다
+  (50체인 f280-300: 324.7ms → 0.62ms).
+- **Playback 탭 신규**(세 탭 공통): `Rebuild Phase` / `Bake Phase to Keys (V02-exact)` /
+  `Solo Selected` · `Unmute All` · `Mute All` + 상태 줄.
+- **`windMute`** — 체인을 **rest 자세로 세우고 평가를 멈춘다**. `windEnvelope=0` 으로는
+  성능이 전혀 안 바뀐다는 걸 실측으로 확인(62.97→63.18ms) — 값에 0을 곱하는 것과 평가를
+  막는 것은 다른 일이다. envelope 0 으로 rest 를 만든 뒤 `nodeState=2(Blocking)` 로 고정하고
+  envelope 값을 되돌리는 3단계. **`HasNoEffect(1)` 로는 안 된다** — "계산 없이 통과" 라
+  rest 가 아니고(`0 -5 5 15 -15`) 성능 이득도 없다(2.51→2.33ms). Blocking 은 rest 정확
+  (`0 0 0 0 0`) + 4.63→2.01ms.
+- **`listHistory -future` 는 쓸 수 없었다** — 드라이버 로케이터의 Shape 하나만 준다
+  (wind* 어트리뷰트 연결은 셰이프/디포머 히스토리가 아니다). `listAttr -userDefined` 의
+  destination 에서 시작해 **직접 BFS** 로 내려가고 조인트/트랜스폼에서 멈춘다.
+- **표현식은 커브 이름이 아니라 `drv.windSpeed` plug 를 조회**한다. 커브 이름을 박아 두면
+  사용자가 키를 지우는 순간 표현식이 매 프레임 "No object matches name" 을 쏟는다(실제로
+  겪고 고침). plug 로 물으면 빈 배열이 와서 가드에 걸린다.
+- **알아 둘 것**: 키 걸린 속도에서 spline 탄젠트면 V02 와 값이 다르다(최대 21%, linear 는
+  정확히 일치). V02 는 프레임 단위 사다리꼴, V03 라이브 경로는 키 구간 선형이라 곡률을
+  놓친다. 표현식 안에서 프레임 단위 커브 평가는 불가능함을 확인했다(`keyframe -q -eval` 의
+  `-t` 가 TimeRange 리터럴이라 루프 변수를 못 받는다 — 문법 4종 전부 실패).
+  값을 맞춰야 하면 `Bake Phase to Keys (V02-exact)`(실측 diff `0.000e+00`).
+- **세 탭이 같은 표현식을 공유했으므로 Chain Wave · Sine 탭도 같이 빨라졌다**
+  (Chain Wave 2체인 4.15ms → 0.45ms). 두 탭 모두 V02 와 값 동일(`0.000e+00`) 확인.
+- 검증 **38 항목** 통과(코어 12 · mute 12 · UI 11 · 회귀 15 중 중복 제외). 회귀에는
+  Curve 베이크 · Auto Period 유지 · 여러 번 빌드 후 부분 Remove · ntsc 시간 단위 포함.
+- 문서: [가이드](A00390_WindTool_V03.md) · [CHANGELOG](../tools/A00390_WindTool_V03/CHANGELOG.md) ·
+  [계획서](plans/A00390_WindTool_V02_playback_speed_plan.md)(적용 완료로 갱신).
+
 > [!summary] `A00390_WindTool_V02` **재생이 느린 원인 진단 — `windPhaseTime` 표현식** (진단 + 계획서, 코드 미수정)
 - **요청**: Chain Wave Lite 의 Node 출력으로 드라이버를 30개 넘게 만들면 재생이 30fps 아래로
   떨어진다(50개면 15fps). Evaluation mode 를 Parallel/Serial/DG 어느 쪽으로 해도 같다.

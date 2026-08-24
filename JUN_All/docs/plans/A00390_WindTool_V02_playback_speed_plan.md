@@ -13,7 +13,9 @@ updated: 2026-08-24
 - **작성일**: 2026-08-24
 - **대상**: `tools/A00390_WindTool_V02/app/core/wind_manager.py` — `_make_phase_expression()`
   (세 탭이 **공유**한다: Sine · Chain Wave · Chain Wave Lite)
-- **상태**: **진단 완료 · 미적용** (이 문서는 계획서다. 코드는 아직 손대지 않았다)
+- **상태**: **적용 완료** → `tools/A00390_WindTool_V03` (v03.00, 2026-08-24).
+  구현 결과와 사용법은 [A00390_WindTool_V03 사용법](../A00390_WindTool_V03.md) 참고.
+  채택한 안: 해법 A(노드 경로) + 4-2 **방법 1**(통합 표현식, 하이브리드) + 해법 B(mute, bool).
 - **측정 환경**: `mayapy` (Maya 2024) 헤드리스 · Parallel EM · 체인당 조인트 5 · 프레임 80–100 평균
 
 > [!important] 한 줄 요약
