@@ -38,6 +38,7 @@
 - [name matching: token index](attr-name-matching-token-index.md) — 이름 대량 유사도 매칭은 편집 거리 말고 토큰 역색인+IDF. **difflib 비율은 coverage 와 척도가 다르다**
 - [hold mesh while moving joints](skincluster-hold-mesh-while-moving-joints.md) — 스킨 행렬 `bindPreMatrix*matrix` 를 multMatrix 로 상수 유지. `worldInverseMatrix` **직결은 포즈된 리그에서 메시가 튄다**
 - [constraint target plugs & offset spaces](constraint-target-plugs-and-offset-spaces.md) — `listConnections("con.target[0]")` 는 None(노드 단위로 열거), parentConstraint 의 offsetT/offsetR 은 **다른 공간**, 오일러 순서는 driven `rotateOrder`
+- [shape.pnts is post-deformation](shape-pnts-is-post-deformation.md) — 히스토리 있는 셰이프의 `pnts` 는 디포머 **뒤**에 더해진다 — 포즈를 안 따라가는 상수 오프셋. skinCluster 는 메시 트랜스폼 t/r/s 를 잠그고, geomMatrix 는 단일 matrix
 - [blendShape delta space = origin](blendshape-delta-space-origin.md) — 델타 공간은 `origin` 이 정함(0=world→베이스 공간). 미러/회전 타겟에서 일부 축만 반대로 가는 원인
 - [blendShape target name vs alias](blendshape-target-name-vs-alias.md) — 타겟 **노드 이름**과 **웨이트 alias** 는 다른 것. 포즈 이름을 노드 이름으로 쓰면 메시 2개째부터 남의 타겟을 재사용해 깨짐. 다음 인덱스는 `size` 말고 `max(multiIndices)+1`
 - [blendShape live target deltas](blendshape-live-target-inputpointstarget.md) — inputGeomTarget 연결 시 inputPointsTarget setAttr 은 조용히 무시, 타겟 메시를 옮겨야 함
@@ -98,6 +99,7 @@
 - [A00290 Mix Targets tab](wip-a00290-mix-targets-tab.md) — **신규**: 소스 가중합을 다른 타겟 + 최종(리깅) 메시에 일괄 반영. Base mesh 3모드, 공용 `delta_utils` (v01.17)
 - [A00290 Shape Editor tab](wip-a00290-shape-editor-tab.md) — 마야 Shape Editor 대체. `cmds.sculptTarget` 필수, 행 클릭 다중 편집, 제스처당 undo 1회 (v01.10)
 - [A00280 cloth-corrective](metahuman-cloth-corrective-A00280.md) — Houdini 알렘빅 캐시 → MetaHuman RBF 코렉티브 일괄 추출(invertShape)
+- [A00275 Edit Mesh](wip-a00275-edit-mesh.md) — **신규**: 웨이트 불변으로 바인드된 메시 수정(envelope 0 + `pnts` 를 rest 로 이동 + `geomMatrix` 갱신). 메시 자체 이동도 (v01.14)
 - [A00275 Expand Bind](wip-a00275-expand-bind.md) — 루프 위 조인트에 측지 거리 기반 균등 바인드(Kangaroo ClosestExpand 대체). **엣지 루프를 주면** 밴드 전 줄이 루프 비율 유지, coverage 없이 정규화만 하면 커브가 무의미, falloff 커브 위젯 자작 (v01.10)
 - [A00275 Move Joints](wip-a00275-move-joints.md) — Edit 토글로 메시 변형 없이 조인트 이동 → 재바인드, 웨이트 불변 (v01.08)
 - [A00275 SkinTool Bind Pose](wip-a00275-skintool-bindpose.md) — Update Bind Pose 탭. bindPreMatrix 인덱스는 `matrix[]` 연결에서 얻어야 함 (v01.03)

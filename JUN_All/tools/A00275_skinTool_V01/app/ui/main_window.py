@@ -15,7 +15,10 @@
 #                          마야에 대응 기능이 없다(자세한 근거는 core/bind_pose_manager.py).
 #   Tab 5 "Move Joints"  : Edit 토글 방식. 켜면 조인트를 옮겨도 메시가 변형되지 않고,
 #                          다시 끄면 그 자리에서 재바인드된다(웨이트 불변).
-#   Tab 6 "Expand Bind"  : 저장한 버텍스 집합을 저장한 조인트들에 바인드. 조인트 사이가
+#   Tab 6 "Edit Mesh"    : Edit 토글 방식. 켜면 rest 셰이프가 보이고 버텍스/엣지/페이스도
+#                          메시 자체도 자유롭게 옮길 수 있으며, 끄면 그 형상이 새 rest 가
+#                          된다(웨이트 불변 — core/mesh_edit_manager.py).
+#   Tab 7 "Expand Bind"  : 저장한 버텍스 집합을 저장한 조인트들에 바인드. 조인트 사이가
 #                          엣지 길이(측지 거리)에 비례해 고르게 분배된다
 #                          (Kangaroo ClosestExpand 대체 — core/expand_bind_manager.py).
 
@@ -33,6 +36,7 @@ from tools.A00275_skinTool_V01.app.core import SkinMigrateManager
 from tools.A00275_skinTool_V01.app.core import bind_pose_manager as bp_mgr
 from tools.A00275_skinTool_V01.app.core import weight_transfer_manager as wt_mgr
 from tools.A00275_skinTool_V01.app.core import joint_edit_manager as je_mgr
+from tools.A00275_skinTool_V01.app.core import mesh_edit_manager as me_mgr
 from tools.A00275_skinTool_V01.app.core import expand_bind_manager as eb_mgr
 from tools.A00275_skinTool_V01.app.core import falloff
 from tools.A00275_skinTool_V01.app.ui.falloff_curve_widget import FalloffCurveWidget
@@ -53,6 +57,9 @@ EDIT_ON_STYLE = (
 EDIT_ON_TEXT = "EDIT ON  -  move the joints, then press again"
 EDIT_OFF_TEXT = "EDIT JOINTS"
 
+MESH_EDIT_ON_TEXT = "EDIT ON  -  edit the mesh, then press again"
+MESH_EDIT_OFF_TEXT = "EDIT MESH"
+
 
 class MainWindow(QWidget):
 
@@ -71,6 +78,9 @@ class MainWindow(QWidget):
 
         # Move Joints 탭이 잡아둔 대상 skinCluster 목록
         self.je_targets = []
+
+        # Edit Mesh 탭이 잡아둔 대상 메시 셰이프 목록
+        self.me_targets = []
 
         # Expand Bind 탭이 저장해 둔 버텍스 집합 (메시 롱네임, 버텍스 id 리스트).
         # 리스트 위젯으로 펼치지 않는다 — 수천 개가 예사라 UI 가 바로 느려진다.
@@ -117,6 +127,12 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_bind_pose_tab(), "Bind Pose")
         self.je_tab_index = self.tabs.addTab(
             self._build_move_joints_tab(), "Move Joints")
+        self.me_tab_index = self.tabs.addTab(
+            self._build_edit_mesh_tab(), "Edit Mesh")
+        self.tabs.setTabToolTip(
+            self.me_tab_index,
+            "Edit the shape or the position of a bound mesh without changing a "
+            "single skin weight.")
         index = self.tabs.addTab(self._build_expand_bind_tab(), "Expand Bind")
         self.tabs.setTabToolTip(
             index,
@@ -697,10 +713,13 @@ class MainWindow(QWidget):
                      f"mode: {', '.join(editing)}")
 
     def _on_tab_changed(self, index):
-        # Move Joints 탭이 보일 때만 씬 상태를 다시 읽는다.
+        # 편집 상태는 씬에 있다. 해당 탭이 보일 때만 다시 읽어 화면을 맞춘다.
         if index == self.je_tab_index:
             self._adopt_scene_edits()
             self._update_je_state()
+        elif index == self.me_tab_index:
+            self._adopt_scene_mesh_edits()
+            self._update_me_state()
 
     # --------------------------------------------------
     # Handlers : Move Joints
@@ -785,7 +804,203 @@ class MainWindow(QWidget):
         self._update_je_state()
 
     # --------------------------------------------------
-    # Tab 6 : Expand Bind (Kangaroo ClosestExpand 대체)
+    # Tab 6 : Edit Mesh (Edit 토글 - 웨이트를 건드리지 않고 메시 수정)
+    # --------------------------------------------------
+
+    def _build_edit_mesh_tab(self):
+
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        desc = QLabel(
+            "Edit a bound mesh without changing a single skin weight.\n"
+            "Press EDIT MESH, move vertices / edges / faces or the mesh itself, then\n"
+            "press the button again to make that the new rest shape.\n"
+            "While editing, the mesh shows its rest shape and its transform is unlocked.")
+        desc.setAlignment(Qt.AlignCenter)
+        layout.addWidget(desc)
+
+        # ---- 대상 ----
+        tgt_grp = QGroupBox("Target")
+        tgt_layout = QVBoxLayout(tgt_grp)
+
+        self.lbl_me_target = QLabel("Nothing loaded.")
+        self.lbl_me_target.setWordWrap(True)
+        tgt_layout.addWidget(self.lbl_me_target)
+
+        row = QHBoxLayout()
+        self.btn_me_load = QPushButton("Load Selection")
+        self.btn_me_load.setMinimumHeight(30)
+        self.btn_me_load.setToolTip(
+            "Pick up the bound mesh from the current selection.\n"
+            "Select the mesh you want to edit (a mesh without a skinCluster is "
+            "ignored).")
+        self.btn_me_load.clicked.connect(self.on_me_load)
+        row.addWidget(self.btn_me_load, 2)
+
+        self.btn_me_clear = QPushButton("Clear")
+        self.btn_me_clear.clicked.connect(self.on_me_clear)
+        row.addWidget(self.btn_me_clear, 1)
+        tgt_layout.addLayout(row)
+
+        self.btn_me_select = QPushButton("Select Mesh")
+        self.btn_me_select.setToolTip(
+            "Select the loaded mesh in the viewport so you can start editing it "
+            "right away.")
+        self.btn_me_select.clicked.connect(self.on_me_select)
+        tgt_layout.addWidget(self.btn_me_select)
+
+        layout.addWidget(tgt_grp)
+
+        # ---- Edit 토글 ----
+        self.btn_me_edit = QPushButton(MESH_EDIT_OFF_TEXT)
+        self.btn_me_edit.setCheckable(True)
+        self.btn_me_edit.setMinimumHeight(44)
+        self.btn_me_edit.setToolTip(
+            "ON  : the skin is held at envelope 0 so the mesh shows its rest shape,\n"
+            "      and the transform is unlocked - edit anything you like.\n"
+            "OFF : the mesh you see becomes the new rest shape. Weights are never\n"
+            "      touched, so every vertex keeps exactly the same weight values.\n"
+            "Each press is a single undo step.")
+        self.btn_me_edit.clicked.connect(self.on_me_edit_clicked)
+        layout.addWidget(self.btn_me_edit)
+
+        self.btn_me_cancel = QPushButton("Cancel Edit (restore mesh)")
+        self.btn_me_cancel.setToolTip(
+            "Leave edit mode and put the mesh back the way it was when you pressed\n"
+            "EDIT MESH - vertex tweaks, transform, envelope and locks.")
+        self.btn_me_cancel.clicked.connect(self.on_me_cancel)
+        layout.addWidget(self.btn_me_cancel)
+
+        self.lbl_me_state = QLabel("")
+        self.lbl_me_state.setAlignment(Qt.AlignCenter)
+        self.lbl_me_state.setWordWrap(True)
+        layout.addWidget(self.lbl_me_state)
+
+        layout.addStretch(1)
+
+        self._update_me_state()
+
+        return tab
+
+    def _update_me_state(self):
+        """씬의 실제 편집 상태를 읽어 버튼/라벨을 맞춘다 (Move Joints 와 같은 규칙)."""
+
+        editing = me_mgr.editing_of(self.me_targets)
+        on = bool(editing)
+
+        self.btn_me_edit.setChecked(on)
+        self.btn_me_edit.setText(MESH_EDIT_ON_TEXT if on else MESH_EDIT_OFF_TEXT)
+        self.btn_me_edit.setStyleSheet(EDIT_ON_STYLE if on else "")
+        self.btn_me_edit.setEnabled(bool(self.me_targets))
+
+        self.btn_me_cancel.setEnabled(on)
+        self.btn_me_select.setEnabled(bool(self.me_targets))
+        # 편집 중에 대상을 바꾸면 envelope 를 내려놓은 메시가 씬에 남는다. 끝낼 때까지 잠근다.
+        self.btn_me_load.setEnabled(not on)
+        self.btn_me_clear.setEnabled(not on)
+
+        self.lbl_me_target.setText(me_mgr.describe(self.me_targets))
+
+        if on:
+            self.lbl_me_state.setText(
+                "Edit mode is ON - the mesh shows its rest shape. Edit it, then press "
+                "the button again to keep it.")
+        elif self.me_targets:
+            self.lbl_me_state.setText("Ready.")
+        else:
+            self.lbl_me_state.setText(
+                "Select a bound mesh and press Load Selection.")
+
+    def _adopt_scene_mesh_edits(self):
+        """툴 밖(다른 세션/재실행)에서 시작된 편집을 되찾는다."""
+
+        if self.me_targets:
+            return
+
+        editing = me_mgr.find_editing_in_scene()
+        if editing:
+            self.me_targets = editing
+            self.log(f"[Info] Found {len(editing)} mesh(es) still in mesh edit mode: "
+                     f"{', '.join(s.split('|')[-1] for s in editing)}")
+
+    # --------------------------------------------------
+    # Handlers : Edit Mesh
+    # --------------------------------------------------
+
+    def on_me_load(self):
+
+        try:
+            self.me_targets = me_mgr.resolve_targets()
+        except Exception as e:
+            self.me_targets = []
+            self.log(f"[Error] {e}")
+
+        self._update_me_state()
+
+        if not self.me_targets:
+            self.log("[Warning] No skinned mesh found. Select a bound mesh.")
+        else:
+            self.log(f"[OK] Loaded {len(self.me_targets)} mesh(es): "
+                     f"{', '.join(s.split('|')[-1] for s in self.me_targets)}")
+
+    def on_me_clear(self):
+        self.me_targets = []
+        self._update_me_state()
+        self.log("Edit Mesh target cleared.")
+
+    def on_me_select(self):
+
+        if not self.me_targets:
+            self.log("[Warning] Nothing loaded. Press 'Load Selection' first.")
+            return
+
+        try:
+            cmds.select(self.me_targets, replace=True)
+        except Exception as e:
+            self.log(f"[Error] {e}")
+            return
+
+        self.log(f"[OK] Selected {len(self.me_targets)} mesh(es).")
+
+    def on_me_edit_clicked(self):
+
+        if not self.me_targets:
+            self.log("[Warning] Nothing loaded. Press 'Load Selection' first.")
+            self._update_me_state()
+            return
+
+        # 버튼의 체크 상태가 아니라 **씬의 실제 상태**로 방향을 정한다.
+        if me_mgr.editing_of(self.me_targets):
+            count, messages = me_mgr.end_edit(self.me_targets)
+            done = f"[Done] {count} mesh(es) kept as the new rest shape."
+        else:
+            count, messages = me_mgr.begin_edit(self.me_targets)
+            done = (f"[Done] {count} mesh(es) opened for editing - edit them now, "
+                    f"then press the button again.")
+
+        for m in messages:
+            self.log(m)
+        self.log(done)
+
+        self._update_me_state()
+
+    def on_me_cancel(self):
+
+        if not me_mgr.editing_of(self.me_targets):
+            self.log("[Warning] Not in edit mode.")
+            self._update_me_state()
+            return
+
+        count, messages = me_mgr.cancel_edit(self.me_targets)
+        for m in messages:
+            self.log(m)
+        self.log(f"[Done] {count} mesh(es) restored.")
+
+        self._update_me_state()
+
+    # --------------------------------------------------
+    # Tab 7 : Expand Bind (Kangaroo ClosestExpand 대체)
     # --------------------------------------------------
 
     # 콤보 표시 이름 -> core 의 Falloff mode.
