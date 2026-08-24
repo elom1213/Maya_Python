@@ -10,18 +10,22 @@ updated: 2026-08-24
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.14 — **`Edit Mesh` 탭 신규**: 웨이트를 건드리지 않고 바인드된 메시의 형상·위치를 수정, §1-B2)
+- **버전**: `app/config/version.py` (v01.15 — **탭 재분류**: 평평한 탭 7개를 `카테고리 3 → 기능 7` 의 2단 구조로, 아래 표)
 - **설치**: `__dragDrop_A00275.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **SkinTool** → `tools.A00275_skinTool_V01.run(True)`
 
-| 탭 | 내용 |
-|----|------|
-| **Classic** | 레거시 2버튼 UI — `Joints to Joints (single mesh)` / `Meshes to Meshes`. **Engine(Kangaroo/Native) 선택**(v01.04~) |
-| **Transfer** (v01.04~) | **여러 소스 메시 → 현재 선택한 하나의 메시**로 웨이트 전이. **Engine(Native/Kangaroo) 선택**(v01.05~). 선택 버텍스에만/소프트 falloff 반영(Native) |
-| **Migrate A -> B** | 토폴로지가 다른 두 메시 사이 Transfer + Move 통합 마이그레이션 |
-| **Bind Pose** | **조인트를 이동·회전한 현재 상태를 새 바인드 포즈로** |
-| **Move Joints** (v01.08~) | **Edit 토글** — 켜면 조인트를 옮겨도 메시가 변형되지 않고, 다시 끄면 그 자리에서 재바인드. **웨이트 불변** |
-| **Edit Mesh** (v01.14~) | **Edit 토글** — 켜면 rest 셰이프가 보이고 **버텍스/엣지/페이스도 메시 자체도** 자유롭게 옮길 수 있으며, 끄면 그 형상이 새 rest 가 된다. **웨이트 불변** |
-| **Expand Bind** (v01.09~) | 저장한 버텍스 집합 → 저장한 조인트들에 바인드. 조인트 사이가 **엣지 길이에 비례해 고르게** 분배 (Kangaroo `ClosestExpand` 대체). **엣지 루프 입력**(v01.10~)으로 밴드 전체가 루프와 같은 비율 유지 |
+> **탭 구조 (v01.15~)** — **상위 탭 = 카테고리, 하위 탭 = 기능**.
+> 상위 3개(`Weights` / `Bind` / `Edit`) 안에 기능 7개가 하위 탭으로 들어 있다.
+> 기능·이름·레이아웃은 재분류 전과 **완전히 같다**(빠지거나 합쳐진 기능 없음).
+
+| 상위 탭 | 뜻 | 하위 탭 | 내용 |
+|---|---|---|---|
+| **Weights** | 이미 있는 웨이트를 다른 곳으로 옮긴다 | **Classic** | 레거시 2버튼 UI — `Joints to Joints (single mesh)` / `Meshes to Meshes`. **Engine(Kangaroo/Native) 선택**(v01.04~) |
+| 〃 | 〃 | **Transfer** (v01.04~) | **여러 소스 메시 → 현재 선택한 하나의 메시**로 웨이트 전이. **Engine(Native/Kangaroo) 선택**(v01.05~). 선택 버텍스에만/소프트 falloff 반영(Native) |
+| 〃 | 〃 | **Migrate A -> B** | 토폴로지가 다른 두 메시 사이 Transfer + Move 통합 마이그레이션 |
+| **Bind** | 바인드를 새로 만들거나 바인드 상태를 갱신한다 | **Bind Pose** | **조인트를 이동·회전한 현재 상태를 새 바인드 포즈로** |
+| 〃 | 〃 | **Expand Bind** (v01.09~) | 저장한 버텍스 집합 → 저장한 조인트들에 바인드. 조인트 사이가 **엣지 길이에 비례해 고르게** 분배 (Kangaroo `ClosestExpand` 대체). **엣지 루프 입력**(v01.10~)으로 밴드 전체가 루프와 같은 비율 유지 |
+| **Edit** | **웨이트를 그대로 둔 채** 리그를 고친다 (Edit 토글) | **Move Joints** (v01.08~) | 켜면 조인트를 옮겨도 메시가 변형되지 않고, 다시 끄면 그 자리에서 재바인드. **웨이트 불변** |
+| 〃 | 〃 | **Edit Mesh** (v01.14~) | 켜면 rest 셰이프가 보이고 **버텍스/엣지/페이스도 메시 자체도** 자유롭게 옮길 수 있으며, 끄면 그 형상이 새 rest 가 된다. **웨이트 불변** |
 
 Migrate 탭 사용법은 [[A00270_skinMigrate]] 문서와 동일하다.
 
@@ -35,7 +39,7 @@ Migrate 탭 사용법은 [[A00270_skinMigrate]] 문서와 동일하다.
 
 ---
 
-## Classic 탭 — Engine 선택 (v01.04~)
+## Weights > Classic — Engine 선택 (v01.04~)
 
 `Joints to Joints (single mesh)` / `Meshes to Meshes` 두 버튼은 이제 **Engine** 을 고를 수 있다.
 
@@ -47,7 +51,7 @@ Migrate 탭 사용법은 [[A00270_skinMigrate]] 문서와 동일하다.
 
 ---
 
-## Transfer 탭 — 여러 소스 → 선택 메시 (v01.04~)
+## Weights > Transfer — 여러 소스 → 선택 메시 (v01.04~)
 
 Kangaroo 의 *SkinCluster > Transfer* 를 흉내낸 기능. **여러 소스 메시로부터 현재 선택한
 메시(들)** 로 스킨 웨이트를 전이한다. **Engine** 을 고를 수 있다(v01.05~):
@@ -93,7 +97,7 @@ Kangaroo 의 *SkinCluster > Transfer* 를 흉내낸 기능. **여러 소스 메�
 
 ---
 
-## 1. Bind Pose 탭 — 무엇을 하는 기능인가
+## 1. Bind > Bind Pose — 무엇을 하는 기능인가
 
 리깅된 캐릭터의 조인트를 옮기거나 돌리면 바인드된 메시가 따라 변형된다.
 이때 마야의 **Go to Bind Pose** 를 누르면 **원래** 바인드 포즈로 되돌아간다.
@@ -193,7 +197,7 @@ blendShape의 **타겟 메시가 아직 씬에 남아 연결돼 있고** 그 wei
 
 ---
 
-## 1-B. Move Joints 탭 — 메시를 건드리지 않고 조인트만 옮기기 (v01.08~)
+## 1-B. Edit > Move Joints — 메시를 건드리지 않고 조인트만 옮기기 (v01.08~)
 
 바인드된 메시는 그대로 둔 채 **스켈레톤 배치만 고치고 싶을 때** 쓴다. 조인트 위치를 잘못 잡아
 바인드했거나, 리깅 후에 관절 피벗을 조금 옮겨야 할 때가 대표적이다.
@@ -251,7 +255,7 @@ bindPreMatrix_i(t) = C_i * worldInverseMatrix_i(t)              (라이브)
 
 ---
 
-## 1-B2. Edit Mesh 탭 — 웨이트를 건드리지 않고 메시 고치기 (v01.14~)
+## 1-B2. Edit > Edit Mesh — 웨이트를 건드리지 않고 메시 고치기 (v01.14~)
 
 Move Joints 와 **정반대 방향**이다. 조인트는 그대로 두고 **메시 쪽을 고친다.**
 모델 수정 요청이 리깅 뒤에 들어왔을 때, 스킨을 풀었다 다시 바인드하지 않고 그 자리에서 고친다.
@@ -342,7 +346,7 @@ geomMatrix' = geomMatrix * G0^-1 * G1        (G0 / G1 = 편집 전 / 후 메시 
 
 ---
 
-## 1-C. Expand Bind 탭 — 루프 위 조인트에 고르게 바인드 (v01.09~)
+## 1-C. Bind > Expand Bind — 루프 위 조인트에 고르게 바인드 (v01.09~)
 
 > [!bug] **v01.13 수정 — Ctrl+Z 뒤 재바인드 실패**
 > `Bind stored vertices to stored joints` 로 바인드한 뒤 **Ctrl+Z** 로 되돌리고 같은 버튼을 다시
@@ -531,6 +535,22 @@ mayapy 로 확인한, 전부 **조용히 틀리는** 종류의 함정이다.
 - `bindPose` 노드를 새로 만든 뒤 **`skinCluster.bindPose` 로 재연결하는 것을 빼먹으면**
   마야의 Go to Bind Pose 가 포즈를 못 찾는다.
 
+### 탭 구조를 건드릴 때 (v01.15~)
+
+- **분류는 `main_window.py` 의 `CATEGORIES` 표 하나가 정한다.** 탭을 더하려면
+  `WEIGHTS_PAGES` / `BIND_PAGES` / `EDIT_PAGES` 중 한 곳에 `(라벨, 툴팁, 빌더 메서드 이름)`
+  한 줄을 넣는다. 빌더는 지금처럼 `QWidget` 을 돌려주면 되고, 스크롤 래핑은 골격이 해 준다.
+- **탭 인덱스로 무언가를 판단하지 말 것.** `_on_tab_changed` 가 상위 탭 인덱스로 갈라지고
+  있었는데, 중첩하는 순간 그 인덱스는 카테고리 인덱스가 되어 **에러 없이** `Move Joints` ·
+  `Edit Mesh` 의 씬 상태 재조회가 죽었다(툴을 껐다 켜면 편집 중이던 대상을 못 되찾는다).
+  지금은 상위는 **위젯 동일성**(`self.edit_page`), 하위는 `EDIT_PAGES` 순서와 묶인 상수
+  (`JE_SUB_INDEX` / `ME_SUB_INDEX`)로 가린다. 하위 탭 순서를 바꾸면 그 상수도 함께 고칠 것.
+- **`tabs.widget(i)` 는 페이지가 아니라 `QScrollArea` 를 돌려준다**(`_scrolled` 가 감쌌다).
+  페이지 위젯이 필요하면 `.widget()` 을 한 번 더 벗긴다.
+- **스크롤은 하위 페이지에만.** 상위 카테고리 페이지에도 씌우면 스크롤바가 두 겹으로 보인다.
+- TSL 위젯에 `setMaximumHeight` 를 **위젯 전체로** 걸지 말 것(리스트 최소 높이가 안 줄어
+  버튼에서 높이를 빼앗아 글자가 잘린다). 필요하면 `list_widget` 에만 건다.
+
 ---
 
 ## 4. 검증
@@ -606,3 +626,17 @@ Expand Bind 탭 (v01.09) — 코어 44항목 + UI 28항목:
 - **닫힌 루프** — 토러스 밴드에서 각 조인트가 자기 루프 정점 1.0, 중간 50/50, **0번 정점을 넘어가는 wrap**,
   루프에서 한 줄 떨어진 정점도 같은 비율
 - **Fit to Joints** — 루프 위 간격으로 측정, 토폴로지 변경 후 stale 루프는 명확한 에러
+
+탭 재분류 (v01.15) — UI 스모크 52항목:
+
+- 상위 탭이 정확히 `Weights` / `Bind` / `Edit` 3개, 순서와 툴팁까지 일치
+- 하위 기능 7개가 전부 존재하고 라벨이 재분류 표와 일치(빠진 기능 없음)
+- 하위 페이지가 **전부 스크롤 영역에 담기고**, 상위 페이지는 **담기지 않음**(이중 스크롤 없음)
+- 탭마다 대표 위젯 12개(`tsl_classic_from` · `btn_bp_update` · `btn_eb_bind` · `btn_je_edit` ·
+  `btn_me_edit` 등)가 **스크롤 래핑 뒤에도** `self.*` 로 접근됨
+- **씬 상태 동기화 회귀 4종** — 툴 밖에서 편집을 시작해 두고 ① 다른 카테고리에 갔다 돌아오기
+  ② 하위 탭만 전환 ③ `Edit` 밖에서는 씬을 조회하지 않기 ④ `Move Joints` · `Edit Mesh` 각각
+  토글 복원. **이 항목들이 재분류의 진짜 통과 기준이다**(§3 "탭 구조를 건드릴 때" 참고)
+- 재분류 뒤에도 `Edit Mesh` 전체 왕복(Load → EDIT ON → 버텍스 이동 → EDIT OFF)과
+  `Bind Pose` 의 Load 가 그대로 동작
+- 코어 51항목은 **손대지 않았고 그대로 통과**

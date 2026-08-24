@@ -8,7 +8,8 @@ metadata:
   modified: 2026-08-24T08:16:57.717Z
 ---
 
-A00275_skinTool_V01 **6번째 탭 `Edit Mesh`** (v01.13→**01.14**, 2026-08-24). 코어는
+A00275_skinTool_V01 **`Edit > Edit Mesh`** (v01.13→**01.14**, 2026-08-24. v01.15 에서 `Edit`
+카테고리 하위 탭이 됐다 — [[wip-a00275-tab-reorg]]). 코어는
 `app/core/mesh_edit_manager.py`. Move Joints 와 **정반대 방향** — 조인트는 그대로 두고 메시를 고친다.
 
 `EDIT MESH` 토글을 켜면 skinCluster **envelope 0** 으로 rest 셰이프를 보여 주고 스킨이 잠가 둔

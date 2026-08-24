@@ -1,5 +1,49 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.15 (2026-08-24)
+**[Change] 탭 재분류 — 평평한 상위 탭 7개를 `카테고리 3 → 기능 7` 의 2단 구조로.**
+**상위 탭 = 카테고리, 하위 탭 = 기능** 하나로 통일했다
+([계획서](../../docs/plans/A00275_skinTool_V01_tab_reorg_plan.md)).
+
+| 상위 탭 | 뜻 | 하위 탭 |
+|---|---|---|
+| **Weights** | 이미 있는 웨이트를 다른 곳으로 옮긴다 | `Classic` · `Transfer` · `Migrate A -> B` |
+| **Bind** | 바인드를 새로 만들거나 바인드 상태를 갱신한다 | `Bind Pose` · `Expand Bind` |
+| **Edit** | 웨이트를 그대로 둔 채 리그를 고친다 (Edit 토글) | `Move Joints` · `Edit Mesh` |
+
+**이동 매핑 — 빠지거나 합쳐지거나 이름이 바뀐 기능은 없다.**
+
+| 기존 | 새 위치 |
+|---|---|
+| Classic | **Weights > Classic** |
+| Transfer | **Weights > Transfer** |
+| Migrate A -> B | **Weights > Migrate A -> B** |
+| Bind Pose | **Bind > Bind Pose** |
+| Expand Bind | **Bind > Expand Bind** |
+| Move Joints | **Edit > Move Joints** |
+| Edit Mesh | **Edit > Edit Mesh** |
+
+- 상위 순서(Weights → Bind → Edit)는 **기존 왼→오 배치를 가장 적게 흔드는** 순서다.
+- 분류는 **`CATEGORIES` 표 하나**가 정한다. 탭을 더할 때 그 표에만 줄을 넣는다.
+  기존 `_build_*_tab()` 7개는 **이름도 내용도 바뀌지 않았다** — 묶기만 했다.
+- **하위 페이지마다 스크롤 영역**을 씌웠다. 이전에는 창보다 긴 페이지(`Expand Bind` 는
+  약 850px)가 그냥 잘렸다. 상위 카테고리 페이지에는 씌우지 않는다(이중 스크롤 방지).
+- 하위 탭 바가 한 줄 늘어난 만큼 창 기본 높이를 **680 → 710** 으로.
+
+**[Fix] 재분류가 조용히 깨뜨릴 뻔한 것 — 편집 탭의 씬 상태 재조회**
+`_on_tab_changed` 는 **상위 탭 인덱스**로 갈라지고 있었다(`index == self.je_tab_index`).
+중첩하면 그 인덱스가 카테고리 인덱스가 되어 영영 일치하지 않고, 그러면 **에러 하나 없이**
+`Move Joints` · `Edit Mesh` 가 씬을 다시 읽지 않는다 — 툴을 껐다 켰을 때 편집 중이던 대상을
+못 되찾는, 두 탭의 핵심 약속이 깨지는 자리다. 인덱스 비교를 버리고 **위젯 동일성**(상위) +
+**`EDIT_PAGES` 순서와 묶인 상수**(하위)로 판단하도록 고쳤고, 상위·하위 두 `currentChanged` 를
+같은 슬롯에 연결했다.
+
+- 검증: UI 스모크 **25 → 52항목**(상위/하위 라벨·툴팁·스크롤 래핑·이중 스크롤 없음, 탭마다
+  대표 위젯 12개가 스크롤 래핑 뒤에도 접근되는지, **다른 카테고리에 갔다 돌아오기 / 하위 탭만
+  전환 / Edit 밖에서는 조회하지 않기** 4종 회귀) + 코어 51항목 그대로 통과.
+- 실측: 하위 탭 바 폭 최대 246px(창 620 에 여유), `find_editing_in_scene()` 은 메시 5,000개
+  씬에서 205ms — `Edit > Edit Mesh` 가 보이고 대상이 비어 있을 때만 돌므로 그대로 둔다.
+
 ## v01.14 (2026-08-24)
 **[Add] `Edit Mesh` 탭 — 웨이트를 하나도 건드리지 않고 바인드된 메시를 수정한다.**
 Move Joints 와 같은 **Edit 토글** 방식이다. 대상 메시를 고르고 `Load Selection` → `EDIT MESH`

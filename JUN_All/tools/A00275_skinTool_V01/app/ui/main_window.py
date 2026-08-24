@@ -1,26 +1,33 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-29
+# last Update date : 2026-08-24
 # A00275_skinTool_V01 - Qt UI
 #
-# 스킨 관련 범용 툴. 네 개의 탭:
-#   Tab 1 "Classic"      : 레거시 JUN_PY_move_skinWeightTool_v01_04 의 원본 2버튼 UI 이식.
+# 스킨 관련 범용 툴. **상위 탭 = 카테고리, 하위 탭 = 기능** 으로 통일돼 있다(v01.15~).
+# 분류는 아래 CATEGORIES 표 하나가 정한다 — 탭을 더할 때 그 표에만 줄을 넣는다.
+#
+#   Weights : 이미 있는 웨이트를 다른 곳으로 옮긴다
+#     - "Classic"        : 레거시 JUN_PY_move_skinWeightTool_v01_04 의 원본 2버튼 UI 이식.
 #                          From / To 리스트 + Engine(Kangaroo/Native) + Transfer Mode +
 #                          [Joints to Joints in single mesh] / [Meshes to Meshes].
-#   Tab 2 "Transfer"     : 여러 소스 메시 → 현재 선택한 하나의 메시로 웨이트 전이(Kangaroo
+#     - "Transfer"       : 여러 소스 메시 → 현재 선택한 하나의 메시로 웨이트 전이(Kangaroo
 #                          무의존). 선택 버텍스에만/소프트 falloff 반영 (weight_transfer_manager).
-#   Tab 3 "Migrate A->B" : 토폴로지가 다른 두 메시 A,B 사이 Transfer + Move 를 한 번에 처리하는
+#     - "Migrate A -> B" : 토폴로지가 다른 두 메시 A,B 사이 Transfer + Move 를 한 번에 처리하는
 #                          통합 마이그레이션 (A00270_skinMigrate 기능 이식).
-#   Tab 4 "Bind Pose"    : 조인트를 이동·회전한 현재 상태를 새 바인드 포즈로 만든다.
+#
+#   Bind : 바인드를 새로 만들거나 바인드 상태를 갱신한다
+#     - "Bind Pose"      : 조인트를 이동·회전한 현재 상태를 새 바인드 포즈로 만든다.
 #                          마야에 대응 기능이 없다(자세한 근거는 core/bind_pose_manager.py).
-#   Tab 5 "Move Joints"  : Edit 토글 방식. 켜면 조인트를 옮겨도 메시가 변형되지 않고,
-#                          다시 끄면 그 자리에서 재바인드된다(웨이트 불변).
-#   Tab 6 "Edit Mesh"    : Edit 토글 방식. 켜면 rest 셰이프가 보이고 버텍스/엣지/페이스도
-#                          메시 자체도 자유롭게 옮길 수 있으며, 끄면 그 형상이 새 rest 가
-#                          된다(웨이트 불변 — core/mesh_edit_manager.py).
-#   Tab 7 "Expand Bind"  : 저장한 버텍스 집합을 저장한 조인트들에 바인드. 조인트 사이가
+#     - "Expand Bind"    : 저장한 버텍스 집합을 저장한 조인트들에 바인드. 조인트 사이가
 #                          엣지 길이(측지 거리)에 비례해 고르게 분배된다
 #                          (Kangaroo ClosestExpand 대체 — core/expand_bind_manager.py).
+#
+#   Edit : 웨이트를 그대로 둔 채 리그를 고친다 (둘 다 Edit 토글, 웨이트 불변)
+#     - "Move Joints"    : 켜면 조인트를 옮겨도 메시가 변형되지 않고, 다시 끄면 그 자리에서
+#                          재바인드된다 (core/joint_edit_manager.py).
+#     - "Edit Mesh"      : 켜면 rest 셰이프가 보이고 버텍스/엣지/페이스도 메시 자체도 자유롭게
+#                          옮길 수 있으며, 끄면 그 형상이 새 rest 가 된다
+#                          (core/mesh_edit_manager.py).
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
@@ -70,7 +77,9 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
 
         self.win_width = 620
-        self.win_height = 680
+        # 하위 탭 바가 한 줄 더 생긴 만큼(v01.15) 높였다. 페이지가 이보다 길면
+        # 잘리지 않고 스크롤된다(_scrolled) — 가장 긴 Expand Bind 가 약 850px 다.
+        self.win_height = 710
         self.win_title = f"Skin Tool v{VERSION}"
 
         # Bind Pose 탭이 잡아둔 대상 skinCluster 목록
@@ -119,27 +128,21 @@ class MainWindow(QWidget):
         self.te_log.setMinimumHeight(90)
         self.te_log.setMaximumHeight(160)
 
-        # 탭
+        # 탭 : 카테고리 3개 (Weights / Bind / Edit) → 각 카테고리 안에 기능 하위 탭
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._build_classic_tab(), "Classic")
-        self.tabs.addTab(self._build_transfer_tab(), "Transfer")
-        self.tabs.addTab(self._build_migrate_tab(), "Migrate A -> B")
-        self.tabs.addTab(self._build_bind_pose_tab(), "Bind Pose")
-        self.je_tab_index = self.tabs.addTab(
-            self._build_move_joints_tab(), "Move Joints")
-        self.me_tab_index = self.tabs.addTab(
-            self._build_edit_mesh_tab(), "Edit Mesh")
-        self.tabs.setTabToolTip(
-            self.me_tab_index,
-            "Edit the shape or the position of a bound mesh without changing a "
-            "single skin weight.")
-        index = self.tabs.addTab(self._build_expand_bind_tab(), "Expand Bind")
-        self.tabs.setTabToolTip(
-            index,
-            "Bind a stored vertex set to stored joints, spreading the weights "
-            "evenly by edge length (replaces Kangaroo's ClosestExpand).")
-        # 편집 상태는 UI 가 아니라 씬(노드)에 있다. 탭을 열 때마다 씬을 다시 읽어 맞춘다.
+
+        for label, tip, pages, attr in self.CATEGORIES:
+            index = self.tabs.addTab(self._build_category_tab(pages, attr), label)
+            self.tabs.setTabToolTip(index, tip)
+            if attr == "edit_tabs":
+                # 씬 상태를 다시 읽어야 하는 카테고리. 인덱스가 아니라 **위젯**을 기억한다
+                # (인덱스는 탭이 늘고 줄면 의미가 변한다 — 아래 _on_tab_changed 주석 참고).
+                self.edit_page = self.tabs.widget(index)
+
+        # 편집 상태는 UI 가 아니라 씬(노드)에 있다. 상위/하위 어느 쪽을 눌러도 다시 읽는다.
         self.tabs.currentChanged.connect(self._on_tab_changed)
+        self.edit_tabs.currentChanged.connect(self._on_tab_changed)
+
         main_layout.addWidget(self.tabs)
 
         # 공유 로그
@@ -150,8 +153,99 @@ class MainWindow(QWidget):
         self.lbl_copyright.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(self.lbl_copyright)
 
+    # ==================================================================
+    # 탭 분류 (v01.15~) — **상위 탭 = 카테고리 / 하위 탭 = 기능** 하나로 통일.
+    #
+    # 기준은 "무엇을 바꾸는가"(결과물)다. 대상(조인트/메시)으로 나누지 않는다 —
+    # 그러면 Expand Bind 가 전이 기능들과 한 칸에 섞이고 배분이 4/2/1 로 기운다.
+    #
+    # 하위 페이지가 하나뿐인 카테고리가 생겨도 하위 탭 바를 그대로 둔다. 그래야 기능
+    # 이름이 화면에 남고, 기능이 늘어도 구조가 그대로다.
+    #
+    # 기존 _build_*_tab() 은 이름도 내용도 바뀌지 않았다. 이 표는 그것들을 **묶기만** 한다.
+    # ==================================================================
+
+    # (하위 탭 라벨, 툴팁 = 전체 이름/설명, 빌더 메서드 이름)
+    WEIGHTS_PAGES = (
+        ("Classic", "Classic - the legacy two-button transfer UI "
+         "(joints to joints in one mesh / meshes to meshes)", "_build_classic_tab"),
+        ("Transfer", "Transfer - weights from several source meshes onto the "
+         "selected mesh (selected vertices and soft-selection falloff supported)",
+         "_build_transfer_tab"),
+        ("Migrate A -> B", "Migrate A -> B - transfer + bone move in one step "
+         "between two meshes with different topology", "_build_migrate_tab"),
+    )
+
+    BIND_PAGES = (
+        ("Bind Pose", "Bind Pose - make the current joint pose the new bind pose",
+         "_build_bind_pose_tab"),
+        ("Expand Bind", "Expand Bind - bind a stored vertex set to stored joints, "
+         "spreading the weights evenly by edge length "
+         "(replaces Kangaroo's ClosestExpand)", "_build_expand_bind_tab"),
+    )
+
+    EDIT_PAGES = (
+        ("Move Joints", "Move Joints - move the joints without deforming the mesh, "
+         "then re-bind where they are", "_build_move_joints_tab"),
+        ("Edit Mesh", "Edit Mesh - edit the shape or the position of a bound mesh "
+         "without changing a single skin weight", "_build_edit_mesh_tab"),
+    )
+
+    # Edit 카테고리 하위 탭의 인덱스 (EDIT_PAGES 의 순서와 같아야 한다).
+    # _on_tab_changed 가 어느 편집 탭이 보이는지 가리는 데 쓴다.
+    JE_SUB_INDEX = 0        # Move Joints
+    ME_SUB_INDEX = 1        # Edit Mesh
+
+    # (상위 탭 라벨, 툴팁, 하위 페이지 표, 하위 QTabWidget 을 담을 속성 이름)
+    CATEGORIES = (
+        ("Weights", "Move existing skin weights somewhere else.",
+         WEIGHTS_PAGES, "weights_tabs"),
+        ("Bind", "Create a bind, or update what the current bind pose is.",
+         BIND_PAGES, "bind_tabs"),
+        ("Edit", "Change the joints or the mesh while every weight value stays "
+         "the same.", EDIT_PAGES, "edit_tabs"),
+    )
+
+    def _build_category_tab(self, pages, attr):
+        """카테고리 상위 탭 하나 — 기능들을 하위 탭으로 담는다."""
+
+        tabs = self._build_sub_tabs(pages)
+        setattr(self, attr, tabs)
+
+        return tabs
+
+    def _build_sub_tabs(self, pages):
+        """(라벨, 툴팁, 빌더 메서드 이름) 목록을 중첩 탭 위젯으로 만든다.
+
+        A00145_RigConnect 의 Constrain / Connect 탭과 같은 골격이다.
+        """
+
+        tabs = QTabWidget()
+        # 폭이 모자라면 라벨을 자른다(스크롤 화살표만 뜨는 것보다 읽기 쉽다).
+        tabs.tabBar().setElideMode(Qt.ElideRight)
+
+        for label, tip, builder in pages:
+            index = tabs.addTab(self._scrolled(getattr(self, builder)()), label)
+            tabs.setTabToolTip(index, tip)
+
+        return tabs
+
+    def _scrolled(self, widget):
+        """페이지를 스크롤 영역에 담아 돌려준다 (창이 작아도 위젯이 겹치지 않도록).
+
+        스크롤은 **하위 페이지에만** 씌운다. 상위 카테고리 페이지에도 씌우면 스크롤바가
+        두 겹으로 보인다. (이 툴은 A00110 처럼 창을 콘텐츠에 맞춰 자동으로 늘리지 않으므로
+        fit page 가 아니라 스크롤이 맞다.)
+        """
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(widget)
+
+        return scroll
+
     # --------------------------------------------------
-    # Tab 1 : Classic (레거시 원본 2버튼 이식)
+    # Weights > Classic (레거시 원본 2버튼 이식)
     # --------------------------------------------------
 
     def _build_classic_tab(self):
@@ -221,7 +315,7 @@ class MainWindow(QWidget):
         return tab
 
     # --------------------------------------------------
-    # Tab 2 : Transfer (여러 소스 -> 선택한 하나의 메시, Kangaroo 무의존)
+    # Weights > Transfer (여러 소스 -> 선택한 하나의 메시, Kangaroo 무의존)
     # --------------------------------------------------
 
     def _build_transfer_tab(self):
@@ -308,7 +402,7 @@ class MainWindow(QWidget):
         self.log(msg)
 
     # --------------------------------------------------
-    # Tab 3 : Migrate A -> B (기존 통합 마이그레이션)
+    # Weights > Migrate A -> B (기존 통합 마이그레이션)
     # --------------------------------------------------
 
     def _build_migrate_tab(self):
@@ -427,7 +521,7 @@ class MainWindow(QWidget):
         return tab
 
     # --------------------------------------------------
-    # Tab 4 : Bind Pose (현재 포즈를 새 바인드 포즈로)
+    # Bind > Bind Pose (현재 포즈를 새 바인드 포즈로)
     # --------------------------------------------------
 
     def _build_bind_pose_tab(self):
@@ -579,7 +673,7 @@ class MainWindow(QWidget):
                  f"({'shape kept' if keep else 'snapped to rest'}).")
 
     # --------------------------------------------------
-    # Tab 5 : Move Joints (Edit 토글 - 메시를 건드리지 않고 조인트 이동)
+    # Edit > Move Joints (Edit 토글 - 메시를 건드리지 않고 조인트 이동)
     # --------------------------------------------------
 
     def _build_move_joints_tab(self):
@@ -712,12 +806,27 @@ class MainWindow(QWidget):
             self.log(f"[Info] Found {len(editing)} skinCluster(s) still in joint edit "
                      f"mode: {', '.join(editing)}")
 
-    def _on_tab_changed(self, index):
-        # 편집 상태는 씬에 있다. 해당 탭이 보일 때만 다시 읽어 화면을 맞춘다.
-        if index == self.je_tab_index:
+    def _on_tab_changed(self, *_):
+        """편집 상태는 씬에 있다. 편집 탭이 보일 때 다시 읽어 화면을 맞춘다.
+
+        상위(`tabs`)와 하위(`edit_tabs`) 두 QTabWidget 이 같은 슬롯에 연결돼 있으므로
+        **넘어온 인덱스를 쓰지 않는다** — 어느 위젯이 보낸 신호인지에 따라 뜻이 다르다.
+        상위는 위젯 동일성으로, 하위는 EDIT_PAGES 순서와 묶인 상수로 가린다.
+
+        (중첩 전에는 상위 탭 인덱스 하나로 갈랐는데, 그대로 두면 그 인덱스가 카테고리
+        인덱스가 되어 **에러 없이** 편집 탭의 씬 재조회가 죽는다. 그러면 툴을 껐다 켰을 때
+        편집 중이던 대상을 못 되찾는다 — 두 편집 탭의 핵심 약속이 조용히 깨지는 자리다.)
+        """
+
+        if self.tabs.currentWidget() is not self.edit_page:
+            return
+
+        index = self.edit_tabs.currentIndex()
+
+        if index == self.JE_SUB_INDEX:
             self._adopt_scene_edits()
             self._update_je_state()
-        elif index == self.me_tab_index:
+        elif index == self.ME_SUB_INDEX:
             self._adopt_scene_mesh_edits()
             self._update_me_state()
 
@@ -804,7 +913,7 @@ class MainWindow(QWidget):
         self._update_je_state()
 
     # --------------------------------------------------
-    # Tab 6 : Edit Mesh (Edit 토글 - 웨이트를 건드리지 않고 메시 수정)
+    # Edit > Edit Mesh (Edit 토글 - 웨이트를 건드리지 않고 메시 수정)
     # --------------------------------------------------
 
     def _build_edit_mesh_tab(self):
@@ -1000,7 +1109,7 @@ class MainWindow(QWidget):
         self._update_me_state()
 
     # --------------------------------------------------
-    # Tab 7 : Expand Bind (Kangaroo ClosestExpand 대체)
+    # Bind > Expand Bind (Kangaroo ClosestExpand 대체)
     # --------------------------------------------------
 
     # 콤보 표시 이름 -> core 의 Falloff mode.

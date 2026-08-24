@@ -99,6 +99,7 @@
 - [A00290 Mix Targets tab](wip-a00290-mix-targets-tab.md) — **신규**: 소스 가중합을 다른 타겟 + 최종(리깅) 메시에 일괄 반영. Base mesh 3모드, 공용 `delta_utils` (v01.17)
 - [A00290 Shape Editor tab](wip-a00290-shape-editor-tab.md) — 마야 Shape Editor 대체. `cmds.sculptTarget` 필수, 행 클릭 다중 편집, 제스처당 undo 1회 (v01.10)
 - [A00280 cloth-corrective](metahuman-cloth-corrective-A00280.md) — Houdini 알렘빅 캐시 → MetaHuman RBF 코렉티브 일괄 추출(invertShape)
+- [A00275 tab reorg](wip-a00275-tab-reorg.md) — 평평한 탭 7개를 **Weights / Bind / Edit** 카테고리 3 → 기능 7 로. 중첩 탭 전환 시 **탭 인덱스로 판단하던 코드가 에러 없이 죽는다** (v01.15)
 - [A00275 Edit Mesh](wip-a00275-edit-mesh.md) — **신규**: 웨이트 불변으로 바인드된 메시 수정(envelope 0 + `pnts` 를 rest 로 이동 + `geomMatrix` 갱신). 메시 자체 이동도 (v01.14)
 - [A00275 Expand Bind](wip-a00275-expand-bind.md) — 루프 위 조인트에 측지 거리 기반 균등 바인드(Kangaroo ClosestExpand 대체). **엣지 루프를 주면** 밴드 전 줄이 루프 비율 유지, coverage 없이 정규화만 하면 커브가 무의미, falloff 커브 위젯 자작 (v01.10)
 - [A00275 Move Joints](wip-a00275-move-joints.md) — Edit 토글로 메시 변형 없이 조인트 이동 → 재바인드, 웨이트 불변 (v01.08)
