@@ -1,14 +1,14 @@
 ---
-title: Portfolio — Work Summary (2026-05-06 ~ 2026-08-19)
+title: Portfolio — Work Summary (2026-05-06 ~ 2026-08-24)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-08-19
+updated: 2026-08-24
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
 
 > **Author**: Ji Hun Park (Junny)
-> **Period**: 2026-05-06 – 2026-08-19 (~15 weeks)
+> **Period**: 2026-05-06 – 2026-08-24 (~16 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
 > **Volume**: 40+ in-house tools (50 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
@@ -337,6 +337,16 @@ Default Distance attribute (driver signal x)
   **two nodes**. Exactly one arrangement can still cycle (the driver being an ancestor of the root), and that
   case alone is **refused with the reason logged**. Build output is split into per-kind groups (locators /
   debug curves) so the outliner no longer alternates between them.
+- **The wavelength comes from the chain, not from a number** (`Auto Period`, on by default). Previously one
+  hand-typed wavelength was shared by every chain, so short chains got half a wave and long ones got several.
+  Now each chain gets `windWavelength = its own length`, which puts **exactly one cycle between root and tip**
+  (one maximum, one minimum). "Length" here is the **path walked along the chain, not the straight line** from
+  root to tip — the wave's phase is already measured with that same cumulative distance, so matching the two
+  scales makes a **bent chain get one cycle over its bent length**. The node network did not grow by a single
+  node (only the `lambda` constant changes), and `windWavelength` stays a live attribute afterwards — Auto only
+  sets where it starts. Verified headless in mayapy: a bent chain receives **11.0 (path)** rather than 8.544
+  (straight line), and the sampled waveform ends on the value it started at with one max and one min.
+
 
 ---
 

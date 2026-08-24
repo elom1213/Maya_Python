@@ -378,21 +378,36 @@ def _group_nodes(nodes, name):
 
 def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
                       phase_offset, envelope=1.0, local_axis=None,
-                      driver_at_root=True, debug_curve=True, follow_root=True):
+                      driver_at_root=True, debug_curve=True, follow_root=True,
+                      auto_period=False):
     """체인 하나에 각도 노드망을 만든다. (드라이버, 만든 노드들, rest 회전, 정보, 커브)
 
     local_axis : "X"/"Y"/"Z" 를 주면 각 노드의 **오브젝트 공간** 축으로만 돌린다.
                  이때 `axis`(Sway Axis) 는 **전혀 쓰이지 않는다**.
     debug_curve: True 면 흔들림을 보여 주는 커브를 하나 만든다(`_make_debug_curve`).
     follow_root: True 면 드라이버가 체인 루트의 **월드 위치**를 계속 따라간다.
+    auto_period: True 면 `wavelength` 인자를 무시하고 **이 체인의 길이**를 파장으로 쓴다
+                 (아래 참고). 체인마다 값이 달라지므로 드라이버별로 정해진다.
 
     실패하면 (None, [], {}, 사유문자열, None) 을 돌려준다.
-    성공하면 정보는 (직결 노드 수, 체인 노드 수, 루트추종 건너뛴 사유 or None) 이다.
+    성공하면 정보는 (직결 노드 수, 체인 노드 수, 루트추종 건너뛴 사유 or None, 쓴 파장) 이다.
     """
     name = _safe(_leaf(chain[0]))
     points = _chain_positions(chain)
     arcs = _arc_positions(points)
     total = arcs[-1] if arcs[-1] > 1e-9 else 1.0
+
+    # ---- Auto Period : 파장을 **체인의 길이**로 잡는다.
+    #
+    # u_k = s_k/lambda - t 이고 LUT 가 sin(2pi*u) 이므로, lambda = (체인 전체 길이) 로 두면
+    # s_k/lambda 가 루트에서 0, 끝에서 정확히 1 이 된다 - 체인 위에 파형이 **딱 한 주기**
+    # 실린다(최댓값 한 번, 최솟값 한 번).
+    #
+    # 여기서 "체인의 길이" 는 루트와 끝의 **직선 거리가 아니라** 노드를 따라간 **경로 길이**
+    # (`_arc_positions` 의 누적 거리)다. 파형의 위상도 같은 누적 거리 s_k 로 매기므로,
+    # 체인이 굽어 있어도 굽은 길이 그대로 한 주기가 된다.
+    if auto_period:
+        wavelength = total
 
     chain_dir = om.MVector(*points[-1]) - om.MVector(*points[0])
     if chain_dir.length() < 1e-6:
@@ -514,7 +529,8 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
         crv, crv_made = _make_debug_curve(chain, points, name + LITE_DEBUG_SUFFIX)
         made += crv_made
 
-    return drv, made, rest_rotate, (cardinal_count, len(chain), follow_skip), crv
+    return (drv, made, rest_rotate,
+            (cardinal_count, len(chain), follow_skip, wavelength), crv)
 
 
 # --------------------------------------------------------------- 공개 API
@@ -523,7 +539,7 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
                     period=24.0, speed=1.0, ramp=1.0, node_offset=0.0,
                     output=OUTPUT_NODE, start=0.0, end=100.0, prefix=None,
                     envelope=1.0, local_axis=None, driver_at_root=True,
-                    debug_curve=True):
+                    debug_curve=True, auto_period=True):
     """커브·ikHandle 없이 체인이 파형을 따라가게 한다.
 
     swing : **뼈가 흔들리는 각도(도)**. 기존 Chain Wave 의 windAmplitude(거리)와 뜻이 다르다.
@@ -535,6 +551,12 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
     driver_at_root : True 면 드라이버 로케이터를 체인 최상단(루트) 월드 위치에 놓고,
                      node 출력이면 그 자리를 **계속 따라가게** 한다(위치만, constraint 없이
                      `multMatrix + decomposeMatrix` 직결). False 면 예전처럼 원점에 만든다.
+    auto_period : True(기본)면 `wavelength` 를 무시하고 **체인마다 그 체인의 길이**를
+                  파장으로 쓴다 - 루트에서 끝까지 파형이 딱 한 주기 실린다(진폭의 최댓값과
+                  최솟값이 각각 한 번씩). 길이는 직선 거리가 아니라 노드를 따라간 **경로
+                  길이**라 굽은 체인도 굽은 대로 한 주기다. 체인 길이가 제각각이어도
+                  각각 자기 길이에 맞는 파장을 받는다. False 면 예전처럼 모든 체인이
+                  `wavelength` 를 그대로 쓴다.
     debug_curve : True(기본)면 체인마다 **흔들림을 보여 주는 커브**를 하나 만든다.
                   Chain Wave 탭의 커브와 같은 방식(노드 위치 = CV, degree 3)이지만 구동
                   방향이 반대라 **실제 결과**를 그린다. Remove 로 함께 지워진다.
@@ -553,12 +575,13 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
             msg += " Skipped: {0}".format(", ".join(missing[:5]))
         return 0, 0, msg
 
-    if wavelength <= 0 or period <= 0:
+    if period <= 0 or (not auto_period and wavelength <= 0):
         return 0, 0, "[Warning] Wavelength and Period must be greater than 0."
 
     drivers, curves, made_all, rest_all, failed = [], [], [], {}, []
     cardinal_total, node_total = 0, 0
     no_follow = []
+    used_lengths = []       # Auto Period 로 체인마다 실제로 쓴 파장(= 체인 길이)
     # 루트 추종은 라이브 노드망일 때만 뜻이 있다 - curve 출력은 구운 뒤 셋업을 지운다.
     follow_root = driver_at_root and output != OUTPUT_CURVE
 
@@ -566,7 +589,8 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
         drv, made, rest, info, crv = _build_chain_lite(
             chain, axis, swing, wavelength, period, speed, ramp, k * node_offset,
             envelope, local_axis=local_axis, driver_at_root=driver_at_root,
-            debug_curve=debug_curve, follow_root=follow_root)
+            debug_curve=debug_curve, follow_root=follow_root,
+            auto_period=auto_period)
 
         if drv is None:
             failed.append("{0} ({1})".format(_leaf(chain[0]), info))
@@ -581,6 +605,7 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
         node_total += info[1]
         if info[2]:
             no_follow.append("{0} ({1})".format(_leaf(chain[0]), info[2]))
+        used_lengths.append(info[3])
 
     if not drivers:
         return 0, 0, "[Warning] Nothing built. {0}".format("; ".join(failed))
@@ -604,6 +629,17 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
                      "ignored)".format(local_axis.upper()))
     else:
         axis_note = "Sway axis: world {0}".format(axis.upper())
+
+    # 파장을 어떻게 정했는지 알린다. Auto 면 체인마다 다르므로 범위로 보여 준다.
+    if auto_period:
+        span = sorted(used_lengths)
+        span_txt = ("{0:g}".format(span[0]) if span[0] == span[-1]
+                    else "{0:g}-{1:g}".format(span[0], span[-1]))
+        length_note = ("Auto Period on: windWavelength = each chain's own path length "
+                       "({0}), so exactly one cycle sits on every chain".format(span_txt))
+    else:
+        length_note = ("Auto Period off: every chain uses windWavelength "
+                       "{0:g}".format(wavelength))
 
     set_name = (prefix or "chainWaveLite") + LITE_SET_SUFFIX
     node_set = cmds.sets(made_all, name=set_name)
@@ -651,6 +687,8 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
         if no_follow:
             msg += " Root-follow skipped (would cycle): {0}.".format(
                 ", ".join(no_follow[:5]))
+
+    msg += " {0}.".format(length_note)
 
     if failed:
         msg += " Failed: {0}.".format(", ".join(failed[:5]))

@@ -573,7 +573,34 @@ class MainWindow(QWidget):
             "This is NOT the Chain Wave amplitude (which is a distance).")
         self.sb_lite_len = self._wave_spin(10.0, 0.001, 100000.0, 1.0)
         self.sb_lite_len.setToolTip(
-            "Length of ONE wave along the chain, in WORLD units.")
+            "Length of ONE wave along the chain, in WORLD units.\n"
+            "Ignored while 'Auto' is on.")
+
+        # 파장을 손으로 정하는 대신 **체인 길이**에서 받아 온다(기본 ON).
+        self.chk_lite_auto_period = QCheckBox("Auto")
+        self.chk_lite_auto_period.setChecked(True)
+        self.chk_lite_auto_period.setToolTip(
+            "On (default): the wavelength is taken from the CHAIN ITSELF - each\n"
+            "chain gets windWavelength = its own length, so exactly ONE cycle sits\n"
+            "on the chain from root to tip. The swing reaches its maximum once and\n"
+            "its minimum once along every chain.\n\n"
+            "'Length' here is the PATH along the chain (the distance walked from\n"
+            "node to node), not the straight line from the root to the tip, so a\n"
+            "bent chain still gets exactly one cycle over its bent length.\n\n"
+            "Chains of different lengths therefore each get their own wavelength\n"
+            "instead of sharing one fixed number.\n\n"
+            "Off: every chain uses the Wavelength value on the left, whatever its\n"
+            "length is (the old behaviour).\n\n"
+            "Either way windWavelength stays a live attribute on the driver - Auto\n"
+            "only decides what it starts at.")
+        self.chk_lite_auto_period.toggled.connect(self._on_lite_auto_period_changed)
+
+        len_row = QWidget()
+        len_layout = QHBoxLayout(len_row)
+        len_layout.setContentsMargins(0, 0, 0, 0)
+        len_layout.addWidget(self.sb_lite_len, 1)
+        len_layout.addWidget(self.chk_lite_auto_period)
+
         self.sb_lite_period = self._wave_spin(24.0, 0.001, 100000.0, 1.0)
         self.sb_lite_period.setToolTip("Frames for one cycle to pass.")
         self.sb_lite_speed = self._wave_spin(1.0, -100.0, 100.0, 0.1)
@@ -596,7 +623,7 @@ class MainWindow(QWidget):
             "without touching the swing angle.")
 
         rows = (("Swing Angle", self.sb_lite_swing),
-                ("Wavelength", self.sb_lite_len),
+                ("Wavelength", len_row),
                 ("Period", self.sb_lite_period),
                 ("Speed", self.sb_lite_speed),
                 ("Root Ramp", self.sb_lite_ramp),
@@ -640,6 +667,7 @@ class MainWindow(QWidget):
         lite.addStretch(1)
         self._on_lite_output_changed()
         self._on_lite_axis_mode_changed()
+        self._on_lite_auto_period_changed()
         return page
 
     def _on_lite_output_changed(self, *args):
@@ -649,6 +677,10 @@ class MainWindow(QWidget):
         self.chk_lite_driver_root.setEnabled(node)
         self.btn_lite_apply.setText(
             "Build Chain Wave Lite" if node else "Bake Chain Wave Lite")
+
+    def _on_lite_auto_period_changed(self, *args):
+        """Auto Period 면 파장은 체인 길이에서 오므로 손으로 정할 값이 없다."""
+        self.sb_lite_len.setEnabled(not self.chk_lite_auto_period.isChecked())
 
     def _on_lite_axis_mode_changed(self, *args):
         """오브젝트 축 모드면 Sway Axis 를 통째로 비활성화한다(계산에도 안 들어간다)."""
@@ -687,6 +719,7 @@ class MainWindow(QWidget):
                                 if self.chk_lite_local.isChecked() else None),
                     driver_at_root=self.chk_lite_driver_root.isChecked(),
                     debug_curve=self.chk_lite_debug.isChecked(),
+                    auto_period=self.chk_lite_auto_period.isChecked(),
                     output=(wind_mgr.OUTPUT_NODE if node
                             else wind_mgr.OUTPUT_CURVE),
                     start=start, end=end)
