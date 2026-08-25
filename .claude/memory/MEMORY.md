@@ -73,6 +73,7 @@
 
 ## 툴 작업 (신규 · 큰 기능)
 
+- [A00060_V03 tab reorg](wip-a00060-v03-tab-reorg.md) — **신규 V03**: 탭 재분류(카테고리 5 → 기능 11). 뒤섞임의 증거는 **리스트 하나가 세 종류를 담는 것**, V02 는 재분류 전으로 보존 (v03.00)
 - [A00060 IK Edit](wip-a00060-ik-edit.md) — ikHandle·폴 벡터 컨스트레인트를 둔 채 본 체인 수정. **핸들 스냅만으론 편차 1.615** — 폴 벡터 역산(offset 만 갱신)이 핵심, twist 는 −각도로 상쇄 (v01.05)
 - [A00010 HIK Mirror](wip-a00010-hik-mirror.md) — 한쪽 슬롯을 읽어 반대쪽 자동 할당(조인트 + Custom Rig 컨트롤러). 근거는 **이름 1순위 · 위치 폴백**, `setCharacterObject` 는 Control Rig 이 있으면 **조용히 아무것도 안 한다** (v02.01)
 - [A00090 rule versions](wip-a00090-rule-versions.md) — 규칙 json 을 `app/rules/<version>` 폴더로 분리 + UI Version 콤보 (v01.05). v01.06 에서 blendShape 타겟 이름 버그 수정([[blendshape-target-name-vs-alias]])

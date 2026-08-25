@@ -19,7 +19,8 @@
 | 툴 | 도메인 | 문서 |
 |----|--------|------|
 | `A00030_quickTool` | 잡동사니 / 퀵 유틸 | [A00030_quickTool](A00030_quickTool.md) |
-| `A00060_jointTool_V02` | 리깅 / 조인트 생성 (Curve·Divide·Aim·Hair) | [A00060_jointTool_V02](A00060_jointTool_V02.md) |
+| `A00060_jointTool_V03` | 리깅 / 조인트 생성 (Create·Orient·Chain·Curve·Select) | [A00060_jointTool_V03](A00060_jointTool_V03.md) |
+| `A00060_jointTool_V02` | 〃 (탭 재분류 전 · 보존) | [A00060_jointTool_V02](A00060_jointTool_V02.md) |
 | `A00080_KWI_creator_V03` | 언리얼 / KawaiiPhysics | [A00080_KWI_creator_V03](A00080_KWI_creator_V03.md) |
 | `A00110_animTool` | 애니메이션 | [A00110_animTool](A00110_animTool.md) |
 | `A00140_ConnectClosest` | 리깅 / 페이셜 | [A00140_ConnectClosest](A00140_ConnectClosest.md) |

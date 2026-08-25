@@ -9,6 +9,8 @@ metadata:
 
 DONE (verified + pushed Dnable/dev, commit f09fb21), v01.03: A00060_jointTool_V02. Guide doc `JUN_All/docs/A00060_jointTool_V02.md` §6 added.
 
+**V03 위치**: Match to Obj → `Create > From Object`, Make Joint Divided → `Create > Divide`, joint-to-Crv → `Create > From Curve` ([[wip-a00060-v03-tab-reorg]]).
+
 **Bug reported:** Match to Obj (Curve tab) and Make Joint Divided (Divide tab) created joints at the wrong spot when the source objects/curves live under a transformed hierarchy — positions weren't taken as world-space absolutes.
 
 **Root causes found (3 spots) & fixes:**

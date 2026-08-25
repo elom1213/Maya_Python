@@ -5,7 +5,9 @@ metadata:
   type: project
 ---
 
-`A00060_jointTool_V02` **v01.05 `IK Edit` 탭** (2026-08-25). 본 체인에 걸린 ikHandle 과
+`A00060_jointTool_V02` **v01.05 `IK Edit` 탭** (2026-08-25).
+**V03 에서는 `Chain > IK Edit` 하위 탭이다** ([[wip-a00060-v03-tab-reorg]]) — V03 은 탭을 열
+때마다 씬을 다시 읽어 버튼 상태를 맞춘다(V02 는 창을 만들 때 한 번만 읽었다). 본 체인에 걸린 ikHandle 과
 poleVectorConstraint 를 **지우지 않고** 체인을 수정한다. UI 는 A00275 `Edit Mesh` 와 같은
 토글(`EDIT IK CHAIN`) + 상태를 씬 노드에(`JUN_ikEdit` / `JUN_ikEditData` on the ikHandle).
 
