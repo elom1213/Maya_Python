@@ -11,6 +11,8 @@
 # v01.04 : Curve 탭 joint to obj 에 "Match to Sel" 버튼 추가 - 리스트를 거치지 않고
 #          지금 씬에서 선택한 오브젝트/버텍스로 바로 실행. Order 가 켜져 있으면
 #          버텍스를 고른 순서대로 처리.
+# v01.05 : IK Edit 탭 추가 - 이미 설치된 ikHandle 과 폴 벡터 컨스트레인트를 그대로 둔 채
+#          본 체인을 수정한다. 토글 버튼(EDIT IK CHAIN)으로 편집 시작/확정.
 
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
@@ -27,6 +29,7 @@ from tools.A00060_jointTool_V02.app.core import obj_joint_manager as obj_mgr
 from tools.A00060_jointTool_V02.app.core import divide_manager as div_mgr
 from tools.A00060_jointTool_V02.app.core import aim_manager as aim_mgr
 from tools.A00060_jointTool_V02.app.core import hair_manager as hair_mgr
+from tools.A00060_jointTool_V02.app.core import ik_edit_manager as ike_mgr
 from tools.A00060_jointTool_V02.app.ui.collapsible import CollapsibleBox
 
 
@@ -38,6 +41,28 @@ _POINT_TYPES = [
     ("Control Vertex (Omit [1], [-2])", crv_mgr.POINT_TYPE_CV_OMIT),
     ("Control Vertex", crv_mgr.POINT_TYPE_CV),
     ("Edit Point", crv_mgr.POINT_TYPE_EP),
+]
+
+# IK Edit 토글 버튼의 상태 표시 (A00275 Edit Mesh 와 같은 규칙)
+IK_EDIT_ON_STYLE = (
+    "QPushButton { background-color: #c85a28; color: #ffffff;"
+    " border: 1px solid #f09050; font-weight: bold; }"
+    "QPushButton:hover { background-color: #d96a34; }"
+    "QPushButton:pressed { background-color: #a8441c; }"
+)
+IK_EDIT_ON_TEXT = "EDIT ON  -  move the chain, then press again"
+IK_EDIT_OFF_TEXT = "EDIT IK CHAIN"
+
+# 폴 벡터 갱신 방법 라벨 -> core 상수
+_PV_MODES = [
+    ("Constraint offset (keep the target where it is)", ike_mgr.PV_MODE_OFFSET),
+    ("Move the pole vector target", ike_mgr.PV_MODE_TARGET),
+]
+
+# 핸들을 무엇으로 옮길지
+_SNAP_MODES = [
+    ("IK handle", ike_mgr.SNAP_HANDLE),
+    ("Handle's parent", ike_mgr.SNAP_PARENT),
 ]
 
 
@@ -84,6 +109,7 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_divide_tab(), "Divide")
         self.tabs.addTab(self._build_aim_tab(), "Aim")
         self.tabs.addTab(self._build_hair_tab(), "Hair")
+        self.tabs.addTab(self._build_ik_edit_tab(), "IK Edit")
         main_layout.addWidget(self.tabs)
 
         main_layout.addWidget(self.te_log)
@@ -350,6 +376,259 @@ class MainWindow(QWidget):
 
         layout.addStretch(1)
         return tab
+
+    # --------------------------------------------------------------
+    # Tab : IK Edit
+    # --------------------------------------------------------------
+
+    def _build_ik_edit_tab(self):
+        """이미 설치된 ikHandle 을 그대로 둔 채 본 체인을 고치는 탭.
+
+        토글 한 번으로 IK 를 내리고, 다시 눌러 확정할 때 핸들과 폴 벡터를 편집된 체인에
+        맞춘다. 상태는 UI 가 아니라 ikHandle 노드에 있으므로 툴을 껐다 켜도 이어진다.
+        """
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        self.ike_targets = []
+
+        # ---- 대상 ----
+        grp_tgt = QGroupBox("IK Handle")
+        tgt_layout = QVBoxLayout(grp_tgt)
+
+        row = QHBoxLayout()
+        self.btn_ike_load = QPushButton("Load Selection")
+        self.btn_ike_load.setToolTip(
+            "Pick up IK handles from the current selection. You can select the handle\n"
+            "itself, any joint of the IK chain, or the control that drives the handle.")
+        self.btn_ike_load.clicked.connect(self.on_ike_load)
+        row.addWidget(self.btn_ike_load)
+
+        self.btn_ike_clear = QPushButton("Clear")
+        self.btn_ike_clear.clicked.connect(self.on_ike_clear)
+        row.addWidget(self.btn_ike_clear)
+
+        self.btn_ike_select = QPushButton("Select Handle")
+        self.btn_ike_select.setToolTip("Select the loaded handles in the viewport.")
+        self.btn_ike_select.clicked.connect(self.on_ike_select)
+        row.addWidget(self.btn_ike_select)
+        tgt_layout.addLayout(row)
+
+        self.lbl_ike_target = QLabel("No IK handle loaded.")
+        self.lbl_ike_target.setWordWrap(True)
+        tgt_layout.addWidget(self.lbl_ike_target)
+
+        layout.addWidget(grp_tgt)
+
+        # ---- 옵션 ----
+        grp_opt = QGroupBox("On Finish")
+        opt_layout = QVBoxLayout(grp_opt)
+
+        self.cmb_ike_pv = QComboBox()
+        for label, _ in _PV_MODES:
+            self.cmb_ike_pv.addItem(label)
+        self.cmb_ike_pv.setToolTip(
+            "How to point the pole vector at the edited chain plane.\n\n"
+            "Constraint offset : the constraint and its target stay exactly where they\n"
+            "  are and only the offset is updated - the same idea as the Update Offset\n"
+            "  button on a parent constraint in Maya 2024.\n"
+            "Move the pole vector target : the target object is moved onto the new\n"
+            "  chain plane and the offset is left at zero. Cleaner for a rig that\n"
+            "  should carry no baked offsets, but it moves an animator's control.")
+        opt_layout.addLayout(self._labeled("Pole vector", self.cmb_ike_pv))
+
+        self.cmb_ike_snap = QComboBox()
+        for label, _ in _SNAP_MODES:
+            self.cmb_ike_snap.addItem(label)
+        self.cmb_ike_snap.setToolTip(
+            "What to move so that the handle sits on the new end of the chain.\n\n"
+            "IK handle : move the handle itself.\n"
+            "Handle's parent : move the parent instead, so a handle that sits at local\n"
+            "  zero under an IK control stays at local zero.")
+        opt_layout.addLayout(self._labeled("Snap", self.cmb_ike_snap))
+
+        self.chk_ike_preferred = QCheckBox("Set preferred angles from the edited pose")
+        self.chk_ike_preferred.setChecked(True)
+        self.chk_ike_preferred.setToolTip(
+            "Runs Set Preferred Angle on every chain joint, so later solves keep bending\n"
+            "the way the edited chain bends.")
+        opt_layout.addWidget(self.chk_ike_preferred)
+
+        layout.addWidget(grp_opt)
+
+        # ---- 토글 ----
+        self.btn_ike_edit = QPushButton(IK_EDIT_OFF_TEXT)
+        self.btn_ike_edit.setCheckable(True)
+        self.btn_ike_edit.setMinimumHeight(44)
+        self.btn_ike_edit.setToolTip(
+            "ON  : IK is switched off for this handle so the chain joints move freely.\n"
+            "OFF : the handle is snapped to the new end of the chain and the pole vector\n"
+            "      is re-derived from the edited chain plane, so the chain keeps exactly\n"
+            "      the shape you just gave it. The pole vector constraint is kept.\n"
+            "Each press is a single undo step.")
+        self.btn_ike_edit.clicked.connect(self.on_ike_edit_clicked)
+        layout.addWidget(self.btn_ike_edit)
+
+        self.btn_ike_cancel = QPushButton("Cancel Edit (restore chain)")
+        self.btn_ike_cancel.setToolTip(
+            "Leave edit mode and put the chain, the handle and the pole vector back the\n"
+            "way they were when EDIT IK CHAIN was pressed.")
+        self.btn_ike_cancel.clicked.connect(self.on_ike_cancel)
+        layout.addWidget(self.btn_ike_cancel)
+
+        self.btn_ike_update = QPushButton("Update Now (no edit session)")
+        self.btn_ike_update.setToolTip(
+            "Match the handle and the pole vector to the chain as it is right now,\n"
+            "without starting an edit session. Use this when the chain was already\n"
+            "edited some other way.")
+        self.btn_ike_update.clicked.connect(self.on_ike_update_now)
+        layout.addWidget(self.btn_ike_update)
+
+        self.lbl_ike_state = QLabel("")
+        self.lbl_ike_state.setAlignment(Qt.AlignCenter)
+        self.lbl_ike_state.setWordWrap(True)
+        layout.addWidget(self.lbl_ike_state)
+
+        layout.addStretch(1)
+
+        self._adopt_scene_ik_edits()
+        self._update_ike_state()
+
+        return tab
+
+    # ==============================================================
+    # Handlers : IK Edit
+    # ==============================================================
+
+    def _ike_pv_mode(self):
+        return _PV_MODES[self.cmb_ike_pv.currentIndex()][1]
+
+    def _ike_snap_mode(self):
+        return _SNAP_MODES[self.cmb_ike_snap.currentIndex()][1]
+
+    def _log_all(self, messages):
+        for m in messages or []:
+            self.log(m)
+
+    def _adopt_scene_ik_edits(self):
+        """툴 밖(다른 세션 / 툴 재실행)에서 시작된 편집을 되찾는다."""
+        if self.ike_targets:
+            return
+        editing = ike_mgr.find_editing_in_scene()
+        if not editing:
+            return
+        self.ike_targets = editing
+        self.log("[Info] Found {0} IK handle(s) still in edit mode: {1}".format(
+            len(editing), ", ".join(h.split("|")[-1] for h in editing)))
+        # ikSystem 의 solve 플래그는 씬이 아니라 세션 상태라 마야를 다시 켜면 살아난다.
+        self._log_all(ike_mgr.reassert_disabled(editing))
+
+    def _update_ike_state(self):
+        """씬의 실제 편집 상태를 읽어 버튼/라벨을 맞춘다."""
+        editing = ike_mgr.editing_of(self.ike_targets)
+        on = bool(editing)
+
+        self.btn_ike_edit.setChecked(on)
+        self.btn_ike_edit.setText(IK_EDIT_ON_TEXT if on else IK_EDIT_OFF_TEXT)
+        self.btn_ike_edit.setStyleSheet(IK_EDIT_ON_STYLE if on else "")
+        self.btn_ike_edit.setEnabled(bool(self.ike_targets))
+
+        self.btn_ike_cancel.setEnabled(on)
+        self.btn_ike_update.setEnabled(bool(self.ike_targets) and not on)
+        self.btn_ike_select.setEnabled(bool(self.ike_targets))
+        # 편집 중에 대상을 바꾸면 IK 가 꺼진 핸들이 씬에 남는다. 끝낼 때까지 잠근다.
+        self.btn_ike_load.setEnabled(not on)
+        self.btn_ike_clear.setEnabled(not on)
+
+        self.lbl_ike_target.setText(ike_mgr.describe(self.ike_targets))
+
+        if on:
+            self.lbl_ike_state.setText(
+                "Edit mode is ON - IK is off, so the chain moves freely. Move it, then "
+                "press the button again to keep it.")
+        elif self.ike_targets:
+            self.lbl_ike_state.setText("Ready.")
+        else:
+            self.lbl_ike_state.setText(
+                "Select an IK handle, a chain joint or the IK control, then press "
+                "Load Selection.")
+
+    def on_ike_load(self):
+        try:
+            self.ike_targets = ike_mgr.resolve_targets()
+        except Exception as e:
+            self.ike_targets = []
+            self.log("[ERR] {0}".format(e))
+        self._update_ike_state()
+
+        if not self.ike_targets:
+            return
+
+        self.log("[OK] Loaded {0} IK handle(s): {1}".format(
+            len(self.ike_targets),
+            ", ".join(h.split("|")[-1] for h in self.ike_targets)))
+        # 편집을 시작하기 전에 무엇이 막히는지 미리 알려 준다.
+        for h in self.ike_targets:
+            info = ike_mgr.inspect(h)
+            for b in info["blockers"]:
+                self.log("[Warning] {0}: {1}".format(h.split("|")[-1], b))
+            for n in info["notes"]:
+                self.log("[Info] {0}: {1}".format(h.split("|")[-1], n))
+
+    def on_ike_clear(self):
+        self.ike_targets = []
+        self._update_ike_state()
+        self.log("IK Edit target cleared.")
+
+    def on_ike_select(self):
+        alive = [h for h in self.ike_targets if cmds.objExists(h)]
+        if alive:
+            cmds.select(alive, replace=True)
+
+    def on_ike_edit_clicked(self):
+        if not self.ike_targets:
+            self._update_ike_state()
+            return
+
+        editing = ike_mgr.editing_of(self.ike_targets)
+        try:
+            if editing:
+                results, messages = ike_mgr.end_edit(
+                    editing,
+                    snap_mode=self._ike_snap_mode(),
+                    pv_mode=self._ike_pv_mode(),
+                    set_preferred=self.chk_ike_preferred.isChecked())
+                self._log_all(messages)
+            else:
+                self._log_all(ike_mgr.begin_edit(self.ike_targets))
+        except Exception as e:
+            self.log("[ERR] {0}".format(e))
+            cmds.warning(str(e))
+
+        self._update_ike_state()
+
+    def on_ike_cancel(self):
+        try:
+            self._log_all(ike_mgr.cancel_edit(ike_mgr.editing_of(self.ike_targets)))
+        except Exception as e:
+            self.log("[ERR] {0}".format(e))
+            cmds.warning(str(e))
+        self._update_ike_state()
+
+    def on_ike_update_now(self):
+        if not self.ike_targets:
+            return
+        try:
+            results, messages = ike_mgr.update_now(
+                self.ike_targets,
+                snap_mode=self._ike_snap_mode(),
+                pv_mode=self._ike_pv_mode(),
+                set_preferred=self.chk_ike_preferred.isChecked())
+            self._log_all(messages)
+        except Exception as e:
+            self.log("[ERR] {0}".format(e))
+            cmds.warning(str(e))
+        self._update_ike_state()
 
     # ==============================================================
     # UI helpers

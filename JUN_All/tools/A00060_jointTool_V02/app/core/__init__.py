@@ -6,6 +6,7 @@ from . import obj_joint_manager
 from . import divide_manager
 from . import aim_manager
 from . import hair_manager
+from . import ik_edit_manager
 
 __all__ = [
     "curve_joint_manager",
@@ -13,4 +14,5 @@ __all__ = [
     "divide_manager",
     "aim_manager",
     "hair_manager",
+    "ik_edit_manager",
 ]

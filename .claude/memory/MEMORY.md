@@ -33,6 +33,7 @@
 - [undo_chunk by default](undo-chunk-by-default.md) — 반복 씬 변경은 요청 없어도 `Framework.core.maya_undo.undo_chunk()` 로 묶기
 - [Maya 2023 compat](maya-2023-compat.md) — 2023 지원 필요할 수 있음, sin/cos 노드 없음(eulerToQuat 우회)
 - [addAttr min/max raises](addattr-min-max-raises-not-clamps.md) — `minValue`/`maxValue` 는 범위 밖 `setAttr` 을 **잘라내지 않고 RuntimeError**. 초기값은 파이썬에서 먼저 클램프
+- [getAttr settable lies](getattr-settable-lies-for-constrained.md) — `getAttr(plug, settable=True)` 는 **컨스트레인트가 구동하는 트랜스폼에도 True**. 쓸 수 있나는 `connectionInfo(isDestination=True)` + lock 으로 판정
 - [Maya loadPlugin no __file__](maya-loadplugin-no-file.md) — loadPlugin 으로 뜬 .py 플러그인은 `__file__` 없음
 - [animLayer no global selected query](animlayer-no-global-selected-query.md) — `animLayer(q,selected)` 는 레이어 인자 필요, `ls(type=animLayer)` 순회
 - [name matching: token index](attr-name-matching-token-index.md) — 이름 대량 유사도 매칭은 편집 거리 말고 토큰 역색인+IDF. **difflib 비율은 coverage 와 척도가 다르다**
@@ -72,6 +73,7 @@
 
 ## 툴 작업 (신규 · 큰 기능)
 
+- [A00060 IK Edit](wip-a00060-ik-edit.md) — ikHandle·폴 벡터 컨스트레인트를 둔 채 본 체인 수정. **핸들 스냅만으론 편차 1.615** — 폴 벡터 역산(offset 만 갱신)이 핵심, twist 는 −각도로 상쇄 (v01.05)
 - [A00010 HIK Mirror](wip-a00010-hik-mirror.md) — 한쪽 슬롯을 읽어 반대쪽 자동 할당(조인트 + Custom Rig 컨트롤러). 근거는 **이름 1순위 · 위치 폴백**, `setCharacterObject` 는 Control Rig 이 있으면 **조용히 아무것도 안 한다** (v02.01)
 - [A00090 rule versions](wip-a00090-rule-versions.md) — 규칙 json 을 `app/rules/<version>` 폴더로 분리 + UI Version 콤보 (v01.05). v01.06 에서 blendShape 타겟 이름 버그 수정([[blendshape-target-name-vs-alias]])
 - [A00450 ManipulatorTool](wip-a00450-manipulatortool.md) — **신규**: 매니퓰레이터 축 굵기 슬라이더. `manipOptions` 는 전역 하나뿐(도구별 굵기 없음), 굵기(lineSize)와 클릭 히트(linePick)는 별개

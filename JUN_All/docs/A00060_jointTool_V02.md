@@ -3,9 +3,9 @@
 MEL `JointTool V05.03`(탭: Curve / Divide / Aim)와 기존 `A00060_jointTool`(헤어 커브용 조인트 유틸)을
 하나로 합친 툴이다. **UI 는 PySide(Qt)**, 로직은 `maya.cmds` 로 작성되었다.
 
-- 버전: `v01.04` (`app/config/version.py`) — `Match to Sel` 버튼 추가 (§7)
+- 버전: `v01.05` (`app/config/version.py`) — **`IK Edit` 탭 신규** (§8)
 - 위치: `JUN_All/tools/A00060_jointTool_V02`
-- 형태: 아키텍처 (B) — Maya 내 PySide 툴(`QTabWidget` 4탭)
+- 형태: 아키텍처 (B) — Maya 내 PySide 툴(`QTabWidget` 5탭)
 - 원본 `A00060_jointTool` / MEL 파일은 그대로 보존(미수정)
 
 ---
@@ -103,6 +103,12 @@ X 둘레 트위스트만 적용한다. (구 ikHandle + poleVector 방식 대체)
   - `Reverse joint chain` : 리스트의 root 조인트 체인을 위치/radius 유지하며 역순 재생성
   - `Select Unused Joints` : 리스트 조인트 중 skinCluster 에 쓰이지 않는 것을 선택
 
+### 3.5 IK Edit 탭 (v01.05)
+이미 설치된 `ikHandle` 과 폴 벡터 컨스트레인트를 **그대로 둔 채** 본 체인을 고친다.
+토글 버튼 `EDIT IK CHAIN` 으로 IK 를 내리고, 다시 눌러 확정하면 핸들과 폴 벡터가 편집된
+체인에 맞춰진다. 이 탭만 리스트를 쓰지 않고 `Load Selection` 으로 대상을 잡는다.
+**자세한 설명은 §8.**
+
 ---
 
 ## 4. 구조 (개발자용)
@@ -120,10 +126,11 @@ A00060_jointTool_V02/
     │   ├── obj_joint_manager.py    # Curve 탭 (joint to obj / orient / swap)
     │   ├── divide_manager.py       # Divide 탭
     │   ├── aim_manager.py          # Aim 탭
-    │   └── hair_manager.py         # Hair 탭 (A00060 이식)
+    │   ├── hair_manager.py         # Hair 탭 (A00060 이식)
+    │   └── ik_edit_manager.py     # IK Edit 탭 (ikHandle / 폴 벡터 갱신)
     └── ui/
         ├── collapsible.py          # CollapsibleBox (frameLayout -collapsable 대응)
-        └── main_window.py          # QTabWidget 4탭 + 공유 로그 + Help>About
+        └── main_window.py          # QTabWidget 5탭 + 공유 로그 + Help>About
 ```
 
 - `core`(로직)와 `ui`(화면)를 분리: UI 가 위젯에서 값을 읽어 매니저에 넘기고, 결과로 리스트/로그를 갱신한다.
@@ -208,3 +215,119 @@ Curve 탭 `Tool : joint to obj` 의 `Match to Obj` **오른쪽에 `Match to Sel`
 - 전체 작업은 기존과 같이 **undo chunk** 로 묶인다(Ctrl+Z 한 번).
 - headless(mayapy) 검증: pref ON/OFF 순서 거동, 찍은 순서(5,0,3,1)대로 생기는 체인,
   `Separate` 모드의 전원 루트 여부, 오프셋 그룹 아래 오브젝트의 월드 위치 보존.
+
+---
+
+## 8. IK Edit — 설치된 ikHandle 을 그대로 둔 채 본 체인 고치기 (v01.05)
+
+본 체인에 ikHandle 을 걸어 둔 뒤 "조인트 위치를 조금 손보고 싶다" 는 상황을 위한 탭이다.
+**IK 도 폴 벡터 컨스트레인트도 지우지 않고**, 체인만 고친 뒤 리그를 편집 결과에 맞춰 준다.
+
+### 8.1 마야에는 이 기능이 없다
+
+마야 2024 의 컨스트레인트에는 어트리뷰트 에디터에 **`Update Offset`** 버튼이 있다. 드리븐을
+손으로 옮긴 뒤 그 자리를 새 오프셋으로 굳히는 버튼이고, 실체는
+`parentConstraint -e -maintainOffset <targets> <constraint>` 다
+(`scripts/AETemplates/AEparentConstraintTemplate.mel`).
+
+**ikHandle 에는 그 버튼이 없다.** `AEikHandleTemplate.mel` 을 다 뒤져도 없고,
+`ikHandle` 명령에도 대응 플래그가 없다(`-enable` 같은 플래그는 아예 존재하지 않는다).
+그래서 이 탭을 만들었다.
+
+### 8.2 왜 그냥은 안 되는가 — 실측
+
+| | 실측 결과 |
+|---|---|
+| IK 가 켜진 채 중간 조인트를 `(2, 5, 1)` 로 이동 | 솔버가 **`(0.00068, 5.2, 1.72)` 로 되돌린다** |
+| IK 를 끄고 고친 뒤, **핸들만** 이펙터로 스냅 | 최대 편차 **1.615** — 체인이 옛 평면으로 비틀린다 |
+| 핸들 스냅 **+ 폴 벡터 재계산** | 최대 편차 **0.00000000** (위치·회전 모두) |
+
+두 번째 줄이 이 기능의 핵심이다. 폴 벡터는 "IK 루트에서 뻗은 벡터" 이고 **체인이 놓일 평면**을
+정한다. 체인을 고치면 그 평면이 바뀌는데 폴 벡터는 옛 평면을 계속 가리키므로, 핸들 위치만
+맞춰서는 체인이 축을 중심으로 돌아가 버린다.
+
+### 8.3 어떻게 고치는가
+
+편집이 끝난 체인에서 **원하는 폴 벡터를 역산**해 넣는다.
+
+```
+poleVectorConstraint 의 식 (Maya 2024 실측)
+    pv = (target_world - ikRoot_world) * handle.parentInverseMatrix(3x3) + offset
+```
+
+`offset` 은 출력(핸들 부모) 공간에서 그대로 더해지므로 역산이 선형이다.
+
+```
+    new_offset = desired_pv - (current_pv - current_offset)
+```
+
+즉 **컨스트레인트도 타깃도 건드리지 않고 offset 만** 갱신한다 — 마야의 `Update Offset` 과
+정확히 같은 발상이다.
+
+`desired_pv` 는 편집된 체인의 팔꿈치 방향이다. 루트→중간 벡터에서 체인 축(루트→끝) 성분을 뺀
+**수직 성분**을 쓴다. 축과 평행해질 수 없어서 평면 정의가 안정적이다.
+
+> **twist 보정** — `ikHandle.twist` 가 0 이 아니면 솔버가 폴 벡터 평면 위에 그 각을 **더** 얹는다
+> (보정 없이는 편차 1.06). 그래서 원하는 폴 벡터를 체인 축 기준 **−twist** 만큼 미리 돌려 상쇄한다.
+> **twist 값 자체는 애니메이션 채널이라 건드리지 않는다.** (`roll` 은 `ikRPsolver` 가 쓰지 않는다 — 실측.)
+
+### 8.4 쓰는 법
+
+1. IK 핸들을 고르고 `Load Selection`. **핸들 자체 / 체인 안의 아무 조인트 / 핸들을 구동하는
+   컨트롤러** 중 무엇을 골라도 된다. 로드 직후 로그에 무엇이 되고 무엇이 막히는지 미리 나온다.
+2. **`EDIT IK CHAIN`** — IK 가 내려가고 체인이 자유로워진다. 버튼이 주황색으로 바뀐다.
+3. 조인트를 옮기거나 돌린다. 원하는 만큼.
+4. **버튼을 다시 누른다** — 핸들이 새 체인 끝으로, 폴 벡터가 새 평면으로 맞춰지고 IK 가 돌아온다.
+   로그에 **편집한 포즈와 얼마나 다른지 실측치**가 찍힌다.
+
+`Cancel Edit` 은 `EDIT IK CHAIN` 을 누른 시점으로 전부 되돌린다(조인트 · 핸들 · 폴 벡터 오프셋 ·
+폴 벡터 타깃 위치 · `ikBlend`).
+
+`Update Now (no edit session)` 는 **편집 세션 없이 지금 상태로 한 번만 맞춘다.** 이미 다른
+방법으로 IK 를 끄고 체인을 고쳐 둔 경우에 쓴다 — 마야 컨스트레인트의 `Update` 버튼에 가장
+가까운 것이 이 버튼이다.
+
+### 8.5 On Finish 옵션
+
+| 옵션 | 뜻 |
+|---|---|
+| `Pole vector` → **Constraint offset** | **기본값.** 컨스트레인트와 타깃은 있던 자리 그대로, offset 만 갱신 |
+| `Pole vector` → Move the pole vector target | 타깃 오브젝트를 새 평면 위로 옮기고 offset 은 0 으로. 오프셋이 굳는 걸 싫어하는 리그용이지만 **애니메이터의 컨트롤을 움직인다** |
+| `Snap` → **IK handle** | **기본값.** 핸들 자신을 옮긴다 |
+| `Snap` → Handle's parent | 부모를 옮긴다. 핸들이 IK 컨트롤 밑에서 로컬 0 으로 있어야 하는 리그용 |
+| `Set preferred angles from the edited pose` | 기본 ON. 체인 조인트마다 Set Preferred Angle |
+
+### 8.6 상태는 씬에 있다
+
+`A00275_skinTool_V01` 의 `Edit Mesh` 와 같은 규칙이다. 편집 중이라는 사실과 되돌릴 스냅샷은
+UI 가 아니라 **ikHandle 노드의 어트리뷰트**(`JUN_ikEdit` / `JUN_ikEditData`)에 있다.
+툴을 껐다 켜도, 씬을 저장했다 열어도 이어서 확정하거나 취소할 수 있고, 툴을 열면 진행 중인
+편집을 알아서 되찾는다.
+
+### 8.7 알아 둘 것
+
+- **`ikBlend` 가 FK/IK 스위치에 연결돼 있으면** `setAttr` 이 거부된다(실측 `RuntimeError`).
+  그럴 때만 마야의 `Enable IK Solvers` 토글(`ikSystem -e -solve 0`)로 물러선다 — **씬 전체의 IK 가
+  꺼지므로** 로그에 그렇게 썼다고 남긴다. 이 플래그는 씬이 아니라 세션 상태라 마야를 다시 켜면
+  살아나는데, 툴을 열 때 진행 중인 편집을 찾으면 다시 꺼 준다.
+- **`snapEnable`(기본 ON) 은 IK 가 꺼진 동안 핸들을 이펙터에 자동으로 붙여 준다.** 그래서 자유로운
+  핸들에서는 스냅 단계가 사실상 무동작이다. `snapEnable` 을 꺼 둔 리그에서는 핸들이 뒤에 남으므로
+  이 툴의 명시적 스냅이 실제로 일한다(둘 다 테스트로 덮었다).
+- **핸들이 pointConstraint 로 구동되면** 핸들을 직접 못 옮기므로 그 컨스트레인트의 `offset` 을
+  갱신한다. 이때 델타를 핸들의 트랜스폼에서 내면 안 된다 — 위 `snapEnable` 때문에 이미 이펙터에
+  붙어 있어서 델타가 0 으로 나온다. **컨스트레인트의 출력 플러그(`constraintTranslate`)를 직접 본다.**
+  parentConstraint 등 그 밖의 구동은 막힌 이유를 로그로 알리고 건너뛴다.
+- **`ikSplineSolver` 는 거부한다.** 체인을 커브가 구동하므로 "핸들 스냅" 이라는 개념이 성립하지
+  않는다. 조용히 망가뜨리는 대신 무엇이 문제인지 로그로 알린다.
+- **체인이 일직선이면** 팔꿈치 방향을 읽을 수 없다. 폴 벡터를 손대지 않고 그 사실을 경고한다.
+- `ikSCsolver` 는 폴 벡터가 없어서 핸들 스냅만으로 편차 0 이다.
+
+### 8.8 검증
+
+mayapy(Maya 2024) 헤드리스로 **core 87항목 + UI 스모크 56항목**.
+
+편차 0 은 정적으로만 확인한 것이 아니라 — **핸들을 멀리 끌었다 되돌려도, 씬을 저장했다 다시
+열어도** 편집한 포즈가 그대로 재현되는지까지 확인했다. 그 밖에 3·4 조인트 체인, 부모가 변환된
+그룹 아래의 핸들(폴 벡터가 핸들 부모 공간에 산다), `twist` +35/−50/0, 폴 벡터 컨스트레인트가
+없는 경우, `ikSCsolver`, `ikSplineSolver` 거부, `ikBlend` 가 연결된 리그, `snapEnable` ON/OFF,
+pointConstraint 로 구동되는 핸들, 두 핸들 동시 편집, `Cancel` 복원, 일직선 체인 경고.
