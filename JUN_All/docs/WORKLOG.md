@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-08-24
+updated: 2026-08-25
 ---
 
 # 작업 일지 (WORKLOG)
@@ -15,7 +15,50 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-08-24 (오늘)
+## 2026-08-25 (오늘)
+
+> [!summary] `A00010_humanIKTool_V02` **`Mirror` 탭 신규 — 한쪽을 정의하면 반대쪽은 버튼 하나로** (v02.00→02.01)
+- **요청**: Get HIK Nodes 로 캐릭터 노드를 고른 상태에서, 왼쪽 팔·다리 Assign 이 끝났으면
+  오른쪽은 일일이 찍지 말고 **미러 버튼**으로 자동 할당되게. 무엇을 근거로 삼을지(위치·이름 등)는
+  판단해서 고르고, **조인트뿐 아니라 컨트롤러도** 같은 방식이 가능하면 구현.
+- 입력을 **리스트가 아니라 "이미 할당된 슬롯"** 으로 잡았다. 캐릭터 노드의 슬롯 플러그
+  (`<char>.LeftArm` 등)를 `listConnections` 하면 지금 뭐가 붙어 있는지 그대로 나오므로,
+  사용자가 따로 준비할 것이 없다.
+- **근거는 이름을 1순위, 위치를 폴백으로.** 이름의 방향 토큰(`L_arm_JNT`→`R_arm_JNT`)은
+  **포즈에 의존하지 않고**(애님 들어간 리그에서도 맞다), 좌우 비대칭 리그에서도 성립하며,
+  결과를 사람이 이름만 보고 검수할 수 있다. 위치 미러는 이름 규칙이 없는 리그를 구제하지만
+  **대칭 포즈일 때만 옳으므로**, tolerance 밖이면 추측하지 않고 **실제 거리를 적어 fail 로
+  보고**한다(조용히 엉뚱한 조인트를 집는 게 이 방식의 유일한 위험이라). 계층 대칭은 순환이라,
+  조인트 라벨 `.side`/`.type` 는 HumanIK 이 **할당 뒤에** 써 주는 값이라 둘 다 기각.
+- 이름 매칭은 단순 치환이 아니라 **토큰 경계**를 본다 — `L_arm`·`arm_L`·`arm01L`·`LeftArm`·
+  `myLeftArm`·`arm_lf_ctrl` 은 잡고 `elbow`·`clavicle`·`Larm`·`leftover` 는 안 잡는다.
+  `LEFT_arm` 이 `l/r` 쌍에도 걸려 `REFT_arm` 이라는 헛 후보를 내던 것은 **더 긴 토큰이 그 자리에서
+  시작하면 짧은 토큰 매칭으로 보지 않는** blocker 규칙으로 잡았다(테스트가 먼저 잡아냄).
+- **컨트롤러(Custom Rig)도 같은 해석기로.** `CustomRigDefaultMappingNode` 의
+  `bodyPart`/`type`(0=T,1=R)/`id`/`destinationRig` 를 읽어 반대쪽 이펙터에 `RetargeterAddMapping`.
+  **HumanIK 은 잠긴 컨트롤러를 만나면 `confirmDialog` 를 띄워 배치가 모달에서 멈춘다** — 호출 전에
+  잠금을 직접 검사해 그 줄만 skip 한다. 매번 끊었다 잇는 대신 배치 전체를 한 번만 끊는다.
+- **겸사겸사 잡은 기존 버그** — `setCharacterObject` 는 캐릭터에 Control Rig 이 있으면
+  **경고만 찍고 아무것도 하지 않으면서 예외도 안 던진다**. v02.00 은 이 경우에도 "assigned" 로
+  보고했다. 이제 `hikGetControlRig` 로 미리 막고, 붙일 때마다 연결을 **되읽어** 성공을 판정한다.
+- 슬롯 ID↔이름 테이블은 `GetHIKNodeName(id)` 런타임 조회가 권위(Maya 2024 = 212개)이고,
+  실측 폴백 테이블을 함께 둬 **테스트가 둘의 일치를 검사**한다(마야 버전을 올려 테이블이 낡으면
+  테스트가 먼저 잡는다). 좌우 짝은 체인 정의에 적지 않고 **이름 접두사를 뒤집어 역인덱스**로
+  찾으므로 `BONE_CHAINS` 에 없는 슬롯(손가락 4마디·InHand·Roll·Leaf roll)까지 자동으로 따라온다.
+- `Preview Joints` / `Preview Controllers` 는 **씬을 전혀 바꾸지 않고** 결과 표만 채운다
+  (`무엇을 → 어디에 → 어떤 근거로`, 줄을 고르면 그 대상이 씬에서 선택된다).
+  상위 탭 2개(`Assign` / `Mirror`)로 나누되 **`Assign` 탭은 기능·이름·배치가 하나도 안 바뀌었고**,
+  캐릭터 노드 선택은 두 탭이 공유하므로 탭 밖 상단에 그대로 뒀다. 창 `360x620` → `620x760`.
+- 검증: mayapy(Maya 2024) 헤드리스 **core 111항목 + UI 스모크 49항목**. 이름 토큰 13종과 오탐 6종,
+  폴백/런타임 테이블 일치, Preview 무변경, 이름·위치·Auto 3모드, 재실행 멱등, Overwrite on/off,
+  Scope 3종, 방향 뒤집기, 포즈 틀어진 리그의 실패 보고, Custom Rig 미러·오프셋 복사·잠긴 컨트롤러 skip.
+  `setCharacterObject` 의 undo 와 `InputCharacterizationLock` 의 실제 거동(**API 레벨에서는 막지
+  않는다** — UI 전용 가드)도 실측해 불필요한 가드를 넣지 않았다.
+- 문서: [[A00010_humanIKTool_V02]] 신규 작성, `CHANGELOG.md` v02.01 신규, 포트폴리오 KR/EN 항목 추가.
+
+---
+
+## 2026-08-24
 
 > [!summary] `A00275_skinTool_V01` **탭 재분류 적용 — Weights / Bind / Edit 2단 구조** (v01.14→01.15)
 - **요청**: [계획서](plans/A00275_skinTool_V01_tab_reorg_plan.md)대로 구현.

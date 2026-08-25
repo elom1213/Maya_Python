@@ -458,6 +458,25 @@ Default Distance attribute (driver signal x)
   verified headlessly that **parent together with point/orient makes two constraints fight over the same
   channels** — Maya rejects the second with `Object is already connected` — so the tool warns instead of
   blocking; the combination that is actually useful is `parent + scale`.
+- **`A00010_humanIKTool_V02`** — drives **HumanIK characterization** (declaring which joint fills which slot)
+  one bone chain at a time, and the point of it is that **defining one side is enough — the other side is a
+  single button**. The work of assigning the left arm and leg and then repeating the whole thing on the right
+  disappears. Its input is not a list you prepare but **the slots already assigned in the scene**, read back
+  from the character node. The one real design decision was *what evidence identifies the opposite node*, and I
+  put **the side token in the name first**: it is **pose independent** (correct on a rigged, animated character,
+  not just in T-pose), it holds on asymmetric rigs, and a human can audit the result from the names alone.
+  **World-position mirroring** is the fallback for rigs with no naming convention, but that is **only correct in
+  a symmetric pose**, so outside the tolerance the tool refuses to guess and **reports the actual distance as a
+  failure** — quietly picking the wrong joint is the single risk of that method. Name matching inspects token
+  boundaries rather than substituting text, so it catches `L_arm`, `arm_L`, `arm01L`, `LeftArm`, `myLeftArm`
+  and leaves `elbow`, `clavicle`, `Larm` alone. The same resolver drives **controller mirroring (Custom Rig
+  mappings)**, generating the opposite rig-control-to-effector mapping — where I found that HumanIK **pops a
+  `confirmDialog` on a locked controller, stalling a batch in a modal**, so the tool checks the locks itself and
+  skips just that row. A **Preview** shows *what → where → on what evidence* as a table before anything is
+  touched, and selecting a row selects the target in the scene. It also fixed an existing bug:
+  **`setCharacterObject` does nothing but print a warning when the character has a Control Rig, and raises no
+  exception**, so the tool had been reporting those as assigned — it now blocks up front and **reads the
+  connection back** to judge every assignment.
 - **`A00050_uvTool`**, **`A00030_quickTool`**, **`A00330_NamingTool`** (legacy naming tool port + Quick Rename), **`A00310_SearchTool`** (select by type/name), **`A00360_SortTool`** (sort by world X/Y/Z, name or type and reorder the Outliner).
 
 ---
