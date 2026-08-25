@@ -158,6 +158,9 @@ Unreal **KawaiiPhysics** 노드를 클립보드 텍스트로 대량 생성한다
 - 파일 헤더 관례: `# Python Script by Ji Hun Park` + `# last Update date :` + 버전 이력.
 - Qt 앱은 `CHANGELOG.md` + `app/config/version.py`로 버전 기록.
 - `.gitignore`: `**/0020_out/`, `__pycache__/`, `*.pyc`, `**/JUN_memo/`.
+- **작업 일지는 월 롤링**: 루트 `JUN_All/docs/WORKLOG.md` 가 **현재 월**, 지난 달은
+  `JUN_All/docs/worklog/YYYY-MM.md` 로 내린다. **루트 파일 경로는 고정** — 저장소 안 60군데가
+  이 경로를 가리킨다. 옮길 때 본문은 고치지 않는 **순수 이동**. 절차는 `docs/worklog/README.md`.
 
 ## 8. 실행 / 빌드
 
