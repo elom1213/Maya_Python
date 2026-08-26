@@ -2,7 +2,7 @@
 
 레거시 `JUN_PY_BSTool_V01_01`(maya.cmds) 을 **PySide(Qt)** 로 재작성한 blendShape 작업 툴.
 기존 툴의 **Connect BS 탭은 제외**하고 **Edit BS 탭만** 이식했으며, **Base Shape 탭** ·
-**Shape Editor 탭** · **Mix Targets 탭**을 신규 추가했다.
+**Shape Editor 탭** · **Mix Targets 탭** · **Bake Delete 탭**을 신규 추가했다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`A00270_skinMigrate` 클론, green_dark 테마)
 - **버전**: `app/config/version.py`
@@ -440,6 +440,130 @@ geometryFilter 는 모두 `input[N].inputGeometry` 로 거슬러 오를 수 있�
 
 ---
 
+## 탭 5 — Bake Delete  (v01.19~, 신규)
+
+리깅된 메시에서 **페이스 · 엣지 · 버텍스를 지우고 나면** 마야는 지우기를 디포머 **뒤에** 붙인다.
+
+```
+blendShape  ->  skinCluster  ->  deleteComponent  ->  <보이는 메시>
+```
+
+리그는 여전히 **지우기 전 토폴로지**로 돌고, 지우기는 맨 끝에서 결과만 잘라낸다. 그래서
+**보이는 메시와 타겟 메시가 서로 다른 메시**가 된다 — Shape Editor 로 타겟을 열거나 Edit BS 로
+타겟을 뽑으면 지우기 전 모양이 나오고, 지운 부분을 다시 만난다.
+
+이 탭은 지우기를 **체인 맨 앞(중립 셰이프)으로 옮긴다**. 결과는
+
+```
+blendShape  ->  skinCluster  ->  <보이는 메시>
+```
+
+이고 **중립 메시와 모든 타겟 메시가 같은 만큼 줄어든다**. **보이는 모양은 바뀌지 않는다** —
+끝나면 툴이 직접 재 보고 로그에 편차를 적는다(실측 전 케이스 오차 `0`).
+
+### 사용 흐름
+
+1. 씬에서 **보이는 메시**를 선택 → **`<- Set`** (누르면 곧바로 Analyze 까지 돈다).
+2. 리포트에서 무엇을 건드릴지 확인한다 — 히스토리 · 정점/페이스 수 · blendShape 타겟 수
+   (live / baked) · skinCluster 인플루언스 · 함께 줄어들 live 타겟 메시 · 경고.
+3. **`Bake Delete into the Rig`**.
+
+> [!warning] 되돌리기
+> 토폴로지를 갈아 끼우는 작업이라 **Ctrl+Z 로 완전히 돌아오지 않는다**(정점/웨이트 쓰기가
+> OpenMaya API 라 undo 스택에 안 남는다). **작업 전에 씬을 저장할 것.**
+
+| 요소 | 동작 |
+|------|------|
+| **`<- Set`** | 선택에서 대상 메시를 잡고 Analyze 실행 |
+| **`Analyze`** | 씬을 **전혀 건드리지 않고** 히스토리만 조사해 리포트를 채운다 |
+| 리포트 | 고정폭 글꼴. `Not ready: ...` 로 시작하면 그 이유가 곧 거절 사유다 |
+| **`Bake Delete into the Rig`** | 실제 실행. 진행 상황은 창 아래 공용 로그에 한 줄씩 |
+
+### 무엇을 다시 매핑하는가
+
+정점 번호를 쓰는 데이터는 **전부** 새 번호로 옮긴다. 하나라도 빠뜨리면 조용히 엉뚱한 정점에 걸린다.
+
+| 대상 | 내용 |
+|------|------|
+| 중립 셰이프(`<base>ShapeOrig`) | 줄어든 토폴로지 + 살아남은 정점의 위치로 교체 |
+| live 타겟 메시 | 같은 방식으로 함께 줄인다. 자체 히스토리가 있으면 먼저 지운다(안 지우면 상류가 옛 토폴로지로 다시 덮어쓴다) |
+| baked 델타 | `inputPointsTarget` / `inputComponentsTarget` 재번호. **인비트윈 아이템도 전부**. 지워진 정점의 델타는 버린다 |
+| blendShape 페인트 웨이트 | `baseWeights` · `targetWeights` |
+| skinCluster | `weightList` 전체 + `blendWeights`, 범위 밖 찌꺼기 항목 제거 |
+| tweak / polyTweak | `vlist[0].vertex` · `tweak` 오프셋 |
+| 디포머 멤버십 | `<orig>.componentTags`(마야 2022+) 와 `groupParts.inputComponents` |
+| 그 밖의 weightGeometryFilter | `weightList[g].weights` (cluster · deltaMush 등) |
+
+### 동작 원리
+
+**1) 살아남은 정점 찾기.** deleteComponent 의 **입력 메시**(지우기 전)와 **출력 메시**(지운 뒤)를
+플러그 데이터로 직접 읽어 위치로 맞춘다. 마야는 컴포넌트를 지울 때 **살아남은 정점의 상대 순서를
+보존**하므로(실측), 앞에서부터 한 번만 훑는 greedy 매칭이면 된다(O(N)). 두 메시는 같은 계산
+결과라 좌표가 비트 단위로 같아 매칭이 흔들릴 여지가 없다.
+
+**2) 토폴로지로 검증.** 남은 메시의 모든 엣지를 매핑으로 되돌렸을 때, 그 두 정점이 원본에서
+**같은 페이스 안에** 있어야 한다. 조건을 "같은 엣지"가 아니라 "같은 페이스"로 잡은 이유:
+
+| 지운 것 | 결과 |
+|---------|------|
+| 페이스 | 남은 페이스가 원본 그대로 (엣지도 그대로) |
+| 버텍스 | 그 정점만 빠지고 페이스가 한 변 줄어든다 → **없던 엣지가 생긴다** |
+| 엣지 | 두 페이스가 **하나로 병합**된다 |
+
+세 경우 모두 새로 생기는 엣지의 양 끝은 **원래 한 페이스 안에 있던 정점들**이다. 매핑이 한 칸이라도
+밀리면 이 조건이 즉시 깨진다 — 조용히 틀린 리그를 만들지 않는다.
+
+**3) 줄어든 토폴로지를 어디서 가져오는가.** **지금 보이는 메시를 복제**해 도너로 쓴다. 그 자체가
+이미 "줄어든 토폴로지 + 올바른 UV/노멀"이다. 메시를 새로 조립하면 **UV 를 잃는다**. 도너의 정점만
+대상 메시(중립 · 각 타겟)의 값으로 바꿔 `donor.outMesh -> dst.inMesh` 로 연결 → 평가 → 연결 해제
+한다. 해제해도 마지막 데이터가 그대로 남는다(실측).
+
+### 함정 (mayapy 2024 실측)
+
+- **밀어 넣은 셰이프의 `pnts` 를 안 지우면 조용히 틀린다.** `pnts`(트윅) 인덱스는 지우기 전 번호라
+  그대로 두면 **엉뚱한 정점에 옛 오프셋이 얹힌다**. 실측에서 live 타겟이 정확히 이것 때문에 깨졌다
+  (오프셋이 새 번호 자리에 한 번, 옛 번호 자리에 또 한 번).
+- **skinCluster 웨이트는 DAG 셰이프의 정점 수만큼만 읽힌다.** 지우기 뒤 셰이프는 이미 줄어 있어서
+  `MFnSkinCluster.getWeights` 가 앞쪽 일부만 준다(25개 중 23개 — 게다가 **에러 없이**). 그래서 읽기
+  전에 deleteComponent 를 `nodeState = 1`(HasNoEffect)로 잠깐 꺼 지우기 전 토폴로지로 되돌린다.
+- **`baseWeights` / `targetWeights` 는 `setAttr` 로 써도 blendShape 가 더러워지지 않는다.** 값은
+  바뀌었는데 화면은 그대로다. 그래서 끝에 `cmds.dgdirty` 로 명시적으로 흔든다.
+- **디포머 멤버십은 이제 groupParts 가 아니다.** 마야 2022+ 는 `<orig>.componentTags[i]` 에
+  이름 + 컴포넌트 목록으로 저장한다(`cmds.cluster` 가 groupParts 를 **아예 안 만든다**). 태그는
+  우리가 지오메트리를 밀어 넣는 중립 셰이프에 **그대로 남으므로** 같이 고쳐 주지 않으면 디포머가
+  엉뚱한 정점에 걸린다. 폴리 프리미티브가 기본으로 다는 `front` / `rim` 같은 태그는 아무도 안 쓰면
+  경고하지 않는다(디포머의 `componentTagExpression` 이 참조하는 것만 본다).
+- **`pnts` 를 정점마다 setAttr 로 지우면 9만 정점에서 40 초가 넘는다.** 연속 구간을 한 번에 쓰는
+  `delta_utils.write_tweaks` 로 묶어 **2.5 초**로 줄였다(전체 apply 기준 46s -> 2.5s).
+
+### 거절하는 경우
+
+조용히 잘못된 결과를 내느니 멈추고 이유를 말한다.
+
+| 상황 | 메시지 |
+|------|--------|
+| deleteComponent 가 없다 | `no deleteComponent after the deformers - this mesh has nothing to bake.` |
+| 꼬리에 다른 노드가 있다(예: `polySoftEdge`) | `unsupported node(s) between the deformers and the mesh: ...` |
+| polyTweak 이 지우기 **사이에** 끼어 있다 | `... sits between two deleteComponent nodes - its vertex numbers are only half reduced.` |
+| 디포머가 없다 | `no deformer in front of the delete - just use Edit > Delete by Type > History instead.` |
+| 정점을 못 맞추거나 검증 실패 | `could not match the vertices ...` / `vertex mapping failed validation - ...` |
+| skinCluster 가 메시 여러 개를 구동 | `... only handles single-mesh skinClusters.` |
+
+> `polyTweak` 은 지우기보다 **위**에 있으면 번호를 다시 매핑해 주고(정점을 옮긴 뒤 지운 흔한 경우),
+> **아래**에 있으면 이미 새 번호라 그대로 둔다(지운 뒤 정점을 옮긴 경우).
+
+### 검증 (mayapy 2024)
+
+- 시나리오 9종(페이스 · 버텍스 · 엣지 · 내부 페이스 하나 · tweak 낀 체인 · 인비트윈 ·
+  페인트 웨이트 · deleteComponent 2개 · 절반 잘라내기) × 웨이트/포즈 조합 6종 = **126 검사 통과**,
+  전부 오차 `0`.
+- 변형 시나리오 6종(스킨만 · blendShape 만 · 회전/스케일 그룹 밑 · 네임스페이스 ·
+  cluster 멤버십 · 자체 히스토리를 가진 live 타겟) + 거절 4종 = **27 검사 통과**.
+- UI 스모크 15종 통과(다른 탭 회귀 포함).
+- 성능: 9만 정점 · 전 정점 페인트 맵 · 인플루언스 4 → `analyze` 0.33s, `apply` **2.5s**.
+
+---
+
 ## 구조
 
 ```
@@ -458,8 +582,9 @@ A00290_BSTool/
     │   ├── shape_editor_manager.py # Shape Editor 탭: sculptTargetIndex 편집 토글
     │   ├── edit_bs_manager.py      # Edit BS 탭: key/copy every target + copy every frame
     │   ├── base_shape_manager.py   # Base Shape 탭: 타겟 델타 스케일
-    │   └── mix_manager.py          # Mix Targets 탭: 소스 가중합을 다른 타겟/베이스에 반영
-    └── ui/main_window.py           # QTabWidget 4탭 + 공용 로그
+    │   ├── mix_manager.py          # Mix Targets 탭: 소스 가중합을 다른 타겟/베이스에 반영
+    │   └── bake_delete_manager.py  # (v01.19~) Bake Delete 탭: 지우기를 리그 전체에 반영
+    └── ui/main_window.py           # QTabWidget 5탭 + 공용 로그
 ```
 
 > `delta_utils` 는 Base Shape 탭과 Mix Targets 탭이 **같은 저수준 처리**(델타 공간 · live 타겟

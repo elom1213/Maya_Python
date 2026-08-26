@@ -11,6 +11,9 @@
 #                     weight=1.0 기본 모양으로 재정의(델타 스케일)
 #   4) Mix Targets  : 소스 타겟 몇 개를 원하는 배율로 섞은 만큼, 체크한 다른 타겟들의
 #                     모양을 한꺼번에 변형(델타 가중합을 더한다)
+#   5) Bake Delete  : 디포머 뒤에 남은 deleteComponent(페이스/엣지/버텍스 지우기)를 리그
+#                     전체에 반영 - 중립 셰이프와 모든 타겟 메시도 같이 줄이고 히스토리를
+#                     blendShape -> skinCluster 로 되돌린다
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
@@ -24,7 +27,7 @@ import maya.cmds as cmds
 from tools.A00290_BSTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00290_BSTool.app.core import (EditBSManager, BaseShapeManager,
                                           MixManager, ShapeEditorManager,
-                                          EDITABLE_STATES)
+                                          BakeDeleteManager, EDITABLE_STATES)
 from tools.A00290_BSTool.app.core import blendshape_utils as bsu
 
 
@@ -250,6 +253,7 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_edit_bs_tab(), "Edit BS")
         self.tabs.addTab(self._build_base_shape_tab(), "Base Shape")
         self.tabs.addTab(self._build_mix_tab(), "Mix Targets")
+        self.tabs.addTab(self._build_bake_delete_tab(), "Bake Delete")
         self.tabs.currentChanged.connect(lambda *_a: self._update_se_timer())
         main_layout.addWidget(self.tabs)
 
@@ -1215,6 +1219,78 @@ class MainWindow(QWidget):
 
         return panel
 
+    # ==================================================
+    # Tab 5 : Bake Delete
+    # ==================================================
+
+    def _build_bake_delete_tab(self):
+        """디포머 뒤에 남은 deleteComponent 를 리그 전체에 반영하는 탭.
+
+        `Analyze` 로 무엇을 건드릴지 먼저 보여 주고, `Apply` 가 실제로 바꾼다.
+        토폴로지를 갈아 끼우는 작업이라 Ctrl+Z 로 완전히 돌아오지 않는다 — 그 사실을
+        버튼 바로 위에서 눈에 띄게 알린다.
+        """
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # 대상 메시 지정 행
+        mesh_row = QHBoxLayout()
+        lbl = QLabel("Mesh")
+        lbl.setMinimumWidth(110)
+        mesh_row.addWidget(lbl)
+        self.le_bd_mesh = QLineEdit()
+        self.le_bd_mesh.setPlaceholderText("Pick the visible mesh, then <- Set")
+        mesh_row.addWidget(self.le_bd_mesh)
+        btn_set = QPushButton("<- Set")
+        btn_set.setToolTip("Set the mesh from the current selection.")
+        btn_set.clicked.connect(self.on_bd_set_mesh)
+        mesh_row.addWidget(btn_set)
+        layout.addLayout(mesh_row)
+
+        btn_analyze = QPushButton("Analyze")
+        btn_analyze.setToolTip(
+            "Read the mesh's history and report what would change.\n"
+            "Nothing in the scene is touched.")
+        btn_analyze.clicked.connect(self.on_bd_analyze)
+        layout.addWidget(btn_analyze)
+
+        self.te_bd_report = QTextEdit()
+        self.te_bd_report.setReadOnly(True)
+        self.te_bd_report.setLineWrapMode(QTextEdit.NoWrap)
+        self.te_bd_report.setMinimumHeight(200)
+        mono = QFont("Consolas")
+        mono.setStyleHint(QFont.Monospace)
+        self.te_bd_report.setFont(mono)
+        self.te_bd_report.setPlaceholderText(
+            "Set a mesh and press Analyze to see its history.")
+        layout.addWidget(self.te_bd_report, 1)
+
+        info = QLabel(
+            "Deleting faces / edges / vertices on a rigged mesh leaves a deleteComponent\n"
+            "AFTER the deformers, so the visible mesh and the blendShape targets no longer\n"
+            "share a topology.  This bakes the delete into the whole rig: the neutral mesh\n"
+            "and every target mesh lose the same components, all deltas / skin weights are\n"
+            "renumbered, and the deleteComponent is removed.  The visible shape does not move.")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        self.lbl_bd_warn = QLabel(
+            "This rebuilds the mesh topology - Ctrl+Z cannot fully restore it. "
+            "Save your scene first.")
+        self.lbl_bd_warn.setWordWrap(True)
+        self.lbl_bd_warn.setStyleSheet("color: #e8a33d; font-weight: bold;")
+        layout.addWidget(self.lbl_bd_warn)
+
+        btn_apply = QPushButton("Bake Delete into the Rig")
+        btn_apply.setMinimumHeight(36)
+        btn_apply.setToolTip(
+            "Push the delete up to the neutral mesh and the targets, then remove the\n"
+            "deleteComponent so the history is blendShape -> skinCluster again.")
+        btn_apply.clicked.connect(self.on_bd_apply)
+        layout.addWidget(btn_apply)
+
+        return tab
+
     # --------------------------------------------------
     # Helpers
     # --------------------------------------------------
@@ -1580,6 +1656,71 @@ class MainWindow(QWidget):
         targets = [self._mix_name(it) for it in dest_items]
         _done, msg = MixManager.mix_into_targets(bs_node, sources, targets, base_mode)
         self.log(msg)
+
+    # --------------------------------------------------
+    # Handlers : Bake Delete
+    # --------------------------------------------------
+
+    def on_bd_set_mesh(self):
+        """<- Set : 선택에서 대상 메시를 잡고 곧바로 Analyze 까지 돌린다."""
+        sel = cmds.ls(sl=True, long=False) or []
+        if not sel:
+            self.log("[Warning] Select the visible mesh first.")
+            return
+        self.le_bd_mesh.setText(sel[0])
+        self.on_bd_analyze()
+
+    def _bd_mesh(self):
+        mesh = self.le_bd_mesh.text().strip()
+        if not mesh or not cmds.objExists(mesh):
+            self.log("[Warning] Set a mesh first.")
+            return None
+        return mesh
+
+    def on_bd_analyze(self):
+        """씬은 그대로 두고 히스토리만 조사해 리포트를 채운다."""
+        mesh = self._bd_mesh()
+        if mesh is None:
+            return
+        report = BakeDeleteManager.analyze(mesh)
+        self.te_bd_report.setPlainText(BakeDeleteManager.format_report(report))
+        if report["ok"]:
+            self.log("[Info] {0}: {1} -> {2} verts, {3} delete node(s) to bake.".format(
+                mesh, report["pre_count"], report["post_count"],
+                len(report["deletes"])))
+        else:
+            self.log("[Warning] {0}".format(report["error"]))
+
+    def on_bd_apply(self):
+        """실제로 지우기를 리그에 굽는다. 진행 로그는 공용 로그 창으로."""
+        mesh = self._bd_mesh()
+        if mesh is None:
+            return
+        ok, report = BakeDeleteManager.apply(mesh, log=self.log)
+        if not ok:
+            self.te_bd_report.setPlainText(BakeDeleteManager.format_report(report))
+            self.log("[Warning] Nothing was changed - see the message above.")
+            return
+
+        # 끝난 뒤 다시 analyze 하면 "지울 게 없다"는 거절 메시지가 나온다(당연하다).
+        # 그러니 방금 한 일을 요약해서 보여 준다.
+        lines = ["Done.",
+                 "Mesh        : {0}".format(mesh),
+                 "Vertices    : {0} -> {1}   ({2} removed)".format(
+                     report["pre_count"], report["post_count"],
+                     report["pre_count"] - report["post_count"]),
+                 "Faces       : {0} -> {1}".format(report["pre_faces"],
+                                                   report["post_faces"]),
+                 "Removed     : {0}".format(
+                     ", ".join(n.split("|")[-1] for n in report["deletes"]))]
+        if report["live_targets"]:
+            lines.append("Targets cut : {0}".format(len(report["live_targets"])))
+        if "deviation" in report:
+            lines.append("Shape check : visible mesh moved by {0:.3g}".format(
+                report["deviation"]))
+        for warn in report["warnings"]:
+            lines.append("Warning     : {0}".format(warn))
+        self.te_bd_report.setPlainText("\n".join(lines))
 
     # --------------------------------------------------
     # Show / Hide / Close

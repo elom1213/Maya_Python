@@ -101,6 +101,7 @@
 - [A00310 SearchTool](wip-a00310-searchtool-merge.md) — 레거시 Selection/Search 툴 2개를 탭 하나로 병합 (Maya 테스트 대기)
 - [A00300 batch summary](wip-a00300-batch-summary-table.md) — Target Meshes TSL + 색상 요약 테이블 (v01.02)
 - [A00300 zero-area rework](wip-a00300-zero-area-quality-rework.md) — **진행 중**: zero_area_faces 를 shape-quality 로 재작업 + Clear Log
+- [A00290 Bake Delete tab](wip-a00290-bake-delete-tab.md) — **신규**: 디포머 뒤 `deleteComponent` 를 리그 전체에 반영(중립·타겟·델타·웨이트 재매핑). 정점 순서는 보존되므로 위치 greedy 로 매핑, 검증은 **엣지가 아니라 같은 페이스**, 밀어 넣은 셰이프의 `pnts` 를 안 지우면 조용히 틀린다 (v01.19)
 - [A00290 Mix Targets tab](wip-a00290-mix-targets-tab.md) — **신규**: 소스 가중합을 다른 타겟 + 최종(리깅) 메시에 일괄 반영. Base mesh 3모드, 공용 `delta_utils` (v01.17)
 - [A00290 Shape Editor tab](wip-a00290-shape-editor-tab.md) — 마야 Shape Editor 대체. `cmds.sculptTarget` 필수, 행 클릭 다중 편집, 제스처당 undo 1회 (v01.10)
 - [A00280 cloth-corrective](metahuman-cloth-corrective-A00280.md) — Houdini 알렘빅 캐시 → MetaHuman RBF 코렉티브 일괄 추출(invertShape)
