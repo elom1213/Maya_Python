@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-08-25
+updated: 2026-08-26
 ---
 
 # 작업 일지 (WORKLOG)
@@ -120,6 +120,21 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   서로를 닫지 않는다.**
 - 문서: [`A00060_jointTool_V03.md`](A00060_jointTool_V03.md) 신규, `CHANGELOG.md` v03.00,
   `docs/README.md` 목록.
+
+> [!summary] `저장소` **WORKLOG 을 월 롤링으로 전환 — 루트는 현재 월만** (`02ea1a3`)
+- **크기가 아니라 컨텍스트가 이유였다.** 단일 누적 파일이 2.4개월 만에 **4,742줄 / 497KB**
+  (대략 15만~24만 토큰)이 되어 세션에서 통째로 열 수 없게 됐다.
+- `JUN_All/docs/worklog/` 신설. 2026-06(12일) · 2026-07(18일)을 보관본으로 내렸다 —
+  루트 **4,742 → 2,193줄**. 날짜 44개 · 본문 줄 전부 보존(유실 0)을 확인하고 옮겼다.
+- **루트 `JUN_All/docs/WORKLOG.md` 경로는 고정**이다. 저장소 안 **60군데**가 이 경로를
+  가리키고 있어서, 파일을 옮기는 대신 **내용만** 내린다.
+- **단위는 월.** `JUN_Study/UPDATELOG.md` 는 같은 기제를 쓰되 **연도** 단위다 — 밀도가 30배 다르다.
+- 이동으로 한 단계 깊어져 깨질 **상대 경로 50건**을 `../` 로 보정했고, 그 단계를 절차에 명시했다.
+  이동 전부터 깨져 있던 링크 2건(`A00080_KWI_creator.md` · `plans/A00270_skinMigrate_plan.md`)도
+  함께 정정.
+- 규칙을 네 곳에 명문화 — [`worklog/README.md`](worklog/README.md)(트리거·절차·판단 근거) ·
+  루트 `CLAUDE.md` 7장 · [`plans/worklog_doc_plan.md`](plans/worklog_doc_plan.md) ·
+  메모리 `worklog-maintenance`. #저장소 #WORKLOG
 
 > [!summary] `A00060_jointTool_V02` **`IK Edit` 탭 신규 — 설치된 ikHandle 을 그대로 둔 채 본 체인 수정** (v01.04→01.05)
 - **요청**: 마야 2024 컨스트레인트의 `Update` 버튼처럼 **ikHandle 도 업데이트가 되는지** 알고 싶다.
@@ -879,6 +894,30 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 검증(mayapy 2024) 36항목: 코어 20 + UI 16. 커브/ikHandle/프록시가 하나도 안 생기는지,
   각도가 정의식과 일치하는지, 라이브 파라미터, 제거 후 잔여 0, FK 컨트롤러 체인, 굽기,
   **기존 Chain Wave 와 서로 간섭하지 않는지**. #A00390
+
+> [!summary] `Framework` **툴 테마를 기능 기준으로 재분류 — `coral_dark` 22 → 4** (툴 37건 · qss 8개 신설)
+- **문제**: `launch.py` 가 있는 Qt 툴 44개 중 **22개(절반)가 `coral_dark`** 였고, 색을 나눠 둔
+  것들도 기준이 없었다(`blue_dark` 하나에 애니 · 메시 · 리깅 · 파일 · 선택 **5개 도메인**).
+  색이 **"이 창이 무엇을 만지는가"** 를 뜻하도록 다시 배정했다.
+- **축 2개** — 색상(hue) = 작업 대상(리깅 구축 / 리깅 연결 / 스키닝 / 애니 / 모델링 / 씬 유틸 /
+  언리얼 / 씬→데이터 출력), **명도 = 실행 위치**(마야 안 본작업 `_dark` / 마야 밖 스탠드얼론·런처 `_mid`).
+- **먼저 확인한 것**: 완전판 qss 6종은 서로 **색 값만 다르고 구조가 완전히 같다**(diff 86줄이 전부 hex).
+  그래서 새 계열을 만드는 비용이 거의 없었다. 다만 사람이 구분할 수 있는 색은 **8종 안팎**이라
+  `_dark` 는 이미 포화 — 그 이상은 색이 아니라 **명도 축**으로 나눈다.
+- **새 qss 8개** — `teal_dark/light`(리깅 연결·구동, accent `#6f9e9e`) ·
+  `slate_dark/light`(씬→데이터 출력, `#89919e`) · `slate/green/yellow/purple _mid`.
+  `green_dark` 를 바탕으로 색상만 회전해 만들었다. **어떤 색이 계열색인지는 `green` 과 `blue` 를
+  같은 자리끼리 비교해 정했다**(값이 같으면 중립색). `_mid` 는 `V<0.5` 인 색만 **+0.12**
+  (배경 `#2b2b2b` → `#4a4a4a`) — 들어올림 양은 **본문 글자 명암비를 재서** 골랐다
+  (0.12 → **7.10:1**, 0.24 → 4.46 으로 기준 미달).
+- **결과**: `coral_dark` 22 → **4**, 최대 그룹이 **7개**로 평탄해졌다. `_light` 는 마야 옆에 두기엔
+  너무 밝아(실사용 0건) 전부 `_mid` 로 교체.
+- **검증** — 툴당 `git diff` 가 **정확히 `+1 -1`**(테마 문자열 외 무변경) · 새 qss 가 바탕과
+  색 말고 다른 데가 없음(hex 마스킹 비교) · 22개 테마 전부 위젯에 적용됨(mayapy + PySide2,
+  `@STYLES@` 치환 정상) · **사용 중인 테마 이름 13종이 모두 실제 qss 로 존재**(오타로 인한 무테마 0건).
+- 문서: [Framework_theme](Framework_theme.md) 신설 — **색 ↔ 하는 일 표**. 새 툴은 여기서 색을 고른다.
+  경위와 3차 개정 근거는 [plans/theme_reassignment_plan.md](plans/theme_reassignment_plan.md).
+  #Framework #Theme
 
 > [!summary] `A00440_SetTool` **셸프 아이콘 추가** (SVG + 32×32 PNG)
 - 이 툴만 기본 `pythonFamily.png` 를 쓰고 있어 셸프에서 구분이 안 됐다. 집합 연산 툴이니
@@ -2119,6 +2158,21 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   **마야 실기 UI 테스트 대기.** #A00120 #FKIK #timeRange #공용위젯
 
 ## 2026-08-03
+
+> [!summary] `데이터` **MetaHuman 페이셜 데이터 세트 2건 — A00090 `v002` 규칙 + A00100 `sample_08`**
+- 바로 아래 항목(규칙 json 버전 폴더 분리)이 만든 `rules/v002` 자리를 **실제 데이터로 채운 커밋**이다.
+- **`A00090_ConnectionBuilder` `v002` 규칙 세트** — `WRK_calf_l/r` 의 포즈를 `back_50` 하나에서
+  **`back_30` / `back_60` 둘로** 재구성(5 → 6). `functionType` Gaussian → **Linear**,
+  `normalizeMethod` AlwaysNormalize → **OnlyNormalizeAboveOne**.
+- **`A00100_jsonEditor_MH` `sample_08`** — PoseWrangler 익스포트, 솔버 **8 → 14**.
+  `WRK_` 접두사가 없는 **본체 솔버 6개 신규**(`upperarm_l/r` 포즈 12, `lowerarm_l/r` 9,
+  `clavicle_l/r` 5). `driven_transforms` 는 코렉티브 조인트(bicep · tricep · scap · pec ·
+  latissimus 등)이고 `driven_attrs` 는 비어 있다 — **어트리뷰트가 아니라 트랜스폼을 구동**한다.
+- `WRK_` 솔버 8개의 **전 포즈 driver 매트릭스를 재캡처**했다(회전 성분 최대 0.03, 이동 최대 1.0 —
+  리그 프로포션 갱신 반영).
+- **알아 둘 것**: 신규 `upperarm_l` / `upperarm_r` 솔버의 **포즈 이름이 양쪽 모두 `upperarm_l_*`** 다.
+  미러할 때 이름이 그대로 복사된 것으로 보인다 — 이름으로 좌우를 가르는 코드가 있으면 걸린다.
+  #A00090 #A00100 #MetaHuman #데이터
 
 > [!summary] `A00090_ConnectionBuilder` **규칙 json 을 버전 폴더로 분리 + UI 에서 버전 선택** (v01.04→01.05)
 - **요청**: 규칙 json 의 **버전이 다른 상황**에 대응. `v001`, `v002` … 폴더마다 수정된 json 을 두고
