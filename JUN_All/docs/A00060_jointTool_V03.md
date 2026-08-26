@@ -4,9 +4,9 @@
 평평하던 상위 탭 5개(그 안에 접이식 6섹션)를 **상위 탭 = 카테고리 / 하위 탭 = 기능**
 의 2단 구조로 다시 나눠 담았다.
 
-- 버전: `v03.00` (`app/config/version.py`)
+- 버전: `v03.01` (`app/config/version.py`) — **`Chain > Create IK` 신규** (§4.3)
 - 위치: `JUN_All/tools/A00060_jointTool_V03`
-- 형태: 아키텍처 (B) — Maya 내 PySide 툴 (상위 5 × 하위 11 중첩 `QTabWidget`)
+- 형태: 아키텍처 (B) — Maya 내 PySide 툴 (상위 5 × 하위 12 중첩 `QTabWidget`)
 - 계획서: [A00060_jointTool_V02 탭 재분류 계획서](plans/A00060_jointTool_V02_tab_reorg_plan.md)
 - **`A00060_jointTool_V02` 는 재분류 전 상태로 그대로 둔다**(저장소 관례: 새 버전은 새 폴더).
   앞으로의 작업은 **V03 에서** 한다.
@@ -62,7 +62,7 @@ A00060_jointTool_V03.run(True)   # True 면 DEV_MODE 에서 reload 후 실행
 |---|---|---|
 | **Create** | 씬에 **조인트가 생긴다** | `From Curve` · `From Object` · `Divide` |
 | **Orient** | 있는 조인트의 **방향만** 바뀐다 (위치·개수 불변) | `Aim` · `Set Orient` · `Orient / Rotate` |
-| **Chain** | 있는 체인의 **구조·연결**을 고친다 | `Reverse` · `IK Edit` |
+| **Chain** | 있는 체인의 **구조·연결**을 고친다 | `Reverse` · `Create IK` · `IK Edit` |
 | **Curve** | 조인트가 아니라 **커브·디포머**를 다룬다 (조인트를 만들기 전 준비) | `Edit Curve` · `Clusters` |
 | **Select** | **씬을 바꾸지 않는다** — 고르기만 한다 | `Unused Joints` |
 
@@ -81,6 +81,7 @@ A00060_jointTool_V03.run(True)   # True 면 DEV_MODE 에서 reload 후 실행
 | Hair > Tool : Edit > `Reverse joint chain` | **Chain > Reverse** |
 | Hair > Tool : Edit > `Select Unused Joints` | **Select > Unused Joints** |
 | IK Edit | **Chain > IK Edit** |
+| *(MEL V05.03 의 `Make Joint Aim` = ikHandle 생성)* | **Chain > Create IK** (v03.01 에서 되살림) |
 
 **빠지는 기능 없음. 합쳐지는 기능 없음. 버튼 이름 바뀌는 것 없음.**
 사라진 것은 상위 탭 이름 `Hair` 와 접이식 섹션 제목들뿐이다
@@ -156,6 +157,68 @@ X 둘레 트위스트만 적용한다.
 - `Remove origin` 체크 : 켜면 원본 체인 삭제 + `_rev` 접미사 제거
 - 리스트 순서가 체인 순서(root→end)와 일치해야 한다.
 
+#### Chain > Create IK (v03.01)
+시작/끝 조인트 쌍마다 **ikHandle** 을 만들고, **폴 타깃이 주어진 체인에만** 폴 벡터
+컨스트레인트를 건다. 레이아웃은 MEL `JointTool V05.03` 의 Aim 탭(Start / End / pole tgt
+3분할)을 그대로 따랐다 — 손이 기억하는 자리를 지키기 위해서다.
+
+- `Start` / `End` / `pole tgt` 리스트(3분할). **`pole tgt` 는 비워 둬도 된다.**
+- `Select Start End` / `Add Start End` : `Create > Divide` 와 같은 규칙
+- `Add with Pole` : **정확히 3개**(시작 조인트 · 끝 조인트 · 폴 타깃)를 골라 세 리스트에
+  한 줄씩 동시에 넣는다. 세 리스트를 따로 채우다 순서가 어긋나면 엉뚱한 체인에 폴이
+  걸리기 때문에 둔 경로다(MEL 원본에는 없다).
+- **Options**
+  - `Solver` : `ikRPsolver`(기본) / `ikSCsolver` / `ikSpringSolver`
+  - `Handle suffix` : 핸들 이름은 `<시작 조인트><suffix>`. 기본 `_ikHandle`
+  - `Rename the effector to match the handle` : 이펙터를 `<시작 조인트>_effector` 로
+    (마야는 `effector1` 로 남긴다). 기본 ON
+  - `Sticky` / `Select the new handles when done`
+- `Create IK Handle` : 전부 **한 번의 undo** 로 묶인다.
+
+##### MEL 원본에서 고친 것
+
+원본은 이게 전부였다.
+
+```mel
+for($i=0; $i < $all_size; $i++) {
+    string $ik[] = `ikHandle -sj $str[$i] -ee $end[$i]`;
+    poleVectorConstraint $pole[$i] $ik[0];
+}
+```
+
+| # | 원본 | V03 |
+|---|---|---|
+| 1 | 폴 리스트가 짧으면 **빈 문자열을 넘겨 에러** | **폴이 없으면 컨스트레인트를 안 만든다**(요청 사항). 로그로 알린다 |
+| 2 | 개수가 안 맞으면 `min()` 으로 **조용히 자름** | 몇 쌍만 쓰는지 로그로 알린다 |
+| 3 | 솔버 고정(`ikRPsolver`) | 솔버 선택. `ikSCsolver` 는 폴 벡터가 없어 타깃을 무시하고 경고 |
+| 4 | 이름은 `ikHandle1` / `effector1` | 시작 조인트에서 이름을 짓는다(이펙터는 옵션) |
+| 5 | 검증 없음 | 조인트인가 · 끝이 시작의 자손인가 · **이미 핸들이 걸려 있지 않은가** |
+| 6 | 한 쌍이 실패하면 거기서 멈춤 | 그 쌍만 건너뛰고 나머지는 계속 |
+| 7 | undo 가 쌍마다 흩어짐 | 전체가 undo 한 스텝 |
+
+##### 알아 둘 것 (전부 Maya 2024 실측)
+
+- **`ikSCsolver` 핸들에도 `poleVector` 어트리뷰트는 있다** — `attributeQuery` 가 `True` 를
+  돌려준다. 그런데 `poleVectorConstraint` 를 걸면
+  `RuntimeError: Handle must be valid and use rotate plane solver` 다.
+  **판정은 어트리뷰트가 아니라 솔버 이름으로 해야 한다.**
+- **`ikSpringSolver` 는 플러그인 로드만으로는 부족하다.** 로드해도 솔버 *노드*가 없어
+  `The ikSolver does not exist.` 로 죽는다. 노드는 같은 이름의 MEL 프로시저
+  (`ikSpringSolver;`)가 만든다 — 툴이 로드 뒤 한 번 호출한다.
+- **같은 체인에 두 번째 핸들을 만드는 것을 마야는 에러도 경고도 없이 해 준다.**
+  그래서 툴이 대신 경고한다(막지는 않는다 — 의도한 셋업일 수 있다).
+- **일직선 체인**은 팔꿈치 방향이 없어 폴 벡터 평면이 임의가 된다. 다만
+  `poleVectorConstraint` 자체는 **에러 없이 성공**하므로 경고만 내고 진행한다.
+- `ikHandle -e -sticky "off"` 는 `The sticky value supplied was invalid.` 경고를 낸다
+  (값은 들어간다). 새 핸들은 어차피 off 라 **켤 때만** 건드린다.
+- 이름이 겹치면 마야가 조용히 `_ikHandle1` 로 늘린다(에러 아님).
+
+> **`Orient > Aim` 과 헷갈리지 말 것.** 이름이 비슷하지만 하는 일이 다르다.
+> `Create IK` 는 **ikHandle 을 만든다**. `Aim` 은 IK 를 전혀 쓰지 않고
+> **jointOrient 만 고쳐** 체인을 정렬한다(월드 위치 완전 보존). MEL V05.03 에서는
+> 이 둘이 `Make Joint Aim` 버튼 하나였고, V02 포팅 때 Aim 이 회전 전용으로 다시
+> 설계되면서 ikHandle 경로가 사라졌다 — v03.01 이 그 자리를 되살린 것이다.
+
 #### Chain > IK Edit
 이미 설치된 `ikHandle` 과 폴 벡터 컨스트레인트를 **그대로 둔 채** 본 체인을 고친다.
 토글 버튼 `EDIT IK CHAIN` 으로 IK 를 내리고, 다시 눌러 확정하면 핸들과 폴 벡터가 편집된
@@ -210,9 +273,10 @@ A00060_jointTool_V03/
     │   ├── divide_manager.py       # Create > Divide
     │   ├── aim_manager.py          # Orient > Aim
     │   ├── hair_manager.py         # Curve > Edit Curve / Chain > Reverse / Select > Unused Joints
-    │   └── ik_edit_manager.py      # Chain > IK Edit (ikHandle / 폴 벡터 갱신)
+    │   ├── ik_edit_manager.py      # Chain > IK Edit (ikHandle / 폴 벡터 갱신)
+    │   └── ik_create_manager.py    # Chain > Create IK (ikHandle 생성 + 폴 벡터)
     └── ui/
-        └── main_window.py          # 중첩 QTabWidget (5 × 11) + 공유 로그 + Help>About
+        └── main_window.py          # 중첩 QTabWidget (5 × 12) + 공유 로그 + Help>About
 ```
 
 - `app/core/*` 는 **V02 에서 한 줄도 고치지 않았다.** 바뀐 것은 UI 뿐이다.
@@ -240,7 +304,9 @@ CATEGORIES = (
 - **상위 탭에 기능 하나를 직접 올리지 않는다.** 그 예외가 다시 불균형을 만든다.
 - 하위가 하나뿐인 카테고리(`Select`)도 **하위 탭 바를 남긴다** — 없으면 기능 이름이 화면에서 사라진다.
 - 탭 전환을 감지해야 한다면 **상위 탭 인덱스로 비교하지 말 것** — 탭이 늘고 줄면 뜻이 조용히 변한다.
-  지금은 상위가 위젯 동일성(`self.chain_page`), 하위가 `CHAIN_PAGES` 순서와 묶인 상수(`IKE_SUB_INDEX`)다.
+  지금은 상위가 위젯 동일성(`self.chain_page`), 하위가 `IKE_SUB_INDEX` 다 — 그 값은
+  **숫자를 박지 않고 `CHAIN_PAGES` 에서 찾는다.** v03.01 에서 `Create IK` 를 앞에 끼우며
+  실제로 1 → 2 로 밀렸고, 박아 뒀다면 조용히 어긋났을 자리다.
   `chain_tabs.widget(i)` 는 페이지가 아니라 **`QScrollArea` 래퍼**를 돌려준다.
 
 ### MEL → Python 포팅 매핑(요약)

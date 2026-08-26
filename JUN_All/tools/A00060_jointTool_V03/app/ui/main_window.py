@@ -10,7 +10,7 @@
 #
 #   Create : From Curve  · From Object · Divide          (조인트가 생긴다)
 #   Orient : Aim         · Set Orient  · Orient / Rotate (방향만 바뀐다)
-#   Chain  : Reverse     · IK Edit                       (체인 구조를 고친다)
+#   Chain  : Reverse · Create IK · IK Edit               (체인 구조를 고친다)
 #   Curve  : Edit Curve  · Clusters                      (커브·디포머를 다룬다)
 #   Select : Unused Joints                               (씬을 바꾸지 않는다)
 #
@@ -21,6 +21,10 @@
 #          Hair 탭(커브 편집 + 체인 편집 + 선택이 뒤섞임)을 해체하고, 다섯 기능이
 #          나눠 쓰던 공용 리스트(tsl_curve / tsl_hair)를 하위 탭마다 자기 리스트로 쪼갰다.
 #          접이식(CollapsibleBox)은 전부 하위 탭이 되어 사라졌다.
+# v03.01 : Chain > Create IK 하위 탭 추가 - 시작/끝 조인트 쌍마다 ikHandle 을 만들고,
+#          폴 타깃이 주어진 체인에만 폴 벡터 컨스트레인트를 건다.
+#          MEL JointTool V05.03 의 `JUN_cmd_make_jntAim` 이 하던 일로, V02 포팅 때
+#          Aim 탭이 회전 전용으로 다시 설계되면서 사라졌던 경로다.
 
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
@@ -38,6 +42,7 @@ from tools.A00060_jointTool_V03.app.core import divide_manager as div_mgr
 from tools.A00060_jointTool_V03.app.core import aim_manager as aim_mgr
 from tools.A00060_jointTool_V03.app.core import hair_manager as hair_mgr
 from tools.A00060_jointTool_V03.app.core import ik_edit_manager as ike_mgr
+from tools.A00060_jointTool_V03.app.core import ik_create_manager as ikc_mgr
 
 
 # 재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -108,6 +113,10 @@ CHAIN_PAGES = (
     ("Reverse",
      "Reverse - rebuild a joint chain in the opposite order.",
      "_build_chain_reverse_tab"),
+    ("Create IK",
+     "Create IK - build an IK handle for each start/end joint pair, and a pole vector "
+     "constraint for the chains that were given a target.",
+     "_build_chain_create_ik_tab"),
     ("IK Edit",
      "IK Edit - edit the bone chain while the IK handle and its pole vector stay in place.",
      "_build_ik_edit_tab"),
@@ -148,9 +157,11 @@ CATEGORIES = (
      SELECT_PAGES, "select_tabs"),
 )
 
-# CHAIN_PAGES 안에서 IK Edit 의 자리. 하위 탭은 위젯이 아니라 이 상수로 판단한다
+# CHAIN_PAGES 안에서 IK Edit 의 자리. 하위 탭은 위젯이 아니라 이 인덱스로 판단한다
 # (chain_tabs.widget(i) 는 페이지가 아니라 QScrollArea 래퍼를 돌려준다).
-IKE_SUB_INDEX = 1
+# **표에서 찾는다** - 숫자를 박아 두면 표에 줄을 넣을 때 조용히 어긋난다
+# (v03.01 에서 Create IK 를 앞에 끼우며 실제로 1 -> 2 로 밀렸다).
+IKE_SUB_INDEX = [label for label, _tip, _b in CHAIN_PAGES].index("IK Edit")
 
 
 class MainWindow(QWidget):
@@ -161,7 +172,7 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
 
         self.win_width = 560
-        self.win_height = 720
+        self.win_height = 760
         self.win_title = "Joint Tool v{0}".format(VERSION)
 
         self.resize(self.win_width, self.win_height)
@@ -488,6 +499,99 @@ class MainWindow(QWidget):
             "position and the radius of every joint.")
         self.btn_reverse.clicked.connect(self.on_chain_reverse)
         layout.addWidget(self.btn_reverse)
+
+        layout.addStretch(1)
+        return tab
+
+    # --------------------------------------------------------------
+    # Chain > Create IK
+    # --------------------------------------------------------------
+
+    def _build_chain_create_ik_tab(self):
+        """시작/끝 조인트 쌍마다 ikHandle 을 만든다 (+ 폴 타깃이 있으면 컨스트레인트).
+
+        레이아웃은 MEL JointTool V05.03 의 Aim 탭(Start / End / pole tgt 3분할)을
+        그대로 따른다 - 손이 기억하는 자리를 지키기 위해서다. 그 아래 옵션 줄과
+        검증·로그가 이 버전에서 더해진 부분이다.
+        """
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        self.tsl_ikc_start = self._tsl("Start")
+        self.tsl_ikc_end = self._tsl("End")
+        self.tsl_ikc_pole = self._tsl("pole tgt")
+        self.tsl_ikc_pole.setToolTip(
+            "Optional. A chain with no target here gets an IK handle and no pole "
+            "vector constraint.")
+
+        list_row = QHBoxLayout()
+        list_row.addWidget(self.tsl_ikc_start)
+        list_row.addWidget(self.tsl_ikc_end)
+        list_row.addWidget(self.tsl_ikc_pole)
+        layout.addLayout(list_row)
+
+        pair_row = QHBoxLayout()
+        btn_sel_se = QPushButton("Select Start End")
+        btn_sel_se.setToolTip(
+            "Fill Start and End from the current selection, in the order you picked.")
+        btn_sel_se.clicked.connect(self.on_ikc_select_startend)
+        btn_add_se = QPushButton("Add Start End")
+        btn_add_se.setToolTip("Select exactly 2 joints - start first, then end.")
+        btn_add_se.clicked.connect(self.on_ikc_add_startend)
+        self.btn_ikc_add_pole = QPushButton("Add with Pole")
+        self.btn_ikc_add_pole.setToolTip(
+            "Select exactly 3 objects - start joint, end joint, pole target - and add\n"
+            "one row to all three lists at once.")
+        self.btn_ikc_add_pole.clicked.connect(self.on_ikc_add_with_pole)
+        pair_row.addWidget(btn_sel_se)
+        pair_row.addWidget(btn_add_se)
+        pair_row.addWidget(self.btn_ikc_add_pole)
+        layout.addLayout(pair_row)
+
+        grp_opt = QGroupBox("Options")
+        opt_layout = QVBoxLayout(grp_opt)
+
+        self.cmb_ikc_solver = QComboBox()
+        self.cmb_ikc_solver.addItems(list(ikc_mgr.SOLVERS))
+        self.cmb_ikc_solver.setToolTip(
+            "ikRPsolver   : the Maya default. Uses a pole vector.\n"
+            "ikSCsolver   : single chain - has no pole vector, so a target is ignored.\n"
+            "ikSpringSolver : plug-in solver for chains with more than two bones.")
+        opt_layout.addLayout(self._labeled("Solver :", self.cmb_ikc_solver))
+
+        self.le_ikc_suffix = QLineEdit(ikc_mgr.DEFAULT_HANDLE_SUFFIX)
+        self.le_ikc_suffix.setToolTip(
+            "The handle is named <start joint><suffix>. Maya adds a number if that "
+            "name is taken.")
+        opt_layout.addLayout(self._labeled("Handle suffix :", self.le_ikc_suffix))
+
+        self.chk_ikc_rename_eff = QCheckBox(
+            "Rename the effector to match the handle")
+        self.chk_ikc_rename_eff.setChecked(True)
+        self.chk_ikc_rename_eff.setToolTip(
+            "Maya leaves the effector as 'effector1'. With this on it becomes "
+            "<start joint>_effector.")
+        opt_layout.addWidget(self.chk_ikc_rename_eff)
+
+        self.chk_ikc_sticky = QCheckBox("Sticky")
+        self.chk_ikc_sticky.setToolTip(
+            "Keep the handle solved while the rest of the skeleton is dragged around.")
+        opt_layout.addWidget(self.chk_ikc_sticky)
+
+        self.chk_ikc_select = QCheckBox("Select the new handles when done")
+        self.chk_ikc_select.setChecked(True)
+        opt_layout.addWidget(self.chk_ikc_select)
+
+        layout.addWidget(grp_opt)
+
+        self.btn_ikc_create = QPushButton("Create IK Handle")
+        self.btn_ikc_create.setMinimumHeight(32)
+        self.btn_ikc_create.setToolTip(
+            "One IK handle per Start/End pair. A pole vector constraint is created only\n"
+            "for the chains that have a target in the third list.\n"
+            "Everything is one undo step.")
+        self.btn_ikc_create.clicked.connect(self.on_ikc_create)
+        layout.addWidget(self.btn_ikc_create)
 
         layout.addStretch(1)
         return tab
@@ -1022,6 +1126,56 @@ class MainWindow(QWidget):
         remove_origin = self.cb_remove_origin.isChecked()
         self._run("Reverse joint chain",
                   lambda: hair_mgr.reverse_joints(roots, remove_origin))
+
+    def on_ikc_select_startend(self):
+        sel = cmds.ls(sl=True) or []
+        starts, ends = div_mgr.pairs_from_selection(sel)
+        self.tsl_ikc_start.set_items(starts)
+        self.tsl_ikc_end.set_items(ends)
+        self.log("[OK] Select Start End : {0} pair(s)".format(len(starts)))
+
+    def on_ikc_add_startend(self):
+        sel = cmds.ls(sl=True) or []
+        if len(sel) != 2:
+            self.log("[ERR] Add Start End : must select exactly 2 objects")
+            cmds.warning("Must select 2 objects to Add")
+            return
+        self.tsl_ikc_start.append_unique([sel[0]])
+        self.tsl_ikc_end.append_unique([sel[1]])
+        self.log("[OK] Add Start End")
+
+    def on_ikc_add_with_pole(self):
+        """start / end / pole 셋을 한 번에 한 줄씩 넣는다.
+
+        MEL 원본에는 없던 경로다. 폴 타깃까지 있는 체인은 세 리스트를 따로 채우는 것이
+        번거롭고, 순서가 어긋나면 엉뚱한 체인에 폴이 걸린다.
+        """
+        sel = cmds.ls(sl=True) or []
+        if len(sel) != 3:
+            self.log("[ERR] Add with Pole : must select exactly 3 objects "
+                     "(start joint, end joint, pole target)")
+            cmds.warning("Must select 3 objects: start, end, pole target")
+            return
+        self.tsl_ikc_start.append_unique([sel[0]])
+        self.tsl_ikc_end.append_unique([sel[1]])
+        self.tsl_ikc_pole.append_unique([sel[2]])
+        self.log("[OK] Add with Pole : {0} / {1} / {2}".format(*sel))
+
+    def on_ikc_create(self):
+        results, messages = ikc_mgr.create_ik_handles(
+            self.tsl_ikc_start.get_all_items(),
+            self.tsl_ikc_end.get_all_items(),
+            self.tsl_ikc_pole.get_all_items(),
+            solver=self.cmb_ikc_solver.currentText(),
+            handle_suffix=self.le_ikc_suffix.text(),
+            rename_effector=self.chk_ikc_rename_eff.isChecked(),
+            sticky=self.chk_ikc_sticky.isChecked())
+        self._log_all(messages)
+
+        handles = [r["handle"] for r in results
+                   if r["handle"] and cmds.objExists(r["handle"])]
+        if handles and self.chk_ikc_select.isChecked():
+            cmds.select(handles, replace=True)
 
     # ==============================================================
     # Handlers : Curve

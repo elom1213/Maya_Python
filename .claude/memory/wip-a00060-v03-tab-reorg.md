@@ -1,6 +1,6 @@
 ---
 name: wip-a00060-v03-tab-reorg
-description: A00060_jointTool_V03 — V02 의 탭 재분류판(카테고리 5 → 기능 11). Curve/Hair 탭이 뒤섞였다는 증거는 "리스트 하나가 세 종류를 담는 것" 이었다 (v03.00)
+description: A00060_jointTool_V03 — V02 의 탭 재분류판(카테고리 5 → 기능 12). 뒤섞임의 증거는 "리스트 하나가 세 종류를 담는 것", v03.01 에 Chain > Create IK 추가
 metadata:
   type: project
 ---
@@ -15,7 +15,7 @@ metadata:
 |---|---|---|
 | **Create** | 씬에 조인트가 생긴다 | From Curve · From Object · Divide |
 | **Orient** | 있는 조인트의 방향만 바뀐다 | Aim · Set Orient · Orient / Rotate |
-| **Chain** | 있는 체인의 구조·연결을 고친다 | Reverse · [[wip-a00060-ik-edit]] |
+| **Chain** | 있는 체인의 구조·연결을 고친다 | Reverse · **Create IK**(v03.01) · [[wip-a00060-ik-edit]] |
 | **Curve** | 커브·디포머를 다룬다(조인트 준비) | Edit Curve · Clusters |
 | **Select** | **씬을 바꾸지 않는다** | Unused Joints |
 
@@ -55,4 +55,32 @@ V02 와 V03 의 `MainWindow` 를 **같은 프로세스에 띄워 위젯 속성 �
 
 실측: 상위 탭 바 291px · 가장 넓은 하위 탭 바 241px(`Create`) · 가장 긴 페이지 423px
 → 창 `540 × 820` → **`560 × 720`**(접이식이 갈라지면서 페이지가 짧아졌다).
-`app/core/*` 는 한 줄도 안 고쳤다 — 바뀐 것은 `app/ui/main_window.py` 뿐.
+v03.00 시점에 `app/core/*` 는 한 줄도 안 고쳤다 — 바뀐 것은 `app/ui/main_window.py` 뿐.
+
+---
+
+## v03.01 — `Chain > Create IK` (2026-08-26)
+
+시작/끝 조인트 쌍마다 `ikHandle` 을 만들고, **폴 타깃이 주어진 체인에만** 폴 벡터
+컨스트레인트를 건다. 코어는 `app/core/ik_create_manager.py`.
+
+**원본을 열어 보니 지금 툴에 없는 기능이었다.** MEL `JointTool V05.03` 의
+`Make Joint Aim` 버튼은 실제로 `ikHandle` + `poleVectorConstraint` 를 만드는 것이었는데,
+V02 포팅 때 `Aim` 탭이 **IK 를 안 쓰고 jointOrient 만 고치는** 방식으로 다시 설계되면서
+ikHandle 경로가 통째로 사라져 있었다. 두 기능은 이제 `Chain > Create IK` 와
+`Orient > Aim` 으로 갈라져 있다 — **이름이 비슷하니 헷갈리지 말 것.**
+
+마야 함정 3종은 [[ikhandle-creation-traps]] 에 따로 적었다(SC 핸들의 `poleVector`
+어트리뷰트 · `ikSpringSolver` 노드 · 조용한 중복 핸들).
+
+**v03.00 이 심어 둔 지뢰를 이번에 밟을 뻔했다.** `IKE_SUB_INDEX = 1` 이 숫자로 박혀
+있었는데 `Create IK` 를 `IK Edit` 앞에 끼우며 실제 자리가 **1 → 2** 로 밀렸다. 그대로
+뒀으면 **에러 하나 없이** IK Edit 의 씬 재조회가 죽었을 것이다([[wip-a00275-tab-reorg]]
+에서 겪은 것과 같은 모양). 이제 `CHAIN_PAGES` 에서 찾는다 —
+`IKE_SUB_INDEX = [label for label, _tip, _b in CHAIN_PAGES].index("IK Edit")`.
+**분류표로 탭을 만드는 구조에서 하위 인덱스를 숫자로 박으면 표에 줄을 넣는 순간 어긋난다.**
+
+UI 는 원본 Aim 탭(Start / End / pole tgt 3분할)을 그대로 따르고, `Add with Pole`
+(정확히 3개 선택 → 세 리스트에 한 줄씩)과 Options(Solver / Handle suffix /
+이펙터 리네임 / Sticky / 완료 후 선택)를 더했다. 창 높이 720 → **760**.
+검증 79항목 + v03.00 회귀 130항목 전부 통과.

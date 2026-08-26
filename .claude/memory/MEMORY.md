@@ -36,6 +36,7 @@
 - [getAttr settable lies](getattr-settable-lies-for-constrained.md) — `getAttr(plug, settable=True)` 는 **컨스트레인트가 구동하는 트랜스폼에도 True**. 쓸 수 있나는 `connectionInfo(isDestination=True)` + lock 으로 판정
 - [Maya loadPlugin no __file__](maya-loadplugin-no-file.md) — loadPlugin 으로 뜬 .py 플러그인은 `__file__` 없음
 - [animLayer no global selected query](animlayer-no-global-selected-query.md) — `animLayer(q,selected)` 는 레이어 인자 필요, `ls(type=animLayer)` 순회
+- [ikHandle creation traps](ikhandle-creation-traps.md) — SC 핸들에도 `poleVector` 어트리뷰트가 **있다**(솔버 이름으로 갈라야 함) · `ikSpringSolver` 는 플러그인 로드만으론 부족(MEL 프로시저로 솔버 노드 생성) · **같은 체인에 두 번째 핸들을 마야가 조용히 만들어 준다**
 - [name matching: token index](attr-name-matching-token-index.md) — 이름 대량 유사도 매칭은 편집 거리 말고 토큰 역색인+IDF. **difflib 비율은 coverage 와 척도가 다르다**
 - [hold mesh while moving joints](skincluster-hold-mesh-while-moving-joints.md) — 스킨 행렬 `bindPreMatrix*matrix` 를 multMatrix 로 상수 유지. `worldInverseMatrix` **직결은 포즈된 리그에서 메시가 튄다**
 - [constraint target plugs & offset spaces](constraint-target-plugs-and-offset-spaces.md) — `listConnections("con.target[0]")` 는 None(노드 단위로 열거), parentConstraint 의 offsetT/offsetR 은 **다른 공간**, 오일러 순서는 driven `rotateOrder`
