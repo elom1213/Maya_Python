@@ -3,6 +3,51 @@
 `A00060_jointTool_V02` 를 복제해 갈라낸 **탭 재분류판**이다.
 아래 `v01.xx` 항목은 갈라 나오기 전 V02 의 이력이다.
 
+## v03.02 (2026-08-27)
+**[Fix] 레퍼런스에서 온 ikHandle 은 `IK Edit` 이 폴 벡터를 갱신하지 않고 있었다.**
+
+케이지 파일을 **레퍼런스로 불러와** 그 안의 조인트를 고치는 것이 `A00130_ControlRig_V02` 의
+작업 방식이라, 그 경로가 실제로 되는지 확인하다 찾았다.
+
+**증상** — 레퍼런스된 핸들에서 `EDIT IK CHAIN` 으로 조인트를 옮기고 확정하면
+**조인트가 제자리에 남지 않는다.** 실측 편차 **위치 2.036 / 회전 45.77도**
+(로컬 씬에서는 0.000000 이다). `Load Selection` 이 아무 경고도 내지 않아 **조용히 틀린다.**
+
+**원인** — `ikHandle -q -solver` 는 솔버의 **노드 이름**을 준다. 그런데 파일을 레퍼런스하면
+**솔버 노드까지 함께 레퍼런스되어** `CAGE:ikRPsolver` 로 온다(실측).
+
+```python
+cmds.ikHandle(h, q=True, solver=True)   # 'CAGE:ikRPsolver'
+'CAGE:ikRPsolver' in ("ikRPsolver", "ikSpringSolver")   # False (!)
+```
+
+`_apply_pole_vector()` 가 맨 앞에서 `if solver not in RP_LIKE_SOLVERS: return True` 로
+빠져나가면서 **폴 벡터 갱신이 통째로 건너뛰어졌다.** 핸들만 이펙터로 스냅되고 폴 벡터는
+옛 평면을 계속 가리키니, 정확히 v01.05 개발 때 측정했던 **"핸들 스냅만 하면 편차 1.615"**
+그 실패 모드로 되돌아간 것이다. `inspect()` 도 같은 비교를 쓰므로 `blockers` 가 비어 있었고,
+**폴 벡터 컨스트레인트를 찾지도 못했다**(`pv_constraint: None`).
+
+**수정** — `handle_solver()` 가 이름이 아니라 **노드 타입**(`cmds.nodeType`)을 돌려준다.
+네임스페이스에도, **솔버 노드를 리네임한 씬**에도 흔들리지 않는다(둘 다 검증에 포함).
+바꾼 곳은 이 함수 하나이고, 비교하는 쪽 3곳(`inspect` · `_apply_pole_vector` · `describe`)은
+그대로 둔다.
+
+**레퍼런스 워크플로에서 그 밖에 확인한 것** (전부 문제없음 — 실측)
+
+| | 결과 |
+|---|---|
+| 레퍼런스 조인트/핸들/컨스트레인트에 `setAttr` | ✅ 된다. **reference edit 으로 저장되어 씬을 다시 열어도 남는다** |
+| 레퍼런스 핸들에 `addAttr` / `deleteAttr` (편집 상태 저장) | ✅ 된다. 확정 후 지워지므로 **케이지 파일에는 흔적이 남지 않는다** |
+| `preferredAngle` 쓰기 | ✅ 된다 |
+| `rename` | ❌ `Cannot rename a read only node` — 다만 **이 모듈은 rename 을 쓰지 않는다** |
+| `ikBlend` 가 FK/IK 스위치에 물린 케이지 | 예상대로 **씬 전역 폴백**(`ikSystem -solve 0`)을 탄다 |
+
+**검증**(mayapy headless, **39항목 신규** + 기존 79 · 130항목 회귀 통과):
+솔버 이름이 네임스페이스로 오는 것 · 솔버 노드 리네임 · 레퍼런스 씬에서 `inspect` 가 폴 벡터를
+찾는가 · **편집 후 조인트가 제자리에 남고 편차가 0 인가** · 로컬 씬 회귀 · 레퍼런스 노드의
+`addAttr`/`deleteAttr` · 편집 상태를 껐다 켜도 되찾는가 · **저장 후 다시 열어도 남는가** ·
+**케이지 원본 파일이 안 더럽혀지는가** · SC 솔버 분류.
+
 ## v03.01 (2026-08-26)
 **[Feature] `Chain > Create IK` 하위 탭 신규 — 시작/끝 조인트 쌍마다 ikHandle 생성.**
 

@@ -46,6 +46,14 @@
 # 아니라 **ikHandle 노드의 어트리뷰트**에 있다. 툴을 껐다 켜도, 씬을 저장했다 열어도
 # 이어서 확정하거나 취소할 수 있다.
 
+# ── 레퍼런스에서 온 핸들 ────────────────────────────────────────────────────
+#
+# 케이지 파일을 **레퍼런스로 불러와** 그 안의 조인트를 고치는 것이 A00130_ControlRig_V02
+# 의 작업 방식이다. 실측 결과 레퍼런스 노드에도 `setAttr` · `addAttr` · `deleteAttr` 이
+# 전부 먹고(편집은 reference edit 으로 저장돼 씬을 다시 열어도 남는다), 이 모듈이 하는
+# 일 중 레퍼런스가 막는 것은 없다 - 단 하나, **솔버 이름 비교**만 빼고. 위 handle_solver()
+# 참고. (`rename` 은 막히지만 이 모듈은 이름을 바꾸지 않는다.)
+
 import json
 import math
 
@@ -215,10 +223,30 @@ def _translate_settable(node):
 # =========================
 
 def handle_solver(handle):
+    """핸들이 쓰는 솔버의 **타입 이름** (`ikRPsolver` / `ikSCsolver` / ...).
+
+    `ikHandle -q -solver` 가 주는 것은 솔버의 **노드 이름**이다. 그래서 **레퍼런스에서 온
+    핸들이면 `CAGE:ikRPsolver` 처럼 네임스페이스가 붙어 온다**(실측 - 솔버 노드까지 함께
+    레퍼런스된다). 그 이름을 `("ikRPsolver", ...)` 과 그대로 비교하면 **에러 없이 어긋나서**
+    폴 벡터 갱신이 통째로 건너뛰어지고, 체인이 옛 평면으로 비틀린 채 확정된다
+    (실측 편차 2.03 / 45.8도).
+
+    그래서 이름이 아니라 **노드 타입**으로 판정한다 - 네임스페이스에도, 솔버 노드를
+    리네임한 씬에도 흔들리지 않는다.
+    """
     try:
-        return cmds.ikHandle(handle, q=True, solver=True)
+        node = cmds.ikHandle(handle, q=True, solver=True)
     except Exception:
         return ""
+    if not node:
+        return ""
+    try:
+        if cmds.objExists(node):
+            return cmds.nodeType(node)
+    except Exception:
+        pass
+    # 노드를 못 찾으면 최소한 네임스페이스만이라도 뗀다
+    return node.split(":")[-1]
 
 
 def chain_joints(handle):

@@ -4,7 +4,7 @@
 평평하던 상위 탭 5개(그 안에 접이식 6섹션)를 **상위 탭 = 카테고리 / 하위 탭 = 기능**
 의 2단 구조로 다시 나눠 담았다.
 
-- 버전: `v03.01` (`app/config/version.py`) — **`Chain > Create IK` 신규** (§4.3)
+- 버전: `v03.02` (`app/config/version.py`) — **레퍼런스 ikHandle 수정** (§8.8)
 - 위치: `JUN_All/tools/A00060_jointTool_V03`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴 (상위 5 × 하위 12 중첩 `QTabWidget`)
 - 계획서: [A00060_jointTool_V02 탭 재분류 계획서](plans/A00060_jointTool_V02_tab_reorg_plan.md)
@@ -491,7 +491,45 @@ UI 가 아니라 **ikHandle 노드의 어트리뷰트**(`JUN_ikEdit` / `JUN_ikEd
 - **체인이 일직선이면** 팔꿈치 방향을 읽을 수 없다. 폴 벡터를 손대지 않고 그 사실을 경고한다.
 - `ikSCsolver` 는 폴 벡터가 없어서 핸들 스냅만으로 편차 0 이다.
 
-### 8.8 검증
+### 8.8 레퍼런스로 불러온 ikHandle (v03.02)
+
+케이지 파일을 **레퍼런스로 불러와** 그 안의 조인트를 고치는 워크플로(`A00130_ControlRig_V02`)를
+확인하다 **조용한 버그**를 찾아 고쳤다.
+
+**증상** — 레퍼런스된 핸들에서 조인트를 옮기고 확정하면 **제자리에 남지 않았다.**
+실측 편차 **위치 2.036 / 회전 45.77도**(로컬 씬은 0.000000). 경고가 없어 알아채기 어려웠다.
+
+**원인** — `ikHandle -q -solver` 는 솔버의 **노드 이름**을 주는데, 파일을 레퍼런스하면
+**솔버 노드까지 함께 레퍼런스되어** `CAGE:ikRPsolver` 로 온다.
+
+```python
+cmds.ikHandle(h, q=True, solver=True)                    # 'CAGE:ikRPsolver'
+'CAGE:ikRPsolver' in ("ikRPsolver", "ikSpringSolver")    # False (!)
+```
+
+폴 벡터를 다루는 코드가 맨 앞에서 이 비교로 빠져나가면서 **폴 벡터 갱신이 통째로
+건너뛰어졌다** — 핸들만 이펙터로 스냅되고 폴 벡터는 옛 평면을 가리키니, §8.2 에서 측정했던
+**"핸들 스냅만 하면 편차 1.615"** 그 실패 모드다.
+
+**수정** — `handle_solver()` 가 이름이 아니라 **노드 타입**(`cmds.nodeType`)을 돌려준다.
+네임스페이스에도 솔버 노드 리네임에도 흔들리지 않는다.
+
+#### 레퍼런스에서 되는 것 / 안 되는 것 (실측)
+
+| | |
+|---|---|
+| 조인트 · 핸들 · 컨스트레인트에 `setAttr` | O — **reference edit 으로 저장되어 씬을 다시 열어도 남는다** |
+| 핸들에 `addAttr` / `deleteAttr` (편집 상태) | O — 확정 후 지워지므로 **케이지 원본 파일은 안 더럽혀진다** |
+| `preferredAngle` 쓰기 | O |
+| `rename` | X (`Cannot rename a read only node`) — 이 툴은 rename 을 쓰지 않는다 |
+
+> **케이지에 FK/IK 스위치가 있으면** `ikBlend` 가 구동되므로 `EDIT IK CHAIN` 은
+> **씬 전역 IK 정지**(`ikSystem -solve 0`)로 물러선다(§8.7). 레퍼런스든 아니든 같다 —
+> 씬의 **다른 리그 IK 도 함께 멈추므로** 편집을 끝내고 반드시 확정/취소할 것.
+
+---
+
+### 8.9 검증
 
 mayapy(Maya 2024) 헤드리스로 **core 87항목 + UI 스모크 56항목**.
 

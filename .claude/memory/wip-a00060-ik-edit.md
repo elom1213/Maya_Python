@@ -47,5 +47,13 @@ pv = (target_world − ikRoot_world) × handle.parentInverseMatrix(3x3) + offset
 - `ikSplineSolver` 는 커브가 체인을 구동 → 거부. 일직선 체인은 팔꿈치 방향을 못 읽음 → 경고.
   `ikSCsolver` 는 폴 벡터가 없어 스냅만으로 편차 0.
 
+**v03.02 (2026-08-27) — 레퍼런스에서 온 핸들은 폴 벡터를 갱신하지 않고 있었다.**
+`ikHandle -q -solver` 가 **솔버 노드 이름**을 주는데 레퍼런스면 `CAGE:ikRPsolver` 로 온다 →
+`RP_LIKE_SOLVERS` 비교가 어긋나 `_apply_pole_vector` 가 맨 앞에서 빠져나갔다.
+**핸들만 스냅되고 폴 벡터는 옛 평면** → 편차 **2.036 / 45.77도**(로컬은 0.000000), 경고 없음.
+`handle_solver()` 가 `cmds.nodeType` 을 돌려주게 고쳤다 — 자세한 건
+[[referenced-node-name-comparisons]]. **레퍼런스 자체는 이 툴을 막지 않는다** —
+`setAttr`/`addAttr`/`deleteAttr` 다 되고 편집은 reference edit 으로 저장된다.
+
 관련: [[mayapy-headless-verify]] · [[wip-a00275-edit-mesh]] ·
 [[constraint-target-plugs-and-offset-spaces]] · [[undo-chunk-by-default]]

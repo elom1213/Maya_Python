@@ -36,6 +36,7 @@
 - [getAttr settable lies](getattr-settable-lies-for-constrained.md) — `getAttr(plug, settable=True)` 는 **컨스트레인트가 구동하는 트랜스폼에도 True**. 쓸 수 있나는 `connectionInfo(isDestination=True)` + lock 으로 판정
 - [Maya loadPlugin no __file__](maya-loadplugin-no-file.md) — loadPlugin 으로 뜬 .py 플러그인은 `__file__` 없음
 - [animLayer no global selected query](animlayer-no-global-selected-query.md) — `animLayer(q,selected)` 는 레이어 인자 필요, `ls(type=animLayer)` 순회
+- [Referenced node name compares](referenced-node-name-comparisons.md) — 레퍼런스는 **솔버 노드까지 네임스페이스가 붙는다** (`ikHandle -q -solver` → `CAGE:ikRPsolver`). 이름 비교는 조용히 어긋난다 — **타입으로 판정**할 것
 - [Set rename traps](maya-set-rename-traps.md) — 마야 Search/Replace 가 세트에 안 먹히는 건 **`select(set)` 이 멤버를 펼치기** 때문 · **짧은 이름으로 rename 하면 네임스페이스가 벗겨진다** · 잘못된 문자를 조용히 고침 · 기본 세트 판정은 `defaultNodes=True`
 - [ikHandle creation traps](ikhandle-creation-traps.md) — SC 핸들에도 `poleVector` 어트리뷰트가 **있다**(솔버 이름으로 갈라야 함) · `ikSpringSolver` 는 플러그인 로드만으론 부족(MEL 프로시저로 솔버 노드 생성) · **같은 체인에 두 번째 핸들을 마야가 조용히 만들어 준다**
 - [name matching: token index](attr-name-matching-token-index.md) — 이름 대량 유사도 매칭은 편집 거리 말고 토큰 역색인+IDF. **difflib 비율은 coverage 와 척도가 다르다**
