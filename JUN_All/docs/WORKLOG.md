@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-08-26
+updated: 2026-08-27
 ---
 
 # 작업 일지 (WORKLOG)
@@ -28,7 +28,80 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-08-26 (오늘)
+## 2026-08-27 (오늘)
+
+> [!summary] `A00330_NamingTool` **Set Rename 에 Add/Del · Copy Name 이 세트도 대상으로** (v01.02→**01.03**)
+- **요청**: ① Set Rename 의 목록도 다른 TSL 처럼 `Add`/`Del` 로 편집하게 ② Copy Name 이
+  오브젝트뿐 아니라 **세트에도** 이름을 복사하게. 세트는 이름을 그대로 못 쓰니 **`_copy` 접미사**를 붙여서.
+- **`Add` / `Del`** — `Add` 는 선택과 관련된 세트를 **기존 목록에 더한다**(중복은 건너뛰고 몇 개가
+  이미 있었는지 로그). `Del` 은 하이라이트한 행을 **목록에서만** 뺀다 — **씬의 세트는 지워지지
+  않는다**(툴팁·로그에 명시). 필터에 가려진 선택은 남긴다.
+- **접미사가 왜 필요한지 실측으로 확인했다.** 세트는 DG 노드라 이미 쓰이는 이름을 못 쓴다 —
+  트랜스폼 `myName` 이 있는 씬에서 세트를 `myName` 으로 바꾸면 **마야가 조용히 `myName1`**,
+  반대로 트랜스폼을 세트 이름으로 바꿔도 **`shared2`** 다.
+  **DAG 는 부모만 다르면 같은 이름을 가질 수 있어**(`|g1|c` 와 `|g2|c` 공존) 이 문제가 없다
+  → **접미사는 세트 대상에만 붙인다.** 비우면 접미사 없이 시도하고, 마야가 바꾸면
+  **실제로 붙은 이름**을 `[Warning]` 으로 알린다.
+- **세트 판정은 `nodeType(inherited=True)`** 로 한다 — `shadingEngine` 은 `objectSet` 의
+  하위 타입이라(`['containerBase','entity','objectSet','shadingEngine']`) `nodeType()` 문자열
+  비교로는 놓친다. `partition` 은 별도 타입이라 따로 본다.
+- 세트는 `cmds.select(set)` 이 멤버를 펼쳐 담기 어려우므로 Copy Name 두 리스트에
+  **`Add Sets`** 버튼을 붙였다(선택에 든 세트 + 선택한 오브젝트가 **속한** 세트).
+  공용 TSL 의 `add_button()` 을 그대로 썼다.
+- **[Fix] `Copy Name` 이 네임스페이스를 벗기고 있었다.** 짧은 이름으로 `rename` 하면 노드가
+  **루트 네임스페이스로 옮겨간다** — 세트만이 아니라 **트랜스폼도 마찬가지다**(실측).
+  레퍼런스에서 온 대상을 리네임하면 네임스페이스를 잃었다는 뜻이다. 이제 대상의
+  네임스페이스를 떼어 두고 짧은 이름만 바꿔 다시 붙인다.
+  **요청 범위 밖이지만 같은 함수 안의 같은 종류 버그라 함께 고쳤다** —
+  안 고치면 세트 지원 자체가 레퍼런스 씬에서 깨진다.
+- **검증**(mayapy headless, **124항목 전부 통과** — v01.02 의 92항목 포함):
+  Add/Del 의 목록 변화와 **씬 불변** · 중복 Add · 선택이 무관할 때 거부 · `is_set_node` 4종 ·
+  접미사 기본/커스텀/빈 값 · 오브젝트 대상은 접미사 없음 · prefix 동시 적용 ·
+  **네임스페이스 보존(세트·트랜스폼 각각)** · 개수 불일치 경고 · UI 의 `Add Sets`/`Set suffix` 경로.
+- 문서: `docs/A00330_NamingTool.md` §6.2·§6.4, `CHANGELOG.md` v01.03, 툴 `README.md`. #A00330 #Sets
+
+> [!summary] `A00330_NamingTool` **`Set Rename` 탭 신규 — 세트 이름의 부분 문자열 찾아 바꾸기** (v01.01→**01.02**)
+- **요청**: 마야 기본 `Search Replace Option` 으로 세트 이름도 바꾸고 싶은데 세트는 안 된다.
+  같은 기능을 `A00330_NamingTool` 에 탭으로 추가해 달라.
+- **원인을 먼저 실측했다 — 막힌 것은 명령이 아니라 "세트를 선택하는 방법" 이었다.**
+  `Modify > Search and Replace Names` 의 실체인 MEL `searchReplaceNames` 는
+  **`"all"` 모드로 돌리면 세트도 잘 바꾼다**(실측: 세트 5개 포함 8개 이름이 한 번에 바뀐다).
+  그런데 **`cmds.select(set)` 은 세트가 아니라 그 멤버를 펼쳐 선택한다** — `ls(sl)` 이
+  `['pCube1']` 이라 `"selected"` 모드는 세트를 영영 못 본다.
+  `noExpand=True` 로 고르면 세트 자신이 잡히고 마야 기본 기능도 동작하지만, 뷰포트·아웃라이너
+  조작으로는 그 상태를 만들기 어렵다. `"all"` 모드는 대안이 못 된다 — 메시·조인트·카메라까지
+  전부 바꾼다. → **그래서 탭이 하는 일은 문자열 치환이 아니라 "세트를 고르게 하고 미리 보여 주는 것"** 이다.
+- **UI**: `Refresh`(씬의 모든 세트) / `From Selection`(**선택한 오브젝트가 속한** 세트) →
+  공용 Filter 로 좁히기 → 하이라이트 → `Search`/`Replace` 를 치면 목록의 `New name`·`Status`
+  열이 **즉시** 갱신 → `Rename Selected Sets`(undo 한 스텝).
+  옵션은 `Case sensitive`(기본 켜짐, 마야와 같음) · `Shading Engines`/`Partitions`(기본 꺼짐) ·
+  `Select Sets in Scene`(세트 자신을 `noExpand` 로 선택).
+- **실측으로 알아낸 함정 4가지 — 전부 탭이 막는다**:
+  - **네임스페이스가 벗겨진다.** `rename("NS:in_ns", "plain")` 은 세트를 **루트 네임스페이스로
+    옮긴다**(NS 가 빈다). 짧은 이름만 바꿔 넘기면 레퍼런스에서 온 세트가 전부 네임스페이스를 잃는다.
+    → 네임스페이스를 떼어 두고 **짧은 이름만 치환한 뒤 다시 붙인다.**
+  - **마야가 이름을 조용히 고친다.** `1bad` → `bad`(**맨 앞 숫자가 사라진다**),
+    `has space` → `has_space`, `a|b` → `a_b`. 경고만 뜬다 → **미리 걸러 내고 건너뛴다**
+    (조용한 변환을 흉내 내지 않는다).
+  - **이름이 겹치면 번호를 붙인다**(`dst_set` → `dst_set1`, 에러가 아니다) → `name taken` 으로
+    미리 표시하고 실행 후 **실제로 붙은 이름**을 보고한다.
+  - **`ls(readOnly=True)` 는 빈 리스트를 준다** — 기본 세트 판정에 쓰면 안 된다.
+    `ls(defaultNodes=True)` 로 골라야 `initialShadingGroup` 을 걸러 낼 수 있다.
+  - 그 밖에 **`partition` 은 `objectSet` 이 아니라** `ls(type="objectSet")` 에 안 잡힌다(옵션으로 따로).
+- **Framework**: 공용 Filter 위젯 `JUN_mod_filter_qt_v01` 에 **`QTreeWidget` 모드**를 더했다
+  (컬럼 있는 목록용, 기존 호출부 무영향). 만들다 **버그를 하나 심었다가 테스트가 잡았다** —
+  **`QTreeWidget.selectedItems()` 는 숨긴 항목을 빼고 주는데 `QListWidget` 은 그대로 준다**(실측).
+  그래서 트리 모드는 `isSelected()` 로 직접 판정하게 고쳤다. 안 그랬으면 "가려진 선택 수" 가
+  늘 0 이 되어 **"보이는 것이 작업 대상" 경고가 조용히 사라졌을 것이다.**
+- **검증**(mayapy headless, **92항목 전부 통과**): 이름 헬퍼(네임스페이스 분리·치환·유효성,
+  치환 문자열이 정규식으로 해석되지 않는지 포함) · 열거(세트/SG/partition/기본/잠금) ·
+  `select(set)` 이 멤버를 펼치는 거동과 `noExpand` 대조 · **미리보기가 씬을 안 바꾸는지** ·
+  상태 7종 · **네임스페이스 보존(+ 벗겨지는 대조군)** · 충돌 시 실제 이름 보고 ·
+  **undo 한 스텝** · Filter 리스트/트리 모드(가려진 선택 계수 포함) · UI 버튼 경로.
+- 문서: `docs/A00330_NamingTool.md` §6.4 신규, `docs/Framework_MOD_filter_qt.md` 5장 신규,
+  `CHANGELOG.md` v01.02, 툴 `README.md`. #A00330 #Framework #Sets
+
+## 2026-08-26
 
 > [!summary] `A00130_ControlRig_V02` **제작 계획서 — 템플릿 조인트 패러다임** (계획서만, 코드 미착수)
 - **요청**: A00130 을 mgear 의 *Guide Template Manager* · AdvancedSkeleton 의 *FitSkeleton* 처럼

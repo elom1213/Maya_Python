@@ -41,6 +41,23 @@ Qt 는 항목을 **숨겨도 선택 상태를 유지**한다. 그래서 필터�
 number_label 을 주면 `Number: N`(필터 없음) / `Number: 보이는수 / 전체수`(필터 중)로
 자동 갱신한다. 라벨을 안 쓰면 생략해도 된다.
 
+열이 있는 목록 (tree_widget)
+----------------------------
+컬럼이 필요한 목록은 `QTreeWidget` 을 쓴다(예: A00330_NamingTool 의 Set Rename 탭 —
+세트 이름 / 타입 / 새 이름 / 상태 4열). `tree_widget` 으로 넘기면 최상위 항목을
+`setHidden` 으로 거른다. 어느 열로 거를지는 `tree_column`(기본 0).
+
+    self.flt = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+        tree_widget=self.tree, number_label=self.lbl_number)
+
+`visible_items()` / `visible_selected()` / `select_all_visible()` 은 이 모드에서도
+QListWidget 과 똑같이 동작한다(이름은 `tree_column` 열의 텍스트).
+
+**함정**: `QTreeWidget.selectedItems()` 는 **숨긴 항목을 빼고 준다** — `QListWidget` 은
+숨겨도 그대로 준다(실측). 그래서 트리 모드의 `visible_selected()` 는 `selectedItems()`
+대신 항목을 직접 훑어 `isSelected()` 로 판정한다. 안 그러면 "가려진 선택 수" 가 늘 0 이 되어
+경고가 사라진다.
+
 QListWidget 이 아닌 목록 (rows_provider)
 ----------------------------------------
 탭에 따라 목록이 `QListWidget` 이 아니라 **행 위젯을 쌓아 만든 것**일 때가 있다
@@ -69,11 +86,14 @@ class JUN_mod_filter_qt_v01(QWidget):
     def __init__(self, list_widget=None, label="Filter",
                  placeholder="Type any part of a name (e.g. Inner)",
                  show_clear=True, number_label=None, rows_provider=None,
-                 parent=None):
+                 tree_widget=None, tree_column=0, parent=None):
         super(JUN_mod_filter_qt_v01, self).__init__(parent)
 
         self.list_widget = None
-        # QListWidget 이 아닌 목록용 — () -> [(name, widget), ...]
+        # 컬럼이 있는 목록용 — QTreeWidget 의 최상위 항목을 거른다
+        self.tree_widget = None
+        self.tree_column = int(tree_column or 0)
+        # QListWidget 도 QTreeWidget 도 아닌 목록용 — () -> [(name, widget), ...]
         self.rows_provider = rows_provider
         self.number_label = number_label
 
@@ -101,6 +121,8 @@ class JUN_mod_filter_qt_v01(QWidget):
 
         if list_widget is not None:
             self.attach(list_widget)
+        elif tree_widget is not None:
+            self.attach_tree(tree_widget)
 
     # ================================================================
     # 연결 / 조회
@@ -109,6 +131,13 @@ class JUN_mod_filter_qt_v01(QWidget):
     def attach(self, list_widget):
         """필터를 걸 QListWidget 을 지정하고 즉시 한 번 적용한다."""
         self.list_widget = list_widget
+        self.refresh()
+
+    def attach_tree(self, tree_widget, column=None):
+        """필터를 걸 QTreeWidget 을 지정하고 즉시 한 번 적용한다."""
+        self.tree_widget = tree_widget
+        if column is not None:
+            self.tree_column = int(column)
         self.refresh()
 
     def text(self):
@@ -150,6 +179,16 @@ class JUN_mod_filter_qt_v01(QWidget):
                 if hit:
                     shown += 1
 
+        elif self.tree_widget is not None:
+            total = self.tree_widget.topLevelItemCount()
+            for i in range(total):
+                item = self.tree_widget.topLevelItem(i)
+                hit = True if not tokens else self._matches(
+                    item.text(self.tree_column), tokens)
+                item.setHidden(not hit)
+                if hit:
+                    shown += 1
+
         elif self.rows_provider is not None:
             for name, widget in (self.rows_provider() or []):
                 total += 1
@@ -186,15 +225,25 @@ class JUN_mod_filter_qt_v01(QWidget):
             return []
         return [(n, w) for n, w in (self.rows_provider() or []) if w.isVisible()]
 
+    def _item_text(self, item):
+        """QListWidgetItem 은 text(), QTreeWidgetItem 은 text(column)."""
+        if self.tree_widget is not None:
+            return item.text(self.tree_column)
+        return item.text()
+
     def visible_items(self):
         """지금 보이는 항목들."""
+        if self.tree_widget is not None:
+            return [self.tree_widget.topLevelItem(i)
+                    for i in range(self.tree_widget.topLevelItemCount())
+                    if not self.tree_widget.topLevelItem(i).isHidden()]
         if self.list_widget is None:
             return []
         return [self.list_widget.item(i) for i in range(self.list_widget.count())
                 if not self.list_widget.item(i).isHidden()]
 
     def visible_texts(self):
-        return [it.text() for it in self.visible_items()]
+        return [self._item_text(it) for it in self.visible_items()]
 
     def visible_selected(self):
         """(보이면서 선택된 이름들, 필터에 가려진 선택 수).
@@ -202,9 +251,25 @@ class JUN_mod_filter_qt_v01(QWidget):
         Qt 는 숨긴 항목의 선택을 유지하므로, 작업 대상은 이 함수로 고른다.
         가려진 선택 수가 0 이 아니면 호출부가 로그로 알려 준다.
         """
+        names, hidden = [], 0
+
+        if self.tree_widget is not None:
+            # **QTreeWidget.selectedItems() 는 숨긴 항목을 빼고 준다**(실측) —
+            # QListWidget 과 다르다. 그대로 쓰면 "가려진 선택" 이 늘 0 으로 보여
+            # 이 함수의 존재 이유가 사라진다. 항목을 직접 훑어 isSelected() 로 본다.
+            for i in range(self.tree_widget.topLevelItemCount()):
+                item = self.tree_widget.topLevelItem(i)
+                if not item.isSelected():
+                    continue
+                if item.isHidden():
+                    hidden += 1
+                else:
+                    names.append(self._item_text(item))
+            return names, hidden
+
         if self.list_widget is None:
             return [], 0
-        names, hidden = [], 0
+        # QListWidget 은 숨겨도 selectedItems() 에 그대로 들어온다(실측)
         for item in self.list_widget.selectedItems():
             if item.isHidden():
                 hidden += 1
@@ -214,8 +279,9 @@ class JUN_mod_filter_qt_v01(QWidget):
 
     def select_all_visible(self):
         """보이는 항목만 전체 선택(가려진 것까지 잡는 selectAll 대체)."""
-        if self.list_widget is None:
+        source = self.tree_widget if self.tree_widget is not None else self.list_widget
+        if source is None:
             return
-        self.list_widget.clearSelection()
+        source.clearSelection()
         for item in self.visible_items():
             item.setSelected(True)

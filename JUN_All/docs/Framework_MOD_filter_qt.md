@@ -107,7 +107,37 @@ btn_all.clicked.connect(self.flt.select_all_visible)
 
 ---
 
-## 5. `QListWidget` 이 아닌 목록 — `rows_provider`
+## 5. 컬럼이 있는 목록 — `tree_widget` (v2 추가)
+
+컬럼이 필요한 목록은 `QTreeWidget` 을 쓴다
+(예: `A00330_NamingTool` 의 Set Rename 탭 — 세트 이름 / 타입 / 멤버 수 / 새 이름 / 상태 5열).
+`tree_widget` 으로 넘기면 **최상위 항목**을 `setHidden` 으로 거른다.
+어느 열로 거를지는 `tree_column`(기본 0).
+
+```python
+self.flt = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+    tree_widget=self.tree, number_label=self.lbl_number,
+    placeholder="Type any part of a set name")
+```
+
+`visible_items()` / `visible_texts()` / `visible_selected()` / `select_all_visible()` 은
+`QListWidget` 모드와 **똑같이** 동작한다(이름은 `tree_column` 열의 텍스트).
+목록을 다시 채운 뒤 `refresh()` 를 부르는 것도 같다.
+
+> **함정 — 두 위젯의 `selectedItems()` 가 다르다** (Maya 2024 / PySide2 실측)
+>
+> | | 항목을 선택한 뒤 숨기면 |
+> |---|---|
+> | `QListWidget` | `selectedItems()` 에 **그대로 들어온다** |
+> | `QTreeWidget` | `selectedItems()` 에서 **빠진다** (단 `item.isSelected()` 는 여전히 `True`) |
+>
+> 그래서 트리 모드의 `visible_selected()` 는 `selectedItems()` 를 쓰지 않고 **최상위 항목을
+> 직접 훑어 `isSelected()` 로 판정**한다. 그냥 `selectedItems()` 를 썼다면 **"가려진 선택 수"가
+> 늘 0 이 되어** 4장의 경고가 조용히 사라졌을 것이다.
+
+---
+
+## 6. `QListWidget` 이 아닌 목록 — `rows_provider`
 
 탭에 따라 목록이 `QListWidget` 이 아니라 **행 위젯을 쌓아 만든 것**일 때가 있다
 (예: `A00290_BSTool` Shape Editor 탭 — 행마다 Edit 버튼·슬라이더·스핀박스).
@@ -129,7 +159,7 @@ self.flt_se.filtered.connect(self._on_se_filtered)   # 개수 라벨 등 후처�
 
 ---
 
-## 6. 적용 현황
+## 7. 적용 현황
 
 | 툴 | 위치 | 모드 | 버전 |
 |----|------|------|------|
@@ -137,6 +167,7 @@ self.flt_se.filtered.connect(self._on_se_filtered)   # 개수 라벨 등 후처�
 | `A00290_BSTool` | Base Shape 탭 | `QListWidget` | v01.13 |
 | `A00290_BSTool` | Shape Editor 탭 | `rows_provider` | v01.13 |
 | `A00170_driverTool` | Remap Value 탭, Stretch 탭 2개 그룹 | `QListWidget`(TSL 내부) | v01.13 |
+| `A00330_NamingTool` | Set Rename 탭 | **`tree_widget`** | v01.02 |
 
 > **TSL(`JUN_mod_tsl_qt_v01`) 안의 리스트에 붙일 때**는 `tsl.list_widget` 을 넘긴다.
 > 단, TSL 의 `get_all_items()` / `selected_items()` 는 **숨김을 모른다** — 작업 대상은

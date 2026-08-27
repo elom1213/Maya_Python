@@ -36,6 +36,7 @@
 - [getAttr settable lies](getattr-settable-lies-for-constrained.md) — `getAttr(plug, settable=True)` 는 **컨스트레인트가 구동하는 트랜스폼에도 True**. 쓸 수 있나는 `connectionInfo(isDestination=True)` + lock 으로 판정
 - [Maya loadPlugin no __file__](maya-loadplugin-no-file.md) — loadPlugin 으로 뜬 .py 플러그인은 `__file__` 없음
 - [animLayer no global selected query](animlayer-no-global-selected-query.md) — `animLayer(q,selected)` 는 레이어 인자 필요, `ls(type=animLayer)` 순회
+- [Set rename traps](maya-set-rename-traps.md) — 마야 Search/Replace 가 세트에 안 먹히는 건 **`select(set)` 이 멤버를 펼치기** 때문 · **짧은 이름으로 rename 하면 네임스페이스가 벗겨진다** · 잘못된 문자를 조용히 고침 · 기본 세트 판정은 `defaultNodes=True`
 - [ikHandle creation traps](ikhandle-creation-traps.md) — SC 핸들에도 `poleVector` 어트리뷰트가 **있다**(솔버 이름으로 갈라야 함) · `ikSpringSolver` 는 플러그인 로드만으론 부족(MEL 프로시저로 솔버 노드 생성) · **같은 체인에 두 번째 핸들을 마야가 조용히 만들어 준다**
 - [name matching: token index](attr-name-matching-token-index.md) — 이름 대량 유사도 매칭은 편집 거리 말고 토큰 역색인+IDF. **difflib 비율은 coverage 와 척도가 다르다**
 - [hold mesh while moving joints](skincluster-hold-mesh-while-moving-joints.md) — 스킨 행렬 `bindPreMatrix*matrix` 를 multMatrix 로 상수 유지. `worldInverseMatrix` **직결은 포즈된 리그에서 메시가 튄다**
@@ -66,7 +67,7 @@
 - [TSL selection order](tsl-selection-order.md) — `Order` 체크박스. `ls(sl)` 는 컴포넌트를 인덱스 순으로 줌 → `selectPref(trackSelectionOrder)`+`ls(orderedSelection)`. **함정: pref off 면 `ls(os)` 도 에러 없이 인덱스 순서**
 - [Sub-tabs over collapsibles](prefer-subtabs-over-stacked-collapsibles.md) — 기능 섹션이 3~4개 넘으면 접이식 대신 **중첩 탭**. 하위 탭마다 개별 스크롤(이중 스크롤 주의), 단 **창 자동 리사이즈 툴은 스크롤 대신 fit page**
 - [Framework expand widget](framework-expand-widget.md) — MOD_expand_qt_v01: 본문을 별도 창으로 빼는 Expand 패널. **복제 말고 이동**, 호스트 창 Close 는 위젯이 감시
-- [Framework filter widget](framework-filter-widget.md) — MOD_filter_qt_v01: 검색 있는 툴은 전부 이 공용 Filter 로 통일 중
+- [Framework filter widget](framework-filter-widget.md) — MOD_filter_qt_v01: 검색 있는 툴은 전부 이 공용 Filter 로 통일 중. v2 에 **QTreeWidget 모드** 추가([[wip-a00330-set-rename]])
 - [Framework timeRange widget](framework-timerange-widget.md) — MOD_timeRange_qt_v01: Start/End 입력 + Get Current / Get Sel Range 공용 위젯
 - [QTreeWidgetItem checkable default](qtreewidgetitem-checkable-default-flag.md) — ItemIsUserCheckable 은 기본 ON, 플래그로 체크 가능 판정 금지
 - [clicked passes checked bool](qt-clicked-passes-checked-bool.md) — `clicked` 는 `checked`(bool)를 넘긴다. 기본 인자 있는 슬롯에 직접 연결하면 그 값이 옵션으로 샌다
@@ -97,6 +98,7 @@
 - [A00370 ToolLauncher](wip-a00370-toollauncher.md) — **신규**: 툴 바로가기 런처. 경로를 JUN_All 상대로 저장해 PC 간 git churn 제거 (v01.04)
 - [A00360 SortTool](wip-a00360-sorttool.md) — **신규**: 월드 XYZ/이름/타입 정렬 + 아웃라이너 재정렬 (v01.00)
 - [A00350 ArrayCreator](wip-a00350-arraycreator.md) — **신규**: TSL → UE Control Rig Item Array 텍스트. 공용 TSL 에 Reverse 버튼 옵션 추가
+- [A00330 Set Rename](wip-a00330-set-rename.md) — 세트 이름 찾아 바꾸기 + 미리보기. **막힌 건 명령이 아니라 세트를 고르는 방법**이었다 · 공용 Filter 에 트리 모드 추가. v01.03 에 Add/Del · Copy Name 세트 지원(`_copy` 접미사)
 - [A00340 SelectionTool](wip-a00340-selectiontool.md) — **신규**: 저장한 오브젝트 세트 빠른 재선택 + 프로파일 (v01.00)
 - [A00310 SearchTool](wip-a00310-searchtool-merge.md) — 레거시 Selection/Search 툴 2개를 탭 하나로 병합 (Maya 테스트 대기)
 - [A00300 batch summary](wip-a00300-batch-summary-table.md) — Target Meshes TSL + 색상 요약 테이블 (v01.02)

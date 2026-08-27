@@ -9,7 +9,9 @@
 1. **Naming Dyn** — 오브젝트와 그 transform 자손을 `Token1_Token2_Token3_Index1_Index2` 로 일괄 리네임.
    (구 Naming Dynamics 탭)
 2. **Copy Name** — Base 리스트의 leaf 이름(+Prefix)을 Targets 리스트에 순서대로 적용. (구 Copy name 탭)
-3. **Quick Rename** — **현재 선택** 기준으로 앞/뒤 글자 추가·제거, 새 이름+인덱스 부여. (`ref/ref_01.mel` 이식, 신규)
+3. **Quick Rename** — **현재 선택** 기준으로 앞/뒤 글자 추가·제거, 새 이름+인덱스 부여. (`ref/ref_01.mel` 이식)
+4. **Set Rename** — **세트 이름**의 부분 문자열 찾아 바꾸기. 마야 기본 `Search and Replace Names` 는
+   세트를 고를 수 없다(§6.4). (v01.02 신규)
 
 - 모든 UI 문자열/로그는 영어. 리스트(TSL)는 공용 위젯 `JUN_mod_tsl_qt_v01`(**Select / Add / Del / Up / Down / Sort**)을 쓴다.
 - 로직(리네임)은 `app/core`(maya.cmds), 화면은 `app/ui`(PySide)로 분리한다. 모든 작업은 **단일 Undo** 로 묶인다.
@@ -79,8 +81,23 @@ A00330_NamingTool/
 ### 6.2 Copy Name 탭
 
 1. 좌측 **Select Base**, 우측 **Select Targets** 로 두 리스트를 채운다. (필요하면 각 **Sort**)
+   - **세트를 담으려면 `Add Sets`** 를 쓴다(v01.03). `cmds.select(set)` 이 멤버를 펼쳐 버려서
+     평범한 Select/Add 로는 세트가 안 담긴다. 이 버튼은 **선택에 든 세트**와
+     **선택한 오브젝트가 속한 세트**를 함께 모은다.
 2. **Prefix** 에 접두어를 입력한다(선택).
-3. **Copy Name** 클릭 → Targets[i] 가 `Prefix + Base[i] 의 leaf 이름` 으로 리네임된다(리스트 순서 기준).
+3. **Set suffix** — **대상이 세트일 때만** 뒤에 붙는다. 기본 `_copy` (v01.03).
+4. **Copy Name** 클릭 → Targets[i] 가 `Prefix + Base[i] 의 leaf 이름` 으로 리네임된다(리스트 순서 기준).
+
+> **세트에 접미사가 필요한 이유** — 세트는 DG 노드라 **이미 쓰이는 이름을 그대로 못 쓴다.**
+> 트랜스폼 `myName` 이 있는 씬에서 세트를 `myName` 으로 바꾸면 **마야가 조용히 `myName1` 로
+> 만든다**(실측). DAG 노드는 부모가 다르면 같은 이름을 가질 수 있어(`|g1|c` 와 `|g2|c` 공존)
+> 이 문제가 없다 — 그래서 접미사는 **세트 대상에만** 붙는다.
+>
+> `Set suffix` 를 비우면 접미사 없이 시도하고, 마야가 이름을 바꾸면 **실제로 붙은 이름**을
+> 로그에 `[Warning]` 으로 알린다(조용히 넘어가지 않는다).
+
+> **네임스페이스는 보존된다**(v01.03). 짧은 이름만 넘기면 노드가 **루트 네임스페이스로
+> 옮겨간다** — 세트도 트랜스폼도 마찬가지다(실측). 이 탭은 대상의 네임스페이스를 그대로 다시 붙인다.
 
 ### 6.3 Quick Rename 탭 (현재 선택 기준)
 
@@ -91,6 +108,85 @@ A00330_NamingTool/
    - **Last Add** + **Add Apply** — 이름 뒤에 텍스트 추가.
    - **-1 Front / -1 Rear** — 이름의 앞/뒤 한 글자 제거.
    - **All Apply** — Change New → Front Insert → Last Add 순으로 한 번에 적용.
+
+---
+
+### 6.4 Set Rename 탭 (v01.02, 신규)
+
+**세트 이름 안의 부분 문자열을 찾아 바꾼다.**
+
+#### 마야 기본 기능은 왜 안 되나 (Maya 2024 실측)
+
+`Modify > Search and Replace Names` 의 실체는 MEL `searchReplaceNames` 다.
+**이 명령 자체는 세트도 잘 바꾼다** — `"all"` 모드로 돌리면 세트 이름이 같이 바뀐다
+(실측: 세트 5개를 포함해 8개 이름이 한 번에 바뀌었다).
+
+막힌 것은 명령이 아니라 **세트를 선택하는 방법**이다.
+
+```python
+cmds.select(mySet)
+cmds.ls(sl=True)                    # ['pCube1']  <- 세트가 아니라 멤버가 나온다
+cmds.ls(sl=True, type="objectSet")  # []
+```
+
+**`cmds.select(set)` 은 세트가 아니라 그 멤버를 펼쳐 선택한다.** 그래서 `"selected"` 모드는
+세트를 영영 못 본다. `noExpand=True` 로 넘기면 세트 자신이 선택되고 그때는 마야 기본 기능도
+세트를 바꾸지만, 뷰포트·아웃라이너 조작으로 그 상태를 만들기가 어렵다.
+`"all"` 모드는 대안이 못 된다 — 씬의 메시·조인트·카메라까지 전부 바꾼다.
+
+→ **이 탭은 세트를 직접 열거해 고르게 하고, 바꾸기 전에 미리보기를 준다.**
+
+#### 쓰는 법
+
+1. **`Refresh`** — 씬의 모든 세트를 나열한다(목록을 **교체**).
+   **`From Selection`** — 지금 선택한 오브젝트가 **속한** 세트를 나열한다(목록을 **교체**).
+   메시 하나를 고르고 그것이 든 세트를 찾는 흐름이다. 세트 자신을 `noExpand` 로 골라 둔
+   경우도 함께 잡는다.
+   **`Add`** / **`Del`** (v01.03) — 다른 탭의 TSL 과 같은 조작이다.
+   `Add` 는 선택과 관련된 세트를 **기존 목록에 더한다**(이미 있으면 건너뛴다).
+   `Del` 은 하이라이트한 행을 **목록에서만** 뺀다 — **씬의 세트는 지워지지 않는다.**
+2. **Filter** 로 목록을 좁힌다(부분 일치 · 대소문자 무시 · 공백은 AND).
+3. 바꿀 세트를 **하이라이트**한다(다중 선택).
+4. **Search / Replace** 를 친다 — **목록의 `New name` · `Status` 열이 즉시 갱신된다.**
+5. **`Rename Selected Sets`** — 전체가 **undo 한 스텝**.
+
+> **필터에 가려진 선택은 대상이 아니다.** 가려진 채 선택된 행이 있으면 로그로 알려 준다
+> ("보이는 것이 작업 대상" — 공용 Filter 위젯의 규칙).
+
+| 옵션 | 뜻 |
+|---|---|
+| `Shading Engines` | `shadingEngine` 노드도 목록에. **기본 꺼짐** — 렌더 셋업을 건드리게 된다 |
+| `Partitions` | `partition` 노드도 목록에. **`partition` 은 `objectSet` 이 아니라서** 기본 목록에 안 잡힌다 |
+| `Case sensitive` | 마야 기본 기능과 같은 동작 (기본 켜짐) |
+| `Select Sets in Scene` | 하이라이트한 **세트 자신**을 씬에서 선택한다 (`noExpand=True`) |
+
+#### Status 열
+
+| 상태 | 뜻 | 실행되나 |
+|---|---|---|
+| `OK` | 문제 없음 | O |
+| `name taken` | 같은 이름이 이미 있다 — **마야가 번호를 붙인다**(`dst_set` → `dst_set1`) | O (실제 붙은 이름을 로그로 보고) |
+| `no change` | 검색어가 이름에 없다 | X |
+| `invalid name` | 마야가 허용하지 않는 문자 (이유를 함께 표시) | X |
+| `locked` | 잠긴 노드 | X |
+| `referenced` | 레퍼런스에서 온 노드 | X |
+| `default set` | `initialShadingGroup` 등 기본 세트 | X |
+
+#### 실측으로 알아낸 함정 (이 탭이 대신 막아 주는 것)
+
+- **네임스페이스가 벗겨진다.** `rename("NS:in_ns", "plain")` 하면 세트가 **루트 네임스페이스로
+  옮겨간다**(`NS` 는 비게 된다). 짧은 이름만 바꿔 넘기면 레퍼런스에서 온 세트가 전부
+  네임스페이스를 잃는다. → 이 탭은 **네임스페이스를 떼어 두고 짧은 이름만 치환한 뒤 다시
+  붙여서** rename 한다.
+- **마야가 이름을 조용히 고친다.** `1bad` → `bad`(**맨 앞 숫자가 사라진다**),
+  `has space` → `has_space`, `has-dash` → `has_dash`, `a|b` → `a_b`.
+  경고만 뜨고 넘어가므로 의도와 다른 이름이 조용히 생긴다. → **미리 걸러 내고 건너뛴다**
+  (마야의 조용한 변환을 흉내 내지 않는다).
+- **이름이 겹치면 번호를 붙인다**(에러가 아니다). → 미리보기에서 `name taken` 으로 표시하고,
+  실행 후 **실제로 붙은 이름**을 `[Warning]` 으로 알린다.
+- **기본 세트는 못 바꾼다** — `Cannot rename a read only node`. 다만 **`ls(readOnly=True)` 는
+  빈 리스트를 준다**(판정에 쓰면 안 된다) — `ls(defaultNodes=True)` 로 골라야 한다.
+- `rename` 은 **undo 된다.**
 
 ---
 

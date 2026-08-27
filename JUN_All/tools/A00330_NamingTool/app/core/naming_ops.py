@@ -8,6 +8,14 @@
 #   - ref/ref_01.mel              : Quick Rename(Front Insert / Change New / Last Add / -1 trim)
 # UI 는 이 함수들만 호출한다(thin UI). Maya 밖에서도 import 가능하도록 cmds 는 lazy.
 
+from .set_rename_ops import split_namespace, join_namespace
+
+
+#: 세트를 대상으로 이름을 복사할 때 기본으로 붙는 접미사.
+#: 세트는 DG 노드라 **같은 이름을 그대로 쓸 수 없다**(실측: 마야가 조용히 `name1` 로 바꾼다).
+DEFAULT_SET_COPY_SUFFIX = "_copy"
+
+
 def _cmds():
     """maya.cmds 를 lazy import. Maya 밖이면 None 반환."""
     try:
@@ -52,6 +60,20 @@ def _rename_by_uuid(uuid, new_name):
     if not paths:
         return None
     return cmds.rename(paths[0], new_name)
+
+
+def is_set_node(node):
+    """objectSet / shadingEngine / partition 이면 True.
+
+    `nodeType(inherited=True)` 로 본다 - `shadingEngine` 은 `objectSet` 의 하위 타입이라
+    `nodeType()` 문자열 비교로는 놓친다(실측:
+    `['containerBase', 'entity', 'objectSet', 'shadingEngine']`).
+    """
+    cmds = _cmds()
+    if cmds is None or not node or not cmds.objExists(node):
+        return False
+    inherited = cmds.nodeType(node, inherited=True) or []
+    return "objectSet" in inherited or "partition" in inherited
 
 
 def _zeros(length):
@@ -160,33 +182,63 @@ def rename_dynamics(objects, token1, token2, token3,
 # Tab 2 : Copy Name  (JUN_cmd_copyName 이식)
 # ================================================================
 
-def copy_name(base_items, target_items, prefix):
+def copy_name(base_items, target_items, prefix,
+              set_suffix=DEFAULT_SET_COPY_SUFFIX):
     """base 리스트의 이름(prefix 부착)을 target 리스트에 순서대로 적용(rename).
 
-    반환: (new_names, warning) — warning 은 개수 불일치 시 안내 문자열(없으면 None).
+    **세트도 대상이 된다.** 다만 세트는 DG 노드라 **같은 이름을 그대로 못 쓴다** — 트랜스폼과
+    같은 이름을 주면 마야가 **조용히 `name1` 로 바꾼다**(실측). 그래서 대상이 세트면
+    `set_suffix`(기본 `_copy`)를 뒤에 붙인다. 빈 문자열을 주면 안 붙이고, 그때 충돌이 나면
+    실제로 붙은 이름을 notes 로 알린다.
+
+    (DAG 노드는 부모가 다르면 같은 이름을 가질 수 있어 이 문제가 없다 — 실측:
+    `|g1|c` 와 `|g2|c` 가 공존한다.)
+
+    반환: `(new_names, warning, notes)`
+        warning : 개수 불일치 안내(없으면 None)
+        notes   : 항목별 경고 목록(충돌로 이름이 바뀌었다 / 노드가 사라졌다 등)
     """
     cmds = _cmds()
     if cmds is None:
-        return [], "Maya not available."
+        return [], "Maya not available.", []
 
     warning = None
+    notes = []
     count = min(len(base_items), len(target_items))
     if len(base_items) != len(target_items):
         warning = ("Base({0}) and Targets({1}) counts differ; "
                    "renaming first {2} item(s).").format(
             len(base_items), len(target_items), count)
 
+    suffix = set_suffix or ""
+
     # 동일 이름 대비: target 을 먼저 UUID 로 잡아두고 rename 한다.
-    plan = [(_to_uuid(target_items[i]), prefix + short_name(base_items[i]))
-            for i in range(count)]
+    plan = []
+    for i in range(count):
+        target = target_items[i]
+        new_leaf = prefix + short_name(base_items[i])
+        if is_set_node(target):
+            new_leaf += suffix
+        # **네임스페이스를 보존한다** - 짧은 이름만 주면 노드가 루트 네임스페이스로
+        # 옮겨간다(실측: 세트도 트랜스폼도 마찬가지다).
+        namespace, _leaf = split_namespace(target)
+        plan.append((_to_uuid(target), namespace, new_leaf, target))
 
     new_names = []
-    for uuid, new_base in plan:
-        new_name = _rename_by_uuid(uuid, new_base)
-        if new_name is not None:
-            new_names.append(new_name)
+    for uuid, namespace, new_leaf, original in plan:
+        want = join_namespace(namespace, new_leaf)
+        new_name = _rename_by_uuid(uuid, want)
+        if new_name is None:
+            notes.append("[Warning] {0}: node no longer exists.".format(original))
+            continue
+        new_names.append(new_name)
+        if short_name(new_name) != new_leaf:
+            # 이름이 겹쳐 마야가 번호를 붙였거나, 잘못된 문자를 고쳤다
+            notes.append(
+                "[Warning] {0} -> {1} (asked for '{2}' - Maya changed it).".format(
+                    original, new_name, new_leaf))
 
-    return new_names, warning
+    return new_names, warning, notes
 
 
 # ================================================================
