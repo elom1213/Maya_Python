@@ -1,10 +1,10 @@
 # A00030_quickTool — Quick Tool (사용 안내)
 
 자주 쓰는 자잘한 작업을 버튼 하나로 처리하는 잡동사니 툴이다. 플레이백 갱신 범위 전환, 선택 출력,
-FBX 노멀 임포트 옵션, 텍스처 파일 노드 생성, 오브젝트별 클러스터 생성, 씬 저장 폴더 복사,
-로컬 축 표시 일괄 ON/OFF 를 모아뒀다.
+**계층 트리 출력**, FBX 노멀 임포트 옵션, 텍스처 파일 노드 생성, 오브젝트별 클러스터 생성,
+씬 저장 폴더 복사, 로컬 축 표시 일괄 ON/OFF 를 모아뒀다.
 
-- 버전: `V01.15` (파일 헤더 주석 / `str_headTitle`)
+- 버전: `V01.16` (파일 헤더 주석 / `str_headTitle`) — **`Print Hierarchy` 추가**
 - 위치: `JUN_All/tools/A00030_quickTool`
 - 형태: 아키텍처 (A) — **maya.cmds UI** 툴
 
@@ -34,6 +34,7 @@ A00030_quickTool/
 | **Pin (always on top)** (v01.13~) | 켜면 이 창이 다른 창들 위에 항상 유지된다 |
 | **Update window** — `Selected` / `All Windows` | `playbackOptions(view=...)` 를 `active` / `all` 로 전환 |
 | **print** — `Print Selected` | 현재 선택을 스크립트 에디터에 출력 |
+| **print** — `Print Hierarchy` (v01.16~) | 선택 오브젝트와 그 **아래 자식들의 부모 관계를 트리로** 출력 |
 | **Import option** — `Import FBX normal` | FBX 임포트 시 `OverrideNormalsLock` 을 켠다 |
 | **Create tool** — `Create texture file` | `file` + `place2dTexture` 를 만들고 UV 관련 어트리뷰트를 전부 연결 |
 | **Create tool** — `Cluster Each` (v01.12~) | 선택한 **오브젝트마다 클러스터를 하나씩** 만든다 |
@@ -49,6 +50,34 @@ A00030_quickTool/
 반드시 `show()` 를 다시 부른다. (Qt 툴들의 Pin 과 같은 방식 — `A00110` / `A00220` / `A00340`)
 
 > `maya_ui_widget()` 은 공용 헬퍼다. 다른 `maya.cmds` 툴에 Pin 을 붙일 때 그대로 재사용하면 된다.
+
+### Print Hierarchy (v01.16~)
+
+선택한 오브젝트와 **그 아래 모든 자손**의 부모 관계를 트리 그림으로 스크립트 에디터에 찍는다.
+**씬은 건드리지 않는다.**
+
+```
+root_grp
+├── child_a
+│   └── leaf_of_a
+├── child_b
+└── child_c
+```
+
+| 규칙 | |
+|---|---|
+| 대상 | **트랜스폼만**(조인트 포함). 셰이프는 뺀다 — 부모 관계를 보는 게 목적이라서 |
+| 이름 | **leaf 이름**만. **네임스페이스는 남긴다**(레퍼런스에서 의미가 있다) |
+| 여러 개 선택 | 오브젝트마다 트리를 하나씩. 단 **다른 선택의 자손인 것은 건너뛴다**(계층을 통째로 고르면 같은 트리가 몇 번이고 다시 찍히므로). 몇 개를 건너뛰었는지 마지막 줄에 알린다 |
+| 선택이 없으면 | 경고만 내고 아무것도 안 찍는다 |
+| 마지막 줄 | `Print Hierarchy: N node(s).` — 전체 노드 수 |
+
+> **`listRelatives -type transform` 은 조인트도 함께 준다**(joint 가 transform 을 상속하므로 —
+> 실측). 그래서 조인트 체인도 그대로 나온다.
+
+> **재귀를 쓰지 않는다.** 조인트 체인은 수백 단계로 깊어질 수 있어서, 재귀로 짜면
+> 파이썬 재귀 한계(기본 1000, 마야 콜백 스택 위라 여유가 더 적다)에 걸릴 수 있다.
+> 명시적 스택으로 **깊이 우선 전위 순회**한다 — 900단 체인으로 검증했다.
 
 ### Cluster Each
 `cmds.cluster` 는 **선택 전체에 클러스터 하나**를 만든다. 오브젝트마다 따로 걸려면 하나씩 선택해서
@@ -107,3 +136,7 @@ A00030_quickTool/
   (콜백 `JUN_cmd_set_local_axis(state)`, 헬퍼 `JUN_fun_resolve_local_axis_node`).
   현재 상태를 진단해 다른 것만 `setAttr` 로 바꾸며, `toggle -localAxis` 는 undo 가 안 걸려 쓰지 않는다.
   섹션이 늘어난 만큼 창 높이 360 → 420.
+- `V01.16` — **`print` 섹션에 `Print Hierarchy` 버튼 추가**
+  (선택과 그 자손의 부모 관계를 트리로 출력. 콜백 `JUN_cmd_print_hierarchy`,
+  트리 생성은 `JUN_fun_build_tree` — 재귀 없이 명시적 스택).
+  `print` 섹션의 `paneLayout` 이 `vertical2` 라 버튼 2개가 그대로 들어간다.

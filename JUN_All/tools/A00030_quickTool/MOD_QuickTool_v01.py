@@ -1,7 +1,7 @@
 # last Update date 26 05 27
 # Python Script by Ji Hun Park
 
-# Quickk Tool V01.13
+# Quick Tool V01.16
 # V01.04 : Create Create tool
 # V01.05 : Create Anim Tool
 # V01.06 : Create UV Tool
@@ -14,6 +14,7 @@
 # V01.13 : add Pin (always on top) toggle / remove Anim Tool UI
 # V01.14 : add "Copy Scene Folder" button (copy current scene folder path to clipboard)
 # V01.15 : add "Local Axis ON / OFF" buttons (batch show/hide local rotation axes)
+# V01.16 : add "Print Hierarchy" button (print the parent/child tree of the selection)
 
 import maya.cmds as cmds;
 import maya.mel as mel
@@ -36,6 +37,118 @@ def JUN_cmd_update_window_for_anim(*is_selected_only, **kw_args):
 
 def JUN_cmd_print_selected(*args, **kwargs):
     print(cmds.ls(sl = True))
+
+
+#--------------------------------------------------------------------
+# Print Hierarchy (V01.16)
+#--------------------------------------------------------------------
+
+# 트리 그림 문자. 스크립트 에디터는 유니코드를 그대로 찍는다.
+TREE_MID = u"\u251c\u2500\u2500 "   # |--
+TREE_END = u"\u2514\u2500\u2500 "   # `--
+TREE_BAR = u"\u2502   "               # |
+TREE_GAP = u"    "
+
+
+def JUN_fun_short_name(path):
+    """DAG 경로에서 leaf 이름만. 네임스페이스는 남긴다(레퍼런스에서 의미가 있다)."""
+    return path.split("|")[-1]
+
+
+def JUN_fun_child_transforms(path):
+    """자식 트랜스폼(조인트 포함)을 풀 경로로. 셰이프는 뺀다.
+
+    `listRelatives -type transform` 은 **조인트도 함께 준다**(joint 가 transform 을
+    상속하므로 - 실측). 셰이프만 빠지므로 부모 관계를 보는 데 이게 맞다.
+    """
+    return cmds.listRelatives(path, children=True, fullPath=True,
+                              type="transform") or []
+
+
+def JUN_fun_build_tree(root_path):
+    """root_path 이하를 트리 그림 줄 목록으로. **재귀를 쓰지 않는다.**
+
+    조인트 체인은 수백 단계로 깊어질 수 있는데(실측: 300단 체인도 흔한 형태),
+    재귀로 짜면 파이썬 재귀 한계(기본 1000, 마야 콜백 스택 위라 여유가 더 적다)에
+    걸릴 수 있다. 명시적 스택으로 훑는다.
+    """
+    lines = [JUN_fun_short_name(root_path)]
+
+    def push_children(stack, parent, prefix):
+        """자식을 **역순으로** 쌓는다. LIFO 라 그래야 첫 자식이 먼저 꺼내진다."""
+        kids = JUN_fun_child_transforms(parent)
+        for i in range(len(kids) - 1, -1, -1):
+            stack.append((kids[i], prefix, i == len(kids) - 1))
+
+    # (노드 경로, 이 줄에 붙을 접두사, 형제 중 마지막인가)
+    stack = []
+    push_children(stack, root_path, u"")
+
+    while stack:
+        node, prefix, is_last = stack.pop()
+
+        # 꺼내는 즉시 줄을 만든다 = 깊이 우선 전위 순회.
+        # (자식을 다 쌓아 두고 나중에 줄을 만들면 손자가 형제들 뒤로 밀린다)
+        lines.append(prefix + (TREE_END if is_last else TREE_MID)
+                     + JUN_fun_short_name(node))
+
+        # 마지막 형제 아래로는 세로줄을 잇지 않는다
+        push_children(stack, node, prefix + (TREE_GAP if is_last else TREE_BAR))
+
+    return lines
+
+
+def JUN_fun_hierarchy_text(roots):
+    """선택한 오브젝트마다 트리를 그려 하나의 문자열로. (텍스트, 노드 수) 반환."""
+    paths = []
+    for node in (roots or []):
+        found = cmds.ls(node, long=True) or []
+        if found:
+            paths.append(found[0])
+
+    # 이미 다른 선택의 자손인 것은 건너뛴다 - 계층을 통째로 고르면 같은 트리가
+    # 몇 번이고 다시 찍히기 때문이다.
+    roots_only = []
+    skipped = 0
+    for path in paths:
+        if any(path != other and path.startswith(other + "|") for other in paths):
+            skipped += 1
+            continue
+        roots_only.append(path)
+
+    blocks = []
+    total = 0
+    for path in roots_only:
+        lines = JUN_fun_build_tree(path)
+        total += len(lines)
+        blocks.append(u"\n".join(lines))
+
+    text = u"\n\n".join(blocks)
+    if skipped:
+        text += (u"\n\n[Info] {0} selected object(s) were skipped - they are already "
+                 u"inside another printed tree.".format(skipped))
+    return text, total
+
+
+def JUN_cmd_print_hierarchy(*args, **kwargs):
+    """선택 오브젝트와 그 아래 자식들의 부모 관계를 트리로 프린트한다.
+
+        joint_01
+        \u2514\u2500\u2500 joint_02_zro_01
+            \u2514\u2500\u2500 joint_02_zro_02
+
+    씬은 건드리지 않는다.
+    """
+    selection = cmds.ls(sl=True, long=True) or []
+    if not selection:
+        cmds.warning("Print Hierarchy: select one or more objects first.")
+        return u""
+
+    text, total = JUN_fun_hierarchy_text(selection)
+    print(text)
+    print("Print Hierarchy: {0} node(s).".format(total))
+    return text
+
 
 def JUN_cmd_importFBX_nrm(*args, **kwargs):
     mel.eval('FBXProperty "Import|IncludeGrp|Geometry|OverrideNormalsLock" -v 1')
@@ -206,8 +319,8 @@ def JUN_cmd_copy_scene_path(*args, **kwargs):
 class JUN_ToolUI_QuickTool:
     def __init__(self):
         # self.str_winTitle = "Quick Tool V01.06"
-        self.str_headTitle = "Quick Tool V01.15"
-        self.str_winName = "Junny_win_Quick_tool_V01_15"
+        self.str_headTitle = "Quick Tool V01.16"
+        self.str_winName = "Junny_win_Quick_tool_V01_16"
         self.win_width = 300;
         # File / Display 섹션을 추가한 만큼 창 세로를 늘려, 마지막 버튼 아래
         # Copyright 문구까지 잘리지 않고 보이게 한다. 버튼 높이는 기존 값(450/40)을 유지.
@@ -227,7 +340,7 @@ class JUN_ToolUI_QuickTool:
         self.idx_file = 4
         self.idx_display = 5
 
-        self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 23-MAY-2026\')".format(self.color_main)
+        self.menu_cmd = "cmds.confirmDialog( title=\'About\', icon =\"information\", bgc ={}, button = \"OK\", messageAlign = \"center\", message=\' Written by Ji Hun Park. \\n Update date: 27-AUG-2026\')".format(self.color_main)
 
     def cb_toggle_pin(self, enabled, *args, **kwargs):
         """Pin(Always on Top) 토글.
@@ -416,6 +529,10 @@ def JUN_PY_Quick_tool_v01_08():
                         {
                             "label": "Print Selected",
                             "callback": JUN_cmd_print_selected,
+                        },
+                        {
+                            "label": "Print Hierarchy",
+                            "callback": JUN_cmd_print_hierarchy,
                         }
                     ],
                     # idx_importFBX_nrm : 2
