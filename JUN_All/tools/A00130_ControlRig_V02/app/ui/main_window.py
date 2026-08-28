@@ -9,10 +9,14 @@
 # 상위 탭 = 단계. 지금은 `Match` 하나뿐이고, 다음 단계(Orient / Mirror / IK / Validate)는
 # 아래 STEPS 표에 줄을 넣으면 붙는다.
 #
-#   Orient : 규칙(A1 · A2 · A3)대로 템플릿 조인트의 방향을 잡는다  <- Match 보다 먼저
-#   Match  : 매핑 표(json)대로 세트의 원소를 짝인 조인트에 맞춘다
-#   Length : 템플릿 조인트 사이 거리를 옵션 컨트롤러 어트리뷰트에 써 넣는다
+#   Orient & Place : 규칙(A1 · A2 · A3)대로 방향을 잡고, 폴 타깃 4개는 위치까지 놓는다
+#                    <- Match 보다 먼저
+#   Length         : 템플릿 조인트 사이 거리를 옵션 컨트롤러 어트리뷰트에 써 넣는다
+#   Match          : 매핑 표(json)대로 세트의 원소를 짝인 조인트에 맞춘다
 #
+# v02.07 : 폴 타깃 4개 추가 + **Place** 규칙(자기 축 +Z 로 10) —
+#          방향만이 아니라 위치도 다루므로 탭·버튼을 **Orient & Place** 로.
+#          탭 순서도 Orient & Place / Length / Match 로.
 # v02.06 : Match 가 **세트에 없는 관련 ikHandle 도 찾아** 함께 끈다.
 # v02.05 : 탭 순서를 실제 작업 순서대로 — **Orient** 를 맨 앞으로.
 # v02.04 : **Orient** 단계 — A1(척추) · A2(팔·다리 + tail/preserve) · A3(미러).
@@ -46,20 +50,24 @@ WINDOW_OBJECT_NAME = "JUN_A00130_ControlRig_V02_window"
 
 
 # (탭 라벨, 툴팁, 빌더 메서드 이름) — 단계가 늘면 여기에 줄만 넣는다
-# 탭 순서 = 실제로 누르는 순서다. Orient 가 먼저인 이유는 Match 가 케이지를 조인트
-# 자리로 옮기기 때문 - 방향이 정해진 뒤에 맞춰야 한다.
+# 탭 순서 = 실제로 누르는 순서다. `Orient & Place` 가 먼저인 이유는 Match 가 케이지를
+# 조인트 자리로 옮기기 때문 - 조인트가 다 잡힌 뒤에 맞춰야 한다.
+#
+# 이름이 `Orient` 가 아닌 이유: 폴 타깃 4개는 **위치까지** 놓는다(orient_map 의 `place`).
+# 방향만 다루지 않으므로 탭도 버튼도 `Orient & Place` 다.
 STEPS = (
-    ("Orient",
-     "Orient - mirror the left side to the right, then set every template joint's "
-     "rotation from the rules. Run this before Match.",
+    ("Orient & Place",
+     "Orient & Place - mirror the left side to the right, set every template joint's "
+     "rotation from the rules, then place the foot and toe pole targets. "
+     "Run this before Match.",
      "_build_orient_tab"),
-    ("Match",
-     "Match - move each cage set's members onto the template joint it is paired with.",
-     "_build_match_tab"),
     ("Length",
      "Length - measure the template joints and write the distances onto the "
      "option controller.",
      "_build_length_tab"),
+    ("Match",
+     "Match - move each cage set's members onto the template joint it is paired with.",
+     "_build_match_tab"),
 )
 
 
@@ -379,9 +387,11 @@ class MainWindow(QWidget):
         layout = QVBoxLayout(tab)
 
         note = QLabel(
-            "Place the template joints by hand first, then press Orient. The left "
-            "side is mirrored onto the right, the spine is squared up, and the arms "
-            "and legs are aimed down the chain with the pole target deciding the roll.")
+            "Place the template joints by hand first, then press Orient & Place. The "
+            "left side is mirrored onto the right, the spine is squared up, and the "
+            "arms and legs are aimed down the chain with the pole target deciding the "
+            "roll. Finally the foot and toe pole targets are moved out along their own "
+            "+Z - that last step is why this is not called Orient.")
         note.setWordWrap(True)
         layout.addWidget(note)
 
@@ -424,16 +434,18 @@ class MainWindow(QWidget):
         row = QHBoxLayout()
         self.btn_check_orient = QPushButton("Check")
         self.btn_check_orient.setToolTip(
-            "Show which rule covers which joint. Changes nothing.\n"
+            "Show which rule covers which joint, and which ones get placed.\n"
+            "Changes nothing.\n"
             "'Up dev' is measured from the scene as it is now - the number that\n"
             "matters is the one after Orient has run.")
         self.btn_check_orient.clicked.connect(self.on_check_orient)
         row.addWidget(self.btn_check_orient)
 
-        self.btn_orient = QPushButton("Orient")
+        self.btn_orient = QPushButton("Orient && Place")
         self.btn_orient.setMinimumHeight(34)
         self.btn_orient.setToolTip(
-            "Mirror, then set the rotations. One undo step.\n"
+            "Mirror, set the rotations, then place the foot and toe pole targets.\n"
+            "One undo step.\n"
             "Joints with no rule are left untouched and listed as 'no rule'.")
         self.btn_orient.clicked.connect(self.on_orient)
         row.addWidget(self.btn_orient, 1)
@@ -745,6 +757,10 @@ class MainWindow(QWidget):
             return
         rows, _messages = self._refresh_orient(log_messages=True)
         counts = orient_manager.summarize(rows)
+        placed = [r for r in rows if r["status"] == orient_manager.ST_PLACED]
+        if placed:
+            self.log("[Info] {0} joint(s) will be MOVED, not just rotated: {1}.".format(
+                len(placed), ", ".join(su.short_name(r["joint"]) for r in placed)))
         self.log("Check : " + ", ".join(
             "{0} {1}".format(v, k) for k, v in sorted(counts.items())))
         no_rule = [r for r in rows if r["status"] == orient_manager.ST_NO_RULE]

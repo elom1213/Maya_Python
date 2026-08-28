@@ -86,6 +86,24 @@
     }
   ],
 
+  "place": [
+    {
+      "comment": [
+        "Pole targets for the foot and toe IK. After everything is oriented they sit",
+        "10 along their own +Z, measured from their parent (translate = 0,0,10).",
+        "This is the only rule that moves a joint, which is why the step is called",
+        "'Orient & Place' and not 'Orient'."
+      ],
+      "joints": [
+        "helper_polTgt_foot_l", "helper_polTgt_foot_r",
+        "helper_polTgt_toe_r", "helper_polTgt_toe_l"
+      ],
+      "reset": true,
+      "axis": "+Z",
+      "distance": 10.0
+    }
+  ],
+
   "mirror": {
     "plane": "YZ",
 

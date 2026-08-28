@@ -1,0 +1,84 @@
+helper_root
+└── helper_pelvis
+    ├── helper_spine_01
+    │   └── helper_spine_02
+    │       └── helper_spine_03
+    │           └── helper_spine_04
+    │               └── helper_spine_05
+    │                   ├── helper_neck_01
+    │                   │   └── helper_neck_02
+    │                   │       └── helper_head
+    │                   ├── helper_clavicle_l
+    │                   │   └── helper_upperarm_l
+    │                   │       ├── helper_lowerarm_l
+    │                   │       │   └── helper_hand_l
+    │                   │       │       ├── helper_thumb_01_l
+    │                   │       │       │   └── helper_thumb_02_l
+    │                   │       │       │       └── helper_thumb_03_l
+    │                   │       │       ├── helper_index_metacarpal_l
+    │                   │       │       │   └── helper_index_01_l
+    │                   │       │       │       └── helper_index_02_l
+    │                   │       │       │           └── helper_index_03_l
+    │                   │       │       ├── helper_middle_metacarpal_l
+    │                   │       │       │   └── helper_middle_01_l
+    │                   │       │       │       └── helper_middle_02_l
+    │                   │       │       │           └── helper_middle_03_l
+    │                   │       │       ├── helper_ring_metacarpal_l
+    │                   │       │       │   └── helper_ring_01_l
+    │                   │       │       │       └── helper_ring_02_l
+    │                   │       │       │           └── helper_ring_03_l
+    │                   │       │       └── helper_pinky_metacarpal_l
+    │                   │       │           └── helper_pinky_01_l
+    │                   │       │               └── helper_pinky_02_l
+    │                   │       │                   └── helper_pinky_03_l
+    │                   │       └── helper_polTgt_arm_l
+    │                   └── helper_clavicle_r
+    │                       └── helper_upperarm_r
+    │                           ├── helper_lowerarm_r
+    │                           │   └── helper_hand_r
+    │                           │       ├── helper_thumb_01_r
+    │                           │       │   └── helper_thumb_02_r
+    │                           │       │       └── helper_thumb_03_r
+    │                           │       ├── helper_index_metacarpal_r
+    │                           │       │   └── helper_index_01_r
+    │                           │       │       └── helper_index_02_r
+    │                           │       │           └── helper_index_03_r
+    │                           │       ├── helper_middle_metacarpal_r
+    │                           │       │   └── helper_middle_01_r
+    │                           │       │       └── helper_middle_02_r
+    │                           │       │           └── helper_middle_03_r
+    │                           │       ├── helper_ring_metacarpal_r
+    │                           │       │   └── helper_ring_01_r
+    │                           │       │       └── helper_ring_02_r
+    │                           │       │           └── helper_ring_03_r
+    │                           │       └── helper_pinky_metacarpal_r
+    │                           │           └── helper_pinky_01_r
+    │                           │               └── helper_pinky_02_r
+    │                           │                   └── helper_pinky_03_r
+    │                           └── helper_polTgt_arm_r
+    ├── helper_thigh_l
+    │   ├── helper_calf_l
+    │   │   └── helper_foot_l
+    │   │       ├── helper_polTgt_foot_l
+    │   │       ├── helper_ball_l
+    │   │       │   ├── helper_ballEnd_l
+    │   │       │   └── helper_polTgt_toe_l
+    │   │       ├── helper_FootSideInner_l
+    │   │       ├── helper_FootSideOuter_l
+    │   │       ├── helper_Heel_l
+    │   │       ├── helper_ballTwist_l
+    │   │       └── helper_toeEnd_l
+    │   └── helper_polTgt_leg_l
+    └── helper_thigh_r
+        ├── helper_calf_r
+        │   └── helper_foot_r
+        │       ├── helper_polTgt_foot_r
+        │       ├── helper_ball_r
+        │       │   ├── helper_ballEnd_r
+        │       │   └── helper_polTgt_toe_r
+        │       ├── helper_FootSideInner_r
+        │       ├── helper_FootSideOuter_r
+        │       ├── helper_Heel_r
+        │       ├── helper_ballTwist_r
+        │       └── helper_toeEnd_r
+        └── helper_polTgt_leg_r

@@ -3,6 +3,41 @@
 `A00130_ControlRig`(V01)의 **템플릿 조인트 패러다임 재작성판**이다.
 계획서: `JUN_All/docs/plans/A00130_ControlRig_V02_plan.md`
 
+## v02.07 (2026-08-28)
+**[Feature] 템플릿 조인트 4개 추가 + `Place` 규칙. 단계 이름을 `Orient & Place` 로.**
+
+사용자가 `joints_structure.json` 으로 갱신된 템플릿 구조를 줬다. 기존 매핑과 대조하니
+**추가 4개, 삭제 0, 부모 이동 0** 이었다:
+
+| 새 조인트 | 부모 |
+|---|---|
+| `helper_polTgt_foot_l` | `helper_foot_l` |
+| `helper_polTgt_toe_l` | `helper_ball_l` |
+| `helper_polTgt_foot_r` | `helper_foot_r` |
+| `helper_polTgt_toe_r` | `helper_ball_r` |
+
+`template_map.json` 에 넣었다(총 **84개**). 케이지 세트 짝은 아직 없어 구조/배치용이다.
+
+**`Place` 규칙** — 방향이 전부 정해진 **뒤에** 이 넷의 `translate` 가 `(0, 0, 10)` 이 된다.
+부모 자리에서 **자기 축 `+Z`** 로 10. 실측하면 `setAttr .translate` · `xform -os -t` ·
+`move -r -os` 가 **모두 같은 결과**다 — 오브젝트 공간 이동은 곧 `translate` 어트리뷰트다.
+방향 단계 뒤에 도는 이유는 **자기 축이 확정돼야 `+Z` 가 어디인지 정해지기** 때문이다.
+
+**[Change] 이름** — 이 단계가 방향만이 아니라 **위치까지** 다루게 됐으므로
+탭과 버튼을 **`Orient & Place`** 로 바꿨다. 표에는 **`placed`** 상태를 따로 두고,
+`Check` 는 로그에 `N joint(s) will be MOVED, not just rotated` 를 먼저 적는다 —
+**회전만 될 거라 생각하고 눌렀다가 위치가 바뀌는 일이 없도록.**
+
+**[Change] 탭 순서** — `Orient & Place` · `Length` · `Match` (사용자 지정).
+
+축과 거리는 `orient_map.json` 의 `place` 에 있다 — **코드는 안 고친다.**
+
+**검증**(mayapy headless, **Orient 83 + Match 112 + Length 127 + IK 57 = 379항목 전부 통과**):
+구조 파일과 `template_map` 이 맞는가 · 조인트 84개 · 네 조인트의 `translate` 가 정확히
+`(0,0,10)` 인가 · **엉뚱한 곳에 둬도 덮어쓰는가** · 부모에서 정확히 10 떨어지는가 ·
+`placed` 가 `ok` 와 다른 상태인가 · **방향 행 뒤에 오는가** · 잠긴 translate 를 건너뛰고
+알리는가 · 탭 이름과 순서.
+
 ## v02.06 (2026-08-28)
 **[Fix] Match — 세트에 없는 **중첩 IK 핸들** 때문에 조인트 회전이 틀어지던 문제.**
 

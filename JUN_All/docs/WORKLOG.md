@@ -76,6 +76,28 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   안 건드리는 것 · 역방향도 같은 규칙.
 - 문서: `docs/A00145_RigConnect.md` 에 두 절 추가(`Match Same Name`, `Show Match Only` 와 `(Null)`).
 
+> [!summary] `A00130_ControlRig_V02` **템플릿 조인트 4개 + Place 규칙 — 단계 이름 `Orient & Place`** (v02.06 -> 02.07)
+- **구조 분석**: 사용자가 `joints_structure.json`(이름은 json 인데 **내용은 트리 텍스트**)로
+  갱신된 템플릿 구조를 줬다. 파싱해 기존 `template_map.json` 과 대조하니
+  **추가 4개 · 삭제 0 · 부모 이동 0** 이었다 —
+  `helper_polTgt_foot_l/r`(부모 `foot`) · `helper_polTgt_toe_l/r`(부모 `ball`).
+  발·발끝 IK 의 폴 타깃이다. `template_map.json` 에 넣어 **84개**가 됐다.
+- **`Place` 규칙**: 방향이 전부 정해진 **뒤에** 이 넷의 `translate` 가 `(0,0,10)` —
+  부모 자리에서 **자기 축 `+Z`** 로 10.
+  - **실측**: `setAttr .translate` · `xform -os -t` · `move -r -os` 가 **모두 같은 결과**다.
+    오브젝트 공간 이동은 곧 `translate` 어트리뷰트다.
+  - **방향 단계 뒤에 도는 이유**: 자기 축이 확정돼야 `+Z` 가 어디인지 정해진다.
+- **이름을 바꿨다** — 이 단계가 **위치까지** 다루게 됐으니 `Orient` 는 더는 맞지 않는다.
+  탭·버튼을 **`Orient & Place`** 로. 표에 **`placed`** 상태를 따로 두고, `Check` 는
+  `N joint(s) will be MOVED, not just rotated` 를 먼저 적는다 —
+  **회전만 될 거라 생각하고 눌렀다가 위치가 바뀌는 일이 없도록.**
+- **탭 순서**: `Orient & Place` · `Length` · `Match` (사용자 지정).
+- 축과 거리는 `orient_map.json` 의 `place` 에 있다 — **코드는 안 고친다.**
+- **검증**(mayapy headless, **Orient 83 + Match 112 + Length 127 + IK 57 = 379항목 전부 통과**):
+  구조 파일과 매핑이 맞는가 · 84개 · `translate` 가 정확히 `(0,0,10)` 인가 ·
+  **엉뚱한 곳에 둬도 덮어쓰는가** · 부모에서 정확히 10 인가 · `placed` 가 `ok` 와 다른가 ·
+  **방향 행 뒤에 오는가** · 잠긴 translate 처리 · 탭 이름과 순서. #A00130 #ControlRig
+
 > [!summary] `A00130_ControlRig_V02` **Match — 세트에 없는 중첩 IK 핸들이 매칭과 싸우던 문제** (v02.05 -> 02.06)
 - **증상**(사용자 보고): 아래 구조에서 Match 를 하면 `CH_r_UpperArmDrv_xx_ikjnt` 의
   **위치는 의도대로인데 회전이 부모와 어긋난다.** 두 Drv 조인트는 부모와 회전 차이가

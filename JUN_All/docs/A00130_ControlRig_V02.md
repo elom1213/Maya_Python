@@ -44,20 +44,21 @@ V01(`CtrlRig`)과 `WINDOW_OBJECT_NAME` 이 달라 **둘을 동시에 띄워도 �
 
 ## 3. 작업 순서
 
-**탭 순서가 곧 작업 순서다** — 왼쪽부터 `Orient` · `Match` · `Length`.
+**탭 순서가 곧 작업 순서다** — 왼쪽부터 `Orient & Place` · `Length` · `Match`.
 
 1. **케이지를 레퍼런스로 불러온다.** `Source > Cage namespace` 에서 그 네임스페이스를 고른다.
    레퍼런스가 아니면 `(none)`.
 2. **`Match` 탭 > `Create Template Joints`** — 매핑 표의 이름·부모 관계대로 조인트를 만든다.
    **전부 원점에 쌓인다** — 위치는 사람이 놓는다. 이미 있는 조인트는 건드리지 않는다.
 3. **템플릿 조인트를 아바타에 맞춰 손으로 옮긴다.** (왼쪽과 가운데만 — 오른쪽은 미러가 채운다)
-4. **`Orient` 탭 > `Orient`** — 미러하고 방향을 잡는다. **undo 한 스텝.**
+4. **`Orient & Place` 탭 > `Orient & Place`** — 미러하고 방향을 잡은 뒤,
+   발·발끝 폴 타깃 4개를 자기 축 `+Z` 로 10 만큼 내보낸다. **undo 한 스텝.**
 5. **`Match` 탭 > `Check`** — 없는 템플릿 조인트 / 없는 케이지 세트를 보고한다. **씬 불변.**
 6. **`Match` 탭 > `Match`** — 각 케이지 세트의 원소를 짝인 조인트 자리로 옮긴다. **undo 한 스텝.**
 7. **`Length` 탭 > `Measure`** → **`Write Values`** — 거리를 재서 옵션 컨트롤러에 쓴다.
 
-> **`Orient` 가 `Match` 보다 먼저**여야 한다 — Match 는 케이지를 조인트 자리로 옮기므로
-> 방향이 정해진 뒤에 맞춰야 한다. 그래서 탭도 `Orient` 가 맨 앞이다.
+> **`Orient & Place` 가 `Match` 보다 먼저**여야 한다 — Match 는 케이지를 조인트 자리로
+> 옮기므로 조인트가 다 잡힌 뒤에 맞춰야 한다. 그래서 탭도 맨 앞이다.
 
 > `Length` 는 **`Match` 와 순서 의존이 없다.** Match 는 케이지를 움직이지 조인트를
 > 움직이지 않으므로, 조인트만 놓여 있으면 언제 눌러도 값이 같다.
@@ -423,17 +424,20 @@ A00130_ControlRig_V02/
 
 ---
 
-## 7. Orient — 템플릿 조인트의 방향
+## 7. Orient & Place — 템플릿 조인트의 방향과 (일부) 위치
 
 계획서: [`plans/A00130_ControlRig_V02_orient_plan.md`](plans/A00130_ControlRig_V02_orient_plan.md)
 
-조인트를 손으로 놓은 뒤 `Orient` 한 번이면 방향이 규칙대로 잡힌다. **위치는 안 바뀐다**
-(미러로 채우는 오른쪽만 예외).
+조인트를 손으로 놓은 뒤 `Orient & Place` 한 번이면 방향이 규칙대로 잡힌다.
+**대부분은 위치가 안 바뀌지만**, 미러로 채우는 오른쪽과 **폴 타깃 4개**는 위치도 정해진다.
+
+> **왜 이름이 `Orient` 가 아닌가.** 발·발끝 폴 타깃 4개는 **위치까지** 놓기 때문이다(7.7).
+> 방향만 다루지 않으므로 탭도 버튼도 `Orient & Place` 다.
 
 ### 7.1 순서가 강제된다
 
 ```
-미러  ->  A1(척추)  ->  A2(팔·다리 + tail/preserve)  ->  위치 전용(월드 회전 0)
+미러  ->  A1(척추)  ->  A2(팔·다리 + tail/preserve)  ->  위치 전용(월드 회전 0)  ->  Place
 ```
 
 **미러가 먼저여야 한다** — A2 는 오른쪽 **폴 타깃 위치를 읽는데**, 그걸 제자리에 놓는 게
@@ -491,3 +495,32 @@ foot -> ball 이 수직에서 36.87도 기울면
 놓아야 하는 것은 **왼손 19개와 `clavicle_l`** 이다.
 
 규칙이 정해지면 `orient_map.json` 에 줄만 더하면 된다 — **코드는 안 고친다.**
+
+### 7.7 Place — 발·발끝 폴 타깃 4개
+
+| 조인트 | 부모 |
+|---|---|
+| `helper_polTgt_foot_l` | `helper_foot_l` |
+| `helper_polTgt_toe_l` | `helper_ball_l` |
+| `helper_polTgt_foot_r` | `helper_foot_r` |
+| `helper_polTgt_toe_r` | `helper_ball_r` |
+
+방향이 전부 정해진 **뒤에**, 이 넷은 `translate` 가 **`(0, 0, 10)`** 이 된다 —
+부모 자리에서 **자기 축 `+Z`** 로 10.
+
+> **실측**: `setAttr .translate 0 0 10` · `xform -os -t 0 0 10` · `move -r -os 0 0 10` 이
+> **모두 같은 결과**다. 오브젝트 공간 이동은 곧 `translate` 어트리뷰트다.
+
+**방향 단계가 끝난 뒤에 돈다** — 자기 축이 확정돼야 `+Z` 가 어디인지 정해지기 때문이다.
+
+표에서 이 넷은 `ok` 가 아니라 **`placed`** 로 뜨고, `Check` 는 로그에
+`N joint(s) will be MOVED, not just rotated` 라고 미리 알린다 — **회전만 될 거라
+생각하고 눌렀다가 위치가 바뀌는 일이 없도록.**
+
+`translate` 가 잠겼거나 구동되면 건너뛰고 알린다.
+
+축과 거리는 `orient_map.json` 의 `place` 에 있다 — **코드는 안 고친다.**
+
+```jsonc
+{ "joints": [...], "reset": true, "axis": "+Z", "distance": 10.0 }
+```

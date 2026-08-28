@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
 # last Update date : 2026-08-28
-# A00130_ControlRig_V02 - Orient : 템플릿 조인트의 방향을 규칙대로 잡는다 (A1 · A2 · A3).
+# A00130_ControlRig_V02 - Orient & Place : 템플릿 조인트의 **방향**을 규칙대로 잡고,
+#                          일부 조인트는 **위치**까지 놓는다 (A1 · A2 · A3 + Place).
 #
 # 계획서: docs/plans/A00130_ControlRig_V02_orient_plan.md
 #
@@ -60,6 +61,7 @@ from . import scene_utils as su
 ST_OK = "ok"
 ST_PRESERVED = "preserved"          # 일부러 안 건드린다 (결정) - 계획서 4-9
 ST_NO_RULE = "no rule"              # 아직 규칙이 없다 (미결)  - 계획서 4-9
+ST_PLACED = "placed"               # 방향만이 아니라 위치까지 놓았다
 ST_MISSING = "joint missing"
 ST_BLOCKED = "blocked"
 ST_ERROR = "error"
@@ -461,6 +463,16 @@ def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True):
             add(entry["target"], "A3 position + world zero")
             add(entry["source"], "A3 world zero")
 
+    # ---- 5. 배치 (마지막) ----
+    for group in (doc.get("place") or []):
+        for name in group["joints"]:
+            row = add(name, "Place {0} {1:g}".format(
+                group.get("axis", "+Z"), group.get("distance", 0.0)))
+            if row["status"] == ST_OK:
+                row["status"] = ST_PLACED
+                row["note"] = "moved along its own {0} by {1:g} from the parent".format(
+                    group.get("axis", "+Z"), group.get("distance", 0.0))
+
     # ---- 규칙이 없는 조인트 ----
     known = set(claimed)
     for name in (doc.get("_all_joints") or []):
@@ -494,7 +506,8 @@ def apply(doc, namespace, world_zero_spine=None, mirror_enabled=True):
         미러 -> A1 -> A2(+tail/preserve) -> 위치 전용
     """
     messages = []
-    results = {"mirrored": 0, "aimed": 0, "preserved": 0, "zeroed": 0, "skipped": 0}
+    results = {"mirrored": 0, "aimed": 0, "preserved": 0, "zeroed": 0,
+               "placed": 0, "skipped": 0}
 
     if world_zero_spine is None:
         world_zero_spine = bool(doc.get("world_zero_default", True))
@@ -532,16 +545,19 @@ def apply(doc, namespace, world_zero_spine=None, mirror_enabled=True):
                 "[Info] {0} joint(s) were dragged along while their parents were "
                 "rotated - put back where they were.".format(moved))
 
-        # ---- 4. 위치 전용 (마지막) ----
+        # ---- 4. 위치 전용 ----
         if mirror_enabled:
             results["zeroed"] += _do_position_only(mirror, plane, namespace,
                                                    results, messages)
 
+        # ---- 5. 배치 (마지막 - 방향이 다 정해진 뒤라야 자기 축이 확정된다) ----
+        results["placed"] += _do_place(doc, namespace, results, messages)
+
     messages.append(
-        "[OK] Orient done - {0} mirrored, {1} aimed, {2} preserved, {3} zeroed, "
-        "{4} skipped.".format(results["mirrored"], results["aimed"],
-                              results["preserved"], results["zeroed"],
-                              results["skipped"]))
+        "[OK] Orient & Place done - {0} mirrored, {1} aimed, {2} preserved, {3} zeroed, "
+        "{4} placed, {5} skipped.".format(
+            results["mirrored"], results["aimed"], results["preserved"],
+            results["zeroed"], results["placed"], results["skipped"]))
     return results, messages
 
 
@@ -750,6 +766,51 @@ def _do_tail(tail, namespace, results, messages, label):
             "[OK] {0} tail : {1} is {2:.2f} deg off world {3} - that is how far the "
             "chain itself leans; aiming down the chain wins.".format(
                 label, tail["up"], dev, tail["up_world"]))
+    return done
+
+
+def _do_place(doc, namespace, results, messages):
+    """조인트를 **자기 축 방향으로** 놓는다. 방향 단계가 전부 끝난 뒤에 돈다.
+
+    `translate` 를 직접 쓴다 — 실측하면 `setAttr .translate`, `xform -os -t`,
+    `move -r -os` 가 **모두 같은 결과**다(오브젝트 공간 이동 = translate 어트리뷰트).
+
+    **이 단계 때문에 이 탭이 방향만이 아니라 위치까지 건드린다** — 그래서 이름이
+    `Orient` 가 아니라 `Orient & Place` 다.
+    """
+    done = 0
+    for group in (doc.get("place") or []):
+        axis = group.get("axis", "+Z")
+        dist = float(group.get("distance", 0.0))
+        index, sign = parse_axis(axis)
+
+        offset = [0.0, 0.0, 0.0]
+        offset[index] = sign * dist
+
+        for name in group["joints"]:
+            node = _resolve(name, namespace)
+            if not node:
+                results["skipped"] += 1
+                messages.append("[Warning] {0}: not in the scene - not placed.".format(
+                    name))
+                continue
+            if su.blocked_channels(node, translate=True, rotate=False):
+                results["skipped"] += 1
+                messages.append(
+                    "[Warning] {0}: translation is locked or driven - not placed.".format(
+                        su.short_name(node)))
+                continue
+            try:
+                if group.get("reset", True):
+                    cmds.setAttr(node + ".translate", 0, 0, 0)
+                cmds.xform(node, objectSpace=True, translation=offset)
+                done += 1
+            except Exception as e:
+                results["skipped"] += 1
+                messages.append("[ERR] {0}: {1}".format(su.short_name(node), e))
+
+        messages.append("[OK] placed {0} joint(s) at {1} {2:g} in object space.".format(
+            len(group["joints"]), axis, dist))
     return done
 
 

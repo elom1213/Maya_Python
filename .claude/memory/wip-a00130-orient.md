@@ -1,6 +1,6 @@
 ---
 name: wip-a00130-orient
-description: A00130_ControlRig_V02 Orient 단계 — 규칙 A1/A2/A3 가 결국 한 계산(aim+up hint). 부모를 돌리면 후손이 전부 딸려 움직이고, forward 를 맞추면 up 은 직교화만큼 기운다 (v02.04)
+description: A00130_ControlRig_V02 Orient & Place 단계 — 규칙 A1/A2/A3 가 결국 한 계산(aim+up hint). 부모를 돌리면 후손이 전부 딸려 움직이고, forward 를 맞추면 up 은 직교화만큼 기운다 (v02.04)
 metadata:
   type: project
 ---
@@ -43,6 +43,18 @@ A2 가 **오른쪽 폴 타깃 위치를 읽으므로** 미러가 먼저다.
   보게 되어 **오른팔 forward 가 로컬 `-X`**. 수식으로 구현하고 **`cmds.mirrorJoint` 와 행렬
   단위로 대조**해 검증했다(여러 방향).
 - **IK 는 끝 조인트를 안 돌린다** → 다리 `tail` / 팔 `preserve`(로컬 값 기준, 월드는 부모를 따라감).
+
+**`Place` — 이 단계는 방향만 다루지 않는다** (v02.07)
+
+발·발끝 폴 타깃 4개(`helper_polTgt_foot_l/r` · `helper_polTgt_toe_l/r`)는 방향이 다 정해진
+**뒤에** `translate` 가 `(0,0,10)` 이 된다 — 자기 축 `+Z` 로 10.
+실측: `setAttr .translate` · `xform -os -t` · `move -r -os` 가 **모두 같은 결과**
+(오브젝트 공간 이동 = translate 어트리뷰트). **방향 뒤에 도는 이유는 자기 축이 확정돼야
+`+Z` 가 어디인지 정해지기** 때문이다.
+
+**위치까지 건드리므로 이름을 `Orient` -> `Orient & Place` 로 바꿨다.**
+표에 `placed` 상태를 따로 두고 `Check` 가 "MOVED, not just rotated" 를 먼저 알린다 —
+**이름과 실제 동작이 어긋나면 사용자가 안심하고 잘못 누른다.**
 
 **`preserved` 와 `no rule` 을 가른다** — 둘 다 씬을 안 바꾸지만 하나는 **결정**, 하나는 **미결**.
 같은 칸에 담으면 **확인해야 할 빈칸이 결정된 항목에 묻힌다.**
