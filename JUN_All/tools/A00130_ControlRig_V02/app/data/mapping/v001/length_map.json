@@ -1,0 +1,51 @@
+{
+  "_comment": [
+    "Length values written onto the option controller.",
+    "Plan: JUN_All/docs/plans/A00130_ControlRig_V02_length_plan.md",
+    "",
+    "12 attributes in total - 3 per part. The '_up' / '_low' ones are as",
+    "required as 'total'; do not drop them (plan 1-1).",
+    "",
+    "option_ctl is the FULL node name, not the V01 token. V01 stored",
+    "'OptionAll_xx_ctl' and matched it with a substring test against every node",
+    "under the MainGlobal hierarchy; the node is really called",
+    "'CH_n_OptionAll_xx_ctl'. If the name does not match exactly the tool falls",
+    "back to a substring search, and you can always set it by hand in the UI.",
+    "",
+    "Attribute names are written out in full on purpose. They are NOT derived",
+    "by mirroring the left side: the rig spells the right arm total as 'Arm_r'",
+    "with a lower case r while every other total is upper case. Deriving would",
+    "silently write the wrong name (plan 4-1).",
+    "",
+    "total_mode : 'straight' = distance from the first joint to the last one,",
+    "             ignoring the bend. This is what V01 did.",
+    "             'sum'      = the segment lengths added up (fully extended).",
+    "             They differ by ~3.4% at a 30 degree bend (plan 3-1)."
+  ],
+
+  "option_ctl": "CH_n_OptionAll_xx_ctl",
+  "total_mode": "straight",
+
+  "measures": [
+    {
+      "part": "Arm_L",
+      "chain": ["helper_upperarm_l", "helper_lowerarm_l", "helper_hand_l"],
+      "attrs": { "total": "Arm_L", "upper": "arm_l_up", "lower": "arm_l_low" }
+    },
+    {
+      "part": "Arm_R",
+      "chain": ["helper_upperarm_r", "helper_lowerarm_r", "helper_hand_r"],
+      "attrs": { "total": "Arm_r", "upper": "arm_r_up", "lower": "arm_r_low" }
+    },
+    {
+      "part": "Leg_L",
+      "chain": ["helper_thigh_l", "helper_calf_l", "helper_foot_l"],
+      "attrs": { "total": "Leg_L", "upper": "leg_l_up", "lower": "leg_l_low" }
+    },
+    {
+      "part": "Leg_R",
+      "chain": ["helper_thigh_r", "helper_calf_r", "helper_foot_r"],
+      "attrs": { "total": "Leg_R", "upper": "leg_r_up", "lower": "leg_r_low" }
+    }
+  ]
+}

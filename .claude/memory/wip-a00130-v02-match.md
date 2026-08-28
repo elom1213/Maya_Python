@@ -1,6 +1,6 @@
 ---
 name: wip-a00130-v02-match
-description: A00130_ControlRig_V02 — 템플릿 조인트 패러다임 재작성. Phase 1(Match) 완료. 매핑은 json, 이름은 네임스페이스 붙인 쪽과 안 붙인 쪽을 둘 다 찾아본다, matchTransform 은 잠긴 채널을 조용히 건너뛴다 (v02.00)
+description: A00130_ControlRig_V02 — 템플릿 조인트 패러다임 재작성. Phase 1(Match) 완료. 매핑은 json, 이름은 네임스페이스 붙인 쪽과 안 붙인 쪽을 둘 다 찾아본다, 막힌 채널은 그룹 단위로 갈라 나머지는 매칭한다 (v02.02)
 metadata:
   type: project
 ---
@@ -33,9 +33,29 @@ V01 은 `Targets` 리스트에 **손으로 순서대로** 담아야 했고 그�
   (실측: `rotate 30/40/50` 인 노드의 rotateOrder 만 바꾸면 월드 회전이 달라진다).
   → 마야 내장 **`matchTransform`** 을 쓴다. rotateOrder·rotateAxis·피벗을 마야가 처리한다.
 - **`matchTransform` 은 잠긴 채널을 조용히 건너뛴다** — `translateX` 만 잠근 오브젝트가
-  **X 만 안 움직이고 에러도 없었다**(실측). 반쯤 옮겨진 상태가 제일 나쁘므로, 쓰기 전에
-  **잠금 + 입력 연결**을 직접 보고 막혀 있으면 **그 오브젝트를 통째로 건너뛴다.**
+  **X 만 안 움직이고 에러도 없었다**(실측). 그래서 쓰기 전에 **잠금 + 입력 연결**을 직접 본다.
   판정에 `getAttr(settable=True)` 는 쓰지 않는다([[getattr-settable-lies-for-constrained]]).
+
+**막힌 채널은 "통째로" 가 아니라 그룹 단위로 가른다** ★ (v02.02, 사용자 보고)
+
+처음에는 채널 하나라도 막히면 **그 오브젝트를 통째로 건너뛰었다**("반쪽이 제일 나쁘다").
+실제 케이지에서 과했다 — `pointConstraint` 가 걸린 컨트롤러가 **회전까지 매칭 안 된 채
+방치**됐다. 실측하면 컨스트레인트는 **그룹을 통째로** 막는다:
+
+| 걸린 것 | translate | rotate |
+|---|---|---|
+| `pointConstraint` | **3/3** | 0/3 |
+| `orientConstraint` · `aimConstraint` | 0/3 | **3/3** |
+| `parentConstraint` | 3/3 | 3/3 |
+| `translateX` 만 잠금 | **1/3** ← 진짜 반쪽 | 0/3 |
+
+→ `su.channel_group_state(node, group)` 가 `free` / `driven`(전부) / `partial`(일부) 를 가른다.
+**`driven` 이면 그 그룹만 건너뛰고 나머지는 매칭**, **`partial` 이면 그 그룹을 손대지 않고
+크게 경고**(위치를 맞추면 `t=[90,2,3]` 처럼 X 만 남는다), 둘 다 막히면 오브젝트를 건너뛴다.
+
+> **반쪽이 나쁜 것은 그룹 *안에서* 갈릴 때지, translate 와 rotate *사이*에서가 아니다.**
+> 원래 규칙이 틀린 게 아니라 **적용 범위를 재 보지 않은 것**이 문제였다.
+> 안전 규칙을 넣을 때는 **그 규칙이 어디까지 걸리는지도 실측**한다.
 
 **이름은 "어디에 산다" 고 정하지 말고 찾아본다** ★ — `scene_utils.resolve()` 가 후보 두 개를
 순서대로 본다: `CAGE:helper_pelvis` → `helper_pelvis`. **조인트와 세트에 똑같이** 적용한다.
@@ -72,5 +92,5 @@ V01 은 `Targets` 리스트에 **손으로 순서대로** 담아야 했고 그�
 **의존**: 지금은 없다(Phase 4 에서 `A00060_jointTool_V03` 의 IK Edit 을 부른다 —
 [[referenced-node-name-comparisons]] 로 레퍼런스 케이지에서도 되는 것을 확인해 뒀다).
 
-검증 **88항목** — `plan()`/`apply()` 를 갈라 둬서 `Check` 와 미리보기가 **씬을 안 바꾸고**
+검증 **110항목** — `plan()`/`apply()` 를 갈라 둬서 `Check` 와 미리보기가 **씬을 안 바꾸고**
 같은 계산을 쓴다. [[mayapy-headless-verify]] · [[qapplication-before-maya-standalone]].

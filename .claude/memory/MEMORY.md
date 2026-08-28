@@ -80,7 +80,9 @@
 - [A00060 IK Edit](wip-a00060-ik-edit.md) — ikHandle·폴 벡터 컨스트레인트를 둔 채 본 체인 수정. **핸들 스냅만으론 편차 1.615** — 폴 벡터 역산(offset 만 갱신)이 핵심, twist 는 −각도로 상쇄 (v01.05)
 - [A00010 HIK Mirror](wip-a00010-hik-mirror.md) — 한쪽 슬롯을 읽어 반대쪽 자동 할당(조인트 + Custom Rig 컨트롤러). 근거는 **이름 1순위 · 위치 폴백**, `setCharacterObject` 는 Control Rig 이 있으면 **조용히 아무것도 안 한다** (v02.01)
 - [A00090 rule versions](wip-a00090-rule-versions.md) — 규칙 json 을 `app/rules/<version>` 폴더로 분리 + UI Version 콤보 (v01.05). v01.06 에서 blendShape 타겟 이름 버그 수정([[blendshape-target-name-vs-alias]])
-- [A00130 V02 Match](wip-a00130-v02-match.md) — **신규 V02**: 템플릿 조인트 패러다임 재작성. Phase 1(Match). 매핑은 json(값은 언제나 목록) · **이름은 네임스페이스 붙인 쪽과 안 붙인 쪽을 둘 다 찾아본다**(로컬/레퍼런스를 정해 두면 조용히 전부 실패) · matchTransform 은 잠긴 채널을 조용히 건너뛴다 (v02.00)
+- [A00130 V02 Match](wip-a00130-v02-match.md) — **신규 V02**: 템플릿 조인트 패러다임 재작성. Phase 1(Match). 매핑은 json(값은 언제나 목록) · **이름은 네임스페이스 붙인 쪽과 안 붙인 쪽을 둘 다 찾아본다**(로컬/레퍼런스를 정해 두면 조용히 전부 실패) · **막힌 채널은 그룹 단위로 갈라**(pointConstraint = 위치만 막힘) 나머지는 매칭한다 (v02.02)
+- [A00130 Length](wip-a00130-length-values.md) — 템플릿 조인트 거리를 옵션 컨트롤러 **12개** 어트리뷰트에. **total 은 직선이라 up+low 와 다르다**(30°=3.4%) · min/max 는 안 자르고 예외 · **`ls` 와일드카드는 네임스페이스를 안 넘고 셰이프를 잡는다** · 이름으로 찾는 기능엔 **수동 지정(Get Selected)을 같이** (v02.01)
+- [A00130 IK session](wip-a00130-ik-session.md) — Match 가 앞뒤로 IK 를 껐다 켠다. **IK 는 연결이 아니라 솔버로 써서 막힌 걸로 안 보인다**(조용한 거짓 성공) · **snapEnable 이 평가 중에 핸들을 써서 undo 를 깨뜨린다** (v02.03)
 - [A00450 ManipulatorTool](wip-a00450-manipulatortool.md) — **신규**: 매니퓰레이터 축 굵기 슬라이더. `manipOptions` 는 전역 하나뿐(도구별 굵기 없음), 굵기(lineSize)와 클릭 히트(linePick)는 별개
 - [A00440 SetTool](wip-a00440-settool.md) — **신규**: 컴포넌트 세트 집합연산(∪∩∖ + Split). 이름 정규화가 전부, **`cmds.select(세트)` 는 멤버를 펼쳐 선택**한다
 - [A00430 DemBone](wip-a00430-dembone.md) — **신규 v01.03**: EA Dem Bones(스키닝 분해) 마야 이식 4모드(조인트 생성 포함). ref/ 는 git 제외·런타임 무의존, 공분산 4×4 질량 함정, 라벨 확산은 절대오차 말고 최선 대비 열위

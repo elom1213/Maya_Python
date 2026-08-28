@@ -9,8 +9,14 @@
 # 상위 탭 = 단계. 지금은 `Match` 하나뿐이고, 다음 단계(Orient / Mirror / IK / Validate)는
 # 아래 STEPS 표에 줄을 넣으면 붙는다.
 #
-#   Match : 매핑 표(json)대로 세트의 원소를 짝인 조인트에 맞춘다
+#   Match  : 매핑 표(json)대로 세트의 원소를 짝인 조인트에 맞춘다
+#   Length : 템플릿 조인트 사이 거리를 옵션 컨트롤러 어트리뷰트에 써 넣는다
 #
+# v02.03 : Match 앞뒤로 **IK 편집 세션** — D01_IK_handle 의 핸들을 끄고 매칭한 뒤
+#          핸들 스냅 + 폴 벡터 역산으로 되켠다 (계획서 Phase 4).
+# v02.02 : 막힌 채널을 그룹 단위로 갈라, 일부만 막혀도 나머지는 매칭한다.
+# v02.01 : Length 단계 — 템플릿 조인트 사이 거리를 옵션 컨트롤러에 쓴다.
+#          계획서: docs/plans/A00130_ControlRig_V02_length_plan.md
 # v02.00 : 신규. Match + 템플릿 조인트 생성.
 #          **orient 규칙은 아직 안 정해졌다** — 매핑 json 의 `orient` 필드는 자리만
 #          잡아 두고 아무도 읽지 않는다. 규칙이 오면 `Orient` 단계를 STEPS 에 더한다.
@@ -24,6 +30,8 @@ import maya.cmds as cmds
 
 from tools.A00130_ControlRig_V02.app.config.version import VERSION, LAST_UPDATE
 from tools.A00130_ControlRig_V02.app.core import mapping_data
+from tools.A00130_ControlRig_V02.app.core import ik_session
+from tools.A00130_ControlRig_V02.app.core import length_manager
 from tools.A00130_ControlRig_V02.app.core import match_manager
 from tools.A00130_ControlRig_V02.app.core import scene_utils as su
 
@@ -36,6 +44,10 @@ STEPS = (
     ("Match",
      "Match - move each cage set's members onto the template joint it is paired with.",
      "_build_match_tab"),
+    ("Length",
+     "Length - measure the template joints and write the distances onto the "
+     "option controller.",
+     "_build_length_tab"),
 )
 
 
@@ -53,6 +65,9 @@ class MainWindow(QWidget):
         self.resize(self.win_width, self.win_height)
 
         self.joints = []
+        self.length_doc = {}
+        self.ik_set_name = None
+        self.option_ctl_override = ""      # 손으로 지정하면 그것이 이긴다
         self.messages_seen = 0
 
         self.build_ui()
@@ -188,6 +203,30 @@ class MainWindow(QWidget):
 
         layout.addWidget(grp_tpl)
 
+        # ---- IK 핸들 ----
+        grp_ik = QGroupBox("IK handles")
+        ik_layout = QVBoxLayout(grp_ik)
+
+        self.chk_ik_session = QCheckBox("Turn IK off while matching, then snap the handles back")
+        self.chk_ik_session.setChecked(True)
+        self.chk_ik_session.setToolTip(
+            "Joints driven by an ikHandle cannot be matched while IK is solving -\n"
+            "matchTransform succeeds and the solver takes the value straight back,\n"
+            "so the log would say OK while nothing changed.\n"
+            "\n"
+            "With this on, Match does:\n"
+            "  turn IK off  ->  match  ->  snap handle + rebuild pole vector  ->  IK on\n"
+            "\n"
+            "The snap and the pole vector maths come from A00060 Joint Tool.\n"
+            "If the match fails half way the chains are put back and IK is turned on.")
+        ik_layout.addWidget(self.chk_ik_session)
+
+        self.lbl_ik_set = QLabel("")
+        self.lbl_ik_set.setWordWrap(True)
+        ik_layout.addWidget(self.lbl_ik_set)
+
+        layout.addWidget(grp_ik)
+
         # ---- 미리보기 ----
         self.tree_plan = QTreeWidget()
         self.tree_plan.setColumnCount(5)
@@ -207,6 +246,110 @@ class MainWindow(QWidget):
             "Everything is one undo step.")
         self.btn_match.clicked.connect(self.on_match)
         layout.addWidget(self.btn_match)
+
+        return tab
+
+    # --------------------------------------------------------------
+    # Step : Length
+    # --------------------------------------------------------------
+
+    def _build_length_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        note = QLabel(
+            "The distance between template joints is written onto the option "
+            "controller. Place the template joints first - Match does not have to "
+            "have been run. Measure changes nothing; Write Values is one undo step.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        # ---- 대상 / 옵션 ----
+        grp = QGroupBox("Target")
+        grid = QGridLayout(grp)
+
+        grid.addWidget(QLabel("Option controller"), 0, 0)
+        self.le_option_ctl = QLineEdit()
+        self.le_option_ctl.setPlaceholderText("not found - select it and press Get Selected")
+        self.le_option_ctl.setToolTip(
+            "Where the values are written.\n"
+            "\n"
+            "Found automatically from the name in length_map.json: the chosen namespace\n"
+            "first, then the bare name, then any transform whose name contains it\n"
+            "(a referenced cage brings it in as CAGE:CH_n_OptionAll_xx_ctl).\n"
+            "\n"
+            "You can also type a name here or select the controller in the scene and\n"
+            "press Get Selected. A name you set by hand wins until you press Auto.")
+        self.le_option_ctl.editingFinished.connect(self.on_option_ctl_typed)
+        grid.addWidget(self.le_option_ctl, 0, 1)
+
+        ctl_row = QHBoxLayout()
+        self.btn_get_option_ctl = QPushButton("Get Selected")
+        self.btn_get_option_ctl.setToolTip(
+            "Use the selected object as the option controller.\n"
+            "Select a shape and its transform is used.")
+        self.btn_get_option_ctl.clicked.connect(self.on_get_option_ctl)
+        ctl_row.addWidget(self.btn_get_option_ctl)
+
+        self.btn_auto_option_ctl = QPushButton("Auto")
+        self.btn_auto_option_ctl.setToolTip(
+            "Drop the name you set by hand and look it up from length_map.json again.")
+        self.btn_auto_option_ctl.clicked.connect(self.on_auto_option_ctl)
+        ctl_row.addWidget(self.btn_auto_option_ctl)
+        grid.addLayout(ctl_row, 0, 2)
+
+        self.lbl_ctl_how = QLabel("")
+        self.lbl_ctl_how.setWordWrap(True)
+        grid.addWidget(self.lbl_ctl_how, 1, 1, 1, 2)
+
+        grid.addWidget(QLabel("Total"), 2, 0)
+        self.cmb_total_mode = QComboBox()
+        self.cmb_total_mode.addItems([mapping_data.TOTAL_STRAIGHT,
+                                      mapping_data.TOTAL_SUM])
+        self.cmb_total_mode.setToolTip(
+            "How the whole-limb length is measured.\n"
+            "  straight : first joint to last joint, ignoring the bend (what V01 did)\n"
+            "  sum      : the two segments added up, i.e. fully extended\n"
+            "They differ by about 3.4% at a 30 degree bend. If the value drives IK\n"
+            "stretch, 'sum' is usually what you want.")
+        self.cmb_total_mode.currentIndexChanged.connect(lambda *_: self._refresh_length())
+        grid.addWidget(self.cmb_total_mode, 2, 1)
+
+        self.lbl_unit = QLabel("")
+        self.lbl_unit.setToolTip(
+            "Distances follow the scene's linear unit. The tool never changes it.")
+        grid.addWidget(self.lbl_unit, 2, 2)
+
+        layout.addWidget(grp)
+
+        # ---- 미리보기 ----
+        self.tree_length = QTreeWidget()
+        self.tree_length.setColumnCount(6)
+        self.tree_length.setHeaderLabels(
+            ["Part", "Total", "Upper", "Lower", "Attributes", "Status"])
+        self.tree_length.setRootIsDecorated(False)
+        self.tree_length.setAlternatingRowColors(True)
+        self.tree_length.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        layout.addWidget(self.tree_length, 1)
+
+        row = QHBoxLayout()
+        self.btn_measure = QPushButton("Measure")
+        self.btn_measure.setToolTip(
+            "Measure the template joints and show what would be written.\n"
+            "Changes nothing.")
+        self.btn_measure.clicked.connect(self.on_measure)
+        row.addWidget(self.btn_measure)
+
+        self.btn_write_length = QPushButton("Write Values")
+        self.btn_write_length.setMinimumHeight(34)
+        self.btn_write_length.setToolTip(
+            "Write the measured distances onto the option controller.\n"
+            "Attributes that are missing, locked, driven or out of range are skipped\n"
+            "and reported - the rest are still written.\n"
+            "One undo step.")
+        self.btn_write_length.clicked.connect(self.on_write_length)
+        row.addWidget(self.btn_write_length, 1)
+        layout.addLayout(row)
 
         return tab
 
@@ -230,6 +373,16 @@ class MainWindow(QWidget):
         self._log_all(messages)
         self._log_all(mapping_data.check(self.joints))
 
+        self.ik_set_name = mapping_data.load_ik_set(
+            None if version == "(none)" else version)
+
+        # 길이 데이터도 같은 버전 폴더에서 읽는다. 조인트 이름 오타를 여기서 잡는다.
+        self.length_doc, length_messages = mapping_data.load_length(
+            None if version == "(none)" else version, joints=self.joints)
+        self._log_all(length_messages)
+        self._log_all(mapping_data.check_length(self.length_doc))
+        self._sync_total_mode()
+
         pairs = sum(len(j["targets"]) for j in self.joints)
         structure = len([j for j in self.joints if not j["targets"]])
         self.lbl_mapping.setText(
@@ -237,6 +390,18 @@ class MainWindow(QWidget):
             .format(len(self.joints), pairs, structure))
 
         self._refresh_plan()
+        self._refresh_length()
+
+    def _sync_total_mode(self):
+        """콤보를 json 의 total_mode 로 맞춘다 (사용자가 바꾸면 그 뒤로는 콤보가 이긴다)."""
+        if not hasattr(self, "cmb_total_mode"):
+            return
+        mode = self.length_doc.get("total_mode")
+        index = self.cmb_total_mode.findText(mode or "")
+        if index >= 0 and self.cmb_total_mode.currentIndex() != index:
+            self.cmb_total_mode.blockSignals(True)
+            self.cmb_total_mode.setCurrentIndex(index)
+            self.cmb_total_mode.blockSignals(False)
 
     def refresh_namespaces(self):
         current = self.cmb_namespace.currentText()
@@ -277,7 +442,32 @@ class MainWindow(QWidget):
             self.tree_plan.addTopLevelItem(item)
         for col in range(5):
             self.tree_plan.resizeColumnToContents(col)
+        self._refresh_ik_label()
         return rows
+
+    # --------------------------------------------------------------
+    # IK 세션
+    # --------------------------------------------------------------
+
+    def _ik_handles(self, log_messages=False):
+        """`D01_IK_handle` 세트에서 ikHandle 을 모은다. `(handles, set_node)`."""
+        if not self.ik_set_name:
+            return [], None
+        set_node, messages = ik_session.resolve_set(self.ik_set_name, self._namespace())
+        handles, more = ik_session.handles_in_set(set_node)
+        if log_messages:
+            self._log_all(messages + more)
+        return handles, set_node
+
+    def _refresh_ik_label(self):
+        if not hasattr(self, "lbl_ik_set"):
+            return
+        handles, set_node = self._ik_handles()
+        text = ik_session.describe(set_node, handles)
+        stranded = ik_session.stranded_handles(handles)
+        if stranded:
+            text += "  -  {0} still in edit mode from an earlier run".format(len(stranded))
+        self.lbl_ik_set.setText(text)
 
     def on_check(self):
         rows = self._refresh_plan()
@@ -312,9 +502,116 @@ class MainWindow(QWidget):
         if not rows:
             self.log("[WARN] Nothing to match.")
             return
-        _results, messages = match_manager.apply(rows)
+
+        ik_handles = []
+        if self.chk_ik_session.isChecked():
+            ik_handles, _set_node = self._ik_handles(log_messages=True)
+
+        _results, messages = match_manager.apply(rows, ik_handles=ik_handles)
         self._log_all(messages)
         self._refresh_plan()
+
+    # --------------------------------------------------------------
+    # Length
+    # --------------------------------------------------------------
+
+    def _current_length_plan(self):
+        return length_manager.plan(
+            self.length_doc, self._namespace(), self.cmb_total_mode.currentText(),
+            override=self.option_ctl_override)
+
+    def _refresh_length(self, log_messages=False):
+        if not hasattr(self, "tree_length"):
+            return [], []
+
+        rows, messages = self._current_length_plan()
+        if log_messages:
+            self._log_all(messages)
+
+        node, _msgs, how = length_manager.find_option_ctl(
+            self.length_doc.get("option_ctl"), self._namespace(),
+            self.option_ctl_override)
+        if self.le_option_ctl.text() != (node or ""):
+            self.le_option_ctl.setText(node or "")
+        self.lbl_ctl_how.setText({
+            "manual": "set by hand",
+            "exact": "found by name",
+            "token": "matched by name - check it is the right node",
+        }.get(how, "not found - select it and press Get Selected"))
+        self.lbl_unit.setText("Measured in " + length_manager.linear_unit())
+
+        self.tree_length.clear()
+        for row in rows:
+            values = row["values"]
+            item = QTreeWidgetItem([
+                row["part"],
+                "{0:.4f}".format(values["total"]) if "total" in values else "-",
+                "{0:.4f}".format(values["upper"]) if "upper" in values else "-",
+                "{0:.4f}".format(values["lower"]) if "lower" in values else "-",
+                ", ".join(row["attrs"][r] for r in ("total", "upper", "lower")
+                          if r in row["attrs"]),
+                row["status"] if not row["note"]
+                else "{0} - {1}".format(row["status"], row["note"]),
+            ])
+            self.tree_length.addTopLevelItem(item)
+        for col in range(6):
+            self.tree_length.resizeColumnToContents(col)
+        return rows, messages
+
+    def on_get_option_ctl(self):
+        """선택한 오브젝트를 옵션 컨트롤러로 삼는다."""
+        node, message = length_manager.selected_option_ctl()
+        self.log(message)
+        if node:
+            self.option_ctl_override = node
+            self._refresh_length()
+
+    def on_auto_option_ctl(self):
+        """손으로 지정한 것을 버리고 다시 자동으로 찾는다."""
+        self.option_ctl_override = ""
+        _rows, messages = self._refresh_length()
+        self._log_all(messages)
+
+    def on_option_ctl_typed(self):
+        """필드에 직접 친 이름을 받는다 (빈 칸이면 자동으로 돌아간다)."""
+        text = self.le_option_ctl.text().strip()
+        if not text:
+            self.option_ctl_override = ""
+            self._refresh_length()
+            return
+        if text == self.option_ctl_override:
+            return
+        if not cmds.objExists(text):
+            self.log("[Warning] '{0}' does not exist.".format(text))
+            return
+        self.option_ctl_override = text
+        self.log("[OK] Option controller set to '{0}'.".format(text))
+        self._refresh_length()
+
+    def on_measure(self):
+        if not self.length_doc.get("measures"):
+            self.log("[WARN] No length data loaded.")
+            return
+        rows, _messages = self._refresh_length(log_messages=True)
+        counts = length_manager.summarize(rows)
+        self.log("Measure : " + ", ".join(
+            "{0} {1}".format(v, k) for k, v in sorted(counts.items())))
+        ready, wanted = length_manager.attribute_count(rows)
+        self.log("[{0}] {1} of {2} attribute(s) can be written.".format(
+            "OK" if ready == wanted else "Warning", ready, wanted))
+
+    def on_write_length(self):
+        if not self.length_doc.get("measures"):
+            self.log("[WARN] No length data loaded.")
+            return
+        rows, messages = self._refresh_length()
+        self._log_all(messages)
+        if not rows:
+            self.log("[WARN] Nothing to write.")
+            return
+        _results, write_messages = length_manager.apply(rows)
+        self._log_all(write_messages)
+        self._refresh_length()
 
     # ==============================================================
     # helpers

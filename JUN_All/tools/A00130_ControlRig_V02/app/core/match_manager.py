@@ -21,12 +21,26 @@
 #
 # V01 은 `except Exception: print(...)` 로 실패를 삼켰다. 여기서는 건너뛴 것과 실패한
 # 것을 **세어서** 돌려준다. 특히 `matchTransform` 은 **잠긴 채널을 조용히 건너뛰므로**
-# (실측) 쓰기 전에 미리 보고, 막혀 있으면 **반쯤 옮기지 않고** 통째로 건너뛴다.
+# (실측) 쓰기 전에 미리 본다.
+#
+# ── 막힌 채널은 **그룹 단위**로 가른다 (2026-08-28) ─────────────────────────
+#
+# 처음에는 채널 하나라도 막히면 그 오브젝트를 **통째로** 건너뛰었다. 실제 케이지에서
+# 그게 과했다 — `pointConstraint` 가 걸린 컨트롤러는 **위치만** 리그가 갖고 있고
+# **회전은 비어 있는데**, 통째로 건너뛰니 **회전이 매칭 안 된 채 방치**됐다.
+#
+# 실측: 컨스트레인트는 그룹을 통째로 막는다(point=T 3/3, orient/aim=R 3/3, parent=양쪽).
+# 반면 축 하나만 잠긴 경우는 `t=[90, 2, 3]` 처럼 진짜 반쪽이 된다.
+#
+# → **그룹(translate / rotate) 단위로 all-or-nothing.**
+#   전부 막혔으면 그 그룹만 깨끗이 건너뛰고 **나머지 그룹은 매칭한다.**
+#   일부만 막혔으면 그 그룹은 **건드리지 않고 크게 알린다.**
 
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
 
+from . import ik_session
 from . import scene_utils as su
 
 
@@ -105,71 +119,152 @@ def plan(joints, namespace):
     return rows
 
 
-def apply(rows):
+def apply(rows, ik_handles=None):
     """계산된 행대로 실제로 맞춘다. `(results, messages)`.
 
     전체가 **undo 한 스텝**이다.
+
+    `ik_handles` 를 주면 **매칭 앞뒤로 IK 편집 세션을 연다** (계획서 Phase 4):
+
+        IK 끄기 -> 매칭 -> 핸들 스냅 + 폴 벡터 역산 -> IK 켜기
+
+    이게 없으면 IK 가 걸린 조인트는 `matchTransform` 이 **성공해도 다음 평가에서 IK 가
+    도로 가져간다**(실측). 그러면 툴은 `[OK] matched` 라고 보고하는데 아무것도 안 바뀐다.
+    자세한 근거는 `ik_session` 의 모듈 주석.
+
+    매칭 도중 예외가 나면 **편집을 취소해 체인을 원래대로 돌리고** IK 를 되켠 뒤 예외를
+    다시 올린다 — 반쯤 매칭된 체인에 IK 가 다시 붙는 것이 제일 나쁘다.
     """
     messages = []
-    results = {"matched": 0, "joints": 0, "skipped_members": 0}
+    results = {
+        "matched": 0,            # 한 그룹이라도 적용된 멤버 수
+        "joints": 0,
+        "skipped_members": 0,    # 아무것도 적용 못 한 멤버 수
+        "partial": 0,            # 일부 그룹만 적용된 멤버 수
+        "driven_t": 0,           # 위치를 리그가 갖고 있어 건너뛴 수
+        "driven_r": 0,
+        "half": 0,               # 축이 일부만 막혀 손대지 않은 그룹 수
+    }
     seen_joints = set()
 
     with undo_chunk():
-        for row in rows:
-            if row["status"] in (ST_NO_JOINT, ST_NO_SET):
-                messages.append("[Warning] {0} <- {1} : {2} ({3}).".format(
-                    row["joint"], row["set"], row["status"], row["note"]))
-                continue
+        # ---- IK 편집 모드 진입 ----
+        session = None
+        if ik_handles:
+            session, ik_msgs = ik_session.begin(ik_handles)
+            messages.extend(ik_msgs)
 
-            if row["skipped_sets"]:
-                messages.append("[Info] {0}: {1} sub-set(s) ignored - {2}.".format(
-                    row["set"], len(row["skipped_sets"]),
-                    ", ".join(su.short_name(s) for s in row["skipped_sets"])))
-
-            if not row["members"]:
-                messages.append("[Warning] {0} <- {1} : no member to match{2}.".format(
-                    row["joint"], row["set"],
-                    " ({0})".format(row["note"]) if row["note"] else ""))
-                continue
-
-            want_t = "t" in row["match"]
-            want_r = "r" in row["match"]
-
-            for member in row["members"]:
-                if not cmds.objExists(member):
-                    results["skipped_members"] += 1
-                    messages.append("[Warning] {0}: member '{1}' is gone.".format(
-                        row["set"], member))
+        try:
+            for row in rows:
+                if row["status"] in (ST_NO_JOINT, ST_NO_SET):
+                    messages.append("[Warning] {0} <- {1} : {2} ({3}).".format(
+                        row["joint"], row["set"], row["status"], row["note"]))
                     continue
 
-                blocked = su.blocked_channels(member, translate=want_t, rotate=want_r)
-                if blocked:
-                    # 반쯤 옮겨진 상태가 제일 나쁘다 - 통째로 건너뛴다
-                    results["skipped_members"] += 1
-                    messages.append(
-                        "[Warning] {0}: '{1}' skipped - locked or driven ({2}).".format(
-                            row["set"], su.short_name(member), ", ".join(blocked)))
+                if row["skipped_sets"]:
+                    messages.append("[Info] {0}: {1} sub-set(s) ignored - {2}.".format(
+                        row["set"], len(row["skipped_sets"]),
+                        ", ".join(su.short_name(s) for s in row["skipped_sets"])))
+
+                if not row["members"]:
+                    messages.append("[Warning] {0} <- {1} : no member to match{2}.".format(
+                        row["joint"], row["set"],
+                        " ({0})".format(row["note"]) if row["note"] else ""))
                     continue
 
-                try:
-                    cmds.matchTransform(member, row["joint"],
-                                        position=want_t, rotation=want_r, scale=False)
-                except Exception as e:
-                    results["skipped_members"] += 1
-                    messages.append("[ERR] {0} <- {1} : {2}".format(
-                        su.short_name(member), row["joint"], e))
-                    continue
+                want_t = "t" in row["match"]
+                want_r = "r" in row["match"]
 
-                results["matched"] += 1
+                for member in row["members"]:
+                    if not cmds.objExists(member):
+                        results["skipped_members"] += 1
+                        messages.append("[Warning] {0}: member '{1}' is gone.".format(
+                            row["set"], member))
+                        continue
 
-            seen_joints.add(row["joint"])
-            mode = "position only" if not want_r else "position + rotation"
-            messages.append("[OK] {0} <- {1} : {2} member(s), {3}.".format(
-                row["joint"], su.short_name(row["set"]), len(row["members"]), mode))
+                    # 그룹 단위로 "지금 쓸 수 있나" 를 본다 (위 주석 참고)
+                    do_t, do_r = want_t, want_r
+                    notes = []
+
+                    if want_t:
+                        state, blocked = su.channel_group_state(member, "translate")
+                        if state == su.GROUP_DRIVEN:
+                            do_t = False
+                            results["driven_t"] += 1
+                            notes.append("position is driven by the rig")
+                        elif state == su.GROUP_PARTIAL:
+                            do_t = False
+                            results["half"] += 1
+                            notes.append(
+                                "position left alone - only {0} blocked, moving the rest "
+                                "would half-move it".format(", ".join(blocked)))
+
+                    if want_r:
+                        state, blocked = su.channel_group_state(member, "rotate")
+                        if state == su.GROUP_DRIVEN:
+                            do_r = False
+                            results["driven_r"] += 1
+                            notes.append("rotation is driven by the rig")
+                        elif state == su.GROUP_PARTIAL:
+                            do_r = False
+                            results["half"] += 1
+                            notes.append(
+                                "rotation left alone - only {0} blocked, rotating the rest "
+                                "would half-move it".format(", ".join(blocked)))
+
+                    if not do_t and not do_r:
+                        results["skipped_members"] += 1
+                        messages.append("[Warning] {0}: '{1}' skipped - {2}.".format(
+                            row["set"], su.short_name(member), "; ".join(notes)))
+                        continue
+
+                    try:
+                        cmds.matchTransform(member, row["joint"],
+                                            position=do_t, rotation=do_r, scale=False)
+                    except Exception as e:
+                        results["skipped_members"] += 1
+                        messages.append("[ERR] {0} <- {1} : {2}".format(
+                            su.short_name(member), row["joint"], e))
+                        continue
+
+                    results["matched"] += 1
+                    if notes:
+                        # 일부만 넣었다 - 무엇을 넣고 무엇을 뺐는지 분명히 적는다
+                        results["partial"] += 1
+                        did = " + ".join(
+                            [x for x in ("position" if do_t else "",
+                                         "rotation" if do_r else "") if x])
+                        messages.append("[Info] {0}: '{1}' matched {2} only - {3}.".format(
+                            row["set"], su.short_name(member), did, "; ".join(notes)))
+
+                seen_joints.add(row["joint"])
+                mode = "position only" if not want_r else "position + rotation"
+                messages.append("[OK] {0} <- {1} : {2} member(s), {3}.".format(
+                    row["joint"], su.short_name(row["set"]), len(row["members"]), mode))
+        except Exception:
+            # 반쯤 매칭된 체인에 IK 를 도로 붙이지 않는다 - 시작 상태로 되돌린다
+            if session:
+                messages.extend(ik_session.cancel(session))
+            raise
+
+        # ---- IK 편집 모드 종료 (핸들 스냅 + 폴 벡터 역산) ----
+        if session:
+            _ik_results, ik_msgs = ik_session.end(session)
+            messages.extend(ik_msgs)
 
     results["joints"] = len(seen_joints)
     messages.append("[OK] Match done - {0} object(s) on {1} joint(s), {2} skipped.".format(
         results["matched"], results["joints"], results["skipped_members"]))
+    if results["partial"]:
+        messages.append(
+            "[Info] {0} object(s) matched only part of the channels - the rig already "
+            "drives the rest ({1} position, {2} rotation).".format(
+                results["partial"], results["driven_t"], results["driven_r"]))
+    if results["half"]:
+        messages.append(
+            "[Warning] {0} channel group(s) were left alone because only some axes are "
+            "locked - moving the rest would half-move the object. Unlock them or "
+            "lock the whole group.".format(results["half"]))
     return results, messages
 
 

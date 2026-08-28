@@ -1,6 +1,7 @@
 {
   "version": "1.0",
   "note": "Generated from .ref/ref_01.txt. joint names are local (no namespace); set names get the namespace chosen in the UI. 'match' defaults to [\"t\",\"r\"]; ['t'] means position only. Optional per-joint 'orient' is reserved for a later phase.",
+  "ik_handle_set": "D01_IK_handle",
   "joints": [
     {
       "name": "helper_root",

@@ -118,8 +118,11 @@ def resolve_members(node):
 # 쓰기 가능 판정
 # =========================
 
-def _plug_writable(plug):
+def plug_writable(plug):
     """이 플러그에 `setAttr`/`xform` 이 실제로 '먹는지'.
+
+    Match(트랜스폼 채널)와 Length(옵션 컨트롤러 어트리뷰트) 두 곳이 쓴다 —
+    그래서 밑줄 없는 공개 이름이다.
 
     잠겨 있거나 무언가에 구동되면 안 먹는다. **`getAttr(settable=True)` 는 믿을 수 없다**
     — 컨스트레인트가 구동하는 트랜스폼에도 True 를 돌려준다(A00060 에서 실측).
@@ -153,9 +156,55 @@ def blocked_channels(node, translate=True, rotate=True):
     blocked = []
     for attr in axes:
         plug = "{0}.{1}".format(node, attr)
-        if not _plug_writable(plug):
+        if not plug_writable(plug):
             blocked.append(attr)
     return blocked
+
+
+#: 채널 그룹의 상태
+GROUP_FREE = "free"          # 전부 쓸 수 있다
+GROUP_DRIVEN = "driven"      # 전부 막혔다 - 리그가 이 채널을 갖고 있다
+GROUP_PARTIAL = "partial"    # 일부만 막혔다 - 건드리면 반쪽이 된다
+
+#: 그룹 이름 -> 채널
+CHANNEL_GROUPS = {
+    "translate": ("translateX", "translateY", "translateZ"),
+    "rotate": ("rotateX", "rotateY", "rotateZ"),
+}
+
+
+def channel_group_state(node, group):
+    """이 그룹을 지금 쓸 수 있나. `(상태, 막힌 채널 이름들)`.
+
+    ── 왜 그룹으로 보나 (2026-08-28) ─────────────────────────────────────────
+    처음에는 채널 하나라도 막히면 **그 오브젝트를 통째로 건너뛰었다.** "반쯤 옮겨진
+    상태가 제일 나쁘다" 는 이유였는데, 실제 케이지에서 그게 과했다.
+
+    실측하면 **컨스트레인트는 그룹을 통째로** 막는다:
+
+        pointConstraint    -> translate 3/3,  rotate 0/3
+        orientConstraint   -> translate 0/3,  rotate 3/3
+        aimConstraint      -> translate 0/3,  rotate 3/3
+        parentConstraint   -> 양쪽 3/3
+
+    즉 `pointConstraint` 가 걸린 컨트롤러는 **위치를 리그가 갖고 있을 뿐 회전은 비어 있다.**
+    통째로 건너뛰면 **회전이 매칭 안 된 채 방치된다** (사용자 보고:
+    `A01_Arm_L_01_UpperArm` 안의 오브젝트들).
+
+    반면 **축 하나만 잠긴 경우**는 다르다 — `translateX` 만 잠그고 위치를 맞추면
+    `t=[90, 2, 3]` 처럼 **X 만 안 가고 Y·Z 만 간다**(실측). 이것이 진짜 반쪽 상태다.
+
+    → **그룹 단위로 all-or-nothing.** 전부 막혔으면 깨끗이 건너뛰고(리그 몫),
+      일부만 막혔으면 **건드리지 않고 크게 알린다.**
+    """
+    channels = CHANNEL_GROUPS.get(group, ())
+    blocked = [c for c in channels
+               if not plug_writable("{0}.{1}".format(node, c))]
+    if not blocked:
+        return GROUP_FREE, []
+    if len(blocked) == len(channels):
+        return GROUP_DRIVEN, blocked
+    return GROUP_PARTIAL, blocked
 
 
 def short_name(node):
