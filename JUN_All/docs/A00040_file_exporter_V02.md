@@ -55,7 +55,7 @@ A00040_file_exporter_V02/
 | **Export Path** | `Browse` 로 FBX 를 저장할 폴더 선택(읽기 전용 필드에 표시) |
 | **Set Up** | 두 개의 TSL — `Set's Name`(내보낼 objectSet 목록, 씬 선택에서 Select/Add) / `File name`(각 세트의 결과 파일명) |
 | **Naming** | 토큰 6개(SK / MANU / CH / Name / Type / Version)로 파일명을 조립. 각 토큰은 `Custom`(직접 입력) 또는 `Set's Name`(세트 이름 사용) 모드. **Set Name** 버튼으로 File name 리스트 자동 생성 |
-| **Export** | **Move to scene root** 체크박스 + **Type Filter** 드롭다운(포함/제외 타입 선택) + **Export** 버튼 |
+| **Export** | **Move to scene root** · **Joints only under joints** 체크박스 + **Type Filter** 드롭다운(포함/제외 타입 선택) + **Export** 버튼 |
 | **Log** | 모든 결과·경고(`[OK]`/`[SKIP]`/`[FAIL]`/`[WARN]`)가 누적 |
 
 ---
@@ -67,13 +67,15 @@ A00040_file_exporter_V02/
 3. (선택) **Naming** 토큰을 설정하고 **Set Name** 으로 `File name` 을 자동 생성한다.
    - 토큰 모드가 `Custom` 이면 입력한 텍스트를, `Set's Name` 이면 그 세트의 이름(leaf)을 토큰으로 쓴다.
    - 빈 토큰은 건너뛰어 `__` 가 생기지 않는다.
-4. (선택) **Type Filter** 에서 내보낼 타입을 조정한다(§6).
+4. (선택) **Type Filter** 에서 내보낼 타입을 조정한다(§6), **Joints only under joints** 로 조인트 하위 정리 여부를 정한다(§6.3).
 5. **Export** — 각 세트의 멤버를 모아 `{Export Path}/{File name}.fbx` 로 내보낸다.
    - 파일명이 겹치면 `_000`, `_001` … 로 **고유 경로**를 붙인다. 파일명의 `:` 는 `_` 로 치환.
 
 ---
 
-## 6. Type Filter (NEW)
+## 6. 내보낼 대상 고르기 (Type Filter · Joints only)
+
+### 6.0 Type Filter
 
 내보낼 때 **특정 노드 타입을 포함/제외**할 수 있다. `Export` 섹션의 **"Include Types ▾"** 드롭다운에
 등록된 타입이 **체크박스**로 나온다(기본: 모두 체크 = 모두 포함).
@@ -88,13 +90,16 @@ A00040_file_exporter_V02/
 
 - 노드 자체가 해당 타입이거나(예: `joint`), 그 트랜스폼 아래 **shape** 이 해당 타입이면(예: `mesh`) 그 타입으로 간주한다.
 - **그룹 하위도 필터를 받는다**: 세트 멤버가 그룹이면 그 **계층 전체**를 훑어, 하위에 있는 제외 타입 노드(그룹 안 mesh 등)를
-  내보내기 직전에 잠깐 계층 밖으로 빼냈다가(export 후 원위치 복원) 처리한다. 즉 그룹은 유지되고 그 안의 제외 타입만 FBX 에서 빠진다.
-- 제외 대상 타입 중 **하나라도** 걸리면: 세트에 **직접 든 멤버**면 그 멤버가 통째로 빠지고, **그룹 하위 노드**면 그 노드(및 그 자손)만 빠진다.
-- **제외 방식(중요)**: shape 기반 타입(mesh 등)은 해당 **shape 의 `intermediateObject` 를 잠깐 켜서** FBX 에서 제외한다
-  (export 후 원복). FBX 는 intermediate shape 를 내보내지 않는다. 이 방식은 **노드를 옮기지 않으므로**(reparent 불필요)
-  메시 transform 이 **잠김(locked)·연결(connected)·컨스트레인**되어 있거나, 레퍼런스이거나, 같은 이름이 네임스페이스로만
-  구분되는 상황에서도 항상 동작한다. 단, shape 만 숨기므로 그 **transform 은 빈 노드로 FBX 에 남을 수 있다**.
-  shape 가 없는 타입(joint)만 계층에서 빼내며, 그마저 잠김/연결 등으로 불가하면 `[WARN] could not exclude ...` 로 안내된다.
+  내보낼 목록에서 뺀다. 즉 그룹은 유지되고 그 안의 제외 타입만 FBX 에서 빠진다.
+- 제외 대상 타입 중 **하나라도** 걸리면: 세트에 **직접 든 멤버**면 그 멤버가 통째로 빠지고, **그룹 하위 노드**면 그 노드와
+  **그 자손 전부**가 함께 빠진다(자손만 남기면 부모를 잃고 FBX 계층이 임의로 바뀌므로 그렇게 하지 않는다).
+- **제외 방식(중요, v02.06 변경)**: 노드를 **옮기지도 고치지도 않는다.** 내보낼 노드를 전부 **명시로 선택**한 뒤
+  `FBXExportIncludeChildren` 을 끄고 export 하고, 끝나면 옵션을 원래 값으로 되돌린다.
+  FBX *export selected* 는 이 옵션이 꺼지면 **선택한 노드만** 내보내므로(선택 안 한 조상은 계층 유지용으로 따라 나온다),
+  잠김(locked)·연결(connected)·컨스트레인·레퍼런스·네임스페이스 상황과 **무관하게** 항상 제외된다.
+  - 예전(~v02.05)처럼 `intermediateObject` 를 켜거나 월드로 빼냈다 되돌리지 않으므로, **씬은 필터 때문에 전혀 바뀌지 않는다.**
+  - 제외된 메시가 **빈 트랜스폼(null)으로 FBX 에 남던 문제**도 없어졌다 — 노드 자체가 나가지 않는다.
+  - `[WARN] could not exclude ... still in FBX` 경고는 더 이상 발생할 수 없어 삭제됐다.
 
 ### 6.2 타입 추가하기 (확장)
 
@@ -116,6 +121,31 @@ _TYPE_MATCHERS = {
 }
 ```
 
+### 6.3 Joints only under joints (NEW, v02.06)
+
+`Export` 섹션의 체크박스. **기본 켜짐.**
+
+조인트를 FBX 로 뽑을 때 **그 조인트 하위에 매달린 non-joint 오브젝트를 FBX 에서 뺀다** —
+메시(프롭·헬퍼 지오), 로케이터, 그룹, 그리고 조인트 밑에 생기는 **컨스트레인트 노드**
+(`*_parentConstraint1` 등)까지. 게임 엔진에 넘길 **스켈레톤만** 깔끔하게 뽑을 때 쓴다.
+
+| 상태 | FBX 결과 (`root_jnt > mid_jnt > (end_jnt, propGeo > helper_loc)`) |
+|------|------|
+| **체크 (기본)** | `root_jnt > mid_jnt > end_jnt` |
+| 해제 | `root_jnt > mid_jnt > (end_jnt, propGeo > helper_loc)` (전체 계층) |
+
+- **씬은 그대로다.** 노드를 빼내거나 숨겼다 되돌리는 게 아니라, 내보낼 노드만 골라 선택하고
+  `FBXExportIncludeChildren` 을 꺼서 export 한다(§6.1). 그래서 **export 전후로 조인트 하위 계층이
+  완전히 동일**하다 — 잠긴 채널·컨스트레인된 메시·레퍼런스도 마찬가지.
+- **제외는 그 노드의 자손까지 함께** 적용된다. 예를 들어 `joint > sub_grp > deep_jnt` 라면
+  `sub_grp` 가 빠지면서 `deep_jnt` 도 빠진다. (`deep_jnt` 만 남기면 부모를 잃어 FBX 에서 계층이
+  임의로 재배치되므로, 계층을 조용히 바꾸는 대신 함께 뺀다.)
+- 조인트를 내보낼 때는 **입력 연결(`FBXExportInputConnections`)도 함께 끈다.** 그래야 조인트를
+  구동하는 컨스트레인트의 **드라이버(컨트롤러 로케이터 등)** 가 FBX 루트에 딸려 나오지 않는다.
+  이 옵션도 export 직후 원래 값으로 복원된다.
+- 조인트가 아닌 멤버(그룹·메시)의 하위 계층에는 영향이 없다. 규칙은 **"조인트 아래"** 에만 적용된다.
+- 빠진 노드는 로그의 `excluded n object(s): ...` 에 이름이 나온다.
+
 ---
 
 ## 7. 내보내기 동작 (Move to scene root / Keep hierarchy)
@@ -132,11 +162,11 @@ _TYPE_MATCHERS = {
 - 원래 부모/멤버를 **UUID** 로 기록해 두고 복원한다. 씬에 **같은 이름의 오브젝트**가 있어도, 또
   부모를 옮겨 경로가 바뀌어도 안전하다(참고: [노드 신원 - 이름/경로 vs UUID](https://github.com/elom1213/JUN_Study/blob/master/008000_maya_node_identity_name_vs_uuid.md)).
 - 이미 월드 최상위인(부모가 없는) 멤버는 옮기지 않고 그대로 내보낸 뒤 그대로 둔다.
-- **타입 필터로 제외된 그룹 하위 노드**도 같은 방식으로 export 직전에 월드로 빼냈다가 원부모로 복원한다(§6).
+- **타입 필터 · Joints only 로 제외되는 노드는 옮기지 않는다**(§6.1). 씬을 실제로 건드리는 것은 이 `Move to scene root` 의 멤버 이동뿐이고, 그것도 export 후 원부모로 복원된다.
 - **레퍼런스 오브젝트**(레퍼런스 부모 밑의 레퍼런스 노드)는 Maya 가 월드로 빼내는 것을 금지한다. 이 경우
   에러 없이 **제자리에서 내보내고**(복원 생략) 넘어간다. 덕분에 레퍼런스 네임스페이스로 같은 이름이 생긴 씬
-  (`Test` + `namespace:Test`)에서도 정상 동작한다. 타입 제외 대상이 레퍼런스라 뺄 수 없으면 로그에
-  `[WARN] could not exclude ... still in FBX` 로 알린다.
+  (`Test` + `namespace:Test`)에서도 정상 동작한다. 제외 대상이 레퍼런스여도 노드를 옮기지 않으므로
+  (§6.1) 제외는 언제나 성공한다.
 - 전체 동작은 단일 Undo(`core.undo_chunk`)로 묶인다.
 
 ---
@@ -160,5 +190,6 @@ _TYPE_MATCHERS = {
 | UI | maya.cmds | **PySide(Qt)** |
 | 구조 | 단일 파일 + utility | **app/core · app/ui 분리** |
 | 타입 필터 | 없음(세트 멤버 전부) | **드롭다운 체크로 포함/제외** |
+| 조인트 하위 정리 | 없음 | **Joints only under joints**(조인트 밑 non-joint 를 FBX 에서 제외, 씬은 그대로) |
 | reparent 안전성 | 이름 기반 | **UUID 기반**(동일 이름 안전) |
 | 아이콘 | A00040 | **동일 아이콘 재사용** |

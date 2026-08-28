@@ -1,5 +1,30 @@
 # Changelog — A00040_file_exporter_V02
 
+## v02.06 (2026-08-28)
+- NEW **Joints only under joints** checkbox (Export section, on by default).
+  - When a joint is exported, everything parented under it that is **not a joint**
+    (meshes, locators, constraint nodes, groups) is left out of the FBX, together
+    with its own children. A joint sitting under such a node is dropped as well,
+    so no node is silently re-parented in the FBX.
+  - Input connections are skipped when a joint is being exported, so constraint
+    drivers (controller locators, ...) no longer sneak into the FBX root.
+  - Off: the whole hierarchy under each joint is exported (previous behavior).
+- Changed **how objects are kept out of the FBX** (both this option and the Type
+  Filter): instead of unparenting nodes to the world / flagging shapes as
+  `intermediateObject`, the exporter now selects **every node it wants** and turns
+  `FBXExportIncludeChildren` off for the export (the option is restored right
+  after). Consequences:
+  - **The scene is not modified at all by filtering.** The hierarchy under a joint
+    is identical before and after the export - nothing is unparented, hidden, or
+    restored, so locked / connected / constrained / referenced nodes are handled
+    like any other node.
+  - Excluded meshes no longer leave an empty transform (null) in the FBX; the
+    whole node is gone.
+  - The `[WARN] could not exclude ... still in FBX` case cannot happen any more
+    and the warning was removed.
+  - `Move to scene root` still unparents the set members themselves (and restores
+    them afterwards) - that is what the option is for.
+
 ## v02.05 (2026-07-03)
 - Fix/rediagnose: excluded meshes could stay in the FBX not because they were
   *referenced*, but because their transforms are locked/connected/constrained

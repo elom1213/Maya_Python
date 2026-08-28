@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-03
+# last Update date : 2026-08-28
 # A00040_file_exporter_V02 - Qt UI
 #
 # 레거시 maya.cmds 툴(A00040_file_exporter/file_exporter_v01)을 PySide 로 재작업했다.
 #   - Export path : FBX 를 저장할 폴더 선택
-#   - Type Filter : 드롭다운 체크로 내보낼 노드 타입 포함/제외 (mesh / joint, 확장 가능) [NEW]
+#   - Type Filter : 드롭다운 체크로 내보낼 노드 타입 포함/제외 (mesh / joint, 확장 가능)
+#   - Joints only : joint 하위의 non-joint 노드를 FBX 에서 뺀다 (씬은 그대로) [NEW]
 #   - Set's Name / File name : 내보낼 objectSet 목록과 결과 파일명(TSL)
 #   - Naming      : 토큰 조합으로 파일명 자동 생성 (Custom / Set's Name 모드)
 # 리스트 UI 는 공용 위젯 JUN_mod_tsl_qt_v01, 로직은 app/core. 모든 UI 문자열/로그는 영어.
@@ -171,6 +172,21 @@ class MainWindow(QWidget):
             "Off: keep the current scene hierarchy -> 'grp>joint_01' stays "
             "'grp>joint_01'.")
         opt_row.addWidget(self.cb_move_to_root)
+
+        # joint 하위의 non-joint(메시/로케이터/컨스트레인트 노드/그룹)를 FBX 에서 뺀다.
+        self.cb_joints_only = QCheckBox("Joints only under joints")
+        self.cb_joints_only.setChecked(True)
+        self.cb_joints_only.setToolTip(
+            "On (default): when a joint is exported, everything parented under it "
+            "that is not a joint (meshes, locators, constraint nodes, groups) is "
+            "left out of the FBX, together with its children.\n"
+            "Input connections (constraint drivers) are skipped as well, so a "
+            "skeleton export stays joints-only.\n"
+            "The scene is not modified: nothing is unparented or hidden, so the "
+            "hierarchy under the joint is identical before and after the export.\n"
+            "Off: export the whole hierarchy under each joint.")
+        opt_row.addWidget(self.cb_joints_only)
+
         opt_row.addStretch(1)
         outer.addLayout(opt_row)
 
@@ -231,15 +247,19 @@ class MainWindow(QWidget):
         file_names = self.name_tsl.get_all_items()
         excluded = self.type_filter.excluded_keys()
         keep_hierarchy = not self.cb_move_to_root.isChecked()
+        joints_only = self.cb_joints_only.isChecked()
 
         included = self.type_filter.included_keys()
-        self._log("--- Export start (include: {0} | hierarchy: {1}) ---".format(
-            ", ".join(included) if included else "none of the filtered types",
-            "keep" if keep_hierarchy else "scene root"))
+        self._log("--- Export start (include: {0} | hierarchy: {1} | "
+                  "under joints: {2}) ---".format(
+                      ", ".join(included) if included else "none of the filtered types",
+                      "keep" if keep_hierarchy else "scene root",
+                      "joints only" if joints_only else "everything"))
 
         with core.undo_chunk():
             logs = core.export_sets(
-                set_names, file_names, excluded, export_path, keep_hierarchy)
+                set_names, file_names, excluded, export_path, keep_hierarchy,
+                joints_only)
         for line in logs:
             self._log(line)
 
@@ -264,6 +284,10 @@ class MainWindow(QWidget):
             "[Type Filter] choose node types to include/exclude. Unchecked types\n"
             "are excluded (e.g. uncheck Mesh + keep Joint -> meshes are skipped,\n"
             "everything else is exported). Types not listed are always included.\n"
+            "\n"
+            "[Joints only under joints] non-joint objects parented under a joint\n"
+            "are left out of the FBX. Nothing is unparented or hidden, so the\n"
+            "scene hierarchy is identical before and after the export.\n"
             "\n"
             "Written by Ji Hun Park."
         ).format(version=VERSION, update=LAST_UPDATE)
