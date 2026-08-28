@@ -906,16 +906,23 @@ class MainWindow(QWidget):
         return box
 
     def _build_match_row(self):
-        """Destination 패널의 'Match from Source' 행 (버튼 + 옵션)."""
+        """Destination 패널의 매칭 행 (버튼 2개 + 옵션 3개).
+
+        매칭 방식이 두 가지(이름이 비슷한 것 / 이름이 똑같은 것)라 버튼과 옵션을 두 줄로
+        나눈다. 옵션은 두 버튼이 **공유**한다 (`Min` 만 'Match from Source' 전용).
+        """
+        rows = QVBoxLayout()
+        rows.setContentsMargins(0, 0, 0, 0)
+
         row = QHBoxLayout()
 
         btn = QPushButton("Match from Source")
         btn.setToolTip(
             "Find the destination attribute whose NAME is most similar to each "
             "source attribute.\n"
-            "The matches are moved to the top of this list IN SOURCE ORDER and "
+            "The matches are lined up with this list IN SOURCE ORDER and "
             "selected,\n"
-            "so 'Connect Source to Destination' pairs them up right away.\n"
+            "so 'Source -> Destination' pairs them up right away.\n"
             "\n"
             "Example: source brow_up / brow_down against\n"
             "  lod0_mesh_body_eye_L_up, lod0_mesh_body_eye_L_down,\n"
@@ -928,12 +935,51 @@ class MainWindow(QWidget):
         btn.clicked.connect(self.on_match_from_source)
         row.addWidget(btn, 1)
 
+        btn_same = QPushButton("Match Same Name")
+        btn_same.setToolTip(
+            "Only pair attributes whose names are EXACTLY the same "
+            "(case sensitive).\n"
+            "No similarity, no guessing - 'Min' is ignored.\n"
+            "\n"
+            "Example: source ab / abc / abcd against\n"
+            "  bcd, cd, abcd, ab\n"
+            "  ->  ab, {0}, abcd      ('abc' has no counterpart)\n"
+            "\n"
+            "Use it when both sides already share a naming convention, where a "
+            "loose\n"
+            "match would be worse than no match.".format(attr_match.NULL_TARGET))
+        btn_same.clicked.connect(self.on_match_same_name)
+        row.addWidget(btn_same, 1)
+
+        rows.addLayout(row)
+
+        # --- 옵션 행 (두 매칭 버튼이 함께 쓴다) ---
+        row = QHBoxLayout()
+
+        # 기본 ON : 짝이 어긋난 채 연결되는 사고를 막는 쪽이 기본값이어야 한다.
+        self.cb_match_only = QCheckBox("Show Match Only")
+        self.cb_match_only.setChecked(True)
+        self.cb_match_only.setToolTip(
+            "On  : keep only the rows that line up 1:1 with the source "
+            "attributes.\n"
+            "      A source with no counterpart gets a '{0}' row, so the "
+            "pairing keeps\n"
+            "      its order - those pairs are skipped when connecting.\n"
+            "      Press 'List Attributes' to get the full list back.\n"
+            "Off : the matches are moved to the top of the full list and "
+            "selected\n"
+            "      (unmatched sources leave the two sides out of "
+            "step).".format(attr_match.NULL_TARGET))
+        row.addWidget(self.cb_match_only)
+
         self.cb_match_unique = QCheckBox("Unique")
         self.cb_match_unique.setChecked(True)
         self.cb_match_unique.setToolTip(
             "On  : one destination attribute is never used twice.\n"
             "Off : two source attributes may match the same destination.")
         row.addWidget(self.cb_match_unique)
+
+        row.addStretch(1)
 
         row.addWidget(QLabel("Min"))
         self.sb_match_min = QDoubleSpinBox()
@@ -946,10 +992,13 @@ class MainWindow(QWidget):
         self.sb_match_min.setToolTip(
             "How much of the source name must be explained by the match (0-1).\n"
             "1.00 = every distinctive word of the source appears in the match.\n"
-            "Raise it to reject loose matches, lower it to force a best guess.")
+            "Raise it to reject loose matches, lower it to force a best guess.\n"
+            "'Match Same Name' ignores this.")
         row.addWidget(self.sb_match_min)
 
-        return row
+        rows.addLayout(row)
+
+        return rows
 
     # --------------------------------------------------------------
     # Tab : Attribute
@@ -2346,59 +2395,93 @@ class MainWindow(QWidget):
         return names
 
     def on_match_from_source(self):
-        """소스에서 고른 어트리뷰트와 이름이 가장 비슷한 destination 어트리뷰트를 찾는다.
+        """이름이 **가장 비슷한** destination 어트리뷰트를 찾는다."""
+        self._match_destination(exact=False)
 
-        찾은 것들을 **소스 순서 그대로** destination 목록 맨 위로 옮기고 선택한다.
-        connect_attrs 가 `src[i] <-> dst[i]` 를 순서로 짝짓기 때문에, 이 상태에서 바로
-        'Connect Source to Destination' 을 누르면 그대로 연결된다.
+    def on_match_same_name(self):
+        """이름이 **완전히 같은** destination 어트리뷰트만 찾는다."""
+        self._match_destination(exact=True)
+
+    def _match_destination(self, exact):
+        """소스 어트리뷰트에 대응하는 destination 어트리뷰트를 찾아 목록을 다시 짠다.
+
+        찾은 것들을 **소스 순서 그대로** destination 목록에 놓고 선택한다.
+        `connect_attrs` 가 `src[i] <-> dst[i]` 를 순서로 짝짓기 때문에, 이 상태에서 바로
+        'Source -> Destination' 을 누르면 그대로 연결된다.
+
+        `Show Match Only` 가 켜져 있으면(기본) 목록을 **소스와 1:1 로 맞춘 자리만** 남기고,
+        짝이 없는 자리는 `(Null)` 로 채운다. 자리를 비우지 않는 게 핵심이다 — 순서로 짝짓는
+        연결에서 한 자리만 빠져도 그 뒤가 통째로 밀려 **엉뚱한 짝이 이어지기** 때문이다.
+        연결할 때 그 짝은 양쪽에서 함께 빠진다(`attr_match.strip_null_pairs`).
+
+        Args:
+            exact: True 면 이름이 완전히 같은 것만(`match_exact_names`),
+                False 면 이름이 가장 비슷한 것(`match_attributes`).
         """
+        label = "Match Same Name" if exact else "Match from Source"
+
         src = self._connect_widgets["src"]
         dst = self._connect_widgets["dst"]
 
         # 소스: 고른 게 있으면 그것, 없으면 지금 보이는 전체.
         sources, hidden = src["filter"].visible_selected()
         if hidden:
-            self.log("[INFO] Match : {0} selected source attribute(s) hidden by the "
-                     "filter were skipped".format(hidden))
+            self.log("[INFO] {0} : {1} selected source attribute(s) hidden by the "
+                     "filter were skipped".format(label, hidden))
         if not sources:
             sources = src["filter"].visible_texts()
             if sources:
-                self.log("[INFO] Match : nothing selected in Source - using all "
-                         "{0} visible attribute(s)".format(len(sources)))
+                self.log("[INFO] {0} : nothing selected in Source - using all "
+                         "{1} visible attribute(s)".format(label, len(sources)))
 
         if not sources:
-            self.log("[ERR] Match from Source : source attribute list is empty. "
-                     "Press 'List Attributes' on the Source side first.")
+            self.log("[ERR] {0} : source attribute list is empty. Press "
+                     "'List Attributes' on the Source side first.".format(label))
             return
 
         dst_list = dst["attrs"]
-        candidates = [dst_list.item(i).text() for i in range(dst_list.count())]
+
+        # 지난 매칭이 남긴 (Null) 자리는 후보가 아니다 — 실제 어트리뷰트가 아니다.
+        candidates = [dst_list.item(i).text() for i in range(dst_list.count())
+                      if dst_list.item(i).text() != attr_match.NULL_TARGET]
         if not candidates:
-            self.log("[ERR] Match from Source : destination attribute list is empty. "
-                     "Press 'List Attributes' on the Destination side first.")
+            self.log("[ERR] {0} : destination attribute list is empty. Press "
+                     "'List Attributes' on the Destination side first.".format(label))
             return
 
         unique = self.cb_match_unique.isChecked()
         min_score = self.sb_match_min.value()
 
         try:
-            matches, unmatched = attr_match.match_attributes(
-                sources, candidates, unique=unique, min_score=min_score)
+            if exact:
+                matches, unmatched = attr_match.match_exact_names(
+                    sources, candidates, unique=unique)
+            else:
+                matches, unmatched = attr_match.match_attributes(
+                    sources, candidates, unique=unique, min_score=min_score)
         except Exception as e:
-            self.log("[ERR] Match from Source : {0}".format(e))
+            self.log("[ERR] {0} : {1}".format(label, e))
             cmds.warning(str(e))
             return
 
-        # 매칭된 것을 소스 순서대로 앞에, 나머지는 원래 순서대로 뒤에 놓는다.
-        matched_rows = [m["index"] for m in matches]
-        taken = set(matched_rows)
-        ordered = ([candidates[i] for i in matched_rows]
-                   + [c for i, c in enumerate(candidates) if i not in taken])
+        match_only = self.cb_match_only.isChecked()
+
+        if match_only:
+            # 소스와 자리를 맞춘 목록. 짝이 없는 자리는 (Null) 로 채운다.
+            ordered = attr_match.aligned_names(sources, matches)
+            selected = len(ordered)
+        else:
+            # 예전 동작: 매칭된 것을 소스 순서대로 앞에, 나머지는 원래 순서로 뒤에.
+            matched_rows = [m["index"] for m in matches]
+            taken = set(matched_rows)
+            ordered = ([candidates[i] for i in matched_rows]
+                       + [c for i, c in enumerate(candidates) if i not in taken])
+            selected = len(matches)
 
         # 선택이 필터에 가려지면 연결 대상에서 빠지므로 필터를 비운다.
         if dst["filter"].text().strip():
-            self.log("[INFO] Match : destination filter cleared so the matched "
-                     "attributes are all visible.")
+            self.log("[INFO] {0} : destination filter cleared so the matched "
+                     "attributes are all visible.".format(label))
             dst["filter"].clear()
 
         dst_list.clear()
@@ -2406,20 +2489,57 @@ class MainWindow(QWidget):
         dst["filter"].refresh()
 
         dst_list.clearSelection()
-        for row in range(len(matches)):
+        for row in range(selected):
             dst_list.item(row).setSelected(True)
-        if matches:
+        self._mark_null_rows(dst_list)
+        if ordered:
             dst_list.scrollToItem(dst_list.item(0))
 
-        self.log("[OK] Match from Source : {0}/{1} matched ({2}, min {3:.2f})".format(
-            len(matches), len(sources),
-            "unique" if unique else "duplicates allowed", min_score))
+        self._log_match_result(label, exact, sources, candidates,
+                               matches, unmatched, unique, min_score, match_only)
+
+    def _mark_null_rows(self, list_widget):
+        """(Null) 자리를 흐리게 칠한다 — 실제 어트리뷰트가 아니라는 신호."""
+        brush = QBrush(QColor(150, 150, 150))
+        for row in range(list_widget.count()):
+            item = list_widget.item(row)
+            if item.text() != attr_match.NULL_TARGET:
+                continue
+            item.setForeground(brush)
+            item.setToolTip(
+                "The matching source attribute has no counterpart here.\n"
+                "This row only holds the pairing order - it is skipped when "
+                "connecting.")
+
+    def _log_match_result(self, label, exact, sources, candidates,
+                          matches, unmatched, unique, min_score, match_only):
+        """매칭 결과를 로그로 푼다.
+
+        짝을 못 찾은 것을 조용히 넘기지 않는다 — 무엇이 왜 빠졌는지 이름까지 찍어야
+        "왜 일부만 연결됐지?" 가 안 된다.
+        """
+        head = "[OK] {0} : {1}/{2} matched ({3}".format(
+            label, len(matches), len(sources),
+            "unique" if unique else "duplicates allowed")
+        if not exact:
+            head += ", min {0:.2f}".format(min_score)
+        self.log(head + ")")
+
         for m in matches:
             self.log("       {0}  ->  {1}   ({2:.2f}{3})".format(
                 m["source"], m["target"], m["score"],
                 ", ambiguous" if m["ambiguous"] else ""))
+
         for u in unmatched:
-            if u["best"]:
+            if exact and u["best"]:
+                # 이름은 있었는데 Unique 때문에 앞 소스가 이미 가져간 경우.
+                self.log("[WARN] '{0}' : the destination attribute of the same "
+                         "name was already taken by an earlier source (Unique "
+                         "is on).".format(u["source"]))
+            elif exact:
+                self.log("[WARN] no attribute named '{0}' in the destination "
+                         "list.".format(u["source"]))
+            elif u["best"]:
                 self.log("[WARN] no match for '{0}' - closest was '{1}' "
                          "({2:.2f} < {3:.2f})".format(
                              u["source"], u["best"], u["score"], min_score))
@@ -2427,11 +2547,27 @@ class MainWindow(QWidget):
                 self.log("[WARN] no match for '{0}' - nothing similar in the "
                          "destination list.".format(u["source"]))
 
+        if not match_only:
+            if unmatched:
+                self.log("[INFO] {0} : source and destination selections no longer "
+                         "line up 1:1 ({1} source attribute(s) unmatched). Turn "
+                         "'Show Match Only' on, or deselect those on the Source "
+                         "side before connecting.".format(label, len(unmatched)))
+            return
+
         if unmatched:
-            self.log("[INFO] Match : source and destination selections no longer "
-                     "line up 1:1 ({0} source attribute(s) unmatched). Deselect "
-                     "those on the Source side before connecting.".format(
-                         len(unmatched)))
+            self.log("[INFO] {0} : {1} unmatched source attribute(s) hold a '{2}' "
+                     "row each so the pairing keeps its order - those pairs are "
+                     "skipped when connecting.".format(
+                         label, len(unmatched), attr_match.NULL_TARGET))
+
+        # Show Match Only 는 짝이 안 된 destination 어트리뷰트를 목록에서 뺀다.
+        # 사라진 게 아니라 다시 나열하면 된다는 걸 알려 준다.
+        left_out = len(candidates) - len(set(m["index"] for m in matches))
+        if left_out > 0:
+            self.log("[INFO] {0} : {1} destination attribute(s) are not shown "
+                     "(Show Match Only) - press 'List Attributes' to get the "
+                     "full list back.".format(label, left_out))
 
     def on_connect_attrs(self):
         """Source 어트리뷰트 -> Destination 어트리뷰트."""
@@ -2458,6 +2594,19 @@ class MainWindow(QWidget):
         to_objs = self._connect_widgets[to_role]["tsl"].get_all_items()
         from_attrs = self._filtered_attrs(from_role, from_label)
         to_attrs = self._filtered_attrs(to_role, to_label)
+
+        # 매칭에서 짝을 못 찾아 (Null) 로 남은 자리는 연결하지 않는다. 연결은 순서로
+        # 짝짓기 때문에 **양쪽에서 같은 자리를 함께** 빼야 뒤 짝이 안 밀린다.
+        from_attrs, to_attrs, dropped = attr_match.strip_null_pairs(
+            from_attrs, to_attrs)
+        if dropped:
+            self.log("[INFO] {0} '{1}' pair(s) had no counterpart and were "
+                     "skipped".format(dropped, attr_match.NULL_TARGET))
+            if not (from_attrs and to_attrs):
+                self.log("[ERR] Connect {0} to {1} : every selected pair was "
+                         "'{2}' - nothing to connect.".format(
+                             from_label, to_label, attr_match.NULL_TARGET))
+                return
 
         def _do():
             count, mode, report = cnt_mgr.connect_attrs(

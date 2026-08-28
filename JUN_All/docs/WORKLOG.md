@@ -30,6 +30,28 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-28 (오늘)
 
+> [!summary] `A00145_RigConnect` Connect 탭 — **`Match Same Name` + `Show Match Only`** (v01.33 → v01.34)
+- **요청**: Connect > Connect 하위 탭에서 **이름이 완전히 같은** 어트리뷰트가 선택되게 하고,
+  짝이 없는 자리는 **`(Null)`** 로 표시해 소스 순서대로 세워 달라. 그 상태로 연결하면
+  `(Null)` 이 아닌 짝만 이어지게. 같은 방식을 **`Match from Source`** 에도 넣고,
+  **`Show match Only`** 체크박스(기본 ON)로 토글.
+- **자리를 비우지 않는 것이 이 작업의 전부다.** 연결은 `src[i] ↔ dst[i]` 를 **순서로** 짝짓는다.
+  짝 없는 소스를 그냥 건너뛰고 목록을 만들면 그 뒤가 한 칸씩 밀려 **엉뚱한 어트리뷰트끼리
+  조용히 이어진다** — 에러도 안 난다. `(Null)` 은 그 자리를 잡아 두는 표식이고, 연결 직전에
+  **양쪽에서 함께** 빠진다(`strip_null_pairs`). 한쪽만 빼면 밀림이 그대로 살아난다.
+- `attr_match.py` 에 넣은 것 — `match_exact_names()`(색인도 점수도 필요 없다, `이름 → 인덱스`
+  사전 하나로 O(n+m)) · `align_matches()` / `aligned_names()`(성공한 것만 담긴 결과를 소스
+  자리에 맞춰 편다) · `strip_null_pairs()` · 표식 상수 `NULL_TARGET = "(Null)"`.
+- **소스 이름이 중복될 수 있어 매칭 결과에 `source_index` 를 넣었다.** 이름으로 되짚으면
+  같은 이름 두 개가 첫 자리에 몰려 조용히 어긋난다.
+- 반환 형태를 두 매칭이 **똑같이** 맞춰 뒀다 — UI 는 `exact` 플래그 하나만 보고 나머지 흐름
+  (목록 재구성 · 선택 · 로그 · 연결)을 **한 경로**로 처리한다(`_match_destination`).
+- `Show Match Only` **OFF 는 v01.33 까지의 동작 그대로** 남겼다(매칭된 것이 맨 위, 나머지는 뒤).
+- 검증: mayapy(Maya 2024) 헤드리스로 5가지 — 정확 매칭 `["ab", "(Null)", "abcd"]` ·
+  OFF 의 옛 동작 · 유사도 매칭의 `(Null)` · 실제 연결이 `abcd → abcd` 로 가고 `bcd`/`cd` 는
+  안 건드리는 것 · 역방향도 같은 규칙.
+- 문서: `docs/A00145_RigConnect.md` 에 두 절 추가(`Match Same Name`, `Show Match Only` 와 `(Null)`).
+
 > [!summary] `A00130_ControlRig_V02` **신규 — Phase 1(최소 기능 : Match)** (v02.00)
 - **요청**: 계획서대로 툴을 만들되 **orient 규칙은 나중에 줄 테니 그걸 고려해서** 만들어라.
   열린 질문 4건도 답을 받았다 — `A00_Spine_00` 으로 수정 · 오른쪽 다리 IK 는 `B02_` 로 수정 ·

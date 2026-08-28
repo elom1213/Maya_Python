@@ -130,6 +130,7 @@
 - [A00170 AttachCrv tab](wip-a00170-attachcrv-tab.md) — TSL 오브젝트를 커브 최근접점에 부착
 - [A00170 Remap List Attributes](wip-a00170-remap-listattrs.md) — Remap Value 탭에 전체 어트리뷰트 목록 + 검색
 - [A00145 Match 1<-n](wip-a00145-match-one-to-many.md) — Targets 1개면 Followers 전부 매칭(기본 ON). 짝짓기는 **공용 `resolve_pairs()` 하나로** (로그/동작 어긋남 방지), parent 패스도 같은 pairs (v01.32)
+- [A00145 (Null) match rows](wip-a00145-match-null-placeholder.md) — Match Same Name(정확 이름) + 짝 없는 자리를 `(Null)` 로 채워 **순서 짝짓기**를 지키고, 연결 직전에 양쪽에서 함께 빠진다
 - [A00145 Match Cache](wip-a00145-match-cache.md) — 노드 없이 월드 T/R/S 만 기억하는 `@cache` 항목. `@` 는 마야 이름에 못 쓴다, 적용은 undo 되는 `xform`
 - [A00145 Connect both directions](wip-a00145-connect-both-directions.md) — 역방향 연결(인자 순서만 뒤집기) + 개수 달라도 적은 쪽만큼 부분 연결·실패해도 계속 (v01.24~01.25)
 - [A00145 Match from Source](wip-a00145-attr-name-matching.md) — 이름 유사 어트리뷰트를 소스 순서대로 찾아 Connect 로 연결. 1000x1000 = 0.15s (v01.21)

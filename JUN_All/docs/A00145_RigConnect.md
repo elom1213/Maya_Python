@@ -4,7 +4,10 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.33` (`app/config/version.py`) — **Attribute 탭이 하위 탭 3개로** (`Copy` / `Create` / `Delete`):
+- 버전: `v01.34` (`app/config/version.py`) — Connect > Connect 하위 탭에 **`Match Same Name`**(이름이
+  **완전히 같은 것만** 매칭)과 **`Show Match Only`**(기본 ON) 추가: 짝이 없는 자리를 **`(Null)`** 로 채워
+  destination 목록을 소스와 **1:1 로 세우고**, 연결할 때 그 짝만 건너뛴다 (§Match from Source)
+  · v01.33 은 **Attribute 탭이 하위 탭 3개로** (`Copy` / `Create` / `Delete`):
   `Create` 는 **프로파일에 적어 둔 정의**로 어트리뷰트를 만들고, `Delete` 는 사용자 정의 어트리뷰트를 지운다 (§Attribute)
   · v01.32 는 Match 탭에 **`1 <- n`** 체크박스(기본 ON): Targets 가 **하나면** Followers 전부가 그 하나에 매칭 (§Match)
   · v01.30 은 Match 탭에 **Cache**(노드를 만들지 않고 월드 T/R/S 만 기억) 추가 (§Cache)
@@ -473,7 +476,7 @@ Filter [ inner              ] [Clear]   [Select All]
 
 | 하위 탭 | 내용 |
 |---------|------|
-| **Connect** | 어트리뷰트 **양방향** 연결(Source ↔ Destination) (+ Match from Source, 52 facial) |
+| **Connect** | 어트리뷰트 **양방향** 연결(Source ↔ Destination) (+ Match from Source / Match Same Name, 52 facial) |
 | **List Connected** | 오브젝트의 up/down stream 노드를 타입별로 탐색 |
 | **Connect Closest** | 각 driver 에 가장 가까운 오브젝트를 1:1 로 constraint (A00140 이식) |
 
@@ -525,6 +528,7 @@ Constrain 탭과 같은 방식이다(§Constrain 참고) — 짧은 라벨 + 툴
 | 어트리뷰트 수가 다름 (예: 5 vs 3) | **적은 쪽 개수만큼**(앞에서부터 3쌍) 연결. 남는 2개는 **건드리지 않고 그대로** |
 | 오브젝트 수가 다름 | 같은 규칙. 단 패턴 1(드라이버 1개)은 원래 **모든** 대상 obj 에 브로드캐스트한다 |
 | 개별 연결이 실패 (잠김·타입 불일치·읽기 전용 등) | **거기서 멈추지 않고** 나머지를 계속 연결한 뒤, 실패한 것만 따로 보고 |
+| 한쪽에 **`(Null)`** 자리가 있음 (v01.34) | 그 자리는 **양쪽에서 함께** 빠진다. 뒤의 짝은 밀리지 않는다 |
 
 남은 항목과 실패는 로그로 **이름까지** 알려 준다 — 조용히 넘기면 "왜 일부만 연결됐지?" 가 되기 때문.
 
@@ -563,6 +567,9 @@ Destination : lod0_mesh_body_brow_up    ← 선택됨 (brow_up 에 대응)
               lod0_mesh_body_eye_L_down
 ```
 
+> 위는 **`Show Match Only` 를 끈** 모습이다. 기본값(ON)에서는 짝이 없는 자리를 `(Null)` 로 채워
+> **소스와 1:1 로 세운 줄만** 남는다 — 바로 아래 절 참고.
+
 `Connect Source to Destination` 이 `src[i] ↔ dst[i]` 를 **순서로** 짝짓기 때문에, 이 상태에서 곧바로
 연결 버튼을 누르면 그대로 연결된다. 수백 개 페이셜 타겟을 손으로 하나씩 짝지어 고르던 작업이
 버튼 한 번이 된다.
@@ -575,6 +582,74 @@ Destination : lod0_mesh_body_brow_up    ← 선택됨 (brow_up 에 대응)
   그 점수를 로그에 남긴다. 1.00 이면 소스 이름의 변별 단어가 **전부** 들어 있는 후보만 통과한다.
 - 로그에 `source -> target (점수)` 가 한 줄씩 남는다. 같은 점수의 후보가 더 있었으면 `ambiguous`
   가 붙는다(이름만으로는 못 가렸다는 뜻).
+
+##### 이름이 똑같은 것만 — `Match Same Name` (v01.34)
+
+**`Match Same Name`** 은 이름이 **완전히 같은**(대소문자 구분) destination 어트리뷰트만 짝짓는다.
+유사도도 추측도 없다 — `Min` 은 무시된다.
+
+```
+Source      : ab, abc, abcd
+Destination : bcd, cd, abcd, ab
+                    │ Match Same Name
+                    ▼
+Destination : ab        ← 선택됨 (ab 에 대응)
+              (Null)    ← abc 에 짝이 없다
+              abcd      ← 선택됨 (abcd 에 대응)
+```
+
+양쪽이 **이미 같은 이름 규칙을 쓰는데** 느슨한 매칭이 남의 어트리뷰트를 물어 오는 게 더 나쁜
+상황에서 쓴다(같은 리그의 두 노드, 같은 이름으로 만든 blendShape 타겟 등).
+`Match from Source` 와 **버튼만 다르고 나머지는 전부 같다** — `Unique`, `Show Match Only`, 로그 형식,
+연결로 이어지는 흐름이 그대로다.
+
+> 구현은 `attr_match.match_exact_names()`. 색인도 점수도 필요 없다 — `이름 → 인덱스` 사전 하나면
+> 끝난다(O(n + m)). 반환 형태를 `match_attributes` 와 **똑같이** 맞춰 둬서 UI 가 두 매칭을 구분 없이
+> 다룬다.
+
+##### 짝이 없는 자리 — `Show Match Only` 와 `(Null)` (v01.34)
+
+**`Show Match Only`**(기본 **ON**)를 켜면 destination 목록에 **소스와 1:1 로 맞춘 줄만** 남는다.
+짝을 못 찾은 소스 자리는 **`(Null)`** 로 채우고, 그 줄까지 **전부 선택**한다.
+
+| | `Show Match Only` **ON** (기본) | **OFF** (v01.33 까지의 동작) |
+|---|---|---|
+| 목록 | 소스와 자리를 맞춘 줄만 (`(Null)` 포함) | 매칭된 것이 맨 위, 나머지는 원래 순서로 뒤에 |
+| 선택 | 전부 (`(Null)` 포함) | 매칭된 것만 |
+| 짝이 어긋날 위험 | 없다 | 짝을 못 찾은 소스가 있으면 **그 뒤가 통째로 밀린다** |
+
+**자리를 비우지 않는 것이 핵심이다.** 연결은 `src[i] ↔ dst[i]` 를 **순서로** 짝짓기 때문에,
+짝 없는 소스 자리를 그냥 건너뛰고 목록을 만들면 그 뒤의 짝이 한 칸씩 밀려 **엉뚱한
+어트리뷰트끼리 조용히 이어진다.** `(Null)` 은 그 자리를 잡아 두는 표식이다.
+
+```
+Source      : ab      abc      abcd            Source      : ab      abc     abcd
+Destination : ab      (Null)   abcd            Destination : ab      abcd
+                 └ 연결        └ 연결                            └ 연결   └ 연결 (?!)
+              (Null 짝은 건너뜀)                (자리를 비우면 abc → abcd 로 밀린다)
+```
+
+- **연결할 때** `(Null)` 이 낀 자리는 **양쪽에서 함께** 빠진다(`attr_match.strip_null_pairs`).
+  한쪽만 빼면 뒤가 밀리기 때문이다. 두 방향 버튼(`Source -> Destination` /
+  `Destination -> Source`) 모두 같다.
+- `(Null)` 줄은 **회색**으로 그려지고 툴팁이 붙는다. 실제 어트리뷰트가 아니라는 신호다.
+  마야 어트리뷰트 이름에는 괄호를 못 쓰므로 실제 이름과 충돌하지 않는다.
+- 다시 매칭할 때 **지난 `(Null)` 줄은 후보에서 빠진다.**
+- ON 은 짝이 안 된 destination 어트리뷰트를 목록에서 **뺀다**(사라지는 게 아니라 안 보이는 것).
+  몇 개가 빠졌는지 로그로 알려 주고, `List Attributes` 를 다시 누르면 전부 돌아온다.
+
+```
+[OK] Match Same Name : 2/3 matched (unique)
+       ab  ->  ab   (1.00)
+       abcd  ->  abcd   (1.00)
+[WARN] no attribute named 'abc' in the destination list.
+[INFO] Match Same Name : 1 unmatched source attribute(s) hold a '(Null)' row each so the
+       pairing keeps its order - those pairs are skipped when connecting.
+[INFO] Match Same Name : 2 destination attribute(s) are not shown (Show Match Only) -
+       press 'List Attributes' to get the full list back.
+[INFO] 1 '(Null)' pair(s) had no counterpart and were skipped
+       2 connection(s) [1 obj -> #objs, attr set matched]  Source -> Destination
+```
 
 ##### 어떻게 찾는가
 

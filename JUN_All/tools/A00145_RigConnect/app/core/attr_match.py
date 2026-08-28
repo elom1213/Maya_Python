@@ -61,6 +61,15 @@ LENGTH_WEIGHT = 0.02        # 길이가 비슷할수록 조금 유리
 # 이 아래 coverage 는 "못 찾음" 으로 본다 (UI 에서 조절 가능).
 DEFAULT_MIN_SCORE = 0.4
 
+# Destination 목록에서 **짝이 없는 자리**를 채우는 표식.
+#
+# 연결은 `src[i] <-> dst[i]` 를 **순서로** 짝짓는다. 그래서 짝을 못 찾은 소스 자리를 그냥
+# 비워 두면 그 뒤의 짝이 통째로 한 칸씩 밀려 **엉뚱한 어트리뷰트끼리 이어진다.** 자리를
+# 이 표식으로 채워 순서를 지키고, 연결 직전에 `strip_null_pairs` 로 짝째 걸러 낸다.
+#
+# 마야 어트리뷰트 이름에는 괄호를 쓸 수 없으므로 실제 이름과 충돌하지 않는다.
+NULL_TARGET = "(Null)"
+
 # 폴백(문자 단위 비교) 하한과 척도 변환.
 #
 # difflib 비율은 coverage 와 **척도가 다르다**. 아무 관계 없는 두 이름도 글자만 겹치면
@@ -303,10 +312,15 @@ def match_attributes(sources, candidates, unique=True,
 
     Returns:
         (matches, unmatched)
-        matches  : [{"source", "target", "index", "score", "ambiguous"}, ...]
+        matches  : [{"source", "source_index", "target", "index", "score",
+                     "ambiguous"}, ...]
                    sources 순서. `ambiguous` 는 같은 coverage 를 가진 후보가 또 있어
                    가산점으로만 승부가 갈렸다는 뜻(이름이 변별력이 없는 경우).
-        unmatched: [{"source", "best", "score"}, ...] — best 는 문턱을 못 넘은 최선 후보
+        unmatched: [{"source", "source_index", "best", "score"}, ...]
+                   best 는 문턱을 못 넘은 최선 후보
+
+    `source_index` 는 sources 안의 자리다. matches 는 성공한 것만 담으므로, 소스와
+    1:1 로 맞춘 목록이 필요하면 이 값을 쓰는 `align_matches` 로 편다.
     """
     index = AttributeIndex(candidates)
 
@@ -314,7 +328,7 @@ def match_attributes(sources, candidates, unique=True,
     unmatched = []
     used = set()
 
-    for source in (sources or []):
+    for i, source in enumerate(sources or []):
 
         hits = index.query(source, top_k=top_k, min_score=min_score)
 
@@ -332,6 +346,7 @@ def match_attributes(sources, candidates, unique=True,
 
         if chosen is None:
             unmatched.append({"source": source,
+                              "source_index": i,
                               "best": best_name,
                               "score": best_score})
             continue
@@ -344,12 +359,142 @@ def match_attributes(sources, candidates, unique=True,
                         if c >= coverage - _AMBIGUOUS_EPS) > 1
 
         matches.append({"source": source,
+                        "source_index": i,
                         "target": index.names[j],
                         "index": j,
                         "score": coverage,
                         "ambiguous": ambiguous})
 
     return matches, unmatched
+
+
+def match_exact_names(sources, candidates, unique=True):
+    """이름이 **완전히 같은** 후보만 짝짓는다 (Connect 탭 'Match Same Name').
+
+    유사도가 아니라 문자열 동일 비교라 색인도 점수도 필요 없다 — `이름 -> 인덱스` 사전
+    하나면 끝난다. 대소문자는 구분한다(마야 어트리뷰트 이름이 대소문자를 구분한다).
+
+        sources    = ["ab", "abc", "abcd"]
+        candidates = ["bcd", "cd", "abcd", "ab"]
+        ->  matched   : ab -> ab, abcd -> abcd
+            unmatched : abc
+
+    반환 형태는 `match_attributes` 와 **똑같다.** UI 가 두 매칭을 구분 없이 다루고,
+    `align_matches` / `aligned_names` 도 그대로 쓸 수 있다.
+
+    Args:
+        sources: 찾고 싶은 이름들. 순서가 결과 순서다.
+        candidates: 찾을 대상 이름들.
+        unique: True 면 후보 하나가 두 번 쓰이지 않는다(sources 순서대로 선점).
+
+    Returns:
+        (matches, unmatched) — `match_attributes` 와 같은 키. score 는 항상 1.0.
+    """
+    lookup = {}
+    for j, name in enumerate(candidates or []):
+        lookup.setdefault(name, []).append(j)
+
+    matches = []
+    unmatched = []
+    used = set()
+
+    for i, source in enumerate(sources or []):
+
+        rows = lookup.get(source, ())
+
+        chosen = None
+        for j in rows:
+            if unique and j in used:
+                continue
+            chosen = j
+            break
+
+        if chosen is None:
+            # rows 가 비어 있지 않은데 못 골랐다면 unique 때문에 이미 쓰인 것이다.
+            # 그 사실이 로그에서 갈리도록 best 에 이름을 남긴다.
+            unmatched.append({"source": source,
+                              "source_index": i,
+                              "best": source if rows else None,
+                              "score": 1.0 if rows else 0.0})
+            continue
+
+        used.add(chosen)
+
+        matches.append({"source": source,
+                        "source_index": i,
+                        "target": candidates[chosen],
+                        "index": chosen,
+                        "score": 1.0,
+                        "ambiguous": len(rows) > 1})
+
+    return matches, unmatched
+
+
+def align_matches(sources, matches):
+    """매칭 결과를 **소스 순서 그대로** 편다 (짝이 없는 자리는 None).
+
+    `match_attributes` / `match_exact_names` 는 성공한 것만 돌려주므로 그대로는 소스와
+    자리가 맞지 않는다. 자리를 맞춰야 "i 번째 소스의 짝" 을 말할 수 있다.
+
+    이름으로 되짚지 않고 `source_index` 를 쓰는 이유: 소스에 **같은 이름이 두 번**
+    들어 있을 수 있고(다른 오브젝트에서 온 목록), 그때 이름으로 되짚으면 첫 자리에
+    몰려 조용히 어긋난다.
+
+    Returns:
+        [match dict or None, ...] — 길이는 len(sources).
+    """
+    rows = [None] * len(sources or [])
+
+    for match in (matches or []):
+        i = match.get("source_index")
+        if i is not None and 0 <= i < len(rows):
+            rows[i] = match
+
+    return rows
+
+
+def aligned_names(sources, matches, null=NULL_TARGET):
+    """`align_matches` 의 이름 버전 — 짝이 없는 자리는 `null` 표식으로 채운다.
+
+        aligned_names(["ab", "abc", "abcd"], matches)
+        ->  ["ab", "(Null)", "abcd"]
+    """
+    return [m["target"] if m else null
+            for m in align_matches(sources, matches)]
+
+
+def strip_null_pairs(left, right, null=NULL_TARGET):
+    """`null` 표식이 낀 자리를 **양쪽에서 함께** 뺀다 (연결 직전 단계).
+
+    연결은 순서로 짝을 짓는다. 한쪽에서만 빼면 그 뒤의 짝이 통째로 한 칸씩 밀려
+    **엉뚱한 어트리뷰트끼리 이어진다** — 그래서 자리째 뺀다.
+
+    길이가 다르면 짝이 만들어지는 앞부분(min 길이)만 자리로 보고, 짝이 없는 꼬리에
+    남은 표식은 그냥 버린다(실제 어트리뷰트가 아니므로 연결에 쓸 수 없다).
+
+    Returns:
+        (left, right, dropped) — dropped 는 뺀 **자리 수**.
+    """
+    left = list(left or [])
+    right = list(right or [])
+
+    paired = min(len(left), len(right))
+
+    kept_left = []
+    kept_right = []
+    dropped = 0
+
+    for i in range(paired):
+        if left[i] == null or right[i] == null:
+            dropped += 1
+            continue
+        kept_left.append(left[i])
+        kept_right.append(right[i])
+
+    kept_left.extend(name for name in left[paired:] if name != null)
+    kept_right.extend(name for name in right[paired:] if name != null)
+
+    return kept_left, kept_right, dropped
 
 
 def complexity_notes():
