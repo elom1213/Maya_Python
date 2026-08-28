@@ -23,6 +23,7 @@
 | `A00060_jointTool_V02` | 〃 (탭 재분류 전 · 보존) | [A00060_jointTool_V02](A00060_jointTool_V02.md) |
 | `A00080_KWI_creator_V03` | 언리얼 / KawaiiPhysics | [A00080_KWI_creator_V03](A00080_KWI_creator_V03.md) |
 | `A00110_animTool` | 애니메이션 | [A00110_animTool](A00110_animTool.md) |
+| `A00130_ControlRig_V02` | 리깅 / 컨트롤러(cage) 세팅 — 템플릿 조인트 | [A00130_ControlRig_V02](A00130_ControlRig_V02.md) |
 | `A00140_ConnectClosest` | 리깅 / 페이셜 | [A00140_ConnectClosest](A00140_ConnectClosest.md) |
 | `A00145_RigConnect` | 리깅 / 연결·매칭·컨스트레인트 통합 | [A00145_RigConnect](A00145_RigConnect.md) |
 | `A00150_remapVal` | 리깅 | [A00150_remapVal](A00150_remapVal.md) |

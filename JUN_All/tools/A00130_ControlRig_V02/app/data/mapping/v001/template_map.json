@@ -1,0 +1,716 @@
+{
+  "version": "1.0",
+  "note": "Generated from .ref/ref_01.txt. joint names are local (no namespace); set names get the namespace chosen in the UI. 'match' defaults to [\"t\",\"r\"]; ['t'] means position only. Optional per-joint 'orient' is reserved for a later phase.",
+  "joints": [
+    {
+      "name": "helper_root",
+      "parent": null,
+      "targets": []
+    },
+    {
+      "name": "helper_pelvis",
+      "parent": "helper_root",
+      "targets": [
+        {
+          "set": "A00_Spine_00"
+        }
+      ]
+    },
+    {
+      "name": "helper_spine_01",
+      "parent": "helper_pelvis",
+      "targets": [
+        {
+          "set": "A00_Spine_01"
+        }
+      ]
+    },
+    {
+      "name": "helper_spine_02",
+      "parent": "helper_spine_01",
+      "targets": [
+        {
+          "set": "A00_Spine_02"
+        }
+      ]
+    },
+    {
+      "name": "helper_spine_03",
+      "parent": "helper_spine_02",
+      "targets": [
+        {
+          "set": "A00_Spine_03"
+        }
+      ]
+    },
+    {
+      "name": "helper_spine_04",
+      "parent": "helper_spine_03",
+      "targets": [
+        {
+          "set": "A00_Spine_04"
+        }
+      ]
+    },
+    {
+      "name": "helper_spine_05",
+      "parent": "helper_spine_04",
+      "targets": [
+        {
+          "set": "A00_Spine_05"
+        }
+      ]
+    },
+    {
+      "name": "helper_neck_01",
+      "parent": "helper_spine_05",
+      "targets": [
+        {
+          "set": "C02_Neck_01"
+        }
+      ]
+    },
+    {
+      "name": "helper_neck_02",
+      "parent": "helper_neck_01",
+      "targets": []
+    },
+    {
+      "name": "helper_head",
+      "parent": "helper_neck_02",
+      "targets": [
+        {
+          "set": "C02_Head_01"
+        }
+      ]
+    },
+    {
+      "name": "helper_clavicle_l",
+      "parent": "helper_spine_05",
+      "targets": [
+        {
+          "set": "A03_Shoulder_L"
+        }
+      ]
+    },
+    {
+      "name": "helper_upperarm_l",
+      "parent": "helper_clavicle_l",
+      "targets": [
+        {
+          "set": "A01_Arm_L_01_UpperArm"
+        }
+      ]
+    },
+    {
+      "name": "helper_lowerarm_l",
+      "parent": "helper_upperarm_l",
+      "targets": [
+        {
+          "set": "A01_Arm_L_02_LowerArm"
+        }
+      ]
+    },
+    {
+      "name": "helper_hand_l",
+      "parent": "helper_lowerarm_l",
+      "targets": [
+        {
+          "set": "A01_Arm_L_03_Wrist"
+        }
+      ]
+    },
+    {
+      "name": "helper_thumb_01_l",
+      "parent": "helper_hand_l",
+      "targets": [
+        {
+          "set": "CA01_Thumb_l_01"
+        }
+      ]
+    },
+    {
+      "name": "helper_thumb_02_l",
+      "parent": "helper_thumb_01_l",
+      "targets": [
+        {
+          "set": "CA01_Thumb_l_02"
+        }
+      ]
+    },
+    {
+      "name": "helper_thumb_03_l",
+      "parent": "helper_thumb_02_l",
+      "targets": [
+        {
+          "set": "CA01_Thumb_l_03"
+        }
+      ]
+    },
+    {
+      "name": "helper_index_metacarpal_l",
+      "parent": "helper_hand_l",
+      "targets": []
+    },
+    {
+      "name": "helper_index_01_l",
+      "parent": "helper_index_metacarpal_l",
+      "targets": [
+        {
+          "set": "CA02_Index_l_01"
+        }
+      ]
+    },
+    {
+      "name": "helper_index_02_l",
+      "parent": "helper_index_01_l",
+      "targets": [
+        {
+          "set": "CA02_Index_l_02"
+        }
+      ]
+    },
+    {
+      "name": "helper_index_03_l",
+      "parent": "helper_index_02_l",
+      "targets": [
+        {
+          "set": "CA02_Index_l_03"
+        }
+      ]
+    },
+    {
+      "name": "helper_middle_metacarpal_l",
+      "parent": "helper_hand_l",
+      "targets": []
+    },
+    {
+      "name": "helper_middle_01_l",
+      "parent": "helper_middle_metacarpal_l",
+      "targets": [
+        {
+          "set": "CA03_Middle_l_01"
+        }
+      ]
+    },
+    {
+      "name": "helper_middle_02_l",
+      "parent": "helper_middle_01_l",
+      "targets": [
+        {
+          "set": "CA03_Middle_l_02"
+        }
+      ]
+    },
+    {
+      "name": "helper_middle_03_l",
+      "parent": "helper_middle_02_l",
+      "targets": [
+        {
+          "set": "CA03_Middle_l_03"
+        }
+      ]
+    },
+    {
+      "name": "helper_ring_metacarpal_l",
+      "parent": "helper_hand_l",
+      "targets": []
+    },
+    {
+      "name": "helper_ring_01_l",
+      "parent": "helper_ring_metacarpal_l",
+      "targets": [
+        {
+          "set": "CA04_Ring_l_01"
+        }
+      ]
+    },
+    {
+      "name": "helper_ring_02_l",
+      "parent": "helper_ring_01_l",
+      "targets": [
+        {
+          "set": "CA04_Ring_l_02"
+        }
+      ]
+    },
+    {
+      "name": "helper_ring_03_l",
+      "parent": "helper_ring_02_l",
+      "targets": [
+        {
+          "set": "CA04_Ring_l_03"
+        }
+      ]
+    },
+    {
+      "name": "helper_pinky_metacarpal_l",
+      "parent": "helper_hand_l",
+      "targets": []
+    },
+    {
+      "name": "helper_pinky_01_l",
+      "parent": "helper_pinky_metacarpal_l",
+      "targets": [
+        {
+          "set": "CA05_Little_l_01"
+        }
+      ]
+    },
+    {
+      "name": "helper_pinky_02_l",
+      "parent": "helper_pinky_01_l",
+      "targets": [
+        {
+          "set": "CA05_Little_l_02"
+        }
+      ]
+    },
+    {
+      "name": "helper_pinky_03_l",
+      "parent": "helper_pinky_02_l",
+      "targets": [
+        {
+          "set": "CA05_Little_l_03"
+        }
+      ]
+    },
+    {
+      "name": "helper_polTgt_arm_l",
+      "parent": "helper_upperarm_l",
+      "targets": [
+        {
+          "set": "A01_Arm_L_04_Pole",
+          "match": [
+            "t"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "helper_clavicle_r",
+      "parent": "helper_spine_05",
+      "targets": [
+        {
+          "set": "A03_Shoulder_R"
+        }
+      ]
+    },
+    {
+      "name": "helper_upperarm_r",
+      "parent": "helper_clavicle_r",
+      "targets": [
+        {
+          "set": "A02_Arm_R_01_UpperArm"
+        }
+      ]
+    },
+    {
+      "name": "helper_lowerarm_r",
+      "parent": "helper_upperarm_r",
+      "targets": [
+        {
+          "set": "A02_Arm_R_02_LowerArm"
+        }
+      ]
+    },
+    {
+      "name": "helper_hand_r",
+      "parent": "helper_lowerarm_r",
+      "targets": [
+        {
+          "set": "A02_Arm_R_03_Wrist"
+        }
+      ]
+    },
+    {
+      "name": "helper_thumb_01_r",
+      "parent": "helper_hand_r",
+      "targets": [
+        {
+          "set": "CA01_Thumb_r_01"
+        }
+      ]
+    },
+    {
+      "name": "helper_thumb_02_r",
+      "parent": "helper_thumb_01_r",
+      "targets": [
+        {
+          "set": "CA01_Thumb_r_02"
+        }
+      ]
+    },
+    {
+      "name": "helper_thumb_03_r",
+      "parent": "helper_thumb_02_r",
+      "targets": [
+        {
+          "set": "CA01_Thumb_r_03"
+        }
+      ]
+    },
+    {
+      "name": "helper_index_metacarpal_r",
+      "parent": "helper_hand_r",
+      "targets": []
+    },
+    {
+      "name": "helper_index_01_r",
+      "parent": "helper_index_metacarpal_r",
+      "targets": [
+        {
+          "set": "CA02_Index_r_01"
+        }
+      ]
+    },
+    {
+      "name": "helper_index_02_r",
+      "parent": "helper_index_01_r",
+      "targets": [
+        {
+          "set": "CA02_Index_r_02"
+        }
+      ]
+    },
+    {
+      "name": "helper_index_03_r",
+      "parent": "helper_index_02_r",
+      "targets": [
+        {
+          "set": "CA02_Index_r_03"
+        }
+      ]
+    },
+    {
+      "name": "helper_middle_metacarpal_r",
+      "parent": "helper_hand_r",
+      "targets": []
+    },
+    {
+      "name": "helper_middle_01_r",
+      "parent": "helper_middle_metacarpal_r",
+      "targets": [
+        {
+          "set": "CA03_Middle_r_01"
+        }
+      ]
+    },
+    {
+      "name": "helper_middle_02_r",
+      "parent": "helper_middle_01_r",
+      "targets": [
+        {
+          "set": "CA03_Middle_r_02"
+        }
+      ]
+    },
+    {
+      "name": "helper_middle_03_r",
+      "parent": "helper_middle_02_r",
+      "targets": [
+        {
+          "set": "CA03_Middle_r_03"
+        }
+      ]
+    },
+    {
+      "name": "helper_ring_metacarpal_r",
+      "parent": "helper_hand_r",
+      "targets": []
+    },
+    {
+      "name": "helper_ring_01_r",
+      "parent": "helper_ring_metacarpal_r",
+      "targets": [
+        {
+          "set": "CA04_Ring_r_01"
+        }
+      ]
+    },
+    {
+      "name": "helper_ring_02_r",
+      "parent": "helper_ring_01_r",
+      "targets": [
+        {
+          "set": "CA04_Ring_r_02"
+        }
+      ]
+    },
+    {
+      "name": "helper_ring_03_r",
+      "parent": "helper_ring_02_r",
+      "targets": [
+        {
+          "set": "CA04_Ring_r_03"
+        }
+      ]
+    },
+    {
+      "name": "helper_pinky_metacarpal_r",
+      "parent": "helper_hand_r",
+      "targets": []
+    },
+    {
+      "name": "helper_pinky_01_r",
+      "parent": "helper_pinky_metacarpal_r",
+      "targets": [
+        {
+          "set": "CA05_Little_r_01"
+        }
+      ]
+    },
+    {
+      "name": "helper_pinky_02_r",
+      "parent": "helper_pinky_01_r",
+      "targets": [
+        {
+          "set": "CA05_Little_r_02"
+        }
+      ]
+    },
+    {
+      "name": "helper_pinky_03_r",
+      "parent": "helper_pinky_02_r",
+      "targets": [
+        {
+          "set": "CA05_Little_r_03"
+        }
+      ]
+    },
+    {
+      "name": "helper_polTgt_arm_r",
+      "parent": "helper_upperarm_r",
+      "targets": [
+        {
+          "set": "A02_Arm_R_04_Pole",
+          "match": [
+            "t"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "helper_thigh_l",
+      "parent": "helper_pelvis",
+      "targets": [
+        {
+          "set": "B01_Leg_L_01"
+        }
+      ]
+    },
+    {
+      "name": "helper_calf_l",
+      "parent": "helper_thigh_l",
+      "targets": [
+        {
+          "set": "B01_Leg_L_02"
+        }
+      ]
+    },
+    {
+      "name": "helper_foot_l",
+      "parent": "helper_calf_l",
+      "targets": [
+        {
+          "set": "B01_Leg_L_03"
+        },
+        {
+          "set": "B01_Leg_L_ik_01_foot",
+          "match": [
+            "t"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "helper_ball_l",
+      "parent": "helper_foot_l",
+      "targets": [
+        {
+          "set": "B01_Leg_L_04"
+        },
+        {
+          "set": "B01_Leg_L_ik_07_Ball"
+        }
+      ]
+    },
+    {
+      "name": "helper_ballEnd_l",
+      "parent": "helper_ball_l",
+      "targets": [
+        {
+          "set": "B01_Leg_L_05"
+        }
+      ]
+    },
+    {
+      "name": "helper_FootSideInner_l",
+      "parent": "helper_foot_l",
+      "targets": [
+        {
+          "set": "B01_Leg_L_ik_03_TiltIn"
+        }
+      ]
+    },
+    {
+      "name": "helper_FootSideOuter_l",
+      "parent": "helper_foot_l",
+      "targets": [
+        {
+          "set": "B01_Leg_L_ik_04_TiltOut"
+        }
+      ]
+    },
+    {
+      "name": "helper_Heel_l",
+      "parent": "helper_foot_l",
+      "targets": [
+        {
+          "set": "B01_Leg_L_ik_05_Heel"
+        }
+      ]
+    },
+    {
+      "name": "helper_ballTwist_l",
+      "parent": "helper_foot_l",
+      "targets": [
+        {
+          "set": "B01_Leg_L_ik_06_TwistBall"
+        }
+      ]
+    },
+    {
+      "name": "helper_toeEnd_l",
+      "parent": "helper_foot_l",
+      "targets": [
+        {
+          "set": "B01_Leg_L_ik_02_fnt"
+        }
+      ]
+    },
+    {
+      "name": "helper_polTgt_leg_l",
+      "parent": "helper_thigh_l",
+      "targets": [
+        {
+          "set": "B01_Leg_L_06_pole",
+          "match": [
+            "t"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "helper_thigh_r",
+      "parent": "helper_pelvis",
+      "targets": [
+        {
+          "set": "B02_Leg_R_01"
+        }
+      ]
+    },
+    {
+      "name": "helper_calf_r",
+      "parent": "helper_thigh_r",
+      "targets": [
+        {
+          "set": "B02_Leg_R_02"
+        }
+      ]
+    },
+    {
+      "name": "helper_foot_r",
+      "parent": "helper_calf_r",
+      "targets": [
+        {
+          "set": "B02_Leg_R_03"
+        },
+        {
+          "set": "B02_Leg_R_ik_01_foot",
+          "match": [
+            "t"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "helper_ball_r",
+      "parent": "helper_foot_r",
+      "targets": [
+        {
+          "set": "B02_Leg_R_04"
+        },
+        {
+          "set": "B02_Leg_R_ik_07_Ball"
+        }
+      ]
+    },
+    {
+      "name": "helper_ballEnd_r",
+      "parent": "helper_ball_r",
+      "targets": [
+        {
+          "set": "B02_Leg_R_05"
+        }
+      ]
+    },
+    {
+      "name": "helper_FootSideInner_r",
+      "parent": "helper_foot_r",
+      "targets": [
+        {
+          "set": "B02_Leg_R_ik_03_TiltOut"
+        }
+      ]
+    },
+    {
+      "name": "helper_FootSideOuter_r",
+      "parent": "helper_foot_r",
+      "targets": [
+        {
+          "set": "B02_Leg_R_ik_04_TiltIn"
+        }
+      ]
+    },
+    {
+      "name": "helper_Heel_r",
+      "parent": "helper_foot_r",
+      "targets": [
+        {
+          "set": "B02_Leg_R_ik_05_Heel"
+        }
+      ]
+    },
+    {
+      "name": "helper_ballTwist_r",
+      "parent": "helper_foot_r",
+      "targets": [
+        {
+          "set": "B02_Leg_R_ik_06_TwistBall"
+        }
+      ]
+    },
+    {
+      "name": "helper_toeEnd_r",
+      "parent": "helper_foot_r",
+      "targets": [
+        {
+          "set": "B02_Leg_R_ik_02_fnt"
+        }
+      ]
+    },
+    {
+      "name": "helper_polTgt_leg_r",
+      "parent": "helper_thigh_r",
+      "targets": [
+        {
+          "set": "B02_Leg_R_06_pole",
+          "match": [
+            "t"
+          ]
+        }
+      ]
+    }
+  ]
+}
