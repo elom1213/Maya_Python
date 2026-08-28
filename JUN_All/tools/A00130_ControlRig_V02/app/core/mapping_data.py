@@ -27,6 +27,7 @@ DEFAULT_MATCH = ("t", "r")
 MAPPING_DIRNAME = os.path.join("data", "mapping")
 MAPPING_FILENAME = "template_map.json"
 LENGTH_FILENAME = "length_map.json"
+ORIENT_FILENAME = "orient_map.json"
 
 #: `total` 을 어떻게 잴지 (계획서 3-1)
 TOTAL_STRAIGHT = "straight"   # 첫 조인트 -> 마지막 조인트 직선 거리 (V01 과 동일)
@@ -67,6 +68,13 @@ def mapping_path(version=None):
     return os.path.join(mapping_root(), version, MAPPING_FILENAME)
 
 
+def orient_path(version=None):
+    version = version or default_version()
+    if not version:
+        return None
+    return os.path.join(mapping_root(), version, ORIENT_FILENAME)
+
+
 def length_path(version=None):
     version = version or default_version()
     if not version:
@@ -77,6 +85,71 @@ def length_path(version=None):
 # =========================
 # 로드
 # =========================
+
+def load_orient(version=None, joints=None):
+    """`orient_map.json` 을 읽어 `(doc, messages)`.
+
+    `joints`(template_map 로드 결과)를 주면 **규칙에 적힌 조인트 이름이 거기 있는지**
+    검사하고, `doc["_all_joints"]` 에 전체 목록을 실어 준다 —
+    `orient_manager.plan()` 이 **규칙이 없는 조인트를 세는 데** 쓴다(계획서 3장).
+    """
+    messages = []
+    empty = {"world_zero_default": True, "aim_groups": [], "pole_chains": [],
+             "mirror": {}, "_all_joints": []}
+    path = orient_path(version)
+
+    if not path or not os.path.isfile(path):
+        messages.append("[ERR] Orient file not found: {0}".format(path))
+        return empty, messages
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            doc = json.load(f)
+    except Exception as e:
+        messages.append("[ERR] Could not read {0} ({1}).".format(path, e))
+        return empty, messages
+
+    known = {j["name"] for j in (joints or [])}
+    doc["_all_joints"] = [j["name"] for j in (joints or [])]
+
+    named = []
+    for group in (doc.get("aim_groups") or []):
+        named.extend(group.get("joints") or [])
+    for chain in (doc.get("pole_chains") or []):
+        named.extend(chain.get("joints") or [])
+        if chain.get("pole"):
+            named.append(chain["pole"])
+        tail = chain.get("tail")
+        if isinstance(tail, dict):
+            named.extend(tail.get("joints") or [])
+            # tail 은 반드시 체인의 끝 조인트에서 시작해야 한다 (계획서 5-1)
+            if (tail.get("joints") or [None])[0] != (chain.get("joints") or [None])[-1]:
+                messages.append(
+                    "[Warning] {0}: the tail should start at the last chain joint "
+                    "({1}) but starts at {2}.".format(
+                        chain.get("name"), (chain.get("joints") or [""])[-1],
+                        (tail.get("joints") or [""])[0]))
+    mirror = doc.get("mirror") or {}
+    for key in ("behavior", "position_pairs", "position_only"):
+        for entry in (mirror.get(key) or []):
+            named.extend([entry.get("source"), entry.get("target")])
+
+    if known:
+        unknown = sorted({n for n in named if n and n not in known})
+        if unknown:
+            messages.append("[Warning] not in template_map.json: {0}".format(
+                ", ".join(unknown)))
+
+    preserve = sum(1 for c in (doc.get("pole_chains") or [])
+                   if c.get("tail") == "preserve")
+    messages.append(
+        "[OK] Loaded orient rules - {0} aim group(s), {1} pole chain(s) "
+        "({2} preserve), {3} mirror entry set(s).".format(
+            len(doc.get("aim_groups") or []), len(doc.get("pole_chains") or []),
+            preserve, len([k for k in ("behavior", "position_pairs", "position_only")
+                           if mirror.get(k)])))
+    return doc, messages
+
 
 def load_ik_set(version=None):
     """`template_map.json` 의 `ik_handle_set` — ikHandle 을 모아 둔 케이지 세트 이름.

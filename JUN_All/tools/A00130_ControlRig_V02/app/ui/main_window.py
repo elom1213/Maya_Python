@@ -11,7 +11,10 @@
 #
 #   Match  : 매핑 표(json)대로 세트의 원소를 짝인 조인트에 맞춘다
 #   Length : 템플릿 조인트 사이 거리를 옵션 컨트롤러 어트리뷰트에 써 넣는다
+#   Orient : 규칙(A1 · A2 · A3)대로 템플릿 조인트의 방향을 잡는다
 #
+# v02.04 : **Orient** 단계 — A1(척추) · A2(팔·다리 + tail/preserve) · A3(미러).
+#          계획서: docs/plans/A00130_ControlRig_V02_orient_plan.md
 # v02.03 : Match 앞뒤로 **IK 편집 세션** — D01_IK_handle 의 핸들을 끄고 매칭한 뒤
 #          핸들 스냅 + 폴 벡터 역산으로 되켠다 (계획서 Phase 4).
 # v02.02 : 막힌 채널을 그룹 단위로 갈라, 일부만 막혀도 나머지는 매칭한다.
@@ -33,6 +36,7 @@ from tools.A00130_ControlRig_V02.app.core import mapping_data
 from tools.A00130_ControlRig_V02.app.core import ik_session
 from tools.A00130_ControlRig_V02.app.core import length_manager
 from tools.A00130_ControlRig_V02.app.core import match_manager
+from tools.A00130_ControlRig_V02.app.core import orient_manager
 from tools.A00130_ControlRig_V02.app.core import scene_utils as su
 
 
@@ -48,6 +52,10 @@ STEPS = (
      "Length - measure the template joints and write the distances onto the "
      "option controller.",
      "_build_length_tab"),
+    ("Orient",
+     "Orient - mirror the left side to the right, then set every template joint's "
+     "rotation from the rules.",
+     "_build_orient_tab"),
 )
 
 
@@ -67,6 +75,7 @@ class MainWindow(QWidget):
         self.joints = []
         self.length_doc = {}
         self.ik_set_name = None
+        self.orient_doc = {}
         self.option_ctl_override = ""      # 손으로 지정하면 그것이 이긴다
         self.messages_seen = 0
 
@@ -353,6 +362,77 @@ class MainWindow(QWidget):
 
         return tab
 
+    # --------------------------------------------------------------
+    # Step : Orient
+    # --------------------------------------------------------------
+
+    def _build_orient_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        note = QLabel(
+            "Place the template joints by hand first, then press Orient. The left "
+            "side is mirrored onto the right, the spine is squared up, and the arms "
+            "and legs are aimed down the chain with the pole target deciding the roll.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        grp = QGroupBox("Rules")
+        opt = QVBoxLayout(grp)
+
+        self.chk_spine_zero = QCheckBox(
+            "Spine joints get world rotation 0, 0, 0 (uncheck to aim +X along the chain)")
+        self.chk_spine_zero.setChecked(True)
+        self.chk_spine_zero.setToolTip(
+            "On  : pelvis, spine, neck and head are squared up to the world axes.\n"
+            "Off : the forward axis aims at the next joint and +Z leans toward world +Z.\n"
+            "The head has no child, so it copies the joint before it.")
+        self.chk_spine_zero.stateChanged.connect(lambda *_: self._refresh_orient())
+        opt.addWidget(self.chk_spine_zero)
+
+        self.chk_mirror = QCheckBox("Mirror the left side onto the right first")
+        self.chk_mirror.setChecked(True)
+        self.chk_mirror.setToolTip(
+            "The arm is mirrored with Maya's behaviour rule (the right arm's forward\n"
+            "axis ends up being -X). The leg is mirrored by position only and then\n"
+            "aimed, because its forward axis stays +X.\n"
+            "\n"
+            "This has to run BEFORE the arms and legs are aimed: aiming reads the pole\n"
+            "targets, and mirroring is what puts the right-hand ones in place.")
+        self.chk_mirror.stateChanged.connect(lambda *_: self._refresh_orient())
+        opt.addWidget(self.chk_mirror)
+
+        layout.addWidget(grp)
+
+        self.tree_orient = QTreeWidget()
+        self.tree_orient.setColumnCount(5)
+        self.tree_orient.setHeaderLabels(
+            ["Joint", "Rule", "Up dev", "Status", "Note"])
+        self.tree_orient.setRootIsDecorated(False)
+        self.tree_orient.setAlternatingRowColors(True)
+        self.tree_orient.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        layout.addWidget(self.tree_orient, 1)
+
+        row = QHBoxLayout()
+        self.btn_check_orient = QPushButton("Check")
+        self.btn_check_orient.setToolTip(
+            "Show which rule covers which joint. Changes nothing.\n"
+            "'Up dev' is measured from the scene as it is now - the number that\n"
+            "matters is the one after Orient has run.")
+        self.btn_check_orient.clicked.connect(self.on_check_orient)
+        row.addWidget(self.btn_check_orient)
+
+        self.btn_orient = QPushButton("Orient")
+        self.btn_orient.setMinimumHeight(34)
+        self.btn_orient.setToolTip(
+            "Mirror, then set the rotations. One undo step.\n"
+            "Joints with no rule are left untouched and listed as 'no rule'.")
+        self.btn_orient.clicked.connect(self.on_orient)
+        row.addWidget(self.btn_orient, 1)
+        layout.addLayout(row)
+
+        return tab
+
     # ==============================================================
     # 데이터
     # ==============================================================
@@ -383,6 +463,10 @@ class MainWindow(QWidget):
         self._log_all(mapping_data.check_length(self.length_doc))
         self._sync_total_mode()
 
+        self.orient_doc, orient_messages = mapping_data.load_orient(
+            None if version == "(none)" else version, joints=self.joints)
+        self._log_all(orient_messages)
+
         pairs = sum(len(j["targets"]) for j in self.joints)
         structure = len([j for j in self.joints if not j["targets"]])
         self.lbl_mapping.setText(
@@ -391,6 +475,7 @@ class MainWindow(QWidget):
 
         self._refresh_plan()
         self._refresh_length()
+        self._refresh_orient()
 
     def _sync_total_mode(self):
         """콤보를 json 의 total_mode 로 맞춘다 (사용자가 바꾸면 그 뒤로는 콤보가 이긴다)."""
@@ -612,6 +697,60 @@ class MainWindow(QWidget):
         _results, write_messages = length_manager.apply(rows)
         self._log_all(write_messages)
         self._refresh_length()
+
+    # --------------------------------------------------------------
+    # Orient
+    # --------------------------------------------------------------
+
+    def _refresh_orient(self, log_messages=False):
+        if not hasattr(self, "tree_orient"):
+            return [], []
+
+        rows, messages = orient_manager.plan(
+            self.orient_doc, self._namespace(),
+            world_zero_spine=self.chk_spine_zero.isChecked(),
+            mirror_enabled=self.chk_mirror.isChecked())
+        if log_messages:
+            self._log_all(messages)
+
+        self.tree_orient.clear()
+        for row in rows:
+            item = QTreeWidgetItem([
+                su.short_name(row["joint"]),
+                row["rule"],
+                "" if row["up_dev"] is None else "{0:.2f} deg".format(row["up_dev"]),
+                row["status"],
+                row["note"],
+            ])
+            self.tree_orient.addTopLevelItem(item)
+        for col in range(5):
+            self.tree_orient.resizeColumnToContents(col)
+        return rows, messages
+
+    def on_check_orient(self):
+        if not self.orient_doc.get("pole_chains"):
+            self.log("[WARN] No orient rules loaded.")
+            return
+        rows, _messages = self._refresh_orient(log_messages=True)
+        counts = orient_manager.summarize(rows)
+        self.log("Check : " + ", ".join(
+            "{0} {1}".format(v, k) for k, v in sorted(counts.items())))
+        no_rule = [r for r in rows if r["status"] == orient_manager.ST_NO_RULE]
+        if no_rule:
+            self.log("[Info] {0} joint(s) have no rule yet and are left alone - "
+                     "this is different from the ones marked 'preserved', which are "
+                     "deliberately kept.".format(len(no_rule)))
+
+    def on_orient(self):
+        if not self.orient_doc.get("pole_chains"):
+            self.log("[WARN] No orient rules loaded.")
+            return
+        _results, messages = orient_manager.apply(
+            self.orient_doc, self._namespace(),
+            world_zero_spine=self.chk_spine_zero.isChecked(),
+            mirror_enabled=self.chk_mirror.isChecked())
+        self._log_all(messages)
+        self._refresh_orient()
 
     # ==============================================================
     # helpers
