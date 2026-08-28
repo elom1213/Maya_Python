@@ -28,6 +28,7 @@
 
 ## 검증 · 마야 공통 함정
 
+- [FBX export selected scope](fbx-export-selected-scope.md) — FBX 내용은 씬 말고 `FBXExportIncludeChildren`/`InputConnections` 로 통제(off 면 **선택한 노드만**, 조상은 계층 유지용으로 따라옴)
 - [mayapy headless verify](mayapy-headless-verify.md) — maya.cmds 동작은 추측 말고 Maya2024/bin/mayapy.exe + maya.standalone 으로 확인
 - [QApplication before standalone](qapplication-before-maya-standalone.md) — mayapy Qt 테스트는 `QApplication` 을 `standalone.initialize()` **앞에** (뒤면 QWidget 에서 무단 종료)
 - [undo_chunk by default](undo-chunk-by-default.md) — 반복 씬 변경은 요청 없어도 `Framework.core.maya_undo.undo_chunk()` 로 묶기
@@ -156,4 +157,5 @@
 - [A00110 Euler Filter range](wip-a00110-euler-filter-range.md) — 구간 한정 오일러 필터. filterCurve 는 start/endTime 을 존중, 앵커 = 구간 안 첫 키 (v01.37) + 씬/키 선택 감지 원버튼 (v01.38)
 - [A00340 button colors](wip-a00340-button-colors.md) — 버튼별 커스텀 색 + Color Select 모드 (v01.03)
 - [A00340 split layout](wip-a00340-split-layout.md) — QSplitter 로 Controls 박스 접기 (v01.04)
+- [A00040 Joints only export](wip-a00040-joints-only-export.md) — 조인트 하위 non-joint 를 FBX 에서 제외. **씬은 안 건드린다**(FBX 옵션으로 처리), 그룹 밑 조인트는 부모를 잃지 않게 함께 뺀다 (v02.06)
 - [A00060 world-space joint pos](wip-a00060-world-space-joint-pos.md) — Curve/Divide 조인트 생성을 월드 절대좌표로 (v01.03)
