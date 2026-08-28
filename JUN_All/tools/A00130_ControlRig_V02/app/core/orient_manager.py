@@ -8,7 +8,7 @@
 #
 # ── 규칙 셋이 결국 한 가지 계산이다 ────────────────────────────────────────
 #
-# A1(척추) · A2(팔·다리) · A3(미러) 의 모든 회전 규칙은
+# A1(척추) · A2(팔·다리) · A3(미러) · 손가락의 모든 회전 규칙은
 # **"forward 축을 무언가로 aim 하고, up 축을 힌트 쪽으로 둔다"** 하나로 표현된다.
 # 다른 것은 **힌트가 무엇이냐** 뿐이다 — 폴 타깃(A2 의 IK 부분)이거나 월드 축(A1 · tail).
 #
@@ -421,6 +421,8 @@ def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True):
     # ---- 1. 미러 ----
     if mirror_enabled:
         for entry in (mirror.get("behavior") or []):
+            if entry.get("stage", "early") != "early":
+                continue                       # 늦은 미러는 아래 3c 에서
             src = _resolve(entry["source"], namespace)
             dst = _resolve(entry["target"], namespace)
             if not src or not dst:
@@ -462,6 +464,32 @@ def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True):
         for entry in (mirror.get("position_only") or []):
             add(entry["target"], "A3 position + world zero")
             add(entry["source"], "A3 world zero")
+
+    # ---- 3b. 하위 계층 정렬 ----
+    for group in (doc.get("aim_subtrees") or []):
+        root = _resolve(group["root"], namespace)
+        if not root:
+            add(group["root"], "aim subtree", ST_MISSING)
+        else:
+            for node in descendants(root):
+                add(su.short_name(node), "Aim " + group.get("name", "subtree"),
+                    up_expect=(group.get("up"), group.get("up_world")))
+
+    # ---- 3c. 늦은 미러 ----
+    if mirror_enabled:
+        for entry in (mirror.get("behavior") or []):
+            if entry.get("stage", "early") != "late":
+                continue
+            src = _resolve(entry["source"], namespace)
+            dst = _resolve(entry["target"], namespace)
+            if not src or not dst:
+                add(entry["target"], "A3 behavior (late)", ST_MISSING)
+                continue
+            pairs = ([(src, dst)] if not entry.get("children")
+                     else _pair_subtrees(src, dst)[0])
+            for _s, d in pairs:
+                add(su.short_name(d), "A3 behavior (late)",
+                    note="mirrored from the left after it was aimed")
 
     # ---- 5. 배치 (마지막) ----
     for group in (doc.get("place") or []):
@@ -518,7 +546,8 @@ def apply(doc, namespace, world_zero_spine=None, mirror_enabled=True):
     with undo_chunk():
         # ---- 1. 미러 (A2 가 폴 타깃 위치를 읽으므로 반드시 먼저) ----
         if mirror_enabled:
-            results["mirrored"] += _do_behavior(mirror, plane, namespace, messages)
+            results["mirrored"] += _do_behavior(mirror, plane, namespace, messages,
+                                                stage="early")
             results["mirrored"] += _do_position_pairs(mirror, plane, namespace, messages)
         else:
             messages.append(
@@ -545,6 +574,14 @@ def apply(doc, namespace, world_zero_spine=None, mirror_enabled=True):
                 "[Info] {0} joint(s) were dragged along while their parents were "
                 "rotated - put back where they were.".format(moved))
 
+        # ---- 3b. 하위 계층 정렬 (손가락) ----
+        results["aimed"] += _do_aim_subtrees(doc, namespace, results, messages)
+
+        # ---- 3c. 늦은 미러 (오른손가락 - 왼쪽이 정렬된 뒤라야 한다) ----
+        if mirror_enabled:
+            results["mirrored"] += _do_behavior(mirror, plane, namespace, messages,
+                                                stage="late")
+
         # ---- 4. 위치 전용 ----
         if mirror_enabled:
             results["zeroed"] += _do_position_only(mirror, plane, namespace,
@@ -565,9 +602,17 @@ def _writable(joint):
     return not su.blocked_channels(joint, translate=False, rotate=True)
 
 
-def _do_behavior(mirror, plane, namespace, messages):
+def _do_behavior(mirror, plane, namespace, messages, stage="early"):
+    """`stage` 가 맞는 behavior 미러만 돈다.
+
+    `late` 가 왜 필요한가 — 오른손가락은 **왼손가락을 정렬한 뒤에** 미러해야 한다.
+    이른 미러는 아직 손대지 않은 왼손가락을 복사하므로, 사용자가 놓아 둔 방향이
+    그대로 오른쪽에 박힌다.
+    """
     done = 0
     for entry in (mirror.get("behavior") or []):
+        if entry.get("stage", "early") != stage:
+            continue
         src = _resolve(entry["source"], namespace)
         dst = _resolve(entry["target"], namespace)
         if not src or not dst:
@@ -665,6 +710,64 @@ def _do_aim_groups(doc, world_zero_spine, namespace, results, messages):
         messages.append("[OK] {0} : {1}.".format(
             group.get("name", "aim group"),
             "world zero" if use_zero else "aimed along the chain"))
+    return done
+
+
+def _do_aim_subtrees(doc, namespace, results, messages):
+    """어느 조인트 아래 **전부**를, 각자 제 자식을 보도록 정렬한다.
+
+    손가락처럼 **마디 수가 제각각이고 갈래가 많은** 계층에 쓴다 — 조인트 이름을 하나하나
+    적는 대신 뿌리 하나만 적는다. 손가락이 늘거나 줄어도 json 은 그대로다.
+
+    잎(자식 없는 끝마디)은 **부모의 방향을 물려받는다** — aim 할 대상이 없다.
+    부모부터 내려가므로 그때 부모는 이미 정렬돼 있다.
+    """
+    done = 0
+    for group in (doc.get("aim_subtrees") or []):
+        root = _resolve(group["root"], namespace)
+        if not root:
+            messages.append("[Warning] {0}: not in the scene - subtree skipped.".format(
+                group["root"]))
+            continue
+
+        hint = axis_vector(group["up_world"])
+        nodes = descendants(root)          # 부모가 먼저 오는 순서
+        if not nodes:
+            messages.append("[Info] {0}: nothing under it.".format(
+                su.short_name(root)))
+            continue
+
+        for node in nodes:
+            if not _writable(node):
+                results["skipped"] += 1
+                messages.append("[Warning] {0}: rotation is locked or driven.".format(
+                    su.short_name(node)))
+                continue
+
+            kids = cmds.listRelatives(node, children=True, type="joint") or []
+            if kids:
+                here = world_point(node)
+                mat = basis_matrix(here, world_point(kids[0]) - here, hint,
+                                   group["forward"], group["up"])
+                if mat is None:
+                    results["skipped"] += 1
+                    continue
+                set_world_orientation(node, mat)
+            else:
+                # 끝마디 - 부모 방향을 그대로
+                parent = (cmds.listRelatives(node, parent=True, type="joint")
+                          or [None])[0]
+                if not parent:
+                    continue
+                set_world_orientation(node, om.MMatrix(
+                    cmds.xform(parent, q=True, ws=True, m=True)))
+            done += 1
+
+        messages.append("[OK] {0} : {1} joint(s) under {2} aimed ({3} forward, "
+                        "{4} -> world {5}).".format(
+                            group.get("name", "subtree"), len(nodes),
+                            su.short_name(root), group["forward"],
+                            group["up"], group["up_world"]))
     return done
 
 

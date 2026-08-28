@@ -5,5 +5,5 @@
 #           Orient & Place - A1 spine / A2 limbs + tail / A3 mirror
 #                            + place the foot and toe pole targets.
 
-VERSION = "02.07"
+VERSION = "02.09"
 LAST_UPDATE = "2026-08-28"

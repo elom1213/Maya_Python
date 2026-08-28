@@ -79,11 +79,13 @@ V01(`CtrlRig`)과 `WINDOW_OBJECT_NAME` 이 달라 **둘을 동시에 띄워도 �
 
 ### 4.2 위치만 맞추는 세트
 
-`match` 가 `["t"]` 인 세트는 **위치만** 옮기고 **회전은 그대로 둔다.** 지금 그런 세트는 6개다.
+`match` 가 `["t"]` 인 세트는 **위치만** 옮기고 **회전은 그대로 둔다.** 지금 그런 세트는 **10개**다.
 
 | 세트 | 왜 |
 |---|---|
 | `B01_Leg_L_ik_01_foot` · `B02_Leg_R_ik_01_foot` | 발 IK 컨트롤 — 회전은 리그가 정한다 |
+| `B01_Leg_L_ik_08_polTgt_foot` · `B01_Leg_R_ik_08_polTgt_foot` | 발 IK 폴 타깃 |
+| `B01_Leg_L_ik_09_polTgt_toe` · `B01_Leg_R_ik_09_polTgt_toe` | 발끝 IK 폴 타깃 |
 | `A01_Arm_L_04_Pole` · `A02_Arm_R_04_Pole` | 폴 타깃 — `poleVectorConstraint` 는 **위치만** 쓴다 |
 | `B01_Leg_L_06_pole` · `B02_Leg_R_06_pole` | 〃 |
 
@@ -498,12 +500,16 @@ foot -> ball 이 수직에서 36.87도 기울면
 
 ### 7.7 Place — 발·발끝 폴 타깃 4개
 
-| 조인트 | 부모 |
-|---|---|
-| `helper_polTgt_foot_l` | `helper_foot_l` |
-| `helper_polTgt_toe_l` | `helper_ball_l` |
-| `helper_polTgt_foot_r` | `helper_foot_r` |
-| `helper_polTgt_toe_r` | `helper_ball_r` |
+| 조인트 | 부모 | 짝인 케이지 세트 (**위치만**) |
+|---|---|---|
+| `helper_polTgt_foot_l` | `helper_foot_l` | `B01_Leg_L_ik_08_polTgt_foot` |
+| `helper_polTgt_toe_l` | `helper_ball_l` | `B01_Leg_L_ik_09_polTgt_toe` |
+| `helper_polTgt_foot_r` | `helper_foot_r` | `B01_Leg_R_ik_08_polTgt_foot` |
+| `helper_polTgt_toe_r` | `helper_ball_r` | `B01_Leg_R_ik_09_polTgt_toe` |
+
+> **오른쪽 두 세트의 접두가 `B01` 이다.** 다른 오른쪽 다리 세트 13개는 전부 `B02_Leg_R_*`
+> 인데 이 둘만 `B01_Leg_R_*` 다 — 받은 그대로 넣었다. 오타라면 json 한 줄이고,
+> 씬에 그 이름이 없으면 Match 가 `set missing` 으로 **찾아본 이름을 그대로 적어** 알린다.
 
 방향이 전부 정해진 **뒤에**, 이 넷은 `translate` 가 **`(0, 0, 10)`** 이 된다 —
 부모 자리에서 **자기 축 `+Z`** 로 10.
@@ -524,3 +530,28 @@ foot -> ball 이 수직에서 36.87도 기울면
 ```jsonc
 { "joints": [...], "reset": true, "axis": "+Z", "distance": 10.0 }
 ```
+
+### 7.8 손가락
+
+| 손 | 규칙 |
+|---|---|
+| **왼손** (`helper_hand_l` 하위 19개) | forward **`+X`** 가 제 자식을, **`+Y`** 가 월드 `+Y` 쪽 |
+| **오른손** (19개) | **왼손을 Behavior 미러**한 결과 |
+
+조인트 이름을 하나하나 적지 않는다 — **뿌리 하나(`helper_hand_l`)만** 적으면 그 아래
+전부에 적용된다. 손가락 마디가 늘거나 줄어도 json 은 그대로다.
+
+**끝마디는 부모의 방향을 물려받는다** — aim 할 자식이 없다.
+
+> **★ 순서가 중요하다.** 오른손 미러는 **왼손을 정렬한 뒤에** 돌아야 한다.
+> 팔 전체를 미러하는 이른 단계(1번)는 **아직 손대지 않은 왼손가락**을 복사하므로,
+> 사용자가 놓아 둔 방향이 그대로 오른쪽에 박힌다.
+> 그래서 손 미러는 `"stage": "late"` 로 표시해 **정렬 뒤에** 돈다:
+>
+> ```
+> 미러(이른) → A1 → A2 → 손가락 정렬 → 미러(늦은) → 위치 전용 → Place
+> ```
+>
+> 검증에 **"이른 단계로 되돌리면 깨진다"** 를 넣어 뒀다 — 순서가 진짜 필요하다는 증거다.
+
+이제 **규칙이 없는 조인트는 `helper_root` 와 `helper_clavicle_l` 둘뿐이다**(40 → 2).

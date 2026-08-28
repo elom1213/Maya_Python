@@ -86,6 +86,22 @@
     }
   ],
 
+  "aim_subtrees": [
+    {
+      "name": "fingers_l",
+      "comment": [
+        "Every joint under the left hand: forward +X at its own child, +Y toward",
+        "world +Y. A leaf finger tip has no child, so it copies its parent.",
+        "The right hand is not listed here - it is mirrored from this one, and that",
+        "mirror has to run AFTER this (see mirror.behavior with stage 'late')."
+      ],
+      "root": "helper_hand_l",
+      "forward": "+X",
+      "up": "+Y",
+      "up_world": "+Y"
+    }
+  ],
+
   "place": [
     {
       "comment": [
@@ -113,6 +129,17 @@
         "source": "helper_clavicle_l",
         "target": "helper_clavicle_r",
         "children": true
+      },
+      {
+        "comment": [
+          "The right fingers. This one runs LATE - after aim_subtrees has oriented",
+          "the left hand. The early mirror above would copy the left fingers before",
+          "they are aimed, so their orientation would be whatever the user left."
+        ],
+        "source": "helper_hand_l",
+        "target": "helper_hand_r",
+        "children": true,
+        "stage": "late"
       }
     ],
 

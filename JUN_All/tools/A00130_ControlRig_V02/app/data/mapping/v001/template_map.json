@@ -527,7 +527,14 @@
     {
       "name": "helper_polTgt_foot_l",
       "parent": "helper_foot_l",
-      "targets": []
+      "targets": [
+        {
+          "set": "B01_Leg_L_ik_08_polTgt_foot",
+          "match": [
+            "t"
+          ]
+        }
+      ]
     },
     {
       "name": "helper_ball_l",
@@ -544,7 +551,14 @@
     {
       "name": "helper_polTgt_toe_l",
       "parent": "helper_ball_l",
-      "targets": []
+      "targets": [
+        {
+          "set": "B01_Leg_L_ik_09_polTgt_toe",
+          "match": [
+            "t"
+          ]
+        }
+      ]
     },
     {
       "name": "helper_ballEnd_l",
@@ -648,7 +662,14 @@
     {
       "name": "helper_polTgt_foot_r",
       "parent": "helper_foot_r",
-      "targets": []
+      "targets": [
+        {
+          "set": "B01_Leg_R_ik_08_polTgt_foot",
+          "match": [
+            "t"
+          ]
+        }
+      ]
     },
     {
       "name": "helper_ball_r",
@@ -665,7 +686,14 @@
     {
       "name": "helper_polTgt_toe_r",
       "parent": "helper_ball_r",
-      "targets": []
+      "targets": [
+        {
+          "set": "B01_Leg_R_ik_09_polTgt_toe",
+          "match": [
+            "t"
+          ]
+        }
+      ]
     },
     {
       "name": "helper_ballEnd_r",
