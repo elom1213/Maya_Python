@@ -115,6 +115,81 @@ def handles_in_set(set_node):
 
 
 # =========================
+# 세트에 없는데 관련된 핸들 찾기
+# =========================
+
+def _long(node):
+    names = cmds.ls(node, long=True) or []
+    return names[0] if names else node
+
+
+def _self_and_descendants(node):
+    out = {_long(node)}
+    for c in (cmds.listRelatives(node, allDescendents=True, type="joint",
+                                 fullPath=True) or []):
+        out.add(c)
+    return out
+
+
+def related_handles(members, known=()):
+    """매칭 대상을 건드리는데 **세트에 없는** ikHandle 을 찾는다. `(handles, messages)`.
+
+    ── 왜 필요한가 (2026-08-28 실측) ─────────────────────────────────────────
+    `D01_IK_handle` 은 리거가 손으로 채우는 목록이라 **빠진 핸들이 있을 수 있다.**
+    특히 **중첩 IK** — 메인 팔 체인 안에 Drv 체인이 또 들어 있는 구조:
+
+        CH_r_UpperArm_xx_ikjnt
+        └── CH_r_UpperArmDrv_xx_ikjnt      <- 이 체인에도 제 ikHandle 이 있다
+            └── CH_r_LowerArmDrv_xx_ikjnt
+
+    Drv 핸들이 세트에 없으면 **매칭 중에도 계속 풀린다.** 부모 체인이 움직이는 동안
+    솔버가 Drv 조인트를 다시 잡아, 회전이 부모와 어긋난 채 남는다:
+
+        Drv 핸들이 세트에 있을 때  -> 부모 대비 0.000 도   OK
+        Drv 핸들이 세트에 없을 때  -> 부모 대비 7.643 도   X
+
+    (`LowerArmDrv` 는 **끝 조인트**라 솔버가 안 돌린다 - 그래서 겉보기엔 한 조인트만
+    틀어진 것처럼 보인다.)
+
+    그래서 **세트를 믿되 그것만 믿지 않는다.** 매칭 대상(그리고 그 하위)을 체인에
+    포함하는 핸들을 씬에서 찾아 **함께 끄고, 무엇을 더 껐는지 알린다** — 리거가
+    세트를 고칠 수 있도록.
+    """
+    messages = []
+    if not members:
+        return [], messages
+
+    touched = set()
+    for m in members:
+        if cmds.objExists(m):
+            touched |= _self_and_descendants(m)
+
+    known_long = {_long(h) for h in (known or [])}
+    found = []
+
+    for handle in (cmds.ls(type="ikHandle", long=True) or []):
+        if handle in known_long:
+            continue
+        try:
+            chain = ike.chain_joints(handle)
+        except Exception:
+            chain = []
+        if not chain:
+            continue
+        if any(_long(j) in touched for j in chain):
+            found.append(handle)
+
+    if found:
+        messages.append(
+            "[Warning] {0} ikHandle(s) drive joints being matched but are NOT in the "
+            "handle set - turning them off too, otherwise their solver would fight the "
+            "match and leave the joints rotated: {1}. Consider adding them to the "
+            "set.".format(len(found), ", ".join(su.short_name(h) for h in found[:6])))
+
+    return found, messages
+
+
+# =========================
 # 사전 점검
 # =========================
 

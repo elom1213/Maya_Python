@@ -9,10 +9,12 @@
 # 상위 탭 = 단계. 지금은 `Match` 하나뿐이고, 다음 단계(Orient / Mirror / IK / Validate)는
 # 아래 STEPS 표에 줄을 넣으면 붙는다.
 #
+#   Orient : 규칙(A1 · A2 · A3)대로 템플릿 조인트의 방향을 잡는다  <- Match 보다 먼저
 #   Match  : 매핑 표(json)대로 세트의 원소를 짝인 조인트에 맞춘다
 #   Length : 템플릿 조인트 사이 거리를 옵션 컨트롤러 어트리뷰트에 써 넣는다
-#   Orient : 규칙(A1 · A2 · A3)대로 템플릿 조인트의 방향을 잡는다
 #
+# v02.06 : Match 가 **세트에 없는 관련 ikHandle 도 찾아** 함께 끈다.
+# v02.05 : 탭 순서를 실제 작업 순서대로 — **Orient** 를 맨 앞으로.
 # v02.04 : **Orient** 단계 — A1(척추) · A2(팔·다리 + tail/preserve) · A3(미러).
 #          계획서: docs/plans/A00130_ControlRig_V02_orient_plan.md
 # v02.03 : Match 앞뒤로 **IK 편집 세션** — D01_IK_handle 의 핸들을 끄고 매칭한 뒤
@@ -44,7 +46,13 @@ WINDOW_OBJECT_NAME = "JUN_A00130_ControlRig_V02_window"
 
 
 # (탭 라벨, 툴팁, 빌더 메서드 이름) — 단계가 늘면 여기에 줄만 넣는다
+# 탭 순서 = 실제로 누르는 순서다. Orient 가 먼저인 이유는 Match 가 케이지를 조인트
+# 자리로 옮기기 때문 - 방향이 정해진 뒤에 맞춰야 한다.
 STEPS = (
+    ("Orient",
+     "Orient - mirror the left side to the right, then set every template joint's "
+     "rotation from the rules. Run this before Match.",
+     "_build_orient_tab"),
     ("Match",
      "Match - move each cage set's members onto the template joint it is paired with.",
      "_build_match_tab"),
@@ -52,10 +60,6 @@ STEPS = (
      "Length - measure the template joints and write the distances onto the "
      "option controller.",
      "_build_length_tab"),
-    ("Orient",
-     "Orient - mirror the left side to the right, then set every template joint's "
-     "rotation from the rules.",
-     "_build_orient_tab"),
 )
 
 
@@ -227,7 +231,11 @@ class MainWindow(QWidget):
             "  turn IK off  ->  match  ->  snap handle + rebuild pole vector  ->  IK on\n"
             "\n"
             "The snap and the pole vector maths come from A00060 Joint Tool.\n"
-            "If the match fails half way the chains are put back and IK is turned on.")
+            "If the match fails half way the chains are put back and IK is turned on.\n"
+            "\n"
+            "Handles that drive the joints being matched but are missing from the set\n"
+            "are found and turned off as well - a nested chain left solving would fight\n"
+            "the match and leave its joints rotated. You are told which ones.")
         ik_layout.addWidget(self.chk_ik_session)
 
         self.lbl_ik_set = QLabel("")
@@ -588,11 +596,15 @@ class MainWindow(QWidget):
             self.log("[WARN] Nothing to match.")
             return
 
+        # 체크박스는 "매칭 중 IK 를 다룬다" 는 뜻이다 - 세트에서 온 것도,
+        # 툴이 찾아낸 것도 함께 끈다/안 끈다.
+        use_ik = self.chk_ik_session.isChecked()
         ik_handles = []
-        if self.chk_ik_session.isChecked():
+        if use_ik:
             ik_handles, _set_node = self._ik_handles(log_messages=True)
 
-        _results, messages = match_manager.apply(rows, ik_handles=ik_handles)
+        _results, messages = match_manager.apply(
+            rows, ik_handles=ik_handles, auto_ik=use_ik)
         self._log_all(messages)
         self._refresh_plan()
 

@@ -4,5 +4,5 @@
 #           Match brackets the run with an IK edit session (D01_IK_handle).
 #           Orient - A1 spine / A2 limbs + tail / A3 mirror.
 
-VERSION = "02.04"
+VERSION = "02.06"
 LAST_UPDATE = "2026-08-28"

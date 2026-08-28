@@ -1,6 +1,6 @@
 ---
 name: wip-a00130-ik-session
-description: A00130_ControlRig_V02 Match 가 앞뒤로 IK 를 껐다 켠다. IK 는 연결이 아니라 솔버로 써서 막힌 걸로 안 보인다(조용한 거짓 성공), snapEnable 은 평가 중에 핸들을 써서 undo 를 깨뜨린다 (v02.03)
+description: A00130_ControlRig_V02 Match 가 앞뒤로 IK 를 껐다 켠다. IK 는 연결이 아니라 솔버로 써서 막힌 걸로 안 보인다(조용한 거짓 성공), snapEnable 은 undo 를 깨뜨린다, 세트에 없는 중첩 IK 핸들이 매칭과 싸운다 (v02.06)
 metadata:
   type: project
 ---
@@ -47,6 +47,32 @@ channel_group_state("jnt_mid", "rotate")               ->  free
 **다만 가정하지 않는다**: `preflight()` 가 실행 시점에 `ikBlend` 가 구동되는 핸들을 찾으면
 **크게 알린다**(전제가 깨졌다는 뜻이고, 그대로 두면 씬 전체 IK 가 꺼진 채 매칭이 돈다).
 
+**★ 세트에 없는 중첩 IK 핸들이 매칭과 싸운다** (2026-08-28, 사용자 보고)
+
+`D01_IK_handle` 은 **리거가 손으로 채우는 목록**이라 빠진 것이 있다. 특히 **중첩 IK** —
+메인 팔 체인 **안에** Drv 체인이 또 들어 있는 구조:
+
+```
+CH_r_UpperArm_xx_ikjnt
+└── CH_r_UpperArmDrv_xx_ikjnt      <- 이 체인에도 제 ikHandle 이 있다
+    └── CH_r_LowerArmDrv_xx_ikjnt
+```
+
+| Drv 핸들이 세트에 | `UpperArmDrv` 의 부모 대비 회전 |
+|---|---|
+| 있을 때 | **0.000°** |
+| 없을 때 | **7.643°** |
+
+**위치는 맞고 회전만 틀어진다** — IK 가 핸들까지 끌어다 놓으니 위치는 맞지만, 회전은
+솔버가 정한다. `LowerArmDrv` 가 멀쩡해 보이는 건 **끝 조인트라 솔버가 안 돌리기** 때문이라
+**겉보기엔 한 조인트만 틀어진 것처럼 보인다.**
+
+→ `related_handles()` 가 **매칭 대상(과 그 하위)을 체인에 포함하는 핸들을 씬에서 찾아**
+함께 끄고 **무엇을 더 껐는지 알린다**. 관계없는 체인은 안 건드린다.
+
+> **손으로 채우는 목록은 언젠가 빠진다.** 목록을 없애지 말고 **목록 + 실측 검사**로.
+> 리거의 의도는 그대로 두고, 놓친 것은 툴이 찾아 알린다.
+
 **나머지 계약**
 - 세트 이름은 `template_map.json` 의 `ik_handle_set`. **조인트·세트·옵션 컨트롤러와 같은
   이름 해석**(네임스페이스 먼저) → 레퍼런스 케이지 지원
@@ -56,5 +82,5 @@ channel_group_state("jnt_mid", "rotate")               ->  free
 - A00060 이 편집 상태를 **핸들 어트리뷰트에** 남기므로, 지난 실행이 끊겨도
   `stranded_handles()` 로 알아챈다
 
-검증 **IK 44 + Match 110 + Length 126 = 280항목**.
+검증 **IK 57 + Match 110 + Length 126 + Orient 68 = 361항목**.
 [[mayapy-headless-verify]] · [[undo-chunk-by-default]] · [[referenced-node-name-comparisons]]

@@ -119,7 +119,7 @@ def plan(joints, namespace):
     return rows
 
 
-def apply(rows, ik_handles=None):
+def apply(rows, ik_handles=None, auto_ik=True):
     """계산된 행대로 실제로 맞춘다. `(results, messages)`.
 
     전체가 **undo 한 스텝**이다.
@@ -131,6 +131,11 @@ def apply(rows, ik_handles=None):
     이게 없으면 IK 가 걸린 조인트는 `matchTransform` 이 **성공해도 다음 평가에서 IK 가
     도로 가져간다**(실측). 그러면 툴은 `[OK] matched` 라고 보고하는데 아무것도 안 바뀐다.
     자세한 근거는 `ik_session` 의 모듈 주석.
+
+    `auto_ik` 면 **세트에 없더라도 매칭 대상을 건드리는 핸들을 씬에서 찾아 함께 끈다.**
+    중첩 IK(팔 체인 안의 Drv 체인 등)가 세트에서 빠져 있으면, 그 솔버가 매칭과 싸워
+    **조인트가 부모와 어긋난 채 남는다**(실측 7.643도). 자세한 것은
+    `ik_session.related_handles` 의 주석.
 
     매칭 도중 예외가 나면 **편집을 취소해 체인을 원래대로 돌리고** IK 를 되켠 뒤 예외를
     다시 올린다 — 반쯤 매칭된 체인에 IK 가 다시 붙는 것이 제일 나쁘다.
@@ -149,9 +154,18 @@ def apply(rows, ik_handles=None):
 
     with undo_chunk():
         # ---- IK 편집 모드 진입 ----
+        handles = list(ik_handles or [])
+
+        if auto_ik:
+            # 세트를 믿되 그것만 믿지 않는다 - 빠진 핸들을 찾아 함께 끈다
+            members = [m for row in rows for m in (row["members"] or [])]
+            extra, extra_msgs = ik_session.related_handles(members, handles)
+            messages.extend(extra_msgs)
+            handles.extend(extra)
+
         session = None
-        if ik_handles:
-            session, ik_msgs = ik_session.begin(ik_handles)
+        if handles:
+            session, ik_msgs = ik_session.begin(handles)
             messages.extend(ik_msgs)
 
         try:

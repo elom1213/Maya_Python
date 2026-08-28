@@ -3,6 +3,60 @@
 `A00130_ControlRig`(V01)의 **템플릿 조인트 패러다임 재작성판**이다.
 계획서: `JUN_All/docs/plans/A00130_ControlRig_V02_plan.md`
 
+## v02.06 (2026-08-28)
+**[Fix] Match — 세트에 없는 **중첩 IK 핸들** 때문에 조인트 회전이 틀어지던 문제.**
+
+사용자 보고: 이런 구조에서 Match 를 하면 `CH_r_UpperArmDrv_xx_ikjnt` 의 **위치는 맞는데
+회전이 부모와 어긋난다.**
+
+```
+CH_r_UpperArm_xx_ikjnt
+└── CH_r_UpperArmDrv_xx_ikjnt      <- 이 체인에도 제 ikHandle 이 있다
+    └── CH_r_LowerArmDrv_xx_ikjnt
+```
+
+**원인** — `D01_IK_handle` 에 **Drv 체인의 핸들이 없었다.** 그러면 그 IK 는 매칭 중에도
+계속 풀려서, 부모 체인이 움직이는 동안 솔버가 Drv 조인트를 다시 잡는다. 재현:
+
+| Drv 핸들이 세트에 | `UpperArmDrv` 의 부모 대비 회전 |
+|---|---|
+| 있을 때 | **0.000°** |
+| 없을 때 | **7.643°** |
+
+`LowerArmDrv` 가 멀쩡해 보이는 건 **끝 조인트라 솔버가 안 돌리기** 때문이다 —
+겉보기엔 한 조인트만 틀어진 것처럼 보인다.
+
+**고침** — 세트를 믿되 **그것만 믿지 않는다.** 매칭 대상(과 그 하위)을 체인에 포함하는
+ikHandle 을 **씬에서 찾아 함께 끄고**, 무엇을 더 껐는지 **로그에 적는다**:
+
+```
+[Warning] 1 ikHandle(s) drive joints being matched but are NOT in the handle set -
+turning them off too, otherwise their solver would fight the match and leave the
+joints rotated: drvHandle. Consider adding them to the set.
+```
+
+관계없는 체인은 건드리지 않는다. `Match` 탭 체크박스를 끄면 이것도 함께 꺼진다
+(체크박스 = "매칭 중 IK 를 다룬다").
+
+> **손으로 채우는 목록은 언젠가 빠진다.** 목록을 없애는 대신 **목록 + 실측 검사**로 갔다 —
+> 리거의 의도(세트)는 그대로 두고, 놓친 것은 툴이 찾아 알린다.
+
+**검증**(mayapy headless, **IK 57 + Match 110 + Length 126 + Orient 68 = 361항목 전부 통과**):
+Drv 핸들이 세트에 **있을 때와 없을 때 결과가 같은가** · 빠진 핸들을 찾아 **알리는가** ·
+**관계없는 체인은 안 건드리는가** · 이미 세트에 있는 핸들을 중복으로 세지 않는가 ·
+끝난 뒤 그 핸들의 `ikBlend` 가 복원되는가 · **`auto_ik` 를 끄면 증상이 되돌아오는가**
+(고친 것이 진짜 원인이라는 증거).
+
+## v02.05 (2026-08-28)
+**[Change] 탭 순서를 실제 작업 순서대로 — `Orient` 를 맨 앞으로.**
+
+`Orient` · `Match` · `Length`. **`Orient` 가 `Match` 보다 먼저여야 한다** — Match 는
+케이지를 조인트 자리로 옮기므로 방향이 정해진 뒤에 맞춰야 한다. 탭이 그 순서를
+그대로 보여 준다.
+
+검증은 **탭 순서를 단언하지 않고 `Orient` 가 첫 탭인지**만 본다 — 나중에 단계가
+늘어도 이 계약만 지키면 된다. 전체 회귀 **348항목 통과.**
+
 ## v02.04 (2026-08-28)
 **[Feature] `Orient` 단계 — 템플릿 조인트의 방향을 규칙대로 잡는다 (A1 · A2 · A3).**
 
