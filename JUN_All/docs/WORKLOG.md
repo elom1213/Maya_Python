@@ -30,6 +30,33 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-08-31 (오늘)
 
+> [!summary] `A00145_RigConnect` **Match — Followers 에 버텍스를 담아도 매칭된다** (v01.34 -> 01.35)
+- **요청**: `Followers` 에 메시 버텍스를, `Targets` 에 로케이터(또는 다른 메시의 버텍스)를
+  리스트업하고 Match 하면 `0 matched, 1 skipped` 로 실패한다 —
+  `At least one source and one target object is needed to match transforms. Found 1.`
+  버텍스를 팔로워로 놔도 매칭되게 할 것.
+- **원인은 한 줄이었다.** `_match_one` 이 팔로워를 **언제나 transform 으로 보고**
+  `cmds.matchTransform(flw, tgt, ...)` 을 불렀다. 이 명령은 **컴포넌트를 인자로 받지 못한다** —
+  `mesh.vtx[81]` 을 주면 오브젝트로 세지 않아 "Found 1" 이 된다. 타겟 쪽은 종류별로
+  꼼꼼히 갈라 놨는데(vertex/mesh/cluster/component/snapshot) **팔로워 쪽에는 그 분기가 없었다.**
+- **팔로워가 컴포넌트면 별도 경로로 간다.** 타겟 종류를 가리지 않고 **월드 위치 하나**만 뽑아
+  (`_target_position` — transform 은 rotatePivot, 메시는 centroid, 클러스터는 피벗, 버텍스/
+  컴포넌트는 그 점, 캐시는 스냅샷 값) `xform` 으로 그 점을 옮긴다.
+- **점에는 회전도 스케일도 없다.** `Rotation`/`Scale` 이 켜져 있어도 무시하고 로그에 한 줄 알린다.
+  `Translation` 이 꺼져 있으면 옮길 게 없어 skip. `Parent` 도 건너뛴다(버텍스는 부모를 못 가진다).
+  **조용히 무시하지 않는 것이 요점** — 로그를 보면 무엇이 빠졌는지 알 수 있다.
+- **엣지·페이스는 중심을 옮긴다.** 점이 여럿 걸린 컴포넌트에 절대 좌표를 그대로 주면
+  `xform` 이 걸린 점을 **전부 한 자리로 뭉갠다.** 그래서 중심 → 타겟의 **차이만큼 상대 이동**한다.
+- **정보성 메모를 `[skip]` 으로 찍지 않는다.** notes 채널이 하나뿐이라 "이렇게 처리했다" 도
+  실패처럼 보였다 → `NOTE_PREFIX` 표식을 붙여 UI 가 `[note]` 로 구분해 찍는다.
+- **mayapy(2024) 로 9가지를 확인**: 로케이터→버텍스 · 버텍스→버텍스(다른 메시) · `1 <- n`
+  (로케이터 1개 ← 버텍스 3개) · 엣지 팔로워(중심 일치 + 두 점이 안 뭉개짐) · Translation off →
+  skip + 사유 · Parent 켜도 안 죽음 · `@cache` 타겟 → 버텍스 · 메시 centroid → 버텍스 ·
+  기존 transform←transform 회귀. **undo 한 번에 원래 자리로 돌아오는 것까지 확인.**
+- 파일: `app/core/match_manager.py`(`_is_component` / `_target_position` /
+  `_match_pos_component` / `NOTE_PREFIX`), `app/ui/main_window.py`(로그 구분 · 툴팁 · About),
+  `docs/A00145_RigConnect.md`(§컴포넌트 팔로워)
+
 > [!summary] `A00110_animTool_V02` **Transfer > Layer — 애니메이션 레이어 사이 키 복사 · 잘라내기** (v02.12 -> 02.13)
 - **요청**: 오브젝트를 리스트업하고 그 키를 **임의의 애님 레이어 → 다른 레이어**로 복사 /
   잘라내기. TRS 9축을 체크박스로 고르되 **키가 찍힌 다른 어트리뷰트도** 함께 옮길 것.

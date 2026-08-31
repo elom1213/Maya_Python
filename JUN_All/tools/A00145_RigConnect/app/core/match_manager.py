@@ -11,6 +11,9 @@ follower 를 target 의 위치/회전에 맞춘다. target 종류에 따라:
   - 그 외 component(edge/face/cv) : pointPosition 으로 위치만.
   - vertex(.vtx[i])        : 정점 월드 위치로 이동 + follower 의 +Y 축을 정점 노말에 정렬.
 
+follower 도 컴포넌트일 수 있다 — 그 점을 타겟의 월드 위치로 옮긴다(회전/스케일은 점에 없다).
+`cmds.matchTransform` 은 컴포넌트를 인자로 못 받으므로 이 경로는 `xform` 으로 따로 간다.
+
 UI 비의존: 위젯에서 읽은 list/str 값만 받는다. (app/core ↔ app/ui 분리)
 
 MEL 대비 개선/버그 수정:
@@ -354,6 +357,61 @@ def _match_pos(flw, pos):
     cmds.xform(flw, ws=True, translation=(pos[0], pos[1], pos[2]))
 
 
+def _is_component(name):
+    """이름이 컴포넌트(`obj.vtx[3]` / `.cv[2]` / `.e[7]` ...)인지.
+
+    스냅샷 키는 씬 이름이 아니므로 호출부에서 **먼저** 걸러 놓고 부른다
+    (표시 텍스트에 `[` 가 들어 있을 수 있다 — `_classify` 주석 참고).
+    """
+    return "[" in name
+
+
+def _target_position(tgt, ctx=None, cache=None):
+    """타겟 종류를 가리지 않고 **월드 위치 하나**만 뽑는다 (x, y, z).
+
+    컴포넌트 팔로워(버텍스·CV·엣지·페이스)는 회전을 가질 수 없어 위치만 필요하다.
+    종류별 해석은 `_match_one` 과 같다 — transform 은 `matchTransform -position` 과 같은
+    자리(월드 rotatePivot), 메시는 centroid, 클러스터는 피벗, 버텍스/컴포넌트는 그 점.
+    """
+    kind = _classify(tgt, ctx)
+    if kind == "snapshot":
+        shot = cache.get(tgt) if cache is not None else None
+        if shot is None:
+            raise ValueError(
+                "No cached transform for '{0}' - it was cleared or the tool "
+                "was reloaded.".format(tgt))
+        return shot.position()
+    if kind == "vertex":
+        pos, _normal = _vertex_pos_normal(tgt, ctx)
+        return (pos.x, pos.y, pos.z)
+    if kind == "component":
+        return _component_center(tgt)
+    if kind == "mesh":
+        return _mesh_centroid(tgt, ctx)
+    if kind == "cluster":
+        return _cluster_pivot(tgt)
+    return cmds.xform(tgt, q=True, ws=True, rotatePivot=True)
+
+
+def _match_pos_component(flw, pos):
+    """컴포넌트 팔로워를 월드 pos 로 옮긴다.
+
+    점 하나(vtx/cv)면 그 자리에 정확히 놓고, 여러 점이 걸린 컴포넌트(edge/face)면 **중심**이
+    pos 에 오도록 통째로 옮긴다 — 절대 좌표를 그대로 주면 걸린 점이 전부 한 자리로 뭉개진다.
+    """
+    pts = cmds.xform(flw, q=True, ws=True, translation=True) or []
+    n = len(pts) // 3
+    if not n:
+        raise ValueError("Cannot read a position from '{0}'.".format(flw))
+    if n == 1:
+        cmds.xform(flw, ws=True, translation=(pos[0], pos[1], pos[2]))
+        return
+    center = (sum(pts[0::3]) / n, sum(pts[1::3]) / n, sum(pts[2::3]) / n)
+    cmds.xform(flw, ws=True, relative=True,
+               translation=(pos[0] - center[0], pos[1] - center[1],
+                            pos[2] - center[2]))
+
+
 def _apply_snapshot(flw, shot, translate=True, rotate=True, scale=False, ctx=None):
     """캐시해 둔 스냅샷을 flw 에 적용한다. 채널 의미는 원본 타겟 종류를 그대로 따른다.
 
@@ -440,7 +498,17 @@ def _match_one(tgt, flw, normal_axis, translate=True, rotate=True, scale=False,
     - mesh(centroid)/cluster(pivot)/component : 위치만(translate). rotate/scale 무시.
     scale 은 DOOTOOL 'Scale (Only in The World Space)' 이식 — matchTransform scale 은
     flw 의 월드 스케일이 tgt 의 월드 스케일과 같아지도록 맞춘다(월드 기준).
+
+    **팔로워가 컴포넌트**(메시 버텍스 등)이면 위 분기를 타지 않는다 — `cmds.matchTransform`
+    은 컴포넌트를 인자로 받지 못하고("At least one source and one target object is needed
+    to match transforms. Found 1.") 컴포넌트에는 옮길 회전/스케일도 없다. 타겟에서 월드
+    위치 하나만 뽑아 그 점을 옮긴다(반환 kind 는 `"component-follower"`).
     """
+    if _is_component(flw):
+        if translate:
+            _match_pos_component(flw, _target_position(tgt, ctx, cache))
+        return "component-follower"
+
     kind = _classify(tgt, ctx)
     if kind == "snapshot":
         shot = cache.get(tgt) if cache is not None else None
@@ -481,6 +549,11 @@ def _match_one(tgt, flw, normal_axis, translate=True, rotate=True, scale=False,
 # ======================================================================
 # public API
 # ======================================================================
+
+#: 정보성 메모의 표식. 실패가 아니라 "이렇게 처리했다" 를 알리는 줄에 붙인다 —
+#: UI 는 이 표식이 붙은 줄만 `[skip]` 이 아니라 `[note]` 로 찍는다.
+NOTE_PREFIX = "note: "
+
 
 def _note(notes, message, limit=5):
     """진행을 멈추지 않고 남기는 메모. 같은 이야기가 길어지지 않도록 앞의 몇 줄만 남긴다."""
@@ -583,6 +656,10 @@ def match(targets, followers, normal_axis="y",
                    매칭한다(`1 <- n`). 타겟이 2개 이상이면 이 값과 무관하게 `n <- n`.
                    짝짓기는 `resolve_pairs()` 가 정한다.
 
+    팔로워도 **컴포넌트**(메시 버텍스 등)일 수 있다. 이때는 타겟이 무엇이든 그 월드 위치로
+    점을 옮기는 것이 전부다 — 회전/스케일/parent 는 점에 걸 수 없어 조용히 무시하지 않고
+    notes 로 한 줄 알린다.
+
     Returns:
         (matched_count, skipped_count). `n <- n` 에서 개수가 다르면 min 만큼만 매칭하고 차이를
         skipped 에 더한다(`1 <- n` 은 개수가 달라도 정상이라 더하지 않는다).
@@ -596,6 +673,19 @@ def match(targets, followers, normal_axis="y",
     pairs, _fan_out, unpaired = resolve_pairs(targets, followers, one_to_many)
     skipped = unpaired                             # 개수 차이는 호출부가 안내한다
 
+    # 컴포넌트 팔로워는 위치밖에 못 받는다 — 무엇이 빠졌는지 한 줄로 알린다.
+    comp_followers = sum(1 for _t, flw in pairs
+                         if not snap.is_snapshot(flw) and _is_component(flw))
+    if comp_followers:
+        if not translate:
+            _note(notes, "{0} component follower(s) need Translation - a vertex "
+                         "or CV can only take a position".format(comp_followers))
+        elif rotate or scale:
+            _note(notes, NOTE_PREFIX +
+                  "{0} component follower(s) matched by position only - "
+                  "rotation/scale do not apply to a vertex or CV".format(
+                      comp_followers))
+
     matched = 0
     ctx = _Ctx()
     try:
@@ -604,6 +694,10 @@ def match(targets, followers, normal_axis="y",
                 if snap.is_snapshot(flw):
                     # 추상 캐시는 씬에 없으니 움직일 수 없다(타겟으로만 쓴다).
                     _note(notes, "follower {0} is a cached item - nothing to move".format(flw))
+                    skipped += 1
+                    continue
+                if _is_component(flw) and not translate:
+                    # 위치 말고 옮길 것이 없다(사유는 루프 앞에서 한 줄로 알렸다).
                     skipped += 1
                     continue
                 try:
@@ -622,6 +716,9 @@ def match(targets, followers, normal_axis="y",
                 for tgt, flw in pairs:
                     if snap.is_snapshot(flw):
                         continue
+                    if _is_component(flw):
+                        # 점은 부모를 가질 수 없다(루프 앞 안내에 이미 포함).
+                        continue
                     try:
                         if not _parent_one(flw, tgt):
                             unparented += 1
@@ -630,6 +727,10 @@ def match(targets, followers, normal_axis="y",
                 if unparented:
                     _note(notes, "{0} follower(s) not parented - a cached item "
                                  "cannot be a parent".format(unparented))
+                if comp_followers:
+                    _note(notes, NOTE_PREFIX +
+                          "{0} component follower(s) not parented - a vertex "
+                          "or CV cannot be parented".format(comp_followers))
     finally:
         ctx.dispose()
 

@@ -210,13 +210,16 @@ class MainWindow(QWidget):
         self.cb_mt_translate = QCheckBox("Translation")
         self.cb_mt_translate.setChecked(True)
         self.cb_mt_translate.setToolTip(
-            "Match the follower's world position to the target.")
+            "Match the follower's world position to the target.\n"
+            "A component follower (a mesh vertex, a CV) can only take this - "
+            "the point is moved to the target's world position.")
         self.cb_mt_rotate = QCheckBox("Rotation")
         self.cb_mt_rotate.setChecked(True)
         self.cb_mt_rotate.setToolTip(
             "Match the follower's world rotation to the target (rotateOrder "
             "safe). For a vertex target, aligns the follower to the vertex "
-            "normal instead.")
+            "normal instead.\n"
+            "Ignored for a component follower (a vertex has no rotation).")
         tr_row.addWidget(self.cb_mt_translate)
         tr_row.addWidget(self.cb_mt_rotate)
         tr_row.addStretch(1)
@@ -227,7 +230,7 @@ class MainWindow(QWidget):
         self.cb_mt_scale.setToolTip(
             "Match the follower's world scale to the target. Only meaningful "
             "for transform/joint targets (ignored for mesh/cluster/component/"
-            "vertex targets).")
+            "vertex targets, and for a component follower).")
         opt_layout.addWidget(self.cb_mt_scale)
 
         self.cb_mt_parent = QCheckBox("Parent Followers to Targets")
@@ -235,7 +238,9 @@ class MainWindow(QWidget):
         self.cb_mt_parent.setToolTip(
             "After matching, parent each follower under its target (under the "
             "owning object for a component target). Keeps the matched world "
-            "position.")
+            "position.\n"
+            "Skipped for a component follower - a vertex or CV cannot be "
+            "parented.")
         opt_layout.addWidget(self.cb_mt_parent)
 
         # 1 <- n : 타겟이 하나면 팔로워 전부를 그 하나에. 타겟이 여럿이면 켜져 있어도
@@ -1465,6 +1470,8 @@ class MainWindow(QWidget):
             "Match       : match followers to targets (rotateOrder safe)\n"
             "              options: Translation / Rotation / Scale (world) / Parent\n"
             "              + create locators/sphere/cube at targets + vertex normal (+Y)\n"
+            "              followers may be components too - a vertex/CV is moved\n"
+            "                             to the target position (position only)\n"
             "              {2}+ items are summarized instead of listed ('List All')\n"
             "              Cache Targets: remember world T/R/S with no nodes,\n"
             "                             then Swap + Match to put things back\n"
@@ -1561,7 +1568,12 @@ class MainWindow(QWidget):
                              "not restored. Tick Scale for an exact restore "
                              "(it is also the fastest path).")
             for note in notes:
-                self.log("       [skip] {0}".format(note))
+                # 정보성 줄(NOTE_PREFIX)은 실패가 아니다 - [skip] 으로 찍으면 오해를 부른다.
+                if note.startswith(mch_mgr.NOTE_PREFIX):
+                    self.log("       [note] {0}".format(
+                        note[len(mch_mgr.NOTE_PREFIX):]))
+                else:
+                    self.log("       [skip] {0}".format(note))
 
         self._run("Match", _do)
 

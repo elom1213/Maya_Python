@@ -4,7 +4,9 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.34` (`app/config/version.py`) — Connect > Connect 하위 탭에 **`Match Same Name`**(이름이
+- 버전: `v01.35` (`app/config/version.py`) — Match 탭의 **Followers 에 컴포넌트(메시 버텍스·CV 등)를
+  담을 수 있다**: 타겟의 월드 위치로 그 점을 옮긴다 (§컴포넌트 팔로워)
+  · v01.34 는 Connect > Connect 하위 탭에 **`Match Same Name`**(이름이
   **완전히 같은 것만** 매칭)과 **`Show Match Only`**(기본 ON) 추가: 짝이 없는 자리를 **`(Null)`** 로 채워
   destination 목록을 소스와 **1:1 로 세우고**, 연결할 때 그 짝만 건너뛴다 (§Match from Source)
   · v01.33 은 **Attribute 탭이 하위 탭 3개로** (`Copy` / `Create` / `Delete`):
@@ -55,9 +57,40 @@ A00145_RigConnect.run(True)   # True = DEV_MODE 면 reload 후 실행
     예전에는 `cmds.pointPosition` 을 썼는데 이 명령은 **점 컴포넌트만** 받아서 엣지/페이스 타겟이
     조용히 실패했다. 지금은 `xform -q -ws -t` 로 컴포넌트가 걸친 점들을 받아 평균을 낸다
     (점 컴포넌트면 결과가 `pointPosition` 과 동일).
+
+##### 컴포넌트 팔로워 — 버텍스를 타겟 위치로 (v01.35)
+
+`Followers` 에도 **컴포넌트**(메시 버텍스 `mesh.vtx[i]`, 커브 CV, 엣지, 페이스)를 담을 수 있다.
+Targets 에 로케이터를, Followers 에 버텍스를 넣고 `Match` 하면 **그 점이 로케이터 자리로 간다.**
+
+```
+Targets : locator2            Followers : SIN_Body1.vtx[81]
+                 [ Match ]
+[OK] Match
+       1 matched, 0 skipped [TR] (n <- n)
+       [note] 1 component follower(s) matched by position only - rotation/scale
+              do not apply to a vertex or CV
+```
+
+- **타겟은 종류를 안 가린다.** 로케이터·조인트(월드 rotatePivot), 다른 메시의 버텍스, CV/엣지/페이스
+  (컴포넌트 중심), 메시 오브젝트(centroid), clusterHandle(피벗), 캐시 항목(`@cache`) 전부 쓸 수 있다.
+- **위치만 옮긴다.** 점에는 회전도 스케일도 없다. `Rotation` / `Scale` 은 켜져 있어도 무시하고
+  로그에 `[note]` 한 줄로 알린다. `Translation` 을 끄면 옮길 것이 없어 **skip** 된다.
+- **`Parent Followers to Targets` 는 건너뛴다** — 버텍스는 부모를 가질 수 없다(이것도 `[note]`).
+- 엣지·페이스처럼 **점이 여럿 걸린** 컴포넌트는 **중심**이 타겟 위치에 오도록 통째로 옮긴다.
+  (절대 좌표를 그대로 주면 걸린 점이 전부 한 자리로 뭉개진다.)
+- `1 <- n`, Swap, Cache 는 그대로 어울린다 — 예: 버텍스 여러 개를 로케이터 하나로 모으기.
+
+> **v01.34 까지는 `0 matched, 1 skipped` 로 실패했다.** `cmds.matchTransform` 이 컴포넌트를
+> 인자로 받지 못해서(`At least one source and one target object is needed to match transforms.
+> Found 1.`) 팔로워를 늘 transform 으로 다뤘기 때문이다. 지금은 팔로워가 컴포넌트면 타겟에서
+> 월드 위치 하나만 뽑아 `xform` 으로 그 점을 옮기는 **별도 경로**로 간다.
+
 - **Match Options** (레거시 `DOOTOOL_PY_TOOL_Match.py` 이식, v01.10). 기본 체크 상태는 원본을 따름:
-  - **Translation**(기본 ON) — follower 의 월드 위치를 타겟에 맞춘다.
+  - **Translation**(기본 ON) — follower 의 월드 위치를 타겟에 맞춘다. **컴포넌트 팔로워는 이것만**
+    받는다(v01.35).
   - **Rotation**(기본 ON) — follower 의 월드 회전을 타겟에 맞춘다(vertex 타겟이면 노말 정렬).
+    컴포넌트 팔로워에는 무시된다.
   - **Scale (world space)**(기본 OFF) — follower 의 **월드 스케일**을 타겟에 맞춘다. transform/joint
     타겟에만 의미가 있고 mesh/cluster/component/vertex 타겟에는 무시된다.
   - **Parent Followers to Targets**(기본 OFF) — 매칭 후 각 follower 를 타겟(컴포넌트면 소유
