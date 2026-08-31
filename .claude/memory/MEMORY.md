@@ -36,6 +36,7 @@
 - [addAttr min/max raises](addattr-min-max-raises-not-clamps.md) — `minValue`/`maxValue` 는 범위 밖 `setAttr` 을 **잘라내지 않고 RuntimeError**. 초기값은 파이썬에서 먼저 클램프
 - [getAttr settable lies](getattr-settable-lies-for-constrained.md) — `getAttr(plug, settable=True)` 는 **컨스트레인트가 구동하는 트랜스폼에도 True**. 쓸 수 있나는 `connectionInfo(isDestination=True)` + lock 으로 판정
 - [Maya loadPlugin no __file__](maya-loadplugin-no-file.md) — loadPlugin 으로 뜬 .py 플러그인은 `__file__` 없음
+- [animLayer copy/cut traps](animlayer-copy-cut-traps.md) — 레이어 간 키 이동: `copyKey`/`pasteKey` 는 `animLayer` 를 받지만 **`cutKey` 는 안 받는다**, 비멤버 plug 는 paste 실패(`BaseAnimation` 은 예외) · `findCurveForPlug` 가 `None`
 - [animLayer no global selected query](animlayer-no-global-selected-query.md) — `animLayer(q,selected)` 는 레이어 인자 필요, `ls(type=animLayer)` 순회
 - [Referenced node name compares](referenced-node-name-comparisons.md) — 레퍼런스는 **솔버 노드까지 네임스페이스가 붙는다** (`ikHandle -q -solver` → `CAGE:ikRPsolver`). 이름 비교는 조용히 어긋난다 — **타입으로 판정**할 것
 - [Set rename traps](maya-set-rename-traps.md) — 마야 Search/Replace 가 세트에 안 먹히는 건 **`select(set)` 이 멤버를 펼치기** 때문 · **짧은 이름으로 rename 하면 네임스페이스가 벗겨진다** · 잘못된 문자를 조용히 고침 · 기본 세트 판정은 `defaultNodes=True`
@@ -147,6 +148,7 @@
 - [A00145 Match DOOTOOL options](wip-a00145-match-dootool-options.md) — Match 탭에 T/R/S/Parent 체크박스 이식 (v01.10)
 - [A00120 FKIK constraint-free bake](wip-a00120-fkik-bake-constraintfree.md) — parentConstraint 대신 프레임별 matchTransform (애님 레이어 포즈 깨짐 수정)
 - [A00110 Follow: component target](wip-a00110-follow-component-target.md) — Follow Target 에 메시 버텍스 지원. 컴포넌트는 worldMatrix 가 없다 → 위치+노말로 행렬, `getAttr(time=)` 불가라 프레임 이동, `ls` 는 범위 밖 인덱스를 클램프 (v01.41)
+- [A00110 Layer key copy](wip-a00110-layer-key-copy.md) — **신규 탭** Transfer > Layer: 애님 레이어 사이 키 복사/잘라내기. 9축 전부 ON 이 "전부" 가 아니다(대신 `All Keyed Channels`), Cut 은 **붙은 채널만** 지운다 (v02.13)
 - [A00110 Copy Key custom attrs](wip-a00110-copykey-custom-attrs.md) — 9축 필터가 커스텀 어트리뷰트를 조용히 버리던 문제 → Custom Channels 목록 (v02.12)
 - [A00110 Copy Key 1->n](wip-a00110-copykey-one-to-many.md) — Base 1개면 Target 전부에 복사(기본 ON). **Follow 의 `1<-n` 은 에러, 여기는 조용히 n->n 폴백** (v02.06)
 - [A00110_V02 tab taxonomy](wip-a00110-tab-taxonomy.md) — **신규 V02**: 상위 탭 = 카테고리(Key/Timing/Curve/Transfer/Bake/View), 하위 탭 = 기능. V01 은 재분류 전으로 방치 + 툴 복제 체크리스트 (V02 v02.00)

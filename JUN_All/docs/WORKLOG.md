@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-08-28
+updated: 2026-08-31
 ---
 
 # 작업 일지 (WORKLOG)
@@ -28,7 +28,45 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-08-28 (오늘)
+## 2026-08-31 (오늘)
+
+> [!summary] `A00110_animTool_V02` **Transfer > Layer — 애니메이션 레이어 사이 키 복사 · 잘라내기** (v02.12 -> 02.13)
+- **요청**: 오브젝트를 리스트업하고 그 키를 **임의의 애님 레이어 → 다른 레이어**로 복사 /
+  잘라내기. TRS 9축을 체크박스로 고르되 **키가 찍힌 다른 어트리뷰트도** 함께 옮길 것.
+  (`Ctrl+C` / `Ctrl+V` 로는 여러 오브젝트의 레이어 간 복사가 온전히 안 된다 — 붙여넣기가
+  **지금 선택된 레이어**로 가 버리고, 어떤 채널이 어디로 갔는지 확인할 방법도 없다.)
+- **네 가지를 mayapy(2024) 로 확인하고 그 위에 지었다.**
+  ① `copyKey(plug, animLayer=L)` / `pasteKey(plug, animLayer=L)` 는 **레이어 지정 복사·붙여넣기가
+  되고**, 붙여넣기는 클립보드의 **원래 시간**에 들어가며 **대상 레이어에 커브가 없으면 만들어 준다.**
+  ② 단 대상이 `BaseAnimation` 이 아닌데 그 plug 가 **레이어 멤버가 아니면**
+  `RuntimeError: Nothing to paste to` — `animLayer(L, e=True, attribute=plug)` 로 먼저 넣어야 한다.
+  **`BaseAnimation` 은 멤버가 아니어도 그냥 붙는다.**
+  ③ **`cutKey` 에는 `animLayer` 플래그가 없다**(`TypeError: Invalid flag`) → 잘라내기는 소스
+  **커브 노드**를 찾아 거기서 지운다.
+  ④ `findCurveForPlug` 는 **어느 레이어에도 안 든 오브젝트**에는 `BaseAnimation` 을 물어도
+  `None` 을 준다 → 그때는 **plug 직결 `animCurve`** 가 base 커브다(레이어에 든 plug 는 앞단이
+  `animBlendNode*` 라 이 조회에 안 걸려 판정이 겹치지 않는다).
+- **Copy Key 탭의 "9축 전부 = 필터 없음" 을 여기서는 못 쓴다.** 레이어 이동은 채널(plug)
+  하나씩 `copyKey`/`pasteKey` 해야 하는데(노드 단위 `pasteKey` 는 클립보드 커브를 **이름이
+  아니라 순서로** 맞춘다), 그러면 언제나 명시 목록이 필요하다. 그래서 **`All Keyed Channels`**
+  체크박스를 대신 뒀다 — 오브젝트마다 **소스 레이어에 커브가 있는 채널 전부**.
+- **Custom Channels 는 소스 레이어에 키가 있는 채널만 나열한다.** 옮길 게 없는 채널을 목록에
+  올려 봐야 고를 이유가 없다. **From 을 바꾸면 목록을 지운다** — 남겨 두면 지금 소스에는 없는
+  채널을 고른 채 실행하게 된다.
+- **Cut 은 붙여넣기에 성공한 채널만 지운다.** 실패한 자리에서 원본이 사라지지 않도록.
+  구간을 한정하면 **지우는 것도 그 구간뿐**이다.
+- **기본 Paste Option 은 `replace`** (Copy Key 탭의 `insert` 와 일부러 다르다). 레이어를 옮길 때
+  원하는 것은 "그 구간을 이 커브로 바꿔라" 이지 기존 키를 시간축으로 밀어내는 게 아니다.
+- **값은 커브 그대로 간다** — 레이어 기여분을 다시 계산하지 않는다. Base(절대값) → additive
+  로 옮기면 최종 결과가 달라진다는 것을 UI·문서에 적었다(최종 포즈 유지는 `Bake` 탭).
+- **로그**: 키 없는 9축은 기본이 전부 켜져 있어 이름이 예닐곱 개씩 붙으므로 **개수로만**,
+  사용자가 직접 고른 커스텀 채널은 **이름으로** 적는다.
+- **검증**(mayapy headless, Qt 창 실제 빌드): 커스텀 채널 나열 · TRS+커스텀 Copy · 구간 Cut ·
+  `Ctrl+Z` 복원 · `All Keyed Channels` · 같은 레이어/빈 리스트 방어 · **레이어 비멤버 오브젝트 ·
+  DAG 긴 이름(`|grp1|ctrl`) · 네임스페이스(`NS:ctrl`)** 전부 통과.
+    #A00110 #animTool #animLayer
+
+## 2026-08-28
 
 > [!summary] `A00040_file_exporter_V02` — **Joints only under joints**: 조인트 하위 non-joint 를 FBX 에서 빼기 (v02.05 -> 02.06)
 - **요청**: 조인트를 FBX 로 뽑을 때 **그 하위의 조인트 아닌 오브젝트는 전부 FBX 에 안 들어가게**,
