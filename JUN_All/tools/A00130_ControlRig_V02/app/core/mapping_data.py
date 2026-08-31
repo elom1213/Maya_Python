@@ -28,6 +28,8 @@ MAPPING_DIRNAME = os.path.join("data", "mapping")
 MAPPING_FILENAME = "template_map.json"
 LENGTH_FILENAME = "length_map.json"
 ORIENT_FILENAME = "orient_map.json"
+PAIR_FILENAME = "pair_map.json"
+CONSTRAIN_FILENAME = "constrain_map.json"
 
 #: `total` 을 어떻게 잴지 (계획서 3-1)
 TOTAL_STRAIGHT = "straight"   # 첫 조인트 -> 마지막 조인트 직선 거리 (V01 과 동일)
@@ -66,6 +68,85 @@ def mapping_path(version=None):
     if not version:
         return None
     return os.path.join(mapping_root(), version, MAPPING_FILENAME)
+
+
+def _version_path(version, filename):
+    version = version or default_version()
+    if not version:
+        return None
+    return os.path.join(mapping_root(), version, filename)
+
+
+def pair_path(version=None):
+    return _version_path(version, PAIR_FILENAME)
+
+
+def constrain_path(version=None):
+    return _version_path(version, CONSTRAIN_FILENAME)
+
+
+def _read_json(path, label, messages):
+    if not path or not os.path.isfile(path):
+        messages.append("[ERR] {0} file not found: {1}".format(label, path))
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        messages.append("[ERR] Could not read {0} ({1}).".format(path, e))
+        return None
+
+
+def load_pairs(version=None):
+    """`pair_map.json` -> `(doc, messages)`.
+
+    `doc["pairs"]` 는 `{"from": A, "to": B}` 목록. **같은 세트가 두 번 나오면 알린다** —
+    한 세트를 두 짝이 서로 다른 곳으로 옮기려 들면 뒤에 오는 것이 이긴다.
+    """
+    messages = []
+    empty = {"match": ["t", "r"], "pairs": []}
+    doc = _read_json(pair_path(version), "Pair", messages)
+    if doc is None:
+        return empty, messages
+
+    pairs = [p for p in (doc.get("pairs") or [])
+             if p.get("from") and p.get("to")]
+    dropped = len(doc.get("pairs") or []) - len(pairs)
+    if dropped:
+        messages.append("[Warning] {0} pair(s) have no 'from'/'to' - skipped.".format(
+            dropped))
+
+    for key in ("from", "to"):
+        seen = {}
+        for p in pairs:
+            seen.setdefault(p[key], 0)
+            seen[p[key]] += 1
+        dup = sorted(n for n, c in seen.items() if c > 1)
+        if dup:
+            messages.append("[Warning] '{0}' set(s) used more than once: {1}".format(
+                key, ", ".join(dup)))
+
+    messages.append("[OK] Loaded {0} pair(s).".format(len(pairs)))
+    return {"match": doc.get("match") or ["t", "r"], "pairs": pairs}, messages
+
+
+def load_constrain(version=None):
+    """`constrain_map.json` -> `(doc, messages)`."""
+    messages = []
+    empty = {"set": "", "attribute": "Con", "maintain_offset": False}
+    doc = _read_json(constrain_path(version), "Constrain", messages)
+    if doc is None:
+        return empty, messages
+
+    if not doc.get("set"):
+        messages.append("[ERR] 'set' is missing - there are no pose objects to read.")
+    messages.append("[OK] Loaded constrain rule - set '{0}', attribute '{1}', "
+                    "maintain offset {2}.".format(
+                        doc.get("set"), doc.get("attribute") or "Con",
+                        "on" if doc.get("maintain_offset") else "off"))
+    return {"set": doc.get("set") or "",
+            "attribute": doc.get("attribute") or "Con",
+            "maintain_offset": bool(doc.get("maintain_offset", False))}, messages
 
 
 def orient_path(version=None):

@@ -86,6 +86,7 @@
 - [A00130 Length](wip-a00130-length-values.md) — 템플릿 조인트 거리를 옵션 컨트롤러 **12개** 어트리뷰트에. **total 은 직선이라 up+low 와 다르다**(30°=3.4%) · min/max 는 안 자르고 예외 · **`ls` 와일드카드는 네임스페이스를 안 넘고 셰이프를 잡는다** · 이름으로 찾는 기능엔 **수동 지정(Get Selected)을 같이** (v02.01)
 - [A00130 IK session](wip-a00130-ik-session.md) — Match 가 앞뒤로 IK 를 껐다 켠다. **IK 는 연결이 아니라 솔버로 써서 막힌 걸로 안 보인다**(조용한 거짓 성공) · **snapEnable 이 평가 중에 핸들을 써서 undo 를 깨뜨린다** · **세트에 없는 중첩 IK 핸들이 매칭과 싸운다**(위치는 맞고 회전만 틀어짐) (v02.06)
 - [A00130 Orient & Place](wip-a00130-orient.md) — 규칙 A1/A2/A3 가 결국 **한 계산**(aim + up 힌트) · 폴 타깃 4개는 **위치까지** 놓아서 단계 이름을 바꿨다. **부모를 돌리면 후손이 전부 딸려 움직인다**(자식만 되돌리면 또 물림) · **forward 를 맞추면 up 은 직교화만큼 기운다** (v02.04)
+- [A00130 Pair & Constrain](wip-a00130-pair-constrain.md) — 세트 1:1 매칭 + `Con` -> parentConstraint. **parentConstraint 는 드라이버가 다르면 조용히 타깃을 늘린다** · `cmds.sets(q=True)` 는 멤버 순서를 보장하지 않는다 (v02.10)
 - [A00450 ManipulatorTool](wip-a00450-manipulatortool.md) — **신규**: 매니퓰레이터 축 굵기 슬라이더. `manipOptions` 는 전역 하나뿐(도구별 굵기 없음), 굵기(lineSize)와 클릭 히트(linePick)는 별개
 - [A00440 SetTool](wip-a00440-settool.md) — **신규**: 컴포넌트 세트 집합연산(∪∩∖ + Split). 이름 정규화가 전부, **`cmds.select(세트)` 는 멤버를 펼쳐 선택**한다
 - [A00430 DemBone](wip-a00430-dembone.md) — **신규 v01.03**: EA Dem Bones(스키닝 분해) 마야 이식 4모드(조인트 생성 포함). ref/ 는 git 제외·런타임 무의존, 공분산 4×4 질량 함정, 라벨 확산은 절대오차 말고 최선 대비 열위

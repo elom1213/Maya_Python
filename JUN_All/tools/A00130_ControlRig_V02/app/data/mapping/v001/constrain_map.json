@@ -1,0 +1,19 @@
+{
+  "_comment": [
+    "Constraint rules - run AFTER the Pair step.",
+    "",
+    "Every object in the set is checked for an attribute called 'Con'. Whatever node",
+    "is connected to it becomes the driver, and a parentConstraint is built so the",
+    "driver drives the object.",
+    "",
+    "Measured: re-running with the SAME driver is idempotent, but a DIFFERENT driver",
+    "silently adds a second target to the existing constraint. So the tool refuses to",
+    "touch an object that already has a parentConstraint and says so.",
+    "",
+    "2026-08-31: the set had been spelled 'C04_pose_objects' (no 'j') - the user",
+    "confirmed it was a typo and it now reads 'C04_pose_objects'."
+  ],
+  "set": "C04_pose_objects",
+  "attribute": "Con",
+  "maintain_offset": false
+}

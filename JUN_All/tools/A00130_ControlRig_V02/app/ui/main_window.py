@@ -13,7 +13,11 @@
 #                    <- Match 보다 먼저
 #   Length         : 템플릿 조인트 사이 거리를 옵션 컨트롤러 어트리뷰트에 써 넣는다
 #   Match          : 매핑 표(json)대로 세트의 원소를 짝인 조인트에 맞춘다
+#   Pair           : 세트 A 의 하나뿐인 원소로 세트 B 의 하나뿐인 원소를 맞춘다 (Match 뒤)
+#   Constrain      : 포즈 오브젝트를 `Con` 이 가리키는 노드에 parentConstraint (Pair 뒤)
 #
+# v02.10 : **Pair** 탭(세트 1:1 매칭)과 **Constrain** 탭(`Con` -> parentConstraint).
+#          둘 다 Match 뒤에 오고, Constrain 은 Pair 뒤다.
 # v02.09 : 손가락 회전 규칙 — 왼손은 aim(+X / +Y->월드+Y),
 #          오른손은 **왼쪽을 정렬한 뒤** behavior 미러(늦은 단계).
 # v02.07 : 폴 타깃 4개 추가 + **Place** 규칙(자기 축 +Z 로 10) —
@@ -44,7 +48,9 @@ from tools.A00130_ControlRig_V02.app.core import mapping_data
 from tools.A00130_ControlRig_V02.app.core import ik_session
 from tools.A00130_ControlRig_V02.app.core import length_manager
 from tools.A00130_ControlRig_V02.app.core import match_manager
+from tools.A00130_ControlRig_V02.app.core import constrain_manager
 from tools.A00130_ControlRig_V02.app.core import orient_manager
+from tools.A00130_ControlRig_V02.app.core import pair_manager
 from tools.A00130_ControlRig_V02.app.core import scene_utils as su
 
 
@@ -70,6 +76,14 @@ STEPS = (
     ("Match",
      "Match - move each cage set's members onto the template joint it is paired with.",
      "_build_match_tab"),
+    ("Pair",
+     "Pair - for each set pair, move the one member of the second set onto the one "
+     "member of the first. Run this after Match.",
+     "_build_pair_tab"),
+    ("Constrain",
+     "Constrain - give every pose object a parentConstraint from whatever its 'Con' "
+     "attribute points at. Run this after Pair.",
+     "_build_constrain_tab"),
 )
 
 
@@ -90,6 +104,8 @@ class MainWindow(QWidget):
         self.length_doc = {}
         self.ik_set_name = None
         self.orient_doc = {}
+        self.pair_doc = {}
+        self.constrain_doc = {}
         self.option_ctl_override = ""      # 손으로 지정하면 그것이 이긴다
         self.messages_seen = 0
 
@@ -455,6 +471,101 @@ class MainWindow(QWidget):
 
         return tab
 
+    # --------------------------------------------------------------
+    # Step : Pair
+    # --------------------------------------------------------------
+
+    def _build_pair_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        note = QLabel(
+            "Each rule names two sets. Both must hold exactly one object - then the "
+            "second one is moved onto the first (position and rotation). A set with "
+            "none or several members is reported and skipped, never guessed at.\n"
+            "Run this after Match.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        self.tree_pair = QTreeWidget()
+        self.tree_pair.setColumnCount(5)
+        self.tree_pair.setHeaderLabels(
+            ["From (set)", "To (set)", "Source", "Target", "Status"])
+        self.tree_pair.setRootIsDecorated(False)
+        self.tree_pair.setAlternatingRowColors(True)
+        self.tree_pair.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        layout.addWidget(self.tree_pair, 1)
+
+        row = QHBoxLayout()
+        self.btn_check_pair = QPushButton("Check")
+        self.btn_check_pair.setToolTip(
+            "Report which pairs are ready and which sets do not hold exactly one\n"
+            "object. Changes nothing.")
+        self.btn_check_pair.clicked.connect(self.on_check_pair)
+        row.addWidget(self.btn_check_pair)
+
+        self.btn_pair = QPushButton("Pair")
+        self.btn_pair.setMinimumHeight(34)
+        self.btn_pair.setToolTip(
+            "Move each 'to' object onto its 'from' object. One undo step.\n"
+            "Locked or driven objects are skipped and reported.")
+        self.btn_pair.clicked.connect(self.on_pair)
+        row.addWidget(self.btn_pair, 1)
+        layout.addLayout(row)
+
+        return tab
+
+    # --------------------------------------------------------------
+    # Step : Constrain
+    # --------------------------------------------------------------
+
+    def _build_constrain_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        note = QLabel(
+            "Every object in the pose set is checked for a 'Con' attribute. Whatever "
+            "node is connected to it becomes the driver, and a parentConstraint is "
+            "built so the driver drives the object.\n"
+            "Run this after Pair.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        self.lbl_constrain_src = QLabel("")
+        self.lbl_constrain_src.setWordWrap(True)
+        layout.addWidget(self.lbl_constrain_src)
+
+        self.tree_constrain = QTreeWidget()
+        self.tree_constrain.setColumnCount(4)
+        self.tree_constrain.setHeaderLabels(
+            ["Pose object", "Driver(s)", "Status", "Note"])
+        self.tree_constrain.setRootIsDecorated(False)
+        self.tree_constrain.setAlternatingRowColors(True)
+        self.tree_constrain.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        layout.addWidget(self.tree_constrain, 1)
+
+        row = QHBoxLayout()
+        self.btn_check_constrain = QPushButton("Check")
+        self.btn_check_constrain.setToolTip(
+            "Report which pose objects have a 'Con' attribute, what it points at,\n"
+            "and which ones are already constrained. Changes nothing.")
+        self.btn_check_constrain.clicked.connect(self.on_check_constrain)
+        row.addWidget(self.btn_check_constrain)
+
+        self.btn_constrain = QPushButton("Constrain")
+        self.btn_constrain.setMinimumHeight(34)
+        self.btn_constrain.setToolTip(
+            "Build the parentConstraints. One undo step.\n"
+            "\n"
+            "An object that already has a parentConstraint is LEFT ALONE. Re-running\n"
+            "with a different driver would otherwise add a second target without\n"
+            "saying anything, and the two would fight over the object.")
+        self.btn_constrain.clicked.connect(self.on_constrain)
+        row.addWidget(self.btn_constrain, 1)
+        layout.addLayout(row)
+
+        return tab
+
     # ==============================================================
     # 데이터
     # ==============================================================
@@ -489,6 +600,14 @@ class MainWindow(QWidget):
             None if version == "(none)" else version, joints=self.joints)
         self._log_all(orient_messages)
 
+        self.pair_doc, pair_messages = mapping_data.load_pairs(
+            None if version == "(none)" else version)
+        self._log_all(pair_messages)
+
+        self.constrain_doc, constrain_messages = mapping_data.load_constrain(
+            None if version == "(none)" else version)
+        self._log_all(constrain_messages)
+
         pairs = sum(len(j["targets"]) for j in self.joints)
         structure = len([j for j in self.joints if not j["targets"]])
         self.lbl_mapping.setText(
@@ -498,6 +617,8 @@ class MainWindow(QWidget):
         self._refresh_plan()
         self._refresh_length()
         self._refresh_orient()
+        self._refresh_pair()
+        self._refresh_constrain()
 
     def _sync_total_mode(self):
         """콤보를 json 의 total_mode 로 맞춘다 (사용자가 바꾸면 그 뒤로는 콤보가 이긴다)."""
@@ -781,6 +902,107 @@ class MainWindow(QWidget):
             mirror_enabled=self.chk_mirror.isChecked())
         self._log_all(messages)
         self._refresh_orient()
+
+    # --------------------------------------------------------------
+    # Pair
+    # --------------------------------------------------------------
+
+    def _refresh_pair(self, log_messages=False):
+        if not hasattr(self, "tree_pair"):
+            return [], []
+        rows, messages = pair_manager.plan(self.pair_doc, self._namespace())
+        if log_messages:
+            self._log_all(messages)
+
+        self.tree_pair.clear()
+        for row in rows:
+            item = QTreeWidgetItem([
+                su.short_name(row["from"]),
+                su.short_name(row["to"]),
+                su.short_name(row["source"]) if row["source"] else "-",
+                su.short_name(row["target"]) if row["target"] else "-",
+                row["status"] if not row["note"]
+                else "{0} - {1}".format(row["status"], row["note"]),
+            ])
+            self.tree_pair.addTopLevelItem(item)
+        for col in range(5):
+            self.tree_pair.resizeColumnToContents(col)
+        return rows, messages
+
+    def on_check_pair(self):
+        if not self.pair_doc.get("pairs"):
+            self.log("[WARN] No pair rules loaded.")
+            return
+        rows, _m = self._refresh_pair(log_messages=True)
+        counts = pair_manager.summarize(rows)
+        self.log("Check : " + ", ".join(
+            "{0} {1}".format(v, k) for k, v in sorted(counts.items())))
+        odd = [r for r in rows if r["status"] == pair_manager.ST_NOT_ONE]
+        if odd:
+            self.log("[Warning] {0} pair(s) skipped because a set does not hold "
+                     "exactly one object.".format(len(odd)))
+
+    def on_pair(self):
+        if not self.pair_doc.get("pairs"):
+            self.log("[WARN] No pair rules loaded.")
+            return
+        rows, _m = self._refresh_pair()
+        _results, messages = pair_manager.apply(rows)
+        self._log_all(messages)
+        self._refresh_pair()
+
+    # --------------------------------------------------------------
+    # Constrain
+    # --------------------------------------------------------------
+
+    def _refresh_constrain(self, log_messages=False):
+        if not hasattr(self, "tree_constrain"):
+            return [], []
+        rows, messages = constrain_manager.plan(self.constrain_doc, self._namespace())
+        if log_messages:
+            self._log_all(messages)
+
+        self.lbl_constrain_src.setText(
+            "Set '{0}' - attribute '{1}' - maintain offset {2}".format(
+                self.constrain_doc.get("set") or "?",
+                self.constrain_doc.get("attribute") or "Con",
+                "on" if self.constrain_doc.get("maintain_offset") else "off"))
+
+        self.tree_constrain.clear()
+        for row in rows:
+            item = QTreeWidgetItem([
+                su.short_name(row["object"]),
+                ", ".join(su.short_name(d) for d in row["drivers"]) or "-",
+                row["status"],
+                row["note"],
+            ])
+            self.tree_constrain.addTopLevelItem(item)
+        for col in range(4):
+            self.tree_constrain.resizeColumnToContents(col)
+        return rows, messages
+
+    def on_check_constrain(self):
+        if not self.constrain_doc.get("set"):
+            self.log("[WARN] No constrain rule loaded.")
+            return
+        rows, _m = self._refresh_constrain(log_messages=True)
+        counts = constrain_manager.summarize(rows)
+        self.log("Check : " + ", ".join(
+            "{0} {1}".format(v, k) for k, v in sorted(counts.items())))
+        already = [r for r in rows if r["status"] == constrain_manager.ST_ALREADY]
+        if already:
+            self.log("[Info] {0} object(s) already have a parentConstraint and will be "
+                     "left alone - delete it first if the driver changed.".format(
+                         len(already)))
+
+    def on_constrain(self):
+        if not self.constrain_doc.get("set"):
+            self.log("[WARN] No constrain rule loaded.")
+            return
+        rows, _m = self._refresh_constrain()
+        _results, messages = constrain_manager.apply(rows, self.constrain_doc)
+        self._log_all(messages)
+        self._refresh_constrain()
 
     # ==============================================================
     # helpers

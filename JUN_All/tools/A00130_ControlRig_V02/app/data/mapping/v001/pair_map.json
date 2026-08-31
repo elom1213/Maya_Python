@@ -1,0 +1,117 @@
+{
+  "_comment": [
+    "Pair rules - run AFTER Match (plan: the Pair tab sits to the right of Match).",
+    "",
+    "For each pair the tool checks that BOTH sets hold exactly one member. Only then",
+    "does it move the 'to' member onto the 'from' member (position + rotation).",
+    "A set with 0 or 2+ members is reported and skipped - never guessed at.",
+    "",
+    "'from' is the source you match TO; 'to' is the object that gets moved.",
+    "",
+    "2026-08-31: C04_match_10_l_ArmPol had lost its trailing 'e' - the user",
+    "confirmed it was a typo and it now reads C04_match_10_l_ArmPole, matching",
+    "its partner C04_ik_10_l_ArmPole."
+  ],
+  "match": [
+    "t",
+    "r"
+  ],
+  "pairs": [
+    {
+      "from": "C04_match_01_r_LegIkPos",
+      "to": "C04_ik_01_r_LegIkPos"
+    },
+    {
+      "from": "C04_match_02_r_LegToeIkPos",
+      "to": "C04_ik_02_r_LegToeIkPos"
+    },
+    {
+      "from": "C04_match_03_l_LegIkPos",
+      "to": "C04_ik_03_l_LegIkPos"
+    },
+    {
+      "from": "C04_match_04_l_LegToeIkPos",
+      "to": "C04_ik_04_l_LegToeIkPos"
+    },
+    {
+      "from": "C04_match_05_r_ArmIkPos",
+      "to": "C04_ik_05_r_ArmIkPos"
+    },
+    {
+      "from": "C04_match_06_l_ArmIkPos",
+      "to": "C04_ik_06_l_ArmIkPos"
+    },
+    {
+      "from": "C04_match_07_r_LegPole",
+      "to": "C04_ik_07_r_LegPole"
+    },
+    {
+      "from": "C04_match_08_l_LegPole",
+      "to": "C04_ik_08_l_LegPole"
+    },
+    {
+      "from": "C04_match_09_r_ArmPole",
+      "to": "C04_ik_09_r_ArmPole"
+    },
+    {
+      "from": "C04_match_10_l_ArmPole",
+      "to": "C04_ik_10_l_ArmPole"
+    },
+    {
+      "from": "C04_match_01_l_ArmUpIK",
+      "to": "C04_fk_01_l_ArmUpIK"
+    },
+    {
+      "from": "C04_match_02_l_ArmLowIK",
+      "to": "C04_fk_02_l_ArmLowIK"
+    },
+    {
+      "from": "C04_match_03_l_HandIK",
+      "to": "C04_fk_03_l_HandIK"
+    },
+    {
+      "from": "C04_match_04_r_ArmUpIK",
+      "to": "C04_fk_04_r_ArmUpIK"
+    },
+    {
+      "from": "C04_match_05_r_ArmLowIK",
+      "to": "C04_fk_05_r_ArmLowIK"
+    },
+    {
+      "from": "C04_match_06_r_HandIK",
+      "to": "C04_fk_06_r_HandIK"
+    },
+    {
+      "from": "C04_match_07_l_LegUpIK",
+      "to": "C04_fk_07_l_LegUpIK"
+    },
+    {
+      "from": "C04_match_08_l_LegLowIK",
+      "to": "C04_fk_08_l_LegLowIK"
+    },
+    {
+      "from": "C04_match_09_l_LegAnkleIK",
+      "to": "C04_fk_09_l_LegAnkleIK"
+    },
+    {
+      "from": "C04_match_10_l_LegFootBallIK",
+      "to": "C04_fk_10_l_LegFootBallIK"
+    },
+    {
+      "from": "C04_match_11_r_LegUpIK",
+      "to": "C04_fk_11_r_LegUpIK"
+    },
+    {
+      "from": "C04_match_12_r_LegLowIK",
+      "to": "C04_fk_12_r_LegLowIK"
+    },
+    {
+      "from": "C04_match_13_r_LegAnkleIK",
+      "to": "C04_fk_13_r_LegAnkleIK"
+    },
+    {
+      "from": "C04_match_14_r_LegFootBallIK",
+      "to": "C04_fk_14_r_LegFootBallIK"
+    }
+  ]
+}
