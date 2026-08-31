@@ -30,6 +30,7 @@ LENGTH_FILENAME = "length_map.json"
 ORIENT_FILENAME = "orient_map.json"
 PAIR_FILENAME = "pair_map.json"
 CONSTRAIN_FILENAME = "constrain_map.json"
+IK_AXIS_FILENAME = "ik_axis_map.json"
 
 #: `total` 을 어떻게 잴지 (계획서 3-1)
 TOTAL_STRAIGHT = "straight"   # 첫 조인트 -> 마지막 조인트 직선 거리 (V01 과 동일)
@@ -85,6 +86,10 @@ def constrain_path(version=None):
     return _version_path(version, CONSTRAIN_FILENAME)
 
 
+def ik_axis_path(version=None):
+    return _version_path(version, IK_AXIS_FILENAME)
+
+
 def _read_json(path, label, messages):
     if not path or not os.path.isfile(path):
         messages.append("[ERR] {0} file not found: {1}".format(label, path))
@@ -128,6 +133,37 @@ def load_pairs(version=None):
 
     messages.append("[OK] Loaded {0} pair(s).".format(len(pairs)))
     return {"match": doc.get("match") or ["t", "r"], "pairs": pairs}, messages
+
+
+def load_ik_axis(version=None):
+    """`ik_axis_map.json` -> `(doc, messages)`.
+
+    `doc["sets"]` 는 `{"set": 이름, "axis": "+Z"}` 목록. **목록인 이유는 세트가 늘어날
+    수 있어서**다 — 지금은 하나뿐이지만 코드는 개수를 모른다.
+    """
+    messages = []
+    empty = {"sets": []}
+    doc = _read_json(ik_axis_path(version), "IK axis", messages)
+    if doc is None:
+        return empty, messages
+
+    sets = []
+    for e in (doc.get("sets") or []):
+        name, axis = e.get("set"), (e.get("axis") or "").strip()
+        if not name:
+            messages.append("[Warning] an ik-axis rule has no 'set' - skipped.")
+            continue
+        if not axis or axis[-1].upper() not in ("X", "Y", "Z"):
+            messages.append("[Warning] {0}: '{1}' is not an axis - skipped.".format(
+                name, axis))
+            continue
+        sets.append({"set": name, "axis": axis})
+
+    if sets:
+        messages.append("[OK] Loaded {0} ik-axis rule(s): {1}.".format(
+            len(sets), ", ".join("{0} -> {1}".format(e["set"], e["axis"])
+                                 for e in sets)))
+    return {"sets": sets}, messages
 
 
 def load_constrain(version=None):

@@ -17,18 +17,21 @@
     "  legs -> a tail group, arms -> \"preserve\" (leave it exactly as it is).",
     "  \"preserve\" is a DECISION, not a gap - see plan 4-9."
   ],
-
   "world_zero_default": true,
-
   "aim_groups": [
     {
       "name": "spine",
       "comment": "A1. forward +X at the next joint, +Z toward world +Z. The checkbox replaces this with world zero.",
       "joints": [
         "helper_pelvis",
-        "helper_spine_01", "helper_spine_02", "helper_spine_03",
-        "helper_spine_04", "helper_spine_05",
-        "helper_neck_01", "helper_neck_02", "helper_head"
+        "helper_spine_01",
+        "helper_spine_02",
+        "helper_spine_03",
+        "helper_spine_04",
+        "helper_spine_05",
+        "helper_neck_01",
+        "helper_neck_02",
+        "helper_head"
       ],
       "forward": "+X",
       "up": "+Z",
@@ -36,11 +39,14 @@
       "world_zero_option": true
     }
   ],
-
   "pole_chains": [
     {
       "name": "arm_l",
-      "joints": ["helper_upperarm_l", "helper_lowerarm_l", "helper_hand_l"],
+      "joints": [
+        "helper_upperarm_l",
+        "helper_lowerarm_l",
+        "helper_hand_l"
+      ],
       "pole": "helper_polTgt_arm_l",
       "forward": "+X",
       "up": "+Z",
@@ -49,7 +55,11 @@
     },
     {
       "name": "arm_r",
-      "joints": ["helper_upperarm_r", "helper_lowerarm_r", "helper_hand_r"],
+      "joints": [
+        "helper_upperarm_r",
+        "helper_lowerarm_r",
+        "helper_hand_r"
+      ],
       "pole": "helper_polTgt_arm_r",
       "forward": "-X",
       "up": "+Z",
@@ -58,13 +68,21 @@
     },
     {
       "name": "leg_l",
-      "joints": ["helper_thigh_l", "helper_calf_l", "helper_foot_l"],
+      "joints": [
+        "helper_thigh_l",
+        "helper_calf_l",
+        "helper_foot_l"
+      ],
       "pole": "helper_polTgt_leg_l",
       "forward": "+X",
       "up": "+Z",
       "expect_up_world": "+Z",
       "tail": {
-        "joints": ["helper_foot_l", "helper_ball_l", "helper_ballEnd_l"],
+        "joints": [
+          "helper_foot_l",
+          "helper_ball_l",
+          "helper_ballEnd_l"
+        ],
         "forward": "+X",
         "up": "+Z",
         "up_world": "+Y"
@@ -72,20 +90,27 @@
     },
     {
       "name": "leg_r",
-      "joints": ["helper_thigh_r", "helper_calf_r", "helper_foot_r"],
+      "joints": [
+        "helper_thigh_r",
+        "helper_calf_r",
+        "helper_foot_r"
+      ],
       "pole": "helper_polTgt_leg_r",
       "forward": "+X",
       "up": "+Z",
       "expect_up_world": "+Z",
       "tail": {
-        "joints": ["helper_foot_r", "helper_ball_r", "helper_ballEnd_r"],
+        "joints": [
+          "helper_foot_r",
+          "helper_ball_r",
+          "helper_ballEnd_r"
+        ],
         "forward": "+X",
         "up": "+Z",
         "up_world": "+Y"
       }
     }
   ],
-
   "aim_subtrees": [
     {
       "name": "fingers_l",
@@ -101,7 +126,62 @@
       "up_world": "+Y"
     }
   ],
-
+  "pole_targets": {
+    "_comment": [
+      "The four pole targets are not placed by hand. Each one is wired to its own limb",
+      "with a pointConstraint so it always sits at A + poleDistance * v, where",
+      "A = midpoint(first, last) and v = middle - A.",
+      "",
+      "Each joint gets a keyable 'poleDistance' attribute, so the distance can be dialled",
+      "in the viewport and the joint follows straight away.",
+      "",
+      "The maths and the wiring are shared with A00060's Pole Target tab",
+      "(pole_target_manager.ensure).",
+      "",
+      "'distance' below is only the value used the FIRST time the attribute is made.",
+      "Re-running Orient & Place keeps whatever you dialled in - otherwise tuning would",
+      "be wiped every run. Set reset_distance to true to force it back.",
+      "",
+      "1.0 would sit exactly on the elbow/knee, which is no use as a pole. 2.0 pushes it",
+      "one bend-length past the joint."
+    ],
+    "distance": 2.0,
+    "reset_distance": false,
+    "targets": [
+      {
+        "name": "helper_polTgt_arm_l",
+        "chain": [
+          "helper_upperarm_l",
+          "helper_lowerarm_l",
+          "helper_hand_l"
+        ]
+      },
+      {
+        "name": "helper_polTgt_arm_r",
+        "chain": [
+          "helper_upperarm_r",
+          "helper_lowerarm_r",
+          "helper_hand_r"
+        ]
+      },
+      {
+        "name": "helper_polTgt_leg_l",
+        "chain": [
+          "helper_thigh_l",
+          "helper_calf_l",
+          "helper_foot_l"
+        ]
+      },
+      {
+        "name": "helper_polTgt_leg_r",
+        "chain": [
+          "helper_thigh_r",
+          "helper_calf_r",
+          "helper_foot_r"
+        ]
+      }
+    ]
+  },
   "place": [
     {
       "comment": [
@@ -111,18 +191,18 @@
         "'Orient & Place' and not 'Orient'."
       ],
       "joints": [
-        "helper_polTgt_foot_l", "helper_polTgt_foot_r",
-        "helper_polTgt_toe_r", "helper_polTgt_toe_l"
+        "helper_polTgt_foot_l",
+        "helper_polTgt_foot_r",
+        "helper_polTgt_toe_r",
+        "helper_polTgt_toe_l"
       ],
       "reset": true,
       "axis": "+Z",
       "distance": 10.0
     }
   ],
-
   "mirror": {
     "plane": "YZ",
-
     "behavior": [
       {
         "comment": "A3 arm. Mirrors the whole arm including the 19 finger joints. Runs first; A2 overwrites upperarm/lowerarm afterwards.",
@@ -142,29 +222,50 @@
         "stage": "late"
       }
     ],
-
     "position_pairs": [
       {
         "comment": "A3 leg. Position only - the orientation is rebuilt by A2 (forward +X, not a behavior mirror).",
-        "source": "helper_thigh_l", "target": "helper_thigh_r"
+        "source": "helper_thigh_l",
+        "target": "helper_thigh_r"
       },
-      { "source": "helper_calf_l", "target": "helper_calf_r" },
-      { "source": "helper_foot_l", "target": "helper_foot_r" },
-      { "source": "helper_ball_l", "target": "helper_ball_r" },
-      { "source": "helper_ballEnd_l", "target": "helper_ballEnd_r" }
+      {
+        "source": "helper_calf_l",
+        "target": "helper_calf_r"
+      },
+      {
+        "source": "helper_foot_l",
+        "target": "helper_foot_r"
+      },
+      {
+        "source": "helper_ball_l",
+        "target": "helper_ball_r"
+      },
+      {
+        "source": "helper_ballEnd_l",
+        "target": "helper_ballEnd_r"
+      }
     ],
-
     "position_only": [
       {
-        "comment": "A3. Position mirrored onto the _r side, world rotation zero on BOTH sides. Runs last.",
-        "source": "helper_polTgt_arm_l", "target": "helper_polTgt_arm_r"
+        "source": "helper_Heel_l",
+        "target": "helper_Heel_r"
       },
-      { "source": "helper_polTgt_leg_l", "target": "helper_polTgt_leg_r" },
-      { "source": "helper_Heel_l", "target": "helper_Heel_r" },
-      { "source": "helper_FootSideInner_l", "target": "helper_FootSideInner_r" },
-      { "source": "helper_FootSideOuter_l", "target": "helper_FootSideOuter_r" },
-      { "source": "helper_ballTwist_l", "target": "helper_ballTwist_r" },
-      { "source": "helper_toeEnd_l", "target": "helper_toeEnd_r" }
+      {
+        "source": "helper_FootSideInner_l",
+        "target": "helper_FootSideInner_r"
+      },
+      {
+        "source": "helper_FootSideOuter_l",
+        "target": "helper_FootSideOuter_r"
+      },
+      {
+        "source": "helper_ballTwist_l",
+        "target": "helper_ballTwist_r"
+      },
+      {
+        "source": "helper_toeEnd_l",
+        "target": "helper_toeEnd_r"
+      }
     ]
   }
 }

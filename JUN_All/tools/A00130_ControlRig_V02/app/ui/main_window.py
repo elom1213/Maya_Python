@@ -45,6 +45,7 @@ import maya.cmds as cmds
 
 from tools.A00130_ControlRig_V02.app.config.version import VERSION, LAST_UPDATE
 from tools.A00130_ControlRig_V02.app.core import mapping_data
+from tools.A00130_ControlRig_V02.app.core import ik_axis_manager
 from tools.A00130_ControlRig_V02.app.core import ik_session
 from tools.A00130_ControlRig_V02.app.core import length_manager
 from tools.A00130_ControlRig_V02.app.core import match_manager
@@ -106,6 +107,7 @@ class MainWindow(QWidget):
         self.orient_doc = {}
         self.pair_doc = {}
         self.constrain_doc = {}
+        self.ik_axis_doc = {}
         self.option_ctl_override = ""      # 손으로 지정하면 그것이 이긴다
         self.messages_seen = 0
 
@@ -261,7 +263,11 @@ class MainWindow(QWidget):
             "\n"
             "Handles that drive the joints being matched but are missing from the set\n"
             "are found and turned off as well - a nested chain left solving would fight\n"
-            "the match and leave its joints rotated. You are told which ones.")
+            "the match and leave its joints rotated. You are told which ones.\n"
+            "\n"
+            "When the session closes, any handle listed in ik_axis_map.json has its\n"
+            "'twist' adjusted so the axis the rig wants is the one pointing at the pole\n"
+            "target. twist is saved with the file, so a reference keeps the same axis.")
         ik_layout.addWidget(self.chk_ik_session)
 
         self.lbl_ik_set = QLabel("")
@@ -608,6 +614,10 @@ class MainWindow(QWidget):
             None if version == "(none)" else version)
         self._log_all(constrain_messages)
 
+        self.ik_axis_doc, axis_messages = mapping_data.load_ik_axis(
+            None if version == "(none)" else version)
+        self._log_all(axis_messages)
+
         pairs = sum(len(j["targets"]) for j in self.joints)
         structure = len([j for j in self.joints if not j["targets"]])
         self.lbl_mapping.setText(
@@ -739,7 +749,8 @@ class MainWindow(QWidget):
             ik_handles, _set_node = self._ik_handles(log_messages=True)
 
         _results, messages = match_manager.apply(
-            rows, ik_handles=ik_handles, auto_ik=use_ik)
+            rows, ik_handles=ik_handles, auto_ik=use_ik,
+            axis_doc=self.ik_axis_doc, namespace=self._namespace())
         self._log_all(messages)
         self._refresh_plan()
 

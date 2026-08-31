@@ -54,6 +54,8 @@ import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
 
+from tools.A00060_jointTool_V03.app.core import pole_target_manager as pt
+
 from . import scene_utils as su
 
 
@@ -62,6 +64,7 @@ ST_OK = "ok"
 ST_PRESERVED = "preserved"          # 일부러 안 건드린다 (결정) - 계획서 4-9
 ST_NO_RULE = "no rule"              # 아직 규칙이 없다 (미결)  - 계획서 4-9
 ST_PLACED = "placed"               # 방향만이 아니라 위치까지 놓았다
+ST_POLE = "pole placed"            # 체인에서 계산해 놓았다
 ST_MISSING = "joint missing"
 ST_BLOCKED = "blocked"
 ST_ERROR = "error"
@@ -365,6 +368,9 @@ def restore_positions(snap):
     for node, pos in snap:
         if not cmds.objExists(node):
             continue
+        # 폴 타깃처럼 translate 가 구동되는 것은 되돌릴 수 없고 되돌릴 필요도 없다
+        if su.blocked_channels(node, translate=True, rotate=False):
+            continue
         now = cmds.xform(node, q=True, ws=True, t=True)
         if max(abs(now[i] - pos[i]) for i in range(3)) < 1e-7:
             continue
@@ -465,6 +471,15 @@ def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True):
             add(entry["target"], "A3 position + world zero")
             add(entry["source"], "A3 world zero")
 
+    # ---- 1b. 폴 타깃 ----
+    for entry in ((doc.get("pole_targets") or {}).get("targets") or []):
+        row = add(entry["name"], "Pole from {0}".format(
+            su.short_name(entry["chain"][1])))
+        if row["status"] == ST_OK:
+            row["status"] = ST_POLE
+            row["note"] = "computed from {0}".format(
+                " / ".join(su.short_name(n) for n in entry["chain"]))
+
     # ---- 3b. 하위 계층 정렬 ----
     for group in (doc.get("aim_subtrees") or []):
         root = _resolve(group["root"], namespace)
@@ -535,7 +550,9 @@ def apply(doc, namespace, world_zero_spine=None, mirror_enabled=True):
     """
     messages = []
     results = {"mirrored": 0, "aimed": 0, "preserved": 0, "zeroed": 0,
-               "placed": 0, "skipped": 0}
+               # 폴 타깃과 Place 는 둘 다 "위치를 놓는" 일이지만 성격이 다르다.
+               # 한 칸에 담으면 요약에서 어느 쪽이 몇 개인지 알 수 없다.
+               "poles": 0, "placed": 0, "skipped": 0}
 
     if world_zero_spine is None:
         world_zero_spine = bool(doc.get("world_zero_default", True))
@@ -554,6 +571,11 @@ def apply(doc, namespace, world_zero_spine=None, mirror_enabled=True):
                 "[Warning] Mirroring is off. A2 reads the pole targets on the right "
                 "side, so if they were never mirrored the right arm and leg will be "
                 "aimed at the wrong place.")
+
+        # ---- 1b. 폴 타깃을 체인에서 계산해 놓는다 ----
+        # A2 가 이 위치를 읽어 롤을 정하므로 **A2 보다 먼저**여야 하고,
+        # 오른쪽은 미러가 체인을 놓은 **뒤**여야 한다.
+        results["poles"] += _do_pole_targets(doc, namespace, results, messages)
 
         # ---- 방향을 잡기 전에 위치를 적어 둔다 ----
         # 조인트를 돌리면 자식이 딸려 움직인다(모듈 주석 5). 미러가 끝난 **뒤**에
@@ -587,14 +609,18 @@ def apply(doc, namespace, world_zero_spine=None, mirror_enabled=True):
             results["zeroed"] += _do_position_only(mirror, plane, namespace,
                                                    results, messages)
 
+        # ---- 4b. 폴 타깃 회전 0 (방향 단계가 끝난 뒤라야 뜻이 있다) ----
+        results["zeroed"] += _zero_pole_targets(doc, namespace, results, messages)
+
         # ---- 5. 배치 (마지막 - 방향이 다 정해진 뒤라야 자기 축이 확정된다) ----
         results["placed"] += _do_place(doc, namespace, results, messages)
 
     messages.append(
         "[OK] Orient & Place done - {0} mirrored, {1} aimed, {2} preserved, {3} zeroed, "
-        "{4} placed, {5} skipped.".format(
+        "{4} pole target(s) computed, {5} placed, {6} skipped.".format(
             results["mirrored"], results["aimed"], results["preserved"],
-            results["zeroed"], results["placed"], results["skipped"]))
+            results["zeroed"], results["poles"], results["placed"],
+            results["skipped"]))
     return results, messages
 
 
@@ -869,6 +895,96 @@ def _do_tail(tail, namespace, results, messages, label):
             "[OK] {0} tail : {1} is {2:.2f} deg off world {3} - that is how far the "
             "chain itself leans; aiming down the chain wins.".format(
                 label, tail["up"], dev, tail["up_world"]))
+    return done
+
+
+def _do_pole_targets(doc, namespace, results, messages):
+    """폴 타깃을 제 팔·다리에 **살아 있게 물린다**. 회전은 뒤에서 월드 0.
+
+    배선은 `A00060_jointTool_V03` 의 `pole_target_manager.ensure()` 를 그대로 쓴다 —
+    그 툴의 `Chain > Pole Target` 으로 만든 것과 **같은 구성**이어야 하기 때문이다.
+
+    각 조인트에 **`poleDistance` 어트리뷰트**가 붙어 뷰포트에서 실시간으로 거리를
+    맞출 수 있다.
+
+    **이미 배선돼 있으면 거리 값을 안 건드린다** — 맞춰 둔 값이 실행할 때마다 json 값으로
+    되돌아가면 실시간 조절이 무의미해진다. json 의 `distance` 는 **처음 만들 때만** 쓰고,
+    되돌리려면 `reset_distance` 를 켠다.
+    """
+    group = doc.get("pole_targets") or {}
+    entries = group.get("targets") or []
+    if not entries:
+        return 0
+
+    distance = float(group.get("distance", 1.0))
+    reset = bool(group.get("reset_distance", False))
+    done = 0
+    kept = []
+
+    for entry in entries:
+        node = _resolve(entry["name"], namespace)
+        if not node:
+            results["skipped"] += 1
+            messages.append("[Warning] {0}: not in the scene - not placed.".format(
+                entry["name"]))
+            continue
+
+        chain = [_resolve(n, namespace) for n in entry["chain"]]
+        if None in chain:
+            results["skipped"] += 1
+            messages.append("[Warning] {0}: chain incomplete ({1}) - not placed.".format(
+                su.short_name(node),
+                ", ".join(n for n, r in zip(entry["chain"], chain) if not r)))
+            continue
+
+        # translate 가 구동되는지 여기서 미리 보지 않는다 — 두 번째 실행부터는
+        # **우리가 건 컨스트레인트**가 몰고 있어서 전부 걸러져 버린다(실제로 물렸다).
+        # 남의 컨스트레인트인지 우리 것인지는 `ensure()` 가 가른다.
+        _pos, note = pt.solve(chain, distance)
+        if note:
+            messages.append("[Warning] {0}: {1}.".format(su.short_name(node), note))
+
+        status, msgs = pt.ensure(node, chain, distance, reset_distance=reset)
+        messages.extend(msgs)
+        if status == "skipped":
+            results["skipped"] += 1
+            continue
+        done += 1
+        if status == "kept":
+            kept.append(su.short_name(node))
+
+    if kept:
+        messages.append(
+            "[Info] {0} pole target(s) kept the distance you dialled in ({1}). "
+            "Set 'reset_distance' in the mapping file to force them back.".format(
+                len(kept), ", ".join(kept)))
+    messages.append(
+        "[OK] {0} pole target(s) wired to their limb - each has a '{1}' attribute you "
+        "can change in the viewport.".format(done, pt.DISTANCE_ATTR))
+    return done
+
+
+def _zero_pole_targets(doc, namespace, results, messages):
+    """폴 타깃의 회전을 월드 0 으로. **방향 단계가 전부 끝난 뒤에** 돈다.
+
+    위치는 일찍(A2 가 읽어야 하므로) 놓지만, 회전을 그때 0 으로 만들면 **소용이 없다** —
+    폴 타깃은 `upperarm` · `thigh` 의 **자식**이라, 뒤이어 A2 가 부모를 돌리면 월드 회전이
+    따라 움직인다(실측: `[170.27, 13.49, -2.29]`). 그래서 두 단계로 갈랐다.
+    """
+    done = 0
+    for entry in ((doc.get("pole_targets") or {}).get("targets") or []):
+        node = _resolve(entry["name"], namespace)
+        if not node:
+            continue
+        if not _writable(node):
+            results["skipped"] += 1
+            messages.append("[Warning] {0}: rotation is locked or driven.".format(
+                su.short_name(node)))
+            continue
+        world_zero(node)
+        done += 1
+    if done:
+        messages.append("[OK] {0} pole target(s) set to world zero rotation.".format(done))
     return done
 
 

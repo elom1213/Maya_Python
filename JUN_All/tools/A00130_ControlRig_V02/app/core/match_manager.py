@@ -40,6 +40,7 @@ import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
 
+from . import ik_axis_manager
 from . import ik_session
 from . import scene_utils as su
 
@@ -119,7 +120,7 @@ def plan(joints, namespace):
     return rows
 
 
-def apply(rows, ik_handles=None, auto_ik=True):
+def apply(rows, ik_handles=None, auto_ik=True, axis_doc=None, namespace=None):
     """계산된 행대로 실제로 맞춘다. `(results, messages)`.
 
     전체가 **undo 한 스텝**이다.
@@ -136,6 +137,10 @@ def apply(rows, ik_handles=None, auto_ik=True):
     중첩 IK(팔 체인 안의 Drv 체인 등)가 세트에서 빠져 있으면, 그 솔버가 매칭과 싸워
     **조인트가 부모와 어긋난 채 남는다**(실측 7.643도). 자세한 것은
     `ik_session.related_handles` 의 주석.
+
+    `axis_doc` 을 주면 **IK 세션이 끝난 뒤에** 정해진 축이 폴 타깃을 보도록 `twist` 를
+    맞춘다(`ik_axis_manager`). 세션이 끝난 **뒤**여야 하는 이유는, 그때라야 핸들과 폴
+    벡터가 새 체인에 맞춰져 있어 잰 각도가 뜻을 갖기 때문이다.
 
     매칭 도중 예외가 나면 **편집을 취소해 체인을 원래대로 돌리고** IK 를 되켠 뒤 예외를
     다시 올린다 — 반쯤 매칭된 체인에 IK 가 다시 붙는 것이 제일 나쁘다.
@@ -265,6 +270,15 @@ def apply(rows, ik_handles=None, auto_ik=True):
         if session:
             _ik_results, ik_msgs = ik_session.end(session)
             messages.extend(ik_msgs)
+
+        # ---- IK 축 맞추기 (세션이 끝난 뒤라야 잰 각도가 뜻을 갖는다) ----
+        if axis_doc and (axis_doc.get("sets") or []):
+            axis_rows, axis_msgs = ik_axis_manager.plan(
+                axis_doc, namespace if namespace is not None else su.NO_NAMESPACE)
+            messages.extend(axis_msgs)
+            if axis_rows:
+                _axis_results, axis_msgs = ik_axis_manager.apply(axis_rows)
+                messages.extend(axis_msgs)
 
     results["joints"] = len(seen_joints)
     messages.append("[OK] Match done - {0} object(s) on {1} joint(s), {2} skipped.".format(

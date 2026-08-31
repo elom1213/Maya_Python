@@ -43,6 +43,7 @@ from tools.A00060_jointTool_V03.app.core import aim_manager as aim_mgr
 from tools.A00060_jointTool_V03.app.core import hair_manager as hair_mgr
 from tools.A00060_jointTool_V03.app.core import ik_edit_manager as ike_mgr
 from tools.A00060_jointTool_V03.app.core import ik_create_manager as ikc_mgr
+from tools.A00060_jointTool_V03.app.core import pole_target_manager
 
 
 # 재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -113,6 +114,10 @@ CHAIN_PAGES = (
     ("Reverse",
      "Reverse - rebuild a joint chain in the opposite order.",
      "_build_chain_reverse_tab"),
+    ("Pole Target",
+     "Pole Target - build an object that always sits out along the bend of a "
+     "three-object chain, ready to be used as a pole vector target.",
+     "_build_pole_target_tab"),
     ("Create IK",
      "Create IK - build an IK handle for each start/end joint pair, and a pole vector "
      "constraint for the chains that were given a target.",
@@ -502,6 +507,145 @@ class MainWindow(QWidget):
 
         layout.addStretch(1)
         return tab
+
+    # --------------------------------------------------------------
+    # Chain : Pole Target
+    # --------------------------------------------------------------
+
+    def _build_pole_target_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        note = QLabel(
+            "Pick three objects in chain order - end, middle, end. The new object sits "
+            "on the line between the two ends, pushed out towards the middle one by "
+            "Distance, and it stays there when the chain moves.\n"
+            "Distance 0 is the midpoint, 1 is the middle object itself, 2 is twice as "
+            "far out. Negative flips it to the other side.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        self.tsl_pole = self._tsl("Objects  (end - middle - end)")
+        layout.addWidget(self.tsl_pole, 1)
+
+        grp = QGroupBox("New object")
+        grid = QGridLayout(grp)
+
+        grid.addWidget(QLabel("Distance"), 0, 0)
+        self.spn_pole_distance = QDoubleSpinBox()
+        self.spn_pole_distance.setRange(-1000.0, 1000.0)
+        self.spn_pole_distance.setDecimals(3)
+        self.spn_pole_distance.setSingleStep(0.5)
+        self.spn_pole_distance.setValue(1.0)
+        self.spn_pole_distance.setKeyboardTracking(False)
+        self.spn_pole_distance.setToolTip(
+            "How far out along the bend. It is a multiple of the bend itself, not a\n"
+            "scene distance - so a straighter chain gives a smaller step.\n"
+            "The value is kept on the new object as 'poleDistance' and stays live.")
+        grid.addWidget(self.spn_pole_distance, 0, 1)
+
+        grid.addWidget(QLabel("Type"), 0, 2)
+        self.cmb_pole_kind = QComboBox()
+        self.cmb_pole_kind.addItems(list(pole_target_manager.KINDS))
+        self.cmb_pole_kind.setToolTip(
+            "locator : easy to see in the viewport (default)\n"
+            "joint   : when the rig is built out of joints\n"
+            "group   : an empty transform, nothing drawn")
+        grid.addWidget(self.cmb_pole_kind, 0, 3)
+
+        grid.addWidget(QLabel("Name"), 1, 0)
+        self.le_pole_name = QLineEdit()
+        self.le_pole_name.setPlaceholderText("<middle object>_polTgt")
+        self.le_pole_name.setToolTip(
+            "Leave it empty to name it after the middle object.")
+        grid.addWidget(self.le_pole_name, 1, 1, 1, 3)
+
+        layout.addWidget(grp)
+
+        row = QHBoxLayout()
+        self.btn_pole_check = QPushButton("Check")
+        self.btn_pole_check.setToolTip(
+            "Say where it would go and what is in the way. Changes nothing.")
+        self.btn_pole_check.clicked.connect(self.on_pole_check)
+        row.addWidget(self.btn_pole_check)
+
+        self.btn_pole_create = QPushButton("Create")
+        self.btn_pole_create.setMinimumHeight(30)
+        self.btn_pole_create.setToolTip(
+            "Build the object and keep it on the bend. One undo step.")
+        self.btn_pole_create.clicked.connect(self.on_pole_create)
+        row.addWidget(self.btn_pole_create, 1)
+        layout.addLayout(row)
+
+        row2 = QHBoxLayout()
+        self.btn_pole_update = QPushButton("Update Selected")
+        self.btn_pole_update.setToolTip(
+            "Set Distance on the pole targets you have selected. Nothing is rebuilt.")
+        self.btn_pole_update.clicked.connect(self.on_pole_update)
+        row2.addWidget(self.btn_pole_update)
+
+        self.btn_pole_bake = QPushButton("Bake Selected")
+        self.btn_pole_bake.setToolTip(
+            "Freeze the selected pole targets where they are and delete the\n"
+            "constraint and helper nodes. Undo brings them back.")
+        self.btn_pole_bake.clicked.connect(self.on_pole_bake)
+        row2.addWidget(self.btn_pole_bake)
+        layout.addLayout(row2)
+
+        return tab
+
+    # --------------------------------------------------------------
+
+    def _pole_nodes(self):
+        return self.tsl_pole.get_all_nodes()
+
+    def on_pole_check(self):
+        nodes = self._pole_nodes()
+        row = pole_target_manager.plan(
+            nodes, self.spn_pole_distance.value(),
+            name=self.le_pole_name.text().strip() or None,
+            kind=self.cmb_pole_kind.currentText())
+        for p in row["problems"]:
+            self.log("[Warning] " + p)
+        if row["note"]:
+            self.log("[Warning] " + row["note"] + ".")
+        if row["position"] is not None:
+            p = row["position"]
+            self.log("[Info] '{0}' would sit at {1:.3f}, {2:.3f}, {3:.3f}.".format(
+                row["name"], p.x, p.y, p.z))
+        if row["ok"] and not row["problems"]:
+            self.log("[OK] Ready to create.")
+
+    def on_pole_create(self):
+        node, messages = pole_target_manager.create(
+            self._pole_nodes(), distance=self.spn_pole_distance.value(),
+            name=self.le_pole_name.text().strip() or None,
+            kind=self.cmb_pole_kind.currentText())
+        for m in messages:
+            self.log(m)
+        if node:
+            cmds.select(node)
+
+    def on_pole_update(self):
+        selection = cmds.ls(selection=True, long=False) or []
+        if not selection:
+            self.log("[Warning] Select the pole target(s) to update.")
+            return
+        for node in selection:
+            _ok, messages = pole_target_manager.update(
+                node, self.spn_pole_distance.value())
+            for m in messages:
+                self.log(m)
+
+    def on_pole_bake(self):
+        selection = cmds.ls(selection=True, long=False) or []
+        if not selection:
+            self.log("[Warning] Select the pole target(s) to bake.")
+            return
+        for node in selection:
+            _ok, messages = pole_target_manager.bake(node)
+            for m in messages:
+                self.log(m)
 
     # --------------------------------------------------------------
     # Chain > Create IK

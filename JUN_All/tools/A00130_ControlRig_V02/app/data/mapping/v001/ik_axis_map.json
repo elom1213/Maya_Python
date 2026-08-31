@@ -1,0 +1,21 @@
+{
+  "_comment": [
+    "Which local axis of an IK chain's first joint should point at its pole target.",
+    "",
+    "Maya decides this on its own - measured, the default is -Y. When the rig wants a",
+    "different one the tool corrects it with the handle's 'twist' attribute.",
+    "",
+    "'twist' is the right lever: jointOrient does NOT work (the solver compensates and",
+    "the axis stays put), and rotate must never be used (the solver overwrites it every",
+    "evaluation). twist is stored in the file, so saving and then referencing keeps the",
+    "same axis - which is the whole point.",
+    "",
+    "This is a list so more sets can be added later, each with its own axis."
+  ],
+  "sets": [
+    {
+      "set": "D02_IK_handle_axiesUpadate",
+      "axis": "+Z"
+    }
+  ]
+}
