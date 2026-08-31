@@ -82,13 +82,14 @@ V01(`CtrlRig`)과 `WINDOW_OBJECT_NAME` 이 달라 **둘을 동시에 띄워도 �
 
 ### 4.2 위치만 맞추는 세트
 
-`match` 가 `["t"]` 인 세트는 **위치만** 옮기고 **회전은 그대로 둔다.** 지금 그런 세트는 **10개**다.
+`match` 가 `["t"]` 인 세트는 **위치만** 옮기고 **회전은 그대로 둔다.** 지금 그런 세트는 **12개**다.
 
 | 세트 | 왜 |
 |---|---|
 | `B01_Leg_L_ik_01_foot` · `B02_Leg_R_ik_01_foot` | 발 IK 컨트롤 — 회전은 리그가 정한다 |
 | `B01_Leg_L_ik_08_polTgt_foot` · `B01_Leg_R_ik_08_polTgt_foot` | 발 IK 폴 타깃 |
 | `B01_Leg_L_ik_09_polTgt_toe` · `B01_Leg_R_ik_09_polTgt_toe` | 발끝 IK 폴 타깃 |
+| `B01_Leg_L_ik_07_Ball` · `B02_Leg_R_ik_07_Ball` | 발 볼 IK 컨트롤 — 회전은 리그가 정한다 |
 | `A01_Arm_L_04_Pole` · `A02_Arm_R_04_Pole` | 폴 타깃 — `poleVectorConstraint` 는 **위치만** 쓴다 |
 | `B01_Leg_L_06_pole` · `B02_Leg_R_06_pole` | 〃 |
 

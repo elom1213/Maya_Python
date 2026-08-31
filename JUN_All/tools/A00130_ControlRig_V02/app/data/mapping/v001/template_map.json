@@ -544,7 +544,10 @@
           "set": "B01_Leg_L_04"
         },
         {
-          "set": "B01_Leg_L_ik_07_Ball"
+          "set": "B01_Leg_L_ik_07_Ball",
+          "match": [
+            "t"
+          ]
         }
       ]
     },
@@ -664,7 +667,7 @@
       "parent": "helper_foot_r",
       "targets": [
         {
-          "set": "B01_Leg_R_ik_08_polTgt_foot",
+          "set": "B02_Leg_R_ik_08_polTgt_foot",
           "match": [
             "t"
           ]
@@ -679,7 +682,10 @@
           "set": "B02_Leg_R_04"
         },
         {
-          "set": "B02_Leg_R_ik_07_Ball"
+          "set": "B02_Leg_R_ik_07_Ball",
+          "match": [
+            "t"
+          ]
         }
       ]
     },
@@ -688,7 +694,7 @@
       "parent": "helper_ball_r",
       "targets": [
         {
-          "set": "B01_Leg_R_ik_09_polTgt_toe",
+          "set": "B02_Leg_R_ik_09_polTgt_toe",
           "match": [
             "t"
           ]
