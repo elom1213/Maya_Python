@@ -51,6 +51,12 @@
    기본 모두 ON)로 **Translate / Rotate / Scale × X/Y/Z 9축** 중 복사할 채널만 골라낼 수 있고,
    그 아래 **Custom Channels**(v02.12~)로 `ikBlend` · 페이셜 슬라이더 같은 **사용자 어트리뷰트**를
    **9축과 함께** 골라 복사한다(`List Attributes` 가 Base 의 채널박스 채널을 나열).
+   **Layer**(v02.13~): 리스트업한 오브젝트의 키를 **한 애니메이션 레이어에서 다른
+   레이어로** 복사(Copy)하거나 옮긴다(Cut). 마야의 Ctrl+C / Ctrl+V 는 붙여넣기가 **지금
+   선택된 레이어**로 가 버려서 오브젝트 여러 개의 레이어 간 복사가 온전히 되지 않는다.
+   **From / To 레이어를 명시**하고, 옮길 채널을 **9축 체크박스 + Custom Channels**(소스
+   레이어에 키가 있는 채널만 나열) 또는 **All Keyed Channels** 로 정한다. 시간 구간은
+   선택 사항(기본 = 그 커브의 모든 키)이다.
    **Mirror Key**(v01.04~): 한쪽 컨트롤러의 키를 **반대쪽 컨트롤러로 좌우 미러**한다(언리얼
    *Mirror Data Table* 과 동일한 결과). 좌/우 토큰(`_l/_r` 등, **JSON 으로 확장 가능**)으로 자동
    페어링하거나 수동 리스트로 짝짓는다. **소스/타겟의 rotateOrder 가 달라도 정확**하다.
@@ -73,6 +79,29 @@
 
 하위 탭이나 상위 탭을 바꾸면 **창 크기가 지금 보이는 페이지에 맞춰 자동 조정**된다.
 
+> **V02 v02.13 — Transfer > Layer: 애니메이션 레이어 사이 키 복사 · 잘라내기**:
+> 마야에서 여러 컨트롤러의 키를 **레이어 A → 레이어 B** 로 옮기는 방법이 사실상 없다.
+> Ctrl+C / Ctrl+V 는 붙여넣기가 **지금 선택된 레이어**로 가 버리고, 오브젝트가 여러 개면
+> 어떤 채널이 어디로 갔는지도 확인할 수 없다. 그래서 **From / To 를 명시하는** 탭을 뒀다.
+>
+> 구현이 기대는 사실은 mayapy(2024)로 확인했다. ① `copyKey(plug, animLayer=L)` /
+> `pasteKey(plug, animLayer=L)` 는 **레이어를 지정한 복사·붙여넣기가 되고**, 붙여넣기는
+> 클립보드의 **원래 시간**에 들어가며 **대상 레이어에 커브가 없으면 만들어 준다**.
+> ② 단 대상이 `BaseAnimation` 이 아닌데 그 plug 가 **레이어 멤버가 아니면**
+> `RuntimeError: Nothing to paste to` 로 실패하므로 `animLayer(L, e=True, attribute=plug)`
+> 로 먼저 넣어 줘야 한다(BaseAnimation 은 멤버가 아니어도 그냥 붙는다).
+> ③ **`cutKey` 에는 `animLayer` 플래그가 없다** — 그래서 잘라내기는 소스 **커브 노드**를
+> 찾아 거기서 지운다. ④ `findCurveForPlug` 는 **어느 레이어에도 안 든 오브젝트**에
+> 대해서는 `BaseAnimation` 을 물어도 `None` 을 주므로, 그때는 plug 직결 애님 커브가 곧
+> base 커브다.
+>
+> **값은 커브 그대로 옮긴다** — 레이어 기여분을 다시 계산하지 않는다. 즉 Base(절대값)
+> → additive 레이어처럼 성격이 다른 레이어로 옮기면 **최종 결과는 달라진다**(그 값의
+> 커브가 그 레이어에 생기는 것뿐이다). 마야 복사/붙여넣기와 같은 규칙이며, 최종 포즈를
+> 유지한 채 레이어를 바꾸고 싶으면 `Bake` 탭을 쓴다.
+> 변경: `app/core/layer_key_manager.py`(신규) · `app/ui/main_window.py`
+> (`_build_layer_key_tab` + `on_lk_*` 핸들러) · `app/core/__init__.py`.
+>
 > **V02 v02.12 — Copy Key: 커스텀(채널박스) 어트리뷰트도 복사**:
 > `Transfer > Copy Key` 가 **위치·회전·스케일만** 복사하는 것 같다는 제보를 받고 짚어 보니,
 > 원인은 v02.08 에서 넣은 **Attributes 9축 체크박스**였다. 9축이 **전부 켜져 있을 때만**
@@ -595,6 +624,7 @@ A00110_animTool_V02/
     │   ├── hotkey_manager.py     # Shift+A 핫키 설치 / 복원 → Hold 호출
     │   ├── pose_key_manager.py   # 현재 프레임 6축 pose 키 (Pose Key 탭)
     │   ├── copykey_manager.py    # Base→Target 키 복사 + 축 Reverse (Copy Key 탭)
+    │   ├── layer_key_manager.py  # 애님 레이어 사이 키 복사 / 잘라내기 (Transfer > Layer)
     │   ├── mirror_key_manager.py # 컨트롤 키 좌우 미러 (Mirror Key 탭, OpenMaya)
     │   ├── mirror_token_store.py # mirror_tokens.json 입출력 + 폴백
     │   ├── bake_manager.py       # 리스트 노드 구간 bake (Bake 탭, native bakeResults)
@@ -1226,8 +1256,9 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 
 ### 5.6 Transfer 탭 — 애니메이션을 다른 오브젝트로 옮긴다
 
-**오브젝트 사이**로 애니메이션을 옮기는 카테고리다. 셋 다 "어느 것을 어느 것에" 라는
-같은 형태(소스 리스트 / 타깃 리스트)를 쓴다.
+애니메이션을 **지금 있는 자리에서 다른 자리로** 옮기는 카테고리다. `Copy Key` · `Mirror Key` ·
+`Follow` 는 **오브젝트 사이**를 옮기므로 "어느 것을 어느 것에" 라는 같은 형태(소스 리스트 /
+타깃 리스트)를 쓰고, `Layer` 만 **같은 오브젝트의 레이어 사이**를 옮기므로 리스트가 하나다.
 
 #### Copy Key
 
@@ -1281,6 +1312,70 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   뒤집어 버리지 않도록.
 - **Copy Key**: 복사 실행. 결과(처리한 쌍 수 / **매칭 모드(`1->n` · `n->n`)** / 사용한 옵션 /
   **복사한 어트리뷰트(`all attrs` 또는 이름 목록)** / 건너뛴 쌍 / 개수 불일치 경고)가 로그에 출력.
+
+#### Layer — 애니메이션 레이어 사이 키 복사 · 잘라내기 (v02.13~)
+
+```
+┌───────────────────────────────────────────────────┐
+│ [Objects]                                          │  ← 재사용 위젯 1개 (레이어만 바뀐다)
+│ List Selected Objects                              │
+│ ┌ QListWidget ┐                                    │
+│ └─────────────┘  Add|Del|Up|Down|Sort              │
+│ ┌ Anim Layers ─────────────────────────────────┐  │
+│ │ From [ BaseAnimation ▼ ] <-> To [ LayerA ▼ ] │  │  ← <-> = 소스/대상 맞바꾸기
+│ │                                    [Refresh] │  │
+│ └──────────────────────────────────────────────┘  │
+│ [ ] Limit to Time Range                            │  ← 기본 OFF = 모든 키
+│ Start [ 1 ]   End [ 24 ]                           │  ← 위 체크가 꺼져 있으면 비활성
+│ Paste Option [ replace ▼ ]   [ ] All Keyed Channels│
+│ ┌ Channels ────────────────────────────────────┐  │
+│ │ T [X][Y][Z]  R [X][Y][Z]  S [X][Y][Z]        │  │  ← 기본 모두 ON
+│ │ Custom Channels                    Number: 0 │  │
+│ │ ┌ QListWidget ┐  [List Attributes]           │  │
+│ │ │  ikBlend    │  [Select All]                │  │
+│ │ └─────────────┘  [Clear]                     │  │
+│ │ Filter [                                   ] │  │
+│ └──────────────────────────────────────────────┘  │
+│ [ Copy Keys to Layer ]                             │
+│ [ Cut Keys to Layer (Move) ]                       │
+└───────────────────────────────────────────────────┘
+```
+
+- **왜 필요한가**: 마야의 `Ctrl+C` / `Ctrl+V` 는 붙여넣기가 **지금 선택된 레이어**로 간다.
+  오브젝트가 여러 개면 어떤 채널이 어느 레이어로 갔는지 확인할 방법도 없어서, 레이어 사이
+  키 이동이 사실상 손으로 하나씩 하는 작업이 된다. 이 탭은 **From / To 를 명시**하고
+  **채널을 골라** 한 번에 처리한다.
+- **Objects** (재사용 위젯 `JUN_mod_tsl_qt_v01`): `List Selected Objects` 로 현재 선택을 담는다.
+  **오브젝트는 그대로이고 레이어만 바뀌므로 리스트가 하나**다(Copy Key 의 Base/Target 과 다르다).
+- **From / To**: 씬의 애니메이션 레이어 목록. `BaseAnimation`(루트)이 맨 앞에 온다.
+  처음 열면 **From = 애님 레이어 에디터에서 선택된 레이어**, **To = 그와 다른 첫 레이어**로
+  맞춰진다. `<->` 로 둘을 맞바꾸고, `Refresh` 로 다시 훑는다.
+  **`(current)` 항목은 없다** — 어디서 어디로 가는지가 이 기능의 전부라 "마야가 알아서" 가
+  성립하지 않는다(Fill Keys 탭과 다른 점).
+- **Limit to Time Range** (기본 OFF): 꺼져 있으면 그 채널 커브의 **모든 키**가 대상이다.
+  켜면 `[Start, End]` 안의 키만 옮기고, **Cut 일 때 지워지는 것도 그 구간뿐**이다.
+- **Paste Option**: `cmds.pasteKey` 의 `option`. **기본 `replace`** — Copy Key 탭의 기본값
+  (`insert`, 마야 기본)과 **일부러 다르다.** 레이어를 옮길 때 원하는 것은 "그 구간을 이 커브로
+  바꿔라" 이지, 대상 레이어에 이미 있던 키를 시간축으로 **밀어내는** 게 아니기 때문이다.
+- **Channels** (기본 9개 모두 ON): Translate / Rotate / Scale × X/Y/Z.
+  **Copy Key 와 달리 9개를 다 켜도 "전부" 라는 뜻이 아니다** — TRS 만 간다. 레이어 이동은
+  채널(plug) 하나씩 처리해야 해서 "필터 없음" 경로가 없기 때문이다(아래 §7).
+- **Custom Channels**: `List Attributes` 를 누르면 리스트업한 오브젝트 중 **소스 레이어에
+  커브가 있는** 채널(9축 제외)만 나열한다. 옮길 게 없는 채널을 목록에 올려 봐야 고를 이유가
+  없다. **From 을 바꾸면 목록이 지워진다** — 다른 레이어의 채널 목록을 그대로 두면 지금 소스에는
+  없는 채널을 고른 채로 실행하게 되기 때문이다(로그에 다시 누르라고 적는다).
+- **All Keyed Channels** (기본 OFF): 켜면 위 체크박스와 목록을 **무시하고**, 오브젝트마다
+  **소스 레이어에 커브가 있는 채널 전부**를 옮긴다. 컨트롤러의 레이어 애니메이션을 통째로
+  옮길 때 쓴다(켜면 Channels 그룹이 비활성화된다).
+- **Copy Keys to Layer**: 소스 레이어의 키는 **그대로 두고** 대상 레이어에 붙여넣는다.
+- **Cut Keys to Layer (Move)**: 붙여넣기에 **성공한 채널만** 소스 레이어에서 지운다.
+  붙여넣기가 실패한 채널의 원본은 남는다 — 실패한 자리에서 키가 사라지지 않도록.
+- 둘 다 **undo 한 항목**(`Ctrl+Z` 한 번)으로 되돌아간다.
+
+> **값은 커브 그대로 간다.** 레이어 기여분을 다시 계산하지 않으므로, `BaseAnimation`(절대값)
+> → additive 레이어처럼 성격이 다른 레이어로 옮기면 **최종 결과가 달라진다**(그 값의 커브가
+> 그 레이어에 생기는 것뿐이다). 마야의 복사/붙여넣기와 같은 규칙이다. 최종 포즈를 유지한 채
+> 레이어를 정리하고 싶으면 `Bake` 탭을 쓴다.
 
 #### Mirror Key
 
@@ -1494,6 +1589,19 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 > **원본 하나를 여러 대상에 뿌릴 때**: Base 에 오브젝트를 **하나만** 담고 **1 → n**(기본 ON)을
 > 켠 채로 Copy Key. 순서를 맞출 필요도, Base 를 대상 수만큼 복제할 필요도 없다.
 
+### Transfer > Layer — 레이어 사이 키 복사 / 이동
+1. 옮길 컨트롤러들을 선택 → **List Selected Objects**.
+2. **From** 에 지금 키가 있는 레이어, **To** 에 넣을 레이어를 고른다(`<->` 로 맞바꿈).
+3. 구간을 한정하려면 **Limit to Time Range** 체크 후 Start / End 입력(기본은 모든 키).
+4. 옮길 채널을 정한다.
+   - TRS 만이면 그대로 두고(9개 기본 ON),
+   - `ikBlend` 같은 커스텀 채널도 함께면 **List Attributes → 골라서 선택**,
+   - 채널을 따지지 않고 통째로 옮길 거면 **All Keyed Channels** 체크.
+5. **Copy Keys to Layer**(원본 유지) 또는 **Cut Keys to Layer (Move)**(원본 삭제).
+
+> **레이어 하나를 통째로 다른 레이어로 옮길 때**: 컨트롤러를 전부 리스트업하고
+> **All Keyed Channels** 를 켠 뒤 **Cut**. 채널 이름을 하나도 몰라도 된다.
+
 ### Transfer > Mirror Key — 자동(Auto)
 1. 미러할 **소스 컨트롤(들)을 선택**(예: 왼팔 FK 컨트롤). 한쪽만 선택하면 된다.
 2. **Mirror Axis**(보통 X) / **Channels**(T·R) / **Start·End** / **Time** 확인.
@@ -1621,6 +1729,36 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   **Attributes 에서 빠진 축도 건너뛴다** — 복사하지도 않은 타깃의 기존 키를 뒤집지 않도록.
 - 키가 없거나 붙여넣기에 실패한 쌍은 **건너뛰고**(skip) 집계해 로그에 표시한다 → 일부 실패해도 중단되지 않는다.
 - **Paste Option** 이 유효값 목록 밖이면 `insert` 로 폴백(방어).
+
+### Transfer > Layer (`layer_key_manager.LayerKeyManager.transfer_keys`)
+- **채널(plug) 하나씩** `cmds.copyKey(plug, animLayer=<From>)` → `cmds.pasteKey(plug,
+  animLayer=<To>, option=<선택값>)`. 붙여넣기는 클립보드의 **원래 시간**에 들어간다.
+  노드 단위 `pasteKey(attribute=[...])` 를 쓰지 않는 이유는 Copy Key 와 같다 — 마야가
+  클립보드 커브를 **이름이 아니라 순서로** 맞춘다. 그래서 이 탭에는 Copy Key 의
+  "9축 전부 ON = 필터 없음" 같은 경로가 **없다**(대신 `All Keyed Channels` 가 그 역할).
+- **대상 레이어 편입**: `To` 가 `BaseAnimation` 이 아닌데 그 plug 가 레이어 멤버가 아니면
+  `pasteKey` 가 `RuntimeError: Nothing to paste to` 로 실패한다. 그래서 붙여넣기 전에
+  `findCurveForPlug` 로 확인하고 없으면 `animLayer(<To>, e=True, attribute=plug)` 로 넣는다.
+  **`BaseAnimation` 은 멤버가 아니어도 그냥 붙는다**(커브까지 만들어 준다) — 그래서 건드리지 않는다.
+- **커브 찾기**: `animLayer(L, q=True, findCurveForPlug=plug)`. 단 **어느 레이어에도 안 든
+  오브젝트**는 `BaseAnimation` 을 물어도 `None` 이 오므로, 그때는 plug 에 **직접 연결된**
+  `animCurve`(`listConnections(type="animCurve", skipConversionNodes=True)`)가 base 커브다.
+  레이어에 든 plug 는 앞단이 `animBlendNode*` 라 이 조회에 걸리지 않으므로 판정이 겹치지 않는다.
+- **잘라내기(Cut)**: **`cutKey` 에는 `animLayer` 플래그가 없다**(`TypeError: Invalid flag`).
+  그래서 위 규칙으로 **소스 커브 노드**를 찾아 `cutKey(curve, time=(start,end), clear=True)`
+  로 지운다(구간을 안 쓰면 `clear=True` 만 — 그 커브의 모든 키). `clear=True` 라 클립보드는
+  건드리지 않는다. **붙여넣기에 성공한 채널만** 지우므로 실패한 자리의 원본은 남는다.
+  구간의 키를 다 지우면 마야가 **커브 노드까지 지운다**(그 뒤 그 이름을 다시 쓰지 않는다).
+- **채널 목록**(`list_layer_attrs`): 후보는 다른 탭과 같은
+  `listAttr(keyable=True, visible=True, unlocked=True)` 이고, 거기서 **소스 레이어에 커브가
+  있는 것**만 남긴다. `All Keyed Channels` 는 이 목록을 오브젝트마다 `skip_trs=False` 로 구한다.
+- **집계·로그**: `copyKey` 반환이 0 이면(그 레이어·구간에 키 없음) 붙여넣기를 부르지 않고
+  넘어간다. 9축은 기본이 전부 켜져 있어 키 없는 축 이름이 줄줄이 붙으므로 **개수로만**
+  적고(`N axis channel(s) not keyed in ...`), 사용자가 직접 고른 커스텀 채널은 **이름으로**
+  적는다. 붙여넣기 실패(잠긴 채널 등)는 `Paste failed` 로 따로 센다 — 하나가 실패해도 나머지는 계속 간다.
+- **막는 경우**: 리스트 비었음 / 레이어가 없음 / **From 과 To 가 같음** / 레이어가 씬에서
+  사라짐(목록 갱신 후 중단) / 채널을 하나도 안 골랐는데 `All Keyed Channels` 도 꺼져 있음.
+- `Paste Option` 이 유효값 목록 밖이면 `replace` 로 폴백(방어).
 
 ### Transfer > Mirror Key
 - **두 가지 미러 모드** (Behavior 체크박스, v01.08~). 둘 다 프레임 `t` 마다 `_mirrored_values` 가

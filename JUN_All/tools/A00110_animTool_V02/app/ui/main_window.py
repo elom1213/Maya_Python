@@ -32,6 +32,7 @@ from tools.A00110_animTool_V02.app.core import GraphViewManager
 from tools.A00110_animTool_V02.app.core import GraphFocusManager
 from tools.A00110_animTool_V02.app.core import FillKeyManager
 from tools.A00110_animTool_V02.app.core import CURRENT_LAYER
+from tools.A00110_animTool_V02.app.core import LayerKeyManager
 from tools.A00110_animTool_V02.app.core import CurveFilterSession
 from tools.A00110_animTool_V02.app.core import (
     CF_EASE_IN, CF_EASE_OUT, CF_LINEAR, CF_EASE_IN_OUT,
@@ -331,6 +332,8 @@ class MainWindow(QWidget):
     TRANSFER_PAGES = (
         ("Copy Key", "Copy Key - copy a frame range of keys from Base[i] to "
          "Target[i], with an optional per-axis reverse", "_build_copy_key_tab"),
+        ("Layer", "Layer Copy - copy or cut the listed objects' keys from one "
+         "animation layer to another", "_build_layer_key_tab"),
         ("Mirror Key", "Mirror Key - mirror keys onto the opposite controller "
          "(frame range or current frame, token pairing)",
          "_build_mirror_key_tab"),
@@ -1332,6 +1335,228 @@ class MainWindow(QWidget):
         tab_layout.addStretch(1)
 
         self.btn_copy_key.clicked.connect(self.on_copy_key)
+
+        return tab
+
+    def _build_layer_key_tab(self):
+        """리스트업한 오브젝트의 키를 **애니메이션 레이어 사이**로 복사/이동하는 탭
+        (Transfer > Layer).
+
+        마야의 Ctrl+C / Ctrl+V 는 붙여넣기가 **지금 선택된 레이어**로 가 버려서, 오브젝트
+        여러 개의 키를 레이어 A -> 레이어 B 로 온전히 옮길 수 없다. 여기서는 Source /
+        Destination 레이어를 **명시**하고, 옮길 채널을 9축 체크박스 + Custom Channels 로
+        골라서 한 번에 처리한다.
+
+        구성은 Transfer > Copy Key 탭과 일부러 같게 뒀다(같은 채널 선택 UI). 다른 점은
+        **오브젝트 리스트가 하나**(같은 오브젝트의 레이어만 바뀌므로 Base/Target 이 없다)
+        라는 것과, 시간 구간이 **선택 사항**(기본은 커브의 모든 키)이라는 것이다.
+        """
+        tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
+        tab_layout = QVBoxLayout(tab)
+
+        # -------------------------
+        # 대상 오브젝트 (공용 TSL 하나)
+        # -------------------------
+
+        self.layer_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", select_label="List Selected Objects",
+            list_min_height=110, log_callback=self.log)
+        tab_layout.addWidget(self.layer_tsl)
+
+        # -------------------------
+        # Source -> Destination 레이어
+        # -------------------------
+
+        layer_grp = QGroupBox("Anim Layers")
+        layer_box = QVBoxLayout(layer_grp)
+
+        layer_row = QHBoxLayout()
+        layer_row.addWidget(QLabel("From"))
+        self.cmb_lk_src = QComboBox()
+        self.cmb_lk_src.setToolTip("The layer the keys are read from.")
+        self.cmb_lk_src.currentIndexChanged.connect(self._lk_source_changed)
+        layer_row.addWidget(self.cmb_lk_src, 1)
+
+        self.btn_lk_swap = QPushButton("<->")
+        self.btn_lk_swap.setFixedWidth(40)
+        self.btn_lk_swap.setToolTip("Swap the source and the destination layer.")
+        self.btn_lk_swap.clicked.connect(self.on_lk_swap_layers)
+        layer_row.addWidget(self.btn_lk_swap)
+
+        layer_row.addWidget(QLabel("To"))
+        self.cmb_lk_dst = QComboBox()
+        self.cmb_lk_dst.setToolTip("The layer the keys are written to.\n"
+                                   "Channels missing from this layer are added to "
+                                   "it, and their curves are created.")
+        layer_row.addWidget(self.cmb_lk_dst, 1)
+
+        self.btn_lk_layers = QPushButton("Refresh")
+        self.btn_lk_layers.setToolTip("Re-scan the scene for animation layers.")
+        self.btn_lk_layers.clicked.connect(self.on_lk_refresh_layers)
+        layer_row.addWidget(self.btn_lk_layers)
+        layer_box.addLayout(layer_row)
+
+        tab_layout.addWidget(layer_grp)
+
+        # -------------------------
+        # 시간 구간 (선택 사항). 기본은 꺼져 있고, 그러면 **커브의 모든 키**를 옮긴다.
+        # -------------------------
+
+        self.cb_lk_range = QCheckBox("Limit to Time Range")
+        self.cb_lk_range.setToolTip(
+            "Off (default): every key of the channel moves.\n"
+            "On: only the keys inside [Start, End] move - and with Cut, only "
+            "those\nare removed from the source layer.")
+        self.cb_lk_range.toggled.connect(self._lk_range_toggled)
+        tab_layout.addWidget(self.cb_lk_range)
+
+        time_str = int(cmds.playbackOptions(query=True, minTime=True))
+        time_end = int(cmds.playbackOptions(query=True, maxTime=True))
+        self.lk_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_value=time_str, end_value=time_end, log_callback=self.log)
+        self.lk_range.setEnabled(False)
+        tab_layout.addWidget(self.lk_range)
+
+        # -------------------------
+        # Paste Option + All Keyed Channels
+        # -------------------------
+
+        option_row = QHBoxLayout()
+        option_row.addWidget(QLabel("Paste Option"))
+        self.cmb_lk_paste = QComboBox()
+        self.cmb_lk_paste.addItems(LayerKeyManager.PASTE_OPTIONS)
+        self.cmb_lk_paste.setCurrentText(LayerKeyManager.DEFAULT_PASTE_OPTION)
+        self.cmb_lk_paste.setToolTip(
+            "How the keys land on the destination curve (cmds.pasteKey).\n"
+            "'replace' (default) overwrites the pasted time range and leaves the "
+            "rest\nof that curve alone. 'insert' pushes the existing keys later "
+            "in time.")
+        option_row.addWidget(self.cmb_lk_paste)
+
+        option_row.addSpacing(12)
+        self.cb_lk_all_keyed = QCheckBox("All Keyed Channels")
+        self.cb_lk_all_keyed.setToolTip(
+            "Ignore the boxes below and move EVERY channel that has a curve on "
+            "the\nsource layer - per object. Use it to move a controller's whole "
+            "layer\nanimation without listing its channels.")
+        self.cb_lk_all_keyed.toggled.connect(self._lk_all_keyed_toggled)
+        option_row.addWidget(self.cb_lk_all_keyed)
+
+        option_row.addStretch(1)
+        tab_layout.addLayout(option_row)
+
+        # -------------------------
+        # Channels : 9축 + Custom Channels (Copy Key 탭과 같은 구성)
+        # -------------------------
+
+        self.lk_attr_grp = QGroupBox("Channels")
+        attr_box = QVBoxLayout(self.lk_attr_grp)
+
+        attr_layout = QHBoxLayout()
+
+        # attr key -> checkbox. LayerKeyManager.COPY_ATTRS 키와 일치.
+        self.lk_attrs = {}
+
+        for group_label, keys in (
+            ("Translate", (("tx", "X"), ("ty", "Y"), ("tz", "Z"))),
+            ("Rotate", (("rx", "X"), ("ry", "Y"), ("rz", "Z"))),
+            ("Scale", (("sx", "X"), ("sy", "Y"), ("sz", "Z"))),
+        ):
+            if self.lk_attrs:
+                attr_layout.addSpacing(12)
+            attr_layout.addWidget(QLabel(group_label))
+            for key, label in keys:
+                cb = QCheckBox(label)
+                cb.setChecked(True)
+                self.lk_attrs[key] = cb
+                attr_layout.addWidget(cb)
+
+        self.lk_attr_grp.setToolTip(
+            "Channels to move. Unlike Copy Key, checking all nine boxes does NOT "
+            "mean\n'everything' - only translate / rotate / scale move. Pick the "
+            "rest in\nCustom Channels below, or turn on 'All Keyed Channels'.")
+
+        attr_layout.addStretch(1)
+        attr_box.addLayout(attr_layout)
+
+        # Custom Channels : 소스 레이어에 커브가 있는 채널(9축 제외)만 나열한다.
+        custom_head = QHBoxLayout()
+        custom_head.addWidget(QLabel("Custom Channels"))
+        custom_head.addStretch(1)
+        self.lbl_lk_custom_number = QLabel("Number: 0")
+        custom_head.addWidget(self.lbl_lk_custom_number)
+        attr_box.addLayout(custom_head)
+
+        custom_body = QHBoxLayout()
+
+        self.lw_lk_custom = QListWidget()
+        self.lw_lk_custom.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        # Copy Key 탭과 같은 높이 제한 - QListWidget 기본 sizeHint(192px)를 그대로 두면
+        # 이 탭에서만 창이 200px 가까이 길어진다.
+        self.lw_lk_custom.setMinimumHeight(90)
+        self.lw_lk_custom.setMaximumHeight(110)
+        self.lw_lk_custom.setToolTip(
+            "Channels of the listed objects that have a curve on the SOURCE "
+            "layer,\nminus translate / rotate / scale. Select the ones to move.")
+        custom_body.addWidget(self.lw_lk_custom, 1)
+
+        custom_btns = QVBoxLayout()
+
+        btn_lk_custom_list = QPushButton("List Attributes")
+        btn_lk_custom_list.setToolTip(
+            "List the channels that are keyed on the source layer (union),\n"
+            "excluding translate / rotate / scale.")
+        btn_lk_custom_list.clicked.connect(self.on_lk_list_custom_attrs)
+        custom_btns.addWidget(btn_lk_custom_list)
+
+        btn_lk_custom_all = QPushButton("Select All")
+        btn_lk_custom_all.setToolTip(
+            "Select every channel currently visible in the list.")
+        btn_lk_custom_all.clicked.connect(self.on_lk_select_all_custom)
+        custom_btns.addWidget(btn_lk_custom_all)
+
+        btn_lk_custom_clear = QPushButton("Clear")
+        btn_lk_custom_clear.setToolTip(
+            "Clear the selection, so only the nine axis boxes decide what moves.")
+        btn_lk_custom_clear.clicked.connect(self.lw_lk_custom.clearSelection)
+        custom_btns.addWidget(btn_lk_custom_clear)
+
+        custom_btns.addStretch(1)
+        custom_body.addLayout(custom_btns)
+        attr_box.addLayout(custom_body)
+
+        self.flt_lk_custom = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_lk_custom, placeholder="Type any part of a channel name",
+            number_label=self.lbl_lk_custom_number)
+        attr_box.addWidget(self.flt_lk_custom)
+
+        tab_layout.addWidget(self.lk_attr_grp)
+
+        # -------------------------
+        # 실행 : Copy(원본 유지) / Cut(원본에서 지움)
+        # -------------------------
+
+        self.btn_lk_copy = QPushButton("Copy Keys to Layer")
+        self.btn_lk_copy.setMinimumHeight(32)
+        self.btn_lk_copy.setToolTip(
+            "Copy the chosen channels from the source layer to the destination "
+            "layer.\nThe source layer keeps its keys. Runs as a single undo step.")
+        self.btn_lk_copy.clicked.connect(lambda *_: self.on_lk_transfer(cut=False))
+        tab_layout.addWidget(self.btn_lk_copy)
+
+        self.btn_lk_cut = QPushButton("Cut Keys to Layer (Move)")
+        self.btn_lk_cut.setMinimumHeight(32)
+        self.btn_lk_cut.setToolTip(
+            "Same as Copy, then DELETE those keys from the source layer -\n"
+            "the animation ends up on the destination layer only.\n"
+            "Keys are removed only from channels that pasted successfully.\n"
+            "Runs as a single undo step.")
+        self.btn_lk_cut.clicked.connect(lambda *_: self.on_lk_transfer(cut=True))
+        tab_layout.addWidget(self.btn_lk_cut)
+
+        tab_layout.addStretch(1)
+
+        self.on_lk_refresh_layers(quiet=True)
 
         return tab
 
@@ -2888,6 +3113,195 @@ class MainWindow(QWidget):
             one_to_many=one_to_many, attr_flags=attr_flags,
             custom_attrs=custom_attrs)
         self.log(msg)
+
+    # --------------------------------------------------
+    # Handlers : Transfer > Layer (레이어 사이 키 복사 / 이동)
+    # --------------------------------------------------
+
+    def on_lk_refresh_layers(self, quiet=False):
+        """씬의 애니메이션 레이어를 다시 훑어 From / To 콤보를 채운다.
+
+        지금 고른 항목은 최대한 유지한다. 처음 채울 때는 **From = 지금 선택된 레이어**
+        (없으면 BaseAnimation), **To = 그 다음 레이어**로 둔다 - 둘이 같으면 실행이 막히므로
+        처음부터 서로 다른 레이어를 가리키게 해 준다.
+
+        Fill Keys 탭과 달리 `(current)` 항목은 두지 않는다. 어느 레이어에서 어느 레이어로
+        가는지가 이 기능의 전부라서, "마야가 알아서" 가 성립하지 않는다.
+        """
+        keep_src = self.cmb_lk_src.currentText() if self.cmb_lk_src.count() else ""
+        keep_dst = self.cmb_lk_dst.currentText() if self.cmb_lk_dst.count() else ""
+
+        layers, selected = LayerKeyManager.list_anim_layers()
+
+        for cmb in (self.cmb_lk_src, self.cmb_lk_dst):
+            cmb.blockSignals(True)
+            cmb.clear()
+            cmb.addItems(layers)
+
+        if layers:
+            src = keep_src if keep_src in layers else (selected or layers[0])
+            if keep_dst in layers and keep_dst != src:
+                dst = keep_dst
+            else:
+                # From 과 겹치지 않는 첫 레이어.
+                dst = next((l for l in layers if l != src), src)
+            self.cmb_lk_src.setCurrentText(src)
+            self.cmb_lk_dst.setCurrentText(dst)
+
+        for cmb in (self.cmb_lk_src, self.cmb_lk_dst):
+            cmb.blockSignals(False)
+
+        if quiet:
+            return
+
+        if not layers:
+            self.log("[Warning] No animation layer in the scene. Create one "
+                     "(Windows > Animation Editors > Anim Layer) first.")
+        elif len(layers) == 1:
+            self.log("[Warning] Only one animation layer ({0}); there is nowhere "
+                     "to copy to.".format(layers[0]))
+        else:
+            self.log("Anim layers: {0}  ({1} -> {2})".format(
+                ", ".join(layers), self.cmb_lk_src.currentText(),
+                self.cmb_lk_dst.currentText()))
+
+    def on_lk_swap_layers(self):
+        """From <-> To 를 맞바꾼다."""
+        src = self.cmb_lk_src.currentText()
+        dst = self.cmb_lk_dst.currentText()
+        if not src or not dst:
+            return
+        self.cmb_lk_src.blockSignals(True)
+        self.cmb_lk_src.setCurrentText(dst)
+        self.cmb_lk_src.blockSignals(False)
+        self.cmb_lk_dst.setCurrentText(src)
+        self._lk_source_changed()
+        self.log("Layers swapped: {0} -> {1}".format(dst, src))
+
+    def _lk_source_changed(self, *args):
+        """소스 레이어가 바뀌면 Custom Channels 목록은 더 이상 그 레이어의 것이 아니다.
+
+        목록은 **소스 레이어에 커브가 있는 채널**만 담으므로, 레이어를 바꾸면 지워서
+        `List Attributes` 를 다시 누르게 한다. 옛 목록을 남겨 두면 지금 소스에는 없는
+        채널을 고른 채 실행하게 된다.
+        """
+        if self.lw_lk_custom.count():
+            self.lw_lk_custom.clear()
+            self.flt_lk_custom.refresh()
+            self.log("[Info] Source layer changed; press 'List Attributes' again "
+                     "for its custom channels.")
+
+    def _lk_range_toggled(self, checked):
+        """Limit to Time Range 체크에 따라 Start/End 입력을 켜고 끈다."""
+        self.lk_range.setEnabled(bool(checked))
+
+    def _lk_all_keyed_toggled(self, checked):
+        """All Keyed Channels 를 켜면 채널 선택 UI 는 쓰이지 않으므로 비활성화한다."""
+        self.lk_attr_grp.setEnabled(not bool(checked))
+
+    def on_lk_list_custom_attrs(self):
+        """리스트업한 오브젝트 중 **소스 레이어에 키가 있는** 커스텀 채널을 나열한다.
+
+        Copy Key 탭의 `List Attributes` 와 같은 구성이되, 소스 레이어에 커브가 없는 채널은
+        애초에 옮길 게 없으므로 목록에서 뺀다.
+        """
+        objs = self.layer_tsl.get_all_items()
+        if not objs:
+            self.log("[Warning] Add objects to the Objects list first.")
+            return
+
+        src = self.cmb_lk_src.currentText()
+        if not src:
+            self.log("[Warning] No animation layer in the scene.")
+            return
+
+        keep = set(self._lk_custom_attrs(quiet=True))
+
+        attrs = LayerKeyManager.list_layer_attrs(objs, src)
+
+        self.lw_lk_custom.clear()
+        self.lw_lk_custom.addItems(attrs)
+
+        for i in range(self.lw_lk_custom.count()):
+            item = self.lw_lk_custom.item(i)
+            if item.text() in keep:
+                item.setSelected(True)
+
+        shown, total = self.flt_lk_custom.refresh()
+
+        if not attrs:
+            self.log("[Warning] No custom channel is keyed on '{0}' for the "
+                     "listed objects (translate / rotate / scale are handled by "
+                     "the nine boxes).".format(src))
+            return
+
+        msg = "{0} custom channel(s) keyed on '{1}', from {2} object(s).".format(
+            total, src, len(objs))
+        if shown != total:
+            msg += " Filter '{0}' shows {1}.".format(
+                self.flt_lk_custom.text().strip(), shown)
+        self.log(msg)
+
+    def on_lk_select_all_custom(self):
+        """필터로 보이는 커스텀 채널을 전부 선택한다."""
+        self.flt_lk_custom.select_all_visible()
+
+    def _lk_custom_attrs(self, quiet=False):
+        """**보이면서 선택된** 커스텀 채널 이름들.
+
+        Qt 는 필터로 숨긴 항목의 선택도 유지하므로, 가려진 채널까지 옮기지 않도록 거른다.
+        """
+        names, hidden = self.flt_lk_custom.visible_selected()
+        if hidden and not quiet:
+            self.log("[Info] {0} selected channel(s) hidden by the filter were "
+                     "skipped.".format(hidden))
+        return names
+
+    def on_lk_transfer(self, cut=False):
+        """Copy / Cut 실행. cut=True 면 붙여넣은 뒤 소스 레이어에서 그 키를 지운다."""
+        objs = self.layer_tsl.get_all_items()
+        if not objs:
+            self.log("[Warning] Add objects to the Objects list first.")
+            return
+
+        src = self.cmb_lk_src.currentText()
+        dst = self.cmb_lk_dst.currentText()
+        if not src or not dst:
+            self.log("[Warning] No animation layer in the scene. Create one "
+                     "(Windows > Animation Editors > Anim Layer) first.")
+            return
+        if src == dst:
+            self.log("[Warning] Source and destination layer are the same "
+                     "({0}).".format(src))
+            return
+        for layer in (src, dst):
+            if not cmds.objExists(layer):
+                self.log("[Warning] Anim layer '{0}' is gone; refreshing the "
+                         "list.".format(layer))
+                self.on_lk_refresh_layers()
+                return
+
+        start = end = None
+        if self.cb_lk_range.isChecked():
+            rng = self.lk_range.values()
+            if rng is None:
+                self.log("[Warning] Enter Start / End.")
+                return
+            start, end = rng
+
+        all_keyed = self.cb_lk_all_keyed.isChecked()
+        attr_flags = {key: cb.isChecked() for key, cb in self.lk_attrs.items()}
+        custom_attrs = [] if all_keyed else self._lk_custom_attrs()
+
+        count, msg = LayerKeyManager.transfer_keys(
+            objs, src, dst, attr_flags=attr_flags, custom_attrs=custom_attrs,
+            all_keyed=all_keyed, start=start, end=end,
+            paste_option=self.cmb_lk_paste.currentText(), cut=cut)
+        self.log(msg)
+
+        # 옮긴 뒤 소스 레이어의 채널 구성이 달라졌을 수 있다(Cut 이면 커브가 사라진다).
+        if count and cut and self.lw_lk_custom.count():
+            self.on_lk_list_custom_attrs()
 
     # --------------------------------------------------
     # Mirror Key
