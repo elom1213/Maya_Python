@@ -137,6 +137,7 @@
 - [A00170 Stretch tab](wip-a00170-stretch-tab.md) — Default Distance 가 Stretch 구동, linear + Sigmoid 노드망 (v01.11)
 - [A00170 AttachCrv tab](wip-a00170-attachcrv-tab.md) — TSL 오브젝트를 커브 최근접점에 부착
 - [A00170 Remap List Attributes](wip-a00170-remap-listattrs.md) — Remap Value 탭에 전체 어트리뷰트 목록 + 검색
+- [A00145 Update offset](wip-a00145-update-offset.md) — AE 의 constraint `Update` 버튼(`-e -maintainOffset`)을 리스트 전체에. **타깃을 전부 넘겨야** 하고(일부만 넘기면 나머지 offset 이 옛 값으로 남아 driven 이 튄다), **타깃이 아닌 걸 넘기면 edit 인데도 추가된다**
 - [A00145 component followers](wip-a00145-component-followers.md) — Followers 에 버텍스/CV. **`matchTransform` 은 컴포넌트를 인자로 못 받는다**(`Found 1`) · 여러 점 컴포넌트에 절대 좌표를 주면 **한 자리로 뭉개진다**(중심 기준 상대 이동)
 - [A00145 Match 1<-n](wip-a00145-match-one-to-many.md) — Targets 1개면 Followers 전부 매칭(기본 ON). 짝짓기는 **공용 `resolve_pairs()` 하나로** (로그/동작 어긋남 방지), parent 패스도 같은 pairs (v01.32)
 - [A00145 (Null) match rows](wip-a00145-match-null-placeholder.md) — Match Same Name(정확 이름) + 짝 없는 자리를 `(Null)` 로 채워 **순서 짝짓기**를 지키고, 연결 직전에 양쪽에서 함께 빠진다

@@ -8,7 +8,8 @@
 #
 # 최상위 탭은 4개이고, 기능이 여럿인 탭은 **중첩 탭**으로 나눈다:
 #   Match
-#   Constrain : Constraint / Skin Weight / Group Create / Transfer / Target Edit
+#   Constrain : Constraint / Skin Weight / Group Create / Transfer / Target Edit /
+#               Update
 #   Connect   : Connect / List Connected / Connect Closest
 #   Attribute : Copy / Create / Delete
 #
@@ -36,6 +37,7 @@ from tools.A00145_RigConnect.app.core import skin_constraint_manager as skn_mgr
 from tools.A00145_RigConnect.app.core import group_create_manager as grp_mgr
 from tools.A00145_RigConnect.app.core import constraint_transfer_manager as cxfer_mgr
 from tools.A00145_RigConnect.app.core import constraint_target_manager as ctgt_mgr
+from tools.A00145_RigConnect.app.core import constraint_update_manager as cupd_mgr
 from tools.A00145_RigConnect.app.core import attr_match
 from tools.A00145_RigConnect.app.core import snapshot_manager as snap_mgr
 from tools.A00145_RigConnect.app.core import attr_profile_prefs as aprefs
@@ -290,6 +292,9 @@ class MainWindow(QWidget):
          "another object", "_build_constraint_transfer_page"),
         ("Target Edit", "Replace / add / remove the targets (drivers) of existing "
          "constraints", "_build_target_edit_page"),
+        ("Update", "Update Offset - re-bake the maintain offset of existing "
+         "constraints from their current pose (the Attribute Editor's Update "
+         "button, for the whole list at once)", "_build_constraint_update_page"),
     )
 
     def _build_constrain_tab(self):
@@ -779,6 +784,49 @@ class MainWindow(QWidget):
         edit_row.addWidget(btn_remove)
 
         layout.addLayout(edit_row)
+
+        return page
+
+    def _build_constraint_update_page(self):
+        """Update Offset UI (Constrain 하위 탭).
+
+        Attribute Editor 의 constraint 에 있는 **Update** 버튼과 같은 일을 한다 —
+        `parentConstraint -e -maintainOffset <targets> <constraint>`. AE 는 한 번에
+        하나씩만 누를 수 있어서, 여기서는 리스트에 담은 constraint 전부에 돌린다.
+        """
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        note = QLabel(
+            "Move the constrained objects first, then re-bake their offsets here.\n"
+            "Same as the Update button in the Attribute Editor, run on every "
+            "listed constraint at once.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        self.tsl_cupd_cons = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Constraints", select_label="Select",
+            list_min_height=220, log_callback=self.log)
+        self.tsl_cupd_cons.setToolTip(
+            "Constraint nodes, or objects that carry constraints (expanded to "
+            "their constraint children).\n"
+            "Pick rows to work on a subset - with nothing picked the whole list "
+            "is used.")
+        layout.addWidget(self.tsl_cupd_cons)
+
+        btn = QPushButton("Update Offset")
+        btn.setMinimumHeight(32)
+        btn.setToolTip(
+            "Recompute the maintain offset of every listed constraint from the "
+            "current pose,\n"
+            "so each driven object stays where it is now.\n"
+            "Types: parent / point / orient / scale / aim / point on poly.\n"
+            "geometry / normal / tangent / pole vector have no offset and are "
+            "skipped.\n"
+            "A constraint nothing has moved is left with the values it already "
+            "had (logged as 'no change').")
+        btn.clicked.connect(self.on_update_constraint_offset)
+        layout.addWidget(btn)
 
         return page
 
@@ -1906,8 +1954,42 @@ class MainWindow(QWidget):
         self._tedit_refresh()
 
     # ==============================================================
-    # Handlers : Connect
+    # Handlers : Update Offset
     # ==============================================================
+
+    def _cupd_constraints(self, warn=False):
+        """작업 대상 constraint 이름들 — 고른 항목, 없으면 리스트 전체.
+
+        Target Edit 과 같은 규칙이다(고른 게 있으면 그것만).
+        """
+        picked = self.tsl_cupd_cons.selected_items()
+        if picked:
+            if warn:
+                self.log("[INFO] using {0} picked constraint(s) of {1}".format(
+                    len(picked), self.tsl_cupd_cons.count()))
+            return picked
+        return self.tsl_cupd_cons.get_all_items()
+
+    def on_update_constraint_offset(self):
+        cons = self._cupd_constraints(warn=True)
+
+        def _do():
+            results, warns = cupd_mgr.update_offsets(cons)
+            for w in warns:
+                self.log("[WARN] {0}".format(w))
+            updated = 0
+            for r in results:
+                if r["changed"]:
+                    updated += 1
+                self.log("       {0} ({1}) : {2}  <- {3}{4}".format(
+                    r["constraint"], r["type"],
+                    "updated" if r["changed"] else "no change",
+                    ", ".join(r["targets"]),
+                    "  ({0})".format(r["note"]) if r["note"] else ""))
+            self.log("       {0} of {1} constraint(s) re-baked".format(
+                updated, len(results)))
+
+        self._run("Update Offset", _do)
 
     def on_list_attrs(self, role):
         w = self._connect_widgets[role]

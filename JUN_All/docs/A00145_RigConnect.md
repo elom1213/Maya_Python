@@ -4,7 +4,10 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.35` (`app/config/version.py`) — Match 탭의 **Followers 에 컴포넌트(메시 버텍스·CV 등)를
+- 버전: `v01.36` (`app/config/version.py`) — Constrain 탭에 **`Update` 하위 탭** 추가:
+  Attribute Editor 의 constraint **Update 버튼**(= `parentConstraint -e -maintainOffset ...`)을
+  **리스트에 담은 constraint 전부에 한 번에** 돌린다 (§Update)
+  · v01.35 는 Match 탭의 **Followers 에 컴포넌트(메시 버텍스·CV 등)를
   담을 수 있다**: 타겟의 월드 위치로 그 점을 옮긴다 (§컴포넌트 팔로워)
   · v01.34 는 Connect > Connect 하위 탭에 **`Match Same Name`**(이름이
   **완전히 같은 것만** 매칭)과 **`Show Match Only`**(기본 ON) 추가: 짝이 없는 자리를 **`(Null)`** 로 채워
@@ -210,11 +213,11 @@ Targets                       Number: 4212
 끝나면 함께 버려지므로 씬이 바뀌어도 낡은 값이 남지 않는다.
 
 ### Constrain
-기능별 **하위 탭 5개**로 나뉜다(v01.22).
+기능별 **하위 탭 6개**로 나뉜다(v01.22 에 5개, v01.36 에 `Update` 추가).
 
 ```
 [ Match ][ Constrain ][ Connect ][ Attribute ]
-          └─ [ Constraint ][ Skin Weight ][ Group Create ][ Transfer ][ Target Edit ]
+          └─ [ Constraint ][ Skin Weight ][ Group Create ][ Transfer ][ Target Edit ][ Update ]
 ```
 
 | 하위 탭 | 내용 |
@@ -224,6 +227,7 @@ Targets                       Number: 4212
 | **Group Create** | 오프셋(zero-out) 노드 삽입 (v01.12, 옵션 확장 v01.13) |
 | **Transfer** | Constraint Transfer — 기존 constraint 를 다른 오브젝트로 이관 (v01.14) |
 | **Target Edit** | 타깃(드라이버) **교체**(v01.20) / **추가 · 삭제**(v01.26) |
+| **Update** | 기존 constraint 의 **maintain offset 을 지금 포즈로 다시 굽기** (v01.36) |
 
 탭 라벨은 창 폭(기본 560)에 맞춰 줄였고 **전체 이름은 탭 툴팁**에 있다. 폭이 모자라면 라벨이
 말줄임(`ElideRight`)된다. **각 하위 탭은 따로 스크롤**되므로 창을 줄여도 위젯이 겹치지 않는다.
@@ -462,6 +466,62 @@ after :  con_01 : [tgt_A_01]                 con_02 : [tgt_A_03]               c
     point/scale/orient 는 공유 `.offset` 을 재계산해 driven 이 움직이지 않는다).
   - 보정 후 driven 의 월드 행렬을 **다시 읽어 검증**하고, 어긋나면 오차를 경고로 남긴다.
 - **UUID 기반** — 같은 이름의 오브젝트가 여럿이어도 안전하다.
+
+#### Update — 오프셋을 지금 포즈로 다시 굽기 (v01.36)
+Attribute Editor 에서 constraint 를 열면 **Update** 버튼이 있다. constraint 가 걸린 오브젝트를
+다른 자리로 옮긴 뒤 이 버튼을 누르면 offset 이 **지금 위치/회전 기준으로 다시 계산**되어, 옮긴
+자리 그대로 물린다. MEL 로는 이렇게 찍힌다.
+
+```mel
+parentConstraint -e -maintainOffset curve2  curve1_parentConstraint1;
+```
+
+AE 버튼은 **한 번에 constraint 하나씩**이다. 이 탭은 같은 일을 **리스트에 담은 constraint
+전부**에 돌린다.
+
+```
+Constraints                        ← constraint 노드, 또는 constraint 가 걸린 오브젝트
+[ curve1_parentConstraint1 ]         (오브젝트를 담으면 그 아래 constraint 로 자동 확장)
+[ curve3 ]
+[ jnt_L_arm ]
+
+[ Update Offset ]
+```
+
+- **고른 항목만** 대상으로 한다(아무것도 고르지 않으면 리스트 전체). Target Edit 과 같은 규칙이고
+  `[INFO] using n picked constraint(s) of m` 로 범위가 로그에 남는다.
+- 지원 타입: **parent / point / orient / scale / aim / pointOnPoly**.
+  `geometry` / `normal` / `tangent` / `poleVector` 는 애초에 `maintainOffset` 플래그가 없어
+  (Maya 2024 실측: `Invalid flag 'mo'`) 건너뛰고 경고한다.
+- 로그는 값이 실제로 바뀐 것(`updated`)과 그대로인 것(`no change`)을 구분한다. 아무도 움직이지
+  않은 constraint 를 같이 담아도 무해한 no-op 이므로, "일단 다 담고 돌리기" 가 안전하다.
+
+```
+       curve1_parentConstraint1 (parentConstraint) : updated  <- curve2
+       jnt_L_arm_parentConstraint1 (parentConstraint) : no change  <- ctl_L_arm
+       1 of 2 constraint(s) re-baked
+[OK] Update Offset
+```
+
+> **driven 을 어떻게 옮기나** — constraint 가 살아 있으면 driven 의 채널이 연결되어 있어 그냥은
+> 움직일 수 없다. 보통은 `blendParent1`(키가 있는 오브젝트에 constraint 를 걸면 Maya 가 만드는
+> pairBlend 어트리뷰트)을 **0 으로 두고 옮긴 뒤 Update → 다시 1 로** 되돌린다. 어떤 방법으로
+> 옮겼든 이 기능은 **현재 월드 행렬**을 읽어 offset 을 굽는다.
+
+##### 계산은 Maya 명령을 그대로 쓴다
+offset 공식을 다시 구현하지 않고 `cmds.<type>Constraint(*targets, cn, e=True, mo=True)` 를
+부른다 — AE 버튼과 결과가 어긋날 이유가 없어야 하기 때문이다. 대신 **명령에 넘길 타깃 목록**이
+까다로워서, Maya 2024 에서 실측으로 확인했다.
+
+- **타깃을 전부 넘겨야 한다.** 타깃 2개 중 하나만 넘기면 **넘긴 슬롯의 offset 만** 다시 구워지고
+  나머지는 옛 값 그대로 남는다 → weight 가 섞이는 순간 driven 이 튄다.
+- **타깃이 아닌 오브젝트를 넘기면 `-e` 인데도 타깃으로 추가된다.** 그래서 이름을 새로 만들지 않고
+  지금 연결된 target 슬롯에서 그대로 읽어 넘긴다.
+- `<type>Constraint -q -targetList` 는 **짧은 이름**이라 동명 노드가 있으면 어긋난다. Target Edit
+  과 같은 `_target_entries()`(target 슬롯의 입력 연결을 역추적한 **롱네임**)를 쓴다.
+- 타깃이 여럿이고 **weight 가 섞여 있어도 정확**하다 — driven 월드 행렬 오차 **4e-16**
+  (parent / point / orient / scale / aim / pointOnPoly 전부 실측).
+- 업데이트 뒤 driven 의 월드 행렬을 **다시 읽어 검증**하고, 어긋나면 경고를 남긴다.
 
 ### Filter — 이름으로 어트리뷰트 찾기 (v01.19)
 
@@ -941,6 +1001,7 @@ A00145_RigConnect/
     │   ├── skin_constraint_manager.py # Skin Weight to Constraint (스킨 웨이트 → weighted Parent/Scale/Point/Orient constraint)
     │   ├── group_create_manager.py # Group Create (부모/자식 쪽 오프셋 노드 _<suffix>_NN 삽입, 그룹·오브젝트 타입, UUID 기반)
     │   ├── constraint_transfer_manager.py # Constraint Transfer (constraint 를 다른 오브젝트로 이관: 삭제+동일세팅 재생성, MO 유지, UUID 기반)
+    │   ├── constraint_update_manager.py # Update (AE 의 Update 버튼 = <type>Constraint -e -mo 를 리스트 전체에, 타깃은 연결에서 역추적)
     │   ├── constraint_target_manager.py # Target Edit (타깃(드라이버) 교체 = target[i] 입력 연결만 rewire / 추가·삭제 = constraint 명령의 add·remove, offset 재계산, UUID 기반)
     │   ├── attr_match.py           # Match from Source (이름 유사 어트리뷰트 검색: 토큰 역색인 + IDF, maya 비의존 순수 파이썬)
     │   ├── connect_manager.py      # Connect    (MEL 포팅: attr 나열/검색/연결, 52 facial)
@@ -958,7 +1019,7 @@ A00145_RigConnect/
     └── ui/
         ├── collapsible.py          # CollapsibleBox
         ├── attr_spec_dialog.py     # Attribute > Create 의 어트리뷰트 정의 편집 창
-        └── main_window.py          # QTabWidget 최상위 4탭(Constrain 5 / Connect 3 / Attribute 3 하위 탭) + 공유 로그 + Help>About
+        └── main_window.py          # QTabWidget 최상위 4탭(Constrain 6 / Connect 3 / Attribute 3 하위 탭) + 공유 로그 + Help>About
 ```
 
 - 모든 textScrollList 는 `Framework.qt.JUN_mod_tsl_qt_v01` 위젯으로 대체.
