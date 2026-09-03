@@ -10,6 +10,7 @@ A00140_ConnectClosest 의 closest_connector 를 그대로 옮겨온 것이다.
 """
 
 from .maya_scene import MayaScene
+from .object_match import NULL_TARGET
 
 
 # constraint key -> (label, MayaScene 메서드명).
@@ -20,6 +21,12 @@ CONSTRAINT_TYPES = [
     ("orient", "Orient", "orient_constraint"),
     ("scale", "Scale", "scale_constraint"),
 ]
+
+# 짝짓는 방법.
+#   closest : 거리로 다시 계산한다 (원래 동작 — 리스트 순서를 보지 않는다).
+#   order   : 리스트에 보이는 자리 그대로 (Match by Name 결과, 손으로 Up/Down 한 순서).
+PAIRING_CLOSEST = "closest"
+PAIRING_ORDER = "order"
 
 
 def find_closest(driver, driven_pool):
@@ -121,13 +128,60 @@ def find_closest_for_drivers(drivers, candidates):
     return pairs, errors
 
 
-def connect_closest(drivers, drivens, constraint_keys, maintain_offset=True):
-    """driver 들을 가장 가까운 driven 과 1:1 매칭 후 constraint 로 연결.
+def pairs_by_order(drivers, drivens):
+    """**리스트에 보이는 자리 그대로** 짝짓는다 (`PAIRING_ORDER`).
+
+    거리로 다시 계산하지 않는다. Match by Name 으로 세운 짝이나 Up/Down 으로 손수
+    맞춘 순서를 그대로 연결하려면 이 방법이어야 한다 — 거리로 다시 짝지으면 애써 세운
+    순서가 조용히 뒤집힌다.
+
+    `(Null)` 자리는 짝이 없다는 표식이므로 **자리째** 건너뛴다. 한쪽만 빼면 뒤의 짝이
+    한 칸씩 밀려 엉뚱한 오브젝트끼리 연결된다.
+
+    Returns:
+        ([(driver, driven, dist), ...], errors) — dist 는 로그용(못 재면 0.0).
+    """
+    pairs = []
+    errors = []
+
+    paired = min(len(drivers), len(drivens))
+    if len(drivers) != len(drivens):
+        errors.append(
+            "Driver/Driven counts differ ({0} vs {1}); pairing the first "
+            "{2} row(s).".format(len(drivers), len(drivens), paired))
+
+    for i in range(paired):
+        driver, driven = drivers[i], drivens[i]
+
+        if driver == NULL_TARGET or driven == NULL_TARGET:
+            errors.append("Row {0}: no match ({1}), skipped.".format(
+                i + 1, NULL_TARGET))
+            continue
+        if not MayaScene.exists(driver):
+            errors.append("Driver not found in scene, skipped: {0}".format(driver))
+            continue
+        if not MayaScene.exists(driven):
+            errors.append("Driven not found in scene, skipped: {0}".format(driven))
+            continue
+
+        try:
+            dist = MayaScene.distance(driver, driven)
+        except Exception:
+            dist = 0.0
+        pairs.append((driver, driven, dist))
+
+    return pairs, errors
+
+
+def connect_closest(drivers, drivens, constraint_keys, maintain_offset=True,
+                    pairing=PAIRING_CLOSEST):
+    """driver 들을 driven 과 1:1 매칭 후 constraint 로 연결.
 
     Args:
         drivers: driver 오브젝트 이름 리스트.
         drivens: driven 오브젝트 이름 리스트 (1:1 매칭 — 한 번 쓰이면 풀에서 제외).
         constraint_keys: 적용할 constraint key 리스트 (예: ["parent", "scale"]).
+        pairing: `PAIRING_CLOSEST`(거리로 다시 계산) 또는 `PAIRING_ORDER`(리스트 자리).
         maintain_offset: constraint 의 maintain offset 옵션.
 
     Returns:
@@ -154,6 +208,14 @@ def connect_closest(drivers, drivens, constraint_keys, maintain_offset=True):
     if not constraint_keys:
         errors.append("No constraint type selected. Check at least one type.")
         return results, errors
+
+    # 리스트 자리로 짝짓는 모드는 **거르기 전에** 짝을 만든다 — 존재하지 않는 항목을
+    # 먼저 빼 버리면 그 자리가 사라져 뒤의 짝이 한 칸씩 밀린다.
+    if pairing == PAIRING_ORDER:
+        pairs, order_errors = pairs_by_order(drivers, drivens)
+        errors.extend(order_errors)
+        return _apply_constraints(pairs, type_map, constraint_keys,
+                                  maintain_offset, results, errors)
 
     # 씬에 존재하지 않는 오브젝트는 미리 걸러낸다.
     valid_drivers = []
@@ -188,6 +250,13 @@ def connect_closest(drivers, drivens, constraint_keys, maintain_offset=True):
             errors.append("No driven left for driver: {0}".format(driver))
 
     # 연결 -----------------------------------------------------------
+    return _apply_constraints(pairs, type_map, constraint_keys, maintain_offset,
+                              results, errors)
+
+
+def _apply_constraints(pairs, type_map, constraint_keys, maintain_offset,
+                       results, errors):
+    """짝 목록에 고른 constraint 를 건다. 두 짝짓기 모드가 공유하는 마지막 단계."""
     for driver, driven, dist in pairs:
 
         applied = []

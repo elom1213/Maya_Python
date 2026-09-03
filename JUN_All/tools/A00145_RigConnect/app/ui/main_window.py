@@ -10,7 +10,7 @@
 #   Match
 #   Constrain : Constraint / Skin Weight / Group Create / Transfer / Target Edit /
 #               Update
-#   Connect   : Connect / List Connected / Connect Closest
+#   Connect   : Connect / List Connected / Pair
 #   Attribute : Copy / Create / Delete
 #
 # 로직은 app/core 에 위임하고 이 모듈은 위젯 구성/시그널 연결/로그 출력만 담당한다.
@@ -39,12 +39,14 @@ from tools.A00145_RigConnect.app.core import constraint_transfer_manager as cxfe
 from tools.A00145_RigConnect.app.core import constraint_target_manager as ctgt_mgr
 from tools.A00145_RigConnect.app.core import constraint_update_manager as cupd_mgr
 from tools.A00145_RigConnect.app.core import attr_match
+from tools.A00145_RigConnect.app.core import object_match as obj_match
 from tools.A00145_RigConnect.app.core import snapshot_manager as snap_mgr
 from tools.A00145_RigConnect.app.core import attr_profile_prefs as aprefs
 from tools.A00145_RigConnect.app.core import attr_create_manager as acreate_mgr
 from tools.A00145_RigConnect.app.core import attr_delete_manager as adel_mgr
 from tools.A00145_RigConnect.app.core import (
-    CONSTRAINT_TYPES, connect_closest, find_closest_for_drivers)
+    CONSTRAINT_TYPES, PAIRING_CLOSEST, PAIRING_ORDER,
+    connect_closest, find_closest_for_drivers)
 from tools.A00145_RigConnect.app.ui.collapsible import CollapsibleBox
 from tools.A00145_RigConnect.app.ui.attr_spec_dialog import AttrSpecDialog
 
@@ -831,7 +833,7 @@ class MainWindow(QWidget):
         return page
 
     # --------------------------------------------------------------
-    # Tab : Connect  (하위 탭 : Connect / List Connected / Connect Closest)
+    # Tab : Connect  (하위 탭 : Connect / List Connected / Pair)
     # --------------------------------------------------------------
 
     # Connect 페이지의 두 패널 역할 -> 화면에 쓰는 이름. 연결 방향 로그/라벨에 쓴다.
@@ -844,14 +846,15 @@ class MainWindow(QWidget):
          "_build_connect_page"),
         ("List Connected", "Explore the nodes up / down stream of the listed "
          "objects, by node type", "_build_list_connected_page"),
-        ("Connect Closest", "Constrain each driver to its nearest object (1:1)",
+        ("Pair", "Pair Driver <-> Driven by name or by proximity, then "
+         "constrain the pairs (was 'Connect Closest')",
          "_build_connect_closest_page"),
     )
 
     def _build_connect_tab(self):
         """Connect 탭 — 어트리뷰트/노드 연결 기능을 하나로 묶은 **중첩 탭**.
 
-        Connect / List Connected / Connect Closest 는 모두 "연결" 작업이라 최상위에
+        Connect / List Connected / Pair 는 모두 "연결" 작업이라 최상위에
         따로 있을 이유가 없었다. Constrain 탭과 같은 방식으로 하위 탭에 모은다.
         """
         self.connect_tabs = self._build_sub_tabs(self.CONNECT_PAGES)
@@ -1450,10 +1453,16 @@ class MainWindow(QWidget):
         return tab
 
     # --------------------------------------------------------------
-    # Connect > Connect Closest  (A00140 ConnectClosest 이식)
+    # Connect > Pair  (A00140 ConnectClosest 이식 + 이름 매칭)
     # --------------------------------------------------------------
 
     def _build_connect_closest_page(self):
+        """Driver <-> Driven 짝짓기 + constraint (Connect 하위 탭 'Pair').
+
+        짝을 세우는 방법이 둘이다 — **거리**(Get Closest, A00140 이식)와 **이름**
+        (Match by Name, v01.37). 어느 쪽이든 결과는 Driven 리스트가 Driver 순서에
+        맞춰 서는 것이고, 짝이 없는 자리는 `(Null)` 이 지킨다.
+        """
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
@@ -1468,9 +1477,14 @@ class MainWindow(QWidget):
         # 각 Driver 에 가장 가까운 오브젝트를 찾아 Driven 을 driver 순서대로 채운다.
         # 후보 풀: Driven 에 항목이 있으면 그걸, 없으면 현재 씬 선택.
         self.cc_driver.add_button("Get Closest", self.on_get_closest)
+        # 같은 자리에 '이름으로' 찾는 버튼도 둔다 (후보 풀 규칙도 동일).
+        self.cc_driver.add_button("Match by Name", self.on_match_by_name)
         set_layout.addWidget(self.cc_driven)
         set_layout.addWidget(self.cc_driver)
         layout.addWidget(set_box)
+
+        layout.addWidget(self._build_object_match_box())
+        layout.addWidget(self._build_pairing_box())
 
         opt_box = QGroupBox("Constraint Type")
         opt_layout = QVBoxLayout(opt_box)
@@ -1489,11 +1503,112 @@ class MainWindow(QWidget):
 
         btn = QPushButton("Connect")
         btn.setMinimumHeight(32)
+        btn.setToolTip(
+            "Constrain each Driven object to its Driver.\n"
+            "Which object goes with which is decided by the Pairing option above.")
         btn.clicked.connect(self.on_connect_closest)
         layout.addWidget(btn)
 
         layout.addStretch(1)
         return tab
+
+    def _build_object_match_box(self):
+        """'Match by Name' 옵션 상자 (Connect 하위 탭 'Pair').
+
+        Connect > Connect 의 어트리뷰트 매칭 옵션과 **같은 이름·같은 뜻**으로 둔다
+        (`Unique` / `Min`). 오브젝트에만 있는 것은 `Ignore Namespace` 하나다.
+        """
+        box = QGroupBox("Match by Name")
+        rows = QVBoxLayout(box)
+
+        row = QHBoxLayout()
+
+        self.cb_om_exact = QCheckBox("Same Name Only")
+        self.cb_om_exact.setChecked(False)
+        self.cb_om_exact.setToolTip(
+            "On  : pair only objects whose names are EXACTLY the same "
+            "(case sensitive, 'Min' is ignored).\n"
+            "      Use it when both sides already share a naming convention, "
+            "where a loose match\n"
+            "      would be worse than no match.\n"
+            "Off : pair by name similarity - names are compared by tokens "
+            "(ctrl_L_arm == ctrlLArm),\n"
+            "      so a prefix both sides carry is ignored automatically.")
+        row.addWidget(self.cb_om_exact)
+
+        self.cb_om_unique = QCheckBox("Unique")
+        self.cb_om_unique.setChecked(True)
+        self.cb_om_unique.setToolTip(
+            "On  : one Driven object is never used twice.\n"
+            "Off : two Drivers may match the same Driven object.")
+        row.addWidget(self.cb_om_unique)
+
+        self.cb_om_namespace = QCheckBox("Ignore Namespace")
+        self.cb_om_namespace.setChecked(True)
+        self.cb_om_namespace.setToolTip(
+            "On  : compare 'rig:jnt_L_arm' as 'jnt_L_arm' - the usual case when "
+            "one side is referenced.\n"
+            "Off : the namespace is part of the name, so 'rig:jnt_L_arm' and "
+            "'jnt_L_arm' score lower.\n"
+            "The DAG path (|grp|...) is always dropped before comparing; the "
+            "full path is still what gets connected.")
+        row.addWidget(self.cb_om_namespace)
+
+        row.addStretch(1)
+
+        row.addWidget(QLabel("Min"))
+        self.sb_om_min = QDoubleSpinBox()
+        self.sb_om_min.setRange(0.0, 1.0)
+        self.sb_om_min.setSingleStep(0.05)
+        self.sb_om_min.setDecimals(2)
+        self.sb_om_min.setValue(obj_match.DEFAULT_MIN_SCORE)
+        self.sb_om_min.setKeyboardTracking(False)
+        self.sb_om_min.setMaximumWidth(70)
+        self.sb_om_min.setToolTip(
+            "How much of the Driver name must be explained by the match (0-1).\n"
+            "1.00 = every distinctive word of the Driver name appears in the "
+            "Driven name.\n"
+            "Raise it to reject loose matches, lower it to force a best guess.\n"
+            "'Same Name Only' ignores this.")
+        row.addWidget(self.sb_om_min)
+
+        rows.addLayout(row)
+        return box
+
+    def _build_pairing_box(self):
+        """Connect 가 무엇을 짝으로 볼지 (Connect 하위 탭 'Pair').
+
+        예전에는 Connect 가 **언제나 거리로 다시 계산**했다. 그러면 Match by Name 으로
+        세운 짝이나 Up/Down 으로 맞춘 순서가 연결 순간에 조용히 뒤집힌다. 그래서
+        짝짓는 방법을 눈에 보이게 꺼냈다.
+        """
+        box = QGroupBox("Pairing")
+        row = QHBoxLayout(box)
+
+        self.rb_cc_group = QButtonGroup(self)
+
+        self.rb_cc_closest = QRadioButton("Closest distance")
+        self.rb_cc_closest.setChecked(True)
+        self.rb_cc_group.addButton(self.rb_cc_closest)
+        self.rb_cc_closest.setToolTip(
+            "Ignore the row order: for each Driver, find the nearest Driven "
+            "object again (greedy 1:1).\n"
+            "This is what the tab has always done.")
+        row.addWidget(self.rb_cc_closest)
+
+        self.rb_cc_order = QRadioButton("List order")
+        self.rb_cc_group.addButton(self.rb_cc_order)
+        self.rb_cc_order.setToolTip(
+            "Pair row by row, exactly as the two lists read (Driver row 1 with "
+            "Driven row 1, ...).\n"
+            "Use it after 'Match by Name', or after ordering the lists by hand "
+            "with Up / Down.\n"
+            "'{0}' rows are skipped as a pair, so the rest stay lined "
+            "up.".format(obj_match.NULL_TARGET))
+        row.addWidget(self.rb_cc_order)
+
+        row.addStretch(1)
+        return box
 
     # ==============================================================
     # UI helpers
@@ -1537,8 +1652,10 @@ class MainWindow(QWidget):
             "                             + Match from Source (find look-alike\n"
             "                             destination attributes, in order)\n"
             "              List Conn.   : explore up/down stream nodes by type\n"
-            "              Conn. Closest: 1:1 closest matching constraints\n"
-            "                             + Get Closest\n"
+            "              Pair         : pair Driver <-> Driven 1:1, then\n"
+            "                             constrain - Get Closest (distance)\n"
+            "                             or Match by Name (similar / same\n"
+            "                             name, unmatched rows kept as (Null))\n"
             "Attribute   : Copy   : copy attributes off one source object,\n"
             "                       same name or with a Prefix / Suffix\n"
             "              Create : create attributes from a saved profile\n"
@@ -2797,7 +2914,7 @@ class MainWindow(QWidget):
             cmds.warning(str(e))
 
     # ==============================================================
-    # Handlers : Connect Closest
+    # Handlers : Pair (Get Closest / Match by Name / Connect)
     # ==============================================================
 
     def on_get_closest(self):
@@ -2814,19 +2931,12 @@ class MainWindow(QWidget):
             self.log("[WARN] Driver list is empty. Add objects to the Driver list.")
             return
 
-        candidates = self.cc_driven.get_all_items()
-        source = "Driven list"
-        if not candidates:
-            candidates = cmds.ls(sl=True, fl=True) or []
-            source = "current selection"
-        if not candidates:
-            self.log("[WARN] No candidates. Fill the Driven list or "
-                     "select objects in the scene.")
+        pool, note = self._cc_candidate_pool(drivers, "Get Closest")
+        if pool is None:
             return
-        self.log("Candidate pool: {0} ({1} object(s))".format(
-            source, len(candidates)))
+        self.log(note)
 
-        pairs, errors = find_closest_for_drivers(drivers, candidates)
+        pairs, errors = find_closest_for_drivers(drivers, pool)
 
         for err in errors:
             self.log("[WARN] {0}".format(err))
@@ -2851,16 +2961,108 @@ class MainWindow(QWidget):
         self.log("Done. {0} closest object(s) listed in Driven.".format(
             len(pairs)))
 
+    def _cc_candidate_pool(self, drivers, label):
+        """Driver 와 짝지을 후보 풀. (pool, 로그 문자열) — 없으면 (None, None).
+
+        Get Closest 와 Match by Name 이 **같은 규칙**을 쓴다: Driven 리스트에 항목이
+        있으면 그것을, 없으면 현재 씬 선택을 후보로 본다. driver 자신은 뺀다 —
+        거리로는 자기 자신이 언제나 최단이고, 이름으로는 자기 이름이 언제나 만점이다.
+        """
+        candidates = self.cc_driven.get_all_items()
+        source = "Driven list"
+        if not candidates:
+            candidates = cmds.ls(sl=True, fl=True) or []
+            source = "current selection"
+        if not candidates:
+            self.log("[WARN] No candidates. Fill the Driven list or "
+                     "select objects in the scene.")
+            return None, None
+
+        driver_set = set(drivers)
+        pool = [c for c in candidates if c not in driver_set]
+        dropped = len(candidates) - len(pool)
+
+        if not pool:
+            self.log("[WARN] {0} : every candidate is also a Driver.".format(label))
+            return None, None
+
+        note = "Candidate pool: {0} ({1} object(s))".format(source, len(pool))
+        if dropped:
+            note += " - {0} driver(s) excluded".format(dropped)
+        return pool, note
+
+    def on_match_by_name(self):
+        """Driver 이름과 가장 비슷한 오브젝트를 찾아 Driven 을 driver 순서로 세운다.
+
+        Get Closest 의 이름 버전이다 — 거리 대신 이름으로 짝을 찾고, 짝을 못 찾은
+        자리는 `(Null)` 이 지킨다(그래야 뒤의 짝이 밀리지 않는다). 세운 순서를 그대로
+        연결해야 하므로 Pairing 을 **List order** 로 돌려 놓는다.
+        """
+        drivers = self.cc_driver.get_all_items()
+        self.log("--- Match by Name ---")
+
+        if not drivers:
+            self.log("[WARN] Driver list is empty. Add objects to the Driver list.")
+            return
+
+        pool, note = self._cc_candidate_pool(drivers, "Match by Name")
+        if pool is None:
+            return
+        self.log(note)
+
+        exact = self.cb_om_exact.isChecked()
+        rows = obj_match.match_objects(
+            drivers, pool,
+            exact=exact,
+            unique=self.cb_om_unique.isChecked(),
+            min_score=self.sb_om_min.value(),
+            ignore_namespace=self.cb_om_namespace.isChecked())
+
+        aligned = obj_match.aligned_targets(rows)
+        self.cc_driven.set_items(aligned)
+
+        matched = 0
+        for row in rows:
+            if row["target"]:
+                matched += 1
+                self.log("Match: {0} -> {1} ({2:.2f}){3}".format(
+                    row["source"], row["target"], row["score"],
+                    "  [ambiguous]" if row["ambiguous"] else ""))
+            else:
+                best = ""
+                if row["best"]:
+                    best = "  (best: {0} {1:.2f})".format(row["best"], row["score"])
+                self.log("Match: {0} -> {1}{2}".format(
+                    row["source"], obj_match.NULL_TARGET, best))
+
+        # 세운 순서대로 연결해야 뜻이 있다. 거리로 다시 짝지으면 이 정렬이 무의미해진다.
+        self.rb_cc_order.setChecked(True)
+
+        self.log("{0} of {1} driver(s) matched by {2} name. Pairing set to "
+                 "'List order'.".format(
+                     matched, len(rows), "exact" if exact else "similar"))
+
+        # 발견 검증용: 찾은 오브젝트를 뷰포트에서 선택 ((Null) 은 노드가 아니다).
+        found = [row["target"] for row in rows if row["target"]]
+        if found:
+            try:
+                cmds.select(found, replace=True)
+            except Exception as e:
+                self.log("[WARN] could not select the matches: {0}".format(e))
+
     def on_connect_closest(self):
         drivers = self.cc_driver.get_all_items()
         drivens = self.cc_driven.get_all_items()
         keys = [key for key, cb in self.cc_checkboxes.items() if cb.isChecked()]
         maintain_offset = self.cc_maintain.isChecked()
+        order_mode = self.rb_cc_order.isChecked()
 
-        self.log("--- Connect Closest ---")
+        self.log("--- Connect ({0}) ---".format(
+            "list order" if order_mode else "closest distance"))
 
         results, errors = connect_closest(
-            drivers, drivens, keys, maintain_offset)
+            drivers, drivens, keys, maintain_offset,
+            pairing=PAIRING_ORDER if order_mode else PAIRING_CLOSEST)
 
         for err in errors:
             self.log("[WARN] {0}".format(err))

@@ -4,9 +4,12 @@
 from .maya_scene import MayaScene
 from .closest_connector import (
     CONSTRAINT_TYPES,
+    PAIRING_CLOSEST,
+    PAIRING_ORDER,
     find_closest,
     match_closest_pairs,
     find_closest_for_drivers,
+    pairs_by_order,
     connect_closest,
 )
 from . import match_manager
@@ -19,3 +22,4 @@ from . import group_create_manager
 from . import constraint_transfer_manager
 from . import constraint_target_manager
 from . import attr_match
+from . import object_match

@@ -4,7 +4,11 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.36` (`app/config/version.py`) — Constrain 탭에 **`Update` 하위 탭** 추가:
+- 버전: `v01.37` (`app/config/version.py`) — Connect > `Connect Closest` 하위 탭이
+  **`Pair`** 로 바뀌면서 **`Match by Name`** 추가: Driver 와 **이름이 비슷한/같은** Driven 을
+  찾아 driver 순서로 세우고, 짝이 없는 자리는 **`(Null)`** 로 채운다. 짝짓는 방법을 고르는
+  **`Pairing`**(거리 / 리스트 자리) 도 함께 (§Pair)
+  · v01.36 은 Constrain 탭에 **`Update` 하위 탭** 추가:
   Attribute Editor 의 constraint **Update 버튼**(= `parentConstraint -e -maintainOffset ...`)을
   **리스트에 담은 constraint 전부에 한 번에** 돌린다 (§Update)
   · v01.35 는 Match 탭의 **Followers 에 컴포넌트(메시 버텍스·CV 등)를
@@ -564,14 +568,14 @@ Filter [ inner              ] [Clear]   [Select All]
 
 ```
 [ Match ][ Constrain ][ Connect ][ Attribute ]
-                       └─ [ Connect ][ List Connected ][ Connect Closest ]
+                       └─ [ Connect ][ List Connected ][ Pair ]
 ```
 
 | 하위 탭 | 내용 |
 |---------|------|
 | **Connect** | 어트리뷰트 **양방향** 연결(Source ↔ Destination) (+ Match from Source / Match Same Name, 52 facial) |
 | **List Connected** | 오브젝트의 up/down stream 노드를 타입별로 탐색 |
-| **Connect Closest** | 각 driver 에 가장 가까운 오브젝트를 1:1 로 constraint (A00140 이식) |
+| **Pair** | Driver ↔ Driven 을 **거리** 또는 **이름**으로 1:1 짝짓고 constraint (A00140 이식 + v01.37 이름 매칭) |
 
 Constrain 탭과 같은 방식이다(§Constrain 참고) — 짧은 라벨 + 툴팁, `ElideRight`, **하위 탭별 스크롤**.
 
@@ -966,18 +970,74 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
 - `Types` 에서 타입 선택 후 `Search`: 해당 타입의 **노드들**을 `Nodes` 에 표시.
 - `Nodes` 목록에서 항목을 선택하면 씬에서도 선택된다.
 
-#### Connect Closest
-각 driver 에 대해 가장 가까운 driven 을 1:1 매칭해 constraint 로 연결한다(A00140 이식).
+#### Pair — Driver ↔ Driven 짝짓기 (v01.37 이름 매칭, 예전 이름 `Connect Closest`)
+두 리스트를 **1:1 로 짝짓고** 그 짝을 constraint 로 연결한다. 짝을 세우는 방법이 둘이다 —
+**거리**(`Get Closest`, A00140 이식)와 **이름**(`Match by Name`, v01.37).
+
+```
+Driven                       Driver
+[ rig:jnt_L_arm  ]           [ ctrl_L_arm  ]   [ Get Closest ][ Match by Name ]
+[ rig:jnt_L_hand ]           [ ctrl_L_hand ]
+[ (Null)         ]           [ ctrl_R_foot ]   <- 짝을 못 찾은 자리
+
+Match by Name : [ ] Same Name Only  [x] Unique  [x] Ignore Namespace   Min [0.40]
+Pairing       : ( ) Closest distance   (o) List order
+```
 
 - `Driven` / `Driver` 리스트 구성.
 - constraint 종류 체크박스(`Parent` / `Point` / `Orient` / `Scale`, 다중) + `Maintain Offset`.
-- `Connect`: 월드 좌표 유클리드 거리 기준 최근접 매칭. 각 driven 은 한 번만 사용.
+- `Connect`: 짝을 지어 constraint 를 건다. **무엇을 짝으로 볼지는 `Pairing` 이 정한다**(아래).
 - **`Get Closest`(v01.08, Driver 리스트 버튼 행)**: 각 driver 에 가장 가까운 오브젝트를 찾아
   `Driven` 을 **driver 순서대로** 채운다. "어떤 오브젝트가 각 driver 와 가장 가까운지" 발견용.
   - **후보 풀**: `Driven` 에 항목이 있으면 그걸 풀로, 비어 있으면 **현재 씬 선택**을 풀로 사용.
   - driver 자신은 풀에서 자동 제외(거리 0 회피). 매칭은 **greedy 1:1**(쓰인 후보는 제거)로
     `Connect` 와 동일한 로직 → 채워진 `Driven` 은 곧 `Connect` 가 연결할 페어의 **미리보기**.
   - 찾은 오브젝트는 로그(`driver -> closest (dist)`)에 남고 **뷰포트에서도 선택**돼 눈으로 확인 가능.
+##### Match by Name — 이름으로 짝 세우기 (v01.37)
+`Get Closest` 의 **이름 버전**이다. 거리 대신 이름으로 짝을 찾아 `Driven` 을 **driver 순서대로**
+세운다. 버튼은 `Get Closest` 옆(Driver 리스트 버튼 행)에 있고 **후보 풀 규칙도 같다** —
+`Driven` 에 항목이 있으면 그걸, 비어 있으면 현재 씬 선택을 후보로 쓰고, driver 자신은 뺀다
+(자기 이름과 가장 비슷한 것은 언제나 자기 자신이다).
+
+점수 계산은 Connect 탭의 **어트리뷰트 매칭과 같은 엔진**이다(토큰 역색인 + IDF,
+§Match from Source). 그래서 `ctrl_L_arm` ↔ `jnt_L_arm` 이 이어지고, 양쪽에 다 붙은 접두어는
+IDF 가 알아서 0 으로 만든다.
+
+| 옵션 | 기본 | 뜻 |
+|------|------|-----|
+| `Same Name Only` | OFF | 이름이 **완전히 같은 것만** 짝짓는다(대소문자 구분, `Min` 무시). |
+| `Unique` | ON | Driven 하나가 두 번 쓰이지 않는다. |
+| `Ignore Namespace` | ON | `rig:jnt_L_arm` 을 `jnt_L_arm` 으로 본다(한쪽이 레퍼런스일 때). |
+| `Min` | 0.40 | driver 이름이 얼마나 설명되어야 짝으로 인정하는가(0~1). |
+
+- **경로는 비교 전에 떼고, 연결은 전체 경로로 한다.** `|grp|rig:jnt_L_arm` 을 통째로
+  토큰화하면 `grp` · `rig` 가 토큰으로 섞여, 한쪽 리스트에만 경로가 붙어 있으면 **같은
+  오브젝트인데 문턱을 못 넘는다.** 그래서 비교는 말단 이름으로 하되, **돌려주는 것은 언제나
+  원래 이름**이다 — 말단 이름만 돌려주면 동명 노드가 있는 씬에서 엉뚱한 노드를 잡는다.
+- **짝을 못 찾은 자리는 `(Null)`** 이 지킨다. 연결은 `driver[i] ↔ driven[i]` 를 **순서로**
+  짝짓기 때문에, 그냥 비우면 뒤가 통째로 한 칸 밀려 **엉뚱한 오브젝트끼리 조용히 연결된다.**
+  Connect 는 그 자리를 **짝째** 건너뛴다.
+- 로그는 점수와, 못 찾은 자리의 **최선 후보**를 함께 적는다(`Min` 만 낮추면 되는지 보려고).
+  1등과 점수가 같은 후보가 또 있었으면 `[ambiguous]` 를 붙인다.
+- 찾은 오브젝트는 **뷰포트에서도 선택**된다(`Get Closest` 와 같은 확인 방식).
+
+##### Pairing — Connect 가 무엇을 짝으로 보는가 (v01.37)
+예전에는 `Connect` 가 **언제나 거리로 다시 계산**했다. 그러면 `Match by Name` 으로 세운 짝이나
+`Up`/`Down` 으로 맞춰 둔 순서가 **연결 순간 조용히 뒤집힌다.** 그래서 짝짓는 방법을 눈에
+보이게 꺼냈다.
+
+| 값 | 뜻 |
+|-----|-----|
+| `Closest distance` (기본) | 리스트 순서를 무시하고 각 driver 의 최근접 driven 을 다시 찾는다(기존 동작). |
+| `List order` | 리스트에 보이는 자리 그대로 짝짓는다. `(Null)` 자리는 짝째 건너뛴다. |
+
+`Match by Name` 을 누르면 **자동으로 `List order` 로 바뀐다** — 애써 세운 짝을 거리로 다시
+짝지으면 뜻이 없기 때문이다. 로그 첫 줄이 어느 방법으로 연결했는지 밝힌다
+(`--- Connect (list order) ---`).
+
+> **`List order` 는 거르기 전에 짝을 만든다.** 씬에 없는 항목을 먼저 빼 버리면 그 자리가
+> 사라져 뒤의 짝이 한 칸씩 밀린다. 없는 항목은 **그 줄만** 경고하고 넘어간다.
+
 - **cluster handle 위치 처리(v01.15)**: 거리 계산에 쓰는 월드 좌표는 기본적으로 transform 의 월드
   translate 지만, **`clusterHandle` 은 translate 가 `(0,0,0)` 인 채로 실제 중심이 shape 의 `origin`**
   (아이콘이 그려지고 rotate pivot 이 놓이는 지점)에 있다. 그래서 클러스터는 `origin` 을 월드로 변환해
@@ -1011,8 +1071,9 @@ A00145_RigConnect/
     │   ├── attr_delete_manager.py  # Attribute > Delete (지울 수 있는 어트리뷰트 나열 + deleteAttr, 잠김 보고)
     │   ├── blendshape_utils.py     # blendShape 타겟(weight 별칭) 조회 — Attribute / Connect 탭 공용
     │   ├── stream_manager.py       # List Connected (MEL 포팅: hyperShade up/down)
-    │   ├── maya_scene.py           # Connect Closest (A00140 복사)
-    │   └── closest_connector.py    # Connect Closest (A00140 복사)
+    │   ├── maya_scene.py           # Pair (A00140 복사)
+    │   ├── closest_connector.py    # Pair (A00140 복사 + 짝짓기 모드: 거리 / 리스트 자리)
+    │   └── object_match.py         # Pair > Match by Name (이름으로 오브젝트 짝짓기 — attr_match 엔진 재사용, 비교는 말단 이름·반환은 전체 경로)
     ├── data/                        # 사용자 데이터 (git 제외)
     │   ├── attr_profiles/<이름>.json   # Attribute > Create 프로파일
     │   └── attr_profiles_active.json   # 마지막으로 쓰던 프로파일
