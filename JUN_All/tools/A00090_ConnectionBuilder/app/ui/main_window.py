@@ -137,7 +137,12 @@ class MainWindow(QWidget):
         self.cb_version = QComboBox()
         self.cb_version.setToolTip(
             "Rule set version folder (app/rules/<version>).\n"
-            "Add a new folder (v002, v003 ...) with edited json files and pick it here."
+            "Add a new folder (v002, v003 ...) and pick it here.\n"
+            "\n"
+            "A folder may hold either shape of json, or both:\n"
+            "  - one file per solver (WRK_calf_l.json ...)\n"
+            "  - a single Pose Wrangler export (rules_v003.json), split into\n"
+            "    one rule per solver automatically."
         )
         self.cb_version.setFixedWidth(90)
 
@@ -151,7 +156,9 @@ class MainWindow(QWidget):
 
         self.btn_refresh_rules = QPushButton("Refresh")
         self.btn_refresh_rules.setToolTip(
-            "Rescan app/rules for version folders and json files."
+            "Rescan app/rules for version folders and json files.\n"
+            "Edited files are picked up on their own; use this after adding or\n"
+            "removing a folder."
         )
         self.btn_refresh_rules.setFixedWidth(self.btn_width_01)
 
@@ -383,10 +390,12 @@ class MainWindow(QWidget):
 
         version = self.current_version()
 
-        for rule_name in RuleLoader.find_all_json(version):
-            for src, tgt in pairs:
-                rule = self.get_rule(rule_name, solver_node=src, driver_node=tgt)
-                self.connection_manager.connect(rule, is_solver)
+        # 규칙 x 짝 전부가 한 번의 Ctrl+Z 로 되돌아가야 한다.
+        with undo_chunk():
+            for rule_name in RuleLoader.find_all_json(version):
+                for src, tgt in pairs:
+                    rule = self.get_rule(rule_name, solver_node=src, driver_node=tgt)
+                    self.connection_manager.connect(rule, is_solver)
 
         self.log(f"Connect All Finished ({version})")
 
@@ -403,9 +412,10 @@ class MainWindow(QWidget):
 
         is_solver = self.cb_is_solver.isChecked()
 
-        for src, tgt in pairs:
-            rule = self.get_rule(solver_node=src, driver_node=tgt)
-            self.connection_manager.connect(rule, is_solver)
+        with undo_chunk():
+            for src, tgt in pairs:
+                rule = self.get_rule(solver_node=src, driver_node=tgt)
+                self.connection_manager.connect(rule, is_solver)
 
         self.log("Connect Finished")
 
@@ -425,7 +435,10 @@ class MainWindow(QWidget):
             for name in rule_names
         ]
 
-        connected, skipped = IntermediateManager.connect(rules)
+        # 노드 생성 + 어트리뷰트 추가 + 연결이 한 덩어리다. 묶지 않으면 Ctrl+Z 가
+        # 연결을 하나씩 끊다가 마지막에야 노드를 지운다(사용자 보고).
+        with undo_chunk():
+            connected, skipped = IntermediateManager.connect(rules)
 
         self.log(
             f"Connect Intermediate Finished ({version}) : "
@@ -447,9 +460,10 @@ class MainWindow(QWidget):
         if not pairs:
             return
 
-        for src, tgt in pairs:
-            rule = self.get_rule(solver_node=src, driver_node=tgt)
-            self.connection_manager.disconnect(rule)
+        with undo_chunk():
+            for src, tgt in pairs:
+                rule = self.get_rule(solver_node=src, driver_node=tgt)
+                self.connection_manager.disconnect(rule)
 
         self.log("Disconnect Finished")
 
@@ -487,21 +501,23 @@ class MainWindow(QWidget):
         """리스트 위젯의 모든 노드에 선택 rule mapping attr 생성."""
         rule = self.get_rule()
 
-        for node in tsl.get_all_items():
-            try:
-                AttributeManager.create(rule, node)
-            except Exception as e:
-                self.log(f"[Set Attr] {node} : {e}")
+        with undo_chunk():
+            for node in tsl.get_all_items():
+                try:
+                    AttributeManager.create(rule, node)
+                except Exception as e:
+                    self.log(f"[Set Attr] {node} : {e}")
 
     def delete_attributes_for(self, tsl):
         """리스트 위젯의 모든 노드에서 선택 rule mapping attr 삭제."""
         rule = self.get_rule()
 
-        for node in tsl.get_all_items():
-            try:
-                AttributeManager.delete(rule, node)
-            except Exception as e:
-                self.log(f"[Del Attr] {node} : {e}")
+        with undo_chunk():
+            for node in tsl.get_all_items():
+                try:
+                    AttributeManager.delete(rule, node)
+                except Exception as e:
+                    self.log(f"[Del Attr] {node} : {e}")
 
 
     def _nodes_from_field(self):

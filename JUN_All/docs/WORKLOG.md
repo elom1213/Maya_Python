@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # 작업 일지 (WORKLOG)
@@ -29,7 +29,49 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-09-03 (오늘)
+## 2026-09-04 (오늘)
+
+> [!summary] `A00090_ConnectionBuilder` **Pose Wrangler export 를 규칙으로 그대로** + 모든 버튼 undo 1스텝 (v01.06 -> 01.07)
+- **요청 1**: `app/rules/v003/rules_v003.json` 은 마야 **Pose Wrangler 에서 솔버 세팅을 그대로
+  export 한 파일**이다. 지금은 포즈를 고칠 때마다 `WRK_calf_l.json`, `WRK_calf_r.json` … 을
+  **솔버 수만큼 손으로 다시 써야** 한다. 이 export 파일을 규칙으로 바로 읽어 v002 와 똑같이
+  동작하게 할 것. 그리고 앞으로 v004, v005 에도 파일을 하나씩 둘 계획이니 **파일 이름 규칙을
+  정해 달라**.
+- **파일 이름은 `rules_<폴더이름>.json` 으로 정했다**(`v004/rules_v004.json`). 파일만 떼어 놔도
+  어느 버전에서 나온 것인지 읽힌다. **다만 코드는 이 이름에 기대지 않는다** — 최상위에 `solvers`
+  키가 있으면 번들로 읽으므로 Pose Wrangler 가 지어 준 이름 그대로 떨어뜨려도 되고, 한 폴더에
+  두 방식(솔버당 파일 / 번들)을 **섞어 둬도 된다.** 이름 규칙은 나중에 폴더를 열어 본 사람을 위한
+  것이지 동작 조건이 아니다.
+- **★ 그대로 쓸 수 없는 이름이 딱 하나 있었다.** Pose Wrangler 는 중립 포즈를 **언제나 그냥
+  `default`** 로 부른다. 그대로 mapping 에 넣으면 솔버 8개가 전부 `WRK_intermediate.default`
+  라는 **같은 어트리뷰트 하나로 몰려 서로를 덮어쓴다.** 손글씨 규칙은 이 자리를
+  `calf_l_default` 로 적고 있었고, 번들의 `drivers[0]` 이 정확히 `calf_l` 이라
+  **`<driver>_default`** 로 되살렸다. 나머지 포즈는 사용자가 이미 드라이버 이름을 붙여 짓기
+  때문에 손대지 않는다.
+- **동치를 눈으로 확인하고 나서 붙였다** — v003 번들의 솔버 8개를 v002 손글씨 mapping 과 한 줄씩
+  대조해 **mapping · solver_node 전부 일치**. 포즈 순서(=`outputs[i]` 순서)도 json 이 순서를
+  보존하므로 그대로 맞는다.
+- **규칙 이름은 솔버 이름에서 `_UERBFSolver` 를 뗀 것**으로 했다(`WRK_calf_l`). v002 의 파일
+  이름과 같아서 **버전을 바꿔도 `Rule` 콤보 목록이 그대로다.**
+- **파일을 고치면 `Refresh` 없이 반영된다** — 색인이 폴더 안 json 의 (이름 · 수정 시각 · 크기)를
+  기억해 두고 달라지면 다시 읽는다. Pose Wrangler 에서 다시 export 해 덮어써도 그만이다.
+- **요청 2**: `Connect Intermediate` 로 노드를 만든 뒤 `Ctrl+Z` 를 누르면 노드가 생기기 전으로
+  돌아가지 않고 **어트리뷰트가 하나씩 끊어지다가 마지막에야 노드가 사라진다.** `undo_chunk()` 로
+  안 묶인 곳을 묶을 것.
+- **씬을 바꾸는 버튼 6개를 묶었다** — `Connect` / `Connect All` / `Disconnect` / `Set Attr` /
+  `Del Attr` / `Connect Intermediate`. `Create` 계열은 v01.04 때 이미 묶여 있었고, `Validate` 는
+  읽기만 해서 뺐다.
+- **검증**(mayapy 2024 headless, Qt 창 실제 빌드): 49항목 통과 — 로더 30(두 포맷 동치 · 규칙 이름 ·
+  `default` 이름 충돌 · 섞인 폴더 · 깨진 json 무시 · mtime 재읽기) + UI 19(`Connect Intermediate`
+  뒤 **undo 한 번**으로 `WRK_All`/`WRK_intermediate` 까지 사라지는 것, Set/Del Attr · Connect/
+  Disconnect 각각 한 번, 46개 attr 이름이 겹치지 않는 것).
+- 파일: `app/core/rule_loader.py`, `app/ui/main_window.py`, `app/config/version.py`,
+  [`docs/A00090_ConnectionBuilder.md`](A00090_ConnectionBuilder.md)(§1-2 · §4-2)
+    #A00090 #ConnectionBuilder #poseWrangler #undo
+
+---
+
+## 2026-09-03
 
 > [!summary] `A00145_RigConnect` **Connect > Pair — 오브젝트를 이름으로 짝짓기** (v01.36 -> 01.37)
 - **요청**: Connect > Connect 하위 탭의 어트리뷰트 이름 매칭을 **오브젝트에도** 달라. Driver /
