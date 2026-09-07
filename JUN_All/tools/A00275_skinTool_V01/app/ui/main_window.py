@@ -436,8 +436,8 @@ class MainWindow(QWidget):
             "Copy the weights of one vertex set onto other vertices of the "
             "SAME mesh.\nSelect the vertices to copy FROM and press Copy, then "
             "select the vertices to\npaste ONTO and press Paste. Each target "
-            "takes the weights of its nearest\nsource vertex, exactly as they "
-            "are.")
+            "takes the weights of its nearest\nsource vertex - fully, or "
+            "part of the way with Blend.")
         desc.setAlignment(Qt.AlignCenter)
         layout.addWidget(desc)
 
@@ -500,12 +500,36 @@ class MainWindow(QWidget):
 
         layout.addWidget(mode_grp)
 
+        # ---------------- Blend (0~1)
+        # Expand Bind 의 Blend 와 같은 자리/같은 이름이지만 뜻이 다르다. 여기서는
+        # "원래 웨이트와 소스 웨이트 사이의 자리" 다.
+        blend_row = QHBoxLayout()
+        blend_row.addWidget(QLabel("Blend"))
+        self.sb_wc_blend = QDoubleSpinBox()
+        self.sb_wc_blend.setDecimals(3)
+        self.sb_wc_blend.setRange(0.0, 1.0)
+        self.sb_wc_blend.setSingleStep(0.05)
+        self.sb_wc_blend.setValue(1.0)
+        # 값을 되쓰는 스핀박스는 타이핑 중간값이 새지 않게 tracking 을 끈다.
+        self.sb_wc_blend.setKeyboardTracking(False)
+        self.sb_wc_blend.setToolTip(
+            "How much of the copied weights lands on each target vertex.\n\n"
+            "  1.0 : the source row replaces the target row (default).\n"
+            "  0.5 : half way - the target keeps half of what it had.\n"
+            "  0.0 : nothing changes.\n\n"
+            "  new = (1 - Blend) * old + Blend * source\n\n"
+            "Blending cannot break normalization: mixing two rows that each sum "
+            "to 1\nsums to 1 again.")
+        blend_row.addWidget(self.sb_wc_blend)
+        blend_row.addStretch(1)
+        layout.addLayout(blend_row)
+
         self.btn_wc_paste = QPushButton("PASTE weights onto selected vertices")
         self.btn_wc_paste.setMinimumHeight(40)
         self.btn_wc_paste.setToolTip(
             "Select the vertices to paste onto (same mesh) and press this.\n"
-            "Each one takes the full weight row of its nearest copied vertex - "
-            "values are not blended.")
+            "Each one takes the weight row of its nearest copied vertex, as far "
+            "as Blend says\n(Blend 1.0 = the whole row).")
         self.btn_wc_paste.clicked.connect(self.on_wc_paste)
         layout.addWidget(self.btn_wc_paste)
 
@@ -600,7 +624,8 @@ class MainWindow(QWidget):
         try:
             with undo_chunk():
                 report = wc_mgr.copy_weights(
-                    self.wc_mesh, self.wc_vertices, ids, mode=self._wc_mode())
+                    self.wc_mesh, self.wc_vertices, ids, mode=self._wc_mode(),
+                    blend=self.sb_wc_blend.value())
         except Exception as e:
             self.log("[Error] Paste : {0}".format(e))
             cmds.warning(str(e))
@@ -611,11 +636,13 @@ class MainWindow(QWidget):
                      "copied ones and were left untouched. Use 'Volume "
                      "(straight line)' to reach them.".format(
                          report["unreached"]))
+        if report["blend"] <= 0.0:
+            self.log("[Warning] Blend is 0.0 - nothing was changed.")
         self.log("[OK] Pasted weights onto {0} of {1} selected vertices  "
-                 "(mode {2}, from {3} copied vertices / {4} used, {5} "
-                 "influences).".format(
+                 "(mode {2}, blend {3:.3f}, from {4} copied vertices / {5} "
+                 "used, {6} influences).".format(
                      report["pasted"], report["targets"], report["mode"],
-                     report["sources"], report["used_sources"],
+                     report["blend"], report["sources"], report["used_sources"],
                      report["influences"]))
 
     # --------------------------------------------------

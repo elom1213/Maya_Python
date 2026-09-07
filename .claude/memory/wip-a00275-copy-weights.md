@@ -1,6 +1,6 @@
 ---
 name: wip-a00275-copy-weights
-description: A00275 Copy Weights 탭 — 같은 메시 안에서 버텍스→버텍스 웨이트 복사. 탐색 범위를 Expand Bind 에서 베끼면 안 되고(집합 안으로 가두면 못 간다), volume 최근접은 전수 비교 대신 균일 격자 (v01.17)
+description: A00275 Copy Weights 탭 — 같은 메시 안에서 버텍스→버텍스 웨이트 복사. 탐색 범위를 Expand Bind 에서 베끼면 안 되고(집합 안으로 가두면 못 간다), volume 최근접은 전수 비교 대신 균일 격자. Blend(0~1)는 볼록결합이라 정규화가 안 깨진다 (v01.18)
 metadata:
   node_type: memory
   type: project
@@ -50,3 +50,18 @@ UI 는 [[wip-a00275-tab-reorg]] 의 `WEIGHTS_PAGES` 표에 줄 하나. 버텍스
 펼치지 않는다**(사용자 요청이기도 하고, Expand Bind 와 같은 이유 — 수천 개면 창이 느려진다).
 검증 30항목([[mayapy-headless-verify]]). 셰이프 확정은 공용 헬퍼로([[extendtoshape-picks-wrong-shape]]),
 웨이트 인덱스는 물리 인덱스로([[skincluster-weight-index-physical]]).
+
+## Blend (v01.18, 2026-09-08)
+
+`PASTE` 위에 `Blend` 스핀박스(0~1, 기본 **1.0**). 목표의 **원래 웨이트와 소스 웨이트 사이의
+자리**다 — `새 = (1 - Blend) x 원래 + Blend x 소스`. 0.5 면 절반만 실리고 0 이면 무변화.
+
+- **★ Blend 는 정규화를 깨지 않는다.** 합이 1 인 두 행의 **볼록결합**은 다시 합이 1 이라,
+  둘 다 정규화돼 있었다면 결과도 정규화돼 있다 — `normalize=False` 를 그대로 둘 수 있다
+  (여기서 마야에게 정규화를 맡기면 이미 "그대로 복사" 가 아니다).
+- **Blend 가 1 이면 목표의 현재 웨이트를 아예 안 읽는다.** 전부 덮어쓸 거라 읽는 비용
+  (버텍스 x 인플루언스)이 낭비다 — 기본값 경로는 v01.17 과 **값도 비용도 동일**.
+- 읽는 컴포넌트를 **쓸 때와 같은 것**으로 둔다. 다르게 만들면 행 순서가 어긋나 조용히 틀린다.
+- 스핀박스는 `setKeyboardTracking(False)` ([[qdoublespinbox-keyboard-tracking]]).
+- 검증: blend 1.0/0.5/0.25/0.0 이 식과 **1e-12 이내** 일치 · 목표 행 합 전부 1.0 ·
+  목표 밖 버텍스 무변화 · 범위 밖 클램프 · 기본값이 소스 행과 완전 동일 · UI 스모크.

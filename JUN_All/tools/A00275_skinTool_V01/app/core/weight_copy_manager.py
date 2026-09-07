@@ -12,6 +12,22 @@
 # 그대로 베낀다. 값을 섞거나 보간하지 않는다 — 그래서 인플루언스 구성이 무엇이든,
 # 행의 합이 얼마든 소스와 **완전히 같은 값**이 나온다.
 #
+# ## Blend — 얼마나 실을지 (0~1)
+#
+# `blend` 는 목표 버텍스의 **원래 웨이트와 소스 웨이트 사이의 자리**다.
+#
+#     새 웨이트 = (1 - blend) * 원래 웨이트 + blend * 소스 웨이트
+#
+#   1.0 : 소스 행이 그대로 실린다(원래 웨이트는 사라진다). 기본값.
+#   0.5 : 절반만 실린다 — 원래 웨이트와 반반 섞인다.
+#   0.0 : 아무것도 바뀌지 않는다.
+#
+# 이 식은 **정규화를 깨지 않는다**. 합이 1 인 두 행의 볼록결합은 다시 합이 1 이기 때문에,
+# 둘 다 정규화돼 있었다면 결과도 정규화돼 있다(그래서 `normalize=False` 를 그대로 쓴다).
+#
+# blend 가 1 이면 목표의 원래 웨이트를 **읽지 않는다** — 어차피 전부 덮어쓰므로,
+# 읽는 비용(버텍스 x 인플루언스)이 그대로 낭비다.
+#
 # 인플루언스를 새로 넣지 않는다. 소스와 목표가 **같은 skinCluster** 라 열 구성이 이미
 # 같기 때문이다(그래서 이 기능은 한 메시 안에서만 동작한다. 메시 사이 전이는
 # `weight_transfer_manager` / `skin_migrate_manager` 쪽이다).
@@ -45,6 +61,7 @@ import maya.api.OpenMaya as om
 from Framework.core import maya_shape
 from Framework.core import maya_skin
 from tools.A00275_skinTool_V01.app.core import expand_bind_manager as eb
+from tools.A00275_skinTool_V01.app.core import falloff
 
 
 # Falloff mode 와 같은 값을 쓴다 — 콤보 표시도 같아야 사용자가 두 탭을 같은 것으로 읽는다.
@@ -218,21 +235,24 @@ def _validate(mesh, source_ids, target_ids):
     return src, tgt
 
 
-def copy_weights(mesh, source_ids, target_ids, mode=MODE_SURFACE):
-    """저장한 버텍스의 웨이트를 고른 버텍스에 그대로 붙여넣는다.
+def copy_weights(mesh, source_ids, target_ids, mode=MODE_SURFACE, blend=1.0):
+    """저장한 버텍스의 웨이트를 고른 버텍스에 붙여넣는다.
 
     Args:
         mesh: 대상 메시(소스와 목표가 **같은 메시**여야 한다).
         source_ids: 복사해 둔 버텍스 id.
         target_ids: 붙여넣을 버텍스 id (현재 선택).
         mode: MODE_SURFACE / MODE_TOPOLOGY / MODE_VOLUME — 무엇을 "가깝다" 고 볼지.
+        blend: 0~1. 목표의 **원래 웨이트와 소스 웨이트 사이의 자리**.
+            1 이면 소스 행이 그대로, 0.5 면 절반만, 0 이면 아무것도 안 바뀐다.
 
     Returns:
-        report dict — mesh/skin_cluster/sources/targets/pasted/unreached/mode 등.
+        report dict — mesh/skin_cluster/sources/targets/pasted/unreached/mode/blend 등.
     """
     src, tgt = _validate(mesh, source_ids, target_ids)
     if mode not in MODES:
         mode = MODE_SURFACE
+    blend = falloff.clamp01(float(blend))
 
     sc = eb.skincluster_of(mesh)
     if not sc:
@@ -272,16 +292,28 @@ def copy_weights(mesh, source_ids, target_ids, mode=MODE_SURFACE):
     src_row = {vid: i for i, vid in enumerate(used)}
 
     tgt_comp = _component(touched)
+
+    # blend 가 1 이면 어차피 전부 덮어쓴다 - 목표의 원래 웨이트를 읽지 않는다.
+    keep = None if blend >= 1.0 else fn.getWeights(dag, tgt_comp)[0]
+
     new_weights = om.MDoubleArray()
     new_weights.setLength(len(touched) * n_inf)
     for row, vid in enumerate(touched):
         base = row * n_inf
         origin = src_row[pairs[vid]] * n_inf
-        for col in range(n_inf):
-            new_weights[base + col] = src_weights[origin + col]
+        if keep is None:
+            for col in range(n_inf):
+                new_weights[base + col] = src_weights[origin + col]
+        else:
+            for col in range(n_inf):
+                was = keep[base + col]
+                new_weights[base + col] = (
+                    was + (src_weights[origin + col] - was) * blend)
 
     # normalize=False — 소스 행을 **그대로** 옮기는 것이 이 기능의 정의다. 마야가 다시
     # 정규화하면 소스와 값이 달라진다(정규화가 필요한 씬은 소스도 이미 정규화돼 있다).
+    # blend 를 걸어도 마찬가지다: 합이 1 인 두 행의 볼록결합은 다시 합이 1 이라
+    # 정규화가 깨지지 않는다.
     fn.setWeights(dag, tgt_comp, inf_indices, new_weights, False)
 
     return {
@@ -294,6 +326,7 @@ def copy_weights(mesh, source_ids, target_ids, mode=MODE_SURFACE):
         "used_sources": len(used),
         "influences": n_inf,
         "mode": mode,
+        "blend": blend,
     }
 
 
