@@ -14,6 +14,10 @@
 #                          무의존). 선택 버텍스에만/소프트 falloff 반영 (weight_transfer_manager).
 #     - "Migrate A -> B" : 토폴로지가 다른 두 메시 A,B 사이 Transfer + Move 를 한 번에 처리하는
 #                          통합 마이그레이션 (A00270_skinMigrate 기능 이식).
+#     - "Copy Weights"   : **한 메시 안에서** 버텍스 -> 버텍스로 웨이트를 그대로 복사.
+#                          목표마다 가장 가까운 소스 버텍스의 웨이트 행을 통째로 베낀다.
+#                          "가깝다" 의 기준은 Expand Bind 와 같은 세 가지
+#                          (surface / topology / volume — core/weight_copy_manager.py).
 #
 #   Bind : 바인드를 새로 만들거나 바인드 상태를 갱신한다
 #     - "Bind Pose"      : 조인트를 이동·회전한 현재 상태를 새 바인드 포즈로 만든다.
@@ -47,6 +51,7 @@ from tools.A00275_skinTool_V01.app.core import weight_transfer_manager as wt_mgr
 from tools.A00275_skinTool_V01.app.core import joint_edit_manager as je_mgr
 from tools.A00275_skinTool_V01.app.core import mesh_edit_manager as me_mgr
 from tools.A00275_skinTool_V01.app.core import expand_bind_manager as eb_mgr
+from tools.A00275_skinTool_V01.app.core import weight_copy_manager as wc_mgr
 from tools.A00275_skinTool_V01.app.core import falloff
 from tools.A00275_skinTool_V01.app.ui.falloff_curve_widget import FalloffCurveWidget
 
@@ -92,6 +97,11 @@ class MainWindow(QWidget):
 
         # Edit Mesh 탭이 잡아둔 대상 메시 셰이프 목록
         self.me_targets = []
+
+        # Copy Weights 탭이 복사해 둔 버텍스 집합 (메시 롱네임, 버텍스 id 리스트).
+        # Expand Bind 와 같은 이유로 리스트 위젯을 만들지 않는다 - 개수만 보여 준다.
+        self.wc_mesh = None
+        self.wc_vertices = []
 
         # Expand Bind 탭이 저장해 둔 버텍스 집합 (메시 롱네임, 버텍스 id 리스트).
         # 리스트 위젯으로 펼치지 않는다 — 수천 개가 예사라 UI 가 바로 느려진다.
@@ -176,6 +186,9 @@ class MainWindow(QWidget):
          "_build_transfer_tab"),
         ("Migrate A -> B", "Migrate A -> B - transfer + bone move in one step "
          "between two meshes with different topology", "_build_migrate_tab"),
+        ("Copy Weights", "Copy Weights - copy the weights of a stored vertex "
+         "set onto other vertices of the SAME mesh (nearest source vertex by "
+         "surface / topology / volume)", "_build_weight_copy_tab"),
     )
 
     BIND_PAGES = (
@@ -402,6 +415,208 @@ class MainWindow(QWidget):
         count, msg = wt_mgr.transfer_to_mesh(
             sources, respect_soft=self.cb_transfer_soft.isChecked(), engine=engine)
         self.log(msg)
+
+    # --------------------------------------------------
+    # Weights > Copy Weights (한 메시 안에서 버텍스 -> 버텍스)
+    # --------------------------------------------------
+
+    # 콤보 표시 이름 -> core 의 모드. Expand Bind 의 Falloff mode 와 같은 값이다.
+    WC_MODES = (
+        ("Surface (edge length)", wc_mgr.MODE_SURFACE),
+        ("Topology (edge count)", wc_mgr.MODE_TOPOLOGY),
+        ("Volume (straight line)", wc_mgr.MODE_VOLUME),
+    )
+
+    def _build_weight_copy_tab(self):
+
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        desc = QLabel(
+            "Copy the weights of one vertex set onto other vertices of the "
+            "SAME mesh.\nSelect the vertices to copy FROM and press Copy, then "
+            "select the vertices to\npaste ONTO and press Paste. Each target "
+            "takes the weights of its nearest\nsource vertex, exactly as they "
+            "are.")
+        desc.setAlignment(Qt.AlignCenter)
+        layout.addWidget(desc)
+
+        # ---------------- 복사해 둔 버텍스 (리스트로 펼치지 않는다)
+        src_grp = QGroupBox("Copied vertices (source)")
+        src_layout = QVBoxLayout(src_grp)
+
+        self.lbl_wc_verts = QLabel("Copied: none")
+        self.lbl_wc_verts.setToolTip(
+            "The copied vertex set is kept as ids, not as a list widget - a "
+            "region is easily thousands of vertices and a list that long makes "
+            "the window crawl.")
+        src_layout.addWidget(self.lbl_wc_verts)
+
+        src_row = QHBoxLayout()
+        btn_copy = QPushButton("Copy (store vertices from selection)")
+        btn_copy.setToolTip(
+            "Store the selected vertices as the source (edges/faces are "
+            "converted).\nNothing is written yet - this only remembers where "
+            "the weights come from.")
+        btn_copy.clicked.connect(self.on_wc_copy)
+        src_row.addWidget(btn_copy)
+        btn_sel = QPushButton("Select")
+        btn_sel.setToolTip("Re-select the copied vertices in the scene.")
+        btn_sel.clicked.connect(self.on_wc_select)
+        src_row.addWidget(btn_sel)
+        btn_clr = QPushButton("Clear")
+        btn_clr.clicked.connect(self.on_wc_clear)
+        src_row.addWidget(btn_clr)
+        src_layout.addLayout(src_row)
+
+        layout.addWidget(src_grp)
+
+        # ---------------- 무엇을 "가깝다" 고 볼지
+        mode_grp = QGroupBox("How to find the source of each vertex")
+        mode_layout = QVBoxLayout(mode_grp)
+
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Search mode"))
+        self.cmb_wc_mode = QComboBox()
+        for label, _mode in self.WC_MODES:
+            self.cmb_wc_mode.addItem(label)
+        self.cmb_wc_mode.setToolTip(
+            "Which copied vertex a selected vertex takes its weights from.\n"
+            "Surface  : nearest along the mesh edges (edge lengths) - the "
+            "default.\n"
+            "Topology : fewest edge steps, ignoring how long the edges are.\n"
+            "Volume   : nearest in a straight line, ignoring the topology "
+            "(reaches across a gap).")
+        mode_row.addWidget(self.cmb_wc_mode)
+        mode_row.addStretch(1)
+        mode_layout.addLayout(mode_row)
+
+        note = QLabel(
+            "Surface / Topology walk the mesh, so a selected vertex on a "
+            "separate shell is left\nuntouched (the log says how many). Volume "
+            "always finds a source.")
+        note.setWordWrap(True)
+        mode_layout.addWidget(note)
+
+        layout.addWidget(mode_grp)
+
+        self.btn_wc_paste = QPushButton("PASTE weights onto selected vertices")
+        self.btn_wc_paste.setMinimumHeight(40)
+        self.btn_wc_paste.setToolTip(
+            "Select the vertices to paste onto (same mesh) and press this.\n"
+            "Each one takes the full weight row of its nearest copied vertex - "
+            "values are not blended.")
+        self.btn_wc_paste.clicked.connect(self.on_wc_paste)
+        layout.addWidget(self.btn_wc_paste)
+
+        layout.addStretch(1)
+        return tab
+
+    # ---------------- Copy Weights : 상태/헬퍼
+
+    def _wc_mode(self):
+        return self.WC_MODES[self.cmb_wc_mode.currentIndex()][1]
+
+    def _wc_update_label(self):
+        if not self.wc_vertices:
+            self.lbl_wc_verts.setText("Copied: none")
+        else:
+            self.lbl_wc_verts.setText("Copied: {0} vertices  ({1})".format(
+                len(self.wc_vertices), self.wc_mesh.split("|")[-1]))
+
+    def _wc_vertex_names(self):
+        """저장된 id 를 연속 구간으로 묶어 컴포넌트 이름으로 만든다(선택이 빨라진다)."""
+        names = []
+        ids = sorted(self.wc_vertices)
+        start = 0
+        while start < len(ids):
+            end = start
+            while end + 1 < len(ids) and ids[end + 1] == ids[end] + 1:
+                end += 1
+            if end == start:
+                names.append("{0}.vtx[{1}]".format(self.wc_mesh, ids[start]))
+            else:
+                names.append("{0}.vtx[{1}:{2}]".format(
+                    self.wc_mesh, ids[start], ids[end]))
+            start = end + 1
+        return names
+
+    # ---------------- Copy Weights : 핸들러
+
+    def on_wc_copy(self):
+        try:
+            mesh, ids = wc_mgr.parse_selected_vertices()
+        except Exception as e:
+            self.log("[Error] Copy : {0}".format(e))
+            return
+        self.wc_mesh = mesh
+        self.wc_vertices = ids
+        self._wc_update_label()
+        self.log("[OK] Copied {0} vertices on {1}. Now select the vertices to "
+                 "paste onto and press PASTE.".format(
+                     len(ids), mesh.split("|")[-1]))
+
+    def on_wc_select(self):
+        if not self.wc_vertices:
+            self.log("[Warning] No vertices copied yet.")
+            return
+        if not cmds.objExists(self.wc_mesh):
+            self.log("[Error] Stored mesh is gone. Copy the vertices again.")
+            return
+        try:
+            cmds.select(self._wc_vertex_names(), r=True)
+        except Exception as e:
+            self.log("[Error] Select : {0}".format(e))
+            return
+        self.log("[OK] Selected the copied vertices ({0}).".format(
+            len(self.wc_vertices)))
+
+    def on_wc_clear(self):
+        self.wc_mesh = None
+        self.wc_vertices = []
+        self._wc_update_label()
+        self.log("[OK] Cleared the copied vertices.")
+
+    def on_wc_paste(self):
+        if not self.wc_vertices:
+            self.log("[Error] Paste : nothing copied yet. Select the vertices "
+                     "to copy from and press Copy.")
+            return
+        try:
+            mesh, ids = wc_mgr.parse_selected_vertices()
+        except Exception as e:
+            self.log("[Error] Paste : {0}".format(e))
+            return
+
+        # 소스와 목표가 같은 메시여야 한다 - surface/topology 는 엣지를 타고 가므로
+        # 애초에 다른 메시로는 갈 수 없고, 열(인플루언스) 구성도 같다는 보장이 없다.
+        if mesh != self.wc_mesh:
+            self.log("[Error] Paste : the selected vertices are on '{0}', but "
+                     "the weights were copied from '{1}'. Copy Weights works "
+                     "within one mesh.".format(
+                         mesh.split("|")[-1], self.wc_mesh.split("|")[-1]))
+            return
+
+        try:
+            with undo_chunk():
+                report = wc_mgr.copy_weights(
+                    self.wc_mesh, self.wc_vertices, ids, mode=self._wc_mode())
+        except Exception as e:
+            self.log("[Error] Paste : {0}".format(e))
+            cmds.warning(str(e))
+            return
+
+        if report["unreached"]:
+            self.log("[Warning] {0} selected vertices are not connected to the "
+                     "copied ones and were left untouched. Use 'Volume "
+                     "(straight line)' to reach them.".format(
+                         report["unreached"]))
+        self.log("[OK] Pasted weights onto {0} of {1} selected vertices  "
+                 "(mode {2}, from {3} copied vertices / {4} used, {5} "
+                 "influences).".format(
+                     report["pasted"], report["targets"], report["mode"],
+                     report["sources"], report["used_sources"],
+                     report["influences"]))
 
     # --------------------------------------------------
     # Weights > Migrate A -> B (기존 통합 마이그레이션)

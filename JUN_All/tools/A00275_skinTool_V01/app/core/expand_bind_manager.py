@@ -388,11 +388,14 @@ def _bfs(adj, seed, limit):
     return dist
 
 
-def _dijkstra_multi(mode, adj, points, seeds, limit):
+def dijkstra_multi(mode, adj, points, seeds, limit):
     """여러 시작점에서 동시에 퍼지는 거리 + **어느 시작점에서 왔는지**(anchor).
 
     루프 전체를 시작점으로 주면 버텍스마다 "루프에서 얼마나 떨어졌나 / 가장 가까운
     루프 버텍스는 어디인가" 를 한 번에 얻는다. 루프 버텍스별로 따로 돌릴 필요가 없다.
+
+    공개 함수다 — `weight_copy_manager` 도 "가장 가까운 소스 버텍스" 를 이걸로 찾는다
+    (같은 계산이므로 두 번 구현하지 않는다).
     """
     dist = {}
     anchor = {}
@@ -711,7 +714,7 @@ def _raw_from_loop(mode, adj, points, allowed, order, closed, origins, radius,
                    across_radius, points_curve, curve_interp):
     """루프를 줬을 때 — 루프 따라(분배) / 루프 바깥(amount) 을 분리해 낸다.
 
-    1. 루프 전체를 시작점으로 한 번에 퍼뜨려(`_dijkstra_multi`) 버텍스마다
+    1. 루프 전체를 시작점으로 한 번에 퍼뜨려(`dijkstra_multi`) 버텍스마다
        "루프에서 떨어진 거리" 와 "가장 가까운 루프 버텍스(anchor)" 를 얻는다.
     2. 조인트 사이 비율은 **anchor 의 루프 위 호 거리**로만 낸다. 그래서 밴드
        어디서나 루프와 같은 비율이 유지된다(바깥 거리가 비율을 흔들지 않는다).
@@ -723,7 +726,7 @@ def _raw_from_loop(mode, adj, points, allowed, order, closed, origins, radius,
     limit = across_radius
     if mode == MODE_TOPOLOGY:
         limit = float(int(round(across_radius)))
-    across_dist, anchor = _dijkstra_multi(mode, adj, points, order, limit)
+    across_dist, anchor = dijkstra_multi(mode, adj, points, order, limit)
 
     raw = [{} for _ in origins]
     across = {}
@@ -812,7 +815,7 @@ def _raw_from_loop_even(mode, adj, points, allowed, order, closed, origins,
     seeds = [_closest_vertex(points, set(order), o) for o in origins]
 
     # 밴드 폭을 재야 하므로 **반경으로 자르지 않고** 끝까지 퍼뜨린다.
-    across_dist, anchor = _dijkstra_multi(mode, adj, points, order,
+    across_dist, anchor = dijkstra_multi(mode, adj, points, order,
                                           float("inf"))
 
     # anchor 별로 '가장 멀리까지 간 거리' = 그 자리의 밴드 폭.
