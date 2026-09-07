@@ -2,7 +2,7 @@
 
 레거시 `JUN_PY_BSTool_V01_01`(maya.cmds) 을 **PySide(Qt)** 로 재작성한 blendShape 작업 툴.
 기존 툴의 **Connect BS 탭은 제외**하고 **Edit BS 탭만** 이식했으며, **Base Shape 탭** ·
-**Shape Editor 탭** · **Mix Targets 탭** · **Bake Delete 탭**을 신규 추가했다.
+**Shape Editor 탭** · **Mix Targets 탭** · **Target Order 탭** · **Bake Delete 탭**을 신규 추가했다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`A00270_skinMigrate` 클론, green_dark 테마)
 - **버전**: `app/config/version.py`
@@ -440,7 +440,113 @@ geometryFilter 는 모두 `input[N].inputGeometry` 로 거슬러 오를 수 있�
 
 ---
 
-## 탭 5 — Bake Delete  (v01.19~, 신규)
+## 탭 5 — Target Order  (v01.20~, 신규)
+
+blendShape 노드의 **타겟 나열 순서**를 바꾼다. 리스트에서 위아래로 옮긴 순서가 곧 노드의
+순서가 된다.
+
+### 왜 툴이 필요한가 — 마야에는 이 명령이 없다
+
+`blendShape` 커맨드에는 타겟을 재정렬하는 플래그가 없다. Shape Editor 에서 타겟을 드래그할
+수 있지만 그것은 **그룹(디렉터리) 안에서의 표시 순서**를 옮길 뿐이고, 채널박스 ·
+`aliasAttr` · `blendShape -q -target` 이 보여 주는 **진짜 순서인 weight 인덱스**는 그대로다.
+한 번 만들어진 순서를 고치려면 타겟을 지우고 원하는 순서로 다시 넣는 수밖에 없었다 —
+구운 델타(타겟 메시가 씬에 없는 타겟)라면 그마저도 못 한다.
+
+### 사용법
+
+1. 씬에서 blendShape 노드(또는 그 메시)를 선택 → **`<- Set`**. 타겟이 바로 리스트에 채워진다.
+   (이미 노드 이름이 적혀 있으면 **`List Targets`** 로 다시 읽는다.)
+2. 리스트에서 순서를 바꾼다 — **`Up` / `Down`**(선택 항목 한 칸씩) · **`Sort`**(이름순) ·
+   **`Reverse`**(통째로 뒤집기). 맨 위가 첫 타겟이다.
+3. **`APPLY ORDER to the blendShape`** — 노드의 타겟 순서가 실제로 바뀐다.
+   끝나면 노드에서 다시 읽어 리스트를 채운다(화면과 씬이 같은지 눈으로 확인된다).
+
+리스트 아래 상태 줄이 지금 상태를 말한다 — *the list matches the node* / *N would move* /
+*리스트가 노드와 안 맞으니 다시 읽어라*.
+
+| 요소 | 동작 |
+|------|------|
+| **`<- Set`** | 선택(노드 또는 메시)에서 blendShape 를 잡고 **곧바로 타겟을 나열**한다 |
+| **`List Targets`** | 노드에서 다시 읽는다. **적용하지 않은 재정렬은 버려진다** |
+| **`Up` / `Down` / `Sort` / `Reverse`** | 리스트 순서만 바꾼다(씬은 아직 그대로) |
+| **`Filter`** | 타겟 이름 검색. 필터가 걸려 있으면 상태 줄이 알린다 — `Up`/`Down` 은 **숨은 행까지 세어** 한 칸 움직이므로, 눌러도 안 움직인 것처럼 보일 수 있다 |
+| **`APPLY ORDER`** | 리스트 순서대로 노드의 weight 인덱스를 갈아 끼운다. **Ctrl+Z 한 번**으로 전부 되돌아온다 |
+
+이 탭의 리스트에는 `Select` / `Add` / `Del` 버튼이 없다. 타겟은 씬 오브젝트가 아니라
+어트리뷰트 **별칭**이라 씬 선택으로 담을 것이 없고, 항목을 지운 부분 목록은 어차피
+"전체 순열이 아니다" 로 거절된다.
+
+### 무엇이 함께 따라오는가
+
+타겟 하나는 인덱스 `i` 를 키로 여러 어트리뷰트에 흩어져 있다. **하나라도 빠뜨리면 이름과
+모양이 어긋난다** — 가장 흔한 사고가 별칭만 옮겨서 `A` 라는 이름이 `B` 의 델타를 가리키게
+되는 것이다. 이 탭은 아래를 **전부** 함께 옮긴다.
+
+| 옮기는 것 | 어디에 |
+|---|---|
+| 타겟 이름 | `aliasAttr` → `weight[i]` |
+| weight 값 · 들어오는/나가는 연결 · lock/keyable | `weight[i]` |
+| 델타(구운 것 · 라이브 메시 연결) · **인비트윈** | `inputTarget[b].inputTargetGroup[i].inputTargetItem[k]` |
+| 타겟별 페인트 웨이트 | `…inputTargetGroup[i].targetWeights[v]` |
+| `normalizationId` · `postDeformersMode` · 타겟 행렬 | `…inputTargetGroup[i]` |
+| Shape Editor 그룹 소속 · 표시/부모 표시 | `parentDirectory[i]` · `targetVisibility[i]` · `targetParentVisibility[i]` |
+| 인비트윈 이름/타입 | `inbetweenInfoGroup[i].inbetweenInfo[k]` |
+| 그룹이 담은 타겟 목록(= Shape Editor 표시 순서) | `targetDirectory[d].childIndices` |
+
+> **`inputTarget` 는 베이스 지오메트리마다 하나**다. 한 blendShape 가 메시 여러 개를 디폼하면
+> 같은 타겟의 델타가 `inputTarget[0]`, `inputTarget[1]` … 에 따로 있다. `inputTarget[0]` 만
+> 옮기면 **두 번째 메시부터** 이름과 모양이 어긋난다 — 툴은 전부 순회한다.
+
+### 규칙 · 한계
+
+- **인덱스 슬롯은 새로 만들지 않는다.** 타겟을 지웠던 blendShape 는 인덱스가 듬성하다
+  (예: `0, 1, 4, 7`). 툴은 **있던 슬롯 집합을 그대로 두고** 그 안에서 타겟만 자리를 바꾼다.
+  `0..n-1` 로 다시 촘촘하게 매기면, 이름 대신 번호로 `weight[4]` 를 참조하던 바깥
+  노드/스크립트가 조용히 다른 타겟을 가리키게 된다.
+- **모양은 변하지 않는다.** blendShape 평가는 `base + Σ(weight_i * delta_i)` 라 더하는
+  순서와 무관하다. 실측에서도 웨이트 조합 5종 × 인비트윈 포함으로 결과가 같았다
+  (부동소수 합 순서 차이로 `1e-6` 수준만 다르다).
+- **편집(Edit/sculpt) 중이면 거절한다.** `sculptTargetIndex` 가 가리키는 타겟은 확정되지
+  않은 편집이 떠 있는 상태라, 그대로 인덱스를 갈아 끼우면 편집분이 **엉뚱한 타겟에**
+  확정된다. Shape Editor 탭의 `Exit Edit Mode` 로 끄고 다시 하면 된다.
+- **리스트가 노드와 안 맞으면 거절한다.** 이름이 빠졌거나 없는 이름이 섞이면 무엇이
+  문제인지 짚어 알린다(`missing: … / not a target: …`).
+- Shape Editor 그룹(`targetDirectory`)이 있으면 그룹이 담은 타겟 목록도 새 번호로 옮기고
+  오름차순으로 다시 세운다 — 그래야 **Shape Editor 도 바뀐 순서로 보인다**. 하위 그룹
+  참조(음수)는 자리를 지킨다.
+
+### 구현 메모 (수정할 때 주의)
+
+- **`removeMultiInstance` 는 `inputTargetGroup[i]` 를 통째로 지우면 undo 로 되살아나지
+  않는다.** 지운 뒤 Ctrl+Z 를 해도 `inputPointsTarget` 이 빈 채로 남는다 = **델타가 영영
+  사라진다**(실측). 잎(leaf) 요소(`inputTargetItem[6000]`, `targetWeights[4]` …)는 정상
+  복원된다. 그래서 이 탭은 **그룹을 비우지 않고 슬롯 위에 덮어쓰고, 남는 잎만** 지운다.
+- **새 주인이 안 쓰는 배열은 "안 쓰니까 건너뛰기" 가 아니라 빈 배열로 지운다.** 값이 없다고
+  건너뛰면 그 슬롯에 있던 **전 주인의 델타가 그대로 남아**, 이름만 바뀐 채 남의 모양이
+  딸려 온다(빈 인비트윈 아이템이 있는 씬에서 실제로 났다).
+- **`setAttr` 의 인자 모양이 타입마다 다르다.**
+  `pointArray` 는 `(x,y,z,w)` **튜플 그대로**(풀어서 넘기면 `Error reading data element`),
+  `componentList` 는 개수 + 문자열, **`Int32Array` 는 개수를 붙이면 안 된다** — 붙이면
+  마야가 개수를 첫 값으로 읽고 나머지를 버린다. 값이 하나뿐이면 **에러 없이 개수가 값으로
+  저장**되는 조용한 오작동이 난다.
+- 값 → 연결 순서를 지킨다. 연결된 plug 는 `setAttr` 이 막히므로 **값을 다 쓴 뒤에** 연결을 건다.
+
+### 검증 (mayapy 2024 실측)
+
+- 타겟 4개(구운 델타 · 라이브 메시 · 인비트윈 · 페인트 웨이트 · lock · 들어오는/나가는 연결 ·
+  Shape Editor 그룹 2개 · **베이스 지오메트리 2개**) 재정렬 → **59 검사 통과**.
+  델타 · 인비트윈 · 페인트 웨이트 · 연결 · 그룹 `childIndices` 가 전부 타겟을 따라갔고,
+  변형된 메시는 그대로였다.
+- 듬성한 인덱스(`0,3,7`) 유지 · **Ctrl+Z 한 번으로 순서와 델타 완전 복원** · sculpt 중 거절
+  → **11 검사 통과**.
+- 타겟 6개(인비트윈 2 · live/baked 혼재 · 페인트 웨이트) × 웨이트 조합 5종으로 **변형 결과
+  동일** + 되돌리기 왕복 → **6 검사 통과**(최대 편차 `1e-6`).
+- UI 스모크 **16 검사 통과**(노드 지정 → 나열 → Up/Sort/Reverse → 적용 → 상태 줄 · 거절 경로).
+
+---
+
+## 탭 6 — Bake Delete  (v01.19~, 신규)
 
 리깅된 메시에서 **페이스 · 엣지 · 버텍스를 지우고 나면** 마야는 지우기를 디포머 **뒤에** 붙인다.
 
@@ -583,8 +689,9 @@ A00290_BSTool/
     │   ├── edit_bs_manager.py      # Edit BS 탭: key/copy every target + copy every frame
     │   ├── base_shape_manager.py   # Base Shape 탭: 타겟 델타 스케일
     │   ├── mix_manager.py          # Mix Targets 탭: 소스 가중합을 다른 타겟/베이스에 반영
-    │   └── bake_delete_manager.py  # (v01.19~) Bake Delete 탭: 지우기를 리그 전체에 반영
-    └── ui/main_window.py           # QTabWidget 5탭 + 공용 로그
+    │   ├── bake_delete_manager.py  # (v01.19~) Bake Delete 탭: 지우기를 리그 전체에 반영
+    │   └── target_order_manager.py # (v01.20~) Target Order 탭: 타겟 순서(weight 인덱스) 재배치
+    └── ui/main_window.py           # QTabWidget 6탭 + 공용 로그
 ```
 
 > `delta_utils` 는 Base Shape 탭과 Mix Targets 탭이 **같은 저수준 처리**(델타 공간 · live 타겟

@@ -27,6 +27,11 @@ UUID 보관 (v01.01~)
 
 UUID 는 리네임·리페어런트·이름 충돌과 무관하므로 두 경우 모두 해결된다.
 
+항목이 **씬 노드가 아닌 것이 확실한** 리스트(blendShape 타겟 별칭, 어트리뷰트 이름, 파일명 …)는
+`attach_uuids=False` 로 이 조회를 아예 끈다. UUID 부착은 항목마다 `cmds.ls` 를 부르므로 목록이
+커질수록 그대로 비용이고(수백 개면 눈에 띈다), 노드가 아닌 항목에는 어차피 아무것도 붙지 않는다.
+이름이 우연히 씬 노드와 겹치는 항목을 눌렀을 때 엉뚱한 노드가 선택되는 일도 없어진다.
+
 노드가 아닌 항목(어트리뷰트 이름, 파일명, 노드 타입 이름 등)은 UUID 가 없으므로 예전처럼
 이름으로 동작하고, 씬에 없는 이름이면 조용히 건너뛴다. **애초에 노드 이름이 될 수 없는 모양**
 (공백·`@` 처럼 마야가 이름에 허용하지 않는 글자, 숫자로 시작 등)이면 마야에 묻지도 않는다
@@ -221,7 +226,7 @@ class JUN_mod_tsl_qt_v01(QWidget):
                  show_up=True, show_down=True, show_sort=True,
                  show_reverse=False, show_order=True, order_default=False,
                  multi_select=True, list_min_height=None, list_limit=0,
-                 select_label="Select Objects",
+                 select_label="Select Objects", attach_uuids=True,
                  log_callback=None, parent=None):
         super(JUN_mod_tsl_qt_v01, self).__init__(parent)
 
@@ -238,6 +243,12 @@ class JUN_mod_tsl_qt_v01(QWidget):
         # Order 체크박스(선택 순서 유지). 헤더 행에 들어가므로 세로 공간을 더 먹지 않는다.
         self.show_order = show_order
         self.multi_select = multi_select
+        # 항목에 UUID 를 붙일지. 항목이 **씬 노드가 아닌 것이 확실한** 리스트
+        # (blendShape 타겟 별칭, 어트리뷰트 이름, 파일명 …)는 꺼 두는 편이 낫다.
+        # UUID 부착은 항목마다 `cmds.ls` 를 부르므로 목록이 커질수록 그대로 비용이 되고
+        # (수백 개면 눈에 띈다), 노드가 아닌 항목에는 어차피 아무것도 붙지 않는다.
+        # 이름이 우연히 씬 노드와 겹치는 항목을 클릭했을 때 엉뚱한 노드가 선택되는 일도 없앤다.
+        self.attach_uuids = attach_uuids
         self.list_min_height = list_min_height
         # 항목이 이 수 **이상**이면 리스트에 펼치지 않고 요약만 보여준다(0 = 언제나 펼침).
         self.list_limit = int(list_limit or 0)
@@ -638,14 +649,17 @@ class JUN_mod_tsl_qt_v01(QWidget):
     def _add_item(self, text):
         """텍스트로 항목을 만들고, 씬 노드면 (uuid, component) 를 함께 보관한다."""
         item = QListWidgetItem(text)
-        uuid, comp = _uuid_of(text)
-        if uuid:
-            item.setData(UUID_ROLE, (uuid, comp))
+        if self.attach_uuids:
+            uuid, comp = _uuid_of(text)
+            if uuid:
+                item.setData(UUID_ROLE, (uuid, comp))
         self.list_widget.addItem(item)
         return item
 
     def _attach_uuids(self, texts, offset=0):
         """이미 들어간 항목들(offset 부터)에 UUID 를 붙인다."""
+        if not self.attach_uuids:
+            return
         for i, text in enumerate(texts):
             uuid, comp = _uuid_of(text)
             if uuid:

@@ -56,6 +56,7 @@
 - [extendToShape picks wrong shape](extendtoshape-picks-wrong-shape.md) — `kInvalidParameter: Object is incompatible` 1순위 원인. 새 코드는 `extendToShape` 금지, **공용 `Framework.core.maya_shape`** 사용. `polyEvaluate`/`copySkinWeights` 도 셰이프에 걸 것
 - [pointPosition: points only](pointposition-points-only.md) — 엣지/페이스는 `RuntimeError`. 컴포넌트 중심은 `xform -q -ws -t` 평균(점이면 값 동일)
 - [skin weights: physical index](skincluster-weight-index-physical.md) — `get/setWeights` 는 **물리** 인덱스. `indexForInfluenceObject`(논리)를 넘기면 **undo 뒤** `kInvalidParameter`
+- [setAttr Int32Array no count](setattr-int32array-no-count.md) — 배열 `setAttr` 은 타입마다 인자 모양이 다르다. **`Int32Array` 는 개수를 붙이면 안 된다**(값이 하나면 에러 없이 개수가 저장된다) · `pointArray` 는 튜플 그대로
 - [list_attrs multi detection](list-attrs-multi-detection.md) — multi 판정은 `attributeQuery(multi=True)`, getNextFreeMultiIndex 남용 금지
 - [UUID-safe rename](uuid-safe-rename-duplicate-names.md) — 동명 노드 대비 UUID 로 노드 보관("UUID 기반 리네임 패턴 적용해줘")
 - [standalone app package collision](standalone-app-package-collision.md) — standalone Qt 툴은 `tools.<tool>.app.*` 로 import, 맨 `app` 금지
@@ -66,6 +67,7 @@
 ## 공용 위젯 · 프레임워크
 
 - [TSL UUID selection](wip-tsl-uuid-selection.md) — MOD_tsl_qt_v01 이 (uuid, component) 보관 → 리네임/동명/다중 레퍼런스 안전
+- [TSL attach_uuids](framework-tsl-attach-uuids.md) — 항목이 **씬 노드가 아닌 것이 확실한** 리스트(어트리뷰트 별칭 · 파일명)는 `attach_uuids=False` 로 항목마다 나가는 `cmds.ls` 를 없앤다
 - [TSL list_limit summary](framework-tsl-list-limit.md) — 500개 이상은 리스트 대신 요약 + `List All`. 느린 원인은 줄 수가 아니라 **항목별 UUID 조회**
 - [TSL max-height squeezes buttons](tsl-widget-max-height-squeezes-buttons.md) — TSL **위젯 전체**에 `setMaximumHeight` 금지(리스트 최소 높이가 안 줄어 **버튼에서 높이를 빼앗아** 글자가 잘림) → `list_widget` 에만. **테마 qss 를 입혀야 재현된다**
 - [TSL selection order](tsl-selection-order.md) — `Order` 체크박스. `ls(sl)` 는 컴포넌트를 인덱스 순으로 줌 → `selectPref(trackSelectionOrder)`+`ls(orderedSelection)`. **함정: pref off 면 `ls(os)` 도 에러 없이 인덱스 순서**
@@ -116,6 +118,7 @@
 - [A00310 SearchTool](wip-a00310-searchtool-merge.md) — 레거시 Selection/Search 툴 2개를 탭 하나로 병합 (Maya 테스트 대기)
 - [A00300 batch summary](wip-a00300-batch-summary-table.md) — Target Meshes TSL + 색상 요약 테이블 (v01.02)
 - [A00300 zero-area rework](wip-a00300-zero-area-quality-rework.md) — **진행 중**: zero_area_faces 를 shape-quality 로 재작업 + Clear Log
+- [A00290 Target Order tab](wip-a00290-target-order-tab.md) — **신규**: blendShape 타겟 순서(weight 인덱스) 재배치. 마야에 없는 기능 · 타겟은 여러 곳에 흩어져 있고, `removeMultiInstance` 를 **그룹 단위로 쓰면 undo 가 안 된다** (v01.20)
 - [A00290 Bake Delete tab](wip-a00290-bake-delete-tab.md) — **신규**: 디포머 뒤 `deleteComponent` 를 리그 전체에 반영(중립·타겟·델타·웨이트 재매핑). 정점 순서는 보존되므로 위치 greedy 로 매핑, 검증은 **엣지가 아니라 같은 페이스**, 밀어 넣은 셰이프의 `pnts` 를 안 지우면 조용히 틀린다 (v01.19)
 - [A00290 Mix Targets tab](wip-a00290-mix-targets-tab.md) — **신규**: 소스 가중합을 다른 타겟 + 최종(리깅) 메시에 일괄 반영. Base mesh 3모드, 공용 `delta_utils` (v01.17)
 - [A00290 Shape Editor tab](wip-a00290-shape-editor-tab.md) — 마야 Shape Editor 대체. `cmds.sculptTarget` 필수, 행 클릭 다중 편집, 제스처당 undo 1회 (v01.10)

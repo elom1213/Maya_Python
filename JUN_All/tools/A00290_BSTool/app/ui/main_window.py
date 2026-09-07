@@ -11,7 +11,9 @@
 #                     weight=1.0 기본 모양으로 재정의(델타 스케일)
 #   4) Mix Targets  : 소스 타겟 몇 개를 원하는 배율로 섞은 만큼, 체크한 다른 타겟들의
 #                     모양을 한꺼번에 변형(델타 가중합을 더한다)
-#   5) Bake Delete  : 디포머 뒤에 남은 deleteComponent(페이스/엣지/버텍스 지우기)를 리그
+#   5) Target Order : blendShape 노드의 타겟을 리스트업 → 리스트에서 순서를 바꾼 대로
+#                     노드의 타겟 순서(weight 인덱스)를 실제로 갈아 끼운다
+#   6) Bake Delete  : 디포머 뒤에 남은 deleteComponent(페이스/엣지/버텍스 지우기)를 리그
 #                     전체에 반영 - 중립 셰이프와 모든 타겟 메시도 같이 줄이고 히스토리를
 #                     blendShape -> skinCluster 로 되돌린다
 
@@ -24,11 +26,13 @@ print("QT version  :  " + str(QT_VERSION))
 
 import maya.cmds as cmds
 
+from Framework.core.maya_undo import undo_chunk
 from tools.A00290_BSTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00290_BSTool.app.core import (EditBSManager, BaseShapeManager,
                                           MixManager, ShapeEditorManager,
                                           BakeDeleteManager, EDITABLE_STATES)
 from tools.A00290_BSTool.app.core import blendshape_utils as bsu
+from tools.A00290_BSTool.app.core import target_order_manager as tom
 
 
 # Edit 토글이 켜졌을 때의 버튼 색(Maya Shape Editor 의 활성 Edit 버튼과 같은 의미).
@@ -253,6 +257,7 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_edit_bs_tab(), "Edit BS")
         self.tabs.addTab(self._build_base_shape_tab(), "Base Shape")
         self.tabs.addTab(self._build_mix_tab(), "Mix Targets")
+        self.tabs.addTab(self._build_target_order_tab(), "Target Order")
         self.tabs.addTab(self._build_bake_delete_tab(), "Bake Delete")
         self.tabs.currentChanged.connect(lambda *_a: self._update_se_timer())
         main_layout.addWidget(self.tabs)
@@ -1220,7 +1225,193 @@ class MainWindow(QWidget):
         return panel
 
     # ==================================================
-    # Tab 5 : Bake Delete
+    # Tab 5 : Target Order
+    # ==================================================
+
+    def _build_target_order_tab(self):
+        """blendShape 의 타겟 나열 순서(weight 인덱스)를 리스트에서 바꾸는 탭.
+
+        리스트는 공용 TSL 을 쓰되 **Select / Add / Del 은 감춘다** — 타겟은 씬 오브젝트가
+        아니라 어트리뷰트 별칭이라, 씬 선택으로 담거나 항목을 지우는 것은 의미가 없다
+        (부분 목록은 어차피 코어가 순열이 아니라며 거절한다). 남는 Up / Down / Sort /
+        Reverse 가 곧 이 탭의 편집 수단이다.
+        """
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # blendShape 노드 지정 행
+        node_row = QHBoxLayout()
+        lbl = QLabel("BlendShape Node")
+        lbl.setMinimumWidth(110)
+        node_row.addWidget(lbl)
+        self.le_to_node = QLineEdit()
+        self.le_to_node.setPlaceholderText(
+            "Pick a blendShape node or a mesh, then <- Set")
+        node_row.addWidget(self.le_to_node)
+        btn_set = QPushButton("<- Set")
+        btn_set.setToolTip(
+            "Set the blendShape from the current selection (node or mesh)\n"
+            "and list its targets right away.")
+        btn_set.clicked.connect(self.on_to_set_node)
+        node_row.addWidget(btn_set)
+        layout.addLayout(node_row)
+
+        btn_list = QPushButton("List Targets")
+        btn_list.setToolTip(
+            "Read the targets from the node, in the order the node lists them.\n"
+            "This throws away any reordering in the list below that was not applied.")
+        btn_list.clicked.connect(self.on_to_list_targets)
+        layout.addWidget(btn_list)
+
+        self.tsl_to_targets = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Targets (top = first)",
+            show_select=False, show_add=False, show_del=False,
+            show_up=True, show_down=True, show_sort=True, show_reverse=True,
+            show_order=False, attach_uuids=False,
+            list_min_height=260, log_callback=self.log)
+        self.tsl_to_targets.setToolTip(
+            "The blendShape's targets, top to bottom, in weight-index order.\n"
+            "Move them with Up / Down (or Sort / Reverse), then press APPLY ORDER.")
+        layout.addWidget(self.tsl_to_targets, 1)
+
+        # TSL 은 재정렬 시그널을 따로 내지 않는다. Up/Down/Sort/Reverse 는 모두
+        # 리스트를 지우고 다시 채우므로(_set_records) 모델의 행 시그널로 잡는다.
+        model = self.tsl_to_targets.list_widget.model()
+        model.rowsInserted.connect(self._to_sync_state)
+        model.rowsRemoved.connect(self._to_sync_state)
+
+        # 검색 = 공용 Filter 위젯. 필터가 걸려 있어도 Up/Down 은 **숨은 행까지 포함해**
+        # 한 칸씩 움직이므로(눌러도 안 움직인 것처럼 보인다) 상태 줄에서 알린다.
+        self.flt_to_targets = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.tsl_to_targets.list_widget,
+            placeholder="Type any part of a target name (e.g. Inner)")
+        self.flt_to_targets.filtered.connect(self._to_sync_state)
+        layout.addWidget(self.flt_to_targets)
+
+        self.lbl_to_state = QLabel("No blendShape set.")
+        self.lbl_to_state.setWordWrap(True)
+        layout.addWidget(self.lbl_to_state)
+
+        info = QLabel(
+            "Maya has no command for this - the Shape Editor only drags targets around "
+            "inside a group, and the real order (the weight index the Channel Box shows) "
+            "never moves.  APPLY ORDER rewrites those indices: every target keeps its own "
+            "name, shape, in-betweens, paint weights, value and connections, and the "
+            "deformed mesh does not move.")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        self.btn_to_apply = QPushButton("APPLY ORDER to the blendShape")
+        self.btn_to_apply.setMinimumHeight(36)
+        self.btn_to_apply.setEnabled(False)
+        self.btn_to_apply.setToolTip(
+            "Give the targets the order shown above, on the node itself.\n"
+            "One Ctrl+Z undoes the whole thing.")
+        self.btn_to_apply.clicked.connect(self.on_to_apply)
+        layout.addWidget(self.btn_to_apply)
+
+        return tab
+
+    # ---------------- Target Order : 상태/헬퍼
+
+    def _to_node(self):
+        return self.le_to_node.text().strip()
+
+    def _to_sync_state(self, *_args):
+        """리스트가 노드와 어떻게 다른지를 한 줄로 보여 준다."""
+        node = self._to_node()
+        listed = self.tsl_to_targets.get_all_items()
+
+        if not bsu.is_blendshape(node):
+            self.lbl_to_state.setText("No blendShape set.")
+            self.btn_to_apply.setEnabled(False)
+            return
+
+        scene = tom.target_names(node)
+        if not listed:
+            text = "'{0}' has {1} target(s). Press List Targets.".format(
+                node, len(scene))
+        elif sorted(listed) != sorted(scene):
+            text = ("The list no longer matches '{0}' ({1} listed, {2} on the node). "
+                    "Press List Targets again.".format(node, len(listed), len(scene)))
+        elif listed == scene:
+            text = "{0} target(s) - the list matches the node.".format(len(scene))
+        else:
+            moved = sum(1 for a, b in zip(listed, scene) if a != b)
+            text = "{0} target(s) - {1} would move. Press APPLY ORDER.".format(
+                len(scene), moved)
+
+        if self.flt_to_targets.text().strip():
+            text += ("   [Filter is on - Up/Down still steps over the hidden rows, "
+                     "so a press can look like it did nothing.]")
+
+        self.lbl_to_state.setText(text)
+        self.btn_to_apply.setEnabled(bool(listed))
+
+    # ---------------- Target Order : 핸들러
+
+    def on_to_set_node(self):
+        found = bsu.find_blendshapes_from_selection()
+        if not found:
+            self.log("[Warning] Select a blendShape node or a mesh driven by one.")
+            return
+        self.le_to_node.setText(found[0])
+        if len(found) > 1:
+            self.log("[Info] {0} blendShapes found; using '{1}'.".format(
+                len(found), found[0]))
+        self.on_to_list_targets()
+
+    def on_to_list_targets(self):
+        node = self._to_node()
+        if not bsu.is_blendshape(node):
+            self.log("[Warning] '{0}' is not a valid blendShape node.".format(node))
+            self.tsl_to_targets.clear()
+            self._to_sync_state()
+            return
+
+        targets = tom.target_names(node)
+        self.tsl_to_targets.set_items(targets)
+        self.flt_to_targets.refresh()
+        self._to_sync_state()
+
+        self.log("[Target Order] '{0}' : {1} target(s) listed.".format(
+            node, len(targets)))
+        if tom.editing_target(node) != -1:
+            self.log("[Warning] A target of '{0}' is in Edit (sculpt) mode - turn it "
+                     "off before applying a new order.".format(node))
+
+    def on_to_apply(self):
+        node = self._to_node()
+        order = self.tsl_to_targets.get_all_items()
+        if not order:
+            self.log("[Warning] Nothing listed. Press List Targets first.")
+            return
+
+        try:
+            with undo_chunk():
+                report = tom.reorder_targets(node, order)
+        except Exception as e:
+            self.log("[Error] Apply Order : {0}".format(e))
+            cmds.warning(str(e))
+            self._to_sync_state()
+            return
+
+        if not report["moved"]:
+            self.log("[Target Order] '{0}' is already in this order - nothing "
+                     "changed.".format(node))
+        else:
+            msg = "[OK] '{0}' reordered : {1} of {2} target(s) moved.".format(
+                node, report["moved"], report["count"])
+            if report["directories"]:
+                msg += " {0} Shape Editor group(s) updated.".format(
+                    report["directories"])
+            self.log(msg)
+
+        # 노드에서 다시 읽어 채운다 — 화면과 씬이 같은지 눈으로 확인된다.
+        self.on_to_list_targets()
+
+    # ==================================================
+    # Tab 6 : Bake Delete
     # ==================================================
 
     def _build_bake_delete_tab(self):
@@ -1756,6 +1947,12 @@ class MainWindow(QWidget):
         QMessageBox.information(
             self,
             "About",
-            f"BS Tool v{VERSION}\n"
+            f"BS Tool v{VERSION}\n\n"
+            "Shape Editor : every target of a blendShape, with an Edit toggle.\n"
+            "Edit BS : key every target / extract the target meshes.\n"
+            "Base Shape : make the shape at <Value> the new weight=1.0 shape.\n"
+            "Mix Targets : add a weighted mix of some targets onto others.\n"
+            "Target Order : reorder the targets on the blendShape node itself.\n"
+            "Bake Delete : push a post-deformer deleteComponent into the rig.\n\n"
             f"Written by Ji Hun Park.\nUpdate date: {LAST_UPDATE}",
         )
