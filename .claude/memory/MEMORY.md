@@ -94,6 +94,7 @@
 - [A00130 Pair & Constrain](wip-a00130-pair-constrain.md) — 세트 1:1 매칭 + `Con` -> parentConstraint. **parentConstraint 는 드라이버가 다르면 조용히 타깃을 늘린다** · `cmds.sets(q=True)` 는 멤버 순서를 보장하지 않는다 (v02.10)
 - [A00130 IK axis](wip-a00130-ik-axis.md) — 폴을 보는 축은 **`twist` 로만** 고쳐진다(`jointOrient` 는 솔버가 보정, `rotate` 는 덮어쓴다) · **`twist` 는 레퍼런스에서 유지** (v02.14)
 - [A00060 Pole Target](wip-a00060-pole-target.md) — `A'=A+n·v` 는 **pointConstraint 하나**로 환원된다 · **컨스트레인트 가중치는 `setAttr` 이 음수를 거부하고 연결은 통과** (v03.03)
+- [A00460 FK & IK](wip-a00460-fk-ik.md) — 컨트롤러 스택 생성. 자식 스택은 `_tgt` 가 아니라 **`_ctl` 밑에**(`_tgt` 는 잎) · **Hierarchy(FK/IK) 는 Mode(Bone Root/Chain) 와 별개 축**(네 조합) · 자손을 **따라가는 것과 잇는 것은 별개** · 중복 판정은 풀패스로 (v01.04)
 - [A00450 ManipulatorTool](wip-a00450-manipulatortool.md) — **신규**: 매니퓰레이터 축 굵기 슬라이더. `manipOptions` 는 전역 하나뿐(도구별 굵기 없음), 굵기(lineSize)와 클릭 히트(linePick)는 별개
 - [A00440 SetTool](wip-a00440-settool.md) — **신규**: 컴포넌트 세트 집합연산(∪∩∖ + Split). 이름 정규화가 전부, **`cmds.select(세트)` 는 멤버를 펼쳐 선택**한다
 - [A00430 DemBone](wip-a00430-dembone.md) — **신규 v01.03**: EA Dem Bones(스키닝 분해) 마야 이식 4모드(조인트 생성 포함). ref/ 는 git 제외·런타임 무의존, 공분산 4×4 질량 함정, 라벨 확산은 절대오차 말고 최선 대비 열위

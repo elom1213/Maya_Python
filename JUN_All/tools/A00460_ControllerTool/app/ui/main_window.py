@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-21
+# last Update date : 2026-09-07
 # A00460_ControllerTool - Qt UI
 #
 # 키프레임 애니메이션용 컨트롤러를 제작자 편의에 맞춰 생성하는 in-Maya PySide 툴.
-# 첫 기능은 FK — 리스트업한 조인트/오브젝트에 zro > con > ctl > tgt 계층을 만들고
-# 조인트가 그 계층을 따라오게 컨스트레인트한다. 자세한 구조는 core/fk_manager.py 참고.
+# 리스트업한 조인트/오브젝트에 zro > con > ctl > tgt 스택을 만들고 조인트가 그것을
+# 따라오게 컨스트레인트한다. 자세한 구조는 core/fk_manager.py 참고.
 #
 # 탭은 상위 = 카테고리, 하위 = 기능으로 두 단계다 (A00110_animTool_V02 · A00400 과 같은 규칙).
-#   Create > FK   - 씬에 새 컨트롤러 계층을 만든다
-# 지금은 하위가 FK 하나지만 하위 탭 바를 그대로 둔다 — 기능 이름이 화면에 남고,
-# IK / Space Switch 같은 기능이 늘어도 구조가 그대로다.
+#   Create > FK & IK  - 씬에 새 컨트롤러 스택을 만든다
+#
+# 이 탭에는 **서로 다른 두 가지 선택**이 있다. 섞어 읽지 않도록 그룹을 나눠 두었다.
+#   Mode      (Bone Root / Bone Chain) : **누구에게** 컨트롤러를 만들까
+#   Hierarchy (FK / IK)                : **만든 것끼리 어떻게 이을까**
+# 네 조합이 모두 성립한다.
 
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
@@ -36,9 +39,10 @@ class MainWindow(QWidget):
     # ==================================================================
 
     CREATE_PAGES = (
-        ("FK",
-         "FK - build a zro > con > ctl > tgt controller hierarchy for the "
-         "listed joints and constrain the joints to it.",
+        ("FK & IK",
+         "FK & IK - build a zro > con > ctl > tgt controller stack for the "
+         "listed joints and constrain the joints to it. FK links the stacks "
+         "into a hierarchy; IK leaves every stack at the top of the scene.",
          "_build_fk_tab"),
     )
 
@@ -91,7 +95,7 @@ class MainWindow(QWidget):
         root.addWidget(self.lbl_copyright)
 
         self.log("Controller Tool v{0} ({1}) ready. List joints and click "
-                 "'Create FK Controls'.".format(VERSION, LAST_UPDATE))
+                 "'Create Controls'.".format(VERSION, LAST_UPDATE))
 
     # --------------------------------------------------------------
     # 카테고리 상위 탭 / 기능 하위 탭
@@ -132,8 +136,8 @@ class MainWindow(QWidget):
             log_callback=self.log)
         root.addWidget(self.tsl, 1)
 
-        # ---------------- 대상 해석 모드 ----------------
-        mode_box = QGroupBox("Mode")
+        # ---------------- 대상 해석 모드 (누구에게 만들까) ----------------
+        mode_box = QGroupBox("Mode - which nodes get a control")
         mode_row = QHBoxLayout(mode_box)
         self.mode_group = QButtonGroup(self)
 
@@ -156,6 +160,41 @@ class MainWindow(QWidget):
         mode_row.addStretch(1)
         root.addWidget(mode_box)
 
+        # ---------------- 계층 방식 (만든 것끼리 어떻게 이을까) ----------------
+        # Mode 와 **다른 축**이다. 한 줄에 섞어 두면 네 조합 중 어느 것을 고른 것인지
+        # 읽히지 않으므로 그룹을 따로 둔다.
+        hier_box = QGroupBox("Hierarchy - how the stacks are linked")
+        hier_lay = QVBoxLayout(hier_box)
+
+        hier_row = QHBoxLayout()
+        self.hier_group = QButtonGroup(self)
+
+        self.rb_fk = QRadioButton("FK")
+        self.rb_fk.setChecked(True)
+        self.rb_fk.setToolTip(
+            "The stacks are LINKED: a child's zro goes under its parent's ctl,\n"
+            "so turning a parent control carries the children with it.")
+
+        self.rb_ik = QRadioButton("IK")
+        self.rb_ik.setToolTip(
+            "The stacks are NOT linked: every zro is created at the TOP of the\n"
+            "scene, even when the listed objects have children. Each control\n"
+            "moves on its own in world space.")
+
+        self.hier_group.addButton(self.rb_fk)
+        self.hier_group.addButton(self.rb_ik)
+        hier_row.addWidget(self.rb_fk)
+        hier_row.addWidget(self.rb_ik)
+        hier_row.addStretch(1)
+        hier_lay.addLayout(hier_row)
+
+        lbl_hier = QLabel(
+            "Independent of Mode - Mode picks the nodes, Hierarchy links them.")
+        lbl_hier.setWordWrap(True)
+        hier_lay.addWidget(lbl_hier)
+
+        root.addWidget(hier_box)
+
         # ---------------- 만들 노드 ----------------
         node_box = QGroupBox("Nodes to Build")
         node_lay = QVBoxLayout(node_box)
@@ -173,8 +212,9 @@ class MainWindow(QWidget):
         self.chk_tgt = QCheckBox("tgt")
         self.chk_tgt.setChecked(True)
         self.chk_tgt.setToolTip(
-            "Null under the control. This is what constrains the joint,\n"
-            "and the next joint's stack hangs from it.")
+            "Null under the control. This is what constrains the joint.\n"
+            "It is a LEAF - nothing is parented under it (the next joint's\n"
+            "stack hangs from the ctl instead).")
 
         for chk in (self.chk_zro, self.chk_con, self.chk_tgt):
             node_row.addWidget(chk)
@@ -235,11 +275,11 @@ class MainWindow(QWidget):
         root.addWidget(con_box)
 
         # ---------------- 실행 ----------------
-        self.btn_create = QPushButton("Create FK Controls")
+        self.btn_create = QPushButton("Create Controls")
         self.btn_create.setToolTip(
-            "Build the controller hierarchy for the listed nodes and constrain\n"
+            "Build the controller stacks for the listed nodes and constrain\n"
             "them to it. One undo step.")
-        self.btn_create.clicked.connect(self.on_create_fk)
+        self.btn_create.clicked.connect(self.on_create)
         root.addWidget(self.btn_create)
 
         return tab
@@ -260,7 +300,7 @@ class MainWindow(QWidget):
             types.append(fk_mgr.CON_SCALE)
         return types
 
-    def on_create_fk(self):
+    def on_create(self):
         nodes = self.tsl.get_all_nodes() or self.tsl.get_all_items()
         if not nodes:
             self.log("Nothing listed. Select joints in the scene and click "
@@ -268,14 +308,16 @@ class MainWindow(QWidget):
             return
 
         mode = fk_mgr.MODE_ROOT if self.rb_root.isChecked() else fk_mgr.MODE_CHAIN
+        hierarchy = fk_mgr.HIER_FK if self.rb_fk.isChecked() else fk_mgr.HIER_IK
 
         # 공용 undo_chunk 는 인자를 받지 않는다(Framework/core/maya_undo.py).
         # 마지막 select 도 **chunk 안에서** 한다 — 밖에서 하면 select 가 별도 undo
         # 스텝이 되어 Ctrl+Z 를 한 번 눌렀을 때 선택만 되돌아가고 컨트롤러는 남는다.
         with undo_chunk():
-            result = fk_mgr.build_fk_controls(
+            result = fk_mgr.build_controls(
                 nodes,
                 mode=mode,
+                hierarchy=hierarchy,
                 use_zro=self.chk_zro.isChecked(),
                 use_con=self.chk_con.isChecked(),
                 use_tgt=self.chk_tgt.isChecked(),
@@ -285,9 +327,9 @@ class MainWindow(QWidget):
             if result["roots"]:
                 cmds.select(result["roots"], replace=True)
 
-        self._report(result, mode)
+        self._report(result, mode, hierarchy)
 
-    def _report(self, result, mode):
+    def _report(self, result, mode, hierarchy):
         for node in result["missing"]:
             self.log("Not in the scene, skipped: {0}".format(node), warn=True)
 
@@ -303,12 +345,16 @@ class MainWindow(QWidget):
             self.log("Nothing was built.", warn=True)
             return
 
+        is_ik = hierarchy == fk_mgr.HIER_IK
         self.log(
-            "FK built ({0} mode): {1} control(s) over {2} joint(s), "
-            "{3} root hierarchy(ies), {4} constraint node(s).".format(
+            "{0} built ({1} mode): {2} control(s) over {3} joint(s), "
+            "{4} {5}, {6} constraint node(s).".format(
+                "IK" if is_ik else "FK",
                 "Bone Root" if mode == fk_mgr.MODE_ROOT else "Bone Chain",
-                len(controls), len(result["driven"]),
-                len(result["roots"]), len(result["constraints"])))
+                len(controls), len(result["driven"]), len(result["roots"]),
+                # IK 는 스택마다 최상단이 하나씩이라 "계층" 이라고 부르면 오해를 준다.
+                "stack(s) at the scene top" if is_ik else "root hierarchy(ies)",
+                len(result["constraints"])))
 
     # ==============================================================
     # 공용
@@ -329,6 +375,8 @@ class MainWindow(QWidget):
             "Version {0}\n"
             "Last update {1}\n\n"
             "Build animation controllers.\n"
-            "FK: <joint>_zro > _con > _ctl > _tgt, joint follows _tgt.\n"
+            "<joint>_zro > _con > _ctl > _tgt, joint follows _tgt.\n"
+            "_tgt is a leaf - child stacks hang from _ctl.\n"
+            "FK links the stacks; IK leaves every _zro at the scene top.\n"
             "Controls are cube outline curves.\n\n"
             "Python Script by Ji Hun Park".format(VERSION, LAST_UPDATE))

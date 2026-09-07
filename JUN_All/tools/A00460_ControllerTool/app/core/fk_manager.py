@@ -1,23 +1,41 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-21
-# A00460_ControllerTool - FK 컨트롤러 생성 (maya.cmds, UI 비의존)
+# last Update date : 2026-09-07
+# A00460_ControllerTool - FK / IK 컨트롤러 생성 (maya.cmds, UI 비의존)
 #
-# 조인트(또는 오브젝트) 하나마다 아래 스택을 만들고, 스택끼리 계층으로 잇는다.
+# 조인트(또는 오브젝트) 하나마다 아래 스택을 만든다.
 #
 #   <joint>_zro          zero-out 널 (조인트 자리 · 방향)
 #   └── <joint>_con      오프셋 널
 #       └── <joint>_ctl  ★ 애니메이터가 잡는 커브 컨트롤러
-#           └── <joint>_tgt  조인트를 컨스트레인트하는 널
-#               └── <child>_zro ...   (자식 조인트의 스택이 여기에 붙는다)
+#           ├── <joint>_tgt      조인트를 컨스트레인트하는 널 — **잎이다(자식 없음)**
+#           └── <child>_zro ...  자식 스택은 **_ctl 밑에** 붙는다 (FK 계층일 때)
 #
 # 조인트는 자기 스택의 **마지막 노드**(보통 _tgt)를 따라간다.
-# _zro / _con / _tgt 는 옵션이라 꺼면 스택에서 빠지고, 꺼진 만큼 위/아래가 직접 이어진다.
+# _zro / _con / _tgt 는 옵션이라 끄면 스택에서 빠지고, 꺼진 만큼 위/아래가 직접 이어진다.
 # _ctl 은 이 툴의 존재 이유이므로 항상 만든다.
+#
+# ## 자식 스택은 _tgt 가 아니라 _ctl 밑에 (v01.04~)
+#
+# 예전에는 자식 `_zro` 가 `_tgt` 밑으로 들어가서 `_tgt` 가 "컨스트레인트 드라이버" 와
+# "다음 뼈의 부모" 두 역할을 겸했다. 결과는 같지만(둘 다 `_ctl` 에 로컬 0 으로 붙어 있어
+# 월드 행렬이 동일) `_tgt` 에 자식이 달려 있으면 그것만 따로 옮기거나 지우기 어렵다.
+# 이제 **`_tgt` 는 잎으로 남고** 자식 스택은 `_ctl` 밑에 붙는다.
+#
+# ## 계층 방식 — FK / IK
+#
+#   fk : 스택끼리 **계층으로 잇는다.** 부모 컨트롤러를 돌리면 자식이 딸려 온다(FK 감각).
+#   ik : 스택을 **하나도 잇지 않는다.** 모든 `_zro` 가 **씬 최상위(월드)** 에 선다.
+#        리스트에 자식 계층이 있는 오브젝트가 섞여 있어도 마찬가지다. 컨트롤러끼리
+#        서로를 끌지 않으므로 각자 월드에서 독립으로 움직인다(IK 감각).
+#
+# 이 선택은 **대상 해석 모드(Bone Root / Bone Chain)와 별개**다. 모드는 "누구에게 컨트롤러를
+# 만들까", 계층 방식은 "만든 것끼리 어떻게 이을까" 를 정한다. 네 조합이 모두 성립한다.
 #
 # 좌표: 스택의 **최상단 노드만** matchTransform 으로 조인트 자리(위치+회전)에 맞추고,
 # 나머지는 로컬 0 으로 부모 밑에 넣는다(relative parent). 그래서 셋 다 정확히 겹치고,
 # 컨트롤러를 움직인 값이 곧 조인트 대비 오프셋이 된다. (A00170_driverTool 과 같은 방식)
+# IK 도 최상단을 조인트 자리에 맞추는 것은 같다 — 부모가 없을 뿐이다.
 
 import maya.cmds as cmds
 
@@ -30,6 +48,16 @@ import maya.cmds as cmds
 #   chain : 리스트업한 노드들이 **하나의 체인** — 씬 계층과 무관하게 리스트 순서로 잇는다.
 MODE_ROOT = "root"
 MODE_CHAIN = "chain"
+
+MODES = (MODE_ROOT, MODE_CHAIN)
+
+# 계층 방식 — 만든 스택끼리 **어떻게 이을지**. 대상 해석 모드와 별개다.
+#   fk : 스택을 계층으로 잇는다(자식 _zro 가 부모 _ctl 밑으로).
+#   ik : 잇지 않는다 — 모든 _zro 가 씬 최상위(월드)에 선다.
+HIER_FK = "fk"
+HIER_IK = "ik"
+
+HIERARCHIES = (HIER_FK, HIER_IK)
 
 CON_PARENT = "parent"
 CON_POINT = "point"
@@ -66,6 +94,18 @@ DEFAULT_SIZE = 1.0
 def _short(node):
     """풀패스에서 짧은 이름만."""
     return node.split("|")[-1]
+
+
+def _long(node):
+    """풀패스. 같은 노드를 두 이름으로 만나도 하나로 세기 위한 것이다.
+
+    ROOT 모드의 `seen` 이 **입력 그대로의 문자열**을 담으면, 사용자가 루트와 그 자식을
+    함께 리스트에 담았을 때 같은 조인트를 두 번 만난다 — 재귀는 `_children_of` 가 준
+    풀패스(`|a|b`)로, 바깥 루프는 사용자가 넣은 짧은 이름(`b`)으로. 그러면 **에러 없이**
+    `b_zro1` 스택이 하나 더 생긴다. 비교는 언제나 풀패스로 한다.
+    """
+    found = cmds.ls(node, long=True) or []
+    return found[0] if found else node
 
 
 def _is_constraint(node):
@@ -196,7 +236,11 @@ def _apply_constraints(driver, driven, types, result):
 # --------------------------------------------------------------- 빌드
 
 def _build_one(joint, parent_node, plan, types, size, result):
-    """조인트 하나: 스택 생성 + 컨스트레인트. 스택의 **최하단**을 돌려준다."""
+    """조인트 하나: 스택 생성 + 컨스트레인트. **자식 스택을 붙일 노드**를 돌려준다.
+
+    조인트를 끄는 것은 스택의 **마지막 노드**(보통 `_tgt`)지만, 다음 스택이 붙는 곳은
+    **`_ctl`** 이다. 두 역할을 나눠 두어야 `_tgt` 가 잎으로 남는다(모듈 상단 참고).
+    """
     top, last, ctl = _create_stack(joint, parent_node, plan, size, result)
 
     result["controls"].append(ctl)
@@ -206,37 +250,47 @@ def _build_one(joint, parent_node, plan, types, size, result):
     _apply_constraints(last, joint, types, result)
     result["driven"].append(joint)
 
-    return last
+    return ctl
 
 
 def _build_root_recursive(joint, parent_node, plan, types, size,
-                          result, seen):
-    """ROOT 모드 — 조인트와 그 자손을 계층 그대로 따라 내려가며 스택을 잇는다."""
-    if joint in seen:
-        return
-    seen.add(joint)
+                          result, seen, hierarchy):
+    """ROOT 모드 — 조인트와 그 자손을 따라 내려가며 스택을 만든다.
 
-    last = _build_one(joint, parent_node, plan, types, size, result)
+    자손을 **따라가는 것**과 스택을 **잇는 것**은 별개다. IK 계층에서는 자손까지 그대로
+    돌지만 부모를 넘기지 않아 모든 스택이 월드에 선다.
+    """
+    key = _long(joint)
+    if key in seen:
+        return
+    seen.add(key)
+
+    anchor = _build_one(joint, parent_node, plan, types, size, result)
+    child_parent = anchor if hierarchy == HIER_FK else None
 
     for child in _children_of(joint):
-        _build_root_recursive(child, last, plan, types, size, result, seen)
+        _build_root_recursive(child, child_parent, plan, types, size,
+                              result, seen, hierarchy)
 
 
-def build_fk_controls(nodes, mode=MODE_ROOT,
-                      use_zro=True, use_con=True, use_tgt=True,
-                      constraints=DEFAULT_CONSTRAINTS,
-                      size=DEFAULT_SIZE):
-    """리스트업한 노드들에 FK 컨트롤러 계층을 만든다.
+def build_controls(nodes, mode=MODE_ROOT, hierarchy=HIER_FK,
+                   use_zro=True, use_con=True, use_tgt=True,
+                   constraints=DEFAULT_CONSTRAINTS,
+                   size=DEFAULT_SIZE):
+    """리스트업한 노드들에 컨트롤러 스택을 만든다.
 
     nodes       : 조인트/오브젝트 이름 목록(리스트 순서 그대로 쓴다).
-    mode        : MODE_ROOT(각 항목이 체인 루트, 자손까지 따라감) /
-                  MODE_CHAIN(리스트 전체가 한 체인, 리스트 순서로 이음).
+    mode        : **누구에게 만들까** — MODE_ROOT(각 항목이 체인 루트, 자손까지 따라감) /
+                  MODE_CHAIN(리스트에 담긴 것만, 리스트 순서로 본다).
+    hierarchy   : **만든 것끼리 어떻게 이을까** — HIER_FK(스택을 계층으로 잇는다) /
+                  HIER_IK(잇지 않는다. 모든 _zro 가 씬 최상위에 선다).
+                  mode 와 별개라 네 조합이 모두 성립한다.
     use_zro/con/tgt : 만들 널 그룹 종류. _ctl 은 항상 만든다.
     constraints : CON_* 목록. 조인트는 스택의 마지막 노드(보통 _tgt)를 따라간다.
     size        : 컨트롤러 큐브의 반변길이(반지름 감각).
 
     반환 dict:
-        roots       계층 최상단 노드들
+        roots       부모가 없는 최상단 노드들 (IK 면 스택마다 하나씩)
         controls    만들어진 _ctl 목록
         constraints 만들어진 컨스트레인트 노드
         driven      컨스트레인트가 걸린 조인트
@@ -274,15 +328,19 @@ def build_fk_controls(nodes, mode=MODE_ROOT,
     if not valid:
         return result
 
+    if hierarchy not in HIERARCHIES:
+        hierarchy = HIER_FK
+
     if mode == MODE_ROOT:
         seen = set()
         for root in valid:
             _build_root_recursive(root, None, plan, types, size,
-                                  result, seen)
+                                  result, seen, hierarchy)
     else:
         parent_node = None
         for node in valid:
-            parent_node = _build_one(node, parent_node, plan, types,
-                                     size, result)
+            anchor = _build_one(node, parent_node, plan, types, size, result)
+            # IK 는 다음 스택에 부모를 넘기지 않는다 — 전부 월드에 선다.
+            parent_node = anchor if hierarchy == HIER_FK else None
 
     return result

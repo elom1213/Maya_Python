@@ -447,14 +447,20 @@ Default Distance attribute (driver signal x)
   and hit-testing are separate** — `lineSize` is what is drawn, `linePick` is what is hit — and exposed
   `Pick Radius` alongside it with that distinction written into the UI, because thickness alone does not
   actually achieve what was asked for.
-- **`A00460_ControllerTool`** — **a tool for building keyframe-animation controllers**; the first feature is
-  **FK**. For every listed joint it builds a `zro > con > ctl > tgt` stack and links the stacks along the joint
+- **`A00460_ControllerTool`** — **a tool for building keyframe-animation controllers**, in two hierarchy
+  flavours: **FK and IK**. For every listed joint it builds a `zro > con > ctl > tgt` stack and links the stacks along the joint
   hierarchy, so rotating a control carries every joint below it the way FK should. Only the **top of each stack
   is `matchTransform`ed onto the joint while the rest stay at local zero**, so all four nodes overlap exactly —
   that is what makes "how far you moved the control" equal "the offset against the joint". The null types
   (`zro`/`con`/`tgt`) can each be turned off, and because the constraint driver is defined as **"the last node in
   the stack"**, switching `tgt` off hands that job to `_ctl` automatically (the descent is recursive, so a joint
-  with several children branches into one stack per child). Constraints can be parent/point/orient/scale, but I
+  with several children branches into one stack per child). **Child stacks hang from `_ctl`, not `_tgt`** — the
+  world result is identical, but `_tgt` has to stay a leaf for it to be movable or deletable on its own. And
+  **"which nodes get a control" (Bone Root / Bone Chain) is split from "how the stacks are linked" (FK / IK)**
+  as two independent axes, so all four combinations hold: IK puts every `_zro` at the top of the scene even when
+  the listed objects have children, so the controls never carry each other. Walking the descendants and linking
+  the stacks are **separate things** — Bone Root + IK still builds a control for every descendant, it just does
+  not parent them. Constraints can be parent/point/orient/scale, but I
   verified headlessly that **parent together with point/orient makes two constraints fight over the same
   channels** — Maya rejects the second with `Object is already connected` — so the tool warns instead of
   blocking; the combination that is actually useful is `parent + scale`.
