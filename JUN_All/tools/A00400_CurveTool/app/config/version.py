@@ -6,6 +6,7 @@
 # 01.04  Points to Curve     - 리스트 순서대로 월드 위치를 잇는 커브 (Exact / Smoothed)
 # 01.05  Smooth              - 선택 CV 를 슬라이더로 Smooth / Rough (소프트 셀렉션 폴오프 반영)
 # 01.06  Tab taxonomy        - 상위 탭 = 카테고리(Create / Edit / Display), 하위 탭 = 기능
+# 01.07  Joints              - 커브 위 균일 조인트 + 커브 바인드 + zro/con/ctl/tgt 컨트롤러
 
-VERSION = "01.06"
-LAST_UPDATE = "2026-08-21"
+VERSION = "01.07"
+LAST_UPDATE = "2026-09-07"

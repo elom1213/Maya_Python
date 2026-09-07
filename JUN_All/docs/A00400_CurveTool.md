@@ -1,8 +1,8 @@
 ---
 title: A00400_CurveTool 사용법
 aliases: [Curve Tool, CurveTool, A00400]
-tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve, lineWidth, wrap, blendShape, editPoint, laplacian, smoothCurve, softSelect]
-updated: 2026-08-21
+tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve, lineWidth, wrap, blendShape, editPoint, laplacian, smoothCurve, softSelect, joint, skinCluster, controller]
+updated: 2026-09-07
 ---
 
 # A00400_CurveTool 사용법
@@ -17,6 +17,7 @@ Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya).
 | | **From Points** (v01.04~) | 리스트에 담은 오브젝트·조인트·컴포넌트의 **월드 위치**를 **순서대로** 잇는 커브 하나. 정확히 통과 / 완화 선택 |
 | **Edit**<br>기존 커브의 **형상(CV)** 을 바꾼다 | **Smooth** (v01.05~) | 씬에서 고른 **CV** 를 슬라이더로 실시간 Smooth / Rough. **소프트 셀렉션 폴오프**를 그대로 쓴다 |
 | | **Wrap** (v01.03~) | **CV 개수가 달라도** 한 커브가 다른 커브의 모양을 따르게 한다. 0~1 envelope 어트리뷰트로 라이브 블렌드 |
+| | **Joints** (v01.07~) | 커브 위에 조인트를 **균일 배치** → 그 조인트로 **커브를 바인드** → 조인트마다 `zro/con/ctl/tgt` 컨트롤러. 컨트롤러가 조인트를, 조인트가 커브를 움직인다 |
 | **Display**<br>**그려지는 방식만** 바꾼다 | **Line Width** (v01.01~) | 리스트업한 커브의 **뷰포트 표시 굵기**를 슬라이더로 조절 — 씬에서 **잘 보이고 잘 집히게**. 형상은 불변 |
 
 ### 분류 기준 (v01.06)
@@ -30,9 +31,14 @@ Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya).
 - **하위 페이지가 하나뿐인 Display 도 하위 탭 바를 그대로 둔다** — ① 기능 이름이 화면에 남고
   ② 나중에 커브 색상·CV 크기 같은 표시 기능이 늘어도 구조가 그대로다.
 
+- **Joints 는 조인트·컨트롤러를 새로 만들지만 Create 가 아니라 Edit** — Create 의 기준은
+  "새 **커브**를 만든다" 이고, Joints 는 **이미 있는 커브**를 대상으로 그 커브의 CV 를 무엇이
+  움직일지 바꾼다(바인드). 만들어지는 조인트·컨트롤러는 그 목적을 위한 수단이라, 분류는
+  커브 기준으로 유지했다.
+
 > 분류표는 코드에서 `MainWindow.CATEGORIES` 한 곳이 정한다. 탭을 추가·이동하려면 그 표만 고치면 된다.
 
-- **버전**: `app/config/version.py` (v01.06)
+- **버전**: `app/config/version.py` (v01.07)
 - **설치**: `__dragDrop_A00400.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **CurveTool** → `tools.A00400_CurveTool.run(True)`
 - **참고**: 엣지→커브 생성은 `ref/ref_01.mel`(`duplicateCurve`+`attachCurve`)의 아이디어를, 축 비교 방식은 `A00360_SortTool` 을 이식/응용.
 
@@ -122,7 +128,11 @@ tools/A00400_CurveTool/
 ├── ref/ref_01.mel                       # 참고: 단일 커브 attach 방식 MEL
 └── app/
     ├── config/version.py
-    ├── core/curve_manager.py   # 엣지 그룹핑 + polyToCurve + reverseCurve (maya.cmds, UI 비의존)
+    ├── core/curve_manager.py        # 엣지 그룹핑 + polyToCurve + reverseCurve (maya.cmds, UI 비의존)
+    ├── core/points_manager.py       # 월드 위치 목록 -> 커브
+    ├── core/smooth_manager.py       # CV 라플라시안 스무딩
+    ├── core/wrap_manager.py         # rebuildCurve + blendShape 래핑
+    ├── core/joint_curve_manager.py  # 커브 위 균일 조인트 + skinCluster 바인드 + 컨트롤러 스택
     └── ui/main_window.py       # PySide UI (카테고리 상위 탭 + 기능 하위 탭 + 로그)
 ```
 
@@ -132,7 +142,8 @@ tools/A00400_CurveTool/
 CREATE_PAGES  = (("From Edges", tip, "_build_create_tab"),
                  ("From Points", tip, "_build_points_tab"))
 EDIT_PAGES    = (("Smooth", tip, "_build_smooth_tab"),
-                 ("Wrap",   tip, "_build_wrap_tab"))
+                 ("Wrap",   tip, "_build_wrap_tab"),
+                 ("Joints", tip, "_build_joints_tab"))
 DISPLAY_PAGES = (("Line Width", tip, "_build_width_tab"),)
 
 CATEGORIES = (("Create",  tip, CREATE_PAGES,  "create_tabs"),
@@ -407,3 +418,123 @@ result[i] = origin[i] + sign(적용값) * weight[i] * (target[i] - origin[i])
   > 한 청크 안에서 여러 번 불러도 `Ctrl+Z` 한 번에 전부 되돌아간다.
 - 확정 뒤 슬라이더를 0 으로 되돌릴 때는 **신호를 막고** 되돌린다. 막지 않으면 `valueChanged` 가
   0 으로 다시 적용되어 방금 확정한 결과가 그대로 지워진다.
+
+---
+
+## Edit > Joints (v01.07~) — 커브를 조인트로 움직이게
+
+커브를 애니메이션·리깅에서 쓰려면 **커브를 직접 잡는 대신 무언가가 커브를 끌어 주어야** 한다.
+이 탭은 그 셋업을 한 번에 만든다.
+
+```
+리스트업한 커브
+   ↓ ① 균일 배치
+조인트 n 개
+   ↓ ② 바인드(skinCluster)
+커브가 조인트를 따라간다
+   ↑ ③ 컨스트레인트
+<joint>_zro > _con > _ctl > _tgt      ← 애니메이터는 _ctl 만 잡는다
+```
+
+컨트롤러 스택의 모양·옵션·툴팁은 **`A00460_ControllerTool` 의 FK 탭과 같게** 맞췄다.
+두 툴을 오가며 써도 같은 자리에서 같은 이름을 찾을 수 있어야 하기 때문이다.
+
+### 사용법
+
+1. 씬에서 커브를 고르고 **List Selected Curves**.
+2. **Count per Curve** 를 정한다.
+3. 필요하면 아래 옵션을 손보고 **Create Joints on Curves**.
+
+만들어진 컨트롤러가 선택된 채로 끝난다. **전체가 undo 한 스텝**이다.
+
+### Count per Curve — 몇 개를, 어디에
+
+커브의 **처음~끝을 `[0, 1]`** 로 보고 그만큼 균일하게 놓는다.
+
+| 입력 | 놓이는 자리 |
+|------|-------------|
+| `1` | `0.5` (구간 중앙 하나) |
+| `2` | `0`, `1` (양 끝) |
+| `3` | `0`, `0.5`, `1` |
+| `5` | `0`, `0.25`, `0.5`, `0.75`, `1` |
+
+**닫힌 커브는 마지막 자리를 뺀다.** 닫힌/주기 커브에서 `u=1` 은 `u=0` 과 **같은 점**이라
+그대로 두면 마지막 조인트가 첫 조인트 위에 겹친다. 그래서 `count` 등분으로 바꿔
+`4` → `0, 0.25, 0.5, 0.75` 를 쓴다. (엣지 루프에서 뜬 커브가 대부분 여기 해당한다)
+
+### Spacing — 호 길이 균등 vs 파라미터 균등
+
+| 옵션 | 뜻 |
+|------|-----|
+| **By length** (기본) | 눈에 보이는 **커브를 따라** 균등. `MFnNurbsCurve.findParamFromLength` |
+| **By parameter** | 커브 **자기 파라미터** 범위에서 균등 |
+
+둘은 스팬 길이가 고르면 같지만, **제각각이면 눈에 띄게 달라진다.** 예를 들어 CV 가
+`(0,0,0) (1,0,0) (11,0,0)` 인 직선 커브(스팬 1 : 10)에 3개를 놓으면
+
+- **By length** → `x = 0, 5.5, 11` (정확히 절반 지점)
+- **By parameter** → `x = 0, 1, 11` (짧은 스팬 쪽에 몰린다)
+
+메시 엣지에서 뜬 커브는 스팬 길이가 고르지 않은 게 보통이라 **기본은 By length** 다.
+
+### 나머지 옵션
+
+| 옵션 | 기본 | 설명 |
+|------|------|------|
+| **Aim joints along the curve** | 켬 | 조인트 **X 축을 커브 접선**으로 돌린다. up 힌트는 월드 Y, 접선이 Y 와 나란하면 월드 Z 로 갈아탄다. 컨트롤러는 조인트에 맞춰지므로 같이 돈다. 끄면 조인트가 월드 방향 그대로 |
+| **Bind the curve to the new joints** | 켬 | 방금 만든 조인트로 그 커브를 `skinCluster`. **이미 skinCluster 가 걸린 커브는 건너뛰고** 로그에 남긴다(덮어쓰지 않는다) |
+| **Group the new nodes per curve** | 켬 | `<curve>_crvJnt_grp` 밑에 `<curve>_jnt_grp` · `<curve>_ctl_grp` 로 나눠 담는다 |
+| **zro / con / tgt** | 셋 다 켬 | 컨트롤러 스택에 넣을 널. **`ctl`(큐브 커브)은 항상** 만든다 |
+| **Control Size** | `1.0` | 큐브의 **반변 길이**(반지름 감각) |
+| **Constraint** | Parent | 조인트가 스택 **마지막 노드**(보통 `_tgt`)를 따르는 방식. Parent / Point / Orient / Scale |
+
+### 만들어지는 이름
+
+커브 이름이 `spine_crv`, 조인트 3개라면
+
+```
+spine_crv_crvJnt_grp
+├── spine_crv_jnt_grp
+│   ├── spine_crv_1_jnt        (0.0 지점)
+│   ├── spine_crv_2_jnt        (0.5)
+│   └── spine_crv_3_jnt        (1.0)
+└── spine_crv_ctl_grp
+    ├── spine_crv_1_jnt_zro > _con > _ctl > _tgt
+    ├── spine_crv_2_jnt_zro > ...
+    └── spine_crv_3_jnt_zro > ...
+
+spine_crv_skinCluster          (커브를 세 조인트에 바인드)
+```
+
+번호는 개수 자릿수만큼 0 을 채운다 — 3개면 `1`~`3`, 12개면 `01`~`12`.
+이름이 이미 쓰이고 있으면 마야가 뒤에 번호를 붙이고, **그 사실을 로그에 남긴다**.
+
+### 알아둘 것 (mayapy 로 확인)
+
+- **커브에도 `skinCluster` 가 걸린다.** 메시 전용이 아니다. `polyToCurve` 로 만든
+  **히스토리가 살아 있는 커브**에도 걸리고(디포머가 히스토리 뒤에 끼어든다) 조인트가
+  CV 를 정상으로 끈다.
+- **바인드는 조인트를 그룹에 넣은 뒤에 한다.** `bindPreMatrix` 는 **바인드 시점의 행렬**을
+  잡아 두므로, 바인드하고 나서 조인트를 옮기면 옮긴 것만으로 커브가 튄다.
+- **리페어런트는 롱네임을 죽인다.** 조인트를 `_jnt_grp` 에 넣는 순간 `|spine_crv_1_jnt` 는
+  없는 경로가 된다(`cmds.xform` 이 곧바로 `No object matches name`). 결과 dict 에는
+  **옮긴 뒤의 경로**를 담고, 컨트롤러 스택은 옮기기 전에 **UUID** 를 잡아 두었다가 다시
+  해석한다. 개발 중 실제로 이 회귀를 냈고 헤드리스 테스트가 잡았다.
+- **조인트는 하나씩 선택을 비우고 만든다.** `cmds.joint` 는 **현재 선택의 자식**으로 붙으므로
+  그냥 반복하면 조인트끼리 부모-자식 체인이 된다. 커브를 구동하는 조인트들은 각자 독립으로
+  움직여야 CV 가 제 몫만큼만 따라온다.
+- **조인트 방향은 `rotate` 가 아니라 `jointOrient` 에 쓴다.** 조인트의 로컬 행렬은
+  `R * JO` 라, 부모가 항등이고 `rotate` 가 0 인 갓 만든 조인트에서는 `jointOrient` 에 넣은
+  값이 곧 월드 방향이 된다. `rotate` 에 넣으면 애니메이터가 채널을 0 으로 돌리는 순간
+  방향이 풀린다.
+- **`A00460_ControllerTool` 의 `fk_manager` 를 import 하지 않는다.** 노드 구성은 같지만
+  `dev/build_release.py` 가 **툴 하나 + Framework** 만 릴리스로 복사하므로, 다른 툴의 core 를
+  참조하면 릴리스에서 곧바로 깨진다. 정말 공유해야 해지면 `Framework` 로 올릴 자리다.
+- 커브가 아닌 항목, 씬에 없는 이름, 이미 바인드된 커브는 **사유와 함께 건너뛴다** — 나머지
+  커브 처리는 계속된다.
+
+- 핵심 API:
+  - `joint_curve_manager.build_joints_on_curves(curves, count, spacing, aim, bind, group, use_zro, use_con, use_tgt, constraints, size, joint_radius)` → 결과 dict
+    (`curves` / `joints` / `controls` / `roots` / `groups` / `skins` / `constraints` / `missing` / `skipped` / `renamed` / `warnings`)
+  - `joint_curve_manager.uniform_us(count, closed)` → `[0, 1]` 위의 균일 위치 목록
+  - `joint_curve_manager.sample_curve(shape, count, spacing)` → `[(월드 위치, 월드 접선), ...]`

@@ -28,6 +28,7 @@ from tools.A00400_CurveTool.app.core import curve_manager as curve_mgr
 from tools.A00400_CurveTool.app.core import wrap_manager as wrap_mgr
 from tools.A00400_CurveTool.app.core import points_manager as points_mgr
 from tools.A00400_CurveTool.app.core import smooth_manager as smooth_mgr
+from tools.A00400_CurveTool.app.core import joint_curve_manager as jnt_mgr
 
 
 WINDOW_OBJECT_NAME = "JUN_A00400_CurveTool_window"
@@ -55,6 +56,11 @@ class MainWindow(QWidget):
     # Line Width 를 Edit 이 아니라 Display 에 둔 이유: nurbsCurve.lineWidth 는
     # 뷰포트 표시 굵기일 뿐 커브 데이터를 건드리지 않는다. 커브를 바꾸는 기능과
     # 보이는 방식만 바꾸는 기능을 같은 상자에 두면 분류가 흐려진다.
+    #
+    # Edit > Joints 는 씬에 조인트·컨트롤러를 **새로 만들지만** Create 가 아니라 Edit 이다.
+    # Create 의 기준은 "새 **커브**를 만든다" 이고, Joints 는 이미 있는 커브를 대상으로
+    # 그 커브의 CV 를 무엇이 움직일지 바꾼다(바인드). 만들어지는 조인트·컨트롤러는 그
+    # 목적을 위한 수단이라 분류를 커브 기준으로 유지했다.
     #
     # Reverse Direction 은 성격상 Edit 이지만 Create 의 "From Edges" 에 남겨 둔다 —
     # 생성 버튼과 **같은 커브 리스트(self.tsl)** 를 공유하기 때문이다. 떼어내면
@@ -85,6 +91,10 @@ class MainWindow(QWidget):
          "Make one curve take the shape of another, even when the two have "
          "different CV counts.",
          "_build_wrap_tab"),
+        ("Joints",
+         "Place joints evenly along each listed curve, bind the curve to them, "
+         "and build a zro / con / ctl / tgt controller on every joint.",
+         "_build_joints_tab"),
     )
 
     DISPLAY_PAGES = (
@@ -1196,6 +1206,240 @@ class MainWindow(QWidget):
     def on_width_reset(self):
         with undo_chunk():
             self._apply_width(curve_mgr.LINE_WIDTH_DEFAULT)
+
+    # --------------------------------------------------------------
+    # Edit > Joints  (커브 위 균일 조인트 -> 커브 바인드 -> 컨트롤러 스택)
+    # --------------------------------------------------------------
+
+    def _build_joints_tab(self):
+        """리스트업한 커브마다 조인트를 균일하게 놓고, 커브를 바인드하고, 컨트롤러를 세운다.
+
+        컨트롤러 스택(zro / con / ctl / tgt)과 옵션 구성은 A00460_ControllerTool 의
+        FK 탭과 같은 모양으로 맞췄다 — 두 툴을 오가며 쓸 때 같은 자리에서 같은 이름을
+        찾을 수 있어야 하기 때문이다.
+        """
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+
+        desc = QLabel(
+            "Place joints evenly along each listed curve, bind the curve to them,\n"
+            "and give every joint a zro / con / ctl / tgt controller stack.\n"
+            "Moving a control moves its joint, and the joints move the curve.")
+        desc.setAlignment(Qt.AlignCenter)
+        root.addWidget(desc)
+
+        self.tsl_joints = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Curves", select_label="List Selected Curves",
+            show_sort=False, list_min_height=140, log_callback=self.log)
+        root.addWidget(self.tsl_joints, 1)
+
+        # ---------------- 조인트 ----------------
+        jnt_box = QGroupBox("Joints")
+        jnt_lay = QVBoxLayout(jnt_box)
+
+        count_row = QHBoxLayout()
+        count_row.addWidget(QLabel("Count per Curve"))
+        self.sb_jnt_count = QSpinBox()
+        self.sb_jnt_count.setRange(jnt_mgr.COUNT_MIN, 500)
+        self.sb_jnt_count.setValue(jnt_mgr.COUNT_DEFAULT)
+        self.sb_jnt_count.setKeyboardTracking(False)
+        self.sb_jnt_count.setToolTip(
+            "How many joints to place on each curve, from its start to its end\n"
+            "seen as 0 to 1.\n"
+            "  1 -> one joint at 0.5 (the middle)\n"
+            "  2 -> 0 and 1 (both ends)\n"
+            "  3 -> 0, 0.5 and 1\n"
+            "On a closed curve the last spot is dropped, because 1 is the same\n"
+            "point as 0 - so 4 gives 0, 0.25, 0.5, 0.75.")
+        count_row.addWidget(self.sb_jnt_count)
+        count_row.addStretch(1)
+        jnt_lay.addLayout(count_row)
+
+        space_row = QHBoxLayout()
+        space_row.addWidget(QLabel("Spacing"))
+        self.jnt_space_group = QButtonGroup(self)
+        self.rb_jnt_length = QRadioButton("By length")
+        self.rb_jnt_length.setChecked(True)
+        self.rb_jnt_length.setToolTip(
+            "Even along the curve as it is drawn (arc length).\n"
+            "This is what you usually want - the gaps look equal.")
+        self.rb_jnt_param = QRadioButton("By parameter")
+        self.rb_jnt_param.setToolTip(
+            "Even in the curve's own parameter range.\n"
+            "When the spans have different lengths - curves built from mesh edges\n"
+            "often do - the joints bunch up on the short spans.")
+        self.jnt_space_group.addButton(self.rb_jnt_length)
+        self.jnt_space_group.addButton(self.rb_jnt_param)
+        space_row.addWidget(self.rb_jnt_length)
+        space_row.addWidget(self.rb_jnt_param)
+        space_row.addStretch(1)
+        jnt_lay.addLayout(space_row)
+
+        self.chk_jnt_aim = QCheckBox("Aim joints along the curve")
+        self.chk_jnt_aim.setChecked(True)
+        self.chk_jnt_aim.setToolTip(
+            "Turn each joint so its X axis points down the curve tangent\n"
+            "(world Y is the up hint). Off: joints keep world orientation.\n"
+            "The controls are matched to the joints, so this orients them too.")
+        jnt_lay.addWidget(self.chk_jnt_aim)
+
+        self.chk_jnt_bind = QCheckBox("Bind the curve to the new joints")
+        self.chk_jnt_bind.setChecked(True)
+        self.chk_jnt_bind.setToolTip(
+            "skinCluster the curve to the joints it just got, so moving a joint\n"
+            "moves the curve. A curve that already has a skinCluster is left\n"
+            "alone and reported in the log.")
+        jnt_lay.addWidget(self.chk_jnt_bind)
+
+        self.chk_jnt_group = QCheckBox("Group the new nodes per curve")
+        self.chk_jnt_group.setChecked(True)
+        self.chk_jnt_group.setToolTip(
+            "Put everything under <curve>_crvJnt_grp, split into\n"
+            "<curve>_jnt_grp and <curve>_ctl_grp.")
+        jnt_lay.addWidget(self.chk_jnt_group)
+
+        root.addWidget(jnt_box)
+
+        # ---------------- 컨트롤러 ----------------
+        # A00460_ControllerTool 의 FK 탭과 같은 구성·같은 툴팁이다.
+        ctl_box = QGroupBox("Controller Stack")
+        ctl_lay = QVBoxLayout(ctl_box)
+
+        node_row = QHBoxLayout()
+        self.chk_jnt_zro = QCheckBox("zro")
+        self.chk_jnt_zro.setChecked(True)
+        self.chk_jnt_zro.setToolTip(
+            "Zero-out null placed at the joint (position + rotation).")
+        self.chk_jnt_con = QCheckBox("con")
+        self.chk_jnt_con.setChecked(True)
+        self.chk_jnt_con.setToolTip("Offset null between zro and ctl.")
+        self.chk_jnt_tgt = QCheckBox("tgt")
+        self.chk_jnt_tgt.setChecked(True)
+        self.chk_jnt_tgt.setToolTip(
+            "Null under the control. This is what constrains the joint.")
+        for chk in (self.chk_jnt_zro, self.chk_jnt_con, self.chk_jnt_tgt):
+            node_row.addWidget(chk)
+        node_row.addStretch(1)
+        ctl_lay.addLayout(node_row)
+
+        lbl_ctl = QLabel("ctl (cube control curve) is always created.")
+        lbl_ctl.setStyleSheet("color: {0};".format(_WARN_COLOR))
+        ctl_lay.addWidget(lbl_ctl)
+
+        size_row = QHBoxLayout()
+        size_row.addWidget(QLabel("Control Size"))
+        self.sb_jnt_size = QDoubleSpinBox()
+        self.sb_jnt_size.setRange(0.001, 1000.0)
+        self.sb_jnt_size.setDecimals(3)
+        self.sb_jnt_size.setSingleStep(0.1)
+        self.sb_jnt_size.setValue(jnt_mgr.DEFAULT_SIZE)
+        self.sb_jnt_size.setKeyboardTracking(False)
+        self.sb_jnt_size.setToolTip(
+            "Half the cube edge length - so 1.0 gives a cube reaching 1 unit\n"
+            "from the joint in every direction (same feel as a radius).")
+        size_row.addWidget(self.sb_jnt_size)
+        size_row.addStretch(1)
+        ctl_lay.addLayout(size_row)
+
+        con_row = QHBoxLayout()
+        con_row.addWidget(QLabel("Constraint"))
+        self.chk_jnt_parent = QCheckBox("Parent")
+        self.chk_jnt_parent.setChecked(True)
+        self.chk_jnt_parent.setToolTip("parentConstraint - translate + rotate.")
+        self.chk_jnt_point = QCheckBox("Point")
+        self.chk_jnt_point.setToolTip("pointConstraint - translate only.")
+        self.chk_jnt_orient = QCheckBox("Orient")
+        self.chk_jnt_orient.setToolTip("orientConstraint - rotate only.")
+        self.chk_jnt_scale = QCheckBox("Scale")
+        self.chk_jnt_scale.setToolTip(
+            "scaleConstraint - scale only. Parent does NOT drive scale.")
+        for chk in (self.chk_jnt_parent, self.chk_jnt_point,
+                    self.chk_jnt_orient, self.chk_jnt_scale):
+            con_row.addWidget(chk)
+        con_row.addStretch(1)
+        ctl_lay.addLayout(con_row)
+
+        root.addWidget(ctl_box)
+
+        self.btn_jnt_create = QPushButton("Create Joints on Curves")
+        self.btn_jnt_create.setMinimumHeight(34)
+        self.btn_jnt_create.setToolTip(
+            "Build joints, bind and controls for every listed curve. One undo step.")
+        self.btn_jnt_create.clicked.connect(self.on_joints_create)
+        root.addWidget(self.btn_jnt_create)
+
+        return tab
+
+    # ==============================================================
+    # actions : Joints
+    # ==============================================================
+
+    def _joint_constraints(self):
+        """체크된 컨스트레인트 종류 목록."""
+        pairs = ((self.chk_jnt_parent, jnt_mgr.CON_PARENT),
+                 (self.chk_jnt_point, jnt_mgr.CON_POINT),
+                 (self.chk_jnt_orient, jnt_mgr.CON_ORIENT),
+                 (self.chk_jnt_scale, jnt_mgr.CON_SCALE))
+        return [con for chk, con in pairs if chk.isChecked()]
+
+    def on_joints_create(self):
+        # UUID 로 현재 경로를 되찾아(리네임/리페어런트 안전) 대상 커브를 얻는다.
+        curves = self.tsl_joints.get_all_nodes() or self.tsl_joints.get_all_items()
+        if not curves:
+            self.log("Curve list is empty. Select curves in the scene and click "
+                     "'List Selected Curves'.", warn=True)
+            return
+
+        spacing = (jnt_mgr.SPACING_LENGTH if self.rb_jnt_length.isChecked()
+                   else jnt_mgr.SPACING_PARAM)
+
+        try:
+            # 마지막 select 도 chunk 안에서 일어난다(build_joints_on_curves 가 한다) —
+            # 밖에서 하면 select 가 별도 undo 스텝이 되어 Ctrl+Z 한 번에 선택만 되돌아간다.
+            with undo_chunk():
+                result = jnt_mgr.build_joints_on_curves(
+                    curves,
+                    count=self.sb_jnt_count.value(),
+                    spacing=spacing,
+                    aim=self.chk_jnt_aim.isChecked(),
+                    bind=self.chk_jnt_bind.isChecked(),
+                    group=self.chk_jnt_group.isChecked(),
+                    use_zro=self.chk_jnt_zro.isChecked(),
+                    use_con=self.chk_jnt_con.isChecked(),
+                    use_tgt=self.chk_jnt_tgt.isChecked(),
+                    constraints=self._joint_constraints(),
+                    size=self.sb_jnt_size.value(),
+                )
+        except ValueError as e:
+            self.log(str(e), warn=True)
+            return
+        except Exception as e:                              # noqa: BLE001
+            self.log("Create joints failed: {0}".format(e), warn=True)
+            return
+
+        self._report_joints(result)
+
+    def _report_joints(self, result):
+        for node in result["missing"]:
+            self.log("Not in the scene, skipped: {0}".format(node), warn=True)
+        for name, why in result["skipped"]:
+            self.log("Skipped {0}: {1}".format(name, why), warn=True)
+        for wanted, actual in result["renamed"]:
+            self.log("Name '{0}' was taken - Maya used '{1}'.".format(
+                wanted, actual), warn=True)
+        for msg in result["warnings"]:
+            self.log(msg, warn=True)
+
+        if not result["joints"]:
+            self.log("Nothing was built.", warn=True)
+            return
+
+        self.log(
+            "Built {0} joint(s) on {1} curve(s): {2} control(s), {3} bind(s), "
+            "{4} constraint node(s).".format(
+                len(result["joints"]), len(result["curves"]),
+                len(result["controls"]), len(result["skins"]),
+                len(result["constraints"])))
 
     # ==============================================================
     # log / about
