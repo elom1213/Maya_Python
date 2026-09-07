@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-24
+# last Update date : 2026-09-07
 # A00275_skinTool_V01 - Qt UI
 #
 # 스킨 관련 범용 툴. **상위 탭 = 카테고리, 하위 탭 = 기능** 으로 통일돼 있다(v01.15~).
@@ -21,6 +21,8 @@
 #     - "Expand Bind"    : 저장한 버텍스 집합을 저장한 조인트들에 바인드. 조인트 사이가
 #                          엣지 길이(측지 거리)에 비례해 고르게 분배된다
 #                          (Kangaroo ClosestExpand 대체 — core/expand_bind_manager.py).
+#                          "Even distribution"(v01.16~) 은 거리 대신 **자리**로 분배해,
+#                          조인트 간격이나 밴드 폭이 자리마다 달라도 같은 모양이 나온다.
 #
 #   Edit : 웨이트를 그대로 둔 채 리그를 고친다 (둘 다 Edit 토글, 웨이트 불변)
 #     - "Move Joints"    : 켜면 조인트를 옮겨도 메시가 변형되지 않고, 다시 끄면 그 자리에서
@@ -1232,13 +1234,13 @@ class MainWindow(QWidget):
             "How far the bind reaches, measured from the vertex closest to each "
             "joint.\nScene units for Surface / Volume, edge steps for Topology.")
         radius_row.addWidget(self.sb_eb_radius)
-        btn_fit = QPushButton("Fit to Joints")
-        btn_fit.setToolTip(
+        self.btn_eb_fit = QPushButton("Fit to Joints")
+        self.btn_eb_fit.setToolTip(
             "Set the radius so each joint's falloff just reaches its nearest "
             "neighbouring joint\n(measured with the current falloff mode, along "
             "the edge loop when one is stored).")
-        btn_fit.clicked.connect(self.on_eb_fit_radius)
-        radius_row.addWidget(btn_fit)
+        self.btn_eb_fit.clicked.connect(self.on_eb_fit_radius)
+        radius_row.addWidget(self.btn_eb_fit)
         radius_row.addStretch(1)
         fall_layout.addLayout(radius_row)
 
@@ -1259,6 +1261,24 @@ class MainWindow(QWidget):
         across_row.addWidget(self.sb_eb_across)
         across_row.addStretch(1)
         fall_layout.addLayout(across_row)
+
+        self.chk_eb_even = QCheckBox("Even distribution (needs an edge loop)")
+        self.chk_eb_even.setToolTip(
+            "Spread by POSITION on the loop instead of by distance, so the "
+            "falloff curve means the same thing everywhere.\n"
+            "\n"
+            "  Along the loop : the gap between two neighbouring joints IS the "
+            "whole curve, however far apart they sit.\n"
+            "                   A joint's own vertex gets weight 1 and no other "
+            "joint reaches it.\n"
+            "  Across the loop: each part of the band is measured against ITS "
+            "OWN width, so a narrow part\n"
+            "                   and a wide part get the same spread "
+            "(curve x = 0 on the loop, 1 at the far edge).\n"
+            "\n"
+            "Soft Select and Across width are not used while this is on.")
+        self.chk_eb_even.toggled.connect(self._on_eb_even_toggled)
+        fall_layout.addWidget(self.chk_eb_even)
 
         curve_row = QHBoxLayout()
         lbl_curve = QLabel("Falloff curve")
@@ -1322,6 +1342,7 @@ class MainWindow(QWidget):
 
         layout.addStretch(1)
         self._on_eb_mode_changed(0)
+        self._on_eb_even_toggled(self.chk_eb_even.isChecked())
         return tab
 
     # ---------------- Expand Bind : 상태/헬퍼
@@ -1337,6 +1358,15 @@ class MainWindow(QWidget):
         else:
             self.sb_eb_radius.setSuffix("")
             self.sb_eb_radius.setSingleStep(0.1)
+
+    def _on_eb_even_toggled(self, checked):
+        """Even distribution 은 두 반경을 아예 쓰지 않는다 — 그래서 회색으로 끈다.
+
+        "비활성인데 값은 쓰인다" 거나 그 반대인 상태를 만들지 않는다. 값이 화면에
+        살아 있으면 사용자는 그 숫자가 결과를 바꾼다고 읽는다.
+        """
+        for widget in (self.sb_eb_radius, self.btn_eb_fit, self.sb_eb_across):
+            widget.setEnabled(not checked)
 
     def _eb_apply_preset(self, name):
         self.eb_curve.set_preset(name)
@@ -1487,7 +1517,8 @@ class MainWindow(QWidget):
                     curve_interp=self.eb_curve.interpolation(),
                     loop_ids=self.eb_loop,
                     loop_closed=self.eb_loop_closed,
-                    across_radius=self.sb_eb_across.value())
+                    across_radius=self.sb_eb_across.value(),
+                    even=self.chk_eb_even.isChecked())
         except Exception as e:
             self.log("[Error] Bind : {0}".format(e))
             cmds.warning(str(e))
@@ -1504,6 +1535,17 @@ class MainWindow(QWidget):
             self.log("[Warning] {0} stored vertices were out of range and left "
                      "untouched (raise Soft Select to reach them).".format(
                          report["skipped"]))
+        if report["even"]:
+            # 반경을 안 썼으므로 로그에도 적지 않는다 — 적으면 그 값이 결과에
+            # 반영된 것처럼 읽힌다.
+            self.log("[OK] Bound {0} vertices to {1} joints  (mode {2}, even "
+                     "distribution, loop {3} verts {4}, blend {5:.3f}, max "
+                     "weight {6:.3f}).".format(
+                         report["affected"], len(report["joints"]),
+                         report["mode"], report["loop"],
+                         "closed" if report["loop_closed"] else "open",
+                         report["blend"], report["max_weight"]))
+            return
         loop_note = ""
         if report["loop"]:
             loop_note = ", loop {0} verts / across {1:.4f}".format(

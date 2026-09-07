@@ -125,7 +125,7 @@
 - [A00280 cloth-corrective](metahuman-cloth-corrective-A00280.md) — Houdini 알렘빅 캐시 → MetaHuman RBF 코렉티브 일괄 추출(invertShape)
 - [A00275 tab reorg](wip-a00275-tab-reorg.md) — 평평한 탭 7개를 **Weights / Bind / Edit** 카테고리 3 → 기능 7 로. 중첩 탭 전환 시 **탭 인덱스로 판단하던 코드가 에러 없이 죽는다** (v01.15)
 - [A00275 Edit Mesh](wip-a00275-edit-mesh.md) — **신규**: 웨이트 불변으로 바인드된 메시 수정(envelope 0 + `pnts` 를 rest 로 이동 + `geomMatrix` 갱신). 메시 자체 이동도 (v01.14)
-- [A00275 Expand Bind](wip-a00275-expand-bind.md) — 루프 위 조인트에 측지 거리 기반 균등 바인드(Kangaroo ClosestExpand 대체). **엣지 루프를 주면** 밴드 전 줄이 루프 비율 유지, coverage 없이 정규화만 하면 커브가 무의미, falloff 커브 위젯 자작 (v01.10)
+- [A00275 Expand Bind](wip-a00275-expand-bind.md) — 루프 위 조인트에 측지 거리 기반 균등 바인드(Kangaroo ClosestExpand 대체). **엣지 루프를 주면** 밴드 전 줄이 루프 비율 유지, coverage 없이 정규화만 하면 커브가 무의미, falloff 커브 위젯 자작. **Even distribution**(v01.16): 반경이 '거리' 라서 생기던 두 증상이 한 원인 — 거리 대신 **자리**로 분배, 조인트 버텍스 웨이트 1 은 커브에 맡기지 말고 못박기
 - [A00275 Move Joints](wip-a00275-move-joints.md) — Edit 토글로 메시 변형 없이 조인트 이동 → 재바인드, 웨이트 불변 (v01.08)
 - [A00275 SkinTool Bind Pose](wip-a00275-skintool-bindpose.md) — Update Bind Pose 탭. bindPreMatrix 인덱스는 `matrix[]` 연결에서 얻어야 함 (v01.03)
 - [A00275 Transfer tab](wip-a00275-transfer-tab.md) — N 소스 → 선택 메시/버텍스 전부. copySkinWeights 는 컴포넌트 선택 무시 (v01.07)

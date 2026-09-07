@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-12
+# last Update date : 2026-09-07
 # A00275_skinTool_V01 - Expand Bind (저장한 버텍스 집합을 저장한 조인트들에 바인드)
 #
 # Kangaroo 의 SkinCluster > ClosestExpand 를 대신하는 기능이다. 입술/눈처럼 **중심에서
@@ -46,6 +46,29 @@
 # 루프를 주면 각 버텍스는 **가장 가까운 루프 버텍스(anchor)** 의 분배 비율을 그대로
 # 물려받고, 루프에서 떨어진 거리는 `Across width` 로 amount 만 줄인다. 그래서 밴드
 # 어디서나 루프와 같은 비율이 유지된다.
+#
+# ## Even distribution (`even=True`, 루프 필수)
+#
+# 위 방식은 두 반경(`radius` / `across_radius`)이 **씬 단위 절대 거리**라, 밴드 폭이나
+# 조인트 간격이 자리마다 다르면 분배 모양도 자리마다 달라진다. 격자 플랜에서 한쪽이
+# 좁고(폭 L1) 한쪽이 넓으면(폭 L3), 같은 반경으로 재기 때문에 좁은 쪽은 커브의 앞부분만,
+# 넓은 쪽은 커브 전체를 쓴다. 조인트 간격이 비균일하면 같은 이유로 옆 조인트가 남의
+# 자리까지 밀고 들어온다(조인트가 앉은 버텍스가 웨이트 1 이 아니게 된다).
+#
+# `even=True` 는 두 방향 모두 **거리 대신 '자리(파라미터)'** 로 잰다. 반경 두 개를 쓰지
+# 않는다.
+#
+#   루프 **따라**  : 이웃한 두 조인트 사이를 통째로 0~1 로 본다. 그래서 간격이 비균일해도
+#                    분배 모양이 같고, **조인트가 앉은 버텍스는 그 조인트가 웨이트 1** 로
+#                    가져간다(다른 조인트는 0 — 커브 모양과 무관하게 못박는다).
+#                    조인트 두 개 사이에서만 나뉘므로 멀리 있는 조인트가 새지 않는다.
+#   루프 **바깥**  : 그 자리의 **밴드 폭**(anchor 가 도달하는 가장 먼 거리)으로 나눠 0~1 로
+#                    본다. 그래서 폭이 L1 인 줄과 L3 인 줄의 분배가 **똑같아진다** —
+#                    커브 가로축 0 = 루프 위, 1 = 그 줄의 밴드 끝.
+#
+# 폭을 재려면 반경으로 자르면 안 되므로, even 모드의 바깥 방향 탐색은 **반경 없이** 밴드
+# 끝까지 퍼뜨린 뒤 정규화한다. 열린 루프에서 조인트가 덮지 않는 양 끝 구간은 끝 조인트가
+# 그대로 잡는다(감쇠시키면 그 구간이 아무 조인트에도 안 잡힌다).
 #
 # ## Blend
 #
@@ -720,9 +743,140 @@ def _raw_from_loop(mode, adj, points, allowed, order, closed, origins, radius,
     return raw, across
 
 
+def _build_segments(arcs, seeds, total, closed):
+    """조인트를 루프 호 순서로 세우고 **이웃한 두 조인트 사이 구간**을 만든다.
+
+    Returns:
+        (ordered, segs)
+        ordered : [(호 위치, 조인트 인덱스), ...] 오름차순
+        segs    : [(s_start, s_end, 조인트_lo, 조인트_hi), ...]
+                  닫힌 루프면 마지막 -> 처음 을 **감아 도는** 구간까지 들어간다
+                  (끝 값이 `s_first + total` 이라 그 구간 안에서도 s 가 단조 증가한다).
+    """
+    ordered = sorted(((arcs[s], i) for i, s in enumerate(seeds)),
+                     key=lambda p: p[0])
+    segs = []
+    for k in range(len(ordered) - 1):
+        segs.append((ordered[k][0], ordered[k + 1][0],
+                     ordered[k][1], ordered[k + 1][1]))
+    if closed and len(ordered) > 1:
+        segs.append((ordered[-1][0], ordered[0][0] + total,
+                     ordered[-1][1], ordered[0][1]))
+    return ordered, segs
+
+
+def _segment_param(ordered, segs, total, closed, s):
+    """호 위치 s 를 감싸는 두 조인트와 그 사이에서의 파라미터 u(0~1).
+
+    조인트가 하나뿐이면 (그 조인트, 같은 조인트, 0.0) 을 돌려준다 — 부르는 쪽이
+    "혼자 다 가져간다" 로 처리한다.
+
+    **열린 루프에서 조인트 바깥은 끝 구간으로 클램프한다.** 루프 끝을 끝 조인트가
+    그대로 잡는 게 맞기 때문이다 — 여기서 감쇠시키면 그 구간이 어느 조인트에도
+    안 잡혀 바인드가 비어 버린다.
+    """
+    if not segs:
+        return ordered[0][1], ordered[0][1], 0.0
+
+    if closed:
+        # 첫 조인트보다 앞이면 감아 도는 구간에 속한다 — 한 바퀴 더해 단조 구간으로.
+        if s < ordered[0][0]:
+            s += total
+    else:
+        if s <= ordered[0][0]:
+            return segs[0][2], segs[0][3], 0.0
+        if s >= ordered[-1][0]:
+            return segs[-1][2], segs[-1][3], 1.0
+
+    for s0, s1, lo, hi in segs:
+        if s0 <= s <= s1:
+            span = s1 - s0
+            u = 0.0 if span <= 1e-9 else (s - s0) / span
+            return lo, hi, falloff.clamp01(u)
+    return segs[-1][2], segs[-1][3], 1.0
+
+
+def _raw_from_loop_even(mode, adj, points, allowed, order, closed, origins,
+                        points_curve, curve_interp):
+    """Even distribution — 두 방향 모두 거리가 아니라 **자리**로 잰다(모듈 상단 참고).
+
+    반경(`radius` / `across_radius`)을 쓰지 않는다. 대신
+      * 루프 따라  : 이웃한 두 조인트 사이가 커브 전체(0~1)다.
+      * 루프 바깥  : 그 자리의 밴드 폭이 커브 전체(0~1)다.
+
+    조인트 사이 분배는 이 함수 안에서 **합이 1 이 되도록 미리 정규화**해 둔다.
+    그래야 `expand_bind` 의 coverage(= min(1, 합) x across)가 바깥 방향 커브만 따르고,
+    좌우 비대칭 커브(Ease In/Out, Spike)에서도 조인트 사이가 덜 덮이지 않는다.
+    """
+    arcs, total = _loop_arcs(mode, points, order, closed)
+    seeds = [_closest_vertex(points, set(order), o) for o in origins]
+
+    # 밴드 폭을 재야 하므로 **반경으로 자르지 않고** 끝까지 퍼뜨린다.
+    across_dist, anchor = _dijkstra_multi(mode, adj, points, order,
+                                          float("inf"))
+
+    # anchor 별로 '가장 멀리까지 간 거리' = 그 자리의 밴드 폭.
+    width = {}
+    for vid, d in across_dist.items():
+        if vid not in allowed:
+            continue
+        a = anchor[vid]
+        if d > width.get(a, 0.0):
+            width[a] = d
+
+    ordered, segs = _build_segments(arcs, seeds, total, closed)
+
+    raw = [{} for _ in origins]
+    across = {}
+    for vid, d in across_dist.items():
+        if vid not in allowed:
+            continue
+        a = anchor[vid]
+        w = width.get(a, 0.0)
+        t = 0.0 if w <= 1e-9 else d / w
+        amount = falloff.evaluate(points_curve, curve_interp, t)
+        if amount <= 0.0:
+            continue
+
+        lo, hi, u = _segment_param(ordered, segs, total, closed, arcs[a])
+        if lo == hi:
+            across[vid] = amount
+            raw[lo][vid] = 1.0
+            continue
+
+        lo_share = falloff.evaluate(points_curve, curve_interp, u)
+        hi_share = falloff.evaluate(points_curve, curve_interp, 1.0 - u)
+        both = lo_share + hi_share
+        if both <= 0.0:
+            continue
+        across[vid] = amount
+        if lo_share > 0.0:
+            raw[lo][vid] = lo_share / both
+        if hi_share > 0.0:
+            raw[hi][vid] = hi_share / both
+
+    # 요구사항: **조인트가 앉은 버텍스는 그 조인트가 웨이트 1.** 커브 모양에 맡기면
+    # 보장되지 않는다(예: 'Solid' 프리셋은 끝값이 1 이라 이웃 조인트도 같이 가져간다).
+    # 그래서 여기서 못박는다. 두 조인트가 같은 버텍스로 스냅했다면 누구 것인지 정할 수
+    # 없으므로 손대지 않고 위에서 계산된 분배(둘 다 u=0 -> 반반)를 그대로 둔다.
+    owners = {}
+    for i, seed in enumerate(seeds):
+        owners.setdefault(seed, []).append(i)
+    for seed, holders in owners.items():
+        if len(holders) != 1 or seed not in allowed:
+            continue
+        for bucket in raw:
+            bucket.pop(seed, None)
+        raw[holders[0]][seed] = 1.0
+        across[seed] = 1.0
+
+    return raw, across
+
+
 def expand_bind(mesh, vtx_ids, joints, radius, blend=1.0, mode=MODE_SURFACE,
                 curve_points=None, curve_interp=falloff.DEFAULT_INTERP,
-                loop_ids=None, loop_closed=False, across_radius=0.0):
+                loop_ids=None, loop_closed=False, across_radius=0.0,
+                even=False):
     """저장된 버텍스 집합을 저장된 조인트들에 바인드한다.
 
     Args:
@@ -740,6 +894,10 @@ def expand_bind(mesh, vtx_ids, joints, radius, blend=1.0, mode=MODE_SURFACE,
             주면 조인트 분배를 루프 위 거리로만 계산한다(권장).
         loop_closed: 그 루프가 닫혀 있는지.
         across_radius: 루프에서 **멀어지는 방향**의 반경. 0 이면 radius 와 같게 쓴다.
+        even: True 면 거리 대신 **자리**로 분배한다(모듈 상단 "Even distribution").
+            `radius` 와 `across_radius` 를 쓰지 않고, 조인트 간격이 비균일하거나 밴드
+            폭이 자리마다 달라도 분배 모양이 같아진다. 조인트가 앉은 버텍스는 그
+            조인트가 웨이트 1 로 가져간다. **엣지 루프가 있어야 한다.**
 
     Returns:
         report dict — mesh/joints/affected/skipped/created/max_weight 등.
@@ -758,6 +916,13 @@ def expand_bind(mesh, vtx_ids, joints, radius, blend=1.0, mode=MODE_SURFACE,
         across_radius = radius
 
     order, loop_added = _validate_loop(mesh, ids, loop_ids)
+    even = bool(even)
+    if even and not order:
+        # 루프가 없으면 '따라/바깥' 두 방향을 가를 기준이 없다 — 조용히 꺼 버리면
+        # 체크는 켜 뒀는데 결과가 예전 방식인 상태가 되므로 분명히 막는다.
+        raise ValueError(
+            "Even distribution needs a stored edge loop - press 'Store Edge "
+            "Loop from Selection' first, or uncheck it.")
     if loop_added:
         ids = sorted(set(ids) | set(loop_added))
     allowed = set(ids)
@@ -768,7 +933,11 @@ def expand_bind(mesh, vtx_ids, joints, radius, blend=1.0, mode=MODE_SURFACE,
     adj = ({} if (mode == MODE_VOLUME and not order)
            else adjacency(mesh, allowed))
 
-    if order:
+    if order and even:
+        raw, across = _raw_from_loop_even(
+            mode, adj, points, allowed, order, loop_closed, origins,
+            points_curve, curve_interp)
+    elif order:
         raw, across = _raw_from_loop(
             mode, adj, points, allowed, order, loop_closed, origins, radius,
             across_radius, points_curve, curve_interp)
@@ -805,6 +974,12 @@ def expand_bind(mesh, vtx_ids, joints, radius, blend=1.0, mode=MODE_SURFACE,
 
     touched = sorted(v for v in shares if coverage.get(v, 0.0) > 0.0)
     if not touched:
+        if even:
+            # 반경을 쓰지 않으므로 "반경을 올려라" 는 틀린 안내다.
+            raise ValueError(
+                "No vertex was reached. Check that the stored edge loop is "
+                "inside the stored vertices, and that the falloff curve is "
+                "not flat at 0.")
         raise ValueError(
             "No vertex is within the Soft Select radius. Raise the radius, or "
             "check that the joints sit on the stored vertices.")
@@ -868,6 +1043,7 @@ def expand_bind(mesh, vtx_ids, joints, radius, blend=1.0, mode=MODE_SURFACE,
         "skipped": len(ids) - len(touched),
         "radius": radius,
         "across_radius": across_radius if order else radius,
+        "even": even,
         "mode": mode,
         "blend": blend,
         "max_weight": max_weight,
