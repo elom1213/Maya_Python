@@ -26,6 +26,7 @@ print("QT version  :  " + str(QT_VERSION))
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.core.mirror_tokens import MirrorTokenStore
 from tools.A00145_RigConnect.app.config.version import VERSION, LAST_UPDATE
 from tools.A00145_RigConnect.app.core import match_manager as mch_mgr
 from tools.A00145_RigConnect.app.core import constrain_manager as con_mgr
@@ -44,6 +45,7 @@ from tools.A00145_RigConnect.app.core import snapshot_manager as snap_mgr
 from tools.A00145_RigConnect.app.core import attr_profile_prefs as aprefs
 from tools.A00145_RigConnect.app.core import attr_create_manager as acreate_mgr
 from tools.A00145_RigConnect.app.core import attr_delete_manager as adel_mgr
+from tools.A00145_RigConnect.app.core import mirror_manager as mir_mgr
 from tools.A00145_RigConnect.app.core import (
     CONSTRAINT_TYPES, PAIRING_CLOSEST, PAIRING_ORDER,
     connect_closest, find_closest_for_drivers)
@@ -124,6 +126,7 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_constrain_tab(), "Constrain")
         self.tabs.addTab(self._build_connect_tab(), "Connect")
         self.tabs.addTab(self._build_attribute_tab(), "Attribute")
+        self.tabs.addTab(self._scrolled(self._build_mirror_tab()), "Mirror")
         main_layout.addWidget(self.tabs)
 
         main_layout.addWidget(self.te_log)
@@ -275,6 +278,130 @@ class MainWindow(QWidget):
         layout.addStretch(1)
         self._update_cache_label()
         return tab
+
+    # --------------------------------------------------------------
+    # Tab : Mirror
+    # --------------------------------------------------------------
+
+    def _build_mirror_tab(self):
+        """리스트업된 오브젝트(와 자식들)를 반대쪽으로 통째로 미러하는 탭."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        self.tsl_mirror = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", select_label="Select",
+            list_min_height=200, list_limit=MATCH_LIST_LIMIT,
+            log_callback=self.log)
+        self.tsl_mirror.setToolTip(
+            "Top objects to mirror. Every child under them is mirrored too.\n\n"
+            "Only what is listed here gets copied - a mesh that is skinned to a\n"
+            "listed joint is NOT copied unless the mesh itself is listed.\n"
+            "Anything outside the list is reused as-is (a centre joint stays the\n"
+            "driver of the mirrored constraint).")
+        layout.addWidget(self.tsl_mirror)
+
+        # --- 반사 평면 ---
+        plane_box = QGroupBox("Mirror Plane")
+        plane_row = QHBoxLayout(plane_box)
+        self.rb_mirror_plane = QButtonGroup(self)
+        for index, (label, key) in enumerate(mir_mgr.MIRROR_PLANES):
+            rb = QRadioButton(label)
+            rb.setProperty("mirror_key", key)
+            if key == mir_mgr.PLANE_YZ:
+                rb.setChecked(True)
+            self.rb_mirror_plane.addButton(rb, index)
+            plane_row.addWidget(rb)
+        plane_row.addStretch(1)
+        layout.addWidget(plane_box)
+
+        # --- 미러 방식 (조인트 / 나머지) ---
+        mode_box = QGroupBox("Mirror Type")
+        mode_layout = QGridLayout(mode_box)
+        mode_box.setToolTip(
+            "Behavior    : same rotation values give mirrored motion - the local "
+            "axes are flipped\n"
+            "              (matches Maya's mirrorJoint with Mirror function "
+            "'Behavior').\n"
+            "Orientation : the local axes keep pointing the same way as the "
+            "original.\n\n"
+            "Behavior mirrors rotation, not translation: moving a control +Y on "
+            "both sides moves\n"
+            "them in opposite directions. Pick Orientation for translate driven "
+            "objects (cluster handles).")
+
+        self.rb_mirror_joint = self._mirror_mode_row(
+            mode_layout, 0, "Joints", mir_mgr.MODE_BEHAVIOR)
+        self.rb_mirror_other = self._mirror_mode_row(
+            mode_layout, 1, "Curves / Others", mir_mgr.MODE_BEHAVIOR)
+        layout.addWidget(mode_box)
+
+        # --- 옵션 ---
+        opt_box = QGroupBox("Options")
+        opt_layout = QVBoxLayout(opt_box)
+
+        self.cb_mirror_no_token = QCheckBox("Disable token check")
+        self.cb_mirror_no_token.setChecked(False)
+        self.cb_mirror_no_token.setToolTip(
+            "Off : an object whose name has no L/R token is reported and NOTHING "
+            "is mirrored.\n"
+            "      Their names are logged and they are collected in the "
+            "'{0}' set,\n"
+            "      which is then selected - fix the names and run Mirror again.\n"
+            "On  : the warning is still logged, but those objects are mirrored "
+            "with the '{1}'\n"
+            "      suffix instead of a swapped token (no set is made).\n\n"
+            "Tokens come from the shared rule file:\n{2}".format(
+                mir_mgr.MISSING_TOKEN_SET, mir_mgr.NO_TOKEN_SUFFIX,
+                MirrorTokenStore.json_path()))
+        opt_layout.addWidget(self.cb_mirror_no_token)
+
+        keep_row = QHBoxLayout()
+        self.cb_mirror_skin = QCheckBox("Skin Weights")
+        self.cb_mirror_constraints = QCheckBox("Constraints")
+        self.cb_mirror_clusters = QCheckBox("Clusters")
+        for cb, tip in ((self.cb_mirror_skin,
+                         "Rebuild each skinCluster on the mirrored mesh with the "
+                         "mirrored influences and the same weights."),
+                        (self.cb_mirror_constraints,
+                         "Rebuild the constraints that drive the mirrored objects, "
+                         "with mirrored drivers."),
+                        (self.cb_mirror_clusters,
+                         "Rebuild the clusters that deform the mirrored geometry, "
+                         "with a mirrored handle and the same weights.")):
+            cb.setChecked(True)
+            cb.setToolTip(tip)
+            keep_row.addWidget(cb)
+        keep_row.addStretch(1)
+        opt_layout.addLayout(keep_row)
+
+        layout.addWidget(opt_box)
+
+        btn = QPushButton("Mirror")
+        btn.setMinimumHeight(32)
+        btn.clicked.connect(self.on_mirror)
+        layout.addWidget(btn)
+
+        layout.addStretch(1)
+        return tab
+
+    def _mirror_mode_row(self, grid, row, label, default_key):
+        """'Behavior / Orientation' 라디오 한 줄. 반환: QButtonGroup."""
+        grid.addWidget(QLabel(label + " :"), row, 0)
+        group = QButtonGroup(self)
+        for index, (text, key) in enumerate(mir_mgr.MIRROR_MODES):
+            rb = QRadioButton(text)
+            rb.setProperty("mirror_key", key)
+            if key == default_key:
+                rb.setChecked(True)
+            group.addButton(rb, index)
+            grid.addWidget(rb, row, index + 1)
+        return group
+
+    @staticmethod
+    def _mirror_key(group):
+        """라디오 그룹에서 고른 항목의 식별자(mirror_key 프로퍼티)."""
+        button = group.checkedButton()
+        return button.property("mirror_key") if button else None
 
     # --------------------------------------------------------------
     # Tab : Constrain
@@ -1660,7 +1787,11 @@ class MainWindow(QWidget):
             "                       same name or with a Prefix / Suffix\n"
             "              Create : create attributes from a saved profile\n"
             "                       (name / type / range), checkbox per attr\n"
-            "              Delete : delete user defined attributes".format(
+            "              Delete : delete user defined attributes\n"
+            "Mirror      : mirror the listed objects and everything under them -\n"
+            "              names swap L/R with the shared token rules, and skin\n"
+            "              weights, constraints and clusters are rebuilt on the\n"
+            "              other side (YZ/XY/XZ plane, Behavior / Orientation)".format(
                 VERSION, LAST_UPDATE, MATCH_LIST_LIMIT))
 
     def _run(self, label, func):
@@ -1672,6 +1803,50 @@ class MainWindow(QWidget):
             except Exception as e:
                 self.log("[ERR] {0} : {1}".format(label, e))
                 cmds.warning(str(e))
+
+    # ==============================================================
+    # Handlers : Mirror
+    # ==============================================================
+
+    def on_mirror(self):
+        objects = self.tsl_mirror.get_all_items()
+        plane = self._mirror_key(self.rb_mirror_plane)
+        joint_mode = self._mirror_key(self.rb_mirror_joint)
+        other_mode = self._mirror_key(self.rb_mirror_other)
+        disable_token_check = self.cb_mirror_no_token.isChecked()
+        do_skin = self.cb_mirror_skin.isChecked()
+        do_constraints = self.cb_mirror_constraints.isChecked()
+        do_clusters = self.cb_mirror_clusters.isChecked()
+
+        self.log("--- Mirror ({0} plane, joints {1}, others {2}) ---".format(
+            plane.upper(), joint_mode, other_mode))
+
+        def _do():
+            try:
+                created, warns, infos = mir_mgr.mirror(
+                    objects, plane=plane, joint_mode=joint_mode, other_mode=other_mode,
+                    disable_token_check=disable_token_check,
+                    do_skin=do_skin, do_constraints=do_constraints,
+                    do_clusters=do_clusters)
+            except mir_mgr.MissingTokenError as e:
+                # 예외로 나가면 반환값(경고)이 통째로 사라진다. 이름 목록을 먼저 찍고
+                # 다시 던져 _run 이 [ERR] 로 마무리하게 둔다.
+                for line in e.report:
+                    self.log("[WARN] {0}".format(line))
+                if e.set_name:
+                    # 세트를 만들어 놓고 아웃라이너에서 찾게 두면 소용이 적다.
+                    # (cmds.select 는 세트를 주면 멤버를 펼쳐 선택한다)
+                    cmds.select(e.set_name, replace=True)
+                    self.log("       members of '{0}' are selected.".format(e.set_name))
+                raise
+            for warn in warns:
+                self.log("[WARN] {0}".format(warn))
+            for info in infos:
+                self.log("       {0}".format(info))
+            if created:
+                cmds.select(created)
+
+        self._run("Mirror", _do)
 
     # ==============================================================
     # Handlers : Match

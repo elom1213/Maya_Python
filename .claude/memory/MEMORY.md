@@ -34,6 +34,7 @@
 - [undo_chunk by default](undo-chunk-by-default.md) — 반복 씬 변경은 요청 없어도 `Framework.core.maya_undo.undo_chunk()` 로 묶기
 - [Maya 2023 compat](maya-2023-compat.md) — 2023 지원 필요할 수 있음, sin/cos 노드 없음(eulerToQuat 우회)
 - [addAttr min/max raises](addattr-min-max-raises-not-clamps.md) — `minValue`/`maxValue` 는 범위 밖 `setAttr` 을 **잘라내지 않고 RuntimeError**. 초기값은 파이썬에서 먼저 클램프
+- [xform silent on locked](xform-silent-on-locked-channels.md) — `cmds.xform` 은 **잠긴 채널에 에러 없이 아무것도 안 한다**. 스킨된 메시의 복제본은 히스토리를 지워도 t/r/s 가 잠긴 채다 → 놓은 뒤 월드 행렬을 **되읽어 확인**
 - [getAttr settable lies](getattr-settable-lies-for-constrained.md) — `getAttr(plug, settable=True)` 는 **컨스트레인트가 구동하는 트랜스폼에도 True**. 쓸 수 있나는 `connectionInfo(isDestination=True)` + lock 으로 판정
 - [Maya loadPlugin no __file__](maya-loadplugin-no-file.md) — loadPlugin 으로 뜬 .py 플러그인은 `__file__` 없음
 - [animLayer copy/cut traps](animlayer-copy-cut-traps.md) — 레이어 간 키 이동: `copyKey`/`pasteKey` 는 `animLayer` 를 받지만 **`cutKey` 는 안 받는다**, 비멤버 plug 는 paste 실패(`BaseAnimation` 은 예외) · `findCurveForPlug` 가 `None`
@@ -71,6 +72,7 @@
 - [Sub-tabs over collapsibles](prefer-subtabs-over-stacked-collapsibles.md) — 기능 섹션이 3~4개 넘으면 접이식 대신 **중첩 탭**. 하위 탭마다 개별 스크롤(이중 스크롤 주의), 단 **창 자동 리사이즈 툴은 스크롤 대신 fit page**
 - [Framework expand widget](framework-expand-widget.md) — MOD_expand_qt_v01: 본문을 별도 창으로 빼는 Expand 패널. **복제 말고 이동**, 호스트 창 Close 는 위젯이 감시
 - [Framework filter widget](framework-filter-widget.md) — MOD_filter_qt_v01: 검색 있는 툴은 전부 이 공용 Filter 로 통일 중. v2 에 **QTreeWidget 모드** 추가([[wip-a00330-set-rename]])
+- [Framework mirror tokens](framework-mirror-tokens.md) — 좌/우 미러 토큰은 `Framework/rules/mirror_tokens.json` **공용 한 파일**. 이름 미러링은 **경계 매칭**(`arm_lower`·`sample_lip_l_ctl` 오탐 차단)
 - [Framework timeRange widget](framework-timerange-widget.md) — MOD_timeRange_qt_v01: Start/End 입력 + Get Current / Get Sel Range 공용 위젯
 - [QTreeWidgetItem checkable default](qtreewidgetitem-checkable-default-flag.md) — ItemIsUserCheckable 은 기본 ON, 플래그로 체크 가능 판정 금지
 - [clicked passes checked bool](qt-clicked-passes-checked-bool.md) — `clicked` 는 `checked`(bool)를 넘긴다. 기본 인자 있는 슬롯에 직접 연결하면 그 값이 옵션으로 샌다
@@ -138,6 +140,7 @@
 - [A00170 Stretch tab](wip-a00170-stretch-tab.md) — Default Distance 가 Stretch 구동, linear + Sigmoid 노드망 (v01.11)
 - [A00170 AttachCrv tab](wip-a00170-attachcrv-tab.md) — TSL 오브젝트를 커브 최근접점에 부착
 - [A00170 Remap List Attributes](wip-a00170-remap-listattrs.md) — Remap Value 탭에 전체 어트리뷰트 목록 + 검색
+- [A00145 Mirror tab](wip-a00145-mirror-tab.md) — **신규 탭**: 계층을 통째로 미러(스킨·컨스트레인트·클러스터 재구성). Behavior 는 **회전만 미러하고 이동은 반대로 간다** · 메시는 트랜스폼만으론 안 뒤집혀 정점을 한 번 더 반사 · 트랜스폼을 리네임하면 **마야가 셰이프를 알아서 따라 바꾼다** · 토큰 없으면 이름을 찍고 `mirror_noToken_set` 으로 묶는다(예외로 던지면 warnings 가 사라진다) (v01.38)
 - [A00145 object name match](wip-a00145-object-name-match.md) — Connect > `Pair`(구 Connect Closest) 에서 오브젝트를 이름으로 짝짓기. **경로·네임스페이스를 떼고 비교하되 반환은 전체 경로** · **Connect 가 거리로 다시 짝짓어** 세운 순서를 뒤집던 것을 `Pairing` 옵션으로
 - [A00145 Update offset](wip-a00145-update-offset.md) — AE 의 constraint `Update` 버튼(`-e -maintainOffset`)을 리스트 전체에. **타깃을 전부 넘겨야** 하고(일부만 넘기면 나머지 offset 이 옛 값으로 남아 driven 이 튄다), **타깃이 아닌 걸 넘기면 edit 인데도 추가된다**
 - [A00145 component followers](wip-a00145-component-followers.md) — Followers 에 버텍스/CV. **`matchTransform` 은 컴포넌트를 인자로 못 받는다**(`Found 1`) · 여러 점 컴포넌트에 절대 좌표를 주면 **한 자리로 뭉개진다**(중심 기준 상대 이동)

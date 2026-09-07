@@ -4,7 +4,12 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.37` (`app/config/version.py`) — Connect > `Connect Closest` 하위 탭이
+- 버전: `v01.38` (`app/config/version.py`) — **`Mirror` 탭 신규**: 리스트에 담은 오브젝트와
+  **그 아래 자식 전부**를 반대쪽으로 미러한다. 이름은 공용 토큰 규칙으로 바꾸고
+  **스킨 웨이트 · 컨스트레인트 · 클러스터**를 반대쪽에 다시 세운다.
+  반사 평면(YZ/XY/XZ) · Behavior / Orientation · `Disable token check`
+  (토큰이 없어 멈추면 그 오브젝트 이름을 찍고 `mirror_noToken_set` 세트로 묶어 선택) (§Mirror)
+  · v01.37 은 Connect > `Connect Closest` 하위 탭이
   **`Pair`** 로 바뀌면서 **`Match by Name`** 추가: Driver 와 **이름이 비슷한/같은** Driven 을
   찾아 driver 순서로 세우고, 짝이 없는 자리는 **`(Null)`** 로 채운다. 짝짓는 방법을 고르는
   **`Pairing`**(거리 / 리스트 자리) 도 함께 (§Pair)
@@ -25,8 +30,8 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
   · v01.27 은 Target Replace 하위 탭이 **Target Edit** 으로 확장(타깃 **추가 / 삭제** 추가) (§Target Edit)
   · v01.27 은 Match 탭의 셰이프 해석을 공용 [`Framework.core.maya_shape`](Framework_maya_shape.md) 로 교체(동작 변화 없음, 다중 셰이프 메시 안전)
 - 위치: `JUN_All/tools/A00145_RigConnect`
-- 형태: 아키텍처 (B) — Maya 내 PySide 툴. **최상위 4탭**(Match / Constrain / Connect / Attribute),
-  Constrain·Connect·Attribute 는 다시 **중첩 탭**으로 나뉜다
+- 형태: 아키텍처 (B) — Maya 내 PySide 툴. **최상위 5탭**(Match / Constrain / Connect /
+  Attribute / Mirror), Constrain·Connect·Attribute 는 다시 **중첩 탭**으로 나뉜다
 - 원본 `A00140_ConnectClosest` / MEL 파일은 그대로 보존(미수정)
 
 ---
@@ -1046,6 +1051,167 @@ IDF 가 알아서 0 으로 만든다.
 
 ---
 
+### Mirror — 리그를 통째로 반대쪽으로 (v01.38)
+
+리스트에 담은 오브젝트와 **그 아래 자식 전부**를 복제해 반대쪽 리그를 만든다.
+이름은 좌/우 토큰으로 바꾸고, 계층 안에서 유지되어야 할 관계를 다시 세운다.
+
+```
+┌ Objects (TSL) ──────────────────────────────┐
+│  grp_l_all                                  │
+│  mesh_l_02                                  │
+│  [Select][Add][Del][Up][Down] ...           │
+└─────────────────────────────────────────────┘
+┌ Mirror Plane ───────────────────────────────┐
+│  (•) YZ    ( ) XY    ( ) XZ                 │
+└─────────────────────────────────────────────┘
+┌ Mirror Type ────────────────────────────────┐
+│  Joints          :  (•) Behavior ( ) Orient.│
+│  Curves / Others :  (•) Behavior ( ) Orient.│
+└─────────────────────────────────────────────┘
+┌ Options ────────────────────────────────────┐
+│  [ ] Disable token check                    │
+│  [v] Skin Weights [v] Constraints [v] Clusters│
+└─────────────────────────────────────────────┘
+[             Mirror             ]
+```
+
+다시 세우는 관계는 셋이다.
+
+| 관계 | 무엇을 하는가 |
+|------|---------------|
+| **스킨 웨이트** | 미러된 메시에 `skinCluster` 를 다시 만든다. 인플루언스는 **반대쪽 조인트**로 갈아끼우고 웨이트 값은 그대로. `maxInfluences` · `skinningMethod` · `normalizeWeights` 도 원본을 따른다 |
+| **컨스트레인트** | 미러된 오브젝트를 구동하던 컨스트레인트를 **반대쪽 드라이버 → 반대쪽 드리븐**으로 다시 건다. 타깃 가중치 · skip 채널 · `interpType` 유지 |
+| **클러스터** | 미러된 지오메트리를 물던 `cluster` 를 반대쪽 핸들 + 같은 웨이트로 다시 만든다 |
+
+체크박스로 각각 끌 수 있다(기본 전부 ON).
+
+#### ★ 스코프 — 리스트에 없으면 복사하지 않는다
+
+미러 대상은 **리스트에 올라온 오브젝트와 그 자손뿐**이다. 스코프 밖 노드는 복제하지 않고
+*그대로 참조*한다.
+
+예를 들어
+
+```
+grp_l_all
+├── jnt_l_01
+│   └── jnt_l_01_parentConstraint
+├── jnt_l_01_zro > jnt_l_01_con > jnt_l_01_ctl > jnt_l_01_tgt
+└── mesh_l_01
+
+mesh_l_02          ← 계층 밖. jnt_l_01 에 바인드되어 있다
+```
+
+- `grp_l_all` 과 `mesh_l_02` 를 **둘 다** 담으면 → `grp_r_all`, `mesh_r_02` 가 생긴다.
+- `grp_l_all` **만** 담으면 → `mesh_l_02` 는 `jnt_l_01` 에 바인드되어 있어도
+  **복사되지 않는다.** `mesh_r_01` 만 생기고, 원래 `mesh_l_02` 는 그대로 남는다.
+- `jnt_l_01_tgt` 가 `jnt_l_01` 을 parentConstraint 로 구동하고 있었다면,
+  미러 뒤에는 `jnt_r_01_tgt` 가 `jnt_r_01` 을 똑같이 구동한다.
+
+**스코프 밖이 드라이버/인플루언스면 그 노드를 그대로 쓴다** — 센터 조인트가
+좌우 메시를 함께 물고 있으면 미러된 스킨도 같은 센터 조인트를 인플루언스로 갖는다.
+컨스트레인트도 마찬가지로, 센터 컨트롤이 드라이버면 미러 후에도 같은 센터 컨트롤이
+드라이버다.
+
+#### 이름 — 공용 토큰 규칙
+
+이름은 [`Framework/rules/mirror_tokens.json`](Framework_mirror_tokens.md) 의 좌/우 토큰으로
+바꾼다. **`A00110_animTool_V02` 의 Mirror Key 와 같은 파일**이라 한쪽에서 토큰을 추가하면
+양쪽에 적용된다.
+
+- **토큰이 없는 이름**(`grp_center_all` 처럼)은 **경고를 띄우고 미러하지 않는다.**
+  하나라도 걸리면 아무것도 만들지 않고 멈춘다 — 반쪽만 만들어진 리그가 제일 고치기 어렵다.
+  이때 **걸린 오브젝트 이름을 전부 로그에 찍고, 그 오브젝트들을 세트
+  `mirror_noToken_set` 하나로 묶은 뒤 선택**한다. 이름만 찍어 두면 씬에서 다시 찾아야 하니,
+  바로 고를 수 있게 해 둔 것이다.
+  - 세트 이름은 **고정**이고, 다시 돌리면 **비워서 재사용**한다.
+    같은 이름으로 세트를 또 만들면 `mirror_noToken_set1`, `...2` 로 쌓여서
+    정작 어느 것이 방금 것인지 알 수 없어진다.
+  - 씬에 남는 변화는 이 세트 하나뿐이다(미러는 아무것도 만들지 않았다).
+    `Ctrl+Z` 한 번이면 세트도 사라진다.
+- **`Disable token check`** 를 켜면 경고는 그대로 띄우되 진행한다. 토큰이 없는 노드는
+  이름 뒤에 **`_mir`** 를 붙여 만든다(이 경우 세트는 만들지 않는다).
+- 셰이프 이름도 따라간다. 다만 마야가 **트랜스폼을 리네임하면 `<transform>Shape*` 를
+  알아서 따라 바꾸므로**, 이미 맞는 이름을 다시 미러해 되돌리지 않도록 마야가 손대지 않은
+  셰이프만 바꾼다.
+
+#### ★ Behavior 와 Orientation
+
+조인트와 "커브 / 나머지" 를 따로 고른다(둘 다 기본 **Behavior**).
+
+| | 무엇이 되는가 |
+|---|---|
+| **Behavior** | 로컬 축이 뒤집혀서 **같은 회전값이 좌우 대칭 동작**을 만든다. Maya `mirrorJoint` 의 Mirror function **Behavior** 와 행렬 단위로 같다 |
+| **Orientation** | 로컬 축이 원본과 **같은 방향**을 계속 가리킨다(위치만 반사) |
+
+수학은 간단하다. 평면의 **법선 축**(YZ → X, XZ → Y, XY → Z)만 알면,
+
+- **Orientation** : 축 3개 그대로, 위치만 법선 성분을 뒤집는다.
+- **Behavior** : 위치는 같고, **각 축에서 법선 성분만 남기고 나머지 둘을 뒤집는다.**
+  (= 반사한 뒤 세 축을 모두 뒤집기. 세 축을 다 뒤집어야 행렬식이 양수로 돌아와
+  오른손 좌표계가 유지된다.)
+
+> [!warning] Behavior 는 **회전**을 미러하지, 이동을 미러하지 않는다
+> 양쪽 컨트롤을 똑같이 `rotateZ +40` 하면 좌우 대칭으로 움직인다. 그런데 똑같이
+> `translateY +2` 하면 **반대 방향으로** 간다 — 로컬 Y 축이 뒤집혀 있기 때문이다.
+> 이동으로 구동하는 오브젝트(대표적으로 **클러스터 핸들**)가 있으면
+> `Curves / Others` 를 **Orientation** 으로 두는 편이 낫다.
+> mirrorJoint 의 Behavior 도 똑같은 성질을 갖는다.
+
+조인트는 회전을 `rotate` 가 아니라 **`jointOrient`** 에 넣고 `rotate` 는 0 으로 둔다
+(`xform -ws -m` 는 회전을 `rotate` 에 넣으므로, 그 뒤에 로컬 행렬을 다시 읽어 옮긴다).
+
+#### ★ 메시는 트랜스폼만으로 뒤집히지 않는다
+
+Behavior 도 Orientation 도 **강체 회전**이라, 메시는 회전만 하고 거울상이 되지 않는다
+(왼쪽 신발이 오른쪽에서도 왼쪽 신발이다). 그래서 메시는 트랜스폼을 규칙대로 놓은 뒤
+오브젝트 공간에서 보정 행렬 `C = (M·S)·M_new⁻¹` 로 정점을 한 번 더 반사하고 노멀을
+뒤집는다. 결과의 월드 형상은 원본의 **정확한 거울상**이다.
+
+정점 순서는 그대로라, 스킨 웨이트도 클러스터 웨이트도 인덱스 그대로 옮겨진다.
+
+#### ★ 스킨된 메시의 복제본은 트랜스폼이 **잠긴 채로** 나온다
+
+마야는 `skinCluster` 가 붙은 메시의 트랜스폼 t/r/s 를 잠근다. 그 메시를 복제하면
+**히스토리를 지워도 잠금이 남는다.** 그런데 `cmds.xform` 은 잠긴 채널에 대해
+**에러도 없이 조용히 아무것도 하지 않는다** — 메시만 제자리에 남고, 게다가 위의 지오메트리
+보정이 그걸 가려서 월드 형상은 맞아 보인다(트랜스폼만 엉뚱한 자리에 있다).
+
+그래서 놓기 직전에만 잠금을 풀고 되돌리며, **적용 뒤 월드 행렬을 되읽어 확인**한다.
+확인에 실패하면 그 노드를 로그에 남긴다(잠김 또는 연결된 채널).
+
+#### 로그 예
+
+```
+--- Mirror (YZ plane, joints behavior, others behavior) ---
+       4 token pair(s) loaded.
+       10 object(s) mirrored across the YZ plane.
+       2 skinCluster(s) rebuilt.
+       1 cluster(s) rebuilt.
+       1 constraint(s) rebuilt.
+[OK] Mirror
+```
+
+토큰이 없어 멈춘 경우 — 이름은 한 줄에 4개씩 묶어 찍는다(하나씩 한 줄이면 수백 줄이 쏟아지고,
+한 줄에 다 넣으면 잘려 읽을 수 없다):
+
+```
+--- Mirror (YZ plane, joints behavior, others behavior) ---
+[WARN] 5 object(s) have no mirror token:
+[WARN]   spine_01, spine_02, chest_ctl, neck_ctl
+[WARN]   head_ctl
+[WARN] Collected in the set 'mirror_noToken_set'.
+       members of 'mirror_noToken_set' are selected.
+[ERR] Mirror : 5 object(s) have no mirror token - nothing was mirrored
+      (see the set 'mirror_noToken_set'). Check 'Disable token check' to mirror them anyway.
+```
+
+만든 오브젝트는 실행 뒤 씬에서 선택된다. 전체가 **undo 한 번**으로 되돌아간다.
+
+
+---
+
 ## 3. 구조 (개발자용)
 
 ```
@@ -1074,16 +1240,19 @@ A00145_RigConnect/
     │   ├── maya_scene.py           # Pair (A00140 복사)
     │   ├── closest_connector.py    # Pair (A00140 복사 + 짝짓기 모드: 거리 / 리스트 자리)
     │   └── object_match.py         # Pair > Match by Name (이름으로 오브젝트 짝짓기 — attr_match 엔진 재사용, 비교는 말단 이름·반환은 전체 경로)
+    │   └── mirror_manager.py       # Mirror (계층 복제 -> 미러 행렬 -> 스킨/컨스트레인트/클러스터 재구성, 토큰은 Framework 공용 규칙, MissingTokenError 가 이름 목록 + 세트를 실어 나른다)
     ├── data/                        # 사용자 데이터 (git 제외)
     │   ├── attr_profiles/<이름>.json   # Attribute > Create 프로파일
     │   └── attr_profiles_active.json   # 마지막으로 쓰던 프로파일
     └── ui/
         ├── collapsible.py          # CollapsibleBox
         ├── attr_spec_dialog.py     # Attribute > Create 의 어트리뷰트 정의 편집 창
-        └── main_window.py          # QTabWidget 최상위 4탭(Constrain 6 / Connect 3 / Attribute 3 하위 탭) + 공유 로그 + Help>About
+        └── main_window.py          # QTabWidget 최상위 5탭(Constrain 6 / Connect 3 / Attribute 3 하위 탭) + 공유 로그 + Help>About
 ```
 
 - 모든 textScrollList 는 `Framework.qt.JUN_mod_tsl_qt_v01` 위젯으로 대체.
   Match 탭의 두 리스트만 `list_limit=MATCH_LIST_LIMIT`(500) 으로 **요약 모드**를 켠다.
+- 좌/우 토큰 규칙은 공용 [`Framework.core.mirror_tokens`](Framework_mirror_tokens.md)
+  (`Framework/rules/mirror_tokens.json`) — `A00110_animTool_V02` 의 Mirror Key 와 **같은 파일**.
 - `app/core`(로직) ↔ `app/ui`(화면) 분리. 위젯은 값만 읽어 매니저에 전달.
 - UI 문자열은 영어, 한국어는 주석/독스트링만.

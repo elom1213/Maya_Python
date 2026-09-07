@@ -25,7 +25,7 @@
 | `A00110_animTool` | 애니메이션 | [A00110_animTool](A00110_animTool.md) |
 | `A00130_ControlRig_V02` | 리깅 / 컨트롤러(cage) 세팅 — 템플릿 조인트 | [A00130_ControlRig_V02](A00130_ControlRig_V02.md) |
 | `A00140_ConnectClosest` | 리깅 / 페이셜 | [A00140_ConnectClosest](A00140_ConnectClosest.md) |
-| `A00145_RigConnect` | 리깅 / 연결·매칭·컨스트레인트 통합 | [A00145_RigConnect](A00145_RigConnect.md) |
+| `A00145_RigConnect` | 리깅 / 연결·매칭·컨스트레인트·**미러** 통합 | [A00145_RigConnect](A00145_RigConnect.md) |
 | `A00150_remapVal` | 리깅 | [A00150_remapVal](A00150_remapVal.md) |
 | `A00160_sphericalEye` | 리깅 / 페이셜 | [A00160_sphericalEye](A00160_sphericalEye.md) |
 | `A00180_abSymMesh` | 모델링 / 블렌드셰이프 | [A00180_abSymMesh](A00180_abSymMesh.md) |
@@ -52,6 +52,7 @@
 | `Framework/qt/MOD_expand_qt_v01.py` | 공용 **Expand(별도 창)** 패널 — 본문을 독립 창으로 빼고 되돌린다. **복제가 아니라 이동**이라 값이 어긋날 여지가 없다 | [Framework_MOD_expand_qt](Framework_MOD_expand_qt.md) |
 | `Framework/core/maya_shape.py` | **트랜스폼 → 셰이프 확정** 헬퍼 — `extendToShape()` 가 엉뚱한 셰이프를 집는 함정을 막는다(`kInvalidParameter` 원인) | [Framework_maya_shape](Framework_maya_shape.md) |
 | `Framework/core/maya_skin.py` | skinCluster 웨이트 **인덱스 함정**(물리 vs 논리) — `get/setWeights` 는 물리 인덱스. undo 뒤 재바인드가 죽던 원인 | [Framework_maya_skin](Framework_maya_skin.md) |
+| `Framework/core/mirror_tokens.py` | 좌/우 미러 **토큰 규칙 공용화**(`Framework/rules/mirror_tokens.json`) — 이름 미러링은 **경계 매칭**으로 `arm_lower` 같은 오탐을 막는다 | [Framework_mirror_tokens](Framework_mirror_tokens.md) |
 
 ---
 

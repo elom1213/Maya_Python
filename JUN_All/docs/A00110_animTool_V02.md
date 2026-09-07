@@ -589,8 +589,12 @@
 
 > **v01.04 — Mirror Key 탭 신설**: 컨트롤 키를 좌우 대칭으로 반대쪽에 복사한다. 채널 부호 반전이
 > 아니라 **월드 매트릭스 반사 → 타겟 rotateOrder 재분해** 방식이라 rotateOrder/축 정렬에 무관하다.
-> 로직은 `app/core/mirror_key_manager.py`, 토큰 JSON 입출력은 `app/core/mirror_token_store.py`
-> (`app/config/mirror_tokens.json`)로 분리했다. 리스트 UI 는 재사용 위젯 `JUN_mod_tsl_qt_v01` 2개.
+> 로직은 `app/core/mirror_key_manager.py`. 토큰 JSON 입출력은 **공용**
+> [`Framework.core.mirror_tokens`](Framework_mirror_tokens.md)
+> (`Framework/rules/mirror_tokens.json`)로 옮겼다 — 미러가 필요한 툴이 늘면서 툴마다 토큰
+> 목록이 갈라졌기 때문이다(`A00145_RigConnect` 의 Mirror 탭과 **같은 파일**을 읽고 쓴다).
+> `app/core/mirror_token_store.py` 는 기존 import 경로를 살리는 얇은 재노출만 남았다.
+> 리스트 UI 는 재사용 위젯 `JUN_mod_tsl_qt_v01` 2개.
 
 > **v01.03 — Copy Key 탭 신설**: 레거시 단일 파일 툴
 > `01_Modules/JUN_PY_CopyPasteKey_V03_01.py`(maya.cmds 기반 "Copy Key Tool V03.01")의
@@ -617,8 +621,8 @@ A00110_animTool_V02/
 ├── requirements.txt
 └── app/
     ├── config/
-    │   ├── version.py            # VERSION / LAST_UPDATE
-    │   └── mirror_tokens.json    # 좌/우 토큰 쌍 (Mirror Key, 확장 가능)
+    │   └── version.py            # VERSION / LAST_UPDATE
+    │                             # (좌/우 토큰 쌍은 Framework/rules/mirror_tokens.json 으로 이전)
     ├── core/              # 로직 (UI 비의존, maya.cmds)
     │   ├── keyframe_manager.py   # 키 이동 / 구간삭제 / 전체삭제 / Hold (Timing · Key 탭)
     │   ├── hotkey_manager.py     # Shift+A 핫키 설치 / 복원 → Hold 호출
@@ -626,7 +630,7 @@ A00110_animTool_V02/
     │   ├── copykey_manager.py    # Base→Target 키 복사 + 축 Reverse (Copy Key 탭)
     │   ├── layer_key_manager.py  # 애님 레이어 사이 키 복사 / 잘라내기 (Transfer > Layer)
     │   ├── mirror_key_manager.py # 컨트롤 키 좌우 미러 (Mirror Key 탭, OpenMaya)
-    │   ├── mirror_token_store.py # mirror_tokens.json 입출력 + 폴백
+    │   ├── mirror_token_store.py # Framework.core.mirror_tokens 재노출(경로 호환용)
     │   ├── bake_manager.py       # 리스트 노드 구간 bake (Bake 탭, native bakeResults)
     │   ├── follow_match_manager.py # follower→target 월드 매치 베이크 (Follow 탭, OpenMaya + blend, maintain offset, 1<-n)
     │   ├── offset_hold_manager.py # 키를 hold+offset 구조로 재배치 (Timing > Offset)
@@ -1425,7 +1429,8 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 - **Start / End**: (구간 미러 전용) 미러 대상 시간 범위(기본 = 현재 playback 범위).
 - **Time**: (구간 미러 전용) **Source keys**(기본, 소스의 실제 키 시점에만 기록 → 곡선·타이밍 보존) /
   **Bake**(범위 내 정수 프레임 전수 기록).
-- **L / R Tokens**: `app/config/mirror_tokens.json` 의 좌/우 토큰 쌍 편집 테이블.
+- **L / R Tokens**: 공용 `Framework/rules/mirror_tokens.json` 의 좌/우 토큰 쌍 편집 테이블.
+  **다른 툴(`A00145_RigConnect` Mirror 탭)과 같은 파일**이라 여기서 고치면 그쪽에도 적용된다.
   **Add/Remove Row** 로 행 추가·삭제, **Save** 로 JSON 기록, **Reload** 로 다시 읽기.
   기본 4쌍(`_l/_r`, `_L/_R`, `_lf/_rt`, `Left/Right`). 새 네이밍은 행 추가만으로 지원.
 - **Mirror Selected**: **구간 미러** 실행(Start/End/Time 사용). 결과(처리한 페어 수 / 반사축 /
