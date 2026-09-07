@@ -143,7 +143,7 @@
 - [A00170 Stretch tab](wip-a00170-stretch-tab.md) — Default Distance 가 Stretch 구동, linear + Sigmoid 노드망 (v01.11)
 - [A00170 AttachCrv tab](wip-a00170-attachcrv-tab.md) — TSL 오브젝트를 커브 최근접점에 부착
 - [A00170 Remap List Attributes](wip-a00170-remap-listattrs.md) — Remap Value 탭에 전체 어트리뷰트 목록 + 검색
-- [A00145 Mirror tab](wip-a00145-mirror-tab.md) — **신규 탭**: 계층을 통째로 미러(스킨·컨스트레인트·클러스터 재구성). Behavior 는 **회전만 미러하고 이동은 반대로 간다** · 메시는 트랜스폼만으론 안 뒤집혀 정점을 한 번 더 반사 · 트랜스폼을 리네임하면 **마야가 셰이프를 알아서 따라 바꾼다** · 토큰 없으면 이름을 찍고 `mirror_noToken_set` 으로 묶는다(예외로 던지면 warnings 가 사라진다) (v01.38)
+- [A00145 Mirror tab](wip-a00145-mirror-tab.md) — **신규 탭**: 계층을 통째로 미러(스킨·컨스트레인트·클러스터·**임의의 노드망** 재구성). **Reflect** = `M·S`(월드 scaleX -1 과 같은 상태, 컨트롤러 기본) · 노드망은 **DAG 에서 멈춰** 수집하고 `expression` 은 뺀다(원본을 또 구동한다). Behavior 는 **회전만 미러하고 이동은 반대로 간다** · 메시는 트랜스폼만으론 안 뒤집혀 정점을 한 번 더 반사 · 트랜스폼을 리네임하면 **마야가 셰이프를 알아서 따라 바꾼다** · 토큰 없으면 이름을 찍고 `mirror_noToken_set` 으로 묶는다(예외로 던지면 warnings 가 사라진다) (v01.38)
 - [A00145 object name match](wip-a00145-object-name-match.md) — Connect > `Pair`(구 Connect Closest) 에서 오브젝트를 이름으로 짝짓기. **경로·네임스페이스를 떼고 비교하되 반환은 전체 경로** · **Connect 가 거리로 다시 짝짓어** 세운 순서를 뒤집던 것을 `Pairing` 옵션으로
 - [A00145 Update offset](wip-a00145-update-offset.md) — AE 의 constraint `Update` 버튼(`-e -maintainOffset`)을 리스트 전체에. **타깃을 전부 넘겨야** 하고(일부만 넘기면 나머지 offset 이 옛 값으로 남아 driven 이 튄다), **타깃이 아닌 걸 넘기면 edit 인데도 추가된다**
 - [A00145 component followers](wip-a00145-component-followers.md) — Followers 에 버텍스/CV. **`matchTransform` 은 컴포넌트를 인자로 못 받는다**(`Found 1`) · 여러 점 컴포넌트에 절대 좌표를 주면 **한 자리로 뭉개진다**(중심 기준 상대 이동)

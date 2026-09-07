@@ -314,7 +314,7 @@ class MainWindow(QWidget):
         plane_row.addStretch(1)
         layout.addWidget(plane_box)
 
-        # --- 미러 방식 (조인트 / 나머지) ---
+        # --- 미러 방식 (조인트 / 컨트롤러) ---
         mode_box = QGroupBox("Mirror Type")
         mode_layout = QGridLayout(mode_box)
         mode_box.setToolTip(
@@ -323,16 +323,29 @@ class MainWindow(QWidget):
             "              (matches Maya's mirrorJoint with Mirror function "
             "'Behavior').\n"
             "Orientation : the local axes keep pointing the same way as the "
-            "original.\n\n"
+            "original.\n"
+            "Reflect     : a true mirror image - the same state you get by putting "
+            "the object under\n"
+            "              a group and setting world scaleX to -1 (YZ plane). The "
+            "local axes point\n"
+            "              the reflected way, so moving the mirrored control along "
+            "its own +X / +Y / +Z\n"
+            "              moves it exactly opposite across the plane. This leaves "
+            "a negative scale\n"
+            "              on one axis, which is what that mirror is.\n\n"
             "Behavior mirrors rotation, not translation: moving a control +Y on "
             "both sides moves\n"
             "them in opposite directions. Pick Orientation for translate driven "
-            "objects (cluster handles).")
+            "objects (cluster handles).\n\n"
+            "Meshes always fall back to Orientation - their geometry is reflected, "
+            "so Reflect would\n"
+            "only add a negative scale on top.")
 
         self.rb_mirror_joint = self._mirror_mode_row(
-            mode_layout, 0, "Joints", mir_mgr.MODE_BEHAVIOR)
+            mode_layout, 0, "Joints", mir_mgr.MIRROR_MODES, mir_mgr.MODE_BEHAVIOR)
         self.rb_mirror_other = self._mirror_mode_row(
-            mode_layout, 1, "Curves / Others", mir_mgr.MODE_BEHAVIOR)
+            mode_layout, 1, "Curves / Others", mir_mgr.CONTROL_MIRROR_MODES,
+            mir_mgr.MODE_REFLECT)
         layout.addWidget(mode_box)
 
         # --- 옵션 ---
@@ -359,6 +372,7 @@ class MainWindow(QWidget):
         self.cb_mirror_skin = QCheckBox("Skin Weights")
         self.cb_mirror_constraints = QCheckBox("Constraints")
         self.cb_mirror_clusters = QCheckBox("Clusters")
+        self.cb_mirror_networks = QCheckBox("Node Networks")
         for cb, tip in ((self.cb_mirror_skin,
                          "Rebuild each skinCluster on the mirrored mesh with the "
                          "mirrored influences and the same weights."),
@@ -367,7 +381,19 @@ class MainWindow(QWidget):
                          "with mirrored drivers."),
                         (self.cb_mirror_clusters,
                          "Rebuild the clusters that deform the mirrored geometry, "
-                         "with a mirrored handle and the same weights.")):
+                         "with a mirrored handle and the same weights."),
+                        (self.cb_mirror_networks,
+                         "Rebuild the utility node networks that drive the mirrored "
+                         "objects - any chain of\n"
+                         "nodes, not just constraints (pointOnCurveInfo, "
+                         "fourByFourMatrix, multMatrix,\n"
+                         "decomposeMatrix, ...). The nodes are duplicated and "
+                         "rewired to the mirrored side;\n"
+                         "drivers outside the mirror stay shared.\n\n"
+                         "Values that are not connected are copied as-is, so check "
+                         "any baked offsets.\n"
+                         "Animation curves, expressions and deformers are left "
+                         "out on purpose.")):
             cb.setChecked(True)
             cb.setToolTip(tip)
             keep_row.addWidget(cb)
@@ -384,11 +410,15 @@ class MainWindow(QWidget):
         layout.addStretch(1)
         return tab
 
-    def _mirror_mode_row(self, grid, row, label, default_key):
-        """'Behavior / Orientation' 라디오 한 줄. 반환: QButtonGroup."""
+    def _mirror_mode_row(self, grid, row, label, modes, default_key):
+        """미러 방식 라디오 한 줄. 반환: QButtonGroup.
+
+        조인트와 컨트롤러가 고를 수 있는 방식이 다르다 - 조인트에는 음수 스케일을 남기는
+        `Reflect` 를 주지 않는다.
+        """
         grid.addWidget(QLabel(label + " :"), row, 0)
         group = QButtonGroup(self)
-        for index, (text, key) in enumerate(mir_mgr.MIRROR_MODES):
+        for index, (text, key) in enumerate(modes):
             rb = QRadioButton(text)
             rb.setProperty("mirror_key", key)
             if key == default_key:
@@ -1817,6 +1847,7 @@ class MainWindow(QWidget):
         do_skin = self.cb_mirror_skin.isChecked()
         do_constraints = self.cb_mirror_constraints.isChecked()
         do_clusters = self.cb_mirror_clusters.isChecked()
+        do_networks = self.cb_mirror_networks.isChecked()
 
         self.log("--- Mirror ({0} plane, joints {1}, others {2}) ---".format(
             plane.upper(), joint_mode, other_mode))
@@ -1827,7 +1858,7 @@ class MainWindow(QWidget):
                     objects, plane=plane, joint_mode=joint_mode, other_mode=other_mode,
                     disable_token_check=disable_token_check,
                     do_skin=do_skin, do_constraints=do_constraints,
-                    do_clusters=do_clusters)
+                    do_clusters=do_clusters, do_networks=do_networks)
             except mir_mgr.MissingTokenError as e:
                 # 예외로 나가면 반환값(경고)이 통째로 사라진다. 이름 목록을 먼저 찍고
                 # 다시 던져 _run 이 [ERR] 로 마무리하게 둔다.

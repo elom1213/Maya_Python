@@ -9,6 +9,8 @@ mirror_manager - Mirror 탭 로직.
   - 스킨 웨이트 (skinCluster)  : 인플루언스를 반대쪽 조인트로 갈아끼우고 웨이트 그대로
   - 컨스트레인트               : 드라이버/드리븐을 반대쪽 짝으로 다시 건다
   - 클러스터                   : 핸들·웨이트를 반대쪽으로
+  - 노드 네트워크               : 컨스트레인트가 아닌 임의의 유틸리티 노드망도 복제해 다시 잇는다
+                                (pointOnCurveInfo -> fourByFourMatrix -> multMatrix -> ...)
 
 **스코프 규칙**: 미러 대상은 리스트에 올라온 오브젝트와 그 자손뿐이다. 스코프 밖 노드는
 복제하지 않고 *그대로 참조*한다 - 스코프 밖 메시에 스킨이 걸려 있어도 그 메시는 복제되지
@@ -22,6 +24,10 @@ mirror_manager - Mirror 탭 로직.
 
   Orientation : 축 3개는 그대로, 위치만 법선 성분을 뒤집는다.
   Behavior    : 위치는 같고, 각 축 행에서 **법선 성분만 남기고 나머지 둘을 뒤집는다**.
+  Reflect     : 진짜 반사(M·S). 컨트롤러 전용이고 행렬식이 음수라 음수 스케일이 남는다 -
+                "그룹에 넣고 월드 scaleX 를 -1" 한 것과 같은 상태다. 계층 전체에 같은
+                Reflect 를 쓰면 **후손의 로컬 트랜스폼은 원본 그대로**이고 뒤집힘은
+                맨 위 노드 하나만 갖는다(local = (M_c·S)(M_p·S)^-1 = M_c·M_p^-1).
 
 Behavior 식은 "반사한 뒤 세 축을 모두 뒤집기"(= -(M·S))와 같다. 세 축을 모두 뒤집어야
 행렬식이 양수로 돌아와 오른손 좌표계가 유지되고, 같은 로컬 회전값이 좌우 대칭 동작을
@@ -65,11 +71,17 @@ _PLANE_NORMAL = {PLANE_YZ: 0, PLANE_XZ: 1, PLANE_XY: 2}
 # 미러 방식.
 MODE_BEHAVIOR = "behavior"
 MODE_ORIENTATION = "orientation"
+MODE_REFLECT = "reflect"
 
+# 조인트용(회전 행렬이 오른손계로 유지되는 두 가지만).
 MIRROR_MODES = (
     ("Behavior", MODE_BEHAVIOR),
     ("Orientation", MODE_ORIENTATION),
 )
+
+# 컨트롤러(커브 등)용. Reflect 는 **진짜 거울상**이라 음수 스케일이 남는다 -
+# "그룹에 넣고 월드 scaleX 를 -1" 한 것과 같은 상태다.
+CONTROL_MIRROR_MODES = MIRROR_MODES + (("Reflect", MODE_REFLECT),)
 
 # 토큰을 못 찾은 노드에 붙이는 접미사('Disable token check' 일 때만 쓰인다).
 NO_TOKEN_SUFFIX = "_mir"
@@ -208,14 +220,21 @@ def _component_count(shape):
 # 미러 행렬
 # ==================================================================
 
-def _mirror_matrix(matrix, axis, behavior):
+def _mirror_matrix(matrix, axis, mode):
     """월드 행렬 16개 값을 미러한다.
 
-    axis     : 반사 평면의 법선 축 인덱스(0/1/2)
-    behavior : True 면 Behavior, False 면 Orientation
+    axis : 반사 평면의 법선 축 인덱스(0/1/2)
+    mode : MODE_BEHAVIOR / MODE_ORIENTATION / MODE_REFLECT
+
+    MODE_REFLECT 는 **진짜 반사**(M·S)라 행렬식이 음수다. 트랜스폼에 넣으면 마야가
+    한 축의 스케일을 -1 로 분해한다 - 그룹에 넣고 월드 scaleX 를 -1 한 것과 같은 상태이고,
+    오브젝트 공간의 로컬 축이 거울상 방향을 정확히 가리킨다(실측 확인).
     """
+    if mode == MODE_REFLECT:
+        return _reflected_matrix(matrix, axis)
+
     out = list(matrix)
-    if behavior:
+    if mode == MODE_BEHAVIOR:
         for row in range(3):
             for col in range(3):
                 if col != axis:
@@ -655,7 +674,7 @@ def _geometry_index(geos, indices, shape):
     return None
 
 
-def _copy_clusters(scope, node_map, axis, other_behavior, token_pairs, warnings):
+def _copy_clusters(scope, node_map, axis, other_mode, token_pairs, warnings):
     """스코프 안 지오메트리를 변형하는 cluster 를 반대쪽에 다시 만든다.
 
     한 cluster 가 여러 지오메트리를 물고 있으면 **하나의 미러 cluster** 로 묶는다.
@@ -690,7 +709,7 @@ def _copy_clusters(scope, node_map, axis, other_behavior, token_pairs, warnings)
                 if handle:
                     _apply_world_matrix(new_handle, _mirror_matrix(
                         cmds.xform(handle, query=True, worldSpace=True, matrix=True),
-                        axis, other_behavior))
+                        axis, other_mode))
 
             new_cluster = cmds.cluster(
                 [dst for _src, dst in geo_pairs],
@@ -730,6 +749,209 @@ def _copy_clusters(scope, node_map, axis, other_behavior, token_pairs, warnings)
                 _short(cluster), e))
 
     return created
+
+
+# ==================================================================
+# 노드 네트워크 (컨스트레인트가 아닌 임의의 연결)
+# ==================================================================
+#
+# 리그의 연결이 늘 컨스트레인트인 것은 아니다. 예를 들어
+#
+#     crv_l_01 -> pointOnCurveInfo -> fourByFourMatrix -> multMatrix
+#              -> decomposeMatrix -> jnt_l_01.translate
+#
+# 처럼 **한 종류로 특정할 수 없는 유틸리티 노드**들을 거쳐 이어져 있다. 이런 연결도
+# 반대쪽에 그대로 서 있어야 미러가 끝난 것이다.
+#
+# 찾는 법: 스코프 안 오브젝트의 **구동 플러그**(t/r/s · jointOrient · offsetParentMatrix ·
+# 사용자 정의 어트리뷰트 …)에서 **거슬러 올라가며** DG 노드를 모은다. DAG 노드를 만나면
+# 멈춘다 - DAG 노드는 미러 대상이면 리스트에 있어야 하고, 아니면 스코프 밖 드라이버라
+# 그대로 공유하면 된다.
+#
+# 다시 세울 때는 모은 노드를 복제하고 **모든 연결을 양쪽 끝을 갈아끼워** 다시 잇는다.
+#   출발 노드 : 네트워크면 복제본, 스코프면 미러본, 그 외(센터)면 원본 그대로
+#   도착 노드 : 네트워크/스코프가 아니면 **잇지 않는다** - 이으면 스코프 밖 노드를
+#              양쪽에서 구동해 버린다.
+
+# 상속 타입에 이게 있으면 네트워크로 안 본다.
+_NETWORK_SKIP_INHERITED = (
+    "constraint",         # 컨스트레인트는 따로 다시 만든다
+    "geometryFilter",     # skinCluster / cluster / blendShape ... (따로 다시 만든다)
+    "shadingDependNode",  # 셰이딩 · 텍스처
+    "polyModifier", "polyBase", "polyCreator",   # 폴리 히스토리(복제본엔 히스토리가 없다)
+)
+
+# 정확히 이 타입이면 네트워크로 안 본다.
+_NETWORK_SKIP_TYPES = {
+    "pairBlend",        # 컨스트레인트 + 키가 만드는 블렌드. 컨스트레인트 재생성과 겹친다
+    "expression",       # 식 안에 **원본 이름**이 박혀 있어 복제하면 원본을 또 구동한다
+    "time", "objectSet", "groupId", "groupParts", "tweak", "shadingEngine",
+    "displayLayer", "renderLayer", "lightLinker", "dagPose", "hyperLayout",
+    "reference", "script", "unknown", "nodeGraphEditorInfo", "nodeGraphEditorBookmarks",
+}
+
+# 몇 홉까지 거슬러 올라갈지. DAG 노드에서 멈추므로 보통 훨씬 얕게 끝난다.
+_NETWORK_DEPTH = 25
+
+
+def _is_dag(node):
+    return "dagNode" in (cmds.nodeType(node, inherited=True) or [])
+
+
+def _skip_network_node(node):
+    """네트워크로 데려가면 안 되는 노드인가."""
+    if cmds.nodeType(node) in _NETWORK_SKIP_TYPES:
+        return True
+    for type_ in cmds.nodeType(node, inherited=True) or []:
+        if type_ in _NETWORK_SKIP_INHERITED:
+            return True
+        # 애니메이션은 미러 대상이 아니다(키 미러는 A00110 animTool 의 Mirror Key).
+        # 레이어/컨스트레인트 블렌드도 같이 걸러진다.
+        if type_.startswith("animCurve") or type_.startswith("animBlend"):
+            return True
+    return False
+
+
+def _driver_plugs(node):
+    """이 노드에서 '무엇이 구동되는지' 를 볼 플러그들.
+
+    지오메트리 입력(`inMesh`, `create` …)은 일부러 뺀다 - 그쪽은 디포머/히스토리라
+    따로 다루고, 거슬러 올라가면 씬 절반이 딸려온다.
+    """
+    attrs = ["translate", "rotate", "scale", "shear", "rotateOrder", "rotateAxis",
+             "visibility", "offsetParentMatrix", "jointOrient"]
+
+    plugs = []
+    targets = [node] + (cmds.listRelatives(node, shapes=True, fullPath=True) or [])
+    for target in targets:
+        for attr in attrs:
+            for name in [attr] + [attr + axis for axis in "XYZ"]:
+                plug = "{0}.{1}".format(target, name)
+                if cmds.objExists(plug):
+                    plugs.append(plug)
+        for attr in cmds.listAttr(target, userDefined=True) or []:
+            plug = "{0}.{1}".format(target, attr)
+            if cmds.objExists(plug):
+                plugs.append(plug)
+    return plugs
+
+
+def _collect_network(scope):
+    """스코프 오브젝트를 구동하는 DG 유틸리티 노드를 거슬러 올라가며 모은다.
+
+    반환: 롱네임 목록(발견 순서. 중복 없음)
+    """
+    scope_set = set(scope)
+    found = []
+    seen = set()
+
+    todo = [(plug, 0) for node in scope for plug in _driver_plugs(node)]
+    while todo:
+        target, level = todo.pop()
+        sources = cmds.listConnections(target, source=True, destination=False,
+                                       plugs=True) or []
+        for source in sources:
+            name = source.split(".", 1)[0]
+            node = _long(name) or name
+            if node in seen or node in scope_set:
+                continue
+            if _is_dag(node):
+                # DAG 노드에서 멈춘다(스코프 안이면 이미 미러됐고, 밖이면 공유 드라이버).
+                continue
+            if _skip_network_node(node):
+                continue
+            seen.add(node)
+            found.append(node)
+            if level < _NETWORK_DEPTH:
+                todo.append((node, level + 1))
+
+    return found
+
+
+def _map_plug(plug, dup_map, node_map):
+    """플러그의 노드 부분을 미러 쪽으로 갈아끼운다.
+
+    반환: (새 플러그, 갈아끼웠는지)
+    """
+    name, attr = plug.split(".", 1)
+    node = _long(name) or name
+    target = dup_map.get(node) or node_map.get(node)
+    if target:
+        return ("{0}.{1}".format(target, attr), True)
+    return (plug, False)
+
+
+def _mirror_networks(scope, node_map, token_pairs, warnings):
+    """스코프를 구동하는 유틸리티 노드망을 반대쪽에 다시 세운다.
+
+    반환: 만든 노드 목록
+    """
+    network = _collect_network(scope)
+    if not network:
+        return []
+
+    dup_map = {}
+    for node in network:
+        try:
+            dup_map[node] = cmds.duplicate(
+                node, name=_mirror_name(node, token_pairs))[0]
+        except Exception as e:
+            warnings.append("Could not duplicate '{0}' ({1}).".format(_short(node), e))
+
+    done = set()
+    for node in network:
+        if node not in dup_map:
+            continue
+
+        # 들어오는 연결 : [이 노드의 플러그, 소스 플러그, ...]
+        incoming = cmds.listConnections(node, connections=True, plugs=True,
+                                        source=True, destination=False) or []
+        for i in range(0, len(incoming) - 1, 2):
+            new_dst = _map_plug(incoming[i], dup_map, node_map)[0]
+            new_src = _map_plug(incoming[i + 1], dup_map, node_map)[0]
+            _connect_once(new_src, new_dst, done, warnings)
+
+        # 나가는 연결 : [이 노드의 플러그, 목적지 플러그, ...]
+        outgoing = cmds.listConnections(node, connections=True, plugs=True,
+                                        source=False, destination=True) or []
+        for i in range(0, len(outgoing) - 1, 2):
+            new_src = _map_plug(outgoing[i], dup_map, node_map)[0]
+            new_dst, mapped = _map_plug(outgoing[i + 1], dup_map, node_map)
+            if not mapped:
+                # 스코프 밖으로 나가는 출력. 이으면 그 노드를 양쪽에서 구동하게 된다.
+                warnings.append(
+                    "'{0}' also drives '{1}' which is outside the mirror - "
+                    "that connection was not rebuilt.".format(
+                        _short(node), _short(outgoing[i + 1])))
+                continue
+            _connect_once(new_src, new_dst, done, warnings)
+
+    created = [dup_map[node] for node in network if node in dup_map]
+    if created:
+        # 연결로 들어오는 값은 미러 쪽에서 다시 계산되지만, 노드에 **박혀 있는** 값
+        # (multMatrix 의 고정 오프셋 등)은 그대로 복사된다. 반사 평면을 가로지르는
+        # 성분이 있으면 그것만 손으로 고쳐야 한다.
+        warnings.append(
+            "Utility node values that are not connected were copied as-is - "
+            "check any baked offsets (e.g. multMatrix matrixIn).")
+    return created
+
+
+def _connect_once(source, destination, done, warnings):
+    """같은 연결을 두 번 만들지 않도록 기억하며 잇는다.
+
+    네트워크 내부의 간선은 한쪽의 '나가는 연결' 과 다른 쪽의 '들어오는 연결' 로
+    **두 번** 보인다.
+    """
+    key = (source, destination)
+    if key in done:
+        return
+    done.add(key)
+    try:
+        cmds.connectAttr(source, destination, force=True)
+    except Exception as e:
+        warnings.append("Could not connect '{0}' -> '{1}' ({2}).".format(
+            source, destination, e))
 
 
 # ==================================================================
@@ -887,14 +1109,16 @@ def _mirror_constraint(constraint, driven, node_map, token_pairs, warnings):
 # ==================================================================
 
 def mirror(objects, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
-           other_mode=MODE_BEHAVIOR, disable_token_check=False,
-           token_pairs=None, do_skin=True, do_constraints=True, do_clusters=True):
+           other_mode=MODE_REFLECT, disable_token_check=False,
+           token_pairs=None, do_skin=True, do_constraints=True,
+           do_clusters=True, do_networks=True):
     """리스트업된 오브젝트와 그 자식들을 미러한다.
 
     objects             : 미러할 최상위 오브젝트 이름 목록(TSL 내용).
     plane               : PLANE_YZ / PLANE_XY / PLANE_XZ
     joint_mode          : 조인트의 MODE_BEHAVIOR / MODE_ORIENTATION
-    other_mode          : 커브 등 나머지 트랜스폼의 미러 방식
+    other_mode          : 커브(컨트롤러) 등 나머지 트랜스폼의 미러 방식.
+                          MODE_REFLECT 는 진짜 거울상이라 음수 스케일이 남는다.
     disable_token_check : True 면 토큰 없는 이름도 경고만 하고 진행(접미사 '_mir')
     token_pairs         : [(left, right), ...]. None 이면 공용 규칙 파일에서 읽는다.
 
@@ -912,8 +1136,6 @@ def mirror(objects, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
     axis = _PLANE_NORMAL.get(plane)
     if axis is None:
         raise ValueError("Unknown mirror plane '{0}'.".format(plane))
-    joint_behavior = (joint_mode == MODE_BEHAVIOR)
-    other_behavior = (other_mode == MODE_BEHAVIOR)
 
     roots = _resolve_roots(objects, warnings)
     if not roots:
@@ -976,15 +1198,29 @@ def mirror(objects, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
     created_roots = [path for path in (_by_uuid(u) for u in root_uuids) if path]
 
     # ---- 트랜스폼 (부모 -> 자식 순서로 놓아야 자식이 안 밀린다) ----
+    reflected_meshes = 0
     for orig, dup in resolved_pairs:
-        is_joint = (cmds.nodeType(orig) == "joint")
-        behavior = joint_behavior if is_joint else other_behavior
+        mode = joint_mode if cmds.nodeType(orig) == "joint" else other_mode
+        # 메시에 Reflect 를 그대로 쓰면 **월드 행렬이 왼손계**가 되어 노멀이 뒤집힌 채
+        # 렌더되고, 그 위에 스킨을 얹게 된다. 메시는 어차피 아래에서 **정점을 반사**하므로
+        # 트랜스폼은 Orientation 으로 두어 월드 행렬을 오른손계로 유지한다.
+        # (부모가 Reflect 로 뒤집혀 있으면 그걸 상쇄하느라 로컬 스케일 한 축이 음수가
+        #  되지만, 정작 중요한 **월드**는 오른손계로 남는다.)
+        if mode == MODE_REFLECT and _shape_of(dup, "mesh"):
+            mode = MODE_ORIENTATION
+            reflected_meshes += 1
         matrix = _mirror_matrix(
-            cmds.xform(orig, query=True, worldSpace=True, matrix=True), axis, behavior)
+            cmds.xform(orig, query=True, worldSpace=True, matrix=True), axis, mode)
         try:
             _apply_world_matrix(dup, matrix)
         except Exception as e:
             warnings.append("Could not place '{0}' ({1}).".format(_short(dup), e))
+
+    if reflected_meshes:
+        infos.append("{0} mesh(es) placed with Orientation instead of Reflect - "
+                     "their geometry is reflected instead, which keeps the world "
+                     "orientation right-handed so normals and skinning stay "
+                     "valid.".format(reflected_meshes))
 
     # ---- 메시 지오메트리는 한 번 더 반사한다 (트랜스폼만으로는 안 뒤집힌다) ----
     for orig, dup in resolved_pairs:
@@ -1000,6 +1236,17 @@ def mirror(objects, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
     # ---- 관계 재구성 ----
     scope_orig = [orig for orig, _dup in resolved_pairs]
 
+    # 노드 네트워크는 트랜스폼이 아니라 **셰이프**에 붙는 일이 흔하다
+    # (`crv.worldSpace[0] -> pointOnCurveInfo.inputCurve`). 셰이프 짝도 지도에 넣는다.
+    plug_map = dict(node_map)
+    for orig, dup in resolved_pairs:
+        orig_shapes = cmds.listRelatives(orig, shapes=True, fullPath=True,
+                                         noIntermediate=True) or []
+        dup_shapes = cmds.listRelatives(dup, shapes=True, fullPath=True,
+                                        noIntermediate=True) or []
+        for a, b in zip(orig_shapes, dup_shapes):
+            plug_map[a] = b
+
     skins = []
     if do_skin:
         for orig, dup in resolved_pairs:
@@ -1014,8 +1261,15 @@ def mirror(objects, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
 
     clusters = []
     if do_clusters:
-        clusters = _copy_clusters(scope_orig, node_map, axis, other_behavior,
+        clusters = _copy_clusters(scope_orig, node_map, axis, other_mode,
                                   token_pairs, warnings)
+
+    networks = []
+    if do_networks:
+        try:
+            networks = _mirror_networks(scope_orig, plug_map, token_pairs, warnings)
+        except Exception as e:
+            warnings.append("Node network could not be mirrored ({0}).".format(e))
 
     constraints = []
     if do_constraints:
@@ -1039,5 +1293,7 @@ def mirror(objects, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
         infos.append("{0} cluster(s) rebuilt.".format(len(clusters)))
     if do_constraints:
         infos.append("{0} constraint(s) rebuilt.".format(len(constraints)))
+    if do_networks:
+        infos.append("{0} utility node(s) rebuilt.".format(len(networks)))
 
     return (created_roots, warnings, infos)
