@@ -4,7 +4,7 @@
 독립 실행(standalone) Qt 앱을 직접 설계·개발한 포트폴리오 저장소입니다.
 
 > 작성자: **Ji Hun Park (Junny)** · Technical Artist / Rigging & Pipeline Tools Developer
-> 최근 갱신: 2026-08-26 · 툴 폴더 **61개**(템플릿·구버전 포함, **현행 48종**) · 공용 프레임워크 1개
+> 최근 갱신: 2026-09-08 · 툴 폴더 **61개**(템플릿·구버전 포함, **현행 48종**) · 공용 프레임워크 1개
 
 ---
 
@@ -18,7 +18,8 @@ It contains **61 tool folders (48 actively maintained)** spanning two architectu
 (reusable widgets, theming, path management, undo handling, drag-&-drop installers).
 
 Domains include character **rigging** (FKIK, control rigs, skin weight transfer & geodesic binding,
-constraint conversion, curve-driven lip/eyelid setups), **facial / MetaHuman** (RBF solver → blendshape
+constraint conversion, curve-driven lip/eyelid setups, **whole-hierarchy rig mirroring** that rebuilds
+skin weights, constraints, clusters and arbitrary node graphs on the opposite side), **facial / MetaHuman** (RBF solver → blendshape
 auto-connection, PoseWrangler corrective extraction from Houdini cloth caches, blendshape authoring),
 **deformation R&D** (skinning decomposition ported from EA's *Dem Bones* paper, TPS/RBF mesh wrapping
 across different topologies, baked secondary motion), **animation tooling** (key transfer/mirror/bake,
@@ -86,12 +87,16 @@ A narrative work summary lives in
 - **`A00145_RigConnect`** — 리깅 연결 통합 툴(Match · Matrix Constraint · Connect Closest ·
   스킨 웨이트→컨스트레인트 · 오프셋 그룹 생성 · **Constraint Transfer / Target Edit** ·
   이름이 비슷한 어트리뷰트를 찾아 잇는 **Match from Source**).
+  **Mirror** 탭은 계층을 통째로 반대쪽으로 미러하면서 **스킨 웨이트 · 컨스트레인트 · 클러스터 ·
+  컨스트레인트가 아닌 임의의 노드망**까지 다시 세운다(YZ/XY/XZ · Behavior / Orientation /
+  **Reflect**).
 - **`A00170_driverTool`** — 드라이버 셋업 통합 툴. **Remap Value · Spherical Eye · AttachCrv · Stretch ·
   Seal** 탭. 엣지 루프에서 커브·널·컨트롤러·조인트를 한 번에 만드는 **Edge Loop 드라이버 셋업**,
   함수(선형/시그모이드) 기반 **Stretch**, 입술을 끝에서 중앙으로 다무는 **Seal(지퍼)** 를 포함.
-- **`A00275_skinTool_V01`** — 스킨 범용 툴(**Weights / Bind / Edit** 3카테고리 · 기능 7).
+- **`A00275_skinTool_V01`** — 스킨 범용 툴(**Weights / Bind / Edit** 3카테고리 · 기능 8).
   **Expand Bind**(엣지 루프 기준 측지 거리 균등 바인드) · **Move Joints** ·
-  **Edit Mesh**(웨이트를 그대로 둔 채 바인드된 메시를 수정) · **Transfer** · **Update Bind Pose**.
+  **Edit Mesh**(웨이트를 그대로 둔 채 바인드된 메시를 수정) · **Transfer** · **Update Bind Pose** ·
+  **Copy Weights**(같은 메시 안에서 버텍스 → 버텍스, `Blend` 0~1 로 실리는 정도 조절).
 - **`A00460_ControllerTool`** — 조인트 체인에서 `zro > con > ctl > tgt` **FK 컨트롤러 계층**을 만들고
   조인트를 그 계층에 컨스트레인트(Bone Chain / Bone Root 모드).
 - **`A00270_skinMigrate` / `A00020_move_skineWeightTool`** — 스킨 웨이트 이동·전이(토폴로지 다른 메시).
@@ -159,6 +164,10 @@ A narrative work summary lives in
 
 | 시기 | 내용 |
 |------|------|
+| 2026-09 초 | **`A00145` Mirror 탭 신규** — 계층을 통째로 반대쪽으로: 스킨 웨이트 · 컨스트레인트 · 클러스터에 더해 **컨스트레인트가 아닌 임의의 노드망**까지 복제·재배선. 컨트롤러용 **Reflect**(월드 `scaleX -1` 과 같은 상태) · 좌/우 토큰 규칙을 **`Framework/rules` 공용 파일**로 |
+| 2026-09 초 | **`A00275` Copy Weights 신규** — 같은 메시 안 버텍스 → 버텍스 웨이트 복사(Surface / Topology / Volume, 균일 격자로 20배) + **`Blend` 0~1** · **Expand Bind `Even distribution`** |
+| 2026-09 초 | **`A00290` Target Order 탭** — blendShape 타겟 순서를 리스트에서 바꿔 노드에 적용(마야에 없는 기능) · **`A00400` Edit > Joints** · **`A00460` FK & IK** |
+| 2026-09 초 | **`A00145` Pair / Update** — 오브젝트를 이름으로 짝짓기 · AE 의 constraint `Update` 버튼을 리스트 전체에 · **`A00090`** Pose Wrangler export 를 규칙으로 그대로 |
 | 2026-08 하순 | **`A00060_jointTool_V03` 신규** — 탭 재분류(카테고리 5 → 기능 12) + **IK Edit**(ikHandle·폴 벡터를 설치한 채 본 체인 수정) · **Create IK** |
 | 2026-08 하순 | **`A00290` Bake Delete** — 디포머 뒤에 남은 `deleteComponent` 를 중립 셰이프로 옮겨 타겟 · 스킨 웨이트 · 디포머 멤버십까지 **리그 전체에 반영**(9만 정점 46s → 2.5s) |
 | 2026-08 하순 | **`A00275` 탭 재분류 + Edit Mesh**(웨이트 불변으로 바인드된 메시 수정) · **`A00010_V02` Mirror**(반대쪽 슬롯 자동 할당) |
