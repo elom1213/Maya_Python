@@ -22,11 +22,12 @@ updated: 2026-09-09
 | 클래스 | 무엇 | 언제 |
 |--------|------|------|
 | `JUN_mod_falloffCurve_qt_v01` | 커브 캔버스(그리기 + 편집) | 커브만 필요할 때 |
-| `JUN_mod_falloffCurvePanel_qt_v01` | 캔버스 + **Interpolation** 콤보 + **Curve presets** 버튼 | 탭 안에 박아 쓸 때 |
+| `JUN_mod_falloffCurvePanel_qt_v01` | 캔버스 + **Point(X/Y 숫자 입력)** + **Interpolation** 콤보 + **Curve presets** 버튼 | 탭 안에 박아 쓸 때 |
 | `JUN_mod_falloffCurveDialog_qt_v01` | 패널을 담은 **비모달 팝업**(+ Reset / Close) | 버튼으로 띄울 때 |
 
-세 클래스 모두 `points()` / `interpolation()` / `set_curve()` / `evaluate(t)` / `is_flat()` 과
-`changed` 시그널을 같은 이름으로 낸다 — 호출부는 어느 것을 쓰든 코드가 같다.
+세 클래스 모두 `points()` / `interpolation()` / `set_curve()` / `evaluate(t)` / `is_flat()` /
+`selected_index()` / `set_selected_index()` / `set_point()` 과 `changed` · `selectionChanged`
+시그널을 같은 이름으로 낸다 — 호출부는 어느 것을 쓰든 코드가 같다.
 
 ---
 
@@ -54,6 +55,38 @@ dlg.popup()          # 비모달 — 띄워 둔 채로 슬라이더를 만질 �
 
 편집 조작은 마야와 같다 — **드래그**로 모양 조절, **빈 곳 더블클릭**으로 포인트 추가,
 **우클릭**으로 삭제. 양 끝 포인트는 x 가 고정(0 / 1)이고 세로로만 움직인다.
+
+---
+
+## 2.1 `Point` — 고른 포인트를 **숫자로** 정하기
+
+포인트를 클릭해 고르면(고른 포인트는 채워져서 크게 그려진다) 아래 `Point` 줄에서
+**가로축(X) · 세로축(Y) 값을 실수로 직접 입력**할 수 있다. 입력칸은 축마다 하나씩 **두 개**다.
+
+```
+Point  [2 / 4]   X [0.250]   Y [0.900]
+```
+
+- 드래그로는 "정확히 0.1" 을 맞출 수 없다. 값이 결과에 그대로 곱해지는 툴
+  (`A00410` 의 파라미터 배수)에서는 숫자 입력이 사실상 본길이다.
+- **범위 규칙은 드래그와 완전히 같다** — 양 끝 포인트는 x 가 0 / 1 로 고정이라 **X 칸이
+  꺼지고**(세로로만 움직인다), 가운데 포인트는 이웃을 넘지 못하게 X 범위가 이웃 사이로 좁혀진다.
+  클램프된 값은 **칸에 되돌아온다**(왜 안 들어가는지 화면에서 보인다).
+- 아무것도 안 골랐으면 두 칸 다 회색으로 꺼진다 — "비활성인데 값은 쓰인다" 는 상태를 만들지 않는다.
+- 드래그·프리셋·더블클릭 추가 등 **어느 경로로 커브가 바뀌든 칸이 따라온다.** 빈 곳에
+  더블클릭해 만든 포인트는 바로 고른 상태가 되어 곧장 숫자로 다듬을 수 있다.
+- `show_point_fields=False` 로 줄을 뺄 수 있고, `decimals=` 로 소수 자릿수를 정한다.
+
+> 스핀박스는 `setKeyboardTracking(False)` 다 — 값을 되쓰는 칸이라 타이핑 중간값을 받으면
+> `0.1` 을 치는 도중 `0.100` 으로 잘린다([[qdoublespinbox-keyboard-tracking]] 과 같은 이유).
+
+코드로도 같은 일을 한다.
+
+```python
+panel.set_selected_index(1)               # 두 번째 포인트를 고르고
+panel.set_point(1, x=1.0, y=0.1)          # 정확한 값으로 (범위는 알아서 클램프)
+panel.selected_point()                    # -> (x, y) 또는 None
+```
 
 ---
 

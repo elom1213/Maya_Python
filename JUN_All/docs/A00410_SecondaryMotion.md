@@ -14,7 +14,7 @@ FK 로 애니메이션된 **컨트롤러/조인트 체인**에 언리얼 **Kawai
 부모를 더 따라간다.** 마야의 시뮬레이션 솔버(nucleus/nHair/nCloth)를 **쓰지 않는다** — 게임 에셋
 작업에 맞춰 가볍고 빠르며, 스크럽/되감기가 자유롭다.
 
-- **버전**: `app/config/version.py` (v01.05)
+- **버전**: `app/config/version.py` (v01.06)
 - **설치**: `__dragDrop_A00410.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **SecondMotion** →
   `tools.A00410_SecondaryMotion.run(True)`
 - **설계 배경**: [plans/A00410_ChainPhysics_plan](plans/A00410_ChainPhysics_plan.md)
@@ -146,6 +146,9 @@ Apply 를 누르면 뜨는 진행률 팝업 ↓
 - **가로축 = 체인의 루트(왼쪽) → 팁(오른쪽)**, **세로축 = 그 자리에서 값에 곱할 배수**(0~1).
 - 기본은 처음부터 끝까지 **1.0** 이라 켜도 아무것도 바뀌지 않는다(곱해서 그대로).
 - 드래그로 모양 조절, 빈 곳 더블클릭으로 포인트 추가, 우클릭으로 삭제.
+- **포인트를 클릭해 고르면 `Point` 줄에서 X · Y 를 숫자로 직접 넣을 수 있다**(v01.06~).
+  커브 값이 파라미터에 그대로 곱해지므로 "팁 배수를 정확히 0.1 로" 같은 작업은 이쪽이 본길이다.
+  양 끝 포인트는 x 가 0 / 1 로 고정이라 X 칸이 꺼진다(세로로만 움직인다).
   `Interpolation`(None / Linear / Smooth / Spline)과 `Curve presets` 는
   `A00275_skinTool_V01` 의 Falloff curve 와 같은 것이다(공용 위젯).
 - 팝업은 **비모달**이다 — 띄워 둔 채 슬라이더를 만질 수 있고, `Live Preview` 가 켜져 있으면

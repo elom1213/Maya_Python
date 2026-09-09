@@ -1,5 +1,18 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.20 (2026-09-09)
+
+**[Add] Expand Bind 의 Falloff curve — 포인트 값을 숫자로 입력.**
+
+커브의 포인트를 클릭해 고르면 `Point  [2 / 4]   X [0.250]   Y [0.900]` 줄에서 **가로축·세로축
+값을 실수로 직접** 넣을 수 있다. 드래그로 못 맞추던 정확한 값(예: 반경 60% 지점에서 웨이트
+비중 0.25)을 그대로 지정한다.
+
+- 범위 규칙은 드래그와 같다 — 양 끝 포인트는 x 고정이라 X 칸이 꺼지고, 가운데는 이웃 사이로
+  클램프된다(클램프된 값이 칸에 되돌아온다).
+- 공용 위젯([Framework_MOD_falloffCurve_qt](../../docs/Framework_MOD_falloffCurve_qt.md))의
+  기능이라 `A00410_SecondaryMotion` 의 커브 팝업도 같이 얻었다.
+
 ## v01.19 (2026-09-09)
 
 **[Change] Falloff 커브 UI 를 Framework 공용 위젯으로 승격 — 기능/모양 변화 없음.**

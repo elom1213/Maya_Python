@@ -376,7 +376,11 @@ Default Distance attribute (driver signal x)
   preserved: the frame-rate correction is applied to the base value *before* the curve, or a flat
   curve would still shift results in non-24 fps scenes. Verification was algebraic rather than by
   eye: a constant 0.5 curve produces **exactly** the same result as halving the parameter, checked
-  for all three.
+  for all three. Curve points are set by dragging **or by typing exact X / Y values** — "exactly
+  0.1" cannot be dragged, and in a tool where the value multiplies the result that precision is the
+  point. The numeric path shares its range rules with dragging (ends pinned in x, middle points held
+  between their neighbours) and clamped values are written back into the field, so it is visible on
+  screen why a value did not take.
 - **Riding on a looping animation (`Loop`)** — adding secondary motion to a cycling range (a walk,
   an idle) **breaks at the seam**: the solver starts at rest on the first frame, so even with a
   perfectly cyclic source the first frame has zero swing while the last is still swinging. The range
