@@ -61,7 +61,7 @@ import maya.api.OpenMaya as om
 from Framework.core import maya_shape
 from Framework.core import maya_skin
 from tools.A00275_skinTool_V01.app.core import expand_bind_manager as eb
-from tools.A00275_skinTool_V01.app.core import falloff
+from Framework.core import falloff_curve as falloff   # 2026-09-09 Framework 로 승격
 
 
 # Falloff mode 와 같은 값을 쓴다 — 콤보 표시도 같아야 사용자가 두 탭을 같은 것으로 읽는다.

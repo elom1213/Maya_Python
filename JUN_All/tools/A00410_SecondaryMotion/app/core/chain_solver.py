@@ -4,6 +4,7 @@
 # A00410_SecondaryMotion core - 체인 관성(2차 모션) 솔버.
 #
 # **DCC 비의존 순수 파이썬**. maya 를 import 하지 않으므로 헤드리스로 단독 테스트할 수 있다.
+# (`Framework.core.falloff_curve` 도 Qt/maya 를 모르는 순수 모듈이라 이 성질이 유지된다.)
 #
 # 모델
 # ----
@@ -22,6 +23,23 @@
 #
 #   stiffness_i = stiffness * (1 - falloff * i/(n-1))
 #
+# 파라미터 커브 (Stiffness / Damping / World Damp)
+# ----------------------------------------------
+# 세 파라미터는 체인 위치에 따라 **배수**를 받을 수 있다. 커브의 가로축은 체인의
+# **루트(0) -> 팁(1)**, 세로축은 그 자리에서 파라미터에 곱할 값(0~1)이다.
+#
+#   stiffness_i = stiffness * curve_s(u) * (1 - falloff * u)      (u = i/(n-1))
+#   damping_i   = damping   * curve_d(u)
+#   world_i     = world_damping * curve_w(u)
+#
+# 예: Stiffness 0.5 + 커브가 왼쪽 1 -> 오른쪽 0.1 (선형) 이면 체인 시작은 뻣뻣하고
+# 끝으로 갈수록 뻣뻣함이 사라진다. 커브가 평평한 1 이면(기본값) 곱해도 아무것도 안 바뀌므로
+# **예전 결과와 완전히 동일**하다. 커브 모델은 공용 `Framework.core.falloff_curve` 를
+# 쓴다 — UI 위젯이 그리는 것과 **같은 함수**라 화면 모양과 계산이 어긋나지 않는다.
+#
+# 주의: fps 보정(`_fps_adjust`)은 **커브를 곱하기 전 기본값에** 걸린다. 예전 계산 순서를
+# 그대로 두어야 커브가 평평할 때 24fps 아닌 씬에서도 결과가 안 바뀐다.
+#
 # 길이 구속이 매 프레임 성립하므로 |p[i+1]-p[i]| == len_i 가 보장되고, 그 덕분에
 # 회전 재구성(pose_builder)이 점 시뮬과 정확히 일치한다(체인이 벌어지지 않는다).
 #
@@ -35,6 +53,8 @@
 # 대신 첫 프레임의 회전값은 더 이상 원본과 같지 않다(그게 루프가 되는 조건이다).
 
 import math
+
+from Framework.core import falloff_curve
 
 
 # 파라미터 기본값(=UI 초기값)의 기준 프레임레이트. 다른 fps 에서도 비슷한 감쇠가 되도록
@@ -50,7 +70,8 @@ class SolverParams(object):
 
     def __init__(self, stiffness=0.35, damping=0.12, world_damping=0.0,
                  falloff=0.5, gravity=(0.0, 0.0, 0.0), limit_angle=45.0,
-                 blend=1.0, substeps=1, fps=REF_FPS, loop=False):
+                 blend=1.0, substeps=1, fps=REF_FPS, loop=False,
+                 stiffness_curve=None, damping_curve=None, world_curve=None):
         self.stiffness = float(stiffness)        # 0~1, 원래 자리로 당기는 힘
         self.damping = float(damping)            # 0~1, 속도 감쇠
         self.world_damping = float(world_damping)  # 0~1, 결과를 원본 쪽으로 끌어당김
@@ -62,18 +83,27 @@ class SolverParams(object):
         self.fps = float(fps) or REF_FPS
         # True 면 구간을 사이클로 보고 정상상태를 구한다(solve() 가 solve_loop 로 넘긴다).
         self.loop = bool(loop)
+        # 체인 위치별 배수 커브. 각각 `(points, interp)` 또는 None(=평평한 1.0).
+        # points 는 [(x, y), ...] 정규화 좌표 — `Framework.core.falloff_curve` 형식.
+        self.stiffness_curve = stiffness_curve
+        self.damping_curve = damping_curve
+        self.world_curve = world_curve
 
     def copy(self):
         return SolverParams(self.stiffness, self.damping, self.world_damping,
                             self.falloff, self.gravity, self.limit_angle,
-                            self.blend, self.substeps, self.fps, self.loop)
+                            self.blend, self.substeps, self.fps, self.loop,
+                            self.stiffness_curve, self.damping_curve,
+                            self.world_curve)
 
     def as_dict(self):
         return dict(stiffness=self.stiffness, damping=self.damping,
                     world_damping=self.world_damping, falloff=self.falloff,
                     gravity=self.gravity, limit_angle=self.limit_angle,
                     blend=self.blend, substeps=self.substeps, fps=self.fps,
-                    loop=self.loop)
+                    loop=self.loop, stiffness_curve=self.stiffness_curve,
+                    damping_curve=self.damping_curve,
+                    world_curve=self.world_curve)
 
 
 # --------------------------------------------------------------------- 벡터 헬퍼
@@ -159,6 +189,24 @@ def _fps_adjust(value, fps):
     return 1.0 - math.pow(1.0 - v, REF_FPS / fps)
 
 
+def curve_multipliers(spec, n):
+    """커브 스펙 -> 노드별 배수 [n]. spec 이 None 이면 전부 1.0.
+
+    spec 은 `(points, interp)` 다(UI 위젯이 그대로 내주는 값). 커브를 프레임마다가 아니라
+    **노드마다 한 번만** 평가해 두는 것이 요점 — 솔버 안쪽 루프는 프레임 x 노드 x 서브스텝
+    이라 거기서 커브를 부르면 비싸다.
+    """
+    if n <= 0:
+        return []
+    if not spec:
+        return [1.0] * n
+    points, interp = spec
+    if not points:
+        return [1.0] * n
+    denom = float(n - 1) if n > 1 else 1.0
+    return [falloff_curve.evaluate(points, interp, i / denom) for i in range(n)]
+
+
 # --------------------------------------------------------------------- 솔버 본체
 
 def solve(targets, params):
@@ -192,6 +240,7 @@ def _solve_once(targets, params):
         # 조인트가 1개면 흔들 자식이 없다 — 원본 그대로.
         return [list(f) for f in targets]
 
+    # fps 보정은 **커브를 곱하기 전 기본값에** 건다(계산 순서 유지 = 무회귀).
     stiff = _fps_adjust(params.stiffness, params.fps)
     damp = _fps_adjust(params.damping, params.fps)
     wdamp = params.world_damping
@@ -200,12 +249,20 @@ def _solve_once(targets, params):
     substeps = params.substeps
     max_ang = math.radians(params.limit_angle) if params.limit_angle > 0 else None
 
-    # 조인트별 stiffness — 루트에서 멀수록 작아진다(= 더 뒤처진다).
+    # 노드별 파라미터 — 커브 배수(기본 1.0) x 기존 falloff.
+    curve_s = curve_multipliers(params.stiffness_curve, n)
+    curve_d = curve_multipliers(params.damping_curve, n)
+    curve_w = curve_multipliers(params.world_curve, n)
+
     denom = float(n - 1) if n > 1 else 1.0
-    stiff_i = []
+    stiff_i = []          # 조인트별 stiffness — 루트에서 멀수록 작아진다(= 더 뒤처진다)
+    damp_i = []
+    wdamp_i = []
     for i in range(n):
-        k = stiff * (1.0 - params.falloff * (i / denom))
+        k = stiff * curve_s[i] * (1.0 - params.falloff * (i / denom))
         stiff_i.append(max(0.0, min(1.0, k)))
+        damp_i.append(max(0.0, min(1.0, damp * curve_d[i])))
+        wdamp_i.append(max(0.0, min(1.0, wdamp * curve_w[i])))
 
     # 서브스텝을 쓰면 프레임당 힘을 나눠 적용한다.
     sub_g = _scale(grav, 1.0 / (substeps * substeps))
@@ -235,9 +292,10 @@ def _solve_once(targets, params):
                 tx, ty, tz = tgt[i]
 
                 # 베를레 속도 + 감쇠
-                vx = (px - qx) * (1.0 - damp)
-                vy = (py - qy) * (1.0 - damp)
-                vz = (pz - qz) * (1.0 - damp)
+                d = damp_i[i]
+                vx = (px - qx) * (1.0 - d)
+                vy = (py - qy) * (1.0 - d)
+                vz = (pz - qz) * (1.0 - d)
 
                 # 원래 자리로 당기는 스프링 + 중력
                 k = stiff_i[i]
@@ -246,10 +304,11 @@ def _solve_once(targets, params):
                 nz = pz + vz + (tz - pz) * k + sub_g[2]
 
                 # 월드 감쇠 — 결과를 원본 쪽으로 일정 비율 끌어당긴다
-                if wdamp > 0.0:
-                    nx += (tx - nx) * wdamp
-                    ny += (ty - ny) * wdamp
-                    nz += (tz - nz) * wdamp
+                w = wdamp_i[i]
+                if w > 0.0:
+                    nx += (tx - nx) * w
+                    ny += (ty - ny) * w
+                    nz += (tz - nz) * w
 
                 # 결과 강도(blend). 0 이면 원본과 완전히 동일해진다.
                 if blend < 1.0:

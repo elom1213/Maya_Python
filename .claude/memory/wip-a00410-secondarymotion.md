@@ -8,7 +8,7 @@ metadata:
   modified: 2026-07-29T09:04:00.209Z
 ---
 
-`A00410_SecondaryMotion` (2026-09-09, v01.04, 헤드리스 검증 완료, **마야 실기 UI 테스트 대기**)
+`A00410_SecondaryMotion` (2026-09-09, v01.05, 헤드리스 검증 완료, **마야 실기 UI 테스트 대기**)
 — FK 컨트롤러/조인트 체인에 언리얼 KawaiiPhysics 식 **관성(찰랑임)** 을 얹어 **키로 굽는** in-Maya PySide 툴.
 
 **Why:** 마야 nucleus 계열은 성능 이전에 **작업 흐름**이 안 맞는다 — 시작 프레임부터 순차 재생해야
@@ -72,6 +72,19 @@ Jiggle 은 메시 포인트 전용(조인트에 못 씀), spring 컨스트레인
   - 비용: 20본x300f 솔브 0.034s -> 0.048s, 프리뷰 0.043s -> 0.054s (**프리뷰 실시간 유지**).
   - API: `SolverParams.loop`, `chain_solver.solve_loop() -> (sim, LoopInfo)`,
     `solve()` 는 loop 면 그쪽으로 디스패치(본체는 `_solve_once`), `session.loop_report()`.
+- **v01.05 파라미터 커브(`Graph`)**: Stiffness / Damping / World Damp 를 **체인 위치별 배수 커브**로.
+  가로축 = 루트(0) -> 팁(1), 세로축 = 그 자리에서 값에 곱할 배수. UI 는 공용
+  [[framework-falloff-curve-widget]] 의 비모달 팝업(A00275 Expand Bind 와 같은 위젯).
+  - `stiffness_i = stiffness * curve_s(u) * (1 - falloff*u)`, `damping_i = damping * curve_d(u)`,
+    `world_i = world_damping * curve_w(u)`. 커브는 **노드마다 한 번만** 평가해 배열로 든다.
+  - **★ fps 보정은 커브를 곱하기 전 기본값에** 건다 — 순서를 바꾸면 커브가 평평해도 24fps 아닌
+    씬에서 결과가 달라진다(무회귀의 조건).
+  - UI 는 커브가 평평하면 `None` 을 넘긴다(계산을 아예 건너뜀 = 예전 경로). 버튼은 `Graph *` 표식.
+  - **★ 검증 대조군 함정**: `falloff=0` 으로 대조군을 잡으면 모든 노드가 같은 stiffness 라
+    **체인이 통째로 강체처럼 늦어져 자식 로컬 회전이 전부 0** 이 된다(흔들림이 루트 회전 하나로 감).
+    대조군은 기본값 `falloff=0.5`. 그리고 커브는 노드 위치마다 평가되므로 **정확히 1.0 인 곳은
+    루트뿐** — "커브 왼쪽이 1 이니 루트쪽 노드는 그대로" 는 틀린 기대다.
+  - 검증 관용구: **상수 0.5 커브 == 값을 절반으로 준 것과 완전히 동일**(대수적, 세 파라미터 모두).
 - 문서: `JUN_All/docs/A00410_SecondaryMotion.md`, 계획서 `docs/plans/A00410_ChainPhysics_plan.md`.
 - 미해결: 빠른 구동 + Substeps=3 에서 왕복 오차 4.7e-05(~3ppm), 원인 미특정. 콜라이더/키 감축 없음(v01.03~04 예정).
 

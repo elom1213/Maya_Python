@@ -1,5 +1,23 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.19 (2026-09-09)
+
+**[Change] Falloff 커브 UI 를 Framework 공용 위젯으로 승격 — 기능/모양 변화 없음.**
+
+`A00410_SecondaryMotion` 이 같은 커브 UI 를 필요로 해서(파라미터 배수 커브) 이 툴의 것을
+공용으로 올렸다. Expand Bind 탭의 커브·Interpolation·Curve presets 는 **보이는 것도 하는 일도
+그대로**다.
+
+- `app/core/falloff.py` → **`Framework/core/falloff_curve.py`** (Qt·maya 비의존 모델)
+- `app/ui/falloff_curve_widget.py` → **`Framework/qt/MOD_falloffCurve_qt_v01.py`**
+- 커브 + `Interpolation` + `Curve presets` 세 줄을 공용 **패널** 하나
+  (`JUN_mod_falloffCurvePanel_qt_v01`)로 바꿨다. **프리셋이 보간까지 바꾸므로 콤보를 맞춰 두던
+  동기화**(`_sync_eb_interp_combo`)도 위젯이 맡는다 — 툴에서는 사라졌다.
+- 문서: [Framework_MOD_falloffCurve_qt](../../docs/Framework_MOD_falloffCurve_qt.md)
+
+검증(mayapy 헤드리스): 창 생성, 기본 커브 `[(0,1),(1,0)]`/`linear`, 프리셋이 보간과 콤보까지
+바꾸는 것, `evaluate()` 가 공용 모델과 같은 값인 것 확인.
+
 ## v01.18 (2026-09-08)
 **[Add] Weights > Copy Weights — `Blend` (0~1): 옮겨지는 웨이트가 목표에 얼마나 실릴지.**
 

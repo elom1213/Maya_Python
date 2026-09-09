@@ -1,5 +1,44 @@
 # Changelog — A00410_SecondaryMotion
 
+## v01.05 (2026-09-09)
+
+- **[Add] `Stiffness` · `Damping` · `World Damp` 옆 `Graph` 버튼** — 값을 **체인 위치에 따라**
+  조절하는 커브 팝업이 뜬다.
+  - 커브의 **가로축 = 체인 루트(왼쪽) -> 팁(오른쪽)**, **세로축 = 그 자리에서 값에 곱할 배수**.
+    기본은 처음부터 끝까지 **1.0** 이라 아무것도 바뀌지 않는다.
+  - 예: `Stiffness 0.5` + 커브 왼쪽 1.0 / 오른쪽 0.1(선형) → 체인 시작은 뻣뻣하고 끝으로
+    갈수록 뻣뻣함이 사라진다. 실측(6본): 팁 쪽 흔들림이 **14.4배**, 루트 쪽은 3.8배로
+    **끝으로 갈수록 효과가 커진다**.
+  - 팝업은 **비모달**이라 띄워 둔 채 슬라이더를 만질 수 있고, `Live Preview` 가 켜져 있으면
+    커브를 드래그하는 동안 결과가 바로 갱신된다. `Reset` 으로 평평한 1.0 복귀.
+  - 커브가 걸린 파라미터는 버튼이 **`Graph *`** 로 바뀐다 — 창을 닫아도 걸려 있는 것이 보인다.
+  - `Interpolation`(None/Linear/Smooth/Spline)과 `Curve presets`(Linear/Smooth/Ease In/
+    Ease Out/Spike/Solid)는 `A00275_skinTool_V01` Expand Bind 의 것을 **그대로** 쓴다.
+- **[Change] 커브 UI 를 Framework 공용 위젯으로 승격** —
+  `Framework/qt/MOD_falloffCurve_qt_v01.py`(`JUN_mod_falloffCurve_qt`) +
+  모델 `Framework/core/falloff_curve.py`. `A00275_skinTool_V01` 도 이 공용 위젯을 쓰도록 옮겼다
+  (`app/core/falloff.py` · `app/ui/falloff_curve_widget.py` 삭제).
+- **[Change] `SolverParams.stiffness_curve` / `damping_curve` / `world_curve`** — 각각
+  `(points, interp)` 또는 `None`. 계산은 `stiffness_i = stiffness * curve(u) * (1 - falloff*u)`,
+  `damping_i = damping * curve(u)`, `world_i = world_damping * curve(u)` (u = i/(n-1)).
+  - **fps 보정은 커브를 곱하기 전 기본값에** 건다 — 계산 순서를 예전 그대로 두어야 커브가
+    평평할 때 24fps 아닌 씬에서도 결과가 안 바뀐다.
+  - 커브는 **노드마다 한 번만** 평가해 배열로 들고 간다(솔버 안쪽은 프레임 x 노드 x 서브스텝
+    이라 거기서 커브를 부르면 비싸다).
+  - UI 는 커브가 평평하면 `None` 을 넘긴다 — "커브를 안 건드린 상태 = 예전과 같은 계산".
+
+### 검증 (mayapy 헤드리스, Maya 2024 — 33개 항목 전부 통과)
+
+- **대수적 검증**: 상수 0.5 커브 == 파라미터를 절반으로 준 것과 **완전히 동일한 결과**
+  (Stiffness / Damping / World Damp 셋 다). 전 구간 0 인 World 커브 == `World Damp 0`.
+- 평평한 1.0 커브 == 커브 없음(무회귀). `curve_multipliers` 양 끝/가운데 값.
+- 요청 예시(1 -> 0.1 선형): 팁 쪽이 느슨해지는 정도가 루트 쪽의 **3.8배**.
+- `Loop` 와 함께 써도 이음매 **0.000000deg**.
+- UI: Graph 버튼이 세 슬라이더에만, 팝업이 중복 생성되지 않고 값이 남는다,
+  평평하면 `None` + 표식 없음, 커브가 걸리면 `Graph *`, Reset 이 되돌린다.
+- **A00275 무회귀**: 승격 후에도 창이 그대로 뜨고(헤드리스 생성), 기본 커브·프리셋·콤보
+  동기화·`evaluate` 가 예전과 같다.
+
 ## v01.04 (2026-09-09)
 
 - **[Add] `Loop (cycle the range)` 체크박스** — 켜면 결과가 **루프**가 된다. 구간의 마지막 프레임이

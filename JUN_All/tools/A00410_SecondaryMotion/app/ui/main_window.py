@@ -12,6 +12,8 @@ from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_timeRange_qt
 from Framework.qt import JUN_mod_progress_qt
+from Framework.qt import JUN_mod_falloffCurve_qt
+from Framework.core import falloff_curve
 
 import maya.cmds as cmds
 
@@ -29,6 +31,20 @@ _WARN_COLOR = "#ffb454"
 
 # 프리뷰 재계산 디바운스(ms). 슬라이더를 드래그하는 동안 계산을 묶는다.
 _DEBOUNCE_MS = 40
+
+# 커브를 붙일 파라미터 — (키, 슬라이더 속성명, 팝업 제목, 설명).
+# 키는 SolverParams 의 인자 이름과 맞춰 둔다(코드 두 군데가 어긋날 여지를 없앤다).
+CURVE_PARAMS = (
+    ("stiffness_curve", "sr_stiff", "Stiffness curve",
+     "X = chain root -> tip.   Y multiplies Stiffness at that point.\n"
+     "Example: left 1.0, right 0.1 - stiff at the root, loose towards the tip."),
+    ("damping_curve", "sr_damp", "Damping curve",
+     "X = chain root -> tip.   Y multiplies Damping at that point.\n"
+     "Lower Y = that part of the chain keeps wobbling longer."),
+    ("world_curve", "sr_world", "World Damp curve",
+     "X = chain root -> tip.   Y multiplies World Damp at that point.\n"
+     "Higher Y = that part is pulled back to the original pose more."),
+)
 
 # Apply 진행률 팝업의 단계 가중치(비율). 실측 비용에 맞춘 값이다 —
 # 샘플링은 노드 x 프레임 만큼 `getAttr -time`, Bake Keys 는 노드 x 프레임 만큼
@@ -56,12 +72,18 @@ QSlider::handle:horizontal:hover { background: #ffffff; }
 
 
 class _SliderRow(QWidget):
-    """라벨 + 슬라이더 + 스핀박스가 묶여 움직이는 실수 파라미터 한 줄."""
+    """라벨 + 슬라이더 + 스핀박스가 묶여 움직이는 실수 파라미터 한 줄.
+
+    `graph=True` 면 오른쪽에 `Graph` 버튼이 붙는다 — 체인 위치별 **배수 커브** 팝업을
+    여는 버튼이다(`graphClicked` 시그널). 커브가 평평하지 않으면 버튼에 `*` 를 붙여
+    **지금 이 값에 커브가 걸려 있다**는 것을 한눈에 보이게 한다.
+    """
 
     valueChanged = Signal(float)
+    graphClicked = Signal()
 
     def __init__(self, label, minimum, maximum, value, decimals=3,
-                 step=0.01, tooltip="", parent=None):
+                 step=0.01, tooltip="", graph=False, parent=None):
         super(_SliderRow, self).__init__(parent)
         self._min = float(minimum)
         self._max = float(maximum)
@@ -84,6 +106,17 @@ class _SliderRow(QWidget):
         self.spin.setSingleStep(step)
         self.spin.setMaximumWidth(78)
         row.addWidget(self.spin)
+
+        self.btn_graph = None
+        if graph:
+            self.btn_graph = QPushButton("Graph")
+            self.btn_graph.setMaximumWidth(62)
+            self.btn_graph.setToolTip(
+                "Shape this value along the chain with a curve.\n"
+                "X = chain root -> tip, Y multiplies the value above.")
+            self.btn_graph.clicked.connect(
+                lambda _checked=False: self.graphClicked.emit())
+            row.addWidget(self.btn_graph)
 
         if tooltip:
             self.setToolTip(tooltip)
@@ -116,6 +149,12 @@ class _SliderRow(QWidget):
     def value(self):
         return self.spin.value()
 
+    def mark_graph(self, active):
+        """커브가 걸려 있음을 버튼에 표시한다(평평한 1.0 이면 표시 없음)."""
+        if self.btn_graph is None:
+            return
+        self.btn_graph.setText("Graph *" if active else "Graph")
+
 
 class MainWindow(QWidget):
 
@@ -130,6 +169,8 @@ class MainWindow(QWidget):
         self._dirty = True          # 캐시 무효 — 다음 프리뷰에서 다시 샘플링
         # Loop 를 켠 직후 프리뷰 한 번만 진단을 남기기 위한 일회성 플래그.
         self._loop_report_pending = False
+        # 파라미터 커브 팝업(키 -> 다이얼로그). 처음 누를 때 만든다.
+        self._curve_dialogs = {}
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -213,20 +254,23 @@ class MainWindow(QWidget):
         pl = QVBoxLayout(phys)
 
         self.sr_stiff = _SliderRow(
-            "Stiffness", 0.0, 1.0, 0.35,
+            "Stiffness", 0.0, 1.0, 0.35, graph=True,
             tooltip="How strongly each node is pulled back to its original (FK) place.\n"
-                    "Higher = follows the parent more closely.")
+                    "Higher = follows the parent more closely.\n"
+                    "'Graph' shapes this value along the chain (root -> tip).")
         self.sr_damp = _SliderRow(
-            "Damping", 0.0, 1.0, 0.12,
-            tooltip="Velocity damping. Higher = settles faster, less wobble.")
+            "Damping", 0.0, 1.0, 0.12, graph=True,
+            tooltip="Velocity damping. Higher = settles faster, less wobble.\n"
+                    "'Graph' shapes this value along the chain (root -> tip).")
         self.sr_falloff = _SliderRow(
             "Falloff", 0.0, 1.0, 0.5,
             tooltip="Root-to-tip stiffness falloff - THE inertia dial.\n"
                     "0 = every node equally stiff. 1 = the tip barely follows,\n"
                     "so nodes further from the parent lag behind more.")
         self.sr_world = _SliderRow(
-            "World Damp", 0.0, 1.0, 0.0,
-            tooltip="Pulls the result back toward the original pose in world space.")
+            "World Damp", 0.0, 1.0, 0.0, graph=True,
+            tooltip="Pulls the result back toward the original pose in world space.\n"
+                    "'Graph' shapes this value along the chain (root -> tip).")
         self.sr_blend = _SliderRow(
             "Blend", 0.0, 1.0, 1.0,
             tooltip="Overall amount. 0 = identical to the original animation.")
@@ -234,6 +278,12 @@ class MainWindow(QWidget):
                   self.sr_world, self.sr_blend):
             w.valueChanged.connect(self._schedule)
             pl.addWidget(w)
+
+        # Graph 버튼 -> 파라미터별 커브 팝업(비모달, 한 번 만들면 값이 남는다).
+        for key, attr, title, info in CURVE_PARAMS:
+            row = getattr(self, attr)
+            row.graphClicked.connect(
+                lambda _checked=False, k=key: self._open_curve(k))
 
         form = QFormLayout()
 
@@ -358,6 +408,49 @@ class MainWindow(QWidget):
         if self.chk_preview.isChecked():
             self._timer.start(_DEBOUNCE_MS)
 
+    def _open_curve(self, key):
+        """파라미터 커브 팝업을 띄운다(없으면 만들고, 있으면 그 창을 앞으로)."""
+        dlg = self._curve_dialogs.get(key)
+        if dlg is None:
+            title, info = "Curve", ""
+            for k, _attr, t, i in CURVE_PARAMS:
+                if k == key:
+                    title, info = t, i
+                    break
+            dlg = JUN_mod_falloffCurve_qt.JUN_mod_falloffCurveDialog_qt_v01(
+                self, title="Secondary Motion - {0}".format(title),
+                # 기본은 **평평한 1.0** — 곱해도 아무것도 바뀌지 않는 상태에서 시작한다.
+                points=falloff_curve.FLAT_POINTS, interp=falloff_curve.FLAT_INTERP,
+                reset_points=falloff_curve.FLAT_POINTS,
+                reset_interp=falloff_curve.FLAT_INTERP,
+                info=info,
+                tooltip="Drag a point to reshape, double-click to add, "
+                        "right-click to remove.\n"
+                        "The first and last points only move vertically.")
+            dlg.changed.connect(lambda k=key: self._on_curve_changed(k))
+            self._curve_dialogs[key] = dlg
+        dlg.popup()
+
+    def _on_curve_changed(self, key):
+        for k, attr, _title, _info in CURVE_PARAMS:
+            if k == key:
+                dlg = self._curve_dialogs.get(key)
+                getattr(self, attr).mark_graph(
+                    dlg is not None and not dlg.is_flat())
+                break
+        self._schedule()
+
+    def _curve_spec(self, key):
+        """솔버에 넘길 `(points, interp)`. 팝업이 없거나 평평한 1.0 이면 None.
+
+        평평하면 None 을 주는 것이 중요하다 — 커브 평가를 아예 건너뛰어 **예전 경로와
+        완전히 같은 계산**이 되고, 로그/디버깅에서도 '커브 없음' 이 분명해진다.
+        """
+        dlg = self._curve_dialogs.get(key)
+        if dlg is None or dlg.is_flat():
+            return None
+        return (dlg.points(), dlg.interpolation())
+
     def _params(self):
         return chain_solver.SolverParams(
             stiffness=self.sr_stiff.value(),
@@ -368,7 +461,10 @@ class MainWindow(QWidget):
             limit_angle=self.sb_limit.value(),
             blend=self.sr_blend.value(),
             substeps=self.sb_sub.value(),
-            loop=self.chk_loop.isChecked())
+            loop=self.chk_loop.isChecked(),
+            stiffness_curve=self._curve_spec("stiffness_curve"),
+            damping_curve=self._curve_spec("damping_curve"),
+            world_curve=self._curve_spec("world_curve"))
 
     def _mode(self):
         return (scene_sampler.MODE_ROOT if self.rb_root.isChecked()
@@ -588,4 +684,10 @@ class MainWindow(QWidget):
             self.session.clear_preview()
         except Exception:
             pass
+        # 커브 팝업은 자식 창이라 그대로 두면 툴을 닫아도 떠 있는다.
+        for dlg in self._curve_dialogs.values():
+            try:
+                dlg.close()
+            except Exception:
+                pass
         super(MainWindow, self).closeEvent(event)

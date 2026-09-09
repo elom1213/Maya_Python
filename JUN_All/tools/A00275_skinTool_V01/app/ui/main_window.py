@@ -52,8 +52,8 @@ from tools.A00275_skinTool_V01.app.core import joint_edit_manager as je_mgr
 from tools.A00275_skinTool_V01.app.core import mesh_edit_manager as me_mgr
 from tools.A00275_skinTool_V01.app.core import expand_bind_manager as eb_mgr
 from tools.A00275_skinTool_V01.app.core import weight_copy_manager as wc_mgr
-from tools.A00275_skinTool_V01.app.core import falloff
-from tools.A00275_skinTool_V01.app.ui.falloff_curve_widget import FalloffCurveWidget
+from Framework.core import falloff_curve as falloff   # 2026-09-09 Framework 로 승격
+from Framework.qt import JUN_mod_falloffCurve_qt
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -1522,40 +1522,14 @@ class MainWindow(QWidget):
         self.chk_eb_even.toggled.connect(self._on_eb_even_toggled)
         fall_layout.addWidget(self.chk_eb_even)
 
-        curve_row = QHBoxLayout()
-        lbl_curve = QLabel("Falloff curve")
-        lbl_curve.setAlignment(Qt.AlignTop)
-        curve_row.addWidget(lbl_curve)
-        self.eb_curve = FalloffCurveWidget()
-        curve_row.addWidget(self.eb_curve, 1)
-        fall_layout.addLayout(curve_row)
-
-        interp_row = QHBoxLayout()
-        interp_row.addWidget(QLabel("Interpolation"))
-        self.cmb_eb_interp = QComboBox()
-        for name in falloff.INTERPOLATIONS:
-            self.cmb_eb_interp.addItem(name.capitalize())
-        self.cmb_eb_interp.setCurrentIndex(
-            list(falloff.INTERPOLATIONS).index(self.eb_curve.interpolation()))
-        self.cmb_eb_interp.currentIndexChanged.connect(
-            lambda i: self.eb_curve.set_interpolation(falloff.INTERPOLATIONS[i]))
-        # 프리셋은 보간 방식까지 바꾼다. 커브가 바뀔 때마다 콤보를 맞춰 두어야
-        # 화면 표기와 실제 계산이 어긋나지 않는다(어느 경로로 바뀌든).
-        self.eb_curve.changed.connect(self._sync_eb_interp_combo)
-        interp_row.addWidget(self.cmb_eb_interp)
-        interp_row.addStretch(1)
-        fall_layout.addLayout(interp_row)
-
-        preset_row = QHBoxLayout()
-        preset_row.addWidget(QLabel("Curve presets"))
-        for label, _points, _interp in falloff.PRESETS:
-            btn = QPushButton(label)
-            btn.setToolTip("Load the '{0}' falloff curve.".format(label))
-            btn.clicked.connect(
-                lambda _checked=False, name=label: self._eb_apply_preset(name))
-            preset_row.addWidget(btn)
-        preset_row.addStretch(1)
-        fall_layout.addLayout(preset_row)
+        # 커브 + Interpolation + Curve presets 는 공용 위젯 하나로 온다.
+        # (프리셋이 보간까지 바꾸므로 콤보 동기화도 위젯이 맡는다 — 예전엔 여기서 했다.)
+        self.eb_curve = JUN_mod_falloffCurve_qt.JUN_mod_falloffCurvePanel_qt_v01(
+            title="Falloff curve",
+            tooltip="Falloff curve: X = distance / radius, Y = weight share.\n"
+                    "Drag a point to reshape, double-click to add, right-click to "
+                    "remove.\nThe first and last points only move vertically.")
+        fall_layout.addWidget(self.eb_curve)
 
         layout.addWidget(fall_grp)
 
@@ -1609,18 +1583,6 @@ class MainWindow(QWidget):
         """
         for widget in (self.sb_eb_radius, self.btn_eb_fit, self.sb_eb_across):
             widget.setEnabled(not checked)
-
-    def _eb_apply_preset(self, name):
-        self.eb_curve.set_preset(name)
-
-    def _sync_eb_interp_combo(self):
-        """커브 위젯의 보간 방식을 콤보에 반영(시그널 루프는 blockSignals 로 차단)."""
-        index = list(falloff.INTERPOLATIONS).index(self.eb_curve.interpolation())
-        if self.cmb_eb_interp.currentIndex() == index:
-            return
-        self.cmb_eb_interp.blockSignals(True)
-        self.cmb_eb_interp.setCurrentIndex(index)
-        self.cmb_eb_interp.blockSignals(False)
 
     def _eb_update_label(self):
         if not self.eb_vertices:

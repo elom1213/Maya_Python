@@ -366,6 +366,17 @@ Default Distance attribute (driver signal x)
   transform's is `rotateAxis × R` — composing them the same way breaks one of the two. Assuming a chain
   node's parent is the previous chain node also breaks on rigs with offset groups in between, so the real
   parent is resolved per node.
+- **Parameters shaped along the chain (`Graph`)** — Stiffness, Damping and World Damp can be a
+  **curve** instead of a single slider value: X runs from chain root to tip, Y multiplies the value
+  there, so "stiff at the base, loose towards the tip" is drawn rather than approximated. The curve
+  UI was not written again — the skin tool's Falloff curve was **promoted to a shared framework
+  widget** so both tools use one implementation, and the skin tool actually lost code in the process
+  (the combo-sync it did by hand, because presets also change the interpolation, now lives in the
+  widget). Leaving existing results untouched was a requirement, so the **multiplication order** is
+  preserved: the frame-rate correction is applied to the base value *before* the curve, or a flat
+  curve would still shift results in non-24 fps scenes. Verification was algebraic rather than by
+  eye: a constant 0.5 curve produces **exactly** the same result as halving the parameter, checked
+  for all three.
 - **Riding on a looping animation (`Loop`)** — adding secondary motion to a cycling range (a walk,
   an idle) **breaks at the seam**: the solver starts at rest on the first frame, so even with a
   perfectly cyclic source the first frame has zero swing while the last is still swinging. The range

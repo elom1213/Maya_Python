@@ -89,7 +89,7 @@ import maya.api.OpenMayaAnim as oma
 
 from Framework.core import maya_shape
 from Framework.core import maya_skin
-from tools.A00275_skinTool_V01.app.core import falloff
+from Framework.core import falloff_curve as falloff   # 2026-09-09 Framework 로 승격
 
 
 # Falloff mode — ref/ref_01.png 의 "Falloff mode" 콤보에 대응.

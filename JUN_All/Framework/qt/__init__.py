@@ -9,6 +9,7 @@ from Framework.qt import MOD_timeRange_qt_v01 as JUN_mod_timeRange_qt
 from Framework.qt import MOD_filter_qt_v01 as JUN_mod_filter_qt
 from Framework.qt import MOD_expand_qt_v01 as JUN_mod_expand_qt
 from Framework.qt import MOD_progress_qt_v01 as JUN_mod_progress_qt
+from Framework.qt import MOD_falloffCurve_qt_v01 as JUN_mod_falloffCurve_qt
 
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "JUN_mod_filter_qt",
     "JUN_mod_expand_qt",
     "JUN_mod_progress_qt",
+    "JUN_mod_falloffCurve_qt",
 ]

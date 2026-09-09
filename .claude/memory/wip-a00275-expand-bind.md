@@ -74,9 +74,13 @@ b-spline 감쇠 → **실제 엣지 길이를 안 본다**. 간격이 조금만 
 
 **UI**: 버텍스 집합은 **리스트 위젯으로 만들지 않는다**(수천 개 → 창이 느려짐, 사용자 요청). 요약 라벨 +
 Select/Clear, 재선택은 연속 id 를 `vtx[a:b]` 로 압축. 조인트는 공용 TSL.
-falloff 커브 편집 위젯을 새로 만들었다(`app/ui/falloff_curve_widget.py`) — 마야
-`gradientControlNoAttr` 는 **cmds 전용이라 PySide 창에 못 쓴다**. 계산/그리기가 같은 함수
-(`app/core/falloff.py`)를 쓴다. 다른 툴에도 쓸 일이 생기면 Framework 로 올릴 후보.
+falloff 커브 편집 위젯을 새로 만들었다 — 마야 `gradientControlNoAttr` 는 **cmds 전용이라
+PySide 창에 못 쓴다**. 계산/그리기가 같은 함수를 쓴다.
+**2026-09-09 (v01.19) 에 Framework 로 승격했다** → [[framework-falloff-curve-widget]]
+(`Framework/qt/MOD_falloffCurve_qt_v01.py` + `Framework/core/falloff_curve.py`).
+툴에 있던 `app/core/falloff.py` · `app/ui/falloff_curve_widget.py` 는 삭제됐고, 커브 +
+Interpolation + Curve presets 세 줄은 공용 **패널** 하나가 됐다(콤보 동기화도 위젯이 맡는다).
+보이는 것과 하는 일은 그대로다.
 
 성능: 순수 파이썬 Dijkstra 로 25,921 버텍스 / 조인트 20개 **0.60s** — numpy 불필요.
 검증 코어 44 + UI 28 항목([[mayapy-headless-verify]]). 토러스 테스트 시 주의: 정점 id 는 **minor 링

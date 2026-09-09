@@ -51,6 +51,7 @@
 | `Framework/qt/MOD_filter_qt_v01.py` | 공용 **검색/필터** 위젯 — 입력 즉시 일치 항목만 표시, "보이는 것이 작업 대상" 헬퍼 | [Framework_MOD_filter_qt](Framework_MOD_filter_qt.md) |
 | `Framework/qt/MOD_expand_qt_v01.py` | 공용 **Expand(별도 창)** 패널 — 본문을 독립 창으로 빼고 되돌린다. **복제가 아니라 이동**이라 값이 어긋날 여지가 없다 | [Framework_MOD_expand_qt](Framework_MOD_expand_qt.md) |
 | `Framework/qt/MOD_progress_qt_v01.py` | 공용 **진행률 팝업** — 오래 걸리는 작업의 0~100% 게이지 모달 창. 단계 가중치 자동 재정규화, core 는 `progress(done, total)` 콜백만 안다 | [Framework_MOD_progress_qt](Framework_MOD_progress_qt.md) |
+| `Framework/qt/MOD_falloffCurve_qt_v01.py` | 공용 **falloff 커브 편집기** — 캔버스 / +Interpolation·Presets 패널 / 비모달 팝업. 모델은 `Framework/core/falloff_curve.py`(Qt·maya 비의존) | [Framework_MOD_falloffCurve_qt](Framework_MOD_falloffCurve_qt.md) |
 | `Framework/core/maya_shape.py` | **트랜스폼 → 셰이프 확정** 헬퍼 — `extendToShape()` 가 엉뚱한 셰이프를 집는 함정을 막는다(`kInvalidParameter` 원인) | [Framework_maya_shape](Framework_maya_shape.md) |
 | `Framework/core/maya_skin.py` | skinCluster 웨이트 **인덱스 함정**(물리 vs 논리) — `get/setWeights` 는 물리 인덱스. undo 뒤 재바인드가 죽던 원인 | [Framework_maya_skin](Framework_maya_skin.md) |
 | `Framework/core/mirror_tokens.py` | 좌/우 미러 **토큰 규칙 공용화**(`Framework/rules/mirror_tokens.json`) — 이름 미러링은 **경계 매칭**으로 `arm_lower` 같은 오탐을 막는다 | [Framework_mirror_tokens](Framework_mirror_tokens.md) |

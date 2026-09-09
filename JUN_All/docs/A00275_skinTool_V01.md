@@ -2,7 +2,7 @@
 title: A00275_skinTool_V01 사용법
 aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose, Move Joints, Edit Mesh, Expand Bind]
 tags: [maya-python, tool-guide, skin, skincluster, bind-pose, rigging]
-updated: 2026-09-08
+updated: 2026-09-09
 ---
 
 # A00275_skinTool_V01 사용법
@@ -594,7 +594,10 @@ Surface / Topology 의 탐색은 **저장된 버텍스 집합 안으로 제한**
 - **드래그**로 모양 조절, **더블클릭**으로 포인트 추가, **우클릭**으로 삭제(양 끝은 세로로만 이동).
 - `Interpolation` : `None`(계단) / `Linear` / `Smooth` / `Spline`.
 - `Curve presets` : Linear / Smooth / Ease In / Ease Out / Spike / Solid.
-- 그리기와 실제 계산이 **같은 함수**(`app/core/falloff.py`)를 쓰므로 화면 모양과 결과가 어긋나지 않는다.
+- 그리기와 실제 계산이 **같은 함수**(`Framework/core/falloff_curve.py`)를 쓰므로 화면 모양과
+  결과가 어긋나지 않는다.
+- v01.19 부터 이 커브 UI 는 **공용 위젯**이다 — [Framework_MOD_falloffCurve_qt](Framework_MOD_falloffCurve_qt.md)
+  (`A00410_SecondaryMotion` 의 파라미터 커브도 같은 위젯을 쓴다). 보이는 것과 하는 일은 그대로다.
 
 ### Blend — 이미 다른 조인트에 바인드된 버텍스
 
