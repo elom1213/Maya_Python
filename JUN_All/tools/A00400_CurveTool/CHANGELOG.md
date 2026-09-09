@@ -1,5 +1,22 @@
 # Changelog — A00400_CurveTool
 
+## v01.09 (2026-09-09)
+**`Edit > Smooth` — 닫힌 커브에 한 번 적용하면 그 뒤로 아무것도 안 되던 것 수정.**
+
+- **[Fix] 임시 커브를 만들고 지우는 것이 사용자의 CV 선택을 지우고 있었다.** 닫힌 커브에
+  Smooth 를 걸면 한 번은 되고(`Smooth 0.070 -> 1 curve(s), 12 of 12 CV(s) moved`),
+  그 다음부터는 `Select some curve CVs first ...
+  [RuntimeError: (kFailure): Object does not exist]` 만 떴다. 뒤의 예외는 **빈 선택에서
+  `getRichSelection()` 이 던지는 것** — 즉 진짜 원인은 "선택이 사라졌다" 였다.
+- **[Note] `cmds.curve` 는 만든 커브를 선택 상태로 만든다.** 닫힌 커브의 임시 사본만
+  이 경로(감아 넣은 커브를 새로 만든다)를 쓰고, 열린 커브는 `cmds.duplicate`(선택을 안 건드린다)를
+  써서 **닫힌 커브에서만** 증상이 났다. 이어서 `cmds.delete` 가 그 선택을 비운다.
+- **[Change] 선택을 건드리는 구간을 공용 `keep_selection()` 컨텍스트로 묶었다** —
+  임시 커브 생성 · 삭제 · `smoothCurve` 세 군데 전부. 선택을 지우는 마야 명령을 이 툴에서
+  찾은 것이 이제 **셋**(`smoothCurve` v01.05, `curve` · `delete` v01.09)이라 한 군데서 관리한다.
+- 검증(mayapy 2024): 닫힌 · 닫힌+히스토리 · 열린 커브 각각 — **연속 3회 적용** 후에도 선택 동일,
+  드래그 세션 중/후 선택 동일, 임시 커브 잔여 없음, **그 다음 `capture()` 가 여전히 CV 를 찾는다**.
+
 ## v01.08 (2026-09-09)
 **`Edit > Smooth` 가 닫힌(주기) 커브에도 듣는다 — 이음매를 넘어서 고르게.**
 

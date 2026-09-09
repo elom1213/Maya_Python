@@ -427,6 +427,15 @@ result[i] = origin[i] + sign(적용값) * weight[i] * (target[i] - origin[i])
   `1.19 → 2.48` 로 커졌지만 특정 CV 는 `0.89 → 0.81` 로 오히려 줄었다. 스무딩이 굽이를 재분배하기
   때문이며 버그가 아니다.
 - `smoothCurve` 는 **히스토리 노드를 만들지 않는다**(일회성 편집).
+- **씬 선택을 지우는 마야 명령이 세 개다**(v01.09 에서 둘을 더 찾았다). `cmds.smoothCurve` 는
+  다른 커브에 걸어도 **활성 선택을 지우고**, `cmds.curve` 는 **만든 커브를 선택하며**,
+  `cmds.delete` 는 지운 것이 선택돼 있었으면 **선택을 비운다.** 이 탭은 슬라이더를 놓을 때마다
+  선택을 다시 읽으므로, 한 번이라도 풀리면 그 뒤로는
+  `Select some curve CVs first ... [RuntimeError: (kFailure): Object does not exist]`
+  (빈 선택에서 `getRichSelection()` 이 던지는 예외) 만 나온다. **닫힌 커브의 임시 사본만**
+  `cmds.curve` 로 새로 만들기 때문에 닫힌 커브에서만 이 증상이 났다
+  (열린 커브는 `cmds.duplicate` — 선택을 안 건드린다). 세 군데 전부 공용
+  `keep_selection()` 컨텍스트로 묶여 있다.
 - **선택을 읽는 경로가 두 개다.** 폴오프까지 얻으려면 `MGlobal.getRichSelection()` 이 필요한데,
   이 호출은 **빈 선택에서 예외를 던지고**(`Object does not exist`) 마야 버전/상태에 따라 다른
   이유로도 실패할 수 있다. 그 실패를 조용히 삼키면 **"선택한 게 없다"** 로 오해되어 CV 를

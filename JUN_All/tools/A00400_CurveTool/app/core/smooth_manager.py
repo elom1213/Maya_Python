@@ -66,6 +66,7 @@
 #    실패할 수 있다. 실패를 조용히 삼키면 "선택한 게 없다"로 오해되므로,
 #    평범한 선택 목록으로 되돌아가고 사유를 로그에 남긴다(아래 `cv_selection`).
 
+import contextlib
 import re
 
 import maya.cmds as cmds
@@ -74,6 +75,30 @@ import maya.api.OpenMaya as om2
 from Framework.core.maya_undo import undo_chunk
 
 TEMP_PREFIX = "JUN_smoothTemp"
+
+
+@contextlib.contextmanager
+def keep_selection():
+    """블록 안에서 무슨 짓을 하든 씬 선택을 그대로 돌려놓는다.
+
+    이 툴은 **사용자가 골라 둔 CV 선택 위에서** 산다 - 슬라이더를 놓을 때마다 선택을 다시
+    읽어 다음 적용을 준비하므로, 중간에 선택이 한 번이라도 풀리면 그 뒤로는
+    `Select some curve CVs first ... [RuntimeError: (kFailure): Object does not exist]`
+    (= 빈 선택에서 `getRichSelection()` 이 던지는 예외) 만 나오고 아무 것도 되지 않는다.
+
+    선택을 건드리는 마야 명령이 **세 군데**나 있다(전부 실측).
+      * `cmds.smoothCurve` - 다른 커브에 걸어도 활성 선택을 지운다.
+      * `cmds.curve` (생성) - 만든 커브를 **선택 상태로 만든다.** 닫힌 커브의 임시 사본이
+        이 경로라, 열린 커브(`cmds.duplicate` - 선택을 안 건드린다)에서는 안 나던 증상이
+        닫힌 커브에서만 나왔다.
+      * `cmds.delete` - 지운 것이 선택돼 있었으면 선택이 빈다.
+    """
+    stored = om2.MGlobal.getActiveSelectionList()
+
+    try:
+        yield
+    finally:
+        om2.MGlobal.setActiveSelectionList(stored)
 
 # `...cv[12]` 만 잡는다. NURBS **서페이스**는 `cv[0][0]` 이라 여기 걸리지 않는다.
 _CV_PATTERN = re.compile(r"\.cv\[(\d+)\]$")
@@ -383,26 +408,33 @@ class CurveTarget(object):
                 for i in range(distinct + 2 * self.pad)]
 
     def open_temp(self):
-        """마야의 smoothCurve 를 돌릴 임시 사본. 드래그 한 번에 하나만 만든다."""
-        if self.periodic:
-            # 닫힌 커브는 그대로 복제해도 smoothCurve 가 거절한다.
-            # 감아 넣은 **열린** 커브로 만든다.
-            self.temp = cmds.curve(name=TEMP_PREFIX + "#", degree=self.degree,
-                                   point=self._wrapped(self.origin))
-        else:
-            transform = cmds.listRelatives(self.shape, parent=True, fullPath=True)[0]
+        """마야의 smoothCurve 를 돌릴 임시 사본. 드래그 한 번에 하나만 만든다.
 
-            self.temp = cmds.duplicate(transform, name=TEMP_PREFIX + "#",
-                                       upstreamNodes=False)[0]
-            cmds.delete(self.temp, constructionHistory=True)
+        ⚠️ **사용자의 CV 선택을 건드리면 안 된다** - `cmds.curve` 는 만든 커브를 선택하고
+        `cmds.delete` 는 선택을 비운다. 그러면 다음 적용 때 읽을 선택이 남지 않는다.
+        """
+        with keep_selection():
+            if self.periodic:
+                # 닫힌 커브는 그대로 복제해도 smoothCurve 가 거절한다.
+                # 감아 넣은 **열린** 커브로 만든다.
+                self.temp = cmds.curve(name=TEMP_PREFIX + "#", degree=self.degree,
+                                       point=self._wrapped(self.origin))
+            else:
+                transform = cmds.listRelatives(self.shape, parent=True, fullPath=True)[0]
 
-        cmds.setAttr(self.temp + ".visibility", False)
+                self.temp = cmds.duplicate(transform, name=TEMP_PREFIX + "#",
+                                           upstreamNodes=False)[0]
+                cmds.delete(self.temp, constructionHistory=True)
 
-        self.temp_shape = cmds.listRelatives(self.temp, shapes=True, fullPath=True)[0]
+            cmds.setAttr(self.temp + ".visibility", False)
+
+            self.temp_shape = cmds.listRelatives(self.temp, shapes=True,
+                                                 fullPath=True)[0]
 
     def close_temp(self):
-        if self.temp and cmds.objExists(self.temp):
-            cmds.delete(self.temp)
+        with keep_selection():
+            if self.temp and cmds.objExists(self.temp):
+                cmds.delete(self.temp)
 
         self.temp = None
         self.temp_shape = None
@@ -432,14 +464,11 @@ class CurveTarget(object):
         # 그대로 두면 슬라이더를 처음 움직이는 순간 사용자가 골라 둔 CV 가 전부 풀리고,
         # 그 다음 틱부터는 적용할 대상이 없어 **드래그해도 아무 반응이 없다.**
         # 그래서 이 명령 앞뒤로 선택을 그대로 보관했다 되돌린다.
-        stored = om2.MGlobal.getActiveSelectionList()
-
-        try:
-            cmds.smoothCurve(components, smoothness=float(smoothness))
-        except Exception:
-            return None
-        finally:
-            om2.MGlobal.setActiveSelectionList(stored)
+        with keep_selection():
+            try:
+                cmds.smoothCurve(components, smoothness=float(smoothness))
+            except Exception:
+                return None
 
         result = self._read(self.temp_shape)
 

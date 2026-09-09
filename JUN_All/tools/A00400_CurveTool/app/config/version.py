@@ -8,6 +8,7 @@
 # 01.06  Tab taxonomy        - 상위 탭 = 카테고리(Create / Edit / Display), 하위 탭 = 기능
 # 01.07  Joints              - 커브 위 균일 조인트 + 커브 바인드 + zro/con/ctl/tgt 컨트롤러
 # 01.08  Smooth on closed    - 닫힌(주기) 커브도 Smooth / Rough (이음매를 넘어서)
+# 01.09  Smooth keep sel     - 임시 커브 생성/삭제가 CV 선택을 지우던 것 수정
 
-VERSION = "01.08"
+VERSION = "01.09"
 LAST_UPDATE = "2026-09-09"
