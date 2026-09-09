@@ -1,11 +1,11 @@
 ---
 name: wip-a00400-smooth-tab
-description: A00400 Smooth 탭 - smoothCurve 결과에 소프트셀렉션 가중치+Rough 를 얹는다. smoothCurve 는 음수 무시·주기 실패
+description: A00400 Smooth 탭 - smoothCurve 결과에 소프트셀렉션 가중치+Rough+닫힌 커브를 얹는다. smoothCurve 는 음수 무시·주기 실패(감아 넣은 임시 커브로 우회)
 metadata: 
   node_type: memory
   type: project
   originSessionId: 559dfd30-01bc-4110-8708-a1499b043ca1
-  modified: 2026-08-18T01:57:03.406Z
+  modified: 2026-09-09T00:00:00.000Z
 ---
 
 `A00400_CurveTool` **Smooth 탭** (v01.04→01.05, 2026-08-18). 고른 CV 를 슬라이더로 실시간
@@ -21,7 +21,9 @@ amount = 슬라이더 × Multiplier   (1 이면 마야 기본 Smooth 와 동일 
 
 **`cmds.smoothCurve` 실측**
 - **음수 smoothness 를 조용히 무시**한다(s=-1 → 변화 없음) → Rough 는 직접 구현
-- **주기(periodic) 커브**와 **degree 1(직선) 커브에서 실패**한다 → 미리 걸러낸다
+- **degree 1(직선) 커브에서 실패**한다 → 미리 걸러낸다
+- **주기(periodic) 커브에서도 실패**한다(`Cannot smooth CVs on periodic curves`)
+  → v01.08 부터 **감아 넣은 임시 열린 커브**로 우회한다(아래)
 - **커브 양 끝 CV 를 절대 안 움직인다**(실측 CV12: d2→앞2/뒤1, d3→앞뒤2, d5→앞뒤3 ≈ `(degree+1)//2`).
   끝쪽만 고르면 **성공하는데 아무 것도 안 변한다** → "실제로 움직인 CV 수"를 세어 보고하고 0 이면 경고.
   조용한 무동작이 "툴이 안 된다"의 진짜 정체였다
@@ -53,5 +55,27 @@ amount = 슬라이더 × Multiplier   (1 이면 마야 기본 Smooth 와 동일 
   (이 회귀를 실제로 냈고 테스트가 잡음). `cmds.curve -r` 은 0.16ms/call, undo 되고, degree/CV수/
   히스토리 보존, 숨긴 커브 OK, 한 청크 안 여러 번 호출해도 Ctrl+Z 한 번.
 
+**닫힌(주기) 커브** (v01.07→01.08, 2026-09-09). 마야가 거절하는 건 계산이 아니라 **이음매를 넘는
+이웃 관계**뿐이다. 그래서 라플라시안을 따로 짜지 않는다 — 그러면 열린 커브와 **감촉이 갈라진다.**
+실제 CV(spans 개)를 앞뒤로 **감아 복사한 열린 임시 커브**에 마야 `smoothCurve` 를 돌리고
+**가운데 구간만** 읽는다. 마야의 끝 고정은 패딩 안에서만 일어난다.
+
+```
+[ 0..7 ]  →  [ 5 6 7 : 0..7 : 0 1 2 ]  →  smoothCurve  →  가운데 [ 0..7 ] 만 읽기
+```
+- `pad = 2*degree + 4` 면 degree 7 까지 pad 40 과 비트 단위로 같다(실측).
+- 결과 = 마야 내부 스텐실을 **순환**으로 건 것과 오차 `8.9e-16`.
+  임펄스 응답으로 뽑은 d3 스텐실은 `[-1/18, 2/9, 2/3, 2/9, -1/18]`(합 1).
+- ⚠️ **주기 커브는 CV 가 두 가지로 세어진다** — `.cv[i]` 는 `spans` 개, `cvPositions()` 는
+  `spans + degree` 개(뒤 degree 개는 앞의 복사본). **쓸 때 복사본까지 갱신**해야 이음매가 안 벌어진다.
+- ⚠️ **주기 커브엔 `cmds.curve(replace=True)` 가 그냥 안 통한다**
+  (`Must specify knots with the -per option`) → `periodic=True` + `knot=` 까지 넘긴다.
+  `setAttr .controlPoints` 는 **히스토리가 있으면 절대 위치가 아니라 트윅(델타)** 이라 값이 두 번 섞인다
+  (`makeNurbCircle` 살아 있는 원에서 재현) — 쓰지 않는다. [[shape-pnts-is-post-deformation]] 과 같은 함정.
+- 닫힌 커브는 **고정되는 CV 가 없다** → `pinned_indices(periodic=True)` 는 빈 목록,
+  `Check Selection` 이 `open`/`closed` 를 적는다.
+- 닫힌 커브의 `u=0`/`u=1` 이 같은 점인 것은 [[wip-a00400-curve-joints]] 에도 나온 성질.
+
 검증: mayapy 2024 코어 26 + UI 31 + 폴백 23 + 고정CV 22 + 라이브 13 + 선택유지 15. 툴 전체 회귀 252항목.
+v01.08 닫힌 커브 20 + 드래그 9 + UI 9 (열린 커브 결과 회귀 포함).
 같은 툴: [[wip-a00400-points-to-curve]], [[wip-a00400-curve-wrap]], [[wip-a00400-curvetool]]

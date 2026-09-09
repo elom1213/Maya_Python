@@ -479,7 +479,13 @@ Default Distance attribute (driver signal x)
     selection** — even when run on a throwaway curve — so after the first tick there was nothing left to apply
     to. The selection is now saved and restored around the command. Related: Maya never moves the **end CVs** of
     a curve, so the tool counts and reports **how many CVs actually moved** and explains why when that is zero
-    (no silent no-ops).
+    (no silent no-ops). **Closed (periodic) curves** were refused outright by Maya
+    (`Cannot smooth CVs on periodic curves`) and used to be skipped; rather than bolting on a separate laplacian
+    smoother — which would make open and closed curves *feel* different — the CV list is **wrapped around into a
+    padded open temporary curve**, Maya's own `smoothCurve` runs on that, and only the middle window is read back.
+    Maya's end-pinning then happens entirely inside the padding, so the seam smooths like any other stretch of the
+    curve. The result matches Maya's interior stencil (`[-1/18, 2/9, 2/3, 2/9, -1/18]` at degree 3, recovered by
+    probing the command with impulse inputs) applied **cyclically**, to `8.9e-16`.
 - **`A00040_file_exporter_V02`** — export automation: type filters (applied through group hierarchies), referenced-mesh handling, and a choice of flattening to scene root or preserving hierarchy.
 - **`A00440_SetTool`** — **set algebra between Maya object sets whose elements are components**: union `∪`,
   intersection `∩` and difference `∖`, folded over any number of sets in list order. On top of those it can

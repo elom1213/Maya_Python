@@ -85,6 +85,7 @@ class MainWindow(QWidget):
     EDIT_PAGES = (
         ("Smooth",
          "Smooth or roughen the selected curve CVs with a live slider. "
+         "Open and closed curves alike. "
          "Soft selection falloff is respected.",
          "_build_smooth_tab"),
         ("Wrap",
@@ -647,7 +648,7 @@ class MainWindow(QWidget):
         """씬에서 고른 CV 를 슬라이더로 실시간 Smooth / Rough.
 
         마야 기본 `Curves > Smooth`(`cmds.smoothCurve`)의 결과를 그대로 쓰되,
-        그 명령이 못 하는 Rough(음수)와 **소프트 셀렉션 폴오프**를 얹는다.
+        그 명령이 못 하는 Rough(음수) · **소프트 셀렉션 폴오프** · **닫힌 커브**를 얹는다.
         자세한 근거는 core/smooth_manager.py.
         """
         tab = QWidget()
@@ -656,7 +657,8 @@ class MainWindow(QWidget):
         desc = QLabel(
             "Select curve CVs in the scene, then drag the slider.\n"
             "Left roughens, right smooths - it updates live and is applied when you "
-            "let go.\nSoft selection falloff is used if it is turned on.")
+            "let go.\nSoft selection falloff is used if it is turned on. "
+            "Closed curves are smoothed across the seam.")
         desc.setAlignment(Qt.AlignCenter)
         root.addWidget(desc)
 
@@ -867,9 +869,10 @@ class MainWindow(QWidget):
         if moved or abs(amount) < 1e-6:
             return
 
-        self.log("Nothing moved. Maya's smooth keeps the first and last CVs of a curve "
-                 "(2 at each end for degree 3), so a selection made only of end CVs "
-                 "cannot change. Use 'Check Selection' to see which CVs can move.",
+        self.log("Nothing moved. On an open curve Maya's smooth keeps the first and "
+                 "last CVs (2 at each end for degree 3), so a selection made only of "
+                 "end CVs cannot change - a closed curve has no such ends. "
+                 "Use 'Check Selection' to see which CVs can move.",
                  warn=True)
 
     def on_smooth_check(self):
@@ -898,13 +901,13 @@ class MainWindow(QWidget):
         self.log("  scene selection : {0}".format(cmds.ls(selection=True)))
 
         for shape, weights in selection.items():
-            degree = cmds.getAttr(shape + ".degree")
-            total = cmds.getAttr(shape + ".spans") + degree
-            pinned = smooth_mgr.pinned_indices(total, degree)
+            degree, total, periodic = smooth_mgr.curve_info(shape)
+            pinned = smooth_mgr.pinned_indices(total, degree, periodic=periodic)
             usable = sorted(set(weights) - set(pinned))
 
-            self.log("  {0} : degree {1}, {2} CVs   picked [{3}]".format(
+            self.log("  {0} : degree {1}, {2} CVs, {3}   picked [{4}]".format(
                 shape.split("|")[-1], degree, total,
+                "closed" if periodic else "open",
                 smooth_mgr.summarize_indices(weights)))
 
             if smooth_mgr.has_falloff({shape: weights}):

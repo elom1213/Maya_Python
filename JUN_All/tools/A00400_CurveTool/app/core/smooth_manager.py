@@ -20,13 +20,43 @@
 # amount 를 키우면 `smoothCurve` 에 더 큰 smoothness 를 넘긴다(마야가 하는 것과 같은 방식).
 # 스무딩 결과를 넘겨 외삽하지 않으므로 값이 커져도 형태가 튀지 않는다.
 #
+# ── 닫힌(주기) 커브 ───────────────────────────────────────
+# `smoothCurve` 는 주기 커브를 거절한다("Cannot smooth CVs on periodic curves").
+# 그렇다고 자체 라플라시안을 따로 짤 이유는 없다 — 마야가 못 하는 건 **이음매(seam)를 넘어가는
+# 이웃 관계**일 뿐, 연산 자체는 그대로 된다. 그래서 닫힌 커브는
+#
+#   1) 실제 CV 목록(spans 개)을 **앞뒤로 감아 복사**해 `pad` 만큼 늘린
+#      **열린 임시 커브**를 만들고,
+#   2) 거기에 마야의 `smoothCurve` 를 그대로 돌린 뒤,
+#   3) 가운데 구간(pad ~ pad+spans)만 읽어 돌아온다.
+#
+# 이렇게 하면 마야가 커브 끝을 고정하는 것은 **패딩 구간에서만** 일어나고,
+# 읽어 오는 구간은 전부 "안쪽" 이라 **이음매에 모서리가 생기지 않는다.**
+#
+# mayapy 로 확인한 것:
+#  * 마야의 내부 스텐실은 degree 3 기준 `[-1/18, 2/9, 2/3, 2/9, -1/18]` 이고,
+#    위 방법의 결과는 그 스텐실을 **순환으로** 건 것과 소수점까지 같다.
+#  * `pad = 2 * degree + 4` 면 degree 7 까지 끝 영향이 완전히 사라진다
+#    (pad 를 40 으로 키워도 결과가 비트 단위로 같다).
+#  * 주기 커브는 **`.cv[i]` 로 고를 수 있는 것이 spans 개**인데
+#    `MFnNurbsCurve.cvPositions()` 는 **spans + degree 개**를 돌려준다 — 뒤의 degree 개는
+#    앞의 degree 개를 그대로 복사한 것이다. 쓸 때도 그 복사본까지 맞춰 넣어야 한다.
+#  * 주기 커브에는 **`cmds.curve(replace=True)` 가 그냥은 안 통한다**
+#    ("Must specify knots with the -per option") → `periodic=True` + `knot=` 까지 준다.
+#    이 형태는 히스토리가 붙은 커브(예: `makeNurbCircle` 이 살아 있는 원)에서도
+#    정확히 동작하고 undo 도 된다(실측). `setAttr .controlPoints` 는 히스토리가 있으면
+#    **절대 위치가 아니라 트윅(델타)** 가 되므로 쓰지 않는다.
+#  * 끝이 고정되지 않으므로 닫힌 커브는 **고른 CV 가 전부 움직일 수 있다.**
+#
 # ── mayapy 로 확인한 사실 ──────────────────────────────────────────────────
 #  * `smoothCurve` 는 **실수 smoothness** 를 받는다(0.5 와 1 의 결과가 다르다).
 #  * **음수는 무시**한다(s=-1 이면 그대로).
 #  * 히스토리 노드를 만들지 않는다(일회성 편집).
 #  * **활성 선택을 지운다**(다른 커브에 걸어도 그렇다). 슬라이더를 잡고 드래그하는 동안
 #    사용자의 CV 선택이 풀려 버리므로, 이 명령 앞뒤로 선택을 보관했다 되돌린다.
-#  * **주기(periodic) 커브**와 **degree 1(직선) 커브에서는 실패**한다 → 미리 걸러 이유를 알린다.
+#  * **degree 1(직선) 커브에서는 실패**한다 → 미리 걸러 이유를 알린다.
+#  * **주기(periodic) 커브에서도 실패한다** ("Cannot smooth CVs on periodic curves").
+#    그래서 닫힌 커브는 **CV 를 둘러 이은 임시 열린 커브**로 바꿔 돌린다 (아래 `CurveTarget`).
 #  * **커브 양 끝 CV 는 절대 움직이지 않는다** — degree 3 이면 앞뒤 2개씩, degree 5 면 3개씩.
 #    끝쪽만 고르면 명령은 성공하는데 아무 것도 안 변한다. 그래서 "실제로 움직인 CV 수" 를
 #    세어 돌려주고, 0 이면 호출부가 그 이유를 알려 줄 수 있게 한다.
@@ -167,7 +197,7 @@ def cv_selection():
     return plain, "plain selection", note
 
 
-def pinned_indices(cv_count, degree):
+def pinned_indices(cv_count, degree, periodic=False):
     """마야 smoothCurve 가 절대 건드리지 않는 CV 인덱스.
 
     실측(CV 12개): degree 2 -> 앞 2 / 뒤 1, degree 3 -> 앞뒤 2, degree 5 -> 앞뒤 3.
@@ -175,11 +205,29 @@ def pinned_indices(cv_count, degree):
 
     이 값은 **안내 문구를 만들기 위한 것**이지 실제 연산에 쓰이지 않으므로, 실제로 고정되는
     것보다 더 많이 말하지 않도록(= 실제 집합의 부분집합이 되도록) 보수적으로 잡는다.
+
+    **닫힌(주기) 커브는 빈 목록**이다 - 끝이 없으므로 고정되는 CV 도 없다.
     """
+    if periodic:
+        return []
+
     edge = max(1, (int(degree) + 1) // 2)
     edge = min(edge, cv_count)
 
     return sorted(set(range(edge)) | set(range(max(0, cv_count - edge), cv_count)))
+
+
+def curve_info(shape):
+    """(degree, 고를 수 있는 CV 수, 닫혔는가) - 로그와 안내 문구용.
+
+    주기 커브는 `spans + degree` 개의 CV 를 들고 있지만 뒤의 degree 개는 앞의 복사본이고
+    `.cv[i]` 로 고를 수 있는 것은 **앞의 spans 개**뿐이다.
+    """
+    degree = int(cmds.getAttr(shape + ".degree"))
+    spans = int(cmds.getAttr(shape + ".spans"))
+    periodic = int(cmds.getAttr(shape + ".form")) == 2
+
+    return degree, (spans if periodic else spans + degree), periodic
 
 
 def has_falloff(selection):
@@ -232,13 +280,45 @@ def soft_select_state():
 # ==========================================================================
 
 class CurveTarget(object):
-    """커브 하나의 원본 스냅샷 + 가중치 + 계산용 임시 커브."""
+    """커브 하나의 원본 스냅샷 + 가중치 + 계산용 임시 커브.
+
+    열린 커브와 닫힌(주기) 커브를 둘 다 다룬다. 두 경우의 차이는 세 군데뿐이다.
+
+      * **임시 커브** — 열린 커브는 그대로 복제하고, 닫힌 커브는 CV 를 앞뒤로
+        감아 복사한 **열린** 커브를 만든다(그래야 `smoothCurve` 가 돌아간다).
+      * **읽기** — 닫힌 커브는 임시 커브의 가운데 구간만 가져온다.
+      * **쓰기** — 닫힌 커브는 `cmds.curve` 에 `periodic` + `knot` 까지 넘겨야 한다.
+    """
 
     def __init__(self, shape, weights):
         self.shape = shape
         self.weights = weights                       # {cv index: weight}
+        self.degree = int(cmds.getAttr(shape + ".degree"))
+        self.periodic = int(cmds.getAttr(shape + ".form")) == 2
         self.origin = self._read(shape)
         self.count = len(self.origin)
+
+        # 주기 커브는 `cvPositions()` 가 spans + degree 개를 돌려주고, 뒤의 degree 개는
+        # 앞의 degree 개를 그대로 복사한 것이다. `.cv[i]` 로 고를 수 있는 것도,
+        # 우리가 값을 정해야 하는 것도 **앞의 spans 개**뿐이다.
+        self.distinct = self.count - self.degree if self.periodic else self.count
+
+        # 복사본 구간의 인덱스가 들어오더라도 같은 CV 로 접어 둔다.
+        # (`cmds.ls` 는 spans 개만 돌려주지만 리치 셀렉션은 보장되지 않는다.)
+        if self.periodic:
+            folded = {}
+
+            for index, weight in self.weights.items():
+                key = index % self.distinct
+                folded[key] = max(folded.get(key, 0.0), weight)
+
+            self.weights = folded
+
+        # 끝 고정 효과가 읽어 올 구간까지 번지지 않을 만큼의 여유분.
+        # degree 7 까지 이 값이면 pad 를 40 으로 키운 결과와 같다(실측).
+        self.pad = 2 * self.degree + 4
+        self.knots = list(self._fn(shape).knots()) if self.periodic else None
+
         self.temp = None
         self.temp_shape = None
 
@@ -269,17 +349,53 @@ class CurveTarget(object):
                 for point in cls._fn(shape).cvPositions(om2.MSpace.kObject)]
 
     @staticmethod
-    def _write(shape, positions):
-        """오브젝트 공간 CV 전체를 한 번에, **undo 가 되게** 쓴다."""
+    def _write_open(shape, positions):
+        """열린 커브에 오브젝트 공간 CV 전체를 한 번에, **undo 가 되게** 쓴다."""
         cmds.curve(shape, replace=True, point=[tuple(p) for p in positions])
+
+    def _write(self, shape, positions):
+        """이 커브의 형태에 맞춰 쓴다.
+
+        주기 커브는 `cmds.curve(replace=True)` 만으로는 거절된다
+        ("Must specify knots with the -per option"). 원본의 매듭을 그대로 다시 넘겨
+        형태가 열린 커브로 바뀌지 않게 한다.
+        """
+        if not self.periodic:
+            self._write_open(shape, positions)
+            return
+
+        cmds.curve(shape, replace=True, periodic=True, degree=self.degree,
+                   point=[tuple(p) for p in positions], knot=list(self.knots))
+
+    # ------------------------------------------------------------------
+    # 닫힌 커브를 위한 감아 넣기
+    # ------------------------------------------------------------------
+
+    def _wrapped(self, positions):
+        """닫힌 커브의 CV 를 앞뒤로 `pad` 만큼 감아 복사한 목록.
+
+        이걸 **열린** 커브로 만들어 `smoothCurve` 를 돌리면, 마야가 고정하는 양 끝은
+        전부 패딩 안에 들어가고 우리가 읽어 올 구간은 전부 "안쪽" 이 된다.
+        """
+        distinct = self.distinct
+
+        return [positions[(i - self.pad) % distinct]
+                for i in range(distinct + 2 * self.pad)]
 
     def open_temp(self):
         """마야의 smoothCurve 를 돌릴 임시 사본. 드래그 한 번에 하나만 만든다."""
-        transform = cmds.listRelatives(self.shape, parent=True, fullPath=True)[0]
+        if self.periodic:
+            # 닫힌 커브는 그대로 복제해도 smoothCurve 가 거절한다.
+            # 감아 넣은 **열린** 커브로 만든다.
+            self.temp = cmds.curve(name=TEMP_PREFIX + "#", degree=self.degree,
+                                   point=self._wrapped(self.origin))
+        else:
+            transform = cmds.listRelatives(self.shape, parent=True, fullPath=True)[0]
 
-        self.temp = cmds.duplicate(transform, name=TEMP_PREFIX + "#",
-                                   upstreamNodes=False)[0]
-        cmds.delete(self.temp, constructionHistory=True)
+            self.temp = cmds.duplicate(transform, name=TEMP_PREFIX + "#",
+                                       upstreamNodes=False)[0]
+            cmds.delete(self.temp, constructionHistory=True)
+
         cmds.setAttr(self.temp + ".visibility", False)
 
         self.temp_shape = cmds.listRelatives(self.temp, shapes=True, fullPath=True)[0]
@@ -292,11 +408,25 @@ class CurveTarget(object):
         self.temp_shape = None
 
     def smoothed(self, smoothness):
-        """임시 사본에 마야 smoothCurve 를 걸어 나온 위치들. 실패하면 None."""
-        # 매번 원본으로 되돌린 뒤 계산한다 → 드래그해도 누적되지 않는다.
-        self._write(self.temp_shape, self.origin)
+        """임시 사본에 마야 smoothCurve 를 걸어 나온 위치들. 실패하면 None.
 
-        components = ["{0}.cv[{1}]".format(self.temp_shape, i) for i in sorted(self.weights)]
+        돌려주는 목록은 언제나 **`self.weights` 의 인덱스로 바로 읽을 수 있는** 모양이다.
+        """
+        # 매번 원본으로 되돌린 뒤 계산한다 → 드래그해도 누적되지 않는다.
+        if self.periodic:
+            wrapped = self._wrapped(self.origin)
+            self._write_open(self.temp_shape, wrapped)
+
+            # 닫힌 커브는 임시 커브의 CV 를 **전부** 넘긴다. 마야의 스텐실은 이웃의
+            # 원본 위치만 보므로 고른 범위가 달라도 CV 하나하나의 결과는 같고(실측),
+            # 이렇게 해야 이음매 너머가 이웃이 된 패딩 CV 까지 함께 섞인다.
+            components = ["{0}.cv[{1}]".format(self.temp_shape, i)
+                          for i in range(len(wrapped))]
+        else:
+            self._write_open(self.temp_shape, self.origin)
+
+            components = ["{0}.cv[{1}]".format(self.temp_shape, i)
+                          for i in sorted(self.weights)]
 
         # ⚠️ `cmds.smoothCurve` 는 **활성 선택을 지운다**(실측 - 다른 커브에 걸어도 그렇다).
         # 그대로 두면 슬라이더를 처음 움직이는 순간 사용자가 골라 둔 CV 가 전부 풀리고,
@@ -311,15 +441,21 @@ class CurveTarget(object):
         finally:
             om2.MGlobal.setActiveSelectionList(stored)
 
-        return self._read(self.temp_shape)
+        result = self._read(self.temp_shape)
+
+        if self.periodic:
+            # 가운데 구간만 — 여기가 원본의 cv[0..spans-1] 에 해당한다.
+            result = result[self.pad:self.pad + self.distinct]
+
+        return result
 
     def apply(self, amount):
         """origin + sign * weight * (smoothed - origin) 을 실제 커브에 쓴다.
 
         (성공했는가, 실제로 움직인 CV 수) 를 돌려준다. 움직인 수를 세는 이유는
-        **마야가 커브 양 끝 CV 를 고정**하기 때문이다 - 끝쪽만 고른 경우 명령은
+        **마야가 열린 커브의 양 끝 CV 를 고정**하기 때문이다 - 끝쪽만 고른 경우 명령은
         성공하지만 아무 것도 변하지 않는다. 그걸 조용히 넘기면 "툴이 동작을 안 한다"
-        로만 보인다.
+        로만 보인다. **닫힌 커브에는 고정되는 CV 가 없다** - 고른 것은 전부 움직인다.
         """
         if abs(amount) < 1e-6:
             self._write(self.shape, self.origin)
@@ -347,6 +483,12 @@ class CurveTarget(object):
                 moved += 1
 
             positions[index] = position
+
+        # 주기 커브의 마지막 degree 개는 앞의 degree 개를 복사한 것이다.
+        # 그 복사본까지 같이 갱신해야 이음매가 벌어지지 않는다.
+        if self.periodic:
+            for offset in range(self.degree):
+                positions[self.distinct + offset] = positions[offset]
 
         self._write(self.shape, positions)
 
@@ -422,11 +564,9 @@ def capture():
     skipped = []
 
     for shape, weights in selection.items():
-        # 마야 smoothCurve 가 실패하는 두 경우는 미리 걸러 이유를 알린다(실측).
-        if cmds.getAttr(shape + ".form") == 2:
-            skipped.append((shape, "periodic curve - Maya's smoothCurve cannot handle it"))
-            continue
-
+        # 마야 smoothCurve 가 실패하는 경우는 미리 걸러 이유를 알린다(실측).
+        # 주기(닫힌) 커브도 명령 자체는 거절하지만, 그건 `CurveTarget` 이 CV 를 감아
+        # 넣은 열린 임시 커브로 돌려 처리하므로 여기서 걸러내지 않는다.
         if cmds.getAttr(shape + ".degree") < 2:
             skipped.append((shape, "degree 1 (linear) curve - Maya's smoothCurve "
                                    "cannot handle it"))
