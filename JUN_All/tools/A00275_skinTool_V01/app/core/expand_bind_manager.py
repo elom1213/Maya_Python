@@ -696,22 +696,33 @@ def _validate_loop(mesh, ids, loop_ids):
     return order, extra
 
 
-def _raw_from_region(mode, adj, points, allowed, seeds, radius,
-                     points_curve, curve_interp):
+def _curve_fn(curve_points, curve_interp, curve_tangents=None):
+    """(포인트, 보간, 탄젠트) -> `f(t)` 콜러블.
+
+    커브를 이루는 값이 셋이 되면서 내부 함수마다 인자를 셋씩 나르게 됐다.
+    **하나로 묶어** 넘기면 커브 해석이 한 군데(여기)에만 있게 되고, 나중에 항목이 또
+    늘어도 내부 시그니처가 흔들리지 않는다.
+    """
+    def _f(t):
+        return falloff.evaluate(curve_points, curve_interp, t, curve_tangents)
+    return _f
+
+
+def _raw_from_region(mode, adj, points, allowed, seeds, radius, curve):
     """루프 없이 — 조인트 seed 에서 영역 전체로 퍼진 거리로 원시 가중치를 낸다."""
     raw = [{} for _ in seeds]
     for i, seed in enumerate(seeds):
         dist = _distances(mode, adj, points, allowed, seed, radius)
         bucket = raw[i]
         for vid, d in dist.items():
-            value = falloff.evaluate(points_curve, curve_interp, d / radius)
+            value = curve(d / radius)
             if value > 0.0:
                 bucket[vid] = value
     return raw, None
 
 
 def _raw_from_loop(mode, adj, points, allowed, order, closed, origins, radius,
-                   across_radius, points_curve, curve_interp):
+                   across_radius, curve):
     """루프를 줬을 때 — 루프 따라(분배) / 루프 바깥(amount) 을 분리해 낸다.
 
     1. 루프 전체를 시작점으로 한 번에 퍼뜨려(`dijkstra_multi`) 버텍스마다
@@ -733,14 +744,14 @@ def _raw_from_loop(mode, adj, points, allowed, order, closed, origins, radius,
     for vid, d in across_dist.items():
         if vid not in allowed:
             continue
-        value = falloff.evaluate(points_curve, curve_interp, d / across_radius)
+        value = curve(d / across_radius)
         if value <= 0.0:
             continue
         across[vid] = value
         anchor_arc = arcs[anchor[vid]]
         for i, seed in enumerate(seeds):
             gap = _arc_distance(anchor_arc, arcs[seed], total, closed)
-            share = falloff.evaluate(points_curve, curve_interp, gap / radius)
+            share = curve(gap / radius)
             if share > 0.0:
                 raw[i][vid] = share
     return raw, across
@@ -800,7 +811,7 @@ def _segment_param(ordered, segs, total, closed, s):
 
 
 def _raw_from_loop_even(mode, adj, points, allowed, order, closed, origins,
-                        points_curve, curve_interp):
+                        curve):
     """Even distribution — 두 방향 모두 거리가 아니라 **자리**로 잰다(모듈 상단 참고).
 
     반경(`radius` / `across_radius`)을 쓰지 않는다. 대신
@@ -837,7 +848,7 @@ def _raw_from_loop_even(mode, adj, points, allowed, order, closed, origins,
         a = anchor[vid]
         w = width.get(a, 0.0)
         t = 0.0 if w <= 1e-9 else d / w
-        amount = falloff.evaluate(points_curve, curve_interp, t)
+        amount = curve(t)
         if amount <= 0.0:
             continue
 
@@ -847,8 +858,8 @@ def _raw_from_loop_even(mode, adj, points, allowed, order, closed, origins,
             raw[lo][vid] = 1.0
             continue
 
-        lo_share = falloff.evaluate(points_curve, curve_interp, u)
-        hi_share = falloff.evaluate(points_curve, curve_interp, 1.0 - u)
+        lo_share = curve(u)
+        hi_share = curve(1.0 - u)
         both = lo_share + hi_share
         if both <= 0.0:
             continue
@@ -878,8 +889,8 @@ def _raw_from_loop_even(mode, adj, points, allowed, order, closed, origins,
 
 def expand_bind(mesh, vtx_ids, joints, radius, blend=1.0, mode=MODE_SURFACE,
                 curve_points=None, curve_interp=falloff.DEFAULT_INTERP,
-                loop_ids=None, loop_closed=False, across_radius=0.0,
-                even=False):
+                curve_tangents=None, loop_ids=None, loop_closed=False,
+                across_radius=0.0, even=False):
     """저장된 버텍스 집합을 저장된 조인트들에 바인드한다.
 
     Args:
@@ -893,6 +904,8 @@ def expand_bind(mesh, vtx_ids, joints, radius, blend=1.0, mode=MODE_SURFACE,
             인플루언스가 비율대로 유지한다. 기존 인플루언스가 없으면 항상 1.
         mode: MODE_SURFACE / MODE_TOPOLOGY / MODE_VOLUME.
         curve_points, curve_interp: falloff 커브(정규화 거리 -> 비중).
+        curve_tangents: `curve_interp` 가 `bezier` 일 때 쓰는 포인트별 탄젠트
+            (`Framework.core.falloff_curve` 형식). 다른 보간에서는 무시된다.
         loop_ids: 조인트가 앉아 있는 **엣지 루프**의 버텍스 id (order_loop 로 정렬된 것).
             주면 조인트 분배를 루프 위 거리로만 계산한다(권장).
         loop_closed: 그 루프가 닫혀 있는지.
@@ -912,7 +925,9 @@ def expand_bind(mesh, vtx_ids, joints, radius, blend=1.0, mode=MODE_SURFACE,
     blend = falloff.clamp01(float(blend))
     if mode not in MODES:
         mode = MODE_SURFACE
-    points_curve = falloff.normalize_points(curve_points)
+    points_curve, curve_tangents = falloff.normalize_curve(
+        curve_points, curve_tangents)
+    curve = _curve_fn(points_curve, curve_interp, curve_tangents)
 
     across_radius = float(across_radius or 0.0)
     if across_radius <= MIN_RADIUS:
@@ -938,17 +953,15 @@ def expand_bind(mesh, vtx_ids, joints, radius, blend=1.0, mode=MODE_SURFACE,
 
     if order and even:
         raw, across = _raw_from_loop_even(
-            mode, adj, points, allowed, order, loop_closed, origins,
-            points_curve, curve_interp)
+            mode, adj, points, allowed, order, loop_closed, origins, curve)
     elif order:
         raw, across = _raw_from_loop(
             mode, adj, points, allowed, order, loop_closed, origins, radius,
-            across_radius, points_curve, curve_interp)
+            across_radius, curve)
     else:
         seeds = [_closest_vertex(points, allowed, o) for o in origins]
         raw, across = _raw_from_region(
-            mode, adj, points, allowed, seeds, radius, points_curve,
-            curve_interp)
+            mode, adj, points, allowed, seeds, radius, curve)
 
     # 버텍스별로 (a) 조인트들 사이의 비율, (b) 이 조인트 집합이 그 버텍스를 얼마나
     # 덮는지(coverage) 를 따로 낸다.

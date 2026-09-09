@@ -25,9 +25,9 @@ updated: 2026-09-09
 | `JUN_mod_falloffCurvePanel_qt_v01` | 캔버스 + **Point(X/Y 숫자 입력)** + **Interpolation** 콤보 + **Curve presets** 버튼 | 탭 안에 박아 쓸 때 |
 | `JUN_mod_falloffCurveDialog_qt_v01` | 패널을 담은 **비모달 팝업**(+ Reset / Close) | 버튼으로 띄울 때 |
 
-세 클래스 모두 `points()` / `interpolation()` / `set_curve()` / `evaluate(t)` / `is_flat()` /
-`selected_index()` / `set_selected_index()` / `set_point()` 과 `changed` · `selectionChanged`
-시그널을 같은 이름으로 낸다 — 호출부는 어느 것을 쓰든 코드가 같다.
+세 클래스 모두 `points()` / `tangents()` / `interpolation()` / `set_curve()` / `evaluate(t)` /
+`is_flat()` / `selected_index()` / `set_selected_index()` / `set_point()` 과
+`changed` · `selectionChanged` 시그널을 같은 이름으로 낸다 — 호출부는 어느 것을 쓰든 코드가 같다.
 
 ---
 
@@ -90,6 +90,46 @@ panel.selected_point()                    # -> (x, y) 또는 None
 
 ---
 
+## 2.2 `Bezier` — 포인트 사이를 곡선으로 (탄젠트)
+
+`Interpolation` 을 **Bezier** 로 두면 포인트마다 **탄젠트 핸들**이 붙고 구간이 3차 베지어가 된다.
+나머지 보간(None/Linear/Smooth/Spline)은 탄젠트를 아예 보지 않으므로 **예전 커브는 그대로**다.
+
+```
+Tangent  [ ] Break   [Auto]
+In    Angle [  -30.0 deg ]   Length [ 0.167 ]
+Out   Angle [  -30.0 deg ]   Length [ 0.200 ]
+```
+
+- **드래그**: 고른 포인트의 핸들을 끌면 각도와 길이가 함께 바뀐다(핸들은 포인트보다 **먼저**
+  잡힌다 — 겹쳤을 때 핸들을 집으려는 의도가 더 흔하다).
+- **각도**는 양쪽 다 **자기 핸들이 뻗는 방향**으로 잰다(in 은 -x 쪽). 그래서 **끊지 않은 탄젠트는
+  두 각도가 같다** — 화면의 "한 직선" 과 숫자가 어긋나지 않는다.
+- **Break**: 좌우 핸들이 따로 논다. 끄면 out 각도를 기준으로 다시 한 직선에 맞춘다.
+  화면에서도 **끊긴 핸들은 빈 원, 이어진 핸들은 채운 원**이다.
+- **Length**: 핸들이 뻗는 거리(0~`MAX_TANGENT_LENGTH`=2.0). 길수록 커브를 세게 끈다.
+  끊지 않아도 **길이는 좌우가 따로** 논다(마야의 weighted tangent 와 같은 감각).
+- **Auto**: 그 포인트를 자동 탄젠트(이웃을 보고 매끄럽게)로 되돌린다. 새로 찍은 포인트와
+  프리셋을 누른 뒤에는 전부 자동 탄젠트로 시작한다.
+
+> **커브는 언제나 함수로 남는다.** 핸들을 아무리 길게 빼도 x 가 되돌아가지 않도록, 평가할 때
+> 제어점 x 를 `x0 <= cx0 <= cx1 <= x1` 로 가둔다. 그래서 "한 x 에 값이 둘" 인 상태가 생기지 않는다.
+
+```python
+panel.set_selected_index(1)
+panel.curve.set_tangent(1, falloff_curve.SIDE_OUT, angle=-30.0, length=0.2)
+panel.curve.break_tangent(1, True)      # 좌우 독립
+panel.curve.reset_tangent(1)            # 자동으로
+pts, tans = panel.points(), panel.tangents()
+falloff_curve.evaluate(pts, "bezier", 0.4, tans)
+```
+
+**비용**: 베지어는 x 로 t 를 되찾느라 이분법(24회)을 돈다 — 25,000회 평가에 **0.29s**
+(linear 0.05s). Expand Bind 처럼 정점마다 부르는 곳에서도 체감되지 않지만, 다른 보간보다
+6배쯤 비싸다는 것은 알고 쓰는 편이 좋다.
+
+---
+
 ## 3. 모델은 따로 산다 — `Framework.core.falloff_curve`
 
 커브 값 계산은 **Qt 도 maya 도 모르는 순수 파이썬 모듈**이 한다.
@@ -103,11 +143,22 @@ falloff_curve.sample(points, interp, 64)      # [(t, value), ...] 그리기용
 falloff_curve.normalize_points(points)        # x 오름차순 + 0~1 로 정리
 falloff_curve.preset_points("Ease In")        # (포인트, 보간)
 falloff_curve.is_flat(points)                 # 처음부터 끝까지 1.0 인가
+
+# 탄젠트(bezier 에서만 쓰인다)
+falloff_curve.evaluate(points, "bezier", t, tangents)
+falloff_curve.resolve_tangents(points, tangents)   # 자동 탄젠트까지 풀어 준 (in, out, broken)
+falloff_curve.set_tangent(points, tangents, i, side, angle=, length=)
+falloff_curve.break_tangent(points, tangents, i, True)
+falloff_curve.reset_tangent(tangents, i)
+falloff_curve.normalize_curve(points, tangents)    # **둘을 같이** 정렬(짝이 어긋나지 않게)
 ```
+
+> `normalize_points` 는 x 로 정렬한다. 탄젠트를 따로 정렬하면 **짝이 어긋나므로**, 둘을 같이
+> 다루는 곳은 반드시 `normalize_curve` 를 쓴다.
 
 | 상수 | 값 |
 |------|-----|
-| `INTERPOLATIONS` | `none` / `linear` / `smooth` / `spline` (마야 gradient control 과 같은 의미) |
+| `INTERPOLATIONS` | `none` / `linear` / `smooth` / `spline` (마야 gradient control 과 같은 의미) + **`bezier`**(탄젠트) |
 | `PRESETS` | Linear · Smooth · Ease In · Ease Out · Spike · **Solid**(= 평평한 1.0) |
 | `DEFAULT_POINTS` | `[(0,1), (1,0)]` — 오른쪽으로 갈수록 0 (감쇠용 기본) |
 | `FLAT_POINTS` | `[(0,1), (1,1)]` — **곱해도 아무것도 안 바뀌는** 커브 |
@@ -145,3 +196,6 @@ falloff_curve.is_flat(points)                 # 처음부터 끝까지 1.0 인�
 |----|--------|
 | `A00275_skinTool_V01` | Bind > Expand Bind — Falloff curve (패널) |
 | `A00410_SecondaryMotion` | Physics — Stiffness / Damping / World Damp 의 `Graph` 팝업 |
+
+두 툴 모두 커브를 저장/전달할 때 **탄젠트를 함께** 나른다
+(`expand_bind(curve_tangents=...)`, A00410 의 `(points, interp, tangents)` spec).

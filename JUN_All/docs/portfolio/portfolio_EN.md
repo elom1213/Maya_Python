@@ -381,6 +381,11 @@ Default Distance attribute (driver signal x)
   point. The numeric path shares its range rules with dragging (ends pinned in x, middle points held
   between their neighbours) and clamped values are written back into the field, so it is visible on
   screen why a value did not take.
+  Segments between points can also be **curved via tangents (Bezier)** — handles are dragged or
+  given exact angle/length, and `Break` frees the two sides. Because the angle is defined along the
+  direction each handle points, **an unbroken tangent always reads the same angle on both sides**, so
+  the straight line on screen and the numbers agree. Control-point x is held inside its segment, so
+  however far a handle is pulled the curve stays a function.
 - **Riding on a looping animation (`Loop`)** — adding secondary motion to a cycling range (a walk,
   an idle) **breaks at the seam**: the solver starts at rest on the first frame, so even with a
   perfectly cyclic source the first frame has zero swing while the last is still swinging. The range

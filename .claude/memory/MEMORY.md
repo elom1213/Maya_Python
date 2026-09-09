@@ -75,7 +75,7 @@
 - [Framework expand widget](framework-expand-widget.md) — MOD_expand_qt_v01: 본문을 별도 창으로 빼는 Expand 패널. **복제 말고 이동**, 호스트 창 Close 는 위젯이 감시
 - [Framework filter widget](framework-filter-widget.md) — MOD_filter_qt_v01: 검색 있는 툴은 전부 이 공용 Filter 로 통일 중. v2 에 **QTreeWidget 모드** 추가([[wip-a00330-set-rename]])
 - [Framework mirror tokens](framework-mirror-tokens.md) — 좌/우 미러 토큰은 `Framework/rules/mirror_tokens.json` **공용 한 파일**. 이름 미러링은 **경계 매칭**(`arm_lower`·`sample_lip_l_ctl` 오탐 차단)
-- [Framework falloff curve](framework-falloff-curve-widget.md) — MOD_falloffCurve_qt_v01 + core/falloff_curve: 커브·Interpolation·Presets 공용 위젯(캔버스/패널/비모달 팝업). **가로축의 뜻은 툴이 정한다**
+- [Framework falloff curve](framework-falloff-curve-widget.md) — MOD_falloffCurve_qt_v01 + core/falloff_curve: 커브·Interpolation·Presets 공용 위젯(캔버스/패널/비모달 팝업). **가로축의 뜻은 툴이 정한다** · 탄젠트(Bezier)는 각도를 '핸들 방향' 으로 재야 끊지 않은 양쪽이 같아진다
 - [Framework progress popup](framework-progress-widget.md) — MOD_progress_qt_v01: 오래 걸리는 작업의 0~100% 게이지 팝업. core 는 콜백만 받고, **값 갱신까지 스로틀하면 마지막 퍼센트가 화면에 안 올라간다**
 - [Framework timeRange widget](framework-timerange-widget.md) — MOD_timeRange_qt_v01: Start/End 입력 + Get Current / Get Sel Range 공용 위젯
 - [QTreeWidgetItem checkable default](qtreewidgetitem-checkable-default-flag.md) — ItemIsUserCheckable 은 기본 ON, 플래그로 체크 가능 판정 금지

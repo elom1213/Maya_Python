@@ -1,5 +1,23 @@
 # Changelog — A00410_SecondaryMotion
 
+## v01.07 (2026-09-09)
+
+- **[Add] `Graph` 커브에 탄젠트(Bezier)** — `Interpolation` 을 **Bezier** 로 두면 포인트마다
+  탄젠트 핸들이 붙어 포인트 사이가 **곡선**이 된다. 전에는 포인트 사이가 직선(또는 고정된
+  smooth/spline)뿐이라 "루트 근처는 천천히 떨어지다가 팁에서 급히 0.1 로" 같은 감쇠를 만들 수 없었다.
+  - 핸들은 **드래그**로도, `Tangent` 줄의 **각도 / 길이** 숫자로도 조절한다.
+  - **`Break`** 로 좌우 핸들을 독립시킨다(끄면 한 직선 유지, 길이는 좌우 따로).
+  - **`Auto`** 로 그 포인트를 자동 탄젠트로 되돌린다.
+- **[Change] 커브 spec 이 `(points, interp, tangents)`** 로 나간다. `curve_multipliers()` 는
+  옛 2-튜플도 그대로 받는다(무회귀).
+- 공용 위젯 `Framework/qt/MOD_falloffCurve_qt_v01.py` + 모델 `Framework/core/falloff_curve.py`
+  의 기능이라 `A00275_skinTool_V01` 도 함께 얻는다.
+
+### 검증 (mayapy 헤드리스 — 46개 항목 전부 통과, 기존 스위트 125항목 무회귀)
+
+- 탄젠트가 **솔버 배수를 실제로 바꾸고**(같은 포인트여도 linear 와 다름), 양 끝 배수는 포인트 값 그대로.
+- 끊은 탄젠트가 `SolverParams` 까지 그대로 전달된다.
+
 ## v01.06 (2026-09-09)
 
 - **[Add] `Graph` 커브 팝업에서 포인트 값을 숫자로 입력** — 커브의 포인트를 클릭해 고르면

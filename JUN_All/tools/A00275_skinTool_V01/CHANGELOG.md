@@ -1,5 +1,24 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.21 (2026-09-09)
+
+**[Add] Falloff curve 에 탄젠트(Bezier) — 포인트 사이를 곡선으로.**
+
+`Interpolation` 에 **Bezier** 가 생겼다. 고르면 포인트마다 탄젠트 핸들이 붙어 구간이 곡선이 되고,
+핸들은 드래그로도 `Tangent` 줄의 **각도 / 길이** 숫자로도 조절한다. **`Break`** 로 좌우 핸들을
+독립시키고(끄면 한 직선), **`Auto`** 로 자동 탄젠트로 되돌린다.
+
+- 기존 보간(None/Linear/Smooth/Spline)은 탄젠트를 아예 보지 않으므로 **예전 커브는 그대로**다.
+- `expand_bind()` 가 `curve_tangents=` 를 받아 바인드 계산에도 같은 곡선이 쓰인다 — 화면 모양과
+  실제 웨이트가 어긋나지 않는다.
+- 내부적으로 (포인트, 보간, 탄젠트) 를 **콜러블 하나**로 묶어 넘긴다(`_curve_fn`). 커브를 이루는
+  값이 셋이 되면서 내부 함수마다 인자를 셋씩 나르던 것을 한 군데로 모았다.
+- 공용 위젯([Framework_MOD_falloffCurve_qt](../../docs/Framework_MOD_falloffCurve_qt.md))의
+  기능이라 `A00410_SecondaryMotion` 의 커브 팝업도 같이 얻었다.
+
+**비용**: 베지어 평가는 x 로 t 를 되찾느라 이분법을 돈다 — 25,000회에 0.29s(linear 0.05s).
+정점마다 부르는 Expand Bind 에서도 체감되지 않지만 다른 보간보다 6배쯤 비싸다.
+
 ## v01.20 (2026-09-09)
 
 **[Add] Expand Bind 의 Falloff curve — 포인트 값을 숫자로 입력.**

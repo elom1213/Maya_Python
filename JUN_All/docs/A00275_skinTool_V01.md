@@ -594,7 +594,10 @@ Surface / Topology 의 탐색은 **저장된 버텍스 집합 안으로 제한**
 - **드래그**로 모양 조절, **더블클릭**으로 포인트 추가, **우클릭**으로 삭제(양 끝은 세로로만 이동).
 - **`Point` 줄** (v01.20~) : 포인트를 클릭해 고르면 **X · Y 를 숫자로 직접** 넣는다
   (`Point [2 / 4]  X [0.250]  Y [0.900]`). 양 끝 포인트는 x 가 고정이라 X 칸이 꺼진다.
-- `Interpolation` : `None`(계단) / `Linear` / `Smooth` / `Spline`.
+- `Interpolation` : `None`(계단) / `Linear` / `Smooth` / `Spline` / **`Bezier`**(v01.21~).
+- **`Bezier` 를 고르면 포인트마다 탄젠트 핸들**이 붙어 포인트 사이가 곡선이 된다. 핸들은
+  드래그로도, `Tangent` 줄의 **각도 / 길이** 숫자로도 조절한다. **`Break`** 로 좌우 핸들을
+  독립시키고, **`Auto`** 로 자동 탄젠트로 되돌린다.
 - `Curve presets` : Linear / Smooth / Ease In / Ease Out / Spike / Solid.
 - 그리기와 실제 계산이 **같은 함수**(`Framework/core/falloff_curve.py`)를 쓰므로 화면 모양과
   결과가 어긋나지 않는다.

@@ -1719,6 +1719,7 @@ class MainWindow(QWidget):
                     mode=self._eb_mode(),
                     curve_points=self.eb_curve.points(),
                     curve_interp=self.eb_curve.interpolation(),
+                    curve_tangents=self.eb_curve.tangents(),
                     loop_ids=self.eb_loop,
                     loop_closed=self.eb_loop_closed,
                     across_radius=self.sb_eb_across.value(),

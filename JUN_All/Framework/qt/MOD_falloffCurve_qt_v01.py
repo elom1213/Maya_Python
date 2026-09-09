@@ -11,6 +11,9 @@ JUN_mod_falloffCurve_qt_v01 - 재사용 PySide **falloff 커브** 편집기.
   - 포인트를 클릭해 고르면 **X / Y 를 숫자로 직접 입력**할 수 있다(패널의 `Point` 줄).
     드래그로는 "대충 0.1" 을 맞추기 어렵다 — 정확한 값이 필요한 작업(예: A00410 에서
     팁 배수를 정확히 0.1 로)에서는 숫자 입력이 유일한 방법이다.
+  - `Interpolation` 을 **Bezier** 로 두면 포인트마다 **탄젠트 핸들**이 붙어 구간이 곡선이
+    된다. 핸들은 드래그로도, `Tangent` 줄의 **각도 / 길이** 숫자로도 조절한다.
+    `Break` 를 켜면 좌우 핸들이 **따로 논다**(안 켜면 한 직선을 유지하고 길이만 따로).
 
 값 계산은 **`Framework.core.falloff_curve`** 가 한다. 위젯(그리기)과 툴의 계산 로직이
 **같은 함수**를 써야 화면 모양과 실제 결과가 어긋나지 않는다. 이 파일은 그리기/입력만 맡는다.
@@ -73,14 +76,18 @@ class JUN_mod_falloffCurve_qt_v01(QWidget):
     changed = Signal()
     selectionChanged = Signal()
 
-    def __init__(self, parent=None, points=None, interp=None, tooltip=None):
+    def __init__(self, parent=None, points=None, interp=None, tangents=None,
+                 tooltip=None):
         super(JUN_mod_falloffCurve_qt_v01, self).__init__(parent)
 
-        self._points = falloff_curve.normalize_points(
-            points if points is not None else falloff_curve.DEFAULT_POINTS)
+        self._points, self._tangents = falloff_curve.normalize_curve(
+            points if points is not None else falloff_curve.DEFAULT_POINTS,
+            tangents)
         self._interp = interp if interp in falloff_curve.INTERPOLATIONS \
             else falloff_curve.DEFAULT_INTERP
         self._drag_index = None
+        # 탄젠트 핸들을 끌고 있는 중이면 (포인트 인덱스, 'in'/'out').
+        self._drag_handle = None
         # 클릭으로 고른 포인트. 드래그가 끝나도 남는다(숫자로 계속 편집하기 위해).
         self._selected = None
 
@@ -92,19 +99,33 @@ class JUN_mod_falloffCurve_qt_v01(QWidget):
             "Falloff curve: X = normalised axis, Y = value.\n"
             "Drag a point to reshape, double-click to add, right-click to remove.\n"
             "The first and last points only move vertically.\n"
-            "Click a point to select it, then type exact X / Y values below."))
+            "Click a point to select it, then type exact X / Y values below.\n"
+            "Interpolation 'Bezier': drag the tangent handles of the selected point, "
+            "or set their angle / length below."))
 
     # ------------------------------------------------------------ 값 API
 
     def points(self):
         return [tuple(p) for p in self._points]
 
+    def tangents(self):
+        """포인트와 나란한 탄젠트 목록(항목은 None 이거나 dict 사본)."""
+        return [dict(t) if isinstance(t, dict) else None for t in self._tangents]
+
     def interpolation(self):
         return self._interp
 
-    def set_points(self, points, quiet=False):
-        self._points = falloff_curve.normalize_points(points)
+    def set_points(self, points, quiet=False, tangents=None):
+        self._points, self._tangents = falloff_curve.normalize_curve(
+            points, tangents if tangents is not None else self._tangents)
         self._clamp_selection()
+        self.update()
+        if not quiet:
+            self.changed.emit()
+
+    def set_tangents(self, tangents, quiet=False):
+        self._points, self._tangents = falloff_curve.normalize_curve(
+            self._points, tangents)
         self.update()
         if not quiet:
             self.changed.emit()
@@ -117,9 +138,14 @@ class JUN_mod_falloffCurve_qt_v01(QWidget):
         if not quiet:
             self.changed.emit()
 
-    def set_curve(self, points, interp, quiet=False):
-        """포인트와 보간을 **한 번에** 바꾼다(시그널도 한 번만 나간다)."""
-        self._points = falloff_curve.normalize_points(points)
+    def set_curve(self, points, interp, quiet=False, tangents=None):
+        """포인트 · 보간 · 탄젠트를 **한 번에** 바꾼다(시그널도 한 번만 나간다).
+
+        `tangents` 를 주지 않으면 **자동 탄젠트로 되돌린다** — 프리셋처럼 모양이 통째로
+        바뀌는 경우 옛 핸들을 들고 있으면 엉뚱한 커브가 된다.
+        """
+        self._points, self._tangents = falloff_curve.normalize_curve(
+            points, tangents)
         if interp in falloff_curve.INTERPOLATIONS:
             self._interp = interp
         self._clamp_selection()
@@ -132,10 +158,16 @@ class JUN_mod_falloffCurve_qt_v01(QWidget):
         self.set_curve(points, interp, quiet=quiet)
 
     def evaluate(self, t):
-        return falloff_curve.evaluate(self._points, self._interp, t)
+        return falloff_curve.evaluate(self._points, self._interp, t,
+                                      self._tangents)
 
     def is_flat(self, value=1.0):
-        return falloff_curve.is_flat(self._points, self._interp, value)
+        return falloff_curve.is_flat(self._points, self._interp, value,
+                                     tangents=self._tangents)
+
+    def uses_tangents(self):
+        """지금 보간 방식이 탄젠트를 쓰는가(= 핸들 UI 를 보여야 하는가)."""
+        return self._interp == falloff_curve.INTERP_BEZIER
 
     # ------------------------------------------------------- 포인트 선택 / 숫자 편집
 
@@ -206,6 +238,63 @@ class JUN_mod_falloffCurve_qt_v01(QWidget):
             self.changed.emit()
         return (new_x, new_y)
 
+    # ------------------------------------------------------- 탄젠트
+
+    def tangent_polar(self, index, side):
+        """그 포인트 핸들의 (각도 deg, 길이). 자동 탄젠트도 실제 값으로 풀어서 준다."""
+        if index is None or not (0 <= index < len(self._points)):
+            return (0.0, 0.0)
+        res = falloff_curve.resolve_tangents(self._points, self._tangents)
+        vec = res[index][0] if side == falloff_curve.SIDE_IN else res[index][1]
+        return falloff_curve.tangent_polar(vec, side)
+
+    def is_tangent_broken(self, index):
+        if index is None or not (0 <= index < len(self._points)):
+            return False
+        return falloff_curve.resolve_tangents(self._points, self._tangents)[index][2]
+
+    def set_tangent(self, index, side, angle=None, length=None, quiet=False):
+        """핸들을 각도/길이로 지정. 끊지 않았으면 반대쪽 각도도 따라 돈다."""
+        self._tangents = falloff_curve.set_tangent(
+            self._points, self._tangents, index, side, angle=angle, length=length)
+        self.update()
+        if not quiet:
+            self.changed.emit()
+
+    def break_tangent(self, index, broken=True, quiet=False):
+        """좌우 핸들을 따로 놀게(또는 다시 한 직선으로) 만든다."""
+        self._tangents = falloff_curve.break_tangent(
+            self._points, self._tangents, index, broken)
+        self.update()
+        if not quiet:
+            self.changed.emit()
+
+    def reset_tangent(self, index, quiet=False):
+        """그 포인트를 자동 탄젠트로 되돌린다."""
+        self._tangents = falloff_curve.reset_tangent(self._tangents, index)
+        self.update()
+        if not quiet:
+            self.changed.emit()
+
+    def _handle_pos(self, index, side):
+        """핸들 끝의 커브 좌표."""
+        res = falloff_curve.resolve_tangents(self._points, self._tangents)
+        vec = res[index][0] if side == falloff_curve.SIDE_IN else res[index][1]
+        x, y = self._points[index]
+        return (x + vec[0], y + vec[1])
+
+    def _handle_at(self, pos):
+        """화면 좌표에서 잡히는 핸들 -> (인덱스, side). 고른 포인트의 것만 잡는다."""
+        if not self.uses_tangents() or self._selected is None:
+            return None
+        for side in (falloff_curve.SIDE_OUT, falloff_curve.SIDE_IN):
+            hx, hy = self._handle_pos(self._selected, side)
+            screen = self._to_screen(hx, hy)
+            if (abs(screen.x() - pos.x()) <= GRAB_RADIUS and
+                    abs(screen.y() - pos.y()) <= GRAB_RADIUS):
+                return (self._selected, side)
+        return None
+
     def _clamp_selection(self):
         """포인트 목록이 바뀌면(프리셋 등) 선택이 범위를 벗어날 수 있다."""
         if self._selected is not None and self._selected >= len(self._points):
@@ -263,7 +352,8 @@ class JUN_mod_falloffCurve_qt_v01(QWidget):
             painter.drawLine(self._to_screen(0.0, f), self._to_screen(1.0, f))
 
         # 커브 + 아래 채움
-        samples = falloff_curve.sample(self._points, self._interp, SAMPLE_COUNT)
+        samples = falloff_curve.sample(self._points, self._interp, SAMPLE_COUNT,
+                                       self._tangents)
         path = QPainterPath()
         fill = QPainterPath()
         fill.moveTo(self._to_screen(0.0, 0.0))
@@ -283,6 +373,23 @@ class JUN_mod_falloffCurve_qt_v01(QWidget):
         painter.fillPath(fill, shade)
         painter.setPen(QPen(accent, 2))
         painter.drawPath(path)
+
+        # 탄젠트 핸들 — 고른 포인트의 것만 그린다(전부 그리면 화면이 시끄럽다).
+        if self.uses_tangents() and self._selected is not None:
+            painter.setPen(QPen(text.darker(120), 1, Qt.DashLine))
+            center = self._to_screen(*self._points[self._selected])
+            ends = []
+            for side in (falloff_curve.SIDE_IN, falloff_curve.SIDE_OUT):
+                hx, hy = self._handle_pos(self._selected, side)
+                end = self._to_screen(hx, hy)
+                ends.append(end)
+                painter.drawLine(center, end)
+            broken = self.is_tangent_broken(self._selected)
+            # 끊긴 탄젠트는 빈 원, 이어진 탄젠트는 채운 원 — 상태가 한눈에 보여야 한다.
+            painter.setPen(QPen(accent, 1))
+            painter.setBrush(QBrush(Qt.NoBrush) if broken else QBrush(accent))
+            for end in ends:
+                painter.drawEllipse(end, 4.0, 4.0)
 
         # 컨트롤 포인트. 고른 포인트는 채우고 한 칸 크게 그린다 — 숫자 입력이
         # **어느 포인트를 건드리는지**가 화면에서 보여야 한다.
@@ -309,6 +416,7 @@ class JUN_mod_falloffCurve_qt_v01(QWidget):
             # 끝점 두 개는 남겨 둔다(커브가 사라지면 편집 불가).
             if index is not None and 0 < index < len(self._points) - 1:
                 del self._points[index]
+                del self._tangents[index]
                 if self._selected is not None:
                     if self._selected == index:
                         self._selected = None
@@ -320,6 +428,12 @@ class JUN_mod_falloffCurve_qt_v01(QWidget):
             return
 
         if event.button() == Qt.LeftButton:
+            # 핸들이 포인트보다 먼저다 — 겹칠 때 핸들을 잡으려는 의도가 더 흔하다.
+            handle = self._handle_at(pos)
+            if handle is not None:
+                self._drag_handle = handle
+                self._drag_index = None
+                return
             self._drag_index = index
             if index != self._selected:
                 self._selected = index
@@ -335,7 +449,9 @@ class JUN_mod_falloffCurve_qt_v01(QWidget):
             return
         x, y = self._to_value(pos)
         self._points.append((x, y))
-        self._points = falloff_curve.normalize_points(self._points)
+        self._tangents.append(None)          # 새 포인트는 자동 탄젠트로 시작
+        self._points, self._tangents = falloff_curve.normalize_curve(
+            self._points, self._tangents)
         self._drag_index = self._points.index((x, y)) if (x, y) in self._points else None
         # 방금 만든 포인트를 고른 상태로 둔다 — 바로 숫자로 다듬을 수 있게.
         self._selected = self._drag_index
@@ -344,9 +460,19 @@ class JUN_mod_falloffCurve_qt_v01(QWidget):
         self.changed.emit()
 
     def mouseMoveEvent(self, event):
+        pos = event.position() if hasattr(event, "position") else event.pos()
+
+        # 탄젠트 핸들 드래그 — 마우스까지의 벡터가 그대로 핸들이 된다.
+        if self._drag_handle is not None:
+            index, side = self._drag_handle
+            hx, hy = self._to_value(QPointF(pos))
+            px, py = self._points[index]
+            angle, length = falloff_curve.tangent_polar((hx - px, hy - py), side)
+            self.set_tangent(index, side, angle=angle, length=length)
+            return
+
         if self._drag_index is None:
             return
-        pos = event.position() if hasattr(event, "position") else event.pos()
         x, y = self._to_value(QPointF(pos))
 
         index = self._drag_index
@@ -365,6 +491,9 @@ class JUN_mod_falloffCurve_qt_v01(QWidget):
         self.changed.emit()
 
     def mouseReleaseEvent(self, event):
+        if self._drag_handle is not None:
+            self._drag_handle = None
+            self.update()
         if self._drag_index is not None:
             self._drag_index = None
             self.update()
@@ -379,14 +508,19 @@ class JUN_mod_falloffCurvePanel_qt_v01(QWidget):
     `Point` 줄은 캔버스에서 고른 포인트의 **X / Y 를 숫자로** 편집한다. 드래그로는
     "정확히 0.1" 을 맞출 수 없으므로, 값이 결과에 그대로 곱해지는 툴에서는 이쪽이 본길이다.
     아무것도 안 골랐으면 회색으로 꺼져 있다 — "비활성인데 값은 쓰인다" 는 상태를 만들지 않는다.
+
+    `Tangent` 줄은 **Bezier 보간일 때만 나타난다** — 다른 보간은 탄젠트를 아예 안 보므로,
+    보이는데 아무 일도 안 하는 칸을 두지 않는다. `Break` 로 좌우를 끊고, In / Out 의
+    **각도와 길이**를 숫자로 준다.
     """
 
     changed = Signal()
     selectionChanged = Signal()
 
     def __init__(self, parent=None, title="Falloff curve", points=None, interp=None,
-                 presets=None, show_title=True, show_interp=True, show_presets=True,
-                 show_point_fields=True, decimals=3, tooltip=None):
+                 tangents=None, presets=None, show_title=True, show_interp=True,
+                 show_presets=True, show_point_fields=True, show_tangent_fields=True,
+                 decimals=3, tooltip=None):
         super(JUN_mod_falloffCurvePanel_qt_v01, self).__init__(parent)
 
         self._presets = list(presets) if presets else list(falloff_curve.PRESETS)
@@ -402,7 +536,7 @@ class JUN_mod_falloffCurvePanel_qt_v01(QWidget):
             lbl.setAlignment(Qt.AlignTop)
             curve_row.addWidget(lbl)
         self.curve = JUN_mod_falloffCurve_qt_v01(
-            points=points, interp=interp, tooltip=tooltip)
+            points=points, interp=interp, tangents=tangents, tooltip=tooltip)
         curve_row.addWidget(self.curve, 1)
         lay.addLayout(curve_row)
 
@@ -437,6 +571,60 @@ class JUN_mod_falloffCurvePanel_qt_v01(QWidget):
             point_row.addStretch(1)
             lay.addLayout(point_row)
 
+        # ---- Tangent : Bezier 보간일 때만 보인다
+        self.chk_break = None
+        self.sb_in_angle = None
+        self.sb_in_len = None
+        self.sb_out_angle = None
+        self.sb_out_len = None
+        self._tangent_rows = []
+        if show_tangent_fields:
+            head = QHBoxLayout()
+            head.addWidget(QLabel("Tangent"))
+            self.chk_break = QCheckBox("Break")
+            self.chk_break.setToolTip(
+                "Let the two handles of this point move independently.\n"
+                "Off: they stay on one straight line (lengths still separate).")
+            self.chk_break.toggled.connect(self._on_break)
+            head.addWidget(self.chk_break)
+            self.btn_tangent_auto = QPushButton("Auto")
+            self.btn_tangent_auto.setMaximumWidth(56)
+            self.btn_tangent_auto.setToolTip(
+                "Back to the automatic tangent for this point (follows its neighbours).")
+            self.btn_tangent_auto.clicked.connect(self._on_tangent_auto)
+            head.addWidget(self.btn_tangent_auto)
+            head.addStretch(1)
+            lay.addLayout(head)
+            self._tangent_rows.append(head)
+
+            for side_label in ("In", "Out"):
+                row = QHBoxLayout()
+                lbl = QLabel(side_label)
+                lbl.setMinimumWidth(28)
+                row.addWidget(lbl)
+                row.addWidget(QLabel("Angle"))
+                sb_a = self._make_angle_spin()
+                row.addWidget(sb_a)
+                row.addWidget(QLabel("Length"))
+                sb_l = self._make_length_spin(decimals)
+                row.addWidget(sb_l)
+                row.addStretch(1)
+                lay.addLayout(row)
+                self._tangent_rows.append(row)
+                if side_label == "In":
+                    self.sb_in_angle, self.sb_in_len = sb_a, sb_l
+                else:
+                    self.sb_out_angle, self.sb_out_len = sb_a, sb_l
+
+            self.sb_in_angle.valueChanged.connect(
+                lambda v: self._on_tangent(falloff_curve.SIDE_IN, angle=v))
+            self.sb_in_len.valueChanged.connect(
+                lambda v: self._on_tangent(falloff_curve.SIDE_IN, length=v))
+            self.sb_out_angle.valueChanged.connect(
+                lambda v: self._on_tangent(falloff_curve.SIDE_OUT, angle=v))
+            self.sb_out_len.valueChanged.connect(
+                lambda v: self._on_tangent(falloff_curve.SIDE_OUT, length=v))
+
         self.cmb_interp = None
         if show_interp:
             interp_row = QHBoxLayout()
@@ -447,8 +635,7 @@ class JUN_mod_falloffCurvePanel_qt_v01(QWidget):
             self.cmb_interp.setCurrentIndex(
                 list(falloff_curve.INTERPOLATIONS).index(self.curve.interpolation()))
             self.cmb_interp.currentIndexChanged.connect(
-                lambda i: self.curve.set_interpolation(
-                    falloff_curve.INTERPOLATIONS[i]))
+                lambda i: self._on_interp_picked(i))
             interp_row.addWidget(self.cmb_interp)
             interp_row.addStretch(1)
             lay.addLayout(interp_row)
@@ -468,6 +655,31 @@ class JUN_mod_falloffCurvePanel_qt_v01(QWidget):
         self.curve.changed.connect(self._on_curve_changed)
         self.curve.selectionChanged.connect(self._on_selection_changed)
         self._sync_point_fields()
+        self._sync_tangent_fields()
+
+    @staticmethod
+    def _make_angle_spin():
+        sb = QDoubleSpinBox()
+        sb.setDecimals(1)
+        sb.setRange(-180.0, 180.0)
+        sb.setSingleStep(5.0)
+        sb.setSuffix(" deg")
+        sb.setMaximumWidth(92)
+        sb.setKeyboardTracking(False)
+        sb.setToolTip("Direction the handle points, measured along the handle itself.\n"
+                      "Unbroken tangents keep both angles equal.")
+        return sb
+
+    @staticmethod
+    def _make_length_spin(decimals):
+        sb = QDoubleSpinBox()
+        sb.setDecimals(decimals)
+        sb.setRange(0.0, falloff_curve.MAX_TANGENT_LENGTH)
+        sb.setSingleStep(0.05)
+        sb.setMaximumWidth(78)
+        sb.setKeyboardTracking(False)
+        sb.setToolTip("How far the handle reaches - longer pulls the curve harder.")
+        return sb
 
     @staticmethod
     def _make_spin(decimals):
@@ -486,6 +698,13 @@ class JUN_mod_falloffCurvePanel_qt_v01(QWidget):
     def points(self):
         return self.curve.points()
 
+    def tangents(self):
+        return self.curve.tangents()
+
+    def set_tangents(self, tangents, quiet=False):
+        self.curve.set_tangents(tangents, quiet=quiet)
+        self._sync_tangent_fields()
+
     def interpolation(self):
         return self.curve.interpolation()
 
@@ -497,9 +716,10 @@ class JUN_mod_falloffCurvePanel_qt_v01(QWidget):
         self.curve.set_interpolation(interp, quiet=quiet)
         self._sync_combo()
 
-    def set_curve(self, points, interp, quiet=False):
-        self.curve.set_curve(points, interp, quiet=quiet)
+    def set_curve(self, points, interp, quiet=False, tangents=None):
+        self.curve.set_curve(points, interp, quiet=quiet, tangents=tangents)
         self._sync_combo()
+        self._sync_tangent_fields()
 
     def set_preset(self, name, quiet=False):
         for label, points, interp in self._presets:
@@ -535,11 +755,78 @@ class JUN_mod_falloffCurvePanel_qt_v01(QWidget):
     def _on_curve_changed(self):
         self._sync_combo()
         self._sync_point_fields()
+        self._sync_tangent_fields()
         self.changed.emit()
 
     def _on_selection_changed(self):
         self._sync_point_fields()
+        self._sync_tangent_fields()
         self.selectionChanged.emit()
+
+    # ------------------------------------------------------------ 탄젠트
+
+    def _on_break(self, checked):
+        if self._updating:
+            return
+        index = self.curve.selected_index()
+        if index is None:
+            return
+        self.curve.break_tangent(index, checked)
+        self._sync_tangent_fields()
+
+    def _on_tangent_auto(self):
+        index = self.curve.selected_index()
+        if index is None:
+            return
+        self.curve.reset_tangent(index)
+        self._sync_tangent_fields()
+
+    def _on_tangent(self, side, angle=None, length=None):
+        if self._updating:
+            return
+        index = self.curve.selected_index()
+        if index is None:
+            return
+        self.curve.set_tangent(index, side, angle=angle, length=length)
+        self._sync_tangent_fields()
+
+    def _sync_tangent_fields(self):
+        """탄젠트 칸을 현재 상태에 맞춘다 + Bezier 가 아니면 줄째로 숨긴다."""
+        if self.chk_break is None:
+            return
+
+        show = self.curve.uses_tangents()
+        for row in self._tangent_rows:
+            for i in range(row.count()):
+                item = row.itemAt(i).widget()
+                if item is not None:
+                    item.setVisible(show)
+        if not show:
+            return
+
+        index = self.curve.selected_index()
+        active = index is not None
+
+        self._updating = True
+        try:
+            self.chk_break.setEnabled(active)
+            self.btn_tangent_auto.setEnabled(active)
+            for sb in (self.sb_in_angle, self.sb_in_len,
+                       self.sb_out_angle, self.sb_out_len):
+                sb.setEnabled(active)
+            if not active:
+                self.chk_break.setChecked(False)
+                return
+
+            self.chk_break.setChecked(self.curve.is_tangent_broken(index))
+            in_a, in_l = self.curve.tangent_polar(index, falloff_curve.SIDE_IN)
+            out_a, out_l = self.curve.tangent_polar(index, falloff_curve.SIDE_OUT)
+            self.sb_in_angle.setValue(in_a)
+            self.sb_in_len.setValue(in_l)
+            self.sb_out_angle.setValue(out_a)
+            self.sb_out_len.setValue(out_l)
+        finally:
+            self._updating = False
 
     def _on_point_x(self, value):
         if self._updating:
@@ -588,6 +875,10 @@ class JUN_mod_falloffCurvePanel_qt_v01(QWidget):
         finally:
             self._updating = False
 
+    def _on_interp_picked(self, index):
+        self.curve.set_interpolation(falloff_curve.INTERPOLATIONS[index])
+        self._sync_tangent_fields()
+
     def _sync_combo(self):
         if self.cmb_interp is None:
             return
@@ -609,8 +900,8 @@ class JUN_mod_falloffCurveDialog_qt_v01(QDialog):
     changed = Signal()
 
     def __init__(self, parent=None, title="Falloff curve", points=None, interp=None,
-                 reset_points=None, reset_interp=None, info="", presets=None,
-                 size=(440, 390), tooltip=None):
+                 tangents=None, reset_points=None, reset_interp=None, info="",
+                 presets=None, size=(440, 470), tooltip=None):
         super(JUN_mod_falloffCurveDialog_qt_v01, self).__init__(parent)
 
         self._reset_points = list(
@@ -631,8 +922,8 @@ class JUN_mod_falloffCurveDialog_qt_v01(QDialog):
             lay.addWidget(lbl)
 
         self.panel = JUN_mod_falloffCurvePanel_qt_v01(
-            title="", points=points, interp=interp, presets=presets,
-            show_title=False, tooltip=tooltip)
+            title="", points=points, interp=interp, tangents=tangents,
+            presets=presets, show_title=False, tooltip=tooltip)
         self.panel.changed.connect(self.changed.emit)
         lay.addWidget(self.panel, 1)
 
@@ -652,11 +943,17 @@ class JUN_mod_falloffCurveDialog_qt_v01(QDialog):
     def points(self):
         return self.panel.points()
 
+    def tangents(self):
+        return self.panel.tangents()
+
+    def set_tangents(self, tangents, quiet=False):
+        self.panel.set_tangents(tangents, quiet=quiet)
+
     def interpolation(self):
         return self.panel.interpolation()
 
-    def set_curve(self, points, interp, quiet=False):
-        self.panel.set_curve(points, interp, quiet=quiet)
+    def set_curve(self, points, interp, quiet=False, tangents=None):
+        self.panel.set_curve(points, interp, quiet=quiet, tangents=tangents)
 
     def evaluate(self, t):
         return self.panel.evaluate(t)

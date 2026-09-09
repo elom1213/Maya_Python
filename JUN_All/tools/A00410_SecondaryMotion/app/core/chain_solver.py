@@ -83,8 +83,9 @@ class SolverParams(object):
         self.fps = float(fps) or REF_FPS
         # True 면 구간을 사이클로 보고 정상상태를 구한다(solve() 가 solve_loop 로 넘긴다).
         self.loop = bool(loop)
-        # 체인 위치별 배수 커브. 각각 `(points, interp)` 또는 None(=평평한 1.0).
-        # points 는 [(x, y), ...] 정규화 좌표 — `Framework.core.falloff_curve` 형식.
+        # 체인 위치별 배수 커브. 각각 `(points, interp)` / `(points, interp, tangents)`
+        # 또는 None(=평평한 1.0). `Framework.core.falloff_curve` 형식이고, tangents 는
+        # 보간이 bezier 일 때만 쓰인다(옛 2-튜플도 그대로 받는다).
         self.stiffness_curve = stiffness_curve
         self.damping_curve = damping_curve
         self.world_curve = world_curve
@@ -200,11 +201,14 @@ def curve_multipliers(spec, n):
         return []
     if not spec:
         return [1.0] * n
-    points, interp = spec
+    # (points, interp) / (points, interp, tangents) 둘 다 받는다.
+    points, interp = spec[0], spec[1]
+    tangents = spec[2] if len(spec) > 2 else None
     if not points:
         return [1.0] * n
     denom = float(n - 1) if n > 1 else 1.0
-    return [falloff_curve.evaluate(points, interp, i / denom) for i in range(n)]
+    return [falloff_curve.evaluate(points, interp, i / denom, tangents)
+            for i in range(n)]
 
 
 # --------------------------------------------------------------------- 솔버 본체

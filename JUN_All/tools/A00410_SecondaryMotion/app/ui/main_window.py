@@ -441,7 +441,7 @@ class MainWindow(QWidget):
         self._schedule()
 
     def _curve_spec(self, key):
-        """솔버에 넘길 `(points, interp)`. 팝업이 없거나 평평한 1.0 이면 None.
+        """솔버에 넘길 `(points, interp, tangents)`. 팝업이 없거나 평평한 1.0 이면 None.
 
         평평하면 None 을 주는 것이 중요하다 — 커브 평가를 아예 건너뛰어 **예전 경로와
         완전히 같은 계산**이 되고, 로그/디버깅에서도 '커브 없음' 이 분명해진다.
@@ -449,7 +449,7 @@ class MainWindow(QWidget):
         dlg = self._curve_dialogs.get(key)
         if dlg is None or dlg.is_flat():
             return None
-        return (dlg.points(), dlg.interpolation())
+        return (dlg.points(), dlg.interpolation(), dlg.tangents())
 
     def _params(self):
         return chain_solver.SolverParams(
