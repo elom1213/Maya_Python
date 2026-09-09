@@ -24,6 +24,15 @@
 #
 # 길이 구속이 매 프레임 성립하므로 |p[i+1]-p[i]| == len_i 가 보장되고, 그 덕분에
 # 회전 재구성(pose_builder)이 점 시뮬과 정확히 일치한다(체인이 벌어지지 않는다).
+#
+# 루프(사이클) 모드
+# ----------------
+# 기본 솔브는 **첫 프레임에 정지 상태로 출발**한다. 그래서 구간 애니메이션 자체가 순환해도
+# (첫 프레임 포즈 == 마지막 프레임 포즈) 2차 모션은 첫 프레임에서만 흔들림이 0 이라
+# **이음매에서 튄다**. `params.loop=True` 면 같은 구간을 여러 번 이어 붙여 미리 돌리고
+# (프리롤 = pre-roll) **마지막 한 바퀴만** 결과로 쓴다 — 스프링의 과도응답이 사라진
+# **정상상태(limit cycle)** 라서 첫 프레임과 마지막 프레임의 흔들림이 같아진다.
+# 대신 첫 프레임의 회전값은 더 이상 원본과 같지 않다(그게 루프가 되는 조건이다).
 
 import math
 
@@ -41,7 +50,7 @@ class SolverParams(object):
 
     def __init__(self, stiffness=0.35, damping=0.12, world_damping=0.0,
                  falloff=0.5, gravity=(0.0, 0.0, 0.0), limit_angle=45.0,
-                 blend=1.0, substeps=1, fps=REF_FPS):
+                 blend=1.0, substeps=1, fps=REF_FPS, loop=False):
         self.stiffness = float(stiffness)        # 0~1, 원래 자리로 당기는 힘
         self.damping = float(damping)            # 0~1, 속도 감쇠
         self.world_damping = float(world_damping)  # 0~1, 결과를 원본 쪽으로 끌어당김
@@ -51,17 +60,20 @@ class SolverParams(object):
         self.blend = float(blend)                # 0~1, 결과 강도(0 = 원본과 동일)
         self.substeps = max(1, int(substeps))    # 프레임당 서브스텝
         self.fps = float(fps) or REF_FPS
+        # True 면 구간을 사이클로 보고 정상상태를 구한다(solve() 가 solve_loop 로 넘긴다).
+        self.loop = bool(loop)
 
     def copy(self):
         return SolverParams(self.stiffness, self.damping, self.world_damping,
                             self.falloff, self.gravity, self.limit_angle,
-                            self.blend, self.substeps, self.fps)
+                            self.blend, self.substeps, self.fps, self.loop)
 
     def as_dict(self):
         return dict(stiffness=self.stiffness, damping=self.damping,
                     world_damping=self.world_damping, falloff=self.falloff,
                     gravity=self.gravity, limit_angle=self.limit_angle,
-                    blend=self.blend, substeps=self.substeps, fps=self.fps)
+                    blend=self.blend, substeps=self.substeps, fps=self.fps,
+                    loop=self.loop)
 
 
 # --------------------------------------------------------------------- 벡터 헬퍼
@@ -152,6 +164,9 @@ def _fps_adjust(value, fps):
 def solve(targets, params):
     """강체 FK 위치열 -> 관성이 적용된 위치열.
 
+    `params.loop` 가 True 면 `solve_loop()` 로 넘겨 **사이클 정상상태**를 돌려준다
+    (이 함수의 본체는 `_solve_once`). 호출부는 loop 여부를 신경 쓰지 않아도 된다.
+
     targets : [frame][i] = (x, y, z)  각 프레임의 **원본(강체 FK)** 월드 위치.
               i=0 이 체인 루트이며 루트는 100% 드라이버를 따른다(수정하지 않는다).
     params  : SolverParams
@@ -162,6 +177,13 @@ def solve(targets, params):
     프레임 사이의 뼈 길이는 **그 프레임의 원본 길이**를 쓴다. 체인 자체에 이동
     애니메이션이 있어도(늘었다 줄었다 해도) 그 변화를 그대로 따라간다.
     """
+    if getattr(params, "loop", False):
+        return solve_loop(targets, params)[0]
+    return _solve_once(targets, params)
+
+
+def _solve_once(targets, params):
+    """`solve()` 의 본체 — 첫 프레임에 정지 상태로 출발하는 한 번 풀기."""
     if not targets:
         return []
 
@@ -264,6 +286,111 @@ def solve(targets, params):
         out.append(list(p))
 
     return out
+
+
+# --------------------------------------------------------------------- 루프(사이클)
+
+# 프리롤을 몇 바퀴까지 돌 것인가. 2 -> 4 -> 8 -> 16 으로 배로 늘리며 이음매가 닫힐 때까지
+# 돈다(전부 다시 푸는데도 총비용이 마지막 한 번의 2배를 넘지 않는다).
+LOOP_MAX_CYCLES = 16
+
+# 이음매(첫 프레임 <-> 마지막 프레임) 허용 오차 = 체인 전체 길이 x 이 비율.
+# 절대값으로 두면 씬 스케일(cm/m)에 따라 의미가 달라진다.
+#
+# **위치 오차는 회전 오차보다 관대하게 보이므로 넉넉히 잡으면 안 된다.** 1e-4 로 뒀을 때
+# 위치 이음매는 허용 오차 안이었는데도 회전 키는 0.05deg 벌어졌다(체인을 내려가며 부모의
+# 스윙 델타가 누적된다). 과도응답은 바퀴마다 기하급수로 줄어서 한 바퀴 더 도는 값이
+# 싸므로(2->4 에서 1e-3 -> 1e-9 수준) 애초에 조이는 편이 낫다.
+LOOP_TOL_RATIO = 1e-6
+
+# **입력 애니메이션 자체**가 순환하지 않는다고 볼 기준 = 체인 전체 길이 x 이 비율.
+LOOP_INPUT_TOL_RATIO = 1e-3
+
+
+class LoopInfo(object):
+    """`solve_loop()` 결과 요약. UI 로그용이라 물리에는 관여하지 않는다."""
+
+    def __init__(self, cycles, residual, tolerance, input_gap, input_tolerance):
+        self.cycles = cycles                    # 실제로 돌린 바퀴 수
+        self.residual = residual                # 결과의 이음매 오차(월드 유닛)
+        self.tolerance = tolerance
+        self.input_gap = input_gap              # 입력 첫/끝 프레임 포즈 차이
+        self.input_tolerance = input_tolerance
+
+    @property
+    def converged(self):
+        """이음매가 허용 오차 안으로 닫혔는가."""
+        return self.residual <= self.tolerance
+
+    @property
+    def input_cyclic(self):
+        """입력 애니메이션의 첫/끝 포즈가 같은가(루프의 전제)."""
+        return self.input_gap <= self.input_tolerance
+
+
+def _chain_length(row):
+    """한 프레임의 체인 전체 길이. 허용 오차를 씬 스케일에 맞추는 기준."""
+    total = 0.0
+    for i in range(1, len(row)):
+        a, b = row[i - 1], row[i]
+        total += math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2
+                           + (b[2] - a[2]) ** 2)
+    return total if total > _EPS else 1.0
+
+
+def _max_point_gap(row_a, row_b):
+    """두 포즈(점 목록) 사이의 최대 점 거리."""
+    worst = 0.0
+    for a, b in zip(row_a, row_b):
+        d = math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2
+                      + (b[2] - a[2]) ** 2)
+        if d > worst:
+            worst = d
+    return worst
+
+
+def solve_loop(targets, params, max_cycles=LOOP_MAX_CYCLES):
+    """구간을 **사이클로 보고** 푼다. 반환: (위치열, LoopInfo)
+
+    전제: `targets[0]` 과 `targets[-1]` 이 같은 포즈다(= 사용자가 만든 루프 애니).
+
+    방법은 단순하다 — 같은 구간을 여러 바퀴 이어 붙여 풀고 **마지막 한 바퀴만** 쓴다.
+    스프링의 과도응답(처음 정지 상태에서 출발한 흔들림)이 바퀴를 돌수록 사라지므로,
+    마지막 바퀴는 첫 프레임과 마지막 프레임의 **흔들림 상태가 같은 정상상태**가 된다.
+
+        extended = targets[:-1] * (cycles-1) + targets
+
+    마지막 바퀴의 목표열이 원본 `targets` 와 **정확히 같게** 이어 붙이는 것이 요점이다.
+    그래야 잘라낸 구간의 f 번째가 원본 f 번째 프레임과 1:1 로 맞아 회전 재구성이 어긋나지
+    않는다. 몇 바퀴가 필요한지는 감쇠에 따라 다르므로 이음매 오차를 재서 **닫힐 때까지**
+    2 -> 4 -> 8 로 늘린다(닫히지 않으면 LoopInfo.converged 가 False — UI 가 알린다).
+
+    첫 프레임의 회전값은 더 이상 원본과 같지 않다. 그것이 루프가 되는 조건이다.
+    """
+    n = len(targets)
+    if n < 3:
+        # 프레임이 2개 이하면 사이클을 만들 수 없다 — 그냥 한 번 푼다.
+        return _solve_once(targets, params), LoopInfo(1, 0.0, 0.0, 0.0, 0.0)
+
+    scale = _chain_length(targets[0])
+    tol = LOOP_TOL_RATIO * scale
+    input_gap = _max_point_gap(targets[0], targets[-1])
+    input_tol = LOOP_INPUT_TOL_RATIO * scale
+
+    body = targets[:-1]          # 반복 단위(마지막 프레임 = 다음 바퀴의 첫 프레임)
+    cycles = 2
+    while True:
+        extended = []
+        for _ in range(cycles - 1):
+            extended.extend(body)
+        extended.extend(targets)
+
+        sim = _solve_once(extended, params)[-n:]
+        residual = _max_point_gap(sim[0], sim[-1])
+
+        if residual <= tol or cycles >= max_cycles:
+            return sim, LoopInfo(cycles, residual, tol, input_gap, input_tol)
+        cycles = min(cycles * 2, max_cycles)
 
 
 def response_delay(targets, sim, index=-1, fraction=0.5):

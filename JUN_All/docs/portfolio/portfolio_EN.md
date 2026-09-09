@@ -366,6 +366,20 @@ Default Distance attribute (driver signal x)
   transform's is `rotateAxis × R` — composing them the same way breaks one of the two. Assuming a chain
   node's parent is the previous chain node also breaks on rigs with offset groups in between, so the real
   parent is resolved per node.
+- **Riding on a looping animation (`Loop`)** — adding secondary motion to a cycling range (a walk,
+  an idle) **breaks at the seam**: the solver starts at rest on the first frame, so even with a
+  perfectly cyclic source the first frame has zero swing while the last is still swinging. The range
+  is therefore pre-rolled — concatenated with itself several times — and only the **last pass** is
+  kept, which is the steady state (limit cycle) where first and last frame swing identically. How the
+  passes are concatenated is the crux: the **final pass's target sequence must equal the original
+  range exactly**, or the sliced result lines up with frames one step off. The number of passes is not
+  fixed but **measured** — the seam error decides, doubling 2→4→8→16 — and a setting with zero
+  damping, which has no steady state at all, is honestly reported as unresolved rather than shipped
+  quietly. Choosing the tolerance exposed a trap: **positional error looks more forgiving than
+  rotational error** — a seam within positional tolerance still left rotation keys 0.05° apart,
+  because each node inherits its parent's swing down the chain. Final result: **0.000000°** rotation
+  seam, **0.000002°** measured in the scene after baking, and preview stays real-time with looping on
+  (0.043 s → 0.054 s for 20 bones × 300 frames).
 - **Work measured in seconds needs a progress readout.** Apply can take several seconds depending on the
   range and chain length, and it said nothing while it ran — so it now shows a **0-100% progress popup**,
   written as a **shared framework widget** rather than something local to this tool, so other heavy tools

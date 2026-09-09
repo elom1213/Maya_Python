@@ -77,6 +77,8 @@ class SecondaryMotionSession(object):
         self.branched = []
         self.missing = []
         self.empty_roots = []
+        # 마지막 solve() 의 체인별 루프 진단(Loop 가 꺼져 있으면 빈 목록).
+        self.loop_infos = []
 
     # ------------------------------------------------------------ helpers
 
@@ -86,6 +88,37 @@ class SecondaryMotionSession(object):
 
     def has_cache(self):
         return bool(self.samples)
+
+    def loop_report(self):
+        """마지막 solve() 의 루프 진단을 UI 로그용 [(메시지, warn), ...] 로.
+
+        체인이 여럿이면 **가장 나쁜 값**으로 한 줄에 모은다(체인마다 줄이 늘면 로그가
+        읽히지 않는다). Loop 가 꺼져 있었으면 빈 목록.
+        """
+        infos = [i for i in self.loop_infos if i is not None]
+        if not infos:
+            return []
+
+        out = []
+        worst_in = max(infos, key=lambda i: i.input_gap)
+        if not worst_in.input_cyclic:
+            out.append((
+                "Loop: the first and last frame of the range are NOT the same pose "
+                "(off by {0:.4f}). The result can only cycle as well as the source "
+                "animation does.".format(worst_in.input_gap), True))
+
+        worst = max(infos, key=lambda i: i.residual)
+        cycles = max(i.cycles for i in infos)
+        if worst.converged:
+            out.append((
+                "Loop: cycled after {0} pre-roll pass(es), seam error {1:.6f}.".format(
+                    cycles, worst.residual), False))
+        else:
+            out.append((
+                "Loop: still settling after {0} pre-roll pass(es), seam error {1:.6f} "
+                "(> {2:.6f}). Raise Damping / Stiffness, or use a longer range.".format(
+                    cycles, worst.residual, worst.tolerance), True))
+        return out
 
     def node_count(self):
         return len(self._last_writes) or sum(s.count() for s in self.samples)
@@ -177,9 +210,16 @@ class SecondaryMotionSession(object):
         params.fps = self.fps
 
         writes = {}
+        loop = bool(getattr(params, "loop", False))
+        self.loop_infos = []
         total = len(self.samples)
         for ci, (sample, own) in enumerate(zip(self.samples, self.owners)):
-            sim = chain_solver.solve(sample.positions, params)
+            if loop:
+                # 사이클 정상상태 — 첫/마지막 프레임의 흔들림이 같아진다.
+                sim, info = chain_solver.solve_loop(sample.positions, params)
+                self.loop_infos.append(info)
+            else:
+                sim = chain_solver.solve(sample.positions, params)
             rots = pose_builder.build_rotations(sample, sim)
             # rots 는 팁을 제외한 노드 수 - 1 개
             for i, values in enumerate(rots):

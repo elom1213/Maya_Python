@@ -128,6 +128,8 @@ class MainWindow(QWidget):
 
         self.session = bake_mgr.SecondaryMotionSession(log=self.log)
         self._dirty = True          # 캐시 무효 — 다음 프리뷰에서 다시 샘플링
+        # Loop 를 켠 직후 프리뷰 한 번만 진단을 남기기 위한 일회성 플래그.
+        self._loop_report_pending = False
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -280,6 +282,19 @@ class MainWindow(QWidget):
         self.chk_tip.toggled.connect(self._invalidate)
         pl.addWidget(self.chk_tip)
 
+        # 구간을 사이클로 보고 푼다 — 샘플링은 그대로라 다시 풀기만 하면 된다.
+        self.chk_loop = QCheckBox("Loop (cycle the range)")
+        self.chk_loop.setToolTip(
+            "Make the result loop: the pose at the END of the range continues\n"
+            "seamlessly into its START.\n"
+            "The range is solved as a cycle - it is pre-rolled a few times so the\n"
+            "swing has settled into a steady state, and only the last pass is kept.\n"
+            "Needs the source animation itself to cycle (first frame pose == last).\n"
+            "The first frame no longer starts at rest, so its rotation will differ\n"
+            "from the original - that is what makes it loop.")
+        self.chk_loop.toggled.connect(self._on_loop_toggled)
+        pl.addWidget(self.chk_loop)
+
         root.addWidget(phys)
 
         # ---- 프리뷰
@@ -352,7 +367,8 @@ class MainWindow(QWidget):
             gravity=tuple(sb.value() for sb in self.sb_grav),
             limit_angle=self.sb_limit.value(),
             blend=self.sr_blend.value(),
-            substeps=self.sb_sub.value())
+            substeps=self.sb_sub.value(),
+            loop=self.chk_loop.isChecked())
 
     def _mode(self):
         return (scene_sampler.MODE_ROOT if self.rb_root.isChecked()
@@ -424,6 +440,25 @@ class MainWindow(QWidget):
             self.session.clear_preview()
             self.log("Preview off - back to the original animation.")
 
+    def _on_loop_toggled(self, on):
+        if on:
+            rng = self.range.values()
+            span = ("frame {0} and frame {1}".format(rng[0], rng[1]) if rng
+                    else "the first and last frame")
+            self.log("Loop on - the range is solved as a cycle. {0} must hold the "
+                     "same pose in the source animation. The first frame no longer "
+                     "starts at rest, so its rotation can differ from the "
+                     "original.".format(span))
+            self._loop_report_pending = True
+        else:
+            self.log("Loop off - the solve starts at rest on the first frame.")
+        self._schedule()
+
+    def _log_loop_report(self):
+        """마지막 솔브의 루프 진단을 로그에 남긴다(Loop 가 꺼져 있으면 아무것도 안 한다)."""
+        for msg, warn in self.session.loop_report():
+            self.log(msg, warn=warn)
+
     def _refresh_preview(self):
         if not self.chk_preview.isChecked():
             return
@@ -436,6 +471,11 @@ class MainWindow(QWidget):
             self.session.update_preview(self._params())
         except Exception as e:
             self.log("Preview failed: {0}".format(e), warn=True)
+            return
+        # Loop 를 켠 직후 한 번만 — 슬라이더를 만질 때마다 찍으면 로그가 묻힌다.
+        if self._loop_report_pending:
+            self._loop_report_pending = False
+            self._log_loop_report()
 
     def on_reset(self):
         self.chk_preview.blockSignals(True)
@@ -513,6 +553,7 @@ class MainWindow(QWidget):
         self.chk_preview.setChecked(False)
         self.chk_preview.blockSignals(False)
         self._dirty = True
+        self._log_loop_report()
         self.log("{0}  ({1:.1f}s)".format(msg, elapsed), warn=(count == 0))
 
     # ==============================================================
