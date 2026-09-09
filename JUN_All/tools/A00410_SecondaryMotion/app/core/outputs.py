@@ -40,10 +40,14 @@ FAMILY_NODE = "node"
 class OutputSpec(object):
     """출력 백엔드 1종의 명세.
 
-    apply_fn(session, params, writes, **kw) -> (노드 수, 사용자에게 보여줄 메시지)
-        session : SecondaryMotionSession (frames / samples / 레이어 헬퍼 제공)
-        params  : SolverParams
-        writes  : needs_solve=True 면 {node: [(rx,ry,rz), ...프레임별]}, 아니면 None
+    apply_fn(session, params, writes, progress=None, **kw)
+        -> (노드 수, 사용자에게 보여줄 메시지)
+        session  : SecondaryMotionSession (frames / samples / 레이어 헬퍼 제공)
+        params   : SolverParams
+        writes   : needs_solve=True 면 {node: [(rx,ry,rz), ...프레임별]}, 아니면 None
+        progress : progress(done, total, message=None) 또는 None.
+                   **기록 단계 전체**에서의 상대 진행이다(UI 가 전체 퍼센트로 환산한다).
+                   새 출력을 붙일 때도 이 인자를 받아 넘겨 주면 진행률 팝업이 그대로 돈다.
     """
 
     def __init__(self, id, label, family, apply_fn,
@@ -98,11 +102,25 @@ def default_id():
     return specs[0].id if specs else None
 
 
+def sub_progress(progress, offset, total):
+    """한 기록 단계 안에서 여러 하위 작업으로 진행을 쪼갤 때 쓰는 어댑터.
+
+    예: 레이어 출력은 '커브 생성' 과 '값 기록' 두 패스라서, 각각 [0..n], [n..2n]
+    구간을 맡는다. progress 가 None 이면 None 을 돌려주므로 호출부는 그대로 넘기면 된다.
+    """
+    if progress is None:
+        return None
+
+    def _fn(done, total_local, message=None):
+        progress(offset + done, total, message)
+    return _fn
+
+
 # ======================================================================
 # curve 계열 — 프레임별 해를 키로 굽는다
 # ======================================================================
 
-def _apply_layer(session, params, writes, layer_name=None, **kw):
+def _apply_layer(session, params, writes, layer_name=None, progress=None, **kw):
     """override 애님 레이어에 절대 회전값 기록. 원본 보존 + weight 로 강도 조절."""
     if not writes:
         raise RuntimeError("Nothing to apply.")
@@ -111,26 +129,35 @@ def _apply_layer(session, params, writes, layer_name=None, **kw):
 
     if session.has_preview():
         # 프리뷰 레이어를 그대로 최종 레이어로 승격 — 다시 계산하지 않는다.
+        if progress:
+            progress(0, 1, "promoting preview layer")
         final = session.promote_preview(name)
+        if progress:
+            progress(1, 1, "promoting preview layer")
         return len(writes), (
             "Applied to override anim layer '{0}' ({1} nodes). "
             "Use the layer weight to dial the amount.".format(final, len(writes)))
 
-    final = session.ensure_layer(name, writes.keys(), unique=True)
-    session.write_curves(final, writes)
+    # 커브 생성 패스 [0..n] + 값 기록 패스 [n..2n]
+    n = len(writes)
+    final = session.ensure_layer(
+        name, writes.keys(), unique=True,
+        progress=sub_progress(progress, 0, 2 * n))
+    session.write_curves(
+        final, writes, progress=sub_progress(progress, n, 2 * n))
     session.forget_layer()
     return len(writes), (
         "Applied to override anim layer '{0}' ({1} nodes). "
         "Use the layer weight to dial the amount.".format(final, len(writes)))
 
 
-def _apply_keys(session, params, writes, **kw):
+def _apply_keys(session, params, writes, progress=None, **kw):
     """컨트롤러/조인트 커브에 직접 굽는다(undo 가능한 cmds 경로)."""
     if not writes:
         raise RuntimeError("Nothing to apply.")
 
     session.clear_preview()
-    session.bake_keys(writes)
+    session.bake_keys(writes, progress=progress)
     return len(writes), (
         "Baked keys onto {0} nodes, frames {1}~{2}.".format(
             len(writes), session.frames[0], session.frames[-1]))

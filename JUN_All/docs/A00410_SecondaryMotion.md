@@ -2,7 +2,7 @@
 title: A00410_SecondaryMotion 사용법
 aliases: [Secondary Motion, SecondaryMotion, A00410, 찰랑이, 관성 툴]
 tags: [maya-python, tool-guide, animation, secondary-motion, physics, kawaiiphysics]
-updated: 2026-07-30
+updated: 2026-09-09
 ---
 
 # A00410_SecondaryMotion 사용법
@@ -14,7 +14,7 @@ FK 로 애니메이션된 **컨트롤러/조인트 체인**에 언리얼 **Kawai
 부모를 더 따라간다.** 마야의 시뮬레이션 솔버(nucleus/nHair/nCloth)를 **쓰지 않는다** — 게임 에셋
 작업에 맞춰 가볍고 빠르며, 스크럽/되감기가 자유롭다.
 
-- **버전**: `app/config/version.py` (v01.02)
+- **버전**: `app/config/version.py` (v01.03)
 - **설치**: `__dragDrop_A00410.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **SecondMotion** →
   `tools.A00410_SecondaryMotion.run(True)`
 - **설계 배경**: [plans/A00410_ChainPhysics_plan](plans/A00410_ChainPhysics_plan.md)
@@ -70,6 +70,14 @@ FK 로 애니메이션된 **컨트롤러/조인트 체인**에 언리얼 **Kawai
 │ └───────────────────────────────────────┘ │
 │ [               Apply              ]      │
 │ [ log ... ]                               │
+└───────────────────────────────────────────┘
+
+Apply 를 누르면 뜨는 진행률 팝업 ↓
+
+┌ Secondary Motion - Apply ─────────────────┐
+│ Baking keys                               │
+│ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░  62%               │
+│ ctl_hair_03  (3/8)                 2.4s   │
 └───────────────────────────────────────────┘
 ```
 
@@ -142,6 +150,31 @@ FK 로 애니메이션된 **컨트롤러/조인트 체인**에 언리얼 **Kawai
 Live Preview 를 켠 상태에서 Apply 하면, 프리뷰 레이어가 그대로 최종 레이어로 **이름만 바뀌어**
 승격되므로 다시 계산하지 않는다.
 
+### 5.1 Apply 진행률 팝업
+
+Apply 는 구간과 체인 길이에 따라 몇 초씩 걸릴 수 있어서, 누르면 **0~100% 게이지 팝업**이 뜬다
+(모달이라 도는 동안 실수로 다시 누를 수 없고, 닫기 버튼도 없다 — 창만 닫히고 작업은 계속 도는
+상태를 만들지 않기 위해서다).
+
+| 단계 | 언제 나오나 | 무엇을 세는가 |
+|------|-------------|---------------|
+| `Sampling scene` | 캐시가 없거나 체인·구간·모드가 바뀐 뒤 | **프레임 단위** (체인 × 프레임) |
+| `Solving chains` | 항상 | 체인 단위 |
+| `Baking keys` | Output = **Bake Keys** | **노드 × 프레임** (가장 무거운 단계) |
+| `Writing anim layer` | Output = **Override Layer** (프리뷰 없이) | 커브 생성 패스 + 값 기록 패스 |
+| `Applying anim layer` | Live Preview 가 켜진 채 Apply (레이어 승격) | 사실상 즉시 |
+
+돌지 않는 단계는 **애초에 목록에서 빠지고 나머지 가중치가 재정규화**되므로, 게이지가 중간에서
+멈추거나 건너뛰지 않는다. 끝나면 로그에 걸린 시간이 함께 남는다
+(`Baked keys onto 12 nodes, frames 1.0~300.0.  (3.4s)`).
+
+> 팝업 자체는 공용 위젯 `Framework/qt/MOD_progress_qt_v01.py`(`JUN_mod_progress_qt`) 다
+> ([Framework_MOD_progress_qt](Framework_MOD_progress_qt.md)).
+> core 는 `progress(done, total, message=None)` **콜백만** 받고 위젯을 모른다 — 콜백을 주지 않으면
+> (예: 13ms 짜리 프리뷰 경로) 예전과 똑같이 돈다.
+
+---
+
 > **확장 지점**: 출력 방식은 `app/core/outputs.py` 의 **레지스트리**로 관리된다. 현재는 둘 다
 > "커브(키로 굽기)" 계열이고, 훗날 `A00390_WindTool` 처럼 **라이브 노드망 출력**을 붙일 수 있게
 > `Live Node` spec 이 예약돼 있다. spec 하나를 `register()` 하면 **UI Output 라디오에 자동으로
@@ -196,6 +229,7 @@ Live Preview 를 켠 상태에서 Apply 하면, 프리뷰 레이어가 그대로
 | 흔들림이 거의 없다 | **Falloff** 를 올리거나 **Stiffness** 를 낮춘다. Blend 가 0 인지도 확인 |
 | 너무 출렁인다 | **Damping** 을 올린다. 빠른 모션이면 **Substeps** 를 2~4 로 |
 | 체인이 이상하게 꺾인다 | **Limit Angle** 을 낮춰 원본 방향에서 크게 벗어나지 않게 한다 |
+| Apply 가 오래 걸린다 | 정상이다 — 진행률 팝업의 단계 이름과 게이지로 어디까지 갔는지 본다. `Bake Keys` 가 `Override Layer` 보다 훨씬 오래 걸린다(노드 × 프레임 만큼 `setKeyframe`) |
 | 원본으로 되돌리고 싶다 | **Reset**(프리뷰 레이어 삭제) 또는 결과 레이어 삭제. 창을 닫아도 프리뷰 레이어는 지워진다 |
 
 ---

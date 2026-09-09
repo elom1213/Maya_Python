@@ -8,7 +8,7 @@ metadata:
   modified: 2026-07-29T09:04:00.209Z
 ---
 
-`A00410_SecondaryMotion` (2026-07-30, v01.02, 헤드리스 검증 + 푸시 완료, **마야 실기 UI 테스트 대기**)
+`A00410_SecondaryMotion` (2026-09-09, v01.03, 헤드리스 검증 완료, **마야 실기 UI 테스트 대기**)
 — FK 컨트롤러/조인트 체인에 언리얼 KawaiiPhysics 식 **관성(찰랑임)** 을 얹어 **키로 굽는** in-Maya PySide 툴.
 
 **Why:** 마야 nucleus 계열은 성능 이전에 **작업 흐름**이 안 맞는다 — 시작 프레임부터 순차 재생해야
@@ -49,7 +49,16 @@ Jiggle 은 메시 포인트 전용(조인트에 못 씀), spring 컨스트레인
 - **검증 관용구**: "기록한 회전으로 계산된 실제 씬 위치 == 솔버 위치" **왕복 검증**이 가장 강력했다
   (조인트 9.7e-13 / 컨트롤러 5.4e-12). 반드시 **비자명 jointOrient·rotateAxis·rotateOrder 혼합**으로
   테스트할 것 — JO 가 0 인 씬으로 테스트하면 통과해도 아무것도 검증하지 못한다.
+- **v01.03 Apply 진행률 팝업**: 공용 위젯 [[framework-progress-widget]] 을 쓴다.
+  core(`prepare`/`solve`/`ensure_layer`/`write_curves`/`bake_keys` + `outputs.py` spec)가
+  `progress(done, total, message=None)` 콜백만 받고, **13ms 프리뷰 경로에는 안 넘긴다**.
+  단계 가중치 = 샘플링 30 / 솔브 5 / **Bake Keys 65**(노드×프레임 `setKeyframe`) /
+  레이어 기록 40 / 프리뷰 레이어 승격 5. 캐시가 살아 있으면 샘플링 단계를 **목록에서 뺀다**.
+- **v01.03 조용한 버그 2개(진행률 붙이다 발견)**: ① 프리뷰를 **끔 채** 슬라이더를 만지고
+  Apply 하면 `_last_writes` 에 남은 **앞서 계산한 값이 그대로 구워졌다**(슬라이더는 캐시를
+  무효화하지 않는다) → Apply 는 **항상 다시 푸다**(전 구간 솔브는 수슭 ms). ② 디바운스(40ms)가
+  터지기 전에 Apply 하면 **한 단계 전 프리뷰가 승격**됐다 → 대기 중인 타이머를 먼저 반영.
 - 문서: `JUN_All/docs/A00410_SecondaryMotion.md`, 계획서 `docs/plans/A00410_ChainPhysics_plan.md`.
 - 미해결: 빠른 구동 + Substeps=3 에서 왕복 오차 4.7e-05(~3ppm), 원인 미특정. 콜라이더/키 감축 없음(v01.03~04 예정).
 
-관련: [[mayapy-headless-verify]], [[tsl-selection-order]], [[undo-chunk-by-default]], [[maya-2023-compat]]
+관련: [[framework-progress-widget]], [[mayapy-headless-verify]], [[tsl-selection-order]], [[undo-chunk-by-default]], [[maya-2023-compat]]

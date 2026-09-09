@@ -11,6 +11,7 @@ from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_timeRange_qt
+from Framework.qt import JUN_mod_progress_qt
 
 import maya.cmds as cmds
 
@@ -28,6 +29,15 @@ _WARN_COLOR = "#ffb454"
 
 # 프리뷰 재계산 디바운스(ms). 슬라이더를 드래그하는 동안 계산을 묶는다.
 _DEBOUNCE_MS = 40
+
+# Apply 진행률 팝업의 단계 가중치(비율). 실측 비용에 맞춘 값이다 —
+# 샘플링은 노드 x 프레임 만큼 `getAttr -time`, Bake Keys 는 노드 x 프레임 만큼
+# `setKeyframe` 이라 기록이 압도적으로 무겁고, 레이어 승격은 사실상 즉시 끝난다.
+_W_SAMPLE = 30
+_W_SOLVE = 5
+_W_WRITE_KEYS = 65        # Bake Keys — 노드 x 프레임 setKeyframe
+_W_WRITE_LAYER = 40       # 레이어 커브 생성 + 값 기록
+_W_WRITE_PROMOTE = 5      # 프리뷰 레이어 이름만 바꾸는 경로
 
 # coral_dark 테마에서 홈이 배경에 묻히지 않도록 직접 그린다(A00290/A00380 과 같은 접근).
 SLIDER_STYLE = """
@@ -359,8 +369,12 @@ class MainWindow(QWidget):
         return (scene_sampler.TARGET_JOINT if self.rb_joint.isChecked()
                 else scene_sampler.TARGET_CTRL)
 
-    def _ensure_cache(self):
-        """필요하면 씬을 다시 샘플링한다. 성공 여부 반환."""
+    def _ensure_cache(self, progress=None):
+        """필요하면 씬을 다시 샘플링한다. 성공 여부 반환.
+
+        progress 를 주면(Apply 의 진행률 팝업) 샘플링 진행이 그쪽으로 보고된다.
+        프리뷰 경로는 그냥 None 으로 둔다.
+        """
         if not self._dirty and self.session.has_cache():
             return True
 
@@ -378,7 +392,7 @@ class MainWindow(QWidget):
         try:
             chains, count, frames = self.session.prepare(
                 nodes, self._mode(), self._target(), rng[0], rng[1],
-                dummy_tip=self.chk_tip.isChecked())
+                dummy_tip=self.chk_tip.isChecked(), progress=progress)
         except Exception as e:
             self.log("Prepare failed: {0}".format(e), warn=True)
             return False
@@ -433,26 +447,73 @@ class MainWindow(QWidget):
             self.log("No preview layer to remove.")
 
     def on_apply(self):
-        if not self._ensure_cache():
+        # 팝업을 띄우기 전에 값싼 검증부터 — 리스트/구간이 비었으면 로그만 남긴다.
+        if not self.tsl.get_all_nodes():
+            self.log("Chain list is empty. Select the chain and click "
+                     "'Select Chain'.", warn=True)
             return
+        if self.range.values() is None:
+            self.log("Enter valid Start / End frames.", warn=True)
+            return
+
+        # 프리뷰가 켜져 있고 디바운스가 아직 안 터졌으면 먼저 반영한다 —
+        # 안 그러면 마지막 조작 직후 Apply 를 눌렀을 때 한 단계 전 프리뷰가 승격된다.
+        if self.chk_preview.isChecked() and self._timer.isActive():
+            self._timer.stop()
+            self._refresh_preview()
 
         output = self._output()
         params = self._params()
 
+        need_sample = self._dirty or not self.session.has_cache()
+        promote = (output == outputs.OUTPUT_LAYER and not need_sample
+                   and self.session.has_preview())
+
+        phases = []
+        if need_sample:
+            phases.append(("Sampling scene", _W_SAMPLE))
+        phases.append(("Solving chains", _W_SOLVE))
+        if output == outputs.OUTPUT_KEYS:
+            phases.append(("Baking keys", _W_WRITE_KEYS))
+        elif promote:
+            phases.append(("Applying anim layer", _W_WRITE_PROMOTE))
+        else:
+            phases.append(("Writing anim layer", _W_WRITE_LAYER))
+
+        dlg = JUN_mod_progress_qt.JUN_mod_progress_qt_v01(
+            self, title="Secondary Motion - Apply",
+            message="Starting...", phases=phases)
+        dlg.start()
+        elapsed = 0.0
+
         try:
             with undo_chunk():
-                if not self.session._last_writes:
-                    self.session.solve(params)
-                count, msg = self.session.apply(params, output)
+                if need_sample:
+                    dlg.begin_phase()
+                    if not self._ensure_cache(progress=dlg.callback()):
+                        return
+
+                # 파라미터는 프리뷰 없이도 바뀔 수 있으므로 **항상 다시 푼다**
+                # (예전에는 앞서 만든 _last_writes 를 그대로 써서 슬라이더를 만진
+                #  뒤에도 옛 값이 구워질 수 있었다). 전 구간 솔브는 수십 ms 다.
+                dlg.begin_phase()
+                self.session.solve(params, progress=dlg.callback())
+
+                dlg.begin_phase()
+                count, msg = self.session.apply(
+                    params, output, progress=dlg.callback())
         except Exception as e:
             self.log("Apply failed: {0}".format(e), warn=True)
             return
+        finally:
+            elapsed = dlg.elapsed()
+            dlg.finish()
 
         self.chk_preview.blockSignals(True)
         self.chk_preview.setChecked(False)
         self.chk_preview.blockSignals(False)
         self._dirty = True
-        self.log(msg, warn=(count == 0))
+        self.log("{0}  ({1:.1f}s)".format(msg, elapsed), warn=(count == 0))
 
     # ==============================================================
     # log / about

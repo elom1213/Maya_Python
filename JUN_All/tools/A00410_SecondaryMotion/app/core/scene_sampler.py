@@ -235,7 +235,8 @@ def _static_info(node, target_type):
     return jo_inv, ra_inv, order, tuple(rest)
 
 
-def sample_chain(chain, frames, target_type=TARGET_CTRL, dummy_tip=True):
+def sample_chain(chain, frames, target_type=TARGET_CTRL, dummy_tip=True,
+                 progress=None):
     """체인의 프레임별 원본 월드 포즈를 읽어 ChainSample 로 담는다.
 
     `getAttr -time` 을 쓰므로 현재 시간을 바꾸지 않는다(= 씬 상태를 건드리지 않는다).
@@ -245,6 +246,9 @@ def sample_chain(chain, frames, target_type=TARGET_CTRL, dummy_tip=True):
     dummy_tip=True 면 마지막 뼈를 같은 방향으로 한 번 더 연장한 **가상 점**을 붙인다.
     팁 노드도 '자식' 이 생겨 회전을 정의할 수 있게 되므로, 체인의 마지막 컨트롤러/조인트도
     다른 노드처럼 회전한다(KawaiiPhysics 의 dummy bone 과 같은 방식).
+
+    progress(done, total, message=None) 를 주면 **프레임마다** 진행을 보고한다.
+    이 함수가 이 툴에서 유일하게 오래 걸리는 단계라서, 진행률 표시가 붙는 곳도 여기다.
     """
     s = ChainSample(chain, frames)
 
@@ -268,7 +272,8 @@ def sample_chain(chain, frames, target_type=TARGET_CTRL, dummy_tip=True):
         if p and p not in chain_set and p not in extra:
             extra.append(p)
 
-    for f in frames:
+    total_frames = len(frames)
+    for fi, f in enumerate(frames):
         quats = {}
         pos_row, quat_row = [], []
         for node in chain:
@@ -284,6 +289,9 @@ def sample_chain(chain, frames, target_type=TARGET_CTRL, dummy_tip=True):
         s.world_quats.append(quat_row)
         s.parent_quats.append(
             [quats[pn] if pn else om.MQuaternion() for pn in parents])
+
+        if progress:
+            progress(fi + 1, total_frames)
 
     if dummy_tip and len(chain) >= 2:
         s.dummy_tip = True

@@ -366,6 +366,17 @@ Default Distance attribute (driver signal x)
   transform's is `rotateAxis × R` — composing them the same way breaks one of the two. Assuming a chain
   node's parent is the previous chain node also breaks on rigs with offset groups in between, so the real
   parent is resolved per node.
+- **Work measured in seconds needs a progress readout.** Apply can take several seconds depending on the
+  range and chain length, and it said nothing while it ran — so it now shows a **0-100% progress popup**,
+  written as a **shared framework widget** rather than something local to this tool, so other heavy tools
+  get the same popup. The core knows nothing about the widget: it takes a `progress(done, total)`
+  **callback**, so the 13 ms preview path, which passes none, is byte-for-byte the old path. Only the
+  phases that actually run are listed and their weights renormalise (a live cache drops the sampling phase
+  entirely), so the bar never stalls halfway or jumps. Updates always set the value but throttle only the
+  repaint — throttling both leaves the percentage at the moment updates stop **permanently unpainted**
+  (a test caught that). Re-reading the Apply path to place the phases also surfaced two silent bugs:
+  with preview **off**, moving a slider and pressing Apply **baked the previous solve**, and pressing Apply
+  before the debounce fired **promoted the preview from one edit ago**.
 
 ### 4-3. Wind sway from a periodic function
 `A00390_WindTool`
