@@ -524,7 +524,10 @@ class MainWindow(QWidget):
             "middle object, in scene units - bending the chain no longer moves it "
             "closer or further away. With it off, Distance is a multiple of the bend: "
             "0 is the midpoint, 1 is the middle object itself, 2 is twice as far out. "
-            "Negative flips it to the other side either way.")
+            "Negative flips it to the other side either way.\n"
+            "Slide moves it along the line between the two ends: positive towards "
+            "the FIRST object in the list, negative towards the LAST one, 1 being "
+            "all the way there. It is kept as 'poleSlide' and stays live too.")
         note.setWordWrap(True)
         layout.addWidget(note)
 
@@ -550,6 +553,24 @@ class MainWindow(QWidget):
             "The value is kept on the new object as 'poleDistance' and stays live.")
         grid.addWidget(self.spn_pole_distance, 0, 1)
 
+        grid.addWidget(QLabel("Slide"), 1, 0)
+        self.spn_pole_slide = QDoubleSpinBox()
+        self.spn_pole_slide.setRange(-100.0, 100.0)
+        self.spn_pole_slide.setDecimals(3)
+        self.spn_pole_slide.setSingleStep(0.1)
+        self.spn_pole_slide.setValue(0.0)
+        self.spn_pole_slide.setKeyboardTracking(False)
+        self.spn_pole_slide.setToolTip(
+            "Where it sits between the two END objects.\n"
+            " 0 : halfway (the default)\n"
+            "+1 : all the way at the FIRST object in the list\n"
+            "-1 : all the way at the LAST object in the list\n"
+            "So a positive value brings it closer to the first object and a\n"
+            "negative one closer to the last. The step is half the distance\n"
+            "between the two ends, so the value keeps its meaning at any scale.\n"
+            "The value is kept on the object as 'poleSlide' and stays live.")
+        grid.addWidget(self.spn_pole_slide, 1, 1)
+
         grid.addWidget(QLabel("Type"), 0, 2)
         self.cmb_pole_kind = QComboBox()
         self.cmb_pole_kind.addItems(list(pole_target_manager.KINDS))
@@ -559,12 +580,12 @@ class MainWindow(QWidget):
             "group   : an empty transform, nothing drawn")
         grid.addWidget(self.cmb_pole_kind, 0, 3)
 
-        grid.addWidget(QLabel("Name"), 1, 0)
+        grid.addWidget(QLabel("Name"), 2, 0)
         self.le_pole_name = QLineEdit()
         self.le_pole_name.setPlaceholderText("<middle object>_polTgt")
         self.le_pole_name.setToolTip(
             "Leave it empty to name it after the middle object.")
-        grid.addWidget(self.le_pole_name, 1, 1, 1, 3)
+        grid.addWidget(self.le_pole_name, 2, 1, 1, 3)
 
         self.cb_pole_fixed = QCheckBox(
             "Fixed distance  -  stay this far from the middle object")
@@ -578,7 +599,7 @@ class MainWindow(QWidget):
             "      so the object moves in as the chain straightens.\n"
             "It decides how the object is wired, so changing it and pressing Create\n"
             "Selected again rebuilds the wiring.")
-        grid.addWidget(self.cb_pole_fixed, 2, 0, 1, 4)
+        grid.addWidget(self.cb_pole_fixed, 3, 0, 1, 4)
 
         layout.addWidget(grp)
 
@@ -614,7 +635,8 @@ class MainWindow(QWidget):
         row2 = QHBoxLayout()
         self.btn_pole_update = QPushButton("Update Selected")
         self.btn_pole_update.setToolTip(
-            "Set Distance on the pole targets you have selected. Nothing is rebuilt.")
+            "Set Distance and Slide on the pole targets you have selected.\n"
+            "Nothing is rebuilt.")
         self.btn_pole_update.clicked.connect(self.on_pole_update)
         row2.addWidget(self.btn_pole_update)
 
@@ -639,7 +661,8 @@ class MainWindow(QWidget):
             nodes, self.spn_pole_distance.value(),
             name=self.le_pole_name.text().strip() or None,
             kind=self.cmb_pole_kind.currentText(),
-            fixed=self.cb_pole_fixed.isChecked())
+            fixed=self.cb_pole_fixed.isChecked(),
+            slide=self.spn_pole_slide.value())
         for p in row["problems"]:
             self.log("[Warning] " + p)
         if row["note"]:
@@ -656,7 +679,8 @@ class MainWindow(QWidget):
             self._pole_nodes(), distance=self.spn_pole_distance.value(),
             name=self.le_pole_name.text().strip() or None,
             kind=self.cmb_pole_kind.currentText(),
-            fixed=self.cb_pole_fixed.isChecked())
+            fixed=self.cb_pole_fixed.isChecked(),
+            slide=self.spn_pole_slide.value())
         for m in messages:
             self.log(m)
         if node:
@@ -671,7 +695,8 @@ class MainWindow(QWidget):
         selection = cmds.ls(selection=True, long=True) or []
         rows, messages = pole_target_manager.create_on(
             selection, self._pole_nodes(), distance=self.spn_pole_distance.value(),
-            fixed=self.cb_pole_fixed.isChecked())
+            fixed=self.cb_pole_fixed.isChecked(),
+            slide=self.spn_pole_slide.value())
         for m in messages:
             self.log(m)
         if rows:
@@ -686,7 +711,8 @@ class MainWindow(QWidget):
             return
         for node in selection:
             _ok, messages = pole_target_manager.update(
-                node, self.spn_pole_distance.value())
+                node, self.spn_pole_distance.value(),
+                slide=self.spn_pole_slide.value())
             for m in messages:
                 self.log(m)
 

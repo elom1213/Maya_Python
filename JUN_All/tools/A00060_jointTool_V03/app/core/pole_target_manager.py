@@ -58,6 +58,31 @@
 #     |v| = distanceBetween( (p1+p3)/2 , p2 )        <- decomposeMatrix 둘 + average
 #     n   = 1 + d / clamp(|v|)
 #
+# ── 양 끝 사이로 미끄러뜨리는 모드 (v03.07) ★★ ──────────────────────
+#
+# 폴 타깃은 방향만 맞으면 되는 것이 아니라 **체인을 따라 앞뒤로도** 놓고 싶다
+# (무릎 타깃을 골반 쪽으로, 팔꿈치 타깃을 어깨 쪽으로). 그래서 두 번째 어트리뷰트
+# `poleSlide` (= s) 로 타깃을 **현 방향(p1 - p3)** 으로 미끄러뜨린다:
+#
+#     A' = A + n*v + (s/2) * (p1 - p3)
+#
+#     s = +1  ->  기준점이 p1 (목록의 첫 오브젝트 A) 으로 간다
+#     s = -1  ->  기준점이 p3 (마지막 오브젝트 C) 으로 간다
+#
+# **현(chord) 길이의 절반을 단위로 쓴다** - 체인 크기에 따라 값을 다시 잡을 필요가 없고,
+# `±1` 이 "끝까지" 라는 뜻이라 쉽다.
+#
+# ★ 이것도 **가중치 합이 1 이라 여전히 pointConstraint 하나**다:
+#
+#     A' = ((1-n)/2 + s/2)*p1 + n*p2 + ((1-n)/2 - s/2)*p3
+#          \________________/         \________________/
+#            w0                          w2              (합 = (1-n) + n = 1)
+#
+# ★ **슬라이드를 `n` 에 섞지 않는 것이 핵심이다.** 기준점 A 를 먼저 움직이고
+#   거기서 `n*v` 를 가면(즉 `A_s + n(p2 - A_s)`) 가중치가 `(1-n)*s/2` 가 되어
+#   **`n > 1` 에서 부호가 뒤집힌다** - 폴 타깃은 보통 `n > 1` 이므로 양수를 넣었는데
+#   C 쪽으로 가는 상황이 된다. 슬라이드는 **마지막에 더하는 평행이동**이어야 한다.
+#
 # ★ **`multiplyDivide` 의 0 나누기는 0 도 NaN 도 아니고 `100000` 이다** (실측, 경고만 낸다).
 #   게다가 `|v|` 가 0 이 아니라 아주 작을 때가 더 위험하다 - `n` 이 1e9 쯤으로 뛰면
 #   가중 평균이 큰 수끼리의 뺄셈이 되어 **자릿수가 통째로 날아간다.** 그래서 나누기
@@ -74,6 +99,9 @@ from Framework.core.maya_undo import undo_chunk
 
 #: 폴 거리 어트리뷰트 이름
 DISTANCE_ATTR = "poleDistance"
+
+#: 양 끝 사이를 오가는 어트리뷰트 이름 (+1 = 첫 오브젝트, -1 = 마지막 오브젝트)
+SLIDE_ATTR = "poleSlide"
 
 #: 만들 수 있는 오브젝트 종류
 KIND_LOCATOR = "locator"
@@ -105,28 +133,44 @@ def world_point(node):
     return om.MVector(*cmds.xform(node, query=True, worldSpace=True, translation=True))
 
 
-def solve_position(p1, p2, p3, distance):
-    """`A' = A + n*v` 를 계산한다. 세 인자는 `MVector`. 돌려주는 것도 `MVector`.
+def slide_offset(p1, p3, slide):
+    """`(s/2) * (p1 - p3)` — 현(chord) 방향으로의 평행이동.
+
+    `s = +1` 이면 반현 하나만큼, 즉 기준점이 중점에서 **`p1` 까지** 간다.
+    모드(배수 / 거리 고정)와 무관하게 **마지막에 더해진다** — 그래야 부호가
+    `n` 에 따라 뒤집히지 않는다(모듈 주석).
+    """
+    if not slide:
+        return om.MVector(0.0, 0.0, 0.0)
+    return (p1 - p3) * (float(slide) * 0.5)
+
+
+def solve_position(p1, p2, p3, distance, slide=0.0):
+    """`A' = A + n*v + (s/2)(p1-p3)` 를 계산한다. 세 인자는 `MVector`. 돌려주는 것도 `MVector`.
 
     **씬을 건드리지 않는다.** `A00130_ControlRig_V02` 처럼 노드를 남기지 않고 위치만
     필요한 곳이 이걸 쓴다.
     """
     a = (p1 + p3) * 0.5
-    return a + (p2 - a) * float(distance)
+    return a + (p2 - a) * float(distance) + slide_offset(p1, p3, slide)
 
 
-def solve_position_fixed(p1, p2, p3, distance):
+def solve_position_fixed(p1, p2, p3, distance, slide=0.0):
     """`A' = p2 + d * v/|v|` 를 계산한다 - **가운데 점에서 늘 `d` 만큼** 떨어진 자리.
 
     방향은 `solve_position` 과 같고 길이만 정규화한다. 일직선이면 방향이 없으므로
     가운데 점을 그대로 돌려준다(막지 않는다 - 부르는 쪽이 경고한다).
+
+    슬라이드는 **마지막에 더해진다** — `s ≠ 0` 이면 가운데 오브젝트까지의 거리가
+    더 이상 정확히 `d` 가 아니다(직각삼각형으로 조금 늘어난다). 의도된 동작이다.
     """
     a = (p1 + p3) * 0.5
     v = p2 - a
     length = v.length()
+    offset = slide_offset(p1, p3, slide)
     if length < STRAIGHT_EPS:
-        return om.MVector(p2)
-    return p2 + v * (float(distance) / length)
+        return om.MVector(p2) + offset
+    return p2 + v * (float(distance) / length) + offset
 
 
 def fixed_from_multiple(nodes, distance):
@@ -149,7 +193,7 @@ def fixed_from_multiple(nodes, distance):
     return (float(distance) - 1.0) * v.length()
 
 
-def solve(nodes, distance, fixed=False):
+def solve(nodes, distance, fixed=False, slide=0.0):
     """세 노드의 월드 위치로 `A'` 을 계산한다. `(위치 또는 None, note)`.
 
     `fixed=True` 면 `distance` 가 **가운데 오브젝트에서의 씬 거리**다(`solve_position_fixed`).
@@ -172,8 +216,8 @@ def solve(nodes, distance, fixed=False):
                     "on the middle object" if fixed
                     else "on the chord no matter what the distance is"))
     if fixed:
-        return solve_position_fixed(p1, p2, p3, distance), note
-    return a + v * float(distance), note
+        return solve_position_fixed(p1, p2, p3, distance, slide), note
+    return a + v * float(distance) + slide_offset(p1, p3, slide), note
 
 
 # =========================
@@ -226,7 +270,7 @@ def default_name(nodes):
 # 계획
 # =========================
 
-def plan(nodes, distance, name=None, kind=KIND_LOCATOR, fixed=False):
+def plan(nodes, distance, name=None, kind=KIND_LOCATOR, fixed=False, slide=0.0):
     """무엇이 만들어질지. **씬은 안 바꾼다.** `dict`.
 
     `ok` · `name` · `position` · `note` · `problems`
@@ -250,7 +294,7 @@ def plan(nodes, distance, name=None, kind=KIND_LOCATOR, fixed=False):
         return row
 
     row["name"] = name or default_name(nodes)
-    position, note = solve(nodes, distance, fixed=fixed)
+    position, note = solve(nodes, distance, fixed=fixed, slide=slide)
     row["position"] = position
     row["note"] = note
 
@@ -283,18 +327,20 @@ def _make_node(name, kind):
 
 
 def create(nodes, distance=1.0, name=None, kind=KIND_LOCATOR, parent=None,
-           fixed=False):
+           fixed=False, slide=0.0):
     """폴 타깃을 만들고 `A'` 에 **늘 붙어 있게** 한다. `(node 또는 None, messages)`.
 
     전체가 **undo 한 스텝**이다. 만드는 노드는 셋:
 
-        <name>                      타깃 (거리 어트리뷰트를 갖는다)
+        <name>                      타깃 (거리 · 슬라이드 어트리뷰트를 갖는다)
         <name>_pointConstraint1     타깃 3개
         <name>_oneMinusN            plusMinusAverage : 1 - n
-        <name>_side                 multiplyDivide   : (1-n)/2
+        <name>_side                 multiplyDivide   : X=(1-n)/2, Y=s/2
+        <name>_weightA              plusMinusAverage : (1-n)/2 + s/2   (첫 타깃)
+        <name>_weightC              plusMinusAverage : (1-n)/2 - s/2   (끝 타깃)
     """
     messages = []
-    row = plan(nodes, distance, name=name, kind=kind, fixed=fixed)
+    row = plan(nodes, distance, name=name, kind=kind, fixed=fixed, slide=slide)
     for p in row["problems"]:
         messages.append("[Warning] " + p)
     if not row["ok"]:
@@ -318,10 +364,14 @@ def create(nodes, distance=1.0, name=None, kind=KIND_LOCATOR, parent=None,
         cmds.addAttr(made, longName=DISTANCE_ATTR, attributeType="double",
                      defaultValue=float(distance), keyable=True)
         cmds.setAttr("{0}.{1}".format(made, DISTANCE_ATTR), float(distance))
+        cmds.addAttr(made, longName=SLIDE_ATTR, attributeType="double",
+                     defaultValue=float(slide), keyable=True)
+        cmds.setAttr("{0}.{1}".format(made, SLIDE_ATTR), float(slide))
 
         _wire(made, nodes, messages, fixed=fixed)
 
     messages.append(_wired_line(made, nodes, distance, fixed))
+    messages.append(_slide_line(made, nodes))
     return made, messages
 
 
@@ -338,6 +388,13 @@ def _wired_line(target, nodes, distance, fixed):
                 float(distance), DISTANCE_ATTR))
 
 
+def _slide_line(target, nodes):
+    """슬라이드 어트리뷰트를 어느 쪽으로 돌리면 어디로 가는지 한 줄 — 부호를 외우게 하지 않는다."""
+    return ("[Info] '{0}' : + moves it towards {1}, - towards {2} "
+            "(1 = all the way).".format(
+                SLIDE_ATTR, _short(nodes[0]), _short(nodes[2])))
+
+
 def targets_of(target):
     """이 오브젝트를 몰고 있는 pointConstraint 의 타깃 목록 (없으면 빈 목록)."""
     con = constraint_of(target)
@@ -346,7 +403,8 @@ def targets_of(target):
     return cmds.pointConstraint(con, query=True, targetList=True) or []
 
 
-def ensure(target, nodes, distance, reset_distance=False, fixed=False):
+def ensure(target, nodes, distance, reset_distance=False, fixed=False,
+           slide=0.0):
     """**이미 있는** 오브젝트를 폴 타깃으로 만들거나 갱신한다. `(status, messages)`.
 
     `status` 는 `"wired"` · `"kept"` · `"rewired"` · `"skipped"`.
@@ -359,6 +417,10 @@ def ensure(target, nodes, distance, reset_distance=False, fixed=False):
     ── 모드가 다르면 다시 짓는다 ────────────────────────────────────────────
     체인이 같아도 **배선 모드**(배수 / 거리 고정)가 요청과 다르면 `kept` 가 아니라
     다시 짓는다. 안 그러면 체크박스를 켜고 눌러도 아무 일도 안 일어난 것처럼 보인다.
+
+    ── 예전 버전으로 배선된 타깃은 한 번 다시 짓는다 ─────────────────
+    `poleSlide` (v03.07) 가 없는 타깃은 구성이 달라서 `kept` 로 둘 수 없다 — 그대로
+    두면 버튼을 눌러도 슬라이드가 생기지 않는다. 한 번 재배선하고 그 뒤로는 `kept` 다.
     """
     messages = []
     if not cmds.objExists(target):
@@ -370,6 +432,7 @@ def ensure(target, nodes, distance, reset_distance=False, fixed=False):
             _short(target), ", ".join(missing))]
 
     plug = "{0}.{1}".format(target, DISTANCE_ATTR)
+    slide_plug = "{0}.{1}".format(target, SLIDE_ATTR)
     mine = cmds.objExists(plug)
     con = constraint_of(target)
 
@@ -383,12 +446,19 @@ def ensure(target, nodes, distance, reset_distance=False, fixed=False):
         want = [_long(n) for n in nodes]
         have = [_long(t) for t in targets_of(target)]
         want_mode = MODE_FIXED if fixed else MODE_MULTIPLE
-        if want == have and mode_of(target) == want_mode:
-            if reset_distance and _writable(plug):
-                cmds.setAttr(plug, float(distance))
+        has_slide = cmds.objExists(slide_plug)
+        if want == have and mode_of(target) == want_mode and has_slide:
+            if reset_distance:
+                if _writable(plug):
+                    cmds.setAttr(plug, float(distance))
+                if _writable(slide_plug):
+                    cmds.setAttr(slide_plug, float(slide))
                 return "wired", messages
             return "kept", messages
-        if want == have:
+        if not has_slide:
+            messages.append("[Info] {0}: rebuilt to add '{1}'.".format(
+                _short(target), SLIDE_ATTR))
+        elif want == have:
             messages.append("[Info] {0}: rewired to '{1}' distance.".format(
                 _short(target), want_mode))
         else:
@@ -407,6 +477,11 @@ def ensure(target, nodes, distance, reset_distance=False, fixed=False):
         cmds.addAttr(target, longName=DISTANCE_ATTR, attributeType="double",
                      defaultValue=float(distance), keyable=True)
         cmds.setAttr(plug, float(distance))
+
+    if not cmds.objExists(slide_plug):
+        cmds.addAttr(target, longName=SLIDE_ATTR, attributeType="double",
+                     defaultValue=float(slide), keyable=True)
+        cmds.setAttr(slide_plug, float(slide))
 
     _wire(target, nodes, messages, fixed=fixed)
     return "wired", messages
@@ -471,6 +546,10 @@ def _wire(target, nodes, messages, fixed=False):
 
     `fixed=True` 면 `n` 이 `poleDistance` 자신이 아니라 `1 + d/|v|` 다. **그 차이가
     전부다** - 아래 `1-n` · `(1-n)/2` · 가중치 연결은 두 모드가 똑같이 쓴다.
+
+    양 끝 가중치는 `(1-n)/2` 에서 **`s/2` 를 더하고 뺀 값**이다(모듈 주석).
+    `s/2` 는 새 노드 없이 `_side` 의 **Y 채널**로 계산한다 — `multiplyDivide` 는
+    한 노드가 세 채널을 갖고 `operation`(divide) 은 세 채널에 같이 걸린다.
     """
     con = cmds.pointConstraint(nodes[0], nodes[1], nodes[2], target,
                                maintainOffset=False)[0]
@@ -494,12 +573,25 @@ def _wire(target, nodes, messages, fixed=False):
     half = cmds.createNode("multiplyDivide", name=base + "_side")
     cmds.setAttr(half + ".operation", 2)                 # divide
     cmds.setAttr(half + ".input2X", 2.0)
+    cmds.setAttr(half + ".input2Y", 2.0)
     cmds.connectAttr(sub + ".output1D", half + ".input1X")
+    # Y 채널은 s/2 — 노드를 더 만들지 않고 같은 노드에 얹혀 붙인다.
+    cmds.connectAttr("{0}.{1}".format(target, SLIDE_ATTR), half + ".input1Y")
+
+    # 첫 타깃 (1-n)/2 + s/2   ·   끝 타깃 (1-n)/2 - s/2
+    w_a = cmds.createNode("plusMinusAverage", name=base + "_weightA")
+    cmds.connectAttr(half + ".outputX", w_a + ".input1D[0]")
+    cmds.connectAttr(half + ".outputY", w_a + ".input1D[1]")
+
+    w_c = cmds.createNode("plusMinusAverage", name=base + "_weightC")
+    cmds.setAttr(w_c + ".operation", 2)                  # subtract
+    cmds.connectAttr(half + ".outputX", w_c + ".input1D[0]")
+    cmds.connectAttr(half + ".outputY", w_c + ".input1D[1]")
 
     # ★ setAttr 이 아니라 연결. 음수 가중치가 필요하고 setAttr 은 min 0 에 막힌다.
-    cmds.connectAttr(half + ".outputX", "{0}.{1}".format(con, aliases[0]))
+    cmds.connectAttr(w_a + ".output1D", "{0}.{1}".format(con, aliases[0]))
     cmds.connectAttr(n_plug, "{0}.{1}".format(con, aliases[1]))
-    cmds.connectAttr(half + ".outputX", "{0}.{1}".format(con, aliases[2]))
+    cmds.connectAttr(w_c + ".output1D", "{0}.{1}".format(con, aliases[2]))
     return con
 
 
@@ -557,7 +649,8 @@ def _drop_helpers(con):
 # 이미 있는 오브젝트에 걸기
 # =========================
 
-def create_on(targets, nodes, distance=1.0, reset_distance=False, fixed=False):
+def create_on(targets, nodes, distance=1.0, reset_distance=False, fixed=False,
+              slide=0.0):
     """**이미 씬에 있는** 오브젝트들에 `create()` 와 같은 배선을 건다.
 
     `(rows, messages)` — `rows` 는 `[{"target", "status"}]`,
@@ -601,7 +694,7 @@ def create_on(targets, nodes, distance=1.0, reset_distance=False, fixed=False):
         messages.append("[Warning] the same object was given more than once")
         return rows, messages
 
-    _position, note = solve(nodes, distance, fixed=fixed)
+    _position, note = solve(nodes, distance, fixed=fixed, slide=slide)
     if note:
         messages.append("[Warning] {0}.".format(note))
 
@@ -621,13 +714,15 @@ def create_on(targets, nodes, distance=1.0, reset_distance=False, fixed=False):
                 continue
 
             status, notes = ensure(target, nodes, distance,
-                                   reset_distance=reset_distance, fixed=fixed)
+                                   reset_distance=reset_distance, fixed=fixed,
+                                   slide=slide)
             rows.append({"target": target, "status": status})
             messages.extend(notes)
             if status == "wired":
                 messages.append(_wired_line(
                     target, nodes,
                     cmds.getAttr("{0}.{1}".format(target, DISTANCE_ATTR)), fixed))
+                messages.append(_slide_line(target, nodes))
             elif status == "kept":
                 messages.append(
                     "[Info] {0}: already follows the same three objects - left as "
@@ -641,8 +736,13 @@ def create_on(targets, nodes, distance=1.0, reset_distance=False, fixed=False):
 # 고치기 / 굳히기
 # =========================
 
-def update(target, distance):
-    """이미 있는 폴 타깃의 거리만 바꾼다. 노드는 다시 만들지 않는다."""
+def update(target, distance, slide=None):
+    """이미 있는 폴 타깃의 값만 바꾼다. 노드는 다시 만들지 않는다.
+
+    `slide=None` 이면 슬라이드는 건드리지 않는다. 슬라이드 어트리뷰트가 없는
+    예전 타깃이면 거리만 바꾸고 **다시 지으라고 알린다** — 여기서 몰래 배선을
+    고치지 않는다(이 함수의 약속은 "노드를 안 건드린다" 이다).
+    """
     messages = []
     plug = "{0}.{1}".format(target, DISTANCE_ATTR)
     if not cmds.objExists(plug):
@@ -654,9 +754,25 @@ def update(target, distance):
             _short(target), DISTANCE_ATTR))
         return False, messages
 
+    slide_plug = "{0}.{1}".format(target, SLIDE_ATTR)
+    has_slide = cmds.objExists(slide_plug)
     with undo_chunk():
         cmds.setAttr(plug, float(distance))
+        if slide is not None and has_slide and _writable(slide_plug):
+            cmds.setAttr(slide_plug, float(slide))
     messages.append("[OK] {0} distance -> {1:g}.".format(_short(target), float(distance)))
+    if slide is not None:
+        if not has_slide:
+            messages.append(
+                "[Warning] {0} has no {1} - it was wired before v03.07. Press "
+                "Create Selected once to rebuild it with the slide.".format(
+                    _short(target), SLIDE_ATTR))
+        elif not _writable(slide_plug):
+            messages.append("[Warning] {0}.{1} is locked or driven.".format(
+                _short(target), SLIDE_ATTR))
+        else:
+            messages.append("[OK] {0} slide -> {1:g}.".format(
+                _short(target), float(slide)))
     return True, messages
 
 

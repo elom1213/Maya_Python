@@ -1,11 +1,11 @@
 ---
 name: wip-a00060-pole-target
-description: A00060 Chain>Pole Target — A'=A+n*v 는 pointConstraint 하나로 환원된다. 가중치는 setAttr 이 음수를 거부하고 연결은 통과한다. 거리 고정은 n 만 계산해 먹인다 (v03.05)
+description: A00060 Chain>Pole Target — A'=A+n*v 는 pointConstraint 하나로 환원된다. 가중치는 setAttr 이 음수를 거부하고 연결은 통과한다. 거리 고정은 n 만 계산해 먹이고, 슬라이드는 n 에 섞지 않는다 (v03.07)
 metadata:
   type: project
 ---
 
-**`A00060_jointTool_V03` 의 `Chain > Pole Target`** (v03.03, 2026-08-31) —
+**`A00060_jointTool_V03` 의 `Chain > Pole Target`** (v03.07, 2026-09-10) —
 세 오브젝트에 대해 `A=(p1+p3)/2`, `v=p2-A` 일 때 **`A'=A+n·v` 에 늘 붙어 있는 오브젝트**.
 `app/core/pole_target_manager.py`. 계획서 `docs/plans/A00060_poleTarget_plan.md`.
 
@@ -71,4 +71,21 @@ v03.06). `d = (n-1)*|v|` 면 **두 식이 같은 점**이라 놓이는 자리가
 2.0 이 '2배' 가 아니라 '2cm' 가 되어 타깃이 가운데 오브젝트에 달라붙는다.
 `A00130` 의 템플릿 폴 타깃 4개가 이 경로다(v02.16). `ensure()` 의 **기본값은 여전히 배수**.
 
-검증 **54 + 22 + 25항목**. [[mayapy-headless-verify]] · [[wip-a00060-ik-edit]]
+**`Slide` — `poleSlide` (v03.07)** — 타깃을 현 방향으로 미끄러뜨린다.
+`A' = A + n*v + (s/2)(p1-p3)` — **양수 = 리스트의 첫 오브젝트 쪽, 음수 = 마지막 쪽**,
+단위는 현 길이의 절반(`±1` = 끝까지).
+
+**★ 슬라이드를 `n` 에 섞지 마라.** 먼저 떠오르는 설계(기준점 A 를 옮기고 거기서
+`n*v`)는 가중치가 `(1-n)*s/2` 라 **`n > 1` 에서 부호가 뒤집힌다** — 폴 타깃은 보통
+`n > 1` 이므로 "양수를 넣었는데 반대로 간다" 가 된다. 슬라이드는 **마지막에 더하는
+평행이동**이어야 하고, 그래야 가중치 합 1 도 유지된다
+(`w0=(1-n)/2+s/2`, `w1=n`, `w2=(1-n)/2-s/2`).
+
+**★ `s/2` 는 새 노드 없이 `_side` 의 Y 채널**로 계산한다 — `multiplyDivide` 는 한 노드가
+세 채널이고 `operation` 은 세 채널 공통이다. 늘어난 노드는 `plusMinusAverage` 둘.
+
+**★ 구성이 바뀌었으면 `kept` 가 아니다.** `poleSlide` 가 없는 예전 타깃을 `kept` 로 두면
+버튼을 눌러도 슬라이드가 안 생긴다 — 한 번만 재배선하고 그 뒤로 `kept`
+(모드 불일치 규칙과 같은 자리). `A00130` 은 `slide` 를 안 넘겨 기본 0 — 자리는 그대로다.
+
+검증 **54 + 22 + 25항목** (+ v03.07 core 41 · UI 11). [[mayapy-headless-verify]] · [[wip-a00060-ik-edit]]
