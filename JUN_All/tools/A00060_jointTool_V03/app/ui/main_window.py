@@ -520,8 +520,11 @@ class MainWindow(QWidget):
             "Pick three objects in chain order - end, middle, end. The new object sits "
             "on the line between the two ends, pushed out towards the middle one by "
             "Distance, and it stays there when the chain moves.\n"
-            "Distance 0 is the midpoint, 1 is the middle object itself, 2 is twice as "
-            "far out. Negative flips it to the other side.")
+            "With Fixed distance on, Distance is how far the object stays from the "
+            "middle object, in scene units - bending the chain no longer moves it "
+            "closer or further away. With it off, Distance is a multiple of the bend: "
+            "0 is the midpoint, 1 is the middle object itself, 2 is twice as far out. "
+            "Negative flips it to the other side either way.")
         note.setWordWrap(True)
         layout.addWidget(note)
 
@@ -539,8 +542,11 @@ class MainWindow(QWidget):
         self.spn_pole_distance.setValue(1.0)
         self.spn_pole_distance.setKeyboardTracking(False)
         self.spn_pole_distance.setToolTip(
-            "How far out along the bend. It is a multiple of the bend itself, not a\n"
-            "scene distance - so a straighter chain gives a smaller step.\n"
+            "How far out along the bend.\n"
+            "Fixed distance ON  : a scene distance from the middle object, kept the\n"
+            "                     same however the chain bends.\n"
+            "Fixed distance OFF : a multiple of the bend itself, so a straighter\n"
+            "                     chain gives a smaller step.\n"
             "The value is kept on the new object as 'poleDistance' and stays live.")
         grid.addWidget(self.spn_pole_distance, 0, 1)
 
@@ -559,6 +565,20 @@ class MainWindow(QWidget):
         self.le_pole_name.setToolTip(
             "Leave it empty to name it after the middle object.")
         grid.addWidget(self.le_pole_name, 1, 1, 1, 3)
+
+        self.cb_pole_fixed = QCheckBox(
+            "Fixed distance  -  stay this far from the middle object")
+        self.cb_pole_fixed.setChecked(True)
+        self.cb_pole_fixed.setToolTip(
+            "ON  : Distance is a scene distance from the middle object and the\n"
+            "      object keeps it - straightening or bending the chain no longer\n"
+            "      pulls it in or pushes it out. This is what a pole vector target\n"
+            "      usually wants.\n"
+            "OFF : Distance is a multiple of the bend (how it worked before v03.05),\n"
+            "      so the object moves in as the chain straightens.\n"
+            "It decides how the object is wired, so changing it and pressing Create\n"
+            "Selected again rebuilds the wiring.")
+        grid.addWidget(self.cb_pole_fixed, 2, 0, 1, 4)
 
         layout.addWidget(grp)
 
@@ -618,7 +638,8 @@ class MainWindow(QWidget):
         row = pole_target_manager.plan(
             nodes, self.spn_pole_distance.value(),
             name=self.le_pole_name.text().strip() or None,
-            kind=self.cmb_pole_kind.currentText())
+            kind=self.cmb_pole_kind.currentText(),
+            fixed=self.cb_pole_fixed.isChecked())
         for p in row["problems"]:
             self.log("[Warning] " + p)
         if row["note"]:
@@ -634,7 +655,8 @@ class MainWindow(QWidget):
         node, messages = pole_target_manager.create(
             self._pole_nodes(), distance=self.spn_pole_distance.value(),
             name=self.le_pole_name.text().strip() or None,
-            kind=self.cmb_pole_kind.currentText())
+            kind=self.cmb_pole_kind.currentText(),
+            fixed=self.cb_pole_fixed.isChecked())
         for m in messages:
             self.log(m)
         if node:
@@ -648,7 +670,8 @@ class MainWindow(QWidget):
         """
         selection = cmds.ls(selection=True, long=True) or []
         rows, messages = pole_target_manager.create_on(
-            selection, self._pole_nodes(), distance=self.spn_pole_distance.value())
+            selection, self._pole_nodes(), distance=self.spn_pole_distance.value(),
+            fixed=self.cb_pole_fixed.isChecked())
         for m in messages:
             self.log(m)
         if rows:

@@ -95,7 +95,7 @@
 - [A00130 Orient & Place](wip-a00130-orient.md) — 규칙 A1/A2/A3 가 결국 **한 계산**(aim + up 힌트) · 폴 타깃 4개는 **위치까지** 놓아서 단계 이름을 바꿨다. **부모를 돌리면 후손이 전부 딸려 움직인다**(자식만 되돌리면 또 물림) · **forward 를 맞추면 up 은 직교화만큼 기운다** (v02.04)
 - [A00130 Pair & Constrain](wip-a00130-pair-constrain.md) — 세트 1:1 매칭 + `Con` -> parentConstraint. **parentConstraint 는 드라이버가 다르면 조용히 타깃을 늘린다** · `cmds.sets(q=True)` 는 멤버 순서를 보장하지 않는다 (v02.10)
 - [A00130 IK axis](wip-a00130-ik-axis.md) — 폴을 보는 축은 **`twist` 로만** 고쳐진다(`jointOrient` 는 솔버가 보정, `rotate` 는 덮어쓴다) · **`twist` 는 레퍼런스에서 유지** (v02.14)
-- [A00060 Pole Target](wip-a00060-pole-target.md) — `A'=A+n·v` 는 **pointConstraint 하나**로 환원된다 · **컨스트레인트 가중치는 `setAttr` 이 음수를 거부하고 연결은 통과** · `Create Selected` 는 **체인 멤버를 건너뛴다**(자기 자신을 모는 컨스트레인트 = 사이클) (v03.04)
+- [A00060 Pole Target](wip-a00060-pole-target.md) — `A'=A+n·v` 는 **pointConstraint 하나**로 환원된다 · **컨스트레인트 가중치는 `setAttr` 이 음수를 거부하고 연결은 통과** · `Create Selected` 는 **체인 멤버를 건너뛴다**(자기 자신을 모는 컨스트레인트 = 사이클) · **거리 고정은 `n=1+d/|v|` 만 계산해 먹인다**(컨스트레인트는 그대로) (v03.05)
 - [A00460 FK & IK](wip-a00460-fk-ik.md) — 컨트롤러 스택 생성. 자식 스택은 `_tgt` 가 아니라 **`_ctl` 밑에**(`_tgt` 는 잎) · **Hierarchy(FK/IK) 는 Mode(Bone Root/Chain) 와 별개 축**(네 조합) · 자손을 **따라가는 것과 잇는 것은 별개** · 중복 판정은 풀패스로 (v01.04)
 - [A00450 ManipulatorTool](wip-a00450-manipulatortool.md) — **신규**: 매니퓰레이터 축 굵기 슬라이더. `manipOptions` 는 전역 하나뿐(도구별 굵기 없음), 굵기(lineSize)와 클릭 히트(linePick)는 별개
 - [A00440 SetTool](wip-a00440-settool.md) — **신규**: 컴포넌트 세트 집합연산(∪∩∖ + Split). 이름 정규화가 전부, **`cmds.select(세트)` 는 멤버를 펼쳐 선택**한다

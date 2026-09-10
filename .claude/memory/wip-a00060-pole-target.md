@@ -1,6 +1,6 @@
 ---
 name: wip-a00060-pole-target
-description: A00060 Chain>Pole Target — A'=A+n*v 는 pointConstraint 하나로 환원된다. 가중치는 setAttr 이 음수를 거부하고 연결은 통과한다. Create Selected 는 체인 멤버를 건너뛴다 (v03.04)
+description: A00060 Chain>Pole Target — A'=A+n*v 는 pointConstraint 하나로 환원된다. 가중치는 setAttr 이 음수를 거부하고 연결은 통과한다. 거리 고정은 n 만 계산해 먹인다 (v03.05)
 metadata:
   type: project
 ---
@@ -53,4 +53,19 @@ setAttr(w0, -0.25)  ->  RuntimeError: below its minimum
 타깃으로 삼는 pointConstraint** 다. 마야는 **사이클 경고만 내고 씬은 망가진 채 남는다** —
 막지 않으면 조용히 깨진다. 긴 이름으로 비교해 건너뛴다.
 
-검증 **54 + 22항목**. [[mayapy-headless-verify]] · [[wip-a00060-ik-edit]]
+**`Fixed distance` (v03.05)** — 거리를 상수로 두려면 `A' = p2 + d*v/|v|` 인데, 이것은
+`A' = A + n*v` 에서 **`n = 1 + d/|v|`** 와 **같은 식**이다. **정규화가 필요해도 컨스트레인트를
+버릴 이유가 없다** — 구성은 그대로 두고 **먹이는 `n` 만 계산된 값으로** 바꾼다(노드 6개).
+
+**★ `multiplyDivide` 의 0 나누기는 0 도 NaN 도 아니고 `100000`** (실측, 경고만).
+더 위험한 건 `|v|` 가 **아주 작을 때** — `n` 이 1e9 로 뛰면 가중 평균이 큰 수끼리의 뺄셈이라
+자릿수가 날아간다. 나누기 앞에 `clamp` 로 하한.
+
+**★ 모드가 다르면 `kept` 가 아니라 재배선.** 체인이 같으면 `kept` 라는 규칙 때문에 옵션을
+켜고 눌러도 **아무 일도 안 일어난 것처럼** 보인다. 재배선·bake 는 가중치에서 거슬러 올라가
+**우리 유틸리티 타입만** 골라 지운다(`helper_nodes()`) — 계산 노드가 여러 단이라 한 단만
+지우면 떠돌이가 남는다.
+
+**A00130 은 `ensure(fixed=False)` 기본값이라 영향 없다.**
+
+검증 **54 + 22 + 25항목**. [[mayapy-headless-verify]] · [[wip-a00060-ik-edit]]
