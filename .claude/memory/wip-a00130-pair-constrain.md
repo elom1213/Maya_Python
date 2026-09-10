@@ -1,6 +1,6 @@
 ---
 name: wip-a00130-pair-constrain
-description: A00130_ControlRig_V02 Pair/Constrain 탭 — 세트 1:1 매칭과 Con->parentConstraint. parentConstraint 는 드라이버가 다르면 조용히 타깃을 늘린다 (v02.10)
+description: A00130_ControlRig_V02 Pair/Constrain 탭 — 세트 1:1 매칭과 Con->parentConstraint. 드라이버가 다르면 조용히 타깃을 늘린다. maintainOffset 기본 off 가 Pair 회전을 덮었다 (v02.17)
 metadata:
   type: project
 ---
@@ -27,8 +27,12 @@ metadata:
 
 **그 밖의 실측**
 - 잠긴 채널이 있으면 `parentConstraint` 는 **`RuntimeError`**(조용하진 않다). 미리 보고 건너뛴다.
-- `maintainOffset` off 면 오브젝트가 **드라이버로 끌려가고**, on 이면 제자리.
-  기본 off(명령 기본값)이고 **떨어져 있으면 거리를 로그에 적는다** — 그때만 결과가 갈린다.
+- `maintainOffset` off 면 오브젝트가 **드라이버로 끌려간다 — 위치뿐 아니라 회전까지.**
+  **★ 기본을 off(마야 명령 기본값)로 뒀던 것이 버그였다** (v02.17 에서 on 으로).
+  `Pair` 가 맞춰 둔 회전이 `Constrain` 한 번에 덮였다(`(30,-20,45)` -> 드라이버 `(-70,15,120)`).
+  **앞 단계가 세워 둔 것을 다음 단계가 지우면 기본값이 틀린 것이다** — 명령 기본값은 근거가 아니다.
+  **★ 켰다고 믿지 않고 잰다**: 걸기 전후 월드 행렬을 비교해 움직인 것을 이름으로 짚는다.
+  회전 차는 **세 축 사이의 각** 중 최대로 (오일러로 빼면 180/-180 이 움직인 것처럼 보인다).
 - `Con` 이 `message` 든 일반 어트리뷰트든 `listConnections` 로 노드가 나온다.
 
 **받은 이름을 임의로 고치지 않고 짚는다** — `C04_match_10_l_ArmPol`(끝 `e` 없음) ·
@@ -43,5 +47,5 @@ metadata:
 > 리스트로 비교하다 실패했고 매핑 비교로 고쳤다. 같은 회차에 **같은 라벨을 두 곳에 쓴 것**과
 > **0부터 세는 인덱스를 1부터로 착각한 것**도 함께 잡았다. 셋 다 코드가 아니라 테스트 문제였다.
 
-검증 **Pair/Constrain 69 + Orient 96 + Match 115 + Length 127 + IK 57 = 464항목**.
+검증 **Pair/Constrain 69 + 24(mo) + Orient 96 + Match 115 + Length 127 + IK 57 = 488항목**.
 [[mayapy-headless-verify]] · [[undo-chunk-by-default]] · [[constraint-target-plugs-and-offset-spaces]]

@@ -533,6 +533,9 @@ class MainWindow(QWidget):
             "Every object in the pose set is checked for a 'Con' attribute. Whatever "
             "node is connected to it becomes the driver, and a parentConstraint is "
             "built so the driver drives the object.\n"
+            "Maintain offset is on, so the objects keep the place and the rotation "
+            "Pair gave them - each one is measured before and after, and anything "
+            "that moves is reported.\n"
             "Run this after Pair.")
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -977,7 +980,8 @@ class MainWindow(QWidget):
             "Set '{0}' - attribute '{1}' - maintain offset {2}".format(
                 self.constrain_doc.get("set") or "?",
                 self.constrain_doc.get("attribute") or "Con",
-                "on" if self.constrain_doc.get("maintain_offset") else "off"))
+                "on" if constrain_manager.maintain_offset(self.constrain_doc)
+                else "OFF - the objects will snap onto their drivers"))
 
         self.tree_constrain.clear()
         for row in rows:

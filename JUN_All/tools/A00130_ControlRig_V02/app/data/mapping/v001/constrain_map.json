@@ -10,10 +10,14 @@
     "silently adds a second target to the existing constraint. So the tool refuses to",
     "touch an object that already has a parentConstraint and says so.",
     "",
-    "2026-08-31: the set had been spelled 'C04_pose_objects' (no 'j') - the user",
-    "confirmed it was a typo and it now reads 'C04_pose_objects'."
+    "'maintain_offset' is TRUE (2026-09-10). With it off, parentConstraint snaps the",
+    "object onto the driver - position AND rotation - which wipes the rotations the",
+    "Pair step just set on the pose objects. The tool also measures each object's",
+    "world matrix before and after and reports anything that moved, so a silent drift",
+    "cannot hide. Set it to false only if you want the objects pulled onto their",
+    "drivers on purpose."
   ],
   "set": "C04_pose_objects",
   "attribute": "Con",
-  "maintain_offset": false
+  "maintain_offset": true
 }
