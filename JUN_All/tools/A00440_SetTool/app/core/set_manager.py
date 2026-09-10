@@ -6,18 +6,22 @@
 # UI 는 여기 있는 run_* 만 부르고 결과 리포트를 로그에 뿌린다.
 # 씬을 바꾸는 연산은 전부 undo_chunk 로 묶어 Ctrl+Z 한 번에 되돌아가게 한다.
 
+import maya.cmds as cmds
+
 from tools.A00440_SetTool.app.core import maya_sets, set_ops
 
 
 class OpResult(object):
     """연산 한 번의 결과. UI 는 이것만 보고 로그를 그린다."""
 
-    def __init__(self, ok, message, created=None, warnings=None, members=None):
+    def __init__(self, ok, message, created=None, warnings=None, members=None,
+                 created_many=None):
         self.ok = ok
         self.message = message
         self.created = created          # 새로 만들어진 세트 이름 (없으면 None)
         self.warnings = warnings or []
         self.members = members or []    # 결과 원소
+        self.created_many = created_many or []   # 여러 개를 만든 연산의 결과 이름들
 
     def __repr__(self):
         return "OpResult(ok={0}, message={1!r}, created={2!r})".format(
@@ -182,6 +186,50 @@ def run_split(set_name, result_name, remove_from_source=True, picked=None):
                 set_name))
 
     return OpResult(True, message, created=created, warnings=warnings, members=extracted)
+
+
+def run_create_per_object(objects, suffix=maya_sets.SET_SUFFIX):
+    """오브젝트 **하나마다** 그것만 담은 세트를 만든다. 이름은 `<오브젝트 이름>_Set`.
+
+    세트 개수 = 오브젝트 개수다. 전체가 **undo 한 스텝**.
+
+    ★ **요청한 이름과 실제로 붙은 이름이 다를 수 있다.** 같은 이름이 이미 있으면 마야가
+      뒤에 번호를 붙인다(`pCube1_Set` -> `pCube1_Set1`). 세트가 아닌 노드가 그 이름을
+      쓰고 있어도 마찬가지다. 밀린 것은 **하나하나 경고로 짚는다** - 이름을 보고 찾을
+      사람에게는 조용히 밀리는 것이 가장 나쁘다.
+
+    ★ **경로와 네임스페이스는 이름에서 뗀다** (`set_name_for`). 남겨 두면 마야가 그
+      네임스페이스 **안에** 세트를 만든다.
+    """
+    objects = [o for o in (objects or []) if o]
+    if not objects:
+        return _fail("The list is empty. Add the objects to make sets from.")
+
+    warnings = []
+    missing = [o for o in objects if not cmds.objExists(o)]
+    if missing:
+        warnings.append("{0} item(s) are not in the scene and were skipped: {1}".format(
+            len(missing), ", ".join(missing)))
+    objects = [o for o in objects if cmds.objExists(o)]
+    if not objects:
+        return OpResult(False, "Nothing in the list is in the scene.", warnings=warnings)
+
+    created = []
+    with maya_sets.undo_chunk():
+        for obj in objects:
+            wanted = maya_sets.set_name_for(obj, suffix)
+            made = maya_sets.create_set([obj], wanted)
+            created.append(made)
+            if made != wanted:
+                warnings.append(
+                    "'{0}' was taken, so the set for {1} is '{2}'.".format(
+                        wanted, obj.split("|")[-1], made))
+
+    message = "Create  {0} object(s)  ->  {1} set(s) : {2}".format(
+        len(objects), len(created), ", ".join(created))
+
+    return OpResult(True, message, warnings=warnings, created_many=created,
+                    members=list(created))
 
 
 def describe_set(set_name):

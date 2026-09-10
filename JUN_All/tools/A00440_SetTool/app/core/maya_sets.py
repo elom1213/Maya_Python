@@ -17,9 +17,18 @@
 #   - 빈 세트는 `None` 을 돌려준다 → 반드시 `or []` 로 받는다
 #   - `cmds.sets()` 에 **모호한 짧은 이름을 넘기면 에러**가 난다 → 항상 정규화된 이름으로 넘긴다
 
+import re
+
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
+
+
+#: 오브젝트 하나짜리 세트에 붙이는 접미사
+SET_SUFFIX = "_Set"
+
+#: 마야 노드 이름에 쓸 수 있는 글자
+_NAME_OK = re.compile(r"[^A-Za-z0-9_]")
 
 
 def canonicalize(items):
@@ -53,6 +62,33 @@ def current_selection():
     return canonicalize(cmds.ls(selection=True, flatten=True, long=True) or [])
 
 
+def set_name_for(item, suffix=SET_SUFFIX):
+    """오브젝트 이름에서 세트 이름을 만든다 - 경로·네임스페이스를 떼고 접미사를 붙인다.
+
+    `|grp1|rig:pCube1` -> `pCube1_Set`.
+
+    ★ **직접 다듬는 이유는 마야가 조용히 고치기 때문이다** (실측):
+
+        cmds.sets(name="pCube1.vtx[0]_Set") -> 'pCube1_vtx_0__Set'   (문자를 바꾼다)
+        cmds.sets(name="1_Set")             -> '_Set'                (앞 숫자를 **버린다**)
+        cmds.sets(name="rig:pCube1_Set")    -> 'rig:pCube1_Set'      (그 네임스페이스에 만든다)
+
+    네임스페이스를 떼는 이유가 세 번째 줄이다 - 남겨 두면 세트가 **그 네임스페이스 안에**
+    생긴다(레퍼런스 네임스페이스면 곤란해진다).
+
+    앞 숫자를 `_` 로 살리는 것은 **대비**다. 마야는 이름이 숫자로 시작하면 그것을 조용히
+    버리므로(`01_arm` -> `_arm`, `9grp` -> `grp`, 네임스페이스 `1ns` -> `ns` : 실측)
+    **씬에서 온 이름은 애초에 숫자로 시작할 수 없다.** 하지만 손으로 넣은 이름이나 다른
+    데서 온 문자열이 들어오면 숫자가 통째로 사라져 `01_arm` 과 `02_arm` 이 같은 이름을
+    노리게 된다 - 그 경우에도 잃지 않도록 앞에 `_` 를 둔다.
+    """
+    name = (item or "").split("|")[-1].split(":")[-1]
+    name = _NAME_OK.sub("_", name)
+    if name and name[0].isdigit():
+        name = "_" + name
+    return (name or "set") + suffix
+
+
 def create_set(members, name):
     """멤버로 새 세트를 만들고 **실제로 붙은 이름**을 돌려준다.
 
@@ -84,13 +120,28 @@ def select(members):
         cmds.select(clear=True)
 
 
+def select_sets(set_nodes):
+    """**세트 노드 자체**를 선택한다.
+
+    ★ 그냥 `select` 하면 마야가 세트를 **펼쳐 멤버를 선택한다**(모듈 상단 주석과 같은
+      함정). 세트를 고르려면 `noExpand` 가 필요하다.
+    """
+    if set_nodes:
+        cmds.select(list(set_nodes), replace=True, noExpand=True)
+    else:
+        cmds.select(clear=True)
+
+
 __all__ = [
+    "SET_SUFFIX",
+    "set_name_for",
     "canonicalize",
     "is_object_set",
     "set_members",
     "nested_sets",
     "current_selection",
     "create_set",
+    "select_sets",
     "remove_from_set",
     "add_to_set",
     "select",

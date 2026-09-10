@@ -1,6 +1,6 @@
 ---
 name: wip-a00440-settool
-description: A00440_SetTool - 컴포넌트 세트 집합연산. 이름 정규화가 전부이고 세트 클릭은 멤버를 선택한다
+description: A00440_SetTool - 컴포넌트 세트 집합연산(Edit) + 오브젝트마다 세트 만들기(Create). 이름 정규화가 전부이고 세트 클릭은 멤버를 선택한다
 metadata: 
   node_type: memory
   type: project
@@ -33,5 +33,16 @@ mayapy 실측:
 `A∖S` = **상대여집합**, 둘을 합친 `{A∖S, A∩S}` = **S 가 A 에 유도하는 분할(partition)**.
 `A = (A∖S) ⊔ (A∩S)`. 구현 세계에서는 partition/split.
 
-검증: mayapy 2024 헤드리스 71항목. 관련: [[mayapy-headless-verify]], [[undo-chunk-by-default]],
+**`Create` 탭 (v01.01)** — 리스트의 오브젝트 **하나마다** `<이름>_Set` 세트. `Edit` 는 v01.00 그대로.
+
+**★ 세트 이름을 마야에 맡기면 조용히 고친다** (실측): `pCube1.vtx[0]_Set` → `pCube1_vtx_0__Set`,
+**`1_Set` → `_Set`(앞 숫자를 버린다)**, `rig:x_Set` 는 **그 네임스페이스 안에** 만든다.
+→ 경로·네임스페이스를 떼고 못 쓰는 문자를 먼저 바꾼다(`set_name_for`).
+**앞 숫자는 마야가 어디서나 버린다** — 노드 `01_arm`→`_arm`, 그룹 `9grp`→`grp`, 네임스페이스
+`1ns`→`ns`. **그래서 씬에서 온 이름은 애초에 숫자로 시작할 수 없다**(테스트의 기대값이 틀렸던 게
+이걸로 드러났다).
+
+**세트 노드 자체를 고르려면 `select(noExpand=True)`** (`select_sets()`) — 위의 '가장 큰 함정' 의 뒷면.
+
+검증: mayapy 2024 헤드리스 71 + 34항목. 관련: [[mayapy-headless-verify]], [[undo-chunk-by-default]],
 [[wip-tsl-uuid-selection]], [[qapplication-before-maya-standalone]]
