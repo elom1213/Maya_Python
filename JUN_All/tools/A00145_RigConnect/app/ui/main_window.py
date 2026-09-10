@@ -1624,7 +1624,8 @@ class MainWindow(QWidget):
         layout = QVBoxLayout(tab)
 
         set_box = QGroupBox("Set Up")
-        set_layout = QHBoxLayout(set_box)
+        set_rows = QVBoxLayout(set_box)
+        list_row = QHBoxLayout()
         self.cc_driven = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Driven",
             list_min_height=200, log_callback=self.log)
@@ -1636,8 +1637,25 @@ class MainWindow(QWidget):
         self.cc_driver.add_button("Get Closest", self.on_get_closest)
         # 같은 자리에 '이름으로' 찾는 버튼도 둔다 (후보 풀 규칙도 동일).
         self.cc_driver.add_button("Match by Name", self.on_match_by_name)
-        set_layout.addWidget(self.cc_driven)
-        set_layout.addWidget(self.cc_driver)
+        list_row.addWidget(self.cc_driven)
+        list_row.addWidget(self.cc_driver)
+        set_rows.addLayout(list_row)
+
+        # 두 리스트 사이의 방향만 뒤집는다 — Match 탭의 Swap 과 같은 동작.
+        swap_row = QHBoxLayout()
+        swap_row.addStretch(1)
+        btn_swap = QPushButton("Swap")
+        btn_swap.setToolTip(
+            "Swap the two lists: what is now Driven becomes Driver and back.\n"
+            "Row order is kept, so pairs built with 'Match by Name' (and the "
+            "'{0}' rows)\n"
+            "stay lined up - only the direction of the constraint is "
+            "flipped.".format(obj_match.NULL_TARGET))
+        btn_swap.clicked.connect(self.on_pair_swap)
+        swap_row.addWidget(btn_swap)
+        swap_row.addStretch(1)
+        set_rows.addLayout(swap_row)
+
         layout.addWidget(set_box)
 
         layout.addWidget(self._build_object_match_box())
@@ -1813,6 +1831,7 @@ class MainWindow(QWidget):
             "                             constrain - Get Closest (distance)\n"
             "                             or Match by Name (similar / same\n"
             "                             name, unmatched rows kept as (Null))\n"
+            "                             + Swap to flip Driven <-> Driver\n"
             "Attribute   : Copy   : copy attributes off one source object,\n"
             "                       same name or with a Prefix / Suffix\n"
             "              Create : create attributes from a saved profile\n"
@@ -3255,6 +3274,19 @@ class MainWindow(QWidget):
                 cmds.select(found, replace=True)
             except Exception as e:
                 self.log("[WARN] could not select the matches: {0}".format(e))
+
+    def on_pair_swap(self):
+        """Driven <-> Driver 목록 교환 (Connect > Pair).
+
+        Match 탭의 `Swap` 과 같은 동작이다. 짝은 **자리**로 서 있으므로
+        (`(Null)` 자리까지 포함해) 두 리스트를 통째로 맞바꾸면 짝은 그대로 남고
+        constraint 방향만 반대가 된다. Pairing 설정은 건드리지 않는다.
+        """
+        driven = self.cc_driven.get_all_items()
+        driver = self.cc_driver.get_all_items()
+        self.cc_driven.set_items(driver)
+        self.cc_driver.set_items(driven)
+        self.log("[OK] Swap : Driven <-> Driver")
 
     def on_connect_closest(self):
         drivers = self.cc_driver.get_all_items()

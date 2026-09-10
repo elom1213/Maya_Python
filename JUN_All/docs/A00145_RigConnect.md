@@ -4,7 +4,10 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.38` (`app/config/version.py`) — **`Mirror` 탭 신규**: 리스트에 담은 오브젝트와
+- 버전: `v01.39` (`app/config/version.py`) — Connect > `Pair` 에 **`Swap` 버튼**:
+  `Driven` ↔ `Driver` 두 리스트를 통째로 맞바꿔 **constraint 방향만 뒤집는다**
+  (자리 순서와 `(Null)` 은 그대로) (§Pair)
+  · v01.38 은 **`Mirror` 탭 신규**: 리스트에 담은 오브젝트와
   **그 아래 자식 전부**를 반대쪽으로 미러한다. 이름은 공용 토큰 규칙으로 바꾸고
   **스킨 웨이트 · 컨스트레인트 · 클러스터**를 반대쪽에 다시 세운다.
   반사 평면(YZ/XY/XZ) · Behavior / Orientation / **Reflect**(컨트롤러 기본, 월드
@@ -987,11 +990,19 @@ Driven                       Driver
 [ rig:jnt_L_hand ]           [ ctrl_L_hand ]
 [ (Null)         ]           [ ctrl_R_foot ]   <- 짝을 못 찾은 자리
 
+                   [ Swap ]                              <- 두 리스트를 맞바꾼다
+
 Match by Name : [ ] Same Name Only  [x] Unique  [x] Ignore Namespace   Min [0.40]
 Pairing       : ( ) Closest distance   (o) List order
 ```
 
 - `Driven` / `Driver` 리스트 구성.
+- **`Swap`(v01.39)**: 두 리스트를 통째로 맞바꾼다 — 지금 `Driven` 인 것이 `Driver` 가 되고 그 반대도
+  된다. Match 탭의 `Swap` 과 같은 동작이고, 담을 때 방향을 거꾸로 골랐거나 **같은 짝을 반대로
+  한 번 더 걸어 보고 싶을 때** 리스트를 다시 담지 않게 해 준다.
+  - 짝은 **자리**로 서 있으므로 `(Null)` 을 포함한 **행 순서가 그대로 보존**된다 —
+    `Match by Name` 으로 세운 짝을 `List order` 로 그대로 이어서 방향만 반대로 걸 수 있다.
+  - `Pairing` 설정은 건드리지 않는다.
 - constraint 종류 체크박스(`Parent` / `Point` / `Orient` / `Scale`, 다중) + `Maintain Offset`.
 - `Connect`: 짝을 지어 constraint 를 건다. **무엇을 짝으로 볼지는 `Pairing` 이 정한다**(아래).
 - **`Get Closest`(v01.08, Driver 리스트 버튼 행)**: 각 driver 에 가장 가까운 오브젝트를 찾아
