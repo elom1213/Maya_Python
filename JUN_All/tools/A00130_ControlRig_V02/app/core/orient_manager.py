@@ -910,6 +910,17 @@ def _do_pole_targets(doc, namespace, results, messages):
     **이미 배선돼 있으면 거리 값을 안 건드린다** — 맞춰 둔 값이 실행할 때마다 json 값으로
     되돌아가면 실시간 조절이 무의미해진다. json 의 `distance` 는 **처음 만들 때만** 쓰고,
     되돌리려면 `reset_distance` 를 켠다.
+
+    ── 거리는 **고정**이다 (v02.16) ─────────────────────────────────────────
+    배선은 A00060 의 `Fixed distance` 쪽을 쓴다. 예전 배수 배선에서는 폴 타깃과 팔꿈치의
+    거리가 `|n-1| * |v|` 라 **팔을 펴면 팔꿈치로 빨려 들어왔다.** 템플릿 조인트는 매칭
+    단계마다 포즈가 바뀌므로 이 쪽이 특히 거슬린다.
+
+    ★ **json 의 `distance` 는 여전히 '굽은 정도의 배수' 로 읽는다.** 거리 고정 배선은 씬
+      거리를 받지만, 2.0 을 그대로 씬 거리로 넘기면 뜻이 달라져 타깃이 팔꿈치에 달라붙는다.
+      `fixed_from_multiple()` 로 **지금 포즈에서 그 배수가 놓았을 자리까지의 거리**로
+      환산해 넘긴다 - 처음 놓이는 자리는 예전과 **똑같고**, 그 뒤로 거리가 유지된다.
+      json 에 `"fixed": false` 를 두면 예전 배수 배선 그대로다.
     """
     group = doc.get("pole_targets") or {}
     entries = group.get("targets") or []
@@ -918,6 +929,7 @@ def _do_pole_targets(doc, namespace, results, messages):
 
     distance = float(group.get("distance", 1.0))
     reset = bool(group.get("reset_distance", False))
+    fixed = bool(group.get("fixed", True))
     done = 0
     kept = []
 
@@ -940,11 +952,15 @@ def _do_pole_targets(doc, namespace, results, messages):
         # translate 가 구동되는지 여기서 미리 보지 않는다 — 두 번째 실행부터는
         # **우리가 건 컨스트레인트**가 몰고 있어서 전부 걸러져 버린다(실제로 물렸다).
         # 남의 컨스트레인트인지 우리 것인지는 `ensure()` 가 가른다.
-        _pos, note = pt.solve(chain, distance)
+        # 배수 -> 씬 거리 환산은 **지금 포즈**를 읽으므로 조인트마다 따로 잰다.
+        want = pt.fixed_from_multiple(chain, distance) if fixed else distance
+
+        _pos, note = pt.solve(chain, want, fixed=fixed)
         if note:
             messages.append("[Warning] {0}: {1}.".format(su.short_name(node), note))
 
-        status, msgs = pt.ensure(node, chain, distance, reset_distance=reset)
+        status, msgs = pt.ensure(node, chain, want, reset_distance=reset,
+                                 fixed=fixed)
         messages.extend(msgs)
         if status == "skipped":
             results["skipped"] += 1
@@ -960,7 +976,10 @@ def _do_pole_targets(doc, namespace, results, messages):
                 len(kept), ", ".join(kept)))
     messages.append(
         "[OK] {0} pole target(s) wired to their limb - each has a '{1}' attribute you "
-        "can change in the viewport.".format(done, pt.DISTANCE_ATTR))
+        "can change in the viewport{2}.".format(
+            done, pt.DISTANCE_ATTR,
+            ", and it is a distance the target keeps however the limb bends"
+            if fixed else ""))
     return done
 
 

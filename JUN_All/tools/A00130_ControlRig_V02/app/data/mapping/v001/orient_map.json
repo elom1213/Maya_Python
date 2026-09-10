@@ -129,8 +129,7 @@
   "pole_targets": {
     "_comment": [
       "The four pole targets are not placed by hand. Each one is wired to its own limb",
-      "with a pointConstraint so it always sits at A + poleDistance * v, where",
-      "A = midpoint(first, last) and v = middle - A.",
+      "with a pointConstraint so it always sits out along the bend of the limb.",
       "",
       "Each joint gets a keyable 'poleDistance' attribute, so the distance can be dialled",
       "in the viewport and the joint follows straight away.",
@@ -138,13 +137,22 @@
       "The maths and the wiring are shared with A00060's Pole Target tab",
       "(pole_target_manager.ensure).",
       "",
-      "'distance' below is only the value used the FIRST time the attribute is made.",
-      "Re-running Orient & Place keeps whatever you dialled in - otherwise tuning would",
-      "be wiped every run. Set reset_distance to true to force it back.",
+      "'fixed' (default true) uses A00060's Fixed distance wiring: the target keeps the",
+      "same distance from the elbow/knee however the limb bends. With the old wiring the",
+      "distance was a multiple of the bend, so straightening the arm pulled the target",
+      "into the elbow - and the template joints get re-posed on every match.",
       "",
+      "'distance' is still read as a MULTIPLE of the bend, in both modes. In fixed mode it",
+      "is converted to the matching scene distance from the pose at build time, so the",
+      "target lands exactly where it always did and only then stops drifting.",
       "1.0 would sit exactly on the elbow/knee, which is no use as a pole. 2.0 pushes it",
-      "one bend-length past the joint."
+      "one bend-length past the joint.",
+      "",
+      "'distance' is only the value used the FIRST time the attribute is made.",
+      "Re-running Orient & Place keeps whatever you dialled in - otherwise tuning would",
+      "be wiped every run. Set reset_distance to true to force it back."
     ],
+    "fixed": true,
     "distance": 2.0,
     "reset_distance": false,
     "targets": [

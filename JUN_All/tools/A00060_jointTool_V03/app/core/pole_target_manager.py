@@ -129,6 +129,26 @@ def solve_position_fixed(p1, p2, p3, distance):
     return p2 + v * (float(distance) / length)
 
 
+def fixed_from_multiple(nodes, distance):
+    """배수 `n` 이 **지금 포즈에서** 만드는 자리를 가운데 오브젝트로부터의 거리로.
+
+    `A' = A + n*v` 와 `A' = p2 + d*v/|v|` 는
+
+        d = (n - 1) * |v|
+
+    에서 **같은 점**이다(부호까지 - `n < 1` 이면 `d` 가 음수라 반대쪽으로 간다).
+
+    배수로 잡아 두었던 규칙을 **거리 고정 배선으로 옮길 때** 쓴다. 값을 그대로 넘기면
+    뜻이 달라져 타깃이 딴 데로 가는데, 이 환산을 거치면 **놓이는 자리가 예전과 같고**
+    그 뒤로 거리가 유지된다. 일직선이면 `|v| = 0` 이라 0 - 가운데 오브젝트 자리다.
+    """
+    if len(nodes) != 3 or any(not cmds.objExists(n) for n in nodes):
+        return float(distance)
+    p1, p2, p3 = [world_point(n) for n in nodes]
+    v = p2 - (p1 + p3) * 0.5
+    return (float(distance) - 1.0) * v.length()
+
+
 def solve(nodes, distance, fixed=False):
     """세 노드의 월드 위치로 `A'` 을 계산한다. `(위치 또는 None, note)`.
 
