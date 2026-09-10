@@ -2,7 +2,7 @@
 title: A00410_SecondaryMotion 사용법
 aliases: [Secondary Motion, SecondaryMotion, A00410, 찰랑이, 관성 툴]
 tags: [maya-python, tool-guide, animation, secondary-motion, physics, kawaiiphysics]
-updated: 2026-09-09
+updated: 2026-09-10
 ---
 
 # A00410_SecondaryMotion 사용법
@@ -14,7 +14,7 @@ FK 로 애니메이션된 **컨트롤러/조인트 체인**에 언리얼 **Kawai
 부모를 더 따라간다.** 마야의 시뮬레이션 솔버(nucleus/nHair/nCloth)를 **쓰지 않는다** — 게임 에셋
 작업에 맞춰 가볍고 빠르며, 스크럽/되감기가 자유롭다.
 
-- **버전**: `app/config/version.py` (v01.07)
+- **버전**: `app/config/version.py` (v01.08)
 - **설치**: `__dragDrop_A00410.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **SecondMotion** →
   `tools.A00410_SecondaryMotion.run(True)`
 - **설계 배경**: [plans/A00410_ChainPhysics_plan](plans/A00410_ChainPhysics_plan.md)
@@ -62,6 +62,7 @@ FK 로 애니메이션된 **컨트롤러/조인트 체인**에 언리얼 **Kawai
 │ │ Blend       ────────●  1.00           │ │
 │ │ Limit Angle [45]  Gravity X[0]Y[0]Z[0]│ │
 │ │ Substeps    [1]                       │ │
+│ │ Rotate Axis [x] X [x] Y [x] Z         │ │
 │ │ [x] Rotate last node (dummy bone)     │ │
 │ │ [ ] Loop (cycle the range)            │ │
 │ └───────────────────────────────────────┘ │
@@ -134,6 +135,7 @@ Apply 를 누르면 뜨는 진행률 팝업 ↓
 | **Limit Angle** | `LimitAngle` | 원본 방향에서 벗어날 수 있는 최대 각(도). 0 = 무제한 |
 | **Gravity** | `Gravity` | 월드 상수 외력(유닛/프레임²) |
 | **Substeps** | — | 프레임당 서브스텝. 빠른 모션에서 불안정하면 올린다 |
+| **Rotate Axis** | — | 결과를 기록할 회전 축. 체크가 빠진 축은 **손대지 않는다**(4.3 참고) |
 | **Rotate last node** | `DummyBone` | 켜짐(기본) = 마지막 뼈를 한 번 더 연장한 **가상 점**을 붙여 **팁도 회전하고 키를 받는다**. 끄면 팁은 원본 회전 유지 |
 
 > **먼저 만질 것은 Falloff 와 Stiffness** 다. Falloff 를 올리면 팁이 늘어지고, Stiffness 를 올리면
@@ -208,6 +210,36 @@ Loop: still settling after 16 pre-roll pass(es), seam error 8.362341 (> 0.000018
 
 ---
 
+### 4.3 Rotate Axis — 원하는 축에만 기록하기
+
+`Substeps` 아래의 **`Rotate Axis  [x] X  [x] Y  [x] Z`** 는 결과를 쓸 회전 축을 고른다.
+기본은 세 축 전부 켜짐이다.
+
+- **체크한 축에만** 결과가 들어간다.
+- **체크가 빠진 축은 그대로 남는다** — `Override Layer` 에서는 그 축의 커브를
+  아예 만들지 않고(레이어에 없으므로 base 값이 그대로 보인다), `Bake Keys` 에서는
+  **원본 키를 지우지도 덮어쓰지도 않는다**.
+
+쓰는 곳
+
+| 상황 | 설정 |
+|------|------|
+| 꼬리를 **좌우로만** 흔들리고 싶다 | 그 평면에 해당하는 축 하나만 |
+| 다른 축에 **수작업 키**가 있어 지키고 싶다 | 그 축을 끌다 |
+| 롤(비틀림)이 들어가는 것이 싫다 | 본의 길이 축에 해당하는 체크를 끌다 |
+
+> **주의**: 물리 계산은 여전히 **3차원**으로 돌아간다. 축 체크는 **기록 단계**에만
+> 적용되므로, 결과는 "그 평면으로 시뮬레이션한 것" 이 아니라
+> "3차원 결과 중 그 축의 성분만 쓴 것" 이다. 스윙이 거의 없는 축만 남기면 결과도 거의 없다.
+
+- **마지막 한 축은 꺼지지 않는다** — 세 개를 다 끄려고 하면 체크가 되돌아오고
+  로그에 `At least one rotate axis has to stay on.` 이 뜨다.
+- **축을 바꾸면 프리뷰 레이어가 다시 만들어진다**(샘플링은 다시 하지 않는다).
+  살아 있는 레이어에는 예전 축의 커브가 남아 있어서, 그대로 두면 끈 축이 계속
+  원본을 덮어쓴다.
+
+---
+
 ## 5. 출력 모드
 
 | 모드 | 설명 |
@@ -268,6 +300,8 @@ Apply 는 구간과 체인 길이에 따라 몇 초씩 걸릴 수 있어서, 누
   `rotateAxis` 를 처리한다(`local = RA * R`). 노드마다 다른 **rotateOrder** 도 존중한다.
 - **분기 계층**: Bone Root 모드에서 자식이 여럿이면 루트→말단 경로마다 체인으로 쪼갠다. 공유되는
   앞부분은 **가장 긴 체인이 소유**하고 로그로 알린다.
+- **고른 축에만 키가 들어간다.** `Rotate Axis` 에서 빠진 축은 커브도 키도 만들지 않으므로
+  원본 값이 그대로 남는다. 솔버는 여전히 3차원으로 푸니, 축 선택은 **기록 단계**의 일이다.
 - **결정적**: 구간 시작에서 항상 정지 상태로 출발한다. 어느 프레임에서 재생하든 같은 결과가 나온다.
   `Loop` 를 켜면 정지가 아니라 **사이클의 정상상태**에서 출발한다 — 이것도 결정적이다(같은 입력이면
   항상 같은 결과).
@@ -298,6 +332,8 @@ Apply 는 구간과 체인 길이에 따라 몇 초씩 걸릴 수 있어서, 누
 |-------------|-----------|
 | `Sampled N chain(s), M nodes, F frames.` | 정상. 캐시가 만들어졌다 |
 | `No chain resolved...` | 체인은 **2개 이상**의 노드가 필요하다(루트 + 자식 하나) |
+| `At least one rotate axis has to stay on.` | `Rotate Axis` 를 세 개 다 끄려 했다. 마지막 체크는 되돌려진다 |
+| `Rotate axis: X, Z only - ...` | Apply 가 그 축에만 썼다는 안내. 나머지 축은 원본 그대로다 |
 | `Branching under: ...` | 분기가 있어 체인이 쪼개졌다. 공유 노드는 가장 긴 체인이 소유한다 |
 | `No chain under: ...` | Bone Root 로 담은 노드에 자식이 없다. Target(Controller/Joint)이 맞는지 확인 |
 | `Chain list is empty.` | 리스트에 담고 **Select Chain** 을 누른다 |

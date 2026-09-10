@@ -39,8 +39,23 @@ from tools.A00410_SecondaryMotion.app.core import scene_sampler
 # 프리뷰 전용 레이어 이름(고정). Apply/Reset 시 정리된다.
 PREVIEW_LAYER = "SM_preview_LYR"
 
-# 결과를 쓰는 회전 어트리뷰트.
+# 결과를 쓸 수 있는 회전 어트리뷰트(전체).
 ROT_ATTRS = ("rotateX", "rotateY", "rotateZ")
+
+# 어트리뷰트 -> 프레임별 회전값 튜플 (rx, ry, rz) 안의 자리.
+ROT_INDEX = dict((at, i) for i, at in enumerate(ROT_ATTRS))
+
+
+def normalize_axes(axes):
+    """축 목록을 ROT_ATTRS 순서로 정리한다(중복 제거). 비어 있으면 예외."""
+    picked = set()
+    for at in axes or ():
+        if at not in ROT_INDEX:
+            raise RuntimeError("Unknown rotate axis '{0}'.".format(at))
+        picked.add(at)
+    if not picked:
+        raise RuntimeError("Pick at least one rotate axis (X / Y / Z).")
+    return tuple(at for at in ROT_ATTRS if at in picked)
 
 # 출력 id — 실제 구현은 outputs.py 의 레지스트리에 있다(새 출력은 그쪽에만 추가).
 OUTPUT_LAYER = outputs.OUTPUT_LAYER
@@ -72,6 +87,8 @@ class SecondaryMotionSession(object):
         self.frames = []
         self.target_type = scene_sampler.TARGET_CTRL
         self.fps = chain_solver.REF_FPS
+        # 키를 기록할 회전 축. 체크가 빠진 축은 손대지 않는다(원본 그대로).
+        self.axes = tuple(ROT_ATTRS)
         self._curves = {}          # (node, attr) -> 프리뷰 레이어 커브 이름
         self._last_writes = {}     # node -> [(rx,ry,rz), ...]
         self.branched = []
@@ -119,6 +136,20 @@ class SecondaryMotionSession(object):
                 "(> {2:.6f}). Raise Damping / Stiffness, or use a longer range.".format(
                     cycles, worst.residual, worst.tolerance), True))
         return out
+
+    def set_axes(self, axes):
+        """키를 기록할 회전 축을 정한다. 반환: 정리된 축 튜플.
+
+        빠진 축에는 커브도 키도 만들지 않으므로 **원본 값이 그대로 남는다**.
+        축이 바뀌면 프리뷰 레이어를 지운다 — 살아 있는 레이어에는 이미 옛 축의 커브가
+        들어 있어서, 축을 뺀 뒤에도 그 커브가 계속 원본을 덮어쓴다. 샘플 캐시는 축과
+        무관하므로 그대로 둔다(재샘플링 없음).
+        """
+        new_axes = normalize_axes(axes)
+        if new_axes != tuple(self.axes):
+            self.axes = new_axes
+            self.clear_preview()
+        return self.axes
 
     def node_count(self):
         return len(self._last_writes) or sum(s.count() for s in self.samples)
@@ -294,6 +325,9 @@ class SecondaryMotionSession(object):
     def ensure_layer(self, name, nodes, unique=False, progress=None):
         """override 애님 레이어를 만들고 대상 회전 어트리뷰트를 등록한다.
 
+        등록하는 것은 `self.axes` 의 축뿐이다 — 빠진 축은 레이어에 커브가 없으므로
+        base 값(원본 애니)이 그대로 보인다.
+
         레이어 커브는 만들자마자 이름을 캐시해 둔다(이후 갱신은 값만 덮어쓴다).
         레이어 안의 커브 이름은 규칙에 의존하지 말고 **추가 전/후 차집합**으로 찾는다.
         """
@@ -305,7 +339,7 @@ class SecondaryMotionSession(object):
 
         plugs = []
         for node in nodes:
-            for at in ROT_ATTRS:
+            for at in self.axes:
                 plugs.append("{0}.{1}".format(node, at))
         cmds.animLayer(layer, edit=True, attribute=plugs)
 
@@ -314,7 +348,7 @@ class SecondaryMotionSession(object):
         self._curves = {}
         node_list = list(nodes)
         for ni, node in enumerate(node_list):
-            for at in ROT_ATTRS:
+            for at in self.axes:
                 before = set(cmds.animLayer(layer, q=True, animCurves=True) or [])
                 cmds.setKeyframe(node, at=at, t=first,
                                  v=cmds.getAttr("{0}.{1}".format(node, at)),
@@ -340,7 +374,8 @@ class SecondaryMotionSession(object):
 
         items = list(writes.items())
         for ni, (node, values) in enumerate(items):
-            for ai, at in enumerate(ROT_ATTRS):
+            for at in self.axes:
+                ai = ROT_INDEX[at]
                 crv = self._curves.get((node, at))
                 if not crv or not cmds.objExists(crv):
                     continue
@@ -365,6 +400,8 @@ class SecondaryMotionSession(object):
     def bake_keys(self, writes, progress=None):
         """base 커브에 직접 키를 굽는다(undo 가능한 cmds 경로).
 
+        `self.axes` 의 축만 지우고 다시 굽는다 — 빠진 축의 원본 키는 손대지 않는다.
+
         노드 x 프레임 만큼 `setKeyframe` 이 돌아 이 툴에서 **가장 오래 걸리는 기록
         경로**다. 그래서 진행률도 프레임 단위로 보고한다.
         """
@@ -376,7 +413,7 @@ class SecondaryMotionSession(object):
         done = 0
 
         for node, values in items:
-            for at in ROT_ATTRS:
+            for at in self.axes:
                 try:
                     cmds.cutKey(node, at=at, time=(start, end), clear=True)
                 except Exception:
@@ -390,8 +427,8 @@ class SecondaryMotionSession(object):
             label = "{0}  ({1}/{2})".format(short, ni + 1, len(items))
             for k, f in enumerate(self.frames):
                 v = values[k]
-                for ai, at in enumerate(ROT_ATTRS):
-                    cmds.setKeyframe(node, at=at, t=f, v=v[ai])
+                for at in self.axes:
+                    cmds.setKeyframe(node, at=at, t=f, v=v[ROT_INDEX[at]])
                 done += 1
                 if progress:
                     progress(done, total, label)

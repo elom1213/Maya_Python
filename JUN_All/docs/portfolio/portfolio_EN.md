@@ -411,6 +411,15 @@ Default Distance attribute (driver signal x)
   (a test caught that). Re-reading the Apply path to place the phases also surfaced two silent bugs:
   with preview **off**, moving a slider and pressing Apply **baked the previous solve**, and pressing Apply
   before the debounce fired **promoted the preview from one edit ago**.
+- **The rotation axes the result is written to are selectable (`Rotate Axis`)** — for a tail that should
+  only swing sideways, or when another axis already carries hand-made keys that must survive. **The solve
+  stays three-dimensional and the axis filter lives in the writing step**, so with all three on the result
+  is bit-for-bit what it was before. An unchecked axis is not written as zero, it is **not written at all**:
+  it is never registered on the animation layer, and the bake path does not even `cutKey` it, so the
+  original keys stay. The trap was the preview — a live preview layer still holds curves for the old axes,
+  so after turning an axis off those curves keep overriding the original and **nothing appears to change**.
+  The layer is rebuilt only when the axes actually change, and the sample cache, which does not depend on
+  them, is kept so nothing is re-sampled.
 
 ### 4-3. Wind sway from a periodic function
 `A00390_WindTool`

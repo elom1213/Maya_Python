@@ -319,6 +319,24 @@ class MainWindow(QWidget):
         self.sb_sub.valueChanged.connect(self._schedule)
         form.addRow("Substeps", self.sb_sub)
 
+        # 결과를 쓸 회전 축. 체크가 빠진 축에는 커브도 키도 만들지 않으므로
+        # 그 축은 원본 애니메이션 그대로 남는다.
+        axis_row = QHBoxLayout()
+        self.chk_axes = []
+        for axis in ("X", "Y", "Z"):
+            cb = QCheckBox(axis)
+            cb.setChecked(True)
+            cb.setToolTip(
+                "Write the secondary motion into rotate{0}.\n"
+                "Unchecked axes are left exactly as they are - no curve and no key\n"
+                "is written on them, so the original animation stays.\n"
+                "At least one axis has to stay on.".format(axis))
+            cb.toggled.connect(self._on_axis_toggled)
+            axis_row.addWidget(cb)
+            self.chk_axes.append(cb)
+        axis_row.addStretch(1)
+        form.addRow("Rotate Axis", axis_row)
+
         pl.addLayout(form)
 
         # 팁도 회전시킬지 — 체인 끝에 가상 뼈를 하나 붙여 마지막 노드에도 키를 만든다.
@@ -466,6 +484,26 @@ class MainWindow(QWidget):
             damping_curve=self._curve_spec("damping_curve"),
             world_curve=self._curve_spec("world_curve"))
 
+    def _axes(self):
+        """체크된 회전 어트리뷰트 튜플 (ROT_ATTRS 순서)."""
+        return tuple(bake_mgr.ROT_ATTRS[i]
+                     for i, cb in enumerate(self.chk_axes) if cb.isChecked())
+
+    def _on_axis_toggled(self, on):
+        if not self._axes():
+            # 마지막 축은 끄지 못하게 되돌린다 — 축이 하나도 없으면 쓸 것이 없다.
+            cb = self.sender()
+            if cb is not None:
+                cb.blockSignals(True)
+                cb.setChecked(True)
+                cb.blockSignals(False)
+            self.log("At least one rotate axis has to stay on.", warn=True)
+            return
+        # 축이 바뀌면 프리뷰 레이어를 다시 만들어야 한다(빠진 축의 커브가 남아 있다).
+        # set_axes 가 알아서 지우고, 이어지는 프리뷰가 새 축으로 다시 만든다.
+        self.session.set_axes(self._axes())
+        self._schedule()
+
     def _mode(self):
         return (scene_sampler.MODE_ROOT if self.rb_root.isChecked()
                 else scene_sampler.MODE_CHAIN)
@@ -564,6 +602,7 @@ class MainWindow(QWidget):
             self.chk_preview.blockSignals(False)
             return
         try:
+            self.session.set_axes(self._axes())
             self.session.update_preview(self._params())
         except Exception as e:
             self.log("Preview failed: {0}".format(e), warn=True)
@@ -600,6 +639,9 @@ class MainWindow(QWidget):
 
         output = self._output()
         params = self._params()
+        # promote 판정(프리뷰 승격) 전에 축을 확정해야 한다 — 축이 바뀌었다면
+        # set_axes 가 프리뷰를 지우므로 승격이 아니라 새로 기록하는 경로로 가야 한다.
+        axes = self.session.set_axes(self._axes())
 
         need_sample = self._dirty or not self.session.has_cache()
         promote = (output == outputs.OUTPUT_LAYER and not need_sample
@@ -650,6 +692,9 @@ class MainWindow(QWidget):
         self.chk_preview.blockSignals(False)
         self._dirty = True
         self._log_loop_report()
+        if len(axes) < len(bake_mgr.ROT_ATTRS):
+            self.log("Rotate axis: {0} only - the other axes were left "
+                     "untouched.".format(", ".join(a[-1] for a in axes)))
         self.log("{0}  ({1:.1f}s)".format(msg, elapsed), warn=(count == 0))
 
     # ==============================================================
