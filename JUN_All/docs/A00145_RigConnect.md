@@ -986,19 +986,19 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
 
 ```
 Driven                       Driver
-[ rig:jnt_L_arm  ]           [ ctrl_L_arm  ]   [ Get Closest ][ Match by Name ]
-[ rig:jnt_L_hand ]           [ ctrl_L_hand ]
-[ (Null)         ]           [ ctrl_R_foot ]   <- 짝을 못 찾은 자리
-
-                   [ Swap ]                              <- 두 리스트를 맞바꾼다
+[ rig:jnt_L_arm  ] +------+  [ ctrl_L_arm  ]   [ Get Closest ][ Match by Name ]
+[ rig:jnt_L_hand ] | Swap |  [ ctrl_L_hand ]
+[ (Null)         ] +------+  [ ctrl_R_foot ]   <- 짝을 못 찾은 자리
+                      ^
+                      +-- 두 리스트를 통째로 맞바꾼다 (리스트 높이만큼 세로로 길다)
 
 Match by Name : [ ] Same Name Only  [x] Unique  [x] Ignore Namespace   Min [0.40]
 Pairing       : ( ) Closest distance   (o) List order
 ```
 
 - `Driven` / `Driver` 리스트 구성.
-- **`Swap`(v01.39)**: 두 리스트를 통째로 맞바꾼다 — 지금 `Driven` 인 것이 `Driver` 가 되고 그 반대도
-  된다. Match 탭의 `Swap` 과 같은 동작이고, 담을 때 방향을 거꾸로 골랐거나 **같은 짝을 반대로
+- **`Swap`(v01.39)**: **두 리스트 사이에 세로로 길게** 선 버튼. 두 리스트를 통째로 맞바꾼다 —
+  지금 `Driven` 인 것이 `Driver` 가 되고 그 반대도 된다. Match 탭의 `Swap` 과 같은 동작이고, 담을 때 방향을 거꾸로 골랐거나 **같은 짝을 반대로
   한 번 더 걸어 보고 싶을 때** 리스트를 다시 담지 않게 해 준다.
   - 짝은 **자리**로 서 있으므로 `(Null)` 을 포함한 **행 순서가 그대로 보존**된다 —
     `Match by Name` 으로 세운 짝을 `List order` 로 그대로 이어서 방향만 반대로 걸 수 있다.
