@@ -569,28 +569,26 @@ class MainWindow(QWidget):
         self.btn_pole_check.clicked.connect(self.on_pole_check)
         row.addWidget(self.btn_pole_check)
 
-        # Create 는 한 칸을 통째로 쓰던 큰 버튼이었다. 세로를 반으로 줄여 그 자리에
-        # 'Create Selected' 를 얹는다 - 같은 배선을 **새 노드에** 거느냐 **고른
+        # Create 는 남는 폭을 통째로 쓰던 버튼이었다. 폭을 반으로 나눠 그 옆에
+        # 'Create Selected' 를 세운다 - 같은 배선을 **새 노드에** 거느냐 **고른
         # 오브젝트에** 거느냐의 차이라 나란히 서 있는 편이 읽기 쉽다.
-        create_col = QVBoxLayout()
-        create_col.setSpacing(2)
-
         self.btn_pole_create = QPushButton("Create")
+        self.btn_pole_create.setMinimumHeight(30)
         self.btn_pole_create.setToolTip(
             "Build the object and keep it on the bend. One undo step.")
         self.btn_pole_create.clicked.connect(self.on_pole_create)
-        create_col.addWidget(self.btn_pole_create)
+        row.addWidget(self.btn_pole_create, 1)
 
         self.btn_pole_create_selected = QPushButton("Create Selected")
+        self.btn_pole_create_selected.setMinimumHeight(30)
         self.btn_pole_create_selected.setToolTip(
             "Same wiring as Create, but on the objects you have selected in the\n"
             "scene instead of on a new one - nothing is created and nothing is\n"
             "renamed or reparented, they just start following the bend.\n"
             "Put the three chain objects in the list above first. One undo step.")
         self.btn_pole_create_selected.clicked.connect(self.on_pole_create_selected)
-        create_col.addWidget(self.btn_pole_create_selected)
+        row.addWidget(self.btn_pole_create_selected, 1)
 
-        row.addLayout(create_col, 1)
         layout.addLayout(row)
 
         row2 = QHBoxLayout()

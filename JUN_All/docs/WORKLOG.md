@@ -46,8 +46,9 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   바꾸는 길은 이미 `Update Selected` 로 따로 있다.
 - 남이 건 컨스트레인트가 있는 오브젝트는 `ensure()` 가 원래대로 조용히 지우지 않고 건너뛴다.
   여러 개를 골라도 **전체가 undo 한 스텝**(`create_on` 이 통째로 감싼다).
-- UI: `Create` 의 `setMinimumHeight(30)` 을 걷고 `Create` / `Create Selected` 를 같은 칸에
-  세로로 쌓았다 — `Check` 옆 한 칸을 반씩 나눠 쓰므로 **버튼 줄이 늘지 않는다**.
+- UI: `Create` 가 쓰던 폭을 **반으로 갈라**(254px씩) 그 옆에 `Create Selected` 를 세웠다.
+  `Check` / `Create` / `Create Selected` 가 한 줄이라 **버튼 줄이 늘지 않고**, 아래
+  `Update Selected` / `Bake Selected` 줄과도 자리가 맞는다.
 - headless(mayapy 2024) **22항목** 통과 — 위치가 `A'` 와 일치 · 체인을 따라옴 · undo 한 스텝 ·
   여러 개 동시 · 체인 멤버 가드 · 리스트 3개 가드 · 두 번째 실행 `kept` · 남의 컨스트레인트 보존.
   coral_dark 테마 실제 창 캡처로 버튼 배치도 확인.
