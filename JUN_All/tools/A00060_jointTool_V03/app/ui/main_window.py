@@ -526,7 +526,7 @@ class MainWindow(QWidget):
             "0 is the midpoint, 1 is the middle object itself, 2 is twice as far out. "
             "Negative flips it to the other side either way.\n"
             "Slide moves it along the line between the two ends: positive towards "
-            "the FIRST object in the list, negative towards the LAST one, 1 being "
+            "the FIRST object in the list, negative towards the LAST one, 10 being "
             "all the way there. It is kept as 'poleSlide' and stays live too.")
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -556,18 +556,20 @@ class MainWindow(QWidget):
         grid.addWidget(QLabel("Slide"), 1, 0)
         self.spn_pole_slide = QDoubleSpinBox()
         self.spn_pole_slide.setRange(-100.0, 100.0)
-        self.spn_pole_slide.setDecimals(3)
+        # 0.1 한 칸이 반현의 1% 라 소수점 세 자리로는 거칠다 — 네 자리로 둔다.
+        self.spn_pole_slide.setDecimals(4)
         self.spn_pole_slide.setSingleStep(0.1)
         self.spn_pole_slide.setValue(0.0)
         self.spn_pole_slide.setKeyboardTracking(False)
         self.spn_pole_slide.setToolTip(
             "Where it sits between the two END objects.\n"
-            " 0 : halfway (the default)\n"
-            "+1 : all the way at the FIRST object in the list\n"
-            "-1 : all the way at the LAST object in the list\n"
+            "  0 : halfway (the default)\n"
+            "+10 : all the way at the FIRST object in the list\n"
+            "-10 : all the way at the LAST object in the list\n"
             "So a positive value brings it closer to the first object and a\n"
-            "negative one closer to the last. The step is half the distance\n"
-            "between the two ends, so the value keeps its meaning at any scale.\n"
+            "negative one closer to the last. One step of 0.1 moves it by 1/200\n"
+            "of the distance between the two ends, and the value is relative to\n"
+            "that distance, so it keeps its meaning at any rig scale.\n"
             "The value is kept on the object as 'poleSlide' and stays live.")
         grid.addWidget(self.spn_pole_slide, 1, 1)
 

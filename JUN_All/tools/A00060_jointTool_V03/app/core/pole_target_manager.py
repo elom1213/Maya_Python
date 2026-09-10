@@ -64,22 +64,24 @@
 # (무릎 타깃을 골반 쪽으로, 팔꿈치 타깃을 어깨 쪽으로). 그래서 두 번째 어트리뷰트
 # `poleSlide` (= s) 로 타깃을 **현 방향(p1 - p3)** 으로 미끄러뜨린다:
 #
-#     A' = A + n*v + (s/2) * (p1 - p3)
+#     A' = A + n*v + (s * SLIDE_SCALE / 2) * (p1 - p3)
 #
-#     s = +1  ->  기준점이 p1 (목록의 첫 오브젝트 A) 으로 간다
-#     s = -1  ->  기준점이 p3 (마지막 오브젝트 C) 으로 간다
+#     s = +10  ->  기준점이 p1 (목록의 첫 오브젝트 A) 으로 간다
+#     s = -10  ->  기준점이 p3 (마지막 오브젝트 C) 으로 간다
 #
-# **현(chord) 길이의 절반을 단위로 쓴다** - 체인 크기에 따라 값을 다시 잡을 필요가 없고,
-# `±1` 이 "끝까지" 라는 뜻이라 쉽다.
+# **현(chord) 길이에 비례하는 단위**라 체인 크기가 달라도 값을 다시 잡을 필요가 없다.
+# 여기에 **배율 `SLIDE_SCALE = 0.1`** 을 곱한다(v03.08) - 반현을 그대로 단위로 쓰면
+# 스핀박스 한 칸(0.1)이 반현의 10% 라 **한 칸에도 크게 움직인다.** 곱하고 나면
+# `±10` 이 "끝까지" 이고, 한 칸은 그 10분의 1 이라 손으로 맞추기 좋다.
 #
 # ★ 이것도 **가중치 합이 1 이라 여전히 pointConstraint 하나**다:
 #
-#     A' = ((1-n)/2 + s/2)*p1 + n*p2 + ((1-n)/2 - s/2)*p3
-#          \________________/         \________________/
-#            w0                          w2              (합 = (1-n) + n = 1)
+#     A' = ((1-n)/2 + s'/2)*p1 + n*p2 + ((1-n)/2 - s'/2)*p3       (s' = s * SLIDE_SCALE)
+#          \_________________/         \_________________/
+#            w0                           w2             (합 = (1-n) + n = 1)
 #
 # ★ **슬라이드를 `n` 에 섞지 않는 것이 핵심이다.** 기준점 A 를 먼저 움직이고
-#   거기서 `n*v` 를 가면(즉 `A_s + n(p2 - A_s)`) 가중치가 `(1-n)*s/2` 가 되어
+#   거기서 `n*v` 를 가면(즉 `A_s + n(p2 - A_s)`) 가중치가 `(1-n)*s'/2` 가 되어
 #   **`n > 1` 에서 부호가 뒤집힌다** - 폴 타깃은 보통 `n > 1` 이므로 양수를 넣었는데
 #   C 쪽으로 가는 상황이 된다. 슬라이드는 **마지막에 더하는 평행이동**이어야 한다.
 #
@@ -100,8 +102,13 @@ from Framework.core.maya_undo import undo_chunk
 #: 폴 거리 어트리뷰트 이름
 DISTANCE_ATTR = "poleDistance"
 
-#: 양 끝 사이를 오가는 어트리뷰트 이름 (+1 = 첫 오브젝트, -1 = 마지막 오브젝트)
+#: 양 끝 사이를 오가는 어트리뷰트 이름 (양수 = 첫 오브젝트 쪽, 음수 = 마지막 쪽)
 SLIDE_ATTR = "poleSlide"
+
+#: 슬라이드 값에 곱해지는 배율 (v03.08)
+#: 반현을 그대로 단위로 쓰면 눈금 0.1 이 반현의 10% 라 **한 칸에 너무 많이 움직인다**.
+#: 값에 0.1 을 곱해 같은 눈금으로 **10배 섬세하게** 만든다 (`±10` 이 끝까지).
+SLIDE_SCALE = 0.1
 
 #: 만들 수 있는 오브젝트 종류
 KIND_LOCATOR = "locator"
@@ -134,15 +141,16 @@ def world_point(node):
 
 
 def slide_offset(p1, p3, slide):
-    """`(s/2) * (p1 - p3)` — 현(chord) 방향으로의 평행이동.
+    """`(s * SLIDE_SCALE / 2) * (p1 - p3)` — 현(chord) 방향으로의 평행이동.
 
-    `s = +1` 이면 반현 하나만큼, 즉 기준점이 중점에서 **`p1` 까지** 간다.
+    `s = +10` 이면 반현 하나만큼, 즉 기준점이 중점에서 **`p1` 까지** 간다
+    (배율 `SLIDE_SCALE` 이 곱해져 있다 - 모듈 주석).
     모드(배수 / 거리 고정)와 무관하게 **마지막에 더해진다** — 그래야 부호가
     `n` 에 따라 뒤집히지 않는다(모듈 주석).
     """
     if not slide:
         return om.MVector(0.0, 0.0, 0.0)
-    return (p1 - p3) * (float(slide) * 0.5)
+    return (p1 - p3) * (float(slide) * SLIDE_SCALE * 0.5)
 
 
 def solve_position(p1, p2, p3, distance, slide=0.0):
@@ -391,8 +399,9 @@ def _wired_line(target, nodes, distance, fixed):
 def _slide_line(target, nodes):
     """슬라이드 어트리뷰트를 어느 쪽으로 돌리면 어디로 가는지 한 줄 — 부호를 외우게 하지 않는다."""
     return ("[Info] '{0}' : + moves it towards {1}, - towards {2} "
-            "(1 = all the way).".format(
-                SLIDE_ATTR, _short(nodes[0]), _short(nodes[2])))
+            "({3:g} = all the way).".format(
+                SLIDE_ATTR, _short(nodes[0]), _short(nodes[2]),
+                1.0 / SLIDE_SCALE))
 
 
 def targets_of(target):
@@ -447,7 +456,10 @@ def ensure(target, nodes, distance, reset_distance=False, fixed=False,
         have = [_long(t) for t in targets_of(target)]
         want_mode = MODE_FIXED if fixed else MODE_MULTIPLE
         has_slide = cmds.objExists(slide_plug)
-        if want == have and mode_of(target) == want_mode and has_slide:
+        # 배율까지 맞아야 같은 배선이다 - 다르면 타깃마다 감도가 엇갈린다.
+        scale = slide_scale_of(target) if has_slide else None
+        scale_ok = scale is not None and abs(scale - SLIDE_SCALE) < 1e-9
+        if want == have and mode_of(target) == want_mode and scale_ok:
             if reset_distance:
                 if _writable(plug):
                     cmds.setAttr(plug, float(distance))
@@ -458,6 +470,10 @@ def ensure(target, nodes, distance, reset_distance=False, fixed=False,
         if not has_slide:
             messages.append("[Info] {0}: rebuilt to add '{1}'.".format(
                 _short(target), SLIDE_ATTR))
+        elif not scale_ok:
+            messages.append(
+                "[Info] {0}: rebuilt for the current '{1}' scale ({2:g}).".format(
+                    _short(target), SLIDE_ATTR, SLIDE_SCALE))
         elif want == have:
             messages.append("[Info] {0}: rewired to '{1}' distance.".format(
                 _short(target), want_mode))
@@ -539,6 +555,33 @@ def _wire_n_fixed(target, nodes, base):
     return plus + ".output1D"
 
 
+def _slide_divisor():
+    """`_side` 의 Y 채널에 넣을 나눗수 - `s / 이값 = s * SLIDE_SCALE / 2`."""
+    return 2.0 / SLIDE_SCALE
+
+
+def slide_scale_of(target):
+    """이 타깃이 **어느 배율로** 배선됐는가 (모르면 `None`).
+
+    배율을 바꾸면 예전에 배선한 타깃은 감도가 달라서 **같은 씬 안에서 타깃마다
+    다르게 움직인다** - 이름이 아니라 **살아 있는 나눗수 값**으로 판정해서,
+    `ensure()` 가 한 번 다시 짓도록 한다.
+    """
+    con = constraint_of(target)
+    if not con or not cmds.objExists("{0}.{1}".format(target, SLIDE_ATTR)):
+        return None
+    for node in helper_nodes(con):
+        if cmds.nodeType(node) != "multiplyDivide":
+            continue
+        src = cmds.listConnections(
+            node + ".input1Y", source=True, destination=False, plugs=True) or []
+        if not src or src[0].split(".")[-1] != SLIDE_ATTR:
+            continue
+        div = cmds.getAttr(node + ".input2Y")
+        return (2.0 / div) if div else None
+    return None
+
+
 def _wire(target, nodes, messages, fixed=False):
     """컨스트레인트와 보조 노드를 만들고 가중치를 **연결**한다.
 
@@ -547,9 +590,10 @@ def _wire(target, nodes, messages, fixed=False):
     `fixed=True` 면 `n` 이 `poleDistance` 자신이 아니라 `1 + d/|v|` 다. **그 차이가
     전부다** - 아래 `1-n` · `(1-n)/2` · 가중치 연결은 두 모드가 똑같이 쓴다.
 
-    양 끝 가중치는 `(1-n)/2` 에서 **`s/2` 를 더하고 뺀 값**이다(모듈 주석).
-    `s/2` 는 새 노드 없이 `_side` 의 **Y 채널**로 계산한다 — `multiplyDivide` 는
-    한 노드가 세 채널을 갖고 `operation`(divide) 은 세 채널에 같이 걸린다.
+    양 끝 가중치는 `(1-n)/2` 에서 **`s*SLIDE_SCALE/2` 를 더하고 뺀 값**이다(모듈 주석).
+    그 값은 새 노드 없이 `_side` 의 **Y 채널**로 계산한다 — `multiplyDivide` 는
+    한 노드가 세 채널을 갖고 `operation`(divide) 은 세 채널에 같이 걸리므로,
+    나누는 수를 `2/SLIDE_SCALE` 로 두면 **반으로 나누기와 배율을 한 번에** 처리한다.
     """
     con = cmds.pointConstraint(nodes[0], nodes[1], nodes[2], target,
                                maintainOffset=False)[0]
@@ -573,9 +617,10 @@ def _wire(target, nodes, messages, fixed=False):
     half = cmds.createNode("multiplyDivide", name=base + "_side")
     cmds.setAttr(half + ".operation", 2)                 # divide
     cmds.setAttr(half + ".input2X", 2.0)
-    cmds.setAttr(half + ".input2Y", 2.0)
+    cmds.setAttr(half + ".input2Y", _slide_divisor())
     cmds.connectAttr(sub + ".output1D", half + ".input1X")
-    # Y 채널은 s/2 — 노드를 더 만들지 않고 같은 노드에 얹혀 붙인다.
+    # Y 채널은 s*SLIDE_SCALE/2 — 나누는 수 하나로 배율까지 같이 처리한다
+    # (노드를 더 만들지 않고 같은 노드에 얹혀 붙인다).
     cmds.connectAttr("{0}.{1}".format(target, SLIDE_ATTR), half + ".input1Y")
 
     # 첫 타깃 (1-n)/2 + s/2   ·   끝 타깃 (1-n)/2 - s/2
