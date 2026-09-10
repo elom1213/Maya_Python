@@ -4,7 +4,9 @@
 평평하던 상위 탭 5개(그 안에 접이식 6섹션)를 **상위 탭 = 카테고리 / 하위 탭 = 기능**
 의 2단 구조로 다시 나눠 담았다.
 
-- 버전: `v03.02` (`app/config/version.py`) — **레퍼런스 ikHandle 수정** (§8.8)
+- 버전: `v03.04` (`app/config/version.py`) — `Chain > Pole Target` 에 **`Create Selected`**:
+  `Create` 와 같은 배선을 **씬에서 고른 오브젝트**에 건다(새 노드를 만들지 않는다) (§Pole Target)
+  · v03.03 은 **`Chain > Pole Target` 하위 탭 신규** · v03.02 는 **레퍼런스 ikHandle 수정** (§8.8)
 - 위치: `JUN_All/tools/A00060_jointTool_V03`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴 (상위 5 × 하위 12 중첩 `QTabWidget`)
 - 계획서: [A00060_jointTool_V02 탭 재분류 계획서](plans/A00060_jointTool_V02_tab_reorg_plan.md)
@@ -62,7 +64,7 @@ A00060_jointTool_V03.run(True)   # True 면 DEV_MODE 에서 reload 후 실행
 |---|---|---|
 | **Create** | 씬에 **조인트가 생긴다** | `From Curve` · `From Object` · `Divide` |
 | **Orient** | 있는 조인트의 **방향만** 바뀐다 (위치·개수 불변) | `Aim` · `Set Orient` · `Orient / Rotate` |
-| **Chain** | 있는 체인의 **구조·연결**을 고친다 | `Reverse` · `Create IK` · `IK Edit` |
+| **Chain** | 있는 체인의 **구조·연결**을 고친다 | `Reverse` · `Pole Target` · `Create IK` · `IK Edit` |
 | **Curve** | 조인트가 아니라 **커브·디포머**를 다룬다 (조인트를 만들기 전 준비) | `Edit Curve` · `Clusters` |
 | **Select** | **씬을 바꾸지 않는다** — 고르기만 한다 | `Unused Joints` |
 
@@ -156,6 +158,37 @@ X 둘레 트위스트만 적용한다.
 
 - `Remove origin` 체크 : 켜면 원본 체인 삭제 + `_rev` 접미사 제거
 - 리스트 순서가 체인 순서(root→end)와 일치해야 한다.
+
+#### Chain > Pole Target (v03.03)
+세 오브젝트 `[끝, 가운데, 끝]` 의 **굽은 쪽 바깥**에 늘 붙어 있는 오브젝트를 만든다.
+IK 의 폴 벡터 타깃으로 쓰라고 만든 것이고, 체인이 움직이면 따라온다.
+
+```
+A  = (p1 + p3) / 2     <- 양 끝의 중점        v  = p2 - A
+A' = A + n*v           <- 여기에 오브젝트를 둔다 (n = Distance)
+```
+
+- `Objects (end - middle - end)` 리스트에 **정확히 3개**를 체인 순서로 담는다.
+- `Distance` : 굽은 정도의 **배수**다(씬 거리가 아니다). `0` 은 중점, `1` 은 가운데
+  오브젝트 자신, `2` 는 두 배 바깥, 음수는 반대쪽. 만든 오브젝트에 `poleDistance`
+  어트리뷰트로 남아 **살아 있다** — 나중에 값만 바꿔도 즉시 움직인다.
+- `Type` : `locator`(기본) / `joint` / `group`, `Name` : 비우면 `<가운데 이름>_polTgt`.
+- `Check` : 어디에 놓일지와 무엇이 막고 있는지만 말한다. **씬을 안 바꾼다.**
+- `Create` : 오브젝트를 만들고 배선한다. **undo 한 스텝.**
+- **`Create Selected` (v03.04)** : `Create` 와 **같은 배선**을 새 노드가 아니라 **지금 씬에서
+  고른 오브젝트들**에 건다. 리스트에 세 오브젝트를 담아 두고 대상을 고른 뒤 누르면 된다.
+  이름 · 부모 · 셰이프 · 이미 걸려 있던 다른 연결은 **하나도 건드리지 않는다** — 이미 만들어 둔
+  컨트롤러를 그대로 폴 타깃으로 쓰고 싶을 때 쓴다. 여러 개를 골라도 **undo 한 스텝.**
+  - **리스트에 담긴 세 오브젝트 자신은 건너뛴다.** 자기 자신을 타깃으로 삼는 컨스트레인트가
+    되어 순환이 되기 때문이다. 마야는 사이클 경고만 내고 씬은 망가진 채 남으므로 걸기 전에 막는다.
+  - **이미 폴 타깃인 것은 그대로 둔다**(`kept`). `poleDistance` 는 실시간으로 맞춰 두는 값이라
+    누를 때마다 `Distance` 값으로 되돌리지 않는다 — 바꾸려면 `Update Selected`.
+  - 남이 건 컨스트레인트가 이미 있는 오브젝트도 **조용히 지우지 않고** 건너뛰고 로그로 알린다.
+- `Update Selected` : 고른 폴 타깃의 `Distance` 만 바꾼다(다시 만들지 않는다).
+- `Bake Selected` : 컨스트레인트와 보조 노드를 지우고 **그 자리에 굳힌다**. undo 로 되돌아온다.
+
+> **일직선이면 경고한다.** 세 점이 한 줄에 있으면 `v = 0` 이라 `Distance` 가 얼마든 중점에
+> 머문다(T 포즈에서 흔하다). 막지는 않고 알려 준다 — 관절을 먼저 굽혀 두면 된다.
 
 #### Chain > Create IK (v03.01)
 시작/끝 조인트 쌍마다 **ikHandle** 을 만들고, **폴 타깃이 주어진 체인에만** 폴 벡터
@@ -274,7 +307,8 @@ A00060_jointTool_V03/
     │   ├── aim_manager.py          # Orient > Aim
     │   ├── hair_manager.py         # Curve > Edit Curve / Chain > Reverse / Select > Unused Joints
     │   ├── ik_edit_manager.py      # Chain > IK Edit (ikHandle / 폴 벡터 갱신)
-    │   └── ik_create_manager.py    # Chain > Create IK (ikHandle 생성 + 폴 벡터)
+    │   ├── ik_create_manager.py    # Chain > Create IK (ikHandle 생성 + 폴 벡터)
+    │   └── pole_target_manager.py  # Chain > Pole Target (A'=A+n*v, create / create_on / update / bake)
     └── ui/
         └── main_window.py          # 중첩 QTabWidget (5 × 12) + 공유 로그 + Help>About
 ```

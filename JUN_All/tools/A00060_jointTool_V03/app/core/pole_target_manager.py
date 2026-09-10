@@ -347,6 +347,93 @@ def _wire(target, nodes, messages):
 
 
 # =========================
+# 이미 있는 오브젝트에 걸기
+# =========================
+
+def create_on(targets, nodes, distance=1.0, reset_distance=False):
+    """**이미 씬에 있는** 오브젝트들에 `create()` 와 같은 배선을 건다.
+
+    `(rows, messages)` — `rows` 는 `[{"target", "status"}]`,
+    `status` 는 `ensure()` 의 것(`wired` · `kept` · `skipped`).
+
+    `create()` 는 노드를 새로 만들어 거기에 배선하지만, 이미 만들어 둔 컨트롤러나
+    로케이터를 그대로 폴 타깃으로 쓰고 싶은 경우가 더 흔하다. 그때 노드를 다시 만들고
+    옛것을 지우는 대신 **가진 오브젝트를 고친다** — 이름 · 부모 · 셰이프 · 이미 걸린
+    다른 연결이 전부 그대로 남는다.
+
+    ★ **리스트의 세 오브젝트 자신은 건너뛴다.** 체인 멤버에 이 배선을 걸면 자기 자신을
+      타깃으로 삼는 컨스트레인트가 되어 순환이 된다. 마야는 사이클 경고만 내고 씬은
+      망가진 채로 남으므로, 걸기 전에 막는다.
+
+    ★ **거리는 기본적으로 덮어쓰지 않는다.** 이미 배선된 타깃의 `poleDistance` 는
+      실시간으로 맞춰 둔 값이다 - 바꾸려면 `Update Selected`(= `update()`) 를 쓴다.
+      [[ensure]] 와 같은 규칙.
+
+    전체가 **undo 한 스텝**이다.
+    """
+    messages = []
+    rows = []
+
+    targets = [t for t in (targets or [])]
+    if not targets:
+        messages.append("[Warning] Select the object(s) to turn into pole targets.")
+        return rows, messages
+
+    if len(nodes) != 3:
+        messages.append(
+            "[Warning] pick exactly 3 objects, in the order end - middle - end "
+            "(got {0})".format(len(nodes)))
+        return rows, messages
+
+    missing = [n for n in nodes if not cmds.objExists(n)]
+    if missing:
+        messages.append("[Warning] not in the scene: " + ", ".join(missing))
+        return rows, messages
+
+    if len(set(_long(n) for n in nodes)) != 3:
+        messages.append("[Warning] the same object was given more than once")
+        return rows, messages
+
+    _position, note = solve(nodes, distance)
+    if note:
+        messages.append("[Warning] {0}.".format(note))
+
+    chain = set(_long(n) for n in nodes)
+    with undo_chunk():
+        for target in targets:
+            if not cmds.objExists(target):
+                rows.append({"target": target, "status": "skipped"})
+                messages.append("[Warning] '{0}' is not in the scene.".format(target))
+                continue
+            if _long(target) in chain:
+                # 체인 멤버를 자기 자신으로 몰면 사이클이다 (위 주석)
+                rows.append({"target": target, "status": "skipped"})
+                messages.append(
+                    "[Warning] {0}: it is one of the three objects in the list - "
+                    "a pole target cannot be driven by itself.".format(_short(target)))
+                continue
+
+            status, notes = ensure(target, nodes, distance,
+                                   reset_distance=reset_distance)
+            rows.append({"target": target, "status": status})
+            messages.extend(notes)
+            if status == "wired":
+                messages.append(
+                    "[OK] '{0}' follows {1} at distance {2:g} - change '{3}' to "
+                    "move it.".format(
+                        _short(target), " / ".join(_short(n) for n in nodes),
+                        float(cmds.getAttr("{0}.{1}".format(target, DISTANCE_ATTR))),
+                        DISTANCE_ATTR))
+            elif status == "kept":
+                messages.append(
+                    "[Info] {0}: already follows the same three objects - left as "
+                    "it is (use Update Selected to change the distance).".format(
+                        _short(target)))
+
+    return rows, messages
+
+
+# =========================
 # 고치기 / 굳히기
 # =========================
 

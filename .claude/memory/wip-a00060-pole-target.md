@@ -1,6 +1,6 @@
 ---
 name: wip-a00060-pole-target
-description: A00060 Chain>Pole Target — A'=A+n*v 는 pointConstraint 하나로 환원된다. 가중치는 setAttr 이 음수를 거부하고 연결은 통과한다 (v03.03)
+description: A00060 Chain>Pole Target — A'=A+n*v 는 pointConstraint 하나로 환원된다. 가중치는 setAttr 이 음수를 거부하고 연결은 통과한다. Create Selected 는 체인 멤버를 건너뛴다 (v03.04)
 metadata:
   type: project
 ---
@@ -46,4 +46,11 @@ setAttr(w0, -0.25)  ->  RuntimeError: below its minimum
 구동되나" 사전 검사를 뒀더니, 두 번째 실행에서 **우리가 건 컨스트레인트**에 걸려 4개가 전부
 걸러졌다(`0 pole target(s) wired`). **두 번째 실행에서만 드러나는 종류의 버그다.**
 
-검증 **54항목**. [[mayapy-headless-verify]] · [[wip-a00060-ik-edit]]
+**`Create Selected` (v03.04)** — `create_on()` 은 `ensure()` 를 선택 목록에 돌리는 얇은 층이다.
+새 노드를 만드는 `create()` 와 배선(`_wire`)이 같다.
+
+**★ 체인 멤버를 고른 채 누르면 순환이 된다.** 리스트의 세 오브젝트 자신에게 걸면 **자기 자신을
+타깃으로 삼는 pointConstraint** 다. 마야는 **사이클 경고만 내고 씬은 망가진 채 남는다** —
+막지 않으면 조용히 깨진다. 긴 이름으로 비교해 건너뛴다.
+
+검증 **54 + 22항목**. [[mayapy-headless-verify]] · [[wip-a00060-ik-edit]]
