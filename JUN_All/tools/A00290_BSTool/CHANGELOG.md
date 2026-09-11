@@ -1,5 +1,11 @@
 # Changelog — A00290_BSTool
 
+## v01.22 (2026-09-11)
+- **[Change] Naming 탭의 `Also rename the live target mesh node` 를 기본 켬으로.**
+  씬에 남아 있는 타겟 메시 이름이 타겟 이름과 어긋난 채 쌓이는 것이 더 헷갈린다.
+  별칭만 바꾸고 싶으면 끄면 된다 — 동작 자체는 v01.21 과 같다(FBX 에는 메시 이름이
+  나가지 않으므로 언리얼 결과는 켜든 끄든 동일하다).
+
 ## v01.21 (2026-09-11)
 **Edit BS 하위 탭 2개(Default / Naming)** — 기존 Edit BS 는 `Default` 로 그대로 옮기고,
 `Naming` 에서 **타겟 이름(weight 별칭)을 규칙으로 한꺼번에** 바꾼다.

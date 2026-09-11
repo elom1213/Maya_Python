@@ -1058,10 +1058,14 @@ class MainWindow(QWidget):
         layout.addWidget(self.tree_nm_preview, 1)
 
         self.chk_nm_mesh = QCheckBox("Also rename the live target mesh node")
+        # 기본 켬(v01.22~) - 씬에 남아 있는 타겟 메시의 이름이 타겟 이름과 어긋나 있는 것이
+        # 더 헷갈린다. 별칭만 바꾸고 싶으면 끈다.
+        self.chk_nm_mesh.setChecked(True)
         self.chk_nm_mesh.setToolTip(
             "Rename the target mesh in the scene to match, when the target still has\n"
             "one connected.  The mesh name never reaches the FBX - this is only to keep\n"
-            "the scene tidy.  Targets whose shape is already baked in are unaffected.")
+            "the scene tidy.  Targets whose shape is already baked in are unaffected.\n"
+            "Turn it off to rename the target (the alias) alone.")
         layout.addWidget(self.chk_nm_mesh)
 
         self.lbl_nm_state = QLabel("No blendShape set.")
