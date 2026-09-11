@@ -122,6 +122,7 @@
 - [A00310 SearchTool](wip-a00310-searchtool-merge.md) — 레거시 Selection/Search 툴 2개를 탭 하나로 병합 (Maya 테스트 대기)
 - [A00300 batch summary](wip-a00300-batch-summary-table.md) — Target Meshes TSL + 색상 요약 테이블 (v01.02)
 - [A00300 zero-area rework](wip-a00300-zero-area-quality-rework.md) — **진행 중**: zero_area_faces 를 shape-quality 로 재작업 + Clear Log
+- [A00290 Naming tab](wip-a00290-naming-tab.md) — **신규** Edit BS > Naming: 타겟 이름(weight 별칭) 일괄 변경. **FBX 에 나가는 이름은 별칭뿐**(메시 노드 이름은 어디에도 없다) · `aliasAttr` 은 **같은 이름·맞바꾸기를 거절**해 임시 이름 2단계가 필요 (v01.21)
 - [A00290 Target Order tab](wip-a00290-target-order-tab.md) — **신규**: blendShape 타겟 순서(weight 인덱스) 재배치. 마야에 없는 기능 · 타겟은 여러 곳에 흩어져 있고, `removeMultiInstance` 를 **그룹 단위로 쓰면 undo 가 안 된다** (v01.20)
 - [A00290 Bake Delete tab](wip-a00290-bake-delete-tab.md) — **신규**: 디포머 뒤 `deleteComponent` 를 리그 전체에 반영(중립·타겟·델타·웨이트 재매핑). 정점 순서는 보존되므로 위치 greedy 로 매핑, 검증은 **엣지가 아니라 같은 페이스**, 밀어 넣은 셰이프의 `pnts` 를 안 지우면 조용히 틀린다 (v01.19)
 - [A00290 Mix Targets tab](wip-a00290-mix-targets-tab.md) — **신규**: 소스 가중합을 다른 타겟 + 최종(리깅) 메시에 일괄 반영. Base mesh 3모드, 공용 `delta_utils` (v01.17)

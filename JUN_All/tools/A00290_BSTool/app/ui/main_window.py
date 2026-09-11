@@ -6,7 +6,10 @@
 # 탭 구성:
 #   1) Shape Editor : blendShape 노드의 모든 타겟을 리스트업 → 타겟마다 Edit 토글
 #                     (Maya 기본 Shape Editor 대체)
-#   2) Edit BS      : blendShape 노드 리스트 → 모든 타겟 키 / 타겟 메시 추출
+#   2) Edit BS      : 하위 탭 둘
+#        - Default  : blendShape 노드 리스트 → 모든 타겟 키 / 타겟 메시 추출
+#        - Naming   : 타겟 이름(weight 별칭)을 규칙으로 한꺼번에 바꿔 놓는다
+#                     (= FBX 의 BlendShapeChannel 이름 = 언리얼 모프 타겟 이름)
 #   3) Base Shape   : blendShape 의 타겟을 리스트업 → 선택 타겟의 weight=value 모양을
 #                     weight=1.0 기본 모양으로 재정의(델타 스케일)
 #   4) Mix Targets  : 소스 타겟 몇 개를 원하는 배율로 섞은 만큼, 체크한 다른 타겟들의
@@ -33,6 +36,7 @@ from tools.A00290_BSTool.app.core import (EditBSManager, BaseShapeManager,
                                           BakeDeleteManager, EDITABLE_STATES)
 from tools.A00290_BSTool.app.core import blendshape_utils as bsu
 from tools.A00290_BSTool.app.core import target_order_manager as tom
+from tools.A00290_BSTool.app.core import naming_manager as nm
 
 
 # Edit 토글이 켜졌을 때의 버튼 색(Maya Shape Editor 의 활성 Edit 버튼과 같은 의미).
@@ -835,6 +839,23 @@ class MainWindow(QWidget):
     # ==================================================
 
     def _build_edit_bs_tab(self):
+        """Edit BS = 하위 탭 둘(Default / Naming).
+
+        Default 는 예전 Edit BS 그대로고, Naming 은 타겟 **이름**(weight 별칭)을 바꾼다.
+        둘 다 "blendShape 노드를 골라 타겟을 다룬다" 는 같은 일이라 한 탭 아래 묶었다.
+        """
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        self.tabs_edit_bs = QTabWidget()
+        self.tabs_edit_bs.addTab(self._build_edit_bs_default_tab(), "Default")
+        self.tabs_edit_bs.addTab(self._build_naming_tab(), "Naming")
+        layout.addWidget(self.tabs_edit_bs)
+
+        return tab
+
+    def _build_edit_bs_default_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
@@ -892,6 +913,361 @@ class MainWindow(QWidget):
 
         layout.addStretch(1)
         return tab
+
+    # ==================================================
+    # Tab 2-2 : Edit BS > Naming
+    # ==================================================
+
+    def _build_naming_tab(self):
+        """blendShape 타겟의 이름(weight 별칭)을 규칙으로 한꺼번에 바꾸는 하위 탭.
+
+        여기서 바꾸는 이름이 곧 **FBX 의 BlendShapeChannel 이름**이고, 언리얼은 그것을
+        모프 타겟 이름으로 쓴다(타겟 메시의 노드 이름은 FBX 에 나가지 않는다).
+        """
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # ---- blendShape 노드 지정
+        node_row = QHBoxLayout()
+        lbl = QLabel("BlendShape Node")
+        lbl.setMinimumWidth(110)
+        node_row.addWidget(lbl)
+        self.le_nm_node = QLineEdit()
+        self.le_nm_node.setPlaceholderText(
+            "Pick a blendShape node or a mesh, then <- Set")
+        node_row.addWidget(self.le_nm_node)
+        btn_set = QPushButton("<- Set")
+        btn_set.setToolTip(
+            "Set the blendShape from the current selection (node or mesh)\n"
+            "and list its targets right away.")
+        btn_set.clicked.connect(self.on_nm_set_node)
+        node_row.addWidget(btn_set)
+        layout.addLayout(node_row)
+
+        btn_list = QPushButton("List Targets")
+        btn_list.setToolTip("Read the target names from the node again.")
+        btn_list.clicked.connect(self.on_nm_list_targets)
+        layout.addWidget(btn_list)
+
+        # ---- 타겟 목록
+        # 이름을 고르는 것이 전부라 Select / Add / Del / Up / Down / Sort 는 감춘다
+        # (타겟은 씬 오브젝트가 아니라 어트리뷰트 별칭이고, 순서는 Target Order 탭의 일이다).
+        self.tsl_nm_targets = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Targets", show_select=False, show_add=False, show_del=False,
+            show_up=False, show_down=False, show_sort=False, show_order=False,
+            attach_uuids=False, list_min_height=120, log_callback=self.log)
+        self.tsl_nm_targets.setToolTip(
+            "Select the targets to rename. With nothing selected, every listed\n"
+            "(and visible) target is renamed.")
+        layout.addWidget(self.tsl_nm_targets, 1)
+        self.tsl_nm_targets.list_widget.itemSelectionChanged.connect(
+            lambda *_a: self._nm_refresh())
+
+        self.flt_nm_targets = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.tsl_nm_targets.list_widget,
+            placeholder="Type any part of a target name (e.g. Inner)")
+        self.flt_nm_targets.filtered.connect(lambda *_a: self._nm_refresh())
+        layout.addWidget(self.flt_nm_targets)
+
+        # ---- 이름 짓는 규칙
+        box = QGroupBox("New Name")
+        box_layout = QVBoxLayout(box)
+
+        mode_row = QHBoxLayout()
+        self.rb_nm_set = QRadioButton("Set Name")
+        self.rb_nm_set.setToolTip(
+            "Replace the whole name.  '#' becomes a number ('##' = two digits),\n"
+            "counting from Start in list order.  With more than one target and no\n"
+            "'#', _01 / _02 ... is appended instead (also counting from Start).")
+        self.rb_nm_replace = QRadioButton("Search && Replace")
+        self.rb_nm_replace.setToolTip("Replace one piece of text inside the names.")
+        self.rb_nm_affix = QRadioButton("Prefix / Suffix")
+        self.rb_nm_affix.setToolTip("Keep the name, add text in front and/or behind.")
+        self.rb_nm_set.setChecked(True)
+        for radio in (self.rb_nm_set, self.rb_nm_replace, self.rb_nm_affix):
+            mode_row.addWidget(radio)
+            radio.toggled.connect(self._on_nm_mode_changed)
+        mode_row.addStretch(1)
+        box_layout.addLayout(mode_row)
+
+        self.stk_nm = QStackedWidget()
+
+        # 페이지 0 : Set Name
+        page_set = QWidget()
+        row_set = QHBoxLayout(page_set)
+        row_set.setContentsMargins(0, 0, 0, 0)
+        row_set.addWidget(QLabel("Name"))
+        self.le_nm_name = QLineEdit()
+        self.le_nm_name.setPlaceholderText("mouth_smile_L      ( pose_## -> pose_01 )")
+        self.le_nm_name.textChanged.connect(lambda *_a: self._nm_refresh())
+        row_set.addWidget(self.le_nm_name, 1)
+        row_set.addWidget(QLabel("Start"))
+        self.sb_nm_start = QSpinBox()
+        self.sb_nm_start.setRange(0, 99999)
+        self.sb_nm_start.setValue(1)
+        self.sb_nm_start.setToolTip("The first number used for '#'.")
+        self.sb_nm_start.valueChanged.connect(lambda *_a: self._nm_refresh())
+        row_set.addWidget(self.sb_nm_start)
+        self.stk_nm.addWidget(page_set)
+
+        # 페이지 1 : Search & Replace
+        page_rep = QWidget()
+        row_rep = QHBoxLayout(page_rep)
+        row_rep.setContentsMargins(0, 0, 0, 0)
+        row_rep.addWidget(QLabel("Search"))
+        self.le_nm_search = QLineEdit()
+        self.le_nm_search.textChanged.connect(lambda *_a: self._nm_refresh())
+        row_rep.addWidget(self.le_nm_search, 1)
+        row_rep.addWidget(QLabel("Replace"))
+        self.le_nm_replace = QLineEdit()
+        self.le_nm_replace.textChanged.connect(lambda *_a: self._nm_refresh())
+        row_rep.addWidget(self.le_nm_replace, 1)
+        self.chk_nm_case = QCheckBox("Match case")
+        self.chk_nm_case.setChecked(True)
+        self.chk_nm_case.toggled.connect(lambda *_a: self._nm_refresh())
+        row_rep.addWidget(self.chk_nm_case)
+        self.stk_nm.addWidget(page_rep)
+
+        # 페이지 2 : Prefix / Suffix
+        page_affix = QWidget()
+        row_affix = QHBoxLayout(page_affix)
+        row_affix.setContentsMargins(0, 0, 0, 0)
+        row_affix.addWidget(QLabel("Prefix"))
+        self.le_nm_prefix = QLineEdit()
+        self.le_nm_prefix.textChanged.connect(lambda *_a: self._nm_refresh())
+        row_affix.addWidget(self.le_nm_prefix, 1)
+        row_affix.addWidget(QLabel("Suffix"))
+        self.le_nm_suffix = QLineEdit()
+        self.le_nm_suffix.textChanged.connect(lambda *_a: self._nm_refresh())
+        row_affix.addWidget(self.le_nm_suffix, 1)
+        self.stk_nm.addWidget(page_affix)
+
+        box_layout.addWidget(self.stk_nm)
+        layout.addWidget(box)
+
+        # ---- 미리보기
+        self.tree_nm_preview = QTreeWidget()
+        self.tree_nm_preview.setHeaderLabels(["Current", "New", "Note"])
+        self.tree_nm_preview.setRootIsDecorated(False)
+        self.tree_nm_preview.setUniformRowHeights(True)
+        self.tree_nm_preview.setSelectionMode(QAbstractItemView.NoSelection)
+        self.tree_nm_preview.setMinimumHeight(120)
+        self.tree_nm_preview.setToolTip(
+            "What APPLY would do.  Rows in red are refused - fix them (or narrow the\n"
+            "selection) before applying; nothing is renamed while one is red.")
+        layout.addWidget(self.tree_nm_preview, 1)
+
+        self.chk_nm_mesh = QCheckBox("Also rename the live target mesh node")
+        self.chk_nm_mesh.setToolTip(
+            "Rename the target mesh in the scene to match, when the target still has\n"
+            "one connected.  The mesh name never reaches the FBX - this is only to keep\n"
+            "the scene tidy.  Targets whose shape is already baked in are unaffected.")
+        layout.addWidget(self.chk_nm_mesh)
+
+        self.lbl_nm_state = QLabel("No blendShape set.")
+        self.lbl_nm_state.setWordWrap(True)
+        layout.addWidget(self.lbl_nm_state)
+
+        info = QLabel(
+            "The target name is the alias of the blendShape's weight attribute - the "
+            "name the Channel Box and the Shape Editor show.  Maya writes exactly that "
+            "name into the FBX (Geometry and BlendShapeChannel), so Unreal imports the "
+            "morph target under the new name.  The target mesh's own node name is never "
+            "exported.  One target at a time can also be renamed by double-clicking it "
+            "in Maya's Shape Editor.")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        self.btn_nm_apply = QPushButton("APPLY RENAME")
+        self.btn_nm_apply.setMinimumHeight(36)
+        self.btn_nm_apply.setEnabled(False)
+        self.btn_nm_apply.setToolTip(
+            "Rename the targets on the node itself.\nOne Ctrl+Z undoes the whole thing.")
+        self.btn_nm_apply.clicked.connect(self.on_nm_apply)
+        layout.addWidget(self.btn_nm_apply)
+
+        return tab
+
+    # ---------------- Naming : 상태/헬퍼
+
+    def _nm_node(self):
+        return self.le_nm_node.text().strip()
+
+    def _nm_mode(self):
+        if self.rb_nm_replace.isChecked():
+            return nm.MODE_REPLACE
+        if self.rb_nm_affix.isChecked():
+            return nm.MODE_AFFIX
+        return nm.MODE_SET
+
+    def _nm_options(self):
+        return {"name": self.le_nm_name.text().strip(),
+                "start": self.sb_nm_start.value(),
+                "search": self.le_nm_search.text(),
+                "replace": self.le_nm_replace.text(),
+                "match_case": self.chk_nm_case.isChecked(),
+                "prefix": self.le_nm_prefix.text().strip(),
+                "suffix": self.le_nm_suffix.text().strip()}
+
+    def _nm_scope(self):
+        """(작업 대상 이름들, 가려진 선택 수, 선택으로 좁혔는지).
+
+        **리스트에 보이는 순서 그대로** 돌려준다 - `#` 번호가 그 순서대로 매겨지므로
+        `selectedItems()`(선택한 순서일 수 있다) 대신 행을 직접 훑는다.
+        """
+        list_widget = self.tsl_nm_targets.list_widget
+        chosen, visible, hidden = [], [], 0
+        for i in range(list_widget.count()):
+            item = list_widget.item(i)
+            if item.isHidden():
+                if item.isSelected():
+                    hidden += 1
+                continue
+            visible.append(item.text())
+            if item.isSelected():
+                chosen.append(item.text())
+        if chosen:
+            return chosen, hidden, True
+        return visible, hidden, False
+
+    def _on_nm_mode_changed(self, _checked=False):
+        if self.rb_nm_replace.isChecked():
+            self.stk_nm.setCurrentIndex(1)
+        elif self.rb_nm_affix.isChecked():
+            self.stk_nm.setCurrentIndex(2)
+        else:
+            self.stk_nm.setCurrentIndex(0)
+        self._nm_refresh()
+
+    def _nm_plan(self):
+        """지금 화면대로라면 무엇이 어떻게 바뀌는지 - 미리보기 행 목록."""
+        node = self._nm_node()
+        if not bsu.is_blendshape(node):
+            return []
+        names, _hidden, _sel = self._nm_scope()
+        if not names:
+            return []
+        new_names = nm.build_names(names, self._nm_mode(), self._nm_options())
+        return nm.plan_renames(node, list(zip(names, new_names)))
+
+    def _nm_refresh(self):
+        """미리보기 트리 + 상태 줄 + APPLY 버튼을 지금 상태에 맞춘다."""
+        self.tree_nm_preview.clear()
+        node = self._nm_node()
+
+        if not bsu.is_blendshape(node):
+            self.lbl_nm_state.setText("No blendShape set.")
+            self.btn_nm_apply.setEnabled(False)
+            return
+
+        names, hidden, narrowed = self._nm_scope()
+        if not names:
+            self.lbl_nm_state.setText(
+                "Nothing to rename - press List Targets (or clear the filter).")
+            self.btn_nm_apply.setEnabled(False)
+            return
+
+        try:
+            rows = self._nm_plan()
+        except Exception as e:
+            self.lbl_nm_state.setText(str(e))
+            self.btn_nm_apply.setEnabled(False)
+            return
+
+        for row in rows:
+            note = row["error"] or ("" if row["changed"] else "unchanged")
+            item = QTreeWidgetItem([row["old"], row["new"], note])
+            if row["error"]:
+                for col in range(3):
+                    item.setForeground(col, QBrush(QColor("#e05050")))
+            elif not row["changed"]:
+                for col in range(3):
+                    item.setForeground(col, QBrush(QColor("#808080")))
+            self.tree_nm_preview.addTopLevelItem(item)
+        for col in range(3):
+            self.tree_nm_preview.resizeColumnToContents(col)
+
+        errors = nm.plan_errors(rows)
+        changes = nm.plan_changes(rows)
+
+        text = "{0} target(s) {1} - {2} would be renamed.".format(
+            len(rows), "selected" if narrowed else "listed", len(changes))
+        if errors:
+            text += "  {0} refused (in red) - nothing is applied until they are fixed.".format(
+                len(errors))
+        if hidden:
+            text += "  [{0} selected target(s) are hidden by the filter and left alone.]".format(
+                hidden)
+        self.lbl_nm_state.setText(text)
+        self.btn_nm_apply.setEnabled(bool(changes) and not errors)
+
+    # ---------------- Naming : 핸들러
+
+    def on_nm_set_node(self):
+        found = bsu.find_blendshapes_from_selection()
+        if not found:
+            self.log("[Warning] Select a blendShape node or a mesh driven by one.")
+            return
+        self.le_nm_node.setText(found[0])
+        if len(found) > 1:
+            self.log("[Info] {0} blendShapes found; using '{1}'.".format(
+                len(found), found[0]))
+        self.on_nm_list_targets()
+
+    def on_nm_list_targets(self):
+        node = self._nm_node()
+        if not bsu.is_blendshape(node):
+            self.log("[Warning] '{0}' is not a valid blendShape node.".format(node))
+            self.tsl_nm_targets.clear()
+            self._nm_refresh()
+            return
+
+        targets = nm.target_names(node)
+        self.tsl_nm_targets.set_items(targets)
+        self.flt_nm_targets.refresh()
+        self._nm_refresh()
+        self.log("[Naming] '{0}' : {1} target(s) listed.".format(node, len(targets)))
+
+    def on_nm_apply(self):
+        node = self._nm_node()
+        try:
+            rows = self._nm_plan()
+        except Exception as e:
+            self.log("[Error] Naming : {0}".format(e))
+            return
+
+        changes = nm.plan_changes(rows)
+        if not changes:
+            self.log("[Naming] Nothing to rename.")
+            return
+
+        try:
+            with undo_chunk():
+                report = nm.apply_renames(node, rows,
+                                          rename_meshes=self.chk_nm_mesh.isChecked())
+        except Exception as e:
+            self.log("[Error] Rename : {0}".format(e))
+            cmds.warning(str(e))
+            self.on_nm_list_targets()
+            return
+
+        self.log("[OK] '{0}' : {1} target(s) renamed.".format(node, report["renamed"]))
+        for row in changes:
+            self.log("       {0}  ->  {1}".format(row["old"], row["new"]))
+        if report["meshes"]:
+            self.log("[Naming] {0} target mesh(es) renamed too.".format(
+                len(report["meshes"])))
+        for name, count in report["skipped_meshes"]:
+            self.log("[Warning] '{0}' has {1} live target meshes (multiple base "
+                     "geometries) - mesh names left alone.".format(name, count))
+
+        # 노드에서 다시 읽어 채운다 - 화면과 씬이 같은지 눈으로 확인된다.
+        # 방금 바꾼 것들을 다시 고른 채로 둔다(연달아 규칙을 더 먹일 수 있게).
+        # select_by_texts 는 시그널을 막으므로 미리보기는 직접 다시 그린다.
+        renamed = [row["new"] for row in changes]
+        self.on_nm_list_targets()
+        self.tsl_nm_targets.select_by_texts(renamed)
+        self._nm_refresh()
 
     # ==================================================
     # Tab 3 : Base Shape

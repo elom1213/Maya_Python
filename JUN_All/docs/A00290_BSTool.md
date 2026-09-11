@@ -3,6 +3,7 @@
 레거시 `JUN_PY_BSTool_V01_01`(maya.cmds) 을 **PySide(Qt)** 로 재작성한 blendShape 작업 툴.
 기존 툴의 **Connect BS 탭은 제외**하고 **Edit BS 탭만** 이식했으며, **Base Shape 탭** ·
 **Shape Editor 탭** · **Mix Targets 탭** · **Target Order 탭** · **Bake Delete 탭**을 신규 추가했다.
+Edit BS 는 v01.21 에서 하위 탭 둘(**Default** / **Naming**)로 갈라졌다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`A00270_skinMigrate` 클론, green_dark 테마)
 - **버전**: `app/config/version.py`
@@ -207,6 +208,10 @@ Maya 는 Qt 에 알려 주지 않는다. 그래서 `QTimer` 로 `120ms` 마다 `
 
 ## 탭 2 — Edit BS
 
+하위 탭 둘이다 — **Default**(레거시 Edit BS 그대로) · **Naming**(v01.21~, 타겟 이름 바꾸기).
+
+### 탭 2-1 — Default
+
 여러 blendShape 노드를 리스트에 담고 일괄 처리한다. (레거시 Edit BS 탭 그대로)
 
 | 버튼 | 동작 |
@@ -222,6 +227,115 @@ Maya 는 Qt 에 알려 주지 않는다. 그래서 `QTimer` 로 `120ms` 마다 `
 > `Get Current` 는 해당 입력을 현재 Maya 프레임으로 채운다. 대상은 blendShape 리스트가 아니라 **씬에서
 > 선택한 메시**다. `suspend_refresh` 로 빠르게 처리하고 끝나면 **현재 프레임을 원복**한다(전체 단일 undo).
 > 로직: `edit_bs_manager.copy_every_frame(meshes, start, end)`.
+
+### 탭 2-2 — Naming  (v01.21~, 신규)
+
+**타겟 이름을 규칙으로 한꺼번에 바꾼다.** 목적은 리깅 씬의 정리가 아니라 **언리얼** 이다 —
+여기서 바꾼 이름이 그대로 FBX 에 실려, 다시 임포트하면 **모프 타겟 이름이 바뀐 이름으로** 들어온다.
+
+#### 왜 "타겟 이름" 이 weight 별칭인가
+
+타겟 하나에는 이름이 둘 있다. **타겟 메시의 노드 이름**(`ugly_target_1`)과
+**weight 어트리뷰트의 별칭**(`aliasAttr`, 채널박스 · Shape Editor 가 보여 주는 이름)이다.
+둘은 완전히 다른 것이고([[blendshape-target-name-vs-alias]]), **FBX 로 나가는 것은 별칭뿐**이다.
+
+Maya 2024 + FBX 2020.3.4 로 실측한 익스포트 결과(ASCII):
+
+```
+Geometry:  ..., "Geometry::browInnerUp_L", "Shape" { ...
+Deformer:  ..., "SubDeformer::head_BS.browInnerUp_L", "BlendShapeChannel" { ...
+```
+
+- 타겟 메시 노드 이름(`ugly_target_1`)은 **파일 안에 한 번도 나오지 않는다.**
+  타겟 메시를 지운 **구운(baked)** 상태든, **라이브로 연결된** 상태든 같다.
+- 언리얼은 이 `BlendShapeChannel` 이름에서 `<blendShape 노드>.` 접두사를 떼어 모프 타겟
+  이름으로 쓴다. 그래서 **별칭만 바꾸면** 재익스포트한 FBX 가 새 이름으로 임포트된다.
+
+#### 마야 기본 기능으로 되는가 — 하나씩은 된다
+
+**Shape Editor(Windows > Animation Editors > Shape Editor)에서 타겟 이름을 더블클릭**하면
+그 자리에서 이름을 고칠 수 있다. 그게 곧
+
+```python
+cmds.aliasAttr("browInnerUp_L", "head_BS.weight[0]")
+```
+
+이다. 없는 것은 **여러 개를 규칙으로 바꾸는 방법**과 **바꾸기 전에 결과를 보는 방법**이다
+(Search/Replace, 접두·접미사, 번호 매기기, 충돌·금지문자 사전 검사). 이 탭이 그 부분을 채운다.
+
+#### 사용 흐름
+
+1. blendShape 노드(또는 그 메시)를 선택하고 **`<- Set`** → **`List Targets`** 로 타겟을 채운다.
+2. 바꿀 타겟을 선택한다. **아무것도 안 고르면 목록에 보이는 타겟 전부**가 대상이다.
+   (`Filter` 로 좁힐 수 있고, 가려진 선택은 대상에서 빠지며 상태 줄이 그 수를 알린다.)
+3. 모드를 고르고 값을 입력한다 — 미리보기가 **타이핑하는 즉시** 따라온다.
+4. **`APPLY RENAME`** → 노드의 별칭이 바뀐다. **Ctrl+Z 한 번**으로 전부 되돌아온다.
+
+#### 세 가지 모드
+
+| 모드 | 입력 | 예 (`browInnerUp_L`, `mouthSmile_L`) |
+|------|------|--------------------------------------|
+| **Set Name** | `Name` + `Start` | `pose_##` → `pose_01`, `pose_02` / `#` 없이 여러 개면 `pose_01`, `pose_02` 처럼 `_01` 을 자동으로 붙인다 / 한 개면 입력한 이름 그대로 |
+| **Search & Replace** | `Search`, `Replace`, `Match case` | `_L` → `_left` : `browInnerUp_left`, `mouthSmile_left` |
+| **Prefix / Suffix** | `Prefix`, `Suffix` | `FACE_` + `` → `FACE_browInnerUp_L`, `FACE_mouthSmile_L` |
+
+- `#` 의 개수가 자리수다(`##` = `01`). 번호는 `Start` 부터 **리스트에 보이는 순서대로** 센다.
+- `Search` 가 비어 있으면 아무것도 바뀌지 않는다(미리보기가 전부 `unchanged`).
+
+#### 미리보기와 사전 검사
+
+미리보기 트리는 `Current` / `New` / `Note` 세 칸이다.
+
+| 색 | 뜻 |
+|----|-----|
+| 보통 | 바뀐다 |
+| 회색 (`unchanged`) | 이름이 그대로다 — **호출 자체를 건너뛴다**(마야는 같은 이름 rename 을 에러로 거절한다) |
+| 빨간색 | 그대로 적용하면 실패한다. `Note` 에 이유가 적히고 **APPLY 가 잠긴다** |
+
+빨간 줄이 하나라도 있으면 **아무것도 적용하지 않는다** — 절반만 바뀐 상태를 만들지 않기 위해서다.
+거절 이유는 다음과 같다.
+
+| Note | 뜻 |
+|------|-----|
+| `starts with a digit` / `only letters, digits and _ …` | 별칭으로 쓸 수 없는 모양 (아래 표 참고) |
+| `non-ASCII characters` | 한글 등 — 마야가 거절한다 |
+| `the node already has an attribute named 'X'` | 그 노드에 이미 있는 어트리뷰트/별칭과 충돌 (`envelope` 같은 실제 어트리뷰트도 포함) |
+| `same new name as 'Y'` | 이번 작업에서 두 타겟이 같은 이름이 된다 |
+| `no such target on the node` | 목록이 노드와 어긋났다 — `List Targets` 를 다시 누른다 |
+
+**서로 자리를 바꾸는 것(A → B, B → A)은 통과한다.** 이 작업으로 비워지는 이름과의 충돌은
+충돌로 보지 않고, 적용할 때 **임시 이름을 거치는 2단계**로 넘긴다(마야는 이미 있는 이름으로
+바로 못 바꾼다).
+
+#### 허용되는 이름
+
+| 입력 | 결과 |
+|------|------|
+| `mouthSmile_L`, `_tmp`, `A1` | OK — `[A-Za-z_][A-Za-z0-9_]*` |
+| `1bad` | 거절 (숫자로 시작) |
+| `has space`, `dot.name`, `b[0]` | 거절 (마야가 `Aliases cannot contain reserved symbols or spaces`) |
+| `한글이름` | 거절 (마야가 `contains invalid characters`) |
+| `dash-name` | **마야는 받아 주지만 툴이 막는다** — `bs.a-b` 가 표현식에서 뺄셈으로 읽힌다 |
+
+#### 옵션 — Also rename the live target mesh node
+
+기본 꺼짐. 켜면 타겟에 **라이브로 연결된 타겟 메시**의 transform 도 새 이름으로 리네임한다
+(셰이프는 마야가 따라 바꾼다). FBX 에는 이 이름이 나가지 않으니 순전히 씬 정리용이다.
+
+- 이미 **구워진(baked)** 타겟은 메시가 없으니 그냥 넘어간다.
+- 베이스 지오메트리가 여럿이라 **한 타겟에 메시가 여러 개**면(`inputTarget[0]`, `[1]` …)
+  전부 같은 이름으로 바꿀 수 없어 **손대지 않고** 로그로 알린다. 별칭은 인덱스 하나에 하나라
+  이 경우에도 정상적으로 바뀐다.
+
+#### 바뀌지 않는 것
+
+- **값 · 키 · 연결 · lock** — 연결은 별칭이 아니라 실제 plug(`weight[i]`)에 붙어 있어 그대로다.
+  드라이브하던 애님 커브의 **노드 이름**(`head_BS_poseB`)은 따라 바뀌지 않는다(이름일 뿐이다).
+- **타겟 순서(weight 인덱스)** — 순서를 바꾸려면 [탭 5 Target Order](#탭-5--target-order--v0120-신규) 를 쓴다.
+- **모양 · 인비트윈 · 페인트 웨이트 · Shape Editor 그룹** — 전부 인덱스로 매달려 있어 무관하다.
+
+> 로직: `naming_manager.build_names()`(마야 비의존 순수 문자열) →
+> `plan_renames()`(미리보기 + 사전 검사) → `apply_renames()`(2단계 별칭 교체 + 실패 시 원복).
 
 ## 탭 3 — Base Shape  (신규)
 
@@ -690,8 +804,9 @@ A00290_BSTool/
     │   ├── base_shape_manager.py   # Base Shape 탭: 타겟 델타 스케일
     │   ├── mix_manager.py          # Mix Targets 탭: 소스 가중합을 다른 타겟/베이스에 반영
     │   ├── bake_delete_manager.py  # (v01.19~) Bake Delete 탭: 지우기를 리그 전체에 반영
-    │   └── target_order_manager.py # (v01.20~) Target Order 탭: 타겟 순서(weight 인덱스) 재배치
-    └── ui/main_window.py           # QTabWidget 6탭 + 공용 로그
+    │   ├── target_order_manager.py # (v01.20~) Target Order 탭: 타겟 순서(weight 인덱스) 재배치
+    │   └── naming_manager.py       # (v01.21~) Naming 탭: 타겟 이름(weight 별칭) 일괄 변경
+    └── ui/main_window.py           # QTabWidget 6탭(Edit BS 는 하위 탭 2개) + 공용 로그
 ```
 
 > `delta_utils` 는 Base Shape 탭과 Mix Targets 탭이 **같은 저수준 처리**(델타 공간 · live 타겟
