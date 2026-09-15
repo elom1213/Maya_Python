@@ -109,7 +109,11 @@ A00080_KWI_creator_V03.run(True)   # True = reload
 - **Create type**:
   - **Multiple Nodes**(기본): 본마다 KawaiiPhysics 노드 1개를 만들어 **체인으로 연결**.
   - **Single Node**: 노드 1개만 만들고, **나머지 본은 Additional Root Bones** 로 합친다.
-- **Setting nodes Number**: 세팅/LD 링크의 interval(정수).
+- **Setting nodes Number**: 세팅/LD 링크의 interval(정수). 세팅 노드 `PS_base_0 … PS_base_(N-1)` 가
+  만들어지고, 본 i 의 노드는 **`PS_base_(i % N)`** 에 엮인다.
+- **One node per setting node** (v01.05~, Multiple Nodes 에서만, 기본 OFF): 켜면 본마다 노드를 만들지 않고
+  **같은 세팅 노드에 엮일 본들을 KawaiiPhysics 노드 하나로 모은다**(첫 본 = Root Bone, 나머지 = Additional
+  Root Bones). 노드가 N 개 생기고, `PS_base_k` 는 노드 k 하나에만, LD 는 N 개 전부에 엮인다(7장).
 - **Create base / setting / LD nodes**: 각 부분을 **개별 파일**로 생성.
 - **Create combined file**: base + setting + LD 를 **하나의 파일**로 합쳐 생성.
   - 합본 코드가 **클립보드에 자동 복사**되어 언리얼 AnimGraph 에 바로 붙여넣을 수 있다(Ctrl+V).
@@ -140,6 +144,16 @@ A00080_KWI_creator_V03.run(True)   # True = reload
 - **Multiple**: 본 i 의 노드를 `..._{i}` 로 만들고, 이전 노드(`..._{i-1}`)의 Pose 핀에 LinkedTo 연결.
   노드 위치는 4개마다 줄바꿈(`nodePos_lineChange`).
 - **Single**: 첫 본을 RootBone, 나머지를 `AdditionalRootBones` 로 합친다.
+- **One node per setting node** (v01.05~, Multiple 에서만): 본 i 는 세팅 노드 `i % N` 에 엮이므로
+  그룹 k = `tgtBones[k::N]` 이다(체크박스를 끈 Multiple 과 **같은 본이 같은 세팅 노드**를 쓴다).
+  그룹마다 노드 `..._{k}` 하나 — 첫 본이 RootBone, 나머지가 `AdditionalRootBones`. 체인 연결·위치 규칙은
+  Multiple 과 같고 노드 수만 그룹 수로 줄어든다.
+  - `PS_base_k` 는 노드 k 하나에만, LD 노드는 만들어진 노드 전부에 엮인다.
+  - 예: 본 120개 · N = 4 → 노드 4개(각 30본). 본 12개 · N = 5 → 노드 5개(3·3·2·2·2본).
+  - **N 이 본 개수보다 크면** 본이 없는 세팅 노드는 노드를 만들지 않고, 그 세팅 노드는 아무 데도 엮이지 않는다
+    (로그로 알린다).
+  - 체크박스를 끄면 출력은 v01.04 와 **완전히 같다**(회귀 비교로 확인).
+  - `Create base nodes` 도 켜져 있으면 **Setting nodes Number** 를 읽는다(그룹을 나누는 수라서).
 - 텍스트 치환은 `TemplateEngine.apply` 의 `{{KEY}}` 단순 치환(`NODE_NAME`/`ROOT_BONE`/`LINKED_TO`/
   `NODE_POS_X`/`NODE_POS_Y` 등).
 

@@ -132,6 +132,23 @@ class MainWindow(QWidget):
         self.ipf_setting_nodes_interval = QLineEdit()
         self.ipf_setting_nodes_interval.setText("1")
 
+        # 같은 세팅 노드에 엮일 본들을 KawaiiPhysics 노드 하나로 모은다(Multiple Nodes 에서만).
+        self.chk_group_by_setting = QCheckBox(
+            "One node per setting node (group the bones that share a setting node)")
+        self.chk_group_by_setting.setToolTip(
+            "Multiple Nodes only.\n"
+            "Off : one KawaiiPhysics node per bone. Bone i is linked to setting node "
+            "i % N\n      (N = Setting nodes Number).\n"
+            "On  : one KawaiiPhysics node per setting node. Every bone that would be "
+            "linked to\n      the same setting node goes into that one node - the first "
+            "is the Root Bone,\n      the rest are Additional Root Bones. Setting node k "
+            "links to node k only,\n      and the LD node links to all of them.")
+        self.chk_group_by_setting.toggled.connect(
+            lambda checked: setattr(self.KWI_creator, "group_by_setting", bool(checked)))
+        # Single Node 는 이미 노드 하나라 의미가 없다.
+        self.radio_create_multiple_nodes.toggled.connect(self.chk_group_by_setting.setEnabled)
+        self.chk_group_by_setting.setEnabled(self.radio_create_multiple_nodes.isChecked())
+
         # --- Create buttons -------------------------------------------
         self.btn_create_base_nodes = QPushButton("Create base nodes")
         self.btn_create_base_nodes.clicked.connect(self.create_base_nodes_on_click)
@@ -169,6 +186,7 @@ class MainWindow(QWidget):
 
         kwi_layout.addWidget(self.label_setting_nodes_num)
         kwi_layout.addWidget(self.ipf_setting_nodes_interval)
+        kwi_layout.addWidget(self.chk_group_by_setting)
 
         kwi_layout.addWidget(self.btn_create_base_nodes)
         kwi_layout.addWidget(self.btn_create_setting_nodes)
@@ -414,11 +432,31 @@ class MainWindow(QWidget):
     def is_create_multiple_nodes(self):
         return self.radio_create_multiple_nodes.isChecked()
 
+    def _log_grouping(self):
+        # 세팅 노드마다 노드 하나로 모았을 때, 몇 개의 본이 몇 개의 노드가 됐는지 알린다.
+        if not self.KWI_creator.is_grouped():
+            return
+        groups = self.KWI_creator.bone_groups()
+        self.log("One node per setting node : {0} bone(s) -> {1} node(s) ({2})".format(
+            len(self.KWI_creator.tgtBones), len(groups),
+            ", ".join(str(len(group)) for group in groups)))
+        if len(groups) < self.KWI_creator.interval_setting_node:
+            self.log("  Setting nodes Number is larger than the bone count - "
+                     "{0} setting node(s) have no bone.".format(
+                         self.KWI_creator.interval_setting_node - len(groups)))
+
     def create_base_nodes_on_click(self):
         if not self._apply_bones_to_creator():
             return
+        # 모으기는 세팅 노드 수로 그룹을 나누므로 base 노드를 만들 때도 그 수가 필요하다.
+        if self.KWI_creator.is_grouped():
+            interval = self._read_interval()
+            if interval is None:
+                return
+            self.KWI_creator.interval_setting_node = interval
         self.KWI_creator.create_base_nodes()
         self.log("Current mode  :  " + str(self.KWI_creator.create_mode))
+        self._log_grouping()
 
     def create_setting_nodes_on_click(self):
         if not self._apply_bones_to_creator():
@@ -453,6 +491,7 @@ class MainWindow(QWidget):
         self.log(f"Combined file created : {out_path}")
         if write_individual:
             self.log("Individual files also written")
+        self._log_grouping()
         self.log("Copied combined code to clipboard. Paste into Unreal AnimGraph (Ctrl+V).")
 
     # ------------------------------------------------------------------
@@ -477,7 +516,11 @@ class MainWindow(QWidget):
             "<li><b>Multiple Nodes</b> : one KawaiiPhysics node per bone, chained.</li>"
             "<li><b>Single Node</b> : one node, extra bones become Additional Root Bones.</li>"
             "</ul></li>"
-            "<li>Set <b>Setting nodes Number</b> (interval for setting / LD links).</li>"
+            "<li>Set <b>Setting nodes Number</b> (interval for setting / LD links). "
+            "Bone <i>i</i> is linked to setting node <i>i % N</i>.</li>"
+            "<li><b>One node per setting node</b> (Multiple Nodes only): instead of one node "
+            "per bone, every bone that shares a setting node goes into one KawaiiPhysics node "
+            "(first bone = Root Bone, the rest = Additional Root Bones), so N nodes are made.</li>"
             "<li>Create the output:"
             "<ul>"
             "<li><b>Create base / setting / LD nodes</b> : write each part separately.</li>"

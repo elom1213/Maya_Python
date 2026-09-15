@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 
-# last Update date : 26.05.24
+# last Update date : 26.09.15
 # Python Script by Ji Hun Park
 
-# KWI creator V01.01
+# KWI creator V01.02
 # V01.00 : Create
 # V01.01 : create linking setting nodes, LD nodes
+# V01.02 : group_by_setting - 같은 세팅 노드에 엮일 본들을 KawaiiPhysics 노드 하나로 모은다
 
 
 import glob, os, re, math, ast
@@ -40,6 +41,10 @@ class KWI_creator:
 
         self._create_mode = "multiple"
 
+        # True 면 multiple 모드에서 본마다 노드를 만들지 않고, **같은 세팅 노드에 엮일 본들**을
+        # 노드 하나(RootBone + AdditionalRootBones)로 모은다. 세팅 노드 수만큼 노드가 생긴다.
+        self._group_by_setting = False
+
         self.id_PhysicsSettings      = "F56CA1A44D9143498D4F0E924F403F39"
         self.id_pose                 = "4D524E0342A22F9A278E3EB31AF3C195"
         self.id_LD                   = "6222BDF34477D9F24F863390648BE4CA"
@@ -52,7 +57,7 @@ class KWI_creator:
                                 "NODE_POS_X"            : "",
                                 "NODE_POS_Y"            : "",
                             }
-        
+
         self.replacements_setting = {
                                         "NODE_NAME"     : "K2Node_VariableGet_1",
                                         "MEMBER_NAME"   : 'PS_base_01',
@@ -60,7 +65,7 @@ class KWI_creator:
                                         "NODE_POS_X"    : "",
                                         "NODE_POS_Y"    : "",
                                     }
-        
+
         self.replacements_LD = {
                                     "NODE_NAME"      : "K2Node_VariableGet_1",
                                     "MEMBER_NAME"    : 'LD_base_01',
@@ -70,22 +75,22 @@ class KWI_creator:
                                 }
 
     def set_path(self):
-        self.pm = PathManager(  __file__, 
+        self.pm = PathManager(  __file__,
                                 read_dir  = "0010_src",
                                 write_dir = "0020_out" )
-        
+
         self.extension = "py"
         self.paths = KWIPaths(
                                 read_base_node          =   self.pm.path(
                                     "read",
                                     f"A0001_Src_KWI_node_v03.{self.extension}"
                                 ),
-                            
+
                                 read_setting_node        =   self.pm.path(
                                     "read",
                                     f"A0002_Src_KWI_setting_node_v02.{self.extension}"
                                 ),
-                            
+
                                 read_LD_node             =   self.pm.path(
                                     "read",
                                     f"A0003_Src_KWI_LD_v02.{self.extension}"
@@ -116,24 +121,28 @@ class KWI_creator:
                                     f"A000_KWI_combined_out.{self.extension}"
                                 ),
                             )
-        
+
     @property
     def create_multiple_nodes(self):
         return self._create_multiple_nodes
-    
+
     @property
     def create_single_node(self):
         return self._create_single_node
-    
+
     @property
     def interval_setting_node(self):
         return self._interval_setting_node
-    
+
     @property
     def create_mode(self):
         return self._create_mode
 
-    
+    @property
+    def group_by_setting(self):
+        return self._group_by_setting
+
+
     @create_multiple_nodes.setter
     def create_multiple_nodes(self, value):
         if not isinstance(value, bool):
@@ -158,6 +167,12 @@ class KWI_creator:
             raise ValueError("Name must be a string")
         self._create_mode = value
 
+    @group_by_setting.setter
+    def group_by_setting(self, value):
+        if not isinstance(value, bool):
+            raise ValueError("group_by_setting must be a bool")
+        self._group_by_setting = value
+
     def set_mode(self, mode):
         self._create_mode = mode
         print(mode)
@@ -173,7 +188,7 @@ class KWI_creator:
 
         if func:
             func()
-    
+
     def set_mode(self, mode):
         self._create_mode = mode
 
@@ -200,12 +215,43 @@ class KWI_creator:
             f.write(text)
 
     # ------------------------------------------------------------------
+    # 세팅 노드 단위로 본 모으기 (group_by_setting)
+
+    def is_grouped(self):
+        """지금 설정이 '세팅 노드마다 노드 하나' 로 만드는가. (single 모드에서는 무시)"""
+        return self._create_mode == "multiple" and self._group_by_setting
+
+    def bone_groups(self):
+        """세팅 노드마다 엮일 본 목록 (빈 그룹 제외).
+
+        본 i 는 세팅 노드 `i % N` 에 엮인다 - `_build_setting_text` 가 multiple 모드에서 링크를
+        거는 규칙(`get_keyword_linked_to`)과 **같은 규칙**이어야, 켜기 전과 같은 본이 같은
+        세팅 노드를 쓴다. 그래서 그룹 k 는 `tgtBones[k::N]` 이다.
+        N 이 본 개수보다 크면 뒤쪽 세팅 노드에는 본이 없어 그룹이 N 개보다 적다.
+        """
+        count = max(1, int(self._interval_setting_node))
+        groups = [self.tgtBones[k::count] for k in range(count)]
+        return [group for group in groups if group]
+
+    def base_node_count(self):
+        """만들어질 KawaiiPhysics 노드 수. 세팅/LD 링크가 가리킬 노드 번호의 범위다."""
+        if self.is_grouped():
+            return len(self.bone_groups())
+        return self.tgt_node_num
+
+    @staticmethod
+    def _additional_root_bones(bones):
+        return ",".join(f'(RootBone=(BoneName="{bone}"))' for bone in bones)
+
+    # ------------------------------------------------------------------
     # build 헬퍼 : 텍스트만 반환 (파일 쓰기 없음). 합본/개별 생성이 공유한다.
 
     def _build_base_text(self):
         # 현재 모드(multiple/single)에 따라 base 노드 텍스트를 생성해 반환
         if self._create_mode == "single":
             return self._build_base_text_single()
+        if self._group_by_setting:
+            return self._build_base_text_grouped()
         return self._build_base_text_multiple()
 
     def _build_base_text_multiple(self):
@@ -240,6 +286,37 @@ class KWI_creator:
 
         return join_list_with_newline(text_new_lst, True)
 
+    def _build_base_text_grouped(self):
+        """세팅 노드마다 KawaiiPhysics 노드 하나. 그룹의 첫 본이 RootBone, 나머지가 Additional.
+
+        노드 이름·체인 연결·위치 규칙은 multiple 과 같다(노드 수만 그룹 수로 줄어든다).
+        """
+        text_new_lst = []
+        self.clear_replacements(self.replacements)
+
+        with open(self.paths.read_base_node, 'r', encoding="utf-8") as f:
+            read_base_node = f.read()
+
+        for idx_nodeNum, bones in enumerate(self.bone_groups()):
+            linked_to = f"LinkedTo=({self.node_name}_{idx_nodeNum-1} {self.id_pose})"
+            if idx_nodeNum-1 < 0:
+                linked_to = ""
+
+            posX = self.nodePos_start_X + self.nodePos_offset_X * (idx_nodeNum % self.nodePos_lineChange)
+            posY = self.nodePos_start_Y + (math.floor(idx_nodeNum/self.nodePos_lineChange) * self.nodePos_offset_Y)
+
+            self.replacements["NODE_NAME"] = self.node_name + "_" + str(idx_nodeNum)
+            self.replacements["ROOT_BONE"] = bones[0]
+            self.replacements["ROOT_BONE_ADDITIONAL"] = self._additional_root_bones(bones[1:])
+            self.replacements["LINKED_TO"] = linked_to
+            self.replacements["NODE_POS_X"] = posX
+            self.replacements["NODE_POS_Y"] = posY
+
+            text_new_lst.append(TemplateEngine.apply(read_base_node, self.replacements))
+            self.clear_replacements(self.replacements)
+
+        return join_list_with_newline(text_new_lst, True)
+
     def _build_base_text_single(self):
         read_base_node = []
         self.clear_replacements(self.replacements)
@@ -248,10 +325,10 @@ class KWI_creator:
 
         additional = self.tgtBones[1:]
 
+        # 본이 하나뿐이면 additional 이 비어 아래 치환에서 이름이 없어 죽었다.
+        additional_str = ""
         if additional:
-            additional_str = ",".join(
-                f'(RootBone=(BoneName="{bone}"))' for bone in additional
-            )
+            additional_str = self._additional_root_bones(additional)
 
         self.replacements["NODE_NAME"] = self.node_name + "_0"
         self.replacements["ROOT_BONE"] = self.tgtBones[0]
@@ -266,8 +343,9 @@ class KWI_creator:
 
         with open(self.paths.read_setting_node, 'r', encoding="utf-8") as f:
             setting_node = f.read()
+        # 링크가 가리킬 노드 수. grouped 면 세팅 노드 k 가 노드 k 하나에만 엮인다.
         lst_setting_node = get_keyword_linked_to(self._interval_setting_node,
-                                                 self.tgt_node_num,
+                                                 self.base_node_count(),
                                                  self.id_PhysicsSettings,
                                                  self.node_name)
 
@@ -293,7 +371,7 @@ class KWI_creator:
             LD_node_base = f.read()
 
         LD_linked_to = get_keyword_linked_to(1,
-                                             self.tgt_node_num,
+                                             self.base_node_count(),
                                              self.id_LD,
                                              self.node_name)
 
@@ -312,6 +390,9 @@ class KWI_creator:
     # 개별 생성 : build 헬퍼로 텍스트를 만들어 각 출력 파일에 쓴다.
 
     def _create_multiple_nodes_impl(self):
+        if self._group_by_setting:
+            self._write(self.paths.write_base_node, self._build_base_text_grouped())
+            return
         self._write(self.paths.write_base_node, self._build_base_text_multiple())
 
     def _create_single_node_impl(self):

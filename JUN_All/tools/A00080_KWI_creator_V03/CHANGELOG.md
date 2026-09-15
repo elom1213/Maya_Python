@@ -1,5 +1,21 @@
 # Changelog
 
+## V01.05 (2026-09-15)
+
+### Added
+- **KWI Nodes tab — one node per setting node**: a new checkbox
+  *"One node per setting node (group the bones that share a setting node)"* (Multiple Nodes only,
+  default **off**). With **Setting nodes Number = N**, bone *i* is linked to setting node *i % N*;
+  when the checkbox is on, every bone of the same setting node goes into **one** KawaiiPhysics node
+  (first bone = Root Bone, the rest = Additional Root Bones), so N nodes are made instead of one per
+  bone. Setting node *k* links to node *k* only, the LD node links to all of them, and the nodes are
+  chained like before. If N is larger than the bone count, only the non-empty groups become nodes.
+  - Core: `KWI_creator.group_by_setting`, `bone_groups()`, `base_node_count()`,
+    `_build_base_text_grouped()`. With the checkbox off the output is byte-identical to V01.04.
+
+### Fixed
+- **Single Node with only one bone** no longer fails (`additional_str` was undefined).
+
 ## V01.04 (2026-07-13)
 
 ### Added

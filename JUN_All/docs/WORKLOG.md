@@ -31,6 +31,18 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-15 (오늘)
 
+> [!summary] `A00080_KWI_creator_V03` **One node per setting node** 체크박스 — 같은 세팅 노드에 엮일 본들을 KawaiiPhysics 노드 하나로 모은다 (v01.04 -> 01.05)
+- **요청**: 본마다 노드를 만들지 말고, **같은 피직스 세팅 노드에 엮인 본들은 모두 같은 KawaiiPhysics 노드**에
+  있도록 하는 설정을 체크박스로. 직전에 LUN 머리카락 `ref_02.txt`(노드 120개 · `PS_hair_0~3` 에 30개씩)를
+  손으로 4개 노드로 합친 작업을 툴 기능으로 옮긴 것.
+- **규칙**: 툴은 이미 본 i 의 노드를 세팅 노드 `i % N` 에 엮는다 → 그룹 k = `tgtBones[k::N]`. 그룹마다 노드 하나
+  (첫 본 RootBone, 나머지 AdditionalRootBones), `PS_base_k` 는 노드 k 에만, LD 는 전부에. 체인·위치 규칙은 그대로.
+  N 이 본보다 많으면 빈 그룹은 노드를 만들지 않는다. Multiple 에서만 활성(Single 은 이미 노드 하나).
+- 검증(plain python 36항목): **체크박스를 끄면 v01.04 출력과 바이트 단위 동일**(수정 전에 기준값을 떠 비교),
+  켜면 LUN 본 120 · N=4 의 노드별 본이 ref_02 의 `PS_hair_0~3` 그룹과 정확히 일치, 링크·체인, 12본/N=5,
+  N > 본 수. 덤으로 **Single 모드에 본이 하나면 죽던** 기존 버그(`additional_str` 미정의) 수정.
+- 파일: `app/core/KWI_creator.py`, `app/ui/main_window.py`, `CHANGELOG.md`, `docs/A00080_KWI_creator_V03.md` `#A00080`
+
 > [!summary] `A00145_RigConnect` Mirror > Apply 에 **`Keep Children in Place`**(기본 ON) + 리스트 이름 `Left`/`Right` → **`Source`/`Target`** (v01.40 -> 01.41)
 - **요청**: Apply 로 오른쪽 리스트 오브젝트의 위치·회전을 바꿀 때, 그 **모든 자식은 영향을 받지 않고 수정 전
   월드 위치·회전을 지키는** 체크박스(기본 체크). 그리고 리스트 이름 `Left`/`Right` 를 적절한 이름으로.
