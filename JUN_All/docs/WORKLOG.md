@@ -31,6 +31,26 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-15 (오늘)
 
+> [!summary] `A00275_skinTool_V01` **`Weights > Layer`** 신규 — 버텍스 순서가 같은 메시 N 개의 웨이트를 메시마다 lock + Blend 로 레이어처럼 합성해 새 메시로 만들거나 기존 메시를 갱신 (v01.21 -> 01.22)
+- **요청**: M_01, M_02 … 가 각자 다른 조인트에 바인드돼 있을 때, 메시마다 조인트를 리스트업하고 **보존할 조인트를
+  lock**, `Blend`(0~1)로 섞을 양을 정해 `Merge` 하면 합성된 `M_new` 가 생긴다. 먼저 계획서
+  (`docs/plans/A00275_skinTool_V01_layer_tab_plan.md`, `169c2e2`)를 쓰고 질문 5개에 답을 받아 구현.
+- **규칙(사용자 답)**: 위 레이어부터 `Blend x lock 웨이트` 를 **절대값**으로 넣고, 남은 몫을 넘는 레이어만 비율로
+  줄인다(위 레이어 우선). 모자라면 재정규화. lock 이 0 인 버텍스는 아래 행이 그대로 옮겨진다. 베이스(맨 아래)도
+  lock 가능(없으면 전 조인트), 결과 형상은 베이스. 추가로 **Update existing mesh 모드**와 조인트 **다중 선택·다중
+  체크**(A00290 Shape Editor 식)를 요청받아 함께.
+- **★ `MFnSkinCluster.setWeights` 는 undo 기록에 남지 않는다**(mayapy 실측 — 청크 안에서 써도 undo 할 것이 없다).
+  갱신 모드는 Ctrl+Z 로 돌아와야 해서 버텍스마다 구간 `setAttr` 로 쓴다(19,881 x 8 에 0.57초, undo 0.27초).
+  구간은 새 값과 기존 값의 인덱스를 모두 덮는다.
+- **★ 새로 바인드하면 지금 포즈가 바인드 포즈가 된다** → `bindPreMatrix` 를 소스 skinCluster 에서 복사. 포즈 중에
+  Merge 해도 lock 영역은 M_01, 나머지는 M_02 의 변형과 1e-4 이내로 일치(포즈를 더 바꿔도 유지).
+- **★ Lock 리스트 항목에 `ItemIsUserCheckable` 을 주면 한 번 클릭에 두 번 토글**된다(델리게이트가 놓을 때 또 뒤집음)
+  → 트리가 누를 때 직접 전환, 선택된 행 전부, 선택 유지. `setSelected(True)` 는 단일 선택 목록에서도 다른 줄을
+  안 풀어 `setCurrentItem` 으로 고른다.
+- 검증: mayapy 코어 47항목 + UI 33항목(실제 마우스 클릭) 통과, 19,881 버텍스 x 레이어 3 = 1.0초. 실제 마야 GUI 확인은 아직.
+- 파일: `app/core/weight_layer_manager.py`(신규), `app/ui/layer_tab.py`(신규), `app/ui/main_window.py`,
+  `docs/A00275_skinTool_V01.md` `#A00275`
+
 > [!summary] `A00145_RigConnect` Mirror 탭에 **`Apply (Left -> Right)`** 모드 — 새로 만들지 않고, 이미 있는 반대쪽 오브젝트를 미러 위치·회전으로 옮긴다 (v01.39 -> 01.40)
 - **요청**: Mirror 탭에 `Left` / `Right` 리스트 두 개를 두고, Left 를 미러한 결과의 위치·회전을
   같은 줄 Right 오브젝트에 적용. `Translation` / `Rotation` 체크박스(기본 ON), Mirror Plane · Mirror Type

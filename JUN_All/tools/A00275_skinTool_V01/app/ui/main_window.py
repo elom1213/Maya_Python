@@ -189,6 +189,9 @@ class MainWindow(QWidget):
         ("Copy Weights", "Copy Weights - copy the weights of a stored vertex "
          "set onto other vertices of the SAME mesh (nearest source vertex by "
          "surface / topology / volume)", "_build_weight_copy_tab"),
+        ("Layer", "Layer - merge the weights of several meshes with the same vertex "
+         "order: each keeps its locked joints as much as Blend says, top layer "
+         "first, into a new or an existing mesh", "_build_layer_tab"),
     )
 
     BIND_PAGES = (
@@ -1840,6 +1843,17 @@ class MainWindow(QWidget):
         )
         self.log(msg)
 
+    # --------------------------------------------------
+    # Weights > Layer (여러 메시의 웨이트를 레이어처럼 합성)
+    # --------------------------------------------------
+
+    def _build_layer_tab(self):
+        """이 파일이 이미 길어서 탭 전체를 app/ui/layer_tab.py 의 위젯 하나로 둔다."""
+        from tools.A00275_skinTool_V01.app.ui.layer_tab import LayerTab
+
+        self.layer_tab = LayerTab(log_callback=self.log)
+        return self.layer_tab
+
     def show_about(self, *args):
         QMessageBox.information(
             self,
@@ -1848,6 +1862,10 @@ class MainWindow(QWidget):
             "Classic : joint/mesh weight move (Kangaroo or Native engine).\n"
             "Transfer : many source meshes -> selected mesh/vertices (no plugin).\n"
             "Migrate A->B : cross-topology transfer + bone remap.\n"
+            "Copy Weights : vertex -> vertex weight copy within one mesh.\n"
+            "Layer : merge the weights of meshes with the same vertex order -\n"
+            "        locked joints + Blend per mesh, top layer first, into a\n"
+            "        new mesh or an existing one.\n"
             "Bind Pose : make the current joint pose the new bind pose.\n"
             "Move Joints : Edit toggle - move joints without deforming the mesh,\n"
             "              then re-bind at the new positions (weights unchanged).\n"

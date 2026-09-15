@@ -4,6 +4,8 @@ from . import weight_transfer_manager
 from . import joint_edit_manager
 from . import mesh_edit_manager
 from . import weight_copy_manager
+from . import weight_layer_manager
 
 __all__ = ["SkinMigrateManager", "bind_pose_manager", "weight_transfer_manager",
-           "joint_edit_manager", "mesh_edit_manager", "weight_copy_manager"]
+           "joint_edit_manager", "mesh_edit_manager", "weight_copy_manager",
+           "weight_layer_manager"]

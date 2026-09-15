@@ -13,7 +13,10 @@ updated: 2026-09-15
 
 - **작성일**: 2026-09-15
 - **대상**: `tools/A00275_skinTool_V01` — 신규 `app/core/weight_layer_manager.py` + `app/ui/main_window.py`
-- **상태**: **계획 — 10장 질문에 대한 답을 받은 뒤 구현 시작**
+- **상태**: **구현 — v01.22 (2026-09-15).** 10장 답 반영: Q1 계획대로 · **Q2 베이스 lock 허용 + 재정규화** ·
+  **Q3 규칙 ②(lock 절대값 보존, 넘친 곳만 위 레이어 우선)** · Q4 메시는 겹쳐 있고 조인트는 다름, 형상은 맨 아래 ·
+  Q5 순서 동일 가정. 추가 요청: **Update existing mesh 모드**, 조인트 **다중 선택·다중 체크**(Shape Editor 식),
+  `Weights > Layer`. 2장의 식은 규칙 ① 기준이라 **실제 구현 규칙은 가이드 문서 `A00275_skinTool_V01.md` 의 Layer 절**을 볼 것.
 - **버전**: v01.21 → **v01.22**
 - **선례**: `Weights > Copy Weights` 의 Blend(볼록결합이라 정규화가 안 깨진다),
   `Bind > Bind Pose`(`bindPreMatrix` 를 직접 다루는 법), `Weights > Transfer`(여러 소스 메시 리스트)

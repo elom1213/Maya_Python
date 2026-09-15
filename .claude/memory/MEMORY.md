@@ -74,7 +74,7 @@
 - A00210 — [PathStructure tree](wip-a00210-pathstructure-tree-depth.md) · [Recreate To + Rename](wip-a00210-recreate-to-rename.md) · [PathStructure files](wip-a00210-pathstructure-files.md)(v01.29)
 - A00220 — [Pin toggle](wip-a00220-pin.md) · [dino save pulse](wip-a00220-dino-save-pulse.md)
 - A00270 — [Classic tab](wip-a00270-classic-tab.md)
-- A00275 — [tab reorg](wip-a00275-tab-reorg.md)(탭 인덱스 판단 주의) · [Copy Weights](wip-a00275-copy-weights.md)(v01.18) · [Edit Mesh](wip-a00275-edit-mesh.md) · [Expand Bind](wip-a00275-expand-bind.md) · [Move Joints](wip-a00275-move-joints.md) · [Bind Pose](wip-a00275-skintool-bindpose.md) · [Transfer tab](wip-a00275-transfer-tab.md)
+- A00275 — [Layer tab](wip-a00275-layer-tab.md)(N 메시 lock+Blend 합성, setWeights 는 undo 안 됨, v01.22) · [tab reorg](wip-a00275-tab-reorg.md)(탭 인덱스 판단 주의) · [Copy Weights](wip-a00275-copy-weights.md)(v01.18) · [Edit Mesh](wip-a00275-edit-mesh.md) · [Expand Bind](wip-a00275-expand-bind.md) · [Move Joints](wip-a00275-move-joints.md) · [Bind Pose](wip-a00275-skintool-bindpose.md) · [Transfer tab](wip-a00275-transfer-tab.md)
 - A00280 — [cloth-corrective](metahuman-cloth-corrective-A00280.md)(알렘빅 → RBF 코렉티브)
 - A00290 — [Naming tab](wip-a00290-naming-tab.md)(FBX 엔 별칭뿐, v01.22) · [Target Order](wip-a00290-target-order-tab.md) · [Bake Delete](wip-a00290-bake-delete-tab.md) · [Mix Targets](wip-a00290-mix-targets-tab.md) · [Shape Editor](wip-a00290-shape-editor-tab.md)(`sculptTarget` 필수)
 - A00300 — [batch summary](wip-a00300-batch-summary-table.md) · [zero-area rework](wip-a00300-zero-area-quality-rework.md)(**진행 중**)
