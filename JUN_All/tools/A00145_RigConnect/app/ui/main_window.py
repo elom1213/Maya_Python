@@ -288,7 +288,7 @@ class MainWindow(QWidget):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        # --- 모드 : 새로 만들기(Objects) / 이미 있는 반대쪽을 옮기기(Left -> Right) ---
+        # --- 모드 : 새로 만들기(Objects) / 이미 있는 반대쪽을 옮기기(Source -> Target) ---
         # 아래 Mirror Plane / Mirror Type 은 두 모드가 같이 쓴다. 모드가 바꾸는 것은
         # 리스트(1개 / 2개)와 옵션 박스, 버튼 이름뿐이다.
         source_box = QGroupBox("Mode")
@@ -298,10 +298,10 @@ class MainWindow(QWidget):
             "Duplicate the listed objects and everything under them onto the other "
             "side,\nwith L/R names, skin weights, constraints, clusters and node "
             "networks rebuilt.")
-        self.rb_mirror_apply = QRadioButton("Apply (Left -> Right)")
+        self.rb_mirror_apply = QRadioButton("Apply (Source -> Target)")
         self.rb_mirror_apply.setToolTip(
-            "Nothing is created. Each Right object is moved to where the Objects "
-            "mode would have\nput the mirror of the Left object in the same row "
+            "Nothing is created. Each Target object is moved to where the Create "
+            "mode would have\nput the mirror of the Source object in the same row "
             "(translation / rotation only).")
         self.rb_mirror_create.setChecked(True)
         self.rb_mirror_source = QButtonGroup(self)
@@ -325,28 +325,30 @@ class MainWindow(QWidget):
             "driver of the mirrored constraint).")
         layout.addWidget(self.tsl_mirror)
 
-        # Apply : Left / Right 두 개 (같은 줄끼리 짝)
+        # Apply : Source / Target 두 개 (같은 줄끼리 짝)
+        # 이름을 Left / Right 로 두지 않는다 - 스왑(Source=[a_l, a_r], Target=[a_r, a_l])처럼
+        # 오른쪽 오브젝트가 원본일 수 있어 좌우 이름은 틀린 설명이 된다.
         self.w_mirror_pair = QWidget()
         pair_row = QHBoxLayout(self.w_mirror_pair)
         pair_row.setContentsMargins(0, 0, 0, 0)
-        self.tsl_mirror_left = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Left", select_label="Select",
+        self.tsl_mirror_source = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Source", select_label="Select",
             list_min_height=200, list_limit=MATCH_LIST_LIMIT,
             log_callback=self.log)
-        self.tsl_mirror_left.setToolTip(
-            "Source objects. They are only read, never changed.\n"
+        self.tsl_mirror_source.setToolTip(
+            "Objects to mirror from. They are only read, never changed.\n"
             "Children are NOT included - list every object you want to mirror.")
-        self.tsl_mirror_right = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Right", select_label="Select",
+        self.tsl_mirror_target = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Target", select_label="Select",
             list_min_height=200, list_limit=MATCH_LIST_LIMIT,
             log_callback=self.log)
-        self.tsl_mirror_right.setToolTip(
-            "Objects to move. Right[i] gets the mirror of Left[i] - keep both lists "
-            "in the same order.\n\n"
-            "All Left transforms are read before anything moves, so listing\n"
-            "Left = [a, b] and Right = [b, a] swaps the two sides in one go.")
-        pair_row.addWidget(self.tsl_mirror_left)
-        pair_row.addWidget(self.tsl_mirror_right)
+        self.tsl_mirror_target.setToolTip(
+            "Objects to move. Target[i] gets the mirror of Source[i] - keep both "
+            "lists in the same order.\n\n"
+            "All Source transforms are read before anything moves, so listing\n"
+            "Source = [a, b] and Target = [b, a] swaps the two sides in one go.")
+        pair_row.addWidget(self.tsl_mirror_source)
+        pair_row.addWidget(self.tsl_mirror_target)
         layout.addWidget(self.w_mirror_pair)
 
         # --- 반사 평면 ---
@@ -460,20 +462,33 @@ class MainWindow(QWidget):
         self.cb_mirror_translate = QCheckBox("Translation")
         self.cb_mirror_translate.setChecked(True)
         self.cb_mirror_translate.setToolTip(
-            "Move each Right object to the mirrored world position of its Left "
+            "Move each Target object to the mirrored world position of its Source "
             "partner.")
         self.cb_mirror_rotate = QCheckBox("Rotation")
         self.cb_mirror_rotate.setChecked(True)
         self.cb_mirror_rotate.setToolTip(
-            "Turn each Right object to the mirrored world rotation of its Left "
+            "Turn each Target object to the mirrored world rotation of its Source "
             "partner.\n"
-            "The scale size of the Right object is kept. A joint takes it in rotate "
+            "The scale size of the Target object is kept. A joint takes it in rotate "
             "(jointOrient is kept).\n"
             "Reflect is a true mirror image, so an object that was not reflected "
             "before ends up with\na negative scale on one axis - the same state the "
             "Create mode makes.")
+        # 자식 보존 : Target 을 옮겨도 그 아래 오브젝트는 옮기기 전 월드 자리에 둔다.
+        self.cb_mirror_keep_children = QCheckBox("Keep Children in Place")
+        self.cb_mirror_keep_children.setChecked(True)
+        self.cb_mirror_keep_children.setToolTip(
+            "On : every child under a Target object keeps the world position, "
+            "rotation and scale it had\n"
+            "     before the Apply - only the Target itself moves. A child that is "
+            "itself listed in Target\n"
+            "     still goes to its own mirrored place.\n"
+            "     A child with locked or driven channels cannot be held and follows "
+            "its parent (logged).\n"
+            "Off: children move with their parent (their local values stay the same).")
         apply_row.addWidget(self.cb_mirror_translate)
         apply_row.addWidget(self.cb_mirror_rotate)
+        apply_row.addWidget(self.cb_mirror_keep_children)
         apply_row.addStretch(1)
         layout.addWidget(apply_box)
 
@@ -498,7 +513,7 @@ class MainWindow(QWidget):
         self.gb_mirror_options.setVisible(not apply)
         self.w_mirror_pair.setVisible(apply)
         self.gb_mirror_apply.setVisible(apply)
-        self.btn_mirror.setText("Mirror to Right" if apply else "Mirror")
+        self.btn_mirror.setText("Mirror to Target" if apply else "Mirror")
 
     def _mirror_mode_row(self, grid, row, label, modes, default_key):
         """미러 방식 라디오 한 줄. 반환: QButtonGroup.
@@ -1928,9 +1943,10 @@ class MainWindow(QWidget):
             "              names swap L/R with the shared token rules, and skin\n"
             "              weights, constraints and clusters are rebuilt on the\n"
             "              other side (YZ/XY/XZ plane, Behavior / Orientation)\n"
-            "              Apply (Left -> Right): nothing is created - each Right\n"
-            "              object takes the mirrored position / rotation of the\n"
-            "              Left object in the same row".format(
+            "              Apply (Source -> Target): nothing is created - each\n"
+            "              Target object takes the mirrored position / rotation\n"
+            "              of the Source object in the same row, its children\n"
+            "              kept in place (Keep Children in Place)".format(
                 VERSION, LAST_UPDATE, MATCH_LIST_LIMIT))
 
     def _run(self, label, func):
@@ -1993,24 +2009,27 @@ class MainWindow(QWidget):
         self._run("Mirror", _do)
 
     def on_mirror_apply(self):
-        """Left -> Right : 새로 만들지 않고 Right 오브젝트를 Left 의 미러 위치 / 회전으로."""
-        sources = self.tsl_mirror_left.get_all_items()
-        targets = self.tsl_mirror_right.get_all_items()
+        """Source -> Target : 새로 만들지 않고 Target 오브젝트를 Source 의 미러 위치 / 회전으로."""
+        sources = self.tsl_mirror_source.get_all_items()
+        targets = self.tsl_mirror_target.get_all_items()
         plane = self._mirror_key(self.rb_mirror_plane)
         joint_mode = self._mirror_key(self.rb_mirror_joint)
         other_mode = self._mirror_key(self.rb_mirror_other)
         translate = self.cb_mirror_translate.isChecked()
         rotate = self.cb_mirror_rotate.isChecked()
+        keep_children = self.cb_mirror_keep_children.isChecked()
 
-        self.log("--- Mirror Left -> Right ({0} plane, joints {1}, others {2}, "
-                 "translation {3}, rotation {4}) ---".format(
+        self.log("--- Mirror Source -> Target ({0} plane, joints {1}, others {2}, "
+                 "translation {3}, rotation {4}, keep children {5}) ---".format(
                      plane.upper(), joint_mode, other_mode,
-                     "on" if translate else "off", "on" if rotate else "off"))
+                     "on" if translate else "off", "on" if rotate else "off",
+                     "on" if keep_children else "off"))
 
         def _do():
             moved, warns, infos = mir_mgr.mirror_onto(
                 sources, targets, plane=plane, joint_mode=joint_mode,
-                other_mode=other_mode, translate=translate, rotate=rotate)
+                other_mode=other_mode, translate=translate, rotate=rotate,
+                keep_children=keep_children)
             for warn in warns:
                 self.log("[WARN] {0}".format(warn))
             for info in infos:
@@ -2018,7 +2037,7 @@ class MainWindow(QWidget):
             if moved:
                 cmds.select(moved)
 
-        self._run("Mirror Left -> Right", _do)
+        self._run("Mirror Source -> Target", _do)
 
     # ==============================================================
     # Handlers : Match

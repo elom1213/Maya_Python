@@ -4,8 +4,11 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.40` (`app/config/version.py`) — Mirror 탭에 **`Apply (Left -> Right)` 모드**:
-  새로 만들지 않고, `Right` 리스트의 **이미 있는 오브젝트**를 같은 줄 `Left` 오브젝트의
+- 버전: `v01.41` (`app/config/version.py`) — Mirror > Apply 에 **`Keep Children in Place`**(기본 ON):
+  Target 을 옮겨도 **그 아래 자식들은 옮기기 전 월드 위치 / 회전 / 스케일을 지킨다.** 리스트 이름을
+  `Left` / `Right` → **`Source` / `Target`** 으로(모드 `Apply (Source -> Target)`, 버튼 `Mirror to Target`) (§Apply)
+  · v01.40 은 Mirror 탭에 **`Apply` 모드**:
+  새로 만들지 않고, `Target` 리스트의 **이미 있는 오브젝트**를 같은 줄 `Source` 오브젝트의
   **미러 위치 / 회전**으로 옮긴다(`Translation` / `Rotation` 체크박스). Mirror Plane · Mirror Type 은
   Create 와 공유 (§Apply)
   · v01.39 는 Connect > `Pair` 에 **`Swap` 버튼**:
@@ -1305,38 +1308,54 @@ Behavior 도 Orientation 도 **강체 회전**이라, 메시는 회전만 하고
 #### Apply — 이미 있는 반대쪽을 미러 위치 / 회전으로 (v01.40)
 
 반대쪽 오브젝트가 **이미 있을 때**(따로 만든 리그, 한쪽 포즈만 고친 경우) 새로 복제하지 않고
-**있는 오브젝트를 옮긴다.** 탭 맨 위 `Mode` 에서 `Apply (Left -> Right)` 를 고르면 리스트가 둘로
+**있는 오브젝트를 옮긴다.** 탭 맨 위 `Mode` 에서 `Apply (Source -> Target)` 를 고르면 리스트가 둘로
 바뀌고, `Options` 박스 대신 `Apply` 박스가 나온다. Mirror Plane · Mirror Type 은 Create 와 **공유**한다.
 
 ```
-┌ Mode ───────────────────────────────────────────────┐
-│  ( ) Create (Objects)   (•) Apply (Left -> Right)   │
-└─────────────────────────────────────────────────────┘
-┌ Left (TSL) ─────────────┐ ┌ Right (TSL) ────────────┐
+┌ Mode ─────────────────────────────────────────────────┐
+│  ( ) Create (Objects)   (•) Apply (Source -> Target)  │
+└───────────────────────────────────────────────────────┘
+┌ Source (TSL) ───────────┐ ┌ Target (TSL) ───────────┐
 │  arm_l_ctl              │ │  arm_r_ctl              │
 │  hand_l_ctl             │ │  hand_r_ctl             │
 └─────────────────────────┘ └─────────────────────────┘
 ┌ Mirror Plane ─ (그대로) ┐   ┌ Mirror Type ─ (그대로) ┐
-┌ Apply ──────────────────────────────────────────────┐
-│  [v] Translation   [v] Rotation                     │
-└─────────────────────────────────────────────────────┘
-[                  Mirror to Right                  ]
+┌ Apply ────────────────────────────────────────────────┐
+│  [v] Translation   [v] Rotation   [v] Keep Children in Place │
+└───────────────────────────────────────────────────────┘
+[                  Mirror to Target                   ]
 ```
 
-- **짝은 같은 줄끼리다** — `Right[i]` 가 `Left[i]` 의 미러 위치 / 회전을 받는다. 자식은 따라가지
-  않으므로 옮길 오브젝트를 전부 담는다. 개수가 다르면 적은 쪽만큼만 하고 경고한다.
+> [!note] 리스트 이름이 `Left` / `Right` 가 아닌 이유 (v01.41)
+> 원본은 읽기만 하는 **Source**, 옮겨지는 쪽은 **Target** 이다. 아래 스왑처럼 오른쪽 오브젝트가
+> Source 에 들어가는 일이 정상 사용법이라, 좌우 이름은 틀린 설명이 됐다.
+
+- **짝은 같은 줄끼리다** — `Target[i]` 가 `Source[i]` 의 미러 위치 / 회전을 받는다. Source 의 자식은
+  미러되지 않으므로 옮길 오브젝트를 전부 담는다. 개수가 다르면 적은 쪽만큼만 하고 경고한다.
+- **`Keep Children in Place`**(기본 ON, v01.41): Target 을 옮겨도 **그 아래 자식들(과 손자 전부)은
+  옮기기 전 월드 위치 / 회전 / 스케일에 그대로** 남는다. 끄면 예전처럼 자식이 부모를 따라간다(로컬 값 그대로).
+  - 방법: 아무것도 옮기기 전에 각 Target 의 **직계 자식** 월드 행렬을 읽어 두고, 그 Target 을 놓은
+    직후 되돌린다. 손자는 로컬이 그대로라 저절로 제자리다. 피벗 · `jointOrient` · `rotateAxis` 가 있어도
+    월드 행렬로 되돌리므로 상관없다(조인트 자식은 `rotate` 가 바뀐다).
+  - **자식이 그 자신도 Target 이면 붙잡지 않는다** — 제 차례에 자기 미러 위치로 간다. 그 아래 자식은
+    다시 지켜진다. 컨스트레인트 노드(driven 밑에 붙는 노드)는 건너뛴다.
+  - **잠겼거나 연결된 자식은 붙잡을 수 없어 부모를 따라간 채로 남고** 로그에 이유가 찍힌다
+    (Target 과 같은 판정). 단 **컨스트레인트가 구동하는 자식은 보통 이미 제자리**라(월드를 드라이버가
+    잡고 있다) 경고 없이 넘어간다.
+  - Reflect 로 **부모의 좌우손계가 바뀌면** 자식이 월드에서 그대로 있으려면 자기 로컬 손계가 바뀌어야 해
+    **한 축 스케일이 음수**가 된다 — 그래서 이때는 scale 채널도 검사하고, 그런 자식 수를 로그로 알린다.
 - **결과는 "Create 모드가 그 자리에 만들었을 트랜스폼" 과 같다.** 같은 미러 행렬, 같은
   조인트 / 컨트롤러 줄, 메시는 Reflect 대신 Orientation(Create 와 동일). 포즈를 준 왼쪽 리그에
   Apply 한 결과는 그 리그를 **새로 Create 한 결과와 행렬 단위로 같다**(mayapy 확인).
-- **이동 / 회전만 바꾼다.** 스케일 **크기**는 오른쪽 오브젝트의 것을 유지한다.
+- **이동 / 회전만 바꾼다.** 스케일 **크기**는 Target 오브젝트의 것을 유지한다.
   조인트는 `jointOrient` 를 그대로 두고 **`rotate`** 가 바뀐다(포즈를 고치는 것이지 리그를 다시
   짜는 게 아니다).
 - `Reflect` 는 진짜 거울상이라, 반사된 적 없는 오브젝트에 회전을 적용하면 **한 축 스케일이 음수**가
   된다(Create 결과와 같은 상태). 그런 오브젝트 수를 로그로 알린다.
 
 > [!tip] 좌우 포즈 스왑
-> **Left 의 트랜스폼을 아무것도 옮기기 전에 전부 읽어 둔다.** 그래서 `Left = [arm_l, arm_r]`,
-> `Right = [arm_r, arm_l]` 로 담으면 양쪽이 **한 번에 맞바뀐다.** 한쪽을 먼저 옮기고 나머지를
+> **Source 의 트랜스폼을 아무것도 옮기기 전에 전부 읽어 둔다.** 그래서 `Source = [arm_l, arm_r]`,
+> `Target = [arm_r, arm_l]` 로 담으면 양쪽이 **한 번에 맞바뀐다.** 한쪽을 먼저 옮기고 나머지를
 > 읽는 방식이면 두 번째가 이미 옮겨진 값을 미러해 버린다.
 
 쓰는 순서는 **부모 -> 자식**이다(자식을 먼저 담아도 된다). 자식을 먼저 놓으면 부모를 놓을 때
@@ -1353,10 +1372,12 @@ Behavior 도 Orientation 도 **강체 회전**이라, 메시는 회전만 하고
 옮긴 오브젝트는 실행 뒤 선택되고, 전체가 undo 한 번이다.
 
 ```
---- Mirror Left -> Right (YZ plane, joints behavior, others reflect, translation on, rotation on) ---
+--- Mirror Source -> Target (YZ plane, joints behavior, others reflect, translation on, rotation on, keep children on) ---
 [WARN] 'hand_r_ctl' skipped - rotateX is locked.
-       1 object(s) moved to the mirror of their Left partner across the YZ plane (translation + rotation).
-[OK] Mirror Left -> Right
+[WARN] Child 'arm_r_fk_grp' could not be kept in place and followed its parent - translateX is locked.
+       1 object(s) moved to the mirror of their Source partner across the YZ plane (translation + rotation).
+       3 child object(s) kept their world position / rotation.
+[OK] Mirror Source -> Target
 ```
 
 
@@ -1390,7 +1411,7 @@ A00145_RigConnect/
     │   ├── maya_scene.py           # Pair (A00140 복사)
     │   ├── closest_connector.py    # Pair (A00140 복사 + 짝짓기 모드: 거리 / 리스트 자리)
     │   └── object_match.py         # Pair > Match by Name (이름으로 오브젝트 짝짓기 — attr_match 엔진 재사용, 비교는 말단 이름·반환은 전체 경로)
-    │   └── mirror_manager.py       # Mirror (계층 복제 -> 미러 행렬 -> 스킨/컨스트레인트/클러스터 재구성, 토큰은 Framework 공용 규칙, MissingTokenError 가 이름 목록 + 세트를 실어 나른다 · mirror_onto = Apply(Left -> Right), 있는 오브젝트에 미러 위치/회전만)
+    │   └── mirror_manager.py       # Mirror (계층 복제 -> 미러 행렬 -> 스킨/컨스트레인트/클러스터 재구성, 토큰은 Framework 공용 규칙, MissingTokenError 가 이름 목록 + 세트를 실어 나른다 · mirror_onto = Apply(Source -> Target), 있는 오브젝트에 미러 위치/회전만, keep_children 이면 자식 월드 보존)
     ├── data/                        # 사용자 데이터 (git 제외)
     │   ├── attr_profiles/<이름>.json   # Attribute > Create 프로파일
     │   └── attr_profiles_active.json   # 마지막으로 쓰던 프로파일

@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 8a1f639d-1fbe-4096-98f7-2265e5589a17
-  modified: 2026-09-15T00:27:38.835Z
+  modified: 2026-09-15T03:52:32.193Z
 ---
 
 A00145_RigConnect **`Mirror` 탭 신규** (v01.37→**01.38**, 2026-09-07). TSL 에 담은
@@ -76,6 +76,16 @@ Plane/Type 공유, `Options` 대신 `Translation`/`Rotation`(기본 ON).
   찾아 오브젝트째 skip. 키만 걸렸으면 옮기고 알린다. 좌우손계가 바뀌면 scale 도 검사
   ([[xform-silent-on-locked-channels]], [[getattr-settable-lies-for-constrained]]).
 - 짝은 필터링 **전에** 인덱스로 — 잘못된 줄이 뒤 짝을 밀지 않게.
+
+**v01.41 (2026-09-15) `Keep Children in Place`**(기본 ON) + 리스트 이름 **Left/Right → Source/Target**
+(스왑이 정상 사용법이라 좌우 이름은 틀린 설명. 위젯 `tsl_mirror_source/target`, 모드 `Apply (Source -> Target)`).
+- 방법: 읽기 단계에서 Target 마다 **직계 자식** 월드 행렬 캡처 → 그 Target 을 쓴 직후 `xform -ws -m` 로 복원.
+  손자는 로컬 그대로라 자동. **자식이 그 자신 Target 이면 제외**(부모→자식 순서라 뒤에서 절대 배치),
+  컨스트레인트 노드 제외. 막힌 자식은 Target 과 같은 `_channel_blockers` 로 걸러 경고.
+- **★ 컨스트레인트가 구동하는 자식은 부모가 움직여도 이미 제자리** → 값 비교로 먼저 넘어가 경고 없음.
+  Reflect 로 부모 손계가 바뀌면 자식 scale 부호를 써야 해 scale 도 검사(그때만 경고).
+- headless 115항목(Orientation/Behavior/Reflect × 피벗·rotateOrder 자식 · 조인트 · 메시 · 손자 · Target 인 자식 ·
+  잠김 · scale 잠김 · 컨스트레인트 · undo · UI).
 
 파일: `app/core/mirror_manager.py`(신규) · `app/ui/main_window.py`(Mirror 탭 · `on_mirror`) ·
 `docs/A00145_RigConnect.md`.

@@ -12,10 +12,12 @@ mirror_manager - Mirror 탭 로직.
   - 노드 네트워크               : 컨스트레인트가 아닌 임의의 유틸리티 노드망도 복제해 다시 잇는다
                                 (pointOnCurveInfo -> fourByFourMatrix -> multMatrix -> ...)
 
-**Left -> Right (`mirror_onto`)**: 새로 만들지 않고, 이미 있는 Right 오브젝트를 같은 줄
-Left 오브젝트의 미러 위치 / 회전으로 옮긴다. 행렬 규칙은 아래와 똑같다(Objects 모드가
-그 자리에 만들었을 트랜스폼). 스케일 크기는 Right 것을 유지하고, 조인트는 `jointOrient`
-대신 `rotate` 가 바뀐다.
+**Source -> Target (`mirror_onto`)**: 새로 만들지 않고, 이미 있는 Target 오브젝트를 같은 줄
+Source 오브젝트의 미러 위치 / 회전으로 옮긴다. 행렬 규칙은 아래와 똑같다(Objects 모드가
+그 자리에 만들었을 트랜스폼). 스케일 크기는 Target 것을 유지하고, 조인트는 `jointOrient`
+대신 `rotate` 가 바뀐다. `keep_children` 이면 Target 의 자식들은 옮기기 전 월드 위치 / 회전을
+지킨다. (v01.41 에 리스트 이름을 Left / Right 에서 바꿨다 - 스왑처럼 오른쪽 오브젝트가 원본일
+수도 있어 좌우 이름이 틀린 설명이 됐다.)
 
 **스코프 규칙**: 미러 대상은 리스트에 올라온 오브젝트와 그 자손뿐이다. 스코프 밖 노드는
 복제하지 않고 *그대로 참조*한다 - 스코프 밖 메시에 스킨이 걸려 있어도 그 메시는 복제되지
@@ -1305,7 +1307,7 @@ def mirror(objects, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
 
 
 # ==================================================================
-# Left -> Right : 이미 있는 반대쪽 오브젝트에 미러 결과를 적용
+# Source -> Target : 이미 있는 반대쪽 오브젝트에 미러 결과를 적용
 # ==================================================================
 #
 # `mirror()` 는 복제본을 **새로 만든다.** 반대쪽이 이미 있을 때(리그를 따로 만들었거나,
@@ -1322,7 +1324,7 @@ _APPLY_TOLERANCE = 1e-4
 
 
 def _resolve_pair_items(sources, targets, warnings):
-    """Left[i] <-> Right[i] 를 짝짓는다. 반환: [(source 롱네임, target 롱네임)].
+    """Source[i] <-> Target[i] 를 짝짓는다. 반환: [(source 롱네임, target 롱네임)].
 
     걸러내기 **전에** 인덱스로 짝짓는다 - 한 줄이 빠졌다고 뒤의 짝이 한 칸씩 밀리면
     엉뚱한 오브젝트가 옮겨진다.
@@ -1331,7 +1333,7 @@ def _resolve_pair_items(sources, targets, warnings):
     targets = [(item or "").strip() for item in targets]
     if len(sources) != len(targets):
         warnings.append(
-            "Left has {0} item(s) and Right has {1} - only the first {2} pair(s) "
+            "Source has {0} item(s) and Target has {1} - only the first {2} pair(s) "
             "are used.".format(len(sources), len(targets),
                                min(len(sources), len(targets))))
 
@@ -1351,7 +1353,7 @@ def _resolve_pair_items(sources, targets, warnings):
                 row, src if not src_path else dst))
             continue
         if dst_path in seen_targets:
-            warnings.append("Row {0}: '{1}' is already listed on the Right - "
+            warnings.append("Row {0}: '{1}' is already listed in Target - "
                             "skipped.".format(row, _short(dst_path)))
             continue
         seen_targets.add(dst_path)
@@ -1431,22 +1433,85 @@ def _compose_applied_matrix(current, target, translate, rotate):
     return out
 
 
-def mirror_onto(sources, targets, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
-                other_mode=MODE_REFLECT, translate=True, rotate=True):
-    """Left 오브젝트를 미러한 위치 / 회전을 Right 오브젝트에 적용한다. (새로 만들지 않는다)
+def _children_to_keep(node, target_paths):
+    """node 의 직계 자식 트랜스폼 중 제자리에 둘 것과 지금 월드 행렬. [(롱네임, matrix)]
 
-    sources    : Left 리스트(원본). Right 와 **같은 자리끼리** 짝이다.
-    targets    : Right 리스트(옮겨질 오브젝트).
+    직계만 본다 - 자식을 월드에 붙잡아 두면 손자는 로컬이 그대로라 저절로 제자리다.
+    제외: 그 자신이 Target 인 자식(제 차례에 미러 위치로 옮겨진다), 컨스트레인트 노드
+    (driven 밑에 붙어 있을 뿐 위치에 의미가 없다). 조인트도 트랜스폼이라 포함된다.
+    """
+    kept = []
+    for child in cmds.listRelatives(node, children=True, fullPath=True) or []:
+        if child in target_paths:
+            continue
+        if "transform" not in (cmds.nodeType(child, inherited=True) or []):
+            continue                     # shape
+        if _is_constraint(child):
+            continue
+        kept.append((child, cmds.xform(child, query=True, worldSpace=True, matrix=True)))
+    return kept
+
+
+def _restore_children(kept, parent_flipped, warnings, keyed_plugs):
+    """부모를 옮긴 뒤 자식들을 읽어 둔 월드 행렬로 되돌린다. 반환: (되돌린 수, 스케일 부호가 바뀐 수)
+
+    부모의 좌우손계가 바뀌었으면(Reflect <-> 그 밖) 자식이 월드에서 그대로 있으려면 자기 로컬의
+    손계가 바뀌어야 한다 - 즉 scale 부호를 써야 하므로 scale 채널도 검사한다.
+    `mirror_onto` 의 Target 과 같은 이유로, 막힌 채널이 있으면 그 자식은 건드리지 않고
+    (부모를 따라간 채로 남는다) 이유를 알린다.
+    """
+    restored = 0
+    flipped = 0
+    for child, matrix in kept:
+        current = cmds.xform(child, query=True, worldSpace=True, matrix=True)
+        if max(abs(a - b) for a, b in zip(current, matrix)) <= _APPLY_TOLERANCE:
+            restored += 1                 # 부모가 안 움직였다(값이 이미 같다)
+            continue
+
+        channels = ["translate", "rotate"] + (["scale"] if parent_flipped else [])
+        blocked, keyed = _channel_blockers(child, channels)
+        if blocked:
+            warnings.append("Child '{0}' could not be kept in place and followed its "
+                            "parent - {1}.".format(
+                                _short(child),
+                                ", ".join("{0} is {1}".format(plug.split(".", 1)[1], why)
+                                          for plug, why in blocked[:3])
+                                + (" ..." if len(blocked) > 3 else "")))
+            continue
+
+        cmds.xform(child, worldSpace=True, matrix=matrix)
+        result = cmds.xform(child, query=True, worldSpace=True, matrix=True)
+        if max(abs(a - b) for a, b in zip(result, matrix)) > _APPLY_TOLERANCE:
+            warnings.append("Child '{0}' could not be kept exactly in place (a pivot, "
+                            "limit or non-uniform parent scale got in the way) - check "
+                            "it.".format(_short(child)))
+        restored += 1
+        keyed_plugs.extend(keyed)
+        if parent_flipped:
+            flipped += 1
+    return restored, flipped
+
+
+def mirror_onto(sources, targets, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
+                other_mode=MODE_REFLECT, translate=True, rotate=True,
+                keep_children=True):
+    """Source 오브젝트를 미러한 위치 / 회전을 Target 오브젝트에 적용한다. (새로 만들지 않는다)
+
+    sources    : Source 리스트(원본, 읽기만 한다). Target 과 **같은 자리끼리** 짝이다.
+    targets    : Target 리스트(옮겨질 오브젝트).
     plane      : PLANE_YZ / PLANE_XY / PLANE_XZ
-    joint_mode : Right 가 조인트일 때의 방식(Behavior / Orientation)
+    joint_mode : Target 이 조인트일 때의 방식(Behavior / Orientation)
     other_mode : 그 밖의 방식(Behavior / Orientation / Reflect). 메시는 Objects 모드와
                  같게 Reflect 대신 Orientation 으로 둔다.
     translate / rotate : 무엇을 옮길지.
+    keep_children : Target 의 자식(과 그 아래 전부)이 옮기기 전 월드 위치 / 회전 / 스케일을
+                 지킨다. 자식 중 그 자신이 Target 인 것은 제외(제 미러 위치로 간다).
+                 False 면 자식은 부모를 따라 움직인다(로컬 그대로).
 
-    Left 월드 행렬은 **아무것도 옮기기 전에 전부 읽어 둔다.** 그래서 Left = [a, b],
-    Right = [b, a] 로 담으면 양쪽이 동시에 맞바뀌고(좌우 포즈 스왑), Right 가 Left 의
-    조상이어도 결과가 흔들리지 않는다. 쓰기는 부모 -> 자식 순서다(자식을 먼저 놓으면
-    부모를 놓을 때 밀린다).
+    Source 월드 행렬은 **아무것도 옮기기 전에 전부 읽어 둔다.** 그래서 Source = [a, b],
+    Target = [b, a] 로 담으면 양쪽이 동시에 맞바뀌고(좌우 포즈 스왑), Target 이 Source 의
+    조상이어도 결과가 흔들리지 않는다. 지킬 자식의 월드 행렬도 같은 때 읽는다.
+    쓰기는 부모 -> 자식 순서다(자식을 먼저 놓으면 부모를 놓을 때 밀린다).
 
     반환: (moved, warnings, infos)
     """
@@ -1462,7 +1527,7 @@ def mirror_onto(sources, targets, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
 
     pairs = _resolve_pair_items(sources, targets, warnings)
     if not pairs:
-        raise RuntimeError("Nothing to mirror - list objects on both Left and Right.")
+        raise RuntimeError("Nothing to mirror - list objects in both Source and Target.")
 
     # ---- 읽기 : 옮기기 전에 원본 행렬을 전부 ----
     # 옮기기만 하고 이름·계층은 안 바꾸므로 롱네임이 끝까지 유효하다.
@@ -1479,6 +1544,13 @@ def mirror_onto(sources, targets, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
         source_matrix = cmds.xform(src, query=True, worldSpace=True, matrix=True)
         jobs.append((src, dst, _mirror_matrix(source_matrix, axis, mode)))
 
+    # 지킬 자식도 아무것도 옮기기 전에 읽는다(앞 줄 Target 이 움직이면 그 아래 자식도 밀린다).
+    target_paths = set(dst for _, dst, _ in jobs)
+    children = {}
+    if keep_children:
+        for _, dst, _ in jobs:
+            children[dst] = _children_to_keep(dst, target_paths)
+
     # ---- 쓰기 : 부모 -> 자식 (경로 깊이 순, 같은 깊이는 리스트 순서) ----
     jobs.sort(key=lambda job: job[1].count("|"))
 
@@ -1486,6 +1558,8 @@ def mirror_onto(sources, targets, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
     moved = []
     keyed_plugs = []
     flipped = 0
+    kept_count = 0
+    kept_flipped = 0
     for src, dst, target in jobs:
         current = cmds.xform(dst, query=True, worldSpace=True, matrix=True)
         new_matrix = _compose_applied_matrix(current, target, translate, rotate)
@@ -1514,11 +1588,24 @@ def mirror_onto(sources, targets, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
         if flips:
             flipped += 1
 
-    infos.append("{0} object(s) moved to the mirror of their Left partner across the "
+        # 이 Target 의 자식을 제자리로. 부모 -> 자식 순서라, 자식 밑의 Target 은 뒤에서
+        # 제 미러 위치로 절대 배치되므로 여기서 되돌린 결과에 흔들리지 않는다.
+        if children.get(dst):
+            count, sign = _restore_children(children[dst], flips, warnings, keyed_plugs)
+            kept_count += count
+            kept_flipped += sign
+
+    infos.append("{0} object(s) moved to the mirror of their Source partner across the "
                  "{1} plane ({2}).".format(
                      len(moved), plane.upper(),
                      " + ".join(part for part, on in (("translation", translate),
                                                       ("rotation", rotate)) if on)))
+    if keep_children:
+        infos.append("{0} child object(s) kept their world position / rotation.".format(
+            kept_count))
+    if kept_flipped:
+        infos.append("{0} child object(s) took a negative scale on one axis to stay in "
+                     "place under a parent that changed handedness.".format(kept_flipped))
     if fallback_meshes:
         infos.append("{0} mesh(es) used Orientation instead of Reflect "
                      "(same as the Objects mode).".format(fallback_meshes))
