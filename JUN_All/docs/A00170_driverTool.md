@@ -30,6 +30,8 @@
      `pointOnCurveInfo(parameter=최근접) → fourByFourMatrix → multMatrix(* parentInverseMatrix)
      → decomposeMatrix → translate`(옵션: `rotate`) 네트워크를 만든다. **부모 계층 안전**
      (parentInverse 사용)하고, 빌드 후 **커브가 변형되면 따라간다**.
+     **Maintain offset**(v01.22~, 기본 ON)이면 오브젝트를 커브 위로 옮기지 않는다 — 지금 자리·회전·
+     스케일을 그대로 두고 `offsetParentMatrix` 를 구동해 **이후 커브가 움직인 만큼만** 따라간다.
    - **Distribute Drivers on Curve** (ref 원래 동작): **Count**(양의 정수)만큼 **새 드라이버**
      (Locator/Null)를 만들어 커브의 시작~끝(`minValue`~`maxValue`) 사이에 **균일한 파라미터 간격**으로
      배치·어태치한다. 파라미터는 ref 의 `makeParameterValueList` 그대로 구한다 — **Distribute across
@@ -151,6 +153,17 @@ A00170_driverTool/
      있으니 그런 경우 norCrv 를 쓰거나 Orient 를 끈다.
    - **Group pointOnCurveInfo nodes into a set**(기본 ON): 이번 빌드로 생긴 `pointOnCurveInfo`
      노드들을 모두 담는 objectSet 한 개(`<curve>_atcPOCI_SET`)를 만든다(나중에 한 번에 선택·관리용).
+   - **Maintain offset**(기본 ON, v01.22~): 켜면 리스트의 오브젝트가 **빌드 전 위치·회전·스케일을
+     그대로 유지**한다. `translate`/`rotate`/`scale` 채널 값도 바뀌지 않고 연결도 걸리지 않는다
+     (컨트롤러면 그대로 애니메이션할 수 있다). 대신 `offsetParentMatrix` 에
+     `상수 오프셋 × 커브 프레임 × 부모 worldInverseMatrix` 를 물려, 이후 커브(와 norCrv)가 움직인 만큼만
+     따라간다. 끄면 기존대로 `translate`(Orient 면 `rotate` 도)를 커브 지점에 맞춘다.
+     **Distribute 에는 적용되지 않는다**(새로 만든 드라이버라 지킬 자리가 없다).
+     - 오프셋을 들고 가는 프레임은 **직교 정규**로 다시 짠다 — X=커브 접선, 업 시드=norCrv 접선(norCrv
+       OFF 면 월드 +Y). ref 프레임(Y=norCrv 접선, Z=norCrv **노멀**)은 X 와 직교가 아니라 커브가 휘면
+       shear 가 오브젝트로 새고, **직선 norCrv 의 노멀은 커브를 평행 이동만 해도 부호가 뒤집힌다**
+       (Maya 2024 실측).
+     - `offsetParentMatrix` 가 이미 다른 노드에 연결된 오브젝트는 건너뛰고 로그로 알린다.
 4. **Attach to Closest Point** 클릭. 각 오브젝트가 자신과 가장 가까운 커브 파라미터 지점에 붙고,
    로그에 오브젝트별 파라미터가 출력된다. norCrv 를 만들었으면 그 이름도 로그에 표시된다(이후
    그 커브를 조정해 방향을 잡는다). 씬에 없는 항목은 skip 후 경고하고, 세트 이름도 로그에 표시된다.
@@ -168,8 +181,9 @@ A00170_driverTool/
 **Distribute Drivers on Curve** 클릭 → `<curve>_1_drv`, `<curve>_2_drv` … (Count 자릿수만큼 0 패딩)
 드라이버가 생성되어 커브 시작~끝에 균일 배치된다. 로그에 드라이버별 파라미터가 출력된다.
 
-> 어태치는 오브젝트의 `translate`(옵션 `rotate`)에 노드를 **연결**한다. Closest 모드에서 이미
-> 연결/잠금된 채널이 있으면 해당 오브젝트만 실패 처리(로그 경고)하고 나머지는 계속한다.
+> 어태치는 오브젝트의 `translate`(옵션 `rotate`)에 노드를 **연결**한다(Maintain offset 이면
+> `offsetParentMatrix` 하나). Closest 모드에서 이미 연결/잠금된 채널이 있으면 해당 오브젝트만
+> 실패 처리(로그 경고)하고 나머지는 계속한다.
 
 #### 4.3.1 Edge Loop — 루프에서 드라이버 셋업 한 번에 (v01.14~)
 

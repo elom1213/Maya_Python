@@ -23,6 +23,7 @@ orient 옵션이 켜지면 커브 접선(tangent)을 aim 축에 정렬한다. �
     접선이 월드 업과 평행한(수직) 커브에서는 프레임이 무너질 수 있어 그런 경우 orient 를 끈다.
 """
 
+import maya.api.OpenMaya as om
 import maya.cmds as cmds
 
 # Aim Axis 옵션(오브젝트의 로컬 어느 축을 커브 접선에 맞출지). ref 의 +X / -X 와 동일.
@@ -58,19 +59,23 @@ def _closest_parameter(curve_shape, world_pos):
         cmds.delete(npoc)
 
 
-def _orient_frame_outputs(poci, aim_axis):
+def _orient_frame_outputs(poci, aim_axis, up_plug=None):
     """커브 접선 기반 직교 프레임의 (X행, Y행, Z행) 소스 어트리뷰트 3쌍을 만들어 반환.
 
     각 원소는 (.x, .y, .z) 성분 어트리뷰트 튜플. fourByFourMatrix in0*/in1*/in2* 에 연결한다.
     +X: X=+T, Y=+up', Z=+side / -X: X=-T, Z=-side (handedness 유지).
+    up_plug 가 주어지면 월드 +Y 대신 그 벡터 어트리뷰트를 업 시드로 쓴다(예: norCrv 접선).
     """
-    # side = T x worldUp,  up' = side x T (둘 다 normalizeOutput).
+    # side = T x up,  up' = side x T (둘 다 normalizeOutput).
     vp_side = cmds.createNode("vectorProduct")
     cmds.setAttr(vp_side + ".operation", 2)          # cross product
     cmds.setAttr(vp_side + ".normalizeOutput", 1)
     cmds.connectAttr(poci + ".normalizedTangent", vp_side + ".input1",
                      force=True)
-    cmds.setAttr(vp_side + ".input2", *_WORLD_UP, type="double3")
+    if up_plug:
+        cmds.connectAttr(up_plug, vp_side + ".input2", force=True)
+    else:
+        cmds.setAttr(vp_side + ".input2", *_WORLD_UP, type="double3")
 
     vp_up = cmds.createNode("vectorProduct")
     cmds.setAttr(vp_up + ".operation", 2)
@@ -152,14 +157,54 @@ def _orient_rows_from_normal_curve(attach_poci, norcrv_poci, aim_axis):
     return x_row, y_row, z_row
 
 
-def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=None):
+def _parent_of(obj):
+    """DAG 부모 transform(풀패스). 월드 바로 밑이면 None."""
+    parents = cmds.listRelatives(obj, parent=True, fullPath=True) or []
+    return parents[0] if parents else None
+
+
+def _offset_matrix(obj, frame_plug, parent):
+    """maintain offset 용 상수 행렬 = offsetParentMatrix0 * parentWorld0 * inverse(frame0).
+
+    월드 = local * offsetParentMatrix * parentWorld 이므로, offsetParentMatrix 를
+    `상수 * frame * parentWorldInverse` 로 구동하면 빌드 시점엔 원래 값과 정확히 같고
+    이후엔 커브 프레임이 움직인 만큼만 따라간다. local(translate/rotate/scale, 피벗,
+    jointOrient, rotateAxis)은 한 번도 건드리지 않는다.
+
+    주의: 오브젝트 자신의 `parentMatrix` / `parentInverseMatrix` 는 **자기 offsetParentMatrix 를
+    포함한다**(Maya 2024 실측: parentMatrix == OPM * parent.worldMatrix). 그걸로 OPM 을 구동하면
+    자기 출력을 되먹는 사이클이라, 부모 transform 의 worldMatrix 를 직접 쓴다.
+    """
+    frame0 = om.MMatrix(cmds.getAttr(frame_plug))
+    if abs(frame0.det3x3()) < 1e-8:
+        raise ValueError("curve frame is degenerate here (tangent parallel to "
+                         "the up vector); cannot keep the offset")
+    opm0 = om.MMatrix(cmds.getAttr(obj + ".offsetParentMatrix"))
+    if parent:
+        opm0 = opm0 * om.MMatrix(cmds.getAttr(parent + ".worldMatrix[0]"))
+    return opm0 * frame0.inverse()
+
+
+def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=None,
+                maintain_offset=False):
     """오브젝트 하나를 커브 위 한 지점에 라이브 어태치한다(노드 네트워크 구성).
 
     param 이 None 이면 오브젝트의 월드 위치에서 최근접 파라미터를 구해 쓰고(closest 모드),
     값이 주어지면 그 파라미터 지점에 그대로 붙인다(distribute 모드).
     norcrv_shape 가 주어지면(use_normal_curve) up/side 를 그 norCrv 에서 가져오고(ref 원본),
     없으면 커브 접선 기반 자족 직교 프레임을 쓴다.
+
+    maintain_offset 이 True 면 translate/rotate 대신 offsetParentMatrix 를 구동한다
+    (`_offset_matrix` 참고). 오브젝트의 위치·회전·스케일과 채널 값이 빌드 전 그대로 남는다.
     """
+    if maintain_offset:
+        # 노드를 만들기 전에 거른다(실패한 오브젝트에 반쯤 만든 네트워크를 남기지 않게).
+        src = cmds.listConnections(obj + ".offsetParentMatrix", source=True,
+                                   destination=False, plugs=True) or []
+        if src:
+            raise ValueError(
+                "offsetParentMatrix is already connected ({0})".format(src[0]))
+
     if param is None:
         world_pos = cmds.xform(obj, query=True, worldSpace=True, rotatePivot=True)
         param = _closest_parameter(curve_shape, world_pos)
@@ -183,8 +228,16 @@ def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=Non
             cmds.connectAttr(norcrv_shape + ".worldSpace[0]",
                              nor_poci + ".inputCurve", force=True)
             cmds.setAttr(nor_poci + ".turnOnPercentage", 0)
-            x_row, y_row, z_row = _orient_rows_from_normal_curve(
-                poci, nor_poci, aim_axis)
+            if maintain_offset:
+                # 오프셋을 들고 가려면 프레임이 강체(직교 정규)여야 한다. ref 프레임은
+                # X(attachCrv 접선)와 Y(norCrv 접선)가 직교가 아니라 커브가 휘면 shear 가
+                # offsetParentMatrix 로 새고, 직선 norCrv 의 normal 은 커브를 평행 이동만 해도
+                # 부호가 뒤집힌다(실측 det +0.95 -> -0.95). norCrv 접선을 업 시드로만 쓴다.
+                x_row, y_row, z_row = _orient_frame_outputs(
+                    poci, aim_axis, up_plug=nor_poci + ".normalizedTangent")
+            else:
+                x_row, y_row, z_row = _orient_rows_from_normal_curve(
+                    poci, nor_poci, aim_axis)
         else:
             x_row, y_row, z_row = _orient_frame_outputs(poci, aim_axis)
         for col, src in zip(("in00", "in01", "in02"), x_row):
@@ -195,6 +248,18 @@ def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=Non
             cmds.connectAttr(src, "{0}.{1}".format(fbf, col), force=True)
 
     mul = cmds.createNode("multMatrix", n="{0}_atc_MMX".format(obj))
+    if maintain_offset:
+        parent = _parent_of(obj)
+        offset = _offset_matrix(obj, fbf + ".output", parent)
+        cmds.setAttr(mul + ".matrixIn[0]", list(offset), type="matrix")
+        cmds.connectAttr(fbf + ".output", mul + ".matrixIn[1]", force=True)
+        if parent:
+            cmds.connectAttr(parent + ".worldInverseMatrix[0]",
+                             mul + ".matrixIn[2]", force=True)
+        cmds.connectAttr(mul + ".matrixSum", obj + ".offsetParentMatrix",
+                         force=True)
+        return param, poci
+
     cmds.connectAttr(fbf + ".output", mul + ".matrixIn[0]", force=True)
     cmds.connectAttr(obj + ".parentInverseMatrix[0]", mul + ".matrixIn[1]",
                      force=True)
@@ -211,8 +276,12 @@ def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=Non
 
 def build_attach_to_closest(curve, objects, orient=True, aim_axis="+X",
                             use_normal_curve=True, normal_curve_length=1.0,
-                            create_set=True):
+                            create_set=True, maintain_offset=False):
     """objects 의 각 오브젝트를 curve 에서 가장 가까운 지점에 라이브 어태치한다.
+
+    maintain_offset 이 True 면 오브젝트를 커브 위로 옮기지 않는다 — 빌드 시점의 위치·회전·
+    스케일을 그대로 두고, 이후 커브(와 norCrv)가 움직인 만큼만 따라간다(offsetParentMatrix
+    구동, `_attach_one` 참고). False 면 기존대로 translate(/rotate)를 커브 지점에 맞춘다.
 
     orient 가 True 이고 use_normal_curve 가 True 면(기본, ref 원본) attachCrv 밑에
     별도 'norCrv' 직선 커브 하나를 만들어 up/side 의 기준으로 쓴다. False 면 norCrv 없이
@@ -253,7 +322,8 @@ def build_attach_to_closest(curve, objects, orient=True, aim_axis="+X",
             continue
         try:
             param, poci = _attach_one(curve_shape, obj, orient, aim_axis,
-                                      norcrv_shape)
+                                      norcrv_shape,
+                                      maintain_offset=maintain_offset)
             attached.append((obj, param))
             pocis.append(poci)
         except Exception as exc:                       # noqa: BLE001

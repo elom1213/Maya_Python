@@ -5,6 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 8546124f-32a8-4de0-8ce6-b4460f257dcf
+  modified: 2026-09-15T00:31:15.437Z
 ---
 
 WIP (started 2026-06-26): A00170_driverTool 에 새 탭 **AttachCrv** 추가. `ref/ref_01.mel`
@@ -48,6 +49,15 @@ OFF→division=count(주기커브 seam). Locator/Null 드라이버 생성 후 re
 (0패딩) → 기존 `_attach_one(..., param=)` 재사용(param=None 이면 closest, 값주면 그 지점).
 UI: "Distribute new drivers uniformly" 그룹(Count spin, Driver Type 콤보, full-range 체크,
 Distribute 버튼) — orient/aim/norCrv/set 옵션은 Closest 모드와 공유. 핸들러 `on_atc_distribute`.
+**UPDATE 2026-09-15 (v01.22)**: Default 에 **`Maintain offset`**(기본 ON, Closest 전용).
+core `build_attach_to_closest(..., maintain_offset=False)` — 기본 False 라 Edge Loop(`loop_rig`)는 그대로.
+켜면 translate/rotate 대신 `offsetParentMatrix = 상수 × fbf.output × 부모.worldInverseMatrix`
+(상수 = `OPM0 × 부모월드0 × inv(프레임0)`) → 채널 값·피벗·JO·RA 무보정으로 제자리 유지.
+함정 2개: `obj.parentMatrix` 는 자기 OPM 포함([[parentmatrix-includes-offsetparentmatrix]]),
+**직선 norCrv 의 normal 은 커브 평행 이동만으로 부호가 뒤집힌다** → maintain 경로는 X=접선 +
+업시드=norCrv 접선의 직교 정규 프레임을 새로 짠다. **OFF 경로의 ref 프레임(Z=norCrv normal)은 같은
+뒤집힘으로 rotate 가 튈 수 있는데 손대지 않았다** — 사용자에게 보고함. headless 148항목.
+
 **남은 일**: Maya 실기 검증 + 푸시(기본 푸시처: [[push-target-dnable-dev]]). 검증/푸시 끝나면 이 메모 삭제.
 규약: [[ui-text-english-only]], [[prefer-pyside-for-new-tools]], [[push-includes-tool-guide-docs]],
 [[worklog-maintenance]], [[maya-2023-compat]].

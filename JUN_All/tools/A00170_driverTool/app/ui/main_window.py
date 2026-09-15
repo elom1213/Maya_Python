@@ -735,6 +735,19 @@ class MainWindow(QWidget):
             "pointOnCurveInfo node made by this build, for easy selection later.")
         root.addWidget(self.atc_cb_make_set)
 
+        # Maintain offset : 오브젝트를 커브 위로 옮기지 않고 지금 자리에서 커브를 따라가게.
+        self.atc_cb_maintain_offset = QCheckBox("Maintain offset")
+        self.atc_cb_maintain_offset.setChecked(True)
+        self.atc_cb_maintain_offset.setToolTip(
+            "On: every listed object keeps its current position, rotation and "
+            "scale (and its translate / rotate / scale channel values). The "
+            "network drives offsetParentMatrix instead, so the object only "
+            "follows how the curve moves from now on.\n"
+            "Off: snap translate (and rotate, with Orient) onto the closest "
+            "point of the curve.\n"
+            "Applies to Attach to Closest Point only.")
+        root.addWidget(self.atc_cb_maintain_offset)
+
         # Build : Attach the listed objects to their closest point.
         self.atc_btn_build = QPushButton("Attach to Closest Point")
         self.atc_btn_build.setMinimumHeight(34)
@@ -1167,6 +1180,7 @@ class MainWindow(QWidget):
         use_norcrv = self.atc_cb_norcrv.isChecked()
         norcrv_len = self.atc_dsb_norcrv_len.value()
         create_set = self.atc_cb_make_set.isChecked()
+        maintain_offset = self.atc_cb_maintain_offset.isChecked()
 
         with undo_chunk():
             try:
@@ -1174,17 +1188,19 @@ class MainWindow(QWidget):
                     curve, objects, orient=orient, aim_axis=aim_axis,
                     use_normal_curve=use_norcrv,
                     normal_curve_length=norcrv_len,
-                    create_set=create_set)
+                    create_set=create_set,
+                    maintain_offset=maintain_offset)
             except Exception as exc:
                 self._log("[ERROR] Attach failed: {0}".format(exc))
                 return
 
         self._log(
-            "Attached {n} object(s) to '{c}' | orient: {o}{axis}{nc}".format(
+            "Attached {n} object(s) to '{c}' | orient: {o}{axis}{nc}{mo}".format(
                 n=len(attached), c=curve,
                 o="on" if orient else "off",
                 axis=" ({0})".format(aim_axis) if orient else "",
-                nc=" | norCrv" if (orient and use_norcrv) else ""))
+                nc=" | norCrv" if (orient and use_norcrv) else "",
+                mo=" | maintain offset" if maintain_offset else ""))
         if norcrv:
             self._log(
                 "Normal curve created: {0} "
@@ -1982,6 +1998,8 @@ class MainWindow(QWidget):
             "- Attach to Closest Point: drives each listed object onto its closest\n"
             "  parameter on the curve via a pointOnCurveInfo -> matrix network\n"
             "  (parent-safe, live as the curve deforms). Optional orient to tangent.\n"
+            "  Maintain offset (default on): objects keep their current position,\n"
+            "  rotation, scale and channel values; offsetParentMatrix follows the curve.\n"
             "- Distribute Drivers on Curve (ref original): create N new Locator/Null\n"
             "  drivers spread evenly from the curve start to its end (Count, full /\n"
             "  open-ended range), attached with the same matrix network.\n"

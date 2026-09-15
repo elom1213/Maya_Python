@@ -56,6 +56,30 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 파일: `app/core/mirror_manager.py`(`mirror_onto`), `app/ui/main_window.py`, `docs/A00145_RigConnect.md`
   `#A00145`
 
+> [!summary] `A00170_driverTool` AttachCrv > Default 에 **`Maintain offset`**(기본 ON) — 어태치해도 오브젝트가 제자리·제 회전·제 스케일 그대로 (v01.21 -> 01.22)
+- **요청**: `Attach to Closest Point` 를 누르면 Objects 리스트의 오브젝트가 전부 커브 위로
+  옮겨지고 회전도 바뀐다. 체크박스 `Maintain offset`(기본 체크)을 두고, 켜져 있으면 기능 수행 후에도
+  **원래 위치·회전(·스케일)이 보존**되게.
+- **`translate`/`rotate` 대신 `offsetParentMatrix` 를 구동한다.** 오프셋 상수 =
+  `OPM0 × 부모월드0 × inverse(프레임0)`, 네트워크 = `상수 × fourByFourMatrix.output × 부모.worldInverseMatrix`.
+  빌드 순간엔 OPM 이 원래 값과 같고, 이후엔 커브 프레임이 움직인 만큼만 따라간다. 채널을 아예 안
+  건드리므로 **피벗 · `jointOrient` · `rotateAxis` · `rotateOrder` 를 따로 보정할 필요가 없고**, 채널이
+  비어 있어 컨트롤러면 그대로 키를 줄 수 있다.
+- **★ 오브젝트 자신의 `parentMatrix` 에는 자기 `offsetParentMatrix` 가 들어 있다**(Maya 2024 실측:
+  `parentMatrix == OPM × parent.worldMatrix`, `worldMatrix == matrix × parentMatrix`). 처음엔 기존
+  경로처럼 `obj.parentInverseMatrix` 를 물렸다가 **자기 출력을 되먹어**, 부모 + OPM 값이 있는
+  오브젝트만 월드가 어긋났다. 부모 transform 의 `worldInverseMatrix` 를 직접 쓴다.
+- **★ 직선 norCrv 의 노멀은 커브를 평행 이동만 해도 부호가 뒤집힌다**(det `+0.95 -> -0.95`). ref
+  프레임(Y=norCrv 접선, Z=norCrv 노멀)은 X 와 직교도 아니라, 오프셋을 들고 가면 오브젝트가 뒤집히거나
+  shear 가 샌다. Maintain offset 일 때만 **X=커브 접선, 업 시드=norCrv 접선**으로 직교 정규 프레임을
+  다시 짠다(OFF 경로와 Edge Loop 탭은 ref 프레임 그대로).
+- `offsetParentMatrix` 가 이미 연결된 오브젝트는 노드를 만들기 전에 건너뛴다. Distribute 는 대상 아님.
+- headless(mayapy 2024) **148항목** 통과 — 부모 회전·스케일 + 기존 OPM 값 + 피벗 + `rotateAxis` +
+  `rotateOrder` 로케이터, `jointOrient` 조인트, 월드 널 × (norCrv +X/-X · 월드업 · orient off):
+  빌드 후 월드/채널 불변, 커브 평행 이동·회전을 정확히 따라감, CV 변형 뒤 변화가 강체(shear·뒤집힘 없음),
+  undo 한 번에 원복, 연결된 OPM skip, OFF 는 기존대로 스냅, UI 핸들러 스모크.
+
+
 ## 2026-09-11
 
 > [!summary] `A00290_BSTool` `Edit BS` 하위 탭 2개 — **`Default`**(기존) + **`Naming`**(타겟 이름 = 언리얼 모프 타겟 이름 일괄 변경) (v01.20 -> 01.21)
