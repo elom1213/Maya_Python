@@ -139,14 +139,15 @@ class LayerTab(QWidget):
 
         desc = QLabel(
             "Merge the skin weights of meshes with the SAME vertex order.\n"
-            "Each mesh keeps the joints you lock, as much as Blend says. The top "
-            "layer wins\nwhere the locked weights add up past 1.0; the bottom mesh "
-            "is the base and\nits geometry is used for the result.")
+            "Each mesh keeps the joints you lock, as much as Blend says. Where the "
+            "locked\nweights add up past 1.0, the UPPER layers are cut first. The "
+            "bottom mesh is the base:\nits geometry is used, and without locks its "
+            "joints fill what is left.")
         desc.setAlignment(Qt.AlignCenter)
         layout.addWidget(desc)
 
         # ---------------- 레이어 목록
-        layers_grp = QGroupBox("Layers  (top = highest priority, bottom = base)")
+        layers_grp = QGroupBox("Layers  (bottom = base, upper layers are cut first)")
         layers_layout = QVBoxLayout(layers_grp)
 
         self.tw_layers = QTreeWidget()
@@ -167,9 +168,10 @@ class LayerTab(QWidget):
                 ("Add Selected", "Add the selected skinned meshes to the bottom of the "
                  "list (in selection order).", self.on_add_selected),
                 ("Remove", "Remove the highlighted layer.", self.on_remove),
-                ("Up", "Move the highlighted layer up (higher priority).",
-                 lambda: self.on_move(-1)),
-                ("Down", "Move the highlighted layer down.", lambda: self.on_move(1)),
+                ("Up", "Move the highlighted layer up. Where the locks overflow, "
+                 "upper layers are cut first.", lambda: self.on_move(-1)),
+                ("Down", "Move the highlighted layer down. Lower layers keep their "
+                 "locks first.", lambda: self.on_move(1)),
                 ("Clear", "Remove every layer.", self.on_clear)):
             btn = QPushButton(label)
             btn.setToolTip(tip)
@@ -252,10 +254,10 @@ class LayerTab(QWidget):
         blend_tip = (
             "How much of this layer's locked weights goes into the result.\n\n"
             "  1.0 : the locked weights as they are (default).\n"
-            "  0.5 : half of them - the other half is left for the layers below.\n"
+            "  0.5 : half of them - the rest is left for the other layers.\n"
             "  0.0 : this layer adds nothing.\n\n"
-            "Where the layers above have already used some of the 1.0, a layer that "
-            "does not fit\nis scaled down to what is left. A vertex that ends below "
+            "Locks are poured from the bottom layer up: where they add up past 1.0, "
+            "an upper\nlayer is scaled down to what is left. A vertex that ends below "
             "1.0 is renormalized.")
         self.sb_blend.setToolTip(blend_tip)
         self.sb_blend.valueChanged.connect(self._on_blend_spin)

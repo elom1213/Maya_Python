@@ -190,8 +190,9 @@ class MainWindow(QWidget):
          "set onto other vertices of the SAME mesh (nearest source vertex by "
          "surface / topology / volume)", "_build_weight_copy_tab"),
         ("Layer", "Layer - merge the weights of several meshes with the same vertex "
-         "order: each keeps its locked joints as much as Blend says, top layer "
-         "first, into a new or an existing mesh", "_build_layer_tab"),
+         "order: each keeps its locked joints as much as Blend says (upper layers "
+         "are cut first where they overflow), into a new or an existing mesh",
+         "_build_layer_tab"),
     )
 
     BIND_PAGES = (
@@ -1864,8 +1865,8 @@ class MainWindow(QWidget):
             "Migrate A->B : cross-topology transfer + bone remap.\n"
             "Copy Weights : vertex -> vertex weight copy within one mesh.\n"
             "Layer : merge the weights of meshes with the same vertex order -\n"
-            "        locked joints + Blend per mesh, top layer first, into a\n"
-            "        new mesh or an existing one.\n"
+            "        locked joints + Blend per mesh (upper layers are cut first\n"
+            "        where the locks overflow), into a new mesh or an existing one.\n"
             "Bind Pose : make the current joint pose the new bind pose.\n"
             "Move Joints : Edit toggle - move joints without deforming the mesh,\n"
             "              then re-bind at the new positions (weights unchanged).\n"

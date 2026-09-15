@@ -1,3 +1,3 @@
 # Skin Tool
-VERSION = "01.22"
+VERSION = "01.23"
 LAST_UPDATE = "2026-09-15"

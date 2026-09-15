@@ -14,15 +14,18 @@ weight_layer_manager - 토폴로지가 같은 메시 N 개의 스킨 웨이트�
 합성 규칙 (계획서 `docs/plans/A00275_skinTool_V01_layer_tab_plan.md` 10장 답)
 --------------------------------------------------------------------------
     cap = 1                                   # 아직 남은 몫
-    위 레이어부터 아래로:
+    lock 이 있는 레이어마다 **아래에서 위로**:
         c = Blend x (lock 한 조인트의 웨이트)    # 절대값 그대로
         합(c) <= cap 이면 그대로 넣고 cap -= 합(c)
         합(c) >  cap 이면 c 를 cap/합(c) 배로 줄여 넣고 cap = 0   (넘친 레이어만 잘린다)
-    끝까지 cap 이 남으면(합 < 1) 결과 행을 **재정규화**해 합을 1 로 만든다.
+    베이스에 lock 이 없으면 베이스의 전체 행으로 남은 cap 을 채운다.
+    그래도 cap 이 남으면(합 < 1) 결과 행을 **재정규화**해 합을 1 로 만든다.
     아무 레이어도 기여하지 못한 버텍스는 베이스의 **전체 행**을 쓴다(로그로 개수).
 
-- lock 값은 **절대값으로 보존**된다. 합이 1 을 넘는 버텍스에서만 위 레이어가 우선하고,
-  넘친 레이어가 비율대로 줄어든다(Q3).
+- lock 값은 **절대값으로 보존**된다. 합이 1 을 넘는 버텍스에서만 **위 레이어부터** 비율대로
+  줄어든다 — 아래 레이어의 lock 이 먼저 지켜진다(Q3 답 "위 레이어에서부터 자르도록").
+  v01.22 는 이 방향을 반대로 구현해, 위 레이어가 조인트를 전부 lock 하면 아래 레이어의 lock 이
+  통째로 사라졌다(v01.23 수정).
 - lock 한 조인트가 0 인 버텍스는 그 레이어가 아무것도 가져가지 않으므로, 아래 레이어의 행이
   **그대로** 옮겨진다(Q1).
 - 베이스에도 lock 을 걸 수 있다. 채우지 못한 몫은 재정규화로 메운다(Q2).
@@ -139,21 +142,53 @@ def _all_vertices(count):
 # 합성 (마야 없는 순수 계산)
 # ==================================================================
 
-def compose_rows(layers_rows, fallback_rows):
+def _pour(entries, cap, row):
+    """entries 를 남은 몫 cap 안에 붓는다. 넘치면 비율대로 줄인다.
+
+    반환: (새 cap, 잘렸는지)
+    """
+    if not entries:
+        return cap, False
+    total = 0.0
+    for _key, value in entries:
+        total += value
+    if total <= EPS:
+        return cap, False
+    if cap <= EPS:
+        return cap, True            # 이미 꽉 찼다 - 통째로 잘렸다
+
+    scale = 1.0
+    if total > cap:
+        scale = cap / total
+    for key, value in entries:
+        row[key] = row.get(key, 0.0) + value * scale
+    if scale < 1.0:
+        return 0.0, True
+    return cap - total, False
+
+
+def compose_rows(locked_rows, fill_rows, fallback_rows):
     """버텍스마다 레이어 행을 합성한다.
 
-    layers_rows   : 위 -> 아래 순서(마지막이 베이스). 원소마다 버텍스별 행 목록이고,
+    locked_rows   : 레이어 순서(**위 -> 아래**)의 lock 행 목록. 원소마다 버텍스별 행 목록이고,
                     행은 [(key, value), ...] — lock 으로 거르고 Blend 를 **이미 곱한** 값.
-    fallback_rows : 아무 레이어도 기여하지 못한 버텍스에 쓸 행(베이스의 전체 행).
+                    베이스에 lock 이 있으면 베이스도 여기(마지막)에 들어간다.
+    fill_rows     : 베이스에 lock 이 **없을 때** 베이스의 (Blend 를 곱한) 전체 행. lock 을 전부 넣고
+                    **남은 몫**을 채운다. 베이스에 lock 이 있으면 None.
+    fallback_rows : 아무것도 못 들어간 버텍스에 쓸 행(베이스의 전체 행).
+
+    **lock 은 아래 레이어부터 붓는다.** 합이 1 을 넘으면 **위 레이어부터 잘린다**(계획서 Q3 답
+    "합이 1 넘긴 부위만 위 레이어에서부터 자르도록"). v01.22 는 반대로 위 레이어부터 부어서,
+    위 레이어가 조인트를 전부 lock 하면 아래 레이어의 lock 이 통째로 사라졌다(사용자 피드백).
 
     반환: (rows, stats)
         rows  : 버텍스별 {key: value}
-        stats : {"cut": 베이스가 아닌 레이어가 잘린 버텍스 수,
+        stats : {"cut": lock 이 잘린 버텍스 수,
                  "renormalized": 재정규화한 버텍스 수,
                  "fallback": 베이스 전체 행을 쓴 버텍스 수}
     """
     count = len(fallback_rows)
-    last = len(layers_rows) - 1
+    order = list(reversed(locked_rows))
     rows = []
     cut = renormalized = fallback = 0
 
@@ -162,29 +197,13 @@ def compose_rows(layers_rows, fallback_rows):
         row = {}
         was_cut = False
 
-        for index, layer in enumerate(layers_rows):
-            entries = layer[v]
-            if not entries:
-                continue
-            total = 0.0
-            for _key, value in entries:
-                total += value
-            if total <= EPS:
-                continue
-            if cap <= EPS:
-                # 이미 꽉 찼다 - 이 레이어가 가져가려던 것이 통째로 잘렸다.
-                if index < last:
-                    was_cut = True
-                continue
+        for layer in order:
+            cap, clipped = _pour(layer[v], cap, row)
+            was_cut = was_cut or clipped
 
-            scale = 1.0
-            if total > cap:
-                scale = cap / total
-                if index < last:
-                    was_cut = True
-            for key, value in entries:
-                row[key] = row.get(key, 0.0) + value * scale
-            cap = 0.0 if scale < 1.0 else cap - total
+        # 베이스의 lock 안 된 조인트는 남은 몫을 채우는 것이지 lock 이 아니다 - 잘림으로 세지 않는다.
+        if fill_rows is not None:
+            cap, _clipped = _pour(fill_rows[v], cap, row)
 
         if cap > RENORMALIZE_GAP:
             filled = 1.0 - cap
@@ -518,7 +537,14 @@ def merge(layers, mode=MODE_CREATE, name=DEFAULT_NAME, target=None):
                                 _short(layer.transform), layer.normalized_inputs))
     base = data[-1]
 
-    rows, stats = compose_rows([layer.rows for layer in data], base.full_rows)
+    # 베이스에 lock 이 없으면 베이스는 lock 이 아니라 **남은 몫을 채우는 쪽**이다.
+    if base.use_all:
+        locked_rows = [layer.rows for layer in data[:-1]]
+        fill_rows = base.rows
+    else:
+        locked_rows = [layer.rows for layer in data]
+        fill_rows = None
+    rows, stats = compose_rows(locked_rows, fill_rows, base.full_rows)
 
     # 조인트 순서: 레이어 위 -> 아래, 각 레이어의 인플루언스 순서.
     used = set()
@@ -585,8 +611,9 @@ def merge(layers, mode=MODE_CREATE, name=DEFAULT_NAME, target=None):
             ", ".join(_short(j) for j in unused[:6]) + (" ..." if len(unused) > 6 else "")))
 
     if stats["cut"]:
-        infos.append("{0} vertex(es): the locked weights added up past 1.0, so the lower "
-                     "layers were cut there.".format(stats["cut"]))
+        infos.append("{0} vertex(es): the locked weights added up past 1.0, so the upper "
+                     "layers were cut there (lower layers keep their locks).".format(
+                         stats["cut"]))
     if stats["renormalized"]:
         infos.append("{0} vertex(es) did not reach 1.0 and were renormalized.".format(
             stats["renormalized"]))
