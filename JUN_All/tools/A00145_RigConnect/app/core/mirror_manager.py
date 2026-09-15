@@ -12,6 +12,11 @@ mirror_manager - Mirror 탭 로직.
   - 노드 네트워크               : 컨스트레인트가 아닌 임의의 유틸리티 노드망도 복제해 다시 잇는다
                                 (pointOnCurveInfo -> fourByFourMatrix -> multMatrix -> ...)
 
+**Left -> Right (`mirror_onto`)**: 새로 만들지 않고, 이미 있는 Right 오브젝트를 같은 줄
+Left 오브젝트의 미러 위치 / 회전으로 옮긴다. 행렬 규칙은 아래와 똑같다(Objects 모드가
+그 자리에 만들었을 트랜스폼). 스케일 크기는 Right 것을 유지하고, 조인트는 `jointOrient`
+대신 `rotate` 가 바뀐다.
+
 **스코프 규칙**: 미러 대상은 리스트에 올라온 오브젝트와 그 자손뿐이다. 스코프 밖 노드는
 복제하지 않고 *그대로 참조*한다 - 스코프 밖 메시에 스킨이 걸려 있어도 그 메시는 복제되지
 않고, 스코프 밖 조인트가 드라이버면 미러된 컨스트레인트도 같은 조인트를 본다(센터 처리).
@@ -1297,3 +1302,231 @@ def mirror(objects, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
         infos.append("{0} utility node(s) rebuilt.".format(len(networks)))
 
     return (created_roots, warnings, infos)
+
+
+# ==================================================================
+# Left -> Right : 이미 있는 반대쪽 오브젝트에 미러 결과를 적용
+# ==================================================================
+#
+# `mirror()` 는 복제본을 **새로 만든다.** 반대쪽이 이미 있을 때(리그를 따로 만들었거나,
+# 한쪽 포즈만 고쳤을 때)는 만들 필요 없이 **있는 오브젝트를 옮기면** 된다.
+#
+# 규칙은 "Objects 모드가 그 자리에 만들었을 트랜스폼" 과 같다. 같은 `_mirror_matrix`,
+# 같은 조인트/컨트롤러 방식, 메시의 Orientation 폴백까지 그대로 따른다. 다른 점은 둘:
+#   - 이동 / 회전만 바꾼다. 스케일 **크기**는 오른쪽 오브젝트의 것을 유지한다.
+#   - 조인트는 `jointOrient` 를 건드리지 않고 `rotate` 에 넣는다(포즈를 고치는 것이지
+#     리그를 다시 짜는 게 아니다). `xform -ws -m` 이 원래 그렇게 동작한다(mayapy 확인).
+
+# 되읽은 월드 행렬 허용 오차.
+_APPLY_TOLERANCE = 1e-4
+
+
+def _resolve_pair_items(sources, targets, warnings):
+    """Left[i] <-> Right[i] 를 짝짓는다. 반환: [(source 롱네임, target 롱네임)].
+
+    걸러내기 **전에** 인덱스로 짝짓는다 - 한 줄이 빠졌다고 뒤의 짝이 한 칸씩 밀리면
+    엉뚱한 오브젝트가 옮겨진다.
+    """
+    sources = [(item or "").strip() for item in sources]
+    targets = [(item or "").strip() for item in targets]
+    if len(sources) != len(targets):
+        warnings.append(
+            "Left has {0} item(s) and Right has {1} - only the first {2} pair(s) "
+            "are used.".format(len(sources), len(targets),
+                               min(len(sources), len(targets))))
+
+    pairs = []
+    seen_targets = set()
+    for index, (src, dst) in enumerate(zip(sources, targets)):
+        row = index + 1
+        if not src or not dst:
+            continue
+        if "." in src or "." in dst:
+            warnings.append("Row {0} ('{1}' -> '{2}') holds a component - only objects "
+                            "can be mirrored.".format(row, src, dst))
+            continue
+        src_path, dst_path = _long(src), _long(dst)
+        if not src_path or not dst_path:
+            warnings.append("Row {0}: '{1}' does not exist.".format(
+                row, src if not src_path else dst))
+            continue
+        if dst_path in seen_targets:
+            warnings.append("Row {0}: '{1}' is already listed on the Right - "
+                            "skipped.".format(row, _short(dst_path)))
+            continue
+        seen_targets.add(dst_path)
+        pairs.append((src_path, dst_path))
+    return pairs
+
+
+def _plug_blocker(plug):
+    """plug 에 값을 쓸 수 없는 이유. 쓸 수 있으면 None, 키가 걸려 있으면 'keyed'.
+
+    `xform` 은 잠긴 채널을 **에러 없이 건너뛰고 나머지만** 바꾼다(이동만 되고 회전은 안 되는
+    반쪽 결과). 그래서 쓰기 전에 막힌 채널을 먼저 찾아 그 오브젝트를 통째로 건너뛴다.
+    `getAttr(settable=True)` 는 컨스트레인트가 구동해도 True 라 쓸 수 없다 - 연결로 판정한다.
+    """
+    if cmds.getAttr(plug, lock=True):
+        return "locked"
+    if not cmds.connectionInfo(plug, isDestination=True):
+        return None
+    sources = cmds.listConnections(plug, source=True, destination=False,
+                                   skipConversionNodes=True) or []
+    # 키만 걸린 채널은 값이 들어간다(시간을 바꾸면 커브 값으로 돌아간다).
+    # 애님 레이어(animBlendNode*) · pairBlend · 컨스트레인트는 값이 안 남는다.
+    if sources and all(cmds.nodeType(src).startswith("animCurve") for src in sources):
+        return "keyed"
+    return "connected"
+
+
+def _channel_blockers(node, channels):
+    """channels(translate/rotate/scale) 중 막힌 plug 와 키 걸린 plug.
+
+    반환: (blocked [(plug, 이유)], keyed [plug])
+    """
+    blocked, keyed = [], []
+    for channel in channels:
+        for plug in [node + "." + channel] + [node + "." + channel + a for a in "XYZ"]:
+            if not cmds.objExists(plug):
+                continue
+            reason = _plug_blocker(plug)
+            if reason == "keyed":
+                keyed.append(plug)
+            elif reason:
+                blocked.append((plug, reason))
+    return blocked, keyed
+
+
+def _determinant3(matrix):
+    """월드 행렬 16개 값의 회전/스케일 3x3 부분의 행렬식."""
+    m = matrix
+    return (m[0] * (m[5] * m[10] - m[6] * m[9])
+            - m[1] * (m[4] * m[10] - m[6] * m[8])
+            + m[2] * (m[4] * m[9] - m[5] * m[8]))
+
+
+def _row_length(matrix, row):
+    return math.sqrt(sum(matrix[row * 4 + col] ** 2 for col in range(3)))
+
+
+def _compose_applied_matrix(current, target, translate, rotate):
+    """오른쪽 오브젝트의 지금 월드 행렬에 target 의 위치 / 회전만 옮겨 담는다.
+
+    회전 = 축 방향(행 0~2 를 정규화한 것). 스케일 크기는 current 의 축 길이를 유지한다.
+    Reflect 의 target 은 왼손계라, 회전을 받으면 한 축의 스케일이 음수가 된다
+    - 그게 Reflect 의 정의다(Objects 모드 결과와 같은 상태).
+    """
+    out = list(current)
+    if rotate:
+        for row in range(3):
+            length = _row_length(target, row)
+            if length < 1e-9:
+                continue
+            scale = _row_length(current, row)
+            for col in range(3):
+                out[row * 4 + col] = target[row * 4 + col] / length * scale
+    if translate:
+        for col in range(3):
+            out[12 + col] = target[12 + col]
+    return out
+
+
+def mirror_onto(sources, targets, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
+                other_mode=MODE_REFLECT, translate=True, rotate=True):
+    """Left 오브젝트를 미러한 위치 / 회전을 Right 오브젝트에 적용한다. (새로 만들지 않는다)
+
+    sources    : Left 리스트(원본). Right 와 **같은 자리끼리** 짝이다.
+    targets    : Right 리스트(옮겨질 오브젝트).
+    plane      : PLANE_YZ / PLANE_XY / PLANE_XZ
+    joint_mode : Right 가 조인트일 때의 방식(Behavior / Orientation)
+    other_mode : 그 밖의 방식(Behavior / Orientation / Reflect). 메시는 Objects 모드와
+                 같게 Reflect 대신 Orientation 으로 둔다.
+    translate / rotate : 무엇을 옮길지.
+
+    Left 월드 행렬은 **아무것도 옮기기 전에 전부 읽어 둔다.** 그래서 Left = [a, b],
+    Right = [b, a] 로 담으면 양쪽이 동시에 맞바뀌고(좌우 포즈 스왑), Right 가 Left 의
+    조상이어도 결과가 흔들리지 않는다. 쓰기는 부모 -> 자식 순서다(자식을 먼저 놓으면
+    부모를 놓을 때 밀린다).
+
+    반환: (moved, warnings, infos)
+    """
+    warnings = []
+    infos = []
+
+    if not (translate or rotate):
+        raise RuntimeError("Nothing to apply - check Translation and/or Rotation.")
+
+    axis = _PLANE_NORMAL.get(plane)
+    if axis is None:
+        raise ValueError("Unknown mirror plane '{0}'.".format(plane))
+
+    pairs = _resolve_pair_items(sources, targets, warnings)
+    if not pairs:
+        raise RuntimeError("Nothing to mirror - list objects on both Left and Right.")
+
+    # ---- 읽기 : 옮기기 전에 원본 행렬을 전부 ----
+    # 옮기기만 하고 이름·계층은 안 바꾸므로 롱네임이 끝까지 유효하다.
+    jobs = []
+    fallback_meshes = 0
+    for src, dst in pairs:
+        if cmds.nodeType(dst) == "joint":
+            mode = joint_mode if joint_mode != MODE_REFLECT else MODE_BEHAVIOR
+        else:
+            mode = other_mode
+            if mode == MODE_REFLECT and _shape_of(dst, "mesh"):
+                mode = MODE_ORIENTATION
+                fallback_meshes += 1
+        source_matrix = cmds.xform(src, query=True, worldSpace=True, matrix=True)
+        jobs.append((src, dst, _mirror_matrix(source_matrix, axis, mode)))
+
+    # ---- 쓰기 : 부모 -> 자식 (경로 깊이 순, 같은 깊이는 리스트 순서) ----
+    jobs.sort(key=lambda job: job[1].count("|"))
+
+    channels = (["translate"] if translate else []) + (["rotate"] if rotate else [])
+    moved = []
+    keyed_plugs = []
+    flipped = 0
+    for src, dst, target in jobs:
+        current = cmds.xform(dst, query=True, worldSpace=True, matrix=True)
+        new_matrix = _compose_applied_matrix(current, target, translate, rotate)
+
+        check = list(channels)
+        flips = rotate and (_determinant3(new_matrix) < 0) != (_determinant3(current) < 0)
+        if flips:
+            check.append("scale")        # 좌우손계가 바뀌면 스케일 부호도 써야 한다
+
+        blocked, keyed = _channel_blockers(dst, check)
+        if blocked:
+            warnings.append("'{0}' skipped - {1}.".format(
+                _short(dst), ", ".join("{0} is {1}".format(plug.split(".", 1)[1], why)
+                                       for plug, why in blocked[:3])
+                + (" ..." if len(blocked) > 3 else "")))
+            continue
+
+        cmds.xform(dst, worldSpace=True, matrix=new_matrix)
+
+        result = cmds.xform(dst, query=True, worldSpace=True, matrix=True)
+        if max(abs(a - b) for a, b in zip(result, new_matrix)) > _APPLY_TOLERANCE:
+            warnings.append("'{0}' could not be placed exactly (a pivot, limit or "
+                            "connection got in the way) - check it.".format(_short(dst)))
+        moved.append(dst)
+        keyed_plugs.extend(keyed)
+        if flips:
+            flipped += 1
+
+    infos.append("{0} object(s) moved to the mirror of their Left partner across the "
+                 "{1} plane ({2}).".format(
+                     len(moved), plane.upper(),
+                     " + ".join(part for part, on in (("translation", translate),
+                                                      ("rotation", rotate)) if on)))
+    if fallback_meshes:
+        infos.append("{0} mesh(es) used Orientation instead of Reflect "
+                     "(same as the Objects mode).".format(fallback_meshes))
+    if flipped:
+        infos.append("{0} object(s) changed handedness, so one scale axis flipped "
+                     "sign (Reflect <-> Behavior / Orientation).".format(flipped))
+    if keyed_plugs:
+        infos.append("{0} keyed channel(s) were changed without setting a key - "
+                     "key them or the curve wins on the next frame change.".format(
+                         len(keyed_plugs)))
+    return (moved, warnings, infos)

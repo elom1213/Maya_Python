@@ -4,7 +4,11 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.39` (`app/config/version.py`) — Connect > `Pair` 에 **`Swap` 버튼**:
+- 버전: `v01.40` (`app/config/version.py`) — Mirror 탭에 **`Apply (Left -> Right)` 모드**:
+  새로 만들지 않고, `Right` 리스트의 **이미 있는 오브젝트**를 같은 줄 `Left` 오브젝트의
+  **미러 위치 / 회전**으로 옮긴다(`Translation` / `Rotation` 체크박스). Mirror Plane · Mirror Type 은
+  Create 와 공유 (§Apply)
+  · v01.39 는 Connect > `Pair` 에 **`Swap` 버튼**:
   `Driven` ↔ `Driver` 두 리스트를 통째로 맞바꿔 **constraint 방향만 뒤집는다**
   (자리 순서와 `(Null)` 은 그대로) (§Pair)
   · v01.38 은 **`Mirror` 탭 신규**: 리스트에 담은 오브젝트와
@@ -1298,6 +1302,63 @@ Behavior 도 Orientation 도 **강체 회전**이라, 메시는 회전만 하고
 
 만든 오브젝트는 실행 뒤 씬에서 선택된다. 전체가 **undo 한 번**으로 되돌아간다.
 
+#### Apply — 이미 있는 반대쪽을 미러 위치 / 회전으로 (v01.40)
+
+반대쪽 오브젝트가 **이미 있을 때**(따로 만든 리그, 한쪽 포즈만 고친 경우) 새로 복제하지 않고
+**있는 오브젝트를 옮긴다.** 탭 맨 위 `Mode` 에서 `Apply (Left -> Right)` 를 고르면 리스트가 둘로
+바뀌고, `Options` 박스 대신 `Apply` 박스가 나온다. Mirror Plane · Mirror Type 은 Create 와 **공유**한다.
+
+```
+┌ Mode ───────────────────────────────────────────────┐
+│  ( ) Create (Objects)   (•) Apply (Left -> Right)   │
+└─────────────────────────────────────────────────────┘
+┌ Left (TSL) ─────────────┐ ┌ Right (TSL) ────────────┐
+│  arm_l_ctl              │ │  arm_r_ctl              │
+│  hand_l_ctl             │ │  hand_r_ctl             │
+└─────────────────────────┘ └─────────────────────────┘
+┌ Mirror Plane ─ (그대로) ┐   ┌ Mirror Type ─ (그대로) ┐
+┌ Apply ──────────────────────────────────────────────┐
+│  [v] Translation   [v] Rotation                     │
+└─────────────────────────────────────────────────────┘
+[                  Mirror to Right                  ]
+```
+
+- **짝은 같은 줄끼리다** — `Right[i]` 가 `Left[i]` 의 미러 위치 / 회전을 받는다. 자식은 따라가지
+  않으므로 옮길 오브젝트를 전부 담는다. 개수가 다르면 적은 쪽만큼만 하고 경고한다.
+- **결과는 "Create 모드가 그 자리에 만들었을 트랜스폼" 과 같다.** 같은 미러 행렬, 같은
+  조인트 / 컨트롤러 줄, 메시는 Reflect 대신 Orientation(Create 와 동일). 포즈를 준 왼쪽 리그에
+  Apply 한 결과는 그 리그를 **새로 Create 한 결과와 행렬 단위로 같다**(mayapy 확인).
+- **이동 / 회전만 바꾼다.** 스케일 **크기**는 오른쪽 오브젝트의 것을 유지한다.
+  조인트는 `jointOrient` 를 그대로 두고 **`rotate`** 가 바뀐다(포즈를 고치는 것이지 리그를 다시
+  짜는 게 아니다).
+- `Reflect` 는 진짜 거울상이라, 반사된 적 없는 오브젝트에 회전을 적용하면 **한 축 스케일이 음수**가
+  된다(Create 결과와 같은 상태). 그런 오브젝트 수를 로그로 알린다.
+
+> [!tip] 좌우 포즈 스왑
+> **Left 의 트랜스폼을 아무것도 옮기기 전에 전부 읽어 둔다.** 그래서 `Left = [arm_l, arm_r]`,
+> `Right = [arm_r, arm_l]` 로 담으면 양쪽이 **한 번에 맞바뀐다.** 한쪽을 먼저 옮기고 나머지를
+> 읽는 방식이면 두 번째가 이미 옮겨진 값을 미러해 버린다.
+
+쓰는 순서는 **부모 -> 자식**이다(자식을 먼저 담아도 된다). 자식을 먼저 놓으면 부모를 놓을 때
+자식이 밀린다.
+
+> [!warning] 잠긴 / 연결된 채널이 있으면 그 오브젝트는 **통째로 건너뛴다**
+> `cmds.xform` 은 잠긴 채널을 **에러 없이 건너뛰고 나머지만 바꾼다** — `rotateX` 가 잠겼으면
+> 이동만 되고 회전은 그대로인 반쪽 결과가 조용히 남는다(실측). 그래서 쓰기 전에 바꿀 채널
+> (`Translation` 이면 translate, `Rotation` 이면 rotate, 좌우손계가 바뀌면 scale)을 검사해,
+> **잠겼거나 컨스트레인트 · 애님 레이어 등이 구동하면** 건너뛰고 이유를 로그에 남긴다.
+> **키만 걸린 채널**은 옮긴다 — 다만 키를 찍지는 않으므로 프레임을 바꾸면 커브 값으로 돌아간다(로그로 알린다).
+
+한 줄이 없는 이름이거나 컴포넌트여도 **그 줄만** 빠지고 뒤의 짝은 밀리지 않는다.
+옮긴 오브젝트는 실행 뒤 선택되고, 전체가 undo 한 번이다.
+
+```
+--- Mirror Left -> Right (YZ plane, joints behavior, others reflect, translation on, rotation on) ---
+[WARN] 'hand_r_ctl' skipped - rotateX is locked.
+       1 object(s) moved to the mirror of their Left partner across the YZ plane (translation + rotation).
+[OK] Mirror Left -> Right
+```
+
 
 ---
 
@@ -1329,7 +1390,7 @@ A00145_RigConnect/
     │   ├── maya_scene.py           # Pair (A00140 복사)
     │   ├── closest_connector.py    # Pair (A00140 복사 + 짝짓기 모드: 거리 / 리스트 자리)
     │   └── object_match.py         # Pair > Match by Name (이름으로 오브젝트 짝짓기 — attr_match 엔진 재사용, 비교는 말단 이름·반환은 전체 경로)
-    │   └── mirror_manager.py       # Mirror (계층 복제 -> 미러 행렬 -> 스킨/컨스트레인트/클러스터 재구성, 토큰은 Framework 공용 규칙, MissingTokenError 가 이름 목록 + 세트를 실어 나른다)
+    │   └── mirror_manager.py       # Mirror (계층 복제 -> 미러 행렬 -> 스킨/컨스트레인트/클러스터 재구성, 토큰은 Framework 공용 규칙, MissingTokenError 가 이름 목록 + 세트를 실어 나른다 · mirror_onto = Apply(Left -> Right), 있는 오브젝트에 미러 위치/회전만)
     ├── data/                        # 사용자 데이터 (git 제외)
     │   ├── attr_profiles/<이름>.json   # Attribute > Create 프로파일
     │   └── attr_profiles_active.json   # 마지막으로 쓰던 프로파일

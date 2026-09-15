@@ -1,11 +1,11 @@
 ---
 name: wip-a00145-mirror-tab
-description: "A00145 Mirror 탭 신규 — 계층을 통째로 미러(스킨/컨스트레인트/클러스터/임의의 노드망 재구성). Reflect 모드는 M·S(월드 scaleX -1 과 같은 상태), Behavior 는 이동을 미러하지 않는다, 메시는 정점을 한 번 더 반사, 노드망은 DAG 에서 멈춰 수집하고 expression 은 뺀다 (v01.38)"
+description: "A00145 Mirror 탭 신규 — 계층을 통째로 미러(스킨/컨스트레인트/클러스터/임의의 노드망 재구성). Reflect 모드는 M·S(월드 scaleX -1 과 같은 상태), Behavior 는 이동을 미러하지 않는다, 메시는 정점을 한 번 더 반사, 노드망은 DAG 에서 멈춰 수집하고 expression 은 뺀다 (v01.38). v01.40 Apply (Left -> Right): 있는 반대쪽을 미러 위치/회전으로, Left 를 먼저 다 읽어 스왑 가능, 잠긴 채널은 오브젝트째 skip"
 metadata: 
   node_type: memory
   type: project
   originSessionId: 8a1f639d-1fbe-4096-98f7-2265e5589a17
-  modified: 2026-09-07T01:05:42.741Z
+  modified: 2026-09-15T00:27:38.835Z
 ---
 
 A00145_RigConnect **`Mirror` 탭 신규** (v01.37→**01.38**, 2026-09-07). TSL 에 담은
@@ -65,6 +65,17 @@ A00145_RigConnect **`Mirror` 탭 신규** (v01.37→**01.38**, 2026-09-07). TSL 
 - 클러스터는 `cluster -wn <미러된 핸들> -bindState` — bindState 가 핸들의 현재 트랜스폼을
   상쇄해 생성 직후 형상이 안 튄다. 웨이트는 범위 지정 `weightList[i].weights[0:n-1]`.
 - 좌/우 토큰 규칙은 **공용**으로 옮겼다 → [[framework-mirror-tokens]].
+
+**v01.40 (2026-09-15) `Apply (Left -> Right)` 모드** — 탭 맨 위 `Mode` 라디오로 `Create (Objects)`
+와 전환. 새로 만들지 않고 Right[i] 를 Left[i] 의 미러 위치/회전으로 옮긴다(`mirror_onto`).
+Plane/Type 공유, `Options` 대신 `Translation`/`Rotation`(기본 ON).
+- **정의 = Create 모드가 그 자리에 만들었을 트랜스폼**(메시 Orientation 폴백까지). 포즈 후 Apply ==
+  포즈 후 새 Create, 행렬 단위 일치(mayapy). 스케일 크기는 Right 유지, 조인트는 jointOrient 두고 rotate.
+- **★ Left 를 옮기기 전에 전부 읽는다** → `Left=[a,b]`, `Right=[b,a]` 가 좌우 스왑. 쓰기는 경로 깊이 순.
+- **★ `xform -m` 은 잠긴 채널만 조용히 빼고 나머지를 쓴다**(반쪽 결과) → 쓰기 전에 잠김/비키 연결을
+  찾아 오브젝트째 skip. 키만 걸렸으면 옮기고 알린다. 좌우손계가 바뀌면 scale 도 검사
+  ([[xform-silent-on-locked-channels]], [[getattr-settable-lies-for-constrained]]).
+- 짝은 필터링 **전에** 인덱스로 — 잘못된 줄이 뒤 짝을 밀지 않게.
 
 파일: `app/core/mirror_manager.py`(신규) · `app/ui/main_window.py`(Mirror 탭 · `on_mirror`) ·
 `docs/A00145_RigConnect.md`.

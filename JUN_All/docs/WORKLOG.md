@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-09-11
+updated: 2026-09-15
 ---
 
 # 작업 일지 (WORKLOG)
@@ -29,7 +29,34 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-09-11 (오늘)
+## 2026-09-15 (오늘)
+
+> [!summary] `A00145_RigConnect` Mirror 탭에 **`Apply (Left -> Right)`** 모드 — 새로 만들지 않고, 이미 있는 반대쪽 오브젝트를 미러 위치·회전으로 옮긴다 (v01.39 -> 01.40)
+- **요청**: Mirror 탭에 `Left` / `Right` 리스트 두 개를 두고, Left 를 미러한 결과의 위치·회전을
+  같은 줄 Right 오브젝트에 적용. `Translation` / `Rotation` 체크박스(기본 ON), Mirror Plane · Mirror Type
+  (Reflect 기본)은 그대로, 스킨·컨스트레인트 옵션은 쓰지 않는다. "리스트를 Objects 1개 / 2개 중
+  고르는 UI" 제안의 적합성 검토도 함께.
+- **UI**: 탭 맨 위 `Mode` 라디오 — `Create (Objects)` / `Apply (Left -> Right)`. 모드가 바꾸는 것은
+  리스트(1개 ↔ 2개), 옵션 박스(`Options` ↔ `Apply`), 버튼 이름(`Mirror` ↔ `Mirror to Right`)뿐이고
+  Plane / Type 은 두 모드가 공유한다.
+- **규칙 = "Create 모드가 그 자리에 만들었을 트랜스폼"**: 같은 `_mirror_matrix`, 조인트 / 컨트롤러 줄,
+  메시의 Orientation 폴백까지 그대로. 포즈를 준 왼쪽을 Apply 한 결과가 **같은 리그를 새로 Create 한
+  결과와 행렬 단위로 일치**한다(mayapy). 스케일 **크기**는 Right 것을 유지하고, 조인트는 `jointOrient`
+  를 두고 `rotate` 가 바뀐다(`xform -ws -m` 이 원래 그렇게 동작 — 실측).
+- **★ Left 행렬을 옮기기 전에 전부 읽는다** → `Left=[a, b]`, `Right=[b, a]` 로 좌우 포즈 스왑이 한 번에.
+  쓰기는 부모 -> 자식 순이라 자식을 먼저 담아도 밀리지 않는다.
+- **★ `xform` 은 잠긴 채널을 에러 없이 건너뛰고 나머지만 바꾼다**(회전이 잠겼으면 이동만 되는
+  반쪽 결과 — 실측). 그래서 쓰기 전에 막힌 채널(잠김 / 키가 아닌 연결)을 찾아 **그 오브젝트를 통째로
+  건너뛰고** 이유를 로그에 남긴다. 키만 걸린 채널은 옮기고 "키는 안 찍었다" 고 알린다.
+  좌우손계가 바뀌면(Reflect ↔ 나머지) scale 부호도 써야 하므로 scale 도 검사한다.
+- 짝(인덱스)은 걸러내기 **전에** 정한다 — 한 줄이 없는 이름이라도 뒤의 짝이 밀리지 않는다.
+- 검증: mayapy 코어 27항목(Reflect/Behavior/조인트/T·R 단독/스왑/잠김·컨스트레인트·키/부모-자식 순서/
+  XY 평면 부호 뒤집힘/메시 폴백/잘못된 줄) + UI 14항목(모드 전환 시 리스트·박스 표시, 버튼 이름,
+  버튼 실행 결과·로그, 둘 다 끄면 에러) 통과. 실제 마야 GUI 확인은 아직.
+- 파일: `app/core/mirror_manager.py`(`mirror_onto`), `app/ui/main_window.py`, `docs/A00145_RigConnect.md`
+  `#A00145`
+
+## 2026-09-11
 
 > [!summary] `A00290_BSTool` `Edit BS` 하위 탭 2개 — **`Default`**(기존) + **`Naming`**(타겟 이름 = 언리얼 모프 타겟 이름 일괄 변경) (v01.20 -> 01.21)
 - **요청**: `Edit BS` 에 하위 탭 `Default` / `Naming` 을 만들고, 기존 기능은 `Default` 로.
