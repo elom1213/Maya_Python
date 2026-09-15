@@ -21,6 +21,17 @@ orient 옵션이 켜지면 커브 접선(tangent)을 aim 축에 정렬한다. �
   - use_normal_curve=False:
     norCrv 없이 월드 +Y 를 시드로 side = T x up, up' = side x T 직교 프레임을 만든다(자족).
     접선이 월드 업과 평행한(수직) 커브에서는 프레임이 무너질 수 있어 그런 경우 orient 를 끈다.
+
+NURBS surface (v01.23~) — `_archive/legacy_tools/01_Modules/JUN_PY_matrixPinning_V01_01.py`
+(Chris Lesage `pin_to_surface`) 이식:
+  - closestPointOnSurface 로 빌드 시점의 최근접 (u, v) 를 구하고(임시 노드),
+  - pointOnSurfaceInfo(parameterU/V) -> fourByFourMatrix 로 같은 매트릭스 네트워크를 쓴다.
+  - orient : X = tangentU, Y = normal 은 ref 그대로. 단 ref 의 Z = +tangentV 는 **왼손 좌표계**다
+    (Maya 2024 실측: normal = tangentU x tangentV 라 det < 0 — decomposeMatrix 가 음수 스케일로
+    받아 회전이 한 축 뒤집힌다). 그래서 `_orient_frame_outputs` 로 Z = tangentU x normal
+    (= -tangentV 방향)인 오른손 직교 정규 프레임을 만든다(normal 이 업 시드, shear 도 없음).
+  - norCrv 는 커브 전용이다(서피스는 normal 이 업 벡터라 필요 없다).
+  - Distribute 는 ref 'Pin by given number' 처럼 한 방향(U 또는 V)으로 균일, 다른 방향은 가운데.
 """
 
 import maya.api.OpenMaya as om
@@ -31,6 +42,9 @@ AIM_AXES = ("+X", "-X")
 
 # Distribute 모드에서 생성할 드라이버 종류(ref 의 Locator / Null).
 DRIVER_TYPES = ("locator", "null")
+
+# 서피스 Distribute 에서 균일 분배할 방향(다른 방향은 파라미터 범위 가운데).
+SURFACE_AXES = ("U", "V")
 
 # 직교 프레임의 업벡터 시드(월드 +Y).
 _WORLD_UP = (0.0, 1.0, 0.0)
@@ -59,19 +73,69 @@ def _closest_parameter(curve_shape, world_pos):
         cmds.delete(npoc)
 
 
-def _orient_frame_outputs(poci, aim_axis, up_plug=None):
-    """커브 접선 기반 직교 프레임의 (X행, Y행, Z행) 소스 어트리뷰트 3쌍을 만들어 반환.
+def _shape_of_surface(surface):
+    """transform 이면 그 nurbsSurface shape 를, 이미 shape 면 자신을 반환. 없으면 None."""
+    if cmds.objectType(surface, isType="nurbsSurface"):
+        return surface
+    shapes = cmds.listRelatives(surface, shapes=True, type="nurbsSurface",
+                                fullPath=True) or []
+    return shapes[0] if shapes else None
+
+
+def resolve_target(target):
+    """어태치 대상의 (shape, kind) 를 반환. kind 는 'curve' | 'surface'.
+
+    NURBS curve / NURBS surface 가 아니면(또는 씬에 없으면) (None, None).
+    """
+    if not target or not cmds.objExists(target):
+        return None, None
+    shape = _shape_of_curve(target)
+    if shape:
+        return shape, "curve"
+    shape = _shape_of_surface(target)
+    if shape:
+        return shape, "surface"
+    return None, None
+
+
+def attach_target_kind(target):
+    """'curve' | 'surface' | None — UI 가 옵션 활성 상태를 정할 때 쓴다."""
+    return resolve_target(target)[1]
+
+
+def _closest_uv(surface_shape, world_pos):
+    """closestPointOnSurface 임시 노드로 world_pos 의 최근접 (u, v) 를 구해 반환.
+
+    결과는 실제 파라미터 값이다(0~1 정규화 아님) — pointOnSurfaceInfo 도
+    turnOnPercentage=0 으로 같은 값을 받는다(ref 주석: minMaxRange 를 고려해야 한다).
+    """
+    cpos = cmds.createNode("closestPointOnSurface")
+    try:
+        cmds.connectAttr(surface_shape + ".worldSpace[0]",
+                         cpos + ".inputSurface", force=True)
+        cmds.setAttr(cpos + ".inPosition", *world_pos, type="double3")
+        return (cmds.getAttr(cpos + ".parameterU"),
+                cmds.getAttr(cpos + ".parameterV"))
+    finally:
+        cmds.delete(cpos)
+
+
+def _orient_frame_outputs(poci, aim_axis, up_plug=None, tangent_plug=None):
+    """접선 기반 직교 프레임의 (X행, Y행, Z행) 소스 어트리뷰트 3쌍을 만들어 반환.
 
     각 원소는 (.x, .y, .z) 성분 어트리뷰트 튜플. fourByFourMatrix in0*/in1*/in2* 에 연결한다.
     +X: X=+T, Y=+up', Z=+side / -X: X=-T, Z=-side (handedness 유지).
-    up_plug 가 주어지면 월드 +Y 대신 그 벡터 어트리뷰트를 업 시드로 쓴다(예: norCrv 접선).
+    up_plug 가 주어지면 월드 +Y 대신 그 벡터 어트리뷰트를 업 시드로 쓴다(예: norCrv 접선,
+    서피스 normal). tangent_plug 가 주어지면 `<poci>.normalizedTangent` 대신 그 벡터를
+    T 로 쓴다(예: `<posi>.normalizedTangentU`). 성분은 plug 이름 뒤에 X/Y/Z 를 붙여 얻는다.
     """
+    tangent = tangent_plug or (poci + ".normalizedTangent")
+
     # side = T x up,  up' = side x T (둘 다 normalizeOutput).
     vp_side = cmds.createNode("vectorProduct")
     cmds.setAttr(vp_side + ".operation", 2)          # cross product
     cmds.setAttr(vp_side + ".normalizeOutput", 1)
-    cmds.connectAttr(poci + ".normalizedTangent", vp_side + ".input1",
-                     force=True)
+    cmds.connectAttr(tangent, vp_side + ".input1", force=True)
     if up_plug:
         cmds.connectAttr(up_plug, vp_side + ".input2", force=True)
     else:
@@ -81,12 +145,9 @@ def _orient_frame_outputs(poci, aim_axis, up_plug=None):
     cmds.setAttr(vp_up + ".operation", 2)
     cmds.setAttr(vp_up + ".normalizeOutput", 1)
     cmds.connectAttr(vp_side + ".output", vp_up + ".input1", force=True)
-    cmds.connectAttr(poci + ".normalizedTangent", vp_up + ".input2",
-                     force=True)
+    cmds.connectAttr(tangent, vp_up + ".input2", force=True)
 
-    tan_attr = (poci + ".normalizedTangentX",
-                poci + ".normalizedTangentY",
-                poci + ".normalizedTangentZ")
+    tan_attr = (tangent + "X", tangent + "Y", tangent + "Z")
     up_attr = (vp_up + ".outputX", vp_up + ".outputY", vp_up + ".outputZ")
     side_attr = (vp_side + ".outputX", vp_side + ".outputY",
                  vp_side + ".outputZ")
@@ -108,8 +169,9 @@ def _negate_vector(node_hint, src_attrs, name):
 
 
 def _transform_of_curve(curve):
-    """shape 가 주어지면 그 부모 transform 을, transform 이면 자신을 반환."""
-    if cmds.objectType(curve, isType="nurbsCurve"):
+    """shape(커브/서피스)가 주어지면 그 부모 transform 을, transform 이면 자신을 반환."""
+    if (cmds.objectType(curve, isType="nurbsCurve")
+            or cmds.objectType(curve, isType="nurbsSurface")):
         parents = cmds.listRelatives(curve, parent=True, fullPath=True) or []
         return parents[0] if parents else curve
     return curve
@@ -177,8 +239,8 @@ def _offset_matrix(obj, frame_plug, parent):
     """
     frame0 = om.MMatrix(cmds.getAttr(frame_plug))
     if abs(frame0.det3x3()) < 1e-8:
-        raise ValueError("curve frame is degenerate here (tangent parallel to "
-                         "the up vector); cannot keep the offset")
+        raise ValueError("attach frame is degenerate here (tangent parallel to "
+                         "the up vector / normal); cannot keep the offset")
     opm0 = om.MMatrix(cmds.getAttr(obj + ".offsetParentMatrix"))
     if parent:
         opm0 = opm0 * om.MMatrix(cmds.getAttr(parent + ".worldMatrix[0]"))
@@ -186,8 +248,11 @@ def _offset_matrix(obj, frame_plug, parent):
 
 
 def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=None,
-                maintain_offset=False):
-    """오브젝트 하나를 커브 위 한 지점에 라이브 어태치한다(노드 네트워크 구성).
+                maintain_offset=False, kind="curve"):
+    """오브젝트 하나를 커브(또는 서피스) 위 한 지점에 라이브 어태치한다(노드 네트워크 구성).
+
+    kind == 'surface' 면 curve_shape 는 nurbsSurface shape 이고 param 은 (u, v) 다.
+    pointOnSurfaceInfo 를 쓰고, orient 프레임은 tangentU / normal 로 만든다(norcrv_shape 무시).
 
     param 이 None 이면 오브젝트의 월드 위치에서 최근접 파라미터를 구해 쓰고(closest 모드),
     값이 주어지면 그 파라미터 지점에 그대로 붙인다(distribute 모드).
@@ -205,15 +270,30 @@ def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=Non
             raise ValueError(
                 "offsetParentMatrix is already connected ({0})".format(src[0]))
 
+    surface = kind == "surface"
+
     if param is None:
         world_pos = cmds.xform(obj, query=True, worldSpace=True, rotatePivot=True)
-        param = _closest_parameter(curve_shape, world_pos)
+        if surface:
+            param = _closest_uv(curve_shape, world_pos)
+        else:
+            param = _closest_parameter(curve_shape, world_pos)
 
-    poci = cmds.createNode("pointOnCurveInfo", n="{0}_atc_POCI".format(obj))
-    cmds.connectAttr(curve_shape + ".worldSpace[0]", poci + ".inputCurve",
-                     force=True)
-    cmds.setAttr(poci + ".turnOnPercentage", 0)
-    cmds.setAttr(poci + ".parameter", param)
+    # poci 는 커브면 pointOnCurveInfo, 서피스면 pointOnSurfaceInfo. position* 이름은 같다.
+    if surface:
+        poci = cmds.createNode("pointOnSurfaceInfo",
+                               n="{0}_atc_POSI".format(obj))
+        cmds.connectAttr(curve_shape + ".worldSpace[0]", poci + ".inputSurface",
+                         force=True)
+        cmds.setAttr(poci + ".turnOnPercentage", 0)
+        cmds.setAttr(poci + ".parameterU", param[0])
+        cmds.setAttr(poci + ".parameterV", param[1])
+    else:
+        poci = cmds.createNode("pointOnCurveInfo", n="{0}_atc_POCI".format(obj))
+        cmds.connectAttr(curve_shape + ".worldSpace[0]", poci + ".inputCurve",
+                         force=True)
+        cmds.setAttr(poci + ".turnOnPercentage", 0)
+        cmds.setAttr(poci + ".parameter", param)
 
     fbf = cmds.createNode("fourByFourMatrix", n="{0}_atc_FBF".format(obj))
     cmds.connectAttr(poci + ".positionX", fbf + ".in30", force=True)
@@ -221,7 +301,14 @@ def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=Non
     cmds.connectAttr(poci + ".positionZ", fbf + ".in32", force=True)
 
     if orient:
-        if norcrv_shape:
+        if surface:
+            # matrixPinning(ref): X = tangentU, Y = normal, Z = tangentV 는 왼손계다
+            # (normal = tangentU x tangentV). normal 을 업 시드로 직교 정규화해
+            # Z = tangentU x normal(= -tangentV 방향)인 오른손 프레임을 쓴다.
+            x_row, y_row, z_row = _orient_frame_outputs(
+                poci, aim_axis, up_plug=poci + ".normalizedNormal",
+                tangent_plug=poci + ".normalizedTangentU")
+        elif norcrv_shape:
             # ref 원본 : norCrv 에 같은 곡선 shape 를 물린 별도 POCI 를 만들어 up/side 를 뽑는다.
             nor_poci = cmds.createNode("pointOnCurveInfo",
                                        n="{0}_nor_POCI".format(obj))
@@ -279,6 +366,9 @@ def build_attach_to_closest(curve, objects, orient=True, aim_axis="+X",
                             create_set=True, maintain_offset=False):
     """objects 의 각 오브젝트를 curve 에서 가장 가까운 지점에 라이브 어태치한다.
 
+    curve 에는 NURBS surface(transform 또는 shape)도 줄 수 있다 — 최근접 (u, v) 에
+    pointOnSurfaceInfo 로 붙고, norCrv 옵션은 무시된다(서피스 normal 이 업 벡터).
+
     maintain_offset 이 True 면 오브젝트를 커브 위로 옮기지 않는다 — 빌드 시점의 위치·회전·
     스케일을 그대로 두고, 이후 커브(와 norCrv)가 움직인 만큼만 따라간다(offsetParentMatrix
     구동, `_attach_one` 참고). False 면 기존대로 translate(/rotate)를 커브 지점에 맞춘다.
@@ -291,15 +381,16 @@ def build_attach_to_closest(curve, objects, orient=True, aim_axis="+X",
     하나 만든다(이름 '<curve>_atcPOCI_SET', 이미 있으면 Maya 가 자동 넘버링).
 
     Returns (attached, failed, set_node, norcrv):
-      attached  = [(obj, parameter), ...]
+      attached  = [(obj, parameter), ...]  (서피스면 parameter 가 (u, v))
       failed    = [(obj, reason), ...]
-      set_node  = 생성한 세트 이름(미생성/멤버 없음이면 None)
+      set_node  = 생성한 세트 이름(미생성/멤버 없음이면 None; 서피스면 '<surface>_atcPOSI_SET')
       norcrv    = 생성한 norCrv transform 이름(미생성이면 None)
     한 오브젝트가 실패해도 나머지는 계속 진행한다.
     """
-    curve_shape = _shape_of_curve(curve)
+    curve_shape, kind = resolve_target(curve)
     if curve_shape is None:
-        raise ValueError("'{0}' is not a NURBS curve.".format(curve))
+        raise ValueError(
+            "'{0}' is not a NURBS curve or NURBS surface.".format(curve))
     if aim_axis not in AIM_AXES:
         aim_axis = "+X"
 
@@ -309,7 +400,7 @@ def build_attach_to_closest(curve, objects, orient=True, aim_axis="+X",
     # ref 원본 : orient + use_normal_curve 면 norCrv 를 한 개 만들어 공유한다.
     norcrv = None
     norcrv_shape = None
-    if orient and use_normal_curve:
+    if orient and use_normal_curve and kind == "curve":
         norcrv, norcrv_shape = _create_normal_curve(
             _transform_of_curve(curve), aim_axis, normal_curve_length, base)
 
@@ -323,7 +414,8 @@ def build_attach_to_closest(curve, objects, orient=True, aim_axis="+X",
         try:
             param, poci = _attach_one(curve_shape, obj, orient, aim_axis,
                                       norcrv_shape,
-                                      maintain_offset=maintain_offset)
+                                      maintain_offset=maintain_offset,
+                                      kind=kind)
             attached.append((obj, param))
             pocis.append(poci)
         except Exception as exc:                       # noqa: BLE001
@@ -331,9 +423,14 @@ def build_attach_to_closest(curve, objects, orient=True, aim_axis="+X",
 
     set_node = None
     if create_set and pocis:
-        set_node = cmds.sets(pocis, name="{0}_atcPOCI_SET".format(base))
+        set_node = cmds.sets(pocis, name=_set_name(base, kind))
 
     return attached, failed, set_node, norcrv
+
+
+def _set_name(base, kind):
+    """빌드로 만든 point-info 노드 세트 이름. 커브는 기존 이름 그대로."""
+    return "{0}_atc{1}_SET".format(base, "POSI" if kind == "surface" else "POCI")
 
 
 # ----------------------------------------------------------------------------
@@ -345,6 +442,11 @@ def _curve_param_range(curve_shape):
     """커브 shape 의 (minValue, maxValue) 파라미터 범위를 반환."""
     return (cmds.getAttr(curve_shape + ".minValue"),
             cmds.getAttr(curve_shape + ".maxValue"))
+
+
+def _surface_param_range(surface_shape, axis):
+    """서피스 shape 의 axis('U'|'V') 방향 (min, max) 파라미터 범위를 반환."""
+    return tuple(cmds.getAttr("{0}.minMaxRange{1}".format(surface_shape, axis))[0])
 
 
 def _uniform_parameters(count, start, end, full_range):
@@ -380,8 +482,13 @@ def build_attach_uniform(curve, count, driver_type="locator", name_prefix=None,
                          start=None, end=None, full_range=True,
                          orient=True, aim_axis="+X",
                          use_normal_curve=True, normal_curve_length=1.0,
-                         create_set=True):
+                         create_set=True, surface_axis="U"):
     """커브 위에 새 드라이버 count 개를 균일한 파라미터 간격으로 생성·라이브 어태치한다.
+
+    curve 가 NURBS surface 면 matrixPinning(ref) 'Pin by given number' 처럼 surface_axis
+    ('U'|'V') 방향으로 균일 분배하고 다른 방향은 파라미터 범위의 가운데에 둔다(ref 는 v=0.5
+    고정 — 범위가 0~1 일 때와 같다). start/end 는 그 분배 방향의 범위다. created 의 parameter
+    는 (u, v) 가 되고 norCrv 는 만들지 않는다.
 
     ref_01.mel attachDriverOnCurve 의 원래 동작 이식 : Locator/Null 드라이버를 만들어
     makeParameterValueList 로 구한 파라미터 지점마다 pointOnCurveInfo -> matrix 네트워크로
@@ -395,17 +502,27 @@ def build_attach_uniform(curve, count, driver_type="locator", name_prefix=None,
       set_node  = 생성한 pointOnCurveInfo 세트 이름(미생성이면 None)
       norcrv    = 생성한 norCrv transform 이름(미생성이면 None)
     """
-    curve_shape = _shape_of_curve(curve)
+    curve_shape, kind = resolve_target(curve)
     if curve_shape is None:
-        raise ValueError("'{0}' is not a NURBS curve.".format(curve))
+        raise ValueError(
+            "'{0}' is not a NURBS curve or NURBS surface.".format(curve))
     if count < 1:
         raise ValueError("count must be a positive integer.")
     if driver_type not in DRIVER_TYPES:
         driver_type = "locator"
     if aim_axis not in AIM_AXES:
         aim_axis = "+X"
+    if surface_axis not in SURFACE_AXES:
+        surface_axis = "U"
 
-    min_v, max_v = _curve_param_range(curve_shape)
+    across_mid = None
+    if kind == "surface":
+        other = "V" if surface_axis == "U" else "U"
+        min_v, max_v = _surface_param_range(curve_shape, surface_axis)
+        lo, hi = _surface_param_range(curve_shape, other)
+        across_mid = lo + (hi - lo) / 2.0
+    else:
+        min_v, max_v = _curve_param_range(curve_shape)
     if start is None:
         start = min_v
     if end is None:
@@ -417,11 +534,14 @@ def build_attach_uniform(curve, count, driver_type="locator", name_prefix=None,
     # ref 원본 : orient + use_normal_curve 면 norCrv 를 한 개 만들어 공유한다.
     norcrv = None
     norcrv_shape = None
-    if orient and use_normal_curve:
+    if orient and use_normal_curve and kind == "curve":
         norcrv, norcrv_shape = _create_normal_curve(
             _transform_of_curve(curve), aim_axis, normal_curve_length, base)
 
     params = _uniform_parameters(count, start, end, full_range)
+    if kind == "surface":
+        params = [(p, across_mid) if surface_axis == "U" else (across_mid, p)
+                  for p in params]
 
     created = []
     pocis = []
@@ -430,12 +550,12 @@ def build_attach_uniform(curve, count, driver_type="locator", name_prefix=None,
         drv = cmds.rename(
             drv, "{0}_{1}_drv".format(prefix, _padded_number(count, i + 1)))
         _, poci = _attach_one(curve_shape, drv, orient, aim_axis,
-                              norcrv_shape, param=param)
+                              norcrv_shape, param=param, kind=kind)
         created.append((drv, param))
         pocis.append(poci)
 
     set_node = None
     if create_set and pocis:
-        set_node = cmds.sets(pocis, name="{0}_atcPOCI_SET".format(base))
+        set_node = cmds.sets(pocis, name=_set_name(base, kind))
 
     return created, set_node, norcrv

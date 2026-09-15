@@ -23,6 +23,7 @@ from tools.A00170_driverTool.app.core import (
     run_build_slerp, run_build_wave,
     run_build_spherical, run_build_nodes,
     run_attach_to_closest, run_attach_uniform, AIM_AXES, DRIVER_TYPES,
+    SURFACE_AXES, attach_target_kind,
     run_build_loop_drivers, loop_parse_edges, loop_parse_vertices, loop_alive,
     group_loop_edges, CURVE_DEGREES, LOOP_DEFAULT_PREFIX, LOOP_CONTROL_SCALE,
     run_build_seal, run_remove_seal, run_seal_recapture_rest,
@@ -665,10 +666,15 @@ class MainWindow(QWidget):
         tab = QWidget()
         root = QVBoxLayout(tab)
 
-        # Attachment Curve
+        # Attachment Curve (v01.23~ : NURBS surface 도 받는다 — matrixPinning 이식)
         row = QHBoxLayout()
-        row.addWidget(QLabel("Attachment Curve"))
+        row.addWidget(QLabel("Attachment Curve / Surface"))
         self.atc_le_curve = QLineEdit()
+        self.atc_le_curve.setPlaceholderText("NURBS curve or NURBS surface")
+        self.atc_le_curve.setToolTip(
+            "NURBS curve: attach with pointOnCurveInfo.\n"
+            "NURBS surface: attach with pointOnSurfaceInfo at the closest (u, v) "
+            "(matrix pinning, like a follicle but without flipping).")
         row.addWidget(self.atc_le_curve)
         self.atc_btn_get_curve = QPushButton("Get")
         self.atc_btn_get_curve.setFixedWidth(70)
@@ -684,19 +690,22 @@ class MainWindow(QWidget):
 
         # Options : Orient to tangent + Aim Axis
         row = QHBoxLayout()
-        self.atc_cb_orient = QCheckBox("Orient to curve tangent")
+        self.atc_cb_orient = QCheckBox("Orient to tangent")
         self.atc_cb_orient.setChecked(True)
         self.atc_cb_orient.setToolTip(
             "On: aim the chosen local axis along the curve tangent and drive "
             "the object's rotate as well as translate. Off: drive translate "
             "only (keeps each object's current rotation). Turn off for vertical "
-            "curves where the tangent is parallel to world up.")
+            "curves where the tangent is parallel to world up.\n"
+            "Surface: X follows tangent U, Y the surface normal, Z = X cross Y "
+            "(right-handed, opposite tangent V).")
         row.addWidget(self.atc_cb_orient)
         row.addWidget(QLabel("Aim Axis"))
         self.atc_cb_aim = QComboBox()
         self.atc_cb_aim.addItems(list(AIM_AXES))
         self.atc_cb_aim.setToolTip(
-            "Which local axis of each object aims along the curve tangent.")
+            "Which local axis of each object aims along the curve tangent "
+            "(surface: tangent U).")
         row.addWidget(self.atc_cb_aim)
         row.addStretch(1)
         root.addLayout(row)
@@ -711,7 +720,8 @@ class MainWindow(QWidget):
             "object's up (Y) / side (Z) from it. Rotate or reshape the norCrv "
             "to control the up direction and twist of the whole chain.\n"
             "Off: use the self-contained world-up frame computed from the curve "
-            "tangent (no extra curve created).")
+            "tangent (no extra curve created).\n"
+            "Curves only: a surface uses its own normal as the up vector.")
         row.addWidget(self.atc_cb_norcrv)
         row.addWidget(QLabel("norCrv Length"))
         self.atc_dsb_norcrv_len = QDoubleSpinBox()
@@ -726,13 +736,14 @@ class MainWindow(QWidget):
         row.addStretch(1)
         root.addLayout(row)
 
-        # Collect the created pointOnCurveInfo nodes into one objectSet.
+        # Collect the created pointOnCurveInfo / pointOnSurfaceInfo nodes into one objectSet.
         self.atc_cb_make_set = QCheckBox(
-            "Group pointOnCurveInfo nodes into a set")
+            "Group point info nodes into a set")
         self.atc_cb_make_set.setChecked(True)
         self.atc_cb_make_set.setToolTip(
-            "Create one objectSet ('<curve>_atcPOCI_SET') containing every "
-            "pointOnCurveInfo node made by this build, for easy selection later.")
+            "Create one objectSet containing every pointOnCurveInfo "
+            "('<curve>_atcPOCI_SET') or pointOnSurfaceInfo ('<surface>_atcPOSI_SET') "
+            "node made by this build, for easy selection later.")
         root.addWidget(self.atc_cb_make_set)
 
         # Maintain offset : 오브젝트를 커브 위로 옮기지 않고 지금 자리에서 커브를 따라가게.
@@ -752,9 +763,10 @@ class MainWindow(QWidget):
         self.atc_btn_build = QPushButton("Attach to Closest Point")
         self.atc_btn_build.setMinimumHeight(34)
         self.atc_btn_build.setToolTip(
-            "For each listed object: find the closest parameter on the curve, "
-            "then drive it there with a pointOnCurveInfo -> matrix network "
-            "(parent-safe, live as the curve deforms).")
+            "For each listed object: find the closest parameter on the curve "
+            "(or closest u, v on the surface), then drive it there with a "
+            "pointOnCurveInfo / pointOnSurfaceInfo -> matrix network "
+            "(parent-safe, live as the curve / surface deforms).")
         root.addWidget(self.atc_btn_build)
 
         # Distribute : create N new drivers uniformly along the curve
@@ -778,6 +790,13 @@ class MainWindow(QWidget):
         self.atc_cb_drvtype.setToolTip(
             "Locator: spaceLocator drivers (visible). Null: empty groups.")
         dist_row.addWidget(self.atc_cb_drvtype)
+        dist_row.addWidget(QLabel("Surface Axis"))
+        self.atc_cb_surface_axis = QComboBox()
+        self.atc_cb_surface_axis.addItems(list(SURFACE_AXES))
+        self.atc_cb_surface_axis.setToolTip(
+            "Surfaces only: spread the drivers evenly along U or V. The other "
+            "direction stays at the middle of its parameter range.")
+        dist_row.addWidget(self.atc_cb_surface_axis)
         dist_row.addStretch(1)
         dist_layout.addLayout(dist_row)
 
@@ -787,7 +806,8 @@ class MainWindow(QWidget):
             "On (open curves): the first and last drivers land exactly on the "
             "curve ends (parameter min and max).\n"
             "Off (periodic/closed curves): the last driver stops just before the "
-            "end so it does not overlap the first at the seam.")
+            "end so it does not overlap the first at the seam.\n"
+            "Surfaces: the same rule along the chosen Surface Axis.")
         dist_layout.addWidget(self.atc_cb_fullrange)
 
         self.atc_btn_distribute = QPushButton("Distribute Drivers on Curve")
@@ -805,16 +825,34 @@ class MainWindow(QWidget):
         self.atc_btn_distribute.clicked.connect(self.on_atc_distribute)
         self.atc_cb_orient.toggled.connect(self._atc_sync_orient_enabled)
         self.atc_cb_norcrv.toggled.connect(self._atc_sync_orient_enabled)
+        self.atc_le_curve.textChanged.connect(self._atc_sync_orient_enabled)
         self._atc_sync_orient_enabled()
 
         return tab
 
     def _atc_sync_orient_enabled(self, *args):
-        """Orient/norCrv 토글에 따라 종속 위젯의 활성 상태를 동기화한다."""
+        """Orient/norCrv 토글과 대상 종류(커브/서피스)에 따라 종속 위젯 활성 상태를 동기화한다.
+
+        norCrv 는 커브 전용, Surface Axis 는 서피스 전용이다. 대상이 비었거나 아직 판별이
+        안 되면(타이핑 중) 커브로 보고 커브 옵션을 열어 둔다.
+        """
+        try:
+            surface = attach_target_kind(self.atc_le_curve.text().strip()) == "surface"
+        except Exception:                                  # noqa: BLE001
+            surface = False
         orient = self.atc_cb_orient.isChecked()
         self.atc_cb_aim.setEnabled(orient)
-        self.atc_cb_norcrv.setEnabled(orient)
-        self.atc_dsb_norcrv_len.setEnabled(orient and self.atc_cb_norcrv.isChecked())
+        self.atc_cb_norcrv.setEnabled(orient and not surface)
+        self.atc_dsb_norcrv_len.setEnabled(
+            orient and not surface and self.atc_cb_norcrv.isChecked())
+        self.atc_cb_surface_axis.setEnabled(surface)
+
+    @staticmethod
+    def _atc_param_text(param):
+        """로그용 파라미터 문자열 — 커브는 값 하나, 서피스는 (u, v)."""
+        if isinstance(param, (tuple, list)):
+            return "(u {0:.4f}, v {1:.4f})".format(param[0], param[1])
+        return "param {0:.4f}".format(param)
 
     # ----------------------------------------------------------------
     # AttachCrv > Edge Loop : 루프 -> 커브 -> 널 -> 어태치 (+ 조인트)
@@ -1153,23 +1191,39 @@ class MainWindow(QWidget):
                 set_node))
 
     def on_atc_get_curve(self):
-        """현재 선택의 첫 오브젝트를 Attachment Curve 로 설정."""
+        """현재 선택의 첫 오브젝트를 Attachment Curve / Surface 로 설정."""
         selection = MayaScene.selection()
         if not selection:
-            self._log("[WARN] Nothing selected. Select a curve first.")
+            self._log("[WARN] Nothing selected. Select a curve or a NURBS "
+                      "surface first.")
             return
         self.atc_le_curve.setText(selection[0])
+        if attach_target_kind(selection[0]) is None:
+            self._log("[WARN] {0} is not a NURBS curve or NURBS surface.".format(
+                selection[0]))
+
+    def _atc_check_target(self, curve):
+        """Attachment Curve / Surface 칸을 검사해 kind('curve'|'surface')를, 문제면 None."""
+        if not curve:
+            self._log("[WARN] Attachment Curve / Surface is empty. Use Get to "
+                      "set it.")
+            return None
+        if not MayaScene.exists(curve):
+            self._log("[WARN] Not found in scene: {0}".format(curve))
+            return None
+        kind = attach_target_kind(curve)
+        if kind is None:
+            self._log("[WARN] Not a NURBS curve or NURBS surface: {0}".format(
+                curve))
+        return kind
 
     def on_atc_build(self):
         self._log("--- Attach to Closest Point ---")
         curve = self.atc_le_curve.text().strip()
         objects = self.atc_objs_tsl.get_all_items()
 
-        if not curve:
-            self._log("[WARN] Attachment Curve is empty. Use Get to set it.")
-            return
-        if not MayaScene.exists(curve):
-            self._log("[WARN] Curve not found in scene: {0}".format(curve))
+        kind = self._atc_check_target(curve)
+        if kind is None:
             return
         if not objects:
             self._log("[WARN] Objects list is empty. Add objects first.")
@@ -1194,36 +1248,37 @@ class MainWindow(QWidget):
                 self._log("[ERROR] Attach failed: {0}".format(exc))
                 return
 
+        surface = kind == "surface"
         self._log(
-            "Attached {n} object(s) to '{c}' | orient: {o}{axis}{nc}{mo}".format(
-                n=len(attached), c=curve,
+            "Attached {n} object(s) to {k} '{c}' | orient: {o}{axis}{nc}{mo}".format(
+                n=len(attached), k=kind, c=curve,
                 o="on" if orient else "off",
                 axis=" ({0})".format(aim_axis) if orient else "",
-                nc=" | norCrv" if (orient and use_norcrv) else "",
+                nc=" | norCrv" if (orient and use_norcrv and not surface) else "",
                 mo=" | maintain offset" if maintain_offset else ""))
+        if orient and use_norcrv and surface:
+            self._log("norCrv is not used on a surface (the surface normal is "
+                      "the up vector).")
         if norcrv:
             self._log(
                 "Normal curve created: {0} "
                 "(rotate/reshape it to control up & twist)".format(norcrv))
         for obj, param in attached:
-            self._log("  {0} -> param {1:.4f}".format(obj, param))
+            self._log("  {0} -> {1}".format(obj, self._atc_param_text(param)))
         for obj, reason in failed:
             self._log("[WARN] Skipped {0}: {1}".format(obj, reason))
         if set_node:
-            self._log("pointOnCurveInfo nodes grouped into set: {0}".format(
-                set_node))
+            self._log("Point info nodes grouped into set: {0}".format(set_node))
 
     def on_atc_distribute(self):
-        """커브에 새 드라이버 N 개를 균일 파라미터 간격으로 생성·어태치(ref 원래 동작)."""
-        self._log("--- Distribute Drivers on Curve ---")
+        """커브(또는 서피스)에 새 드라이버 N 개를 균일 파라미터 간격으로 생성·어태치(ref 원래 동작)."""
+        self._log("--- Distribute Drivers ---")
         curve = self.atc_le_curve.text().strip()
 
-        if not curve:
-            self._log("[WARN] Attachment Curve is empty. Use Get to set it.")
+        kind = self._atc_check_target(curve)
+        if kind is None:
             return
-        if not MayaScene.exists(curve):
-            self._log("[WARN] Curve not found in scene: {0}".format(curve))
-            return
+        surface_axis = self.atc_cb_surface_axis.currentText()
 
         count = self.atc_sb_count.value()
         driver_type = self.atc_cb_drvtype.currentText().lower()
@@ -1241,28 +1296,29 @@ class MainWindow(QWidget):
                     orient=orient, aim_axis=aim_axis,
                     use_normal_curve=use_norcrv,
                     normal_curve_length=norcrv_len,
-                    create_set=create_set)
+                    create_set=create_set, surface_axis=surface_axis)
             except Exception as exc:
                 self._log("[ERROR] Distribute failed: {0}".format(exc))
                 return
 
+        surface = kind == "surface"
         self._log(
-            "Distributed {n} {t} driver(s) on '{c}' | range: {rng} | "
+            "Distributed {n} {t} driver(s) on {k} '{c}'{sa} | range: {rng} | "
             "orient: {o}{axis}{nc}".format(
-                n=len(created), t=driver_type, c=curve,
+                n=len(created), t=driver_type, k=kind, c=curve,
+                sa=" along {0}".format(surface_axis) if surface else "",
                 rng="full" if full_range else "open-ended",
                 o="on" if orient else "off",
                 axis=" ({0})".format(aim_axis) if orient else "",
-                nc=" | norCrv" if (orient and use_norcrv) else ""))
+                nc=" | norCrv" if (orient and use_norcrv and not surface) else ""))
         if norcrv:
             self._log(
                 "Normal curve created: {0} "
                 "(rotate/reshape it to control up & twist)".format(norcrv))
         for drv, param in created:
-            self._log("  {0} -> param {1:.4f}".format(drv, param))
+            self._log("  {0} -> {1}".format(drv, self._atc_param_text(param)))
         if set_node:
-            self._log("pointOnCurveInfo nodes grouped into set: {0}".format(
-                set_node))
+            self._log("Point info nodes grouped into set: {0}".format(set_node))
 
     # ================================================================
     # Tab : Stretch  (ref/ref_01_StretchTool.mel Stretch 기능 이식 + 리팩토링)
@@ -2000,6 +2056,10 @@ class MainWindow(QWidget):
             "  (parent-safe, live as the curve deforms). Optional orient to tangent.\n"
             "  Maintain offset (default on): objects keep their current position,\n"
             "  rotation, scale and channel values; offsetParentMatrix follows the curve.\n"
+            "- NURBS surface (from matrixPinning): put a surface in the Attachment\n"
+            "  field instead. Objects pin to the closest (u, v) via pointOnSurfaceInfo\n"
+            "  (X = tangent U, Y = normal, Z = X cross Y). Distribute spreads along the\n"
+            "  chosen Surface Axis at the middle of the other direction.\n"
             "- Distribute Drivers on Curve (ref original): create N new Locator/Null\n"
             "  drivers spread evenly from the curve start to its end (Count, full /\n"
             "  open-ended range), attached with the same matrix network.\n"

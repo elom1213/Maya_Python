@@ -56,6 +56,26 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 파일: `app/core/mirror_manager.py`(`mirror_onto`), `app/ui/main_window.py`, `docs/A00145_RigConnect.md`
   `#A00145`
 
+> [!summary] `A00170_driverTool` AttachCrv > Default 의 대상 칸이 **NURBS surface** 도 받는다 — `JUN_PY_matrixPinning_V01_01` 이식 (v01.22 -> 01.23)
+- **요청**: `Attachment Curve` 칸에 커브뿐 아니라 NURBS surface 도 넣어 동작하게. 참고는
+  `_archive/legacy_tools/01_Modules/JUN_PY_matrixPinning_V01_01.py`(Chris Lesage `pin_to_surface`).
+- ref 흐름 그대로: `closestPointOnSurface`(임시)로 최근접 **(u, v)** → `pointOnSurfaceInfo` →
+  `fourByFourMatrix`. 뒷단(`multMatrix` · decompose / Maintain offset 의 `offsetParentMatrix`)은
+  커브와 **같은 경로**를 탄다 — `_attach_one(kind=)` 한 곳에서 point-info 노드만 갈라진다.
+  대상 판별은 `resolve_target()`(transform/shape 모두), 아니면 `NURBS curve or NURBS surface` 경고.
+- **★ ref 의 행 구성 `[tangentU, normal, tangentV]` 는 왼손 좌표계다.** 진단해 보니 마야의 normal 이
+  정확히 `tangentU × tangentV`(내적 `+1.0`) — 그 행렬은 det < 0 이라 decomposeMatrix 가 음수 스케일로
+  풀고 `rotate` 만 연결하면 한 축이 뒤집힌다. **normal 을 업 시드로 직교 정규화**해
+  `Z = tangentU × normal`(−tangentV 방향) 오른손 프레임을 쓴다. tangentU/V 가 직교가 아닐 때의 shear 도 같이 없어진다.
+- norCrv 는 커브 전용 — 서피스를 넣으면 체크박스가 꺼진다(대상 칸 `textChanged` 로 동기화).
+- **Distribute** 도 서피스에서: 새 `Surface Axis`(U/V) 방향으로 균일, 반대 방향은 **파라미터 범위의
+  가운데**. ref 는 `v=0.5` 고정이라 `rebuildSurface -kr 2`(범위 0~4 × 0~2) 같은 서피스에서 가운데를 벗어난다.
+- 노드 `<obj>_atc_POSI`, 세트 `<surface>_atcPOSI_SET`(커브 이름은 그대로). 로그의 파라미터는 `(u, v)`.
+- headless(mayapy 2024) — 서피스 **139항목**(대상 판별 5종 · maintain offset × (+X/−X/orient off) 에서
+  월드·채널 불변 / 서피스 이동·회전 추종 / CV 변형 뒤 강체 / undo · 스냅 모드 위치·X=tanU·Y=normal·오른손·
+  최근접이 41×41 격자보다 가까움 · Distribute U/V/open/범위≠0~1 · UI 활성 동기화·빌드·분배·경고)
+  + 커브 회귀 **148항목** 통과.
+
 > [!summary] `A00170_driverTool` AttachCrv > Default 에 **`Maintain offset`**(기본 ON) — 어태치해도 오브젝트가 제자리·제 회전·제 스케일 그대로 (v01.21 -> 01.22)
 - **요청**: `Attach to Closest Point` 를 누르면 Objects 리스트의 오브젝트가 전부 커브 위로
   옮겨지고 회전도 바뀐다. 체크박스 `Maintain offset`(기본 체크)을 두고, 켜져 있으면 기능 수행 후에도

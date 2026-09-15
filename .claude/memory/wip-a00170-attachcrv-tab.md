@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 8546124f-32a8-4de0-8ce6-b4460f257dcf
-  modified: 2026-09-15T00:31:15.437Z
+  modified: 2026-09-15T00:46:17.638Z
 ---
 
 WIP (started 2026-06-26): A00170_driverTool 에 새 탭 **AttachCrv** 추가. `ref/ref_01.mel`
@@ -57,6 +57,15 @@ core `build_attach_to_closest(..., maintain_offset=False)` — 기본 False 라 
 **직선 norCrv 의 normal 은 커브 평행 이동만으로 부호가 뒤집힌다** → maintain 경로는 X=접선 +
 업시드=norCrv 접선의 직교 정규 프레임을 새로 짠다. **OFF 경로의 ref 프레임(Z=norCrv normal)은 같은
 뒤집힘으로 rotate 가 튈 수 있는데 손대지 않았다** — 사용자에게 보고함. headless 148항목.
+
+**UPDATE 2026-09-15 (v01.23)**: Attachment 칸이 **NURBS surface** 도 받는다(`JUN_PY_matrixPinning_V01_01` 이식).
+core `resolve_target()` → (shape, 'curve'|'surface'), `attach_target_kind()` 재노출. `_attach_one(kind=)` 가
+서피스면 `closestPointOnSurface`(임시) → `pointOnSurfaceInfo`(`<obj>_atc_POSI`, 세트 `_atcPOSI_SET`),
+attached 의 param 은 `(u, v)`. norCrv 는 커브 전용(서피스면 UI 체크박스 비활성). Distribute 는
+`surface_axis`(U/V) 방향 균일 + 반대 방향은 **범위 가운데**(ref 는 0.5 고정). **ref 프레임은 왼손계**
+([[surface-normal-handedness]]) → Z = tangentU×normal 오른손 프레임. Maintain offset 그대로 적용.
+관찰(미수정): 모든 오브젝트가 skip 돼도 norCrv 는 먼저 만들어져 남는다(기존 동작).
+headless 서피스 139항목 + 커브 회귀 148항목.
 
 **남은 일**: Maya 실기 검증 + 푸시(기본 푸시처: [[push-target-dnable-dev]]). 검증/푸시 끝나면 이 메모 삭제.
 규약: [[ui-text-english-only]], [[prefer-pyside-for-new-tools]], [[push-includes-tool-guide-docs]],

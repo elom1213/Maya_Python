@@ -9,7 +9,7 @@ from .spherical_drive import run_build as run_build_spherical, run_build_nodes
 from .attach_curve import (
     build_attach_to_closest as run_attach_to_closest,
     build_attach_uniform as run_attach_uniform,
-    AIM_AXES, DRIVER_TYPES,
+    AIM_AXES, DRIVER_TYPES, SURFACE_AXES, attach_target_kind,
 )
 from .loop_rig import (
     build_loop_drivers as run_build_loop_drivers,
@@ -46,6 +46,7 @@ __all__ = [
     "run_build_slerp", "run_build_wave",
     "run_build_spherical", "run_build_nodes",
     "run_attach_to_closest", "run_attach_uniform", "AIM_AXES", "DRIVER_TYPES",
+    "SURFACE_AXES", "attach_target_kind",
     "run_build_loop_drivers", "loop_parse_edges", "loop_parse_vertices",
     "loop_alive", "group_loop_edges", "CURVE_DEGREES", "LOOP_DEFAULT_PREFIX",
     "run_build_seal", "run_remove_seal", "run_seal_recapture_rest",

@@ -32,6 +32,10 @@
      (parentInverse 사용)하고, 빌드 후 **커브가 변형되면 따라간다**.
      **Maintain offset**(v01.22~, 기본 ON)이면 오브젝트를 커브 위로 옮기지 않는다 — 지금 자리·회전·
      스케일을 그대로 두고 `offsetParentMatrix` 를 구동해 **이후 커브가 움직인 만큼만** 따라간다.
+   - **NURBS surface**(v01.23~, `_archive/.../JUN_PY_matrixPinning_V01_01.py` 이식): Attachment 칸에
+     커브 대신 서피스를 넣으면 `closestPointOnSurface` 로 구한 **최근접 (u, v)** 에
+     `pointOnSurfaceInfo → fourByFourMatrix → …` 같은 네트워크로 붙는다(follicle 대용, 뒤집힘 없음).
+     Maintain offset · Orient · Aim Axis · set 옵션이 그대로 적용되고, Distribute 도 서피스에서 동작한다.
    - **Distribute Drivers on Curve** (ref 원래 동작): **Count**(양의 정수)만큼 **새 드라이버**
      (Locator/Null)를 만들어 커브의 시작~끝(`minValue`~`maxValue`) 사이에 **균일한 파라미터 간격**으로
      배치·어태치한다. 파라미터는 ref 의 `makeParameterValueList` 그대로 구한다 — **Distribute across
@@ -138,7 +142,8 @@ A00170_driverTool/
 
 #### Default
 
-1. 커브를 선택하고 **Get** → **Attachment Curve** 설정.
+1. 커브 **또는 NURBS surface** 를 선택하고 **Get** → **Attachment Curve / Surface** 설정
+   (transform 이든 shape 든 된다. 둘 다 아니면 로그로 경고하고 빌드하지 않는다).
 2. **Objects** 리스트에 커브에 붙일 오브젝트들을 추가(`Select`/`Add`).
 3. 옵션:
    - **Orient to curve tangent**(기본 ON): 켜면 **Aim Axis**(`+X`/`-X`) 축을 커브 접선에 맞추고
@@ -164,6 +169,16 @@ A00170_driverTool/
        shear 가 오브젝트로 새고, **직선 norCrv 의 노멀은 커브를 평행 이동만 해도 부호가 뒤집힌다**
        (Maya 2024 실측).
      - `offsetParentMatrix` 가 이미 다른 노드에 연결된 오브젝트는 건너뛰고 로그로 알린다.
+   - **대상이 NURBS surface 일 때**(v01.23~):
+     - 오브젝트마다 `closestPointOnSurface`(임시)로 최근접 **(u, v)** 를 구해 `pointOnSurfaceInfo`
+       (`turnOnPercentage=0`, 실제 파라미터 값)에 넣는다. 노드 이름 `<obj>_atc_POSI`, 세트 `<surface>_atcPOSI_SET`.
+       u/v 는 이 노드의 `parameterU` / `parameterV` 를 고쳐 나중에 옮길 수 있다.
+     - **Orient**: X = **tangentU**(Aim Axis `-X` 면 반대), Y = **surface normal**, Z = X × Y.
+       ref(matrixPinning)는 Z 에 **+tangentV** 를 넣는데, 마야의 normal 이 `tangentU × tangentV` 라
+       그 행렬은 **왼손 좌표계**(det < 0)다 — decomposeMatrix 가 음수 스케일로 받아 회전 한 축이
+       뒤집힌다(Maya 2024 실측). 그래서 normal 을 업 시드로 직교 정규화한 오른손 프레임을 쓴다
+       (Z 는 −tangentV 방향, tangentU/V 가 직교가 아니어도 shear 없음).
+     - **norCrv 옵션은 쓰지 않는다**(서피스 normal 이 업 벡터). 서피스를 넣으면 체크박스가 비활성화된다.
 4. **Attach to Closest Point** 클릭. 각 오브젝트가 자신과 가장 가까운 커브 파라미터 지점에 붙고,
    로그에 오브젝트별 파라미터가 출력된다. norCrv 를 만들었으면 그 이름도 로그에 표시된다(이후
    그 커브를 조정해 방향을 잡는다). 씬에 없는 항목은 skip 후 경고하고, 세트 이름도 로그에 표시된다.
@@ -177,6 +192,10 @@ A00170_driverTool/
 - **Driver Type**: `Locator`(spaceLocator) 또는 `Null`(빈 그룹).
 - **Distribute across full range (open curve)**(기본 ON): 열린 커브면 켜서 양 끝에 정확히
   드라이버를 둔다. 주기적/닫힌 커브면 꺼서 seam 에서 첫·마지막이 겹치지 않게 한다.
+- **Surface Axis**(`U`/`V`, 서피스일 때만 활성): 서피스면 ref 'Pin by given number' 처럼 이 방향으로
+  균일 분배하고 **다른 방향은 파라미터 범위의 가운데**에 둔다. ref 는 `v=0.5` 고정이었는데, 범위가
+  0~1 이 아닌 서피스(`rebuildSurface -kr 2` 등)에서는 가운데가 아니게 되어 범위 기준으로 바꿨다.
+  full range 규칙은 고른 방향에 그대로 적용된다.
 
 **Distribute Drivers on Curve** 클릭 → `<curve>_1_drv`, `<curve>_2_drv` … (Count 자릿수만큼 0 패딩)
 드라이버가 생성되어 커브 시작~끝에 균일 배치된다. 로그에 드라이버별 파라미터가 출력된다.
