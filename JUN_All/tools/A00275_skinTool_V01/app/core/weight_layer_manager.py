@@ -369,7 +369,90 @@ def _rest_geometry_plug(skin, shape):
     return sources[0]
 
 
-def _create_mesh(base, name):
+def _face_ranges(faces):
+    """연속한 면 번호를 `[(시작, 끝), ...]` 구간으로 묶는다.
+
+    면 하나씩 이름을 만들면 머티리얼이 면 단위로 잘게 섞인 메시에서 문자열이 수만 개가
+    된다. `f[0:511]` 처럼 구간으로 주면 `cmds.sets` 호출 한 번으로 끝난다.
+    """
+    ranges = []
+    start = previous = None
+    for index in faces:
+        if start is None:
+            start = previous = index
+        elif index == previous + 1:
+            previous = index
+        else:
+            ranges.append((start, previous))
+            start = previous = index
+    if start is not None:
+        ranges.append((start, previous))
+    return ranges
+
+
+def _copy_shading(source, shape, warnings=None):
+    """소스 셰이프의 머티리얼 배정을 새 셰이프에 그대로 옮긴다.
+
+    ★ **면 단위 배정까지 옮긴다.** 예전에는 `listConnections(..., type="shadingEngine")`
+    의 **첫 번째 하나**를 메시 전체에 걸었다. 머티리얼이 하나인 메시에서는 맞는 답이지만,
+    면마다 다른 머티리얼이 붙은 메시(캐릭터는 대개 그렇다)에서는 **나머지가 전부 사라지고
+    한 벌만 입혀진다.** 그 목록은 어떤 면에 무엇이 붙었는지를 담고 있지 않다.
+
+    면별 배정은 `MFnMesh.getConnectedShaders` 가 알려 준다 - 셰이딩 엔진 목록과, **면마다
+    그중 몇 번인지**(배정이 없으면 -1)를 함께 돌려준다. rest 형상은 skinCluster 의 입력이라
+    베이스와 토폴로지가 같아 면 번호가 그대로 맞는다(다르면 손대지 않고 경고만 남긴다).
+    """
+    try:
+        selection = om.MSelectionList()
+        selection.add(source)
+        dag = selection.getDagPath(0)
+        engines, face_index = om.MFnMesh(dag).getConnectedShaders(dag.instanceNumber())
+        names = [om.MFnDependencyNode(engine).absoluteName() for engine in engines]
+    except Exception:
+        engines, face_index, names = [], [], []
+
+    if not names:
+        try:
+            cmds.sets(shape, edit=True, forceElement="initialShadingGroup")
+        except Exception:
+            pass
+        return
+
+    # 면 개수가 다르면 면 번호를 옮길 수 없다. 통째로 거는 것은 틀린 답이므로 하지 않는다.
+    if len(face_index) != (cmds.polyEvaluate(shape, face=True) or 0):
+        if warnings is not None:
+            warnings.append("Face count differs from '{0}' - materials were not "
+                            "copied.".format(_short(source)))
+        return
+
+    # 면이 전부 같은 엔진이면 셰이프째 건다(면 단위 멤버를 남기지 않는다).
+    used = set(face_index)
+    if len(used) == 1 and -1 not in used:
+        try:
+            cmds.sets(shape, edit=True, forceElement=names[face_index[0]])
+        except Exception:
+            pass
+        return
+
+    by_engine = {}
+    for face, index in enumerate(face_index):
+        if index < 0:
+            continue                      # 아무 머티리얼도 없는 면은 그대로 둔다
+        by_engine.setdefault(index, []).append(face)
+
+    for index, faces in sorted(by_engine.items()):
+        members = ["{0}.f[{1}:{2}]".format(shape, lo, hi) if lo != hi
+                   else "{0}.f[{1}]".format(shape, lo)
+                   for lo, hi in _face_ranges(faces)]
+        try:
+            cmds.sets(members, edit=True, forceElement=names[index])
+        except Exception:
+            if warnings is not None:
+                warnings.append("Could not assign '{0}' to the new mesh."
+                                .format(_short(names[index])))
+
+
+def _create_mesh(base, name, warnings=None):
     """베이스의 rest 형상을 굽은 새 메시. 반환: (트랜스폼 롱네임, 셰이프 롱네임)."""
     source = _rest_geometry_plug(base.skin, base.shape)
 
@@ -386,12 +469,7 @@ def _create_mesh(base, name):
     cmds.xform(transform, worldSpace=True,
                matrix=cmds.xform(base.transform, query=True, worldSpace=True, matrix=True))
 
-    engines = cmds.listConnections(base.shape, type="shadingEngine") or []
-    try:
-        cmds.sets(shape, edit=True, forceElement=engines[0] if engines
-                  else "initialShadingGroup")
-    except Exception:
-        pass
+    _copy_shading(base.shape, shape, warnings)
     return transform, shape
 
 
@@ -563,7 +641,7 @@ def merge(layers, mode=MODE_CREATE, name=DEFAULT_NAME, target=None):
     created = False
     added = []
     if mode == MODE_CREATE:
-        transform, shape = _create_mesh(base, name)
+        transform, shape = _create_mesh(base, name, warnings)
         skin = _new_skin(transform, joints, _short(transform) + "_skinCluster")
         created = True
         for joint in joints:
