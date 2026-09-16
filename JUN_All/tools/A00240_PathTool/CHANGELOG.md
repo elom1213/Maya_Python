@@ -2,6 +2,34 @@
 
 All notable changes to this tool are documented here.
 
+## [01.07] - 2026-09-16
+### Added
+- **Pin (always on top).** A `Pin` toggle sits at the top-right of the window. Turning
+  it on keeps Path Tool above other windows (the label becomes `Pinned`).
+- **Tree tab: Filter.** Find items by **name or path** - matching is done against the
+  full path, so a file name (`skin_color`), a folder name (`tex`) or a path fragment
+  (`charA/tex`) all work. Several words are **AND**. Separators `/` and `\` are treated
+  the same. Matches keep their parent folders visible and the tree opens down to the
+  hit; `N match(es)` is shown next to the box. Clearing the filter folds the tree back.
+- **Tree tab: Copy file path.** The right-click menu now has `Copy file path` next to
+  `Reveal in File Explorer`. It puts the item's **absolute path** on the clipboard
+  (folder or file), in OS-native form so it can be pasted into Explorer or a file dialog.
+
+### Changed
+- **Tree tab: the tree no longer opens fully expanded.** Build (and a Depth change) now
+  leaves **only the root expanded** - every folder under it is folded.
+  - plain expand -> one level
+  - **Shift + expand** -> everything below, down to the leaves
+  - **Shift + collapse** -> everything below folds
+  - after a Shift-collapse, a plain expand opens **one level** again
+  Qt remembers a child's expanded state when you fold a parent, so a plain fold/unfold
+  re-opens what was open; **Shift + collapse is how that memory is cleared**. The rule
+  applies at every depth.
+- **App / taskbar icon is now yellow**, matching the `yellow_mid` UI theme (it was
+  purple, left over from an earlier theme). Same artwork, recoloured from the qss
+  palette (`#c8b86f` / `#e6d68f` / `#a09150`); `.svg` -> `.png` + multi-size `.ico`
+  (16-256 px) rebuilt.
+
 ## [01.06] - 2026-07-03
 ### Added
 - **App / taskbar icon.** Added a purple folder-tree icon

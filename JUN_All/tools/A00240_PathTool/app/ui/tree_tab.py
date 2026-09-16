@@ -14,6 +14,7 @@ import os
 
 from Framework.qt.qt import (
     Qt,
+    QApplication,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
@@ -58,6 +59,12 @@ class TreeTab(QWidget):
         self._tree = None         # tree_scanner.build_tree() 결과(모든 파일 포함, 필터 전)
         self._type_states = {}    # 확장자(점 없음) -> 체크 여부
         self._type_actions = {}   # 확장자 -> File Types 메뉴 QAction
+
+        # 지금 살아 있는 트리 위젯들(메인 + Expand 창). 필터·접기 규칙을 함께 먹인다.
+        self._trees = []
+        # Shift 로 한꺼번에 펼치는 중에는 itemExpanded 가 다시 들어와도 무시한다.
+        # (안 그러면 자식마다 같은 작업을 반복해 깊은 트리에서 폭발한다)
+        self._bulk = False
 
         # 폴더/파일 구분용 표준 아이콘(테마 무관). 1회 만들어 재사용한다.
         self._icon_dir = self.style().standardIcon(QStyle.SP_DirIcon)
@@ -131,6 +138,28 @@ class TreeTab(QWidget):
         opt_row.addWidget(self.btn_expand)
 
         layout.addLayout(opt_row)
+
+        # 필터 행: 경로/파일 이름으로 찾기
+        flt_row = QHBoxLayout()
+        flt_row.addWidget(QLabel("Filter"))
+        self.ipf_filter = QLineEdit()
+        self.ipf_filter.setPlaceholderText("Find by name or path (space = AND)")
+        self.ipf_filter.setToolTip(
+            "Type part of a file/folder name, or part of the path.\n"
+            "Several words separated by spaces must all match (AND).\n"
+            "Matches stay visible with their parent folders, opened down to the hit.")
+        self.ipf_filter.textChanged.connect(self._on_filter_changed)
+        flt_row.addWidget(self.ipf_filter, stretch=1)
+
+        btn_clear = QPushButton("Clear")
+        btn_clear.setToolTip("Clear the filter and fold the tree back.")
+        btn_clear.clicked.connect(self.ipf_filter.clear)
+        flt_row.addWidget(btn_clear)
+
+        self.lbl_filter_count = QLabel("")
+        flt_row.addWidget(self.lbl_filter_count)
+
+        layout.addLayout(flt_row)
         return group
 
     def _make_tree_widget(self):
@@ -139,7 +168,62 @@ class TreeTab(QWidget):
         tree.setHeaderLabels(["Name"])
         tree.setContextMenuPolicy(Qt.CustomContextMenu)
         tree.customContextMenuRequested.connect(self._on_tree_context_menu)
+        # Shift 를 누른 채 펼치면/접으면 그 아래 전부에 같은 것을 적용한다.
+        tree.itemExpanded.connect(self._on_item_expanded)
+        tree.itemCollapsed.connect(self._on_item_collapsed)
+        self._trees.append(tree)
         return tree
+
+    # =============================================== 펼치기 규칙 (Shift 재귀)
+
+    def _shift_held(self):
+        return bool(QApplication.keyboardModifiers() & Qt.ShiftModifier)
+
+    def _on_item_expanded(self, item):
+        if self._shift_held():
+            self._set_expanded_deep(item, True)
+
+    def _on_item_collapsed(self, item):
+        if self._shift_held():
+            self._set_expanded_deep(item, False)
+
+    def _set_expanded_deep(self, item, expanded):
+        """item 아래 **전부**를 펼치거나 접는다.
+
+        ★ 재귀를 쓰지 않는다 - 경로는 수십 단계로 깊어질 수 있고, 더 중요하게는
+        `setExpanded` 가 `itemExpanded` 를 **다시 쏘기** 때문이다. Shift 는 여전히
+        눌려 있으므로 핸들러가 또 불려 같은 일을 반복한다. `_bulk` 로 한 번만 돌게 막고,
+        명시적 스택으로 훑는다.
+
+        접을 때 자손까지 접어 두는 것이 이 규칙의 핵심이다 - 그래야 **다시 그냥 펼쳤을 때
+        한 단계만** 열린다(Qt 는 접어도 자식의 펼침 상태를 기억한다).
+        """
+        if self._bulk:
+            return
+
+        self._bulk = True
+        try:
+            stack = [item]
+            while stack:
+                node = stack.pop()
+                node.setExpanded(expanded)
+                for i in range(node.childCount()):
+                    stack.append(node.child(i))
+        finally:
+            self._bulk = False
+
+    def _fold_to_default(self, tree):
+        """기본 상태로 접는다 - **루트만 펼치고 그 아래는 전부 접는다.**
+
+        예전에는 `expandAll()` 이라 최하위까지 전부 열린 채로 나왔다. 루트(입력한 경로)만
+        열어 두는 것은 빌드 직후 한 줄만 보이는 것을 막기 위해서다 - 루트 아래의 폴더는
+        하나도 펼쳐져 있지 않다. Depth 를 바꾸면 다시 빌드되므로 그때도 이 상태로 돌아온다.
+        """
+        tree.collapseAll()
+        root = tree.topLevelItem(0)
+        if root is not None:
+            self._set_expanded_deep(root, False)
+            root.setExpanded(True)
 
     # ============================================================== actions
 
@@ -254,7 +338,10 @@ class TreeTab(QWidget):
 
         root_item = self._make_item(self._tree, show_files, exts)
         tree.addTopLevelItem(root_item)
-        tree.expandAll()
+
+        # 기본은 접힌 상태. 필터가 걸려 있으면 그 규칙이 다시 펼쳐 준다.
+        self._fold_to_default(tree)
+        self._apply_filter(tree)
 
     def _make_item(self, node, show_files, exts):
         """node(폴더 가정)와 그 자식을 필터에 맞춰 QTreeWidgetItem 트리로 만든다."""
@@ -277,6 +364,103 @@ class TreeTab(QWidget):
 
         return item
 
+    # ============================================================== 필터
+
+    def _on_filter_changed(self, _text):
+        for tree in list(self._trees):
+            self._apply_filter(tree)
+
+    def _filter_tokens(self):
+        """공백으로 나눈 토큰들(소문자). 비어 있으면 빈 리스트 = 필터 없음.
+
+        ★ 구분자를 `/` 로 통일한다. 저장된 경로는 윈도우라 `\\` 인데 사람은 `tex/deep` 처럼
+        `/` 로도 친다 - 안 맞춰 두면 같은 경로를 쳐도 안 걸린다(실측으로 밟았다).
+        """
+        text = self.ipf_filter.text().strip().lower().replace("\\", "/")
+        return [t for t in text.split() if t]
+
+    def _apply_filter(self, tree):
+        """이름 **또는 경로**로 걸러 맞는 것과 그 부모만 남긴다.
+
+        - 토큰은 **AND** 다(`char tex` -> 둘 다 들어간 것만). 공용 필터 위젯과 같은 규칙.
+        - **전체 경로**로 본다. 이름은 경로의 일부라 이름 검색도 그대로 되고, 폴더 이름을
+          치면 그 아래가 통째로 남는다("경로로 찾기").
+        - 맞은 항목의 **부모는 함께 보여 준다** - 안 그러면 트리에서 닿을 수가 없다.
+          그리고 맞은 곳까지 **펼쳐 준다**(접혀 있으면 찾아 놓고도 안 보인다).
+        - 필터를 지우면 **기본 접힘 상태로 되돌린다**(3번 규칙과 같은 모양).
+
+        재귀 대신 후위 순회 스택을 쓴다 - 자식의 판정이 부모에 올라와야 하므로 아래에서
+        위로 접어 올린다.
+        """
+        if tree is None:
+            return
+
+        tokens = self._filter_tokens()
+        root = tree.topLevelItem(0)
+        if root is None:
+            self.lbl_filter_count.setText("")
+            return
+
+        if not tokens:
+            # 필터 없음 - 전부 보이게 하고 기본 접힘으로.
+            stack = [root]
+            while stack:
+                node = stack.pop()
+                node.setHidden(False)
+                for i in range(node.childCount()):
+                    stack.append(node.child(i))
+            self._fold_to_default(tree)
+            self.lbl_filter_count.setText("")
+            return
+
+        matched = self._mark_matches(root, tokens)
+
+        # 맞은 것이 하나도 없으면 루트만 남는다(빈 화면보다 낫다).
+        self.lbl_filter_count.setText("{0} match(es)".format(matched))
+
+    def _mark_matches(self, root, tokens):
+        """맞는 항목/조상만 보이게 하고 맞은 개수를 돌려준다."""
+        # 1) 후위 순회 순서를 만든다(자식 -> 부모).
+        order = []
+        stack = [root]
+        while stack:
+            node = stack.pop()
+            order.append(node)
+            for i in range(node.childCount()):
+                stack.append(node.child(i))
+        order.reverse()
+
+        matched = 0
+        keep = {}          # id(item) -> 보여야 하는가
+
+        for node in order:
+            path = (node.data(0, Qt.UserRole) or node.text(0) or "")
+            path = path.lower().replace("\\", "/")   # 토큰과 같은 구분자로
+            self_hit = all(t in path for t in tokens)
+            child_hit = any(keep.get(id(node.child(i)), False)
+                            for i in range(node.childCount()))
+
+            keep[id(node)] = self_hit or child_hit
+            if self_hit:
+                matched += 1
+
+        # 2) 보이기/숨기기 + 맞은 곳까지 펼치기(자식이 맞은 폴더만 연다).
+        self._bulk = True
+        try:
+            for node in order:
+                show = keep.get(id(node), False)
+                node.setHidden(not show)
+                if show and node.childCount():
+                    node.setExpanded(
+                        any(keep.get(id(node.child(i)), False)
+                            for i in range(node.childCount())))
+        finally:
+            self._bulk = False
+
+        root.setHidden(False)      # 루트는 언제나 보인다(닿는 길)
+        root.setExpanded(True)
+        return matched
+
     # ----------------------------------------------------- expand / reveal
 
     def on_expand(self):
@@ -297,7 +481,12 @@ class TreeTab(QWidget):
         buttons.rejected.connect(dlg.reject)
         v.addWidget(buttons)
 
-        dlg.exec_()
+        try:
+            dlg.exec_()
+        finally:
+            # 닫힌 창의 트리를 목록에 남겨 두면 다음 필터 입력이 죽은 위젯을 건드린다.
+            if big in self._trees:
+                self._trees.remove(big)
 
     def _on_tree_context_menu(self, pos):
         tree = self.sender()
@@ -307,9 +496,31 @@ class TreeTab(QWidget):
 
         menu = QMenu(tree)
         act_reveal = menu.addAction("Reveal in File Explorer")
+        act_copy = menu.addAction("Copy file path")
         chosen = menu.exec_(tree.viewport().mapToGlobal(pos))
+
         if chosen == act_reveal:
             self._reveal(item.data(0, Qt.UserRole))
+        elif chosen == act_copy:
+            self._copy_path(item.data(0, Qt.UserRole))
+
+    def _copy_path(self, path):
+        """그 항목(폴더든 파일이든)의 **절대 경로**를 클립보드에 넣는다.
+
+        경로는 OS 네이티브 모양(윈도우는 `\\`)으로 바꿔 탐색기 주소창·파일 다이얼로그에
+        그대로 붙여넣을 수 있게 한다(`ShortCut` 탭이 경로를 다루는 방식과 같다).
+        """
+        if not path:
+            return
+
+        text = os.path.normpath(os.path.abspath(path))
+
+        clipboard = QApplication.clipboard()
+        if clipboard is None:
+            QMessageBox.warning(self, "Tree", "Could not access the system clipboard.")
+            return
+
+        clipboard.setText(text)
 
     def _reveal(self, path):
         if not path:

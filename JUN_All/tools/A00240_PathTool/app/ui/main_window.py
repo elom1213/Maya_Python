@@ -7,8 +7,11 @@
 # QTabWidget 에 addTab 만 추가하면 확장된다.
 
 from Framework.qt.qt import (
+    Qt,
     QWidget,
     QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
     QTabWidget,
     QIcon,
 )
@@ -38,6 +41,22 @@ class MainWindow(QWidget):
     def _build_ui(self):
         root = QVBoxLayout(self)
 
+        # 상단 헤더 행 : Pin(항상 위) 토글.
+        # 탭의 코너 위젯 대신 별도 행에 둔다 - 토글로 라벨이 바뀌어도 위치·크기가 흔들리지
+        # 않는다(다른 Qt 툴들과 같은 방식).
+        self.pin_button = QPushButton("Pin")
+        self.pin_button.setCheckable(True)
+        self.pin_button.setToolTip("Keep this window above other windows")
+        # 고정 크기 - "Pin"/"Pinned" 토글 시 버튼 크기가 변하지 않도록(넓은 라벨 기준).
+        self.pin_button.setFixedSize(72, 28)
+        self.pin_button.toggled.connect(self.toggle_always_on_top)
+
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(0, 0, 0, 0)
+        header_row.addStretch(1)
+        header_row.addWidget(self.pin_button)
+        root.addLayout(header_row)
+
         self.tabs = QTabWidget()
 
         # ShortCut 탭. 탭 추가 시 여기에 addTab 한 줄만 더하면 된다.
@@ -49,3 +68,15 @@ class MainWindow(QWidget):
         self.tabs.addTab(self.tree_tab, "Tree")
 
         root.addWidget(self.tabs)
+
+    # ------------------------------------------------------------------
+
+    def toggle_always_on_top(self, enabled):
+        """Pin - 이 창을 다른 창 위에 고정한다.
+
+        플래그를 바꾸면 창이 숨으므로 **반드시 다시 show()** 한다(Qt 규칙).
+        standalone 앱이라 마야 창이 아니라 OS 의 다른 창들 위에 선다.
+        """
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, enabled)
+        self.pin_button.setText("Pinned" if enabled else "Pin")
+        self.show()

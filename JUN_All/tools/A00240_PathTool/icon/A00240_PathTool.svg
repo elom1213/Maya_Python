@@ -1,19 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- A00240_PathTool icon — folder path shortcuts + directory tree.
-     purple_dark 테마에 맞춘 보라 계열. 폴더 계층 트리(루트 + 자식 폴더 2개). -->
+     UI 테마(yellow_mid)에 맞춘 노랑 계열. 도형은 그대로, 색만 바꿨다.
+     기준색: qss 의 accent #c8b86f / 밝은 쪽 #e6d68f / 어두운 쪽 #a09150. -->
 <svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#2b2340"/>
-      <stop offset="1" stop-color="#191325"/>
+      <stop offset="0" stop-color="#3a3527"/>
+      <stop offset="1" stop-color="#211e16"/>
     </linearGradient>
     <linearGradient id="root" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#b47cf0"/>
-      <stop offset="1" stop-color="#8e51d9"/>
+      <stop offset="0" stop-color="#e6d68f"/>
+      <stop offset="1" stop-color="#c8b86f"/>
     </linearGradient>
     <linearGradient id="child" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#a066e8"/>
-      <stop offset="1" stop-color="#7b45c7"/>
+      <stop offset="0" stop-color="#d4c47b"/>
+      <stop offset="1" stop-color="#a09150"/>
     </linearGradient>
   </defs>
 
@@ -21,11 +22,11 @@
   <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#bg)"/>
 
   <!-- tree connector lines (root → two children) -->
-  <g stroke="#7a6aa8" stroke-width="7" fill="none" stroke-linecap="round">
+  <g stroke="#89805a" stroke-width="7" fill="none" stroke-linecap="round">
     <path d="M78 96 V150 H126"/>
     <path d="M78 150 V196 H126"/>
   </g>
-  <circle cx="78" cy="96" r="7" fill="#c9b8ef"/>
+  <circle cx="78" cy="96" r="7" fill="#efe4b4"/>
 
   <!-- root folder (top-left) -->
   <path d="M40 60 h40 l14 16 h44 a12 12 0 0 1 12 12 v20 a12 12 0 0 1 -12 12 H40
