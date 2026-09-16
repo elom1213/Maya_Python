@@ -18,6 +18,7 @@ from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_filter_qt
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from tools.A00330_NamingTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00330_NamingTool.app import core
@@ -55,8 +56,9 @@ class MainWindow(QWidget):
         main_layout.setMenuBar(self.menu_bar)
 
         # 공용 로그창 (탭 빌더가 self._log / TSL log_callback 을 쓰므로 탭보다 먼저 생성)
-        self.log_view = QPlainTextEdit()
-        self.log_view.setReadOnly(True)
+        self.log_view = JUN_mod_log_qt_v01(
+            window_title="Naming Tool - Log",
+            object_name="JUN_A00330_NamingTool_log_window")
         self.log_view.setFixedHeight(110)
 
         # 탭: Naming Dyn / Copy Name / Quick Rename

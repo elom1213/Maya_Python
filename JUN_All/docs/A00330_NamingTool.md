@@ -216,3 +216,17 @@ cmds.ls(sl=True, type="objectSet")  # []
   - `[WARN] Base(n) and Targets(m) counts differ; renaming first k item(s).` — 개수 불일치 시 앞쪽만 처리.
   - `[WARN] Enter a new name. (Change New is empty)` — Change New 비어 있음.
 - **이름이 안 바뀜**: Quick Rename 은 리스트가 아니라 **현재 씬 선택**을 대상으로 한다. 선택 여부를 먼저 확인.
+
+---
+
+## 로그창 (v01.04)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

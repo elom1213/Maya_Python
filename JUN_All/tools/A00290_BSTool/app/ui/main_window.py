@@ -30,6 +30,7 @@ print("QT version  :  " + str(QT_VERSION))
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from tools.A00290_BSTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00290_BSTool.app.core import (EditBSManager, BaseShapeManager,
                                           MixManager, ShapeEditorManager,
@@ -267,8 +268,9 @@ class MainWindow(QWidget):
         main_layout.addWidget(self.tabs)
 
         # 공용 로그
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="BS Tool - Log",
+            object_name="JUN_A00290_BSTool_log_window")
         self.te_log.setMinimumHeight(80)
         self.te_log.setMaximumHeight(140)
         main_layout.addWidget(self.te_log)

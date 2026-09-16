@@ -8,5 +8,5 @@
 #                   Add / Del to edit the listed sets (v01.03)
 #   - Copy Name   : also works on SETS - a set cannot reuse a name, so "_copy" is added (v01.03)
 
-VERSION = "01.03"
-LAST_UPDATE = "2026-08-27"
+VERSION = "01.04"
+LAST_UPDATE = "2026-09-16"

@@ -2,7 +2,7 @@
 title: A00400_CurveTool 사용법
 aliases: [Curve Tool, CurveTool, A00400]
 tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve, lineWidth, wrap, blendShape, editPoint, laplacian, smoothCurve, softSelect, joint, skinCluster, controller]
-updated: 2026-09-07
+updated: 2026-09-16
 ---
 
 # A00400_CurveTool 사용법
@@ -588,3 +588,17 @@ spine_crv_skinCluster          (커브를 세 조인트에 바인드)
     (`curves` / `joints` / `controls` / `roots` / `groups` / `skins` / `constraints` / `missing` / `skipped` / `renamed` / `warnings`)
   - `joint_curve_manager.uniform_us(count, closed)` → `[0, 1]` 위의 균일 위치 목록
   - `joint_curve_manager.sample_curve(shape, count, spacing)` → `[(월드 위치, 월드 접선), ...]`
+
+---
+
+## 로그창 (v01.10)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

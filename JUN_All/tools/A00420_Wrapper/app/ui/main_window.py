@@ -17,6 +17,7 @@ from Framework.qt import JUN_mod_tsl_qt
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from tools.A00420_Wrapper.app.config.version import VERSION, LAST_UPDATE
 
 # core 는 numpy 를 쓴다(Maya 2022+ 내장). 없으면 창은 뜨되 기능을 막고 이유를 알린다.
@@ -99,8 +100,9 @@ class MainWindow(QWidget):
         self.btn_wrap.clicked.connect(self.on_wrap)
         root.addWidget(self.btn_wrap)
 
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="Wrapper - Log",
+            object_name="JUN_A00420_Wrapper_log_window")
         self.te_log.setMinimumHeight(110)
         root.addWidget(self.te_log)
 

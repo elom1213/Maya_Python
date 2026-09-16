@@ -38,6 +38,7 @@ from Framework.qt.qt import (
     QIcon,
     Qt,
 )
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from ..config.version import VERSION, LAST_UPDATE
 from ..config.app_meta import icon_path
@@ -233,8 +234,9 @@ class MainWindow(QWidget):
 
         # 로그 위젯은 탭 밖(하단)에 두어 모든 탭에서 보이게 한다.
         # 새 탭이 self.log 를 캡처하므로 탭보다 먼저 생성한다.
-        self.log_widget = QPlainTextEdit()
-        self.log_widget.setReadOnly(True)
+        self.log_widget = JUN_mod_log_qt_v01(
+            window_title="File Manager - Log",
+            object_name="JUN_A00210_FileManager_log_window")
         self.log_widget.setMaximumHeight(120)
 
         self.tabs = QTabWidget()
