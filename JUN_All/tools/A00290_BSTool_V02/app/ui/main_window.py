@@ -1,0 +1,2451 @@
+# -*- coding: utf-8 -*-
+# Python Script by Ji Hun Park
+# last Update date : 2026-08-03
+# A00290_BSTool_V02 - Qt UI (V01 의 탭을 카테고리 3 / 기능 7 의 2단으로 재편)
+#
+# 탭 구성 — 상위 = 카테고리("무엇을 바꾸는가"), 하위 = 기능
+#
+#   [Shape]  타겟의 모양(델타)이 바뀐다 — 끝나면 버텍스가 움직여 있다
+#     - Shape Editor : blendShape 노드의 모든 타겟을 리스트업 → 타겟마다 Edit 토글
+#                      (Maya 기본 Shape Editor 대체)
+#     - Base Shape   : 선택 타겟의 weight=value 모양을 weight=1.0 기본 모양으로
+#                      재정의(델타 스케일)
+#     - Mix Targets  : 소스 타겟 몇 개를 원하는 배율로 섞은 만큼, 체크한 다른 타겟들의
+#                      모양을 한꺼번에 변형(델타 가중합을 더한다)
+#
+#   [Target] 버텍스를 하나도 안 움직인다 — 바뀌는 것은 이름과 인덱스뿐이다
+#     - Naming       : 타겟 이름(weight 별칭)을 규칙으로 한꺼번에 바꿔 놓는다
+#                      (= FBX 의 BlendShapeChannel 이름 = 언리얼 모프 타겟 이름)
+#     - Target Order : 리스트에서 순서를 바꾼 대로 노드의 타겟 순서(weight 인덱스)를
+#                      실제로 갈아 끼운다
+#
+#   [Node]   타겟 하나를 고르지 않는다 — 노드/리그를 통째로 다룬다
+#     - Extract      : blendShape 노드 리스트 → 모든 타겟 키 / 타겟 메시 추출 /
+#                      프레임별 메시 추출. **V01 의 `Edit BS > Default` 가 이것이다**
+#                      ("Default" 는 부모 탭 없이는 뜻이 없는 이름이라 하는 일로 바꿨다)
+#     - Bake Delete  : 디포머 뒤에 남은 deleteComponent(페이스/엣지/버텍스 지우기)를 리그
+#                      전체에 반영 - 중립 셰이프와 모든 타겟 메시도 같이 줄이고 히스토리를
+#                      blendShape -> skinCluster 로 되돌린다
+#
+# 각 하위 페이지는 QScrollArea 에 담긴다. 기본 창 크기는 **스크롤바가 안 보이는 폭**으로
+# 잡아 두었으므로(win_width/height) 평소에는 스크롤이 나타나지 않고, 창을 줄이면 그때
+# 스크롤이 받는다. 계획서: docs/plans/A00290_BSTool_tab_reorg_plan.md
+
+from Framework.qt.qt import *
+from Framework.qt import JUN_mod_tsl_qt
+from Framework.qt import JUN_mod_filter_qt
+from Framework.qt.maya_window import maya_main_window
+
+print("QT version  :  " + str(QT_VERSION))
+
+import maya.cmds as cmds
+
+from Framework.core.maya_undo import undo_chunk
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
+from tools.A00290_BSTool_V02.app.config.version import VERSION, LAST_UPDATE
+from tools.A00290_BSTool_V02.app.core import (EditBSManager, BaseShapeManager,
+                                          MixManager, ShapeEditorManager,
+                                          BakeDeleteManager, EDITABLE_STATES)
+from tools.A00290_BSTool_V02.app.core import blendshape_utils as bsu
+from tools.A00290_BSTool_V02.app.core import target_order_manager as tom
+from tools.A00290_BSTool_V02.app.core import naming_manager as nm
+
+
+# Edit 토글이 켜졌을 때의 버튼 색(Maya Shape Editor 의 활성 Edit 버튼과 같은 의미).
+# 테마 qss 의 QPushButton:hover / :pressed 는 pseudo-state 규칙이라, 색만 바꾸면
+# 마우스를 올리는 순간 테마 색으로 되돌아가 보인다. 그래서 hover/pressed 까지 함께 덮는다.
+EDIT_ON_STYLE = (
+    "QPushButton { background-color: #c85a28; color: #ffffff;"
+    " border: 1px solid #f09050; font-weight: bold; }"
+    "QPushButton:hover { background-color: #d96a34; }"
+    "QPushButton:pressed { background-color: #a8441c; }"
+)
+EDIT_ON_TEXT = "Edit ON"
+EDIT_OFF_TEXT = "Edit"
+
+# WeightSlider 전용 스타일.
+# 어떤 테마 qss 도 QSlider 를 스타일링하지 않아, 어두운 배경에선 Maya 네이티브 홈(groove)이
+# 배경에 묻혀 핸들만 보인다("가로 막대가 안 보임"). 그래서 위젯이 자체적으로 홈을 그린다.
+# 이 슬라이더는 중앙이 0 인 양방향이라, 한쪽에서 채워지는 sub-page fill 은 0 에서도 절반이
+# 찬 것처럼 보여 오해를 준다. 그래서 홈을 좌우 균일한 한 줄로만 그리고, 0 위치는 기존 중앙
+# 눈금(TicksBelow)이 표시한다. green_dark 테마 색(#6f9e80)에 맞췄다.
+SLIDER_STYLE = (
+    "QSlider:horizontal { min-height: 20px; }"
+    # 홈: 좌우 균일한 트랙 + accent 테두리 (sub/add-page 를 같은 색으로 덮어 방향성 제거)
+    "QSlider::groove:horizontal {"
+    " height: 6px; margin: 0 4px;"
+    " background: #353835; border: 1px solid #6f9e80; border-radius: 3px; }"
+    "QSlider::sub-page:horizontal, QSlider::add-page:horizontal {"
+    " background: #353835; border: 1px solid #6f9e80; border-radius: 3px; }"
+    # 핸들: 홈 위로 튀어나오게
+    "QSlider::handle:horizontal {"
+    " width: 12px; margin: -6px 0;"
+    " background: #cfe6d6; border: 1px solid #6f9e80; border-radius: 3px; }"
+    "QSlider::handle:horizontal:hover { background: #ffffff; }"
+    # 비활성(구동/잠긴 weight, 편집 중): 전체를 흐리게
+    "QSlider::groove:horizontal:disabled,"
+    " QSlider::sub-page:horizontal:disabled,"
+    " QSlider::add-page:horizontal:disabled {"
+    " background: #2f2f2f; border: 1px solid #454545; }"
+    "QSlider::handle:horizontal:disabled {"
+    " background: #5a5a5a; border: 1px solid #454545; }"
+)
+
+
+# ★ 예전에는 여기 `SHAPE_EDITOR_TAB = 0` 이 있었고 `tabs.currentIndex()` 와 비교해 weight
+#   폴링을 켰다. 2단 탭으로 묶으면서 **인덱스 비교를 버렸다** — 인덱스 0 은 이제 "Shape
+#   카테고리" 라서, Base Shape / Mix Targets 를 봐도 참이 되어 타이머가 계속 돌았을 것이고,
+#   나중에 카테고리 순서를 바꾸면 반대로 영영 거짓이 되어 슬라이더가 씬을 안 따라갔을 것이다.
+#   **둘 다 에러가 나지 않는다.** 지금은 `_shape_editor_visible()` 이 위젯 동일성으로 본다.
+SE_SUB_INDEX = 0        # Shape 카테고리 안에서 Shape Editor 하위 탭의 자리
+
+# 씬에서 weight 가 바뀌어도(채널박스, 어트리뷰트 에디터, 애니메이션 재생, 다른 스크립트 등)
+# Maya 는 Qt 에 알려 주지 않는다. 그래서 주기적으로 다시 읽어 스핀박스에 반영한다.
+SE_SYNC_INTERVAL_MS = 120
+
+# 스핀박스가 보여 주는 마지막 자리(decimals=3)의 절반. 이보다 작은 차이는 화면상 같은 값이라
+# 다시 써 봐야 소용이 없다.
+SE_WEIGHT_EPS = 0.0005
+
+
+# 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
+WINDOW_OBJECT_NAME = "JUN_A00290_BSTool_V02_window"
+TARGETS_WINDOW_OBJECT_NAME = "JUN_A00290_BSTool_V02_targets_window"
+
+
+class TargetsWindow(QWidget):
+    """Shape Editor 의 타겟 영역을 크게 보는 별도 창(Expand).
+
+    타겟 행을 복제하지 않고 **스크롤 영역 자체를 옮겨 온다**. 그래서 Edit 토글 / 슬라이더 /
+    실시간 폴링이 그대로 동작하고, 두 벌을 동기화할 일이 없다. 창을 닫으면 탭의 제자리로
+    되돌아간다.
+    """
+
+    def __init__(self, owner):
+        super().__init__(owner, Qt.Window)
+        self._owner = owner
+        self.setObjectName(TARGETS_WINDOW_OBJECT_NAME)
+        self.setWindowTitle("BS Tool V02 - Targets")
+        self.resize(640, 900)
+
+        layout = QVBoxLayout(self)
+
+        top = QHBoxLayout()
+        top.addWidget(QLabel("Filter"))
+        self.le_filter = QLineEdit()
+        self.le_filter.setPlaceholderText("Type to filter target names")
+        top.addWidget(self.le_filter, 1)
+        self.lbl_number = QLabel("Number: 0")
+        top.addWidget(self.lbl_number)
+        layout.addLayout(top)
+
+        # 탭에서 넘겨받은 스크롤 영역이 들어갈 자리
+        self.body = QVBoxLayout()
+        layout.addLayout(self.body, 1)
+
+    def closeEvent(self, event):
+        self._owner.on_se_collapse()
+        super().closeEvent(event)
+
+
+class WeightSlider(QSlider):
+    """중앙이 0, 왼쪽 끝이 -1, 오른쪽 끝이 +1 인 가로 슬라이더.
+
+    QSlider 는 정수만 다루므로 weight 를 SCALE 배 한 정수로 담는다(0.001 해상도).
+    스핀박스(-10~10)보다 범위가 좁다. 범위를 벗어난 weight 는 슬라이더에서 끝에 붙고,
+    실제 값은 옆의 스핀박스가 보여 준다.
+    """
+
+    SCALE = 1000
+    MIN = -1.0
+    MAX = 1.0
+
+    def __init__(self, parent=None):
+        super().__init__(Qt.Horizontal, parent)
+        self.setRange(int(self.MIN * self.SCALE), int(self.MAX * self.SCALE))
+        # 양 끝과 중앙(0)에 눈금을 찍어 0 위치를 눈으로 찾을 수 있게 한다.
+        self.setTickPosition(QSlider.TicksBelow)
+        self.setTickInterval(int(self.MAX * self.SCALE))
+        self.setSingleStep(self.SCALE // 100)   # 방향키 0.01
+        self.setPageStep(self.SCALE // 10)      # PageUp/Down 0.1
+        self.setMinimumWidth(110)
+        # 테마 qss 가 QSlider 를 스타일링하지 않아 홈이 배경에 묻히므로 직접 그린다.
+        self.setStyleSheet(SLIDER_STYLE)
+
+    def weight(self):
+        return self.value() / float(self.SCALE)
+
+    def _clamp(self, value):
+        return max(self.MIN, min(self.MAX, value))
+
+    def set_weight(self, value):
+        self.setValue(int(round(self._clamp(value) * self.SCALE)))
+
+    def shows(self, value, eps):
+        """이 슬라이더가 이미 그 weight 를(범위 밖이면 클램프한 값을) 가리키고 있는가."""
+        return abs(self.weight() - self._clamp(value)) < eps
+
+
+# 선택된 타겟 행 배경(다중 편집 대상 표시). green_dark accent 계열.
+ROW_SELECTED_STYLE = "QFrame#seTargetRow { background-color: #3f5c48; border-radius: 3px; }"
+
+
+class TargetRow(QFrame):
+    """Shape Editor 의 타겟 한 줄. 칸(빈 영역/이름)을 클릭하면 선택된다.
+
+    슬라이더/스핀박스/Edit 버튼은 자기 클릭을 소비하므로 편집을 방해하지 않는다.
+    QLabel 은 클릭을 무시(ignore)해 부모(이 행)로 전달되므로 이름 칸 클릭도 선택으로 잡힌다.
+    """
+
+    def __init__(self, owner, parent=None):
+        super().__init__(parent)
+        self._owner = owner
+        self.row_info = None            # _add_se_target_row 에서 연결
+        self.setObjectName("seTargetRow")
+
+    def mousePressEvent(self, event):
+        if self.row_info is not None:
+            self._owner._on_se_row_clicked(self.row_info, event.modifiers())
+        super().mousePressEvent(event)
+
+
+class MainWindow(QWidget):
+
+    # ==================================================
+    # ★ 탭 분류 (V02) — 상위 = 카테고리 / 하위 = 기능
+    # ==================================================
+    # 기준은 **"무엇을 바꾸는가"**(결과물)다. 조작 방식이나 대상 노드로 나누지 않는다.
+    #
+    #   Shape  : 타겟의 **모양(델타)** 이 바뀐다 — 끝나면 버텍스가 움직여 있다.
+    #   Target : 버텍스를 하나도 안 움직인다 — 바뀌는 것은 **이름과 인덱스**뿐이다.
+    #   Node   : 타겟 하나를 고르지 않는다 — **노드/리그를 통째로** 다룬다.
+    #
+    # V01 은 상위 탭 6개가 평평했고 `Edit BS` 만 하위 탭을 가졌다. 그건 분류가 아니라
+    # v01.21 에 Naming 을 넣을 자리가 없어서였고, 그래서 Naming(이름 바꾸기)이
+    # Default(타겟 꺼내기)와 한 상자에 있었다. 그 오분류를 푸는 것이 이 재편의 핵심이다.
+    # 계획서: `docs/plans/A00290_BSTool_tab_reorg_plan.md`
+
+    # (하위 탭 라벨, 툴팁, 빌더 메서드 이름)
+    SHAPE_PAGES = (
+        ("Shape Editor",
+         "Shape Editor - list every target of a blendShape node and toggle Edit "
+         "on any of them",
+         "_build_shape_editor_tab"),
+        ("Base Shape",
+         "Base Shape - redefine the shape seen at a given weight as the new "
+         "weight=1.0 shape",
+         "_build_base_shape_tab"),
+        ("Mix Targets",
+         "Mix Targets - add a weighted mix of source targets onto other targets",
+         "_build_mix_tab"),
+    )
+    TARGET_PAGES = (
+        ("Naming",
+         "Naming - rename target aliases in bulk (these become the morph target "
+         "names in Unreal)",
+         "_build_naming_tab"),
+        ("Target Order",
+         "Target Order - change the real target order (weight index) of the node",
+         "_build_target_order_tab"),
+    )
+    NODE_PAGES = (
+        ("Extract",
+         "Extract (was Edit BS > Default) - key every target, copy targets or "
+         "frames to meshes",
+         "_build_edit_bs_default_tab"),
+        ("Bake Delete",
+         "Bake Delete - move a deleteComponent to the front of the chain so the "
+         "whole rig shrinks with it",
+         "_build_bake_delete_tab"),
+    )
+
+    # (상위 탭 라벨, 툴팁, 하위 페이지 표, 하위 QTabWidget 을 담을 속성 이름)
+    CATEGORIES = (
+        ("Shape", "Change what a target looks like.",
+         SHAPE_PAGES, "shape_tabs"),
+        ("Target", "Rename or reorder targets. No shape changes.",
+         TARGET_PAGES, "target_tabs"),
+        ("Node", "Work on the whole blendShape node - pull targets out, or bake a "
+         "topology change into the rig.",
+         NODE_PAGES, "node_tabs"),
+    )
+
+    def __init__(self):
+
+        super().__init__(maya_main_window())
+
+        self.setObjectName(WINDOW_OBJECT_NAME)
+
+        # Shape Editor 탭의 타겟 행 정보:
+        # [{node, index, name, row, btn, spin, slider, selected}, ...]
+        self._se_rows = []
+        self._se_rebuild_pending = False
+        # 다중 편집 중 위젯 setValue 가 다시 on_se_weight_changed 를 부르는 재귀를 막는다.
+        self._se_applying = False
+        # Shift 범위 선택의 기준점(직전 단일/토글 선택 행). 재빌드 때 초기화한다.
+        self._se_anchor = None
+        # 슬라이더 드래그 전체를 하나의 undo 로 묶기 위한 상태.
+        # 드래그는 매 틱 setAttr 을 내는데, 청크로 안 묶으면 Ctrl+Z 가 마지막 한 틱(한 타겟)만
+        # 되돌린다. press~release 를 한 청크로 감싼다.
+        self._se_dragging = False
+        self._se_undo_open = False
+
+        # Expand 로 띄운 별도 타겟 창 (없으면 None)
+        self._se_window = None
+
+        # Mix Targets 탭: 체크 상태를 코드가 바꾸는 동안 itemChanged 로 되돌아오는 것을 막는다.
+        self._mix_updating = False
+
+        # 씬의 weight 를 스핀박스로 되비추는 폴링 타이머. Shape Editor 탭이 보일 때만 돈다.
+        # (build_ui 가 tabs.currentChanged 를 붙이며 이 타이머를 건드리므로 먼저 만든다.)
+        self._se_sync_timer = QTimer(self)
+        self._se_sync_timer.setInterval(SE_SYNC_INTERVAL_MS)
+        self._se_sync_timer.timeout.connect(self._sync_se_weights)
+
+        # 타겟 행이 Edit + 이름 + 슬라이더 + 스핀박스라 460 이면 슬라이더가 눌린다.
+        # Mix Targets 탭은 목록이 좌우 두 개라 조금 더 넓어야 이름이 잘리지 않는다.
+        #
+        # ★ V02 의 기본 크기는 **실측으로 정한 값**이다 — 이 크기에서는 **일곱 페이지 어디에도
+        #   스크롤바가 뜨지 않는다**(오프스크린 Qt 로 전수 확인).
+        #
+        #   폭만으로는 안 된다. 폭을 넓히면 `Shape Editor` 가 필요로 하는 세로가 959 -> 839px
+        #   까지 줄지만 **839 에서 바닥을 친다**(1400 을 넘겨도 더 안 줄어든다). 그래서 세로도
+        #   함께 키워야 하고, 그 최소가 이 값이다. 더 넓혀 봐야 1144 밑으로는 안 내려간다.
+        #
+        #   ※ 세로 1158 은 **1080p 모니터에는 안 들어간다**(작업표시줄 빼면 약 1040px).
+        #     그 경우 창이 화면에 맞춰 잘리면서 `Shape Editor` · `Naming` 에 세로 스크롤이
+        #     생긴다 — 페이지를 QScrollArea 에 담아 둔 것이 그래서다(그때는 스크롤이 받는다).
+        #     화면에 맞추는 것이 더 중요하면 이 두 값만 줄이면 된다.
+        self.win_width = 1400
+        self.win_height = 1158
+        self.win_title = f"BS Tool V02 v{VERSION}"
+
+        self.resize(self.win_width, self.win_height)
+
+        self.build_ui()
+
+    # --------------------------------------------------
+    # UI
+    # --------------------------------------------------
+
+    def build_ui(self):
+
+        self.setWindowTitle(self.win_title)
+        self.setWindowFlags(Qt.Window)
+
+        main_layout = QVBoxLayout(self)
+
+        # 메뉴 바 (Help > About)
+        self.menu_bar = QMenuBar()
+        help_menu = self.menu_bar.addMenu("Help")
+        act_about = help_menu.addAction("About")
+        act_about.triggered.connect(self.show_about)
+        main_layout.setMenuBar(self.menu_bar)
+
+        # 탭 : 상위 = 카테고리 / 하위 = 기능 (V02)
+        self.tabs = QTabWidget()
+        for label, tip, pages, attr in self.CATEGORIES:
+            index = self.tabs.addTab(self._build_category_tab(pages, attr), label)
+            self.tabs.setTabToolTip(index, tip)
+            if label == "Shape":
+                self.shape_page = self.tabs.widget(index)
+        # ★ 상위·하위 **둘 다** 연결해야 한다. Shape Editor -> Base Shape 처럼 하위만 바뀌는
+        #   전환에서는 상위 시그널이 오지 않는다.
+        self.tabs.currentChanged.connect(lambda *_a: self._update_se_timer())
+        self.shape_tabs.currentChanged.connect(lambda *_a: self._update_se_timer())
+        main_layout.addWidget(self.tabs)
+
+        # 공용 로그
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="BS Tool V02 - Log",
+            object_name="JUN_A00290_BSTool_V02_log_window")
+        self.te_log.setMinimumHeight(80)
+        self.te_log.setMaximumHeight(140)
+        main_layout.addWidget(self.te_log)
+
+        # 저작권
+        self.lbl_copyright = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
+        self.lbl_copyright.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(self.lbl_copyright)
+
+    # ==================================================
+    # Tab 1 : Shape Editor
+    # ==================================================
+
+    def _build_shape_editor_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # blendShape 노드 리스트 (씬 선택 연동). 노드가 추가/삭제되면 타겟을 다시 훑는다.
+        self.tsl_se_nodes = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="BlendShape Nodes",
+            select_label="Select BlendShape Nodes",
+            list_min_height=70,
+            log_callback=self.log)
+        self.tsl_se_nodes.list_widget.model().rowsInserted.connect(
+            self._on_se_nodes_changed)
+        self.tsl_se_nodes.list_widget.model().rowsRemoved.connect(
+            self._on_se_nodes_changed)
+        layout.addWidget(self.tsl_se_nodes)
+
+        # 필터 + 새로고침
+        # 이 탭의 목록은 QListWidget 이 아니라 **행 위젯을 쌓은 것**이라(행마다
+        # Edit 버튼·슬라이더·스핀박스) 공용 Filter 를 rows_provider 모드로 쓴다.
+        tool_row = QHBoxLayout()
+        self.flt_se = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            rows_provider=lambda: [(r["name"], r["row"]) for r in self._se_rows],
+            placeholder="Type any part of a target name (e.g. Inner)")
+        self.flt_se.filtered.connect(self._on_se_filtered)
+        tool_row.addWidget(self.flt_se, 1)
+        btn_refresh = QPushButton("Refresh")
+        btn_refresh.setToolTip("Re-read targets and weights from the listed blendShape nodes.")
+        btn_refresh.clicked.connect(self.on_se_refresh)
+        tool_row.addWidget(btn_refresh)
+        btn_expand = QPushButton("Expand")
+        btn_expand.setToolTip("Show the target list in a separate, resizable window.")
+        btn_expand.clicked.connect(self.on_se_expand)
+        tool_row.addWidget(btn_expand)
+        layout.addLayout(tool_row)
+
+        # 타겟 헤더
+        header = QHBoxLayout()
+        lbl_t = QLabel("Targets")
+        f = lbl_t.font()
+        f.setBold(True)
+        lbl_t.setFont(f)
+        header.addWidget(lbl_t)
+
+        # 다중 선택: 선택한 여러 타겟을 슬라이더/스핀박스 하나로 동시에 조절한다.
+        # (행을 클릭하면 선택, Shift+클릭으로 여러 개 선택/해제.)
+        btn_select_all = QPushButton("Select All")
+        btn_select_all.setToolTip("Select all currently visible targets for multi-edit.")
+        btn_select_all.clicked.connect(lambda: self._se_select_all(True))
+        header.addWidget(btn_select_all)
+        btn_clear_sel = QPushButton("Clear")
+        btn_clear_sel.setToolTip("Clear the target selection.")
+        btn_clear_sel.clicked.connect(lambda: self._se_select_all(False))
+        header.addWidget(btn_clear_sel)
+
+        header.addStretch(1)
+        self.lbl_se_number = QLabel("Number: 0")
+        header.addWidget(self.lbl_se_number)
+        layout.addLayout(header)
+
+        # 타겟 행 스크롤 영역 (blendShape 별 헤더 + 타겟마다 Edit 토글 / weight)
+        self.se_scroll = QScrollArea()
+        self.se_scroll.setWidgetResizable(True)
+        self.se_scroll.setMinimumHeight(260)
+        self.se_body = QWidget()
+        self.se_body_layout = QVBoxLayout(self.se_body)
+        self.se_body_layout.setContentsMargins(2, 2, 2, 2)
+        self.se_body_layout.setSpacing(2)
+        self.se_body_layout.addStretch(1)
+        self.se_scroll.setWidget(self.se_body)
+        layout.addWidget(self.se_scroll, 1)
+
+        # Expand 로 스크롤 영역을 별도 창에 넘겨준 동안 탭에서 그 자리를 지킨다.
+        # (숨긴 위젯은 레이아웃에서 자리를 차지하지 않으므로 평소엔 보이지 않는다.)
+        self.lbl_se_expanded = QLabel("Targets are shown in the expanded window.")
+        self.lbl_se_expanded.setAlignment(Qt.AlignCenter)
+        self.lbl_se_expanded.setVisible(False)
+        layout.addWidget(self.lbl_se_expanded, 1)
+
+        # 스크롤 영역을 되돌릴 때 쓸 원래 자리
+        self.se_tab_layout = layout
+        self.se_scroll_index = layout.indexOf(self.se_scroll)
+
+        # 설명
+        info = QLabel(
+            "Turn Edit on, sculpt the base mesh in the viewport, then turn Edit off\n"
+            "to bake the change into that target - same as Maya's Shape Editor.\n"
+            "Click a target row to select it; Shift+click selects the range in between,\n"
+            "Ctrl+click toggles one. Then drag or type one value to change all selected.\n"
+            "Animated targets (keyed or on an animation layer) are editable too: with\n"
+            "Auto Key on, the value you settle on becomes the key at the current frame;\n"
+            "with it off it is a preview that reverts when you scrub time.")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        btn_exit = QPushButton("Exit Edit Mode (all blendShapes)")
+        btn_exit.setToolTip("Turn off edit mode on every blendShape node in the scene.")
+        btn_exit.clicked.connect(self.on_se_exit_all)
+        layout.addWidget(btn_exit)
+
+        return tab
+
+    # --------------------------------------------------
+    # 탭 골격 (V02) — 기존 _build_*_tab 은 한 줄도 건드리지 않고 **묶기만** 한다
+    # --------------------------------------------------
+
+    def _build_category_tab(self, pages, attr):
+        """카테고리 상위 탭 하나 - 기능들을 하위 탭으로 담는다."""
+        tabs = self._build_sub_tabs(pages)
+        setattr(self, attr, tabs)
+        return tabs
+
+    def _build_sub_tabs(self, pages):
+        tabs = QTabWidget()
+        tabs.tabBar().setElideMode(Qt.ElideRight)   # 폭이 모자라면 라벨을 자른다
+        for label, tip, builder in pages:
+            index = tabs.addTab(self._scrolled(getattr(self, builder)()), label)
+            tabs.setTabToolTip(index, tip)
+        return tabs
+
+    def _scrolled(self, widget):
+        """페이지를 스크롤 영역에 담는다.
+
+        창을 작게 줄여도 위젯이 겹치지 않는다. 기본 창 크기는 **스크롤바가 안 보이는 폭**
+        으로 잡아 두었으므로(`win_width`), 평소에는 스크롤이 나타나지 않는다.
+        스크롤은 **하위 페이지에만** 씌운다 - 상위 카테고리 페이지까지 감싸면 스크롤바가
+        두 겹으로 보인다.
+        """
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidget(widget)
+        return scroll
+
+    def _shape_editor_visible(self):
+        """Shape Editor 페이지가 실제로 화면에 있는가.
+
+        ★ 인덱스가 아니라 **위젯 동일성**으로 본다 - 인덱스는 탭이 늘고 줄면 의미가 변한다.
+        """
+        return (self.tabs.currentWidget() is self.shape_page
+                and self.shape_tabs.currentIndex() == SE_SUB_INDEX)
+
+    # --------------------------------------------------
+    # Shape Editor : 행 구성
+    # --------------------------------------------------
+
+    def _clear_se_rows(self):
+        # 드래그 청크가 열린 채 행이 재생성되면 청크가 누수된다. 안전하게 닫는다.
+        if self._se_undo_open:
+            cmds.undoInfo(closeChunk=True)
+            self._se_undo_open = False
+        self._se_dragging = False
+        self._se_rows = []
+        self._se_anchor = None
+        # 마지막 stretch 를 제외한 모든 위젯 제거
+        while self.se_body_layout.count() > 1:
+            item = self.se_body_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+
+    def _add_se_node_header(self, bs_node):
+        lbl = QLabel(bs_node)
+        f = lbl.font()
+        f.setBold(True)
+        lbl.setFont(f)
+        lbl.setContentsMargins(2, 6, 2, 2)
+        self.se_body_layout.insertWidget(self.se_body_layout.count() - 1, lbl)
+
+    def _add_se_target_row(self, bs_node, target, editing_idx):
+        idx = target["index"]
+        is_editing = (idx == editing_idx)
+
+        row = TargetRow(self)
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(2, 0, 2, 0)
+
+        btn = QPushButton(EDIT_OFF_TEXT)
+        btn.setCheckable(True)
+        # "Edit ON" 으로 바뀌어도 폭이 흔들리지 않도록 고정.
+        btn.setFixedWidth(72)
+        btn.setToolTip("Toggle sculpt mode on this target (blendShape sculptTargetIndex).")
+        btn.setChecked(is_editing)
+        self._style_edit_button(btn, is_editing)
+        # clicked 는 clicked(bool checked=false) 라 인자 없이 발화될 수 있다.
+        # 시그널 인자에 기대지 말고 버튼에서 직접 체크 상태를 읽는다.
+        btn.clicked.connect(
+            lambda *_a, n=bs_node, i=idx, b=btn: self.on_se_edit_toggled(n, i, b.isChecked()))
+        row_layout.addWidget(btn)
+
+        lbl = QLabel(target["name"])
+        lbl.setToolTip("weight[{0}]".format(idx))
+        row_layout.addWidget(lbl, 1)
+
+        # 편집 가능(free/keyed) 하고 sculpt 편집 중이 아니면 조절 가능.
+        enabled = target["editable"] and not is_editing
+
+        slider = WeightSlider()
+        slider.set_weight(target["weight"])
+        slider.setEnabled(enabled)
+        row_layout.addWidget(slider, 1)
+
+        spin = QDoubleSpinBox()
+        spin.setDecimals(3)
+        spin.setRange(-10.0, 10.0)
+        spin.setSingleStep(0.1)
+        spin.setFixedWidth(72)
+        # 키를 누를 때마다 값을 확정하지 않는다(기본값은 확정한다).
+        # 켜져 있으면 "0.1" 까지 친 순간 valueChanged 가 나가고, 되돌아온 setValue 가
+        # 편집 중인 텍스트를 "0.100" 으로 다시 써 버려 뒤 자릿수를 이어 칠 수 없다.
+        # 끄면 Enter 또는 포커스 아웃에서 한 번만 확정된다.
+        spin.setKeyboardTracking(False)
+        spin.setValue(target["weight"])
+        spin.setEnabled(enabled)
+        row_layout.addWidget(spin)
+
+        self._apply_se_row_tooltip(slider, spin, target["state"])
+
+        self.se_body_layout.insertWidget(self.se_body_layout.count() - 1, row)
+        row_info = {
+            "node": bs_node, "index": idx, "name": target["name"],
+            "row": row, "btn": btn, "spin": spin, "slider": slider,
+            "selected": False,
+        }
+        row.row_info = row_info
+        self._se_rows.append(row_info)
+
+        # 슬라이더와 스핀박스는 같은 weight 를 가리키는 두 얼굴이다. 어느 쪽을 움직이든
+        # 씬에 쓰고 반대쪽을 맞춘다.
+        # valueChanged 는 바인딩/버전에 따라 double 또는 문자열을 넘긴다. 위젯에서 직접 읽는다.
+        spin.valueChanged.connect(
+            lambda *_a, r=row_info, s=spin: self.on_se_weight_changed(r, s.value()))
+        slider.valueChanged.connect(
+            lambda *_a, r=row_info, s=slider: self.on_se_weight_changed(r, s.weight()))
+        # 드래그 전체를 한 undo 로 묶는다(press~release 한 청크).
+        slider.sliderPressed.connect(self._se_slider_pressed)
+        slider.sliderReleased.connect(self._se_slider_released)
+
+    @staticmethod
+    def _apply_se_row_tooltip(slider, spin, state):
+        """weight 상태에 맞는 툴팁을 슬라이더/스핀박스에 건다."""
+        base = "Drag to set the weight. Center is 0, right end +1, left end -1."
+        if state in ("keyed", "layered"):
+            what = "Keyed" if state == "keyed" else "On an animation layer"
+            tip = (base + "\n{0}: the value changes right away. With Auto Key on the "
+                   "value you settle on becomes the key at the current time; with it "
+                   "off it is a preview that reverts when you scrub time.".format(what))
+        elif state == "driven":
+            tip = "This weight is driven by another node and cannot be edited."
+        elif state == "locked":
+            tip = "This weight is locked and cannot be edited."
+        else:
+            tip = base
+        slider.setToolTip(tip)
+        spin.setToolTip(tip)
+
+    def _style_edit_button(self, btn, on):
+        """Edit 토글의 현재 상태(색 + 라벨)를 버튼에 반영한다."""
+        btn.setStyleSheet(EDIT_ON_STYLE if on else "")
+        btn.setText(EDIT_ON_TEXT if on else EDIT_OFF_TEXT)
+
+    def _populate_shape_editor(self):
+        """리스트의 blendShape 노드들을 훑어 타겟 행을 다시 만든다."""
+        self._clear_se_rows()
+
+        nodes = [n for n in self.tsl_se_nodes.get_all_items() if bsu.is_blendshape(n)]
+        total = 0
+        for bs_node in nodes:
+            targets = ShapeEditorManager.list_targets(bs_node)
+            editing_idx = ShapeEditorManager.get_edit_target(bs_node)
+            if len(nodes) > 1 or not targets:
+                self._add_se_node_header(bs_node)
+            for target in targets:
+                self._add_se_target_row(bs_node, target, editing_idx)
+            total += len(targets)
+
+        # 행을 새로 만들었으므로 필터를 다시 먹인다(Number 라벨은 filtered 시그널로 갱신).
+        self.flt_se.refresh()
+        self._update_se_timer()
+        return nodes, total
+
+    def _on_se_filtered(self, shown, total):
+        """공용 Filter 가 다시 걸릴 때마다 Number 라벨과 확장 창을 맞춘다.
+
+        Number 라벨은 rows_provider 모드에서 위젯에 넘기지 않고 여기서 직접 쓴다 —
+        같은 문구를 확장 창의 라벨에도 함께 반영해야 하기 때문이다.
+        """
+        text = ("Number: {0}".format(total) if shown == total
+                else "Number: {0} / {1}".format(shown, total))
+        self.lbl_se_number.setText(text)
+
+        # 필터는 하나지만 입력 칸은 탭과 확장 창에 하나씩 있다. 서로 맞춰 준다.
+        # (같을 때 쓰지 않으므로 textChanged 가 서로를 부르며 맴돌지 않는다.)
+        if self._se_window is not None:
+            self._se_window.lbl_number.setText(text)
+            if self._se_window.le_filter.text() != self.flt_se.text():
+                self._se_window.le_filter.setText(self.flt_se.text())
+
+    def _sync_se_edit_states(self):
+        """씬의 실제 sculptTargetIndex 를 읽어 Edit 버튼/스핀박스 상태를 맞춘다."""
+        editing = {}
+        for row in self._se_rows:
+            node = row["node"]
+            if node not in editing:
+                editing[node] = ShapeEditorManager.get_edit_target(node)
+
+            on = (editing[node] == row["index"])
+
+            row["btn"].blockSignals(True)
+            row["btn"].setChecked(on)
+            row["btn"].blockSignals(False)
+            self._style_edit_button(row["btn"], on)
+
+            state = ShapeEditorManager.weight_state(node, row["index"])
+            editable = state in EDITABLE_STATES
+            self._show_weight(row, ShapeEditorManager.get_weight(node, row["index"]))
+            row["spin"].setEnabled(editable and not on)
+            row["slider"].setEnabled(editable and not on)
+            self._apply_se_row_tooltip(row["slider"], row["spin"], state)
+
+    # --------------------------------------------------
+    # Shape Editor : 씬 -> UI weight 실시간 반영
+    # --------------------------------------------------
+
+    @staticmethod
+    def _show_weight(row, value):
+        """행의 슬라이더/스핀박스에 값을 표시한다.
+
+        setValue 는 valueChanged 를 발화해 on_se_weight_changed 로 되돌아온다. 그대로 두면
+        방금 씬에서 읽은 값을 씬에 다시 쓰고(잠긴/구동되는 weight 는 매 틱 경고 로그까지 남는다),
+        슬라이더 -> 스핀박스 -> 슬라이더 로 되울리기까지 한다. 그래서 시그널을 막고 쓴다.
+
+        포커스가 있는 스핀박스는 사용자가 지금 타이핑하는 칸이므로 건드리지 않는다.
+        setValue 는 편집 중인 텍스트를 소수점 자릿수에 맞춰 다시 쓰고(예: "0." -> "0.000")
+        커서까지 옮기므로 입력이 끊긴다. 그 칸의 값은 포커스가 떠날 때 다시 맞춰진다.
+        """
+        for widget, setter in ((row["spin"], row["spin"].setValue),
+                               (row["slider"], row["slider"].set_weight)):
+            if widget is row["spin"] and widget.hasFocus():
+                continue
+            widget.blockSignals(True)
+            setter(value)
+            widget.blockSignals(False)
+
+    @staticmethod
+    def _user_is_dragging(row):
+        """사용자가 그 행의 위젯을 직접 만지는 중이면 밑에서 값을 바꾸지 않는다.
+
+        슬라이더는 '잡고 있는 동안'(isSliderDown)만 막는다. hasFocus 까지 막으면 한 번 클릭한
+        행은 포커스를 옮길 때까지 씬 변화를 영영 못 따라온다.
+        """
+        return row["spin"].hasFocus() or row["slider"].isSliderDown()
+
+    def _update_se_timer(self):
+        """폴링은 타겟 행이 실제로 화면에 있을 때만 돌린다.
+
+        확장 창이 떠 있으면 타겟은 그쪽에 있다. 이때는 본 창이 가려져 있거나 다른 탭이어도
+        계속 갱신해야 한다.
+        """
+        expanded = self._se_window is not None and self._se_window.isVisible()
+        active = bool(self._se_rows) and (
+            expanded
+            or (self.isVisible() and self._shape_editor_visible()))
+        if active and not self._se_sync_timer.isActive():
+            self._se_sync_timer.start()
+        elif not active and self._se_sync_timer.isActive():
+            self._se_sync_timer.stop()
+
+    def _sync_se_weights(self):
+        """씬의 현재 weight 를 슬라이더/스핀박스에 반영한다(UI -> 씬 방향은 건드리지 않는다)."""
+        for row in self._se_rows:
+            node = row["node"]
+            if not cmds.objExists(node):
+                # 노드가 지워졌다. 행 자체는 Refresh(또는 노드 리스트 변경) 때 다시 만든다.
+                continue
+
+            if self._user_is_dragging(row):
+                continue
+
+            value = ShapeEditorManager.get_weight(node, row["index"])
+            # 두 위젯을 다 봐야 한다. 씬에 못 쓴 조작(잠긴/구동되는 weight 를 민 경우)은 한쪽만
+            # 어긋난 채 남으므로, 스핀박스만 보고 판단하면 그 행은 영영 되돌아오지 않는다.
+            if (abs(value - row["spin"].value()) < SE_WEIGHT_EPS
+                    and row["slider"].shows(value, SE_WEIGHT_EPS)):
+                continue
+
+            self._show_weight(row, value)
+
+    # --------------------------------------------------
+    # Handlers : Shape Editor
+    # --------------------------------------------------
+
+    def _on_se_nodes_changed(self, *args):
+        # set_items 는 clear + add 로 rowsRemoved / rowsInserted 를 연달아 낸다.
+        # 이벤트 루프로 한 번 미뤄 재빌드를 1회로 합친다.
+        if self._se_rebuild_pending:
+            return
+        self._se_rebuild_pending = True
+        QTimer.singleShot(0, self._rebuild_se_now)
+
+    def _rebuild_se_now(self):
+        self._se_rebuild_pending = False
+        self._populate_shape_editor()
+
+    def on_se_refresh(self):
+        nodes, total = self._populate_shape_editor()
+        if not nodes:
+            self.log("[Warning] Add blendShape nodes to the list first.")
+            return
+        self.log("[Shape Editor] {0} node(s), {1} target(s).".format(len(nodes), total))
+
+    def on_se_edit_toggled(self, bs_node, weight_idx, checked):
+        if checked:
+            _ok, msg = ShapeEditorManager.begin_edit(bs_node, weight_idx)
+        else:
+            _ok, msg = ShapeEditorManager.end_edit(bs_node)
+        self.log(msg)
+        # 노드당 한 타겟만 편집할 수 있으므로 다른 행의 상태도 다시 맞춘다.
+        self._sync_se_edit_states()
+
+    def _co_edit_rows(self, row):
+        """이번 조작이 적용될 행들.
+
+        조작한 행이 다중 선택의 일부면 선택된 행 전체, 아니면 그 행 하나.
+        """
+        selected = [r for r in self._se_rows if r["selected"]]
+        if row in selected and len(selected) > 1:
+            return selected
+        return [row]
+
+    # --------------------------------------------------
+    # Shape Editor : 행 선택(칸 클릭 / Shift 다중)
+    # --------------------------------------------------
+
+    def _on_se_row_clicked(self, row, modifiers):
+        """타겟 칸 클릭.
+
+        - Shift+클릭 : 기준점(anchor)부터 이 행까지 **사이의 (보이는) 행 전체를 선택**(범위).
+        - Ctrl+클릭  : 이 행만 선택 토글(비연속 다중 선택).
+        - 그냥 클릭   : 이 행만 단일 선택. (Shift/Ctrl 이 아닐 때는 기준점을 이 행으로 갱신)
+        """
+        shift = bool(modifiers & Qt.ShiftModifier)
+        ctrl = bool(modifiers & Qt.ControlModifier)
+
+        anchor_alive = any(r is self._se_anchor for r in self._se_rows)
+        if shift and anchor_alive:
+            self._se_select_range(self._se_anchor, row)   # 기준점은 유지
+        elif ctrl:
+            row["selected"] = not row["selected"]
+            self._se_anchor = row
+        else:
+            for r in self._se_rows:
+                r["selected"] = (r is row)
+            self._se_anchor = row
+
+        self._refresh_se_selection_styles()
+
+    def _se_select_range(self, anchor, row):
+        """표시 순서로 anchor..row 구간을 선택하고 나머지는 해제한다.
+
+        필터로 보이는 행만 대상으로 한다(화면상 A~B 사이). 기준점/끝점이 숨겨진 예외
+        상황에서는 전체 순서로 폴백한다.
+        """
+        seq = [r for r in self._se_rows if r["row"].isVisible()]
+        if anchor not in seq or row not in seq:
+            seq = self._se_rows
+
+        # 행 정보는 dict(unhashable)이므로 정체성(id)으로 구간을 판별한다.
+        i = next(k for k, r in enumerate(seq) if r is anchor)
+        j = next(k for k, r in enumerate(seq) if r is row)
+        lo, hi = (i, j) if i <= j else (j, i)
+        in_range = {id(r) for r in seq[lo:hi + 1]}
+
+        for r in self._se_rows:
+            r["selected"] = (id(r) in in_range)
+
+    def _refresh_se_selection_styles(self):
+        """각 행의 배경을 선택 상태에 맞게 칠한다."""
+        for r in self._se_rows:
+            r["row"].setStyleSheet(ROW_SELECTED_STYLE if r["selected"] else "")
+
+    def _se_select_all(self, selected):
+        """현재 보이는(필터 통과) 행들의 선택 상태를 일괄 설정한다."""
+        for row in self._se_rows:
+            if row["row"].isVisible():
+                row["selected"] = selected
+            elif selected is False:
+                row["selected"] = False
+        # 일괄 조작 뒤에는 기준점을 지워, 다음 Shift+클릭이 엉뚱한 구간을 잡지 않게 한다.
+        self._se_anchor = None
+        self._refresh_se_selection_styles()
+
+    def _se_slider_pressed(self):
+        """슬라이더를 잡았다. 놓을 때까지의 변경을 한 undo 로 묶기 시작한다."""
+        self._se_dragging = True
+
+    def _se_slider_released(self):
+        """슬라이더를 놓았다. 드래그 청크를 닫는다."""
+        self._se_dragging = False
+        if self._se_undo_open:
+            cmds.undoInfo(closeChunk=True)
+            self._se_undo_open = False
+
+    def on_se_weight_changed(self, row, value):
+        """슬라이더나 스핀박스를 움직였다. 대상 행들에 값을 쓰고 위젯을 맞춘다.
+
+        다중 선택이면 같은 value 를 선택된 모든 타겟에 동시에 적용한다.
+
+        키(또는 애니메이션 레이어)가 걸린 타겟도 그대로 조절된다. Auto Keyframe 이 켜져 있으면
+        매 변경이 **현재 프레임의 키**가 되므로, 조절을 마친 값이 그 프레임의 키값으로 남는다.
+
+        undo 는 **제스처 단위**로 묶는다:
+          - 슬라이더 드래그: press~release 전체를 한 청크로(첫 변경 때 lazy open). 매 틱마다
+            여러 타겟에 setAttr 을 내므로, 안 묶으면 Ctrl+Z 가 마지막 한 틱(한 타겟)만 되돌린다.
+          - 스핀박스/개별 변경: 그 한 번의 변경(선택된 모든 타겟)을 한 청크로 감싼다.
+
+        드래그 중에는 키를 미루고 놓을 때 한 번만 찍고 싶어지지만, 그러면 오히려 손해다
+        (mayapy 실측): Auto Keyframe 이 켜져 있으면 **마야가 setAttr 마다 자체적으로 키를
+        찍는데**, 그 키는 우리 undo 청크 밖에 별도 항목으로 쌓여 Ctrl+Z 가 두 번 필요해진다.
+        키를 우리가 먼저 찍어 두면 setAttr 이 같은 값이라 마야의 자동 키가 개입하지 않아
+        제스처 하나가 undo 하나로 남는다.
+        """
+        if self._se_applying:
+            return
+
+        rows = self._co_edit_rows(row)
+        # Auto Keyframe 상태는 이번 조작에서 한 번만 조회해 모든 행에 같은 기준을 쓴다.
+        autokey = ShapeEditorManager.is_autokey_on()
+
+        own_chunk = False
+        if self._se_dragging:
+            # 드래그: 첫 변경에서 청크를 열고 release 에서 닫는다.
+            if not self._se_undo_open:
+                cmds.undoInfo(openChunk=True)
+                self._se_undo_open = True
+        else:
+            # 스핀박스 등 이산 변경: 이 한 번을 청크로 감싼다.
+            cmds.undoInfo(openChunk=True)
+            own_chunk = True
+
+        self._se_applying = True
+        try:
+            for r in rows:
+                ok, msg = ShapeEditorManager.set_weight(
+                    r["node"], r["index"], value, autokey=autokey)
+                if not ok:
+                    # 다중 편집에서 잠긴/구동 타겟이 섞여 있을 수 있다. 매 틱 로그를 쏟지 않도록
+                    # 조용히 건너뛴다(단일 편집이면 한 번 알린다).
+                    if len(rows) == 1:
+                        self.log(msg)
+                    continue
+                self._show_weight(r, value)
+        finally:
+            self._se_applying = False
+            if own_chunk:
+                cmds.undoInfo(closeChunk=True)
+
+    def on_se_expand(self):
+        """타겟 스크롤 영역을 별도 창으로 옮긴다(이미 떠 있으면 앞으로 가져온다)."""
+        if self._se_window is not None:
+            self._se_window.raise_()
+            self._se_window.activateWindow()
+            return
+
+        win = TargetsWindow(self)
+        win.lbl_number.setText(self.lbl_se_number.text())
+        win.le_filter.setText(self.flt_se.text())
+        win.le_filter.textChanged.connect(self.flt_se.set_text)
+        # addWidget 이 스크롤 영역을 탭 레이아웃에서 떼어 이 창으로 옮긴다.
+        win.body.addWidget(self.se_scroll)
+        self._se_window = win
+
+        self.lbl_se_expanded.setVisible(True)
+        win.show()
+        self._update_se_timer()
+
+    def on_se_collapse(self):
+        """확장 창이 닫혔다. 스크롤 영역을 탭의 원래 자리로 되돌린다."""
+        if self._se_window is None:
+            return
+
+        win, self._se_window = self._se_window, None
+        self.lbl_se_expanded.setVisible(False)
+        self.se_tab_layout.insertWidget(self.se_scroll_index, self.se_scroll, 1)
+        win.deleteLater()
+        self._update_se_timer()
+
+    def on_se_exit_all(self):
+        _n, msg = ShapeEditorManager.exit_all_edits()
+        self.log(msg)
+        self._sync_se_edit_states()
+
+    # ==================================================
+    # Tab 2 : Edit BS
+    # ==================================================
+
+    def _build_edit_bs_default_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # blendShape 노드 리스트 (씬 선택 연동)
+        self.tsl_bs_nodes = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="BlendShape Nodes",
+            select_label="Select BlendShape Nodes",
+            log_callback=self.log)
+        layout.addWidget(self.tsl_bs_nodes)
+
+        # 동작 버튼
+        btn_key = QPushButton("Key every target")
+        btn_key.setToolTip(
+            "Keyframe each target so it shows one at a time: frame i = 1, i-1/i+1 = 0.")
+        btn_key.clicked.connect(self.on_key_every_target)
+        layout.addWidget(btn_key)
+
+        btn_copy = QPushButton("Copy every target")
+        btn_copy.setToolTip(
+            "Key every target, then duplicate the base mesh at each frame to extract\n"
+            "each target shape as a mesh (visibility off), grouped under <node>_targets.")
+        btn_copy.clicked.connect(self.on_copy_every_target)
+        layout.addWidget(btn_copy)
+
+        # --- Copy every frame (구간 베이크) ---------------------------------
+        # 정해진 [Start, End] 구간을 1프레임마다 베이스 메시를 복제(visibility off).
+        # 구간 입력 UI 는 A00110 Follow 탭의 Start/End + Get Current 패턴을 따른다.
+        validator = QIntValidator(-1000000, 1000000, self)
+        t_min = int(cmds.playbackOptions(query=True, minTime=True))
+        t_max = int(cmds.playbackOptions(query=True, maxTime=True))
+
+        range_row = QHBoxLayout()
+        range_row.addWidget(QLabel("Start"))
+        self.le_copy_start = QLineEdit(str(t_min))
+        self.le_copy_start.setValidator(validator)
+        range_row.addWidget(self.le_copy_start)
+        btn_get_start = QPushButton("Get Current")
+        btn_get_start.clicked.connect(lambda: self._set_current_frame(self.le_copy_start))
+        range_row.addWidget(btn_get_start)
+        range_row.addWidget(QLabel("End"))
+        self.le_copy_end = QLineEdit(str(t_max))
+        self.le_copy_end.setValidator(validator)
+        range_row.addWidget(self.le_copy_end)
+        btn_get_end = QPushButton("Get Current")
+        btn_get_end.clicked.connect(lambda: self._set_current_frame(self.le_copy_end))
+        range_row.addWidget(btn_get_end)
+        layout.addLayout(range_row)
+
+        btn_copy_frame = QPushButton("Copy every frame")
+        btn_copy_frame.setToolTip(
+            "Duplicate the SELECTED mesh(es) in the scene at every frame in\n"
+            "[Start, End] (visibility off), grouped under <mesh>_frames.")
+        btn_copy_frame.clicked.connect(self.on_copy_every_frame)
+        layout.addWidget(btn_copy_frame)
+
+        layout.addStretch(1)
+        return tab
+
+    # ==================================================
+    # Tab 2-2 : Edit BS > Naming
+    # ==================================================
+
+    def _build_naming_tab(self):
+        """blendShape 타겟의 이름(weight 별칭)을 규칙으로 한꺼번에 바꾸는 하위 탭.
+
+        여기서 바꾸는 이름이 곧 **FBX 의 BlendShapeChannel 이름**이고, 언리얼은 그것을
+        모프 타겟 이름으로 쓴다(타겟 메시의 노드 이름은 FBX 에 나가지 않는다).
+        """
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # ---- blendShape 노드 지정
+        node_row = QHBoxLayout()
+        lbl = QLabel("BlendShape Node")
+        lbl.setMinimumWidth(110)
+        node_row.addWidget(lbl)
+        self.le_nm_node = QLineEdit()
+        self.le_nm_node.setPlaceholderText(
+            "Pick a blendShape node or a mesh, then <- Set")
+        node_row.addWidget(self.le_nm_node)
+        btn_set = QPushButton("<- Set")
+        btn_set.setToolTip(
+            "Set the blendShape from the current selection (node or mesh)\n"
+            "and list its targets right away.")
+        btn_set.clicked.connect(self.on_nm_set_node)
+        node_row.addWidget(btn_set)
+        layout.addLayout(node_row)
+
+        btn_list = QPushButton("List Targets")
+        btn_list.setToolTip("Read the target names from the node again.")
+        btn_list.clicked.connect(self.on_nm_list_targets)
+        layout.addWidget(btn_list)
+
+        # ---- 타겟 목록
+        # 이름을 고르는 것이 전부라 Select / Add / Del / Up / Down / Sort 는 감춘다
+        # (타겟은 씬 오브젝트가 아니라 어트리뷰트 별칭이고, 순서는 Target Order 탭의 일이다).
+        self.tsl_nm_targets = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Targets", show_select=False, show_add=False, show_del=False,
+            show_up=False, show_down=False, show_sort=False, show_order=False,
+            attach_uuids=False, list_min_height=120, log_callback=self.log)
+        self.tsl_nm_targets.setToolTip(
+            "Select the targets to rename. With nothing selected, every listed\n"
+            "(and visible) target is renamed.")
+        layout.addWidget(self.tsl_nm_targets, 1)
+        self.tsl_nm_targets.list_widget.itemSelectionChanged.connect(
+            lambda *_a: self._nm_refresh())
+
+        self.flt_nm_targets = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.tsl_nm_targets.list_widget,
+            placeholder="Type any part of a target name (e.g. Inner)")
+        self.flt_nm_targets.filtered.connect(lambda *_a: self._nm_refresh())
+        layout.addWidget(self.flt_nm_targets)
+
+        # ---- 이름 짓는 규칙
+        box = QGroupBox("New Name")
+        box_layout = QVBoxLayout(box)
+
+        mode_row = QHBoxLayout()
+        self.rb_nm_set = QRadioButton("Set Name")
+        self.rb_nm_set.setToolTip(
+            "Replace the whole name.  '#' becomes a number ('##' = two digits),\n"
+            "counting from Start in list order.  With more than one target and no\n"
+            "'#', _01 / _02 ... is appended instead (also counting from Start).")
+        self.rb_nm_replace = QRadioButton("Search && Replace")
+        self.rb_nm_replace.setToolTip("Replace one piece of text inside the names.")
+        self.rb_nm_affix = QRadioButton("Prefix / Suffix")
+        self.rb_nm_affix.setToolTip("Keep the name, add text in front and/or behind.")
+        self.rb_nm_set.setChecked(True)
+        for radio in (self.rb_nm_set, self.rb_nm_replace, self.rb_nm_affix):
+            mode_row.addWidget(radio)
+            radio.toggled.connect(self._on_nm_mode_changed)
+        mode_row.addStretch(1)
+        box_layout.addLayout(mode_row)
+
+        self.stk_nm = QStackedWidget()
+
+        # 페이지 0 : Set Name
+        page_set = QWidget()
+        row_set = QHBoxLayout(page_set)
+        row_set.setContentsMargins(0, 0, 0, 0)
+        row_set.addWidget(QLabel("Name"))
+        self.le_nm_name = QLineEdit()
+        self.le_nm_name.setPlaceholderText("mouth_smile_L      ( pose_## -> pose_01 )")
+        self.le_nm_name.textChanged.connect(lambda *_a: self._nm_refresh())
+        row_set.addWidget(self.le_nm_name, 1)
+        row_set.addWidget(QLabel("Start"))
+        self.sb_nm_start = QSpinBox()
+        self.sb_nm_start.setRange(0, 99999)
+        self.sb_nm_start.setValue(1)
+        self.sb_nm_start.setToolTip("The first number used for '#'.")
+        self.sb_nm_start.valueChanged.connect(lambda *_a: self._nm_refresh())
+        row_set.addWidget(self.sb_nm_start)
+        self.stk_nm.addWidget(page_set)
+
+        # 페이지 1 : Search & Replace
+        page_rep = QWidget()
+        row_rep = QHBoxLayout(page_rep)
+        row_rep.setContentsMargins(0, 0, 0, 0)
+        row_rep.addWidget(QLabel("Search"))
+        self.le_nm_search = QLineEdit()
+        self.le_nm_search.textChanged.connect(lambda *_a: self._nm_refresh())
+        row_rep.addWidget(self.le_nm_search, 1)
+        row_rep.addWidget(QLabel("Replace"))
+        self.le_nm_replace = QLineEdit()
+        self.le_nm_replace.textChanged.connect(lambda *_a: self._nm_refresh())
+        row_rep.addWidget(self.le_nm_replace, 1)
+        self.chk_nm_case = QCheckBox("Match case")
+        self.chk_nm_case.setChecked(True)
+        self.chk_nm_case.toggled.connect(lambda *_a: self._nm_refresh())
+        row_rep.addWidget(self.chk_nm_case)
+        self.stk_nm.addWidget(page_rep)
+
+        # 페이지 2 : Prefix / Suffix
+        page_affix = QWidget()
+        row_affix = QHBoxLayout(page_affix)
+        row_affix.setContentsMargins(0, 0, 0, 0)
+        row_affix.addWidget(QLabel("Prefix"))
+        self.le_nm_prefix = QLineEdit()
+        self.le_nm_prefix.textChanged.connect(lambda *_a: self._nm_refresh())
+        row_affix.addWidget(self.le_nm_prefix, 1)
+        row_affix.addWidget(QLabel("Suffix"))
+        self.le_nm_suffix = QLineEdit()
+        self.le_nm_suffix.textChanged.connect(lambda *_a: self._nm_refresh())
+        row_affix.addWidget(self.le_nm_suffix, 1)
+        self.stk_nm.addWidget(page_affix)
+
+        box_layout.addWidget(self.stk_nm)
+        layout.addWidget(box)
+
+        # ---- 미리보기
+        self.tree_nm_preview = QTreeWidget()
+        self.tree_nm_preview.setHeaderLabels(["Current", "New", "Note"])
+        self.tree_nm_preview.setRootIsDecorated(False)
+        self.tree_nm_preview.setUniformRowHeights(True)
+        self.tree_nm_preview.setSelectionMode(QAbstractItemView.NoSelection)
+        self.tree_nm_preview.setMinimumHeight(120)
+        self.tree_nm_preview.setToolTip(
+            "What APPLY would do.  Rows in red are refused - fix them (or narrow the\n"
+            "selection) before applying; nothing is renamed while one is red.")
+        layout.addWidget(self.tree_nm_preview, 1)
+
+        self.chk_nm_mesh = QCheckBox("Also rename the live target mesh node")
+        # 기본 켬(v01.22~) - 씬에 남아 있는 타겟 메시의 이름이 타겟 이름과 어긋나 있는 것이
+        # 더 헷갈린다. 별칭만 바꾸고 싶으면 끈다.
+        self.chk_nm_mesh.setChecked(True)
+        self.chk_nm_mesh.setToolTip(
+            "Rename the target mesh in the scene to match, when the target still has\n"
+            "one connected.  The mesh name never reaches the FBX - this is only to keep\n"
+            "the scene tidy.  Targets whose shape is already baked in are unaffected.\n"
+            "Turn it off to rename the target (the alias) alone.")
+        layout.addWidget(self.chk_nm_mesh)
+
+        self.lbl_nm_state = QLabel("No blendShape set.")
+        self.lbl_nm_state.setWordWrap(True)
+        layout.addWidget(self.lbl_nm_state)
+
+        info = QLabel(
+            "The target name is the alias of the blendShape's weight attribute - the "
+            "name the Channel Box and the Shape Editor show.  Maya writes exactly that "
+            "name into the FBX (Geometry and BlendShapeChannel), so Unreal imports the "
+            "morph target under the new name.  The target mesh's own node name is never "
+            "exported.  One target at a time can also be renamed by double-clicking it "
+            "in Maya's Shape Editor.")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        self.btn_nm_apply = QPushButton("APPLY RENAME")
+        self.btn_nm_apply.setMinimumHeight(36)
+        self.btn_nm_apply.setEnabled(False)
+        self.btn_nm_apply.setToolTip(
+            "Rename the targets on the node itself.\nOne Ctrl+Z undoes the whole thing.")
+        self.btn_nm_apply.clicked.connect(self.on_nm_apply)
+        layout.addWidget(self.btn_nm_apply)
+
+        return tab
+
+    # ---------------- Naming : 상태/헬퍼
+
+    def _nm_node(self):
+        return self.le_nm_node.text().strip()
+
+    def _nm_mode(self):
+        if self.rb_nm_replace.isChecked():
+            return nm.MODE_REPLACE
+        if self.rb_nm_affix.isChecked():
+            return nm.MODE_AFFIX
+        return nm.MODE_SET
+
+    def _nm_options(self):
+        return {"name": self.le_nm_name.text().strip(),
+                "start": self.sb_nm_start.value(),
+                "search": self.le_nm_search.text(),
+                "replace": self.le_nm_replace.text(),
+                "match_case": self.chk_nm_case.isChecked(),
+                "prefix": self.le_nm_prefix.text().strip(),
+                "suffix": self.le_nm_suffix.text().strip()}
+
+    def _nm_scope(self):
+        """(작업 대상 이름들, 가려진 선택 수, 선택으로 좁혔는지).
+
+        **리스트에 보이는 순서 그대로** 돌려준다 - `#` 번호가 그 순서대로 매겨지므로
+        `selectedItems()`(선택한 순서일 수 있다) 대신 행을 직접 훑는다.
+        """
+        list_widget = self.tsl_nm_targets.list_widget
+        chosen, visible, hidden = [], [], 0
+        for i in range(list_widget.count()):
+            item = list_widget.item(i)
+            if item.isHidden():
+                if item.isSelected():
+                    hidden += 1
+                continue
+            visible.append(item.text())
+            if item.isSelected():
+                chosen.append(item.text())
+        if chosen:
+            return chosen, hidden, True
+        return visible, hidden, False
+
+    def _on_nm_mode_changed(self, _checked=False):
+        if self.rb_nm_replace.isChecked():
+            self.stk_nm.setCurrentIndex(1)
+        elif self.rb_nm_affix.isChecked():
+            self.stk_nm.setCurrentIndex(2)
+        else:
+            self.stk_nm.setCurrentIndex(0)
+        self._nm_refresh()
+
+    def _nm_plan(self):
+        """지금 화면대로라면 무엇이 어떻게 바뀌는지 - 미리보기 행 목록."""
+        node = self._nm_node()
+        if not bsu.is_blendshape(node):
+            return []
+        names, _hidden, _sel = self._nm_scope()
+        if not names:
+            return []
+        new_names = nm.build_names(names, self._nm_mode(), self._nm_options())
+        return nm.plan_renames(node, list(zip(names, new_names)))
+
+    def _nm_refresh(self):
+        """미리보기 트리 + 상태 줄 + APPLY 버튼을 지금 상태에 맞춘다."""
+        self.tree_nm_preview.clear()
+        node = self._nm_node()
+
+        if not bsu.is_blendshape(node):
+            self.lbl_nm_state.setText("No blendShape set.")
+            self.btn_nm_apply.setEnabled(False)
+            return
+
+        names, hidden, narrowed = self._nm_scope()
+        if not names:
+            self.lbl_nm_state.setText(
+                "Nothing to rename - press List Targets (or clear the filter).")
+            self.btn_nm_apply.setEnabled(False)
+            return
+
+        try:
+            rows = self._nm_plan()
+        except Exception as e:
+            self.lbl_nm_state.setText(str(e))
+            self.btn_nm_apply.setEnabled(False)
+            return
+
+        for row in rows:
+            note = row["error"] or ("" if row["changed"] else "unchanged")
+            item = QTreeWidgetItem([row["old"], row["new"], note])
+            if row["error"]:
+                for col in range(3):
+                    item.setForeground(col, QBrush(QColor("#e05050")))
+            elif not row["changed"]:
+                for col in range(3):
+                    item.setForeground(col, QBrush(QColor("#808080")))
+            self.tree_nm_preview.addTopLevelItem(item)
+        for col in range(3):
+            self.tree_nm_preview.resizeColumnToContents(col)
+
+        errors = nm.plan_errors(rows)
+        changes = nm.plan_changes(rows)
+
+        text = "{0} target(s) {1} - {2} would be renamed.".format(
+            len(rows), "selected" if narrowed else "listed", len(changes))
+        if errors:
+            text += "  {0} refused (in red) - nothing is applied until they are fixed.".format(
+                len(errors))
+        if hidden:
+            text += "  [{0} selected target(s) are hidden by the filter and left alone.]".format(
+                hidden)
+        self.lbl_nm_state.setText(text)
+        self.btn_nm_apply.setEnabled(bool(changes) and not errors)
+
+    # ---------------- Naming : 핸들러
+
+    def on_nm_set_node(self):
+        found = bsu.find_blendshapes_from_selection()
+        if not found:
+            self.log("[Warning] Select a blendShape node or a mesh driven by one.")
+            return
+        self.le_nm_node.setText(found[0])
+        if len(found) > 1:
+            self.log("[Info] {0} blendShapes found; using '{1}'.".format(
+                len(found), found[0]))
+        self.on_nm_list_targets()
+
+    def on_nm_list_targets(self):
+        node = self._nm_node()
+        if not bsu.is_blendshape(node):
+            self.log("[Warning] '{0}' is not a valid blendShape node.".format(node))
+            self.tsl_nm_targets.clear()
+            self._nm_refresh()
+            return
+
+        targets = nm.target_names(node)
+        self.tsl_nm_targets.set_items(targets)
+        self.flt_nm_targets.refresh()
+        self._nm_refresh()
+        self.log("[Naming] '{0}' : {1} target(s) listed.".format(node, len(targets)))
+
+    def on_nm_apply(self):
+        node = self._nm_node()
+        try:
+            rows = self._nm_plan()
+        except Exception as e:
+            self.log("[Error] Naming : {0}".format(e))
+            return
+
+        changes = nm.plan_changes(rows)
+        if not changes:
+            self.log("[Naming] Nothing to rename.")
+            return
+
+        try:
+            with undo_chunk():
+                report = nm.apply_renames(node, rows,
+                                          rename_meshes=self.chk_nm_mesh.isChecked())
+        except Exception as e:
+            self.log("[Error] Rename : {0}".format(e))
+            cmds.warning(str(e))
+            self.on_nm_list_targets()
+            return
+
+        self.log("[OK] '{0}' : {1} target(s) renamed.".format(node, report["renamed"]))
+        for row in changes:
+            self.log("       {0}  ->  {1}".format(row["old"], row["new"]))
+        if report["meshes"]:
+            self.log("[Naming] {0} target mesh(es) renamed too.".format(
+                len(report["meshes"])))
+        for name, count in report["skipped_meshes"]:
+            self.log("[Warning] '{0}' has {1} live target meshes (multiple base "
+                     "geometries) - mesh names left alone.".format(name, count))
+
+        # 노드에서 다시 읽어 채운다 - 화면과 씬이 같은지 눈으로 확인된다.
+        # 방금 바꾼 것들을 다시 고른 채로 둔다(연달아 규칙을 더 먹일 수 있게).
+        # select_by_texts 는 시그널을 막으므로 미리보기는 직접 다시 그린다.
+        renamed = [row["new"] for row in changes]
+        self.on_nm_list_targets()
+        self.tsl_nm_targets.select_by_texts(renamed)
+        self._nm_refresh()
+
+    # ==================================================
+    # Tab 3 : Base Shape
+    # ==================================================
+
+    def _build_base_shape_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # blendShape 노드 지정 행
+        node_row = QHBoxLayout()
+        lbl = QLabel("BlendShape Node")
+        lbl.setMinimumWidth(110)
+        node_row.addWidget(lbl)
+        self.le_bs_node = QLineEdit()
+        self.le_bs_node.setPlaceholderText("Pick a blendShape node or a mesh, then <- Set")
+        node_row.addWidget(self.le_bs_node)
+        btn_set = QPushButton("<- Set")
+        btn_set.setToolTip("Set the blendShape from the current selection (node or mesh).")
+        btn_set.clicked.connect(self.on_set_bs_node)
+        node_row.addWidget(btn_set)
+        layout.addLayout(node_row)
+
+        # List Targets 버튼
+        btn_list = QPushButton("List Targets")
+        btn_list.setToolTip("Populate the list below with this blendShape's targets.")
+        btn_list.clicked.connect(self.on_list_targets)
+        layout.addWidget(btn_list)
+
+        # 타겟 리스트 (씬 오브젝트가 아니므로 일반 QListWidget)
+        header = QHBoxLayout()
+        lbl_t = QLabel("Targets")
+        f = lbl_t.font()
+        f.setBold(True)
+        lbl_t.setFont(f)
+        header.addWidget(lbl_t)
+        header.addStretch(1)
+        self.lbl_tgt_number = QLabel("Number: 0")
+        header.addWidget(self.lbl_tgt_number)
+        layout.addLayout(header)
+
+        self.lw_targets = QListWidget()
+        self.lw_targets.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lw_targets.setMinimumHeight(220)
+        layout.addWidget(self.lw_targets)
+
+        # 검색 = 공용 Filter 위젯(Framework). "Inner" 로 browInnerUp 이 잡힌다.
+        self.flt_targets = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_targets,
+            placeholder="Type any part of a target name (e.g. Inner)",
+            number_label=self.lbl_tgt_number)
+        layout.addWidget(self.flt_targets)
+
+        # 전체 선택 / 해제
+        sel_row = QHBoxLayout()
+        btn_all = QPushButton("Select All")
+        btn_all.setToolTip("Select every target currently visible in the list.")
+        btn_all.clicked.connect(self.flt_targets.select_all_visible)
+        btn_none = QPushButton("Clear Selection")
+        btn_none.clicked.connect(self.lw_targets.clearSelection)
+        sel_row.addWidget(btn_all)
+        sel_row.addWidget(btn_none)
+        layout.addLayout(sel_row)
+
+        # 값 입력 행
+        val_row = QHBoxLayout()
+        lbl_v = QLabel("Value")
+        lbl_v.setMinimumWidth(110)
+        val_row.addWidget(lbl_v)
+        self.dsb_value = QDoubleSpinBox()
+        self.dsb_value.setDecimals(3)
+        self.dsb_value.setRange(-10.0, 10.0)
+        self.dsb_value.setSingleStep(0.1)
+        self.dsb_value.setValue(0.5)
+        self.dsb_value.setToolTip(
+            "The shape currently seen at this weight value becomes the new weight=1.0 shape.\n"
+            "Internally the target deltas are scaled by this factor (must be non-zero).\n"
+            "If the target mesh is still connected to the blendShape, that mesh itself is\n"
+            "moved - that is the only way the new base shape survives a scene save or Edit.")
+        val_row.addWidget(self.dsb_value)
+        val_row.addStretch(1)
+        layout.addLayout(val_row)
+
+        # 설명
+        info = QLabel(
+            "Make the shape at <Value> become the default (weight 1.0) shape\n"
+            "for the selected targets. e.g. Value 0.5 halves the target; 1.3 exaggerates it.\n"
+            "Targets whose mesh is still in the scene have that mesh edited in place.")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        # Apply
+        btn_apply = QPushButton("Apply  (Value -> 1.0)")
+        btn_apply.setMinimumHeight(36)
+        btn_apply.clicked.connect(self.on_apply_base_shape)
+        layout.addWidget(btn_apply)
+
+        layout.addStretch(1)
+        return tab
+
+    # ==================================================
+    # Tab 4 : Mix Targets
+    # ==================================================
+
+    def _build_mix_tab(self):
+        """소스 타겟들을 원하는 비율로 섞어 다른 타겟들에 한꺼번에 더하는 탭.
+
+        왼쪽에서 **섞을 소스 + 배율**을, 오른쪽에서 **바꿀 타겟들**을 체크한다.
+        두 목록 모두 체크박스라, 다른 탭의 "선택"과 달리 필터를 바꿔도 상태가 남는다.
+        """
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # blendShape 노드 지정 행 (Base Shape 탭과 같은 방식이지만 탭마다 따로 둔다)
+        node_row = QHBoxLayout()
+        lbl = QLabel("BlendShape Node")
+        lbl.setMinimumWidth(110)
+        node_row.addWidget(lbl)
+        self.le_mix_node = QLineEdit()
+        self.le_mix_node.setPlaceholderText("Pick a blendShape node or a mesh, then <- Set")
+        node_row.addWidget(self.le_mix_node)
+        btn_set = QPushButton("<- Set")
+        btn_set.setToolTip("Set the blendShape from the current selection (node or mesh).")
+        btn_set.clicked.connect(self.on_mix_set_node)
+        node_row.addWidget(btn_set)
+        layout.addLayout(node_row)
+
+        btn_list = QPushButton("List Targets")
+        btn_list.setToolTip("Fill both lists below with this blendShape's targets.")
+        btn_list.clicked.connect(self.on_mix_list_targets)
+        layout.addWidget(btn_list)
+
+        # 어떤 메시가 베이스로 잡혔는지, 그 중립을 직접 옮길 수 있는지 바로 보여 준다.
+        # (Base mesh 옵션을 고르기 전에 알아야 하는 정보다.)
+        self.lbl_mix_base_mesh = QLabel("Base mesh: -")
+        self.lbl_mix_base_mesh.setWordWrap(True)
+        self.lbl_mix_base_mesh.setToolTip(
+            "The mesh this blendShape deforms, and the shape that holds its neutral\n"
+            "(weight 0) form. 'through ...' lists the deformers in between.\n"
+            "If the neutral cannot be reached, only the 'New mesh' option can build\n"
+            "the mixed result.")
+        layout.addWidget(self.lbl_mix_base_mesh)
+
+        # 소스 | 대상 두 패널. 이름이 길어(browInnerUpLeft ...) 폭을 직접 조절할 수 있게 스플리터.
+        split = QSplitter(Qt.Horizontal)
+        split.addWidget(self._build_mix_source_panel())
+        split.addWidget(self._build_mix_dest_panel())
+        split.setSizes([320, 320])
+        layout.addWidget(split, 1)
+
+        layout.addLayout(self._build_mix_base_row())
+
+        info = QLabel(
+            "Deform the checked targets by the mix of the checked sources.\n"
+            "e.g. sources [a x1.0, b x0.5, c x0.8] -> every checked target is reshaped\n"
+            "by exactly what those three add up to at those amounts.\n"
+            "Whatever you check is deformed; whatever you do not check keeps its shape.\n"
+            "Sources themselves are never modified. In-between shapes are left alone.")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        btn_apply = QPushButton("Apply Mix")
+        btn_apply.setMinimumHeight(36)
+        btn_apply.setToolTip(
+            "Add the source mix to every checked target.\n"
+            "Targets whose mesh is still in the scene have that mesh moved,\n"
+            "so the change survives a scene save. One Ctrl+Z undoes all of it.")
+        btn_apply.clicked.connect(self.on_apply_mix)
+        layout.addWidget(btn_apply)
+
+        return tab
+
+    def _build_mix_base_row(self):
+        """베이스(최종) 메시를 어떻게 할지 고르는 줄.
+
+        타겟은 "베이스로부터의 오프셋"으로 저장되므로 베이스를 옮기면 타겟이 따라 움직인다.
+        그래서 세 갈래를 명시적으로 고르게 한다(자세한 셈은 mix_manager 헤더 주석).
+        """
+        row = QHBoxLayout()
+        lbl = QLabel("Base mesh")
+        f = lbl.font()
+        f.setBold(True)
+        lbl.setFont(f)
+        row.addWidget(lbl)
+
+        self.grp_mix_base = QButtonGroup(self)
+
+        self.rb_mix_base_none = QRadioButton("Leave it alone")
+        self.rb_mix_base_none.setToolTip(
+            "Only the checked targets change. The neutral mesh you see with every\n"
+            "weight at 0 stays exactly as it is.")
+        self.rb_mix_base_none.setChecked(True)
+
+        self.rb_mix_base_edit = QRadioButton("Deform it too")
+        self.rb_mix_base_edit.setToolTip(
+            "The final mesh is deformed by the same mix - the neutral (bind) shape\n"
+            "is moved, so a skinned rig keeps working and the change survives a save.\n"
+            "Checked targets move with it; unchecked targets are compensated so their\n"
+            "shape stays exactly where it was.\n"
+            "Needs the blendShape to sit in front of the other deformers.")
+
+        self.rb_mix_base_new = QRadioButton("New mesh")
+        self.rb_mix_base_new.setToolTip(
+            "Leave the rig untouched and build a separate mesh that looks like the\n"
+            "neutral shape with the mix applied (named <base>_mixed).")
+
+        for i, rb in enumerate((self.rb_mix_base_none, self.rb_mix_base_edit,
+                                self.rb_mix_base_new)):
+            self.grp_mix_base.addButton(rb, i)
+            row.addWidget(rb)
+        row.addStretch(1)
+        return row
+
+    def _mix_base_mode(self):
+        if self.rb_mix_base_edit.isChecked():
+            return MixManager.BASE_EDIT
+        if self.rb_mix_base_new.isChecked():
+            return MixManager.BASE_NEW
+        return MixManager.BASE_NONE
+
+    def _build_mix_source_panel(self):
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 4, 0)
+
+        header = QHBoxLayout()
+        lbl = QLabel("Mix Sources")
+        f = lbl.font()
+        f.setBold(True)
+        lbl.setFont(f)
+        header.addWidget(lbl)
+        header.addStretch(1)
+        self.lbl_mix_src_count = QLabel("Checked: 0")
+        header.addWidget(self.lbl_mix_src_count)
+        layout.addLayout(header)
+
+        self.lw_mix_src = QListWidget()
+        self.lw_mix_src.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lw_mix_src.setMinimumHeight(200)
+        self.lw_mix_src.setToolTip(
+            "Check the targets to mix, then give each one an amount below.\n"
+            "The checked amounts are what the other targets get deformed by.")
+        self.lw_mix_src.itemChanged.connect(self._on_mix_src_item_changed)
+        layout.addWidget(self.lw_mix_src, 1)
+
+        self.flt_mix_src = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_mix_src,
+            placeholder="Filter sources (e.g. jaw)")
+        layout.addWidget(self.flt_mix_src)
+
+        # 배율 지정: 목록에서 고른(하이라이트) 행에 값을 찍어 준다. 소스마다 다른 값을
+        # 주려면 한 행씩, 같은 값이면 여러 행을 골라 한 번에.
+        amount_row = QHBoxLayout()
+        amount_row.addWidget(QLabel("Amount"))
+        self.dsb_mix_amount = QDoubleSpinBox()
+        self.dsb_mix_amount.setDecimals(3)
+        self.dsb_mix_amount.setRange(-10.0, 10.0)
+        self.dsb_mix_amount.setSingleStep(0.1)
+        self.dsb_mix_amount.setValue(1.0)
+        self.dsb_mix_amount.setKeyboardTracking(False)
+        self.dsb_mix_amount.setToolTip(
+            "How much of that source goes into the other targets.\n"
+            "1.0 = the whole shape, 0.5 = half of it, negative = the opposite way.")
+        amount_row.addWidget(self.dsb_mix_amount)
+        btn_set_amount = QPushButton("Set to Selected")
+        btn_set_amount.setToolTip(
+            "Give this amount to the highlighted rows and check them as sources.")
+        btn_set_amount.clicked.connect(self.on_mix_set_amount)
+        amount_row.addWidget(btn_set_amount, 1)
+        layout.addLayout(amount_row)
+
+        btn_row = QHBoxLayout()
+        btn_scene = QPushButton("Use Scene Weights")
+        btn_scene.setToolTip(
+            "Read each checked source's current weight from the scene and use it\n"
+            "as the amount - dial the shape in Maya, then bake exactly that.")
+        btn_scene.clicked.connect(self.on_mix_use_scene_weights)
+        btn_row.addWidget(btn_scene)
+        btn_clear = QPushButton("Uncheck All")
+        btn_clear.clicked.connect(lambda: self._mix_check_all(self.lw_mix_src, False))
+        btn_row.addWidget(btn_clear)
+        layout.addLayout(btn_row)
+
+        return panel
+
+    def _build_mix_dest_panel(self):
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(4, 0, 0, 0)
+
+        header = QHBoxLayout()
+        lbl = QLabel("Targets to Modify")
+        f = lbl.font()
+        f.setBold(True)
+        lbl.setFont(f)
+        header.addWidget(lbl)
+        header.addStretch(1)
+        self.lbl_mix_dest_number = QLabel("Number: 0")
+        header.addWidget(self.lbl_mix_dest_number)
+        layout.addLayout(header)
+
+        self.lw_mix_dest = QListWidget()
+        self.lw_mix_dest.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lw_mix_dest.setMinimumHeight(200)
+        self.lw_mix_dest.setToolTip(
+            "Check every target that should be deformed by the source mix.\n"
+            "Rows checked as a source are greyed out here - a source is never modified.")
+        self.lw_mix_dest.itemChanged.connect(self._on_mix_dest_item_changed)
+        layout.addWidget(self.lw_mix_dest, 1)
+
+        self.flt_mix_dest = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_mix_dest,
+            placeholder="Filter targets (e.g. brow)",
+            number_label=self.lbl_mix_dest_number)
+        layout.addWidget(self.flt_mix_dest)
+
+        # 전체 체크 하나로 지금 보이는 행을 모두 켜고 끈다(필터를 걸어 두면 그 안에서만).
+        all_row = QHBoxLayout()
+        self.chk_mix_all = QCheckBox("Check All (visible)")
+        self.chk_mix_all.setTristate(True)
+        self.chk_mix_all.setToolTip(
+            "Check or uncheck every target currently visible in this list.\n"
+            "Partially filled means some are checked.")
+        self.chk_mix_all.clicked.connect(self.on_mix_all_clicked)
+        all_row.addWidget(self.chk_mix_all)
+        all_row.addStretch(1)
+        self.lbl_mix_dest_count = QLabel("Checked: 0")
+        all_row.addWidget(self.lbl_mix_dest_count)
+        layout.addLayout(all_row)
+
+        return panel
+
+    # ==================================================
+    # Tab 5 : Target Order
+    # ==================================================
+
+    def _build_target_order_tab(self):
+        """blendShape 의 타겟 나열 순서(weight 인덱스)를 리스트에서 바꾸는 탭.
+
+        리스트는 공용 TSL 을 쓰되 **Select / Add / Del 은 감춘다** — 타겟은 씬 오브젝트가
+        아니라 어트리뷰트 별칭이라, 씬 선택으로 담거나 항목을 지우는 것은 의미가 없다
+        (부분 목록은 어차피 코어가 순열이 아니라며 거절한다). 남는 Up / Down / Sort /
+        Reverse 가 곧 이 탭의 편집 수단이다.
+        """
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # blendShape 노드 지정 행
+        node_row = QHBoxLayout()
+        lbl = QLabel("BlendShape Node")
+        lbl.setMinimumWidth(110)
+        node_row.addWidget(lbl)
+        self.le_to_node = QLineEdit()
+        self.le_to_node.setPlaceholderText(
+            "Pick a blendShape node or a mesh, then <- Set")
+        node_row.addWidget(self.le_to_node)
+        btn_set = QPushButton("<- Set")
+        btn_set.setToolTip(
+            "Set the blendShape from the current selection (node or mesh)\n"
+            "and list its targets right away.")
+        btn_set.clicked.connect(self.on_to_set_node)
+        node_row.addWidget(btn_set)
+        layout.addLayout(node_row)
+
+        btn_list = QPushButton("List Targets")
+        btn_list.setToolTip(
+            "Read the targets from the node, in the order the node lists them.\n"
+            "This throws away any reordering in the list below that was not applied.")
+        btn_list.clicked.connect(self.on_to_list_targets)
+        layout.addWidget(btn_list)
+
+        self.tsl_to_targets = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Targets (top = first)",
+            show_select=False, show_add=False, show_del=False,
+            show_up=True, show_down=True, show_sort=True, show_reverse=True,
+            show_order=False, attach_uuids=False,
+            list_min_height=260, log_callback=self.log)
+        self.tsl_to_targets.setToolTip(
+            "The blendShape's targets, top to bottom, in weight-index order.\n"
+            "Move them with Up / Down (or Sort / Reverse), then press APPLY ORDER.")
+        layout.addWidget(self.tsl_to_targets, 1)
+
+        # TSL 은 재정렬 시그널을 따로 내지 않는다. Up/Down/Sort/Reverse 는 모두
+        # 리스트를 지우고 다시 채우므로(_set_records) 모델의 행 시그널로 잡는다.
+        model = self.tsl_to_targets.list_widget.model()
+        model.rowsInserted.connect(self._to_sync_state)
+        model.rowsRemoved.connect(self._to_sync_state)
+
+        # 검색 = 공용 Filter 위젯. 필터가 걸려 있어도 Up/Down 은 **숨은 행까지 포함해**
+        # 한 칸씩 움직이므로(눌러도 안 움직인 것처럼 보인다) 상태 줄에서 알린다.
+        self.flt_to_targets = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.tsl_to_targets.list_widget,
+            placeholder="Type any part of a target name (e.g. Inner)")
+        self.flt_to_targets.filtered.connect(self._to_sync_state)
+        layout.addWidget(self.flt_to_targets)
+
+        self.lbl_to_state = QLabel("No blendShape set.")
+        self.lbl_to_state.setWordWrap(True)
+        layout.addWidget(self.lbl_to_state)
+
+        info = QLabel(
+            "Maya has no command for this - the Shape Editor only drags targets around "
+            "inside a group, and the real order (the weight index the Channel Box shows) "
+            "never moves.  APPLY ORDER rewrites those indices: every target keeps its own "
+            "name, shape, in-betweens, paint weights, value and connections, and the "
+            "deformed mesh does not move.")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        self.btn_to_apply = QPushButton("APPLY ORDER to the blendShape")
+        self.btn_to_apply.setMinimumHeight(36)
+        self.btn_to_apply.setEnabled(False)
+        self.btn_to_apply.setToolTip(
+            "Give the targets the order shown above, on the node itself.\n"
+            "One Ctrl+Z undoes the whole thing.")
+        self.btn_to_apply.clicked.connect(self.on_to_apply)
+        layout.addWidget(self.btn_to_apply)
+
+        return tab
+
+    # ---------------- Target Order : 상태/헬퍼
+
+    def _to_node(self):
+        return self.le_to_node.text().strip()
+
+    def _to_sync_state(self, *_args):
+        """리스트가 노드와 어떻게 다른지를 한 줄로 보여 준다."""
+        node = self._to_node()
+        listed = self.tsl_to_targets.get_all_items()
+
+        if not bsu.is_blendshape(node):
+            self.lbl_to_state.setText("No blendShape set.")
+            self.btn_to_apply.setEnabled(False)
+            return
+
+        scene = tom.target_names(node)
+        if not listed:
+            text = "'{0}' has {1} target(s). Press List Targets.".format(
+                node, len(scene))
+        elif sorted(listed) != sorted(scene):
+            text = ("The list no longer matches '{0}' ({1} listed, {2} on the node). "
+                    "Press List Targets again.".format(node, len(listed), len(scene)))
+        elif listed == scene:
+            text = "{0} target(s) - the list matches the node.".format(len(scene))
+        else:
+            moved = sum(1 for a, b in zip(listed, scene) if a != b)
+            text = "{0} target(s) - {1} would move. Press APPLY ORDER.".format(
+                len(scene), moved)
+
+        if self.flt_to_targets.text().strip():
+            text += ("   [Filter is on - Up/Down still steps over the hidden rows, "
+                     "so a press can look like it did nothing.]")
+
+        self.lbl_to_state.setText(text)
+        self.btn_to_apply.setEnabled(bool(listed))
+
+    # ---------------- Target Order : 핸들러
+
+    def on_to_set_node(self):
+        found = bsu.find_blendshapes_from_selection()
+        if not found:
+            self.log("[Warning] Select a blendShape node or a mesh driven by one.")
+            return
+        self.le_to_node.setText(found[0])
+        if len(found) > 1:
+            self.log("[Info] {0} blendShapes found; using '{1}'.".format(
+                len(found), found[0]))
+        self.on_to_list_targets()
+
+    def on_to_list_targets(self):
+        node = self._to_node()
+        if not bsu.is_blendshape(node):
+            self.log("[Warning] '{0}' is not a valid blendShape node.".format(node))
+            self.tsl_to_targets.clear()
+            self._to_sync_state()
+            return
+
+        targets = tom.target_names(node)
+        self.tsl_to_targets.set_items(targets)
+        self.flt_to_targets.refresh()
+        self._to_sync_state()
+
+        self.log("[Target Order] '{0}' : {1} target(s) listed.".format(
+            node, len(targets)))
+        if tom.editing_target(node) != -1:
+            self.log("[Warning] A target of '{0}' is in Edit (sculpt) mode - turn it "
+                     "off before applying a new order.".format(node))
+
+    def on_to_apply(self):
+        node = self._to_node()
+        order = self.tsl_to_targets.get_all_items()
+        if not order:
+            self.log("[Warning] Nothing listed. Press List Targets first.")
+            return
+
+        try:
+            with undo_chunk():
+                report = tom.reorder_targets(node, order)
+        except Exception as e:
+            self.log("[Error] Apply Order : {0}".format(e))
+            cmds.warning(str(e))
+            self._to_sync_state()
+            return
+
+        if not report["moved"]:
+            self.log("[Target Order] '{0}' is already in this order - nothing "
+                     "changed.".format(node))
+        else:
+            msg = "[OK] '{0}' reordered : {1} of {2} target(s) moved.".format(
+                node, report["moved"], report["count"])
+            if report["directories"]:
+                msg += " {0} Shape Editor group(s) updated.".format(
+                    report["directories"])
+            self.log(msg)
+
+        # 노드에서 다시 읽어 채운다 — 화면과 씬이 같은지 눈으로 확인된다.
+        self.on_to_list_targets()
+
+    # ==================================================
+    # Tab 6 : Bake Delete
+    # ==================================================
+
+    def _build_bake_delete_tab(self):
+        """디포머 뒤에 남은 deleteComponent 를 리그 전체에 반영하는 탭.
+
+        `Analyze` 로 무엇을 건드릴지 먼저 보여 주고, `Apply` 가 실제로 바꾼다.
+        토폴로지를 갈아 끼우는 작업이라 Ctrl+Z 로 완전히 돌아오지 않는다 — 그 사실을
+        버튼 바로 위에서 눈에 띄게 알린다.
+        """
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # 대상 메시 지정 행
+        mesh_row = QHBoxLayout()
+        lbl = QLabel("Mesh")
+        lbl.setMinimumWidth(110)
+        mesh_row.addWidget(lbl)
+        self.le_bd_mesh = QLineEdit()
+        self.le_bd_mesh.setPlaceholderText("Pick the visible mesh, then <- Set")
+        mesh_row.addWidget(self.le_bd_mesh)
+        btn_set = QPushButton("<- Set")
+        btn_set.setToolTip("Set the mesh from the current selection.")
+        btn_set.clicked.connect(self.on_bd_set_mesh)
+        mesh_row.addWidget(btn_set)
+        layout.addLayout(mesh_row)
+
+        btn_analyze = QPushButton("Analyze")
+        btn_analyze.setToolTip(
+            "Read the mesh's history and report what would change.\n"
+            "Nothing in the scene is touched.")
+        btn_analyze.clicked.connect(self.on_bd_analyze)
+        layout.addWidget(btn_analyze)
+
+        self.te_bd_report = QTextEdit()
+        self.te_bd_report.setReadOnly(True)
+        self.te_bd_report.setLineWrapMode(QTextEdit.NoWrap)
+        self.te_bd_report.setMinimumHeight(200)
+        mono = QFont("Consolas")
+        mono.setStyleHint(QFont.Monospace)
+        self.te_bd_report.setFont(mono)
+        self.te_bd_report.setPlaceholderText(
+            "Set a mesh and press Analyze to see its history.")
+        layout.addWidget(self.te_bd_report, 1)
+
+        info = QLabel(
+            "Deleting faces / edges / vertices on a rigged mesh leaves a deleteComponent\n"
+            "AFTER the deformers, so the visible mesh and the blendShape targets no longer\n"
+            "share a topology.  This bakes the delete into the whole rig: the neutral mesh\n"
+            "and every target mesh lose the same components, all deltas / skin weights are\n"
+            "renumbered, and the deleteComponent is removed.  The visible shape does not move.")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        self.lbl_bd_warn = QLabel(
+            "This rebuilds the mesh topology - Ctrl+Z cannot fully restore it. "
+            "Save your scene first.")
+        self.lbl_bd_warn.setWordWrap(True)
+        self.lbl_bd_warn.setStyleSheet("color: #e8a33d; font-weight: bold;")
+        layout.addWidget(self.lbl_bd_warn)
+
+        btn_apply = QPushButton("Bake Delete into the Rig")
+        btn_apply.setMinimumHeight(36)
+        btn_apply.setToolTip(
+            "Push the delete up to the neutral mesh and the targets, then remove the\n"
+            "deleteComponent so the history is blendShape -> skinCluster again.")
+        btn_apply.clicked.connect(self.on_bd_apply)
+        layout.addWidget(btn_apply)
+
+        return tab
+
+    # --------------------------------------------------
+    # Helpers
+    # --------------------------------------------------
+
+    def log(self, text):
+        self.te_log.append(text)
+
+    def _visible_selected_targets(self):
+        """(보이면서 선택된 타겟 이름들, 필터에 가려진 선택 수).
+
+        Qt 는 숨겨도 선택을 유지하므로, 안 보이는 타겟에까지 Apply 가 먹지 않도록
+        공용 Filter 위젯의 판정을 그대로 쓴다.
+        """
+        return self.flt_targets.visible_selected()
+
+    def _set_current_frame(self, line_edit):
+        """Get Current 버튼: 현재 Maya 프레임으로 해당 Start/End LineEdit 을 갱신."""
+        line_edit.setText(str(int(round(cmds.currentTime(query=True)))))
+
+    # --------------------------------------------------
+    # Handlers : Edit BS
+    # --------------------------------------------------
+
+    def on_key_every_target(self):
+        nodes = self.tsl_bs_nodes.get_all_items()
+        if not nodes:
+            self.log("[Warning] Add blendShape nodes to the list first.")
+            return
+        _n, msg = EditBSManager.key_every_target(nodes)
+        self.log(msg)
+
+    def on_copy_every_target(self):
+        nodes = self.tsl_bs_nodes.get_all_items()
+        if not nodes:
+            self.log("[Warning] Add blendShape nodes to the list first.")
+            return
+        _n, msg = EditBSManager.copy_every_target(nodes)
+        self.log(msg)
+
+    def on_copy_every_frame(self):
+        meshes = cmds.ls(selection=True, long=False) or []
+        if not meshes:
+            self.log("[Warning] Select mesh(es) in the scene first.")
+            return
+
+        s_txt = self.le_copy_start.text().strip()
+        e_txt = self.le_copy_end.text().strip()
+        if s_txt == "" or e_txt == "":
+            self.log("[Warning] Enter Start / End.")
+            return
+
+        start, end = int(s_txt), int(e_txt)
+        if start > end:
+            self.log("[Warning] Start ({0}) is greater than End ({1}).".format(start, end))
+            return
+
+        _n, msg = EditBSManager.copy_every_frame(meshes, start, end)
+        self.log(msg)
+
+    # --------------------------------------------------
+    # Handlers : Base Shape
+    # --------------------------------------------------
+
+    def on_set_bs_node(self):
+        found = bsu.find_blendshapes_from_selection()
+        if not found:
+            self.log("[Warning] Select a blendShape node or a mesh driven by one.")
+            return
+        self.le_bs_node.setText(found[0])
+        if len(found) > 1:
+            self.log("[Info] {0} blendShapes found; using '{1}'.".format(
+                len(found), found[0]))
+        # 지정과 동시에 타겟도 채워준다
+        self.on_list_targets()
+
+    def on_list_targets(self):
+        bs_node = self.le_bs_node.text().strip()
+        if not bsu.is_blendshape(bs_node):
+            self.log("[Warning] '{0}' is not a valid blendShape node.".format(bs_node))
+            return
+        targets = BaseShapeManager.list_targets(bs_node)
+        self.lw_targets.clear()
+        self.lw_targets.addItems(targets)
+        # 새로 채운 항목에도 현재 필터를 다시 먹인다(Number 라벨 갱신 포함).
+        shown, total = self.flt_targets.refresh()
+
+        msg = "[List Targets] '{0}' : {1} target(s).".format(bs_node, total)
+        if shown != total:
+            msg += " Filter '{0}' shows {1}.".format(
+                self.flt_targets.text().strip(), shown)
+        self.log(msg)
+
+    def on_apply_base_shape(self):
+        bs_node = self.le_bs_node.text().strip()
+        if not bsu.is_blendshape(bs_node):
+            self.log("[Warning] '{0}' is not a valid blendShape node.".format(bs_node))
+            return
+
+        target_names, hidden = self._visible_selected_targets()
+        if not target_names:
+            if hidden:
+                self.log("[Warning] The {0} selected target(s) are hidden by the filter "
+                         "- clear the filter or select a visible target.".format(hidden))
+            else:
+                self.log("[Warning] Select target(s) in the list first.")
+            return
+
+        if hidden:
+            self.log("[Info] {0} selected target(s) hidden by the filter were skipped.".format(
+                hidden))
+
+        value = self.dsb_value.value()
+        _done, msg = BaseShapeManager.apply_value_as_default(bs_node, target_names, value)
+        self.log(msg)
+
+    # --------------------------------------------------
+    # Handlers : Mix Targets
+    # --------------------------------------------------
+    #
+    # 이 탭은 선택(하이라이트)이 아니라 **체크박스**가 작업 대상이다. 다른 탭은 "보이는 것이
+    # 작업 대상"(가려진 선택은 제외)이지만, 체크는 사용자가 명시적으로 남긴 상태이고 두 목록의
+    # 필터를 번갈아 쓰다 보면 쉽게 가려진다. 체크를 조용히 버리면 오히려 사고이므로 **가려져
+    # 있어도 체크된 것은 모두 적용**하고, 가려진 개수를 로그로 알려 준다.
+
+    @staticmethod
+    def _mix_name(item):
+        """행의 실제 타겟 이름(표시 텍스트에는 배율이 붙을 수 있다)."""
+        return item.data(Qt.UserRole) or item.text()
+
+    @staticmethod
+    def _mix_amount(item):
+        value = item.data(Qt.UserRole + 1)
+        return 1.0 if value is None else float(value)
+
+    def _mix_src_label(self, item):
+        """소스 행 표시 텍스트: 체크된 것만 배율을 함께 보여 준다."""
+        name = self._mix_name(item)
+        if item.checkState() == Qt.Checked:
+            return "{0}    x{1:g}".format(name, self._mix_amount(item))
+        return name
+
+    def _mix_items(self, list_widget):
+        return [list_widget.item(i) for i in range(list_widget.count())]
+
+    def _mix_checked(self, list_widget):
+        """(체크된 항목들, 그 중 필터에 가려진 수)."""
+        checked = [it for it in self._mix_items(list_widget)
+                   if it.checkState() == Qt.Checked]
+        hidden = sum(1 for it in checked if it.isHidden())
+        return checked, hidden
+
+    def _mix_check_all(self, list_widget, checked, visible_only=False):
+        state = Qt.Checked if checked else Qt.Unchecked
+        self._mix_updating = True
+        try:
+            for it in self._mix_items(list_widget):
+                if visible_only and it.isHidden():
+                    continue
+                if it.flags() & Qt.ItemIsEnabled:
+                    it.setCheckState(state)
+                    if list_widget is self.lw_mix_src:
+                        it.setText(self._mix_src_label(it))
+        finally:
+            self._mix_updating = False
+        self._mix_refresh_counts()
+        if list_widget is self.lw_mix_src:
+            self._mix_sync_dest_enabled()
+
+    def _mix_refresh_counts(self):
+        """양쪽 'Checked: N' 라벨과 전체 체크박스 상태를 지금 상태에 맞춘다."""
+        for list_widget, label in ((self.lw_mix_src, self.lbl_mix_src_count),
+                                   (self.lw_mix_dest, self.lbl_mix_dest_count)):
+            checked, hidden = self._mix_checked(list_widget)
+            text = "Checked: {0}".format(len(checked))
+            if hidden:
+                text += " ({0} hidden)".format(hidden)
+            label.setText(text)
+
+        # 전체 체크박스는 **보이는 행** 기준으로 상태를 표시한다(동작 범위와 같게).
+        visible = [it for it in self._mix_items(self.lw_mix_dest)
+                   if not it.isHidden() and (it.flags() & Qt.ItemIsEnabled)]
+        checked = [it for it in visible if it.checkState() == Qt.Checked]
+        if not visible or not checked:
+            state = Qt.Unchecked
+        elif len(checked) == len(visible):
+            state = Qt.Checked
+        else:
+            state = Qt.PartiallyChecked
+        self.chk_mix_all.blockSignals(True)
+        self.chk_mix_all.setCheckState(state)
+        self.chk_mix_all.blockSignals(False)
+
+    def _mix_sync_dest_enabled(self):
+        """소스로 체크된 타겟은 대상 목록에서 회색으로 잠근다(자기 자신에 더할 수 없다)."""
+        sources = {self._mix_name(it) for it in self._mix_items(self.lw_mix_src)
+                   if it.checkState() == Qt.Checked}
+        self._mix_updating = True
+        try:
+            for it in self._mix_items(self.lw_mix_dest):
+                is_source = self._mix_name(it) in sources
+                flags = it.flags()
+                if is_source:
+                    it.setFlags(flags & ~Qt.ItemIsEnabled)
+                    if it.checkState() == Qt.Checked:
+                        it.setCheckState(Qt.Unchecked)
+                else:
+                    it.setFlags(flags | Qt.ItemIsEnabled)
+        finally:
+            self._mix_updating = False
+
+    def _on_mix_src_item_changed(self, item):
+        if self._mix_updating:
+            return
+        self._mix_updating = True
+        try:
+            item.setText(self._mix_src_label(item))
+        finally:
+            self._mix_updating = False
+        self._mix_sync_dest_enabled()
+        self._mix_refresh_counts()
+
+    def _on_mix_dest_item_changed(self, _item):
+        if self._mix_updating:
+            return
+        self._mix_refresh_counts()
+
+    def on_mix_all_clicked(self, _checked=False):
+        """전체 체크박스: 지금 보이는 대상 행을 모두 켜거나 끈다.
+
+        Qt 의 3-state 는 클릭할 때마다 부분 체크까지 순환하지만, 사용자가 원하는 것은
+        "전부 켜기 / 전부 끄기" 뿐이다. 그래서 부분 상태에서 누르면 전부 켠다.
+        """
+        turn_on = self.chk_mix_all.checkState() != Qt.Unchecked
+        self._mix_check_all(self.lw_mix_dest, turn_on, visible_only=True)
+
+    def on_mix_set_node(self):
+        found = bsu.find_blendshapes_from_selection()
+        if not found:
+            self.log("[Warning] Select a blendShape node or a mesh driven by one.")
+            return
+        self.le_mix_node.setText(found[0])
+        if len(found) > 1:
+            self.log("[Info] {0} blendShapes found; using '{1}'.".format(
+                len(found), found[0]))
+        self.on_mix_list_targets()
+
+    def _mix_refresh_base_label(self, bs_node):
+        """Base mesh 라벨을 지금 노드 기준으로 갱신한다.
+
+        중립을 직접 옮길 수 없으면(다른 디포머가 앞에 있는 리그) 눈에 띄게 표시해,
+        Base mesh 옵션을 고르기 전에 New mesh 를 써야 한다는 걸 알 수 있게 한다.
+        """
+        text, editable = MixManager.base_mesh_info(bs_node)
+        self.lbl_mix_base_mesh.setText(text)
+        self.lbl_mix_base_mesh.setStyleSheet("" if editable else "color: #e0a030;")
+
+    def on_mix_list_targets(self):
+        bs_node = self.le_mix_node.text().strip()
+        if not bsu.is_blendshape(bs_node):
+            self.lbl_mix_base_mesh.setText("Base mesh: -")
+            self.log("[Warning] '{0}' is not a valid blendShape node.".format(bs_node))
+            return
+
+        self._mix_refresh_base_label(bs_node)
+        targets = MixManager.list_targets(bs_node)
+        self._mix_updating = True
+        try:
+            for list_widget in (self.lw_mix_src, self.lw_mix_dest):
+                list_widget.clear()
+                for name in targets:
+                    item = QListWidgetItem(name)
+                    item.setData(Qt.UserRole, name)
+                    item.setData(Qt.UserRole + 1, 1.0)
+                    item.setCheckState(Qt.Unchecked)
+                    list_widget.addItem(item)
+        finally:
+            self._mix_updating = False
+
+        # 목록을 새로 채웠으니 두 필터를 다시 먹인다(숨김 상태가 초기화돼 있다).
+        self.flt_mix_src.refresh()
+        self.flt_mix_dest.refresh()
+        self._mix_refresh_counts()
+
+        self.log("[Mix Targets] '{0}' : {1} target(s) listed.".format(
+            bs_node, len(targets)))
+
+    def on_mix_set_amount(self):
+        """하이라이트된 소스 행에 Amount 를 찍고 소스로 체크한다."""
+        items = [it for it in self.lw_mix_src.selectedItems() if not it.isHidden()]
+        if not items:
+            self.log("[Warning] Highlight the source row(s) in the left list first, "
+                     "then press Set to Selected.")
+            return
+
+        amount = self.dsb_mix_amount.value()
+        self._mix_updating = True
+        try:
+            for it in items:
+                it.setData(Qt.UserRole + 1, amount)
+                it.setCheckState(Qt.Checked)
+                it.setText(self._mix_src_label(it))
+        finally:
+            self._mix_updating = False
+
+        self._mix_sync_dest_enabled()
+        self._mix_refresh_counts()
+        self.log("[Mix Targets] Amount {0:g} set on {1} source(s): {2}".format(
+            amount, len(items), ", ".join(self._mix_name(it) for it in items)))
+
+    def on_mix_use_scene_weights(self):
+        """체크된 소스의 배율을 씬의 현재 weight 값으로 채운다."""
+        bs_node = self.le_mix_node.text().strip()
+        if not bsu.is_blendshape(bs_node):
+            self.log("[Warning] '{0}' is not a valid blendShape node.".format(bs_node))
+            return
+
+        checked, _hidden = self._mix_checked(self.lw_mix_src)
+        if not checked:
+            self.log("[Warning] Check the source target(s) first.")
+            return
+
+        filled = []
+        self._mix_updating = True
+        try:
+            for it in checked:
+                name = self._mix_name(it)
+                weight = MixManager.current_weight(bs_node, name)
+                if weight is None:
+                    continue
+                it.setData(Qt.UserRole + 1, float(weight))
+                it.setText(self._mix_src_label(it))
+                filled.append("{0} x{1:g}".format(name, weight))
+        finally:
+            self._mix_updating = False
+
+        self._mix_refresh_counts()
+        self.log("[Mix Targets] Amounts read from the scene: {0}".format(
+            ", ".join(filled) if filled else "none"))
+
+    def on_apply_mix(self):
+        bs_node = self.le_mix_node.text().strip()
+        if not bsu.is_blendshape(bs_node):
+            self.log("[Warning] '{0}' is not a valid blendShape node.".format(bs_node))
+            return
+
+        src_items, src_hidden = self._mix_checked(self.lw_mix_src)
+        if not src_items:
+            self.log("[Warning] Check at least one target in Mix Sources and give it "
+                     "an amount.")
+            return
+
+        base_mode = self._mix_base_mode()
+        dest_items, dest_hidden = self._mix_checked(self.lw_mix_dest)
+        if not dest_items and base_mode == MixManager.BASE_NONE:
+            self.log("[Warning] Check at least one target in Targets to Modify.")
+            return
+
+        if src_hidden or dest_hidden:
+            self.log("[Info] Checked entries hidden by a filter are included: "
+                     "{0} source(s), {1} target(s).".format(src_hidden, dest_hidden))
+
+        sources = [(self._mix_name(it), self._mix_amount(it)) for it in src_items]
+        targets = [self._mix_name(it) for it in dest_items]
+        _done, msg = MixManager.mix_into_targets(bs_node, sources, targets, base_mode)
+        self.log(msg)
+
+    # --------------------------------------------------
+    # Handlers : Bake Delete
+    # --------------------------------------------------
+
+    def on_bd_set_mesh(self):
+        """<- Set : 선택에서 대상 메시를 잡고 곧바로 Analyze 까지 돌린다."""
+        sel = cmds.ls(sl=True, long=False) or []
+        if not sel:
+            self.log("[Warning] Select the visible mesh first.")
+            return
+        self.le_bd_mesh.setText(sel[0])
+        self.on_bd_analyze()
+
+    def _bd_mesh(self):
+        mesh = self.le_bd_mesh.text().strip()
+        if not mesh or not cmds.objExists(mesh):
+            self.log("[Warning] Set a mesh first.")
+            return None
+        return mesh
+
+    def on_bd_analyze(self):
+        """씬은 그대로 두고 히스토리만 조사해 리포트를 채운다."""
+        mesh = self._bd_mesh()
+        if mesh is None:
+            return
+        report = BakeDeleteManager.analyze(mesh)
+        self.te_bd_report.setPlainText(BakeDeleteManager.format_report(report))
+        if report["ok"]:
+            self.log("[Info] {0}: {1} -> {2} verts, {3} delete node(s) to bake.".format(
+                mesh, report["pre_count"], report["post_count"],
+                len(report["deletes"])))
+        else:
+            self.log("[Warning] {0}".format(report["error"]))
+
+    def on_bd_apply(self):
+        """실제로 지우기를 리그에 굽는다. 진행 로그는 공용 로그 창으로."""
+        mesh = self._bd_mesh()
+        if mesh is None:
+            return
+        ok, report = BakeDeleteManager.apply(mesh, log=self.log)
+        if not ok:
+            self.te_bd_report.setPlainText(BakeDeleteManager.format_report(report))
+            self.log("[Warning] Nothing was changed - see the message above.")
+            return
+
+        # 끝난 뒤 다시 analyze 하면 "지울 게 없다"는 거절 메시지가 나온다(당연하다).
+        # 그러니 방금 한 일을 요약해서 보여 준다.
+        lines = ["Done.",
+                 "Mesh        : {0}".format(mesh),
+                 "Vertices    : {0} -> {1}   ({2} removed)".format(
+                     report["pre_count"], report["post_count"],
+                     report["pre_count"] - report["post_count"]),
+                 "Faces       : {0} -> {1}".format(report["pre_faces"],
+                                                   report["post_faces"]),
+                 "Removed     : {0}".format(
+                     ", ".join(n.split("|")[-1] for n in report["deletes"]))]
+        if report["live_targets"]:
+            lines.append("Targets cut : {0}".format(len(report["live_targets"])))
+        if "deviation" in report:
+            lines.append("Shape check : visible mesh moved by {0:.3g}".format(
+                report["deviation"]))
+        for warn in report["warnings"]:
+            lines.append("Warning     : {0}".format(warn))
+        self.te_bd_report.setPlainText("\n".join(lines))
+
+    # --------------------------------------------------
+    # Show / Hide / Close
+    # --------------------------------------------------
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._update_se_timer()
+
+    def hideEvent(self, event):
+        # 본 창이 가려져도 확장 창이 떠 있으면 타겟은 보이므로 폴링을 이어 간다.
+        super().hideEvent(event)
+        self._update_se_timer()
+
+    def closeEvent(self, event):
+        # 확장 창을 먼저 닫아 스크롤 영역을 탭으로 되돌린다(고아 창이 남지 않게).
+        if self._se_window is not None:
+            self._se_window.close()
+        self._se_sync_timer.stop()
+        # 편집 모드를 켠 채 창을 닫으면 씬이 조용히 sculpt 상태로 남는다.
+        # 닫을 때 해제해 편집 결과를 타겟에 확정시킨다(Maya 의 Edit off 와 동일).
+        try:
+            ShapeEditorManager.exit_all_edits()
+        except Exception:
+            pass
+        super().closeEvent(event)
+
+    # --------------------------------------------------
+    # About
+    # --------------------------------------------------
+
+    def show_about(self, *args):
+        QMessageBox.information(
+            self,
+            "About",
+            f"BS Tool v{VERSION}\n\n"
+            "Shape Editor : every target of a blendShape, with an Edit toggle.\n"
+            "Edit BS : key every target / extract the target meshes.\n"
+            "Base Shape : make the shape at <Value> the new weight=1.0 shape.\n"
+            "Mix Targets : add a weighted mix of some targets onto others.\n"
+            "Target Order : reorder the targets on the blendShape node itself.\n"
+            "Bake Delete : push a post-deformer deleteComponent into the rig.\n\n"
+            f"Written by Ji Hun Park.\nUpdate date: {LAST_UPDATE}",
+        )

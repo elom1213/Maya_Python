@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2e7d32"/>
+      <stop offset="1" stop-color="#1b3d1c"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="12" fill="url(#bg)" stroke="#8bc34a" stroke-width="2"/>
+  <!-- base face (neutral mouth) -->
+  <circle cx="32" cy="27" r="15" fill="none" stroke="#9ccc65" stroke-width="2" opacity="0.45"/>
+  <path d="M23 33 q9 -2 18 0" fill="none" stroke="#9ccc65" stroke-width="2.5" opacity="0.45" stroke-linecap="round"/>
+  <!-- morphed face (smile) -->
+  <path d="M22 32 q10 10 20 0" fill="none" stroke="#cddc39" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="26" cy="24" r="2.2" fill="#cddc39"/>
+  <circle cx="38" cy="24" r="2.2" fill="#cddc39"/>
+  <!-- BS label -->
+  <text x="32" y="56" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#f1f8e9" text-anchor="middle">BS</text>
+</svg>
