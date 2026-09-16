@@ -6,9 +6,20 @@ metadata:
   type: project
 ---
 
-`A00310_SearchTool` 은 **상위 탭 Selection / Search**, Search 아래 **하위 탭 Token / Rules**
-(v01.02, 2026-09-16). Token 은 예전 Search(이름 토큰) 그대로고, **Rules 가 새로 붙은 쪽**이다.
-접두사 — Selection `sel_*` · Token `sch_*` · Rules `rul_*`.
+`A00310_SearchTool` 은 **최상위 탭 Type / Token / Rules** (v01.03, 2026-09-16). 이 툴이 하는 일은
+하나다 — **Objects 리스트에서 조건에 맞는 것만 골라 선택한다.** 다른 건 *무엇으로* 고르느냐뿐이라
+그 기준이 탭이다 — **타입 / 이름 / 상태**.
+
+**★ Objects 리스트 · Get · Source · Invert 는 탭 바깥에서 셋이 공유한다.** 한 번 Get 하면 어느
+탭에서나 쓴다. v01.02 까지는 탭마다 따로라 탭을 옮길 때마다 다시 Get 해야 했다.
+`List Types` 도 씬 선택이 아니라 **이 공유 리스트**를 본다.
+
+이름 규칙 — 공유하는 것은 접두사 없이(`objs_tsl` · `rb_hierarchy`/`rb_selected` · `cb_invert`),
+탭 전용만 탭 이름을 붙인다(`type_types_tsl` · `token_le` · `rules_list`).
+
+> 연혁: v01.02 는 상위 탭 `Selection`/`Search` 에 Search 만 하위 탭을 가진 구조였다. Selection 도
+> 같은 일이라 셋을 같은 층으로 올렸고, 그러면 상위 탭이 하나만 남아 **중첩을 걷어냈다**(v01.03).
+> 옛 `Selection` 탭의 내용이 그대로 `Type` 탭이다.
 
 **★ 규칙은 늘어나는 것이 전제다.** `app/core/select_rules.py` 의 레지스트리에 모이고,
 UI 는 `all_rules()` 를 **그대로 그린다**. 그래서 규칙 추가 = **함수 하나 + `register()` 한 줄**,
@@ -36,5 +47,5 @@ register(SelectRule("x", "X", "한 줄 설명.", _rule_x))
 > 두 뜻이 되고, `Pure` 만으로는 무엇으로부터 순수한지가 안 드러난다. 되돌리려면
 > `register(...)` 의 **라벨 인자 한 줄**만 바꾸면 된다.
 
-검증: 규칙 판정 19케이스 + UI 13항목(mayapy + 오프스크린 Qt) 전부 통과. **마야 GUI 육안 확인은
+검증: 규칙 판정 19케이스 + 구조 16항목(mayapy + 오프스크린 Qt) 전부 통과. **마야 GUI 육안 확인은
 아직.** 관련: [[qt-exclusive-radio-uncheck-ignored]], [[framework-log-widget]]
