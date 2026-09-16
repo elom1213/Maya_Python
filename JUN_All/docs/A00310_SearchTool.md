@@ -2,13 +2,16 @@
 
 ## 1. 개요
 
-씬에서 **오브젝트를 타입/이름으로 골라 선택**하는 PySide(Qt) 툴이다. 레거시 maya.cmds 단일 파일
+씬에서 **오브젝트를 타입 / 이름 / 상태로 골라 선택**하는 PySide(Qt) 툴이다. 레거시 maya.cmds 단일 파일
 툴 두 개(`JUN_PY_SelectionTool_V02_01`, `JUN_PY_SearchTool_V01_02`)를 `A00170_driverTool` 과 같은
-**하나의 창 + 탭** 구조로 통합했다. **두 개의 탭**과 **공유 로그창**으로 구성된다.
+**하나의 창 + 탭** 구조로 통합했다. **상위 탭 두 개**와 **공유 로그창**으로 구성된다.
 
 1. **Selection** — 선택(또는 그 계층)에서 오브젝트/노드 타입을 리스트업하고, **타입별로** 선택한다.
    (구 `JUN_PY_SelectionTool`)
-2. **Search** — 오브젝트 이름에 **토큰(부분 문자열)** 이 들어간 것을 선택한다. (구 `JUN_PY_SearchTool`)
+2. **Search** — 하위 탭 두 개 (v01.02~)
+   - **Token** — 오브젝트 이름에 **토큰(부분 문자열)** 이 들어간 것을 선택한다. (구 `JUN_PY_SearchTool`)
+   - **Rules** — 리스트업된 오브젝트 중 **규칙에 맞는 것**만 선택한다. 규칙은 늘어나는 것을 전제로
+     레지스트리에 모아 두었고, **규칙을 더해도 UI 코드는 건드리지 않는다**(6-2 참고).
 
 - 모든 UI 문자열/로그는 영어. 두 탭의 리스트는 공용 위젯 `JUN_mod_tsl_qt_v01` 을 쓰며
   **Select 계열 + Add / Del / Up / Down / Sort** 버튼을 갖는다.
@@ -30,11 +33,13 @@ A00310_SearchTool/
     │   ├── maya_scene.py      # 선택/계층 펼치기/노드 타입/존재 (cmds 어댑터)
     │   ├── search_select.py   # collect_from_selection / collect_types /
     │   │                      #   select_by_types / select_by_token (+ CONSTRAINT_TYPES)
+    │   ├── select_rules.py    # ★ 규칙 레지스트리 (Search > Rules, v01.02~)
     │   └── __init__.py        # core 재노출
-    └── ui/main_window.py  # 전체 UI (2개 탭 + 공유 로그창 + 메뉴 바)
+    └── ui/main_window.py  # 전체 UI (상위 탭 2 + Search 하위 탭 2 + 공유 로그창 + 메뉴 바)
 ```
 
-- `main_window.py` 의 위젯/핸들러는 탭별 접두사로 분리한다: **Selection = `sel_*`**, **Search = `sch_*`**.
+- `main_window.py` 의 위젯/핸들러는 탭별 접두사로 분리한다: **Selection = `sel_*`**,
+  **Search > Token = `sch_*`**, **Search > Rules = `rul_*`**.
   공유하는 것은 `self._log()`(공용 로그창)뿐이다.
 
 ---
@@ -81,14 +86,89 @@ A00310_SearchTool/
 
 ---
 
-## 6. Search 탭
+## 6. Search 탭 — 하위 탭 **Token** / **Rules** (v01.02~)
 
-오브젝트 이름에 토큰이 포함된 것을 선택한다.
+둘 다 "Objects 리스트에서 조건에 맞는 것만 고른다" 는 점은 같고, **무엇으로 고르느냐**가 다르다.
+
+| 하위 탭 | 고르는 기준 |
+|---------|---------------|
+| **Token** | 오브젝트의 **이름** |
+| **Rules** | 오브젝트의 **씬에서의 상태**(연결 · 히스토리 · 디포머 등) |
+
+### 6-1. Token — 이름으로 (v01.00~, 예전 Search 탭 그대로)
 
 1. **Search Token** 에 찾을 부분 문자열을 입력한다.
 2. 씬에서 오브젝트를 선택하고 Objects 리스트의 **Get** → 대상 오브젝트를 채운다.
 3. **Search By Token**(또는 토큰 입력 후 Enter) → 이름에 토큰이 들어간 오브젝트를 선택한다.
    **Invert** 면 토큰이 **없는** 것을 선택한다.
+
+> 기존 기능은 하나도 바뀌지 않았다 — 자리만 Search 밑으로 내려갔다.
+
+### 6-2. Rules — 씬에서의 상태로 (v01.02~)
+
+1. 씬에서 오브젝트를 고르고 **Get** → Objects 리스트를 채운다.
+2. 아래 **Rules** 목록에서 규칙을 고른다. **여러 개 고르면 AND** — 고른 규칙을 **전부** 만족하는
+   것만 남는다. 고른 규칙의 설명은 목록 밑에 한 줄로 뜨고, 항목 툴팁에도 같은 글이 나온다.
+3. **Select By Rules** → 맞는 것만 씬에서 선택한다(**Invert** 면 여집합).
+
+**빠진 것은 이유가 로그에 남는다.** "12개 중 3개" 보다 "나머지 9개는 각각 이래서 제외" 가
+쓸모 있기 때문이다. 리스트가 크면 앞에서 20줄까지만 적고 나머지는 개수로 알린다.
+
+```
+Select By Rules [Standalone] : 3 of 6 object(s).
+    - dirty_hist : has history - polyCube1 (polyCube)
+    - dirty_skin : has a deformer - skinCluster1 (skinCluster)
+    - dirty_con  : driven by a constraint - dirty_con_parentConstraint1 (parentConstraint)
+```
+
+#### 규칙 목록
+
+| 규칙 | 통과 조건 |
+|------|-----------|
+| **Standalone** (v01.02~) | 연결도 히스토리도 없다 — 아무것도 이 노드를 구동하지 않고, 이 노드도 아무것도 구동하지 않는다 |
+
+> **이름에 대해** — 요청은 `Get Pure` 였다. 바꾸어 달다 하셔서 **`Standalone`** 으로 놓았다.
+> 이유는 두 가지다 — 이 툴에서 `Get` 은 **리스트를 채우는 버튼 이름**이라 규칙 이름에 들어가면
+> 같은 단어가 두 가지 뜻으로 쓰이고, `Pure` 만으로는 **무엇으로부터 순수한지**가 안 드러난다.
+> `Standalone` 은 "혼자 서 있다" 를 그대로 말한다. 그대로 `Get Pure` 를 쓰고 싶으시면
+> `select_rules.py` 맨 아래 `register(...)` 의 두 번째 인자(라벨)만 바꾸면 된다.
+
+#### Standalone 이 무엇을 보는가
+
+통과하려면 **네 가지가 전부 없어야** 한다 — 컬러 항목은 로그에 찍히는 사유 이름이다.
+
+| 검사 | 탈락 사유 | 예 |
+|------|-----------|----|
+| 컨스트레인트 | `driven by a constraint` | parent/point/orient/scale/aim… (걸린 쪽도, **드라이버 쪽도**) |
+| 디포머 | `has a deformer` | skinCluster · blendShape 등 `geometryFilter` 상속 전부 |
+| 히스토리 | `has history` | polyCube 같은 생성 노드, 애니메이션 커브 … |
+| 어트리뷰트 연결 | `connected to …` | 들어오는 것도, **나가는 것도** |
+
+**통과하는 것**(헷갈리기 쉬운 자리 — 전부 실측으로 고정했다):
+
+- **머티리얼만 배정된 메시** — 히스토리 없이 만든 폴리큐브에도 `initialShadingGroup` 은 붙어 있다.
+  이걸 연결로 치면 **어떤 메시도 통과하지 못한다.** 면 단위로 머티리얼이 여러 벌 붙은 것도 같다.
+- **디스플레이 레이어 멤버 · 평범한 오브젝트 셋 멤버** — 리깅으로 엮인 것이 아니다.
+- **그룹 밑에 부모만 있는 것** — 부모-자식은 DAG 관계지 DG 연결이 아니다. 그룹 밑에 넣었다고
+  그 노드가 무언가에 구동되는 것은 아니다.
+
+무시하는 타입 목록은 `select_rules.IGNORED_TYPES` 에 한데 모여 있다.
+
+#### ★ 규칙을 늘리는 법 — UI 는 안 고친다
+
+규칙은 `app/core/select_rules.py` 의 **레지스트리**에 모인다. UI 는 `all_rules()` 를 그대로
+그리므로, **함수 하나 + `register()` 한 줄**이면 목록에 저절로 나타난다.
+
+```python
+def _rule_my_thing(obj):
+    if 조건에 맞지 않으면:
+        return False, "왜 안 맞는지"      # 이 문장이 로그에 그대로 찍힌다
+    return True, ""
+
+register(SelectRule("my_thing", "My Thing", "한 줄 설명.", _rule_my_thing))
+```
+
+판정 함수는 `(맞는가, 안 맞는 이유)` 를 돌려준다. 이유를 함께 돌려주는 것이 이 구조의 핵심이다.
 
 ---
 

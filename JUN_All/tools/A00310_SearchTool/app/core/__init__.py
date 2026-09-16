@@ -9,6 +9,14 @@ from .search_select import (
     select_by_types,
     select_by_token,
 )
+from .select_rules import (
+    SelectRule,
+    all_rules,
+    get_rule,
+    register,
+    filter_objects,
+    select_by_rules,
+)
 
 __all__ = [
     "MayaScene",
@@ -17,4 +25,10 @@ __all__ = [
     "collect_types",
     "select_by_types",
     "select_by_token",
+    "SelectRule",
+    "all_rules",
+    "get_rule",
+    "register",
+    "filter_objects",
+    "select_by_rules",
 ]
