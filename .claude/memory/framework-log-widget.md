@@ -1,6 +1,6 @@
 ---
 name: framework-log-widget
-description: "공용 로그창 JUN_mod_log_qt_v01 (Expand/Clear/Copy) — 내부는 QTextEdit 이어야 하고(색깔 로그), 높이는 컨테이너가 아니라 내부 텍스트에 걸어야 한다"
+description: "공용 로그창 JUN_mod_log_qt_v01 (Expand/Clear/Copy) — 2026-09-16 에 PySide 툴 47곳 전부 교체 완료. 내부는 QTextEdit 이어야 하고(색깔 로그), 높이는 컨테이너가 아니라 내부 텍스트에 걸어야 한다"
 metadata: 
   node_type: memory
   type: reference
@@ -12,8 +12,9 @@ metadata:
 [[wip-a00470-materialtool]]). 읽기 전용 로그 + **작은 버튼 3개** — `Expand`(별도 창) ·
 `Clear` · `Copy`(전문 클립보드). 문서 `JUN_All/docs/Framework_MOD_log_qt.md`.
 
-**저장소 로그창은 두 계열이고 합쳐서 39곳이다** — `te_log`/`log_widget`/`txt_log`(QTextEdit) 25,
-`log_view`(QPlainTextEdit) 14. 실제로 부르는 메서드는 `append` · `appendPlainText` · `setReadOnly` ·
+**★ 2026-09-16 에 전면 교체를 마쳤다 — `tools/*/app/ui/main_window.py` 의 로그창은 이제
+47/47 전부 이 위젯이다.** 이전은 두 계열 — `te_log`/`log_widget`/`txt_log`(QTextEdit) 33,
+`log_view`(QPlainTextEdit) 13. 실제로 부르는 메서드는 `append` · `appendPlainText` · `setReadOnly` ·
 높이 3종 · `clear` · `setFont` · `setLineWrapMode` · `moveCursor` 뿐이라, 위젯이 **그 이름을 전부
 받게** 만들어 두면 교체는 **생성 두 줄**로 끝난다(나머지는 `__getattr__` 로 내부 텍스트에 위임).
 
@@ -49,6 +50,19 @@ metadata:
 **함정 하나**: `copy()` 는 `QTextEdit` 의 **선택 영역 복사**로 위임된다. 전문 복사는
 `copy_to_clipboard()`(= Copy 버튼). 빈 로그면 **클립보드를 건드리지 않는다.**
 
-`object_name` 은 **툴마다 유일하게** 준다(확장 창이 서로를 닫지 않도록).
-검증: mayapy + 오프스크린 Qt **56 + 55항목**(버튼 여백은 8개 테마 × 3버튼, 버그 재현 포함).
-마야 GUI 확인은 아직.
+**`object_name` 은 툴 폴더명을 그대로 넣는다** — `JUN_<폴더명>_log_window`. 폴더명이 이미
+유일하므로 버전 병존 4쌍(`A00060` · `A00080` · `A00110` · `A00390`, V01/V02/V03 가 동시에 뜨는
+상황)도 자동으로 갈린다. 같으면 Expand 창이 서로를 찾아 닫는다.
+`window_title` 은 `"<툴 이름> - Log"`, 버전 병존 툴만 제목에도 버전을 넣는다.
+
+**교체 대상이 아닌 텍스트 위젯이 있다** — 미리보기/리포트/편집기는 로그가 아니다:
+`constraint_preview`(A00080_V03) · `te_bd_report`(A00290) · `txt_log_history` / `txt_new_note`
+(A00210) · `editor`(A00250). **`A00200_CSV_tool` 은 보류** — 단일 파일 구조에 `QtWidgets.`
+접두사 import 스타일이라 일괄 처리에 섞지 않았다.
+
+계획서 · 결과: `JUN_All/docs/Framework_MOD_log_qt_migration_plan.md` (배치 5개로 커밋).
+검증: 위젯 자체 **56 + 55항목** + 전면 교체 후 **47툴 전수 스모크 46/47**(mayapy + 오프스크린 Qt).
+실패 1건 `A00008_base_QT_maya` 는 로그창과 무관한 **기존 결함** — 존재하지 않는
+`tools.A00001_base_maya` 를 import 한다(2026-06-02 `86a8a45` 부터). 미해결 안건.
+**마야 GUI 육안 확인은 아직** — 색깔 로그 3툴의 색 · Pin 툴과 Expand 창의 항상-위 관계 ·
+창 높이를 스스로 계산하는 툴(`A00110` · `A00220`)의 섹션 접기/펼치기 · `setFixedHeight` 13곳의 +22px.
