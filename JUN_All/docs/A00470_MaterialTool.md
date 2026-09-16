@@ -30,7 +30,7 @@ Maya 안에서 도는 **머티리얼 이름 진단** PySide 툴이다(arch B, in
      선택이 딸려 바뀌지 않도록 한 것이다(v01.03 에서 바뀐 동작).
    - 칸 경계(`Material` / `Status` / `Meshes` 헤더의 세로선)를 **드래그해 폭을 조절**할 수 있고,
      목록을 다시 채워도 그 폭은 유지된다.
-3. **`Profile`** 콤보에서 규칙을 고른다(기본 제공 `Set_v001`). 아래에 그 규칙의 패턴이 보인다.
+3. **`Profile`** 콤보에서 규칙을 고른다(기본 제공 `Basic_v001` · `Set_v001`). 아래에 그 규칙의 패턴이 보인다.
 4. **`Check Names`** — 진단해서 로그창에 리포트를 찍고, 기본값으로 **클립보드에 복사**한다.
 
 > `List Materials` 를 누르지 않고 바로 `Check Names` 를 눌러도 된다 — 리스트가 비어 있으면
@@ -95,7 +95,43 @@ MT_SYN_Sett002_Pantss
 
 ---
 
-## 3. 기본 프로파일 `Set_v001`
+## 3. 기본 제공 프로파일
+
+두 벌이 함께 들어 있다. **앞 네 자리(`MT_MANU_CH_{character}`)는 둘이 똑같고**, 그 뒤가 다르다.
+
+| 프로파일 | 패턴 | 쓰는 곳 |
+|---|---|---|
+| **`Basic_v001`** (v01.04~) | `MT_MANU_CH_{character}_{part}_{extra...}` | 캐릭터 본체 — 의상 세트가 없는 머티리얼 |
+| **`Set_v001`** | `MT_MANU_CH_{character}_{set}_{part}_{extra...}` | 의상 세트 머티리얼 |
+
+> 콤보에는 **이름순**으로 뜨므로 `Basic_v001` 이 먼저 나온다. 툴을 켜면 그것이 선택돼 있다.
+
+### 3-1. `Basic_v001` (v01.04~)
+
+```
+MT_MANU_CH_{character}_{part}_{extra...}
+```
+
+| 자리 | 규칙 | 예 |
+|------|------|-----|
+| 1 `prefix` | 고정 `MT` (대소문자까지 동일) | `MT` |
+| 2 `vendor` | 고정 `MANU` | `MANU` |
+| 3 `category` | 고정 `CH` | `CH` |
+| 4 `character` | `CHN` `DHA` `LUN` `SIN` `TBM` 중 하나 | `CHN` |
+| 5 `part` | **`Body` `Head` `Eye` `Tooth` `Hair` 중 하나** | `Head` |
+| 6~ `extra` | 아무 글자나, **몇 개든**(없어도 된다) | `Front_Long` |
+
+`Set_v001` 과 다른 것은 **`set` 자리가 없다**는 것과 **`part` 목록**뿐이다(세트 쪽은 의상 부위,
+이쪽은 신체 부위). 꼬리 숫자 규칙(아래)은 똑같이 적용된다.
+
+```
+MT_MANU_CH_CHN_Body                 OK
+MT_MANU_CH_TBM_Hair_Front_Long_A    OK   (extra 는 몇 개든)
+MT_MANU_CH_CHN_Top                  X    part 가 목록 밖 - 그건 Set_v001 의 부위다
+MT_MANU_CH_CHN_Tooht                X    -> MT_MANU_CH_CHN_Tooth 로 고치라고 제안한다
+```
+
+### 3-2. `Set_v001`
 
 ```
 MT_MANU_CH_{character}_{set}_{part}_{extra...}
@@ -116,7 +152,7 @@ MT_MANU_CH_{character}_{set}_{part}_{extra...}
 > 쪽을 더 높은 점수로 고른다. 반대로 `MT_MANU_CH_Set002_Top` 은 **`CH` 는 제자리, 캐릭터가 생략**
 > 으로 읽힌다. 두 경우 모두 테스트로 못 박아 두었다.
 
-### 꼬리 숫자 규칙
+### 3-3. 꼬리 숫자 규칙 (두 프로파일 공통)
 
 이름 **맨 끝의 숫자**가 마지막 토큰에 **붙어** 있으면 경고한다.
 
@@ -173,7 +209,8 @@ A00470_MaterialTool/
 ├─ launch.py                 # run() — 창 재생성 방지 + 테마(teal_dark)
 ├─ __dragDrop_A00470.py
 ├─ icon/A00470_MaterialTool.svg (+ .png)   # 셸프 아이콘(머티리얼 볼 + 네임 태그)
-├─ data/profiles/Set_v001.json             # 규칙 = 데이터
+├─ data/profiles/Basic_v001.json           # 규칙 = 데이터
+├─ data/profiles/Set_v001.json             #   (파일 하나 = 규칙 한 벌)
 └─ app/
    ├─ config/version.py
    ├─ core/

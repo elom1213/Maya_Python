@@ -6,6 +6,8 @@
 # 01.01  Set_v001 에 고정 토큰 `CH` 추가 : MT_MANU_CH_{character}_{set}_{part}_{extra...}
 # 01.02  로그창을 공용 위젯 `JUN_mod_log_qt_v01` 로 교체 (Expand / Clear / Copy)
 # 01.03  머티리얼 표 : 칸 폭을 드래그로 조절 + 씬 선택은 더블클릭으로(한 번 클릭은 선택만)
+# 01.04  프로파일 `Basic_v001` 추가 : MT_MANU_CH_{character}_{part}_{extra...}
+#        (part = Body / Head / Eye / Tooth / Hair). 코드 수정 없이 JSON 한 장.
 
-VERSION = "01.03"
+VERSION = "01.04"
 LAST_UPDATE = "2026-09-16"

@@ -1,0 +1,42 @@
+{
+  "name": "Basic_v001",
+  "description": "Basic character materials : MT_MANU_CH_<character>_<part>_<extra...>",
+  "separator": "_",
+  "pattern": "MT_MANU_CH_{character}_{part}_{extra...}",
+  "tokens": [
+    {
+      "role": "prefix",
+      "type": "literal",
+      "value": "MT"
+    },
+    {
+      "role": "vendor",
+      "type": "literal",
+      "value": "MANU"
+    },
+    {
+      "role": "category",
+      "type": "literal",
+      "value": "CH"
+    },
+    {
+      "role": "character",
+      "type": "enum",
+      "values": ["CHN", "DHA", "LUN", "SIN", "TBM"]
+    },
+    {
+      "role": "part",
+      "type": "enum",
+      "values": ["Body", "Head", "Eye", "Tooth", "Hair"]
+    },
+    {
+      "role": "extra",
+      "type": "any",
+      "repeat": true,
+      "optional": true
+    }
+  ],
+  "checks": {
+    "trailing_digit": true
+  }
+}
