@@ -22,6 +22,7 @@
 
 - [FBX export selected scope](fbx-export-selected-scope.md) — 내용은 `FBXExportIncludeChildren`/`InputConnections` 로 통제
 - [mayapy headless verify](mayapy-headless-verify.md) — maya.cmds 동작은 mayapy + standalone 으로 확인
+- [offscreen size needs theme](offscreen-size-needs-theme.md) — 창 크기는 테마 qss 를 입히고 재라 (한 줄에 나란히 둔 것이 최소 폭)
 - [QApplication before standalone](qapplication-before-maya-standalone.md) — `QApplication` 을 `initialize()` 앞에
 - [undo_chunk by default](undo-chunk-by-default.md) — 반복 씬 변경은 `undo_chunk()` 로
 - [Maya 2023 compat](maya-2023-compat.md) — sin/cos 노드 없음(eulerToQuat 우회)

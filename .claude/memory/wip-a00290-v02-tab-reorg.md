@@ -1,6 +1,6 @@
 ---
 name: wip-a00290-v02-tab-reorg
-description: "A00290_BSTool_V02 — V01 을 복제해 탭을 Shape/Target/Node 3카테고리 x 7기능 2단으로 재편(v02.00). Edit BS > Default 는 Node > Extract 가 됐고, 창 기본 크기는 스크롤이 안 뜨는 1400x1158"
+description: "A00290_BSTool_V02 — V01 을 복제해 탭을 Shape/Target/Node 3카테고리 x 7기능 2단으로 재편(v02.00). Edit BS > Default 는 Node > Extract, 창은 620x1000 (가로 스크롤 없음)"
 metadata:
   node_type: memory
   type: project
@@ -38,11 +38,14 @@ V02 에서는 이 표로 옮겨 읽는다.
    반대로 영영 안 돈다. **둘 다 에러가 안 난다.** → 위젯 동일성(`_shape_editor_visible()`)으로
    판단하고 **상위·하위 두 탭 위젯의 시그널을 모두** 받는다(하위만 바뀌는 전환은 상위 시그널이
    안 온다). [[prefer-subtabs-over-stacked-collapsibles]] 작업에서 반복되는 함정이다.
-2. **스크롤이 안 뜨는 창 크기는 폭만으로 못 만든다.** 폭을 넓히면 `Shape Editor` 가 필요로 하는
-   세로가 959 → **839px 에서 바닥을 친다**(1400 을 넘겨도 안 줄어든다). 그래서 세로도 키워
-   **1400 x 1158** 이 되었고, 폭을 1500·1700 으로 해도 필요한 세로는 1144 밑으로 안 내려간다.
-   ※ **1158 은 1080p 모니터에 안 들어간다** — 그때는 `Shape Editor` · `Naming` 에 세로 스크롤이
-   생긴다(페이지를 `QScrollArea` 에 담아 둔 이유). 줄이려면 `win_width`/`win_height` 두 줄만.
+2. **창 폭을 좁히려면 "한 줄에 나란히 둔 것" 을 찾아 내려야 한다.** 버튼·라디오·라벨을 가로로
+   늘어놓으면 **그 줄의 최소 폭이 그대로 창의 최소 폭**이 되고, **좌우 스플리터 안에 있으면 두 배**로
+   올라온다. 자리만 내려(기능·라벨 그대로) `Mix Targets` 1092 → **573px**, `Naming` 792 → **498px**.
+   최종 창은 **620 x 1000** 이고 **가로 스크롤이 전혀 없다**(처음엔 1400 x 1158 로 잡았다 — 그건
+   테마 없이 잰 값이라 과했다, [[offscreen-size-needs-theme]]).
+   ※ **세로는 반대로 움직인다** — 좁히면 글이 접혀 필요한 세로가 **늘어난다**(Shape Editor 918 ·
+   Naming 894 · Mix Targets 756). 세로까지 없애려면 약 1195px 인데 1080p 화면에 안 들어가므로,
+   화면에 들어가는 높이를 택하고 그 세 페이지는 세로 스크롤이 받게 뒀다(`QScrollArea` 를 쓴 이유).
    덤으로 V01 의 `win_width = 660` 이 **실현되지 않는 값**이었음이 드러났다(실제 최소 1118x925,
    `Mix Targets` 의 최소 폭 1092px 이 혼자 정하고 있었다).
 
@@ -50,6 +53,6 @@ V02 에서는 이 표로 옮겨 읽는다.
 갈렸다(같으면 Expand 창이 서로를 찾아 닫는다 — [[framework-log-widget]]).
 셸프 라벨 `BSToolV2`, 드롭 파일 `__dragDrop_A00290_V02.py`.
 
-검증 24항목(mayapy + 오프스크린 Qt) 통과. **마야 GUI 육안 확인은 아직.**
+검증 25항목(mayapy + 오프스크린 Qt, 테마 적용) 통과. **마야 GUI 육안 확인은 아직.**
 관련: [[wip-a00290-shape-editor-tab]], [[wip-a00290-naming-tab]], [[wip-a00290-target-order-tab]],
 [[wip-a00290-mix-targets-tab]], [[wip-a00290-bake-delete-tab]]
