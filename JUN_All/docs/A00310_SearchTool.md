@@ -2,20 +2,29 @@
 
 ## 1. 개요
 
-씬에서 **오브젝트를 타입 / 이름 / 상태로 골라 선택**하는 PySide(Qt) 툴이다. 레거시 maya.cmds 단일 파일
-툴 두 개(`JUN_PY_SelectionTool_V02_01`, `JUN_PY_SearchTool_V01_02`)를 `A00170_driverTool` 과 같은
-**하나의 창 + 탭** 구조로 통합했다. **상위 탭 두 개**와 **공유 로그창**으로 구성된다.
+이 툴이 하는 일은 하나다 — **Objects 리스트에서 조건에 맞는 것만 골라 선택한다.**
+다른 것은 **무엇으로 고르는가** 뿐이고, 그 기준이 탭이다.
 
-1. **Selection** — 선택(또는 그 계층)에서 오브젝트/노드 타입을 리스트업하고, **타입별로** 선택한다.
-   (구 `JUN_PY_SelectionTool`)
-2. **Search** — 하위 탭 두 개 (v01.02~)
-   - **Token** — 오브젝트 이름에 **토큰(부분 문자열)** 이 들어간 것을 선택한다. (구 `JUN_PY_SearchTool`)
-   - **Rules** — 리스트업된 오브젝트 중 **규칙에 맞는 것**만 선택한다. 규칙은 늘어나는 것을 전제로
-     레지스트리에 모아 두었고, **규칙을 더해도 UI 코드는 건드리지 않는다**(6-2 참고).
+| 탭 | 고르는 기준 | 출신 |
+|----|-------------|------|
+| **Type** | 노드 **타입** | 구 `JUN_PY_SelectionTool_V02_01` |
+| **Token** | 오브젝트 **이름**(부분 문자열) | 구 `JUN_PY_SearchTool_V01_02` |
+| **Rules** | 씬에서의 **상태** — 연결 · 히스토리 · 디포머 (v01.02~) | 신규 |
 
-- 모든 UI 문자열/로그는 영어. 두 탭의 리스트는 공용 위젯 `JUN_mod_tsl_qt_v01` 을 쓰며
+**대상 목록은 셋이 공유한다** — 창 위쪽의 **Source · Objects · Get · Invert** 는 탭 바깥에 있어,
+한 번 `Get` 하면 어느 탭으로 옮겨도 같은 목록을 본다(4장).
+
+**규칙(Rules)은 늘어나는 것을 전제로** 레지스트리에 모아 두었다. 규칙을 더하는 일은
+**함수 하나 + 등록 한 줄**이고 **UI 코드는 건드리지 않는다**(7장).
+
+- 모든 UI 문자열/로그는 영어. 리스트는 공용 위젯 `JUN_mod_tsl_qt_v01` 을 쓰며
   **Select 계열 + Add / Del / Up / Down / Sort** 버튼을 갖는다.
-- 로직(선택/검색)은 `app/core`(maya.cmds), 화면은 `app/ui`(PySide)로 분리한다.
+- 로직(선택/검색/규칙)은 `app/core`(maya.cmds), 화면은 `app/ui`(PySide)로 분리한다.
+
+> **v01.03 에서 탭 구조가 바뀌었다.** 그전에는 상위 탭이 `Selection` / `Search` 였고 `Search` 만
+> 하위 탭(`Token`/`Rules`)을 가졌다. `Selection` 도 결국 같은 일(리스트에서 조건에 맞는 것 고르기)이라
+> **셋을 같은 층으로** 올렸고, 그러면 상위 탭이 하나만 남아 중첩이 의미가 없어지므로 중첩을 걷어냈다.
+> **기능은 하나도 빠지지 않았다** — `Selection` 탭의 내용이 그대로 `Type` 탭이다.
 
 ---
 
@@ -33,14 +42,14 @@ A00310_SearchTool/
     │   ├── maya_scene.py      # 선택/계층 펼치기/노드 타입/존재 (cmds 어댑터)
     │   ├── search_select.py   # collect_from_selection / collect_types /
     │   │                      #   select_by_types / select_by_token (+ CONSTRAINT_TYPES)
-    │   ├── select_rules.py    # ★ 규칙 레지스트리 (Search > Rules, v01.02~)
+    │   ├── select_rules.py    # ★ 규칙 레지스트리 (Rules 탭, v01.02~)
     │   └── __init__.py        # core 재노출
-    └── ui/main_window.py  # 전체 UI (상위 탭 2 + Search 하위 탭 2 + 공유 로그창 + 메뉴 바)
+    └── ui/main_window.py  # 전체 UI (공유 영역 + 탭 3 + 공유 로그창 + 메뉴 바)
 ```
 
-- `main_window.py` 의 위젯/핸들러는 탭별 접두사로 분리한다: **Selection = `sel_*`**,
-  **Search > Token = `sch_*`**, **Search > Rules = `rul_*`**.
-  공유하는 것은 `self._log()`(공용 로그창)뿐이다.
+- `main_window.py` 에서 **공유하는 것**(세 탭이 함께 쓰는 것)은 접두사 없이 둔다 —
+  `objs_tsl` · `rb_hierarchy` / `rb_selected` · `cb_invert` · `_log()`.
+  탭 전용 위젯만 탭 이름을 붙인다 — `type_types_tsl` · `token_le` · `rules_list`.
 
 ---
 
@@ -57,58 +66,59 @@ A00310_SearchTool/
 
 ---
 
-## 4. 공통 옵션
+## 4. 공통 영역 — 세 탭이 함께 쓴다 (v01.03~)
 
-두 탭 모두 상단에 **Source** 옵션과 **Invert** 체크박스가 있다.
+창 위쪽의 **Source · Objects 리스트 · Get · Invert** 는 **탭 바깥**에 있고 세 탭이 함께 쓴다.
+**한 번 `Get` 하면 Type / Token / Rules 어디로 옮겨도 같은 목록**을 대상으로 삼는다.
 
-- **Source — Hierarchy / Selected**: `Get`/`List Types` 가 무엇을 대상으로 할지 정한다.
+- **Source — Hierarchy / Selected**: `Get` 이 무엇을 대상으로 할지 정한다.
   - **Hierarchy**(기본): 선택한 오브젝트 각각의 **자손 transform 까지 펼쳐서** 대상으로 삼는다(shape 제외).
   - **Selected**: 현재 선택만 그대로 대상으로 삼는다.
+- **Get**: 위 기준대로 Objects 리스트를 채운다.
 - **Invert**: 선택 결과를 **여집합**으로 뒤집는다. 즉 Objects 리스트에서 조건에 **맞지 않는** 것을 선택한다.
+  세 탭의 모든 선택 버튼에 함께 걸린다.
 
-> 각 리스트(TSL)의 버튼: **Get/List Types**(채우기) · **Add**(현재 선택 추가) · **Del** · **Up** · **Down** ·
+> Objects 리스트(TSL)의 버튼: **Get**(채우기) · **Add**(현재 선택 추가) · **Del** · **Up** · **Down** ·
 > **Sort**(이름 정렬). 리스트 항목을 클릭하면 그 오브젝트가 씬에서 선택된다.
+
+> **v01.02 까지는 탭마다 Objects 리스트·Get·Source·Invert 를 따로 갖고 있었다.** Token 에서 Get 해 놓고
+> Rules 로 넘어가면 리스트가 비어 있어서 다시 모아야 했다. 같은 대상을 다른 기준으로 고르는 것이 이 툴의
+> 전부인데 대상을 탭마다 다시 모으는 것은 앞뒤가 맞지 않아 v01.03 에서 하나로 합쳤다.
 
 ---
 
-## 5. Selection 탭
+## 5. Type 탭 — 노드 타입으로 (구 Selection 탭)
 
-선택(또는 계층)에서 오브젝트와 노드 타입을 리스트업하고, 타입별로 선택한다.
+Objects 리스트에 있는 것들의 **노드 타입**으로 고른다.
 
-1. 씬에서 오브젝트를 선택하고 Objects 리스트의 **Get** → 대상 오브젝트를 채운다.
-2. (선택) Types 리스트의 **List Types** → 대상의 **노드 타입**(shape 가 있으면 shape 타입, 없으면
-   transform 타입)을 정렬·중복제거해 채운다.
+1. 위에서 **Get** → Objects 리스트를 채운다.
+2. (선택) Types 리스트의 **List Types** → Objects 리스트에 있는 오브젝트들의 **노드 타입**(shape 가
+   있으면 shape 타입, 없으면 transform 타입)을 정렬·중복제거해 채운다.
 3. 원하는 방식으로 선택:
    - **Select By Shape**: 고정 버튼 — **Mesh / nurbsCurve / Joint / Constraint**. Objects 리스트 중 그
      타입인 것을 선택한다. (Constraint 는 `aim/orient/point/scale/parentConstraint` 5종을 모두 매칭)
    - **Select By Type (use selected types)**: Types 리스트에서 **선택한 타입들**과 일치하는 Objects 를 선택한다.
-4. 선택 결과는 씬에 반영되고 Objects 리스트에서도 하이라이트된다. **Invert** 면 여집합을 선택한다.
+
+> **`List Types` 는 v01.03 부터 씬 선택이 아니라 Objects 리스트를 본다.** 다른 버튼들과 같은 대상을
+> 보게 해서, 화면에 보이는 목록과 타입 목록이 어긋나지 않도록 한 것이다. 먼저 **Get** 을 눌러야 한다.
 
 ---
 
-## 6. Search 탭 — 하위 탭 **Token** / **Rules** (v01.02~)
-
-둘 다 "Objects 리스트에서 조건에 맞는 것만 고른다" 는 점은 같고, **무엇으로 고르느냐**가 다르다.
-
-| 하위 탭 | 고르는 기준 |
-|---------|---------------|
-| **Token** | 오브젝트의 **이름** |
-| **Rules** | 오브젝트의 **씬에서의 상태**(연결 · 히스토리 · 디포머 등) |
-
-### 6-1. Token — 이름으로 (v01.00~, 예전 Search 탭 그대로)
+## 6. Token 탭 — 이름으로
 
 1. **Search Token** 에 찾을 부분 문자열을 입력한다.
-2. 씬에서 오브젝트를 선택하고 Objects 리스트의 **Get** → 대상 오브젝트를 채운다.
-3. **Search By Token**(또는 토큰 입력 후 Enter) → 이름에 토큰이 들어간 오브젝트를 선택한다.
+2. **Search By Token**(또는 토큰 입력 후 Enter) → Objects 리스트 중 이름에 토큰이 들어간 것을 선택한다.
    **Invert** 면 토큰이 **없는** 것을 선택한다.
 
-> 기존 기능은 하나도 바뀌지 않았다 — 자리만 Search 밑으로 내려갔다.
+---
 
-### 6-2. Rules — 씬에서의 상태로 (v01.02~)
+## 7. Rules 탭 — 씬에서의 상태로 (v01.02~)
 
-1. 씬에서 오브젝트를 고르고 **Get** → Objects 리스트를 채운다.
-2. 아래 **Rules** 목록에서 규칙을 고른다. **여러 개 고르면 AND** — 고른 규칙을 **전부** 만족하는
-   것만 남는다. 고른 규칙의 설명은 목록 밑에 한 줄로 뜨고, 항목 툴팁에도 같은 글이 나온다.
+연결 · 히스토리 · 디포머처럼 **이름이 아니라 씬에서 어떤 상태인지**로 고른다.
+
+1. 위에서 **Get** → Objects 리스트를 채운다.
+2. **Rules** 목록에서 규칙을 고른다. **여러 개 고르면 AND** — 고른 규칙을 **전부** 만족하는 것만 남는다.
+   고른 규칙의 설명은 목록 밑에 한 줄로 뜨고, 항목 툴팁에도 같은 글이 나온다.
 3. **Select By Rules** → 맞는 것만 씬에서 선택한다(**Invert** 면 여집합).
 
 **빠진 것은 이유가 로그에 남는다.** "12개 중 3개" 보다 "나머지 9개는 각각 이래서 제외" 가
@@ -121,7 +131,7 @@ Select By Rules [Standalone] : 3 of 6 object(s).
     - dirty_con  : driven by a constraint - dirty_con_parentConstraint1 (parentConstraint)
 ```
 
-#### 규칙 목록
+### 규칙 목록
 
 | 규칙 | 통과 조건 |
 |------|-----------|
@@ -133,9 +143,9 @@ Select By Rules [Standalone] : 3 of 6 object(s).
 > `Standalone` 은 "혼자 서 있다" 를 그대로 말한다. 그대로 `Get Pure` 를 쓰고 싶으시면
 > `select_rules.py` 맨 아래 `register(...)` 의 두 번째 인자(라벨)만 바꾸면 된다.
 
-#### Standalone 이 무엇을 보는가
+### Standalone 이 무엇을 보는가
 
-통과하려면 **네 가지가 전부 없어야** 한다 — 컬러 항목은 로그에 찍히는 사유 이름이다.
+통과하려면 **네 가지가 전부 없어야** 한다 — 오른쪽은 로그에 찍히는 사유 이름이다.
 
 | 검사 | 탈락 사유 | 예 |
 |------|-----------|----|
@@ -154,7 +164,7 @@ Select By Rules [Standalone] : 3 of 6 object(s).
 
 무시하는 타입 목록은 `select_rules.IGNORED_TYPES` 에 한데 모여 있다.
 
-#### ★ 규칙을 늘리는 법 — UI 는 안 고친다
+### ★ 규칙을 늘리는 법 — UI 는 안 고친다
 
 규칙은 `app/core/select_rules.py` 의 **레지스트리**에 모인다. UI 는 `all_rules()` 를 그대로
 그리므로, **함수 하나 + `register()` 한 줄**이면 목록에 저절로 나타난다.
@@ -172,7 +182,7 @@ register(SelectRule("my_thing", "My Thing", "한 줄 설명.", _rule_my_thing))
 
 ---
 
-## 7. 로그 / About
+## 8. 로그 / About
 
 - 두 탭의 모든 결과·경고(`[WARN]`)는 창 하단의 **공유 로그창**에 누적된다.
 - **Help > About** 에 두 탭의 기능 설명이 표기된다.

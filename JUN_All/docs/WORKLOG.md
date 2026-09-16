@@ -31,6 +31,29 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-16 (오늘)
 
+> [!summary] `A00310_SearchTool` — **탭을 Type / Token / Rules 세 개로 평탄화**하고 **Objects 리스트를 셋이 공유**하도록 (v01.02 -> 01.03)
+- **제안과 결정**: "Selection 도 Search 의 하위 탭 Type 으로 옮기는 것 어때?" 라는 물음에서 시작했다.
+  묶는 것은 맞다 — 셋 다 **"Objects 리스트에서 조건에 맞는 것만 고른다"** 이고 다른 건 *무엇으로*
+  고르느냐(**타입 / 이름 / 상태**)뿐이다. 다만 그대로 옮기면 **상위 탭이 `Search` 하나만 남아**
+  탭 하나짜리 QTabWidget 이 된다. 그래서 **중첩을 걷어내고 셋을 최상위로** 올렸다(사용자 확인).
+- **★ Objects 리스트·Get·Source·Invert 를 탭 바깥으로 빼 공유한다.** 전에는 탭마다 따로라
+  Token 에서 Get 해 놓고 Rules 로 넘어가면 **리스트가 비어 있었다.** 같은 대상을 다른 기준으로
+  고르는 것이 이 툴의 전부인데 대상을 탭마다 다시 모으는 것은 앞뒤가 맞지 않는다. 이제 **한 번 Get
+  하면 어느 탭에서나** 쓰고, Invert 도 한 곳에서 켜면 세 탭에 다 걸린다.
+- **기능은 하나도 빠지지 않았다** — 옛 Selection 탭의 내용(Types 리스트 · List Types ·
+  Select By Shape 4버튼 · Select By Type)이 그대로 Type 탭이다.
+- **`List Types` 는 이제 씬 선택이 아니라 Objects 리스트를 본다.** 다른 버튼들과 같은 대상을 보게 해
+  화면의 목록과 타입 목록이 어긋나지 않도록 했다(그래서 먼저 Get 을 눌러야 한다).
+- 이름 정리 — 공유하는 것은 접두사 없이(`objs_tsl` · `rb_hierarchy`/`rb_selected` · `cb_invert`),
+  탭 전용만 탭 이름을 붙인다(`type_types_tsl` · `token_le` · `rules_list`). 옛 `sel_*`/`sch_*`/`rul_*`
+  접두사는 사라졌다.
+- **검증(mayapy + 오프스크린 Qt) 16항목 전부 통과** — 최상위 탭이 Type/Token/Rules 이고 중첩이 없는지 ·
+  Objects/Source/Invert 가 하나로 합쳐졌는지 · **Get 한 번 뒤 세 탭이 다시 Get 없이 동작하는지**
+  (Type 의 List Types/Select By Shape/Select By Type · Token 검색 · Rules 선택) ·
+  **Invert 가 세 탭에 함께 걸리는지** · 탈락 사유 로그 · `register()` 한 줄로 새 규칙이 UI 에 나타나는지 ·
+  규칙 2개 AND. 파일: `tools/A00310_SearchTool/app/ui/main_window.py` · `app/config/version.py` ·
+  `docs/A00310_SearchTool.md` `#A00310`
+
 > [!summary] `A00310_SearchTool` — **Search 를 하위 탭 Token / Rules 로 나누고**, 리스트업된 오브젝트 중 **규칙에 맞는 것만 고르는 Rules 탭** 신규 (v01.01 -> 01.02)
 - **요청**: 기존 Search 기능은 **Token** 하위 탭으로 내리고, **Rules** 하위 탭을 새로 만든다.
   Rules 는 TSL 에 리스트업된 오브젝트 중 **정해 둔 규칙에 맞는 것만** 선택한다. 첫 규칙은

@@ -1,20 +1,27 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-26
+# last Update date : 2026-09-16
 # A00310_SearchTool - Qt UI
 #
-# 레거시 maya.cmds 툴 두 개를 하나의 창 + QTabWidget 으로 통합한다.
-#   - Selection 탭 : JUN_PY_SelectionTool_V02_01 이식 (타입/오브젝트 리스트업 + 타입별 선택)
-#   - Search    탭 : 하위 탭 2개
-#       · Token : JUN_PY_SearchTool_V01_02 이식 (이름 토큰으로 검색 선택)
-#       · Rules : 리스트업된 오브젝트 중 **규칙에 맞는 것**만 선택 (v01.02~).
-#                 규칙은 app/core/select_rules.py 의 레지스트리에 모여 있고,
-#                 UI 는 all_rules() 를 그대로 그리므로 **규칙을 더해도 UI 를 안 고친다.**
-# 두 탭의 위젯/핸들러는 접두사(sel_ / sch_)로 분리하고, 로그/메뉴/푸터는 공유한다.
+# 이 툴이 하는 일은 하나다 - **Objects 리스트에서 조건에 맞는 것만 골라 선택한다.**
+# 다른 것은 "무엇으로 고르는가" 뿐이라, 그 기준을 탭으로 나눈다.
+#
+#   Type  : 노드 **타입**으로     (구 JUN_PY_SelectionTool_V02_01)
+#   Token : 오브젝트 **이름**으로 (구 JUN_PY_SearchTool_V01_02)
+#   Rules : 씬에서의 **상태**로   (연결 · 히스토리 · 디포머 …, v01.02~)
+#
+# ★ v01.03 에서 구조를 바꿨다.
+#   - 예전에는 상위 탭 Selection / Search 에 Search 만 하위 탭(Token/Rules)을 갖고 있었다.
+#     Selection 도 결국 같은 일(리스트에서 조건에 맞는 것 고르기)이라 **셋을 같은 층으로**
+#     올렸다. 그러면 상위 탭이 하나만 남아 중첩이 의미가 없어지므로 **중첩을 걷어냈다.**
+#   - **Objects 리스트 · Get · Source · Invert 는 셋이 공유한다.** 탭마다 따로 두면 Token 에서
+#     Get 해 놓고 Rules 로 넘어갔을 때 리스트가 비어 있다 - 같은 대상을 다른 기준으로 고르는
+#     것이 이 툴의 전부인데 대상을 탭마다 다시 모으는 것은 앞뒤가 안 맞는다.
+#
 # 리스트 UI 는 공용 위젯 JUN_mod_tsl_qt_v01(Select/Add/Del/Up/Down/Sort), 로직은 app/core.
+# 규칙은 app/core/select_rules.py 의 레지스트리에 모이고 UI 는 all_rules() 를 그대로 그리므로
+# **규칙을 더해도 이 파일은 안 고친다.**
 # 모든 UI 문자열/로그는 영어.
-
-import maya.cmds as cmds
 
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
@@ -23,7 +30,6 @@ from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from tools.A00310_SearchTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00310_SearchTool.app.core import (
-    MayaScene,
     CONSTRAINT_TYPES,
     collect_from_selection,
     collect_types,
@@ -40,6 +46,9 @@ WINDOW_OBJECT_NAME = "JUN_A00310_SearchTool_window"
 
 
 class MainWindow(QWidget):
+
+    # 규칙 탈락 사유를 로그에 몇 줄까지 적을지. 전부 적으면 큰 리스트에서 로그가 묻힌다.
+    REJECT_LOG_LIMIT = 20
 
     def __init__(self):
         super().__init__(maya_main_window())
@@ -72,11 +81,21 @@ class MainWindow(QWidget):
             object_name="JUN_A00310_SearchTool_log_window")
         self.log_view.setFixedHeight(110)
 
-        # 탭: Selection / Search
+        # ---- 공유 영역 : 세 탭이 모두 이 리스트를 대상으로 삼는다
+        main_layout.addLayout(self._build_option_row())
+        main_layout.addWidget(self._build_objects_list(), stretch=1)
+
+        # ---- 기준별 탭
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._build_selection_tab(), "Selection")
-        self.tabs.addTab(self._build_search_tab(), "Search")
-        main_layout.addWidget(self.tabs)
+        self.tabs.addTab(self._build_type_tab(), "Type")
+        self.tabs.setTabToolTip(0, "Pick by node type.")
+        self.tabs.addTab(self._build_token_tab(), "Token")
+        self.tabs.setTabToolTip(1, "Pick by name - objects whose name contains "
+                                   "the token.")
+        self.tabs.addTab(self._build_rules_tab(), "Rules")
+        self.tabs.setTabToolTip(2, "Pick by state in the scene - connections, "
+                                   "history, deformers.")
+        main_layout.addWidget(self.tabs, stretch=1)
 
         # 로그창
         log_group = QGroupBox("Log")
@@ -89,67 +108,75 @@ class MainWindow(QWidget):
         footer.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(footer)
 
-    def _build_option_row(self, prefix):
-        """Hierarchy/Selected 라디오 + Invert 체크박스 한 줄. (radio, invert) 를 반환."""
+    # ---- 공유 : 옵션 행 + Objects 리스트
+
+    def _build_option_row(self):
+        """Hierarchy/Selected 라디오 + Invert 체크박스 한 줄 (세 탭 공용)."""
         row = QHBoxLayout()
         row.addWidget(QLabel("Source"))
 
-        rb_hierarchy = QRadioButton("Hierarchy")
-        rb_selected = QRadioButton("Selected")
-        rb_hierarchy.setChecked(True)
-        rb_hierarchy.setToolTip(
+        self.rb_hierarchy = QRadioButton("Hierarchy")
+        self.rb_selected = QRadioButton("Selected")
+        self.rb_hierarchy.setChecked(True)
+        self.rb_hierarchy.setToolTip(
             "Hierarchy: expand each selected object to its descendant "
             "transforms. Selected: use the raw selection only.")
+        # ★ 두 라디오를 다 보관한다 - 배타적 라디오는 `setChecked(False)` 가 **무시되므로**
+        #   모드를 코드로 바꾸려면 켜려는 쪽을 직접 켜야 한다.
         group = QButtonGroup(self)
-        group.addButton(rb_hierarchy)
-        group.addButton(rb_selected)
-        row.addWidget(rb_hierarchy)
-        row.addWidget(rb_selected)
+        group.addButton(self.rb_hierarchy)
+        group.addButton(self.rb_selected)
+        row.addWidget(self.rb_hierarchy)
+        row.addWidget(self.rb_selected)
 
         row.addStretch(1)
 
-        cb_invert = QCheckBox("Invert")
-        cb_invert.setToolTip(
+        self.cb_invert = QCheckBox("Invert")
+        self.cb_invert.setToolTip(
             "Select the complement: everything in the Objects list that does "
             "NOT match.")
-        row.addWidget(cb_invert)
-
-        # 핸들러에서 참조하도록 보관.
-        # ★ `rb_selected` 도 보관한다 - 배타적 라디오는 `setChecked(False)` 가 **무시되므로**
-        #   모드를 코드로 바꾸려면 켜려는 쪽을 직접 켜야 한다(끄는 쪽으로는 못 바꾼다).
-        setattr(self, prefix + "_rb_hierarchy", rb_hierarchy)
-        setattr(self, prefix + "_rb_selected", rb_selected)
-        setattr(self, prefix + "_cb_invert", cb_invert)
+        row.addWidget(self.cb_invert)
         return row
 
+    def _build_objects_list(self):
+        """세 탭이 함께 쓰는 Objects 리스트. 한 번 Get 하면 어느 탭에서나 쓴다."""
+        self.objs_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", show_select=False, log_callback=self._log)
+        self.objs_tsl.add_button("Get", self.on_get_objects, index=0)
+        return self.objs_tsl
+
+    def _objects_or_warn(self):
+        objects = self.objs_tsl.get_all_items()
+        if not objects:
+            self._log("[WARN] Objects list is empty. Use Get first.")
+        return objects
+
+    def on_get_objects(self):
+        """선택/계층의 오브젝트로 공유 Objects 리스트를 채운다."""
+        hierarchy = self.rb_hierarchy.isChecked()
+        objects = collect_from_selection(hierarchy)
+        if not objects:
+            self._log("[WARN] Nothing selected.")
+            return
+        self.objs_tsl.set_items(objects)
+        self._log("Got {0} object(s) ({1}).".format(
+            len(objects), "hierarchy" if hierarchy else "selected"))
+
     # ================================================================
-    # Tab : Selection  (JUN_PY_SelectionTool_V02_01 이식)
+    # Tab : Type  (구 Selection 탭, JUN_PY_SelectionTool_V02_01 이식)
     # ================================================================
 
-    def _build_selection_tab(self):
+    def _build_type_tab(self):
         tab = QWidget()
         root = QVBoxLayout(tab)
 
-        # 옵션 (Hierarchy/Selected + Invert)
-        root.addLayout(self._build_option_row("sel"))
-
-        # Types | Objects (좌우)
-        self.sel_types_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+        # Types 리스트 - 이 탭에서만 쓰므로 탭 안에 둔다.
+        self.type_types_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Types", show_select=False, show_add=False,
             log_callback=self._log)
-        # 'List Types' : 선택/계층에서 노드 타입을 모아 채운다(편집 행 맨 앞).
-        self.sel_types_tsl.add_button(
-            "List Types", self.on_sel_list_types, index=0)
-
-        self.sel_objs_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Objects", show_select=False, log_callback=self._log)
-        # 'Get' : 선택/계층의 오브젝트로 리스트를 채운다(편집 행 맨 앞).
-        self.sel_objs_tsl.add_button("Get", self.on_sel_get_objects, index=0)
-
-        list_row = QHBoxLayout()
-        list_row.addWidget(self.sel_types_tsl)
-        list_row.addWidget(self.sel_objs_tsl)
-        root.addLayout(list_row, stretch=1)
+        self.type_types_tsl.add_button(
+            "List Types", self.on_list_types, index=0)
+        root.addWidget(self.type_types_tsl, stretch=1)
 
         # Select By Shape (고정 타입 버튼)
         shape_box = QGroupBox("Select By Shape (from the Objects list)")
@@ -159,17 +186,17 @@ class MainWindow(QWidget):
                                  ("nurbsCurve", "nurbsCurve")):
             btn = QPushButton(label)
             btn.clicked.connect(
-                lambda _checked=False, t=type_name: self.on_sel_by_shape(t))
+                lambda _checked=False, t=type_name: self.on_select_by_shape(t))
             r1.addWidget(btn)
         shape_layout.addLayout(r1)
         r2 = QHBoxLayout()
         btn_joint = QPushButton("Joint")
         btn_joint.clicked.connect(
-            lambda _checked=False: self.on_sel_by_shape("joint"))
+            lambda _checked=False: self.on_select_by_shape("joint"))
         r2.addWidget(btn_joint)
         btn_con = QPushButton("Constraint")
         btn_con.clicked.connect(
-            lambda _checked=False: self.on_sel_by_shape(CONSTRAINT_TYPES))
+            lambda _checked=False: self.on_select_by_shape(CONSTRAINT_TYPES))
         r2.addWidget(btn_con)
         shape_layout.addLayout(r2)
         root.addWidget(shape_box)
@@ -180,124 +207,100 @@ class MainWindow(QWidget):
         btn_by_type.setToolTip(
             "Select objects whose node type is among the types you have "
             "selected in the Types list.")
-        btn_by_type.clicked.connect(self.on_sel_by_type)
+        btn_by_type.clicked.connect(self.on_select_by_type)
         root.addWidget(btn_by_type)
 
         return tab
 
-    def _selection_objects_or_warn(self, tsl):
-        objects = tsl.get_all_items()
-        if not objects:
-            self._log("[WARN] Objects list is empty. Use Get first.")
-        return objects
+    def on_list_types(self):
+        """Objects 리스트에 있는 오브젝트들의 노드 타입을 모아 Types 에 채운다.
 
-    def on_sel_get_objects(self):
-        """선택/계층의 오브젝트로 Objects 리스트를 채운다."""
-        hierarchy = self.sel_rb_hierarchy.isChecked()
-        objects = collect_from_selection(hierarchy)
+        v01.02 까지는 씬 선택에서 직접 모았다. Objects 리스트가 공유가 된 v01.03 부터는
+        **다른 버튼들과 같은 대상**(= Objects 리스트)을 본다 - 화면에 보이는 목록과 타입
+        목록이 어긋나지 않는다.
+        """
+        objects = self._objects_or_warn()
         if not objects:
-            self._log("[WARN] Nothing selected.")
-            return
-        self.sel_objs_tsl.set_items(objects)
-        self._log("Got {0} object(s) ({1}).".format(
-            len(objects), "hierarchy" if hierarchy else "selected"))
-
-    def on_sel_list_types(self):
-        """선택/계층의 노드 타입을 모아 Types 리스트에 채운다."""
-        hierarchy = self.sel_rb_hierarchy.isChecked()
-        objects = collect_from_selection(hierarchy)
-        if not objects:
-            self._log("[WARN] Nothing selected.")
             return
         types = collect_types(objects)
-        self.sel_types_tsl.set_items(types)
-        self._log("Listed {0} node type(s).".format(len(types)))
+        self.type_types_tsl.set_items(types)
+        self._log("Listed {0} node type(s) from {1} object(s).".format(
+            len(types), len(objects)))
 
-    def on_sel_by_shape(self, type_names):
+    def on_select_by_shape(self, type_names):
         """Objects 리스트 중 주어진 타입(들)인 것을 선택한다."""
-        objects = self._selection_objects_or_warn(self.sel_objs_tsl)
+        objects = self._objects_or_warn()
         if not objects:
             return
-        invert = self.sel_cb_invert.isChecked()
+        invert = self.cb_invert.isChecked()
         selected = select_by_types(objects, type_names, invert)
-        self.sel_objs_tsl.select_by_texts(selected)
+        self.objs_tsl.select_by_texts(selected)
         label = type_names if isinstance(type_names, str) else "constraint"
         self._log("Select By Shape '{0}'{1} : {2} object(s).".format(
             label, " (inverted)" if invert else "", len(selected)))
 
-    def on_sel_by_type(self):
+    def on_select_by_type(self):
         """Types 리스트에서 선택된 타입들에 매칭되는 Objects 를 선택한다."""
-        types = self.sel_types_tsl.selected_items()
+        types = self.type_types_tsl.selected_items()
         if not types:
             self._log("[WARN] Select one or more types in the Types list.")
             return
-        objects = self._selection_objects_or_warn(self.sel_objs_tsl)
+        objects = self._objects_or_warn()
         if not objects:
             return
-        invert = self.sel_cb_invert.isChecked()
+        invert = self.cb_invert.isChecked()
         selected = select_by_types(objects, types, invert)
-        self.sel_objs_tsl.select_by_texts(selected)
+        self.objs_tsl.select_by_texts(selected)
         self._log("Select By Type {0}{1} : {2} object(s).".format(
             types, " (inverted)" if invert else "", len(selected)))
 
     # ================================================================
-    # Tab : Search  -  하위 탭 Token / Rules (v01.02~)
+    # Tab : Token  (JUN_PY_SearchTool_V01_02 이식)
     # ================================================================
-    # Token 은 이 툴이 처음부터 갖고 있던 이름 검색이고, Rules 는 "씬에서의 상태"로 고르는
-    # 쪽이다. 둘 다 "리스트에서 조건에 맞는 것을 고른다" 라 Search 아래 하위 탭으로 묶었다.
 
-    def _build_search_tab(self):
-        tab = QWidget()
-        root = QVBoxLayout(tab)
-        root.setContentsMargins(0, 0, 0, 0)
-
-        self.sch_tabs = QTabWidget()
-        self.sch_tabs.addTab(self._build_search_token_tab(), "Token")
-        self.sch_tabs.setTabToolTip(0, "Select by name - objects whose name "
-                                       "contains the token.")
-        self.sch_tabs.addTab(self._build_search_rules_tab(), "Rules")
-        self.sch_tabs.setTabToolTip(1, "Select by state - objects that satisfy "
-                                       "the rules you pick.")
-        root.addWidget(self.sch_tabs)
-        return tab
-
-    # ---- Search > Token  (JUN_PY_SearchTool_V01_02 이식)
-
-    def _build_search_token_tab(self):
+    def _build_token_tab(self):
         tab = QWidget()
         root = QVBoxLayout(tab)
 
-        # Search Token
         row = QHBoxLayout()
         row.addWidget(QLabel("Search Token"))
-        self.sch_le_token = QLineEdit()
-        self.sch_le_token.setPlaceholderText("substring of the object name")
-        self.sch_le_token.returnPressed.connect(self.on_sch_search)
-        row.addWidget(self.sch_le_token)
+        self.token_le = QLineEdit()
+        self.token_le.setPlaceholderText("substring of the object name")
+        self.token_le.returnPressed.connect(self.on_search_token)
+        row.addWidget(self.token_le)
         root.addLayout(row)
 
-        # 옵션 (Hierarchy/Selected + Invert)
-        root.addLayout(self._build_option_row("sch"))
+        root.addStretch(1)
 
-        # Objects 리스트
-        self.sch_objs_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Objects", show_select=False, log_callback=self._log)
-        self.sch_objs_tsl.add_button("Get", self.on_sch_get_objects, index=0)
-        root.addWidget(self.sch_objs_tsl, stretch=1)
-
-        # Search By Token
         btn_search = QPushButton("Search By Token")
         btn_search.setMinimumHeight(32)
         btn_search.setToolTip(
             "Select objects in the list whose name contains the token.")
-        btn_search.clicked.connect(self.on_sch_search)
+        btn_search.clicked.connect(self.on_search_token)
         root.addWidget(btn_search)
 
         return tab
 
-    # ---- Search > Rules  (v01.02~)
+    def on_search_token(self):
+        """Objects 리스트 중 이름에 토큰을 포함하는 것을 선택한다."""
+        token = self.token_le.text().strip()
+        if not token:
+            self._log("[WARN] Enter a search token.")
+            return
+        objects = self._objects_or_warn()
+        if not objects:
+            return
+        invert = self.cb_invert.isChecked()
+        selected = select_by_token(objects, token, invert)
+        self.objs_tsl.select_by_texts(selected)
+        self._log("Search '{0}'{1} : {2} object(s).".format(
+            token, " (inverted)" if invert else "", len(selected)))
 
-    def _build_search_rules_tab(self):
+    # ================================================================
+    # Tab : Rules  (v01.02~)
+    # ================================================================
+
+    def _build_rules_tab(self):
         """규칙 목록은 `app/core/select_rules.all_rules()` 를 그대로 그린다.
 
         ★ 규칙이 늘어나도 **이 함수는 손대지 않는다** - core 에 `register()` 한 줄을
@@ -306,35 +309,26 @@ class MainWindow(QWidget):
         tab = QWidget()
         root = QVBoxLayout(tab)
 
-        # 옵션 (Hierarchy/Selected + Invert)
-        root.addLayout(self._build_option_row("rul"))
-
-        # Objects 리스트
-        self.rul_objs_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Objects", show_select=False, log_callback=self._log)
-        self.rul_objs_tsl.add_button("Get", self.on_rul_get_objects, index=0)
-        root.addWidget(self.rul_objs_tsl, stretch=1)
-
-        # 규칙 목록
         rules_box = QGroupBox("Rules (pick one or more - all of them must match)")
         rules_layout = QVBoxLayout(rules_box)
 
-        self.rul_list = QListWidget()
-        self.rul_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.rules_list = QListWidget()
+        self.rules_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         for rule in all_rules():
             item = QListWidgetItem(rule.label)
             item.setData(Qt.UserRole, rule.key)
             item.setToolTip(rule.description)
-            self.rul_list.addItem(item)
-        if self.rul_list.count():
-            self.rul_list.setCurrentRow(0)
-        self.rul_list.itemSelectionChanged.connect(self._on_rule_selection_changed)
-        rules_layout.addWidget(self.rul_list)
+            self.rules_list.addItem(item)
+        if self.rules_list.count():
+            self.rules_list.setCurrentRow(0)
+        self.rules_list.itemSelectionChanged.connect(
+            self._on_rule_selection_changed)
+        rules_layout.addWidget(self.rules_list)
 
         # 고른 규칙이 무엇을 뜻하는지 한 줄로 (툴팁을 못 보는 사람도 알도록)
-        self.rul_lbl_desc = QLabel()
-        self.rul_lbl_desc.setWordWrap(True)
-        rules_layout.addWidget(self.rul_lbl_desc)
+        self.rules_lbl_desc = QLabel()
+        self.rules_lbl_desc.setWordWrap(True)
+        rules_layout.addWidget(self.rules_lbl_desc)
 
         root.addWidget(rules_box, stretch=1)
 
@@ -343,53 +337,38 @@ class MainWindow(QWidget):
         btn_rules.setToolTip(
             "Select objects in the list that satisfy every rule you picked.\n"
             "Objects that do not are listed in the log with the reason.")
-        btn_rules.clicked.connect(self.on_rul_select)
+        btn_rules.clicked.connect(self.on_select_by_rules)
         root.addWidget(btn_rules)
 
         self._on_rule_selection_changed()
         return tab
 
     def _selected_rule_keys(self):
-        return [item.data(Qt.UserRole) for item in self.rul_list.selectedItems()]
+        return [item.data(Qt.UserRole) for item in self.rules_list.selectedItems()]
 
     def _on_rule_selection_changed(self):
         keys = self._selected_rule_keys()
         if not keys:
-            self.rul_lbl_desc.setText("Pick a rule above.")
+            self.rules_lbl_desc.setText("Pick a rule above.")
             return
-        self.rul_lbl_desc.setText(
+        self.rules_lbl_desc.setText(
             "\n".join("{0} - {1}".format(get_rule(key).label,
                                          get_rule(key).description)
                       for key in keys))
 
-    def on_rul_get_objects(self):
-        """선택/계층의 오브젝트로 Rules 탭 Objects 리스트를 채운다."""
-        hierarchy = self.rul_rb_hierarchy.isChecked()
-        objects = collect_from_selection(hierarchy)
-        if not objects:
-            self._log("[WARN] Nothing selected.")
-            return
-        self.rul_objs_tsl.set_items(objects)
-        self._log("Got {0} object(s) ({1}).".format(
-            len(objects), "hierarchy" if hierarchy else "selected"))
-
-    # 로그에 탈락 사유를 몇 줄까지 적을지. 전부 적으면 큰 리스트에서 로그가 묻힌다.
-    REJECT_LOG_LIMIT = 20
-
-    def on_rul_select(self):
+    def on_select_by_rules(self):
         """Objects 리스트 중 고른 규칙을 전부 만족하는 것을 선택한다."""
         keys = self._selected_rule_keys()
         if not keys:
             self._log("[WARN] Pick one or more rules.")
             return
-        objects = self.rul_objs_tsl.get_all_items()
+        objects = self._objects_or_warn()
         if not objects:
-            self._log("[WARN] Objects list is empty. Use Get first.")
             return
 
-        invert = self.rul_cb_invert.isChecked()
+        invert = self.cb_invert.isChecked()
         selected, rejected = select_by_rules(objects, keys, invert)
-        self.rul_objs_tsl.select_by_texts(selected)
+        self.objs_tsl.select_by_texts(selected)
 
         labels = ", ".join(get_rule(key).label for key in keys)
         self._log("Select By Rules [{0}]{1} : {2} of {3} object(s).".format(
@@ -401,33 +380,6 @@ class MainWindow(QWidget):
         if len(rejected) > self.REJECT_LOG_LIMIT:
             self._log("    ... and {0} more.".format(
                 len(rejected) - self.REJECT_LOG_LIMIT))
-
-    def on_sch_get_objects(self):
-        """선택/계층의 오브젝트로 Search 탭 Objects 리스트를 채운다."""
-        hierarchy = self.sch_rb_hierarchy.isChecked()
-        objects = collect_from_selection(hierarchy)
-        if not objects:
-            self._log("[WARN] Nothing selected.")
-            return
-        self.sch_objs_tsl.set_items(objects)
-        self._log("Got {0} object(s) ({1}).".format(
-            len(objects), "hierarchy" if hierarchy else "selected"))
-
-    def on_sch_search(self):
-        """Objects 리스트 중 이름에 토큰을 포함하는 것을 선택한다."""
-        token = self.sch_le_token.text().strip()
-        if not token:
-            self._log("[WARN] Enter a search token.")
-            return
-        objects = self.sch_objs_tsl.get_all_items()
-        if not objects:
-            self._log("[WARN] Objects list is empty. Use Get first.")
-            return
-        invert = self.sch_cb_invert.isChecked()
-        selected = select_by_token(objects, token, invert)
-        self.sch_objs_tsl.select_by_texts(selected)
-        self._log("Search '{0}'{1} : {2} object(s).".format(
-            token, " (inverted)" if invert else "", len(selected)))
 
     # ================================================================
     # Helper / About
@@ -441,15 +393,22 @@ class MainWindow(QWidget):
             "Search Tool v{version}\n"
             "Update date: {update}\n"
             "\n"
-            "Merge of two legacy selection helpers into tabs:\n"
+            "Pick objects from the shared Objects list by one of three\n"
+            "criteria. Get fills the list once - every tab works on it.\n"
             "\n"
-            "[Selection] (from JUN_PY_SelectionTool)\n"
-            "- Get / List Types from the selection (or its hierarchy).\n"
+            "[Type] (from JUN_PY_SelectionTool)\n"
+            "- List Types: collect the node types of the listed objects.\n"
             "- Select By Shape: Mesh / nurbsCurve / Joint / Constraint.\n"
             "- Select By Type: match the types you picked in the Types list.\n"
             "\n"
-            "[Search] (from JUN_PY_SearchTool)\n"
+            "[Token] (from JUN_PY_SearchTool)\n"
             "- Search By Token: select objects whose name contains the token.\n"
+            "\n"
+            "[Rules]\n"
+            "- Select By Rules: keep only the objects that satisfy every rule\n"
+            "  you picked. Rejected objects are logged with the reason.\n"
+            "- Standalone: no connections and no history - nothing drives it\n"
+            "  and it drives nothing.\n"
             "\n"
             "Invert flips the result to the complement. All UI text is English.\n"
             "\n"
