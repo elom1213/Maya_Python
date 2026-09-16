@@ -1,6 +1,7 @@
 # from Framework.qt.qt import QApplication 
 from Framework.qt.qt import * 
 from Framework.qt.maya_window import maya_main_window
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -42,10 +43,12 @@ class MainWindow(QWidget):
 
         self.layout.addWidget(self.btn_open)
 
-        # 로그창
-        self.log_widget = QTextEdit()
-
-        self.log_widget.setReadOnly(True)
+        # 로그창 - 공용 위젯(Expand / Clear / Copy).
+        # ★ 이 템플릿을 복제해 새 툴을 만들 때 object_name 을 그 툴의 것으로
+        #    바꾼다. 같은 이름이면 Expand 창이 서로를 찾아 닫는다.
+        self.log_widget = JUN_mod_log_qt_v01(
+            window_title="Qt Tool - Log",
+            object_name="JUN_A00008_base_QT_maya_log_window")
 
         self.layout.addWidget(self.log_widget)
 
