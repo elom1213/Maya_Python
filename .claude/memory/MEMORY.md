@@ -57,7 +57,7 @@
 
 - TSL — [UUID selection](wip-tsl-uuid-selection.md)((uuid, component) 보관) · [attach_uuids](framework-tsl-attach-uuids.md)(씬 노드 아닌 리스트는 False) · [list_limit summary](framework-tsl-list-limit.md)(500+ 요약) · [max-height squeezes buttons](tsl-widget-max-height-squeezes-buttons.md)(`list_widget` 에만) · [selection order](tsl-selection-order.md)(`trackSelectionOrder` 꺼지면 `ls(os)` 도 인덱스 순)
 - [Sub-tabs over collapsibles](prefer-subtabs-over-stacked-collapsibles.md) — 섹션 3~4개 넘으면 중첩 탭
-- Framework 위젯 — [log](framework-log-widget.md)(Expand/Clear/Copy, 드롭인 교체 · 내부는 QTextEdit) · [expand](framework-expand-widget.md)(복제 말고 이동) · [filter](framework-filter-widget.md)(v2 트리 모드) · [mirror tokens](framework-mirror-tokens.md)(공용 json, 경계 매칭) · [falloff curve](framework-falloff-curve-widget.md) · [progress popup](framework-progress-widget.md)(마지막 값 스로틀 금지) · [timeRange](framework-timerange-widget.md)
+- Framework 위젯 — [log](framework-log-widget.md)(Expand/Clear/Copy, **47툴 전부 교체 완료** · 내부는 QTextEdit) · [expand](framework-expand-widget.md)(복제 말고 이동) · [filter](framework-filter-widget.md)(v2 트리 모드) · [mirror tokens](framework-mirror-tokens.md)(공용 json, 경계 매칭) · [falloff curve](framework-falloff-curve-widget.md) · [progress popup](framework-progress-widget.md)(마지막 값 스로틀 금지) · [timeRange](framework-timerange-widget.md)
 - Qt 함정 — [QTreeWidgetItem checkable default](qtreewidgetitem-checkable-default-flag.md) · [clicked passes checked bool](qt-clicked-passes-checked-bool.md) · [QDoubleSpinBox keyboardTracking](qdoublespinbox-keyboard-tracking.md)
 
 ## 툴 작업
