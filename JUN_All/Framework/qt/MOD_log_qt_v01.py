@@ -184,6 +184,7 @@ class JUN_mod_log_qt_v01(QWidget):
             outer.addLayout(row)
 
         self._outer = outer
+        self._row = row
         self._text_index = outer.indexOf(self.text)
 
     def _make_button(self, row, label, tooltip):
@@ -308,19 +309,41 @@ class JUN_mod_log_qt_v01(QWidget):
         self.text.setReadOnly(bool(value))
 
     # ==================================================================
-    # ★ 높이 · 폰트는 컨테이너가 아니라 내부 텍스트에 건다
+    # ★ 높이 · 폰트는 내부 텍스트에 걸고, **컨테이너에도 버튼 줄만큼 더해 건다**
     # ==================================================================
-    # 이 위젯에 그대로 걸면 버튼 줄이 그 높이를 나눠 먹어 로그가 줄어든다.
-    # 교체 전과 **같은 줄 수**가 보이도록 전부 내부로 넘긴다.
+    # 내부 텍스트에만 거는 이유: 이 위젯에 그대로 걸면 버튼 줄이 그 높이를 나눠 먹어
+    # 교체 전보다 로그가 줄어든다. 그래서 요청한 높이는 텍스트가 그대로 받는다.
+    #
+    # ★ 그런데 **텍스트에만** 걸면 이번엔 컨테이너의 상한이 없어진다. 툴 창을 세로로
+    #   늘리면 레이아웃이 컨테이너를 끝없이 늘리고, 텍스트는 상한에서 멈추므로 그 차이가
+    #   **빈 공간**으로 남는다 - 로그는 그대로인데 로그창이 자리를 다 먹고 다른 UI 가
+    #   밀려 스크롤이 생긴다(교체 전 `QTextEdit` 에 직접 걸 때는 없던 일이다. 그때는
+    #   위젯 자신이 상한을 가졌다). 그래서 컨테이너에도 **버튼 줄 높이를 더해** 같은
+    #   제약을 건다 - 보이는 줄 수는 요청한 그대로면서 창을 늘려도 로그창은 커지지 않는다.
+    #
+    # 높이를 아예 지정하지 않은 툴(로그를 늘어나는 칸으로 쓰는 템플릿 등)은 그대로
+    # 늘어난다. 그쪽은 텍스트도 같이 늘어나므로 빈 공간이 생기지 않는다.
+
+    def _chrome_height(self):
+        """버튼 줄 + 그 아래 간격. 높이 요청을 컨테이너 크기로 옮길 때 더한다."""
+        row = self._row.sizeHint().height()
+        if row <= 0:
+            row = BUTTON_HEIGHT
+        return row + self._outer.spacing()
 
     def setFixedHeight(self, height):
         self.text.setFixedHeight(height)
+        super(JUN_mod_log_qt_v01, self).setFixedHeight(height + self._chrome_height())
 
     def setMinimumHeight(self, height):
         self.text.setMinimumHeight(height)
+        super(JUN_mod_log_qt_v01, self).setMinimumHeight(
+            height + self._chrome_height())
 
     def setMaximumHeight(self, height):
         self.text.setMaximumHeight(height)
+        super(JUN_mod_log_qt_v01, self).setMaximumHeight(
+            height + self._chrome_height())
 
     def setFont(self, font):
         self.text.setFont(font)
