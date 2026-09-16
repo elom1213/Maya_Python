@@ -11,6 +11,7 @@ import os
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_collapsible_qt
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 import maya.cmds as cmds
 
@@ -124,8 +125,9 @@ class MainWindow(QWidget):
         root.addWidget(self.tbl_summary, 1)
 
         # --- 로그뷰 ---
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="Mesh Doctor - Log",
+            object_name="JUN_A00300_meshDoctor_log_window")
         self.te_log.setLineWrapMode(QTextEdit.NoWrap)
         self.te_log.setMinimumHeight(280)
         try:
@@ -133,12 +135,6 @@ class MainWindow(QWidget):
         except Exception:
             pass
         root.addWidget(self.te_log, 1)
-
-        # --- 로그 Clear ---
-        self.btn_clear_log = QPushButton("Clear Log")
-        self.btn_clear_log.setToolTip("Clear the log view above.")
-        self.btn_clear_log.clicked.connect(lambda: self.te_log.clear())
-        root.addWidget(self.btn_clear_log)
 
         # --- Fixes (접이식) ---
         fixes = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01(

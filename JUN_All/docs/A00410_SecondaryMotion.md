@@ -2,7 +2,7 @@
 title: A00410_SecondaryMotion 사용법
 aliases: [Secondary Motion, SecondaryMotion, A00410, 찰랑이, 관성 툴]
 tags: [maya-python, tool-guide, animation, secondary-motion, physics, kawaiiphysics]
-updated: 2026-09-10
+updated: 2026-09-16
 ---
 
 # A00410_SecondaryMotion 사용법
@@ -383,3 +383,17 @@ tools/A00410_SecondaryMotion/
 - 출력은 아직 **커브(키) 계열 2종**만 구현돼 있다. `Live Node` 는 예약 상태다.
 - 빠른 구동 + `Substeps=3` 에서 왕복 수치 오차 **4.7e-05**(리그 스케일 대비 약 3ppm) 관측 — 원인
   미특정, 실사용에서 보이는 수준은 아니다. 자세한 내용은 CHANGELOG v01.01 참고.
+
+---
+
+## 로그창 (v01.09)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

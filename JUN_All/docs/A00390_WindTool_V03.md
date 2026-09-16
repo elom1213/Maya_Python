@@ -2,7 +2,7 @@
 title: A00390_WindTool_V03 사용법
 aliases: [Wind Tool V03, Playback tab, windPhaseEngine]
 tags: [maya-python, tool-guide, wind, chain-wave, performance, expression, evaluation-manager, mute]
-updated: 2026-08-24
+updated: 2026-09-16
 ---
 
 # A00390_WindTool_V03 사용법
@@ -211,3 +211,17 @@ V02 는 **프레임 단위** 사다리꼴, V03 의 라이브 경로는 **키 구
 | 회귀 15 | **Chain Wave 탭 값 동일** · **Sine 탭 값 동일** · Curve 베이크 · Auto Period 유지 · 여러 번 빌드 후 부분 Remove · ntsc 시간 단위 |
 
 세 탭이 같은 표현식을 공유했으므로 **Chain Wave 탭도 같이 빨라졌다**(2체인 4.15ms → 0.45ms).
+
+---
+
+## 로그창 (v03.01)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

@@ -16,6 +16,7 @@ from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_timeRange_qt
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 import maya.cmds as cmds
 
@@ -95,8 +96,9 @@ class MainWindow(QWidget):
         root.addWidget(self._build_tabs())
         root.addLayout(self._build_run_row())
 
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="DemBone - Log",
+            object_name="JUN_A00430_DemBone_log_window")
         self.te_log.setMinimumHeight(130)
         root.addWidget(self.te_log)
 

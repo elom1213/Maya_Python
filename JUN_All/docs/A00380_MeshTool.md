@@ -2,7 +2,7 @@
 title: A00380_MeshTool 사용법
 aliases: [Mesh Tool, MeshTool, A00380, Peak, Match]
 tags: [maya-python, tool-guide, mesh, modeling, peak, normal, match, kangaroo, layout]
-updated: 2026-08-19
+updated: 2026-09-16
 ---
 
 # A00380_MeshTool 사용법
@@ -219,3 +219,17 @@ self.tsl_from.list_widget.setMaximumHeight(70)  # 천장은 리스트에만
 
 메시 관련 기능이 생기면 탭으로 추가한다(현재 Peak / Match). 새 탭도 Peak/Match 처럼
 `app/core/<name>_manager.py` 에 세션 모델(preview/restore/commit)을 두고, 공용 헬퍼를 재사용한다.
+
+---
+
+## 로그창 (v01.07)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

@@ -2,7 +2,7 @@
 title: A00390_WindTool_V02 사용법
 aliases: [Wind Tool V02, Chain Wave Lite]
 tags: [maya-python, tool-guide, wind, chain-wave, ikSpline, performance, envelope, axis, auto-period]
-updated: 2026-08-24
+updated: 2026-09-16
 ---
 
 # A00390_WindTool_V02 사용법
@@ -437,3 +437,17 @@ lambda = (체인 전체 길이)
 
 Auto ON 은 최댓값(**+0.965**)과 최솟값(**-0.965**)이 각각 한 번씩 나오고 **양끝 값이 같다**
 — 정확히 한 주기다. OFF 는 파장이 고정이라 1.6 주기가 실린다.
+
+---
+
+## 로그창 (v02.06)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

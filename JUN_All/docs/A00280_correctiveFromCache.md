@@ -88,3 +88,17 @@ A00280_correctiveFromCache/
 - 설계 계획서: [A00280_correctiveFromCache_plan.md](A00280_correctiveFromCache_plan.md)
 - 연계 툴: `A00090_ConnectionBuilder`(Direct Route 와이어), `A00100_jsonEditor_MH`(sample_04.json 솔버 데이터).
 - PoseWrangler: `epic_pose_wrangler.v2`(api.py `edit_blendshape`/`invertShape`, `mirror_blendshape`; main.py `UERBFAPI`).
+
+---
+
+## 로그창 (v01.03)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

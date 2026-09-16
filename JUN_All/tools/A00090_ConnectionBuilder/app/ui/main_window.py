@@ -10,6 +10,7 @@ import maya.cmds as cmds
 from tools.A00090_ConnectionBuilder.app.config.version import VERSION
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from tools.A00090_ConnectionBuilder.app.core import RuleLoader
 from tools.A00090_ConnectionBuilder.app.core import ConnectionManager
@@ -214,9 +215,9 @@ class MainWindow(QWidget):
         # Log
         # -------------------------
 
-        self.te_log = QTextEdit()
-
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="MetaHuman Connection Builder - Log",
+            object_name="JUN_A00090_ConnectionBuilder_log_window")
 
         main_layout.addWidget(self.te_log)
 

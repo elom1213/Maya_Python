@@ -17,6 +17,7 @@ from Framework.qt import JUN_mod_timeRange_qt
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from tools.A00390_WindTool_V02.app.config.version import VERSION, LAST_UPDATE
 from tools.A00390_WindTool_V02.app.core import wind_manager as wind_mgr
 from tools.A00390_WindTool_V02.app.core import wave_manager as wave_mgr
@@ -247,8 +248,9 @@ class MainWindow(QWidget):
 
 
         # 로그
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="Wind Tool V02 - Log",
+            object_name="JUN_A00390_WindTool_V02_log_window")
         self.te_log.setMaximumHeight(120)
         root.addWidget(self.te_log)
 

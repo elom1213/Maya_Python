@@ -215,3 +215,17 @@ Built sine wave: driver ctl.wave | 5 object(s) | range in[0.0,0.0] out[0.0,1.0] 
 - **어트리뷰트 연결 실패** → 선택한 어트리뷰트가 조인트들에 모두 존재하는지 확인.
 - **Slerp Ramp 결과가 예전과 다름(덮어쓰기 → 가산)** → v01.03 부터 Slerp Ramp 는 어트리뷰트를
   덮어쓰지 않고 **초기값에 가산**한다(`{prefix}_lerp_{i}_OFFSET_{attr}`). 또 기본 보간이 linear 다.
+
+---
+
+## 로그창 (v01.07)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

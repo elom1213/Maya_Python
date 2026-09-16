@@ -18,6 +18,7 @@ from Framework.core import falloff_curve
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from tools.A00410_SecondaryMotion.app.config.version import VERSION, LAST_UPDATE
 from tools.A00410_SecondaryMotion.app.core import bake_manager as bake_mgr
 from tools.A00410_SecondaryMotion.app.core import chain_solver
@@ -403,8 +404,9 @@ class MainWindow(QWidget):
         self.btn_apply.clicked.connect(self.on_apply)
         root.addWidget(self.btn_apply)
 
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="Secondary Motion - Log",
+            object_name="JUN_A00410_SecondaryMotion_log_window")
         self.te_log.setMaximumHeight(110)
         root.addWidget(self.te_log)
 

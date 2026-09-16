@@ -26,6 +26,7 @@
 #        windMute - 체인을 rest 자세로 세우고 평가를 멈춘다(nodeState=Blocking).
 #                    `windEnvelope=0` 은 값에 0을 곱할 뿐 평가를 막지 못한다(실측
 #                    62.97ms -> 63.18ms). 둘은 전혀 다른 일이다.
+# 03.01  로그창을 공용 위젯 `JUN_mod_log_qt_v01` 로 교체 (Expand / Clear / Copy)
 
-VERSION = "03.00"
-LAST_UPDATE = "2026-08-24"
+VERSION = "03.01"
+LAST_UPDATE = "2026-09-16"

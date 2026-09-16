@@ -26,6 +26,7 @@ from Framework.qt.qt import (
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from tools.A00080_KWI_creator_V03.app.config.version import VERSION
 from tools.A00080_KWI_creator_V03.app.core.KWI_creator import KWI_creator
@@ -166,8 +167,9 @@ class MainWindow(QWidget):
         self.btn_create_combined.clicked.connect(self.create_combined_on_click)
 
         # --- Output log -----------------------------------------------
-        self.log_widget = QTextEdit()
-        self.log_widget.setReadOnly(True)
+        self.log_widget = JUN_mod_log_qt_v01(
+            window_title="Kawaii Creator V03 - Log",
+            object_name="JUN_A00080_KWI_creator_V03_log_window")
 
         # --- assemble : tabs + shared log -----------------------------
         self.tabs = QTabWidget()

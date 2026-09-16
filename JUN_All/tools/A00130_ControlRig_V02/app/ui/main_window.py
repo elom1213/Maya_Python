@@ -38,6 +38,7 @@
 
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -130,8 +131,9 @@ class MainWindow(QWidget):
         root.setMenuBar(self.menu_bar)
 
         # 로그창 (탭 빌더가 self.log 를 부를 수 있어 탭보다 먼저)
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="Control Rig Tool - Log",
+            object_name="JUN_A00130_ControlRig_V02_log_window")
         self.te_log.setMinimumHeight(140)
 
         root.addWidget(self._build_source_group())

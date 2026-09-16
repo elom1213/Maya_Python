@@ -21,6 +21,7 @@ from Framework.qt.MOD_tsl_qt_v01 import JUN_mod_tsl_qt_v01
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from tools.A00380_MeshTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00380_MeshTool.app.core import peak_manager as peak_mgr
 from tools.A00380_MeshTool.app.core import match_manager as match_mgr
@@ -111,8 +112,9 @@ class MainWindow(QWidget):
         self.tabs.currentChanged.connect(self.on_tab_changed)
         root.addWidget(self.tabs, 1)
 
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="Mesh Tool - Log",
+            object_name="JUN_A00380_MeshTool_log_window")
         self.te_log.setMaximumHeight(110)
         root.addWidget(self.te_log)
 

@@ -306,3 +306,17 @@ tools/A00300_meshDoctor/
 
 - 진단 로직은 `maya.api.OpenMaya` (`MFnMesh`, `MItMeshPolygon/Edge/Vertex`) + `maya.cmds.polyInfo` 사용.
 - 임계값(떠돌이 배수, bbox 팽창비, 면적/엣지 epsilon, merge tol)은 `mesh_scan.py` 상단 상수로 조정 가능.
+
+---
+
+## 로그창 (v01.05)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

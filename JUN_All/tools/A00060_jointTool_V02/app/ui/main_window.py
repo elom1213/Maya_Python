@@ -23,6 +23,7 @@ print("QT version  :  " + str(QT_VERSION))
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from tools.A00060_jointTool_V02.app.config.version import VERSION, LAST_UPDATE
 from tools.A00060_jointTool_V02.app.core import curve_joint_manager as crv_mgr
 from tools.A00060_jointTool_V02.app.core import obj_joint_manager as obj_mgr
@@ -99,8 +100,9 @@ class MainWindow(QWidget):
         main_layout.setMenuBar(self.menu_bar)
 
         # 공유 로그창 (탭 빌더가 self.log 를 호출할 수 있어 탭보다 먼저 생성)
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="Joint Tool V02 - Log",
+            object_name="JUN_A00060_jointTool_V02_log_window")
         self.te_log.setMaximumHeight(120)
 
         # 탭

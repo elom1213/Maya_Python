@@ -19,8 +19,9 @@
 
 # 02.05  Chain Wave Lite 의 Auto Period (기본 ON) - 파장을 손으로 정하지 않고
 #                          **체인 길이**에서 받아 온다. 체인마다 windWavelength = 그 체인의
+# 02.06  로그창을 공용 위젯 `JUN_mod_log_qt_v01` 로 교체 (Expand / Clear / Copy)
 #                          경로 길이(직선 거리가 아니라 노드를 따라간 누적 거리)라
 #                          루트에서 끝까지 파형이 **딱 한 주기** 실린다.
 
-VERSION = "02.05"
-LAST_UPDATE = "2026-08-24"
+VERSION = "02.06"
+LAST_UPDATE = "2026-09-16"

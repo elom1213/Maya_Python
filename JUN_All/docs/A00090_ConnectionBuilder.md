@@ -284,3 +284,17 @@ A00090_ConnectionBuilder/
   Source/Target 을 리스트 위젯(`JUN_mod_tsl_qt_v01`)으로 교체(좌·우 배치), Pair mode(1→n / n→n) 체크박스
   추가로 Connect/Disconnect/Validate batch 동작.
 - v01.02 — Connect Intermediate(solver outputs → `WRK_intermediate`) 등.
+
+---
+
+## 로그창 (v01.08)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

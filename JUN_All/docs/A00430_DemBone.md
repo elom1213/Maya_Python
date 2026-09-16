@@ -288,3 +288,17 @@ tools/A00430_DemBone/
   - Le & Deng, *Smooth Skinning Decomposition with Rigid Bones*, ACM TOG 31(6), SIGGRAPH Asia 2012.
   - Le & Deng, *Robust and Accurate Skeletal Rigging from Mesh Sequences*, ACM TOG 33(4), 2014. (웨이트 스무딩)
 - `ref/`(사전 컴파일 exe 포함)는 배포 대상이 아니다.
+
+---
+
+## 로그창 (v01.05)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

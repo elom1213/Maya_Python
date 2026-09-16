@@ -2,7 +2,7 @@
 title: A00080_KWI_creator_V03 사용법
 aliases: [KWI Creator V03, Kawaii Creator V03]
 tags: [tool, unreal, kawaii-physics, maya]
-updated: 2026-07-13
+updated: 2026-09-16
 ---
 
 # A00080_KWI_creator_V03 사용법
@@ -222,3 +222,17 @@ A00080_KWI_creator_V03.run(True)   # True = reload
   `exists_fn(name)->bool` 을 주면 씬에 없는 본이 낀 쌍을 제외하고 그 목록을 `skipped` 로 반환
   (`None` 이면 필터 안 함 = DCC 비의존). `skipped = [(bone_a, bone_b, [없는 이름들]), ...]`.
 - `create_file(rows, exists_fn=None) -> (out_path, text, skipped)` — `0020_out` 기록 + 텍스트/제외목록 반환.
+
+---
+
+## 로그창 (v01.06)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

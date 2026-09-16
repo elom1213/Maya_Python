@@ -6,6 +6,7 @@
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.core.maya_refresh import force_refresh
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -82,8 +83,9 @@ class MainWindow(QWidget):
         main_layout.addLayout(run_row)
 
         # 로그
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="Corrective From Cache - Log",
+            object_name="JUN_A00280_correctiveFromCache_log_window")
         self.te_log.setMinimumHeight(90)
         self.te_log.setMaximumHeight(150)
         main_layout.addWidget(self.te_log)
