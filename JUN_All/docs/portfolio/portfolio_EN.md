@@ -1,14 +1,14 @@
 ---
-title: Portfolio — Work Summary (2026-05-06 ~ 2026-09-08)
+title: Portfolio — Work Summary (2026-05-06 ~ 2026-09-16)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-09-08
+updated: 2026-09-16
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
 
 > **Author**: Ji Hun Park (Junny)
-> **Period**: 2026-05-06 – 2026-09-08 (~18 weeks)
+> **Period**: 2026-05-06 – 2026-09-16 (~19 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
 > **Volume**: 40+ in-house tools (50 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
@@ -580,6 +580,20 @@ Default Distance attribute (driver signal x)
   verified headlessly that **parent together with point/orient makes two constraints fight over the same
   channels** — Maya rejects the second with `Object is already connected` — so the tool warns instead of
   blocking; the combination that is actually useful is `parent + scale`.
+- **`A00470_MaterialTool`** — **checks material names against a naming convention kept as data rather than code**:
+  one JSON profile per rule set (the first one being `MT_MANU_CH_<character>_<set>_<part>_<extra...>`), so a new
+  convention is a new file, not a new branch in the tool — when the team added a fixed `CH` token to that rule, the
+  change was one entry in the JSON and no code at all. What the tool really had to get right is **how a name is
+  matched against the rule**. Pairing token 1 with slot 1 collapses the moment a token is left out —
+  `MT_SYN_Sett002_Pantss` is missing `MANU`, and read left to right every later token lands in the wrong slot, so
+  the report claims everything is wrong and helps nobody. I aligned them with a **Needleman-Wunsch style DP** over
+  three moves instead (pair a token with a slot / leave a slot empty / drop a token), scoring a repairable typo
+  above an outright mismatch, so the tool reports what a person would actually say: three bad tokens **and one
+  omitted `MANU`**. Every rule type also knows **how to repair itself** — nearest enum value by edit distance
+  (`SYN -> SIN`, `Pantss -> Pants`), alpha/digit split and re-pad for `Sett002 -> Set002` — and the repaired tokens
+  are assembled into a suggested name, with a headless test asserting that **every suggestion itself passes the
+  rule** (a fix that is not itself valid is worse than no fix). Since the report exists to be handed to someone
+  else, it goes to the clipboard by default.
 - **`A00010_humanIKTool_V02`** — drives **HumanIK characterization** (declaring which joint fills which slot)
   one bone chain at a time, and the point of it is that **defining one side is enough — the other side is a
   single button**. The work of assigning the left arm and leg and then repeating the whole thing on the right

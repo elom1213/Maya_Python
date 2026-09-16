@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-09-15
+updated: 2026-09-16
 ---
 
 # 작업 일지 (WORKLOG)
@@ -29,7 +29,85 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-09-15 (오늘)
+## 2026-09-16 (오늘)
+
+> [!summary] `A00470_MaterialTool` 머티리얼 표 — **칸 폭을 드래그로 조절** + **더블클릭으로 씬 선택**(한 번 클릭은 선택만) (v01.02 -> 01.03)
+- **요청**: `Material` / `Status` / `Meshes` 칸을 드래그해 가로 폭을 조절 · 머티리얼을 더블클릭하면
+  그 노드가 선택되도록.
+- **★ 드래그로 폭을 바꾸려면 헤더가 `Interactive` 여야 한다** — 기존의 `Stretch`(0번) ·
+  `ResizeToContents`(1·2번)는 **스타일이 폭을 계산해 버려 드래그 자체가 막힌다.** 세 칸을 전부
+  `Interactive` 로 두고 초기 폭(250/90/70)만 주었으며, `setStretchLastSection(False)` 로 마지막 칸이
+  남는 공간에 맞춰 늘어나는 것도 껐다(그러면 사용자가 정한 폭이 무시된다).
+- **더블클릭 선택으로 옮겼다** — 그전에는 `itemSelectionChanged` 라 **행을 한 번 클릭만 해도** 씬
+  선택이 바뀌었다. 그 상태로 더블클릭을 얹으면 더블클릭이 무의미하므로, 한 번 클릭은 행 선택만 하고
+  **더블클릭에서만** 씬 선택을 바꾼다(목록을 훑어보다 씬 선택이 딸려 바뀌지 않는다).
+  여러 행을 골라 두고 더블클릭하면 **고른 것 전부**를 선택하고, 무엇을 선택했는지 로그에 적는다.
+  지워진 머티리얼이면 죽지 않고 사유를 남긴다.
+- 검증(mayapy + 오프스크린 Qt + 실제 씬): **21항목**. 파일:
+  `tools/A00470_MaterialTool/app/ui/name_check_tab.py` · `app/config/version.py` ·
+  `docs/A00470_MaterialTool.md` `#A00470`
+
+> [!summary] **공용 로그 위젯 `JUN_mod_log_qt_v01` 신규** — `Expand` / `Clear` / `Copy` 버튼이 달린 로그창을 Framework 로 승격하고 `A00470` 에 적용 (A00470 v01.01 -> 01.02)
+- **요청**: 로그창에 작은 버튼 3개 — **Expand**(팝업으로 로그를 보여주는 창) · **Clear** · **Copy**.
+  이것을 **공용 위젯으로 승격**해 A00470 이 쓰게 하고, 이후 로그창을 쓰는 모든 툴을 이걸로 교체할 계획.
+- **★ 드롭인 교체가 되도록 설계했다.** 저장소 로그창은 두 계열이다 — `te_log`(QTextEdit) 25곳,
+  `log_view`(QPlainTextEdit) 14곳. 호출하는 메서드를 전수 조사해 **그 이름을 전부 받는다**:
+  `append` · `appendPlainText` · `setReadOnly` · 높이 3종 · `clear` · `setFont` · `setLineWrapMode` ·
+  `moveCursor`. 나머지는 `__getattr__` 로 내부 텍스트에 위임 → 교체는 **생성 두 줄**만 바뀐다.
+- **★ 내부는 `QTextEdit` 이어야 한다** — `A00300` · `A00430` · `A00410` 이 `append('<span style=…>')`
+  로 **색깔 로그**를 쓴다. `QPlainTextEdit` 로 두면 그 세 툴에서 태그가 글자로 보인다. 대신
+  `appendPlainText` 를 커서로 직접 구현해 **평문은 `<` 가 먹히지 않게** 했다.
+- **★ 높이는 컨테이너가 아니라 내부 텍스트에 건다** — `setFixedHeight(110)` 을 컨테이너에 걸면
+  버튼 줄이 그 높이를 나눠 먹어 로그가 줄어든다(공용 TSL 의 max-height 함정과 같은 것).
+  결과적으로 **보이는 줄 수는 교체 전과 같고** 창만 버튼 줄만큼 커진다.
+- **Expand 는 복제가 아니라 이동** (`MOD_expand_qt_v01` 과 같은 방식) — 확장 중에 들어온 로그도
+  같은 위젯에 쌓여 동기화 문제 자체가 없다. 툴 창이 닫히면 `eventFilter` 로 자동으로 접어 미아 방지.
+- **★ 첫 시도에서 버튼 글자가 안 보였다** — 모든 테마 qss 의 `QPushButton { padding: 8px; }` 이
+  `setFixedHeight(20)` 과 만나 위아래 16px + 테두리 2px 로 **글자 자리가 2px** 만 남았다(글꼴 12px).
+  버튼은 멀쩡히 보이고 클릭도 되므로 **크기만 보면 정상인** 버그다. 이 세 버튼만
+  `padding: 0px 6px` 로 덮어써 내용 영역을 **72x2 -> 72x18** 로 되돌렸다(색·테두리는 테마 그대로).
+  폭도 `setFixedWidth` 를 버리고 `setMinimumWidth(58)` 로 — 폰트가 큰 테마에서 같은 일이 가로로
+  되풀이되지 않게.
+- **★ 검증 방법도 한 번 틀렸다** — 버튼을 `grab()` 해 글자 픽셀을 세려 했는데, 오프스크린에서는
+  `QLabel` 조차 고유 색이 1개다(**글자가 래스터화되지 않는다**). 멀쩡한 버튼도 0px 로 나와
+  아무것도 가리지 못했다. `QStyle.SE_PushButtonContents` 내용 영역을 재는 방식으로 바꿨다.
+- 검증(mayapy + 오프스크린 Qt): **56 + 55항목**(버튼 여백은 8개 테마 × 3버튼, 버그 재현 포함).
+  파일: `Framework/qt/MOD_log_qt_v01.py`(신규) ·
+  `Framework/qt/__init__.py` · `tools/A00470_MaterialTool/app/ui/main_window.py` ·
+  `docs/Framework_MOD_log_qt.md`(신규) `#Framework` `#A00470`
+
+> [!summary] `A00470_MaterialTool` **신규** — 메시에 붙은 머티리얼 이름이 명명 규칙(JSON 프로파일)에 맞는지 진단하고 고칠 이름을 제안 (v01.00)
+- **요청**: TSL 에 메시를 담아 거기 붙은 머티리얼 이름을 보고, **정해진 규칙과 맞는지 · 어떻게 고칠지**를 로그로.
+  규칙은 **profile 로서 json 파일**로 저장하고 골라서 적용. 첫 규칙 `Set_v001` 은
+  `MT_MANU_{캐릭터}_{세트}_{부위}_{기타...}`. 리포트는 **클립보드 복사**(체크박스, 기본 켬)와 **자세한 로그** 기능까지.
+- **규칙 = 데이터**: `data/profiles/Set_v001.json` 한 파일이 규칙 한 벌. 토큰 타입 `literal`/`enum`/`pattern`/
+  `regex`/`any` + `optional`·`repeat`·`case_sensitive`·`hint`. 새 규칙은 툴 수정이 아니라 파일 추가다.
+  (`SetXXX` 는 **3자리 숫자**로 읽었다 — 바꾸려면 JSON 의 `"digits": 3` 한 줄)
+- **★ 토큰을 앞에서부터 붙이면 안 된다** — `MT_SYN_Sett002_Pantss` 는 `MANU` 가 빠진 이름이라, 순서대로 붙이면
+  뒤가 전부 밀려 "전부 틀림" 이 된다(사람에게 쓸모없는 리포트). **정렬 DP**(Needleman–Wunsch 꼴, 짝짓기 /
+  슬롯 비우기 / 토큰 버리기)로 풀어 요청한 그대로 **틀린 토큰 3개 + 생략된 `MANU`** 가 나온다.
+  고칠 수 있는 오타에 가산점(+2)을 줘 "그 자리에 오려던 토큰" 으로 읽게 했다.
+- **고칠 이름 제안**: `enum` 은 편집 거리로 가장 가까운 값(`SYN`→`SIN`, `Pantss`→`Pants`), `pattern` 은 알파벳/숫자를
+  갈라 재조립(`Sett002`→`Set002`). **제안은 돌려주기 전에 자기 규칙으로 다시 검사한다** — 통과 못 하는 수정 제안은
+  없느니만 못하다. 꼬리 숫자(`..._extra3`)는 경고 + `extra_3` 제안, `_002` 처럼 갈라진 숫자는 통과.
+- **★ 한 트랜스폼에 셰이프가 여럿**이면 "첫 셰이프" 만 보는 순간 머티리얼을 놓친다 → non-intermediate 셰이프를
+  **전부** 본다. 페이스별 할당도 같은 경로로 잡힌다(실측). 씬은 **읽기만** 한다.
+- 검증(mayapy 2024 헤드리스): **규칙 엔진 85항목 + 마야 통합 25항목**. 마야 GUI 확인은 아직.
+- 파일: `tools/A00470_MaterialTool/**`(코어 4 · UI 2 · 프로파일 1 · 아이콘), `docs/A00470_MaterialTool.md`,
+  `docs/portfolio/portfolio_EN.md` · `portfolio_KR.md`, `README.md` `#A00470`
+
+> [!summary] `A00470_MaterialTool` `Set_v001` 규칙 갱신 — 고정 토큰 **`CH`** 추가 : `MT_MANU_CH_{character}_{set}_{part}_{extra...}` (v01.00 -> 01.01)
+- **요청**: `MT` 와 마찬가지로 **한 글자도 변하면 안 되는** `CH` 를 `MANU` 뒤에 넣는다.
+- 코드는 그대로고 **프로파일 JSON 한 파일만 고쳤다**(`{"role": "category", "type": "literal", "value": "CH"}`) —
+  규칙을 데이터로 둔 설계가 처음으로 값을 한 셈이다.
+- **★ `CH` 와 `CHN` 은 편집 거리 1** 이라 서로 빨려들 수 있는 자리다. `MT_MANU_CHN_Set002_Top` 은
+  **`CH` 생략 + `CHN` 은 캐릭터**로, `MT_MANU_CH_Set002_Top` 은 **`CH` 는 제자리 + 캐릭터 생략**으로
+  읽혀야 한다. 정렬 점수(유효 +4 > 오타 +2)가 두 경우를 모두 옳게 고르는 것을 테스트로 못 박았다.
+- 검증: 규칙 엔진 **102항목**(`CH` 슬롯 10종 신설) + 마야 통합 **27항목**. `#A00470`
+
+---
+
+## 2026-09-15
 
 > [!summary] `A00080_KWI_creator_V03` **One node per setting node** 체크박스 — 같은 세팅 노드에 엮일 본들을 KawaiiPhysics 노드 하나로 모은다 (v01.04 -> 01.05)
 - **요청**: 본마다 노드를 만들지 말고, **같은 피직스 세팅 노드에 엮인 본들은 모두 같은 KawaiiPhysics 노드**에

@@ -140,6 +140,8 @@ A narrative work summary lives in
 - **`A00360_SortTool`** — 월드 X/Y/Z·이름·타입 기준 정렬 + 아웃라이너 재정렬. · **`A00330_NamingTool`** — 리네임/Quick Rename.
 - **`A00440_SetTool`** — 컴포넌트 세트끼리의 **집합 연산**(합집합 · 교집합 · 차집합 + 씬 선택 기준 분할). ·
   **`A00450_manipulatorTool`** — 이동/회전/스케일 **매니퓰레이터 축 굵기**를 슬라이더로 라이브 조절.
+- **`A00470_MaterialTool`** — 메시에 붙은 **머티리얼 이름이 명명 규칙(JSON 프로파일)에 맞는지 진단** +
+  틀린 토큰마다 고칠 이름 제안(리포트는 클립보드로).
 - **`A00250_SceneMemo`** — 오브젝트별 메모를 씬에 저장.
 
 ### 독립 실행(Standalone) / in-Maya PySide 앱
