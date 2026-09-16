@@ -8,7 +8,11 @@
 #   2) Show files : 폴더만 볼지, 파일까지 볼지 토글.
 #   3) File Types : 스캔에서 발견된 확장자 중 표시할 것만 체크(A00210 File Manager 와 동일).
 #   4) Expand  : 창이 작을 때 큰 창에서 트리를 본다.
-#   5) 우클릭  : Reveal in File Explorer — 그 항목을 탐색기에서 연다(폴더=열기, 파일=선택).
+#   5) 우클릭  : Reveal in File Explorer — 그 항목을 탐색기에서 연다(폴더=열기, 파일=선택)
+#               Copy file path — 그 항목의 절대 경로를 클립보드로.
+#   6) Filter  : 이름 또는 경로로 거른다(맞은 것의 부모까지 보이고 그 자리까지 펼친다).
+#   7) Refresh : 디스크를 다시 읽어 갱신한다. Selected(고른 폴더만) · Recursive(아래 전부).
+#               **펼침·선택·스크롤은 그대로 둔다** — 갱신했다고 열어 둔 경로가 닫히지 않는다.
 
 import os
 
@@ -138,6 +142,35 @@ class TreeTab(QWidget):
         opt_row.addWidget(self.btn_expand)
 
         layout.addLayout(opt_row)
+
+        # 갱신 행: 디스크를 다시 읽어 바뀐 것만 반영한다(펼침·선택은 유지).
+        ref_row = QHBoxLayout()
+
+        self.btn_refresh = QPushButton("Refresh")
+        self.btn_refresh.setToolTip(
+            "Read the folders again and update the tree.\n"
+            "What is open stays open - only what actually changed on disk moves.")
+        self.btn_refresh.clicked.connect(self.on_refresh)
+        ref_row.addWidget(self.btn_refresh)
+
+        self.chk_ref_selected = QCheckBox("Selected")
+        # 기본으로 켜 둔다 - Refresh 는 대개 "지금 보고 있는 폴더" 를 다시 읽으려고 누른다.
+        # 트리 전체를 다시 읽고 싶을 때만 끄면 된다.
+        self.chk_ref_selected.setChecked(True)
+        self.chk_ref_selected.setToolTip(
+            "Refresh only the folder(s) selected in the tree (a selected file means "
+            "its folder).\nOff = the whole tree from the root path.")
+        ref_row.addWidget(self.chk_ref_selected)
+
+        self.chk_ref_recursive = QCheckBox("Recursive")
+        self.chk_ref_recursive.setToolTip(
+            "Also refresh everything below the folder(s) being refreshed.\n"
+            "Off = that folder's own contents only (what is already known deeper "
+            "is kept).")
+        ref_row.addWidget(self.chk_ref_recursive)
+
+        ref_row.addStretch(1)
+        layout.addLayout(ref_row)
 
         # 필터 행: 경로/파일 이름으로 찾기
         flt_row = QHBoxLayout()
@@ -364,6 +397,201 @@ class TreeTab(QWidget):
 
         return item
 
+    # ============================================================== Refresh
+
+    def on_refresh(self):
+        """디스크를 다시 읽어 트리를 갱신한다. **펼침·선택·스크롤은 그대로 둔다.**
+
+        갱신 범위는 체크박스 둘이 정한다.
+
+          Selected  : 트리에서 고른 폴더만(파일을 골랐으면 그 폴더). 끄면 루트 전체.
+          Recursive : 그 폴더 **아래 전부**. 끄면 그 폴더의 **바로 아래 한 겹**만 —
+                      이때 더 깊은 곳은 **이미 알고 있는 것을 그대로 둔다**(다시 읽지 않는다).
+
+        ★ 이 기능의 핵심은 "다시 그리지 않는 것" 이 아니라 **"상태를 잃지 않는 것"** 이다.
+        항목을 지웠다 새로 만들면 `QTreeWidgetItem` 객체가 바뀌어 펼침 상태가 날아간다.
+        그래서 **경로로 상태를 적어 두고 다시 입힌다** - 객체가 바뀌어도 열려 있던 경로는
+        그대로 열린 채로 남는다(없어진 경로는 자연히 빠진다).
+        """
+        if self._tree is None:
+            QMessageBox.information(self, "Tree", "Build the tree first.")
+            return
+
+        recursive = self.chk_ref_recursive.isChecked()
+        nodes = self._refresh_target_nodes()
+        if nodes is None:
+            return
+
+        for node in nodes:
+            self._rescan_node(node, recursive)
+
+        for tree in list(self._trees):
+            state = self._capture_view_state(tree)
+            for node in nodes:
+                self._rebuild_children(tree, node)
+            self._restore_view_state(tree, state)
+            self._apply_filter(tree, fold=False)
+
+    def _refresh_target_nodes(self):
+        """갱신할 캐시 노드 목록. 고를 수 없으면 안내하고 None."""
+        if not self.chk_ref_selected.isChecked():
+            return [self._tree]
+
+        paths = []
+        for item in self.tree.selectedItems():
+            path = item.data(0, Qt.UserRole)
+            if not path:
+                continue
+            node = self._find_node(self._tree, path)
+            # 파일을 골랐으면 그 파일이 든 폴더를 갱신한다.
+            if node is not None and not node["is_dir"]:
+                parent = item.parent()
+                path = parent.data(0, Qt.UserRole) if parent is not None else None
+                node = self._find_node(self._tree, path) if path else None
+            if node is not None and node["is_dir"] and node["path"] not in paths:
+                paths.append(node["path"])
+
+        if not paths:
+            QMessageBox.information(
+                self, "Tree",
+                "Select a folder in the tree first, or uncheck 'Selected'.")
+            return None
+
+        # 이미 다른 대상의 안쪽이면 뺀다 - 같은 곳을 두 번 읽지 않는다.
+        roots = [p for p in paths
+                 if not any(p != q and p.startswith(q + os.sep) for q in paths)]
+        return [self._find_node(self._tree, p) for p in roots]
+
+    def _find_node(self, node, path):
+        """캐시 트리에서 path 인 노드를 찾는다(없으면 None). 재귀 대신 스택."""
+        if not path:
+            return None
+        stack = [node]
+        while stack:
+            cur = stack.pop()
+            if cur["path"] == path:
+                return cur
+            stack.extend(cur["children"])
+        return None
+
+    def _rel_depth(self, path):
+        """루트에서 몇 단계 아래인가(루트 자신 = 0)."""
+        rel = os.path.relpath(path, self._root_path)
+        if rel in (".", ""):
+            return 0
+        return len(rel.replace("\\", "/").split("/"))
+
+    def _rescan_node(self, node, recursive):
+        """node 의 자식을 디스크에서 다시 읽어 캐시에 반영한다.
+
+        Depth 설정을 넘어서까지 읽지 않는다 - 화면에 안 보이는 것을 캐시에만 쌓아 두면
+        Depth 를 줄였다 늘렸을 때 결과가 달라진다.
+        """
+        limit = self.spn_depth.value()          # 0 = All
+        rel = self._rel_depth(node["path"])
+
+        if limit and rel >= limit:
+            node["children"] = []               # Depth 상 더 보여 줄 것이 없다
+            return
+
+        if recursive:
+            max_depth = 0 if limit == 0 else (limit - rel)
+        else:
+            max_depth = 1
+
+        fresh = tree_scanner.build_tree(node["path"], max_depth=max_depth)
+        self._merge_children(node, fresh, recursive)
+
+    def _merge_children(self, old_node, fresh_node, recursive):
+        """새로 읽은 자식 목록을 캐시에 합친다.
+
+        ★ Recursive 가 꺼져 있으면 **이미 알고 있는 하위는 그대로 둔다.** 한 겹만 읽었으므로
+        그 결과로 덮어쓰면 밑에 있던 것이 통째로 사라져 **열어 두었던 폴더가 비어 보인다.**
+        """
+        known = {c["path"]: c for c in old_node["children"]}
+        merged = []
+
+        for child in fresh_node["children"]:
+            old = known.get(child["path"])
+            if old is not None and child["is_dir"] and not recursive:
+                old["name"] = child["name"]
+                merged.append(old)              # 하위는 캐시 유지
+            else:
+                merged.append(child)            # 새로 생긴 것 · 파일 · 재귀 결과
+
+        old_node["children"] = merged
+
+    # ---- 위젯 반영 (상태 보존)
+
+    def _find_item(self, tree, path):
+        root = tree.topLevelItem(0)
+        if root is None:
+            return None
+        stack = [root]
+        while stack:
+            item = stack.pop()
+            if item.data(0, Qt.UserRole) == path:
+                return item
+            for i in range(item.childCount()):
+                stack.append(item.child(i))
+        return None
+
+    def _rebuild_children(self, tree, node):
+        """node 에 해당하는 항목의 **자식만** 다시 만든다(항목 자신은 그대로)."""
+        item = self._find_item(tree, node["path"])
+        if item is None:
+            return
+
+        show_files = self.chk_show_files.isChecked()
+        exts = self._checked_exts()
+
+        # 새 자식들을 임시 항목에 만들고 통째로 옮긴다.
+        fresh = self._make_item(node, show_files, exts)
+        item.takeChildren()
+        item.addChildren(fresh.takeChildren())
+
+    def _capture_view_state(self, tree):
+        """펼친 경로 · 고른 경로 · 스크롤 위치를 적어 둔다."""
+        expanded, selected = set(), set()
+        root = tree.topLevelItem(0)
+        if root is not None:
+            stack = [root]
+            while stack:
+                item = stack.pop()
+                path = item.data(0, Qt.UserRole)
+                if path:
+                    if item.isExpanded():
+                        expanded.add(path)
+                    if item.isSelected():
+                        selected.add(path)
+                for i in range(item.childCount()):
+                    stack.append(item.child(i))
+        return (expanded, selected, tree.verticalScrollBar().value())
+
+    def _restore_view_state(self, tree, state):
+        """적어 둔 상태를 다시 입힌다. 사라진 경로는 자연히 빠진다."""
+        expanded, selected, scroll = state
+        root = tree.topLevelItem(0)
+        if root is None:
+            return
+
+        self._bulk = True                        # Shift 규칙이 끼어들지 않게
+        try:
+            stack = [root]
+            while stack:
+                item = stack.pop()
+                path = item.data(0, Qt.UserRole)
+                if path:
+                    item.setExpanded(path in expanded)
+                    item.setSelected(path in selected)
+                for i in range(item.childCount()):
+                    stack.append(item.child(i))
+        finally:
+            self._bulk = False
+
+        root.setExpanded(True)                   # 루트는 늘 열려 있다
+        tree.verticalScrollBar().setValue(scroll)
+
     # ============================================================== 필터
 
     def _on_filter_changed(self, _text):
@@ -379,8 +607,12 @@ class TreeTab(QWidget):
         text = self.ipf_filter.text().strip().lower().replace("\\", "/")
         return [t for t in text.split() if t]
 
-    def _apply_filter(self, tree):
+    def _apply_filter(self, tree, fold=True):
         """이름 **또는 경로**로 걸러 맞는 것과 그 부모만 남긴다.
+
+        `fold` 는 **필터가 비어 있을 때** 기본 접힘으로 되돌릴지다. 트리를 새로 그릴 때는
+        True(접고 시작), **Refresh 처럼 지금 상태를 지켜야 할 때는 False** 다 — 그러지
+        않으면 갱신할 때마다 열어 둔 경로가 전부 닫힌다(실제로 밟았다).
 
         - 토큰은 **AND** 다(`char tex` -> 둘 다 들어간 것만). 공용 필터 위젯과 같은 규칙.
         - **전체 경로**로 본다. 이름은 경로의 일부라 이름 검색도 그대로 되고, 폴더 이름을
@@ -409,7 +641,8 @@ class TreeTab(QWidget):
                 node.setHidden(False)
                 for i in range(node.childCount()):
                     stack.append(node.child(i))
-            self._fold_to_default(tree)
+            if fold:
+                self._fold_to_default(tree)
             self.lbl_filter_count.setText("")
             return
 

@@ -2,6 +2,20 @@
 
 All notable changes to this tool are documented here.
 
+## [01.08] - 2026-09-16
+### Added
+- **Tree tab: `Refresh`.** Reads the folders again and updates the tree **without losing the
+  view** - what is expanded stays expanded, the selection and the scroll position are kept,
+  and only what actually changed on disk moves (new / removed / renamed entries).
+  - **`Selected`** (on by default) - refresh only the folder(s) selected in the tree; a
+    selected file means its folder. Off = the whole tree from the root path.
+  - **`Recursive`** - also refresh everything below. Off = that folder's own contents only,
+    and whatever is already known deeper is kept as it is.
+  - The refresh never scans past the `Depth` setting, and `Show files` / `File Types` /
+    `Filter` stay applied afterwards.
+  - With `Selected` on and nothing selected, nothing happens and the tool says what to do -
+    quietly re-reading the whole tree would be worse.
+
 ## [01.07] - 2026-09-16
 ### Added
 - **Pin (always on top).** A `Pin` toggle sits at the top-right of the window. Turning
