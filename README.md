@@ -4,7 +4,7 @@
 독립 실행(standalone) Qt 앱을 직접 설계·개발한 포트폴리오 저장소입니다.
 
 > 작성자: **Ji Hun Park (Junny)** · Technical Artist / Rigging & Pipeline Tools Developer
-> 최근 갱신: 2026-09-08 · 툴 폴더 **61개**(템플릿·구버전 포함, **현행 48종**) · 공용 프레임워크 1개
+> 최근 갱신: 2026-09-16 · 툴 폴더 **64개**(템플릿·구버전 포함, **현행 50종**) · 공용 프레임워크 1개
 
 ---
 
@@ -13,7 +13,7 @@
 A portfolio of **production-grade Python tooling for Autodesk Maya and game pipelines**, written and
 maintained by **Ji Hun Park (Junny)**, a Technical Artist focused on rigging, facial, and pipeline automation.
 
-It contains **61 tool folders (48 actively maintained)** spanning two architectures — **in-Maya
+It contains **64 tool folders (50 actively maintained)** spanning two architectures — **in-Maya
 `maya.cmds` / PySide UIs** and **standalone PySide (Qt) desktop apps** — built on a **shared framework**
 (reusable widgets, theming, path management, undo handling, drag-&-drop installers).
 
@@ -133,10 +133,11 @@ A narrative work summary lives in
 - **`A00390_WindTool_V03`** — 본 체인에 위상이 어긋난 싸인 파형을 넣어 **바람에 일렁이는** 애니메이션 생성
   (Sine · Chain Wave · Chain Wave Lite). V03 은 드라이버마다 붙던 표현식 적분을 걷어내
   **재생이 V02 대비 144~202배**(결과 회전값은 실측 동일).
-- **`A00040_file_exporter_V02`** — 타입 필터 기반 익스포트 자동화. · **`A00050_uvTool`**, **`A00030_quickTool`**, **`A00200_CSV_tool`**.
+- **`A00040_file_exporter_V02`** — 타입 필터 기반 익스포트 자동화. · **`A00050_uvTool`**, **`A00030_quickTool_V02`**(레거시 퀵툴의 PySide 재작성), **`A00200_CSV_tool`**.
 
 ### 씬 / 선택 · 네이밍 유틸
-- **`A00310_SearchTool`** — 오브젝트를 **타입·이름으로 골라 선택**(Selection·Search 탭). · **`A00340_SelectionTool`** — 자주 쓰는 선택 세트를 버튼·프로파일로 재선택(버튼별 색 지정).
+- **`A00310_SearchTool`** — 오브젝트를 **타입 · 이름 · 씬에서의 상태**로 골라 선택(Type / Token / Rules 탭).
+  규칙은 레지스트리에 데이터로 모여 있어 **함수 하나 + 등록 한 줄**이면 늘어난다. · **`A00340_SelectionTool`** — 자주 쓰는 선택 세트를 버튼·프로파일로 재선택(버튼별 색 지정).
 - **`A00360_SortTool`** — 월드 X/Y/Z·이름·타입 기준 정렬 + 아웃라이너 재정렬. · **`A00330_NamingTool`** — 리네임/Quick Rename.
 - **`A00440_SetTool`** — 컴포넌트 세트끼리의 **집합 연산**(합집합 · 교집합 · 차집합 + 씬 선택 기준 분할). ·
   **`A00450_manipulatorTool`** — 이동/회전/스케일 **매니퓰레이터 축 굵기**를 슬라이더로 라이브 조절.
@@ -146,7 +147,7 @@ A narrative work summary lives in
 
 ### 독립 실행(Standalone) / in-Maya PySide 앱
 - **`A00210_FileManager`** — 파일/버전 매니저(파일 참조관계 **Lineage 그래프 시각화**, Remote Git ↔ Local/NAS Source Mode, 폴더 구조 캡처·재생성). · **`A00211_RefLineage`** — 씬 reference → Lineage 내보내기.
-- **`A00220_BackupTool`** — 지정 파일 **주기적/저장 시점 자동 백업**(크래시 대비). · **`A00240_PathTool`** — 자주 쓰는 폴더를 버튼/프로파일로 빠르게 열기.
+- **`A00220_BackupTool`** — 지정 파일 **주기적/저장 시점 자동 백업**(크래시 대비). · **`A00240_PathTool`** — 자주 쓰는 폴더를 버튼/프로파일로 빠르게 열기 + **경로 트리**(이름·경로 필터, Shift 로 한꺼번에 펼치기, 경로 복사).
 - **`A00370_ToolLauncher`** — 툴 폴더 경로를 버튼에 담아 JUN 툴을 즉시 실행(PC가 바뀌어도 경로 자동 재매핑).
 - **`A00230_StartupTool`** — Windows 로그인 시 폴더 팝업 + standalone 툴 자동 실행.
 - PySide 앱은 **PyInstaller로 `.exe` 빌드** 가능.
@@ -155,7 +156,7 @@ A narrative work summary lives in
 [skinTool](JUN_All/docs/A00275_skinTool_V01.md), [DemBone](JUN_All/docs/A00430_DemBone.md),
 [Wrapper](JUN_All/docs/A00420_Wrapper.md), [RigConnect](JUN_All/docs/A00145_RigConnect.md),
 [animTool V02](JUN_All/docs/A00110_animTool_V02.md), [jointTool V03](JUN_All/docs/A00060_jointTool_V03.md),
-[BSTool](JUN_All/docs/A00290_BSTool.md), [FileManager](JUN_All/docs/A00210_FileManager.md))
+[BSTool V02](JUN_All/docs/A00290_BSTool_V02.md), [FileManager](JUN_All/docs/A00210_FileManager.md))
 📝 작업 내역 요약(포트폴리오 문구): **[국문](JUN_All/docs/portfolio/portfolio_KR.md)** · **[English](JUN_All/docs/portfolio/portfolio_EN.md)**
 
 ---
@@ -166,6 +167,9 @@ A narrative work summary lives in
 
 | 시기 | 내용 |
 |------|------|
+| 2026-09 중순 | **공용 로그창을 Framework 로 승격해 PySide 툴 47곳에 일괄 적용** — `Expand`(별도 창으로 옮겨 크게 보기) · `Clear` · `Copy`. 호출 메서드를 전수 집계해 **드롭인**으로 설계, 툴당 생성부 2~3줄로 교체 |
+| 2026-09 중순 | **`A00290_BSTool_V02` 신규** — 넘치던 상위 탭 6개를 **Shape / Target / Node 3 카테고리 × 기능 7** 의 2단으로. **`A00030_quickTool_V02` 신규** — 레거시 maya.cmds 퀵툴을 PySide 로 재작성 |
+| 2026-09 중순 | **`A00310_SearchTool` Rules 탭** — 씬에서의 상태(연결·히스토리·디포머)로 고르는 **규칙 레지스트리**(규칙 추가 = 함수 하나 + 등록 한 줄) · **`A00240_PathTool`** Pin · 경로 트리 필터 · Shift 펼치기 |
 | 2026-09 초 | **`A00145` Mirror 탭 신규** — 계층을 통째로 반대쪽으로: 스킨 웨이트 · 컨스트레인트 · 클러스터에 더해 **컨스트레인트가 아닌 임의의 노드망**까지 복제·재배선. 컨트롤러용 **Reflect**(월드 `scaleX -1` 과 같은 상태) · 좌/우 토큰 규칙을 **`Framework/rules` 공용 파일**로 |
 | 2026-09 초 | **`A00275` Copy Weights 신규** — 같은 메시 안 버텍스 → 버텍스 웨이트 복사(Surface / Topology / Volume, 균일 격자로 20배) + **`Blend` 0~1** · **Expand Bind `Even distribution`** |
 | 2026-09 초 | **`A00290` Target Order 탭** — blendShape 타겟 순서를 리스트에서 바꿔 노드에 적용(마야에 없는 기능) · **`A00400` Edit > Joints** · **`A00460` FK & IK** |
@@ -227,6 +231,8 @@ A narrative work summary lives in
 ## 🧩 아키텍처 개요
 
 툴은 두 가지 형태 중 하나이며, 공통 **Framework**(재사용 위젯 · qss 테마 · `PathManager`)를 공유합니다.
+위젯을 고치면 **전 툴이 함께 고쳐집니다** — 예: `Expand` / `Clear` / `Copy` 를 갖춘 공용 로그창을
+만들어 **PySide 툴 47곳의 로그창을 한 번에** 갈아끼웠습니다.
 
 ```
 (A) in-Maya 툴      — maya.cmds UI. 드래그&드롭으로 셸프 버튼 설치 → run() 실행

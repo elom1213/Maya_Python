@@ -10,7 +10,7 @@ updated: 2026-09-16
 > **Author**: Ji Hun Park (Junny)
 > **Period**: 2026-05-06 – 2026-09-16 (~19 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
-> **Volume**: 40+ in-house tools (50 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
+> **Volume**: 50+ in-house tools (64 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
 
 ---
@@ -207,7 +207,7 @@ Default Distance attribute (driver signal x)
 | `A00120_FKIK`, `A00190_FKIK_General_Tool` | FK/IK switching and baking. Moved to native `bakeResults` for speed, then fixed to a constraint-free per-frame match bake so that **keys outside the range and anim-layer poses are no longer corrupted** |
 | `A00130_ControlRig` | Control rig generation |
 | `A00180_abSymMesh` | Legacy abSymMesh **re-implemented on OpenMaya** for speed: snap-to-symmetry, mirror deform, selected-vertices-only mode |
-| `A00290_BSTool` | blendShape editing suite — a tab that **replaces Maya's native Shape Editor** (all targets listed, per-target edit toggle, live weight sync, **range/multi-select to drive many weights at once**, **editing animated targets** — keyframed or on an animation layer, with the value applied instantly and recorded as the key at the current frame when Auto Keyframe is on, gesture-level undo), Base Shape editing, **mixing several targets at chosen amounts into other targets and into the final (rigged) mesh in one pass**, **baking a leftover `deleteComponent` back into the whole rig (neutral shape, every target mesh, deltas, skin weights, deformer membership) so the history collapses back to blendShape -> skinCluster**, **reordering a blendShape's targets (the weight indices)** — something Maya has no command for, moving each target's name, deltas, in-betweens, paint weights, connections and Shape Editor group along with it, **batch-renaming targets (the weight aliases Unreal imports morph targets under) by pattern, search/replace or prefix/suffix, with a live preview that refuses invalid or clashing names before anything is applied**, per-frame shape copy |
+| `A00290_BSTool` | blendShape editing suite — a tab that **replaces Maya's native Shape Editor** (all targets listed, per-target edit toggle, live weight sync, **range/multi-select to drive many weights at once**, **editing animated targets** — keyframed or on an animation layer, with the value applied instantly and recorded as the key at the current frame when Auto Keyframe is on, gesture-level undo), Base Shape editing, **mixing several targets at chosen amounts into other targets and into the final (rigged) mesh in one pass**, **baking a leftover `deleteComponent` back into the whole rig (neutral shape, every target mesh, deltas, skin weights, deformer membership) so the history collapses back to blendShape -> skinCluster**, **reordering a blendShape's targets (the weight indices)** — something Maya has no command for, moving each target's name, deltas, in-betweens, paint weights, connections and Shape Editor group along with it, **batch-renaming targets (the weight aliases Unreal imports morph targets under) by pattern, search/replace or prefix/suffix, with a live preview that refuses invalid or clashing names before anything is applied**, per-frame shape copy · **`A00290_BSTool_V02`** — the same features regrouped from six overflowing top-level tabs into **three categories (Shape / Target / Node) x seven functions**, planned in writing with a move map and a risk list before any code moved |
 | `A00170_driverTool`, `A00150_remapVal`, `A00160_sphericalEye` | **Function-driven stretch** (linear/sigmoid functions as a driven network, laid additively over the original value; sigmoid thresholds & sharpness exposed as **live scene attributes on the driver object** — see 3-1), driven keys / remapValue (master node driving child remaps, sine-wave and slerp-ramp build modes), closest-point curve attach with even distribution, **one-click edge-loop driver setup** (a curve per stored loop, a null at each stored vertex attached to its nearest curve, joints created to follow them - lip / eyelid rigs), **lip zip / seal** (two independent attributes close each lip from a corner toward the centre; the pose captured at build time is the closed shape, stored in head space, so a sealed driver keeps its own orientation and the two lips keep their thickness instead of collapsing onto one point), spherical eye rig (pupil dilation, converge-to-center) |
 
 ### 3-3. Update Bind Pose — implementing a missing Maya capability by working the deformer graph directly
@@ -609,7 +609,7 @@ Default Distance attribute (driver signal x)
 - **`A00470_MaterialTool`** — **checks material names against a naming convention kept as data rather than code**:
   one JSON profile per rule set (the first one being `MT_MANU_CH_<character>_<set>_<part>_<extra...>`), so a new
   convention is a new file, not a new branch in the tool — when the team added a fixed `CH` token to that rule, the
-  change was one entry in the JSON and no code at all. What the tool really had to get right is **how a name is
+  change was one entry in the JSON and no code at all. When a **second rule** with a different part list (`MT_MANU_CH_<character>_<part>_<extra...>`) was needed later, that too was **one more file** - the combo box, the pattern display, the diagnosis and the typo suggestions all followed on their own. What the tool really had to get right is **how a name is
   matched against the rule**. Pairing token 1 with slot 1 collapses the moment a token is left out —
   `MT_SYN_Sett002_Pantss` is missing `MANU`, and read left to right every later token lands in the wrong slot, so
   the report claims everything is wrong and helps nobody. I aligned them with a **Needleman-Wunsch style DP** over
@@ -639,7 +639,7 @@ Default Distance attribute (driver signal x)
   **`setCharacterObject` does nothing but print a warning when the character has a Control Rig, and raises no
   exception**, so the tool had been reporting those as assigned — it now blocks up front and **reads the
   connection back** to judge every assignment.
-- **`A00050_uvTool`**, **`A00030_quickTool`**, **`A00330_NamingTool`** (legacy naming tool port + Quick Rename), **`A00310_SearchTool`** (select by type/name), **`A00360_SortTool`** (sort by world X/Y/Z, name or type and reorder the Outliner).
+- **`A00050_uvTool`**, **`A00030_quickTool_V02`** (PySide rewrite of the legacy `maya.cmds` quick tool - same buttons and behaviour, but results go to a log panel inside the window instead of the script editor, and the logic moved into `core`), **`A00330_NamingTool`** (legacy naming tool port + Quick Rename), **`A00310_SearchTool`** (select by **type, name or state in the scene** - the state rules live in a registry as data, so a new rule is **one function plus one line of registration** and the UI is untouched), **`A00360_SortTool`** (sort by world X/Y/Z, name or type and reorder the Outliner).
 
 ---
 
@@ -661,7 +661,7 @@ I designed the common foundation alongside the tools, not as an afterthought.
 - **Standalone pipeline utilities**
   - `A00210_FileManager` — file/version manager that **visualises file reference relationships as a node graph (Lineage)**, switches between Remote (Git) and Local (NAS) source modes, **captures and recreates folder structures** (files included, restored as **0-byte placeholders** with a marker appended to the name so they can never be mistaken for the real scene — the tool never shares actual scene files), and records thumbnails and logs. (`A00211_RefLineage` exports a Maya scene's reference graph straight into it.)
   - `A00220_BackupTool` — periodic and on-save **automatic backup** of watched files (crash insurance).
-  - `A00240_PathTool` · `A00370_ToolLauncher` · `A00230_StartupTool` — launch frequently used folders/tools from buttons and profiles, auto-start them on Windows login, and **re-map paths automatically when the workstation changes**.
+  - `A00240_PathTool` · `A00370_ToolLauncher` · `A00230_StartupTool` — launch frequently used folders/tools from buttons and profiles, auto-start them on Windows login, and **re-map paths automatically when the workstation changes**. PathTool also carries a **path tree** (filter by name or path, `Shift` to expand/collapse a whole branch, copy the absolute path).
 - **Documentation** — every tool carries a usage guide, a CHANGELOG and a version file, backed by a daily WORKLOG.
 
 ---
@@ -671,6 +671,7 @@ I designed the common foundation alongside the tools, not as an afterthought.
 1. **Cross-DCC problem solving.** Maya, Unreal and Houdini caches are stitched into one flow. Generating Unreal node text in particular proved to be a pragmatic way to automate large graph setups **without writing an engine plugin**.
 2. **Modernising legacy assets.** Scattered MEL and single-file scripts were analysed, consolidated into Qt tools, verified for behavioural parity, and documented.
 3. **Artist-first design.** A tool lives or dies at its UI: always-on-top pins, collapsible sections, sorting/search, colour customisation and undo safety were iterated on repeatedly because that is where artists' hands actually land.
+   When features kept piling up and the tab bar only grew sideways, I **regrouped the tabs into category -> function, sorted by what each one changes** (`A00110` · `A00275` · `A00060_V03` · `A00290_V02`). Each regroup started as a written plan listing the **move map and the risks**, so nothing was lost on the way - and in `A00290_V02` that plan caught a timer that keyed off the **top-level tab index** and would have broken silently once the tabs nested.
 4. **Reusable structure.** Because logic (core) and UI are kept apart, moving the KWI Creator from a standalone app into Maya reused the generation core untouched.
 
 ---
