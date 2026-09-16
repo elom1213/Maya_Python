@@ -305,19 +305,23 @@ class MainWindow(QWidget):
         # 타겟 행이 Edit + 이름 + 슬라이더 + 스핀박스라 460 이면 슬라이더가 눌린다.
         # Mix Targets 탭은 목록이 좌우 두 개라 조금 더 넓어야 이름이 잘리지 않는다.
         #
-        # ★ V02 의 기본 크기는 **실측으로 정한 값**이다 — 이 크기에서는 **일곱 페이지 어디에도
-        #   스크롤바가 뜨지 않는다**(오프스크린 Qt 로 전수 확인).
+        # ★ V02 의 기본 크기는 **테마(green_dark)를 입힌 상태에서 실측**해 정했다.
         #
-        #   폭만으로는 안 된다. 폭을 넓히면 `Shape Editor` 가 필요로 하는 세로가 959 -> 839px
-        #   까지 줄지만 **839 에서 바닥을 친다**(1400 을 넘겨도 더 안 줄어든다). 그래서 세로도
-        #   함께 키워야 하고, 그 최소가 이 값이다. 더 넓혀 봐야 1144 밑으로는 안 내려간다.
+        #   처음에는 1400 x 1158 로 잡았는데, 그건 **테마 없이 잰 값**이라 과했다. 테마 qss 가
+        #   `font-size: 12px` 를 주므로 위젯 최소 폭이 확 줄어든다 — 가장 넓은 페이지 기준
+        #   1092px -> 809px. **창 크기를 오프스크린으로 잴 때는 테마를 입히고 재야 한다.**
         #
-        #   ※ 세로 1158 은 **1080p 모니터에는 안 들어간다**(작업표시줄 빼면 약 1040px).
-        #     그 경우 창이 화면에 맞춰 잘리면서 `Shape Editor` · `Naming` 에 세로 스크롤이
-        #     생긴다 — 페이지를 QScrollArea 에 담아 둔 것이 그래서다(그때는 스크롤이 받는다).
-        #     화면에 맞추는 것이 더 중요하면 이 두 값만 줄이면 된다.
-        self.win_width = 1400
-        self.win_height = 1158
+        #   그래도 좁힐 수 없던 이유는 **한 줄에 나란히 둔 버튼·라디오·라벨**이었다. 그런 줄의
+        #   최소 폭은 그대로 창의 최소 폭이 되고, 좌우 스플리터 안에 있으면 두 배로 올라온다.
+        #   버튼을 한 줄씩 내리고 라디오를 두 줄로 나눠(기능은 그대로) 가장 넓은 페이지가
+        #   **1092 -> 573px** 이 되었고, 그래서 이 폭에서 **가로 스크롤이 전혀 없다.**
+        #
+        #   ※ 세로는 다르다. 좁아지면 글이 접혀 **필요한 세로가 오히려 늘어난다**(Shape Editor
+        #     918 · Naming 894 · Mix Targets 756). 세로 스크롤까지 없애려면 창이 약 1195 여야
+        #     하는데 그건 1080p 모니터에 안 들어간다. 그래서 **화면에 들어가는 높이**를 택하고
+        #     세 페이지는 세로 스크롤이 받게 뒀다(페이지를 QScrollArea 에 담아 둔 이유).
+        self.win_width = 620
+        self.win_height = 1000
         self.win_title = f"BS Tool V02 v{VERSION}"
 
         self.resize(self.win_width, self.win_height)
@@ -1086,7 +1090,9 @@ class MainWindow(QWidget):
         box = QGroupBox("New Name")
         box_layout = QVBoxLayout(box)
 
-        mode_row = QHBoxLayout()
+        # ★ 라디오 3개를 한 줄에 두면 그 줄(약 610px)이 창의 최소 폭을 정한다.
+        #   그리드 2줄로 나누면 같은 라디오가 그대로 있으면서 약 465px 로 내려간다(실측).
+        mode_row = QGridLayout()
         self.rb_nm_set = QRadioButton("Set Name")
         self.rb_nm_set.setToolTip(
             "Replace the whole name.  '#' becomes a number ('##' = two digits),\n"
@@ -1097,10 +1103,11 @@ class MainWindow(QWidget):
         self.rb_nm_affix = QRadioButton("Prefix / Suffix")
         self.rb_nm_affix.setToolTip("Keep the name, add text in front and/or behind.")
         self.rb_nm_set.setChecked(True)
-        for radio in (self.rb_nm_set, self.rb_nm_replace, self.rb_nm_affix):
-            mode_row.addWidget(radio)
+        for pos, radio in enumerate((self.rb_nm_set, self.rb_nm_replace,
+                                     self.rb_nm_affix)):
+            mode_row.addWidget(radio, pos // 2, pos % 2)
             radio.toggled.connect(self._on_nm_mode_changed)
-        mode_row.addStretch(1)
+        mode_row.setColumnStretch(2, 1)
         box_layout.addLayout(mode_row)
 
         self.stk_nm = QStackedWidget()
@@ -1563,12 +1570,16 @@ class MainWindow(QWidget):
         타겟은 "베이스로부터의 오프셋"으로 저장되므로 베이스를 옮기면 타겟이 따라 움직인다.
         그래서 세 갈래를 명시적으로 고르게 한다(자세한 셈은 mix_manager 헤더 주석).
         """
+        # ★ 라벨과 라디오 3개를 한 줄에 두면 그 줄의 최소 폭(약 690px)이 그대로 창의
+        #   최소 폭이 된다. 라벨을 위로 올려 라디오 줄만 남기면 약 555px 로 내려간다(실측).
+        outer = QVBoxLayout()
+        outer.setContentsMargins(0, 0, 0, 0)
         row = QHBoxLayout()
         lbl = QLabel("Base mesh")
         f = lbl.font()
         f.setBold(True)
         lbl.setFont(f)
-        row.addWidget(lbl)
+        outer.addWidget(lbl)
 
         self.grp_mix_base = QButtonGroup(self)
 
@@ -1596,7 +1607,8 @@ class MainWindow(QWidget):
             self.grp_mix_base.addButton(rb, i)
             row.addWidget(rb)
         row.addStretch(1)
-        return row
+        outer.addLayout(row)
+        return outer
 
     def _mix_base_mode(self):
         if self.rb_mix_base_edit.isChecked():
@@ -1617,9 +1629,13 @@ class MainWindow(QWidget):
         lbl.setFont(f)
         header.addWidget(lbl)
         header.addStretch(1)
-        self.lbl_mix_src_count = QLabel("Checked: 0")
-        header.addWidget(self.lbl_mix_src_count)
         layout.addLayout(header)
+
+        # 카운트 라벨을 제목과 같은 줄에 두지 않는다 - 위와 같은 이유로 그 줄의 최소 폭이
+        # 그대로 창 최소 폭에 실린다.
+        self.lbl_mix_src_count = QLabel("Checked: 0")
+        self.lbl_mix_src_count.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        layout.addWidget(self.lbl_mix_src_count)
 
         self.lw_mix_src = QListWidget()
         self.lw_mix_src.setSelectionMode(QAbstractItemView.ExtendedSelection)
@@ -1648,25 +1664,29 @@ class MainWindow(QWidget):
         self.dsb_mix_amount.setToolTip(
             "How much of that source goes into the other targets.\n"
             "1.0 = the whole shape, 0.5 = half of it, negative = the opposite way.")
-        amount_row.addWidget(self.dsb_mix_amount)
+        amount_row.addWidget(self.dsb_mix_amount, 1)
+        layout.addLayout(amount_row)
+
+        # ★ 버튼을 한 줄에 둘씩 넣지 않는다. 이 패널은 좌우 스플리터의 한 칸이라
+        #   **한 줄의 최소 폭이 두 칸 합쳐 그대로 창의 최소 폭으로 올라온다.**
+        #   `Set to Selected`(198) + `Use Scene Weights`(222) 를 나란히 두었더니 패널
+        #   최소 폭이 406px, 두 칸 합쳤 791px 이 되어 창을 좀힐 수 없었다(실측).
+        #   한 줄씩 내리면 같은 버튼이 그대로 있으면서 최소 폭이 버튼 하나 폭으로 내려간다.
         btn_set_amount = QPushButton("Set to Selected")
         btn_set_amount.setToolTip(
             "Give this amount to the highlighted rows and check them as sources.")
         btn_set_amount.clicked.connect(self.on_mix_set_amount)
-        amount_row.addWidget(btn_set_amount, 1)
-        layout.addLayout(amount_row)
+        layout.addWidget(btn_set_amount)
 
-        btn_row = QHBoxLayout()
         btn_scene = QPushButton("Use Scene Weights")
         btn_scene.setToolTip(
             "Read each checked source's current weight from the scene and use it\n"
             "as the amount - dial the shape in Maya, then bake exactly that.")
         btn_scene.clicked.connect(self.on_mix_use_scene_weights)
-        btn_row.addWidget(btn_scene)
+        layout.addWidget(btn_scene)
         btn_clear = QPushButton("Uncheck All")
         btn_clear.clicked.connect(lambda: self._mix_check_all(self.lw_mix_src, False))
-        btn_row.addWidget(btn_clear)
-        layout.addLayout(btn_row)
+        layout.addWidget(btn_clear)
 
         return panel
 
@@ -1682,9 +1702,11 @@ class MainWindow(QWidget):
         lbl.setFont(f)
         header.addWidget(lbl)
         header.addStretch(1)
-        self.lbl_mix_dest_number = QLabel("Number: 0")
-        header.addWidget(self.lbl_mix_dest_number)
         layout.addLayout(header)
+
+        self.lbl_mix_dest_number = QLabel("Number: 0")
+        self.lbl_mix_dest_number.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        layout.addWidget(self.lbl_mix_dest_number)
 
         self.lw_mix_dest = QListWidget()
         self.lw_mix_dest.setSelectionMode(QAbstractItemView.ExtendedSelection)
@@ -1711,9 +1733,11 @@ class MainWindow(QWidget):
         self.chk_mix_all.clicked.connect(self.on_mix_all_clicked)
         all_row.addWidget(self.chk_mix_all)
         all_row.addStretch(1)
-        self.lbl_mix_dest_count = QLabel("Checked: 0")
-        all_row.addWidget(self.lbl_mix_dest_count)
         layout.addLayout(all_row)
+
+        self.lbl_mix_dest_count = QLabel("Checked: 0")
+        self.lbl_mix_dest_count.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        layout.addWidget(self.lbl_mix_dest_count)
 
         return panel
 
