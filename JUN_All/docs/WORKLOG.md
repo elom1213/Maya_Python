@@ -31,6 +31,30 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-16 (오늘)
 
+> [!summary] `A00030_quickTool_V02` **신규** — 레거시 maya.cmds 퀵툴(V01.16)을 **PySide 로 재작성** (v02.00)
+- **요청**: `A00030_quickTool_V02` 경로에 기존 퀵툴을 PySide 로 재작성. UI 는 현재 PySide 툴들의 관례를 따를 것.
+- **기능은 하나도 안 바뀌었다** — 섹션 6 / 버튼 10 그대로(Update window · Print · Import option ·
+  Create · File · Display). 바뀐 것은 그릇이다.
+  - 결과가 `print`/`cmds.warning` → **창 안 공용 로그창**(Expand/Clear/Copy)으로. 스크립트
+    에디터를 안 열어도 보인다. **코어는 로그 문자열 리스트를 돌려준다**(UI 비의존 · 테스트 가능).
+  - 로직을 `app/core/quick_ops.py` 로 분리, UI 는 `app/ui/main_window.py`.
+  - Pin 은 레거시가 창을 Qt 위젯으로 **감싸서** 하던 것을, 창이 Qt 라 바로 한다.
+  - 색은 코드에 박힌 RGB → 공용 테마 qss(`slate_dark`).
+  - **버튼 표 `MainWindow.SECTIONS` 한 줄이면 버튼이 는다** — 레거시는 인덱스 상수
+    (`idx_updateWin`…`idx_display`)와 중첩 리스트를 짝맞춰야 했다.
+- **★ 재작성하면서 하나 고쳤다 — FBX 버튼.** `FBXProperty` 는 MEL 기본 명령이 아니라
+  **`fbxmaya` 플러그인이 등록하는 프로시저**다. 플러그인이 안 올라와 있으면 V01 은
+  `Cannot find procedure "FBXProperty"` **트레이스백**으로 죽었다(mayapy 에서 실제로 재현됐다).
+  V02 는 **플러그인을 먼저 올려 보고**, 그래도 안 되면 로그에 이유를 적는다.
+- **V01 은 그대로 둔다** — 창·로그 확장창의 `objectName` 이 갈려 동시에 띄울 수 있다.
+  셸프 라벨 `QuickToolV2`, 드롭 파일 `__dragDrop_A00030_V02.py`.
+- **검증(mayapy + 오프스크린 Qt) 22항목 전부 통과** — 섹션·버튼 순서가 레거시와 동일 · 전 버튼 툴팁 ·
+  `playbackOptions -view` 실제 변경 · 선택 없을 때 경고 · 조인트 3단 **계층 트리**와 중복 스킵 ·
+  FBX 설정(트레이스백이 로그로 새지 않음) · `file`+`place2dTexture` 연결 · **선택 2개 → 클러스터 2개** ·
+  미저장 씬 경고 · `displayLocalAxis` 실제 변경과 **컴포넌트 선택 시 부모 transform** · Pin 토글 ·
+  `run()` 재실행 시 보이는 창 하나. 파일: `tools/A00030_quickTool_V02/**`(신규) ·
+  `docs/A00030_quickTool_V02.md`(신규) `#A00030`
+
 > [!summary] `A00040_file_exporter_V02` — Export Path 에 **`Paste` 버튼** 추가 (v02.07 -> 02.08)
 - **요청**: `Browse` 옆에 Paste 버튼을 두고, 클립보드에 복사해 둔 경로를 바로 꽂게 해 달라.
   (원하는 경로를 복사한 뒤 대화상자를 거치지 않고 붙여넣기)
