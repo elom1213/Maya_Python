@@ -4,7 +4,14 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.41` (`app/config/version.py`) — Mirror > Apply 에 **`Keep Children in Place`**(기본 ON):
+- 버전: `v01.42` (`app/config/version.py`) — Mirror > Create 의 **노드 네트워크 미러 수정** 두 가지:
+  (1) `multiplyDivide` · `vectorProduct` · `plusMinusAverage` 처럼 **셰이딩 노드를 상속하는**
+  리깅 유틸리티가 네트워크에서 통째로 빠져 있었다 — 이제 노드 **분류**(`getClassification`)로
+  셰이딩을 가려 이들도 복제·재연결한다.
+  (2) `A00170_driverTool` 의 AttachCrv **Maintain offset** 처럼 `multMatrix` 에 **값으로 박힌
+  오프셋**은 원본 쪽 프레임 기준이라 미러된 오브젝트를 제자리에서 끌어냈다 — 미러가 놓아 준
+  월드 행렬로 돌아오도록 그 상수를 **다시 푼다** (§노드 네트워크)
+  · v01.41 은 Mirror > Apply 에 **`Keep Children in Place`**(기본 ON):
   Target 을 옮겨도 **그 아래 자식들은 옮기기 전 월드 위치 / 회전 / 스케일을 지킨다.** 리스트 이름을
   `Left` / `Right` → **`Source` / `Target`** 으로(모드 `Apply (Source -> Target)`, 버튼 `Mirror to Target`) (§Apply)
   · v01.40 은 Mirror 탭에 **`Apply` 모드**:
@@ -1243,12 +1250,60 @@ crv_l_01 ─▶ pointOnCurveInfo ─▶ fourByFourMatrix ─┐
 | 컨스트레인트 · 디포머(skinCluster / cluster / blendShape) | 위에서 규칙대로 **따로** 다시 만든다 |
 | `animCurve*` · `animBlendNode*` · `pairBlend` | 애니메이션은 미러 대상이 아니다(키 미러는 `A00110_animTool` 의 Mirror Key). 컨스트레인트 + 키가 만드는 블렌드는 컨스트레인트 재생성과 겹친다 |
 | `expression` | 식 안에 **원본 이름이 문자열로 박혀 있어**, 복제하면 미러본이 원본을 또 구동한다 |
-| 셰이딩 · 폴리 히스토리 | 복제본에는 히스토리가 없다 |
+| 머티리얼 · 텍스처 · 폴리 히스토리 | 복제본에는 히스토리가 없다 |
 
-> [!warning] 박혀 있는 값은 그대로 복사된다
-> 연결로 들어오는 값은 미러 쪽에서 다시 계산되지만, 노드에 **박혀 있는** 값
-> (`multMatrix.matrixIn[i]` 의 고정 오프셋 등)은 그대로 복사된다. 반사 평면을 가로지르는
-> 성분이 있으면 그것만 손으로 고쳐야 한다. 실행할 때마다 로그로 알린다.
+> [!caution] 셰이딩은 **타입 상속이 아니라 분류**로 가른다 (v01.42 에 고쳤다)
+> `multiplyDivide` · `vectorProduct` · `plusMinusAverage` 는 마야에서 **셰이딩 노드를
+> 상속한다** — `nodeType(inherited=True)` 가 `['shadingDependNode', 'multiplyDivide']` 다.
+> 그래서 `shadingDependNode` 로 셰이딩을 거르던 v01.41 까지는 **리깅에서 제일 흔한
+> 유틸리티 노드들이 네트워크에서 통째로 빠졌다.** 미러된 쪽은 노드망이 반만 서고 나머지는
+> 원본 노드를 계속 바라봐서, 겉보기엔 "미러가 안 된" 상태가 된다.
+> 지금은 `getClassification` 의 **기능 분류**로 판정한다 — `multiplyDivide` 는
+> `math/operation`, `file` 은 `texture/2d`, `lambert` 는 `shader/surface` 라 둘이 깔끔히
+> 갈린다(앞의 `drawdb/shader/...` 는 하이퍼셰이드 그리기 분류라 **버린다**).
+
+> [!warning] 박혀 있는 값은 그대로 복사된다 — 오프셋만 다시 푼다
+> 연결로 들어오는 값은 미러 쪽에서 다시 계산되지만, 노드에 **박혀 있는** 값은 그대로
+> 복사된다. 그중 **`offsetParentMatrix` 를 구동하는 `multMatrix` 의 오프셋**은 v01.42 부터
+> 자동으로 다시 풀고(아래), 나머지 상수(스케일 · 각도 등)는 반사 평면을 가로지르는 성분이
+> 있으면 손으로 고쳐야 한다. 실행할 때마다 로그로 알린다.
+
+#### ★ maintain offset — 박힌 오프셋을 미러 쪽 기준으로 다시 푼다 (v01.42)
+
+`A00170_driverTool` 의 **AttachCrv > Maintain offset** 처럼, 오브젝트를 **옮기지 않고** 커브에
+붙이는 리그는 `offsetParentMatrix` 를 이렇게 구동한다.
+
+```
+multMatrix.matrixIn[0] = <상수>                # 빌드 시점의 오프셋 (OPM0 · frame0⁻¹)
+multMatrix.matrixIn[1] ◀ fourByFourMatrix      # 커브 위의 라이브 프레임
+multMatrix.matrixIn[2] ◀ parent.worldInverseMatrix
+multMatrix.matrixSum   ▶ obj.offsetParentMatrix
+```
+
+`matrixIn[0]` 은 연결이 아니라 **값**이라 복제하면 그대로 따라오는데, 그 값은 **원본 쪽
+프레임 `frame0` 기준**이다. 미러된 커브의 프레임 `frame'` 과 곱해지는 순간 오브젝트는
+미러 위치가 아니라 원본 쪽으로 끌려간다 (YZ 미러 실측: `x = -4` 로 가야 할 조인트가
+`x = -10.1` 로 갔다 — 커브는 미러됐는데 붙어 있던 조인트만 "미러가 안 된" 것처럼 보인다).
+
+**오프셋의 미러는 "같은 상수" 가 아니라 "미러된 프레임 기준으로 같은 관계"다.** 그래서
+네트워크를 다시 세운 뒤, 미러가 놓아 준 월드 행렬 `T` 로 돌아오도록 그 상수를 다시 푼다.
+
+```
+W = L · OPM · P                                  (마야: 로컬 · offsetParentMatrix · 부모 월드)
+OPM_need    = OPM_now · P · W_now⁻¹ · T · P⁻¹
+matrixIn[k] = (앞쪽 곱)⁻¹ · OPM_need · (뒤쪽 곱)⁻¹   (matrixSum = matrixIn[0]·[1]·…)
+```
+
+로컬 `L` 을 직접 읽지 않고 **현재 상태에서 역산**하므로 피벗 · `jointOrient` · `rotateAxis` 가
+섞여 있어도 그대로 성립한다. 연결되지 않은 `matrixIn` 이 하나도 없으면 풀 자유도가 없으니
+로그로 알리고 넘어간다.
+
+> [!note] Maintain offset 을 **끄고** 붙인 조인트는 회전을 네트워크가 정한다
+> 그쪽은 `decomposeMatrix` 가 `translate` / `rotate` 를 직접 구동하므로 미러가 놓은 자리를
+> 네트워크가 덮어쓴다(위치는 미러된 커브 위라 대칭이다). 이때 미러가 회전을
+> **`jointOrient` 로 옮겨 두면** 네트워크의 `rotate` 와 겹쳐 조인트가 엉뚱한 곳을 본다 —
+> 그래서 `jointOrient` 는 **원본 값 그대로** 두고(= 커브 프레임에 대한 같은 로컬 오프셋),
+> 그 사실을 로그에 남긴다.
 
 > [!tip] 월드 값을 로컬 채널에 바로 꽂은 네트워크는 원래부터 계층에 취약하다
 > `decomposeMatrix` 결과를 driven 의 `translate` 에 바로 꽂으면서 **driven 의
@@ -1411,7 +1466,7 @@ A00145_RigConnect/
     │   ├── maya_scene.py           # Pair (A00140 복사)
     │   ├── closest_connector.py    # Pair (A00140 복사 + 짝짓기 모드: 거리 / 리스트 자리)
     │   └── object_match.py         # Pair > Match by Name (이름으로 오브젝트 짝짓기 — attr_match 엔진 재사용, 비교는 말단 이름·반환은 전체 경로)
-    │   └── mirror_manager.py       # Mirror (계층 복제 -> 미러 행렬 -> 스킨/컨스트레인트/클러스터 재구성, 토큰은 Framework 공용 규칙, MissingTokenError 가 이름 목록 + 세트를 실어 나른다 · mirror_onto = Apply(Source -> Target), 있는 오브젝트에 미러 위치/회전만, keep_children 이면 자식 월드 보존)
+    │   └── mirror_manager.py       # Mirror (계층 복제 -> 미러 행렬 -> 스킨/컨스트레인트/클러스터 재구성, 토큰은 Framework 공용 규칙, MissingTokenError 가 이름 목록 + 세트를 실어 나른다 · mirror_onto = Apply(Source -> Target), 있는 오브젝트에 미러 위치/회전만, keep_children 이면 자식 월드 보존 · 네트워크 재구성 뒤 multMatrix 에 박힌 maintain offset 을 다시 푼다)
     ├── data/                        # 사용자 데이터 (git 제외)
     │   ├── attr_profiles/<이름>.json   # Attribute > Create 프로파일
     │   └── attr_profiles_active.json   # 마지막으로 쓰던 프로파일

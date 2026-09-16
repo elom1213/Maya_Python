@@ -296,6 +296,29 @@ Default Distance attribute (driver signal x)
   sides. `expression` nodes are deliberately excluded: their node names live inside a **string**, so a
   duplicate would drive the original as well (animation curves and blend nodes are excluded for the same
   kind of reason).
+- **★ Why half the graph was missing — Maya's rigging utilities inherit from the shading node**: to keep
+  materials and textures out of the graph the tool asked whether `nodeType(inherited=True)` contained
+  `shadingDependNode` — and `multiplyDivide`, `vectorProduct` and `plusMinusAverage` genuinely inherit
+  from it (`['shadingDependNode', ...]`). **The three most common rigging utilities were dropped
+  wholesale**, which surfaces only as "the mirror did not work": a half-built graph keeps looking at the
+  original nodes. The test now uses the node **classification** (`getClassification`) instead of type
+  inheritance — `multiplyDivide` is `math/operation`, `file` is `texture/2d`, `lambert` is
+  `shader/surface`. The leading `drawdb/shader/...` is the Hypershade **drawing** classification and
+  carries `shader` even on utility nodes, so it is discarded and only the functional half is read.
+- **★ Mirroring an offset means the same relation in the mirrored frame, not the same constant**: a rig
+  that attaches an object to a curve **without moving it** (`A00170`'s AttachCrv **Maintain offset**)
+  bakes `OPM₀·frame₀⁻¹` into `multMatrix.matrixIn[0]` **as a value**. Being a value rather than a
+  connection, it survives duplication untouched — but that constant is expressed in the **original**
+  frame, so the moment it meets the mirrored curve's frame it drags the object back toward the original
+  side (measured on a YZ mirror: a joint that should land at `x = -4` went to `x = -10.1`). So after the
+  graph is rebuilt the constant is **re-solved** to return the object to the world matrix `T` the mirror
+  placed it at — `OPM_need = OPM_now·P·W_now⁻¹·T·P⁻¹`,
+  `matrixIn[k] = (product before)⁻¹·OPM_need·(product after)⁻¹`. It is derived **from the current state**
+  rather than by reading the local transform, so it holds with pivots, `jointOrient` and `rotateAxis` in
+  play, and it applies to **any** rig driving `offsetParentMatrix` through a `multMatrix`. A joint
+  attached with Maintain offset **off** has its rotation driven by the graph itself, so moving the
+  mirrored rotation into `jointOrient` would stack two rotations — there the original `jointOrient` is
+  kept as is and the fact is reported in the log.
 - **The list defines the scope**: nothing outside it is copied. A mesh skinned to a mirrored joint is
   left alone unless the mesh itself is listed, and drivers or influences outside the scope are
   **referenced as they are** — which makes centre joints and centre controls fall out for free.
@@ -317,7 +340,10 @@ Default Distance attribute (driver signal x)
 - **Verification** (headless `mayapy` 2024): positions and matrices, Behavior producing mirrored motion
   from identical rotation values, Orientation keeping the original rotation, symmetric skin deformation
   across every vertex, all three planes (YZ/XY/XZ), node graphs rebuilt symmetrically without touching
-  the original side, the no-token abort and its override, and a UI smoke test.
+  the original side, the no-token abort and its override, and a UI smoke test — plus seven curve and
+  surface attachments (aim axis ±X, with and without a normal curve, with and without orient, joint vs.
+  group, with and without maintain offset, NURBS surface) checked for **landing on the mirrored place,
+  being independent of the original curve, and following the mirrored curve symmetrically**.
 - **Keywords**: mirror matrices (reflection, determinant), verified against `mirrorJoint`, DG graph
   traversal & rewiring, skinCluster influence remapping, constraint reconstruction, locked-channel
   verification, OpenMaya

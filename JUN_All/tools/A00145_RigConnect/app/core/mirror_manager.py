@@ -781,12 +781,23 @@ def _copy_clusters(scope, node_map, axis, other_mode, token_pairs, warnings):
 #              양쪽에서 구동해 버린다.
 
 # 상속 타입에 이게 있으면 네트워크로 안 본다.
+#
+# **`shadingDependNode` 로 셰이딩을 거르면 안 된다** (v01.42 에 고쳤다) - 마야에서
+# `multiplyDivide` · `vectorProduct` · `plusMinusAverage` 는 **셰이딩 노드를 상속한다**
+# (`nodeType(inherited=True)` 가 `['shadingDependNode', 'multiplyDivide']`). 리깅에서 제일
+# 흔한 유틸리티 노드들이 통째로 네트워크에서 빠져서, 미러된 쪽은 노드망이 반만 서고
+# 원본 노드를 계속 바라보고 있었다. 셰이딩 여부는 `_is_shading_node` 가 노드 **분류**
+# (`getClassification` 의 `shader/*` · `texture/*`)로 판정한다 - `multiplyDivide` 는
+# `math/operation`, `file` 은 `texture/2d` 라 둘이 깔끔히 갈린다.
 _NETWORK_SKIP_INHERITED = (
     "constraint",         # 컨스트레인트는 따로 다시 만든다
     "geometryFilter",     # skinCluster / cluster / blendShape ... (따로 다시 만든다)
-    "shadingDependNode",  # 셰이딩 · 텍스처
     "polyModifier", "polyBase", "polyCreator",   # 폴리 히스토리(복제본엔 히스토리가 없다)
 )
+
+# 셰이딩으로 보는 분류 접두사(노드 타입 -> 판정 캐시).
+_SHADING_CLASSES = ("shader", "texture")
+_shading_cache = {}
 
 # 정확히 이 타입이면 네트워크로 안 본다.
 _NETWORK_SKIP_TYPES = {
@@ -805,9 +816,47 @@ def _is_dag(node):
     return "dagNode" in (cmds.nodeType(node, inherited=True) or [])
 
 
+def _is_shading_node(type_):
+    """머티리얼 · 텍스처인가. 마야 노드 **분류**로 판정한다(타입 상속이 아니라).
+
+    `getClassification` 은 `'drawdb/shader/operation/multiplyDivide:math/operation'`
+    처럼 (그리기 분류):(기능 분류) 를 돌려준다. 앞의 `drawdb/...` 는 하이퍼셰이드 스윙
+    때문에 유틸리티 노드에도 `shader` 가 들어 있으므로 **버리고**, 뒤쪽 기능 분류만 본다.
+    `file` -> `texture/2d`, `lambert` -> `shader/surface` 는 걸리고,
+    `multiplyDivide` -> `math/operation`, `condition` -> `utility/general` 은 통과한다.
+    """
+    cached = _shading_cache.get(type_)
+    if cached is not None:
+        return cached
+
+    try:
+        classifications = cmds.getClassification(type_) or []
+    except Exception:                                # noqa: BLE001  (플러그인 타입 등)
+        classifications = []
+
+    shading = False
+    for classification in classifications:
+        for part in classification.split(":"):
+            part = part.strip()
+            if not part or part.startswith("drawdb"):
+                continue
+            head = part.split("/", 1)[0]
+            if head in _SHADING_CLASSES:
+                shading = True
+                break
+        if shading:
+            break
+
+    _shading_cache[type_] = shading
+    return shading
+
+
 def _skip_network_node(node):
     """네트워크로 데려가면 안 되는 노드인가."""
-    if cmds.nodeType(node) in _NETWORK_SKIP_TYPES:
+    type_ = cmds.nodeType(node)
+    if type_ in _NETWORK_SKIP_TYPES:
+        return True
+    if _is_shading_node(type_):
         return True
     for type_ in cmds.nodeType(node, inherited=True) or []:
         if type_ in _NETWORK_SKIP_INHERITED:
@@ -935,12 +984,13 @@ def _mirror_networks(scope, node_map, token_pairs, warnings):
 
     created = [dup_map[node] for node in network if node in dup_map]
     if created:
-        # 연결로 들어오는 값은 미러 쪽에서 다시 계산되지만, 노드에 **박혀 있는** 값
-        # (multMatrix 의 고정 오프셋 등)은 그대로 복사된다. 반사 평면을 가로지르는
-        # 성분이 있으면 그것만 손으로 고쳐야 한다.
+        # 연결로 들어오는 값은 미러 쪽에서 다시 계산되지만, 노드에 **박혀 있는** 값은
+        # 그대로 복사된다. offsetParentMatrix 를 구동하는 multMatrix 의 오프셋은
+        # `_rebake_network_offsets` 가 다시 풀어 주고, 나머지(스케일 · 각도 상수 등)는
+        # 반사 평면을 가로지르는 성분이 있으면 손으로 고쳐야 한다.
         warnings.append(
             "Utility node values that are not connected were copied as-is - "
-            "check any baked offsets (e.g. multMatrix matrixIn).")
+            "check any baked values other than the offsets that were re-solved.")
     return created
 
 
@@ -959,6 +1009,196 @@ def _connect_once(source, destination, done, warnings):
     except Exception as e:
         warnings.append("Could not connect '{0}' -> '{1}' ({2}).".format(
             source, destination, e))
+
+
+# ==================================================================
+# 네트워크에 박힌 오프셋 다시 풀기 (maintain offset)
+# ==================================================================
+#
+# A00170 driverTool 의 AttachCrv > Maintain offset 처럼, 오브젝트를 **옮기지 않고** 커브에
+# 붙이는 리그는 `offsetParentMatrix` 를 이렇게 구동한다:
+#
+#     multMatrix.matrixIn[0] = <상수>            # 빌드 시점의 오프셋(월드)
+#     multMatrix.matrixIn[1] < fourByFourMatrix  # 커브 위의 라이브 프레임
+#     multMatrix.matrixIn[2] < parent.worldInverseMatrix
+#     multMatrix.matrixSum   > obj.offsetParentMatrix
+#
+# `matrixIn[0]` 은 **연결이 아니라 값**이라 복제하면 그대로 따라온다 - 그런데 그 값은
+# `OPM0 * frame0^-1` 로, **원본 쪽 프레임**을 기준으로 잡힌 상수다. 미러된 커브의 프레임
+# `frame'` 과 곱해지는 순간 오브젝트는 미러 위치가 아니라 원본 쪽으로 끌려간다
+# (YZ 미러 실측: x = -4 로 가야 할 조인트가 x = -10.1 로 갔다).
+#
+# 그래서 네트워크를 다시 세운 뒤, **미러가 놓아 준 월드 행렬로 되돌리도록 그 상수를
+# 다시 푼다.** 오프셋의 미러는 "같은 상수" 가 아니라 "미러된 프레임 기준으로 같은 관계"다.
+#
+#     W = L * OPM * P          (마야: 로컬 * offsetParentMatrix * 부모 월드)
+#     OPM_need = OPM_now * P * W_now^-1 * T * P^-1        (T = 미러 목표 월드)
+#     matrixIn[k] = (앞쪽 곱)^-1 * OPM_need * (뒤쪽 곱)^-1
+#
+# `L`(로컬)을 직접 읽지 않고 현재 상태에서 역산하므로, 피벗 · jointOrient · rotateAxis 가
+# 섞여 있어도 그대로 성립한다.
+
+def _parent_world(node):
+    """부모 transform 의 월드 행렬. 월드 바로 밑이면 단위행렬."""
+    parents = cmds.listRelatives(node, parent=True, fullPath=True) or []
+    if not parents:
+        return om.MMatrix()
+    return om.MMatrix(cmds.getAttr(parents[0] + ".worldMatrix[0]"))
+
+
+def _network_source_node(plug, created):
+    """plug 를 구동하는 노드가 이번 미러에서 만든 네트워크 노드면 그 이름, 아니면 None."""
+    sources = cmds.listConnections(plug, source=True, destination=False,
+                                   plugs=True) or []
+    if not sources:
+        return None
+    name = sources[0].split(".", 1)[0]
+    node = _long(name) or name
+    return node if node in created else None
+
+
+def _static_matrix_index(mult):
+    """multMatrix 에서 **연결되지 않은** 첫 matrixIn 인덱스. 없으면 None.
+
+    반환: (인덱스, 전체 인덱스 목록)
+    """
+    indices = cmds.getAttr(mult + ".matrixIn", multiIndices=True) or []
+    for index in indices:
+        plug = "{0}.matrixIn[{1}]".format(mult, index)
+        if not (cmds.listConnections(plug, source=True, destination=False) or []):
+            return index, indices
+    return None, indices
+
+
+def _rebake_offset(node, mult, target):
+    """`mult` 의 고정 matrixIn 을 다시 풀어 `node` 를 목표 월드 행렬 `target` 에 놓는다.
+
+    실패 사유 문자열을 반환한다(성공이면 None).
+    """
+    index, indices = _static_matrix_index(mult)
+    if index is None:
+        return ("'{0}' has no baked matrix to re-solve - every matrixIn is "
+                "connected".format(_short(mult)))
+
+    world_now = om.MMatrix(cmds.xform(node, query=True, worldSpace=True, matrix=True))
+    if abs(world_now.det4x4()) < 1e-10:
+        return "'{0}' has a degenerate world matrix".format(_short(node))
+
+    opm_now = om.MMatrix(cmds.getAttr(node + ".offsetParentMatrix"))
+    parent = _parent_world(node)
+    opm_need = (opm_now * parent * world_now.inverse()
+                * om.MMatrix(list(target)) * parent.inverse())
+
+    # matrixSum = matrixIn[0] * matrixIn[1] * ... 이므로 앞뒤 곱을 나눠 가운데를 푼다.
+    pre = om.MMatrix()
+    post = om.MMatrix()
+    for other in indices:
+        value = om.MMatrix(cmds.getAttr("{0}.matrixIn[{1}]".format(mult, other)))
+        if other < index:
+            pre = pre * value
+        elif other > index:
+            post = post * value
+
+    solved = pre.inverse() * opm_need * post.inverse()
+    cmds.setAttr("{0}.matrixIn[{1}]".format(mult, index), list(solved),
+                 type="matrix")
+    return None
+
+
+def _rotation_driver(node, created):
+    """node 의 rotate(또는 축별 rotateX/Y/Z)를 구동하는 네트워크 노드. 없으면 None."""
+    for attr in ("rotate", "rotateX", "rotateY", "rotateZ"):
+        driver = _network_source_node("{0}.{1}".format(node, attr), created)
+        if driver:
+            return driver
+    return None
+
+
+def _restore_joint_orient(orig, dup):
+    """rotate 가 네트워크에 물린 조인트의 jointOrient 를 원본 값으로 되돌린다.
+
+    `_apply_world_matrix` 는 조인트를 놓을 때 회전을 **jointOrient 로 옮긴다**(rotate 0).
+    그런데 그 rotate 를 네트워크가 다시 구동하면 두 회전이 겹쳐 - 조인트가 엉뚱한 방향을
+    본다(AttachCrv 를 Maintain offset 없이 쓴 조인트에서 실측). 이때 jointOrient 는 미러가
+    정할 값이 아니라 **커브 프레임에 대한 로컬 오프셋**이라, 원본이 갖고 있던 값을 그대로
+    두는 것이 반대쪽에 같은 리그를 세우는 것이다.
+    """
+    value = cmds.getAttr(orig + ".jointOrient")[0]
+    cmds.setAttr(dup + ".jointOrient", *value)
+
+
+def _restore_network_placement(resolved_pairs, placed, created, warnings):
+    """다시 세운 네트워크가 미러 위치에서 끌어낸 오브젝트를 제자리로 되돌린다.
+
+    두 가지를 처리한다.
+      - offsetParentMatrix 를 구동하는 multMatrix : 박힌 오프셋을 다시 푼다(maintain offset).
+      - rotate 를 구동당하는 조인트               : jointOrient 를 원본 값으로 되돌린다.
+        (이쪽은 네트워크가 회전을 통째로 정하므로 미러 위치로 되돌릴 수는 없다)
+
+    placed  : {복제 롱네임: 미러가 놓은 월드 행렬}
+    created : 이번 미러에서 만든 네트워크 노드 목록
+    반환: (다시 푼 오프셋 수, jointOrient 를 되돌린 조인트 수)
+    """
+    if not created:
+        return 0, 0
+
+    created = set(created)
+    fixed = 0
+    restored = 0
+    for orig, dup in resolved_pairs:
+        target = placed.get(dup)
+        if target is None:
+            continue
+
+        mult = _network_source_node(dup + ".offsetParentMatrix", created)
+        if not mult:
+            # offsetParentMatrix 가 아니라 rotate 를 직접 구동하는 네트워크.
+            if (cmds.nodeType(dup) == "joint"
+                    and _rotation_driver(dup, created)):
+                try:
+                    _restore_joint_orient(orig, dup)
+                except Exception as e:               # noqa: BLE001
+                    warnings.append(
+                        "jointOrient of '{0}' could not be restored ({1}).".format(
+                            _short(dup), e))
+                    continue
+                restored += 1
+                warnings.append(
+                    "'{0}' has its rotation driven by the rebuilt network - it "
+                    "sits where the network puts it, not where the mirror placed "
+                    "it (its jointOrient was kept as on the original).".format(
+                        _short(dup)))
+            continue
+
+        world = cmds.xform(dup, query=True, worldSpace=True, matrix=True)
+        if max(abs(a - b) for a, b in zip(world, target)) < 1e-4:
+            continue                      # 이미 제자리 - 박힌 오프셋이 없는 네트워크
+
+        if cmds.nodeType(mult) != "multMatrix":
+            warnings.append(
+                "'{0}' was pulled off its mirrored place by '{1}' - only a "
+                "multMatrix offset can be re-solved, fix it by hand.".format(
+                    _short(dup), _short(mult)))
+            continue
+
+        try:
+            reason = _rebake_offset(dup, mult, target)
+        except Exception as e:                       # noqa: BLE001
+            reason = str(e)
+        if reason:
+            warnings.append("Offset of '{0}' could not be re-solved ({1}).".format(
+                _short(dup), reason))
+            continue
+
+        world = cmds.xform(dup, query=True, worldSpace=True, matrix=True)
+        if max(abs(a - b) for a, b in zip(world, target)) > 1e-3:
+            warnings.append(
+                "Offset of '{0}' was re-solved but it is still off its mirrored "
+                "place - check '{1}'.".format(_short(dup), _short(mult)))
+            continue
+        fixed += 1
+
+    return fixed, restored
 
 
 # ==================================================================
@@ -1206,6 +1446,7 @@ def mirror(objects, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
 
     # ---- 트랜스폼 (부모 -> 자식 순서로 놓아야 자식이 안 밀린다) ----
     reflected_meshes = 0
+    placed = {}                     # {복제 롱네임: 미러가 놓은 월드 행렬}
     for orig, dup in resolved_pairs:
         mode = joint_mode if cmds.nodeType(orig) == "joint" else other_mode
         # 메시에 Reflect 를 그대로 쓰면 **월드 행렬이 왼손계**가 되어 노멀이 뒤집힌 채
@@ -1220,6 +1461,7 @@ def mirror(objects, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
             cmds.xform(orig, query=True, worldSpace=True, matrix=True), axis, mode)
         try:
             _apply_world_matrix(dup, matrix)
+            placed[dup] = matrix
         except Exception as e:
             warnings.append("Could not place '{0}' ({1}).".format(_short(dup), e))
 
@@ -1272,11 +1514,23 @@ def mirror(objects, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
                                   token_pairs, warnings)
 
     networks = []
+    rebaked = 0
+    restored = 0
     if do_networks:
         try:
             networks = _mirror_networks(scope_orig, plug_map, token_pairs, warnings)
         except Exception as e:
             warnings.append("Node network could not be mirrored ({0}).".format(e))
+        else:
+            # 네트워크에 **값으로** 박힌 오프셋(multMatrix 의 maintain offset)은 원본 쪽
+            # 프레임 기준이라 미러된 오브젝트를 제자리에서 끌어낸다. 미러가 놓아 준
+            # 월드 행렬로 돌아오도록 그 상수를 다시 푼다.
+            try:
+                rebaked, restored = _restore_network_placement(
+                    resolved_pairs, placed, networks, warnings)
+            except Exception as e:
+                warnings.append(
+                    "Baked network offsets could not be re-solved ({0}).".format(e))
 
     constraints = []
     if do_constraints:
@@ -1302,6 +1556,12 @@ def mirror(objects, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
         infos.append("{0} constraint(s) rebuilt.".format(len(constraints)))
     if do_networks:
         infos.append("{0} utility node(s) rebuilt.".format(len(networks)))
+        if rebaked:
+            infos.append("{0} baked offset(s) re-solved so the mirrored objects "
+                         "kept their mirrored place.".format(rebaked))
+        if restored:
+            infos.append("{0} joint(s) driven by the network kept the jointOrient "
+                         "of the original.".format(restored))
 
     return (created_roots, warnings, infos)
 

@@ -31,6 +31,33 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-16 (오늘)
 
+> [!summary] `A00145_RigConnect` Mirror > Create — **`A00170` AttachCrv 로 붙인 오브젝트가 미러가 안 되던 문제** 두 가지 수정 (v01.41 -> 01.42)
+- **증상**: `A00170_driverTool` 의 `AttachCrv > Default + Maintain offset` 으로 만든
+  `CRV -> vectorProduct -> POCI -> fourByFourMatrix -> multMatrix -> joint` 네트워크를 커브와 함께
+  Mirror > Create 로 미러하면, **커브는 미러되는데 붙어 있던 오브젝트는 미러가 안 된 자리**에 남았다.
+- **★ 원인 1 — `multiplyDivide` · `vectorProduct` · `plusMinusAverage` 는 셰이딩 노드를 상속한다.**
+  `nodeType(inherited=True)` 가 `['shadingDependNode', 'multiplyDivide']` 다. 네트워크 수집이
+  `shadingDependNode` 로 셰이딩을 걸러 내고 있어서, **리깅에서 제일 흔한 유틸리티 노드들이 통째로
+  빠졌다.** 실측: 6개짜리 네트워크에서 3개만 복제되고 나머지는 원본 노드를 계속 바라봤다.
+  → 셰이딩 판정을 노드 **분류**(`getClassification`)로 바꿨다. `multiplyDivide` 는 `math/operation`,
+  `file` 은 `texture/2d`, `lambert` 는 `shader/surface`. 앞의 `drawdb/shader/...` 는 하이퍼셰이드
+  그리기 분류라 유틸리티에도 붙어 있으므로 **버리고 뒤쪽 기능 분류만** 본다.
+- **★ 원인 2 — `multMatrix` 에 값으로 박힌 maintain offset 은 원본 프레임 기준이다.**
+  `matrixIn[0] = OPM0 · frame0⁻¹` 는 연결이 아니라 값이라 복제하면 그대로 따라오는데, 미러된 커브의
+  프레임과 곱해지는 순간 오브젝트를 원본 쪽으로 끌어당긴다(YZ 미러 실측: `x = -4` 로 가야 할 조인트가
+  `x = -10.1`). **오프셋의 미러는 "같은 상수" 가 아니라 "미러된 프레임 기준으로 같은 관계"다.**
+  → 네트워크를 다시 세운 뒤 미러가 놓아 준 월드 행렬 `T` 로 돌아오도록 상수를 다시 푼다 —
+  `OPM_need = OPM_now · P · W_now⁻¹ · T · P⁻¹`, `matrixIn[k] = 앞쪽곱⁻¹ · OPM_need · 뒤쪽곱⁻¹`.
+  로컬을 직접 읽지 않고 현재 상태에서 역산하므로 피벗 · `jointOrient` · `rotateAxis` 와 무관하다.
+- **덤 — Maintain offset 을 끄고 붙인 조인트**: 그쪽은 `rotate` 를 네트워크가 직접 구동하는데,
+  미러가 회전을 `jointOrient` 로 옮겨 두면 두 회전이 겹쳐 엉뚱한 방향을 봤다. 이 경우 `jointOrient` 는
+  **원본 값 그대로** 두고(= 커브 프레임에 대한 같은 로컬 오프셋) 로그에 남긴다.
+- 검증(mayapy + `maya.standalone`): 어태치 6종(±X aim · norCrv 유무 · orient 유무 · 조인트/그룹 ·
+  maintain offset 유무) + NURBS surface 어태치 + `multiplyDivide`/`plusMinusAverage` 네트워크 +
+  셰이딩 노드 제외 — **미러 위치 일치 · 원본 커브와 무관 · 미러된 커브를 대칭으로 따라감** 전부 통과.
+  파일: `tools/A00145_RigConnect/app/core/mirror_manager.py` · `app/config/version.py` ·
+  `docs/A00145_RigConnect.md` `#A00145`
+
 > [!summary] `A00470_MaterialTool` 머티리얼 표 — **칸 폭을 드래그로 조절** + **더블클릭으로 씬 선택**(한 번 클릭은 선택만) (v01.02 -> 01.03)
 - **요청**: `Material` / `Status` / `Meshes` 칸을 드래그해 가로 폭을 조절 · 머티리얼을 더블클릭하면
   그 노드가 선택되도록.
