@@ -30,6 +30,7 @@
 - [getAttr settable lies](getattr-settable-lies-for-constrained.md) — 컨스트레인트 구동도 True, 연결+lock 으로 판정
 - [Maya loadPlugin no __file__](maya-loadplugin-no-file.md) — loadPlugin .py 에 `__file__` 없음
 - animLayer — [copy/cut traps](animlayer-copy-cut-traps.md)(`cutKey` 는 `animLayer` 를 안 받는다) · [no global selected query](animlayer-no-global-selected-query.md)(`ls(type=animLayer)` 순회)
+- [node purity signals](node-purity-signals.md) — listHistory 는 짧은 이름, 깨끗한 메시에도 initialShadingGroup
 - [shading: per-face assignment](shading-per-face-assignment.md) — `listConnections(shadingEngine)` 는 면별 배정을 잃는다, `getConnectedShaders`
 - [utility nodes inherit shadingDependNode](utility-nodes-inherit-shadingdependnode.md) — multiplyDivide/vectorProduct/plusMinusAverage, 셰이딩 판정은 `getClassification`
 - [Referenced node name compares](referenced-node-name-comparisons.md) — 솔버까지 네임스페이스, 타입으로 판정
@@ -59,7 +60,7 @@
 - TSL — [UUID selection](wip-tsl-uuid-selection.md)((uuid, component) 보관) · [attach_uuids](framework-tsl-attach-uuids.md)(씬 노드 아닌 리스트는 False) · [list_limit summary](framework-tsl-list-limit.md)(500+ 요약) · [max-height squeezes buttons](tsl-widget-max-height-squeezes-buttons.md)(`list_widget` 에만) · [selection order](tsl-selection-order.md)(`trackSelectionOrder` 꺼지면 `ls(os)` 도 인덱스 순)
 - [Sub-tabs over collapsibles](prefer-subtabs-over-stacked-collapsibles.md) — 섹션 3~4개 넘으면 중첩 탭
 - Framework 위젯 — [log](framework-log-widget.md)(Expand/Clear/Copy, **47툴 전부 교체 완료** · 내부는 QTextEdit) · [expand](framework-expand-widget.md)(복제 말고 이동) · [filter](framework-filter-widget.md)(v2 트리 모드) · [mirror tokens](framework-mirror-tokens.md)(공용 json, 경계 매칭) · [falloff curve](framework-falloff-curve-widget.md) · [progress popup](framework-progress-widget.md)(마지막 값 스로틀 금지) · [timeRange](framework-timerange-widget.md)
-- Qt 함정 — [QTreeWidgetItem checkable default](qtreewidgetitem-checkable-default-flag.md) · [clicked passes checked bool](qt-clicked-passes-checked-bool.md) · [QDoubleSpinBox keyboardTracking](qdoublespinbox-keyboard-tracking.md)
+- Qt 함정 — [exclusive radio: setChecked(False) 무시](qt-exclusive-radio-uncheck-ignored.md) · [QTreeWidgetItem checkable default](qtreewidgetitem-checkable-default-flag.md) · [clicked passes checked bool](qt-clicked-passes-checked-bool.md) · [QDoubleSpinBox keyboardTracking](qdoublespinbox-keyboard-tracking.md)
 
 ## 툴 작업
 
@@ -80,7 +81,7 @@
 - A00280 — [cloth-corrective](metahuman-cloth-corrective-A00280.md)(알렘빅 → RBF 코렉티브)
 - A00290 — [Naming tab](wip-a00290-naming-tab.md)(FBX 엔 별칭뿐, v01.22) · [Target Order](wip-a00290-target-order-tab.md) · [Bake Delete](wip-a00290-bake-delete-tab.md) · [Mix Targets](wip-a00290-mix-targets-tab.md) · [Shape Editor](wip-a00290-shape-editor-tab.md)(`sculptTarget` 필수)
 - A00300 — [batch summary](wip-a00300-batch-summary-table.md) · [zero-area rework](wip-a00300-zero-area-quality-rework.md)(**진행 중**)
-- A00310 — [SearchTool](wip-a00310-searchtool-merge.md)(Maya 테스트 대기) · A00330 — [Set Rename](wip-a00330-set-rename.md)
+- A00310 — [Rules tab](wip-a00310-searchtool-rules.md)(규칙 레지스트리 · Standalone, v01.02) · A00330 — [Set Rename](wip-a00330-set-rename.md)
 - A00340 — [SelectionTool](wip-a00340-selectiontool.md) · [button colors](wip-a00340-button-colors.md) · [split layout](wip-a00340-split-layout.md)
 - A00350 — [ArrayCreator](wip-a00350-arraycreator.md) · A00360 — [SortTool](wip-a00360-sorttool.md) · A00370 — [ToolLauncher](wip-a00370-toollauncher.md)
 - A00380 — [MeshTool Peak](wip-a00380-meshtool-peak.md) · [Match tab](wip-a00380-match-tab.md)
