@@ -9,6 +9,7 @@
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt.maya_window import maya_main_window
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -67,8 +68,9 @@ class MainWindow(QWidget):
         main_layout.setMenuBar(self.menu_bar)
 
         # 로그 (탭 빌더가 self.log 를 호출할 수 있으므로 먼저 생성)
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="Constraint Converter - Log",
+            object_name="JUN_A00260_ConstraintConverter_log_window")
         self.te_log.setMinimumHeight(90)
         self.te_log.setMaximumHeight(160)
 

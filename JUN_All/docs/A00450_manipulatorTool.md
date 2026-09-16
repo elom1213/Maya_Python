@@ -131,3 +131,17 @@ A00450_manipulatorTool/
 - 스핀박스는 `setKeyboardTracking(False)` — 타이핑 도중 값이 되쓰이면 `0.1` 이 `0.100` 으로 잘린다.
 - 창을 닫으면 `closeEvent` → `ManipTab.shutdown()` 으로 `scriptJob` 을 끊는다.
   늦게 도는 job 이 죽은 위젯을 건드리는 경우까지 `RuntimeError` 로 받아 감시를 정리한다.
+
+---
+
+## 로그창 (v01.01)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

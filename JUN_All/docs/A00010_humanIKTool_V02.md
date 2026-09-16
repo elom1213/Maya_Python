@@ -2,7 +2,7 @@
 title: A00010_humanIKTool_V02 사용법
 aliases: [HumanIK Tool, HumanIKTool, A00010, Mirror Assign, Custom Rig Mirror]
 tags: [maya-python, tool-guide, humanik, hik, characterization, retarget, mirror]
-updated: 2026-08-25
+updated: 2026-09-16
 ---
 
 # A00010_humanIKTool_V02 사용법
@@ -259,3 +259,17 @@ Maya 2024 기준 **212개**(`0~171` 정의 슬롯, `172~211` Leaf roll).
 | `hikGetControlRig(char)` | mayaHIK 플러그인 | Control Rig 존재 확인 |
 | `RetargeterAddMapping / DeleteMapping / Connect / Disconnect` | `retargeter.mel` | Custom Rig 매핑 |
 | `hikUpdateDefinitionUI` · `hikUpdateCustomRigUI` | `hik*UI.mel` | HIK 창 갱신(`catchQuiet` 로 감쌈) |
+
+---
+
+## 로그창 (v02.02)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

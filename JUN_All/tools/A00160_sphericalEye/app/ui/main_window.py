@@ -13,6 +13,7 @@ from Framework.core.maya_undo import undo_chunk
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from tools.A00160_sphericalEye.app.config.version import VERSION, LAST_UPDATE
 from tools.A00160_sphericalEye.app.core import MayaScene, run_build, run_build_nodes
@@ -138,8 +139,9 @@ class MainWindow(QWidget):
     def _build_log_group(self):
         group = QGroupBox("Log")
         layout = QVBoxLayout(group)
-        self.log_view = QPlainTextEdit()
-        self.log_view.setReadOnly(True)
+        self.log_view = JUN_mod_log_qt_v01(
+            window_title="Spherical Eye Tool - Log",
+            object_name="JUN_A00160_sphericalEye_log_window")
         self.log_view.setFixedHeight(120)
         layout.addWidget(self.log_view)
         return group

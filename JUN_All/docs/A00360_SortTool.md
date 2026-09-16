@@ -2,7 +2,7 @@
 title: A00360_SortTool 사용법
 aliases: [Sort Tool, SortTool, A00360]
 tags: [maya-python, tool-guide, outliner, sort]
-updated: 2026-07-08
+updated: 2026-09-16
 ---
 
 # A00360_SortTool 사용법
@@ -87,3 +87,17 @@ tools/A00360_SortTool/
 
 - 핵심 API: `sort_manager.sort_objects(items, mode, reverse, reorder_outliner)` → `(ordered_texts, missing)`.
   `mode` = `MODE_X/Y/Z/NAME/TYPE`. 위치는 `xform(ws)`, 이름은 짧은이름, 타입은 (shape nodeType, 이름).
+
+---
+
+## 로그창 (v01.01)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

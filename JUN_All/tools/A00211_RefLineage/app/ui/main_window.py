@@ -22,6 +22,7 @@ from Framework.qt.qt import (
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from tools.A00211_RefLineage.app.config.version import VERSION
 from tools.A00211_RefLineage.app.core import ref_scanner as rs
@@ -90,8 +91,9 @@ class MainWindow(QWidget):
         root.addWidget(self.tree, stretch=1)
 
         # 로그
-        self.txt_log = QTextEdit()
-        self.txt_log.setReadOnly(True)
+        self.txt_log = JUN_mod_log_qt_v01(
+            window_title="Ref to Lineage - Log",
+            object_name="JUN_A00211_RefLineage_log_window")
         self.txt_log.setMaximumHeight(140)
         root.addWidget(self.txt_log)
 

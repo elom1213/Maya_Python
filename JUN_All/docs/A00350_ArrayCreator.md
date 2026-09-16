@@ -2,7 +2,7 @@
 title: A00350_ArrayCreator 사용법
 aliases: [Array Creator, ArrayCreator, A00350]
 tags: [maya-python, tool-guide, unreal, control-rig, text-generator]
-updated: 2026-07-13
+updated: 2026-09-16
 ---
 
 # A00350_ArrayCreator 사용법
@@ -78,3 +78,17 @@ tools/A00350_ArrayCreator/
 - 요소별로 바뀌는 것은 Type/Name 의 `DefaultValue` 뿐이라, 조각 템플릿을 반복 조립한다(A00260 NodeBuilder 패턴).
 - 참고: v02 는 한 노드에 여러 타입이 아니라 **타입별 단일요소 노드 8개**를 이어붙인 카탈로그다. 현재 툴은
   **모든 요소 공통 타입**(Type 콤보)으로 동작한다.
+
+---
+
+## 로그창 (v01.02)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

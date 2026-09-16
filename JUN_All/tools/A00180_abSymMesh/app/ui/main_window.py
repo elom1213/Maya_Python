@@ -17,6 +17,7 @@ import maya.cmds as cmds
 from Framework.core.maya_undo import undo_chunk
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from ..config.version import VERSION, LAST_UPDATE
 from ..core import mesh_io
@@ -85,8 +86,9 @@ class MainWindow(QWidget):
         root.addWidget(self.tabs)
 
         # 로그 / 푸터는 탭 공용(항상 보임).
-        self.log_view = QPlainTextEdit()
-        self.log_view.setReadOnly(True)
+        self.log_view = JUN_mod_log_qt_v01(
+            window_title="abSymMesh - Log",
+            object_name="JUN_A00180_abSymMesh_log_window")
         self.log_view.setFixedHeight(90)
         root.addWidget(self.log_view)
 

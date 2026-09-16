@@ -8,6 +8,7 @@ from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_timeRange_qt
 from Framework.core.maya_refresh import force_refresh
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -213,8 +214,9 @@ class MainWindow(QWidget):
 
     def _build_log_section(self, root):
 
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="FKIK Tool - Log",
+            object_name="JUN_A00120_FKIK_log_window")
         self.te_log.setFixedHeight(90)
         root.addWidget(self.te_log)
 

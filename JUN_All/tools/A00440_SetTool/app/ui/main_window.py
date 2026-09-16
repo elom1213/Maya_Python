@@ -23,6 +23,7 @@ from Framework.qt.qt import (
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from tools.A00440_SetTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00440_SetTool.app.ui.create_tab import CreateTab
@@ -68,8 +69,9 @@ class MainWindow(QWidget):
         main_layout.addLayout(header_row)
 
         # 공용 로그창. 탭보다 먼저 만들어 넘겨준다.
-        self.log_view = QPlainTextEdit()
-        self.log_view.setReadOnly(True)
+        self.log_view = JUN_mod_log_qt_v01(
+            window_title="Set Tool - Log",
+            object_name="JUN_A00440_SetTool_log_window")
         self.log_view.setFixedHeight(110)
 
         # Edit = 있는 세트를 다룬다, Create = 세트를 만든다.

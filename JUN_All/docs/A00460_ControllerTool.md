@@ -2,7 +2,7 @@
 title: A00460_ControllerTool 사용법
 aliases: [Controller Tool, ControllerTool, A00460, FK Control]
 tags: [maya-python, tool-guide, controller, fk, ik, rigging, constraint, zro, con, ctl, tgt]
-updated: 2026-09-07
+updated: 2026-09-16
 ---
 
 # A00460_ControllerTool 사용법
@@ -293,3 +293,17 @@ IK / Space Switch 같은 기능이 늘어도 구조가 그대로다.
 
 이 툴의 목적은 "컨트롤러를 제작자 편의에 맞춰 생성"하는 것이라, FK 는 시작점이다.
 `Create` 카테고리에 하위 탭을 추가하는 형태로 늘린다 — 표만 고치면 된다.
+
+---
+
+## 로그창 (v01.05)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

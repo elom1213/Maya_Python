@@ -182,3 +182,17 @@ A00220_BackupTool/
 - `app/core`(로직)와 `app/ui`(화면)를 분리한다(`backup_manager` 는 표준 라이브러리만 사용).
 - import 는 **툴 고유 경로**(`tools.A00220_BackupTool.app...`)와 내부 **상대 import** 로 한다 —
   여러 standalone 툴을 한 인터프리터에서 동시에 띄울 때 최상위 `app` 패키지가 충돌하지 않도록.
+
+---
+
+## 로그창 (v01.14)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

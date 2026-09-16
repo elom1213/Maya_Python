@@ -10,6 +10,7 @@
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt.maya_window import maya_main_window
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -102,8 +103,9 @@ class MainWindow(QWidget):
         # -------------------------
         # 로그
         # -------------------------
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="HumanIK Tool - Log",
+            object_name="JUN_A00010_humanIKTool_V02_log_window")
         self.te_log.setMaximumHeight(120)
         main_layout.addWidget(self.te_log)
 

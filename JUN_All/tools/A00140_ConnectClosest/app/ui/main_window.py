@@ -13,6 +13,7 @@ A00020_move_skineWeightTool 의 좌/우 2-리스트 UI 개념을 PySide 로 재�
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from tools.A00140_ConnectClosest.app.config.version import VERSION, LAST_UPDATE
 from tools.A00140_ConnectClosest.app.core import (
@@ -102,8 +103,9 @@ class MainWindow(QWidget):
         group = QGroupBox("Log")
         layout = QVBoxLayout(group)
 
-        self.log_view = QPlainTextEdit()
-        self.log_view.setReadOnly(True)
+        self.log_view = JUN_mod_log_qt_v01(
+            window_title="Connect Closest Tool - Log",
+            object_name="JUN_A00140_ConnectClosest_log_window")
         layout.addWidget(self.log_view)
 
         return group

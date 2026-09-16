@@ -15,6 +15,7 @@ import maya.cmds as cmds
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from tools.A00310_SearchTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00310_SearchTool.app.core import (
@@ -59,8 +60,9 @@ class MainWindow(QWidget):
         main_layout.setMenuBar(self.menu_bar)
 
         # 공용 로그창 (탭 빌더가 self._log / TSL log_callback 을 쓰므로 탭보다 먼저 생성)
-        self.log_view = QPlainTextEdit()
-        self.log_view.setReadOnly(True)
+        self.log_view = JUN_mod_log_qt_v01(
+            window_title="Search Tool - Log",
+            object_name="JUN_A00310_SearchTool_log_window")
         self.log_view.setFixedHeight(110)
 
         # 탭: Selection / Search

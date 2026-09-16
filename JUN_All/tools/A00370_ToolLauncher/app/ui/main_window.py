@@ -25,6 +25,7 @@ from Framework.qt.qt import (
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from tools.A00370_ToolLauncher.app.config.version import VERSION, LAST_UPDATE
 from tools.A00370_ToolLauncher.app.ui.launcher_tab import LauncherTab
@@ -72,8 +73,9 @@ class MainWindow(QWidget):
         main_layout.addLayout(header_row)
 
         # 공용 로그창. 탭이 상단 컨트롤의 접이식 'Log' 섹션에 담으므로 탭보다 먼저 생성.
-        self.log_view = QPlainTextEdit()
-        self.log_view.setReadOnly(True)
+        self.log_view = JUN_mod_log_qt_v01(
+            window_title="Tool Launcher - Log",
+            object_name="JUN_A00370_ToolLauncher_log_window")
         self.log_view.setFixedHeight(90)
 
         # 툴 버튼 탭 (컨트롤 pane + 버튼 pane 을 상하 스플리터로 분리, 로그도 그 안에)

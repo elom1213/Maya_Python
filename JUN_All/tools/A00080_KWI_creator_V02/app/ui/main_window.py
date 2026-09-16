@@ -9,6 +9,7 @@ from Framework.qt.qt import (
     QLabel,
     QTextEdit,
 )
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from tools.A00080_KWI_creator_V02.app.config.version import VERSION
 from tools.A00080_KWI_creator_V02.app.core.file_processor import process_file
@@ -76,8 +77,9 @@ class MainWindow(QWidget):
         self.btn_create_combined.clicked.connect(self.create_combined_on_click)
 
         # out put log
-        self.log_widget = QTextEdit()
-        self.log_widget.setReadOnly(True)
+        self.log_widget = JUN_mod_log_qt_v01(
+            window_title="Kawaii Creator V02 - Log",
+            object_name="JUN_A00080_KWI_creator_V02_log_window")
 
         # set layout
 

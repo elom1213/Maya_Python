@@ -2,7 +2,7 @@
 title: A00211_RefLineage — 씬 reference → Lineage 내보내기
 aliases: [A00211, RefLineage, Ref Lineage]
 tags: [tool, maya, lineage, A00211_RefLineage]
-updated: 2026-06-22
+updated: 2026-09-16
 ---
 
 # A00211_RefLineage
@@ -60,3 +60,17 @@ A00210 에서 손으로 그리던 reference 관계를 **씬에서 자동으로**
 - 같은 파일을 여러 번 reference 해도(복사본) **노드는 1개**로 합친다. 로드 안 된 reference 는
   트리/노드에 `unloaded` 로 표시한다.
 - 이 툴은 **읽기 전용 스캔 + JSON 쓰기**만 한다. 씬을 수정하지 않는다.
+
+---
+
+## 로그창 (v01.02)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

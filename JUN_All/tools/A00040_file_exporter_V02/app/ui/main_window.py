@@ -14,6 +14,7 @@
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from tools.A00040_file_exporter_V02.app.config.version import VERSION, LAST_UPDATE
 from tools.A00040_file_exporter_V02.app import core
@@ -67,8 +68,9 @@ class MainWindow(QWidget):
         main_layout.setMenuBar(self.menu_bar)
 
         # 공용 로그창 (TSL log_callback 이 self._log 를 쓰므로 먼저 생성)
-        self.log_view = QPlainTextEdit()
-        self.log_view.setReadOnly(True)
+        self.log_view = JUN_mod_log_qt_v01(
+            window_title="File Exporter - Log",
+            object_name="JUN_A00040_file_exporter_V02_log_window")
         self.log_view.setFixedHeight(120)
 
         main_layout.addWidget(self._build_path_group())

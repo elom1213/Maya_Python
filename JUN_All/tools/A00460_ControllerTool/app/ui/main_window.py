@@ -22,6 +22,7 @@ from Framework.qt import JUN_mod_tsl_qt
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from tools.A00460_ControllerTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00460_ControllerTool.app.core import fk_manager as fk_mgr
 
@@ -77,8 +78,9 @@ class MainWindow(QWidget):
         root.setMenuBar(self.menu_bar)
 
         # 로그창은 탭 빌더가 self.log 를 부를 수 있어 탭보다 먼저 만든다(둘이 공유).
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="Controller Tool - Log",
+            object_name="JUN_A00460_ControllerTool_log_window")
         self.te_log.setMaximumHeight(120)
 
         self.tabs = QTabWidget()

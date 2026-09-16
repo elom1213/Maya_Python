@@ -15,8 +15,9 @@
 
 # 01.04  FK & IK - 탭 개명. 자식 스택이 _tgt 가 아니라 **_ctl** 밑에 붙어 _tgt 가 잎으로
 #              남는다. **Hierarchy(FK / IK)** 추가 — IK 는 모든 _zro 를 씬 최상위에 둔다
+# 01.05  로그창을 공용 위젯 `JUN_mod_log_qt_v01` 로 교체 (Expand / Clear / Copy)
 #              (Mode 와 별개 축). fix - 루트와 자손을 함께 리스트에 담으면 자손 스택이
 #              두 번 만들어지던 것(중복 판정을 풀패스로)
 
-VERSION = "01.04"
-LAST_UPDATE = "2026-09-07"
+VERSION = "01.05"
+LAST_UPDATE = "2026-09-16"

@@ -18,6 +18,7 @@ from Framework.qt.qt import (
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from tools.A00450_manipulatorTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00450_manipulatorTool.app.ui.manip_tab import ManipTab
@@ -64,8 +65,9 @@ class MainWindow(QWidget):
         main_layout.addLayout(header_row)
 
         # 공용 로그창. 탭보다 먼저 만들어 넘겨준다.
-        self.log_view = QPlainTextEdit()
-        self.log_view.setReadOnly(True)
+        self.log_view = JUN_mod_log_qt_v01(
+            window_title="Manipulator Tool - Log",
+            object_name="JUN_A00450_manipulatorTool_log_window")
         self.log_view.setFixedHeight(90)
 
         self.manip_tab = ManipTab(log_view=self.log_view)

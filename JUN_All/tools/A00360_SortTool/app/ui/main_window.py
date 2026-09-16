@@ -15,6 +15,7 @@ from Framework.qt import JUN_mod_tsl_qt
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from tools.A00360_SortTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00360_SortTool.app.core import sort_manager as sort_mgr
 
@@ -98,8 +99,9 @@ class MainWindow(QWidget):
         root.addWidget(self.btn_sort)
 
         # 로그
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="Sort Tool - Log",
+            object_name="JUN_A00360_SortTool_log_window")
         self.te_log.setMaximumHeight(110)
         root.addWidget(self.te_log)
 

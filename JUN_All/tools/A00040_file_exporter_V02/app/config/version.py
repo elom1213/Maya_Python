@@ -3,5 +3,5 @@
 # Adds a Type Filter dropdown to include/exclude node types (mesh / joint, extensible)
 # and a 'Joints only under joints' option that keeps non-joint children out of the FBX.
 
-VERSION = "02.06"
-LAST_UPDATE = "2026-08-28"
+VERSION = "02.07"
+LAST_UPDATE = "2026-09-16"

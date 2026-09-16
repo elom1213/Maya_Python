@@ -39,6 +39,7 @@ from Framework.qt.qt import (
 )
 
 from Framework.qt import JUN_mod_collapsible_qt
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from ..config.version import VERSION
 from ..config.app_meta import icon_path
@@ -144,8 +145,9 @@ class MainWindow(QWidget):
         root.addWidget(self._build_control_group())
 
         root.addWidget(QLabel("Log"))
-        self.log_widget = QPlainTextEdit()
-        self.log_widget.setReadOnly(True)
+        self.log_widget = JUN_mod_log_qt_v01(
+            window_title="Backup Tool - Log",
+            object_name="JUN_A00220_BackupTool_log_window")
         self.log_widget.setMaximumHeight(140)
         root.addWidget(self.log_widget)
 
