@@ -37,6 +37,13 @@ JUN_mod_log_qt_v01 - 재사용 PySide 로그창.
 전부 내부 텍스트로 넘긴다 — **로그가 보이는 줄 수는 교체 전과 같고**, 창이 버튼 줄 높이만큼
 커진다.
 
+★ 확장 창에서는 그 높이 제약을 **푼다**
+-------------------------------------
+위 제약은 "툴 창 안에서 로그가 차지할 몫" 이지 확장 창에서까지 지킬 값이 아니다.
+그대로 두면 **창을 아무리 늘려도 로그는 상한에 묶여** 남는 자리가 빈 공간이 된다 —
+크게 보려고 누른 버튼인데 크게 안 보인다. 그래서 `expand()` 가 제약을 담아 두고 풀어,
+확장 창에서는 로그가 **창 높이를 그대로 따라간다**(`collapse()` 가 되돌린다).
+
 Expand 는 복제가 아니라 이동이다
 --------------------------------
 `MOD_expand_qt_v01` 과 같은 방식이다. 텍스트 위젯을 **그대로 새 창으로 옮기므로** 두 벌을
@@ -78,6 +85,10 @@ BUTTON_STYLE = "padding: 0px 6px; margin: 0px;"
 # 폭은 고정하지 않는다. 글자 폭은 테마의 font-size 에 따라 달라지므로, 고정 폭으로 잘라 두면
 # 폰트가 커지는 테마에서 이번과 같은 일이 가로로 되풀이된다. 최소 폭만 주고 나머지는 맡긴다.
 BUTTON_MIN_WIDTH = 58
+
+# Qt 가 "제한 없음" 으로 쓰는 값(`QWIDGETSIZE_MAX`). 바인딩에 따라 이 이름이 노출되지 않아
+# 상수로 적어 둔다 - 확장 창에서 높이 제약을 풀 때 쓴다.
+WIDGET_MAX_HEIGHT = 16777215
 
 
 class _LogWindow(QWidget):
@@ -131,6 +142,8 @@ class JUN_mod_log_qt_v01(QWidget):
         self._expand_size = expand_size
         self._window = None
         self._filtered = None          # Close 를 감시 중인 툴 창
+        # 확장 중에 풀어 둔 내부 텍스트의 (min, max). 접혀 있으면 None.
+        self._text_limits = None
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -243,6 +256,16 @@ class JUN_mod_log_qt_v01(QWidget):
 
         window = _LogWindow(self, self._window_title, self._object_name,
                             self._expand_size)
+
+        # ★ 툴 창에서 걸어 둔 높이 제약을 **확장 창에서는 푼다.**
+        #   그 제약(예: `setMaximumHeight(160)`)은 "툴 창 안에서 로그가 차지할 몫" 이지
+        #   확장 창에서까지 지킬 값이 아니다. 그대로 두면 **창을 아무리 늘려도 로그는 160px
+        #   에 묶여** 남는 자리가 빈 공간이 된다 - 크게 보려고 누른 버튼인데 크게 안 보인다.
+        #   원래 값은 담아 두었다가 collapse 에서 되돌린다.
+        self._text_limits = (self.text.minimumHeight(), self.text.maximumHeight())
+        self.text.setMinimumHeight(0)
+        self.text.setMaximumHeight(WIDGET_MAX_HEIGHT)
+
         # addWidget 이 텍스트를 이 위젯에서 떼어 창으로 옮긴다(복제가 아니다).
         window.body.addWidget(self.text)
         self._window = window
@@ -259,6 +282,14 @@ class JUN_mod_log_qt_v01(QWidget):
 
         window, self._window = self._window, None
         self.placeholder.setVisible(False)
+
+        # 확장하며 풀어 둔 높이 제약을 되돌린다(제자리에서는 원래 몫만 차지해야 한다).
+        if self._text_limits is not None:
+            low, high = self._text_limits
+            self._text_limits = None
+            self.text.setMinimumHeight(low)
+            self.text.setMaximumHeight(high)
+
         self._outer.insertWidget(self._text_index, self.text, 1)
         window.deleteLater()
         self.expanded_changed.emit(False)
@@ -331,17 +362,29 @@ class JUN_mod_log_qt_v01(QWidget):
             row = BUTTON_HEIGHT
         return row + self._outer.spacing()
 
+    # 확장 중에는 텍스트를 자유롭게 두어야 하므로(창 높이를 따라가야 한다) 값을 텍스트에
+    # 걸지 않고 **되돌아갈 때 쓸 값**만 갱신한다. 컨테이너 쪽은 언제든 그대로 건다.
+
     def setFixedHeight(self, height):
-        self.text.setFixedHeight(height)
+        if self._text_limits is None:
+            self.text.setFixedHeight(height)
+        else:
+            self._text_limits = (height, height)
         super(JUN_mod_log_qt_v01, self).setFixedHeight(height + self._chrome_height())
 
     def setMinimumHeight(self, height):
-        self.text.setMinimumHeight(height)
+        if self._text_limits is None:
+            self.text.setMinimumHeight(height)
+        else:
+            self._text_limits = (height, self._text_limits[1])
         super(JUN_mod_log_qt_v01, self).setMinimumHeight(
             height + self._chrome_height())
 
     def setMaximumHeight(self, height):
-        self.text.setMaximumHeight(height)
+        if self._text_limits is None:
+            self.text.setMaximumHeight(height)
+        else:
+            self._text_limits = (self._text_limits[0], height)
         super(JUN_mod_log_qt_v01, self).setMaximumHeight(
             height + self._chrome_height())
 
