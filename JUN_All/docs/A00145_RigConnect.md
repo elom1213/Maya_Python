@@ -1482,3 +1482,17 @@ A00145_RigConnect/
   (`Framework/rules/mirror_tokens.json`) — `A00110_animTool_V02` 의 Mirror Key 와 **같은 파일**.
 - `app/core`(로직) ↔ `app/ui`(화면) 분리. 위젯은 값만 읽어 매니저에 전달.
 - UI 문자열은 영어, 한국어는 주석/독스트링만.
+
+---
+
+## 로그창 (v01.43)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

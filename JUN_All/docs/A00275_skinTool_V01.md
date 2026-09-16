@@ -2,7 +2,7 @@
 title: A00275_skinTool_V01 사용법
 aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose, Move Joints, Edit Mesh, Expand Bind]
 tags: [maya-python, tool-guide, skin, skincluster, bind-pose, rigging]
-updated: 2026-09-09
+updated: 2026-09-16
 ---
 
 # A00275_skinTool_V01 사용법
@@ -942,3 +942,17 @@ Even distribution (v01.16) — 43항목:
 - 재분류 뒤에도 `Edit Mesh` 전체 왕복(Load → EDIT ON → 버텍스 이동 → EDIT OFF)과
   `Bind Pose` 의 Load 가 그대로 동작
 - 코어 51항목은 **손대지 않았고 그대로 통과**
+
+---
+
+## 로그창 (v01.24)
+
+로그창은 **공용 위젯 `JUN_mod_log_qt_v01`** 이다. 오른쪽 위에 작은 버튼 셋이 붙어 있다.
+
+| 버튼 | 동작 |
+|------|------|
+| `Expand` | 로그를 **별도 창으로 옮겨** 크게 본다. 확장 중에 들어온 로그도 같은 곳에 쌓이고, 창을 닫으면 제자리로 돌아온다 |
+| `Clear` | 로그를 비운다 |
+| `Copy` | 로그 **전문**을 클립보드로 |
+
+자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).

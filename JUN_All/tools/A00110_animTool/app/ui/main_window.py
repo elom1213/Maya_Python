@@ -10,6 +10,7 @@ from Framework.qt import JUN_mod_timeRange_qt
 from Framework.qt import JUN_mod_filter_qt
 from Framework.qt.maya_window import maya_main_window
 from Framework.core.maya_refresh import force_refresh
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -153,8 +154,9 @@ class MainWindow(QWidget):
         # (레이아웃 추가는 탭 아래에 한다)
         # -------------------------
 
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="Anim Key Tool - Log",
+            object_name="JUN_A00110_animTool_log_window")
         # 창이 콘텐츠에 맞춰 줄어들 때도 로그창이 쓸만한 높이를 유지하도록 최소 높이 지정.
         # 최대 높이도 막아, 창을 다시 키울 때 남는 공간을 로그가 독식해 비대해지는 걸 방지한다.
         # (남는 공간은 탭/리스트 영역으로 간다)

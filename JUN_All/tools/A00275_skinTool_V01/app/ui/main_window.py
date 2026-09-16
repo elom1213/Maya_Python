@@ -54,6 +54,7 @@ from tools.A00275_skinTool_V01.app.core import expand_bind_manager as eb_mgr
 from tools.A00275_skinTool_V01.app.core import weight_copy_manager as wc_mgr
 from Framework.core import falloff_curve as falloff   # 2026-09-09 Framework 로 승격
 from Framework.qt import JUN_mod_falloffCurve_qt
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -135,8 +136,9 @@ class MainWindow(QWidget):
         main_layout.setMenuBar(self.menu_bar)
 
         # 공유 로그 위젯을 먼저 만든다 (탭의 TSL 위젯이 log_callback=self.log 로 참조).
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="Skin Tool - Log",
+            object_name="JUN_A00275_skinTool_V01_log_window")
         self.te_log.setMinimumHeight(90)
         self.te_log.setMaximumHeight(160)
 

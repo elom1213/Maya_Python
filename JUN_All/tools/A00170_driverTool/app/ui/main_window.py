@@ -16,6 +16,7 @@ from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_filter_qt
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
 from tools.A00170_driverTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00170_driverTool.app.core import (
@@ -80,8 +81,9 @@ class MainWindow(QWidget):
         # 탭 빌더가 생성 중(_sync_*) self._log() 를 호출할 수 있으므로 탭보다 먼저 생성한다.
         # (레이아웃 추가는 탭 아래에 한다)
         # -------------------------
-        self.log_view = QPlainTextEdit()
-        self.log_view.setReadOnly(True)
+        self.log_view = JUN_mod_log_qt_v01(
+            window_title="Driver Tool - Log",
+            object_name="JUN_A00170_driverTool_log_window")
         self.log_view.setFixedHeight(120)
 
         # -------------------------

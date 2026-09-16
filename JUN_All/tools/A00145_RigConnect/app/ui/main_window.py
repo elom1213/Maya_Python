@@ -27,6 +27,7 @@ import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
 from Framework.core.mirror_tokens import MirrorTokenStore
+from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from tools.A00145_RigConnect.app.config.version import VERSION, LAST_UPDATE
 from tools.A00145_RigConnect.app.core import match_manager as mch_mgr
 from tools.A00145_RigConnect.app.core import constrain_manager as con_mgr
@@ -114,8 +115,9 @@ class MainWindow(QWidget):
         main_layout.setMenuBar(self.menu_bar)
 
         # 공유 로그창 (탭 빌더가 self.log 를 호출할 수 있어 탭보다 먼저 생성)
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
+        self.te_log = JUN_mod_log_qt_v01(
+            window_title="RigConnect - Log",
+            object_name="JUN_A00145_RigConnect_log_window")
         self.te_log.setMaximumHeight(120)
 
         # 탭
