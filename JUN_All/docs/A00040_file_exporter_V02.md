@@ -52,7 +52,7 @@ A00040_file_exporter_V02/
 
 | 섹션 | 내용 |
 |------|------|
-| **Export Path** | `Browse` 로 FBX 를 저장할 폴더 선택(읽기 전용 필드에 표시) |
+| **Export Path** | FBX 를 저장할 폴더. **`Browse`**(파일 대화상자) 또는 **`Paste`**(클립보드, v02.08~). 필드는 읽기 전용이라 오타가 들어갈 자리가 없다 |
 | **Set Up** | 두 개의 TSL — `Set's Name`(내보낼 objectSet 목록, 씬 선택에서 Select/Add) / `File name`(각 세트의 결과 파일명) |
 | **Naming** | 토큰 6개(SK / MANU / CH / Name / Type / Version)로 파일명을 조립. 각 토큰은 `Custom`(직접 입력) 또는 `Set's Name`(세트 이름 사용) 모드. **Set Name** 버튼으로 File name 리스트 자동 생성 |
 | **Export** | **Move to scene root** · **Joints only under joints** 체크박스 + **Type Filter** 드롭다운(포함/제외 타입 선택) + **Export** 버튼 |
@@ -60,9 +60,28 @@ A00040_file_exporter_V02/
 
 ---
 
+### 4-1. `Paste` — 클립보드의 경로 꽂기 (v02.08~)
+
+탐색기 주소창에서 복사한 경로를 **대화상자를 거치지 않고 바로** 넣는다.
+**사람이 복사해 오는 모양을 그대로 받아 준다.**
+
+| 클립보드 | 결과 |
+|---|---|
+| `D:\work\export` | `D:/work/export` — 역슬래시를 툴이 쓰는 `/` 로 |
+| `"D:\work\export"` | 따옴표를 벗긴다 — 윈도우 **`경로로 복사`**(Shift+우클릭)가 붙여 주는 것 |
+| `"D:\work\export\scene.fbx"` | **파일이면 그 폴더**를 쓴다(`경로로 복사` 는 대개 파일에 쓴다). 로그에 알린다 |
+| 앞뒤 공백 · 여러 줄 | 공백을 떼고 **첫 줄**만 쓴다 |
+| 비어 있음 / 공백뿐 | **기존 값을 건드리지 않고** `[WARN]` 만 남긴다 |
+
+**없는 경로여도 넣어는 준다** — 아직 만들지 않은 폴더나 지금 연결 안 된 네트워크 경로일 수 있다.
+대신 로그에 `[WARN] Pasted path does not exist yet : ...` 을 남기므로, Export 에서 실패하기 전에
+눈에 띈다.
+
+---
+
 ## 5. 사용 흐름
 
-1. **Browse** 로 내보낼 폴더를 지정한다.
+1. **Browse** 로 내보낼 폴더를 지정한다. 탐색기에서 경로를 복사해 왔다면 **`Paste`** 가 빠르다(아래 4-1).
 2. 씬에서 내보낼 objectSet 들을 선택하고 `Set's Name` 의 **Select Sets**(교체) 또는 **Add**(추가)로 채운다.
 3. (선택) **Naming** 토큰을 설정하고 **Set Name** 으로 `File name` 을 자동 생성한다.
    - 토큰 모드가 `Custom` 이면 입력한 텍스트를, `Set's Name` 이면 그 세트의 이름(leaf)을 토큰으로 쓴다.
@@ -177,6 +196,8 @@ _TYPE_MATCHERS = {
 - 경고/건너뜀:
   - `[WARN] Set's Name list is empty.` — 내보낼 세트를 먼저 추가.
   - `[WARN] Select an export path first.` — Export Path 미지정.
+  - `[WARN] Clipboard has no text to paste.` — `Paste` 를 눌렀는데 클립보드가 비었다.
+  - `[WARN] Pasted path does not exist yet : ...` — 붙여넣은 경로가 아직 없다(넣기는 했다).
   - `[SKIP] <name> is not an objectSet.` — objectSet 이 아닌 항목.
   - `[FAIL] <set>: nothing left to export after type filter.` — 필터로 전부 제외됨(체크 상태 확인).
 - **FBX 미출력**: `fbxmaya` 플러그인이 로드되어 있어야 한다(Maya 기본 제공).

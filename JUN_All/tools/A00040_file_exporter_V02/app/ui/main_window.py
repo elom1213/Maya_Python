@@ -4,12 +4,14 @@
 # A00040_file_exporter_V02 - Qt UI
 #
 # 레거시 maya.cmds 툴(A00040_file_exporter/file_exporter_v01)을 PySide 로 재작업했다.
-#   - Export path : FBX 를 저장할 폴더 선택
+#   - Export path : FBX 를 저장할 폴더 선택 (Browse 로 고르거나 Paste 로 클립보드에서)
 #   - Type Filter : 드롭다운 체크로 내보낼 노드 타입 포함/제외 (mesh / joint, 확장 가능)
 #   - Joints only : joint 하위의 non-joint 노드를 FBX 에서 뺀다 (씬은 그대로) [NEW]
 #   - Set's Name / File name : 내보낼 objectSet 목록과 결과 파일명(TSL)
 #   - Naming      : 토큰 조합으로 파일명 자동 생성 (Custom / Set's Name 모드)
 # 리스트 UI 는 공용 위젯 JUN_mod_tsl_qt_v01, 로직은 app/core. 모든 UI 문자열/로그는 영어.
+
+import os
 
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
@@ -101,8 +103,18 @@ class MainWindow(QWidget):
         layout.addWidget(self.le_path, stretch=1)
 
         btn_browse = QPushButton("Browse")
+        btn_browse.setToolTip("Pick the export folder with a file dialog.")
         btn_browse.clicked.connect(self.on_browse)
         layout.addWidget(btn_browse)
+
+        btn_paste = QPushButton("Paste")
+        btn_paste.setToolTip(
+            "Paste a folder path from the clipboard.\n"
+            "Copy the path in Explorer (or 'Copy as path') and press this - "
+            "quotes and backslashes are handled.\n"
+            "If the clipboard holds a file, its folder is used.")
+        btn_paste.clicked.connect(self.on_paste_path)
+        layout.addWidget(btn_paste)
 
         return group
 
@@ -219,6 +231,46 @@ class MainWindow(QWidget):
         folder = QFileDialog.getExistingDirectory(self, "Select Export Folder")
         if folder:
             self.le_path.setText(folder.replace("\\", "/"))
+
+    def on_paste_path(self):
+        """클립보드의 경로를 Export Path 에 넣는다 (v02.08~).
+
+        탐색기 주소창에서 경로를 복사해 바로 꽂으라는 기능이라, **사람이 복사해 오는 모양**을
+        그대로 받아 준다.
+
+          - 윈도우의 `경로로 복사`(Shift+우클릭)는 **따옴표로 감싸서** 준다 -> 벗긴다.
+          - 역슬래시는 이 툴이 쓰는 `/` 로 바꾼다(Browse 도 같은 처리를 한다).
+          - 여러 줄이 들어오면 **첫 줄**만 쓴다.
+          - **파일** 경로가 들어오면 그 **폴더**를 쓴다(`Copy as path` 는 대개 파일에 쓴다).
+
+        없는 경로여도 **넣어는 준다** - 아직 만들지 않은 폴더나 지금 연결 안 된 네트워크
+        경로일 수 있다. 대신 로그에 경고를 남긴다(코어는 내보낼 때 비어 있는지만 본다).
+        """
+        text = QApplication.clipboard().text() or ""
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if not lines:
+            self._log("[WARN] Clipboard has no text to paste.")
+            return
+
+        path = lines[0].strip('"').strip("'").strip()
+        if not path:
+            self._log("[WARN] Clipboard has no text to paste.")
+            return
+
+        path = path.replace("\\", "/")
+
+        if os.path.isfile(path):
+            folder = os.path.dirname(path)
+            if folder:
+                self._log("Clipboard held a file - using its folder instead.")
+                path = folder
+
+        self.le_path.setText(path)
+
+        if os.path.isdir(path):
+            self._log("Export path : {0}".format(path))
+        else:
+            self._log("[WARN] Pasted path does not exist yet : {0}".format(path))
 
     def on_set_name(self):
         set_names = self.set_tsl.get_all_items()
