@@ -30,6 +30,7 @@
 - [getAttr settable lies](getattr-settable-lies-for-constrained.md) — 컨스트레인트 구동도 True, 연결+lock 으로 판정
 - [Maya loadPlugin no __file__](maya-loadplugin-no-file.md) — loadPlugin .py 에 `__file__` 없음
 - animLayer — [copy/cut traps](animlayer-copy-cut-traps.md)(`cutKey` 는 `animLayer` 를 안 받는다) · [no global selected query](animlayer-no-global-selected-query.md)(`ls(type=animLayer)` 순회)
+- [shading: per-face assignment](shading-per-face-assignment.md) — `listConnections(shadingEngine)` 는 면별 배정을 잃는다, `getConnectedShaders`
 - [utility nodes inherit shadingDependNode](utility-nodes-inherit-shadingdependnode.md) — multiplyDivide/vectorProduct/plusMinusAverage, 셰이딩 판정은 `getClassification`
 - [Referenced node name compares](referenced-node-name-comparisons.md) — 솔버까지 네임스페이스, 타입으로 판정
 - [Set rename traps](maya-set-rename-traps.md) — `select(set)` 은 멤버를 펼침, 짧은 이름 rename 은 NS 를 벗김
