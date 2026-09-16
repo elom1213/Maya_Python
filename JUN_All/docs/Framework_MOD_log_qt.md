@@ -18,8 +18,26 @@ updated: 2026-09-16
 | **Clear** | 로그를 비운다 |
 | **Copy** | 로그 **전문**을 클립보드로 |
 
-`A00470_MaterialTool` 에 먼저 붙였다. 저장소에는 로그창이 **39군데**(`log_view` 계열 14 ·
-`te_log` 계열 25) 있고, 하나씩 이 위젯으로 갈아끼우는 것이 목표다.
+## 사용처 — PySide 툴 **47곳 전부**
+
+`A00470_MaterialTool` 에 먼저 붙였고(v01.02), 2026-09-16 에 나머지 **46곳을 한번에
+갈아끼웠다**(계획서: [`Framework_MOD_log_qt_migration_plan.md`](Framework_MOD_log_qt_migration_plan.md)).
+이제 `tools/*/app/ui/main_window.py` 의 로그창은 **전부 이 위젯이다.**
+
+| 이전 계열 | 변수 이름 | 개수 |
+|-----------|-----------|-----:|
+| `QTextEdit` | `te_log` (26) · `log_widget` (6) · `txt_log` (1) | 33 |
+| `QPlainTextEdit` | `log_view` | 13 |
+| (선행) | `A00470_MaterialTool` | 1 |
+
+`object_name` 은 **툴 폴더명을 그대로** 넣어 유일성을 보장한다 — `JUN_<폴더명>_log_window`.
+버전 병존 4쌍(`A00060` · `A00080` · `A00110` · `A00390`)도 폴더명이 다르므로 자동으로 갈린다.
+같은 이름이면 Expand 창이 서로를 찾아 닫는다.
+
+**교체 대상이 아닌 텍스트 위젯도 있다** — 미리보기/리포트/편집기는 로그가 아니다:
+`A00080_V03` 의 `constraint_preview` · `A00290_BSTool` 의 `te_bd_report` ·
+`A00210_FileManager` 의 `txt_log_history` / `txt_new_note` · `A00250_SceneMemo` 의 `editor`.
+`A00200_CSV_tool` 은 파일 구조와 import 스타일이 달라 **보류**했다.
 
 ---
 
@@ -58,8 +76,8 @@ self.log_view.log("새 코드에서는 이 이름을 써도 된다")
 
 | 계열 | 변수 이름 | 호출하는 것 |
 |------|-----------|-------------|
-| `QTextEdit` | `te_log` · `log_widget` · `txt_log` (25곳) | `append` · `setReadOnly` · `setMaximumHeight` / `setMinimumHeight` / `setFixedHeight` · `clear` · `setFont` · `setLineWrapMode` · `moveCursor` |
-| `QPlainTextEdit` | `log_view` (14곳) | `appendPlainText` · `setReadOnly` · `setFixedHeight` / `setMinimumHeight` |
+| `QTextEdit` | `te_log` · `log_widget` · `txt_log` (33곳) | `append` · `setReadOnly` · `setMaximumHeight` / `setMinimumHeight` / `setFixedHeight` · `clear` · `setFont` · `setLineWrapMode` · `moveCursor` |
+| `QPlainTextEdit` | `log_view` (13곳) | `appendPlainText` · `setReadOnly` · `setFixedHeight` / `setMinimumHeight` |
 
 이 위젯은 **그 이름을 전부 그대로 받는다.** 그래서 교체는 보통 **생성 두 줄만** 바뀐다.
 
@@ -182,4 +200,18 @@ Copy(전문 · 클립보드 내용 · 빈 로그는 클립보드를 건드리지
 > (`QStyle.SE_PushButtonContents`)을 재고 글꼴 높이와 비교한다 — qss 의 padding 이 그대로
 > 반영되는 값이라 이 버그를 정확히 집는다.
 
-> 실제 Maya GUI 확인은 아직이다(헤드리스 검증만 마쳤다).
+### 전면 교체 후 — 47툴 전수 스모크 테스트
+
+교체를 마치고 `mayapy` + 오프스크린 Qt 로 **툴 47개의 `MainWindow` 를 실제로 생성**해
+다섯 가지를 한꺼번에 확인했다 — 생성 중 예외 없음 · 로그 위젯이 `JUN_mod_log_qt_v01` 인스턴스 ·
+**`object_name` 이 47개 전부 유일** · `append`(HTML 색 살아있음) · `appendPlainText`(`<tag>` 글자 그대로) ·
+**파일에 적힌 높이 제약이 내부 텍스트에 걸렸는지**(컨테이너가 아니라) · `expand()` → `collapse()` 왕복 후
+텍스트가 제자리로 돌아오고 내용이 보존되는지.
+
+**46/47 통과.** 유일한 실패는 `A00008_base_QT_maya` 이고, 이번 교체와 무관한 **기존 결함**이다 —
+존재하지 않는 `tools.A00001_base_maya` 를 import 한다(2026-06-02 `86a8a45` 부터).
+
+> 실제 Maya GUI 육안 확인은 아직이다(헤드리스 검증만 마쳤다). 특히 다음 세가지를 눈으로 본다 —
+> 색깔 로그 3툴(`A00300` · `A00410` · `A00430`)의 색 · Pin 툴과 Expand 창의 항상-위 관계
+> (`A00110` · `A00220` · `A00340` · `A00370`) · 창 높이를 스스로 계산하는 툴(`A00110` · `A00220`)의
+> 섹션 접기/펼치기.

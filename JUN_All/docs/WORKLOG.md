@@ -31,6 +31,37 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-16 (오늘)
 
+> [!summary] **공용 로그창 전면 교체** — PySide 툴 **46곳**의 로그창을 `JUN_mod_log_qt_v01` 로 (이제 저장소 전체 47/47)
+- **계획서**: [`Framework_MOD_log_qt_migration_plan.md`](Framework_MOD_log_qt_migration_plan.md) — 대상 선정 · 교체 규칙 ·
+  예상 문제 · 배치 5개를 먼저 적어 두고 그대로 진행했다.
+- **무엇을 얻나**: 모든 툴의 로그창이 **Expand**(별도 창으로 옮겨 크게 보기) · **Clear** ·
+  **Copy**(전문 복사)를 갖는다. 템플릿 `A00004_base_QT` · `A00008_base_QT_maya` 를 같이 바꿨으므로
+  **앞으로 만드는 툴은 기본으로** 이 로그창을 갖는다.
+- **★ 드롭인이 된 이유는 먼저 세어 봤기 때문이다.** 로그 위젯에 실제로 부르는 메서드는 **10종뿐**이고,
+  `isinstance(..., QTextEdit)` · `findChild` · `setStyleSheet` 호출은 **0건**이었다. 그래서 교체는 툴당
+  **생성부 2~3줄**로 끝나고 `append` / `appendPlainText` 호출부 **43 + 17곳은 한 글자도 안 건드렸다.**
+- **★ 높이는 컨테이너가 아니라 내부 텍스트에 걸린다.** `setFixedHeight(120)` 을 컨테이너에 그대로 걸었다면
+  버튼 줄이 그 120 을 나눠 먹어 로그가 줄었을 것이다. 위젯이 내부로 넘기므로 **보이는 줄 수는 교체
+  전과 같고**, 창만 버튼 줄(약 22px)만큼 커진다.
+- **`object_name` 은 툴 폴더명을 그대로** — `JUN_<폴더명>_log_window`. 같으면 Expand 창이 서로를 찾아
+  닫는다. 버전 병존 4쌍(`A00060` · `A00080` · `A00110` · `A00390`)이 동시에 떠 있을 수 있어 실제로 위험한 자리다.
+- **결들면 손봐야 했던 곳** — `A00300_meshDoctor` 는 자기 `Clear Log` 버튼을 따로 갖고 있었어서
+  같은 기능 버튼이 둘이 되지 않도록 **그 버튼과 연결 코드를 지웠다.**
+- **건드리지 않은 것** — 미리보기/리포트/편집기는 로그가 아니다(`constraint_preview` · `te_bd_report` ·
+  `txt_log_history` · `txt_new_note` · `editor`). `A00200_CSV_tool` 은 파일 구조와 import 스타일이 달라 **보류**.
+- **검증(mayapy + 오프스크린 Qt)**: 툴 47개의 `MainWindow` 를 실제로 생성해 — 예외 없음 · 위젯 타입 ·
+  **`object_name` 47개 전부 유일** · `append` 의 HTML 색 살아있음 · `appendPlainText` 가 `<tag>` 를 글자대로 남김 ·
+  **파일에 적힌 높이 제약이 내부 텍스트에 걸렸음** · `expand()` → `collapse()` 왕복 후 내용 보존 — **46/47 통과**.
+  유일한 실패 `A00008_base_QT_maya` 는 **이번 작업과 무관한 기존 결함**이다 — 존재하지 않는
+  `tools.A00001_base_maya` 를 import 한다(2026-06-02 `86a8a45` 부터). 별도 안건.
+- **남은 것 — Maya GUI 육안 확인**(오프스크린으로는 잡힐 수 없는 항목): 색깔 로그 3툴
+  (`A00300` · `A00410` · `A00430`)의 색 · Pin 툴(`A00110` · `A00220` · `A00340` · `A00370`)과 Expand 창의
+  항상-위 관계 · 창 높이를 스스로 계산하는 툴(`A00110` · `A00220`)의 섹션 접기/펼치기 ·
+  `setFixedHeight` 계열 13곳의 +22px 가 거슬리는지.
+- 커밋은 계획대로 **배치 5개**로 끊었다(문제가 나면 그 배치만 되돌릴 수 있도록) —
+  템플릿 2 · 최상위 이득 5 · 상위 6 · 중위 12 · 하위 21. 툴마다 `app/config/version.py` 와
+  `docs/<툴>.md` 를 함께 올렸다. `#Framework` `#로그창`
+
 > [!summary] `A00145_RigConnect` Mirror > Create — **`A00170` AttachCrv 로 붙인 오브젝트가 미러가 안 되던 문제** 두 가지 수정 (v01.41 -> 01.42)
 - **증상**: `A00170_driverTool` 의 `AttachCrv > Default + Maintain offset` 으로 만든
   `CRV -> vectorProduct -> POCI -> fourByFourMatrix -> multMatrix -> joint` 네트워크를 커브와 함께
