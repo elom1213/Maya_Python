@@ -4,7 +4,8 @@
 Manager* · AdvancedSkeleton 의 *FitSkeleton* 처럼 — **씬에 템플릿 조인트를 놓고 눈으로 맞춘 뒤,
 버튼으로 컨트롤러(cage)를 그 자리에 굽는다.**
 
-- 버전: `v02.22` (`app/config/version.py`) — `Length` 탭 **`Total` 기본값을 `sum`** 으로, 콤보 맨 위로 (§6.2)
+- 버전: `v02.23` (`app/config/version.py`) — `Match` 표의 행을 **더블클릭하면 그 Cage set 이 마야에서 선택**된다 (§4.1c)
+  · v02.22 는 `Length` 탭 **`Total` 기본값을 `sum`** 으로, 콤보 맨 위로 (§6.2)
   · v02.21 은 `Match` 탭 **`Check Position`** — 세트마다 멤버들이 같은 월드 위치·회전인지 Status 에 초록/빨강으로 (§4.1c)
   · v02.20 은 `Match` 가 **부모부터 맞추고 밀려난 것은 다시 맞춘다** — 한 번 누르면 된다 (§4.1b)
   · v02.17 은 `Constrain` 의 **`maintain offset` 기본 ON** + 걸기 전후를 재서 움직인 것을 짚는다 (§9.2)
@@ -152,6 +153,15 @@ obj_01
 > **빨강인데 Match 를 눌러도 안 없어진다면** — 그 멤버의 채널이 잠겼거나 리그가 구동 중이다(§4.4b, 로그에 이유가 있다).
 > 또는 부모에 **비균등 스케일 + 회전**이 있어 shear 가 생긴 경우다 — 이때는 `matchTransform` 도 같은 방향을
 > 만들 수 없어 진짜로 다르다(실측 15.14°).
+
+### 4.1d 행 더블클릭 → Cage set 선택 (v02.23)
+
+`Match` 표의 행을 **더블클릭하면 그 행의 Cage set 노드가 마야에서 선택**된다(씬 불변, 선택만).
+빨강으로 나온 세트를 바로 찾아 Outliner · Relationship Editor 에서 보려는 용도다.
+
+- **세트 노드 자체**를 고른다 — `cmds.select(set)` 은 세트를 **멤버로 펼쳐** 안의 오브젝트를 고르므로 `noExpand=True` 로 고른다.
+- 이름은 **누르는 순간** 네임스페이스 콤보로 다시 찾는다(`CAGE:sB` → `sB`). 템플릿 조인트가 없는 행도 세트만 있으면 선택된다.
+- 세트가 없으면 선택을 건드리지 않고 로그에 `[WARN] Cage set not found - looked for ...`. 선택하면 `Selected set: <이름>`.
 
 ### 4.3 없어도 멈추지 않는다
 

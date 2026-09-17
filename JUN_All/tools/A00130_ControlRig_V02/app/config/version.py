@@ -13,5 +13,7 @@
 
 #           Length Total (v02.22) - 'sum' is the default and the first item.
 
-VERSION = "02.22"
+#           Match list (v02.23) - double-click a row to select its cage set in Maya.
+
+VERSION = "02.23"
 LAST_UPDATE = "2026-09-17"

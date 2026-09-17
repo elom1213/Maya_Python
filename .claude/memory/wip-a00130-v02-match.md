@@ -108,3 +108,6 @@ V01 은 `Targets` 리스트에 **손으로 순서대로** 담아야 했고 그�
 - 비균등 스케일 + 회전 부모 아래(shear)는 matchTransform 으로도 같은 방향이 안 나온다(15.14°) — 오판이 아니라 진짜 불일치.
 - 조인트 없는 행은 plan() 이 멤버를 안 펴므로 check 에서 `su.resolve(set_wanted, namespace)` 로 직접 편다.
 - 표를 다시 그리면(`_refresh_plan`) 색이 지워진다 — 의도(오래된 판정 방지).
+- **행 더블클릭 → Cage set 선택 (v02.23)** — `item.setData(0, UserRole, row["set_wanted"])` 로 담고 누를 때 `su.resolve` 후
+  `cmds.select(set, noExpand=True)`([[maya-set-rename-traps]]). 오프스크린 테스트에서 `QTest.mouseDClick` 만 보내면
+  **itemDoubleClicked 가 안 온다**(press 가 먼저 와야 한다) — `mouseClick` 다음 `mouseDClick`.

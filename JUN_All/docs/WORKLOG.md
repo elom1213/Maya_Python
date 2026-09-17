@@ -31,6 +31,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-17 (오늘)
 
+> [!summary] `A00130_ControlRig_V02` Match 표 **행 더블클릭 → 그 Cage set 을 마야에서 선택** (v02.22 -> 02.23)
+- **요청**: 리스트업된 Cage set 줄을 더블클릭하면 해당 set 이 마야 씬에서 선택되도록.
+- 세트 노드 자체를 `noExpand=True` 로(그냥 select 는 멤버로 펼친다), 누르는 순간 네임스페이스로 다시 찾는다. 없으면 선택 유지 + 경고.
+- mayapy 2024 6항목 통과(실제 클릭 이벤트). #A00130
+
 > [!summary] `A00130_ControlRig_V02` Length 탭 **`Total` 기본값을 `sum`** 으로, 콤보 맨 위로 (v02.21 -> 02.22)
 - **요청**: Length 의 Total 기본 세팅이 sum 이 되고 sum 위치도 맨 위로.
 - `length_map.json` `total_mode: "sum"` + 폴백 `TOTAL_DEFAULT = sum`, 콤보 순서는 `TOTAL_MODES` 한 곳. `straight` 는 그대로 고를 수 있다.

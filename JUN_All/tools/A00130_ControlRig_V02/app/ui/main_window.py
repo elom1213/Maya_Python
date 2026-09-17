@@ -16,6 +16,7 @@
 #   Pair           : 세트 A 의 하나뿐인 원소로 세트 B 의 하나뿐인 원소를 맞춘다 (Match 뒤)
 #   Constrain      : 포즈 오브젝트를 `Con` 이 가리키는 노드에 parentConstraint (Pair 뒤)
 #
+# v02.23 : Match 표 행 더블클릭 -> 그 Cage set 노드를 마야에서 선택(noExpand).
 # v02.22 : Length 탭 Total 기본값을 **sum** 으로, 콤보 맨 위로.
 # v02.21 : Match 탭 **Check Position** — 세트마다 멤버들이 월드 위치 · 회전이 같은지
 #          Status 칸에 초록 OK / 빨강(무엇이 얼마나 다른지)으로. 씬 불변.
@@ -297,6 +298,8 @@ class MainWindow(QWidget):
         self.tree_plan.setRootIsDecorated(False)
         self.tree_plan.setAlternatingRowColors(True)
         self.tree_plan.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.tree_plan.setToolTip("Double-click a row to select its cage set in Maya.")
+        self.tree_plan.itemDoubleClicked.connect(self.on_plan_double_clicked)
         layout.addWidget(self.tree_plan, 1)
 
         match_row = QHBoxLayout()
@@ -716,11 +719,33 @@ class MainWindow(QWidget):
                 row["status"] if not row["note"]
                 else "{0} - {1}".format(row["status"], row["note"]),
             ])
+            # 더블클릭 선택용 - 매핑 표의 이름(네임스페이스 없음)을 담아 두고 누를 때 다시 푼다.
+            # 조인트가 없는 행은 plan() 이 세트를 안 풀어 두므로 row["set"] 을 믿을 수 없다.
+            item.setData(0, Qt.UserRole, row["set_wanted"])
             self.tree_plan.addTopLevelItem(item)
         for col in range(5):
             self.tree_plan.resizeColumnToContents(col)
         self._refresh_ik_label()
         return rows
+
+    def on_plan_double_clicked(self, item, _column=0):
+        """더블클릭한 행의 Cage set **노드 자체**를 마야에서 선택한다(씬 불변, 선택만).
+
+        ★ `cmds.select(set)` 은 세트를 **멤버로 펼쳐** 고른다 - 세트가 아니라 안의 오브젝트가
+        선택된다. 세트 노드를 고르려면 `noExpand=True` 가 필요하다.
+        이름은 누르는 시점에 네임스페이스로 다시 푼다 - 표를 그린 뒤 씬이 바뀌었을 수 있다.
+        """
+        wanted = item.data(0, Qt.UserRole) if item is not None else None
+        if not wanted:
+            return
+        set_node, found = su.resolve(wanted, self._namespace())
+        if not set_node:
+            self.log("[WARN] Cage set not found - looked for {0}.".format(
+                " and ".join(su.candidates(wanted, self._namespace()))))
+            return
+        cmds.select(set_node, replace=True, noExpand=True)
+        note = " (also found {0})".format(", ".join(found[1:])) if len(found) > 1 else ""
+        self.log("Selected set: {0}{1}".format(set_node, note))
 
     # --------------------------------------------------------------
     # IK 세션
