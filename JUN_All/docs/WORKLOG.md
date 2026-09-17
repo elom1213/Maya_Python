@@ -803,6 +803,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 파일: `app/core/weight_layer_manager.py`(신규), `app/ui/layer_tab.py`(신규), `app/ui/main_window.py`,
   `docs/A00275_skinTool_V01.md` `#A00275`
 
+> [!summary] `memory` **MEMORY.md 색인 정리** — 182 -> 88줄, 같은 툴의 기능 메모를 한 줄로 묶어 200줄 읽기 한도 아래로
+- 링크 153개는 **전부 유지**(누락 파일 없음). 같은 툴의 기능 메모를 `- A00xxx — [a](..) · [b](..)` 한 줄로 묶었다.
+- 색인 정리는 다른 세션이 시작하고 이어받아 마쳤다 — 한 파일이라 세션별로 나누지 않고 한 커밋.
+- 함께 추가한 메모 링크 2개(A00170 세션): `parentmatrix-includes-offsetparentmatrix` · `surface-normal-handedness`.
+  파일: `.claude/memory/MEMORY.md` `#memory` (ea3afa4)
+
 > [!summary] `A00145_RigConnect` Mirror 탭에 **`Apply (Left -> Right)`** 모드 — 새로 만들지 않고, 이미 있는 반대쪽 오브젝트를 미러 위치·회전으로 옮긴다 (v01.39 -> 01.40)
 - **요청**: Mirror 탭에 `Left` / `Right` 리스트 두 개를 두고, Left 를 미러한 결과의 위치·회전을
   같은 줄 Right 오브젝트에 적용. `Translation` / `Rotation` 체크박스(기본 ON), Mirror Plane · Mirror Type
