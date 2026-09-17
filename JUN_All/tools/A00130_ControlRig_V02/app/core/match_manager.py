@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-28
+# last Update date : 2026-09-17
 # A00130_ControlRig_V02 - Match : 케이지 세트의 원소를 짝인 템플릿 조인트에 맞춘다.
 #
 # 계획서 Phase 1 (최소 기능).
@@ -35,6 +35,12 @@
 # → **그룹(translate / rotate) 단위로 all-or-nothing.**
 #   전부 막혔으면 그 그룹만 깨끗이 건너뛰고 **나머지 그룹은 매칭한다.**
 #   일부만 막혔으면 그 그룹은 **건드리지 않고 크게 알린다.**
+#
+# ── 부모부터 맞추고, 밀려난 것은 다시 맞춘다 (2026-09-17, v02.20) ────────────
+#
+# 매핑 표 순서대로 맞추면 자식을 먼저 맞춘 뒤 부모가 움직여 **자식이 도로 어긋났다**
+# (Match 를 여러 번 눌러야 했다). 이제 **계층이 얕은 것부터** 맞추고, 한 바퀴 뒤 다른 매칭에
+# 밀려난 멤버를 **다시 맞춘다**(최대 MAX_PASSES 바퀴). 자세한 것은 `_run_ops`.
 
 import maya.cmds as cmds
 
@@ -120,6 +126,97 @@ def plan(joints, namespace):
     return rows
 
 
+#: 다시 맞추기를 몇 바퀴까지 돌릴지 (첫 바퀴 포함)
+MAX_PASSES = 5
+
+#: 월드 행렬이 "그대로" 라고 볼 허용치 (행렬 원소 차이)
+MATRIX_TOLERANCE = 1e-4
+
+
+class _MatchOp(object):
+    """멤버 하나를 조인트 하나에 맞추는 일 한 건."""
+
+    def __init__(self, index, row, member, do_t, do_r, notes):
+        self.index = index          # 매핑 표 순서 (같은 깊이 안에서 이 순서를 지킨다)
+        self.row = row
+        self.member = member
+        self.do_t = do_t
+        self.do_r = do_r
+        self.notes = notes
+        self.error = None
+        try:
+            path = (cmds.ls(member, long=True) or [member])[0]
+        except Exception:
+            path = member
+        self.depth = path.count("|")
+
+
+def _world_matrix(node):
+    return cmds.xform(node, query=True, worldSpace=True, matrix=True)
+
+
+def _same_matrix(a, b):
+    return all(abs(x - y) <= MATRIX_TOLERANCE for x, y in zip(a, b))
+
+
+def _run_ops(ops):
+    """매칭을 실행한다. 로그 목록을 돌려준다.
+
+    ── 왜 순서가 문제인가 (2026-09-17, 사용자 보고) ─────────────────────────
+    `obj_01 > obj_02 > obj_03 > obj_04` 에서 **obj_03 을 먼저 맞추고 obj_01 을 나중에**
+    맞추면, obj_01 이 움직일 때 **자식인 obj_03 이 딸려 가서 다시 어긋난다.** 매핑 표 순서대로
+    맞추면 이런 일이 생기고, 그래서 Match 를 여러 번 눌러야 자리를 잡았다.
+
+    1) **계층이 얕은 것(부모)부터** 맞춘다. 같은 깊이 안에서는 매핑 표 순서 그대로다
+       (같은 멤버가 두 세트에 있으면 뒤쪽 행이 이기는 기존 규칙이 유지된다).
+    2) 부모-자식이 아닌 연결(컨스트레인트로 따라가는 그룹 · offsetParentMatrix 등)은 깊이로
+       순서를 못 정한다. 그래서 한 바퀴 끝나면 **멤버마다 자기가 맞춰진 직후의 월드 행렬과
+       지금 행렬을 비교**하고, 다른 매칭에 밀려난 멤버만 **다시 맞춘다.** 사람이 Match 를 다시
+       누르던 일을 툴이 한다. 서로가 서로를 미는 순환이면 끝나지 않으므로 MAX_PASSES 에서
+       멈추고 이름을 짚어 알린다.
+    """
+    messages = []
+    ordered = sorted(ops, key=lambda op: (op.depth, op.index))
+
+    def run(batch):
+        """batch 를 순서대로 맞추고 멤버별 '맞춘 직후' 행렬을 돌려준다."""
+        after = {}
+        for op in batch:
+            try:
+                cmds.matchTransform(op.member, op.row["joint"],
+                                    position=op.do_t, rotation=op.do_r, scale=False)
+            except Exception as e:
+                op.error = e
+                continue
+            after[op.member] = _world_matrix(op.member)
+        return after
+
+    after = run(ordered)
+    moved = set()
+    for pass_number in range(2, MAX_PASSES + 1):
+        moved = {member for member, matrix in after.items()
+                 if not _same_matrix(_world_matrix(member), matrix)}
+        if not moved:
+            break
+        messages.append(
+            "[Info] Match pass {0}: {1} object(s) were moved by another match after they "
+            "were placed (not a parent-child link) - matching them again: {2}.".format(
+                pass_number, len(moved),
+                ", ".join(sorted(su.short_name(m) for m in moved))))
+        again = [op for op in ordered if op.member in moved and op.error is None]
+        after.update(run(again))
+    else:
+        moved = {member for member, matrix in after.items()
+                 if not _same_matrix(_world_matrix(member), matrix)}
+        if moved:
+            messages.append(
+                "[Warning] {0} object(s) still move each other after {1} passes - they "
+                "probably drive each other in a loop: {2}.".format(
+                    len(moved), MAX_PASSES,
+                    ", ".join(sorted(su.short_name(m) for m in moved))))
+    return messages
+
+
 def apply(rows, ik_handles=None, auto_ik=True, axis_doc=None, namespace=None):
     """계산된 행대로 실제로 맞춘다. `(results, messages)`.
 
@@ -174,6 +271,9 @@ def apply(rows, ik_handles=None, auto_ik=True, axis_doc=None, namespace=None):
             messages.extend(ik_msgs)
 
         try:
+            # ---- 1) 행마다 "무엇을 어떤 채널로 맞출지" 만 정한다 (아직 안 옮긴다) ----
+            ops = []            # _MatchOp 목록 - 실행은 아래에서 계층 순서로
+            ok_rows = []        # 멤버가 있는 행 - 행별 [OK] 로그용
             for row in rows:
                 if row["status"] in (ST_NO_JOINT, ST_NO_SET):
                     messages.append("[Warning] {0} <- {1} : {2} ({3}).".format(
@@ -193,6 +293,7 @@ def apply(rows, ik_handles=None, auto_ik=True, axis_doc=None, namespace=None):
 
                 want_t = "t" in row["match"]
                 want_r = "r" in row["match"]
+                ok_rows.append(row)
 
                 for member in row["members"]:
                     if not cmds.objExists(member):
@@ -237,27 +338,31 @@ def apply(rows, ik_handles=None, auto_ik=True, axis_doc=None, namespace=None):
                             row["set"], su.short_name(member), "; ".join(notes)))
                         continue
 
-                    try:
-                        cmds.matchTransform(member, row["joint"],
-                                            position=do_t, rotation=do_r, scale=False)
-                    except Exception as e:
-                        results["skipped_members"] += 1
-                        messages.append("[ERR] {0} <- {1} : {2}".format(
-                            su.short_name(member), row["joint"], e))
-                        continue
+                    op = _MatchOp(len(ops), row, member, do_t, do_r, notes)
+                    ops.append(op)
 
-                    results["matched"] += 1
-                    if notes:
-                        # 일부만 넣었다 - 무엇을 넣고 무엇을 뺐는지 분명히 적는다
-                        results["partial"] += 1
-                        did = " + ".join(
-                            [x for x in ("position" if do_t else "",
-                                         "rotation" if do_r else "") if x])
-                        messages.append("[Info] {0}: '{1}' matched {2} only - {3}.".format(
-                            row["set"], su.short_name(member), did, "; ".join(notes)))
+            # ---- 2) 부모부터 맞춘다 + 다른 매칭에 밀려난 것은 다시 맞춘다 ----
+            messages.extend(_run_ops(ops))
 
+            for op in ops:
+                if op.error:
+                    results["skipped_members"] += 1
+                    messages.append("[ERR] {0} <- {1} : {2}".format(
+                        su.short_name(op.member), op.row["joint"], op.error))
+                    continue
+                results["matched"] += 1
+                if op.notes:
+                    # 일부만 넣었다 - 무엇을 넣고 무엇을 뺐는지 분명히 적는다
+                    results["partial"] += 1
+                    did = " + ".join(
+                        [x for x in ("position" if op.do_t else "",
+                                     "rotation" if op.do_r else "") if x])
+                    messages.append("[Info] {0}: '{1}' matched {2} only - {3}.".format(
+                        op.row["set"], su.short_name(op.member), did, "; ".join(op.notes)))
+
+            for row in ok_rows:
                 seen_joints.add(row["joint"])
-                mode = "position only" if not want_r else "position + rotation"
+                mode = "position only" if "r" not in row["match"] else "position + rotation"
                 messages.append("[OK] {0} <- {1} : {2} member(s), {3}.".format(
                     row["joint"], su.short_name(row["set"]), len(row["members"]), mode))
         except Exception:
