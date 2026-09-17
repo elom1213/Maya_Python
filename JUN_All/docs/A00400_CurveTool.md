@@ -17,7 +17,7 @@ Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya).
 | | **From Points** (v01.04~) | 리스트에 담은 오브젝트·조인트·컴포넌트의 **월드 위치**를 **순서대로** 잇는 커브 하나. 정확히 통과 / 완화 선택 |
 | **Edit**<br>기존 커브의 **형상(CV)** 을 바꾼다 | **Smooth** (v01.05~) | 씬에서 고른 **CV** 를 슬라이더로 실시간 Smooth / Rough. **소프트 셀렉션 폴오프**를 그대로 쓴다. **닫힌 커브도 이음매를 넘어** 고른다 (v01.08~) |
 | | **Wrap** (v01.03~) | **CV 개수가 달라도** 한 커브가 다른 커브의 모양을 따르게 한다. 0~1 envelope 어트리뷰트로 라이브 블렌드 |
-| | **Joints** (v01.07~) | 커브 위에 조인트를 **균일 배치** → 그 조인트로 **커브를 바인드** → 조인트마다 `zro/con/ctl/tgt` 컨트롤러. 컨트롤러가 조인트를, 조인트가 커브를 움직인다 |
+| | **Joints** (v01.07~) | 커브 위에 조인트를 **균일 배치** → 그 조인트로 **커브를 바인드** → 조인트마다 `zro/con/ctl/tgt` 컨트롤러. 컨트롤러가 조인트를, 조인트가 커브를 움직인다. **v01.14~ NURBS 서피스도** — U 또는 V 방향 한 줄로 |
 | | **Combine** (v01.11~) | 좌측 **Source** 커브의 쉐입을 우측 **Target** 커브에 합친다. 인스턴스가 아닌 **복사본**이라 Source 를 지우거나 고쳐도 영향 없음 |
 | **Display**<br>**그려지는 방식만** 바꾼다 | **Line Width** (v01.01~) | 리스트업한 커브의 **뷰포트 표시 굵기**를 슬라이더로 조절 — 씬에서 **잘 보이고 잘 집히게**. 형상은 불변 |
 
@@ -472,7 +472,11 @@ result[i] = origin[i] + sign(적용값) * weight[i] * (target[i] - origin[i])
 
 ---
 
-## Edit > Joints (v01.07~) — 커브를 조인트로 움직이게
+## Edit > Joints (v01.07~) — 커브(와 NURBS 서피스)를 조인트로 움직이게
+
+> **v01.14~ NURBS 서피스도 받는다.** 리스트에 커브와 서피스를 섞어 담아도 된다.
+> 서피스는 **U 또는 V 방향의 아이소파름 한 줄**을 커브처럼 보고 같은 흐름(배치 → 바인드 → 스택)을 탄다.
+> 자세한 내용은 아래 [NURBS 서피스 (v01.14~)](#nurbs-서피스-v0114) 절.
 
 커브를 애니메이션·리깅에서 쓰려면 **커브를 직접 잡는 대신 무언가가 커브를 끌어 주어야** 한다.
 이 탭은 그 셋업을 한 번에 만든다.
@@ -492,13 +496,13 @@ result[i] = origin[i] + sign(적용값) * weight[i] * (target[i] - origin[i])
 
 ### 사용법
 
-1. 씬에서 커브를 고르고 **List Selected Curves**.
-2. **Count per Curve** 를 정한다.
-3. 필요하면 아래 옵션을 손보고 **Create Joints on Curves**.
+1. 씬에서 커브 또는 NURBS 서피스를 고르고 **List Selected**.
+2. **Count per Object** 를 정한다. 서피스라면 **Surface Direction**(U / V)과 **Across** 도.
+3. 필요하면 아래 옵션을 손보고 **Create Joints**.
 
 만들어진 컨트롤러가 선택된 채로 끝난다. **전체가 undo 한 스텝**이다.
 
-### Count per Curve — 몇 개를, 어디에
+### Count per Object — 몇 개를, 어디에
 
 커브의 **처음~끝을 `[0, 1]`** 로 보고 그만큼 균일하게 놓는다.
 
@@ -532,9 +536,11 @@ result[i] = origin[i] + sign(적용값) * weight[i] * (target[i] - origin[i])
 
 | 옵션 | 기본 | 설명 |
 |------|------|------|
-| **Aim joints along the curve** | 켬 | 조인트 **X 축을 커브 접선**으로 돌린다. up 힌트는 월드 Y, 접선이 Y 와 나란하면 월드 Z 로 갈아탄다. 컨트롤러는 조인트에 맞춰지므로 같이 돈다. 끄면 조인트가 월드 방향 그대로 |
-| **Bind the curve to the new joints** | 켬 | 방금 만든 조인트로 그 커브를 `skinCluster`. **이미 skinCluster 가 걸린 커브는 건너뛰고** 로그에 남긴다(덮어쓰지 않는다) |
-| **Group the new nodes per curve** | 켬 | `<curve>_crvJnt_grp` 밑에 `<curve>_jnt_grp` · `<curve>_ctl_grp` 로 나눠 담는다 |
+| **Surface Direction** (v01.14~) | `U` | 서피스에서 조인트를 **U 를 따라**(V 고정) 놓을지 **V 를 따라**(U 고정) 놓을지. 커브는 무시 |
+| **Across** (v01.14~) | `0.5` | 서피스에서 그 줄이 **반대 방향 어디에** 있는지, 파라미터 범위의 비율 `0~1`. `0.5` = 가운데 줄. 커브는 무시 |
+| **Aim joints along the curve / row** | 켬 | 조인트 **X 축을 접선**으로 돌린다. 커브는 up 힌트가 월드 Y(접선이 Y 와 나란하면 월드 Z), **서피스는 Y 가 서피스 노멀 쪽**. 컨트롤러는 조인트에 맞춰지므로 같이 돈다. 끄면 조인트가 월드 방향 그대로 |
+| **Bind the curve / surface to the new joints** | 켬 | 방금 만든 조인트로 그 커브/서피스를 `skinCluster`. **이미 skinCluster 가 걸린 것은 건너뛰고** 로그에 남긴다(덮어쓰지 않는다) |
+| **Group the new nodes per object** | 켬 | `<name>_crvJnt_grp`(서피스는 **`<name>_srfJnt_grp`**) 밑에 `<name>_jnt_grp` · `<name>_ctl_grp` 로 나눠 담는다 |
 | **zro / con / tgt** | 셋 다 켬 | 컨트롤러 스택에 넣을 널. **`ctl`(큐브 커브)은 항상** 만든다 |
 | **Control Size** | `1.0` | 큐브의 **반변 길이**(반지름 감각) |
 | **Constraint** | Parent | 조인트가 스택 **마지막 노드**(보통 `_tgt`)를 따르는 방식. Parent / Point / Orient / Scale |
@@ -560,8 +566,35 @@ spine_crv_skinCluster          (커브를 세 조인트에 바인드)
 번호는 개수 자릿수만큼 0 을 채운다 — 3개면 `1`~`3`, 12개면 `01`~`12`.
 이름이 이미 쓰이고 있으면 마야가 뒤에 번호를 붙이고, **그 사실을 로그에 남긴다**.
 
+### NURBS 서피스 (v01.14~)
+
+서피스에서는 **한 줄**을 고른다 — 방향(U/V)과 그 줄이 반대 방향 어디에 있는지(Across).
+
+```
+Direction U, Across 0.5            Direction V, Across 0.25
+ V                                  V
+ ↑ ┌───────────────────┐            ↑ ┌───────────────────┐
+ │ │                   │            │ │    ●              │
+ │ │ ●────●────●────●  │  ← 가운데  │ │    ●              │
+ │ │                   │            │ │    ●              │
+ │ └───────────────────┘            │ └───────────────────┘
+ └──────────────────────→ U         └──────────────────────→ U
+```
+
+- **Count · Spacing · 닫힘 처리 · 바인드 · 컨트롤러 스택은 커브와 똑같다.**
+  - **By length** 는 그 줄의 **호 길이** 균등이다. 아이소파름용 길이 함수가 MFn 에 없어서, 줄을 **스팬당 32점**으로
+    촘촘히 찍은 꺾은선 길이로 재고 역보간한다(스팬 1 : 3 인 평면에서 가운데 조인트가 정확히 가운데).
+  - **원통처럼 그 방향으로 닫힌(`formU/formV ≠ 0`) 서피스**는 커브처럼 마지막 자리를 뺀다 — 둘레에 4개면 90° 간격.
+- **Across 는 파라미터 비율**이다. 반대 방향으로 호 길이를 맞추지는 않는다(스팬이 고르지 않으면 `0.5` 가 눈으로 본 정가운데와 조금 다를 수 있다).
+- **조준(Aim)** — X = 그 방향 접선, **Y = 서피스 노멀 쪽**. 노멀은 `tangentU × tangentV` 라 `[tanU, N, tanV]` 를 그대로 행렬에 넣으면
+  왼손계가 되어 회전이 뒤집힌다. 그래서 `Z = X × N`, `Y = Z × X` 로 직교화한다(A00170 AttachCrv 와 같은 판단).
+- **극점(구의 끝처럼 한 점으로 모이는 줄)** 은 접선이 0 이라 방향을 정할 수 없다. 그 조인트는 월드 방향으로 두고
+  **로그에 경고**한다. 줄 전체가 한 점이면 조인트들도 한 점에 겹친다 — Direction 이나 Across 를 바꾸면 된다.
+- 결과 이름은 커브와 같은 규칙이고 최상위 그룹만 `<name>_srfJnt_grp` 다.
+
 ### 알아둘 것 (mayapy 로 확인)
 
+- **NURBS 서피스에도 `skinCluster` 가 걸린다** (v01.14~) — 컨트롤러를 움직이면 서피스 CV 가 따라온다.
 - **커브에도 `skinCluster` 가 걸린다.** 메시 전용이 아니다. `polyToCurve` 로 만든
   **히스토리가 살아 있는 커브**에도 걸리고(디포머가 히스토리 뒤에 끼어든다) 조인트가
   CV 를 정상으로 끈다.
@@ -581,14 +614,23 @@ spine_crv_skinCluster          (커브를 세 조인트에 바인드)
 - **`A00460_ControllerTool` 의 `fk_manager` 를 import 하지 않는다.** 노드 구성은 같지만
   `dev/build_release.py` 가 **툴 하나 + Framework** 만 릴리스로 복사하므로, 다른 툴의 core 를
   참조하면 릴리스에서 곧바로 깨진다. 정말 공유해야 해지면 `Framework` 로 올릴 자리다.
-- 커브가 아닌 항목, 씬에 없는 이름, 이미 바인드된 커브는 **사유와 함께 건너뛴다** — 나머지
-  커브 처리는 계속된다.
+- 커브·서피스가 아닌 항목(메시 등), 씬에 없는 이름, 이미 바인드된 것은 **사유와 함께 건너뛴다** — 나머지
+  처리는 계속된다.
+
+**v01.14 검증** (mayapy 2024 + 오프스크린 Qt, **22항목 전부 통과**): 이동·회전한 평면에서 U 5개가 **서피스 위**에 **같은 간격** ·
+`_srfJnt_grp` + 서피스 skinCluster · V 줄은 U 줄과 **직교**하고 가운데에서 만난다 · Aim 의 X = 줄 방향, Y = 노멀(내적 1.0) ·
+컨트롤러를 움직이면 서피스가 변형 · Across 0 과 1 이 반대 가장자리 · 스팬 1 : 3 에서 By length 는 가운데 0, By parameter 는 -1 ·
+원통 둘레(닫힌 방향) 4개가 겹치지 않고 균등 · 구의 극점 줄에서 크래시 없이 경고 · **커브 기존 동작(0, 5.5, 11) 그대로** ·
+커브+서피스+메시 혼합(메시는 사유와 함께 건너뜀) · 잘못된 방향 거절 · UI 기본값 U / 0.5 · UI 에서 V · 4개 · Across 0.25 로 생성 → **undo 한 번에 전부 제거** ·
+Joints 탭 최소 폭(906)이 창 폭(1176) 안.
 
 - 핵심 API:
-  - `joint_curve_manager.build_joints_on_curves(curves, count, spacing, aim, bind, group, use_zro, use_con, use_tgt, constraints, size, joint_radius)` → 결과 dict
-    (`curves` / `joints` / `controls` / `roots` / `groups` / `skins` / `constraints` / `missing` / `skipped` / `renamed` / `warnings`)
+  - `joint_curve_manager.build_joints_on_curves(curves, count, spacing, aim, bind, group, use_zro, use_con, use_tgt, constraints, size, joint_radius, direction, across)` → 결과 dict
+    (`curves` / `surfaces` / `joints` / `controls` / `roots` / `groups` / `skins` / `constraints` / `missing` / `skipped` / `renamed` / `warnings`)
   - `joint_curve_manager.uniform_us(count, closed)` → `[0, 1]` 위의 균일 위치 목록
-  - `joint_curve_manager.sample_curve(shape, count, spacing)` → `[(월드 위치, 월드 접선), ...]`
+  - `joint_curve_manager.sample_curve(shape, count, spacing)` → `[(월드 위치, 월드 접선, None), ...]`
+  - `joint_curve_manager.sample_surface(shape, count, spacing, direction, across)` → `[(월드 위치, 월드 접선, 월드 노멀), ...]` (v01.14~)
+  - `joint_curve_manager.resolve_target(node)` → `(shape, "curve" | "surface")`, 둘 다 아니면 `(None, None)` (v01.14~)
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: wip-a00400-curve-joints
-description: "A00400_CurveTool Edit > Joints — 커브 위 균일 조인트 + 커브 바인드 + zro/con/ctl/tgt 컨트롤러"
+description: "A00400_CurveTool Edit > Joints — 커브/NURBS 서피스(U·V 한 줄) 위 균일 조인트 + 바인드 + zro/con/ctl/tgt 컨트롤러"
 metadata:
   node_type: memory
   type: project
@@ -40,3 +40,11 @@ metadata:
   조인트끼리 체인이 되어 버린다. 커브 구동 조인트는 각자 독립이어야 한다.
 - 조인트 방향은 `rotate` 말고 **`jointOrient`** 에 쓴다(로컬 = `R * JO`, 갓 만든 조인트는
   `R=0` 이라 JO 가 곧 월드 방향). `rotate` 에 넣으면 애니메이터가 채널을 0 으로 돌릴 때 풀린다.
+
+**v01.14 (2026-09-17) NURBS 서피스:** 같은 리스트에 서피스를 섞어 받는다. `Surface Direction` U/V + `Across`(반대 방향
+파라미터 비율, 기본 0.5). `resolve_target` 이 커브를 먼저 본다. `sample_surface` 는
+- 호 길이: 아이소파름 길이 MFn 함수가 없어 **스팬당 32점 꺾은선**으로 재고 역보간.
+- 닫힘: `formU/formV != 0` 이면 커브처럼 마지막 자리를 뺀다(원통 둘레).
+- Aim: up 힌트 = 노멀, `_aim_euler(tangent, up_hint)` 가 X 보존 직교화([[surface-normal-handedness]]). 접선 0(구 극점)이면 None -> 월드 방향 + 경고.
+- 샘플은 커브·서피스 모두 `(pos, tangent, up_hint)` 3-튜플. 결과 dict 에 `surfaces`, 그룹은 `_srfJnt_grp`.
+- 확인: nurbsSurface 에도 skinCluster 가 걸리고 ctl 이동으로 CV 가 따라온다. 조인트 그룹을 지우면 skinCluster 도 같이 사라진다.

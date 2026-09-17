@@ -1,5 +1,23 @@
 # Changelog — A00400_CurveTool
 
+## v01.14 (2026-09-17)
+**[Feature] `Edit > Joints` — NURBS surface 도 원하는 개수만큼 조인트 + 바인드 + zro/con/ctl/tgt 스택.**
+
+- **요청**: Joints 탭에서 커브뿐 아니라 NURBS surface 도 같은 구조를 만들고, U / V 중 어느 방향으로 조인트를 나열할지 고를 수 있게.
+- **[Add] `Surface Direction` U / V** — U 면 V 를 고정한 줄을 따라, V 면 U 를 고정한 줄을 따라 놓는다. 커브는 무시.
+- **[Add] `Across` 0~1 (기본 0.5)** — 그 줄이 반대 방향 파라미터 범위의 어디에 있는지. 0.5 = 가운데 줄.
+- 리스트에 **커브와 서피스를 섞어** 담아도 된다. Count / Spacing / 닫힘 / 바인드 / 스택 / 컨스트레인트는 커브와 같다.
+  - **By length** = 줄을 스팬당 32점으로 찍은 꺾은선 길이로 역보간(아이소파름 길이 MFn 함수가 없다).
+  - 그 방향으로 닫힌 서피스(`formU/formV`)는 마지막 자리를 뺀다(원통 둘레).
+  - **Aim** — X = 줄 접선, **Y = 서피스 노멀 쪽**(`Z = X × N` 으로 직교화, 왼손계 회피).
+  - 극점처럼 접선이 0 인 자리는 월드 방향으로 두고 경고.
+  - 최상위 그룹 이름은 `<name>_srfJnt_grp`.
+- **[Change] UI 문구** — 리스트 `Curves / Surfaces` · `List Selected`, `Count per Object`, 버튼 `Create Joints`, 로그 `... curve(s) and N surface(s)`.
+- core API: `build_joints_on_curves(..., direction=, across=)` 추가, 결과 dict 에 `surfaces`. `sample_curve` 는 `(위치, 접선, None)` 3-튜플로.
+
+**검증**(mayapy 2024 + 오프스크린 Qt, **22항목 전부 통과**): 서피스 위 · 등간격 · U/V 직교 · Aim X/Y · 컨트롤러로 서피스 변형 ·
+Across 0/1 · 불균등 스팬 By length/parameter · 원통 닫힌 방향 · 구 극점 · 커브 회귀 · 혼합 리스트 · 잘못된 방향 · UI 생성 + 단일 undo · 창 폭.
+
 ## v01.13 (2026-09-17)
 **[Change] `Edit > Combine` — 기본으로 Source 를 Target 월드 위치로 옮긴 모양이 합쳐진다.**
 

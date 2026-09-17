@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-07
+# last Update date : 2026-09-17
 # A00400_CurveTool core - 커브 위에 조인트를 균일 배치 -> 커브를 바인드 -> 컨트롤러 스택
 # (maya.cmds / maya.api.OpenMaya, UI 비의존)
 #
-# 흐름은 커브 하나마다 세 단계다.
+# v01.14~ **NURBS surface** 도 받는다. 서피스는 U 또는 V 방향의 **아이소파름 한 줄**을
+# 커브처럼 보고 같은 흐름을 탄다(아래 "서피스" 절). 배치 줄의 반대 방향 위치는
+# across(0~1, 기본 0.5 = 가운데) 로 정한다.
+#
+# 흐름은 커브(또는 서피스) 하나마다 세 단계다.
 #
 #   1) 배치  : 커브의 시작~끝을 [0, 1] 로 보고 count 개를 균일하게 찍어 조인트를 만든다.
 #              count=1 -> [0.5] 하나, count=3 -> [0.0, 0.5, 1.0].
@@ -24,6 +28,15 @@
 # 엣지 루프에서 만든 커브는 닫혀 있는 경우가 많다. 닫힌 커브에서 u=0 과 u=1 은 **같은 점**
 # 이라 그대로 두면 마지막 조인트가 첫 조인트 위에 겹친다. 닫힌/주기 커브는 마지막 자리를
 # 빼고 count 등분해서(0, 1/n, 2/n ...) 겹침을 없앤다.
+#
+# -- 서피스 (v01.14~) --------------------------------------------------------
+# direction=U 면 v 를 across 위치에 고정하고 u 를 따라, V 면 그 반대로 놓는다.
+#   - 호 길이: 아이소파름용 MFn 함수가 없어서 그 줄을 **촘촘히 샘플링한 꺾은선 길이**로
+#     재고 역보간한다(스팬당 32점 - 길이 오차는 눈에 안 띄는 수준).
+#   - 닫힘: formU / formV 가 0 이 아니면 커브와 똑같이 마지막 자리를 뺀다(원통의 둘레 방향).
+#   - 조준: X = 그 방향 접선, **up 힌트 = 서피스 노멀**. 노멀은 tangentU x tangentV 라
+#     [tanU, N, tanV] 를 그대로 쓰면 왼손계가 되므로, Z = X x N / Y = Z x X 로 직교화한다.
+#   - across 는 **파라미터 비율**이다(min~max 의 비율). 반대 방향으로 호 길이를 맞추지는 않는다.
 #
 # -- A00460 의 스택을 여기 다시 둔 이유 --------------------------------------
 # 노드 구성은 A00460_ControllerTool 의 fk_manager 와 같지만 그 모듈을 import 하지 않는다.
@@ -46,6 +59,17 @@ SPACING_PARAM = "param"        # 커브 파라미터 균등
 COUNT_MIN = 1
 COUNT_DEFAULT = 3
 
+# 서피스에서 조인트를 늘어놓을 방향 (v01.14~)
+DIRECTION_U = "u"
+DIRECTION_V = "v"
+ACROSS_DEFAULT = 0.5           # 반대 방향 위치(파라미터 비율). 0.5 = 가운데 줄
+
+# 서피스 아이소파름 길이를 잴 때 스팬 하나당 샘플 수
+_SURFACE_SAMPLES_PER_SPAN = 32
+
+KIND_CURVE = "curve"
+KIND_SURFACE = "surface"
+
 SUFFIX_JNT = "_jnt"
 SUFFIX_ZRO = "_zro"
 SUFFIX_CON = "_con"
@@ -53,6 +77,7 @@ SUFFIX_CTL = "_ctl"
 SUFFIX_TGT = "_tgt"
 
 GRP_TOP = "_crvJnt_grp"
+GRP_TOP_SURFACE = "_srfJnt_grp"
 GRP_JNT = "_jnt_grp"
 GRP_CTL = "_ctl_grp"
 
@@ -90,20 +115,44 @@ def _short(node):
     return node.split("|")[-1].split(":")[-1]
 
 
-def _curve_shape(node):
-    """transform/shape 이름 -> nurbsCurve shape 롱네임. 커브가 아니면 None.
+def _shape_of_type(node, shape_type):
+    """transform/shape 이름 -> shape_type 셰이프 롱네임. 해당 타입이 아니면 None.
 
     noIntermediate=True 로 orig shape(`...Orig`)을 걸러 낸다 - 이미 디포머가 걸린
     커브를 다시 리스트업했을 때 원본 셰이프를 잡으면 엉뚱한 곳을 재는 셈이 된다.
     """
     if not node or not cmds.objExists(node):
         return None
-    if cmds.objectType(node, isType="nurbsCurve"):
+    if cmds.objectType(node, isType=shape_type):
         found = cmds.ls(node, long=True) or []
         return found[0] if found else None
-    shapes = cmds.listRelatives(node, shapes=True, type="nurbsCurve",
+    shapes = cmds.listRelatives(node, shapes=True, type=shape_type,
                                 fullPath=True, noIntermediate=True) or []
     return shapes[0] if shapes else None
+
+
+def _curve_shape(node):
+    """transform/shape 이름 -> nurbsCurve shape 롱네임. 커브가 아니면 None."""
+    return _shape_of_type(node, "nurbsCurve")
+
+
+def _surface_shape(node):
+    """transform/shape 이름 -> nurbsSurface shape 롱네임. 서피스가 아니면 None."""
+    return _shape_of_type(node, "nurbsSurface")
+
+
+def resolve_target(node):
+    """(shape 롱네임, KIND_CURVE | KIND_SURFACE). 둘 다 아니면 (None, None).
+
+    커브를 먼저 본다 - 트랜스폼 하나에 둘이 같이 붙어 있는 드문 경우 기존 동작(커브)을 지킨다.
+    """
+    shape = _curve_shape(node)
+    if shape:
+        return shape, KIND_CURVE
+    shape = _surface_shape(node)
+    if shape:
+        return shape, KIND_SURFACE
+    return None, None
 
 
 def _transform_of(shape):
@@ -147,7 +196,9 @@ def _padded(count, n):
 
 
 def sample_curve(shape, count, spacing=SPACING_LENGTH):
-    """커브 위 count 개 지점의 (월드 위치, 월드 접선) 목록.
+    """커브 위 count 개 지점의 (월드 위치, 월드 접선, None) 목록.
+
+    세 번째 자리는 up 힌트다 - 커브에는 노멀이 없어 None(= 월드 Y). sample_surface 와 모양을 맞춘다.
 
     spacing=SPACING_LENGTH 면 호 길이로, SPACING_PARAM 이면 파라미터로 균등 분할한다.
     닫힌 커브는 seam 겹침을 피하려고 마지막 자리를 빼고 나눈다(uniform_us 참고).
@@ -172,20 +223,125 @@ def sample_curve(shape, count, spacing=SPACING_LENGTH):
     for param in params:
         point = fn.getPointAtParam(param, om.MSpace.kWorld)
         tangent = fn.tangent(param, om.MSpace.kWorld)
-        samples.append(((point.x, point.y, point.z), tangent))
+        samples.append(((point.x, point.y, point.z), tangent, None))
     return samples
 
 
-def _aim_euler(tangent):
+def _fn_surface(shape):
+    """nurbsSurface shape 의 MFnNurbsSurface(월드 평가가 되는 DAG 경로로 연다)."""
+    sel = om.MSelectionList()
+    sel.add(shape)
+    return om.MFnNurbsSurface(sel.getDagPath(0))
+
+
+def _surface_closed(shape, direction):
+    """그 방향으로 서피스가 닫혀 있는가. `.formU/.formV` 0=open / 1=closed / 2=periodic."""
+    attr = ".formU" if direction == DIRECTION_U else ".formV"
+    try:
+        return int(cmds.getAttr(shape + attr)) != 0
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
+def sample_surface(shape, count, spacing=SPACING_LENGTH,
+                   direction=DIRECTION_U, across=ACROSS_DEFAULT):
+    """서피스 아이소파름 한 줄 위 count 개 지점의 (월드 위치, 월드 접선, 월드 노멀) 목록.
+
+    direction : DIRECTION_U 면 u 를 따라 늘어놓고(v 고정), DIRECTION_V 면 v 를 따라(u 고정).
+    across    : 고정한 쪽 파라미터의 위치, min~max 사이 비율 [0, 1]. 0.5 = 가운데.
+    spacing   : SPACING_LENGTH 면 그 줄의 호 길이, SPACING_PARAM 이면 파라미터로 균등.
+    """
+    if direction not in (DIRECTION_U, DIRECTION_V):
+        raise ValueError("Unknown surface direction: {0}".format(direction))
+
+    fn = _fn_surface(shape)
+    u_min, u_max = fn.knotDomainInU
+    v_min, v_max = fn.knotDomainInV
+    across = min(max(float(across), 0.0), 1.0)
+
+    if direction == DIRECTION_U:
+        a_min, a_max = u_min, u_max
+        fixed = v_min + (v_max - v_min) * across
+        spans = fn.numSpansInU
+
+        def uv(t):
+            return t, fixed
+    else:
+        a_min, a_max = v_min, v_max
+        fixed = u_min + (u_max - u_min) * across
+        spans = fn.numSpansInV
+
+        def uv(t):
+            return fixed, t
+
+    def point_at(t):
+        u, v = uv(t)
+        return fn.getPointAtParam(u, v, om.MSpace.kWorld)
+
+    closed = _surface_closed(shape, direction)
+    us = uniform_us(count, closed=closed)
+    params = None
+
+    if spacing == SPACING_LENGTH:
+        # 꺾은선 누적 길이 -> 목표 길이를 구간 안에서 선형 역보간.
+        n = max(int(spans), 1) * _SURFACE_SAMPLES_PER_SPAN
+        ts = [a_min + (a_max - a_min) * i / float(n) for i in range(n + 1)]
+        pts = [point_at(t) for t in ts]
+        acc = [0.0]
+        for i in range(1, len(pts)):
+            acc.append(acc[-1] + (pts[i] - pts[i - 1]).length())
+        total = acc[-1]
+        # 한 점으로 무너진 줄(구의 극점 등)은 길이로 나눌 수 없다 -> 파라미터로.
+        if total > 1e-9:
+            params = []
+            seg = 1
+            for u in us:
+                target = total * u
+                while seg < len(acc) - 1 and acc[seg] < target:
+                    seg += 1
+                span_len = acc[seg] - acc[seg - 1]
+                w = (target - acc[seg - 1]) / span_len if span_len > 1e-12 else 0.0
+                w = min(max(w, 0.0), 1.0)
+                params.append(ts[seg - 1] + (ts[seg] - ts[seg - 1]) * w)
+
+    if params is None:
+        params = [a_min + (a_max - a_min) * u for u in us]
+
+    samples = []
+    for t in params:
+        u, v = uv(t)
+        point = fn.getPointAtParam(u, v, om.MSpace.kWorld)
+        tan_u, tan_v = fn.tangents(u, v, om.MSpace.kWorld)
+        tangent = tan_u if direction == DIRECTION_U else tan_v
+        normal = fn.normal(u, v, om.MSpace.kWorld)
+        samples.append(((point.x, point.y, point.z), tangent, normal))
+    return samples
+
+
+def _aim_euler(tangent, up_hint=None):
     """접선을 X 축으로 삼는 회전(도 단위 XYZ 오일러).
 
-    up 은 월드 Y 를 쓰되, 접선이 Y 와 거의 나란하면 축이 무너지므로 월드 Z 로 갈아탄다.
+    up_hint 가 없으면 월드 Y 를 쓰고, 접선과 거의 나란하면 월드 Z 로 갈아탄다.
+    서피스는 up_hint 로 **노멀**을 넘긴다 -> Y 가 서피스 바깥을 본다.
     직교화 순서가 x -> z -> y 라 x(접선)는 정확히 보존되고 up 은 힌트로만 쓰인다.
+    접선이 0 으로 무너진 자리(구의 극점 등)는 방향을 정할 수 없어 None 을 돌려준다.
     """
-    x = om.MVector(tangent).normal()
-    up = om.MVector(0.0, 1.0, 0.0)
-    if abs(x * up) > 0.999:
-        up = om.MVector(0.0, 0.0, 1.0)
+    x = om.MVector(tangent)
+    if x.length() < 1e-9:
+        return None
+    x = x.normal()
+
+    up = None
+    if up_hint is not None:
+        up = om.MVector(up_hint)
+        if up.length() < 1e-9 or abs(x * up.normal()) > 0.999:
+            up = None
+        else:
+            up = up.normal()
+    if up is None:
+        up = om.MVector(0.0, 1.0, 0.0)
+        if abs(x * up) > 0.999:
+            up = om.MVector(0.0, 0.0, 1.0)
     z = (x ^ up).normal()
     y = (z ^ x).normal()
 
@@ -302,19 +458,24 @@ def existing_skin(shape):
 # --------------------------------------------------------------- 빌드
 
 def _build_one_curve(curve, count, spacing, aim, plan, types, size,
-                     joint_radius, do_group, do_bind, result):
-    """커브 하나: 조인트 배치 -> (선택) 바인드 -> 컨트롤러 스택."""
-    shape = _curve_shape(curve)
+                     joint_radius, do_group, do_bind, result,
+                     direction=DIRECTION_U, across=ACROSS_DEFAULT):
+    """커브(또는 서피스) 하나: 조인트 배치 -> (선택) 바인드 -> 컨트롤러 스택."""
+    shape, kind = resolve_target(curve)
     if shape is None:
-        result["skipped"].append((_short(curve), "not a NURBS curve"))
+        result["skipped"].append((_short(curve), "not a NURBS curve or surface"))
         return
 
     base = _short(_transform_of(shape))
 
     try:
-        samples = sample_curve(shape, count, spacing=spacing)
+        if kind == KIND_SURFACE:
+            samples = sample_surface(shape, count, spacing=spacing,
+                                     direction=direction, across=across)
+        else:
+            samples = sample_curve(shape, count, spacing=spacing)
     except Exception as exc:                                # noqa: BLE001
-        result["skipped"].append((base, "could not sample the curve: {0}".format(exc)))
+        result["skipped"].append((base, "could not sample the {0}: {1}".format(kind, exc)))
         return
 
     # ---------------- 1) 조인트 배치 ----------------
@@ -322,7 +483,8 @@ def _build_one_curve(curve, count, spacing, aim, plan, types, size,
     # 선택을 비워야 서로 부모-자식으로 엮이지 않는다. 커브를 구동하는 조인트들은 각자
     # 독립으로 움직여야 CV 가 제 몫만큼만 따라온다.
     joints = []
-    for i, (point, tangent) in enumerate(samples):
+    unaimed = 0
+    for i, (point, tangent, up_hint) in enumerate(samples):
         cmds.select(clear=True)
         name = "{0}_{1}{2}".format(base, _padded(len(samples), i + 1), SUFFIX_JNT)
         jnt = cmds.joint(position=point, name=name)
@@ -332,13 +494,23 @@ def _build_one_curve(curve, count, spacing, aim, plan, types, size,
         if aim:
             # 조인트의 월드 회전은 rotate * jointOrient 인데 rotate 는 0 이고 부모가
             # 아직 월드(항등)라, jointOrient 에 그대로 쓰면 원하는 월드 방향이 된다.
-            cmds.setAttr(jnt + ".jointOrient", *_aim_euler(tangent))
+            euler = _aim_euler(tangent, up_hint)
+            if euler is None:
+                unaimed += 1
+            else:
+                cmds.setAttr(jnt + ".jointOrient", *euler)
         joints.append(cmds.ls(jnt, long=True)[0])
+
+    if unaimed:
+        result["warnings"].append(
+            "{0}: {1} joint(s) sit where the {2} has no direction (e.g. a pole) - "
+            "left in world orientation.".format(base, unaimed, kind))
 
     # ---------------- 그룹 ----------------
     jnt_grp = ctl_grp = None
     if do_group:
-        top_grp = cmds.group(empty=True, name=base + GRP_TOP)
+        top_suffix = GRP_TOP_SURFACE if kind == KIND_SURFACE else GRP_TOP
+        top_grp = cmds.group(empty=True, name=base + top_suffix)
         jnt_grp = cmds.group(empty=True, name=base + GRP_JNT, parent=top_grp)
         ctl_grp = cmds.group(empty=True, name=base + GRP_CTL, parent=top_grp)
         result["groups"].extend([top_grp, jnt_grp, ctl_grp])
@@ -387,7 +559,10 @@ def _build_one_curve(curve, count, spacing, aim, plan, types, size,
         result["controls"].append(ctl)
         _apply_constraints(last, jnt, types, result)
 
-    result["curves"].append(base)
+    if kind == KIND_SURFACE:
+        result["surfaces"].append(base)
+    else:
+        result["curves"].append(base)
 
 
 def build_joints_on_curves(curves, count=COUNT_DEFAULT,
@@ -396,15 +571,19 @@ def build_joints_on_curves(curves, count=COUNT_DEFAULT,
                            use_zro=True, use_con=True, use_tgt=True,
                            constraints=DEFAULT_CONSTRAINTS,
                            size=DEFAULT_SIZE,
-                           joint_radius=DEFAULT_JOINT_RADIUS):
-    """리스트업한 커브마다 조인트를 균일 배치하고, 커브를 바인드하고, 컨트롤러를 세운다.
+                           joint_radius=DEFAULT_JOINT_RADIUS,
+                           direction=DIRECTION_U,
+                           across=ACROSS_DEFAULT):
+    """리스트업한 커브·서피스마다 조인트를 균일 배치하고, 바인드하고, 컨트롤러를 세운다.
 
-    curves       : 커브 transform/shape 이름 목록.
-    count        : 커브 하나당 조인트 개수(1 이상). 1 이면 중앙 하나, n 이면 [0,1] 균등.
+    curves       : 커브 또는 NURBS 서피스 transform/shape 이름 목록(섞여도 된다).
+    count        : 하나당 조인트 개수(1 이상). 1 이면 중앙 하나, n 이면 [0,1] 균등.
     spacing      : SPACING_LENGTH(호 길이 균등, 기본) / SPACING_PARAM(파라미터 균등).
-    aim          : True 면 각 조인트의 X 축을 커브 접선 방향으로 돌린다.
-    bind         : True 면 만든 조인트로 그 커브를 skinCluster 한다.
-    group        : True 면 커브마다 <curve>_crvJnt_grp 밑으로 정리한다.
+    aim          : True 면 각 조인트의 X 축을 접선 방향으로 돌린다(서피스는 Y 가 노멀 쪽).
+    bind         : True 면 만든 조인트로 그 커브/서피스를 skinCluster 한다.
+    group        : True 면 하나마다 <name>_crvJnt_grp(서피스는 _srfJnt_grp) 밑으로 정리한다.
+    direction    : 서피스에서 조인트를 늘어놓을 방향 DIRECTION_U / DIRECTION_V. 커브는 무시.
+    across       : 서피스에서 반대 방향 위치(파라미터 비율 0~1, 0.5 = 가운데). 커브는 무시.
     use_zro/con/tgt : 컨트롤러 스택에 넣을 널. _ctl 은 항상 만든다.
     constraints  : CON_* 목록. 조인트는 스택 마지막 노드(보통 _tgt)를 따라간다.
     size         : 컨트롤러 큐브의 반변 길이.
@@ -412,6 +591,7 @@ def build_joints_on_curves(curves, count=COUNT_DEFAULT,
 
     반환 dict:
         curves      처리한 커브 이름
+        surfaces    처리한 서피스 이름
         joints      만든 조인트
         controls    만든 _ctl
         roots       컨트롤러 스택 최상단
@@ -419,12 +599,12 @@ def build_joints_on_curves(curves, count=COUNT_DEFAULT,
         skins       만든 skinCluster
         constraints 만든 컨스트레인트 노드
         missing     씬에 없던 입력
-        skipped     (이름, 사유) - 커브가 아니거나 샘플링 실패
+        skipped     (이름, 사유) - 커브/서피스가 아니거나 샘플링 실패
         renamed     이름이 겹쳐 마야가 번호를 붙인 (원한 이름, 실제 이름)
         warnings    경고 문자열
     """
     result = {
-        "curves": [], "joints": [], "controls": [], "roots": [], "groups": [],
+        "curves": [], "surfaces": [], "joints": [], "controls": [], "roots": [], "groups": [],
         "skins": [], "constraints": [], "missing": [], "skipped": [],
         "renamed": [], "warnings": [],
     }
@@ -432,6 +612,8 @@ def build_joints_on_curves(curves, count=COUNT_DEFAULT,
     count = int(count)
     if count < COUNT_MIN:
         raise ValueError("Joint count must be {0} or more.".format(COUNT_MIN))
+    if direction not in (DIRECTION_U, DIRECTION_V):
+        raise ValueError("Surface direction must be 'u' or 'v'.")
 
     types = [t for t in CONSTRAINT_TYPES if t in (constraints or ())]
     if not types:
@@ -456,7 +638,8 @@ def build_joints_on_curves(curves, count=COUNT_DEFAULT,
 
     for curve in valid:
         _build_one_curve(curve, count, spacing, aim, plan, types, size,
-                         joint_radius, group, bind, result)
+                         joint_radius, group, bind, result,
+                         direction=direction, across=across)
 
     if result["controls"] or result["joints"]:
         cmds.select(result["controls"] or result["joints"], replace=True)

@@ -12,6 +12,7 @@
 # 01.10  로그창을 공용 위젯 `JUN_mod_log_qt_v01` 로 교체 (Expand / Clear / Copy)
 # 01.11  Edit > Combine       - Source 커브 쉐입을 Target 에 복사해 합친다 (인스턴스 아님)
 # 01.13  Combine Placement    - 기본값: Source 를 Target 월드 위치(피벗)로 옮긴 모양으로 합친다
+# 01.14  Joints on surfaces   - NURBS surface 도 U / V 방향 한 줄로 조인트 + 바인드 + 컨트롤러
 
-VERSION = "01.13"
+VERSION = "01.14"
 LAST_UPDATE = "2026-09-17"

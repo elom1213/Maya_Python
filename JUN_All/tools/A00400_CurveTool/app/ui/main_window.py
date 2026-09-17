@@ -96,8 +96,8 @@ class MainWindow(QWidget):
          "different CV counts.",
          "_build_wrap_tab"),
         ("Joints",
-         "Place joints evenly along each listed curve, bind the curve to them, "
-         "and build a zro / con / ctl / tgt controller on every joint.",
+         "Place joints evenly along each listed curve or NURBS surface (U or V), "
+         "bind it to them, and build a zro / con / ctl / tgt controller on every joint.",
          "_build_joints_tab"),
         ("Combine",
          "Add the shapes of the Source curves to the Target curves. The added shapes "
@@ -1233,14 +1233,14 @@ class MainWindow(QWidget):
         root = QVBoxLayout(tab)
 
         desc = QLabel(
-            "Place joints evenly along each listed curve, bind the curve to them,\n"
-            "and give every joint a zro / con / ctl / tgt controller stack.\n"
-            "Moving a control moves its joint, and the joints move the curve.")
+            "Place joints evenly along each listed curve or NURBS surface, bind it\n"
+            "to them, and give every joint a zro / con / ctl / tgt controller stack.\n"
+            "Moving a control moves its joint, and the joints move the curve / surface.")
         desc.setAlignment(Qt.AlignCenter)
         root.addWidget(desc)
 
         self.tsl_joints = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Curves", select_label="List Selected Curves",
+            title="Curves / Surfaces", select_label="List Selected",
             show_sort=False, list_min_height=140, log_callback=self.log)
         root.addWidget(self.tsl_joints, 1)
 
@@ -1249,19 +1249,20 @@ class MainWindow(QWidget):
         jnt_lay = QVBoxLayout(jnt_box)
 
         count_row = QHBoxLayout()
-        count_row.addWidget(QLabel("Count per Curve"))
+        count_row.addWidget(QLabel("Count per Object"))
         self.sb_jnt_count = QSpinBox()
         self.sb_jnt_count.setRange(jnt_mgr.COUNT_MIN, 500)
         self.sb_jnt_count.setValue(jnt_mgr.COUNT_DEFAULT)
         self.sb_jnt_count.setKeyboardTracking(False)
         self.sb_jnt_count.setToolTip(
-            "How many joints to place on each curve, from its start to its end\n"
-            "seen as 0 to 1.\n"
+            "How many joints to place on each curve (or surface row), from its\n"
+            "start to its end seen as 0 to 1.\n"
             "  1 -> one joint at 0.5 (the middle)\n"
             "  2 -> 0 and 1 (both ends)\n"
             "  3 -> 0, 0.5 and 1\n"
-            "On a closed curve the last spot is dropped, because 1 is the same\n"
-            "point as 0 - so 4 gives 0, 0.25, 0.5, 0.75.")
+            "On a closed curve (or a surface closed in that direction) the last\n"
+            "spot is dropped, because 1 is the same point as 0 - so 4 gives\n"
+            "0, 0.25, 0.5, 0.75.")
         count_row.addWidget(self.sb_jnt_count)
         count_row.addStretch(1)
         jnt_lay.addLayout(count_row)
@@ -1286,27 +1287,62 @@ class MainWindow(QWidget):
         space_row.addStretch(1)
         jnt_lay.addLayout(space_row)
 
-        self.chk_jnt_aim = QCheckBox("Aim joints along the curve")
+        # 서피스 전용 (v01.14~) - 커브에는 영향이 없다.
+        dir_row = QHBoxLayout()
+        dir_row.addWidget(QLabel("Surface Direction"))
+        self.jnt_dir_group = QButtonGroup(self)
+        self.rb_jnt_dir_u = QRadioButton("U")
+        self.rb_jnt_dir_u.setChecked(True)
+        self.rb_jnt_dir_u.setToolTip(
+            "NURBS surface only: line the joints up along U\n"
+            "(one row of constant V). Curves ignore this.")
+        self.rb_jnt_dir_v = QRadioButton("V")
+        self.rb_jnt_dir_v.setToolTip(
+            "NURBS surface only: line the joints up along V\n"
+            "(one row of constant U). Curves ignore this.")
+        self.jnt_dir_group.addButton(self.rb_jnt_dir_u)
+        self.jnt_dir_group.addButton(self.rb_jnt_dir_v)
+        dir_row.addWidget(self.rb_jnt_dir_u)
+        dir_row.addWidget(self.rb_jnt_dir_v)
+        dir_row.addSpacing(12)
+        dir_row.addWidget(QLabel("Across"))
+        self.sb_jnt_across = QDoubleSpinBox()
+        self.sb_jnt_across.setRange(0.0, 1.0)
+        self.sb_jnt_across.setDecimals(3)
+        self.sb_jnt_across.setSingleStep(0.05)
+        self.sb_jnt_across.setValue(jnt_mgr.ACROSS_DEFAULT)
+        self.sb_jnt_across.setKeyboardTracking(False)
+        self.sb_jnt_across.setToolTip(
+            "NURBS surface only: where the row sits in the other direction,\n"
+            "0 to 1 of that parameter range. 0.5 = the middle row.\n"
+            "  Direction U -> the V position of the row\n"
+            "  Direction V -> the U position of the row")
+        dir_row.addWidget(self.sb_jnt_across)
+        dir_row.addStretch(1)
+        jnt_lay.addLayout(dir_row)
+
+        self.chk_jnt_aim = QCheckBox("Aim joints along the curve / row")
         self.chk_jnt_aim.setChecked(True)
         self.chk_jnt_aim.setToolTip(
-            "Turn each joint so its X axis points down the curve tangent\n"
-            "(world Y is the up hint). Off: joints keep world orientation.\n"
+            "Turn each joint so its X axis points down the tangent.\n"
+            "Curve: world Y is the up hint. Surface: Y faces the surface normal.\n"
+            "Off: joints keep world orientation.\n"
             "The controls are matched to the joints, so this orients them too.")
         jnt_lay.addWidget(self.chk_jnt_aim)
 
-        self.chk_jnt_bind = QCheckBox("Bind the curve to the new joints")
+        self.chk_jnt_bind = QCheckBox("Bind the curve / surface to the new joints")
         self.chk_jnt_bind.setChecked(True)
         self.chk_jnt_bind.setToolTip(
-            "skinCluster the curve to the joints it just got, so moving a joint\n"
-            "moves the curve. A curve that already has a skinCluster is left\n"
+            "skinCluster the curve or surface to the joints it just got, so moving\n"
+            "a joint moves it. One that already has a skinCluster is left\n"
             "alone and reported in the log.")
         jnt_lay.addWidget(self.chk_jnt_bind)
 
-        self.chk_jnt_group = QCheckBox("Group the new nodes per curve")
+        self.chk_jnt_group = QCheckBox("Group the new nodes per object")
         self.chk_jnt_group.setChecked(True)
         self.chk_jnt_group.setToolTip(
-            "Put everything under <curve>_crvJnt_grp, split into\n"
-            "<curve>_jnt_grp and <curve>_ctl_grp.")
+            "Put everything under <name>_crvJnt_grp (surface: <name>_srfJnt_grp),\n"
+            "split into <name>_jnt_grp and <name>_ctl_grp.")
         jnt_lay.addWidget(self.chk_jnt_group)
 
         root.addWidget(jnt_box)
@@ -1372,10 +1408,11 @@ class MainWindow(QWidget):
 
         root.addWidget(ctl_box)
 
-        self.btn_jnt_create = QPushButton("Create Joints on Curves")
+        self.btn_jnt_create = QPushButton("Create Joints")
         self.btn_jnt_create.setMinimumHeight(34)
         self.btn_jnt_create.setToolTip(
-            "Build joints, bind and controls for every listed curve. One undo step.")
+            "Build joints, bind and controls for every listed curve and surface.\n"
+            "One undo step.")
         self.btn_jnt_create.clicked.connect(self.on_joints_create)
         root.addWidget(self.btn_jnt_create)
 
@@ -1397,12 +1434,14 @@ class MainWindow(QWidget):
         # UUID 로 현재 경로를 되찾아(리네임/리페어런트 안전) 대상 커브를 얻는다.
         curves = self.tsl_joints.get_all_nodes() or self.tsl_joints.get_all_items()
         if not curves:
-            self.log("Curve list is empty. Select curves in the scene and click "
-                     "'List Selected Curves'.", warn=True)
+            self.log("The list is empty. Select curves or NURBS surfaces in the scene "
+                     "and click 'List Selected'.", warn=True)
             return
 
         spacing = (jnt_mgr.SPACING_LENGTH if self.rb_jnt_length.isChecked()
                    else jnt_mgr.SPACING_PARAM)
+        direction = (jnt_mgr.DIRECTION_U if self.rb_jnt_dir_u.isChecked()
+                     else jnt_mgr.DIRECTION_V)
 
         try:
             # 마지막 select 도 chunk 안에서 일어난다(build_joints_on_curves 가 한다) —
@@ -1420,6 +1459,8 @@ class MainWindow(QWidget):
                     use_tgt=self.chk_jnt_tgt.isChecked(),
                     constraints=self._joint_constraints(),
                     size=self.sb_jnt_size.value(),
+                    direction=direction,
+                    across=self.sb_jnt_across.value(),
                 )
         except ValueError as e:
             self.log(str(e), warn=True)
@@ -1446,9 +1487,10 @@ class MainWindow(QWidget):
             return
 
         self.log(
-            "Built {0} joint(s) on {1} curve(s): {2} control(s), {3} bind(s), "
-            "{4} constraint node(s).".format(
+            "Built {0} joint(s) on {1} curve(s) and {2} surface(s): {3} control(s), "
+            "{4} bind(s), {5} constraint node(s).".format(
                 len(result["joints"]), len(result["curves"]),
+                len(result["surfaces"]),
                 len(result["controls"]), len(result["skins"]),
                 len(result["constraints"])))
 

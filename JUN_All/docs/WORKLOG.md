@@ -31,6 +31,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-17 (오늘)
 
+> [!summary] `A00400_CurveTool` **`Edit > Joints`** 가 **NURBS surface** 도 받는다 — U / V 방향 한 줄로 조인트 + 바인드 + zro/con/ctl/tgt (v01.13 -> 01.14)
+- **요청**: Joints 탭에서 커브뿐 아니라 nurbs surface 도 원하는 간격마다 조인트 · 바인드 · 스택 구조를 만들고, U 또는 V 방향을 고를 수 있게.
+- **`Surface Direction`(U/V)** + **`Across`**(반대 방향 위치 0~1, 기본 가운데 줄). 커브와 서피스를 한 리스트에 섞어도 된다.
+- By length 는 줄을 촘촘히 찍은 꺾은선 길이로 역보간, 닫힌 방향은 마지막 자리를 뺀다. Aim 은 X = 줄 접선, Y = 서피스 노멀(`Z = X × N` 직교화).
+- mayapy 2024 22항목 통과 — 커브 기존 결과(0, 5.5, 11) 그대로, UI 생성이 undo 한 번에 사라짐.
+
 > [!summary] `A00030_quickTool_V02` **`File > Open Scene Folder`** 신규 — 현재 씬이 저장된 폴더를 탐색기로 연다 (v02.02 -> 02.03)
 - **요청**: File 칸에 Open Scene Folder 버튼 — 누르면 마야 씬이 저장된 폴더가 탐색기로 열리도록.
 - 씬 파일이 있으면 **파일을 선택한 채로** 연다(`Framework.core.file_opener.open_path`). 파일이 없으면 폴더만, 미저장·폴더 없음은 경고만.
