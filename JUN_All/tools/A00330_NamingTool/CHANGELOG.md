@@ -1,5 +1,20 @@
 # Changelog — A00330_NamingTool
 
+## v01.05 (2026-09-17)
+**[Feature] `Copy Name` 에 `Search` / `Replace`.**
+
+Set Rename 탭의 찾아 바꾸기를 Copy Name 탭에도 넣었다. **Base 이름 속 `Search` 를 `Replace` 로 바꾼 결과**를
+Targets 에 복사한다 — 예: Base `L_arm_jnt`, Search `jnt`, Replace `ctrl` → Target `L_arm_ctrl`.
+
+- 치환은 Set Rename 과 같은 `replace_in_name` 을 쓴다(글자 그대로, 전부 치환, `Case sensitive` 기본 켬).
+- **Base 이름에만** 건다. `Prefix` / `Set suffix` 는 치환 뒤에 붙는다. 네임스페이스 보존은 그대로.
+- `Search` 가 비면 기존 동작과 같다(`copy_name` 새 인자는 전부 기본값이 있어 호출부 호환).
+- 치환 결과가 **빈 이름**이면 rename 이 에러를 내므로, 그 대상은 건너뛰고 `[Warning]` 을 남긴다.
+
+**검증**(mayapy headless, 12항목 통과): 대소문자 구분/무시 · Prefix 는 치환 뒤 · 단일 Undo ·
+빈 이름 건너뛰기 · Search 빈칸 = 기존 복사 · 네임스페이스 보존 · 세트 접미사는 치환 뒤 ·
+UI(치환 적용 · Targets 리스트 갱신 · 로그) · 버전.
+
 ## v01.03 (2026-08-27)
 **[Feature] `Set Rename` 에 `Add` / `Del`, `Copy Name` 이 세트도 대상으로.**
 

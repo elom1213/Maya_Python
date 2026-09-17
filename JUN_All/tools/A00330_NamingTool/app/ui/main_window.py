@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-30
+# last Update date : 2026-09-17
 # A00330_NamingTool - Qt UI
 #
 # 레거시 maya.cmds 네이밍 툴(JUN_PY_NamingTool_V03_04)을 PySide + QTabWidget 으로 이식.
@@ -12,6 +12,7 @@
 #       멤버를 펼쳐 선택하기 때문이다. 이 탭은 세트를 직접 열거해 고르고 미리보기를 준다.
 #   v01.03 : Set Rename 에 Add / Del (다른 탭의 TSL 과 같은 조작),
 #            Copy Name 이 세트도 대상으로 (세트는 같은 이름을 못 써서 `_copy` 접미사).
+#   v01.05 : Copy Name 에 Search / Replace - Base 이름 속 단어를 바꿔서 Targets 에 복사.
 # 리스트 UI 는 공용 위젯 JUN_mod_tsl_qt_v01, 로직은 app/core. 모든 UI 문자열/로그는 영어.
 
 from Framework.qt.qt import *
@@ -201,6 +202,32 @@ class MainWindow(QWidget):
             "it 'name1'. Clear this field to copy the name as-is and let Maya decide\n"
             "(the log then reports the name it actually gave).")
         form.addWidget(self.copy_le_set_suffix, 1, 1)
+
+        # Search / Replace (v01.05) - Base 이름 속 단어를 바꿔서 Targets 에 복사.
+        # 규칙은 Set Rename 탭과 같다(글자 그대로, 전부 치환, 대소문자 옵션).
+        search_tip = (
+            "Every Search found in the Base name is replaced with Replace,\n"
+            "and the result is given to the Target.\n"
+            "e.g. Base 'L_arm_jnt', Search 'jnt', Replace 'ctrl' -> Target 'L_arm_ctrl'\n"
+            "Only the Base name is searched - Prefix and Set suffix are added after.")
+
+        form.addWidget(QLabel("Search :"), 2, 0)
+        self.copy_le_search = QLineEdit()
+        self.copy_le_search.setPlaceholderText(
+            "text to find inside each Base name (empty = copy as-is)")
+        self.copy_le_search.setToolTip(search_tip)
+        form.addWidget(self.copy_le_search, 2, 1)
+
+        form.addWidget(QLabel("Replace :"), 3, 0)
+        self.copy_le_replace = QLineEdit()
+        self.copy_le_replace.setPlaceholderText("text to put in its place (may be empty)")
+        self.copy_le_replace.setToolTip(search_tip)
+        form.addWidget(self.copy_le_replace, 3, 1)
+
+        self.copy_cb_case = QCheckBox("Case sensitive")
+        self.copy_cb_case.setChecked(True)
+        self.copy_cb_case.setToolTip("Match Search with the same upper / lower case.")
+        form.addWidget(self.copy_cb_case, 4, 1)
         root.addLayout(form)
 
         # 실행 버튼
@@ -209,6 +236,7 @@ class MainWindow(QWidget):
         btn.setToolTip(
             "Rename each Targets item to (Prefix + the matching Base item's "
             "leaf name), in list order.\n"
+            "If Search is filled, it is replaced with Replace inside the Base name first.\n"
             "Sets also get the Set suffix. Namespaces are kept.")
         btn.clicked.connect(self.on_copy_name)
         root.addWidget(btn)
@@ -241,7 +269,10 @@ class MainWindow(QWidget):
         with core.undo_chunk():
             new_names, warning, notes = core.copy_name(
                 base_items, target_items, self.copy_le_prefix.text(),
-                set_suffix=self.copy_le_set_suffix.text())
+                set_suffix=self.copy_le_set_suffix.text(),
+                search=self.copy_le_search.text(),
+                replace=self.copy_le_replace.text(),
+                case_sensitive=self.copy_cb_case.isChecked())
         if warning:
             self._log("[WARN] " + warning)
         for note in notes:
@@ -250,7 +281,12 @@ class MainWindow(QWidget):
         # Targets 리스트를 새 이름으로 갱신
         if new_names:
             self.copy_tgt_tsl.set_items(new_names)
-        self._log("Copy Name : {0} target(s) renamed.".format(len(new_names)))
+        search = self.copy_le_search.text()
+        if search:
+            self._log("Copy Name : {0} target(s) renamed (Search '{1}' -> Replace '{2}').".format(
+                len(new_names), search, self.copy_le_replace.text()))
+        else:
+            self._log("Copy Name : {0} target(s) renamed.".format(len(new_names)))
 
     # ================================================================
     # Tab 3 : Quick Rename  (ref/ref_01.mel 이식, 현재 선택 기준)
@@ -678,6 +714,7 @@ class MainWindow(QWidget):
             "  transform descendants.\n"
             "\n"
             "[Copy Name] copy Base leaf names onto Targets with a prefix.\n"
+            "  Search / Replace swaps a word inside the Base name first.\n"
             "\n"
             "[Quick Rename] (ported from ref/ref_01.mel, current selection):\n"
             "  Front Insert / Change New (+index) / Last Add / -1 trim / All Apply.\n"

@@ -9,6 +9,7 @@
 1. **Naming Dyn** — 오브젝트와 그 transform 자손을 `Token1_Token2_Token3_Index1_Index2` 로 일괄 리네임.
    (구 Naming Dynamics 탭)
 2. **Copy Name** — Base 리스트의 leaf 이름(+Prefix)을 Targets 리스트에 순서대로 적용. (구 Copy name 탭)
+   **Search / Replace** 로 Base 이름 속 단어를 바꿔서 복사할 수도 있다(v01.05).
 3. **Quick Rename** — **현재 선택** 기준으로 앞/뒤 글자 추가·제거, 새 이름+인덱스 부여. (`ref/ref_01.mel` 이식)
 4. **Set Rename** — **세트 이름**의 부분 문자열 찾아 바꾸기. 마야 기본 `Search and Replace Names` 는
    세트를 고를 수 없다(§6.4). (v01.02 신규)
@@ -86,7 +87,14 @@ A00330_NamingTool/
      **선택한 오브젝트가 속한 세트**를 함께 모은다.
 2. **Prefix** 에 접두어를 입력한다(선택).
 3. **Set suffix** — **대상이 세트일 때만** 뒤에 붙는다. 기본 `_copy` (v01.03).
-4. **Copy Name** 클릭 → Targets[i] 가 `Prefix + Base[i] 의 leaf 이름` 으로 리네임된다(리스트 순서 기준).
+4. **Search / Replace** (v01.05, 선택) — Base 이름 안의 `Search` 를 **전부** `Replace` 로 바꾼 결과를 복사한다.
+   예: Base `L_arm_jnt`, Search `jnt`, Replace `ctrl` → Target `L_arm_ctrl`.
+   - 규칙은 Set Rename 탭과 같다 — 글자 그대로(정규식 아님), `Case sensitive`(기본 켬).
+   - 치환은 **Base 이름에만** 걸린다. `Prefix` 와 `Set suffix` 는 그 **뒤에** 붙는다
+     (Prefix 안의 단어는 바뀌지 않는다).
+   - `Search` 가 비어 있으면 예전과 똑같이 그대로 복사한다.
+   - 치환 결과가 빈 이름이면(Base 이름 전체를 지움) 그 대상은 **건너뛰고** `[Warning]` 을 남긴다.
+5. **Copy Name** 클릭 → Targets[i] 가 `Prefix + (치환한) Base[i] 의 leaf 이름` 으로 리네임된다(리스트 순서 기준).
 
 > **세트에 접미사가 필요한 이유** — 세트는 DG 노드라 **이미 쓰이는 이름을 그대로 못 쓴다.**
 > 트랜스폼 `myName` 이 있는 씬에서 세트를 `myName` 으로 바꾸면 **마야가 조용히 `myName1` 로

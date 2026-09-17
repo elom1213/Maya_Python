@@ -31,6 +31,16 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-17 (오늘)
 
+> [!summary] `A00330_NamingTool` Copy Name — **`Search` / `Replace`** 추가 : Base 이름 속 단어를 바꿔서 Targets 에 복사 (v01.04 -> 01.05)
+- **요청**: Set Rename 탭의 Search / Replace 를 Copy Name 탭에도. Base 에 올라온 이름 중 Search 단어를
+  Replace 단어로 바꿔 Targets 이름을 고친다(예: `L_arm_jnt` + `jnt`→`ctrl` = `L_arm_ctrl`).
+- core 는 Set Rename 의 `replace_in_name` 을 그대로 재사용 — `copy_name(..., search, replace, case_sensitive)`.
+  새 인자는 기본값이 있어 **Search 가 비면 기존 동작 그대로**.
+- 치환은 **Base 이름에만**, `Prefix` / `Set suffix` 는 그 뒤에 붙는다. 결과가 **빈 이름**이면 건너뛰고 경고.
+- **검증(mayapy + 오프스크린 Qt) 12항목 전부 통과**.
+  파일: `tools/A00330_NamingTool/app/core/naming_ops.py` · `app/ui/main_window.py` · `app/config/version.py` ·
+  `CHANGELOG.md` · `docs/A00330_NamingTool.md` `#A00330`
+
 > [!summary] `A00030_quickTool_V02` — **`Shelf > Update Shelves`** 추가 : 셸프를 지금 디스크에 써서 새로 뜨는 마야가 바로 읽게 (v02.00 -> 02.01)
 - **증상**: 셸프를 고쳐 놓고(툴의 `__dragDrop_*.py` 를 떨어뜨려 버튼이 생긴 것도 포함) **그 마야를 켠
   채 다른 마야를 새로 띄우면** 바뀐 것이 하나도 안 보인다. 고친 마야를 껐다 켜야 반영됐다.

@@ -8,7 +8,7 @@
 #   - ref/ref_01.mel              : Quick Rename(Front Insert / Change New / Last Add / -1 trim)
 # UI 는 이 함수들만 호출한다(thin UI). Maya 밖에서도 import 가능하도록 cmds 는 lazy.
 
-from .set_rename_ops import split_namespace, join_namespace
+from .set_rename_ops import split_namespace, join_namespace, replace_in_name
 
 
 #: 세트를 대상으로 이름을 복사할 때 기본으로 붙는 접미사.
@@ -183,8 +183,14 @@ def rename_dynamics(objects, token1, token2, token3,
 # ================================================================
 
 def copy_name(base_items, target_items, prefix,
-              set_suffix=DEFAULT_SET_COPY_SUFFIX):
+              set_suffix=DEFAULT_SET_COPY_SUFFIX,
+              search="", replace="", case_sensitive=True):
     """base 리스트의 이름(prefix 부착)을 target 리스트에 순서대로 적용(rename).
+
+    v01.05 : `search` 가 있으면 **Base 의 leaf 이름** 안의 `search` 를 `replace` 로 바꾼 뒤
+    복사한다(예: Base `L_arm_jnt`, Search `jnt`, Replace `ctrl` -> Target `L_arm_ctrl`).
+    치환은 Base 이름에만 걸리고 prefix / set suffix 는 그 뒤에 붙는다. 규칙은 Set Rename 탭과
+    같은 `replace_in_name`(글자 그대로, 전부 치환, 대소문자 옵션)이다.
 
     **세트도 대상이 된다.** 다만 세트는 DG 노드라 **같은 이름을 그대로 못 쓴다** — 트랜스폼과
     같은 이름을 주면 마야가 **조용히 `name1` 로 바꾼다**(실측). 그래서 대상이 세트면
@@ -216,7 +222,9 @@ def copy_name(base_items, target_items, prefix,
     plan = []
     for i in range(count):
         target = target_items[i]
-        new_leaf = prefix + short_name(base_items[i])
+        base_leaf = replace_in_name(
+            short_name(base_items[i]), search, replace, case_sensitive)
+        new_leaf = prefix + base_leaf
         if is_set_node(target):
             new_leaf += suffix
         # **네임스페이스를 보존한다** - 짧은 이름만 주면 노드가 루트 네임스페이스로
@@ -226,6 +234,11 @@ def copy_name(base_items, target_items, prefix,
 
     new_names = []
     for uuid, namespace, new_leaf, original in plan:
+        if not new_leaf:
+            # Search 가 Base 이름 전체를 지웠다 - 빈 이름으로는 rename 할 수 없다
+            notes.append("[Warning] {0}: skipped - the new name would be empty.".format(
+                original))
+            continue
         want = join_namespace(namespace, new_leaf)
         new_name = _rename_by_uuid(uuid, want)
         if new_name is None:
