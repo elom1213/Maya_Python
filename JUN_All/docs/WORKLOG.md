@@ -31,6 +31,20 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-17 (오늘)
 
+> [!summary] `A00470_MaterialTool` — **`Copy Material`** 탭 추가 : 소스 메시 M(UUID 로 기억)의 면별 머티리얼을 M_i 에 똑같이 (v01.04 -> 01.05)
+- **요청**: 메시 M 을 UUID 로 기억, TSL 에 M_i 를 담고, `Copy Material` 로 M 의 면마다 붙은 머티리얼을 M_i 의 같은 면에.
+- 면별 배정은 `MFnMesh.getConnectedShaders` 로 읽는다(A00275 에서 확인한 방식). 머티리얼이 하나면 셰이프째,
+  아니면 머티리얼마다 **연속 면 구간**으로 한 번씩 `forceElement`. **면 개수가 다르면 건너뛴다.**
+- 적용 후 **되읽어 소스와 비교** — 다르면 성공으로 세지 않는다. 이 확인이 실제로 두 가지 함정을 잡았다:
+  - **★ 면 하나를 `sets -remove` 해서는 안 비워진다** — 오브젝트째 배정이면 무시, 면별이면 `initialShadingGroup` 으로 되돌아감.
+    → 비울 면이 있으면 대상 배정을 전부 걷어낸 뒤 다시 건다.
+  - **★ 면별 배정을 걷어낸 메시에서 `getConnectedShaders` 는 세트에 없는 면을 `initialShadingGroup` 으로 보고한다.**
+    → 비어야 할 면은 `listSets(object=face)` 멤버십으로 재확인.
+- **검증(mayapy + 오프스크린 Qt) 24항목 전부 통과** — UUID(이름·부모 변경) · 단일 Undo · 면 수 불일치 · 빈 면 3종 ·
+  네임스페이스 SG · 셰이프 2개 · 4만 면 체커보드 1.15초 · UI.
+  파일: `tools/A00470_MaterialTool/app/core/material_copy.py`(신규) · `app/ui/copy_material_tab.py`(신규) ·
+  `app/ui/main_window.py` · `app/config/version.py` · `docs/A00470_MaterialTool.md` `#A00470`
+
 > [!summary] `A00145_RigConnect` Attribute — **`Copy`+`Delete` 를 `Edit` 한 탭으로** 합치고 **어트리뷰트 순서 바꾸기(`Up`/`Down`)** 추가 (v01.43 -> 01.44)
 - **요청**: 체크박스로 고른 어트리뷰트를 `Up` / `Down` 으로 옮겨 **씬의 실제 어트리뷰트 순서**를 바꾼다.
   새 탭 `Move` 대신 **기존 탭을 묶는 개념의 탭**으로. (결정: 탭 이름 `Edit`, `Create` 는 합치지 않는다)

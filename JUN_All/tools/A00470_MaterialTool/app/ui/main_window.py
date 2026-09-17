@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-16
+# last Update date : 2026-09-17
 # A00470_MaterialTool - Qt UI (in-Maya)
 #
-#   Name Check : 리스트업한 메시의 머티리얼 이름이 프로파일(JSON) 규칙에 맞는지 진단
+#   Name Check    : 리스트업한 메시의 머티리얼 이름이 프로파일(JSON) 규칙에 맞는지 진단
+#   Copy Material : 소스 메시(UUID 로 기억)의 면별 머티리얼을 대상 메시들에 똑같이 (v01.05)
 #
 # 창은 마야 메인 윈도우에 parent 되어 뷰포트 위에 뜬다. 모든 UI 문자열/로그는 영어.
 
@@ -23,6 +24,7 @@ from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from tools.A00470_MaterialTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00470_MaterialTool.app.core import profiles
 from tools.A00470_MaterialTool.app.ui.name_check_tab import NameCheckTab
+from tools.A00470_MaterialTool.app.ui.copy_material_tab import CopyMaterialTab
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -73,6 +75,8 @@ class MainWindow(QWidget):
         self.tabs = QTabWidget()
         self.name_check_tab = NameCheckTab(log_view=self.log_view)
         self.tabs.addTab(self.name_check_tab, "Name Check")
+        self.copy_material_tab = CopyMaterialTab(log_view=self.log_view)
+        self.tabs.addTab(self.copy_material_tab, "Copy Material")
 
         main_layout.addWidget(self.tabs, stretch=1)
         main_layout.addWidget(self.log_view)
@@ -94,7 +98,9 @@ class MainWindow(QWidget):
             "About",
             "Material Tool v{0}\nLast update : {1}\n\n"
             "Name Check  Collect the materials of the listed meshes and check their\n"
-            "names against a rule profile. The scene is only read, never changed.".format(
+            "names against a rule profile. The scene is only read, never changed.\n\n"
+            "Copy Material  Remember a source mesh, then give the listed target meshes\n"
+            "the same material on every face.".format(
                 VERSION, LAST_UPDATE),
         )
 

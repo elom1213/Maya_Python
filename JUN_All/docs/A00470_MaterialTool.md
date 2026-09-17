@@ -2,7 +2,7 @@
 title: A00470_MaterialTool 사용법
 aliases: [Material Tool, MaterialTool, A00470, Material Name Check]
 tags: [maya-python, tool-guide, material, naming, convention, qc, json-profile]
-updated: 2026-09-16
+updated: 2026-09-17
 ---
 
 # A00470_MaterialTool 사용법
@@ -14,6 +14,7 @@ Maya 안에서 도는 **머티리얼 이름 진단** PySide 툴이다(arch B, in
 | 상위 탭 | 내용 |
 |---------|------|
 | **Name Check** (v01.00) | 메시 → 머티리얼 수집 → 프로파일(JSON) 규칙으로 진단 → 리포트(클립보드 복사) |
+| **Copy Material** (v01.05) | 소스 메시 M 을 **UUID 로 기억** → 리스트의 메시 M_i 에 **면마다 같은 머티리얼**을 건다. **씬을 바꾸는 유일한 탭** |
 
 - **버전**: `app/config/version.py` (v01.03 — 표의 칸 폭 조절 · 더블클릭 선택)
 - **설치**: `__dragDrop_A00470.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **MatTool** → `tools.A00470_MaterialTool.run(True)`
@@ -92,6 +93,48 @@ MT_SYN_Sett002_Pantss
 | `Copy` | 로그 **전문**을 클립보드로 (`Check Names` 의 리포트 복사와는 별개로, 로그에 쌓인 것 전부) |
 
 자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).
+
+---
+
+## 2-B. Copy Material 탭 (v01.05~)
+
+소스 메시 **M** 의 **면별 머티리얼 배정**을 대상 메시 **M_i** 에 그대로 옮긴다.
+M 의 `f[0]` · `f[1]` · `f[2]` 에 서로 다른 머티리얼이 붙어 있으면 각 M_i 의 `f[0]` · `f[1]` · `f[2]` 에도 같은 것이 붙는다.
+**M_i 는 M 과 같은 메시(면 순서 동일)** 라고 가정한다.
+
+### 쓰는 법
+
+1. 씬에서 메시 하나를 고르고 **`Set Source`** — **UUID 로 기억**한다. 기억한 뒤 이름을 바꾸거나 부모를
+   옮겨도 같은 메시를 찾는다(칸에는 현재 이름이 다시 표시된다). 면을 골라도 그 메시가 잡힌다.
+   `Select` 는 기억한 소스를 씬에서 선택한다.
+2. 대상 메시들을 고르고 **`Select Targets`** (또는 `Add`) 로 리스트에 담는다.
+3. **`Copy Material`** — 전체가 **한 번의 Undo**.
+
+### 규칙
+
+- **면 개수가 다르면 건드리지 않고 `[skipped]`** — 통째로 하나를 거는 것은 틀린 답이지 안전한 폴백이 아니다.
+  메시 셰이프 개수가 다른 대상도 건너뛴다(셰이프가 여럿이면 순서대로 짝짓는다).
+- 소스의 모든 면이 한 머티리얼이면 대상에 **셰이프째** 건다(면 단위 멤버를 남기지 않는다).
+- 아니면 머티리얼마다 면을 **연속 구간**(`f[0:511]`)으로 묶어 한 번씩 건다 — 4만 면 체커보드도 약 1초.
+- 대상에 원래 있던 면별 배정은 덮어쓴다. 소스에서 **아무 머티리얼도 없는 면**은 대상도 비운다(경고로 알린다).
+- 적용 후 대상의 배정을 **다시 읽어 소스와 비교**한다. 다르면 성공으로 세지 않고 `[skipped] applied, but N face(s) still differ` 로 알린다.
+- 소스 자신 · 메시가 아닌 항목은 건너뛴다. 소스가 지워졌으면 다시 지정하라고 알린다.
+
+### 구현에서 알아둔 것 (mayapy 2024 실측)
+
+- **어느 면에 무엇이 붙었는지는 `MFnMesh.getConnectedShaders(instanceNumber)`** 로 읽는다.
+  `listConnections(shape, type="shadingEngine")` 는 붙은 엔진 목록뿐이라 면별 배정을 잃는다.
+- **면 하나를 `sets -remove` 해서는 비워지지 않는다** — 오브젝트째 배정이면 조용히 무시되고, 면별 배정이면
+  마야가 그 면을 `initialShadingGroup` 으로 되돌린다. 비워야 할 면이 있으면 대상 배정을 **전부 걷어낸 뒤** 다시 건다.
+- **면별 배정을 걷어낸 메시에서 `getConnectedShaders` 는 어느 세트에도 없는 면을 `initialShadingGroup` 으로 보고한다**
+  (`sets -q` 로는 멤버가 아니다). 그래서 비어 있어야 할 면은 `listSets(object="shape.f[i]")` 로 다시 확인한다.
+- 마야 2024 의 기본 머티리얼은 `lambert1` 이 아니라 `standardSurface1` 이다(`initialShadingGroup.surfaceShader`).
+
+**검증(mayapy + 오프스크린 Qt, 24항목)**: 면 3개에 다른 머티리얼 → 대상 2개 동일 · 원래 면별 배정이 있던 대상 ·
+머티리얼 보고 · 단일 Undo · **소스 이름 변경 + 부모 변경 후 UUID 로 찾기** · 단일 머티리얼 = 셰이프째 ·
+면 개수 불일치 건너뛰기(대상 불변) · 빈 면(대상이 오브젝트째 / 다른 머티리얼 / 면별 배정 3종, 각각 Undo) ·
+소스 자신 / 메시 아님 / 지워진 소스 · 네임스페이스 SG + 컴포넌트로 담은 대상 · 셰이프 2개 짝짓기 ·
+4만 면 체커보드 · UI(탭 · 면 선택으로 Set Source · 소스 이름 변경 후 복사 · Select).
 
 ---
 
@@ -217,11 +260,13 @@ A00470_MaterialTool/
    │  ├─ profiles.py        # 프로파일 JSON 입출력          (Maya 무의존)
    │  ├─ name_rules.py      # 규칙 · 정렬 · 진단 · 제안      (Maya 무의존)
    │  ├─ reporter.py        # 진단 결과 -> 사람이 읽는 글    (Maya 무의존)
-   │  └─ maya_materials.py  # 메시 -> 셰이딩 엔진 -> 머티리얼 (씬 읽기 전용)
+   │  ├─ maya_materials.py  # 메시 -> 셰이딩 엔진 -> 머티리얼 (씬 읽기 전용)
+   │  └─ material_copy.py   # Copy Material : 면별 배정 읽기 · 적용 · 되읽어 확인
    └─ ui/
       ├─ main_window.py     # 창 · 탭 · 메뉴(Help > Profile Format) · Pin
       │                     #  + 공용 로그 위젯 JUN_mod_log_qt_v01 (Expand/Clear/Copy)
-      └─ name_check_tab.py  # Name Check 탭 본문
+      ├─ name_check_tab.py  # Name Check 탭 본문
+      └─ copy_material_tab.py # Copy Material 탭 (소스 UUID 기억 + 대상 TSL)
 ```
 
 코어 3개가 `maya.cmds` 를 쓰지 않으므로 **규칙 엔진은 마야 없이 그대로 테스트된다**(§7).

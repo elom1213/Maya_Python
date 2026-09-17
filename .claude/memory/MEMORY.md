@@ -32,7 +32,7 @@
 - [Maya loadPlugin no __file__](maya-loadplugin-no-file.md) — loadPlugin .py 에 `__file__` 없음
 - animLayer — [copy/cut traps](animlayer-copy-cut-traps.md)(`cutKey` 는 `animLayer` 를 안 받는다) · [no global selected query](animlayer-no-global-selected-query.md)(`ls(type=animLayer)` 순회)
 - [node purity signals](node-purity-signals.md) — listHistory 는 짧은 이름, 깨끗한 메시에도 initialShadingGroup
-- [shading: per-face assignment](shading-per-face-assignment.md) — `listConnections(shadingEngine)` 는 면별 배정을 잃는다, `getConnectedShaders`
+- [shading: per-face assignment](shading-per-face-assignment.md) — `listConnections(shadingEngine)` 는 면별 배정을 잃는다, `getConnectedShaders` · 면 하나 `sets -remove` 는 안 비워짐 · 빈 면은 `listSets` 로 판정
 - [utility nodes inherit shadingDependNode](utility-nodes-inherit-shadingdependnode.md) — multiplyDivide/vectorProduct/plusMinusAverage, 셰이딩 판정은 `getClassification`
 - [Referenced node name compares](referenced-node-name-comparisons.md) — 솔버까지 네임스페이스, 타입으로 판정
 - [Set rename traps](maya-set-rename-traps.md) — `select(set)` 은 멤버를 펼침, 짧은 이름 rename 은 NS 를 벗김
@@ -93,4 +93,4 @@
 - A00400 — [CurveTool](wip-a00400-curvetool.md) · [Smooth](wip-a00400-smooth-tab.md)(닫힌 커브 우회, v01.09) · [Points to Curve](wip-a00400-points-to-curve.md) · [Wrap](wip-a00400-curve-wrap.md) · [Joints](wip-a00400-curve-joints.md) · Combine(v01.11, 쉐입 복사 합치기 — [instance trap](parent-shape-add-is-instance.md))
 - A00410 — [SecondaryMotion](wip-a00410-secondarymotion.md)(FK 관성 굽기, v01.08) · A00420 — [Wrapper](wip-a00420-wrapper.md) · A00430 — [DemBone](wip-a00430-dembone.md)
 - A00440 — [SetTool](wip-a00440-settool.md)(v01.01) · A00450 — [ManipulatorTool](wip-a00450-manipulatortool.md) · A00460 — [FK & IK](wip-a00460-fk-ik.md)(v01.04)
-- A00470 — [MaterialTool](wip-a00470-materialtool.md)(머티리얼 이름 규칙 진단 · 토큰 정렬 DP · 고칠 이름 제안, v01.03)
+- A00470 — [MaterialTool](wip-a00470-materialtool.md)(머티리얼 이름 규칙 진단 · 토큰 정렬 DP · 고칠 이름 제안, v01.03) · Copy Material(소스 UUID 기억 → 면별 머티리얼 복사 + 되읽어 확인, v01.05)

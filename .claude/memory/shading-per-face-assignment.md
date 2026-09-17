@@ -36,5 +36,13 @@ names = [om.MFnDependencyNode(e).absoluteName() for e in engines]
 토폴로지가 같아야 면 번호가 맞는다. skinCluster 의 **입력(rest) 형상**은 디포머가 토폴로지를
 바꾸지 않으므로 보이는 셰이프와 면 번호가 그대로 맞는다.
 
-관련: [[framework-log-widget]], [[utility-nodes-inherit-shadingdependnode]],
+**그 밖의 함정 (2026-09-17, A00470 Copy Material 에서 실측)**
+
+- **면 하나를 `sets -remove` 해서는 비워지지 않는다** — 오브젝트째 배정이면 조용히 무시, 면별이면 마야가
+  `initialShadingGroup` 으로 되돌린다. 빈 면을 만들려면 셰이프의 멤버십을 전부 걷어낸 뒤 필요한 면만 건다.
+- **그렇게 걷어낸 메시에서 `getConnectedShaders` 는 어느 세트에도 없는 면을 `initialShadingGroup` 으로 보고한다**
+  (`sets -q` 로는 멤버 아님). 빈 면 판정은 `listSets(object="shape.f[i]", type=1)` 로.
+- 마야 2024 기본 머티리얼은 `standardSurface1` (`lambert1` 아님).
+
+관련: [[wip-a00470-materialtool]], [[framework-log-widget]], [[utility-nodes-inherit-shadingdependnode]],
 [[wip-a00275-layer-tab]]
