@@ -31,6 +31,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-17 (오늘)
 
+> [!summary] `A00130_ControlRig_V02` Match 탭 **`Check Position`** — 케이지 세트마다 멤버들이 같은 월드 위치·회전인지 Status 에 초록 OK / 빨강으로 (v02.20 -> 02.21)
+- **요청**: 각 Cage set 에 있는 오브젝트들이 모두 월드 기준 같은 위치·회전인지 진단해 Status 에, OK 는 초록 · 아니면 빨강.
+- 기준은 첫 멤버. 위치는 **월드 rotate pivot**(Match 와 같은 기준), 회전은 **쿼터니언 각도**라 rotateOrder · 360° 차이는 같다고 본다. 빨강에는 어느 멤버가 얼마나 다른지.
+- 실측: 컴포넌트 멤버는 `xform` 이 오브젝트 행렬을 조용히 돌려줘 OK 로 오판 → 이름으로 먼저 거른다. 비균등 스케일 부모의 shear 는 matchTransform 도 못 맞춘다(15.14°, 진짜 불일치).
+- mayapy 2024 22항목 통과, 씬 불변. #A00130
+
 > [!summary] `A00145_RigConnect` Constrain > Constraint — 종류를 **체크박스**로, `Parent` + `Scale` · `Point`/`Orient`/`Scale` 2~3개를 한 번에 (v01.46 -> 01.47)
 - **요청**: Parent 와 Scale 을 동시에, Scale · Point · Orient 중 2개 · 3개를 동시에 체크해 한 번에 constraint 세팅.
 - 규칙은 **구동 채널이 겹치지 않는 것**(실측: Parent → Point / Orient 는 `already connected`). 겹치는 것을 체크하면 먼저 켜진 쪽이 꺼지고, `Point On Poly` 는 혼자.

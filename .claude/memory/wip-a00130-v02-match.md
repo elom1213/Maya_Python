@@ -101,3 +101,10 @@ V01 은 `Targets` 리스트에 **손으로 순서대로** 담아야 했고 그�
 
 검증 **110항목** — `plan()`/`apply()` 를 갈라 둬서 `Check` 와 미리보기가 **씬을 안 바꾸고**
 같은 계산을 쓴다. [[mayapy-headless-verify]] · [[qapplication-before-maya-standalone]].
+
+**Check Position (v02.21, 2026-09-17)** — Match 버튼 왼쪽. 세트마다 **멤버끼리** 월드 위치(rotate pivot) · 회전(쿼터니언 각도)이
+같은지 미리보기 `Status` 칸에 초록 OK / 빨강(무엇이 얼마나, 어느 멤버). `match_manager.check_positions(rows, namespace)`, 씬 불변.
+- **컴포넌트 멤버(`cube.vtx[0]`)는 `xform -q -ws -m/-rp` 가 에러 없이 오브젝트 값을 돌려준다** — 이름에 `.` 이면 먼저 거른다.
+- 비균등 스케일 + 회전 부모 아래(shear)는 matchTransform 으로도 같은 방향이 안 나온다(15.14°) — 오판이 아니라 진짜 불일치.
+- 조인트 없는 행은 plan() 이 멤버를 안 펴므로 check 에서 `su.resolve(set_wanted, namespace)` 로 직접 편다.
+- 표를 다시 그리면(`_refresh_plan`) 색이 지워진다 — 의도(오래된 판정 방지).

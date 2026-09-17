@@ -3,6 +3,23 @@
 `A00130_ControlRig`(V01)의 **템플릿 조인트 패러다임 재작성판**이다.
 계획서: `JUN_All/docs/plans/A00130_ControlRig_V02_plan.md`
 
+## v02.21 (2026-09-17)
+**[Feature] `Match` 탭 `Check Position` — 케이지 세트마다 멤버들이 같은 월드 위치·회전인지 `Status` 에 초록 / 빨강으로.**
+
+- **요청**: 각 Cage set 의 오브젝트들이 모두 월드 기준 같은 위치·회전인지 진단해 Status 에 알리고, OK 는 초록 · 아니면 빨강.
+- `Match` 버튼 왼쪽. **씬 불변.** 결과는 미리보기 표 `Status` 칸 — 초록 `OK - N members share position and rotation`,
+  빨강 `Position differs by X (멤버) vs 기준` / `Rotation differs by X deg ...` / `Cannot read the transform of: ...`,
+  볼 것이 없으면 색 없이 `Not checked - ...`. 로그에 요약 한 줄 + 빨강 행별 `[Warning]`.
+- 기준은 첫 멤버, **위치는 월드 rotate pivot**(Match 와 같은 기준), **회전은 쿼터니언 사이 각도**(rotateOrder · 360° 차이 무시).
+  허용치 0.001 / 0.01°. 템플릿 조인트가 없는 행도 세트만 있으면 검사한다.
+- **[Note] 컴포넌트 멤버는 `xform` 이 에러 없이 오브젝트 행렬을 돌려준다**(실측) — 그대로 두면 OK 가 나와서 이름으로 먼저 거른다.
+- core API: `match_manager.check_positions(rows, namespace)` → `(results, messages)`.
+
+**검증**(mayapy 2024 + 오프스크린 Qt, **22항목 통과**): 같음 → OK · 0.5 이동 → 빨강(멤버·거리) · 90° 회전 → 빨강 ·
+rotateOrder/+360 → OK · 회전·균등 스케일 부모 + 자기 스케일 차이 → OK · 멤버 1개 · 허용치 안 · 컴포넌트 → 빨강 ·
+피벗만 같은 경우 → OK · 조인트 없는 행도 검사 · 세트 없음 → 검사 안 함 · 씬 불변 · Match 뒤 전부 OK ·
+UI 버튼 위치 · 실제 매핑 + 케이지 없는 씬 · 초록/빨강/무색 · 로그 · 표를 새로 그리면 색이 지워짐 · 창 폭.
+
 ## v02.20 (2026-09-17)
 **[Fix] `Match` 를 여러 번 눌러야 자리를 잡던 것 — 부모부터 맞추고, 밀려난 것은 다시 맞춘다.**
 

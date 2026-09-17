@@ -4,7 +4,8 @@
 Manager* · AdvancedSkeleton 의 *FitSkeleton* 처럼 — **씬에 템플릿 조인트를 놓고 눈으로 맞춘 뒤,
 버튼으로 컨트롤러(cage)를 그 자리에 굽는다.**
 
-- 버전: `v02.20` (`app/config/version.py`) — `Match` 가 **부모부터 맞추고 밀려난 것은 다시 맞춘다** — 한 번 누르면 된다 (§4.1b)
+- 버전: `v02.21` (`app/config/version.py`) — `Match` 탭 **`Check Position`** — 세트마다 멤버들이 같은 월드 위치·회전인지 Status 에 초록/빨강으로 (§4.1c)
+  · v02.20 은 `Match` 가 **부모부터 맞추고 밀려난 것은 다시 맞춘다** — 한 번 누르면 된다 (§4.1b)
   · v02.17 은 `Constrain` 의 **`maintain offset` 기본 ON** + 걸기 전후를 재서 움직인 것을 짚는다 (§9.2)
   · v02.16 은 템플릿 폴 타깃 4개를 **거리 고정**으로 (§7.9)
   · 시작은 **Phase 1 (최소 기능 : Match)** 이었다
@@ -58,6 +59,7 @@ V01(`CtrlRig`)과 `WINDOW_OBJECT_NAME` 이 달라 **둘을 동시에 띄워도 �
    발·발끝 폴 타깃 4개를 자기 축 `+Z` 로 10 만큼 내보낸다. **undo 한 스텝.**
 5. **`Match` 탭 > `Check`** — 없는 템플릿 조인트 / 없는 케이지 세트를 보고한다. **씬 불변.**
 6. **`Match` 탭 > `Match`** — 각 케이지 세트의 원소를 짝인 조인트 자리로 옮긴다. **undo 한 스텝.**
+   **`Check Position`** 으로 세트마다 멤버들이 같은 자리·같은 방향에 모였는지 확인한다(§4.1c). **씬 불변.**
 7. **`Length` 탭 > `Measure`** → **`Write Values`** — 거리를 재서 옵션 컨트롤러에 쓴다.
 8. **`Pair` 탭 > `Check`** → **`Pair`** — 짝지어진 두 세트의 원소를 맞춘다. **Match 뒤.**
 9. **`Constrain` 탭 > `Check`** → **`Constrain`** — 포즈 오브젝트를 `Con` 이 가리키는
@@ -121,6 +123,34 @@ obj_01
    `[Warning] ... still move each other after 5 passes ...`
 
 잠금·구동 채널 판정(§4.4b), IK 세션(§4.4c), undo 한 스텝은 그대로다.
+
+### 4.1c Check Position — 세트 안 오브젝트가 전부 같은 자리·같은 방향인가 (v02.21)
+
+`Match` 버튼 왼쪽의 **`Check Position`** 은 케이지 세트마다 **멤버끼리** 월드 위치와 월드 회전이
+같은지 보고, 결과를 미리보기 표의 **`Status` 칸**에 쓴다. **씬은 바꾸지 않는다.**
+
+| 글자색 | Status 예 | 뜻 |
+|--------|-----------|-----|
+| **초록** | `OK - 3 members share position and rotation` · `OK - 1 member` | 전부 같다 |
+| **빨강** | `Position differs by 1.25 (b2) vs b0` | 가장 멀리 벗어난 멤버와 그 거리 |
+| **빨강** | `Rotation differs by 45 deg (c1) vs c0` | 가장 많이 돌아간 멤버와 그 각도(둘 다 틀리면 `;` 로 함께) |
+| **빨강** | `Cannot read the transform of: cube.vtx[0]` | 트랜스폼이 아닌 멤버(컴포넌트 등) — 괜찮다고 말할 수 없다 |
+| (색 없음) | `Not checked - set missing` · `Not checked - no member` | 볼 것이 없다 |
+
+로그에는 `Check Position : 7 OK, 3 different, 1 not checked.` 한 줄(문제가 없으면 앞에 `[OK]`)과
+빨강 행마다 `[Warning] Check Position <세트>: ...` 가 남는다.
+
+- **기준은 첫 멤버**다. 멤버끼리 비교하므로 **템플릿 조인트가 없는 행도 검사한다**(세트만 있으면 된다).
+- **위치 = 월드 rotate pivot.** `Match` 의 `matchTransform -position` 이 맞추는 기준이 피벗이라, translate 값이
+  달라도 피벗이 같은 자리면 OK 다.
+- **회전 = 두 월드 방향 사이 각도**(쿼터니언). `rotateOrder` 가 다르거나 `+360` 이 붙어 **숫자만 다른 같은 방향**은 OK 다.
+  스케일 차이는 보지 않는다.
+- 허용치: 위치 `0.001`, 회전 `0.01°`.
+- 표를 다시 그리는 동작(`Check` · `Match` · 네임스페이스 변경 등)이 있으면 **색은 지워진다** — 오래된 판정이 남지 않게.
+
+> **빨강인데 Match 를 눌러도 안 없어진다면** — 그 멤버의 채널이 잠겼거나 리그가 구동 중이다(§4.4b, 로그에 이유가 있다).
+> 또는 부모에 **비균등 스케일 + 회전**이 있어 shear 가 생긴 경우다 — 이때는 `matchTransform` 도 같은 방향을
+> 만들 수 없어 진짜로 다르다(실측 15.14°).
 
 ### 4.3 없어도 멈추지 않는다
 

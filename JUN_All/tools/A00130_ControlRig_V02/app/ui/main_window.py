@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-28
+# last Update date : 2026-09-17
 # A00130_ControlRig_V02 - Qt UI
 #
 # 계획서: docs/plans/A00130_ControlRig_V02_plan.md
@@ -16,6 +16,8 @@
 #   Pair           : 세트 A 의 하나뿐인 원소로 세트 B 의 하나뿐인 원소를 맞춘다 (Match 뒤)
 #   Constrain      : 포즈 오브젝트를 `Con` 이 가리키는 노드에 parentConstraint (Pair 뒤)
 #
+# v02.21 : Match 탭 **Check Position** — 세트마다 멤버들이 월드 위치 · 회전이 같은지
+#          Status 칸에 초록 OK / 빨강(무엇이 얼마나 다른지)으로. 씬 불변.
 # v02.10 : **Pair** 탭(세트 1:1 매칭)과 **Constrain** 탭(`Con` -> parentConstraint).
 #          둘 다 Match 뒤에 오고, Constrain 은 Pair 뒤다.
 # v02.09 : 손가락 회전 규칙 — 왼손은 aim(+X / +Y->월드+Y),
@@ -58,6 +60,13 @@ from tools.A00130_ControlRig_V02.app.core import scene_utils as su
 
 
 WINDOW_OBJECT_NAME = "JUN_A00130_ControlRig_V02_window"
+
+# Check Position 결과 글자색 (Status 칸). 어두운 테마 위에서 읽히는 밝은 초록 / 빨강.
+# 검사하지 못한 행(세트 없음 등)은 색을 입히지 않는다 - OK 도 문제도 아니다.
+_CHECK_COLORS = {
+    match_manager.CHECK_OK: "#5fd068",
+    match_manager.CHECK_DIFFERENT: "#ff5c5c",
+}
 
 
 # (탭 라벨, 툴팁, 빌더 메서드 이름) — 단계가 늘면 여기에 줄만 넣는다
@@ -289,6 +298,27 @@ class MainWindow(QWidget):
         self.tree_plan.setSelectionMode(QAbstractItemView.ExtendedSelection)
         layout.addWidget(self.tree_plan, 1)
 
+        match_row = QHBoxLayout()
+
+        # v02.21 - 세트 멤버끼리 월드 위치 · 회전이 같은지 진단한다(씬 불변).
+        self.btn_check_position = QPushButton("Check Position")
+        self.btn_check_position.setMinimumHeight(34)
+        self.btn_check_position.setToolTip(
+            "For every cage set, check whether all of its objects sit at the same\n"
+            "world position and world rotation. Changes nothing.\n"
+            "\n"
+            "The result goes in the Status column:\n"
+            "  green  OK - they all match\n"
+            "  red    what differs, by how much, and which object\n"
+            "\n"
+            "Position = world rotate pivot (what Match lines up).\n"
+            "Rotation = angle between world orientations, so rotate order or\n"
+            "360-degree differences do not count as a mismatch.\n"
+            "Tolerance: {0} units, {1} degrees.".format(
+                match_manager.POSITION_TOLERANCE, match_manager.ROTATION_TOLERANCE))
+        self.btn_check_position.clicked.connect(self.on_check_position)
+        match_row.addWidget(self.btn_check_position, 1)
+
         self.btn_match = QPushButton("Match")
         self.btn_match.setMinimumHeight(34)
         self.btn_match.setToolTip(
@@ -297,7 +327,8 @@ class MainWindow(QWidget):
             "and reported rather than half-moved.\n"
             "Everything is one undo step.")
         self.btn_match.clicked.connect(self.on_match)
-        layout.addWidget(self.btn_match)
+        match_row.addWidget(self.btn_match, 2)
+        layout.addLayout(match_row)
 
         return tab
 
@@ -728,6 +759,34 @@ class MainWindow(QWidget):
             self.log("[Warning] missing cage set(s): " + ", ".join(missing_s))
         if not missing_j and not missing_s:
             self.log("[OK] Every template joint and cage set was found.")
+
+    def on_check_position(self):
+        """세트마다 멤버들이 같은 월드 위치 · 회전인지 Status 칸에 색으로 보인다(씬 불변).
+
+        미리보기를 먼저 새로 그린다 - 그사이 씬이 바뀌었을 수 있고, 행 순서가 결과 순서다.
+        새로 그리면 Status 칸이 plan 상태로 돌아가므로 색도 함께 지워진다(오래된 판정이 남지 않는다).
+        """
+        if not self.joints:
+            self.log("[WARN] No mapping loaded.")
+            return
+        rows = self._refresh_plan()
+        if not rows:
+            self.log("[WARN] Nothing to check.")
+            return
+
+        results, messages = match_manager.check_positions(rows, self._namespace())
+        status_col = 4
+        for index, result in enumerate(results):
+            item = self.tree_plan.topLevelItem(index)
+            if item is None:
+                continue
+            item.setText(status_col, result["text"])
+            color = _CHECK_COLORS.get(result["state"])
+            if color:
+                item.setForeground(status_col, QBrush(QColor(color)))
+            item.setToolTip(status_col, result["text"])
+        self.tree_plan.resizeColumnToContents(status_col)
+        self._log_all(messages)
 
     def on_create_template(self):
         if not self.joints:

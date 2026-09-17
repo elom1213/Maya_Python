@@ -8,5 +8,8 @@
 #           Match (v02.20) - parents are matched before children, and anything another
 #                            match pushed away is matched again - one press is enough.
 
-VERSION = "02.20"
+#           Check Position (v02.21) - in every cage set, are all objects at the same
+#                            world position and rotation? Green OK / red what differs.
+
+VERSION = "02.21"
 LAST_UPDATE = "2026-09-17"

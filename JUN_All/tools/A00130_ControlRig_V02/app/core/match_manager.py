@@ -460,3 +460,148 @@ def create_template(joints, namespace=None):
         messages.append("[Info] They are all at the origin - place them by hand, "
                         "then press Match.")
     return created, messages
+
+
+# =========================
+# Check Position (v02.21)
+# =========================
+#
+# "Cage set 안의 오브젝트들이 **월드 기준으로 전부 같은 위치 · 같은 회전**에 있나" 를 본다.
+# 씬은 바꾸지 않는다. Match 가 한 세트의 멤버를 같은 조인트에 맞추므로, 멤버끼리 어긋나 있으면
+# 매칭이 덜 됐거나(막힌 채널 · 리그가 구동) 누군가 손으로 옮긴 것이다.
+#
+# - **위치는 월드 rotate pivot** 으로 비교한다. `matchTransform -position` 이 맞추는 기준이
+#   피벗이라(translate 값이 아니라) 같은 기준으로 봐야 Match 결과와 판정이 어긋나지 않는다.
+# - **회전은 월드 행렬의 방향(쿼터니언) 사이 각도**로 비교한다. 오일러 값끼리 비교하면
+#   rotateOrder · jointOrient · 360도 차이 · 짐벌에서 같은 방향이 다른 숫자로 나와 틀린 판정을 낸다.
+#   스케일은 MTransformationMatrix 가 떼어 낸다.
+# - 기준은 **첫 멤버**다. 가장 멀리 벗어난 멤버의 이름과 차이를 적는다.
+
+#: Check Position 허용치
+POSITION_TOLERANCE = 1e-3       # 월드 단위
+ROTATION_TOLERANCE = 1e-2       # 도
+
+#: Check Position 결과 코드
+CHECK_OK = "OK"
+CHECK_DIFFERENT = "different"
+CHECK_SKIPPED = "not checked"
+
+
+def _world_pose(node):
+    """(월드 rotate pivot MVector, 월드 방향 MQuaternion). 트랜스폼이 아니면 예외."""
+    import maya.api.OpenMaya as om
+
+    pivot = cmds.xform(node, query=True, worldSpace=True, rotatePivot=True)
+    matrix = om.MMatrix(cmds.xform(node, query=True, worldSpace=True, matrix=True))
+    quat = om.MTransformationMatrix(matrix).rotation(asQuaternion=True)
+    return om.MVector(pivot[0], pivot[1], pivot[2]), quat
+
+
+def _angle_between(q1, q2):
+    """두 방향 사이 각도(도). q 와 -q 는 같은 방향이라 절댓값을 쓴다."""
+    import math
+    dot = abs(q1.x * q2.x + q1.y * q2.y + q1.z * q2.z + q1.w * q2.w)
+    return math.degrees(2.0 * math.acos(min(1.0, dot)))
+
+
+def check_positions(rows, namespace=None,
+                    pos_tol=POSITION_TOLERANCE, rot_tol=ROTATION_TOLERANCE):
+    """행(= Cage set)마다 멤버들이 같은 월드 위치 · 회전인지 본다. 씬 불변.
+
+    템플릿 조인트가 없는 행은 plan() 이 멤버를 안 펴 두므로, 그때는 namespace 로 세트를
+    직접 찾아 본다 - 이 검사는 조인트가 없어도 뜻이 있다(멤버끼리 비교).
+
+    돌려주는 것: `(results, messages)`. results 는 rows 와 같은 순서의 dict 목록 -
+        state      CHECK_OK / CHECK_DIFFERENT / CHECK_SKIPPED
+        text       Status 칸에 쓸 한 줄 (영어)
+        max_pos    멤버 사이 최대 위치 차 (없으면 None)
+        max_rot    멤버 사이 최대 회전 차, 도 (없으면 None)
+    """
+    results = []
+    counts = {CHECK_OK: 0, CHECK_DIFFERENT: 0, CHECK_SKIPPED: 0}
+    messages = []
+
+    for row in rows:
+        result = {"state": CHECK_SKIPPED, "text": "", "max_pos": None, "max_rot": None}
+        results.append(result)
+        name = su.short_name(row["set"])
+
+        members = row["members"] or []
+        if row["status"] == ST_NO_JOINT:
+            set_node, _found = su.resolve(row["set_wanted"], namespace)
+            if set_node:
+                members, _skipped = su.resolve_members(set_node)
+            else:
+                result["text"] = "Not checked - set missing"
+                counts[CHECK_SKIPPED] += 1
+                continue
+
+        if row["status"] == ST_NO_SET:
+            result["text"] = "Not checked - set missing"
+            counts[CHECK_SKIPPED] += 1
+            continue
+
+        members = [m for m in members if cmds.objExists(m)]
+        if not members:
+            result["text"] = "Not checked - no member"
+            counts[CHECK_SKIPPED] += 1
+            continue
+
+        poses, unreadable = [], []
+        for member in members:
+            # ★ 컴포넌트(`cube.vtx[0]`)는 xform 이 **에러 없이 오브젝트의 행렬을 돌려준다**(실측) -
+            #   그대로 두면 오브젝트와 "같다" 고 OK 가 나온다. 이름으로 먼저 거른다.
+            if "." in member:
+                unreadable.append(member)
+                continue
+            try:
+                poses.append((member,) + _world_pose(member))
+            except Exception:
+                unreadable.append(member)
+
+        if unreadable:
+            # 트랜스폼이 아닌 멤버(컴포넌트 등)는 위치·회전을 비교할 수 없다 - 괜찮다고 말하지 않는다.
+            result["state"] = CHECK_DIFFERENT
+            result["text"] = "Cannot read the transform of: {0}".format(
+                ", ".join(su.short_name(m) for m in unreadable))
+            counts[CHECK_DIFFERENT] += 1
+            messages.append("[Warning] Check Position {0}: {1}".format(name, result["text"]))
+            continue
+
+        base_name, base_pos, base_rot = poses[0]
+        worst_pos, worst_rot = (0.0, None), (0.0, None)
+        for member, pos, rot in poses[1:]:
+            d_pos = (pos - base_pos).length()
+            d_rot = _angle_between(rot, base_rot)
+            if d_pos > worst_pos[0]:
+                worst_pos = (d_pos, member)
+            if d_rot > worst_rot[0]:
+                worst_rot = (d_rot, member)
+
+        result["max_pos"], result["max_rot"] = worst_pos[0], worst_rot[0]
+        problems = []
+        if worst_pos[0] > pos_tol:
+            problems.append("position differs by {0:.4g} ({1})".format(
+                worst_pos[0], su.short_name(worst_pos[1])))
+        if worst_rot[0] > rot_tol:
+            problems.append("rotation differs by {0:.4g} deg ({1})".format(
+                worst_rot[0], su.short_name(worst_rot[1])))
+
+        if problems:
+            result["state"] = CHECK_DIFFERENT
+            text = "; ".join(problems)
+            result["text"] = text[0].upper() + text[1:] + " vs {0}".format(su.short_name(base_name))
+            counts[CHECK_DIFFERENT] += 1
+            messages.append("[Warning] Check Position {0}: {1}".format(name, result["text"]))
+        else:
+            result["state"] = CHECK_OK
+            result["text"] = ("OK - 1 member" if len(poses) == 1 else
+                              "OK - {0} members share position and rotation".format(len(poses)))
+            counts[CHECK_OK] += 1
+
+    summary = "Check Position : {0} OK, {1} different, {2} not checked.".format(
+        counts[CHECK_OK], counts[CHECK_DIFFERENT], counts[CHECK_SKIPPED])
+    if counts[CHECK_DIFFERENT] == 0 and counts[CHECK_OK]:
+        summary = "[OK] " + summary
+    messages.insert(0, summary)
+    return results, messages
