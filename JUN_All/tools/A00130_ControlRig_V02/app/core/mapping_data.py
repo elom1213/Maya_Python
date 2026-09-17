@@ -35,7 +35,10 @@ IK_AXIS_FILENAME = "ik_axis_map.json"
 #: `total` 을 어떻게 잴지 (계획서 3-1)
 TOTAL_STRAIGHT = "straight"   # 첫 조인트 -> 마지막 조인트 직선 거리 (V01 과 동일)
 TOTAL_SUM = "sum"             # 마디 길이의 합 (완전히 폈을 때)
-TOTAL_MODES = (TOTAL_STRAIGHT, TOTAL_SUM)
+# 순서 = 콤보 순서. 기본값이 맨 위다 (v02.22 부터 sum).
+TOTAL_MODES = (TOTAL_SUM, TOTAL_STRAIGHT)
+#: json 에 total_mode 가 없거나 모르는 값일 때 (v02.22 부터 sum - IK stretch 에는 편 길이가 맞다)
+TOTAL_DEFAULT = TOTAL_SUM
 
 
 def _app_dir():
@@ -411,7 +414,7 @@ def load_length(version=None, joints=None):
     `load()` 와 같은 태도로 **예외를 던지지 않는다** — 무엇이 잘못됐는지 messages 로 알린다.
     """
     messages = []
-    empty = {"option_ctl": "", "total_mode": TOTAL_STRAIGHT, "measures": []}
+    empty = {"option_ctl": "", "total_mode": TOTAL_DEFAULT, "measures": []}
     path = length_path(version)
 
     if not path or not os.path.isfile(path):
@@ -429,11 +432,11 @@ def load_length(version=None, joints=None):
     if not option_ctl:
         messages.append("[ERR] 'option_ctl' is missing - there is nowhere to write.")
 
-    total_mode = doc.get("total_mode") or TOTAL_STRAIGHT
+    total_mode = doc.get("total_mode") or TOTAL_DEFAULT
     if total_mode not in TOTAL_MODES:
         messages.append("[Warning] Unknown total_mode '{0}' - using '{1}'.".format(
-            total_mode, TOTAL_STRAIGHT))
-        total_mode = TOTAL_STRAIGHT
+            total_mode, TOTAL_DEFAULT))
+        total_mode = TOTAL_DEFAULT
 
     known = {j["name"] for j in (joints or [])}
     measures = []

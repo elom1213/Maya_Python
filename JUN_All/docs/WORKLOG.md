@@ -31,6 +31,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-17 (오늘)
 
+> [!summary] `A00130_ControlRig_V02` Length 탭 **`Total` 기본값을 `sum`** 으로, 콤보 맨 위로 (v02.21 -> 02.22)
+- **요청**: Length 의 Total 기본 세팅이 sum 이 되고 sum 위치도 맨 위로.
+- `length_map.json` `total_mode: "sum"` + 폴백 `TOTAL_DEFAULT = sum`, 콤보 순서는 `TOTAL_MODES` 한 곳. `straight` 는 그대로 고를 수 있다.
+- mayapy 2024 8항목 통과(굽은 체인 3+4 에서 total 7). #A00130
+
 > [!summary] `A00130_ControlRig_V02` Match 탭 **`Check Position`** — 케이지 세트마다 멤버들이 같은 월드 위치·회전인지 Status 에 초록 OK / 빨강으로 (v02.20 -> 02.21)
 - **요청**: 각 Cage set 에 있는 오브젝트들이 모두 월드 기준 같은 위치·회전인지 진단해 Status 에, OK 는 초록 · 아니면 빨강.
 - 기준은 첫 멤버. 위치는 **월드 rotate pivot**(Match 와 같은 기준), 회전은 **쿼터니언 각도**라 rotateOrder · 360° 차이는 같다고 본다. 빨강에는 어느 멤버가 얼마나 다른지.

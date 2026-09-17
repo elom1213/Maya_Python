@@ -241,7 +241,7 @@ def plan(doc, namespace, total_mode=None, option_ctl_node=None, override=None):
     messages = []
     rows = []
 
-    mode = total_mode or doc.get("total_mode") or mapping_data.TOTAL_STRAIGHT
+    mode = total_mode or doc.get("total_mode") or mapping_data.TOTAL_DEFAULT
 
     ctl = option_ctl_node
     if ctl is None:

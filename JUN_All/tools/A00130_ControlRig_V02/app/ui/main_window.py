@@ -16,6 +16,7 @@
 #   Pair           : 세트 A 의 하나뿐인 원소로 세트 B 의 하나뿐인 원소를 맞춘다 (Match 뒤)
 #   Constrain      : 포즈 오브젝트를 `Con` 이 가리키는 노드에 parentConstraint (Pair 뒤)
 #
+# v02.22 : Length 탭 Total 기본값을 **sum** 으로, 콤보 맨 위로.
 # v02.21 : Match 탭 **Check Position** — 세트마다 멤버들이 월드 위치 · 회전이 같은지
 #          Status 칸에 초록 OK / 빨강(무엇이 얼마나 다른지)으로. 씬 불변.
 # v02.10 : **Pair** 탭(세트 1:1 매칭)과 **Constrain** 탭(`Con` -> parentConstraint).
@@ -387,12 +388,13 @@ class MainWindow(QWidget):
 
         grid.addWidget(QLabel("Total"), 2, 0)
         self.cmb_total_mode = QComboBox()
-        self.cmb_total_mode.addItems([mapping_data.TOTAL_STRAIGHT,
-                                      mapping_data.TOTAL_SUM])
+        # v02.22 - sum 이 맨 위 + 기본값. 순서는 mapping_data.TOTAL_MODES 한 곳이 정한다.
+        self.cmb_total_mode.addItems(list(mapping_data.TOTAL_MODES))
+        self.cmb_total_mode.setCurrentText(mapping_data.TOTAL_DEFAULT)
         self.cmb_total_mode.setToolTip(
             "How the whole-limb length is measured.\n"
+            "  sum      : the two segments added up, i.e. fully extended (default)\n"
             "  straight : first joint to last joint, ignoring the bend (what V01 did)\n"
-            "  sum      : the two segments added up, i.e. fully extended\n"
             "They differ by about 3.4% at a 30 degree bend. If the value drives IK\n"
             "stretch, 'sum' is usually what you want.")
         self.cmb_total_mode.currentIndexChanged.connect(lambda *_: self._refresh_length())

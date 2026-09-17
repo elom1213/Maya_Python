@@ -11,5 +11,7 @@
 #           Check Position (v02.21) - in every cage set, are all objects at the same
 #                            world position and rotation? Green OK / red what differs.
 
-VERSION = "02.21"
+#           Length Total (v02.22) - 'sum' is the default and the first item.
+
+VERSION = "02.22"
 LAST_UPDATE = "2026-09-17"

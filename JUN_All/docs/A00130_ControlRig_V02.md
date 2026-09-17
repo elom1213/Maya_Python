@@ -4,7 +4,8 @@
 Manager* · AdvancedSkeleton 의 *FitSkeleton* 처럼 — **씬에 템플릿 조인트를 놓고 눈으로 맞춘 뒤,
 버튼으로 컨트롤러(cage)를 그 자리에 굽는다.**
 
-- 버전: `v02.21` (`app/config/version.py`) — `Match` 탭 **`Check Position`** — 세트마다 멤버들이 같은 월드 위치·회전인지 Status 에 초록/빨강으로 (§4.1c)
+- 버전: `v02.22` (`app/config/version.py`) — `Length` 탭 **`Total` 기본값을 `sum`** 으로, 콤보 맨 위로 (§6.2)
+  · v02.21 은 `Match` 탭 **`Check Position`** — 세트마다 멤버들이 같은 월드 위치·회전인지 Status 에 초록/빨강으로 (§4.1c)
   · v02.20 은 `Match` 가 **부모부터 맞추고 밀려난 것은 다시 맞춘다** — 한 번 누르면 된다 (§4.1b)
   · v02.17 은 `Constrain` 의 **`maintain offset` 기본 ON** + 걸기 전후를 재서 움직인 것을 짚는다 (§9.2)
   · v02.16 은 템플릿 폴 타깃 4개를 **거리 고정**으로 (§7.9)
@@ -413,8 +414,12 @@ A00130_ControlRig_V02/
 | 0° | 20.0000 | 20.0000 | 0 |
 | 30° | 19.3185 | 20.0000 | **−3.4 %** |
 
-`Total` 콤보로 고른다. 기본값은 **`straight`**(V01 과 같다). 값이 **IK 스트레치 기준**이면
-보통 **`sum`**(완전히 폈을 때 길이)이 맞다 — 직선을 쓰면 스트레치가 일찍 걸린다.
+`Total` 콤보로 고른다. **v02.22 부터 기본값은 `sum`**(완전히 폈을 때 길이)이고 콤보 **맨 위**에 있다.
+값이 **IK 스트레치 기준**이면 보통 `sum` 이 맞다 — 직선을 쓰면 스트레치가 일찍 걸린다.
+V01 과 같은 값이 필요하면 **`straight`** 를 고른다. (v02.21 까지는 `straight` 가 기본이었다)
+
+기본값은 `length_map.json` 의 `total_mode`(지금 `"sum"`)가 정하고, 그 필드가 없거나 모르는 값이면
+`mapping_data.TOTAL_DEFAULT`(= `sum`)을 쓴다. 콤보 순서는 `mapping_data.TOTAL_MODES` 한 곳이 정한다.
 두 값이 0.5 % 넘게 벌어지면 그 행에 `bent - straight ... vs sum ...` 이 뜬다.
 
 ### 6.3 쓰기 전에 전부 미리 본다

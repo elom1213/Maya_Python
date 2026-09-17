@@ -3,6 +3,15 @@
 `A00130_ControlRig`(V01)의 **템플릿 조인트 패러다임 재작성판**이다.
 계획서: `JUN_All/docs/plans/A00130_ControlRig_V02_plan.md`
 
+## v02.22 (2026-09-17)
+**[Change] `Length` 탭 `Total` — 기본값을 `sum` 으로, 콤보 맨 위로.**
+
+- **요청**: Length 의 Total 기본 세팅이 sum 이 되고, sum 위치도 맨 위로.
+- `length_map.json` 의 `total_mode` → `"sum"`, json 에 없거나 모르는 값일 때의 폴백도 `sum`(`mapping_data.TOTAL_DEFAULT`).
+- 콤보 순서 `sum` · `straight` — `mapping_data.TOTAL_MODES` 순서를 그대로 쓴다. `straight` 는 여전히 고를 수 있다.
+- **검증**(mayapy 2024 + 오프스크린 Qt, 8항목 통과): json 로드 · 순서 · UI 콤보 `[sum, straight]` 와 현재값 `sum` ·
+  straight 선택 가능 · json 에 `total_mode` 가 없을 때 굽은 체인(3 + 4, 직선 5)에서 total = 7.
+
 ## v02.21 (2026-09-17)
 **[Feature] `Match` 탭 `Check Position` — 케이지 세트마다 멤버들이 같은 월드 위치·회전인지 `Status` 에 초록 / 빨강으로.**
 

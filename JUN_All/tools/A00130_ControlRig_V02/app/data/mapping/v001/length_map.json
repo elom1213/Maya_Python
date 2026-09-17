@@ -17,14 +17,15 @@
     "with a lower case r while every other total is upper case. Deriving would",
     "silently write the wrong name (plan 4-1).",
     "",
-    "total_mode : 'straight' = distance from the first joint to the last one,",
+    "total_mode : 'sum'      = the segment lengths added up (fully extended).",
+    "             The default since v02.22.",
+    "             'straight' = distance from the first joint to the last one,",
     "             ignoring the bend. This is what V01 did.",
-    "             'sum'      = the segment lengths added up (fully extended).",
     "             They differ by ~3.4% at a 30 degree bend (plan 3-1)."
   ],
 
   "option_ctl": "CH_n_OptionAll_xx_ctl",
-  "total_mode": "straight",
+  "total_mode": "sum",
 
   "measures": [
     {
