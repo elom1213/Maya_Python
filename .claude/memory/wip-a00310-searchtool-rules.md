@@ -37,6 +37,12 @@ register(SelectRule("x", "X", "한 줄 설명.", _rule_x))
 - 규칙을 **여러 개 고르면 AND**(`filter_objects(objects, keys)`).
 - `select_by_rules(objects, keys, invert)` → `(선택한 것, [(오브젝트, 이유), ...])`.
 
+**등록된 규칙 3개** (v01.04) — `Standalone` · `No Upstream` · `No Downstream`.
+뒤의 둘은 **한쪽 방향만** 본다: 들어오는 연결 0(노드망의 시작점) / 나가는 연결 0(끝점).
+공용 헬퍼 `_foreign_connections(own, source=, destination=)` 에 방향 인자를 두어 갈랐다.
+**둘을 함께 골라도 `Standalone` 과 같지 않다** — `Standalone` 은 **히스토리까지** 보므로 더 엄격하다
+(`polyCube` 히스토리가 달린 메시는 연결이 없어도 빠진다). 무시 목록은 셋이 공유한다.
+
 **규칙 `Standalone`** — 연결도 히스토리도 없는 노드. 잡아내는 것은 컨스트레인트(걸린 쪽 **+
 드라이버 쪽**) · 디포머(`geometryFilter` 상속 전부) · 히스토리 · 어트리뷰트 연결(**양방향**).
 통과시키는 것은 머티리얼 배정 · 디스플레이 레이어/셋 멤버십 · 부모가 있는 것.

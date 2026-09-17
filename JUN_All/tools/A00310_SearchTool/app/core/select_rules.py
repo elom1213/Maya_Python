@@ -184,12 +184,21 @@ def _foreign_history(obj, own):
     return found
 
 
-def _foreign_connections(own):
-    """자기 자신·셰이프·무시 타입을 뺀, 들어오고 나가는 모든 연결 상대."""
+def _foreign_connections(own, source=True, destination=True):
+    """자기 자신·셰이프·무시 타입을 뺀 연결 상대.
+
+    `source` / `destination` 으로 **방향을 가른다** — `listConnections` 의 플래그 그대로다.
+
+      source=True,  destination=False : **업스트림**(나에게 들어오는 것 = 나를 구동하는 것)
+      source=False, destination=True  : **다운스트림**(나에게서 나가는 것 = 내가 구동하는 것)
+
+    둘 다 True 면 방향을 가리지 않는다(`Standalone` 이 쓰는 방식).
+    """
     found = []
     seen = set()
     for node in own:
-        for other in cmds.listConnections(node, source=True, destination=True) or []:
+        for other in cmds.listConnections(node, source=source,
+                                          destination=destination) or []:
             path = _long(other)
             if path in own or path in seen:
                 continue
@@ -241,3 +250,52 @@ register(SelectRule(
     "Constraints, skin/deformers, history nodes and attribute connections all "
     "disqualify. Being parented under a group does not.",
     _rule_standalone))
+
+
+# ==================================================================
+# 규칙 2 · 3 - No Upstream / No Downstream
+# ==================================================================
+# `Standalone` 이 "아무것에도 안 엮였나" 라면, 이 둘은 **한쪽 방향만** 본다.
+#
+#   No Upstream   : 나를 구동하는 것이 없다 (들어오는 연결 0)  - 체인의 **맨 위**
+#   No Downstream : 내가 구동하는 것이 없다 (나가는 연결 0)    - 체인의 **맨 끝**
+#
+# 무시하는 것은 `Standalone` 과 같다(`IGNORED_TYPES`) - 머티리얼 배정 · 디스플레이 레이어 ·
+# 평범한 셋 멤버십은 리깅으로 엮인 것이 아니다. 부모-자식도 DG 연결이 아니라 세지 않는다.
+# 둘을 **함께 고르면**(AND) 결과는 `Standalone` 의 연결 조건과 같아진다 - 다만 `Standalone`
+# 쪽은 **히스토리까지** 보므로 완전히 같지는 않다.
+
+
+def _rule_no_upstream(obj):
+    """들어오는 연결이 하나도 없는가(나를 구동하는 것이 없다)."""
+    own = _self_nodes(obj)
+    incoming = _foreign_connections(own, source=True, destination=False)
+    if incoming:
+        return False, "driven by " + _describe(incoming[0])
+    return True, ""
+
+
+def _rule_no_downstream(obj):
+    """나가는 연결이 하나도 없는가(내가 구동하는 것이 없다)."""
+    own = _self_nodes(obj)
+    outgoing = _foreign_connections(own, source=False, destination=True)
+    if outgoing:
+        return False, "drives " + _describe(outgoing[0])
+    return True, ""
+
+
+register(SelectRule(
+    "no_upstream",
+    "No Upstream",
+    "Nothing feeds into it - no incoming connections, so nothing drives this node. "
+    "Shading, display layers and plain sets are ignored; being parented under a "
+    "group does not count.",
+    _rule_no_upstream))
+
+register(SelectRule(
+    "no_downstream",
+    "No Downstream",
+    "It feeds nothing - no outgoing connections, so this node drives nothing. "
+    "Shading, display layers and plain sets are ignored; having children does not "
+    "count.",
+    _rule_no_downstream))

@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-09-16
+updated: 2026-09-17
 ---
 
 # 작업 일지 (WORKLOG)
@@ -29,7 +29,32 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-09-16 (오늘)
+## 2026-09-17 (오늘)
+
+> [!summary] `A00310_SearchTool` Rules — 방향 규칙 **`No Upstream` · `No Downstream`** 추가 (v01.03 -> 01.04)
+- **요청**: 리스트업된 오브젝트 중 **업스트림이 아무것도 연결되지 않은 것**, **다운스트림이 아무것도
+  연결되지 않은 것**을 고르는 규칙 두 개.
+- **★ 코드는 규칙 함수 둘 + 등록 두 줄이 전부다.** 어제 만든 레지스트리 설계가 의도대로 동작하는지
+  확인된 셈이다 — UI 는 한 줄도 안 고쳤고, 목록·툴팁·설명줄·AND 조합·탈락 사유 로그가 전부 따라왔다.
+- 공용 헬퍼 `_foreign_connections(own)` 에 **방향 인자**(`source` / `destination`)를 더해 갈랐다.
+  `Standalone` 은 둘 다 True 로 예전과 같은 동작을 유지한다.
+  - **No Upstream** : 들어오는 연결 0 — 나를 구동하는 것이 없다(노드망의 **시작점**).
+  - **No Downstream** : 나가는 연결 0 — 내가 구동하는 것이 없다(노드망의 **끝점**).
+  - 탈락 사유도 방향에 맞췄다 — `driven by ...` / `drives ...`.
+- **무시 목록은 셋이 공유한다**(`IGNORED_TYPES`) — 머티리얼 배정 · 디스플레이 레이어 · 평범한 셋.
+  부모-자식도 DG 연결이 아니라 세지 않는다.
+- **`Standalone` 과 같지 않다** — 둘을 함께 골라도 `Standalone` 쪽이 더 엄격하다(**히스토리까지** 본다).
+  예: `polyCube` 히스토리가 달린 메시는 연결이 없어도 `Standalone` 에서는 빠진다. 문서에 적어 두었다.
+- **검증(mayapy + 오프스크린 Qt) 22항목 전부 통과** — 등록 순서 · 내보내기만/받기만/중간/무연결
+  네 경우의 방향 판정 8 · 한 방향만 있을 때의 통과·탈락과 **사유 문구** 4 · 머티리얼·레이어·셋 무시 2 ·
+  부모-자식 2 · 스킨 메시(Upstream 탈락)와 바인드 조인트(Downstream 탈락) 2 · AND 조합과
+  `Standalone` 과의 포함 관계 2 · UI 자동 등록 2. 기존 A00310 구조 검증도 다시 돌려 회귀 없음.
+  파일: `tools/A00310_SearchTool/app/core/select_rules.py` · `app/config/version.py` ·
+  `docs/A00310_SearchTool.md` `#A00310`
+
+---
+
+## 2026-09-16
 
 > [!summary] `A00240_PathTool` Tree 탭 — **Refresh**(Selected · Recursive), **갱신해도 열어 둔 경로가 닫히지 않는다** (v01.07 -> 01.08)
 - **요청**: 디스크를 다시 읽어 갱신하는 `Refresh` 버튼. `Selected` 는 고른 경로만, `Recursive` 는

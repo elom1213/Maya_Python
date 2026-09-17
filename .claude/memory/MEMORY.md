@@ -83,7 +83,7 @@
 - A00290 **V02** — [tab reorg](wip-a00290-v02-tab-reorg.md)(Shape/Target/Node 3x7 · Default→Extract · 1400x1158, v02.00) — **아래 V01 메모의 탭 경로는 V01 기준**
 - A00290 — [Naming tab](wip-a00290-naming-tab.md)(FBX 엔 별칭뿐, v01.22) · [Target Order](wip-a00290-target-order-tab.md) · [Bake Delete](wip-a00290-bake-delete-tab.md) · [Mix Targets](wip-a00290-mix-targets-tab.md) · [Shape Editor](wip-a00290-shape-editor-tab.md)(`sculptTarget` 필수)
 - A00300 — [batch summary](wip-a00300-batch-summary-table.md) · [zero-area rework](wip-a00300-zero-area-quality-rework.md)(**진행 중**)
-- A00310 — [Type/Token/Rules](wip-a00310-searchtool-rules.md)(공유 Objects 리스트 · 규칙 레지스트리 · Standalone, v01.03) · A00330 — [Set Rename](wip-a00330-set-rename.md)
+- A00310 — [Type/Token/Rules](wip-a00310-searchtool-rules.md)(공유 Objects 리스트 · 규칙 레지스트리 · Standalone/No Upstream/No Downstream, v01.04) · A00330 — [Set Rename](wip-a00330-set-rename.md)
 - A00340 — [SelectionTool](wip-a00340-selectiontool.md) · [button colors](wip-a00340-button-colors.md) · [split layout](wip-a00340-split-layout.md)
 - A00350 — [ArrayCreator](wip-a00350-arraycreator.md) · A00360 — [SortTool](wip-a00360-sorttool.md) · A00370 — [ToolLauncher](wip-a00370-toollauncher.md)
 - A00380 — [MeshTool Peak](wip-a00380-meshtool-peak.md) · [Match tab](wip-a00380-match-tab.md)
