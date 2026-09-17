@@ -45,6 +45,7 @@
 - [shape.pnts is post-deformation](shape-pnts-is-post-deformation.md) — pnts 는 디포머 뒤에 더해진다
 - blendShape — [delta space = origin](blendshape-delta-space-origin.md) · [target name vs alias](blendshape-target-name-vs-alias.md)(노드 이름 ≠ 웨이트 alias, 인덱스는 max+1) · [live target deltas](blendshape-live-target-inputpointstarget.md)(라이브 타겟은 메시를 옮겨야 함)
 - keys — [setKeyframe insert needs a curve](setkeyframe-insert-needs-existing-curve.md)(없으면 조용히 no-op) · [pasteKey attribute = order match](pastekey-attribute-matches-by-order.md)(plug 단위로) · [animated attr: key + setAttr](animated-attr-setkeyframe-plus-setattr.md)
+- [parent -s -add = instance](parent-shape-add-is-instance.md) — 소스 계층 삭제 시 붙인 쉐입도 사라짐, duplicate + `parent -r -s` + 월드 CV 복원
 - [cmds.toggle not undoable](maya-toggle-cmd-not-undoable.md) — `toggle -localAxis` 대신 setAttr
 - [extendToShape picks wrong shape](extendtoshape-picks-wrong-shape.md) — 금지, 공용 `maya_shape` 사용
 - [pointPosition: points only](pointposition-points-only.md) — 엣지/페이스는 xform 평균
@@ -88,7 +89,7 @@
 - A00350 — [ArrayCreator](wip-a00350-arraycreator.md) · A00360 — [SortTool](wip-a00360-sorttool.md) · A00370 — [ToolLauncher](wip-a00370-toollauncher.md)
 - A00380 — [MeshTool Peak](wip-a00380-meshtool-peak.md) · [Match tab](wip-a00380-match-tab.md)
 - A00390 — [WindTool](wip-a00390-windtool.md) · [Chain Wave](wip-a00390-chain-wave.md) · [V02 axis & driver](wip-a00390-v02-axis-driver.md) · [V02 Envelope](wip-a00390-v02-envelope.md) · [Lite debug curve](wip-a00390-lite-debug-curve.md)(v02.03)
-- A00400 — [CurveTool](wip-a00400-curvetool.md) · [Smooth](wip-a00400-smooth-tab.md)(닫힌 커브 우회, v01.09) · [Points to Curve](wip-a00400-points-to-curve.md) · [Wrap](wip-a00400-curve-wrap.md) · [Joints](wip-a00400-curve-joints.md)
+- A00400 — [CurveTool](wip-a00400-curvetool.md) · [Smooth](wip-a00400-smooth-tab.md)(닫힌 커브 우회, v01.09) · [Points to Curve](wip-a00400-points-to-curve.md) · [Wrap](wip-a00400-curve-wrap.md) · [Joints](wip-a00400-curve-joints.md) · Combine(v01.11, 쉐입 복사 합치기 — [instance trap](parent-shape-add-is-instance.md))
 - A00410 — [SecondaryMotion](wip-a00410-secondarymotion.md)(FK 관성 굽기, v01.08) · A00420 — [Wrapper](wip-a00420-wrapper.md) · A00430 — [DemBone](wip-a00430-dembone.md)
 - A00440 — [SetTool](wip-a00440-settool.md)(v01.01) · A00450 — [ManipulatorTool](wip-a00450-manipulatortool.md) · A00460 — [FK & IK](wip-a00460-fk-ik.md)(v01.04)
 - A00470 — [MaterialTool](wip-a00470-materialtool.md)(머티리얼 이름 규칙 진단 · 토큰 정렬 DP · 고칠 이름 제안, v01.03)

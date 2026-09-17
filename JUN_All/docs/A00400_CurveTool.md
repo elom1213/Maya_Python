@@ -2,7 +2,7 @@
 title: A00400_CurveTool 사용법
 aliases: [Curve Tool, CurveTool, A00400]
 tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve, lineWidth, wrap, blendShape, editPoint, laplacian, smoothCurve, softSelect, joint, skinCluster, controller]
-updated: 2026-09-16
+updated: 2026-09-17
 ---
 
 # A00400_CurveTool 사용법
@@ -18,6 +18,7 @@ Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya).
 | **Edit**<br>기존 커브의 **형상(CV)** 을 바꾼다 | **Smooth** (v01.05~) | 씬에서 고른 **CV** 를 슬라이더로 실시간 Smooth / Rough. **소프트 셀렉션 폴오프**를 그대로 쓴다. **닫힌 커브도 이음매를 넘어** 고른다 (v01.08~) |
 | | **Wrap** (v01.03~) | **CV 개수가 달라도** 한 커브가 다른 커브의 모양을 따르게 한다. 0~1 envelope 어트리뷰트로 라이브 블렌드 |
 | | **Joints** (v01.07~) | 커브 위에 조인트를 **균일 배치** → 그 조인트로 **커브를 바인드** → 조인트마다 `zro/con/ctl/tgt` 컨트롤러. 컨트롤러가 조인트를, 조인트가 커브를 움직인다 |
+| | **Combine** (v01.11~) | 좌측 **Source** 커브의 쉐입을 우측 **Target** 커브에 합친다. 인스턴스가 아닌 **복사본**이라 Source 를 지우거나 고쳐도 영향 없음 |
 | **Display**<br>**그려지는 방식만** 바꾼다 | **Line Width** (v01.01~) | 리스트업한 커브의 **뷰포트 표시 굵기**를 슬라이더로 조절 — 씬에서 **잘 보이고 잘 집히게**. 형상은 불변 |
 
 ### 분류 기준 (v01.06)
@@ -588,6 +589,50 @@ spine_crv_skinCluster          (커브를 세 조인트에 바인드)
     (`curves` / `joints` / `controls` / `roots` / `groups` / `skins` / `constraints` / `missing` / `skipped` / `renamed` / `warnings`)
   - `joint_curve_manager.uniform_us(count, closed)` → `[0, 1]` 위의 균일 위치 목록
   - `joint_curve_manager.sample_curve(shape, count, spacing)` → `[(월드 위치, 월드 접선), ...]`
+
+---
+
+## Edit > Combine (v01.11~) — 커브 쉐입 합치기
+
+좌측 **Source** 리스트의 커브 쉐입을 우측 **Target** 리스트의 커브 트랜스폼 밑에 붙인다.
+컨트롤러 모양을 여러 커브로 그린 뒤 하나로 묶을 때 쓴다.
+
+### 사용법
+
+1. 좌측 **Select Source** 로 합칠 커브들을, 우측 **Select Target** 으로 받을 커브를 담는다.
+   - Target **1 개** → 모든 Source 가 그 Target 으로 간다.
+   - Target **여러 개** → Source 와 **행 순서대로 1:1**. 개수가 다르면 실행하지 않는다.
+2. 옵션
+   - **Keep world position**(기본 켬) — 붙은 쉐입이 **원래 보이던 자리 그대로** 남는다.
+     끄면 CV 로컬 값을 그대로 가져가서 Target 트랜스폼을 따라 움직인다(MEL `parent -s -add` 와 같다).
+   - **Delete Source curves after combining** — 복사가 끝난 Source 를 지운다.
+     Source 가 다른 짝의 Target 이거나 **밑에 Target 이 있으면** 지우지 않는다(같이 사라지므로).
+3. **Combine Shapes** — 한 번의 Undo 로 되돌릴 수 있다. 새 쉐입 이름은 `<Target>Shape#`.
+
+### 왜 MEL `parent -s -add` 를 쓰지 않나 (mayapy 로 확인)
+
+`parent -s -add` 는 쉐입을 **옮기거나 복사하지 않고 인스턴스로 하나 더 매단다** — 노드는 하나인데
+부모가 둘이다(`listRelatives(shape, allParents=True)` → `['A', 'B']`).
+
+| A 를 지우는 방법 | B 에 붙은 쉐입 |
+|------------------|----------------|
+| 아웃라이너에서 계층째 (`select -hi A; delete`) | **함께 삭제** |
+| 쉐입 경로 (`delete \|A\|AShape`) | **함께 삭제** |
+| 트랜스폼만 (`delete A` / `doDelete`) | 남는다 |
+
+지우지 않아도 **A 의 CV 를 움직이면 B 도 같이 움직인다** — 같은 노드이기 때문이다.
+
+이 탭은 대신 ① Source 를 `duplicate`(upstream 없이 → 히스토리 없는 현재 모양의 **새 쉐입 노드**)
+② 새 쉐입을 `parent -r -s` 로 Target 에 **옮기고** ③ 임시 트랜스폼을 지운다.
+결과 쉐입은 Source 와 연결이 전혀 없다.
+
+### 알아둘 것
+
+- **히스토리가 있는 Source**(예: `makeNurbCircle`) — 복사본은 입력이 없는 **정적 모양**이다.
+  이후 Source 의 히스토리를 바꿔도 따라가지 않는다.
+- **스킨된 Source** — intermediate(`Orig`) 쉐입은 제외하고, **지금 디폼된 모양**을 복사한다.
+- Target 에 디포머가 있어도 새 쉐입은 그 디포머에 들어가지 않는다(별도 쉐입이다).
+- 한 Source 에 쉐입이 여러 개면 전부 복사한다. 커브가 아닌 항목은 건너뛰고 로그에 남긴다.
 
 ---
 

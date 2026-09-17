@@ -31,6 +31,20 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-17 (오늘)
 
+> [!summary] `A00400_CurveTool` — **`Edit > Combine`** 추가 : Source 커브 쉐입을 Target 커브에 합친다, 인스턴스가 아닌 복사본으로 (v01.10 -> 01.11)
+- **요청**: 좌 TSL 커브들의 쉐입을 우 TSL 커브에 합치기. 참고 MEL(`parent -s -add`)은 A 를 B 에 붙인 뒤
+  A 를 지우면 B 에 붙은 쉐입도 사라지는 문제가 있다.
+- **★ 원인 — `parent -s -add` 는 인스턴스다.** 노드 하나에 부모 둘(`allParents` → `['A','B']`).
+  mayapy 로 지우는 방법별로 확인: **계층째 삭제 · 쉐입 경로 삭제 → B 쪽도 삭제**, 트랜스폼만 삭제 → 남음.
+  지우지 않아도 A 의 CV 편집이 B 에 그대로 보인다.
+- **해결**: `duplicate`(upstream 없음) → 새 쉐입을 `parent -r -s` 로 **이동** → 임시 트랜스폼 삭제.
+  **Keep world position**(기본 켬)으로 CV 를 원래 월드 위치로 되돌린다(`-r -s` 는 로컬 값을 가져가 모양이 튄다).
+  옵션 **Delete Source** (밑에 Target 이 있는 Source 는 보존). Target 1 개 = 전부, 여러 개 = 행 순서 1:1.
+- **검증(mayapy + 오프스크린 Qt) 22항목 전부 통과** — 인스턴스 아님 · Source 계층 삭제/CV 편집에도 유지 ·
+  회전+비균등 스케일+닫힌 커브 월드 위치 · 단일 undo · 히스토리/스킨된/멀티 쉐입 Source · 짝 짓기 · UI.
+  파일: `tools/A00400_CurveTool/app/core/combine_manager.py`(신규) · `app/ui/main_window.py` ·
+  `app/config/version.py` · `CHANGELOG.md` · `docs/A00400_CurveTool.md` `#A00400`
+
 > [!summary] `A00330_NamingTool` Copy Name — **`Search` / `Replace`** 추가 : Base 이름 속 단어를 바꿔서 Targets 에 복사 (v01.04 -> 01.05)
 - **요청**: Set Rename 탭의 Search / Replace 를 Copy Name 탭에도. Base 에 올라온 이름 중 Search 단어를
   Replace 단어로 바꿔 Targets 이름을 고친다(예: `L_arm_jnt` + `jnt`→`ctrl` = `L_arm_ctrl`).

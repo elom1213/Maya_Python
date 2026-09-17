@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-29
+# last Update date : 2026-09-17
 # A00400_CurveTool - Qt UI
 #
 # 1) 선택한 메시 엣지에 부착된 커브를 만든다. 떨어져 있는 엣지 덩어리(연결 성분)마다
@@ -10,7 +10,7 @@
 #
 # 탭은 상위 = 카테고리, 하위 = 기능으로 두 단계다 (A00110_animTool_V02 과 같은 규칙).
 #   Create  > From Edges / From Points   - 씬에 새 커브를 만든다
-#   Edit    > Smooth / Wrap              - 기존 커브의 형상(CV)을 바꾼다
+#   Edit    > Smooth / Wrap / Joints / Combine - 기존 커브의 형상(CV)을 바꾼다
 #   Display > Line Width                 - 그려지는 방식만 바꾼다(형상 불변)
 # 위 1)2) 는 Create > From Edges 이고, Line Width 는 리스트업한 커브의 뷰포트 표시
 # 굵기(nurbsCurve.lineWidth)를 조절한다 — 씬에서 커브를 눈으로 찾고 클릭으로 집기
@@ -30,6 +30,7 @@ from tools.A00400_CurveTool.app.core import wrap_manager as wrap_mgr
 from tools.A00400_CurveTool.app.core import points_manager as points_mgr
 from tools.A00400_CurveTool.app.core import smooth_manager as smooth_mgr
 from tools.A00400_CurveTool.app.core import joint_curve_manager as jnt_mgr
+from tools.A00400_CurveTool.app.core import combine_manager as combine_mgr
 
 
 WINDOW_OBJECT_NAME = "JUN_A00400_CurveTool_window"
@@ -97,6 +98,10 @@ class MainWindow(QWidget):
          "Place joints evenly along each listed curve, bind the curve to them, "
          "and build a zro / con / ctl / tgt controller on every joint.",
          "_build_joints_tab"),
+        ("Combine",
+         "Add the shapes of the Source curves to the Target curves. The added shapes "
+         "are real copies, so deleting or editing a Source does not touch them.",
+         "_build_combine_tab"),
     )
 
     DISPLAY_PAGES = (
@@ -1445,6 +1450,104 @@ class MainWindow(QWidget):
                 len(result["joints"]), len(result["curves"]),
                 len(result["controls"]), len(result["skins"]),
                 len(result["constraints"])))
+
+    # --------------------------------------------------------------
+    # Edit > Combine  (v01.11)
+    # --------------------------------------------------------------
+
+    def _build_combine_tab(self):
+        """좌측 Source 커브의 쉐입을 우측 Target 커브 트랜스폼에 합친다.
+
+        MEL `parent -s -add` 는 쉐입을 **인스턴스**로 붙여서, Source 를 계층째 지우면
+        Target 에 붙은 쉐입도 함께 사라진다. 여기서는 복제한 **독립 쉐입**을 옮겨 붙인다
+        (자세한 실측은 core/combine_manager.py).
+        """
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+
+        desc = QLabel(
+            "Add the shapes of the Source curves to the Target curves.\n"
+            "The added shapes are copies - deleting or editing a Source\n"
+            "later does not affect them.")
+        desc.setAlignment(Qt.AlignCenter)
+        root.addWidget(desc)
+
+        self.tsl_combine_src = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Source", select_label="Select Source",
+            show_sort=False, list_min_height=140, log_callback=self.log)
+        self.tsl_combine_tgt = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Target", select_label="Select Target",
+            show_sort=False, list_min_height=140, log_callback=self.log)
+        list_row = QHBoxLayout()
+        list_row.addWidget(self.tsl_combine_src)
+        list_row.addWidget(self.tsl_combine_tgt)
+        root.addLayout(list_row, 1)
+
+        opt_box = QGroupBox("Options")
+        opt_lay = QVBoxLayout(opt_box)
+
+        self.chk_combine_world = QCheckBox("Keep world position")
+        self.chk_combine_world.setChecked(True)
+        self.chk_combine_world.setToolTip(
+            "On  : the added shape stays exactly where the Source curve is drawn.\n"
+            "Off : the CV values are kept in local space, so the shape moves with the\n"
+            "      Target's transform (same as MEL 'parent -s -add').")
+        opt_lay.addWidget(self.chk_combine_world)
+
+        self.chk_combine_delete = QCheckBox("Delete Source curves after combining")
+        self.chk_combine_delete.setToolTip(
+            "Remove the Source curves once their shapes are copied.\n"
+            "A Source that is also a Target, or that has a Target under it, is kept.")
+        opt_lay.addWidget(self.chk_combine_delete)
+
+        pair_note = QLabel(
+            "One Target : every Source goes into it.\n"
+            "Several Targets : paired with the Sources row by row.")
+        pair_note.setStyleSheet("color: gray;")
+        opt_lay.addWidget(pair_note)
+        root.addWidget(opt_box)
+
+        btn = QPushButton("Combine Shapes")
+        btn.setMinimumHeight(30)
+        btn.setToolTip("Copy the Source shapes under the Targets. One undo step.")
+        btn.clicked.connect(self.on_combine)
+        root.addWidget(btn)
+
+        return tab
+
+    def on_combine(self):
+        sources = self.tsl_combine_src.get_all_nodes() or self.tsl_combine_src.get_all_items()
+        targets = self.tsl_combine_tgt.get_all_nodes() or self.tsl_combine_tgt.get_all_items()
+        if not sources or not targets:
+            self.log("Fill both lists - Source curves on the left, Target curves on "
+                     "the right.", warn=True)
+            return
+
+        delete_sources = self.chk_combine_delete.isChecked()
+        try:
+            result = combine_mgr.combine_shapes(
+                sources, targets,
+                keep_world=self.chk_combine_world.isChecked(),
+                delete_sources=delete_sources)
+        except Exception as e:                              # noqa: BLE001
+            self.log("Combine failed: {0}".format(e), warn=True)
+            return
+
+        for item, why in result["skipped"]:
+            self.log("Skipped {0} ({1}).".format(item.split("|")[-1], why), warn=True)
+        if not result["ok"]:
+            self.log(result["message"], warn=True)
+            return
+        for source, target, shapes in result["added"]:
+            self.log("{0} -> {1} : {2}".format(
+                source.split("|")[-1], target.split("|")[-1],
+                ", ".join(s.split("|")[-1] for s in shapes)))
+        self.log(result["message"])
+
+        # 지운 Source 는 리스트에서도 뺀다(남겨 두면 다음 조작이 없는 노드를 찾는다).
+        if result["deleted"]:
+            alive = [n for n in self.tsl_combine_src.get_all_items() if cmds.objExists(n)]
+            self.tsl_combine_src.set_items(alive)
 
     # ==============================================================
     # log / about

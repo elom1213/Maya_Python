@@ -1,5 +1,31 @@
 # Changelog — A00400_CurveTool
 
+## v01.11 (2026-09-17)
+**[Feature] `Edit > Combine` — 좌측 Source 커브의 쉐입을 우측 Target 커브에 합친다.**
+
+참고 MEL(`parent -s -add $shape $target`)의 문제를 없앴다.
+
+- **[Note] `parent -s -add` 는 쉐입을 인스턴스로 붙인다** — 노드는 하나, 부모가 둘
+  (mayapy 실측: `listRelatives(shape, allParents=True)` -> `['A', 'B']`). 그래서
+  - `select -hi A; delete`(아웃라이너에서 계층째 지우기) · `delete |A|AShape` → **B 의 쉐입도 삭제**
+  - `delete A` / `doDelete`(트랜스폼만) → B 에 남는다
+  - 지우지 않아도 A 의 CV 를 움직이면 B 도 같이 움직인다.
+- **[Add] 복제한 독립 쉐입을 옮겨 붙인다** — Source 를 `duplicate`(upstream 없음 → 히스토리 없는
+  현재 모양) → 새 쉐입을 `parent -r -s` 로 Target 에 **이동** → 임시 트랜스폼 삭제.
+  결과 쉐입 이름은 `<Target>Shape#`.
+- **[Add] `Keep world position`(기본 켬)** — `parent -r -s` 는 로컬 CV 값을 그대로 가져가서 두
+  트랜스폼이 다르면 모양이 튄다(MEL 원본도 같다). 켜면 CV 를 원래 월드 위치로 되돌린다. 끄면 MEL 과 같은 로컬 동작.
+- **[Add] `Delete Source curves after combining`** — Target 이기도 하거나 밑에 Target 이 있는 Source 는 남긴다.
+- 짝 짓기: Target 1 개면 모든 Source 를 거기에, 여러 개면 Source 와 **행 순서대로 1:1**(개수가 다르면 거절).
+- intermediate 쉐입(스킨된 커브의 Orig 등)은 제외하고, 보이는 쉐입의 **현재(디폼된) 모양**을 복사한다.
+- 전부 **한 번의 undo**.
+
+**검증**(mayapy 2024 + 오프스크린 Qt, **22항목 전부 통과**): 인스턴스 아님 · 임시 트랜스폼 잔여 없음 ·
+회전/비균등 스케일/닫힌 커브에서 월드 위치 유지 · Source CV 편집·**계층째 삭제에도 복사본 유지** ·
+단일 undo · 로컬 모드 · 히스토리 Source(입력 없음, 이후 변경 무관) · 스킨된 Source(쉐입 1개, 디폼 위치) ·
+멀티 쉐입 Source · N→1 · N:N · 개수 불일치 거절 · 커브 아닌 항목 건너뛰기 · 같은 커브 건너뛰기 ·
+Source 삭제 옵션(+ 밑에 Target 이 있으면 보존, undo 복원) · UI(탭 위치 · 실행 · 지운 Source 리스트 정리).
+
 ## v01.09 (2026-09-09)
 **`Edit > Smooth` — 닫힌 커브에 한 번 적용하면 그 뒤로 아무것도 안 되던 것 수정.**
 

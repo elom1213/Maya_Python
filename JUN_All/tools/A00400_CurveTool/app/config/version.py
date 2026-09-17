@@ -10,6 +10,7 @@
 # 01.08  Smooth on closed    - 닫힌(주기) 커브도 Smooth / Rough (이음매를 넘어서)
 # 01.09  Smooth keep sel     - 임시 커브 생성/삭제가 CV 선택을 지우던 것 수정
 # 01.10  로그창을 공용 위젯 `JUN_mod_log_qt_v01` 로 교체 (Expand / Clear / Copy)
+# 01.11  Edit > Combine       - Source 커브 쉐입을 Target 에 복사해 합친다 (인스턴스 아님)
 
-VERSION = "01.10"
-LAST_UPDATE = "2026-09-16"
+VERSION = "01.11"
+LAST_UPDATE = "2026-09-17"
