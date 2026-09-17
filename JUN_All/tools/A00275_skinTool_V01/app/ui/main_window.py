@@ -34,6 +34,11 @@
 #     - "Edit Mesh"      : 켜면 rest 셰이프가 보이고 버텍스/엣지/페이스도 메시 자체도 자유롭게
 #                          옮길 수 있으며, 끄면 그 형상이 새 rest 가 된다
 #                          (core/mesh_edit_manager.py).
+#
+#   Select : 스킨 웨이트로 버텍스를 고른다 (씬은 선택 말고 아무것도 바뀌지 않는다)
+#     - "By Weight"      : 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체
+#                          또는 저장한 버텍스 안에서 선택 (core/weight_select_manager.py,
+#                          ui/weight_select_tab.py).
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
@@ -143,7 +148,7 @@ class MainWindow(QWidget):
         self.te_log.setMinimumHeight(90)
         self.te_log.setMaximumHeight(160)
 
-        # 탭 : 카테고리 3개 (Weights / Bind / Edit) → 각 카테고리 안에 기능 하위 탭
+        # 탭 : 카테고리 4개 (Weights / Bind / Edit / Select) → 각 카테고리 안에 기능 하위 탭
         self.tabs = QTabWidget()
 
         for label, tip, pages, attr in self.CATEGORIES:
@@ -213,6 +218,12 @@ class MainWindow(QWidget):
          "without changing a single skin weight", "_build_edit_mesh_tab"),
     )
 
+    SELECT_PAGES = (
+        ("By Weight", "By Weight - select the vertices whose weight on the checked "
+         "joints is at least / at most a value, in the whole mesh or in stored "
+         "vertices", "_build_weight_select_tab"),
+    )
+
     # Edit 카테고리 하위 탭의 인덱스 (EDIT_PAGES 의 순서와 같아야 한다).
     # _on_tab_changed 가 어느 편집 탭이 보이는지 가리는 데 쓴다.
     JE_SUB_INDEX = 0        # Move Joints
@@ -226,6 +237,8 @@ class MainWindow(QWidget):
          BIND_PAGES, "bind_tabs"),
         ("Edit", "Change the joints or the mesh while every weight value stays "
          "the same.", EDIT_PAGES, "edit_tabs"),
+        ("Select", "Pick vertices from their skin weights. Nothing in the scene "
+         "changes except the selection.", SELECT_PAGES, "select_tabs"),
     )
 
     def _build_category_tab(self, pages, attr):
@@ -1858,6 +1871,17 @@ class MainWindow(QWidget):
         self.layer_tab = LayerTab(log_callback=self.log)
         return self.layer_tab
 
+    # --------------------------------------------------
+    # Select > By Weight (웨이트 기준으로 버텍스 선택)
+    # --------------------------------------------------
+
+    def _build_weight_select_tab(self):
+        """Layer 탭처럼 app/ui/weight_select_tab.py 의 위젯 하나로 둔다."""
+        from tools.A00275_skinTool_V01.app.ui.weight_select_tab import WeightSelectTab
+
+        self.weight_select_tab = WeightSelectTab(log_callback=self.log)
+        return self.weight_select_tab
+
     def show_about(self, *args):
         QMessageBox.information(
             self,
@@ -1874,6 +1898,8 @@ class MainWindow(QWidget):
             "Move Joints : Edit toggle - move joints without deforming the mesh,\n"
             "              then re-bind at the new positions (weights unchanged).\n"
             "Expand Bind : bind a stored vertex set to stored joints with a\n"
-            "              falloff curve; weights spread by real edge length.\n\n"
+            "              falloff curve; weights spread by real edge length.\n"
+            "By Weight : select vertices whose weight on the checked joints is\n"
+            "            at least / at most a value (whole mesh or stored vertices).\n\n"
             f"Written by Ji Hun Park.\nUpdate date: {LAST_UPDATE}",
         )
