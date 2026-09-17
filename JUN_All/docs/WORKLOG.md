@@ -177,6 +177,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   파일: `tools/A00240_PathTool/app/ui/tree_tab.py` · `app/config/version.py` · `CHANGELOG.md` ·
   `docs/A00240_PathTool.md` `#A00240`
 
+> [!summary] `docs` **README · 포트폴리오(EN/KR) 최신화** — 9월 중순 작업 반영
+- `README.md` 갱신 이력 표에 **`2026-09 중순`** 3행 추가 — 공용 로그창 Framework 승격과 47곳 일괄 적용 ·
+  `A00290_BSTool_V02` / `A00030_quickTool_V02` 신규 · `A00310_SearchTool` Rules 레지스트리 + `A00240_PathTool`
+  Pin / 트리 필터 / Shift 펼치기.
+- `portfolio_EN.md` / `portfolio_KR.md` 툴 표의 `A00290_BSTool` 행을 V02 재편에 맞춰 갱신.
+  파일: `README.md` · `docs/portfolio/portfolio_EN.md` · `docs/portfolio/portfolio_KR.md` `#docs` `#portfolio`
+
 > [!summary] `A00240_PathTool` — **Pin** · Tree 탭 **Filter** · **기본 접힘 + Shift 펼치기 규칙** · **Copy file path** · 아이콘을 UI 색으로 (v01.06 -> 01.07)
 - **Pin** — 창 오른쪽 위 토글. 켜면 다른 창들 위에 고정된다(라벨 `Pinned`). standalone 앱이라
   마야가 아니라 OS 의 다른 창들 위에 선다.
@@ -717,6 +724,7 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   빌드 후 월드/채널 불변, 커브 평행 이동·회전을 정확히 따라감, CV 변형 뒤 변화가 강체(shear·뒤집힘 없음),
   undo 한 번에 원복, 연결된 OPM skip, OFF 는 기존대로 스냅, UI 핸들러 스모크.
 
+---
 
 ## 2026-09-11
 
@@ -754,6 +762,7 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   (이름 짓기 · 사전 검사 7종 · 맞바꾸기/돌려쓰기 · undo 한 스텝 · 구운/라이브 타겟 ·
   베이스 여러 개 · 필터로 가려진 선택 제외 · 익스포트한 FBX 에 예전 이름이 없는지)
 
+---
 
 ## 2026-09-10
 
@@ -942,6 +951,7 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - headless(mayapy 2024) 확인 — `(Null)` 이 낀 3행짜리 두 리스트가 자리 순서 그대로 맞바뀌고,
   teal_dark 테마를 입힌 실제 창 캡처로 배치와 폭(573px = Set Up 상자 전체)까지 확인.
 
+---
 
 ## 2026-09-09
 
@@ -1119,7 +1129,18 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   히스토리 살아 있는 원 · 3스팬 최소 커브 · 드래그 중 무누적과 임시 커브 정리 ·
   **undo 1스텝** · 열린+닫힌 동시 선택, 그리고 **열린 커브 결과가 이전과 완전히 동일**.
 
+---
+
 ## 2026-09-08
+
+> [!summary] `docs` **README · 포트폴리오(EN/KR) 9월 초 작업 반영** — 리그 미러링(3-5) · 공용 미러 토큰 규칙 · Copy Weights Blend
+- 포트폴리오 기간을 **`2026-05-06 ~ 2026-09-08`(약 18주)** 로 늘리고, 새 절 **`3-5. 리그 미러링`**
+  (계층 · 스킨 웨이트 · 컨스트레인트 · 임의의 노드망을 한 번에)을 EN/KR 양쪽에 추가.
+- 툴 표의 `A00145_RigConnect` · `A00275_skinTool_V01` 행에 Mirror 탭 · Pair / Update · Copy Weights(`Blend`) ·
+  Expand Bind `Even distribution` 을 반영.
+- `README.md` 갱신 이력 표에 **`2026-09 초`** 4행 추가 — `A00145` Mirror / Pair / Update · `A00275` Copy Weights ·
+  `A00290` Target Order · `A00400` Edit > Joints · `A00460` FK & IK · `A00090` Pose Wrangler export.
+  파일: `README.md` · `docs/portfolio/portfolio_EN.md` · `docs/portfolio/portfolio_KR.md` `#docs` `#portfolio`
 
 > [!summary] `A00275_skinTool_V01` Copy Weights — **`Blend` (0~1)** 로 옮겨지는 웨이트가 얼마나 실릴지 조절 (v01.17 -> 01.18)
 - **요청**: Copy Weights 탭에서 `[0,1]` 실수로 블렌딩 정도를 조절할 것. `0.5` 면 옮겨지는
@@ -1138,6 +1159,8 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - headless(mayapy 2024) 검증 — blend `1.0 / 0.5 / 0.25 / 0.0` 의 결과가 식과 **1e-12 이내**로
   일치 · 목표 행 합이 전부 `1.0` · 목표가 아닌 버텍스 무변화 · 범위 밖 입력 클램프 ·
   기본값이 소스 행과 **완전히 동일** · UI 스모크(스핀박스 기본값/범위/tracking + 실제 PASTE).
+
+---
 
 ## 2026-09-07
 
@@ -1419,6 +1442,19 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 ---
 
 ## 2026-09-04
+
+> [!summary] `docs` **지원서 문항 답변 문서 신규** — "직무를 수행하며 AI 를 활용해 성과를 낸 경험" (3D 애니메이터)
+- `docs/portfolio/application_AI_experience_KR.md`(신규, 499줄). 근거는 `portfolio_KR.md` · 툴별 가이드 ·
+  커밋 기록(2026-05-06 ~ 2026-09-04).
+- 구성: **제출용 짧은 답변(약 1,000자)** → 애니메이션(`A00410` 2차 모션 굽기 · Stagger Offset · 구간 오일러 필터 등) →
+  리깅(Update Bind Pose · IK Edit · 스킨 웨이트 역산 · 페이셜 결선 자동화) → 언리얼 세팅(노드 텍스트 변환기 ·
+  splineIK 런타임 물리 · 플러그인 패치) → 전공과의 접점 · AI 활용 방식 · 수치 요약.
+    #docs #portfolio
+
+> [!summary] `A00100_jsonEditor_MH` **작업용 소스 `wrk_0010.json` 추가** (데이터만, 코드 변경 없음)
+- `app/core/0010_src_wrk/wrk_0010.json` — Pose Wrangler 솔버 번들(`solvers` 최상위 키, `WRK_calf_l_UERBFSolver` …)
+  형식의 작업용 입력. 같은 날 `A00090` 이 읽게 된 번들 export 와 같은 포맷이다.
+    #A00100 #data
 
 > [!summary] `A00090_ConnectionBuilder` **Pose Wrangler export 를 규칙으로 그대로** + 모든 버튼 undo 1스텝 (v01.06 -> 01.07)
 - **요청 1**: `app/rules/v003/rules_v003.json` 은 마야 **Pose Wrangler 에서 솔버 세팅을 그대로
