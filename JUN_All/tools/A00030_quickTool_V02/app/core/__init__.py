@@ -11,6 +11,7 @@ from .quick_ops import (
     create_texture_file,
     create_cluster_each,
     scene_folder,
+    open_scene_folder,
     set_local_axis,
     save_all_shelves,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "create_texture_file",
     "create_cluster_each",
     "scene_folder",
+    "open_scene_folder",
     "set_local_axis",
     "save_all_shelves",
 ]

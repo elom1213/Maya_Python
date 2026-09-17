@@ -11,7 +11,7 @@ updated: 2026-09-17
 다시 쓴 버전이다. **버튼도 동작도 그대로**고 달라진 것은 그릇이다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`slate_dark` 테마)
-- **버전**: `app/config/version.py` (v02.01)
+- **버전**: `app/config/version.py` (v02.03)
 - **설치**: `__dragDrop_A00030_V02.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **QuickToolV2**
   → `tools.A00030_quickTool_V02.run(True)`
 - **V01 과 동시에 띄울 수 있다** — 창과 로그 확장창의 `objectName` 이 갈렸다.
@@ -30,14 +30,14 @@ updated: 2026-09-17
 | FBX 버튼 | 플러그인이 없으면 **트레이스백** | 플러그인을 올려 보고, 안 되면 **로그로 이유** |
 
 **V01 의 기능은 하나도 빠지지 않았다** — 섹션 6개, 버튼 10개 그대로다.
-v02.01 에서 **`Shelf > Update Shelves` 하나만 새로 붙었다**(레거시에 없던 기능).
+새로 붙은 것은 레거시에 없던 **`Shelf > Update Shelves`**(v02.01)와 **`File > Open Scene Folder`**(v02.03) 두 개다.
 
 ---
 
 ## 2. 화면 구성
 
 ```
-┌ Quick Tool v02.01 ──────────────────┐
+┌ Quick Tool v02.03 ──────────────────┐
 │ Help                        [ Pin ] │   ← 메뉴 + 항상 위 토글
 │ ┌ Update window ────────────────┐   │
 │ │ [ Selected ] [ All Windows ]  │   │
@@ -48,7 +48,7 @@ v02.01 에서 **`Shelf > Update Shelves` 하나만 새로 붙었다**(레거시�
 │ ├ Create ──────────────────────┤    │
 │ │ [ Create texture file ] [ Cl… ]│  │
 │ ├ File ────────────────────────┤    │
-│ │ [ Copy Scene Folder ]         │   │
+│ │ [ Copy Scene F… ] [ Open Sce… ]│  │
 │ ├ Shelf ──────────────────────┤    │
 │ │ [ Update Shelves ]            │   │
 │ ├ Display ─────────────────────┤    │
@@ -108,13 +108,20 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
   `cmds.cluster` 는 선택 전체에 **하나**를 만들기 때문에 오브젝트마다 따로 선택해 호출한다.
   여러 개여도 **Ctrl+Z 한 번**으로 되돌아간다.
 
-### File — `Copy Scene Folder`
+### File — `Copy Scene Folder` / `Open Scene Folder`
 
-현재 씬이 저장된 **폴더** 경로를 클립보드에 넣는다(파일 이름은 뺀다). 경로는 OS 네이티브 모양
+**`Copy Scene Folder`** — 현재 씬이 저장된 **폴더** 경로를 클립보드에 넣는다(파일 이름은 뺀다). 경로는 OS 네이티브 모양
 (윈도우는 `\`)으로 바꿔 탐색기·파일 다이얼로그에 그대로 붙여넣을 수 있다.
 저장하지 않은 씬이면 경고만 남긴다.
 
 > `A00040_file_exporter_V02` 의 **`Paste`** 버튼과 짝이다 — 여기서 복사해 거기에 붙여넣는다.
+
+**`Open Scene Folder`** (v02.03~) — 현재 씬이 저장된 폴더를 **탐색기로 연다.**
+씬 파일이 디스크에 있으면 그 파일을 **선택(하이라이트)한 채로** 연다.
+
+- 씬 파일이 지워졌거나 이름이 바뀌어 없으면 **폴더만** 연다.
+- 저장하지 않은 씬이거나 폴더 자체가 없으면(드라이브 분리 등) 탐색기를 띄우지 않고 **경고만** 남긴다.
+- 여는 일은 공용 `Framework.core.file_opener.open_path` 에 맡긴다(`A00210` · `A00220` 과 같은 구현).
 
 ### Shelf — `Update Shelves` (v02.01~, 레거시에 없던 것)
 
@@ -169,7 +176,7 @@ A00030_quickTool_V02/
 ├── __dragDrop_A00030_V02.py    # 셸프 설치 (TOOL_LABEL = "QuickToolV2")
 ├── icon/                       # A00030_quickTool_V02.svg / .png
 └── app/
-    ├── config/version.py       # VERSION = "02.01"
+    ├── config/version.py       # VERSION = "02.03"
     ├── core/quick_ops.py       # ★ 버튼이 하는 일 전부 (maya.cmds/mel, UI 비의존)
     └── ui/main_window.py       # 창 · 섹션 · 버튼 · 로그
 ```
@@ -183,7 +190,7 @@ A00030_quickTool_V02/
 
 ## 5. 검증 (mayapy 2024 + 오프스크린 Qt)
 
-**22 + 12항목 통과.**
+**22 + 12 + 8항목 통과.**
 
 - 섹션 7개와 버튼 11개(레거시 10 + `Update Shelves`)가 **레거시와 같은 순서**,
   전 버튼에 툴팁, Pin 토글과 로그창 존재
@@ -194,6 +201,9 @@ A00030_quickTool_V02/
 - `Create texture file` — `file` 1개 생성 + `place2dTexture` 가 `uv` · `coverage` 에 연결됨
 - `Cluster Each` — 선택 2개면 **클러스터 2개**(하나가 아니라), 선택 없으면 경고
 - `Copy Scene Folder` — 미저장 씬이면 경고
+- `Open Scene Folder`(8항목, 탐색기 호출은 가로채서 확인) — 미저장 씬은 **경고만, 탐색기 안 띄움** ·
+  저장된 씬은 **씬 파일 경로**로 연다(선택 상태) · 파일이 지워지면 **폴더**로 연다 · 폴더가 없으면 경고 ·
+  탐색기 호출이 실패해도 트레이스백 없이 경고 · File 섹션 버튼 2개 · 클릭하면 로그에 결과
 - `Local Axis ON/OFF` — 실제 `displayLocalAxis` 값이 바뀌고, **컴포넌트를 골라도 부모 transform**
   으로 올라간다. 선택 없으면 경고
 - `Pin` — 켜면 `Pinned` + `WindowStaysOnTopHint`, 끄면 원복

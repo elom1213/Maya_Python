@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-16
+# last Update date : 2026-09-17
 # A00030_quickTool_V02 - Qt UI (in-Maya)
 #
 # 레거시 maya.cmds 툴 `A00030_quickTool`(V01.16) 을 PySide 로 재작성했다.
@@ -10,12 +10,12 @@
 #     스크립트 에디터를 안 열어도 결과가 보인다.
 #   - Pin(항상 위)은 레거시가 창을 Qt 위젯으로 감싸서 하던 것을, 이제 창이 Qt 라 바로 한다.
 #
-# 버튼 구성(레거시 그대로) — 섹션 6 / 버튼 10:
+# 버튼 구성(레거시 그대로) — 섹션 6 / 버튼 10 (+ 신규 2):
 #   Update window : Selected · All Windows
 #   Print         : Print Selected · Print Hierarchy
 #   Import option : Import FBX normal
 #   Create        : Create texture file · Cluster Each
-#   File          : Copy Scene Folder
+#   File          : Copy Scene Folder · Open Scene Folder  (v02.03~ Open 신규)
 #   Shelf         : Update Shelves  (v02.01~ 신규 - 레거시에 없던 것)
 #   Display       : Local Axis ON · Local Axis OFF
 #
@@ -82,6 +82,9 @@ class MainWindow(QWidget):
         ("File", (
             ("Copy Scene Folder", "on_copy_scene_folder",
              "Copy the folder of the current scene to the clipboard."),
+            ("Open Scene Folder", "on_open_scene_folder",
+             "Open the folder of the current scene in the file explorer\n"
+             "(the scene file is selected)."),
         )),
         ("Shelf", (
             ("Update Shelves", "on_update_shelves",
@@ -226,6 +229,9 @@ class MainWindow(QWidget):
         clipboard.setText(folder)
         self._log("Copied to clipboard : {0}".format(folder))
 
+    def on_open_scene_folder(self):
+        self._log_all(core.open_scene_folder())
+
     def on_update_shelves(self):
         self._log_all(core.save_all_shelves())
 
@@ -268,6 +274,7 @@ class MainWindow(QWidget):
             "[Import option] Import FBX normal - use the normals in the file.\n"
             "[Create] Create texture file / Cluster Each.\n"
             "[File] Copy Scene Folder - the scene's folder to the clipboard.\n"
+            "  Open Scene Folder - open that folder in the file explorer.\n"
             "[Shelf] Update Shelves - write the shelves to disk now, so a Maya\n"
             "  started later sees them (Maya only saves them on exit).\n"
             "[Display] Local Axis ON / OFF - batch show or hide local axes.\n"

@@ -21,6 +21,7 @@ import maya.cmds as cmds
 import maya.mel as mel
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.core.file_opener import open_path
 
 
 # ==========================================================================
@@ -269,6 +270,32 @@ def scene_folder():
 
     folder = os.path.normpath(os.path.dirname(scene_path))
     return folder, []
+
+
+def open_scene_folder():
+    """현재 씬이 저장된 폴더를 OS 탐색기로 연다. 로그 리스트를 돌려준다.
+
+    - 씬 파일이 디스크에 있으면 폴더를 열고 **그 파일을 선택(하이라이트)** 한다
+      (`Framework.core.file_opener.open_path` 가 파일 경로면 `explorer /select,` 로 연다).
+    - 파일이 지워졌거나 이름이 바뀌어 없으면 **폴더만** 연다.
+    - 폴더까지 없으면(드라이브 분리 등) 탐색기를 띄우지 않고 경고한다.
+    """
+    folder, _logs = scene_folder()
+    if not folder:
+        return ["[WARN] Current scene has not been saved yet (no folder to open)."]
+
+    if not os.path.isdir(folder):
+        return ["[WARN] Scene folder does not exist on disk : {0}".format(folder)]
+
+    scene_path = os.path.normpath(cmds.file(q=True, sceneName=True))
+    target = scene_path if os.path.isfile(scene_path) else folder
+
+    try:
+        open_path(target)
+    except Exception as exc:
+        return ["[WARN] Could not open the folder : {0} ({1})".format(folder, exc)]
+
+    return ["Opened scene folder : {0}".format(folder)]
 
 
 # ==========================================================================
