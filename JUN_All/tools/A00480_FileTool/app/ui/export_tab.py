@@ -55,6 +55,8 @@ class ExportTab(QWidget):
 
     def build_ui(self):
         layout = QVBoxLayout(self)
+        # 탭 테두리가 이미 한 겹 감싸므로 페이지 여백은 뺀다 → 창 크기가 A00040_V02 원본과 같아진다.
+        layout.setContentsMargins(0, 0, 0, 0)
 
         layout.addWidget(self._build_path_group())
         layout.addWidget(self._build_lists_group(), stretch=1)

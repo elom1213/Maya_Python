@@ -4,7 +4,7 @@
 >
 > **사용자 결정(2026-09-17)** — 이름 `FileTool` · quickTool 버튼 **보존** · `A00040_file_exporter_V02` **보존** · 탭 `Export / Import / Path`.
 > 구현 중 바뀐 점: 플러그인 헬퍼는 `import_ops` 가 아니라 별도 `core/fbx_plugin.py`, 탭 파일명은 `*_tab.py`,
-> Import · Path 탭의 버튼 표는 공용 `ui/button_section.py`. 창 기본 크기는 테마 기준 최소 폭(약 980)에 맞춰 1000 x 890.
+> Import · Path 탭의 버튼 표는 공용 `ui/button_section.py`. 창 크기는 v01.01 에서 원본 A00040_V02 와 같은 960 x 853 으로 맞췄다(테마 polish 뒤 최소 크기로 fit).
 
 ## 0. 배경 · 목표
 

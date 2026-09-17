@@ -58,9 +58,10 @@ def run(reload_module=True):
     window_instance = MainWindow()
 
     ThemeManager.load_theme_to_widget(window_instance, "slate_dark")
-    # 테마가 글자 크기를 줄이므로 크기는 테마를 입힌 뒤에 맞춘다.
-    window_instance.fit_to_theme()
 
     window_instance.show()
+    # 테마가 자식 위젯에 적용된(polish) 뒤에 크기를 맞춘다 - 원본 A00040_V02 와 같은 크기.
+    from Framework.qt.qt import QTimer
+    QTimer.singleShot(0, window_instance.fit_to_content)
 
     return window_instance

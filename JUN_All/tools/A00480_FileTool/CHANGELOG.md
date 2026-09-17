@@ -1,5 +1,13 @@
 # Changelog — A00480_FileTool
 
+## v01.01 (2026-09-17)
+- The window now opens at the same size as `A00040_file_exporter_V02`
+  (960 x 853 with slate_dark). v01.00 measured its size before the theme reached
+  the child widgets and opened at about 1290 x 890.
+  - The size is fitted to the layout minimum on the event loop right after show().
+  - Export tab page margins removed, window side margins reduced by the tab
+    frame, Pin button height 22 so the header row matches the menu bar.
+
 ## v01.00 (2026-09-17)
 - New tool: file import / export / path helpers in one window, three tabs.
   - **Export** — the whole `A00040_file_exporter_V02` (v02.09) window: Export Path

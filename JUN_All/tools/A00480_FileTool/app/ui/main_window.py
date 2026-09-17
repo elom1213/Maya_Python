@@ -34,8 +34,6 @@ from tools.A00480_FileTool.app.ui.path_tab import PathTab
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
 WINDOW_OBJECT_NAME = "JUN_A00480_FileTool_window"
 
-# 기본 창 크기 (테마 적용 후 기준)
-DEFAULT_SIZE = (1000, 890)
 
 
 class MainWindow(QWidget):
@@ -50,15 +48,16 @@ class MainWindow(QWidget):
 
         self.build_ui()
 
-        # 테마(slate_dark) 기준 최소 크기가 약 982 x 877 이다(Naming 토큰 6칸 줄이 폭을 정한다 -
-        # A00040_V02 원본도 960). 테마를 입기 전엔 글자가 커서 최소 폭이 1300 가까이 나오고,
-        # 그 크기로 한 번 커진 창은 테마를 입어도 줄지 않는다 → launch.py 가 테마 뒤에 fit_to_theme().
-        self.resize(DEFAULT_SIZE[0], DEFAULT_SIZE[1])
+        # A00040_file_exporter_V02 와 같은 값. 최소 크기보다 작아서 실제 크기는 fit_to_content() 가 정한다.
+        self.resize(560, 720)
 
-    def fit_to_theme(self):
-        """테마 qss 를 입힌 **뒤에** 부른다. 기본 크기로 되돌린다(최소보다 작으면 최소로)."""
-        hint = self.minimumSizeHint()
-        self.resize(max(DEFAULT_SIZE[0], hint.width()), max(DEFAULT_SIZE[1], hint.height()))
+    def fit_to_content(self):
+        """창을 레이아웃 최소 크기로 맞춘다 - A00040_V02 원본이 뜨는 크기와 같다(slate_dark 기준 960 x 853).
+
+        테마 qss 는 show() 뒤 polish 때 자식에 적용되므로, 그 전에 재면 글자가 큰 상태의
+        최소 크기(약 1280 폭)로 창이 커진다. launch.py 가 show() 다음 이벤트 루프에서 부른다.
+        """
+        self.resize(self.minimumSizeHint())
 
     # ==================================================================
     # UI
@@ -66,6 +65,9 @@ class MainWindow(QWidget):
 
     def build_ui(self):
         main_layout = QVBoxLayout(self)
+        # 탭 테두리(좌우 2px)만큼 창 좌우 여백을 줄여 A00040_V02 원본과 같은 폭이 되게 한다.
+        left, top, right, bottom = main_layout.getContentsMargins()
+        main_layout.setContentsMargins(max(0, left - 2), top, max(0, right - 2), bottom)
 
         # 상단 헤더 행 : 메뉴 바(좌) + Pin 토글(우)
         self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
@@ -76,7 +78,8 @@ class MainWindow(QWidget):
         self.pin_button.setCheckable(True)
         self.pin_button.setToolTip("Keep this window above other Maya windows")
         # 고정 크기 - "Pin"/"Pinned" 토글 시 버튼 크기가 변하지 않도록(넓은 라벨 기준).
-        self.pin_button.setFixedSize(72, 28)
+        # 높이는 메뉴 바 한 줄에 맞춘다(28 이면 헤더 행이 원본 A00040 의 메뉴 바보다 커진다).
+        self.pin_button.setFixedSize(72, 22)
         self.pin_button.toggled.connect(self.toggle_always_on_top)
 
         header_row = QHBoxLayout()

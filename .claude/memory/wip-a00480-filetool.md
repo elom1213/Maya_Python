@@ -22,6 +22,8 @@ metadata:
 - FBX 명령 전에는 `core/fbx_plugin.ensure_fbx_plugin()`.
 - Export 로직을 고칠 때 원본 A00040_V02 와 갈라지게 되는 것은 괜찮다(원본은 보존만). 동등성 검증 스크립트 방식:
   같은 씬을 두 core 로 내보내고 **FBX 를 재임포트한 계층**을 비교했다 → [[fbx-export-selected-scope]].
-- 창 최소 폭은 테마 기준 ~982(Naming 6칸 줄, 원본도 960). launch 가 테마 뒤에 `fit_to_theme()` → [[offscreen-size-needs-theme]].
-  오프스크린에선 `show()` 가 화면 폭(800) 때문에 창을 1294 로 키우지만 오프스크린 착시다(quickTool 도 같다).
+- **창 크기는 A00040_V02 와 같게(960 x 853)** — 사용자 요청(v01.01). 테마 qss 는 show() 뒤 polish 때 자식에 입혀져서,
+  그 전(테마 직후 · show 직전)에 재거나 resize 하면 글자 큰 상태의 최소 크기(~1290)로 창이 커진다.
+  launch 가 `QTimer.singleShot(0, fit_to_content)` 로 show 다음 루프에서 `resize(minimumSizeHint())`.
+  탭 테두리만큼(+4 x +6)은 Export 페이지 여백 0 · 창 좌우 여백 -2 · Pin 높이 22 로 상쇄. → [[offscreen-size-needs-theme]]
 - 마야 GUI 육안 확인은 아직.

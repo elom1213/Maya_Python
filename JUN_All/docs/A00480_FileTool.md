@@ -16,7 +16,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 | **Import** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` |
 | **Path** | `Copy Scene Folder` · `Open Scene Folder` | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `File` |
 
-- **버전**: `app/config/version.py` (v01.00)
+- **버전**: `app/config/version.py` (v01.01 — 창 크기를 A00040_V02 와 같게)
 - **설치**: `__dragDrop_A00480.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **FileTool** → `tools.A00480_FileTool.run(True)`
 - **테마**: `slate_dark`
 - **원본 두 툴은 그대로 남아 있다.** quickTool 의 File · Import option 버튼도 지워지지 않았다.
@@ -30,7 +30,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 ## 1. 화면
 
 ```
-┌ File Tool v01.00 ───────────────────────────── [ Pin ] ┐
+┌ File Tool v01.01 ───────────────────────────── [ Pin ] ┐
 │ Help                                                    │
 │ ┌ Export ┬ Import ┬ Path ┐                              │
 │ │ Export Path [.................] [Browse][Paste][Scene]│
@@ -45,7 +45,10 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 ```
 
 - **로그창은 세 탭이 함께 쓴다.** 어느 탭에서 누른 결과든 같은 곳에 쌓인다.
-- 기본 크기는 1000 x 890. Naming 토큰 6칸이 한 줄이라 **폭은 약 980 아래로 줄지 않는다**(원본 A00040 도 960).
+- **창 크기는 원본 `A00040_file_exporter_V02` 와 같다**(slate_dark 기준 960 x 853, v01.01~). 폭은 Naming 토큰 6칸 줄이 정한다.
+  - 테마 qss 는 `show()` 뒤에야 자식 위젯에 입혀지므로, 그 전에 재면 글자가 큰 상태의 최소 크기(약 1290 폭)로 창이 커진다.
+    `launch.py` 가 show 다음 이벤트 루프에서 `fit_to_content()` 로 레이아웃 최소 크기에 맞춘다.
+  - 탭 테두리만큼 늘어나는 것은 Export 페이지 여백 0 · 창 좌우 여백 -2 · Pin 높이 22 로 상쇄했다.
 
 ---
 
@@ -119,12 +122,12 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
 ```
 A00480_FileTool/
 ├── __init__.py                 # from .launch import run
-├── launch.py                   # run(reload): MainWindow → 테마(slate_dark) → fit_to_theme() → show
+├── launch.py                   # run(reload): MainWindow → 테마(slate_dark) → show → (다음 루프) fit_to_content()
 ├── __dragDrop_A00480.py        # 셸프 설치 (TOOL_LABEL = "FileTool")
 ├── icon/                       # A00480_FileTool.svg / .png (폴더 + 들어오고 나가는 화살표)
 ├── CHANGELOG.md
 └── app/
-    ├── config/version.py       # VERSION = "01.00"
+    ├── config/version.py       # VERSION = "01.01"
     ├── core/                   # UI 비의존 (결과는 로그 문자열 리스트)
     │   ├── fbx_plugin.py       # ensure_fbx_plugin() — Export · Import 공용
     │   ├── export_ops.py       # A00040_V02 export_ops 이식 (타입 필터 · 파일명 · FBX export)
@@ -151,7 +154,7 @@ A00480_FileTool/
 
 ## 6. 검증 (mayapy 2024 + 오프스크린 Qt)
 
-**54항목 통과.**
+**54항목 통과.** 창 크기는 원본과 나란히 띄워 **둘 다 960 x 853** 인 것을 확인(v01.01).
 
 - **창** — `run()` 을 두 번 불러도 보이는 창은 하나 · 제목 · 탭 `Export / Import / Path` 순서, Export 가 기본 ·
   원본 두 툴과 objectName 이 다름 · 버튼 라벨과 툴팁 · Pin 켜기/끄기
