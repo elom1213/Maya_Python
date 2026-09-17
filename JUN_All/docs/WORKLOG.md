@@ -31,6 +31,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-17 (오늘)
 
+> [!summary] `A00330_NamingTool` 상위 탭 **`Rename`**(Token / Set Rename) — **Token** 탭은 칸 수 자유 토큰(`Custom` / `Numbering`) + **Profile**(json) (v01.06 -> 01.07)
+- **요청**: Naming Dyn 을 Token 으로 바꿔 Set Rename 과 함께 Rename 탭의 하위 탭으로. 칸마다 규칙 콤보, Add/Delete Token 으로 원하는 자리에 칸 추가·삭제 + 가로 스크롤, 규칙을 A00145 Attribute > Create 처럼 프로파일로.
+- **Numbering 개수 = 세는 대상**: 1 개 = 전체 순번, 2 개 = 오브젝트 / 오브젝트 안 노드(레거시 Index1 / Index2), 3 개 이상은 실행 안 함. 처음엔 레거시 규칙 `Default`(`dyn_asset_side_{번호}_{번호}`, Pad 2).
+- 마야는 `01_a` 를 **조용히 `_a`** 로 만든다(실측) → Custom 은 영문·숫자·`_` 만, 숫자로 시작하는 이름은 실행 전에 막는다. `Preview` 줄로 미리 본다.
+- mayapy 2024 61항목 통과 — `Default` 결과 = 레거시 `rename_dynamics`, 프로파일 전 흐름, 칸이 늘어도 창 최소 폭 불변. #A00330
+
 > [!summary] **`A00480_FileTool` 신규** — `A00040_file_exporter_V02` 와 quickTool 의 File · Import option 버튼을 **Export / Import / Path** 탭 한 창으로 (v01.00 -> 01.02)
 - **요청**: 파일 임포트 · 익스포트 · 경로 설정/조작을 모아 계속 늘려 갈 툴. 이름은 `FileTool`, 원본 두 툴과 quickTool 버튼은 **보존**.
 - **Export** 탭은 A00040_V02 화면 그대로 + Export Path 옆 **`Scene`**(씬 폴더를 바로 채움). FBX 플러그인이 없으면 트레이스백 대신 `[FAIL]` 로그.

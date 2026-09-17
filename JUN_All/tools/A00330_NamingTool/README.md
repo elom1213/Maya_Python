@@ -11,10 +11,10 @@
 
 | 탭 | 출처 | 기능 |
 |----|------|------|
-| **Naming Dyn** | legacy Naming Dynamics | 오브젝트 + transform 자손을 `Token1_Token2_Token3_Index1_Index2` 로 일괄 리네임. Index1=루트 그룹마다 증가, Index2=그룹 내 항목마다 증가. pad 로 0 패딩. |
+| **Rename > Token** | legacy Naming Dynamics (v01.07 확장) | 오브젝트 + transform 자손을 토큰 규칙으로 일괄 리네임. 칸마다 `Custom`(글자) / `Numbering`(Start + Pad 0), `Add Token` / `Delete Token` 으로 칸 수 자유(가로 스크롤), 규칙은 Profile(json) 저장. Numbering 2 개 = 루트 그룹마다 / 그룹 내 항목마다(레거시 Index1 / Index2). |
 | **Copy Name** | legacy Copy name | Base 리스트의 leaf 이름(+Prefix)을 Targets 리스트에 순서대로 적용. 좌/우 리스트 각각 Sort 지원. **세트도 대상이 된다**(v01.03) — 세트는 같은 이름을 못 써서 `Set suffix`(기본 `_copy`)가 붙는다. `Add Sets` 로 세트를 담는다. 네임스페이스 보존. |
 | **Quick Rename** | `ref/ref_01.mel` (이식) | **현재 선택** 기준. Front Insert(앞 삽입) / Change New(이름+인덱스, 10 미만 0 패딩) / Last Add(뒤 추가) / `-1 Front`·`-1 Rear`(앞·뒤 한 글자 제거) / All Apply(New→Insert→Add 순). |
-| **Set Rename** | 신규 (v01.02) | **세트 이름**의 부분 문자열 찾아 바꾸기 + 미리보기 + `Add`/`Del`(v01.03). 마야 기본 `Search and Replace Names` 는 세트를 못 고른다 — `cmds.select(set)` 이 멤버를 펼쳐 선택하기 때문이다. 네임스페이스 보존 · 충돌/잘못된 문자 사전 표시. |
+| **Rename > Set Rename** | 신규 (v01.02) | **세트 이름**의 부분 문자열 찾아 바꾸기 + 미리보기 + `Add`/`Del`(v01.03). 마야 기본 `Search and Replace Names` 는 세트를 못 고른다 — `cmds.select(set)` 이 멤버를 펼쳐 선택하기 때문이다. 네임스페이스 보존 · 충돌/잘못된 문자 사전 표시. |
 
 리스트 위젯(Select/Add/Del/Up/Down/Sort)은 공용 `Framework.qt.JUN_mod_tsl_qt_v01` 재사용.
 모든 작업은 단일 Undo 로 묶인다(`core.undo_chunk`).

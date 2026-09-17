@@ -1,5 +1,24 @@
 # Changelog — A00330_NamingTool
 
+## v01.07 (2026-09-17)
+**[Feature] 상위 탭 `Rename` — `Naming Dyn`(→ `Token`) · `Set Rename` 을 하위 탭으로. `Token` 탭 규칙 · 칸 수 · 프로파일.**
+
+- 상위 탭: `Rename`(Token / Set Rename) · `Copy Name` · `Quick Rename`.
+- **토큰 칸마다 규칙**: `Custom`(글자 그대로) / `Numbering`(Start + Pad 0). A00480_FileTool Export 탭의 Naming 처럼 칸 밑 콤보.
+- **칸 수 자유**: 칸 머리를 눌러 고르고 `Add Token`(오른쪽에 삽입) / `Delete Token`(마지막 한 칸은 남김). 칸이 넘치면 가로 스크롤.
+- **Numbering 개수가 세는 대상을 정한다**: 1 개 = 전체 순번, 2 개 = 오브젝트 / 오브젝트 안 노드(레거시 Index1 / Index2), 3 개 이상은 실행 안 함.
+- **Profile**(json): 콤보 + `New`(지금 칸 복사) / `Rename` / `Delete`. 칸을 고치면 바로 저장. 처음엔 레거시 규칙 `Default`
+  (`dyn_asset_side_{번호}_{번호}`, Pad 2)를 만든다. `data/` 는 git 추적 안 함.
+- **실행 전 검사**: Custom 은 영문·숫자·`_` 만, 이름이 숫자로 시작하면 막는다 — 마야는 `01_a` 를 **조용히 `_a`** 로 만든다(실측).
+- `Preview` 줄: 첫 이름 · 다음 노드 · 다음 오브젝트.
+- 네임스페이스 보존(레거시 Naming Dyn 은 루트로 옮겼다). 빈 Custom 토큰은 건너뛴다(`__` 없음).
+- 핵심 로직은 순수 파이썬 `core/token_ops.py`, 파일은 `core/token_profile_prefs.py`, UI 는 `ui/token_tab.py`.
+
+**검증**(mayapy 2024 headless, 61항목 통과): `Default` 결과 = 레거시 `rename_dynamics`(같은 이름 노드 포함 계층) ·
+번호 규칙 1/2/3 개 · 검사(숫자 시작 · 금지 문자 · 빈 이름) · 단일 Undo · 네임스페이스 보존 · 충돌 보고 ·
+프로파일 생성/깨진 파일/전환/New/Rename/Delete/마지막 남김/다시 열면 복원 · Add/Delete Token 자리 · 가로 스크롤 ·
+칸이 늘어도 창 최소 폭 불변 · 칸 높이 잘림 없음 · 고른 칸 강조 · 하위 탭 구성.
+
 ## v01.05 (2026-09-17)
 **[Feature] `Copy Name` 에 `Search` / `Replace`.**
 

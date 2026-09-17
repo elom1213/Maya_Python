@@ -4,7 +4,7 @@
 # A00330_NamingTool - Qt UI
 #
 # 레거시 maya.cmds 네이밍 툴(JUN_PY_NamingTool_V03_04)을 PySide + QTabWidget 으로 이식.
-#   - Naming Dyn   탭 : 계층 토큰 네이밍 (legacy Naming Dynamics)
+#   - Rename > Token 탭 : 계층 토큰 네이밍 (legacy Naming Dynamics, v01.07 규칙·프로파일 - token_tab.py)
 #   - Copy Name    탭 : base 이름을 target 에 prefix 부착 복사 (legacy Copy name)
 #   - Quick Rename 탭 : Front Insert / Change New / Last Add / -1 trim (ref/ref_01.mel 이식)
 #   - Set Rename   탭 : 세트 이름의 부분 문자열 찾아 바꾸기 (v01.02, NEW)
@@ -13,6 +13,8 @@
 #   v01.03 : Set Rename 에 Add / Del (다른 탭의 TSL 과 같은 조작),
 #            Copy Name 이 세트도 대상으로 (세트는 같은 이름을 못 써서 `_copy` 접미사).
 #   v01.05 : Copy Name 에 Search / Replace - Base 이름 속 단어를 바꿔서 Targets 에 복사.
+#   v01.07 : 상위 탭 Rename 을 만들고 Naming Dyn(-> Token) · Set Rename 을 하위 탭으로.
+#            Token 탭은 칸 수가 자유인 토큰(Custom / Numbering) + Profile(json) - app/ui/token_tab.py.
 # 리스트 UI 는 공용 위젯 JUN_mod_tsl_qt_v01, 로직은 app/core. 모든 UI 문자열/로그는 영어.
 
 from Framework.qt.qt import *
@@ -24,6 +26,7 @@ from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 
 from tools.A00330_NamingTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00330_NamingTool.app import core
+from tools.A00330_NamingTool.app.ui.token_tab import TokenTab
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -63,16 +66,15 @@ class MainWindow(QWidget):
             object_name="JUN_A00330_NamingTool_log_window")
         self.log_view.setFixedHeight(110)
 
-        # 탭: Naming Dyn / Copy Name / Quick Rename
+        # 탭: Rename(하위 탭 Token / Set Rename) / Copy Name / Quick Rename
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._build_naming_dyn_tab(), "Naming Dyn")
+        self.tabs.addTab(self._build_rename_tab(), "Rename")
         self.tabs.addTab(self._build_copy_name_tab(), "Copy Name")
         self.tabs.addTab(self._build_quick_rename_tab(), "Quick Rename")
-        self.tabs.addTab(self._build_set_rename_tab(), "Set Rename")
         self.tabs.setTabToolTip(
-            3,
-            "Set Rename - search and replace inside set names.\n"
-            "Maya's own Search and Replace Names cannot reach sets from a selection.")
+            0,
+            "Token - name objects from token rules.\n"
+            "Set Rename - search and replace inside set names.")
         main_layout.addWidget(self.tabs, stretch=1)
 
         # 로그창
@@ -87,81 +89,26 @@ class MainWindow(QWidget):
         main_layout.addWidget(footer)
 
     # ================================================================
-    # Tab 1 : Naming Dyn  (legacy Naming Dynamics)
+    # Tab : Rename  (v01.07) - 하위 탭 Token / Set Rename
     # ================================================================
 
-    def _build_naming_dyn_tab(self):
-        tab = QWidget()
-        root = QVBoxLayout(tab)
-
-        # Objects 리스트 (Select / Add / Del / Up / Down / Sort)
-        self.dyn_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Objects", select_label="Select Base",
-            log_callback=self._log)
-        root.addWidget(self.dyn_tsl, stretch=1)
-
-        # 토큰 / 인덱스 / 패딩 입력
-        grid = QGridLayout()
-        labels = ["Token 1", "Token 2", "Token 3", "Index 1", "Index 2"]
-        for col, text in enumerate(labels):
-            grid.addWidget(QLabel(text), 0, col)
-
-        self.dyn_le_token1 = QLineEdit("dyn")
-        self.dyn_le_token2 = QLineEdit("asset")
-        self.dyn_le_token3 = QLineEdit("side")
-        self.dyn_le_index1 = QLineEdit("0")
-        self.dyn_le_index2 = QLineEdit("0")
-        for col, widget in enumerate([
-                self.dyn_le_token1, self.dyn_le_token2, self.dyn_le_token3,
-                self.dyn_le_index1, self.dyn_le_index2]):
-            grid.addWidget(widget, 1, col)
-
-        # 패딩 행 (Index 1 / Index 2 아래에만)
-        grid.addWidget(QLabel("pad 0"), 2, 3)
-        grid.addWidget(QLabel("pad 0"), 2, 4)
-        self.dyn_le_pad1 = QLineEdit("2")
-        self.dyn_le_pad2 = QLineEdit("2")
-        grid.addWidget(self.dyn_le_pad1, 3, 3)
-        grid.addWidget(self.dyn_le_pad2, 3, 4)
-        root.addLayout(grid)
-
-        # 실행 버튼
-        btn = QPushButton("Naming Dynamics")
-        btn.setMinimumHeight(32)
-        btn.setToolTip(
-            "Rename each object (and its transform descendants) to "
-            "'Token1_Token2_Token3_Index1_Index2'. Index1 increments per root "
-            "group, Index2 per item within a group.")
-        btn.clicked.connect(self.on_dyn_rename)
-        root.addWidget(btn)
-
-        return tab
-
-    def on_dyn_rename(self):
-        objects = self.dyn_tsl.get_all_items()
-        if not objects:
-            self._log("[WARN] Objects list is empty. Use Select Base first.")
-            return
-        try:
-            pad1 = int(self.dyn_le_pad1.text() or "0")
-            pad2 = int(self.dyn_le_pad2.text() or "0")
-            index1 = int(self.dyn_le_index1.text() or "0")
-            index2 = int(self.dyn_le_index2.text() or "0")
-        except ValueError:
-            self._log("[WARN] Index / pad must be integers.")
-            return
-
-        with core.undo_chunk():
-            count = core.rename_dynamics(
-                objects,
-                self.dyn_le_token1.text(),
-                self.dyn_le_token2.text(),
-                self.dyn_le_token3.text(),
-                index1, index2, pad1, pad2)
-        self._log("Naming Dynamics : {0} node(s) renamed.".format(count))
+    def _build_rename_tab(self):
+        self.rename_tabs = QTabWidget()
+        self.token_tab = TokenTab(log=self._log)
+        self.rename_tabs.addTab(self.token_tab, "Token")
+        self.rename_tabs.addTab(self._build_set_rename_tab(), "Set Rename")
+        self.rename_tabs.setTabToolTip(
+            0,
+            "Rename objects and their descendants with token rules (Custom / Numbering).\n"
+            "The rules are kept in profiles.")
+        self.rename_tabs.setTabToolTip(
+            1,
+            "Search and replace inside set names.\n"
+            "Maya's own Search and Replace Names cannot reach sets from a selection.")
+        return self.rename_tabs
 
     # ================================================================
-    # Tab 2 : Copy Name  (legacy Copy name)
+    # Tab : Copy Name  (legacy Copy name)
     # ================================================================
 
     def _build_copy_name_tab(self):
@@ -290,7 +237,7 @@ class MainWindow(QWidget):
             self._log("Copy Name : {0} target(s) renamed.".format(len(new_names)))
 
     # ================================================================
-    # Tab 3 : Quick Rename  (ref/ref_01.mel 이식, 현재 선택 기준)
+    # Tab : Quick Rename  (ref/ref_01.mel 이식, 현재 선택 기준)
     # ================================================================
 
     def _build_quick_rename_tab(self):
@@ -398,7 +345,7 @@ class MainWindow(QWidget):
             self._log("All Apply " + message)
 
     # ================================================================
-    # Tab 4 : Set Rename  (v01.02, NEW)
+    # Rename > Set Rename  (v01.02)
     # ================================================================
 
     #: 트리 컬럼
@@ -710,9 +657,10 @@ class MainWindow(QWidget):
             "\n"
             "Qt port of legacy JUN_PY_NamingTool_V03_04, plus a new tab.\n"
             "\n"
-            "[Naming Dyn] hierarchy token naming:\n"
-            "  Token1_Token2_Token3_Index1_Index2 over each object and its\n"
-            "  transform descendants.\n"
+            "[Rename > Token] name each object and its transform descendants\n"
+            "  from tokens joined by '_'. Each token is Custom (text) or\n"
+            "  Numbering (Start + Pad 0). Add / Delete Token; rules are kept in profiles.\n"
+            "[Rename > Set Rename] search and replace inside set names.\n"
             "\n"
             "[Copy Name] copy Base leaf names onto Targets with a prefix.\n"
             "  Search / Replace swaps a word inside the Base name first.\n"

@@ -6,12 +6,15 @@
 `JUN_PY_NamingTool_V03_04` 를 `A00310_SearchTool` 과 같은 **하나의 창 + 탭** 구조로 이식했고,
 원본 2개 탭에 더해 `ref/ref_01.mel`(현장용 빠른 리네임)을 **3번째 탭**으로 통합했다.
 
-1. **Naming Dyn** — 오브젝트와 그 transform 자손을 `Token1_Token2_Token3_Index1_Index2` 로 일괄 리네임.
-   (구 Naming Dynamics 탭)
+1. **Rename** (v01.07 상위 탭) — 이름을 **짓고 바꾸는** 두 하위 탭을 묶었다.
+   - **Token** (구 Naming Dyn) — 오브젝트와 그 transform 자손을 **토큰 규칙**으로 일괄 리네임.
+     토큰 칸마다 `Custom`(글자) / `Numbering`(Start + Pad 0)을 고르고, 칸 수는 `Add Token` / `Delete Token` 으로 자유.
+     규칙 한 벌은 **Profile**(json)로 저장·불러오기(§6.1).
+   - **Set Rename** — 아래 4번.
 2. **Copy Name** — Base 리스트의 leaf 이름(+Prefix)을 Targets 리스트에 순서대로 적용. (구 Copy name 탭)
    **Search / Replace** 로 Base 이름 속 단어를 바꿔서 복사할 수도 있다(v01.05).
 3. **Quick Rename** — **현재 선택** 기준으로 앞/뒤 글자 추가·제거, 새 이름+인덱스 부여. (`ref/ref_01.mel` 이식)
-4. **Set Rename** — **세트 이름**의 부분 문자열 찾아 바꾸기. 마야 기본 `Search and Replace Names` 는
+4. **Set Rename** (Rename 의 하위 탭) — **세트 이름**의 부분 문자열 찾아 바꾸기. 마야 기본 `Search and Replace Names` 는
    세트를 고를 수 없다(§6.4). (v01.02 신규)
 
 - 모든 UI 문자열/로그는 영어. 리스트(TSL)는 공용 위젯 `JUN_mod_tsl_qt_v01`(**Select / Add / Del / Up / Down / Sort**)을 쓴다.
@@ -31,13 +34,18 @@ A00330_NamingTool/
 └── app/
     ├── config/version.py  # VERSION / LAST_UPDATE
     ├── core/              # 로직 (UI 비의존, maya.cmds)
-    │   ├── naming_ops.py      # rename_dynamics / copy_name / insert_front /
+    │   ├── naming_ops.py      # rename_tokens(v01.07) / rename_dynamics / copy_name / insert_front /
     │   │                      #   add_rear / change_new / trim_front / trim_rear / all_apply
+    │   ├── token_ops.py       # 토큰 규칙 · 번호 세기 · 검사 · 미리보기 (순수 파이썬, v01.07)
+    │   ├── token_profile_prefs.py  # Token 프로파일 json 읽기/쓰기 (v01.07)
+    │   ├── set_rename_ops.py  # Set Rename
     │   └── __init__.py        # core 재노출
-    └── ui/main_window.py  # 전체 UI (3개 탭 + 공유 로그창 + 메뉴 바)
+    ├── ui/main_window.py  # 창 · 상위 탭(Rename / Copy Name / Quick Rename) · Set Rename · 공유 로그창 · 메뉴 바
+    └── ui/token_tab.py    # Rename > Token 탭 (토큰 칸 · Add/Delete Token · Profile, v01.07)
+data/                      # (git 추적 안 함) Token 프로파일 - token_profiles/<이름>.json + token_profiles_active.json
 ```
 
-- 위젯/핸들러는 탭별 접두사로 분리한다: **Naming Dyn = `dyn_*`**, **Copy Name = `copy_*`**, **Quick Rename = `qr_*`**.
+- 위젯/핸들러는 탭별로 나눈다: **Token = `ui/token_tab.py`**, **Copy Name = `copy_*`**, **Quick Rename = `qr_*`**, **Set Rename = `sr_*`**.
   공유하는 것은 `self._log()`(공용 로그창)뿐이다.
 
 ---
@@ -63,7 +71,7 @@ A00330_NamingTool/
 
 ## 5. UI 구성
 
-- **상단 탭**: Naming Dyn / Copy Name / Quick Rename.
+- **상단 탭**: Rename(하위 탭 **Token** / **Set Rename**) / Copy Name / Quick Rename (v01.07).
 - **하단 공유 로그창**: 모든 결과·경고(`[WARN]`)가 누적된다.
 - **Help > About**: 세 탭의 기능 요약.
 - 리스트(TSL)의 버튼: **Select**(현재 선택으로 교체) · **Add**(현재 선택 추가) · **Del** · **Up** · **Down** · **Sort**.
@@ -73,11 +81,89 @@ A00330_NamingTool/
 
 ## 6. 사용 순서
 
-### 6.1 Naming Dyn 탭
+### 6.1 Rename > Token 탭 (v01.07, 구 Naming Dyn)
 
-1. 씬에서 루트 오브젝트들을 선택하고 **Select Base** → Objects 리스트에 채운다(순서가 곧 그룹 순서).
-2. **Token 1/2/3** 에 이름 토큰을, **Index 1/2** 에 시작 번호를, 그 아래 **pad 0** 에 자리수를 입력한다.
-3. **Naming Dynamics** 클릭 → 각 오브젝트와 transform 자손이 `T1_T2_T3_Idx1_Idx2` 로 리네임된다.
+```
+┌ Objects ───────────────────────────────┐
+│ (Select Base / Add / Del / Up / Down / Sort)
+├ Profile ───────────────────────────────┤
+│ [Default        v] [New] [Rename] [Delete]
+├ Tokens ────────────────────────────────┤
+│ [Add Token] [Delete Token]
+│ ┌Token 1─┐┌Token 2─┐┌Token 3─┐┌Token 4───┐┌Token 5───┐  <- 가로 스크롤 ->
+│ │Custom v││Custom v││Custom v││Numbering v││Numbering v│
+│ │ dyn    ││ asset  ││ side   ││Start [0]  ││Start [0]  │
+│ │        ││        ││        ││Pad 0 [2]  ││Pad 0 [2]  │
+│ Preview : dyn_asset_side_00_00 -> next node dyn_asset_side_00_01 | next object dyn_asset_side_01_00
+└────────────────────────────────────────┘
+[ Rename ]
+```
+
+**쓰는 법**
+
+1. 씬에서 루트 오브젝트들을 선택하고 **Select Base** → Objects 리스트에 채운다(순서가 곧 오브젝트 번호 순서).
+2. **Profile** 에서 규칙을 고른다. 처음 열면 레거시 규칙 그대로인 **`Default`** 가 만들어져 있다
+   (`dyn_asset_side_{번호}_{번호}`, Pad 0 은 둘 다 2).
+3. 필요하면 토큰 칸을 고친다 — **고치는 즉시 지금 프로파일에 저장된다**. `Preview` 줄에서 결과 이름을 미리 본다.
+4. **Rename** → 각 오브젝트와 그 transform 자손이 토큰을 `_` 로 이은 이름으로 바뀐다. **Undo 한 번**으로 되돌아간다.
+
+**토큰 규칙** (칸 밑의 콤보)
+
+| 규칙 | 입력 | 결과 |
+|------|------|------|
+| `Custom` | 글자 | 적은 글자 그대로. **비워 두면 그 토큰은 건너뛴다**(`a__b` 가 생기지 않는다) |
+| `Numbering` | `Start`(시작 정수) · `Pad 0`(자리수) | Start 부터 올라가는 번호, Pad 0 자리까지 0 을 채운다(Pad 2 → `00, 01, …`, 자리수를 넘으면 `123` 그대로) |
+
+**Numbering 토큰 개수 = 무엇을 세는지** — 레거시 Index 1 / Index 2 와 같은 규칙이다.
+
+| 개수 | 세는 것 | 예 (오브젝트 2개, 각각 노드 2개) |
+|------|---------|------|
+| 1 개 | 이름을 바꾸는 **노드 전부를 순서대로** (오브젝트가 바뀌어도 이어진다) | `jnt_001, jnt_002, jnt_003, jnt_004` |
+| 2 개 | 앞 = **오브젝트마다** +1, 뒤 = **오브젝트 안의 노드마다** +1(오브젝트가 바뀌면 Start 로) | `a_00_00, a_00_01, a_01_00, a_01_01` |
+| 0 개 | 번호 없음 — 모든 노드가 같은 이름을 원하게 된다. 마야가 번호를 붙이면 로그에 `[Warning]` | |
+| 3 개 이상 | 셀 대상이 없어 **실행하지 않는다** (`Preview` 와 로그에 `[WARN]`) | |
+
+**토큰 칸 늘리고 줄이기**
+
+- 칸 머리(`Token N`)를 누르면 그 칸이 **골라진다**(노랗게 표시). 처음엔 마지막 칸이 골라져 있다.
+- **`Add Token`** — 고른 칸 **오른쪽**에 빈 `Custom` 칸을 넣고 그 칸을 고른다.
+- **`Delete Token`** — 고른 칸을 지우고 그 자리의 이웃 칸을 고른다. **마지막 한 칸은 지울 수 없다.**
+- 칸이 창 폭보다 많아지면 **가로 스크롤**이 생긴다. 칸 수가 늘어도 창의 최소 폭은 늘지 않는다.
+
+**Profile** (A00145 `Attribute > Create` 의 Profile 과 같은 구성)
+
+| 버튼 | 동작 |
+|------|------|
+| 콤보 | 프로파일을 바꾸면 그 규칙으로 칸을 다시 만든다. 마지막으로 쓴 프로파일은 다음에 열 때도 그대로 |
+| `New` | **지금 칸을 복사해** 새 프로파일을 만들고 그쪽으로 바꾼다(같은 이름은 거절) |
+| `Rename` | 지금 프로파일 이름 바꾸기 |
+| `Delete` | 지금 프로파일 삭제(확인 창). **마지막 하나는 남긴다** |
+
+- 저장 위치: `A00330_NamingTool/data/token_profiles/<이름>.json`, 활성 프로파일은 `data/token_profiles_active.json`.
+  **git 으로 추적하지 않는다**(A00145 · A00340 프로파일과 같다 — PC 마다 따로). 없으면 `Default` 를 코드가 다시 만든다.
+- json 모양:
+  ```json
+  {"tokens": [
+    {"rule": "custom", "text": "dyn"},
+    {"rule": "custom", "text": "asset"},
+    {"rule": "custom", "text": "side"},
+    {"rule": "numbering", "start": 0, "pad": 2},
+    {"rule": "numbering", "start": 0, "pad": 2}
+  ]}
+  ```
+  깨진 파일이나 빈 목록은 `Default` 규칙으로 읽는다.
+
+**실행 전에 막는 것** — 마야는 잘못된 이름을 **에러 없이 다른 이름으로 바꿔 버린다**(Maya 2024 실측):
+
+| 넣은 이름 | 마야가 만든 이름 |
+|-----------|------------------|
+| `01_a` | **`_a`** (앞 숫자를 지운다) |
+| `a-b` | `a_b` |
+
+그래서 `Custom` 글자는 **영문 · 숫자 · `_`** 만, 이름이 **숫자로 시작하면**(첫 토큰이 Numbering) 실행하지 않고 이유를 알린다.
+
+- **네임스페이스는 보존한다** — `ns:grp` 는 `ns:<새 이름>` 이 된다(레거시 Naming Dyn 은 루트 네임스페이스로 옮겼다).
+- `Default` 규칙의 결과는 레거시 `rename_dynamics` 와 **같다**(같은 이름이 있는 계층에서 대조 확인).
 
 ### 6.2 Copy Name 탭
 
@@ -200,8 +286,8 @@ cmds.ls(sl=True, type="objectSet")  # []
 
 ## 7. 동작 규칙
 
-- **Naming Dyn 인덱스**: `Index1` 은 **루트 그룹마다** 1 증가, `Index2` 는 **그룹 내 항목마다** 증가하고 그룹이 바뀌면
-  `Index2` 시작값으로 리셋된다. 각 인덱스는 **pad 0** 자리수로 0 패딩된다(예: pad=2 → `00, 01, …`).
+- **Token 번호**: Numbering 이 2 개면 앞 번호는 **루트 그룹마다** 1 증가, 뒤 번호는 **그룹 내 항목마다** 증가하고 그룹이 바뀌면
+  시작값으로 리셋된다(레거시 Index1 / Index2). 1 개면 전체 순번. 각 번호는 **Pad 0** 자리수로 0 패딩된다(§6.1).
 - **자손 수집**: 루트가 transform 이면 자손 중 **transform 만** 남긴다(shape 노드 제외). `[root, 얕은→깊은 자손]` 순서.
 - **Change New 패딩**: 10 미만은 `0` 패딩(`01…09`), 이후는 그대로(`10, 11…`).
   Start 가 비어 있고 **단일 선택**이면 번호 없이 이름만, **다중 선택**이면 `01` 부터 자동 부여.
@@ -216,10 +302,14 @@ cmds.ls(sl=True, type="objectSet")  # []
 
 ## 8. 로그 · 문제 해결
 
-- 정상: `Naming Dynamics : 12 node(s) renamed.` / `Copy Name : 8 target(s) renamed.` / `Front Insert : 3 renamed.`
+- 정상: `Token : 12 node(s) renamed (profile 'Default').` / `Copy Name : 8 target(s) renamed.` / `Front Insert : 3 renamed.`
 - 경고:
   - `[WARN] Objects list is empty. Use Select Base first.` — Naming Dyn 리스트가 비어 있음.
-  - `[WARN] Index / pad must be integers.` — 인덱스/패딩에 숫자가 아닌 값.
+  - `[WARN] 3 Numbering tokens - use at most 2 ...` — Numbering 토큰이 3 개 이상.
+  - `[WARN] The name would start with a digit ...` — 첫 토큰이 Numbering. 앞에 Custom 토큰을 둔다.
+  - `[WARN] Token N '...' has characters Maya does not allow ...` — Custom 에 영문·숫자·`_` 외 글자.
+  - `[WARN] Token : one token must remain.` — 마지막 칸은 못 지운다.
+  - `[Warning] ... (asked for '...' - Maya changed it, the name is already used).` — 번호가 없어 이름이 겹쳤다.
   - `[WARN] Both Base and Targets lists must be filled.` — Copy Name 양쪽 리스트 필요.
   - `[WARN] Base(n) and Targets(m) counts differ; renaming first k item(s).` — 개수 불일치 시 앞쪽만 처리.
   - `[WARN] Enter a new name. (Change New is empty)` — Change New 비어 있음.

@@ -9,5 +9,9 @@
 #   - Copy Name   : also works on SETS - a set cannot reuse a name, so "_copy" is added (v01.03)
 #   - Copy Name   : Search / Replace a word inside the Base name before copying (v01.05)
 
-VERSION = "01.06"
+#   - Rename      : new parent tab - Token (was Naming Dyn) and Set Rename are its sub tabs (v01.07)
+#   - Token       : any number of tokens, each Custom (text) or Numbering (Start + Pad 0),
+#                   Add / Delete Token at the picked place, horizontal scroll, profiles as JSON (v01.07)
+
+VERSION = "01.07"
 LAST_UPDATE = "2026-09-17"

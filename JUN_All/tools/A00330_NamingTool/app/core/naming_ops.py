@@ -9,6 +9,7 @@
 # UI 는 이 함수들만 호출한다(thin UI). Maya 밖에서도 import 가능하도록 cmds 는 lazy.
 
 from .set_rename_ops import split_namespace, join_namespace, replace_in_name
+from . import token_ops
 
 
 #: 세트를 대상으로 이름을 복사할 때 기본으로 붙는 접미사.
@@ -176,6 +177,56 @@ def rename_dynamics(objects, token1, token2, token3,
             count += 1
 
     return count
+
+
+def rename_tokens(objects, tokens):
+    """Rename > Token 탭 (v01.07). 토큰 규칙으로 오브젝트와 transform 자손을 일괄 rename.
+
+    `rename_dynamics` 의 일반화다 - 토큰 개수와 종류가 자유롭고, 번호를 세는 규칙은
+    `token_ops` 에 있다(Numbering 1 개 = 전체 순번, 2 개 = 오브젝트 / 오브젝트 안의 노드).
+    레거시 기본 규칙(DEFAULT_TOKENS)이면 `rename_dynamics` 와 같은 이름이 나온다.
+
+    **네임스페이스는 보존한다** - 짧은 이름만 주면 노드가 루트 네임스페이스로 옮겨간다(copy_name 과 같은 규칙).
+
+    반환: `(count, notes)`
+        notes : 실행을 막은 이유(`[WARN]`) 또는 마야가 이름을 바꾼 항목(`[Warning]`)
+    """
+    tokens = token_ops.normalize_tokens(tokens)
+    errors = token_ops.validate(tokens)
+    if errors:
+        return 0, ["[WARN] " + e for e in errors]
+
+    cmds = _cmds()
+    if cmds is None:
+        return 0, ["[WARN] Maya not available."]
+
+    groups = build_hierarchy_groups(objects)
+    names = token_ops.plan_names([len(g) for g in groups], tokens)
+
+    # rename 전에 UUID 로 전부 잡아 둔다 - 부모를 바꾸면 자식 경로가 바뀐다.
+    plan = []
+    for group, group_names in zip(groups, names):
+        for node, leaf in zip(group, group_names):
+            namespace, _old = split_namespace(short_name_with_namespace(node))
+            plan.append((_to_uuid(node), namespace, leaf, node))
+
+    count = 0
+    notes = []
+    for uuid, namespace, leaf, original in plan:
+        new_name = _rename_by_uuid(uuid, join_namespace(namespace, leaf))
+        if new_name is None:
+            notes.append("[Warning] {0}: node no longer exists.".format(original))
+            continue
+        count += 1
+        if short_name(new_name) != leaf:
+            notes.append("[Warning] {0} -> {1} (asked for '{2}' - Maya changed it, "
+                         "the name is already used).".format(original, new_name, leaf))
+    return count, notes
+
+
+def short_name_with_namespace(path):
+    """DAG 경로만 떼고 네임스페이스는 남긴다. 'a|ns:b' -> 'ns:b'."""
+    return path.split("|")[-1]
 
 
 # ================================================================
