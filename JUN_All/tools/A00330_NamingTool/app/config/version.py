@@ -13,5 +13,8 @@
 #   - Token       : any number of tokens, each Custom (text) or Numbering (Start + Pad 0),
 #                   Add / Delete Token at the picked place, horizontal scroll, profiles as JSON (v01.07)
 
-VERSION = "01.07"
+#   - Token       : each token column is 2/3 as wide (120 -> 80 px); Start / Pad 0 labels sit
+#                   above their spin boxes so everything still fits (v01.08)
+
+VERSION = "01.08"
 LAST_UPDATE = "2026-09-17"

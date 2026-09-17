@@ -29,5 +29,9 @@ Token 칸마다 규칙 콤보(A00480 Export Naming 처럼), Add/Delete Token 으
   안쪽 위젯 LayoutRequest/Polish 때 `setFixedHeight(inner + hbar + 2*frame)` 로 직접 고정(`TokenScrollArea`).
   오프스크린 창은 화면(800x600)보다 크면 `show()` 가 sizeHint 로 키우므로 가로 스크롤 검증은 `win.resize(min 폭)` 뒤에.
 
+**v01.08 칸 폭 120 → 80px(사용자 요청 2/3).** 오프스크린 Qt 는 폰트 폭이 엉터리('Pinned' 72px)라 폭 판단에 못 쓴다 →
+`QT_QPA_PLATFORM=windows` + `WA_DontShowOnScreen` 으로 **실제 폰트**로 재고 `grab()` 캡처로 확인했다.
+80px 에 넣으려고 콤보 stylesheet padding 1px · drop-down 12px(89 → 79), Start/Pad 0 라벨을 스핀박스 위로(107 → 69).
+
 검증: mayapy 61항목(Default = 레거시 rename_dynamics 결과, 프로파일 전 흐름, 스크롤·최소 폭 불변). 마야 GUI 확인 전.
 관련: [[wip-a00330-set-rename]], [[qt-exclusive-radio-uncheck-ignored]], [[offscreen-size-needs-theme]], [[wip-a00480-filetool]]

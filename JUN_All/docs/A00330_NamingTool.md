@@ -90,10 +90,12 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 │ [Default        v] [New] [Rename] [Delete]
 ├ Tokens ────────────────────────────────┤
 │ [Add Token] [Delete Token]
-│ ┌Token 1─┐┌Token 2─┐┌Token 3─┐┌Token 4───┐┌Token 5───┐  <- 가로 스크롤 ->
-│ │Custom v││Custom v││Custom v││Numbering v││Numbering v│
-│ │ dyn    ││ asset  ││ side   ││Start [0]  ││Start [0]  │
-│ │        ││        ││        ││Pad 0 [2]  ││Pad 0 [2]  │
+│ ┌Token 1┐┌Token 2┐┌Token 3┐┌Token 4──┐┌Token 5──┐  <- 가로 스크롤 ->
+│ │Custom ││Custom ││Custom ││Numbering││Numbering│
+│ │ dyn   ││ asset ││ side  ││Start    ││Start    │
+│ │       ││       ││       ││ [0]     ││ [0]     │
+│ │       ││       ││       ││Pad 0    ││Pad 0    │
+│ │       ││       ││       ││ [2]     ││ [2]     │
 │ Preview : dyn_asset_side_00_00 -> next node dyn_asset_side_00_01 | next object dyn_asset_side_01_00
 └────────────────────────────────────────┘
 [ Rename ]
@@ -129,6 +131,7 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 - **`Add Token`** — 고른 칸 **오른쪽**에 빈 `Custom` 칸을 넣고 그 칸을 고른다.
 - **`Delete Token`** — 고른 칸을 지우고 그 자리의 이웃 칸을 고른다. **마지막 한 칸은 지울 수 없다.**
 - 칸이 창 폭보다 많아지면 **가로 스크롤**이 생긴다. 칸 수가 늘어도 창의 최소 폭은 늘지 않는다.
+- 칸 폭은 **80px**(v01.08, 처음 120px 의 2/3). 이 폭에 맞추려고 규칙 콤보의 여백을 줄이고 `Start` / `Pad 0` 라벨을 스핀박스 위에 둔다.
 
 **Profile** (A00145 `Attribute > Create` 의 Profile 과 같은 구성)
 

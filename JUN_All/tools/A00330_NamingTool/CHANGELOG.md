@@ -1,5 +1,13 @@
 # Changelog — A00330_NamingTool
 
+## v01.08 (2026-09-17)
+**[UI] Token 칸 폭을 2/3 로 — 120 → 80px.**
+
+- 80px 에 그대로는 안 들어갔다(실제 윈도우 폰트로 측정): `Numbering` 콤보 89px, `Start` 라벨 + 스핀박스 한 줄 107px.
+  - 칸 좌우 여백 0, 규칙 콤보만 padding 1px · 화살표 폭 12px → 79px.
+  - `Start` / `Pad 0` 라벨을 스핀박스 **위**로 → 69px. 그만큼 토큰 영역이 15px 높아졌다.
+- 기존 61항목 재통과, 실제 폰트 캡처로 글자 잘림 없음 확인.
+
 ## v01.07 (2026-09-17)
 **[Feature] 상위 탭 `Rename` — `Naming Dyn`(→ `Token`) · `Set Rename` 을 하위 탭으로. `Token` 탭 규칙 · 칸 수 · 프로파일.**
 

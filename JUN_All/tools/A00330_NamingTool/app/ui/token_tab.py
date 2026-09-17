@@ -23,7 +23,9 @@ from tools.A00330_NamingTool.app.core import token_ops
 from tools.A00330_NamingTool.app.core import token_profile_prefs as tprefs
 
 
-COLUMN_WIDTH = 120
+# v01.08: 120 -> 80 (2/3). 80px 에 넣으려고 칸 여백 0, 콤보 padding · 화살표 폭을 줄이고,
+# Numbering 의 Start / Pad 0 라벨을 스핀박스 **위**로 올렸다(한 줄이면 실측 107px 필요).
+COLUMN_WIDTH = 80
 
 
 class TokenScrollArea(QScrollArea):
@@ -66,7 +68,7 @@ class TokenColumn(QFrame):
         self.setFixedWidth(COLUMN_WIDTH)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(2, 2, 2, 2)
+        layout.setContentsMargins(0, 2, 0, 2)
         layout.setSpacing(4)
 
         # 머리 = 칸 고르기 (Add / Delete Token 의 기준 자리)
@@ -82,6 +84,9 @@ class TokenColumn(QFrame):
         self.combo = QComboBox()
         for key, label in token_ops.RULES:
             self.combo.addItem(label, key)
+        # 테마 padding 이면 'Numbering' 콤보가 89px 을 요구해 잘린다(실측) → 이 콤보만 줄인다.
+        self.combo.setStyleSheet(
+            "QComboBox { padding: 1px 1px; } QComboBox::drop-down { width: 12px; }")
         self.combo.setToolTip(
             "Custom    : the text as typed\n"
             "Numbering : a number counting up from Start, zero-padded to Pad 0 digits")
@@ -107,12 +112,13 @@ class TokenColumn(QFrame):
         self.sp_pad.setRange(0, token_ops.MAX_PAD)
         self.sp_pad.setToolTip("Zero padding - 2 gives 00, 01, 02 ...")
         number_page = QWidget()
-        number_layout = QGridLayout(number_page)
+        number_layout = QVBoxLayout(number_page)
         number_layout.setContentsMargins(0, 0, 0, 0)
-        number_layout.addWidget(QLabel("Start"), 0, 0)
-        number_layout.addWidget(self.sp_start, 0, 1)
-        number_layout.addWidget(QLabel("Pad 0"), 1, 0)
-        number_layout.addWidget(self.sp_pad, 1, 1)
+        number_layout.setSpacing(1)
+        number_layout.addWidget(QLabel("Start"))
+        number_layout.addWidget(self.sp_start)
+        number_layout.addWidget(QLabel("Pad 0"))
+        number_layout.addWidget(self.sp_pad)
         self.stack.addWidget(number_page)
 
         layout.addWidget(self.stack)
