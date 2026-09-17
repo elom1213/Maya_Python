@@ -1,6 +1,6 @@
 ---
 name: framework-log-widget
-description: "공용 로그창 JUN_mod_log_qt_v01 (Expand/Clear/Copy) — 2026-09-16 에 PySide 툴 47곳 전부 교체 완료. 내부는 QTextEdit 이어야 하고(색깔 로그), 높이는 컨테이너가 아니라 내부 텍스트에 걸어야 한다"
+description: "공용 로그창 JUN_mod_log_qt_v01 (Expand/Shrink/Clear/Copy) — 2026-09-16 에 PySide 툴 47곳 전부 교체 완료. 내부는 QTextEdit 이어야 하고(색깔 로그), 높이는 컨테이너가 아니라 내부 텍스트에 걸어야 한다"
 metadata: 
   node_type: memory
   type: reference
@@ -89,3 +89,13 @@ Expand 로 띄운 창에서까지 지킬 값이 아니다. 그대로 두면 **�
 `tools.A00001_base_maya` 를 import 한다(2026-06-02 `86a8a45` 부터). 미해결 안건.
 **마야 GUI 육안 확인은 아직** — 색깔 로그 3툴의 색 · Pin 툴과 Expand 창의 항상-위 관계 ·
 창 높이를 스스로 계산하는 툴(`A00110` · `A00220`)의 섹션 접기/펼치기 · `setFixedHeight` 13곳의 +22px.
+
+**★ Shrink 토글 (2026-09-17)** — `Expand · Shrink · Clear · Copy`. 체크 가능 버튼, 접히면 라벨 `Show`.
+텍스트를 숨기기만 하면 **컨테이너 min/max 때문에 자리가 안 빈다** → 접을 때 컨테이너 `(min, max)` 를
+`_container_limits` 에 담고 버튼 줄 높이로, 펼 때 복원(접힌 동안 높이 setter 는 **복원 값만** 갱신 — `_text_limits` 와 같은 패턴).
+최상위 툴 창은 레이아웃이 안 줄이므로 **창 높이도 줄인 만큼 줄이고 실제로 줄인 양만** 되돌린다(최대화 제외,
+`resize_window_on_shrink=False` 로 끔). 표시 여부는 `_sync_body_visibility()` 한 곳이 (확장, 접힘) 네 조합을 정한다.
+- **창 높이는 컨테이너 제약을 되돌리기 전에 잴 것** — 되돌리는 순간 Qt 가 창을 새 최소 높이로 먼저 키워, 뒤에 재고 delta 를 더하면 두 번 커진다(600 → 692).
+- **`owner.layout()` 금지, `QWidget.layout(owner)`** — `A00004_base_QT` 가 `self.layout = QVBoxLayout(self)` 로 메서드를 가린다.
+- mayapy 스모크에서 `os._exit(0)` 를 쓰면 stdout 버퍼가 버려진다 → `mayapy -u` 또는 flush.
+검증: 위젯 28항목 + 툴 50곳 스모크 48/50(A00004 경로 보정 후 통과, A00008 기존 결함).

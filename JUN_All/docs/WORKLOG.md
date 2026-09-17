@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-17 (오늘)
 
+> [!summary] Framework 공용 로그창 `JUN_mod_log_qt_v01` 에 **`Shrink`** 토글 — 누르면 로그가 사라지고 창이 그만큼 짧아지며, 다시 누르면 돌아온다
+- **요청**: 공용 로그 위젯에 Shrink 버튼 — 누르면 로그창이 사라지고 다시 클릭하면 나타나는 토글.
+- 버튼 순서 `Expand · Shrink · Clear · Copy`, 접히면 라벨 `Show`. **툴 코드 수정 없이 50곳 전부에 붙는다.**
+- 숨기기만으로는 자리가 안 빈다(컨테이너 min/max) → 컨테이너 제약을 담아 두고 버튼 줄 높이로, 최상위 창도 줄인 만큼 줄였다가 **실제로 줄인 만큼만** 되돌린다.
+- 잡은 함정: 제약을 되돌린 **뒤에** 창 높이를 재면 Qt 가 먼저 키운 것에 또 더해진다(600 → 692) · `self.layout` 속성이 `layout()` 을 가리는 툴(A00004).
+- 위젯 28항목 + 툴 50곳 스모크 48/50(나머지 둘은 기존 import 문제, A00004 는 경로 보정 후 통과).
+
 > [!summary] `A00330_NamingTool` 상위 탭 **`Rename`**(Token / Set Rename) — **Token** 탭은 칸 수 자유 토큰(`Custom` / `Numbering`) + **Profile**(json) (v01.06 -> 01.07)
 - **요청**: Naming Dyn 을 Token 으로 바꿔 Set Rename 과 함께 Rename 탭의 하위 탭으로. 칸마다 규칙 콤보, Add/Delete Token 으로 원하는 자리에 칸 추가·삭제 + 가로 스크롤, 규칙을 A00145 Attribute > Create 처럼 프로파일로.
 - **Numbering 개수 = 세는 대상**: 1 개 = 전체 순번, 2 개 = 오브젝트 / 오브젝트 안 노드(레거시 Index1 / Index2), 3 개 이상은 실행 안 함. 처음엔 레거시 규칙 `Default`(`dyn_asset_side_{번호}_{번호}`, Pad 2).

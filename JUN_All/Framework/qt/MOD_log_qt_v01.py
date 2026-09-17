@@ -2,11 +2,13 @@
 """
 JUN_mod_log_qt_v01 - 재사용 PySide 로그창.
 
-읽기 전용 텍스트 + **작은 버튼 3개**(Expand / Clear / Copy)를 한 줄에 얹은 위젯이다.
+읽기 전용 텍스트 + **작은 버튼 4개**(Expand / Shrink / Clear / Copy)를 한 줄에 얹은 위젯이다.
 툴마다 `QTextEdit` / `QPlainTextEdit` 를 하나씩 놓고 "읽기 전용 + 높이 고정" 을 반복하던
 것을 하나로 모은다.
 
   - **Expand** : 로그를 **별도 창으로 옮겨** 크게 본다(다시 누르면 그 창을 앞으로).
+  - **Shrink** : 로그를 **접어 숨긴다**(토글). 누르면 버튼 줄만 남고 라벨이 `Show` 가 되며,
+                 다시 누르면 로그가 돌아온다. 툴 창도 그만큼 줄었다가 다시 늘어난다.
   - **Clear**  : 로그를 비운다.
   - **Copy**   : 로그 **전문**을 클립보드로.
 
@@ -49,10 +51,26 @@ Expand 는 복제가 아니라 이동이다
 `MOD_expand_qt_v01` 과 같은 방식이다. 텍스트 위젯을 **그대로 새 창으로 옮기므로** 두 벌을
 동기화할 일이 없다 — 확장 중에 들어온 로그도 당연히 같은 위젯에 쌓이고, 툴 코드는
 `self.log_view` 참조를 그대로 쓰면 된다. (공용 Expand 패널을 쓰지 않고 여기에 다시 구현한
-것은, 그 패널이 버튼 하나를 위한 전용 줄을 갖는 구조라 **버튼 3개를 한 줄에** 두려는 이
+것은, 그 패널이 버튼 하나를 위한 전용 줄을 갖는 구조라 **버튼 여러 개를 한 줄에** 두려는 이
 위젯의 요구와 맞지 않기 때문이다.)
 
 창이 미아로 남지 않게, 툴 창의 Close 를 감시해 자동으로 접는다.
+
+Shrink 는 숨기기 + 높이 제약 치우기 + 창 줄이기다
+------------------------------------------------
+텍스트를 `setVisible(False)` 만 하면 로그는 안 보여도 **자리는 그대로** 남는다 — 위 ★ 에서
+컨테이너에도 `높이 + 버튼 줄` 의 min/max 를 걸어 두었기 때문이다. 그래서 접을 때 컨테이너의
+(min, max) 를 담아 두고 **버튼 줄 높이로** 바꾸고, 펼 때 되돌린다(Expand 의 `_text_limits` 와
+같은 방식). 접혀 있는 동안 툴이 높이를 바꾸면 **되돌릴 값만** 갱신한다.
+
+그래도 **툴 창 크기는 레이아웃이 알아서 줄이지 않는다**(최상위 창은 사용자가 정한 크기를
+지킨다). 그러면 비운 자리가 스트레치나 다른 위젯으로 넘어갈 뿐 "줄어든" 느낌이 없다. 그래서
+최상위 창이면 **줄어든 만큼 창 높이를 줄이고**, 펼 때 **실제로 줄인 만큼만** 다시 늘린다
+(최소 높이에 걸려 덜 줄었으면 덜 늘린다). 최대화 · 전체 화면 창은 건드리지 않는다.
+`resize_window_on_shrink=False` 로 끌 수 있다.
+
+Expand 와 겹쳐도 된다: 접힌 채 Expand 하면 확장 창에는 로그가 보이고(자리 안내 라벨만 숨는다),
+접힌 채 확장 창을 닫으면 로그는 제자리로 돌아오되 **접힌 상태를 유지**한다.
 
 사용법
 ------
@@ -78,7 +96,7 @@ BUTTON_HEIGHT = 20
 
 # ★ 테마 qss 가 `QPushButton { padding: 8px; }` 를 준다. 그 패딩은 버튼 높이를 20px 로
 #   고정한 순간 위아래 16px + 테두리 2px 로 20px 를 다 먹어, **글자가 들어갈 자리가 남지
-#   않는다**(글자가 아예 안 보인다). 그래서 이 세 버튼만 패딩을 덮어쓴다 - 색·테두리·호버는
+#   않는다**(글자가 아예 안 보인다). 그래서 이 버튼들만 패딩을 덮어쓴다 - 색·테두리·호버는
 #   테마 규칙 그대로 남는다(Qt 스타일시트는 지정한 속성만 덮어쓴다).
 BUTTON_STYLE = "padding: 0px 6px; margin: 0px;"
 
@@ -114,7 +132,7 @@ class _LogWindow(QWidget):
 
 
 class JUN_mod_log_qt_v01(QWidget):
-    """Expand / Clear / Copy 버튼을 갖춘 읽기 전용 로그창.
+    """Expand / Shrink / Clear / Copy 버튼을 갖춘 읽기 전용 로그창.
 
     Args:
         window_title: Expand 로 띄우는 창의 제목.
@@ -125,15 +143,21 @@ class JUN_mod_log_qt_v01(QWidget):
         expand_size: 확장 창의 초기 크기 (w, h).
         buttons_on_top: True(기본)면 버튼 줄이 로그 위에, False 면 아래에 온다.
         read_only: 기본 True. 로그는 읽는 것이다.
+        resize_window_on_shrink: True(기본)면 Shrink 로 접을 때 최상위 툴 창 높이도
+            그만큼 줄이고, 펼 때 되돌린다.
     """
 
     expanded_changed = Signal(bool)
+    shrunk_changed = Signal(bool)
     cleared = Signal()
     copied = Signal(int)
 
+    SHRINK_LABEL = "Shrink"
+    SHOW_LABEL = "Show"
+
     def __init__(self, window_title="Log", object_name=None, title=None,
                  expand_size=(620, 520), buttons_on_top=True, read_only=True,
-                 parent=None):
+                 resize_window_on_shrink=True, parent=None):
         super(JUN_mod_log_qt_v01, self).__init__(parent)
 
         self._window_title = window_title
@@ -144,6 +168,11 @@ class JUN_mod_log_qt_v01(QWidget):
         self._filtered = None          # Close 를 감시 중인 툴 창
         # 확장 중에 풀어 둔 내부 텍스트의 (min, max). 접혀 있으면 None.
         self._text_limits = None
+        # Shrink 로 접는 동안 치워 둔 컨테이너의 (min, max). 펼쳐져 있으면 None.
+        self._container_limits = None
+        self._resize_window_on_shrink = bool(resize_window_on_shrink)
+        # 접을 때 툴 창을 **실제로** 줄인 높이(펼 때 그만큼만 되돌린다).
+        self._window_shrink_delta = 0
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -168,12 +197,21 @@ class JUN_mod_log_qt_v01(QWidget):
             "Show the log in a separate, resizable window.\n"
             "The log is moved, not copied - new messages keep going to the same "
             "place.\nClose that window to bring it back here.")
+        self.btn_shrink = self._make_button(
+            row, self.SHRINK_LABEL,
+            "Hide the log and keep only this button row (the window gets shorter).\n"
+            "Click again (Show) to bring the log back.\n"
+            "Messages keep arriving while it is hidden.")
+        # 토글 - 체크 상태 = 접힘. 라벨로도 상태를 보인다(테마가 :checked 를 칠하지 않는다).
+        self.btn_shrink.setCheckable(True)
         self.btn_clear = self._make_button(
             row, "Clear", "Remove everything from the log.")
         self.btn_copy = self._make_button(
             row, "Copy", "Copy the whole log to the clipboard.")
 
         self.btn_expand.clicked.connect(self.toggle_expand)
+        # clicked 는 checked bool 을 넘기지만 toggled 가 더 정확하다(setChecked 로 바뀌어도 온다).
+        self.btn_shrink.toggled.connect(self.set_shrunk)
         self.btn_clear.clicked.connect(self.clear_log)
         self.btn_copy.clicked.connect(self.copy_to_clipboard)
 
@@ -270,7 +308,7 @@ class JUN_mod_log_qt_v01(QWidget):
         window.body.addWidget(self.text)
         self._window = window
 
-        self.placeholder.setVisible(True)
+        self._sync_body_visibility()
         self._watch_owner_close()
         window.show()
         self.expanded_changed.emit(True)
@@ -281,7 +319,6 @@ class JUN_mod_log_qt_v01(QWidget):
             return
 
         window, self._window = self._window, None
-        self.placeholder.setVisible(False)
 
         # 확장하며 풀어 둔 높이 제약을 되돌린다(제자리에서는 원래 몫만 차지해야 한다).
         if self._text_limits is not None:
@@ -291,11 +328,59 @@ class JUN_mod_log_qt_v01(QWidget):
             self.text.setMaximumHeight(high)
 
         self._outer.insertWidget(self._text_index, self.text, 1)
+        # 접힌 채 돌아왔으면 계속 숨겨 둔다.
+        self._sync_body_visibility()
         window.deleteLater()
         self.expanded_changed.emit(False)
 
     def is_expanded(self):
         return self._window is not None
+
+    def toggle_shrink(self):
+        """Shrink 버튼과 같은 동작 - 접혀 있으면 펴고, 펴져 있으면 접는다."""
+        self.set_shrunk(not self.is_shrunk())
+
+    def set_shrunk(self, shrunk):
+        """로그를 접거나(True) 편다(False). 이미 그 상태면 아무것도 안 한다.
+
+        버튼의 체크 상태 · 라벨도 함께 맞추므로 코드에서 불러도 화면이 어긋나지 않는다.
+        """
+        shrunk = bool(shrunk)
+
+        if self.btn_shrink.isChecked() != shrunk:
+            # setChecked -> toggled -> 다시 여기로 들어온다. 그쪽에서 처리하게 두고 끝낸다.
+            self.btn_shrink.setChecked(shrunk)
+            return
+        if shrunk == self.is_shrunk():
+            return
+
+        self.btn_shrink.setText(self.SHOW_LABEL if shrunk else self.SHRINK_LABEL)
+        before = self.height()
+
+        if shrunk:
+            # 컨테이너의 min/max(= 텍스트 높이 + 버튼 줄)를 치워야 자리가 실제로 빈다.
+            self._container_limits = (self.minimumHeight(), self.maximumHeight())
+            self._sync_body_visibility()
+            collapsed = self._row.sizeHint().height()
+            super(JUN_mod_log_qt_v01, self).setMinimumHeight(0)
+            super(JUN_mod_log_qt_v01, self).setMaximumHeight(max(collapsed, BUTTON_HEIGHT))
+            self._resize_owner(shrink_by=max(before - max(collapsed, BUTTON_HEIGHT), 0))
+        else:
+            # ★ 창 높이는 제약을 되돌리기 **전에** 재 둔다. 되돌리는 순간 Qt 가 창을 새 최소
+            #   높이까지 먼저 키우므로, 그 뒤에 재서 delta 를 더하면 두 번 커진다.
+            owner = self.window()
+            owner_height = owner.height() if owner is not None else 0
+            low, high = self._container_limits
+            self._container_limits = None
+            super(JUN_mod_log_qt_v01, self).setMinimumHeight(low)
+            super(JUN_mod_log_qt_v01, self).setMaximumHeight(high)
+            self._sync_body_visibility()
+            self._resize_owner(shrink_by=None, owner_height=owner_height)
+
+        self.shrunk_changed.emit(shrunk)
+
+    def is_shrunk(self):
+        return self._container_limits is not None
 
     # ==================================================================
     # 로그 쓰기
@@ -365,28 +450,40 @@ class JUN_mod_log_qt_v01(QWidget):
     # 확장 중에는 텍스트를 자유롭게 두어야 하므로(창 높이를 따라가야 한다) 값을 텍스트에
     # 걸지 않고 **되돌아갈 때 쓸 값**만 갱신한다. 컨테이너 쪽은 언제든 그대로 건다.
 
+    # Shrink 로 접혀 있는 동안에도 같다 - 컨테이너에는 걸지 않고 **펼 때 쓸 값**만 갱신한다.
+
     def setFixedHeight(self, height):
         if self._text_limits is None:
             self.text.setFixedHeight(height)
         else:
             self._text_limits = (height, height)
-        super(JUN_mod_log_qt_v01, self).setFixedHeight(height + self._chrome_height())
+        total = height + self._chrome_height()
+        if self._container_limits is None:
+            super(JUN_mod_log_qt_v01, self).setFixedHeight(total)
+        else:
+            self._container_limits = (total, total)
 
     def setMinimumHeight(self, height):
         if self._text_limits is None:
             self.text.setMinimumHeight(height)
         else:
             self._text_limits = (height, self._text_limits[1])
-        super(JUN_mod_log_qt_v01, self).setMinimumHeight(
-            height + self._chrome_height())
+        total = height + self._chrome_height()
+        if self._container_limits is None:
+            super(JUN_mod_log_qt_v01, self).setMinimumHeight(total)
+        else:
+            self._container_limits = (total, self._container_limits[1])
 
     def setMaximumHeight(self, height):
         if self._text_limits is None:
             self.text.setMaximumHeight(height)
         else:
             self._text_limits = (self._text_limits[0], height)
-        super(JUN_mod_log_qt_v01, self).setMaximumHeight(
-            height + self._chrome_height())
+        total = height + self._chrome_height()
+        if self._container_limits is None:
+            super(JUN_mod_log_qt_v01, self).setMaximumHeight(total)
+        else:
+            self._container_limits = (self._container_limits[0], total)
 
     def setFont(self, font):
         self.text.setFont(font)
@@ -410,6 +507,62 @@ class JUN_mod_log_qt_v01(QWidget):
     # ==================================================================
     # 내부
     # ==================================================================
+
+    def _sync_body_visibility(self):
+        """텍스트 · 자리 안내 라벨의 표시 여부를 (확장, 접힘) 상태에 맞춘다.
+
+            확장 X / 접힘 X : 텍스트 보임
+            확장 X / 접힘 O : 둘 다 숨김(버튼 줄만)
+            확장 O / 접힘 X : 확장 창의 텍스트 보임 + 제자리에 안내 라벨
+            확장 O / 접힘 O : 확장 창의 텍스트 보임, 제자리는 비운다
+        """
+        expanded = self._window is not None
+        shrunk = self._container_limits is not None
+        self.text.setVisible(expanded or not shrunk)
+        self.placeholder.setVisible(expanded and not shrunk)
+
+    @staticmethod
+    def _activate_layout(owner):
+        """owner 의 최상위 레이아웃을 지금 계산시킨다.
+
+        ★ `owner.layout()` 으로 부르지 않는다 - 툴 창이 `self.layout = QVBoxLayout(self)` 처럼
+        같은 이름의 **속성**을 두면 메서드가 가려져 `'QVBoxLayout' object is not callable` 이 난다
+        (A00004_base_QT 템플릿이 그렇다). 클래스 메서드로 직접 부른다.
+        """
+        layout = QWidget.layout(owner)
+        if layout is not None:
+            layout.activate()
+
+    def _resize_owner(self, shrink_by, owner_height=None):
+        """최상위 툴 창 높이를 Shrink 에 맞춰 줄이거나(shrink_by=int) 되돌린다(None).
+
+        줄일 때는 **실제로 줄어든 양**을 기억한다 - 창 최소 높이에 걸려 덜 줄었는데 펼 때 전부
+        더하면 창이 누를 때마다 조금씩 커진다. 되돌릴 때는 owner_height(제약을 풀기 전에 잰
+        창 높이)에 그 양을 더한다.
+        """
+        owner = self.window()
+        usable = (self._resize_window_on_shrink and owner is not None and owner is not self
+                  and owner.isWindow()
+                  and not (owner.windowState() & (Qt.WindowMaximized | Qt.WindowFullScreen)))
+
+        if shrink_by is None:
+            delta, self._window_shrink_delta = self._window_shrink_delta, 0
+            if usable and delta > 0:
+                self._activate_layout(owner)
+                base = owner_height if owner_height else owner.height()
+                owner.resize(owner.width(), max(base + delta, owner.height()))
+            return
+
+        self._window_shrink_delta = 0
+        if not usable or shrink_by <= 0:
+            return
+        # 방금 바꾼 표시/제약이 창의 최소 크기에 반영되게 레이아웃을 먼저 돌린다.
+        self._activate_layout(owner)
+        before = owner.height()
+        target = max(before - shrink_by, owner.minimumSizeHint().height(), owner.minimumHeight())
+        if target < before:
+            owner.resize(owner.width(), target)
+            self._window_shrink_delta = before - owner.height()
 
     def _watch_owner_close(self):
         """툴 창이 닫히면 자동으로 접는다.
