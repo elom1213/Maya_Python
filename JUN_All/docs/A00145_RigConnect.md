@@ -4,7 +4,10 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.44` (`app/config/version.py`) — Attribute 탭을 **`Edit` / `Create` 두 하위 탭**으로:
+- 버전: `v01.46` (`app/config/version.py`) — Attribute > Edit 에 **`Maintain connections`**(기본 ON):
+  `Up` / `Down` 으로 순서를 바꾸기 전 연결을 이름으로 적어 두고, 옮긴 뒤 어긋난 것만 되돌린다 (§Attribute)
+  · v01.45 는 창 메뉴 바를 공용 위젯으로 — `Help > Copy Tool Name`
+  · v01.44 는 Attribute 탭을 **`Edit` / `Create` 두 하위 탭**으로:
   예전 `Copy` 와 `Delete` 가 **한 목록**(`Edit`)을 함께 쓰고, 고르는 방법이 선택에서
   **체크박스**로 바뀌었다. 여기에 **`Order` `Up` / `Down`** 이 들어와 **채널 박스의 나열 순서**를
   바꾼다 — 마야엔 재정렬 명령이 없어 `deleteAttr` + `undo` 로 하므로 **`Ctrl+Z` 로는 되돌아가지
@@ -949,6 +952,36 @@ Destination : ab      (Null)   abcd            Destination : ab      abcd
 - **`deleteAttr` 이 실패했을 때는 `undo` 를 부르지 않는다.** 실패한 자리에서 undo 를 부르면
   **남의 작업**이 되돌아간다(실측: 사용자가 만든 노드가 사라졌다). 잠긴 어트리뷰트는 잠금을
   잠시 풀고 옮긴 뒤 **다시 잠근다.**
+
+**`Maintain connections` — 순서를 바꿔도 연결은 이름 그대로 (v01.46, 기본 ON)**
+
+`Up` / `Down` 줄 아래 체크박스. 켜 두면 **어느 어트리뷰트가 어느 어트리뷰트에 물려 있는지**가
+순서와 상관없이 그대로다. `obj_02` 의 `attr_02_a` / `attr_02_b` 자리를 바꿔도:
+
+```
+attr_01_b ─▶ attr_02_b        ← obj_02 의 새 순서 (b, a, c)
+attr_01_a ─▶ attr_02_a
+attr_01_c ─▶ attr_02_c        obj_01 의 순서는 그대로다
+```
+
+- **옮기기 전에** 그 오브젝트의 연결(들어오는 것 · 나가는 것 · 키 커브 · multi 원소)을 **플러그 이름으로
+  적어 두고**, **옮긴 뒤** 다시 읽어 **어긋난 것만** 되돌린다. 어긋난 것이 없으면 씬을 **전혀 건드리지
+  않는다**(재연결 0회). 로그:
+  ```
+         Maintain connections : all 6 connection(s) kept.
+  [OK] Maintain connections : fixed 2 connection(s) (6 checked).      ← 되돌린 게 있을 때
+  ```
+  되돌린 연결은 한 줄씩(`obj_02 : reconnected obj_01.attr_01_a -> obj_02.attr_02_a`) 남는다.
+- `unitConversion` 은 **건너뛴 실제 양 끝**으로 비교한다 — undo 가 변환 노드를 다른 이름으로 되살려도
+  멀쩡한 연결을 끊지 않는다. 다시 이을 때 필요하면 마야가 변환 노드를 새로 만든다.
+- 잠긴 받는 쪽은 잠깐 풀었다가 다시 잠근다. 소스가 사라져 되돌릴 수 없는 연결은 `[WARN]` 으로 짚는다.
+- `Objects` 에 서로 연결된 오브젝트를 **함께** 넣어도 된다 — **전부 먼저 적고 → 전부 옮기고 → 전부
+  확인**한다(한쪽을 옮긴 뒤 다른 쪽을 적으면 이미 어긋난 상태를 "원래" 로 삼게 된다).
+- 끄면 연결을 확인하지 않는다(v01.45 까지의 동작).
+
+> [!note] 이 증상은 사용자 씬에서 보고됐고 **mayapy · 마야 GUI(2024, 병렬 평가)에서는 재현되지 않았다**
+> (이름 · API 연결 · 실제 값 흐름 모두 유지, 17가지 변형). 그래서 원인을 고치는 대신 **결과를 확인하고
+> 어긋나면 되돌리는** 방식으로 만들었다. 검증은 옮긴 직후 연결을 일부러 엇갈리게 만들어 했다.
 
 **Copy — 다른 오브젝트에 같은 정의로 만들기**
 

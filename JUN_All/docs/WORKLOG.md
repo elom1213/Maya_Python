@@ -31,6 +31,32 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-17 (오늘)
 
+> [!summary] `A00145_RigConnect` Attribute > Edit — **`Maintain connections`**(기본 ON) : 순서를 바꿔도 연결은 이름 그대로 (v01.45 -> 01.46)
+- **요청**: `obj_02` 의 `attr_02_a` / `attr_02_b` 순서를 바꾸면 연결이 **자리 기준으로 엇갈린다**
+  (`attr_01_a -> attr_02_b`). 원래 이름끼리(`attr_01_a -> attr_02_a`) 유지되게, 기본 체크된 체크박스로.
+- **★ 재현이 안 됐다.** mayapy 에서 core 직접 · `undo_chunk` 안 · DG/병렬 평가 · double/float/enum/bool/long ·
+  잠금 · 여러 오브젝트 동시 · 키 · multi · blendShape 구동 등 **17가지**, 그리고 **별도로 띄운 마야 GUI(2024,
+  병렬 평가)에서 실제 툴 핸들러(`on_aedit_move`)** 로도 돌렸는데 **이름 · API 연결(`MPlug.connectedTo`) ·
+  실제 값 흐름이 모두 유지**됐다. Node Editor 는 순서를 바꿔도 행을 옛 순서(A·B·C)로 그려 채널 박스와
+  다르게 보인다는 점만 확인했다.
+- 그래서 원인을 고치는 대신 **결과를 보장**하도록 만들었다 — 옮기기 **전** 연결을 플러그 이름으로 적고,
+  옮긴 **뒤** 비교해 **어긋난 것만** `connectAttr -force` 로 되돌리고 낯선 연결은 끊는다. 어긋난 게 없으면
+  **재연결 0회**(씬을 안 건드림). 로그: `Maintain connections : all N connection(s) kept.` /
+  `[OK] ... fixed N connection(s)`.
+  - `unitConversion` 은 `skipConversionNodes=True` 로 **실제 양 끝**을 비교 — 변환 노드 이름이 바뀌어도
+    멀쩡한 연결을 끊지 않는다. 끊을 때는 받는 쪽에 **직접** 붙은 플러그를 찾는다.
+  - 여러 오브젝트는 **전부 적고 → 전부 옮기고 → 전부 확인** (서로 연결된 둘을 함께 옮길 때 대비).
+- 체크박스는 `Up`/`Down` 줄 **아래 한 줄**(같은 줄에 두면 오른쪽 열이 넓어진다).
+- **검증(mayapy 2024 + 오프스크린 Qt) 36항목 전부 통과** — 증상은 옮긴 직후 연결을 **일부러 엇갈리게**
+  만들어 흉내 냈다: 사용자 시나리오 복구 + 값 흐름 · OFF 면 그대로 · 멀쩡하면 connect/disconnect 0회 ·
+  잠긴 dst · unitConversion(복구/무변화) · 나가는 연결 · 서로 연결된 두 오브젝트 동시 · 키 커브 · multi 원소 ·
+  낯선 연결 제거 · 소스가 사라진 경우 경고 · 이미 맨 위 · UI 기본 체크/ON·OFF 전달. 기존 17가지 변형 회귀 없음.
+- **그 과정에서 본 기존 결함 둘(이번에 안 고침)**: ① **컴파운드**(`double3`) 는 자식까지 목록에 올라와
+  자식 `deleteAttr` 에서 멈추는데, 그 전까지 **순서가 반쯤 바뀐 채** 남는다 ② **alias** 가 붙은 어트리뷰트는
+  `listAttr -ud` 가 alias 이름을 돌려줘 "not user defined" 로 못 옮긴다.
+  파일: `tools/A00145_RigConnect/app/core/attr_order_manager.py` · `app/ui/main_window.py` ·
+  `app/config/version.py` · `docs/A00145_RigConnect.md` `#A00145`
+
 > [!summary] **A00400 `Edit > Combine` 기본 배치 변경** — Source 를 Target 월드 위치(rotate pivot)로 옮긴 모양으로 합친다 (v01.13)
 - **요청**: Combine Shapes 가 Source 커브 쉐입을 보이던 자리 그대로 붙이던 것을, Source 를 Target 월드 위치로 이동한 뒤의 모양으로.
 - `Keep world position` 체크박스를 **`Placement` 라디오 3 개**로 교체 — `Move to Target position`(기본) / `Keep Source world position` / `Keep local CV values`.

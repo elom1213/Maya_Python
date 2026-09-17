@@ -31,6 +31,24 @@ attr_order_manager - 사용자 정의 어트리뷰트의 **나열 순서**를 �
 
 기본(빌트인) 어트리뷰트는 `deleteAttr` 대상이 아니므로 **순서를 바꿀 수 없다.**
 목록에서 걸러 내고 이유를 돌려준다.
+
+Maintain connections (v01.46)
+-----------------------------
+옮기기 **전에** 그 오브젝트에 걸린 연결을 **플러그 이름으로** 적어 두고, 옮긴 **뒤에** 다시 읽어
+어긋난 것만 되돌린다 — `attr_01_a -> attr_02_a` 는 `attr_02_a` 가 몇 번째 자리로 가든 그대로다.
+
+사용자 보고: `obj_02` 의 `attr_02_a` / `attr_02_b` 순서를 바꾸자 연결이 자리 기준으로 엇갈렸다
+(`attr_01_a -> attr_02_b`). **mayapy 와 마야 GUI(2024, 병렬 평가)에서는 재현되지 않았다** —
+이름 · API 연결 · 실제 값 흐름이 모두 유지됐다(17가지 변형). 원인과 상관없이 결과를 보장하도록
+**비교 후 복구**로 만들었다. 어긋난 것이 없으면 씬을 전혀 건드리지 않는다.
+
+- 연결은 `skipConversionNodes=True` 로 **실제 양 끝**을 적는다. `unitConversion` 노드는 undo 가
+  다른 이름으로 되살릴 수 있어, 그 이름으로 비교하면 멀쩡한 연결을 "틀렸다" 고 끊게 된다.
+- 되돌리기는 **받는 쪽(dst)** 기준이다 — `connectAttr -force` 로 맞는 소스를 다시 물리고, 그래도
+  남은 낯선 연결은 dst 에 직접 붙은 플러그를 찾아 끊는다(사이에 변환 노드가 있어도 된다).
+- 잠긴 dst 는 잠깐 풀었다가 다시 잠근다.
+- 여러 오브젝트를 함께 옮기면 **전부 먼저 적고 → 전부 옮기고 → 전부 확인**한다. 둘이 서로
+  연결돼 있을 때, 한쪽을 옮긴 뒤에 다른 쪽을 적으면 이미 어긋난 상태를 "원래" 로 삼게 된다.
 """
 
 import maya.cmds as cmds
@@ -108,12 +126,98 @@ def _apply_order(obj, new_order):
     return moved, problems
 
 
-def move_attributes(objects, attrs, up=True):
+# ======================================================================
+# Maintain connections
+# ======================================================================
+
+def connection_snapshot(obj):
+    """obj 에 걸린 연결 전부를 `{(src_plug, dst_plug), ...}` 로. 변환 노드는 건너뛴 실제 양 끝."""
+    pairs = set()
+
+    incoming = cmds.listConnections(
+        obj, source=True, destination=False, connections=True, plugs=True,
+        skipConversionNodes=True) or []
+    for i in range(0, len(incoming) - 1, 2):
+        pairs.add((incoming[i + 1], incoming[i]))
+
+    outgoing = cmds.listConnections(
+        obj, source=False, destination=True, connections=True, plugs=True,
+        skipConversionNodes=True) or []
+    for i in range(0, len(outgoing) - 1, 2):
+        pairs.add((outgoing[i], outgoing[i + 1]))
+
+    return pairs
+
+
+def _direct_source(dst):
+    """dst 에 **직접** 붙은 소스 플러그(변환 노드면 그 노드의 출력). 없으면 None."""
+    found = cmds.listConnections(dst, source=True, destination=False, plugs=True,
+                                 skipConversionNodes=False) or []
+    return found[0] if found else None
+
+
+def _with_unlocked(plug, func):
+    try:
+        locked = bool(cmds.getAttr(plug, lock=True))
+    except Exception:
+        locked = False
+    if locked:
+        cmds.setAttr(plug, lock=False)
+    try:
+        func()
+    finally:
+        if locked:
+            cmds.setAttr(plug, lock=True)
+
+
+def restore_connections(obj, expected):
+    """지금 연결을 `expected` 와 비교해 어긋난 것만 되돌린다.
+
+    반환: (되돌린 연결 줄 목록, 실패 사유 목록). 어긋난 게 없으면 ([], []) 이고 씬은 그대로다.
+    """
+    fixed = []
+    problems = []
+
+    actual = connection_snapshot(obj)
+    if actual == expected:
+        return fixed, problems
+
+    # 1) 빠진 연결을 다시 문다. force 라 dst 에 잘못 붙은 소스는 이 한 번으로 바뀐다.
+    for src, dst in sorted(expected - actual):
+        if not cmds.objExists(src) or not cmds.objExists(dst):
+            problems.append("{0} -> {1} : plug no longer exists".format(src, dst))
+            continue
+        try:
+            _with_unlocked(dst, lambda s=src, d=dst: cmds.connectAttr(s, d, force=True))
+            fixed.append("reconnected {0} -> {1}".format(src, dst))
+        except Exception as exc:
+            problems.append("{0} -> {1} : {2}".format(
+                src, dst, str(exc).strip().splitlines()[0]))
+
+    # 2) 그래도 남은 낯선 연결은 끊는다(받는 쪽에 직접 붙은 플러그 기준).
+    for src, dst in sorted(connection_snapshot(obj) - expected):
+        direct = _direct_source(dst)
+        if not direct:
+            continue
+        try:
+            _with_unlocked(dst, lambda s=direct, d=dst: cmds.disconnectAttr(s, d))
+            fixed.append("disconnected {0} -> {1}".format(src, dst))
+        except Exception as exc:
+            problems.append("{0} -> {1} : {2}".format(
+                src, dst, str(exc).strip().splitlines()[0]))
+
+    if connection_snapshot(obj) != expected and not problems:
+        problems.append("connections still differ after restoring")
+    return fixed, problems
+
+
+def move_attributes(objects, attrs, up=True, maintain_connections=True):
     """`objects` 각각에서 `attrs` 를 한 칸 위/아래로 옮긴다.
 
     - 오브젝트마다 **독립으로** 처리한다. 그 오브젝트에 없는 어트리뷰트는 건너뛴다.
     - 사용자 정의가 아닌 어트리뷰트(`translateX` …)는 마야가 지울 수 없어 **옮길 수 없다.**
     - 이미 끝(맨 위/맨 아래)이라 바뀔 게 없으면 그 오브젝트는 건드리지 않는다.
+    - `maintain_connections` 이면 옮기기 전 연결을 이름으로 적어 두고 옮긴 뒤 어긋난 것을 되돌린다.
 
     반환: (로그 줄 목록, 순서가 실제로 바뀐 오브젝트 수)
     """
@@ -130,6 +234,7 @@ def move_attributes(objects, attrs, up=True):
                 "(deleteAttr + undo). Turn undo on and try again."], 0
 
     changed = 0
+    plans = []   # (obj, new_order)
 
     for obj in objects:
         if not cmds.objExists(obj):
@@ -156,12 +261,38 @@ def move_attributes(objects, attrs, up=True):
         new_order = plan_order(current, here, up)
         if new_order == current:
             continue
+        plans.append((obj, new_order))
 
+    # ★ 전부 먼저 적는다 - 서로 연결된 두 오브젝트를 함께 옮길 때, 한쪽을 옮긴 뒤에 다른 쪽을
+    #   적으면 이미 어긋난 상태를 "원래" 로 삼게 된다.
+    snapshots = {}
+    if maintain_connections:
+        for obj, _order in plans:
+            snapshots[obj] = connection_snapshot(obj)
+
+    for obj, new_order in plans:
         moved, problems = _apply_order(obj, new_order)
         for name, why in problems:
             logs.append("[WARN] {0}.{1} : {2}".format(obj, name, why))
         if moved and not problems:
             changed += 1
+
+    if maintain_connections and plans:
+        restored = 0
+        for obj, _order in plans:
+            fixed, problems = restore_connections(obj, snapshots[obj])
+            for line in fixed:
+                logs.append("       {0} : {1}".format(obj, line))
+            for why in problems:
+                logs.append("[WARN] {0} : connection not restored - {1}".format(obj, why))
+            restored += len(fixed)
+        checked = sum(len(s) for s in snapshots.values())
+        if restored:
+            logs.append("[OK] Maintain connections : fixed {0} connection(s) "
+                        "({1} checked).".format(restored, checked))
+        else:
+            logs.append("       Maintain connections : all {0} connection(s) "
+                        "kept.".format(checked))
 
     if changed:
         logs.append("       Order changed on {0} object(s).".format(changed))

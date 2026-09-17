@@ -1457,6 +1457,19 @@ class MainWindow(QWidget):
         order_row.addStretch(1)
         right.addLayout(order_row)
 
+        # 옮기기 전 연결을 이름으로 적어 두고 옮긴 뒤 어긋난 것을 되돌린다 (v01.46).
+        # Up/Down 줄 끝에 붙이면 오른쪽 열이 넓어져 따로 한 줄로 둔다.
+        self.cb_aedit_keep_conn = QCheckBox("Maintain connections")
+        self.cb_aedit_keep_conn.setChecked(True)
+        self.cb_aedit_keep_conn.setToolTip(
+            "On (default) : every connection keeps its attribute names after the move.\n"
+            "               e.g. obj_01.attr_a -> obj_02.attr_a stays that way even when\n"
+            "               attr_a and attr_b swap places on obj_02.\n"
+            "               Connections are recorded before the move, compared after it,\n"
+            "               and only the ones that differ are reconnected.\n"
+            "Off          : the move does not check connections.")
+        right.addWidget(self.cb_aedit_keep_conn)
+
         src_layout.addLayout(right, 1)
         layout.addWidget(src_box)
 
@@ -1627,9 +1640,11 @@ class MainWindow(QWidget):
         """체크한 어트리뷰트를 한 칸 위/아래로 — 씬의 실제 순서가 바뀐다."""
         objects = self.tsl_aedit_objs.get_all_items()
         attrs = self._aedit_checked()
+        keep_conn = self.cb_aedit_keep_conn.isChecked()
 
         def _do():
-            logs, changed = aord_mgr.move_attributes(objects, attrs, up)
+            logs, changed = aord_mgr.move_attributes(
+                objects, attrs, up, maintain_connections=keep_conn)
             for line in logs:
                 self.log(line)
 
