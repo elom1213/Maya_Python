@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-17 (오늘)
 
+> [!summary] `A00145_RigConnect` Constrain > Constraint — 종류를 **체크박스**로, `Parent` + `Scale` · `Point`/`Orient`/`Scale` 2~3개를 한 번에 (v01.46 -> 01.47)
+- **요청**: Parent 와 Scale 을 동시에, Scale · Point · Orient 중 2개 · 3개를 동시에 체크해 한 번에 constraint 세팅.
+- 규칙은 **구동 채널이 겹치지 않는 것**(실측: Parent → Point / Orient 는 `already connected`). 겹치는 것을 체크하면 먼저 켜진 쪽이 꺼지고, `Point On Poly` 는 혼자.
+- 한 follower 에서 한 종류가 실패해도 나머지는 계속 걸고 `[WARN]` 으로 남긴다. 종류별 개수 로그, Undo 한 번.
+- 실측 곁가지: 이미 `pointConstraint` 가 있는 곳에 `parentConstraint` 를 걸면 에러 없이 **`pairBlend`** 가 끼어든다(가이드에 주의 추가).
+- mayapy 2024 37항목 통과. #A00145
+
 > [!summary] `A00130_ControlRig_V02` **`Match` 를 한 번만 누르면 된다** — 부모부터 맞추고, 다른 매칭에 밀려난 것은 다시 맞춘다 (v02.19 -> 02.20)
 - **보고**: `obj_01 > obj_02 > obj_03 > obj_04` 에서 obj_03 을 맞춘 뒤 obj_01 을 옮기면 obj_03 이 어긋나서 Match 를 여러 번 눌렀다. 원인은 매칭을 매핑 표 순서대로 돌린 것(실측: 목표 `(3,7,-4)` → `(8.87,12,-3.96)`).
 - **계층 깊이 순**(같은 깊이는 표 순서)으로 맞추고, 계층이 아닌 연결(컨스트레인트로 따라가는 그룹 등)은 한 바퀴 뒤 **월드 행렬을 비교해 밀려난 것만 다시** 맞춘다(최대 5바퀴, 순환이면 경고).

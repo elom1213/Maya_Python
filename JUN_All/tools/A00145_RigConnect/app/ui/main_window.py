@@ -622,15 +622,19 @@ class MainWindow(QWidget):
         self.cb_con_maintain.setChecked(True)
         opt_layout.addWidget(self.cb_con_maintain)
 
-        self.rb_con_group = QButtonGroup(self)
-        rb_row = QHBoxLayout()
+        # 종류는 체크박스 (v01.47, 예전엔 라디오) - 채널이 겹치지 않으면 여러 개를 함께 건다.
+        # Parent + Scale / Point · Orient · Scale 중 2~3개. 겹치는 것(Parent 와 Point 등)을 체크하면
+        # 먼저 체크돼 있던 쪽을 끈다 - 마야가 둘째를 `already connected` 로 거절하기 때문이다.
+        self.cb_con_types = {}
+        type_row = QHBoxLayout()
         for i, (key, label) in enumerate(con_mgr.CONSTRAIN_TYPES):
-            rb = QRadioButton(label)
-            if i == 0:
-                rb.setChecked(True)
-            self.rb_con_group.addButton(rb, i)
-            rb_row.addWidget(rb)
-        opt_layout.addLayout(rb_row)
+            cb = QCheckBox(label)
+            cb.setChecked(i == 0)
+            cb.setToolTip(self._con_type_tip(key))
+            cb.toggled.connect(lambda checked, k=key: self._on_con_type_toggled(k, checked))
+            self.cb_con_types[key] = cb
+            type_row.addWidget(cb)
+        opt_layout.addLayout(type_row)
 
         # --- Matrix Constraint 모드 ---
         # 체크 시 *Constraint 노드 대신 multMatrix/decomposeMatrix 네트워크로 구속한다.
@@ -668,8 +672,34 @@ class MainWindow(QWidget):
         """
         for cb in (self.cb_mtx_t, self.cb_mtx_r, self.cb_mtx_s):
             cb.setEnabled(enabled)
-        for rb in self.rb_con_group.buttons():
-            rb.setEnabled(not enabled)
+        for cb in self.cb_con_types.values():
+            cb.setEnabled(not enabled)
+
+    _CHANNEL_WORDS = {"t": "translate", "r": "rotate", "s": "scale"}
+
+    def _con_type_tip(self, key):
+        """체크박스 툴팁 - 무엇을 구동하고 무엇과 함께 못 거는지."""
+        channels = con_mgr.CONSTRAIN_CHANNELS[key]
+        labels = dict(con_mgr.CONSTRAIN_TYPES)
+        if key == "pointOnPoly":
+            return ("Drives translate + rotate from a mesh component.\n"
+                    "Used alone - checking it unchecks the others.")
+        clash = [labels[k] for k, _l in con_mgr.CONSTRAIN_TYPES
+                 if k != key and con_mgr.types_conflict(key, k)]
+        return "Drives {0}.\nCannot be combined with {1} (same channels).".format(
+            " + ".join(self._CHANNEL_WORDS[c] for c in channels), ", ".join(clash))
+
+    def _on_con_type_toggled(self, key, checked):
+        """체크한 종류와 채널이 겹치는 종류를 끈다 (함께 걸 수 없다)."""
+        if not checked:
+            return
+        for other, cb in self.cb_con_types.items():
+            if other != key and cb.isChecked() and con_mgr.types_conflict(key, other):
+                cb.setChecked(False)
+
+    def _checked_con_types(self):
+        return [key for key, _label in con_mgr.CONSTRAIN_TYPES
+                if self.cb_con_types[key].isChecked()]
 
     def _build_skin_constraint_page(self):
         """Skin Weight to Constraint UI (Constrain 하위 탭).
@@ -2402,10 +2432,19 @@ class MainWindow(QWidget):
             self._run("Matrix Constraint", _do)
             return
 
-        con_type = con_mgr.CONSTRAIN_TYPES[self.rb_con_group.checkedId()][0]
-        self._run("Constrain",
-                  lambda: con_mgr.constrain(
-                      targets, followers, con_type, maintain_offset))
+        con_types = self._checked_con_types()
+        labels = dict(con_mgr.CONSTRAIN_TYPES)
+
+        def _do():
+            made, errors = con_mgr.constrain_types(
+                targets, followers, con_types, maintain_offset)
+            for err in errors:
+                self.log("[WARN] {0}".format(err))
+            for key in con_types:
+                count = sum(1 for k, _node in made if k == key)
+                self.log("       {0} {1} constraint(s) created".format(count, labels[key]))
+
+        self._run("Constrain ({0})".format(" + ".join(labels[k] for k in con_types)), _do)
 
     def _skin_con_type(self):
         """Skin Weight to Constraint 박스에서 선택한 constraint 타입 key."""

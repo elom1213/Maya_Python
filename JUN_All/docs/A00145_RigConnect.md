@@ -4,7 +4,10 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.46` (`app/config/version.py`) — Attribute > Edit 에 **`Maintain connections`**(기본 ON):
+- 버전: `v01.47` (`app/config/version.py`) — Constrain > Constraint 의 종류가 **체크박스**:
+  `Parent` + `Scale`, `Point` · `Orient` · `Scale` 중 2~3개를 **한 번에** 건다. 같은 채널을 구동하는 종류는
+  서로를 끈다 (§Constraint)
+  · v01.46 은 Attribute > Edit 에 **`Maintain connections`**(기본 ON):
   `Up` / `Down` 으로 순서를 바꾸기 전 연결을 이름으로 적어 두고, 옮긴 뒤 어긋난 것만 되돌린다 (§Attribute)
   · v01.45 는 창 메뉴 바를 공용 위젯으로 — `Help > Copy Tool Name`
   · v01.44 는 Attribute 탭을 **`Edit` / `Create` 두 하위 탭**으로:
@@ -283,10 +286,39 @@ Targets                       Number: 4212
 타겟(드라이버) → 팔로워로 constraint 를 건다.
 
 - `Targets` / `Followers` 리스트에 오브젝트 추가(Select/Add/Del/Up/Down).
-- Options: `Maintain Offset` 체크(**기본 ON**, v01.28) + constraint 종류 라디오
-  (`Parent` / `Scale` / `Point` / `Orient` / `Point On Poly`).
+- Options: `Maintain Offset` 체크(**기본 ON**, v01.28) + constraint 종류 **체크박스**(v01.47, 예전엔 라디오)
+  (`Parent` / `Scale` / `Point` / `Orient` / `Point On Poly`, 기본은 `Parent` 하나).
 - `Constrain` 클릭.
 - **브로드캐스트**: target 이 1개면 모든 follower 에 동일 target 적용, 아니면 인덱스 1:1.
+
+##### 여러 종류를 함께 걸기 (v01.47)
+
+체크한 종류를 **모두** 건다. 조건은 하나 — **구동하는 채널이 겹치지 않아야 한다.**
+
+| 종류 | 구동 채널 | 함께 걸 수 있는 것 |
+|------|-----------|--------------------|
+| `Parent` | translate + rotate | `Scale` |
+| `Point` | translate | `Orient` · `Scale` |
+| `Orient` | rotate | `Point` · `Scale` |
+| `Scale` | scale | `Parent` 또는 `Point` · `Orient` |
+| `Point On Poly` | translate + rotate (타깃이 버텍스) | **혼자** |
+
+- 예: `Parent` + `Scale` → follower 마다 `parentConstraint` 와 `scaleConstraint` 둘.
+  `Point` + `Orient` + `Scale` → 셋.
+- **겹치는 것을 체크하면 먼저 체크돼 있던 쪽이 꺼진다** — `Parent` 가 켜진 채 `Point` 를 누르면 `Parent` 가 꺼지고
+  `Scale` 은 그대로 남는다. 마야가 두 번째를 `Object is already connected.` 로 거절하기 때문이다(실측: Parent → Point,
+  Parent → Orient). 체크박스에 마우스를 올리면 무엇과 겹치는지 나온다.
+- `Point On Poly` 는 버텍스를 타깃으로 쓰므로 `Scale` 과도 섞을 수 없어 혼자 쓴다.
+- 건 순서는 항상 `Parent` → `Scale` → `Point` → `Orient`. 로그에 종류별 개수가 남는다
+  (`2 Parent constraint(s) created` / `2 Scale constraint(s) created`).
+- **한 follower 에서 한 종류가 실패해도 나머지는 계속 건다**(이미 다른 constraint 가 걸린 채널 등) — 실패는
+  `[WARN] <follower> <- <target> (<종류>): <이유>` 로 하나씩 남는다. 전체가 **Undo 한 번**이다.
+- 아무것도 체크하지 않고 누르면 `[ERR] ... No constraint type is checked.` 만 남기고 아무것도 만들지 않는다.
+
+> **주의 — 마야는 순서에 따라 에러 대신 `pairBlend` 를 끼운다.** 이미 `pointConstraint` 가 걸린 오브젝트에
+> `parentConstraint` 를 걸면 에러가 나지 않고 두 constraint 사이에 **`pairBlend` 가 생겨 섞인다**(실측).
+> 반대 순서(Parent 먼저)면 `already connected` 에러다. 이 탭은 한 번에 거는 종류끼리만 겹침을 막으므로,
+> **이미 constraint 가 걸린 오브젝트**에 다시 걸 때는 채널 상태를 먼저 확인할 것.
 
 ##### Matrix Constraint (v01.07)
 `Matrix Constraint` 체크 시 일반 `*Constraint` 노드 대신 **`multMatrix` + `decomposeMatrix`
