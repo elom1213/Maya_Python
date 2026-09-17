@@ -16,7 +16,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 | **Import** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` |
 | **Path** | `Copy Scene Folder` · `Open Scene Folder` | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `File` |
 
-- **버전**: `app/config/version.py` (v01.01 — 창 크기를 A00040_V02 와 같게)
+- **버전**: `app/config/version.py` (v01.02 — Pin 글자 잘림 수정)
 - **설치**: `__dragDrop_A00480.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **FileTool** → `tools.A00480_FileTool.run(True)`
 - **테마**: `slate_dark`
 - **원본 두 툴은 그대로 남아 있다.** quickTool 의 File · Import option 버튼도 지워지지 않았다.
@@ -30,7 +30,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 ## 1. 화면
 
 ```
-┌ File Tool v01.01 ───────────────────────────── [ Pin ] ┐
+┌ File Tool v01.02 ───────────────────────────── [ Pin ] ┐
 │ Help                                                    │
 │ ┌ Export ┬ Import ┬ Path ┐                              │
 │ │ Export Path [.................] [Browse][Paste][Scene]│
@@ -49,6 +49,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
   - 테마 qss 는 `show()` 뒤에야 자식 위젯에 입혀지므로, 그 전에 재면 글자가 큰 상태의 최소 크기(약 1290 폭)로 창이 커진다.
     `launch.py` 가 show 다음 이벤트 루프에서 `fit_to_content()` 로 레이아웃 최소 크기에 맞춘다.
   - 탭 테두리만큼 늘어나는 것은 Export 페이지 여백 0 · 창 좌우 여백 -2 · Pin 높이 22 로 상쇄했다.
+  - Pin 버튼은 22px 높이라 테마의 `padding: 8px` 이면 글자 자리가 4px 뿐이다 → 이 버튼만 위아래 padding 0(v01.02).
 
 ---
 
@@ -127,7 +128,7 @@ A00480_FileTool/
 ├── icon/                       # A00480_FileTool.svg / .png (폴더 + 들어오고 나가는 화살표)
 ├── CHANGELOG.md
 └── app/
-    ├── config/version.py       # VERSION = "01.01"
+    ├── config/version.py       # VERSION = "01.02"
     ├── core/                   # UI 비의존 (결과는 로그 문자열 리스트)
     │   ├── fbx_plugin.py       # ensure_fbx_plugin() — Export · Import 공용
     │   ├── export_ops.py       # A00040_V02 export_ops 이식 (타입 필터 · 파일명 · FBX export)

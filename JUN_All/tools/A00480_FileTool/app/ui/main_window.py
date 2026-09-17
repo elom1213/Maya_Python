@@ -80,6 +80,9 @@ class MainWindow(QWidget):
         # 고정 크기 - "Pin"/"Pinned" 토글 시 버튼 크기가 변하지 않도록(넓은 라벨 기준).
         # 높이는 메뉴 바 한 줄에 맞춘다(28 이면 헤더 행이 원본 A00040 의 메뉴 바보다 커진다).
         self.pin_button.setFixedSize(72, 22)
+        # 테마 qss 의 QPushButton padding(8px)이면 22px 높이에 글자 자리가 4px 뿐이라 글자가 잘린다.
+        # 이 버튼만 위아래 padding 을 뺀다(색 · 테두리 등 나머지는 테마 규칙이 그대로 적용된다).
+        self.pin_button.setStyleSheet("QPushButton { padding: 0px 4px; }")
         self.pin_button.toggled.connect(self.toggle_always_on_top)
 
         header_row = QHBoxLayout()

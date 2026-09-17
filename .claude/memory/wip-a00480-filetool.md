@@ -26,4 +26,6 @@ metadata:
   그 전(테마 직후 · show 직전)에 재거나 resize 하면 글자 큰 상태의 최소 크기(~1290)로 창이 커진다.
   launch 가 `QTimer.singleShot(0, fit_to_content)` 로 show 다음 루프에서 `resize(minimumSizeHint())`.
   탭 테두리만큼(+4 x +6)은 Export 페이지 여백 0 · 창 좌우 여백 -2 · Pin 높이 22 로 상쇄. → [[offscreen-size-needs-theme]]
+  Pin 을 22px 로 줄이면 테마 `QPushButton { padding: 8px }` 에 글자가 잘린다 → 버튼 stylesheet `padding: 0px 4px`(v01.02).
+  오프스크린은 폰트가 안 그려져 캡처로 확인 불가 — `style().subElementRect(SE_PushButtonContents)` 높이로 확인.
 - 마야 GUI 육안 확인은 아직.

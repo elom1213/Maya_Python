@@ -1,5 +1,9 @@
 # Changelog — A00480_FileTool
 
+## v01.02 (2026-09-17)
+- Fix: the Pin button label was clipped. The button keeps its 72 x 22 size; its
+  vertical padding is now 0 (the theme's 8px padding left only 4px for the text).
+
 ## v01.01 (2026-09-17)
 - The window now opens at the same size as `A00040_file_exporter_V02`
   (960 x 853 with slate_dark). v01.00 measured its size before the theme reached
