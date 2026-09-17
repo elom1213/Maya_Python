@@ -1487,13 +1487,24 @@ class MainWindow(QWidget):
         opt_box = QGroupBox("Options")
         opt_lay = QVBoxLayout(opt_box)
 
-        self.chk_combine_world = QCheckBox("Keep world position")
-        self.chk_combine_world.setChecked(True)
-        self.chk_combine_world.setToolTip(
-            "On  : the added shape stays exactly where the Source curve is drawn.\n"
-            "Off : the CV values are kept in local space, so the shape moves with the\n"
-            "      Target's transform (same as MEL 'parent -s -add').")
-        opt_lay.addWidget(self.chk_combine_world)
+        # 배치 방식 (v01.13) - 기본은 Source 를 Target 월드 위치로 옮긴 모양
+        opt_lay.addWidget(QLabel("Placement"))
+        self.rb_combine_place = {}
+        for mode, label, tip in (
+                (combine_mgr.PLACE_TARGET, "Move to Target position",
+                 "The shape as if the Source curve were moved to the Target's world\n"
+                 "position (pivot to pivot, like Match Transformation > Position).\n"
+                 "The Source's rotation and scale are kept."),
+                (combine_mgr.PLACE_WORLD, "Keep Source world position",
+                 "The added shape stays exactly where the Source curve is drawn."),
+                (combine_mgr.PLACE_LOCAL, "Keep local CV values",
+                 "The CV values are copied in local space, so the shape follows the\n"
+                 "Target's transform (same as MEL 'parent -s -add').")):
+            rb = QRadioButton(label)
+            rb.setToolTip(tip)
+            opt_lay.addWidget(rb)
+            self.rb_combine_place[mode] = rb
+        self.rb_combine_place[combine_mgr.PLACE_TARGET].setChecked(True)
 
         self.chk_combine_delete = QCheckBox("Delete Source curves after combining")
         self.chk_combine_delete.setToolTip(
@@ -1525,10 +1536,12 @@ class MainWindow(QWidget):
             return
 
         delete_sources = self.chk_combine_delete.isChecked()
+        placement = next((m for m, rb in self.rb_combine_place.items() if rb.isChecked()),
+                         combine_mgr.PLACE_TARGET)
         try:
             result = combine_mgr.combine_shapes(
                 sources, targets,
-                keep_world=self.chk_combine_world.isChecked(),
+                placement=placement,
                 delete_sources=delete_sources)
         except Exception as e:                              # noqa: BLE001
             self.log("Combine failed: {0}".format(e), warn=True)

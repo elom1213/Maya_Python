@@ -1,5 +1,23 @@
 # Changelog — A00400_CurveTool
 
+## v01.13 (2026-09-17)
+**[Change] `Edit > Combine` — 기본으로 Source 를 Target 월드 위치로 옮긴 모양이 합쳐진다.**
+
+- **요청**: Combine Shapes 결과가 *Source 오브젝트를 Target 의 월드 위치로 이동한 뒤의 커브 모양* 이어야 한다.
+  v01.11 은 Source 가 보이던 자리 그대로 붙어서, Target 에서 떨어진 곳에 쉐입이 생겼다.
+- **[Add] `Placement` 라디오 3 개** (`Keep world position` 체크박스 대체)
+  - **`Move to Target position`(기본)** — Source 의 월드 CV 에 `(Target rotate pivot − Source rotate pivot)` 을 더한다.
+    Source 의 회전·스케일은 그대로.
+  - `Keep Source world position` — v01.11 의 켬 동작.
+  - `Keep local CV values` — v01.11 의 끔 동작(MEL `parent -s -add` 와 같음).
+- **[Note] 피벗끼리 맞춘다** — mayapy 실측: `matchTransform -pos` 후 A 의 월드 rotate pivot == B 의 월드
+  rotate pivot 이고, translate 값끼리는 다르다. 그래서 Maya Match Transformation > Position 과 같은 기준을 썼다.
+- core API: `combine_shapes(..., keep_world=)` → `combine_shapes(..., placement=PLACE_TARGET | PLACE_WORLD | PLACE_LOCAL)`.
+
+**검증**(mayapy 2024 + 오프스크린 Qt, **12항목 전부 통과**): 기본 결과 == Source 복제본에 `matchTransform -pos`
+한 모양(회전 · 비균등 스케일 · 피벗이 옮겨진 Source, 회전·스케일된 Target) · Source 불변 · 인스턴스 아님 ·
+단일 undo · World / Local 모드 · 잘못된 placement 거절 · 부모가 있는 Source/Target 에서 N→1 · UI 기본 라디오 · UI 실행.
+
 ## v01.11 (2026-09-17)
 **[Feature] `Edit > Combine` — 좌측 Source 커브의 쉐입을 우측 Target 커브에 합친다.**
 

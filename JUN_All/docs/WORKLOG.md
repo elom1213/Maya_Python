@@ -31,6 +31,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-17 (오늘)
 
+> [!summary] **A00400 `Edit > Combine` 기본 배치 변경** — Source 를 Target 월드 위치(rotate pivot)로 옮긴 모양으로 합친다 (v01.13)
+- **요청**: Combine Shapes 가 Source 커브 쉐입을 보이던 자리 그대로 붙이던 것을, Source 를 Target 월드 위치로 이동한 뒤의 모양으로.
+- `Keep world position` 체크박스를 **`Placement` 라디오 3 개**로 교체 — `Move to Target position`(기본) / `Keep Source world position` / `Keep local CV values`.
+- 기준은 `matchTransform -pos` 와 같은 **rotate pivot** (mayapy 실측). 회전·스케일은 Source 것 유지.
+- 검증: mayapy 2024 + 오프스크린 Qt 12항목 통과 (결과 == 복제본에 `matchTransform -pos` 한 모양).
+
 > [!summary] **공용 메뉴 바 `JUN_mod_menuBar_qt_v01` 신규** — 모든 툴 `Help` 메뉴에 **`Copy Tool Name`**(툴 폴더 이름을 클립보드로). PySide 툴 42곳 + maya.cmds 툴 7곳
 - **요청**: 각 툴 창 위 `Help` 메뉴에 `Copy Tool Name` — 누르면 그 툴 코드가 있는 폴더 이름(예: `A00060_jointTool_V03`)을
   클립보드로. 앞으로 **모든 툴 공통 항목이나 다른 메뉴가 늘어날 수 있으니** 그 성질이면 공용 위젯으로 만들고 Help 도 그걸 쓰게.

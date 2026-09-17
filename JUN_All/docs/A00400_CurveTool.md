@@ -603,8 +603,11 @@ spine_crv_skinCluster          (커브를 세 조인트에 바인드)
    - Target **1 개** → 모든 Source 가 그 Target 으로 간다.
    - Target **여러 개** → Source 와 **행 순서대로 1:1**. 개수가 다르면 실행하지 않는다.
 2. 옵션
-   - **Keep world position**(기본 켬) — 붙은 쉐입이 **원래 보이던 자리 그대로** 남는다.
-     끄면 CV 로컬 값을 그대로 가져가서 Target 트랜스폼을 따라 움직인다(MEL `parent -s -add` 와 같다).
+   - **Placement** (v01.13~)
+     - **Move to Target position**(기본) — Source 를 **Target 의 월드 위치로 옮겼을 때의 모양**으로 붙는다.
+       Maya *Match Transformation > Position* 처럼 **rotate pivot 끼리** 맞추고, Source 의 회전·스케일은 그대로 둔다.
+     - **Keep Source world position** — 붙은 쉐입이 **원래 보이던 자리 그대로** 남는다(v01.11~01.12 기본).
+     - **Keep local CV values** — CV 로컬 값을 그대로 가져가서 Target 트랜스폼을 따라 움직인다(MEL `parent -s -add` 와 같다).
    - **Delete Source curves after combining** — 복사가 끝난 Source 를 지운다.
      Source 가 다른 짝의 Target 이거나 **밑에 Target 이 있으면** 지우지 않는다(같이 사라지므로).
 3. **Combine Shapes** — 한 번의 Undo 로 되돌릴 수 있다. 새 쉐입 이름은 `<Target>Shape#`.
