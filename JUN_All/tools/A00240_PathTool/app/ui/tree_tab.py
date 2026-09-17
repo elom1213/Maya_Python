@@ -595,8 +595,10 @@ class TreeTab(QWidget):
     # ============================================================== 필터
 
     def _on_filter_changed(self, _text):
+        # v01.09 : 필터는 펼침을 건드리지 않으므로, 지울 때도 접지 않는다 -
+        # 검색하는 동안 사용자가 직접 열어 둔 폴더가 그대로 남는다.
         for tree in list(self._trees):
-            self._apply_filter(tree)
+            self._apply_filter(tree, fold=False)
 
     def _filter_tokens(self):
         """공백으로 나눈 토큰들(소문자). 비어 있으면 빈 리스트 = 필터 없음.
@@ -618,8 +620,10 @@ class TreeTab(QWidget):
         - **전체 경로**로 본다. 이름은 경로의 일부라 이름 검색도 그대로 되고, 폴더 이름을
           치면 그 아래가 통째로 남는다("경로로 찾기").
         - 맞은 항목의 **부모는 함께 보여 준다** - 안 그러면 트리에서 닿을 수가 없다.
-          그리고 맞은 곳까지 **펼쳐 준다**(접혀 있으면 찾아 놓고도 안 보인다).
-        - 필터를 지우면 **기본 접힘 상태로 되돌린다**(3번 규칙과 같은 모양).
+        - ★ **펼침은 건드리지 않는다**(v01.09). 예전에는 맞은 곳까지 펼쳐 줬는데, 폴더 이름으로
+          찾으면 그 아래 경로가 전부 맞은 것이 되어 **트리가 통째로 펼쳐졌다.** 이제는 걸러진
+          트리가 **지금 접힘 상태 그대로** 보이고, 필요한 곳만 직접 연다(Shift 로 한꺼번에).
+        - 필터를 지워도 펼침은 그대로다. 트리를 새로 그릴 때(`fold=True`)만 기본 접힘으로.
 
         재귀 대신 후위 순회 스택을 쓴다 - 자식의 판정이 부모에 올라와야 하므로 아래에서
         위로 접어 올린다.
@@ -677,18 +681,9 @@ class TreeTab(QWidget):
             if self_hit:
                 matched += 1
 
-        # 2) 보이기/숨기기 + 맞은 곳까지 펼치기(자식이 맞은 폴더만 연다).
-        self._bulk = True
-        try:
-            for node in order:
-                show = keep.get(id(node), False)
-                node.setHidden(not show)
-                if show and node.childCount():
-                    node.setExpanded(
-                        any(keep.get(id(node.child(i)), False)
-                            for i in range(node.childCount())))
-        finally:
-            self._bulk = False
+        # 2) 보이기/숨기기만 한다. 펼침은 건드리지 않는다(v01.09).
+        for node in order:
+            node.setHidden(not keep.get(id(node), False))
 
         root.setHidden(False)      # 루트는 언제나 보인다(닿는 길)
         root.setExpanded(True)

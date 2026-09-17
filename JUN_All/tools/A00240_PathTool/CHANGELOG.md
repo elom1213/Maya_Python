@@ -2,6 +2,16 @@
 
 All notable changes to this tool are documented here.
 
+## [01.09] - 2026-09-17
+### Changed
+- **Tree tab: the Filter no longer expands the tree.** Before, every folder on the way to a
+  match was opened - and since a folder name (`charA`) matches every path below it, searching
+  for a folder expanded the whole subtree. Now the filter only hides what does not match; the
+  tree keeps its current expanded/collapsed state and you open what you need (Shift + expand
+  still opens everything below).
+- Clearing the filter no longer folds the tree back to the default - folders you opened while
+  searching stay open. `Build`, `Depth` and `Show files` still start folded as before.
+
 ## [01.08] - 2026-09-16
 ### Added
 - **Tree tab: `Refresh`.** Reads the folders again and updates the tree **without losing the
