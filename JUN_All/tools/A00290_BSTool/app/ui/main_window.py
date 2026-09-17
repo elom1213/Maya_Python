@@ -31,6 +31,7 @@ import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
+from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 from tools.A00290_BSTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00290_BSTool.app.core import (EditBSManager, BaseShapeManager,
                                           MixManager, ShapeEditorManager,
@@ -250,7 +251,7 @@ class MainWindow(QWidget):
         main_layout = QVBoxLayout(self)
 
         # 메뉴 바 (Help > About)
-        self.menu_bar = QMenuBar()
+        self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
         help_menu = self.menu_bar.addMenu("Help")
         act_about = help_menu.addAction("About")
         act_about.triggered.connect(self.show_about)

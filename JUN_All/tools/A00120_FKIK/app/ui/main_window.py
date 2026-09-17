@@ -9,6 +9,7 @@ from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_timeRange_qt
 from Framework.core.maya_refresh import force_refresh
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
+from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -48,7 +49,7 @@ class MainWindow(QWidget):
         root = QVBoxLayout(self)
 
         # 맨 위 메뉴 바 (Help > About)
-        self.menu_bar = QMenuBar()
+        self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
         help_menu = self.menu_bar.addMenu("Help")
         act_about = help_menu.addAction("About")
         act_about.triggered.connect(self.show_about)

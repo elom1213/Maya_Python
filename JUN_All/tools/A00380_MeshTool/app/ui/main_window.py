@@ -22,6 +22,7 @@ import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
+from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 from tools.A00380_MeshTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00380_MeshTool.app.core import peak_manager as peak_mgr
 from tools.A00380_MeshTool.app.core import match_manager as match_mgr
@@ -101,7 +102,7 @@ class MainWindow(QWidget):
 
         root = QVBoxLayout(self)
 
-        self.menu_bar = QMenuBar()
+        self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
         help_menu = self.menu_bar.addMenu("Help")
         help_menu.addAction("About").triggered.connect(self.show_about)
         root.setMenuBar(self.menu_bar)

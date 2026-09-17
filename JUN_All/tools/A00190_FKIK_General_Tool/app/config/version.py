@@ -1,5 +1,5 @@
 # FKIK General Tool - FK/IK match & bake tool (PySide UI).
 # Refactor of legacy maya.cmds tool JUN_PY_FKIK_General_Tool_V01_02.py.
 
-VERSION = "01.03"
-LAST_UPDATE = "2026-09-16"
+VERSION = "01.04"
+LAST_UPDATE = "2026-09-17"

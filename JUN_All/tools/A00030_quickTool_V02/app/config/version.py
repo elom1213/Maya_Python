@@ -7,5 +7,5 @@
 # 02.01  Shelf > Update Shelves 추가 : 지금 셸프 상태를 prefs/shelves 에 즉시 쓴다.
 #        마야는 종료할 때만 저장해서, 켜 둔 채 새 마야를 띄우면 옛 셸프가 보였다.
 
-VERSION = "02.01"
+VERSION = "02.02"
 LAST_UPDATE = "2026-09-17"

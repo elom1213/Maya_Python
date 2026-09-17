@@ -55,6 +55,7 @@ from tools.A00275_skinTool_V01.app.core import weight_copy_manager as wc_mgr
 from Framework.core import falloff_curve as falloff   # 2026-09-09 Framework 로 승격
 from Framework.qt import JUN_mod_falloffCurve_qt
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
+from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -129,7 +130,7 @@ class MainWindow(QWidget):
         main_layout = QVBoxLayout(self)
 
         # 메뉴 바 (Help > About)
-        self.menu_bar = QMenuBar()
+        self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
         help_menu = self.menu_bar.addMenu("Help")
         act_about = help_menu.addAction("About")
         act_about.triggered.connect(self.show_about)

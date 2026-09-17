@@ -12,7 +12,7 @@ from functools import partial
 
 from . import config
 from .utility import *
-from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem
+from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_menu
 
 class JUN_ToolUI_uvTool_v01:
     def __init__(self):
@@ -119,6 +119,7 @@ class JUN_ToolUI_uvTool_v01:
     
         cmds.menu( label='Help' );
         cmds.menuItem( label='About', command = self.show_about);
+        JUN_mod_menu.add_common_items('Help', tool_file=__file__);
 
         cmds.columnLayout(adjustableColumn=True, 
                           columnAttach=('both', 5), 

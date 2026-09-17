@@ -25,6 +25,7 @@ import config
 from Framework.core.maya_undo import undo_chunk
 from Framework.qt.maya_window import maya_ui_widget
 from Framework.qt.qt import Qt
+from Framework.ui import JUN_mod_menu
 
 #====================================================================
 # call back functions (Start)
@@ -383,6 +384,7 @@ class JUN_ToolUI_QuickTool:
     
         cmds.menu( label='Help' );
         cmds.menuItem( label='About', command = self.menu_cmd);
+        JUN_mod_menu.add_common_items('Help', tool_file=__file__);
 
         cmds.columnLayout(adjustableColumn=True,
                           columnAttach=('both', 5),

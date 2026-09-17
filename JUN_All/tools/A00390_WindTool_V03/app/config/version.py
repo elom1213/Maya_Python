@@ -28,5 +28,5 @@
 #                    62.97ms -> 63.18ms). 둘은 전혀 다른 일이다.
 # 03.01  로그창을 공용 위젯 `JUN_mod_log_qt_v01` 로 교체 (Expand / Clear / Copy)
 
-VERSION = "03.01"
-LAST_UPDATE = "2026-09-16"
+VERSION = "03.02"
+LAST_UPDATE = "2026-09-17"

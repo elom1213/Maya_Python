@@ -1,5 +1,5 @@
 # abSymMesh - symmetrical / asymmetrical blendshape tool (PySide UI).
 # Python / OpenMaya 2.0 re-implementation of Brendan Ross's abSymMesh (origin.mel).
 
-VERSION = "02.06"
-LAST_UPDATE = "2026-09-16"
+VERSION = "02.07"
+LAST_UPDATE = "2026-09-17"

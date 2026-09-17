@@ -16,6 +16,7 @@ from Framework.core.maya_undo import undo_chunk
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
+from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 
 from ..config.version import VERSION, LAST_UPDATE
 from ..core import matching
@@ -78,7 +79,7 @@ class MainWindow(QWidget):
         root.addWidget(footer)
 
     def _build_menu_bar(self):
-        bar = QMenuBar()
+        bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
         help_menu = bar.addMenu("Help")
         help_menu.addAction("About", self.show_about)
         return bar

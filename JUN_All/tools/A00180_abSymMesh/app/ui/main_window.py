@@ -18,6 +18,7 @@ from Framework.core.maya_undo import undo_chunk
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
+from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 
 from ..config.version import VERSION, LAST_UPDATE
 from ..core import mesh_io
@@ -370,7 +371,7 @@ class MainWindow(QWidget):
         return tab
 
     def _build_menu_bar(self):
-        bar = QMenuBar()
+        bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
         op_menu = bar.addMenu("Operations")
         op_menu.addAction("Copy A to B", lambda: self.on_add_sub_copy(2))
         op_menu.addAction("Add A to B", lambda: self.on_add_sub_copy(1))

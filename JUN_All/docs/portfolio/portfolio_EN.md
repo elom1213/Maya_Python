@@ -1,14 +1,14 @@
 ---
-title: Portfolio — Work Summary (2026-05-06 ~ 2026-09-16)
+title: Portfolio — Work Summary (2026-05-06 ~ 2026-09-17)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-09-16
+updated: 2026-09-17
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
 
 > **Author**: Ji Hun Park (Junny)
-> **Period**: 2026-05-06 – 2026-09-16 (~19 weeks)
+> **Period**: 2026-05-06 – 2026-09-17 (~19 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
 > **Volume**: 50+ in-house tools (64 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
@@ -654,6 +654,7 @@ I designed the common foundation alongside the tools, not as an afterthought.
   - `PathManager` (read/write path separation), Maya main-window parenting, module reloader.
   - **Rules that several tools share live in one file.** The left/right mirror tokens (`_l`<->`_r` ...) used to sit inside each tool, so the lists drifted apart silently; they now live in `Framework/rules/mirror_tokens.json`, read and written by both the animation tool's key mirror and the rigging tool's rig mirror. Name matching is decided on **token boundaries** rather than plain substring replacement - otherwise `arm_lower` becomes `arm_rower` and `_l` swallows `jnt_lf_01`.
   - **Build it once, then swap it into every tool - the shared log panel.** Every tool used to park its own read-only text box and pin its height; that is now one shared widget carrying **Expand (move the log into its own resizable window), Clear and Copy (the whole log)**, rolled into **all 47 PySide tools**. The swap came down to **two or three lines per tool** by design, not by luck: I first counted **every method the codebase actually calls on a log widget** (ten of them; zero type checks, zero `setStyleSheet` calls) and built the widget to answer to all of those names - so the **60-odd `append` / `appendPlainText` call sites were left untouched**. Height requests are forwarded to the **inner text**, not the container, so the button row cannot eat into the height the tool asked for and shrink the visible log (a trap the shared list widget had already taught me), and Expand **moves** the text rather than cloning it, so there are never two copies to keep in sync. The expanded window's `objectName` is derived from the tool's folder name, which keeps the four tools that ship side-by-side versions (V01/V02/V03 running at once) from closing each other's windows. Verified headlessly (`mayapy` + offscreen Qt) by **constructing all 47 tool windows for real** and checking widget type, name uniqueness, HTML-coloured logs, where the height constraints landed, and an expand/collapse round trip.
+  - **Same approach for menus - the shared menu bar.** The `Help` menu on top of every tool window is now a shared widget, and every tool got **`Copy Tool Name`** (copies the tool folder name to the clipboard) at once. Each tool changed **only the `QMenuBar()` line** - `addMenu("Help")` now returns the existing menu instead of making a second one, so existing items like `About` attach unchanged, and shared items are always sorted to **the bottom** when the menu opens. Shared items live in one registry file, so **one added line reaches all 42 PySide tools and 7 maya.cmds tools**.
   - Recurring Maya traps are fixed **once, in the framework, for every tool**: a shared shape-resolution helper replaced the `extendToShape` pattern across **6 tools** in one pass, removing the `kInvalidParameter: Object is incompatible` failures it caused on meshes carrying more than one shape node.
 - **Deployment / install system**
   - **Drag-&-drop shelf install** — drop a `.py` onto the Maya viewport and an icon shelf button appears. Solved the `sys.modules` cache collision between tools with a per-tool unique install-file convention.

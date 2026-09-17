@@ -27,6 +27,7 @@ from Framework.qt.qt import (
 )
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
+from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 
 from tools.A00080_KWI_creator_V03.app.config.version import VERSION
 from tools.A00080_KWI_creator_V03.app.core.KWI_creator import KWI_creator
@@ -64,7 +65,7 @@ class MainWindow(QWidget):
         self.layout = QVBoxLayout(self)
 
         # --- Menu bar (Help) ------------------------------------------
-        self.menu_bar = QMenuBar()
+        self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
         help_menu = self.menu_bar.addMenu("Help")
         help_menu.addAction("How to use").triggered.connect(self.show_help)
         self.layout.setMenuBar(self.menu_bar)

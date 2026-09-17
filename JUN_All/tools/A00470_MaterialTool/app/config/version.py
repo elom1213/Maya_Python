@@ -10,5 +10,5 @@
 #        (part = Body / Head / Eye / Tooth / Hair). 코드 수정 없이 JSON 한 장.
 # 01.05  Copy Material 탭 : 소스 메시 M 을 UUID 로 기억 -> 대상 메시 M_i 에 면별 머티리얼을 똑같이
 
-VERSION = "01.05"
+VERSION = "01.06"
 LAST_UPDATE = "2026-09-17"

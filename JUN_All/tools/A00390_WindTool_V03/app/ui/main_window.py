@@ -18,6 +18,7 @@ import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
+from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 from tools.A00390_WindTool_V03.app.config.version import VERSION, LAST_UPDATE
 from tools.A00390_WindTool_V03.app.core import wind_manager as wind_mgr
 from tools.A00390_WindTool_V03.app.core import wave_manager as wave_mgr
@@ -51,7 +52,7 @@ class MainWindow(QWidget):
         root = QVBoxLayout(self)
 
         # 메뉴 (Help > About)
-        self.menu_bar = QMenuBar()
+        self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
         help_menu = self.menu_bar.addMenu("Help")
         help_menu.addAction("About").triggered.connect(self.show_about)
         root.setMenuBar(self.menu_bar)

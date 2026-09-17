@@ -9,5 +9,5 @@
 #   - Copy Name   : also works on SETS - a set cannot reuse a name, so "_copy" is added (v01.03)
 #   - Copy Name   : Search / Replace a word inside the Base name before copying (v01.05)
 
-VERSION = "01.05"
+VERSION = "01.06"
 LAST_UPDATE = "2026-09-17"

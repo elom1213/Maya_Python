@@ -18,6 +18,7 @@ import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
+from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 from tools.A00420_Wrapper.app.config.version import VERSION, LAST_UPDATE
 
 # core 는 numpy 를 쓴다(Maya 2022+ 내장). 없으면 창은 뜨되 기능을 막고 이유를 알린다.
@@ -81,7 +82,7 @@ class MainWindow(QWidget):
 
         root = QVBoxLayout(self)
 
-        self.menu_bar = QMenuBar()
+        self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
         help_menu = self.menu_bar.addMenu("Help")
         help_menu.addAction("About").triggered.connect(self.show_about)
         root.setMenuBar(self.menu_bar)

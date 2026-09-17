@@ -20,6 +20,7 @@ from Framework.qt.qt import (
 )
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
+from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 
 from tools.A00470_MaterialTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00470_MaterialTool.app.core import profiles
@@ -48,7 +49,7 @@ class MainWindow(QWidget):
         main_layout = QVBoxLayout(self)
 
         # 상단 헤더 행 : 메뉴 바(좌) + Always on Top 토글(우)
-        self.menu_bar = QMenuBar()
+        self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
         help_menu = self.menu_bar.addMenu("Help")
         help_menu.addAction("About").triggered.connect(self.show_about)
         help_menu.addAction("Profile Format").triggered.connect(self.show_profile_format)

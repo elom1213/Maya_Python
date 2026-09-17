@@ -31,6 +31,32 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-17 (오늘)
 
+> [!summary] **공용 메뉴 바 `JUN_mod_menuBar_qt_v01` 신규** — 모든 툴 `Help` 메뉴에 **`Copy Tool Name`**(툴 폴더 이름을 클립보드로). PySide 툴 42곳 + maya.cmds 툴 7곳
+- **요청**: 각 툴 창 위 `Help` 메뉴에 `Copy Tool Name` — 누르면 그 툴 코드가 있는 폴더 이름(예: `A00060_jointTool_V03`)을
+  클립보드로. 앞으로 **모든 툴 공통 항목이나 다른 메뉴가 늘어날 수 있으니** 그 성질이면 공용 위젯으로 만들고 Help 도 그걸 쓰게.
+- **공용으로 만들었다 — 세 조각.** ① `Framework/core/tool_menu.py` : 공통 항목 **레지스트리**(`COMMON_MENUS`) +
+  툴 이름 판정 + 동작(maya/Qt 비의존) ② `Framework/qt/MOD_menuBar_qt_v01.py` : `QMenuBar` 대체 위젯
+  ③ `Framework/ui/MOD_menu_v01.py` : maya.cmds 메뉴용 함수. **두 UI 계열이 같은 목록을 읽어서**, 앞으로
+  항목 추가는 레지스트리 **한 줄**이면 49툴 전부에 생긴다(새 메뉴 제목이면 그 메뉴가 생긴다).
+- **드롭인 교체** — PySide 툴은 전부 `self.menu_bar = QMenuBar()` → `addMenu("Help")` 모양이었다.
+  `addMenu("제목")` 을 **"있으면 돌려주고 없으면 만든다"** 로 바꿔, 툴은 **생성 한 줄**만 바뀌고 `About` 등
+  기존 항목은 그대로 붙는다. cmds 툴은 `About` 다음에 `JUN_mod_menu.add_common_items('Help', tool_file=__file__)` 한 줄.
+- 공통 항목은 **메뉴가 열릴 때(`aboutToShow`) 구분선과 함께 맨 아래로** 옮긴다(생성자에서 먼저 들어가서
+  그냥 두면 About 가 그 아래에 붙는다). 툴이 새로 만든 메뉴는 **Help 왼쪽**에 끼운다 — `A00180` 은 `Operations | Help`.
+- 툴 이름은 `__file__` 에서 **부모가 `tools` 인 폴더**, 없으면 `app` 을 담은 폴더. 결과는 창 안 공용 로그창에
+  `[Copy Tool Name] Copied to clipboard : <name>`, 로그창이 없으면 print. 못 찾으면 클립보드를 건드리지 않는다.
+- **★ PySide2 에서 `QAction.menu()` 가 메뉴를 지웠다.** 처음엔 기존 메뉴를 `action.menu()` 로 찾았는데, 이
+  서브클래스에서 한 번 부르자 곧바로 `Internal C++ object (QMenu) already deleted`. 메뉴를 **만들 때 파이썬 목록에
+  기억**하고 `menu()` 를 쓰지 않도록 바꿨다.
+- **검증(mayapy 2024 + 오프스크린 Qt)** — 위젯 **28항목** · PySide 툴 **42곳 전수 스모크 42/42**(실제 MainWindow
+  생성 → Help 맨 오른쪽 하나 · 기존 항목 유지 · 맨 아래 Copy Tool Name · 클립보드 = 폴더명 · 로그 기록) ·
+  cmds 헬퍼 5항목 + 7개 파일 컴파일. **cmds 메뉴 실물은 standalone 에 UI 가 없어 마야 GUI 확인이 남았다.**
+- 42툴 `version.py` +0.01. 메뉴 바가 없는 창(템플릿 2개 · `A00090` · `A00210` · `A00240` 등 15곳)은 대상이 아니다.
+  파일: `Framework/core/tool_menu.py`(신규) · `Framework/qt/MOD_menuBar_qt_v01.py`(신규) · `Framework/ui/MOD_menu_v01.py`(신규) ·
+  `Framework/qt/__init__.py` · `Framework/ui/__init__.py` · `tools/*/app/ui/main_window.py` 42 · cmds 툴 7 ·
+  [`docs/Framework_MOD_menuBar_qt.md`](Framework_MOD_menuBar_qt.md)(신규) · `docs/portfolio/portfolio_EN.md` · `portfolio_KR.md`
+    #Framework #menu #widget
+
 > [!summary] `A00470_MaterialTool` — **`Copy Material`** 탭 추가 : 소스 메시 M(UUID 로 기억)의 면별 머티리얼을 M_i 에 똑같이 (v01.04 -> 01.05)
 - **요청**: 메시 M 을 UUID 로 기억, TSL 에 M_i 를 담고, `Copy Material` 로 M 의 면마다 붙은 머티리얼을 M_i 의 같은 면에.
 - 면별 배정은 `MFnMesh.getConnectedShaders` 로 읽는다(A00275 에서 확인한 방식). 머티리얼이 하나면 셰이프째,

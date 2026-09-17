@@ -12,5 +12,5 @@
 # 01.10  로그창을 공용 위젯 `JUN_mod_log_qt_v01` 로 교체 (Expand / Clear / Copy)
 # 01.11  Edit > Combine       - Source 커브 쉐입을 Target 에 복사해 합친다 (인스턴스 아님)
 
-VERSION = "01.11"
+VERSION = "01.12"
 LAST_UPDATE = "2026-09-17"

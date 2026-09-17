@@ -8,7 +8,7 @@ from functools import partial
 
 
 import config
-from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem
+from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_menu
 
 class JUN_ToolUI_humanIKTool_01_01:
     def __init__(self):
@@ -128,6 +128,7 @@ class JUN_ToolUI_humanIKTool_01_01:
     
         cmds.menu( label='Help' );
         cmds.menuItem( label='About', command = self.menu_cmd);
+        JUN_mod_menu.add_common_items('Help', tool_file=__file__);
 
 
         
