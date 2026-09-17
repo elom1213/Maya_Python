@@ -342,3 +342,76 @@ def set_local_axis(state):
         logs.append("[WARN] Could not change {0} object(s) (locked or connected) : "
                     "{1}".format(len(failed), failed))
     return logs
+
+
+# ==========================================================================
+# Shelf
+# ==========================================================================
+
+def _shelf_top_level():
+    """셸프 탭 레이아웃 이름(`$gShelfTopLevel`). UI 가 없으면 빈 문자열."""
+    try:
+        return mel.eval('global string $gShelfTopLevel; '
+                        '$JUN_quickTool_tmp = $gShelfTopLevel;') or ""
+    except RuntimeError:
+        return ""
+
+
+def _shelf_file(folder, name):
+    return os.path.join(folder, "shelf_{0}.mel".format(name))
+
+
+def _mtime(path):
+    try:
+        return os.path.getmtime(path)
+    except OSError:
+        return None
+
+
+def save_all_shelves():
+    """지금 셸프 상태를 `prefs/shelves` 에 **즉시** 쓴다.
+
+    ★ 왜 필요한가 — **마야는 셸프를 종료할 때 저장한다.** 그래서 셸프를 고쳐 놓고(드롭 설치로
+    버튼이 생기는 것도 포함) 그 마야를 켠 채 **다른 마야를 새로 띄우면**, 새 마야는 디스크에
+    남아 있는 **옛 파일**을 읽어 바뀐 것이 하나도 안 보인다. 고친 마야를 껐다 켜야 반영된다.
+    이 함수가 그 저장을 **지금** 해 버리므로, 이후에 뜨는 마야는 바뀐 셸프를 그대로 읽는다.
+
+    ★ 조심할 것 — `saveAllShelves("")` 는 **빈 인자에도 조용히 성공한다**(mayapy 실측).
+    그대로 부르면 아무것도 안 쓰고 "됐다" 고 말하게 된다. 그래서
+      1) UI 가 있는지(`$gShelfTopLevel` + 탭 레이아웃)를 먼저 보고,
+      2) 저장 전후의 **파일 수정 시각을 비교해** 실제로 쓰였는지 확인한다.
+    """
+    top = _shelf_top_level()
+    if not top or not cmds.shelfTabLayout(top, exists=True):
+        return ["[WARN] Shelves are only available in the Maya UI "
+                "(nothing to save here)."]
+
+    folder = cmds.internalVar(userShelfDir=True)
+    names = cmds.shelfTabLayout(top, query=True, childArray=True) or []
+    if not names:
+        return ["[WARN] No shelf found to save."]
+
+    before = {name: _mtime(_shelf_file(folder, name)) for name in names}
+
+    try:
+        mel.eval('global string $gShelfTopLevel; saveAllShelves($gShelfTopLevel);')
+    except RuntimeError as exc:
+        return ["[WARN] Could not save the shelves : {0}".format(
+            str(exc).strip().splitlines()[0] if str(exc).strip() else exc)]
+
+    written = [name for name in names
+               if _mtime(_shelf_file(folder, name)) != before[name]]
+
+    if not written:
+        return ["[WARN] saveAllShelves ran but no shelf file changed on disk - "
+                "check that {0} is writable.".format(folder)]
+
+    logs = ["Saved {0} of {1} shelf file(s) to {2}".format(
+        len(written), len(names), folder)]
+    logs.append("A Maya started from now on will see these shelves "
+                "(no need to close this one first).")
+
+    missed = [name for name in names if name not in written]
+    if missed:
+        logs.append("[WARN] Not written : {0}".format(missed))
+    return logs

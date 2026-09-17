@@ -16,6 +16,7 @@
 #   Import option : Import FBX normal
 #   Create        : Create texture file · Cluster Each
 #   File          : Copy Scene Folder
+#   Shelf         : Update Shelves  (v02.01~ 신규 - 레거시에 없던 것)
 #   Display       : Local Axis ON · Local Axis OFF
 #
 # 창은 마야 메인 윈도우에 parent 되어 뷰포트 위에 뜬다. 모든 UI 문자열/로그는 영어.
@@ -80,6 +81,13 @@ class MainWindow(QWidget):
         ("File", (
             ("Copy Scene Folder", "on_copy_scene_folder",
              "Copy the folder of the current scene to the clipboard."),
+        )),
+        ("Shelf", (
+            ("Update Shelves", "on_update_shelves",
+             "Write the current shelves to disk right now.\n"
+             "Maya only saves shelves when it quits, so a Maya started while this "
+             "one is open\nwould read the old files. Press this and the next Maya "
+             "sees your shelves."),
         )),
         ("Display", (
             ("Local Axis ON", "on_local_axis_on",
@@ -217,6 +225,9 @@ class MainWindow(QWidget):
         clipboard.setText(folder)
         self._log("Copied to clipboard : {0}".format(folder))
 
+    def on_update_shelves(self):
+        self._log_all(core.save_all_shelves())
+
     def on_local_axis_on(self):
         self._log_all(core.set_local_axis(True))
 
@@ -256,6 +267,8 @@ class MainWindow(QWidget):
             "[Import option] Import FBX normal - use the normals in the file.\n"
             "[Create] Create texture file / Cluster Each.\n"
             "[File] Copy Scene Folder - the scene's folder to the clipboard.\n"
+            "[Shelf] Update Shelves - write the shelves to disk now, so a Maya\n"
+            "  started later sees them (Maya only saves them on exit).\n"
             "[Display] Local Axis ON / OFF - batch show or hide local axes.\n"
             "\n"
             "Written by Ji Hun Park."

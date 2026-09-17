@@ -2,7 +2,7 @@
 title: A00030_quickTool_V02 사용법
 aliases: [Quick Tool V02, QuickToolV2, 퀵툴 V02]
 tags: [maya-python, tool-guide, quicktool, pyside, qt]
-updated: 2026-09-16
+updated: 2026-09-17
 ---
 
 # A00030_quickTool_V02 — Quick Tool (PySide 재작성)
@@ -11,7 +11,7 @@ updated: 2026-09-16
 다시 쓴 버전이다. **버튼도 동작도 그대로**고 달라진 것은 그릇이다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`slate_dark` 테마)
-- **버전**: `app/config/version.py` (v02.00)
+- **버전**: `app/config/version.py` (v02.01)
 - **설치**: `__dragDrop_A00030_V02.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **QuickToolV2**
   → `tools.A00030_quickTool_V02.run(True)`
 - **V01 과 동시에 띄울 수 있다** — 창과 로그 확장창의 `objectName` 이 갈렸다.
@@ -29,14 +29,15 @@ updated: 2026-09-16
 | 색 | 코드에 RGB 를 박아 둠 | 공용 **테마 qss** |
 | FBX 버튼 | 플러그인이 없으면 **트레이스백** | 플러그인을 올려 보고, 안 되면 **로그로 이유** |
 
-**기능은 하나도 빠지지 않았다** — 섹션 6개, 버튼 10개 그대로다.
+**V01 의 기능은 하나도 빠지지 않았다** — 섹션 6개, 버튼 10개 그대로다.
+v02.01 에서 **`Shelf > Update Shelves` 하나만 새로 붙었다**(레거시에 없던 기능).
 
 ---
 
 ## 2. 화면 구성
 
 ```
-┌ Quick Tool v02.00 ──────────────────┐
+┌ Quick Tool v02.01 ──────────────────┐
 │ Help                        [ Pin ] │   ← 메뉴 + 항상 위 토글
 │ ┌ Update window ────────────────┐   │
 │ │ [ Selected ] [ All Windows ]  │   │
@@ -48,6 +49,8 @@ updated: 2026-09-16
 │ │ [ Create texture file ] [ Cl… ]│  │
 │ ├ File ────────────────────────┤    │
 │ │ [ Copy Scene Folder ]         │   │
+│ ├ Shelf ──────────────────────┤    │
+│ │ [ Update Shelves ]            │   │
 │ ├ Display ─────────────────────┤    │
 │ │ [ Local Axis ON ] [ Local A… ]│   │
 │ └───────────────────────────────┘   │
@@ -113,6 +116,33 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
 
 > `A00040_file_exporter_V02` 의 **`Paste`** 버튼과 짝이다 — 여기서 복사해 거기에 붙여넣는다.
 
+### Shelf — `Update Shelves` (v02.01~, 레거시에 없던 것)
+
+**지금 셸프 상태를 `prefs/shelves` 에 즉시 쓴다.**
+
+> **왜 필요한가** — 마야는 셸프를 **종료할 때** 저장한다. 그래서 셸프를 고쳐 놓고(툴의
+> `__dragDrop_*.py` 를 떨어뜨려 버튼이 생긴 것도 포함) **그 마야를 켠 채 다른 마야를 새로 띄우면**,
+> 새 마야는 디스크에 남아 있는 **옛 파일**을 읽어 바뀐 것이 하나도 안 보인다. 고친 마야를 껐다
+> 켜야 반영됐다. 이 버튼을 누르면 그 저장을 **지금** 해 버리므로, **이후에 뜨는 마야는 바뀐 셸프를
+> 그대로 읽는다.**
+
+로그에 **몇 개 중 몇 개가 실제로 쓰였는지**와 폴더 경로가 남는다.
+
+```
+Saved 12 of 12 shelf file(s) to C:/Users/USER/Documents/maya/2024/prefs/shelves/
+A Maya started from now on will see these shelves (no need to close this one first).
+```
+
+**주의 — 이미 떠 있는 다른 마야는 갱신되지 않는다.** 그 마야는 자기 메모리의 셸프를 들고 있고,
+**종료할 때 자기 상태로 파일을 덮어쓴다.** 즉 **마지막에 종료하는 마야가 이긴다.** 여러 마야를
+띄워 쓸 때는 셸프를 고친 쪽에서 이 버튼을 누르고, **다른 마야는 셸프를 건드리지 않은 채 끄는** 것이
+안전하다.
+
+> **구현 메모** — `saveAllShelves($gShelfTopLevel)` 를 부른다. 그런데 **`saveAllShelves("")` 는
+> 빈 인자에도 조용히 성공한다**(mayapy 실측). 그대로 부르면 아무것도 안 쓰고 "됐다" 고 말하게 되므로,
+> ① UI 가 있는지(`$gShelfTopLevel` + 탭 레이아웃)를 먼저 보고 ② 저장 **전후의 파일 수정 시각을
+> 비교해** 실제로 쓰였는지 확인한다. 하나도 안 바뀌었으면 성공이라고 하지 않고 경고한다.
+
 ### Display — `Local Axis ON` / `Local Axis OFF`
 
 선택한 오브젝트의 로컬 회전축 표시를 **한 번에** 켜고 끈다. 현재 상태를 먼저 보고 **목표와 다른
@@ -139,7 +169,7 @@ A00030_quickTool_V02/
 ├── __dragDrop_A00030_V02.py    # 셸프 설치 (TOOL_LABEL = "QuickToolV2")
 ├── icon/                       # A00030_quickTool_V02.svg / .png
 └── app/
-    ├── config/version.py       # VERSION = "02.00"
+    ├── config/version.py       # VERSION = "02.01"
     ├── core/quick_ops.py       # ★ 버튼이 하는 일 전부 (maya.cmds/mel, UI 비의존)
     └── ui/main_window.py       # 창 · 섹션 · 버튼 · 로그
 ```
@@ -153,9 +183,10 @@ A00030_quickTool_V02/
 
 ## 5. 검증 (mayapy 2024 + 오프스크린 Qt)
 
-**22항목 통과.**
+**22 + 12항목 통과.**
 
-- 섹션 6개와 버튼 10개가 **레거시와 같은 순서**, 전 버튼에 툴팁, Pin 토글과 로그창 존재
+- 섹션 7개와 버튼 11개(레거시 10 + `Update Shelves`)가 **레거시와 같은 순서**,
+  전 버튼에 툴팁, Pin 토글과 로그창 존재
 - `Selected` / `All Windows` 가 `playbackOptions -view` 를 실제로 바꾼다
 - `Print Selected` — 선택 없으면 경고, 있으면 이름 로그
 - `Print Hierarchy` — 조인트 3단 트리를 그리고, 이미 다른 트리 안이면 건너뛴다
@@ -166,6 +197,9 @@ A00030_quickTool_V02/
 - `Local Axis ON/OFF` — 실제 `displayLocalAxis` 값이 바뀌고, **컴포넌트를 골라도 부모 transform**
   으로 올라간다. 선택 없으면 경고
 - `Pin` — 켜면 `Pinned` + `WindowStaysOnTopHint`, 끄면 원복
+- `Update Shelves`(12항목) — UI 가 없으면 **트레이스백 없이 경고만** · 파일이 하나도
+  안 바뀌면 **성공이라고 하지 않음** · 쓰인 개수를 정확히 보고 · 일부만 쓰이면 어느 것이
+  안 쓰였는지 · MEL 실패는 경고 한 줄로
 - `run()` 진입점이 창을 띄우고, 다시 불러도 **보이는 창은 하나**
 
 > 실제 Maya GUI 육안 확인은 아직이다.

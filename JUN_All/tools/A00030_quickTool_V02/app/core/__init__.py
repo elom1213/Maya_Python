@@ -12,6 +12,7 @@ from .quick_ops import (
     create_cluster_each,
     scene_folder,
     set_local_axis,
+    save_all_shelves,
 )
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "create_cluster_each",
     "scene_folder",
     "set_local_axis",
+    "save_all_shelves",
 ]
