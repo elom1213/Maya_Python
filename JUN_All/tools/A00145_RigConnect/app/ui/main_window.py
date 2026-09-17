@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-26
+# last Update date : 2026-09-17
 # A00145_RigConnect - Qt UI
 #
 # MEL ConnectionTool V04.02 의 3탭(Constrain / Connect / List Connected)을 PySide 로
@@ -11,7 +11,7 @@
 #   Constrain : Constraint / Skin Weight / Group Create / Transfer / Target Edit /
 #               Update
 #   Connect   : Connect / List Connected / Pair
-#   Attribute : Copy / Create / Delete
+#   Attribute : Edit / Create
 #
 # 로직은 app/core 에 위임하고 이 모듈은 위젯 구성/시그널 연결/로그 출력만 담당한다.
 # 모든 UI 문자열(버튼/라벨/로그)은 영어. (한국어는 주석/독스트링만)
@@ -46,6 +46,7 @@ from tools.A00145_RigConnect.app.core import snapshot_manager as snap_mgr
 from tools.A00145_RigConnect.app.core import attr_profile_prefs as aprefs
 from tools.A00145_RigConnect.app.core import attr_create_manager as acreate_mgr
 from tools.A00145_RigConnect.app.core import attr_delete_manager as adel_mgr
+from tools.A00145_RigConnect.app.core import attr_order_manager as aord_mgr
 from tools.A00145_RigConnect.app.core import mirror_manager as mir_mgr
 from tools.A00145_RigConnect.app.core import (
     CONSTRAINT_TYPES, PAIRING_CLOSEST, PAIRING_ORDER,
@@ -1326,98 +1327,146 @@ class MainWindow(QWidget):
 
     # Attribute 하위 탭: (탭 라벨, 툴팁 = 설명, 빌더 메서드 이름).
     ATTRIBUTE_PAGES = (
-        ("Copy", "Copy attributes from one source object onto other objects, "
-         "same name or with a Prefix / Suffix", "_build_attribute_copy_page"),
+        ("Edit", "Pick existing attributes and reorder / copy / delete them",
+         "_build_attribute_edit_page"),
         ("Create", "Create attributes from a saved profile (name / type / range) "
          "on the listed objects", "_build_attribute_create_page"),
-        ("Delete", "Delete user defined attributes from the listed objects",
-         "_build_attribute_delete_page"),
     )
 
     def _build_attribute_tab(self):
-        """Attribute 탭 — 어트리뷰트를 다루는 세 가지 작업을 **중첩 탭**으로 나눈다.
+        """Attribute 탭 — **있는 것을 다루는 Edit** 과 **없는 것을 만드는 Create**.
 
-        Copy 는 씬에 있는 원본을 복제하고, Create 는 원본 없이 프로파일에 적어 둔
-        정의로 만들고, Delete 는 지운다. 셋 다 "어트리뷰트" 이지만 입력이 서로 달라
-        한 화면에 쌓으면 읽기 어렵다 — Constrain / Connect 탭과 같은 방식으로 나눈다.
+        v01.43 에서 Copy / Delete 를 Edit 하나로 합쳤다. 둘은 화면이 이미 같았다 —
+        오브젝트를 담고 → 어트리뷰트를 나열하고 → 고른 것에 무언가를 한다. 다른 것은
+        마지막 버튼 하나뿐이라, 같은 목록을 두 탭에서 따로 채우는 것이 낭비였다.
+        순서 바꾸기(Up / Down)도 "고른 것에 무언가를 한다" 라 같은 자리에 들어간다.
+
+        Create 는 합치지 않았다 — 씬에서 아무것도 읽지 않고 저장된 프로파일로 만드는,
+        입력의 출처가 다른 작업이다.
         """
         self.attribute_tabs = self._build_sub_tabs(self.ATTRIBUTE_PAGES)
         return self.attribute_tabs
 
-    def _build_attribute_copy_page(self):
-        """소스 오브젝트의 어트리뷰트를 골라 타겟들에 같은 정의로 새로 만드는 탭.
+    # --------------------------------------------------------------
+    # Attribute > Edit   (있는 어트리뷰트를 고르고 옮기고 복사하고 지우기)
+    # --------------------------------------------------------------
 
-        이름은 그대로 두거나 Prefix / Suffix 를 붙일 수 있다.
+    def _build_attribute_edit_page(self):
+        """이미 있는 어트리뷰트를 **고르고 → 옮기거나 · 복사하거나 · 지운다**.
+
+        ★ v01.43 에서 Copy 와 Delete 를 여기 하나로 합쳤다. 둘은 화면 구조가 이미 같았다 —
+        `오브젝트 TSL -> List Attributes -> 어트리뷰트 목록(+필터) -> 실행 버튼`. 다른 것은
+        **끝의 동작 하나**뿐이라 목록을 두 벌 유지할 이유가 없었다. 순서 바꾸기(Up / Down)도
+        같은 목록에 붙는 일이라 함께 들어왔다.
+
+        (`Create` 는 합치지 않았다 — 씬에서 어트리뷰트를 읽지 않고 저장된 프로파일로
+        만드는, 성격이 다른 작업이다.)
+
+        선택이 아니라 **체크박스**로 고른다. 필터를 걸어도 체크는 남으므로 여러 번 걸러
+        가며 고른 것을 모을 수 있다.
         """
         content = QWidget()
         layout = QVBoxLayout(content)
 
-        # --- Source : 오브젝트 1개 + 그 오브젝트의 어트리뷰트 목록 ---
-        src_box = QGroupBox("Source (attributes to copy)")
+        # --- 오브젝트 + 어트리뷰트 목록 (세 동작이 함께 쓴다) ---
+        src_box = QGroupBox("Objects and their attributes")
         src_layout = QHBoxLayout(src_box)
 
-        self.tsl_attr_src = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Source Object", select_label="Select",
-            list_min_height=150, log_callback=self.log)
-
         left = QVBoxLayout()
-        left.addWidget(self.tsl_attr_src)
+        self.tsl_aedit_objs = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", select_label="Select",
+            list_min_height=170, log_callback=self.log)
+        left.addWidget(self.tsl_aedit_objs)
+
         btn_list = QPushButton("List Attributes")
         btn_list.setToolTip(
-            "List the attributes of the first object in the Source list.")
-        btn_list.clicked.connect(self.on_attr_list)
+            "List the attributes of every object in the list.\n"
+            "The order shown is the order in the scene - that is what Up / Down "
+            "changes.")
+        btn_list.clicked.connect(self.on_aedit_list)
         left.addWidget(btn_list)
-
-        # 어트리뷰트는 여러 개를 골라 한 번에 복사한다.
-        self.lw_attr_src = QListWidget()
-        self.lw_attr_src.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.lw_attr_src.setMinimumHeight(150)
-        self.lw_attr_src.itemSelectionChanged.connect(self._update_attr_preview)
+        src_layout.addLayout(left, 1)
 
         right = QVBoxLayout()
         head = QHBoxLayout()
         head.addWidget(QLabel("Attributes"))
         head.addStretch(1)
-        self.lbl_attr_number = QLabel("Number: 0")
-        head.addWidget(self.lbl_attr_number)
+        self.lbl_aedit_number = QLabel("Number: 0")
+        head.addWidget(self.lbl_aedit_number)
         right.addLayout(head)
-        right.addWidget(self.lw_attr_src)
 
-        # 기본값 ON : 리깅에서 복사할 대상은 거의 항상 사용자 정의 어트리뷰트다.
-        # 끄면 translateX 같은 기본 어트리뷰트까지 전부 나온다.
+        self.lw_aedit_attrs = QListWidget()
+        self.lw_aedit_attrs.setMinimumHeight(170)
+        self.lw_aedit_attrs.setToolTip(
+            "Check the attributes to work on.\n"
+            "Hover a row to see which objects carry it.\n"
+            "Rows that cannot be reordered (built-ins) are shown in grey.")
+        self.lw_aedit_attrs.itemChanged.connect(self._update_attr_preview)
+        right.addWidget(self.lw_aedit_attrs, 1)
+
+        # 기본값 ON : 리깅에서 다루는 것은 거의 항상 사용자 정의 어트리뷰트다.
         self.cb_attr_user_only = QCheckBox("User defined only")
         self.cb_attr_user_only.setChecked(True)
         self.cb_attr_user_only.setToolTip(
             "On  : only custom (user defined) attributes.\n"
-            "Off : every attribute, including built-ins like translateX.")
+            "Off : every attribute, including built-ins like translateX.\n"
+            "Built-ins can be copied but NOT reordered - Maya cannot delete them.")
         right.addWidget(self.cb_attr_user_only)
 
-        # Connect 탭과 같은 공용 Filter. 예전에는 검색어가 목록을 다시 질의하는
-        # 인자였는데(Enter -> 재조회), 이제는 이미 채워진 목록을 즉시 거른다.
         search_row = QHBoxLayout()
-        self.flt_attr_src = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
-            self.lw_attr_src, placeholder="Type any part of an attribute name",
-            number_label=self.lbl_attr_number)
-        search_row.addWidget(self.flt_attr_src, 1)
-        btn_all = QPushButton("Select All")
-        btn_all.setToolTip("Select every attribute currently visible in the list.")
-        btn_all.clicked.connect(self.flt_attr_src.select_all_visible)
-        search_row.addWidget(btn_all)
+        self.flt_aedit = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_aedit_attrs, placeholder="Type any part of an attribute name",
+            number_label=self.lbl_aedit_number)
+        search_row.addWidget(self.flt_aedit, 1)
+        btn_check_all = QPushButton("Check All")
+        btn_check_all.setToolTip("Check every attribute currently visible.")
+        btn_check_all.clicked.connect(lambda: self._aedit_set_all(True))
+        search_row.addWidget(btn_check_all)
+        btn_uncheck = QPushButton("Clear Checks")
+        btn_uncheck.setToolTip("Uncheck everything, visible or not.")
+        btn_uncheck.clicked.connect(lambda: self._aedit_set_all(False))
+        search_row.addWidget(btn_uncheck)
         right.addLayout(search_row)
 
-        src_layout.addLayout(left)
-        src_layout.addLayout(right)
+        # ★ 필터에 가려진 채 체크된 것을 대상에 넣을지. 기본은 꺼 둔다 —
+        #   "보이는 것이 작업 대상" 이 이 저장소의 규칙이고, 안 보이는 것을 건드리는 쪽이
+        #   사고가 크다. 켜면 가려진 것까지 포함한다. 어느 쪽이든 몇 개가 가려졌는지 로그로 알린다.
+        self.cb_aedit_hidden = QCheckBox("Include attributes hidden by the filter")
+        self.cb_aedit_hidden.setChecked(False)
+        self.cb_aedit_hidden.setToolTip(
+            "Off (default) : only what you can see is acted on.\n"
+            "On            : checked attributes hidden by the filter are included too.\n"
+            "Either way the log tells you how many checked ones are hidden.")
+        right.addWidget(self.cb_aedit_hidden)
+
+        # --- 순서 바꾸기 ---
+        order_row = QHBoxLayout()
+        order_row.addWidget(QLabel("Order"))
+        btn_up = QPushButton("Up")
+        btn_up.setToolTip(
+            "Move the checked attributes one slot up, on every listed object.\n"
+            "Maya has no reorder command - this deletes and undoes each attribute,\n"
+            "which keeps values, connections and keys. It cannot be undone with Ctrl+Z.")
+        btn_up.clicked.connect(lambda: self.on_aedit_move(True))
+        order_row.addWidget(btn_up)
+        btn_down = QPushButton("Down")
+        btn_down.setToolTip("Move the checked attributes one slot down.")
+        btn_down.clicked.connect(lambda: self.on_aedit_move(False))
+        order_row.addWidget(btn_down)
+        order_row.addStretch(1)
+        right.addLayout(order_row)
+
+        src_layout.addLayout(right, 1)
         layout.addWidget(src_box)
 
-        # --- Targets : 어트리뷰트를 새로 만들 오브젝트들 ---
+        # --- 복사 ---
+        copy_box = QGroupBox("Copy to other objects")
+        copy_layout = QVBoxLayout(copy_box)
+
         self.tsl_attr_tgt = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Targets (new attributes here)", select_label="Select",
-            list_min_height=150, log_callback=self.log)
-        layout.addWidget(self.tsl_attr_tgt)
-
-        # --- Options : 새 이름 규칙 ---
-        opt_box = QGroupBox("New Attribute Name")
-        opt_layout = QVBoxLayout(opt_box)
+            list_min_height=130, log_callback=self.log)
+        copy_layout.addWidget(self.tsl_attr_tgt)
 
         name_row = QHBoxLayout()
         name_row.addWidget(QLabel("Prefix"))
@@ -1430,33 +1479,226 @@ class MainWindow(QWidget):
         self.le_attr_suffix.setPlaceholderText("e.g. _ctrl")
         self.le_attr_suffix.textChanged.connect(self._update_attr_preview)
         name_row.addWidget(self.le_attr_suffix)
-        opt_layout.addLayout(name_row)
+        copy_layout.addLayout(name_row)
 
-        # 둘 다 비우면 소스와 같은 이름으로 만들어진다.
         self.lbl_attr_preview = QLabel("Preview : -")
-        opt_layout.addWidget(self.lbl_attr_preview)
+        copy_layout.addWidget(self.lbl_attr_preview)
 
         self.cb_attr_value = QCheckBox("Copy current value")
         self.cb_attr_value.setChecked(True)
         self.cb_attr_value.setToolTip(
-            "Also set the source's current value on the new attribute.")
-        opt_layout.addWidget(self.cb_attr_value)
+            "Also set the source value on the new attribute.")
+        copy_layout.addWidget(self.cb_attr_value)
 
-        layout.addWidget(opt_box)
-
-        btn_copy = QPushButton("Copy Attributes to Targets")
+        btn_copy = QPushButton("Copy Checked Attributes to Targets")
         btn_copy.setMinimumHeight(32)
         btn_copy.setToolTip(
-            "Create the selected attributes on every object in the Targets "
-            "list, keeping type / range / default / keyable.\n"
+            "Create the checked attributes on every object in the Targets list,\n"
+            "keeping type / range / default / keyable. The definition is read from\n"
+            "the FIRST object in the Objects list.\n"
             "Targets that already have the attribute are skipped.")
-        btn_copy.clicked.connect(self.on_attr_copy)
-        layout.addWidget(btn_copy)
+        btn_copy.clicked.connect(self.on_aedit_copy)
+        copy_layout.addWidget(btn_copy)
+        layout.addWidget(copy_box)
+
+        # --- 지우기 ---
+        btn_delete = QPushButton("Delete Checked Attributes")
+        btn_delete.setMinimumHeight(32)
+        btn_delete.setToolTip(
+            "Delete the checked attributes from every object in the Objects list\n"
+            "that has them. Locked attributes are reported, not force-unlocked.")
+        btn_delete.clicked.connect(self.on_aedit_delete)
+        layout.addWidget(btn_delete)
 
         layout.addStretch(1)
-
-        # 바깥 스크롤은 _build_sub_tabs 의 _scrolled 가 씌운다(예전에는 여기서 씌웠다).
         return content
+
+    # ==============================================================
+    # Handlers : Attribute > Edit   (목록 · 순서 · 복사 · 삭제가 한 목록을 쓴다)
+    # ==============================================================
+
+    def _aedit_set_all(self, checked):
+        """Check All / Clear Checks.
+
+        켤 때는 **보이는 것만** 켠다(필터가 걸려 있으면 그 안에서). 끌 때는 **전부** 끈다 —
+        안 보이는 곳에 체크가 남아 있는 것이 사고의 씨앗이기 때문이다.
+        """
+        state = Qt.Checked if checked else Qt.Unchecked
+        for i in range(self.lw_aedit_attrs.count()):
+            item = self.lw_aedit_attrs.item(i)
+            if checked and item.isHidden():
+                continue
+            item.setCheckState(state)
+
+    def _aedit_checked(self, warn=True):
+        """체크된 어트리뷰트 이름. `Include hidden` 설정을 따른다.
+
+        체크됐는데 필터에 가려진 것이 있으면 **어느 쪽을 택했든 로그로 알린다** —
+        포함했으면 "안 보이는 것까지 건드렸다", 뺐으면 "고른 게 빠졌다" 를 모르면 안 된다.
+        """
+        visible, hidden = [], []
+        for i in range(self.lw_aedit_attrs.count()):
+            item = self.lw_aedit_attrs.item(i)
+            if item.checkState() != Qt.Checked:
+                continue
+            (hidden if item.isHidden() else visible).append(item.text())
+
+        include = self.cb_aedit_hidden.isChecked()
+        if warn and hidden:
+            if include:
+                self.log("[INFO] {0} checked attribute(s) are hidden by the filter "
+                         "- included ('Include attributes hidden by the filter' is "
+                         "on)".format(len(hidden)))
+            else:
+                self.log("[INFO] {0} checked attribute(s) hidden by the filter were "
+                         "skipped - tick 'Include attributes hidden by the filter' "
+                         "to use them".format(len(hidden)))
+
+        return visible + hidden if include else visible
+
+    def _update_attr_preview(self, *_args):
+        """Prefix/Suffix 를 적용한 새 이름을 첫 체크 항목으로 미리 보여준다."""
+        if not hasattr(self, "lbl_attr_preview"):
+            return
+        checked = self._aedit_checked(warn=False)
+        if not checked:
+            self.lbl_attr_preview.setText("Preview : -")
+            return
+        new_name = att_mgr.build_new_name(
+            checked[0],
+            self.le_attr_prefix.text().strip(),
+            self.le_attr_suffix.text().strip())
+        more = "" if len(checked) == 1 else "   (+{0} more)".format(len(checked) - 1)
+        self.lbl_attr_preview.setText(
+            "Preview : {0}  ->  {1}{2}".format(checked[0], new_name, more))
+
+    def on_aedit_list(self):
+        """오브젝트들의 어트리뷰트를 **씬 순서 그대로** 목록에 채운다."""
+        objects = self.tsl_aedit_objs.get_all_items()
+        if not objects:
+            self.log("[ERR] List Attributes : Objects list is empty")
+            return
+
+        user_only = self.cb_attr_user_only.isChecked()
+        try:
+            rows, missing = att_mgr.list_attributes_multi(objects, user_only)
+        except Exception as e:
+            self.log("[ERR] List Attributes : {0}".format(e))
+            cmds.warning(str(e))
+            return
+
+        # 채우는 동안 itemChanged 가 매번 튀지 않도록 잠깐 막는다.
+        self.lw_aedit_attrs.blockSignals(True)
+        self.lw_aedit_attrs.clear()
+        total_objs = len(objects) - len(missing)
+
+        for row in rows:
+            item = QListWidgetItem(row["name"])
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Unchecked)
+
+            tip = "on {0} of {1} object(s):\n  {2}".format(
+                len(row["owners"]), total_objs, "\n  ".join(row["owners"][:12]))
+            if not row["movable"]:
+                tip += "\n\nBuilt-in - can be copied but NOT reordered."
+                item.setForeground(QBrush(QColor("#808080")))
+            if row["locked"]:
+                tip += "\n\nLOCKED on {0} object(s)".format(len(row["locked"]))
+                item.setForeground(QBrush(QColor("#e0a030")))
+            item.setToolTip(tip)
+            self.lw_aedit_attrs.addItem(item)
+
+        self.lw_aedit_attrs.blockSignals(False)
+
+        shown, total = self.flt_aedit.refresh()
+        self._update_attr_preview()
+
+        for obj in missing:
+            self.log("[WARN] {0} : object not found in scene".format(obj))
+        msg = "[OK] List Attributes : {0} attr(s) on {1} object(s){2}".format(
+            total, total_objs, ", user defined" if user_only else "")
+        if shown != total:
+            msg += " - filter '{0}' shows {1}".format(
+                self.flt_aedit.text().strip(), shown)
+        self.log(msg)
+
+    def on_aedit_move(self, up):
+        """체크한 어트리뷰트를 한 칸 위/아래로 — 씬의 실제 순서가 바뀐다."""
+        objects = self.tsl_aedit_objs.get_all_items()
+        attrs = self._aedit_checked()
+
+        def _do():
+            logs, changed = aord_mgr.move_attributes(objects, attrs, up)
+            for line in logs:
+                self.log(line)
+
+        self._run("Move Attributes {0}".format("Up" if up else "Down"), _do)
+
+        # 순서가 바뀌었으므로 목록을 다시 읽어 화면과 씬을 맞춘다(체크는 다시 살린다).
+        if objects and attrs:
+            checked = set(attrs)
+            self.on_aedit_list()
+            self.lw_aedit_attrs.blockSignals(True)
+            for i in range(self.lw_aedit_attrs.count()):
+                item = self.lw_aedit_attrs.item(i)
+                if item.text() in checked:
+                    item.setCheckState(Qt.Checked)
+            self.lw_aedit_attrs.blockSignals(False)
+            self._update_attr_preview()
+
+    def on_aedit_copy(self):
+        """체크한 어트리뷰트를 Targets 에 같은 정의로 새로 만든다."""
+        objects = self.tsl_aedit_objs.get_all_items()
+        source = objects[0] if objects else ""
+        attrs = self._aedit_checked()
+        targets = self.tsl_attr_tgt.get_all_items()
+        prefix = self.le_attr_prefix.text().strip()
+        suffix = self.le_attr_suffix.text().strip()
+        copy_value = self.cb_attr_value.isChecked()
+
+        # 목록은 오브젝트들의 합집합이라, 첫 오브젝트에 없는 것이 체크될 수 있다.
+        # 정의를 읽을 곳이 없으므로 미리 걸러 이유를 말한다.
+        if source:
+            missing = [a for a in attrs
+                       if not cmds.attributeQuery(a, node=source, exists=True)]
+            if missing:
+                self.log("[WARN] {0} does not have {1} - copy reads the definition "
+                         "from the first object".format(source, ", ".join(missing[:6])))
+                attrs = [a for a in attrs if a not in missing]
+
+        def _do():
+            created, skipped = att_mgr.copy_attributes(
+                source, attrs, targets, prefix, suffix, copy_value)
+            for target, name, reason in skipped:
+                self.log("[WARN] {0}.{1} : {2}".format(target, name, reason))
+            self.log("       {0} attribute(s) created on {1} target(s)".format(
+                len(created), len(targets)))
+
+        self._run("Copy Attributes", _do)
+
+    def on_aedit_delete(self):
+        """체크한 어트리뷰트를 Objects 목록의 오브젝트들에서 지운다."""
+        objects = self.tsl_aedit_objs.get_all_items()
+        attrs = self._aedit_checked()
+
+        if attrs and QMessageBox.question(
+                self, "Attribute",
+                "Delete {0} attribute(s) from {1} object(s)?\n\n{2}".format(
+                    len(attrs), len(objects),
+                    ", ".join(attrs[:8]))) != QMessageBox.Yes:
+            return
+
+        def _do():
+            deleted, failed = adel_mgr.delete_attributes(objects, attrs)
+            for obj, name, reason in failed:
+                self.log("[WARN] {0}.{1} : {2}".format(obj, name, reason))
+            self.log("       {0} attribute(s) deleted from {1} object(s)".format(
+                len(deleted), len(objects)))
+
+        self._run("Delete Attributes", _do)
+        # 지운 뒤에는 목록이 실제와 어긋나므로 다시 읽는다.
+        if objects:
+            self.on_aedit_list()
 
     # --------------------------------------------------------------
     # Attribute > Create   (프로파일에 적어 둔 정의로 새로 만들기)
@@ -1604,69 +1846,6 @@ class MainWindow(QWidget):
     # --------------------------------------------------------------
     # Attribute > Delete
     # --------------------------------------------------------------
-
-    def _build_attribute_delete_page(self):
-        """왼쪽 = 오브젝트, 오른쪽 = 그 오브젝트들이 가진 지울 수 있는 어트리뷰트.
-
-        구성은 Connect 하위 탭과 같게 뒀다(왼쪽 TSL + 오른쪽 목록 + 검색 + 다중 선택).
-        """
-        page = QWidget()
-        layout = QVBoxLayout(page)
-
-        body = QHBoxLayout()
-        layout.addLayout(body)
-
-        left = QVBoxLayout()
-        self.tsl_adel_objs = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Objects", select_label="Select",
-            list_min_height=220, log_callback=self.log)
-        left.addWidget(self.tsl_adel_objs)
-
-        btn_list = QPushButton("List Attributes")
-        btn_list.setToolTip(
-            "List the user defined attributes of every object in the list.\n"
-            "Built-in attributes (translateX ...) and compound children cannot be\n"
-            "deleted in Maya, so they are not listed.")
-        btn_list.clicked.connect(self.on_adel_list)
-        left.addWidget(btn_list)
-        body.addLayout(left, 1)
-
-        right = QVBoxLayout()
-        head = QHBoxLayout()
-        head.addWidget(QLabel("Attributes"))
-        head.addStretch(1)
-        self.lbl_adel_number = QLabel("Number: 0")
-        head.addWidget(self.lbl_adel_number)
-        right.addLayout(head)
-
-        self.lw_adel_attrs = QListWidget()
-        self.lw_adel_attrs.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.lw_adel_attrs.setMinimumHeight(220)
-        self.lw_adel_attrs.setToolTip(
-            "Select the attributes to delete (multi-select).\n"
-            "Hover a row to see which objects carry it.")
-        right.addWidget(self.lw_adel_attrs, 1)
-
-        self.flt_adel = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
-            self.lw_adel_attrs, placeholder="Type any part of an attribute name",
-            number_label=self.lbl_adel_number)
-        right.addWidget(self.flt_adel)
-
-        btn_all = QPushButton("Select All")
-        btn_all.setToolTip("Select every attribute currently visible in the list.")
-        btn_all.clicked.connect(self.flt_adel.select_all_visible)
-        right.addWidget(btn_all)
-        body.addLayout(right, 1)
-
-        btn_delete = QPushButton("Delete Selected Attributes")
-        btn_delete.setMinimumHeight(32)
-        btn_delete.setToolTip(
-            "Delete the selected attributes from every object in the list that\n"
-            "has them. Locked attributes are reported, not force-unlocked.")
-        btn_delete.clicked.connect(self.on_adel_delete)
-        layout.addWidget(btn_delete)
-
-        return page
 
     # --------------------------------------------------------------
     # Connect > List Connected
@@ -1936,11 +2115,13 @@ class MainWindow(QWidget):
             "                             or Match by Name (similar / same\n"
             "                             name, unmatched rows kept as (Null))\n"
             "                             + Swap to flip Driven <-> Driver\n"
-            "Attribute   : Copy   : copy attributes off one source object,\n"
-            "                       same name or with a Prefix / Suffix\n"
+            "Attribute   : Edit   : list the attributes of the listed objects and,\n"
+            "                       on the checked ones, change their order\n"
+            "                       (Up / Down), copy them onto other objects,\n"
+            "                       or delete them. Reorder changes the real order\n"
+            "                       in the scene and CANNOT be undone with Ctrl+Z.\n"
             "              Create : create attributes from a saved profile\n"
             "                       (name / type / range), checkbox per attr\n"
-            "              Delete : delete user defined attributes\n"
             "Mirror      : mirror the listed objects and everything under them -\n"
             "              names swap L/R with the shared token rules, and skin\n"
             "              weights, constraints and clusters are rebuilt on the\n"
@@ -2502,86 +2683,6 @@ class MainWindow(QWidget):
     # Handlers : Attribute
     # ==============================================================
 
-    def _selected_src_attrs(self, warn=False):
-        """Attribute 탭에서 **보이면서 선택된** 어트리뷰트 이름들.
-
-        Qt 는 숨긴 항목의 선택을 유지하므로, 필터에 가려진 것까지 복사해 버리지
-        않도록 걸러 낸다. warn=True 면 가려진 선택 수를 로그로 알린다(미리보기처럼
-        자주 불리는 곳에서는 로그를 내지 않는다).
-        """
-        names, hidden = self.flt_attr_src.visible_selected()
-        if warn and hidden:
-            self.log("[INFO] {0} selected attribute(s) hidden by the filter "
-                     "were skipped".format(hidden))
-        return names
-
-    def _update_attr_preview(self):
-        """Prefix/Suffix 를 적용한 새 이름을 첫 선택 항목으로 미리 보여준다."""
-        selected = self._selected_src_attrs()
-        if not selected:
-            self.lbl_attr_preview.setText("Preview : -")
-            return
-        new_name = att_mgr.build_new_name(
-            selected[0],
-            self.le_attr_prefix.text().strip(),
-            self.le_attr_suffix.text().strip())
-        more = ""
-        if len(selected) > 1:
-            more = "   (+{0} more)".format(len(selected) - 1)
-        self.lbl_attr_preview.setText(
-            "Preview : {0}  ->  {1}{2}".format(selected[0], new_name, more))
-
-    def on_attr_list(self):
-        objs = self.tsl_attr_src.get_all_items()
-        if not objs:
-            self.log("[ERR] List Attributes : Source list is empty")
-            return
-
-        user_only = self.cb_attr_user_only.isChecked()
-        try:
-            # 검색은 더 이상 조회 인자가 아니다 — 전부 받아 와서 Filter 로 거른다.
-            attrs = att_mgr.list_attributes(objs[0], user_only)
-        except Exception as e:
-            self.log("[ERR] List Attributes : {0}".format(e))
-            cmds.warning(str(e))
-            return
-
-        self.lw_attr_src.clear()
-        self.lw_attr_src.addItems(attrs)
-        # 새로 채운 항목에도 현재 필터를 다시 먹인다(필터가 유지되도록).
-        shown, total = self.flt_attr_src.refresh()
-        self._update_attr_preview()
-
-        msg = "[OK] List Attributes : {0} ({1} attr(s){2})".format(
-            objs[0], total, ", user defined" if user_only else "")
-        if shown != total:
-            msg += " - filter '{0}' shows {1}".format(
-                self.flt_attr_src.text().strip(), shown)
-        self.log(msg)
-
-    def on_attr_copy(self):
-        srcs = self.tsl_attr_src.get_all_items()
-        source = srcs[0] if srcs else ""
-        attrs = self._selected_src_attrs(warn=True)
-        targets = self.tsl_attr_tgt.get_all_items()
-        prefix = self.le_attr_prefix.text().strip()
-        suffix = self.le_attr_suffix.text().strip()
-        copy_value = self.cb_attr_value.isChecked()
-
-        def _do():
-            created, skipped = att_mgr.copy_attributes(
-                source, attrs, targets, prefix, suffix, copy_value)
-            for target, name, reason in skipped:
-                self.log("[WARN] {0}.{1} : {2}".format(target, name, reason))
-            self.log("       {0} attribute(s) created on {1} target(s)".format(
-                len(created), len(targets)))
-
-        self._run("Copy Attributes", _do)
-
-    # ==============================================================
-    # Handlers : Attribute > Create
-    # ==============================================================
-
     def _acr_items(self):
         return [self.lw_acr_attrs.item(i)
                 for i in range(self.lw_acr_attrs.count())]
@@ -2892,74 +2993,6 @@ class MainWindow(QWidget):
     # ==============================================================
     # Handlers : Attribute > Delete
     # ==============================================================
-
-    def on_adel_list(self):
-        objects = self.tsl_adel_objs.get_all_items()
-        try:
-            rows, missing = adel_mgr.list_deletable(objects)
-        except Exception as e:
-            self.log("[ERR] List Attributes : {0}".format(e))
-            cmds.warning(str(e))
-            return
-
-        total_objs = len(objects) - len(missing)
-        self.lw_adel_attrs.clear()
-        for row in rows:
-            # 표시 텍스트는 **어트리뷰트 이름 그대로** 둔다. 공용 Filter 위젯의
-            # visible_selected() 가 item.text() 를 돌려주므로, 여기에 개수나 표식을
-            # 붙이면 그 이름으로 삭제를 시도하게 된다. 부가 정보는 툴팁으로.
-            item = QListWidgetItem(row["name"])
-            tip = "on {0} of {1} object(s):\n  {2}".format(
-                len(row["owners"]), total_objs, "\n  ".join(row["owners"][:12]))
-            if row["locked"]:
-                tip += "\n\nLOCKED on {0} object(s) - unlock before deleting".format(
-                    len(row["locked"]))
-            if row["referenced"]:
-                tip += "\n\nOn {0} referenced object(s) - Maya may refuse".format(
-                    len(row["referenced"]))
-            item.setToolTip(tip)
-            if row["locked"]:
-                item.setForeground(QBrush(QColor("#e0a030")))
-            self.lw_adel_attrs.addItem(item)
-
-        shown, total = self.flt_adel.refresh()
-
-        for obj in missing:
-            self.log("[WARN] {0} : object not found in scene".format(obj))
-        msg = "[OK] List Attributes : {0} deletable attr(s) on {1} object(s)".format(
-            total, total_objs)
-        if shown != total:
-            msg += " - filter '{0}' shows {1}".format(
-                self.flt_adel.text().strip(), shown)
-        locked = sum(1 for r in rows if r["locked"])
-        if locked:
-            msg += " ({0} locked, shown in orange)".format(locked)
-        self.log(msg)
-
-    def on_adel_delete(self):
-        objects = self.tsl_adel_objs.get_all_items()
-        attrs, hidden = self.flt_adel.visible_selected()
-        if hidden:
-            self.log("[INFO] {0} selected attribute(s) hidden by the filter "
-                     "were skipped".format(hidden))
-        if attrs and QMessageBox.question(
-                self, "Attribute",
-                "Delete {0} attribute(s) from {1} object(s)?\n\n{2}".format(
-                    len(attrs), len(objects),
-                    ", ".join(attrs[:8]))) != QMessageBox.Yes:
-            return
-
-        def _do():
-            deleted, failed = adel_mgr.delete_attributes(objects, attrs)
-            for obj, name, reason in failed:
-                self.log("[WARN] {0}.{1} : {2}".format(obj, name, reason))
-            self.log("       {0} attribute(s) deleted from {1} object(s)".format(
-                len(deleted), len(objects)))
-
-        self._run("Delete Attributes", _do)
-        # 지운 뒤에는 목록이 실제와 어긋나므로 다시 읽는다.
-        if objects:
-            self.on_adel_list()
 
     def _filtered_attrs(self, role, label):
         """Connect 탭 한쪽의 **보이면서 선택된** 어트리뷰트.

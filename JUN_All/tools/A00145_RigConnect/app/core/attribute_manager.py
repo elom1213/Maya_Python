@@ -354,3 +354,53 @@ def copy_attributes(source, attrs, targets, prefix="", suffix="",
                 skipped.append((target, new_name, str(e)))
 
     return created, skipped
+
+
+def list_attributes_multi(objects, user_defined_only=True):
+    """여러 오브젝트의 어트리뷰트를 **합쳐** 한 목록으로 돌려준다.
+
+    ★ 정렬하지 않는다 — **씬에 있는 순서 그대로** 둔다. Attribute > Edit 의 Up / Down 이
+    이 목록의 순서를 그대로 바꾸는 것이라, 이름순으로 정렬해 버리면 화면과 실제가 어긋난다.
+    첫 오브젝트의 순서를 기준으로 삼고, 뒤 오브젝트에만 있는 것은 뒤에 이어 붙인다.
+
+    Args:
+        objects: 오브젝트 이름 리스트.
+        user_defined_only: True 면 사용자 정의만(기본). False 면 빌트인까지.
+
+    Returns:
+        (rows, missing)
+        rows : [{"name", "owners":[obj...], "locked":[obj...], "movable": bool}, ...]
+               `movable` 은 **사용자 정의라 순서를 바꿀 수 있는가**다(빌트인은 False).
+        missing : 씬에 없는 오브젝트 이름.
+    """
+    rows = {}
+    order = []
+    missing = []
+
+    for obj in objects or []:
+        if not cmds.objExists(obj):
+            missing.append(obj)
+            continue
+
+        user_attrs = set(cmds.listAttr(obj, userDefined=True) or [])
+
+        for name in list_attributes(obj, user_defined_only):
+            row = rows.get(name)
+            if row is None:
+                row = {"name": name, "owners": [], "locked": [],
+                       "movable": name in user_attrs}
+                rows[name] = row
+                order.append(name)
+            elif name in user_attrs:
+                # 한 오브젝트에서라도 사용자 정의면 그쪽에서는 옮길 수 있다.
+                row["movable"] = True
+
+            row["owners"].append(obj)
+
+            try:
+                if cmds.getAttr("{0}.{1}".format(obj, name), lock=True):
+                    row["locked"].append(obj)
+            except Exception:
+                pass
+
+    return [rows[name] for name in order], missing

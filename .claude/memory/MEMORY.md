@@ -51,6 +51,7 @@
 - [pointPosition: points only](pointposition-points-only.md) — 엣지/페이스는 xform 평균
 - [skin weights: physical index](skincluster-weight-index-physical.md) — get/setWeights 는 물리 인덱스
 - [setAttr Int32Array no count](setattr-int32array-no-count.md) — Int32Array 는 개수를 붙이지 않는다
+- [attr reorder = deleteAttr + undo](maya-attr-reorder-deleteattr-undo.md) — 재정렬 명령이 없다, 성공했을 때만 undo, Ctrl+Z 로 안 돌아감
 - [list_attrs multi detection](list-attrs-multi-detection.md) — `attributeQuery(multi=True)`
 - [UUID-safe rename](uuid-safe-rename-duplicate-names.md) — 동명 노드 대비 UUID 보관
 - [standalone app package collision](standalone-app-package-collision.md) — `tools.<tool>.app.*` 로 import
@@ -74,7 +75,7 @@
 - A00120 — [FKIK constraint-free bake](wip-a00120-fkik-bake-constraintfree.md)(프레임별 matchTransform)
 - A00130 V02 — [Match](wip-a00130-v02-match.md)(NS 양쪽 탐색) · [Length](wip-a00130-length-values.md) · [IK session](wip-a00130-ik-session.md)(snapEnable 이 undo 를 깬다) · [Orient & Place](wip-a00130-orient.md) · [Pair & Constrain](wip-a00130-pair-constrain.md)(parentConstraint 가 조용히 타깃을 늘린다, v02.17) · [IK axis](wip-a00130-ik-axis.md)(`twist` 로만)
 - A00145 — [Mirror network offsets](wip-a00145-mirror-network-offsets.md)(박힌 maintain offset 을 미러 기준으로 다시 풀기, v01.42) · [Mirror tab](wip-a00145-mirror-tab.md)(Reflect=`M·S`, Apply Source->Target + Keep Children in Place, v01.41) · [object name match](wip-a00145-object-name-match.md) · [Update offset](wip-a00145-update-offset.md)(타깃은 전부) · [component followers](wip-a00145-component-followers.md) · [Match 1<-n](wip-a00145-match-one-to-many.md) · [(Null) match rows](wip-a00145-match-null-placeholder.md) · [Match Cache](wip-a00145-match-cache.md)
-- A00145 (계속) — [Connect both directions](wip-a00145-connect-both-directions.md) · [Match from Source](wip-a00145-attr-name-matching.md) · [Target Edit](wip-a00145-target-edit.md) · [Target Replace](wip-a00145-target-replace.md) · [Attribute tab](a00145-attribute-tab-blendshape-alias.md) · [skin constraint types](wip-a00145-skin-constraint-types.md) · [Constraint Transfer](wip-a00145-constraint-transfer.md) · [Group Create](wip-a00145-group-create.md) · [Match DOOTOOL options](wip-a00145-match-dootool-options.md)
+- A00145 (계속) — [Connect both directions](wip-a00145-connect-both-directions.md) · [Match from Source](wip-a00145-attr-name-matching.md) · [Target Edit](wip-a00145-target-edit.md) · [Target Replace](wip-a00145-target-replace.md) · [Attribute Edit tab](a00145-attribute-tab-blendshape-alias.md) · [skin constraint types](wip-a00145-skin-constraint-types.md) · [Constraint Transfer](wip-a00145-constraint-transfer.md) · [Group Create](wip-a00145-group-create.md) · [Match DOOTOOL options](wip-a00145-match-dootool-options.md)
 - A00170 — [AttachCrv tab](wip-a00170-attachcrv-tab.md)(Maintain offset = OPM 구동 · NURBS surface 지원, v01.23) · [Edge Loop drivers](wip-a00170-edge-loop-drivers.md) · [Lip Seal](wip-a00170-lip-seal.md)(rest 포즈를 머리 공간에, v01.21) · [Stretch tab](wip-a00170-stretch-tab.md) · [Remap List Attributes](wip-a00170-remap-listattrs.md)
 - A00210 — [PathStructure tree](wip-a00210-pathstructure-tree-depth.md) · [Recreate To + Rename](wip-a00210-recreate-to-rename.md) · [PathStructure files](wip-a00210-pathstructure-files.md)(v01.29)
 - A00220 — [Pin toggle](wip-a00220-pin.md) · [dino save pulse](wip-a00220-dino-save-pulse.md)

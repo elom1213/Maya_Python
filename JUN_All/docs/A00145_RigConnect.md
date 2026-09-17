@@ -4,7 +4,14 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.42` (`app/config/version.py`) — Mirror > Create 의 **노드 네트워크 미러 수정** 두 가지:
+- 버전: `v01.44` (`app/config/version.py`) — Attribute 탭을 **`Edit` / `Create` 두 하위 탭**으로:
+  예전 `Copy` 와 `Delete` 가 **한 목록**(`Edit`)을 함께 쓰고, 고르는 방법이 선택에서
+  **체크박스**로 바뀌었다. 여기에 **`Order` `Up` / `Down`** 이 들어와 **채널 박스의 나열 순서**를
+  바꾼다 — 마야엔 재정렬 명령이 없어 `deleteAttr` + `undo` 로 하므로 **`Ctrl+Z` 로는 되돌아가지
+  않는다**(로그가 알린다). 필터에 가려진 체크를 쓸지 정하는
+  **`Include attributes hidden by the filter`**(기본 OFF) 도 함께 (§Attribute)
+  · v01.43 은 로그창을 **공용 위젯**(Expand / Clear / Copy)으로 교체 (§로그창)
+  · v01.42 는 Mirror > Create 의 **노드 네트워크 미러 수정** 두 가지:
   (1) `multiplyDivide` · `vectorProduct` · `plusMinusAverage` 처럼 **셰이딩 노드를 상속하는**
   리깅 유틸리티가 네트워크에서 통째로 빠져 있었다 — 이제 노드 **분류**(`getClassification`)로
   셰이딩을 가려 이들도 복제·재연결한다.
@@ -834,55 +841,159 @@ Destination : ab      (Null)   abcd            Destination : ab      abcd
 > 구현: `app/core/attr_match.py`. **maya import 가 없는 순수 파이썬 모듈**이라 DCC 없이
 > 단독으로 테스트·벤치마크할 수 있다. `attr_match.complexity_notes()` 가 위 요약을 문자열로 돌려준다.
 
-### Attribute (v01.33 부터 **하위 탭 3개**)
-
-어트리뷰트를 다루는 세 가지 작업을 중첩 탭으로 나눴다. 셋 다 "어트리뷰트" 지만 **입력이
-서로 달라**(원본 오브젝트 / 저장해 둔 정의 / 지울 대상) 한 화면에 쌓으면 읽기 어렵다.
+### Attribute (v01.44 부터 **하위 탭 2개**)
 
 | 하위 탭 | 하는 일 | 원본이 필요한가 |
 |---------|---------|-----------------|
-| **Copy** (v01.17~) | 씬에 있는 **소스 오브젝트의 어트리뷰트를 복제** | 필요 |
+| **Edit** (v01.44) | 씬에 **이미 있는** 어트리뷰트를 골라 **순서를 바꾸거나 · 복사하거나 · 지운다** | 필요 |
 | **Create** (v01.33) | **프로파일에 적어 둔 정의**로 새로 만든다 | 불필요 |
-| **Delete** (v01.33) | 사용자 정의 어트리뷰트를 **지운다** | — |
 
-#### Copy (v01.17)
-**소스 오브젝트의 어트리뷰트를 골라, 다른 오브젝트들에 같은 정의로 새로 만든다.**
-이름은 그대로 쓰거나 **Prefix / Suffix** 를 붙일 수 있다.
+> [!note] v01.44 에서 `Copy` 와 `Delete` 를 `Edit` 하나로 합쳤다
+> 두 탭은 화면이 이미 같았다 — **오브젝트를 담고 → `List Attributes` 로 나열하고 → 고른 것에
+> 무언가를 한다.** 다른 것은 마지막 버튼 하나뿐인데, 목록은 두 벌을 따로 채워야 했다.
+> 같은 어트리뷰트를 복사하고 나서 원본을 지우려면 **똑같은 나열을 옆 탭에서 한 번 더** 했다.
+>
+> 이번에 들어온 **순서 바꾸기(Up / Down)** 도 성격이 똑같다("고른 것에 무언가를 한다").
+> 새 탭 `Move` 를 하나 더 만들면 같은 목록을 **세 번** 채우게 되므로, 목록을 한 벌로 모으고
+> 그 아래에 동작들을 붙였다.
+>
+> `Create` 는 합치지 않았다. 씬에서 아무것도 읽지 않고 **저장해 둔 프로파일**로 만드는,
+> 입력의 출처가 다른 작업이다. 같은 화면에 두면 "지금 목록이 씬인가 프로파일인가" 가 흐려진다.
+
+#### Edit (v01.44)
+
+```
+┌ Objects and their attributes ──────────────────────────────────────┐
+│ Objects                      Attributes             Number: 5      │
+│ [ ctrl_L_arm   ]             ☑ stretch                             │
+│ [ ctrl_R_arm   ]             ☐ twist                               │
+│ [Select][Add][Del]           ☑ follow                              │
+│ [ List Attributes ]          ☐ vis_ctrl   (회색 = 빌트인)          │
+│                              ☐ lockedAttr (주황 = LOCKED)          │
+│                              ☑ User defined only                   │
+│                              [Filter ....][Check All][Clear Checks]│
+│                              ☐ Include attributes hidden by filter │
+│                              Order  [ Up ][ Down ]                 │
+└────────────────────────────────────────────────────────────────────┘
+┌ Copy to other objects ─────────────────────────────────────────────┐
+│ Targets (new attributes here)  [ctrl_L_hand]                       │
+│ Prefix [ L_ ]   Suffix [ _ctrl ]                                   │
+│ Preview : stretch  ->  L_stretch_ctrl   (+1 more)                  │
+│ ☑ Copy current value                                               │
+│ [        Copy Checked Attributes to Targets        ]               │
+└────────────────────────────────────────────────────────────────────┘
+[            Delete Checked Attributes            ]
+```
+
+**목록 — 씬에 있는 순서 그대로**
+- `List Attributes`: `Objects` 리스트의 **모든 오브젝트**를 훑어 **합집합**을 보여준다. 좌우 컨트롤러에
+  같은 이름을 나란히 만들어 두는 일이 흔해, 하나씩 다루는 것보다 "이 이름을 가진 것 전부" 가
+  실제 작업에 맞는다. 몇 개가 가졌는지는 **항목 툴팁**에 나온다.
+- **이름순으로 정렬하지 않는다.** 보이는 순서가 곧 **채널 박스에 나오는 순서**이고, `Up`/`Down` 이
+  바꾸는 것이 바로 그 순서다. 정렬해 버리면 화면과 씬이 어긋난다. 첫 오브젝트의 순서를 기준으로
+  삼고, 뒤 오브젝트에만 있는 것은 뒤에 이어 붙인다.
+- **`User defined only`**(기본 ON): 사용자 정의(커스텀) 어트리뷰트만 나열. 끄면 `translate` 같은
+  기본 어트리뷰트까지 나온다 — **복사는 되지만 순서는 못 바꾼다**(아래). 그런 행은 **회색**이다.
+- **잠긴 어트리뷰트는 주황색**이고 툴팁에 `LOCKED` 가 붙는다.
+- 컴파운드 **자식**(`translateX`/`tintR`)은 목록에서 빠진다. 부모를 다루면 자식도 함께 따라오고,
+  자식만 따로는 `addAttr` 로 만들 수도 `deleteAttr` 로 지울 수도 없다.
+- **blendShape 노드를 담으면 타겟 이름들이 나열된다.** 타겟은 `weight[i]` 의 별칭이라
+  `listAttr(userDefined=True)` 로는 `attributeAliasList` 밖에 안 나온다 → `aliasAttr` 에서 직접 읽는다.
+  `User defined only` ON 이면 **타겟만**, OFF 면 타겟 + 노드의 모든 어트리뷰트.
+
+**고르는 방법 — 선택이 아니라 체크박스**
+- 예전 `Copy`/`Delete` 는 **하이라이트 선택**으로 골랐다. 이제는 **체크박스**다. 필터를 바꿔도
+  체크는 남으므로 `arm` 으로 걸러 두 개, `leg` 로 걸러 세 개를 **여러 번에 걸쳐 모을 수 있다.**
+- `Check All` 은 **지금 보이는 행만** 켠다. `Clear Checks` 는 **가려진 것까지 전부** 끈다
+  (안 보이는 곳에 체크가 남아 있는 것이 사고의 씨앗이라 끄는 쪽은 넓게 잡는다).
+- **`Include attributes hidden by the filter`**(기본 **OFF**): 체크는 됐지만 필터에 가려진 것을
+  작업 대상에 넣을지 정한다.
+  - OFF — "보이는 것이 작업 대상". 가려진 체크는 **빠진다.**
+  - ON — 가려진 체크도 **포함한다.** `arm` · `leg` 를 번갈아 걸러 모아 둔 것을 한 번에 옮길 때 쓴다.
+  - **어느 쪽이든 로그가 몇 개가 가려졌는지 말한다.** 뺐으면 "고른 게 빠졌다", 넣었으면
+    "안 보이는 것까지 건드렸다" 를 모르고 지나가면 안 되기 때문이다.
+    ```
+    [INFO] 3 checked attribute(s) hidden by the filter were skipped - tick
+           'Include attributes hidden by the filter' to use them
+    ```
+
+**Order — 채널 박스의 나열 순서를 바꾼다 (v01.44)**
+
+체크한 어트리뷰트를 `Up` / `Down` 으로 한 칸씩 옮긴다. **화면만이 아니라 씬의 실제 순서**가
+바뀌고, `Objects` 리스트의 **모든 오브젝트에 같이** 적용된다(좌우 컨트롤러를 한 번에).
+
+- 여러 개를 함께 옮기면 **덩어리가 서로를 밀지 않는다** — 바로 앞(뒤)이 이미 체크된 것이면
+  그 자리는 건너뛴다. 맨 위(아래)에 닿은 것은 더 움직이지 않는다. 레이어 목록과 같은 규칙이다.
+- 옮긴 뒤 목록을 **씬에서 다시 읽고**, 체크는 그대로 살린다. 그래서 `Up` 을 연달아 눌러
+  원하는 자리까지 밀어 올릴 수 있다.
+
+> [!caution] **`Ctrl+Z` 로 되돌아가지 않는다**
+> 마야에는 어트리뷰트를 재정렬하는 명령이 **없다.** `addAttr` 에도 `attributeQuery` 에도 순서
+> 플래그가 없다. 유일한 방법은 **`deleteAttr` → `undo`** 로, 지웠다 되돌리면 그 어트리뷰트가
+> **목록 맨 뒤로** 간다. 원하는 순서대로 전부 한 바퀴 돌리면 결과가 정확히 그 순서가 된다.
+> (실측: 200개 전체 재정렬이 **0.004초**. 값 · 커넥션 · 키는 undo 가 되돌려 주므로 그대로 살아남는다.)
+>
+> 문제는 **delete 와 undo 가 짝이라 undo 큐에 아무것도 남지 않는다**는 것이다. 그래서
+> 순서를 바꾼 뒤 `Ctrl+Z` 를 누르면 되돌아가는 것은 **그 전에 하던 작업**이다(실측 확인).
+> 실행할 때마다 로그가 이렇게 알린다:
+> ```
+> [INFO] Reorder cannot be undone with Ctrl+Z (it uses deleteAttr + undo internally).
+> ```
+> 되돌리려면 **반대 방향으로 같은 횟수만큼** 누르면 된다.
+
+- **빌트인은 못 옮긴다.** `translate` 같은 기본 어트리뷰트는 `deleteAttr` 대상이 아니다. 체크되어
+  있으면 그 이름을 짚어 `[WARN] ctrlA : translate cannot be moved (not user defined)` 로 알리고
+  **나머지만** 옮긴다(조용히 넘어가면 "왜 아무 일도 안 일어나지" 가 된다).
+- **undo 가 꺼져 있으면 아예 시작하지 않는다.** 지우고 되돌릴 수 없으면 어트리뷰트를 **그대로
+  잃기** 때문이다(`[ERR] Undo is disabled ...`).
+- **`deleteAttr` 이 실패했을 때는 `undo` 를 부르지 않는다.** 실패한 자리에서 undo 를 부르면
+  **남의 작업**이 되돌아간다(실측: 사용자가 만든 노드가 사라졌다). 잠긴 어트리뷰트는 잠금을
+  잠시 풀고 옮긴 뒤 **다시 잠근다.**
+
+**Copy — 다른 오브젝트에 같은 정의로 만들기**
 
 ```
 SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
     ──▶  TGT.L_stretch_ctrl   (Prefix "L_", Suffix "_ctrl" → 정의·값 그대로 복제)
 ```
 
-- **Source**: `Source Object` 리스트(첫 항목을 소스로 사용) → `List Attributes` 로 어트리뷰트 목록을
-  오른쪽에 채운다. 목록에서 복사할 항목을 **다중 선택**(`Select All` 버튼 제공).
-  - **`User defined only`**(기본 ON): 사용자 정의(커스텀) 어트리뷰트만 나열. 끄면 `translateX` 같은
-    기본 어트리뷰트까지 전부 나온다.
-  - **`Filter`**(v01.19): 예전에는 검색어가 **조회 인자**여서 Enter/`List Attributes` 로 다시 질의해야
-    했는데, 이제는 이미 채워진 목록을 **입력하는 즉시** 거른다. → 아래 **Filter** 절 참고.
-  - 컴파운드 **자식**(`tintR`/`translateX` 등)은 목록에서 제외된다. 부모를 복사하면 자식도 같이
-    만들어지고, 자식만 따로는 `addAttr` 로 만들 수도 없다.
-  - **blendShape 노드를 소스로 넣으면 타겟 이름들이 나열된다.** 타겟은 `weight[i]` 의 별칭이라
-    `listAttr(userDefined=True)` 로는 `attributeAliasList` 밖에 안 나온다 → `aliasAttr` 에서 직접
-    읽는다. `User defined only` ON 이면 **타겟만**, OFF 면 타겟 + 노드의 모든 어트리뷰트.
-    - 타겟을 복사하면 컨트롤러에 **타겟 이름 그대로의 float 어트리뷰트**가 생긴다(키어블, 값 복사).
-      blendShape weight 의 정의를 그대로 가져오므로 **soft range 0~1 / hard range -10~10** 이다.
-    - 이렇게 만든 어트리뷰트를 `Connect` 탭에서 blendShape 타겟에 이어주면 페이셜 드라이버가 된다.
+- **정의는 `Objects` 의 첫 오브젝트에서 읽는다.** 합집합 목록이라 첫 오브젝트에 없는 것이
+  체크될 수 있는데, 그때는 읽을 곳이 없으므로 **그 이름만 빼고** 이유를 로그에 남긴다.
 - **Targets**: 어트리뷰트를 **새로 만들** 오브젝트들(여러 개).
-- **New Attribute Name**: `Prefix` / `Suffix`. 둘 다 비우면 **소스와 같은 이름**. 아래 `Preview` 가
-  선택한 첫 항목의 결과 이름을 실시간으로 보여준다.
-- **`Copy current value`**(기본 ON): 소스의 **현재 값**도 새 어트리뷰트에 넣는다.
-- `Copy Attributes to Targets` 클릭.
-
-보존되는 정의: **타입**(double/float/long/short/bool/enum/string/message/doubleAngle/doubleLinear/
-컴파운드 `double3`·`float3`/multi), **min·max·soft min·soft max**, **default**, **keyable**,
-**channel box 표시**, **hidden**, **enum 이름 목록**, **usedAsColor**(컬러 어트리뷰트).
-
-- 같은 이름이 **이미 있는 타겟은 건너뛰고** 로그에 `[WARN]` 을 남긴다(덮어쓰지 않는다).
+- **Prefix / Suffix**: 둘 다 비우면 **원본과 같은 이름**. `Preview` 가 체크한 첫 항목의 결과
+  이름을 실시간으로 보여준다.
+- **`Copy current value`**(기본 ON): 원본의 **현재 값**도 새 어트리뷰트에 넣는다.
+- 보존되는 정의: **타입**(double/float/long/short/bool/enum/string/message/doubleAngle/doubleLinear/
+  컴파운드 `double3`·`float3`/multi), **min·max·soft min·soft max**, **default**, **keyable**,
+  **channel box 표시**, **hidden**, **enum 이름 목록**, **usedAsColor**.
+- 같은 이름이 **이미 있는 타겟은 건너뛰고** `[WARN]` 을 남긴다(덮어쓰지 않는다).
 - 이름을 바꾸지 않은 경우에만 원본 **short name** 을 유지한다. Prefix/Suffix 로 이름이 바뀌면
-  short name 은 Maya 가 새로 만들게 둔다(그대로 쓰면 다른 어트리뷰트와 **충돌**).
-- 컴파운드 자식 이름은 부모의 새 이름을 따라간다(`tint`→`L_tint_ctrl` 이면 자식은
-  `L_tint_ctrlR/G/B`).
+  short name 은 마야가 새로 만들게 둔다(그대로 쓰면 다른 어트리뷰트와 **충돌**).
+- 컴파운드 자식 이름은 부모의 새 이름을 따라간다(`tint`→`L_tint_ctrl` 이면 자식은 `L_tint_ctrlR/G/B`).
+- blendShape 타겟을 복사하면 컨트롤러에 **타겟 이름 그대로의 float 어트리뷰트**가 생긴다
+  (blendShape weight 의 정의를 그대로 가져오므로 **soft range 0~1 / hard range -10~10**).
+  이걸 `Connect` 탭에서 타겟에 이어 주면 페이셜 드라이버가 된다.
+- 전체가 하나의 **undo chunk** 라 `Ctrl+Z` 한 번으로 되돌아간다.
+
+**Delete — 담은 오브젝트들에서 지우기**
+
+- 확인 창을 한 번 거친 뒤, `Objects` 의 **모든 오브젝트**에서 체크된 어트리뷰트를 지운다.
+  그 어트리뷰트가 **없는 오브젝트는 조용히 넘어간다**(합집합 목록에서 고른 것이라 "원래 없음" 은
+  알릴 일이 아니다). 지운 뒤 목록을 자동으로 다시 읽는다.
+- **무엇을 지울 수 있나** — 마야에서 지울 수 있는 것은 **사용자 정의 어트리뷰트의 최상위 항목**
+  뿐이다. 실측(Maya 2024):
+
+  | 대상 | `deleteAttr` 결과 |
+  |------|-------------------|
+  | `translateX` 같은 기본 어트리뷰트 | ❌ `Cannot delete child 'translateX' of compound attribute 'translate'.` |
+  | 컴파운드 **자식**(`vecX`) | ❌ 같은 에러 — 자식만 따로는 못 지운다 |
+  | 컴파운드 **부모**(`vec`) | ✅ 지워지고 **자식도 함께** 사라진다 |
+  | **잠긴** 어트리뷰트 | ❌ `'node.attr' is locked and may not be removed.` |
+  | **연결/키가 걸린** 어트리뷰트 | ✅ 지워진다 |
+
+- **잠금은 몰래 풀지 않는다** — 잠금은 "건드리지 말라" 는 의사표시다.
+  `[WARN] node.attr : locked - unlock it first` 로 사유가 남으므로 풀고 다시 누르면 된다.
+  (순서 바꾸기만은 예외다. 자리를 옮길 뿐 잠금 상태를 그대로 되돌려 놓기 때문이다.)
 - 전체가 하나의 **undo chunk** 라 `Ctrl+Z` 한 번으로 되돌아간다.
 
 #### Create (v01.33)
@@ -909,7 +1020,7 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
 > 아무 뜻도 없다. 체크한 어트리뷰트를 리스트의 **모든** 오브젝트에 똑같이 만든다),
 > 프로파일 그룹의 버튼을 **콤보 아래 줄로** 내렸다.
 > 실측 최소 폭 **675 → 441px** 로, 창 최소 폭(480)과 기본 폭(560) 안에 들어온다
-> (`Copy` 604 · `Delete` 503 보다도 좁다).
+> (예전 `Copy` 604 · `Delete` 503 보다도 좁다 — 둘은 v01.44 에서 `Edit` 으로 합쳐졌다).
 
 **프로파일**
 - 콤보에서 고른다. `New` / `Rename` / `Delete` 로 관리한다
@@ -951,40 +1062,12 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
   묶음이라 "이 프로파일을 만든다" 가 기본 의도이기 때문이다.
 - 필터에 **가려진 체크는 그대로 만든다.** 체크는 명시적인 의사표시라 필터에 가렸다고 없던 일로
   하면 오히려 놀랍다 — 대신 몇 개가 가려져 있었는지 로그로 알린다.
-  (`Delete` 탭의 **선택**은 반대로 "보이는 것이 작업 대상" 규칙을 따른다. 체크는 남고 선택은
-  스쳐 가는 상태라 규칙이 다르다.)
+  (`Edit` 탭은 반대로 **기본이 "보이는 것이 작업 대상"** 이고, 켜야 가려진 체크까지 포함한다
+  — 거기서는 씬의 어트리뷰트를 **옮기고 지우기** 때문에 안 보이는 것을 건드리는 쪽이 더 위험하다.
+  여기 `Create` 는 없던 것을 만들 뿐이라 되돌리기도 쉽다.)
 - `Create Checked Attributes`: 왼쪽 리스트의 **모든 오브젝트**에 만든다.
   **이미 있으면 건너뛴다** — 타입이나 범위가 달라도 손대지 않는다. 기존 어트리뷰트를 고치면
   거기 걸린 연결·키가 깨지기 때문이다. 건너뛴 것은 `[WARN]` 으로 남는다.
-
-#### Delete (v01.33)
-오브젝트들이 가진 **지울 수 있는** 어트리뷰트를 골라 지운다. 구성은 `Connect` 하위 탭과 같다
-(왼쪽 오브젝트 리스트 + 오른쪽 어트리뷰트 목록 + 검색 + 다중 선택).
-
-- `List Attributes`: 왼쪽 리스트의 **모든 오브젝트**를 훑어 **합집합**을 보여준다. 좌우 컨트롤러에
-  같은 이름을 나란히 만들어 두는 일이 흔해, 하나씩 지우는 것보다 "이 이름을 가진 것 전부"를
-  지우는 쪽이 실제 작업에 맞는다. 몇 개가 가졌는지는 **항목 툴팁**에 나온다.
-- **무엇이 목록에 오르나** — 마야에서 지울 수 있는 것은 **사용자 정의 어트리뷰트의 최상위 항목**
-  뿐이다. 실측(Maya 2024):
-
-  | 대상 | `deleteAttr` 결과 |
-  |------|-------------------|
-  | `translateX` 같은 기본 어트리뷰트 | ❌ `Cannot delete child 'translateX' of compound attribute 'translate'.` |
-  | 컴파운드 **자식**(`vecX`) | ❌ 같은 에러 — 자식만 따로는 못 지운다 |
-  | 컴파운드 **부모**(`vec`) | ✅ 지워지고 **자식도 함께** 사라진다 |
-  | **잠긴** 어트리뷰트 | ❌ `'node.attr' is locked and may not be removed.` |
-  | **연결/키가 걸린** 어트리뷰트 | ✅ 지워진다 |
-
-  그래서 목록에는 기본 어트리뷰트와 컴파운드 자식이 **아예 오르지 않는다**.
-- **잠긴 어트리뷰트는 주황색**으로 표시되고 툴팁에 `LOCKED` 라고 나온다. 목록에는 올리되
-  **이 툴이 몰래 잠금을 풀지는 않는다** — 잠금은 "건드리지 말라" 는 의사표시다. 눌러 보면
-  `[WARN] node.attr : locked - unlock it first` 로 사유가 남으므로 풀고 다시 누르면 된다.
-- `Filter` 로 걸러 `Select All` 로 보이는 것만 전체 선택할 수 있다. **가려진 선택은 제외**되고
-  몇 개였는지 로그에 남는다("보이는 것이 작업 대상" 규칙).
-- `Delete Selected Attributes`: 확인 창을 한 번 거친 뒤 지운다. 그 어트리뷰트가 **없는
-  오브젝트는 조용히 넘어간다**(합집합 목록에서 고른 것이라 "원래 없음" 은 알릴 일이 아니다).
-  지운 뒤 목록을 자동으로 다시 읽는다.
-- 전체가 하나의 **undo chunk** 라 `Ctrl+Z` 한 번으로 되돌아간다.
 
 #### List Connected
 노드 그래프(up/down stream)를 타입별로 탐색한다.
@@ -1457,10 +1540,11 @@ A00145_RigConnect/
     │   ├── constraint_target_manager.py # Target Edit (타깃(드라이버) 교체 = target[i] 입력 연결만 rewire / 추가·삭제 = constraint 명령의 add·remove, offset 재계산, UUID 기반)
     │   ├── attr_match.py           # Match from Source (이름 유사 어트리뷰트 검색: 토큰 역색인 + IDF, maya 비의존 순수 파이썬)
     │   ├── connect_manager.py      # Connect    (MEL 포팅: attr 나열/검색/연결, 52 facial)
-    │   ├── attribute_manager.py    # Attribute > Copy   (어트리뷰트 정의를 읽어 다른 오브젝트에 재생성, prefix/suffix)
+    │   ├── attribute_manager.py    # Attribute > Edit   (정의를 읽어 다른 오브젝트에 재생성 prefix/suffix + 여러 오브젝트 합집합 나열 list_attributes_multi)
+    │   ├── attr_order_manager.py   # Attribute > Edit   (Up/Down = 채널 박스 나열 순서 변경. 마야엔 재정렬 명령이 없어 deleteAttr+undo 로 맨 뒤로 보내는 방식)
     │   ├── attr_profile_prefs.py   # Attribute > Create (프로파일 JSON 저장 + 스펙 정규화, maya 비의존)
     │   ├── attr_create_manager.py  # Attribute > Create (프로파일 스펙 -> addAttr, 이미 있으면 건너뜀)
-    │   ├── attr_delete_manager.py  # Attribute > Delete (지울 수 있는 어트리뷰트 나열 + deleteAttr, 잠김 보고)
+    │   ├── attr_delete_manager.py  # Attribute > Edit   (지울 수 있는 어트리뷰트 나열 + deleteAttr, 잠김 보고)
     │   ├── blendshape_utils.py     # blendShape 타겟(weight 별칭) 조회 — Attribute / Connect 탭 공용
     │   ├── stream_manager.py       # List Connected (MEL 포팅: hyperShade up/down)
     │   ├── maya_scene.py           # Pair (A00140 복사)

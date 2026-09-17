@@ -7,6 +7,14 @@ metadata:
   originSessionId: 91ab0dea-4b6f-4134-a5cd-3d3ccc44c43a
 ---
 
+**v01.44(2026-09-17): Attribute 하위 탭이 `Edit` / `Create` 둘로 줄었다.** 예전 `Copy` + `Delete` 가
+`Edit` 한 탭에서 **같은 목록**을 쓰고, 고르는 방법이 선택 → **체크박스**로 바뀌었다. 여기에
+`Order` `Up`/`Down`(= 실제 어트리뷰트 순서 변경)이 들어왔다 → [[maya-attr-reorder-deleteattr-undo]].
+목록은 **이름순 정렬을 하지 않는다**(씬 순서 = 채널 박스 순서 = Up/Down 이 바꾸는 것).
+`att_mgr.list_attributes_multi(objects, user_only)` 가 합집합을 씬 순서로 돌려준다.
+필터에 가려진 체크를 포함할지는 `Include attributes hidden by the filter`(기본 OFF)가 정하고,
+**어느 쪽이든 몇 개가 가려졌는지 로그로 말한다.**
+
 A00145_RigConnect v01.17 — **Attribute 탭** 신설(어트리뷰트를 골라 다른 오브젝트에 같은 정의로
 재생성, Prefix/Suffix) + **blendShape 타겟 이름 나열**(Attribute·Connect 탭). DONE (Maya 검증 + 푸시).
 
