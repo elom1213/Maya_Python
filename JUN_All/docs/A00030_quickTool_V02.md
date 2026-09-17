@@ -16,6 +16,9 @@ updated: 2026-09-17
   → `tools.A00030_quickTool_V02.run(True)`
 - **V01 과 동시에 띄울 수 있다** — 창과 로그 확장창의 `objectName` 이 갈렸다.
 
+> `File` · `Import option` 버튼은 [`A00480_FileTool`](A00480_FileTool.md) 의 `Path` · `Import` 탭에도 있다
+> (2026-09-17~). 이 툴의 버튼은 그대로 둔다.
+
 ---
 
 ## 1. V01 에서 무엇이 달라졌나

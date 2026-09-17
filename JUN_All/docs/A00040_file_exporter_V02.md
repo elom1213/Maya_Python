@@ -12,6 +12,9 @@ Maya 의 **selection set(objectSet)** 단위로 오브젝트를 묶어, 세트�
   이후 셸프 버튼 또는 `tools.A00040_file_exporter_V02.run(True)` 로 실행.
 - 아이콘은 레거시 A00040 아이콘을 그대로 재사용한다. 테마는 `blue_dark`.
 
+> **같은 화면이 [`A00480_FileTool`](A00480_FileTool.md) 의 `Export` 탭에도 있다**(2026-09-17~, 결과 동일 +
+> 씬 폴더를 바로 채우는 `Scene` 버튼). 이 툴은 그대로 보존한다.
+
 ---
 
 ## 2. 폴더 구조

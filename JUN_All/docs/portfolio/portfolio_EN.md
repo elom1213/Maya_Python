@@ -567,6 +567,11 @@ Default Distance attribute (driver signal x)
     curve. The result matches Maya's interior stencil (`[-1/18, 2/9, 2/3, 2/9, -1/18]` at degree 3, recovered by
     probing the command with impulse inputs) applied **cyclically**, to `8.9e-16`.
 - **`A00040_file_exporter_V02`** — export automation: type filters (applied through group hierarchies), referenced-mesh handling, and a choice of flattening to scene root or preserving hierarchy.
+- **`A00480_FileTool`** — **merged file import / export / path features that lived in two tools into one tabbed window**
+  (Export / Import / Path). When moving the exporter I **checked the result against the original** rather than assuming it:
+  the same scene exported with four option combinations through both tools gave **identical file lists, identical hierarchies
+  when the FBX files were re-imported, and identical logs** (verified in mayapy). Pasted-path cleanup moved from the UI into
+  the core so it can be tested without Maya, and a missing FBX plugin is now reported in the log instead of raising.
 - **`A00440_SetTool`** — **set algebra between Maya object sets whose elements are components**: union `∪`,
   intersection `∩` and difference `∖`, folded over any number of sets in list order. On top of those it can
   **split a set in two** using the current scene selection — in set-theoretic terms `{A∖S, A∩S}` is the

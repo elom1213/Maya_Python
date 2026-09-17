@@ -133,6 +133,8 @@ A narrative work summary lives in
 - **`A00390_WindTool_V03`** — 본 체인에 위상이 어긋난 싸인 파형을 넣어 **바람에 일렁이는** 애니메이션 생성
   (Sine · Chain Wave · Chain Wave Lite). V03 은 드라이버마다 붙던 표현식 적분을 걷어내
   **재생이 V02 대비 144~202배**(결과 회전값은 실측 동일).
+- **`A00480_FileTool`** — 파일 입출력 · 경로 툴(**Export / Import / Path** 탭). `A00040_file_exporter_V02` 화면과
+  quickTool 의 File · Import option 버튼을 한 창에 모으고, 씬 폴더를 Export Path 에 바로 채우는 `Scene` 버튼을 더했다.
 - **`A00040_file_exporter_V02`** — 타입 필터 기반 익스포트 자동화. · **`A00050_uvTool`**, **`A00030_quickTool_V02`**(레거시 퀵툴의 PySide 재작성), **`A00200_CSV_tool`**.
 
 ### 씬 / 선택 · 네이밍 유틸

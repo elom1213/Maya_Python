@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-17 (오늘)
 
+> [!summary] **`A00480_FileTool` 신규** — `A00040_file_exporter_V02` 와 quickTool 의 File · Import option 버튼을 **Export / Import / Path** 탭 한 창으로 (v01.00)
+- **요청**: 파일 임포트 · 익스포트 · 경로 설정/조작을 모아 계속 늘려 갈 툴. 이름은 `FileTool`, 원본 두 툴과 quickTool 버튼은 **보존**.
+- **Export** 탭은 A00040_V02 화면 그대로 + Export Path 옆 **`Scene`**(씬 폴더를 바로 채움). FBX 플러그인이 없으면 트레이스백 대신 `[FAIL]` 로그.
+- Paste 경로 정리를 UI 에서 `core.normalize_pasted_path` 로, 자체 `undo_chunk` 복제를 공용 `Framework.core.maya_undo` 로.
+- mayapy 2024 54항목 통과 — 옵션 4조합에서 원본과 **파일 목록 · FBX 재임포트 계층 · 결과 로그가 동일**, 익스포트 후 씬 불변.
+- 계획서 [`plans/A00480_FileTool_merge_plan.md`](plans/A00480_FileTool_merge_plan.md) · 가이드 [`A00480_FileTool.md`](A00480_FileTool.md). #A00480
+
 > [!summary] `A00400_CurveTool` **`Edit > Joints`** 가 **NURBS surface** 도 받는다 — U / V 방향 한 줄로 조인트 + 바인드 + zro/con/ctl/tgt (v01.13 -> 01.14)
 - **요청**: Joints 탭에서 커브뿐 아니라 nurbs surface 도 원하는 간격마다 조인트 · 바인드 · 스택 구조를 만들고, U 또는 V 방향을 고를 수 있게.
 - **`Surface Direction`(U/V)** + **`Across`**(반대 방향 위치 0~1, 기본 가운데 줄). 커브와 서피스를 한 리스트에 섞어도 된다.
