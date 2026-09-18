@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
 # last Update date : 2026-09-18
-# A00400_CurveTool - Create > Controls 탭 (컨트롤러 커브 만들기 · 색 · 셰이프 교체)
+# A00400_CurveTool - Create > Controls 탭 (컨트롤러 커브 만들기 · 색)
 #
-# Brandon Schaal 의 `bs_controls` / `bs_controlsUI` 를 옮긴 화면이다. 원본 창의 세 섹션
-# (Create Controls / Control Colors / Control Shape Replace)을 **그 순서 그대로** 한 탭에 담았다.
+# Brandon Schaal 의 `bs_controls` / `bs_controlsUI` 를 옮긴 화면이다. 원본 창의 세 섹션 중
+# **만들기와 색** 두 가지를 담는다. 세 번째인 셰이프 교체는 v01.16 에서
+# **`Display > Replace` 하위 탭**(`replace_tab.py`)으로 떼어 냈다 - 대상·교체본을 리스트(TSL)에
+# 담아 두고 여러 번 돌리는 쪽이 실제 작업 방식이라 자리가 넉넉해야 했다.
 # 로직은 전부 `app/core/control_manager.py` 에 있고 여기서는 화면만 만든다.
 #
-# 원본은 `cmds.frameLayout` 세 개를 접었다 폈다 했는데, 여기서는 `QGroupBox` 세 개다 -
+# 원본은 `cmds.frameLayout` 을 접었다 폈다 했는데, 여기서는 `QGroupBox` 다 -
 # 이 툴의 다른 탭과 같은 모양을 유지한다.
 
 from Framework.qt.qt import *
-
-import maya.cmds as cmds
 
 from tools.A00400_CurveTool.app.core import control_manager as ctl_mgr
 
@@ -32,9 +32,6 @@ class ControlsTab(QWidget):
         super(ControlsTab, self).__init__(parent)
 
         self._log = log_callback or (lambda text: None)
-        # Load 버튼으로 담아 둔 롱네임들 (씬에서 다시 고르기 전까지 유지)
-        self._targets = []
-        self._replacements = []
 
         self.build_ui()
 
@@ -46,14 +43,14 @@ class ControlsTab(QWidget):
         root = QVBoxLayout(self)
 
         note = QLabel(
-            "Build control curves from a shape library, colour them, and swap the\n"
-            "shape of existing controls. Ported from Brandon Schaal's bs_controls.")
+            "Build control curves from a shape library and colour them.\n"
+            "Ported from Brandon Schaal's bs_controls - its shape replace now\n"
+            "lives in Display > Replace.")
         note.setAlignment(Qt.AlignCenter)
         root.addWidget(note)
 
         root.addWidget(self._build_create_group(), 1)
         root.addWidget(self._build_color_group())
-        root.addWidget(self._build_replace_group())
 
     # ---------------- Create ----------------
 
@@ -177,54 +174,6 @@ class ControlsTab(QWidget):
 
         return box
 
-    # ---------------- Shape Replace ----------------
-
-    def _build_replace_group(self):
-        box = QGroupBox("Shape Replace")
-        layout = QVBoxLayout(box)
-
-        fields = QHBoxLayout()
-        self.le_targets = QLineEdit()
-        self.le_targets.setPlaceholderText("Shapes to replace...")
-        self.le_targets.setReadOnly(True)
-        self.le_replacements = QLineEdit()
-        self.le_replacements.setPlaceholderText("Replacement(s)...")
-        self.le_replacements.setReadOnly(True)
-        fields.addWidget(self.le_targets)
-        fields.addWidget(self.le_replacements)
-        layout.addLayout(fields)
-
-        buttons = QHBoxLayout()
-        self.btn_load_targets = QPushButton("Load Shape")
-        self.btn_load_targets.setToolTip(
-            "Remember the selected control(s) as the ones to change.")
-        self.btn_load_targets.clicked.connect(lambda: self.on_load(True))
-        self.btn_load_replacements = QPushButton("Load Replacement")
-        self.btn_load_replacements.setToolTip(
-            "Remember the selected curve(s) as the shape(s) to copy from.\n"
-            "One replacement goes on every target; the same number as targets\n"
-            "pairs them up in order.")
-        self.btn_load_replacements.clicked.connect(lambda: self.on_load(False))
-        buttons.addWidget(self.btn_load_targets)
-        buttons.addWidget(self.btn_load_replacements)
-        layout.addLayout(buttons)
-
-        self.chk_mirror = QCheckBox("Mirror Shapes")
-        self.chk_mirror.setToolTip(
-            "Flip the replacement across X before it is applied - for the other\n"
-            "side of the rig. The target's own position is then not matched.")
-        layout.addWidget(self.chk_mirror)
-
-        self.btn_replace = QPushButton("Replace Shapes")
-        self.btn_replace.setMinimumHeight(28)
-        self.btn_replace.setToolTip(
-            "Swap the target's curve shape for the replacement's, keeping the\n"
-            "target's transform, name and connections. One undo step.")
-        self.btn_replace.clicked.connect(self.on_replace)
-        layout.addWidget(self.btn_replace)
-
-        return box
-
     # ==================================================================
     # 동작
     # ==================================================================
@@ -257,32 +206,6 @@ class ControlsTab(QWidget):
 
     def on_reset_color(self):
         _touched, messages = ctl_mgr.reset_color()
-        self._log_all(messages)
-
-    def on_load(self, is_target):
-        """지금 선택을 타깃 / 교체용으로 담는다(씬 불변)."""
-        selection = cmds.ls(selection=True, long=True) or []
-        if not selection:
-            self._log("[WARN] Select the curve(s) to load first.")
-            return
-
-        nice = [s.split("|")[-1] for s in selection]
-        text = ", ".join(nice) if len(nice) == 1 else "{0} shapes loaded.".format(len(nice))
-
-        if is_target:
-            self._targets = selection
-            self.le_targets.setText(text)
-            self.le_targets.setToolTip(", ".join(nice))
-        else:
-            self._replacements = selection
-            self.le_replacements.setText(text)
-            self.le_replacements.setToolTip(", ".join(nice))
-        self._log("Loaded {0} {1} shape(s): {2}".format(
-            len(nice), "target" if is_target else "replacement", ", ".join(nice)))
-
-    def on_replace(self):
-        _replaced, messages = ctl_mgr.replace_shapes(
-            self._targets, self._replacements, mirror=self.chk_mirror.isChecked())
         self._log_all(messages)
 
     def _log_all(self, messages):

@@ -11,7 +11,7 @@
 # 탭은 상위 = 카테고리, 하위 = 기능으로 두 단계다 (A00110_animTool_V02 과 같은 규칙).
 #   Create  > From Edges / From Points   - 씬에 새 커브를 만든다
 #   Edit    > Smooth / Wrap / Joints / Combine - 기존 커브의 형상(CV)을 바꾼다
-#   Display > Line Width                 - 그려지는 방식만 바꾼다(형상 불변)
+#   Display > Line Width / Replace       - 어떻게 보이는지 (굵기 · 컨트롤의 셰이프 교체)
 # 위 1)2) 는 Create > From Edges 이고, Line Width 는 리스트업한 커브의 뷰포트 표시
 # 굵기(nurbsCurve.lineWidth)를 조절한다 — 씬에서 커브를 눈으로 찾고 클릭으로 집기
 # 쉽게 하려는 용도다(형상은 건드리지 않는다). 분류 근거는 MainWindow.CATEGORIES 주석 참고.
@@ -33,6 +33,7 @@ from tools.A00400_CurveTool.app.core import smooth_manager as smooth_mgr
 from tools.A00400_CurveTool.app.core import joint_curve_manager as jnt_mgr
 from tools.A00400_CurveTool.app.core import combine_manager as combine_mgr
 from tools.A00400_CurveTool.app.ui.controls_tab import ControlsTab
+from tools.A00400_CurveTool.app.ui.replace_tab import ReplaceTab
 
 
 WINDOW_OBJECT_NAME = "JUN_A00400_CurveTool_window"
@@ -55,7 +56,13 @@ class MainWindow(QWidget):
     # A00110_animTool_V02 와 같은 규칙이다. 기준은 "씬에 무엇을 하는가" 다.
     #   Create  : 씬에 **새 커브를 만든다**
     #   Edit    : **기존 커브의 형상(CV 위치)** 을 바꾼다
-    #   Display : **그려지는 방식만** 바꾼다 — 커브 형상은 그대로다
+    #   Display : **어떻게 보이는지**를 바꾼다 — 굵기(Line Width), 그리고 컨트롤이
+    #             **어떤 모양으로 보일지**(Replace)
+    #
+    # ★ Display > Replace 는 v01.16 에서 사용자 지정으로 여기에 두었다(원래는
+    #   Create > Controls 안의 한 섹션이었다). 셰이프 노드를 갈아 끼우므로 성격은 Edit 에
+    #   가깝지만, 쓰는 사람 입장에서는 "이 컨트롤을 어떤 모양으로 보이게 할까" 라서
+    #   Display 에서 찾는다. 그래서 Display 설명도 "형상 불변" 이 아니라 위와 같이 바꿨다.
     #
     # Line Width 를 Edit 이 아니라 Display 에 둔 이유: nurbsCurve.lineWidth 는
     # 뷰포트 표시 굵기일 뿐 커브 데이터를 건드리지 않는다. 커브를 바꾸는 기능과
@@ -85,8 +92,8 @@ class MainWindow(QWidget):
          "listed objects, joints or components, in list order.",
          "_build_points_tab"),
         ("Controls",
-         "Controls - build control curves from a shape library, colour them and "
-         "swap the shape of existing controls (ported from bs_controls).",
+         "Controls - build control curves from a shape library and colour them "
+         "(ported from bs_controls).",
          "_build_controls_tab"),
     )
 
@@ -115,6 +122,10 @@ class MainWindow(QWidget):
          "Make the listed curves thicker in the viewport so they are easier "
          "to see and to click on. The curve shape is not changed.",
          "_build_width_tab"),
+        ("Replace",
+         "Replace - give a control the shape of another curve. Its name, transform "
+         "and connections stay as they are.",
+         "_build_replace_tab"),
     )
 
     CATEGORIES = (
@@ -122,8 +133,8 @@ class MainWindow(QWidget):
          CREATE_PAGES, "create_tabs"),
         ("Edit", "Edit - change the shape of existing curves",
          EDIT_PAGES, "edit_tabs"),
-        ("Display", "Display - how curves are drawn in the viewport; "
-         "the curve shape is not changed",
+        ("Display", "Display - how curves look in the viewport: line width, and "
+         "which shape a control is drawn with",
          DISPLAY_PAGES, "display_tabs"),
     )
 
@@ -568,6 +579,11 @@ class MainWindow(QWidget):
         """
         self.controls_tab = ControlsTab(log_callback=self.log)
         return self.controls_tab
+
+    def _build_replace_tab(self):
+        """셰이프 교체 탭 — 화면은 `app/ui/replace_tab.py` 가 만든다(TSL 두 개 + 버튼)."""
+        self.replace_tab = ReplaceTab(log_callback=self.log)
+        return self.replace_tab
 
     def _build_points_tab(self):
         """리스트에 담은 오브젝트/조인트/컴포넌트의 **월드 위치**를 순서대로 잇는 커브.

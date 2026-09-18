@@ -1,5 +1,20 @@
 # Changelog — A00400_CurveTool
 
+## v01.16 (2026-09-18)
+**[Change] 셰이프 교체를 `Create > Controls` 에서 떼어 **`Display > Replace`** 하위 탭으로. 두 칸을 **TSL** 로, 개수가 다르면 **적은 쪽만큼** 1:1.**
+
+- **요청**: Control 탭의 Shape Replace 를 잘라내 Display 하위 탭 `Replace` 로 이식, 두 칸을 TSL 로,
+  두 리스트 개수가 같으면 1:1 · 다르면 **더 작은 개수만큼** 동작.
+- **[Add] `app/ui/replace_tab.py`** — `Shapes to replace` / `Replacement` TSL 두 개 + `Mirror Shapes` + `Replace Shapes`.
+  TSL 이라 Add / Del / Up / Down 으로 목록과 순서를 손볼 수 있고, UUID 로 이름이 바뀌어도 대상을 놓치지 않는다.
+- **[Change] `replace_shapes` 의 짝 규칙** — 교체본이 하나면 전부, 여럿이면 순서대로 1:1,
+  개수가 다르면 `min(개수)` 쌍만 하고 몇 쌍을 했는지 로그에 적는다(v01.15 까지는 거절).
+- **[Change] `Display` 카테고리 설명** — "그려지는 방식만 바꾼다(형상 불변)" → "어떻게 보이는지(굵기 · 컨트롤의 셰이프)".
+  Replace 는 셰이프 노드를 바꾸므로 성격은 Edit 에 가깝지만, 쓰는 사람은 "어떤 모양으로 보이게 할까" 로 찾는다.
+
+**검증**(mayapy 2024 + 오프스크린 Qt, **13항목 통과**): 같은 개수 1:1 · 대상이 많을 때 · 교체본이 많을 때 ·
+교체본 1개 · 탭 구성(Display 2개, Controls 에서 제거됨) · TSL 리스트업 · UI 실행 · 빈 리스트 경고 · 창 폭.
+
 ## v01.15 (2026-09-18)
 **[Feature] `Create > Controls` — `bs_controls`(Brandon Schaal) 이식 : 컨트롤러 커브 34종 생성 + 색 + 셰이프 교체.**
 

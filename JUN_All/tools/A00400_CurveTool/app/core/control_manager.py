@@ -354,9 +354,12 @@ def replace_shape(target, replacement, mirror=False):
 def replace_shapes(targets, replacements, mirror=False):
     """여러 타깃의 셰이프를 한 번에 바꾼다. `(replaced, messages)`.
 
-    replacement 가 하나면 **모든 타깃**이 그 모양이 되고, 개수가 같으면 **짝끼리** 바꾼다.
-    그 외(둘 다 여럿인데 개수가 다름)는 아무것도 하지 않고 이유를 알린다 - 어느 짝이
-    맞는지 툴이 추측하면 안 된다(원본도 여기서 멈췄다).
+    ── 짝 짓는 규칙 (v01.16) ──────────────────────────────────────────────
+    - replacement 가 **하나**면 모든 타깃이 그 모양이 된다(원본과 같다).
+    - 여럿이면 **리스트 순서대로 1:1**. 개수가 다르면 **적은 쪽만큼만** 하고 남는 것은
+      건드리지 않는다 - 그 사실을 로그에 적는다.
+      (v01.15 까지는 개수가 다르면 아예 거절했다. 사용자 요청으로 바꿨다 - 리스트에
+      담아 둔 것 중 짝이 맞는 데까지 돌리는 편이 실제 작업 흐름에 맞다.)
     """
     targets = [t for t in (targets or [])]
     replacements = [r for r in (replacements or [])]
@@ -366,10 +369,15 @@ def replace_shapes(targets, replacements, mirror=False):
         return 0, ["[WARN] Load the target shape(s) first."]
     if not replacements:
         return 0, ["[WARN] Load the replacement shape(s) first."]
-    if len(replacements) > 1 and len(replacements) != len(targets):
-        return 0, ["[WARN] {0} replacement(s) for {1} target(s) - use one "
-                   "replacement, or the same number as targets.".format(
-                       len(replacements), len(targets))]
+
+    if len(replacements) > 1:
+        pairs = min(len(targets), len(replacements))
+        if len(targets) != len(replacements):
+            messages.append(
+                "[Info] {0} target(s) and {1} replacement(s) - the first {2} pair(s) "
+                "are used, the rest are left alone.".format(
+                    len(targets), len(replacements), pairs))
+        targets = targets[:pairs]
 
     replaced = 0
     with undo_chunk():

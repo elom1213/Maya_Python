@@ -15,6 +15,8 @@
 # 01.14  Joints on surfaces   - NURBS surface 도 U / V 방향 한 줄로 조인트 + 바인드 + 컨트롤러
 # 01.15  Controls           - bs_controls 이식 : 컨트롤러 커브 34종 생성 + 색 + 셰이프 교체.
 #                           셰이프 데이터는 Framework/rules/control_shapes.json (공용)
+# 01.16  Display > Replace  - 셰이프 교체를 Controls 에서 떼어 하위 탭으로. 두 칸을 TSL 로,
+#                           개수가 다르면 적은 쪽만큼 1:1
 
-VERSION = "01.15"
+VERSION = "01.16"
 LAST_UPDATE = "2026-09-18"
