@@ -8,7 +8,9 @@ from . import delta_utils
 from . import bake_delete_manager
 from . import target_order_manager
 from . import naming_manager
+from . import delete_target_manager
 
 __all__ = ["EditBSManager", "BaseShapeManager", "MixManager", "ShapeEditorManager",
            "BakeDeleteManager", "EDITABLE_STATES", "blendshape_utils", "delta_utils",
-           "bake_delete_manager", "target_order_manager", "naming_manager"]
+           "bake_delete_manager", "target_order_manager", "naming_manager",
+           "delete_target_manager"]

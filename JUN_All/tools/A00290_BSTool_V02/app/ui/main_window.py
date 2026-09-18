@@ -14,8 +14,10 @@
 #                      모양을 한꺼번에 변형(델타 가중합을 더한다)
 #
 #   [Target] 버텍스를 하나도 안 움직인다 — 바뀌는 것은 이름과 인덱스뿐이다
-#     - Naming       : 타겟 이름(weight 별칭)을 규칙으로 한꺼번에 바꿔 놓는다
+#     - Edit         : 타겟 자체를 손본다 (v02.03 에 Naming -> Edit, 안에 하위 탭 둘)
+#         - Naming   : 타겟 이름(weight 별칭)을 규칙으로 한꺼번에 바꿔 놓는다
 #                      (= FBX 의 BlendShapeChannel 이름 = 언리얼 모프 타겟 이름)
+#         - Delete   : 체크한 타겟들을 노드에서 지운다 (Shape Editor 의 Delete 와 같은 MEL)
 #     - Target Order : 리스트에서 순서를 바꾼 대로 노드의 타겟 순서(weight 인덱스)를
 #                      실제로 갈아 끼운다
 #
@@ -51,6 +53,7 @@ from tools.A00290_BSTool_V02.app.core import (EditBSManager, BaseShapeManager,
 from tools.A00290_BSTool_V02.app.core import blendshape_utils as bsu
 from tools.A00290_BSTool_V02.app.core import target_order_manager as tom
 from tools.A00290_BSTool_V02.app.core import naming_manager as nm
+from tools.A00290_BSTool_V02.app.core import delete_target_manager as dtm
 
 
 # Edit 토글이 켜졌을 때의 버튼 색(Maya Shape Editor 의 활성 Edit 버튼과 같은 의미).
@@ -241,11 +244,20 @@ class MainWindow(QWidget):
          "Mix Targets - add a weighted mix of source targets onto other targets",
          "_build_mix_tab"),
     )
-    TARGET_PAGES = (
+    # Target > Edit 안의 하위 탭 (v02.03). 예전 Target > Naming 이 여기 첫 칸으로 들어왔다.
+    EDIT_PAGES = (
         ("Naming",
          "Naming - rename target aliases in bulk (these become the morph target "
          "names in Unreal)",
          "_build_naming_tab"),
+        ("Delete",
+         "Delete - remove the checked targets from the blendShape node",
+         "_build_delete_tab"),
+    )
+    TARGET_PAGES = (
+        ("Edit",
+         "Edit - rename targets in bulk, or delete the checked targets from the node",
+         "_build_edit_tab"),
         ("Target Order",
          "Target Order - change the real target order (weight index) of the node",
          "_build_target_order_tab"),
@@ -493,7 +505,12 @@ class MainWindow(QWidget):
         tabs = QTabWidget()
         tabs.tabBar().setElideMode(Qt.ElideRight)   # 폭이 모자라면 라벨을 자른다
         for label, tip, builder in pages:
-            index = tabs.addTab(self._scrolled(getattr(self, builder)()), label)
+            page = getattr(self, builder)()
+            # 하위 탭을 또 가진 페이지(Target > Edit)는 그 안쪽 페이지들이 이미 스크롤에
+            # 담겨 있다 - 한 번 더 감싸면 스크롤바가 두 겹이 된다.
+            if not isinstance(page, QTabWidget):
+                page = self._scrolled(page)
+            index = tabs.addTab(page, label)
             tabs.setTabToolTip(index, tip)
         return tabs
 
@@ -1034,7 +1051,15 @@ class MainWindow(QWidget):
         return tab
 
     # ==================================================
-    # Tab 2-2 : Edit BS > Naming
+    # Target > Edit (v02.03) - 하위 탭 Naming / Delete
+    # ==================================================
+
+    def _build_edit_tab(self):
+        self.edit_tabs = self._build_sub_tabs(self.EDIT_PAGES)
+        return self.edit_tabs
+
+    # ==================================================
+    # Target > Edit > Naming
     # ==================================================
 
     def _build_naming_tab(self):
@@ -1394,6 +1419,227 @@ class MainWindow(QWidget):
         self.on_nm_list_targets()
         self.tsl_nm_targets.select_by_texts(renamed)
         self._nm_refresh()
+
+    # ==================================================
+    # Target > Edit > Delete (v02.03)
+    # ==================================================
+
+    def _build_delete_tab(self):
+        """blendShape 노드를 지정 -> 타겟 리스트업 -> 체크한 타겟들을 노드에서 지운다."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # ---- blendShape 노드 지정 (Naming 과 같은 줄)
+        node_row = QHBoxLayout()
+        lbl = QLabel("BlendShape Node")
+        lbl.setMinimumWidth(110)
+        node_row.addWidget(lbl)
+        self.le_dt_node = QLineEdit()
+        self.le_dt_node.setPlaceholderText(
+            "Pick a blendShape node or a mesh, then <- Set")
+        node_row.addWidget(self.le_dt_node)
+        btn_set = QPushButton("<- Set")
+        btn_set.setToolTip(
+            "Set the blendShape from the current selection (node or mesh)\n"
+            "and list its targets right away.")
+        btn_set.clicked.connect(self.on_dt_set_node)
+        node_row.addWidget(btn_set)
+        layout.addLayout(node_row)
+
+        btn_list = QPushButton("List Targets")
+        btn_list.setToolTip("Read the targets from the node again.")
+        btn_list.clicked.connect(lambda *_a: self.on_dt_list_targets())
+        layout.addWidget(btn_list)
+
+        # ---- 타겟 목록 (체크박스)
+        header = QHBoxLayout()
+        lbl_t = QLabel("Targets")
+        f = lbl_t.font()
+        f.setBold(True)
+        lbl_t.setFont(f)
+        header.addWidget(lbl_t)
+        header.addStretch(1)
+        self.lbl_dt_number = QLabel("Number: 0")
+        header.addWidget(self.lbl_dt_number)
+        layout.addLayout(header)
+
+        self.lw_dt_targets = QListWidget()
+        self.lw_dt_targets.setMinimumHeight(260)
+        self.lw_dt_targets.setToolTip(
+            "Check the targets to delete.\n"
+            "Shift / Ctrl click to select several rows - clicking the check box of a\n"
+            "selected row (or Space) checks or unchecks every selected row.\n"
+            "Locked targets are greyed out - Maya refuses to delete them.")
+        self.lw_dt_targets.itemChanged.connect(lambda *_a: self._dt_refresh())
+        self.chk_dt_targets = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(
+            self.lw_dt_targets)
+        layout.addWidget(self.lw_dt_targets, 1)
+
+        self.flt_dt_targets = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_dt_targets,
+            placeholder="Type any part of a target name (e.g. Inner)",
+            number_label=self.lbl_dt_number)
+        self.flt_dt_targets.filtered.connect(lambda *_a: self._dt_refresh())
+        layout.addWidget(self.flt_dt_targets)
+
+        check_row = QHBoxLayout()
+        btn_all = QPushButton("Check All")
+        btn_all.setToolTip("Check every visible target.")
+        btn_all.clicked.connect(lambda: self._dt_check_visible(True))
+        check_row.addWidget(btn_all)
+        btn_none = QPushButton("Uncheck All")
+        btn_none.setToolTip("Uncheck every visible target.")
+        btn_none.clicked.connect(lambda: self._dt_check_visible(False))
+        check_row.addWidget(btn_none)
+        layout.addLayout(check_row)
+
+        self.lbl_dt_state = QLabel("No blendShape set.")
+        self.lbl_dt_state.setWordWrap(True)
+        layout.addWidget(self.lbl_dt_state)
+
+        info = QLabel(
+            "Deletes the target from the node - its weight, its shape data (in-betweens "
+            "too) and its name - the same way Maya's Shape Editor Delete does.  A target "
+            "mesh still connected to it stays in the scene.  The other targets keep their "
+            "index; use Target Order to close the gaps.")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        self.btn_dt_delete = QPushButton("DELETE CHECKED TARGETS")
+        self.btn_dt_delete.setMinimumHeight(36)
+        self.btn_dt_delete.setEnabled(False)
+        self.btn_dt_delete.setToolTip(
+            "Delete the checked (and visible) targets from the node.\n"
+            "One Ctrl+Z brings them all back.")
+        self.btn_dt_delete.clicked.connect(self.on_dt_delete)
+        layout.addWidget(self.btn_dt_delete)
+
+        return tab
+
+    # ---------------- Delete : 상태/헬퍼
+
+    def _dt_node(self):
+        return self.le_dt_node.text().strip()
+
+    def _dt_scope(self):
+        """(지울 이름들 - 목록 순서, 필터에 가려진 체크 수).
+
+        **보이는 것만 작업 대상**이다 - 필터에 가려진 체크 행은 지우지 않는다(보지 못한
+        것을 지우면 안 된다). Naming 의 선택 규칙과 같다.
+        """
+        chosen, hidden = [], 0
+        for i in range(self.lw_dt_targets.count()):
+            item = self.lw_dt_targets.item(i)
+            if item.checkState() != Qt.Checked or not (item.flags() & Qt.ItemIsEnabled):
+                continue
+            if item.isHidden():
+                hidden += 1
+                continue
+            chosen.append(item.text())
+        return chosen, hidden
+
+    def _dt_check_visible(self, state):
+        self.lw_dt_targets.blockSignals(True)
+        for i in range(self.lw_dt_targets.count()):
+            item = self.lw_dt_targets.item(i)
+            if item.isHidden() or not (item.flags() & Qt.ItemIsEnabled):
+                continue
+            item.setCheckState(Qt.Checked if state else Qt.Unchecked)
+        self.lw_dt_targets.blockSignals(False)
+        self._dt_refresh()
+
+    def _dt_refresh(self):
+        if not bsu.is_blendshape(self._dt_node()):
+            self.lbl_dt_state.setText("No blendShape set.")
+            self.btn_dt_delete.setEnabled(False)
+            return
+        chosen, hidden = self._dt_scope()
+        text = "{0} of {1} target(s) checked for deletion.".format(
+            len(chosen), self.lw_dt_targets.count())
+        if hidden:
+            text += "  [{0} checked target(s) are hidden by the filter and left alone.]".format(
+                hidden)
+        self.lbl_dt_state.setText(text)
+        self.btn_dt_delete.setEnabled(bool(chosen))
+
+    # ---------------- Delete : 핸들러
+
+    def on_dt_set_node(self):
+        found = bsu.find_blendshapes_from_selection()
+        if not found:
+            self.log("[Warning] Select a blendShape node or a mesh driven by one.")
+            return
+        self.le_dt_node.setText(found[0])
+        if len(found) > 1:
+            self.log("[Info] {0} blendShapes found; using '{1}'.".format(
+                len(found), found[0]))
+        self.on_dt_list_targets()
+
+    def on_dt_list_targets(self):
+        """노드에서 타겟을 다시 읽어 체크 목록을 채운다(체크는 전부 풀린다)."""
+        node = self._dt_node()
+        self.lw_dt_targets.blockSignals(True)
+        self.lw_dt_targets.clear()
+        if not bsu.is_blendshape(node):
+            self.lw_dt_targets.blockSignals(False)
+            self.flt_dt_targets.refresh()
+            self._dt_refresh()
+            self.log("[Warning] '{0}' is not a valid blendShape node.".format(node))
+            return
+
+        targets = dtm.list_targets(node)
+        for index, name in targets:
+            item = QListWidgetItem(name)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Unchecked)
+            if dtm.is_locked(node, index):
+                # 마야는 lock 된 weight 의 타겟을 지우지 않는다 - 체크도 못 하게 회색으로 둔다.
+                item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+                item.setToolTip("weight[{0}] is locked - unlock it to delete.".format(index))
+            self.lw_dt_targets.addItem(item)
+        self.lw_dt_targets.blockSignals(False)
+        self.flt_dt_targets.refresh()
+        self._dt_refresh()
+        self.log("[Delete] '{0}' : {1} target(s) listed.".format(node, len(targets)))
+
+    def on_dt_delete(self):
+        node = self._dt_node()
+        names, _hidden = self._dt_scope()
+        if not bsu.is_blendshape(node) or not names:
+            self.log("[Delete] Nothing to delete.")
+            return
+
+        shown = "\n".join(names[:20]) + ("\n..." if len(names) > 20 else "")
+        answer = QMessageBox.question(
+            self, "Delete Targets",
+            "Delete {0} target(s) from '{1}'?\n\n{2}\n\nOne Ctrl+Z brings them back.".format(
+                len(names), node, shown),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            return
+        self._dt_delete(node, names)
+
+    def _dt_delete(self, node, names):
+        """확인 대화상자 뒤의 실제 삭제 (검증 스크립트가 대화상자 없이 부른다)."""
+        try:
+            with undo_chunk():
+                report = dtm.delete_targets(node, names)
+        except Exception as e:
+            self.log("[Error] Delete : {0}".format(e))
+            cmds.warning(str(e))
+            self.on_dt_list_targets()
+            return
+
+        self.log("[OK] '{0}' : {1} target(s) deleted.".format(node, len(report["deleted"])))
+        for name in report["deleted"]:
+            self.log("       {0}".format(name))
+        for name in report["locked"]:
+            self.log("[Warning] '{0}' is locked - not deleted.".format(name))
+        for name in report["missing"]:
+            self.log("[Warning] '{0}' is no longer on the node - skipped.".format(name))
+
+        # 노드에서 다시 읽는다 - 화면과 씬이 같은지 눈으로 확인된다.
+        self.on_dt_list_targets()
 
     # ==================================================
     # Tab 3 : Base Shape

@@ -1,5 +1,19 @@
 # Changelog — A00290_BSTool_V02
 
+## v02.03 (2026-09-18)
+
+- **[Change] `Target > Naming` 탭 이름을 `Target > Edit` 로.** 그 안에 하위 탭 `Naming`(기존 그대로) · `Delete`.
+- **[Add] `Target > Edit > Delete` — 체크한 타겟들을 blendShape 노드에서 지운다.**
+  노드 지정(`<- Set`, 노드나 메시 선택) → 타겟이 체크 목록으로 뜬다 → 체크 → `DELETE CHECKED TARGETS`(확인 대화상자).
+  - 지우는 방법은 마야 Shape Editor 의 Delete 와 같은 MEL `blendShapeDeleteTargetGroup` — weight · 델타 ·
+    인비트윈 · 별칭까지 정리하고 **Ctrl+Z 한 번**에 전부 돌아온다(`inputTargetGroup` 을 통째로 지우면 undo 로 델타가
+    안 돌아오는데, 이 MEL 은 잎부터 지워 그 함정을 피한다).
+  - weight 가 lock 인 타겟은 마야가 안 지우므로 **회색으로 잠가** 체크도 못 하게 한다.
+  - 공용 `JUN_mod_checkList_qt`(Shift/Ctrl 다중 선택 + 다중 체크) · Filter · `Check All` / `Uncheck All`(보이는 것만).
+    **필터에 가려진 체크 행은 지우지 않는다** — 상태 줄에 몇 개가 가려져 남는지 적는다.
+  - 라이브 타겟 메시는 씬에 남고, 남은 타겟의 인덱스에는 빈 자리가 생긴다(메우려면 `Target Order`).
+  - 코어 `app/core/delete_target_manager.py`.
+
 ## v02.02 (2026-09-18)
 
 - **[Add] Mix Targets 두 목록에 Shift / Ctrl 다중 선택 + 다중 체크.** 고른 행 중 하나의 체크박스(또는 `Space`)를
