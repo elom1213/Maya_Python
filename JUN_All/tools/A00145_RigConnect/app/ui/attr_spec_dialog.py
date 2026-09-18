@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-21
+# last Update date : 2026-09-18
 # A00145_RigConnect - Attribute > Create 탭의 어트리뷰트 정의 편집 다이얼로그
 #
 # 프로파일에 담을 어트리뷰트 하나를 적거나 고치는 작은 창이다. A00340_SelectionTool 의
@@ -15,6 +15,11 @@
 #
 # Min/Max 를 **체크박스로 켜고 끄는** 이유: 마야에서 "범위 없음" 과 "범위 0" 은 다른데,
 # 스핀박스만 두면 그 둘을 구분해 넣을 방법이 없다.
+#
+# v01.48 : enum / string 타입 추가. 타입에 따라 보이는 칸이 바뀐다.
+#   enum   : Items [ left, mid, right ]  +  Default [ mid v ]  (항목 번호가 아니라 이름에서 고른다)
+#   string : Default [ text ]            +  Keyable 칸이 "Channel Box" 로 바뀐다
+#            (string 은 키를 못 걸어서, 체크의 뜻을 "채널박스에 보이게" 로 읽는다)
 
 from Framework.qt.qt import *
 
@@ -49,11 +54,12 @@ class AttrSpecDialog(QDialog):
         # --- 타입 + keyable
         form.addWidget(QLabel("Type"), 1, 0)
         self.cmb_type = QComboBox()
-        self.cmb_type.addItems(["float", "int", "bool"])
+        self.cmb_type.addItems(list(prefs.ATTR_TYPES))
         index = self.cmb_type.findText(spec.get("type", "float"))
         self.cmb_type.setCurrentIndex(index if index >= 0 else 0)
         self.cmb_type.setToolTip(
-            "float : double  -  int : long  -  bool : on / off")
+            "float : double  -  int : long  -  bool : on / off\n"
+            "enum : named choices  -  string : text")
         self.cmb_type.currentTextChanged.connect(self._sync_type)
         form.addWidget(self.cmb_type, 1, 1)
 
@@ -91,6 +97,35 @@ class AttrSpecDialog(QDialog):
         self.chk_default_bool.setToolTip("Default value for a bool attribute.")
         form.addWidget(self.chk_default_bool, 4, 1, 1, 2)
 
+        # --- enum : 항목 + 기본 항목
+        self.lbl_items = QLabel("Items")
+        form.addWidget(self.lbl_items, 5, 0)
+        self.le_items = QLineEdit(", ".join(spec.get("enum") or []))
+        self.le_items.setPlaceholderText("e.g. left, mid, right")
+        self.le_items.setToolTip(
+            "Enum items in order, separated by ',' or ':'.\n"
+            "Empty items are dropped.")
+        self.le_items.textChanged.connect(self._sync_enum_items)
+        form.addWidget(self.le_items, 5, 1, 1, 2)
+
+        self.cmb_default_enum = QComboBox()
+        self.cmb_default_enum.setToolTip("Default item of the enum attribute.")
+        form.addWidget(self.cmb_default_enum, 4, 1, 1, 2)
+
+        # --- string : 기본 글자
+        self.le_default_str = QLineEdit(
+            spec.get("default") if isinstance(spec.get("default"), str) else "")
+        self.le_default_str.setPlaceholderText("(empty)")
+        self.le_default_str.setToolTip("Default text of the string attribute.")
+        form.addWidget(self.le_default_str, 4, 1, 1, 2)
+
+        # 편집으로 열었으면 기본 항목을 그 번호로 맞춘다.
+        self._sync_enum_items()
+        if spec.get("type") == "enum":
+            self.cmb_default_enum.setCurrentIndex(
+                max(0, min(self.cmb_default_enum.count() - 1,
+                           int(spec.get("default") or 0))))
+
         # 범위 밖 기본값은 addAttr 이 조용히 무시하므로(경고만 낸다), 여기서 알려 준다.
         self.lbl_hint = QLabel("")
         self.lbl_hint.setWordWrap(True)
@@ -119,18 +154,42 @@ class AttrSpecDialog(QDialog):
         spin.setRange(-1e6, 1e6)
         # 값을 되쓰는 스핀박스라 타이핑 중 값이 잘리지 않도록 tracking 을 끈다.
         spin.setKeyboardTracking(False)
-        spin.setValue(fallback if value is None else float(value))
+        # string 스펙의 default 는 글자라 숫자가 아니면 fallback 을 쓴다.
+        try:
+            spin.setValue(fallback if value is None else float(value))
+        except (TypeError, ValueError):
+            spin.setValue(fallback)
         return spin
 
     def _sync_type(self, type_name):
         """타입에 따라 범위/기본값 위젯을 바꾼다."""
         is_bool = (type_name == "bool")
         is_int = (type_name == "int")
+        is_enum = (type_name == "enum")
+        is_string = (type_name == "string")
+        is_ranged = type_name in prefs.RANGED_TYPES
 
         for widget in (self.chk_min, self.chk_max, self.sp_min, self.sp_max):
-            widget.setVisible(not is_bool)
-        self.sp_default.setVisible(not is_bool)
+            widget.setVisible(is_ranged)
+        self.sp_default.setVisible(is_ranged)
         self.chk_default_bool.setVisible(is_bool)
+        self.lbl_items.setVisible(is_enum)
+        self.le_items.setVisible(is_enum)
+        self.cmb_default_enum.setVisible(is_enum)
+        self.le_default_str.setVisible(is_string)
+
+        # string 은 키를 못 건다 - 같은 체크를 "채널박스에 보이게" 로 쓴다.
+        if is_string:
+            self.chk_keyable.setText("Channel Box")
+            self.chk_keyable.setToolTip(
+                "String attributes cannot be keyed.\n"
+                "On  : shown in the channel box.\n"
+                "Off : hidden (Attribute Editor only).")
+        else:
+            self.chk_keyable.setText("Keyable")
+            self.chk_keyable.setToolTip(
+                "On  : shows in the channel box and can be keyed.\n"
+                "Off : created hidden from the channel box.")
 
         for spin in (self.sp_min, self.sp_max, self.sp_default):
             spin.setDecimals(0 if is_int else 3)
@@ -139,13 +198,24 @@ class AttrSpecDialog(QDialog):
         self._sync_range()
         self._sync_hint()
 
+    def _sync_enum_items(self, _text=None):
+        """Items 칸이 바뀌면 기본 항목 콤보를 다시 채운다. 고른 이름은 가능하면 유지."""
+        current = self.cmb_default_enum.currentText()
+        items = prefs._enum_items(self.le_items.text())
+        self.cmb_default_enum.blockSignals(True)
+        self.cmb_default_enum.clear()
+        self.cmb_default_enum.addItems(items)
+        index = self.cmb_default_enum.findText(current)
+        self.cmb_default_enum.setCurrentIndex(index if index >= 0 else 0)
+        self.cmb_default_enum.blockSignals(False)
+
     def _sync_range(self):
         self.sp_min.setEnabled(self.chk_min.isChecked())
         self.sp_max.setEnabled(self.chk_max.isChecked())
 
     def _sync_hint(self):
         """기본값이 범위를 벗어나면 "잘린다" 고 미리 알려 준다."""
-        if self.cmb_type.currentText() == "bool":
+        if self.cmb_type.currentText() not in prefs.RANGED_TYPES:
             self.lbl_hint.setText("")
             return
         value = self.sp_default.value()
@@ -165,6 +235,15 @@ class AttrSpecDialog(QDialog):
         if type_name == "bool":
             raw = {"name": self.le_name.text(), "type": "bool",
                    "default": 1 if self.chk_default_bool.isChecked() else 0,
+                   "keyable": self.chk_keyable.isChecked()}
+        elif type_name == "enum":
+            raw = {"name": self.le_name.text(), "type": "enum",
+                   "enum": self.le_items.text(),
+                   "default": max(0, self.cmb_default_enum.currentIndex()),
+                   "keyable": self.chk_keyable.isChecked()}
+        elif type_name == "string":
+            raw = {"name": self.le_name.text(), "type": "string",
+                   "default": self.le_default_str.text(),
                    "keyable": self.chk_keyable.isChecked()}
         else:
             raw = {

@@ -28,18 +28,26 @@ import re
 
 
 # UI 에 보여 주는 타입 이름 -> maya addAttr 의 attributeType.
-# 세 가지만 둔다(실수 / 정수 / 불리언) - 요청 범위이고, 그 이상은 Copy 탭이 원본에서
-# 그대로 복제하는 쪽이 정확하다.
+# v01.48 에 enum / string 을 더했다. 나머지 타입은 Copy 탭이 원본에서 그대로 복제하는 쪽이 정확하다.
 TYPE_TO_MAYA = {
     "float": "double",
     "int": "long",
     "bool": "bool",
+    "enum": "enum",
+    "string": "string",
 }
 
-ATTR_TYPES = ("float", "int", "bool")
+ATTR_TYPES = ("float", "int", "bool", "enum", "string")
 
-# 범위를 쓰는 타입(불리언은 0/1 고정이라 제외).
+# 범위를 쓰는 타입(불리언 0/1, enum 항목 번호, string 은 범위가 없다).
 RANGED_TYPES = ("float", "int")
+
+# `addAttr` 이 `attributeType` 이 아니라 **`dataType`** 으로 받는 타입.
+# string 은 `defaultValue` 도 못 받는다(실측: `Expected float, got str`) - 만든 뒤 setAttr 로 넣는다.
+DATA_TYPES = ("string",)
+
+#: enum 항목 구분자 (마야 `enumName` 형식)
+ENUM_SEPARATOR = ":"
 
 DEFAULT_PROFILE = "Default"
 
@@ -90,8 +98,13 @@ def normalize_spec(spec):
       아니라 **경고 후 무시**해 버리므로(실측), 잘라 두지 않으면 사용자가 적은 기본값이
       조용히 사라진다.
 
+    - enum 은 항목 목록(`enum`)을 정리하고 default 를 **항목 번호**로 자른다. 범위를 벗어난
+      번호를 주면 마야가 조용히 0 으로 만든다(실측).
+    - string 은 default 가 글자이고 범위가 없다.
+
     Raises:
-        ValueError: 이름이 비었거나 마야 어트리뷰트 이름 규칙에 어긋날 때.
+        ValueError: 이름이 비었거나 마야 어트리뷰트 이름 규칙에 어긋날 때,
+            enum 인데 항목이 하나도 없을 때.
     """
     name = (spec.get("name") or "").strip()
     if not name:
@@ -106,6 +119,23 @@ def normalize_spec(spec):
         attr_type = "float"
 
     keyable = bool(spec.get("keyable", True))
+
+    if attr_type == "enum":
+        items = _enum_items(spec.get("enum"))
+        if not items:
+            raise ValueError(
+                "'{0}' is an enum but has no items. Type the items, e.g. "
+                "left, mid, right.".format(name))
+        default = int(round(_as_float(spec.get("default"), 0.0)))
+        default = max(0, min(len(items) - 1, default))
+        return {"name": name, "type": "enum", "min": None, "max": None,
+                "default": default, "keyable": keyable, "enum": items}
+
+    if attr_type == "string":
+        text = spec.get("default")
+        return {"name": name, "type": "string", "min": None, "max": None,
+                "default": text if isinstance(text, str) else "",
+                "keyable": keyable}
 
     if attr_type == "bool":
         default = 1 if _as_float(spec.get("default"), 0.0) else 0
@@ -137,6 +167,27 @@ def normalize_spec(spec):
             "default": default, "keyable": keyable}
 
 
+def _enum_items(value):
+    """enum 항목을 목록으로 정리한다. `"a:b"` · `"a, b"` · `["a", "b"]` 전부 받는다.
+
+    빈 항목과 앞뒤 공백은 버린다. 마야는 `enumName` 을 `:` 로 가르므로 항목 안의 `:` 도 버린다.
+    """
+    if isinstance(value, str):
+        raw = value.replace(",", ENUM_SEPARATOR).split(ENUM_SEPARATOR)
+    elif isinstance(value, (list, tuple)):
+        raw = []
+        for item in value:
+            raw.extend(str(item).replace(",", ENUM_SEPARATOR).split(ENUM_SEPARATOR))
+    else:
+        raw = []
+    return [item.strip() for item in raw if item and item.strip()]
+
+
+def enum_name(items):
+    """항목 목록 -> 마야 `enumName` 문자열."""
+    return ENUM_SEPARATOR.join(items)
+
+
 def _as_float(value, fallback):
     try:
         return float(value)
@@ -155,6 +206,20 @@ def _as_optional_float(value):
 
 def describe_spec(spec):
     """리스트에 보여 줄 한 줄 설명. 예: 'World   float [0, 1]  default 0'."""
+    if spec["type"] == "enum":
+        items = spec.get("enum") or []
+        current = items[spec["default"]] if 0 <= spec["default"] < len(items) else "?"
+        parts = ["enum", "[{0}]".format(" | ".join(items)), "default {0}".format(current)]
+        if not spec["keyable"]:
+            parts.append("non-keyable")
+        return "   ".join(parts)
+
+    if spec["type"] == "string":
+        parts = ["string", 'default "{0}"'.format(spec["default"])]
+        if not spec["keyable"]:
+            parts.append("hidden")
+        return "   ".join(parts)
+
     parts = [spec["type"]]
     if spec["type"] in RANGED_TYPES:
         low = "-inf" if spec["min"] is None else _g(spec["min"])

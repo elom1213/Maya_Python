@@ -4,7 +4,9 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.47` (`app/config/version.py`) — Constrain > Constraint 의 종류가 **체크박스**:
+- 버전: `v01.48` (`app/config/version.py`) — Attribute > Create 의 `Add` / `Edit` 로 **`enum`** · **`string`**
+  어트리뷰트도 정의해 만든다 (§Attribute > Create)
+  · v01.47 은 Constrain > Constraint 의 종류가 **체크박스**:
   `Parent` + `Scale`, `Point` · `Orient` · `Scale` 중 2~3개를 **한 번에** 건다. 같은 채널을 구동하는 종류는
   서로를 끈다 (§Constraint)
   · v01.46 은 Attribute > Edit 에 **`Maintain connections`**(기본 ON):
@@ -1101,13 +1103,23 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
   | 항목 | 내용 |
   |------|------|
   | `Name` | 어트리뷰트 롱네임. 영문자/밑줄로 시작, 영숫자/밑줄만 |
-  | `Type` | `float`(double) · `int`(long) · `bool` |
-  | `Min` / `Max` | **체크박스로 켜고 끈다** — 끄면 "제한 없음" |
-  | `Default` | 기본값 (bool 은 On/Off 체크박스) |
-  | `Keyable` | 끄면 채널 박스에 안 보이게 만든다 |
+  | `Type` | `float`(double) · `int`(long) · `bool` · `enum` · `string` (v01.48) |
+  | `Min` / `Max` | **체크박스로 켜고 끈다** — 끄면 "제한 없음" (float / int 만) |
+  | `Items` | enum 항목. `left, mid, right` 처럼 `,` 또는 `:` 로 가른다 (enum 만) |
+  | `Default` | 기본값 — bool 은 On/Off 체크박스, enum 은 **항목 이름 콤보**, string 은 글자 칸 |
+  | `Keyable` | 끄면 채널 박스에 안 보이게 만든다. string 에서는 **`Channel Box`** 로 바뀐다 |
 
 - **`Min`/`Max` 를 체크박스로 둔 이유**: 마야에서 "범위 없음" 과 "범위가 0" 은 다른데,
   스핀박스만 두면 그 둘을 구분해 넣을 방법이 없다.
+- **enum / string (v01.48)**
+  - enum 은 `Items` 를 적으면 `Default` 콤보가 그 항목으로 채워진다. 기본값은 **항목 번호**로 저장된다
+    (마야 `defaultValue` 가 번호다). 항목이 하나도 없으면 저장하지 않는다.
+    범위를 벗어난 번호를 주면 마야는 **조용히 0** 으로 만들기 때문에 저장할 때 항목 수 안으로 자른다.
+  - string 은 `addAttr -dataType string` 으로 만들고 **기본값은 만든 뒤 `setAttr -type string`** 으로 넣는다
+    — `addAttr` 이 문자열 `defaultValue` 를 못 받는다(실측: `Expected float, got str`). 비워 두면 값을 넣지 않는다.
+  - string 은 키를 걸 수 없고 `addAttr -keyable` 을 켜도 채널 박스에 안 나온다(실측). 그래서 같은 체크를
+    **`Channel Box`**(= `setAttr -channelBox`) 로 읽는다. 끄면 Attribute Editor 에만 보인다.
+  - 리스트 표시: `side   enum   [left | mid | right]   default mid`, `note   string   default "hello"`.
 - `Remove` 는 **프로파일에서만** 지운다(씬의 어트리뷰트는 건드리지 않는다).
 - `min > max` 로 적으면 **서로 바꿔** 저장한다(거꾸로 넣는 일이 흔하다).
 

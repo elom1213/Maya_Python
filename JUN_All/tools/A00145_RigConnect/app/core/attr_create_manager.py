@@ -21,18 +21,42 @@ def _add_flags(spec):
     밖 기본값을 에러가 아니라 **경고 후 무시**하므로(실측), 자르지 않으면 사용자가 적은
     값이 조용히 사라진다.
     """
+    if spec["type"] == "string":
+        # string 은 `dataType` 이고 `defaultValue` 를 받지 못한다(실측:
+        # `Expected float, got str`). 값과 채널박스 표시는 만든 뒤 `_finish_string` 이 넣는다.
+        # `keyable` 도 켜 봐야 채널박스에 안 나오므로 여기서 켜지 않는다.
+        return {"longName": spec["name"], "dataType": "string"}
+
     flags = {
         "longName": spec["name"],
         "attributeType": prefs.TYPE_TO_MAYA[spec["type"]],
         "defaultValue": spec["default"],
         "keyable": bool(spec["keyable"]),
     }
+    if spec["type"] == "enum":
+        # 항목 이름은 `a:b:c` 한 문자열로 준다. defaultValue 는 **항목 번호**이고,
+        # 범위를 벗어나면 마야가 조용히 0 으로 만든다(실측) - normalize_spec 이 이미 잘랐다.
+        flags["enumName"] = prefs.enum_name(spec.get("enum") or [])
     if spec["type"] in prefs.RANGED_TYPES:
         if spec["min"] is not None:
             flags["minValue"] = spec["min"]
         if spec["max"] is not None:
             flags["maxValue"] = spec["max"]
     return flags
+
+
+def _finish_string(plug, spec):
+    """string 어트리뷰트를 만든 뒤 값과 채널박스 표시를 넣는다 (v01.48).
+
+    - 기본값은 `setAttr ... type="string"` 으로 넣는다(addAttr 이 못 받는다).
+      빈 문자열이면 넣지 않는다 - 마야가 주는 값이 `None` 인 상태 그대로 둔다.
+    - `Keyable` 체크는 string 에선 **"채널박스에 보이게"** 로 읽는다. string 은 키를 못 걸고,
+      `addAttr -keyable` 을 켜도 채널박스에 나오지 않는다(실측) - `setAttr -channelBox` 가 필요하다.
+    """
+    if spec["default"]:
+        cmds.setAttr(plug, spec["default"], type="string")
+    if spec["keyable"]:
+        cmds.setAttr(plug, channelBox=True)
 
 
 def create_attributes(objects, specs):
@@ -72,6 +96,8 @@ def create_attributes(objects, specs):
                 continue
             try:
                 cmds.addAttr(obj, **_add_flags(spec))
+                if spec["type"] == "string":
+                    _finish_string(full, spec)
                 created.append(full)
             except Exception as e:
                 skipped.append((obj, spec["name"], str(e)))

@@ -31,6 +31,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-18 (오늘)
 
+> [!summary] `A00145_RigConnect` `Attribute > Create` 의 `Add` / `Edit` 로 **enum · string** 어트리뷰트도 정의해 만든다 (v01.47 -> 01.48)
+- **요청**: Create 탭 Add 버튼으로 Enum, String 종류도 생성.
+- enum: `Items`(`,` 또는 `:` 구분) + 항목 이름 콤보로 기본값. 저장은 **항목 번호** — 범위 밖 번호는 마야가 조용히 0 으로 만든다.
+- string: `addAttr -dataType string` 뒤 `setAttr -type string` 으로 기본값(`addAttr` 은 문자열 기본값을 못 받는다). 키를 못 걸어 `Keyable` 체크가 **`Channel Box`** 로 바뀐다.
+- core 는 직전 세션(컴퓨터 종료로 끊김)이 미커밋으로 남긴 것을 이어받고 편집 창을 붙였다. 끊기기 전 커밋 4개(A00220 Shrink · A00400 Controls/Replace/Palette)도 mayapy 34항목 + UI 클릭 + 오프스크린으로 재진단, 이상 없음. #A00145
+
 > [!summary] `A00400_CurveTool` `Create > Controls` 색에 **팔레트 팝업**(임의 RGB) — `ref_01.mel` 과 같은 `overrideRGBColors` 방식 (v01.16 -> 01.17)
 - **요청**: `ref/ref_01.mel` 참고, 정해진 색이 아니라 팔레트에서 고른 색으로. 팔레트는 별도 팝업.
 - `Color Palette...` + 마지막 색 견본(누르면 재적용). 코어 `set_color_rgb()` 는 ref 와 같은 어트리뷰트를 쓴다.
