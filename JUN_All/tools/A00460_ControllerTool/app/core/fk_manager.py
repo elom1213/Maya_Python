@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-07
+# last Update date : 2026-09-18
 # A00460_ControllerTool - FK / IK 컨트롤러 생성 (maya.cmds, UI 비의존)
 #
 # 조인트(또는 오브젝트) 하나마다 아래 스택을 만든다.
@@ -36,6 +36,18 @@
 # 나머지는 로컬 0 으로 부모 밑에 넣는다(relative parent). 그래서 셋 다 정확히 겹치고,
 # 컨트롤러를 움직인 값이 곧 조인트 대비 오프셋이 된다. (A00170_driverTool 과 같은 방식)
 # IK 도 최상단을 조인트 자리에 맞추는 것은 같다 — 부모가 없을 뿐이다.
+#
+# ## Skip End (v01.07~, FK 계층 전용)
+#
+# 체인 **끝에서 n 개**의 조인트에는 컨트롤러를 만들지 않는다. 손끝 · 발끝 · 꼬리 끝처럼
+# 스킨만 받고 애니메이터가 잡을 일이 없는 end 조인트를 매번 지우던 것을 없앤다.
+#   jnt_01 > 02 > 03 > 04 , n = 2  ->  01, 02 에만 스택. 03, 04 는 부모 조인트를 따라갈 뿐.
+# - Bone Root : 조인트의 **높이**(가장 깊은 자손 잎까지의 거리)가 n 보다 작으면 건너뛴다.
+#               잎 = 0 이라 n=2 면 잎과 그 부모가 빠진다. 분기가 있으면 **가지마다** 끝 n 개가
+#               빠지고, 더 긴 가지가 있는 조인트는 남는다(높이는 가장 긴 가지 기준이라
+#               남긴 조인트의 부모가 빠지는 일은 없다).
+# - Bone Chain : 리스트의 **마지막 n 개**를 뺀다.
+# IK 계층에서는 스택이 서로 잇지 않아 "체인 끝" 이 뜻이 없으므로 무시한다.
 
 import maya.cmds as cmds
 
@@ -253,8 +265,18 @@ def _build_one(joint, parent_node, plan, types, size, result):
     return ctl
 
 
+def _height(joint, memo):
+    """가장 깊은 자손 잎까지의 거리(잎 = 0). Skip End 판정용."""
+    key = _long(joint)
+    if key not in memo:
+        memo[key] = 0      # 순환 방지용 임시값
+        kids = _children_of(joint)
+        memo[key] = 1 + max(_height(k, memo) for k in kids) if kids else 0
+    return memo[key]
+
+
 def _build_root_recursive(joint, parent_node, plan, types, size,
-                          result, seen, hierarchy):
+                          result, seen, hierarchy, skip_end=0, heights=None):
     """ROOT 모드 — 조인트와 그 자손을 따라 내려가며 스택을 만든다.
 
     자손을 **따라가는 것**과 스택을 **잇는 것**은 별개다. IK 계층에서는 자손까지 그대로
@@ -265,18 +287,34 @@ def _build_root_recursive(joint, parent_node, plan, types, size,
         return
     seen.add(key)
 
+    # Skip End: 끝에서 n 개 안쪽이면 이 조인트와 그 아래 전부를 건너뛴다
+    # (자손의 높이는 언제나 더 작으므로 내려가 봐야 다 빠진다).
+    if skip_end > 0 and _height(joint, heights) < skip_end:
+        _collect_skipped(joint, result, seen)
+        return
+
     anchor = _build_one(joint, parent_node, plan, types, size, result)
     child_parent = anchor if hierarchy == HIER_FK else None
 
     for child in _children_of(joint):
         _build_root_recursive(child, child_parent, plan, types, size,
-                              result, seen, hierarchy)
+                              result, seen, hierarchy, skip_end, heights)
+
+
+def _collect_skipped(joint, result, seen):
+    """Skip End 로 빠진 조인트와 그 자손을 result["skipped"] 에 적는다."""
+    result["skipped"].append(joint)
+    for child in _children_of(joint):
+        key = _long(child)
+        if key not in seen:
+            seen.add(key)
+            _collect_skipped(child, result, seen)
 
 
 def build_controls(nodes, mode=MODE_ROOT, hierarchy=HIER_FK,
                    use_zro=True, use_con=True, use_tgt=True,
                    constraints=DEFAULT_CONSTRAINTS,
-                   size=DEFAULT_SIZE):
+                   size=DEFAULT_SIZE, skip_end=0):
     """리스트업한 노드들에 컨트롤러 스택을 만든다.
 
     nodes       : 조인트/오브젝트 이름 목록(리스트 순서 그대로 쓴다).
@@ -288,6 +326,8 @@ def build_controls(nodes, mode=MODE_ROOT, hierarchy=HIER_FK,
     use_zro/con/tgt : 만들 널 그룹 종류. _ctl 은 항상 만든다.
     constraints : CON_* 목록. 조인트는 스택의 마지막 노드(보통 _tgt)를 따라간다.
     size        : 컨트롤러 큐브의 반변길이(반지름 감각).
+    skip_end    : **FK 계층에서만** 체인 끝 n 개 조인트에 컨트롤러를 만들지 않는다
+                  (모듈 상단 Skip End). 0 = 전부 만든다. IK 면 무시.
 
     반환 dict:
         roots       부모가 없는 최상단 노드들 (IK 면 스택마다 하나씩)
@@ -295,12 +335,13 @@ def build_controls(nodes, mode=MODE_ROOT, hierarchy=HIER_FK,
         constraints 만들어진 컨스트레인트 노드
         driven      컨스트레인트가 걸린 조인트
         missing     씬에 없던 입력
+        skipped     Skip End 로 컨트롤러를 만들지 않은 조인트
         renamed     이름이 겹쳐 마야가 번호를 붙인 (원한 이름, 실제 이름)
         warnings    경고 문자열
     """
     result = {
         "roots": [], "controls": [], "constraints": [], "driven": [],
-        "missing": [], "renamed": [], "warnings": [],
+        "missing": [], "renamed": [], "warnings": [], "skipped": [],
     }
 
     types = [t for t in CONSTRAINT_TYPES if t in (constraints or ())]
@@ -331,12 +372,19 @@ def build_controls(nodes, mode=MODE_ROOT, hierarchy=HIER_FK,
     if hierarchy not in HIERARCHIES:
         hierarchy = HIER_FK
 
+    # Skip End 는 FK 계층 전용이다(IK 는 스택을 잇지 않아 '체인 끝' 이 없다).
+    skip_end = max(0, int(skip_end or 0)) if hierarchy == HIER_FK else 0
+
     if mode == MODE_ROOT:
         seen = set()
+        heights = {}
         for root in valid:
             _build_root_recursive(root, None, plan, types, size,
-                                  result, seen, hierarchy)
+                                  result, seen, hierarchy, skip_end, heights)
     else:
+        if skip_end:
+            result["skipped"].extend(valid[max(0, len(valid) - skip_end):])
+            valid = valid[:max(0, len(valid) - skip_end)]
         parent_node = None
         for node in valid:
             anchor = _build_one(node, parent_node, plan, types, size, result)

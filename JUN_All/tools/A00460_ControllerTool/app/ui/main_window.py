@@ -191,6 +191,29 @@ class MainWindow(QWidget):
         hier_row.addStretch(1)
         hier_lay.addLayout(hier_row)
 
+        # Skip End (v01.07) — FK 에서만. 체인 끝 n 개 조인트에는 컨트롤러를 만들지 않는다.
+        skip_row = QHBoxLayout()
+        self.lbl_skip_end = QLabel("Skip End Joints")
+        skip_row.addWidget(self.lbl_skip_end)
+        self.sb_skip_end = QSpinBox()
+        self.sb_skip_end.setRange(0, 999)
+        self.sb_skip_end.setValue(0)
+        self.sb_skip_end.setKeyboardTracking(False)
+        skip_tip = (
+            "FK only. Do not build controls for the last n joints of each chain.\n"
+            "e.g. jnt_01 > 02 > 03 > 04 with 2 -> controls on jnt_01 and jnt_02 only.\n"
+            "Bone Root : counted from each branch end (the leaf is the 1st).\n"
+            "Bone Chain: the last n nodes of the list.\n"
+            "0 = build every joint.")
+        self.lbl_skip_end.setToolTip(skip_tip)
+        self.sb_skip_end.setToolTip(skip_tip)
+        skip_row.addWidget(self.sb_skip_end)
+        skip_row.addStretch(1)
+        hier_lay.addLayout(skip_row)
+        # IK 는 스택을 잇지 않아 '체인 끝' 이 없다 — 칸을 끈다(값은 그대로 둔다).
+        self.rb_fk.toggled.connect(self.sb_skip_end.setEnabled)
+        self.rb_fk.toggled.connect(self.lbl_skip_end.setEnabled)
+
         lbl_hier = QLabel(
             "Independent of Mode - Mode picks the nodes, Hierarchy links them.")
         lbl_hier.setWordWrap(True)
@@ -326,6 +349,7 @@ class MainWindow(QWidget):
                 use_tgt=self.chk_tgt.isChecked(),
                 constraints=self._selected_constraints(),
                 size=self.sb_size.value(),
+                skip_end=self.sb_skip_end.value(),
             )
             if result["roots"]:
                 cmds.select(result["roots"], replace=True)
@@ -342,6 +366,13 @@ class MainWindow(QWidget):
 
         for msg in result["warnings"]:
             self.log(msg, warn=True)
+
+        skipped = result.get("skipped") or []
+        if skipped:
+            names = [n.split("|")[-1] for n in skipped]
+            self.log("Skip End: no control for {0} joint(s): {1}{2}".format(
+                len(names), ", ".join(names[:10]),
+                " ..." if len(names) > 10 else ""))
 
         controls = [c for c in result["controls"] if c]
         if not controls:

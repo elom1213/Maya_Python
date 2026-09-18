@@ -2,7 +2,7 @@
 title: A00460_ControllerTool 사용법
 aliases: [Controller Tool, ControllerTool, A00460, FK Control]
 tags: [maya-python, tool-guide, controller, fk, ik, rigging, constraint, zro, con, ctl, tgt]
-updated: 2026-09-16
+updated: 2026-09-18
 ---
 
 # A00460_ControllerTool 사용법
@@ -16,7 +16,7 @@ Maya 안에서 도는 **애니메이션 컨트롤러 생성** PySide 툴이다(a
 |---------|---------|------|
 | **Create** | **FK & IK** (v01.00~, v01.04 에서 개명) | 리스트업한 조인트/오브젝트에 `zro > con > ctl > tgt` 스택을 만들고, 조인트가 그것을 따라오게 컨스트레인트. **FK** 는 스택끼리 잇고, **IK** 는 모든 `_zro` 를 씬 최상위에 둔다 |
 
-- **버전**: `app/config/version.py` (v01.04)
+- **버전**: `app/config/version.py` (v01.07 — FK 에 **Skip End Joints**: 체인 끝 n 개 조인트에는 컨트롤러를 만들지 않는다)
 - **설치**: `__dragDrop_A00460.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **CtrlTool** → `tools.A00460_ControllerTool.run(True)`
 - **참고**: `con/ctl/tgt` 계층 관례는 `A00170_driverTool` 의 Edge Loop 드라이버,
   Bone Chain / Bone Root 모드는 `A00390_WindTool_V02` 를 이식/응용.
@@ -92,6 +92,7 @@ joint_A_03_zro > _con > _ctl > _tgt
 │ └─────────────────────────────────┘ │
 │ ┌ Hierarchy - how they are linked ┐ │
 │ │ (o) FK         ( ) IK           │ │
+│ │ Skip End Joints [0]   (FK only) │ │
 │ └─────────────────────────────────┘ │
 │ ┌ Nodes to Build ─────────────────┐ │
 │ │ [v] zro  [v] con  [v] tgt       │ │
@@ -157,6 +158,29 @@ IK 에서도 **스택 최상단은 조인트 자리에 그대로 맞춘다** —
 
 > Bone Root + IK 에서도 **자손은 그대로 따라 내려간다.** "따라가는 것" 과 "잇는 것" 은
 > 별개다 — 자손에게도 컨트롤러가 생기되, 그 스택이 부모 밑으로 들어가지 않을 뿐이다.
+
+#### Skip End Joints — 체인 끝 n 개는 건너뛰기 (v01.07~, FK 전용)
+
+정수 칸, **기본 0**(전부 만든다). n 을 넣으면 **체인 끝에서 n 개** 조인트에는 스택을 만들지 않는다.
+손끝 · 발끝 · 꼬리 끝처럼 스킨만 받고 애니메이터가 잡을 일이 없는 end 조인트를 매번 지우던 것을 없앤다.
+
+```
+jnt_01
+└── jnt_02
+    └── jnt_03
+        └── jnt_04          Skip End Joints = 2  ->  jnt_01, jnt_02 에만 컨트롤러
+```
+
+- **Bone Root**: 조인트마다 **가장 깊은 자손 잎까지의 거리**(잎 = 0)를 재어 n 보다 작으면 건너뛴다.
+  분기가 있으면 **가지마다** 끝 n 개가 빠진다. 거리는 가장 긴 가지 기준이라, 긴 가지가 달린 조인트는
+  짧은 가지가 통째로 빠지더라도 남는다 — 남긴 조인트의 부모가 빠지는 일은 없다.
+  예: `jnt_01 > jnt_02 > (a_01 > a_02 > a_03 | b_01)`, n = 2 → `jnt_01`, `jnt_02`, `a_01` 만.
+- **Bone Chain**: 리스트의 **마지막 n 개**를 뺀다.
+- 건너뛴 조인트에는 **컨스트레인트도 걸리지 않는다.** 원래 부모 조인트를 따라 움직일 뿐이다.
+  로그가 `Skip End: no control for 2 joint(s): jnt_03, jnt_04` 로 무엇이 빠졌는지 알린다.
+- **IK 에서는 칸이 꺼지고 무시된다.** 스택끼리 잇지 않으니 "체인 끝" 이 뜻이 없다(값은 남아 있어 FK 로
+  돌아오면 그대로 쓰인다).
+- n 이 체인 길이 이상이면 아무것도 만들지 않는다(`Nothing was built.`).
 
 ### Nodes to Build — 만들 널 그룹
 
