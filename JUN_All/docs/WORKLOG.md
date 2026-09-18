@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-18 (오늘)
 
+> [!summary] `A00480_FileTool` Export 에 **규칙** — 내보내기 전에 모든 세트를 검사, 하나라도 걸리면 파일을 하나도 안 쓴다. 첫 규칙 `Check Hide Mesh` (v01.02 -> 01.03)
+- **요청**: 내보낼 때 여러 규칙을 추가·선택 적용. 첫 규칙 Check Hide Mesh — Set's Name 세트 안 메시 중 visibility 가 꺼진 것이 있으면 내보내기를 시작하지 않고 어떤 세트 · 어떤 메시인지 경고. 규칙은 계속 늘고 여러 개를 동시에 적용. (중간 추가 요청: 도중에 멈추지 말고 한 개도 내보내지 말 것)
+- `app/core/export_rules.py` — 레지스트리 `EXPORT_RULES`(한 줄 = 규칙) + `run_rules`: 켠 규칙을 **전부** 돌리고 모든 세트를 먼저 검사, 실패면 `export_sets` 를 부르지 않는다. 규칙 예외도 실패로 친다.
+- 숨김 판정 = 씬에서 실제로 안 보임: 자기 · 쉐입 · **조상**의 visibility / lodVisibility / 디스플레이 레이어 / 드로잉 오버라이드. intermediate(Orig) 쉐입 제외. 원인을 로그에.
+- UI 는 Type Filter 옆 `Rules (n/m)` 드롭다운 + `Check`(내보내지 않고 검사) — 규칙이 늘어도 창 크기 그대로(HEAD 와 나란히 재서 같음).
+- mayapy 2024 24항목(원인 6종 · Orig 무시 · 하위 세트/컴포넌트 · 조인트 아래 · 실패 시 FBX 0개 · 통과 시 내보냄 · Check). #A00480
+
 > [!summary] `A00130_ControlRig_V02` `Orient & Place` 표에 **필터** — Joint · Rule · Note 에서 글자 찾기, `In` 으로 열 선택 (v02.25 -> 02.26) + 공용 필터 `tree_columns`
 - **요청**: 검색으로 joint 혹은 Rule, note 에 어떤 글자가 있는지 찾고 걸러 보기.
 - 공용 `JUN_mod_filter_qt` 는 트리를 한 열만 봤다 → `tree_columns`(여러 열) + `set_tree_columns()` 추가. 단어마다 어느 열이든, 단어끼리는 AND, 열 사이엔 줄바꿈을 끼워 경계를 넘은 글자는 안 맞게. 기존 `tree_column` 사용처(A00275 · A00330)는 그대로.

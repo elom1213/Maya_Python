@@ -22,6 +22,7 @@ from Framework.core.maya_undo import undo_chunk
 
 from tools.A00480_FileTool.app import core
 from tools.A00480_FileTool.app.ui.type_filter_button import TypeFilterButton
+from tools.A00480_FileTool.app.ui.rules_button import RulesButton
 
 
 # 레거시 6-토큰 기본값 (label = 표 헤더, text = Custom 모드 기본 문자열)
@@ -189,13 +190,25 @@ class ExportTab(QWidget):
         layout.addWidget(QLabel("Type Filter :"))
         self.type_filter = TypeFilterButton(core.FILTER_TYPES)
         layout.addWidget(self.type_filter)
+
+        # 내보내기 전 검사 규칙 (v01.03). 규칙 목록은 core.EXPORT_RULES 가 정한다.
+        layout.addWidget(QLabel("Rules :"))
+        self.rules_button = RulesButton(core.EXPORT_RULES)
+        layout.addWidget(self.rules_button)
+        btn_check_rules = QPushButton("Check")
+        btn_check_rules.setToolTip(
+            "Run the checked rules now without exporting anything.")
+        btn_check_rules.clicked.connect(self.on_check_rules)
+        layout.addWidget(btn_check_rules)
         layout.addStretch(1)
 
         btn_export = QPushButton("Export")
         btn_export.setMinimumHeight(32)
         btn_export.setToolTip(
             "Export each set's members to '<Export Path>/<File name>.fbx'. "
-            "Unchecked types in Type Filter are excluded.")
+            "Unchecked types in Type Filter are excluded.\n"
+            "The checked Rules run first, on every set - if any of them fails,\n"
+            "no file is exported at all.")
         btn_export.clicked.connect(self.on_export)
         layout.addWidget(btn_export, stretch=1)
 
@@ -263,6 +276,14 @@ class ExportTab(QWidget):
         keep_hierarchy = not self.cb_move_to_root.isChecked()
         joints_only = self.cb_joints_only.isChecked()
 
+        # 규칙 (v01.03) : 모든 세트를 **내보내기 전에** 검사한다. 하나라도 걸리면 파일을
+        # 단 한 개도 쓰지 않는다 - 세트별로 내보내다 도중에 멈추는 것이 아니다.
+        ctx = core.RuleContext(set_names, export_path, excluded, keep_hierarchy, joints_only)
+        if not self._run_rules(ctx):
+            self._log("[WARN] Export not started - fix the problems above, or uncheck "
+                      "the rule in 'Rules' if it is intended. No file was written.")
+            return
+
         included = self.type_filter.included_keys()
         self._log("--- Export start (include: {0} | hierarchy: {1} | "
                   "under joints: {2}) ---".format(
@@ -275,6 +296,31 @@ class ExportTab(QWidget):
                 set_names, file_names, excluded, export_path, keep_hierarchy,
                 joints_only)
         self._log_all(logs)
+
+    def _run_rules(self, ctx):
+        """체크된 규칙을 전부 돌려 로그를 남긴다. 모두 통과(또는 켠 규칙 없음)면 True."""
+        keys = self.rules_button.checked_keys()
+        if not keys:
+            return True
+        self._log("--- Rules ({0}) ---".format(", ".join(self.rules_button.checked_labels())))
+        passed, logs = core.run_rules(keys, ctx)
+        self._log_all(logs)
+        return passed
+
+    def on_check_rules(self):
+        """Check 버튼 - 내보내지 않고 규칙만 돌린다."""
+        set_names = self.set_tsl.get_all_items()
+        if not set_names:
+            self._log("[WARN] Set's Name list is empty. Add objectSets first.")
+            return
+        if not self.rules_button.checked_keys():
+            self._log("[WARN] No rule is checked - pick them in 'Rules'.")
+            return
+        ctx = core.RuleContext(
+            set_names, self.le_path.text().strip(), self.type_filter.excluded_keys(),
+            not self.cb_move_to_root.isChecked(), self.cb_joints_only.isChecked())
+        if self._run_rules(ctx):
+            self._log("[OK] All checked rules passed.")
 
     # ================================================================
     # Helper

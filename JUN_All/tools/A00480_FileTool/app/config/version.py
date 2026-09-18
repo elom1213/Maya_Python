@@ -17,5 +17,8 @@
 # 01.02  Pin 버튼 글자가 안 보이던 것 수정. 크기(72 x 22)는 그대로, 테마의 padding 8px 을
 #        이 버튼만 위아래 0 으로(글자 영역 4px -> 20px).
 
-VERSION = "01.02"
-LAST_UPDATE = "2026-09-17"
+# 01.03  Export 규칙 - 내보내기 전에 모든 세트를 검사, 하나라도 걸리면 파일을 하나도 안 쓴다.
+#        첫 규칙 Check Hide Mesh (세트 안 메시 중 씬에서 안 보이는 것). 규칙은 export_rules.EXPORT_RULES 한 줄로 는다.
+
+VERSION = "01.03"
+LAST_UPDATE = "2026-09-18"

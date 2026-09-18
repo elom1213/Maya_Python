@@ -13,6 +13,13 @@ from .export_ops import (
     get_unique_filepath,
     export_sets,
 )
+from .export_rules import (
+    EXPORT_RULES,
+    RuleContext,
+    RuleResult,
+    ExportRule,
+    run_rules,
+)
 from .import_ops import import_fbx_normal
 from .path_ops import scene_folder, open_scene_folder, normalize_pasted_path
 
@@ -28,6 +35,11 @@ __all__ = [
     "build_file_names",
     "get_unique_filepath",
     "export_sets",
+    "EXPORT_RULES",
+    "RuleContext",
+    "RuleResult",
+    "ExportRule",
+    "run_rules",
     "import_fbx_normal",
     "scene_folder",
     "open_scene_folder",

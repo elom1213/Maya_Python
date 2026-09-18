@@ -1,5 +1,19 @@
 # Changelog — A00480_FileTool
 
+## v01.03 (2026-09-18)
+- **Export rules** - checks that run before anything is exported. Pick them in the new
+  `Rules (n/m)` drop-down next to Type Filter; `Check` runs them without exporting.
+  - Every checked rule runs on **every listed set first**. If any rule fails, **no file is
+    exported at all** - not even the sets that passed. All problems are logged in one go.
+  - First rule: **Check Hide Mesh** (off by default). Looks at every mesh in the listed
+    sets (members and everything under them, nested sets and component members too) and
+    fails if any of them is hidden in the scene: its own, its shape's or any parent's
+    `visibility` / `lodVisibility` is off, or a display layer / drawing override hides it.
+    The log lists each set and hidden mesh with the reason. Intermediate (orig) shapes are
+    ignored.
+  - New rules are one entry in `app/core/export_rules.py` (`EXPORT_RULES`); the drop-down
+    and Export / Check pick them up without UI changes.
+
 ## v01.02 (2026-09-17)
 - Fix: the Pin button label was clipped. The button keeps its 72 x 22 size; its
   vertical padding is now 0 (the theme's 8px padding left only 4px for the text).

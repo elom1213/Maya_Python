@@ -29,3 +29,13 @@ metadata:
   Pin 을 22px 로 줄이면 테마 `QPushButton { padding: 8px }` 에 글자가 잘린다 → 버튼 stylesheet `padding: 0px 4px`(v01.02).
   오프스크린은 폰트가 안 그려져 캡처로 확인 불가 — `style().subElementRect(SE_PushButtonContents)` 높이로 확인.
 - 마야 GUI 육안 확인은 아직.
+
+**Export 규칙 (v01.03, 2026-09-18)** — `app/core/export_rules.py` 의 `EXPORT_RULES` 한 줄 = 규칙
+(`ExportRule(key, label, tooltip, check(ctx)->RuleResult, default)`). UI 는 `Rules (n/m)` 드롭다운(`ui/rules_button.py`)이
+목록을 읽어 만든다 — **규칙마다 UI 를 고치지 않는다.** 첫 규칙 `Check Hide Mesh`(기본 꺼짐).
+**사용자 요구: 규칙에 걸리면 "도중에 멈춤" 이 아니라 파일을 단 한 개도 쓰지 않는다** → 모든 세트를 먼저 검사, 실패면
+`export_sets` 를 아예 안 부른다. 켠 규칙은 첫 실패에서 멈추지 않고 전부 돈다(문제를 한 번에).
+숨김 판정 = 자기·쉐입·**조상**의 visibility/lodVisibility/디스플레이 레이어/드로잉 오버라이드, Orig(intermediate) 제외.
+`listRelatives(allDescendents)` 순서는 아웃라이너와 다르다(뒤집어도 안 맞음) → 자식을 직접 따라 내려간다.
+창 크기 확인은 mayapy 에서 **HEAD 코드와 나란히** — `git archive` 를 스크래치에 풀고 `sys.modules` 의 tools/Framework 를
+지운 뒤 import 해야 한다(mayapy 가 시작 때 tools 를 먼저 불러 옛 코드가 안 잡힌다). `tar` 는 `C:` 를 원격으로 오해 → `--force-local`.

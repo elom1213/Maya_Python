@@ -16,7 +16,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 | **Import** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` |
 | **Path** | `Copy Scene Folder` · `Open Scene Folder` | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `File` |
 
-- **버전**: `app/config/version.py` (v01.02 — Pin 글자 잘림 수정)
+- **버전**: `app/config/version.py` (v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
 - **설치**: `__dragDrop_A00480.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **FileTool** → `tools.A00480_FileTool.run(True)`
 - **테마**: `slate_dark`
 - **원본 두 툴은 그대로 남아 있다.** quickTool 의 File · Import option 버튼도 지워지지 않았다.
@@ -75,7 +75,47 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 | 저장된 씬 | 폴더를 `/` 모양으로 채우고 `Export path : ...` 로그 |
 | 저장 안 한 씬 | **기존 경로를 건드리지 않고** `[WARN] Current scene has not been saved yet (no scene folder).` |
 
-### 2-2. 원본과 달라진 것 (동작 아님)
+### 2-2. Export 규칙 — 내보내기 전에 검사 (v01.03)
+
+`Type Filter` 옆 **`Rules (n/m)`** 드롭다운에서 켤 규칙을 고른다(항목에 마우스를 올리면 설명). `Check` 는 **내보내지 않고** 규칙만 돌린다.
+
+```
+Type Filter : [Include Types v]  Rules : [Rules (1/1) v] [Check]        [      Export      ]
+```
+
+- 켜 둔 규칙을 **Set's Name 의 모든 세트에 먼저 전부** 돌린다. 하나라도 걸리면 **파일을 단 한 개도 쓰지 않는다** —
+  세트별로 내보내다 도중에 멈추는 것이 아니다. 통과한 세트도 내보내지 않는다.
+- 첫 실패에서 멈추지 않고 **켠 규칙을 모두** 돌려 문제를 한 번에 보여 준다.
+- 켠 규칙이 없으면 예전과 똑같이 바로 내보낸다.
+
+**`Check Hide Mesh`** (기본 꺼짐) — 세트 안의 **모든 메시**(멤버와 그 아래 전부 · 하위 세트 · 컴포넌트 멤버의 오브젝트) 중
+**마야 씬에서 안 보이는 메시**가 있으면 막는다. 안 보이는 이유:
+
+| 원인 | 로그 |
+|------|------|
+| 자기 · 쉐입 · **조상(그룹/조인트) 중 하나**의 `visibility` 꺼짐 | `grp_face.visibility is off` |
+| `lodVisibility` 꺼짐 | `lodOff.lodVisibility is off` |
+| 디스플레이 레이어가 숨김 | `display layer 'HIDE_LAYER' is hidden` |
+| Drawing Override 로 숨김 | `xxx is hidden by its drawing override` |
+
+원본 쉐입(`intermediateObject`, 디포머가 만든 Orig)은 원래 숨겨진 것이라 보지 않는다.
+
+```
+--- Rules (Check Hide Mesh) ---
+[WARN] Check Hide Mesh : 3 hidden mesh(es) in 2 set(s).
+[WARN]   SET_A : 2 hidden mesh(es)
+[WARN]     - eye  (eye.visibility is off)
+[WARN]     - mouth  (grp_face.visibility is off)
+[WARN]   SET_D : 1 hidden mesh(es)
+[WARN]     - compHidden  (compHidden.visibility is off)
+[WARN] Export not started - fix the problems above, or uncheck the rule in 'Rules' if it is intended. No file was written.
+```
+
+**규칙 늘리기** — `app/core/export_rules.py` 에 검사 함수 `check_xxx(ctx) -> RuleResult(passed, logs)` 를 쓰고
+`EXPORT_RULES` 에 `ExportRule(key, label, tooltip, check, default)` 한 줄. 드롭다운 · Export · Check 가 그대로 읽는다.
+`ctx`(`RuleContext`)에는 세트 목록 · 경로 · 타입 필터 · 계층 옵션이 들어 있다 — 규칙에 필요한 값이 더 생기면 여기에 더한다.
+
+### 2-3. 원본과 달라진 것 (동작 아님)
 
 | | A00040_V02 | FileTool |
 |---|---|---|
@@ -128,10 +168,11 @@ A00480_FileTool/
 ├── icon/                       # A00480_FileTool.svg / .png (폴더 + 들어오고 나가는 화살표)
 ├── CHANGELOG.md
 └── app/
-    ├── config/version.py       # VERSION = "01.02"
+    ├── config/version.py       # VERSION = "01.03"
     ├── core/                   # UI 비의존 (결과는 로그 문자열 리스트)
     │   ├── fbx_plugin.py       # ensure_fbx_plugin() — Export · Import 공용
     │   ├── export_ops.py       # A00040_V02 export_ops 이식 (타입 필터 · 파일명 · FBX export)
+    │   ├── export_rules.py     # Export 규칙 레지스트리 + Check Hide Mesh (v01.03)
     │   ├── import_ops.py       # import_fbx_normal
     │   └── path_ops.py         # scene_folder · open_scene_folder · normalize_pasted_path
     └── ui/
@@ -140,7 +181,8 @@ A00480_FileTool/
         ├── import_tab.py       # SECTIONS 표
         ├── path_tab.py         # SECTIONS 표
         ├── button_section.py   # SECTIONS 표 → 두 칸 버튼 그리드 (quickTool 방식)
-        └── type_filter_button.py
+        ├── type_filter_button.py
+        └── rules_button.py     # Rules (n/m) 드롭다운 - EXPORT_RULES 에서 항목을 만든다 (v01.03)
 ```
 
 ### 기능 더하기
@@ -150,6 +192,7 @@ A00480_FileTool/
 - **섹션이 3~4개를 넘으면** 접이식으로 쌓지 말고 하위 탭으로 나눈다.
 - **새 탭** — `app/ui/<name>_tab.py` 에 `QWidget(log=...)` 를 만들고 `main_window.build_ui` 에서 `addTab`.
 - **Export 의 타입 필터 타입** — `export_ops.FILTER_TYPES` + `_TYPE_MATCHERS` 두 곳(원본과 같다).
+- **Export 규칙** — `export_rules.EXPORT_RULES` 에 한 줄 + 검사 함수(§2-2).
 
 ---
 
