@@ -11,7 +11,7 @@
 #   Constrain : Constraint / Skin Weight / Group Create / Transfer / Target Edit /
 #               Update
 #   Connect   : Connect / List Connected / Pair
-#   Attribute : Edit / Create
+#   Attribute : Edit / Create / Set Value
 #
 # 로직은 app/core 에 위임하고 이 모듈은 위젯 구성/시그널 연결/로그 출력만 담당한다.
 # 모든 UI 문자열(버튼/라벨/로그)은 영어. (한국어는 주석/독스트링만)
@@ -49,6 +49,7 @@ from tools.A00145_RigConnect.app.core import attr_profile_prefs as aprefs
 from tools.A00145_RigConnect.app.core import attr_create_manager as acreate_mgr
 from tools.A00145_RigConnect.app.core import attr_delete_manager as adel_mgr
 from tools.A00145_RigConnect.app.core import attr_order_manager as aord_mgr
+from tools.A00145_RigConnect.app.core import attr_value_manager as aval_mgr
 from tools.A00145_RigConnect.app.core import mirror_manager as mir_mgr
 from tools.A00145_RigConnect.app.core import (
     CONSTRAINT_TYPES, PAIRING_CLOSEST, PAIRING_ORDER,
@@ -1376,6 +1377,8 @@ class MainWindow(QWidget):
          "_build_attribute_edit_page"),
         ("Create", "Create attributes from a saved profile (name / type / range) "
          "on the listed objects", "_build_attribute_create_page"),
+        ("Set Value", "Set an attribute the listed objects share, all at once - "
+         "number with a step, or enum item by name", "_build_attribute_value_page"),
     )
 
     def _build_attribute_tab(self):
@@ -1764,6 +1767,351 @@ class MainWindow(QWidget):
         # 지운 뒤에는 목록이 실제와 어긋나므로 다시 읽는다.
         if objects:
             self.on_aedit_list()
+
+    # --------------------------------------------------------------
+    # Attribute > Set Value   (여러 오브젝트의 공통 어트리뷰트를 한 번에 바꾸기)
+    # --------------------------------------------------------------
+
+    def _build_attribute_value_page(self):
+        """옛 Number Tool(`JUN_PY_numberTool_V01_01`) 이식.
+
+        오브젝트들을 담고 → **공통으로 가진** 어트리뷰트를 나열하고 → 고른 어트리뷰트를
+        한 번에 바꾼다. 원본은 실수 하나로만 넣어서 enum 도 정수로 넣어야 했다. 여기서는
+        고른 어트리뷰트의 종류에 따라 입력칸이 바뀐다:
+          - float / int : 시작값 + Step (int 는 소수점 없는 칸)
+          - enum / bool : 항목 **이름**을 콤보에서 고르고, Step 은 "몇 항목씩 건너뛸지"
+        Step 은 **오브젝트 리스트 순서대로** 누적되고, Repeat 가 N 이면 N 개마다 처음으로.
+        적용 전에 표에서 오브젝트마다 현재 값 -> 새 값을 미리 본다.
+        """
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        # --- 오브젝트 + 공통 어트리뷰트 ---
+        src_box = QGroupBox("Objects and the attributes they share")
+        src_layout = QHBoxLayout(src_box)
+
+        left = QVBoxLayout()
+        # Step 이 리스트 순서대로 쌓이므로 Up / Down / Sort 가 의미 있다.
+        self.tsl_aval_objs = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects (order = step order)", select_label="Select",
+            list_min_height=170, log_callback=self.log)
+        left.addWidget(self.tsl_aval_objs)
+        btn_list = QPushButton("List Common Attributes")
+        btn_list.setToolTip(
+            "List the attributes EVERY object in the list has, that take a\n"
+            "number or an enum item (float / int / bool / enum).")
+        btn_list.clicked.connect(self.on_aval_list)
+        left.addWidget(btn_list)
+        src_layout.addLayout(left, 1)
+
+        right = QVBoxLayout()
+        head = QHBoxLayout()
+        head.addWidget(QLabel("Common Attributes"))
+        head.addStretch(1)
+        self.lbl_aval_number = QLabel("Number: 0")
+        head.addWidget(self.lbl_aval_number)
+        right.addLayout(head)
+
+        self.lw_aval_attrs = QListWidget()
+        self.lw_aval_attrs.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lw_aval_attrs.setMinimumHeight(170)
+        self.lw_aval_attrs.setToolTip(
+            "Select the attribute(s) to set.\n"
+            "The value editor follows the first selected attribute's type;\n"
+            "selected attributes of another type are skipped.")
+        self.lw_aval_attrs.itemSelectionChanged.connect(self._aval_on_attr_changed)
+        right.addWidget(self.lw_aval_attrs, 1)
+
+        self.cb_aval_channel_box = QCheckBox("Channel Box Only")
+        self.cb_aval_channel_box.setChecked(True)
+        self.cb_aval_channel_box.setToolTip(
+            "On  : only attributes shown in the Channel Box.\n"
+            "Off : every number / enum attribute of the nodes.")
+        self.cb_aval_channel_box.toggled.connect(
+            lambda _c: self.lw_aval_attrs.count() and self.on_aval_list())
+        right.addWidget(self.cb_aval_channel_box)
+
+        self.flt_aval = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_aval_attrs, placeholder="Type any part of an attribute name",
+            number_label=self.lbl_aval_number)
+        right.addWidget(self.flt_aval)
+        src_layout.addLayout(right, 1)
+        layout.addWidget(src_box)
+
+        # --- 값 ---
+        val_box = QGroupBox("Value")
+        val_layout = QVBoxLayout(val_box)
+
+        self.lbl_aval_info = QLabel("Attribute : -")
+        val_layout.addWidget(self.lbl_aval_info)
+
+        self.stk_aval = QStackedWidget()
+
+        # 0 : 숫자 (float / int)
+        num_page = QWidget()
+        num_row = QHBoxLayout(num_page)
+        num_row.setContentsMargins(0, 0, 0, 0)
+        num_row.addWidget(QLabel("Start"))
+        self.sp_aval_start = QDoubleSpinBox()
+        self.sp_aval_step = QDoubleSpinBox()
+        for sp in (self.sp_aval_start, self.sp_aval_step):
+            sp.setRange(-1e9, 1e9)
+            sp.setDecimals(4)
+            sp.setKeyboardTracking(False)
+            sp.valueChanged.connect(self._aval_update_preview)
+        self.sp_aval_start.setToolTip("Value for the first object in the list.")
+        num_row.addWidget(self.sp_aval_start, 1)
+        num_row.addWidget(QLabel("Step"))
+        self.sp_aval_step.setToolTip(
+            "Added per object, in list order: object i gets Start + i * Step.\n"
+            "0 = every object gets the same value.")
+        num_row.addWidget(self.sp_aval_step, 1)
+        self.stk_aval.addWidget(num_page)
+
+        # 1 : 항목 (enum / bool)
+        enum_page = QWidget()
+        enum_row = QHBoxLayout(enum_page)
+        enum_row.setContentsMargins(0, 0, 0, 0)
+        enum_row.addWidget(QLabel("Item"))
+        self.cmb_aval_item = QComboBox()
+        self.cmb_aval_item.setToolTip("Item for the first object in the list.")
+        self.cmb_aval_item.currentIndexChanged.connect(self._aval_update_preview)
+        enum_row.addWidget(self.cmb_aval_item, 1)
+        enum_row.addWidget(QLabel("Step"))
+        self.sp_aval_item_step = QSpinBox()
+        self.sp_aval_item_step.setRange(-999, 999)
+        self.sp_aval_item_step.setKeyboardTracking(False)
+        self.sp_aval_item_step.setToolTip(
+            "Items to move forward per object, in list order (wraps around).\n"
+            "0 = every object gets the same item.")
+        self.sp_aval_item_step.valueChanged.connect(self._aval_update_preview)
+        enum_row.addWidget(self.sp_aval_item_step)
+        self.stk_aval.addWidget(enum_page)
+
+        val_layout.addWidget(self.stk_aval)
+
+        opt_row = QHBoxLayout()
+        opt_row.addWidget(QLabel("Repeat every"))
+        self.sp_aval_repeat = QSpinBox()
+        self.sp_aval_repeat.setRange(0, 99999)
+        self.sp_aval_repeat.setKeyboardTracking(False)
+        self.sp_aval_repeat.setSpecialValueText("Off")
+        self.sp_aval_repeat.setToolTip(
+            "Go back to the start value every N objects.\n"
+            "e.g. Start 0, Step 1, Repeat 3 -> 0, 1, 2, 0, 1, 2 ...\n"
+            "Off = keep stepping to the end of the list.")
+        self.sp_aval_repeat.valueChanged.connect(self._aval_update_preview)
+        opt_row.addWidget(self.sp_aval_repeat)
+        opt_row.addWidget(QLabel("objects"))
+        opt_row.addSpacing(12)
+        self.cb_aval_clamp = QCheckBox("Clamp to range")
+        self.cb_aval_clamp.setChecked(True)
+        self.cb_aval_clamp.setToolTip(
+            "On  : values past the attribute's min / max are clamped.\n"
+            "Off : Maya refuses them and the object is reported as failed.")
+        self.cb_aval_clamp.toggled.connect(self._aval_update_preview)
+        opt_row.addWidget(self.cb_aval_clamp)
+        opt_row.addStretch(1)
+        btn_get = QPushButton("Get")
+        btn_get.setToolTip("Read the current value of the first object as the start.")
+        btn_get.clicked.connect(self.on_aval_get)
+        opt_row.addWidget(btn_get)
+        val_layout.addLayout(opt_row)
+
+        # 미리보기: 오브젝트마다 현재 값 -> 새 값. 건너뛸 것은 이유를 적는다.
+        self.tw_aval_preview = QTreeWidget()
+        self.tw_aval_preview.setHeaderLabels(["Object", "Current", "New", "Note"])
+        self.tw_aval_preview.setRootIsDecorated(False)
+        self.tw_aval_preview.setMinimumHeight(150)
+        self.tw_aval_preview.setToolTip(
+            "What Set Values will do. Grey rows are skipped (see Note).")
+        val_layout.addWidget(self.tw_aval_preview, 1)
+
+        btn_set = QPushButton("Set Values")
+        btn_set.setMinimumHeight(32)
+        btn_set.setToolTip(
+            "Set the selected attribute(s) on every listed object as previewed.\n"
+            "Keyed attributes get a key at the current frame. One undo step.")
+        btn_set.clicked.connect(self.on_aval_set)
+        val_layout.addWidget(btn_set)
+
+        layout.addWidget(val_box, 1)
+        return page
+
+    # ==============================================================
+    # Handlers : Attribute > Set Value
+    # ==============================================================
+
+    def _aval_selected_attrs(self):
+        """선택된(필터에 보이는) 어트리뷰트 이름, 목록 순서대로."""
+        return [self.lw_aval_attrs.item(i).text()
+                for i in range(self.lw_aval_attrs.count())
+                if self.lw_aval_attrs.item(i).isSelected()
+                and not self.lw_aval_attrs.item(i).isHidden()]
+
+    def _aval_current_info(self):
+        """첫 선택 어트리뷰트의 정보(첫 오브젝트 기준). 없으면 None."""
+        objects = self.tsl_aval_objs.get_all_items()
+        attrs = self._aval_selected_attrs()
+        if not objects or not attrs or not cmds.objExists(objects[0]):
+            return None
+        return aval_mgr.attr_info(objects[0], attrs[0])
+
+    def on_aval_list(self):
+        """모든 오브젝트가 공통으로 가진 어트리뷰트를 채운다. 고른 것은 이어받는다."""
+        objects = self.tsl_aval_objs.get_all_items()
+        if not objects:
+            self.log("[ERR] List Common Attributes : Objects list is empty")
+            return
+        cb_only = self.cb_aval_channel_box.isChecked()
+        try:
+            rows, missing = aval_mgr.list_common_attrs(objects, cb_only)
+        except Exception as e:
+            self.log("[ERR] List Common Attributes : {0}".format(e))
+            cmds.warning(str(e))
+            return
+
+        keep = set(self._aval_selected_attrs())
+        self.lw_aval_attrs.blockSignals(True)
+        self.lw_aval_attrs.clear()
+        for row in rows:
+            item = QListWidgetItem(row["name"])
+            item.setToolTip(row["kind"])
+            self.lw_aval_attrs.addItem(item)
+            item.setSelected(row["name"] in keep)
+        self.lw_aval_attrs.blockSignals(False)
+        shown, total = self.flt_aval.refresh()
+        self._aval_on_attr_changed()
+
+        for obj in missing:
+            self.log("[WARN] {0} : object not found in scene".format(obj))
+        msg = "[OK] List Common Attributes : {0} attr(s) shared by {1} object(s){2}".format(
+            total, len(objects) - len(missing),
+            ", channel box only" if cb_only else "")
+        if shown != total:
+            msg += " - filter '{0}' shows {1}".format(self.flt_aval.text().strip(), shown)
+        self.log(msg)
+
+    def _aval_on_attr_changed(self):
+        """첫 선택 어트리뷰트의 종류에 맞춰 입력칸(숫자 / 항목)을 바꾼다."""
+        info = self._aval_current_info()
+        attrs = self._aval_selected_attrs()
+        if info is None:
+            self.lbl_aval_info.setText("Attribute : -")
+            self._aval_update_preview()
+            return
+
+        kind = info["kind"]
+        text = "Attribute : {0}   ({1}".format(attrs[0], info["type"])
+        if info["min"] is not None or info["max"] is not None:
+            text += ", range {0} ~ {1}".format(
+                "-" if info["min"] is None else aval_mgr._fmt(info["min"], kind),
+                "-" if info["max"] is None else aval_mgr._fmt(info["max"], kind))
+        text += ")"
+        if len(attrs) > 1:
+            text += "   +{0} more".format(len(attrs) - 1)
+        self.lbl_aval_info.setText(text)
+
+        if kind in (aval_mgr.KIND_ENUM, aval_mgr.KIND_BOOL):
+            prev = self.cmb_aval_item.currentText()
+            self.cmb_aval_item.blockSignals(True)
+            self.cmb_aval_item.clear()
+            for name, value in info["items"]:
+                self.cmb_aval_item.addItem("{0}  ({1})".format(name, value), name)
+            idx = self.cmb_aval_item.findText(prev)
+            self.cmb_aval_item.setCurrentIndex(max(idx, 0))
+            self.cmb_aval_item.blockSignals(False)
+            self.stk_aval.setCurrentIndex(1)
+        else:
+            decimals = 0 if kind == aval_mgr.KIND_INT else 4
+            for sp in (self.sp_aval_start, self.sp_aval_step):
+                sp.blockSignals(True)
+                sp.setDecimals(decimals)
+                sp.blockSignals(False)
+            self.stk_aval.setCurrentIndex(0)
+        self.cb_aval_clamp.setEnabled(kind in (aval_mgr.KIND_FLOAT, aval_mgr.KIND_INT))
+        self._aval_update_preview()
+
+    def _aval_plan(self):
+        """현재 입력으로 (선택 어트리뷰트마다) 적용 계획을 만든다. (rows, kind)."""
+        objects = self.tsl_aval_objs.get_all_items()
+        attrs = self._aval_selected_attrs()
+        info = self._aval_current_info()
+        if info is None:
+            return [], None
+        kind = info["kind"]
+        repeat = self.sp_aval_repeat.value()
+        if kind in (aval_mgr.KIND_ENUM, aval_mgr.KIND_BOOL):
+            values = aval_mgr.build_enum_values(
+                len(objects), info["items"], max(self.cmb_aval_item.currentIndex(), 0),
+                self.sp_aval_item_step.value(), repeat)
+        else:
+            values = aval_mgr.build_values(
+                len(objects), self.sp_aval_start.value(),
+                self.sp_aval_step.value(), repeat)
+
+        rows = []
+        for attr in attrs:
+            rows.extend(aval_mgr.plan(objects, attr, kind, values,
+                                      clamp=self.cb_aval_clamp.isChecked()))
+        return rows, kind
+
+    def _aval_update_preview(self, *_args):
+        if not hasattr(self, "tw_aval_preview"):
+            return
+        self.tw_aval_preview.clear()
+        try:
+            rows, _kind = self._aval_plan()
+        except Exception as e:
+            self.log("[ERR] Set Value preview : {0}".format(e))
+            return
+        grey = QBrush(QColor("#808080"))
+        for row in rows:
+            item = QTreeWidgetItem([row["plug"], row["current"], row["shown"], row["note"]])
+            if row["status"] != "ok":
+                for col in range(4):
+                    item.setForeground(col, grey)
+            self.tw_aval_preview.addTopLevelItem(item)
+        for col in range(3):
+            self.tw_aval_preview.resizeColumnToContents(col)
+
+    def on_aval_get(self):
+        """첫 오브젝트의 현재 값을 시작값(또는 시작 항목)으로 읽어 온다."""
+        objects = self.tsl_aval_objs.get_all_items()
+        attrs = self._aval_selected_attrs()
+        info = self._aval_current_info()
+        if info is None:
+            self.log("[ERR] Get : list objects and select an attribute first")
+            return
+        value = cmds.getAttr("{0}.{1}".format(objects[0], attrs[0]))
+        if info["kind"] in (aval_mgr.KIND_ENUM, aval_mgr.KIND_BOOL):
+            values = [v for _n, v in info["items"]]
+            if int(value) in values:
+                self.cmb_aval_item.setCurrentIndex(values.index(int(value)))
+        else:
+            self.sp_aval_start.setValue(value)
+        self.log("[OK] Get : {0}.{1} = {2}".format(objects[0], attrs[0], value))
+
+    def on_aval_set(self):
+        """미리보기대로 값을 넣는다 (undo 한 번)."""
+        attrs = self._aval_selected_attrs()
+        if not self.tsl_aval_objs.get_all_items() or not attrs:
+            self.log("[ERR] Set Values : list objects and select an attribute first")
+            return
+        rows, kind = self._aval_plan()
+
+        def _do():
+            done, keyed, failed = aval_mgr.apply(rows)
+            for row in rows:
+                if row["status"] != "ok":
+                    self.log("[WARN] {0} : skipped - {1}".format(row["plug"], row["note"]))
+            for plug, reason in failed:
+                self.log("[WARN] {0} : {1}".format(plug, reason))
+            self.log("       {0} value(s) set ({1}){2}".format(
+                done, kind, ", {0} keyed".format(keyed) if keyed else ""))
+
+        self._run("Set Values : {0}".format(", ".join(attrs[:4])), _do)
+        self._aval_update_preview()
 
     # --------------------------------------------------------------
     # Attribute > Create   (프로파일에 적어 둔 정의로 새로 만들기)

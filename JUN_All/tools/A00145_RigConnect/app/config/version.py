@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 # A00145_RigConnect - version info
 
+# 01.51  Attribute > Set Value (new sub tab, ported from the old Number Tool) : set an
+#        attribute the listed objects share, all at once. float / int take Start + Step
+#        (in list order, optional Repeat); enum / bool pick an item BY NAME. Preview table,
+#        clamp to range, keyed attributes get a key.
 # 01.50  Attribute > Create : the attribute list gets the same Shift / Ctrl multi-select +
 #        multi-check as Attribute > Edit.
 # 01.49  Attribute > Edit : Shift / Ctrl click selects several attributes; clicking the
@@ -11,5 +15,5 @@
 #        or any of Point / Orient / Scale together. Types driving the same channels
 #        uncheck each other; Point On Poly stays alone.
 
-VERSION = "01.50"
+VERSION = "01.51"
 LAST_UPDATE = "2026-09-18"

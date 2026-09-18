@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-18 (오늘)
 
+> [!summary] A00145 Attribute > **Set Value** 하위 탭(v01.51) — 옛 Number Tool 이식: 여러 오브젝트의 **공통** 어트리뷰트에 값을 한 번에, 종류별 입력칸
+- **요청**: `JUN_PY_numberTool_V01_01` 은 실수 하나로만 넣어 enum 도 정수로 넣어야 했다 → 정수 · 실수 · 간격 점프 · enum 은 **텍스트로 골라서**, 그리고 A00145 Attribute 탭으로 이식.
+- 목록은 **교집합**(모두가 가진 것), float/int/bool/enum 만, `Channel Box Only` 기본 ON. float/int = `Start` + `Step`(리스트 순서대로 누적) + `Repeat every N`, enum/bool = 콤보에서 **항목 이름** + 항목 Step(끝에서 처음으로). enum 은 이름으로 오브젝트마다 값을 다시 찾는다(`Off:Low=5:High` 처럼 값이 건너뛰어도 맞다).
+- 적용 전 미리보기 표(현재 → 새 값, 건너뛸 이유), `Clamp to range`(마야는 범위 밖을 자르지 않고 에러), 키 걸린 plug 는 키 + setAttr, undo 한 번.
+- 원본도 `JUN_PY_numberTool_V01_02.py` 로 새 버전(maya.cmds, 같은 기능). V01_01 은 그대로.
+- mayapy 2024: core(enum 이름/간격 순환 · clamp · 키 · 잠김 건너뛰기 · 각도 단위) + Qt 오프스크린 탭(enum/int Repeat/float + undo) + V01_02 로직(UI 창 빼고) 통과. 마야 GUI 에서는 아직 안 눌러 봄. #A00145
+
 > [!summary] 공용 다중 체크 동작 `MOD_checkList_qt_v01` 을 **4개 툴 6개 목록**으로 확대 — A00145 Create(v01.50) · A00290_V02 Mix Targets(v02.02) · A00275 By Weight(v01.28) · A00210 Scan/Folders(v01.31)
 - **요청**: 방금 만든 공용 위젯으로 바꿀 수 있는 툴 교체.
 - A00275 는 자체 eventFilter(56줄, 공용 동작의 원본)를 지우고 공용으로. A00290 Sources 는 한 번에 바뀐 행마다 라벨을 다시 써야 해서 helper 가 `checksChanged` 를 `itemChanged` 보다 **먼저** 쏘게 바꿨다.

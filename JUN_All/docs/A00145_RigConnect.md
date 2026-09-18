@@ -4,7 +4,10 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.50` (`app/config/version.py`) — Attribute > **Create** 목록에도 같은 다중 선택 + 다중 체크
+- 버전: `v01.51` (`app/config/version.py`) — Attribute > **Set Value** 하위 탭: 여러 오브젝트의 공통
+  어트리뷰트에 값을 한 번에 — float / int 는 `Start` + `Step`(리스트 순서대로), enum 은 **항목 이름**을
+  골라서 (옛 Number Tool 이식, §Attribute > Set Value)
+  · v01.50 은 Attribute > **Create** 목록에도 같은 다중 선택 + 다중 체크
   · v01.49 는 Attribute > Edit 목록에서 **Shift / Ctrl 로 여러 행을 골라
   한 번에 체크**한다 (§Attribute > Edit)
   · v01.48 은 Attribute > Create 의 `Add` / `Edit` 로 **`enum`** · **`string`**
@@ -881,12 +884,13 @@ Destination : ab      (Null)   abcd            Destination : ab      abcd
 > 구현: `app/core/attr_match.py`. **maya import 가 없는 순수 파이썬 모듈**이라 DCC 없이
 > 단독으로 테스트·벤치마크할 수 있다. `attr_match.complexity_notes()` 가 위 요약을 문자열로 돌려준다.
 
-### Attribute (v01.44 부터 **하위 탭 2개**)
+### Attribute (v01.44 부터 하위 탭, v01.51 부터 **3개**)
 
 | 하위 탭 | 하는 일 | 원본이 필요한가 |
 |---------|---------|-----------------|
 | **Edit** (v01.44) | 씬에 **이미 있는** 어트리뷰트를 골라 **순서를 바꾸거나 · 복사하거나 · 지운다** | 필요 |
 | **Create** (v01.33) | **프로파일에 적어 둔 정의**로 새로 만든다 | 불필요 |
+| **Set Value** (v01.51) | 여러 오브젝트가 **공통으로 가진** 어트리뷰트의 **값**을 한 번에 넣는다 (숫자 + Step, enum 은 이름) | 필요 |
 
 > [!note] v01.44 에서 `Copy` 와 `Delete` 를 `Edit` 하나로 합쳤다
 > 두 탭은 화면이 이미 같았다 — **오브젝트를 담고 → `List Attributes` 로 나열하고 → 고른 것에
@@ -1154,6 +1158,79 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
 - `Create Checked Attributes`: 왼쪽 리스트의 **모든 오브젝트**에 만든다.
   **이미 있으면 건너뛴다** — 타입이나 범위가 달라도 손대지 않는다. 기존 어트리뷰트를 고치면
   거기 걸린 연결·키가 깨지기 때문이다. 건너뛴 것은 `[WARN]` 으로 남는다.
+
+#### Set Value (v01.51)
+
+옛 **Number Tool**(`_archive/legacy_tools/01_Modules/JUN_PY_numberTool_V01_01.py`)의 이식이다.
+원래 의도 그대로 — **여러 오브젝트를 담고 → 그 오브젝트들이 공통으로 가진 어트리뷰트를 나열하고
+→ 고른 어트리뷰트를 한 번에 바꾼다.** 원본은 모든 값을 실수 칸 하나로 `setAttr` 해서 enum 도
+정수로만 넣을 수 있었다. 여기서는 **고른 어트리뷰트의 종류에 따라 입력칸이 바뀐다.**
+
+```
+┌ Objects and the attributes they share ─────────────────────────────┐
+│ Objects (order = step order)  Common Attributes      Number: 12    │
+│ [ ctrl_01 ]                   visibility                           │
+│ [ ctrl_02 ]                   translateX                           │
+│ [ ctrl_03 ]                   mode        <- 선택                  │
+│ [Select][Add][Del][Up][Down]  ☑ Channel Box Only                   │
+│ [ List Common Attributes ]    [Filter ....]                        │
+└────────────────────────────────────────────────────────────────────┘
+┌ Value ─────────────────────────────────────────────────────────────┐
+│ Attribute : mode   (enum)                                          │
+│ Item [ Low  (5)        v]   Step [ 1 ]      <- enum / bool         │
+│ Start [ 0.0 ]  Step [ 0.25 ]                <- float / int         │
+│ Repeat every [ Off ] objects   ☑ Clamp to range          [ Get ]   │
+│ Object          Current  New   Note                                │
+│ ctrl_01.mode    Off      Low                                       │
+│ ctrl_02.mode    Off      High                                      │
+│ ctrl_03.mode    Off      Max                                       │
+│ [                     Set Values                     ]             │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**목록 — 공통으로 가진 것만**
+- `List Common Attributes`: `Objects` 의 **모든 오브젝트가 가진** 어트리뷰트(교집합)만 보여 준다.
+  `Edit` 탭은 합집합이지만, 여기서는 한 번에 모두에게 넣는 것이 목적이라 하나라도 없으면 뺀다.
+  순서는 첫 오브젝트의 채널 순서.
+- 값 하나로 넣을 수 있는 종류만 나온다 — **float · int · bool · enum**. 문자열 · 행렬 · compound
+  부모(`translate` 등, 자식 `translateX` 는 나온다)는 빠진다.
+- **`Channel Box Only`**(기본 ON): 채널박스에 보이는 것만(`Connect` 탭과 같은 판정 — keyable +
+  channelBox, hidden 제외). 끄면 노드의 모든 숫자 / enum 어트리뷰트.
+- blendShape 노드면 타겟 이름(별칭)이 맨 앞에 나온다.
+- 여러 어트리뷰트를 `Shift` / `Ctrl` 로 골라 같은 값을 한 번에 넣을 수 있다. 입력칸은 **첫 번째로
+  고른 어트리뷰트의 종류**를 따르고, 종류가 다른 것은 건너뛰고 알린다.
+
+**값 — 종류마다 다른 입력칸**
+
+| 종류 | 입력 | Step 의 뜻 |
+|------|------|------------|
+| float | `Start` 실수 (소수 4자리) | 오브젝트마다 더할 값 |
+| int (long/short/byte) | `Start` 정수 (소수점 없음) | 오브젝트마다 더할 정수 |
+| enum | `Item` 콤보 — **항목 이름**(값) 에서 고른다 | 몇 항목씩 건너뛸지. 끝에서 처음으로 돈다 |
+| bool | `Item` 콤보 — `Off` / `On` | 1 이면 Off, On 번갈아 |
+
+- **Step 은 `Objects` 리스트 순서대로** 쌓인다: i 번째 오브젝트 = `Start + i × Step`.
+  그래서 이 탭의 오브젝트 리스트는 `Up` / `Down` 이 켜져 있다. Step 0 = 모두 같은 값.
+- **`Repeat every N objects`**(기본 Off): N 개마다 시작값으로 돌아간다.
+  `Start 0, Step 1, Repeat 3` → `0, 1, 2, 0, 1, 2 …`.
+- **enum 은 이름으로 넣는다.** `Off:Low=5:High:Max` 처럼 값이 건너뛰는 enum 도 콤보에 `Low (5)` 로
+  보이고, 고른 항목의 **이름**을 오브젝트마다 다시 찾아 그 오브젝트의 값으로 넣는다 — 오브젝트마다
+  항목 값이 달라도 같은 이름이면 맞게 들어간다. 그 이름이 없는 오브젝트는 건너뛴다.
+- **`Clamp to range`**(기본 ON, float / int): 어트리뷰트의 min / max 밖이면 잘라서 넣는다(미리보기
+  Note 에 `clamped to range`). 끄면 마야가 거부해 그 오브젝트는 실패로 남는다 — 마야는 범위를
+  **자르지 않고 에러를 낸다**.
+- `Get`: 첫 오브젝트의 현재 값을 `Start`(enum 이면 `Item`)로 읽어 온다.
+
+**미리보기와 적용**
+- 입력을 바꿀 때마다 아래 표에 **오브젝트마다 현재 값 → 새 값**이 나온다. 건너뛸 것은 회색이고
+  `Note` 에 이유가 있다 — `locked` · `driven by a connection` · `no enum item 'X'` · 종류 불일치.
+- `Set Values`: 미리보기대로 넣는다. **undo 한 번**으로 되돌린다.
+- **키가 걸린 어트리뷰트**(animCurve · 애니메이션 레이어)는 현재 프레임에 **키를 찍고** `setAttr`
+  한다. `setAttr` 만 하면 다음 프레임에 커브 값으로 돌아가 버린다. 로그에 `n keyed` 로 센다.
+- 키가 아닌 다른 노드가 구동하는 어트리뷰트는 건너뛴다(`setAttr` 이 실패한다).
+
+> 원본 Number Tool 도 같은 기능으로 `JUN_PY_numberTool_V01_02.py`(maya.cmds 단일 파일)를 새로
+> 두었다. V01_01 은 그대로 남아 있다. 현행은 이 탭이다.
 
 #### List Connected
 노드 그래프(up/down stream)를 타입별로 탐색한다.
@@ -1631,6 +1708,7 @@ A00145_RigConnect/
     │   ├── attr_profile_prefs.py   # Attribute > Create (프로파일 JSON 저장 + 스펙 정규화, maya 비의존)
     │   ├── attr_create_manager.py  # Attribute > Create (프로파일 스펙 -> addAttr, 이미 있으면 건너뜀)
     │   ├── attr_delete_manager.py  # Attribute > Edit   (지울 수 있는 어트리뷰트 나열 + deleteAttr, 잠김 보고)
+    │   ├── attr_value_manager.py   # Attribute > Set Value (공통 어트리뷰트 교집합 · Start/Step/Repeat 값 계산 · enum 은 이름으로 · 키 걸린 plug 는 키+setAttr)
     │   ├── blendshape_utils.py     # blendShape 타겟(weight 별칭) 조회 — Attribute / Connect 탭 공용
     │   ├── stream_manager.py       # List Connected (MEL 포팅: hyperShade up/down)
     │   ├── maya_scene.py           # Pair (A00140 복사)
