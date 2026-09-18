@@ -9,7 +9,8 @@
 # ── 규칙을 늘리는 법 ─────────────────────────────────────────────────────
 # 1) 검사 함수를 쓴다   def check_xxx(ctx) -> RuleResult
 #       ctx     : RuleContext (내보내기 설정 - 세트 목록, 경로, 필터 ...)
-#       반환    : RuleResult(passed, logs)   passed=False 면 내보내기가 막힌다
+#       반환    : RuleResult(passed, logs, nodes)   passed=False 면 내보내기가 막힌다
+#                 nodes = 문제가 된 씬 노드(전체 경로). 툴이 검사 뒤 마야에서 선택해 준다(v01.05)
 # 2) EXPORT_RULES 에 ExportRule(...) 한 줄을 더한다
 # 그러면 Export 탭의 `Rules` 드롭다운에 체크 항목이 생기고, Export / Check 가 그대로 돌린다.
 # UI 는 이 목록만 읽는다 - 규칙마다 UI 코드를 고치지 않는다.
@@ -30,11 +31,16 @@ class RuleContext(object):
 
 
 class RuleResult(object):
-    """규칙 하나의 결과. passed=False 면 내보내기를 막는다."""
+    """규칙 하나의 결과. passed=False 면 내보내기를 막는다.
 
-    def __init__(self, passed, logs=None):
+    nodes : 문제가 된 씬 노드(전체 경로). 검사가 끝나면 툴이 이것들을 마야에서 선택한다
+            - 어디가 문제인지 바로 보고 고칠 수 있게(v01.05). 선택할 게 없으면 비워 둔다.
+    """
+
+    def __init__(self, passed, logs=None, nodes=None):
         self.passed = bool(passed)
         self.logs = list(logs or [])
+        self.nodes = list(nodes or [])
 
 
 class ExportRule(object):
@@ -185,6 +191,7 @@ def check_hidden_mesh(ctx):
         return RuleResult(False, ["[FAIL] Check Hide Mesh : Maya not available."])
 
     logs = []
+    nodes = []                               # 선택해 줄 메시 트랜스폼 (전체 경로, 중복 없이)
     hidden_total = 0
     hidden_sets = 0
     checked = 0
@@ -201,13 +208,15 @@ def check_hidden_mesh(ctx):
         hidden_total += len(hidden)
         logs.append("[WARN]   {0} : {1} hidden mesh(es)".format(set_name, len(hidden)))
         for mesh, reasons in hidden:
-            transform = (cmds.listRelatives(mesh, parent=True) or [_short(mesh)])[0]
-            logs.append("[WARN]     - {0}  ({1})".format(transform, "; ".join(reasons)))
+            parent = cmds.listRelatives(mesh, parent=True, fullPath=True) or [mesh]
+            if parent[0] not in nodes:
+                nodes.append(parent[0])
+            logs.append("[WARN]     - {0}  ({1})".format(_short(parent[0]), "; ".join(reasons)))
 
     if hidden_total:
         head = ("[WARN] Check Hide Mesh : {0} hidden mesh(es) in {1} set(s).".format(
             hidden_total, hidden_sets))
-        return RuleResult(False, [head] + logs)
+        return RuleResult(False, [head] + logs, nodes)
     return RuleResult(True, ["[OK] Check Hide Mesh : {0} mesh(es) checked, none hidden.".format(
         checked)])
 
@@ -239,12 +248,14 @@ def rule_by_key(key):
 
 
 def run_rules(keys, ctx):
-    """keys 의 규칙을 **전부** 돌린다. `(passed, logs)`.
+    """keys 의 규칙을 **전부** 돌린다. `(passed, logs, nodes)`.
 
     passed 는 모든 규칙이 통과했을 때만 True. 첫 실패에서 멈추지 않는다 - 문제를 한 번에 보인다.
     규칙이 예외를 던지면 그 규칙은 실패로 친다(내보내기를 안전한 쪽으로 막는다).
+    nodes 는 모든 규칙이 짚은 문제 노드를 합친 것(중복 없이, 규칙 순서) - 툴이 선택한다.
     """
     logs = []
+    nodes = []
     passed = True
     for key in keys:
         rule = rule_by_key(key)
@@ -257,4 +268,5 @@ def run_rules(keys, ctx):
             result = RuleResult(False, ["[FAIL] {0} : {1}".format(rule.label, e)])
         passed = passed and result.passed
         logs.extend(result.logs)
-    return passed, logs
+        nodes.extend(n for n in result.nodes if n not in nodes)
+    return passed, logs, nodes

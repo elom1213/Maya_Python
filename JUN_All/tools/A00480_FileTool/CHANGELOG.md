@@ -1,5 +1,13 @@
 # Changelog — A00480_FileTool
 
+## v01.05 (2026-09-18)
+- **The hidden meshes are selected in the scene.** After `Check` - and after an `Export` that
+  a rule stopped - the meshes Check Hide Mesh found are selected (their transforms, hidden
+  or not), and the log says what was selected. If every rule passes, the selection is left
+  alone.
+- Rules can hand back the nodes to select (`RuleResult.nodes`), so future rules get the
+  same behaviour without UI changes.
+
 ## v01.04 (2026-09-18)
 - **Check Hide Mesh looks at the meshes only.** A mesh fails when the mesh itself is hidden -
   its transform or shape `visibility` / `lodVisibility` is off, or a display layer / drawing

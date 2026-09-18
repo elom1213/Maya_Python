@@ -20,6 +20,8 @@ from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.core.maya_undo import undo_chunk
 
+import maya.cmds as cmds
+
 from tools.A00480_FileTool.app import core
 from tools.A00480_FileTool.app.ui.type_filter_button import TypeFilterButton
 from tools.A00480_FileTool.app.ui.rules_button import RulesButton
@@ -303,9 +305,23 @@ class ExportTab(QWidget):
         if not keys:
             return True
         self._log("--- Rules ({0}) ---".format(", ".join(self.rules_button.checked_labels())))
-        passed, logs = core.run_rules(keys, ctx)
+        passed, logs, nodes = core.run_rules(keys, ctx)
         self._log_all(logs)
+        self._select_problem_nodes(nodes)
         return passed
+
+    def _select_problem_nodes(self, nodes):
+        """규칙이 짚은 노드를 마야에서 선택한다(v01.05) - 숨긴 메시를 바로 찾아 고치도록.
+
+        Check 와, 규칙에 걸려 막힌 Export 둘 다 여기로 온다. 짚은 게 없으면 선택을 건드리지 않는다.
+        숨겨진 오브젝트도 select 로는 잡힌다(아웃라이너 · 채널박스에 뜬다).
+        """
+        existing = [n for n in nodes if cmds.objExists(n)]
+        if not existing:
+            return
+        cmds.select(existing, replace=True)
+        self._log("[Info] Selected {0} object(s) in the scene: {1}".format(
+            len(existing), ", ".join(n.split("|")[-1] for n in existing)))
 
     def on_check_rules(self):
         """Check 버튼 - 내보내지 않고 규칙만 돌린다."""

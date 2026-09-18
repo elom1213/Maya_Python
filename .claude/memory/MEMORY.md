@@ -73,7 +73,7 @@
 
 - A00010 — [HIK Mirror](wip-a00010-hik-mirror.md)(이름 1순위·위치 폴백, v02.01)
 - A00040 — [Joints only export](wip-a00040-joints-only-export.md)(FBX 옵션으로 non-joint 제외, v02.06) · 새 파일 기능은 A00480 으로
-- A00480 — [FileTool](wip-a00480-filetool.md)(A00040_V02 + quickTool File/Import 를 Export/Import/Path 탭으로, 원본 보존, 창 크기 = A00040_V02 960x853, v01.02 · Export 규칙 레지스트리 + Check Hide Mesh(메시 자신만, 조상 안 봄), 걸리면 파일 0개, v01.04)
+- A00480 — [FileTool](wip-a00480-filetool.md)(A00040_V02 + quickTool File/Import 를 Export/Import/Path 탭으로, 원본 보존, 창 크기 = A00040_V02 960x853, v01.02 · Export 규칙 레지스트리 + Check Hide Mesh(메시 자신만, 조상 안 봄), 걸리면 파일 0개 · 걸린 메시 선택, v01.05)
 - A00060 — [Aim Root mode](wip-a00060-aim-root-mode.md)(Chain/Root, 분기는 첫 자식 · X 조준은 자식이 X 축 위일 때만 위치 보존 → 움직인 자식 원위치, v03.11) · [V03 tab reorg](wip-a00060-v03-tab-reorg.md) · [IK Edit](wip-a00060-ik-edit.md)(폴 벡터 역산) · [Pole Target](wip-a00060-pole-target.md)(pointConstraint 하나, Slide, v03.08) · [world-space joint pos](wip-a00060-world-space-joint-pos.md)
 - A00090 — [PoseWrangler bundle](wip-a00090-posewrangler-bundle.md)(`<driver>_default`, v01.07) · [rule versions](wip-a00090-rule-versions.md)
 - A00110 — [Follow: component target](wip-a00110-follow-component-target.md) · [Layer key copy](wip-a00110-layer-key-copy.md)(v02.13) · [Copy Key custom attrs](wip-a00110-copykey-custom-attrs.md) · [Copy Key 1->n](wip-a00110-copykey-one-to-many.md) · [V02 tab taxonomy](wip-a00110-tab-taxonomy.md) · [Fill Keys](wip-a00110-fill-keys.md) · [Stagger Offset](wip-a00110-stagger-offset.md) · [Graph Focus](wip-a00110-graph-focus.md) · [Get Sel Range](wip-a00110-get-sel-range.md) · [Euler Filter range](wip-a00110-euler-filter-range.md)

@@ -40,3 +40,6 @@ metadata:
 `listRelatives(allDescendents)` 순서는 아웃라이너와 다르다(뒤집어도 안 맞음) → 자식을 직접 따라 내려간다.
 창 크기 확인은 mayapy 에서 **HEAD 코드와 나란히** — `git archive` 를 스크래치에 풀고 `sys.modules` 의 tools/Framework 를
 지운 뒤 import 해야 한다(mayapy 가 시작 때 tools 를 먼저 불러 옛 코드가 안 잡힌다). `tar` 는 `C:` 를 원격으로 오해 → `--force-local`.
+
+**선택 (v01.05)** — `RuleResult.nodes`(문제 노드 전체 경로) → `run_rules` 는 **`(passed, logs, nodes)`** 3개를 돌려준다.
+UI 가 Check 와 규칙에 막힌 Export 뒤에 `select(replace)`. 통과면 선택을 건드리지 않는다. 새 규칙은 nodes 만 채우면 된다.

@@ -16,7 +16,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 | **Import** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` |
 | **Path** | `Copy Scene Folder` · `Open Scene Folder` | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `File` |
 
-- **버전**: `app/config/version.py` (v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
+- **버전**: `app/config/version.py` (v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
 - **설치**: `__dragDrop_A00480.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **FileTool** → `tools.A00480_FileTool.run(True)`
 - **테마**: `slate_dark`
 - **원본 두 툴은 그대로 남아 있다.** quickTool 의 File · Import option 버튼도 지워지지 않았다.
@@ -101,6 +101,10 @@ Type Filter : [Include Types v]  Rules : [Rules (1/1) v] [Check]        [      E
 
 원본 쉐입(`intermediateObject`, 디포머가 만든 Orig)은 원래 숨겨진 것이라 보지 않는다.
 
+**걸린 메시는 마야에서 선택된다 (v01.05)** — `Check` 뒤에도, 규칙에 막힌 `Export` 뒤에도 숨긴 메시의 **트랜스폼**이
+선택되고(숨겨져 있어도 선택은 된다 — 아웃라이너 · 채널박스에서 바로 고친다) 로그에 `[Info] Selected N object(s) in the scene: ...`.
+모든 규칙이 통과하면 선택은 **건드리지 않는다**.
+
 ```
 --- Rules (Check Hide Mesh) ---
 [WARN] Check Hide Mesh : 2 hidden mesh(es) in 2 set(s).
@@ -108,11 +112,13 @@ Type Filter : [Include Types v]  Rules : [Rules (1/1) v] [Check]        [      E
 [WARN]     - eye  (eye.visibility is off)
 [WARN]   SET_D : 1 hidden mesh(es)
 [WARN]     - compHidden  (compHidden.visibility is off)
+[Info] Selected 2 object(s) in the scene: eye, compHidden
 [WARN] Export not started - fix the problems above, or uncheck the rule in 'Rules' if it is intended. No file was written.
 ```
 
-**규칙 늘리기** — `app/core/export_rules.py` 에 검사 함수 `check_xxx(ctx) -> RuleResult(passed, logs)` 를 쓰고
+**규칙 늘리기** — `app/core/export_rules.py` 에 검사 함수 `check_xxx(ctx) -> RuleResult(passed, logs, nodes)` 를 쓰고
 `EXPORT_RULES` 에 `ExportRule(key, label, tooltip, check, default)` 한 줄. 드롭다운 · Export · Check 가 그대로 읽는다.
+`nodes` 에 문제 노드(전체 경로)를 담으면 툴이 검사 뒤 선택해 준다 — 없으면 비워 둔다.
 `ctx`(`RuleContext`)에는 세트 목록 · 경로 · 타입 필터 · 계층 옵션이 들어 있다 — 규칙에 필요한 값이 더 생기면 여기에 더한다.
 
 ### 2-3. 원본과 달라진 것 (동작 아님)
