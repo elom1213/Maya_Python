@@ -21,5 +21,7 @@
 #           Orient (v02.25) - helper_hand_l turns to match helper_lowerarm_l (arm tail "parent"),
 #                            helper_hand_r is the behavior mirror of it (arm tail "mirror").
 
-VERSION = "02.25"
+#           Orient table (v02.26) - Filter: find text in Joint / Rule / Note, "In" picks the columns.
+
+VERSION = "02.26"
 LAST_UPDATE = "2026-09-18"

@@ -53,6 +53,17 @@ number_label 을 주면 `Number: N`(필터 없음) / `Number: 보이는수 / 전
 `visible_items()` / `visible_selected()` / `select_all_visible()` 은 이 모드에서도
 QListWidget 과 똑같이 동작한다(이름은 `tree_column` 열의 텍스트).
 
+여러 열에서 찾기 (tree_columns, 2026-09-18)
+-----------------------------------------
+`tree_columns=(0, 1, 4)` 를 주면 **그 열들을 모두** 본다 — 단어마다 **어느 한 열에라도** 있으면 맞고,
+공백으로 나눈 단어는 여전히 **모두** 맞아야 한다(AND). 예: `arm A2` 는 Joint 열의 `arm` 과
+Rule 열의 `A2` 를 함께 가진 행. 처음 쓰인 곳: A00130_ControlRig_V02 의 Orient & Place 표
+(Joint · Rule · Note). 실행 중에 바꾸려면 `set_tree_columns(cols)`.
+`tree_column` 은 그대로 **이름 열**(visible_selected 가 돌려주는 텍스트)이다.
+
+    self.flt = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+        tree_widget=self.tree, tree_columns=(0, 1, 4))
+
 **함정**: `QTreeWidget.selectedItems()` 는 **숨긴 항목을 빼고 준다** — `QListWidget` 은
 숨겨도 그대로 준다(실측). 그래서 트리 모드의 `visible_selected()` 는 `selectedItems()`
 대신 항목을 직접 훑어 `isSelected()` 로 판정한다. 안 그러면 "가려진 선택 수" 가 늘 0 이 되어
@@ -86,13 +97,15 @@ class JUN_mod_filter_qt_v01(QWidget):
     def __init__(self, list_widget=None, label="Filter",
                  placeholder="Type any part of a name (e.g. Inner)",
                  show_clear=True, number_label=None, rows_provider=None,
-                 tree_widget=None, tree_column=0, parent=None):
+                 tree_widget=None, tree_column=0, tree_columns=None, parent=None):
         super(JUN_mod_filter_qt_v01, self).__init__(parent)
 
         self.list_widget = None
         # 컬럼이 있는 목록용 — QTreeWidget 의 최상위 항목을 거른다
         self.tree_widget = None
         self.tree_column = int(tree_column or 0)
+        # 찾을 열들. 없으면 tree_column 하나(예전과 같다).
+        self.tree_columns = tuple(tree_columns) if tree_columns else None
         # QListWidget 도 QTreeWidget 도 아닌 목록용 — () -> [(name, widget), ...]
         self.rows_provider = rows_provider
         self.number_label = number_label
@@ -140,6 +153,17 @@ class JUN_mod_filter_qt_v01(QWidget):
             self.tree_column = int(column)
         self.refresh()
 
+    def set_tree_columns(self, columns):
+        """트리 모드에서 찾을 열들을 바꾸고 다시 거른다. None 이면 tree_column 하나."""
+        self.tree_columns = tuple(columns) if columns else None
+        self.refresh()
+
+    def _tree_haystack(self, item):
+        """트리 항목에서 찾을 텍스트 - 여러 열이면 열 사이에 줄바꿈을 끼운다
+        (열 경계를 넘어 붙은 글자가 우연히 맞지 않도록)."""
+        cols = self.tree_columns or (self.tree_column,)
+        return "\n".join(item.text(c) for c in cols)
+
     def text(self):
         return self.le_filter.text()
 
@@ -184,7 +208,7 @@ class JUN_mod_filter_qt_v01(QWidget):
             for i in range(total):
                 item = self.tree_widget.topLevelItem(i)
                 hit = True if not tokens else self._matches(
-                    item.text(self.tree_column), tokens)
+                    self._tree_haystack(item), tokens)
                 item.setHidden(not hit)
                 if hit:
                     shown += 1

@@ -3,6 +3,18 @@
 `A00130_ControlRig`(V01)의 **템플릿 조인트 패러다임 재작성판**이다.
 계획서: `JUN_All/docs/plans/A00130_ControlRig_V02_plan.md`
 
+## v02.26 (2026-09-18)
+**[Feature] `Orient & Place` 표에 필터 — Joint · Rule · Note 에서 글자를 찾아 그 행만 남긴다.**
+
+- **요청**: 검색으로 joint 혹은 Rule, note 에 어떤 글자가 있는지 찾고 걸러 보기.
+- 표 위에 `Filter [.....] [Clear]  In [All v]  Number: N / M`. 대소문자 무시, 공백으로 나눈 단어는 **모두** 맞아야 하고
+  각 단어는 찾는 열 **어느 것에든** 있으면 된다 — 예: `arm A2` = Joint 에 `arm`, Rule 에 `A2`.
+- `In` : `All`(Joint + Rule + Note, 기본) · `Joint` · `Rule` · `Note`.
+- **표에 보이는 것만 바꾼다** — `Orient & Place` 는 여전히 모든 규칙을 돈다. `Check` 로 표를 다시 채워도 필터는 남는다.
+- 공용 위젯 `JUN_mod_filter_qt` 에 **`tree_columns`**(여러 열 검색)를 더해 썼다. 예전 `tree_column` 쓰는 곳은 그대로.
+- **검증**(mayapy 2024, 44항목 통과): 템플릿 씬 113행에서 `In` 4가지 x 검색어 8개의 보이는 행을 전수 대조 · Number 라벨 ·
+  Check 뒤 필터 유지 · 필터(`clavicle`)가 걸린 채 `Orient & Place` 가 가려진 척추까지 정렬. 공용 위젯 PySide6 6항목(한 열 = 예전과 같음).
+
 ## v02.25 (2026-09-18)
 **[Feature] `Orient & Place` — 손 규칙: `helper_hand_l` 은 `helper_lowerarm_l` 과 같은 방향, `helper_hand_r` 은 왼손의 미러.**
 

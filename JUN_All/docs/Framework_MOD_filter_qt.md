@@ -135,6 +135,21 @@ self.flt = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
 > 직접 훑어 `isSelected()` 로 판정**한다. 그냥 `selectedItems()` 를 썼다면 **"가려진 선택 수"가
 > 늘 0 이 되어** 4장의 경고가 조용히 사라졌을 것이다.
 
+### 여러 열에서 찾기 — `tree_columns` (2026-09-18)
+
+`tree_columns=(0, 1, 4)` 를 주면 **그 열들을 모두** 본다. 단어마다 **어느 한 열에라도** 있으면 맞고,
+공백으로 나눈 단어는 여전히 **모두** 맞아야 한다(AND) — `arm A2` 는 한 열에 `arm`, 다른 열에 `A2` 가 있어도 맞는다.
+열 사이에는 줄바꿈을 끼워 붙이므로 **열 경계를 넘어 이어진 글자는 맞지 않는다**(`lA2` 가 `..._l` + `A2...` 에 안 걸림).
+
+```python
+self.flt = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+    tree_widget=self.tree, tree_columns=(0, 1, 4))
+self.flt.set_tree_columns((1,))      # 실행 중에 바꾸기 (None = tree_column 하나)
+```
+
+`tree_column` 은 그대로 **이름 열**이다 — `visible_selected()` 가 돌려주는 텍스트.
+안 주면 예전처럼 `tree_column` 한 열만 본다(기존 사용처 A00275 · A00330 은 바뀌지 않는다, PySide6 로 확인).
+
 ---
 
 ## 6. `QListWidget` 이 아닌 목록 — `rows_provider`
@@ -168,6 +183,7 @@ self.flt_se.filtered.connect(self._on_se_filtered)   # 개수 라벨 등 후처�
 | `A00290_BSTool` | Shape Editor 탭 | `rows_provider` | v01.13 |
 | `A00170_driverTool` | Remap Value 탭, Stretch 탭 2개 그룹 | `QListWidget`(TSL 내부) | v01.13 |
 | `A00330_NamingTool` | Set Rename 탭 | **`tree_widget`** | v01.02 |
+| `A00130_ControlRig_V02` | Orient & Place 표 (Joint · Rule · Note + `In` 콤보) | **`tree_widget` + `tree_columns`** | v02.26 |
 
 > **TSL(`JUN_mod_tsl_qt_v01`) 안의 리스트에 붙일 때**는 `tsl.list_widget` 을 넘긴다.
 > 단, TSL 의 `get_all_items()` / `selected_items()` 는 **숨김을 모른다** — 작업 대상은

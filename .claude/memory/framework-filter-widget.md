@@ -39,3 +39,7 @@ metadata:
 - 문서: `JUN_All/docs/Framework_MOD_filter_qt.md` (docs/README.md "공용 위젯" 섹션에 등록).
 
 관련: [[tsl-selection-order]], [[qtreewidgetitem-checkable-default-flag]], [[wip-a00290-shape-editor-tab]]
+
+**여러 열 (`tree_columns`, 2026-09-18)** — 트리 모드는 원래 `tree_column` 한 열만 봤다. `tree_columns=(0,1,4)` /
+`set_tree_columns()` 로 여러 열: 단어마다 어느 열이든, 단어끼리 AND. 열 사이에 줄바꿈을 끼워 **경계를 넘어 이어진
+글자는 안 맞게** 했다(`lA2`). 이름 열(visible_selected)은 여전히 `tree_column`. 처음 쓴 곳: A00130 Orient & Place 표(v02.26).

@@ -44,6 +44,7 @@ from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt import JUN_mod_filter_qt
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -68,6 +69,15 @@ WINDOW_OBJECT_NAME = "JUN_A00130_ControlRig_V02_window"
 _CHECK_COLORS = {
     match_manager.CHECK_OK: "#5fd068",
     match_manager.CHECK_DIFFERENT: "#ff5c5c",
+}
+
+# Orient & Place 표 필터가 찾는 열 (v02.26). 표 열 = Joint 0 · Rule 1 · Up dev 2 · Status 3 · Note 4.
+# 콤보 순서가 곧 이 dict 의 순서다.
+ORIENT_FILTER_COLUMNS = {
+    "All": (0, 1, 4),
+    "Joint": (0,),
+    "Rule": (1,),
+    "Note": (4,),
 }
 
 
@@ -492,6 +502,34 @@ class MainWindow(QWidget):
         self.tree_orient.setRootIsDecorated(False)
         self.tree_orient.setAlternatingRowColors(True)
         self.tree_orient.setSelectionMode(QAbstractItemView.ExtendedSelection)
+
+        # --- 필터 (v02.26) : Joint / Rule / Note 열에서 글자를 찾아 그 행만 남긴다.
+        # **보이는 것만 바꾼다** - Orient & Place 는 여전히 모든 규칙을 돈다(이 표는 계획을 보여 줄 뿐).
+        self.lbl_orient_number = QLabel("Number: 0")
+        self.lbl_orient_number.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        filter_row = QHBoxLayout()
+        self.flt_orient = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            tree_widget=self.tree_orient, tree_columns=ORIENT_FILTER_COLUMNS["All"],
+            placeholder="Type part of a joint, rule or note (e.g. arm A2)",
+            number_label=self.lbl_orient_number)
+        self.flt_orient.le_filter.setToolTip(
+            "Show only the rows that contain this text (case-insensitive).\n"
+            "Space-separated words all have to match, each in any searched column.\n"
+            "This only changes what the table shows - Orient & Place still runs\n"
+            "every rule.")
+        filter_row.addWidget(self.flt_orient, 1)
+        filter_row.addWidget(QLabel("In"))
+        self.cmb_orient_filter_in = QComboBox()
+        self.cmb_orient_filter_in.addItems(list(ORIENT_FILTER_COLUMNS))
+        self.cmb_orient_filter_in.setToolTip(
+            "Which columns the filter looks in. All = Joint, Rule and Note.")
+        self.cmb_orient_filter_in.currentTextChanged.connect(
+            lambda text: self.flt_orient.set_tree_columns(ORIENT_FILTER_COLUMNS[text]))
+        filter_row.addWidget(self.cmb_orient_filter_in)
+        filter_row.addWidget(self.lbl_orient_number)
+        layout.addLayout(filter_row)
+
         layout.addWidget(self.tree_orient, 1)
 
         row = QHBoxLayout()
@@ -975,6 +1013,8 @@ class MainWindow(QWidget):
             self.tree_orient.addTopLevelItem(item)
         for col in range(5):
             self.tree_orient.resizeColumnToContents(col)
+        # 새로 채운 행은 숨김이 풀려 있다 - 적어 둔 필터를 다시 먹인다.
+        self.flt_orient.refresh()
         return rows, messages
 
     def on_check_orient(self):

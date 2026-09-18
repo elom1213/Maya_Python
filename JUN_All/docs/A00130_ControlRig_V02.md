@@ -4,7 +4,8 @@
 Manager* · AdvancedSkeleton 의 *FitSkeleton* 처럼 — **씬에 템플릿 조인트를 놓고 눈으로 맞춘 뒤,
 버튼으로 컨트롤러(cage)를 그 자리에 굽는다.**
 
-- 버전: `v02.25` (`app/config/version.py`) — `Orient & Place` 에 **손 규칙**: `helper_hand_l` 은 `helper_lowerarm_l` 과 같은
+- 버전: `v02.26` (`app/config/version.py`) — `Orient & Place` 표에 **필터**: Joint · Rule · Note 에서 글자를 찾아 걸러 본다 (§7.5)
+  · v02.25 는 `Orient & Place` 에 **손 규칙**: `helper_hand_l` 은 `helper_lowerarm_l` 과 같은
   방향, `helper_hand_r` 은 왼손의 Behavior 미러 (§7.3)
   · v02.24 는 `Orient & Place` 에 **쇄골 규칙**: `helper_clavicle_l` 의 `+X` 가 `helper_upperarm_l` 을
   보고 `+Y` 가 월드 `+Y` 쪽(오른쪽은 그 Behavior 미러) (§7.2)
@@ -579,6 +580,18 @@ foot -> ball 이 수직에서 36.87도 기울면
 | `Rule` | 어느 규칙이 이 조인트를 맡았나 (`A1 world zero` · `A2 leg_l` · `A2 keep` · `A3 behavior` ...) |
 | `Up dev` | up 축이 기대한 월드 축에서 몇 도 벗어났나 — **A2 의 up 축이 `+Z` 라는 전제가 맞는지 여기서 갈린다** |
 | `Status` | `ok` · **`preserved`**(정해진 것) · **`no rule`**(미결) · `joint missing` |
+
+**필터 (v02.26)** — 표 위의 `Filter` 에 글자를 적으면 그 글자가 있는 행만 남는다.
+
+```
+Filter [ arm A2          ] [Clear]   In [ All v ]   Number: 5 / 113
+```
+
+- 대소문자 무시. 공백으로 나눈 단어는 **모두** 맞아야 하고, 각 단어는 찾는 열 **어느 것에든** 있으면 된다
+  (`arm A2` = Joint 에 `arm` · Rule 에 `A2`).
+- `In` 으로 찾을 열을 고른다 — `All`(Joint + Rule + Note, 기본) · `Joint` · `Rule` · `Note`.
+- **표에 보이는 것만 바꾼다.** `Orient & Place` 는 여전히 **모든 규칙**을 돈다(표는 계획을 보여 줄 뿐이다).
+  `Check` 로 표를 다시 채워도 필터는 남는다.
 
 ### 7.6 아직 규칙이 없는 40개
 

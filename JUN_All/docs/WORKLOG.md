@@ -31,6 +31,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-18 (오늘)
 
+> [!summary] `A00130_ControlRig_V02` `Orient & Place` 표에 **필터** — Joint · Rule · Note 에서 글자 찾기, `In` 으로 열 선택 (v02.25 -> 02.26) + 공용 필터 `tree_columns`
+- **요청**: 검색으로 joint 혹은 Rule, note 에 어떤 글자가 있는지 찾고 걸러 보기.
+- 공용 `JUN_mod_filter_qt` 는 트리를 한 열만 봤다 → `tree_columns`(여러 열) + `set_tree_columns()` 추가. 단어마다 어느 열이든, 단어끼리는 AND, 열 사이엔 줄바꿈을 끼워 경계를 넘은 글자는 안 맞게. 기존 `tree_column` 사용처(A00275 · A00330)는 그대로.
+- 표 필터는 **보이는 것만** 바꾼다 — Orient & Place 는 여전히 모든 규칙(툴팁·문서에 명시).
+- mayapy 2024 44항목(113행 x `In` 4 x 검색어 8 전수 대조 · Check 뒤 유지 · 가려진 척추도 정렬) + 공용 위젯 PySide6 6항목. #A00130 #Framework
+
 > [!summary] `A00130_ControlRig_V02` `Orient & Place` 에 **손 규칙** — `hand_l` = `lowerarm_l` 과 같은 방향, `hand_r` = 왼손의 미러 (v02.24 -> 02.25)
 - **요청**: hand_l 은 상위 본 lowerarm_l 과 회전값이 같도록, hand_r 은 hand_l 을 미러한 방향.
 - 팔 `tail` 에 `parent`(끝 조인트 = 부모의 월드 방향, arm_l) · `mirror`(A2 는 안 건드리고 늦은 미러가 덮음, arm_r) 추가. 전에는 둘 다 `preserve`.
