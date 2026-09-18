@@ -1,8 +1,8 @@
 ---
 title: A00380_MeshTool 사용법
-aliases: [Mesh Tool, MeshTool, A00380, Peak, Match]
-tags: [maya-python, tool-guide, mesh, modeling, peak, normal, match, kangaroo, layout]
-updated: 2026-09-16
+aliases: [Mesh Tool, MeshTool, A00380, Peak, Match, By Weight]
+tags: [maya-python, tool-guide, mesh, modeling, peak, normal, match, kangaroo, layout, skin-weight, corrective]
+updated: 2026-09-18
 ---
 
 # A00380_MeshTool 사용법
@@ -14,9 +14,12 @@ Maya 안에서 도는 **메시 편집** PySide 툴이다(arch B, in-Maya). **Pea
   느린 점을 해결하는 것이 목적이다.
 - **Match** (v01.01~) = 리스트업한 **From 메시의 같은 인덱스 버텍스 위치**로, 선택한 메시의 버텍스를
   이동시킨다(소프트 셀렉션 falloff 반영). **Kangaroo 의 Geometry > Match** 기능을 Kangaroo 없이
-  재현한 것이다.
+  재현한 것이다. v01.09 부터 하위 탭 두 개:
+  - **Default** — 위 기능 그대로.
+  - **By Weight** (v01.09~) — 스킨 메시의 **조인트 웨이트를 마스크로** 써서, 메시들을 타깃 모양 쪽으로
+    `웨이트 × 델타` 만큼 옮긴다. 블렌드셰이프 타깃에 웨이트 맵(마스크)을 칠한 것과 결과가 같다.
 
-- **버전**: `app/config/version.py` (v01.05)
+- **버전**: `app/config/version.py` (v01.09)
 - **설치**: `__dragDrop_A00380.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **MeshTool** → `tools.A00380_MeshTool.run(True)`
 
 ---
@@ -86,6 +89,11 @@ Maya 안에서 도는 **메시 편집** PySide 툴이다(arch B, in-Maya). **Pea
 
 ## 3-2. Match 탭 (v01.01~)
 
+v01.09 부터 Match 탭은 **하위 탭 두 개**다 — `Default`(이 절) 와 `By Weight`(3-3 절).
+하위 탭을 옮기면 Default 의 확정 안 한 미리보기는 되돌아간다(둘 다 같은 메시의 `pnts` 에 쓰므로).
+
+### Match > Default
+
 리스트업한 **From 메시**의 버텍스 위치로, 현재 선택한 메시의 버텍스를 **같은 인덱스끼리** 이동시킨다.
 버텍스 대응이 **인덱스 기준**이라, 두 메시는 **토폴로지(버텍스 순서·개수)가 같아야** 정확히 맞는다
 (예: 블렌드셰이프 타겟, 복제본, 스컬프트 전/후처럼 위상이 같은 메시). Kangaroo 의 `setModelVerts`
@@ -133,6 +141,79 @@ Maya 안에서 도는 **메시 편집** PySide 툴이다(arch B, in-Maya). **Pea
 
 ---
 
+## 3-3. Match > By Weight (v01.09~)
+
+스킨 웨이트를 **마스크**로 써서 메시를 타깃 모양 쪽으로 옮긴다. 블렌드셰이프에서 타깃마다 웨이트 맵을
+칠해 "이 타깃이 원본을 얼마나 바꿀지" 정하는 것과 **보이는 결과가 같다.** 조인트별로 영역을 나눈
+코렉티브(예: 스컬프트 하나를 `jnt_01` 영역 / `jnt_02` 영역으로 쪼개기)를 만들 때 쓴다.
+
+| 이름 | 뜻 |
+|------|-----|
+| **Weight Mesh** (M_w) | 조인트에 바인드된 메시. **웨이트만 읽는다** — 움직이지 않는다 |
+| **Joints** (jnt_i) | M_w 를 바인드한 조인트. 체크한 것만 쓴다 |
+| **Target Mesh** (M_tgt) | 목표 모양. M_w 와 같은 메시(토폴로지) |
+| **Meshes to Move** (M_j) | 옮길 메시들. M_w 와 같은 메시(토폴로지) |
+
+```
+┌ By Weight ─────────────────────────┐
+│ ┌ Weight Mesh (skinned) ─────────┐ │
+│ │ Weight Mesh [ body_skin ][Load]│ │
+│ │ Joints              Number: 3  │ │
+│ │ [v] jnt_01                     │ │  ← 체크박스 (Shift/Ctrl 다중 체크)
+│ │ [v] jnt_02                     │ │
+│ │ [ ] jnt_03   (회색 = 웨이트 0) │ │
+│ │ [Filter ...]                   │ │
+│ │ [Check All] [Clear]            │ │
+│ └────────────────────────────────┘ │
+│ Target Mesh [ body_sculpt ][Load]  │
+│ ┌ Meshes to Move ────────────────┐ │
+│ │ [ M_01 ]  (Up / Down 로 순서)  │ │
+│ │ [ M_02 ]                       │ │
+│ └────────────────────────────────┘ │
+│ ┌ Pairing (joint weights -> mesh)┐ │
+│ │ (o) Joint k -> Mesh k          │ │
+│ │ ( ) Sum -> every mesh          │ │
+│ │ Mesh   Joint weights           │ │  ← 짝 미리보기
+│ │ M_01   jnt_01                  │ │
+│ │ M_02   jnt_02                  │ │
+│ └────────────────────────────────┘ │
+│ Strength [ 1.000 ]                 │
+│ [       Apply By Weight        ]   │
+└────────────────────────────────────┘
+```
+
+**계산** — 버텍스 인덱스로 대응하고 **오브젝트(로컬) 공간**에서 계산한다(블렌드셰이프와 같다).
+
+```
+new[v] = cur[v] + mask[v] × Strength × (M_tgt[v] − cur[v])
+mask[v] = M_j 에 짝지은 조인트들의 M_w 웨이트 합 (1 로 자름)
+```
+
+예: `jnt_01` 웨이트가 0.2 인 `vtx[0]`, 1.0 인 `vtx[1]` → M_01 의 `vtx[0]` 은 M_tgt 까지 델타의 **20%**,
+`vtx[1]` 은 **100%**(M_tgt 에 정확히 안착) 움직인다. 웨이트 0 인 버텍스는 그대로다.
+
+**사용 순서**
+1. 스킨 메시를 선택하고 Weight Mesh 의 **Load** — 바인드한 조인트가 **이름순**으로 나온다. 웨이트가 하나도
+   없는 인플루언스는 회색이다. 체크박스는 공용 동작 `MOD_checkList_qt`(Shift/Ctrl 로 여러 행 골라 한 번에
+   체크), 필터는 공용 `MOD_filter_qt`.
+2. 목표 메시를 선택하고 Target Mesh 의 **Load**.
+3. 옮길 메시들을 선택하고 Meshes to Move 의 **List Selected**.
+4. **Pairing** 을 고른다.
+   - **Joint k -> Mesh k** (기본): 체크한 조인트 k 번째(목록 순서) → 메시 리스트 k 번째.
+     `jnt_01 -> M_01`, `jnt_02 -> M_02`. 순서는 메시 리스트의 `Up` / `Down` 으로 맞춘다.
+     개수가 다르면 남는 쪽은 건너뛴다(표에 회색으로).
+   - **Sum -> every mesh**: 체크한 조인트 웨이트를 **더한 하나의 마스크**를 모든 메시에.
+   짝 미리보기 표가 체크 · 리스트 · 방식이 바뀔 때마다 갱신된다.
+5. **Apply By Weight** — 한 번에 적용된다. **Ctrl+Z 한 번**에 전부 되돌아간다.
+
+**알아둘 것**
+- 버텍스 수가 M_w 와 다른 메시는 건너뛰고 로그로 알린다. M_tgt 가 다르면 아무것도 하지 않는다.
+- 이동은 Default 와 같은 방식(`shape.pnts` 구간 setAttr)이라 히스토리 · 스킨이 걸린 M_j 에서도 동작한다.
+- M_tgt 의 트랜스폼(위치)은 결과에 영향을 주지 않는다 — 로컬 좌표끼리 비교한다.
+- `Strength` 는 모든 마스크에 곱해진다(0~1).
+
+---
+
 ## 4. 왜 마야 기본 방식보다 빠른가
 
 마야에서 버텍스를 노말 방향으로 옮기면 **버텍스마다 명령이 하나씩** 실행된다.
@@ -153,6 +234,8 @@ Maya 안에서 도는 **메시 편집** PySide 툴이다(arch B, in-Maya). **Pea
 ## 5. 구현 메모 (수정할 때 주의)
 
 `app/core/peak_manager.py`(Peak) 와 `app/core/match_manager.py`(Match) 에 정리돼 있다.
+By Weight 는 `app/core/weight_match_manager.py` — 웨이트는 `MFnSkinCluster.getWeights` 로 한 번에 읽고,
+이동은 Match 의 `MatchTarget` 을 그대로 쓴다(버텍스별 가중치 자리에 소프트 셀렉션 대신 마스크를 넣는다).
 Match 는 Peak 의 공용 헬퍼(`_undo_disabled`, `_selection_map`, `_dag_path`, `_soft_weights`,
 `_contiguous_runs`, `_shape_of`)와 preview/restore/commit·`shape.pnts` 구간 setAttr 모델을
 **그대로 재사용**한다. Peak 과 다른 점은 이동량 계산뿐이다:

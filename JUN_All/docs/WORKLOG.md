@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-18 (오늘)
 
+> [!summary] A00380 Match 를 하위 탭 **Default / By Weight** 로(v01.09) — By Weight = 스킨 웨이트를 마스크로 메시들을 타깃 쪽으로 `웨이트 × 델타`
+- **요청**: 기존 Match 는 Default 로 이식. By Weight 는 스킨 메시 M_w 의 조인트를 체크 목록으로, 타깃 M_tgt 한 칸, 옮길 메시 M_j TSL — 블렌드셰이프 마스크와 같은 결과.
+- `new = cur + mask × Strength × (M_tgt − cur)` (오브젝트 공간, 인덱스 대응). 짝짓기 두 방식: **Joint k -> Mesh k**(기본, jnt_01→M_01) / **Sum -> every mesh**. 짝 미리보기 표.
+- 조인트 목록은 공용 `MOD_checkList_qt` + `MOD_filter_qt`. 웨이트는 `MFnSkinCluster.getWeights` 한 번, 이동은 Match 의 `MatchTarget`(pnts 구간 setAttr) 재사용 → Ctrl+Z 한 번.
+- 창 크기: 그대로 넣으면 최소 435x615 → 660x1002. 스크롤 + 긴 그룹 제목 줄임 + 라디오 세로 배치(테마에서 라디오 하나 245px)로 435x651(하위 탭 바만큼).
+- mayapy 2024: 코어 11항목(예시 0.2/1.0 · 짝 · 합 × 0.5 · undo · 토폴로지 불일치 · 스킨 없음) + Qt 오프스크린 탭(로드 · 회색 조인트 · 짝 표 · 적용 · undo) 통과. 마야 GUI 에서는 아직 안 눌러 봄. #A00380
+
 > [!summary] `A00480_FileTool` 규칙에 걸린 **숨긴 메시를 마야에서 선택** — Check 와 막힌 Export 둘 다 (v01.04 -> 01.05)
 - **요청**: Check 를 하고 하이드된 메시가 있다면 그 메시를 마야 씬에서 선택.
 - `RuleResult.nodes`(문제 노드, 전체 경로) 추가 → `run_rules` 가 `(passed, logs, nodes)`. UI 는 받은 노드를 `select(replace)` 하고 로그. 앞으로의 규칙도 nodes 만 채우면 같은 동작.

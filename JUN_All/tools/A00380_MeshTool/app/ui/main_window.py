@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-23
+# last Update date : 2026-09-18
 # A00380_MeshTool - Qt UI
 #
 # Peak 탭: 선택한 메시/버텍스를 자기 노말 방향으로 팽창(+)·수축(-) 시킨다.
@@ -8,6 +8,7 @@
 #
 # Match 탭: 리스트업한 From 메시의 같은 인덱스 버텍스 위치로, 선택한 메시의 버텍스를
 # 이동시킨다(소프트 셀렉션 falloff 반영). Kangaroo Geometry>Match 를 Kangaroo 없이 재현.
+# v01.09~ 하위 탭 Default(위 기능) / By Weight(스킨 웨이트를 마스크로 타깃 쪽으로 이동).
 #
 # 흐름: Load 로 스냅샷 → 슬라이더를 끌면 실시간 미리보기(API 직접 쓰기) → 손을 떼는 순간
 #       그 상태를 그대로 확정(tweak 구간 setAttr, Ctrl+Z 한 번에 되돌아감). 별도 Apply 버튼 없음.
@@ -17,6 +18,8 @@ import time
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_tsl_qt_v01 import JUN_mod_tsl_qt_v01
+from Framework.qt.MOD_checkList_qt_v01 import JUN_mod_checkList_qt_v01
+from Framework.qt.MOD_filter_qt_v01 import JUN_mod_filter_qt_v01
 
 import maya.cmds as cmds
 
@@ -26,6 +29,7 @@ from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 from tools.A00380_MeshTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00380_MeshTool.app.core import peak_manager as peak_mgr
 from tools.A00380_MeshTool.app.core import match_manager as match_mgr
+from tools.A00380_MeshTool.app.core import weight_match_manager as wm_mgr
 
 
 WINDOW_OBJECT_NAME = "JUN_A00380_MeshTool_window"
@@ -270,6 +274,32 @@ class MainWindow(QWidget):
     # --------------------------------------------------------------
 
     def build_match_tab(self):
+        """Match 탭 = 하위 탭 두 개 (v01.09~).
+
+        Default   : 예전 Match 탭 그대로 — From 메시의 같은 인덱스 버텍스로 선택을 스냅.
+        By Weight : 스킨 웨이트를 마스크로 써서 M_j 들을 M_tgt 쪽으로 옮긴다.
+        """
+        self.match_tabs = QTabWidget()
+        self.match_tabs.addTab(self.build_match_default_page(), "Default")
+        self.match_tabs.setTabToolTip(
+            0, "Snap the selected mesh onto a From mesh's same-index vertices.")
+        # By Weight 는 목록이 셋이라 키가 크다. 스크롤에 담아 창 최소 크기를 늘리지 않는다
+        # (그대로 넣으면 창 최소가 435x615 -> 660x1002 로 커졌다, 테마 적용 실측).
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setWidget(self.build_match_weight_page())
+        self.match_tabs.addTab(scroll, "By Weight")
+        self.match_tabs.setTabToolTip(
+            1, "Move meshes toward a target by a skinned mesh's joint weights\n"
+               "(like painting a blend shape target's weight map).")
+        # Default 의 미확정 미리보기를 남긴 채 By Weight 로 가면 결과가 겹쳐 보인다.
+        self.match_tabs.currentChanged.connect(
+            lambda _i: self.discard_match_preview())
+        return self.match_tabs
+
+    def build_match_default_page(self):
 
         page = QWidget()
         lay = QVBoxLayout(page)
@@ -363,6 +393,159 @@ class MainWindow(QWidget):
 
         lay.addLayout(row_apply)
         lay.addStretch(1)
+
+        return page
+
+    # --------------------------------------------------------------
+    # Match > By Weight
+    # --------------------------------------------------------------
+
+    def _mesh_pick_row(self, label, tip, on_load):
+        """메시 **한 개**를 담는 줄: 이름 칸(읽기 전용) + Load 버튼."""
+        row = QHBoxLayout()
+        lb = QLabel(label)
+        lb.setMinimumWidth(78)
+        row.addWidget(lb)
+        le = QLineEdit()
+        le.setReadOnly(True)
+        le.setPlaceholderText("select a mesh, then Load")
+        le.setToolTip(tip)
+        row.addWidget(le, 1)
+        btn = QPushButton("Load")
+        btn.setToolTip("Take the first selected mesh.")
+        btn.clicked.connect(on_load)
+        row.addWidget(btn)
+        return row, le
+
+    def build_match_weight_page(self):
+        """스킨 웨이트를 마스크로 M_j 를 M_tgt 쪽으로 옮긴다 (블렌드셰이프 웨이트 맵과 같은 결과).
+
+        M_w(스킨 메시)의 조인트를 체크 → 짝지은 M_j 마다
+        `new = cur + weight(jnt, v) * Strength * (M_tgt - cur)` (오브젝트 공간, 버텍스 인덱스 대응).
+        """
+        page = QWidget()
+        lay = QVBoxLayout(page)
+        # 스크롤바 폭만큼 좁아지므로 좌우 여백을 뺀다(Meshes TSL 버튼 줄이 잘리지 않게).
+        lay.setContentsMargins(0, 6, 0, 0)
+
+        # ---- M_w + 조인트 -------------------------------------------
+        box_w = QGroupBox("Weight Mesh (skinned)")
+        vw = QVBoxLayout(box_w)
+        row, self.le_wm_weight = self._mesh_pick_row(
+            "Weight Mesh", "The skinned mesh whose joint weights are the mask.",
+            self.on_wm_load_weight)
+        vw.addLayout(row)
+
+        head = QHBoxLayout()
+        head.addWidget(QLabel("Joints"))
+        head.addStretch(1)
+        self.lb_wm_joints = QLabel("Number: 0")
+        head.addWidget(self.lb_wm_joints)
+        vw.addLayout(head)
+
+        self.lw_wm_joints = QListWidget()
+        self.lw_wm_joints.setMinimumHeight(120)
+        self.lw_wm_joints.setToolTip(
+            "Joints the weight mesh is bound to. Check the ones to use.\n"
+            "Shift / Ctrl click selects several rows - clicking the check box of a\n"
+            "selected row (or Space) checks or unchecks every selected row.\n"
+            "Grey = bound but carries no weight.")
+        self.chk_wm_joints = JUN_mod_checkList_qt_v01(self.lw_wm_joints)
+        self.lw_wm_joints.itemChanged.connect(lambda _i: self.update_wm_pairs())
+        self.chk_wm_joints.checksChanged.connect(lambda _l: self.update_wm_pairs())
+        vw.addWidget(self.lw_wm_joints, 1)
+
+        row_f = QHBoxLayout()
+        self.flt_wm_joints = JUN_mod_filter_qt_v01(
+            self.lw_wm_joints, placeholder="Type any part of a joint name",
+            number_label=self.lb_wm_joints)
+        row_f.addWidget(self.flt_wm_joints, 1)
+        vw.addLayout(row_f)
+        # 버튼은 필터와 한 줄에 두면 폭이 넓어져 따로 둔다.
+        row_f = QHBoxLayout()
+        btn_all = QPushButton("Check All")
+        btn_all.setToolTip("Check every joint currently visible.")
+        btn_all.clicked.connect(lambda: self._wm_set_all(True))
+        row_f.addWidget(btn_all)
+        btn_none = QPushButton("Clear")
+        btn_none.setToolTip("Uncheck every joint.")
+        btn_none.clicked.connect(lambda: self._wm_set_all(False))
+        row_f.addWidget(btn_none)
+        row_f.addStretch(1)
+        vw.addLayout(row_f)
+        lay.addWidget(box_w, 1)
+
+        # ---- M_tgt ----------------------------------------------------
+        row, self.le_wm_target = self._mesh_pick_row(
+            "Target Mesh", "The shape to move toward (same mesh as the weight mesh).",
+            self.on_wm_load_target)
+        lay.addLayout(row)
+
+        # ---- M_j ------------------------------------------------------
+        box_m = QGroupBox("Meshes to Move")
+        vm = QVBoxLayout(box_m)
+        self.tsl_wm_meshes = JUN_mod_tsl_qt_v01(
+            title="Meshes", select_label="List Selected",
+            # Sort 는 뺀다 - 순서는 Up / Down 으로 조인트와 맞추는 것이고, 버튼 줄이 스크롤 폭을
+            # 넘는다(테마 적용 401px > 395px, 실측).
+            show_sort=False,
+            list_min_height=90, log_callback=self.log)
+        model = self.tsl_wm_meshes.list_widget.model()
+        for sig in (model.rowsInserted, model.rowsRemoved, model.rowsMoved,
+                    model.modelReset, model.layoutChanged):
+            sig.connect(lambda *_a: self.update_wm_pairs())
+        vm.addWidget(self.tsl_wm_meshes)
+        lay.addWidget(box_m, 1)
+
+        # ---- 짝짓기 ---------------------------------------------------
+        box_p = QGroupBox("Pairing (joint weights -> mesh)")
+        vp = QVBoxLayout(box_p)
+        self.rb_wm_order = QRadioButton("Joint k -> Mesh k")
+        self.rb_wm_order.setChecked(True)
+        self.rb_wm_order.setToolTip(
+            "The k-th checked joint (list order) masks the k-th mesh.\n"
+            "e.g. jnt_01 -> M_01, jnt_02 -> M_02. Extra joints / meshes are skipped.")
+        self.rb_wm_sum = QRadioButton("Sum -> every mesh")
+        self.rb_wm_sum.setToolTip(
+            "The checked joints' weights are added up (clamped to 1) and that one\n"
+            "mask is used on every mesh in the list.")
+        grp = QButtonGroup(self)
+        grp.addButton(self.rb_wm_order)
+        grp.addButton(self.rb_wm_sum)
+        self.rb_wm_order.toggled.connect(lambda _c: self.update_wm_pairs())
+        # 테마 qss 에서 라디오 하나가 245px 이라 한 줄에 두면 창 폭을 넘는다(실측) - 세로로.
+        vp.addWidget(self.rb_wm_order)
+        vp.addWidget(self.rb_wm_sum)
+
+        self.tw_wm_pairs = QTreeWidget()
+        self.tw_wm_pairs.setHeaderLabels(["Mesh", "Joint weights"])
+        self.tw_wm_pairs.setRootIsDecorated(False)
+        self.tw_wm_pairs.setMinimumHeight(70)
+        self.tw_wm_pairs.setToolTip("What Apply will do. Grey rows are skipped.")
+        vp.addWidget(self.tw_wm_pairs)
+        lay.addWidget(box_p)
+
+        # ---- 세기 + 적용 ---------------------------------------------
+        row_s = QHBoxLayout()
+        row_s.addWidget(QLabel("Strength"))
+        self.sp_wm_strength = QDoubleSpinBox()
+        self.sp_wm_strength.setDecimals(3)
+        self.sp_wm_strength.setRange(0.0, 1.0)
+        self.sp_wm_strength.setSingleStep(0.05)
+        self.sp_wm_strength.setValue(1.0)
+        self.sp_wm_strength.setToolTip(
+            "Multiplies every mask. 1 = a vertex with weight 1 lands exactly on the\n"
+            "target, weight 0.2 moves 20% of the way.")
+        row_s.addWidget(self.sp_wm_strength, 1)
+        lay.addLayout(row_s)
+
+        self.btn_wm_apply = QPushButton("Apply By Weight")
+        self.btn_wm_apply.setMinimumHeight(38)
+        self.btn_wm_apply.setToolTip(
+            "Move each mesh toward the target by its joint weights\n"
+            "(object space, same vertex index). One Ctrl+Z undoes all.")
+        self.btn_wm_apply.clicked.connect(self.on_wm_apply)
+        lay.addWidget(self.btn_wm_apply)
 
         return page
 
@@ -768,6 +951,146 @@ class MainWindow(QWidget):
         self.set_match_weight(0.0)
         self.log("Match reset to 0.")
 
+    # ---- Match > By Weight -------------------------------------------
+
+    def _first_selected_mesh(self):
+        """선택 중 첫 메시의 트랜스폼(짧은 이름). 컴포넌트를 골랐어도 그 메시."""
+        for node in cmds.ls(sl=True, objectsOnly=True) or []:
+            try:
+                shape = peak_mgr._shape_of(node)
+            except Exception:
+                shape = None
+            if shape:
+                parent = cmds.listRelatives(shape, parent=True, fullPath=True)
+                return (cmds.ls(parent[0])[0] if parent else shape)
+        return None
+
+    def on_wm_load_weight(self):
+        """M_w 를 담고 그 메시를 바인드한 조인트를 체크 목록에 채운다."""
+        mesh = self._first_selected_mesh()
+        if not mesh:
+            self.log("Select a skinned mesh first.", warn=True)
+            return
+        try:
+            sw = wm_mgr.SkinWeights(mesh)
+        except Exception as e:
+            self.log(str(e), warn=True)
+            return
+
+        keep = set(self._wm_checked_joints())
+        used = set(sw.bound_joints())
+        self.lw_wm_joints.blockSignals(True)
+        self.lw_wm_joints.clear()
+        # 이름순 — jnt_01, jnt_02 ... 가 그대로 Mesh 01, 02 ... 와 짝이 되도록.
+        for joint in sorted(sw.joints):
+            item = QListWidgetItem(joint)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Checked if joint in keep else Qt.Unchecked)
+            if joint not in used:
+                item.setForeground(QBrush(QColor("#808080")))
+                item.setToolTip("Bound, but carries no weight on this mesh.")
+            self.lw_wm_joints.addItem(item)
+        self.lw_wm_joints.blockSignals(False)
+
+        self.le_wm_weight.setText(mesh)
+        self.flt_wm_joints.refresh()
+        self.update_wm_pairs()
+        self.log("Weight mesh: {0} ({1}, {2} joint(s), {3} with weight, {4} vertices)."
+                 .format(mesh, sw.skin, len(sw.joints), len(used), sw.vertex_count), ok=True)
+
+    def on_wm_load_target(self):
+        mesh = self._first_selected_mesh()
+        if not mesh:
+            self.log("Select the target mesh first.", warn=True)
+            return
+        self.le_wm_target.setText(mesh)
+        self.update_wm_pairs()
+        self.log("Target mesh: {0}".format(mesh), ok=True)
+
+    def _wm_set_all(self, checked):
+        """Check All 은 보이는 행만 켜고, Clear 는 가려진 것까지 전부 끈다."""
+        self.lw_wm_joints.blockSignals(True)
+        for i in range(self.lw_wm_joints.count()):
+            item = self.lw_wm_joints.item(i)
+            if checked and item.isHidden():
+                continue
+            item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+        self.lw_wm_joints.blockSignals(False)
+        self.update_wm_pairs()
+
+    def _wm_checked_joints(self):
+        """체크한 조인트, 목록 순서대로."""
+        return [self.lw_wm_joints.item(i).text()
+                for i in range(self.lw_wm_joints.count())
+                if self.lw_wm_joints.item(i).checkState() == Qt.Checked]
+
+    def _wm_pairs(self):
+        mode = wm_mgr.PAIR_ORDER if self.rb_wm_order.isChecked() else wm_mgr.PAIR_SUM
+        meshes = self.tsl_wm_meshes.get_all_items()
+        return wm_mgr.make_pairs(meshes, self._wm_checked_joints(), mode)
+
+    def update_wm_pairs(self):
+        """짝 미리보기 표를 다시 그린다."""
+        if not hasattr(self, "tw_wm_pairs"):
+            return
+        pairs, left_meshes, left_joints = self._wm_pairs()
+        self.tw_wm_pairs.clear()
+        grey = QBrush(QColor("#808080"))
+        for mesh, joints in pairs:
+            self.tw_wm_pairs.addTopLevelItem(
+                QTreeWidgetItem([mesh.split("|")[-1], " + ".join(joints)]))
+        for mesh in left_meshes:
+            item = QTreeWidgetItem([mesh.split("|")[-1], "(no joint - skipped)"])
+            item.setForeground(0, grey)
+            item.setForeground(1, grey)
+            self.tw_wm_pairs.addTopLevelItem(item)
+        for joint in left_joints:
+            item = QTreeWidgetItem(["(no mesh - skipped)", joint])
+            item.setForeground(0, grey)
+            item.setForeground(1, grey)
+            self.tw_wm_pairs.addTopLevelItem(item)
+        self.tw_wm_pairs.resizeColumnToContents(0)
+
+    def on_wm_apply(self):
+        weight_mesh = self.le_wm_weight.text().strip()
+        target = self.le_wm_target.text().strip()
+        if not weight_mesh:
+            self.log("Load a Weight Mesh first.", warn=True)
+            return
+        if not target:
+            self.log("Load a Target Mesh first.", warn=True)
+            return
+        pairs, left_meshes, left_joints = self._wm_pairs()
+        if not pairs:
+            self.log("Nothing to apply - check joints and list meshes to move.", warn=True)
+            return
+        strength = self.sp_wm_strength.value()
+        if strength < 1e-9:
+            self.log("Strength is 0 - nothing to apply.", warn=True)
+            return
+
+        # Default 탭의 미확정 미리보기가 같은 메시의 pnts 에 남아 있으면 섞인다.
+        self.discard_match_preview()
+        try:
+            with undo_chunk():
+                done, skipped = wm_mgr.apply(weight_mesh, target, pairs, strength)
+        except Exception as e:
+            self.log("By Weight failed: {0}".format(e), warn=True)
+            return
+
+        for mesh, reason in skipped:
+            self.log("{0}: skipped - {1}".format(mesh.split("|")[-1], reason), warn=True)
+        for mesh in left_meshes:
+            self.log("{0}: skipped - no joint paired".format(mesh.split("|")[-1]), warn=True)
+        for joint in left_joints:
+            self.log("{0}: not used - no mesh paired".format(joint), warn=True)
+        for mesh, joints, moved, peak in done:
+            self.log("{0} <- {1}: {2} vertice(s) moved (max weight {3:.3f}).".format(
+                mesh.split("|")[-1], " + ".join(joints), moved, peak), ok=True)
+        if done:
+            self.log("By Weight: {0} mesh(es) toward {1} at strength {2:.3f}.".format(
+                len(done), target, strength), ok=True)
+
     def on_tab_changed(self, index):
         """탭을 옮기면, 떠나는 탭의 확정 안 한 미리보기를 되돌린다.
 
@@ -867,7 +1190,9 @@ class MainWindow(QWidget):
             "like Houdini's peak node.\n\n"
             "Match: snap the selected mesh's vertices onto a From mesh's\n"
             "same-index vertices (soft-selection falloff aware) - a\n"
-            "standalone take on Kangaroo's Geometry > Match.\n\n"
+            "standalone take on Kangaroo's Geometry > Match.\n"
+            "Match > By Weight: move meshes toward a target by a skinned\n"
+            "mesh's joint weights (like a blend shape weight map).\n\n"
             "Peak has no Apply button: dragging the slider applies the\n"
             "result as you go (each change is one Ctrl+Z).\n"
             "by Ji Hun Park".format(VERSION, LAST_UPDATE))

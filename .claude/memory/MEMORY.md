@@ -94,7 +94,7 @@
 - A00310 — [Type/Token/Rules](wip-a00310-searchtool-rules.md)(공유 Objects 리스트 · 규칙 레지스트리 · Standalone/No Upstream/No Downstream, v01.04) · A00330 — [Set Rename](wip-a00330-set-rename.md) · [Token tab](wip-a00330-token-tab.md)(Rename 하위 탭, 칸 수 자유 Custom/Numbering + Profile, 마야는 `01_a` 를 `_a` 로, 칸 폭 80px, v01.08)
 - A00340 — [SelectionTool](wip-a00340-selectiontool.md) · [button colors](wip-a00340-button-colors.md) · [split layout](wip-a00340-split-layout.md)
 - A00350 — [ArrayCreator](wip-a00350-arraycreator.md) · A00360 — [SortTool](wip-a00360-sorttool.md) · A00370 — [ToolLauncher](wip-a00370-toollauncher.md)
-- A00380 — [MeshTool Peak](wip-a00380-meshtool-peak.md) · [Match tab](wip-a00380-match-tab.md)
+- A00380 — [MeshTool Peak](wip-a00380-meshtool-peak.md) · [Match tab](wip-a00380-match-tab.md) · [Match > By Weight](wip-a00380-match-by-weight.md)(스킨 웨이트 마스크, joint k -> mesh k, v01.09)
 - A00390 — [WindTool](wip-a00390-windtool.md) · [Chain Wave](wip-a00390-chain-wave.md) · [V02 axis & driver](wip-a00390-v02-axis-driver.md) · [V02 Envelope](wip-a00390-v02-envelope.md) · [Lite debug curve](wip-a00390-lite-debug-curve.md)(v02.03)
 - A00400 — [CurveTool](wip-a00400-curvetool.md) · [Smooth](wip-a00400-smooth-tab.md)(닫힌 커브 우회, v01.09) · [Points to Curve](wip-a00400-points-to-curve.md) · [Wrap](wip-a00400-curve-wrap.md) · [Joints](wip-a00400-curve-joints.md)(v01.14 NURBS 서피스 U/V 한 줄) · [Controls](wip-a00400-controls-tab.md)(bs_controls 이식, v01.15) · Combine(v01.11, 쉐입 복사 합치기 — [instance trap](parent-shape-add-is-instance.md))
 - A00410 — [SecondaryMotion](wip-a00410-secondarymotion.md)(FK 관성 굽기, v01.08) · A00420 — [Wrapper](wip-a00420-wrapper.md) · A00430 — [DemBone](wip-a00430-dembone.md)
