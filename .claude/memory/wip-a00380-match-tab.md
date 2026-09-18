@@ -11,6 +11,13 @@ metadata:
 A00380_MeshTool v01.00→**01.03** — **Match 탭**(v01.01) + **Auto-load 편집 원상복구 버그 수정**(v01.02)
 + **Match 흐름 단순화**(v01.03). **DONE (코어 headless 통과 + Maya 실기 확인 + pushed).**
 
+**★ v01.10 (2026-09-18) — Default 는 좌(Source) / 우(Targets) TSL 로 바뀌었다. 아래 v01.03 의
+"From 1개 + 현재 씬 선택" 흐름은 더 이상 UI 에 없다**(코어 `MatchSession.from_selection` 은 남아 있음).
+UI 는 `MatchSession.from_pairs(pairs)` + 순수 함수 `pair_meshes(sources, targets)`:
+좌 1개 = `1<=n`, 아니면 k 번째끼리 min(a,b) 개, 남는 쪽은 로그. **리스트가 바뀌면 미리보기 세션을
+discard + None** — 안 하면 `on_match_apply` 의 `self.match_session or self._match_build()` 가 옛 짝으로
+확정한다(테스트에서 실제로 걸렸다). TSL `show_order=False` 로 폭 291→238px(메시 오브젝트는 고른 순서 유지).
+
 **v01.03 흐름 단순화**: 사용자 요청 — "Load Target Selection 없이 메시만 선택하고 Apply Match" 하면 되게.
 Target 박스(lb_match_target/btn_match_load/btn_match_clear) 제거. Apply(또는 Weight 슬라이더 sliderPressed)
 시점에 `_match_build()` 가 **현재 씬 선택**으로 세션을 즉석 생성. **백그라운드 scriptJob 없음** → v01.02

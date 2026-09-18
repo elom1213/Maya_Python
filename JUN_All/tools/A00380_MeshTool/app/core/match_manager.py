@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-23
+# last Update date : 2026-09-18
 # A00380_MeshTool - Match(From 메시 버텍스 위치로 스냅) 코어 로직
+#
+# v01.10~ Default 탭은 `MatchSession.from_pairs` 를 쓴다 — 좌(source) / 우(target) 리스트를
+# 짝지어 target 메시 전체를 source 모양으로. 옛 `from_selection`(From 1개 + 씬 선택)은 남겨 둔다.
 #
 # Kangaroo 의 Geometry > Match 기능을 Kangaroo 없이 재현한다.
 # 리스트업한 From 메시의 "같은 인덱스" 버텍스 위치로, 현재 선택한 메시의 버텍스를
@@ -34,6 +37,31 @@ from .peak_manager import (
     _contiguous_runs,
     _shape_of,
 )
+
+
+# =========================
+# 짝짓기 (마야 비의존)
+# =========================
+
+MODE_ONE_TO_MANY = "1<=n"
+MODE_PAIRWISE = "n<=n"
+
+
+def pair_meshes(sources, targets):
+    """좌(source) / 우(target) 리스트를 짝짓는다.
+
+    - source 가 **1개**면 1 <= n : 모든 target 이 그 하나의 모양이 된다.
+    - 아니면 n <= n : 리스트 순서대로 k 번째끼리. 개수가 다르면 **작은 쪽 수만큼**만 짝짓고
+      남는 쪽은 unmatched 로 돌려준다(호출부가 로그에 적는다).
+
+    반환: (mode, [(source, target), ...], 남은 source 들, 남은 target 들)
+    """
+    sources, targets = list(sources), list(targets)
+    if len(sources) == 1:
+        return MODE_ONE_TO_MANY, [(sources[0], t) for t in targets], [], []
+    count = min(len(sources), len(targets))
+    return (MODE_PAIRWISE, list(zip(sources[:count], targets[:count])),
+            sources[count:], targets[count:])
 
 
 # =========================
@@ -235,6 +263,57 @@ class MatchSession(object):
             return None
 
         return cls(targets, from_name, world, from_count, mismatch)
+
+    @classmethod
+    def from_pairs(cls, pairs, world=True, soft_select=True):
+        """[(source, target), ...] 짝마다 target 메시 **전체**를 source 모양으로 (v01.10~).
+
+        Default 탭의 좌/우 리스트가 만든 짝을 받는다(1 <= n 이면 source 가 전부 같다).
+        soft_select 가 켜져 있고 target 의 버텍스를 소프트 셀렉션으로 골라 두었으면 그
+        버텍스만 falloff 대로 움직인다(없으면 메시 전체).
+
+        반환: (세션 또는 None, 건너뛴 짝 [(source, target, 이유), ...])
+        """
+
+        points = {}          # source shape -> getPoints (같은 source 는 한 번만 읽는다)
+        targets, mismatch, skipped = [], [], []
+        space = om.MSpace.kWorld if world else om.MSpace.kObject
+
+        for src, tgt in pairs:
+            src_shape = _shape_of(src) if cmds.objExists(src) else None
+            tgt_shape = _shape_of(tgt) if cmds.objExists(tgt) else None
+            if not src_shape:
+                skipped.append((src, tgt, "source is not a mesh"))
+                continue
+            if not tgt_shape:
+                skipped.append((src, tgt, "target is not a mesh"))
+                continue
+            if src_shape == tgt_shape:
+                skipped.append((src, tgt, "same mesh on both sides"))
+                continue
+
+            if src_shape not in points:
+                points[src_shape] = om.MFnMesh(_dag_path(src_shape)).getPoints(space)
+            src_points = points[src_shape]
+
+            t = MatchTarget(tgt_shape, src_points, world=world, soft_select=soft_select)
+            # 로그용 이름은 셰이프가 아니라 리스트에 보이는 트랜스폼 이름.
+            t.from_name = src.split("|")[-1]
+            t.target_name = tgt.split("|")[-1]
+            if not t.ids:
+                skipped.append((src, tgt, "no vertex to move"))
+                continue
+            targets.append(t)
+            if t.fn.numVertices != len(src_points):
+                mismatch.append((t.target_name, t.fn.numVertices,
+                                 t.from_name, len(src_points)))
+
+        if not targets:
+            return None, skipped
+
+        names = sorted(set(t.from_name for t in targets))
+        session = cls(targets, ", ".join(names), world, None, mismatch)
+        return session, skipped
 
     # ---- 정보 -------------------------------------------------------
 

@@ -6,8 +6,8 @@
 # Peak 탭: 선택한 메시/버텍스를 자기 노말 방향으로 팽창(+)·수축(-) 시킨다.
 # 후디니 peak 노드와 같은 개념이고, 마야 기본(Move 툴 axis=normal)보다 훨씬 빠르다.
 #
-# Match 탭: 리스트업한 From 메시의 같은 인덱스 버텍스 위치로, 선택한 메시의 버텍스를
-# 이동시킨다(소프트 셀렉션 falloff 반영). Kangaroo Geometry>Match 를 Kangaroo 없이 재현.
+# Match 탭: 좌측 Source 메시의 같은 인덱스 버텍스 위치로, 우측 Target 메시들을 이동시킨다
+# (v01.10~ 좌/우 리스트. 좌 1개 = 1 <= n, 여러 개 = n <= n). Kangaroo Geometry>Match 재현.
 # v01.09~ 하위 탭 Default(위 기능) / By Weight(스킨 웨이트를 마스크로 타깃 쪽으로 이동).
 #
 # 흐름: Load 로 스냅샷 → 슬라이더를 끌면 실시간 미리보기(API 직접 쓰기) → 손을 떼는 순간
@@ -282,7 +282,8 @@ class MainWindow(QWidget):
         self.match_tabs = QTabWidget()
         self.match_tabs.addTab(self.build_match_default_page(), "Default")
         self.match_tabs.setTabToolTip(
-            0, "Snap the selected mesh onto a From mesh's same-index vertices.")
+            0, "Reshape the right-hand meshes into the left-hand mesh(es),\n"
+               "vertex index to vertex index (1 <= n, or pair by pair).")
         # By Weight 는 목록이 셋이라 키가 크다. 스크롤에 담아 창 최소 크기를 늘리지 않는다
         # (그대로 넣으면 창 최소가 435x615 -> 660x1002 로 커졌다, 테마 적용 실측).
         scroll = QScrollArea()
@@ -304,31 +305,45 @@ class MainWindow(QWidget):
         page = QWidget()
         lay = QVBoxLayout(page)
 
-        # ---- From 메시 (버텍스 인덱스 대응 원본) --------------------
-        box_from = QGroupBox("From Mesh  (vertex-index match)")
-        vf = QVBoxLayout(box_from)
+        # ---- 좌(Source) / 우(Targets) 리스트 (v01.10~) ----------------
+        # 예전에는 From 한 칸 + 씬 선택이었다. 이제 좌측 메시 모양으로 **우측 메시들을** 바꾼다.
+        #   좌 1개      -> 1 <= n : 우측 전부가 그 하나의 모양이 된다
+        #   좌 여러 개  -> n <= n : 리스트 순서대로 k 번째끼리. 남는 쪽은 로그에 적는다
+        box_lists = QGroupBox("Meshes  (vertex-index match)")
+        hl = QHBoxLayout(box_lists)
+        hl.setContentsMargins(4, 4, 4, 4)
         self.tsl_from = JUN_mod_tsl_qt_v01(
-            title="From",
-            show_up=False, show_down=False, show_sort=False,
-            multi_select=False,
-            select_label="List From Mesh",
-            list_min_height=44,
-            log_callback=self.log)
+            title="Source",
+            show_sort=False, show_order=False, select_label="List Selected",
+            list_min_height=80, log_callback=self.log)
+        self.tsl_from.setToolTip(
+            "The shape(s) to match TO.  One mesh here = every mesh on the right\n"
+            "takes its shape.  Several = the k-th right mesh takes the k-th shape.")
+        self.tsl_match_targets = JUN_mod_tsl_qt_v01(
+            title="Targets", show_sort=False, show_order=False, select_label="List Selected",
+            list_min_height=80, log_callback=self.log)
+        self.tsl_match_targets.setToolTip(
+            "The meshes that get modified.  Order matters when the left list has\n"
+            "more than one mesh - use Up / Down to line the pairs up.")
+        for tsl in (self.tsl_from, self.tsl_match_targets):
+            model = tsl.list_widget.model()
+            for sig in (model.rowsInserted, model.rowsRemoved, model.rowsMoved,
+                        model.modelReset, model.layoutChanged):
+                sig.connect(lambda *_a: self.update_match_pairs())
+            hl.addWidget(tsl, 1)
+        lay.addWidget(box_lists, 1)
 
-        # From 은 메시 **한 개**만 담으므로 리스트를 짧게 두고 싶다. 다만 위젯 전체에
-        # setMaximumHeight 를 걸면 안 된다 — 리스트의 최소 높이(100)는 줄지 않으므로 레이아웃이
-        # 모자란 높이를 **버튼에서 빼앗아** 'List From Mesh' / Add / Del 이 필요한 30px 대신
-        # 25px 로 눌리고 글자가 잘린다(실측). 높이 제한은 **리스트에만** 건다.
-        self.tsl_from.list_widget.setMaximumHeight(70)
-        vf.addWidget(self.tsl_from)
-        lay.addWidget(box_from)
-
-        # 대상은 따로 로드하지 않는다 — 씬에서 메시/버텍스를 선택한 뒤 곧바로 Apply Match.
-        lb_hint = QLabel("Select the mesh / vertices to move, then Apply "
-                         "(or drag Weight to preview).")
-        lb_hint.setWordWrap(True)
-        lb_hint.setStyleSheet("color:#9aa0a6;")
-        lay.addWidget(lb_hint)
+        # ---- 짝 미리보기 --------------------------------------------
+        self.lb_match_mode = QLabel()
+        self.lb_match_mode.setWordWrap(True)
+        lay.addWidget(self.lb_match_mode)
+        self.tw_match_pairs = QTreeWidget()
+        self.tw_match_pairs.setHeaderLabels(["Source", "Target (modified)"])
+        self.tw_match_pairs.setRootIsDecorated(False)
+        self.tw_match_pairs.setMinimumHeight(60)
+        self.tw_match_pairs.setToolTip("What Apply will do. Grey rows have no partner "
+                                       "and are skipped.")
+        lay.addWidget(self.tw_match_pairs)
 
         # ---- 옵션 -------------------------------------------------
         box_opt = QGroupBox("Options")
@@ -344,8 +359,8 @@ class MainWindow(QWidget):
         self.chk_match_soft = QCheckBox("Respect soft selection")
         self.chk_match_soft.setChecked(True)
         self.chk_match_soft.setToolTip(
-            "Use Maya's soft selection falloff as a per-vertex blend multiplier\n"
-            "(only when soft select is enabled).")
+            "When soft select is on and you have vertices of a Target mesh selected,\n"
+            "only those move, by the falloff. Otherwise the whole Target mesh moves.")
         vo.addWidget(self.chk_match_soft)
         lay.addWidget(box_opt)
 
@@ -392,8 +407,8 @@ class MainWindow(QWidget):
         row_apply.addWidget(self.btn_match_reset, 1)
 
         lay.addLayout(row_apply)
-        lay.addStretch(1)
 
+        self.update_match_pairs()
         return page
 
     # --------------------------------------------------------------
@@ -793,55 +808,108 @@ class MainWindow(QWidget):
 
         self.match_preview()
 
-    def _match_build(self):
-        """From(TSL 첫 항목) + '현재 선택' 으로 세션을 새로 만든다. 실패 시 None.
+    @staticmethod
+    def _short(node):
+        return node.split("|")[-1]
 
-        대상을 따로 로드하지 않는다 — 이 함수가 불릴 때(슬라이더 잡기/스핀 입력/Apply)의
-        씬 선택을 그대로 대상으로 삼는다. 만들기 전에 이전 미리보기는 되돌린다(dirty 가드).
+    def _match_pairing(self):
+        """좌/우 리스트로 짝을 짓는다 -> match_mgr.pair_meshes 의 결과 그대로."""
+        return match_mgr.pair_meshes(self.tsl_from.get_all_nodes(),
+                                     self.tsl_match_targets.get_all_nodes())
+
+    def update_match_pairs(self):
+        """짝 미리보기 표 + 모드 줄을 지금 리스트에 맞춘다."""
+        if not hasattr(self, "tw_match_pairs"):
+            return
+        # 리스트가 바뀌면 미리보기 세션은 옛 짝의 것이다 - 되돌리고 버린다. 안 버리면
+        # Apply 가 그 세션을 재사용해 **지금 리스트와 다른 짝**으로 확정한다(실측).
+        self.discard_match_preview()
+        self.match_session = None
+        sources = self.tsl_from.get_all_nodes()
+        targets = self.tsl_match_targets.get_all_nodes()
+        mode, pairs, extra_src, extra_tgt = self._match_pairing()
+
+        self.tw_match_pairs.clear()
+        for src, tgt in pairs:
+            self.tw_match_pairs.addTopLevelItem(
+                QTreeWidgetItem([self._short(src), self._short(tgt)]))
+        grey = QBrush(QColor("#808080"))
+        for src in extra_src:
+            item = QTreeWidgetItem([self._short(src), "(no target - skipped)"])
+            for col in range(2):
+                item.setForeground(col, grey)
+            self.tw_match_pairs.addTopLevelItem(item)
+        for tgt in extra_tgt:
+            item = QTreeWidgetItem(["(no source - skipped)", self._short(tgt)])
+            for col in range(2):
+                item.setForeground(col, grey)
+            self.tw_match_pairs.addTopLevelItem(item)
+
+        if not sources or not targets:
+            text = "List Source mesh(es) on the left and Target mesh(es) on the right."
+        elif mode == match_mgr.MODE_ONE_TO_MANY:
+            text = "1 <= {0} : every Target takes the Source's shape.".format(len(targets))
+        else:
+            text = "{0} <= {0} : k-th Target takes the k-th Source's shape.".format(len(pairs))
+            if extra_src or extra_tgt:
+                text += "  ({0} left unmatched)".format(len(extra_src) + len(extra_tgt))
+        self.lb_match_mode.setText(text)
+
+    def _match_build(self):
+        """좌/우 리스트의 짝으로 세션을 새로 만든다. 실패 시 None (v01.10~).
+
+        좌 1개 = 1 <= n, 여러 개 = n <= n(작은 쪽 수만큼). 짝이 없어 남은 메시는 로그에 적는다.
+        만들기 전에 이전 미리보기는 되돌린다(dirty 가드).
         """
 
         self.discard_match_preview()
+        self.match_session = None
 
-        nodes = self.tsl_from.get_all_nodes()
-        if not nodes:
-            self.match_session = None
-            self.log("List a From mesh first (select it, then 'List From Mesh').",
-                     warn=True)
+        sources = self.tsl_from.get_all_nodes()
+        targets = self.tsl_match_targets.get_all_nodes()
+        if not sources or not targets:
+            self.log("List Source mesh(es) on the left and Target mesh(es) on the right "
+                     "(select them, then 'List Selected').", warn=True)
             return None
-        if len(nodes) > 1:
-            self.log("Multiple From meshes listed; using the first ({0}).".format(
-                nodes[0].split("|")[-1]), warn=True)
-        from_node = nodes[0]
+
+        mode, pairs, extra_src, extra_tgt = self._match_pairing()
+        if mode == match_mgr.MODE_PAIRWISE and (extra_src or extra_tgt):
+            self.log("Source {0} / Target {1} - matching the first {2} pair(s) only."
+                     .format(len(sources), len(targets), len(pairs)), warn=True)
+            for src in extra_src:
+                self.log("  Unmatched Source '{0}' (#{1}): no Target at that position - "
+                         "skipped.".format(self._short(src), sources.index(src) + 1),
+                         warn=True)
+            for tgt in extra_tgt:
+                self.log("  Unmatched Target '{0}' (#{1}): no Source at that position - "
+                         "left unchanged.".format(self._short(tgt), targets.index(tgt) + 1),
+                         warn=True)
 
         try:
-            session = match_mgr.MatchSession.from_selection(
-                from_node,
+            session, skipped = match_mgr.MatchSession.from_pairs(
+                pairs,
                 world=self.chk_match_world.isChecked(),
                 soft_select=self.chk_match_soft.isChecked())
-        except ValueError as e:
-            self.match_session = None
-            self.log(str(e), warn=True)
-            return None
         except Exception as e:
-            self.match_session = None
             self.log("Match build failed: {0}".format(e), warn=True)
             return None
 
+        for src, tgt, why in skipped:
+            self.log("  Skipped '{0}' <= '{1}': {2}.".format(
+                self._short(tgt), self._short(src), why), warn=True)
+
         self.match_session = session
         self._match_preview_dirty = False
-
         if session is None:
-            self.log("Select the target mesh / vertices (not the From mesh), "
-                     "then Apply.", warn=True)
+            self.log("Nothing to match.", warn=True)
             return None
 
-        if session.mismatch:
-            detail = ", ".join("{0}={1}v".format(n, c) for n, c in session.mismatch)
-            self.log("Warning: vertex count differs from From ({0}v): {1}. "
-                     "Matching is index-based; only overlapping indices move."
-                     .format(session.from_count, detail), warn=True)
+        for name, count, src_name, src_count in session.mismatch:
+            self.log("Warning: '{0}' has {1}v but '{2}' has {3}v. Matching is "
+                     "index-based; only overlapping indices move.".format(
+                         name, count, src_name, src_count), warn=True)
         if session.skipped_count:
-            self.log("{0} selected vertice(s) have no matching index on From "
+            self.log("{0} vertice(s) have no matching index on their Source "
                      "and were skipped.".format(session.skipped_count), warn=True)
 
         return session
@@ -915,9 +983,9 @@ class MainWindow(QWidget):
         self._match_preview_dirty = False
 
     def on_match_apply(self):
-        """현재 선택한 메시/버텍스를 From 에 매칭해 확정한다(Ctrl+Z 한 번).
+        """우측 Target 메시들을 좌측 Source 모양으로 확정한다(Ctrl+Z 한 번).
 
-        따로 로드할 필요 없다 — 미리보기 중이면 그 세션을, 아니면 지금 선택으로 만든다.
+        미리보기 중이면 그 세션을, 아니면 지금 리스트로 만든다.
         """
 
         weight = self.match_weight()
@@ -936,8 +1004,10 @@ class MainWindow(QWidget):
             self.log("Match apply failed: {0}".format(e), warn=True)
             return
 
-        self.log("Matched {0} vertice(s) to {1} at weight {2:.3f}.".format(
-            moved, session.from_name, weight), ok=True)
+        self.log("Matched {0} mesh(es), {1} vertice(s) at weight {2:.3f}.".format(
+            session.mesh_count, moved, weight), ok=True)
+        for t in session.targets:
+            self.log("  {0} <= {1}".format(t.target_name, t.from_name))
 
         # 확정 후에는 원본이 이미 이동했으므로 세션을 비운다(다음 Apply 는 새 선택으로).
         self._match_preview_dirty = False
@@ -1188,9 +1258,10 @@ class MainWindow(QWidget):
             "Mesh Tool\nv{0}  ({1})\n\n"
             "Peak: inflate / shrink a mesh along its vertex normals,\n"
             "like Houdini's peak node.\n\n"
-            "Match: snap the selected mesh's vertices onto a From mesh's\n"
-            "same-index vertices (soft-selection falloff aware) - a\n"
-            "standalone take on Kangaroo's Geometry > Match.\n"
+            "Match: reshape the Target meshes (right list) into the Source\n"
+            "mesh(es) (left list), same vertex index - one Source shapes every\n"
+            "Target, several are paired in list order. A standalone take on\n"
+            "Kangaroo's Geometry > Match.\n"
             "Match > By Weight: move meshes toward a target by a skinned\n"
             "mesh's joint weights (like a blend shape weight map).\n\n"
             "Peak has no Apply button: dragging the slider applies the\n"

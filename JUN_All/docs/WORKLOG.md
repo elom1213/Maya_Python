@@ -31,6 +31,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-18 (오늘)
 
+> [!summary] A00380 Match > Default 를 **좌(Source) / 우(Targets) 리스트**로(v01.10) — 우측 메시들을 좌측 모양으로, 좌 1개 = `1 <= n`, 여러 개 = `n <= n`
+- 개수가 다르면 작은 쪽 수만큼 짝짓고 남는 메시는 로그에 이름 · 순번으로. 짝 미리보기 표 + 모드 줄. 코어 `match_manager.pair_meshes` / `MatchSession.from_pairs`(같은 Source 는 한 번만 읽음).
+- 테스트에서 잡은 것: 리스트를 바꿔도 **옛 미리보기 세션으로 Apply 가 확정**됐다 → 리스트가 바뀌면 되돌리고 버린다. 로그 이름은 셰이프가 아니라 트랜스폼으로.
+- 창 최소 435x651 → 540x732(좌우 TSL). TSL `Order` 체크박스를 빼서 한 쪽 291 → 238px — 메시 오브젝트는 고른 순서가 원래 유지된다.
+- mayapy 2024 + 오프스크린 12항목 통과. 마야 GUI 에서는 아직 안 눌러 봄. #A00380
+
 > [!summary] A00290_V02 **`Target > Delete`** — 체크한 타겟을 blendShape 노드에서 지우기(v02.03). `Target` 하위 탭 = `Naming` · `Delete` · `Target Order` (처음엔 `Edit` 아래 두 겹으로 묶었다가 요청대로 한 겹으로)
 - 노드 지정 → 타겟 체크 목록 → `DELETE CHECKED TARGETS`(확인 대화상자). 공용 `JUN_mod_checkList_qt` + Filter, 필터에 가려진 체크는 안 지운다.
 - 삭제는 마야 Shape Editor 와 같은 MEL `blendShapeDeleteTargetGroup` — `inputTargetGroup` 통째 삭제는 undo 로 델타가 안 돌아오는데, 이 MEL 은 잎부터 지워 Ctrl+Z 한 번에 델타 · 인비트윈까지 복원(실측). lock 된 weight 는 회색으로 잠금.
