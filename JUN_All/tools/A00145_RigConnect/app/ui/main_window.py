@@ -20,6 +20,7 @@ from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_filter_qt
+from Framework.qt import JUN_mod_checkList_qt
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -1443,9 +1444,14 @@ class MainWindow(QWidget):
         self.lw_aedit_attrs.setMinimumHeight(170)
         self.lw_aedit_attrs.setToolTip(
             "Check the attributes to work on.\n"
+            "Shift / Ctrl click to select several rows - clicking the check box of a\n"
+            "selected row (or Space) checks or unchecks every selected row.\n"
             "Hover a row to see which objects carry it.\n"
             "Rows that cannot be reordered (built-ins) are shown in grey.")
         self.lw_aedit_attrs.itemChanged.connect(self._update_attr_preview)
+        # v01.49 : Shift/Ctrl 다중 선택 + 고른 행 한꺼번에 체크 (Framework 공용 동작).
+        self.chk_aedit_attrs = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(
+            self.lw_aedit_attrs)
         right.addWidget(self.lw_aedit_attrs, 1)
 
         # 기본값 ON : 리깅에서 다루는 것은 거의 항상 사용자 정의 어트리뷰트다.

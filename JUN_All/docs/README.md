@@ -50,6 +50,7 @@
 |------|------|------|
 | `Framework/qt/MOD_tsl_qt_v01.py` | 공용 리스트(TSL) 위젯 — Select/Add/Del/Up/Down/Sort, **Order(선택 순서 유지)**, UUID 보관, **요약 모드(`list_limit`)** | [Framework_MOD_tsl_qt](Framework_MOD_tsl_qt.md) |
 | `Framework/qt/MOD_filter_qt_v01.py` | 공용 **검색/필터** 위젯 — 입력 즉시 일치 항목만 표시, "보이는 것이 작업 대상" 헬퍼 | [Framework_MOD_filter_qt](Framework_MOD_filter_qt.md) |
+| `Framework/qt/MOD_checkList_qt_v01.py` | 체크박스 `QListWidget` 에 붙이는 **다중 선택 + 다중 체크** 동작 — Shift/Ctrl 로 고른 행을 체크박스 한 번(또는 Space)으로 함께 켜고 끈다 | [Framework_MOD_checkList_qt](Framework_MOD_checkList_qt.md) |
 | `Framework/qt/MOD_expand_qt_v01.py` | 공용 **Expand(별도 창)** 패널 — 본문을 독립 창으로 빼고 되돌린다. **복제가 아니라 이동**이라 값이 어긋날 여지가 없다 | [Framework_MOD_expand_qt](Framework_MOD_expand_qt.md) |
 | `Framework/qt/MOD_progress_qt_v01.py` | 공용 **진행률 팝업** — 오래 걸리는 작업의 0~100% 게이지 모달 창. 단계 가중치 자동 재정규화, core 는 `progress(done, total)` 콜백만 안다 | [Framework_MOD_progress_qt](Framework_MOD_progress_qt.md) |
 | `Framework/qt/MOD_falloffCurve_qt_v01.py` | 공용 **falloff 커브 편집기** — 캔버스 / +Interpolation·Presets 패널 / 비모달 팝업. 모델은 `Framework/core/falloff_curve.py`(Qt·maya 비의존) | [Framework_MOD_falloffCurve_qt](Framework_MOD_falloffCurve_qt.md) |

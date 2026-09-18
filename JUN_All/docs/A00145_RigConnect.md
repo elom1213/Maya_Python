@@ -4,7 +4,9 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.48` (`app/config/version.py`) — Attribute > Create 의 `Add` / `Edit` 로 **`enum`** · **`string`**
+- 버전: `v01.49` (`app/config/version.py`) — Attribute > Edit 목록에서 **Shift / Ctrl 로 여러 행을 골라
+  한 번에 체크**한다 (§Attribute > Edit)
+  · v01.48 은 Attribute > Create 의 `Add` / `Edit` 로 **`enum`** · **`string`**
   어트리뷰트도 정의해 만든다 (§Attribute > Create)
   · v01.47 은 Constrain > Constraint 의 종류가 **체크박스**:
   `Parent` + `Scale`, `Point` · `Orient` · `Scale` 중 2~3개를 **한 번에** 건다. 같은 채널을 구동하는 종류는
@@ -941,6 +943,10 @@ Destination : ab      (Null)   abcd            Destination : ab      abcd
 **고르는 방법 — 선택이 아니라 체크박스**
 - 예전 `Copy`/`Delete` 는 **하이라이트 선택**으로 골랐다. 이제는 **체크박스**다. 필터를 바꿔도
   체크는 남으므로 `arm` 으로 걸러 두 개, `leg` 로 걸러 세 개를 **여러 번에 걸쳐 모을 수 있다.**
+- **여러 행을 한 번에 체크 (v01.49)** — `Shift` / `Ctrl` 클릭으로 여러 행을 고른 뒤, 고른 행 중 **하나의
+  체크박스를 누르면 고른 행 전부**가 같은 상태가 된다(`Space` 도 같다). 고른 것은 그대로 남아 몇 번이고
+  켜고 끌 수 있다. 고르지 않은 행의 체크박스는 그 행 하나만 바꾼다. 필터에 가려진 행은 고른 범위 안에
+  있어도 **바꾸지 않는다**. 동작은 Framework 공용 [`MOD_checkList_qt`](Framework_MOD_checkList_qt.md).
 - `Check All` 은 **지금 보이는 행만** 켠다. `Clear Checks` 는 **가려진 것까지 전부** 끈다
   (안 보이는 곳에 체크가 남아 있는 것이 사고의 씨앗이라 끄는 쪽은 넓게 잡는다).
 - **`Include attributes hidden by the filter`**(기본 **OFF**): 체크는 됐지만 필터에 가려진 것을
