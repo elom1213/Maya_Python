@@ -19,7 +19,7 @@ V02 에서는 이 표로 옮겨 읽는다.
 | Shape Editor | **Shape > Shape Editor** |
 | Base Shape | **Shape > Base Shape** |
 | Mix Targets | **Shape > Mix Targets** |
-| Edit BS > Naming | **Target > Edit > Naming** (v02.03 에 `Target > Naming` → `Edit` 안으로) |
+| Edit BS > Naming | **Target > Naming** |
 | Target Order | **Target > Target Order** |
 | **Edit BS > Default** | **Node > Extract** ← 이름이 바뀐 유일한 곳 |
 | Bake Delete | **Node > Bake Delete** |
@@ -54,12 +54,13 @@ V02 에서는 이 표로 옮겨 읽는다.
 셸프 라벨 `BSToolV2`, 드롭 파일 `__dragDrop_A00290_V02.py`.
 
 검증 25항목(mayapy + 오프스크린 Qt, 테마 적용) 통과. **마야 GUI 육안 확인은 아직.**
-**v02.03 — `Target > Edit > Delete`** (2026-09-18): 체크한 타겟을 노드에서 지운다
+**v02.03 — `Target > Delete`** (2026-09-18): 체크한 타겟을 노드에서 지운다
 (`app/core/delete_target_manager.py`). **직접 `removeMultiInstance` 하지 말고 MEL
 `blendShapeDeleteTargetGroup(bs, idx)` 를 부른다** — 마야 Shape Editor 의 Delete 그 자체이고,
 잎(`inputTargetItem` · `targetWeights`)부터 지워서 **undo 로 델타 · 인비트윈이 돌아온다**(mayapy 실측).
 lock 된 weight 는 그 MEL 이 경고만 하고 0 을 돌려주므로 UI 에서 회색으로 잠갔다.
-하위 탭 안의 하위 탭은 `_build_sub_tabs` 가 `QTabWidget` 페이지를 스크롤로 한 번 더 싸지 않게 했다.
+처음엔 `Target > Edit` 아래 `Naming` / `Delete` 두 겹으로 묶었는데, 사용자가 **3단 탭을 싫어해**
+`Target` 바로 밑 한 겹(`Naming` · `Delete` · `Target Order`)으로 되돌렸다 — 탭은 2단까지만.
 
 관련: [[wip-a00290-shape-editor-tab]], [[wip-a00290-naming-tab]], [[wip-a00290-target-order-tab]],
 [[wip-a00290-mix-targets-tab]], [[wip-a00290-bake-delete-tab]]

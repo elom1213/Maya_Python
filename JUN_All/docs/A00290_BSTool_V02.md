@@ -39,7 +39,7 @@ V01 은 상위 탭이 **6개인데 한 줄에 안 들어갔다.** 실측으로 �
 | 상위 탭 | 뜻 | 하위 탭 |
 |---|---|---|
 | **Shape** | 타겟의 **모양(델타)** 이 바뀐다 — 끝나면 버텍스가 움직여 있다 | `Shape Editor` · `Base Shape` · `Mix Targets` |
-| **Target** | **버텍스를 하나도 안 움직인다** — 바뀌는 것은 이름과 인덱스뿐 | `Edit`(`Naming` · `Delete`) · `Target Order` |
+| **Target** | **버텍스를 하나도 안 움직인다** — 바뀌는 것은 이름과 인덱스뿐 | `Naming` · `Delete` · `Target Order` |
 | **Node** | 타겟 하나를 고르지 않는다 — **노드/리그를 통째로** 다룬다 | `Extract` · `Bake Delete` |
 
 **툴을 켜면 `Shape > Shape Editor` 가 열린다** — V01 에서 처음 보이던 화면과 같다.
@@ -165,10 +165,9 @@ A00290_BSTool_V02/
 
 ---
 
-## 7. `Target > Edit` — Naming 과 Delete (v02.03)
+## 7. `Target > Delete` (v02.03)
 
-`Target > Naming` 이 **`Target > Edit`** 가 됐고, 그 안에 하위 탭이 둘이다.
-`Naming` 은 전과 똑같다. 표는 `MainWindow.EDIT_PAGES`.
+`Target` 하위 탭은 `Naming` · **`Delete`** · `Target Order` 다(표는 `MainWindow.TARGET_PAGES`).
 
 ### 7-1. Delete — 체크한 타겟을 노드에서 지운다
 
@@ -203,8 +202,7 @@ Filter [            ]
 
 - 코어: 타겟 4개(인비트윈 포함) 중 2개 삭제 · lock 1개 거절 · 없는 이름 건너뜀 → undo 로 **델타와 인비트윈까지**
   복원(0.5 / 1.5 / 2.5 그대로) → redo 로 다시 삭제.
-- UI 13항목: `Target` 하위 탭이 `Edit` · `Target Order` · `Edit` 안이 `Naming` · `Delete` · Edit 페이지가 스크롤
-  두 겹이 아님 · `<- Set` 으로 5개 · lock 행 회색 · 체크 없으면 버튼 꺼짐 · Check All 이 lock 을 건너뜀 · 필터에
+- UI 12항목: `Target` 하위 탭이 `Naming` · `Delete` · `Target Order` · 각 페이지가 스크롤 안 · `<- Set` 으로 5개 · lock 행 회색 · 체크 없으면 버튼 꺼짐 · Check All 이 lock 을 건너뜀 · 필터에
   가려진 체크 2개는 제외 · 삭제 후 목록 · undo 로 5개와 델타 복원.
 - 창 최소 크기 586 x 321(기본 620 x 1000 안) — **가로 스크롤 없음**. Delete 페이지 최소 300 x 518.
 

@@ -2,8 +2,8 @@
 
 ## v02.03 (2026-09-18)
 
-- **[Change] `Target > Naming` 탭 이름을 `Target > Edit` 로.** 그 안에 하위 탭 `Naming`(기존 그대로) · `Delete`.
-- **[Add] `Target > Edit > Delete` — 체크한 타겟들을 blendShape 노드에서 지운다.**
+- **[Add] `Target > Delete` — 체크한 타겟들을 blendShape 노드에서 지운다.** `Target` 하위 탭은
+  `Naming` · `Delete` · `Target Order` (한때 `Edit` 아래 두 겹으로 묶었다가 한 겹으로 되돌렸다).
   노드 지정(`<- Set`, 노드나 메시 선택) → 타겟이 체크 목록으로 뜬다 → 체크 → `DELETE CHECKED TARGETS`(확인 대화상자).
   - 지우는 방법은 마야 Shape Editor 의 Delete 와 같은 MEL `blendShapeDeleteTargetGroup` — weight · 델타 ·
     인비트윈 · 별칭까지 정리하고 **Ctrl+Z 한 번**에 전부 돌아온다(`inputTargetGroup` 을 통째로 지우면 undo 로 델타가

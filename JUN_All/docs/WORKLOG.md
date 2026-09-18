@@ -31,10 +31,10 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-18 (오늘)
 
-> [!summary] A00290_V02 `Target > Naming` → **`Target > Edit`**(하위 탭 `Naming` · `Delete`) — 체크한 타겟을 blendShape 노드에서 지우기(v02.03)
+> [!summary] A00290_V02 **`Target > Delete`** — 체크한 타겟을 blendShape 노드에서 지우기(v02.03). `Target` 하위 탭 = `Naming` · `Delete` · `Target Order` (처음엔 `Edit` 아래 두 겹으로 묶었다가 요청대로 한 겹으로)
 - 노드 지정 → 타겟 체크 목록 → `DELETE CHECKED TARGETS`(확인 대화상자). 공용 `JUN_mod_checkList_qt` + Filter, 필터에 가려진 체크는 안 지운다.
 - 삭제는 마야 Shape Editor 와 같은 MEL `blendShapeDeleteTargetGroup` — `inputTargetGroup` 통째 삭제는 undo 로 델타가 안 돌아오는데, 이 MEL 은 잎부터 지워 Ctrl+Z 한 번에 델타 · 인비트윈까지 복원(실측). lock 된 weight 는 회색으로 잠금.
-- mayapy 2024: 코어(삭제 · lock 거절 · undo/redo) + 오프스크린 UI 13항목 통과, 최소 창 586px 로 가로 스크롤 없음. 마야 GUI 에서는 아직 안 눌러 봄. #A00290
+- mayapy 2024: 코어(삭제 · lock 거절 · undo/redo) + 오프스크린 UI 12항목 통과, 최소 창 586px 로 가로 스크롤 없음. 마야 GUI 에서는 아직 안 눌러 봄. #A00290
 
 > [!summary] A00220 `Settings` 접이식을 **기본 접힘**으로(v01.17)
 - 시작 창 높이를 본문 높이만큼 줄여 파일 목록 크기는 그대로. 오프스크린(런치 테마) 실측: 접힘 612px → 펼침 890px(수정 전 기본과 같음) → 다시 접으면 612px. #A00220

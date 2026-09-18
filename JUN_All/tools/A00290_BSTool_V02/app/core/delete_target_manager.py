@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
 # last Update date : 2026-09-18
-# A00290_BSTool_V02 - Target > Edit > Delete 탭 핵심 로직 (maya.cmds, UI 비의존)
+# A00290_BSTool_V02 - Target > Delete 탭 핵심 로직 (maya.cmds, UI 비의존)
 #
 # 체크한 타겟들을 blendShape 노드에서 **지운다**(weight 슬롯 · 타겟 데이터 · 별칭째).
 #

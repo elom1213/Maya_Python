@@ -14,10 +14,9 @@
 #                      모양을 한꺼번에 변형(델타 가중합을 더한다)
 #
 #   [Target] 버텍스를 하나도 안 움직인다 — 바뀌는 것은 이름과 인덱스뿐이다
-#     - Edit         : 타겟 자체를 손본다 (v02.03 에 Naming -> Edit, 안에 하위 탭 둘)
-#         - Naming   : 타겟 이름(weight 별칭)을 규칙으로 한꺼번에 바꿔 놓는다
+#     - Naming       : 타겟 이름(weight 별칭)을 규칙으로 한꺼번에 바꿔 놓는다
 #                      (= FBX 의 BlendShapeChannel 이름 = 언리얼 모프 타겟 이름)
-#         - Delete   : 체크한 타겟들을 노드에서 지운다 (Shape Editor 의 Delete 와 같은 MEL)
+#     - Delete       : 체크한 타겟들을 노드에서 지운다 (Shape Editor 의 Delete 와 같은 MEL, v02.03)
 #     - Target Order : 리스트에서 순서를 바꾼 대로 노드의 타겟 순서(weight 인덱스)를
 #                      실제로 갈아 끼운다
 #
@@ -244,8 +243,7 @@ class MainWindow(QWidget):
          "Mix Targets - add a weighted mix of source targets onto other targets",
          "_build_mix_tab"),
     )
-    # Target > Edit 안의 하위 탭 (v02.03). 예전 Target > Naming 이 여기 첫 칸으로 들어왔다.
-    EDIT_PAGES = (
+    TARGET_PAGES = (
         ("Naming",
          "Naming - rename target aliases in bulk (these become the morph target "
          "names in Unreal)",
@@ -253,11 +251,6 @@ class MainWindow(QWidget):
         ("Delete",
          "Delete - remove the checked targets from the blendShape node",
          "_build_delete_tab"),
-    )
-    TARGET_PAGES = (
-        ("Edit",
-         "Edit - rename targets in bulk, or delete the checked targets from the node",
-         "_build_edit_tab"),
         ("Target Order",
          "Target Order - change the real target order (weight index) of the node",
          "_build_target_order_tab"),
@@ -505,12 +498,7 @@ class MainWindow(QWidget):
         tabs = QTabWidget()
         tabs.tabBar().setElideMode(Qt.ElideRight)   # 폭이 모자라면 라벨을 자른다
         for label, tip, builder in pages:
-            page = getattr(self, builder)()
-            # 하위 탭을 또 가진 페이지(Target > Edit)는 그 안쪽 페이지들이 이미 스크롤에
-            # 담겨 있다 - 한 번 더 감싸면 스크롤바가 두 겹이 된다.
-            if not isinstance(page, QTabWidget):
-                page = self._scrolled(page)
-            index = tabs.addTab(page, label)
+            index = tabs.addTab(self._scrolled(getattr(self, builder)()), label)
             tabs.setTabToolTip(index, tip)
         return tabs
 
@@ -1051,15 +1039,7 @@ class MainWindow(QWidget):
         return tab
 
     # ==================================================
-    # Target > Edit (v02.03) - 하위 탭 Naming / Delete
-    # ==================================================
-
-    def _build_edit_tab(self):
-        self.edit_tabs = self._build_sub_tabs(self.EDIT_PAGES)
-        return self.edit_tabs
-
-    # ==================================================
-    # Target > Edit > Naming
+    # Target > Naming
     # ==================================================
 
     def _build_naming_tab(self):
@@ -1421,7 +1401,7 @@ class MainWindow(QWidget):
         self._nm_refresh()
 
     # ==================================================
-    # Target > Edit > Delete (v02.03)
+    # Target > Delete (v02.03)
     # ==================================================
 
     def _build_delete_tab(self):
