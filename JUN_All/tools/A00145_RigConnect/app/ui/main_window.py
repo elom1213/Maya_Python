@@ -1212,11 +1212,20 @@ class MainWindow(QWidget):
 
         btn_list = QPushButton("List Attributes")
 
+        # 기본은 채널박스에 보이는 것만 — 연결 대상은 거의 다 채널박스 어트리뷰트다.
+        cb_channel_box = QCheckBox("Channel Box Only")
+        cb_channel_box.setChecked(True)
+        cb_channel_box.setToolTip(
+            "List only the attributes shown in the Channel Box\n"
+            "(keyable + channel box, not hidden). Blend shape targets are kept.\n"
+            "Uncheck to list every attribute of the node.")
+
         body = QHBoxLayout()
 
         left = QVBoxLayout()
         left.addWidget(tsl)
         left.addWidget(btn_list)
+        left.addWidget(cb_channel_box)
 
         right = QVBoxLayout()
         head = QHBoxLayout()
@@ -1251,9 +1260,13 @@ class MainWindow(QWidget):
             "tsl": tsl,
             "attrs": attr_list,
             "filter": flt,
+            "channel_box": cb_channel_box,
         }
 
         btn_list.clicked.connect(lambda: self.on_list_attrs(role))
+        # 이미 리스트가 채워져 있으면 토글 즉시 다시 채운다.
+        cb_channel_box.toggled.connect(
+            lambda _checked: attr_list.count() and self.on_list_attrs(role))
 
         return box
 
@@ -2719,7 +2732,8 @@ class MainWindow(QWidget):
             self.log("[ERR] List Attributes : object list is empty")
             return
         try:
-            attrs = cnt_mgr.list_attrs(objs[0])
+            cb_only = w["channel_box"].isChecked()
+            attrs = cnt_mgr.list_attrs(objs[0], channel_box_only=cb_only)
         except Exception as e:
             self.log("[ERR] List Attributes : {0}".format(e))
             cmds.warning(str(e))
@@ -2729,7 +2743,8 @@ class MainWindow(QWidget):
         # 새로 채운 항목에도 현재 필터를 다시 먹인다(필터가 유지되도록).
         shown, total = w["filter"].refresh()
 
-        msg = "[OK] List Attributes : {0} ({1} attrs)".format(objs[0], total)
+        msg = "[OK] List Attributes : {0} ({1} attrs{2})".format(
+            objs[0], total, ", channel box only" if cb_only else "")
         if shown != total:
             msg += " - filter '{0}' shows {1}".format(w["filter"].text().strip(), shown)
         self.log(msg)

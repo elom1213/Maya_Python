@@ -37,7 +37,36 @@ FACIAL_52 = [
 ]
 
 
-def list_attrs(obj, search=""):
+def channel_box_attrs(obj):
+    """obj 의 채널박스에 보이는 어트리뷰트 이름 집합.
+
+    채널박스 = keyable + channelBox(비키어블 표시). 둘 다 listAttr 로 따로 받는다.
+    mayapy 실측으로 확인한 함정:
+      - `listAttr -k` 는 **hidden 키어블도 돌려준다** -> attributeQuery(hidden) 로 뺀다.
+      - 키어블 compound(double3 등)는 부모도 나오지만 채널박스엔 자식(X/Y/Z)만 보인다
+        -> 자식이 있는 부모는 뺀다.
+    blendShape 타겟(weight 별칭)은 여기 들지 않는다 - list_attrs 가 따로 살린다.
+    """
+    if not obj:
+        return set()
+    raw = (cmds.listAttr(obj, keyable=True) or []) + \
+          (cmds.listAttr(obj, channelBox=True) or [])
+    visible = set()
+    for attr in raw:
+        if "." in attr or attr in visible:
+            continue
+        try:
+            if cmds.attributeQuery(attr, node=obj, hidden=True):
+                continue
+            if cmds.attributeQuery(attr, node=obj, numberOfChildren=True):
+                continue
+        except Exception:
+            pass
+        visible.add(attr)
+    return visible
+
+
+def list_attrs(obj, search="", channel_box_only=False):
     """obj 의 어트리뷰트 목록을 반환 (MEL JUN_cmd_upd_tsl_attr 포팅).
 
     - search 가 있으면 listAttr(obj.search) 로 필터한 목록을 기준으로 한다.
@@ -46,10 +75,13 @@ def list_attrs(obj, search=""):
       listAttr -multi 로 자식 어트리뷰트까지 펼친다.
     - **blendShape 노드면 `weight` 멀티를 타겟 이름(별칭)으로 펼친다.** 일반 멀티 확장은
       인덱스 0 하나만 잡아 첫 타겟만 나오므로, 별칭 목록을 직접 쓴다.
+    - channel_box_only 면 채널박스에 보이는 것(channel_box_attrs)만 남긴다.
+      blendShape 타겟은 채널박스에 늘 보이므로 그대로 둔다.
 
     Args:
         obj: 대상 오브젝트 이름.
         search: 검색 토큰(optional). listAttr 의 부분 이름으로 사용.
+        channel_box_only: True 면 채널박스에 보이는 어트리뷰트만.
 
     Returns:
         어트리뷰트 이름 문자열 리스트.
@@ -101,10 +133,16 @@ def list_attrs(obj, search=""):
                 children = []
             result.extend(children if children else [attr])
 
+    visible = None
+    if channel_box_only:
+        visible = channel_box_attrs(obj) | set(bs_targets)
+
     # 별칭이 raw 에도 섞여 나올 수 있어 순서를 유지한 채 중복을 제거한다.
     seen = set()
     unique = []
     for attr in result:
+        if visible is not None and attr not in visible:
+            continue
         if attr not in seen:
             seen.add(attr)
             unique.append(attr)
