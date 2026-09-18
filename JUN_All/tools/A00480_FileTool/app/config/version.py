@@ -20,5 +20,7 @@
 # 01.03  Export 규칙 - 내보내기 전에 모든 세트를 검사, 하나라도 걸리면 파일을 하나도 안 쓴다.
 #        첫 규칙 Check Hide Mesh (세트 안 메시 중 씬에서 안 보이는 것). 규칙은 export_rules.EXPORT_RULES 한 줄로 는다.
 
-VERSION = "01.03"
+# 01.04  Check Hide Mesh 는 메시 자신(트랜스폼 + 쉐입)만 본다 - 숨겨진 그룹 · 조인트 등 메시가 아닌 오브젝트는 괜찮다.
+
+VERSION = "01.04"
 LAST_UPDATE = "2026-09-18"

@@ -161,17 +161,20 @@ def _node_hidden_reasons(node, cmds):
 
 
 def hidden_reasons(shape):
-    """메시 쉐입이 **마야 뷰포트에서 안 보이는** 이유들. 보이면 빈 목록.
+    """메시 **오브젝트 자신**이 숨겨진 이유들. 숨겨지지 않았으면 빈 목록.
 
-    쉐입 자신과 그 위의 **모든 조상**(트랜스폼 · 그룹 · 조인트)을 본다 - 부모 하나만 꺼져도
-    그 아래는 전부 안 보인다. visibility / lodVisibility / 드로잉 오버라이드(디스플레이 레이어 포함).
+    보는 것은 메시의 **쉐입과 그 트랜스폼** 둘뿐이다 - visibility / lodVisibility / 드로잉
+    오버라이드(메시에 걸린 디스플레이 레이어 포함).
+
+    v01.04 : 조상(그룹 · 조인트 · 로케이터 ...)은 보지 않는다. 사용자 요청 - "메시가 아닌
+    오브젝트는 hide 되어 있어도 좋다". 그래서 메시 자신은 켜져 있고 숨겨진 그룹 안에 있어
+    뷰포트에 안 보이는 경우는 걸리지 않는다(v01.03 은 모든 조상을 봤다).
     """
     cmds = _cmds()
     reasons = list(_node_hidden_reasons(shape, cmds))
     parent = cmds.listRelatives(shape, parent=True, fullPath=True) or []
-    while parent:
+    if parent:
         reasons.extend(_node_hidden_reasons(parent[0], cmds))
-        parent = cmds.listRelatives(parent[0], parent=True, fullPath=True) or []
     return reasons
 
 
@@ -217,10 +220,11 @@ EXPORT_RULES = [
     ExportRule(
         key="check_hidden_mesh",
         label="Check Hide Mesh",
-        tooltip=("Before exporting, look at every mesh in the listed sets. If any of them\n"
-                 "is hidden in the scene (its own or a parent's visibility is off, or a\n"
-                 "display layer hides it), the export does not start and the log lists\n"
-                 "each hidden mesh with its set and the reason."),
+        tooltip=("Before exporting, look at every mesh in the listed sets. If any mesh\n"
+                 "itself is hidden (its transform or shape visibility is off, or a display\n"
+                 "layer hides it), the export does not start and the log lists each hidden\n"
+                 "mesh with its set and the reason.\n"
+                 "Only meshes are checked - hidden groups, joints and other objects are fine."),
         check=check_hidden_mesh,
         default=False,
     ),

@@ -16,7 +16,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 | **Import** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` |
 | **Path** | `Copy Scene Folder` · `Open Scene Folder` | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `File` |
 
-- **버전**: `app/config/version.py` (v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
+- **버전**: `app/config/version.py` (v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
 - **설치**: `__dragDrop_A00480.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **FileTool** → `tools.A00480_FileTool.run(True)`
 - **테마**: `slate_dark`
 - **원본 두 툴은 그대로 남아 있다.** quickTool 의 File · Import option 버튼도 지워지지 않았다.
@@ -89,23 +89,23 @@ Type Filter : [Include Types v]  Rules : [Rules (1/1) v] [Check]        [      E
 - 켠 규칙이 없으면 예전과 똑같이 바로 내보낸다.
 
 **`Check Hide Mesh`** (기본 꺼짐) — 세트 안의 **모든 메시**(멤버와 그 아래 전부 · 하위 세트 · 컴포넌트 멤버의 오브젝트) 중
-**마야 씬에서 안 보이는 메시**가 있으면 막는다. 안 보이는 이유:
+**메시 자신이 숨겨진 것**이 있으면 막는다. **메시만 본다**(v01.04) — 그룹 · 조인트 · 로케이터처럼 메시가 아닌 오브젝트는
+숨겨져 있어도 괜찮고, 그래서 **켜진 메시가 숨겨진 그룹 안에 있는 경우는 걸리지 않는다**(v01.03 은 모든 조상을 봤다). 숨김 원인:
 
 | 원인 | 로그 |
 |------|------|
-| 자기 · 쉐입 · **조상(그룹/조인트) 중 하나**의 `visibility` 꺼짐 | `grp_face.visibility is off` |
+| 메시 트랜스폼 또는 쉐입의 `visibility` 꺼짐 | `eye.visibility is off` · `bodyShape.visibility is off` |
 | `lodVisibility` 꺼짐 | `lodOff.lodVisibility is off` |
-| 디스플레이 레이어가 숨김 | `display layer 'HIDE_LAYER' is hidden` |
+| 메시에 걸린 디스플레이 레이어가 숨김 | `display layer 'HIDE_LAYER' is hidden` |
 | Drawing Override 로 숨김 | `xxx is hidden by its drawing override` |
 
 원본 쉐입(`intermediateObject`, 디포머가 만든 Orig)은 원래 숨겨진 것이라 보지 않는다.
 
 ```
 --- Rules (Check Hide Mesh) ---
-[WARN] Check Hide Mesh : 3 hidden mesh(es) in 2 set(s).
-[WARN]   SET_A : 2 hidden mesh(es)
+[WARN] Check Hide Mesh : 2 hidden mesh(es) in 2 set(s).
+[WARN]   SET_A : 1 hidden mesh(es)
 [WARN]     - eye  (eye.visibility is off)
-[WARN]     - mouth  (grp_face.visibility is off)
 [WARN]   SET_D : 1 hidden mesh(es)
 [WARN]     - compHidden  (compHidden.visibility is off)
 [WARN] Export not started - fix the problems above, or uncheck the rule in 'Rules' if it is intended. No file was written.

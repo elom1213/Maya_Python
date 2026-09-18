@@ -1,5 +1,12 @@
 # Changelog — A00480_FileTool
 
+## v01.04 (2026-09-18)
+- **Check Hide Mesh looks at the meshes only.** A mesh fails when the mesh itself is hidden -
+  its transform or shape `visibility` / `lodVisibility` is off, or a display layer / drawing
+  override on the mesh hides it. Hidden groups, joints, locators and other non-mesh objects
+  are fine, so a mesh that is switched on but sits under a hidden group no longer fails
+  (v01.03 looked at every parent).
+
 ## v01.03 (2026-09-18)
 - **Export rules** - checks that run before anything is exported. Pick them in the new
   `Rules (n/m)` drop-down next to Type Filter; `Check` runs them without exporting.
