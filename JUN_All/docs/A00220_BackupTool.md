@@ -72,9 +72,13 @@
   위**에 유지된다(`Qt.WindowStaysOnTopHint`, 라벨이 `Pinned` 로 바뀜). 다시 누르면 해제. 기본은 정상
   Z-order(밑 창을 클릭하면 위로 올라옴)라 필요할 때만 켠다. (`A00110_animTool` 과 동일 패턴.)
 
+- **Help 메뉴 (v01.16~)**: 모든 툴과 같은 공용 메뉴 바([`MOD_menuBar_qt`](Framework_MOD_menuBar_qt.md)).
+  `Help > Copy Tool Name` 이 툴 폴더명(`A00220_BackupTool`)을 클립보드에 넣고 Log 에 한 줄 남긴다.
+
 - **Shrink (v01.15~)**: `Pin` 왼쪽의 체크형 `Shrink` 버튼. 켜면 **공룡만 남기고** Target Files ·
   Settings · Control · Log 를 감추고 창 세로를 그만큼 줄인다(실측 **788 → 155px**, 가로는 그대로).
   라벨은 `Shrunk` 가 되고, 화면에 남는 버튼은 **`Shrink` 와 `Pin` 둘뿐**이다.
+  v01.16 에 생긴 메뉴 바도 줄어든 동안은 감춘다 - 줄인 높이는 155px 그대로다.
 
   ```
   ┌──────────────────── [ Shrunk ] [ Pin ] ┐

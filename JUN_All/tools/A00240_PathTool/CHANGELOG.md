@@ -2,6 +2,15 @@
 
 All notable changes to this tool are documented here.
 
+## [01.10] - 2026-09-18
+### Added
+- **Menu bar with `Help`** - the shared menu bar every tool uses, so `Help > Copy Tool Name`
+  (and any common item added later) works here too.
+- **Shrink toggle**, next to `Pin`. Hides the tabs and the menu bar and makes the window
+  350 x 78 px - the width of A00220_BackupTool when it is shrunk, and half its height.
+  Press again to go back to the size it had before. The empty space left of the buttons is
+  where a small file tree animation will play (planned for v01.11).
+
 ## [01.09] - 2026-09-17
 ### Changed
 - **Tree tab: the Filter no longer expands the tree.** Before, every folder on the way to a

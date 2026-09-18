@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-18 (오늘)
 
+> [!summary] `A00220_BackupTool`(v01.16) · `A00240_PathTool`(v01.10) 에 **Help 메뉴**(공용 메뉴 바) + A00240 **Shrink** — 애니메이션은 계획서
+- **요청**: 두 툴에 Help 메뉴(공통 기능 그대로). A00240 에도 Shrink - A00220 이 줄었을 때의 가로, 세로 절반. 줄어든 뒤 파일 트리가 자라나는 애니메이션 계획서.
+- 공용 `JUN_mod_menuBar_qt_v01` 를 `setMenuBar` 로 — 레이아웃 인덱스가 안 바뀌어 A00220 Shrink(공룡을 index 1 로 옮김)와 안 부딪힌다. 줄어든 동안은 메뉴 바도 감춰 A00220 은 155px 그대로.
+- A00220 줄었을 때 **350 x 155**(green_mid 실측) → A00240 **350 x 78**. 78px 에선 버튼 행 아래로 그릴 자리가 20px 뿐이라, 애니메이션 자리를 **버튼 옆**에 두어 172 x 56 확보.
+- 계획서 `docs/plans/A00240_PathTool_shrink_animation_plan.md` — 7행을 56px 에 넣는 게 핵심 제약(한 행 8px). 줄었을 때만 여백 2px 로 한 행 10px · 7x9 픽셀 아이콘 추천, 확인 5가지.
+- 오프스크린 PySide6: 두 툴 Help > Copy Tool Name 클립보드 · A00220 155px 유지 · A00240 350x78 ↔ 원래 크기. #A00220 #A00240
+
 > [!summary] A00145 Attribute > **Set Value** 하위 탭(v01.51) — 옛 Number Tool 이식: 여러 오브젝트의 **공통** 어트리뷰트에 값을 한 번에, 종류별 입력칸
 - **요청**: `JUN_PY_numberTool_V01_01` 은 실수 하나로만 넣어 enum 도 정수로 넣어야 했다 → 정수 · 실수 · 간격 점프 · enum 은 **텍스트로 골라서**, 그리고 A00145 Attribute 탭으로 이식.
 - 목록은 **교집합**(모두가 가진 것), float/int/bool/enum 만, `Channel Box Only` 기본 ON. float/int = `Start` + `Step`(리스트 순서대로 누적) + `Repeat every N`, enum/bool = 콤보에서 **항목 이름** + 항목 Step(끝에서 처음으로). enum 은 이름으로 오브젝트마다 값을 다시 찾는다(`Off:Low=5:High` 처럼 값이 건너뛰어도 맞다).

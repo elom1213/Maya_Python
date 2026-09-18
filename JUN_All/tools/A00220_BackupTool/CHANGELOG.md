@@ -1,5 +1,12 @@
 # Changelog — A00220_BackupTool
 
+## [01.16] - 2026-09-18
+
+### Added
+- **Menu bar with `Help`** - the shared menu bar every tool uses, so `Help > Copy Tool Name`
+  (and any common item added later) works here too. The result goes to the Log.
+  While shrunk the menu bar is hidden, so the shrunk window stays 155 px tall.
+
 ## [01.15] - 2026-09-18
 
 ### Added

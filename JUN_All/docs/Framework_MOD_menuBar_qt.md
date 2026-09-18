@@ -30,11 +30,12 @@ Script Editor 에 `print`.
 
 - **PySide 툴 42곳 전부** — `tools/*/app/ui/main_window.py` 에서 `QMenuBar()` 를 쓰던 곳.
   `A00180_abSymMesh` 는 `Operations | Help` 두 메뉴.
+- **메뉴 바를 새로 단 창** (2026-09-18) — `A00220_BackupTool` v01.16 · `A00240_PathTool` v01.10.
 - **maya.cmds 툴 7곳** — `A00000_base` · `A00010_humanIKTool` · `A00020_move_skineWeightTool` ·
   `A00030_quickTool` · `A00040_file_exporter` · `A00050_uvTool` · `A00060_jointTool`.
 - **메뉴 바가 없는 창은 대상이 아니다** — 템플릿 `A00004_base_QT` · `A00008_base_QT_maya`,
   `A00070` · `A00080_V02` · `A00090` · `A00100` · `A00130_ControlRig`(V01) · `A00200` · `A00210` ·
-  `A00211` · `A00220` · `A00230` · `A00240` · `A00250` · `A00320`. 붙이려면 아래 사용법 그대로 메뉴 바를 만든다.
+  `A00211` · `A00230` · `A00250` · `A00320`. 붙이려면 아래 사용법 그대로 메뉴 바를 만든다.
 
 ## 사용법
 

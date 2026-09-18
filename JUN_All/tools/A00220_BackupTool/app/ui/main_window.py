@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-01
+# last Update date : 2026-09-18
 # A00220_BackupTool - main window (Qt, standalone)
 #
 # 컴퓨터 비정상 종료에 대비해 지정 파일들을 주기적으로 자동 백업한다.
@@ -40,6 +40,7 @@ from Framework.qt.qt import (
 
 from Framework.qt import JUN_mod_collapsible_qt
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
+from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 
 from ..config.version import VERSION
 from ..config.app_meta import icon_path
@@ -121,6 +122,12 @@ class MainWindow(QWidget):
 
     def _build_ui(self):
         root = QVBoxLayout(self)
+
+        # 메뉴 바 (v01.16) - 공용 위젯이라 모든 툴과 같은 Help 공통 항목(Copy Tool Name 등)이
+        # 저절로 붙는다. setMenuBar 는 레이아웃 항목이 아니라서 아래 인덱스(0 = 헤더 행)가 그대로다.
+        self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
+        self.menu_bar.addMenu("Help")
+        root.setMenuBar(self.menu_bar)
 
         # -------------------------
         # 상단 헤더 행 : Always on Top(Pin) 토글(우측). A00110_animTool 과 동일 패턴 —
@@ -378,6 +385,8 @@ class MainWindow(QWidget):
         백업은 계속 돈다 - 감추는 것은 화면뿐이다.
         """
         root = self.layout()
+        # 메뉴 바도 줄어든 동안은 감춘다 - 줄인 크기(155px)를 메뉴 바가 생기기 전과 같게 둔다.
+        self.menu_bar.setVisible(not enabled)
         if enabled:
             self._full_height = self.height()
             for widget in self._shrink_hidden:
