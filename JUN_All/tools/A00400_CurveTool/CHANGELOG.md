@@ -1,5 +1,21 @@
 # Changelog — A00400_CurveTool
 
+## v01.15 (2026-09-18)
+**[Feature] `Create > Controls` — `bs_controls`(Brandon Schaal) 이식 : 컨트롤러 커브 34종 생성 + 색 + 셰이프 교체.**
+
+- **요청**: 마야 셸프에서 `bs_controlsUI.BSControlsUI().bsControlsUI()` 로 쓰던 툴을 A00400 의 새 탭으로 이식.
+  이어서 **셰이프 CV 데이터는 특정 툴이 아니라 공용으로** 관리.
+- **[Add] `Framework/rules/control_shapes.json` + `Framework.core.control_shapes`** — 셰이프 34종(Circle 은 `cmds.circle`,
+  나머지 33종은 degree 1 커브 하나, Gear 만 셰이프 2개). `mirror_tokens` 와 같은 자리·같은 규칙.
+  좌표는 **원본 값 그대로** — 6자리로 반올림했더니 8개 셰이프가 원본과 `1e-5` 어긋났다.
+- **[Add] `app/core/control_manager.py`** — 만들기(Parent/Child/World/Origin) · 색(31색 + T/R + Reset) · 셰이프 교체(1→N, N→N, Mirror).
+- **[Add] `app/ui/controls_tab.py`** — 원본 창의 세 섹션을 순서 그대로.
+- 원본과 달라진 것: `cmds.error` 대신 로그 경고 · 버튼 한 번 = undo 한 스텝 · 색 바꿔도 **선택 유지** ·
+  `parentConstraint` 대신 `matchTransform` · 셰이프 없는 노드에서 죽던 `Reset Color` 수정.
+
+**검증**(mayapy 2024 + 오프스크린 Qt, **33항목 통과**): 34종 전부 원본과 **CV 단위 일치**, 이름 규칙,
+4가지 배치 모드의 계층·위치, undo, 색/T/R/Reset, 셰이프 교체 6가지, UI 스모크.
+
 ## v01.14 (2026-09-17)
 **[Feature] `Edit > Joints` — NURBS surface 도 원하는 개수만큼 조인트 + 바인드 + zro/con/ctl/tgt 스택.**
 

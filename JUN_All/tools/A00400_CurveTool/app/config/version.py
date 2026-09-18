@@ -13,6 +13,8 @@
 # 01.11  Edit > Combine       - Source 커브 쉐입을 Target 에 복사해 합친다 (인스턴스 아님)
 # 01.13  Combine Placement    - 기본값: Source 를 Target 월드 위치(피벗)로 옮긴 모양으로 합친다
 # 01.14  Joints on surfaces   - NURBS surface 도 U / V 방향 한 줄로 조인트 + 바인드 + 컨트롤러
+# 01.15  Controls           - bs_controls 이식 : 컨트롤러 커브 34종 생성 + 색 + 셰이프 교체.
+#                           셰이프 데이터는 Framework/rules/control_shapes.json (공용)
 
-VERSION = "01.14"
-LAST_UPDATE = "2026-09-17"
+VERSION = "01.15"
+LAST_UPDATE = "2026-09-18"

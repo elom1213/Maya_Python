@@ -55,6 +55,7 @@
 | `Framework/qt/MOD_falloffCurve_qt_v01.py` | 공용 **falloff 커브 편집기** — 캔버스 / +Interpolation·Presets 패널 / 비모달 팝업. 모델은 `Framework/core/falloff_curve.py`(Qt·maya 비의존) | [Framework_MOD_falloffCurve_qt](Framework_MOD_falloffCurve_qt.md) |
 | `Framework/core/maya_shape.py` | **트랜스폼 → 셰이프 확정** 헬퍼 — `extendToShape()` 가 엉뚱한 셰이프를 집는 함정을 막는다(`kInvalidParameter` 원인) | [Framework_maya_shape](Framework_maya_shape.md) |
 | `Framework/core/maya_skin.py` | skinCluster 웨이트 **인덱스 함정**(물리 vs 논리) — `get/setWeights` 는 물리 인덱스. undo 뒤 재바인드가 죽던 원인 | [Framework_maya_skin](Framework_maya_skin.md) |
+| `Framework/core/control_shapes.py` | **컨트롤러 커브 셰이프 34종** 공용 라이브러리(`Framework/rules/control_shapes.json`) — `bs_controls` 의 CV 데이터를 툴 밖으로 올렸다 | [Framework_control_shapes](Framework_control_shapes.md) |
 | `Framework/core/mirror_tokens.py` | 좌/우 미러 **토큰 규칙 공용화**(`Framework/rules/mirror_tokens.json`) — 이름 미러링은 **경계 매칭**으로 `arm_lower` 같은 오탐을 막는다 | [Framework_mirror_tokens](Framework_mirror_tokens.md) |
 
 ---

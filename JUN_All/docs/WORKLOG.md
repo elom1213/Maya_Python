@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-18 (오늘)
 
+> [!summary] `A00400_CurveTool` **`Create > Controls`** 신규 — `bs_controls` 이식(컨트롤러 커브 34종 · 색 · 셰이프 교체), 셰이프 데이터는 **Framework 공용**으로 (v01.14 -> 01.15)
+- **요청**: 마야 셸프에서 `bs_controlsUI` 로 쓰던 툴을 A00400 새 탭으로 이식. 이어서 **셰이프 CV 데이터를 특정 툴이 아닌 공용 데이터로** 관리.
+- 데이터·로더를 `Framework/rules/control_shapes.json` + `Framework.core.control_shapes` 로 승격(`mirror_tokens` 와 같은 자리). 릴리스는 툴+Framework 를 복사하므로 어느 툴에서 써도 따라간다.
+- 탭은 원본 창처럼 세 섹션(Create / Color / Shape Replace). 원본과 달리 `cmds.error` 대신 로그 경고, 버튼 한 번 = undo 한 스텝, 색 바꿔도 선택 유지, `matchTransform` 사용.
+- 실측: 좌표를 6자리로 반올림하면 8개 셰이프가 원본과 `1e-5` 어긋난다 → 원본 값 그대로 저장. 셰이프 없는 노드에서 원본 `Reset Color` 는 `UnboundLocalError` 로 죽는다.
+- mayapy 2024 33항목 통과(34종 전부 원본과 CV 단위 일치 포함). #A00400 #Framework
+
 > [!summary] `A00220_BackupTool` 에 **`Shrink` 토글** — 공룡만 남기고 창 세로를 788 → 155px 로 (v01.14 -> 01.15)
 - **요청**: `Pinned` 버튼 옆에 `Shrink` 토글. 누르면 공룡 애니메이션만 보이고 `Shrink` · `Pin` 말고 다른 버튼은 안 보이게.
 - 공룡이 `Control` 그룹 안에 있어 그룹을 숨기면 같이 사라진다 → 줄이는 동안 공룡을 **창 레이아웃으로 옮겼다가** 되돌린다(이동이라 애니메이션이 끊기지 않는다).

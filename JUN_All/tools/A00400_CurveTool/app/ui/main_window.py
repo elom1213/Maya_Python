@@ -32,6 +32,7 @@ from tools.A00400_CurveTool.app.core import points_manager as points_mgr
 from tools.A00400_CurveTool.app.core import smooth_manager as smooth_mgr
 from tools.A00400_CurveTool.app.core import joint_curve_manager as jnt_mgr
 from tools.A00400_CurveTool.app.core import combine_manager as combine_mgr
+from tools.A00400_CurveTool.app.ui.controls_tab import ControlsTab
 
 
 WINDOW_OBJECT_NAME = "JUN_A00400_CurveTool_window"
@@ -83,6 +84,10 @@ class MainWindow(QWidget):
          "From Points - draw one curve through the world positions of the "
          "listed objects, joints or components, in list order.",
          "_build_points_tab"),
+        ("Controls",
+         "Controls - build control curves from a shape library, colour them and "
+         "swap the shape of existing controls (ported from bs_controls).",
+         "_build_controls_tab"),
     )
 
     EDIT_PAGES = (
@@ -550,6 +555,19 @@ class MainWindow(QWidget):
     # --------------------------------------------------------------
     # Create > From Points
     # --------------------------------------------------------------
+
+    # --------------------------------------------------------------
+    # Create > Controls  (v01.15 - bs_controls 이식)
+    # --------------------------------------------------------------
+
+    def _build_controls_tab(self):
+        """컨트롤러 커브 탭 — 화면은 `app/ui/controls_tab.py` 가 통째로 만든다.
+
+        세 섹션(만들기 · 색 · 셰이프 교체)이라 이 파일에 넣으면 다른 탭들이 묻힌다.
+        로그는 툴 창의 것을 넘겨 한 곳에 쌓는다.
+        """
+        self.controls_tab = ControlsTab(log_callback=self.log)
+        return self.controls_tab
 
     def _build_points_tab(self):
         """리스트에 담은 오브젝트/조인트/컴포넌트의 **월드 위치**를 순서대로 잇는 커브.
