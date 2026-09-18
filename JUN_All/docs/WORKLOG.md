@@ -31,6 +31,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-18 (오늘)
 
+> [!summary] A00380 **Apply Match 진행률 팝업**(v01.11) — 공용 `JUN_mod_progress_qt_v01` 을 그대로 씀(새로 안 만듦)
+- 단계 `Reading meshes`(30) / `Writing vertices`(70), 메시마다 이름을 띄운다. 미리보기 세션이 있으면 읽기가 끝나 있으므로 Writing 만(자리를 남기면 게이지가 30% 에서 시작해 보인다).
+- 코어에는 `from_pairs(..., progress=None)` · `commit(weight, progress=None)` 콜백만. 로그에 걸린 시간.
+- mayapy 오프스크린: 팝업 5번 전부 보인 채 100% 도달 후 닫힘, 미리보기 뒤 Apply 는 Writing 한 단계, 기존 Match 12항목 그대로 통과. #A00380
+
 > [!summary] A00380 Match > Default 를 **좌(Source) / 우(Targets) 리스트**로(v01.10) — 우측 메시들을 좌측 모양으로, 좌 1개 = `1 <= n`, 여러 개 = `n <= n`
 - 개수가 다르면 작은 쪽 수만큼 짝짓고 남는 메시는 로그에 이름 · 순번으로. 짝 미리보기 표 + 모드 줄. 코어 `match_manager.pair_meshes` / `MatchSession.from_pairs`(같은 Source 는 한 번만 읽음).
 - 테스트에서 잡은 것: 리스트를 바꿔도 **옛 미리보기 세션으로 Apply 가 확정**됐다 → 리스트가 바뀌면 되돌리고 버린다. 로그 이름은 셰이프가 아니라 트랜스폼으로.

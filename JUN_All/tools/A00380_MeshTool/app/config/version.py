@@ -1,5 +1,5 @@
 # Mesh Tool
-VERSION = "01.10"
+VERSION = "01.11"
 LAST_UPDATE = "2026-09-18"
 
 # 01.06  Match 탭 From 리스트의 List From Mesh / Add / Del 버튼 글자가 잘리던 문제.
@@ -11,3 +11,5 @@ LAST_UPDATE = "2026-09-18"
 # 01.10  Match > Default 를 좌(Source) / 우(Targets) 리스트로. 우측 메시들을 좌측 모양으로 바꾼다.
 #        좌 1개 = 1 <= n(전부 같은 모양), 여러 개 = n <= n(순서대로, 작은 쪽 수만큼 - 남는 메시는 로그).
 #        예전의 'From 1개 + 씬 선택' 은 없어졌다. 리스트를 바꾸면 미리보기 세션도 버린다
+# 01.11  Apply Match 가 도는 동안 공용 진행률 팝업(JUN_mod_progress_qt_v01). 단계 Reading meshes /
+#        Writing vertices - 미리보기 세션이 있으면 Writing 만. 로그에 걸린 시간

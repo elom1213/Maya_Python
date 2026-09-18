@@ -20,6 +20,7 @@ from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_tsl_qt_v01 import JUN_mod_tsl_qt_v01
 from Framework.qt.MOD_checkList_qt_v01 import JUN_mod_checkList_qt_v01
 from Framework.qt.MOD_filter_qt_v01 import JUN_mod_filter_qt_v01
+from Framework.qt.MOD_progress_qt_v01 import JUN_mod_progress_qt_v01
 
 import maya.cmds as cmds
 
@@ -855,7 +856,7 @@ class MainWindow(QWidget):
                 text += "  ({0} left unmatched)".format(len(extra_src) + len(extra_tgt))
         self.lb_match_mode.setText(text)
 
-    def _match_build(self):
+    def _match_build(self, progress=None):
         """좌/우 리스트의 짝으로 세션을 새로 만든다. 실패 시 None (v01.10~).
 
         좌 1개 = 1 <= n, 여러 개 = n <= n(작은 쪽 수만큼). 짝이 없어 남은 메시는 로그에 적는다.
@@ -889,7 +890,8 @@ class MainWindow(QWidget):
             session, skipped = match_mgr.MatchSession.from_pairs(
                 pairs,
                 world=self.chk_match_world.isChecked(),
-                soft_select=self.chk_match_soft.isChecked())
+                soft_select=self.chk_match_soft.isChecked(),
+                progress=progress)
         except Exception as e:
             self.log("Match build failed: {0}".format(e), warn=True)
             return None
@@ -986,6 +988,7 @@ class MainWindow(QWidget):
         """우측 Target 메시들을 좌측 Source 모양으로 확정한다(Ctrl+Z 한 번).
 
         미리보기 중이면 그 세션을, 아니면 지금 리스트로 만든다.
+        도는 동안 공용 진행률 팝업(`JUN_mod_progress_qt_v01`)이 뜬다(v01.11~).
         """
 
         weight = self.match_weight()
@@ -993,19 +996,37 @@ class MainWindow(QWidget):
             self.log("Weight is 0 - nothing to apply.", warn=True)
             return
 
-        session = self.match_session or self._match_build()
+        # 미리보기 세션이 있으면 읽기 단계는 이미 끝났다 - 돌지 않는 단계는 목록에서 뺀다
+        # (자리를 남겨 두면 게이지가 중간에서 시작하는 것처럼 보인다).
+        session = self.match_session
+        phases = [("Writing vertices", 70)]
         if session is None:
-            return
+            phases.insert(0, ("Reading meshes", 30))
 
+        dlg = JUN_mod_progress_qt_v01(self, title="Mesh Tool - Apply Match",
+                                      phases=phases)
+        dlg.start()
+        moved = None
         try:
-            with undo_chunk():
-                moved = session.commit(weight)
+            if session is None:
+                dlg.begin_phase()
+                session = self._match_build(progress=dlg.callback())
+            if session is not None:
+                dlg.begin_phase()
+                with undo_chunk():
+                    moved = session.commit(weight, progress=dlg.callback())
         except Exception as e:
             self.log("Match apply failed: {0}".format(e), warn=True)
             return
+        finally:
+            elapsed = dlg.elapsed()
+            dlg.finish()
 
-        self.log("Matched {0} mesh(es), {1} vertice(s) at weight {2:.3f}.".format(
-            session.mesh_count, moved, weight), ok=True)
+        if moved is None:
+            return
+
+        self.log("Matched {0} mesh(es), {1} vertice(s) at weight {2:.3f} ({3:.1f}s).".format(
+            session.mesh_count, moved, weight, elapsed), ok=True)
         for t in session.targets:
             self.log("  {0} <= {1}".format(t.target_name, t.from_name))
 

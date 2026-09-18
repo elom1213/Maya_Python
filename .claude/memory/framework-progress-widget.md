@@ -42,6 +42,7 @@ finally:
 - **닫기 버튼 없음 · Esc 무시 · ApplicationModal** 이 기본이다. 창만 닫히고 작업은 계속 도는 상태를
   만들지 않고, 도는 중에 버튼을 다시 못 누르게 한다. `cancellable=True` 는 **중단해도 안전한 작업에만**.
 - 끝나면 `dlg.elapsed()` 로 로그에 `(3.4s)` 를 붙여 주면 다음번 대기 감각이 생긴다.
+- 쓰는 툴: `A00410` Apply · `A00380` Apply Match(v01.11 — 미리보기 세션이 있으면 읽기 단계를 빼고 한 단계).
 - 아직 안 옮긴 후보: `A00420_Wrapper`(로그 줄), `A00430_DemBone`(창 내장 게이지).
 
 관련: [[wip-a00410-secondarymotion]], [[framework-timerange-widget]], [[framework-expand-widget]],

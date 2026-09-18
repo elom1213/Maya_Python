@@ -19,7 +19,7 @@ Maya 안에서 도는 **메시 편집** PySide 툴이다(arch B, in-Maya). **Pea
   - **By Weight** (v01.09~) — 스킨 메시의 **조인트 웨이트를 마스크로** 써서, 메시들을 타깃 모양 쪽으로
     `웨이트 × 델타` 만큼 옮긴다. 블렌드셰이프 타깃에 웨이트 맵(마스크)을 칠한 것과 결과가 같다.
 
-- **버전**: `app/config/version.py` (v01.10)
+- **버전**: `app/config/version.py` (v01.11)
 - **설치**: `__dragDrop_A00380.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **MeshTool** → `tools.A00380_MeshTool.run(True)`
 
 ---
@@ -147,6 +147,20 @@ v01.09 부터 Match 탭은 **하위 탭 두 개**다 — `Default`(이 절) 와 
 - 로그에는 확정한 짝이 `Target <= Source` 로 한 줄씩 남는다.
 
 > v01.09 까지는 From 한 칸 + **씬 선택**이 대상이었다. v01.10 부터 대상은 **우측 리스트**다.
+
+**진행률 팝업 (v01.11~)** — `Apply Match` 를 누르면 공용 위젯
+[`JUN_mod_progress_qt_v01`](Framework_MOD_progress_qt.md) 팝업이 뜨고, 게이지 · 단계 이름 · 지금 처리 중인
+메시(`Reading head_02` / `Writing head_02`) · 경과 시간을 보여 준다. 끝나면 스스로 닫히고 로그에 걸린 시간이
+붙는다(`... at weight 1.000 (0.4s).`).
+
+| 단계 | 비중 | 언제 |
+|---|---|---|
+| Reading meshes | 30 | 짝마다 Source / Target 점을 읽는다 — **미리보기 세션이 이미 있으면 빠진다**(그땐 Writing 이 0~100%) |
+| Writing vertices | 70 | Target 메시마다 `pnts` 에 쓴다 |
+
+- 닫기 버튼 · Esc 없음(모달) — 도는 중에 창만 닫히거나 Apply 를 또 누르는 일이 없다.
+- 코어(`match_manager`)는 위젯을 모르고 `progress(done, total, message)` 콜백만 받는다. 슬라이더 미리보기에는
+  넘기지 않으므로 팝업이 뜨지 않는다.
 
 **옵션**
 

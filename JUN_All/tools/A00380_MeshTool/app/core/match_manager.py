@@ -265,12 +265,15 @@ class MatchSession(object):
         return cls(targets, from_name, world, from_count, mismatch)
 
     @classmethod
-    def from_pairs(cls, pairs, world=True, soft_select=True):
+    def from_pairs(cls, pairs, world=True, soft_select=True, progress=None):
         """[(source, target), ...] 짝마다 target 메시 **전체**를 source 모양으로 (v01.10~).
 
         Default 탭의 좌/우 리스트가 만든 짝을 받는다(1 <= n 이면 source 가 전부 같다).
         soft_select 가 켜져 있고 target 의 버텍스를 소프트 셀렉션으로 골라 두었으면 그
         버텍스만 falloff 대로 움직인다(없으면 메시 전체).
+
+        progress : `progress(done, total, message)` 콜백(없으면 무시) - 짝 하나 읽을 때마다.
+                   UI 가 공용 진행률 팝업의 `callback()` 을 넘긴다. 코어는 위젯을 모른다.
 
         반환: (세션 또는 None, 건너뛴 짝 [(source, target, 이유), ...])
         """
@@ -279,7 +282,10 @@ class MatchSession(object):
         targets, mismatch, skipped = [], [], []
         space = om.MSpace.kWorld if world else om.MSpace.kObject
 
-        for src, tgt in pairs:
+        total = len(pairs)
+        for k, (src, tgt) in enumerate(pairs):
+            if progress:
+                progress(k, total, "Reading {0}".format(tgt.split("|")[-1]))
             src_shape = _shape_of(src) if cmds.objExists(src) else None
             tgt_shape = _shape_of(tgt) if cmds.objExists(tgt) else None
             if not src_shape:
@@ -307,6 +313,9 @@ class MatchSession(object):
             if t.fn.numVertices != len(src_points):
                 mismatch.append((t.target_name, t.fn.numVertices,
                                  t.from_name, len(src_points)))
+
+        if progress:
+            progress(total, total, "Read {0} pair(s)".format(total))
 
         if not targets:
             return None, skipped
@@ -346,8 +355,15 @@ class MatchSession(object):
         for t in self.targets:
             t.restore()
 
-    def commit(self, weight):
+    def commit(self, weight, progress=None):
+        """전 대상을 확정한다. progress(done, total, message) 는 메시 하나마다(없으면 무시)."""
         moved = 0
-        for t in self.targets:
+        total = len(self.targets)
+        for k, t in enumerate(self.targets):
+            if progress:
+                name = getattr(t, "target_name", None) or t.shape.split("|")[-1]
+                progress(k, total, "Writing {0}".format(name))
             moved += t.commit(weight)
+        if progress:
+            progress(total, total, "Wrote {0} mesh(es)".format(total))
         return moved
