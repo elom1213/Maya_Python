@@ -43,7 +43,7 @@ class _ExpandedWindow(QWidget):
     """본문을 넘겨받아 띄우는 독립 창. 닫히면 패널에게 알린다."""
 
     def __init__(self, panel, title, object_name, size):
-        super(_ExpandedWindow, self).__init__(panel.window(), Qt.Window)
+        super().__init__(panel.window(), Qt.Window)
         self._panel = panel
         self.setObjectName(object_name)
         self.setWindowTitle(title)
@@ -57,7 +57,7 @@ class _ExpandedWindow(QWidget):
 
     def closeEvent(self, event):
         self._panel.collapse()
-        super(_ExpandedWindow, self).closeEvent(event)
+        super().closeEvent(event)
 
 
 class JUN_mod_expand_qt_v01(QWidget):
@@ -83,7 +83,7 @@ class JUN_mod_expand_qt_v01(QWidget):
     def __init__(self, title="Panel", button_label="Expand", placeholder=None,
                  object_name=None, size=(420, 460), button_on_top=True,
                  parent=None):
-        super(JUN_mod_expand_qt_v01, self).__init__(parent)
+        super().__init__(parent)
 
         self._title = title
         self._object_name = object_name or "JUN_expand_{0}_window".format(
@@ -208,4 +208,4 @@ class JUN_mod_expand_qt_v01(QWidget):
     def eventFilter(self, watched, event):
         if watched is self._filtered and event.type() == QEvent.Close:
             self.collapse()
-        return super(JUN_mod_expand_qt_v01, self).eventFilter(watched, event)
+        return super().eventFilter(watched, event)

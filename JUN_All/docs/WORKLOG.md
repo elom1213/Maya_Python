@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-09-17
+updated: 2026-09-18
 ---
 
 # 작업 일지 (WORKLOG)
@@ -30,6 +30,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 ---
 
 ## 2026-09-18 (오늘)
+
+> [!summary] Framework **리로드 뒤 `super(type, obj)` TypeError 수정** — A00380 `Apply By Weight` 중 `MOD_log_qt_v01.eventFilter` 에서 터지던 것
+- 원인: 툴 실행(`run(True)`)이 DEV_MODE 에서 `Framework` 를 `importlib.reload` 한다. 이미 떠 있던 창의 로그 위젯(옛 클래스 인스턴스)은 툴 창에 eventFilter 를 걸어 둔 채 남는데, `super(JUN_mod_log_qt_v01, self)` 의 클래스 이름이 이제 **새 클래스**를 가리켜 옛 인스턴스와 맞지 않는다. 그 창에 이벤트가 올 때마다(씬 변경 → 다른 툴 창 갱신 등) 에러.
+- 수정: `Framework/qt` 10개 파일의 `super(Class, self)` 32곳을 zero-arg `super()` 로 — 메서드가 정의된 클래스(`__class__` 셀)에 묶여 리로드 뒤에도 맞다. 전부 자기 클래스 메서드 바로 안인지 AST 로 확인 후 치환.
+- mayapy 2024: 로그 위젯 생성 → eventFilter 설치 → 모듈 reload → 이벤트/eventFilter·expand·collapse 호출. 수정 전 같은 TypeError 재현, 수정 후 전부 통과. 마야 GUI 에서는 아직 안 눌러 봄. #Framework
 
 > [!summary] A00380 **Apply Match 진행률 팝업**(v01.11) — 공용 `JUN_mod_progress_qt_v01` 을 그대로 씀(새로 안 만듦)
 - 단계 `Reading meshes`(30) / `Writing vertices`(70), 메시마다 이름을 띄운다. 미리보기 세션이 있으면 읽기가 끝나 있으므로 Writing 만(자리를 남기면 게이지가 30% 에서 시작해 보인다).

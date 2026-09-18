@@ -80,7 +80,7 @@ class JUN_mod_progress_qt_v01(QDialog):
 
     def __init__(self, parent=None, title="Progress", message="",
                  phases=None, width=400, cancellable=False):
-        super(JUN_mod_progress_qt_v01, self).__init__(parent)
+        super().__init__(parent)
 
         self._cancellable = bool(cancellable)
         self._cancelled = False
@@ -303,7 +303,7 @@ class JUN_mod_progress_qt_v01(QDialog):
                 self._on_cancel()
             event.accept()
             return
-        super(JUN_mod_progress_qt_v01, self).keyPressEvent(event)
+        super().keyPressEvent(event)
 
     def closeEvent(self, event):
-        super(JUN_mod_progress_qt_v01, self).closeEvent(event)
+        super().closeEvent(event)

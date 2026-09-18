@@ -60,6 +60,7 @@
 
 ## 공용 위젯 · 프레임워크
 
+- [zero-arg super after reload](reload-stale-instance-super.md) — Framework 클래스는 `super()` 만, `super(Class, self)` 는 reload 뒤 옛 인스턴스에서 TypeError
 - [control shapes](framework-control-shapes.md) — 컨트롤러 커브 셰이프 34종 공용 json(좌표 반올림 금지)
 
 - TSL — [UUID selection](wip-tsl-uuid-selection.md)((uuid, component) 보관) · [attach_uuids](framework-tsl-attach-uuids.md)(씬 노드 아닌 리스트는 False) · [list_limit summary](framework-tsl-list-limit.md)(500+ 요약) · [max-height squeezes buttons](tsl-widget-max-height-squeezes-buttons.md)(`list_widget` 에만) · [selection order](tsl-selection-order.md)(`trackSelectionOrder` 꺼지면 `ls(os)` 도 인덱스 순)

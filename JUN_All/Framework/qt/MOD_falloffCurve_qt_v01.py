@@ -78,7 +78,7 @@ class JUN_mod_falloffCurve_qt_v01(QWidget):
 
     def __init__(self, parent=None, points=None, interp=None, tangents=None,
                  tooltip=None):
-        super(JUN_mod_falloffCurve_qt_v01, self).__init__(parent)
+        super().__init__(parent)
 
         self._points, self._tangents = falloff_curve.normalize_curve(
             points if points is not None else falloff_curve.DEFAULT_POINTS,
@@ -521,7 +521,7 @@ class JUN_mod_falloffCurvePanel_qt_v01(QWidget):
                  tangents=None, presets=None, show_title=True, show_interp=True,
                  show_presets=True, show_point_fields=True, show_tangent_fields=True,
                  decimals=3, tooltip=None):
-        super(JUN_mod_falloffCurvePanel_qt_v01, self).__init__(parent)
+        super().__init__(parent)
 
         self._presets = list(presets) if presets else list(falloff_curve.PRESETS)
         # 숫자 칸 -> 커브 -> 숫자 칸 되먹임을 막는 빗장.
@@ -902,7 +902,7 @@ class JUN_mod_falloffCurveDialog_qt_v01(QDialog):
     def __init__(self, parent=None, title="Falloff curve", points=None, interp=None,
                  tangents=None, reset_points=None, reset_interp=None, info="",
                  presets=None, size=(440, 470), tooltip=None):
-        super(JUN_mod_falloffCurveDialog_qt_v01, self).__init__(parent)
+        super().__init__(parent)
 
         self._reset_points = list(
             reset_points if reset_points is not None

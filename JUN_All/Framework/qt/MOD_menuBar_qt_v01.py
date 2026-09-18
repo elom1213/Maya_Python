@@ -65,7 +65,7 @@ def _plain_title(title):
 class JUN_mod_menuBar_qt_v01(QMenuBar):
 
     def __init__(self, tool_file=None, tool_name=None, parent=None):
-        super(JUN_mod_menuBar_qt_v01, self).__init__(parent)
+        super().__init__(parent)
 
         self.tool_dir = tool_menu.tool_dir_from_path(tool_file) if tool_file else None
         self.tool_name = tool_name or (
@@ -88,7 +88,7 @@ class JUN_mod_menuBar_qt_v01(QMenuBar):
 
     def _build_common_menu(self, title):
         menu = QMenu(title, self)
-        super(JUN_mod_menuBar_qt_v01, self).addMenu(menu)
+        super().addMenu(menu)
         self._menus.append((title, menu))
         menu.setToolTipsVisible(True)
 
@@ -166,7 +166,7 @@ class JUN_mod_menuBar_qt_v01(QMenuBar):
         `addMenu(icon, "제목")` 은 Qt 원래 동작 그대로다.
         """
         if len(args) != 1 or not isinstance(args[0], str):
-            result = super(JUN_mod_menuBar_qt_v01, self).addMenu(*args)
+            result = super().addMenu(*args)
             if isinstance(args[0], QMenu):
                 self._menus.append((args[0].title(), args[0]))
             elif isinstance(result, QMenu):
@@ -182,7 +182,7 @@ class JUN_mod_menuBar_qt_v01(QMenuBar):
         self._menus.append((title, menu))
         before = self._first_common_action()
         if before is None:
-            super(JUN_mod_menuBar_qt_v01, self).addMenu(menu)
+            super().addMenu(menu)
         else:
             self.insertMenu(before, menu)
         return menu

@@ -28,7 +28,7 @@ class JUN_mod_collapsible_qt_v01(QWidget):
     toggled = Signal(bool)
 
     def __init__(self, title="", expanded=True, parent=None):
-        super(JUN_mod_collapsible_qt_v01, self).__init__(parent)
+        super().__init__(parent)
         self._build_ui(title, expanded)
 
     def _build_ui(self, title, expanded):
@@ -104,7 +104,7 @@ class JUN_mod_fit_tab_page_v01(QWidget):
     """
 
     def sizeHint(self):
-        return super(JUN_mod_fit_tab_page_v01, self).sizeHint() if self.isVisible() else QSize(0, 0)
+        return super().sizeHint() if self.isVisible() else QSize(0, 0)
 
     def minimumSizeHint(self):
-        return super(JUN_mod_fit_tab_page_v01, self).minimumSizeHint() if self.isVisible() else QSize(0, 0)
+        return super().minimumSizeHint() if self.isVisible() else QSize(0, 0)

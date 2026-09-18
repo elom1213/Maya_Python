@@ -228,7 +228,7 @@ class JUN_mod_tsl_qt_v01(QWidget):
                  multi_select=True, list_min_height=None, list_limit=0,
                  select_label="Select Objects", attach_uuids=True,
                  log_callback=None, parent=None):
-        super(JUN_mod_tsl_qt_v01, self).__init__(parent)
+        super().__init__(parent)
 
         self.title = title
         self.select_label = select_label

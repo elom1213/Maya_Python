@@ -44,7 +44,7 @@ class JUN_mod_checkList_qt_v01(QObject):
     checksChanged = Signal(list)
 
     def __init__(self, list_widget, parent=None):
-        super(JUN_mod_checkList_qt_v01, self).__init__(parent or list_widget)
+        super().__init__(parent or list_widget)
 
         self.list_widget = list_widget
         self._pressed = None

@@ -98,7 +98,7 @@ class JUN_mod_filter_qt_v01(QWidget):
                  placeholder="Type any part of a name (e.g. Inner)",
                  show_clear=True, number_label=None, rows_provider=None,
                  tree_widget=None, tree_column=0, tree_columns=None, parent=None):
-        super(JUN_mod_filter_qt_v01, self).__init__(parent)
+        super().__init__(parent)
 
         self.list_widget = None
         # 컬럼이 있는 목록용 — QTreeWidget 의 최상위 항목을 거른다

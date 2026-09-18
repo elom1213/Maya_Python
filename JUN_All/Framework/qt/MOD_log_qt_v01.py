@@ -113,7 +113,7 @@ class _LogWindow(QWidget):
     """로그 텍스트를 넘겨받아 띄우는 독립 창. 닫히면 로그 위젯에게 알린다."""
 
     def __init__(self, panel, title, object_name, size):
-        super(_LogWindow, self).__init__(panel.window(), Qt.Window)
+        super().__init__(panel.window(), Qt.Window)
 
         self._panel = panel
         self.setObjectName(object_name)
@@ -128,7 +128,7 @@ class _LogWindow(QWidget):
 
     def closeEvent(self, event):
         self._panel.collapse()
-        super(_LogWindow, self).closeEvent(event)
+        super().closeEvent(event)
 
 
 class JUN_mod_log_qt_v01(QWidget):
@@ -158,7 +158,7 @@ class JUN_mod_log_qt_v01(QWidget):
     def __init__(self, window_title="Log", object_name=None, title=None,
                  expand_size=(620, 520), buttons_on_top=True, read_only=True,
                  resize_window_on_shrink=True, parent=None):
-        super(JUN_mod_log_qt_v01, self).__init__(parent)
+        super().__init__(parent)
 
         self._window_title = window_title
         self._object_name = object_name or "JUN_log_{0}_window".format(
@@ -362,8 +362,8 @@ class JUN_mod_log_qt_v01(QWidget):
             self._container_limits = (self.minimumHeight(), self.maximumHeight())
             self._sync_body_visibility()
             collapsed = self._row.sizeHint().height()
-            super(JUN_mod_log_qt_v01, self).setMinimumHeight(0)
-            super(JUN_mod_log_qt_v01, self).setMaximumHeight(max(collapsed, BUTTON_HEIGHT))
+            super().setMinimumHeight(0)
+            super().setMaximumHeight(max(collapsed, BUTTON_HEIGHT))
             self._resize_owner(shrink_by=max(before - max(collapsed, BUTTON_HEIGHT), 0))
         else:
             # ★ 창 높이는 제약을 되돌리기 **전에** 재 둔다. 되돌리는 순간 Qt 가 창을 새 최소
@@ -372,8 +372,8 @@ class JUN_mod_log_qt_v01(QWidget):
             owner_height = owner.height() if owner is not None else 0
             low, high = self._container_limits
             self._container_limits = None
-            super(JUN_mod_log_qt_v01, self).setMinimumHeight(low)
-            super(JUN_mod_log_qt_v01, self).setMaximumHeight(high)
+            super().setMinimumHeight(low)
+            super().setMaximumHeight(high)
             self._sync_body_visibility()
             self._resize_owner(shrink_by=None, owner_height=owner_height)
 
@@ -459,7 +459,7 @@ class JUN_mod_log_qt_v01(QWidget):
             self._text_limits = (height, height)
         total = height + self._chrome_height()
         if self._container_limits is None:
-            super(JUN_mod_log_qt_v01, self).setFixedHeight(total)
+            super().setFixedHeight(total)
         else:
             self._container_limits = (total, total)
 
@@ -470,7 +470,7 @@ class JUN_mod_log_qt_v01(QWidget):
             self._text_limits = (height, self._text_limits[1])
         total = height + self._chrome_height()
         if self._container_limits is None:
-            super(JUN_mod_log_qt_v01, self).setMinimumHeight(total)
+            super().setMinimumHeight(total)
         else:
             self._container_limits = (total, self._container_limits[1])
 
@@ -481,7 +481,7 @@ class JUN_mod_log_qt_v01(QWidget):
             self._text_limits = (self._text_limits[0], height)
         total = height + self._chrome_height()
         if self._container_limits is None:
-            super(JUN_mod_log_qt_v01, self).setMaximumHeight(total)
+            super().setMaximumHeight(total)
         else:
             self._container_limits = (self._container_limits[0], total)
 
@@ -579,4 +579,4 @@ class JUN_mod_log_qt_v01(QWidget):
     def eventFilter(self, watched, event):
         if watched is self._filtered and event.type() == QEvent.Close:
             self.collapse()
-        return super(JUN_mod_log_qt_v01, self).eventFilter(watched, event)
+        return super().eventFilter(watched, event)

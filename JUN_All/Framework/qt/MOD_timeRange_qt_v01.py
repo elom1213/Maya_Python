@@ -51,7 +51,7 @@ class JUN_mod_timeRange_qt_v01(QWidget):
                  show_get_current=True, show_sel_range=True,
                  min_value=-1000000, max_value=1000000,
                  log_callback=None, parent=None):
-        super(JUN_mod_timeRange_qt_v01, self).__init__(parent)
+        super().__init__(parent)
 
         self.start_label = start_label
         self.end_label = end_label
