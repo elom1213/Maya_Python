@@ -96,3 +96,10 @@ A2 가 **오른쪽 폴 타깃 위치를 읽으므로** 미러가 먼저다.
 `clavicle_r` 도 규칙으로: `-X` / `-Y`→월드 `+Y` = 왼쪽의 Behavior 미러와 행렬 단위로 같다(4e-16).
 검증은 템플릿 전체 두 벌(예전/새 규칙)을 네임스페이스 `A:`/`B:` 로 만들어 **쇄골 둘 말고 전부 같은지** 대조.
 규칙 없는 조인트는 이제 `helper_root` 하나.
+
+**손 (v02.25, 2026-09-18)** — 팔 `tail` 이 `preserve` 에서: `arm_l` = **`parent`**(hand_l 이 lowerarm_l 과 같은 월드 방향,
+jointOrient/rotate 0), `arm_r` = **`mirror`**(A2 는 안 건드림 - 늦은 미러 `hand_l -> hand_r` 가 덮는다. 전에도 덮고 있었는데
+`preserve` 라 적혀 표에 두 규칙이 겹쳐 보였다).
+**★ 오른팔 A2 는 왼팔의 Behavior 미러가 아니다** — arm_r 은 `+Z`→월드 `+Z`, Behavior 미러면 `-Z` 쪽. 그래서 왼손을
+미러한 `hand_r` 은 `lowerarm_r` 에 대해 **X 180도**(실측 jointOrient X=-180). 사용자 요청("hand_l 의 미러")대로 두고 보고했다.
+오른손을 lowerarm_r 과 맞추고 싶어지면 `arm_r` tail 을 `parent` 로 바꾸면 된다(단 그러면 미러가 아니다).

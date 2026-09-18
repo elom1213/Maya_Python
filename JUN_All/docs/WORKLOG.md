@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-18 (오늘)
 
+> [!summary] `A00130_ControlRig_V02` `Orient & Place` 에 **손 규칙** — `hand_l` = `lowerarm_l` 과 같은 방향, `hand_r` = 왼손의 미러 (v02.24 -> 02.25)
+- **요청**: hand_l 은 상위 본 lowerarm_l 과 회전값이 같도록, hand_r 은 hand_l 을 미러한 방향.
+- 팔 `tail` 에 `parent`(끝 조인트 = 부모의 월드 방향, arm_l) · `mirror`(A2 는 안 건드리고 늦은 미러가 덮음, arm_r) 추가. 전에는 둘 다 `preserve`.
+- 오른손은 원래 늦은 미러가 덮고 있었다 — `preserve` 표시와 겹쳐 보이던 것을 `mirror` 로 정리.
+- **발견**: 오른팔 A2 는 `+Z`→월드 `+Z` 라 왼팔의 Behavior 미러가 아니다 → 왼손을 미러한 `hand_r` 은 `lowerarm_r` 대비 X 180도(실측). 요청대로 미러를 따르고 보고.
+- mayapy 2024 9항목 — 템플릿 두 벌 대조로 두 손 말고 전부 예전과 같음(2e-13). #A00130
+
 > [!summary] `A00130_ControlRig_V02` `Orient & Place` 에 **쇄골 규칙** — `clavicle_l` 의 `+X` 가 `helper_upperarm_l`, `+Y` 가 월드 `+Y` (v02.23 -> 02.24)
 - **요청**: helper_clavicle_l 의 바로 하위본(helper_upperarm_l)을 X forward 로, up 은 Y 축.
 - A1(`aim_groups`)에 `aim_at` 추가 — 리스트 밖 조인트를 **겨누기만**. upperarm 을 리스트에 넣으면 방향까지 잡아 A2 팔 규칙과 겹친다.

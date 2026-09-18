@@ -4,7 +4,9 @@
 Manager* · AdvancedSkeleton 의 *FitSkeleton* 처럼 — **씬에 템플릿 조인트를 놓고 눈으로 맞춘 뒤,
 버튼으로 컨트롤러(cage)를 그 자리에 굽는다.**
 
-- 버전: `v02.24` (`app/config/version.py`) — `Orient & Place` 에 **쇄골 규칙**: `helper_clavicle_l` 의 `+X` 가 `helper_upperarm_l` 을
+- 버전: `v02.25` (`app/config/version.py`) — `Orient & Place` 에 **손 규칙**: `helper_hand_l` 은 `helper_lowerarm_l` 과 같은
+  방향, `helper_hand_r` 은 왼손의 Behavior 미러 (§7.3)
+  · v02.24 는 `Orient & Place` 에 **쇄골 규칙**: `helper_clavicle_l` 의 `+X` 가 `helper_upperarm_l` 을
   보고 `+Y` 가 월드 `+Y` 쪽(오른쪽은 그 Behavior 미러) (§7.2)
   · v02.23 은 `Match` 표의 행을 **더블클릭하면 그 Cage set 이 마야에서 선택**된다 (§4.1c)
   · v02.22 는 `Length` 탭 **`Total` 기본값을 `sum`** 으로, 콤보 맨 위로 (§6.2)
@@ -541,7 +543,14 @@ IK 솔버는 **끝 조인트를 회전시키지 않는다**(실측). 그래서 A
 | 부위 | 끝 조인트 | 처리 |
 |---|---|---|
 | 다리 | `foot` | **`tail`** — `foot → ball → ballEnd` 를 `+Z` 가 월드 `+Y` 쪽이 되게 |
-| 팔 | `hand` | **`preserve`** — **손대지 않는다.** IK 를 걸기 전과 같은 회전값 |
+| 왼팔 | `hand_l` | **`parent`** (v02.25) — `lowerarm_l` 과 **같은 월드 방향**(`jointOrient`·`rotate` 0). 체인을 aim 한 뒤, 손가락 위치는 붙잡아 둔다 |
+| 오른팔 | `hand_r` | **`mirror`** (v02.25) — A2 는 건드리지 않고 **늦은 미러**(`hand_l -> hand_r`)가 왼손의 Behavior 미러로 덮는다 |
+
+> v02.24 까지 팔은 둘 다 **`preserve`**(손대지 않음, IK 를 걸기 전과 같은 회전값)였다. 오른손은 그때도 늦은 미러가
+> 덮고 있었는데 `preserve` 로 적혀 있어 표에 두 규칙이 겹쳐 보였다.
+>
+> **오른손은 `lowerarm_r` 에 대해 X 축 180도다**(실측 `jointOrient` X = -180). 오른팔 A2 규칙은 `+Z` 가 월드 `+Z` 쪽이라
+> 왼팔의 완전한 Behavior 미러가 아니고(Behavior 미러면 `-Z` 쪽), 오른손은 요청대로 **왼손의 Behavior 미러**를 따르기 때문이다.
 
 > **`preserved` 와 `no rule` 은 다르다.** 둘 다 씬을 안 바꾸지만, 앞은 **정해진 것**이고
 > 뒤는 **아직 안 정해진 것**이다. 표에서 갈라 보여 준다.

@@ -463,6 +463,13 @@ def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True):
             row = add(joints[-1], "A2 keep", ST_PRESERVED,
                       "left exactly as it is - the IK solver never rotates the end joint")
             row["status"] = ST_PRESERVED
+        elif tail == "parent":
+            add(joints[-1], "A2 same as parent",
+                note="same world orientation as {0}".format(joints[-2]))
+        elif tail == "mirror":
+            # 끝 조인트는 늦은 미러(3c)가 왼쪽에서 덮는다 - 그 행이 아래에서 붙는다.
+            # 여기서 행을 따로 만들면 같은 조인트를 두 규칙이 주장하는 것처럼 보인다.
+            pass
         elif isinstance(tail, dict):
             for name in tail["joints"]:
                 add(name, "A2 tail", up_expect=(tail.get("up"), tail.get("up_world")))
@@ -851,6 +858,24 @@ def _do_pole_chains(doc, namespace, results, messages):
                 "[Info] {0}: '{1}' left exactly as it is (rotate/jointOrient "
                 "untouched). Its world orientation follows the parent.".format(
                     chain["name"], su.short_name(end)))
+        elif tail == "parent":
+            # 끝 조인트를 부모와 **같은 월드 방향**으로 (v02.25 - 손 = 아래팔).
+            # 체인을 aim 한 **뒤**라야 부모 방향이 확정돼 있다. 자식(손가락) 위치는 붙잡아 둔다.
+            parent = nodes[-2]
+            if not _writable(end):
+                results["skipped"] += 1
+                messages.append("[Warning] {0}: rotation is locked or driven.".format(
+                    su.short_name(end)))
+            else:
+                set_world_orientation(end, om.MMatrix(
+                    cmds.xform(parent, q=True, ws=True, m=True)))
+                done += 1
+                messages.append("[OK] {0}: '{1}' turned to match '{2}'.".format(
+                    chain["name"], su.short_name(end), su.short_name(parent)))
+        elif tail == "mirror":
+            messages.append(
+                "[Info] {0}: '{1}' is not aimed here - the late behavior mirror copies it "
+                "from the left side.".format(chain["name"], su.short_name(end)))
         elif isinstance(tail, dict):
             done += _do_tail(tail, namespace, results, messages, chain["name"])
 

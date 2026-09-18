@@ -18,5 +18,8 @@
 #           Orient (v02.24) - clavicles get an A1 rule: +X at the upperarm, +Y toward world +Y
 #                            (the right one is its behavior mirror).
 
-VERSION = "02.24"
+#           Orient (v02.25) - helper_hand_l turns to match helper_lowerarm_l (arm tail "parent"),
+#                            helper_hand_r is the behavior mirror of it (arm tail "mirror").
+
+VERSION = "02.25"
 LAST_UPDATE = "2026-09-18"

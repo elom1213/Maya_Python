@@ -15,7 +15,10 @@
     "",
     "'tail' handles the end joint, which an IK solver never rotates (plan 2-1):",
     "  legs -> a tail group, arms -> \"preserve\" (leave it exactly as it is).",
-    "  \"preserve\" is a DECISION, not a gap - see plan 4-9."
+    "  \"preserve\" is a DECISION, not a gap - see plan 4-9.",
+    "  v02.25: the left arm uses \"parent\" instead - helper_hand_l gets the same world",
+    "  orientation as helper_lowerarm_l. The right arm uses \"mirror\" - helper_hand_r is",
+    "  not aimed by A2, the late behavior mirror (helper_hand_l -> helper_hand_r) sets it."
   ],
   "world_zero_default": true,
   "aim_groups": [
@@ -82,7 +85,7 @@
       "forward": "+X",
       "up": "+Z",
       "expect_up_world": "+Z",
-      "tail": "preserve"
+      "tail": "parent"
     },
     {
       "name": "arm_r",
@@ -95,7 +98,7 @@
       "forward": "-X",
       "up": "+Z",
       "expect_up_world": "+Z",
-      "tail": "preserve"
+      "tail": "mirror"
     },
     {
       "name": "leg_l",

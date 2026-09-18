@@ -3,6 +3,22 @@
 `A00130_ControlRig`(V01)의 **템플릿 조인트 패러다임 재작성판**이다.
 계획서: `JUN_All/docs/plans/A00130_ControlRig_V02_plan.md`
 
+## v02.25 (2026-09-18)
+**[Feature] `Orient & Place` — 손 규칙: `helper_hand_l` 은 `helper_lowerarm_l` 과 같은 방향, `helper_hand_r` 은 왼손의 미러.**
+
+- **요청**: hand_l 은 상위 본 lowerarm_l 과 회전값이 같도록, hand_r 은 hand_l 을 미러한 방향이도록.
+- 팔의 끝 조인트 처리(`tail`)에 두 가지를 더했다. 전에는 둘 다 `preserve`(손대지 않음).
+  - **`parent`** (`arm_l`) — 끝 조인트를 부모와 **같은 월드 방향**으로. 체인을 aim 한 **뒤**에 돌고 손가락 위치는 붙잡아 둔다.
+    결과: `hand_l` 의 `jointOrient` · `rotate` 가 0.
+  - **`mirror`** (`arm_r`) — A2 는 끝 조인트를 건드리지 않고, 원래 있던 **늦은 미러**(`helper_hand_l -> helper_hand_r`, 손가락 정렬 뒤)가
+    덮는다. 그 미러가 전에도 `hand_r` 을 덮고 있었는데 `preserve` 라고 적혀 있어 표에 두 규칙이 겹쳐 보였다.
+- **알아 둘 것** — 오른팔 A2 규칙은 `+Z` 가 **월드 `+Z` 쪽**이라 왼팔의 완전한 Behavior 미러가 아니다(Behavior 미러면 `-Z` 쪽).
+  그래서 왼손을 Behavior 미러한 `hand_r` 은 **`lowerarm_r` 에 대해 X 축으로 180도**다(`jointOrient` X = -180, 실측).
+  요청대로 "왼손의 미러" 를 따랐다.
+- **검증**(mayapy 2024, 9항목 통과): 템플릿 전체 두 벌(예전 `preserve` / 새 규칙) 대조 — `hand_l` = `lowerarm_l`(회전 오차 0) ·
+  `jointOrient`/`rotate` 0 · `hand_r` = `hand_l` 의 Behavior 미러(4x4, 3e-14) · **두 손 말고는 손가락까지 전부 예전과 같음**(2e-13) ·
+  손/손가락 위치 불변 · undo · 잠긴 회전 경고 · 표(`A2 same as parent`, 오른손은 늦은 미러).
+
 ## v02.24 (2026-09-18)
 **[Feature] `Orient & Place` — `helper_clavicle_l` 에 규칙: `+X` 가 바로 아래 `helper_upperarm_l` 을 보고, `+Y` 가 월드 `+Y` 쪽.**
 
