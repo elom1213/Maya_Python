@@ -2,6 +2,12 @@
 
 All notable changes to this tool are documented here.
 
+## [01.13] - 2026-09-18
+### Changed
+- **Shrink is now as tall as A00220_BackupTool's shrink: 350 x 155** (was 350 x 78 - too small).
+  The file tree grows with it (icons 20 x 24, lines 4 px) and the window keeps its normal
+  inner margin - the 2 px margin was only there to fit the tree into 78 px.
+
 ## [01.12] - 2026-09-18
 ### Changed
 - **Shrink animation loops forever.** Each stage stays on screen 0.5 s - only the top file,
