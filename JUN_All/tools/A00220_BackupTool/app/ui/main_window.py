@@ -134,22 +134,41 @@ class MainWindow(QWidget):
         self.pin_button.setFixedSize(72, 28)
         self.pin_button.toggled.connect(self.toggle_always_on_top)
 
+        # Shrink : 켜면 공룡만 남기고 나머지를 감춰 창 세로를 줄인다(아래 toggle_shrink).
+        self.shrink_button = QPushButton("Shrink")
+        self.shrink_button.setCheckable(True)
+        self.shrink_button.setToolTip(
+            "Hide everything but the dino and make the window short.\n"
+            "Backups keep running - press again to bring the controls back.")
+        self.shrink_button.setFixedSize(72, 28)
+        self.shrink_button.toggled.connect(self.toggle_shrink)
+
         header_row = QHBoxLayout()
         header_row.setContentsMargins(0, 0, 0, 0)
         header_row.addStretch(1)
+        header_row.addWidget(self.shrink_button)
         header_row.addWidget(self.pin_button)
         root.addLayout(header_row)
 
-        root.addWidget(self._build_files_group())
+        self._files_group = self._build_files_group()
+        self._control_group = self._build_control_group()
+        root.addWidget(self._files_group)
         root.addWidget(self._build_settings_group())
-        root.addWidget(self._build_control_group())
+        root.addWidget(self._control_group)
 
-        root.addWidget(QLabel("Log"))
+        self.lbl_log = QLabel("Log")
+        root.addWidget(self.lbl_log)
         self.log_widget = JUN_mod_log_qt_v01(
             window_title="Backup Tool - Log",
             object_name="JUN_A00220_BackupTool_log_window")
         self.log_widget.setMaximumHeight(140)
         root.addWidget(self.log_widget)
+
+        # Shrink 가 감추는 것들 (공룡과 헤더 버튼 둘만 남는다)
+        self._shrink_hidden = (
+            self._files_group, self._settings_section, self._control_group,
+            self.lbl_log, self.log_widget)
+        self._full_height = None
 
     def _on_settings_toggled(self, expanded):
         """Settings 를 접고/펼칠 때, 사라지거나 나타나는 본문 높이만큼만 '창'을
@@ -324,6 +343,9 @@ class MainWindow(QWidget):
         # 정지면 가만히 서 있는다. 저장 감지 순간엔 강조색 톡 점프(notify_save),
         # 실제 백업 순간엔 360° 스핀(spin)으로 구분해 알린다.
         self.dino = DinoWidget(px=3)
+        # Shrink 때 공룡만 창에 남기려면 이 자리에서 빼내야 한다 - 돌려놓을 자리를 기억해 둔다.
+        self._dino_layout = layout
+        self._dino_index = layout.count()
         layout.addWidget(self.dino)
 
         # 다음 저장까지 남은 시간 카운트다운
@@ -343,6 +365,46 @@ class MainWindow(QWidget):
         self.pin_button.setText("Pinned" if enabled else "Pin")
         self.show()
         self.log(f"Always on Top: {'ON' if enabled else 'OFF'}")
+
+    # ============================================================== shrink
+
+    def toggle_shrink(self, enabled):
+        """Shrink 토글 — 공룡(과 Shrink · Pin 버튼)만 남기고 창을 그만큼 줄인다.
+
+        공룡은 `Control` 그룹 안에 있는데 그 그룹을 통째로 숨기면 공룡도 사라지므로,
+        **공룡만 창의 최상위 레이아웃으로 잠깐 옮긴다**(복제가 아니라 이동 - 애니메이션과
+        타이머가 그대로 이어진다). 되돌릴 때 원래 자리(`_dino_index`)로 돌려놓는다.
+
+        백업은 계속 돈다 - 감추는 것은 화면뿐이다.
+        """
+        root = self.layout()
+        if enabled:
+            self._full_height = self.height()
+            for widget in self._shrink_hidden:
+                widget.hide()
+            self._dino_layout.removeWidget(self.dino)
+            root.insertWidget(1, self.dino)     # 0 = 헤더 행
+            self.dino.show()
+        else:
+            root.removeWidget(self.dino)
+            self._dino_layout.insertWidget(self._dino_index, self.dino)
+            for widget in self._shrink_hidden:
+                # 접혀 있던 Settings 본문까지 펼치지 않도록 섹션 자체만 보이게 한다.
+                widget.show()
+            self.dino.show()
+
+        self.shrink_button.setText("Shrunk" if enabled else "Shrink")
+
+        # 숨김/보임 뒤에는 레이아웃 최소 높이를 다시 계산해야 창이 그만큼 줄어든다
+        # (Settings 접기와 같은 이유 - 옛 최소값에 막힌다).
+        root.invalidate()
+        root.activate()
+        if enabled:
+            self.resize(self.width(), root.sizeHint().height())
+        elif self._full_height:
+            self.resize(self.width(), self._full_height)
+
+        self.log(f"Shrink: {'ON' if enabled else 'OFF'}")
 
     # ============================================================== prefs
 

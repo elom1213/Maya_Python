@@ -2,5 +2,5 @@
 # last Update date : 2026-07-03
 # A00220_BackupTool - version info
 
-VERSION = "01.14"
-LAST_UPDATE = "2026-09-16"
+VERSION = "01.15"
+LAST_UPDATE = "2026-09-18"

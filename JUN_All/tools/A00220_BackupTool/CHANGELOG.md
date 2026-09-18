@@ -1,5 +1,18 @@
 # Changelog — A00220_BackupTool
 
+## [01.15] - 2026-09-18
+
+### Added
+- **Shrink toggle**, next to `Pin` in the header row. When on, everything but the dino
+  is hidden (target files, settings, control, log) and the window shrinks to fit it -
+  788 px tall becomes 155 px (measured). Only `Shrink` and `Pin` stay clickable.
+  Press again and the window returns to the height it had, with the Settings section
+  still collapsed or expanded as it was.
+  - The dino lives inside the `Control` group, so hiding that group would hide it too.
+    The dino is **moved** into the window layout while shrunk and put back afterwards
+    (a move, not a copy - its animation and timers keep running).
+  - Backups keep running while shrunk; only the display is hidden.
+
 ## [01.13] - 2026-07-06
 
 ### Added
