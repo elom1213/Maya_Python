@@ -49,6 +49,7 @@
 │ C:/work/charB/rig.ma                           │
 │ [Add Files...] [Remove Selected] [Clear]       │
 └────────────────────────────────────────────────┘
+▶ Settings   ← 기본은 접힘 (v01.17~). 헤더를 누르면 아래처럼 펼쳐진다
 ┌ Settings ─────────────────────────────────────┐
 │ Backup Folder Name [ backup ]                  │
 │ Suffix             [ BU ]                       │

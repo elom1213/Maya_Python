@@ -115,6 +115,9 @@ class MainWindow(QWidget):
         self._countdown_timer.timeout.connect(self._tick_countdown)
 
         self._build_ui()
+        # Settings 가 접힌 채로 시작하므로 그 본문 높이만큼 창을 줄여 둔다 - 안 줄이면 남는
+        # 높이를 파일 목록이 먹어, 펼칠 때 창이 680 을 넘어 커진다(v01.17).
+        self.resize(350, 680 - self._settings_section.body_height())
         self._load_prefs_to_ui()
         self._set_state(STATE_DEACTIVE)
 
@@ -241,8 +244,9 @@ class MainWindow(QWidget):
     def _build_settings_group(self):
         # 접이식 Settings 섹션(A00110 의 JUN_mod_collapsible_qt 패턴).
         # 헤더 클릭으로 접고/펼치며, 토글 시 접힌/펼친 높이만큼 창을 줄이거나 늘린다.
+        # 기본은 접힘 (v01.17) - 설정은 한 번 정하면 거의 안 건드린다.
         section = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01(
-            "Settings", expanded=True)
+            "Settings", expanded=False)
         self._settings_section = section
         section.toggled.connect(self._on_settings_toggled)
 

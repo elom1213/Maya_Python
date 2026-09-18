@@ -1,5 +1,12 @@
 # Changelog — A00220_BackupTool
 
+## [01.17] - 2026-09-18
+
+### Changed
+- **`Settings` starts collapsed.** Click the header to open it. The starting window height
+  is reduced by the section body, so the file list keeps its size and expanding gives the
+  same window as before (measured with the launch theme: 612 px collapsed / 890 px expanded).
+
 ## [01.16] - 2026-09-18
 
 ### Added
