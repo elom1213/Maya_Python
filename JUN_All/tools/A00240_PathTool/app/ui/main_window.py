@@ -9,7 +9,7 @@
 # v01.10 : 메뉴 바(Help 공통 항목) + Shrink 토글.
 #   Shrink 는 A00220_BackupTool 의 Shrink 를 따른다. 탭을 감추고 창을
 #   **A00220 이 줄었을 때의 가로(350) x 세로의 절반(155 / 2 = 78)** 으로 줄인다.
-#   줄어든 동안 헤더 행 왼쪽 빈 자리(`anim_area`)에 파일 트리 애니메이션이 들어갈 예정이다
+#   줄어든 동안 헤더 행 왼쪽 자리(`anim_area`)에 파일 트리 애니메이션이 재생된다(v01.11)
 #   - 계획서: docs/plans/A00240_PathTool_shrink_animation_plan.md
 
 from Framework.qt.qt import (
@@ -28,12 +28,16 @@ from ..config.version import VERSION
 from ..config.app_meta import icon_path
 from .shortcut_tab import ShortcutTab
 from .tree_tab import TreeTab
+from .file_tree_anim import FileTreeAnimWidget
 
 
 #: 줄어든 창 크기. A00220_BackupTool 이 줄었을 때 350 x 155 (green_mid 테마 실측)
 #: - 가로는 같게, 세로는 절반.
 SHRINK_WIDTH = 350
 SHRINK_HEIGHT = 78
+
+#: 줄어든 동안의 창 안쪽 여백. 7행 트리를 78px 에 넣으려고 11 -> 2 (한 행 약 10px, 계획서 2장 B 안)
+SHRINK_MARGIN = 2
 
 
 class MainWindow(QWidget):
@@ -50,8 +54,9 @@ class MainWindow(QWidget):
         if _sIcon:
             self.setWindowIcon(QIcon(_sIcon))
 
-        # Shrink 전 창 크기 (되돌릴 때 쓴다)
+        # Shrink 전 창 크기 · 창 여백 (되돌릴 때 쓴다)
         self._full_size = None
+        self._full_margins = None
 
         self._build_ui()
 
@@ -81,10 +86,10 @@ class MainWindow(QWidget):
         self.shrink_button.setFixedSize(72, 28)
         self.shrink_button.toggled.connect(self.toggle_shrink)
 
-        # 줄어든 동안만 보이는 자리 - 파일 트리 애니메이션이 여기 그려질 예정이다.
+        # 줄어든 동안만 보이는 자리 - 파일 트리 애니메이션(v01.11).
         # 세로 78px 창에서 버튼 행 아래로 따로 두면 그릴 높이가 거의 남지 않아서,
         # 버튼과 **같은 행의 왼쪽**에 둔다(계획서 2장).
-        self.anim_area = QWidget()
+        self.anim_area = FileTreeAnimWidget()
         self.anim_area.setObjectName("A00240_shrink_anim_area")
         # 남는 가로 · 세로를 전부 차지해야 그릴 자리가 나온다(안 그러면 버튼 높이 28px 로 묶인다).
         self.anim_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -134,11 +139,17 @@ class MainWindow(QWidget):
         root = self.layout()
         if enabled:
             self._full_size = (self.width(), self.height())
+            self._full_margins = root.contentsMargins()
+            root.setContentsMargins(SHRINK_MARGIN, SHRINK_MARGIN,
+                                    SHRINK_MARGIN, SHRINK_MARGIN)
             self.tabs.hide()
             self.menu_bar.hide()
             self.anim_area.show()
         else:
+            self.anim_area.stop()
             self.anim_area.hide()
+            if self._full_margins is not None:
+                root.setContentsMargins(self._full_margins)
             self.menu_bar.show()
             self.tabs.show()
 
@@ -148,5 +159,7 @@ class MainWindow(QWidget):
         root.activate()
         if enabled:
             self.resize(SHRINK_WIDTH, SHRINK_HEIGHT)
+            # 켤 때마다 처음부터 - 파일 0 만 보이다가 0.5 초 간격으로 자란다.
+            self.anim_area.start()
         elif self._full_size:
             self.resize(*self._full_size)

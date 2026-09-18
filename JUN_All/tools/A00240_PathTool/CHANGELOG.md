@@ -2,6 +2,19 @@
 
 All notable changes to this tool are documented here.
 
+## [01.11] - 2026-09-18
+### Added
+- **Shrink: a small file tree grows next to the buttons.** Only the top file icon shows at first;
+  0.5 s later three files unfold out of it, and 0.5 s after that each of them unfolds one more
+  file below it. Each step takes 0.25 s - the new icon slides from its parent to its row while
+  the branch line grows with it and it fades in. When the tree is complete the animation stops
+  (no timer keeps running while the window sits shrunk), and it plays again from the start every
+  time Shrink is turned on.
+- The icons are drawn in code (a 7 x 9 pixel file with a folded corner) in the theme's text
+  colour, like the dino in A00220_BackupTool.
+- While shrunk the window's inner margin is 2 px instead of 11 px so the seven rows fit in the
+  same 350 x 78 window (about 10 px per row).
+
 ## [01.10] - 2026-09-18
 ### Added
 - **Menu bar with `Help`** - the shared menu bar every tool uses, so `Help > Copy Tool Name`

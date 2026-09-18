@@ -84,7 +84,7 @@
 - A00170 — [AttachCrv tab](wip-a00170-attachcrv-tab.md)(Maintain offset = OPM 구동 · NURBS surface 지원, v01.23) · [Edge Loop drivers](wip-a00170-edge-loop-drivers.md) · [Lip Seal](wip-a00170-lip-seal.md)(rest 포즈를 머리 공간에, v01.21) · [Stretch tab](wip-a00170-stretch-tab.md) · [Remap List Attributes](wip-a00170-remap-listattrs.md)
 - A00210 — [PathStructure tree](wip-a00210-pathstructure-tree-depth.md) · [Recreate To + Rename](wip-a00210-recreate-to-rename.md) · [PathStructure files](wip-a00210-pathstructure-files.md)(v01.29)
 - A00220 — [Pin toggle](wip-a00220-pin.md) · [dino save pulse](wip-a00220-dino-save-pulse.md) · [Shrink](wip-a00220-shrink.md)(공룡만 남기고 788→155px, 숨길 그룹 속 위젯은 옮겨서 살린다, v01.15)
-- A00240 — [Shrink + tree anim plan](wip-a00240-shrink-anim.md)(350x78 = A00220 줄었을 때 가로 · 세로 절반, 애니메이션은 계획서 · 확인 대기, v01.10)
+- A00240 — [Shrink + tree anim](wip-a00240-shrink-anim.md)(350x78 = A00220 줄었을 때 가로 · 세로 절반, 파일 트리가 0.5초 간격으로 자라남 · 다 자라면 타이머 정지, v01.11)
 - A00270 — [Classic tab](wip-a00270-classic-tab.md)
 - A00275 — [Select By Weight](wip-a00275-select-by-weight.md)(범위는 Load 때 저장, QListWidget 체크박스 클릭은 eventFilter, v01.27) · [Layer tab](wip-a00275-layer-tab.md)(N 메시 lock+Blend 합성, setWeights 는 undo 안 됨, v01.22) · [tab reorg](wip-a00275-tab-reorg.md)(탭 인덱스 판단 주의) · [Copy Weights](wip-a00275-copy-weights.md)(v01.18) · [Edit Mesh](wip-a00275-edit-mesh.md) · [Expand Bind](wip-a00275-expand-bind.md) · [Move Joints](wip-a00275-move-joints.md) · [Bind Pose](wip-a00275-skintool-bindpose.md) · [Transfer tab](wip-a00275-transfer-tab.md)
 - A00280 — [cloth-corrective](metahuman-cloth-corrective-A00280.md)(알렘빅 → RBF 코렉티브)
