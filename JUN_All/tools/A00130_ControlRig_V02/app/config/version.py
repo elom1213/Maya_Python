@@ -15,5 +15,8 @@
 
 #           Match list (v02.23) - double-click a row to select its cage set in Maya.
 
-VERSION = "02.23"
-LAST_UPDATE = "2026-09-17"
+#           Orient (v02.24) - clavicles get an A1 rule: +X at the upperarm, +Y toward world +Y
+#                            (the right one is its behavior mirror).
+
+VERSION = "02.24"
+LAST_UPDATE = "2026-09-18"

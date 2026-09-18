@@ -31,6 +31,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-18 (오늘)
 
+> [!summary] `A00130_ControlRig_V02` `Orient & Place` 에 **쇄골 규칙** — `clavicle_l` 의 `+X` 가 `helper_upperarm_l`, `+Y` 가 월드 `+Y` (v02.23 -> 02.24)
+- **요청**: helper_clavicle_l 의 바로 하위본(helper_upperarm_l)을 X forward 로, up 은 Y 축.
+- A1(`aim_groups`)에 `aim_at` 추가 — 리스트 밖 조인트를 **겨누기만**. upperarm 을 리스트에 넣으면 방향까지 잡아 A2 팔 규칙과 겹친다.
+- **오른쪽 쇄골도 규칙으로** — 이른 팔 미러가 정렬 전 왼쪽을 복사하므로 왼쪽만 넣으면 좌우가 어긋난다. `-X` / `-Y`→월드 `+Y` 가 왼쪽의 Behavior 미러와 행렬 단위로 같다(4e-16).
+- mayapy 2024 10항목 — 템플릿 전체 두 벌(예전/새 규칙) 대조로 **쇄골 둘 말고는 전부 예전과 같음**(1e-13). 규칙 없는 조인트는 `helper_root` 하나. #A00130
+
 > [!summary] `A00060_jointTool_V03` `Orient > Aim` 에 **Mode `Chain` / `Root`** — Root 는 루트 하나로 모든 최하위 자식까지, 루트마다 pole 하나 (v03.10 -> 03.11)
 - **요청**: A00145 Mirror 탭의 Mode 처럼 라디오 두 개. Chain 은 지금처럼 Start/End, Root 는 그 자리에 Root 리스트 하나 — 리스트의 각 루트부터 최하위 자식까지 aim, 루트에 대응하는 pole tgt 하나를 향하게.
 - 분기점은 **첫 번째 자식**을 조준(마야 `Orient Joint` 와 같은 규칙), 나머지 가지도 끝까지. 계산은 Chain 과 같은 `_apply_tasks` 공유.

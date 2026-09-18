@@ -447,7 +447,9 @@ def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True):
         rule = "A1 world zero" if use_zero else "A1 aim"
         expect = None if use_zero else (group.get("up"), group.get("up_world"))
         for name in group["joints"]:
-            add(name, rule, up_expect=expect)
+            row = add(name, rule, up_expect=expect)
+            if group.get("aim_at") and name == group["joints"][-1] and not use_zero:
+                row["note"] = (row["note"] + " | " if row["note"] else "") +                     "aims at {0}".format(group["aim_at"])
 
     # ---- 3. A2 ----
     for chain in (doc.get("pole_chains") or []):
@@ -713,6 +715,15 @@ def _do_aim_groups(doc, world_zero_spine, namespace, results, messages):
                 continue
 
             child = nodes[i + 1] if i + 1 < len(nodes) else None
+            if not child and group.get("aim_at"):
+                # `aim_at` - 마지막 조인트가 겨눌 조인트. **겨누기만 하고 방향은 안 잡는다**
+                # (예: 쇄골 -> upperarm. upperarm 의 방향은 A2 팔 규칙이 맡는다) - v02.24
+                child = _resolve(group["aim_at"], namespace)
+                if not child:
+                    results["skipped"] += 1
+                    messages.append("[Warning] {0}: aim target {1} is not in the scene.".format(
+                        su.short_name(node), group["aim_at"]))
+                    continue
             if not child:
                 # 마지막 조인트는 앞 조인트의 방향을 물려받는다 (계획서 5-4)
                 prev = nodes[i - 1] if i > 0 else None

@@ -9,7 +9,7 @@
     "Order matters and the tool enforces it (plan 4-6):",
     "  1 mirror        - the right side needs positions before anything is aimed,",
     "                    and A2 reads the mirrored pole targets",
-    "  2 aim_groups    - A1, the spine",
+    "  2 aim_groups    - A1, the spine and the clavicles",
     "  3 pole_chains   - A2, arms and legs (+ tail / preserve)",
     "  4 position_only - forced last so world-zero rotation wins over the mirror",
     "",
@@ -37,6 +37,37 @@
       "up": "+Z",
       "up_world": "+Z",
       "world_zero_option": true
+    },
+    {
+      "name": "clavicle_l",
+      "comment": [
+        "A1. forward +X at the child helper_upperarm_l, +Y toward world +Y (v02.24).",
+        "'aim_at' only aims - the upperarm's own orientation is A2 arm_l's job."
+      ],
+      "joints": [
+        "helper_clavicle_l"
+      ],
+      "aim_at": "helper_upperarm_l",
+      "forward": "+X",
+      "up": "+Y",
+      "up_world": "+Y"
+    },
+    {
+      "name": "clavicle_r",
+      "comment": [
+        "The behavior mirror of clavicle_l, written as a rule (v02.24). The early arm",
+        "mirror copies the left clavicle BEFORE clavicle_l above is aimed, so without",
+        "this the right clavicle would keep the old left orientation.",
+        "Behavior mirror = forward -X (like arm_r) and -Y toward world +Y - checked",
+        "against the mirror matrix of the left clavicle in mayapy."
+      ],
+      "joints": [
+        "helper_clavicle_r"
+      ],
+      "aim_at": "helper_upperarm_r",
+      "forward": "-X",
+      "up": "-Y",
+      "up_world": "+Y"
     }
   ],
   "pole_chains": [

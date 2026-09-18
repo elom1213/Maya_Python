@@ -1,6 +1,6 @@
 ---
 name: wip-a00130-orient
-description: A00130_ControlRig_V02 Orient & Place 단계 — 규칙 A1/A2/A3 가 결국 한 계산(aim+up hint). 부모를 돌리면 후손이 전부 딸려 움직이고, forward 를 맞추면 up 은 직교화만큼 기운다 (v02.04)
+description: A00130_ControlRig_V02 Orient & Place 단계 — 규칙 A1/A2/A3 가 결국 한 계산(aim+up hint). 부모를 돌리면 후손이 전부 딸려 움직이고, forward 를 맞추면 up 은 직교화만큼 기운다. 쇄골은 aim_at + 오른쪽도 규칙으로(v02.24)
 metadata:
   type: project
 ---
@@ -89,3 +89,10 @@ A2 가 **오른쪽 폴 타깃 위치를 읽으므로** 미러가 먼저다.
 
 검증 **Orient 67 + Match 110 + Length 126 + IK 44 = 347항목**.
 [[mayapy-headless-verify]] · [[undo-chunk-by-default]]
+
+**쇄골 (v02.24, 2026-09-18)** — `clavicle_l` : A1 `+X` 가 **`aim_at: helper_upperarm_l`**, `+Y`→월드 `+Y`.
+`aim_at` = 리스트 밖 조인트를 **겨누기만**(리스트에 upperarm 을 넣으면 방향까지 잡아 A2 와 겹친다).
+**★ 왼쪽만 규칙을 주면 오른쪽이 어긋난다** — 이른 팔 미러가 **정렬 전** 왼쪽 쇄골을 복사한다. 그래서
+`clavicle_r` 도 규칙으로: `-X` / `-Y`→월드 `+Y` = 왼쪽의 Behavior 미러와 행렬 단위로 같다(4e-16).
+검증은 템플릿 전체 두 벌(예전/새 규칙)을 네임스페이스 `A:`/`B:` 로 만들어 **쇄골 둘 말고 전부 같은지** 대조.
+규칙 없는 조인트는 이제 `helper_root` 하나.

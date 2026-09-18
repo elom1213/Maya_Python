@@ -3,6 +3,21 @@
 `A00130_ControlRig`(V01)의 **템플릿 조인트 패러다임 재작성판**이다.
 계획서: `JUN_All/docs/plans/A00130_ControlRig_V02_plan.md`
 
+## v02.24 (2026-09-18)
+**[Feature] `Orient & Place` — `helper_clavicle_l` 에 규칙: `+X` 가 바로 아래 `helper_upperarm_l` 을 보고, `+Y` 가 월드 `+Y` 쪽.**
+
+- **요청**: helper_clavicle_l 의 하위본(helper_upperarm_l)을 X forward 로 향하고 up 벡터는 Y 축이 되도록.
+- A1 규칙(`aim_groups`)에 **`aim_at`** 을 더했다 — 마지막 조인트가 **겨누기만 할** 조인트. 쇄골 리스트에 upperarm 을
+  같이 적으면 upperarm 의 방향까지 A1 이 잡아 A2 팔 규칙과 겹친다. `aim_at` 은 겨누기만 하고 방향은 A2 에 맡긴다.
+- **오른쪽 쇄골도 같이 넣었다** — `clavicle_r` : forward `-X` 로 `helper_upperarm_r`, `-Y` 가 월드 `+Y` 쪽.
+  이른 팔 미러가 **정렬 전의 왼쪽 쇄골**을 복사하므로, 이게 없으면 오른쪽만 옛 방향으로 남는다.
+  이 규칙은 왼쪽 쇄골의 **Behavior 미러와 행렬 단위로 같다**(검증 오차 4e-16).
+- forward 우선이라 쇄골이 기울면 `+Y` 는 그만큼 월드 `+Y` 에서 기운다(표의 `Up dev`).
+- 규칙이 없는 조인트는 이제 `helper_root` 하나.
+- **검증**(mayapy 2024, 10항목 통과): 템플릿 전체 계층 두 벌(예전 규칙 / 새 규칙)로 — 쇄골 `+X` · `+Y` 방향 ·
+  오른쪽 = 왼쪽의 Behavior 미러(4x4) · **쇄골 둘을 뺀 모든 조인트가 예전과 같음**(월드 행렬, 1e-13) · 팔 위치 불변 ·
+  undo · upperarm 이 없으면 경고 후 건너뜀 · 표(규칙 이름 · `aims at` 메모 · upperarm 은 계속 A2).
+
 ## v02.23 (2026-09-17)
 **[Feature] `Match` 표 — 행을 더블클릭하면 그 Cage set 노드를 마야에서 선택.**
 
