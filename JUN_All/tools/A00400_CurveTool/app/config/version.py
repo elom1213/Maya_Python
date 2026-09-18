@@ -17,6 +17,8 @@
 #                           셰이프 데이터는 Framework/rules/control_shapes.json (공용)
 # 01.16  Display > Replace  - 셰이프 교체를 Controls 에서 떼어 하위 탭으로. 두 칸을 TSL 로,
 #                           개수가 다르면 적은 쪽만큼 1:1
+# 01.17  Color Palette      - Controls 색에 팔레트 팝업(임의 RGB) 추가 — ref_01.mel 과 같이
+#                           overrideRGBColors + overrideColorRGB
 
-VERSION = "01.16"
+VERSION = "01.17"
 LAST_UPDATE = "2026-09-18"

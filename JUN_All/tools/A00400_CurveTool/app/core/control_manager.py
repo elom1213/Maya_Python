@@ -190,8 +190,13 @@ def _shapes_of(node):
                               noIntermediate=True) or []
 
 
-def _set_override(shapes, color=None, display=None):
-    """셰이프들의 drawing override 를 켜고 값을 쓴다. 건드린 셰이프 수."""
+def _set_override(shapes, color=None, display=None, rgb=None):
+    """셰이프들의 drawing override 를 켜고 값을 쓴다. 건드린 셰이프 수.
+
+    color 는 마야 **인덱스 색**, rgb 는 **임의 색**(0~1 세 값)이다. 둘은 `overrideRGBColors`
+    스위치 하나로 갈린다 - 인덱스를 쓰려면 0, RGB 를 쓰려면 1 이어야 해서 **쓸 때마다 맞춰 준다**
+    (ref_01.mel 도 같다). 안 맞추면 색을 넣어도 화면은 이전 모드의 색 그대로다.
+    """
     touched = 0
     for shape in shapes:
         try:
@@ -199,18 +204,24 @@ def _set_override(shapes, color=None, display=None):
                 cmds.setAttr(shape + ".overrideEnabled", 1)
             if display is not None:
                 cmds.setAttr(shape + ".overrideDisplayType", display)
-            if color is not None:
+            if color is not None or rgb is not None:
                 # 색을 지정하면서 template/reference 로 두면 색이 안 보인다 - 원본과 같이 0 으로.
                 if cmds.getAttr(shape + ".overrideDisplayType") != DISPLAY_NORMAL:
                     cmds.setAttr(shape + ".overrideDisplayType", DISPLAY_NORMAL)
+            if color is not None:
+                cmds.setAttr(shape + ".overrideRGBColors", 0)
                 cmds.setAttr(shape + ".overrideColor", int(color))
+            if rgb is not None:
+                cmds.setAttr(shape + ".overrideRGBColors", 1)
+                cmds.setAttr(shape + ".overrideColorRGB",
+                             float(rgb[0]), float(rgb[1]), float(rgb[2]))
             touched += 1
         except Exception as exc:                            # noqa: BLE001
             raise RuntimeError("{0}: {1}".format(shape.split("|")[-1], exc))
     return touched
 
 
-def _apply_to_selection(color=None, display=None, what="color"):
+def _apply_to_selection(color=None, display=None, rgb=None, what="color"):
     """선택한 것들의 셰이프에 override 를 적용한다. `(touched, messages)`.
 
     **선택은 그대로 둔다** - 원본은 끝에서 선택을 지웠는데, 색을 몇 번 바꿔 보는 흐름이
@@ -230,7 +241,7 @@ def _apply_to_selection(color=None, display=None, what="color"):
                     node.split("|")[-1]))
                 continue
             try:
-                touched += _set_override(shapes, color=color, display=display)
+                touched += _set_override(shapes, color=color, display=display, rgb=rgb)
             except RuntimeError as exc:
                 messages.append("[Warning] Could not set the {0} on {1}.".format(
                     what, exc))
@@ -243,8 +254,20 @@ def _apply_to_selection(color=None, display=None, what="color"):
 
 
 def set_color(index):
-    """선택한 컨트롤의 셰이프 색을 마야 오버라이드 인덱스로 바꾼다."""
+    """선택한 컨트롤의 셰이프 색을 마야 오버라이드 **인덱스**로 바꾼다."""
     return _apply_to_selection(color=int(index), what="color")
+
+
+def set_color_rgb(rgb):
+    """선택한 컨트롤의 셰이프 색을 **임의 색(RGB)** 으로 바꾼다. 값은 0~1 세 개.
+
+    인덱스 32색에 없는 색을 쓰려는 경우다(ref_01.mel 의 `Color Palettes` 와 같은 방식) —
+    `overrideRGBColors` 를 켜고 `overrideColorRGB` 에 쓴다.
+    """
+    values = [min(max(float(v), 0.0), 1.0) for v in rgb]
+    if len(values) != 3:
+        raise ValueError("RGB needs three values.")
+    return _apply_to_selection(rgb=values, what="color")
 
 
 def set_display_type(display):
@@ -282,6 +305,11 @@ def reset_color():
                     cmds.setAttr(target + ".overrideEnabled", 0)
                     cmds.setAttr(target + ".overrideColor", 0)
                     cmds.setAttr(target + ".overrideDisplayType", DISPLAY_NORMAL)
+                    # 임의 색(RGB)으로 칠했던 것도 되돌린다 - 스위치만 남으면 다음에 인덱스
+                    # 색을 넣었을 때 "왜 색이 안 바뀌지" 가 된다.
+                    if cmds.attributeQuery("overrideRGBColors", node=target, exists=True):
+                        cmds.setAttr(target + ".overrideRGBColors", 0)
+                        cmds.setAttr(target + ".overrideColorRGB", 0.0, 0.0, 0.0)
                     touched += 1
                 except Exception as exc:                    # noqa: BLE001
                     messages.append("[Warning] Could not reset {0} ({1}).".format(

@@ -31,6 +31,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-18 (오늘)
 
+> [!summary] `A00400_CurveTool` `Create > Controls` 색에 **팔레트 팝업**(임의 RGB) — `ref_01.mel` 과 같은 `overrideRGBColors` 방식 (v01.16 -> 01.17)
+- **요청**: `ref/ref_01.mel` 참고, 정해진 색이 아니라 팔레트에서 고른 색으로. 팔레트는 별도 팝업.
+- `Color Palette...` + 마지막 색 견본(누르면 재적용). 코어 `set_color_rgb()` 는 ref 와 같은 어트리뷰트를 쓴다.
+- **인덱스 색과 임의 색은 `overrideRGBColors` 스위치로 갈린다** — 넣을 때마다 맞춰 주지 않으면 값만 들어가고 화면 색은 그대로다. Reset 도 함께 되돌린다.
+- 팔레트는 마야 `colorEditor` 대신 Qt 팔레트(PySide 창이라 부모·테마가 맞물린다). mayapy 2024 16항목 통과. #A00400
+
 > [!summary] `A00400_CurveTool` 셰이프 교체를 **`Display > Replace`** 하위 탭으로 분리 — 두 칸을 **TSL** 로, 개수가 다르면 **적은 쪽만큼** 1:1 (v01.15 -> 01.16)
 - **요청**: Control 탭의 Shape Replace 를 잘라 Display 하위 탭 `Replace` 로 이식, `Shapes to replace` · `Replacement` 를 TSL 로, 두 리스트 개수가 같으면 1:1 · 다르면 더 작은 개수만큼.
 - TSL 이라 Add/Del/Up/Down 으로 순서를 손보며 여러 번 돌릴 수 있다. 교체본이 하나면 전부에, 여럿이면 순서대로 1:1, 개수가 다르면 `min` 쌍만 하고 몇 쌍인지 로그.

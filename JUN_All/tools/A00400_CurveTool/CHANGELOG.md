@@ -1,5 +1,18 @@
 # Changelog — A00400_CurveTool
 
+## v01.17 (2026-09-18)
+**[Feature] `Create > Controls` 색에 **팔레트 팝업**(임의 RGB) 추가.**
+
+- **요청**: `ref/ref_01.mel` 을 참고해 정해진 색이 아니라 **팔레트에서 고른 색**을 쓸 수 있게, 팔레트는 **별도 팝업**으로.
+- **[Add] `Color Palette...` 버튼 + 마지막 색 견본** — 견본을 누르면 그 색을 다시 입힌다. 취소하면 아무것도 안 바뀐다.
+- **[Add] `control_manager.set_color_rgb(rgb)`** — ref 와 같은 어트리뷰트(`overrideRGBColors` 1 + `overrideColorRGB`), 값은 0~1 로 클램프.
+- **[Fix] 인덱스 색도 `overrideRGBColors` 를 0 으로 되돌린다** — 스위치가 RGB 에 남아 있으면 인덱스를 바꿔도 화면 색이 안 바뀐다.
+  `Reset Color` 도 스위치와 RGB 값을 함께 되돌린다.
+- 팔레트는 마야 `colorEditor` 대신 **Qt 팔레트** — PySide 창이라 팝업도 같은 계열이어야 부모·테마가 맞물린다.
+
+**검증**(mayapy 2024 + 오프스크린 Qt, **16항목 통과**): RGB 적용·클램프·선택 유지 · 인덱스↔RGB 스위치 왕복 ·
+reset · template/reference 해제 · 선택 없음 · 잘못된 값 거절 · UI(버튼·견본·색 적용·재적용·취소·창 폭).
+
 ## v01.16 (2026-09-18)
 **[Change] 셰이프 교체를 `Create > Controls` 에서 떼어 **`Display > Replace`** 하위 탭으로. 두 칸을 **TSL** 로, 개수가 다르면 **적은 쪽만큼** 1:1.**
 

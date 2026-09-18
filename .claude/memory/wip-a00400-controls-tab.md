@@ -34,3 +34,11 @@ metadata:
   (v01.15 까지는 거절 — 원본 bs_controls 도 거절).
 - `Display` 는 원래 "형상 불변" 카테고리였다. Replace 가 셰이프를 바꾸므로 설명을 **"어떻게 보이는지"** 로 바꿨다 —
   분류를 어기고 둔 게 아니라 **분류 문구를 사용자 기준으로 고친 것**이다.
+
+**v01.17 (2026-09-18) 팔레트 색** — `Create > Controls` 에 `Color Palette...` 팝업 + 마지막 색 견본.
+참고 `A00400_CurveTool/ref/ref_01.mel`(JUN 의 Change Override Color).
+- **인덱스 색과 임의 색은 `overrideRGBColors` 스위치 하나로 갈린다** — 0 이면 `overrideColor`(인덱스),
+  1 이면 `overrideColorRGB`. **색을 넣을 때마다 스위치를 맞춰야** 한다. 안 맞추면 값은 들어가는데 화면은 그대로다.
+  `Reset Color` 도 스위치 + RGB 값을 되돌린다.
+- 팝업은 마야 `colorEditor`(ref 가 쓰는 것) 대신 **QColorDialog** — PySide 툴이라 부모·테마·항상 위가 맞물린다.
+  헤드리스 테스트에서는 `QColorDialog.getColor` 를 갈아끼워 확인한다(모달이라 그대로는 못 띄운다).

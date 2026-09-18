@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
 # last Update date : 2026-09-18
-# A00400_CurveTool - Create > Controls 탭 (컨트롤러 커브 만들기 · 색)
+# A00400_CurveTool - Create > Controls 탭 (컨트롤러 커브 만들기 · 색 · 팔레트)
 #
 # Brandon Schaal 의 `bs_controls` / `bs_controlsUI` 를 옮긴 화면이다. 원본 창의 세 섹션 중
 # **만들기와 색** 두 가지를 담는다. 세 번째인 셰이프 교체는 v01.16 에서
@@ -32,6 +32,8 @@ class ControlsTab(QWidget):
         super(ControlsTab, self).__init__(parent)
 
         self._log = log_callback or (lambda text: None)
+        # 팔레트에서 마지막으로 고른 색 (0~1 세 값). 아직 안 골랐으면 None.
+        self._last_rgb = None
 
         self.build_ui()
 
@@ -165,6 +167,27 @@ class ControlsTab(QWidget):
         grid_row.addStretch(1)
         layout.addLayout(grid_row)
 
+        # v01.17 - 인덱스 32색 밖의 색. ref_01.mel 의 `Color Palettes` 와 같은 방식
+        # (`overrideRGBColors` + `overrideColorRGB`)이고, 팔레트는 별도 팝업이다.
+        palette_row = QHBoxLayout()
+        self.btn_palette = QPushButton("Color Palette...")
+        self.btn_palette.setToolTip(
+            "Pick any colour from a palette window (not just the 32 index colours).\n"
+            "The shape is switched to RGB override (overrideRGBColors) and gets\n"
+            "exactly the colour you picked. Reset Color undoes both kinds.")
+        self.btn_palette.clicked.connect(self.on_palette)
+        palette_row.addWidget(self.btn_palette, 1)
+
+        # 마지막으로 고른 색을 보여 주는 견본 + 다시 적용 버튼
+        self.btn_last_color = QPushButton()
+        self.btn_last_color.setFixedSize(SWATCH_W, SWATCH_H)
+        self.btn_last_color.setToolTip("Apply the colour you picked last.")
+        self.btn_last_color.clicked.connect(
+            lambda: self.on_rgb(self._last_rgb) if self._last_rgb else self.on_palette())
+        palette_row.addWidget(self.btn_last_color)
+        layout.addLayout(palette_row)
+        self._show_last_color()
+
         self.btn_reset_color = QPushButton("Reset Color")
         self.btn_reset_color.setToolTip(
             "Turn the drawing overrides off again, on both the transform and the\n"
@@ -199,6 +222,35 @@ class ControlsTab(QWidget):
     def on_color(self, index):
         _touched, messages = ctl_mgr.set_color(index)
         self._log_all(messages)
+
+    def on_palette(self):
+        """팔레트 팝업을 띄워 임의 색을 고르고, 고른 색을 선택한 컨트롤에 입힌다.
+
+        ★ 마야의 `cmds.colorEditor`(ref_01.mel 이 쓰는 것) 대신 **Qt 팔레트**를 쓴다 -
+        이 툴은 PySide 창이라 팝업도 같은 위젯 계열이어야 부모·테마·항상 위 설정이 맞물린다.
+        고르는 값은 같은 0~1 RGB 이고, 들어가는 어트리뷰트도 ref 와 같다.
+        """
+        start = QColor.fromRgbF(*self._last_rgb) if self._last_rgb else QColor(255, 255, 0)
+        picked = QColorDialog.getColor(start, self, "Control Color")
+        if not picked.isValid():        # 취소
+            return
+        self._last_rgb = (picked.redF(), picked.greenF(), picked.blueF())
+        self._show_last_color()
+        self.on_rgb(self._last_rgb)
+
+    def on_rgb(self, rgb):
+        _touched, messages = ctl_mgr.set_color_rgb(rgb)
+        self._log_all(messages)
+
+    def _show_last_color(self):
+        """견본 버튼에 마지막으로 고른 색을 칠한다(아직 없으면 빈 칸)."""
+        if not self._last_rgb:
+            self.btn_last_color.setStyleSheet("border: 1px dashed #808080;")
+            self.btn_last_color.setText("")
+            return
+        r, g, b = (int(round(v * 255)) for v in self._last_rgb)
+        self.btn_last_color.setStyleSheet(
+            "background-color: rgb({0}, {1}, {2}); border: 1px solid #202020;".format(r, g, b))
 
     def on_display(self, display):
         _touched, messages = ctl_mgr.set_display_type(display)
