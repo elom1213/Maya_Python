@@ -2,6 +2,16 @@
 
 All notable changes to this tool are documented here.
 
+## [01.12] - 2026-09-18
+### Changed
+- **Shrink animation loops forever.** Each stage stays on screen 0.5 s - only the top file,
+  then with its two children, then the full tree - and it starts over, one round every 1.5 s.
+  It no longer stops when the tree is complete. Nothing is redrawn during the 0.5 s holds.
+- **The bottom pair of files is gone** - the tree is now 5 rows: the top file, two children,
+  one grandchild under each.
+- **Thicker lines** - the branch lines and the file icon outline are 2 px instead of 1 px
+  (the icon is now 10 x 12). With 5 rows each row is about 15 px, so it still fits the 350 x 78 window.
+
 ## [01.11] - 2026-09-18
 ### Added
 - **Shrink: a small file tree grows next to the buttons.** Only the top file icon shows at first;
