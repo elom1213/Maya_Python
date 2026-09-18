@@ -14,6 +14,7 @@
 import os
 import time
 
+from Framework.qt import JUN_mod_checkList_qt
 from Framework.qt.qt import (
     Qt,
     QEvent,
@@ -124,8 +125,14 @@ class PathStructureTab(QWidget):
         layout.addLayout(folders_row)
 
         self.list_folders = QListWidget()
-        self.list_folders.setToolTip("Only checked folders are recorded.")
+        self.list_folders.setToolTip(
+            "Only checked folders are recorded.\n"
+            "Shift / Ctrl click to select several rows - clicking the check box of a\n"
+            "selected row (or Space) checks or unchecks every selected row.")
         self.list_folders.itemChanged.connect(self._on_folder_item_changed)
+        # v01.31 : 고른 행 한꺼번에 체크 (Framework 공용 동작).
+        self._check_folders = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(
+            self.list_folders)
         layout.addWidget(self.list_folders)
 
         # Name

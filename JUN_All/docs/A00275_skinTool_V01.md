@@ -10,7 +10,7 @@ updated: 2026-09-17
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
+- **버전**: `app/config/version.py` (v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
   (v01.22 는 아래 레이어 lock 이 사라졌다) · v01.22 — **`Weights > Layer`** 신규: 버텍스 순서가 같은 메시 N 개의
   웨이트를 메시마다 lock + Blend 로 레이어처럼 합성해 새 메시로 만들거나 기존 메시를 갱신 · v01.15 — **탭 재분류**:
   평평한 탭 7개를 `카테고리 3 → 기능 7` 의 2단 구조로, 아래 표)
@@ -334,7 +334,8 @@ lock 이 있는 레이어마다 (아래 -> 위):
    - **Select Scope** 로 저장한 범위를 다시 선택해 볼 수 있다.
    - 같은 메시를 다시 불러오면 체크해 둔 조인트는 유지된다.
 2. **Bound Joints** 리스트에서 조인트를 체크한다. **Check All / Uncheck All**.
-   여러 행을 골라 두고(Shift/Ctrl) 그중 하나의 체크박스를 누르면 **고른 행 전부**가 같은 상태로 바뀐다(Layer 탭 Lock 과 같은 조작).
+   여러 행을 골라 두고(Shift/Ctrl) 그중 하나의 체크박스(또는 `Space`)를 누르면 **고른 행 전부**가 같은 상태로 바뀐다(Layer 탭 Lock 과 같은 조작).
+   v01.28 부터 Framework 공용 동작 [`MOD_checkList_qt`](Framework_MOD_checkList_qt.md) 을 쓴다.
 3. **Condition**
    - `Weight >= Value` / `Weight <= Value` — **경계값은 포함**(float 오차 1e-6 허용, 1.0 이 0.99999994 로 읽혀도 `>= 1.0` 에 걸린다).
    - `Value` — 0~1 (스핀 박스 + 슬라이더).

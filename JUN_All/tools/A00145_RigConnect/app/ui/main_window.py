@@ -1818,9 +1818,14 @@ class MainWindow(QWidget):
         self.lw_acr_attrs.setMinimumHeight(160)
         self.lw_acr_attrs.setToolTip(
             "Check the attributes to create.\n"
+            "Shift / Ctrl click to select several rows - clicking the check box of a\n"
+            "selected row (or Space) checks or unchecks every selected row.\n"
             "Select (highlight) a row and use Edit / Remove to change the profile.\n"
             "Double-click a row to edit it.")
         self.lw_acr_attrs.itemChanged.connect(self._acr_on_item_changed)
+        # v01.50 : 고른 행 한꺼번에 체크 (Edit 탭과 같은 Framework 공용 동작).
+        self.chk_acr_attrs = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(
+            self.lw_acr_attrs)
         self.lw_acr_attrs.itemDoubleClicked.connect(
             lambda _item: self.on_acr_edit_attr())
         right.addWidget(self.lw_acr_attrs, 1)

@@ -13,7 +13,7 @@ updated: 2026-09-16
 **V02 에서만 다른 것**만 적는다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (green_dark 테마)
-- **버전**: `app/config/version.py` (v02.00)
+- **버전**: `app/config/version.py` (v02.02 — Mix Targets 두 목록에 Shift / Ctrl 다중 선택 + 다중 체크, 회색 행은 건너뜀 · Framework 공용 동작 [`MOD_checkList_qt`](Framework_MOD_checkList_qt.md) · v02.00 탭 재편)
 - **설치**: `__dragDrop_A00290_V02.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **BSToolV2**
   → `tools.A00290_BSTool_V02.run(True)`
 - **V01 과 동시에 띄울 수 있다** — 창 · 타겟 확장창 · 로그 확장창의 `objectName` 이 전부 갈렸다.

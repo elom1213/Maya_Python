@@ -2,6 +2,12 @@
 
 All notable changes to this tool are documented here.
 
+## [01.31] - 2026-09-18
+### Added
+- **Shift / Ctrl multi-select + multi-check** on the two check lists - Lineage `Add Node from Scan...`
+  and Path Structure `Folders to record`. Clicking the check box of a selected row (or Space) sets
+  every selected row. Framework shared behaviour `JUN_mod_checkList_qt`.
+
 ## [01.29] - 2026-08-03
 ### Added
 - **Path Structure — capture and recreate files, not just folders.** Two checkboxes,

@@ -34,6 +34,7 @@
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_filter_qt
+from Framework.qt import JUN_mod_checkList_qt
 from Framework.qt.maya_window import maya_main_window
 
 print("QT version  :  " + str(QT_VERSION))
@@ -1643,8 +1644,14 @@ class MainWindow(QWidget):
         self.lw_mix_src.setMinimumHeight(200)
         self.lw_mix_src.setToolTip(
             "Check the targets to mix, then give each one an amount below.\n"
-            "The checked amounts are what the other targets get deformed by.")
+            "The checked amounts are what the other targets get deformed by.\n"
+            "Shift / Ctrl click to select several rows - clicking the check box of a\n"
+            "selected row (or Space) checks or unchecks every selected row.")
         self.lw_mix_src.itemChanged.connect(self._on_mix_src_item_changed)
+        # v02.02 : 고른 행 한꺼번에 체크 (Framework 공용 동작). 한 번에 여러 행이 바뀌면
+        # itemChanged 는 누른 행 하나로만 오므로, 행마다 라벨(배율)은 checksChanged 에서 고친다.
+        self.chk_mix_src = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(self.lw_mix_src)
+        self.chk_mix_src.checksChanged.connect(self._on_mix_src_checks_changed)
         layout.addWidget(self.lw_mix_src, 1)
 
         self.flt_mix_src = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
@@ -1714,8 +1721,12 @@ class MainWindow(QWidget):
         self.lw_mix_dest.setMinimumHeight(200)
         self.lw_mix_dest.setToolTip(
             "Check every target that should be deformed by the source mix.\n"
-            "Rows checked as a source are greyed out here - a source is never modified.")
+            "Rows checked as a source are greyed out here - a source is never modified.\n"
+            "Shift / Ctrl click to select several rows - clicking the check box of a\n"
+            "selected row (or Space) checks or unchecks every selected row.")
         self.lw_mix_dest.itemChanged.connect(self._on_mix_dest_item_changed)
+        # 회색(소스로 쓰인) 행은 공용 동작이 건너뛴다 - 고른 범위 안에 있어도 체크되지 않는다.
+        self.chk_mix_dest = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(self.lw_mix_dest)
         layout.addWidget(self.lw_mix_dest, 1)
 
         self.flt_mix_dest = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
@@ -2220,6 +2231,18 @@ class MainWindow(QWidget):
             self._mix_updating = False
         self._mix_sync_dest_enabled()
         self._mix_refresh_counts()
+
+    def _on_mix_src_checks_changed(self, items):
+        """여러 소스 행이 한 번에 바뀌었을 때 행마다 라벨(배율 표시)을 다시 쓴다.
+
+        목록 전체를 보는 일(대상 회색 동기화 · 개수)은 뒤이어 오는 itemChanged 한 번이 한다.
+        """
+        self._mix_updating = True
+        try:
+            for item in items:
+                item.setText(self._mix_src_label(item))
+        finally:
+            self._mix_updating = False
 
     def _on_mix_dest_item_changed(self, _item):
         if self._mix_updating:

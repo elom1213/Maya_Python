@@ -4,7 +4,8 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.49` (`app/config/version.py`) — Attribute > Edit 목록에서 **Shift / Ctrl 로 여러 행을 골라
+- 버전: `v01.50` (`app/config/version.py`) — Attribute > **Create** 목록에도 같은 다중 선택 + 다중 체크
+  · v01.49 는 Attribute > Edit 목록에서 **Shift / Ctrl 로 여러 행을 골라
   한 번에 체크**한다 (§Attribute > Edit)
   · v01.48 은 Attribute > Create 의 `Add` / `Edit` 로 **`enum`** · **`string`**
   어트리뷰트도 정의해 만든다 (§Attribute > Create)
@@ -1070,6 +1071,8 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
 - 전체가 하나의 **undo chunk** 라 `Ctrl+Z` 한 번으로 되돌아간다.
 
 #### Create (v01.33)
+> v01.50: 어트리뷰트 목록도 Shift / Ctrl 로 여러 행을 골라 체크박스 한 번(또는 `Space`)으로 함께 켜고 끈다 (Framework 공용 동작 [`MOD_checkList_qt`](Framework_MOD_checkList_qt.md)).
+
 **씬에 원본이 없어도** 어트리뷰트를 만든다. 정의를 **프로파일**에 적어 두고, 컨트롤러를
 고른 뒤 `Create` 한 번이면 끝이다. 리그마다 늘 같은 어트리뷰트를 손으로 `addAttr` 하던
 일을 없애는 것이 목적이다.

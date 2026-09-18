@@ -17,6 +17,7 @@ import os
 import time
 
 from Framework.core.file_opener import open_path
+from Framework.qt import JUN_mod_checkList_qt
 from Framework.qt.qt import (
     QWidget,
     QVBoxLayout,
@@ -452,6 +453,12 @@ class AddFromScanDialog(QDialog):
             item.setCheckState(Qt.Unchecked)
             item.setData(Qt.UserRole, entry)
             self.list.addItem(item)
+        self.list.setToolTip(
+            "Check the files to add.\n"
+            "Shift / Ctrl click to select several rows - clicking the check box of a\n"
+            "selected row (or Space) checks or unchecks every selected row.")
+        # v01.31 : 고른 행 한꺼번에 체크 (Framework 공용 동작).
+        self._check_list = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(self.list)
         layout.addWidget(self.list, stretch=1)
 
         sel_row = QHBoxLayout()

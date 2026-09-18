@@ -28,8 +28,10 @@ Shift 범위 선택은 **필터에 가려진 행까지** 고른다(Qt 는 숨긴
 신호
 ----
 여러 행을 한 번에 바꿀 때는 `itemChanged` 를 행마다 쏘지 않는다(목록이 크면 호출부 갱신이
-N 번 돈다). 신호를 막고 바꾼 뒤 **`itemChanged` 를 누른 행 하나로 한 번** 쏘고, 바뀐 행 전부는
-`checksChanged(list)` 로 알린다. 코드에서 `setCheckState` 를 부르는 것(Check All 등)은 전파하지 않는다.
+N 번 돈다). 신호를 막고 바꾼 뒤 바뀐 행 전부를 **`checksChanged(list)`** 로 먼저 알리고, 그다음
+**`itemChanged` 를 누른 행 하나로 한 번** 쏜다. 행마다 할 일(라벨 다시 쓰기 등)이 있는 목록은
+checksChanged 를 받는다(A00290 Mix Targets Sources). 코드에서 `setCheckState` 를 부르는 것
+(Check All 등)은 전파하지 않는다. 비활성(회색) 행은 클릭으로도 전파로도 바꾸지 않는다.
 """
 
 from Framework.qt.qt import *
@@ -57,7 +59,7 @@ class JUN_mod_checkList_qt_v01(QObject):
         """viewport 좌표 pos 가 어느 항목의 체크박스 위면 그 항목, 아니면 None."""
         lw = self.list_widget
         item = lw.itemAt(pos)
-        if item is None or not (item.flags() & Qt.ItemIsUserCheckable):
+        if item is None or not self._checkable(item):
             return None
         opt = QStyleOptionViewItem()
         opt.initFrom(lw)
@@ -67,17 +69,28 @@ class JUN_mod_checkList_qt_v01(QObject):
         rect = lw.style().subElementRect(QStyle.SE_ItemViewItemCheckIndicator, opt, lw)
         return item if rect.contains(pos) else None
 
+    @staticmethod
+    def _checkable(item):
+        """사용자가 체크를 바꿀 수 있는 행인가. 비활성(회색) 행은 Qt 기본 처리도 안 바꾼다
+        - 예: A00290 Mix Targets 는 소스로 쓰인 행을 대상 목록에서 비활성으로 잠근다."""
+        flags = item.flags()
+        return bool(flags & Qt.ItemIsUserCheckable) and bool(flags & Qt.ItemIsEnabled)
+
     def visible_selected(self):
-        """보이는(필터에 안 가려진) 선택 행, 목록 순서대로."""
+        """보이는(필터에 안 가려진) · 바꿀 수 있는 선택 행, 목록 순서대로."""
         lw = self.list_widget
-        return [lw.item(i) for i in range(lw.count())
-                if lw.item(i).isSelected() and not lw.item(i).isHidden()
-                and lw.item(i).flags() & Qt.ItemIsUserCheckable]
+        items = [lw.item(i) for i in range(lw.count())]
+        return [it for it in items
+                if it.isSelected() and not it.isHidden() and self._checkable(it)]
 
     # ------------------------------------------------------------------ 변경
 
     def set_checked(self, items, state, anchor=None):
-        """items 를 state 로. 신호는 막고 바꾼 뒤 itemChanged(anchor) 한 번 + checksChanged."""
+        """items 를 state 로. 신호는 막고 바꾼 뒤 checksChanged(바뀐 전부) -> itemChanged(anchor) 한 번.
+
+        순서가 중요하다 - 행마다 할 일(라벨 다시 쓰기 등)은 checksChanged 에서 먼저 끝내고,
+        목록 전체를 보는 일(개수 · 다른 목록 동기화)은 마지막 itemChanged 한 번에서 하게 된다.
+        """
         lw = self.list_widget
         changed = [it for it in items if it.checkState() != state]
         if not changed:
@@ -88,8 +101,8 @@ class JUN_mod_checkList_qt_v01(QObject):
                 it.setCheckState(state)
         finally:
             lw.blockSignals(False)
-        lw.itemChanged.emit(anchor if anchor in changed else changed[0])
         self.checksChanged.emit(changed)
+        lw.itemChanged.emit(anchor if anchor in changed else changed[0])
         return changed
 
     def _toggle_from(self, item):

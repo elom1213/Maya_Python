@@ -48,8 +48,22 @@ self.chk_attrs = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(self.lw_attrs)
   고르지 않은 행, Space, 필터로 가린 행, `itemChanged` 1회, Preview 갱신, Clear Checks.
 - PySide6 오프스크린: 같은 조작 + `checksChanged` 개수.
 
-## 옮겨 올 후보
+## 적용한 곳 (2026-09-18)
 
-- A00145 Attribute > Create 목록 (이미 `ExtendedSelection` + 체크박스)
-- A00275 Select > By Weight — 같은 코드를 자체로 들고 있다
-- A00290 Mix Targets · A00280 · A00210
+| 툴 | 목록 | 비고 |
+|----|------|------|
+| A00145 v01.49 · v01.50 | Attribute > Edit · Attribute > Create | |
+| A00290_BSTool_V02 v02.02 | Mix Targets Sources · Targets to Modify | Sources 는 `checksChanged` 로 행마다 라벨(`x배율`)을 다시 쓴다. Targets 의 회색(소스) 행은 건너뛴다 |
+| A00275 v01.28 | Select > By Weight 의 Bound Joints | 이 탭의 자체 eventFilter(56줄)가 원본 — 공용으로 교체 |
+| A00210 v01.31 | Lineage `Add Node from Scan...` · Path Structure `Folders to record` | standalone(PySide6) — `Framework.qt` 는 maya 없이 import 된다 |
+
+**적용하지 않은 것**
+- 트리 · 표: A00210 Path Structure 미리보기(`QTreeWidget`, 자체 eventFilter), A00275 Layer(`QTreeWidget`),
+  A00420 Wrapper(`QTreeWidget`), A00280(`QTableWidget`). 이 동작은 `QListWidget` 전용이다.
+- A00290_BSTool(V01): V02 로 넘어간 옛 버전이라 그대로 둔다(새 버전은 새 폴더 규칙).
+
+## 호출부가 알아야 할 것
+
+- **행마다 할 일이 있으면 `checksChanged` 를 받는다.** `itemChanged` 는 누른 행 하나로만 온다.
+  순서는 `checksChanged` → `itemChanged` 라서, 행별 처리가 끝난 뒤 목록 전체 처리(개수 · 동기화)가 한 번 돈다.
+- **비활성(`~ItemIsEnabled`) 행은 클릭으로도 전파로도 바꾸지 않는다** — Qt 기본 처리와 같다.

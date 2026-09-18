@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-17
+# last Update date : 2026-09-18
 # A00275_skinTool_V01 - Select > By Weight 탭 UI
 """
 Select > By Weight - 체크한 조인트의 웨이트가 기준값 이상 / 이하인 버텍스를 고르는 탭.
@@ -17,12 +17,14 @@ main_window.py 가 길어서 Layer 탭처럼 위젯 하나로 따로 둔다. 로
 같은 상태로 바뀐다(Layer 탭 Lock 과 같은 조작). 고른 행은 그대로 남는다.
 QListWidget 기본 처리에 맡기면(오프스크린 QTest 실측) 체크 전파는 되지만 **선택이 누른 행 하나로
 풀려서** 다음 클릭부터 한 행씩만 바뀐다 - 그래서 체크박스 위 클릭은 eventFilter 에서 직접 처리한다.
+v01.28 에서 이 처리를 Framework 공용 동작 `JUN_mod_checkList_qt` 로 옮겼다(이 탭의 코드가 원본이다).
 
 모든 UI 문자열은 영어. (한국어는 주석/독스트링만)
 """
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
+from Framework.qt import JUN_mod_checkList_qt
 
 import maya.cmds as cmds
 
@@ -54,7 +56,6 @@ class WeightSelectTab(QWidget):
         super(WeightSelectTab, self).__init__(parent)
         self._log = log_callback or (lambda text: None)
         self.scope = None           # weight_select_manager.load_scope() 결과
-        self._syncing = False       # 체크 전파 중 itemChanged 재진입 방지
         self._build_ui()
         self._update_scope_label()
 
@@ -101,10 +102,9 @@ class WeightSelectTab(QWidget):
             list_min_height=180, log_callback=self._log)
         self.tsl_joints.add_button("Check All", lambda *_: self._set_all_checked(True))
         self.tsl_joints.add_button("Uncheck All", lambda *_: self._set_all_checked(False))
-        self.tsl_joints.list_widget.itemChanged.connect(self._on_item_changed)
-        # 체크박스 클릭은 직접 처리한다 (기본 처리는 고른 행을 클릭한 행 하나로 풀어버린다).
-        self.tsl_joints.list_widget.viewport().installEventFilter(self)
-        self._pressed_check = None
+        # 고른 행 한꺼번에 체크 (기본 처리는 고른 행을 클릭한 행 하나로 풀어버린다).
+        self.chk_joints = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(
+            self.tsl_joints.list_widget)
         root.addWidget(self.tsl_joints, 1)
 
         # --- 조건 ---
@@ -216,62 +216,6 @@ class WeightSelectTab(QWidget):
         for item in self._items():
             item.setCheckState(state)
         lw.blockSignals(False)
-
-    def _check_hit(self, pos):
-        """pos 가 어느 항목의 체크박스 위면 그 항목, 아니면 None."""
-        lw = self.tsl_joints.list_widget
-        item = lw.itemAt(pos)
-        if item is None or not (item.flags() & Qt.ItemIsUserCheckable):
-            return None
-        opt = QStyleOptionViewItem()
-        opt.initFrom(lw)
-        opt.rect = lw.visualItemRect(item)
-        opt.features = (QStyleOptionViewItem.HasCheckIndicator |
-                        QStyleOptionViewItem.HasDisplay)
-        rect = lw.style().subElementRect(QStyle.SE_ItemViewItemCheckIndicator, opt, lw)
-        return item if rect.contains(pos) else None
-
-    def eventFilter(self, obj, event):
-        """체크박스 위 클릭: 누를 때·놓을 때 기본 처리(선택 변경 + 델리게이트 토글)를 막고,
-        놓을 때 한 번만 뒤집는다. 고른 행은 그대로 남는다."""
-        lw = self.tsl_joints.list_widget
-        if obj is not lw.viewport():
-            return False
-        etype = event.type()
-        if etype not in (QEvent.MouseButtonPress, QEvent.MouseButtonRelease,
-                         QEvent.MouseButtonDblClick):
-            return False
-        if event.button() != Qt.LeftButton:
-            return False
-        pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
-        item = self._check_hit(pos)
-        if etype == QEvent.MouseButtonPress:
-            self._pressed_check = item
-            return item is not None
-        if etype == QEvent.MouseButtonDblClick:
-            return item is not None
-        pressed, self._pressed_check = self._pressed_check, None
-        if item is None or item is not pressed:
-            return pressed is not None
-        state = Qt.Unchecked if item.checkState() == Qt.Checked else Qt.Checked
-        item.setCheckState(state)       # 고른 행 전파는 _on_item_changed 가 한다
-        return True
-
-    def _on_item_changed(self, item):
-        """고른 행 중 하나의 체크를 바꾸면 고른 행 전부에 같은 상태를 준다."""
-        if self._syncing or not item.isSelected():
-            return
-        selected = self.tsl_joints.list_widget.selectedItems()
-        if len(selected) < 2:
-            return
-        self._syncing = True
-        try:
-            state = item.checkState()
-            for other in selected:
-                if other is not item:
-                    other.setCheckState(state)
-        finally:
-            self._syncing = False
 
     # ==============================================================
     # 범위

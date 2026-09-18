@@ -1,5 +1,12 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.28 (2026-09-18)
+
+- **[Change] Select > By Weight 의 다중 체크 처리를 Framework 공용 동작으로 옮겼다.** 이 탭이 들고 있던
+  eventFilter · 체크 전파 코드(56줄)가 `Framework/qt/MOD_checkList_qt_v01` 의 원본이다. 조작은 같다
+  (고른 행 체크박스 = 고른 행 전부, 선택 유지). 달라진 점: `Space` 도 고른 행 전부를 바꾸고,
+  필터에 가려진 행은 바꾸지 않는다.
+
 ## v01.21 (2026-09-09)
 
 **[Add] Falloff curve 에 탄젠트(Bezier) — 포인트 사이를 곡선으로.**
