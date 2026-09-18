@@ -4,7 +4,9 @@
 평평하던 상위 탭 5개(그 안에 접이식 6섹션)를 **상위 탭 = 카테고리 / 하위 탭 = 기능**
 의 2단 구조로 다시 나눠 담았다.
 
-- 버전: `v03.08` (`app/config/version.py`) — `Chain > Pole Target` 에 **`Slide`**:
+- 버전: `v03.11` (`app/config/version.py`) — `Orient > Aim` 에 **Mode `Chain` / `Root`**: Root 는 루트 하나로
+  그 아래 **모든 최하위 자식까지** 정렬한다. 두 모드 모두 이제 **움직인 자식을 원위치**시킨다 (§Aim)
+  · v03.08 은 `Chain > Pole Target` 에 **`Slide`**:
   타깃을 **양 끝 사이로** 옮긴다(양수 = 첫 오브젝트 쪽, 음수 = 마지막 쪽).
   v03.08 에서 값에 **0.1 배율**을 곱해 한 칸이 10배 섬세해졌다 (§Pole Target)
   · v03.05 는 **`Fixed distance`**: 체인이 굽어도 **가운데 오브젝트와의 거리가 그대로**다 (§Pole Target)
@@ -130,18 +132,39 @@ A00060_jointTool_V03.run(True)   # True 면 DEV_MODE 에서 reload 후 실행
 ### 4.2 Orient — 방향만 바뀐다
 
 #### Orient > Aim
-Start~End 조인트 체인을 **IK+pole 식으로 정렬**한다 — 회전만 바꾸고 **모든 joint 의 월드 위치는
-완전 보존**. 자식을 향하는 +X 는 그대로 두고, 선택한 **Aim axis** 가 폴 타깃을 향하도록
-X 둘레 트위스트만 적용한다.
+조인트를 **IK+pole 식으로 정렬**한다 — 방향만 바꾸고 **모든 joint 의 월드 위치는 보존**. 각 조인트의 +X 는
+자식을 향하고, 선택한 **Aim axis** 가 폴 타깃을 향하도록 X 둘레 트위스트를 정한다.
 
-- `Start` / `End` / `pole tgt` 리스트(3분할)
-- `Select Start End` / `Add Start End` : Start·End 채우기(`Create > Divide` 와 동일 규칙)
+**Mode (v03.11)** — 위쪽 `Mode` 박스의 라디오로 고른다(A00145_RigConnect Mirror 탭의 Mode 와 같은 모양).
+
+```
+┌ Mode ─────────────────────┐
+│ (•) Chain   ( ) Root      │
+└───────────────────────────┘
+Chain :  [ Start ] [ End ] [ pole tgt ]   + Select Start End / Add Start End
+Root  :  [ Root        ] [ pole tgt ]
+```
+
+- **Chain** — `Start` / `End` 쌍마다 그 사이 체인을 정렬한다(예전 그대로).
+- **Root** — `Start` / `End` 대신 **`Root` 리스트 하나**. 각 루트부터 **모든 최하위 자식까지** 정렬하고,
+  한 루트의 계층 전체가 **같은 줄의 `pole tgt` 하나**(모자라면 마지막 것)를 향한다.
+  - 갈라지는 곳(예: 척추에서 팔)은 **첫 번째 자식**을 조준한다 — 마야 `Orient Joint` 와 같은 규칙.
+    나머지 가지도 각자 끝까지 정렬된다.
+  - 최하위 조인트는 조준할 곳이 없어 그대로 둔다(Chain 의 End 와 같다).
+  - 조인트가 아닌 루트 · 없는 루트 · 자식 없는 루트는 건너뛰고 `[WARN]` 으로 알린다.
+  - 결과 로그: `Make Joint Aim (Root) : N joint(s) under M root(s)`.
+
+- `Select Start End` / `Add Start End` : Start·End 채우기(`Create > Divide` 와 동일 규칙, Chain 모드만)
 - `Aim axis` (X/Y/Z, 기본 Y) : 폴 타깃을 향할 보조축. X 는 트위스트 축이라 보통 Y/Z.
 - `Make Joint Aim` : 각 쌍의 체인을 root→leaf(부모→자식) 순으로 처리. 부모 X 를 **자식의 원본
   위치로 조준**(조준된 체인이면 X 불변=swing 보존)하고, 보조축이 pole 을 향하도록 X 둘레 트위스트를
-  부모 **jointOrient 에 기록**(rotate=0). **translate 는 건드리지 않으므로** 자식이 고정 거리만큼
-  새 X 위에 놓여 **월드 위치가 그대로 유지**된다. `setAttr`(jointOrient)만 쓰므로
-  **레퍼런스 조인트에서도 동작**, `aimConstraint`/reparent 미사용 → 평가 cycle 없음.
+  부모 **jointOrient 에 기록**(rotate=0). 자식이 이미 부모 X 축 위에 있으면 자식은 고정 거리만큼
+  새 X 위에 놓여 **월드 위치가 그대로 유지**된다. `aimConstraint`/reparent 미사용 → 평가 cycle 없음,
+  **레퍼런스 조인트에서도 동작**.
+- **움직인 자식은 원위치 (v03.11)** — 위 설명은 **자식이 부모 X 축 위에 있을 때만** 맞다(mayapy 실측).
+  분기점의 다른 가지(Root 모드)나 X 로 정렬되지 않은 체인은 자식이 옮겨졌다(실측 1.49). 이제 돌린 직후
+  **움직인 자식만** translate 를 고쳐 원래 월드 위치로 되돌린다. 정렬된 체인은 아무것도 쓰지 않아 예전과
+  결과가 똑같다. translate 가 잠겼거나 연결돼 되돌리지 못하면 `[WARN] ... could not put it back`.
 
 #### Orient > Set Orient
 `Joints` 리스트 조인트의 선택 축 `jointOrient` 를 입력 각도로 설정한다.

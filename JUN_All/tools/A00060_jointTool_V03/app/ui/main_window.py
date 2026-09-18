@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-25
+# last Update date : 2026-09-18
 # A00060_jointTool_V03 - Qt UI
 #
 # A00060_jointTool_V02 의 **탭 재분류판**.
@@ -25,6 +25,8 @@
 #          폴 타깃이 주어진 체인에만 폴 벡터 컨스트레인트를 건다.
 #          MEL JointTool V05.03 의 `JUN_cmd_make_jntAim` 이 하던 일로, V02 포팅 때
 #          Aim 탭이 회전 전용으로 다시 설계되면서 사라졌던 경로다.
+# v03.11 : Orient > Aim 에 Mode(Chain / Root) 라디오 - Root 는 Start / End 대신 Root 리스트 하나로
+#          루트 아래 모든 최하위 자식까지, 줄마다 pole tgt 하나를 향하게 정렬한다.
 
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
@@ -102,7 +104,8 @@ CREATE_PAGES = (
 
 ORIENT_PAGES = (
     ("Aim",
-     "Aim - re-orient a chain so that the chosen axis points at a pole target.",
+     "Aim - re-orient a chain (Chain mode) or a whole hierarchy under a root "
+     "(Root mode) so that the chosen axis points at a pole target.",
      "_build_aim_tab"),
     ("Set Orient",
      "Set Orient - set jointOrient on a chain by axis and degree.",
@@ -395,24 +398,57 @@ class MainWindow(QWidget):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
+        # --- 모드 (v03.11) : A00145_RigConnect Mirror 탭의 Mode 와 같은 모양.
+        # 모드가 바꾸는 것은 왼쪽 리스트(Start / End 두 개 <-> Root 하나)와 Start End 버튼뿐이다.
+        # pole tgt 리스트와 Aim axis 는 두 모드가 같이 쓴다.
+        mode_box = QGroupBox("Mode")
+        mode_row = QHBoxLayout(mode_box)
+        self.rb_aim_chain = QRadioButton("Chain")
+        self.rb_aim_chain.setToolTip(
+            "Aim each Start -> End chain in the same row at the pole target in that row.")
+        self.rb_aim_root = QRadioButton("Root")
+        self.rb_aim_root.setToolTip(
+            "Aim every joint under each Root, down to every last child,\n"
+            "at the pole target in that row. Where the hierarchy branches,\n"
+            "a joint aims at its first child (like Maya's Orient Joint).")
+        self.rb_aim_chain.setChecked(True)
+        self.rb_aim_mode = QButtonGroup(self)
+        self.rb_aim_mode.addButton(self.rb_aim_chain, 0)
+        self.rb_aim_mode.addButton(self.rb_aim_root, 1)
+        mode_row.addWidget(self.rb_aim_chain)
+        mode_row.addWidget(self.rb_aim_root)
+        mode_row.addStretch(1)
+        layout.addWidget(mode_box)
+
         self.tsl_aim_start = self._tsl("Start")
         self.tsl_aim_end = self._tsl("End")
+        # Root 모드 : Start / End 자리에 리스트 하나
+        self.tsl_aim_root = self._tsl("Root")
+        self.tsl_aim_root.setToolTip(
+            "Root joints. Each one is aimed together with everything under it,\n"
+            "at the pole target in the same row (the last one if there are fewer).")
         self.tsl_aim_pole = self._tsl("pole tgt")
 
         list_row = QHBoxLayout()
         list_row.addWidget(self.tsl_aim_start)
         list_row.addWidget(self.tsl_aim_end)
+        list_row.addWidget(self.tsl_aim_root)
         list_row.addWidget(self.tsl_aim_pole)
         layout.addLayout(list_row)
 
-        pair_row = QHBoxLayout()
+        self.w_aim_pair = QWidget()
+        pair_row = QHBoxLayout(self.w_aim_pair)
+        pair_row.setContentsMargins(0, 0, 0, 0)
         btn_sel_se = QPushButton("Select Start End")
         btn_add_se = QPushButton("Add Start End")
         btn_sel_se.clicked.connect(self.on_aim_select_startend)
         btn_add_se.clicked.connect(self.on_aim_add_startend)
         pair_row.addWidget(btn_sel_se)
         pair_row.addWidget(btn_add_se)
-        layout.addLayout(pair_row)
+        layout.addWidget(self.w_aim_pair)
+
+        self.rb_aim_mode.buttonToggled.connect(self._on_aim_mode_changed)
+        self._on_aim_mode_changed()
 
         # 옵션 : pole tgt 을 향할 보조축 (primary 는 +X down-bone 고정)
         opt_row = QHBoxLayout()
@@ -1320,13 +1356,54 @@ class MainWindow(QWidget):
         self.tsl_aim_end.append_unique([sel[1]])
         self.log("[OK] Add Start End")
 
+    def _aim_root_mode(self):
+        return self.rb_aim_root.isChecked()
+
+    def _on_aim_mode_changed(self, *_args):
+        """Chain : Start / End 리스트 + Start End 버튼, Root : Root 리스트 하나.
+
+        buttonToggled 는 한 번 바꿀 때 두 번(꺼짐 / 켜짐) 온다 - 상태만 다시 읽으므로 무해하다.
+        """
+        root = self._aim_root_mode()
+        self.tsl_aim_start.setVisible(not root)
+        self.tsl_aim_end.setVisible(not root)
+        self.w_aim_pair.setVisible(not root)
+        self.tsl_aim_root.setVisible(root)
+
     def on_make_aim(self):
-        starts = self.tsl_aim_start.get_all_items()
-        ends = self.tsl_aim_end.get_all_items()
         poles = self.tsl_aim_pole.get_all_items()
         aim_axis = self.cmb_aim_axis.currentIndex() + 1  # 1-base (1=X,2=Y,3=Z)
-        self._run("Make Joint Aim",
-                  lambda: aim_mgr.make_joint_aim(starts, ends, poles, aim_axis))
+
+        if self._aim_root_mode():
+            roots = self.tsl_aim_root.get_all_items()
+            if not roots:
+                self.log("[ERR] Make Joint Aim : Root list is empty")
+                return
+            result = {}
+
+            def _do():
+                result["done"], result["messages"] = aim_mgr.make_joint_aim_roots(
+                    roots, poles, aim_axis)
+
+            self._run("Make Joint Aim (Root)", _do)
+            for message in result.get("messages", []):
+                self.log(message)
+            if "done" in result:
+                self.log("[OK] Make Joint Aim (Root) : {0} joint(s) under {1} root(s)".format(
+                    result["done"], len(roots)))
+            return
+
+        starts = self.tsl_aim_start.get_all_items()
+        ends = self.tsl_aim_end.get_all_items()
+        result = {}
+
+        def _do():
+            result["done"], result["messages"] = aim_mgr.make_joint_aim(
+                starts, ends, poles, aim_axis)
+
+        self._run("Make Joint Aim", _do)
+        for message in result.get("messages", []):
+            self.log(message)
 
     def on_set_orient(self):
         joints = self.tsl_orient_set.get_all_items()
