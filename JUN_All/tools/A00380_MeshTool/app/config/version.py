@@ -1,5 +1,5 @@
 # Mesh Tool
-VERSION = "01.11"
+VERSION = "01.12"
 LAST_UPDATE = "2026-09-18"
 
 # 01.06  Match 탭 From 리스트의 List From Mesh / Add / Del 버튼 글자가 잘리던 문제.
@@ -13,3 +13,5 @@ LAST_UPDATE = "2026-09-18"
 #        예전의 'From 1개 + 씬 선택' 은 없어졌다. 리스트를 바꾸면 미리보기 세션도 버린다
 # 01.11  Apply Match 가 도는 동안 공용 진행률 팝업(JUN_mod_progress_qt_v01). 단계 Reading meshes /
 #        Writing vertices - 미리보기 세션이 있으면 Writing 만. 로그에 걸린 시간
+# 01.12  By Weight: 블렌드셰이프 타겟 Edit(sculpt) 가 켜진 메시에서 Apply 가 pnts setAttr 에러로 실패하던 문제.
+#        Edit 중이면 이동량을 그 타겟 아이템의 델타(inputPointsTarget)에 직접 더한다 (마야 move 와 같은 결과)

@@ -42,6 +42,7 @@
 - [parentMatrix includes own OPM](parentmatrix-includes-offsetparentmatrix.md) — OPM 을 구동할 땐 `obj.parentInverseMatrix` 금지(자기 OPM 을 되먹음), 부모 `worldInverseMatrix` 직결
 - [surface normal handedness](surface-normal-handedness.md) — normal = tanU×tanV, matrix pinning 의 [tanU, N, tanV] 는 왼손계 → Z = tanU×N 로 직교화
 - [constraint target plugs & offset spaces](constraint-target-plugs-and-offset-spaces.md) — 노드 단위 열거, offsetT/R 공간이 다름
+- [sculpt target: pnts redirect](sculpt-target-pnts-redirect.md) — 타겟 Edit 중 `setAttr pnts` 는 타겟으로 새며 에러, 아이템 `inputPointsTarget` 에 직접 더한다
 - [shape.pnts is post-deformation](shape-pnts-is-post-deformation.md) — pnts 는 디포머 뒤에 더해진다
 - blendShape — [delta space = origin](blendshape-delta-space-origin.md) · [target name vs alias](blendshape-target-name-vs-alias.md)(노드 이름 ≠ 웨이트 alias, 인덱스는 max+1) · [live target deltas](blendshape-live-target-inputpointstarget.md)(라이브 타겟은 메시를 옮겨야 함)
 - keys — [setKeyframe insert needs a curve](setkeyframe-insert-needs-existing-curve.md)(없으면 조용히 no-op) · [pasteKey attribute = order match](pastekey-attribute-matches-by-order.md)(plug 단위로) · [animated attr: key + setAttr](animated-attr-setkeyframe-plus-setattr.md)
@@ -95,7 +96,7 @@
 - A00310 — [Type/Token/Rules](wip-a00310-searchtool-rules.md)(공유 Objects 리스트 · 규칙 레지스트리 · Standalone/No Upstream/No Downstream, v01.04) · A00330 — [Set Rename](wip-a00330-set-rename.md) · [Token tab](wip-a00330-token-tab.md)(Rename 하위 탭, 칸 수 자유 Custom/Numbering + Profile, 마야는 `01_a` 를 `_a` 로, 칸 폭 80px, v01.08)
 - A00340 — [SelectionTool](wip-a00340-selectiontool.md) · [button colors](wip-a00340-button-colors.md) · [split layout](wip-a00340-split-layout.md)
 - A00350 — [ArrayCreator](wip-a00350-arraycreator.md) · A00360 — [SortTool](wip-a00360-sorttool.md) · A00370 — [ToolLauncher](wip-a00370-toollauncher.md)
-- A00380 — [MeshTool Peak](wip-a00380-meshtool-peak.md) · [Match tab](wip-a00380-match-tab.md)(v01.10 좌 Source / 우 Targets, 1<=n · n<=n, 리스트 바뀌면 미리보기 세션 폐기) · [Match > By Weight](wip-a00380-match-by-weight.md)(스킨 웨이트 마스크, joint k -> mesh k, v01.09)
+- A00380 — [MeshTool Peak](wip-a00380-meshtool-peak.md) · [Match tab](wip-a00380-match-tab.md)(v01.10 좌 Source / 우 Targets, 1<=n · n<=n, 리스트 바뀌면 미리보기 세션 폐기) · [Match > By Weight](wip-a00380-match-by-weight.md)(스킨 웨이트 마스크, joint k -> mesh k, v01.09 · 타겟 Edit 중이면 델타에 직접, v01.12)
 - A00390 — [WindTool](wip-a00390-windtool.md) · [Chain Wave](wip-a00390-chain-wave.md) · [V02 axis & driver](wip-a00390-v02-axis-driver.md) · [V02 Envelope](wip-a00390-v02-envelope.md) · [Lite debug curve](wip-a00390-lite-debug-curve.md)(v02.03)
 - A00400 — [CurveTool](wip-a00400-curvetool.md) · [Smooth](wip-a00400-smooth-tab.md)(닫힌 커브 우회, v01.09) · [Points to Curve](wip-a00400-points-to-curve.md) · [Wrap](wip-a00400-curve-wrap.md) · [Joints](wip-a00400-curve-joints.md)(v01.14 NURBS 서피스 U/V 한 줄) · [Controls](wip-a00400-controls-tab.md)(bs_controls 이식, v01.15) · Combine(v01.11, 쉐입 복사 합치기 — [instance trap](parent-shape-add-is-instance.md))
 - A00410 — [SecondaryMotion](wip-a00410-secondarymotion.md)(FK 관성 굽기, v01.08) · A00420 — [Wrapper](wip-a00420-wrapper.md) · A00430 — [DemBone](wip-a00430-dembone.md)

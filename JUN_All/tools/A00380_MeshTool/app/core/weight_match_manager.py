@@ -23,6 +23,8 @@
 #
 # 이동은 Match(Default) 와 같은 `MatchTarget` 을 쓴다 — shape.pnts 구간 setAttr 라
 # Ctrl+Z 한 번에 되돌아가고 히스토리/스킨이 걸린 M_j 에서도 동작한다.
+# 단 M_j 의 blendShape 타겟 Edit(sculpt) 가 켜져 있으면 pnts 가 타겟으로 우회돼 쓰기가
+# 실패한다 → 그 타겟 아이템의 델타에 직접 더한다(`sculpt_target`, v01.12~).
 
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
@@ -30,6 +32,7 @@ import maya.api.OpenMayaAnim as oma
 
 from .peak_manager import _dag_path, _shape_of
 from .match_manager import MatchTarget
+from . import sculpt_target
 
 
 PAIR_ORDER = "order"
@@ -136,7 +139,8 @@ def apply(weight_mesh, target_mesh, pairs, strength=1.0):
 
     Returns:
         (done, skipped)
-        done    = [(mesh, joints, moved_vertex_count, max_mask)]
+        done    = [(mesh, joints, moved_vertex_count, max_mask, sculpt_label)]
+                  sculpt_label = Edit 중이라 델타를 넣은 타겟("bs.target") 또는 None
         skipped = [(mesh, reason)]
     """
     sw = SkinWeights(weight_mesh)
@@ -174,6 +178,19 @@ def apply(weight_mesh, target_mesh, pairs, strength=1.0):
         t = MatchTarget(shape, tgt_points, world=False,
                         vtx_ids=sorted(mask.keys()), soft_select=False)
         t.weights = mask
-        moved = t.commit(strength)
-        done.append((mesh, list(joints), moved, max(mask.values())))
+
+        # blendShape 타겟 Edit 가 켜져 있으면 pnts 쓰기가 타겟으로 새어 에러가 난다
+        # (sculpt_target 상단 주석). 그 타겟의 델타에 직접 더한다.
+        st = sculpt_target.find_sculpt_target(shape)
+        if st is not None:
+            offsets = {}
+            for i in t.ids:
+                k = strength * mask[i]
+                dx, dy, dz = t.delta[i]
+                offsets[i] = (dx * k, dy * k, dz * k)
+            moved = sculpt_target.add_offsets(shape, st, offsets)
+        else:
+            moved = t.commit(strength)
+        done.append((mesh, list(joints), moved, max(mask.values()),
+                     st.label if st is not None else None))
     return done, skipped

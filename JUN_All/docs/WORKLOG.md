@@ -31,6 +31,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-18 (오늘)
 
+> [!summary] A00380 By Weight — **블렌드셰이프 타겟 Edit 가 켜진 메시**에서 Apply 에러 수정(v01.12)
+- 원인: `sculptTarget` 이 셰이프 `tweakLocation` 을 `bs.inputTarget[g].vertex[0]` 에 연결하면 `setAttr shape.pnts` 가 타겟 델타로 **더해지면서** `RuntimeError` 를 낸다(구간 쓰기는 원소 누락까지). `move -r -os` 는 정상이지만 1만 버텍스 11초 · undo 14초.
+- 수정: 새 `app/core/sculpt_target.py` — Edit 중인 아이템(`5000 + 1000 × sculptInbetweenWeight`)의 `inputPointsTarget` / `inputComponentsTarget` 에 이동량을 더해 setAttr 두 번(1만 버텍스 0.03초, undo 한 번). 라이브 타겟이면 타겟 메시 `pnts` 를 옮긴다(origin world 면 공간 변환). 로그에 `into sculpt target ...`.
+- mayapy 2024 43항목: Edit 없음 · w=1 · 조인트 둘 · 기존 델타 · w=0.5 · origin world/local + 회전·스케일 · 라이브 · 인비트윈 0.5 가 마야 `move` 결과와 일치, undo, pnts 안 건드림. 라이브 + origin world 는 **마야 자체 편집이 어긋나** 공식과 대조해 일치. 마야 GUI 에서는 아직 안 눌러 봄.
+- 남은 것: Match > Default · Peak 은 Edit 중인 메시에 쓰면 같은 에러. #A00380
+
 > [!summary] Framework **리로드 뒤 `super(type, obj)` TypeError 수정** — A00380 `Apply By Weight` 중 `MOD_log_qt_v01.eventFilter` 에서 터지던 것
 - 원인: 툴 실행(`run(True)`)이 DEV_MODE 에서 `Framework` 를 `importlib.reload` 한다. 이미 떠 있던 창의 로그 위젯(옛 클래스 인스턴스)은 툴 창에 eventFilter 를 걸어 둔 채 남는데, `super(JUN_mod_log_qt_v01, self)` 의 클래스 이름이 이제 **새 클래스**를 가리켜 옛 인스턴스와 맞지 않는다. 그 창에 이벤트가 올 때마다(씬 변경 → 다른 툴 창 갱신 등) 에러.
 - 수정: `Framework/qt` 10개 파일의 `super(Class, self)` 32곳을 zero-arg `super()` 로 — 메서드가 정의된 클래스(`__class__` 셀)에 묶여 리로드 뒤에도 맞다. 전부 자기 클래스 메서드 바로 안인지 AST 로 확인 후 치환.

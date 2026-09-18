@@ -16,3 +16,5 @@ A00380_MeshTool v01.09 (2026-09-18): Match 탭을 하위 탭 **Default**(기존 
 
 **Why:** 조인트별로 영역을 쪼갠 코렉티브를 만드는 흐름.
 **How to apply:** 사용자가 짝짓기 방식을 다르게 원하면(예: 메시마다 조인트 여러 개) 여기부터 고친다. 관련 [[wip-a00380-match-tab]] · [[offscreen-size-needs-theme]]
+
+**v01.12**: M_j 의 blendShape 타겟 Edit 가 켜져 있으면 pnts 대신 편집 중인 아이템 델타에 더한다(`sculpt_target.py`). Default · Peak 은 아직 미적용. [[sculpt-target-pnts-redirect]]

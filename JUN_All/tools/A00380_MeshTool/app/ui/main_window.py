@@ -1175,9 +1175,10 @@ class MainWindow(QWidget):
             self.log("{0}: skipped - no joint paired".format(mesh.split("|")[-1]), warn=True)
         for joint in left_joints:
             self.log("{0}: not used - no mesh paired".format(joint), warn=True)
-        for mesh, joints, moved, peak in done:
-            self.log("{0} <- {1}: {2} vertice(s) moved (max weight {3:.3f}).".format(
-                mesh.split("|")[-1], " + ".join(joints), moved, peak), ok=True)
+        for mesh, joints, moved, peak, sculpt in done:
+            self.log("{0} <- {1}: {2} vertice(s) moved (max weight {3:.3f}){4}.".format(
+                mesh.split("|")[-1], " + ".join(joints), moved, peak,
+                " into sculpt target {0}".format(sculpt) if sculpt else ""), ok=True)
         if done:
             self.log("By Weight: {0} mesh(es) toward {1} at strength {2:.3f}.".format(
                 len(done), target, strength), ok=True)

@@ -19,7 +19,7 @@ Maya 안에서 도는 **메시 편집** PySide 툴이다(arch B, in-Maya). **Pea
   - **By Weight** (v01.09~) — 스킨 메시의 **조인트 웨이트를 마스크로** 써서, 메시들을 타깃 모양 쪽으로
     `웨이트 × 델타` 만큼 옮긴다. 블렌드셰이프 타깃에 웨이트 맵(마스크)을 칠한 것과 결과가 같다.
 
-- **버전**: `app/config/version.py` (v01.11)
+- **버전**: `app/config/version.py` (v01.12)
 - **설치**: `__dragDrop_A00380.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **MeshTool** → `tools.A00380_MeshTool.run(True)`
 
 ---
@@ -249,6 +249,14 @@ mask[v] = M_j 에 짝지은 조인트들의 M_w 웨이트 합 (1 로 자름)
 **알아둘 것**
 - 버텍스 수가 M_w 와 다른 메시는 건너뛰고 로그로 알린다. M_tgt 가 다르면 아무것도 하지 않는다.
 - 이동은 Default 와 같은 방식(`shape.pnts` 구간 setAttr)이라 히스토리 · 스킨이 걸린 M_j 에서도 동작한다.
+- **M_j 의 블렌드셰이프 타겟 Edit 가 켜져 있으면**(마야 Shape Editor 나 A00290 Shape Editor 탭, v01.12~)
+  이동을 **그 타겟의 델타에 넣는다** — 마야에서 Edit 를 켜고 버텍스를 손으로 옮긴 것과 같다.
+  로그에 `into sculpt target bs.target` 이 붙는다. 스킨 앞에 들어가므로 조인트를 돌려도 편집이 따라간다.
+  - 델타는 블렌드셰이프 입력(스킨 앞) 공간이다. **바인드 포즈에서** 적용해야 화면 결과가 공식과 맞는다
+    (마야에서 손으로 편집할 때와 같은 조건).
+  - 마야처럼 타겟 weight 로 나누지 않는다. Edit 는 보통 weight 1 로 켜지므로 그대로 맞는다.
+  - 라이브 타겟(타겟 메시가 씬에 연결돼 있음)이면 타겟 메시의 버텍스를 옮긴다. origin world 면
+    공간을 되돌려서 옮긴다(이 조합은 마야 자체 편집이 어긋나는데, 이 툴은 공식대로 맞는다).
 - M_tgt 의 트랜스폼(위치)은 결과에 영향을 주지 않는다 — 로컬 좌표끼리 비교한다.
 - `Strength` 는 모든 마스크에 곱해진다(0~1).
 
@@ -276,6 +284,21 @@ mask[v] = M_j 에 짝지은 조인트들의 M_w 웨이트 합 (1 로 자름)
 `app/core/peak_manager.py`(Peak) 와 `app/core/match_manager.py`(Match) 에 정리돼 있다.
 By Weight 는 `app/core/weight_match_manager.py` — 웨이트는 `MFnSkinCluster.getWeights` 로 한 번에 읽고,
 이동은 Match 의 `MatchTarget` 을 그대로 쓴다(버텍스별 가중치 자리에 소프트 셀렉션 대신 마스크를 넣는다).
+
+**블렌드셰이프 타겟 Edit 모드 (v01.12, `app/core/sculpt_target.py`)** — `sculptTarget` 이 켜지면 셰이프의
+`tweakLocation` 이 `<bs>.inputTarget[g].vertex[0]` 에 연결돼 `.pnts` 가 평범한 tweak 가 아니게 된다.
+Maya 2024 mayapy 실측:
+
+| 쓰기 방법 | 결과 |
+|------|------|
+| `setAttr shape.pnts[..]` | 타겟 델타에 **더해지고**(절대값 아님) `RuntimeError: Maya command error`, 구간이면 일부 원소 누락 — **v01.11 까지의 에러 원인** |
+| `move -r -os vtx` | 정상. 이동량이 편집 중 아이템 `inputPointsTarget` 에 그대로 더해진다. 단 1만 버텍스에 11초, undo 14초 |
+| `xform -os -t vtx` | 타겟에 안 들어간다 |
+
+그래서 마야 `move` 와 같은 일을 한 번에 한다: 아이템 `5000 + 1000 × sculptInbetweenWeight` 의
+`inputPointsTarget` / `inputComponentsTarget` 에 이동량을 더해 setAttr 두 번(undo 가능). 1만 버텍스 0.03초.
+라이브 타겟이면 `inputPointsTarget` 이 연결된 메시에서 다시 계산되므로 그 메시의 `pnts` 를 옮긴다.
+Default 탭과 Peak 탭은 아직 이 경로를 쓰지 않는다(Edit 중인 메시에 쓰면 같은 에러).
 Match 는 Peak 의 공용 헬퍼(`_undo_disabled`, `_selection_map`, `_dag_path`, `_soft_weights`,
 `_contiguous_runs`, `_shape_of`)와 preview/restore/commit·`shape.pnts` 구간 setAttr 모델을
 **그대로 재사용**한다. Peak 과 다른 점은 이동량 계산뿐이다:
