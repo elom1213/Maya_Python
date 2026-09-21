@@ -1,5 +1,23 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.29 (2026-09-21)
+
+- **[Fix] Bind > Bind Pose — `Update Bind Pose` 이 버텍스 노멀을 바꿔 버리던 것을 고쳤다.**
+  조인트를 돌려 변형된 상태에서 `Keep current shape` 로 갱신하면 **위치는 그대로인데
+  셰이딩만 바뀌던** 증상이다.
+  - 원인: `skinCluster.deformUserNormals`(기본 ON)가 **잠긴(user) 노멀을 스킨 행렬로 같이
+    회전**시킨다. `bindPreMatrix` 를 현재 포즈로 바꿔 스킨 변형이 항등이 되는 순간
+    그 회전이 사라져 노멀이 Orig 셰이프의 rest 값으로 돌아간다(mayapy 확인).
+  - 수정: 갱신 전 **스킨 출력의 face-vertex 노멀**을 잡아 둔 뒤, 갱신 후 값이 실제로
+    달라진 **잠긴 노멀만** 체인 헤드(Orig) 셰이프에 다시 굽는다(`polyNormalPerVertex`,
+    undo 가능 · face-vertex 6,400개에 0.05초). 쓰고 나서 되읽어 확인하고, 남아 있으면 경고.
+  - 잠기지 않은 노멀은 위치에서 계산되므로 **건드리지 않는다** — 전부 써버리면 그 자리에서
+    잠겨, 이후 디폼에도 노멀이 따라 돌지 않는 메시가 된다. `Snap mesh to rest shape` 모드는 무관.
+- **[Add] Diagnose 에 `locked norms : N / M (deformUserNormals = ...)` 줄.** 잠긴 노멀이 몇 개인지,
+  스킨이 그걸 돌리고 있는지 바로 보인다.
+- **[Fix] 내부** — `MPlug.asMObject()` 로 얻은 메시 데이터를 지역 변수에만 두고 반환하던 곳을
+  고쳤다. MObject 가 먼저 풀리면 **쓰레기 값을 읽을 수 있다**(실제로 겪음).
+
 ## v01.28 (2026-09-18)
 
 - **[Change] Select > By Weight 의 다중 체크 처리를 Framework 공용 동작으로 옮겼다.** 이 탭이 들고 있던

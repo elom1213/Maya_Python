@@ -40,6 +40,11 @@ Step 2 works with blendShapes before OR after the skin because a blendShape adds
   (measured: w=0.25/0.5/0.75/1.0 → error 0.103/0.220/0.352/0.498), so partial weights are silently
   slightly wrong. Update at neutral (weights 0) or delete targets to freeze deltas.
 - Rebuilt `bindPose` node must inherit the original node name, else `bindPoseNN` piles up.
+- **Locked (user) vertex normals snapped back to rest** while positions stayed put — the skin
+  was rotating them via `deformUserNormals`. Fixed in **v01.29** by re-baking the changed locked
+  normals onto the chain-head shape. See [[skincluster-deforms-user-normals]].
+- `_mesh_from_plug` returned an `MFnMesh` built on a local `asMObject()` result -> garbage reads.
+  See [[mplug-asmobject-lifetime]].
 
 **Design lesson worth repeating:** when a user reports a symptom you can't reproduce, make the tool
 report its own reason — the summary line carries `shape NOT kept: <reason>` and a read-only

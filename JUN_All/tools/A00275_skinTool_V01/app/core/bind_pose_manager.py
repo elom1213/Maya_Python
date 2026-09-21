@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-20
+# last Update date : 2026-09-21
 # A00275_skinTool_V01 - 바인드 포즈 갱신 로직 (maya.cmds / maya.api, UI 비의존)
 #
 # "조인트를 이동·회전한 현재 상태를 새 바인드 포즈로 만든다."
@@ -19,6 +19,10 @@
 #   2) (Keep current shape 모드) 스킨이 만들어내던 변형량을 체인 입력 셰이프에 굽는다.
 #      delta = skinCluster 출력 - skinCluster 입력  을 체인 헤드 셰이프에 더한다.
 #      → 새 입력이 곧 예전 출력이 되어, 화면상 형상이 그대로 유지된다.
+#   2-b) (Keep current shape 모드) 잠긴(user) 버텍스 노멀도 현재 값으로 다시 굽는다.
+#      skinCluster 는 deformUserNormals 로 잠긴 노멀을 스킨 행렬과 함께 회전시키므로,
+#      1) 에서 변형이 항등이 되는 순간 노멀만 rest 로 되돌아간다. 위치는 유지되는데
+#      셰이딩만 달라지는 증상이 이것이다. 잠기지 않은 노멀은 위치에서 계산되므로 둔다.
 #   3) bindPose(dagPose) 노드를 현재 포즈로 다시 만들고 skinCluster.bindPose 에 재연결.
 #      → 마야의 Go to Bind Pose 가 이제 이 포즈로 돌아온다.
 #
@@ -141,7 +145,13 @@ def _reaches_shape(node, shape_long, seen):
 
 
 def _mesh_from_plug(plug, what):
-    """지오 플러그의 데이터를 MFnMesh 로 연다. 메시가 아니면 명확한 예외."""
+    """지오 플러그의 데이터를 (data, MFnMesh) 로 연다. 메시가 아니면 명확한 예외.
+
+    **data 를 함께 돌려주는 이유**: `MPlug.asMObject()` 가 준 데이터는 그 MObject 가
+    살아 있는 동안만 유효하다. `_mesh_from_plug(plug).getPoints()` 처럼 MObject 를
+    지역 변수로만 두면, 함수가 반환되는 순간 데이터가 풀려 쓰레기 값(1e19 같은 수)을
+    읽을 수 있다. 호출부가 data 를 붙들고 있다가 다 읽은 뒤에 놓아야 한다.
+    """
 
     data = plug.asMObject()
 
@@ -149,14 +159,22 @@ def _mesh_from_plug(plug, what):
         raise GeometryNotMesh(
             "{0} is not polygon mesh data (got {1})".format(what, data.apiTypeStr))
 
-    return om.MFnMesh(data)
+    return data, om.MFnMesh(data)
+
+
+def _output_geometry_plug(deformer, index=0):
+    """<deformer>.outputGeometry[index] 플러그."""
+    fn = om.MFnDependencyNode(_depend_node(deformer))
+    return fn.findPlug("outputGeometry", False).elementByLogicalIndex(index)
 
 
 def _deformer_input_points(deformer, index=0):
     """디포머가 실제로 받는 입력 지오의 포인트 (상위 디포머 결과가 반영된 값)."""
     plug = _input_geometry_plug(deformer, index)
-    return _mesh_from_plug(plug, "{0}.input[{1}]".format(deformer, index)).getPoints(
-        om.MSpace.kObject)
+    data, fn = _mesh_from_plug(plug, "{0}.input[{1}]".format(deformer, index))
+    points = fn.getPoints(om.MSpace.kObject)
+    del fn, data                     # 다 읽은 뒤에 놓는다 (위 주석 참고)
+    return points
 
 
 def _deformer_output_points(deformer, index=0):
@@ -164,11 +182,115 @@ def _deformer_output_points(deformer, index=0):
 
     화면의 shape 을 읽으면 하류 디포머까지 섞이므로, 반드시 이 디포머의 출력을 읽는다.
     """
-    fn = om.MFnDependencyNode(_depend_node(deformer))
-    plug = fn.findPlug("outputGeometry", False).elementByLogicalIndex(index)
-    return _mesh_from_plug(
-        plug, "{0}.outputGeometry[{1}]".format(deformer, index)).getPoints(
-            om.MSpace.kObject)
+    plug = _output_geometry_plug(deformer, index)
+    data, fn = _mesh_from_plug(
+        plug, "{0}.outputGeometry[{1}]".format(deformer, index))
+    points = fn.getPoints(om.MSpace.kObject)
+    del fn, data
+    return points
+
+
+# =========================
+# 버텍스 노멀 (잠긴 노멀 유지)
+# =========================
+#
+# skinCluster 는 `deformUserNormals` 가 켜져 있으면(기본값) **잠긴(user) 노멀을 스킨
+# 행렬로 같이 회전시킨다.** 그래서 bindPreMatrix 를 현재 포즈로 바꿔 스킨 변형이 항등이
+# 되는 순간, 회전이 사라지고 노멀이 Orig 셰이프에 저장된 rest 노멀로 되돌아간다.
+# 위치는 pnts 에 구워서 유지되는데 노멀만 튀는 이유가 이것이다 (mayapy 로 확인).
+#
+# 잠기지 않은 노멀은 위치에서 다시 계산되므로 손댈 필요가 없다 — 위치가 같으면 노멀도
+# 같다(확인 완료). 따라서 **잠긴 노멀 중 실제로 값이 달라진 것만** 다시 굽는다.
+
+
+def _deformer_output_normals(deformer, index=0):
+    """디포머 출력의 face-vertex 노멀.
+
+    반환: (faces, vertices, values) — 셋 다 face-vertex 평탄 순서로 길이가 같다.
+    values 는 (x, y, z) 오브젝트 공간 노멀.
+    """
+
+    plug = _output_geometry_plug(deformer, index)
+    data, fn = _mesh_from_plug(
+        plug, "{0}.outputGeometry[{1}]".format(deformer, index))
+
+    counts, vertices = fn.getVertices()
+    _n_counts, normal_ids = fn.getNormalIds()
+    normals = fn.getNormals(om.MSpace.kObject)
+
+    faces = []
+    for face, count in enumerate(counts):
+        faces.extend([face] * count)
+
+    values = [(normals[i].x, normals[i].y, normals[i].z) for i in normal_ids]
+
+    del fn, data
+    return faces, list(vertices), values
+
+
+def _locked_normal_flags(shape):
+    """shape 의 face-vertex 별 '노멀이 잠겨 있는가' 리스트.
+
+    잠긴 노멀만 다시 구워야 한다. 안 잠긴 것까지 polyNormalPerVertex 로 쓰면 그 자리에서
+    잠겨 버려서, 이후 디폼에도 노멀이 따라 돌지 않는 메시가 된다.
+    """
+
+    fn = om.MFnMesh(_dag_path(shape))
+    _counts, normal_ids = fn.getNormalIds()
+
+    cache = {}
+    flags = []
+    for i in normal_ids:
+        if i not in cache:
+            cache[i] = fn.isNormalLocked(i)
+        flags.append(cache[i])
+
+    return flags
+
+
+def _bake_normals(shape, entries, vertex_fv_count, chunk=8000):
+    """(face, vertex, (x, y, z)) 목록을 shape 의 잠긴 노멀로 다시 쓴다.
+
+    vertex_fv_count 는 버텍스별 전체 face-vertex 개수 — 한 버텍스가 통째로 들어왔는지
+    판단하는 데 쓴다.
+
+    `polyNormalPerVertex` 를 쓰는 이유는 undo 가 되기 때문이다 —
+    `MFnMesh.setFaceVertexNormals` 는 빠르지만 undo 큐에 안 올라가서, Ctrl+Z 하면
+    bindPreMatrix 와 위치만 되돌아가고 노멀은 새 값으로 남아 이중으로 어긋난다.
+    컴포넌트를 한 번에 몰아 주면 충분히 빠르다 (face-vertex 6,400개에 0.05초).
+
+    한 버텍스의 face-vertex 가 전부 같은 값이면 `.vtx[i]` 하나로 쓴다. 그래야 공유된
+    노멀이 쪼개지지 않는다.
+    """
+
+    if not entries:
+        return 0
+
+    by_vertex = {}
+    for face, vertex, value in entries:
+        by_vertex.setdefault(vertex, []).append((face, value))
+
+    comps, values = [], []
+
+    for vertex, items in by_vertex.items():
+
+        same = all(
+            abs(items[0][1][k] - v[k]) < 1e-6 for _f, v in items for k in range(3))
+
+        if same and len(items) == vertex_fv_count.get(vertex, -1):
+            comps.append("{0}.vtx[{1}]".format(shape, vertex))
+            values.append(items[0][1])
+            continue
+
+        for face, value in items:
+            comps.append("{0}.vtxFace[{1}][{2}]".format(shape, vertex, face))
+            values.append(value)
+
+    for start in range(0, len(comps), chunk):
+        part = comps[start:start + chunk]
+        cmds.polyNormalPerVertex(*part, xyz=values[start:start + chunk])
+
+    return len(entries)
 
 
 def _upstream_geometry_plug(node, out_plug_name):
@@ -438,6 +560,8 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True):
                 delta = None
                 head = None
                 reason = None       # 굽지 못한 이유 (요약 줄에 그대로 싣는다)
+                normals_before = None
+                locked_flags = None
 
                 if keep_shape:
                     try:
@@ -474,6 +598,13 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True):
                                           skin_out[i].z - skin_in[i].z)
                                          for i in range(len(skin_in))]
 
+                                # 잠긴(user) 노멀은 스킨 행렬을 따라 돌고 있었다.
+                                # 바인드를 갱신하면 그 회전이 사라지므로, 지금 값을
+                                # 잡아 두었다가 뒤에서 되돌려 쓴다.
+                                normals_before = _deformer_output_normals(
+                                    sc, geo_index)
+                                locked_flags = _locked_normal_flags(head)
+
                         # 라이브 blendShape 타겟 경고
                         _, risky = _live_blendshape_targets(mesh)
                         for node, hot in risky:
@@ -492,6 +623,8 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True):
                     except GeometryNotMesh as e:
                         head = None
                         delta = None
+                        normals_before = None
+                        locked_flags = None
                         reason = ("{0} - 'Keep current shape' only works on polygon "
                                   "meshes. Use 'Snap mesh to rest shape' instead"
                                   .format(e))
@@ -532,6 +665,12 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True):
                 # ---- 2) 현재 형상을 체인 입력에 굽는다 -----------------------
                 if keep_shape and head is not None and delta is not None:
                     _bake_delta(head, delta)
+
+                    # ---- 2-b) 잠긴 노멀도 현재 값으로 다시 굽는다 ------------
+                    if normals_before and locked_flags:
+                        messages.extend(
+                            _restore_locked_normals(sc, geo_index, head,
+                                                    normals_before, locked_flags))
 
                 # ---- 3) bindPose 노드 재생성 -------------------------------
                 if rebuild_dag_pose:
@@ -610,6 +749,76 @@ def _bake_delta(shape, delta):
     else:
         cmds.setAttr("{0}.pnts[0:{1}]".format(shape, n - 1),
                      *flat, type="double3")
+
+
+def _restore_locked_normals(sc, geo_index, head, normals_before, locked_flags):
+    """바인드 갱신으로 rest 로 되돌아간 잠긴 노멀을, 갱신 전 값으로 다시 굽는다.
+
+    위치는 pnts 에 굽는 것으로 유지되지만, 잠긴(user) 노멀은 skinCluster 가
+    `deformUserNormals` 로 회전시키고 있던 것이라 스킨 변형이 항등이 되는 순간
+    Orig 셰이프의 rest 노멀로 돌아간다. 그래서 여기서 따로 굽는다.
+
+    잠기지 않은 노멀은 위치에서 계산되므로 손대지 않는다. 잠긴 것 중에서도 **실제로
+    값이 달라진 face-vertex 만** 쓴다 — 조인트를 옮기기만 한 경우처럼 노멀이 그대로면
+    아무것도 건드리지 않는다.
+
+    반환: 메시지 리스트.
+    """
+
+    faces, vertices, before = normals_before
+
+    try:
+        _faces_after, _verts_after, after = _deformer_output_normals(sc, geo_index)
+    except Exception as e:
+        return ["[Warning] {0}: could not read the vertex normals back ({1}). "
+                "Locked normals may have snapped back to the rest pose.".format(sc, e)]
+
+    if len(after) != len(before) or len(locked_flags) != len(before):
+        return ["[Warning] {0}: the face-vertex count changed during the update, so "
+                "locked vertex normals were left untouched.".format(sc)]
+
+    changed = []
+    for i, locked in enumerate(locked_flags):
+        if not locked:
+            continue
+        b, a = before[i], after[i]
+        if max(abs(b[0] - a[0]), abs(b[1] - a[1]), abs(b[2] - a[2])) > 1e-5:
+            changed.append(i)
+
+    if not changed:
+        return []
+
+    fv_count = {}
+    for v in vertices:
+        fv_count[v] = fv_count.get(v, 0) + 1
+
+    try:
+        _bake_normals(head, [(faces[i], vertices[i], before[i]) for i in changed],
+                      fv_count)
+    except Exception as e:
+        return ["[Warning] {0}: locked vertex normals could not be re-baked ({1}). "
+                "The shading may differ from before the update.".format(sc, e)]
+
+    messages = ["[Info] {0}: {1} locked vertex normal(s) re-baked so the shading "
+                "stays as it was.".format(sc, len(changed))]
+
+    # 되읽어 확인 — 잠긴 노멀이 head 와 스킨 출력 사이에서 또 바뀔 수 있다.
+    try:
+        _f, _v, final = _deformer_output_normals(sc, geo_index)
+        worst = 0.0
+        if len(final) == len(before):
+            for i in changed:
+                b, f = before[i], final[i]
+                worst = max(worst, abs(b[0] - f[0]), abs(b[1] - f[1]), abs(b[2] - f[2]))
+        if worst > 1e-3:
+            messages.append(
+                "[Warning] {0}: vertex normals still differ by up to {1:.4f} after "
+                "re-baking. Check for a deformer between the input shape and the "
+                "skinCluster that rewrites normals.".format(sc, worst))
+    except Exception:
+        pass
+
+    return messages
 
 
 def _rebuild_bind_pose(sc, influences):
@@ -720,6 +929,21 @@ def diagnose(skin_clusters):
                     lines.append("  {0}  : NOT A MESH ({1})".format(label, e))
                 except Exception as e:
                     lines.append("  {0}  : FAILED ({1})".format(label, e))
+
+            # 잠긴(user) 노멀 — 있으면 바인드 갱신 때 따로 구워야 한다
+            try:
+                fn = om.MFnMesh(_dag_path(mesh))
+                locked = sum(1 for i in range(fn.numNormals) if fn.isNormalLocked(i))
+                deform = (cmds.getAttr(sc + ".deformUserNormals")
+                          if cmds.attributeQuery("deformUserNormals", node=sc,
+                                                 exists=True) else "n/a")
+                lines.append("  locked norms : {0} / {1}  (deformUserNormals = {2})"
+                             .format(locked, fn.numNormals, deform))
+                if locked:
+                    lines.append("     -> these rotate with the skin, so they are "
+                                 "re-baked when the shape is kept")
+            except Exception as e:
+                lines.append("  locked norms : FAILED ({0})".format(e))
 
             # 체인 워크
             lines.append("  chain walk   :")

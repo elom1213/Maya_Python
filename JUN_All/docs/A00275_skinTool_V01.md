@@ -2,7 +2,7 @@
 title: A00275_skinTool_V01 사용법
 aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose, Move Joints, Edit Mesh, Expand Bind]
 tags: [maya-python, tool-guide, skin, skincluster, bind-pose, rigging]
-updated: 2026-09-17
+updated: 2026-09-21
 ---
 
 # A00275_skinTool_V01 사용법
@@ -10,7 +10,7 @@ updated: 2026-09-17
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
+- **버전**: `app/config/version.py` (v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
   (v01.22 는 아래 레이어 lock 이 사라졌다) · v01.22 — **`Weights > Layer`** 신규: 버텍스 순서가 같은 메시 N 개의
   웨이트를 메시마다 lock + Blend 로 레이어처럼 합성해 새 메시로 만들거나 기존 메시를 갱신 · v01.15 — **탭 재분류**:
   평평한 탭 7개를 `카테고리 3 → 기능 7` 의 2단 구조로, 아래 표)
@@ -407,6 +407,23 @@ lock 이 있는 레이어마다 (아래 -> 위):
 - **여러 skinCluster 동시 처리**
 - **blendShape 등 다른 히스토리가 있어도 동작**하고, 그 히스토리는 보존된다(스킨 앞/뒤 무관)
 - 메시 트랜스폼이 원점이 아니어도, 루트 조인트 자체를 옮겨도 동작
+- **잠긴(user) 버텍스 노멀이 있어도 셰이딩이 그대로다** (v01.29~, 아래)
+
+### 잠긴 버텍스 노멀 (v01.29~)
+
+게임용 아바타처럼 **노멀이 잠긴(locked / frozen) 메시**는 `Keep current shape` 로 갱신하면
+v01.28 까지 **위치는 그대로인데 셰이딩만 달라졌다.**
+
+- **왜**: `skinCluster.deformUserNormals`(기본 켜짐)가 **잠긴 노멀을 스킨 행렬과 함께 회전**시킨다.
+  바인드를 현재 포즈로 갱신하면 스킨 변형이 항등이 되므로 그 회전이 사라지고, 노멀만
+  Orig 셰이프에 저장된 **rest 값으로 돌아간다.** 위치는 `pnts` 에 구워서 유지되니 노멀만 튄다.
+- **지금**: 갱신 전 스킨 출력의 노멀을 잡아 두었다가, **값이 실제로 달라진 잠긴 노멀만**
+  체인 헤드(Orig) 셰이프에 다시 굽는다. 로그에
+  `[Info] <skinCluster>: N locked vertex normal(s) re-baked so the shading stays as it was.`
+- **잠기지 않은 노멀은 건드리지 않는다.** 위치에서 다시 계산되므로 손댈 필요가 없고, 전부
+  써버리면 그 자리에서 잠겨 **이후 디폼에 노멀이 따라 돌지 않는 메시**가 된다.
+- 잠긴 노멀이 몇 개인지는 **Diagnose** 의 `locked norms : N / M (deformUserNormals = True)` 줄로 본다.
+- `Snap mesh to rest shape` 모드는 형상이 rest 로 돌아가는 게 정상이라 노멀도 그대로 둔다.
 
 ### 로그에 뜨는 경고 대응법
 
@@ -416,6 +433,7 @@ lock 이 있는 레이어마다 (아래 -> 위):
 | `bindPreMatrix is locked or connected for ...` | 해당 인플루언스의 `bindPreMatrix` 가 **잠겨 있거나 다른 노드에서 연결**돼 있어 건드리지 않았다. 그 조인트만 갱신에서 빠진다. 포함하려면 잠금 해제 또는 연결 해제 후 다시 실행. |
 | `bind matrices only - shape NOT kept: <이유>` | `Keep current shape` 를 요청했지만 형상을 굽지 못했다. **콜론 뒤에 이유가 함께 나온다** — 아래 표 참고. 바인드 행렬은 갱신됐다. |
 | `still has live target geometry with a non-zero weight` | 아래 항목 참고. |
+| `vertex normals still differ by up to ...` | 잠긴 노멀을 다시 구웠는데도 스킨 출력 노멀이 남아서 어긋난다. 입력 셰이프와 skinCluster 사이에 **노멀을 다시 쓰는 디포머/폴리 노드**가 있는지 본다(Diagnose 의 chain walk). |
 
 #### `shape NOT kept` 이 떴을 때 대응 순서
 
@@ -818,6 +836,9 @@ mayapy 로 직접 검증한 결과다.
    → 새 입력이 곧 예전 출력이 되어 화면상 형상이 그대로 유지된다.
    blendShape 는 정적 델타를 더하는 선형 연산이라 `f(orig + d) = f(orig) + d` 가 성립하므로,
    블렌드셰이프가 스킨 앞이든 뒤든 성립한다.
+2-b. **(Keep 모드) 잠긴 버텍스 노멀도 현재 값으로 다시 굽는다**
+   `deformUserNormals` 가 잠긴 노멀을 스킨 행렬로 돌리고 있었으므로, 1) 로 변형이 항등이 되면
+   노멀만 rest 로 되돌아간다. 갱신 전 값을 잡아 두었다가 **달라진 잠긴 노멀만** 다시 쓴다.
 3. **`bindPose`(dagPose) 노드를 현재 포즈로 재생성**하고 `skinCluster.bindPose` 에 재연결한다.
 
 ---
@@ -851,6 +872,18 @@ mayapy 로 확인한, 전부 **조용히 틀리는** 종류의 함정이다.
   `MPlug.getExistingArrayAttributeIndices` 로 읽는다.
 - `bindPose` 노드를 새로 만든 뒤 **`skinCluster.bindPose` 로 재연결하는 것을 빼먹으면**
   마야의 Go to Bind Pose 가 포즈를 못 찾는다.
+- **`skinCluster` 는 위치만 바꾸는 게 아니다.** `deformUserNormals`(기본 ON)가 **잠긴 노멀을 스킨
+  행렬로 회전**시킨다. 바인드를 갱신해 변형이 항등이 되면 그 회전이 사라져 **노멀만 rest 로
+  돌아간다.** 잠기지 않은 노멀은 위치에서 계산되므로 위치가 같으면 노멀도 같다(확인).
+- **노멀을 다시 쓸 때 `MFnMesh.setFaceVertexNormals` 를 쓰면 안 된다** — `setPoints` 와 같은 이유로
+  undo 가 안 된다. `polyNormalPerVertex` 에 컴포넌트를 몰아 한 번에 준다(6,400 face-vertex 0.05초,
+  히스토리 노드도 안 생긴다). 중간(Orig) 셰이프에 써도 하류로 전달된다(확인).
+- **잠긴 노멀만 골라 쓴다.** 안 잠긴 것까지 `polyNormalPerVertex` 로 쓰면 그 자리에서 잠겨 버린다.
+  `MFnMesh.isNormalLocked(normalId)` 로 판정하고, 한 버텍스의 face-vertex 가 전부 같은 값이면
+  `.vtx[i]` 하나로 써서 공유된 노멀이 쪼개지지 않게 한다.
+- **`MPlug.asMObject()` 가 준 데이터는 그 MObject 가 살아 있는 동안만 유효하다.**
+  `_mesh_from_plug(plug).getPoints()` 처럼 MObject 를 지역 변수로만 두면 함수가 반환되는 순간
+  데이터가 풀려 **`1e19` 같은 쓰레기 값**을 읽는다(실제로 겪음). 호출부가 붙들고 있다가 놓는다.
 
 ### 탭 구조를 건드릴 때 (v01.15~)
 

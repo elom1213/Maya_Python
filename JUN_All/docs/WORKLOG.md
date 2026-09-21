@@ -31,6 +31,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-21 (오늘)
 
+> [!summary] A00275 **Bind Pose** — `Update Bind Pose` 가 **버텍스 노멀**을 바꿔 버리던 버그 수정 (v01.28->01.29)
+- 증상: 리깅된 아바타의 조인트를 바인드와 다르게 회전시킨 뒤 `Update Bind Pose`(Keep current shape) 를 누르면 **위치는 그대로인데 셰이딩이 달라진다.**
+- ★ 원인(mayapy 2024 확인): **`skinCluster.deformUserNormals`(기본 ON)가 잠긴(user) 노멀을 스킨 행렬로 같이 회전**시킨다. `bindPreMatrix` 를 현재 포즈로 바꾸면 스킨 변형이 항등이 되므로 그 회전이 사라져 **노멀만 Orig 셰이프의 rest 값으로 되돌아간다.** 위치는 `pnts` 에 구워 유지되니 노멀만 튄다. 잠기지 않은 노멀은 위치에서 계산되므로 **위치가 같으면 노멀도 같다**(차이 0 확인) — 문제는 잠긴 노멀뿐이다.
+- 수정: 갱신 전 **스킨 출력의 face-vertex 노멀**을 잡아 두고, 갱신 뒤 값이 **실제로 달라진 잠긴 노멀만** 체인 헤드(Orig) 셰이프에 다시 굽는다. `polyNormalPerVertex` 에 컴포넌트를 몰아 한 번에 — **undo 되고**(`MFnMesh.setFaceVertexNormals` 는 안 된다) 히스토리 노드도 안 생기고 face-vertex 6,400개에 0.05초. 쓰고 나서 되읽어 확인, 남으면 경고.
+- 안 잠긴 노멀은 **건드리지 않는다** — 전부 쓰면 그 자리에서 잠겨 이후 디폼에 노멀이 따라 돌지 않는 메시가 된다. 한 버텍스의 face-vertex 가 전부 같은 값이면 `.vtx[i]` 하나로 써서 공유 노멀이 쪼개지지 않게 했다.
+- ★ 겸사: `MPlug.asMObject()` 로 얻은 메시 데이터를 **지역 변수에만 두고 MFnMesh 를 반환**하던 `_mesh_from_plug` 를 고쳤다. MObject 가 먼저 풀리면 `1e19` 같은 **쓰레기 값을 읽는다**(진단 중 실제로 겪음).
+- Diagnose 에 `locked norms : N / M (deformUserNormals = True)` 줄 추가.
+- mayapy 2024 검증: 잠김/안 잠김/부분 잠김, undo(위치·노멀·bindPreMatrix 전부 복귀), `Snap mesh to rest`, blendShape 가 스킨 앞에 있는 체인 — 전부 노멀 차이 0. 마야 GUI 에서는 아직 안 눌러 봄. #A00275
+
 > [!summary] A00440 **Find 탭** — 고른 오브젝트가 **어느 세트에 들어 있는지** 찾아 리스트업, 행 클릭이 그 세트를 씬에서 선택 (v01.03->01.04)
 - 요청: 오브젝트를 TSL 에 담고, 그것들이 속한 세트 `set_i` 를 전부 다른 TSL 에 올린다. 아래 리스트는 Shift 다중 선택이 되고 **씬에서도 그 세트가 선택**되어야 한다.
 - 새 화면 `app/ui/find_tab.py` — 위 `Objects` TSL → `Find Sets` → 아래 `Sets` TSL. 세트마다 `arm_Set : 2 / 3 object(s)` 로 몇 개가 걸렸는지 로그. `Info` · `To Edit`(고른 것 없으면 전부) 버튼. 씬은 **아무것도 바뀌지 않는다**(조회 전용).
