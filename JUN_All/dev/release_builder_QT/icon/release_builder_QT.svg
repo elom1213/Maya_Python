@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Release Builder - 툴을 골라 릴리즈 폴더로 내보낸다.
+       공통 배경 틀(rx=6)은 다른 JUN 툴 아이콘과 같다. 요소는 둘 -
+       ① 열린 상자(릴리즈 패키지) ② 그 안에서 위로 나가는 굵은 화살표(내보내기). -->
+  <rect x="1" y="1" width="30" height="30" rx="6"
+        fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+
+  <!-- 상자 : 아래쪽 몸통 + 뚜껑 두 쪽 -->
+  <path d="M6 18 L6 26 L26 26 L26 18"
+        fill="none" stroke="#7fb3d5" stroke-width="2.6"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M6 18 L11 18" fill="none" stroke="#7fb3d5" stroke-width="2.6"
+        stroke-linecap="round"/>
+  <path d="M21 18 L26 18" fill="none" stroke="#7fb3d5" stroke-width="2.6"
+        stroke-linecap="round"/>
+
+  <!-- 내보내기 화살표 : 상자에서 위로 -->
+  <path d="M16 20 L16 7" fill="none" stroke="#e8c37a" stroke-width="3"
+        stroke-linecap="round"/>
+  <path d="M10.5 12 L16 6 L21.5 12" fill="none" stroke="#e8c37a" stroke-width="3"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

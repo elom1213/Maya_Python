@@ -18,6 +18,12 @@ if ROOT not in sys.path:
 # 툴마다 고유한 패키지 경로(dev.release_builder_QT.app...)로 import 한다.
 # 모든 standalone Qt 툴이 똑같이 최상위 `app` 으로 import 하면 한 인터프리터
 # (예: Maya·공용 런처)에서 두 툴을 동시에 띄울 때 sys.modules['app'] 가 충돌한다.
+from dev.release_builder_QT.app.config import app_meta
+
+# ★ AppUserModelID 는 QApplication 보다 **먼저** 지정해야 작업 표시줄이 이 툴을
+#   파이썬이 아닌 자기 자신으로 본다(docs/taskbar_icon_guide.md).
+app_meta.set_app_user_model_id()
+
 from Framework.qt.qt import QApplication
 from dev.release_builder_QT.app.ui.main_window import MainWindow
 from Framework.themes.theme_manager import ThemeManager
@@ -36,6 +42,11 @@ def run():
     app = existing or QApplication(sys.argv)
 
     ThemeManager.load_theme_dev(app, "dark")
+
+    # 앱 아이콘(작업 표시줄) - 창 아이콘은 MainWindow 가 따로 건다.
+    icon = app_meta.window_icon()
+    if icon is not None:
+        app.setWindowIcon(icon)
 
     win = MainWindow()
     win.show()

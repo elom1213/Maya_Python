@@ -13,6 +13,7 @@
 - [Push includes tool guide docs](push-includes-tool-guide-docs.md) — 툴 push 에 docs 가이드·version·WORKLOG 함께
 - [WORKLOG maintenance](worklog-maintenance.md) — 최신이 위, 날짜 헤딩 중복 금지, 월 롤링
 - [Docs go in JUN_All/docs](docs-go-in-jun-all-docs.md) — 분석/설명 문서 위치
+- [release_builder_QT](wip-release-builder-qt.md) — 릴리즈 복사 개발툴(dev/), v01.02 필터 · 공용 로그창 · 아이콘
 - [Update portfolio on tool work](update-portfolio-on-tool-work.md) — portfolio EN/KR 동기, 커밋 통계 건드리지 않기
 - [Prefer PySide for new tools](prefer-pyside-for-new-tools.md) — 신규 툴은 PySide(arch B)
 - [kangaroo plugin read-only](kangaroo-plugin-external-readonly.md) — 외부 플러그인, 수정 금지
