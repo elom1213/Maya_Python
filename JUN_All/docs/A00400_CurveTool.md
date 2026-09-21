@@ -1,8 +1,8 @@
 ---
 title: A00400_CurveTool 사용법
 aliases: [Curve Tool, CurveTool, A00400]
-tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve, lineWidth, wrap, blendShape, editPoint, laplacian, smoothCurve, softSelect, joint, skinCluster, controller]
-updated: 2026-09-17
+tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve, lineWidth, wrap, blendShape, editPoint, laplacian, smoothCurve, softSelect, joint, skinCluster, controller, shape-transform]
+updated: 2026-09-21
 ---
 
 # A00400_CurveTool 사용법
@@ -22,6 +22,7 @@ Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya).
 | | **Combine** (v01.11~) | 좌측 **Source** 커브의 쉐입을 우측 **Target** 커브에 합친다. 인스턴스가 아닌 **복사본**이라 Source 를 지우거나 고쳐도 영향 없음 |
 | **Display**<br>**어떻게 보이는지**를 바꾼다 | **Line Width** (v01.01~) | 리스트업한 커브의 **뷰포트 표시 굵기**를 슬라이더로 조절 — 씬에서 **잘 보이고 잘 집히게**. 형상은 불변 |
 | | **Replace** (v01.16~) | 컨트롤의 **셰이프를 다른 커브 모양으로 교체**한다(이름·트랜스폼·연결은 그대로). 대상과 교체본을 **TSL 두 칸**에 담아 순서대로 짝짓는다 |
+| | **Transform** (v01.18~) | 리스트업한 커브의 **셰이프 자체**를 **각 커브의 피벗 기준**으로 **스케일 · 이동 · 회전**한다. CV 를 전부 골라 툴을 쓴 것과 같은 결과이고 **트랜스폼 채널은 건드리지 않는다**. X/Y/Z 축마다 켜고 끈다. 기본은 **Scale 만** |
 
 ### 분류 기준 (v01.06)
 
@@ -34,7 +35,10 @@ Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya).
 - **`Display > Replace` 는 셰이프 노드를 갈아 끼우므로 성격은 Edit 에 가깝다** — 그런데도 Display 에 둔 것은
   쓰는 사람이 "이 컨트롤을 **어떤 모양으로 보이게 할까**" 로 찾기 때문이다(v01.16, 사용자 지정).
   그래서 Display 의 설명도 "형상 불변" 이 아니라 **"어떻게 보이는지"** 로 바꿨다.
-- ~~하위 페이지가 하나뿐인 Display 도 하위 탭 바를 그대로 둔다~~ — v01.16 에 `Replace` 가 붙어 둘이 됐다.
+- **`Display > Transform` 도 CV 를 옮기니 성격은 Edit** — 그런데도 Display 에 둔 것은 같은 이유다(v01.18,
+  사용자 지정). 쓰는 사람은 "이 컨트롤을 **얼마나 크게 · 어느 방향으로 보이게 할까**" 로 찾고,
+  바로 옆 `Replace` 와 한 묶음으로 쓴다(모양을 갈아 끼우고 → 크기를 맞춘다).
+- ~~하위 페이지가 하나뿐인 Display 도 하위 탭 바를 그대로 둔다~~ — v01.16 에 `Replace`, v01.18 에 `Transform` 이 붙었다.
   탭 하나짜리였을 때도 탭 바를 둔 이유(기능 이름이 화면에 남고, 늘어나도 구조가 그대로)가 그대로 맞았다.
 
 - **Joints 는 조인트·컨트롤러를 새로 만들지만 Create 가 아니라 Edit** — Create 의 기준은
@@ -139,7 +143,13 @@ tools/A00400_CurveTool/
     ├── core/smooth_manager.py       # CV 라플라시안 스무딩
     ├── core/wrap_manager.py         # rebuildCurve + blendShape 래핑
     ├── core/joint_curve_manager.py  # 커브 위 균일 조인트 + skinCluster 바인드 + 컨트롤러 스택
-    └── ui/main_window.py       # PySide UI (카테고리 상위 탭 + 기능 하위 탭 + 로그)
+    ├── core/combine_manager.py      # Source 쉐입을 Target 에 복사해 합치기
+    ├── core/control_manager.py      # 컨트롤러 커브 34종 생성 · 색 · 셰이프 교체
+    ├── core/shape_xform_manager.py  # 셰이프(CV) 를 피벗 기준으로 scale / rotate / move
+    ├── ui/controls_tab.py           # Create > Controls 화면
+    ├── ui/replace_tab.py            # Display > Replace 화면
+    ├── ui/shape_xform_tab.py        # Display > Transform 화면
+    └── ui/main_window.py            # PySide UI (카테고리 상위 탭 + 기능 하위 탭 + 로그)
 ```
 
 **탭 구조 (v01.06~)** — `MainWindow` 안의 표가 분류를 정한다.
@@ -150,7 +160,9 @@ CREATE_PAGES  = (("From Edges", tip, "_build_create_tab"),
 EDIT_PAGES    = (("Smooth", tip, "_build_smooth_tab"),
                  ("Wrap",   tip, "_build_wrap_tab"),
                  ("Joints", tip, "_build_joints_tab"))
-DISPLAY_PAGES = (("Line Width", tip, "_build_width_tab"),)
+DISPLAY_PAGES = (("Line Width", tip, "_build_width_tab"),
+                 ("Replace",    tip, "_build_replace_tab"),
+                 ("Transform",  tip, "_build_shape_xform_tab"))
 
 CATEGORIES = (("Create",  tip, CREATE_PAGES,  "create_tabs"),
               ("Edit",    tip, EDIT_PAGES,    "edit_tabs"),
@@ -599,6 +611,70 @@ TSL 이라 `Add` · `Del` · `Up` · `Down` 으로 목록과 **순서**를 그�
 같은 개수 → 순서대로 1:1 · 대상이 더 많음 → 앞 2쌍만, 나머지 불변 + 로그 · 교체본이 더 많음 → 앞 2쌍 ·
 교체본 1개 → 전부 · Display 하위 탭이 `Line Width` + `Replace` · `Create > Controls` 에서 교체 위젯이 사라짐 ·
 TSL 두 개 · 씬 선택으로 리스트업 · UI 실행 · 빈 리스트 경고 · 창 폭.
+
+---
+
+## Display > Transform (v01.18~) — 셰이프를 피벗 기준으로 크게 · 옮기고 · 돌리기
+
+리스트에 담은 커브마다 **그 커브의 피벗**을 기준으로 **셰이프(CV 전체)** 를
+**스케일 / 이동 / 회전**한다. 뷰포트에서 그 커브의 CV 를 **전부 골라** Scale · Move · Rotate 툴을
+쓴 것과 **같은 결과**이고, 트랜스폼의 `scale` / `rotate` / `translate` 채널은 **전혀 건드리지 않는다**
+— 컨트롤러의 채널은 기본값(0 / 1)으로 남아 있어야 하기 때문이다.
+
+### 사용법
+
+1. 커브(컨트롤)를 씬에서 고르고 **`List Selected Curves`**.
+2. 쓸 줄만 켠다 — **`Scale` / `Move` / `Rotate`** 체크박스. **기본은 `Scale` 만 켜져 있다.**
+3. 각 줄에서 **X / Y / Z 축 체크박스**로 적용할 축을 고르고 값을 친다.
+4. **`Apply to Shapes`**. 다시 누르면 한 번 더 걸린다(스케일은 곱해지고, 이동·회전은 더해진다).
+
+| 위젯 | 내용 |
+|------|------|
+| `Scale` | 배율. `1` = 그대로, `2` = 두 배, `0.5` = 절반. **음수면 그 축으로 뒤집힌다**(미러) |
+| `Move` | 씬 단위 이동량. **그 커브 자신의 축** 방향 |
+| `Rotate` | 도(degree). **XYZ 순**, 그 커브 자신의 축 |
+| 축 체크박스 | **끄면 그 축은 중립값**(스케일 1 / 이동·회전 0) — 아무 것도 안 한 것과 같다 |
+| `Uniform` | **Scale 전용**. 한 칸에 친 값을 **켜 둔 다른 축**에도 그대로 넣는다(세 축을 같은 배율로 키우는 것이 대부분이라 기본 켬) |
+| `Reset Values` | 칸만 기본값으로(스케일 1 / 이동 0 / 회전 0). **씬은 건드리지 않는다** |
+
+### 기준점과 축 ★
+
+```
+new_cv = pivot + T + R * (S * (cv - pivot))          # 스케일 → 회전 → 이동
+```
+
+- **기준점은 그 커브 트랜스폼의 rotate pivot** 이다. 피벗을 옮겨 둔 컨트롤은 **옮긴 그 자리**가 기준이 된다.
+- 계산은 **오브젝트 공간** — 축은 그 커브 **자신의 로컬 축**이다. 그래서 회전이 들어간 좌우 컨트롤에
+  **같은 값**을 넣으면 각자 자기 축으로 같은 만큼 변한다(월드 축으로 갈리지 않는다).
+- 셋 다 켜면 **스케일 → 회전 → 이동** 순으로 한 번에 걸린다.
+- 트랜스폼 아래 **셰이프가 여러 개**면(합쳐진 컨트롤) **전부 같은 피벗 기준**으로 함께 변환한다 —
+  모양 하나만 움직여 어긋나지 않게.
+
+### 알아둘 것
+
+- CV 쓰기는 `cmds.curve(shape, replace=True, point=...)` **한 번**이다. **undo 가 되고**
+  (API 의 `setCVPositions` 는 undo 큐에 안 남는다) 히스토리가 살아 있는 커브(예: `makeNurbCircle` 이
+  붙은 원)에서도 통하며 degree · CV 수를 보존한다. `setAttr .controlPoints` 는 히스토리가 있으면
+  **절대 위치가 아니라 트윅**이 되므로 쓰지 않는다(같은 판단이 `Edit > Smooth` 에도 있다).
+- **닫힌(주기) 커브**는 `replace=True` 만으로는 거절된다("Must specify knots with the -per option") →
+  `periodic` + `degree` + `knot` 까지 같이 넘긴다. 모든 CV 에 **같은 변환**을 걸어 이음매도 어긋나지 않는다.
+- 커브가 아닌 항목 · 없는 노드는 건너뛰고 **사유를 로그에 적는다**. 전체가 **undo 한 스텝**.
+- 값이 전부 중립(스케일 1 / 이동 0 / 회전 0)이면 아무 것도 하지 않고 경고만 낸다.
+
+### 검증 (mayapy 2024, 코어 23항목 + 오프스크린 Qt UI 20항목 통과)
+
+**코어** — CV 를 전부 골라 `cmds.scale` / `move` / `rotate`(축 = `objectSpace`, 피벗 = 커브의 월드 rotate pivot)
+를 건 결과와 **소수점까지 같음**: 균일 스케일 · 축 하나만 스케일(이동+회전된 트랜스폼) · 옮긴 피벗 기준 스케일 ·
+음수 스케일(미러) · 축 하나만 이동 · degree 1 열린 커브 이동 · 옮긴 피벗 기준 회전 · XYZ 회전(회전된 트랜스폼) ·
+degree 1 커브 회전. 그 밖에 트랜스폼 채널 불변 · 닫힌 커브의 form/CV 수 보존 · 히스토리 커브 · undo 한 스텝 ·
+셰이프 여러 개 · 메시/없는 노드 걸러내기 · 셰이프 노드 직접 입력.
+
+> `cmds.scale` / `rotate` 의 `-pivot` 은 `-objectSpace` 를 줘도 **월드 좌표**다(mayapy 로 확인).
+> 비교할 때 이걸 오브젝트 공간 값으로 넘기면 엉뚱한 결과가 나온다.
+
+**UI** — Display 하위 탭이 `Line Width` / `Replace` / `Transform` · 기본은 Scale 만 켜짐(나머지 칸은 비활성) ·
+축을 끄면 중립값 · `Uniform` 켬/끔 · `Reset Values` · 빈 리스트 · 아무것도 안 켬 · 중립값 경고 ·
+실제 적용(스케일 배율 + Y 만 이동) · 트랜스폼 채널 불변 · 커브 아닌 항목 로그.
 
 ---
 

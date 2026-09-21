@@ -50,6 +50,7 @@
 - [cmds.toggle not undoable](maya-toggle-cmd-not-undoable.md) — `toggle -localAxis` 대신 setAttr
 - [extendToShape picks wrong shape](extendtoshape-picks-wrong-shape.md) — 금지, 공용 `maya_shape` 사용
 - [pointPosition: points only](pointposition-points-only.md) — 엣지/페이스는 xform 평균
+- [cmds -pivot is world](cmds-scale-rotate-pivot-is-world.md) — `scale`/`rotate` 의 `-pivot` 은 `-objectSpace` 여도 월드
 - [skin weights: physical index](skincluster-weight-index-physical.md) — get/setWeights 는 물리 인덱스
 - [setAttr Int32Array no count](setattr-int32array-no-count.md) — Int32Array 는 개수를 붙이지 않는다
 - [attr reorder = deleteAttr + undo](maya-attr-reorder-deleteattr-undo.md) — 재정렬 명령이 없다, 성공했을 때만 undo, Ctrl+Z 로 안 돌아감
@@ -98,7 +99,7 @@
 - A00350 — [ArrayCreator](wip-a00350-arraycreator.md) · A00360 — [SortTool](wip-a00360-sorttool.md) · A00370 — [ToolLauncher](wip-a00370-toollauncher.md)
 - A00380 — [MeshTool Peak](wip-a00380-meshtool-peak.md) · [Match tab](wip-a00380-match-tab.md)(v01.10 좌 Source / 우 Targets, 1<=n · n<=n, 리스트 바뀌면 미리보기 세션 폐기) · [Match > By Weight](wip-a00380-match-by-weight.md)(스킨 웨이트 마스크, joint k -> mesh k, v01.09 · 타겟 Edit 중이면 델타에 직접, v01.12)
 - A00390 — [WindTool](wip-a00390-windtool.md) · [Chain Wave](wip-a00390-chain-wave.md) · [V02 axis & driver](wip-a00390-v02-axis-driver.md) · [V02 Envelope](wip-a00390-v02-envelope.md) · [Lite debug curve](wip-a00390-lite-debug-curve.md)(v02.03)
-- A00400 — [CurveTool](wip-a00400-curvetool.md) · [Smooth](wip-a00400-smooth-tab.md)(닫힌 커브 우회, v01.09) · [Points to Curve](wip-a00400-points-to-curve.md) · [Wrap](wip-a00400-curve-wrap.md) · [Joints](wip-a00400-curve-joints.md)(v01.14 NURBS 서피스 U/V 한 줄) · [Controls](wip-a00400-controls-tab.md)(bs_controls 이식, v01.15) · Combine(v01.11, 쉐입 복사 합치기 — [instance trap](parent-shape-add-is-instance.md))
+- A00400 — [CurveTool](wip-a00400-curvetool.md) · [Smooth](wip-a00400-smooth-tab.md)(닫힌 커브 우회, v01.09) · [Points to Curve](wip-a00400-points-to-curve.md) · [Wrap](wip-a00400-curve-wrap.md) · [Joints](wip-a00400-curve-joints.md)(v01.14 NURBS 서피스 U/V 한 줄) · [Controls](wip-a00400-controls-tab.md)(bs_controls 이식, v01.15) · Combine(v01.11, 쉐입 복사 합치기 — [instance trap](parent-shape-add-is-instance.md)) · [Shape Transform](wip-a00400-shape-transform.md)(셰이프 CV 를 피벗 기준 scale/move/rotate, 트랜스폼 채널 불변, v01.18)
 - A00410 — [SecondaryMotion](wip-a00410-secondarymotion.md)(FK 관성 굽기, v01.08) · A00420 — [Wrapper](wip-a00420-wrapper.md) · A00430 — [DemBone](wip-a00430-dembone.md)
 - A00440 — [SetTool](wip-a00440-settool.md)(v01.01) · A00450 — [ManipulatorTool](wip-a00450-manipulatortool.md) · A00460 — [FK & IK](wip-a00460-fk-ik.md)(Skip End Joints = FK 체인 끝 n 개 생략, v01.07)
 - A00470 — [MaterialTool](wip-a00470-materialtool.md)(머티리얼 이름 규칙 진단 · 토큰 정렬 DP · 고칠 이름 제안, v01.03) · Copy Material(소스 UUID 기억 → 면별 머티리얼 복사 + 되읽어 확인, v01.05)

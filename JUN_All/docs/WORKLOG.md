@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-09-18
+updated: 2026-09-21
 ---
 
 # 작업 일지 (WORKLOG)
@@ -29,7 +29,18 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-09-18 (오늘)
+## 2026-09-21 (오늘)
+
+> [!summary] A00400 **Display > Transform** — 리스트업한 커브의 **셰이프**를 각자의 피벗 기준으로 스케일 · 이동 · 회전 (v01.17->01.18)
+- 요청: 커브 쉐입을 커브 피벗 기준으로 키우고/줄이고, 같은 방식으로 옮기고 돌린다. X/Y/Z 중 원하는 축만. 기본은 스케일만 켬.
+- 새 코어 `app/core/shape_xform_manager.py` — `new = pivot + T + R * (S * (cv - pivot))`. 기준점은 트랜스폼의 **rotate pivot**, 계산은 **오브젝트 공간**(그 커브 자신의 축)이라 회전된 좌우 컨트롤에 같은 값을 넣으면 각자 자기 축으로 같은 만큼 변한다. 트랜스폼 채널은 안 건드린다. 셰이프가 여러 개면 전부 같은 피벗으로.
+- 새 화면 `app/ui/shape_xform_tab.py` — TSL + Scale/Move/Rotate 세 줄(줄마다 X/Y/Z 체크 + 값), Scale 의 `Uniform`, `Apply to Shapes` / `Reset Values`. 기본은 Scale 만 켜짐(끄면 그 줄 칸이 비활성).
+- CV 쓰기는 `cmds.curve(shape, replace=True, point=...)` 한 번 — undo 되고 히스토리 커브에도 통한다(`setCVPositions` 는 undo 가 안 남고, `setAttr .controlPoints` 는 히스토리가 있으면 트윅이 된다). 닫힌 커브는 `periodic` + `degree` + `knot` 까지.
+- mayapy 2024 코어 23항목 + 오프스크린 Qt UI 20항목 통과. CV 를 전부 골라 `cmds.scale`/`move`/`rotate` 를 건 결과와 소수점까지 일치(스케일·이동·회전 × 피벗 이동/트랜스폼 회전/음수 스케일/degree 1). **`cmds` 의 `-pivot` 은 `-objectSpace` 를 줘도 월드 좌표**라 비교할 때 월드 피벗을 넘겨야 한다(확인). 마야 GUI 에서는 아직 안 눌러 봄. #A00400
+
+---
+
+## 2026-09-18
 
 > [!summary] A00380 By Weight — **블렌드셰이프 타겟 Edit 가 켜진 메시**에서 Apply 에러 수정(v01.12)
 - 원인: `sculptTarget` 이 셰이프 `tweakLocation` 을 `bs.inputTarget[g].vertex[0]` 에 연결하면 `setAttr shape.pnts` 가 타겟 델타로 **더해지면서** `RuntimeError` 를 낸다(구간 쓰기는 원소 누락까지). `move -r -os` 는 정상이지만 1만 버텍스 11초 · undo 14초.

@@ -532,9 +532,9 @@ Default Distance attribute (driver signal x)
   - Headless benchmarking picked `MMeshIntersector` for the closest-point queries — **8x faster** than
     `MFnMesh.getClosestPoint` over 20,000 queries — and moving the coordinate transforms out of the Python loop into
     numpy gets **32,222 source vertices against 39,802 target vertices, 8 projection passes, done in 0.98 s**.
-- **`A00400_CurveTool`** — **five tabs of curve work**. Builds a curve along the **selected mesh edges** (one
-  curve per connected run of edges, direction unified across them) and adjusts curve **line width** live (one
-  undo step per drag). Three tabs were added on top.
+- **`A00400_CurveTool`** — **curve work across three categories of tabs** (Create / Edit / Display). Builds a
+  curve along the **selected mesh edges** (one curve per connected run of edges, direction unified across them)
+  and adjusts curve **line width** live (one undo step per drag). Several tabs were added on top.
   - **Wrap** — makes one curve take the shape of another **even when the two have different CV counts**. Maya's
     stock `wrap` deformer is too unstable between curves to be usable in production, so instead of a deformer
     this wires up **`rebuildCurve` + `blendShape`**: rebuilding the driver at the driven curve's span/degree
@@ -566,6 +566,18 @@ Default Distance attribute (driver signal x)
     Maya's end-pinning then happens entirely inside the padding, so the seam smooths like any other stretch of the
     curve. The result matches Maya's interior stencil (`[-1/18, 2/9, 2/3, 2/9, -1/18]` at degree 3, recovered by
     probing the command with impulse inputs) applied **cyclically**, to `8.9e-16`.
+  - **Shape Transform** — scales, moves and rotates the **curve shape itself** around **each curve's own
+    pivot**, which is what resizing a control actually means: the same result as picking every CV and using the
+    Scale / Move / Rotate tool, while the transform's `translate` / `rotate` / `scale` channels **stay at their
+    defaults** (a control with baked-in channel values is a broken control). Each of the three is ticked on or
+    off separately, per axis. The maths runs in **object space about the transform's rotate pivot**, so the same
+    numbers typed for a left and a right control change each of them along its **own** axes. Verified headless
+    against Maya itself — CV-by-CV identical to `cmds.scale` / `move` / `rotate` on the whole CV set across
+    moved pivots, rotated transforms, negative (mirroring) scales and degree-1 curves — which is also how I
+    found that **`-pivot` is read in world space even when `-objectSpace` is passed**. Writing goes through one
+    `cmds.curve(replace=True)` call per shape, because the API's `setCVPositions` leaves nothing on the undo
+    queue and `setAttr .controlPoints` turns into a **tweak** rather than an absolute position as soon as the
+    curve has history.
 - **`A00040_file_exporter_V02`** — export automation: type filters (applied through group hierarchies), referenced-mesh handling, and a choice of flattening to scene root or preserving hierarchy.
 - **`A00480_FileTool`** — **merged file import / export / path features that lived in two tools into one tabbed window**
   (Export / Import / Path). When moving the exporter I **checked the result against the original** rather than assuming it:

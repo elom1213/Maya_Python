@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-17
+# last Update date : 2026-09-21
 # A00400_CurveTool - Qt UI
 #
 # 1) 선택한 메시 엣지에 부착된 커브를 만든다. 떨어져 있는 엣지 덩어리(연결 성분)마다
@@ -11,7 +11,9 @@
 # 탭은 상위 = 카테고리, 하위 = 기능으로 두 단계다 (A00110_animTool_V02 과 같은 규칙).
 #   Create  > From Edges / From Points   - 씬에 새 커브를 만든다
 #   Edit    > Smooth / Wrap / Joints / Combine - 기존 커브의 형상(CV)을 바꾼다
-#   Display > Line Width / Replace       - 어떻게 보이는지 (굵기 · 컨트롤의 셰이프 교체)
+#   Display > Line Width / Replace / Transform
+#                                        - 어떻게 보이는지 (굵기 · 셰이프 교체 ·
+#                                          셰이프 크기 · 자리 · 방향)
 # 위 1)2) 는 Create > From Edges 이고, Line Width 는 리스트업한 커브의 뷰포트 표시
 # 굵기(nurbsCurve.lineWidth)를 조절한다 — 씬에서 커브를 눈으로 찾고 클릭으로 집기
 # 쉽게 하려는 용도다(형상은 건드리지 않는다). 분류 근거는 MainWindow.CATEGORIES 주석 참고.
@@ -34,6 +36,7 @@ from tools.A00400_CurveTool.app.core import joint_curve_manager as jnt_mgr
 from tools.A00400_CurveTool.app.core import combine_manager as combine_mgr
 from tools.A00400_CurveTool.app.ui.controls_tab import ControlsTab
 from tools.A00400_CurveTool.app.ui.replace_tab import ReplaceTab
+from tools.A00400_CurveTool.app.ui.shape_xform_tab import ShapeTransformTab
 
 
 WINDOW_OBJECT_NAME = "JUN_A00400_CurveTool_window"
@@ -57,7 +60,11 @@ class MainWindow(QWidget):
     #   Create  : 씬에 **새 커브를 만든다**
     #   Edit    : **기존 커브의 형상(CV 위치)** 을 바꾼다
     #   Display : **어떻게 보이는지**를 바꾼다 — 굵기(Line Width), 그리고 컨트롤이
-    #             **어떤 모양으로 보일지**(Replace)
+    #             **어떤 모양으로 보일지**(Replace · Transform)
+    #
+    # ★ Display > Transform(v01.18) 도 사용자 지정으로 Display 에 둔다. CV 를 옮기므로
+    #   성격은 Edit 이지만, 쓰는 사람에게는 "이 컨트롤을 얼마나 크게 · 어느 방향으로
+    #   보이게 할까" 라서 Replace 바로 옆에서 찾는다. 트랜스폼 채널은 건드리지 않는다.
     #
     # ★ Display > Replace 는 v01.16 에서 사용자 지정으로 여기에 두었다(원래는
     #   Create > Controls 안의 한 섹션이었다). 셰이프 노드를 갈아 끼우므로 성격은 Edit 에
@@ -77,7 +84,7 @@ class MainWindow(QWidget):
     # 생성 버튼과 **같은 커브 리스트(self.tsl)** 를 공유하기 때문이다. 떼어내면
     # 커브를 두 번 리스트업해야 해서 실사용이 나빠진다.
     #
-    # 하위 페이지가 하나뿐인 Display 도 하위 탭 바를 그대로 둔다. 탭 하나짜리 탭 바가
+    # 하위 페이지가 하나뿐인 카테고리도 하위 탭 바를 그대로 둔다. 탭 하나짜리 탭 바가
     # 낭비처럼 보이지만 ① 기능 이름이 화면에 남고 ② 나중에 커브 색상 · CV 크기 같은
     # 표시 기능이 늘어도 구조가 그대로다. (A00110_V02 와 같은 판단)
     # ==================================================================
@@ -126,6 +133,10 @@ class MainWindow(QWidget):
          "Replace - give a control the shape of another curve. Its name, transform "
          "and connections stay as they are.",
          "_build_replace_tab"),
+        ("Transform",
+         "Transform - resize, move and rotate the curve shape itself around each "
+         "curve's own pivot, leaving the transform channels alone.",
+         "_build_shape_xform_tab"),
     )
 
     CATEGORIES = (
@@ -133,8 +144,9 @@ class MainWindow(QWidget):
          CREATE_PAGES, "create_tabs"),
         ("Edit", "Edit - change the shape of existing curves",
          EDIT_PAGES, "edit_tabs"),
-        ("Display", "Display - how curves look in the viewport: line width, and "
-         "which shape a control is drawn with",
+        ("Display", "Display - how curves look in the viewport: line width, which "
+         "shape a control is drawn with, and how big / where / which way that "
+         "shape sits",
          DISPLAY_PAGES, "display_tabs"),
     )
 
@@ -584,6 +596,11 @@ class MainWindow(QWidget):
         """셰이프 교체 탭 — 화면은 `app/ui/replace_tab.py` 가 만든다(TSL 두 개 + 버튼)."""
         self.replace_tab = ReplaceTab(log_callback=self.log)
         return self.replace_tab
+
+    def _build_shape_xform_tab(self):
+        """셰이프 변환 탭 — 화면은 `app/ui/shape_xform_tab.py` 가 만든다(TSL + 값 표)."""
+        self.shape_xform_tab = ShapeTransformTab(log_callback=self.log)
+        return self.shape_xform_tab
 
     def _build_points_tab(self):
         """리스트에 담은 오브젝트/조인트/컴포넌트의 **월드 위치**를 순서대로 잇는 커브.
