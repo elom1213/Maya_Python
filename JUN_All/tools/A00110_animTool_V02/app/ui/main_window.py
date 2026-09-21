@@ -1623,14 +1623,21 @@ class MainWindow(QWidget):
         self.mir_axis_btns["x"].setChecked(True)
         axis_row.addSpacing(12)
 
-        # Channels (Translate / Rotate)
+        # Channels (Translate / Rotate / Scale)
         axis_row.addWidget(QLabel("Channels"))
         self.cb_mir_translate = QCheckBox("Translate")
         self.cb_mir_rotate = QCheckBox("Rotate")
+        self.cb_mir_scale = QCheckBox("Scale")
         self.cb_mir_translate.setChecked(True)
         self.cb_mir_rotate.setChecked(True)
+        self.cb_mir_scale.setToolTip(
+            "Copy the scale channels as they are - no mirroring, no sign flip.\n"
+            "A scale is the same on both sides, and running it through the\n"
+            "reflection would bring back a negative scale or shear.\n"
+            "Off by default: turn it on when the controllers animate their scale.")
         axis_row.addWidget(self.cb_mir_translate)
         axis_row.addWidget(self.cb_mir_rotate)
+        axis_row.addWidget(self.cb_mir_scale)
         axis_row.addStretch(1)
         tab_layout.addLayout(axis_row)
 
@@ -3451,8 +3458,9 @@ class MainWindow(QWidget):
 
         do_t = self.cb_mir_translate.isChecked()
         do_r = self.cb_mir_rotate.isChecked()
-        if not do_t and not do_r:
-            self.log("[Warning] Enable Translate and/or Rotate.")
+        do_s = self.cb_mir_scale.isChecked()
+        if not do_t and not do_r and not do_s:
+            self.log("[Warning] Enable Translate, Rotate and/or Scale.")
             return
 
         axis = self._mir_axis()
@@ -3465,15 +3473,16 @@ class MainWindow(QWidget):
         count, msg = MirrorKeyManager.mirror_keys(
             pairs, start, end, mirror_axis=axis,
             do_translate=do_t, do_rotate=do_r, time_mode=time_mode,
-            behavior=self.cb_mir_behavior.isChecked())
+            behavior=self.cb_mir_behavior.isChecked(), do_scale=do_s)
         self.log(msg)
 
     def on_mirror_current_frame(self):
         """현재 프레임의 포즈만 미러(autoKeyframe 재현). Start/End/Time 미사용."""
         do_t = self.cb_mir_translate.isChecked()
         do_r = self.cb_mir_rotate.isChecked()
-        if not do_t and not do_r:
-            self.log("[Warning] Enable Translate and/or Rotate.")
+        do_s = self.cb_mir_scale.isChecked()
+        if not do_t and not do_r and not do_s:
+            self.log("[Warning] Enable Translate, Rotate and/or Scale.")
             return
 
         pairs = self._mir_resolve_pairs()
@@ -3485,6 +3494,7 @@ class MainWindow(QWidget):
             do_translate=do_t, do_rotate=do_r,
             per_object=self.rb_mir_cf_object.isChecked(),
             behavior=self.cb_mir_behavior.isChecked(),
+            do_scale=do_s,
         )
         self.log(msg)
 

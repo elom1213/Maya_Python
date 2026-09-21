@@ -32,9 +32,11 @@ class MirrorKeyManager:
     정적 메서드 + undoInfo 청크 + (count, msg) 반환.
     """
 
-    # 미러 대상 채널 (UI 토글 키 -> attr). translate / rotate 그룹.
+    # 미러 대상 채널 (UI 토글 키 -> attr). translate / rotate / scale 그룹.
     T_AXES = [("tx", "translateX"), ("ty", "translateY"), ("tz", "translateZ")]
     R_AXES = [("rx", "rotateX"), ("ry", "rotateY"), ("rz", "rotateZ")]
+    # scale 은 **미러하지 않고 그대로 복사**한다 (v02.16). 아래 _mirrored_values 주석 참고.
+    S_AXES = [("sx", "scaleX"), ("sy", "scaleY"), ("sz", "scaleZ")]
 
     # rotateOrder int(0..5) -> MEulerRotation order enum. (값은 0..5 로 동일하지만 명시적으로 매핑)
     RO_ENUM = [
@@ -130,13 +132,14 @@ class MirrorKeyManager:
     @staticmethod
     def mirror_keys(pairs, start, end, mirror_axis="x",
                     do_translate=True, do_rotate=True, time_mode="source_keys",
-                    behavior=True):
+                    behavior=True, do_scale=False):
         """
         pairs 의 각 (src, tgt) 에 대해 [start, end] 구간 키를 미러한다.
 
         mirror_axis  : "x" | "y" | "z" (월드 반사축. 기본 x = YZ 평면)
         do_translate : translate 3축 미러 여부
         do_rotate    : rotate 3축 미러 여부
+        do_scale     : scale 3축 복사 여부 (미러하지 않고 **값 그대로**)
         time_mode    : "source_keys"(소스 키 시점에만 기록) | "bake"(정수 프레임 전수)
         behavior     : True(기본) = 소스 로컬 채널 값을 타겟에 그대로 복사(반사 무관),
                        False = 순수 월드 반사(orientation)
@@ -145,8 +148,8 @@ class MirrorKeyManager:
         if not pairs:
             return (0, "[Warning] No pairs to mirror.")
 
-        if not do_translate and not do_rotate:
-            return (0, "[Warning] Enable Translate and/or Rotate.")
+        if not do_translate and not do_rotate and not do_scale:
+            return (0, "[Warning] Enable Translate, Rotate and/or Scale.")
 
         refl = MirrorKeyManager._reflection_matrix(mirror_axis)
 
@@ -157,7 +160,7 @@ class MirrorKeyManager:
             for src, tgt in pairs:
                 ok = MirrorKeyManager._mirror_one(
                     src, tgt, start, end, refl, do_translate, do_rotate, time_mode,
-                    behavior)
+                    behavior, do_scale)
                 if ok:
                     done += 1
                 else:
@@ -170,8 +173,13 @@ class MirrorKeyManager:
         return (done, msg)
 
     @staticmethod
-    def _mirrored_values(src, tgt, t, refl, do_t, do_r, behavior=True):
+    def _mirrored_values(src, tgt, t, refl, do_t, do_r, behavior=True, do_s=False):
         """시점 t 에서 src 를 미러해 타겟 로컬 TRS(dict: attr -> value)를 반환.
+
+        scale(do_s)은 **두 모드 모두 소스의 로컬 채널 값을 그대로** 가져온다 (v02.16).
+        미러도 부호 반전도 하지 않는다 — 크기는 좌우가 같아야 하는 값이고, 반사 행렬을
+        거쳐 다시 분해하면 축 순서에 따라 음수 스케일이나 셰어가 섞여 들어온다.
+        "스케일은 변화 없이 복붙" 이 요구사항이자 리그에서 기대하는 동작이다.
 
         behavior=True(기본): 소스의 로컬 채널 값을 타겟에 그대로 복사한다(반사·행렬 연산 없음).
             Maya `mirror joints` 의 Behavior 세팅으로 만든 좌우 축 반전 리그는 컨트롤러 자체가
@@ -189,6 +197,8 @@ class MirrorKeyManager:
             if do_r:
                 for _, attr in MirrorKeyManager.R_AXES:
                     values[attr] = cmds.getAttr(src + "." + attr, time=t)
+            if do_s:
+                values.update(MirrorKeyManager._scale_values(src, t))
             return values
 
         ms = om.MMatrix(cmds.getAttr(src + ".worldMatrix[0]", time=t))
@@ -213,16 +223,27 @@ class MirrorKeyManager:
             values["rotateX"] = math.degrees(eul.x)
             values["rotateY"] = math.degrees(eul.y)
             values["rotateZ"] = math.degrees(eul.z)
+        if do_s:
+            # ★ 반사된 월드 행렬에서 분해하지 않는다. 소스 채널 값을 그대로 쓴다.
+            values.update(MirrorKeyManager._scale_values(src, t))
         return values
 
     @staticmethod
-    def _settable_attrs(tgt, do_t, do_r):
+    def _scale_values(src, t):
+        """시점 t 의 소스 scale 3축 값(그대로). {attr: value}."""
+        return {attr: cmds.getAttr(src + "." + attr, time=t)
+                for _, attr in MirrorKeyManager.S_AXES}
+
+    @staticmethod
+    def _settable_attrs(tgt, do_t, do_r, do_s=False):
         """기록 대상 attr(잠긴 채널 제외)."""
         attrs = []
         if do_t:
             attrs += [a for _, a in MirrorKeyManager.T_AXES]
         if do_r:
             attrs += [a for _, a in MirrorKeyManager.R_AXES]
+        if do_s:
+            attrs += [a for _, a in MirrorKeyManager.S_AXES]
         return [a for a in attrs if MirrorKeyManager._is_settable(tgt, a)]
 
     @staticmethod
@@ -232,21 +253,23 @@ class MirrorKeyManager:
         return any(cmds.nodeType(c).startswith("animCurveT") for c in curves)
 
     @staticmethod
-    def _mirror_one(src, tgt, start, end, refl, do_t, do_r, time_mode, behavior=True):
+    def _mirror_one(src, tgt, start, end, refl, do_t, do_r, time_mode, behavior=True,
+                    do_s=False):
         """src -> tgt 단일 페어 미러. 키 하나라도 기록했으면 True."""
 
         times = MirrorKeyManager._collect_times(src, start, end, time_mode)
         if not times:
             return False
 
-        attrs = MirrorKeyManager._settable_attrs(tgt, do_t, do_r)
+        attrs = MirrorKeyManager._settable_attrs(tgt, do_t, do_r, do_s)
         if not attrs:
             return False
 
         any_set = False
 
         for t in times:
-            values = MirrorKeyManager._mirrored_values(src, tgt, t, refl, do_t, do_r, behavior)
+            values = MirrorKeyManager._mirrored_values(
+                src, tgt, t, refl, do_t, do_r, behavior, do_s)
             for attr in attrs:
                 try:
                     cmds.setKeyframe(tgt + "." + attr, time=t, value=values[attr])
@@ -263,7 +286,7 @@ class MirrorKeyManager:
 
     @staticmethod
     def mirror_current_frame(pairs, mirror_axis="x", do_translate=True, do_rotate=True,
-                             tol=1e-6, per_object=False, behavior=True):
+                             tol=1e-6, per_object=False, behavior=True, do_scale=False):
         """
         현재 프레임의 포즈만 각 (src, tgt) 로 미러한다. (구간 베이크 아님)
 
@@ -277,12 +300,13 @@ class MirrorKeyManager:
 
         mirror_axis  : "x" | "y" | "z"
         tol          : 값 변경 판정 임계값(per-channel 모드에서 사용).
+        do_scale     : scale 3축 복사 여부 (미러하지 않고 **값 그대로**)
         반환         : (처리한 페어 수, 메시지)
         """
         if not pairs:
             return (0, "[Warning] No pairs to mirror.")
-        if not do_translate and not do_rotate:
-            return (0, "[Warning] Enable Translate and/or Rotate.")
+        if not do_translate and not do_rotate and not do_scale:
+            return (0, "[Warning] Enable Translate, Rotate and/or Scale.")
 
         refl = MirrorKeyManager._reflection_matrix(mirror_axis)
         cur = cmds.currentTime(q=True)
@@ -291,13 +315,14 @@ class MirrorKeyManager:
 
         with undo_chunk():
             for src, tgt in pairs:
-                attrs = MirrorKeyManager._settable_attrs(tgt, do_translate, do_rotate)
+                attrs = MirrorKeyManager._settable_attrs(
+                    tgt, do_translate, do_rotate, do_scale)
                 if not attrs:
                     skipped += 1
                     continue
 
                 values = MirrorKeyManager._mirrored_values(
-                    src, tgt, cur, refl, do_translate, do_rotate, behavior)
+                    src, tgt, cur, refl, do_translate, do_rotate, behavior, do_scale)
 
                 # per-object 모드: 대상 채널 중 하나라도 애니가 있으면 오브젝트를 "keyed" 로 취급.
                 obj_anim = False

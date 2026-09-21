@@ -60,6 +60,8 @@
    **Mirror Key**(v01.04~): 한쪽 컨트롤러의 키를 **반대쪽 컨트롤러로 좌우 미러**한다(언리얼
    *Mirror Data Table* 과 동일한 결과). 좌/우 토큰(`_l/_r` 등, **JSON 으로 확장 가능**)으로 자동
    페어링하거나 수동 리스트로 짝짓는다. **소스/타겟의 rotateOrder 가 달라도 정확**하다.
+   채널은 **Translate / Rotate / Scale**(v02.16~) 중 고르며, **Scale 은 미러하지 않고 값 그대로**
+   복사한다(기본 OFF).
    **Follow**(v01.11~): 좌(**Target**)/우(**Follower**) 리스트로, follower 가 target 의 **월드
    위치·회전(·스케일)** 에 맞도록 구간 키를 굽는다(컨스트레인트 노드 없이 `parentConstraint` 와
    동등한 행렬 연산, **rotateOrder 무관**). **Maintain Offset**(v01.15) 으로 start 프레임의
@@ -79,6 +81,19 @@
 
 하위 탭이나 상위 탭을 바꾸면 **창 크기가 지금 보이는 페이지에 맞춰 자동 조정**된다.
 
+> **V02 v02.16 — Transfer > Mirror Key: `Scale` 채널 추가(값 그대로 복사)**:
+> `Channels` 에 **Scale** 체크박스를 뒀다(기본 OFF). 켜면 소스의 `scaleX/Y/Z` 가 타겟에
+> **미러 없이, 부호도 뒤집지 않고 그대로** 들어간다 — 크기는 좌우가 같아야 하는 값이고,
+> 반사 행렬을 거쳐 다시 분해하면 축 순서에 따라 **음수 스케일이나 셰어**가 섞여 들어오기
+> 때문이다. 그래서 `Behavior` 를 켜든 끄든(=월드 반사 모드에서도) 스케일 경로는 하나다.
+> 구간 미러(`Mirror Selected`) · 현재 프레임 미러(`Mirror Current Frame`) 둘 다 적용되고,
+> 셋 다 끄면 `Enable Translate, Rotate and/or Scale.` 로 막는다. **Scale 만 켜고도 실행**된다.
+> 검증(mayapy 2024) 30항목: 두 모드 모두 값이 소수점까지 일치, **음수 스케일도 그대로**,
+> 스위치를 끄면 스케일 키가 전혀 안 생김, 스케일만 켠 실행, 스케일만 애니된 소스도
+> `Source keys` 가 시점을 잡음, Bake 모드, 잠긴 스케일 채널 건너뜀, 현재 프레임의
+> per-channel 키잉 규칙(커브 있으면 키 · 없으면 포즈만), 센터 self-mirror, undo 한 스텝,
+> 오프스크린 Qt 배선(창 최소 폭 586 그대로).
+>
 > **V02 v02.13 — Transfer > Layer: 애니메이션 레이어 사이 키 복사 · 잘라내기**:
 > 마야에서 여러 컨트롤러의 키를 **레이어 A → 레이어 B** 로 옮기는 방법이 사실상 없다.
 > Ctrl+C / Ctrl+V 는 붙여넣기가 **지금 선택된 레이어**로 가 버리고, 오브젝트가 여러 개면
@@ -1390,7 +1405,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 │ ┌ QListWidget ┐           ┌ QListWidget ┐         │
 │ └─────────────┘           └─────────────┘         │
 │ [ Resolve Pairs from Selection ]                  │  ← Auto 모드에서 미리보기
-│ Mirror Axis (•)X ( )Y ( )Z   Channels [v]T [v]R   │
+│ Mirror Axis (•)X ( )Y ( )Z  Channels [v]T [v]R [ ]S│  ← Scale 은 기본 OFF
 │ [v] Behavior (keep target local axes)             │  ← 기본 ON (새 방식)
 │ Start [ 1 ] End [ 24 ]   Time (•)Source keys ( )Bake│
 │ ┌ L / R Tokens (mirror_tokens.json) [접이식] ────┐│
@@ -1420,7 +1435,15 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   로 씬 선택을 담거나, **Resolve Pairs** 로 자동 페어 결과를 채워 미리보기/수정할 수 있다.
 - **Mirror Axis**: 월드 반사축(기본 **X** = YZ 평면, 좌우 대칭). 보통 캐릭터 좌우축이 월드 X.
   **Behavior 가 ON 이면 비활성**(behavior 모드는 반사축을 쓰지 않음).
-- **Channels**: **Translate / Rotate** 그룹 토글(기본 둘 다 on). 회전만 미러하려면 Translate off.
+- **Channels**: **Translate / Rotate / Scale** 그룹 토글(기본 T·R on, **S off**).
+  회전만 미러하려면 Translate off.
+  - **Scale (v02.16~) 은 미러하지 않고 값 그대로 복사한다.** 부호도 뒤집지 않는다 —
+    크기는 좌우가 같아야 하는 값이고, 반사 행렬을 거쳐 다시 분해하면 축 순서에 따라
+    **음수 스케일이나 셰어**가 섞여 들어온다. 그래서 `Behavior` 를 켜든 끄든 **소스의
+    `scaleX/Y/Z` 채널 값이 그대로** 타겟에 들어간다(구간 미러 · 현재 프레임 미러 모두).
+  - 셋 다 끄면 실행하지 않고 `[Warning] Enable Translate, Rotate and/or Scale.` 을 남긴다.
+  - **Scale 만 켜고도 실행된다** — 스케일 애니메이션만 반대쪽에 옮기고 싶을 때 쓴다.
+  - 잠긴 스케일 채널은 다른 채널과 똑같이 건너뛴다.
 - **Behavior (keep target local axes)** (기본 **ON**, v01.08~): 반대쪽 컨트롤러의 **고유 forward/up
   축 방향을 보존**하며 미러한다(예: 왼쪽 위팔 up=+Y → 오른쪽 위팔이 자기 고유 up=−Y 를 유지).
   소스의 **로컬 채널 값을 타겟에 그대로 전달**하므로(반사축 무관) Maya `mirror joints` 의
@@ -1609,7 +1632,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 
 ### Transfer > Mirror Key — 자동(Auto)
 1. 미러할 **소스 컨트롤(들)을 선택**(예: 왼팔 FK 컨트롤). 한쪽만 선택하면 된다.
-2. **Mirror Axis**(보통 X) / **Channels**(T·R) / **Start·End** / **Time** 확인.
+2. **Mirror Axis**(보통 X) / **Channels**(T·R, 스케일도 옮기려면 **S**) / **Start·End** / **Time** 확인.
 3. (선택) **Resolve Pairs** 로 페어 결과를 Source/Target 리스트에 미리보기.
 4. **Mirror Selected** → 토큰으로 찾은 반대쪽 컨트롤에 좌우 대칭 키가 기록된다.
 
