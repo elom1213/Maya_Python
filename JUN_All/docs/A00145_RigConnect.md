@@ -4,7 +4,10 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.52` (`app/config/version.py`) — Attribute 가 만든 어트리뷰트는 **반드시 채널 박스에
+- 버전: `v01.53` (`app/config/version.py`) — Match 에 **`Keep Children in Place`**(기본 OFF):
+  팔로워만 움직이고 **그 아래 오브젝트는 있던 월드 자리에 그대로** 둔다. Mirror 탭의 같은 이름
+  체크박스와 **같은 코어**(`app/core/keep_children.py`)를 쓴다 (§Match)
+  · v01.52 는 Attribute 가 만든 어트리뷰트는 **반드시 채널 박스에
   보인다**: `Keyable` 을 꺼도 "키만 못 거는 보이는 채널" 이 된다. 레퍼런스로 들어온 어트리뷰트는
   마야가 표시 변경을 거부하므로 **만들 때** 해 둔다. `Edit` 에 이미 숨은 것을 되살리는
   **`Show in Channel Box`** 버튼 (§Attribute)
@@ -151,6 +154,8 @@ Targets : locator2            Followers : SIN_Body1.vtx[81]
     타겟에만 의미가 있고 mesh/cluster/component/vertex 타겟에는 무시된다.
   - **Parent Followers to Targets**(기본 OFF) — 매칭 후 각 follower 를 타겟(컴포넌트면 소유
     오브젝트) 아래로 `parent` 한다. 이미 그 자식이면 스킵, 매칭된 월드 위치는 유지된다.
+  - **Keep Children in Place**(v01.53~, **기본 OFF**) — 팔로워를 옮겨도 그 **아래 오브젝트는
+    있던 월드 자리**에 남는다(아래 절).
   - **`1 <- n`**(v01.32~, **기본 ON**) — Targets 에 오브젝트가 **정확히 하나**일 때 Followers
     **전부**를 그 하나에 매칭한다. 컨트롤러 여러 개를 한 자리에 모으거나, 한 버텍스/캐시 위치로
     모두 보낼 때 쓴다.
@@ -168,6 +173,38 @@ Targets : locator2            Followers : SIN_Body1.vtx[81]
 - **Cache (remember without creating nodes)** — 타겟의 월드 T/R/S 를 **값으로만** 기억한다(아래).
 - **Swap**: Targets ↔ Followers 목록 교환.
 - (MEL 의 Blend Shape 버튼은 제거됨.)
+
+##### Keep Children in Place — 팔로워만 옮기고 자식은 두기 (v01.53)
+
+팔로워를 타겟으로 보내면 그 **아래 계층도 통째로 따라간다**. 컨트롤만 자리를 잡고 그 밑에 달린
+것들은 **지금 자리에 그대로 있어야 할 때**가 있어서, 체크박스 하나로 고른다. **기본은 꺼짐** —
+평소에는 자식이 부모를 따라가는 것이 맞다.
+
+```
+Targets : jnt_arm_L          Followers : ctrl_arm_L   (그 아래 ctrl_hand_L, geo_pad)
+[x] Keep Children in Place
+                 [ Match ]
+[OK] Match
+       1 matched, 0 skipped [TRK] (n <- n)
+       [note] 2 child object(s) kept their world position / rotation
+```
+
+- **직계 자식만** 잡는다 — 자식을 월드에 붙잡아 두면 **손자들은 로컬이 그대로**라 저절로 제자리다.
+- **읽기는 아무것도 옮기기 전에 전부** 한다. 앞 줄 팔로워가 움직이면 그 아래 자식도 밀리므로,
+  옮기기 시작한 뒤에 읽으면 이미 늦은 값이다.
+- **팔로워끼리 부모/자식이면 부모부터 맞춘다**(체크가 켜졌을 때만 순서를 정렬한다). 자식 쪽
+  팔로워는 보존 대상에서 빠진다 — 제 차례에 **제 타겟**으로 가야 하니까. 순서를 안 맞추면
+  자식을 먼저 맞춰 놓고 부모가 다시 끌고 간다.
+- **잠기거나 연결된 채널**이 있는 자식은 잡을 수 없다 — 부모를 따라간 채로 두고 이유를 로그에
+  적는다(`xform` 은 잠긴 채널을 에러 없이 건너뛰고 나머지만 써서 **반쪽 결과**를 만든다).
+- 컨스트레인트 노드는 자식으로 세지 않는다(driven 밑에 붙어 있을 뿐 위치에 의미가 없다).
+- 부모가 **좌우손계를 바꾸면**(음수 스케일 타겟에 `Scale` 을 켜고 매칭) 자식이 월드에 그대로
+  있으려면 자기 로컬 스케일 부호가 바뀐다. 그때만 `scale` 채널까지 검사하고, 몇 개가 그렇게
+  됐는지 로그에 적는다.
+- 키가 걸린 자식 채널을 바꿨으면 **키는 안 찍는다** — 몇 개인지 알리므로 필요하면 직접 키를 건다
+  (안 그러면 프레임을 옮기는 순간 커브 값으로 돌아간다).
+- 로직은 **Mirror 탭의 같은 체크박스와 공용**이다(`app/core/keep_children.py`, v01.53 에서
+  `mirror_manager` 에서 떼어 냈다). 두 탭의 동작이 갈라지지 않는다.
 
 #### Cache — 로케이터 없이 "원래 자리" 기억하기 (v01.30)
 
@@ -1689,6 +1726,8 @@ Behavior 도 Orientation 도 **강체 회전**이라, 메시는 회전만 하고
   미러되지 않으므로 옮길 오브젝트를 전부 담는다. 개수가 다르면 적은 쪽만큼만 하고 경고한다.
 - **`Keep Children in Place`**(기본 ON, v01.41): Target 을 옮겨도 **그 아래 자식들(과 손자 전부)은
   옮기기 전 월드 위치 / 회전 / 스케일에 그대로** 남는다. 끄면 예전처럼 자식이 부모를 따라간다(로컬 값 그대로).
+  v01.53 부터 구현은 **`app/core/keep_children.py` 공용**이고 `Match` 탭의 같은 이름 체크박스와 나눠 쓴다
+  (Match 는 기본 OFF — 두 탭의 **기본값만** 다르고 동작은 같다).
   - 방법: 아무것도 옮기기 전에 각 Target 의 **직계 자식** 월드 행렬을 읽어 두고, 그 Target 을 놓은
     직후 되돌린다. 손자는 로컬이 그대로라 저절로 제자리다. 피벗 · `jointOrient` · `rotateAxis` 가 있어도
     월드 행렬로 되돌리므로 상관없다(조인트 자식은 `rotate` 가 바뀐다).
@@ -1748,6 +1787,7 @@ A00145_RigConnect/
     ├── config/version.py
     ├── core/                       # UI 비의존 maya.cmds 로직
     │   ├── match_manager.py        # Match (MEL Match Tool 포팅: 위치/회전 매칭·컨트롤 생성·버텍스 노말, 대량 매칭용 _Ctx 캐시, capture(), resolve_pairs())
+    │   ├── keep_children.py        # Match · Mirror 공용 (부모를 옮겨도 직계 자식을 월드 자리에 붙잡아 둔다: 사전 읽기 -> 되돌리기, 잠긴/연결된 채널은 건너뛰고 보고)
     │   ├── snapshot_manager.py     # Match > Cache (노드 없이 월드 T/R/S 만 기억하는 추상 스냅샷, maya 비의존)
     │   ├── constrain_manager.py    # Constrain  (MEL 포팅)
     │   ├── skin_constraint_manager.py # Skin Weight to Constraint (스킨 웨이트 → weighted Parent/Scale/Point/Orient constraint)

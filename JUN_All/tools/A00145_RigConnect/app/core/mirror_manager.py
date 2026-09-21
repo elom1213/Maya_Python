@@ -59,6 +59,7 @@ import maya.api.OpenMaya as om
 
 from Framework.core import maya_skin
 from Framework.core.mirror_tokens import MirrorTokenStore
+from tools.A00145_RigConnect.app.core import keep_children as keep
 
 
 # 반사 평면. 값은 UI 라디오의 식별자로도 쓴다.
@@ -186,9 +187,8 @@ def _same_node(a, b):
     return bool(ua) and ua == ub
 
 
-def _is_constraint(node):
-    """*Constraint 노드인가. 타입 상속으로 판정한다(이름 규칙에 기대지 않는다)."""
-    return "constraint" in (cmds.nodeType(node, inherited=True) or [])
+#: *Constraint 노드인가(타입 상속으로 판정). 공용 `keep_children` 의 것을 쓴다.
+_is_constraint = keep.is_constraint
 
 
 def _shape_of(node, type_):
@@ -1580,7 +1580,8 @@ def mirror(objects, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,
 #     리그를 다시 짜는 게 아니다). `xform -ws -m` 이 원래 그렇게 동작한다(mayapy 확인).
 
 # 되읽은 월드 행렬 허용 오차.
-_APPLY_TOLERANCE = 1e-4
+#: 자식 보존 판정과 같은 허용 오차를 쓴다(공용 `keep_children`).
+_APPLY_TOLERANCE = keep.APPLY_TOLERANCE
 
 
 def _resolve_pair_items(sources, targets, warnings):
@@ -1621,50 +1622,12 @@ def _resolve_pair_items(sources, targets, warnings):
     return pairs
 
 
-def _plug_blocker(plug):
-    """plug 에 값을 쓸 수 없는 이유. 쓸 수 있으면 None, 키가 걸려 있으면 'keyed'.
-
-    `xform` 은 잠긴 채널을 **에러 없이 건너뛰고 나머지만** 바꾼다(이동만 되고 회전은 안 되는
-    반쪽 결과). 그래서 쓰기 전에 막힌 채널을 먼저 찾아 그 오브젝트를 통째로 건너뛴다.
-    `getAttr(settable=True)` 는 컨스트레인트가 구동해도 True 라 쓸 수 없다 - 연결로 판정한다.
-    """
-    if cmds.getAttr(plug, lock=True):
-        return "locked"
-    if not cmds.connectionInfo(plug, isDestination=True):
-        return None
-    sources = cmds.listConnections(plug, source=True, destination=False,
-                                   skipConversionNodes=True) or []
-    # 키만 걸린 채널은 값이 들어간다(시간을 바꾸면 커브 값으로 돌아간다).
-    # 애님 레이어(animBlendNode*) · pairBlend · 컨스트레인트는 값이 안 남는다.
-    if sources and all(cmds.nodeType(src).startswith("animCurve") for src in sources):
-        return "keyed"
-    return "connected"
-
-
-def _channel_blockers(node, channels):
-    """channels(translate/rotate/scale) 중 막힌 plug 와 키 걸린 plug.
-
-    반환: (blocked [(plug, 이유)], keyed [plug])
-    """
-    blocked, keyed = [], []
-    for channel in channels:
-        for plug in [node + "." + channel] + [node + "." + channel + a for a in "XYZ"]:
-            if not cmds.objExists(plug):
-                continue
-            reason = _plug_blocker(plug)
-            if reason == "keyed":
-                keyed.append(plug)
-            elif reason:
-                blocked.append((plug, reason))
-    return blocked, keyed
-
-
-def _determinant3(matrix):
-    """월드 행렬 16개 값의 회전/스케일 3x3 부분의 행렬식."""
-    m = matrix
-    return (m[0] * (m[5] * m[10] - m[6] * m[9])
-            - m[1] * (m[4] * m[10] - m[6] * m[8])
-            + m[2] * (m[4] * m[9] - m[5] * m[8]))
+# 쓸 수 없는 채널 판정 · 행렬식도 공용 `keep_children` 것을 쓴다.
+# (`xform` 은 잠긴 채널을 에러 없이 건너뛰고 나머지만 바꾼다 - 반쪽 결과를 만들지 않으려면
+#  쓰기 전에 막힌 채널을 먼저 찾아 그 오브젝트를 통째로 건너뛰어야 한다.)
+_plug_blocker = keep.plug_blocker
+_channel_blockers = keep.channel_blockers
+_determinant3 = keep.determinant3
 
 
 def _row_length(matrix, row):
@@ -1693,63 +1656,10 @@ def _compose_applied_matrix(current, target, translate, rotate):
     return out
 
 
-def _children_to_keep(node, target_paths):
-    """node 의 직계 자식 트랜스폼 중 제자리에 둘 것과 지금 월드 행렬. [(롱네임, matrix)]
-
-    직계만 본다 - 자식을 월드에 붙잡아 두면 손자는 로컬이 그대로라 저절로 제자리다.
-    제외: 그 자신이 Target 인 자식(제 차례에 미러 위치로 옮겨진다), 컨스트레인트 노드
-    (driven 밑에 붙어 있을 뿐 위치에 의미가 없다). 조인트도 트랜스폼이라 포함된다.
-    """
-    kept = []
-    for child in cmds.listRelatives(node, children=True, fullPath=True) or []:
-        if child in target_paths:
-            continue
-        if "transform" not in (cmds.nodeType(child, inherited=True) or []):
-            continue                     # shape
-        if _is_constraint(child):
-            continue
-        kept.append((child, cmds.xform(child, query=True, worldSpace=True, matrix=True)))
-    return kept
-
-
-def _restore_children(kept, parent_flipped, warnings, keyed_plugs):
-    """부모를 옮긴 뒤 자식들을 읽어 둔 월드 행렬로 되돌린다. 반환: (되돌린 수, 스케일 부호가 바뀐 수)
-
-    부모의 좌우손계가 바뀌었으면(Reflect <-> 그 밖) 자식이 월드에서 그대로 있으려면 자기 로컬의
-    손계가 바뀌어야 한다 - 즉 scale 부호를 써야 하므로 scale 채널도 검사한다.
-    `mirror_onto` 의 Target 과 같은 이유로, 막힌 채널이 있으면 그 자식은 건드리지 않고
-    (부모를 따라간 채로 남는다) 이유를 알린다.
-    """
-    restored = 0
-    flipped = 0
-    for child, matrix in kept:
-        current = cmds.xform(child, query=True, worldSpace=True, matrix=True)
-        if max(abs(a - b) for a, b in zip(current, matrix)) <= _APPLY_TOLERANCE:
-            restored += 1                 # 부모가 안 움직였다(값이 이미 같다)
-            continue
-
-        channels = ["translate", "rotate"] + (["scale"] if parent_flipped else [])
-        blocked, keyed = _channel_blockers(child, channels)
-        if blocked:
-            warnings.append("Child '{0}' could not be kept in place and followed its "
-                            "parent - {1}.".format(
-                                _short(child),
-                                ", ".join("{0} is {1}".format(plug.split(".", 1)[1], why)
-                                          for plug, why in blocked[:3])
-                                + (" ..." if len(blocked) > 3 else "")))
-            continue
-
-        cmds.xform(child, worldSpace=True, matrix=matrix)
-        result = cmds.xform(child, query=True, worldSpace=True, matrix=True)
-        if max(abs(a - b) for a, b in zip(result, matrix)) > _APPLY_TOLERANCE:
-            warnings.append("Child '{0}' could not be kept exactly in place (a pivot, "
-                            "limit or non-uniform parent scale got in the way) - check "
-                            "it.".format(_short(child)))
-        restored += 1
-        keyed_plugs.extend(keyed)
-        if parent_flipped:
-            flipped += 1
-    return restored, flipped
+# 자식 보존(읽기 -> 부모 이동 -> 되돌리기)은 공용 `keep_children` 이 전부 한다.
+# Match 탭의 같은 체크박스도 이 구현을 쓴다 - 두 탭의 동작이 갈라지지 않게.
+_children_to_keep = keep.capture
+_restore_children = keep.restore
 
 
 def mirror_onto(sources, targets, plane=PLANE_YZ, joint_mode=MODE_BEHAVIOR,

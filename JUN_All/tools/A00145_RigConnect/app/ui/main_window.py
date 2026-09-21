@@ -257,6 +257,24 @@ class MainWindow(QWidget):
             "parented.")
         opt_layout.addWidget(self.cb_mt_parent)
 
+        # 자식 보존 : 팔로워를 옮겨도 그 아래 오브젝트는 있던 월드 자리에 둔다.
+        # Mirror 탭의 같은 이름 체크박스와 **같은 코어**(app/core/keep_children.py)를 쓴다.
+        # 기본은 꺼짐 - 평소에는 자식이 부모를 따라가는 것이 맞다(사용자 지정, v01.53).
+        self.cb_mt_keep_children = QCheckBox("Keep Children in Place")
+        self.cb_mt_keep_children.setChecked(False)
+        self.cb_mt_keep_children.setToolTip(
+            "On : every child under a follower keeps the world position, "
+            "rotation and scale it had\n"
+            "     before the Match - only the follower itself moves. A child "
+            "that is itself listed in\n"
+            "     Followers still goes to its own target (followers are then "
+            "matched parent first).\n"
+            "     A child with locked or driven channels cannot be held and "
+            "follows its parent (logged).\n"
+            "Off (default): children move with their follower (their local "
+            "values stay the same).")
+        opt_layout.addWidget(self.cb_mt_keep_children)
+
         # 1 <- n : 타겟이 하나면 팔로워 전부를 그 하나에. 타겟이 여럿이면 켜져 있어도
         #          평소대로 n <- n (인덱스 1:1) 이라 늘 켜 둬도 된다.
         self.cb_mt_one_to_many = QCheckBox("1 <- n")
@@ -2563,6 +2581,8 @@ class MainWindow(QWidget):
             "              {2}+ items are summarized instead of listed ('List All')\n"
             "              Cache Targets: remember world T/R/S with no nodes,\n"
             "                             then Swap + Match to put things back\n"
+            "              Keep Children in Place: only the follower moves,\n"
+            "                             everything under it stays (off by default)\n"
             "Constrain   : sub-tabs -\n"
             "              Constraint   : multi target -> follower (+ Matrix)\n"
             "              Skin Weight  : constrain by the selected vertices'\n"
@@ -2718,6 +2738,7 @@ class MainWindow(QWidget):
         rotate = self.cb_mt_rotate.isChecked()
         scale = self.cb_mt_scale.isChecked()
         parent = self.cb_mt_parent.isChecked()
+        keep_children = self.cb_mt_keep_children.isChecked()
         if not (translate or rotate or scale or parent):
             self.log("[WARN] Match : no channel selected "
                      "(Translation/Rotation/Scale/Parent all off)")
@@ -2733,12 +2754,13 @@ class MainWindow(QWidget):
                 translate=translate, rotate=rotate,
                 scale=scale, parent=parent,
                 cache=self.snapshots, notes=notes,
-                one_to_many=one_to_many)
+                one_to_many=one_to_many, keep_children=keep_children)
             self.log("       {0} matched, {1} skipped [{2}] ({3})".format(
                 matched, skipped,
                 "".join(c for c, on in (
                     ("T", translate), ("R", rotate),
-                    ("S", scale), ("P", parent)) if on),
+                    ("S", scale), ("P", parent),
+                    ("K", keep_children)) if on),
                 "1 <- n" if fan_out else "n <- n"))
             if cached:
                 self.log("       {0} cached target(s) - restored from memory, "

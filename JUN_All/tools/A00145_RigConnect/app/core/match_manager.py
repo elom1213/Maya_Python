@@ -43,6 +43,18 @@ MEL 대비 개선/버그 수정:
 타겟이 2개 이상이면 이 값과 무관하게 `n <- n` 이라, 켜 둔 채로도 평소 작업이 달라지지 않는다.
 `match()` 와 UI 가 **같은 `resolve_pairs()`** 를 쓰므로 로그에 찍히는 모드와 실제 동작이 어긋나지 않는다.
 
+자식 보존 (keep_children)
+-------------------------
+`keep_children=True` 면 팔로워가 옮겨져도 그 **아래 오브젝트는 있던 월드 자리에 그대로** 둔다
+(기본은 꺼짐 - 평소에는 자식이 부모를 따라가는 것이 맞다). 구현은 Mirror 탭의 같은 체크박스와
+**공용 `keep_children` 모듈**을 나눠 쓴다 - 두 탭의 동작이 갈라지면 쓰는 사람이 헷갈린다.
+
+두 가지를 함께 지킨다.
+  * **읽기는 아무것도 옮기기 전에 전부** 한다(앞 줄 팔로워가 움직이면 그 아래 자식도 밀린다).
+  * 켜져 있으면 **부모 -> 자식 순서**(팔로워 경로 깊이)로 적용한다. 팔로워끼리 부모/자식 관계일 때
+    자식을 먼저 맞추면 부모를 맞출 때 다시 끌려가기 때문이다. 자식 쪽 팔로워는 보존 대상에서
+    빠진다 - 제 차례에 **제 타겟**으로 가야 하니까.
+
 스냅샷 타겟 (추상 캐시)
 -----------------------
 `capture()` 로 타겟의 월드 T/R/S 를 값으로 떠서 `SnapshotCache` 에 담아 두면, 그 스냅샷 키를
@@ -61,6 +73,7 @@ import maya.api.OpenMaya as om
 from Framework.core.maya_refresh import suspend_refresh
 from Framework.core import maya_shape
 from tools.A00145_RigConnect.app.core import snapshot_manager as snap
+from tools.A00145_RigConnect.app.core import keep_children as keep
 
 _EPS = 1e-6
 
@@ -565,6 +578,62 @@ def _note(notes, message, limit=5):
         notes.append("... (more of the same, only the first {0} are shown)".format(limit))
 
 
+def _long(node):
+    """노드의 롱네임(DAG 풀패스). 없으면 None."""
+    got = cmds.ls(node, long=True) or []
+    return got[0] if got else None
+
+
+def _movable_followers(pairs):
+    """실제로 씬에서 움직일 팔로워만(스냅샷 · 컴포넌트 제외), 중복 없이 리스트 순서대로."""
+    seen = set()
+    out = []
+    for _tgt, flw in pairs:
+        if snap.is_snapshot(flw) or _is_component(flw) or flw in seen:
+            continue
+        seen.add(flw)
+        out.append(flw)
+    return out
+
+
+def _capture_children(pairs):
+    """자식 보존용 사전 읽기. {팔로워: (옮기기 전 월드 행렬, [(자식, 행렬), ...])}
+
+    **아무것도 옮기기 전에** 불러야 한다 - 앞 줄 팔로워가 움직이면 그 아래 자식도 밀린다.
+    팔로워 자신인 자식은 빼 둔다(제 차례에 제 타겟으로 간다).
+    자식이 없으면 항목을 만들지 않는다(뒤에서 읽기 한 번을 더 아낀다).
+    """
+    movable = _movable_followers(pairs)
+    follower_paths = set(path for path in (_long(flw) for flw in movable) if path)
+
+    captured = {}
+    for flw in movable:
+        path = _long(flw)
+        if not path:
+            continue
+        kept = keep.capture(path, follower_paths)
+        if kept:
+            captured[flw] = (cmds.xform(path, q=True, ws=True, matrix=True), kept)
+    return captured
+
+
+def _depth(name):
+    """팔로워를 부모 -> 자식 순서로 놓기 위한 경로 깊이. 못 찾으면 0(앞쪽)."""
+    path = _long(name) if not snap.is_snapshot(name) else None
+    return path.count("|") if path else 0
+
+
+def _flipped(before, after):
+    """옮기면서 좌우손계가 바뀌었는가(자식을 잡아 두려면 scale 부호를 써야 한다)."""
+    return (keep.determinant3(after) < 0) != (keep.determinant3(before) < 0)
+
+
+def _info(notes, message):
+    """요약 한 줄 — `_note` 와 달리 개수 제한에 걸려 사라지면 안 되는 줄에 쓴다."""
+    if notes is not None:
+        notes.append(NOTE_PREFIX + message)
+
+
 def resolve_pairs(targets, followers, one_to_many=True):
     """(pairs, fan_out, unpaired) — 타겟↔팔로워 짝을 정한다.
 
@@ -638,7 +707,7 @@ def capture(targets, cache, normal_axis="y", notes=None):
 
 def match(targets, followers, normal_axis="y",
           translate=True, rotate=True, scale=False, parent=False,
-          cache=None, notes=None, one_to_many=True):
+          cache=None, notes=None, one_to_many=True, keep_children=False):
     """타겟에 팔로워를 매칭한다. 기본은 인덱스 1:1, 타겟이 하나면 전부 그 하나에.
 
     Args:
@@ -655,6 +724,11 @@ def match(targets, followers, normal_axis="y",
         one_to_many: True(기본)이고 **타겟이 정확히 하나**면 그 하나에 **모든 팔로워**를
                    매칭한다(`1 <- n`). 타겟이 2개 이상이면 이 값과 무관하게 `n <- n`.
                    짝짓기는 `resolve_pairs()` 가 정한다.
+        keep_children: True 면 팔로워가 옮겨져도 그 **아래 오브젝트는 있던 월드 자리에**
+                   그대로 둔다(기본 False = 자식은 부모를 따라간다). 자식 중 그 자신이
+                   팔로워인 것은 빼 둔다(제 타겟으로 간다). 채널이 잠기거나 연결되어
+                   잡을 수 없는 자식은 부모를 따라가고 사유를 notes 로 알린다.
+                   모듈 독스트링의 "자식 보존" 절 참고.
 
     팔로워도 **컴포넌트**(메시 버텍스 등)일 수 있다. 이때는 타겟이 무엇이든 그 월드 위치로
     점을 옮기는 것이 전부다 — 회전/스케일/parent 는 점에 걸 수 없어 조용히 무시하지 않고
@@ -686,7 +760,19 @@ def match(targets, followers, normal_axis="y",
                   "rotation/scale do not apply to a vertex or CV".format(
                       comp_followers))
 
+    # 자식 보존 : **아무것도 옮기기 전에** 자식들의 월드 행렬을 전부 읽어 둔다.
+    # 그리고 적용은 부모 -> 자식 순서로 한다(자식을 먼저 맞추면 부모가 다시 끌고 간다).
+    captured = _capture_children(pairs) if keep_children else {}
+    had_children = bool(captured)
+    if keep_children and len(pairs) > 1:
+        # 잡아 둘 자식이 하나도 없어도 순서는 맞춰 둔다 - 팔로워끼리 부모/자식이면
+        # 자식을 먼저 맞췄을 때 부모가 다시 끌고 가는 것은 마찬가지다.
+        pairs = sorted(pairs, key=lambda pair: _depth(pair[1]))
+
     matched = 0
+    kept_total = 0
+    kept_flipped = 0
+    child_keyed = []
     ctx = _Ctx()
     try:
         with suspend_refresh():
@@ -709,6 +795,20 @@ def match(targets, followers, normal_axis="y",
                     skipped += 1
                     continue
                 matched += 1
+
+                # 이 팔로워의 자식을 있던 자리로. 부모 -> 자식 순서라, 자식 쪽 팔로워는
+                # 뒤에서 제 타겟으로 절대 배치되므로 여기서 되돌린 결과에 흔들리지 않는다.
+                if flw in captured:
+                    before, kept = captured.pop(flw)
+                    warnings = []
+                    count, flips = keep.restore(
+                        kept,
+                        _flipped(before, cmds.xform(flw, q=True, ws=True, matrix=True)),
+                        warnings, child_keyed)
+                    kept_total += count
+                    kept_flipped += flips
+                    for warning in warnings:
+                        _note(notes, warning)
             # DOOTOOL 과 동일하게 매칭을 모두 마친 뒤 별도 패스로 parent 한다.
             # 같은 짝(pairs)을 쓴다 — 1 <- n 이면 팔로워 전부가 그 하나의 타겟 아래로 간다.
             if parent:
@@ -733,6 +833,19 @@ def match(targets, followers, normal_axis="y",
                           "or CV cannot be parented".format(comp_followers))
     finally:
         ctx.dispose()
+
+    # 자식이 애초에 없었으면 "0개 지켰다" 는 줄은 소음이다.
+    if keep_children and (had_children or kept_total):
+        _info(notes, "{0} child object(s) kept their world position / "
+                     "rotation".format(kept_total))
+        if kept_flipped:
+            _info(notes, "{0} child object(s) took a negative scale on one axis to "
+                         "stay in place under a parent that changed "
+                         "handedness".format(kept_flipped))
+        if child_keyed:
+            _info(notes, "{0} keyed channel(s) on children were changed without "
+                         "setting a key - key them or the curve wins on the next "
+                         "frame change".format(len(child_keyed)))
 
     return matched, skipped
 

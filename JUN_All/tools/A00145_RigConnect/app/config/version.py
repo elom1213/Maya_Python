@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 # A00145_RigConnect - version info
 
+# 01.53  Match : "Keep Children in Place" checkbox (off by default) - the children of a
+#        follower stay at the world place they had before the Match, only the follower
+#        moves. Same core as the Mirror tab's checkbox (app/core/keep_children.py).
+#        With it on, followers are matched parent first, so a follower that sits under
+#        another follower still ends on its own target.
 # 01.52  Attribute : every attribute the tool creates (Edit > Copy, Create) is now always
 #        visible in the channel box - "Keyable" off means non-keyable DISPLAYED, not
 #        hidden. Maya refuses to change the channel box state of a referenced attribute,
@@ -20,5 +25,5 @@
 #        or any of Point / Orient / Scale together. Types driving the same channels
 #        uncheck each other; Point On Poly stays alone.
 
-VERSION = "01.52"
+VERSION = "01.53"
 LAST_UPDATE = "2026-09-21"
