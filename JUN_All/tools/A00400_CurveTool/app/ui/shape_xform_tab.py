@@ -26,7 +26,22 @@
 # 사용자가 친 값이 조용히 바뀌고, 처음부터 넓게 잡으면 한 픽셀이 수십 단위가 되어
 # 슬라이더가 쓸모없어진다. `Reset Values` 는 범위도 기본값으로 되돌린다.
 #
-# 슬라이더는 값만 정한다 — 씬은 예전처럼 `Apply to Shapes` 에서만 바뀐다.
+# ── 라이브 (v01.20) ──────────────────────────────────────────────────────
+# `Live` 가 켜져 있으면(기본) 슬라이더를 끄는 **그 순간 씬의 커브가 따라 변한다.**
+# 한 번의 조작을 `ShapeTransformSession` 이 들고 있다 — 세션이 잡아 둔 **CV 원위치에서
+# 매번 다시 계산**하므로 슬라이더를 왕복해도 누적되지 않는다(2배로 키웠다 1.5배로 끌면
+# 원본의 1.5배다).
+#
+# undo 는 코어의 규칙을 그대로 따른다 — 끄는 동안은 **undo 큐에 안 쌓이고**, 손을 떼거나
+# 조작이 멎으면(디바운스) 그때까지의 결과가 **한 항목**으로 기록된다. 그래서 드래그 한 번에
+# `Ctrl+Z` 한 번이다.
+#
+# 세션은 **리스트가 바뀌거나 씬이 어긋나면**(사용자가 `Ctrl+Z` 를 눌렀거나 커브를 따로
+# 건드렸다) 버리고 새로 만든다. 세션을 닫을 때는 값 칸을 중립으로 되돌린다 — 값을 그대로
+# 두면 다음 세션이 **새 원위치에 같은 배율을 다시 걸어** 두 배가 되기 때문이다.
+#
+# `Apply to Shapes` 는 라이브 중이면 **지금 모양을 확정**만 한다(또 걸지 않는다).
+# `Live` 를 끄면 예전처럼 `Apply` 를 눌러야 씬이 바뀐다.
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
@@ -220,6 +235,11 @@ class _XformRow(object):
         return tuple(entry.value() if entry.is_checked() else self.neutral
                      for entry in self.axis_rows)
 
+    def zero(self):
+        """값만 중립으로. 축 체크와 슬라이더 범위는 사용자가 둔 그대로 남긴다."""
+        for entry in self.axis_rows:
+            entry.set_value(entry.neutral)
+
     def reset(self):
         for entry in self.axis_rows:
             entry.reset()
@@ -228,12 +248,28 @@ class _XformRow(object):
 class ShapeTransformTab(QWidget):
     """커브 셰이프 변환 탭. 로그는 툴 창의 것을 그대로 쓴다(log_callback)."""
 
+    #: 조작이 멎고 이만큼 지나면 그때까지의 미리보기를 undo 큐에 한 항목으로 기록한다.
+    SETTLE_MS = 350
+
     def __init__(self, log_callback=None, parent=None):
         super(ShapeTransformTab, self).__init__(parent)
 
         self._log = log_callback or (lambda text: None)
 
+        # 라이브 미리보기 한 세션(슬라이더를 움직이는 동안). 없으면 None.
+        self._session = None
+        # 세션을 만들 때의 커브 목록 - 리스트가 바뀌면 세션을 새로 만든다.
+        self._session_nodes = []
+        # 값을 코드가 바꾸는 중인지(사용자 조작과 구분). 켜져 있으면 미리보기를 걸지 않는다.
+        self._updating = False
+
         self.build_ui()
+
+        # 조작이 멎으면 한 번만 기록(디바운스). A00110 Stagger Offset 과 같은 방식.
+        self._settle_timer = QTimer(self)
+        self._settle_timer.setSingleShot(True)
+        self._settle_timer.setInterval(self.SETTLE_MS)
+        self._settle_timer.timeout.connect(self._settle)
 
     # ==================================================================
     # UI
@@ -254,23 +290,47 @@ class ShapeTransformTab(QWidget):
             show_sort=False, list_min_height=150, log_callback=self._log)
         root.addWidget(self.tsl, 1)
 
+        # 리스트가 바뀌면 라이브 세션을 확정하고 닫는다(세션은 시작 시점의 CV 를 들고 있다).
+        model = self.tsl.list_widget.model()
+        model.rowsInserted.connect(self._on_list_changed)
+        model.rowsRemoved.connect(self._on_list_changed)
+        model.modelReset.connect(self._on_list_changed)
+
         root.addWidget(self._build_xform_group())
+
+        self.chk_live = QCheckBox("Live - the curves follow the sliders")
+        self.chk_live.setChecked(True)
+        self.chk_live.setToolTip(
+            "On (default) : the listed curves change in the scene while you drag,\n"
+            "               always recalculated from the shape you started with\n"
+            "               (dragging back and forth does not pile up).\n"
+            "               The drag itself is not put in the undo queue - when you\n"
+            "               stop, the result goes in as ONE undo step.\n"
+            "Off          : nothing happens until you press 'Apply to Shapes'.\n"
+            "               Worth turning off for a very long curve list.")
+        self.chk_live.toggled.connect(self._on_live_toggled)
+        root.addWidget(self.chk_live)
 
         btn_row = QHBoxLayout()
 
         self.btn_apply = QPushButton("Apply to Shapes")
         self.btn_apply.setMinimumHeight(32)
         self.btn_apply.setToolTip(
-            "Apply the ticked rows to every listed curve, each around its own "
-            "pivot.\nClick again to apply once more (scale multiplies, move and "
-            "rotate add up).\nOne undo step.")
+            "Live on  : keep the shape you see in the scene and start over from it\n"
+            "           (the values go back to 1 / 0 - it is NOT applied twice).\n"
+            "Live off : apply the ticked rows to every listed curve, each around its\n"
+            "           own pivot. Click again to apply once more (scale multiplies,\n"
+            "           move and rotate add up).\n"
+            "Either way it is one undo step.")
         self.btn_apply.clicked.connect(self.on_apply)
         btn_row.addWidget(self.btn_apply, 1)
 
         self.btn_reset = QPushButton("Reset Values")
         self.btn_reset.setToolTip(
             "Put the fields back to scale 1 / move 0 / rotate 0, and the sliders "
-            "back to their\ndefault range. The curves in the scene are not changed.")
+            "back to their\ndefault range.\n"
+            "While a live drag is going on it also puts the curves back to the "
+            "shape they\nhad when the slider was first moved (one undo step).")
         self.btn_reset.clicked.connect(self.on_reset)
         btn_row.addWidget(self.btn_reset)
 
@@ -332,6 +392,15 @@ class ShapeTransformTab(QWidget):
             axis_row.valueChanged.connect(
                 lambda value, i=index: self._on_scale_value(i, value))
 
+        # 값·축·줄이 바뀌면 곧바로 씬에 반영한다(라이브가 켜져 있을 때).
+        for entry in (self.row_scale, self.row_move, self.row_rotate):
+            entry.enable.toggled.connect(self._live_update)
+            for axis_row in entry.axis_rows:
+                axis_row.valueChanged.connect(self._live_update)
+                axis_row.check.toggled.connect(self._live_update)
+                # 슬라이더에서 손을 떼면 기다리지 않고 바로 기록한다.
+                axis_row.slider.sliderReleased.connect(self._settle)
+
         return box
 
     # ==================================================================
@@ -356,14 +425,180 @@ class ShapeTransformTab(QWidget):
         """TSL 에 담긴 노드들. UUID 로 지금 이름을 되찾는다(리네임·리페어런트 안전)."""
         return self.tsl.get_all_nodes() or self.tsl.get_all_items()
 
+    def _values(self):
+        """(scale, rotate, translate) — 꺼진 줄은 None, 끈 축은 중립값."""
+        return (self.row_scale.values(),
+                self.row_rotate.values(),
+                self.row_move.values())
+
+    # ==================================================================
+    # 라이브 미리보기 (v01.19)
+    # ==================================================================
+
+    def _begin_session(self):
+        """지금 리스트로 세션을 준비한다. 만들 수 없으면 None.
+
+        이미 있는 세션이라도 **리스트가 바뀌었거나 씬이 어긋났으면**(사용자가 Ctrl+Z 를
+        눌렀거나 커브를 따로 건드렸다) 버리고 새로 만든다 — 낡은 원위치로 계속 쓰면
+        사용자가 되돌린 것을 덮어쓰게 된다.
+        """
+        nodes = self._nodes()
+        if not nodes:
+            return None
+
+        if self._session is not None:
+            if nodes != self._session_nodes:
+                # 리스트 신호를 놓친 경우의 대비. 값은 건드리지 않는다 — 지금 이 호출이
+                # 사용자가 방금 정한 값이라, 여기서 0 으로 돌리면 그 조작이 사라진다.
+                self._close_session(zero=False)
+            elif not self._session.scene_in_sync():
+                # 씬이 세션의 가정과 다르다 = 밖에서 바뀌었다(사용자 Ctrl+Z 등).
+                # 값 칸은 **건드리지 않고** 세션만 버린다 — 지금 씬 모양을 새 원위치로 삼아
+                # 사용자가 맞춰 둔 값을 그대로 다시 건다.
+                self._settle_timer.stop()
+                self._session = None
+
+        if self._session is None:
+            session, skipped = xform_mgr.ShapeTransformSession.create(nodes)
+            if session is None:
+                for name, why in skipped:
+                    self._log("[WARN] {0} : {1}".format(name, why))
+                return None
+
+            self._session = session
+            self._session_nodes = list(nodes)
+
+            for name, why in skipped:
+                self._log("[WARN] {0} : {1}".format(name, why))
+
+        return self._session
+
+    def _live_update(self, *_args):
+        """값이 바뀔 때마다 씬에 즉시 반영. **원위치에서 다시** 계산하므로 누적되지 않는다.
+
+        기록(undo)은 여기서 하지 않는다 — 조작이 멎으면 타이머가 `_settle` 을 불러
+        그때까지의 결과를 **한 항목**으로 기록한다.
+        """
+        if self._updating or not self.chk_live.isChecked():
+            return
+
+        session = self._begin_session()
+        if session is None:
+            return
+
+        scale, rotate, move = self._values()
+        session.preview(scale=scale, rotate=rotate, translate=move)
+        self._settle_timer.start()
+
+    def _settle(self):
+        """조작이 멎은 시점에 지금까지의 미리보기를 undo 큐에 한 항목으로 기록한다."""
+        self._settle_timer.stop()
+
+        session = self._session
+        if session is None:
+            return
+
+        if not session.scene_in_sync():
+            # 밖에서 씬이 바뀌었다. 기록하면 그걸 덮어쓰므로 세션만 버린다.
+            self._session = None
+            return
+
+        # ★ 위젯이 아니라 **세션이 실제로 씬에 건 값**(applied)을 기록한다.
+        #   리스트를 바꾸거나 값을 고치는 순간에도 불릴 수 있어서, 그때 위젯 값은 이미
+        #   다음 조작의 값이다 — 그걸 기록하면 엉뚱한 값이 커브에 굳는다.
+        scale, rotate, move = session.applied
+        _written, msg = session.settle(scale=scale, rotate=rotate, translate=move)
+        if msg:
+            self._log(msg)
+
+    def _on_list_changed(self, *_args):
+        """커브 리스트가 바뀌면 지금 세션을 확정하고 닫는다.
+
+        세션은 시작 시점의 **CV 원위치**를 들고 있으므로 리스트가 바뀌면 더는 맞지 않는다.
+        커브는 지금 모양 그대로 남고, 값 칸은 0 으로 돌아가 다음 조작이 **새 리스트의
+        지금 모양**에서 시작한다.
+        """
+        if self._session is not None:
+            self._close_session("the curve list changed")
+
+    def _close_session(self, reason="", zero=True):
+        """세션을 확정하고 닫는다. 값 칸은 중립으로 돌려 다음 조작이 지금 모양에서 시작하게.
+
+        커브는 **지금 모양 그대로** 남는다. 값을 그대로 두면 다음 세션이 새 원위치에
+        같은 배율을 다시 걸어 두 배가 되므로 닫을 때 0 으로 되돌린다 — 다만 지금 들어온
+        값 변경 때문에 닫는 경우(`zero=False`)는 그 조작을 지우면 안 되므로 그대로 둔다.
+        """
+        session = self._session
+        if session is None:
+            return
+
+        self._settle_timer.stop()
+
+        if session.scene_in_sync():
+            # 위젯이 아니라 **세션이 씬에 건 값**을 확정한다(`_settle` 과 같은 이유).
+            scale, rotate, move = session.applied
+            _written, msg = session.settle(scale=scale, rotate=rotate, translate=move)
+            if msg:
+                self._log(msg)
+
+        self._session = None
+        self._session_nodes = []
+
+        if zero:
+            self._zero_values()
+
+        if reason:
+            self._log("Live session closed ({0}). The shape stays as it is - the "
+                      "values start from 1 / 0 again.".format(reason))
+
+    def _zero_values(self):
+        """값 칸만 중립으로(축 체크·슬라이더 범위는 그대로). 미리보기를 다시 걸지 않는다."""
+        self._updating = True
+        try:
+            self.row_scale.zero()
+            self.row_move.zero()
+            self.row_rotate.zero()
+        finally:
+            self._updating = False
+
+    def _on_live_toggled(self, on):
+        """Live 를 끄면 지금까지의 미리보기를 확정하고 세션을 닫는다."""
+        if on:
+            return
+        if self._session is not None:
+            self._close_session("Live switched off")
+
     @staticmethod
     def _fmt(values):
         return "({0})".format(", ".join("{0:g}".format(v) for v in values))
 
+    # ==================================================================
+    # 버튼
+    # ==================================================================
+
     def on_reset(self):
-        self.row_scale.reset()
-        self.row_move.reset()
-        self.row_rotate.reset()
+        """값 칸을 기본으로. 라이브로 변형 중이었다면 **커브도 원래 모양으로 되돌린다**."""
+        session = self._session
+
+        if session is not None:
+            self._settle_timer.stop()
+            if session.scene_in_sync():
+                written = session.restore()
+                if written:
+                    self._log("Reset : {0} shape(s) back to the shape they had when "
+                              "the slider was first moved (one undo step).".format(
+                                  written))
+            self._session = None
+            self._session_nodes = []
+
+        self._updating = True
+        try:
+            self.row_scale.reset()
+            self.row_move.reset()
+            self.row_rotate.reset()
+        finally:
+            self._updating = False
+
         self._log("Shape Transform values reset (scale 1 / move 0 / rotate 0).")
 
     def on_apply(self):
@@ -371,6 +606,13 @@ class ShapeTransformTab(QWidget):
         if not nodes:
             self._log("[WARN] Curve list is empty - select curve(s) in the scene "
                       "and click 'List Selected Curves'.")
+            return
+
+        # 라이브로 이미 씬에 들어가 있는 경우: 한 번 더 걸지 않고 **지금 모양을 확정**한다.
+        # (여기서 또 적용하면 두 배가 된다)
+        if self._session is not None:
+            self._close_session("applied")
+            self._log("Applied - the curves keep the shape shown in the scene.")
             return
 
         scale = self.row_scale.values()
