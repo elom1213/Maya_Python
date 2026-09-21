@@ -1,6 +1,6 @@
 ---
 name: wip-a00050-uvtool-v02
-description: A00050_uvTool_V02 — V01(maya.cmds)의 PySide 이식. UV 세트 규칙(map1 하나) 위반을 사유와 함께 로그로 찍고 선택, rename 은 before->after 와 실패 사유를 적는다
+description: A00050_uvTool_V02 — V01(maya.cmds)의 PySide 이식. UV 세트 규칙 위반을 사유와 함께 로그로 찍고 선택, rename 은 before->after 와 실패 사유를 적는다. 원하는 세트 이름은 화면에서 입력(v02.01)
 metadata:
   node_type: memory
   type: project
@@ -32,10 +32,19 @@ metadata:
 - UV 세트 rename 은 **undo 된다** → 전체를 `undo_chunk()` 로.
 - 첫 세트 = `polyUVSet(q=allUVSets)` 순서, `currentUVSet` 과 다를 수 있다(V01 기준 유지).
 
+**v02.01 (사용자 요청): 바꿀 이름을 화면에서 입력.** `UV set name` 칸(기본 `map1`) +
+기본값 버튼. ★ **칸 하나가 두 버튼을 함께 정한다** — Rename 의 목표 이름이자 Catch 의 규칙
+이름이다. 따로 두면 "잡아서 고쳤는데 여전히 위반" 이 된다. 코어는 `find_offenders(wanted=)` ·
+`rename_first_uv_set(new_name=)` 로 받고 기본값은 `map1` 그대로.
+★ 실측 — **마야가 거절하는 이름은 빈 것뿐**(`Invalid new uv set name specified`)이고
+공백(`UV Map`) · `-` · `.` · `:` · `|` · 숫자 시작은 **그대로 받는다.** 그래서 막지 않고
+**앞뒤 공백만** 떼어(오타 대비) 칸에도 되돌려 준다.
+
 실행 대상 우선순위도 뒤집었다 — **리스트가 먼저**, 비면 씬 선택(그 사실을 로그에).
 V01 은 선택이 먼저라 리스트를 채워 두고 눌렀을 때 무엇이 대상인지 알 수 없었다.
 
-검증: mayapy 2024 헤드리스 **42항목**(코어 + 오프스크린 Qt). 창 최소 533x736.
+검증: mayapy 2024 헤드리스 **57항목**(코어 + 오프스크린 Qt, 이름 칸 15항목 포함).
+창 최소 533x772.
 마야 GUI 에서는 아직 안 눌러 봄.
 관련: [[mayapy-headless-verify]], [[undo-chunk-by-default]], [[prefer-pyside-for-new-tools]],
 [[new-tool-needs-icon]](아이콘은 V01 그림을 그대로 씀)

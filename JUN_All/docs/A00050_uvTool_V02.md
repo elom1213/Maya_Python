@@ -7,12 +7,15 @@
 메시의 **UV 세트를 규칙에 맞추는** 툴이다. 규칙은 하나다 —
 
 > **메시는 `map1` 이라는 UV 세트 하나만 갖는다.**
+>
+> (`map1` 은 **기본값**이다 — v02.01 부터 원하는 이름을 화면에서 입력한다, §3)
 
 UV 세트가 둘 이상이거나 이름이 다르면 익스포트·머티리얼 쪽에서 **엉뚱한 세트를 물게 된다.**
 이 툴은 그 규칙에 어긋난 메시를 **찾아 주고**(`Catch Objects`), 첫 UV 세트의 **이름을 고친다**
 (`Rename UV Set`).
 
-- 버전: `v02.00` (`app/config/version.py`) — **PySide 이식 + 로그**
+- 버전: `v02.01` (`app/config/version.py`) — **PySide 이식 + 로그**,
+  **바꿀 UV 세트 이름을 화면에서 입력**(§3)
 - 위치: `JUN_All/tools/A00050_uvTool_V02`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴. 검사·이름 정리 로직은 `app/core` 에 분리
 
@@ -44,6 +47,7 @@ A00050_uvTool_V02.run(True)     # True 면 DEV_MODE 에서 리로드
 │ │ [Add][Del][Up][Down] [Sort] [Reverse]   │   │
 │ └─────────────────────────────────────────┘   │
 │ ┌ Tool ──────────────────────────────────┐   │
+│ │ UV set name [ map1            ] [ map1 ] │  │
 │ │ ☑ Catch : look at every mesh in the scene│  │
 │ │ ☑ Catch : select the offending meshes    │  │
 │ │ [        Catch Objects        ]          │  │
@@ -56,7 +60,27 @@ A00050_uvTool_V02.run(True)     # True 면 DEV_MODE 에서 리로드
 
 ---
 
-## 3. `Catch Objects` — 무엇이 왜 규칙에 어긋나는지
+## 3. `UV set name` — 어떤 이름으로 맞출지 (v02.01~)
+
+**칸 하나가 두 버튼을 함께 정한다.**
+
+| 쓰는 곳 | 뜻 |
+|---------|-----|
+| `Rename UV Set` | 첫 UV 세트를 **이 이름으로** 바꾼다 |
+| `Catch Objects` | **이 이름 하나만** 가진 메시를 "규칙에 맞다" 고 본다 |
+
+둘을 따로 두면 **잡아서 고쳤는데 여전히 위반**이 되므로 한 칸으로 묶었다.
+기본값은 `map1` 이고, 오른쪽 **`map1` 버튼**이 기본값을 되돌린다.
+창 위의 규칙 문장도 입력에 따라 바뀐다 — `One UV set per mesh, named 'uvMap'.`
+
+> **마야가 거절하는 것은 빈 이름뿐이다** — `Invalid new uv set name specified`.
+> 공백(`UV Map`) · `-` · `.` · `:` · `|` · 숫자 시작까지 **마야는 그대로 받는다**(실측).
+> 그래서 막지 않고 **앞뒤 공백만 떼고**(오타일 가능성이 크다) 그 사실을 로그에 적는다.
+> 빈 이름이면 **실행하지 않고** 마야의 문구를 그대로 보여 준다.
+
+---
+
+## 4. `Catch Objects` — 무엇이 왜 규칙에 어긋나는지
 
 **규칙에 어긋난 메시를 찾아 ① 사유를 로그에 적고 ② 리스트에 담고 ③ 씬에서 선택한다.**
 씬은 **아무것도 바뀌지 않는다**(조회 전용).
@@ -68,7 +92,7 @@ A00050_uvTool_V02.run(True)     # True 면 DEV_MODE 에서 리로드
 | `no_uv` | UV 세트가 없음 | `has no UV set at all` |
 
 ```
-Catch : checked 4 mesh(es) in the scene.
+Catch : checked 4 mesh(es) in the scene, wanting one 'map1'.
   [multiple] two_sets : has 2 UV sets (map1, uvSet1) - only 'map1' should be there
   [wrong_name] wrong_name : its only UV set is 'uvSet9', not 'map1'
        2 mesh(es) break the rule, 2 object(s) listed.
@@ -87,25 +111,26 @@ Catch : checked 4 mesh(es) in the scene.
 
 ---
 
-## 4. `Rename UV Set` — 이름이 어떻게 바뀌었나
+## 5. `Rename UV Set` — 이름이 어떻게 바뀌었나
 
-리스트에 담긴 오브젝트(비어 있으면 씬 선택)의 **첫 UV 세트**를 `map1` 으로 바꾼다.
+리스트에 담긴 오브젝트(비어 있으면 씬 선택)의 **첫 UV 세트**를 **`UV set name` 에 적은 이름**(기본 `map1`)으로 바꾼다.
 **메시마다 한 줄씩** 바뀐 내용을 적는다. 전체가 **undo 한 스텝**.
 
 ```
+Rename : first UV set -> 'map1' on 3 object(s).
   wrong_nameShape : uvSet9  ->  map1
   good_meshShape : map1  (already 'map1', left alone)
   [WARN] blocked_meshShape : uvSet1, map1  (not renamed - 'map1' already exists on this mesh)
-Rename : 1 renamed, 2 left as they were.
+       1 renamed, 2 left as they were.
        Ctrl+Z undoes the whole run.
 ```
 
 | 상태 | 뜻 |
 |------|-----|
-| `renamed` | 첫 세트 이름을 `map1` 으로 바꿨다 — `before -> after` 를 적는다 |
-| `already` | 이미 `map1` 하나뿐이라 할 일이 없다 |
-| `extra` | 첫 세트는 `map1` 인데 **다른 세트가 더 있다** — 이 툴은 UV 세트를 **지우지 않는다** |
-| `blocked` | 이미 `map1` 이 있어 **마야가 rename 을 거절**한다 |
+| `renamed` | 첫 세트 이름을 **적은 이름**으로 바꿨다 — `before -> after` 를 적는다 |
+| `already` | 이미 그 이름 하나뿐이라 할 일이 없다 |
+| `extra` | 첫 세트는 그 이름인데 **다른 세트가 더 있다** — 이 툴은 UV 세트를 **지우지 않는다** |
+| `blocked` | 그 이름의 세트가 이미 있어 **마야가 rename 을 거절**한다 |
 | `failed` | 마야가 거절했다(잠김·레퍼런스 등) — 마야의 메시지를 그대로 적는다 |
 | `no_uv` / `not_mesh` / `missing` | UV 세트 없음 / 메시 아님 / 씬에 없음 |
 
@@ -115,7 +140,7 @@ Rename : 1 renamed, 2 left as they were.
 
 ---
 
-## 5. mayapy(2024) 로 확인한 것 ★
+## 6. mayapy(2024) 로 확인한 것 ★
 
 - `polyUVSet` 은 **오브젝트를 인자로 받는다**(트랜스폼·셰이프 둘 다). V01 처럼
   `cmds.select` 로 고른 뒤 부를 필요가 없다 → **씬 선택을 건드리지 않는다.**
@@ -132,7 +157,7 @@ Rename : 1 renamed, 2 left as they were.
 
 ---
 
-## 6. 구조
+## 7. 구조
 
 ```
 A00050_uvTool_V02/
@@ -142,7 +167,7 @@ A00050_uvTool_V02/
 └─ app/
    ├─ config/version.py
    ├─ core/uv_set_manager.py    # 검사(find_offenders) + 이름 정리(rename_first_uv_set)
-   └─ ui/main_window.py         # 창 · 리스트 · 버튼 2개 · 로그 · Pin · 메뉴
+   └─ ui/main_window.py         # 창 · 리스트 · 이름 칸 · 버튼 2개 · 로그 · Pin · 메뉴
 ```
 
 V01 의 `utility.py` 두 함수가 `app/core/uv_set_manager.py` 로 옮겨지면서
@@ -150,9 +175,9 @@ V01 의 `utility.py` 두 함수가 `app/core/uv_set_manager.py` 로 옮겨지면
 
 ---
 
-## 7. 검증
+## 8. 검증
 
-`mayapy` (Maya 2024) 헤드리스 **42항목 통과** (코어 + 오프스크린 Qt UI).
+`mayapy` (Maya 2024) 헤드리스 **57항목 통과** (코어 + 오프스크린 Qt UI).
 
 **코어** — 씬 전체 검사 · 정상 메시는 안 걸림 · `multiple` / `wrong_name` 사유 문구 ·
 커브는 보지 않음 · 트랜스폼으로 보고 · **Catch 가 씬을 안 바꿈** · **Orig 셰이프 중복 없음** ·
@@ -165,7 +190,13 @@ V01 의 `utility.py` 두 함수가 `app/core/uv_set_manager.py` 로 옮겨지면
 빈 리스트 경고 · 리스트 한정 Catch · 빈 리스트면 씬 선택으로 넘어가며 그 사실을 알림 ·
 규칙에 다 맞는 씬.
 
-창 최소 크기 **533 x 736**, 기본 **560 x 780**.
+**이름 칸 15항목 (v02.01)** — 기본값 `map1` · 규칙 문장이 입력을 따라 바뀜 ·
+Rename 이 **입력한 이름**을 씀 · **Catch 가 같은 이름으로 판정**(이름을 바꾸면 같은 메시가
+위반이 되었다가 안 되었다가) · `map1` 버튼 · **빈 이름은 두 버튼 모두 거절**(마야 문구 그대로) ·
+거절 뒤 씬 불변 · 앞뒤 공백 제거 + 칸에도 반영 · 공백이 낀 이름(`UV Map`)은 그대로 통과 ·
+코어 기본값은 여전히 `map1`.
+
+창 최소 크기 **533 x 772**, 기본 **560 x 820**.
 
 ---
 

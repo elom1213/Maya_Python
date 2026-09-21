@@ -12,6 +12,11 @@
 #   * `Rename UV Set` : 이름이 **어떻게 바뀌었는지**(before -> after) 한 줄씩 적고,
 #                       못 바꾼 것은 **사유**를 적는다(V01 은 조용히 넘어갔다).
 #
+# ── 이름 칸 (v02.01) ──────────────────────────────────────────────────────
+# 바꿀 이름을 **화면에서 입력**한다(기본 `map1`). 칸 하나가 **두 버튼을 함께** 정한다 —
+# `Rename` 이 붙일 이름이자 `Catch` 가 규칙으로 삼는 이름이다. 둘을 따로 두면
+# "잡아서 고쳤는데 여전히 위반" 이 되어 버린다. 규칙 문장도 입력에 따라 같이 바뀐다.
+#
 # 로직은 `app/core/uv_set_manager.py` 에 있고 여기서는 화면과 로그만 다룬다.
 
 from Framework.qt.qt import (
@@ -20,6 +25,7 @@ from Framework.qt.qt import (
     QHBoxLayout,
     QGroupBox,
     QLabel,
+    QLineEdit,
     QCheckBox,
     QMessageBox,
     QPushButton,
@@ -47,8 +53,8 @@ class MainWindow(QWidget):
 
         self.setWindowTitle("UV Tool v{0}".format(VERSION))
         self.setWindowFlags(Qt.Window)
-        # 최소 크기(533 x 736)보다 조금 넉넉하게 — 로그가 몇 줄 보이도록.
-        self.resize(560, 780)
+        # 최소 크기(533 x 772)보다 조금 넉넉하게 — 로그가 몇 줄 보이도록.
+        self.resize(560, 820)
 
         self.build_ui()
 
@@ -77,13 +83,11 @@ class MainWindow(QWidget):
         header_row.addWidget(self.pin_button)
         main_layout.addLayout(header_row)
 
-        rule = QLabel(
-            "One UV set per mesh, named '{0}'.\n"
-            "Catch finds the meshes that break it, Rename fixes the name.".format(
-                uv_mgr.DEFAULT_UV_SET))
-        rule.setAlignment(Qt.AlignCenter)
-        rule.setWordWrap(True)
-        main_layout.addWidget(rule)
+        # 규칙 한 줄. 아래 이름 칸을 고치면 이 문장도 따라 바뀐다(v02.01).
+        self.lbl_rule = QLabel()
+        self.lbl_rule.setAlignment(Qt.AlignCenter)
+        self.lbl_rule.setWordWrap(True)
+        main_layout.addWidget(self.lbl_rule)
 
         # ---- 오브젝트 목록 --------------------------------------------
         self.tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
@@ -94,6 +98,32 @@ class MainWindow(QWidget):
         # ---- 동작 -----------------------------------------------------
         tool_box = QGroupBox("Tool")
         tool_layout = QVBoxLayout(tool_box)
+
+        # ---- 원하는 UV 세트 이름 (v02.01) -----------------------------
+        # 하나의 칸이 **두 버튼을 함께** 정한다 — Rename 이 붙일 이름이자, Catch 가
+        # 규칙으로 삼는 이름이다. 둘이 다르면 "잡은 것을 고쳤는데 여전히 위반" 이 된다.
+        name_row = QHBoxLayout()
+        name_row.addWidget(QLabel("UV set name"))
+
+        self.le_uv_name = QLineEdit(uv_mgr.DEFAULT_UV_SET)
+        self.le_uv_name.setPlaceholderText(uv_mgr.DEFAULT_UV_SET)
+        self.le_uv_name.setToolTip(
+            "The name a mesh should have - used by BOTH buttons :\n"
+            "  Catch Objects : a mesh that does not have exactly this one set is caught\n"
+            "  Rename UV Set : the first UV set is renamed to this\n\n"
+            "Default is '{0}'. Maya accepts almost anything here (even spaces),\n"
+            "but it refuses an empty name.".format(uv_mgr.DEFAULT_UV_SET))
+        self.le_uv_name.textChanged.connect(self._sync_rule_label)
+        name_row.addWidget(self.le_uv_name, 1)
+
+        self.btn_name_default = QPushButton("map1")
+        self.btn_name_default.setFixedWidth(64)
+        self.btn_name_default.setToolTip("Put the default name back.")
+        self.btn_name_default.clicked.connect(
+            lambda: self.le_uv_name.setText(uv_mgr.DEFAULT_UV_SET))
+        name_row.addWidget(self.btn_name_default)
+
+        tool_layout.addLayout(name_row)
 
         self.chk_scene_wide = QCheckBox("Catch : look at every mesh in the scene")
         self.chk_scene_wide.setChecked(True)
@@ -119,10 +149,10 @@ class MainWindow(QWidget):
         self.btn_rename = QPushButton("Rename UV Set")
         self.btn_rename.setMinimumHeight(32)
         self.btn_rename.setToolTip(
-            "Rename the FIRST UV set of every listed object to '{0}'.\n"
+            "Rename the FIRST UV set of every listed object to the name typed above.\n"
             "The log shows the name before and after, one line per mesh.\n"
-            "A mesh that already has a '{0}' cannot be renamed - Maya refuses -\n"
-            "and the log says so. One undo step.".format(uv_mgr.DEFAULT_UV_SET))
+            "A mesh that already has a set with that name cannot be renamed -\n"
+            "Maya refuses - and the log says so. One undo step.")
         self.btn_rename.clicked.connect(self.on_rename)
         tool_layout.addWidget(self.btn_rename)
 
@@ -135,6 +165,9 @@ class MainWindow(QWidget):
         self.log_view.setFixedHeight(140)
         main_layout.addWidget(self.log_view)
 
+        # 규칙 문장을 처음 한 번 채운다(이름 칸이 만들어진 뒤라야 한다).
+        self._sync_rule_label()
+
     # ==================================================================
     # 로그
     # ==================================================================
@@ -145,6 +178,32 @@ class MainWindow(QWidget):
     # ==================================================================
     # 동작
     # ==================================================================
+
+    def _sync_rule_label(self, *_args):
+        """규칙 문장을 지금 입력한 이름으로 갱신한다(빈 칸이면 기본값을 보여 준다)."""
+        name = self.le_uv_name.text().strip() or uv_mgr.DEFAULT_UV_SET
+
+        self.lbl_rule.setText(
+            "One UV set per mesh, named '{0}'.\n"
+            "Catch finds the meshes that break it, Rename fixes the name.".format(name))
+
+    def _wanted_name(self):
+        """두 버튼이 함께 쓰는 **원하는 UV 세트 이름**. 못 쓰는 이름이면 None.
+
+        마야가 거절하는 것은 빈 이름뿐이라, 다듬기도 그 선에서 멈춘다.
+        """
+        ok, cleaned, message = uv_mgr.clean_name(self.le_uv_name.text())
+
+        if not ok:
+            self.log("[WARN] " + message)
+            return None
+
+        if message:
+            self.log(message)
+            # 다듬은 값을 칸에도 되돌려 준다 - 화면과 동작이 어긋나지 않게.
+            self.le_uv_name.setText(cleaned)
+
+        return cleaned
 
     def _targets(self):
         """실행 대상 — **리스트가 먼저**, 비어 있으면 씬 선택(그 사실을 로그에 남긴다).
@@ -166,6 +225,10 @@ class MainWindow(QWidget):
 
     def on_catch(self):
         """규칙에 맞지 않는 메시를 찾아 **사유와 함께** 로그에 적고 리스트·씬에 담는다."""
+        wanted = self._wanted_name()
+        if wanted is None:
+            return
+
         nodes = None
 
         if not self.chk_scene_wide.isChecked():
@@ -175,18 +238,18 @@ class MainWindow(QWidget):
                          "tick 'look at every mesh in the scene'.")
                 return
 
-        offenders, checked = uv_mgr.find_offenders(nodes)
+        offenders, checked = uv_mgr.find_offenders(nodes, wanted=wanted)
 
         where = "the scene" if nodes is None else "the list"
-        self.log("Catch : checked {0} mesh(es) in {1}.".format(checked, where))
+        self.log("Catch : checked {0} mesh(es) in {1}, wanting one '{2}'.".format(
+            checked, where, wanted))
 
         if not checked:
             self.log("       No mesh found.")
             return
 
         if not offenders:
-            self.log("       Every mesh follows the rule (one '{0}').".format(
-                uv_mgr.DEFAULT_UV_SET))
+            self.log("       Every mesh follows the rule (one '{0}').".format(wanted))
             return
 
         for item in offenders:
@@ -206,7 +269,11 @@ class MainWindow(QWidget):
             self.log("       Selected them in the scene.")
 
     def on_rename(self):
-        """첫 UV 세트를 map1 으로 바꾸고 **이름이 어떻게 바뀌었는지** 한 줄씩 적는다."""
+        """첫 UV 세트를 **입력한 이름**으로 바꾸고 어떻게 바뀌었는지 한 줄씩 적는다."""
+        wanted = self._wanted_name()
+        if wanted is None:
+            return
+
         nodes = self._targets()
 
         if not nodes:
@@ -214,7 +281,10 @@ class MainWindow(QWidget):
                      "(Catch Objects, or Select Objects).")
             return
 
-        records = uv_mgr.rename_first_uv_set(nodes)
+        self.log("Rename : first UV set -> '{0}' on {1} object(s).".format(
+            wanted, len(nodes)))
+
+        records = uv_mgr.rename_first_uv_set(nodes, new_name=wanted)
 
         renamed = 0
         untouched = 0
@@ -231,18 +301,18 @@ class MainWindow(QWidget):
             elif status == uv_mgr.ALREADY:
                 untouched += 1
                 self.log("  {0} : {1}  (already '{2}', left alone)".format(
-                    name, before, uv_mgr.DEFAULT_UV_SET))
+                    name, before, wanted))
             else:
                 untouched += 1
                 detail = record["detail"] or uv_mgr.REASONS.get(status, status).format(
                     count=len(record["before"]),
                     sets=", ".join(record["before"]) or "-",
                     first=record["before"][0] if record["before"] else "-",
-                    default=uv_mgr.DEFAULT_UV_SET)
+                    default=wanted)
                 self.log("  [WARN] {0} : {1}  (not renamed - {2})".format(
                     name, before, detail))
 
-        self.log("Rename : {0} renamed, {1} left as they were.".format(
+        self.log("       {0} renamed, {1} left as they were.".format(
             renamed, untouched))
 
         if renamed:
@@ -272,13 +342,14 @@ class MainWindow(QWidget):
         QMessageBox.information(
             self,
             "The Rule",
-            "A mesh should have exactly ONE UV set, named '{0}'.\n\n"
+            "A mesh should have exactly ONE UV set, named after the\n"
+            "'UV set name' field (default '{0}').\n\n"
             "Caught as broken :\n"
             "  multiple    two or more UV sets\n"
             "  wrong_name  a single set with another name\n"
             "  no_uv       no UV set at all\n\n"
-            "Rename UV Set renames the FIRST set to '{0}'.\n"
-            "It cannot rename when the mesh already has a '{0}' - Maya refuses -\n"
-            "and it never deletes a UV set (Maya does not allow deleting the "
-            "default one).".format(uv_mgr.DEFAULT_UV_SET),
+            "Rename UV Set renames the FIRST set to that name.\n"
+            "It cannot rename when the mesh already has a set with that name -\n"
+            "Maya refuses - and it never deletes a UV set (Maya does not allow\n"
+            "deleting the default one).".format(uv_mgr.DEFAULT_UV_SET),
         )

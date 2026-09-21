@@ -28,8 +28,13 @@ import maya.cmds as cmds
 from Framework.core.maya_undo import undo_chunk
 
 
-#: 규칙이 요구하는 UV 세트 이름.
+#: 규칙이 요구하는 UV 세트 이름의 **기본값**. 화면에서 바꿀 수 있다(v02.01).
 DEFAULT_UV_SET = "map1"
+
+#: 마야가 거절하는 유일한 이름 — 빈 문자열(`Invalid new uv set name specified`).
+#  공백·`-`·`.`·`:`·`|`·숫자 시작까지 **마야는 그대로 받는다**(실측). 그래서 막지 않고,
+#  앞뒤 공백만 떼어 낸다(오타일 가능성이 크다).
+
 
 
 # 검사 결과 상태 -----------------------------------------------------------
@@ -48,6 +53,26 @@ REASONS = {
     MISSING: "is not in the scene",
     NOT_MESH: "is not a mesh",
 }
+
+
+def clean_name(name):
+    """화면에서 받은 UV 세트 이름을 다듬는다. 반환: (ok, cleaned, message)
+
+    마야가 거절하는 것은 **빈 이름뿐**이다(`Invalid new uv set name specified`).
+    공백이 낀 이름(`UV Map`)도 마야는 받으므로 막지 않는다 — 앞뒤 공백만 떼고,
+    뗀 것이 있으면 알려 준다.
+    """
+    cleaned = (name or "").strip()
+
+    if not cleaned:
+        return (False, "", "The UV set name is empty - Maya refuses that "
+                            "('Invalid new uv set name specified').")
+
+    if cleaned != (name or ""):
+        return (True, cleaned,
+                "Spaces around the name were dropped - using '{0}'.".format(cleaned))
+
+    return (True, cleaned, "")
 
 
 # ==========================================================================
@@ -97,8 +122,10 @@ def transform_of(shape):
     return parents[0] if parents else shape
 
 
-def check_shape(shape):
+def check_shape(shape, wanted=DEFAULT_UV_SET):
     """메시 셰이프 하나를 규칙에 비춰 본다.
+
+    `wanted` 는 **원하는 UV 세트 이름**이다(화면에서 정한다, v02.01).
 
     Returns:
         (status, sets) — status 는 OK / MULTIPLE / WRONG_NAME / NO_UV.
@@ -109,13 +136,13 @@ def check_shape(shape):
         return (NO_UV, sets)
     if len(sets) > 1:
         return (MULTIPLE, sets)
-    if sets[0] != DEFAULT_UV_SET:
+    if sets[0] != wanted:
         return (WRONG_NAME, sets)
 
     return (OK, sets)
 
 
-def describe(status, sets):
+def describe(status, sets, wanted=DEFAULT_UV_SET):
     """로그 한 줄에 붙일 사유. 규칙에 맞으면 빈 문자열."""
     if status == OK:
         return ""
@@ -124,15 +151,18 @@ def describe(status, sets):
         count=len(sets),
         sets=", ".join(sets) if sets else "-",
         first=sets[0] if sets else "-",
-        default=DEFAULT_UV_SET)
+        default=wanted)
 
 
 # ==========================================================================
 # Catch — 규칙에 맞지 않는 메시 찾기
 # ==========================================================================
 
-def find_offenders(nodes=None):
+def find_offenders(nodes=None, wanted=DEFAULT_UV_SET):
     """규칙에 어긋난 메시를 찾는다. `nodes` 가 없으면 **씬 전체**를 본다.
+
+    `wanted` 는 화면에서 정한 **원하는 UV 세트 이름**이다 — Rename 이 붙일 이름과 같은
+    값을 쓴다. 그래야 "잡은 것을 고치면 규칙에 맞는다" 가 성립한다.
 
     Returns:
         (offenders, checked) — offenders 는
@@ -154,7 +184,7 @@ def find_offenders(nodes=None):
     offenders = []
 
     for shape in shapes:
-        status, sets = check_shape(shape)
+        status, sets = check_shape(shape, wanted)
         if status == OK:
             continue
 
@@ -163,7 +193,7 @@ def find_offenders(nodes=None):
             "shape": shape,
             "status": status,
             "sets": sets,
-            "reason": describe(status, sets),
+            "reason": describe(status, sets, wanted),
         })
 
     return (offenders, len(shapes))
@@ -181,8 +211,11 @@ BLOCKED = "blocked"            # map1 이 이미 있어서 첫 세트를 바꿀 
 FAILED = "failed"              # 마야가 거절했다(잠김·레퍼런스 등)
 
 
-def rename_first_uv_set(nodes):
-    """각 노드의 **첫 UV 세트**를 `map1` 으로 바꾼다. 전체가 undo 한 스텝.
+def rename_first_uv_set(nodes, new_name=DEFAULT_UV_SET):
+    """각 노드의 **첫 UV 세트**를 `new_name` 으로 바꾼다. 전체가 undo 한 스텝.
+
+    `new_name` 은 화면에서 입력받는다(v02.01, 기본 `map1`). 빈 이름은 마야가 거절하므로
+    호출 전에 `clean_name()` 으로 다듬어 넘긴다.
 
     ★ 첫 세트만 본다(V01 과 같다). `polyUVSet(q=allUVSets)` 의 **순서 그대로**이고,
       현재 UV 세트(currentUVSet)가 아니다.
@@ -209,7 +242,7 @@ def rename_first_uv_set(nodes):
                 continue
 
             for shape in shapes:
-                records.append(_rename_one(node, shape))
+                records.append(_rename_one(node, shape, new_name))
 
     return records
 
@@ -219,8 +252,8 @@ def _record(node, shape, status, before, after, detail):
             "before": list(before), "after": list(after), "detail": detail}
 
 
-def _rename_one(node, shape):
-    """셰이프 하나의 첫 UV 세트를 map1 으로."""
+def _rename_one(node, shape, new_name=DEFAULT_UV_SET):
+    """셰이프 하나의 첫 UV 세트를 `new_name` 으로."""
     before = uv_sets(shape)
 
     if not before:
@@ -228,7 +261,7 @@ def _rename_one(node, shape):
 
     first = before[0]
 
-    if first == DEFAULT_UV_SET:
+    if first == new_name:
         if len(before) == 1:
             return _record(node, shape, ALREADY, before, before, "")
 
@@ -238,16 +271,16 @@ def _rename_one(node, shape):
             node, shape, EXTRA, before, before,
             "'{0}' is already first, but {1} still there - this tool does not "
             "delete UV sets".format(
-                DEFAULT_UV_SET, ", ".join(repr(s) for s in before[1:])))
+                new_name, ", ".join(repr(s) for s in before[1:])))
 
-    if DEFAULT_UV_SET in before:
+    if new_name in before:
         # 마야가 거절하는 조합. 시도하지 않고 사유를 돌려준다.
         return _record(
             node, shape, BLOCKED, before, before,
-            "'{0}' already exists on this mesh".format(DEFAULT_UV_SET))
+            "'{0}' already exists on this mesh".format(new_name))
 
     try:
-        cmds.polyUVSet(shape, rename=True, uvSet=first, newUVSet=DEFAULT_UV_SET)
+        cmds.polyUVSet(shape, rename=True, uvSet=first, newUVSet=new_name)
     except Exception as exc:                                # noqa: BLE001
         return _record(node, shape, FAILED, before, uv_sets(shape), str(exc).strip())
 

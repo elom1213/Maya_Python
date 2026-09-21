@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-21 (오늘)
 
+> [!summary] A00050 **uvTool V02** — 바꿀 **UV 세트 이름을 화면에서 입력** (v02.00->02.01)
+- 요청: `Rename uv set` 을 누를 때 **어떤 이름으로 바꿀지 입력할 수 있는 UI**.
+- `Tool` 상자 맨 위에 `UV set name` 칸(기본 `map1`) + 기본값 되돌리는 `map1` 버튼. 창 위의 규칙 문장도 입력에 따라 같이 바뀐다.
+- ★ **칸 하나가 두 버튼을 함께 정한다** — `Rename` 이 붙일 이름이자 `Catch` 가 규칙으로 삼는 이름. 둘을 따로 두면 "잡아서 고쳤는데 여전히 위반" 이 되어 버린다. 그래서 코어도 `find_offenders(wanted=)` · `rename_first_uv_set(new_name=)` 로 받게 했다(기본값은 `map1` 그대로).
+- ★ 실측: **마야가 거절하는 이름은 빈 것뿐**(`Invalid new uv set name specified`)이고 공백·`-`·`.`·`:`·`|`·숫자 시작은 **그대로 받는다.** 그래서 막지 않고 **앞뒤 공백만** 떼어 칸에도 반영하고 그 사실을 로그에 적는다. 빈 이름이면 두 버튼 모두 실행 전에 거절.
+- mayapy 2024 헤드리스 **57항목**(기존 42 + 이름 칸 15) 통과. 창 최소 533x772. 마야 GUI 에서는 아직 안 눌러 봄. #A00050
+
 > [!summary] A00470 **Name Check** — `Rename to Suggested` 버튼 + 리포트 순서·색·Detailed 정리 (v01.06->01.07)
 - 요청 셋: ① 제안 받은 이름으로 실제로 바꾸는 버튼 ② 리포트에서 `suggested name` 을 이름 바로 아래로, 이름은 빨강 · 제안은 초록 ③ `invalid tokens` · `missing tokens` 는 `Detailed` 일 때만.
 - **새 버튼 `Rename to Suggested`** (새 코어 `app/core/name_rename.py` — `plan()` 은 씬을 안 건드리고 `apply()` 가 바꾼다, undo 한 스텝). 진단을 안 했으면 스스로 진단하고, 바꾼 뒤 표와 리포트를 새 이름으로 다시 채운다.
