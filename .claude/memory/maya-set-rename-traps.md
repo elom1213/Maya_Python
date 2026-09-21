@@ -21,6 +21,9 @@ cmds.ls(sl=True, type="objectSet")  # ['mySet']   <- 이러면 잡힌다
 ```
 
 **`cmds.select(set)` 은 세트를 멤버로 펼친다**([[wip-a00440-settool]] 과 같은 사실).
+**같은 함정이 `cmds.listRelatives` 에도 있다** — 세트를 넘기면 에러가 아니라 **세트를 펼쳐
+멤버의 셰이프**를 준다(실측: `listRelatives(objSet1, shapes=True)` → `['|pCube1|pCube1Shape']`).
+세트를 조회할 때는 **DAG 노드인지 먼저 확인**할 것([[wip-a00440-find-tab]]).
 그래서 `"selected"` 모드는 세트를 영영 못 보고, `"all"` 모드는 메시·조인트·카메라까지 바꿔
 쓸 수가 없다. → **세트를 다루는 UI 는 씬 선택에 기대지 말고 직접 열거해서 고르게 해야 한다.**
 

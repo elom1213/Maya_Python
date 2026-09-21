@@ -15,13 +15,15 @@ class OpResult(object):
     """연산 한 번의 결과. UI 는 이것만 보고 로그를 그린다."""
 
     def __init__(self, ok, message, created=None, warnings=None, members=None,
-                 created_many=None):
+                 created_many=None, detail=None):
         self.ok = ok
         self.message = message
         self.created = created          # 새로 만들어진 세트 이름 (없으면 None)
         self.warnings = warnings or []
         self.members = members or []    # 결과 원소
         self.created_many = created_many or []   # 여러 개를 만든 연산의 결과 이름들
+        # 연산마다 다른 부가 정보. Find 는 {세트: [그 세트에 든 입력 오브젝트]} 를 담는다.
+        self.detail = detail or {}
 
     def __repr__(self):
         return "OpResult(ok={0}, message={1!r}, created={2!r})".format(
@@ -232,11 +234,97 @@ def run_create_per_object(objects, suffix=maya_sets.SET_SUFFIX):
                     members=list(created))
 
 
+def run_find_sets(objects, include_shapes=True, include_render=False,
+                  include_parents=False, include_default=False):
+    """리스트의 오브젝트들이 **속해 있는 세트를 전부** 찾는다. 씬은 건드리지 않는다.
+
+    오브젝트마다 `listSets` 로 묻고, 나온 순서대로 중복 없이 모은다. 어느 세트에 어느
+    오브젝트가 들어 있었는지도 함께 들고 와서(`detail`) UI 가 `setA : 3 / 5` 로 보여 준다.
+
+    - `include_shapes`  : 트랜스폼이면 **셰이프에 걸린 세트도** 본다. 컴포넌트 세트와
+                          셰이딩 그룹은 트랜스폼이 아니라 셰이프에 붙으므로 이게 기본이다.
+    - `include_render`  : 셰이딩 그룹처럼 `objectSet` 이 아닌 렌더링 세트까지 담을지.
+    - `include_parents` : 찾은 세트를 **멤버로 갖는** 세트까지 위로 따라갈지
+                          (A ∈ setB ∈ setC 면 setC 도).
+    - `include_default` : `initialShadingGroup` · `defaultLightSet` 같은 마야 기본 세트.
+    """
+    objects = [o for o in (objects or []) if o]
+
+    if not objects:
+        return _fail("The list is empty. Add the objects to look up.")
+
+    warnings = []
+
+    missing = [o for o in objects if not cmds.objExists(o)]
+    if missing:
+        warnings.append("{0} item(s) are not in the scene and were skipped: {1}".format(
+            len(missing), ", ".join(missing)))
+
+    objects = [o for o in objects if cmds.objExists(o)]
+    if not objects:
+        return OpResult(False, "Nothing in the list is in the scene.", warnings=warnings)
+
+    # 순서 보존을 위해 dict 를 쓴다(판정에만 set) — 이 툴의 다른 연산과 같은 규칙.
+    owners = {}
+    for obj in objects:
+        for name in maya_sets.sets_of(obj, include_shapes=include_shapes):
+            owners.setdefault(name, []).append(obj)
+
+    if include_parents:
+        for name in maya_sets.parent_sets(list(owners)):
+            owners.setdefault(name, [])
+
+    found = _filter_sets(owners, include_render, include_default)
+
+    if not found:
+        return OpResult(
+            False,
+            "None of the {0} object(s) belong to a set.".format(len(objects)),
+            warnings=warnings)
+
+    message = "Find  {0} object(s)  ->  {1} set(s) : {2}".format(
+        len(objects), len(found),
+        ", ".join("{0}[{1}]".format(n, len(m)) for n, m in found.items()))
+
+    return OpResult(True, message, warnings=warnings, created_many=list(found),
+                    members=list(found), detail=found)
+
+
+def _filter_sets(owners, include_render, include_default):
+    """Find 결과에서 렌더링 세트 / 마야 기본 세트를 걸러낸다(순서 유지).
+
+    `initialShadingGroup` 은 **둘 다**다 — 렌더링 세트이면서 마야 기본 노드. 두 스위치가
+    서로를 막지 않도록 **렌더링 세트는 렌더 스위치 하나로만** 판정한다(그쪽을 켜는 사람은
+    `initialShadingGroup` 을 보려고 켠 것이다). 기본 스위치는 `defaultLightSet` 처럼
+    렌더링 세트가 아닌 기본 세트에만 걸린다.
+    """
+    kept = {}
+
+    for name, members in owners.items():
+        if maya_sets.is_render_set(name):
+            if not include_render:
+                continue
+        elif not include_default and maya_sets.is_default_set(name):
+            continue
+
+        kept[name] = members
+
+    return kept
+
+
 def describe_set(set_name):
-    """리스트에 곁들일 한 줄 설명. 세트가 아니면 사유를 돌려준다."""
-    if not maya_sets.is_object_set(set_name):
+    """리스트에 곁들일 한 줄 설명. 세트가 아니면 사유를 돌려준다.
+
+    셰이딩 그룹처럼 `objectSet` 에서 파생된 세트도 멤버를 세어 준다(Find 탭이 그것들을
+    리스트에 올릴 수 있다). 대신 어떤 타입인지 꼬리에 붙인다.
+    """
+    if not set_name or not cmds.objExists(set_name) or not cmds.ls(set_name, type="objectSet"):
         return "not an object set"
 
     members = maya_sets.set_members(set_name)
+    summary = "{0} elements ({1})".format(len(members), set_ops.type_summary(members))
 
-    return "{0} elements ({1})".format(len(members), set_ops.type_summary(members))
+    if maya_sets.is_render_set(set_name):
+        summary += " - {0}".format(cmds.nodeType(set_name))
+
+    return summary

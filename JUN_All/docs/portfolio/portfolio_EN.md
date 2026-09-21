@@ -1,14 +1,14 @@
 ---
-title: Portfolio — Work Summary (2026-05-06 ~ 2026-09-17)
+title: Portfolio — Work Summary (2026-05-06 ~ 2026-09-21)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-09-17
+updated: 2026-09-21
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
 
 > **Author**: Ji Hun Park (Junny)
-> **Period**: 2026-05-06 – 2026-09-17 (~19 weeks)
+> **Period**: 2026-05-06 – 2026-09-21 (~20 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
 > **Volume**: 50+ in-house tools (64 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
@@ -593,6 +593,13 @@ Default Distance attribute (driver signal x)
   string-set operation (verified headless that picking through the shape still normalises to the transform's
   long name). The algebra itself is kept **free of Maya** so it can be tested on its own, and mixed component
   types are allowed rather than blocked — a vertex set `∩` an edge set is simply empty — with a warning instead.
+  It also answers the reverse question: **which sets do these objects belong to**. The sets found are listed, and
+  picking a row selects **the set node itself** in the scene. That needed a fix in the shared list widget, because
+  `cmds.select` **expands a set into its members**; I added a `noExpand` option (off by default, so none of the 133
+  existing call sites change) and verified headless that `listRelatives` has the same trap — hand it a set and it
+  returns the shapes of its members — so the lookup checks for a DAG node first. Component sets live on the
+  **shape**, not on the transform, which the lookup queries as well (every non-intermediate shape, not just the
+  first one).
 - **`A00450_manipulatorTool`** — **live control over the axis thickness of the Move / Rotate / Scale
   manipulators** (three per-tool sliders plus a master that drives all three, and a `Reset`). I measured what
   Maya actually exposes before designing it: everything lives on a single `manipOptions` command, and

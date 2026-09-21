@@ -7,8 +7,10 @@
 #   Edit   : Union ( ∪ ) / Intersection ( ∩ ) / Difference ( ∖ )
 #            Split ( A ∖ S , A ∩ S )  - 씬 선택으로 세트를 두 조각으로 나눈다
 #   Create : 리스트의 오브젝트 **하나마다** `<이름>_Set` 세트를 만든다
+#   Find   : 오브젝트들이 **어느 세트에 들어 있는지** 찾아 세트를 리스트에 올린다
 #
-# 탭은 **세트를 만드는 쪽(Create)과 만들어진 세트를 다루는 쪽(Edit)** 으로 나눈다.
+# 탭은 **세트를 만드는 쪽(Create) · 찾는 쪽(Find) · 만들어진 세트를 다루는 쪽(Edit)** 으로
+# 나눈다.
 # 창은 마야 메인 윈도우에 parent 되어 뷰포트 위에 뜬다. 모든 UI 문자열/로그는 영어.
 
 from Framework.qt.qt import (
@@ -28,6 +30,7 @@ from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 
 from tools.A00440_SetTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00440_SetTool.app.ui.create_tab import CreateTab
+from tools.A00440_SetTool.app.ui.find_tab import FindTab
 from tools.A00440_SetTool.app.ui.set_tab import SetTab
 
 
@@ -75,19 +78,22 @@ class MainWindow(QWidget):
             object_name="JUN_A00440_SetTool_log_window")
         self.log_view.setFixedHeight(110)
 
-        # Edit = 있는 세트를 다룬다, Create = 세트를 만든다.
+        # Edit = 있는 세트를 다룬다, Create = 세트를 만든다, Find = 속한 세트를 찾는다.
         self.tabs = QTabWidget()
         self.set_tab = SetTab(log_view=self.log_view)
         self.create_tab = CreateTab(log_view=self.log_view,
                                     on_created=self.send_to_edit)
+        self.find_tab = FindTab(log_view=self.log_view,
+                                on_found=self.send_to_edit)
         self.tabs.addTab(self.set_tab, "Edit")
         self.tabs.addTab(self.create_tab, "Create")
+        self.tabs.addTab(self.find_tab, "Find")
 
         main_layout.addWidget(self.tabs, stretch=1)
         main_layout.addWidget(self.log_view)
 
     def send_to_edit(self, set_names):
-        """Create 탭이 만든 세트를 Edit 탭 리스트에 담는다 (탭도 그쪽으로 넘긴다)."""
+        """Create/Find 탭이 내놓은 세트를 Edit 탭 리스트에 담는다 (탭도 그쪽으로 넘긴다)."""
         if not set_names:
             return
         self.set_tab.tsl.append_unique(list(set_names))

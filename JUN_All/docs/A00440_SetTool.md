@@ -4,10 +4,11 @@
 합집합 · 교집합 · 차집합으로 새 세트를 만들고, 씬에서 고른 컴포넌트를 기준으로
 세트 하나를 두 조각으로 **분할(split)** 한다.
 
-탭은 둘이다 — **`Edit`**(있는 세트를 다룬다, v01.00 의 기능 전부) 와
-**`Create`**(오브젝트마다 세트를 하나씩 만든다, v01.01).
+탭은 셋이다 — **`Edit`**(있는 세트를 다룬다, v01.00 의 기능 전부) ·
+**`Create`**(오브젝트마다 세트를 하나씩 만든다, v01.01) ·
+**`Find`**(오브젝트들이 **어느 세트에 들어 있는지** 찾는다, v01.04).
 
-- 버전: `v01.01` (`app/config/version.py`) — **탭 2개 : `Edit` / `Create`** (§7)
+- 버전: `v01.04` (`app/config/version.py`) — **탭 3개 : `Edit` / `Create` / `Find`** (§7, §9)
 - 위치: `JUN_All/tools/A00440_SetTool`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴. 집합 연산 로직은 `maya.cmds` 무의존
 
@@ -125,9 +126,10 @@ A00440_SetTool/
    │  ├─ maya_sets.py        # 세트 읽기/쓰기 + 이름 정규화
    │  └─ set_manager.py      # 검증 → 계산 → 씬 반영 (undo 로 묶음)
    └─ ui/
-      ├─ main_window.py      # 창 · 탭(Edit / Create) · 메뉴(Help > Set Notation) · Pin · 로그
+      ├─ main_window.py      # 창 · 탭(Edit / Create / Find) · 메뉴(Help > Set Notation) · Pin · 로그
       ├─ set_tab.py          # Edit 탭 본문 (집합 연산 · Split)
-      └─ create_tab.py       # Create 탭 본문 (오브젝트마다 세트 하나)
+      ├─ create_tab.py       # Create 탭 본문 (오브젝트마다 세트 하나)
+      └─ find_tab.py         # Find 탭 본문 (오브젝트가 속한 세트 찾기)
 ```
 
 ---
@@ -213,9 +215,91 @@ Objects                      -> 만들어지는 세트
 
 ---
 
+## 9. Find 탭 — 이 오브젝트들은 어느 세트에 있나 (v01.04)
+
+`Create` 가 세트를 만들고 `Edit` 가 세트를 다룬다면, `Find` 는 **거꾸로 묻는다** —
+"내가 고른 이 오브젝트들이 **어느 세트에 들어 있지?**"
+
+```
+Objects                        Find Sets          Sets
+[ ctl_l_arm ]        ───────────────────────▶    [ arm_Set    ]   ← 클릭하면 씬에서
+[ ctl_l_hand ]                                    [ l_side_Set ]     **그 세트 노드**가 선택
+[ pCube1.vtx[0] ]                                 [ compSet1   ]     (Shift / Ctrl 로 여러 개)
+```
+
+### 쓰는 법
+
+1. 위 `Objects` 리스트에 오브젝트를 담는다 (`Select Objects` / `Add`).
+   **컴포넌트(`pCube1.vtx[0]`)도 그대로 넣을 수 있다.**
+2. `Find Sets` — 그것들이 멤버로 들어 있는 세트가 아래 `Sets` 리스트에 올라온다.
+   **씬은 아무것도 바뀌지 않는다.**
+3. 아래 리스트의 행을 클릭한다 → **그 세트가 씬에서 선택된다.**
+   **Shift / Ctrl 로 여러 행**을 고르면 그만큼 여러 세트가 선택된다.
+
+로그에는 세트마다 **몇 개가 걸렸는지**가 함께 찍힌다 — `arm_Set : 2 / 3 object(s)`.
+결과 리스트는 찾을 때마다 **교체**된다(지난 결과가 섞이면 어느 것이 이번 결과인지 알 수 없다).
+
+| 버튼 | 동작 |
+|------|------|
+| `Info` | 리스트에 올라온 세트마다 원소 수 / 종류를 로그에 찍는다 |
+| `To Edit` | 고른 세트(아무것도 안 골랐으면 전부)를 `Edit` 탭 리스트로 보낸다 → 바로 ∪ / ∩ / ∖ |
+
+### 옵션
+
+| 옵션 | 기본 | 뜻 |
+|------|:----:|-----|
+| `Look at the shape as well` | ON | **컴포넌트 세트와 셰이딩 그룹은 셰이프에 붙는다.** 끄면 트랜스폼이 직접 들어간 세트만 나온다 |
+| `Include shading groups` | OFF | 셰이딩 그룹(`shadingEngine`)도 세트다. 켜면 `initialShadingGroup` 까지 보인다 |
+| `Include parent sets` | OFF | 세트를 **멤버로 갖는** 세트까지 위로 따라간다 (오브젝트 ∈ B, B ∈ C → C 도) |
+| `Include Maya's default sets` | OFF | `defaultLightSet` · `defaultObjectSet` … |
+| `Select the found sets in the scene` | OFF | 찾자마자 결과 세트를 전부 선택 |
+
+> `initialShadingGroup` 은 **렌더링 세트이면서 마야 기본 노드**다. 두 스위치가 서로를 막지
+> 않도록 **렌더링 세트는 `Include shading groups` 하나로만** 판정한다.
+
+### 9.1 ★ 행을 클릭하면 "세트" 가 선택된다 — noExpand
+
+이 툴이 §6 과 §7 에서 계속 짚는 그 함정이다. `cmds.select` 는 **세트를 펼쳐 멤버를 선택**한다.
+그대로 두면 `Sets` 리스트에서 행을 눌렀을 때 세트가 아니라 **멤버 전체**가 잡힌다.
+
+그래서 공용 TSL 위젯에 **`select_no_expand`** 옵션을 새로 두고(→ [`Framework_MOD_tsl_qt.md`](Framework_MOD_tsl_qt.md) §2.1)
+`Find` 탭의 결과 리스트에서 켰다. 행 클릭이 `noExpand=True` 로 나가 **세트 노드 자체**가 선택된다.
+
+**`Edit` 탭은 예전 동작 그대로 둔다** — 그쪽 `Split` 은 "씬 선택 == A 의 멤버 전체" 를
+사고 감지(§3)에 쓰고 있기 때문이다.
+
+### 9.2 `listSets` 로 확인한 것들 (mayapy 2024 실측)
+
+| 물어본 것 | 돌아온 것 |
+|---|---|
+| `listSets(o=<트랜스폼>)` | **트랜스폼이 들어간 세트만** — 컴포넌트 세트는 안 나온다 |
+| `listSets(o=<셰이프>)` | 컴포넌트 세트 · 셰이딩 그룹 |
+| `listSets(o="pCube1.vtx[0]")` | **그 컴포넌트를 담은 세트만** (같은 메시의 다른 컴포넌트 세트는 제외) |
+| 면과 버텍스를 함께 담은 세트 | **두 번 나온다** → 중복 제거가 필요하다 |
+| `listSets(o="pCube1.tx")` | `None` |
+| 없는 이름 | **에러(TypeError)** → 감싸야 한다 |
+
+- **`extendToShape` 는 쓰지 않는다** — 첫 셰이프 하나만 본다. `listRelatives(shapes=True,
+  noIntermediate=True)` 로 **셰이프를 전부** 물어본다.
+- ★ **`listRelatives` 에 세트를 넘기면 에러가 아니라 세트를 펼쳐 멤버의 셰이프를 준다**
+  (`listRelatives(objSet1, shapes=True)` → `['|pCube1|pCube1Shape']`). `select` 가 세트를
+  펼치는 것과 같은 함정의 다른 얼굴이라, **DAG 노드인지 먼저 확인**하고 묻는다.
+- 셰이딩 그룹은 `nodeType` 이 `shadingEngine` 이다(`objectSet` 의 파생) — `ls(type="objectSet")`
+  에는 섞여 나오므로 `nodeType` 비교로 갈라낸다.
+
+---
+
 ## 8. 검증
 
-`mayapy` (Maya 2024) 헤드리스 **71 + 34항목 통과**.
+`mayapy` (Maya 2024) 헤드리스 **71 + 34 + 41항목 통과**.
+
+**Find 탭 41항목** — `listSets` 의 트랜스폼/셰이프/컴포넌트 차이 · 중복 제거 ·
+없는 이름/어트리뷰트에도 안 죽는지 · 세트를 `listRelatives` 로 물었을 때 멤버가 새어 들지
+않는지 · 기본 세트/렌더링 세트 판정 · 부모 세트 추적과 **순환 세트에서 멈추는지** ·
+옵션 4개가 각각 결과를 바꾸는지 · 그룹 안 오브젝트의 풀 패스 · 빈 리스트/없는 노드/
+아무 세트에도 없는 오브젝트 · **씬이 바뀌지 않는지** · 탭 3개 · 재검색이 지난 결과를
+교체하는지 · **행 클릭이 멤버가 아니라 세트를 선택하는지** · 두 행이면 두 세트 ·
+`Edit` 탭은 예전대로 멤버를 펼치는지 · `To Edit` · `Select the found sets`.
 
 **Create 탭 34항목** — 탭 구성(기존 UI 가 `Edit` 로 그대로) · 오브젝트 수만큼 세트 · 멤버가
 자기 자신 하나 · undo 한 스텝 · 경로/네임스페이스 제거 · 이름 규칙 6가지 · 이름 충돌 경고 ·

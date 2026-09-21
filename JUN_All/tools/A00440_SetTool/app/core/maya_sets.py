@@ -112,6 +112,125 @@ def add_to_set(set_node, members):
         cmds.sets(list(members), add=set_node)
 
 
+# ==========================================================================
+# 어떤 세트에 들어 있나 (Find 탭)
+# ==========================================================================
+#
+# `cmds.listSets(object=x)` 가 x 를 멤버로 갖는 세트를 준다. mayapy 2024 로 확인한 것:
+#   - **트랜스폼에 물으면 트랜스폼이 들어간 세트만** 나온다. 컴포넌트 세트와 셰이딩 그룹은
+#     **셰이프**에 걸려 있으므로 셰이프에 따로 물어야 나온다
+#   - 컴포넌트 문자열(`pCube1.vtx[0]`)을 그대로 물어도 **그 컴포넌트를 담은 세트만** 나온다
+#     (같은 메시의 다른 컴포넌트 세트는 안 나온다 — 정확하다)
+#   - 한 세트가 **여러 번 나올 수 있다**(면과 버텍스를 함께 담은 세트는 두 번) → 중복 제거 필요
+#   - 어트리뷰트(`pCube1.tx`)는 `None`, **없는 이름은 에러**(TypeError) → 감싸야 한다
+#   - 셰이딩 그룹은 `nodeType` 이 `shadingEngine` 이다(`objectSet` 의 파생) →
+#     `ls(type="objectSet")` 에는 섞여 나오지만 `nodeType` 비교로 갈라낼 수 있다
+#   - `listSets(extendToShape=True)` 는 쓰지 않는다 — **첫 셰이프 하나만** 본다.
+#     셰이프가 여럿인 트랜스폼에서 틀린 셰이프를 짚는 그 함정과 같은 계열이다.
+
+#: 마야가 씬마다 스스로 만드는 세트들. 아무 오브젝트나 들어 있어 목록을 어지럽힌다.
+DEFAULT_SET_NAMES = (
+    "defaultLightSet",
+    "defaultObjectSet",
+    "defaultCreaseDataSet",
+    "defaultHideFaceDataSet",
+    "defaultLastHiddenSet",
+    "initialShadingGroup",
+    "initialParticleSE",
+)
+
+
+def is_default_set(node):
+    """마야가 기본으로 들고 있는 세트인가."""
+    if node in DEFAULT_SET_NAMES:
+        return True
+
+    try:
+        return bool(cmds.ls(node, defaultNodes=True))
+    except Exception:
+        return False
+
+
+def is_render_set(node):
+    """셰이딩 그룹 등 렌더링 세트인가. (`objectSet` 이 아닌 파생 타입)"""
+    try:
+        return cmds.nodeType(node) != "objectSet"
+    except Exception:
+        return False
+
+
+def shapes_of(node):
+    """트랜스폼 아래의 **중간(intermediate) 이 아닌 셰이프 전부**.
+
+    `extendToShape` 를 쓰지 않는 이유가 여기 있다 — 그쪽은 첫 셰이프 하나만 본다.
+
+    ★ **DAG 노드인지 먼저 확인한다.** `cmds.listRelatives` 에 세트를 넘기면 에러가 아니라
+      **세트를 펼쳐 멤버의 셰이프**를 돌려준다(실측: `listRelatives(objSet1, shapes=True)`
+      -> `['|pCube1|pCube1Shape']`). `cmds.select` 가 세트를 펼치는 것과 같은 함정의
+      다른 얼굴이라, 세트를 세트로 조회할 때 엉뚱한 결과가 조용히 섞여 든다.
+    """
+    try:
+        if not cmds.objectType(node, isAType="dagNode"):
+            return []
+
+        return cmds.listRelatives(
+            node, shapes=True, fullPath=True, noIntermediate=True) or []
+    except Exception:
+        return []
+
+
+def _list_sets(item):
+    """`listSets` 한 번. 없는 이름/어트리뷰트에도 죽지 않는다."""
+    try:
+        return cmds.listSets(object=item) or []
+    except Exception:
+        return []
+
+
+def sets_of(item, include_shapes=True):
+    """`item` 이 속한 세트들. **나온 순서대로, 중복 없이.**
+
+    컴포넌트(`node.vtx[0]`)를 주면 그 컴포넌트를 담은 세트만 나온다.
+    트랜스폼을 주면 `include_shapes` 로 셰이프에 걸린 세트(컴포넌트 세트 · 셰이딩 그룹)를
+    함께 볼지 정한다.
+    """
+    if not item:
+        return []
+
+    targets = [item]
+
+    if include_shapes and "." not in item:
+        targets.extend(shapes_of(item))
+
+    found = {}
+    for target in targets:
+        for name in _list_sets(target):
+            found.setdefault(name, None)
+
+    return list(found)
+
+
+def parent_sets(set_nodes):
+    """세트들을 **멤버로 갖는** 세트들을 위로 따라가며 모은다(자기 자신 제외).
+
+    A ∈ setB 이고 setB ∈ setC 면 A 는 setC 에 간접적으로 들어 있다.
+    순환(서로를 담는 세트)에 대비해 이미 본 것은 다시 열지 않는다.
+    """
+    seen = {n: None for n in (set_nodes or [])}
+    queue = list(seen)
+    found = {}
+
+    while queue:
+        current = queue.pop(0)
+        for parent in _list_sets(current):
+            if parent in seen or parent in found:
+                continue
+            found[parent] = None
+            queue.append(parent)
+
+    return list(found)
+
+
 def select(members):
     """결과를 씬에서 선택한다. 비어 있으면 선택을 비운다."""
     if members:
@@ -134,6 +253,12 @@ def select_sets(set_nodes):
 
 __all__ = [
     "SET_SUFFIX",
+    "DEFAULT_SET_NAMES",
+    "is_default_set",
+    "is_render_set",
+    "shapes_of",
+    "sets_of",
+    "parent_sets",
     "set_name_for",
     "canonicalize",
     "is_object_set",

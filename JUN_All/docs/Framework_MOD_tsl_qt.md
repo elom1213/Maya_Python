@@ -61,9 +61,28 @@ tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
     list_min_height=None,        # 지정 없으면 바닥값 100px
     list_limit=0,                # 이 수 **이상**이면 펼치지 않고 요약 (0 = 언제나 펼침, 5장)
     select_label="Select Objects",
+    select_no_expand=False,      # 항목이 **세트**인 리스트에서 켠다 (2.1)
     log_callback=self.log,       # 없으면 print
 )
 ```
+
+### 2.1 `select_no_expand` — 세트를 담은 리스트
+
+`cmds.select` 는 **세트(objectSet)를 만나면 세트를 펼쳐 멤버를 선택**한다. 그래서 세트 이름을
+담은 리스트는 행을 클릭해도 세트 노드가 아니라 **그 안의 멤버 전체**가 씬에서 잡힌다.
+
+`select_no_expand=True` 면 행 클릭의 씬 선택에 `noExpand=True` 를 붙여 **세트 노드 자체**를
+고른다. 세트가 아닌 항목에는 아무 차이가 없으므로 **세트 리스트에서만** 켜면 된다.
+
+```python
+tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(title="Sets", select_no_expand=True)
+```
+
+쓰는 곳: `A00440_SetTool` 의 `Find` 탭(찾은 세트 목록). 같은 툴의 `Edit` 탭은 **끈 채로 둔다** —
+그쪽 `Split` 은 "씬 선택 == 세트의 멤버 전체" 를 사고 감지에 쓰고 있다.
+
+> 같은 함정의 다른 얼굴: `cmds.listRelatives(<세트>, shapes=True)` 도 에러가 아니라
+> **세트를 펼쳐 멤버의 셰이프**를 돌려준다.
 
 주요 메서드
 

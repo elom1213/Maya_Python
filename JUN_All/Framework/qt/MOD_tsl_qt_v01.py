@@ -227,6 +227,7 @@ class JUN_mod_tsl_qt_v01(QWidget):
                  show_reverse=False, show_order=True, order_default=False,
                  multi_select=True, list_min_height=None, list_limit=0,
                  select_label="Select Objects", attach_uuids=True,
+                 select_no_expand=False,
                  log_callback=None, parent=None):
         super().__init__(parent)
 
@@ -249,6 +250,11 @@ class JUN_mod_tsl_qt_v01(QWidget):
         # (수백 개면 눈에 띈다), 노드가 아닌 항목에는 어차피 아무것도 붙지 않는다.
         # 이름이 우연히 씬 노드와 겹치는 항목을 클릭했을 때 엉뚱한 노드가 선택되는 일도 없앤다.
         self.attach_uuids = attach_uuids
+        # 항목이 **세트(objectSet)** 인 리스트에서 켠다. `cmds.select` 는 세트를 만나면
+        # 세트를 **펼쳐 멤버를 선택**하므로, 행을 눌러도 세트 노드 자체는 잡히지 않는다.
+        # 켜 두면 행 클릭의 씬 선택에 `noExpand=True` 를 붙여 **세트 노드 자체**를 고른다.
+        # 세트가 아닌 항목에는 아무 차이가 없으므로 세트 리스트에서만 켜면 된다.
+        self.select_no_expand = select_no_expand
         self.list_min_height = list_min_height
         # 항목이 이 수 **이상**이면 리스트에 펼치지 않고 요약만 보여준다(0 = 언제나 펼침).
         self.list_limit = int(list_limit or 0)
@@ -859,6 +865,9 @@ class JUN_mod_tsl_qt_v01(QWidget):
         UUID 로 현재 경로를 되찾아 선택하므로, 담은 뒤 리네임/리페어런트 됐거나
         같은 이름의 오브젝트가 늘어나도 정확히 그 오브젝트가 잡힌다.
         노드가 아닌 항목(어트리뷰트 이름 등)은 조용히 건너뛴다.
+
+        `select_no_expand=True` 면 `noExpand` 로 선택한다 — 세트를 담은 리스트에서
+        행 클릭이 **멤버가 아니라 세트 노드 자체**를 고르게 하는 옵션이다.
         """
         cmds = _cmds()
         if cmds is None:
@@ -879,7 +888,7 @@ class JUN_mod_tsl_qt_v01(QWidget):
 
         if nodes:
             try:
-                cmds.select(nodes, replace=True)
+                cmds.select(nodes, replace=True, noExpand=self.select_no_expand)
             except Exception as e:
                 self._log("Failed to select in the scene: {0}".format(e))
 

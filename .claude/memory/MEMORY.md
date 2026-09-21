@@ -65,7 +65,7 @@
 - [zero-arg super after reload](reload-stale-instance-super.md) — Framework 클래스는 `super()` 만, `super(Class, self)` 는 reload 뒤 옛 인스턴스에서 TypeError
 - [control shapes](framework-control-shapes.md) — 컨트롤러 커브 셰이프 34종 공용 json(좌표 반올림 금지)
 
-- TSL — [UUID selection](wip-tsl-uuid-selection.md)((uuid, component) 보관) · [attach_uuids](framework-tsl-attach-uuids.md)(씬 노드 아닌 리스트는 False) · [list_limit summary](framework-tsl-list-limit.md)(500+ 요약) · [max-height squeezes buttons](tsl-widget-max-height-squeezes-buttons.md)(`list_widget` 에만) · [selection order](tsl-selection-order.md)(`trackSelectionOrder` 꺼지면 `ls(os)` 도 인덱스 순)
+- TSL — [UUID selection](wip-tsl-uuid-selection.md)((uuid, component) 보관) · [attach_uuids](framework-tsl-attach-uuids.md)(씬 노드 아닌 리스트는 False) · [list_limit summary](framework-tsl-list-limit.md)(500+ 요약) · [max-height squeezes buttons](tsl-widget-max-height-squeezes-buttons.md)(`list_widget` 에만) · [selection order](tsl-selection-order.md)(`trackSelectionOrder` 꺼지면 `ls(os)` 도 인덱스 순) · [select_no_expand](wip-a00440-find-tab.md)(세트를 담은 리스트는 켤 것 — 안 켜면 행 클릭이 멤버를 고른다)
 - [Menu bar + common items](framework-menubar-widget.md) — 공통 메뉴 항목은 `tool_menu.COMMON_MENUS` 한 줄(42 PySide + 7 cmds 툴), PySide2 `action.menu()` 가 QMenu 를 지운다
 - [Sub-tabs over collapsibles](prefer-subtabs-over-stacked-collapsibles.md) — 섹션 3~4개 넘으면 중첩 탭
 - [checkList behavior](framework-checklist-behavior.md) — 체크박스 QListWidget 다중 선택+다중 체크는 `JUN_mod_checkList_qt_v01(lw)` 한 줄 (eventFilter 직접 짜지 말 것)
@@ -101,5 +101,5 @@
 - A00390 — [WindTool](wip-a00390-windtool.md) · [Chain Wave](wip-a00390-chain-wave.md) · [V02 axis & driver](wip-a00390-v02-axis-driver.md) · [V02 Envelope](wip-a00390-v02-envelope.md) · [Lite debug curve](wip-a00390-lite-debug-curve.md)(v02.03)
 - A00400 — [CurveTool](wip-a00400-curvetool.md) · [Smooth](wip-a00400-smooth-tab.md)(닫힌 커브 우회, v01.09) · [Points to Curve](wip-a00400-points-to-curve.md) · [Wrap](wip-a00400-curve-wrap.md) · [Joints](wip-a00400-curve-joints.md)(v01.14 NURBS 서피스 U/V 한 줄) · [Controls](wip-a00400-controls-tab.md)(bs_controls 이식, v01.15) · Combine(v01.11, 쉐입 복사 합치기 — [instance trap](parent-shape-add-is-instance.md)) · [Shape Transform](wip-a00400-shape-transform.md)(셰이프 CV 를 피벗 기준 scale/move/rotate, 트랜스폼 채널 불변, v01.18)
 - A00410 — [SecondaryMotion](wip-a00410-secondarymotion.md)(FK 관성 굽기, v01.08) · A00420 — [Wrapper](wip-a00420-wrapper.md) · A00430 — [DemBone](wip-a00430-dembone.md)
-- A00440 — [SetTool](wip-a00440-settool.md)(v01.01) · A00450 — [ManipulatorTool](wip-a00450-manipulatortool.md) · A00460 — [FK & IK](wip-a00460-fk-ik.md)(Skip End Joints = FK 체인 끝 n 개 생략, v01.07)
+- A00440 — [SetTool](wip-a00440-settool.md)(v01.01) · [Find tab](wip-a00440-find-tab.md)(속한 세트 역조회 · `listSets` 는 트랜스폼/셰이프/컴포넌트가 다르고 중복을 준다 · 공용 TSL `select_no_expand`, v01.04) · A00450 — [ManipulatorTool](wip-a00450-manipulatortool.md) · A00460 — [FK & IK](wip-a00460-fk-ik.md)(Skip End Joints = FK 체인 끝 n 개 생략, v01.07)
 - A00470 — [MaterialTool](wip-a00470-materialtool.md)(머티리얼 이름 규칙 진단 · 토큰 정렬 DP · 고칠 이름 제안, v01.03) · Copy Material(소스 UUID 기억 → 면별 머티리얼 복사 + 되읽어 확인, v01.05)
