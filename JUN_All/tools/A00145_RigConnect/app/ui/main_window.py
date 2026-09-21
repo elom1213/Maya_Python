@@ -47,6 +47,7 @@ from tools.A00145_RigConnect.app.core import object_match as obj_match
 from tools.A00145_RigConnect.app.core import snapshot_manager as snap_mgr
 from tools.A00145_RigConnect.app.core import attr_profile_prefs as aprefs
 from tools.A00145_RigConnect.app.core import attr_create_manager as acreate_mgr
+from tools.A00145_RigConnect.app.core import attr_display as adisp
 from tools.A00145_RigConnect.app.core import attr_delete_manager as adel_mgr
 from tools.A00145_RigConnect.app.core import attr_order_manager as aord_mgr
 from tools.A00145_RigConnect.app.core import attr_value_manager as aval_mgr
@@ -1522,6 +1523,22 @@ class MainWindow(QWidget):
             "Off          : the move does not check connections.")
         right.addWidget(self.cb_aedit_keep_conn)
 
+        # --- 채널박스 표시 고치기 (v01.52) ---
+        # 이미 숨은 채로 만들어져 버린 어트리뷰트를 되살리는 자리다. 새로 만드는 쪽은
+        # 아래 Copy 와 Create 탭이 알아서 보이게 만든다.
+        display_row = QHBoxLayout()
+        display_row.addWidget(QLabel("Display"))
+        btn_show_cb = QPushButton("Show in Channel Box")
+        btn_show_cb.setToolTip(
+            "Bring the checked attributes back into the channel box on every listed\n"
+            "object. Keyable ones stay keyable; the rest become 'non-keyable displayed'.\n"
+            "Attributes that came in from a REFERENCE cannot be changed - Maya refuses -\n"
+            "so those have to be fixed in the rig scene and saved.")
+        btn_show_cb.clicked.connect(self.on_aedit_show_cb)
+        display_row.addWidget(btn_show_cb)
+        display_row.addStretch(1)
+        right.addLayout(display_row)
+
         src_layout.addLayout(right, 1)
         layout.addWidget(src_box)
 
@@ -1555,6 +1572,17 @@ class MainWindow(QWidget):
         self.cb_attr_value.setToolTip(
             "Also set the source value on the new attribute.")
         copy_layout.addWidget(self.cb_attr_value)
+
+        self.cb_attr_show_cb = QCheckBox("Show in Channel Box")
+        self.cb_attr_show_cb.setChecked(True)
+        self.cb_attr_show_cb.setToolTip(
+            "On (default) : the new attribute is always visible in the channel box,\n"
+            "               even when the source attribute is hidden. Keyable sources\n"
+            "               stay keyable, the rest become 'non-keyable displayed'.\n"
+            "Off          : the copy keeps the display state of the source.\n\n"
+            "Worth leaving on : once the object is loaded as a REFERENCE, Maya refuses\n"
+            "to change the channel box state, so a hidden attribute stays hidden.")
+        copy_layout.addWidget(self.cb_attr_show_cb)
 
         btn_copy = QPushButton("Copy Checked Attributes to Targets")
         btn_copy.setMinimumHeight(32)
@@ -1723,6 +1751,7 @@ class MainWindow(QWidget):
         prefix = self.le_attr_prefix.text().strip()
         suffix = self.le_attr_suffix.text().strip()
         copy_value = self.cb_attr_value.isChecked()
+        show_cb = self.cb_attr_show_cb.isChecked()
 
         # 목록은 오브젝트들의 합집합이라, 첫 오브젝트에 없는 것이 체크될 수 있다.
         # 정의를 읽을 곳이 없으므로 미리 걸러 이유를 말한다.
@@ -1736,13 +1765,33 @@ class MainWindow(QWidget):
 
         def _do():
             created, skipped = att_mgr.copy_attributes(
-                source, attrs, targets, prefix, suffix, copy_value)
+                source, attrs, targets, prefix, suffix, copy_value,
+                show_in_channel_box=show_cb)
             for target, name, reason in skipped:
                 self.log("[WARN] {0}.{1} : {2}".format(target, name, reason))
             self.log("       {0} attribute(s) created on {1} target(s)".format(
                 len(created), len(targets)))
 
         self._run("Copy Attributes", _do)
+
+    def on_aedit_show_cb(self):
+        """체크한 어트리뷰트를 채널박스에 보이게 한다 (이미 숨어 있는 것 되살리기).
+
+        새로 만들 때는 Copy / Create 가 알아서 보이게 하므로, 이 버튼은 **예전에 숨은
+        채로 만들어진 것**을 위한 것이다. 레퍼런스에서 온 어트리뷰트는 마야가 표시 변경을
+        거부하므로 여기서 고칠 수 없다 - 이유를 그대로 로그에 적는다.
+        """
+        objects = self.tsl_aedit_objs.get_all_items()
+        attrs = self._aedit_checked()
+
+        def _do():
+            shown, skipped = adisp.show_attributes(objects, attrs)
+            for obj, name, reason in skipped:
+                self.log("[WARN] {0}.{1} : {2}".format(obj, name, reason))
+            self.log("       {0} attribute(s) now visible in the channel box".format(
+                len(shown)))
+
+        self._run("Show in Channel Box", _do)
 
     def on_aedit_delete(self):
         """체크한 어트리뷰트를 Objects 목록의 오브젝트들에서 지운다."""

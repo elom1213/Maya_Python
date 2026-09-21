@@ -59,6 +59,7 @@ updated: 2026-09-21
 - A blendShape's targets are not plain attributes — they live as **aliases on a `weight[]` multi**, so the usual attribute listing only surfaces the first one. I read them straight from `aliasAttr`, so **selecting a blendShape lists every target by name** in both the Attribute and Connect tabs.
 - Chosen targets are **copied onto a controller as named, keyable float attributes** (optional prefix/suffix, type/range/default preserved); the Connect tab then wires **controller → blendShape target**.
 - Turns "expose these dozens of face shapes as rig controls" into a pick-and-copy step instead of hand-adding attributes and connections one at a time — the everyday grind of building a facial control rig.
+- Every attribute the tool creates is now **guaranteed to show up in the channel box**. Maya has three display states for a user attribute (`keyable`, `keyable off + channelBox`, and **neither — invisible**), and `addAttr` defaults to the third, so an attribute could reach the animator as "I made it, but it isn't there". What settles it is that **a referenced attribute's display state cannot be changed at all** (`setAttr ... is from a referenced file`) — there is no fix on the animation side, so it has to be right the moment the attribute is created; attributes already made hidden get a repair button to run in the rig scene.
 
 ### 1-5. Generalizing the MetaHuman skeleton + Unreal RBF setup to non-MetaHuman avatars
 `A00270_skinMigrate`, `A00130_ControlRig`, `A00060_jointTool_V03`, `A00145_RigConnect`, `A00090_ConnectionBuilder`

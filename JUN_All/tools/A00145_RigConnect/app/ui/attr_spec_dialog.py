@@ -26,6 +26,19 @@ from Framework.qt.qt import *
 from tools.A00145_RigConnect.app.core import attr_profile_prefs as prefs
 
 
+#: `Keyable` 체크박스 설명. 어느 쪽이든 **채널박스에는 보인다** (v01.52).
+KEYABLE_TIP = (
+    "On  : a keyable channel - shows in the channel box and can be keyed.\n"
+    "Off : shown in the channel box as 'non-keyable displayed' - no keys.\n\n"
+    "Either way the new attribute IS visible. Maya refuses to change this once the\n"
+    "object is loaded as a reference, so it is decided when the attribute is created.")
+
+#: string 전용 설명 - 키를 못 걸어서 고를 것이 없다.
+STRING_TIP = (
+    "String attributes cannot be keyed.\n"
+    "They are always shown in the channel box.")
+
+
 class AttrSpecDialog(QDialog):
     """어트리뷰트 정의 1개를 편집한다. `spec()` 으로 정규화된 dict 를 얻는다."""
 
@@ -65,9 +78,7 @@ class AttrSpecDialog(QDialog):
 
         self.chk_keyable = QCheckBox("Keyable")
         self.chk_keyable.setChecked(bool(spec.get("keyable", True)))
-        self.chk_keyable.setToolTip(
-            "On  : shows in the channel box and can be keyed.\n"
-            "Off : created hidden from the channel box.")
+        self.chk_keyable.setToolTip(KEYABLE_TIP)
         form.addWidget(self.chk_keyable, 1, 2)
 
         # --- Min / Max (체크를 끄면 제한 없음)
@@ -178,18 +189,17 @@ class AttrSpecDialog(QDialog):
         self.cmb_default_enum.setVisible(is_enum)
         self.le_default_str.setVisible(is_string)
 
-        # string 은 키를 못 건다 - 같은 체크를 "채널박스에 보이게" 로 쓴다.
+        # string 은 키를 못 걸고, 새 어트리뷰트는 늘 채널박스에 보이므로(v01.52)
+        # 고를 것이 없다 - 체크를 켠 채로 잠가서 그 사실을 보여 준다.
         if is_string:
             self.chk_keyable.setText("Channel Box")
-            self.chk_keyable.setToolTip(
-                "String attributes cannot be keyed.\n"
-                "On  : shown in the channel box.\n"
-                "Off : hidden (Attribute Editor only).")
+            self.chk_keyable.setChecked(True)
+            self.chk_keyable.setEnabled(False)
+            self.chk_keyable.setToolTip(STRING_TIP)
         else:
             self.chk_keyable.setText("Keyable")
-            self.chk_keyable.setToolTip(
-                "On  : shows in the channel box and can be keyed.\n"
-                "Off : created hidden from the channel box.")
+            self.chk_keyable.setEnabled(True)
+            self.chk_keyable.setToolTip(KEYABLE_TIP)
 
         for spin in (self.sp_min, self.sp_max, self.sp_default):
             spin.setDecimals(0 if is_int else 3)

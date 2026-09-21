@@ -8,9 +8,13 @@
 #
 # 이미 같은 이름이 있으면 만들지 않는다(덮어쓰지 않는다). 타입이나 범위가 달라도
 # 손대지 않고 건너뛴다 - 기존 어트리뷰트를 바꾸면 거기 걸린 연결·키가 깨지기 때문이다.
+#
+# 만든 어트리뷰트는 **항상 채널박스에 보이게** 한다(`attr_display`, v01.52).
+# `Keyable` 이 꺼진 것은 "non-keyable displayed" 로 올라간다.
 
 import maya.cmds as cmds
 
+from tools.A00145_RigConnect.app.core import attr_display
 from tools.A00145_RigConnect.app.core import attr_profile_prefs as prefs
 
 
@@ -46,17 +50,16 @@ def _add_flags(spec):
 
 
 def _finish_string(plug, spec):
-    """string 어트리뷰트를 만든 뒤 값과 채널박스 표시를 넣는다 (v01.48).
+    """string 어트리뷰트를 만든 뒤 기본값을 넣는다 (v01.48).
 
-    - 기본값은 `setAttr ... type="string"` 으로 넣는다(addAttr 이 못 받는다).
-      빈 문자열이면 넣지 않는다 - 마야가 주는 값이 `None` 인 상태 그대로 둔다.
-    - `Keyable` 체크는 string 에선 **"채널박스에 보이게"** 로 읽는다. string 은 키를 못 걸고,
-      `addAttr -keyable` 을 켜도 채널박스에 나오지 않는다(실측) - `setAttr -channelBox` 가 필요하다.
+    기본값은 `setAttr ... type="string"` 으로 넣는다(addAttr 이 못 받는다).
+    빈 문자열이면 넣지 않는다 - 마야가 주는 값이 `None` 인 상태 그대로 둔다.
+
+    채널박스 표시는 `attr_display` 가 맡는다 — string 은 `keyable` 을 켜도 채널박스에
+    나오지 않아 `setAttr -channelBox` 가 필요하다(실측).
     """
     if spec["default"]:
         cmds.setAttr(plug, spec["default"], type="string")
-    if spec["keyable"]:
-        cmds.setAttr(plug, channelBox=True)
 
 
 def create_attributes(objects, specs):
@@ -98,6 +101,16 @@ def create_attributes(objects, specs):
                 cmds.addAttr(obj, **_add_flags(spec))
                 if spec["type"] == "string":
                     _finish_string(full, spec)
+                # ★ 만든 것은 **반드시 채널박스에 보이게** 한다 (v01.52).
+                #   `Keyable` 을 끈 것은 "키는 못 걸지만 보이는" 채널이 된다 - 예전처럼
+                #   아무 데도 안 보이는 어트리뷰트가 되지 않는다. 레퍼런스로 불러온 뒤에는
+                #   표시 상태를 고칠 수 없으므로(마야가 거부) 여기서 해 두는 수밖에 없다.
+                ok, reason = attr_display.show_in_channel_box(
+                    obj, spec["name"], keyable=bool(spec["keyable"]))
+                if not ok and reason:
+                    skipped.append((obj, spec["name"],
+                                    "created, but not shown in the channel box : "
+                                    + reason))
                 created.append(full)
             except Exception as e:
                 skipped.append((obj, spec["name"], str(e)))

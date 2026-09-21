@@ -4,7 +4,11 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.51` (`app/config/version.py`) — Attribute > **Set Value** 하위 탭: 여러 오브젝트의 공통
+- 버전: `v01.52` (`app/config/version.py`) — Attribute 가 만든 어트리뷰트는 **반드시 채널 박스에
+  보인다**: `Keyable` 을 꺼도 "키만 못 거는 보이는 채널" 이 된다. 레퍼런스로 들어온 어트리뷰트는
+  마야가 표시 변경을 거부하므로 **만들 때** 해 둔다. `Edit` 에 이미 숨은 것을 되살리는
+  **`Show in Channel Box`** 버튼 (§Attribute)
+  · v01.51 은 Attribute > **Set Value** 하위 탭: 여러 오브젝트의 공통
   어트리뷰트에 값을 한 번에 — float / int 는 `Start` + `Step`(리스트 순서대로), enum 은 **항목 이름**을
   골라서 (옛 Number Tool 이식, §Attribute > Set Value)
   · v01.50 은 Attribute > **Create** 목록에도 같은 다중 선택 + 다중 체크
@@ -904,6 +908,48 @@ Destination : ab      (Null)   abcd            Destination : ab      abcd
 > `Create` 는 합치지 않았다. 씬에서 아무것도 읽지 않고 **저장해 둔 프로파일**로 만드는,
 > 입력의 출처가 다른 작업이다. 같은 화면에 두면 "지금 목록이 씬인가 프로파일인가" 가 흐려진다.
 
+#### ★ 만든 어트리뷰트는 반드시 채널 박스에 보인다 (v01.52)
+
+**`Edit > Copy` 와 `Create` 로 만든 어트리뷰트는 예외 없이 채널 박스에 올라온다.**
+예전에는 `Keyable` 을 끄면 **아무 데도 안 보이는** 어트리뷰트가 만들어졌다.
+
+마야에서 유저 어트리뷰트가 채널 박스에 나오는 길은 **둘뿐**이다.
+
+| 상태 | 채널 박스 | 키 |
+|------|-----------|-----|
+| `keyable = on` | 보인다 | 걸 수 있다 |
+| `keyable = off` + `channelBox = on` | 보인다 (non-keyable displayed) | 못 건다 |
+| 둘 다 아님 | **안 보인다** — Attribute Editor 에만 있다 | 못 건다 |
+
+`addAttr` 은 `keyable` 을 주지 않으면 **세 번째 상태**로 만든다. 그래서 툴이 만든 직후에
+표시 상태를 정리한다(`app/core/attr_display.py`). 이제 `Keyable` 은 **보이냐 마냐가 아니라
+키를 걸 수 있냐**를 정한다 — 꺼도 **보이되 키만 못 거는** 채널이 된다.
+
+> [!warning] 레퍼런스로 들어온 어트리뷰트는 **고칠 수 없다** (Maya 2024 실측)
+> ```
+> setAttr: The attribute 'RIG:ctl.plain' is from a referenced file,
+>          thus the channelBox state cannot be changed.
+> ```
+> `keyable` 도 같은 문구로 거부된다. **레퍼런스 쪽에서는 손쓸 방법이 없다** — 그래서
+> 어트리뷰트를 **만드는 그 순간에** 보이게 해 두는 것이 유일한 해법이다.
+> 한 번 제대로 만들어 두면 그 상태는 파일에 저장되어(`setAttr -k on` / `-cb on`),
+> **`.ma` · `.mb` 어느 쪽으로 저장해도 레퍼런스로 불러왔을 때 그대로 보인다**(실측).
+> 레퍼런스된 노드에 **새로 더한** 어트리뷰트는 레퍼런스 에디트로 남아 씬을 다시 열어도 유지된다.
+
+**이미 숨은 채로 만들어진 것** 은 `Edit` 탭의 `Display` 줄에 있는 **`Show in Channel Box`**
+로 되살린다 — 체크한 어트리뷰트를 `Objects` 의 모든 오브젝트에서 채널 박스로 올린다.
+keyable 이던 것은 keyable 그대로 두고, 숨어 있던 것만 non-keyable displayed 로 바꾼다.
+레퍼런스에서 온 것은 위의 이유로 못 고치므로 **그 사유를 로그에 적는다**(리그 씬에서 고쳐 저장할 것).
+
+그 밖에 실측으로 확인한 것:
+
+- `addAttr -h true` 로 숨겨 만든 것도 `setAttr -k/-cb` 로 **되살아난다**
+  (`attributeQuery -hidden` 은 계속 `True` 라고 답한다 — 표시 여부와는 별개다).
+- **컴파운드는 부모만 켜도 자식이 안 나온다** → 자식까지 함께 켠다.
+- 잠긴(locked) 어트리뷰트도 표시 상태는 바뀐다. **잠금은 그대로 둔다.**
+- `string` 은 `keyable` 을 켜도 채널 박스에 안 나온다 → **항상 `channelBox`** 로 켠다.
+- `message` 는 채널 박스에 값이 없다 → 건드리지 않고 사유만 남긴다.
+
 #### Edit (v01.44)
 
 ```
@@ -918,12 +964,15 @@ Destination : ab      (Null)   abcd            Destination : ab      abcd
 │                              [Filter ....][Check All][Clear Checks]│
 │                              ☐ Include attributes hidden by filter │
 │                              Order  [ Up ][ Down ]                 │
+│                              ☑ Maintain connections                │
+│                              Display [ Show in Channel Box ]       │
 └────────────────────────────────────────────────────────────────────┘
 ┌ Copy to other objects ─────────────────────────────────────────────┐
 │ Targets (new attributes here)  [ctrl_L_hand]                       │
 │ Prefix [ L_ ]   Suffix [ _ctrl ]                                   │
 │ Preview : stretch  ->  L_stretch_ctrl   (+1 more)                  │
 │ ☑ Copy current value                                               │
+│ ☑ Show in Channel Box                                              │
 │ [        Copy Checked Attributes to Targets        ]               │
 └────────────────────────────────────────────────────────────────────┘
 [            Delete Checked Attributes            ]
@@ -1041,6 +1090,10 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
 - **Prefix / Suffix**: 둘 다 비우면 **원본과 같은 이름**. `Preview` 가 체크한 첫 항목의 결과
   이름을 실시간으로 보여준다.
 - **`Copy current value`**(기본 ON): 원본의 **현재 값**도 새 어트리뷰트에 넣는다.
+- **`Show in Channel Box`**(기본 ON, v01.52): 원본이 **숨어 있던** 어트리뷰트라도 사본은
+  채널 박스에 보이게 만든다(keyable 이던 것은 keyable 그대로). 끄면 예전처럼 **원본의 표시
+  상태를 그대로** 따라간다. 켜 두는 편이 낫다 — 레퍼런스로 불러온 뒤에는 마야가 표시 변경을
+  거부해서 숨은 채로 굳는다(위 [채널 박스](#-만든-어트리뷰트는-반드시-채널-박스에-보인다-v0152)).
 - 보존되는 정의: **타입**(double/float/long/short/bool/enum/string/message/doubleAngle/doubleLinear/
   컴파운드 `double3`·`float3`/multi), **min·max·soft min·soft max**, **default**, **keyable**,
   **channel box 표시**, **hidden**, **enum 이름 목록**, **usedAsColor**.
@@ -1120,7 +1173,7 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
   | `Min` / `Max` | **체크박스로 켜고 끈다** — 끄면 "제한 없음" (float / int 만) |
   | `Items` | enum 항목. `left, mid, right` 처럼 `,` 또는 `:` 로 가른다 (enum 만) |
   | `Default` | 기본값 — bool 은 On/Off 체크박스, enum 은 **항목 이름 콤보**, string 은 글자 칸 |
-  | `Keyable` | 끄면 채널 박스에 안 보이게 만든다. string 에서는 **`Channel Box`** 로 바뀐다 |
+  | `Keyable` | **켜면 키를 걸 수 있는 채널, 끄면 키만 못 거는 채널** — 어느 쪽이든 채널 박스에는 보인다 (v01.52). string 에서는 **`Channel Box`** 로 바뀌고 켜진 채 잠긴다 |
 
 - **`Min`/`Max` 를 체크박스로 둔 이유**: 마야에서 "범위 없음" 과 "범위가 0" 은 다른데,
   스핀박스만 두면 그 둘을 구분해 넣을 방법이 없다.
@@ -1130,8 +1183,9 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
     범위를 벗어난 번호를 주면 마야는 **조용히 0** 으로 만들기 때문에 저장할 때 항목 수 안으로 자른다.
   - string 은 `addAttr -dataType string` 으로 만들고 **기본값은 만든 뒤 `setAttr -type string`** 으로 넣는다
     — `addAttr` 이 문자열 `defaultValue` 를 못 받는다(실측: `Expected float, got str`). 비워 두면 값을 넣지 않는다.
-  - string 은 키를 걸 수 없고 `addAttr -keyable` 을 켜도 채널 박스에 안 나온다(실측). 그래서 같은 체크를
-    **`Channel Box`**(= `setAttr -channelBox`) 로 읽는다. 끄면 Attribute Editor 에만 보인다.
+  - string 은 키를 걸 수 없고 `addAttr -keyable` 을 켜도 채널 박스에 안 나온다(실측). 그래서
+    **`setAttr -channelBox`** 로 올린다. v01.52 부터는 **늘 올리므로** 고를 것이 없어
+    체크는 **`Channel Box` 로 켜진 채 잠긴다**(그 사실을 보여 주는 표시다).
   - 리스트 표시: `side   enum   [left | mid | right]   default mid`, `note   string   default "hello"`.
 - `Remove` 는 **프로파일에서만** 지운다(씬의 어트리뷰트는 건드리지 않는다).
 - `min > max` 로 적으면 **서로 바꿔** 저장한다(거꾸로 넣는 일이 흔하다).
@@ -1708,6 +1762,7 @@ A00145_RigConnect/
     │   ├── attr_profile_prefs.py   # Attribute > Create (프로파일 JSON 저장 + 스펙 정규화, maya 비의존)
     │   ├── attr_create_manager.py  # Attribute > Create (프로파일 스펙 -> addAttr, 이미 있으면 건너뜀)
     │   ├── attr_delete_manager.py  # Attribute > Edit   (지울 수 있는 어트리뷰트 나열 + deleteAttr, 잠김 보고)
+    │   ├── attr_display.py         # Attribute 공용     (만든 어트리뷰트를 채널 박스에 올린다. 레퍼런스는 못 고치므로 만들 때 해 둔다)
     │   ├── attr_value_manager.py   # Attribute > Set Value (공통 어트리뷰트 교집합 · Start/Step/Repeat 값 계산 · enum 은 이름으로 · 키 걸린 plug 는 키+setAttr)
     │   ├── blendshape_utils.py     # blendShape 타겟(weight 별칭) 조회 — Attribute / Connect 탭 공용
     │   ├── stream_manager.py       # List Connected (MEL 포팅: hyperShade up/down)

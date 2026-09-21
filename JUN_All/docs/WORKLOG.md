@@ -31,6 +31,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-21 (오늘)
 
+> [!summary] A00145 **Attribute** — 만든 어트리뷰트가 숨어 있던 문제: 이제 **반드시 채널 박스에 보인다**, 레퍼런스로 불러와도 (v01.51->01.52)
+- 요청: `Edit`(Copy) · `Create` 로 만든 어트리뷰트가 전부 숨어 있다. 채널 박스에 보이게 하고, 그 오브젝트를 **레퍼런스로 불러와도 늘 보이게** 해 달라.
+- ★ 원인은 마야의 상태가 **셋**이라는 것 — `keyable on` / `keyable off + channelBox on`(non-keyable displayed) / **둘 다 아님(= 아무 데도 안 보임)**. `addAttr` 은 `keyable` 을 주지 않으면 세 번째로 만든다. `Keyable` 을 끄면 보이지도 않는 어트리뷰트가 됐다.
+- ★ **레퍼런스로 들어온 어트리뷰트는 표시 상태를 바꿀 수 없다**(실측): `setAttr: The attribute 'RIG:ctl.plain' is from a referenced file, thus the channelBox state cannot be changed.` `keyable` 도 같은 문구로 거부. → **만드는 순간에 해 두는 것이 유일한 해법**이고, 한 번 해 두면 `.ma`·`.mb` 어느 쪽이든 레퍼런스로 불러와도 그대로 보인다(실측).
+- 새 코어 `app/core/attr_display.py` — `show_in_channel_box / show_attributes / is_visible`. `Create` 와 `Edit > Copy` 가 만든 직후 부른다. `Keyable` 은 이제 **보이냐 마냐가 아니라 키를 걸 수 있냐**를 정한다.
+- UI: `Edit` 에 `Display > Show in Channel Box`(이미 숨은 채로 만들어진 것 되살리기, 레퍼런스면 사유를 로그에) · Copy 박스에 `Show in Channel Box`(기본 ON, 끄면 원본 표시 상태를 그대로) · string 은 키를 못 걸어 `Channel Box` 체크가 **켜진 채 잠긴다**.
+- 실측 곁가지: `addAttr -h` 로 숨긴 것도 `setAttr -k/-cb` 로 되살아난다(`attributeQuery -hidden` 은 계속 True) · **컴파운드는 부모만 켜면 자식이 안 나온다**(자식까지) · 잠긴 어트리뷰트도 표시는 바뀌고 잠금은 그대로 · string 은 `keyable` 로 안 나와 `channelBox` 로 · `message` 는 건드리지 않는다.
+- mayapy 2024 헤드리스 **33항목** 통과(Create / Copy / 되살리기 / **레퍼런스 왕복** / 오프스크린 Qt UI). 마야 GUI 에서는 아직 안 눌러 봄. #A00145
+
 > [!summary] A00275 **Bind Pose** — `Update Bind Pose` 가 **버텍스 노멀**을 바꿔 버리던 버그 수정 (v01.28->01.29)
 - 증상: 리깅된 아바타의 조인트를 바인드와 다르게 회전시킨 뒤 `Update Bind Pose`(Keep current shape) 를 누르면 **위치는 그대로인데 셰이딩이 달라진다.**
 - ★ 원인(mayapy 2024 확인): **`skinCluster.deformUserNormals`(기본 ON)가 잠긴(user) 노멀을 스킨 행렬로 같이 회전**시킨다. `bindPreMatrix` 를 현재 포즈로 바꾸면 스킨 변형이 항등이 되므로 그 회전이 사라져 **노멀만 Orig 셰이프의 rest 값으로 되돌아간다.** 위치는 `pnts` 에 구워 유지되니 노멀만 튄다. 잠기지 않은 노멀은 위치에서 계산되므로 **위치가 같으면 노멀도 같다**(차이 0 확인) — 문제는 잠긴 노멀뿐이다.

@@ -215,10 +215,8 @@ def describe_spec(spec):
         return "   ".join(parts)
 
     if spec["type"] == "string":
-        parts = ["string", 'default "{0}"'.format(spec["default"])]
-        if not spec["keyable"]:
-            parts.append("hidden")
-        return "   ".join(parts)
+        # string 은 키를 못 걸지만 **채널박스에는 늘 올린다**(v01.52) - keyable 값은 안 쓴다.
+        return "   ".join(["string", 'default "{0}"'.format(spec["default"])])
 
     parts = [spec["type"]]
     if spec["type"] in RANGED_TYPES:

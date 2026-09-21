@@ -16,6 +16,7 @@ UI 비의존: 위젯에서 읽은 list/str/bool 값만 받는다. (app/core ↔ 
 
 import maya.cmds as cmds
 
+from tools.A00145_RigConnect.app.core import attr_display
 from tools.A00145_RigConnect.app.core import blendshape_utils as bsu
 
 
@@ -271,8 +272,14 @@ def _set_value(target, new_name, spec):
         pass
 
 
-def _create_one(target, spec, new_name, prefix, suffix, copy_value):
-    """target 에 spec 대로 어트리뷰트 1개(+ 컴파운드면 자식들)를 만든다."""
+def _create_one(target, spec, new_name, prefix, suffix, copy_value,
+                show_in_channel_box=True):
+    """target 에 spec 대로 어트리뷰트 1개(+ 컴파운드면 자식들)를 만든다.
+
+    `show_in_channel_box` 가 True(기본)면 원본이 숨어 있던 것이라도 **채널박스에 보이게**
+    만든다 — 만든 뒤에 숨어 있으면 쓸 수가 없고, 레퍼런스로 불러온 다음에는 표시 상태를
+    고칠 수도 없기 때문이다(마야가 거부한다). keyable 여부는 원본을 그대로 따른다.
+    """
     keep_short_name = (new_name == spec["long_name"])
     cmds.addAttr(target, **_add_flags(spec, new_name, keep_short_name))
 
@@ -290,6 +297,12 @@ def _create_one(target, spec, new_name, prefix, suffix, copy_value):
         except Exception:
             pass
 
+    # ★ 원본이 숨어 있었으면 사본은 채널박스로 올린다 (v01.52).
+    #   keyable 은 원본 그대로 두고, 아무 데도 안 보이는 상태만 없앤다.
+    if show_in_channel_box and not attr_display.is_visible(target, new_name):
+        attr_display.show_in_channel_box(target, new_name,
+                                         keyable=bool(spec["keyable"]))
+
     if copy_value:
         _set_value(target, new_name, spec)
         for child in spec["children"]:
@@ -299,7 +312,8 @@ def _create_one(target, spec, new_name, prefix, suffix, copy_value):
 
 
 def copy_attributes(source, attrs, targets, prefix="", suffix="",
-                    copy_value=True, skip_existing=True):
+                    copy_value=True, skip_existing=True,
+                    show_in_channel_box=True):
     """source 의 attrs 를 targets 에 같은 정의로 새로 만든다.
 
     Args:
@@ -311,6 +325,8 @@ def copy_attributes(source, attrs, targets, prefix="", suffix="",
         copy_value: True 면 소스의 현재 값도 복사한다.
         skip_existing: True 면 같은 이름이 이미 있는 타겟은 건너뛴다(기본).
                        False 면 에러로 보고한다.
+        show_in_channel_box: True(기본) 면 원본이 숨어 있던 어트리뷰트도 사본은
+                       채널박스에 보이게 만든다. False 면 원본의 표시 상태를 그대로 따른다.
 
     Returns:
         (created, skipped) — created 는 "target.newAttr" 리스트,
@@ -348,7 +364,8 @@ def copy_attributes(source, attrs, targets, prefix="", suffix="",
                 raise ValueError("{0} : {1}".format(full, reason))
 
             try:
-                _create_one(target, spec, new_name, prefix, suffix, copy_value)
+                _create_one(target, spec, new_name, prefix, suffix, copy_value,
+                            show_in_channel_box=show_in_channel_box)
                 created.append(full)
             except Exception as e:
                 skipped.append((target, new_name, str(e)))
