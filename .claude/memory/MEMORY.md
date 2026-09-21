@@ -53,7 +53,7 @@
 - [pointPosition: points only](pointposition-points-only.md) — 엣지/페이스는 xform 평균
 - [cmds -pivot is world](cmds-scale-rotate-pivot-is-world.md) — `scale`/`rotate` 의 `-pivot` 은 `-objectSpace` 여도 월드
 - [skin weights: physical index](skincluster-weight-index-physical.md) — get/setWeights 는 물리 인덱스
-- [skinCluster deforms user normals](skincluster-deforms-user-normals.md) — `deformUserNormals` 가 잠긴 노멀을 돌린다, 바인드 갱신하면 노멀만 rest 로
+- [skinCluster deforms user normals](skincluster-deforms-user-normals.md) — `deformUserNormals` 가 잠긴 노멀을 돌린다 · **노멀 쓰기는 MFnMesh + dgdirty**(컴포넌트 명령은 메모리·레퍼런스 편집 폭발), undo 는 스냅샷 명령으로
 - [MPlug.asMObject lifetime](mplug-asmobject-lifetime.md) — MObject 를 붙들고 읽어야, 놓으면 쓰레기 값
 - [setAttr Int32Array no count](setattr-int32array-no-count.md) — Int32Array 는 개수를 붙이지 않는다
 - [attr reorder = deleteAttr + undo](maya-attr-reorder-deleteattr-undo.md) — 재정렬 명령이 없다, 성공했을 때만 undo, Ctrl+Z 로 안 돌아감

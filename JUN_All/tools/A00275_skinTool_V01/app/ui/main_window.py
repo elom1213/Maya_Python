@@ -861,6 +861,18 @@ class MainWindow(QWidget):
             "Turn off to leave the existing bindPose node untouched.")
         mode_layout.addWidget(self.cb_bp_rebuild)
 
+        self.cb_bp_normals = QCheckBox("Keep locked vertex normals")
+        self.cb_bp_normals.setChecked(True)
+        self.cb_bp_normals.setToolTip(
+            "A skinCluster rotates locked (user) vertex normals along with the skin,\n"
+            "so updating the bind pose snaps them back to the rest shading.\n"
+            "On  : they are re-baked, and the shading stays exactly as it looks now.\n"
+            "Off : only the positions are kept - the shading goes back to the rest one.\n"
+            "\n"
+            "Only meshes with locked normals are affected; nothing is written when\n"
+            "there are none. Turn it off if this step is slow on a very heavy mesh.")
+        mode_layout.addWidget(self.cb_bp_normals)
+
         layout.addWidget(mode_grp)
 
         # ---- 실행 ----
@@ -928,7 +940,8 @@ class MainWindow(QWidget):
         count, messages = bp_mgr.update_bind_pose(
             self.bp_targets,
             keep_shape=keep,
-            rebuild_dag_pose=self.cb_bp_rebuild.isChecked())
+            rebuild_dag_pose=self.cb_bp_rebuild.isChecked(),
+            keep_normals=self.cb_bp_normals.isChecked())
 
         for m in messages:
             self.log(m)

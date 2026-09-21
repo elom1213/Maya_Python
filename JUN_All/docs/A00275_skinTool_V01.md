@@ -10,7 +10,7 @@ updated: 2026-09-21
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
+- **버전**: `app/config/version.py` (v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
   (v01.22 는 아래 레이어 lock 이 사라졌다) · v01.22 — **`Weights > Layer`** 신규: 버텍스 순서가 같은 메시 N 개의
   웨이트를 메시마다 lock + Blend 로 레이어처럼 합성해 새 메시로 만들거나 기존 메시를 갱신 · v01.15 — **탭 재분류**:
   평평한 탭 7개를 `카테고리 3 → 기능 7` 의 2단 구조로, 아래 표)
@@ -409,7 +409,7 @@ lock 이 있는 레이어마다 (아래 -> 위):
 - 메시 트랜스폼이 원점이 아니어도, 루트 조인트 자체를 옮겨도 동작
 - **잠긴(user) 버텍스 노멀이 있어도 셰이딩이 그대로다** (v01.29~, 아래)
 
-### 잠긴 버텍스 노멀 (v01.29~)
+### 잠긴 버텍스 노멀 (v01.29~, 쓰는 방식은 v01.30 에서 바뀜)
 
 게임용 아바타처럼 **노멀이 잠긴(locked / frozen) 메시**는 `Keep current shape` 로 갱신하면
 v01.28 까지 **위치는 그대로인데 셰이딩만 달라졌다.**
@@ -424,6 +424,22 @@ v01.28 까지 **위치는 그대로인데 셰이딩만 달라졌다.**
   써버리면 그 자리에서 잠겨 **이후 디폼에 노멀이 따라 돌지 않는 메시**가 된다.
 - 잠긴 노멀이 몇 개인지는 **Diagnose** 의 `locked norms : N / M (deformUserNormals = True)` 줄로 본다.
 - `Snap mesh to rest shape` 모드는 형상이 rest 로 돌아가는 게 정상이라 노멀도 그대로 둔다.
+- **끄고 싶으면** `Keep locked vertex normals` 체크를 푼다(v01.30~). 끄면 노멀은 rest 로 돌아간다.
+
+> **★ v01.30 — 어떻게 쓰느냐가 마야를 내렸다.**
+> v01.29 는 `polyNormalPerVertex` 로 **face-vertex 마다** 썼다. 실측하면 face-vertex 359,400 장
+> 메시 하나에 **마야 메모리가 +1.2 GB**(undo 레코드가 face-vertex 당 3 KB 넘는다), **참조된 리그**
+> 에서는 face-vertex 89,700 개에 **레퍼런스 편집 131,698 개**가 생긴다(노멀을 안 쓰면 145 개).
+> 캐릭터 한 벌이면 수 GB · 수십만 편집이라 마야가 버티지 못한다.
+>
+> v01.30 은 **`MFnMesh` 로 한두 번에** 쓴다(+114 MB, 1.8 초). 같이 챙긴 것 셋:
+>
+> - **`cmds.dgdirty`** 로 하류를 깨운다 — API 로 쓰면 노멀이 쪼개진 사실이 skinCluster 출력까지
+>   가지 않아 값이 이웃과 뒤섞인다(40 개 중 26 개가 틀렸다).
+> - **undo** — 쓸 버텍스 범위에만 `polyNormalPerVertex -freezeNormal` 을 **먼저 한 번** 걸어
+>   값 스냅샷을 undo 큐에 남긴다. 그러면 Ctrl+Z 가 옛 노멀까지 되돌린다.
+> - **참조된 셰이프는 건너뛴다** — 편집 폭발은 API 로 써도 같다. 개수를 적은 경고가 뜨고,
+>   리그 파일에서 작업하거나 레퍼런스를 임포트한 뒤 다시 실행하면 된다.
 
 ### 로그에 뜨는 경고 대응법
 
@@ -433,6 +449,7 @@ v01.28 까지 **위치는 그대로인데 셰이딩만 달라졌다.**
 | `bindPreMatrix is locked or connected for ...` | 해당 인플루언스의 `bindPreMatrix` 가 **잠겨 있거나 다른 노드에서 연결**돼 있어 건드리지 않았다. 그 조인트만 갱신에서 빠진다. 포함하려면 잠금 해제 또는 연결 해제 후 다시 실행. |
 | `bind matrices only - shape NOT kept: <이유>` | `Keep current shape` 를 요청했지만 형상을 굽지 못했다. **콜론 뒤에 이유가 함께 나온다** — 아래 표 참고. 바인드 행렬은 갱신됐다. |
 | `still has live target geometry with a non-zero weight` | 아래 항목 참고. |
+| `... is referenced, so N locked vertex normal(s) were left alone` | 참조된 메시에는 노멀을 쓰지 않는다(위 v01.30 설명). 리그 파일에서 작업하거나 레퍼런스를 임포트한 뒤 다시 실행한다. 위치·바인드 행렬은 정상 갱신된다. |
 | `vertex normals still differ by up to ...` | 잠긴 노멀을 다시 구웠는데도 스킨 출력 노멀이 남아서 어긋난다. 입력 셰이프와 skinCluster 사이에 **노멀을 다시 쓰는 디포머/폴리 노드**가 있는지 본다(Diagnose 의 chain walk). |
 
 #### `shape NOT kept` 이 떴을 때 대응 순서
