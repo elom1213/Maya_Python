@@ -23,5 +23,8 @@
 
 #           Orient table (v02.26) - Filter: find text in Joint / Rule / Note, "In" picks the columns.
 
-VERSION = "02.26"
-LAST_UPDATE = "2026-09-18"
+#           Orient (v02.27) - the whole right arm is the behavior mirror of the finished
+#                            left one (mirrored last), and every joint carries one rule.
+
+VERSION = "02.27"
+LAST_UPDATE = "2026-09-21"

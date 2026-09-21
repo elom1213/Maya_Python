@@ -461,10 +461,10 @@ class MainWindow(QWidget):
 
         note = QLabel(
             "Place the template joints by hand first, then press Orient & Place. The "
-            "left side is mirrored onto the right, the spine is squared up, and the "
-            "arms and legs are aimed down the chain with the pole target deciding the "
-            "roll. Finally the foot and toe pole targets are moved out along their own "
-            "+Z - that last step is why this is not called Orient.")
+            "spine is squared up, the left arm and both legs are aimed down the chain "
+            "with the pole target deciding the roll, and the right arm is then mirrored "
+            "from the finished left one. Finally the foot and toe pole targets are moved "
+            "out along their own +Z - that last step is why this is not called Orient.")
         note.setWordWrap(True)
         layout.addWidget(note)
 
@@ -484,12 +484,16 @@ class MainWindow(QWidget):
         self.chk_mirror = QCheckBox("Mirror the left side onto the right first")
         self.chk_mirror.setChecked(True)
         self.chk_mirror.setToolTip(
-            "The arm is mirrored with Maya's behaviour rule (the right arm's forward\n"
-            "axis ends up being -X). The leg is mirrored by position only and then\n"
-            "aimed, because its forward axis stays +X.\n"
+            "The whole right arm - clavicle, arm, hand and fingers - is the behaviour\n"
+            "mirror of the left one and nothing else touches it, so its forward axis\n"
+            "ends up being -X. The leg is mirrored by position only and then aimed,\n"
+            "because its forward axis stays +X.\n"
             "\n"
-            "This has to run BEFORE the arms and legs are aimed: aiming reads the pole\n"
-            "targets, and mirroring is what puts the right-hand ones in place.")
+            "Positions are mirrored first, before the pole targets are wired. The arm\n"
+            "orientation is mirrored LAST, once the left side has been aimed - mirror\n"
+            "it earlier and you copy the left arm as you left it.\n"
+            "\n"
+            "Off: the right arm is left exactly as it is.")
         self.chk_mirror.stateChanged.connect(lambda *_: self._refresh_orient())
         opt.addWidget(self.chk_mirror)
 

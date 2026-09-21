@@ -6,19 +6,25 @@
     "Everything is computed the same way: aim one local axis at something and",
     "point another local axis at a hint (a pole target, or a world axis).",
     "",
+    "**One joint, one rule** (v02.27). If a joint appears in two places here, the",
+    "table shows it twice and the two rules fight - the right arm used to be mirrored",
+    "AND aimed, and the mirror lost.",
+    "",
     "Order matters and the tool enforces it (plan 4-6):",
-    "  1 mirror        - the right side needs positions before anything is aimed,",
-    "                    and A2 reads the mirrored pole targets",
-    "  2 aim_groups    - A1, the spine and the clavicles",
-    "  3 pole_chains   - A2, arms and legs (+ tail / preserve)",
-    "  4 position_only - forced last so world-zero rotation wins over the mirror",
+    "  1 mirror (early)  - positions only for the arm, position+world zero for the leg;",
+    "                      A2 reads the mirrored pole targets, so the right side has to",
+    "                      be in place before anything is aimed",
+    "  2 aim_groups      - A1, the spine and the left clavicle",
+    "  3 pole_chains     - A2, the left arm and both legs (+ tail / preserve)",
+    "  4 aim_subtrees    - the left fingers",
+    "  5 mirror (late)   - the whole right arm, mirrored from the finished left one",
+    "  6 position_only   - forced last so world-zero rotation wins over the mirror",
     "",
     "'tail' handles the end joint, which an IK solver never rotates (plan 2-1):",
-    "  legs -> a tail group, arms -> \"preserve\" (leave it exactly as it is).",
-    "  \"preserve\" is a DECISION, not a gap - see plan 4-9.",
-    "  v02.25: the left arm uses \"parent\" instead - helper_hand_l gets the same world",
-    "  orientation as helper_lowerarm_l. The right arm uses \"mirror\" - helper_hand_r is",
-    "  not aimed by A2, the late behavior mirror (helper_hand_l -> helper_hand_r) sets it."
+    "  legs -> a tail group, arms -> \"parent\" (helper_hand_l gets the same world",
+    "  orientation as helper_lowerarm_l). \"preserve\" (leave it exactly as it is) is",
+    "  still supported and is a DECISION, not a gap - see plan 4-9.",
+    "  The right hand is not listed at all - the late mirror above covers it."
   ],
   "world_zero_default": true,
   "aim_groups": [
@@ -54,23 +60,6 @@
       "forward": "+X",
       "up": "+Y",
       "up_world": "+Y"
-    },
-    {
-      "name": "clavicle_r",
-      "comment": [
-        "The behavior mirror of clavicle_l, written as a rule (v02.24). The early arm",
-        "mirror copies the left clavicle BEFORE clavicle_l above is aimed, so without",
-        "this the right clavicle would keep the old left orientation.",
-        "Behavior mirror = forward -X (like arm_r) and -Y toward world +Y - checked",
-        "against the mirror matrix of the left clavicle in mayapy."
-      ],
-      "joints": [
-        "helper_clavicle_r"
-      ],
-      "aim_at": "helper_upperarm_r",
-      "forward": "-X",
-      "up": "-Y",
-      "up_world": "+Y"
     }
   ],
   "pole_chains": [
@@ -86,19 +75,6 @@
       "up": "+Z",
       "expect_up_world": "+Z",
       "tail": "parent"
-    },
-    {
-      "name": "arm_r",
-      "joints": [
-        "helper_upperarm_r",
-        "helper_lowerarm_r",
-        "helper_hand_r"
-      ],
-      "pole": "helper_polTgt_arm_r",
-      "forward": "-X",
-      "up": "+Z",
-      "expect_up_world": "+Z",
-      "tail": "mirror"
     },
     {
       "name": "leg_l",
@@ -247,21 +223,28 @@
     "plane": "YZ",
     "behavior": [
       {
-        "comment": "A3 arm. Mirrors the whole arm including the 19 finger joints. Runs first; A2 overwrites upperarm/lowerarm afterwards.",
+        "comment": [
+          "A3 arm. The whole right arm - clavicle, upper arm, lower arm, hand and the",
+          "19 finger joints - is the behavior mirror of the left one, and NOTHING else",
+          "touches it (v02.27). One joint, one rule.",
+          "",
+          "'stage': 'late' - the mirror runs AFTER the left side has been aimed (A1",
+          "clavicle, A2 arm, finger subtree). An early mirror copies the left arm as the",
+          "user left it, which is why v02.24-v02.26 needed extra rules on the right",
+          "(clavicle_r A1, arm_r A2, a second late mirror for the hand). Those rules did",
+          "not agree with the mirror either: arm_r aimed +Z at the mirrored pole target,",
+          "so the right arm kept the LEFT roll instead of the mirrored one.",
+          "",
+          "'position_stage': 'early' - only the POSITIONS are mirrored up front. The right",
+          "pole target is wired to the right arm before A2 runs, and the distance it bakes",
+          "is read from that pose, so the chain has to be symmetric by then. The",
+          "orientation still comes from the late pass."
+        ],
         "source": "helper_clavicle_l",
         "target": "helper_clavicle_r",
-        "children": true
-      },
-      {
-        "comment": [
-          "The right fingers. This one runs LATE - after aim_subtrees has oriented",
-          "the left hand. The early mirror above would copy the left fingers before",
-          "they are aimed, so their orientation would be whatever the user left."
-        ],
-        "source": "helper_hand_l",
-        "target": "helper_hand_r",
         "children": true,
-        "stage": "late"
+        "stage": "late",
+        "position_stage": "early"
       }
     ],
     "position_pairs": [

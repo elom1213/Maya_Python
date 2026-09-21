@@ -28,7 +28,13 @@
 #
 # 4. **Behavior 미러는 축을 `diag(1,-1,-1)` 로 보낸다** (계획서 2-4)
 #    위치는 x 만 뒤집고, 세 축 벡터는 y·z 성분만 뒤집힌다. 그래서 오른팔의 forward 가
-#    로컬 `-X` 가 된다 — A2 의 `arm_r : -X` 와 맞물린다.
+#    로컬 `-X` 가 되고, `+Y`·`+Z` 는 왼쪽이 어디를 보든 **월드에서 그 거울 방향**을 본다.
+#
+#    ★ v02.27 부터 **오른팔은 이 미러 하나가 전부 갖는다.** 예전에는 오른쪽에도 규칙을
+#    달았는데(`clavicle_r` A1 · `arm_r` A2), 그 규칙은 **미러와 답이 달랐다** — A2 는
+#    `+Z` 를 미러된 폴 타깃 쪽으로 두므로 오른팔이 **왼팔과 같은 롤**을 갖게 되고,
+#    미러라면 뒤집혀 있어야 할 `+Y`·`+Z` 가 왼쪽과 같은 쪽을 봤다. 한 조인트에 규칙이
+#    둘 붙으면 어느 쪽이 이겼는지도 표에서만 알 수 있다 — 그래서 규칙을 하나로 줄였다.
 #
 # 5. **부모의 방향을 바꾸면 후손이 전부 딸려 움직인다** ★★
 #    조인트의 방향은 자식의 월드 위치를 정한다. 척추를 위에서부터 정렬하면 `pelvis` 를
@@ -403,9 +409,33 @@ def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True):
         world_zero_spine = bool(doc.get("world_zero_default", True))
 
     def add(name, rule, status=ST_OK, note="", up_expect=None):
+        """이 조인트의 **행 하나**를 만들거나 갱신한다.
+
+        **한 조인트에 행은 하나다** (v02.27). 예전에는 규칙마다 행을 만들어, 미러와
+        A2 양쪽에 걸린 조인트가 표에 두 번 나오고 `also claimed by ...` 가 붙었다.
+        규칙이 겹치는 것 자체가 문제라 규칙 쪽을 먼저 걷어냈고(오른팔은 미러 하나),
+        남은 겹침은 **위치를 먼저 옮겨 두는 준비 단계** 뿐이다 - 그건 규칙이 아니라
+        노트로 적는다.
+
+        나중에 도는 단계가 **최종 권한**이다 (plan 은 apply 와 같은 순서로 부른다).
+        """
         node = _resolve(name, namespace)
-        row = {"joint": node or name, "wanted": name, "rule": rule,
-               "status": status, "note": note, "up_dev": None, "world_shift": None}
+        row = claimed.get(name)
+
+        if row is None:
+            row = {"joint": node or name, "wanted": name, "rule": rule,
+                   "status": status, "note": note, "up_dev": None,
+                   "world_shift": None}
+            rows.append(row)
+            claimed[name] = row
+        else:
+            before = row["rule"]
+            row["rule"] = rule
+            row["status"] = status
+            row["note"] = (note + " | " if note else "") + \
+                "prepared by {0}".format(before)
+            row["up_dev"] = None
+
         if not node:
             row["status"] = ST_MISSING
             row["note"] = "looked for " + " and ".join(su.candidates(name, namespace))
@@ -415,11 +445,6 @@ def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True):
                                               axis_vector(up_expect[1]))
             except Exception:
                 pass
-        if name in claimed:
-            row["note"] = (row["note"] + " | " if row["note"] else "") + \
-                "also claimed by {0} - {1} wins".format(claimed[name], rule)
-        claimed[name] = rule
-        rows.append(row)
         return row
 
     mirror = doc.get("mirror") or {}
@@ -427,7 +452,10 @@ def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True):
     # ---- 1. 미러 ----
     if mirror_enabled:
         for entry in (mirror.get("behavior") or []):
-            if entry.get("stage", "early") != "early":
+            stage = entry.get("stage", "early")
+            positions_only = (stage != "early"
+                              and entry.get("position_stage") == "early")
+            if stage != "early" and not positions_only:
                 continue                       # 늦은 미러는 아래 3c 에서
             src = _resolve(entry["source"], namespace)
             dst = _resolve(entry["target"], namespace)
@@ -437,7 +465,13 @@ def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True):
             pairs = ([(src, dst)] if not entry.get("children")
                      else _pair_subtrees(src, dst)[0])
             for _s, d in pairs:
-                add(su.short_name(d), "A3 behavior", note="mirrored from the left")
+                if positions_only:
+                    # 방향은 늦은 미러가 갖는다 - 아래 3c 가 이 행을 덮어쓴다.
+                    add(su.short_name(d), "A3 position",
+                        note="position mirrored from the left")
+                else:
+                    add(su.short_name(d), "A3 behavior",
+                        note="mirrored from the left")
         for entry in (mirror.get("position_pairs") or []):
             add(entry["target"], "A3 position", note="position mirrored, aimed by A2")
 
@@ -555,7 +589,8 @@ def apply(doc, namespace, world_zero_spine=None, mirror_enabled=True):
     """규칙대로 실제로 방향을 잡는다. `(results, messages)`. **undo 한 스텝.**
 
     순서가 강제된다 (계획서 4-6):
-        미러 -> A1 -> A2(+tail/preserve) -> 위치 전용
+        미러(이른, 위치) -> 폴 타깃 -> A1 -> A2(+tail/preserve) -> 손가락
+        -> 미러(늦은, 오른팔 전체) -> 위치 전용 -> Place
     """
     messages = []
     results = {"mirrored": 0, "aimed": 0, "preserved": 0, "zeroed": 0,
@@ -577,9 +612,10 @@ def apply(doc, namespace, world_zero_spine=None, mirror_enabled=True):
             results["mirrored"] += _do_position_pairs(mirror, plane, namespace, messages)
         else:
             messages.append(
-                "[Warning] Mirroring is off. A2 reads the pole targets on the right "
-                "side, so if they were never mirrored the right arm and leg will be "
-                "aimed at the wrong place.")
+                "[Warning] Mirroring is off. The whole right arm is defined by the "
+                "mirror, so it is left exactly as it is. The right leg is aimed by A2, "
+                "but that reads the right pole target - if it was never mirrored the "
+                "leg is aimed at the wrong place.")
 
         # ---- 1b. 폴 타깃을 체인에서 계산해 놓는다 ----
         # A2 가 이 위치를 읽어 롤을 정하므로 **A2 보다 먼저**여야 하고,
@@ -608,7 +644,7 @@ def apply(doc, namespace, world_zero_spine=None, mirror_enabled=True):
         # ---- 3b. 하위 계층 정렬 (손가락) ----
         results["aimed"] += _do_aim_subtrees(doc, namespace, results, messages)
 
-        # ---- 3c. 늦은 미러 (오른손가락 - 왼쪽이 정렬된 뒤라야 한다) ----
+        # ---- 3c. 늦은 미러 (오른팔 전체 - 왼쪽이 다 정렬된 뒤라야 진짜 미러다) ----
         if mirror_enabled:
             results["mirrored"] += _do_behavior(mirror, plane, namespace, messages,
                                                 stage="late")
@@ -638,16 +674,26 @@ def _writable(joint):
 
 
 def _do_behavior(mirror, plane, namespace, messages, stage="early"):
-    """`stage` 가 맞는 behavior 미러만 돈다.
+    """`stage` 가 맞는 behavior 미러를 돈다. `position_stage` 면 **위치만** 미러한다.
 
-    `late` 가 왜 필요한가 — 오른손가락은 **왼손가락을 정렬한 뒤에** 미러해야 한다.
-    이른 미러는 아직 손대지 않은 왼손가락을 복사하므로, 사용자가 놓아 둔 방향이
-    그대로 오른쪽에 박힌다.
+    **늦은 미러가 기본이다** (v02.27) — 오른팔 전체(쇄골·팔·손·손가락)는 **왼팔이 다
+    정렬된 뒤에** 통째로 미러해야 진짜 미러가 된다. 이른 미러는 아직 손대지 않은 왼쪽을
+    복사하므로, 사용자가 놓아 둔 방향이 그대로 오른쪽에 박힌다. 그걸 메우려고 오른쪽에
+    규칙을 따로 달면(clavicle_r A1 · arm_r A2) **한 조인트가 규칙 둘을 갖고, 둘이 서로
+    다른 답을 낸다.**
+
+    **`position_stage` 는 위치만 먼저 옮긴다** — 오른쪽 폴 타깃이 A2 앞에서 오른팔에
+    물리고 그때 포즈에서 거리를 굽기 때문에, 그 시점에 체인이 대칭이어야 한다.
+    방향은 늦은 단계가 갖는다.
     """
     done = 0
     for entry in (mirror.get("behavior") or []):
-        if entry.get("stage", "early") != stage:
+        entry_stage = entry.get("stage", "early")
+        positions_only = (entry_stage != stage
+                          and entry.get("position_stage") == stage)
+        if entry_stage != stage and not positions_only:
             continue
+
         src = _resolve(entry["source"], namespace)
         dst = _resolve(entry["target"], namespace)
         if not src or not dst:
@@ -663,17 +709,34 @@ def _do_behavior(mirror, plane, namespace, messages, stage="early"):
 
         # 부모부터 내려가며 넣는다. 부모를 돌리면 자식이 끌려가지만, 바로 다음에
         # 그 자식의 월드 행렬을 통째로 덮으므로 최종 결과는 정확하다.
+        driven = []
+        here = 0
         for s, d in pairs:
+            # 폴 타깃처럼 채널이 구동되는 조인트는 **자기 규칙이 따로 있다.**
+            # 여기서 밀어 넣으면 반쯤 옮겨지거나 에러만 난다 (컨스트레인트는 두 번째
+            # 실행부터 이미 걸려 있다).
+            if su.blocked_channels(d, translate=True, rotate=not positions_only):
+                driven.append(su.short_name(d))
+                continue
             try:
-                m = om.MMatrix(cmds.xform(s, q=True, ws=True, m=True))
-                cmds.xform(d, ws=True, m=list(mirror_behavior_matrix(m, plane)))
-                _rotate_into_orient(d, keep_world=True)
-                done += 1
+                if positions_only:
+                    want = mirror_point(world_point(s), plane)
+                    cmds.xform(d, ws=True, t=(want.x, want.y, want.z))
+                else:
+                    m = om.MMatrix(cmds.xform(s, q=True, ws=True, m=True))
+                    cmds.xform(d, ws=True, m=list(mirror_behavior_matrix(m, plane)))
+                    _rotate_into_orient(d, keep_world=True)
+                here += 1
             except Exception as e:
                 messages.append("[ERR] behavior mirror {0}: {1}".format(
                     su.short_name(d), e))
-        messages.append("[OK] behavior mirror {0} -> {1} : {2} joint(s).".format(
-            su.short_name(src), su.short_name(dst), len(pairs)))
+
+        done += here
+        messages.append("[OK] {0} mirror {1} -> {2} : {3} joint(s){4}.".format(
+            "position" if positions_only else "behavior",
+            su.short_name(src), su.short_name(dst), here,
+            " ({0} driven, left to their own rule: {1})".format(
+                len(driven), ", ".join(driven)) if driven else ""))
     return done
 
 
