@@ -3,10 +3,16 @@
 # last Update date : 2026-09-16
 # A00470_MaterialTool - Name Check 탭 (in-Maya)
 #
-# 흐름은 한 줄이다 : **메시를 담는다 -> 머티리얼을 모은다 -> 규칙으로 진단한다.**
+# 흐름은 한 줄이다 : **메시를 담는다 -> 머티리얼을 모은다 -> 규칙으로 진단한다
+# -> (원하면) 제안한 이름으로 바꾼다.**
 # 규칙은 `data/profiles/*.json` 에서 고른다(코드가 아니라 데이터).
 #
-# 리포트는 그대로 클립보드에 들어가므로, 로그창에 찍는 글과 복사되는 글이 같다.
+# 리포트는 그대로 클립보드에 들어가므로, 로그창에 찍는 글과 복사되는 글이 **같은 목록**에서
+# 나온다 — 로그창에는 색이 붙은 HTML(틀린 이름 빨강 · 제안 이름 초록), 클립보드에는 그냥 글.
+#
+# `Rename to Suggested` (v01.07) 는 이 탭에서 **처음으로 씬을 바꾸는 버튼**이다. 그래서
+# 무엇을 바꾸고 무엇을 왜 건너뛰었는지 한 줄씩 남긴다 — 특히 **값을 모르는 자리**
+# (`{character}`)가 남은 제안은 사람이 정해야 하므로 바꾸지 않는다.
 
 from Framework.qt.qt import (
     QWidget,
@@ -27,7 +33,12 @@ from Framework.qt.qt import (
 )
 from Framework.qt.MOD_tsl_qt_v01 import JUN_mod_tsl_qt_v01
 
-from tools.A00470_MaterialTool.app.core import maya_materials, profiles, reporter
+from tools.A00470_MaterialTool.app.core import (
+    maya_materials,
+    name_rename,
+    profiles,
+    reporter,
+)
 from tools.A00470_MaterialTool.app.core.name_rules import NameProfile
 
 
@@ -134,8 +145,11 @@ class NameCheckTab(QWidget):
 
         self.chk_detailed = QCheckBox("Detailed report (why each token is wrong)")
         self.chk_detailed.setToolTip(
-            "Adds one line per wrong token : what was expected there, and what to "
-            "use instead.")
+            "Off : every failing name is reported as the name plus the suggested "
+            "name.\n"
+            "On  : adds the invalid / missing token lists, and one line per wrong "
+            "token -\n"
+            "      what was expected there, and what to use instead.")
         options_layout.addWidget(self.chk_detailed)
 
         self.chk_include_valid = QCheckBox("Include the names that pass")
@@ -160,6 +174,19 @@ class NameCheckTab(QWidget):
         self.btn_check.clicked.connect(self.on_check)
         layout.addWidget(self.btn_check)
 
+        self.btn_rename = QPushButton("Rename to Suggested")
+        self.btn_rename.setMinimumHeight(30)
+        self.btn_rename.setToolTip(
+            "Rename every listed material that has a suggested name, to that name.\n"
+            "Names that already follow the rule are left alone, and so is any\n"
+            "suggestion that still has a value to fill in (like {character}) - the\n"
+            "log says which ones and what is missing.\n"
+            "\n"
+            "This one DOES change the scene. It runs as a single undo step, and the\n"
+            "names are checked again afterwards.")
+        self.btn_rename.clicked.connect(self.on_rename_suggested)
+        layout.addWidget(self.btn_rename)
+
     # ==================================================================
     # 로그
     # ==================================================================
@@ -169,6 +196,23 @@ class NameCheckTab(QWidget):
             self.log_view.appendPlainText(message)
         else:
             print(message)
+
+    def log_lines(self, lines):
+        """`(글, 종류)` 목록을 **색깔로** 찍는다.
+
+        공용 로그 위젯은 내부가 `QTextEdit` 이라 `append()` 가 HTML 을 해석한다.
+        위젯이 없거나 HTML 을 모르면 글만 찍는다 — 색은 덤이지 내용이 아니다.
+        """
+        if self.log_view is None:
+            for text, _kind in lines:
+                print(text)
+            return
+
+        if hasattr(self.log_view, "append"):
+            self.log_view.append(reporter.lines_to_html(lines))
+        else:
+            for text, _kind in lines:
+                self.log_view.appendPlainText(text)
 
     # ==================================================================
     # 프로파일
@@ -330,7 +374,9 @@ class NameCheckTab(QWidget):
         self.reports = {report.name: report for report in reports}
         self.refresh_tree_status()
 
-        text = reporter.format_batch(
+        # 줄 목록 하나로 **로그(색)와 클립보드(그냥 글)** 를 함께 만든다 - 둘이 어긋나지
+        # 않게 하려면 만드는 자리가 하나여야 한다.
+        lines = reporter.batch_lines(
             reports,
             profile,
             detailed=self.chk_detailed.isChecked(),
@@ -339,10 +385,89 @@ class NameCheckTab(QWidget):
         )
 
         self.log("")
-        self.log(text)
+        self.log_lines(lines)
 
         if self.chk_clipboard.isChecked():
-            self.copy_to_clipboard(text)
+            self.copy_to_clipboard("\n".join(text for text, _kind in lines))
+
+    # ==================================================================
+    # 제안한 이름으로 바꾸기 (v01.07)
+    # ==================================================================
+
+    def on_rename_suggested(self):
+        """진단이 제안한 이름으로 리스트업된 머티리얼의 이름을 바꾼다.
+
+        진단을 아직 안 했으면 **먼저 진단한다** - 버튼을 두 번 누르게 하지 않는다.
+        """
+        if not self.assignments:
+            self.log("No material listed yet - listing them from the mesh list first.")
+            self.on_list_materials()
+
+        if not self.assignments:
+            self.log("[failed] Nothing to rename - the material list is empty.")
+            return
+
+        if not self.reports:
+            self.log("Not checked yet - checking the names first.")
+            self.on_check()
+
+        materials = [material for material, _meshes in self.assignments]
+        renames, skipped = name_rename.plan(materials, self.reports)
+
+        lines = [("", reporter.KIND_PLAIN),
+                 ("=== Rename to suggested ===", reporter.KIND_PLAIN)]
+
+        if not renames:
+            lines.append(("Nothing to rename.", reporter.KIND_PLAIN))
+            lines.extend(self._skip_lines(skipped))
+            self.log_lines(lines)
+            return
+
+        done, failed = name_rename.apply(renames)
+
+        for old, new in done:
+            lines.append(("  {0}  ->  {1}".format(
+                old.split("|")[-1], new.split("|")[-1]), reporter.KIND_SUGGESTED))
+        for name, reason in failed:
+            lines.append(("  [failed] {0} : {1}".format(
+                name.split("|")[-1], reason), reporter.KIND_NAME_BAD))
+
+        lines.extend(self._skip_lines(skipped))
+        lines.append(("renamed : {0}   failed : {1}   skipped : {2}".format(
+            len(done), len(failed), len(skipped)), reporter.KIND_PLAIN))
+
+        self.log_lines(lines)
+
+        if not done:
+            return
+
+        # 이름이 바뀌었으니 목록과 진단을 새 이름으로 맞춘다.
+        new_by_old = dict(done)
+        self.assignments = [(new_by_old.get(material, material), meshes)
+                            for material, meshes in self.assignments]
+        self.reports = {}
+        self.fill_tree()
+
+        self.log("")
+        self.log("Checking the new names...")
+        self.on_check()
+
+    def _skip_lines(self, skipped):
+        """건너뛴 것들을 로그 줄로. **왜 건너뛰었는지가 본론이다.**"""
+        rows = []
+        for name, reason in skipped:
+            # "이미 규칙에 맞다" 는 굳이 줄을 잡아먹을 이유가 없다.
+            if reason == "already follows the rule":
+                continue
+            rows.append(("  [skipped] {0} : {1}".format(
+                name.split("|")[-1], reason), reporter.KIND_PLAIN))
+
+        ok_count = sum(1 for _n, reason in skipped
+                       if reason == "already follows the rule")
+        if ok_count:
+            rows.append(("  ({0} name(s) already follow the rule)".format(ok_count),
+                         reporter.KIND_PLAIN))
+        return rows
 
     def copy_to_clipboard(self, text):
         try:

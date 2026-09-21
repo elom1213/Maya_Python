@@ -31,6 +31,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-21 (오늘)
 
+> [!summary] A00470 **Name Check** — `Rename to Suggested` 버튼 + 리포트 순서·색·Detailed 정리 (v01.06->01.07)
+- 요청 셋: ① 제안 받은 이름으로 실제로 바꾸는 버튼 ② 리포트에서 `suggested name` 을 이름 바로 아래로, 이름은 빨강 · 제안은 초록 ③ `invalid tokens` · `missing tokens` 는 `Detailed` 일 때만.
+- **새 버튼 `Rename to Suggested`** (새 코어 `app/core/name_rename.py` — `plan()` 은 씬을 안 건드리고 `apply()` 가 바꾼다, undo 한 스텝). 진단을 안 했으면 스스로 진단하고, 바꾼 뒤 표와 리포트를 새 이름으로 다시 채운다.
+- ★ **제안에 자리표시가 남으면 바꾸지 않는다** — `MT_MANU_CH_Set002_Top` 은 캐릭터 토큰이 통째로 빠져 제안이 `MT_MANU_CH_{character}_Set002_Top` 이다. 그대로 쓰면 중괄호가 박힌 이름이 씬에 남는다. 무엇을 채워야 하는지 로그로 알린다.
+- 가드: 이름 충돌(마야는 조용히 `name1` 로 바꾼다) · **기본 머티리얼** · 참조 · 잠김. ★ **기본 노드는 `ls -readOnly` 로 안 잡힌다**(실측) — `ls -defaultNodes` 로 본다. ★ **네임스페이스는 새 이름에 다시 붙인다** — 짧은 이름으로 바꾸면 노드가 NS 밖으로 빠진다. 바꾼 뒤 되읽어 확인.
+- 리포트는 이제 **줄마다 (글, 종류)** 로 만들고 두 렌더러가 그 목록 하나를 읽는다 — 로그창은 색 HTML(공용 로그 위젯의 `append()` 가 HTML 을 해석한다), **클립보드는 그냥 글**. 색은 표의 Status 열과 같은 값(빨강 `#e2786e` · 초록 `#78c88c`).
+- 기본 리포트는 **이름 + 제안 이름 두 줄**로 줄었다. 토큰 목록 둘은 `Detailed` 아래로.
+- 검증: 코어 15항목(순서 · 색 · 게이팅 · plan) + 마야 오프스크린 16항목(실제 rename · undo/redo · 표 갱신 · 중괄호 이름이 씬에 안 생김 · 로그 색) + 가드 10항목(충돌 · 기본 노드 · 네임스페이스 유지 · 참조 · undo 한 스텝). 마야 GUI 에서는 아직 안 눌러 봄. #A00470
+
 > [!summary] A00050 **uvTool V02** — maya.cmds UI 를 PySide 로 이식 + **무슨 일이 일어났는지 말하는 로그** (신규 v02.00)
 - 요청: `A00050_uvTool` 을 PySide 로 만들어 `A00050_uvTool_V02` 로 이주. `Catch Object` 는 **어떤 오브젝트가 규칙에 안 맞는지 로그로** 찍고 그 메시를 **선택**, `Rename uv set` 은 **이름이 어떻게 바뀌었는지 로그로**.
 - 새 툴 `tools/A00050_uvTool_V02` (아키텍처 B) — `app/core/uv_set_manager.py`(UI 비의존) + `app/ui/main_window.py`(TSL · 버튼 2개 · 공용 로그 · Pin · 메뉴) + `launch.py` + 드롭 설치 파일 + 아이콘. V01 은 그대로 둔다.

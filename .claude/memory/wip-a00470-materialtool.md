@@ -65,3 +65,26 @@ metadata:
 코어 3개(`profiles` · `name_rules` · `reporter`)는 `maya.cmds` 무의존이라 단독 테스트된다.
 문서 `JUN_All/docs/A00470_MaterialTool.md`. 관련: [[mayapy-headless-verify]],
 [[prefer-pyside-for-new-tools]], [[new-tool-needs-icon]], [[framework-tsl-attach-uuids]].
+
+**`Rename to Suggested` + 리포트 정리 (v01.07, 2026-09-21)**
+
+제안 이름으로 **실제로 바꾸는** 버튼. 코어는 `app/core/name_rename.py` —
+`plan()`(씬 안 건드림) / `apply()`(undo 한 스텝)로 갈라 둬서 plan 은 마야 없이 시험된다.
+
+- ★ **자리표시가 남은 제안은 바꾸지 않는다.** `_suggest()` 는 값을 모르는 자리를
+  `{character}` 로 남긴다 — 그대로 쓰면 중괄호가 박힌 이름이 씬에 남는다. 무엇을
+  채워야 하는지 로그로 알리고 건너뛴다.
+- ★ **기본 머티리얼은 `ls -readOnly` 로 안 잡힌다**(실측: 빈 목록). `ls -defaultNodes`
+  에 들어 있는지로 본다. 안 그러면 `lambert1` 에서 "rename failed" 라는 알맹이 없는
+  메시지만 남는다.
+- ★ **네임스페이스를 새 이름에 다시 붙인다** — `CHAR:MT_x` 를 짧은 이름으로 rename 하면
+  노드가 NS 밖으로 빠진다([[maya-set-rename-traps]] 와 같은 함정).
+- 이름 충돌은 **미리 막는다** — 마야는 조용히 `name1` 을 붙인다. 바꾼 뒤에도 되읽어
+  확인한다.
+
+**리포트는 줄마다 `(글, 종류)`** — 로그창엔 색 HTML(공용 로그 위젯 `append()` 가 HTML 을
+해석), 클립보드엔 그냥 글. **같은 내용을 두 군데서 따로 만들면 반드시 어긋나므로 목록은
+하나다.** 틀린 이름 빨강 · 제안 이름 초록(표 Status 열과 같은 색).
+
+**기본 리포트는 두 줄(이름 + 제안 이름)** 이고 `invalid/missing tokens` 는 `Detailed` 아래로
+내렸다(사용자 지정). 순서는 **이름 -> 제안 -> 틀린 토큰 -> 이유 -> 빠진 토큰**.

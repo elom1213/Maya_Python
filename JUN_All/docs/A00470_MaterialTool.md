@@ -13,10 +13,11 @@ Maya 안에서 도는 **머티리얼 이름 진단** PySide 툴이다(arch B, in
 
 | 상위 탭 | 내용 |
 |---------|------|
-| **Name Check** (v01.00) | 메시 → 머티리얼 수집 → 프로파일(JSON) 규칙으로 진단 → 리포트(클립보드 복사) |
-| **Copy Material** (v01.05) | 소스 메시 M 을 **UUID 로 기억** → 리스트의 메시 M_i 에 **면마다 같은 머티리얼**을 건다. **씬을 바꾸는 유일한 탭** |
+| **Name Check** (v01.00) | 메시 → 머티리얼 수집 → 프로파일(JSON) 규칙으로 진단 → 리포트(클립보드 복사) → **제안한 이름으로 바꾸기**(v01.07) |
+| **Copy Material** (v01.05) | 소스 메시 M 을 **UUID 로 기억** → 리스트의 메시 M_i 에 **면마다 같은 머티리얼**을 건다 |
 
-- **버전**: `app/config/version.py` (v01.03 — 표의 칸 폭 조절 · 더블클릭 선택)
+- **버전**: `app/config/version.py` (v01.07 — **`Rename to Suggested`** 버튼 + 리포트 순서·색
+  · v01.05 — `Copy Material` 탭 · v01.03 — 표의 칸 폭 조절 · 더블클릭 선택)
 - **설치**: `__dragDrop_A00470.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **MatTool** → `tools.A00470_MaterialTool.run(True)`
 - **규칙은 코드가 아니라 데이터다** — `data/profiles/*.json` 한 파일이 규칙 한 벌. 새 규칙은 툴 수정이 아니라 파일 추가다.
 
@@ -33,15 +34,46 @@ Maya 안에서 도는 **머티리얼 이름 진단** PySide 툴이다(arch B, in
      목록을 다시 채워도 그 폭은 유지된다.
 3. **`Profile`** 콤보에서 규칙을 고른다(기본 제공 `Basic_v001` · `Set_v001`). 아래에 그 규칙의 패턴이 보인다.
 4. **`Check Names`** — 진단해서 로그창에 리포트를 찍고, 기본값으로 **클립보드에 복사**한다.
+   **씬은 바뀌지 않는다.**
+5. **`Rename to Suggested`** (v01.07) — 제안 이름이 **완전한** 머티리얼의 이름을 그 이름으로 바꾼다.
+   **이 버튼만 씬을 바꾼다** (undo 한 스텝). 아래 §1.1.
 
 > `List Materials` 를 누르지 않고 바로 `Check Names` 를 눌러도 된다 — 리스트가 비어 있으면
 > 먼저 모으고 나서 검사한다(버튼을 두 번 누르게 하지 않는다).
+
+### 1.1 `Rename to Suggested` (v01.07) — 제안한 이름으로 실제로 바꾼다
+
+리포트가 내놓은 **`suggested name` 그대로** 머티리얼 노드의 이름을 바꾼다. 진단을 아직 안 했으면
+**먼저 진단한다**(버튼을 두 번 누르게 하지 않는다). 바꾼 뒤에는 표와 리포트를 **새 이름으로 다시**
+채운다. **undo 한 스텝**이다.
+
+**바꾸지 않고 건너뛰는 것들** — 로그에 한 줄씩 이유가 남는다.
+
+| 건너뛰는 경우 | 왜 |
+|---|---|
+| 제안에 **`{character}` 같은 자리표시**가 남았다 | 무엇을 넣을지는 **사람이 정해야 한다.** 그대로 쓰면 중괄호가 박힌 이름이 씬에 남는다 |
+| 이미 규칙에 맞는다 | 바꿀 것이 없다 (몇 개였는지만 한 줄로 알린다) |
+| 그 이름을 **이미 쓰는 노드**가 있다 | 마야는 조용히 `name1` 로 바꿔 버린다. 그렇게 두지 않고 멈춘다 |
+| **기본 머티리얼**(`lambert1` 등) · **참조된 노드** · **잠긴 노드** | 마야가 이름을 못 바꾼다 |
+
+> **★ 네임스페이스는 지킨다.** `CHAR:MT_...` 를 짧은 이름으로 바꾸면 노드가 네임스페이스 밖으로
+> 빠진다(실측). 원래 네임스페이스를 새 이름에 다시 붙인다.
+>
+> **★ 바꾼 뒤 되읽어 확인한다.** 마야가 다른 이름을 붙였으면 성공으로 세지 않고 그대로 알린다.
+
+```
+=== Rename to suggested ===
+  MT_LUN_Set_008_Top  ->  MT_MANU_CH_LUN_Set008_Top
+  [skipped] MT_MANU_CH_Set002_Top : the suggestion still needs {character} : MT_MANU_CH_{character}_Set002_Top
+  (1 name(s) already follow the rule)
+renamed : 1   failed : 0   skipped : 2
+```
 
 ### 옵션
 
 | 체크박스 | 기본 | 뜻 |
 |----------|------|-----|
-| `Detailed report (why each token is wrong)` | 끔 | 틀린 토큰마다 **기대한 규칙 + 고칠 값**을 한 줄씩 편다 |
+| `Detailed report (why each token is wrong)` | 끔 | **`invalid tokens` · `missing tokens` 목록**과, 틀린 토큰마다 **기대한 규칙 + 고칠 값**을 한 줄씩 편다 (v01.07 부터 이 세 가지가 전부 이 체크박스 아래로 들어갔다 — 기본 리포트는 **이름 + 제안 이름** 두 줄이다) |
 | `Include the names that pass` | 끔 | 통과한 이름도 리포트에 넣는다(기본은 고칠 것만) |
 | `Copy the report to the clipboard` | **켬** | 리포트를 클립보드로. 남에게 그대로 건네는 글이라 기본이 켜져 있다 |
 
@@ -57,15 +89,17 @@ pattern : MT_MANU_CH_{character}_{set}_{part}_{extra...}
 checked : 3 material(s)   ok : 1   failed : 2
 
 MT_SYN_Sett002_Pantss
-  invalid tokens : SYN, Sett002, Pantss
-  missing tokens : MANU, CH
   suggested name : MT_MANU_CH_SIN_Set002_Pants
 ```
+
+> **이름은 빨강, 제안 이름은 초록**으로 찍힌다(v01.07) — 표의 `Status` 열과 같은 색이다.
+> **클립보드로 가는 글에는 색이 없다**(남에게 전달되는 글은 그냥 글이어야 한다).
 
 ### 자세한 쪽 (`Detailed`)
 
 ```
 MT_SYN_Sett002_Pantss
+  suggested name : MT_MANU_CH_SIN_Set002_Pants
   invalid tokens : SYN, Sett002, Pantss
   [-] MANU     missing 'vendor' - expected exactly 'MANU'   (suggest : MANU)
   [-] CH       missing 'category' - expected exactly 'CH'   (suggest : CH)
@@ -73,11 +107,11 @@ MT_SYN_Sett002_Pantss
   [3] Sett002  invalid 'set' - expected 'Set' followed by 3 digit(s) : Set000 - Set999   (suggest : Set002)
   [4] Pantss   invalid 'part' - expected one of : Body, Hair, Top, Pants, Shoes, Accessory   (suggest : Pants)
   missing tokens : MANU, CH
-  suggested name : MT_MANU_CH_SIN_Set002_Pants
 ```
 
 - `[n]` 은 **이름 안에서 몇 번째 토큰**인지다. `[-]` 는 아예 없는(생략된) 토큰.
 - **`suggested name` 이 이 리포트의 핵심이다.** "틀렸다" 로 끝나면 받은 사람이 다시 물어야 한다.
+  그래서 **이름 바로 아래**에 놓는다(v01.07 에서 맨 아래에서 올라왔다).
 - 생략된 토큰은 고정값이면 그 값(`MANU`), 아니면 자리표시(`{character}`)로 적힌다 —
   "`MANU` 라는 단어가 빠졌다" 와 "캐릭터 토큰이 빠졌다" 는 다른 말이기 때문이다.
 - 고칠 값을 알 수 없으면 제안에 `{character}` 가 그대로 남는다(억지로 고르지 않는다).
