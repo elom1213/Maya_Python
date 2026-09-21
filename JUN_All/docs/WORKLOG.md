@@ -31,6 +31,25 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-21 (오늘)
 
+> [!summary] A00470 **Profile 콤보의 기본값을 `Set_v001`** 로 (v01.08->01.09)
+- 요청: Profile 의 `Set_v001` 이 기본 규칙으로 보이게.
+- 콤보는 **폴더를 이름순으로** 보여주므로 `Basic_v001` 이 먼저 와서 툴을 켜면 늘 그것이 골라져 있었다. 실제로 많이 쓰는 것은 의상 세트 쪽인데 매번 콤보를 한 번 더 눌러야 했다.
+- ★ **목록 순서를 건드리지 않았다** — 순서를 바꿔 첫 번째로 만드는 방법도 있지만, 그러면 프로파일이 늘 때마다 "이름순인 줄 알았는데 아닌" 목록이 된다. 대신 **기본값을 따로 이름으로 정했다**: `profiles.DEFAULT_PROFILE = "Set_v001"` + `default_profile(names)`. 그 이름의 JSON 이 없으면 목록의 첫 번째로 떨어지고, 폴더가 비면 빈 문자열.
+- `reload_profiles()` 는 **사용자가 고른 것을 먼저 지킨다** — 고른 게 목록에 있으면 그대로 두고, 없을 때(= 처음 열렸을 때 · 그 JSON 이 사라졌을 때)만 기본값을 고른다. `Reload` 버튼이 선택을 되돌려 버리지 않는다.
+- mayapy 2024 오프스크린 8항목 통과: 목록은 여전히 이름순 · 첫 선택이 `Set_v001` · 패턴 라벨과 `current_profile()` 이 그것을 따름 · `Basic_v001` 을 고른 뒤 Reload 해도 유지 · 기본값 폴백 셋. 마야 GUI 에서는 아직 안 눌러 봄. #A00470
+
+> [!summary] **릴리즈본이 다른 PC 에서 열리지 않던 문제** — 진입 파일 61개가 배치를 스스로 구분 (전 툴)
+- 증상: `Maya_Tool_Release` 를 클론한 PC 에서 A00470 셸프 버튼을 누르면 `ModuleNotFoundError: ... launch.py line 24: No module named 'config'`.
+- 원인: 진입 파일이 `../..` **한 곳만** `sys.path` 에 올리고 곧바로 `import config` 를 했다. dev 트리에선 `../..` 가 `JUN_All` 이라 `config.py` 가 있지만, **릴리즈본에선 저장소 루트라 아무것도 없다**. `release_builder` 는 툴 + `Framework` + docs 만 싣고 `config.py` 와 `dev/` 는 제외한다.
+- ★ **실패 지점이 둘이었다** — `config` 를 넘겼어도 다음 줄 `from Framework...` 에서 또 막힌다. 릴리즈본의 `Framework` 는 저장소 루트가 아니라 **툴 폴더 안**에 동봉되기 때문이다.
+- ★ **한 툴의 버그가 아니었다.** 진입 파일을 복사해 쓴 탓에 같은 함정이 전부에 있었다 — 클린 경로 스윕에서 릴리즈된 11개 중 **8개**가 열리지 않았다(`A00030` `A00040` `A00050` `A00110` `A00170` `A00180` `A00190` `A00290`). 그래서 A00470 만 고치지 않고 **진입 파일 61개**(Qt `launch.py` 49 + standalone `launch.py` 5 + maya.cmds `launcher.py` 7 — `A00200_CSV_tool` 은 Framework 의존이 없어 제외)에 같은 형태를 넣었다.
+- 수정: 경로를 단정하지 말고 **있는 것을 보고 정한다.** `TOOL_ROOT/Framework` 가 있으면 릴리즈본 → `TOOL_ROOT`(Framework 용) + `ROOT`(`tools.*` 용) 를 함께 올리고 `DEV_MODE=False` 로 고정하며 **`import config` 를 아예 하지 않는다**(흔한 이름이라 다른 툴의 `config.py` 를 집는다). 없으면 dev 트리 → 예전 경로 그대로.
+- ★ **maya.cmds 툴은 순서가 문제였다** — 본체 모듈이 `from Framework...` 를 모듈 수준에서 하는데 `launcher.py` 는 `run()` **안에서야** `sys.path` 를 건드렸다. `from . import <본체>` 보다 앞으로 옮겼다. 본체의 최상위 `import config` 4개는 `from . import config` 로(자기 폴더 설정을 집게).
+- 곁가지로 고친 것: Qt 템플릿 `A00004_base_QT` 의 `from JUN_All.tools...` 절대 import(릴리즈본엔 `JUN_All` 패키지가 없다) · A00130/140/150/160 독스트링의 같은 예시.
+- 검증(mayapy 2024, dev 트리를 `sys.path` 에서 걷어내고 `sys.modules` 를 비운 상태): 전 툴을 임시 폴더로 릴리즈해 import 스윕 **62/62 통과**(고치기 전 A00004 포함 실패). 예전에 깨지던 Qt 툴 6개는 `run(True)` 까지 돌려 **창이 뜨고 `Framework` 가 동봉본에서 온 것**까지 확인. dev 트리 12툴도 리로드 타고 그대로 뜬다(회귀 없음).
+- ※ maya.cmds 툴의 `build__()` 는 헤드리스로 확인할 수 없다 — import 사슬(= 깨지던 지점)까지만 확인했다. 실제 마야 GUI 확인은 아직.
+- 배치 규약 · 검증 방법은 [`Release_Layout.md`](Release_Layout.md) 한 곳에 적었다(진입 파일 61개의 주석이 이 문서를 가리킨다). #A00470 #Framework
+
 > [!summary] A00380 **Match > Default** — 좌(Source) / 우(Targets) 리스트에 **Sort 버튼** (v01.12->01.13)
 - 요청: Default 의 좌우 TSL 에 sort 버튼 추가.
 - 공용 TSL 이 이미 갖고 있는 기능이라 `show_sort=True` 두 줄이면 끝이다 — **왜 여기서 쓸모 있는지**를 코드 주석과 문서에 적었다: 짝은 **리스트 순서**로 맺어지므로 `head_01 / head_02 …` 처럼 좌우 이름이 같은 순서로 흐르면 **양쪽 Sort 한 번으로 짝이 맞는다**(Up/Down 반복이 사라진다).

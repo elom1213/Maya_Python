@@ -7,7 +7,7 @@ from functools import partial
 
 
 
-import config
+from . import config   # 툴 폴더의 config.py (최상위 `config` 는 흔한 이름이라 충돌한다)
 from Framework.ui import JUN_mod_tsl, JUN_mod_radCol, JUN_mod_colorThem, JUN_mod_menu
 
 class JUN_ToolUI_humanIKTool_01_01:

@@ -21,7 +21,7 @@ import maya.mel as mel
 import os
 from functools import partial
 
-import config
+from . import config   # 툴 폴더의 config.py (최상위 `config` 는 흔한 이름이라 충돌한다)
 from Framework.core.maya_undo import undo_chunk
 from Framework.qt.maya_window import maya_ui_widget
 from Framework.qt.qt import Qt

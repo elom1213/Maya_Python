@@ -7,7 +7,7 @@ from Framework.qt.qt import (
 )
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 
-from JUN_All.tools.A00004_base_QT.app.core.file_processor import process_file
+from tools.A00004_base_QT.app.core.file_processor import process_file
 
 
 class MainWindow(QWidget):

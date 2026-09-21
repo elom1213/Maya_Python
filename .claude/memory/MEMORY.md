@@ -14,6 +14,7 @@
 - [WORKLOG maintenance](worklog-maintenance.md) — 최신이 위, 날짜 헤딩 중복 금지, 월 롤링
 - [Docs go in JUN_All/docs](docs-go-in-jun-all-docs.md) — 분석/설명 문서 위치
 - [release_builder_QT](wip-release-builder-qt.md) — 릴리즈 복사 개발툴(dev/), v01.02 필터 · 공용 로그창 · 아이콘
+- [Release layout & launch.py](release-layout-launch-py.md) — 릴리즈본은 Framework 를 툴 안에 동봉하고 `config.py`/`dev` 가 없다, launch.py 가 두 배치를 구분해야 남의 PC 에서 열린다
 - [Update portfolio on tool work](update-portfolio-on-tool-work.md) — portfolio EN/KR 동기, 커밋 통계 건드리지 않기
 - [Prefer PySide for new tools](prefer-pyside-for-new-tools.md) — 신규 툴은 PySide(arch B)
 - [kangaroo plugin read-only](kangaroo-plugin-external-readonly.md) — 외부 플러그인, 수정 금지
@@ -107,4 +108,4 @@
 - A00400 — [CurveTool](wip-a00400-curvetool.md) · [Smooth](wip-a00400-smooth-tab.md)(닫힌 커브 우회, v01.09) · [Points to Curve](wip-a00400-points-to-curve.md) · [Wrap](wip-a00400-curve-wrap.md) · [Joints](wip-a00400-curve-joints.md)(v01.14 NURBS 서피스 U/V 한 줄) · [Controls](wip-a00400-controls-tab.md)(bs_controls 이식, v01.15) · Combine(v01.11, 쉐입 복사 합치기 — [instance trap](parent-shape-add-is-instance.md)) · [Shape Edit](wip-a00400-shape-transform.md)(옛 Transform · **Line Width 탭 흡수 + 개명, v01.21** — 셰이프 CV 를 피벗 기준 scale/move/rotate + 선 굵기, 트랜스폼 채널 불변, v01.18 · 값 9개 전부 슬라이더 + 범위 밖 값이면 슬라이더 범위를 넓힌다, v01.19 · 라이브 세션 = CV 원위치에서 매번 재계산 + 드래그 한 번에 undo 한 번, v01.20)
 - A00410 — [SecondaryMotion](wip-a00410-secondarymotion.md)(FK 관성 굽기, v01.08) · A00420 — [Wrapper](wip-a00420-wrapper.md) · A00430 — [DemBone](wip-a00430-dembone.md)
 - A00440 — [SetTool](wip-a00440-settool.md)(v01.01) · [Find tab](wip-a00440-find-tab.md)(속한 세트 역조회 · `listSets` 는 트랜스폼/셰이프/컴포넌트가 다르고 중복을 준다 · 공용 TSL `select_no_expand`, v01.04) · A00450 — [ManipulatorTool](wip-a00450-manipulatortool.md) · A00460 — [FK & IK](wip-a00460-fk-ik.md)(Skip End Joints = FK 체인 끝 n 개 생략, v01.07)
-- A00470 — [MaterialTool](wip-a00470-materialtool.md)(머티리얼 이름 규칙 진단 · 토큰 정렬 DP · 고칠 이름 제안, v01.03) · Copy Material(소스 UUID 기억 → 면별 머티리얼 복사 + 되읽어 확인, v01.05) · **Rename to Suggested**(자리표시 `{character}` 남으면 건너뜀 · 기본 노드는 `ls -defaultNodes` 로 · 리포트는 (글,종류) 목록 하나로 색 HTML + 클립보드, v01.07)
+- A00470 — [MaterialTool](wip-a00470-materialtool.md)(머티리얼 이름 규칙 진단 · 토큰 정렬 DP · 고칠 이름 제안, v01.03) · Copy Material(소스 UUID 기억 → 면별 머티리얼 복사 + 되읽어 확인, v01.05) · **Rename to Suggested**(자리표시 `{character}` 남으면 건너뜀 · 기본 노드는 `ls -defaultNodes` 로 · 리포트는 (글,종류) 목록 하나로 색 HTML + 클립보드, v01.07) · 기본 프로파일은 목록 순서 아닌 `DEFAULT_PROFILE` = Set_v001 (v01.09)

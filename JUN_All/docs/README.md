@@ -59,6 +59,13 @@
 | `Framework/core/control_shapes.py` | **컨트롤러 커브 셰이프 34종** 공용 라이브러리(`Framework/rules/control_shapes.json`) — `bs_controls` 의 CV 데이터를 툴 밖으로 올렸다 | [Framework_control_shapes](Framework_control_shapes.md) |
 | `Framework/core/mirror_tokens.py` | 좌/우 미러 **토큰 규칙 공용화**(`Framework/rules/mirror_tokens.json`) — 이름 미러링은 **경계 매칭**으로 `arm_lower` 같은 오탐을 막는다 | [Framework_mirror_tokens](Framework_mirror_tokens.md) |
 
+### 배치 · 패키징 (툴 하나가 아니라 전체에 걸친 것)
+
+| 주제 | 내용 | 문서 |
+|------|------|------|
+| **릴리즈 배치** | dev 트리와 릴리즈본은 **폴더 모양이 다르다** — `Framework` 는 툴 안에 동봉되고 `config.py` · `dev/` 는 실리지 않는다. 진입 파일(`launch.py` · `launcher.py`)이 지켜야 할 규약과 "남의 PC" 검증법 | [Release_Layout](Release_Layout.md) |
+| **릴리즈 빌더** | 릴리즈본을 만드는 개발 툴(`JUN_All/dev/release_builder_QT`) | [release_builder_QT](release_builder_QT.md) |
+
 ---
 
 ## 새 문서 추가 규칙

@@ -2,7 +2,7 @@
 title: A00470_MaterialTool 사용법
 aliases: [Material Tool, MaterialTool, A00470, Material Name Check]
 tags: [maya-python, tool-guide, material, naming, convention, qc, json-profile]
-updated: 2026-09-17
+updated: 2026-09-21
 ---
 
 # A00470_MaterialTool 사용법
@@ -16,7 +16,9 @@ Maya 안에서 도는 **머티리얼 이름 진단** PySide 툴이다(arch B, in
 | **Name Check** (v01.00) | 메시 → 머티리얼 수집 → 프로파일(JSON) 규칙으로 진단 → 리포트(클립보드 복사) → **제안한 이름으로 바꾸기**(v01.07) |
 | **Copy Material** (v01.05) | 소스 메시 M 을 **UUID 로 기억** → 리스트의 메시 M_i 에 **면마다 같은 머티리얼**을 건다 |
 
-- **버전**: `app/config/version.py` (v01.07 — **`Rename to Suggested`** 버튼 + 리포트 순서·색
+- **버전**: `app/config/version.py` (v01.09 — 기본 프로파일 **`Set_v001`**
+  · v01.08 — **릴리즈본이 다른 PC 에서 안 열리던 문제** 수정(§5-B)
+  · v01.07 — **`Rename to Suggested`** 버튼 + 리포트 순서·색
   · v01.05 — `Copy Material` 탭 · v01.03 — 표의 칸 폭 조절 · 더블클릭 선택)
 - **설치**: `__dragDrop_A00470.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **MatTool** → `tools.A00470_MaterialTool.run(True)`
 - **규칙은 코드가 아니라 데이터다** — `data/profiles/*.json` 한 파일이 규칙 한 벌. 새 규칙은 툴 수정이 아니라 파일 추가다.
@@ -33,6 +35,7 @@ Maya 안에서 도는 **머티리얼 이름 진단** PySide 툴이다(arch B, in
    - 칸 경계(`Material` / `Status` / `Meshes` 헤더의 세로선)를 **드래그해 폭을 조절**할 수 있고,
      목록을 다시 채워도 그 폭은 유지된다.
 3. **`Profile`** 콤보에서 규칙을 고른다(기본 제공 `Basic_v001` · `Set_v001`). 아래에 그 규칙의 패턴이 보인다.
+   툴을 켜면 **`Set_v001`** 이 골라져 있다(v01.09) — 목록은 이름순이지만 기본 규칙은 따로 정해져 있다.
 4. **`Check Names`** — 진단해서 로그창에 리포트를 찍고, 기본값으로 **클립보드에 복사**한다.
    **씬은 바뀌지 않는다.**
 5. **`Rename to Suggested`** (v01.07) — 제안 이름이 **완전한** 머티리얼의 이름을 그 이름으로 바꾼다.
@@ -181,7 +184,9 @@ M 의 `f[0]` · `f[1]` · `f[2]` 에 서로 다른 머티리얼이 붙어 있으
 | **`Basic_v001`** (v01.04~) | `MT_MANU_CH_{character}_{part}_{extra...}` | 캐릭터 본체 — 의상 세트가 없는 머티리얼 |
 | **`Set_v001`** | `MT_MANU_CH_{character}_{set}_{part}_{extra...}` | 의상 세트 머티리얼 |
 
-> 콤보에는 **이름순**으로 뜨므로 `Basic_v001` 이 먼저 나온다. 툴을 켜면 그것이 선택돼 있다.
+> 콤보에는 **이름순**으로 뜨므로 `Basic_v001` 이 먼저 나온다. 다만 **툴을 켜면 `Set_v001` 이
+> 선택돼 있다** (v01.09) — 기본 규칙은 목록 순서가 아니라 `app/core/profiles.py` 의
+> `DEFAULT_PROFILE` 이 정한다. 그 이름의 파일이 없으면 목록의 첫 번째를 고른다.
 
 ### 3-1. `Basic_v001` (v01.04~)
 
@@ -304,6 +309,20 @@ A00470_MaterialTool/
 ```
 
 코어 3개가 `maya.cmds` 를 쓰지 않으므로 **규칙 엔진은 마야 없이 그대로 테스트된다**(§7).
+
+---
+
+## 5-B. 릴리즈본에서의 배치 (v01.08)
+
+이 툴이 **다른 PC 에서 열리지 않던 문제**가 처음 드러난 자리다. 릴리즈본은 dev 트리와
+폴더 모양이 다르다 — `Framework` 가 **툴 폴더 안에 동봉**되고 `config.py` 와 `dev/` 는 실리지 않는다.
+`../..` 한 곳만 `sys.path` 에 올리고 `import config` 를 하던 v01.07 까지의 `launch.py` 는
+거기서 `No module named 'config'` 로 죽었다.
+
+v01.08 의 `launch.py` 는 **`TOOL_ROOT/Framework` 가 있는지 보고** 두 배치를 스스로 구분한다.
+같은 함정이 모든 툴의 진입 파일에 있었으므로 고침도 전 툴에 함께 들어갔다.
+
+> 배치 표 · 진입 파일이 지켜야 할 규약 · 검증하는 법은 **[`Release_Layout.md`](Release_Layout.md)** 한 곳에 있다.
 
 ---
 
