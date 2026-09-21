@@ -31,6 +31,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-21 (오늘)
 
+> [!summary] A00050 **uvTool V02** — maya.cmds UI 를 PySide 로 이식 + **무슨 일이 일어났는지 말하는 로그** (신규 v02.00)
+- 요청: `A00050_uvTool` 을 PySide 로 만들어 `A00050_uvTool_V02` 로 이주. `Catch Object` 는 **어떤 오브젝트가 규칙에 안 맞는지 로그로** 찍고 그 메시를 **선택**, `Rename uv set` 은 **이름이 어떻게 바뀌었는지 로그로**.
+- 새 툴 `tools/A00050_uvTool_V02` (아키텍처 B) — `app/core/uv_set_manager.py`(UI 비의존) + `app/ui/main_window.py`(TSL · 버튼 2개 · 공용 로그 · Pin · 메뉴) + `launch.py` + 드롭 설치 파일 + 아이콘. V01 은 그대로 둔다.
+- 규칙을 **글로 못박았다**: 메시는 `map1` 하나. 위반은 `multiple`(2개 이상) · `wrong_name`(이름 다름) · `no_uv`(없음) 세 가지이고 **사유 문구를 메시마다** 적는다. V01 은 2개 이상만 찾고 리스트에 담기만 했다.
+- ★ **V01 이 조용히 삼키던 실패를 말하게 했다.** `['map1','uvSet1']` 메시는 마야가 `Cannot rename uv set to an existing uv set name.` 로 거절하는데 V01 은 `except: pass` 라 **아무 일도 안 났는데 성공처럼** 보였다. 이제 미리 판정해 `blocked` / `extra`(첫 세트는 map1 인데 다른 세트가 남음 — **기본 UV 세트는 못 지운다**) 로 사유를 적는다.
+- ★ 실측 둘: `polyUVSet` 은 **오브젝트를 인자로 받는다** → V01 의 `cmds.select` 왕복을 없애 **씬 선택을 안 건드린다**. `ls(type="mesh")` 는 **Orig(중간) 셰이프까지** 줘서 디포머 붙은 메시가 두 번 걸렸다 → `noIntermediate=True`.
+- mayapy 2024 헤드리스 **42항목** 통과(코어 + 오프스크린 Qt). 창 최소 533x736. 마야 GUI 에서는 아직 안 눌러 봄. #A00050
+
 > [!summary] A00400 **Display > Shape Edit** — `Line Width` 탭을 `Transform` 탭 안으로 합치고 이름을 바꿨다 (v01.20->01.21)
 - 요청: Line Width 탭 기능을 Transform 탭으로 옮기고 Line Width 탭은 없앤다. Transform 탭 이름은 `Shape Edit` 이 좋으면 그대로, 아니면 더 나은 이름으로.
 - **`Shape Edit` 으로 했다.** 근거: 이 탭이 건드리는 것은 **전부 셰이프 노드**다 — CV 위치도, `nurbsCurve.lineWidth` 도 셰이프에 붙어 있고 **트랜스폼 채널(translate/rotate/scale)은 하나도 건드리지 않는다.** 옛 이름 `Transform` 은 오히려 트랜스폼 채널을 만지는 것처럼 읽혔다.
