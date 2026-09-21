@@ -62,3 +62,8 @@ restore, 단일 undo, 부분 선택, **소프트 falloff**, 토폴로지 불일�
 
 관련: [[mayapy-headless-verify]], [[undo-chunk-by-default]], [[ui-text-english-only]],
 [[prefer-pyside-for-new-tools]], [[push-includes-tool-guide-docs]].
+
+**Sort 버튼 (v01.13, 2026-09-21)** — 좌/우 TSL 에 `show_sort=True`. 짝이 **리스트 순서**로
+맺어지므로 좌우 이름이 같은 순서로 흐르면 **양쪽 Sort 한 번으로 짝이 맞는다**(Up/Down 반복이
+사라진다). 공용 위젯의 정렬은 `_set_records(sorted(...))` 라 **UUID 가 유지**되고, 모델 신호가
+울려 `update_match_pairs()` 가 돌면서 **미리보기 세션도 버려진다** — 옛 짝으로 Apply 되지 않는다.

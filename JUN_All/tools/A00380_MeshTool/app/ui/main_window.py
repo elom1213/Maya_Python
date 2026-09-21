@@ -313,19 +313,32 @@ class MainWindow(QWidget):
         box_lists = QGroupBox("Meshes  (vertex-index match)")
         hl = QHBoxLayout(box_lists)
         hl.setContentsMargins(4, 4, 4, 4)
+        # Sort 를 켜 두는 이유(v01.13) : 짝은 **리스트 순서**로 맺어진다. 양쪽을
+        # 이름순으로 정렬하면 `body_01 / body_02 …` 처럼 규칙적인 이름은 그것만으로
+        # 짝이 맞는다 - Up / Down 을 수십 번 누르지 않아도 된다.
         self.tsl_from = JUN_mod_tsl_qt_v01(
             title="Source",
-            show_sort=False, show_order=False, select_label="List Selected",
+            show_sort=True, show_order=False, select_label="List Selected",
             list_min_height=80, log_callback=self.log)
         self.tsl_from.setToolTip(
             "The shape(s) to match TO.  One mesh here = every mesh on the right\n"
             "takes its shape.  Several = the k-th right mesh takes the k-th shape.")
         self.tsl_match_targets = JUN_mod_tsl_qt_v01(
-            title="Targets", show_sort=False, show_order=False, select_label="List Selected",
+            title="Targets", show_sort=True, show_order=False,
+            select_label="List Selected",
             list_min_height=80, log_callback=self.log)
         self.tsl_match_targets.setToolTip(
             "The meshes that get modified.  Order matters when the left list has\n"
-            "more than one mesh - use Up / Down to line the pairs up.")
+            "more than one mesh - use Sort or Up / Down to line the pairs up.")
+
+        # Sort 는 순서를 바꾸는 버튼이라 무엇을 하는지 분명히 적는다.
+        for tsl, side in ((self.tsl_from, "Source"),
+                          (self.tsl_match_targets, "Target")):
+            tsl.btn_sort.setToolTip(
+                "Sort the {0} list by name.\n"
+                "Pairs are made in list order, so sorting both lists is the quick\n"
+                "way to line them up when the names run in the same "
+                "order.".format(side))
         for tsl in (self.tsl_from, self.tsl_match_targets):
             model = tsl.list_widget.model()
             for sig in (model.rowsInserted, model.rowsRemoved, model.rowsMoved,

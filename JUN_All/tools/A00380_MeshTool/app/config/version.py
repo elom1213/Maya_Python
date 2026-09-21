@@ -1,6 +1,9 @@
 # Mesh Tool
-VERSION = "01.12"
-LAST_UPDATE = "2026-09-18"
+# 01.13  Match > Default 의 좌(Source) / 우(Targets) 리스트에 **Sort 버튼**. 짝은 리스트
+#        순서로 맺어지므로 양쪽을 이름순으로 정렬하면 규칙적인 이름은 그대로 짝이 맞는다
+
+VERSION = "01.13"
+LAST_UPDATE = "2026-09-21"
 
 # 01.06  Match 탭 From 리스트의 List From Mesh / Add / Del 버튼 글자가 잘리던 문제.
 #        TSL 위젯 전체에 걸려 있던 setMaximumHeight 를 치우고 리스트에만 높이를 제한한다.
