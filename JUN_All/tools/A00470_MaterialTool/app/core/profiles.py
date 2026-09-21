@@ -20,6 +20,20 @@ PROFILE_DIR = os.path.join(TOOL_ROOT, "data", "profiles")
 
 PROFILE_EXT = ".json"
 
+# 콤보가 처음 열렸을 때 고를 프로파일. 폴더에 이 이름이 없으면 목록의 첫 번째를 쓴다.
+DEFAULT_PROFILE = "Set_v001"
+
+
+def default_profile(names=None):
+    """기본 프로파일 이름. `DEFAULT_PROFILE` 이 목록에 있으면 그것, 없으면 첫 번째."""
+    if names is None:
+        names = list_profiles()
+
+    if DEFAULT_PROFILE in names:
+        return DEFAULT_PROFILE
+
+    return names[0] if names else ""
+
 
 def profiles_dir():
     """프로파일 JSON 이 모여 있는 폴더 경로."""

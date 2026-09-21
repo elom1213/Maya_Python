@@ -219,10 +219,17 @@ class NameCheckTab(QWidget):
     # ==================================================================
 
     def reload_profiles(self):
-        """프로파일 폴더를 다시 읽어 콤보를 채운다(현재 선택은 최대한 유지)."""
+        """프로파일 폴더를 다시 읽어 콤보를 채운다.
+
+        고른 게 있으면 그대로 두고, 처음 열렸을 때는 기본 프로파일
+        (`profiles.DEFAULT_PROFILE`)을 고른다 - 목록 순서(이름순)와 상관없이.
+        """
         current = self.cmb_profile.currentText()
 
         names = profiles.list_profiles()
+
+        if current not in names:
+            current = profiles.default_profile(names)
 
         self.cmb_profile.blockSignals(True)
         self.cmb_profile.clear()
