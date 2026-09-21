@@ -20,25 +20,30 @@ Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya).
 | | **Wrap** (v01.03~) | **CV 개수가 달라도** 한 커브가 다른 커브의 모양을 따르게 한다. 0~1 envelope 어트리뷰트로 라이브 블렌드 |
 | | **Joints** (v01.07~) | 커브 위에 조인트를 **균일 배치** → 그 조인트로 **커브를 바인드** → 조인트마다 `zro/con/ctl/tgt` 컨트롤러. 컨트롤러가 조인트를, 조인트가 커브를 움직인다. **v01.14~ NURBS 서피스도** — U 또는 V 방향 한 줄로 |
 | | **Combine** (v01.11~) | 좌측 **Source** 커브의 쉐입을 우측 **Target** 커브에 합친다. 인스턴스가 아닌 **복사본**이라 Source 를 지우거나 고쳐도 영향 없음 |
-| **Display**<br>**어떻게 보이는지**를 바꾼다 | **Line Width** (v01.01~) | 리스트업한 커브의 **뷰포트 표시 굵기**를 슬라이더로 조절 — 씬에서 **잘 보이고 잘 집히게**. 형상은 불변 |
-| | **Replace** (v01.16~) | 컨트롤의 **셰이프를 다른 커브 모양으로 교체**한다(이름·트랜스폼·연결은 그대로). 대상과 교체본을 **TSL 두 칸**에 담아 순서대로 짝짓는다 |
-| | **Transform** (v01.18~) | 리스트업한 커브의 **셰이프 자체**를 **각 커브의 피벗 기준**으로 **스케일 · 이동 · 회전**한다. CV 를 전부 골라 툴을 쓴 것과 같은 결과이고 **트랜스폼 채널은 건드리지 않는다**. X/Y/Z 축마다 켜고 끈다. 기본은 **Scale 만**. **v01.19~ 값 아홉 개를 전부 슬라이더로**, **v01.20~ 끄는 동안 씬에 라이브 반영** |
+| **Display**<br>**어떻게 보이는지**를 바꾼다 | **Replace** (v01.16~) | 컨트롤의 **셰이프를 다른 커브 모양으로 교체**한다(이름·트랜스폼·연결은 그대로). 대상과 교체본을 **TSL 두 칸**에 담아 순서대로 짝짓는다 |
+| | **Shape Edit** (v01.18~ `Transform`, v01.21 개명) | 커브의 **셰이프 노드**를 손본다 — ① **셰이프 자체**를 **각 커브의 피벗 기준**으로 **스케일 · 이동 · 회전**(CV 를 전부 골라 툴을 쓴 것과 같은 결과, **트랜스폼 채널은 불변**). X/Y/Z 축마다 켜고 끈다, 기본은 **Scale 만**, **v01.19~ 값 아홉 개 전부 슬라이더**, **v01.20~ 라이브 반영** ② **Line Width** — 뷰포트 표시 굵기(v01.01~ 의 옛 `Line Width` 탭이 **v01.21 에 여기로**). **커브 목록 하나로 둘 다** |
 
 ### 분류 기준 (v01.06)
 
 기준은 **"씬에 무엇을 하는가"** 하나다.
 
-- **Line Width 는 Edit 이 아니라 Display** — `nurbsCurve.lineWidth` 는 **뷰포트 표시 굵기**일 뿐
+- **선 굵기는 Edit 이 아니라 Display** — `nurbsCurve.lineWidth` 는 **뷰포트 표시 굵기**일 뿐
   커브 데이터를 건드리지 않는다. 커브를 바꾸는 기능과 보이는 방식만 바꾸는 기능이 한 상자에 섞이면 분류가 흐려진다.
+  (v01.21 부터 제 탭이 아니라 `Display > Shape Edit` 안의 한 상자다 — 아래)
 - **Reverse Direction 은 성격상 Edit 이지만 `Create > From Edges` 에 남겼다** —
   생성 버튼과 **같은 커브 리스트(`self.tsl`)** 를 공유하기 때문이다. 떼어내면 커브를 두 번 리스트업해야 한다.
 - **`Display > Replace` 는 셰이프 노드를 갈아 끼우므로 성격은 Edit 에 가깝다** — 그런데도 Display 에 둔 것은
   쓰는 사람이 "이 컨트롤을 **어떤 모양으로 보이게 할까**" 로 찾기 때문이다(v01.16, 사용자 지정).
   그래서 Display 의 설명도 "형상 불변" 이 아니라 **"어떻게 보이는지"** 로 바꿨다.
-- **`Display > Transform` 도 CV 를 옮기니 성격은 Edit** — 그런데도 Display 에 둔 것은 같은 이유다(v01.18,
+- **`Display > Shape Edit` 도 CV 를 옮기니 성격은 Edit** — 그런데도 Display 에 둔 것은 같은 이유다(v01.18,
   사용자 지정). 쓰는 사람은 "이 컨트롤을 **얼마나 크게 · 어느 방향으로 보이게 할까**" 로 찾고,
   바로 옆 `Replace` 와 한 묶음으로 쓴다(모양을 갈아 끼우고 → 크기를 맞춘다).
-- ~~하위 페이지가 하나뿐인 Display 도 하위 탭 바를 그대로 둔다~~ — v01.16 에 `Replace`, v01.18 에 `Transform` 이 붙었다.
+- **이름이 `Transform` 이 아니라 `Shape Edit` 인 이유 (v01.21)** — 이 탭이 건드리는 것은 **전부
+  셰이프 노드**다. CV 위치도, 선 굵기(`nurbsCurve.lineWidth`)도 셰이프에 붙어 있고 **트랜스폼
+  채널(translate/rotate/scale)은 하나도 건드리지 않는다.** 옛 이름은 오히려 트랜스폼을 만지는
+  것처럼 읽혔다. 옛 `Line Width` 탭을 여기로 합치면서 함께 바꿨다 — **굵기만 따로 탭을 두면
+  같은 커브를 두 번 리스트업**해야 했다.
+- ~~하위 페이지가 하나뿐인 Display 도 하위 탭 바를 그대로 둔다~~ — v01.16 에 `Replace`, v01.18 에 `Shape Edit` 이 붙었다.
   탭 하나짜리였을 때도 탭 바를 둔 이유(기능 이름이 화면에 남고, 늘어나도 구조가 그대로)가 그대로 맞았다.
 
 - **Joints 는 조인트·컨트롤러를 새로 만들지만 Create 가 아니라 Edit** — Create 의 기준은
@@ -148,7 +153,7 @@ tools/A00400_CurveTool/
     ├── core/shape_xform_manager.py  # 셰이프(CV) 를 피벗 기준으로 scale / rotate / move + 라이브 세션(ShapeTransformSession, v01.20)
     ├── ui/controls_tab.py           # Create > Controls 화면
     ├── ui/replace_tab.py            # Display > Replace 화면
-    ├── ui/shape_xform_tab.py        # Display > Transform 화면
+    ├── ui/shape_edit_tab.py         # Display > Shape Edit 화면 (셰이프 변환 + 선 굵기)
     └── ui/main_window.py            # PySide UI (카테고리 상위 탭 + 기능 하위 탭 + 로그)
 ```
 
@@ -160,9 +165,8 @@ CREATE_PAGES  = (("From Edges", tip, "_build_create_tab"),
 EDIT_PAGES    = (("Smooth", tip, "_build_smooth_tab"),
                  ("Wrap",   tip, "_build_wrap_tab"),
                  ("Joints", tip, "_build_joints_tab"))
-DISPLAY_PAGES = (("Line Width", tip, "_build_width_tab"),
-                 ("Replace",    tip, "_build_replace_tab"),
-                 ("Transform",  tip, "_build_shape_xform_tab"))
+DISPLAY_PAGES = (("Replace",    tip, "_build_replace_tab"),
+                 ("Shape Edit", tip, "_build_shape_edit_tab"))
 
 CATEGORIES = (("Create",  tip, CREATE_PAGES,  "create_tabs"),
               ("Edit",    tip, EDIT_PAGES,    "edit_tabs"),
@@ -183,7 +187,7 @@ CATEGORIES = (("Create",  tip, CREATE_PAGES,  "create_tabs"),
 
 ---
 
-## Display > Line Width (v01.01~) — 커브를 잘 보이고 잘 집히게
+## Display > Shape Edit — Line Width (v01.01~, v01.21 부터 이 탭 안) — 커브를 잘 보이고 잘 집히게
 
 씬에 커브가 많아지면 얇은 선은 **눈에 잘 안 띄고 클릭으로 집기도 어렵다.** 이 탭은 리스트업한
 커브의 `nurbsCurve.lineWidth`(뷰포트에 그려지는 선 굵기)를 한 번에 바꾼다.
@@ -192,7 +196,8 @@ CATEGORIES = (("Create",  tip, CREATE_PAGES,  "create_tabs"),
 
 ### 사용법
 
-1. 씬에서 커브를 고르고 **List Selected Curves** 로 리스트에 담는다(이 탭 전용 리스트).
+1. 씬에서 커브를 고르고 **List Selected Curves** 로 리스트에 담는다
+   (**셰이프 변환과 같은 리스트**다 — v01.21 부터 한 번만 담으면 된다).
 2. **슬라이더를 드래그**하면 리스트의 모든 커브에 **실시간**으로 반영되고,
    **손을 떼는 순간 그 값으로 확정**된다(v01.02~ — 따로 누를 버튼이 없다).
    오른쪽 스핀박스로 정확한 값(0.1 단위)을 넣어도 된다(Enter/포커스 아웃이 곧 확정).
@@ -609,12 +614,17 @@ TSL 이라 `Add` · `Del` · `Up` · `Down` 으로 목록과 **순서**를 그�
 ### 검증 (mayapy 2024 + 오프스크린 Qt, 13항목 통과)
 
 같은 개수 → 순서대로 1:1 · 대상이 더 많음 → 앞 2쌍만, 나머지 불변 + 로그 · 교체본이 더 많음 → 앞 2쌍 ·
-교체본 1개 → 전부 · Display 하위 탭이 `Line Width` + `Replace` · `Create > Controls` 에서 교체 위젯이 사라짐 ·
+교체본 1개 → 전부 · Display 하위 탭 구성 · `Create > Controls` 에서 교체 위젯이 사라짐 ·
 TSL 두 개 · 씬 선택으로 리스트업 · UI 실행 · 빈 리스트 경고 · 창 폭.
 
 ---
 
-## Display > Transform (v01.18~) — 셰이프를 피벗 기준으로 크게 · 옮기고 · 돌리기
+## Display > Shape Edit (v01.18~ `Transform`, v01.21 개명) — 셰이프를 피벗 기준으로 크게 · 옮기고 · 돌리기
+
+> **이 탭은 커브의 셰이프 노드만 다룬다.** 아래의 스케일 · 이동 · 회전(CV)도, 위의 선 굵기
+> (`nurbsCurve.lineWidth`)도 전부 셰이프에 붙어 있고 **트랜스폼 채널은 건드리지 않는다.**
+> 그래서 v01.21 에 이름을 `Transform` 에서 **`Shape Edit`** 으로 바꾸고 옛 `Line Width` 탭을
+> 이 안으로 합쳤다(커브 목록을 두 번 만들 필요가 없어졌다).
 
 리스트에 담은 커브마다 **그 커브의 피벗**을 기준으로 **셰이프(CV 전체)** 를
 **스케일 / 이동 / 회전**한다. 뷰포트에서 그 커브의 CV 를 **전부 골라** Scale · Move · Rotate 툴을
@@ -735,7 +745,7 @@ degree 1 커브 회전. 그 밖에 트랜스폼 채널 불변 · 닫힌 커브�
 > `cmds.scale` / `rotate` 의 `-pivot` 은 `-objectSpace` 를 줘도 **월드 좌표**다(mayapy 로 확인).
 > 비교할 때 이걸 오브젝트 공간 값으로 넘기면 엉뚱한 결과가 나온다.
 
-**UI** — Display 하위 탭이 `Line Width` / `Replace` / `Transform` · 기본은 Scale 만 켜짐(나머지 칸은 비활성) ·
+**UI** — Display 하위 탭 구성 · 기본은 Scale 만 켜짐(나머지 칸은 비활성) ·
 축을 끄면 중립값 · `Uniform` 켬/끔 · `Reset Values` · 빈 리스트 · 아무것도 안 켬 · 중립값 경고 ·
 실제 적용(스케일 배율 + Y 만 이동) · 트랜스폼 채널 불변 · 커브 아닌 항목 로그.
 

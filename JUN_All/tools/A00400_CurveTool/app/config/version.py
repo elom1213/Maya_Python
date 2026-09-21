@@ -33,5 +33,10 @@
 #                           변한다. 세션이 잡아 둔 CV 원위치에서 매번 다시 계산해 누적되지
 #                           않고, 드래그는 undo 큐에 안 쌓이다가 멎으면 한 항목으로 기록된다
 
-VERSION = "01.20"
+# 01.21  Display > Shape Edit  - 옛 `Line Width` 탭을 옛 `Transform` 탭 안으로 합치고,
+#                           그 탭 이름을 **Shape Edit** 으로. 이 탭이 건드리는 것은 전부
+#                           셰이프 노드다(CV 도 lineWidth 도) — 트랜스폼 채널은 불변.
+#                           커브 목록(TSL)을 한 번만 만들면 모양도 굵기도 손본다
+
+VERSION = "01.21"
 LAST_UPDATE = "2026-09-21"

@@ -31,6 +31,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-21 (오늘)
 
+> [!summary] A00400 **Display > Shape Edit** — `Line Width` 탭을 `Transform` 탭 안으로 합치고 이름을 바꿨다 (v01.20->01.21)
+- 요청: Line Width 탭 기능을 Transform 탭으로 옮기고 Line Width 탭은 없앤다. Transform 탭 이름은 `Shape Edit` 이 좋으면 그대로, 아니면 더 나은 이름으로.
+- **`Shape Edit` 으로 했다.** 근거: 이 탭이 건드리는 것은 **전부 셰이프 노드**다 — CV 위치도, `nurbsCurve.lineWidth` 도 셰이프에 붙어 있고 **트랜스폼 채널(translate/rotate/scale)은 하나도 건드리지 않는다.** 옛 이름 `Transform` 은 오히려 트랜스폼 채널을 만지는 것처럼 읽혔다.
+- 합친 실익: **커브 목록(TSL)을 한 번만 만든다.** 예전에는 굵기를 바꾸려고 같은 커브를 Line Width 탭에서 또 리스트업해야 했다.
+- 선 굵기 상자는 변환 블록과 **따로 논다** — `Live` 도 `Apply` 도 거치지 않고 슬라이더에서 손을 떼는 순간 적용(예전 동작 그대로, 드래그 한 번 = undo 한 스텝). 그래서 버튼 줄 **아래**에 제 상자로 뒀다.
+- 파일도 이름을 맞췄다: `ui/shape_xform_tab.py` -> `ui/shape_edit_tab.py`, 클래스 `ShapeTransformTab` -> `ShapeEditTab`(`git mv` 로 이력 보존). 코어 `shape_xform_manager.py` 는 변환 계산 그대로라 이름 유지. main_window 에서 옛 탭 빌더와 굵기 동작 7개를 걷어냈다.
+- 오프스크린 Qt 12항목 통과: Display 하위 탭이 `Replace` / `Shape Edit` 둘뿐 · 스핀박스·슬라이더 드래그 적용 · **드래그가 undo 한 스텝** · `Get` · `Use Maya Default (-1)` · 셰이프 스케일 적용 · 트랜스폼 채널 불변. 마야 GUI 에서는 아직 안 눌러 봄. #A00400
+
 > [!summary] A00275 **Bind Pose** — `Update Bind Pose` 가 **마야를 내리던** 것 수정 (v01.29->01.30)
 - 증상: 어제 넣은 노멀 재굽기(v01.29) 뒤로 `Update Bind Pose` 를 누르면 마야가 다운.
 - ★ 원인: **노멀을 face-vertex 마다 컴포넌트 명령(`polyNormalPerVertex`)으로 쓴 것.** 실측 — face-vertex 359,400 장 메시 하나에 **마야 메모리 +1.2 GB**(undo 레코드가 face-vertex 당 3 KB 넘는다) · 6.3초. **참조된 리그**는 더 나쁘다: face-vertex 89,700 개에 **레퍼런스 편집 131,698 개**(노멀을 안 쓰면 145 개). 캐릭터 한 벌이면 수 GB · 수십만 편집이라 버틸 수가 없다.

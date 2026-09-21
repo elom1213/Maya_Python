@@ -1,6 +1,6 @@
 ---
 name: wip-a00400-shape-transform
-description: A00400_CurveTool Display > Transform — 커브 셰이프(CV)를 각 커브 피벗 기준으로 scale/move/rotate (v01.18)
+description: A00400 Display > Shape Edit(옛 Transform) — 커브 셰이프를 피벗 기준으로 scale/move/rotate + 선 굵기. 트랜스폼 채널은 불변. v01.21 에 Line Width 탭을 흡수하고 개명
 metadata: 
   node_type: memory
   type: project
@@ -58,3 +58,16 @@ metadata:
   - 한 틱 비용(headless): 1커브 0.3ms · 50커브 7ms · **200커브 30ms**. 아주 긴 목록이면 Live 를 끈다.
 - 검증: 코어 23항목 + 오프스크린 Qt UI 20항목 + **슬라이더 34항목** (mayapy 2024). 검증 방식은
   [[cmds-scale-rotate-pivot-is-world]] 참고 — 마야 명령 결과와 CV 단위로 대조했다.
+
+**Line Width 흡수 + 개명 (v01.21, 2026-09-21)**
+
+옛 `Display > Line Width` 탭을 이 탭 안으로 넣고 탭 이름을 **`Transform` -> `Shape Edit`** 으로.
+
+- **왜 그 이름인가**: 이 탭이 건드리는 것은 **전부 셰이프 노드**다 — CV 도, `nurbsCurve.lineWidth` 도
+  셰이프에 붙어 있고 **트랜스폼 채널은 하나도 안 건드린다.** 옛 이름은 트랜스폼을 만지는 것처럼
+  읽혔다. (사용자가 제안한 이름을 그대로 채택했고, 근거를 코드 주석과 문서에 남겼다.)
+- **합친 실익**: 커브 목록(TSL)을 **한 번만** 만든다. 예전에는 같은 커브를 두 탭에서 두 번 담았다.
+- 굵기 상자는 변환과 **따로 논다** — `Live`/`Apply` 를 거치지 않고 슬라이더에서 손을 떼는 순간
+  적용(드래그 한 번 = undo 한 스텝). 그래서 버튼 줄 **아래**에 둔다.
+- 파일·클래스도 이름을 맞췄다(`shape_edit_tab.py` / `ShapeEditTab`, `git mv`). 코어
+  `shape_xform_manager.py` 는 변환 계산이라 그대로.

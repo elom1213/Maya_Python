@@ -11,12 +11,12 @@
 # 탭은 상위 = 카테고리, 하위 = 기능으로 두 단계다 (A00110_animTool_V02 과 같은 규칙).
 #   Create  > From Edges / From Points   - 씬에 새 커브를 만든다
 #   Edit    > Smooth / Wrap / Joints / Combine - 기존 커브의 형상(CV)을 바꾼다
-#   Display > Line Width / Replace / Transform
+#   Display > Replace / Shape Edit
 #                                        - 어떻게 보이는지 (굵기 · 셰이프 교체 ·
 #                                          셰이프 크기 · 자리 · 방향)
-# 위 1)2) 는 Create > From Edges 이고, Line Width 는 리스트업한 커브의 뷰포트 표시
-# 굵기(nurbsCurve.lineWidth)를 조절한다 — 씬에서 커브를 눈으로 찾고 클릭으로 집기
-# 쉽게 하려는 용도다(형상은 건드리지 않는다). 분류 근거는 MainWindow.CATEGORIES 주석 참고.
+# 위 1)2) 는 Create > From Edges 이고, 커브의 **표시 굵기**(nurbsCurve.lineWidth)는
+# v01.21 부터 Display > Shape Edit 안에 있다(예전에는 Line Width 라는 제 탭이었다).
+# 분류 근거는 MainWindow.CATEGORIES 주석 참고.
 
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
@@ -36,7 +36,7 @@ from tools.A00400_CurveTool.app.core import joint_curve_manager as jnt_mgr
 from tools.A00400_CurveTool.app.core import combine_manager as combine_mgr
 from tools.A00400_CurveTool.app.ui.controls_tab import ControlsTab
 from tools.A00400_CurveTool.app.ui.replace_tab import ReplaceTab
-from tools.A00400_CurveTool.app.ui.shape_xform_tab import ShapeTransformTab
+from tools.A00400_CurveTool.app.ui.shape_edit_tab import ShapeEditTab
 
 
 WINDOW_OBJECT_NAME = "JUN_A00400_CurveTool_window"
@@ -59,21 +59,26 @@ class MainWindow(QWidget):
     # A00110_animTool_V02 와 같은 규칙이다. 기준은 "씬에 무엇을 하는가" 다.
     #   Create  : 씬에 **새 커브를 만든다**
     #   Edit    : **기존 커브의 형상(CV 위치)** 을 바꾼다
-    #   Display : **어떻게 보이는지**를 바꾼다 — 굵기(Line Width), 그리고 컨트롤이
-    #             **어떤 모양으로 보일지**(Replace · Transform)
+    #   Display : **어떻게 보이는지**를 바꾼다 — 컨트롤이 **어떤 모양으로 보일지**
+    #             (Replace · Shape Edit)
     #
-    # ★ Display > Transform(v01.18) 도 사용자 지정으로 Display 에 둔다. CV 를 옮기므로
-    #   성격은 Edit 이지만, 쓰는 사람에게는 "이 컨트롤을 얼마나 크게 · 어느 방향으로
-    #   보이게 할까" 라서 Replace 바로 옆에서 찾는다. 트랜스폼 채널은 건드리지 않는다.
+    # ★ Display > Shape Edit(v01.18 Transform, v01.21 개명) 도 사용자 지정으로 Display 에
+    #   둔다. CV 를 옮기므로 성격은 Edit 이지만, 쓰는 사람에게는 "이 컨트롤을 얼마나 크게 ·
+    #   어느 방향으로 보이게 할까" 라서 Replace 바로 옆에서 찾는다.
     #
     # ★ Display > Replace 는 v01.16 에서 사용자 지정으로 여기에 두었다(원래는
     #   Create > Controls 안의 한 섹션이었다). 셰이프 노드를 갈아 끼우므로 성격은 Edit 에
     #   가깝지만, 쓰는 사람 입장에서는 "이 컨트롤을 어떤 모양으로 보이게 할까" 라서
     #   Display 에서 찾는다. 그래서 Display 설명도 "형상 불변" 이 아니라 위와 같이 바꿨다.
     #
-    # Line Width 를 Edit 이 아니라 Display 에 둔 이유: nurbsCurve.lineWidth 는
-    # 뷰포트 표시 굵기일 뿐 커브 데이터를 건드리지 않는다. 커브를 바꾸는 기능과
-    # 보이는 방식만 바꾸는 기능을 같은 상자에 두면 분류가 흐려진다.
+    # ★ 이름이 Transform 이 아니라 Shape Edit 인 이유(v01.21): 이 탭이 건드리는 것은
+    #   **전부 셰이프 노드**다 — CV 위치도, 선 굵기(nurbsCurve.lineWidth)도 셰이프에
+    #   붙어 있고 **트랜스폼 채널은 하나도 건드리지 않는다.** 옛 이름은 트랜스폼을
+    #   만지는 것처럼 읽혔다.
+    #
+    # ★ 옛 Display > Line Width 탭은 v01.21 에 이 탭으로 들어갔다. 굵기만 따로 탭을
+    #   두면 **같은 커브를 두 번 리스트업**해야 했다 — 이제 목록(TSL) 하나로 모양도
+    #   굵기도 손본다. 굵기는 Apply 없이 슬라이더에서 손을 떼는 순간 적용된다.
     #
     # Edit > Joints 는 씬에 조인트·컨트롤러를 **새로 만들지만** Create 가 아니라 Edit 이다.
     # Create 의 기준은 "새 **커브**를 만든다" 이고, Joints 는 이미 있는 커브를 대상으로
@@ -125,18 +130,15 @@ class MainWindow(QWidget):
     )
 
     DISPLAY_PAGES = (
-        ("Line Width",
-         "Make the listed curves thicker in the viewport so they are easier "
-         "to see and to click on. The curve shape is not changed.",
-         "_build_width_tab"),
         ("Replace",
          "Replace - give a control the shape of another curve. Its name, transform "
          "and connections stay as they are.",
          "_build_replace_tab"),
-        ("Transform",
-         "Transform - resize, move and rotate the curve shape itself around each "
-         "curve's own pivot, leaving the transform channels alone.",
-         "_build_shape_xform_tab"),
+        ("Shape Edit",
+         "Shape Edit - work on the curve shape itself: resize, move and rotate it "
+         "around each curve's own pivot, and set how thick it is drawn. The "
+         "transform channels are never touched.",
+         "_build_shape_edit_tab"),
     )
 
     CATEGORIES = (
@@ -144,9 +146,9 @@ class MainWindow(QWidget):
          CREATE_PAGES, "create_tabs"),
         ("Edit", "Edit - change the shape of existing curves",
          EDIT_PAGES, "edit_tabs"),
-        ("Display", "Display - how curves look in the viewport: line width, which "
-         "shape a control is drawn with, and how big / where / which way that "
-         "shape sits",
+        ("Display", "Display - how curves look in the viewport: which shape a "
+         "control is drawn with, how big / where / which way that shape sits, and "
+         "how thick it is drawn",
          DISPLAY_PAGES, "display_tabs"),
     )
 
@@ -306,85 +308,6 @@ class MainWindow(QWidget):
         dir_lay.addWidget(self.btn_reverse)
 
         root.addWidget(dir_box)
-        return tab
-
-    # --------------------------------------------------------------
-    # Display > Line Width  (뷰포트에서 잘 보이고 잘 집히도록 — 형상은 불변)
-    # --------------------------------------------------------------
-
-    def _build_width_tab(self):
-        """리스트업한 커브의 **표시 굵기**(`nurbsCurve.lineWidth`)를 슬라이더로 조절한다.
-
-        형상이 아니라 그려지는 두께만 바꾸는 표시 전용 어트리뷰트라, 굵게 해 두면 씬에서
-        커브가 눈에 잘 띄고 클릭으로 집기도 쉬워진다.
-        """
-        tab = QWidget()
-        root = QVBoxLayout(tab)
-
-        desc = QLabel(
-            "Thicker curves are easier to see and to click in the viewport.\n"
-            "Drag the slider - it is applied as soon as you let go.\n"
-            "This only changes how the curve is drawn - shape and history are "
-            "untouched.")
-        desc.setAlignment(Qt.AlignCenter)
-        root.addWidget(desc)
-
-        self.tsl_width = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Curves", select_label="List Selected Curves",
-            show_sort=False, list_min_height=170, log_callback=self.log)
-        root.addWidget(self.tsl_width, 1)
-
-        width_box = QGroupBox("Line Width")
-        width_lay = QVBoxLayout(width_box)
-
-        row = QHBoxLayout()
-        self.sld_width = QSlider(Qt.Horizontal)
-        # 슬라이더는 정수라 0.1 단위로 쓰려고 10 배로 잡는다.
-        self.sld_width.setRange(int(curve_mgr.LINE_WIDTH_MIN * 10),
-                                int(curve_mgr.LINE_WIDTH_MAX * 10))
-        self.sld_width.setValue(20)
-        self.sld_width.setToolTip(
-            "Drag to set the drawn thickness of every listed curve.\n"
-            "It updates live while you drag and is applied for good the moment "
-            "you let go\n(no Apply button needed). The whole drag is one undo "
-            "step.")
-        row.addWidget(self.sld_width, 1)
-
-        self.dsb_width = QDoubleSpinBox()
-        self.dsb_width.setDecimals(1)
-        self.dsb_width.setSingleStep(0.1)
-        self.dsb_width.setRange(curve_mgr.LINE_WIDTH_MIN, curve_mgr.LINE_WIDTH_MAX)
-        self.dsb_width.setValue(2.0)
-        self.dsb_width.setFixedWidth(70)
-        self.dsb_width.setKeyboardTracking(False)
-        row.addWidget(self.dsb_width)
-        width_lay.addLayout(row)
-
-        btn_row = QHBoxLayout()
-        self.btn_width_get = QPushButton("Get")
-        self.btn_width_get.setToolTip(
-            "Read the line width of the first listed curve into the slider.")
-        self.btn_width_get.clicked.connect(self.on_width_get)
-        btn_row.addWidget(self.btn_width_get)
-
-        self.btn_width_reset = QPushButton("Use Maya Default (-1)")
-        self.btn_width_reset.setToolTip(
-            "Set the listed curves back to -1, which means 'follow Maya's "
-            "global line width'.")
-        self.btn_width_reset.clicked.connect(self.on_width_reset)
-        btn_row.addWidget(self.btn_width_reset)
-        width_lay.addLayout(btn_row)
-
-        root.addWidget(width_box)
-
-        # 슬라이더 <-> 스핀박스 동기화 + 라이브 적용.
-        self.sld_width.valueChanged.connect(self._on_width_slider)
-        self.dsb_width.valueChanged.connect(self._on_width_spin)
-        # 드래그 전체를 undo 한 스텝으로 묶는다(값이 바뀔 때마다 쌓이지 않게).
-        self.sld_width.sliderPressed.connect(self._width_drag_start)
-        self.sld_width.sliderReleased.connect(self._width_drag_end)
-        self._width_dragging = False
-
         return tab
 
     # ==============================================================
@@ -597,10 +520,13 @@ class MainWindow(QWidget):
         self.replace_tab = ReplaceTab(log_callback=self.log)
         return self.replace_tab
 
-    def _build_shape_xform_tab(self):
-        """셰이프 변환 탭 — 화면은 `app/ui/shape_xform_tab.py` 가 만든다(TSL + 값 표)."""
-        self.shape_xform_tab = ShapeTransformTab(log_callback=self.log)
-        return self.shape_xform_tab
+    def _build_shape_edit_tab(self):
+        """셰이프 편집 탭 — 화면은 `app/ui/shape_edit_tab.py` 가 만든다.
+
+        CV 변환(Scale/Move/Rotate)과 선 굵기를 **한 커브 목록**으로 함께 다룬다(v01.21).
+        """
+        self.shape_edit_tab = ShapeEditTab(log_callback=self.log)
+        return self.shape_edit_tab
 
     def _build_points_tab(self):
         """리스트에 담은 오브젝트/조인트/컴포넌트의 **월드 위치**를 순서대로 잇는 커브.
@@ -1174,100 +1100,6 @@ class MainWindow(QWidget):
             self._apply_wrap_env(self.dsb_wrap_env.value())
         finally:
             cmds.undoInfo(closeChunk=True)
-
-    # ==============================================================
-    # actions : Line Width
-    # ==============================================================
-
-    def _width_curves(self):
-        """굵기를 바꿀 대상 커브(UUID 로 현재 경로를 되찾아 리네임에 안전)."""
-        curves = self.tsl_width.get_all_nodes()
-        return curves or self.tsl_width.get_all_items()
-
-    def _apply_width(self, width, log=True):
-        """대상 커브에 굵기를 쓴다. (변경 수, 스킵 리스트)"""
-        curves = self._width_curves()
-        if not curves:
-            if log:
-                self.log("Curve list is empty. List some curves first.", warn=True)
-            return 0, []
-
-        changed, skipped = curve_mgr.set_line_width(curves, width)
-        if log:
-            self.log("Line width {0} -> {1} curve shape(s).".format(
-                "default (-1)" if width < 0 else "{0:.1f}".format(width),
-                len(changed)))
-            if skipped:
-                details = ", ".join("{0} ({1})".format(n.split("|")[-1], why)
-                                    for n, why in skipped)
-                self.log("Skipped {0}: {1}".format(len(skipped), details),
-                         warn=True)
-        return len(changed), skipped
-
-    def _set_width_widgets(self, value):
-        """슬라이더/스핀박스를 값에 맞춘다(서로 신호를 되쏘지 않게 막고)."""
-        for widget, scaled in ((self.sld_width, int(round(value * 10))),
-                               (self.dsb_width, value)):
-            widget.blockSignals(True)
-            widget.setValue(scaled)
-            widget.blockSignals(False)
-
-    def _on_width_slider(self, value):
-        width = value / 10.0
-        self._set_width_widgets(width)
-        if self._width_dragging:
-            # 드래그 중 — undo 청크가 열려 있고, 커밋/로그는 손을 뗄 때 한 번만 한다.
-            self._apply_width(width, log=False)
-        else:
-            # 화살표 키·홈그루브 클릭처럼 한 번에 끝나는 변경은 그 자리에서 적용.
-            with undo_chunk():
-                self._apply_width(width)
-
-    def _on_width_spin(self, value):
-        # keyboardTracking=False 라 Enter/포커스 아웃에서 한 번 들어온다 = 그 자체로 settle.
-        self._set_width_widgets(value)
-        with undo_chunk():
-            self._apply_width(value)
-
-    def _width_drag_start(self):
-        """드래그 시작 — 여기서 연 undo 청크를 놓을 때 닫는다."""
-        self._width_dragging = True
-        cmds.undoInfo(openChunk=True)
-
-    def _width_drag_end(self):
-        """슬라이더에서 손을 떼는 순간이 곧 **자동 적용(commit)** 이다.
-
-        드래그 중에도 라이브로 반영하지만, 마지막 값을 한 번 더 확실히 써서 놓친 이벤트가
-        없게 하고 그때만 로그를 남긴다(드래그 내내 로그가 도배되지 않도록). 별도의 Apply
-        버튼은 두지 않는다.
-        """
-        self._width_dragging = False
-        # 마지막 값 확정은 **청크를 닫기 전에** 해야 드래그 전체가 undo 한 스텝으로 남는다
-        # (닫은 뒤에 쓰면 커밋이 별도 스텝이 되어 Ctrl+Z 를 두 번 눌러야 한다).
-        try:
-            self._apply_width(self.dsb_width.value())
-        finally:
-            cmds.undoInfo(closeChunk=True)
-
-    def on_width_get(self):
-        curves = self._width_curves()
-        if not curves:
-            self.log("Curve list is empty. List some curves first.", warn=True)
-            return
-        width = curve_mgr.get_line_width(curves[0])
-        if width is None:
-            self.log("Could not read the line width of {0}.".format(
-                curves[0].split("|")[-1]), warn=True)
-            return
-        # -1(마야 기본)은 슬라이더 범위 밖이라 최솟값으로 보여 준다.
-        self._set_width_widgets(max(width, curve_mgr.LINE_WIDTH_MIN))
-        self.log("{0} line width = {1}{2}".format(
-            curves[0].split("|")[-1], width,
-            "  (-1 = Maya's global default)" if width < 0 else ""))
-
-    def on_width_reset(self):
-        with undo_chunk():
-            self._apply_width(curve_mgr.LINE_WIDTH_DEFAULT)
 
     # --------------------------------------------------------------
     # Edit > Joints  (커브 위 균일 조인트 -> 커브 바인드 -> 컨트롤러 스택)

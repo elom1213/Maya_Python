@@ -1,7 +1,17 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
 # last Update date : 2026-09-21
-# A00400_CurveTool - Display > Transform 탭 (커브 셰이프를 피벗 기준으로 크게/작게 · 이동 · 회전)
+# A00400_CurveTool - Display > Shape Edit 탭
+#   (커브 **셰이프 노드**를 다룬다 - CV 를 피벗 기준으로 크게/작게 · 이동 · 회전 + 선 굵기)
+#
+# ── 이름이 Shape Edit 인 이유 (v01.21) ───────────────────────────────────
+# 이 탭이 건드리는 것은 전부 **셰이프 노드**다 — CV 위치도, `nurbsCurve.lineWidth` 도
+# 셰이프에 붙어 있다. 트랜스폼 노드(translate/rotate/scale)는 **하나도 건드리지 않는다.**
+# 그래서 옛 `Transform` 이라는 이름은 오히려 오해를 샀다(트랜스폼 채널을 만지는 것처럼
+# 읽힌다). 옛 `Line Width` 탭을 여기로 합치면서 이름을 `Shape Edit` 으로 바꿨다.
+#
+# 두 가지를 한 탭에 두는 실익: **커브 목록(TSL)을 한 번만 만들면 된다.** 예전에는 굵기를
+# 바꾸려고 같은 커브를 Line Width 탭에서 또 리스트업해야 했다.
 #
 # 리스트업한 커브마다 **그 커브의 피벗**을 기준으로 CV 전체를 스케일 / 이동 / 회전한다.
 # 뷰포트에서 커브의 CV 를 전부 골라 Scale / Move / Rotate 툴을 쓴 것과 같은 결과이고,
@@ -42,11 +52,20 @@
 #
 # `Apply to Shapes` 는 라이브 중이면 **지금 모양을 확정**만 한다(또 걸지 않는다).
 # `Live` 를 끄면 예전처럼 `Apply` 를 눌러야 씬이 바뀐다.
+#
+# ── Line Width (v01.21 에 옛 Display > Line Width 탭에서 이주) ────────────
+# `nurbsCurve.lineWidth` 는 **그려지는 두께**일 뿐이라 커브 데이터를 건드리지 않는다.
+# 굵게 해 두면 씬에서 커브가 눈에 띄고 클릭으로 집기 쉬워진다. 위의 Scale/Move/Rotate 와
+# 달리 **Apply 가 없다** — 슬라이더에서 손을 떼는 순간이 곧 적용이고, 드래그 한 번이
+# undo 한 스텝이다. `-1` 은 마야 전역 설정을 따른다는 뜻이다.
+
+import maya.cmds as cmds
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 
 from Framework.core.maya_undo import undo_chunk
+from tools.A00400_CurveTool.app.core import curve_manager as curve_mgr
 from tools.A00400_CurveTool.app.core import shape_xform_manager as xform_mgr
 
 
@@ -245,14 +264,17 @@ class _XformRow(object):
             entry.reset()
 
 
-class ShapeTransformTab(QWidget):
-    """커브 셰이프 변환 탭. 로그는 툴 창의 것을 그대로 쓴다(log_callback)."""
+class ShapeEditTab(QWidget):
+    """커브 **셰이프 노드**를 다루는 탭 — CV 변환 + 선 굵기.
+
+    로그는 툴 창의 것을 그대로 쓴다(log_callback).
+    """
 
     #: 조작이 멎고 이만큼 지나면 그때까지의 미리보기를 undo 큐에 한 항목으로 기록한다.
     SETTLE_MS = 350
 
     def __init__(self, log_callback=None, parent=None):
-        super(ShapeTransformTab, self).__init__(parent)
+        super(ShapeEditTab, self).__init__(parent)
 
         self._log = log_callback or (lambda text: None)
 
@@ -279,9 +301,10 @@ class ShapeTransformTab(QWidget):
         root = QVBoxLayout(self)
 
         note = QLabel(
-            "Resize, move and rotate the curve shape itself, around each curve's\n"
-            "own pivot - the same result as picking all of its CVs and using the\n"
-            "Scale / Move / Rotate tool. The transform channels are not touched.")
+            "Everything here edits the curve SHAPE, never its transform channels.\n"
+            "Resize / move / rotate the shape around each curve's own pivot - the same\n"
+            "result as picking all of its CVs and using the Scale / Move / Rotate tool -\n"
+            "and set how thick the curve is drawn in the viewport.")
         note.setAlignment(Qt.AlignCenter)
         root.addWidget(note)
 
@@ -336,7 +359,66 @@ class ShapeTransformTab(QWidget):
 
         root.addLayout(btn_row)
 
+        # 선 굵기는 위의 변환과 **따로 논다** — Apply 도 Live 도 거치지 않고 슬라이더에서
+        # 손을 떼는 순간 적용된다. 그래서 버튼 줄 아래에 제 상자로 둔다.
+        root.addWidget(self._build_width_group())
+
         return self
+
+    def _build_width_group(self):
+        """선 굵기(`nurbsCurve.lineWidth`) — 위 커브 목록을 그대로 쓴다."""
+
+        box = QGroupBox("Line Width (how thick the curve is drawn)")
+        lay = QVBoxLayout(box)
+
+        row = QHBoxLayout()
+        self.sld_width = QSlider(Qt.Horizontal)
+        # 슬라이더는 정수라 0.1 단위로 쓰려고 10 배로 잡는다.
+        self.sld_width.setRange(int(curve_mgr.LINE_WIDTH_MIN * 10),
+                                int(curve_mgr.LINE_WIDTH_MAX * 10))
+        self.sld_width.setValue(20)
+        self.sld_width.setToolTip(
+            "Drag to set the drawn thickness of every listed curve.\n"
+            "It updates live while you drag and is applied for good the moment "
+            "you let go\n(no Apply button needed). The whole drag is one undo "
+            "step.\n"
+            "This only changes how the curve is drawn - the shape is not touched.")
+        row.addWidget(self.sld_width, 1)
+
+        self.dsb_width = QDoubleSpinBox()
+        self.dsb_width.setDecimals(1)
+        self.dsb_width.setSingleStep(0.1)
+        self.dsb_width.setRange(curve_mgr.LINE_WIDTH_MIN, curve_mgr.LINE_WIDTH_MAX)
+        self.dsb_width.setValue(2.0)
+        self.dsb_width.setFixedWidth(SPIN_WIDTH)
+        self.dsb_width.setKeyboardTracking(False)
+        row.addWidget(self.dsb_width)
+        lay.addLayout(row)
+
+        btn_row = QHBoxLayout()
+        self.btn_width_get = QPushButton("Get")
+        self.btn_width_get.setToolTip(
+            "Read the line width of the first listed curve into the slider.")
+        self.btn_width_get.clicked.connect(self.on_width_get)
+        btn_row.addWidget(self.btn_width_get)
+
+        self.btn_width_reset = QPushButton("Use Maya Default (-1)")
+        self.btn_width_reset.setToolTip(
+            "Set the listed curves back to -1, which means 'follow Maya's "
+            "global line width'.")
+        self.btn_width_reset.clicked.connect(self.on_width_reset)
+        btn_row.addWidget(self.btn_width_reset)
+        lay.addLayout(btn_row)
+
+        # 슬라이더 <-> 스핀박스 동기화 + 라이브 적용.
+        self.sld_width.valueChanged.connect(self._on_width_slider)
+        self.dsb_width.valueChanged.connect(self._on_width_spin)
+        # 드래그 전체를 undo 한 스텝으로 묶는다(값이 바뀔 때마다 쌓이지 않게).
+        self.sld_width.sliderPressed.connect(self._width_drag_start)
+        self.sld_width.sliderReleased.connect(self._width_drag_end)
+        self._width_dragging = False
+
+        return box
 
     def _build_xform_group(self):
         box = QGroupBox("Shape Transform (about each curve's pivot)")
@@ -424,6 +506,94 @@ class ShapeTransformTab(QWidget):
     def _nodes(self):
         """TSL 에 담긴 노드들. UUID 로 지금 이름을 되찾는다(리네임·리페어런트 안전)."""
         return self.tsl.get_all_nodes() or self.tsl.get_all_items()
+
+    # ==================================================================
+    # 선 굵기 (v01.21 - 옛 Line Width 탭)
+    # ==================================================================
+
+    def _apply_width(self, width, log=True):
+        """대상 커브에 굵기를 쓴다. (변경 수, 스킵 리스트)"""
+        curves = self._nodes()
+        if not curves:
+            if log:
+                self._log("[WARN] Curve list is empty. List some curves first.")
+            return 0, []
+
+        changed, skipped = curve_mgr.set_line_width(curves, width)
+        if log:
+            self._log("Line width {0} -> {1} curve shape(s).".format(
+                "default (-1)" if width < 0 else "{0:.1f}".format(width),
+                len(changed)))
+            if skipped:
+                details = ", ".join("{0} ({1})".format(n.split("|")[-1], why)
+                                    for n, why in skipped)
+                self._log("[WARN] Skipped {0}: {1}".format(len(skipped), details))
+        return len(changed), skipped
+
+    def _set_width_widgets(self, value):
+        """슬라이더/스핀박스를 값에 맞춘다(서로 신호를 되쏘지 않게 막고)."""
+        for widget, scaled in ((self.sld_width, int(round(value * 10))),
+                               (self.dsb_width, value)):
+            widget.blockSignals(True)
+            widget.setValue(scaled)
+            widget.blockSignals(False)
+
+    def _on_width_slider(self, value):
+        width = value / 10.0
+        self._set_width_widgets(width)
+        if self._width_dragging:
+            # 드래그 중 — undo 청크가 열려 있고, 커밋/로그는 손을 뗄 때 한 번만 한다.
+            self._apply_width(width, log=False)
+        else:
+            # 화살표 키·홈그루브 클릭처럼 한 번에 끝나는 변경은 그 자리에서 적용.
+            with undo_chunk():
+                self._apply_width(width)
+
+    def _on_width_spin(self, value):
+        # keyboardTracking=False 라 Enter/포커스 아웃에서 한 번 들어온다 = 그 자체로 settle.
+        self._set_width_widgets(value)
+        with undo_chunk():
+            self._apply_width(value)
+
+    def _width_drag_start(self):
+        """드래그 시작 — 여기서 연 undo 청크를 놓을 때 닫는다."""
+        self._width_dragging = True
+        cmds.undoInfo(openChunk=True)
+
+    def _width_drag_end(self):
+        """슬라이더에서 손을 떼는 순간이 곧 **자동 적용(commit)** 이다.
+
+        드래그 중에도 라이브로 반영하지만, 마지막 값을 한 번 더 확실히 써서 놓친 이벤트가
+        없게 하고 그때만 로그를 남긴다(드래그 내내 로그가 도배되지 않도록). 별도의 Apply
+        버튼은 두지 않는다.
+        """
+        self._width_dragging = False
+        # 마지막 값 확정은 **청크를 닫기 전에** 해야 드래그 전체가 undo 한 스텝으로 남는다
+        # (닫은 뒤에 쓰면 커밋이 별도 스텝이 되어 Ctrl+Z 를 두 번 눌러야 한다).
+        try:
+            self._apply_width(self.dsb_width.value())
+        finally:
+            cmds.undoInfo(closeChunk=True)
+
+    def on_width_get(self):
+        curves = self._nodes()
+        if not curves:
+            self._log("[WARN] Curve list is empty. List some curves first.")
+            return
+        width = curve_mgr.get_line_width(curves[0])
+        if width is None:
+            self._log("[WARN] Could not read the line width of {0}.".format(
+                curves[0].split("|")[-1]))
+            return
+        # -1(마야 기본)은 슬라이더 범위 밖이라 최솟값으로 보여 준다.
+        self._set_width_widgets(max(width, curve_mgr.LINE_WIDTH_MIN))
+        self._log("{0} line width = {1}{2}".format(
+            curves[0].split("|")[-1], width,
+            "  (-1 = Maya's global default)" if width < 0 else ""))
+
+    def on_width_reset(self):
+        with undo_chunk():
+            self._apply_width(curve_mgr.LINE_WIDTH_DEFAULT)
 
     def _values(self):
         """(scale, rotate, translate) — 꺼진 줄은 None, 끈 축은 중립값."""
