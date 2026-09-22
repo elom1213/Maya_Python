@@ -16,10 +16,6 @@
           "path": "tools/A00170_driverTool"
         },
         {
-          "name": "skinMigrate",
-          "path": "tools/A00270_skinMigrate"
-        },
-        {
           "name": "SkinTool_V01",
           "path": "tools/A00275_skinTool_V01"
         }

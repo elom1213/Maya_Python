@@ -153,7 +153,7 @@ JUN_All 루트로 resolve 한다.
 |---|---|
 | `ANIM` | AnimTool_V02 · FKIK |
 | `Mesh` | MeshTool · uvTool_V02 · abSymMesh · BSTool_V02 |
-| `RIG` | jointTool_V03 · RigConnect · driverTool · skinMigrate · SkinTool_V01 |
+| `RIG` | jointTool_V03 · RigConnect · driverTool · SkinTool_V01 |
 | `UE` | KWI_creator_V03 · ConstraintConverter · ArrayCreator |
 | `Default` | (비어 있음) |
 
