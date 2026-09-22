@@ -14,6 +14,8 @@
 # **CV 만 대응 CV 에 맞춘다**(Mirror 를 켜면 월드 X 를 뒤집은 자리로). 대상마다 자동으로
 # 갈리고 화면에서 켤 것은 없다 - 어느 쪽으로 처리했는지는 로그에 적힌다.
 
+import maya.cmds as cmds
+
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 
@@ -63,6 +65,22 @@ class ReplaceTab(QWidget):
         pair_note.setAlignment(Qt.AlignCenter)
         root.addWidget(pair_note)
 
+        self.btn_resolve = QPushButton("Resolve Pair from Selection")
+        self.btn_resolve.setMinimumHeight(28)
+        self.btn_resolve.setToolTip(
+            "Fill 'Shapes to replace' with the mirrored counterpart of each\n"
+            "replacement - the other side of the rig, found by the shared\n"
+            "left/right token rules (Framework/rules/mirror_tokens.json).\n"
+            "\n"
+            "Uses the current scene selection as the replacements; with nothing\n"
+            "selected it uses the 'Replacement' list as it stands.\n"
+            "\n"
+            "Only counterparts that exist in the scene as a curve are kept, and\n"
+            "both lists are rewritten together so the pairs stay lined up.\n"
+            "Replacements with no counterpart are dropped and named in the log.")
+        self.btn_resolve.clicked.connect(self.on_resolve_pair)
+        root.addWidget(self.btn_resolve)
+
         self.chk_mirror = QCheckBox("Mirror Shapes")
         self.chk_mirror.setToolTip(
             "Flip the replacement across X before it is applied - for the other\n"
@@ -91,6 +109,53 @@ class ReplaceTab(QWidget):
     def _nodes(self, tsl):
         """TSL 에 담긴 노드들. UUID 로 지금 이름을 되찾는다(리네임·리페어런트 안전)."""
         return tsl.get_all_nodes() or tsl.get_all_items()
+
+    @staticmethod
+    def _listed_name(node):
+        """리스트에 보여 줄 이름. 마야가 주는 **고유한 최소 이름**을 쓴다.
+
+        전체 경로(`|grp|ctrl_l`)를 그대로 넣으면 목록이 읽기 어렵고, 짧은 이름만 쓰면
+        동명 노드에서 엉뚱한 것이 잡힌다. `cmds.ls` 는 필요할 때만 경로를 붙인 이름을
+        돌려주므로 둘 다 피할 수 있다 - 'List Selected' 로 담을 때와 같은 모양이다.
+        """
+        found = cmds.ls(node) or []
+        return found[0] if found else node.split("|")[-1]
+
+    def on_resolve_pair(self):
+        """교체본의 반대쪽 커브를 찾아 좌측 'Shapes to replace' 를 채운다.
+
+        대상은 **씬 선택**이 있으면 그것, 없으면 이미 담겨 있는 'Replacement' 리스트다
+        (A00110_animTool_V02 의 `Resolve Pairs from Selection` 과 같은 규칙).
+
+        ★ 두 리스트를 **짝지어진 것만으로 함께** 다시 채운다. 좌측만 채우면 짝을 못 찾은
+          교체본 때문에 순서가 밀려 **엉뚱한 셰이프가 적용**된다(짝은 리스트 순서로 맺어진다).
+        """
+        selection = cmds.ls(selection=True, long=True) or []
+
+        if selection:
+            sources = selection
+        else:
+            sources = self._nodes(self.tsl_replacements)
+            if not sources:
+                self._log("[WARN] Select the replacement curve(s) in the scene, or list "
+                          "them under 'Replacement' first.")
+                return
+
+        pairs, messages = ctl_mgr.resolve_mirror_pairs(sources)
+
+        for message in (messages or []):
+            self._log(message)
+
+        if not pairs:
+            return
+
+        self.tsl_targets.set_items([self._listed_name(t) for t, _ in pairs])
+        self.tsl_replacements.set_items([self._listed_name(r) for _, r in pairs])
+
+        dropped = len(sources) - len(pairs)
+        if dropped:
+            self._log("{0} replacement(s) had no counterpart and were left out of both "
+                      "lists.".format(dropped))
 
     def on_replace(self):
         targets = self._nodes(self.tsl_targets)

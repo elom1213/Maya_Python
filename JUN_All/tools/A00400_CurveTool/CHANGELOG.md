@@ -1,5 +1,21 @@
 # Changelog — A00400_CurveTool
 
+## v01.23 (2026-09-22)
+**[Feature] `Display > Replace` — **Resolve Pair from Selection** 버튼.**
+
+- **무엇을 하나**: 교체본(`Replacement`)마다 **반대쪽 이름**을 만들어, 그 이름의 커브가 씬에 있으면
+  왼쪽 `Shapes to replace` 에 짝지어 채운다. 리그 한쪽을 만들어 두고 반대쪽에 같은 모양을 입힐 때
+  대상을 손으로 고르는 일이 없어진다. `A00110_animTool_V02` 의 `Resolve Pairs from Selection` 과 같은 규칙.
+- **대상**: 씬 선택이 있으면 그것, 없으면 이미 담겨 있는 `Replacement` 리스트.
+- **[Add] 토큰 규칙은 Framework 공용 파일 하나** (`Framework/rules/mirror_tokens.json`,
+  `MirrorTokenStore`). 단순 substring 치환이 아니라 **경계 매칭**이라 `sample_lip_l_ctl` 의 `_lip` 을
+  잘못 집지 않는다.
+- **★ 양쪽 리스트를 짝지어진 것만으로 함께 다시 채운다** — 짝은 **리스트 순서**로 맺어지므로
+  왼쪽만 채우면 짝을 못 찾은 교체본 때문에 순서가 밀려 **엉뚱한 셰이프가 적용**된다.
+- **건너뛰는 것은 사유와 함께 로그에** — 좌/우 토큰이 없는 이름(센터), 반대쪽이 씬에 없는 경우,
+  같은 이름의 노드가 **커브가 아닌** 경우(조인트 등), 자기 자신으로 미러되는 경우.
+  같은 이름의 커브가 여럿이면 첫 번째를 쓰고 그 사실을 적는다.
+
 ## v01.22 (2026-09-22)
 **[Feature] `Display > Replace` — 대상이 **레퍼런스**면 셰이프를 바꾸는 대신 **CV 를 맞춘다**.**
 

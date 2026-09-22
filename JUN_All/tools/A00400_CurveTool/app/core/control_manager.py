@@ -587,3 +587,84 @@ def replace_shapes(targets, replacements, mirror=False):
     if not replaced and not matched and not messages:
         messages.append("[WARN] Nothing was replaced.")
     return replaced + matched, messages
+
+
+# --------------------------------------------------------------- 미러 짝 찾기 (v01.23)
+#
+# 교체본(Replacement)의 **반대쪽 이름**을 토큰 규칙으로 만들어, 그 노드가 씬에 있으면
+# 교체 대상(Shapes to replace)으로 짝지어 준다. 리그의 한쪽을 만들어 두고 반대쪽에
+# 같은 모양을 입힐 때 대상을 손으로 고르는 일을 없앤다.
+#
+# 토큰 규칙은 **Framework 공용 파일 하나**(`Framework/rules/mirror_tokens.json`)를 쓴다.
+# 단순 substring 치환이 아니라 **경계 매칭**이라 `sample_lip_l_ctl` 의 `_lip` 을 잘못
+# 집지 않는다 (Framework.core.mirror_tokens 참고).
+
+def _curve_transform_candidates(short_name):
+    """그 이름을 가진 **커브 트랜스폼**들의 전체 경로. 없으면 빈 리스트.
+
+    커브가 아닌 동명 노드(조인트·로케이터 등)는 교체 대상이 될 수 없으므로 거른다.
+    """
+    found = cmds.ls(short_name, long=True, type="transform") or []
+    return [node for node in found
+            if cmds.listRelatives(node, shapes=True, fullPath=True,
+                                  type="nurbsCurve")]
+
+
+def resolve_mirror_pairs(replacements):
+    """교체본마다 반대쪽 커브를 찾는다. **씬에 있는 것만** 짝이 된다.
+
+    반환: (pairs, messages)
+        pairs : [(target_fullPath, replacement), ...]
+
+    ★ 짝은 **리스트 순서**로 맺어지므로(`replace_shapes`), 짝을 못 찾은 교체본은
+      돌려주는 pairs 에서 **빠진다**. 호출측이 두 리스트를 이 pairs 로 함께 채우면
+      좌우가 언제나 1:1 로 맞는다 - 한쪽만 빠져 뒤가 밀리는 사고가 없다.
+    """
+    from Framework.core.mirror_tokens import MirrorTokenStore
+
+    token_pairs, _ = MirrorTokenStore.load()
+
+    pairs = []
+    messages = []
+
+    for replacement in replacements:
+        short = replacement.split("|")[-1]
+
+        mirrored, token = MirrorTokenStore.mirror_node_name(replacement, token_pairs)
+
+        if not mirrored:
+            messages.append(
+                "[WARN] '{0}' has no left/right token - nothing to pair it with.".format(short))
+            continue
+
+        candidates = _curve_transform_candidates(mirrored)
+
+        if not candidates:
+            messages.append(
+                "[WARN] '{0}' -> '{1}' ({2}) is not a curve in the scene - skipped.".format(
+                    short, mirrored, token))
+            continue
+
+        if len(candidates) > 1:
+            messages.append(
+                "[WARN] '{0}' matches {1} curves - using the first ({2}).".format(
+                    mirrored, len(candidates), candidates[0]))
+
+        target = candidates[0]
+
+        if target == replacement or target.split("|")[-1] == short:
+            messages.append(
+                "[WARN] '{0}' mirrors onto itself - skipped.".format(short))
+            continue
+
+        pairs.append((target, replacement))
+        messages.append("  {0}  <-  {1}   ({2})".format(
+            target.split("|")[-1], short, token))
+
+    if pairs:
+        messages.insert(0, "Resolved {0} pair(s) - 'Shapes to replace'  <-  'Replacement'.".format(
+            len(pairs)))
+    else:
+        messages.insert(0, "[WARN] No pair could be resolved.")
+
+    return pairs, messages

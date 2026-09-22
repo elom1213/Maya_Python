@@ -43,5 +43,10 @@
 #                           (`crv_to_replace.cv[i]` <- `crv_replacement.cv[i]`).
 #                           Mirror 를 켜면 대응 CV 의 **월드 위치를 X 만 뒤집은** 자리로
 
-VERSION = "01.22"
+# 01.23  Display > Replace 에 **Resolve Pair from Selection** 버튼. 교체본의 반대쪽 이름을
+#                           공용 미러 토큰 규칙으로 만들어, 그 커브가 씬에 있으면
+#                           좌측 `Shapes to replace` 에 짝지어 채운다. 짝은 리스트 순서로
+#                           맺어지므로 **양쪽을 짝지어진 것만으로 함께** 다시 채운다
+
+VERSION = "01.23"
 LAST_UPDATE = "2026-09-22"
