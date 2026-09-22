@@ -36,6 +36,12 @@ def _read_qss(qss_path):
 
 class ThemeManager:
 
+    #: 마지막으로 불러온 테마 이름. 테마는 툴이 뜰 때 한 번 정해지므로 이 값이 곧 현재 테마다.
+    #: 공용 로그창이 `[WARN]` 색을 밝은 배경용 / 어두운 배경용 중 어느 쪽으로 쓸지 고를 때 본다
+    #: (`Framework.core.log_levels`). 테마를 안 입힌 채 열리는 창(템플릿 · 테스트)도 있어서
+    #: 기본값은 저장소의 기본 테마와 같은 어두운 쪽이다.
+    _current_theme = "dark"
+
     @staticmethod
     def get_root():
 
@@ -60,6 +66,7 @@ class ThemeManager:
             f"{theme_name}.qss"
         )
 
+        cls._current_theme = theme_name
         app.setStyleSheet(_read_qss(qss_path))
 
     @staticmethod
@@ -73,6 +80,7 @@ class ThemeManager:
             f"{theme_name}.qss"
         )
 
+        ThemeManager._current_theme = theme_name
         widget.setStyleSheet(_read_qss(qss_path))
 
     @staticmethod
@@ -82,5 +90,27 @@ class ThemeManager:
             f"Framework/styles/{theme_name}.qss"
         )
 
+        ThemeManager._current_theme = theme_name
         app.setStyleSheet(_read_qss(theme_path))
+
+    # ------------------------------------------------------------------
+    # 지금 테마가 어두운가 (로그 색 · 그 밖의 "배경에 맞춰야 하는" 값들이 쓴다)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def current_theme():
+        """마지막으로 불러온 테마 이름."""
+        return ThemeManager._current_theme
+
+    @staticmethod
+    def is_dark_theme(theme_name=None):
+        """그 테마(생략하면 현재 테마)의 배경이 어두운가.
+
+        `*_light.qss` 만 밝고(배경 `#eef…`), 나머지는 전부 어둡다 -
+        `*_dark`(`#2b2b2b`) · `*_mid`(`#4a4a4a`) · 이름 없는 `dark` · `red`.
+        그래서 판정은 **이름의 `_light` 하나**로 충분하다. 밝은 테마가 다른 이름으로
+        생기면 여기만 고친다.
+        """
+        name = theme_name or ThemeManager._current_theme or "dark"
+        return not str(name).lower().endswith("_light")
 

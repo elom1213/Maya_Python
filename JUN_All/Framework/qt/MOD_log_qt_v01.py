@@ -12,6 +12,20 @@ JUN_mod_log_qt_v01 - 재사용 PySide 로그창.
   - **Clear**  : 로그를 비운다.
   - **Copy**   : 로그 **전문**을 클립보드로.
 
+표식 색 (`[WARN]` 노랑 · `[OK]` 초록)
+--------------------------------------
+줄에 `[WARN]` `[OK]` `[ERROR]` 같은 표식이 있으면 **그 줄 전체를 표식 색으로** 칠한다.
+표식과 색의 대응은 이 파일이 아니라 **`Framework.core.log_levels`** 에 있다 - 저장소 전체가
+같은 관례로 로그를 쓰고 있어서(55개 파일), 색도 한 곳에서 정해야 툴마다 다른 노랑이 되지
+않는다. 툴은 지금처럼 `self._log("[WARN] ...")` 만 하면 된다.
+
+  - 켜고 끄기: `JUN_mod_log_qt_v01(colorize_levels=False)` 또는 `set_colorize_levels(False)`.
+  - 색은 **테마 배경**에 맞춘다 - 어두운 테마용/밝은 테마용 한 쌍을 갖고
+    `ThemeManager.is_dark_theme()` 로 고른다(밝은 배경에서 밝은 노랑은 안 보인다).
+  - 손으로 `<span style="color:…">` 를 넣는 툴(A00300 · A00410 · A00430)의 문장은
+    건드리지 않는다 - `<` 가 있으면 툴의 HTML 로 보고 그대로 통과시킨다.
+  - `Copy` 와 `toPlainText()` 는 **평문 그대로** 나온다(색은 표시에만 붙는다).
+
 왜 드롭인(drop-in) 교체가 되는가
 --------------------------------
 저장소의 기존 로그창은 두 계열이고, 호출하는 메서드는 사실상 정해져 있다.
@@ -90,6 +104,8 @@ Maya 밖에서도 import / 생성이 가능하도록 maya 의존이 없다.
 
 from Framework.qt.qt import *
 
+from Framework.core import log_levels
+
 
 # 버튼은 "작게" - 로그창의 주인공은 글이지 버튼이 아니다.
 BUTTON_HEIGHT = 20
@@ -143,6 +159,9 @@ class JUN_mod_log_qt_v01(QWidget):
         expand_size: 확장 창의 초기 크기 (w, h).
         buttons_on_top: True(기본)면 버튼 줄이 로그 위에, False 면 아래에 온다.
         read_only: 기본 True. 로그는 읽는 것이다.
+        colorize_levels: True(기본)면 `[WARN]` `[OK]` 같은 표식이 든 줄을 표식 색으로
+            칠한다(규칙은 `Framework.core.log_levels`). 색을 손으로 칠하는 툴이
+            있으면 False 로 끈다.
         resize_window_on_shrink: True(기본)면 Shrink 로 접을 때 최상위 툴 창 높이도
             그만큼 줄이고, 펼 때 되돌린다.
     """
@@ -157,8 +176,11 @@ class JUN_mod_log_qt_v01(QWidget):
 
     def __init__(self, window_title="Log", object_name=None, title=None,
                  expand_size=(620, 520), buttons_on_top=True, read_only=True,
-                 resize_window_on_shrink=True, parent=None):
+                 resize_window_on_shrink=True, colorize_levels=True, parent=None):
         super().__init__(parent)
+
+        # 표식 색 규칙을 태울지. 끄면 v01 과 글자 그대로 같은 동작이다.
+        self._colorize = bool(colorize_levels)
 
         self._window_title = window_title
         self._object_name = object_name or "JUN_log_{0}_window".format(
@@ -395,6 +417,9 @@ class JUN_mod_log_qt_v01(QWidget):
 
         내부가 `QTextEdit` 이라 `append()` 는 HTML 로 해석된다. 로그 문자열에 `<` 가
         들어 있어도 먹히지 않도록, 이 메서드는 커서로 **평문**을 넣는다.
+
+        `colorize_levels` 가 켜져 있고 줄에 `[WARN]` 같은 표식이 있으면, 글자를 escape 한
+        **색깔 한 줄**로 넣는다 - 평문 경로의 안전함(태그가 먹히지 않음)은 그대로다.
         """
         text = "" if message is None else str(message)
 
@@ -402,14 +427,80 @@ class JUN_mod_log_qt_v01(QWidget):
         cursor.movePosition(QTextCursor.End)
         if not self.text.document().isEmpty():
             cursor.insertBlock()
-        cursor.insertText(text)
+
+        html = self._level_html(text)
+        if html:
+            cursor.insertHtml(html)
+        else:
+            # ★ 앞 줄이 색깔 줄이었으면 커서가 그 색을 물고 있다. 빈 포맷을 다시 걸어
+            #   평문 줄이 남의 색으로 찍히지 않게 한다(이걸 빼면 첫 `[WARN]` 이후의
+            #   모든 줄이 노랗게 나온다).
+            cursor.setCharFormat(QTextCharFormat())
+            cursor.insertText(text)
 
         self.text.setTextCursor(cursor)
         self.text.ensureCursorVisible()
 
     def append(self, message):
-        """`QTextEdit` 과 같은 이름 - **HTML 로 해석**해 한 줄 추가(색깔 로그용)."""
-        self.text.append("" if message is None else str(message))
+        """`QTextEdit` 과 같은 이름 - **HTML 로 해석**해 한 줄 추가(색깔 로그용).
+
+        저장소의 툴 대부분이 이 이름으로 **평문**을 넣으므로(옛 `QTextEdit` 을 그대로
+        교체한 자리), 평문이면 여기서도 표식 색 규칙을 태운다. 이미 `<` 가 들어 있는
+        문장은 **손대지 않는다** - 그건 툴이 손으로 쓴 HTML 이다.
+        """
+        text = "" if message is None else str(message)
+
+        if not log_levels.looks_like_html(text):
+            html = self._level_html(text)
+            if html:
+                self.text.append(html)
+                self._reset_insert_format()
+                return
+
+        self.text.append(text)
+        self._reset_insert_format()
+
+    # ------------------------------------------------------------------
+    # 표식 색 (규칙은 Framework.core.log_levels)
+    # ------------------------------------------------------------------
+
+    def set_colorize_levels(self, enabled):
+        """표식 색을 켜고 끈다. 이미 찍힌 줄은 그대로 있고 다음 줄부터 달라진다."""
+        self._colorize = bool(enabled)
+
+    def is_colorizing_levels(self):
+        return self._colorize
+
+    def _level_html(self, text):
+        """그 줄에 표식이 있으면 색깔 HTML, 없거나 껐으면 None."""
+        if not self._colorize:
+            return None
+        return log_levels.to_html(text, self._is_dark_theme())
+
+    @staticmethod
+    def _is_dark_theme():
+        """지금 테마의 배경이 어두운가. 같은 노랑이 밝은 배경에서는 안 보이기 때문에 묻는다.
+
+        테마 모듈을 **늦게** import 한다 - 이 위젯은 `Framework.qt` 패키지가 올라오는
+        중에 import 되므로, 모듈 맨 위에서 끌어오면 import 순서에 매이게 된다.
+        """
+        try:
+            from Framework.themes.theme_manager import ThemeManager
+            return bool(ThemeManager.is_dark_theme())
+        except Exception:                                  # noqa: BLE001
+            # 테마를 못 읽으면 저장소 기본값(어두운 테마)로 본다.
+            return True
+
+    def _reset_insert_format(self):
+        """★ `append()` 로 색깔 줄을 넣은 뒤 커서에 남는 색을 지운다.
+
+        `QTextEdit.append()` 는 커서의 글자 포맷을 이어 쓰므로, 색깔 줄 다음의 평문
+        줄까지 같은 색으로 찍힌다. 다음 줄이 깨끗하게 시작하도록 여기서 되돌린다.
+        """
+        cursor = self.text.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.setCharFormat(QTextCharFormat())
+        self.text.setTextCursor(cursor)
 
     def toPlainText(self):
         return self.text.toPlainText()

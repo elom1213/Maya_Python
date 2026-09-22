@@ -2,7 +2,7 @@
 title: A00480_FileTool 사용법
 aliases: [File Tool, FileTool, A00480]
 tags: [maya-python, tool-guide, file, fbx, export, import, path, pyside]
-updated: 2026-09-17
+updated: 2026-09-22
 ---
 
 # A00480_FileTool 사용법
@@ -45,6 +45,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 ```
 
 - **로그창은 세 탭이 함께 쓴다.** 어느 탭에서 누른 결과든 같은 곳에 쌓인다.
+- **표식은 색으로 보인다** (2026-09-22~) — `[WARN]` 노랑 · `[OK]` 초록 · `[FAIL]` 빨강 · `[SKIP]` 회색 · `[Info]` 파랑. 이 툴만의 장식이 아니라 **저장소 공용 규칙**이다 — [Framework_log_levels](Framework_log_levels.md).
 - **창 크기는 원본 `A00040_file_exporter_V02` 와 같다**(slate_dark 기준 960 x 853, v01.01~). 폭은 Naming 토큰 6칸 줄이 정한다.
   - 테마 qss 는 `show()` 뒤에야 자식 위젯에 입혀지므로, 그 전에 재면 글자가 큰 상태의 최소 크기(약 1290 폭)로 창이 커진다.
     `launch.py` 가 show 다음 이벤트 루프에서 `fit_to_content()` 로 레이아웃 최소 크기에 맞춘다.

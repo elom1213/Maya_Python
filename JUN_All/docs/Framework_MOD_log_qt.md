@@ -2,7 +2,7 @@
 title: Framework 공용 위젯 — MOD_log_qt (로그창)
 aliases: [JUN_mod_log_qt, 로그창, 로그 위젯, Expand Clear Copy, Shrink]
 tags: [framework, qt, widget, maya-python, log]
-updated: 2026-09-17
+updated: 2026-09-22
 ---
 
 # `JUN_mod_log_qt_v01` — Expand / Shrink / Clear / Copy 버튼이 달린 로그창
@@ -18,6 +18,8 @@ updated: 2026-09-17
 | **Shrink** (2026-09-17~) | **토글.** 누르면 로그가 사라지고 버튼 줄만 남는다(라벨이 `Show` 로 바뀜). 툴 창도 그만큼 짧아진다. 다시 누르면 로그와 창 높이가 돌아온다 |
 | **Clear** | 로그를 비운다 |
 | **Copy** | 로그 **전문**을 클립보드로 |
+
+> **표식 색 (2026-09-22~)** — 줄에 `[WARN]` 이 있으면 **노랑**, `[OK]` 은 **초록**, `[ERROR]`/`[FAIL]` 은 빨강으로 찍힌다. 표식과 색의 대응은 공용 규칙 하나가 갖는다 — [Framework_log_levels](Framework_log_levels.md). 툴이 할 일은 없다(`colorize_levels=False` 로 끈다).
 
 ## 사용처 — PySide 툴 **47곳 전부**
 
@@ -66,8 +68,10 @@ self.log_view.log("새 코드에서는 이 이름을 써도 된다")
 | `expand_size` | `(620, 520)` | 확장 창 초기 크기 |
 | `buttons_on_top` | `True` | 버튼 줄을 로그 위/아래 어디에 둘지 |
 | `read_only` | `True` | 로그는 읽는 것이다 |
+| `colorize_levels` | `True` | `[WARN]` 노랑 · `[OK]` 초록 … 표식이 든 줄을 표식 색으로 칠한다 → [Framework_log_levels](Framework_log_levels.md) |
 
 시그널 — `expanded_changed(bool)` · `cleared()` · `copied(int)`.
+메서드 — `set_colorize_levels(bool)` · `is_colorizing_levels()`.
 
 ---
 
@@ -88,6 +92,12 @@ self.log_view.log("새 코드에서는 이 이름을 써도 된다")
 - **`appendPlainText` 는 직접 구현했다.** `QTextEdit` 에는 없는 이름이고, `append()` 로 대신하면
   로그에 들어 있는 `<` 가 HTML 로 먹힌다. 커서로 **평문**을 넣어 글자를 그대로 남긴다.
   → `a < b and <not a tag>` 가 그대로 보인다(테스트로 고정).
+- **표식 색은 두 경로 모두에 붙는다.** 툴 절반은 `appendPlainText`, 절반은 `append` 로 평문을
+  넣으므로(위 표 참고) 양쪽에서 칠해야 툴마다 다르게 보이지 않는다. 단 `append` 에 들어온 문장에
+  `<` 가 있으면 **툴이 쓴 HTML** 로 보고 통과시킨다.
+- ★ **색깔 줄 다음 평문 줄이 그 색을 물려받는다** — `QTextEdit` 의 커서가 글자 포맷을 이어 쓰기
+  때문이다. 그냥 두면 첫 `[WARN]` 이후 **모든 줄이 노랗게** 찍힌다. 그래서 평문을 넣기 전과
+  색깔 줄을 넣은 뒤에 `QTextCharFormat()` 을 다시 걸어 포맷을 비운다(테스트로 고정).
 - 그 밖에 `QWidget` 에 없는 이름은 `__getattr__` 로 **내부 텍스트에 위임**한다 —
   `toPlainText` · `moveCursor` · `verticalScrollBar` · `document` · `setLineWrapMode` 등.
 

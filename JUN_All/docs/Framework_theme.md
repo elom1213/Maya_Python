@@ -2,7 +2,7 @@
 title: 테마(색) 규칙 — 새 툴은 여기서 색을 고른다
 aliases: [Theme, 테마 규칙, qss]
 tags: [framework, theme, qss, ui, convention]
-updated: 2026-08-18
+updated: 2026-09-22
 ---
 
 # 테마(색) 규칙
@@ -92,3 +92,20 @@ ThemeManager.load_theme_dev(app, "slate_mid")
   `Framework/styles/<이름>.qss` 가 실제로 있는지 확인할 것.
 - `A00200_CSV_tool`(실제 기능은 **ARKit Facial Import**)은 아직 테마 지정이 없다.
   분류상으로는 **애니메이션(`blue_dark`)** 이지만 폴더명 정정과 함께 별도로 처리한다.
+
+## 지금 테마가 어두운가 — `is_dark_theme()` (2026-09-22~)
+
+```python
+ThemeManager.load_theme_to_widget(window, "slate_dark")
+ThemeManager.current_theme()      # "slate_dark"
+ThemeManager.is_dark_theme()      # True
+```
+
+`ThemeManager` 는 **마지막으로 불러온 테마 이름**을 기억한다(세 로더 모두). 배경 밝기에 맞춰야
+하는 값 — 지금은 공용 로그창의 표식 색([Framework_log_levels](Framework_log_levels.md)) — 이 이걸 본다.
+
+- 판정은 **이름의 `_light` 하나**다. `*_light.qss` 만 배경이 밝고(`#eef…`), 나머지는 전부 어둡다
+  (`*_dark` `#2b2b2b` · `*_mid` `#4a4a4a` · `dark` · `red`).
+- ★ **qss 는 `QPalette` 를 바꾸지 않는다.** 그래서 위젯의 팔레트 배경색을 읽어 밝기를 재는 방법은
+  통하지 않는다 — 테마를 입혀도 팔레트는 기본값을 돌려준다. 이름을 기억하는 쪽이 정확하다.
+- 테마를 입히지 않고 열리는 창(템플릿 · 헤드리스 테스트)에서는 기본값 `dark` 로 답한다.
