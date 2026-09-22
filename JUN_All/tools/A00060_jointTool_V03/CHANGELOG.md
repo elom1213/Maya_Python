@@ -3,6 +3,25 @@
 `A00060_jointTool_V02` 를 복제해 갈라낸 **탭 재분류판**이다.
 아래 `v01.xx` 항목은 갈라 나오기 전 V02 의 이력이다.
 
+## v03.12 (2026-09-22)
+**[Add] `Create > From Curve` 에 `By Count` — 개수를 정해 커브를 따라 조인트를 만든다.**
+
+- `Joint Count` 스핀박스(**2 이상**, 기본 3)에 넣은 개수만큼, `Curves` 리스트의 **커브마다**
+  조인트를 만든다.
+- 자리는 **`pointOnCurveInfo` 의 `parameter` 를 `turnOnPercentage` 로 켠 0~1 을 등분**한 곳이다.
+  3 이면 POCI 입력 **0 · 0.5 · 1.0** 자리(요청 규칙). POCI 노드 · `cmds.pointOnCurve` ·
+  `MFnNurbsCurve.getPointAtParam(kWorld)` 세 가지가 같은 월드 좌표를 주는 것을 확인하고 썼다
+  (부모에 이동·회전·스케일이 걸린 커브, degree 1/3, 주기 커브에서도).
+- ★ **길이(arc length) 등분이 아니다.** 파라미터 등분이므로 CV 간격이 불규칙한 커브에서는
+  조인트 간격도 불규칙하다 — 그것이 "POCI 와 같은 자리" 라는 뜻이다. 길이로 고르게 놓는 것은
+  `A00400_CurveTool` 의 `Joints` 탭이다.
+- **`Create as chain`**(기본 켬) : 앞 조인트의 자식으로 이어 붙고 체인 orient(aim x / up y),
+  마지막은 월드 정렬. **끄면** 자리마다 **따로 떨어진 루트 조인트**(부모 없음, 조준 없음).
+- 리스트에 커브가 아닌 것이 있으면 사유와 함께 건너뛴다. 닫힌(주기) 커브는 parameter 0 과 1 이
+  같은 점이라 **마지막 조인트가 첫 조인트에 겹친다** — 자리를 임의로 옮기지 않고 로그로 알린다.
+- 기존 `Joints to Crv`(CV / Edit Point 기준)는 **그대로**다. 한 번 누르면 undo 한 스텝.
+- 검증: mayapy 2024 + 오프스크린 Qt **46항목 통과**(POCI 와 좌표 일치, 체인/분리, 방어, 클릭).
+
 ## v03.11 (2026-09-18)
 **[Add] `Orient > Aim` 에 Mode — `Chain` / `Root`.** (A00145_RigConnect Mirror 탭의 Mode 와 같은 모양)
 

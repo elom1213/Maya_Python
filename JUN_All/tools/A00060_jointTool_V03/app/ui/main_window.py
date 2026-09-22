@@ -299,8 +299,57 @@ class MainWindow(QWidget):
         self.btn_joints_to_crv.clicked.connect(self.on_joints_to_crv)
         layout.addWidget(self.btn_joints_to_crv)
 
+        layout.addWidget(self._build_curve_count_group())
+
         layout.addStretch(1)
         return tab
+
+    def _build_curve_count_group(self):
+        """개수를 정해 커브를 따라 조인트를 만드는 칸 (v03.12~).
+
+        자리는 `pointOnCurveInfo` 의 `parameter`(turnOnPercentage 켠 0~1)를 등분한 곳이다 -
+        3 을 넣으면 POCI 입력 0 · 0.5 · 1.0 자리. **길이 등분이 아니다**(core 주석 참고).
+        """
+        box = QGroupBox("By Count (parameter 0 ~ 1)")
+        layout = QVBoxLayout(box)
+
+        note = QLabel(
+            "Put N joints on each listed curve, at the same places a\n"
+            "pointOnCurveInfo gives for parameter 0 ~ 1 in N equal steps\n"
+            "(N = 3 -> 0, 0.5, 1.0). Parameter steps, not arc length.")
+        note.setAlignment(Qt.AlignCenter)
+        layout.addWidget(note)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Joint Count"))
+        self.sb_crv_count = QSpinBox()
+        self.sb_crv_count.setRange(crv_mgr.MIN_JOINT_COUNT, 1000)
+        self.sb_crv_count.setValue(3)
+        self.sb_crv_count.setKeyboardTracking(False)
+        self.sb_crv_count.setToolTip(
+            "How many joints per curve. 2 or more - the first sits at parameter 0\n"
+            "and the last at parameter 1, the rest evenly in between.")
+        row.addWidget(self.sb_crv_count)
+
+        self.cb_crv_chain = QCheckBox("Create as chain")
+        self.cb_crv_chain.setChecked(True)
+        self.cb_crv_chain.setToolTip(
+            "On (default) : the joints are parented one under the next and\n"
+            "               oriented down the chain (aim x, up y).\n"
+            "Off          : a separate root joint at each place, no parenting\n"
+            "               and no aiming.")
+        row.addWidget(self.cb_crv_chain)
+        row.addStretch(1)
+        layout.addLayout(row)
+
+        self.btn_joints_by_count = QPushButton("Joints by Count")
+        self.btn_joints_by_count.setToolTip(
+            "Build the joints on every curve in the list above.\n"
+            "One click = one undo step.")
+        self.btn_joints_by_count.clicked.connect(self.on_joints_by_count)
+        layout.addWidget(self.btn_joints_by_count)
+
+        return box
 
     # --------------------------------------------------------------
     # Create > From Object
@@ -1278,6 +1327,39 @@ class MainWindow(QWidget):
         pt = self._selected_point_type()
         self._run("Joints to Crv",
                   lambda: crv_mgr.joints_to_curves(curves, pt))
+
+    def on_joints_by_count(self):
+        """개수만큼 커브를 따라 조인트를 만든다 (v03.12~).
+
+        core 가 커브마다 메시지를 돌려주므로 그것을 로그에 그대로 옮긴다 -
+        리스트에 커브가 아닌 것이 섞여 있으면 어느 것이 빠졌는지 알아야 한다.
+        """
+        curves = self.tsl_create_crv.get_all_items()
+        if not curves:
+            self.log("[WARN] Joints by Count : put some curves in the list first")
+            return
+
+        count = self.sb_crv_count.value()
+        chain = self.cb_crv_chain.isChecked()
+
+        with undo_chunk():
+            try:
+                created, messages = crv_mgr.joints_by_count(
+                    curves, count, chain=chain)
+            except Exception as e:                          # noqa: BLE001
+                self.log("[ERR] Joints by Count : {0}".format(e))
+                cmds.warning(str(e))
+                return
+
+        for message in messages:
+            self.log(message)
+
+        total = sum(len(joints) for joints in created)
+        if total:
+            self.log("[OK] Joints by Count : {0} joint(s) on {1} curve(s), "
+                     "{2} per curve, {3}".format(
+                         total, len(created), count,
+                         "chain" if chain else "separate"))
 
     def _match_to_objs(self, label, objs):
         """From Object 축 옵션을 읽어 objs 순서대로 조인트를 만든다."""

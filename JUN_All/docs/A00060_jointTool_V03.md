@@ -4,7 +4,9 @@
 평평하던 상위 탭 5개(그 안에 접이식 6섹션)를 **상위 탭 = 카테고리 / 하위 탭 = 기능**
 의 2단 구조로 다시 나눠 담았다.
 
-- 버전: `v03.11` (`app/config/version.py`) — `Orient > Aim` 에 **Mode `Chain` / `Root`**: Root 는 루트 하나로
+- 버전: `v03.12` (`app/config/version.py`) — `Create > From Curve` 에 **`By Count`**:
+  개수(2 이상)를 정해 **POCI parameter 0~1 등분** 자리에 조인트, 체크박스로 체인/분리 (§From Curve)
+  · v03.11 은 `Orient > Aim` 에 **Mode `Chain` / `Root`** — `Orient > Aim` 에 **Mode `Chain` / `Root`**: Root 는 루트 하나로
   그 아래 **모든 최하위 자식까지** 정렬한다. 두 모드 모두 이제 **움직인 자식을 원위치**시킨다 (§Aim)
   · v03.08 은 `Chain > Pole Target` 에 **`Slide`**:
   타깃을 **양 끝 사이로** 옮긴다(양수 = 첫 오브젝트 쪽, 음수 = 마지막 쪽).
@@ -110,6 +112,25 @@ A00060_jointTool_V03.run(True)   # True 면 DEV_MODE 에서 reload 후 실행
   - `Edit Point` : 에디트 포인트
 - `Joints to Crv` : 위 옵션으로 조인트 생성 (월드 절대 좌표 — §6)
 - 커브가 아닌 것이 들어 있으면 `is not a nurbsCurve` 경고를 내고 건너뛴다.
+
+**`By Count` (v03.12~) — 개수를 정해 만든다**
+
+커브의 포인트(CV / EP)가 아니라 **개수**로 자리를 정하는 칸이다.
+
+| 칸 | 뜻 |
+|----|-----|
+| `Joint Count` | 커브마다 만들 조인트 수. **2 이상**(기본 3). 첫 개는 parameter 0, 마지막은 1, 나머지는 그 사이를 고르게 |
+| `Create as chain` | **켬(기본)** = 조인트 **체인**(앞 조인트의 자식, 체인 orient aim x / up y, 마지막은 월드 정렬) · **끔** = 자리마다 **따로 떨어진 루트 조인트**(부모 없음 · 조준 없음) |
+| `Joints by Count` | 리스트의 커브 전부에 실행. **한 번 누르면 undo 한 스텝** |
+
+- 자리는 **`pointOnCurveInfo`(POCI) 의 `parameter` 를 `turnOnPercentage` 로 켠 0~1** 을
+  등분한 곳이다. `3` 을 넣으면 POCI 입력 **0 · 0.5 · 1.0** 자리와 같다.
+- ★ **길이 등분이 아니다.** 파라미터 등분이라 CV 간격이 불규칙한 커브에서는 조인트 간격도
+  불규칙해진다. 길이로 고르게 놓고 싶으면 [`A00400_CurveTool`](A00400_CurveTool.md) 의
+  `Edit > Joints` 탭을 쓴다(그쪽은 균일 배치 + 바인드까지 한다).
+- **닫힌(주기) 커브**는 parameter 0 과 1 이 **같은 점**이라 마지막 조인트가 첫 조인트에 겹친다.
+  자리를 임의로 옮기지 않고(그러면 POCI 와 같은 자리라는 규칙이 깨진다) 로그로 알린다.
+- 커브가 부모 아래에서 이동·회전·스케일된 상태여도 자리가 맞는다(월드 좌표로 확정).
 
 #### Create > From Object
 `Objects` 리스트의 오브젝트/버텍스 위치마다 조인트를 만든다.
