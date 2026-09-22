@@ -93,9 +93,11 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
 
         self.win_title = "Mesh Tool v{0}".format(VERSION)
-        # 테마를 입힌 상태에서 잰 최소 크기는 748 x 805 다(폭은 Match 탭, 높이는 MeshDoctor 탭이
-        # 끈다). 예전 380 x 520 은 그보다 작아 어차피 Qt 가 늘려 주던 값이라, 실제 크기를 적는다.
-        self.resize(760, 860)
+        # 가로는 A00400_CurveTool 과 같은 1176 로 맞춘다(2026-09-22 실측 — 그 툴은
+        # resize(360, 620) 이라고 적혀 있지만 자기 최소 폭이 1176 이라 늘 그 폭으로 열린다).
+        # 세로는 이 툴 자신의 실측값. 테마를 입힌 상태의 최소는 748 x 805 이고,
+        # 폭을 끄는 것은 Match 탭(722), 높이를 끄는 것은 MeshDoctor 탭이다.
+        self.resize(1176, 860)
 
         self.session = None      # peak_mgr.PeakSession
         self._syncing = False    # 슬라이더 <-> 스핀박스 상호 갱신 재귀 방지
