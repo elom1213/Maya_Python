@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-18
+# last Update date : 2026-09-22
 # A00440_SetTool - Qt UI 본문 (in-Maya)
 #
 # 컴포넌트를 원소로 갖는 세트들끼리 집합 연산을 한다.
@@ -48,7 +48,9 @@ class SetTab(QWidget):
     def build_ui(self):
         layout = QVBoxLayout(self)
 
-        # ---- 세트 목록 ------------------------------------------------
+        # ---- 세트 목록 + 오브젝트 목록 (나란히) --------------------------
+        lists_row = QHBoxLayout()
+
         self.tsl = JUN_mod_tsl_qt_v01(
             title="Sets",
             select_label="Select Sets",
@@ -58,14 +60,28 @@ class SetTab(QWidget):
             list_min_height=150,
             log_callback=self.log,
         )
-        layout.addWidget(self.tsl)
+        lists_row.addWidget(self.tsl, stretch=1)
 
         # 세트 구성 확인용. 리스트에 담은 것들의 원소 수/종류를 로그로 뿌린다.
         self.tsl.add_button("Info", self.on_info)
 
+        # 세트에 **넣을** 오브젝트들 (v01.05~). 세트끼리의 연산에는 쓰이지 않는다.
+        self.tsl_objects = JUN_mod_tsl_qt_v01(
+            title="Objects",
+            select_label="Select Objects",
+            show_reverse=True,
+            show_order=True,
+            multi_select=True,
+            list_min_height=150,
+            log_callback=self.log,
+        )
+        lists_row.addWidget(self.tsl_objects, stretch=1)
+        layout.addLayout(lists_row)
+
         hint = QLabel(
-            "Operations use every item in the list, in list order.\n"
-            "Difference subtracts the rest from the FIRST item.")
+            "Set operations use every item in the Sets list, in list order.\n"
+            "Difference subtracts the rest from the FIRST item.\n"
+            "The Objects list is only used by the operations that put objects into sets.")
         hint.setWordWrap(True)
         layout.addWidget(hint)
 
@@ -105,6 +121,23 @@ class SetTab(QWidget):
         for button in (self.btn_union, self.btn_intersection, self.btn_difference):
             button.setMinimumHeight(30)
             ops_layout.addWidget(button)
+
+        # ---- Sets x Objects (v01.05~) --------------------------------
+        # 위 세 버튼은 세트끼리의 연산이고, 여기부터는 **Objects 리스트와 엮는** 연산이다.
+        # 앞으로 이 자리에 연산이 더 붙는다.
+        ops_layout.addWidget(self._separator_label(
+            "Sets  x  Objects   (the list on the right)"))
+
+        self.btn_add_objects = QPushButton("Add Objects to Sets  ( obj -> Set )")
+        self.btn_add_objects.setMinimumHeight(30)
+        self.btn_add_objects.setToolTip(
+            "Put the objects of the Objects list into the sets of the Sets list.\n"
+            "  One set in the list : every object goes into that one set.\n"
+            "  Several sets        : row order, 1:1 - Objects[i] goes into Sets[i].\n"
+            "                        Different lengths run the shorter count.\n"
+            "Objects already in the set stay as they are. One undo step.")
+        self.btn_add_objects.clicked.connect(self.on_add_objects)
+        ops_layout.addWidget(self.btn_add_objects)
 
         layout.addWidget(ops_box)
 
@@ -152,6 +185,15 @@ class SetTab(QWidget):
         layout.addWidget(split_box)
 
         layout.addStretch(1)
+
+    def _separator_label(self, text):
+        """연산 묶음 사이에 넣는 작은 제목."""
+        label = QLabel(text)
+        font = label.font()
+        font.setBold(True)
+        label.setFont(font)
+        label.setAlignment(Qt.AlignCenter)
+        return label
 
     # ==================================================================
     # 로그
@@ -241,6 +283,17 @@ class SetTab(QWidget):
         self.captured = []
         self.capture_label.setText("S : not captured - the live scene selection will be used")
         self.log("Capture cleared.")
+
+    def on_add_objects(self):
+        """Objects 리스트의 오브젝트를 Sets 리스트의 세트에 넣는다 (v01.05~).
+
+        짝 규칙은 core `pair_objects_with_sets` - 세트가 하나면 전부 그 하나에,
+        여럿이면 행 순서로 1:1. 새 세트를 만들지 않으므로 `_report` 의 "결과를 리스트에
+        추가" 경로는 타지 않는다.
+        """
+        result = set_manager.run_add_objects_to_sets(
+            self._set_names(), self.tsl_objects.get_all_nodes())
+        self._report(result)
 
     def on_union(self):
         self._report(set_manager.run_union(self._set_names(), self._result_name("union_set")))

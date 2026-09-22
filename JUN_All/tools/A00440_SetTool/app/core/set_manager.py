@@ -234,6 +234,139 @@ def run_create_per_object(objects, suffix=maya_sets.SET_SUFFIX):
                     members=list(created))
 
 
+#: 여러 오브젝트를 한 세트로 묶을 때 이름을 안 주면 쓰는 이름.
+GROUP_SET_NAME = "objects" + maya_sets.SET_SUFFIX
+
+
+def run_create_one_set(objects, name=None):
+    """리스트의 오브젝트 **전부를 담은 세트 하나**를 만든다 (v01.05~).
+
+    `run_create_per_object` 와 짝이다 - 그쪽은 오브젝트마다 세트 하나(N 개),
+    이쪽은 **N 개를 담은 세트 하나**. 전체가 undo 한 스텝.
+
+    name 을 비우면 `objects_Set`. 준 이름도 `set_name_for` 로 다듬는다 - 마야가
+    이름을 조용히 고치거나(문자 치환) 네임스페이스 안에 세트를 만드는 것을 막는다.
+    """
+    objects = [o for o in (objects or []) if o]
+    if not objects:
+        return _fail("The list is empty. Add the objects to put in the set.")
+
+    warnings = []
+    missing = [o for o in objects if not cmds.objExists(o)]
+    if missing:
+        warnings.append("{0} item(s) are not in the scene and were skipped: {1}".format(
+            len(missing), ", ".join(missing)))
+    objects = [o for o in objects if cmds.objExists(o)]
+    if not objects:
+        return OpResult(False, "Nothing in the list is in the scene.", warnings=warnings)
+
+    wanted = maya_sets.set_name_for(name, suffix="") if name else GROUP_SET_NAME
+
+    with maya_sets.undo_chunk():
+        created = maya_sets.create_set(objects, wanted)
+
+    if created != wanted:
+        warnings.append("'{0}' was taken, so the new set is '{1}'.".format(wanted, created))
+
+    message = "Create  {0} object(s)  ->  one set '{1}'".format(len(objects), created)
+
+    return OpResult(True, message, created=created, warnings=warnings,
+                    created_many=[created], members=list(objects))
+
+
+def pair_objects_with_sets(set_names, objects):
+    """`(짝 목록, 메모 목록)` - Add 연산이 무엇을 어디에 넣을지 정하는 규칙.
+
+    규칙(요청 그대로):
+      - 세트가 **하나**면 그 하나에 **오브젝트 전부**를 넣는다.
+      - 세트가 여럿이면 **행 순서로 1:1** (`objects[i] -> sets[i]`).
+        개수가 다르면 **적은 쪽만큼**만 짝이 된다.
+
+    돌려주는 짝은 `[(세트, [오브젝트, ...]), ...]`.
+    """
+    notes = []
+
+    if not set_names or not objects:
+        return [], notes
+
+    if len(set_names) == 1:
+        return [(set_names[0], list(objects))], notes
+
+    count = min(len(set_names), len(objects))
+    if len(set_names) != len(objects):
+        notes.append(
+            "{0} set(s) and {1} object(s) - pairing the first {2} by row order.".format(
+                len(set_names), len(objects), count))
+
+    return [(set_names[i], [objects[i]]) for i in range(count)], notes
+
+
+def run_add_objects_to_sets(set_names, objects):
+    """리스트의 오브젝트를 리스트의 세트에 **넣는다** (v01.05~).
+
+    짝짓는 규칙은 `pair_objects_with_sets` - 세트가 하나면 전부 그 하나에,
+    여럿이면 행 순서로 1:1(개수가 다르면 적은 쪽만큼).
+
+    이미 그 세트에 들어 있는 것은 중복되지 않는다(마야가 무시한다). 몇 개가 새로 들어갔고
+    몇 개가 이미 있었는지 세어서 알린다 - 눌렀는데 아무 일도 안 일어난 것처럼 보이는 일이
+    없도록. 전체가 undo 한 스텝.
+    """
+    set_names = [s for s in (set_names or []) if s]
+    objects = [o for o in (objects or []) if o]
+
+    if not set_names:
+        return _fail("The Sets list is empty. Add the set(s) to put the objects in.")
+    if not objects:
+        return _fail("The Objects list is empty. Add the objects to put in the set(s).")
+
+    error, warnings = _validate_sets(set_names, minimum=1)
+    if error:
+        return _fail(error)
+
+    missing = [o for o in objects if not cmds.objExists(o)]
+    if missing:
+        warnings.append("{0} item(s) are not in the scene and were skipped: {1}".format(
+            len(missing), ", ".join(missing)))
+    objects = [o for o in objects if cmds.objExists(o)]
+    if not objects:
+        return OpResult(False, "Nothing in the Objects list is in the scene.",
+                        warnings=warnings)
+
+    pairs, notes = pair_objects_with_sets(set_names, objects)
+    warnings.extend(notes)
+
+    if not pairs:
+        return _fail("Nothing to add.")
+
+    detail = {}
+    added_total = 0
+    already_total = 0
+
+    with maya_sets.undo_chunk():
+        for set_name, members in pairs:
+            before = set(maya_sets.set_members(set_name))
+            fresh = [m for m in members
+                     if not set(maya_sets.canonicalize([m])) & before]
+            already = len(members) - len(fresh)
+
+            maya_sets.add_to_set(set_name, members)
+
+            detail[set_name] = list(members)
+            added_total += len(fresh)
+            already_total += already
+
+    message = "Add  {0} object(s)  ->  {1} : {2}".format(
+        len(objects), "1 set" if len(pairs) == 1 else "{0} sets".format(len(pairs)),
+        " , ".join("{0}[+{1}]".format(name, len(members))
+                   for name, members in pairs))
+
+    if already_total:
+        message += "  ({0} were already members)".format(already_total)
+
+    return OpResult(True, message, warnings=warnings, members=list(objects),
+                    detail=detail)
+
+
 def run_find_sets(objects, include_shapes=True, include_render=False,
                   include_parents=False, include_default=False):
     """리스트의 오브젝트들이 **속해 있는 세트를 전부** 찾는다. 씬은 건드리지 않는다.

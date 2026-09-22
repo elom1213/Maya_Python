@@ -31,6 +31,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-22 (오늘)
 
+> [!summary] A00440 **Create 에 "전부를 담은 세트 하나" 모드 + Edit 에 Objects 리스트·Add 연산** (v01.04->01.05)
+- 요청 둘: ① Create 탭에 **N 개를 담은 세트 하나**를 만드는 방식 추가(지금은 N 개 -> N 세트). ② **오브젝트를 원하는 세트의 원소로 넣는** 기능 — Edit 탭에 있으면 안내, 없으면 `Sets` 우측에 `Objects` TSL 을 만들고 `Set Operation` 에 버튼을 추가. **세트가 하나면 전부 그 하나에**, 여럿이면 1:1.
+- 먼저 확인: **Edit 탭에 그런 기능은 없었다**(∪ ∩ ∖ 와 Split 뿐이고 모두 *새 세트를 만드는* 연산이다). 그래서 요청대로 만들었다.
+- Create : `Mode` 라디오(`One set per object` 기본 = 원래 동작 / `One set for all`) + `Set Name` 칸(한 세트 모드에서만 켜짐). 이름은 per-object 와 **같은 규칙으로 다듬는다** — 경로·네임스페이스를 떼지 않으면 마야가 **그 네임스페이스 안에** 세트를 만든다(이 툴이 v01.01 에서 이미 겪은 함정).
+- Edit : `Sets` 오른쪽에 `Objects` TSL. `Set Operations` 안에 **`Sets x Objects`** 라는 작은 제목을 두고 그 아래 `Add Objects to Sets` — 앞으로 이 자리에 연산이 더 붙는다고 코드 주석에도 적었다.
+- 짝 규칙은 core 한 곳(`pair_objects_with_sets`)에 뒀다 — 세트가 하나면 전부 그 하나에, 여럿이면 행 순서 1:1, 개수가 다르면 적은 쪽만큼(로그에 몇 개인지). 이번 세션의 A00275 Transfer 1:1 과 같은 규칙이라 사용자가 두 툴에서 같은 것을 기대할 수 있다.
+- 이미 멤버인 오브젝트는 마야가 알아서 무시하므로 **"몇 개가 이미 있었다" 를 세어 로그에 적는다** — 안 그러면 눌렀는데 아무 일도 안 일어난 것처럼 보인다.
+- 검증: mayapy 2024 + 오프스크린 Qt **51항목 통과** — 한 세트 생성(기본 이름 · 타이핑 이름 · 네임스페이스 제거 · 이름 충돌 경고 · undo) · per-object 회귀 · 짝 규칙 5가지 · Add(단일/1:1/중복/기존 멤버 유지/컴포넌트 세트) · 방어 4종 · UI(모드 전환 · 이름 칸 활성 · 실제 클릭 · **Objects 가 Sets 오른쪽** · Union 에 Objects 가 섞이지 않는지). 마야 GUI 실기 확인은 사용자 몫. #A00440
+
 > [!summary] A00060_V03 **From Curve 에 `By Count`** — POCI parameter 0~1 등분 자리에 조인트 (v03.11->03.12)
 - 요청: `Create > From Curve` 에 **2 이상의 정수**를 넣는 UI 를 만들고, 그 수만큼 `Curve` TSL 의 커브마다 조인트 체인 생성. **3 이면 POCI 입력이 0 · 0.5 · 1.0 일 때와 같은 자리**. 기본은 체인이고, 체크박스를 끄면 자리마다 **따로** 조인트.
 - ★ **"POCI 와 같은 자리" 를 추측하지 않고 실측으로 맞췄다.** `pointOnCurveInfo`(`turnOnPercentage=1`) 노드 · `cmds.pointOnCurve(shape, pr=f, turnOnPercentage=True)` · `MFnNurbsCurve.getPointAtParam(kWorld)` 세 가지가 **같은 월드 좌표**를 주는지 먼저 확인했다 — 부모에 이동·회전·스케일이 걸린 커브, degree 1/3, 주기 커브 모두 일치. 그래서 명령 쪽을 쓰고, 검증 테스트는 **실제 POCI 노드를 만들어 좌표를 비교**한다.
