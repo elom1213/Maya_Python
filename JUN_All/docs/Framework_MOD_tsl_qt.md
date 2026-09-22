@@ -1,8 +1,8 @@
 ---
 title: 공용 리스트 위젯 (JUN_mod_tsl_qt) 사용법
-aliases: [MOD_tsl_qt, JUN_mod_tsl_qt, TSL 위젯, 공용 TSL]
+aliases: [MOD_tsl_qt, JUN_mod_tsl_qt, TSL 위젯, 공용 TSL, (Null), 자리표시]
 tags: [maya-python, framework, widget, tsl, selection-order]
-updated: 2026-08-18
+updated: 2026-09-22
 ---
 
 # 공용 리스트 위젯 `JUN_mod_tsl_qt_v01`
@@ -193,6 +193,35 @@ Order 가 꺼진 상태를 **조용히 넘기지 말고 로그로 알리는 것*
 | `A00400_CurveTool` | 커브 CV·방향 순서 |
 | `A00110_animTool` (Stagger Offset) | 리스트 순서 = 스태거 단계 |
 | `A00090_ConnectionBuilder` / `A00145_RigConnect` | n→n 페어링에서 Source↔Target 짝 |
+
+---
+
+## 3-1. `(Null)` 자리표시는 **빨간 글씨** (2026-09-22~)
+
+리스트에 **`(Null)`** 이 그대로 들어오면 그 행을 빨갛게 칠하고 툴팁을 붙인다. 툴은 아무것도
+하지 않는다 - `set_items` · `append_unique` 등 **채우는 모든 경로**에서 자동으로 칠한다.
+
+```python
+tsl.set_items(["ctl_l_arm", "(Null)", "ctl_spine"])   # 가운데 줄만 빨강
+```
+
+**왜 표식이 남아 있나** — 순서로 짝을 맺는 기능(A00145 의 `Pair` · `Connect > Match`,
+A00275 의 Transfer 1:1 …)에서 **짝이 없는 자리를 지우면 그 뒤가 한 칸씩 밀려 엉뚱한 것끼리
+이어진다.** 게다가 연결 자체는 성공하므로 **에러도 나지 않는다.** 그래서 자리를 표식으로
+잡아 두고, 실행 직전에 양쪽에서 함께 뺀다. 남아 있는 표식은 **실제 노드가 아니므로** 눈에
+띄어야 한다.
+
+| 이름 | 뜻 |
+|------|-----|
+| `NULL_ITEM_TEXTS` | 자리표시로 볼 텍스트들. 기본 `("(Null)",)` |
+| `tsl.null_texts` | 인스턴스마다 바꿀 수 있다(다른 표식을 쓰는 툴). |
+| `null_item_color()` | 쓰는 빨강. 공용 [`log_levels`](Framework_log_levels.md) 의 실패 색과 같고 **테마(밝은/어두운)에 맞춰** 고른다 |
+| `mark_null_items(list_widget, texts=None, tooltip=None)` | **TSL 을 거치지 않고** `addItems` 로 직접 채운 리스트에 같은 규칙을 거는 모듈 함수 |
+| `tsl.mark_null_rows()` | 그 인스턴스의 리스트를 다시 칠한다(직접 채웠을 때) |
+
+- 색은 [`Framework.core.log_levels`](Framework_log_levels.md) 에서 가져온다 - 저장소의 빨강이
+  한 곳에서 정해지고, 밝은 테마에서도 읽힌다.
+- 리스트를 다시 채우면 칠도 함께 사라진다(항목이 새로 만들어지므로).
 
 ---
 

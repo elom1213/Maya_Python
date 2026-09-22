@@ -3611,17 +3611,18 @@ class MainWindow(QWidget):
                                matches, unmatched, unique, min_score, match_only)
 
     def _mark_null_rows(self, list_widget):
-        """(Null) 자리를 흐리게 칠한다 — 실제 어트리뷰트가 아니라는 신호."""
-        brush = QBrush(QColor(150, 150, 150))
-        for row in range(list_widget.count()):
-            item = list_widget.item(row)
-            if item.text() != attr_match.NULL_TARGET:
-                continue
-            item.setForeground(brush)
-            item.setToolTip(
-                "The matching source attribute has no counterpart here.\n"
-                "This row only holds the pairing order - it is skipped when "
-                "connecting.")
+        """`(Null)` 자리를 **빨갛게** 칠한다 - 실제 어트리뷰트가 아니라는 신호.
+
+        이 리스트는 TSL 을 거치지 않고 `addItems` 로 직접 채우므로(위 `_match_destination`),
+        공용 TSL 이 자동으로 칠해 주는 경로를 타지 않는다. 그래서 같은 규칙을 **공용 함수**로
+        직접 부른다 - 색이 툴마다 달라지지 않게(`Framework.qt.MOD_tsl_qt_v01`).
+        """
+        return JUN_mod_tsl_qt.mark_null_items(
+            list_widget,
+            texts=(attr_match.NULL_TARGET,),
+            tooltip=("The matching source attribute has no counterpart here.\n"
+                     "This row only holds the pairing order - it is skipped when "
+                     "connecting."))
 
     def _log_match_result(self, label, exact, sources, candidates,
                           matches, unmatched, unique, min_score, match_only):

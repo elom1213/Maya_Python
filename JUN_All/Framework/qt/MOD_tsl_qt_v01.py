@@ -219,6 +219,60 @@ def _uuid_of(name):
     return (found[0], comp) if len(found) == 1 else (None, "")
 
 
+#: 짝이 없는 자리를 채우는 **자리표시 텍스트**. 리스트에 이 글자가 그대로 들어오면
+#: 빨간 글씨로 그린다 - 실제 노드가 아니라 "여기는 짝이 없다" 는 표식이기 때문이다.
+#:
+#: 자리를 비우지 않고 표식으로 채우는 것은 이 저장소의 관례다(A00145 의 Pair · Connect 매칭).
+#: 순서로 짝을 맺는 기능에서 빈 자리를 지우면 **그 뒤가 한 칸씩 밀려 엉뚱한 것끼리 이어지는데,
+#: 연결은 성공하므로 에러도 나지 않는다.** 그래서 표식이 남고, 남은 표식은 눈에 띄어야 한다.
+NULL_ITEM_TEXTS = ("(Null)",)
+
+#: 자리표시에 쓸 빨강. 테마(밝은/어두운)에 맞춰 공용 규칙에서 가져오고,
+#: 그쪽을 못 읽으면 어두운 테마용 값을 쓴다.
+NULL_ITEM_FALLBACK_COLOR = "#ff6b6b"
+
+NULL_ITEM_TOOLTIP = ("A placeholder, not a real item - this row has no counterpart.\n"
+                     "It is only here to keep the pairing order, and the tool skips it.")
+
+
+def null_item_color():
+    """자리표시 글자색 (`Framework.core.log_levels` 의 실패 색과 같은 빨강)."""
+    try:
+        from Framework.core import log_levels
+        from Framework.themes.theme_manager import ThemeManager
+        color = log_levels.color("ERROR", ThemeManager.is_dark_theme())
+        if color:
+            return color
+    except Exception:                                      # noqa: BLE001
+        pass
+    return NULL_ITEM_FALLBACK_COLOR
+
+
+def mark_null_items(list_widget, texts=None, tooltip=None):
+    """리스트 위젯에서 자리표시 행을 **빨갛게** 칠한다.
+
+    TSL 을 거치지 않고 `addItems` 로 직접 채우는 툴도 같은 규칙을 쓸 수 있도록
+    모듈 함수로 둔다(A00145 의 Connect > Match 가 그렇다).
+    """
+    if list_widget is None:
+        return 0
+
+    wanted = tuple(texts or NULL_ITEM_TEXTS)
+    brush = QBrush(QColor(null_item_color()))
+    painted = 0
+
+    for row in range(list_widget.count()):
+        item = list_widget.item(row)
+        if item is None or item.text() not in wanted:
+            continue
+        item.setForeground(brush)
+        if not item.toolTip():
+            item.setToolTip(tooltip or NULL_ITEM_TOOLTIP)
+        painted += 1
+
+    return painted
+
+
 class JUN_mod_tsl_qt_v01(QWidget):
 
     def __init__(self, title="List",
@@ -260,6 +314,9 @@ class JUN_mod_tsl_qt_v01(QWidget):
         self.list_limit = int(list_limit or 0)
         # 중복 안내 등 메시지를 출력할 콜백. None 이면 print 사용(툴 로그창에 연결 가능).
         self.log_callback = log_callback
+
+        # 빨갛게 칠할 자리표시 텍스트. 다른 표식을 쓰는 툴은 생성 뒤 이 값을 바꾼다.
+        self.null_texts = tuple(NULL_ITEM_TEXTS)
 
         # 순서 추적 상태(체크박스가 없어도 set_order_tracking 으로 켤 수 있다).
         # dict 로 두는 이유: destroyed 슬롯이 self 를 붙잡지 않도록 이 홀더만 캡처시킨다
@@ -544,6 +601,13 @@ class JUN_mod_tsl_qt_v01(QWidget):
             return len(self._deferred)
         return self.list_widget.count()
 
+    def mark_null_rows(self):
+        """자리표시 행을 빨갛게 칠한다. 채우는 경로에서 자동으로 불린다.
+
+        툴이 `list_widget` 을 직접 채웠을 때는 이걸 손으로 부르면 된다.
+        """
+        return mark_null_items(self.list_widget, self.null_texts)
+
     def clear(self):
         self._deferred = None
         self.list_widget.clear()
@@ -586,6 +650,7 @@ class JUN_mod_tsl_qt_v01(QWidget):
             self.list_widget.addItems(texts)
             self._attach_uuids(texts)
         self.list_widget.blockSignals(False)
+        self.mark_null_rows()
         self._sync_summary()
         self._update_number()
 
@@ -660,6 +725,9 @@ class JUN_mod_tsl_qt_v01(QWidget):
             if uuid:
                 item.setData(UUID_ROLE, (uuid, comp))
         self.list_widget.addItem(item)
+        if text in self.null_texts:
+            item.setForeground(QBrush(QColor(null_item_color())))
+            item.setToolTip(NULL_ITEM_TOOLTIP)
         return item
 
     def _attach_uuids(self, texts, offset=0):
@@ -744,6 +812,7 @@ class JUN_mod_tsl_qt_v01(QWidget):
         self.list_widget.clear()
         if records:
             self.list_widget.addItems([text for text, _ in records])
+            self.mark_null_rows()
             for i, (_text, data) in enumerate(records):
                 if data:
                     self.list_widget.item(i).setData(UUID_ROLE, data)

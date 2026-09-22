@@ -75,7 +75,7 @@
 - [zero-arg super after reload](reload-stale-instance-super.md) — Framework 클래스는 `super()` 만, `super(Class, self)` 는 reload 뒤 옛 인스턴스에서 TypeError
 - [control shapes](framework-control-shapes.md) — 컨트롤러 커브 셰이프 34종 공용 json(좌표 반올림 금지)
 
-- TSL — [UUID selection](wip-tsl-uuid-selection.md)((uuid, component) 보관) · [attach_uuids](framework-tsl-attach-uuids.md)(씬 노드 아닌 리스트는 False) · [list_limit summary](framework-tsl-list-limit.md)(500+ 요약) · [max-height squeezes buttons](tsl-widget-max-height-squeezes-buttons.md)(`list_widget` 에만) · [selection order](tsl-selection-order.md)(`trackSelectionOrder` 꺼지면 `ls(os)` 도 인덱스 순) · [select_no_expand](wip-a00440-find-tab.md)(세트를 담은 리스트는 켤 것 — 안 켜면 행 클릭이 멤버를 고른다)
+- TSL — [(Null) is red](framework-tsl-null-placeholder-red.md)(자리표시 행은 빨간 글씨 · 직접 addItems 한 리스트는 `mark_null_items()` 를 부를 것) · [UUID selection](wip-tsl-uuid-selection.md)((uuid, component) 보관) · [attach_uuids](framework-tsl-attach-uuids.md)(씬 노드 아닌 리스트는 False) · [list_limit summary](framework-tsl-list-limit.md)(500+ 요약) · [max-height squeezes buttons](tsl-widget-max-height-squeezes-buttons.md)(`list_widget` 에만) · [selection order](tsl-selection-order.md)(`trackSelectionOrder` 꺼지면 `ls(os)` 도 인덱스 순) · [select_no_expand](wip-a00440-find-tab.md)(세트를 담은 리스트는 켤 것 — 안 켜면 행 클릭이 멤버를 고른다)
 - [Menu bar + common items](framework-menubar-widget.md) — 공통 메뉴 항목은 `tool_menu.COMMON_MENUS` 한 줄(42 PySide + 7 cmds 툴), PySide2 `action.menu()` 가 QMenu 를 지운다
 - [Sub-tabs over collapsibles](prefer-subtabs-over-stacked-collapsibles.md) — 섹션 3~4개 넘으면 중첩 탭
 - [checkList behavior](framework-checklist-behavior.md) — 체크박스 QListWidget 다중 선택+다중 체크는 `JUN_mod_checkList_qt_v01(lw)` 한 줄 (eventFilter 직접 짜지 말 것)

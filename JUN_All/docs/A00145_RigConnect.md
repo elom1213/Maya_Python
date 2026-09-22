@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.53` (`app/config/version.py`) — Match 에 **`Keep Children in Place`**(기본 OFF):
+- 버전: `v01.54` (`app/config/version.py`) — 리스트의 **`(Null)` 자리표시를 빨간 글씨로**(공용 TSL, 아래 메모) · v01.53 은 Match 에 **`Keep Children in Place`**(기본 OFF):
   팔로워만 움직이고 **그 아래 오브젝트는 있던 월드 자리에 그대로** 둔다. Mirror 탭의 같은 이름
   체크박스와 **같은 코어**(`app/core/keep_children.py`)를 쓴다 (§Match)
   · v01.52 는 Attribute 가 만든 어트리뷰트는 **반드시 채널 박스에
@@ -82,6 +82,11 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 - 원본 `A00140_ConnectClosest` / MEL 파일은 그대로 보존(미수정)
 
 ---
+
+> **`(Null)` 자리는 빨간 글씨다** (v01.54~) — 짝이 없는 자리를 지우지 않고 표식으로
+> 잡아 두는 기능(`Pair` · `Connect > Match`)에서, 남은 표식은 **실제 노드가 아니다**.
+> 칠하는 것은 공용 TSL 위젯이라 다른 툴의 리스트에서도 같은 색으로 보인다
+> ([Framework_MOD_tsl_qt](Framework_MOD_tsl_qt.md) §3-1).
 
 ## 1. 설치 / 실행
 
