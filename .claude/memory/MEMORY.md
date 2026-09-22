@@ -17,6 +17,7 @@
 - [Release layout & launch.py](release-layout-launch-py.md) — 릴리즈본은 Framework 를 툴 안에 동봉하고 `config.py`/`dev` 가 없다, launch.py 가 두 배치를 구분해야 남의 PC 에서 열린다
 - [Release install scripts](release-install-scripts.md) — userSetup 은 이름이 고정(`userSetup_001.py` 는 안 읽힌다) · git 출력은 UTF-8 인데 콘솔은 cp949, 둘 다 고쳐야
 - [Update portfolio on tool work](update-portfolio-on-tool-work.md) — portfolio EN/KR 동기, 커밋 통계 건드리지 않기
+- [Launcher buttons follow current version](launcher-buttons-follow-current-version.md) — 새 버전 폴더를 만들면 A00370 프로파일 버튼도 옮길 것 (옛 폴더를 가리켜도 에러가 안 난다)
 - [Prefer PySide for new tools](prefer-pyside-for-new-tools.md) — 신규 툴은 PySide(arch B)
 - [kangaroo plugin read-only](kangaroo-plugin-external-readonly.md) — 외부 플러그인, 수정 금지
 - [PoseWrangler fork patch](posewrangler-plugin-fork-patch.md) — 포크 위치 + serializer objExists 패치

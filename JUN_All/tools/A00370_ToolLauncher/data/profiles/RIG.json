@@ -4,8 +4,8 @@
       "name": "Main",
       "buttons": [
         {
-          "name": "jointTool_V02",
-          "path": "tools/A00060_jointTool_V02"
+          "name": "jointTool_V03",
+          "path": "tools/A00060_jointTool_V03"
         },
         {
           "name": "RigConnect",

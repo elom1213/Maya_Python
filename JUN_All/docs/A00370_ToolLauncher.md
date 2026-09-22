@@ -5,7 +5,7 @@
 `A00340_SelectionTool` 과 UI·기능(카테고리 / 프로파일 / 버튼 색)은 거의 같고, 버튼을
 누르면 **오브젝트 선택** 대신 **지정한 툴이 실행**되는 점만 다르다.
 
-- **버전**: v01.03 (2026-07-13)
+- **버전**: v01.07 (2026-09-22 — 기본 프로파일의 버튼을 현행 툴로 정리, 아래 "기본 프로파일")
 - **아키텍처**: (B) Standalone/Qt 앱형 구조지만 마야 안에서 실행(PySide, `maya.cmds`).
 - **참고**: 프로파일/카테고리/색/레이아웃은 `A00340_SelectionTool` 을 이식.
   버튼 클릭이 툴을 실행하는 로직은 `app/core/tool_launcher.py`.
@@ -144,6 +144,38 @@ JUN_All 루트로 resolve 한다.
 > **git 추적 범위**: 프로파일(`data/profiles/*.json`, 버튼 세트)은 상대경로라 PC 간 동일하므로
 > **계속 추적·공유**한다. PC별 상태인 `data/local_env.json`(루트 오버라이드)와
 > `data/active.json`(마지막 연 프로파일)은 **gitignore** 되어 추적하지 않는다.
+
+### 8-1) 기본으로 딸려 오는 프로파일 (2026-09-22 기준)
+
+프로파일은 git 으로 공유되므로 **저장소에 들어 있는 버튼 세트가 곧 모든 PC 의 기본값**이다.
+
+| 프로파일 | 버튼 |
+|---|---|
+| `ANIM` | AnimTool_V02 · FKIK |
+| `Mesh` | MeshTool · uvTool_V02 · abSymMesh · BSTool_V02 |
+| `RIG` | jointTool_V03 · RigConnect · driverTool · skinMigrate · SkinTool_V01 |
+| `UE` | KWI_creator_V03 · ConstraintConverter · ArrayCreator |
+| `Default` | (비어 있음) |
+
+> [!warning] 버튼은 **현행 버전 폴더**를 가리켜야 한다
+> 이 저장소는 새 버전을 **새 폴더**(`_V02`, `_V03`)로 만들고 옛 폴더를 지우지 않는다.
+> 그래서 버튼은 가만히 두면 **옛 폴더를 계속 가리킨 채로 남는다** — 링크가 깨지지 않으니
+> 아무 에러도 안 나고, 사용자만 옛 툴을 쓰게 된다. **툴에 새 버전을 만들면 여기 버튼도 함께 옮긴다.**
+>
+> 2026-09-22 에 밀린 것 다섯 개를 정리했다.
+>
+> | 프로파일 | 버튼 | 전 | 후 |
+> |---|---|---|---|
+> | Mesh | meshDoctor | `A00300_meshDoctor` | **삭제** — [`A00380_MeshTool`](A00380_MeshTool.md) 의 MeshDoctor 탭으로 이식됨(MeshTool 버튼이 이미 있다) |
+> | Mesh | uvTool | `A00050_uvTool` | `A00050_uvTool_V02` |
+> | Mesh | BSTool | `A00290_BSTool` | `A00290_BSTool_V02` |
+> | ANIM | AnimTool | `A00110_animTool` | `A00110_animTool_V02` |
+> | RIG | jointTool_V02 | `A00060_jointTool_V02` | `A00060_jointTool_V03` |
+>
+> **"더 새 폴더가 있다" 만으로 옛 툴이라고 판단하지 않았다.** 각 툴의 문서·메모가
+> 후속 버전을 현행으로 적고 있는 것만 골랐다(예: A00110 은 "이후 작업은 V02 에서 한다",
+> docs/README 는 `A00060_jointTool_V02` 를 "탭 재분류 전 · 보존" 으로 적는다).
+> 버튼 이름에도 버전을 붙여(`uvTool_V02`) 어느 쪽을 여는지 화면에서 보이게 했다.
 
 ### 9) 레이아웃 / 기타
 - 컨트롤 패널과 버튼 영역 사이의 **스플리터**를 드래그해 비율 조절.

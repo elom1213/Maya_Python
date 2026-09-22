@@ -8,20 +8,16 @@
           "path": "tools/A00380_MeshTool"
         },
         {
-          "name": "uvTool",
-          "path": "tools/A00050_uvTool"
-        },
-        {
-          "name": "meshDoctor",
-          "path": "tools/A00300_meshDoctor"
+          "name": "uvTool_V02",
+          "path": "tools/A00050_uvTool_V02"
         },
         {
           "name": "abSymMesh",
           "path": "tools/A00180_abSymMesh"
         },
         {
-          "name": "BSTool",
-          "path": "tools/A00290_BSTool"
+          "name": "BSTool_V02",
+          "path": "tools/A00290_BSTool_V02"
         }
       ]
     }

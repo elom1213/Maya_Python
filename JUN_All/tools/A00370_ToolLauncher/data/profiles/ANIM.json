@@ -4,8 +4,8 @@
       "name": "Main",
       "buttons": [
         {
-          "name": "AnimTool",
-          "path": "tools/A00110_animTool"
+          "name": "AnimTool_V02",
+          "path": "tools/A00110_animTool_V02"
         },
         {
           "name": "FKIK",
