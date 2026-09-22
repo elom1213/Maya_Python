@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # 작업 일지 (WORKLOG)
@@ -29,7 +29,21 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-09-21 (오늘)
+## 2026-09-22 (오늘)
+
+> [!summary] **남의 PC 에서 설치·드롭이 깨지던 것 세 가지** — 셸프 구분선 · userSetup 이름 · git 출력 인코딩
+- 다른 PC 에서 두 증상이 보고됐고, 파고들다 **세 번째(설치가 조용히 무효가 되는 것)** 를 같이 찾았다. 계획서: [`plans/release_install_dragdrop_fix_plan.md`](plans/release_install_dragdrop_fix_plan.md).
+- **B. 드롭 설치가 `Object 'separator21' not found` 로 죽는다** — 중복 버튼 제거 루프가 `childArray` 가 준 **모든 자식**에 `shelfButton` 질의를 했다. 셸프에는 버튼만 있는 게 아니라 **구분선(separator)** 도 있다. ★ **구분선을 안 쓰는 셸프에서는 영영 재현되지 않는다** — "내 마야에서 되니까" 가 통하지 않는 종류다. 드롭 파일 **55개 전부**가 같은 코드였고 방어는 0개. `try` / `except RuntimeError: continue` 로 일괄 수정.
+- **C. ★ 설치가 조용히 무효가 된다** — `setup_app_dir.py` 가 덮어쓰기를 피하려고 `userSetup_001.py`, `_002.py` … 로 번호를 붙여 왔는데 **마야는 `userSetup.py` 라는 이름만 실행한다.** 즉 **두 번째 설치부터 경로 등록이 전혀 안 되면서** "Install Complete" 라고 말했다. 보고 로그의 `userSetup_004.py` 가 그 증거고, **이 PC 에도 `userSetup_001.py` 가 죽은 채로 있었다.** → 표식 블록(`# >>> JUN TOOLS >>>`)만 갈아 끼우는 방식으로 바꿨다. 사용자가 쓴 내용은 보존 · 몇 번을 돌려도 같은 결과 · 저장소를 옮기면 경로 갱신.
+- **A. `install.bat` 의 `UnicodeDecodeError`** — `subprocess.run(..., text=True)` 가 **로케일(cp949)** 로 디코딩하는데 git 은 **UTF-8** 로 낸다. 어제 올린 한글 커밋 제목(릴리즈 저장소의 첫 한글 제목)에서 터졌다. ★ 예외가 **리더 스레드**에서 나므로 `run()` 은 조용히 `stdout=None` 을 돌려주고 "Update Complete" 까지 갔다 — **진짜 실패해도 똑같이 조용했다**. ★ 읽기만 고치면 안 된다 — 콘솔도 cp949 라 `print` 에서 `UnicodeEncodeError('—')` 가 또 난다(내 테스트 스크립트가 같은 함정에 걸려서 알았다). 읽기 `encoding="utf-8"` + `sys.stdout.reconfigure()` 둘 다. 종료 코드도 보고 `install.bat` 이 실패 시 멈추게 했다.
+- ★ **고친 `update.py` 는 다음 업데이트부터 듣는다** — `install.bat` 은 클론 안의 **옛** `update.py` 로 돈다. 임시 클론 실험에서 `reset --hard` 가 미커밋 새 파일을 되돌려 옛 코드가 실행되는 것으로 직접 확인했다. → 앞으로 **릴리즈 저장소 커밋 제목은 ASCII** 로 쓴다.
+- 검증: 드롭 파일은 `maya.cmds` 대역으로 구분선 섞인 셸프를 흉내 내 **55/55 통과**(옛 파일로 같은 테스트를 돌려 실제로 실패하는 것까지 확인) · `setup_app_dir.py` 는 임시 폴더 5가지 경우 **17항목 통과** · `update.py` 는 한글 제목 클론에서 증상 재현 후 통과 + 원격이 죽었을 때 exit 1.
+- ※ 드롭의 **최종 확인은 마야 GUI 가 필요**하다(`shelfLayout` 은 GUI 전용). 구분선을 넣은 셸프에 실제로 드롭해 보는 것은 아직 안 했다.
+- 규약은 [`Release_Layout.md`](Release_Layout.md) §5(드롭 파일) · §6(설치 스크립트)에 적었다. #dragDrop #release
+
+---
+
+## 2026-09-21
 
 > [!summary] A00470 **Profile 콤보의 기본값을 `Set_v001`** 로 (v01.08->01.09)
 - 요청: Profile 의 `Set_v001` 이 기본 규칙으로 보이게.

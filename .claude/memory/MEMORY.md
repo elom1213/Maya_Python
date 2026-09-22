@@ -15,6 +15,7 @@
 - [Docs go in JUN_All/docs](docs-go-in-jun-all-docs.md) — 분석/설명 문서 위치
 - [release_builder_QT](wip-release-builder-qt.md) — 릴리즈 복사 개발툴(dev/), v01.02 필터 · 공용 로그창 · 아이콘
 - [Release layout & launch.py](release-layout-launch-py.md) — 릴리즈본은 Framework 를 툴 안에 동봉하고 `config.py`/`dev` 가 없다, launch.py 가 두 배치를 구분해야 남의 PC 에서 열린다
+- [Release install scripts](release-install-scripts.md) — userSetup 은 이름이 고정(`userSetup_001.py` 는 안 읽힌다) · git 출력은 UTF-8 인데 콘솔은 cp949, 둘 다 고쳐야
 - [Update portfolio on tool work](update-portfolio-on-tool-work.md) — portfolio EN/KR 동기, 커밋 통계 건드리지 않기
 - [Prefer PySide for new tools](prefer-pyside-for-new-tools.md) — 신규 툴은 PySide(arch B)
 - [kangaroo plugin read-only](kangaroo-plugin-external-readonly.md) — 외부 플러그인, 수정 금지
@@ -64,6 +65,7 @@
 - [standalone app package collision](standalone-app-package-collision.md) — `tools.<tool>.app.*` 로 import
 - icons — [New tool needs icon](new-tool-needs-icon.md)(svg+png 32px) · [Standalone taskbar icon](standalone-taskbar-icon-method.md)(다중크기 .ico + AppUserModelID)
 - [Pin for maya.cmds tools](pin-for-maya-cmds-tools.md) — maya_ui_widget() + WindowStaysOnTopHint
+- [shelf childArray has separators](shelf-childarray-has-separators.md) — 구분선에 `shelfButton` 질의는 RuntimeError, 드롭 설치가 죽는다 (구분선 없는 셸프에선 재현 안 됨)
 
 ## 공용 위젯 · 프레임워크
 

@@ -71,7 +71,12 @@ def install_shelf_button():
 
     for btn in shelf_buttons:
 
-        cmd = cmds.shelfButton(btn, q=True, command=True)
+        # childArray 는 버튼 말고 구분선(separator) 등도 준다.
+        # shelfButton 이 아닌 것에 shelfButton 질의를 하면 RuntimeError 가 난다.
+        try:
+            cmd = cmds.shelfButton(btn, q=True, command=True)
+        except RuntimeError:
+            continue
 
         if "A00030_quickTool.run(True)" in str(cmd):
 
