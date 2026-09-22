@@ -1,5 +1,26 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.31 (2026-09-22)
+
+- **[Feature] `Weights > Smooth` 신규 — Kangaroo `SkinCluster > Smooth` 를 플러그인 없이 이식했다.**
+  선택한 버텍스마다 `new = (자기 + 이웃들) / (1 + 이웃 수)` 를 `Iterations` 번 돌린다.
+  **이웃은 선택 밖에 있어도 읽되 값은 바뀌지 않는다**(원본 규칙) — 선택 덩어리의 가장자리가
+  튀지 않는 이유다. 한 iteration 안에서는 전부 옛 값으로 계산해(Jacobi) 버텍스 순서가
+  결과를 바꾸지 않는다.
+  - 옮긴 옵션(원본 인자와 1:1) : `Iterations`(`iIterations`) · `Blend`(`fBlend`) ·
+    `Rigid`(`fRigid`) · `Keep Value One`(`bKeepValueOne`) · `Joint Locks` 4모드
+    (`iJointLocks`) · `Border Edges` 3모드 + `Border Mask Steps`(`iBorderEdges` ·
+    `iSmoothBorderMask`) · `Loop Curve`(`sLoopCurve`) · `SkinCluster`
+    (`sChooseSkinCluster`) · 소프트 셀렉션 falloff.
+  - **옮기지 않은 것** : `bBarycentricWeighted`(원본이 실험 중이라고 적어 둔 경로) ·
+    `xDistanceMeshes` · `sSphereMasks` · `xClosestToCurve`(SkinCluster 탭 전체가 쓰는
+    마스크로 Smooth 만의 것이 아니고, kangaroo 의 `kt_findClosestPoints` 명령을 쓴다).
+  - **웨이트 쓰기는 구간 `setAttr`** — `MFnSkinCluster.setWeights` 는 undo 에 안 남는다.
+    스무딩은 눌러 보고 Ctrl+Z 하는 기능이라 undo 가 없으면 못 쓴다. 바뀌는 버텍스만 쓴다.
+  - numpy 가 있으면 numpy, 없으면 같은 식의 순수 파이썬 경로(두 경로 결과 일치를 테스트로 고정).
+    14,641 버텍스 x 3 인플루언스 x 4 iteration = **0.4초**.
+  - 검증: mayapy 2024 **코어 53항목 + UI 38항목 통과**.
+
 ## v01.30 (2026-09-21)
 
 - **[Fix] Bind > Bind Pose — `Update Bind Pose` 가 마야를 내리던 것을 고쳤다.**

@@ -1,8 +1,8 @@
 ---
 title: A00275_skinTool_V01 사용법
-aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose, Move Joints, Edit Mesh, Expand Bind]
+aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose, Move Joints, Edit Mesh, Expand Bind, Smooth Weights]
 tags: [maya-python, tool-guide, skin, skincluster, bind-pose, rigging]
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # A00275_skinTool_V01 사용법
@@ -10,7 +10,7 @@ updated: 2026-09-21
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
+- **버전**: `app/config/version.py` (v01.31 — **`Weights > Smooth`** 신규: Kangaroo `SkinCluster > Smooth` 이식(플러그인 무의존) · v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
   (v01.22 는 아래 레이어 lock 이 사라졌다) · v01.22 — **`Weights > Layer`** 신규: 버텍스 순서가 같은 메시 N 개의
   웨이트를 메시마다 lock + Blend 로 레이어처럼 합성해 새 메시로 만들거나 기존 메시를 갱신 · v01.15 — **탭 재분류**:
   평평한 탭 7개를 `카테고리 3 → 기능 7` 의 2단 구조로, 아래 표)
@@ -26,6 +26,7 @@ updated: 2026-09-21
 | 〃 | 〃 | **Transfer** (v01.04~) | **여러 소스 메시 → 현재 선택한 하나의 메시**로 웨이트 전이. **Engine(Native/Kangaroo) 선택**(v01.05~). 선택 버텍스에만/소프트 falloff 반영(Native) |
 | 〃 | 〃 | **Migrate A -> B** | 토폴로지가 다른 두 메시 사이 Transfer + Move 통합 마이그레이션 |
 | 〃 | 〃 | **Copy Weights** (v01.17~) | **같은 메시 안에서** 버텍스 → 버텍스로 웨이트 복사. 목표마다 가장 가까운 소스 버텍스의 웨이트 행을 베낀다. 최근접 기준은 **Surface / Topology / Volume**, 실리는 정도는 **`Blend` 0~1**(v01.18~) |
+| 〃 | 〃 | **Smooth** (v01.31~) | 선택 버텍스의 웨이트를 **이웃과 평균**해 매끄럽게. Kangaroo `SkinCluster > Smooth` 이식 — `Iterations` · `Blend` · `Rigid` · `Keep Value One` · `Joint Locks`(4) · `Border Edges`(3) + `Border Mask Steps` · `Loop Curve` · 소프트 셀렉션 falloff |
 | **Bind** | 바인드를 새로 만들거나 바인드 상태를 갱신한다 | **Bind Pose** | **조인트를 이동·회전한 현재 상태를 새 바인드 포즈로** |
 | 〃 | 〃 | **Expand Bind** (v01.09~) | 저장한 버텍스 집합 → 저장한 조인트들에 바인드. 조인트 사이가 **엣지 길이에 비례해 고르게** 분배 (Kangaroo `ClosestExpand` 대체). **엣지 루프 입력**(v01.10~)으로 밴드 전체가 루프와 같은 비율 유지, **Even distribution**(v01.16~)으로 간격·폭이 제각각이어도 같은 분배 + 조인트 버텍스 웨이트 1 |
 | **Edit** | **웨이트를 그대로 둔 채** 리그를 고친다 (Edit 토글) | **Move Joints** (v01.08~) | 켜면 조인트를 옮겨도 메시가 변형되지 않고, 다시 끄면 그 자리에서 재바인드. **웨이트 불변** |
@@ -316,6 +317,96 @@ lock 이 있는 레이어마다 (아래 -> 위):
   (인덱스가 듬성한 skinCluster, 기존 인플루언스 0, **undo 로 이전 웨이트 정확 복원**), 공유 조인트 합산, 에러 5종.
   UI 33항목 — 실제 마우스 클릭으로 Shift/Ctrl 선택, Lock 칸 다중 토글과 선택 유지, Space, 필터, Blend 동기,
   Create/Update Merge, Up/Down 시 base 표시.
+
+
+---
+
+## Weights > Smooth — 이웃과 평균해 매끄럽게 (v01.31~)
+
+Kangaroo `SkinCluster > Smooth` 를 **플러그인 없이** 옮긴 탭이다. 코어
+`app/core/weight_smooth_manager.py`, 화면 `app/ui/smooth_tab.py`.
+
+식은 원본과 같다 — 선택한 버텍스마다
+
+    new[v] = ( w[v] + Σ w[이웃] ) / (1 + 이웃 수)
+
+를 `Iterations` 번 돌린다.
+
+- **이웃은 선택 밖에 있어도 읽는다. 대신 값이 바뀌는 것은 선택한 버텍스뿐이다.**
+  그래서 선택 덩어리의 가장자리가 바깥과 어긋나 튀지 않는다(원본과 같은 규칙).
+- 한 iteration 안에서는 **전부 옛 값으로** 계산한다(Jacobi). 버텍스 번호 순서가 결과를 바꾸지 않는다.
+- 행의 합이 1 이면 평균도 1 이다 — **정규화가 따로 필요 없다**(`Rigid` 만 예외로 다시 정규화한다).
+
+### 사용법
+
+1. 씬에서 **버텍스를 고른다**(엣지·페이스도 버텍스로 바뀐다). 메시 자체를 고르면 전체가 대상이고,
+   여러 메시를 함께 골라도 된다. `Refresh` 로 지금 선택과 skinCluster 목록을 다시 읽는다.
+2. 옵션을 정하고 **`Smooth`**. **한 번 누르면 undo 한 스텝**이다(Ctrl+Z 로 웨이트가 돌아온다).
+3. 같은 선택에 여러 번 눌러 가며 원하는 만큼 풀어 준다. `Reset Options` 는 전부 기본값으로.
+
+### 옵션 (전부 원본 인자와 1:1)
+
+| 칸 | 원본 | 뜻 |
+|----|------|-----|
+| **Iterations** | `iIterations` | 평균을 몇 번. 한 번마다 엣지 한 칸씩 번진다(기본 4) |
+| **Blend** | `fBlend` | 결과를 얼마나 실을지. `1.0` 전부, `0.5` 절반, `0` 은 변화 없음 |
+| **Rigid** | `fRigid` | 이웃 몫을 `1 + Rigid*0.25` 제곱한 뒤 다시 정규화 → **약한 몫이 더 깎인다**(약한 조인트가 번져 드는 것을 줄인다). 몫이 전부 같은 자리에서는 정규화로 되돌아와 **값이 그대로다** |
+| **Keep Value One** | `bKeepValueOne` | 한 조인트에 1.0 으로 붙은 버텍스는 건드리지 않는다 |
+| **Use Soft Selection** | (원본은 늘 켬) | 소프트 셀렉션 falloff 를 버텍스별 적용량으로 |
+| **Joint Locks** | `iJointLocks` | `Ignore` / `Keep locked`(잠긴 값 유지, 나머지로 1 을 맞춘다) / `Only add to locked`(늘어나는 것만) / `Only remove from locked`(줄어드는 것만) |
+| **Border Edges** | `iBorderEdges` | `Everything` / `Ignore border edges`(열린 경계 쪽은 그대로) / `Only border edges`(경계 띠만) |
+| **Border Mask Steps** | `iSmoothBorderMask` | 그 경계 마스크가 안쪽으로 몇 칸 번지는지(1~10, 기본 2). `Everything` 이면 꺼진다 |
+| **Loop Curve** | `sLoopCurve` | 아래 참고 |
+| **SkinCluster** | `sChooseSkinCluster` | 메시에 skinCluster 가 여럿일 때 어느 것. `Automatic` 은 히스토리의 첫 번째 |
+
+세 마스크(**Blend · 소프트 셀렉션 · 경계**)는 곱해져 버텍스별 적용량이 된다 —
+원본이 같은 lerp 를 순서대로 세 번 하는 것과 값이 같다(테스트로 고정).
+
+### ★ Loop Curve 는 루프를 "따라" 가 아니라 루프를 "가로질러" 푼다
+
+이름만 보면 커브 방향으로 스무딩할 것 같지만, 원본 코드의 동작은 반대다.
+
+1. 커브의 CV 마다 **가장 가까운 버텍스**(rest 자리 기준)를 찾아 씨앗으로 삼고, 씨앗마다 **자기 번호를
+   라벨**로 붙인다.
+2. 라벨을 이웃으로 번지게 한다. 갈림길(라벨 없는 이웃이 둘 이상)이면 그 자리에서 멈춘다.
+3. 라벨이 붙은 버텍스의 이웃 목록은 **"라벨이 같거나 아직 라벨이 없는" 이웃**만 남는다.
+
+커브가 루프의 버텍스를 촘촘히 집으면 **루프 위의 이웃은 서로 라벨이 달라서 3) 에서 빠진다.**
+남는 것은 루프에서 벗어나는 쪽 이웃뿐이므로, 입술·눈꺼풀 라인의 **라인 방향 결(구석→가운데
+그라데이션)은 그대로 두고 라인을 넘는 쪽만 풀린다.** 5x5 격자의 가운데 행을 커브로 집으면
+그 행 버텍스의 이웃이 위/아래 행 둘로 바뀌는 것으로 확인했다.
+
+커브 대신 **버텍스 id 목록**을 코어에 넘겨도 된다(원본도 받는다). 씨앗이 하나면 갈림길이 없는
+스트랜드 위에서만 체인이 자란다.
+
+### 옮기지 않은 원본 옵션
+
+| 원본 | 왜 |
+|------|-----|
+| `bBarycentricWeighted` | 원본 주석이 **실험 중**이라고 적어 둔 경로다(자기 몫 `0.5` 를 박아 두고, 이웃 4개를 면으로 본다). 필요하면 따로 옮긴다 |
+| `xDistanceMeshes` · `sSphereMasks` · `xClosestToCurve` | **SkinCluster 탭 전체가 공유하는 마스크**들로 Smooth 만의 것이 아니고, kangaroo 의 `kt_findClosestPoints` 플러그인 명령과 세팅 노드를 필요로 한다 |
+| `iCheckMissingInfluences` | 인플루언스를 **새로 더할 때**의 규칙이다. 스무딩은 있는 인플루언스 안에서만 값을 옮긴다 |
+
+### 구현 메모
+
+- **웨이트 쓰기는 API 가 아니라 구간 `setAttr`**(`weightList[v].weights[lo:hi]`).
+  `MFnSkinCluster.setWeights` 는 **undo 기록에 남지 않는다**(Layer 탭에서 겪은 것과 같다).
+  스무딩은 "눌러 보고 Ctrl+Z" 를 반복하는 기능이라 이게 없으면 쓸 수 없다. 바뀌는 버텍스만 쓴다.
+- 읽기는 API bulk(`getWeights`) 이고, **선택 + 그 이웃**만 읽는다.
+- numpy 가 있으면 numpy(원본도 numpy), 없으면 **같은 식의 순수 파이썬 경로**로 돈다.
+  두 경로의 결과가 같은지 테스트로 고정했다.
+- 성능: 14,641 버텍스 x 3 인플루언스, 4 iteration = **0.4초**(numpy, mayapy 2024).
+
+### 검증 (mayapy 2024 + 오프스크린 Qt)
+
+코어 53항목 — 평균 식(손 계산과 일치) · 선택 밖 이웃 불변 · 행 합 1 · Blend 0.5/0 ·
+소프트 falloff · Keep Value One · Joint Locks 4모드 · Rigid(식 · 약한 조인트가 덜 번짐 ·
+몫이 같으면 제자리) · Border 3모드 · **undo 한 번에 전부 복원** · numpy = 순수 파이썬(4가지 설정) ·
+Loop Curve(라벨 · 가로지름 · 씨앗 하나 · 없는 커브) · 메시 2개 동시 · skinCluster 고르기 ·
+방어 5종 · 선택 파싱 4종 · 큰 메시 성능.
+UI 38항목 — 탭 위치와 기존 탭 불변 · 기본값 10개 · 슬라이더↔스핀박스(범위 밖 값 포함) ·
+Border Mask Steps 활성 규칙 · 라디오→옵션 · Loop Curve 버튼 3개(지워진 커브 자동 정리 포함) ·
+`Reset Options` · **실제 클릭 한 번 = 스무딩 + undo 한 스텝** · 선택 없음 경고 · 그룹 배치.
 
 
 ---

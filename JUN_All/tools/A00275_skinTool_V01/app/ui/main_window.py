@@ -14,6 +14,10 @@
 #                          무의존). 선택 버텍스에만/소프트 falloff 반영 (weight_transfer_manager).
 #     - "Migrate A -> B" : 토폴로지가 다른 두 메시 A,B 사이 Transfer + Move 를 한 번에 처리하는
 #                          통합 마이그레이션 (A00270_skinMigrate 기능 이식).
+#     - "Smooth"         : 선택 버텍스의 웨이트를 이웃과 평균(Kangaroo SkinCluster > Smooth
+#                          이식). Iterations / Blend / Rigid / Joint Locks /
+#                          Border Edges / Loop Curve
+#                          (core/weight_smooth_manager.py, ui/smooth_tab.py).
 #     - "Copy Weights"   : **한 메시 안에서** 버텍스 -> 버텍스로 웨이트를 그대로 복사.
 #                          목표마다 가장 가까운 소스 버텍스의 웨이트 행을 통째로 베낀다.
 #                          "가깝다" 의 기준은 Expand Bind 와 같은 세 가지
@@ -201,6 +205,10 @@ class MainWindow(QWidget):
          "order: each keeps its locked joints as much as Blend says (upper layers "
          "are cut first where they overflow), into a new or an existing mesh",
          "_build_layer_tab"),
+        ("Smooth", "Smooth - average the skin weights of the selected vertices "
+         "with their neighbours. Kangaroo SkinCluster > Smooth ported : iterations, "
+         "blend, rigid, keep-value-one, joint locks, border edges, loop curve",
+         "_build_smooth_tab"),
     )
 
     BIND_PAGES = (
@@ -1885,6 +1893,17 @@ class MainWindow(QWidget):
         return self.layer_tab
 
     # --------------------------------------------------
+    # Weights > Smooth (이웃과 평균 — Kangaroo SkinCluster > Smooth 이식)
+    # --------------------------------------------------
+
+    def _build_smooth_tab(self):
+        """Layer 탭처럼 app/ui/smooth_tab.py 의 위젯 하나로 둔다."""
+        from tools.A00275_skinTool_V01.app.ui.smooth_tab import SmoothTab
+
+        self.smooth_tab = SmoothTab(log_callback=self.log)
+        return self.smooth_tab
+
+    # --------------------------------------------------
     # Select > By Weight (웨이트 기준으로 버텍스 선택)
     # --------------------------------------------------
 
@@ -1903,6 +1922,7 @@ class MainWindow(QWidget):
             "Classic : joint/mesh weight move (Kangaroo or Native engine).\n"
             "Transfer : many source meshes -> selected mesh/vertices (no plugin).\n"
             "Migrate A->B : cross-topology transfer + bone remap.\n"
+            "Smooth : average the weights of the selected vertices with their neighbours.\n"
             "Copy Weights : vertex -> vertex weight copy within one mesh.\n"
             "Layer : merge the weights of meshes with the same vertex order -\n"
             "        locked joints + Blend per mesh (upper layers are cut first\n"

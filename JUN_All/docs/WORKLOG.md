@@ -31,6 +31,19 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-22 (오늘)
 
+> [!summary] A00275 **Weights > Smooth 신규** — Kangaroo `SkinCluster > Smooth` 를 플러그인 없이 이식 (v01.30->01.31)
+- 요청: kangaroo 툴 `SkinCluster` 탭의 **Smooth 기능을 분석**하고, 그 기능을 **모두** A00275 의 `Weights` 하위 새 탭 `Smooth` 로 이식.
+- 분석: 원본은 `kangarooTabTools/weights.py::smoothSkinWeights()` + `kangarooTools/patch.py` 의 `getNeighborDataForSmoothing` · `getNeighbors` · `getBorderMask` · `smoothValues2d` · `_applyJointLocks` · `setSkinClusterWeights`. 식은 `new[v] = (w[v] + Σw[이웃]) / (1 + 이웃 수)` 를 iteration 만큼. UI 는 데코레이터(`uiSettings.addToUI`)가 **함수 시그니처에서 자동 생성**하고, `iJointLocks` · `iBorderEdges` 같은 것은 SkinCluster 탭 전체가 공유하는 칸이었다 — 그래서 "Smooth 의 옵션"을 알려면 시그니처와 탭 공유 목록을 함께 봐야 했다. kangaroo 는 [[kangaroo-plugin-external-readonly]] 대로 **한 줄도 고치지 않고 읽기만** 했다.
+- ★ **이웃은 선택 밖에 있어도 읽되 값은 안 바꾼다**(`bIncludeNeighborsNotInIds=True`). 이게 없으면 선택 덩어리 가장자리가 바깥과 어긋나 계단이 생긴다. 옮길 때 이 규칙을 그대로 지켰고 테스트로 고정했다.
+- ★ **`Loop Curve` 는 루프를 "따라" 가 아니라 루프를 "가로질러" 푼다.** 이름만 보고 반대로 구현·문서화했다가 테스트에서 걸렸다 — 원본은 커브가 집은 버텍스마다 **자기 번호를 라벨**로 주므로, 루프 위의 이웃은 라벨이 서로 달라 이웃 목록에서 **빠진다**. 남는 것은 루프를 벗어나는 쪽뿐이다. 입술 라인의 구석→가운데 결을 지키면서 라인을 넘는 쪽만 푸는 것이 목적인 옵션이다(5x5 격자로 확인).
+- ★ **`Rigid` 도 처음 이해가 틀렸다.** "강한 조인트를 더 살린다" 가 아니라 **이웃 몫을 제곱해 약한 몫을 더 깎는 것**이다(0~1 수는 지수를 올리면 작은 쪽이 비율상 더 깎인다). 그래서 몫이 전부 같은 자리에서는 정규화로 되돌아와 **값이 그대로**다 — 내 첫 테스트가 그 자리에서 "Rigid 가 더 강해야 한다" 고 단정해 실패했다. 약한 인플루언스가 번져 드는 것이 줄어드는 것으로 다시 확인했다.
+- ★ **쓰기는 구간 `setAttr`** — `MFnSkinCluster.setWeights` 는 undo 기록에 안 남는다([[wip-a00275-layer-tab]] 에서 겪은 것과 같다). 스무딩은 "눌러 보고 Ctrl+Z" 를 반복하는 기능이라 undo 없이는 못 쓴다. 바뀌는 버텍스만 쓴다(읽기는 API bulk).
+- 세 마스크(Blend · 소프트 셀렉션 · 경계)는 **비율의 곱 하나**로 합쳤다 — 원본이 같은 lerp 를 세 번 하는데 셋 다 "원래 값 쪽으로" 의 lerp 라 값이 같다(테스트로 고정).
+- numpy 가 있으면 numpy(원본도 numpy), 없으면 **같은 식의 순수 파이썬 경로**. 두 경로 결과 일치를 4가지 설정에서 고정했다. 14,641 버텍스 x 3 인플루언스 x 4 iteration = **0.4초**.
+- **옮기지 않은 것**(사용자 요청은 "모두" 였으므로 분명히 남긴다): `bBarycentricWeighted` — 원본 주석이 **실험 중**이라 적어 둔 경로(자기 몫 0.5 를 박아 두고 이웃 4개를 면으로 본다) · `xDistanceMeshes` · `sSphereMasks` · `xClosestToCurve` — **SkinCluster 탭 전체가 쓰는 마스크**들로 Smooth 만의 것이 아니고 kangaroo 의 `kt_findClosestPoints` 명령·세팅 노드를 필요로 한다 · `iCheckMissingInfluences` — 인플루언스를 새로 더할 때의 규칙이라 스무딩과 무관. 필요하면 다음에 따로 옮긴다.
+- UI 에서 한 가지 걸린 버그: **슬라이더가 스핀박스 값을 되먹어** Iterations 40 을 넣으면 20 으로 되돌아갔다(슬라이더 범위가 20). 동기화 플래그로 끊었다.
+- 검증: mayapy 2024 **코어 53항목 + UI 38항목 통과** — 손 계산과 일치하는 평균, Blend/소프트/경계 마스크, lock 4모드, Rigid 식, undo 한 번에 전부 복원, numpy=파이썬, Loop Curve 라벨 동작, 메시 2개 동시, 방어, 실제 클릭 한 번 = 스무딩 + undo. **마야 GUI 실기 확인은 사용자 몫**이다. #A00275 #kangaroo
+
 > [!summary] Framework **로그 표식 색 규칙** — `[WARN]` 노랑 · `[OK]` 초록, 공용 로그창이 47툴에서 함께
 - 요청: `A00480_FileTool` 로그창에서 `[WARN]` 은 노랑, `[OK]` 은 초록으로. **모든 툴에서 반복해서 쓸 규칙으로 만드는 게 좋다면 그렇게 구성**할 것.
 - 규칙으로 뺐다. 근거는 세어 보니 나왔다 — 표식은 이미 저장소 관례다(`.py` 55개 파일에 `[WARN]` 233 · `[OK]` 151 · `[ERROR]` 22 · `[INFO]` 20 · `[FAIL]` 11 · `[SKIP]` 7). 반면 **색을 칠하는 툴은 셋뿐이고 셋이 서로 다른 값**을 썼다(A00300 `#ffd166` · A00410/A00430 `#ffb454`). 툴마다 칠하면 같은 `[WARN]` 이 툴마다 다른 노랑이 되고 새 툴은 잊는다.
