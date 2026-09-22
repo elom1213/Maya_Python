@@ -25,9 +25,11 @@
 #      (transform 도 shape 도 아닌 노드를 고르면 `UnboundLocalError`). 여기서는 건너뛰고 알린다.
 
 import maya.cmds as cmds
+import maya.api.OpenMaya as om2
 
 from Framework.core.maya_undo import undo_chunk
 from Framework.core import control_shapes
+from tools.A00400_CurveTool.app.core.curve_manager import curve_shapes
 
 
 #: 만들 위치 (원본 버튼 4개)
@@ -332,6 +334,125 @@ def _unlock_transform(node):
             pass
 
 
+# --------------------------------------------------------------- 레퍼런스 대상 (v01.22)
+#
+# 레퍼런스로 들어온 컨트롤은 **셰이프 노드를 지울 수 없다.** 위의 `replace_shape` 는
+# "기존 셰이프 삭제 -> 새 셰이프 붙이기" 라서 레퍼런스 대상에서는 `cmds.delete` 가
+# "Cannot delete ... as it has locked or read-only children" 로 실패하고, 이어지는
+# `parent -add -shape` 도 레퍼런스 트랜스폼에는 붙지 않는다.
+#
+# 대신 **셰이프는 그대로 두고 CV 위치만 옮긴다.** `crv_to_replace.cv[i]` 를
+# `crv_replacement.cv[i]` 에 하나씩 맞추는 것이라, 두 커브의 모양이 원래 같고 CV 개수가
+# 같을 때(= 미러 쌍) 의도한 모양이 된다. CV 만 바뀌므로 레퍼런스 edit 로 저장되고
+# (`setAttr ....controlPoints[i]`) 트랜스폼 · 이름 · 연결은 전부 그대로다.
+#
+#   mirror=True   대응 CV 의 **월드** 위치를 X 만 뒤집어(-x, y, z) 가져온다.
+#                 셰이프 교체 경로의 mirror 와 같은 결과다 - 대상의 자리는 맞추지 않는다.
+#   mirror=False  대응 CV 의 **오브젝트** 위치를 그대로 가져온다.
+#                 셰이프 교체 경로의 non-mirror(matchTransform 후 freeze)와 같은 결과다.
+#
+# ── 쓰기는 왜 `xform` 인가 (mayapy 2024 로 확인) ──────────────────────────────
+#  * `cmds.curve -replace`(Shape Edit 탭이 쓰는 방법)는 레퍼런스 커브에서 **그 세션에만**
+#    먹는다. 레퍼런스 edit 로 기록되지 않아 **씬을 저장했다 다시 열면 원래 모양으로 돌아간다.**
+#  * `setAttr .controlPoints[i]` 는 저장은 되지만 히스토리(예: `makeNurbCircle`)가 살아 있는
+#    커브에서 절대 위치가 아니라 **트윅(델타)** 로 들어가 값이 두 배가 된다.
+#  * `cmds.xform(cv, objectSpace=True, translation=...)` 만 **절대 위치 + 레퍼런스 edit 로
+#    저장 + undo 한 스텝** 세 가지를 다 만족한다. 그래서 CV 하나씩 이걸로 쓴다.
+#  * 주기(닫힌) 커브는 컴포넌트 `cv[i]` 가 **spans 개까지만** 유효하다. MFn 은 CV 를
+#    `spans + degree` 개로 세지만(뒤의 degree 개는 앞의 복사본) 그 인덱스로 `xform` 을 쓰면
+#    **조용히 마지막 CV 로 클램프돼 엉뚱한 CV 가 덮어써진다**(원 11개에 cv[8..10] → cv[7] 이
+#    망가진다). 앞의 spans 개만 쓰면 이음매는 마야가 알아서 따라온다.
+
+
+def is_referenced(node):
+    """레퍼런스에서 들어온 노드인가. 대상 트랜스폼이나 그 셰이프 하나라도 걸리면 True."""
+    candidates = [node] + list(curve_shapes(node))
+    for candidate in candidates:
+        try:
+            if cmds.referenceQuery(candidate, isNodeReferenced=True):
+                return True
+        except Exception:                                   # noqa: BLE001
+            continue
+
+    return False
+
+
+def _dag_path(shape):
+    selection = om2.MSelectionList()
+    selection.add(shape)
+
+    return selection.getDagPath(0)
+
+
+def _writable_cv_count(shape):
+    """컴포넌트 `cv[i]` 로 **쓸 수 있는** CV 개수 - 주기 커브는 spans 까지뿐이다(위 주석)."""
+    return len(cmds.ls(shape + ".cv[*]", flatten=True) or [])
+
+
+def _cv_points(shape, world=False):
+    """셰이프의 CV 위치 - **plain tuple 로 즉시 복사**해서 돌려준다.
+
+    `cvPositions()` 가 준 `MPoint` 를 그대로 들고 나오면 `MFnNurbsCurve` 가 사라진 뒤
+    값이 원래 자리로 되돌아가 있는 일이 있었다(씬을 저장했다 다시 연 다음 돌리면 CV 가
+    하나도 안 움직이던 버그 - mayapy 로 재현). `MPlug.asMObject` 와 같은 수명 함정이다.
+    """
+    space = om2.MSpace.kWorld if world else om2.MSpace.kObject
+    positions = om2.MFnNurbsCurve(_dag_path(shape)).cvPositions(space)
+
+    return [(point.x, point.y, point.z) for point in positions]
+
+
+def match_cv_positions(target, replacement, mirror=False):
+    """`target` 의 CV 를 `replacement` 의 대응 CV 에 맞춘다. `(shapes, reason)`.
+
+    셰이프 노드는 건드리지 않는다 - 레퍼런스 대상용 경로다(위 주석 참고).
+    reason 이 None 이 아니면 아무 것도 쓰지 않고 그 사유로 건너뛴 것이다.
+    """
+    target_shapes = curve_shapes(target)
+    source_shapes = curve_shapes(replacement)
+
+    if not target_shapes:
+        return 0, "it has no NURBS curve shape"
+    if not source_shapes:
+        return 0, "the replacement has no NURBS curve shape"
+    if len(target_shapes) != len(source_shapes):
+        return 0, "shape counts differ ({0} vs {1})".format(
+            len(target_shapes), len(source_shapes))
+
+    # 하나라도 안 맞으면 **아무 것도 쓰지 않는다** - 반쪽만 옮겨 어긋나지 않게.
+    plans = []
+    for index, target_shape in enumerate(target_shapes):
+        source_shape = source_shapes[index]
+
+        if mirror:
+            # 월드에서 X 만 뒤집고(= scaleX -1) 대상의 오브젝트 공간으로 되돌린다.
+            inverse = _dag_path(target_shape).inclusiveMatrixInverse()
+            points = []
+            for x, y, z in _cv_points(source_shape, world=True):
+                mirrored = om2.MPoint(-x, y, z) * inverse
+                points.append((mirrored.x, mirrored.y, mirrored.z))
+        else:
+            points = _cv_points(source_shape)
+
+        # CV 개수와 **쓸 수 있는** 개수(주기 커브면 spans)가 둘 다 같아야 i <-> i 가 성립한다.
+        # 뒤엣것까지 보는 이유 - 하나는 열린 커브, 하나는 닫힌 커브인데 CV 총수만 우연히
+        # 같은 경우를 걸러 낸다.
+        if (len(points) != len(_cv_points(target_shape))
+                or _writable_cv_count(source_shape) != _writable_cv_count(target_shape)):
+            return 0, "CV counts differ ({0} vs {1}) on {2}".format(
+                len(_cv_points(target_shape)), len(points),
+                target_shape.split("|")[-1])
+
+        plans.append((target_shape, points))
+
+    for shape, points in plans:
+        for index, point in enumerate(points[:_writable_cv_count(shape)]):
+            cmds.xform("{0}.cv[{1}]".format(shape, index),
+                       objectSpace=True, translation=point)
+
+    return len(plans), None
+
+
 def replace_shape(target, replacement, mirror=False):
     """`target` 의 커브 셰이프를 `replacement` 의 모양으로 바꾼다(트랜스폼은 그대로).
 
@@ -388,6 +509,11 @@ def replace_shapes(targets, replacements, mirror=False):
       건드리지 않는다 - 그 사실을 로그에 적는다.
       (v01.15 까지는 개수가 다르면 아예 거절했다. 사용자 요청으로 바꿨다 - 리스트에
       담아 둔 것 중 짝이 맞는 데까지 돌리는 편이 실제 작업 흐름에 맞다.)
+
+    ── 레퍼런스 대상 (v01.22) ─────────────────────────────────────────────
+    타깃이 **레퍼런스**면 셰이프를 지울 수 없으므로 셰이프 교체 대신
+    `match_cv_positions` 로 **CV 만 대응 CV 에 맞춘다**(mirror 여부는 그대로 따른다).
+    타깃마다 따로 판단하므로 레퍼런스와 로컬이 섞인 리스트도 한 번에 돌아간다.
     """
     targets = [t for t in (targets or [])]
     replacements = [r for r in (replacements or [])]
@@ -408,27 +534,56 @@ def replace_shapes(targets, replacements, mirror=False):
         targets = targets[:pairs]
 
     replaced = 0
+    matched = 0
     with undo_chunk():
         for index, target in enumerate(targets):
             source = replacements[index] if len(replacements) > 1 else replacements[0]
+            short = target.split("|")[-1]
             if not cmds.objExists(target):
                 messages.append("[Warning] Target is gone: {0}.".format(target))
                 continue
             if not cmds.objExists(source):
                 messages.append("[Warning] Replacement is gone: {0}.".format(source))
                 continue
+
+            # 레퍼런스 대상은 셰이프를 지울 수 없다 -> CV 만 맞춘다.
+            if is_referenced(target):
+                try:
+                    shapes, reason = match_cv_positions(target, source, mirror=mirror)
+                except Exception as exc:                    # noqa: BLE001
+                    messages.append(
+                        "[Warning] {0} is referenced and its CVs could not be "
+                        "moved: {1}".format(short, exc))
+                    continue
+                if reason:
+                    messages.append(
+                        "[Warning] {0} is referenced, so only its CVs can move - "
+                        "skipped because {1}.".format(short, reason))
+                    continue
+                messages.append(
+                    "[Info] {0} is referenced - matched {1} CV(s) to {2} instead of "
+                    "swapping the shape node.".format(
+                        short, sum(len(_cv_points(s)) for s in curve_shapes(target)),
+                        source.split("|")[-1]))
+                matched += 1
+                continue
+
             try:
                 moved = replace_shape(target, source, mirror=mirror)
             except Exception as exc:                        # noqa: BLE001
                 messages.append("[Warning] Could not replace {0}: {1}".format(
-                    target.split("|")[-1], exc))
+                    short, exc))
                 continue
             if moved:
                 replaced += 1
 
+    suffix = " (mirrored)" if mirror else ""
     if replaced:
         messages.append("Replaced the shape on {0} control(s){1}.".format(
-            replaced, " (mirrored)" if mirror else ""))
-    elif not messages:
+            replaced, suffix))
+    if matched:
+        messages.append("Matched the CVs on {0} referenced control(s){1}.".format(
+            matched, suffix))
+    if not replaced and not matched and not messages:
         messages.append("[WARN] Nothing was replaced.")
-    return replaced, messages
+    return replaced + matched, messages

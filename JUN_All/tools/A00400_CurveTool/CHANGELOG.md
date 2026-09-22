@@ -1,5 +1,25 @@
 # Changelog — A00400_CurveTool
 
+## v01.22 (2026-09-22)
+**[Feature] `Display > Replace` — 대상이 **레퍼런스**면 셰이프를 바꾸는 대신 **CV 를 맞춘다**.**
+
+- **문제**: `Shapes to replace` 에 올린 커브가 레퍼런스로 들어온 것이면 셰이프 노드를 **지울 수 없다.**
+  기존 경로는 "기존 셰이프 삭제 → 새 셰이프 붙이기" 라서
+  `Cannot delete ... as it has locked or read-only children` 로 막히고 교체가 되지 않았다.
+- **[Add] CV 매칭 경로 (`control_manager.match_cv_positions`)** — 셰이프 노드는 그대로 두고
+  **`crv_to_replace.cv[i]` 를 `crv_replacement.cv[i]` 로 옮긴다.** 두 커브의 모양이 원래 같고
+  CV 개수가 같으면(= 미러 쌍) 의도한 모양이 된다.
+  - **Mirror Shapes 켬** — 대응 CV 의 **월드** 위치를 X 만 뒤집어(`-x, y, z`) 대상의 오브젝트 공간으로
+    가져온다. 즉 교체본을 **월드 기준 scaleX = -1** 한 모양이다(셰이프 교체 경로의 mirror 와 같은 결과).
+  - **Mirror Shapes 끔** — 대응 CV 의 **오브젝트** 위치를 그대로 가져온다
+    (셰이프 교체 경로의 non-mirror = `matchTransform` 후 freeze 와 같은 결과).
+- **[Add] 대상마다 자동으로 갈린다** — 레퍼런스면 CV 매칭, 아니면 기존 셰이프 교체. 화면에 켤 것은 없고
+  **어느 쪽으로 처리했는지 로그에 적는다.** 레퍼런스와 로컬이 섞인 리스트도 한 번에 돌아간다.
+- **[Add] 안 되는 경우는 사유와 함께 건너뛴다** — 셰이프 개수가 다르거나 CV 개수가 다르면
+  **아무 것도 쓰지 않고**(반쪽만 옮겨 어긋나지 않게) 사유를 로그에 남긴다.
+- 쓰기는 `Shape Edit` 탭과 같은 `shape_xform_manager.write_cv_points`(`cmds.curve -replace`) 를
+  공유한다(`_write_points` 를 공개 이름으로). **undo 한 스텝**이고 닫힌(주기) 커브의 매듭도 보존한다.
+
 ## v01.17 (2026-09-18)
 **[Feature] `Create > Controls` 색에 **팔레트 팝업**(임의 RGB) 추가.**
 

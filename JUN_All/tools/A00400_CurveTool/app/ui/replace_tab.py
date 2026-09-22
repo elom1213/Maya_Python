@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-18
+# last Update date : 2026-09-22
 # A00400_CurveTool - Display > Replace 탭 (컨트롤 커브의 셰이프를 다른 커브 모양으로 교체)
 #
 # v01.15 에서는 `Create > Controls` 탭 안의 한 섹션이었고 대상/교체본을 **텍스트 칸**에
@@ -9,6 +9,10 @@
 #
 # 짝 짓기: 두 리스트 개수가 같으면 **순서대로 1:1**, 다르면 **적은 개수만큼**만 한다
 # (교체본이 하나면 모든 대상에 같은 모양). 규칙은 core `control_manager.replace_shapes`.
+#
+# v01.22 - 대상이 **레퍼런스**면 셰이프 노드를 지울 수 없으므로 셰이프를 바꾸는 대신
+# **CV 만 대응 CV 에 맞춘다**(Mirror 를 켜면 월드 X 를 뒤집은 자리로). 대상마다 자동으로
+# 갈리고 화면에서 켤 것은 없다 - 어느 쪽으로 처리했는지는 로그에 적힌다.
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
@@ -35,7 +39,9 @@ class ReplaceTab(QWidget):
         note = QLabel(
             "Swap a control's curve shape for another curve's shape.\n"
             "The target keeps its name, transform and connections - only the\n"
-            "shape node is replaced.")
+            "shape node is replaced.\n"
+            "Referenced targets keep their shape node too - their CVs are moved\n"
+            "onto the replacement's CVs one by one (same CV count needed).")
         note.setAlignment(Qt.AlignCenter)
         root.addWidget(note)
 
@@ -60,7 +66,9 @@ class ReplaceTab(QWidget):
         self.chk_mirror = QCheckBox("Mirror Shapes")
         self.chk_mirror.setToolTip(
             "Flip the replacement across X before it is applied - for the other\n"
-            "side of the rig. The target's own position is then not matched.")
+            "side of the rig. The target's own position is then not matched.\n"
+            "On a referenced target each CV is moved to the mirrored world\n"
+            "position of the matching CV on the replacement.")
         root.addWidget(self.chk_mirror)
 
         self.btn_replace = QPushButton("Replace Shapes")
@@ -68,6 +76,8 @@ class ReplaceTab(QWidget):
         self.btn_replace.setToolTip(
             "Give every listed target the shape of its replacement.\n"
             "The target's transform, name and connections stay as they are.\n"
+            "Referenced targets have their CVs matched instead - the shape node\n"
+            "cannot be deleted there.\n"
             "One undo step.")
         self.btn_replace.clicked.connect(self.on_replace)
         root.addWidget(self.btn_replace)

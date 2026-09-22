@@ -38,5 +38,10 @@
 #                           셰이프 노드다(CV 도 lineWidth 도) — 트랜스폼 채널은 불변.
 #                           커브 목록(TSL)을 한 번만 만들면 모양도 굵기도 손본다
 
-VERSION = "01.21"
-LAST_UPDATE = "2026-09-21"
+# 01.22  Display > Replace  - 대상이 **레퍼런스**면 셰이프 노드를 지울 수 없다. 그럴 때는
+#                           셰이프를 바꾸는 대신 **CV 를 하나씩 대응 CV 에 맞춘다**
+#                           (`crv_to_replace.cv[i]` <- `crv_replacement.cv[i]`).
+#                           Mirror 를 켜면 대응 CV 의 **월드 위치를 X 만 뒤집은** 자리로
+
+VERSION = "01.22"
+LAST_UPDATE = "2026-09-22"
