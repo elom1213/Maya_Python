@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-18
+# last Update date : 2026-09-22
 # A00400_CurveTool core - 컨트롤러 커브 만들기 · 색 지정 · 셰이프 교체 (UI 비의존)
 #
 # Brandon Schaal 의 `bs_controls.py` / `bs_controlsUI.py`(Control Curves Tool)를 이 툴로
@@ -100,20 +100,21 @@ def control_name(node, typed):
 
 # --------------------------------------------------------------- 만들기
 
-def _make_curve(shape, thickness, name, result):
-    crv = control_shapes.build(shape, thickness=thickness, curve_name=name)
+def _make_curve(shape, name, result):
+    crv = control_shapes.build(shape, curve_name=name)
     if name and crv.split("|")[-1] != name:
         result["renamed"].append((name, crv.split("|")[-1]))
     return crv
 
 
-def create_controls(shape, mode=MODE_WORLD, name="", thickness=1.0):
+def create_controls(shape, mode=MODE_WORLD, name=""):
     """선택한 오브젝트마다(또는 원점에) 컨트롤 커브를 만든다. `(result, messages)`.
 
     shape     : `shape_names()` 의 이름 하나
     mode      : MODE_PARENT / MODE_CHILD / MODE_WORLD / MODE_ORIGIN
     name      : 이름 또는 접미사(위 control_name 규칙). 비우면 `<오브젝트>_ANIM`.
-    thickness : 1.0 초과면 셰이프 `lineWidth`.
+
+    선 굵기(`lineWidth`)는 여기서 다루지 않는다 - `Display > Shape Edit` 이 담당한다.
 
     전체가 **undo 한 스텝**이고, 만든 컨트롤이 선택된 채로 끝난다.
     """
@@ -134,14 +135,14 @@ def create_controls(shape, mode=MODE_WORLD, name="", thickness=1.0):
             # 원점 모드는 선택을 보지 않는다. 이름을 비우면 셰이프 이름을 소문자로.
             wanted = (name or shape).strip().replace(" ", "_").lower() \
                 if not name else name.replace(" ", "_")
-            result["controls"].append(_make_curve(shape, thickness, wanted, result))
+            result["controls"].append(_make_curve(shape, wanted, result))
         else:
             for node in selection:
                 if not cmds.objExists(node):
                     result["skipped"].append((node, "gone from the scene"))
                     continue
 
-                crv = _make_curve(shape, thickness, control_name(node, name), result)
+                crv = _make_curve(shape, control_name(node, name), result)
                 # 원본은 parentConstraint 를 걸었다 지웠다 - matchTransform 이 피벗과
                 # rotateOrder/jointOrient 까지 마야에게 맡기므로 더 안전하다.
                 cmds.matchTransform(crv, node, position=True, rotation=True, scale=False)

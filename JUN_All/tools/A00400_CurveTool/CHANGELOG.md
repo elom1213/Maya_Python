@@ -1,5 +1,19 @@
 # Changelog — A00400_CurveTool
 
+## v01.24 (2026-09-22)
+**[Change] `Create > Controls` 의 `Thickness` 칸 삭제 — 선 굵기는 `Display > Shape Edit` 하나로.**
+
+- **왜**: 같은 일(`nurbsCurve.lineWidth`)을 두 탭이 했다. v01.21 에 옛 `Line Width` 탭이
+  `Display > Shape Edit` 안으로 들어가면서, 목록에 담은 커브의 굵기를 언제든 바꿀 수 있게 됐다.
+  만들 때 한 번 정하는 칸은 더 필요하지 않다.
+- **[Remove]** `controls_tab.py` 의 `Thickness` 스핀박스와 `control_manager.create_controls()` /
+  `_make_curve()` 의 `thickness` 인자. 새 컨트롤의 `lineWidth` 는 **아예 건드리지 않는다**
+  (마야 기본값 `-1` = 전역 설정을 따름). 굵기를 바꾸려면 `Display > Shape Edit` 의
+  `Line Width` 를 쓴다.
+- **형상은 그대로** — `Framework.core.control_shapes.build()` 의 `thickness` 인자는 남아 있고
+  (다른 툴도 쓰는 공용 함수) 이 툴이 넘기지 않을 뿐이다. 셰이프 34종의 CV 는 바뀌지 않는다.
+- 탭 안내문에 굵기가 어디 있는지 적었다.
+
 ## v01.23 (2026-09-22)
 **[Feature] `Display > Replace` — **Resolve Pair from Selection** 버튼.**
 

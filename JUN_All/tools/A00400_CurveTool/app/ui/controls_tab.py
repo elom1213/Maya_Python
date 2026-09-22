@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-18
+# last Update date : 2026-09-22
 # A00400_CurveTool - Create > Controls 탭 (컨트롤러 커브 만들기 · 색 · 팔레트)
 #
 # Brandon Schaal 의 `bs_controls` / `bs_controlsUI` 를 옮긴 화면이다. 원본 창의 세 섹션 중
@@ -47,7 +47,8 @@ class ControlsTab(QWidget):
         note = QLabel(
             "Build control curves from a shape library and colour them.\n"
             "Ported from Brandon Schaal's bs_controls - its shape replace now\n"
-            "lives in Display > Replace.")
+            "lives in Display > Replace, the drawn line width in\n"
+            "Display > Shape Edit.")
         note.setAlignment(Qt.AlignCenter)
         root.addWidget(note)
 
@@ -68,21 +69,6 @@ class ControlsTab(QWidget):
             "             for it - spine_jnt + ctl -> spine_ctl\n"
             "With a '_' : used as the name exactly as typed (spaces become '_')")
         layout.addWidget(self.le_name)
-
-        thick_row = QHBoxLayout()
-        thick_row.addWidget(QLabel("Thickness"))
-        self.sb_thickness = QDoubleSpinBox()
-        self.sb_thickness.setRange(1.0, 8.0)
-        self.sb_thickness.setDecimals(1)
-        self.sb_thickness.setSingleStep(0.5)
-        self.sb_thickness.setValue(1.0)
-        self.sb_thickness.setKeyboardTracking(False)
-        self.sb_thickness.setToolTip(
-            "Viewport line width of the new control (nurbsCurve.lineWidth).\n"
-            "1.0 leaves Maya's default - the shape is not changed either way.")
-        thick_row.addWidget(self.sb_thickness)
-        thick_row.addStretch(1)
-        layout.addLayout(thick_row)
 
         self.lw_shapes = QListWidget()
         self.lw_shapes.setMinimumHeight(150)
@@ -212,8 +198,7 @@ class ControlsTab(QWidget):
             return
         try:
             _result, messages = ctl_mgr.create_controls(
-                shape, mode=mode, name=self.le_name.text(),
-                thickness=self.sb_thickness.value())
+                shape, mode=mode, name=self.le_name.text())
         except Exception as exc:                            # noqa: BLE001
             self._log("Create control failed: {0}".format(exc))
             return

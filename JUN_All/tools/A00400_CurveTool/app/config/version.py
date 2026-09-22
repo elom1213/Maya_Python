@@ -48,5 +48,9 @@
 #                           좌측 `Shapes to replace` 에 짝지어 채운다. 짝은 리스트 순서로
 #                           맺어지므로 **양쪽을 짝지어진 것만으로 함께** 다시 채운다
 
-VERSION = "01.23"
+# 01.24  Create > Controls  - `Thickness` 칸 삭제. 선 굵기(`nurbsCurve.lineWidth`)는
+#                           `Display > Shape Edit` 이 담당한다(v01.21 에 합쳐진 옛
+#                           `Line Width` 탭). 같은 기능이 두 곳에 있던 것을 한 곳으로
+
+VERSION = "01.24"
 LAST_UPDATE = "2026-09-22"

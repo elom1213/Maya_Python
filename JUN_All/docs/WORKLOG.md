@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-22 (오늘)
 
+> [!summary] A00400 **Create > Controls 의 `Thickness` 칸 삭제** — 선 굵기는 Shape Edit 하나로 (v01.23->01.24)
+- 요청: `Controls` 탭의 `Thickness` UI 를 없애라 — 같은 기능이 이미 `Display > Shape Edit` 에 있다.
+- 지운 것: 탭의 스핀박스 한 줄과, `control_manager.create_controls()` / `_make_curve()` 의 `thickness` 인자. 이 인자를 넘기는 곳은 이 탭뿐이라 core 까지 함께 걷었다 — 남겨 두면 **아무도 1.0 이외를 넘기지 않는 죽은 분기**가 된다.
+- 공용 함수 `Framework.core.control_shapes.build(thickness=...)` 는 **그대로 둔다**(다른 툴도 쓰는 공용이고, 기본값 1.0 이면 `lineWidth` 를 아예 건드리지 않는다). 새 컨트롤은 마야 기본 `-1`(전역 설정) 로 그려진다.
+- v01.21 에 옛 `Line Width` 탭이 `Shape Edit` 안으로 들어가면서 굵기는 **커브 목록으로 언제든** 바꿀 수 있게 됐다. 만들 때 한 번 정하는 칸이 같은 어트리뷰트를 두고 따로 있을 이유가 없어진 상태였다. 탭 안내문에 어디서 바꾸는지 적었다.
+- 검증: mayapy 2024 오프스크린 **14항목 통과** — 스핀박스/라벨/`QDoubleSpinBox` 부재 · 두 함수 시그니처 · 셰이프 목록 34 · Origin/Parent 생성과 이름 규칙 · 새 커브의 `lineWidth` 가 `-1` · 색이 셰이프에 · `Shape Edit` 쪽 `Line Width` 그룹과 `curve_manager.set_line_width()` 회귀 · 창 전체 빌드. 마야 GUI 확인은 사용자 몫. #A00400
+
 > [!summary] A00400 **Display > Replace 에 `Resolve Pair from Selection`** — 반대쪽 대상을 자동으로 (v01.22->01.23)
 - 요청: A00110_animTool_V02 의 `Resolve Pairs from Selection` 과 같은 버튼을 Replace 탭에도. 규칙은 **교체본에 대응되는 오브젝트가 씬에 있으면 좌측 `Shapes to replace` 에 리스트업**.
 - 토큰 규칙은 **Framework 공용 파일 하나**(`Framework/rules/mirror_tokens.json`, `MirrorTokenStore`)를 쓴다. A00110 은 자기 `_find_opposite` 로 substring 치환을 하지만, Framework 쪽은 **경계 매칭**이라 `sample_lip_l_ctl` 의 `_lip` 을 잘못 집지 않는다 — 새로 쓰는 쪽은 공용을 쓴다.

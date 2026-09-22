@@ -42,3 +42,9 @@ metadata:
   `Reset Color` 도 스위치 + RGB 값을 되돌린다.
 - 팝업은 마야 `colorEditor`(ref 가 쓰는 것) 대신 **QColorDialog** — PySide 툴이라 부모·테마·항상 위가 맞물린다.
   헤드리스 테스트에서는 `QColorDialog.getColor` 를 갈아끼워 확인한다(모달이라 그대로는 못 띄운다).
+
+**v01.24 (2026-09-22) `Thickness` 칸 삭제** — 선 굵기는 `Display > Shape Edit` 하나가 담당한다.
+- 탭의 스핀박스와 함께 **`create_controls()` / `_make_curve()` 의 `thickness` 인자도 걷었다** —
+  넘기는 곳이 이 탭뿐이어서, 남기면 아무도 1.0 이외를 주지 않는 죽은 분기가 된다.
+- 공용 `control_shapes.build(thickness=...)` 는 그대로(다른 툴도 쓴다). 기본값 1.0 이면 `lineWidth` 를
+  아예 안 건드리므로 새 컨트롤은 마야 기본 `-1`(전역 설정)로 그려진다. 굵기는 [[wip-a00400-shape-transform]] 쪽.
