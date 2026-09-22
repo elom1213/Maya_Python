@@ -1,5 +1,27 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.32 (2026-09-22)
+
+- **[Feature] `Weights > Transfer` 에 `Target mode` — 소스와 타겟을 리스트로 1:1 짝짓는 모드.**
+  기존 동작은 **그대로 기본값**(`Scene selection`)이고, 라디오로 모드를 바꾼다.
+  - **`Target list (1:1)`** 을 고르면 `Source Meshes` **우측에 `Target Meshes` 리스트**가 생긴다.
+    버튼을 누르면 `Source[i] -> Target[i]` 로 **행 순서대로** 전이된다.
+  - **개수가 다르면 적은 쪽만큼** 돈다(요청 규칙). 몇 개만 돌았는지 로그에 적는다.
+  - 메시가 아닌 항목(지워진 노드 등)은 **짝을 맺기 전에** 빠진다 - 그러지 않으면 그 뒤가
+    한 칸씩 밀려 엉뚱한 메시에 전이된다.
+  - 짝은 **메시 전체**가 대상이다(씬 선택을 보지 않는다). 부분 전이·소프트 falloff 가
+    필요하면 `Scene selection` 모드를 쓴다 - 그래서 1:1 모드에서는 soft 체크가 꺼진다.
+  - 소스에 skinCluster 가 없거나 자기 자신과 짝이 된 항목은 **사유와 함께 건너뛰고** 나머지는
+    계속한다. 전체가 **한 번의 undo**.
+  - Kangaroo 엔진도 같은 모드로 돈다(`transferSkinCluster(_pSelection=<타겟 이름>)` -
+    kangaroo 가 문자열을 patch 로 바꿔 주므로 씬 선택을 건드리지 않는다).
+- **[Feature] `TRANSFER` 버튼이 진행률 팝업을 띄운다** (공용 `JUN_mod_progress_qt_v01`).
+  **메시 하나(짝 하나)가 끝날 때마다** 게이지가 오르고 지금 처리 중인 이름이 보인다 -
+  `copySkinWeights` 는 메시 안쪽 진행을 주지 않으므로 그보다 잘게 알릴 방법이 없다.
+  팝업은 예외가 나도 `finally` 에서 닫고, 뚫고 올라온 예외는 `[Error]` 로그로 남긴다
+  (모달 창이 뜬 채 트레이스백만 나오면 멈춘 것으로 보인다). 끝나면 걸린 시간을 로그에.
+- 검증: mayapy 2024 + 오프스크린 Qt **58항목 통과**.
+
 ## v01.31 (2026-09-22)
 
 - **[Feature] `Weights > Smooth` 신규 — Kangaroo `SkinCluster > Smooth` 를 플러그인 없이 이식했다.**

@@ -5,5 +5,11 @@
 #                           Loop Curve / 소프트 셀렉션). 플러그인 무의존
 #                           (core/weight_smooth_manager.py, ui/smooth_tab.py)
 
-VERSION = "01.31"
+# 01.32  Weights > Transfer  - Target mode 추가. `Target list (1:1)` 을 고르면 Source
+#                           Meshes 우측에 Target Meshes 리스트가 생기고, 행 순서로
+#                           1:1 짝지어 전이한다(개수가 다르면 적은 쪽만큼).
+#                           TRANSFER 버튼은 두 모드 모두 **진행률 팝업**을 띄운다
+#                           (JUN_mod_progress_qt_v01, 메시/짝 하나마다 게이지)
+
+VERSION = "01.32"
 LAST_UPDATE = "2026-09-22"

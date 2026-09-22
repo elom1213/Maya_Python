@@ -47,6 +47,7 @@
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt.maya_window import maya_main_window
+from Framework.qt.MOD_progress_qt_v01 import JUN_mod_progress_qt_v01
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -367,18 +368,53 @@ class MainWindow(QWidget):
         layout = QVBoxLayout(tab)
 
         desc = QLabel(
-            "Transfer skin weights from the SOURCE meshes (list below) to ALL meshes\n"
-            "you currently have selected in the scene (closest point).\n"
-            "Select vertices on a target to transfer only there; soft selection\n"
-            "falloff is respected (Native engine).")
+            "Transfer skin weights from the SOURCE meshes (list below) to the\n"
+            "targets, by closest point. Target mode says how the targets are\n"
+            "picked - the scene selection (every source acts together on each\n"
+            "selected mesh), or a second list paired 1:1 with the sources.")
         desc.setAlignment(Qt.AlignCenter)
         layout.addWidget(desc)
 
-        # 소스 메시 리스트
+        # 대상을 고르는 방식 (v01.32~). Scene selection 이 원래 동작이고 기본값이다.
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Target mode"))
+        self.transfer_mode_grp = QButtonGroup(self)
+        self.rb_transfer_sel = QRadioButton("Scene selection")
+        self.rb_transfer_sel.setChecked(True)
+        self.rb_transfer_sel.setToolTip(
+            "Targets are the meshes (or the vertices) selected in the scene.\n"
+            "All source meshes act together - Maya picks the closest source per\n"
+            "vertex. Partial transfer and soft-selection falloff work here.")
+        self.rb_transfer_pairs = QRadioButton("Target list (1:1)")
+        self.rb_transfer_pairs.setToolTip(
+            "A second list appears on the right. Source[i] transfers to Target[i]\n"
+            "by row order - one source per target, the whole mesh. When the two\n"
+            "lists differ in length, only the first N pairs run (N = the shorter).\n"
+            "The scene selection is not used in this mode.")
+        self.transfer_mode_grp.addButton(self.rb_transfer_sel)
+        self.transfer_mode_grp.addButton(self.rb_transfer_pairs)
+        mode_row.addWidget(self.rb_transfer_sel)
+        mode_row.addWidget(self.rb_transfer_pairs)
+        mode_row.addStretch(1)
+        layout.addLayout(mode_row)
+
+        # 소스 / 타겟 메시 리스트를 나란히 (타겟은 1:1 모드에서만 보인다)
+        lists_row = QHBoxLayout()
         self.tsl_transfer_src = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Source Meshes", select_label="Select Source Meshes",
             log_callback=self.log)
-        layout.addWidget(self.tsl_transfer_src)
+        lists_row.addWidget(self.tsl_transfer_src, 1)
+
+        self.tsl_transfer_tgt = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Target Meshes", select_label="Select Target Meshes",
+            log_callback=self.log)
+        self.tsl_transfer_tgt.setToolTip(
+            "Paired with Source Meshes by row order - the first source goes to\n"
+            "the first target, and so on. Use the Up / Down buttons of the lists\n"
+            "to line the pairs up.")
+        self.tsl_transfer_tgt.setVisible(False)
+        lists_row.addWidget(self.tsl_transfer_tgt, 1)
+        layout.addLayout(lists_row)
 
         # 옵션 (Engine + Mode + soft selection)
         opt_grp = QGroupBox("Options")
@@ -418,31 +454,96 @@ class MainWindow(QWidget):
         opt_layout.addWidget(self.cb_transfer_soft)
 
         # Kangaroo 를 고르면 soft falloff 옵션은 Native 전용이라 비활성.
+        # 1:1 모드에서도 꺼지므로 판단은 _sync_transfer_mode 한 곳에서 한다.
         self.rb_transfer_kangaroo.toggled.connect(
-            lambda on: self.cb_transfer_soft.setEnabled(not on))
+            lambda *_: self._sync_transfer_mode())
 
         layout.addWidget(opt_grp)
 
-        hint = QLabel(
-            "Targets = your current scene selection (one or more meshes, or "
-            "vertices on them).")
-        hint.setAlignment(Qt.AlignCenter)
-        layout.addWidget(hint)
+        self.lbl_transfer_hint = QLabel()
+        self.lbl_transfer_hint.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.lbl_transfer_hint)
 
         self.btn_transfer_run = QPushButton("TRANSFER to selected mesh(es)")
         self.btn_transfer_run.setMinimumHeight(40)
         self.btn_transfer_run.clicked.connect(self.on_transfer_to_mesh)
         layout.addWidget(self.btn_transfer_run)
 
+        # 모드에 따라 타겟 리스트 · 힌트 · 버튼 글자가 함께 바뀐다.
+        self.transfer_mode_grp.buttonClicked.connect(
+            lambda *_: self._sync_transfer_mode())
+        self._sync_transfer_mode()
+
         layout.addStretch(1)
         return tab
 
+    def transfer_mode(self):
+        """Transfer 탭이 대상을 고르는 방식 (core 의 MODE_* 값)."""
+        if self.rb_transfer_pairs.isChecked():
+            return wt_mgr.MODE_PAIRS
+        return wt_mgr.MODE_SELECTION
+
+    def _sync_transfer_mode(self):
+        """모드에 맞춰 타겟 리스트를 보이고, 힌트와 버튼 글자를 바꾼다.
+
+        소프트 falloff 체크는 **씬 선택 모드 + Native** 에서만 뜻이 있다 - 1:1 모드는
+        메시 전체를 전이하므로(core `transfer_pairs` 주석) 함께 비활성한다.
+        """
+        pairs = self.transfer_mode() == wt_mgr.MODE_PAIRS
+
+        self.tsl_transfer_tgt.setVisible(pairs)
+        if pairs:
+            self.lbl_transfer_hint.setText(
+                "Targets = the Target Meshes list, paired by row order "
+                "(different lengths -> the first N pairs).")
+            self.btn_transfer_run.setText("TRANSFER source -> target (1:1)")
+        else:
+            self.lbl_transfer_hint.setText(
+                "Targets = your current scene selection (one or more meshes, or "
+                "vertices on them).")
+            self.btn_transfer_run.setText("TRANSFER to selected mesh(es)")
+
+        self.cb_transfer_soft.setEnabled(
+            not pairs and not self.rb_transfer_kangaroo.isChecked())
+
     def on_transfer_to_mesh(self):
+        """전이 실행. 도는 동안 공용 진행률 팝업이 뜬다(v01.32~).
+
+        메시 하나(짝 하나)가 끝날 때마다 게이지가 올라간다 - core 가 그 단위로만
+        진행을 알려 주기 때문이다(`copySkinWeights` 는 중간 진행을 주지 않는다).
+        """
         sources = self.tsl_transfer_src.get_all_items()
         engine = "kangaroo" if self.rb_transfer_kangaroo.isChecked() else "native"
-        count, msg = wt_mgr.transfer_to_mesh(
-            sources, respect_soft=self.cb_transfer_soft.isChecked(), engine=engine)
+        pairs = self.transfer_mode() == wt_mgr.MODE_PAIRS
+        targets = self.tsl_transfer_tgt.get_all_items() if pairs else []
+
+        dlg = JUN_mod_progress_qt_v01(
+            self, title="Skin Tool - Transfer",
+            message="Transferring skin weights...",
+            phases=[("Transferring", 100)])
+        dlg.start()
+        dlg.begin_phase()
+        count, msg = 0, None
+        try:
+            if pairs:
+                count, msg = wt_mgr.transfer_pairs(
+                    sources, targets, engine=engine, progress=dlg.callback())
+            else:
+                count, msg = wt_mgr.transfer_to_mesh(
+                    sources, respect_soft=self.cb_transfer_soft.isChecked(),
+                    engine=engine, progress=dlg.callback())
+        except Exception as exc:                            # noqa: BLE001
+            # 코어는 실패를 메시지로 돌려주지만, 뚫고 올라온 것이 있으면 로그로 남긴다 -
+            # 모달 팝업이 뜬 채로 트레이스백만 나오면 사용자는 창이 멈춘 것으로 본다.
+            msg = "[Error] {0}".format(exc)
+        finally:
+            # 팝업은 결과와 상관없이 닫는다(에러가 나도 모달 창이 남지 않도록).
+            elapsed = dlg.elapsed()
+            dlg.finish()
+
         self.log(msg)
+        if count:
+            self.log("Transfer took {0:.1f}s.".format(elapsed))
 
     # --------------------------------------------------
     # Weights > Copy Weights (한 메시 안에서 버텍스 -> 버텍스)

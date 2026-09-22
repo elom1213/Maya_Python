@@ -10,7 +10,7 @@ updated: 2026-09-22
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.31 — **`Weights > Smooth`** 신규: Kangaroo `SkinCluster > Smooth` 이식(플러그인 무의존) · v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
+- **버전**: `app/config/version.py` (v01.32 — Transfer 에 **`Target mode`**(소스↔타겟 리스트 1:1) + **진행률 팝업** · v01.31 — **`Weights > Smooth`** 신규: Kangaroo `SkinCluster > Smooth` 이식(플러그인 무의존) · v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
   (v01.22 는 아래 레이어 lock 이 사라졌다) · v01.22 — **`Weights > Layer`** 신규: 버텍스 순서가 같은 메시 N 개의
   웨이트를 메시마다 lock + Blend 로 레이어처럼 합성해 새 메시로 만들거나 기존 메시를 갱신 · v01.15 — **탭 재분류**:
   평평한 탭 7개를 `카테고리 3 → 기능 7` 의 2단 구조로, 아래 표)
@@ -23,7 +23,7 @@ updated: 2026-09-22
 | 상위 탭 | 뜻 | 하위 탭 | 내용 |
 |---|---|---|---|
 | **Weights** | 이미 있는 웨이트를 다른 곳으로 옮긴다 | **Classic** | 레거시 2버튼 UI — `Joints to Joints (single mesh)` / `Meshes to Meshes`. **Engine(Kangaroo/Native) 선택**(v01.04~) |
-| 〃 | 〃 | **Transfer** (v01.04~) | **여러 소스 메시 → 현재 선택한 하나의 메시**로 웨이트 전이. **Engine(Native/Kangaroo) 선택**(v01.05~). 선택 버텍스에만/소프트 falloff 반영(Native) |
+| 〃 | 〃 | **Transfer** (v01.04~) | **여러 소스 메시 → 타겟**으로 웨이트 전이. **Engine(Native/Kangaroo) 선택**(v01.05~). 선택 버텍스에만/소프트 falloff 반영(Native). **v01.32~ `Target mode`** — 씬 선택 대신 **타겟 리스트와 1:1** 로 짝지어 여러 벌을 한 번에 |
 | 〃 | 〃 | **Migrate A -> B** | 토폴로지가 다른 두 메시 사이 Transfer + Move 통합 마이그레이션 |
 | 〃 | 〃 | **Copy Weights** (v01.17~) | **같은 메시 안에서** 버텍스 → 버텍스로 웨이트 복사. 목표마다 가장 가까운 소스 버텍스의 웨이트 행을 베낀다. 최근접 기준은 **Surface / Topology / Volume**, 실리는 정도는 **`Blend` 0~1**(v01.18~) |
 | 〃 | 〃 | **Smooth** (v01.31~) | 선택 버텍스의 웨이트를 **이웃과 평균**해 매끄럽게. Kangaroo `SkinCluster > Smooth` 이식 — `Iterations` · `Blend` · `Rigid` · `Keep Value One` · `Joint Locks`(4) · `Border Edges`(3) + `Border Mask Steps` · `Loop Curve` · 소프트 셀렉션 falloff |
@@ -57,14 +57,39 @@ Migrate 탭 사용법은 [[A00270_skinMigrate]] 문서와 동일하다.
 
 ---
 
-## Weights > Transfer — 여러 소스 → 선택 메시 (v01.04~)
+## Weights > Transfer — 소스 메시 → 타겟 (v01.04~)
 
-Kangaroo 의 *SkinCluster > Transfer* 를 흉내낸 기능. **여러 소스 메시로부터 현재 선택한
-메시(들)** 로 스킨 웨이트를 전이한다. **Engine** 을 고를 수 있다(v01.05~):
+Kangaroo 의 *SkinCluster > Transfer* 를 흉내낸 기능. 소스 메시들의 스킨 웨이트를
+타겟으로 전이한다. **Engine** 을 고를 수 있다(v01.05~):
 
 - **Native**(기본) — 플러그인 무의존. **선택 버텍스에만 전이 + 소프트 falloff** 를 지원한다(아래).
 - **Kangaroo** — Kangaroo `transferSkinCluster`(플러그인 필요). 컴포넌트/부분 전이는 Kangaroo 로직을
   따른다. soft falloff 옵션은 Native 전용이라 Kangaroo 를 고르면 비활성된다.
+
+### Target mode — 대상을 어떻게 고를지 (v01.32~)
+
+| 모드 | 대상 | 소스가 여럿일 때 |
+|------|------|------------------|
+| **Scene selection** (기본, 원래 동작) | **씬에서 선택한** 메시들(또는 그 버텍스) | 소스 전체가 함께 작용해 **버텍스별로 가장 가까운 소스**가 쓰인다 |
+| **Target list (1:1)** | `Source Meshes` **우측에 생기는 `Target Meshes` 리스트** | 짝마다 소스가 **하나**다. `Source[i] -> Target[i]`, **행 순서** |
+
+`Target list (1:1)` 규칙:
+
+- **개수가 다르면 적은 쪽만큼** 돈다. 몇 개가 짝지어졌는지 로그에 적힌다.
+- 짝은 리스트의 **행 순서**로 맺힌다 — 두 리스트의 `Up` / `Down` 버튼으로 줄을 맞춘다.
+- **메시가 아닌 항목**(지워진 노드, 커브 …)은 **짝을 맺기 전에** 빠진다. 그러지 않으면 그
+  뒤가 한 칸씩 밀려 **엉뚱한 메시에 전이**된다.
+- 짝은 **메시 전체**가 대상이다. 이 모드는 **씬 선택을 보지 않으므로** 부분 전이·소프트
+  falloff 는 `Scene selection` 모드에서 쓴다(그래서 1:1 모드에서는 soft 체크가 꺼진다).
+- 소스에 skinCluster 가 없거나 **자기 자신과 짝**이 된 항목은 사유와 함께 건너뛰고 나머지는
+  계속한다. 전체가 **한 번의 undo** 다.
+
+### 진행률 팝업 (v01.32~)
+
+`TRANSFER` 를 누르면 **게이지 팝업**(공용 `JUN_mod_progress_qt_v01`)이 뜨고, **메시 하나
+(짝 하나)가 끝날 때마다** 차면서 지금 처리 중인 이름이 보인다. `copySkinWeights` 는 메시
+안쪽 진행을 알려 주지 않으므로 그보다 잘게 표시할 방법이 없다. 끝나면 걸린 시간이 로그에
+남고, 에러가 나도 팝업은 닫힌다.
 
 ### 사용법
 
@@ -72,6 +97,7 @@ Kangaroo 의 *SkinCluster > Transfer* 를 흉내낸 기능. **여러 소스 메�
 2. 씬에서 **대상 메시(들)를 선택**한다(v01.06~ **여러 개 동시 가능**). 어떤 메시의 **버텍스를 선택하면
    그 메시는 그 버텍스에만** 전이된다. (소프트 셀렉션을 켜면 falloff 까지 반영된다.)
 3. **TRANSFER to selected mesh(es)** — 선택한 **모든** 대상 메시에 전이되고, 전체가 **한 번의 undo** 로 묶인다.
+   (1:1 모드에서는 타겟을 `Target Meshes` 리스트에 담고 버튼 이름이 **TRANSFER source -> target (1:1)** 로 바뀐다.)
 
 ### 동작
 
@@ -97,9 +123,23 @@ Kangaroo 의 *SkinCluster > Transfer* 를 흉내낸 기능. **여러 소스 메�
 - **소프트 falloff 는 셰이프 MObject 노드로 매칭**한다(v01.07~). 리치 셀렉션 컴포넌트는 셰이프 DAG 를
   주므로 문자열 경로로 비교하면 combine/rename 메시에서 틀어져 `kInvalidParameter` 로 이어졌다.
   이제 컴포넌트의 셰이프 노드와 대상 셰이프 노드를 직접 비교한다(`_shape_node`).
+- **1:1 모드는 전이 경로를 새로 만들지 않는다** — 짝마다 `_transfer_one_native()` 를
+  소스 하나 · 버텍스 선택 없음으로 부를 뿐이다(`transfer_pairs`). 그래서 전이 결과는
+  `Scene selection` 모드로 한 메시씩 전이한 것과 같다.
+- 진행률은 core 가 `progress(done, total, message)` 콜백으로 알린다(UI 비의존).
+  콜백에서 예외가 나도 전이는 멈추지 않는다 — 게이지는 보조 정보다.
 - **연결 shell 은 `MFnMesh.getVertices()` 한 번의 벌크 호출 + 파이썬 BFS**(`_connected_island`)로 구한다.
   하드 선택에서 이어진 버텍스만 남겨, combine 메시의 떨어진 shell 을 소프트 셀렉션에서 걸러낸다
   (버텍스별 반복 없이 빠름 — 3.1k 버텍스에서 0.007s).
+
+### 검증 (v01.32, mayapy 2024 + 오프스크린 Qt, 58항목)
+
+짝 규칙(행 순서 · 개수 불일치 시 적은 쪽 · 메시 아닌 항목이 순서를 밀지 않음) ·
+1:1 전이 결과가 교차하지 않음 · **씬 선택을 보지 않음** · 소스 skinCluster 없음/자기 짝
+건너뜀 · undo 한 번 · 진행률 콜백(시작 0, 끝 total, 짝 이름, 콜백이 터져도 계속) ·
+UI(기본 모드가 옛 동작, 타겟 리스트 숨김→표시, **소스 오른쪽에 위치**, 버튼 글자 변경,
+soft 체크 활성 규칙, 실제 클릭으로 1:1 전이, 팝업이 떠 있고 게이지가 오르고 끝나면 닫힘,
+예외 시에도 닫히고 `[Error]` 로그, `Scene selection` 모드 회귀).
 
 ---
 

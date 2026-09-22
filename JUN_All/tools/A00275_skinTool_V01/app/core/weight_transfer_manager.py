@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-23
+# last Update date : 2026-09-22
 # A00275_skinTool_V01 - 단일 메시 웨이트 전이 (Transfer 탭 코어, UI 비의존)
 #
 # Kangaroo 의 SkinCluster > Transfer 탭을 흉내낸 기능이되, **Kangaroo 없이** 동작한다.
@@ -20,6 +20,14 @@
 #     2) copySkinWeights 로 메시 전체 전이 → after.
 #     3) 선택 버텍스는 falloff 비율 f 로 before~after 를 lerp, 나머지는 before 로 복원.
 #     4) bulk setWeights.
+# 대상을 고르는 방식이 두 가지다 (v01.32~)
+#   MODE_SELECTION : 리스트의 소스들 -> **씬에서 선택한** 메시(또는 그 버텍스) 전부.
+#                    버텍스별로 가장 가까운 소스를 마야가 고른다(원래 동작, 기본).
+#   MODE_PAIRS     : 소스 리스트와 타겟 리스트를 **행 순서로 1:1** 짝지어
+#                    `소스[i] -> 타겟[i]` 로 전이한다. 개수가 다르면 적은 쪽만큼.
+#                    짝마다 소스가 하나뿐이므로 메시 여러 벌을 한 번에 갈아 끼울 때 쓴다.
+#                    전이 알고리즘(closestPoint)과 skinCluster 준비는 위와 같은 것을 쓴다.
+#
 #   버텍스 선택이 없으면(메시 전체 전이) 2)의 copySkinWeights 결과를 그대로 두어 undo 가
 #   깔끔하다. 선택/소프트가 있을 때만 setWeights 로 마스킹한다(그 경우 undo 는 setWeights
 #   특성상 세밀하지 않다 — 전체가 한 스텝).
@@ -31,6 +39,27 @@ import maya.api.OpenMayaAnim as oma
 from Framework.core.maya_undo import undo_chunk
 from Framework.core import maya_shape
 from Framework.core import maya_skin
+
+
+def _report(progress, done, total, message=None):
+    """진행률 콜백을 안전하게 부른다 (UI 가 없으면 None 이 온다).
+
+    콜백에서 예외가 나도 전이를 멈추지 않는다 - 게이지는 보조 정보다.
+    """
+    if not progress:
+        return
+    try:
+        progress(done, total, message)
+    except Exception:                                      # noqa: BLE001
+        pass
+
+
+#: 대상을 씬 선택에서 고른다 (원래 동작).
+MODE_SELECTION = "selection"
+#: 소스 리스트와 타겟 리스트를 행 순서로 1:1 짝짓는다 (v01.32~).
+MODE_PAIRS = "pairs"
+
+MODES = (MODE_SELECTION, MODE_PAIRS)
 
 
 # =========================
@@ -323,11 +352,14 @@ def _import_kangaroo(extra=""):
             "Load Kangaroo Builder first{0}.".format(extra))
 
 
-def transfer_to_mesh(source_meshes, respect_soft=True, engine="native"):
+def transfer_to_mesh(source_meshes, respect_soft=True, engine="native", progress=None):
     """소스 메시들 → 현재 선택한 타겟 메시(또는 그 선택 버텍스)로 웨이트를 전이한다.
 
     engine="native"   : cmds.copySkinWeights + maya.api (플러그인 무의존, 소프트 falloff 지원).
     engine="kangaroo" : Kangaroo transferSkinCluster (플러그인 필요).
+    progress          : `progress(done, total, message=None)` - **메시 하나가 끝날 때마다**
+                        부른다. `copySkinWeights` 는 메시 안쪽 진행을 주지 않으므로 그보다
+                        잘게 알릴 방법이 없다.
 
     반환: (성공 여부 int, 메시지 str)
     """
@@ -336,7 +368,7 @@ def transfer_to_mesh(source_meshes, respect_soft=True, engine="native"):
         return 0, "[Warning] Add one or more source meshes (with skinCluster) to the list."
 
     if engine == "kangaroo":
-        return _transfer_to_mesh_kangaroo(sources)
+        return _transfer_to_mesh_kangaroo(sources, progress=progress)
 
     src_scs = []
     for s in sources:
@@ -371,12 +403,15 @@ def transfer_to_mesh(source_meshes, respect_soft=True, engine="native"):
     try:
         # 선택한 모든 대상 메시를 한 번의 undo 로 묶어 전이한다.
         with undo_chunk():
+            total = len(targets)
+            _report(progress, 0, total, "{0} target(s)".format(total))
             for mesh, vtx_ids, soft in targets:
                 if not respect_soft:
                     soft = None
                 note = _transfer_one_native(sources, union, mesh, vtx_ids, soft)
                 done += 1
                 detail.append("{0}({1})".format(_leaf(mesh), note))
+                _report(progress, done, total, _leaf(mesh))
     except Exception as exc:
         return 0, "[Error] {0} (after {1} mesh(es))".format(exc, done)
 
@@ -453,7 +488,7 @@ def _transfer_one_native(sources, union, target, vtx_ids, soft):
 # Kangaroo 엔진
 # =========================
 
-def _transfer_to_mesh_kangaroo(sources):
+def _transfer_to_mesh_kangaroo(sources, progress=None):
     """Kangaroo transferSkinCluster 로 소스들 → 현재 선택(타겟)에 전이한다.
 
     타겟(메시 또는 버텍스)은 씬의 현재 선택을 그대로 쓴다(_pSelection=None). 소스가
@@ -483,6 +518,8 @@ def _transfer_to_mesh_kangaroo(sources):
 
     try:
         with undo_chunk():
+            # Kangaroo 는 한 번의 호출로 선택 전체를 처리하므로 그 안쪽 진행은 알 수 없다.
+            _report(progress, 0, 1, "kangaroo ({0} target(s))".format(len(targets)))
             ktw.transferSkinCluster(
                 _pSelection=None,        # 현재 선택 = 타겟(들)
                 sFrom=list(sources),
@@ -493,5 +530,147 @@ def _transfer_to_mesh_kangaroo(sources):
     except Exception as exc:
         return 0, "[Error] {0}".format(exc)
 
+    _report(progress, 1, 1, "done")
     return 1, "[Transfer/kangaroo] {0} source(s) -> {1} target(s) (closestPoint).".format(
         len(sources), len(targets))
+
+
+# =========================
+# 1:1 짝 전이 (MODE_PAIRS, v01.32~)
+# =========================
+
+def pair_meshes(source_meshes, target_meshes):
+    """두 리스트를 **행 순서로** 짝짓는다. `(짝 목록, 메모 목록)`.
+
+    개수가 다르면 **적은 쪽만큼**만 짝이 된다(요청 규칙). 남는 쪽은 메모로 알린다.
+    메시가 아닌 항목(지워졌거나 커브 등)은 짝을 맺기 **전에** 빠진다 - 그러지 않으면
+    빠진 자리 뒤가 한 칸씩 밀려 엉뚱한 메시에 전이된다.
+    """
+    notes = []
+
+    def clean(items, label):
+        kept = []
+        for item in items or []:
+            if _is_mesh(item):
+                kept.append(item)
+            else:
+                notes.append("[Warning] {0} '{1}' is not a mesh in the scene - "
+                             "left out of the pairing.".format(label, _leaf(item)))
+        return kept
+
+    sources = clean(source_meshes, "Source")
+    targets = clean(target_meshes, "Target")
+
+    count = min(len(sources), len(targets))
+    if len(sources) != len(targets):
+        notes.append("[Warning] {0} source(s) and {1} target(s) - pairing the first "
+                     "{2}.".format(len(sources), len(targets), count))
+
+    return list(zip(sources[:count], targets[:count])), notes
+
+
+def transfer_pairs(source_meshes, target_meshes, engine="native", progress=None):
+    """`소스[i] -> 타겟[i]` 로 전이한다(행 순서 1:1). `(성공한 짝 수, 메시지 str)`.
+
+    전이 자체는 `MODE_SELECTION` 과 **같은 경로**를 쓴다(closestPoint copySkinWeights +
+    인플루언스 준비). 다른 것은 대상을 리스트에서 고른다는 점과, 짝마다 소스가 하나라는 점이다.
+
+    - 짝은 **메시 전체**가 대상이다. 타겟을 리스트로 정하는 모드라 씬의 버텍스 선택은 보지
+      않는다(그러면 리스트에 담은 메시 중 하나만 부분 전이되는 일이 생긴다).
+      부분 전이·소프트 falloff 가 필요하면 `MODE_SELECTION` 쪽을 쓴다.
+    - 전부 **하나의 undo** 로 묶인다.
+    - progress : `progress(done, total, message=None)` - 짝 하나가 끝날 때마다 부른다.
+    """
+    pairs, notes = pair_meshes(source_meshes, target_meshes)
+    if not pairs:
+        return 0, " ".join(notes or []) or (
+            "[Warning] Put the source meshes and the target meshes in the two lists "
+            "first (they are paired by row order).")
+
+    if engine == "kangaroo":
+        return _transfer_pairs_kangaroo(pairs, notes, progress=progress)
+
+    done = 0
+    seen = 0
+    detail = []
+    try:
+        with undo_chunk():
+            total = len(pairs)
+            _report(progress, 0, total, "{0} pair(s)".format(total))
+            for source, target in pairs:
+                seen += 1
+                if _mesh_transform(source) == _mesh_transform(target):
+                    notes.append("[Warning] {0} is paired with itself - skipped.".format(
+                        _leaf(source)))
+                    _report(progress, seen, total, _leaf(source) + " (skipped)")
+                    continue
+                sc = _skincluster(source)
+                if not sc:
+                    notes.append("[Warning] Source '{0}' has no skinCluster - "
+                                 "skipped.".format(_leaf(source)))
+                    _report(progress, seen, total, _leaf(source) + " (skipped)")
+                    continue
+                note = _transfer_one_native([source], _influences(sc), target, None, None)
+                done += 1
+                detail.append("{0} -> {1}({2})".format(
+                    _leaf(source), _leaf(target), note))
+                _report(progress, seen, total, "{0} -> {1}".format(
+                    _leaf(source), _leaf(target)))
+    except Exception as exc:                                   # noqa: BLE001
+        return 0, "[Error] {0} (after {1} pair(s))".format(exc, done)
+
+    message = "[Transfer/native] {0} pair(s) 1:1: {1}".format(done, ", ".join(detail))
+    if notes:
+        message += " | " + " ".join(notes)
+    return done, message
+
+
+def _transfer_pairs_kangaroo(pairs, notes, progress=None):
+    """Kangaroo `transferSkinCluster` 로 짝마다 전이한다.
+
+    `_pSelection` 에 **타겟 이름**을 넘긴다 - kangaroo 가 문자열을 patch 로 바꿔 주므로
+    (`weights._translateInput` -> `patch.patchFromName`) 씬 선택을 건드리지 않아도 된다.
+    """
+    try:
+        ktw = _import_kangaroo(extra=" or switch the engine to 'Native'")
+    except RuntimeError as exc:
+        return 0, "[Error] {0}".format(exc)
+
+    done = 0
+    seen = 0
+    detail = []
+    try:
+        with undo_chunk():
+            total = len(pairs)
+            _report(progress, 0, total, "{0} pair(s)".format(total))
+            for source, target in pairs:
+                seen += 1
+                if _mesh_transform(source) == _mesh_transform(target):
+                    notes.append("[Warning] {0} is paired with itself - skipped.".format(
+                        _leaf(source)))
+                    _report(progress, seen, total, _leaf(source) + " (skipped)")
+                    continue
+                if not _skincluster(source):
+                    notes.append("[Warning] Source '{0}' has no skinCluster - "
+                                 "skipped.".format(_leaf(source)))
+                    _report(progress, seen, total, _leaf(source) + " (skipped)")
+                    continue
+                ktw.transferSkinCluster(
+                    _pSelection=target,          # 문자열을 kangaroo 가 patch 로 바꾼다
+                    sFrom=[source],
+                    iMode=2,                     # Closest Point
+                    iSmoothBorderMask=1,
+                    bAutoCreateNewSkinCluster=_skincluster(target) is None,
+                )
+                done += 1
+                detail.append("{0} -> {1}".format(_leaf(source), _leaf(target)))
+                _report(progress, seen, total, "{0} -> {1}".format(
+                    _leaf(source), _leaf(target)))
+    except Exception as exc:                                   # noqa: BLE001
+        return 0, "[Error] {0} (after {1} pair(s))".format(exc, done)
+
+    message = "[Transfer/kangaroo] {0} pair(s) 1:1 (closestPoint): {1}".format(
+        done, ", ".join(detail))
+    if notes:
+        message += " | " + " ".join(notes)
+    return done, message

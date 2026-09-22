@@ -31,6 +31,18 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-22 (오늘)
 
+> [!summary] A00275 **Transfer 에 `Target mode`(1:1 타겟 리스트) + 진행률 팝업** (v01.31->01.32)
+- 요청: `Weights > Transfer` 의 기존 기능은 그대로 두고 **새 모드**를 추가 — 그 모드에서는 `Source Meshes` 우측에 `Target Meshes` TSL 이 생기고, 버튼을 누르면 **소스[i] -> 타겟[i]** 로 전이. 개수가 다르면 **적은 쪽만큼**. (이어서) 버튼을 누르면 **게이지 팝업**으로 진행도 표시.
+- 기존 동작은 **기본값 그대로**(`Scene selection`) 두고 라디오로 모드를 바꾼다. 1:1 모드에서만 타겟 TSL 이 보이고, 버튼 글자와 힌트도 함께 바뀐다(무엇이 대상인지 화면에서 읽히게).
+- ★ **메시가 아닌 항목은 짝을 맺기 *전에* 걸러야 한다.** 리스트에 지워진 노드가 섞여 있으면 그 자리 뒤가 한 칸씩 밀려 **엉뚱한 메시에 전이**된다 — A00400 Replace 에서 겪은 것과 같은 함정([[wip-a00400-controls-tab]] 의 짝 순서 규칙). `pair_meshes()` 가 걸러낸 뒤 짝을 맺고, 걸러낸 사실을 로그에 적는다.
+- 1:1 모드는 **전이 경로를 새로 만들지 않는다** — 짝마다 기존 `_transfer_one_native()` 를 소스 하나 · 버텍스 선택 없음으로 부른다. 그래서 결과가 기존 모드로 한 메시씩 전이한 것과 같다.
+- 짝은 **메시 전체**가 대상이다(씬 선택을 보지 않는다). 부분 전이·소프트 falloff 는 `Scene selection` 쪽 일이라 1:1 모드에서는 soft 체크를 끈다 — 값이 살아 있는데 계산에서 빠지면 안 된다.
+- Kangaroo 엔진도 같은 모드로 돈다: `transferSkinCluster(_pSelection=<타겟 이름>)`. kangaroo 가 문자열을 patch 로 바꿔 주므로(`_translateInput` -> `patch.patchFromName`) **씬 선택을 건드리지 않고** 짝마다 부를 수 있다.
+- 진행률은 공용 팝업 `JUN_mod_progress_qt_v01`. core 는 `progress(done, total, message)` 콜백만 알고(UI 비의존), **메시/짝 하나가 끝날 때마다** 보고한다 — `copySkinWeights` 가 메시 안쪽 진행을 주지 않으므로 그보다 잘게 표시할 방법이 없다. 콜백에서 예외가 나도 전이는 멈추지 않는다.
+- 팝업은 `finally` 에서 닫고, 뚫고 올라온 예외는 `[Error]` 로그로 남긴다 — 테스트에서 일부러 터뜨려 보니 **모달 팝업이 뜬 채 트레이스백만** 나왔다(사용자에겐 멈춘 것으로 보인다).
+- UI 검증 함정: `isVisibleTo(window)` 는 그 탭이 **현재 탭이 아니면** False 다. setVisible 결과는 `isHidden()` 으로 보고, 실제로 보이는지는 창을 띄우고 하위 탭을 Transfer 로 바꿔 확인했다(소스 오른쪽에 있는지 x 좌표로도).
+- 검증: mayapy 2024 + 오프스크린 Qt **58항목 통과**. #A00275
+
 > [!summary] A00275 **Weights > Smooth 신규** — Kangaroo `SkinCluster > Smooth` 를 플러그인 없이 이식 (v01.30->01.31)
 - 요청: kangaroo 툴 `SkinCluster` 탭의 **Smooth 기능을 분석**하고, 그 기능을 **모두** A00275 의 `Weights` 하위 새 탭 `Smooth` 로 이식.
 - 분석: 원본은 `kangarooTabTools/weights.py::smoothSkinWeights()` + `kangarooTools/patch.py` 의 `getNeighborDataForSmoothing` · `getNeighbors` · `getBorderMask` · `smoothValues2d` · `_applyJointLocks` · `setSkinClusterWeights`. 식은 `new[v] = (w[v] + Σw[이웃]) / (1 + 이웃 수)` 를 iteration 만큼. UI 는 데코레이터(`uiSettings.addToUI`)가 **함수 시그니처에서 자동 생성**하고, `iJointLocks` · `iBorderEdges` 같은 것은 SkinCluster 탭 전체가 공유하는 칸이었다 — 그래서 "Smooth 의 옵션"을 알려면 시그니처와 탭 공유 목록을 함께 봐야 했다. kangaroo 는 [[kangaroo-plugin-external-readonly]] 대로 **한 줄도 고치지 않고 읽기만** 했다.
