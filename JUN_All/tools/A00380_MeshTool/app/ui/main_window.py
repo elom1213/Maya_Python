@@ -93,11 +93,14 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
 
         self.win_title = "Mesh Tool v{0}".format(VERSION)
-        # 가로는 A00400_CurveTool 과 같은 1176 로 맞춘다(2026-09-22 실측 — 그 툴은
-        # resize(360, 620) 이라고 적혀 있지만 자기 최소 폭이 1176 이라 늘 그 폭으로 열린다).
-        # 세로는 이 툴 자신의 실측값. 테마를 입힌 상태의 최소는 748 x 805 이고,
-        # 폭을 끄는 것은 Match 탭(722), 높이를 끄는 것은 MeshDoctor 탭이다.
-        self.resize(1176, 860)
+        # 가로는 A00400_CurveTool 과 **같은 값(360)** 을 요청한다. 두 툴이 같은 규칙으로
+        # 열리게 하는 것이 목적이다 - 실제 폭은 각자의 레이아웃 최소 폭까지만 벌어진다.
+        #
+        # 숫자를 크게 박지 않는 이유: 오프스크린(mayapy)에서 잰 최소 폭은 폰트가 달라
+        # **마야에서 보이는 폭보다 크게 나온다**(A00400 은 오프스크린 1176, 마야에선 훨씬 좁다).
+        # 그래서 실측값을 그대로 박으면 마야에서 필요 이상으로 넓은 창이 된다.
+        # 세로만 이 툴 자신의 사정으로 넉넉히 둔다(MeshDoctor 탭의 표 + 리포트).
+        self.resize(360, 860)
 
         self.session = None      # peak_mgr.PeakSession
         self._syncing = False    # 슬라이더 <-> 스핀박스 상호 갱신 재귀 방지
