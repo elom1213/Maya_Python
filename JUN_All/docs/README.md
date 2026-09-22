@@ -40,6 +40,8 @@
 | `A00410_SecondaryMotion` | 애니메이션 / 2차 모션 (FK 체인 관성·찰랑임) | [A00410_SecondaryMotion](A00410_SecondaryMotion.md) |
 | `A00420_Wrapper` | 모델링·페이셜 / 커브 가이드 래핑 (다른 토폴로지 메시 맞추기) | [A00420_Wrapper](A00420_Wrapper.md) |
 | `A00480_FileTool` | 파일 입출력 · 경로 (Export / Import / Path — A00040_V02 + quickTool File·Import 통합) | [A00480_FileTool](A00480_FileTool.md) |
+| `A00380_MeshTool` | 모델링 / 메시 진단 · 편집 (MeshDoctor · Peak · Match) | [A00380_MeshTool](A00380_MeshTool.md) |
+| `A00300_meshDoctor` | 〃 (A00380 의 MeshDoctor 탭으로 이식됨 · 보존) | [A00300_meshDoctor](A00300_meshDoctor.md) |
 
 ### 공용 위젯 · 헬퍼 (Framework)
 

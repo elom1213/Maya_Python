@@ -10,9 +10,14 @@
 # (v01.10~ 좌/우 리스트. 좌 1개 = 1 <= n, 여러 개 = n <= n). Kangaroo Geometry>Match 재현.
 # v01.09~ 하위 탭 Default(위 기능) / By Weight(스킨 웨이트를 마스크로 타깃 쪽으로 이동).
 #
+# MeshDoctor 탭 (v01.14~): 옛 A00300_meshDoctor 를 그대로 옮겨 왔다. 메시를 **읽기만 해서**
+# 진단하고(요약 표 + 상세 리포트 + 0020_out/ 에 JSON·TXT), 아래쪽 버튼으로 안전한 원클릭
+# 수정을 한다. Peak/Match 가 메시를 "고치는" 쪽이라면 이 탭은 "무엇이 잘못됐는지 말해 주는" 쪽이다.
+#
 # 흐름: Load 로 스냅샷 → 슬라이더를 끌면 실시간 미리보기(API 직접 쓰기) → 손을 떼는 순간
 #       그 상태를 그대로 확정(tweak 구간 setAttr, Ctrl+Z 한 번에 되돌아감). 별도 Apply 버튼 없음.
 
+import os
 import time
 
 from Framework.qt.qt import *
@@ -21,6 +26,7 @@ from Framework.qt.MOD_tsl_qt_v01 import JUN_mod_tsl_qt_v01
 from Framework.qt.MOD_checkList_qt_v01 import JUN_mod_checkList_qt_v01
 from Framework.qt.MOD_filter_qt_v01 import JUN_mod_filter_qt_v01
 from Framework.qt.MOD_progress_qt_v01 import JUN_mod_progress_qt_v01
+from Framework.qt import JUN_mod_collapsible_qt
 
 import maya.cmds as cmds
 
@@ -31,6 +37,9 @@ from tools.A00380_MeshTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00380_MeshTool.app.core import peak_manager as peak_mgr
 from tools.A00380_MeshTool.app.core import match_manager as match_mgr
 from tools.A00380_MeshTool.app.core import weight_match_manager as wm_mgr
+from tools.A00380_MeshTool.app.core.mesh_scan import MeshScanner
+from tools.A00380_MeshTool.app.core.mesh_fix import MeshFixer
+from tools.A00380_MeshTool.app.core.report import ReportWriter
 
 
 WINDOW_OBJECT_NAME = "JUN_A00380_MeshTool_window"
@@ -40,6 +49,14 @@ SLIDER_TICKS = 1000
 
 _WARN_COLOR = "#ffb454"
 _OK_COLOR = "#7ddc7d"
+
+# MeshDoctor 탭의 진단 등급 색. FAIL = 막힘, WARN = 문제일 가능성, INFO = 참고, PASS = 정상.
+_SEV_COLOR = {
+    "FAIL": "#ff6b6b",
+    "WARN": "#ffd166",
+    "INFO": "#8ab4f8",
+    "PASS": "#6bcf8a",
+}
 
 # 미리보기 한 번이 이 시간을 넘으면 "무거운 메시"로 보고 드래그 중 갱신을 솎아낸다.
 _HEAVY_SEC = 0.08
@@ -76,7 +93,9 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
 
         self.win_title = "Mesh Tool v{0}".format(VERSION)
-        self.resize(380, 520)
+        # 테마를 입힌 상태에서 잰 최소 크기는 748 x 805 다(폭은 Match 탭, 높이는 MeshDoctor 탭이
+        # 끈다). 예전 380 x 520 은 그보다 작아 어차피 Qt 가 늘려 주던 값이라, 실제 크기를 적는다.
+        self.resize(760, 860)
 
         self.session = None      # peak_mgr.PeakSession
         self._syncing = False    # 슬라이더 <-> 스핀박스 상호 갱신 재귀 방지
@@ -93,6 +112,11 @@ class MainWindow(QWidget):
         self.match_session = None      # match_mgr.MatchSession
         self._match_syncing = False
         self._match_preview_dirty = False
+
+        # MeshDoctor 탭 상태. 진단은 씬을 읽기만 하므로 미리보기/세션이 없다.
+        self.scanner = MeshScanner()
+        self._doctor_results = []      # 마지막 진단 결과 (요약 표의 행과 1:1)
+        self._last_out_dir = None      # 마지막으로 리포트를 쓴 폴더
 
         self.build_ui()
         self.update_state()
@@ -113,6 +137,8 @@ class MainWindow(QWidget):
         root.setMenuBar(self.menu_bar)
 
         self.tabs = QTabWidget()
+        # MeshDoctor 가 맨 앞이다 — 무엇이 잘못됐는지 먼저 보고, 그다음에 고치는 순서.
+        self.tabs.addTab(self.build_doctor_tab(), "MeshDoctor")
         self.tabs.addTab(self.build_peak_tab(), "Peak")
         self.tabs.addTab(self.build_match_tab(), "Match")
         self.tabs.currentChanged.connect(self.on_tab_changed)
@@ -124,8 +150,8 @@ class MainWindow(QWidget):
         self.te_log.setMaximumHeight(110)
         root.addWidget(self.te_log)
 
-        self.log("Mesh Tool v{0} ({1}) ready. Select a mesh or vertices, then "
-                 "click 'Load Selection'.".format(VERSION, LAST_UPDATE))
+        self.log("Mesh Tool v{0} ({1}) ready.  Peak / Match reshape meshes, "
+                 "MeshDoctor diagnoses them.".format(VERSION, LAST_UPDATE))
 
     def build_peak_tab(self):
 
@@ -577,6 +603,316 @@ class MainWindow(QWidget):
         lay.addWidget(self.btn_wm_apply)
 
         return page
+
+    # ==============================================================
+    # MeshDoctor 탭 (v01.14, 옛 A00300_meshDoctor 이식)
+    # ==============================================================
+
+    def build_doctor_tab(self):
+        """진단(읽기 전용) + 안전한 원클릭 수정.
+
+        A00300 은 대상 리스트를 직접 만들어 썼지만, 이 툴은 이미 공용 TSL 위젯을 쓰므로
+        그쪽으로 맞췄다 — 행을 누르면 씬에서 선택되고, 항목은 UUID 로 보관되어
+        리네임/리페어런트 뒤에도 같은 메시를 가리킨다.
+        """
+
+        page = QWidget()
+        lay = QVBoxLayout(page)
+
+        # ---- 대상 메시 --------------------------------------------
+        self.tsl_doctor = JUN_mod_tsl_qt_v01(
+            title="Target Meshes",
+            show_sort=True, show_order=False, select_label="List Selected",
+            list_min_height=90, log_callback=self.log)
+        self.tsl_doctor.setToolTip(
+            "Meshes to diagnose. Empty = diagnose whatever is selected in the scene.\n"
+            "Clicking a row selects that mesh in the scene.")
+        lay.addWidget(self.tsl_doctor)
+
+        # ---- 진단 행 ----------------------------------------------
+        diag_row = QHBoxLayout()
+        self.btn_diagnose = QPushButton("Diagnose Listed")
+        self.btn_diagnose.setMinimumHeight(38)
+        self.btn_diagnose.setToolTip(
+            "Diagnose every mesh in the list above, or the current scene selection\n"
+            "when the list is empty. Reads the meshes only - nothing is changed.")
+        self.btn_diagnose.clicked.connect(self.on_diagnose)
+        diag_row.addWidget(self.btn_diagnose, 3)
+
+        self.btn_open_reports = QPushButton("Open Report Folder")
+        self.btn_open_reports.setMinimumHeight(38)
+        self.btn_open_reports.setToolTip(
+            "Open the 0020_out folder where the JSON / TXT reports are written.")
+        self.btn_open_reports.clicked.connect(self.on_open_report_folder)
+        diag_row.addWidget(self.btn_open_reports, 1)
+        lay.addLayout(diag_row)
+
+        # ---- 요약 표 (메시 한 줄, 행을 누르면 아래에 상세) ----------
+        self.tbl_summary = QTableWidget(0, 3)
+        self.tbl_summary.setHorizontalHeaderLabels(["Mesh", "Status", "Issues"])
+        self.tbl_summary.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tbl_summary.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tbl_summary.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tbl_summary.verticalHeader().setVisible(False)
+        self.tbl_summary.setMinimumHeight(120)
+        self.tbl_summary.setToolTip(
+            "Click a row to read that mesh's full report below.\n"
+            "The row is also selected in the scene.")
+        hdr = self.tbl_summary.horizontalHeader()
+        hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(2, QHeaderView.Stretch)
+        self.tbl_summary.itemSelectionChanged.connect(self._on_summary_row)
+        lay.addWidget(self.tbl_summary, 1)
+
+        # ---- 상세 리포트 -------------------------------------------
+        # 공용 로그창은 이 툴 전체가 쓰는 한 줄짜리 상태 표시줄이라(높이 110), 수십 줄짜리
+        # 진단 리포트를 거기 쏟으면 둘 다 못 읽는다. 리포트는 탭 안에 따로 둔다.
+        self.te_report = QTextEdit()
+        self.te_report.setReadOnly(True)
+        self.te_report.setLineWrapMode(QTextEdit.NoWrap)
+        self.te_report.setMinimumHeight(150)
+        self.te_report.setToolTip("Full report of the mesh selected in the table above.")
+        try:
+            self.te_report.setFont(QFont("Consolas", 9))
+        except Exception:
+            pass
+        lay.addWidget(self.te_report, 2)
+
+        # ---- 안전한 원클릭 수정 -------------------------------------
+        fixes = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01(
+            "Safe One-Click Fixes  (undoable)", expanded=False)
+        for label, fn, tip in [
+            ("Delete History (deformer-safe)", MeshFixer.delete_history,
+             "Bake out leftover poly history, keep skinCluster / blendShape."),
+            ("Merge Vertices", MeshFixer.merge_vertices,
+             "Merge coincident / unmerged vertices (tolerance 1e-4)."),
+            ("Conform Normals", MeshFixer.conform_normals,
+             "Unlock + conform face normals (fixes flipped / locked normals)."),
+            ("polyCleanup (fix corruption)", MeshFixer.poly_cleanup,
+             "Fix non-manifold + lamina + zero-area faces + zero-length edges.\n"
+             "May change topology - re-skin if needed."),
+            ("Snap NaN / Stray Verts", MeshFixer.snap_stray_verts,
+             "Move NaN / stray verts to the mesh centroid (nothing is deleted)\n"
+             "-> deflates the bounding box, fixes selection in empty space."),
+        ]:
+            b = QPushButton(label)
+            b.setMinimumHeight(30)
+            b.setToolTip(tip)
+            b.clicked.connect(self._doctor_fix(fn))
+            fixes.add_widget(b)
+        lay.addWidget(fixes)
+
+        # ---- 문제 컴포넌트 선택 -------------------------------------
+        picks = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01(
+            "Select Problem Components", expanded=False)
+        for label, fn, tip in [
+            ("Select Non-Manifold", MeshFixer.select_non_manifold,
+             "Select the non-manifold edges / vertices so you can look at them."),
+            ("Select Zero-Area Faces", MeshFixer.select_zero_area_faces,
+             "Select degenerate / sliver faces (not the small-but-fine ones)."),
+            ("Select Stray / NaN Verts", MeshFixer.select_stray_verts,
+             "Select vertices sitting far outside the mesh, or holding NaN."),
+        ]:
+            b = QPushButton(label)
+            b.setMinimumHeight(28)
+            b.setToolTip(tip)
+            b.clicked.connect(self._doctor_fix(fn))
+            picks.add_widget(b)
+        lay.addWidget(picks)
+
+        return page
+
+    # ---- MeshDoctor 동작 -------------------------------------------
+
+    def on_diagnose(self):
+        """리스트(비어 있으면 씬 선택)를 진단해 요약 표를 채우고 리포트를 쓴다."""
+
+        nodes = self.tsl_doctor.get_all_nodes()
+        source = "listed"
+
+        if not nodes:
+            nodes = cmds.ls(selection=True, long=True) or []
+            source = "selection"
+
+        try:
+            results = self.scanner.scan_nodes(nodes)
+        except Exception as e:
+            self.log("Diagnose failed: {0}".format(e), warn=True)
+            return
+
+        self._doctor_results = results
+        self._fill_summary(results)
+        self.te_report.clear()
+
+        if not results:
+            where = "in the list" if source == "listed" else "selected"
+            self.log("No polygon mesh {0}. List meshes (or select some) and "
+                     "try again.".format(where), warn=True)
+            return
+
+        worst = self._worst_of(results)
+        self.log("Diagnosed {0} mesh(es) [{1}] - worst: {2}. Click a row for the "
+                 "full report.".format(len(results), source, worst),
+                 warn=worst in ("FAIL", "WARN"), ok=worst == "PASS")
+
+        try:
+            json_path, txt_path, out_dir = ReportWriter().write(results)
+            self._last_out_dir = out_dir
+            self.log("  report: {0}".format(json_path))
+        except Exception as e:
+            self.log("Failed to write the report file: {0}".format(e), warn=True)
+
+        # 진단 직후에는 가장 심한 메시의 상세를 바로 펼쳐 준다(한 번 더 클릭하지 않게).
+        worst_row = self._worst_row(results)
+        if worst_row >= 0:
+            self.tbl_summary.selectRow(worst_row)
+
+    @staticmethod
+    def _worst_of(results):
+        for sev in ("FAIL", "WARN", "INFO"):
+            if any(r["worst"] == sev for r in results):
+                return sev
+        return "PASS"
+
+    @staticmethod
+    def _worst_row(results):
+        for sev in ("FAIL", "WARN", "INFO"):
+            for i, r in enumerate(results):
+                if r["worst"] == sev:
+                    return i
+        return 0 if results else -1
+
+    @staticmethod
+    def _issue_summary(r):
+        """WARN / FAIL 인 검사만 'name(count)' 로 줄인다(FAIL 먼저). 없으면 'clean'."""
+        parts = []
+        for sev in ("FAIL", "WARN"):
+            for chk in r["checks"]:
+                if chk["severity"] != sev:
+                    continue
+                parts.append("{0}({1})".format(chk["check"], chk["count"])
+                             if chk["count"] else chk["check"])
+        return ", ".join(parts) if parts else "clean"
+
+    def _fill_summary(self, results):
+
+        self.tbl_summary.blockSignals(True)
+        self.tbl_summary.setRowCount(0)
+
+        for r in results:
+            row = self.tbl_summary.rowCount()
+            self.tbl_summary.insertRow(row)
+
+            mesh_item = QTableWidgetItem(r["transform"])
+            mesh_item.setToolTip(r.get("transform_full", r["transform"]))
+
+            status_item = QTableWidgetItem("● " + r["worst"])
+            color = _SEV_COLOR.get(r["worst"])
+            if color:
+                status_item.setForeground(QColor(color))
+
+            issues_item = QTableWidgetItem(self._issue_summary(r))
+            issues_item.setToolTip(issues_item.text())
+
+            self.tbl_summary.setItem(row, 0, mesh_item)
+            self.tbl_summary.setItem(row, 1, status_item)
+            self.tbl_summary.setItem(row, 2, issues_item)
+
+        self.tbl_summary.blockSignals(False)
+
+    def _on_summary_row(self):
+        """행을 고르면 그 메시의 상세 리포트를 띄우고 씬에서도 선택한다."""
+
+        row = self.tbl_summary.currentRow()
+        if row < 0 or row >= len(self._doctor_results):
+            return
+
+        result = self._doctor_results[row]
+        self._print_result(result)
+
+        # 표에서 고른 메시를 씬에서도 집어 준다. 전체 경로가 있으면 그쪽이 정확하다.
+        node = result.get("transform_full") or result.get("transform")
+        try:
+            if node and cmds.objExists(node):
+                cmds.select(node, replace=True)
+        except Exception:
+            pass
+
+    def _print_result(self, r):
+        """A00300 의 상세 리포트 형식 그대로 — 탭 안 리포트 뷰에 쓴다."""
+
+        c = r.get("counts", {})
+        self.te_report.clear()
+
+        def put(text, severity=None):
+            color = _SEV_COLOR.get(severity)
+            if color:
+                self.te_report.append(
+                    '<span style="color:{0};">{1}</span>'.format(color, self._esc(text)))
+            else:
+                self.te_report.append(text)
+
+        put("=" * 60)
+        put("MESH: {0}  [{1}]  => {2}".format(r["transform"], r["shape"], r["worst"]),
+            r["worst"])
+        put("  verts={0} edges={1} faces={2} shells={3}".format(
+            c.get("vertices", "?"), c.get("edges", "?"),
+            c.get("faces", "?"), c.get("shells", "?")))
+
+        for cause in r.get("suspected_root_causes", []):
+            put("  >> " + cause, "WARN" if "Symptom" in cause else "PASS")
+
+        put("-" * 60)
+
+        clean = True
+        for chk in r["checks"]:
+            if chk["severity"] == "PASS":
+                continue
+            clean = False
+            line = "  [{0}] {1}".format(chk["severity"], chk["check"])
+            if chk["count"]:
+                line += " (count={0})".format(chk["count"])
+            put(line, chk["severity"])
+            put("      " + chk["message"])
+
+        if clean:
+            put("  Nothing to report - every check passed.", "PASS")
+
+        self.te_report.moveCursor(QTextCursor.Start)
+
+    def _doctor_fix(self, fn):
+        """수정 버튼 하나를 슬롯으로. clicked 가 넘기는 checked(bool) 는 버린다."""
+
+        def _slot(*_args):
+            try:
+                msg = fn()
+            except Exception as e:
+                self.log("{0} failed: {1}".format(
+                    getattr(fn, "__name__", "fix"), e), warn=True)
+                return
+            self.log("{0}  -> re-run Diagnose to confirm.".format(msg), ok=True)
+
+        return _slot
+
+    def on_open_report_folder(self):
+
+        out_dir = self._last_out_dir
+
+        if not out_dir:
+            # 아직 한 번도 안 썼으면 기본 0020_out 경로라도 열어 준다.
+            try:
+                out_dir = str(ReportWriter().pm.path("write"))
+            except Exception:
+                out_dir = None
+
+        if out_dir and os.path.isdir(out_dir):
+            try:
+                os.startfile(out_dir)
+            except Exception as e:
+                self.log("Could not open the folder: {0}".format(e), warn=True)
+        else:
+            self.log("No report folder yet. Run Diagnose first.", warn=True)
 
     # ==============================================================
     # 상태
@@ -1299,6 +1635,9 @@ class MainWindow(QWidget):
             "Kangaroo's Geometry > Match.\n"
             "Match > By Weight: move meshes toward a target by a skinned\n"
             "mesh's joint weights (like a blend shape weight map).\n\n"
+            "MeshDoctor: read-only diagnostics - list meshes, diagnose them,\n"
+            "read the per-mesh report, and run the safe one-click fixes.\n"
+            "Reports are written to the tool's 0020_out folder.\n\n"
             "Peak has no Apply button: dragging the slider applies the\n"
             "result as you go (each change is one Ctrl+Z).\n"
             "by Ji Hun Park".format(VERSION, LAST_UPDATE))

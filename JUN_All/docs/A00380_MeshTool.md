@@ -1,14 +1,19 @@
 ---
 title: A00380_MeshTool 사용법
-aliases: [Mesh Tool, MeshTool, A00380, Peak, Match, By Weight]
-tags: [maya-python, tool-guide, mesh, modeling, peak, normal, match, kangaroo, layout, skin-weight, corrective]
-updated: 2026-09-18
+aliases: [Mesh Tool, MeshTool, A00380, Peak, Match, By Weight, MeshDoctor, meshDoctor]
+tags: [maya-python, tool-guide, mesh, modeling, peak, normal, match, kangaroo, layout, skin-weight, corrective, diagnostics, cleanup]
+updated: 2026-09-22
 ---
 
 # A00380_MeshTool 사용법
 
-Maya 안에서 도는 **메시 편집** PySide 툴이다(arch B, in-Maya). **Peak / Match** 두 탭으로 구성된다.
+Maya 안에서 도는 **메시 진단 · 편집** PySide 툴이다(arch B, in-Maya).
+**MeshDoctor / Peak / Match** 세 탭으로 구성된다 — **무엇이 잘못됐는지 먼저 보고, 그다음 고치는** 순서다.
 
+- **MeshDoctor** (v01.14~) = 메시를 **읽기만 해서** 진단한다. 리스트업한 메시들을 한 번에 검사해
+  **메시당 한 줄 요약 표**를 만들고, 행을 누르면 **그 메시의 상세 리포트**가 아래에 펼쳐진다.
+  결과는 `0020_out/` 에 JSON · TXT 로도 남는다. 아래쪽에 **안전한 원클릭 수정**과
+  **문제 컴포넌트 선택** 버튼이 있다. 옛 **`A00300_meshDoctor`** 를 통째로 옮겨 온 것이다(§3-4).
 - **Peak** (v01.00~) = 선택한 메시/버텍스를 **각자의 노말 방향으로 팽창(+) · 수축(-)** 시킨다.
   후디니의 **peak 노드**와 같은 개념이고, 마야 기본 방식(컴포넌트 선택 → Move 툴 `axis = normal`)의
   느린 점을 해결하는 것이 목적이다.
@@ -19,16 +24,21 @@ Maya 안에서 도는 **메시 편집** PySide 툴이다(arch B, in-Maya). **Pea
   - **By Weight** (v01.09~) — 스킨 메시의 **조인트 웨이트를 마스크로** 써서, 메시들을 타깃 모양 쪽으로
     `웨이트 × 델타` 만큼 옮긴다. 블렌드셰이프 타깃에 웨이트 맵(마스크)을 칠한 것과 결과가 같다.
 
-- **버전**: `app/config/version.py` (v01.13 — `Match > Default` 좌/우 리스트에 **Sort** 버튼)
+- **버전**: `app/config/version.py` (v01.14 — **MeshDoctor 탭** 이식 + 새 아이콘
+  · v01.13 — `Match > Default` 좌/우 리스트에 **Sort** 버튼)
 - **설치**: `__dragDrop_A00380.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **MeshTool** → `tools.A00380_MeshTool.run(True)`
 
 ---
 
 ## 1. 화면 구성
 
+탭 순서는 **MeshDoctor → Peak → Match** 다. 진단이 앞에 오는 이유는 작업 순서가 그렇기 때문이다 —
+무엇이 잘못됐는지 보고 나서 고친다. MeshDoctor 탭의 그림은 §3-4 에 따로 있다.
+
 ```
 ┌ Mesh Tool ─────────────────────────┐
 │ Help                               │
+│ [MeshDoctor] [Peak] [Match]        │
 │ ┌ Peak ──────────────────────────┐ │
 │ │ ┌ Target ────────────────────┐ │ │
 │ │ │ pSphere1 | 382 vertice(s)  │ │ │  ← 로드된 대상 요약
@@ -269,6 +279,94 @@ mask[v] = M_j 에 짝지은 조인트들의 M_w 웨이트 합 (1 로 자름)
 
 ---
 
+## 3-4. MeshDoctor 탭 (v01.14~)
+
+옛 **`A00300_meshDoctor`** 를 통째로 옮겨 온 탭이다. **씬을 읽기만 한다** — 진단만으로는
+메시가 바뀌지 않는다. 씬을 건드리는 것은 아래쪽 **Fixes** 버튼뿐이고, 그것도 `Ctrl+Z` 한 번으로 돌아간다.
+
+```
+┌ MeshDoctor ────────────────────────────────┐
+│ ┌ Target Meshes ─────────────────────────┐ │
+│ │ body_geo                     [Select]  │ │  ← 공용 TSL. 비우면 씬 선택을 진단
+│ │ head_geo                     [Add/Del] │ │
+│ └────────────────────────────────────────┘ │
+│ [   Diagnose Listed   ] [Open Report Folder]│
+│ ┌ Mesh ───────┬ Status ┬ Issues ─────────┐ │
+│ │ body_geo    │ ● FAIL │ stray_vertices(3)│ │  ← 행을 누르면 아래에 상세 + 씬 선택
+│ │ head_geo    │ ● PASS │ clean            │ │
+│ └─────────────┴────────┴──────────────────┘ │
+│ ┌ report ────────────────────────────────┐ │
+│ │ MESH: body_geo [bodyShape] => FAIL     │ │
+│ │   [FAIL] stray_vertices (count=3)      │ │
+│ └────────────────────────────────────────┘ │
+│ ▸ Safe One-Click Fixes  (undoable)         │
+│ ▸ Select Problem Components                │
+└────────────────────────────────────────────┘
+```
+
+### 쓰는 법
+
+1. 메시를 고르고 **`Select Objects`** 로 **Target Meshes** 에 담는다.
+   **리스트가 비어 있으면 현재 씬 선택**을 진단한다(그냥 골라 놓고 눌러도 된다).
+2. **`Diagnose Listed`** — 표가 메시당 한 줄로 채워진다. **가장 심한 메시의 상세가 자동으로 펼쳐진다.**
+3. 표의 **행을 누르면** 그 메시의 상세 리포트가 아래에 뜨고, **씬에서도 그 메시가 선택**된다.
+4. 필요하면 **Fixes** 나 **Select Problem Components** 를 쓴 뒤 **다시 진단**해 확인한다.
+
+### 등급
+
+| 등급 | 뜻 |
+|------|-----|
+| `● FAIL` | 막힌다. 이 상태로는 다음 작업(트랜스퍼·스킨 등)이 깨진다 |
+| `● WARN` | 문제일 가능성이 높다. 왜 그런지 보고 판단한다 |
+| `● INFO` | 참고 사항(히스토리가 있다 등) |
+| `● PASS` | 이 검사에서는 문제 없음 |
+
+표의 `Issues` 칸은 **FAIL · WARN 인 검사만** `이름(개수)` 로 줄여 보여 준다(없으면 `clean`).
+
+### 무엇을 보는가
+
+정점 건전성(`nan_inf_vertices` · `stray_vertices` · `bbox_inflation` · `coincident_vertices`),
+토폴로지(`non_manifold` · `lamina_faces` · `zero_area_faces` · `tiny_faces` · `zero_length_edges` ·
+`holed_faces` · `border_edges` · `shells`), 노드 상태(`construction_history` ·
+`intermediate_shapes` · `negative_scale` · `skin_cluster` · `missing_uvs`) 등이다.
+검사 목록과 임계값은 `app/core/mesh_scan.py` 상단 상수부에 모여 있다.
+
+> [!note] `zero_area_faces` 와 `tiny_faces` 는 다르다
+> 면적만으로 가르지 않고 **형상 품질 q**(등주지수 `4πA / P²`, 원 = 1 · 정삼각형 ≈ 0.6 · 슬라이버 → 0)를
+> 함께 본다. **작지만 멀쩡한 면**은 `tiny_faces`(INFO)로 내려가고, **정점이 일직선이라 진짜 퇴화한 면**만
+> `zero_area_faces`(FAIL)로 잡힌다. 후자는 barycentric 좌표가 깨져 트랜스퍼가 실패한다.
+> **필요한 면이면 지우지 말고** closestVertex 모드로 트랜스퍼한다.
+
+### 리포트 파일
+
+진단할 때마다 툴의 `0020_out/` 에 두 벌이 쌓인다(`.gitignore` 대상).
+
+| 파일 | 용도 |
+|------|------|
+| `meshDoctor_<씬>_<시각>.json` | 구조화된 전체 결과. 분석·자동화에 쓴다 |
+| `meshDoctor_<씬>_<시각>_summary.txt` | 사람이 그냥 읽는 요약 |
+
+`Open Report Folder` 로 그 폴더를 연다(아직 진단 전이면 기본 `0020_out` 을 연다).
+
+### 이식하면서 바꾼 것
+
+| | A00300_meshDoctor | A00380 MeshDoctor 탭 |
+|---|---|---|
+| 대상 리스트 | 직접 만든 `QListWidget` + Add/Remove/Clear | **공용 TSL 위젯**(`JUN_mod_tsl_qt_v01`) — Select/Add/Del/Sort, UUID 보관 |
+| 상세 리포트 | 로그창에 출력 | **탭 안의 리포트 뷰**로 분리 (공용 로그창은 한 줄 상태 표시줄이라 수십 줄을 담기엔 좁다) |
+| 진단 직후 | 요약만, 행을 눌러야 상세 | **가장 심한 메시를 자동으로 펼친다** |
+| 행 클릭 | 상세 출력 | 상세 출력 **+ 씬에서도 그 메시 선택** |
+| 리포트 위치 | `A00300_meshDoctor/0020_out/` | `A00380_MeshTool/0020_out/` |
+
+진단 로직(`app/core/mesh_scan.py` · `mesh_fix.py` · `report.py`)은 **한 줄도 바꾸지 않았다** —
+패키지 경로와 리포트 머리말만 이 툴 것으로 고쳤다. 같은 씬에서 두 툴의 진단 결과가
+**완전히 동일**한 것을 확인했다(§5).
+
+> 옛 `A00300_meshDoctor` 는 **그대로 남아 있다.** 이 저장소의 관례대로 옛 툴은 지우지 않는다.
+> 새 작업은 이 탭에서 한다.
+
+---
+
 ## 4. 왜 마야 기본 방식보다 빠른가
 
 마야에서 버텍스를 노말 방향으로 옮기면 **버텍스마다 명령이 하나씩** 실행된다.
@@ -287,6 +385,21 @@ mask[v] = M_j 에 짝지은 조인트들의 M_w 웨이트 합 (1 로 자름)
 ---
 
 ## 5. 구현 메모 (수정할 때 주의)
+
+### MeshDoctor 이식 검증 (v01.14)
+
+진단 로직은 손대지 않았으므로 **결과가 같은지**로 확인했다. 같은 씬(정상 구 · 큐브 · 떠돌이 정점 메시 ·
+평면 · 병합으로 흐트러뜨린 실린더)에서 `A00300` 과 `A00380` 의 `MeshScanner.scan_nodes()` 결과를
+JSON 으로 덤프해 비교 — **완전히 동일**하다.
+
+탭 자체는 mayapy 오프스크린으로 20항목을 확인했다: 탭 순서(MeshDoctor 가 첫 번째) ·
+요약 표가 채워지는지 · 행을 누르면 상세가 뜨고 씬에서도 선택되는지 · 진단 직후 가장 심한 메시가
+자동으로 펼쳐지는지 · 리포트가 **A00380 의** `0020_out/` 에 써지는지 · TSL 로 담은 리스트가
+씬 선택보다 우선하는지 · 테마를 입힌 상태의 최소 크기(748 x 805, 폭은 Match 탭이 끈다).
+
+> 마야 GUI 에서의 실제 확인(셸프 드롭 → 진단 → Fixes 버튼)은 아직이다.
+
+### Peak / Match
 
 `app/core/peak_manager.py`(Peak) 와 `app/core/match_manager.py`(Match) 에 정리돼 있다.
 By Weight 는 `app/core/weight_match_manager.py` — 웨이트는 `MFnSkinCluster.getWeights` 로 한 번에 읽고,
@@ -370,8 +483,17 @@ self.tsl_from.list_widget.setMaximumHeight(70)  # 천장은 리스트에만
 
 ## 6. 앞으로
 
-메시 관련 기능이 생기면 탭으로 추가한다(현재 Peak / Match). 새 탭도 Peak/Match 처럼
-`app/core/<name>_manager.py` 에 세션 모델(preview/restore/commit)을 두고, 공용 헬퍼를 재사용한다.
+메시 관련 기능이 생기면 탭으로 추가한다(현재 MeshDoctor / Peak / Match). 메시를 **바꾸는** 탭은
+Peak/Match 처럼 `app/core/<name>_manager.py` 에 세션 모델(preview/restore/commit)을 두고 공용 헬퍼를
+재사용한다. **읽기만 하는** 탭(MeshDoctor)은 세션이 없어 그 구조를 따르지 않는다.
+
+### 아이콘 (v01.14)
+
+셸프 아이콘을 다시 그렸다. 툴이 하는 세 가지가 한 그림에 들어간다 —
+**누운 와이어프레임 격자**(대상 메시) · **버텍스 하나를 노말 방향으로 끌어올리는 화살표**(Peak/Match = 편집) ·
+**오른쪽 아래 십자 배지**(MeshDoctor = 진단·수정). 32px 에서 뭉개지지 않게 요소는 셋으로 제한했고,
+배지는 격자와 겹치지 않는 모서리에 둔다. `icon/A00380_MeshTool.svg` 가 원본이고
+PNG 는 `dev/build_icons.py` 와 같은 방식(Qt `QSvgRenderer`)으로 32x32 ARGB 로 굽는다.
 
 ---
 

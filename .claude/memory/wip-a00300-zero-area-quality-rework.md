@@ -1,6 +1,6 @@
 ---
 name: wip-a00300-zero-area-quality-rework
-description: IN-PROGRESS — A00300_meshDoctor zero_area_faces 판정을 형상품질 기반으로 재작업 (크래시 복구용 체크포인트)
+description: zero_area_faces 를 면적이 아니라 형상품질(등주지수)로 판정 — 진짜 슬라이버만 FAIL, 작지만 멀쩡한 면은 tiny_faces(INFO)
 metadata: 
   node_type: memory
   type: project
@@ -48,5 +48,6 @@ metadata:
 - [ ] (사용자 요청 시) Dnable_repo/dev 푸시 — **아직 푸시 안 함**
 - [ ] 마야 실기 테스트(드롭→셸프, 실제 케이스 A 메시로 q 값 확인 + Clear Log 동작) — 사용자 측
 
-**상태: 구현 완료 (커밋/푸시 전).** 재개 시 `git status` 로 변경 확인 후, 필요하면 푸시([[push-target-dnable-dev]]).
+**상태: 완료.** 코드는 저장소에 들어갔고, 2026-09-22 에 판정 로직 그대로 `A00380_MeshTool` 의 MeshDoctor 탭으로 이식됐다([[wip-a00380-meshdoctor-tab]]).
+남는 값어치는 **왜 그렇게 판정하는가**(아래 배경/케이스 A·B)다 — 임계값을 건드릴 때 읽는다.
 **작업 완료되어 사용자 검증·푸시만 남으면 이 메모는 삭제해도 됨.**
