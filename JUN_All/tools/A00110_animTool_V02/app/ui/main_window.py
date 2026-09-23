@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-06
+# last Update date : 2026-09-23
 # A00110_animTool_V02 - Qt UI
 
 from Framework.qt.qt import *
@@ -303,8 +303,9 @@ class MainWindow(QWidget):
     )
 
     TIMING_PAGES = (
-        ("Move", "Move Keys - shift the keys in a frame range, or delete "
-         "that range", "_build_move_keys_page"),
+        ("Move", "Move Keys - shift the keys in a frame range (or, with "
+         "Start / End empty, the keys selected in the Graph Editor), or "
+         "delete that range", "_build_move_keys_page"),
         ("Hold", "Hold - hold the key range selected in the Graph Editor "
          "(+ Shift+A hotkey)", "_build_graph_editor_page"),
         ("Offset", "Offset & Hold - rebuild the listed controllers' keys "
@@ -439,6 +440,11 @@ class MainWindow(QWidget):
         row = QHBoxLayout()
         self.btn_move_back = QPushButton("◀ Earlier (-)")
         self.btn_move_fwd = QPushButton("Later (+) ▶")
+        move_tip = ("Start / End filled: move the keys in that range.\n"
+                    "Start / End empty: move only the keys selected in the "
+                    "Graph Editor.")
+        self.btn_move_back.setToolTip(move_tip)
+        self.btn_move_fwd.setToolTip(move_tip)
         row.addWidget(self.btn_move_back)
         row.addWidget(self.btn_move_fwd)
         layout.addLayout(row)
@@ -2532,6 +2538,17 @@ class MainWindow(QWidget):
                      len(attrs), len(objs), layer or CURRENT_LAYER))
 
     def on_move(self, sign):
+
+        # Start / End 가 둘 다 비었으면 그래프 에디터에서 선택한 키만 옮긴다 (v02.17~).
+        # 구간 방식은 구간을 벗어난 키를 다시 잡지 못하기 때문이다.
+        if (self.le_start.text().strip() == ""
+                and self.le_end.text().strip() == ""):
+            offset = self._read_offset()
+            if offset is None:
+                return
+            count, msg = KeyframeManager.move_selected_keys(sign * offset)
+            self.log(msg)
+            return
 
         rng = self._read_range()
         if rng is None:

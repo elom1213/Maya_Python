@@ -18,7 +18,8 @@
    버튼(v02.02~)은 **그래프 에디터에서 고른 키**만으로 대상·채널·구간을 다 정한다. **Delete All Keys**(v01.18~):
    **리스트업한 오브젝트의 모든 키프레임을 일괄 삭제**.
 2. **Timing** — 키의 **시점**을 다룬다(값은 그대로 두고 언제 일어나는지를 바꾼다).
-   **Move**: 키를 시간 범위로 **이동(앞/뒤 offset)·삭제**. **Hold**: 그래프 에디터에서 선택한
+   **Move**: 키를 시간 범위로 **이동(앞/뒤 offset)·삭제**. Start / End 를 비우면 **그래프 에디터에서 고른 키만**
+   이동(v02.17~). **Hold**: 그래프 에디터에서 선택한
    키 구간을 **평평하게 유지**(`Shift+A` 핫키 호출 가능). **Offset**(Offset & Hold, v01.13~):
    **리스트업한 컨트롤러**의 키를 **포즈 유지(hold) + 보간(offset)** 구조로 재배치.
    **Stagger**(Stagger Offset, v01.31~): 구간 키를 **리스트 순서 × Offset** 만큼 **계단식으로 밀어**
@@ -80,6 +81,17 @@
    새로 선택할 때만** 자동으로 프레이밍하고(v01.30~), margin 값은 **스핀박스로 사용자가 지정**한다.
 
 하위 탭이나 상위 탭을 바꾸면 **창 크기가 지금 보이는 페이지에 맞춰 자동 조정**된다.
+
+> **V02 v02.17 — Timing > Move: Start / End 를 비우면 그래프 에디터에서 고른 키만 이동**:
+> 구간 방식은 한 번 옮긴 키가 `[Start, End]` 밖으로 나가면 다음 클릭에서 **더는 잡히지 않았다**.
+> 이제 **Start / End 를 둘 다 비워 두고** `◀ Earlier (-)` / `Later (+) ▶` 를 누르면 그래프 에디터에서
+> **선택한 키만** Offset 만큼 옮긴다. 키 선택이 이동을 따라가므로 **몇 번이든 계속 밀린다**.
+> 오브젝트 선택 · 채널박스 선택은 보지 않는다(선택한 키가 대상·채널을 다 정한다). 선택 안 된 이웃 키는
+> **넘어갈 수 있다**(`option="over"`). 단 **도착 프레임에 선택 안 된 키가 이미 있는 커브는 통째로
+> 건너뛰고** `[WARN]` 로 이름을 알린다 — 마야는 그 경우 거부하지 않고 키를 `19.9999f` 처럼 바로 앞에
+> 밀어 넣기 때문이다(mayapy 로 확인). Start / End 중 하나만 채우면 예전처럼 `Enter Start / End.` 경고.
+> 검증(mayapy 2024): 여러 커브의 선택 키 반복 이동(+3 두 번), 이웃 키 넘기, 겹침 커브만 건너뜀,
+> Ctrl+Z 한 번으로 전부 복원, 선택 키 없음 경고.
 
 > **V02 v02.16 — Transfer > Mirror Key: `Scale` 채널 추가(값 그대로 복사)**:
 > `Channels` 에 **Scale** 체크박스를 뒀다(기본 OFF). 켜면 소스의 `scaleX/Y/Z` 가 타겟에
@@ -883,6 +895,8 @@ Fill Keys: 18 key(s) added, 2 frame(s) already keyed (left alone)  [1-10f, 1 cha
 
 - **Start / End**: 작업할 시간 범위(프레임). **Offset**: 이동량(양수 입력, 부호는 버튼이 결정).
 - **◀ Earlier (-)** / **Later (+) ▶**: `[Start, End]` 구간의 키를 Offset 만큼 **앞/뒤로 상대 이동**.
+  - **Start / End 를 둘 다 비우면**(v02.17~) 그래프 에디터에서 **선택한 키만** 옮긴다. 키 선택이 따라가므로
+    반복 클릭해도 계속 움직인다. 선택 안 된 이웃 키는 넘어가고, 도착 프레임에 이미 키가 있는 커브는 건너뛴다.
 - **Delete Keys in Range**: `[Start, End]` 구간의 키를 **삭제**(클립보드 미사용).
 - **채널 스코프**: 채널박스(`mainChannelBox`)에서 **어트리뷰트를 선택해 두면 그 채널만**,
   선택이 없으면 **오브젝트의 모든 애니메이션 커브**가 대상이 된다(이동/삭제 공통).
@@ -1593,6 +1607,9 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 2. **Start / End** 입력(이동이면 **Offset** 도).
 3. **◀ Earlier (-)** / **Later (+) ▶** 로 이동, 또는 **Delete Keys in Range** 로 삭제.
 
+선택한 키만 옮기려면(v02.17~): 그래프 에디터에서 키를 선택 → **Start / End 를 비우고** Offset 만 입력 →
+**◀ Earlier (-)** / **Later (+) ▶**.
+
 ### Timing > Hold
 1. 그래프 에디터에서 평평하게 만들 **키 구간을 선택**(커브마다 2개 이상).
 2. **Hold Selected Range** 클릭(또는 Shift+A) → 각 커브가 시작 값으로 평평하게 유지된다.
@@ -1724,6 +1741,10 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 ### Timing / Key (키 이동 · 채우기 · 삭제)
 - **이동**(`move_keys`): `cmds.keyframe(..., relative=True, timeChange=offset)`. Offset 은 **절댓값**으로
   입력하고 버튼이 부호를 정한다(Earlier = `-`, Later = `+`). Offset 이 0이면 `Offset is 0.`.
+- **선택 키 이동**(`move_selected_keys`, v02.17~): Start / End 가 둘 다 비었을 때. 커브마다 선택 키의
+  `indexValue` 를 모아 `cmds.keyframe(crv, index=..., relative=True, option="over")` 한 번. 옮기기 전에
+  도착 시각이 **선택 안 된 키와 겹치는지** 검사해 겹치면 그 커브를 건너뛴다(`over` 는 겹침을 거부하지 않고
+  키를 바로 앞 소수 프레임에 밀어 넣는다).
 - **삭제**(`delete_keys`): `cmds.cutKey(..., clear=True)` 로 구간 키 제거.
 - **채널 스코프**(이동/삭제 공통): 채널박스 선택 어트리뷰트가 있으면 **그 채널만**(`attribute` 플래그),
   없으면 **모든 커브**(`all curves`). 선택 리스트 전체를 한 번에 넘겨 Maya 네이티브로 일괄 처리(100+ 대응).
@@ -2021,7 +2042,8 @@ Euler filter: 3 object(s), 27 key(s) changed in [20-40f].  Anchored to the key b
 ### 경고 메시지
 - `No objects selected.` — (Timing > Move / Key > Pose Key) 선택된 오브젝트 없음.
 - `Offset is 0.` — (Timing > Move) Offset 이 0.
-- `No keys selected in Graph Editor.` — (Timing > Hold) 그래프 에디터에 선택된 키 없음.
+- `No keys selected in Graph Editor.` — (Timing > Hold / Timing > Move 의 선택 키 모드) 그래프 에디터에 선택된 키 없음.
+- `[WARN] ... curve(s) not moved - a key already exists at the destination: <curves>` — (Timing > Move 선택 키 모드) 도착 프레임에 키가 있어 건너뛴 커브.
 - `Shift+A not bound: active hotkey set is locked. ...` — 핫키 세트가 잠김(커스텀 세트로 전환 필요).
 - `No axis checked.` / `[Warning] <attr> is checked but empty.` — (Key > Pose Key) 축 미체크 / 값 비어 있음.
 - `[Warning] Fill both Base and Target lists.` — (Transfer > Copy Key) Base/Target 비어 있음.

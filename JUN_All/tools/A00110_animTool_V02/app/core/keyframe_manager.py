@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-11
+# last Update date : 2026-09-23
 # A00110_animTool_V02 - 키프레임 이동/삭제/hold 핵심 로직 (maya.cmds, UI 비의존)
 
 import maya.cmds as cmds
@@ -77,6 +77,84 @@ class KeyframeManager:
             len(sel),
             f"{len(sel)} objects : keys in [{start}-{end}f] moved {offset:+d}f  ({scope})"
         )
+
+    @staticmethod
+    def move_selected_keys(offset):
+        """
+        그래프 에디터에서 **선택한 키만** offset 프레임만큼 상대 이동한다 (v02.17~).
+
+        구간 방식(move_keys)은 한 번 옮긴 키가 [start, end] 밖으로 나가면 다음 클릭에서
+        더는 잡히지 않는다. 선택 키 방식은 키 선택이 이동을 따라가므로 몇 번이든 계속 민다.
+
+        - 커브마다 선택된 키의 인덱스를 모아 한 번에 옮긴다(오브젝트/채널박스 선택 무관).
+        - option="over": 선택 안 된 이웃 키를 넘어갈 수 있다. 기본값 "move" 는 이웃 키에서
+          멈추므로 "Offset 만큼" 이 지켜지지 않는다.
+        - 도착 프레임에 선택 안 된 키가 이미 있으면 마야는 거부하지 않고 키를 바로 앞
+          (19.9999...f) 에 밀어 넣는다(mayapy 로 확인). 그래서 **옮기기 전에** 겹침을 검사해
+          그 커브는 통째로 건너뛰고 보고한다.
+        반환: (옮긴 커브 수, 메시지)
+        """
+        EPS = 1e-3
+
+        if offset == 0:
+            return (0, "Offset is 0.")
+
+        curves = cmds.keyframe(q=True, name=True, selected=True) or []
+        if not curves:
+            return (0, "No keys selected in Graph Editor.")
+
+        moved_curves = 0
+        moved_keys = 0
+        failed = []
+
+        with undo_chunk():
+            for crv in curves:
+                idx = cmds.keyframe(crv, q=True, selected=True,
+                                    indexValue=True) or []
+                if not idx:
+                    continue
+
+                before = cmds.keyframe(crv, q=True, selected=True,
+                                       timeChange=True) or []
+
+                # 겹침 검사: 선택 안 된 키 자리에 떨어지는 키가 있으면 건너뛴다.
+                all_times = cmds.keyframe(crv, q=True, timeChange=True) or []
+                sel_idx = set(int(i) for i in idx)
+                fixed = [t for i, t in enumerate(all_times) if i not in sel_idx]
+                if any(abs(t + offset - f) < EPS
+                       for t in before for f in fixed):
+                    failed.append(crv)
+                    continue
+
+                try:
+                    cmds.keyframe(
+                        crv,
+                        edit=True,
+                        index=[(int(i), int(i)) for i in idx],
+                        relative=True,
+                        timeChange=offset,
+                        option="over",
+                    )
+                except RuntimeError:
+                    failed.append(crv)
+                    continue
+
+                # 되읽어 확인: 키가 실제로 옮겨졌는지(겹침으로 거부되면 그대로다)
+                after = cmds.keyframe(crv, q=True, selected=True,
+                                      timeChange=True) or []
+                if sorted(after) == sorted(before):
+                    failed.append(crv)
+                    continue
+
+                moved_curves += 1
+                moved_keys += len(idx)
+
+        msg = (f"{moved_keys} selected key(s) on {moved_curves} curve(s) "
+               f"moved {offset:+d}f")
+        if failed:
+            msg = (f"[WARN] {msg}  ({len(failed)} curve(s) not moved - a key "
+                   f"already exists at the destination: {', '.join(failed)})")
+        return (moved_curves, msg)
 
     # --------------------------------------------------
     # 삭제

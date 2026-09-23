@@ -50,6 +50,7 @@
 - [sculpt target: pnts redirect](sculpt-target-pnts-redirect.md) — 타겟 Edit 중 `setAttr pnts` 는 타겟으로 새며 에러, 아이템 `inputPointsTarget` 에 직접 더한다
 - [shape.pnts is post-deformation](shape-pnts-is-post-deformation.md) — pnts 는 디포머 뒤에 더해진다
 - blendShape — [delta space = origin](blendshape-delta-space-origin.md) · [target name vs alias](blendshape-target-name-vs-alias.md)(노드 이름 ≠ 웨이트 alias, 인덱스는 max+1) · [live target deltas](blendshape-live-target-inputpointstarget.md)(라이브 타겟은 메시를 옮겨야 함)
+- [keyframe over squeezes on collision](keyframe-over-squeezes-on-collision.md) — `option="over"` 는 도착 프레임 키와 겹쳐도 에러 없이 19.9999f 에 끼워 넣는다, 미리 검사
 - keys — [setKeyframe insert needs a curve](setkeyframe-insert-needs-existing-curve.md)(없으면 조용히 no-op) · [pasteKey attribute = order match](pastekey-attribute-matches-by-order.md)(plug 단위로) · [animated attr: key + setAttr](animated-attr-setkeyframe-plus-setattr.md)
 - [parent -s -add = instance](parent-shape-add-is-instance.md) — 소스 계층 삭제 시 붙인 쉐입도 사라짐, duplicate + `parent -r -s` + 월드 CV 복원
 - [cmds.toggle not undoable](maya-toggle-cmd-not-undoable.md) — `toggle -localAxis` 대신 setAttr
