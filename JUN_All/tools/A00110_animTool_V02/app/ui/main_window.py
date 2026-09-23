@@ -433,7 +433,8 @@ class MainWindow(QWidget):
         row.addWidget(QLabel("Offset"))
         self.le_offset = QLineEdit()
         self.le_offset.setValidator(QIntValidator(0, 1000000, self))
-        self.le_offset.setPlaceholderText("5")
+        self.le_offset.setPlaceholderText("1")
+        self.le_offset.setText("1")   # 기본값 1 (v02.18~)
         row.addWidget(self.le_offset)
         layout.addLayout(row)
 

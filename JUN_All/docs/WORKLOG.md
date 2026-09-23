@@ -31,6 +31,9 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-23 (오늘)
 
+> [!summary] A00110_V02 **Timing > Move: `Offset` 기본값 1** (v02.17->02.18)
+- 요청: Offset 의 기본값을 1 로. 창을 열면 칸에 `1` 이 들어 있다(자리표시도 `5`->`1`). 비우면 예전처럼 `Enter Offset.` 경고.
+
 > [!summary] A00170 **AttachCrv > Default 의 `Maintain offset` 도 translate/rotate 를 구동** — 채널박스로 어태치가 보인다 (v01.25->01.26)
 - 요청: `Maintain offset` 을 켜고 `Attach to Closest Point` 를 누르면 오브젝트의 **translate·rotate 값이 변하면서** 어태치되게. 지금은 `multMatrix.matrixSum` 이 `offsetParentMatrix` 로 바로 들어가 **채널박스만 봐서는 어태치된 것인지 알 수 없다**.
 - ★ **오프셋을 "어디에 넣느냐" 만 바꿨다.** 상수 오프셋 행렬을 `multMatrix` 의 **맨 앞 칸**(`matrixIn[0]`)에 끼우고, 그 뒤는 Maintain offset 이 꺼졌을 때와 **똑같은 네트워크**(`커브 프레임 × parentInverseMatrix → decomposeMatrix → translate/rotate`)를 쓴다. 두 모드가 한 코드 경로가 됐다.
