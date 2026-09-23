@@ -753,10 +753,11 @@ class MainWindow(QWidget):
         self.atc_cb_maintain_offset = QCheckBox("Maintain offset")
         self.atc_cb_maintain_offset.setChecked(True)
         self.atc_cb_maintain_offset.setToolTip(
-            "On: every listed object keeps its current position, rotation and "
-            "scale (and its translate / rotate / scale channel values). The "
-            "network drives offsetParentMatrix instead, so the object only "
-            "follows how the curve moves from now on.\n"
+            "On: every listed object stays exactly where it is (same position, "
+            "rotation and scale) instead of snapping onto the curve. Its "
+            "translate / rotate channels are still driven by the network: they "
+            "start at the current values and change as the curve moves, so the "
+            "channel box shows at a glance that the object is attached.\n"
             "Off: snap translate (and rotate, with Orient) onto the closest "
             "point of the curve.\n"
             "Applies to Attach to Closest Point only.")
@@ -2057,8 +2058,9 @@ class MainWindow(QWidget):
             "- Attach to Closest Point: drives each listed object onto its closest\n"
             "  parameter on the curve via a pointOnCurveInfo -> matrix network\n"
             "  (parent-safe, live as the curve deforms). Optional orient to tangent.\n"
-            "  Maintain offset (default on): objects keep their current position,\n"
-            "  rotation, scale and channel values; offsetParentMatrix follows the curve.\n"
+            "  Maintain offset (default on): objects stay where they are instead of\n"
+            "  snapping onto the curve; translate / rotate are driven from their\n"
+            "  current values, so the channel box shows the attachment.\n"
             "- NURBS surface (from matrixPinning): put a surface in the Attachment\n"
             "  field instead. Objects pin to the closest (u, v) via pointOnSurfaceInfo\n"
             "  (X = tangent U, Y = normal, Z = X cross Y). Distribute spreads along the\n"

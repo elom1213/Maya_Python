@@ -31,7 +31,9 @@
      → decomposeMatrix → translate`(옵션: `rotate`) 네트워크를 만든다. **부모 계층 안전**
      (parentInverse 사용)하고, 빌드 후 **커브가 변형되면 따라간다**.
      **Maintain offset**(v01.22~, 기본 ON)이면 오브젝트를 커브 위로 옮기지 않는다 — 지금 자리·회전·
-     스케일을 그대로 두고 `offsetParentMatrix` 를 구동해 **이후 커브가 움직인 만큼만** 따라간다.
+     스케일을 그대로 두고 **이후 커브가 움직인 만큼만** 따라간다. v01.26~ 이 모드도 같은
+     `translate`/`rotate` 를 구동한다(상수 오프셋 행렬을 multMatrix 맨 앞에 끼운다) — **채널박스
+     값으로 어태치 여부가 바로 보인다**.
    - **NURBS surface**(v01.23~, `_archive/.../JUN_PY_matrixPinning_V01_01.py` 이식): Attachment 칸에
      커브 대신 서피스를 넣으면 `closestPointOnSurface` 로 구한 **최근접 (u, v)** 에
      `pointOnSurfaceInfo → fourByFourMatrix → …` 같은 네트워크로 붙는다(follicle 대용, 뒤집힘 없음).
@@ -159,16 +161,25 @@ A00170_driverTool/
    - **Group pointOnCurveInfo nodes into a set**(기본 ON): 이번 빌드로 생긴 `pointOnCurveInfo`
      노드들을 모두 담는 objectSet 한 개(`<curve>_atcPOCI_SET`)를 만든다(나중에 한 번에 선택·관리용).
    - **Maintain offset**(기본 ON, v01.22~): 켜면 리스트의 오브젝트가 **빌드 전 위치·회전·스케일을
-     그대로 유지**한다. `translate`/`rotate`/`scale` 채널 값도 바뀌지 않고 연결도 걸리지 않는다
-     (컨트롤러면 그대로 애니메이션할 수 있다). 대신 `offsetParentMatrix` 에
-     `상수 오프셋 × 커브 프레임 × 부모 worldInverseMatrix` 를 물려, 이후 커브(와 norCrv)가 움직인 만큼만
-     따라간다. 끄면 기존대로 `translate`(Orient 면 `rotate` 도)를 커브 지점에 맞춘다.
+     그대로 유지**한다(커브 위로 스냅되지 않는다). 끄면 기존대로 오브젝트가 커브 지점으로 옮겨진다.
      **Distribute 에는 적용되지 않는다**(새로 만든 드라이버라 지킬 자리가 없다).
+     - **v01.26~ : 구동하는 채널이 두 모드 모두 `translate`(Orient 면 `rotate` 도)다.**
+       multMatrix 맨 앞에 상수 오프셋 행렬(`local0 × parentMatrix0 × frame0⁻¹`)을 끼워
+       `상수 × 커브 프레임 × parentInverseMatrix` 를 decomposeMatrix 로 푼다. 빌드 순간의 값이
+       **지금 채널 값과 정확히 같아** 오브젝트는 제자리에 있고, 커브가 움직이면 **채널박스의
+       translate/rotate 값이 따라 변한다** — 채널박스만 보고도 어태치를 알 수 있다.
+       (v01.25 까지는 `offsetParentMatrix` 를 구동해 채널박스에 아무 변화가 없었다.)
+     - `decomposeMatrix.inputRotateOrder` 에 오브젝트의 `rotateOrder` 를 연결한다(v01.26~) —
+       회전 순서가 XYZ 가 아닌 오브젝트도 제 값이 나온다.
+     - `scale` 은 구동하지 않는다(빌드 전 값 그대로). 조인트의 `jointOrient` 는 회전에 상수로
+       얹히므로, 회전을 그대로 들고 가려면 널/로케이터에 붙이는 편이 안전하다.
      - 오프셋을 들고 가는 프레임은 **직교 정규**로 다시 짠다 — X=커브 접선, 업 시드=norCrv 접선(norCrv
        OFF 면 월드 +Y). ref 프레임(Y=norCrv 접선, Z=norCrv **노멀**)은 X 와 직교가 아니라 커브가 휘면
        shear 가 오브젝트로 새고, **직선 norCrv 의 노멀은 커브를 평행 이동만 해도 부호가 뒤집힌다**
        (Maya 2024 실측).
-     - `offsetParentMatrix` 가 이미 다른 노드에 연결된 오브젝트는 건너뛰고 로그로 알린다.
+     - 구동할 `translate`(Orient 면 `rotate`)가 **이미 연결됐거나 잠긴** 오브젝트는 노드를
+       만들기 전에 건너뛰고 로그로 알린다 — 이미 어태치된 것을 다시 붙여 옛 네트워크를
+       고아로 만들지 않는다.
    - **대상이 NURBS surface 일 때**(v01.23~):
      - 오브젝트마다 `closestPointOnSurface`(임시)로 최근접 **(u, v)** 를 구해 `pointOnSurfaceInfo`
        (`turnOnPercentage=0`, 실제 파라미터 값)에 넣는다. 노드 이름 `<obj>_atc_POSI`, 세트 `<surface>_atcPOSI_SET`.
@@ -200,8 +211,8 @@ A00170_driverTool/
 **Distribute Drivers on Curve** 클릭 → `<curve>_1_drv`, `<curve>_2_drv` … (Count 자릿수만큼 0 패딩)
 드라이버가 생성되어 커브 시작~끝에 균일 배치된다. 로그에 드라이버별 파라미터가 출력된다.
 
-> 어태치는 오브젝트의 `translate`(옵션 `rotate`)에 노드를 **연결**한다(Maintain offset 이면
-> `offsetParentMatrix` 하나). Closest 모드에서 이미 연결/잠금된 채널이 있으면 해당 오브젝트만
+> 어태치는 오브젝트의 `translate`(옵션 `rotate`)에 노드를 **연결**한다(Maintain offset 이어도
+> 같다, v01.26~). Closest 모드에서 이미 연결/잠금된 채널이 있으면 해당 오브젝트만
 > 실패 처리(로그 경고)하고 나머지는 계속한다.
 
 #### 4.3.1 Edge Loop — 루프에서 드라이버 셋업 한 번에 (v01.14~)

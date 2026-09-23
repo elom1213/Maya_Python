@@ -18,7 +18,10 @@ Maya 2024 실측: 오브젝트의 `parentMatrix[0]` 은 **부모 worldMatrix 가
 **How to apply:**
 - OPM 을 구동하는 네트워크는 **부모 transform 의 `worldInverseMatrix[0]`** 을 직접 물린다(월드 직속이면 생략).
 - 오프셋 상수도 `OPM0 × parent.worldMatrix0 × inverse(frame0)` — `parentMatrix` 를 쓰면 OPM0 이 두 번 들어간다.
-- 반대로 `translate/rotate` 를 decompose 로 구동하는 기존 경로에선 `parentInverseMatrix` 가 맞다(OPM 안쪽 공간).
+- 반대로 `translate/rotate` 를 decompose 로 구동하는 경로에선 `parentInverseMatrix` 가 맞다(OPM 안쪽 공간).
+  **상수 오프셋도 같은 짝으로** — `local0 × obj.parentMatrix0 × inverse(frame0)`(여기선 `parentMatrix` 가 맞다).
+  A00170 은 2026-09-23(v01.26)에 OPM 구동을 버리고 이쪽으로 왔다 — 채널박스에 값이 보여야 해서다
+  ([[wip-a00170-attachcrv-tab]]). 되먹음 함정은 **OPM 을 구동할 때만** 문제가 된다.
 - 테스트 씬엔 **부모 + 0 이 아닌 OPM** 조합을 꼭 넣는다.
 - OPM 으로 오프셋을 들고 갈 프레임은 **직교 정규**여야 한다 — 아니면 shear 가 자식까지 샌다
   (직선 커브의 `pointOnCurveInfo.normal` 은 평행 이동만으로 부호가 뒤집힘, [[wip-a00170-attachcrv-tab]]).

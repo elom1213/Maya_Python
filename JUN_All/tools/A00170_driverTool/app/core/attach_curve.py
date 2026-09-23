@@ -11,6 +11,9 @@ ref/ref_01.mel(attachDriverOnCurve, by Doosup Jung)의 '일정 간격으로 새 
   - pointOnCurveInfo(parameter=그 값)로 커브 위 한 점을 라이브 추적한다.
   - fourByFourMatrix -> multMatrix(* parentInverseMatrix) -> decomposeMatrix 로
     오브젝트의 translate(옵션: rotate)를 구동한다.
+  - maintain offset 이면 그 multMatrix 맨 앞에 상수 오프셋 행렬을 하나 더 끼운다. 구동되는
+    채널은 같고(translate/rotate), 빌드 시점 값이 지금 값과 같아 오브젝트가 제자리에 남는다
+    (v01.26 이전에는 offsetParentMatrix 를 구동해 채널박스에 변화가 보이지 않았다).
 
 orient 옵션이 켜지면 커브 접선(tangent)을 aim 축에 정렬한다. 업벡터는 두 방식 중 하나로 정한다.
 
@@ -219,32 +222,61 @@ def _orient_rows_from_normal_curve(attach_poci, norcrv_poci, aim_axis):
     return x_row, y_row, z_row
 
 
-def _parent_of(obj):
-    """DAG 부모 transform(풀패스). 월드 바로 밑이면 None."""
-    parents = cmds.listRelatives(obj, parent=True, fullPath=True) or []
-    return parents[0] if parents else None
+def _check_channels_free(obj, orient):
+    """구동할 translate(/rotate) 채널이 비어 있는지(연결·잠금 없음) 확인한다.
+
+    maintain offset 모드에서 노드를 만들기 **전에** 거르는 용도다 — 이미 어태치된 오브젝트를
+    다시 붙여 옛 네트워크를 고아로 만들거나, 반쯤 만든 노드를 남기지 않는다.
+    """
+    channels = ("translate", "rotate") if orient else ("translate",)
+    for chan in channels:
+        for plug in [obj + "." + chan] + ["{0}.{1}{2}".format(obj, chan, ax)
+                                          for ax in "XYZ"]:
+            src_plugs = cmds.listConnections(plug, source=True,
+                                             destination=False,
+                                             plugs=True) or []
+            if src_plugs:
+                raise ValueError("{0} is already connected ({1})".format(
+                    plug.split(".")[-1], src_plugs[0]))
+            if cmds.getAttr(plug, lock=True):
+                raise ValueError("{0} is locked".format(plug.split(".")[-1]))
 
 
-def _offset_matrix(obj, frame_plug, parent):
-    """maintain offset 용 상수 행렬 = offsetParentMatrix0 * parentWorld0 * inverse(frame0).
+def _local_matrix_from_channels(obj):
+    """obj 의 현재 translate / rotate 만으로 만든 로컬 행렬(스케일 1, shear 0).
 
-    월드 = local * offsetParentMatrix * parentWorld 이므로, offsetParentMatrix 를
-    `상수 * frame * parentWorldInverse` 로 구동하면 빌드 시점엔 원래 값과 정확히 같고
-    이후엔 커브 프레임이 움직인 만큼만 따라간다. local(translate/rotate/scale, 피벗,
-    jointOrient, rotateAxis)은 한 번도 건드리지 않는다.
+    decomposeMatrix 가 이 행렬을 받으면 outputTranslate / outputRotate 가 지금 채널 값
+    그대로 나온다(회전 순서는 `<obj>.rotateOrder` 를 dcm 에 연결해 맞춘다).
+    """
+    radians = [om.MAngle(v, om.MAngle.kDegrees).asRadians()
+               for v in cmds.getAttr(obj + ".rotate")[0]]
+    xform = om.MTransformationMatrix()
+    xform.setRotation(om.MEulerRotation(radians,
+                                        cmds.getAttr(obj + ".rotateOrder")))
+    xform.setTranslation(om.MVector(*cmds.getAttr(obj + ".translate")[0]),
+                         om.MSpace.kTransform)
+    return xform.asMatrix()
 
-    주의: 오브젝트 자신의 `parentMatrix` / `parentInverseMatrix` 는 **자기 offsetParentMatrix 를
-    포함한다**(Maya 2024 실측: parentMatrix == OPM * parent.worldMatrix). 그걸로 OPM 을 구동하면
-    자기 출력을 되먹는 사이클이라, 부모 transform 의 worldMatrix 를 직접 쓴다.
+
+def _offset_matrix(obj, frame_plug):
+    """maintain offset 용 상수 행렬 = local0 * parentMatrix0 * inverse(frame0).
+
+    네트워크는 `상수 * frame * parentInverseMatrix` 를 decomposeMatrix 로 풀어
+    translate / rotate 를 구동한다. 빌드 시점의 결과는 local0(지금 채널 값)과 정확히 같아
+    오브젝트는 제자리에 그대로 있고, 이후 커브가 움직인 만큼만 따라간다. 채널박스에는
+    커브를 따라 **값이 변하는** translate / rotate 가 보인다.
+
+    주의: `parentMatrix` 는 **자기 offsetParentMatrix 를 포함한다**(Maya 2024 실측:
+    parentMatrix == OPM * parent.worldMatrix). 네트워크가 쓰는 `parentInverseMatrix` 와
+    짝이 맞아야 하므로 부모의 worldMatrix 가 아니라 이 값을 그대로 쓴다.
     """
     frame0 = om.MMatrix(cmds.getAttr(frame_plug))
     if abs(frame0.det3x3()) < 1e-8:
         raise ValueError("attach frame is degenerate here (tangent parallel to "
                          "the up vector / normal); cannot keep the offset")
-    opm0 = om.MMatrix(cmds.getAttr(obj + ".offsetParentMatrix"))
-    if parent:
-        opm0 = opm0 * om.MMatrix(cmds.getAttr(parent + ".worldMatrix[0]"))
-    return opm0 * frame0.inverse()
+    local0 = _local_matrix_from_channels(obj)
+    parent0 = om.MMatrix(cmds.getAttr(obj + ".parentMatrix[0]"))
+    return local0 * parent0 * frame0.inverse()
 
 
 def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=None,
@@ -259,16 +291,13 @@ def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=Non
     norcrv_shape 가 주어지면(use_normal_curve) up/side 를 그 norCrv 에서 가져오고(ref 원본),
     없으면 커브 접선 기반 자족 직교 프레임을 쓴다.
 
-    maintain_offset 이 True 면 translate/rotate 대신 offsetParentMatrix 를 구동한다
-    (`_offset_matrix` 참고). 오브젝트의 위치·회전·스케일과 채널 값이 빌드 전 그대로 남는다.
+    maintain_offset 이 True 면 상수 오프셋 행렬을 multMatrix 맨 앞에 끼워, 빌드 시점의
+    translate/rotate 가 지금 값 그대로 나오게 한다(`_offset_matrix` 참고). 오브젝트는 제자리에
+    그대로 있지만 채널박스의 translate/rotate 는 커브를 따라 **값으로** 움직인다.
     """
     if maintain_offset:
         # 노드를 만들기 전에 거른다(실패한 오브젝트에 반쯤 만든 네트워크를 남기지 않게).
-        src = cmds.listConnections(obj + ".offsetParentMatrix", source=True,
-                                   destination=False, plugs=True) or []
-        if src:
-            raise ValueError(
-                "offsetParentMatrix is already connected ({0})".format(src[0]))
+        _check_channels_free(obj, orient)
 
     surface = kind == "surface"
 
@@ -318,7 +347,7 @@ def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=Non
             if maintain_offset:
                 # 오프셋을 들고 가려면 프레임이 강체(직교 정규)여야 한다. ref 프레임은
                 # X(attachCrv 접선)와 Y(norCrv 접선)가 직교가 아니라 커브가 휘면 shear 가
-                # offsetParentMatrix 로 새고, 직선 norCrv 의 normal 은 커브를 평행 이동만 해도
+                # 섞여 뽑히는 회전이 흔들리고, 직선 norCrv 의 normal 은 커브를 평행 이동만 해도
                 # 부호가 뒤집힌다(실측 det +0.95 -> -0.95). norCrv 접선을 업 시드로만 쓴다.
                 x_row, y_row, z_row = _orient_frame_outputs(
                     poci, aim_axis, up_plug=nor_poci + ".normalizedTangent")
@@ -335,24 +364,22 @@ def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=Non
             cmds.connectAttr(src, "{0}.{1}".format(fbf, col), force=True)
 
     mul = cmds.createNode("multMatrix", n="{0}_atc_MMX".format(obj))
+    slot = 0
     if maintain_offset:
-        parent = _parent_of(obj)
-        offset = _offset_matrix(obj, fbf + ".output", parent)
+        # 상수 오프셋을 맨 앞에 끼운다 - 빌드 시점의 결과가 지금 채널 값과 같아진다.
+        offset = _offset_matrix(obj, fbf + ".output")
         cmds.setAttr(mul + ".matrixIn[0]", list(offset), type="matrix")
-        cmds.connectAttr(fbf + ".output", mul + ".matrixIn[1]", force=True)
-        if parent:
-            cmds.connectAttr(parent + ".worldInverseMatrix[0]",
-                             mul + ".matrixIn[2]", force=True)
-        cmds.connectAttr(mul + ".matrixSum", obj + ".offsetParentMatrix",
-                         force=True)
-        return param, poci
-
-    cmds.connectAttr(fbf + ".output", mul + ".matrixIn[0]", force=True)
-    cmds.connectAttr(obj + ".parentInverseMatrix[0]", mul + ".matrixIn[1]",
+        slot = 1
+    cmds.connectAttr(fbf + ".output", "{0}.matrixIn[{1}]".format(mul, slot),
                      force=True)
+    cmds.connectAttr(obj + ".parentInverseMatrix[0]",
+                     "{0}.matrixIn[{1}]".format(mul, slot + 1), force=True)
 
     dcp = cmds.createNode("decomposeMatrix", n="{0}_atc_DCM".format(obj))
     cmds.connectAttr(mul + ".matrixSum", dcp + ".inputMatrix", force=True)
+    # 회전 순서가 XYZ 가 아닌 오브젝트도 제 값이 나오게 한다(dcm 기본값은 XYZ 고정).
+    cmds.connectAttr(obj + ".rotateOrder", dcp + ".inputRotateOrder",
+                     force=True)
 
     cmds.connectAttr(dcp + ".outputTranslate", obj + ".translate", force=True)
     if orient:
@@ -369,9 +396,10 @@ def build_attach_to_closest(curve, objects, orient=True, aim_axis="+X",
     curve 에는 NURBS surface(transform 또는 shape)도 줄 수 있다 — 최근접 (u, v) 에
     pointOnSurfaceInfo 로 붙고, norCrv 옵션은 무시된다(서피스 normal 이 업 벡터).
 
-    maintain_offset 이 True 면 오브젝트를 커브 위로 옮기지 않는다 — 빌드 시점의 위치·회전·
-    스케일을 그대로 두고, 이후 커브(와 norCrv)가 움직인 만큼만 따라간다(offsetParentMatrix
-    구동, `_attach_one` 참고). False 면 기존대로 translate(/rotate)를 커브 지점에 맞춘다.
+    maintain_offset 이 True 면 오브젝트를 커브 위로 옮기지 않는다 — 빌드 시점의 위치·회전을
+    그대로 두고, 이후 커브(와 norCrv)가 움직인 만큼만 따라간다(`_attach_one` 참고). 두 모드
+    모두 translate(Orient 면 rotate)를 구동하므로 채널박스의 값 변화로 어태치를 알 수 있다.
+    False 면 기존대로 translate(/rotate)를 커브 지점에 맞춘다(오브젝트가 커브로 스냅된다).
 
     orient 가 True 이고 use_normal_curve 가 True 면(기본, ref 원본) attachCrv 밑에
     별도 'norCrv' 직선 커브 하나를 만들어 up/side 의 기준으로 쓴다. False 면 norCrv 없이

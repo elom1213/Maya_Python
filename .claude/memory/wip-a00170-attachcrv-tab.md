@@ -67,6 +67,18 @@ attached 의 param 은 `(u, v)`. norCrv 는 커브 전용(서피스면 UI 체크
 관찰(미수정): 모든 오브젝트가 skip 돼도 norCrv 는 먼저 만들어져 남는다(기존 동작).
 headless 서피스 139항목 + 커브 회귀 148항목.
 
+**UPDATE 2026-09-23 (v01.26)**: 사용자 요청 — `Maintain offset` 도 **translate/rotate 를 구동**해야
+채널박스만 보고 어태치를 알 수 있다. **OPM 구동을 버렸다**: 상수 오프셋을 `multMatrix.matrixIn[0]` 에
+끼우고 나머지는 OFF 경로와 **같은 네트워크**(`프레임 × obj.parentInverseMatrix → decomposeMatrix →
+translate/rotate`). 상수 = `local0 × obj.parentMatrix0 × inv(frame0)` — `local0` 는 현재
+translate/rotate 만으로 만든 행렬(스케일 1)이라 빌드 순간 decompose 출력이 **지금 채널 값과 일치**한다.
+네트워크가 `parentInverseMatrix` 를 쓰므로 상수도 **`parentMatrix`(자기 OPM 포함)로 짝을 맞춘다**
+— OPM 을 구동하지 않으니 [[parentmatrix-includes-offsetparentmatrix]] 의 되먹임은 이제 없다.
+`decomposeMatrix.inputRotateOrder` ← `obj.rotateOrder` 연결(기본 XYZ 고정이라 `xzy` 등이 어긋났다,
+**두 모드 모두 고쳐짐**). 사전 검사도 OPM 연결 → **translate(/rotate) 연결·잠금** 확인으로 교체
+(노드 만들기 전). `scale` 은 구동하지 않는다. norCrv maintain 경로의 직교 정규 프레임은 그대로
+(shear·부호 뒤집힘 때문). 검증 headless 코어 24 + 오프스크린 UI 13.
+
 **남은 일**: Maya 실기 검증 + 푸시(기본 푸시처: [[push-target-dnable-dev]]). 검증/푸시 끝나면 이 메모 삭제.
 규약: [[ui-text-english-only]], [[prefer-pyside-for-new-tools]], [[push-includes-tool-guide-docs]],
 [[worklog-maintenance]], [[maya-2023-compat]].

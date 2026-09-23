@@ -31,6 +31,16 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-23 (오늘)
 
+> [!summary] A00170 **AttachCrv > Default 의 `Maintain offset` 도 translate/rotate 를 구동** — 채널박스로 어태치가 보인다 (v01.25->01.26)
+- 요청: `Maintain offset` 을 켜고 `Attach to Closest Point` 를 누르면 오브젝트의 **translate·rotate 값이 변하면서** 어태치되게. 지금은 `multMatrix.matrixSum` 이 `offsetParentMatrix` 로 바로 들어가 **채널박스만 봐서는 어태치된 것인지 알 수 없다**.
+- ★ **오프셋을 "어디에 넣느냐" 만 바꿨다.** 상수 오프셋 행렬을 `multMatrix` 의 **맨 앞 칸**(`matrixIn[0]`)에 끼우고, 그 뒤는 Maintain offset 이 꺼졌을 때와 **똑같은 네트워크**(`커브 프레임 × parentInverseMatrix → decomposeMatrix → translate/rotate`)를 쓴다. 두 모드가 한 코드 경로가 됐다.
+- 상수는 `local0 × parentMatrix0 × frame0⁻¹` — 빌드 순간 decompose 결과가 **지금 채널 값과 정확히 같아진다**(실측 소수점 4자리 일치). 그래서 오브젝트는 **제자리에 그대로** 있고, 커브를 움직이면 그때부터 채널 값이 따라 변한다.
+- ★ **오프셋을 만들 땐 `parentMatrix`, 네트워크에는 `parentInverseMatrix`** — 둘은 짝이다(`parentMatrix` 는 자기 `offsetParentMatrix` 를 포함한다, [[parentmatrix-includes-offsetparentmatrix]]). OPM 을 구동하느라 **부모의 `worldInverseMatrix`** 를 직결해야 했던 이유가 사라졌다 — 이제 자기 OPM 을 되먹을 일이 없다.
+- `local0` 는 **translate/rotate 만으로** 만든다(스케일 1, shear 0). decompose 가 이 행렬을 받으면 출력이 지금 채널 값 그대로다. `scale` 은 구동하지 않아 빌드 전 값이 남는다.
+- ★ `decomposeMatrix.inputRotateOrder` 에 오브젝트의 `rotateOrder` 를 연결했다 — **dcm 기본값은 XYZ 고정**이라 회전 순서가 다른 오브젝트(실측 `xzy`)는 값이 어긋난다. Maintain offset 이 꺼진 기존 모드도 같이 고쳐졌다.
+- 사전 검사도 바꿨다: 전에는 `offsetParentMatrix` 가 물려 있는지 봤는데, 이제 구동할 **`translate`(Orient 면 `rotate`)가 이미 연결·잠금됐는지**를 **노드를 만들기 전에** 본다 — 이미 어태치된 것을 다시 붙여 옛 네트워크를 고아로 만들지 않고, 실패한 오브젝트에 반쯤 만든 노드도 남지 않는다.
+- 검증: mayapy 2024 **코어 24항목** + 오프스크린 Qt **UI 13항목** 통과 — 채널 연결/OPM 비어 있음 · 월드 위치·회전과 채널 값이 빌드 전과 소수점 4자리 일치(부모에 이동·회전·스케일, 회전 순서 `xzy` 포함) · 커브를 옮기면 채널 값이 변하고 두 오브젝트 간 거리 유지(강체) · 재어태치 거부 · Maintain offset OFF 는 여전히 커브로 스냅(`nearestPointOnCurve` 와 비교) · NURBS surface · Orient OFF 는 `rotate` 를 안 건드림 · UI 툴팁·빌드 클릭·undo 한 스텝. **마야 GUI 실기 확인은 사용자 몫**. #A00170
+
 > [!summary] A00145 **창 기본 높이 900 -> 980 — Match 탭을 스크롤 없이** (v01.54->01.55)
 - 요청: Match 탭의 모든 UI 가 스크롤 없이 보이도록 세로를 늘린다.
 - mayapy 오프스크린 + `teal_dark` 테마로 재면 창 900 에서 Match 스크롤 뷰포트 653 < 내용 692 → 필요 높이 **939**. 여유를 둬 **980**.
