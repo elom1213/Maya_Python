@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.54` (`app/config/version.py`) — 리스트의 **`(Null)` 자리표시를 빨간 글씨로**(공용 TSL, 아래 메모) · v01.53 은 Match 에 **`Keep Children in Place`**(기본 OFF):
+- 버전: `v01.55` (`app/config/version.py`) — 창 기본 높이 900 → **980**(Match 탭이 스크롤 없이 다 보이게) · v01.54 는 리스트의 **`(Null)` 자리표시를 빨간 글씨로**(공용 TSL, 아래 메모) · v01.53 은 Match 에 **`Keep Children in Place`**(기본 OFF):
   팔로워만 움직이고 **그 아래 오브젝트는 있던 월드 자리에 그대로** 둔다. Mirror 탭의 같은 이름
   체크박스와 **같은 코어**(`app/core/keep_children.py`)를 쓴다 (§Match)
   · v01.52 는 Attribute 가 만든 어트리뷰트는 **반드시 채널 박스에
@@ -331,6 +331,9 @@ Targets                       Number: 4212
 > 위젯을 짜부라뜨려 TSL 리스트 위로 `Add/Del/Up/Down` 버튼이 겹쳐 보였다(창 620px 에서 측정하면
 > 리스트 아래와 버튼 위가 **−125px**, 즉 125px 파고들었다). 다른 탭들과 같은 `_scrolled()` 에
 > 담아 고쳤고, 창 기본 높이도 860 → **900** 으로 올렸다. 이제 창을 500px 로 줄여도 간격이 유지된다.
+>
+> **v01.55**: 기능이 늘면서 900 에서는 Match 탭에 스크롤이 생겼다. 테마(`teal_dark`)를 입혀
+> 오프스크린에서 재면 Match 내용이 창 높이 **939** 를 요구해, 여유를 두고 기본 높이를 **980** 으로 올렸다.
 
 > **v01.22 이전**: 접이식 박스(`CollapsibleBox`)를 위에서 아래로 쌓고 탭 전체를 스크롤 영역에
 > 담았다. 기능이 5개로 늘면서 원하는 것을 보려면 접었다 폈다 해야 해서 하위 탭으로 바꿨다.

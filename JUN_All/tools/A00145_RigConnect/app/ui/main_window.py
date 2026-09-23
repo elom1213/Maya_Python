@@ -77,7 +77,9 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
 
         self.win_width = 560
-        self.win_height = 900
+        # Match 탭이 스크롤 없이 다 보이는 높이. 오프스크린(teal_dark)에서 900 이면
+        # 39px 모자랐다(필요 939). 마야 폰트 차이를 감안해 여유를 둔다.
+        self.win_height = 980
         self.win_title = "RigConnect v{0}".format(VERSION)
 
         # Connect 탭 src/dst 위젯 보관용. List Connected 의 stream 방향 상태.

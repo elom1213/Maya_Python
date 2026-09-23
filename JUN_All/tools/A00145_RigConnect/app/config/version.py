@@ -25,9 +25,11 @@
 #        or any of Point / Orient / Scale together. Types driving the same channels
 #        uncheck each other; Point On Poly stays alone.
 
+# 01.55  Default window height 900 -> 980 so the whole Match tab fits without a
+#        scroll bar.
 # 01.54  (Null) placeholder rows are drawn in RED in every list (the shared
 #        TSL paints them; Connect > Match calls the same helper). It used to
 #        be grey in one list only, and plain text in the Pair tab.
 
-VERSION = "01.54"
-LAST_UPDATE = "2026-09-22"
+VERSION = "01.55"
+LAST_UPDATE = "2026-09-23"
