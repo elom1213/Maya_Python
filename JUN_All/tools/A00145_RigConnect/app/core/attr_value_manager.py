@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-18
+# last Update date : 2026-09-23
 """
 attr_value_manager - Attribute > Set Value 탭 로직.
 
@@ -113,14 +113,22 @@ def attr_info(obj, attr):
     return info
 
 
-def list_common_attrs(objects, channel_box_only=True):
-    """모든 오브젝트가 **공통으로** 가진, 값을 넣을 수 있는 어트리뷰트.
+def list_common_attrs(objects, channel_box_only=True, include_partial=False):
+    """오브젝트들이 가진, 값을 넣을 수 있는 어트리뷰트.
 
-    순서는 첫 오브젝트 기준. 종류가 오브젝트마다 다르면(한쪽은 enum, 한쪽은 float)
-    첫 오브젝트의 종류로 보여 주고, 적용할 때 오브젝트별로 다시 판정한다.
+    기본은 **모든 오브젝트가 공통으로** 가진 것(교집합)만. `include_partial` 이면
+    **일부만 가진 것도**(합집합) 넣고, 행마다 몇 개가 가졌는지(`count` / `total`)를 준다.
+    UI 는 이것을 `[k/n]` 으로 보인다 - Target Edit 의 Targets 목록과 같은 표기.
+
+    순서는 첫 오브젝트 기준, 그 뒤에 다른 오브젝트에만 있는 것을 **리스트 순서대로** 잇는다.
+    종류는 **그 어트리뷰트를 가진 첫 오브젝트** 기준(한쪽은 enum, 한쪽은 float 이면
+    그쪽으로 보이고), 적용할 때 오브젝트별로 다시 판정한다 - 없는 오브젝트는 건너뛴다.
 
     Returns:
-        (rows, missing) - rows = [{"name", "kind"}], missing = 씬에 없는 오브젝트.
+        (rows, missing)
+        rows    = [{"name", "kind", "owners", "count", "total"}]
+                  owners = 그 어트리뷰트를 가진 오브젝트(리스트 순서), total = 씬에 있는 오브젝트 수
+        missing = 씬에 없는 오브젝트.
     """
     present = [o for o in objects if cmds.objExists(o)]
     missing = [o for o in objects if o not in present]
@@ -137,22 +145,32 @@ def list_common_attrs(objects, channel_box_only=True):
         names.update(bsu.get_blendshape_targets(obj))
         return names
 
-    first = present[0]
-    common = _names(first)
-    for obj in present[1:]:
-        common &= _names(obj)
+    names = [_names(obj) for obj in present]
+    if include_partial:
+        wanted = set().union(*names)
+        sources = present
+    else:
+        wanted = set.intersection(*names)
+        sources = present[:1]
 
-    # 첫 오브젝트의 씬 순서로 정렬(listAttr 순서). blendShape 타겟은 앞에.
-    order = list(bsu.get_blendshape_targets(first)) + \
-        [a for a in (cmds.listAttr(first) or []) if "." not in a]
+    # 오브젝트의 씬 순서로 정렬(listAttr 순서). blendShape 타겟은 앞에.
+    # 합집합이면 첫 오브젝트 뒤로 다른 오브젝트에만 있는 것이 리스트 순서대로 붙는다.
+    order = []
+    for obj in sources:
+        order += list(bsu.get_blendshape_targets(obj)) + \
+            [a for a in (cmds.listAttr(obj) or []) if "." not in a]
+
+    total = len(present)
     rows, seen = [], set()
     for name in order:
-        if name not in common or name in seen:
+        if name not in wanted or name in seen:
             continue
         seen.add(name)
-        kind = attr_kind(first, name)
+        owners = [obj for obj, have in zip(present, names) if name in have]
+        kind = attr_kind(owners[0], name)
         if kind:
-            rows.append({"name": name, "kind": kind})
+            rows.append({"name": name, "kind": kind, "owners": owners,
+                         "count": len(owners), "total": total})
     return rows, missing
 
 

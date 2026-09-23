@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-23 (오늘)
 
+> [!summary] A00145 **Attribute > Set Value 에 `Include Non-Common` + 행마다 `[k/n]`** (v01.55->01.56)
+- 요청: Objects 들이 서로 겹치는 어트리뷰트만 나오던 목록에 **겹치지 않는 것도** 나오게 하는 체크박스. 몇 개가 겹치는지 Target Edit 의 Targets 와 같은 `[k/n]` 표식.
+- 코어 `list_common_attrs(..., include_partial=False)` 가 합집합 모드와 행마다 `owners` · `count` · `total` 을 준다. 기본(OFF)은 이전과 같은 교집합.
+- 행 글자에 `[k/n]` 이 붙으므로 선택 이름은 `UserRole` 에서 읽는다. 툴팁에 없는 오브젝트 이름. 버튼은 `List Attributes`, 제목은 모드에 따라 `Common Attributes` / `Attributes`.
+- ★ 첫 오브젝트에 없는 어트리뷰트도 고를 수 있게 되어, 입력칸 종류 · 범위 · `Get` 을 **그것을 가진 첫 오브젝트**에서 읽도록 고쳤다(전에는 `objects[0]` 고정). 없는 오브젝트는 미리보기에서 회색 skip.
+- 검증(mayapy 2024) 25항목: 교집합 유지 · 합집합 k/n · 순서 · 중복 없음 · 씬에 없는 오브젝트 · UI 표기 · 툴팁 · enum 편집기 · 미리보기 skip · Get/Set 이 가진 오브젝트에만. 창 최소 폭 586 그대로.
+
 > [!summary] **README 최근 작업 표에 9월 하순(09-18 ~ 09-23) 5행** + 툴 목록 설명 갱신(A00330 Insert · A00380 MeshDoctor/By Weight · A00275 Smooth · A00050 V02) · **portfolio EN/KR** 동기 갱신(A00380 MeshDoctor·By Weight · A00330 Insert · Framework 로그 색 규칙 · 남의 PC 에서 열리는 릴리즈, 기간 끝 09-23)
 
 > [!summary] A00330 **Quick Rename > Insert — 리스트 이름의 n 번째 자리에 글자 넣기 + 미리보기** (v01.08->01.09)

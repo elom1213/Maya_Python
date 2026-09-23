@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.55` (`app/config/version.py`) — 창 기본 높이 900 → **980**(Match 탭이 스크롤 없이 다 보이게) · v01.54 는 리스트의 **`(Null)` 자리표시를 빨간 글씨로**(공용 TSL, 아래 메모) · v01.53 은 Match 에 **`Keep Children in Place`**(기본 OFF):
+- 버전: `v01.56` (`app/config/version.py`) — Attribute > Set Value 에 **`Include Non-Common`**: 일부 오브젝트만 가진 어트리뷰트도 나열, 행마다 **`[k/n]`**(§Set Value) · v01.55 는 창 기본 높이 900 → **980**(Match 탭이 스크롤 없이 다 보이게) · v01.54 는 리스트의 **`(Null)` 자리표시를 빨간 글씨로**(공용 TSL, 아래 메모) · v01.53 은 Match 에 **`Keep Children in Place`**(기본 OFF):
   팔로워만 움직이고 **그 아래 오브젝트는 있던 월드 자리에 그대로** 둔다. Mirror 탭의 같은 이름
   체크박스와 **같은 코어**(`app/core/keep_children.py`)를 쓴다 (§Match)
   · v01.52 는 Attribute 가 만든 어트리뷰트는 **반드시 채널 박스에
@@ -1268,11 +1268,11 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
 ```
 ┌ Objects and the attributes they share ─────────────────────────────┐
 │ Objects (order = step order)  Common Attributes      Number: 12    │
-│ [ ctrl_01 ]                   visibility                           │
-│ [ ctrl_02 ]                   translateX                           │
-│ [ ctrl_03 ]                   mode        <- 선택                  │
-│ [Select][Add][Del][Up][Down]  ☑ Channel Box Only                   │
-│ [ List Common Attributes ]    [Filter ....]                        │
+│ [ ctrl_01 ]                   visibility   [3/3]                   │
+│ [ ctrl_02 ]                   translateX   [3/3]                   │
+│ [ ctrl_03 ]                   mode   [3/3]  <- 선택                │
+│ [Select][Add][Del][Up][Down]  ☑ Channel Box Only ☐ Include Non-Common │
+│ [ List Attributes ]           [Filter ....]                        │
 └────────────────────────────────────────────────────────────────────┘
 ┌ Value ─────────────────────────────────────────────────────────────┐
 │ Attribute : mode   (enum)                                          │
@@ -1287,10 +1287,19 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-**목록 — 공통으로 가진 것만**
-- `List Common Attributes`: `Objects` 의 **모든 오브젝트가 가진** 어트리뷰트(교집합)만 보여 준다.
-  `Edit` 탭은 합집합이지만, 여기서는 한 번에 모두에게 넣는 것이 목적이라 하나라도 없으면 뺀다.
+**목록 — 기본은 공통으로 가진 것만**
+- `List Attributes`(v01.56 전 이름 `List Common Attributes`): `Objects` 의 **모든 오브젝트가 가진**
+  어트리뷰트(교집합)만 보여 준다. 한 번에 모두에게 넣는 것이 목적이라 하나라도 없으면 뺀다.
   순서는 첫 오브젝트의 채널 순서.
+- **`Include Non-Common`**(v01.56, 기본 OFF): 켜면 **일부 오브젝트만 가진 어트리뷰트도** 나온다(합집합).
+  목록 제목이 `Attributes` 로 바뀌고, 첫 오브젝트의 것 뒤에 다른 오브젝트에만 있는 것이 리스트 순서대로 붙는다.
+  체크를 바꾸면 목록을 바로 다시 채운다.
+- **행마다 `[k/n]`** — `Objects` 의 n 개 중 **k 개가 그 어트리뷰트를 가졌다**(Constrain > Target Edit 의
+  Targets 목록과 같은 표기). 공통인 것은 `[n/n]`. 툴팁에 **없는 오브젝트 이름**이 나온다.
+  씬에 없는 오브젝트는 n 에서 빠진다.
+- 일부만 가진 어트리뷰트를 고르면: 종류 · 범위 · `Get` 은 **그것을 가진 첫 오브젝트**에서 읽고,
+  없는 오브젝트는 미리보기에 `no settable attribute` 로 회색 표시되어 `Set Values` 가 건너뛴다.
+  Step 은 여전히 **리스트 순서(없는 오브젝트 자리 포함)** 로 센다.
 - 값 하나로 넣을 수 있는 종류만 나온다 — **float · int · bool · enum**. 문자열 · 행렬 · compound
   부모(`translate` 등, 자식 `translateX` 는 나온다)는 빠진다.
 - **`Channel Box Only`**(기본 ON): 채널박스에 보이는 것만(`Connect` 탭과 같은 판정 — keyable +
@@ -1318,7 +1327,7 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
 - **`Clamp to range`**(기본 ON, float / int): 어트리뷰트의 min / max 밖이면 잘라서 넣는다(미리보기
   Note 에 `clamped to range`). 끄면 마야가 거부해 그 오브젝트는 실패로 남는다 — 마야는 범위를
   **자르지 않고 에러를 낸다**.
-- `Get`: 첫 오브젝트의 현재 값을 `Start`(enum 이면 `Item`)로 읽어 온다.
+- `Get`: 그 어트리뷰트를 가진 첫 오브젝트의 현재 값을 `Start`(enum 이면 `Item`)로 읽어 온다.
 
 **미리보기와 적용**
 - 입력을 바꿀 때마다 아래 표에 **오브젝트마다 현재 값 → 새 값**이 나온다. 건너뛸 것은 회색이고

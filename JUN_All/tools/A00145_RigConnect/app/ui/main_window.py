@@ -1865,17 +1865,20 @@ class MainWindow(QWidget):
             title="Objects (order = step order)", select_label="Select",
             list_min_height=170, log_callback=self.log)
         left.addWidget(self.tsl_aval_objs)
-        btn_list = QPushButton("List Common Attributes")
+        btn_list = QPushButton("List Attributes")
         btn_list.setToolTip(
             "List the attributes EVERY object in the list has, that take a\n"
-            "number or an enum item (float / int / bool / enum).")
+            "number or an enum item (float / int / bool / enum).\n"
+            "With 'Include Non-Common' on, attributes only some objects have are listed too.\n"
+            "[k/n] = k of the n listed objects have the attribute.")
         btn_list.clicked.connect(self.on_aval_list)
         left.addWidget(btn_list)
         src_layout.addLayout(left, 1)
 
         right = QVBoxLayout()
         head = QHBoxLayout()
-        head.addWidget(QLabel("Common Attributes"))
+        self.lbl_aval_attrs_title = QLabel("Common Attributes")
+        head.addWidget(self.lbl_aval_attrs_title)
         head.addStretch(1)
         self.lbl_aval_number = QLabel("Number: 0")
         head.addWidget(self.lbl_aval_number)
@@ -1898,7 +1901,21 @@ class MainWindow(QWidget):
             "Off : every number / enum attribute of the nodes.")
         self.cb_aval_channel_box.toggled.connect(
             lambda _c: self.lw_aval_attrs.count() and self.on_aval_list())
-        right.addWidget(self.cb_aval_channel_box)
+        # 겹치지 않는 어트리뷰트도 (v01.56). 체크박스 둘은 한 줄에 - 세로 공간을 아낀다.
+        self.cb_aval_partial = QCheckBox("Include Non-Common")
+        self.cb_aval_partial.setChecked(False)
+        self.cb_aval_partial.setToolTip(
+            "Off : only the attributes EVERY object has.\n"
+            "On  : also the attributes only some objects have.\n"
+            "[k/n] after a name = k of the n objects have it; objects without it\n"
+            "are skipped by Set Values (shown in the preview).")
+        self.cb_aval_partial.toggled.connect(
+            lambda _c: self.lw_aval_attrs.count() and self.on_aval_list())
+        cb_row = QHBoxLayout()
+        cb_row.addWidget(self.cb_aval_channel_box)
+        cb_row.addWidget(self.cb_aval_partial)
+        cb_row.addStretch(1)
+        right.addLayout(cb_row)
 
         self.flt_aval = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
             self.lw_aval_attrs, placeholder="Type any part of an attribute name",
@@ -2012,31 +2029,55 @@ class MainWindow(QWidget):
     # ==============================================================
 
     def _aval_selected_attrs(self):
-        """선택된(필터에 보이는) 어트리뷰트 이름, 목록 순서대로."""
-        return [self.lw_aval_attrs.item(i).text()
+        """선택된(필터에 보이는) 어트리뷰트 이름, 목록 순서대로.
+
+        행 글자에는 `[k/n]` 이 붙으므로 이름은 UserRole 에서 읽는다.
+        """
+        return [self.lw_aval_attrs.item(i).data(Qt.UserRole)
                 for i in range(self.lw_aval_attrs.count())
                 if self.lw_aval_attrs.item(i).isSelected()
                 and not self.lw_aval_attrs.item(i).isHidden()]
 
+    def _aval_owner(self, objects, attr):
+        """리스트에서 그 어트리뷰트를 가진 첫 오브젝트. 없으면 None.
+
+        Include Non-Common 이면 첫 오브젝트에 없는 어트리뷰트도 고를 수 있어서,
+        종류·범위·Get 은 **그것을 가진** 첫 오브젝트에서 읽는다.
+        """
+        for obj in objects:
+            if cmds.objExists(obj) and aval_mgr.attr_info(obj, attr) is not None:
+                return obj
+        return None
+
     def _aval_current_info(self):
-        """첫 선택 어트리뷰트의 정보(첫 오브젝트 기준). 없으면 None."""
+        """첫 선택 어트리뷰트의 정보(그것을 가진 첫 오브젝트 기준). 없으면 None."""
         objects = self.tsl_aval_objs.get_all_items()
         attrs = self._aval_selected_attrs()
-        if not objects or not attrs or not cmds.objExists(objects[0]):
+        if not objects or not attrs:
             return None
-        return aval_mgr.attr_info(objects[0], attrs[0])
+        owner = self._aval_owner(objects, attrs[0])
+        if owner is None:
+            return None
+        return aval_mgr.attr_info(owner, attrs[0])
 
     def on_aval_list(self):
-        """모든 오브젝트가 공통으로 가진 어트리뷰트를 채운다. 고른 것은 이어받는다."""
+        """오브젝트들의 어트리뷰트를 채운다. 고른 것은 이어받는다.
+
+        기본은 모두가 가진 것만, Include Non-Common 이면 일부만 가진 것도.
+        행마다 `[k/n]` = n 개 오브젝트 중 k 개가 가졌다(Target Edit 의 Targets 와 같은 표기).
+        """
         objects = self.tsl_aval_objs.get_all_items()
         if not objects:
-            self.log("[ERR] List Common Attributes : Objects list is empty")
+            self.log("[ERR] List Attributes : Objects list is empty")
             return
         cb_only = self.cb_aval_channel_box.isChecked()
+        partial = self.cb_aval_partial.isChecked()
+        self.lbl_aval_attrs_title.setText("Attributes" if partial else "Common Attributes")
         try:
-            rows, missing = aval_mgr.list_common_attrs(objects, cb_only)
+            rows, missing = aval_mgr.list_common_attrs(
+                objects, cb_only, include_partial=partial)
         except Exception as e:
-            self.log("[ERR] List Common Attributes : {0}".format(e))
+            self.log("[ERR] List Attributes : {0}".format(e))
             cmds.warning(str(e))
             return
 
@@ -2044,8 +2085,16 @@ class MainWindow(QWidget):
         self.lw_aval_attrs.blockSignals(True)
         self.lw_aval_attrs.clear()
         for row in rows:
-            item = QListWidgetItem(row["name"])
-            item.setToolTip(row["kind"])
+            item = QListWidgetItem("{0}   [{1}/{2}]".format(
+                row["name"], row["count"], row["total"]))
+            item.setData(Qt.UserRole, row["name"])
+            tip = "{0}\nOn {1} of {2} object(s)".format(
+                row["kind"], row["count"], row["total"])
+            if row["count"] < row["total"]:
+                lacking = [o for o in objects
+                           if o not in row["owners"] and o not in missing]
+                tip += "\nMissing on (skipped by Set Values):\n  " + "\n  ".join(lacking)
+            item.setToolTip(tip)
             self.lw_aval_attrs.addItem(item)
             item.setSelected(row["name"] in keep)
         self.lw_aval_attrs.blockSignals(False)
@@ -2054,9 +2103,16 @@ class MainWindow(QWidget):
 
         for obj in missing:
             self.log("[WARN] {0} : object not found in scene".format(obj))
-        msg = "[OK] List Common Attributes : {0} attr(s) shared by {1} object(s){2}".format(
-            total, len(objects) - len(missing),
-            ", channel box only" if cb_only else "")
+        present = len(objects) - len(missing)
+        if partial:
+            common = sum(1 for r in rows if r["count"] == r["total"])
+            msg = ("[OK] List Attributes : {0} attr(s) on {1} object(s) - {2} common, "
+                   "{3} on some only{4}").format(
+                total, present, common, total - common,
+                ", channel box only" if cb_only else "")
+        else:
+            msg = "[OK] List Attributes : {0} attr(s) shared by {1} object(s){2}".format(
+                total, present, ", channel box only" if cb_only else "")
         if shown != total:
             msg += " - filter '{0}' shows {1}".format(self.flt_aval.text().strip(), shown)
         self.log(msg)
@@ -2152,14 +2208,16 @@ class MainWindow(QWidget):
         if info is None:
             self.log("[ERR] Get : list objects and select an attribute first")
             return
-        value = cmds.getAttr("{0}.{1}".format(objects[0], attrs[0]))
+        # 그 어트리뷰트를 가진 첫 오브젝트에서 읽는다 (Include Non-Common 이면 [0] 에 없을 수 있다)
+        owner = self._aval_owner(objects, attrs[0])
+        value = cmds.getAttr("{0}.{1}".format(owner, attrs[0]))
         if info["kind"] in (aval_mgr.KIND_ENUM, aval_mgr.KIND_BOOL):
             values = [v for _n, v in info["items"]]
             if int(value) in values:
                 self.cmb_aval_item.setCurrentIndex(values.index(int(value)))
         else:
             self.sp_aval_start.setValue(value)
-        self.log("[OK] Get : {0}.{1} = {2}".format(objects[0], attrs[0], value))
+        self.log("[OK] Get : {0}.{1} = {2}".format(owner, attrs[0], value))
 
     def on_aval_set(self):
         """미리보기대로 값을 넣는다 (undo 한 번)."""
