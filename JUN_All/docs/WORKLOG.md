@@ -31,7 +31,7 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-23 (오늘)
 
-> [!summary] **README 최근 작업 표에 9월 하순(09-18 ~ 09-23) 5행** + 툴 목록 설명 갱신(A00330 Insert · A00380 MeshDoctor/By Weight · A00275 Smooth · A00050 V02)
+> [!summary] **README 최근 작업 표에 9월 하순(09-18 ~ 09-23) 5행** + 툴 목록 설명 갱신(A00330 Insert · A00380 MeshDoctor/By Weight · A00275 Smooth · A00050 V02) · **portfolio EN/KR** 동기 갱신(A00380 MeshDoctor·By Weight · A00330 Insert · Framework 로그 색 규칙 · 남의 PC 에서 열리는 릴리즈, 기간 끝 09-23)
 
 > [!summary] A00330 **Quick Rename > Insert — 리스트 이름의 n 번째 자리에 글자 넣기 + 미리보기** (v01.08->01.09)
 - 요청: TSL 에 담은 오브젝트 이름의 n 번째 위치에 입력한 텍스트를 삽입. n 은 음수·양수 정수, 음수는 이름 끝부터. 바꾸기 전 미리보기, Apply 를 눌러야 적용.
