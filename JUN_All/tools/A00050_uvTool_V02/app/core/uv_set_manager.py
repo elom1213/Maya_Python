@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-21
+# last Update date : 2026-09-23
 # A00050_uvTool_V02 - UV 세트 검사 / 이름 정리 (maya.cmds, UI 비의존)
 #
 # 규칙은 하나다 — **메시는 `map1` 이라는 UV 세트 하나만 갖는다.**
@@ -155,6 +155,56 @@ def describe(status, sets, wanted=DEFAULT_UV_SET):
 
 
 # ==========================================================================
+# Inspect — 오브젝트마다 UV 세트와 규칙 판정 (v02.02, UV Sets 표)
+# ==========================================================================
+
+def _collect_shapes(nodes):
+    """nodes 아래의 메시 셰이프(중복 없이). 트랜스폼과 셰이프를 함께 담아도 한 번씩."""
+    shapes = []
+    for node in nodes or []:
+        shapes.extend(mesh_shapes(node))
+    return list(dict.fromkeys(shapes))
+
+
+def inspect(nodes, wanted=DEFAULT_UV_SET):
+    """노드마다 **UV 세트 이름들**과 **규칙 판정**을 준다. 씬은 바꾸지 않는다.
+
+    UI 의 `UV Sets` 표(오브젝트 · UV 세트 · 규칙 세 칸)가 이것을 그대로 그린다.
+    메시 셰이프마다 한 행이고, 메시가 아니거나 씬에 없는 노드도 **한 행으로 남긴다** -
+    리스트에 올린 것이 표에서 조용히 사라지면 왜 빠졌는지 알 수 없다.
+
+    Returns:
+        [{node, transform, shape, sets, status, reason}, ...] (nodes 순서)
+        status 는 OK / MULTIPLE / WRONG_NAME / NO_UV / MISSING / NOT_MESH.
+    """
+    rows = []
+    seen = set()
+
+    for node in nodes or []:
+        if not node or not cmds.objExists(node):
+            rows.append({"node": node, "transform": node, "shape": None, "sets": [],
+                         "status": MISSING, "reason": REASONS[MISSING]})
+            continue
+
+        shapes = mesh_shapes(node)
+        if not shapes:
+            rows.append({"node": node, "transform": node, "shape": None, "sets": [],
+                         "status": NOT_MESH, "reason": REASONS[NOT_MESH]})
+            continue
+
+        for shape in shapes:
+            if shape in seen:
+                continue
+            seen.add(shape)
+            status, sets = check_shape(shape, wanted)
+            rows.append({"node": node, "transform": transform_of(shape), "shape": shape,
+                         "sets": sets, "status": status,
+                         "reason": describe(status, sets, wanted)})
+
+    return rows
+
+
+# ==========================================================================
 # Catch — 규칙에 맞지 않는 메시 찾기
 # ==========================================================================
 
@@ -173,11 +223,8 @@ def find_offenders(nodes=None, wanted=DEFAULT_UV_SET):
     문제인지 알아야 고칠 수 있기 때문이다.
     """
     if nodes:
-        shapes = []
-        for node in nodes:
-            shapes.extend(mesh_shapes(node))
         # 같은 셰이프가 두 번 들어오지 않게(트랜스폼과 셰이프를 함께 담은 경우).
-        shapes = list(dict.fromkeys(shapes))
+        shapes = _collect_shapes(nodes)
     else:
         shapes = scene_meshes()
 

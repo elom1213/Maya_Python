@@ -14,8 +14,8 @@ UV 세트가 둘 이상이거나 이름이 다르면 익스포트·머티리얼 
 이 툴은 그 규칙에 어긋난 메시를 **찾아 주고**(`Catch Objects`), 첫 UV 세트의 **이름을 고친다**
 (`Rename UV Set`).
 
-- 버전: `v02.01` (`app/config/version.py`) — **PySide 이식 + 로그**,
-  **바꿀 UV 세트 이름을 화면에서 입력**(§3)
+- 버전: `v02.02` (`app/config/version.py`) — **PySide 이식 + 로그**,
+  **바꿀 UV 세트 이름을 화면에서 입력**(§3) · 리스트 옆 **UV Sets 표** + 로그의 `[wrong_name]` 빨간색(§2.1, v02.02)
 - 위치: `JUN_All/tools/A00050_uvTool_V02`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴. 검사·이름 정리 로직은 `app/core` 에 분리
 
@@ -41,11 +41,13 @@ A00050_uvTool_V02.run(True)     # True 면 DEV_MODE 에서 리로드
 ┌──────────────────────────────────────────────┐
 │ [메뉴 바]                            [ Pin ] │
 │ One UV set per mesh, named 'map1'.           │
-│ ┌ Objects ───────────────────────────────┐   │
-│ │ [ Select Objects ]                      │   │
-│ │ pCube1                                  │   │
-│ │ [Add][Del][Up][Down] [Sort] [Reverse]   │   │
-│ └─────────────────────────────────────────┘   │
+│ ┌ Objects ─────────┐┌ UV Sets   1 / 3 OK ─────┐│
+│ │ [ Select Objects ]││ Object UV Sets    Rule  ││
+│ │ good             ││ good   map1       OK    ││
+│ │ wrong            ││ wrong  uvA        wrong_name ││
+│ │ multi            ││ multi  map1, uvB  multiple ││
+│ │ [Add][Del][Up]...││                         ││
+│ └──────────────────┘└─────────────────────────┘│
 │ ┌ Tool ──────────────────────────────────┐   │
 │ │ UV set name [ map1            ] [ map1 ] │  │
 │ │ ☑ Catch : look at every mesh in the scene│  │
@@ -57,6 +59,28 @@ A00050_uvTool_V02.run(True)     # True 면 DEV_MODE 에서 리로드
 │ └─────────────────────────────────────────┘   │
 └──────────────────────────────────────────────┘
 ```
+
+### 2.1 UV Sets 표 (v02.02)
+
+리스트 옆에 **오브젝트마다 UV 세트 이름들과 규칙에 맞는지**를 세 칸으로 보여 준다
+(A00330_NamingTool Quick Rename > Insert 의 Preview 와 같은 형식 — 줄 선택 없음 · 줄무늬).
+
+| 칸 | 내용 |
+|----|------|
+| `Object` | 트랜스폼 이름(툴팁 = 셰이프 롱네임). 셰이프가 여럿이면 셰이프마다 한 행 |
+| `UV Sets` | 그 메시의 UV 세트 전부, `polyUVSet(q=allUVSets)` 순서. 없으면 `-` |
+| `Rule` | `OK`(초록) 또는 `multiple` / `wrong_name` / `no_uv` / `not_mesh` / `missing`(빨강). 툴팁 = 사유 |
+
+- 제목에 `UV Sets   k / n OK` 로 맞은 수를 적는다.
+- **다시 그리는 때**: 리스트가 바뀔 때(Select / Add / Del / Up / Down / Sort / Catch),
+  `UV set name` 칸을 고칠 때(규칙이 바뀌므로), `Rename UV Set` 뒤. 씬은 바꾸지 않는다.
+- 메시가 아니거나 씬에 없는 항목도 **행으로 남긴다** — 리스트에 올린 것이 표에서 조용히 사라지면 왜 빠졌는지 알 수 없다.
+- 로그의 **`[wrong_name]` 줄은 빨간색**이다(공용 로그 색 규칙의 `[ERROR]` 빨강, 밝은 테마는 진한 빨강).
+  `[wrong_name]` 은 밑줄이 있어 공용 표식 규칙(글자만)에 걸리지 않으므로 툴이 HTML 로 칠해 넣는다.
+- 창 기본 폭을 560 → **720** 으로 넓혔다(표가 보이게). 최소 크기 533 x 772 는 그대로.
+
+> **A00380_MeshTool 로 옮길 예정**이다. 표는 `app/ui/uv_set_table.py`(Framework · Qt 에만 기댐,
+> 툴 코드를 import 하지 않음), 행 데이터는 코어 `uv_set_manager.inspect()` 라 두 파일을 그대로 가져가면 된다.
 
 ---
 
@@ -166,8 +190,9 @@ A00050_uvTool_V02/
 ├─ icon/A00050_uvTool_V02.png|.svg
 └─ app/
    ├─ config/version.py
-   ├─ core/uv_set_manager.py    # 검사(find_offenders) + 이름 정리(rename_first_uv_set)
-   └─ ui/main_window.py         # 창 · 리스트 · 이름 칸 · 버튼 2개 · 로그 · Pin · 메뉴
+   ├─ core/uv_set_manager.py    # 검사(find_offenders · inspect) + 이름 정리(rename_first_uv_set)
+   ├─ ui/uv_set_table.py        # UV Sets 표 + [wrong_name] 빨간 로그 줄 (v02.02, 이식 단위)
+   └─ ui/main_window.py         # 창 · 리스트 | 표 · 이름 칸 · 버튼 2개 · 로그 · Pin · 메뉴
 ```
 
 V01 의 `utility.py` 두 함수가 `app/core/uv_set_manager.py` 로 옮겨지면서

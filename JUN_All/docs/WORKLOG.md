@@ -31,6 +31,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-23 (오늘)
 
+> [!summary] A00050_V02 **UV Sets 표(Object / UV Sets / Rule) + 로그의 `[wrong_name]` 빨간색** (v02.01->02.02)
+- 요청: 로그의 `[wrong_name]` 은 빨간색. 오브젝트 · UV 세트 이름들 · 규칙 부합 여부 세 칸 창을 A00330 Quick Rename > Insert 의 Preview 와 같은 형식으로. **다음에 A00380_MeshTool 로 이식**할 예정.
+- 리스트 옆에 표(QSplitter). 코어 `inspect(nodes, wanted)` 가 셰이프마다 행(메시 아님 · 씬에 없음도 행으로), 표가 그린다. 리스트 · 이름 칸 변경, Catch · Rename 뒤에 다시 그림. 제목 `k / n OK`.
+- `[wrong_name]` 은 밑줄 때문에 공용 표식 규칙(`[A-Za-z]+`)에 안 걸린다 → 공용 규칙을 넓히지 않고 툴이 `[ERROR]` 빨강 HTML 줄로 넣는다(로그창은 `<` 가 든 줄을 그대로 받음). 다음 평문 줄이 빨강을 물려받지 않는 것 확인.
+- 이식 대비: 표는 `app/ui/uv_set_table.py` 한 파일(Framework · Qt 에만 의존), 행 데이터는 코어 — 둘을 그대로 가져가면 된다.
+- 창 기본 폭 560 -> 720(표가 243px 이었다). 최소 533x772 는 수정 전후 동일(오프스크린 coral_dark).
+- 검증(mayapy 2024) 15항목: inspect 상태 · 세트 · 셰이프 중복 제거 · find_offenders 불변 · 표 행/제목/색/툴팁 · 이름 칸 변경 · Catch 로그 빨강(wrong_name 만) · 다음 줄 색 안 물림 · Catch/Rename 뒤 표 갱신.
+
 > [!summary] A00145 **Attribute > Set Value 에 `Include Non-Common` + 행마다 `[k/n]`** (v01.55->01.56)
 - 요청: Objects 들이 서로 겹치는 어트리뷰트만 나오던 목록에 **겹치지 않는 것도** 나오게 하는 체크박스. 몇 개가 겹치는지 Target Edit 의 Targets 와 같은 `[k/n]` 표식.
 - 코어 `list_common_attrs(..., include_partial=False)` 가 합집합 모드와 행마다 `owners` · `count` · `total` 을 준다. 기본(OFF)은 이전과 같은 교집합.

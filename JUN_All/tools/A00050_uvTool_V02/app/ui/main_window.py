@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-21
+# last Update date : 2026-09-23
 # A00050_uvTool_V02 - Qt UI (in-Maya)
 #
 # V01(`A00050_uvTool`, maya.cmds UI)을 **PySide 로 옮긴 버전**이다. 하는 일은 같다 —
@@ -17,6 +17,13 @@
 # `Rename` 이 붙일 이름이자 `Catch` 가 규칙으로 삼는 이름이다. 둘을 따로 두면
 # "잡아서 고쳤는데 여전히 위반" 이 되어 버린다. 규칙 문장도 입력에 따라 같이 바뀐다.
 #
+# ── UV Sets 표 (v02.02) ───────────────────────────────────────────────────
+# 리스트 옆에 **오브젝트 · UV 세트 이름들 · 규칙 판정** 세 칸짜리 표를 둔다
+# (A00330_NamingTool Quick Rename > Insert 의 Preview 와 같은 형식). 리스트 · 이름 칸이
+# 바뀔 때, Catch · Rename 뒤에 다시 그린다. 로그의 `[wrong_name]` 줄은 빨간색.
+# 표는 `app/ui/uv_set_table.py`, 행 데이터는 코어 `inspect()` - A00380_MeshTool 로
+# 옮길 때 두 파일을 그대로 가져가면 된다.
+#
 # 로직은 `app/core/uv_set_manager.py` 에 있고 여기서는 화면과 로그만 다룬다.
 
 from Framework.qt.qt import (
@@ -29,6 +36,7 @@ from Framework.qt.qt import (
     QCheckBox,
     QMessageBox,
     QPushButton,
+    QSplitter,
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
@@ -38,6 +46,7 @@ from Framework.qt import JUN_mod_tsl_qt
 
 from tools.A00050_uvTool_V02.app.config.version import VERSION, LAST_UPDATE
 from tools.A00050_uvTool_V02.app.core import uv_set_manager as uv_mgr
+from tools.A00050_uvTool_V02.app.ui.uv_set_table import UvSetTable, colored_log_line
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -53,8 +62,10 @@ class MainWindow(QWidget):
 
         self.setWindowTitle("UV Tool v{0}".format(VERSION))
         self.setWindowFlags(Qt.Window)
-        # 최소 크기(533 x 772)보다 조금 넉넉하게 — 로그가 몇 줄 보이도록.
-        self.resize(560, 820)
+        # 최소 크기(533 x 772)보다 넉넉하게 — 로그가 몇 줄 보이도록.
+        # 가로는 리스트 옆 UV Sets 표(세 칸)가 보이도록 넓혔다(v02.02, 560 -> 720).
+        # 최소 폭은 그대로라 줄이면 표가 가로 스크롤된다.
+        self.resize(720, 820)
 
         self.build_ui()
 
@@ -89,11 +100,25 @@ class MainWindow(QWidget):
         self.lbl_rule.setWordWrap(True)
         main_layout.addWidget(self.lbl_rule)
 
-        # ---- 오브젝트 목록 --------------------------------------------
+        # ---- 오브젝트 목록 | UV Sets 표 (v02.02) -------------------------
         self.tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Objects", select_label="Select Objects",
             show_reverse=True, list_min_height=150, log_callback=self.log)
-        main_layout.addWidget(self.tsl, 1)
+
+        self.uv_table = UvSetTable()
+
+        split = QSplitter(Qt.Horizontal)
+        split.addWidget(self.tsl)
+        split.addWidget(self.uv_table)
+        split.setStretchFactor(0, 1)
+        split.setStretchFactor(1, 2)
+        main_layout.addWidget(split, 1)
+
+        # 리스트가 바뀌면(Select / Add / Del / Up / Down / Sort / Catch) 표를 다시 그린다
+        model = self.tsl.list_widget.model()
+        for signal in (model.rowsInserted, model.rowsRemoved,
+                       model.rowsMoved, model.modelReset):
+            signal.connect(self._refresh_table)
 
         # ---- 동작 -----------------------------------------------------
         tool_box = QGroupBox("Tool")
@@ -114,6 +139,7 @@ class MainWindow(QWidget):
             "Default is '{0}'. Maya accepts almost anything here (even spaces),\n"
             "but it refuses an empty name.".format(uv_mgr.DEFAULT_UV_SET))
         self.le_uv_name.textChanged.connect(self._sync_rule_label)
+        self.le_uv_name.textChanged.connect(self._refresh_table)
         name_row.addWidget(self.le_uv_name, 1)
 
         self.btn_name_default = QPushButton("map1")
@@ -174,6 +200,14 @@ class MainWindow(QWidget):
 
     def log(self, message):
         self.log_view.appendPlainText(message)
+
+    def _refresh_table(self, *_args):
+        """UV Sets 표를 리스트 항목 기준으로 다시 그린다. 씬은 바꾸지 않는다."""
+        if not hasattr(self, "le_uv_name"):
+            return      # 빌드 중
+        wanted = self.le_uv_name.text().strip() or uv_mgr.DEFAULT_UV_SET
+        nodes = self.tsl.get_all_nodes() or self.tsl.get_all_items()
+        self.uv_table.set_rows(uv_mgr.inspect(nodes, wanted), wanted)
 
     # ==================================================================
     # 동작
@@ -253,8 +287,14 @@ class MainWindow(QWidget):
             return
 
         for item in offenders:
-            self.log("  [{0}] {1} : {2}".format(
-                item["status"], item["transform"].split("|")[-1], item["reason"]))
+            line = "  [{0}] {1} : {2}".format(
+                item["status"], item["transform"].split("|")[-1], item["reason"])
+            html = colored_log_line(line, item["status"])
+            if html:
+                # 로그창은 `<` 가 든 줄을 툴이 쓴 HTML 로 보고 그대로 받는다
+                self.log_view.append(html)
+            else:
+                self.log(line)
 
         transforms = list(dict.fromkeys(item["transform"] for item in offenders))
 
@@ -262,6 +302,8 @@ class MainWindow(QWidget):
             len(offenders), len(transforms)))
 
         self.tsl.set_items(transforms)
+        # 같은 목록이면 rows 신호가 안 올 수도 있다 - 확실히 다시 그린다
+        self._refresh_table()
 
         if self.chk_select_result.isChecked():
             import maya.cmds as cmds
@@ -317,6 +359,9 @@ class MainWindow(QWidget):
 
         if renamed:
             self.log("       Ctrl+Z undoes the whole run.")
+
+        # 이름이 바뀌었으니 표도 다시 (리스트는 그대로라 신호가 오지 않는다)
+        self._refresh_table()
 
     # ==================================================================
     # 창 동작

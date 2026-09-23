@@ -46,5 +46,12 @@ V01 은 선택이 먼저라 리스트를 채워 두고 눌렀을 때 무엇이 �
 검증: mayapy 2024 헤드리스 **57항목**(코어 + 오프스크린 Qt, 이름 칸 15항목 포함).
 창 최소 533x772.
 마야 GUI 에서는 아직 안 눌러 봄.
+**v02.02 (2026-09-23): UV Sets 표 + `[wrong_name]` 빨강.** 리스트 옆 세 칸 표(Object / UV Sets / Rule,
+A00330 Insert Preview 형식). 코어 `inspect()` 가 행을 만들고 `app/ui/uv_set_table.py` 가 그린다.
+★ **다음 단계: A00380_MeshTool 로 이식 예정**(사용자 예고) — 표 파일은 Framework · Qt 에만 기대게 했으니
+`uv_set_table.py` + `uv_set_manager.py` 를 그대로 옮기면 된다(import 경로만 `tools.A00380_MeshTool.app...`).
+`[wrong_name]` 은 밑줄 때문에 공용 표식 정규식(`[A-Za-z]+`)에 안 걸려 툴이 HTML 줄로 칠한다
+(공용 규칙은 안 넓혔다 — 다른 툴 `[Set_v001]` 류가 표식이 될 수 있어서).
+
 관련: [[mayapy-headless-verify]], [[undo-chunk-by-default]], [[prefer-pyside-for-new-tools]],
 [[new-tool-needs-icon]](아이콘은 V01 그림을 그대로 씀)

@@ -11,5 +11,10 @@
 # 02.01  바꿀 UV 세트 이름을 **화면에서 입력**한다(기본 map1). 칸 하나가 Rename 의 목표
 #        이름이자 Catch 의 규칙 이름이다 - 잡은 것을 고치면 규칙에 맞도록
 
-VERSION = "02.01"
-LAST_UPDATE = "2026-09-21"
+# 02.02  리스트 옆에 **UV Sets 표**(Object / UV Sets / Rule) - A00330 Quick Rename > Insert 의
+#        Preview 와 같은 형식. 리스트 · 이름 칸이 바뀔 때, Catch · Rename 뒤에 다시 그린다.
+#        로그의 `[wrong_name]` 줄은 빨간색. 표는 app/ui/uv_set_table.py + 코어 inspect() -
+#        A00380_MeshTool 로 옮길 때 그대로 가져간다
+
+VERSION = "02.02"
+LAST_UPDATE = "2026-09-23"
