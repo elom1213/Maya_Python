@@ -180,7 +180,21 @@ class MainWindow(QWidget):
             "A mesh that already has a set with that name cannot be renamed -\n"
             "Maya refuses - and the log says so. One undo step.")
         self.btn_rename.clicked.connect(self.on_rename)
-        tool_layout.addWidget(self.btn_rename)
+
+        # Delete UV Sets (v02.03) - Rename 의 왼쪽
+        self.btn_delete = QPushButton("Delete UV Sets")
+        self.btn_delete.setMinimumHeight(32)
+        self.btn_delete.setToolTip(
+            "Delete every UV set whose name is NOT the name typed above,\n"
+            "on every listed object. One undo step.\n"
+            "Maya cannot delete the default (first) UV set, so a mesh without\n"
+            "that name is left alone - rename it first.")
+        self.btn_delete.clicked.connect(self.on_delete)
+
+        edit_row = QHBoxLayout()
+        edit_row.addWidget(self.btn_delete)
+        edit_row.addWidget(self.btn_rename)
+        tool_layout.addLayout(edit_row)
 
         main_layout.addWidget(tool_box)
 
@@ -219,7 +233,7 @@ class MainWindow(QWidget):
 
         self.lbl_rule.setText(
             "One UV set per mesh, named '{0}'.\n"
-            "Catch finds the meshes that break it, Rename fixes the name.".format(name))
+            "Catch finds the meshes that break it, Delete / Rename fix them.".format(name))
 
     def _wanted_name(self):
         """두 버튼이 함께 쓰는 **원하는 UV 세트 이름**. 못 쓰는 이름이면 None.
@@ -363,6 +377,61 @@ class MainWindow(QWidget):
         # 이름이 바뀌었으니 표도 다시 (리스트는 그대로라 신호가 오지 않는다)
         self._refresh_table()
 
+    def on_delete(self):
+        """입력한 이름이 **아닌** UV 세트를 지우고 before -> after 를 한 줄씩 적는다 (v02.03)."""
+        wanted = self._wanted_name()
+        if wanted is None:
+            return
+
+        nodes = self._targets()
+
+        if not nodes:
+            self.log("[WARN] Nothing to delete from - list the objects first "
+                     "(Catch Objects, or Select Objects).")
+            return
+
+        self.log("Delete : every UV set except '{0}' on {1} object(s).".format(
+            wanted, len(nodes)))
+
+        records = uv_mgr.delete_other_uv_sets(nodes, keep=wanted)
+
+        changed = 0
+        untouched = 0
+
+        for record in records:
+            name = (record["shape"] or record["node"] or "").split("|")[-1]
+            before = ", ".join(record["before"]) or "-"
+            after = ", ".join(record["after"]) or "-"
+            status = record["status"]
+
+            if status == uv_mgr.DELETED:
+                changed += 1
+                self.log("  {0} : {1}  ->  {2}".format(name, before, after))
+            elif status == uv_mgr.PARTIAL:
+                changed += 1
+                self.log("  [WARN] {0} : {1}  ->  {2}  ({3})".format(
+                    name, before, after, record["detail"]))
+            elif status == uv_mgr.ALREADY:
+                untouched += 1
+                self.log("  {0} : {1}  (only '{2}', nothing to delete)".format(
+                    name, before, wanted))
+            else:
+                untouched += 1
+                detail = record["detail"] or uv_mgr.REASONS.get(status, status).format(
+                    count=len(record["before"]),
+                    sets=", ".join(record["before"]) or "-",
+                    first=record["before"][0] if record["before"] else "-",
+                    default=wanted)
+                self.log("  [WARN] {0} : {1}  (nothing deleted - {2})".format(
+                    name, before, detail))
+
+        self.log("       {0} changed, {1} left as they were.".format(changed, untouched))
+
+        if changed:
+            self.log("       Ctrl+Z undoes the whole run.")
+
+        self._refresh_table()
+
     # ==================================================================
     # 창 동작
     # ==================================================================
@@ -393,6 +462,8 @@ class MainWindow(QWidget):
             "  multiple    two or more UV sets\n"
             "  wrong_name  a single set with another name\n"
             "  no_uv       no UV set at all\n\n"
+            "Delete UV Sets deletes every set with another name - except the\n"
+            "default (first) one, which Maya never deletes.\n"
             "Rename UV Set renames the FIRST set to that name.\n"
             "It cannot rename when the mesh already has a set with that name -\n"
             "Maya refuses - and it never deletes a UV set (Maya does not allow\n"

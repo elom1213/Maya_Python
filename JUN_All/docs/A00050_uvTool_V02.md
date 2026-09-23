@@ -15,7 +15,7 @@ UV 세트가 둘 이상이거나 이름이 다르면 익스포트·머티리얼 
 (`Rename UV Set`).
 
 - 버전: `v02.02` (`app/config/version.py`) — **PySide 이식 + 로그**,
-  **바꿀 UV 세트 이름을 화면에서 입력**(§3) · 리스트 옆 **UV Sets 표** + 로그의 `[wrong_name]` 빨간색(§2.1, v02.02)
+  **바꿀 UV 세트 이름을 화면에서 입력**(§3) · 리스트 옆 **UV Sets 표** + 로그의 `[wrong_name]` 빨간색(§2.1, v02.02) · **`Delete UV Sets`**(§4.1, v02.03)
 - 위치: `JUN_All/tools/A00050_uvTool_V02`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴. 검사·이름 정리 로직은 `app/core` 에 분리
 
@@ -53,7 +53,7 @@ A00050_uvTool_V02.run(True)     # True 면 DEV_MODE 에서 리로드
 │ │ ☑ Catch : look at every mesh in the scene│  │
 │ │ ☑ Catch : select the offending meshes    │  │
 │ │ [        Catch Objects        ]          │  │
-│ │ [        Rename UV Set        ]          │  │
+│ │ [ Delete UV Sets ] [ Rename UV Set ]     │  │
 │ └─────────────────────────────────────────┘   │
 │ ┌ 로그 (Expand / Clear / Copy) ───────────┐   │
 │ └─────────────────────────────────────────┘   │
@@ -135,6 +135,28 @@ Catch : checked 4 mesh(es) in the scene, wanting one 'map1'.
 
 ---
 
+## 4.1 `Delete UV Sets` — 규칙 이름이 아닌 세트 지우기 (v02.03)
+
+`Rename UV Set` **왼쪽** 버튼. 리스트의 오브젝트(비면 씬 선택)에서 **`UV set name` 칸의 이름이 아닌
+UV 세트를 모두 지운다.** 전체가 **undo 한 스텝**이고, 끝나면 UV Sets 표를 다시 그린다.
+
+★ **마야는 첫 번째(기본) UV 세트를 지우지 못한다** — 이름이 무엇이든 `allUVSets` 의 첫 세트면
+`The default uv set cannot be deleted.`(mayapy 2024 실측). 그래서 결과가 넷으로 갈린다.
+
+| 메시의 UV 세트 | 결과 | 로그 |
+|---|---|---|
+| `map1, uvB, uvC` | 지움 → `map1` | `multiShape : map1, uvB, uvC  ->  map1` |
+| `map1` | 할 일 없음 | `(only 'map1', nothing to delete)` |
+| `uvA, map1, uvZ` | **지울 수 있는 것만** → `uvA, map1` | `[WARN] ... ('uvA' is the default (first) UV set and Maya cannot delete it)` |
+| `uvA` (규칙 이름 없음) | **하나도 안 지움** | `[WARN] ... there is no 'map1' to keep - rename a set to 'map1' first` |
+
+- 규칙 이름이 아예 없는 메시를 건드리지 않는 이유: 지워 봐야 규칙 이름은 생기지 않고 UV 만 잃는다. `Rename` 이 먼저다.
+- 현재(current) UV 세트를 지우면 마야가 현재 세트를 기본 세트로 넘긴다.
+- 지울 때마다 히스토리에 `deleteUVSet` 노드가 하나씩 생긴다(스킨이 붙은 메시도 지워진다).
+- 확인 대화상자는 없다 — `Rename` 과 같이 로그에 before -> after 를 남기고, `Ctrl+Z` 한 번으로 전부 돌아간다.
+
+---
+
 ## 5. `Rename UV Set` — 이름이 어떻게 바뀌었나
 
 리스트에 담긴 오브젝트(비어 있으면 씬 선택)의 **첫 UV 세트**를 **`UV set name` 에 적은 이름**(기본 `map1`)으로 바꾼다.
@@ -190,7 +212,7 @@ A00050_uvTool_V02/
 ├─ icon/A00050_uvTool_V02.png|.svg
 └─ app/
    ├─ config/version.py
-   ├─ core/uv_set_manager.py    # 검사(find_offenders · inspect) + 이름 정리(rename_first_uv_set)
+   ├─ core/uv_set_manager.py    # 검사(find_offenders · inspect) + 이름 정리(rename_first_uv_set) + 삭제(delete_other_uv_sets)
    ├─ ui/uv_set_table.py        # UV Sets 표 + [wrong_name] 빨간 로그 줄 (v02.02, 이식 단위)
    └─ ui/main_window.py         # 창 · 리스트 | 표 · 이름 칸 · 버튼 2개 · 로그 · Pin · 메뉴
 ```

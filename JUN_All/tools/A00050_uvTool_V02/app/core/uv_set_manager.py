@@ -22,6 +22,11 @@
 #  * `ls(type="mesh")` 는 **중간(Orig) 셰이프까지** 준다(디포머가 붙은 메시).
 #    같은 트랜스폼이 두 번 걸리므로 `noIntermediate=True` 로 거른다.
 #  * UV 세트 rename 은 **undo 된다**.
+#  * (v02.03 Delete) **지울 수 없는 것은 첫 번째(기본) UV 세트뿐**이다 — 이름이 무엇이든
+#    `allUVSets` 의 첫 세트면 `The default uv set cannot be deleted.` 로 거절된다.
+#    `['uvA', 'map1']` 은 uvA 를 못 지우고, `['uvA']` 도 못 지운다.
+#    현재(current) UV 세트를 지우면 현재 세트는 기본 세트로 넘어간다. 삭제도 undo 된다.
+#    지울 때마다 히스토리에 `deleteUVSet` 노드가 하나씩 생긴다(스킨 메시도 지워진다).
 
 import maya.cmds as cmds
 
@@ -332,3 +337,84 @@ def _rename_one(node, shape, new_name=DEFAULT_UV_SET):
         return _record(node, shape, FAILED, before, uv_sets(shape), str(exc).strip())
 
     return _record(node, shape, RENAMED, before, uv_sets(shape), "")
+
+
+# ==========================================================================
+# Delete — 규칙 이름이 아닌 UV 세트 지우기 (v02.03)
+# ==========================================================================
+
+# delete 결과 상태 (RENAMED 등과 같은 dict 모양으로 돌려준다)
+DELETED = "deleted"            # 규칙 이름 외의 세트를 모두 지웠다
+PARTIAL = "partial"            # 일부는 지웠지만 첫(기본) 세트가 규칙 이름이 아니라 남았다
+NO_KEEPER = "no_keeper"        # 남길 세트(규칙 이름)가 없다 - 지우면 규칙 이름이 영영 없다
+
+
+def delete_other_uv_sets(nodes, keep=DEFAULT_UV_SET):
+    """각 노드에서 이름이 `keep` 이 **아닌** UV 세트를 모두 지운다. 전체가 undo 한 스텝.
+
+    ★ 첫 번째(기본) UV 세트는 마야가 지우지 못하게 한다. 그래서
+      - `keep` 이 아예 없는 메시(`['uvA']`, `['uvA', 'uvB']`)는 **하나도 지우지 않고**
+        `NO_KEEPER` 로 돌려준다 — 지워 봐야 규칙 이름은 생기지 않는다. Rename 이 먼저다.
+      - `keep` 이 있지만 첫 세트가 아닌 메시(`['uvA', 'map1']`)는 지울 수 있는 것만 지우고
+        `PARTIAL` 로 첫 세트가 남았다고 알린다.
+
+    Returns:
+        records — [{node, shape, status, before, after, detail}, ...]
+        status 는 DELETED / ALREADY / PARTIAL / NO_KEEPER / FAILED / NO_UV / MISSING / NOT_MESH.
+    """
+    records = []
+
+    with undo_chunk():
+        for node in nodes or []:
+            if not node or not cmds.objExists(node):
+                records.append(_record(node, None, MISSING, [], [], ""))
+                continue
+
+            shapes = mesh_shapes(node)
+            if not shapes:
+                records.append(_record(node, None, NOT_MESH, [], [], ""))
+                continue
+
+            for shape in shapes:
+                records.append(_delete_one(node, shape, keep))
+
+    return records
+
+
+def _delete_one(node, shape, keep=DEFAULT_UV_SET):
+    """셰이프 하나에서 `keep` 이 아닌 UV 세트를 지운다."""
+    before = uv_sets(shape)
+
+    if not before:
+        return _record(node, shape, NO_UV, before, before, "")
+
+    if keep not in before:
+        return _record(
+            node, shape, NO_KEEPER, before, before,
+            "there is no '{0}' to keep - rename a set to '{0}' first".format(keep))
+
+    extras = [name for name in before if name != keep]
+    if not extras:
+        return _record(node, shape, ALREADY, before, before, "")
+
+    default = before[0]
+    errors = []
+    for name in extras:
+        if name == default:
+            continue            # 마야가 거절한다 - 시도하지 않고 아래에서 알린다
+        try:
+            cmds.polyUVSet(shape, delete=True, uvSet=name)
+        except Exception as exc:                            # noqa: BLE001
+            errors.append("{0}: {1}".format(name, str(exc).strip()))
+
+    after = uv_sets(shape)
+
+    if errors:
+        return _record(node, shape, FAILED, before, after, "; ".join(errors))
+
+    if default != keep:
+        return _record(
+            node, shape, PARTIAL, before, after,
+            "'{0}' is the default (first) UV set and Maya cannot delete it".format(default))
+
+    return _record(node, shape, DELETED, before, after, "")

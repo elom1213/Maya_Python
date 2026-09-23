@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-23 (오늘)
 
+> [!summary] A00050_V02 **`Delete UV Sets` 버튼** — 규칙 이름(지금 `map1`)이 아닌 UV 세트를 모두 삭제, Rename 왼쪽 (v02.02->02.03)
+- 요청: A00380 이식 전에 하나 더. 규칙을 따르는(이름이 map1 이 아닌) 모든 UV 세트를 삭제하는 버튼, `Rename UV Set` 왼쪽.
+- ★ mayapy 실측: **지울 수 없는 것은 첫 번째(기본) UV 세트뿐**(이름 무관, `The default uv set cannot be deleted.`). 현재 세트를 지우면 기본 세트로 넘어간다. undo 한 번에 복원. 지울 때마다 `deleteUVSet` 히스토리 노드. 스킨 메시도 지워진다.
+- 그래서 규칙 이름이 없는 메시(`uvA`)는 **하나도 안 지우고** Rename 먼저라고 알린다(`no_keeper`). 첫 세트가 규칙 이름이 아닌 메시(`uvA, map1, uvZ`)는 지울 수 있는 것만 지우고 `[WARN]`(`partial`).
+- 코어 `delete_other_uv_sets(nodes, keep)` — Rename 과 같은 record 모양. 이름 칸(`UV set name`)이 남길 이름을 정한다. 끝나면 UV Sets 표 갱신.
+- 검증(mayapy 2024) 12항목: 상태 7종 · current 세트 이동 · 스킨 메시 · undo 한 번 · 다른 keep 이름 · 버튼이 Rename 왼쪽 같은 줄 · 로그 · 표 갱신. 창 최소 533x772 그대로.
+
 > [!summary] A00050_V02 **UV Sets 표(Object / UV Sets / Rule) + 로그의 `[wrong_name]` 빨간색** (v02.01->02.02)
 - 요청: 로그의 `[wrong_name]` 은 빨간색. 오브젝트 · UV 세트 이름들 · 규칙 부합 여부 세 칸 창을 A00330 Quick Rename > Insert 의 Preview 와 같은 형식으로. **다음에 A00380_MeshTool 로 이식**할 예정.
 - 리스트 옆에 표(QSplitter). 코어 `inspect(nodes, wanted)` 가 셰이프마다 행(메시 아님 · 씬에 없음도 행으로), 표가 그린다. 리스트 · 이름 칸 변경, Catch · Rename 뒤에 다시 그림. 제목 `k / n OK`.

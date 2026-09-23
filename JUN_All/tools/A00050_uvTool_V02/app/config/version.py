@@ -16,5 +16,9 @@
 #        로그의 `[wrong_name]` 줄은 빨간색. 표는 app/ui/uv_set_table.py + 코어 inspect() -
 #        A00380_MeshTool 로 옮길 때 그대로 가져간다
 
-VERSION = "02.02"
+# 02.03  **Delete UV Sets** 버튼(Rename 왼쪽) - 규칙 이름이 아닌 UV 세트를 모두 지운다.
+#        첫(기본) 세트는 마야가 못 지우므로, 규칙 이름이 없는 메시는 건드리지 않고
+#        첫 세트가 규칙 이름이 아닌 메시는 지울 수 있는 것만 지우고 알린다
+
+VERSION = "02.03"
 LAST_UPDATE = "2026-09-23"

@@ -53,5 +53,9 @@ A00330 Insert Preview 형식). 코어 `inspect()` 가 행을 만들고 `app/ui/u
 `[wrong_name]` 은 밑줄 때문에 공용 표식 정규식(`[A-Za-z]+`)에 안 걸려 툴이 HTML 줄로 칠한다
 (공용 규칙은 안 넓혔다 — 다른 툴 `[Set_v001]` 류가 표식이 될 수 있어서).
 
+**v02.03: `Delete UV Sets`**(Rename 왼쪽) — 규칙 이름이 아닌 세트를 지운다. ★ 실측: **못 지우는 것은 첫(기본) 세트뿐**
+(이름 무관). 규칙 이름이 없는 메시는 안 지운다(`no_keeper`), 첫 세트가 다른 이름이면 지울 수 있는 것만(`partial`).
+지울 때마다 `deleteUVSet` 히스토리 노드. A00380 이식 때 함께 옮길 것.
+
 관련: [[mayapy-headless-verify]], [[undo-chunk-by-default]], [[prefer-pyside-for-new-tools]],
 [[new-tool-needs-icon]](아이콘은 V01 그림을 그대로 씀)
