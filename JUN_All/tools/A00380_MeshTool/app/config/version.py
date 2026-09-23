@@ -11,8 +11,13 @@
 #        그대로 박은 값이라 마야에서 지나치게 넓었다. 오프스크린 px 은 폰트가 달라 마야보다
 #        크게 나온다 - A00400 과 같은 가로는 그 툴의 resize 값(360)을 쓰는 것이 맞다
 
-VERSION = "01.16"
-LAST_UPDATE = "2026-09-22"
+# 01.17  **UV Sets 탭**(MeshDoctor 오른쪽) - A00050_uvTool_V02(v02.03) 이식. UV 세트 규칙(map1 하나)
+#        Catch / Delete / Rename + UV Sets 표(Object / UV Sets / Rule), 로그의 [wrong_name] 빨강.
+#        코어 uv_set_manager.py · 표 uv_set_table.py 는 A00050 파일 그대로, 탭은 app/ui/uv_tab.py.
+#        Help > UV Sets Rule. 원본 A00050_uvTool_V02 는 남긴다
+
+VERSION = "01.17"
+LAST_UPDATE = "2026-09-23"
 
 # 01.06  Match 탭 From 리스트의 List From Mesh / Add / Del 버튼 글자가 잘리던 문제.
 #        TSL 위젯 전체에 걸려 있던 setMaximumHeight 를 치우고 리스트에만 높이를 제한한다.

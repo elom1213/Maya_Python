@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-23 (오늘)
 
+> [!summary] A00380 **UV Sets 탭 — A00050_uvTool_V02(v02.03) 이식**, MeshDoctor 오른쪽 (v01.16->01.17)
+- 요청: A00050 푸시 후 A00380_MeshTool 에 새 탭을 만들어 이식, 탭은 Mesh Doctor 오른쪽. 탭 순서 **MeshDoctor → UV Sets → Peak → Match**.
+- 코어 `uv_set_manager.py` · 표 `uv_set_table.py` 는 A00050 파일 **그대로 복사**(머리말만 다름, `diff` 로 확인). 탭은 새 `app/ui/uv_tab.py`(`UvSetsTab`), `main_window.py` 는 등록 · Help > UV Sets Rule · About 몇 줄.
+- 창에 딸린 것만 바꿨다 — 로그는 A00380 로그창(`log` / `log_html` 콜백, `[wrong_name]` 빨강 그대로). 원본 A00050 은 남긴다.
+- 곁들여 고침(양쪽 코어 동일): Rename 의 `extra` 사유가 'this tool does not delete UV sets' 였는데 v02.03 에 Delete 가 생겨 틀린 말이 됐다 → 'use Delete UV Sets to remove them'.
+- 검증(mayapy 2024) 15항목 + A00050 기존 테스트 재실행 통과. 창 최소 748x805 는 이식 전후 동일(yellow_dark). 런처 Mesh 프로파일의 `uvTool_V02` 버튼은 그대로 뒀다.
+
 > [!summary] A00050_V02 **`Delete UV Sets` 버튼** — 규칙 이름(지금 `map1`)이 아닌 UV 세트를 모두 삭제, Rename 왼쪽 (v02.02->02.03)
 - 요청: A00380 이식 전에 하나 더. 규칙을 따르는(이름이 map1 이 아닌) 모든 UV 세트를 삭제하는 버튼, `Rename UV Set` 왼쪽.
 - ★ mayapy 실측: **지울 수 없는 것은 첫 번째(기본) UV 세트뿐**(이름 무관, `The default uv set cannot be deleted.`). 현재 세트를 지우면 기본 세트로 넘어간다. undo 한 번에 복원. 지울 때마다 `deleteUVSet` 히스토리 노드. 스킨 메시도 지워진다.

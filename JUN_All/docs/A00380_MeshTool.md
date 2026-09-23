@@ -1,19 +1,22 @@
 ---
 title: A00380_MeshTool 사용법
-aliases: [Mesh Tool, MeshTool, A00380, Peak, Match, By Weight, MeshDoctor, meshDoctor]
+aliases: [Mesh Tool, MeshTool, A00380, Peak, Match, By Weight, MeshDoctor, meshDoctor, UV Sets, uvTool]
 tags: [maya-python, tool-guide, mesh, modeling, peak, normal, match, kangaroo, layout, skin-weight, corrective, diagnostics, cleanup]
-updated: 2026-09-22
+updated: 2026-09-23
 ---
 
 # A00380_MeshTool 사용법
 
 Maya 안에서 도는 **메시 진단 · 편집** PySide 툴이다(arch B, in-Maya).
-**MeshDoctor / Peak / Match** 세 탭으로 구성된다 — **무엇이 잘못됐는지 먼저 보고, 그다음 고치는** 순서다.
+**MeshDoctor / UV Sets / Peak / Match** 네 탭으로 구성된다 — **무엇이 잘못됐는지 먼저 보고, 그다음 고치는** 순서다.
 
 - **MeshDoctor** (v01.14~) = 메시를 **읽기만 해서** 진단한다. 리스트업한 메시들을 한 번에 검사해
   **메시당 한 줄 요약 표**를 만들고, 행을 누르면 **그 메시의 상세 리포트**가 아래에 펼쳐진다.
   결과는 `0020_out/` 에 JSON · TXT 로도 남는다. 아래쪽에 **안전한 원클릭 수정**과
   **문제 컴포넌트 선택** 버튼이 있다. 옛 **`A00300_meshDoctor`** 를 통째로 옮겨 온 것이다(§3-4).
+- **UV Sets** (v01.17~) = 메시는 **UV 세트 하나(기본 `map1`)** 라는 규칙으로 어긋난 메시를 찾고(`Catch`),
+  다른 이름의 세트를 지우고(`Delete`), 첫 세트 이름을 고친다(`Rename`). 리스트 옆 **UV Sets 표**가
+  오브젝트마다 세트 이름과 판정을 보여 준다. **`A00050_uvTool_V02`(v02.03) 를 옮겨 온 것**이다(§3-5).
 - **Peak** (v01.00~) = 선택한 메시/버텍스를 **각자의 노말 방향으로 팽창(+) · 수축(-)** 시킨다.
   후디니의 **peak 노드**와 같은 개념이고, 마야 기본 방식(컴포넌트 선택 → Move 툴 `axis = normal`)의
   느린 점을 해결하는 것이 목적이다.
@@ -24,7 +27,8 @@ Maya 안에서 도는 **메시 진단 · 편집** PySide 툴이다(arch B, in-Ma
   - **By Weight** (v01.09~) — 스킨 메시의 **조인트 웨이트를 마스크로** 써서, 메시들을 타깃 모양 쪽으로
     `웨이트 × 델타` 만큼 옮긴다. 블렌드셰이프 타깃에 웨이트 맵(마스크)을 칠한 것과 결과가 같다.
 
-- **버전**: `app/config/version.py` (v01.16 — 창 가로를 `A00400_CurveTool` 과 같게(360 요청)
+- **버전**: `app/config/version.py` (v01.17 — **UV Sets 탭**(A00050_uvTool_V02 이식, MeshDoctor 오른쪽)
+  · v01.16 — 창 가로를 `A00400_CurveTool` 과 같게(360 요청)
   · v01.14 — **MeshDoctor 탭** 이식 + 새 아이콘
   · v01.13 — `Match > Default` 좌/우 리스트에 **Sort** 버튼)
 - **설치**: `__dragDrop_A00380.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **MeshTool** → `tools.A00380_MeshTool.run(True)`
@@ -33,13 +37,14 @@ Maya 안에서 도는 **메시 진단 · 편집** PySide 툴이다(arch B, in-Ma
 
 ## 1. 화면 구성
 
-탭 순서는 **MeshDoctor → Peak → Match** 다. 진단이 앞에 오는 이유는 작업 순서가 그렇기 때문이다 —
-무엇이 잘못됐는지 보고 나서 고친다. MeshDoctor 탭의 그림은 §3-4 에 따로 있다.
+탭 순서는 **MeshDoctor → UV Sets → Peak → Match** 다. 진단이 앞에 오는 이유는 작업 순서가 그렇기 때문이다 —
+무엇이 잘못됐는지 보고 나서 고친다. UV Sets 는 진단 바로 다음(규칙 검사 + 정리), 모양을 바꾸는 탭 앞이다.
+MeshDoctor 탭의 그림은 §3-4, UV Sets 탭은 §3-5 에 따로 있다.
 
 ```
 ┌ Mesh Tool ─────────────────────────┐
 │ Help                               │
-│ [MeshDoctor] [Peak] [Match]        │
+│ [MeshDoctor] [UV Sets] [Peak] [Match] │
 │ ┌ Peak ──────────────────────────┐ │
 │ │ ┌ Target ────────────────────┐ │ │
 │ │ │ pSphere1 | 382 vertice(s)  │ │ │  ← 로드된 대상 요약
@@ -366,6 +371,49 @@ mask[v] = M_j 에 짝지은 조인트들의 M_w 웨이트 합 (1 로 자름)
 > 옛 `A00300_meshDoctor` 는 **그대로 남아 있다.** 이 저장소의 관례대로 옛 툴은 지우지 않는다.
 > 새 작업은 이 탭에서 한다.
 
+## 3-5. UV Sets 탭 (v01.17~, A00050_uvTool_V02 이식)
+
+**규칙: 메시는 `UV set name` 칸의 이름(기본 `map1`)을 가진 UV 세트 하나만 갖는다.**
+`A00050_uvTool_V02` v02.03 의 창을 탭 하나로 옮겼다 — 버튼 · 표 · 로그 문장이 같다.
+자세한 동작(상태 · 로그 예 · 마야 실측)은 **[`A00050_uvTool_V02.md`](A00050_uvTool_V02.md)** 가 그대로 적용된다.
+
+```
+┌ UV Sets ────────────────────────────────────────────┐
+│ One UV set per mesh, named 'map1'.                  │
+│ ┌ Objects ─────────┐┌ UV Sets   1 / 3 OK ──────────┐ │
+│ │ [ Select Objects ]││ Object  UV Sets     Rule     │ │
+│ │ good             ││ good    map1        OK       │ │
+│ │ wrong            ││ wrong   uvA         wrong_name│ │
+│ │ multi            ││ multi   map1, uvB   multiple │ │
+│ └──────────────────┘└──────────────────────────────┘ │
+│ ┌ Tool ────────────────────────────────────────────┐ │
+│ │ UV set name [ map1          ] [ map1 ]           │ │
+│ │ ☑ Catch : look at every mesh in the scene        │ │
+│ │ ☑ Catch : select the offending meshes            │ │
+│ │ [              Catch Objects               ]     │ │
+│ │ [ Delete UV Sets ]  [ Rename UV Set ]            │ │
+│ └──────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────┘
+```
+
+- `Catch Objects` — 어긋난 메시(`multiple` / `wrong_name` / `no_uv`)를 사유와 함께 로그에 적고 리스트 · 씬 선택에 담는다.
+  로그의 **`[wrong_name]` 줄은 빨간색**.
+- `Delete UV Sets` — 규칙 이름이 아닌 세트를 지운다. **첫(기본) 세트는 마야가 못 지우므로** 규칙 이름이 없는 메시는
+  건드리지 않고(Rename 먼저), 첫 세트가 다른 이름이면 지울 수 있는 것만 지우고 `[WARN]`.
+- `Rename UV Set` — 첫 세트 이름을 규칙 이름으로. 그 이름이 이미 있으면 마야가 거절하므로 사유를 적는다.
+- 대상은 **리스트가 먼저**, 비면 씬 선택. 세 버튼 모두 **undo 한 번**. 끝나면 표를 다시 그린다.
+- 규칙 설명은 **Help > UV Sets Rule**. 로그는 이 창의 공용 로그창을 쓴다.
+
+### 이식하면서
+
+- 코어 `app/core/uv_set_manager.py` · 표 `app/ui/uv_set_table.py` 는 **A00050 파일 그대로**(머리말만 다름).
+  탭 본체는 `app/ui/uv_tab.py`(`UvSetsTab`) — `main_window.py` 는 등록 몇 줄만 늘었다.
+  **두 툴의 같은 파일은 내용이 같아야 한다** — 한쪽을 고치면 다른 쪽도 맞춘다.
+- 창에 딸린 것만 바꿨다: 메뉴 · Pin · 로그창은 A00380 창의 것을 쓴다(`log` / `log_html` 콜백).
+- 원본 `A00050_uvTool_V02` 는 **지우지 않고 남긴다**(A00300 → MeshDoctor 때와 같은 관례).
+- 창 최소 크기는 이식 전후 **748 x 805 그대로**(오프스크린, yellow_dark) — 폭은 여전히 Match 탭이 정한다.
+- 검증: mayapy 2024 오프스크린 15항목 — 탭 순서 · Help 메뉴 · 버튼 위치 · 표 · 빨간 로그 · Catch/Delete/Rename · undo · 다른 탭 전환.
+
 ---
 
 ## 4. 왜 마야 기본 방식보다 빠른가
@@ -496,7 +544,7 @@ self.tsl_from.list_widget.setMaximumHeight(70)  # 천장은 리스트에만
 
 ## 6. 앞으로
 
-메시 관련 기능이 생기면 탭으로 추가한다(현재 MeshDoctor / Peak / Match). 메시를 **바꾸는** 탭은
+메시 관련 기능이 생기면 탭으로 추가한다(현재 MeshDoctor / UV Sets / Peak / Match). 메시를 **바꾸는** 탭은
 Peak/Match 처럼 `app/core/<name>_manager.py` 에 세션 모델(preview/restore/commit)을 두고 공용 헬퍼를
 재사용한다. **읽기만 하는** 탭(MeshDoctor)은 세션이 없어 그 구조를 따르지 않는다.
 

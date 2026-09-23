@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-18
+# last Update date : 2026-09-23
 # A00380_MeshTool - Qt UI
 #
 # Peak 탭: 선택한 메시/버텍스를 자기 노말 방향으로 팽창(+)·수축(-) 시킨다.
@@ -13,6 +13,9 @@
 # MeshDoctor 탭 (v01.14~): 옛 A00300_meshDoctor 를 그대로 옮겨 왔다. 메시를 **읽기만 해서**
 # 진단하고(요약 표 + 상세 리포트 + 0020_out/ 에 JSON·TXT), 아래쪽 버튼으로 안전한 원클릭
 # 수정을 한다. Peak/Match 가 메시를 "고치는" 쪽이라면 이 탭은 "무엇이 잘못됐는지 말해 주는" 쪽이다.
+#
+# UV Sets 탭 (v01.17~): A00050_uvTool_V02(v02.03) 를 탭으로 옮겼다 - UV 세트 규칙(`map1` 하나)
+# 검사 · 삭제 · 이름 정리 + UV Sets 표. 탭 본체는 app/ui/uv_tab.py, 이 파일은 등록만 한다.
 #
 # 흐름: Load 로 스냅샷 → 슬라이더를 끌면 실시간 미리보기(API 직접 쓰기) → 손을 떼는 순간
 #       그 상태를 그대로 확정(tweak 구간 setAttr, Ctrl+Z 한 번에 되돌아감). 별도 Apply 버튼 없음.
@@ -40,6 +43,7 @@ from tools.A00380_MeshTool.app.core import weight_match_manager as wm_mgr
 from tools.A00380_MeshTool.app.core.mesh_scan import MeshScanner
 from tools.A00380_MeshTool.app.core.mesh_fix import MeshFixer
 from tools.A00380_MeshTool.app.core.report import ReportWriter
+from tools.A00380_MeshTool.app.ui.uv_tab import UvSetsTab, RULE_TEXT as UV_RULE_TEXT
 
 
 WINDOW_OBJECT_NAME = "JUN_A00380_MeshTool_window"
@@ -139,11 +143,17 @@ class MainWindow(QWidget):
         self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
         help_menu = self.menu_bar.addMenu("Help")
         help_menu.addAction("About").triggered.connect(self.show_about)
+        help_menu.addAction("UV Sets Rule").triggered.connect(self.show_uv_rule)
         root.setMenuBar(self.menu_bar)
 
         self.tabs = QTabWidget()
         # MeshDoctor 가 맨 앞이다 — 무엇이 잘못됐는지 먼저 보고, 그다음에 고치는 순서.
         self.tabs.addTab(self.build_doctor_tab(), "MeshDoctor")
+        # UV Sets (v01.17, A00050_uvTool_V02 이식) - MeshDoctor 오른쪽. 진단 다음, 모양을 고치기 전.
+        # 로그는 이 창의 로그창을 쓴다. 로그창이 아래에서 만들어지므로 람다로 늦게 잡는다.
+        self.uv_tab = UvSetsTab(log=lambda text: self.log(text),
+                                log_html=lambda html: self.te_log.append(html))
+        self.tabs.addTab(self.uv_tab, "UV Sets")
         self.tabs.addTab(self.build_peak_tab(), "Peak")
         self.tabs.addTab(self.build_match_tab(), "Match")
         self.tabs.currentChanged.connect(self.on_tab_changed)
@@ -156,7 +166,8 @@ class MainWindow(QWidget):
         root.addWidget(self.te_log)
 
         self.log("Mesh Tool v{0} ({1}) ready.  Peak / Match reshape meshes, "
-                 "MeshDoctor diagnoses them.".format(VERSION, LAST_UPDATE))
+                 "MeshDoctor diagnoses them, UV Sets checks the UV set rule.".format(
+                     VERSION, LAST_UPDATE))
 
     def build_peak_tab(self):
 
@@ -1628,6 +1639,9 @@ class MainWindow(QWidget):
         else:
             self.te_log.append(text)
 
+    def show_uv_rule(self):
+        QMessageBox.information(self, "UV Sets Rule", UV_RULE_TEXT)
+
     def show_about(self):
         QMessageBox.information(
             self, "About",
@@ -1643,6 +1657,9 @@ class MainWindow(QWidget):
             "MeshDoctor: read-only diagnostics - list meshes, diagnose them,\n"
             "read the per-mesh report, and run the safe one-click fixes.\n"
             "Reports are written to the tool's 0020_out folder.\n\n"
+            "UV Sets: one UV set per mesh (default 'map1') - catch the meshes\n"
+            "that break it, delete the other sets, rename the first one.\n"
+            "Ported from A00050_uvTool_V02. See Help > UV Sets Rule.\n\n"
             "Peak has no Apply button: dragging the slider applies the\n"
             "result as you go (each change is one Ctrl+Z).\n"
             "by Ji Hun Park".format(VERSION, LAST_UPDATE))

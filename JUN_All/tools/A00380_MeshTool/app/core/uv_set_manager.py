@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
 # last Update date : 2026-09-23
-# A00050_uvTool_V02 - UV 세트 검사 / 이름 정리 (maya.cmds, UI 비의존)
+# A00380_MeshTool - UV Sets 탭 코어: UV 세트 검사 / 이름 정리 / 삭제 (maya.cmds, UI 비의존)
+#
+# ★ A00050_uvTool_V02 (v02.03) 의 `app/core/uv_set_manager.py` 를 **로직 그대로** 옮겼다
+#   (v01.17). 아래 설명의 'Catch / Rename / Delete' 는 이 탭의 같은 이름 버튼이다.
 #
 # 규칙은 하나다 — **메시는 `map1` 이라는 UV 세트 하나만 갖는다.**
 # 게임 파이프라인에서 UV 세트가 둘 이상이거나 이름이 다르면 익스포트·머티리얼 쪽에서

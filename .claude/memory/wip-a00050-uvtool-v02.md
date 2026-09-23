@@ -55,7 +55,11 @@ A00330 Insert Preview 형식). 코어 `inspect()` 가 행을 만들고 `app/ui/u
 
 **v02.03: `Delete UV Sets`**(Rename 왼쪽) — 규칙 이름이 아닌 세트를 지운다. ★ 실측: **못 지우는 것은 첫(기본) 세트뿐**
 (이름 무관). 규칙 이름이 없는 메시는 안 지운다(`no_keeper`), 첫 세트가 다른 이름이면 지울 수 있는 것만(`partial`).
-지울 때마다 `deleteUVSet` 히스토리 노드. A00380 이식 때 함께 옮길 것.
+지울 때마다 `deleteUVSet` 히스토리 노드.
+
+**이식 완료 (2026-09-23, A00380 v01.17 `UV Sets` 탭, MeshDoctor 오른쪽).** 코어 · 표 파일은 **두 툴에 같은 내용으로**
+있다(머리말만 다름) — 한쪽을 고치면 다른 쪽도 맞출 것. A00380 탭 본체는 `app/ui/uv_tab.py`. 원본 A00050 은 남김,
+런처 Mesh 프로파일 `uvTool_V02` 버튼도 그대로(정리는 요청 시).
 
 관련: [[mayapy-headless-verify]], [[undo-chunk-by-default]], [[prefer-pyside-for-new-tools]],
 [[new-tool-needs-icon]](아이콘은 V01 그림을 그대로 씀)
