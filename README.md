@@ -96,7 +96,8 @@ A narrative work summary lives in
 - **`A00275_skinTool_V01`** — 스킨 범용 툴(**Weights / Bind / Edit** 3카테고리 · 기능 8).
   **Expand Bind**(엣지 루프 기준 측지 거리 균등 바인드) · **Move Joints** ·
   **Edit Mesh**(웨이트를 그대로 둔 채 바인드된 메시를 수정) · **Transfer** · **Update Bind Pose** ·
-  **Copy Weights**(같은 메시 안에서 버텍스 → 버텍스, `Blend` 0~1 로 실리는 정도 조절).
+  **Copy Weights**(같은 메시 안에서 버텍스 → 버텍스, `Blend` 0~1 로 실리는 정도 조절) ·
+  **Smooth**(Kangaroo SkinCluster>Smooth 를 플러그인 없이 이식).
 - **`A00460_ControllerTool`** — 조인트 체인에서 `zro > con > ctl > tgt` **FK 컨트롤러 계층**을 만들고
   조인트를 그 계층에 컨스트레인트(Bone Chain / Bone Root 모드).
 - **`A00270_skinMigrate` / `A00020_move_skineWeightTool`** — 스킨 웨이트 이동·전이(토폴로지 다른 메시).
@@ -126,7 +127,8 @@ A narrative work summary lives in
   **Noise**(결정론적 · 심리스 노이즈를 내보내는 노드) · Graph Focus.
 - **`A00180_abSymMesh`** — 메쉬 대칭/블렌드셰이프(OpenMaya 재구현).
 - **`A00300_meshDoctor`** — 메시 **읽기전용 진단 + 안전 원클릭 수정**(배치 진단 요약 테이블, JSON/TXT 로그).
-- **`A00380_MeshTool`** — **Peak**(노말 방향 팽창/수축, 후디니 peak 노드 개념) · **Match** 탭.
+- **`A00380_MeshTool`** — **MeshDoctor**(A00300 이식) · **Peak**(노말 방향 팽창/수축, 후디니 peak 노드 개념) ·
+  **Match**(좌 Source / 우 Targets · **By Weight** 스킨 웨이트 마스크) 탭.
 - **`A00400_CurveTool`** — 커브 생성·편집·표시(**Create / Edit / Display**). 엣지 덩어리마다 커브 ·
   월드 위치를 순서대로 잇는 **From Points** · CV 수가 달라도 모양을 따라가는 **Wrap** ·
   고른 CV 실시간 **Smooth** · **Line Width**.
@@ -135,12 +137,13 @@ A narrative work summary lives in
   **재생이 V02 대비 144~202배**(결과 회전값은 실측 동일).
 - **`A00480_FileTool`** — 파일 입출력 · 경로 툴(**Export / Import / Path** 탭). `A00040_file_exporter_V02` 화면과
   quickTool 의 File · Import option 버튼을 한 창에 모으고, 씬 폴더를 Export Path 에 바로 채우는 `Scene` 버튼을 더했다.
-- **`A00040_file_exporter_V02`** — 타입 필터 기반 익스포트 자동화. · **`A00050_uvTool`**, **`A00030_quickTool_V02`**(레거시 퀵툴의 PySide 재작성), **`A00200_CSV_tool`**.
+- **`A00040_file_exporter_V02`** — 타입 필터 기반 익스포트 자동화. · **`A00050_uvTool_V02`**(PySide 이식, 규칙 위반을 사유와 함께 로그), **`A00030_quickTool_V02`**(레거시 퀵툴의 PySide 재작성), **`A00200_CSV_tool`**.
 
 ### 씬 / 선택 · 네이밍 유틸
 - **`A00310_SearchTool`** — 오브젝트를 **타입 · 이름 · 씬에서의 상태**로 골라 선택(Type / Token / Rules 탭).
   규칙은 레지스트리에 데이터로 모여 있어 **함수 하나 + 등록 한 줄**이면 늘어난다. · **`A00340_SelectionTool`** — 자주 쓰는 선택 세트를 버튼·프로파일로 재선택(버튼별 색 지정).
-- **`A00360_SortTool`** — 월드 X/Y/Z·이름·타입 기준 정렬 + 아웃라이너 재정렬. · **`A00330_NamingTool`** — 리네임/Quick Rename.
+- **`A00360_SortTool`** — 월드 X/Y/Z·이름·타입 기준 정렬 + 아웃라이너 재정렬. · **`A00330_NamingTool`** — 토큰 규칙 리네임 · Set Rename · Copy Name ·
+  Quick Rename(**Insert**: n 번째 자리에 글자 삽입 + 미리보기).
 - **`A00440_SetTool`** — 컴포넌트 세트끼리의 **집합 연산**(합집합 · 교집합 · 차집합 + 씬 선택 기준 분할). ·
   **`A00450_manipulatorTool`** — 이동/회전/스케일 **매니퓰레이터 축 굵기**를 슬라이더로 라이브 조절.
 - **`A00470_MaterialTool`** — 메시에 붙은 **머티리얼 이름이 명명 규칙(JSON 프로파일)에 맞는지 진단** +
@@ -169,6 +172,11 @@ A narrative work summary lives in
 
 | 시기 | 내용 |
 |------|------|
+| 2026-09 하순 | **`A00275` Weights > Smooth 신규** — Kangaroo `SkinCluster > Smooth` 를 플러그인 없이 이식 · **Transfer `Target mode`**(타겟 리스트와 행 순서 1:1) + 진행률 팝업 |
+| 2026-09 하순 | **`A00380` MeshDoctor 탭** — `A00300_meshDoctor` 를 통째로 이식 · **Match > By Weight**(스킨 웨이트를 마스크로 메시를 타깃 쪽으로) · Match 좌(Source) / 우(Targets) 리스트 |
+| 2026-09 하순 | **`A00330` Quick Rename > Insert** — 리스트 이름의 **n 번째 자리**(음수는 끝에서부터)에 글자를 넣고, 넣은 글자를 초록으로 **미리보기** 후 Apply · **`A00060_V03` From Curve `By Count`** · **`A00440`** 전부를 담은 세트 하나 + Find 탭 |
+| 2026-09 하순 | **`A00145` Match `Keep Children in Place`** · Attribute 가 만든 어트리뷰트는 레퍼런스로 불러와도 **채널 박스에 보이게** · **`A00110_V02`** Mirror Key Scale · 그래프 에디터 선택 키만 Move · **`A00170`** AttachCrv `Maintain offset` 이 translate/rotate 를 구동 |
+| 2026-09 하순 | **Framework 로그 표식 색**(`[WARN]` 노랑 · `[OK]` 초록, 47툴 공용) · TSL `(Null)` 자리는 빨간 글씨 · **릴리즈본이 남의 PC 에서 열리지 않던 문제** 해결(진입 파일 61개가 배치를 스스로 구분 · 셸프 구분선 · userSetup 이름 · git 출력 인코딩) |
 | 2026-09 중순 | **공용 로그창을 Framework 로 승격해 PySide 툴 47곳에 일괄 적용** — `Expand`(별도 창으로 옮겨 크게 보기) · `Clear` · `Copy`. 호출 메서드를 전수 집계해 **드롭인**으로 설계, 툴당 생성부 2~3줄로 교체 |
 | 2026-09 중순 | **`A00290_BSTool_V02` 신규** — 넘치던 상위 탭 6개를 **Shape / Target / Node 3 카테고리 × 기능 7** 의 2단으로. **`A00030_quickTool_V02` 신규** — 레거시 maya.cmds 퀵툴을 PySide 로 재작성 |
 | 2026-09 중순 | **`A00310_SearchTool` Rules 탭** — 씬에서의 상태(연결·히스토리·디포머)로 고르는 **규칙 레지스트리**(규칙 추가 = 함수 하나 + 등록 한 줄) · **`A00240_PathTool`** Pin · 경로 트리 필터 · Shift 펼치기 |
