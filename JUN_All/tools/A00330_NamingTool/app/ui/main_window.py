@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-17
+# last Update date : 2026-09-23
 # A00330_NamingTool - Qt UI
 #
 # 레거시 maya.cmds 네이밍 툴(JUN_PY_NamingTool_V03_04)을 PySide + QTabWidget 으로 이식.
@@ -15,6 +15,9 @@
 #   v01.05 : Copy Name 에 Search / Replace - Base 이름 속 단어를 바꿔서 Targets 에 복사.
 #   v01.07 : 상위 탭 Rename 을 만들고 Naming Dyn(-> Token) · Set Rename 을 하위 탭으로.
 #            Token 탭은 칸 수가 자유인 토큰(Custom / Numbering) + Profile(json) - app/ui/token_tab.py.
+#   v01.09 : Quick Rename 을 하위 탭 Selection(기존) / Insert(신규) 로.
+#            Insert 는 리스트의 오브젝트 이름 n 번째 자리에 글자를 넣는다(음수는 끝에서부터).
+#            미리보기 표를 보고 Apply 를 눌러야 바뀐다 - app/core/insert_ops.py.
 # 리스트 UI 는 공용 위젯 JUN_mod_tsl_qt_v01, 로직은 app/core. 모든 UI 문자열/로그는 영어.
 
 from Framework.qt.qt import *
@@ -23,6 +26,8 @@ from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_filter_qt
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.core import log_levels
+from Framework.themes.theme_manager import ThemeManager
 
 from tools.A00330_NamingTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00330_NamingTool.app import core
@@ -237,10 +242,27 @@ class MainWindow(QWidget):
             self._log("Copy Name : {0} target(s) renamed.".format(len(new_names)))
 
     # ================================================================
-    # Tab : Quick Rename  (ref/ref_01.mel 이식, 현재 선택 기준)
+    # Tab : Quick Rename  (v01.09) - 하위 탭 Selection / Insert
     # ================================================================
 
     def _build_quick_rename_tab(self):
+        self.quick_tabs = QTabWidget()
+        self.quick_tabs.addTab(self._build_quick_selection_page(), "Selection")
+        self.quick_tabs.addTab(self._build_quick_insert_page(), "Insert")
+        self.quick_tabs.setTabToolTip(
+            0,
+            "Front Insert / Change New / Last Add / -1 trim on the current selection.")
+        self.quick_tabs.setTabToolTip(
+            1,
+            "Insert text at the n-th position of every listed name.\n"
+            "Preview first, then Apply.")
+        return self.quick_tabs
+
+    # ================================================================
+    # Quick Rename > Selection  (ref/ref_01.mel 이식, 현재 선택 기준)
+    # ================================================================
+
+    def _build_quick_selection_page(self):
         tab = QWidget()
         root = QVBoxLayout(tab)
 
@@ -343,6 +365,180 @@ class MainWindow(QWidget):
                 self.qr_le_insert.text(), self.qr_le_add.text())
         for message in messages:
             self._log("All Apply " + message)
+
+    # ================================================================
+    # Quick Rename > Insert  (v01.09)
+    # ================================================================
+
+    #: 미리보기 표 컬럼
+    _INS_COL_NAME, _INS_COL_NEW, _INS_COL_STATUS = range(3)
+
+    def _build_quick_insert_page(self):
+        """리스트의 오브젝트 이름 n 번째 자리에 글자를 넣는다.
+
+        Text / Position 을 바꾸거나 리스트가 바뀌면 오른쪽 미리보기가 바로 갱신되고,
+        씬은 **Apply 를 눌러야** 바뀐다. 규칙은 app/core/insert_ops.py 머리말.
+        """
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+
+        # ---- 좌: 오브젝트 리스트 / 우: 미리보기 ----
+        self.ins_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", select_label="Select Objects",
+            log_callback=self._log)
+
+        self.ins_tree = QTreeWidget()
+        self.ins_tree.setColumnCount(3)
+        self.ins_tree.setHeaderLabels(["Current", "New name", "Status"])
+        self.ins_tree.setRootIsDecorated(False)
+        self.ins_tree.setAlternatingRowColors(True)
+        self.ins_tree.setSelectionMode(QAbstractItemView.NoSelection)
+        self.ins_tree.setToolTip("What each listed name will become. Nothing is renamed "
+                                 "until you press Apply.")
+
+        preview_box = QWidget()
+        preview_layout = QVBoxLayout(preview_box)
+        preview_layout.setContentsMargins(2, 2, 2, 2)
+        lbl_preview = QLabel("Preview")
+        font = lbl_preview.font()
+        font.setBold(True)
+        lbl_preview.setFont(font)
+        preview_layout.addWidget(lbl_preview)
+        preview_layout.addWidget(self.ins_tree, 1)
+
+        split = QSplitter(Qt.Horizontal)
+        split.addWidget(self.ins_tsl)
+        split.addWidget(preview_box)
+        split.setStretchFactor(0, 1)
+        split.setStretchFactor(1, 2)
+        root.addWidget(split, stretch=1)
+
+        # 리스트가 바뀌면(Select / Add / Del / Up / Down / Sort) 미리보기를 다시 그린다
+        model = self.ins_tsl.list_widget.model()
+        for signal in (model.rowsInserted, model.rowsRemoved,
+                       model.rowsMoved, model.modelReset):
+            signal.connect(self._ins_update_preview)
+
+        # ---- Text / Position ----
+        position_tip = (
+            "Where the text goes, counted in characters of the short name\n"
+            "(DAG path and namespace are not counted and are kept).\n"
+            "  0 = front, 3 = after the 3rd character\n"
+            " -1 = end,  -4 = before the last 3 characters\n"
+            "e.g. 'arm_jnt' + 'X' :  0 -> Xarm_jnt,  3 -> armX_jnt,  -1 -> arm_jntX\n"
+            "A position past the name puts the text at the end (or the front).")
+
+        form = QGridLayout()
+        form.addWidget(QLabel("Text"), 0, 0)
+        self.ins_le_text = QLineEdit()
+        self.ins_le_text.setPlaceholderText("text to insert")
+        self.ins_le_text.textChanged.connect(self._ins_update_preview)
+        form.addWidget(self.ins_le_text, 0, 1, 1, 2)
+
+        form.addWidget(QLabel("Position"), 1, 0)
+        self.ins_sb_position = QSpinBox()
+        self.ins_sb_position.setRange(-999, 999)
+        self.ins_sb_position.setValue(0)
+        self.ins_sb_position.setToolTip(position_tip)
+        self.ins_sb_position.valueChanged.connect(self._ins_update_preview)
+        form.addWidget(self.ins_sb_position, 1, 1)
+        self.ins_lbl_position = QLabel("")
+        self.ins_lbl_position.setToolTip(position_tip)
+        form.addWidget(self.ins_lbl_position, 1, 2)
+        form.setColumnStretch(2, 1)
+        root.addLayout(form)
+
+        self.ins_btn_apply = QPushButton("Apply")
+        self.ins_btn_apply.setMinimumHeight(32)
+        self.ins_btn_apply.setToolTip(
+            "Rename the listed objects as shown in the preview.\n"
+            "Rows marked no change / invalid name / locked / referenced are skipped.\n"
+            "Everything is one undo step.")
+        self.ins_btn_apply.clicked.connect(self.on_ins_apply)
+        root.addWidget(self.ins_btn_apply)
+
+        self._ins_update_preview()
+        return tab
+
+    def _ins_position_hint(self, position):
+        """Position 칸 옆의 한 줄 설명."""
+        if position == 0:
+            return "front"
+        if position == -1:
+            return "end"
+        if position > 0:
+            return "after the first {0} character(s)".format(position)
+        return "before the last {0} character(s)".format(-position - 1)
+
+    def _ins_rows(self):
+        return core.insert_ops.preview(
+            self.ins_tsl.get_all_nodes(),
+            self.ins_le_text.text(),
+            self.ins_sb_position.value())
+
+    def _ins_update_preview(self, *args):
+        """미리보기 표를 다시 채운다. 씬은 건드리지 않는다."""
+        if not hasattr(self, "ins_btn_apply"):
+            return      # 빌드 중 (위젯이 아직 다 안 만들어짐)
+
+        position = self.ins_sb_position.value()
+        self.ins_lbl_position.setText(self._ins_position_hint(position))
+
+        rows = self._ins_rows()
+        dark = ThemeManager.is_dark_theme()
+        colors = {
+            core.insert_ops.ST_OK: log_levels.color("OK", dark),
+            core.insert_ops.ST_COLLISION: log_levels.color("WARN", dark),
+            core.insert_ops.ST_SAME: log_levels.color("SKIP", dark),
+        }
+        error_color = log_levels.color("ERROR", dark)
+
+        self.ins_tree.clear()
+        for row in rows:
+            status = row["status"]
+            shows_new = status in core.insert_ops.APPLICABLE
+            item = QTreeWidgetItem([
+                row["path"].split("|")[-1],
+                row["new_name"] if shows_new else "",
+                status if not row["note"] else "{0} - {1}".format(status, row["note"])])
+            item.setToolTip(self._INS_COL_NAME, row["path"])
+            color = colors.get(status, error_color)
+            if color:
+                item.setForeground(self._INS_COL_STATUS, QBrush(QColor(color)))
+            self.ins_tree.addTopLevelItem(item)
+        for col in range(3):
+            self.ins_tree.resizeColumnToContents(col)
+
+    def on_ins_apply(self):
+        # 미리보기 때와 씬이 달라졌을 수 있으니 누르는 순간 다시 계산한다
+        rows = self._ins_rows()
+        if not rows:
+            self._log("[WARN] Insert : the Objects list is empty.")
+            return
+        if not self.ins_le_text.text():
+            self._log("[WARN] Insert : the Text field is empty.")
+            return
+
+        counts = core.insert_ops.summarize(rows)
+        if not any(r["status"] in core.insert_ops.APPLICABLE for r in rows):
+            self._log("[WARN] Insert : nothing to rename ({0}).".format(
+                ", ".join("{0} {1}".format(v, k) for k, v in sorted(counts.items()))))
+            return
+
+        with core.undo_chunk():
+            paths, messages = core.insert_ops.apply_rows(rows)
+        for message in messages:
+            self._log(message)
+
+        skipped = {k: v for k, v in counts.items()
+                   if k not in core.insert_ops.APPLICABLE}
+        if skipped:
+            self._log("[SKIP] {0}".format(
+                ", ".join("{0} {1}".format(v, k) for k, v in sorted(skipped.items()))))
+
+        # 리스트를 새 이름으로 다시 채운다 (짧은 고유 이름으로 보여 준다)
+        self.ins_tsl.set_items(core.insert_ops.display_names(paths))
+        self._ins_update_preview()
 
     # ================================================================
     # Rename > Set Rename  (v01.02)
@@ -665,8 +861,10 @@ class MainWindow(QWidget):
             "[Copy Name] copy Base leaf names onto Targets with a prefix.\n"
             "  Search / Replace swaps a word inside the Base name first.\n"
             "\n"
-            "[Quick Rename] (ported from ref/ref_01.mel, current selection):\n"
+            "[Quick Rename > Selection] (ported from ref/ref_01.mel, current selection):\n"
             "  Front Insert / Change New (+index) / Last Add / -1 trim / All Apply.\n"
+            "[Quick Rename > Insert] insert text at the n-th position of every listed\n"
+            "  name (negative = counted from the end). Preview first, then Apply.\n"
             "\n"
             "Written by Ji Hun Park."
         ).format(version=VERSION, update=LAST_UPDATE)

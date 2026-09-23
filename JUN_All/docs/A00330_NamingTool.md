@@ -13,7 +13,10 @@
    - **Set Rename** — 아래 4번.
 2. **Copy Name** — Base 리스트의 leaf 이름(+Prefix)을 Targets 리스트에 순서대로 적용. (구 Copy name 탭)
    **Search / Replace** 로 Base 이름 속 단어를 바꿔서 복사할 수도 있다(v01.05).
-3. **Quick Rename** — **현재 선택** 기준으로 앞/뒤 글자 추가·제거, 새 이름+인덱스 부여. (`ref/ref_01.mel` 이식)
+3. **Quick Rename** — 하위 탭 두 개(v01.09).
+   - **Selection** — **현재 선택** 기준으로 앞/뒤 글자 추가·제거, 새 이름+인덱스 부여. (`ref/ref_01.mel` 이식)
+   - **Insert** — 리스트에 담은 오브젝트 이름의 **n 번째 자리**에 글자를 넣는다. 음수는 끝에서부터 센다.
+     미리보기 표로 결과를 먼저 보고 **Apply** 를 눌러야 바뀐다(§6.3.1).
 4. **Set Rename** (Rename 의 하위 탭) — **세트 이름**의 부분 문자열 찾아 바꾸기. 마야 기본 `Search and Replace Names` 는
    세트를 고를 수 없다(§6.4). (v01.02 신규)
 
@@ -39,13 +42,14 @@ A00330_NamingTool/
     │   ├── token_ops.py       # 토큰 규칙 · 번호 세기 · 검사 · 미리보기 (순수 파이썬, v01.07)
     │   ├── token_profile_prefs.py  # Token 프로파일 json 읽기/쓰기 (v01.07)
     │   ├── set_rename_ops.py  # Set Rename
+    │   ├── insert_ops.py      # Quick Rename > Insert - 위치 규칙 · 미리보기 · 적용 (v01.09)
     │   └── __init__.py        # core 재노출
     ├── ui/main_window.py  # 창 · 상위 탭(Rename / Copy Name / Quick Rename) · Set Rename · 공유 로그창 · 메뉴 바
     └── ui/token_tab.py    # Rename > Token 탭 (토큰 칸 · Add/Delete Token · Profile, v01.07)
 data/                      # (git 추적 안 함) Token 프로파일 - token_profiles/<이름>.json + token_profiles_active.json
 ```
 
-- 위젯/핸들러는 탭별로 나눈다: **Token = `ui/token_tab.py`**, **Copy Name = `copy_*`**, **Quick Rename = `qr_*`**, **Set Rename = `sr_*`**.
+- 위젯/핸들러는 탭별로 나눈다: **Token = `ui/token_tab.py`**, **Copy Name = `copy_*`**, **Quick Rename = `qr_*`(Selection) / `ins_*`(Insert)**, **Set Rename = `sr_*`**.
   공유하는 것은 `self._log()`(공용 로그창)뿐이다.
 
 ---
@@ -71,7 +75,7 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 
 ## 5. UI 구성
 
-- **상단 탭**: Rename(하위 탭 **Token** / **Set Rename**) / Copy Name / Quick Rename (v01.07).
+- **상단 탭**: Rename(하위 탭 **Token** / **Set Rename**) / Copy Name / Quick Rename(하위 탭 **Selection** / **Insert**, v01.09).
 - **하단 공유 로그창**: 모든 결과·경고(`[WARN]`)가 누적된다.
 - **Help > About**: 세 탭의 기능 요약.
 - 리스트(TSL)의 버튼: **Select**(현재 선택으로 교체) · **Add**(현재 선택 추가) · **Del** · **Up** · **Down** · **Sort**.
@@ -196,7 +200,7 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 > **네임스페이스는 보존된다**(v01.03). 짧은 이름만 넘기면 노드가 **루트 네임스페이스로
 > 옮겨간다** — 세트도 트랜스폼도 마찬가지다(실측). 이 탭은 대상의 네임스페이스를 그대로 다시 붙인다.
 
-### 6.3 Quick Rename 탭 (현재 선택 기준)
+### 6.3 Quick Rename > Selection 탭 (현재 선택 기준)
 
 1. 씬에서 대상 오브젝트를 선택한다(리스트가 아니라 **실제 선택**을 사용).
 2. 원하는 동작:
@@ -205,6 +209,46 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
    - **Last Add** + **Add Apply** — 이름 뒤에 텍스트 추가.
    - **-1 Front / -1 Rear** — 이름의 앞/뒤 한 글자 제거.
    - **All Apply** — Change New → Front Insert → Last Add 순으로 한 번에 적용.
+
+#### 6.3.1 Quick Rename > Insert 탭 (v01.09)
+
+리스트에 담은 오브젝트마다 **이름의 n 번째 자리에 글자를 끼워 넣는다.**
+Selection 탭의 Front Insert / Last Add 가 앞·끝만 되는 것을 **임의의 자리**로 넓힌 것이다.
+
+1. 씬에서 오브젝트를 고르고 **Select Objects**(또는 Add)로 왼쪽 `Objects` 리스트에 담는다.
+2. **Text** 에 넣을 글자, **Position** 에 자리를 적는다.
+3. 오른쪽 **Preview** 표에 `Current` → `New name` 과 `Status` 가 **바로** 보인다
+   (Text · Position · 리스트가 바뀔 때마다 다시 계산한다). 이때 씬은 그대로다.
+4. **Apply** 를 눌러야 이름이 바뀐다. 전부 **Undo 한 번**으로 돌아간다. 바뀐 뒤 리스트는 새 이름으로 갱신된다.
+
+**Position 규칙** — 짧은 이름의 글자 수로 센다. `0` 과 `-1` 이 짝(맨 앞 / 맨 끝)이다.
+
+| Position | 뜻 | `arm_jnt` + `X` |
+|---:|---|---|
+| `0` | 맨 앞 | `Xarm_jnt` |
+| `3` | 앞 3 글자 뒤 | `armX_jnt` |
+| `-1` | 맨 끝 | `arm_jntX` |
+| `-4` | 뒤 3 글자 앞 | `arm_Xjnt` |
+| `99` / `-99` | 이름 밖 → 끝 / 앞에 붙임 (Status 에 적힘) | `arm_jntX` / `Xarm_jnt` |
+
+- Position 칸 옆에 뜻(`front` / `after the first 3 character(s)` …)이 한 줄로 나온다.
+- 이름 밖을 가리켜도 막지 않는다 — 길이가 다른 여러 이름에 한 번에 쓰기 때문이다. 대신 그 행의 Status 에
+  `position is outside the name - put at the end` 로 적는다.
+- **DAG 경로와 네임스페이스는 세지 않고 그대로 둔다** — `NS:hand` 에 `-1`,`_L` → `NS:hand_L`.
+
+**Status 열** — 규칙은 Set Rename 탭과 같다. `OK`·`name taken` 만 Apply 대상이다.
+
+| Status | 뜻 |
+|---|---|
+| `OK` (초록) | 그대로 바뀐다 |
+| `name taken` (노랑) | 같은 부모 아래(DG 노드는 씬 전체)에 이미 있는 이름 → 마야가 번호를 붙인다. 실제 이름은 로그 `[WARN]` 에 |
+| `no change` (회색) | Text 가 비었다 |
+| `invalid name` | 숫자로 시작하거나 공백·`-`·`|` 같은 글자가 생긴다 → 건너뜀 (마야는 조용히 고쳐 버린다) |
+| `locked` / `referenced` / `default node` | 바꿀 수 없는 노드 → 건너뜀 |
+| `not a node` / `gone` | 컴포넌트(`.vtx[0]`)이거나 씬에서 사라졌다 |
+
+- 부모와 자식을 함께 담아도 된다 — **깊은 노드부터** 바꾸므로 경로가 틀어지지 않는다.
+- 트랜스폼을 바꾸면 마야가 **셰이프 이름도 따라 바꾼다**(`arm_jntShape` → `arm_jnt_LShape`, 마야 `rename` 기본 동작 · 다른 탭과 같다).
 
 ---
 
@@ -316,7 +360,8 @@ cmds.ls(sl=True, type="objectSet")  # []
   - `[WARN] Both Base and Targets lists must be filled.` — Copy Name 양쪽 리스트 필요.
   - `[WARN] Base(n) and Targets(m) counts differ; renaming first k item(s).` — 개수 불일치 시 앞쪽만 처리.
   - `[WARN] Enter a new name. (Change New is empty)` — Change New 비어 있음.
-- **이름이 안 바뀜**: Quick Rename 은 리스트가 아니라 **현재 씬 선택**을 대상으로 한다. 선택 여부를 먼저 확인.
+- **이름이 안 바뀜**: Quick Rename > Selection 은 리스트가 아니라 **현재 씬 선택**을 대상으로 한다. 선택 여부를 먼저 확인.
+  Quick Rename > Insert 는 반대로 **리스트**가 대상이고, Preview 의 Status 가 `OK`/`name taken` 인 행만 바뀐다.
 
 ---
 

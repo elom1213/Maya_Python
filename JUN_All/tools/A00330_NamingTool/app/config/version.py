@@ -16,5 +16,10 @@
 #   - Token       : each token column is 2/3 as wide (120 -> 80 px); Start / Pad 0 labels sit
 #                   above their spin boxes so everything still fits (v01.08)
 
-VERSION = "01.08"
-LAST_UPDATE = "2026-09-17"
+#   - Quick Rename: split into sub tabs Selection (the old buttons) and Insert (new).
+#                   Insert puts text at the n-th position of every listed name
+#                   (0 = front, -1 = end, negative counts from the end); a live preview
+#                   table shows the new names, nothing changes until Apply (v01.09)
+
+VERSION = "01.09"
+LAST_UPDATE = "2026-09-23"
