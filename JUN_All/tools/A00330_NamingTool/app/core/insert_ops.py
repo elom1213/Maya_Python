@@ -83,13 +83,13 @@ def split_path(path):
 
 def _row(path, parent, namespace, leaf):
     return {"path": path, "parent": parent, "namespace": namespace, "leaf": leaf,
-            "new_leaf": "", "new_name": "", "status": "", "note": ""}
+            "new_leaf": "", "new_name": "", "insert_span": None, "status": "", "note": ""}
 
 
 def preview(nodes, text, position):
     """노드(롱 경로)마다 새 이름과 상태를 계산한다. 씬은 바꾸지 않는다.
 
-    각 행: path · parent · namespace · leaf · new_leaf · new_name · status · note
+    각 행: path · parent · namespace · leaf · new_leaf · new_name · insert_span · status · note
     """
     cmds = _cmds()
     rows = []
@@ -118,6 +118,9 @@ def preview(nodes, text, position):
         new_leaf, clamped = insert_text(leaf, text, position)
         row["new_leaf"] = new_leaf
         row["new_name"] = join_namespace(namespace, new_leaf)
+        # new_name 안에서 넣은 글자가 차지하는 [start, end) - 미리보기가 그 부분만 칠한다
+        start = insert_index(len(leaf), position)[0] + (len(namespace) + 1 if namespace else 0)
+        row["insert_span"] = (start, start + len(text or ""))
         if clamped:
             row["note"] = "position is outside the name - put at the {0}".format(
                 "end" if int(position) >= 0 else "start")

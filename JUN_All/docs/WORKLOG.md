@@ -34,9 +34,10 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 > [!summary] A00330 **Quick Rename > Insert — 리스트 이름의 n 번째 자리에 글자 넣기 + 미리보기** (v01.08->01.09)
 - 요청: TSL 에 담은 오브젝트 이름의 n 번째 위치에 입력한 텍스트를 삽입. n 은 음수·양수 정수, 음수는 이름 끝부터. 바꾸기 전 미리보기, Apply 를 눌러야 적용.
 - Quick Rename 을 하위 탭 **Selection**(기존 버튼) / **Insert**(신규)로 나눴다. Insert = 왼쪽 TSL + 오른쪽 Preview 표(Current / New name / Status) + Text · Position · Apply.
+- 추가 요청: `New name` 에서 **삽입된 글자만 초록색**. `QTreeWidgetItem` 은 한 칸 한 색이라 리치 텍스트 `QLabel` 을 `setItemWidget` 으로 얹었다(칸 글자는 비움 · 이름은 `UserRole`). 코어가 행마다 `insert_span` 을 준다(네임스페이스 길이 포함).
 - Position: `0` 맨 앞 · `3` 앞 3 글자 뒤 · `-1` 맨 끝 · `-4` 뒤 3 글자 앞. 이름 밖이면 끝/앞에 붙이고 Status 에 적는다. DAG 경로 · 네임스페이스는 세지 않고 보존.
 - 상태는 Set Rename 과 같은 규칙(`OK` / `name taken` 만 적용, invalid · locked · referenced · default 는 건너뜀). 깊은 노드부터 바꿔 부모·자식을 같이 담아도 경로가 안 틀어진다.
-- 코어 `app/core/insert_ops.py`. 검증(mayapy 2024) 31항목: 위치 규칙 · 미리보기가 씬 불변 · 네임스페이스 · 부모+자식 · DG 노드 · undo 한 번 · 상태 7종 · UI(미리보기 → Apply → 리스트 갱신).
+- 코어 `app/core/insert_ops.py`. 검증(mayapy 2024) 39항목(초록 구간 · 칸 폭 포함): 위치 규칙 · 미리보기가 씬 불변 · 네임스페이스 · 부모+자식 · DG 노드 · undo 한 번 · 상태 7종 · UI(미리보기 → Apply → 리스트 갱신).
 
 > [!summary] A00110_V02 **Timing > Move: `Offset` 기본값 1** (v02.17->02.18)
 - 요청: Offset 의 기본값을 1 로. 창을 열면 칸에 `1` 이 들어 있다(자리표시도 `5`->`1`). 비우면 예전처럼 `Enter Offset.` 경고.

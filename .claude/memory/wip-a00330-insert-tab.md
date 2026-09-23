@@ -18,4 +18,7 @@ metadata:
 - 적용은 **깊은 노드부터**, 부모를 바꾼 뒤 그 아래 행 경로의 앞부분을 고쳐 쓴다(UUID 불필요).
 - `cmds.rename` 은 트랜스폼을 바꾸면 셰이프도 따라 바뀐다(`arm_jntShape` → `arm_jnt_LShape`, 실측).
 - 미리보기는 TSL `list_widget.model()` 의 rowsInserted/Removed/Moved/modelReset 에 걸어 자동 갱신.
-- 검증 mayapy 31항목 통과. **마야 UI 실사용 확인은 아직.**
+- New name 의 **삽입 글자만 초록**: 표 칸은 한 색뿐이라 리치 텍스트 QLabel 을 `setItemWidget` 으로 얹는다.
+  칸 글자는 비우고(겹쳐 그려짐) 이름은 `UserRole` 에. `resizeColumnToContents` 는 얹은 위젯 폭도 센다(실측).
+  코어 행의 `insert_span` = new_name 안의 [start, end), 네임스페이스 길이+1 포함.
+- 검증 mayapy 39항목 통과. **마야 UI 실사용 확인은 아직.**

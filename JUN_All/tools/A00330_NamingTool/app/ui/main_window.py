@@ -20,6 +20,8 @@
 #            미리보기 표를 보고 Apply 를 눌러야 바뀐다 - app/core/insert_ops.py.
 # 리스트 UI 는 공용 위젯 JUN_mod_tsl_qt_v01, 로직은 app/core. 모든 UI 문자열/로그는 영어.
 
+import html
+
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
@@ -506,8 +508,30 @@ class MainWindow(QWidget):
             if color:
                 item.setForeground(self._INS_COL_STATUS, QBrush(QColor(color)))
             self.ins_tree.addTopLevelItem(item)
+            if shows_new:
+                self._ins_set_new_name_label(item, row, colors[core.insert_ops.ST_OK])
         for col in range(3):
             self.ins_tree.resizeColumnToContents(col)
+
+    def _ins_set_new_name_label(self, item, row, insert_color):
+        """New name 칸을 라벨로 그려 **넣은 글자만** 초록색으로 칠한다.
+
+        QTreeWidgetItem 은 한 칸에 한 색뿐이라 부분 색칠이 안 된다 - 리치 텍스트 라벨을
+        칸 위에 얹는다. 칸의 글자는 비워 둔다(안 비우면 라벨 밑에 겹쳐 그려진다).
+        """
+        name = row["new_name"]
+        start, end = row["insert_span"] or (0, 0)
+        html_text = "{0}<span style='color:{3};'>{1}</span>{2}".format(
+            html.escape(name[:start]), html.escape(name[start:end]),
+            html.escape(name[end:]), insert_color)
+        item.setText(self._INS_COL_NEW, "")
+        item.setData(self._INS_COL_NEW, Qt.UserRole, name)
+        label = QLabel(html_text)
+        label.setTextFormat(Qt.RichText)
+        label.setContentsMargins(3, 0, 3, 0)
+        label.setAttribute(Qt.WA_TransparentForMouseEvents)
+        label.setToolTip(name)
+        self.ins_tree.setItemWidget(item, self._INS_COL_NEW, label)
 
     def on_ins_apply(self):
         # 미리보기 때와 씬이 달라졌을 수 있으니 누르는 순간 다시 계산한다
