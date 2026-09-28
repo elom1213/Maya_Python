@@ -22,5 +22,9 @@
 #                   table shows the new names, nothing changes until Apply (v01.09)
 #                   The inserted text is drawn in green in the New name column.
 
-VERSION = "01.09"
-LAST_UPDATE = "2026-09-23"
+#   - Token       : the Profile + Tokens screen is now the shared Framework widget
+#                   MOD_tokenName_qt_v01 (rules/profiles: Framework.core.token_naming), also used by
+#                   A00480_FileTool Export > Naming. Same look and behaviour, same profile files (v01.10)
+
+VERSION = "01.10"
+LAST_UPDATE = "2026-09-28"

@@ -31,6 +31,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-28 (오늘)
 
+> [!summary] **공용 토큰 이름 위젯** `Framework/qt/MOD_tokenName_qt_v01` + `Framework/core/token_naming` — A00330 Token 탭(v01.09->01.10) · A00480 Export Naming(v01.05->01.06) 이 함께 쓴다
+- 요청: A00480 Naming 칸을 A00330 이름 짓기 UI 처럼 토큰 단위 생성/삭제 + Profile 저장으로. 같은 UI·기능에 SK · MANU · CH · Name · Basic · Version 이 그대로 나오게, A00480 의 `Set's Name` 규칙도 추가. 두 툴이 공유하는 코드는 공용 위젯으로.
+- 공용 core `token_naming`: `TokenRuleSet`(규칙 묶음 · 검사 · 이름 계획 · 미리보기) — `MAYA_NODE_RULES`(Custom/Numbering, 마야 글자 검사) · `FILE_NAME_RULES`(+Set's Name, Numbering = 세트 순번 하나, Windows 파일명 검사). `TokenProfileStore(data_dir, 기본 토큰, 묶음)`.
+- 공용 위젯: Profile(New/Rename/Delete, 고치면 즉시 저장) + 토큰 칸(Add/Delete Token, 80px, 가로 스크롤) + 미리보기. `framed=False` 는 Profile 과 Add/Delete 를 한 줄에, `preview_row` 에 툴 버튼.
+- A00330: `token_ops` · `token_profile_prefs` 는 예전 이름을 노출하는 얇은 층, `token_tab` 은 Objects + 위젯 + Rename. 저장 위치 그대로(기존 프로파일 그대로 읽힘).
+- A00480: `core/naming_ops.py`(기본 프로파일 `Default` = SK_MANU_CH_Name_Basic_Version, `data/` gitignore). Set Name 은 검사 후 채움.
+- 검증(mayapy 2024): 옛 token_ops 와 normalize · validate · preview · plan_names 9가지 조합 동일 · 실제 A00330 프로파일 동일하게 읽힘 · A00330 rename(`dyn_asset_side_00_00` …) · 칸 추가/삭제/프로파일 · A00480 기본/Set's Name/Numbering/차단 — 전부 통과(프로파일은 임시 폴더로). 창: A00330 전후 820x916 동일, A00480 960x853 → **868x970**(Numbering 칸 4줄).
+- 문서: `Framework_MOD_tokenName_qt.md`(신규) · README 인덱스 · A00480 §2-4 · A00330 §6.1 · 두 CHANGELOG.
+
 > [!summary] A00210 **Help 메뉴 바** · **Path Structure `Recreate To` 를 Project Root 와 분리** (v01.31->01.32)
 - 요청: help 메뉴 바를 만들어 기본 목록을 넣을 것 · Recreate 가 `Recreate To` 가 아니라 File Manager 탭 `Project Root` 쪽에 생성되니, Project Root 와 무관하게 `Recreate To` 에 만들 것.
 - 원인: `recreate()` 호출 자체는 이미 `Recreate To` 값을 썼다. 문제는 `_show_preview` 가 구조를 선택할 때마다(저장 후 · Refresh · 프로파일 전환 새로고침 포함) 칸을 `<Project Root>/<base_rel>` 로 **덮어쓴** 것 — 적어 둔 경로가 조용히 바뀌었다.

@@ -6,7 +6,8 @@
 # A00040_file_exporter_V02(v02.09) 의 화면을 **그대로** 옮긴 탭이다.
 #   - Export path : FBX 를 저장할 폴더 (Browse / Paste / Scene)
 #   - Set Up      : 내보낼 objectSet 목록(Set's Name)과 결과 파일명(File name)
-#   - Naming      : 토큰 조합으로 파일명 자동 생성 (Custom / Set's Name 모드)
+#   - Naming      : 토큰 조합으로 파일명 자동 생성 (v01.06 부터 A00330 Token 과 같은 공용 위젯 -
+#                   Custom / Numbering / Set's Name, Add / Delete Token, Profile json)
 #   - Export      : Move to scene root · Joints only under joints · Type Filter
 #
 # 원본과 다른 점
@@ -18,6 +19,7 @@
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
+from Framework.qt.MOD_tokenName_qt_v01 import JUN_mod_tokenName_qt_v01
 from Framework.core.maya_undo import undo_chunk
 
 import maya.cmds as cmds
@@ -27,20 +29,6 @@ from tools.A00480_FileTool.app.ui.type_filter_button import TypeFilterButton
 from tools.A00480_FileTool.app.ui.rules_button import RulesButton
 
 
-# 레거시 6-토큰 기본값 (label = 표 헤더, text = Custom 모드 기본 문자열)
-TOKEN_DEFAULTS = [
-    {"label": "SK",      "text": "SK"},
-    {"label": "MANU",    "text": "MANU"},
-    {"label": "CH",      "text": "CH"},
-    {"label": "Name",    "text": "Name"},
-    {"label": "Type",    "text": "Basic"},
-    {"label": "Version", "text": "Version"},
-]
-
-MODE_CUSTOM = "Custom"
-MODE_SETNAME = "Set's Name"
-
-
 class ExportTab(QWidget):
 
     def __init__(self, log=None, parent=None):
@@ -48,7 +36,6 @@ class ExportTab(QWidget):
 
         # 로그 콜백 (창의 공용 로그창). TSL 이 생성 때부터 참조하므로 먼저 둔다.
         self._log_callback = log
-        self._token_rows = []  # [{"line": QLineEdit, "combo": QComboBox}, ...]
 
         self.build_ui()
 
@@ -125,30 +112,20 @@ class ExportTab(QWidget):
         group = QGroupBox("Naming")
         root = QVBoxLayout(group)
 
-        grid = QGridLayout()
-        for col, spec in enumerate(TOKEN_DEFAULTS):
-            grid.addWidget(QLabel(spec["label"]), 0, col, alignment=Qt.AlignCenter)
-
-            line = QLineEdit(spec["text"])
-            grid.addWidget(line, 1, col)
-
-            combo = QComboBox()
-            combo.addItems([MODE_CUSTOM, MODE_SETNAME])
-            # 모드 바뀌면 Custom 일 때만 편집 가능하게 토글
-            combo.currentTextChanged.connect(
-                lambda text, le=line: le.setEnabled(text == MODE_CUSTOM))
-            grid.addWidget(combo, 2, col)
-
-            self._token_rows.append({"line": line, "combo": combo})
-
-        root.addLayout(grid)
+        # Profile + Tokens - A00330 Rename > Token 과 같은 공용 위젯 (v01.06).
+        # 기본 프로파일 Default = SK_MANU_CH_Name_Basic_Version. 규칙: Custom / Numbering / Set's Name.
+        self.token_widget = JUN_mod_tokenName_qt_v01(
+            core.TOKEN_STORE, log=self._log, log_prefix="Naming", framed=False)
+        root.addWidget(self.token_widget)
 
         btn_set_name = QPushButton("Set Name")
         btn_set_name.setToolTip(
             "Build a file name for each set from the tokens above and fill the "
-            "File name list. 'Custom' uses the text; 'Set's Name' uses the set name.")
+            "File name list.\n'Custom' uses the text, 'Numbering' counts the sets in "
+            "list order, 'Set's Name' uses each set's name.")
         btn_set_name.clicked.connect(self.on_set_name)
-        root.addWidget(btn_set_name)
+        # 미리보기 줄 오른쪽에 둔다 - 칸이 옛 한 줄 입력보다 높아진 만큼 세로를 아낀다.
+        self.token_widget.preview_row.addWidget(btn_set_name)
 
         return group
 
@@ -253,14 +230,15 @@ class ExportTab(QWidget):
             self._log("[WARN] Set's Name list is empty. Use Select Sets first.")
             return
 
-        token_specs = []
-        for row in self._token_rows:
-            mode = "setname" if row["combo"].currentText() == MODE_SETNAME else "custom"
-            token_specs.append({"mode": mode, "text": row["line"].text()})
+        file_names, errors = core.build_file_names(set_names, self.token_widget.tokens())
+        if errors:
+            for error in errors:
+                self._log("[WARN] Set Name : " + error)
+            return
 
-        file_names = core.build_file_names(set_names, token_specs)
         self.name_tsl.set_items(file_names)
-        self._log("Set Name : {0} file name(s) generated.".format(len(file_names)))
+        self._log("Set Name : {0} file name(s) generated (profile '{1}').".format(
+            len(file_names), self.token_widget.profile()))
 
     def on_export(self):
         set_names = self.set_tsl.get_all_items()

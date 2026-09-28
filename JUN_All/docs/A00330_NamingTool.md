@@ -39,13 +39,13 @@ A00330_NamingTool/
     ├── core/              # 로직 (UI 비의존, maya.cmds)
     │   ├── naming_ops.py      # rename_tokens(v01.07) / rename_dynamics / copy_name / insert_front /
     │   │                      #   add_rear / change_new / trim_front / trim_rear / all_apply
-    │   ├── token_ops.py       # 토큰 규칙 · 번호 세기 · 검사 · 미리보기 (순수 파이썬, v01.07)
-    │   ├── token_profile_prefs.py  # Token 프로파일 json 읽기/쓰기 (v01.07)
+    │   ├── token_ops.py       # 이 툴의 규칙 묶음(MAYA_NODE_RULES) + 레거시 기본값 - 본체는 Framework/core/token_naming (v01.10)
+    │   ├── token_profile_prefs.py  # Token 프로파일 저장소(STORE) - v01.10 부터 공용 TokenProfileStore
     │   ├── set_rename_ops.py  # Set Rename
     │   ├── insert_ops.py      # Quick Rename > Insert - 위치 규칙 · 미리보기 · 적용 (v01.09)
     │   └── __init__.py        # core 재노출
     ├── ui/main_window.py  # 창 · 상위 탭(Rename / Copy Name / Quick Rename) · Set Rename · 공유 로그창 · 메뉴 바
-    └── ui/token_tab.py    # Rename > Token 탭 (토큰 칸 · Add/Delete Token · Profile, v01.07)
+    └── ui/token_tab.py    # Rename > Token 탭 = Objects + 공용 토큰 위젯 + Rename (v01.10)
 data/                      # (git 추적 안 함) Token 프로파일 - token_profiles/<이름>.json + token_profiles_active.json
 ```
 
@@ -86,6 +86,9 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 ## 6. 사용 순서
 
 ### 6.1 Rename > Token 탭 (v01.07, 구 Naming Dyn)
+
+> v01.10 : Profile + Tokens 화면은 공용 위젯 [Framework_MOD_tokenName_qt](Framework_MOD_tokenName_qt.md) 이다.
+> [A00480_FileTool](A00480_FileTool.md) Export > Naming 도 같은 위젯을 쓴다(그쪽은 규칙 `Set's Name` 이 하나 더 있다). 보이는 것 · 동작 · 프로파일 파일은 v01.09 와 같다.
 
 ```
 ┌ Objects ───────────────────────────────┐

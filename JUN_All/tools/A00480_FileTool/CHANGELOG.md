@@ -1,5 +1,18 @@
 # Changelog — A00480_FileTool
 
+## v01.06 (2026-09-28)
+- **Naming works like A00330_NamingTool Rename > Token.** The six fixed boxes are replaced by the
+  shared token widget (`Framework/qt/MOD_tokenName_qt_v01`):
+  - each token picks a rule - `Custom` (the text), `Numbering` (the set's place in the list, Start +
+    Pad 0, one per name) or `Set's Name` (the set's name, no namespace);
+  - `Add Token` inserts to the right of the picked token, `Delete Token` removes it;
+  - **Profiles** - `New` / `Rename` / `Delete`, saved as JSON in the tool's `data/` folder (not in git).
+    Editing a token saves it to the current profile.
+- The default profile `Default` keeps the old six texts: `SK_MANU_CH_Name_Basic_Version`.
+- `Set Name` checks the tokens first (no file-name characters like `: * ?`, at most one Numbering)
+  and sits at the right of the preview line.
+- The window is taller (offscreen slate_dark 960 x 853 -> 868 x 970): a Numbering token needs four rows.
+
 ## v01.05 (2026-09-18)
 - **The hidden meshes are selected in the scene.** After `Check` - and after an `Export` that
   a rule stopped - the meshes Check Hide Mesh found are selected (their transforms, hidden

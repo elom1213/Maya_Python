@@ -9,10 +9,10 @@ from .export_ops import (
     filter_members,
     collect_export_nodes,
     fbx_options,
-    build_file_names,
     get_unique_filepath,
     export_sets,
 )
+from .naming_ops import build_file_names, TOKEN_STORE
 from .export_rules import (
     EXPORT_RULES,
     RuleContext,
@@ -33,6 +33,7 @@ __all__ = [
     "collect_export_nodes",
     "fbx_options",
     "build_file_names",
+    "TOKEN_STORE",
     "get_unique_filepath",
     "export_sets",
     "EXPORT_RULES",

@@ -2,7 +2,7 @@
 title: A00480_FileTool 사용법
 aliases: [File Tool, FileTool, A00480]
 tags: [maya-python, tool-guide, file, fbx, export, import, path, pyside]
-updated: 2026-09-22
+updated: 2026-09-28
 ---
 
 # A00480_FileTool 사용법
@@ -16,7 +16,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 | **Import** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` |
 | **Path** | `Copy Scene Folder` · `Open Scene Folder` | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `File` |
 
-- **버전**: `app/config/version.py` (v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
+- **버전**: `app/config/version.py` (v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
 - **설치**: `__dragDrop_A00480.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **FileTool** → `tools.A00480_FileTool.run(True)`
 - **테마**: `slate_dark`
 - **원본 두 툴은 그대로 남아 있다.** quickTool 의 File · Import option 버튼도 지워지지 않았다.
@@ -35,7 +35,9 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 │ ┌ Export ┬ Import ┬ Path ┐                              │
 │ │ Export Path [.................] [Browse][Paste][Scene]│
 │ │ Set Up      [Set's Name]   [File name]                │
-│ │ Naming      SK MANU CH Name Type Version  [Set Name]  │
+│ │ Naming      Profile [Default▾][New][Rename][Delete] [Add Token][Delete Token]
+│ │             [Token 1][Token 2]...  (칸마다 규칙 콤보)  │
+│ │             Preview : SK_MANU_CH_Name_Basic_Version [Set Name]
 │ │ Export      □ Move to scene root □ Joints only ...    │
 │ │             Type Filter : [Include Types ▾] [Export]  │
 │ └───────────────────────────────────────────────────────┘
@@ -46,7 +48,9 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 
 - **로그창은 세 탭이 함께 쓴다.** 어느 탭에서 누른 결과든 같은 곳에 쌓인다.
 - **표식은 색으로 보인다** (2026-09-22~) — `[WARN]` 노랑 · `[OK]` 초록 · `[FAIL]` 빨강 · `[SKIP]` 회색 · `[Info]` 파랑. 이 툴만의 장식이 아니라 **저장소 공용 규칙**이다 — [Framework_log_levels](Framework_log_levels.md).
-- **창 크기는 원본 `A00040_file_exporter_V02` 와 같다**(slate_dark 기준 960 x 853, v01.01~). 폭은 Naming 토큰 6칸 줄이 정한다.
+- **창 크기** — v01.01~01.05 는 원본 `A00040_file_exporter_V02` 와 같았다(slate_dark 기준 960 x 853, 폭은 Naming 6칸 줄이 정했다).
+  **v01.06 부터 868 x 970**(오프스크린 측정) — Naming 이 토큰 칸이 되면서 Numbering 칸(4줄)만큼 높아지고, 고정 6칸이 없어져 좁아졌다.
+  Profile 과 Add/Delete Token 을 한 줄에, Set Name 을 미리보기 줄 오른쪽에 둬서 높이를 줄였다(988 → 970).
   - 테마 qss 는 `show()` 뒤에야 자식 위젯에 입혀지므로, 그 전에 재면 글자가 큰 상태의 최소 크기(약 1290 폭)로 창이 커진다.
     `launch.py` 가 show 다음 이벤트 루프에서 `fit_to_content()` 로 레이아웃 최소 크기에 맞춘다.
   - 탭 테두리만큼 늘어나는 것은 Export 페이지 여백 0 · 창 좌우 여백 -2 · Pin 높이 22 로 상쇄했다.
@@ -59,7 +63,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 **원본 `A00040_file_exporter_V02` v02.09 와 동작이 같다** — 같은 씬 · 같은 옵션이면 같은 FBX 가 나온다
 (§6 검증). 사용법 전체는 원본 문서를 그대로 따른다:
 
-- 흐름 · Naming 토큰 → [A00040 §5](A00040_file_exporter_V02.md#5-사용-흐름)
+- 흐름 → [A00040 §5](A00040_file_exporter_V02.md#5-사용-흐름). **Naming 만은 v01.06 부터 원본과 다르다** → §2-4
 - Type Filter · Joints only under joints → [A00040 §6](A00040_file_exporter_V02.md#6-내보낼-대상-고르기-type-filter--joints-only)
 - Move to scene root → [A00040 §7](A00040_file_exporter_V02.md#7-내보내기-동작-move-to-scene-root--keep-hierarchy)
 - Paste 가 받아 주는 경로 모양 → [A00040 §4-1](A00040_file_exporter_V02.md#4-1-paste--클립보드의-경로-꽂기-v0208)
@@ -122,6 +126,28 @@ Type Filter : [Include Types v]  Rules : [Rules (1/1) v] [Check]        [      E
 `nodes` 에 문제 노드(전체 경로)를 담으면 툴이 검사 뒤 선택해 준다 — 없으면 비워 둔다.
 `ctx`(`RuleContext`)에는 세트 목록 · 경로 · 타입 필터 · 계층 옵션이 들어 있다 — 규칙에 필요한 값이 더 생기면 여기에 더한다.
 
+### 2-4. Naming — 토큰 칸 + Profile (v01.06)
+
+**A00330_NamingTool Rename > Token 과 같은 화면**이다(공용 위젯 [Framework_MOD_tokenName_qt](Framework_MOD_tokenName_qt.md)).
+세트마다 토큰을 `_` 로 이어 파일명을 만들고, `Set Name` 이 File name 리스트를 채운다.
+
+| 규칙 | 값 |
+|------|-----|
+| `Custom` | 적은 글자 그대로 (비면 건너뜀) |
+| `Numbering` | Set's Name 리스트의 **세트 순번** — Start 부터, Pad 0 자리수. **한 이름에 하나만** |
+| `Set's Name` | 그 세트의 이름 (네임스페이스 · 경로 없이 — `ns:SET_body` → `SET_body`) |
+
+- 칸 머리 `Token N` 을 눌러 고른 뒤 `Add Token`(오른쪽에 새 칸) / `Delete Token`(마지막 한 칸은 남는다). 넘치면 가로 스크롤.
+- **Profile** — `New`(지금 칸 복사) / `Rename` / `Delete`. 칸을 고치면 현재 프로파일에 **바로 저장**된다.
+  파일은 툴 폴더 `data/token_profiles/<이름>.json`(PC 별, git 추적 안 함).
+- **기본 프로파일 `Default` = 옛 6칸 글자 그대로** `SK_MANU_CH_Name_Basic_Version`(전부 Custom).
+  옛 화면의 `Name` 칸을 `Set's Name` 으로 쓰던 방식은 그 칸의 규칙만 `Set's Name` 으로 바꾸면 된다.
+- 막는 것(로그 `[WARN] Set Name : ...`, 파일명 리스트는 그대로): 파일명에 못 쓰는 글자 `\ / : * ? " < > |`,
+  Numbering 2 개 이상, 모든 칸이 빈 경우.
+
+예) 세트 `SET_body`, `SET_head` · 칸 `SK | MANU | CH | Set's Name | Basic | Version | Numbering(Start 1, Pad 2)`
+→ `SK_MANU_CH_SET_body_Basic_Version_01`, `SK_MANU_CH_SET_head_Basic_Version_02`
+
 ### 2-3. 원본과 달라진 것 (동작 아님)
 
 | | A00040_V02 | FileTool |
@@ -175,16 +201,17 @@ A00480_FileTool/
 ├── icon/                       # A00480_FileTool.svg / .png (폴더 + 들어오고 나가는 화살표)
 ├── CHANGELOG.md
 └── app/
-    ├── config/version.py       # VERSION = "01.03"
+    ├── config/version.py       # VERSION = "01.06"
     ├── core/                   # UI 비의존 (결과는 로그 문자열 리스트)
     │   ├── fbx_plugin.py       # ensure_fbx_plugin() — Export · Import 공용
     │   ├── export_ops.py       # A00040_V02 export_ops 이식 (타입 필터 · 파일명 · FBX export)
     │   ├── export_rules.py     # Export 규칙 레지스트리 + Check Hide Mesh (v01.03)
+    │   ├── naming_ops.py       # Naming 규칙 묶음(FILE_NAME_RULES) · 기본 토큰 · TOKEN_STORE · build_file_names (v01.06)
     │   ├── import_ops.py       # import_fbx_normal
     │   └── path_ops.py         # scene_folder · open_scene_folder · normalize_pasted_path
     └── ui/
         ├── main_window.py      # 메뉴 · Pin · QTabWidget · 공용 로그 · 푸터
-        ├── export_tab.py       # A00040_V02 화면 + Scene 버튼
+        ├── export_tab.py       # A00040_V02 화면 + Scene 버튼 · Naming = 공용 토큰 위젯 (v01.06)
         ├── import_tab.py       # SECTIONS 표
         ├── path_tab.py         # SECTIONS 표
         ├── button_section.py   # SECTIONS 표 → 두 칸 버튼 그리드 (quickTool 방식)
@@ -223,5 +250,8 @@ A00480_FileTool/
   - 결과 로그(`[OK]` · exported · excluded)가 같다
   - 익스포트 후 씬 계층이 전과 같고, **Ctrl+Z 한 번** 뒤에도 씬이 깨지지 않는다
 - **플러그인 없는 Export** — `[FAIL]` 로그, 파일 안 생김, 트레이스백 없음
+
+**v01.06 Naming** (mayapy 2024): 기본 6칸 · 규칙 콤보 3개 · 미리보기 · 기본 `SK_MANU_CH_Name_Basic_Version` ·
+Set's Name 칸 · Numbering(세트 순번, pad) · 프로파일 즉시 저장 · Numbering 2 개 차단 · 파일명 금지 글자 차단 · 숫자로 시작 허용.
 
 > 실제 Maya GUI 육안 확인은 아직이다.

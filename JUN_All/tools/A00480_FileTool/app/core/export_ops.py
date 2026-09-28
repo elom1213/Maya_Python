@@ -127,28 +127,7 @@ def short_name(name):
     return name.split("|")[-1].split(":")[-1]
 
 
-def build_file_names(set_names, token_specs):
-    """세트마다 토큰을 조합해 파일명을 만든다.
-
-    token_specs: 토큰별 dict 리스트. 각 dict:
-        {"mode": "custom"|"setname", "text": "<custom 일 때 사용할 문자열>"}
-      - "custom"  : text 를 그대로 토큰 값으로.
-      - "setname" : 해당 세트의 이름(leaf)을 토큰 값으로(세트마다 달라짐).
-    빈 토큰은 건너뛰어 '__' 가 생기지 않게 한다.
-    반환: set_names 와 같은 길이의 파일명 리스트.
-    """
-    names = []
-    for set_name in set_names:
-        parts = []
-        for spec in token_specs:
-            if spec.get("mode") == "setname":
-                value = short_name(set_name)
-            else:
-                value = spec.get("text", "")
-            if value:
-                parts.append(value)
-        names.append("_".join(parts))
-    return names
+# 세트마다 파일명을 짓는 토큰 규칙은 naming_ops.build_file_names (v01.06, 공용 토큰 규칙).
 
 
 # ================================================================

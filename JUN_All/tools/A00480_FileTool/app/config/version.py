@@ -24,5 +24,9 @@
 
 # 01.05  규칙이 짚은 노드를 마야에서 선택 - Check 와 규칙에 막힌 Export 둘 다(숨긴 메시 트랜스폼).
 
-VERSION = "01.05"
-LAST_UPDATE = "2026-09-18"
+# 01.06  Export > Naming 을 A00330 Token 탭과 같은 토큰 방식으로 - 공용 위젯 Framework MOD_tokenName_qt.
+#        칸마다 규칙 Custom / Numbering(세트 순번) / Set's Name, Add / Delete Token, Profile(json, data/).
+#        기본 프로파일 Default = SK_MANU_CH_Name_Basic_Version. Set Name 버튼은 미리보기 줄 오른쪽.
+
+VERSION = "01.06"
+LAST_UPDATE = "2026-09-28"

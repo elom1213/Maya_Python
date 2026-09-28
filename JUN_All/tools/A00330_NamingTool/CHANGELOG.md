@@ -1,5 +1,14 @@
 # Changelog — A00330_NamingTool
 
+## v01.10 (2026-09-28)
+**[Refactor] Token 탭 화면 · 규칙 · 프로파일 저장을 Framework 공용으로.**
+
+- 화면: `Framework/qt/MOD_tokenName_qt_v01.py` (`JUN_mod_tokenName_qt_v01`) — A00480_FileTool Export > Naming 과 같은 위젯.
+- 규칙 · 저장: `Framework/core/token_naming.py` (`TokenRuleSet` · `TokenProfileStore`). 이 툴은 `MAYA_NODE_RULES`(Custom / Numbering).
+- `core/token_ops.py` · `core/token_profile_prefs.py` 는 예전 함수 이름을 그대로 노출하는 얇은 층으로 남았다.
+- **보이는 것 · 동작 · 프로파일 파일은 그대로** — 옛 token_ops 와 검사 · 미리보기 · 이름 계획 결과가 같고(9가지 토큰 조합),
+  기존 `data/token_profiles` 가 그대로 읽힌다. 창 최소 크기도 전후 같다(820 x 916, 오프스크린 brown_dark).
+
 ## v01.08 (2026-09-17)
 **[UI] Token 칸 폭을 2/3 로 — 120 → 80px.**
 
