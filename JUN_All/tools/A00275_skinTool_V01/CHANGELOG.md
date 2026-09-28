@@ -1,5 +1,28 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.33 (2026-09-28)
+
+- **[Feature] `Bind > Bind Pose` 에 `Update blendShape targets` (기본 켬, `Keep current shape` 전용).**
+  스킨 **앞**에 있는 blendShape 의 타겟도 새 바인드 포즈에 맞게 돌린다.
+  - 문제: 조인트를 **회전 · 스케일**한 뒤 갱신하면, 타겟이 만들던 이동량이 예전 방향 그대로 남아
+    타겟을 켠 모양이 틀어졌다(실측: 이동량 0.54 짜리 타겟에서 오차 0.40~0.52, 이동만 했으면 0).
+  - 원리: 스킨은 버텍스마다 아핀 변형 `f(p) = A p + t` 라 `f(orig + d) = f(orig) + A d`.
+    **각 타겟 이동량 d 를 A d 로** 바꾸면 "그 포즈에서 타겟을 켠 모양" 과 같다.
+    같은 웨이트를 입힌 타겟 메시를 같은 포즈로 변형한 것과 결과가 같다(실측 차이 0).
+  - A 는 헤드 셰이프에 x / y / z 단위 오프셋을 넣어 스킨 출력 변화를 읽어 얻는다 -
+    **타겟 수와 상관없이 스킨 평가 3 번**(19,740 버텍스 · 타겟 20 개 0.9 초).
+  - **저장된 타겟**(타겟 메시를 지운 것)은 blendShape 노드 값을 다시 쓴다 - **in-between · 일부 버텍스만
+    가진 타겟** 포함. **라이브 타겟**(메시가 연결된 것)은 **타겟 메시를 직접 고친다**(origin world 도).
+  - blendShape envelope 를 잠깐 0 으로 내려 **중립에서** 잰다 - 이제 **갱신할 때 weight 가 켜져 있어도
+    결과가 맞는다**(예전 "라이브 타겟 weight 가 0 이 아니면 상쇄" 경고의 원인도 사라졌다).
+  - 스킨 **뒤** blendShape 는 건드리지 않는다(이미 변형 뒤에 더해진다). blendShape 와 스킨 사이에
+    lattice · wrap · bend 같은 다른 디포머가 있으면 근사라고 경고한다. envelope 가 잠겨 있으면
+    현재 weight 로 재고 경고한다.
+  - 검증(mayapy 2024) 25항목: linear / DQ / blended · 타겟 3 개 + 갱신 시 weight 켜짐 · in-between ·
+    일부 버텍스 · 라이브 origin local / world(옮긴 타겟) · 옵션 끄면 예전 동작 · 스킨 뒤 blendShape 불변 ·
+    비선형 디포머 경고 · envelope 잠김 경고 · envelope 복원 · undo 한 번에 메시 · 타겟 메시 · bindPreMatrix ·
+    헤드 pnts 원래 값 · UI(기본 켬, Snap 모드에서 비활성).
+
 ## v01.32 (2026-09-22)
 
 - **[Feature] `Weights > Transfer` 에 `Target mode` — 소스와 타겟을 리스트로 1:1 짝짓는 모드.**

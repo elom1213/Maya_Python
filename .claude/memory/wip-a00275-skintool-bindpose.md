@@ -46,6 +46,18 @@ Step 2 works with blendShapes before OR after the skin because a blendShape adds
 - `_mesh_from_plug` returned an `MFnMesh` built on a local `asMObject()` result -> garbage reads.
   See [[mplug-asmobject-lifetime]].
 
+**v01.33 (2026-09-28) — `Update blendShape targets` (default ON, Keep mode only).** User asked first
+whether "skin the target mesh with the same weights, pose it, use that as the target" fixes targets
+looking wrong after an update with ROTATED joints. Measured: yes, exactly (0 error, all 3 skinning
+methods); the old tool is off by ~the whole delta under rotation/scale, 0 under pure translation.
+Skin is per-vertex affine, so `f(orig+d) = f(orig) + A_v d` → rewrite each pre-skin target delta as
+`A_v d`. A_v comes from 3 skin evaluations (unit offsets written to head `pnts`, then the ORIGINAL
+pnts values are written back — do not add/subtract, pnts is float). Measure with the blendShape
+`envelope` at 0 so D is taken at neutral — this also removed the old "live target with non-zero weight
+cancels the bake" limitation. User decision: live-connected targets → **edit the target mesh itself**
+(`new = newInput + A(p − oldInput)`, origin=world via base/target world matrices). Post-skin
+blendShapes untouched; other deformers between bs and skin → approximation warning. 25 checks.
+
 **Design lesson worth repeating:** when a user reports a symptom you can't reproduce, make the tool
 report its own reason — the summary line carries `shape NOT kept: <reason>` and a read-only
 **Diagnose** button prints the deformer chain as actually connected. That one round-trip located

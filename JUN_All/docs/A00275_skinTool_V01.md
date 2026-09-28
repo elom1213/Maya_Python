@@ -2,7 +2,7 @@
 title: A00275_skinTool_V01 사용법
 aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose, Move Joints, Edit Mesh, Expand Bind, Smooth Weights]
 tags: [maya-python, tool-guide, skin, skincluster, bind-pose, rigging]
-updated: 2026-09-22
+updated: 2026-09-28
 ---
 
 # A00275_skinTool_V01 사용법
@@ -511,6 +511,8 @@ Border Mask Steps 활성 규칙 · 라디오→옵션 · Loop Curve 버튼 3개(
 │ │ (o) Keep current shape             │ │  ← 기본
 │ │ ( ) Snap mesh to rest shape        │ │
 │ │ [x] Rebuild bindPose node          │ │
+│ │ [x] Keep locked vertex normals     │ │
+│ │ [x] Update blendShape targets      │ │  ← v01.33
 │ └────────────────────────────────────┘ │
 │ [       UPDATE BIND POSE       ]       │
 └────────────────────────────────────────┘
@@ -617,14 +619,36 @@ v01.28 까지 **위치는 그대로인데 셰이딩만 달라졌다.**
 > 셰이프**를 찾아 자동으로 재시도한다(성공 시 `[Info] ... resolved by fallback`).
 > 버텍스 수가 다르면 고르지 않으므로 엉뚱한 셰이프에 굽지 않는다.
 
-### 주의 (blendShape 타겟이 라이브인 경우)
+### Update blendShape targets — 스킨 앞 blendShape 타겟도 새 포즈에 맞게 (v01.33~)
 
-blendShape의 **타겟 메시가 아직 씬에 남아 연결돼 있고** 그 weight 가 0 이 아니면,
-델타가 매 평가마다 `타겟 − 베이스` 로 재계산되어 이 툴이 구운 값이 **상쇄된다.**
-툴이 이 상황을 감지해 로그에 경고를 띄운다. 다음 중 하나로 해결한다.
+`blendShape → skinCluster` 로 리깅된 메시에서 조인트를 **회전 · 스케일**한 뒤 갱신하면,
+v01.32 까지는 **타겟을 켠 모양이 틀어졌다.** 새 rest 는 굳혀지는데 타겟이 만들던 이동량은
+**예전 방향 그대로** 남기 때문이다. (조인트를 **이동만** 했다면 원래도 맞았다.)
 
-- 타겟 메시를 삭제해 델타를 고정한다(가장 일반적인 프로덕션 상태), 또는
-- blendShape weight 를 0 으로 둔 채 실행한다(보통 바인드 포즈 갱신은 뉴트럴에서 한다)
+**Update blendShape targets**(기본 켬, `Keep current shape` 일 때만)를 켜 두면 타겟도 함께 돌린다.
+갱신 후 타겟을 켠 모양 = **갱신 전 그 포즈에서 타겟을 켠 모양**이다.
+
+- 원리: 스킨은 버텍스마다 `f(p) = A·p + t` 인 변형이라 `f(orig + d) = f(orig) + A·d`.
+  타겟 이동량 `d` 를 `A·d` 로 바꾼다. **타겟 메시에 같은 웨이트를 입혀 같은 포즈로 변형한 것**과
+  결과가 같다(실측 차이 0) — 다만 타겟 메시를 복제하거나 웨이트를 복사하지 않는다.
+- `A` 는 스킨을 **3 번만** 계산해 얻는다. 타겟이 많아도 빠르다(19,740 버텍스 · 타겟 20 개 약 0.9 초).
+- **저장된 타겟**(타겟 메시를 지운 경우): blendShape 노드의 값을 다시 쓴다. **in-between** 과
+  **일부 버텍스만 가진 타겟**도 된다.
+- **라이브 타겟**(타겟 메시가 연결된 경우): **타겟 메시 자체를 고친다.** 같은 타겟 메시가 다른
+  blendShape 도 구동하면, 그쪽도 고친 메시를 보게 된다고 경고한다.
+- **weight 가 켜진 채 갱신해도 된다.** 잴 때는 blendShape 의 envelope 를 잠깐 0 으로 내려 중립에서
+  재고, 끝나면 되돌린다. (envelope 가 잠겨 있거나 연결돼 있으면 지금 weight 로 재고 경고한다.)
+- **스킨 뒤 blendShape 는 건드리지 않는다** — 스킨 변형이 끝난 뒤에 더해지므로 돌릴 필요가 없다.
+- blendShape 와 스킨 **사이에** lattice · wrap · deltaMush · nonLinear 같은 디포머가 있으면
+  결과가 근사라서 경고한다.
+- 로그: `blendShape 'bs' targets updated to the new bind pose (N stored item(s), M live target mesh(es))`.
+- 전체가 한 번의 Ctrl+Z 로 되돌아간다(메시 · 타겟 메시 · 노드 값 · bindPreMatrix 모두).
+
+### 주의 (옵션을 끈 경우의 라이브 blendShape 타겟)
+
+`Update blendShape targets` 를 **끄고** 실행하는데 blendShape 의 **타겟 메시가 씬에 연결돼 있고**
+weight 가 0 이 아니면, 이동량이 매 평가마다 `타겟 − 베이스` 로 다시 계산되어 이 툴이 구운 값이
+**상쇄된다.** 툴이 로그에 경고를 띄운다. weight 를 0 으로 두고 실행하거나 옵션을 켠다.
 
 ---
 

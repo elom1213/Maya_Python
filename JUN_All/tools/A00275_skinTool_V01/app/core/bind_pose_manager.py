@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-21
+# last Update date : 2026-09-28
 # A00275_skinTool_V01 - 바인드 포즈 갱신 로직 (maya.cmds / maya.api, UI 비의존)
 #
 # "조인트를 이동·회전한 현재 상태를 새 바인드 포즈로 만든다."
@@ -38,6 +38,22 @@
 #   blendShape 타겟 지오가 아직 "라이브로 연결"돼 있고 그 weight 가 0 이 아니면,
 #   델타가 (target - base) 로 매 평가마다 재계산돼 우리가 더한 d 가 상쇄된다.
 #   이 경우를 감지해 경고한다(타겟을 지워 델타를 고정하거나 weight 를 0 으로 두고 실행).
+#   -> v01.33 의 `update_targets`(기본 켬)가 스킨 앞 blendShape 에 대해 이 문제를 없앤다.
+#
+# ## 스킨 앞 blendShape 의 타겟도 함께 굽는다 (v01.33, update_targets)
+#
+# 스킨은 버텍스마다 아핀 변형이다: f_v(p) = A_v p + t_v (linear / DQ / blended 모두 - 실측).
+# 그래서 f(orig + d) = f(orig) + A_v d. 즉 조인트를 **회전 · 스케일**하면 타겟이 만들던 델타 d 도
+# A_v 만큼 돌아가야 "그 포즈에서 타겟을 켠 모양" 이 된다. 위 2) 만 하면 d 가 예전 방향 그대로라
+# 회전한 부위에서 타겟이 틀어진다(실측 : 델타 0.54 짜리 타겟에서 오차 0.40~0.52, 이동만이면 0).
+#
+#   1. 스킨 앞 blendShape 의 envelope 를 잠깐 0 으로 - D 를 **중립**에서 잰다
+#      (weight 가 켜진 채로 재면 D 에 타겟이 섞여 결과가 틀린다 - 위 한계의 원인).
+#   2. 헤드 셰이프에 x / y / z 단위 오프셋을 차례로 넣어 스킨 출력 변화를 읽는다 -> 버텍스별 A_v.
+#      타겟 수와 무관하게 스킨 평가 3 번이다. 끝나면 pnts 를 원래 값으로 되돌린다.
+#   3. 저장된 타겟(inputPointsTarget, in-between 포함)은 d -> A_v d 로 다시 쓴다.
+#      **라이브로 연결된 타겟 메시**는 메시 자체를 고친다 : 새 점 = 새 입력 + A_v (점 - 옛 입력).
+#   blendShape 와 스킨 사이에 다른 디포머(lattice · wrap · deltaMush 등)가 있으면 A_v 가 근사라 경고한다.
 
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
@@ -641,11 +657,265 @@ def resolve_targets(nodes=None):
 
 
 # =========================
+# 스킨 앞 blendShape 타겟 갱신 (v01.33)
+# =========================
+
+# 스킨 입력까지 선형으로 지나가는(점을 그대로 넘기는) 노드. 이 밖의 노드가 체인에 있으면 A_v 는 근사다.
+_PASS_THROUGH_TYPES = ("blendShape", "tweak", "groupParts", "groupId")
+
+
+def _upstream_nodes(deformer, index=0):
+    """디포머 입력에서 체인 헤드까지 거슬러 올라가며 만나는 노드들 [(노드, 그 노드의 출력 플러그 이름)]."""
+
+    out = []
+    cur = _input_geometry_plug(deformer, index)
+    seen = set()
+    while cur is not None:
+        src = cmds.listConnections(cur.name(), s=True, d=False, p=True) or []
+        if not src:
+            break
+        node = src[0].split(".")[0]
+        if node in seen or cmds.nodeType(node) == "mesh":
+            break
+        seen.add(node)
+        out.append((node, src[0]))
+        cur = _upstream_geometry_plug(node, src[0])
+    return out
+
+
+def _alias_of(bs, target_index):
+    try:
+        alias = cmds.aliasAttr("{0}.weight[{1}]".format(bs, target_index), q=True)
+        if alias:
+            return alias
+    except Exception:
+        pass
+    return "weight[{0}]".format(target_index)
+
+
+def _expand_components(components):
+    """['vtx[0:3]', 'vtx[7]'] -> [0, 1, 2, 3, 7] (순서 유지)."""
+
+    out = []
+    for comp in components or []:
+        if "[" not in comp:
+            continue
+        body = comp.rsplit("[", 1)[1].rstrip("]")
+        if body == "*":
+            return None                  # 전체 - 호출부가 버텍스 수로 채운다
+        if ":" in body:
+            a, b = body.split(":")
+            out.extend(range(int(a), int(b) + 1))
+        else:
+            out.append(int(body))
+    return out
+
+
+def _target_items(bs, geo):
+    """blendShape 의 geo 번째 지오에 걸린 타겟 항목들 [(타겟 인덱스, 항목 인덱스, 항목 플러그)]."""
+
+    items = []
+    base = "{0}.inputTarget[{1}].inputTargetGroup".format(bs, geo)
+    for t in cmds.getAttr(base, mi=True) or []:
+        group = "{0}[{1}].inputTargetItem".format(base, t)
+        for it in cmds.getAttr(group, mi=True) or []:
+            items.append((t, it, "{0}[{1}]".format(group, it)))
+    return items
+
+
+def _mesh_points(shape):
+    fn = om.MFnMesh(_dag_path(shape))
+    pts = fn.getPoints(om.MSpace.kObject)
+    return [(p.x, p.y, p.z) for p in pts]
+
+
+def _write_tweaks(shape, values):
+    """pnts 를 값 목록 그대로 쓴다(더하지 않는다). values[i] = (x, y, z)."""
+
+    n = len(values)
+    flat = []
+    for v in values:
+        flat.extend(v)
+    cmds.setAttr("{0}.pnts[0:{1}]".format(shape, n - 1), *flat, type="double3")
+
+
+def _skin_jacobian(sc, geo_index, head, n, base_out):
+    """버텍스별 스킨 선형부 A_v 의 세 열 (x, y, z 방향 단위 오프셋이 출력에서 되는 벡터).
+
+    헤드 셰이프 pnts 에 단위 오프셋을 더해 스킨 출력을 다시 읽는다 - 스킨 평가 3 번.
+    끝나면 pnts 를 **원래 값 그대로** 되쓴다(float 더하고 빼기로 되돌리면 오차가 남는다).
+    """
+
+    original = _read_tweaks(head)
+    base_values = [original.get(i, (0.0, 0.0, 0.0)) for i in range(n)]
+    columns = []
+    try:
+        for axis in range(3):
+            unit = [0.0, 0.0, 0.0]
+            unit[axis] = 1.0
+            _write_tweaks(head, [(v[0] + unit[0], v[1] + unit[1], v[2] + unit[2])
+                                 for v in base_values])
+            probed = _deformer_output_points(sc, geo_index)
+            columns.append([(probed[i].x - base_out[i].x,
+                             probed[i].y - base_out[i].y,
+                             probed[i].z - base_out[i].z) for i in range(n)])
+    finally:
+        _write_tweaks(head, base_values)
+    return columns
+
+
+def _apply_jacobian(columns, i, d):
+    cx, cy, cz = columns[0][i], columns[1][i], columns[2][i]
+    return (cx[0] * d[0] + cy[0] * d[1] + cz[0] * d[2],
+            cx[1] * d[0] + cy[1] * d[1] + cz[1] * d[2],
+            cx[2] * d[0] + cy[2] * d[1] + cz[2] * d[2])
+
+
+def _mat_point(m, p):
+    """행벡터 규약 점 변환 (p * M)."""
+    return (p[0] * m[0] + p[1] * m[4] + p[2] * m[8] + m[12],
+            p[0] * m[1] + p[1] * m[5] + p[2] * m[9] + m[13],
+            p[0] * m[2] + p[1] * m[6] + p[2] * m[10] + m[14])
+
+
+def _prepare_target_update(sc, geo_index):
+    """스킨 앞 blendShape 들을 찾아 envelope 를 0 으로 내린다(중립에서 재기 위해).
+
+    반환: dict(blendshapes=[(bs, geo, 입력점)], saved={plug: 값}, messages=[], loose=[노드])
+    - 입력점 : 그 blendShape 가 받는 입력(갱신 전) - 라이브 타겟 메시를 고칠 때 쓴다.
+    - loose  : 체인에 끼어 있는 선형이 아닌 노드들(A_v 가 근사가 된다).
+    """
+
+    info = {"blendshapes": [], "saved": {}, "messages": [], "loose": []}
+    for node, out_plug in _upstream_nodes(sc, geo_index):
+        kind = cmds.nodeType(node)
+        if kind != "blendShape":
+            if kind not in _PASS_THROUGH_TYPES:
+                info["loose"].append(node)
+            continue
+        geo = _upstream_index(out_plug)
+        try:
+            bs_in = [(p.x, p.y, p.z) for p in _deformer_input_points(node, geo)]
+        except Exception:
+            bs_in = None
+        info["blendshapes"].append((node, geo, bs_in))
+
+        plug = node + ".envelope"
+        if cmds.getAttr(plug, settable=True):
+            info["saved"][plug] = cmds.getAttr(plug)
+            cmds.setAttr(plug, 0.0)
+        else:
+            info["messages"].append(
+                "[Warning] {0}: '{1}.envelope' is locked or connected, so the targets "
+                "were measured with their current weights - set the weights to 0 or "
+                "unlock the envelope for an exact result.".format(sc, node))
+    return info
+
+
+def _restore_envelopes(info):
+    for plug, value in info["saved"].items():
+        try:
+            cmds.setAttr(plug, value)
+        except Exception:
+            pass
+
+
+def _update_targets(sc, info, columns, delta, mesh):
+    """저장된 타겟 델타는 A_v d 로, 라이브 타겟 메시는 메시 점을 고친다.
+
+    반환: 메시지 리스트
+    """
+
+    messages = []
+    n = len(delta)
+    base_parent = (cmds.listRelatives(mesh, parent=True, f=True) or [None])[0]
+    edited_meshes = set()
+
+    for bs, geo, bs_in in info["blendshapes"]:
+        stored = live = 0
+        origin_world = (cmds.attributeQuery("origin", node=bs, exists=True)
+                        and cmds.getAttr(bs + ".origin") == 0)
+
+        for t, it, item in _target_items(bs, geo):
+            name = _alias_of(bs, t)
+            sources = cmds.listConnections(item + ".inputGeomTarget", s=True, d=False,
+                                           sh=True) or []
+
+            # ---- 라이브 타겟 : 타겟 메시를 직접 고친다 -----------------------
+            if sources:
+                shape = cmds.ls(sources[0], l=True)[0]
+                if shape in edited_meshes:
+                    continue
+                if bs_in is None or cmds.polyEvaluate(shape, v=True) != n:
+                    messages.append("[Warning] {0}: live target mesh '{1}' ({2}) skipped - "
+                                    "vertex count differs.".format(
+                                        sc, shape.split("|")[-1], name))
+                    continue
+                old = _mesh_points(shape)
+                to_base = to_target = None
+                if origin_world and base_parent:
+                    tgt_parent = cmds.listRelatives(shape, parent=True, f=True)[0]
+                    tw = cmds.getAttr(tgt_parent + ".worldMatrix[0]")
+                    twi = cmds.getAttr(tgt_parent + ".worldInverseMatrix[0]")
+                    bw = cmds.getAttr(base_parent + ".worldMatrix[0]")
+                    bwi = cmds.getAttr(base_parent + ".worldInverseMatrix[0]")
+                    to_base = lambda p: _mat_point(bwi, _mat_point(tw, p))
+                    to_target = lambda p: _mat_point(twi, _mat_point(bw, p))
+                offsets = []
+                for i in range(n):
+                    p = to_base(old[i]) if to_base else old[i]
+                    d = (p[0] - bs_in[i][0], p[1] - bs_in[i][1], p[2] - bs_in[i][2])
+                    ad = _apply_jacobian(columns, i, d)
+                    new = (bs_in[i][0] + delta[i][0] + ad[0],
+                           bs_in[i][1] + delta[i][1] + ad[1],
+                           bs_in[i][2] + delta[i][2] + ad[2])
+                    if to_target:
+                        new = to_target(new)
+                    offsets.append((new[0] - old[i][0], new[1] - old[i][1],
+                                    new[2] - old[i][2]))
+                _bake_delta(shape, offsets)
+                edited_meshes.add(shape)
+                others = [d for d in (cmds.listConnections(shape + ".worldMesh", s=False,
+                                                           d=True) or [])
+                          if cmds.nodeType(d) == "blendShape" and d != bs]
+                if others:
+                    messages.append("[Warning] {0}: target mesh '{1}' also drives {2} - "
+                                    "those see the edited mesh too.".format(
+                                        sc, shape.split("|")[-1], ", ".join(sorted(set(others)))))
+                live += 1
+                continue
+
+            # ---- 저장된 타겟 : inputPointsTarget 을 A_v d 로 --------------------
+            points = cmds.getAttr(item + ".inputPointsTarget") or []
+            if not points:
+                continue
+            indices = _expand_components(cmds.getAttr(item + ".inputComponentsTarget"))
+            if indices is None:
+                indices = list(range(len(points)))
+            if len(indices) != len(points) or (indices and max(indices) >= n):
+                messages.append("[Warning] {0}: '{1}.{2}' item {3} skipped - its component "
+                                "list does not match the mesh.".format(sc, bs, name, it))
+                continue
+            new_points = []
+            for v, pt in zip(indices, points):
+                ad = _apply_jacobian(columns, v, pt[:3])
+                new_points.append((ad[0], ad[1], ad[2], 1.0))
+            cmds.setAttr(item + ".inputPointsTarget", len(new_points), *new_points,
+                         type="pointArray")
+            stored += 1
+
+        messages.append("[Info] {0}: blendShape '{1}' targets updated to the new bind pose "
+                        "({2} stored item(s), {3} live target mesh(es)).".format(
+                            sc, bs, stored, live))
+    return messages
+
+
+# =========================
 # 메인 동작
 # =========================
 
 def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True,
-                     keep_normals=True):
+                     keep_normals=True, update_targets=True):
     """현재 조인트 포즈를 새 바인드 포즈로 만든다.
 
     keep_shape=True  : 지금 보이는(변형된) 형상을 그대로 유지한 채 rest 로 굳힌다.
@@ -653,6 +923,9 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True,
                        (Move Skinned Joints Tool 로 조인트를 옮긴 것과 같은 결과).
     keep_normals     : 잠긴(user) 버텍스 노멀도 함께 굽는다 (keep_shape 일 때만 뜻이 있다).
                        끄면 노멀은 rest 로 돌아간다 — 셰이딩이 달라진다.
+    update_targets   : (v01.33, keep_shape 일 때만) 스킨 **앞** blendShape 의 타겟도 새 바인드
+                       포즈에 맞게 돌린다 - 조인트를 회전 · 스케일해도 타겟을 켠 모양이 그 포즈에서
+                       타겟을 켠 모양과 같다. 라이브로 연결된 타겟은 타겟 메시를 직접 고친다.
 
     반환: (처리한 skinCluster 수, 메시지 리스트)
     """
@@ -683,8 +956,16 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True,
                 out_normals = None
                 head_state = None
 
+                target_info = None
+                columns = None
+
                 if keep_shape:
                     try:
+                        # 스킨 앞 blendShape 를 중립(envelope 0)으로 - D 와 A_v 를 거기서 잰다.
+                        if update_targets:
+                            target_info = _prepare_target_update(sc, geo_index)
+                            messages.extend(target_info["messages"])
+
                         skin_in = _deformer_input_points(sc, geo_index)
                         # 출력은 **한 번만** 당긴다 - 포인트와 노멀을 같은 데이터에서.
                         skin_out, out_normals = _deformer_output_state(
@@ -720,6 +1001,11 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True,
                                           skin_out[i].z - skin_in[i].z)
                                          for i in range(len(skin_in))]
 
+                                # 타겟을 돌릴 버텍스별 스킨 선형부 A_v (스킨 평가 3 번).
+                                if target_info and target_info["blendshapes"]:
+                                    columns = _skin_jacobian(sc, geo_index, head,
+                                                             len(skin_in), skin_out)
+
                                 # 잠긴(user) 노멀은 스킨 행렬을 따라 돌고 있었다.
                                 # 바인드를 갱신하면 그 회전이 사라진다. 헤드 셰이프를
                                 # **디포머를 돌리지 않고** 읽어 두면, 갱신 뒤에 무엇이
@@ -727,9 +1013,14 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True,
                                 if keep_normals:
                                     head_state = _head_normal_state(head)
 
-                        # 라이브 blendShape 타겟 경고
+                        # 라이브 blendShape 타겟 경고 - update_targets 가 다루는 (스킨 앞)
+                        # blendShape 는 중립에서 재고 타겟 메시도 고치므로 해당 없다.
+                        handled = set(b for b, _g, _i in
+                                      (target_info["blendshapes"] if target_info else []))
                         _, risky = _live_blendshape_targets(mesh)
                         for node, hot in risky:
+                            if node in handled:
+                                continue
                             detail = ", ".join("{0}={1:.3f}".format(n, v)
                                                for n, v in hot[:6])
                             if len(hot) > 6:
@@ -750,6 +1041,10 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True,
                         reason = ("{0} - 'Keep current shape' only works on polygon "
                                   "meshes. Use 'Snap mesh to rest shape' instead"
                                   .format(e))
+                    finally:
+                        # 잰 뒤에는 envelope 를 되돌린다 (타겟 갱신은 그 뒤에 쓴다).
+                        if target_info:
+                            _restore_envelopes(target_info)
 
                     if reason:
                         messages.append("[Warning] {0}: shape not kept - {1}.".format(
@@ -804,6 +1099,20 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True,
                                     "queue - Ctrl+Z will bring the joints back and "
                                     "leave these normals. Run Update Bind Pose again "
                                     "after an undo.".format(sc, -count))
+
+                # ---- 2-c) 스킨 앞 blendShape 타겟을 새 바인드 포즈에 맞게 ---------
+                if (keep_shape and head is not None and delta is not None
+                        and target_info and target_info["blendshapes"]):
+                    if columns is None:
+                        messages.append("[Warning] {0}: blendShape targets not updated - "
+                                        "the skin could not be measured.".format(sc))
+                    else:
+                        if target_info["loose"]:
+                            messages.append(
+                                "[Warning] {0}: {1} sit between the blendShape and the "
+                                "skin - the target update is an approximation there."
+                                .format(sc, ", ".join(target_info["loose"])))
+                        messages.extend(_update_targets(sc, target_info, columns, delta, mesh))
 
                 # ---- 3) bindPose 노드 재생성 -------------------------------
                 if rebuild_dag_pose:

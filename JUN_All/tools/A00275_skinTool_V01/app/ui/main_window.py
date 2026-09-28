@@ -982,6 +982,23 @@ class MainWindow(QWidget):
             "there are none. Turn it off if this step is slow on a very heavy mesh.")
         mode_layout.addWidget(self.cb_bp_normals)
 
+        # v01.33 - 스킨 앞 blendShape 타겟도 새 바인드 포즈에 맞게 돌린다.
+        self.cb_bp_targets = QCheckBox("Update blendShape targets")
+        self.cb_bp_targets.setChecked(True)
+        self.cb_bp_targets.setToolTip(
+            "For blendShapes that come BEFORE the skinCluster: rotate / scale each target\n"
+            "the way the skin now moves that part of the mesh, so a target turned on after\n"
+            "the update looks the same as it did in this pose before the update.\n"
+            "Without it, targets keep their old direction and look wrong wherever a joint\n"
+            "was rotated or scaled (moving a joint alone is fine either way).\n"
+            "\n"
+            "Stored targets (target meshes deleted) are rewritten in the blendShape node,\n"
+            "including in-betweens. Targets still connected to a mesh: that TARGET MESH is\n"
+            "edited. The update is measured at neutral, so the current weights do not matter.\n"
+            "Only with 'Keep current shape'.")
+        mode_layout.addWidget(self.cb_bp_targets)
+        self.rb_bp_keep.toggled.connect(self.cb_bp_targets.setEnabled)
+
         layout.addWidget(mode_grp)
 
         # ---- 실행 ----
@@ -1050,7 +1067,8 @@ class MainWindow(QWidget):
             self.bp_targets,
             keep_shape=keep,
             rebuild_dag_pose=self.cb_bp_rebuild.isChecked(),
-            keep_normals=self.cb_bp_normals.isChecked())
+            keep_normals=self.cb_bp_normals.isChecked(),
+            update_targets=self.cb_bp_targets.isChecked())
 
         for m in messages:
             self.log(m)

@@ -31,6 +31,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-28 (오늘)
 
+> [!summary] A00275 Bind Pose — **`Update blendShape targets`**: 스킨 앞 blendShape 타겟도 새 바인드 포즈에 맞게 (v01.32->01.33)
+- 질문(먼저 검증): blendShape → skinCluster 메시를 조인트 이동 · 회전 뒤 Update Bind Pose 하면 타겟이 틀어진다. 타겟 메시에 같은 웨이트 → 같은 포즈로 변형 → 그걸 타겟으로 쓰면 되지 않나?
+- 실측: 사용자 방식 = 의도한 결과(차이 0, linear/DQ/blended). 지금 툴은 회전·스케일에서 0.40~0.52 틀림, 이동만이면 0. 원인 `f(orig+d) = f(orig) + A·d` 인데 d 를 안 돌렸다.
+- 사용자 결정: 옵션으로(기본 켬), 라이브 타겟은 **타겟 메시를 직접** 고친다.
+- 구현(`bind_pose_manager`): 스킨 입력에서 체인을 올라가 blendShape 수집 → envelope 0(중립에서 D 와 A 측정) → 헤드 pnts 에 x/y/z 단위 오프셋으로 스킨 3 번 평가해 버텍스별 A → 저장 타겟(in-between · 희소 컴포넌트)은 `inputPointsTarget = A·d`, 라이브는 타겟 메시 pnts(`새 입력 + A(점 − 옛 입력)`, origin world 는 행렬 변환) → envelope · pnts 원래 값 복원. 스킨 뒤 blendShape 불변, 사이 비선형 디포머는 경고.
+- 검증(mayapy 2024) 25항목 전부 통과 — 부수 효과로 "weight 켠 채 갱신하면 상쇄" 제약도 사라졌다(3 타겟 weight 0.6/0.3/0.8 에서 오차 1e-6). 19,740 버텍스 · 타겟 20 개 0.91 s(옵션 끔 0.15 s).
+- 문서: 가이드 §1 Update blendShape targets, CHANGELOG, version.py.
+
 > [!summary] A00170 Seal — **Preview Pairing 줄 더블클릭 = 그 짝 두 노드 선택** (v01.27->01.28)
 - 요청: Preview Pairing 뒤 리스트 줄을 더블클릭하면 두 오브젝트가 씬에서 선택되게.
 - 줄마다 위/아래 노드 **UUID** 를 `Qt.UserRole` 에 담아 `itemDoubleClicked` → `select(replace)`. 로그에 `Selected: a, b`. 하나가 지워졌으면 남은 것 + `[WARN]`, 둘 다 없으면 경고만(선택 유지).
