@@ -26,5 +26,11 @@
 #           Orient (v02.27) - the whole right arm is the behavior mirror of the finished
 #                            left one (mirrored last), and every joint carries one rule.
 
-VERSION = "02.27"
-LAST_UPDATE = "2026-09-21"
+#           Match IK (v02.28) - closing the IK session keeps every pole vector offset: the
+#                            chains are fitted to their pole planes (mid joints projected,
+#                            joints re-oriented) and the new IK chain lengths are written onto
+#                            the option controller before IK comes back. "Update offset" is
+#                            still there as the second choice.
+
+VERSION = "02.28"
+LAST_UPDATE = "2026-09-28"

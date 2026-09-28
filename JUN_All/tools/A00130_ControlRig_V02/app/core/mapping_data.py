@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-28
+# last Update date : 2026-09-28
 # A00130_ControlRig_V02 - 템플릿 조인트 <-> 케이지 세트 매핑 데이터.
 #
 # 계획서 7-10 의 스키마. 초판은 `.ref/ref_01.txt` 에서 뽑았다.
@@ -483,7 +483,10 @@ def load_length(version=None, joints=None):
             attrs.pop("upper", None)
             attrs.pop("lower", None)
 
-        measures.append({"part": part, "chain": chain, "attrs": attrs})
+        # v02.28 - 이 부위를 움직이는 ikHandle. Match 의 IK 세션이 체인을 폴 평면에 맞추면
+        # 뼈 길이가 템플릿과 달라지므로, 그 **IK 체인** 길이를 다시 쓴다(length_manager).
+        measures.append({"part": part, "chain": chain, "attrs": attrs,
+                         "ik_handle": item.get("ik_handle") or ""})
         attr_count += len(attrs)
 
     messages.append("[OK] Loaded {0} measure(s), {1} attribute(s) from {2}.".format(

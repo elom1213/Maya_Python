@@ -31,6 +31,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-28 (오늘)
 
+> [!summary] A00060 **IK Edit `Keep offset`**(v03.12->03.13) · A00130 **Match IK 세션이 폴 벡터 offset 을 지킨다 + 바뀐 길이를 쓴다**(v02.27->02.28) — 둘 다 새 기본
+- 사용자 답(계획서 6장): 새 방식 기본 · X→다음 조인트, up = Y/Z 중 월드 +Y 를 더 향한 축 · 반대편은 거울 반사 · poleTgt 는 자유 로케이터, 새 위치는 매칭 세트 · 긴 체인은 전부 투영 · 축 맞추기 유지 · 실제 케이지 경로. 추가 둘: **바꾼 체인 길이로 `Arm_L` 도 갱신**, up 축은 **폴 평면 법선 쪽**.
+- 코어(`ik_edit_manager`): `PV_MODE_KEEP` — offset 불변, 중간 조인트를 폴 평면에 투영, 뼈 축 재정렬(−X 규약 유지 · 수직 뼈는 지금 법선에 가까운 축), parentConstraint 로 도는 루트는 타깃 offset 재고정(`constraintRotateOrder`), 구동되는 끝 조인트 축은 리그에, **2조인트 체인은 솔버의 비틀림을 굳힘**, 부모 체인부터, IK 는 한꺼번에. 계산/놓기 분리 + `after_fit` 콜백. 옛 두 모드는 순서까지 그대로.
+- ★ 실측으로 바뀐 것: 2조인트 체인 up 규칙 → 90° (솔버가 축을 정함) · 오른팔 +X 강제 → 180° 뒤집힘 · 길이를 IK 켠 **뒤** 쓰면 스트레치(1.206)가 풀리며 wrist 6.26 이탈 → **켜기 전에** 쓰고 다시 놓는다 · `_measure` 가 오일러 차라 같은 방향을 90/270/356° 로 보고 → 각도로.
+- A00130: `length_map.json` 에 부위별 `ik_handle`, `length_manager.plan(source=SOURCE_IK)`. Match 탭 `On close` 콤보(옛 방식 선택 가능). Length 표는 IK 체인 길이가 다르면 `IK chain is a / b`.
+- 검증(mayapy 2024, 케이지 `Cage_v002_0060`): 실제 Match(로컬·레퍼런스) offset 변경 **0**(옛 4) · 편차 18개 **0**(옛 90° 4개) · 스트레치 없음(옛 1.206/1.017) · 재오픈 ≤ 0.00004. D01 16개 흉내 매칭 · 반대편 · 레퍼런스 통과. 합성 회귀 32/33(실패 1은 옛 모드도 같음). 오프스크린 UI 두 툴.
+- 문서: 계획서 6장 답 · 7장 구현 결과, 가이드 A00060 §8.3b · A00130 §4.4d, 두 CHANGELOG.
+
 > [!summary] **계획서** A00060 · A00130 IK Edit — 폴 벡터 offset 을 지키고 중간 조인트를 폴 평면에 맞추기 (구현 전, 질문 7개)
 - 요청: IK Edit 이 poleVectorConstraint 의 offset 을 바꾸지 않고, joint1 · joint3 · 핸들 · poleTgt 를 옮긴 뒤 Rest Translate 를 Constraint Translate 에 맞추고 joint2 를 v(또는 체인 평면 위 가장 가까운 점)로. 레퍼런스에서도. A00130 Match 의 D01_IK_handle 편집도 같은 방식으로.
 - 실측(mayapy 2024): ★ `Rest Translate` 는 weight 1 이면 **출력에 영향이 없다**(weight 합 0 일 때만) — IK 를 맞추는 건 joint2 를 폴 평면에 올리는 것. offset 고정 + 평면 투영 → 위치·회전 편차 **0**(twist 30 · 원래 offset · 레퍼런스 · 재오픈 모두). v 가 폴 반대편이면 솔버가 뒤집어 편차 6.39. joint2 만 옮기면 뼈 X 축이 18.6° 어긋나고, 방향을 다시 맞춰도 편차 0.

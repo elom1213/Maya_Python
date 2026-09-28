@@ -1,12 +1,31 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-25
+# last Update date : 2026-09-28
 # A00060_jointTool_V03 - 이미 설치된 ikHandle 을 그대로 둔 채 본 체인을 수정한다.
 #
 # 마야 2024 의 컨스트레인트에는 Update(Update Offset) 버튼이 있어서, 드리븐을 손으로
 # 옮긴 뒤 그 자리를 새 오프셋으로 굳힐 수 있다(실체는 `parentConstraint -e -maintainOffset`).
 # **ikHandle 에는 그런 버튼이 없다** - AEikHandleTemplate.mel 을 봐도 없고, 명령에도 없다.
 # 이 모듈이 그 자리를 메운다.
+#
+# ── v03.13 : offset 을 지키는 모드 (PV_MODE_KEEP, 기본) ─────────────────────
+#
+# 아래 두 옛 모드는 "체인이 먼저, 폴 벡터가 따라간다" 였다(offset 을 역산). 새 모드는
+# 반대로 **"폴 타깃이 먼저, 체인이 따라간다"** — offset 은 한 글자도 안 바꾼다.
+#
+#   1. 폴 평면 = 체인 축(루트->끝) + poleVector(월드, twist 만큼 더 돌린 것)
+#   2. 중간 조인트 전부를 그 평면에 **수직 투영**. 폴 반대편에 떨어지면 축에 대해
+#      거울 반사해 폴 쪽으로 (그대로 두면 솔버가 체인을 뒤집는다 - 실측 편차 6.39)
+#   3. 뼈 축 재정렬: X -> 다음 조인트, up = Y/Z 중 지금 월드 +Y 를 더 향한 축을
+#      **평면 법선** 쪽으로 (투영 뒤 체인이 한 평면이라 한 축으로만 굽는다)
+#      회전이 parentConstraint 로 구동되면 그 타깃 offset 을 다시 굳힌다
+#   4. 끝 조인트 · 체인 밖 자식들은 월드 자리를 지킨다
+#   5. restTranslate <- constraintTranslate (weight 1 이면 출력엔 영향 없다 - 정리용)
+#
+# 2조인트 체인(중간 조인트 없음)은 X 만 뼈에 맞추고, 뼈 둘레 회전은 **솔버에게 받는다**
+# (_settle_twist). 이런 체인은 어느 축이 폴을 볼지 솔버가 정해서 up 규칙과 90 도 어긋났다.
+# 여러 핸들은 부모 체인부터 맞추고, IK 는 전부 맞춘 뒤 한꺼번에 켠다.
+# 실측(케이지 Cage_v002_0060): 팔 · 다리 · Drv 체인 16개 + Match 가 찾은 2개 전부 offset 불변, 편차 0.
 #
 # ── 무엇이 문제인가 ─────────────────────────────────────────────────────────
 #
@@ -79,8 +98,12 @@ SC_SOLVERS = ("ikSCsolver",)
 CURVE_SOLVERS = ("ikSplineSolver",)
 
 # 폴 벡터 갱신 방법
-PV_MODE_OFFSET = "offset"    # 컨스트레인트 offset 을 갱신 (기본)
+PV_MODE_KEEP = "keep"        # offset 을 지키고 체인을 폴 평면에 맞춘다 (기본, v03.13)
+PV_MODE_OFFSET = "offset"    # 컨스트레인트 offset 을 갱신
 PV_MODE_TARGET = "target"    # 폴 벡터 타깃(로케이터) 자체를 새 평면으로 옮긴다
+
+# up 축 판정: 두 축 모두 월드 +Y 와 이만큼도 가깝지 않으면(뼈가 거의 수직) 동률로 본다
+UP_AMBIGUOUS_DOT = 0.5
 
 # 핸들을 무엇으로 옮길지
 SNAP_HANDLE = "handle"       # 핸들 자신 (기본)
@@ -474,7 +497,8 @@ def inspect(handle):
         if con:
             info["pv_targets"] = pole_vector_targets(con)
             info["notes"].append(
-                "Pole vector constraint '{0}' will be kept; only its offset is updated."
+                "Pole vector constraint '{0}' will be kept (Keep offset leaves its offset "
+                "as it is; the other modes update the offset or move the target)."
                 .format(_short(con)))
         else:
             driver = pole_vector_driver(handle)
@@ -723,6 +747,364 @@ def _apply_pole_vector(handle, joints, data, pv_mode, messages):
 
 
 # =========================
+# offset 유지 모드 (PV_MODE_KEEP) - 체인을 폴 평면에 맞춘다
+# =========================
+
+def _mvec(v):
+    return om.MVector(v[0], v[1], v[2])
+
+
+def _world_matrix(node):
+    return om.MMatrix(cmds.getAttr(node + ".worldMatrix[0]"))
+
+
+def _row(m, i):
+    return om.MVector(m.getElement(i, 0), m.getElement(i, 1), m.getElement(i, 2))
+
+
+def _pure_rotation(m):
+    """행을 정규화(스케일 제거)하고 평행이동을 뺀 3x3. 조인트 스케일이 스트레치로 1 이 아니어도 된다."""
+    rows = []
+    for i in range(3):
+        v = _row(m, i).normal()
+        rows += [v.x, v.y, v.z, 0.0]
+    return om.MMatrix(rows + [0.0, 0.0, 0.0, 1.0])
+
+
+def _frame(x_dir, up_index, up_dir, origin=None):
+    """X = x_dir, up_index(1=Y, 2=Z) 축 = up_dir 의 X 수직 성분인 오른손 좌표계."""
+    x = x_dir.normal()
+    u = (up_dir - x * (up_dir * x)).normal()
+    if up_index == 1:
+        y, z = u, (x ^ u).normal()
+    else:
+        z, y = u, (u ^ x).normal()
+    o = origin or om.MVector()
+    return om.MMatrix([x.x, x.y, x.z, 0.0, y.x, y.y, y.z, 0.0,
+                       z.x, z.y, z.z, 0.0, o.x, o.y, o.z, 1.0])
+
+
+def pole_vector_world(handle):
+    """핸들의 poleVector(부모 공간) 를 월드 벡터로. 컨스트레인트 출력이든 직접 값이든."""
+    pv = om.MVector(*cmds.getAttr(handle + ".poleVector")[0])
+    return pv * _rotation_only(cmds.getAttr(handle + ".parentMatrix[0]"))
+
+
+def pole_plane(handle, joints):
+    """`(axis_unit, side_unit, normal_unit)` 또는 None.
+
+    side = 폴 쪽을 가리키는 평면 안의 방향(축에 수직), normal = axis x side.
+    twist 는 솔버가 평면을 축 둘레로 **더** 돌리는 각이라 같은 만큼 돌린다.
+    """
+    root, end = _mvec(world_pos(joints[0])), _mvec(world_pos(joints[-1]))
+    axis = end - root
+    if axis.length() < 1e-9:
+        return None
+    pv = pole_vector_world(handle)
+    twist = cmds.getAttr(handle + ".twist") if cmds.objExists(handle + ".twist") else 0.0
+    if abs(twist) > 1e-9:
+        pv = _mvec(_rotate_about([pv.x, pv.y, pv.z], [axis.x, axis.y, axis.z], twist))
+    a = axis.normal()
+    side = pv - a * (pv * a)
+    if side.length() < 1e-9:
+        return None
+    side = side.normal()
+    return a, side, (a ^ side).normal()
+
+
+def pick_up_axis(joint, normal):
+    """재정렬 때 쓸 up 축과 그 방향. `(index 1=Y/2=Z, 방향 벡터, 설명)`.
+
+    규칙(사용자 지정 2026-09-28): Y · Z 중 **지금 월드 +Y 를 더 향한 축**을 up 으로,
+    그 축을 **폴 평면 법선 쪽**으로(법선 두 부호 중 지금 축에 가까운 쪽 - 최소 회전).
+    다리처럼 뼈가 거의 수직이면 Y · Z 둘 다 수평이라 +Y 판정이 동률이 된다 - 그때는
+    지금 법선에 더 가까운 축을 쓴다(리그의 굽힘 축을 그대로 지킨다).
+    """
+    m = _world_matrix(joint)
+    y, z = _row(m, 1).normal(), _row(m, 2).normal()
+    up = om.MVector(0.0, 1.0, 0.0)
+    dy, dz = y * up, z * up
+    if max(dy, dz) < UP_AMBIGUOUS_DOT:
+        index = 1 if abs(y * normal) >= abs(z * normal) else 2
+        why = "bone near vertical - axis closest to the pole plane normal"
+    else:
+        index = 1 if dy >= dz else 2
+        why = "axis most toward world +Y"
+    cur = y if index == 1 else z
+    n = normal if cur * normal >= 0.0 else -normal
+    return index, n, why
+
+
+def _set_local_translate(joint, world_point):
+    """쓸 수 있는 축만 쓴다. 쓰지 못한(잠김/구동) 축 이름 목록을 돌려준다.
+
+    케이지의 Drv 체인은 끝 조인트 `tx` 를 거리 노드가 구동한다(`multiplyDivide80.ox ->
+    CH_l_WristDrv_xx_ikjnt.tx`) - 뼈 길이는 리그가 정한다. 그 축은 리그에 맡긴다.
+    """
+    pim = om.MMatrix(cmds.getAttr(joint + ".parentInverseMatrix[0]"))
+    lp = om.MPoint(world_point) * pim
+    blocked = []
+    for axis, value in zip("XYZ", (lp.x, lp.y, lp.z)):
+        plug = "{0}.translate{1}".format(joint, axis)
+        if _writable(plug):
+            cmds.setAttr(plug, value)
+        else:
+            blocked.append("t" + axis.lower())
+    return blocked
+
+
+def _euler_degrees(matrix, rotate_order=0):
+    e = om.MEulerRotation.decompose(_pure_rotation(matrix), rotate_order)
+    return [math.degrees(e.x), math.degrees(e.y), math.degrees(e.z)]
+
+
+def _orient_joint_world(joint, want_rot):
+    """rotate 는 그대로 두고 jointOrient 를 풀어 월드 회전 = want_rot.
+
+    joint world = rotate x jointOrient x parent  ->  jo = R^-1 x want x parent^-1
+    """
+    r = cmds.getAttr(joint + ".rotate")[0]
+    ro = cmds.getAttr(joint + ".rotateOrder")
+    R = om.MEulerRotation([math.radians(v) for v in r], ro).asMatrix()
+    parent = _pure_rotation(om.MMatrix(cmds.getAttr(joint + ".parentMatrix[0]")))
+    jo = R.inverse() * want_rot * parent.inverse()
+    cmds.setAttr(joint + ".jointOrient", *_euler_degrees(jo))
+
+
+def _rotate_driver(joint):
+    cons = cmds.listConnections(joint + ".rotateX", s=True, d=False) or []
+    return _long(cons[0]) if cons else None
+
+
+def _refit_parent_constraint(con, want_world):
+    """parentConstraint 의 타깃 offset 들을 드리븐 월드 = want_world 가 되게 다시 굳힌다.
+
+    `parentConstraint -e -maintainOffset` 은 드리븐의 **지금** 자리를 굳히는데, 조인트
+    회전은 컨스트레인트가 되쓰고 있어 "지금" 이 원하는 자리가 아니다. 그래서 직접 푼다.
+    offset 회전은 타깃이 아니라 **드리븐의 rotate order**(constraintRotateOrder)로 풀어야
+    한다 - targetRotateOrder 로 풀면 0.03 ~ 1.4 도 어긋난다(실측).
+    """
+    targets = cmds.parentConstraint(con, q=True, targetList=True) or []
+    ro = cmds.getAttr(con + ".constraintRotateOrder")
+    for i, t in enumerate(targets):
+        off = want_world * _world_matrix(t).inverse()
+        tr = om.MTransformationMatrix(off).translation(om.MSpace.kTransform)
+        cmds.setAttr("{0}.target[{1}].targetOffsetTranslate".format(con, i), tr.x, tr.y, tr.z)
+        cmds.setAttr("{0}.target[{1}].targetOffsetRotate".format(con, i),
+                     *_euler_degrees(off, ro))
+
+
+def _chain_children(joints):
+    """체인 조인트(끝 제외)의 자식 중 체인 밖 트랜스폼. 재정렬해도 월드 자리를 지킬 것들."""
+    chain = set(joints)
+    out = []
+    for j in joints[:-1]:
+        for c in (cmds.listRelatives(j, c=True, f=True, type="transform") or []):
+            if c in chain:
+                continue
+            if cmds.objectType(c, isAType="ikEffector") or cmds.objectType(c, isAType="constraint"):
+                continue
+            out.append((c, world_pos(c), world_rot(c)))
+    return out
+
+
+def _x_sign(joint, child):
+    """지금 X 가 자식 쪽이면 +1, 반대쪽이면 -1.
+
+    케이지의 **오른팔 체인은 -X 가 뼈를 따라간다**(자식 translateX = -22.906, 미러 규약).
+    "X 를 다음 조인트로" 를 +X 로 강제하면 오른쪽 규약이 조용히 뒤집힌다 - 부호는 지킨다.
+    """
+    x = _row(_world_matrix(joint), 0)
+    bone = _mvec(world_pos(child)) - _mvec(world_pos(joint))
+    return -1.0 if x * bone < 0.0 else 1.0
+
+
+def _set_joint_world_rotation(joint, want, name, messages):
+    """조인트 월드 회전 = want(4x4, 평행이동 = 조인트 자리). 회전이 구동되면 그 구동을 고친다."""
+    driver = _rotate_driver(joint)
+    if driver is None:
+        _orient_joint_world(joint, _pure_rotation(want))
+        return True
+    if cmds.nodeType(driver) == "parentConstraint":
+        _refit_parent_constraint(driver, want)
+        messages.append("[Info] {0}: '{1}' is rotated by '{2}' - its target offsets were "
+                        "refitted.".format(name, _short(joint), _short(driver)))
+        return True
+    messages.append("[Warning] {0}: '{1}' rotation is driven by '{2}' - not re-oriented."
+                    .format(name, _short(joint), _short(driver)))
+    return False
+
+
+def _restore_children(kids, name, messages):
+    for c, t, r in kids:
+        try:
+            cmds.xform(c, ws=True, t=t)
+            cmds.xform(c, ws=True, ro=r)
+        except Exception:
+            pass
+        # xform 은 잠긴/구동 채널을 조용히 건너뛴다 - 되읽어 확인한다
+        if max(abs(x - y) for x, y in zip(world_pos(c), t)) > 1e-4:
+            messages.append("[Warning] {0}: child '{1}' could not be kept in place (its "
+                            "channels are locked or driven).".format(name, _short(c)))
+
+
+def _settle_twist(handle, joints, kids, name, messages):
+    """2조인트 체인: 뼈 둘레 회전은 **솔버가 정한다** - 그 답을 받아 rest 로 굳힌다.
+
+    중간 조인트가 없는 RP 체인은 "어느 축이 폴을 보는가" 를 솔버가 스스로 정한다
+    (실측 기본 -Y, twist 로만 바뀐다 - A00130 ik_axis). up 축 규칙으로 정하면 ankle · foot
+    에서 90 도 어긋났다(실측). 그래서 X 를 뼈에 맞춘 뒤 IK 를 잠깐 켜서 솔버의 회전을 읽고,
+    끄고 그 회전을 jointOrient 로 넣는다 - 폴이 먼저, 체인이 따라간다.
+    """
+    plug = handle + ".ikBlend"
+    if not _writable(plug):
+        messages.append("[Warning] {0}: ikBlend is driven - could not read the solver's twist, "
+                        "the root may turn about the bone when IK comes back.".format(name))
+        return False
+    effector = end_effector(handle)
+    if effector:
+        _set_world_position(handle, world_pos(effector))
+    end_rot = _pure_rotation(_world_matrix(joints[-1]))
+    # 마지막에 IK 를 켤 때와 **같은 조건**으로 읽는다 - 솔버는 preferred angle 포즈로 평면을
+    # 잡으므로, 안 맞추면 Match 가 남긴 옛 pa 로 풀어 최종 결과와 90 도 달랐다(실측 Wrist_xx_hdl).
+    for j in joints:
+        try:
+            cmds.joint(j, e=True, setPreferredAngles=True)
+        except Exception:
+            pass
+    old = cmds.getAttr(plug)
+    cmds.setAttr(plug, 1.0)
+    for n in [handle] + joints:
+        _flush(n)
+    solved = _world_matrix(joints[0])
+    cmds.setAttr(plug, old)
+    _flush(joints[0])
+    _set_joint_world_rotation(joints[0], solved, name, messages)
+    _orient_joint_world(joints[-1], end_rot)
+    _restore_children(kids, name, messages)
+    return True
+
+
+def fit_to_pole_plane(handle, messages, reorient=True):
+    """PV_MODE_KEEP 의 본체. offset 은 건드리지 않고 체인을 폴 평면에 맞춘다.
+
+    IK 가 꺼진 상태에서 부른다. 반환: `{"moved": [..], "mirrored": n, "lengths": [..]}`
+    또는 맞출 수 없으면 None(메시지에 이유).
+    """
+    name = _short(handle)
+    solver = handle_solver(handle)
+    joints = chain_joints(handle)
+    if solver not in RP_LIKE_SOLVERS or len(joints) < 2:
+        return None
+
+    plane = pole_plane(handle, joints)
+    if plane is None:
+        messages.append("[Warning] {0}: the pole vector lies on the chain axis - no pole plane, "
+                        "chain left as it is.".format(name))
+        return None
+    a, side, n = plane
+
+    for j in joints[1:-1]:
+        if not _writable(j + ".translate"):
+            messages.append("[Warning] {0}: '{1}' translate is locked or driven - cannot put it "
+                            "on the pole plane, chain left as it is.".format(name, _short(j)))
+            return None
+
+    p = [_mvec(world_pos(j)) for j in joints]
+    new_p = [p[0]]
+    moved, mirrored = [], 0
+    for i in range(1, len(p) - 1):
+        d = p[i] - p[0]
+        q = d - n * (d * n)                 # 평면에 수직 투영
+        along = a * (q * a)
+        perp = q - along
+        if perp.length() < 1e-7:
+            messages.append("[Warning] {0}: '{1}' lies on the chain axis - the chain is straight "
+                            "and cannot bend toward the pole.".format(name, _short(joints[i])))
+        elif perp * side < 0.0:
+            perp = -perp                    # 폴 반대편 -> 축에 대해 거울 반사
+            mirrored += 1
+            messages.append("[Info] {0}: '{1}' was on the far side of the pole - mirrored to the "
+                            "pole side.".format(name, _short(joints[i])))
+        new_p.append(p[0] + along + perp)
+        moved.append((new_p[-1] - p[i]).length())
+    new_p.append(p[-1])
+
+    end_rot = _pure_rotation(_world_matrix(joints[-1]))
+    kids = _chain_children(joints)
+
+    # up 축 · X 부호는 옮기기 **전** 방향으로 정한다 (지금 월드 +Y 를 더 향한 축, 지금 규약)
+    ups = [pick_up_axis(j, n) for j in joints[:-1]] if reorient else []
+    signs = [_x_sign(joints[i], joints[i + 1]) for i in range(len(joints) - 1)] if reorient else []
+
+    fit = {"handle": handle, "name": name, "joints": joints, "new_p": new_p, "ups": ups,
+           "signs": signs, "end_rot": end_rot, "kids": kids, "reorient": reorient,
+           "moved": moved, "mirrored": mirrored,
+           "lengths": [(new_p[i + 1] - new_p[i]).length() for i in range(len(new_p) - 1)]}
+    settled = place_fit(fit, messages)
+
+    if settled:
+        messages.append("[Info] {0}: X aimed at the next joint, the turn about the bone taken "
+                        "from the solver (two-joint chain).".format(name))
+    elif reorient:
+        axis_note = ", ".join("{0} {1}X / up {2}".format(_short(joints[i]),
+                                                         "-" if signs[i] < 0 else "+",
+                                                         "YZ"[ups[i][0] - 1])
+                              for i in range(len(ups)))
+        messages.append("[Info] {0}: re-oriented X to the next joint, up axis toward the pole "
+                        "plane normal ({1}).".format(name, axis_note))
+    if moved:
+        messages.append("[OK] {0}: mid joint(s) fitted to the pole plane - moved {1}.".format(
+            name, ", ".join("{0:.4f}".format(m) for m in moved)))
+    return fit
+
+
+def place_fit(fit, messages):
+    """fit_to_pole_plane 이 계산한 **월드 목표**대로 체인을 놓는다. 2조인트면 twist 를 굳혔나.
+
+    계산과 놓기를 나눈 까닭: 호출하는 쪽이 IK 를 켜기 전에 리그 값을 바꿀 수 있다 -
+    A00130 은 바뀐 뼈 길이를 옵션 컨트롤러(스트레치 휴지 길이)에 쓰는데, 그러면 스트레치가
+    풀려 조인트 스케일이 바뀌고 체인이 줄어든다(실측: 1.206 -> 1, wrist 6.26 이탈).
+    같은 월드 목표로 **한 번 더 놓으면** 그 변화가 지워진다. 같은 목표로 다시 놓는 것은
+    아무것도 바꾸지 않는다(멱등).
+    """
+    handle, name, joints = fit["handle"], fit["name"], fit["joints"]
+    new_p, ups, signs = fit["new_p"], fit["ups"], fit["signs"]
+
+    for i in range(len(joints) - 1):
+        j = joints[i]
+        if i > 0:
+            _set_local_translate(j, new_p[i])
+        if not fit["reorient"]:
+            continue
+        index, up_dir, _why = ups[i]
+        bone = (new_p[i + 1] - new_p[i]) * signs[i]
+        _set_joint_world_rotation(j, _frame(bone, index, up_dir, origin=new_p[i]), name, messages)
+
+    # 끝 조인트: 부모가 돌아도 월드 자리 · 회전을 지킨다 (2조인트 체인도 - 루트가 돌면 옮겨진다)
+    blocked = _set_local_translate(joints[-1], new_p[-1])
+    if blocked:
+        messages.append("[Info] {0}: end joint '{1}' {2} is driven by the rig - left to it."
+                        .format(name, _short(joints[-1]), "/".join(blocked)))
+    _orient_joint_world(joints[-1], fit["end_rot"])
+    _restore_children(fit["kids"], name, messages)
+
+    settled = False
+    if fit["reorient"] and len(joints) == 2:
+        settled = _settle_twist(handle, joints, fit["kids"], name, messages)
+
+    con = pole_vector_constraint(handle)
+    if con and _writable(con + ".restTranslate"):
+        cmds.setAttr(con + ".restTranslate", *cmds.getAttr(con + ".constraintTranslate")[0])
+    return settled
+
+
+def _chain_depth(handle):
+    joints = chain_joints(handle)
+    return len(joints[0].split("|")) if joints else 0
+
+
+# =========================
 # 핸들 스냅
 # =========================
 
@@ -803,7 +1185,7 @@ def _update_one(handle, snap_mode, pv_mode, set_preferred, messages):
     반환 : 편집된 포즈 (측정용)
     """
     joints = chain_joints(handle)
-    edited = [(world_pos(j), world_rot(j)) for j in joints]
+    edited = [(world_pos(j), world_rot(j), _world_quat(j)) for j in joints]
 
     effector = end_effector(handle)
     if effector:
@@ -812,7 +1194,8 @@ def _update_one(handle, snap_mode, pv_mode, set_preferred, messages):
         messages.append("[Warning] {0}: no end effector - cannot snap the handle.".format(
             _short(handle)))
 
-    _apply_pole_vector(handle, joints, {}, pv_mode, messages)
+    if pv_mode != PV_MODE_KEEP:
+        _apply_pole_vector(handle, joints, {}, pv_mode, messages)
 
     if set_preferred:
         for j in joints:
@@ -826,8 +1209,22 @@ def _update_one(handle, snap_mode, pv_mode, set_preferred, messages):
     return joints, edited
 
 
+def _world_quat(node):
+    return om.MTransformationMatrix(_pure_rotation(_world_matrix(node))).rotation(asQuaternion=True)
+
+
+def _angle_deg(q1, q2):
+    """두 방향 사이의 실제 각도(0~180). 오일러 세 값을 따로 빼면 같은 방향도
+    (180, a, 180) / (0, 180-a, 0) 처럼 표기만 달라 90 · 270 · 356 도로 나온다(실측, v03.13)."""
+    d = abs(q1.x * q2.x + q1.y * q2.y + q1.z * q2.z + q1.w * q2.w)
+    return math.degrees(2.0 * math.acos(min(1.0, d)))
+
+
 def _measure(handle, joints, edited, messages):
-    """IK 를 되켠 뒤 편집한 포즈와 얼마나 다른지 실측해 보고한다."""
+    """IK 를 되켠 뒤 편집한 포즈와 얼마나 다른지 실측해 보고한다.
+
+    회전은 두 방향 사이의 **각도**로 잰다(v03.13 - 전에는 오일러 성분 차라 표기 차이가 섞였다).
+    """
     _flush(handle)
     for j in joints:
         _flush(j)
@@ -837,9 +1234,12 @@ def _measure(handle, joints, edited, messages):
     for i, j in enumerate(joints):
         if not cmds.objExists(j):
             continue
-        wt, wr = world_pos(j), world_rot(j)
+        wt = world_pos(j)
         dev_t = max(dev_t, max(abs(a - b) for a, b in zip(wt, edited[i][0])))
-        dev_r = max(dev_r, max(abs(a - b) for a, b in zip(wr, edited[i][1])))
+        if len(edited[i]) > 2:
+            dev_r = max(dev_r, _angle_deg(_world_quat(j), edited[i][2]))
+        else:
+            dev_r = max(dev_r, max(abs(a - b) for a, b in zip(world_rot(j), edited[i][1])))
 
     messages.append(
         "[Result] {0}: max deviation from the edited pose - position {1:.6f}, "
@@ -847,12 +1247,68 @@ def _measure(handle, joints, edited, messages):
     return dev_t, dev_r
 
 
-def end_edit(handles, snap_mode=SNAP_HANDLE, pv_mode=PV_MODE_OFFSET, set_preferred=True):
-    """편집을 확정한다. 핸들과 폴 벡터를 편집된 체인에 맞추고 IK 를 되켠다."""
+def _pv_offsets(handles):
+    out = {}
+    for h in handles:
+        con = pole_vector_constraint(h) if cmds.objExists(h) else None
+        if con:
+            out[h] = list(cmds.getAttr(con + ".offset")[0])
+    return out
+
+
+def _fit_all(handles, reorient, messages, fits_out, after_fit=None):
+    """PV_MODE_KEEP: 스냅 전에 체인을 전부 폴 평면에 맞춘다.
+
+    **부모 체인 먼저.** Drv 체인처럼 다른 체인 안에 든 체인은 바깥 체인을 맞춘 뒤(그 자식으로서
+    월드 자리가 지켜진 뒤) 맞춰야 한다. 또 바깥 체인의 중간 조인트가 옮겨지면 그것을 따라가는
+    폴 타깃(예: elbow 타깃)도 옮겨지므로, 안쪽 체인의 폴 평면은 그 뒤에 읽어야 맞다.
+
+    `after_fit(fits)` 를 주면 맞춘 **직후, IK 를 켜기 전에** 부른다(돌려준 메시지는 로그로).
+    그 안에서 리그 값(스트레치 길이 등)이 바뀌어 체인이 흔들릴 수 있으므로, 부른 뒤 같은
+    월드 목표로 **다시 놓는다**(place_fit).
+    """
+    fits = {}
+    order = sorted(handles, key=_chain_depth)
+    for h in order:
+        fit = fit_to_pole_plane(h, messages, reorient=reorient)
+        if fit is not None:
+            fits[h] = fit
+    if after_fit is not None and fits:
+        messages.extend(after_fit(fits) or [])
+        again = []
+        for h in order:
+            if h in fits:
+                place_fit(fits[h], again)
+        messages.extend(m for m in again if "[Warning]" in m and m not in messages)
+    if fits_out is not None:
+        fits_out.update(fits)
+
+
+def _report_offsets(before, messages):
+    for h, old in before.items():
+        con = pole_vector_constraint(h)
+        new = list(cmds.getAttr(con + ".offset")[0]) if con else old
+        if max(abs(x - y) for x, y in zip(old, new)) < 1e-9:
+            messages.append("[OK] {0}: pole vector offset kept ({1:.4f}, {2:.4f}, {3:.4f}).".format(
+                _short(h), old[0], old[1], old[2]))
+        else:
+            messages.append("[Warning] {0}: pole vector offset changed ({1} -> {2}).".format(
+                _short(h), old, new))
+
+
+def end_edit(handles, snap_mode=SNAP_HANDLE, pv_mode=PV_MODE_KEEP, set_preferred=True,
+             reorient=True, fits_out=None, after_fit=None):
+    """편집을 확정한다. 핸들과 폴 벡터를 편집된 체인에 맞추고 IK 를 되켠다.
+
+    `pv_mode=PV_MODE_KEEP`(기본)이면 폴 벡터는 그대로 두고 체인을 폴 평면에 맞춘다.
+    `fits_out` 에 dict 를 넘기면 핸들별 맞춤 결과(옮긴 거리 · 새 뼈 길이)를 채워 준다.
+    `after_fit(fits)` 는 맞춘 뒤 IK 를 켜기 전에 불린다(_fit_all).
+    """
     messages = []
     results = []
 
     with undo_chunk():
+        live = []
         for h in handles:
             if not cmds.objExists(h):
                 messages.append("[Warning] '{0}' no longer exists.".format(_short(h)))
@@ -860,21 +1316,44 @@ def end_edit(handles, snap_mode=SNAP_HANDLE, pv_mode=PV_MODE_OFFSET, set_preferr
             if not is_editing(h):
                 messages.append("[Warning] '{0}' is not in edit mode.".format(_short(h)))
                 continue
+            live.append(h)
 
+        if pv_mode != PV_MODE_KEEP:
+            # 옛 두 모드 - v03.12 까지와 같은 순서 그대로
+            for h in live:
+                data = _read_data(h)
+                joints, edited = _update_one(h, snap_mode, pv_mode, set_preferred, messages)
+                _restore_ik(h, data)
+                dev_t, dev_r = _measure(h, joints, edited, messages)
+                _clear_state(h)
+                results.append((h, dev_t, dev_r))
+            return results, messages
+
+        offsets = _pv_offsets(live)
+        _fit_all(live, reorient, messages, fits_out, after_fit)
+
+        # 스냅 · preferred angle 은 **전부** 끝낸 뒤 IK 를 켠다 - 하나씩 켜면 먼저 켠
+        # 바깥 체인의 솔버가 아직 안 끝난 안쪽 체인의 부모를 움직인다.
+        pending = []
+        for h in live:
             data = _read_data(h)
-
             joints, edited = _update_one(h, snap_mode, pv_mode, set_preferred, messages)
+            pending.append((h, data, joints, edited))
 
+        for h, data, _joints, _edited in pending:
             _restore_ik(h, data)
+        for h, _data, joints, edited in pending:
             dev_t, dev_r = _measure(h, joints, edited, messages)
-
             _clear_state(h)
             results.append((h, dev_t, dev_r))
+
+        _report_offsets(offsets, messages)
 
     return results, messages
 
 
-def update_now(handles, snap_mode=SNAP_HANDLE, pv_mode=PV_MODE_OFFSET, set_preferred=True):
+def update_now(handles, snap_mode=SNAP_HANDLE, pv_mode=PV_MODE_KEEP, set_preferred=True,
+               reorient=True, fits_out=None, after_fit=None):
     """편집 세션 없이 지금 상태로 한 번 맞춘다 (마야 컨스트레인트의 Update 버튼에 대응).
 
     이미 IK 를 끄고 체인을 고쳐 둔 상황에서 쓴다. 편집 상태 표시는 만들지도 지우지도 않는다.
@@ -883,6 +1362,7 @@ def update_now(handles, snap_mode=SNAP_HANDLE, pv_mode=PV_MODE_OFFSET, set_prefe
     results = []
 
     with undo_chunk():
+        live = []
         for h in handles:
             if not cmds.objExists(h):
                 messages.append("[Warning] '{0}' no longer exists.".format(_short(h)))
@@ -893,16 +1373,38 @@ def update_now(handles, snap_mode=SNAP_HANDLE, pv_mode=PV_MODE_OFFSET, set_prefe
                 for b in info["blockers"]:
                     messages.append("[Warning] {0}: {1}".format(_short(h), b))
                 continue
+            live.append(h)
 
-            temp = {}
-            note = _disable_ik(h, temp)
-            messages.append("[Info] " + note)
+        if pv_mode != PV_MODE_KEEP:
+            for h in live:
+                temp = {}
+                note = _disable_ik(h, temp)
+                messages.append("[Info] " + note)
 
+                joints, edited = _update_one(h, snap_mode, pv_mode, set_preferred, messages)
+
+                _restore_ik(h, temp)
+                dev_t, dev_r = _measure(h, joints, edited, messages)
+                results.append((h, dev_t, dev_r))
+            return results, messages
+
+        # 새 모드: end_edit 과 같은 순서 (전부 끄고 -> 부모부터 맞추고 -> 스냅 -> 전부 켠다)
+        temps = {}
+        for h in live:
+            temps[h] = {}
+            messages.append("[Info] " + _disable_ik(h, temps[h]))
+        offsets = _pv_offsets(live)
+        _fit_all(live, reorient, messages, fits_out, after_fit)
+        pending = []
+        for h in live:
             joints, edited = _update_one(h, snap_mode, pv_mode, set_preferred, messages)
-
-            _restore_ik(h, temp)
+            pending.append((h, joints, edited))
+        for h in live:
+            _restore_ik(h, temps[h])
+        for h, joints, edited in pending:
             dev_t, dev_r = _measure(h, joints, edited, messages)
             results.append((h, dev_t, dev_r))
+        _report_offsets(offsets, messages)
 
     return results, messages
 

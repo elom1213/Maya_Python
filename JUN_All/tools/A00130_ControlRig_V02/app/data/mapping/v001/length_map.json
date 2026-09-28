@@ -21,7 +21,13 @@
     "             The default since v02.22.",
     "             'straight' = distance from the first joint to the last one,",
     "             ignoring the bend. This is what V01 did.",
-    "             They differ by ~3.4% at a 30 degree bend (plan 3-1)."
+    "             They differ by ~3.4% at a 30 degree bend (plan 3-1).",
+    "",
+    "ik_handle (v02.28) : the ikHandle whose chain is this part. When Match turns",
+    "IK off and back on it fits that chain to the pole plane (the pole vector",
+    "offset is kept), which changes the bone lengths - so right after that Match",
+    "writes the IK CHAIN lengths onto the same attributes. Write Length on the",
+    "Length tab still measures the template joints."
   ],
 
   "option_ctl": "CH_n_OptionAll_xx_ctl",
@@ -31,22 +37,26 @@
     {
       "part": "Arm_L",
       "chain": ["helper_upperarm_l", "helper_lowerarm_l", "helper_hand_l"],
-      "attrs": { "total": "Arm_L", "upper": "arm_l_up", "lower": "arm_l_low" }
+      "attrs": { "total": "Arm_L", "upper": "arm_l_up", "lower": "arm_l_low" },
+      "ik_handle": "CH_l_UpperArm_xx_ikjnt_ikHandle"
     },
     {
       "part": "Arm_R",
       "chain": ["helper_upperarm_r", "helper_lowerarm_r", "helper_hand_r"],
-      "attrs": { "total": "Arm_r", "upper": "arm_r_up", "lower": "arm_r_low" }
+      "attrs": { "total": "Arm_r", "upper": "arm_r_up", "lower": "arm_r_low" },
+      "ik_handle": "CH_r_UpperArm_xx_ikjnt_ikHandle"
     },
     {
       "part": "Leg_L",
       "chain": ["helper_thigh_l", "helper_calf_l", "helper_foot_l"],
-      "attrs": { "total": "Leg_L", "upper": "leg_l_up", "lower": "leg_l_low" }
+      "attrs": { "total": "Leg_L", "upper": "leg_l_up", "lower": "leg_l_low" },
+      "ik_handle": "CH_l_leg_ikjnt_ikHandle"
     },
     {
       "part": "Leg_R",
       "chain": ["helper_thigh_r", "helper_calf_r", "helper_foot_r"],
-      "attrs": { "total": "Leg_R", "upper": "leg_r_up", "lower": "leg_r_low" }
+      "attrs": { "total": "Leg_R", "upper": "leg_r_up", "lower": "leg_r_low" },
+      "ik_handle": "CH_r_leg_ikjnt_ikHandle"
     }
   ]
 }

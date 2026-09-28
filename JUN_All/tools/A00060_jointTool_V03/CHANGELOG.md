@@ -3,6 +3,28 @@
 `A00060_jointTool_V02` 를 복제해 갈라낸 **탭 재분류판**이다.
 아래 `v01.xx` 항목은 갈라 나오기 전 V02 의 이력이다.
 
+## v03.13 (2026-09-28)
+**[Add] `Chain > IK Edit` — Pole vector `Keep offset - fit the chain to the pole plane` (새 기본).**
+계획서: `JUN_All/docs/plans/A00060_A00130_ik_edit_keep_pv_offset_plan.md`
+
+- poleVectorConstraint 의 **offset 을 바꾸지 않는다.** 폴 타깃이 평면을 정하고 체인이 따라간다 —
+  중간 조인트 전부를 폴 평면에 수직 투영(폴 반대편이면 축에 대해 거울 반사), 끝 조인트는 제자리.
+- `Re-orient joints to the new bones`(기본 ON): X → 다음 조인트(−X 규약 체인은 −X 유지),
+  Y · Z 중 지금 월드 +Y 를 더 향한 축을 평면 법선 쪽으로(뼈가 거의 수직이면 지금 법선에 가까운 축).
+  회전이 parentConstraint 로 구동되면 그 타깃 offset 을 다시 굳힌다(`constraintRotateOrder` 로).
+- 2조인트 체인은 X 만 맞추고 뼈 둘레 회전은 솔버의 답을 받아 굳힌다(preferred angle 을 먼저 맞춘 뒤).
+- 여러 핸들은 **부모 체인부터** 맞추고 IK 는 전부 맞춘 뒤 한꺼번에 켠다. `restTranslate` ← `constraintTranslate`.
+- 코어 API: `end_edit` / `update_now` 에 `reorient` · `fits_out` · `after_fit`(IK 를 켜기 전 콜백 — 부른 뒤 같은
+  월드 목표로 다시 놓는다). 옛 두 모드(`Constraint offset` · `Move the pole vector target`)는 순서까지 그대로.
+
+**[Fix] 편차 보고 — 회전을 두 방향 사이 각도로 잰다.** 오일러 세 값의 차로 재서 같은 방향이 90 · 270 · 356° 로
+보고되던 것.
+
+- 검증(mayapy 2024): 합성 체인 32항목(옛 두 모드 회귀 · twist · 기존 offset · 반대편 · 4조인트 · 직접 poleVector ·
+  SC · 레퍼런스 · undo · 취소 · update_now) + 실제 케이지 D01 16개(로컬 · 레퍼런스 · 반대편 · 재오픈, offset 불변 ·
+  편차 ≤ 3.4e-6°) + 오프스크린 UI(기본 모드 · 체크박스 활성 · 토글 · undo).
+  합성 레퍼런스 장면의 저장→재오픈 1항목은 옛 모드에서도 똑같이 어긋나 이번 변경과 무관(실제 케이지 레퍼런스는 ≤ 0.00004).
+
 ## v03.12 (2026-09-22)
 **[Add] `Create > From Curve` 에 `By Count` — 개수를 정해 커브를 따라 조인트를 만든다.**
 

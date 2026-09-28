@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-17
+# last Update date : 2026-09-28
 # A00130_ControlRig_V02 - Qt UI
 #
 # 계획서: docs/plans/A00130_ControlRig_V02_plan.md
@@ -63,6 +63,12 @@ from tools.A00130_ControlRig_V02.app.core import scene_utils as su
 
 
 WINDOW_OBJECT_NAME = "JUN_A00130_ControlRig_V02_window"
+
+# Match 의 IK 세션을 닫는 방법 (v02.28). 첫 항목이 기본.
+_IK_PV_MODES = [
+    ("Keep pole vector offset - fit the chains (writes lengths)", ik_session.PV_MODE_KEEP),
+    ("Update offset - chains stay as matched (v02.27)", ik_session.PV_MODE_OFFSET),
+]
 
 # Check Position 결과 글자색 (Status 칸). 어두운 테마 위에서 읽히는 밝은 초록 / 빨강.
 # 검사하지 못한 행(세트 없음 등)은 색을 입히지 않는다 - OK 도 문제도 아니다.
@@ -293,6 +299,28 @@ class MainWindow(QWidget):
             "'twist' adjusted so the axis the rig wants is the one pointing at the pole\n"
             "target. twist is saved with the file, so a reference keeps the same axis.")
         ik_layout.addWidget(self.chk_ik_session)
+
+        # v02.28 - 세션을 닫는 방법. 새 방식(offset 유지)이 기본, 옛 방식도 고를 수 있다
+        self.cmb_ik_pv = QComboBox()
+        for label, _mode in _IK_PV_MODES:
+            self.cmb_ik_pv.addItem(label)
+        self.cmb_ik_pv.setToolTip(
+            "How the chains and their pole vectors are made to agree when IK comes back.\n"
+            "\n"
+            "Keep pole vector offset (default) : the poleVectorConstraint offsets are\n"
+            "  not touched. The pole targets (moved by their cage sets) decide each\n"
+            "  plane and the chain goes to it - mid joints are projected onto the plane,\n"
+            "  X aims at the next joint, the up axis turns to the plane normal.\n"
+            "  The bone lengths change, so the new IK chain lengths are written onto the\n"
+            "  option controller (the same attributes as the Length tab) before IK comes\n"
+            "  back - otherwise the stretch would start at the old length.\n"
+            "Update offset (v02.27) : the chain stays exactly as matched and the offsets\n"
+            "  are re-derived from it. Lengths are not written.")
+        pv_row = QHBoxLayout()
+        pv_row.addWidget(QLabel("On close"))
+        pv_row.addWidget(self.cmb_ik_pv, 1)
+        ik_layout.addLayout(pv_row)
+        self.chk_ik_session.toggled.connect(self.cmb_ik_pv.setEnabled)
 
         self.lbl_ik_set = QLabel("")
         self.lbl_ik_set.setWordWrap(True)
@@ -882,11 +910,16 @@ class MainWindow(QWidget):
         if use_ik:
             ik_handles, _set_node = self._ik_handles(log_messages=True)
 
+        pv_mode = _IK_PV_MODES[self.cmb_ik_pv.currentIndex()][1]
         _results, messages = match_manager.apply(
             rows, ik_handles=ik_handles, auto_ik=use_ik,
-            axis_doc=self.ik_axis_doc, namespace=self._namespace())
+            axis_doc=self.ik_axis_doc, namespace=self._namespace(),
+            pv_mode=pv_mode, length_doc=self.length_doc,
+            length_mode=self.cmb_total_mode.currentText(),
+            option_ctl_override=self.option_ctl_override)
         self._log_all(messages)
         self._refresh_plan()
+        self._refresh_length()      # Keep 모드면 옵션 컨트롤러 길이가 바뀌었다
 
     # --------------------------------------------------------------
     # Length

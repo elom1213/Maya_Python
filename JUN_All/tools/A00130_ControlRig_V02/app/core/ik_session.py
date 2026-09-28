@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-28
+# last Update date : 2026-09-28
 # A00130_ControlRig_V02 - IK 편집 세션 : Match 앞뒤로 IK 를 껐다 켠다.
 #
 # 계획서 Phase 4 · 7-4.
@@ -306,14 +306,30 @@ def begin(handles):
     return session, messages
 
 
-def end(session):
-    """핸들과 폴 벡터를 편집된 체인에 맞추고 IK 를 되켠다. `(results, messages)`."""
+#: IK 세션을 닫는 방법 (v02.28). 기본은 폴 벡터 offset 을 지키고 체인을 폴 평면에 맞춘다.
+PV_MODE_KEEP = ike.PV_MODE_KEEP
+PV_MODE_OFFSET = ike.PV_MODE_OFFSET
+
+
+def end(session, pv_mode=PV_MODE_KEEP, fits_out=None, after_fit=None):
+    """핸들을 편집된 체인에 맞추고 IK 를 되켠다. `(results, messages)`.
+
+    `pv_mode`
+      - `PV_MODE_KEEP`(기본, v02.28) : poleVectorConstraint 의 **offset 을 안 바꾼다.**
+        폴 타깃(매칭 세트가 옮긴 자리)이 평면을 정하고, 체인이 그 평면으로 간다 -
+        중간 조인트를 평면에 투영, 뼈 축 재정렬. 뼈 길이가 바뀐다.
+      - `PV_MODE_OFFSET`(v02.27 까지) : 체인이 정답, offset 을 역산해 바꾼다.
+
+    `fits_out` 에 dict 를 주면 핸들별 맞춤 결과를 채운다.
+    `after_fit(fits)` 는 체인을 맞춘 뒤 **IK 를 켜기 전에** 불린다 - Match 가 여기서 길이를 쓴다.
+    """
     messages = []
     handles = (session or {}).get("handles") or []
     if not handles:
         return [], messages
 
-    results, msgs = ike.end_edit(handles)
+    results, msgs = ike.end_edit(handles, pv_mode=pv_mode, fits_out=fits_out,
+                                 after_fit=after_fit)
     messages.extend("[IK] " + m for m in msgs)
 
     # 스냅이 끝난 뒤에 되켠다 (위 _snap_off 주석)
@@ -321,10 +337,11 @@ def end(session):
 
     worst_t = max([r[1] for r in results] or [0.0])
     worst_r = max([r[2] for r in results] or [0.0])
+    how = ("chains fitted to the pole planes, pole vector offsets kept"
+           if pv_mode == PV_MODE_KEEP else "handles and pole vectors follow the chain")
     messages.append(
-        "[OK] IK edit mode OFF for {0} handle(s) - handles and pole vectors follow the "
-        "chain (worst deviation {1:.4f} / {2:.4f} deg).".format(
-            len(results), worst_t, worst_r))
+        "[OK] IK edit mode OFF for {0} handle(s) - {1} (worst deviation {2:.4f} / "
+        "{3:.4f} deg).".format(len(results), how, worst_t, worst_r))
     return results, messages
 
 

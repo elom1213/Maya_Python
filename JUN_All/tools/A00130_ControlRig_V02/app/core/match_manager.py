@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-17
+# last Update date : 2026-09-28
 # A00130_ControlRig_V02 - Match : 케이지 세트의 원소를 짝인 템플릿 조인트에 맞춘다.
 #
 # 계획서 Phase 1 (최소 기능).
@@ -48,6 +48,7 @@ from Framework.core.maya_undo import undo_chunk
 
 from . import ik_axis_manager
 from . import ik_session
+from . import length_manager
 from . import scene_utils as su
 
 
@@ -217,7 +218,9 @@ def _run_ops(ops):
     return messages
 
 
-def apply(rows, ik_handles=None, auto_ik=True, axis_doc=None, namespace=None):
+def apply(rows, ik_handles=None, auto_ik=True, axis_doc=None, namespace=None,
+          pv_mode=ik_session.PV_MODE_KEEP, length_doc=None, length_mode=None,
+          option_ctl_override=None):
     """계산된 행대로 실제로 맞춘다. `(results, messages)`.
 
     전체가 **undo 한 스텝**이다.
@@ -241,6 +244,15 @@ def apply(rows, ik_handles=None, auto_ik=True, axis_doc=None, namespace=None):
 
     매칭 도중 예외가 나면 **편집을 취소해 체인을 원래대로 돌리고** IK 를 되켠 뒤 예외를
     다시 올린다 — 반쯤 매칭된 체인에 IK 가 다시 붙는 것이 제일 나쁘다.
+
+    `pv_mode`(v02.28) — 세션을 닫는 방법. 기본 `PV_MODE_KEEP` 은 폴 벡터 offset 을 지키고
+    체인을 폴 평면에 맞춘다(`ik_session.end`). 그러면 뼈 길이가 바뀌므로 `length_doc` 을
+    주면 **맞춘 체인의 길이**를 옵션 컨트롤러에 쓴다 — 스트레치의 휴지 길이가 옛 길이로
+    남으면 스트레치가 너무 일찍/늦게 켜진다.
+
+    ★ 길이는 **IK 를 켜기 전에** 쓴다(`after_fit`). 매칭 중에는 옛 휴지 길이 때문에
+    스트레치가 켜져 있다(실측 1.206). IK 를 켠 뒤 쓰면 스트레치가 풀리며 체인이 줄어든다
+    (wrist 가 템플릿에서 6.26 벗어났다). 쓴 뒤에는 A00060 이 같은 월드 목표로 다시 놓는다.
     """
     messages = []
     results = {
@@ -371,9 +383,17 @@ def apply(rows, ik_handles=None, auto_ik=True, axis_doc=None, namespace=None):
                 messages.extend(ik_session.cancel(session))
             raise
 
-        # ---- IK 편집 모드 종료 (핸들 스냅 + 폴 벡터 역산) ----
+        # ---- IK 편집 모드 종료 (핸들 스냅 + 체인을 폴 평면에 / 폴 벡터 역산) ----
+        # 맞춘 IK 체인 길이를 옵션 컨트롤러에 - IK 를 켜기 전에 (v02.28, 위 주석)
+        after_fit = None
+        if pv_mode == ik_session.PV_MODE_KEEP and length_doc and                 (length_doc.get("measures") or []):
+            def after_fit(fits):
+                return _write_ik_lengths(
+                    length_doc, namespace if namespace is not None else su.NO_NAMESPACE,
+                    length_mode, option_ctl_override, list(fits))
+
         if session:
-            _ik_results, ik_msgs = ik_session.end(session)
+            _ik_results, ik_msgs = ik_session.end(session, pv_mode=pv_mode, after_fit=after_fit)
             messages.extend(ik_msgs)
 
         # ---- IK 축 맞추기 (세션이 끝난 뒤라야 잰 각도가 뜻을 갖는다) ----
@@ -399,6 +419,22 @@ def apply(rows, ik_handles=None, auto_ik=True, axis_doc=None, namespace=None):
             "locked - moving the rest would half-move the object. Unlock them or "
             "lock the whole group.".format(results["half"]))
     return results, messages
+
+
+def _write_ik_lengths(length_doc, namespace, length_mode, override, handles):
+    """IK 세션이 맞춘 체인의 뼈 길이를 Length 와 같은 어트리뷰트에 쓴다. messages."""
+    messages = []
+    rows, plan_msgs = length_manager.plan(
+        length_doc, namespace, length_mode, override=override,
+        source=length_manager.SOURCE_IK, handles=handles)
+    messages.extend(plan_msgs)
+    if not rows:
+        messages.append("[Info] Length: no fitted IK chain has a length entry - nothing "
+                        "written.")
+        return messages
+    _results, write_msgs = length_manager.apply(rows)
+    messages.extend(write_msgs)
+    return messages
 
 
 def summarize(rows):

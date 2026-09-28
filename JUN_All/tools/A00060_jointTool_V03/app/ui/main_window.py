@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-18
+# last Update date : 2026-09-28
 # A00060_jointTool_V03 - Qt UI
 #
 # A00060_jointTool_V02 의 **탭 재분류판**.
@@ -72,6 +72,7 @@ IK_EDIT_OFF_TEXT = "EDIT IK CHAIN"
 
 # 폴 벡터 갱신 방법 라벨 -> core 상수
 _PV_MODES = [
+    ("Keep offset - fit the chain to the pole plane", ike_mgr.PV_MODE_KEEP),       # v03.13 기본
     ("Constraint offset (keep the target where it is)", ike_mgr.PV_MODE_OFFSET),
     ("Move the pole vector target", ike_mgr.PV_MODE_TARGET),
 ]
@@ -960,7 +961,12 @@ class MainWindow(QWidget):
         for label, _ in _PV_MODES:
             self.cmb_ike_pv.addItem(label)
         self.cmb_ike_pv.setToolTip(
-            "How to point the pole vector at the edited chain plane.\n\n"
+            "How the chain and the pole vector are made to agree.\n\n"
+            "Keep offset (default) : the pole vector is NOT touched - its constraint\n"
+            "  offset stays exactly as it is. The pole target decides the plane and the\n"
+            "  chain goes to it: every mid joint is projected onto the pole plane\n"
+            "  (mirrored to the pole side if it was on the far side), so the bone\n"
+            "  lengths change. The end joint stays where you put it.\n"
             "Constraint offset : the constraint and its target stay exactly where they\n"
             "  are and only the offset is updated - the same idea as the Update Offset\n"
             "  button on a parent constraint in Maya 2024.\n"
@@ -968,6 +974,22 @@ class MainWindow(QWidget):
             "  chain plane and the offset is left at zero. Cleaner for a rig that\n"
             "  should carry no baked offsets, but it moves an animator's control.")
         opt_layout.addLayout(self._labeled("Pole vector", self.cmb_ike_pv))
+        self.cmb_ike_pv.currentIndexChanged.connect(self._on_ike_pv_changed)
+
+        # v03.13 - Keep offset 모드에서만 뜻이 있다
+        self.chk_ike_reorient = QCheckBox("Re-orient joints to the new bones")
+        self.chk_ike_reorient.setChecked(True)
+        self.chk_ike_reorient.setToolTip(
+            "Keep offset mode only.\n\n"
+            "X aims at the next joint (a chain whose -X runs down the bone, like a\n"
+            "mirrored right arm, keeps -X). Of Y and Z, the axis that points more toward\n"
+            "world +Y is turned to the pole plane normal. When the bone is near vertical\n"
+            "neither points up, so the axis already closest to the normal is used.\n"
+            "A two-joint chain has no mid joint - its turn about the bone is taken from\n"
+            "the solver so nothing moves when IK comes back.\n"
+            "A joint rotated by a parent constraint gets that constraint's offsets\n"
+            "refitted instead.")
+        opt_layout.addWidget(self.chk_ike_reorient)
 
         self.cmb_ike_snap = QComboBox()
         for label, _ in _SNAP_MODES:
@@ -994,9 +1016,10 @@ class MainWindow(QWidget):
         self.btn_ike_edit.setMinimumHeight(44)
         self.btn_ike_edit.setToolTip(
             "ON  : IK is switched off for this handle so the chain joints move freely.\n"
-            "OFF : the handle is snapped to the new end of the chain and the pole vector\n"
-            "      is re-derived from the edited chain plane, so the chain keeps exactly\n"
-            "      the shape you just gave it. The pole vector constraint is kept.\n"
+            "OFF : the handle is snapped to the new end of the chain. With Keep offset\n"
+            "      the chain is fitted to the pole plane and the pole vector is left\n"
+            "      alone; with the other two the pole vector is re-derived from the\n"
+            "      edited chain. The pole vector constraint is kept either way.\n"
             "Each press is a single undo step.")
         self.btn_ike_edit.clicked.connect(self.on_ike_edit_clicked)
         layout.addWidget(self.btn_ike_edit)
@@ -1151,6 +1174,9 @@ class MainWindow(QWidget):
     def _ike_pv_mode(self):
         return _PV_MODES[self.cmb_ike_pv.currentIndex()][1]
 
+    def _on_ike_pv_changed(self, _index=None):
+        self.chk_ike_reorient.setEnabled(self._ike_pv_mode() == ike_mgr.PV_MODE_KEEP)
+
     def _ike_snap_mode(self):
         return _SNAP_MODES[self.cmb_ike_snap.currentIndex()][1]
 
@@ -1245,7 +1271,8 @@ class MainWindow(QWidget):
                     editing,
                     snap_mode=self._ike_snap_mode(),
                     pv_mode=self._ike_pv_mode(),
-                    set_preferred=self.chk_ike_preferred.isChecked())
+                    set_preferred=self.chk_ike_preferred.isChecked(),
+                    reorient=self.chk_ike_reorient.isChecked())
                 self._log_all(messages)
             else:
                 self._log_all(ike_mgr.begin_edit(self.ike_targets))
@@ -1271,7 +1298,8 @@ class MainWindow(QWidget):
                 self.ike_targets,
                 snap_mode=self._ike_snap_mode(),
                 pv_mode=self._ike_pv_mode(),
-                set_preferred=self.chk_ike_preferred.isChecked())
+                set_preferred=self.chk_ike_preferred.isChecked(),
+                reorient=self.chk_ike_reorient.isChecked())
             self._log_all(messages)
         except Exception as e:
             self.log("[ERR] {0}".format(e))

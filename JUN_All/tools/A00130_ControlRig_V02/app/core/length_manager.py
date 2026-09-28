@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-28
+# last Update date : 2026-09-28
 # A00130_ControlRig_V02 - Length : 템플릿 조인트 사이 거리를 옵션 컨트롤러에 써 넣는다.
 #
 # 계획서: docs/plans/A00130_ControlRig_V02_length_plan.md
@@ -29,6 +29,8 @@ import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
 
+from tools.A00060_jointTool_V03.app.core import ik_edit_manager as ike
+
 from . import mapping_data
 from . import scene_utils as su
 
@@ -43,6 +45,13 @@ ST_ERROR = "error"
 
 #: 직선 거리와 마디 합이 이보다 더 벌어지면 "굽었다" 고 알린다 (비율)
 BEND_TOLERANCE = 0.005          # 0.5 %
+
+#: 무엇을 재나 (v02.28)
+SOURCE_TEMPLATE = "template"    # 템플릿 조인트 (Length 탭 - 지금까지)
+SOURCE_IK = "ik"                # measure 의 ik_handle 체인 (Match 가 IK 를 맞춘 뒤)
+
+#: 템플릿과 IK 체인 길이가 이보다 다르면 Length 탭에 알린다
+IK_DIFF_TOLERANCE = 1e-3
 
 
 # =========================
@@ -231,15 +240,39 @@ def _attr_status(plug, value):
     return ST_OK, ""
 
 
-def plan(doc, namespace, total_mode=None, option_ctl_node=None, override=None):
+def _ik_chain(measure, namespace):
+    """measure 의 ik_handle 이 움직이는 조인트 체인. `(handle 롱네임 또는 None, joints)`."""
+    name = measure.get("ik_handle")
+    if not name:
+        return None, []
+    node, _found = su.resolve(name, namespace)
+    if not node:
+        return None, []
+    node = (cmds.ls(node, long=True) or [node])[0]
+    try:
+        return node, ike.chain_joints(node)
+    except Exception:
+        return node, []
+
+
+def plan(doc, namespace, total_mode=None, option_ctl_node=None, override=None,
+         source=SOURCE_TEMPLATE, handles=None):
     """무엇을 어디에 얼마로 쓸지 계산한다. 씬은 **바꾸지 않는다**.
 
     `(rows, messages)` — 각 행은
         part · chain · values{role: 값} · attrs{role: 이름} · plugs{role: 플러그} ·
         status · note · bent
+
+    `source=SOURCE_IK` 면 템플릿 조인트 대신 measure 의 **ik_handle 체인**을 잰다(v02.28).
+    Match 의 IK 세션이 체인을 폴 평면에 맞추면 뼈 길이가 템플릿과 달라지는데, 스트레치는
+    이 값(휴지 길이)을 기준으로 켜지므로 IK 체인 길이를 써야 맞다(사용자 지정 2026-09-28).
+    `handles` 를 주면 그 핸들의 부위만 - 세션에 없던 체인은 건드리지 않는다.
     """
     messages = []
     rows = []
+
+    if handles is not None:
+        handles = {(cmds.ls(h, long=True) or [h])[0] for h in handles if cmds.objExists(h)}
 
     mode = total_mode or doc.get("total_mode") or mapping_data.TOTAL_DEFAULT
 
@@ -264,12 +297,22 @@ def plan(doc, namespace, total_mode=None, option_ctl_node=None, override=None):
 
         # --- 조인트를 푼다 (Match 와 같은 이름 해석) ---
         nodes, missing = [], []
-        for jname in measure["chain"]:
-            node, _found = su.resolve(jname, namespace)
-            if node:
-                nodes.append(node)
-            else:
-                missing.append(jname)
+        if source == SOURCE_IK:
+            handle, nodes = _ik_chain(measure, namespace)
+            if handles is not None and handle not in handles:
+                continue
+            if not measure.get("ik_handle"):
+                continue
+            if len(nodes) < 2:
+                missing.append(measure.get("ik_handle") + " chain")
+            row["chain"] = [su.short_name(n) for n in nodes]
+        else:
+            for jname in measure["chain"]:
+                node, _found = su.resolve(jname, namespace)
+                if node:
+                    nodes.append(node)
+                else:
+                    missing.append(jname)
 
         if missing:
             row["status"] = ST_NO_JOINT
@@ -294,6 +337,16 @@ def plan(doc, namespace, total_mode=None, option_ctl_node=None, override=None):
             if row["bent"] > BEND_TOLERANCE:
                 row["note"] = "bent - straight {0:.4g} vs sum {1:.4g}".format(
                     straight, total_sum)
+
+        # 템플릿으로 재는데 IK 체인 길이가 다르면 알린다 - Match 가 IK 체인 길이를 써 두었을
+        # 수 있고, 여기서 쓰면 그것을 덮는다 (v02.28)
+        if source != SOURCE_IK and len(nodes) == 3:
+            _h, ik_nodes = _ik_chain(measure, namespace)
+            if len(ik_nodes) == 3:
+                ik_seg, _s = chain_lengths(ik_nodes)
+                if max(abs(a - b) for a, b in zip(ik_seg, segments)) > IK_DIFF_TOLERANCE:
+                    extra = "IK chain is {0:.4g} / {1:.4g}".format(ik_seg[0], ik_seg[1])
+                    row["note"] = extra if not row["note"] else row["note"] + " | " + extra
 
         # --- 쓸 수 있는지 본다 ---
         if not ctl:

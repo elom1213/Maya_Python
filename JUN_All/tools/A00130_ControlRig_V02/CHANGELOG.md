@@ -3,6 +3,22 @@
 `A00130_ControlRig`(V01)의 **템플릿 조인트 패러다임 재작성판**이다.
 계획서: `JUN_All/docs/plans/A00130_ControlRig_V02_plan.md`
 
+## v02.28 (2026-09-28)
+**[Change] Match 의 IK 세션이 폴 벡터 offset 을 지킨다 (기본) — 체인을 폴 평면에 맞추고 바뀐 길이를 쓴다.**
+계획서: `JUN_All/docs/plans/A00060_A00130_ik_edit_keep_pv_offset_plan.md`
+
+- `ik_session.end(session, pv_mode=PV_MODE_KEEP)` — A00060 v03.13 의 `Keep offset` 으로 닫는다.
+  폴 타깃(매칭 세트가 옮긴 자리)이 평면을 정하고 체인이 그 평면으로 간다. offset 은 안 바뀐다.
+- 뼈 길이가 바뀌므로 `length_map.json` 의 부위마다 **`ik_handle`** 을 두고, 그 IK 체인 길이를 Length 와 같은
+  어트리뷰트 12개에 쓴다(`length_manager.plan(source=SOURCE_IK)`).
+- ★ 길이는 **IK 를 켜기 전에** 쓴다(A00060 `after_fit`). 매칭 중에는 옛 휴지 길이로 스트레치가 켜져 있어(1.206),
+  IK 를 켠 뒤 쓰면 체인이 줄어든다(wrist 가 템플릿에서 6.26 이탈). 쓴 뒤 같은 월드 자리로 다시 놓는다.
+- Match 탭 `IK handles` 에 `On close` 콤보 — 옛 방식 `Update offset - chains stay as matched (v02.27)` 도 고를 수 있다.
+- Length 탭: 템플릿 길이와 IK 체인 길이가 다르면 Status 에 `IK chain is a / b` 를 붙인다(덮어쓰기 경고).
+- 검증(mayapy 2024, 케이지 `Cage_v002_0060` 에서 실제 Match — 로컬 · 레퍼런스): offset 바뀐 핸들 0 (옛 방식 4) ·
+  IK 편차 18개 전부 0 (옛 방식 90° 4개) · 스트레치 켜진 조인트 없음 (옛 방식 1.206/1.017) · 팔 조인트 ↔ 템플릿 0 ·
+  저장→재오픈 ≤ 0.00004 · undo 한 번에 offset · `Arm_L` 복원 · 오프스크린 UI(Match 버튼 · 콤보 · Length 표 갱신).
+
 ## v02.27 (2026-09-21)
 **[Fix] `Orient & Place` — 오른팔 전체가 **왼팔의 Behavior 미러**가 된다. 그리고 **한 조인트 = 한 규칙**.**
 
