@@ -1,27 +1,29 @@
 ---
 name: wip-ik-edit-keep-pv-offset
-description: "A00060/A00130 IK Edit 새 모드(폴 벡터 offset 유지 + 중간 조인트를 폴 평면에 투영) — 2026-09-28 계획서만, 사용자 답 대기. Rest Translate 는 weight 1 이면 IK 에 영향 없음(실측)"
+description: "A00060 IK Edit Keep offset(v03.13) · A00130 Match IK 세션(v02.28) — 폴 벡터 offset 불변, 체인을 폴 평면에 맞춤, 둘 다 기본. 2조인트 체인은 솔버의 비틀림을 굳힘, 길이는 IK 켜기 전에 써야 스트레치가 안 흔든다"
 metadata:
   node_type: memory
   type: project
-  originSessionId: e2f32ad0-e44a-4434-8bf3-44b0353ea50f
-  modified: 2026-09-28T00:07:09.356Z
+  originSessionId: 9708a5ac-8e21-47b2-9c53-e7db58a3356c
+  modified: 2026-09-28T01:20:24.426Z
 ---
 
-2026-09-28 사용자 요청: IK Edit 이 poleVectorConstraint **offset 을 바꾸지 않고** 체인을 고치게.
-계획서 `JUN_All/docs/plans/A00060_A00130_ik_edit_keep_pv_offset_plan.md` — **구현 전, 질문 Q1~Q7 답 대기.**
+2026-09-28 구현 완료 (계획서 `JUN_All/docs/plans/A00060_A00130_ik_edit_keep_pv_offset_plan.md` 6장 답 · 7장 결과).
+공유 코어 `A00060 .../ik_edit_manager.py` 의 `PV_MODE_KEEP` 이 기본. 옛 `offset` · `target` 모드는 순서까지 불변.
 
-**실측 (mayapy 2024)**
-- ★ `restTranslate` 는 타깃 weight 가 1(또는 0.5, 정규화)이면 `constraintTranslate` 에 **영향 없음**.
-  weight 합 0 일 때만 쓰인다. 사용자는 "Rest Translate 만 조절해서" 라고 생각했지만, IK 를 맞추는 건
-  **joint2 를 폴 평면(체인 축 + poleVector, twist 만큼 회전)에 투영**하는 것. rest=ct 동기화는 정리용.
-- offset 고정 + 평면 투영 → 위치·회전 편차 0 (twist 30 · 기존 offset · 레퍼런스 · 재오픈).
-- v 가 폴 **반대편**이면 솔버가 뒤집는다(편차 6.39) → 정책 필요(Q3).
-- joint2 translate 만 바꾸면 joint1 X 축이 뼈에서 18.6° 어긋남. `joint -e -oj xyz` 로 다시 맞춰도 편차 0 (Q2).
+**사용자 규칙**: X → 다음 조인트, up = Y/Z 중 지금 월드 +Y 를 더 향한 축을 **폴 평면 법선 쪽**으로,
+반대편은 거울 반사, 바뀐 체인 길이로 옵션 컨트롤러(`Arm_L` 등 12개)도 갱신.
 
-**구현 때 부딪칠 것**: A00130 IK 축 맞추기가 세션 **뒤**에 twist 를 바꿔 평면이 돈다 · A00130 Orient & Place 의
-폴 타깃이 체인에 살아 있게 물린 A' 면 "고정 평면" 이 없다(Q4).
+**실측으로 정한 것 (케이지 `0035_maya_src_rig/02_Cage_v02/Cage_v002_0060.mb`)**
+- ★ 2조인트 RP 체인(D01 16개 중 12개)은 **솔버가 폴을 볼 축을 정한다** — up 규칙으로 돌리면 90°. X 만 맞추고
+  IK 를 잠깐 켜 솔버 회전을 읽어 굳힌다. **읽기 전에 preferred angle 을 현재 포즈로** (안 하면 또 90°).
+- 오른팔 체인은 **−X 규약**(자식 tx 음수) — +X 강제하면 180° 뒤집힘. 지금 부호 유지.
+- ★ 길이는 **IK 를 켜기 전에** 쓴다. 매칭 중엔 옛 휴지 길이로 스트레치 1.206 → 켠 뒤 쓰면 체인이 줄어 wrist 6.26 이탈.
+  코어가 계산/놓기를 나누고(`fit_to_pole_plane`/`place_fit`) `after_fit` 콜백 뒤 같은 월드 목표로 다시 놓는다.
+- 팔·다리 루트 rotate 는 parentConstraint 구동 — 타깃 offset 재고정은 `constraintRotateOrder` 로 풀어야 0.
+- `_measure` 회전은 이제 쿼터니언 각도. 오일러 성분 차는 같은 방향을 90/270/356° 로 보고했다.
+- up 동률(`UP_AMBIGUOUS_DOT` 0.5): 템플릿 팔이 아래로 내려간 실제 Match 에서 걸려 Y 선택(글자 규칙이면 Z). 사용자에게 보고함.
+- 합성 레퍼런스 체인 저장→재오픈 어긋남은 옛 모드도 같다(테스트 장면 고유). 실제 케이지 레퍼런스는 ≤ 0.00004.
 
-**How to apply:** 답이 오면 Phase 0(실제 케이지 실측)부터. 공유 코어 `ik_edit_manager` 에 셋째 모드
-`PV_MODE_KEEP` 로 더하고 기존 두 모드는 건드리지 않는다. A00060 먼저, A00130 은 그다음.
+**How to apply:** IK 체인을 건드리는 새 기능은 2조인트 체인 · −X 규약 · 스트레치 구동 길이를 먼저 확인한다.
 관련 [[wip-a00060-ik-edit]] · [[wip-a00130-ik-session]] · [[wip-a00130-ik-axis]] · [[wip-a00060-pole-target]]
