@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-09-23
+updated: 2026-09-28
 ---
 
 # 작업 일지 (WORKLOG)
@@ -29,7 +29,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-09-23 (오늘)
+## 2026-09-28 (오늘)
+
+> [!summary] **계획서** A00060 · A00130 IK Edit — 폴 벡터 offset 을 지키고 중간 조인트를 폴 평면에 맞추기 (구현 전, 질문 7개)
+- 요청: IK Edit 이 poleVectorConstraint 의 offset 을 바꾸지 않고, joint1 · joint3 · 핸들 · poleTgt 를 옮긴 뒤 Rest Translate 를 Constraint Translate 에 맞추고 joint2 를 v(또는 체인 평면 위 가장 가까운 점)로. 레퍼런스에서도. A00130 Match 의 D01_IK_handle 편집도 같은 방식으로.
+- 실측(mayapy 2024): ★ `Rest Translate` 는 weight 1 이면 **출력에 영향이 없다**(weight 합 0 일 때만) — IK 를 맞추는 건 joint2 를 폴 평면에 올리는 것. offset 고정 + 평면 투영 → 위치·회전 편차 **0**(twist 30 · 원래 offset · 레퍼런스 · 재오픈 모두). v 가 폴 반대편이면 솔버가 뒤집어 편차 6.39. joint2 만 옮기면 뼈 X 축이 18.6° 어긋나고, 방향을 다시 맞춰도 편차 0.
+- 계획: 공유 코어에 셋째 모드 `PV_MODE_KEEP`(기존 두 모드 불변), A00060 콤보 항목, A00130 `ik_session.end` 가 새 모드로. 부딪칠 곳 둘 — twist 를 바꾸는 IK 축 맞추기(세션 뒤), 체인에 살아 있게 물린 폴 타깃(A').
+- [`plans/A00060_A00130_ik_edit_keep_pv_offset_plan.md`](plans/A00060_A00130_ik_edit_keep_pv_offset_plan.md) — 사용자 답(기본값 여부 · 뼈 축 재정렬 · 반대편 정책 · poleTgt 구조와 새 위치의 출처 · 긴 체인 · 축 맞추기 · 실제 케이지) 뒤 구현.
+
+## 2026-09-23
 
 > [!summary] A00380 **UV Sets 탭 — A00050_uvTool_V02(v02.03) 이식**, MeshDoctor 오른쪽 (v01.16->01.17)
 - 요청: A00050 푸시 후 A00380_MeshTool 에 새 탭을 만들어 이식, 탭은 Mesh Doctor 오른쪽. 탭 순서 **MeshDoctor → UV Sets → Peak → Match**.
