@@ -69,6 +69,16 @@ AttachCrv > Edge Loop 로 만든 위/아래 입술 리그를 **지퍼처럼** �
 - Update Rest Pose 는 **전부 읽은 뒤에 쓴다** — 하나 쓰면 그 널이 바로 움직인다([[setkeyframe-insert-needs-existing-curve]] 와 같은 결).
   rest 노드↔널은 `message` 표식(`sealRestNull`/`sealRestRef`, 세트엔 `sealController`)으로 되찾는다.
 
+**v01.27 (2026-09-28) — NURBS 서피스 어태치(`pointOnSurfaceInfo`) 지원.** 사용자 보고: 서피스에 붙은 조인트를 넣으면 `found 0 / 0`.
+- 서피스 u = 그 리스트 널들이 **더 넓게 퍼진 방향**(U/V) 정규화, 반대쪽 = `row`. 트랙 키 `셰이프@U|V`.
+  같은 서피스라도 row 평균 차 > 0.05 면 공유 아님(윗줄/아랫줄), 같은 줄이면 닫힌 커브처럼 재정규화(formU/V).
+- ★ **`poci_of` 는 translate 소스에서 `listHistory(pruneDagObjects=True)`** — 예전 `listHistory(node)` 는 조인트도
+  컨스트레인트→널→어태치로 이어져 조인트 자신을 드라이버로 잡았고, 조인트 translate 는 **축별** 연결이라
+  Build 가 `not driven by a curve network` 로 **실패**했다(HEAD 로 재현, 커브도 마찬가지). 이제 조인트는 널에서 다문다.
+  pairBlend 가 이미 끼워져 있으면 `inTranslate1` 너머를 본다(리빌드 때 prepare 가 remove 보다 먼저라서).
+- ★ **만남점 = 널 translate 소스 × `parentMatrix`**(`pointMatrixMult`). 어태치 fbf 로 재면 **Maintain offset 어태치**에서
+  빌드 즉시 튄다(널이 fbf 점에서 떨어져 있다). 커브 리그 결과는 HEAD 와 소수점까지 동일.
+
 검증: 코어 26 + UI 26 + 짝짓기 21 + 회전 15 + 닫힌 커브 30 + **v01.20~21 81항목**
 (rest 캡처·회전 보존·간격 유지·sealMerge·bias·머리 회전+이동 불변·반대 방향 커브 재현·
 Update Rest Pose·기준 공간 경고 9·UI 22)([[mayapy-headless-verify]]).

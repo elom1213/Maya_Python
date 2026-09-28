@@ -31,6 +31,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-28 (오늘)
 
+> [!summary] A00170 **Seal 이 NURBS 서피스에 어태치된 입술 리그를 받는다** — Preview · Build · Update Rest Pose · Remove (v01.26->01.27)
+- 요청: Edge Loop 식으로 서피스에 붙은 조인트를 Upper/Lower 에 넣으면 `[WARN] Upper/Lower need curve-attached drivers (found 0 / 0).` — 서피스여도 Seal 탭 전 기능이 되게.
+- 원인: `poci_of` 가 `pointOnCurveInfo` 만 찾았다. mayapy 로 재현(found 0 / 0).
+- 고침(`seal_rig.py`): 어태치 노드 = POCI 또는 **POSI** · 서피스 u = 그 입술 널들이 **더 넓게 퍼진 방향**(U/V) 정규화, 반대쪽은 `row` · 같은 서피스라도 줄이 다르면 공유 아님, 같은 줄이면 닫힌 커브처럼 재정규화(formU/V) · 커브/서피스 트랜스폼을 담아도 붙은 널 전부.
+- ★ 함께 드러난 기존 버그 2개(커브에도 해당): ① **조인트를 담으면 Build 실패**(HEAD 로 재현 — `listHistory` 가 컨스트레인트를 거쳐 어태치까지 봐서 조인트 자신이 드라이버, 그런데 조인트 translate 는 축별 연결이라 pairBlend 못 끼움) → translate 소스에서 **DAG 에서 멈춰** 거슬러 올라가, 조인트는 컨스트레인트 타깃(널)에서 다문다. ② 만남점을 어태치 fbf 로 재서 **Maintain offset 어태치면 빌드 즉시 튐** → 널 translate 소스 × `parentMatrix`(`pointMatrixMult`).
+- 검증(mayapy 2024): 서피스 MO 켬/끔 × 22 + V 방향 · 한 서피스 두 줄 · 닫힌 띠 공유 · 입력 종류 = 전부 통과. 커브 리그 HEAD 대비 4 상태 위치·회전 차이 **0**, 조인트 입력은 HEAD 실패 → 이제 널 입력과 같은 결과. UI 버튼 4개 핸들러 통과.
+- 문서: 가이드 §4.3.2 서피스 절, version.py.
+
 > [!summary] A00145 **Constrain 하위 탭 정리** — Constraint · Skin Weight 를 한 탭의 **모드**(Default / Skin Weight)로, Transfer 에 모드 **Copy**(constraint 성질 복사, 원본 유지) (v01.56->01.57)
 - 요청: Constraint 와 SkinWeight 하위 탭을 Constraint 하나로 합쳐 두 모드를 고르게, 기존 Options UI 는 그대로. Transfer 에 Default / Copy 모드 — Copy 는 좌 TSL constraint(종류 무관) · 우 TSL 오브젝트, `Copy Constraint` 로 좌측 constraint 와 똑같은 constraint 를 우측 각 오브젝트에.
 - UI: 공통 골격 `_build_mode_page` — `Mode` 라디오 줄 + QStackedWidget, 모드 화면은 예전 하위 탭 빌더 그대로(리스트 · 옵션 모드별 유지). 하위 탭 6 → 5.

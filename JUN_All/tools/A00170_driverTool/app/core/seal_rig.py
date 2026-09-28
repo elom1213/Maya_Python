@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-13
-# A00170_driverTool - Seal : 커브에 어태치된 입술 리그를 "끝에서 중앙으로" 다물리는 지퍼 셋업.
+# last Update date : 2026-09-28
+# A00170_driverTool - Seal : 커브(또는 NURBS 서피스)에 어태치된 입술 리그를 "끝에서 중앙으로"
+#                            다물리는 지퍼 셋업.
 #
 # 계획서 : docs/plans/A00170_Seal_plan.md
 #
@@ -54,6 +55,22 @@
 # 그 안에서 u 를 다시 0~1 로 편다(`respan_shared_curve`). 커브의 씸이 입술 한가운데에
 # 있어도 상관없다. 자세한 배경은 그 함수 위 주석 참고.
 #
+# ## NURBS 서피스에 어태치된 리그도 된다 (v01.27)
+#
+# AttachCrv 의 Attachment 칸에 서피스를 주면 널이 `pointOnSurfaceInfo` 로 붙는다
+# (POSI -> fourByFourMatrix -> multMatrix -> decomposeMatrix -> null). 드라이버 찾기는 두 노드를
+# 모두 받는다. 서피스는 파라미터가 U / V 두 개라, 입술을 따라가는 u 는 **그 입술의 널들이 더 넓게
+# 퍼진 방향**의 파라미터를 정규화해 쓴다(입술 한 줄이 U 방향이든 V 방향이든 된다).
+# 위/아래가 같은 서피스를 쓰더라도 **다른 줄**(다른 쪽 파라미터가 다름)이면 서로 다른 트랙으로 본다 —
+# 한 줄(닫힌 띠 서피스를 한 바퀴)을 나눠 쓸 때만 닫힌 커브와 같이 구간을 다시 편다.
+#
+# ## 만남점은 널이 **실제로 받는** 자리에서 잰다 (v01.27)
+#
+# 예전에는 어태치 `fourByFourMatrix.output`(커브/서피스 위 점)을 썼다. 어태치를 **Maintain offset**
+# 으로 만들면 널은 그 점에서 상수 오프셋만큼 떨어져 있어서, 빌드 순간부터 만남점이 rest 와 어긋나
+# 입술이 튀었다. 이제 `pairBlend` 에 들어가는 원래 translate 소스 × `parentMatrix` 로 월드 위치를
+# 만든다 — 오프셋이 있든 없든 빌드 순간 rest 와 정확히 같고, 널보다 상류라 사이클도 없다.
+#
 # UI 비의존: 위젯에서 읽은 이름/옵션 값만 받는다.
 
 import maya.cmds as cmds
@@ -76,6 +93,14 @@ _AXIS_INDEX = {"x": 0, "y": 1, "z": 2}
 
 # 코너(입 끝)로 보고 건너뛸 u 여유
 CORNER_EPS = 0.02
+
+# 어태치 노드 종류 (커브 / 서피스)
+ATTACH_CURVE = "pointOnCurveInfo"
+ATTACH_SURFACE = "pointOnSurfaceInfo"
+ATTACH_TYPES = (ATTACH_CURVE, ATTACH_SURFACE)
+
+# 위/아래가 같은 서피스를 쓸 때 "같은 줄"로 볼 반대쪽 파라미터(정규화) 차이
+SURFACE_ROW_EPS = 0.05
 
 # 짝짓기 척도 : 커브 파라미터 차이 / 월드 거리
 METRIC_PARAM = "param"
@@ -101,13 +126,49 @@ def _leaf(name):
     return name.split("|")[-1].split(":")[-1]
 
 
+def _translate_sources(node):
+    """그 노드 translate 를 구동하는 노드들. seal 이 이미 끼워져 있으면 pairBlend 너머(in1)."""
+    plugs = cmds.listConnections(node + ".translate", s=True, d=False, plugs=True) or []
+    if not plugs:
+        for axis in "XYZ":
+            plugs += cmds.listConnections(node + ".translate" + axis, s=True, d=False,
+                                          plugs=True) or []
+    out = []
+    for plug in plugs:
+        src = plug.split(".")[0]
+        if cmds.nodeType(src) == "pairBlend":
+            out += cmds.listConnections(src + ".inTranslate1", s=True, d=False) or []
+        elif src not in out:
+            out.append(src)
+    return out
+
+
 def poci_of(node):
-    """노드를 구동하는 네트워크에서 pointOnCurveInfo 를 찾는다(없으면 None)."""
+    """그 노드의 translate 를 **직접** 구동하는 어태치 노드(없으면 None).
+
+    커브면 pointOnCurveInfo, 서피스면 pointOnSurfaceInfo (v01.27).
+
+    translate 소스에서 거슬러 올라가되 **DAG 노드에서 멈춘다**(`pruneDagObjects`). v01.26 까지는
+    `listHistory(node)` 전체를 훑어서, 널을 따라가는 **조인트**도 컨스트레인트 → 널 → 어태치로 이어져
+    "직접 구동"으로 잘못 잡혔다 — 그러면 seal 이 널이 아니라 조인트의 컨스트레인트 뒤에 끼워졌다
+    (조인트 JO 가 있으면 회전이 틀어질 수 있다). 이제 조인트는 `resolve_driver` 가 컨스트레인트
+    타깃(널)으로 넘어가 널 단계에서 다문다.
+    """
     if not node or not cmds.objExists(node):
         return None
-    hist = cmds.listHistory(node) or []
-    found = cmds.ls(hist, type="pointOnCurveInfo") or []
-    return found[0] if found else None
+    for src in _translate_sources(node):
+        if cmds.nodeType(src) in ATTACH_TYPES:
+            return src
+        hist = cmds.listHistory(src, pruneDagObjects=True) or []
+        found = set(cmds.ls(hist, type=list(ATTACH_TYPES)) or [])
+        for item in hist:
+            if item in found:
+                return item
+    return None
+
+
+def is_surface_attach(attach_node):
+    return bool(attach_node) and cmds.nodeType(attach_node) == ATTACH_SURFACE
 
 
 def _ancestor_driver(node, depth=6):
@@ -159,27 +220,32 @@ def resolve_driver(node):
 
 
 def _drivers_under(node):
-    """그 노드 **아래(자손)** 에 있는 커브 구동 널들. 그룹을 통째로 담았을 때를 위해."""
+    """그 노드 **아래(자손)** 에 있는 커브/서피스 구동 널들. 그룹을 통째로 담았을 때를 위해."""
     children = cmds.listRelatives(node, allDescendents=True, type="transform",
                                   fullPath=True) or []
     return [c for c in children if poci_of(c)]
 
 
 def _drivers_on_curve(node):
-    """그 노드가 커브면, 그 커브를 쓰는 POCI 가 구동하는 널들.
+    """그 노드가 커브(또는 NURBS 서피스)면, 그걸 쓰는 POCI / POSI 가 구동하는 널들.
 
-    위/아래 **입술 커브 2개만** 리스트에 담아도 동작하게 해 준다.
+    위/아래 **입술 커브 2개만** 리스트에 담아도 동작하게 해 준다(서피스도 같다, v01.27).
     """
     shapes = []
-    if cmds.objectType(node, isType="nurbsCurve"):
+    if (cmds.objectType(node, isType="nurbsCurve")
+            or cmds.objectType(node, isType="nurbsSurface")):
         shapes = [node]
     else:
-        shapes = cmds.listRelatives(node, shapes=True, type="nurbsCurve",
-                                    fullPath=True) or []
+        shapes = (cmds.listRelatives(node, shapes=True, type="nurbsCurve",
+                                     fullPath=True) or [])
+        shapes += (cmds.listRelatives(node, shapes=True, type="nurbsSurface",
+                                      fullPath=True) or [])
     out = []
     for shape in shapes:
-        for poci in (cmds.listConnections(shape + ".worldSpace",
-                                          type="pointOnCurveInfo") or []):
+        attaches = []
+        for kind in ATTACH_TYPES:
+            attaches += cmds.listConnections(shape + ".worldSpace", type=kind) or []
+        for poci in attaches:
             # POCI 의 바로 아래는 transform 이 아니라 fourByFourMatrix 다
             # (POCI -> fbf -> multMatrix -> decomposeMatrix -> null). 하류 전체를 훑는다.
             future = cmds.listHistory(poci, future=True, allFuture=True) or []
@@ -190,11 +256,12 @@ def _drivers_on_curve(node):
 
 
 def curve_of(node):
-    """그 널을 어태치하고 있는 **커브 셰이프**(없으면 None)."""
+    """그 널을 어태치하고 있는 **커브(또는 서피스) 셰이프**(없으면 None)."""
     poci = poci_of(node)
     if not poci:
         return None
-    shapes = cmds.listConnections(poci + ".inputCurve", s=True, d=False,
+    plug = ".inputSurface" if is_surface_attach(poci) else ".inputCurve"
+    shapes = cmds.listConnections(poci + plug, s=True, d=False,
                                   shapes=True) or []
     if not shapes:
         return None
@@ -212,11 +279,34 @@ def is_closed_curve(shape):
         return False
 
 
+def is_closed_surface(shape, direction):
+    """서피스가 그 방향(U / V)으로 닫혀 있나. formU / formV : 0 open / 1 closed / 2 periodic."""
+    try:
+        return int(cmds.getAttr("{0}.form{1}".format(shape, direction))) != 0
+    except Exception:
+        return False
+
+
+def surface_params(node):
+    """서피스 위 정규화 파라미터 (u, v) (0~1). 서피스 구동이 아니면 None."""
+    posi = poci_of(node)
+    shape = curve_of(node)
+    if not is_surface_attach(posi) or not shape:
+        return None
+    out = []
+    for direction in ("U", "V"):
+        lo = cmds.getAttr("{0}.minValue{1}".format(shape, direction))
+        hi = cmds.getAttr("{0}.maxValue{1}".format(shape, direction))
+        p = cmds.getAttr("{0}.parameter{1}".format(posi, direction))
+        out.append((p - lo) / (hi - lo) if hi > lo else 0.0)
+    return tuple(out)
+
+
 def normalized_param(node):
     """커브 위 정규화 파라미터 u(0~1). 커브 구동이 아니면 None."""
     poci = poci_of(node)
     shape = curve_of(node)
-    if not poci or not shape:
+    if not poci or not shape or is_surface_attach(poci):
         return None
     lo = cmds.getAttr(shape + ".minValue")
     hi = cmds.getAttr(shape + ".maxValue")
@@ -224,13 +314,42 @@ def normalized_param(node):
     return (p - lo) / (hi - lo) if hi > lo else 0.0
 
 
+def _surface_tracks(entries):
+    """서피스 엔트리의 u 를 정한다 — 서피스마다 널들이 **더 넓게 퍼진 방향**(U / V).
+
+    한 리스트(= 입술 한 줄) 안에서 판단한다. 입술 한 줄은 서피스 위에서 한 방향으로 늘어서므로
+    그 방향 파라미터가 곧 진행도다. 반대쪽 파라미터는 `row`(어느 줄인가)로 남긴다.
+    """
+    by_shape = {}
+    for e in entries:
+        if e["kind"] == "surface":
+            by_shape.setdefault(e["shape"], []).append(e)
+    for shape, group in by_shape.items():
+        spread = []
+        for index in (0, 1):
+            values = [e["uv"][index] for e in group]
+            spread.append(max(values) - min(values))
+        index = 0 if spread[0] >= spread[1] else 1
+        direction = "UV"[index]
+        closed = is_closed_surface(shape, direction)
+        for e in group:
+            e["u"] = e["u_raw"] = e["uv"][index]
+            e["row"] = e["uv"][1 - index]
+            e["curve"] = "{0}@{1}".format(shape, direction)   # 트랙 키
+            e["closed"] = closed
+
+
 def collect_drivers(nodes):
-    """이름 목록 -> [{node, poci, u, pos}] (커브에 어태치된 것만, 중복 제거).
+    """이름 목록 -> [{node, poci, u, pos, ...}] (커브/서피스에 어태치된 것만, 중복 제거).
 
     무엇을 담아도 되게 세 단계로 넓혀 가며 찾는다:
-      1. 그 노드(또는 그 조상/컨스트레인트 타깃)가 커브 구동인가  -> `resolve_driver`
-      2. 그 **아래(자손)** 에 커브 구동 널이 있는가              -> 그룹을 통째로 담은 경우
-      3. 그 노드가 **커브**인가                                  -> 그 커브에 붙은 널 전부
+      1. 그 노드(또는 그 조상/컨스트레인트 타깃)가 어태치 구동인가 -> `resolve_driver`
+      2. 그 **아래(자손)** 에 어태치 구동 널이 있는가            -> 그룹을 통째로 담은 경우
+      3. 그 노드가 **커브 / 서피스**인가                          -> 거기 붙은 널 전부
+
+    엔트리 키: node · poci(어태치 노드) · kind('curve'|'surface') · shape(커브/서피스 셰이프) ·
+    curve(트랙 키 - 커브는 셰이프, 서피스는 '셰이프@U|V') · u · u_raw · closed · pos
+    (+ 서피스는 uv · row).
     """
     out = []
     seen = set()
@@ -238,18 +357,30 @@ def collect_drivers(nodes):
     def _add(driver):
         if not driver or driver in seen:
             return
-        u = normalized_param(driver)
-        if u is None:
+        poci = poci_of(driver)
+        shape = curve_of(driver)
+        if not poci or not shape:
             return
-        seen.add(driver)
-        out.append({
+        entry = {
             "node": driver,
-            "poci": poci_of(driver),
-            "curve": curve_of(driver),
-            "u": u,
-            "u_raw": u,          # 커브 전체 기준(재정규화 전) — 진단용
+            "poci": poci,
+            "shape": shape,
             "pos": cmds.xform(driver, q=True, ws=True, t=True),
-        })
+        }
+        if is_surface_attach(poci):
+            uv = surface_params(driver)
+            if uv is None:
+                return
+            entry.update(kind="surface", uv=uv)        # u / curve / closed 는 아래에서
+        else:
+            u = normalized_param(driver)
+            if u is None:
+                return
+            entry.update(kind="curve", curve=shape, u=u,
+                         u_raw=u,                      # 커브 전체 기준(재정규화 전) — 진단용
+                         closed=is_closed_curve(shape))
+        seen.add(driver)
+        out.append(entry)
 
     for name in nodes or []:
         node = _long(name)
@@ -261,6 +392,7 @@ def collect_drivers(nodes):
             continue
         for found in _drivers_under(node) or _drivers_on_curve(node):
             _add(found)
+    _surface_tracks(out)
     return out
 
 
@@ -346,6 +478,15 @@ def prepare_sides(upper, lower, axis="x", start_at_min=True):
     up_curves = set(e["curve"] for e in up if e["curve"])
     lo_curves = set(e["curve"] for e in lo if e["curve"])
     shared = up_curves & lo_curves
+    # 서피스는 같은 방향이어도 **다른 줄**(윗입술 줄 / 아랫입술 줄)일 수 있다 — 그건 공유가 아니다.
+    for key in list(shared):
+        rows_up = [e["row"] for e in up if e["curve"] == key and "row" in e]
+        rows_lo = [e["row"] for e in lo if e["curve"] == key and "row" in e]
+        if rows_up and rows_lo:
+            mean_up = sum(rows_up) / len(rows_up)
+            mean_lo = sum(rows_lo) / len(rows_lo)
+            if abs(mean_up - mean_lo) > SURFACE_ROW_EPS:
+                shared.discard(key)
 
     respanned = False
     if shared and up and lo:
@@ -363,7 +504,7 @@ def prepare_sides(upper, lower, axis="x", start_at_min=True):
                orient_u(lo, axis, start_at_min))
     return up, lo, {
         "shared_curve": sorted(shared),
-        "closed": any(is_closed_curve(c) for c in shared),
+        "closed": any(e["closed"] for e in up + lo if e["curve"] in shared),
         "respanned": respanned,
         "flipped": flipped,
         "dropped": dropped,
@@ -501,27 +642,24 @@ def _node(kind, name):
     return cmds.createNode(kind, name=name)
 
 
-def attach_matrix_plug(driver, name=None):
-    """그 널을 구동하는 **커브 어태치 월드 행렬** 플러그. (플러그, 새로 만든 노드들)
+def live_position_plug(null, name):
+    """어태치가 **지금** 널에게 주는 월드 위치 플러그. (플러그, 새로 만든 노드들)
 
-    attach_curve 네트워크는 `POCI -> fourByFourMatrix -> multMatrix(x parentInverse)`
-    이므로 그 **fourByFourMatrix.output** 이 곧 커브가 준 월드 행렬(위치 + orient 옵션이면
-    회전까지)이다. 널의 worldMatrix 를 쓰면 우리가 다시 널을 구동하므로 **사이클**이 된다 —
-    반드시 널보다 상류에서 가져와야 한다.
-
-    orient 없이 만든 리그 등 fbf 가 없으면 POCI 위치만으로 하나 만들어 준다(위치 전용).
+    널 translate 의 원래 소스(어태치 네트워크의 decomposeMatrix) × 널의 `parentMatrix`.
+    - 널의 worldMatrix 를 쓰면 우리가 다시 널을 구동하므로 **사이클** — 반드시 널보다 상류에서.
+    - v01.26 까지는 어태치 `fourByFourMatrix.output`(커브/서피스 위 점)을 썼는데, 어태치를
+      **Maintain offset** 으로 만들면 널은 그 점에서 떨어져 있어 빌드하자마자 입술이 튀었다.
+      이 방식은 오프셋 · 커브 · 서피스 무관하게 빌드 순간 rest 와 정확히 같다.
     """
-    poci = poci_of(driver)
-    found = cmds.listConnections(poci, s=False, d=True,
-                                 type="fourByFourMatrix") or []
-    if found:
-        return found[0] + ".output", []
-
-    fbf = _node("fourByFourMatrix", (name or _leaf(driver)) + "_srcFbf")
-    for comp, row in zip("XYZ", ("in30", "in31", "in32")):
-        cmds.connectAttr("{0}.position{1}".format(poci, comp),
-                         "{0}.{1}".format(fbf, row), f=True)
-    return fbf + ".output", [fbf]
+    src = cmds.listConnections(null + ".translate", s=True, d=False,
+                               plugs=True) or []
+    if not src:
+        raise RuntimeError(
+            "'{0}' translate is not driven by an attach network.".format(_leaf(null)))
+    pmm = _node("pointMatrixMult", name + "_live")
+    cmds.connectAttr(src[0], pmm + ".inPoint", f=True)
+    cmds.connectAttr(null + ".parentMatrix[0]", pmm + ".inMatrix", f=True)
+    return pmm + ".output", [pmm]
 
 
 def _mat_mul(a, b):
@@ -614,8 +752,9 @@ def rest_space_warnings(entries, reference=None):
 
     by_curve = {}
     for entry in entries:
-        if entry.get("curve"):
-            by_curve.setdefault(entry["curve"], []).append(entry["node"])
+        shape = entry.get("shape") or entry.get("curve")
+        if shape:
+            by_curve.setdefault(shape, []).append(entry["node"])
     for shape, nulls in sorted(by_curve.items()):
         movers = curve_movers(shape)
         if not movers:
@@ -662,13 +801,6 @@ def _rest_local_rotate(rest_world_plug, null, name):
     # 널의 회전 순서를 그대로 따라간다(기본 xyz 가 아닐 수도 있다).
     cmds.connectAttr(null + ".rotateOrder", dcm + ".inputRotateOrder", f=True)
     return dcm + ".outputRotate", [mmx, dcm]
-
-
-def _position_plug(matrix_plug, name):
-    """월드 행렬 -> 월드 위치 플러그."""
-    dcm = _node("decomposeMatrix", name + "_dcm")
-    cmds.connectAttr(matrix_plug, dcm + ".inputMatrix", f=True)
-    return dcm + ".outputTranslate", [dcm]
 
 
 def _meeting_point(up_plug, lo_plug, ctrl, name):
@@ -821,8 +953,9 @@ def build_seal(upper, lower, controller, prefix=DEFAULT_PREFIX, axis="x",
                 "Upper and Lower resolve to the same {0} driver(s). With one "
                 "curve around both lips, list each lip's nulls separately "
                 "instead of the whole curve in both.".format(len(info["dropped"])))
-        raise ValueError("Both Upper and Lower need curve-attached drivers "
-                         "(got {0} / {1}).".format(len(up_entries), len(lo_entries)))
+        raise ValueError("Both Upper and Lower need curve- or surface-attached "
+                         "drivers (got {0} / {1}).".format(len(up_entries),
+                                                           len(lo_entries)))
 
     flipped_up, flipped_lo = info["flipped"]
 
@@ -852,14 +985,12 @@ def build_seal(upper, lower, controller, prefix=DEFAULT_PREFIX, axis="x",
     for i, (up, lo, u) in enumerate(pairs):
         name = "{0}_seal_{1:02d}".format(prefix, i + 1)
 
-        # (1) 커브가 지금 말하는 위/아래 자리 -> sealBias 로 섞은 **만남점**.
-        up_plug, up_nodes = attach_matrix_plug(up["node"], name + "_up")
-        lo_plug, lo_nodes = attach_matrix_plug(lo["node"], name + "_lo")
-        up_live, n_up = _position_plug(up_plug, name + "_upLive")
-        lo_live, n_lo = _position_plug(lo_plug, name + "_loLive")
+        # (1) 어태치가 지금 주는 위/아래 자리 -> sealBias 로 섞은 **만남점**.
+        up_live, n_up = live_position_plug(up["node"], name + "_upLive")
+        lo_live, n_lo = live_position_plug(lo["node"], name + "_loLive")
         live_point, n_live = _meeting_point(up_live, lo_live, controller,
                                             name + "_liveMid")
-        created += up_nodes + lo_nodes + n_up + n_lo + n_live
+        created += n_up + n_lo + n_live
 
         # (2) rest(= 지금 씬 포즈)를 기준 공간에 담아 라이브로 재생 + 그 만남점.
         #     pairBlend 를 끼우기 **전에** 읽어야 커브가 주는 자리를 그대로 잡는다.

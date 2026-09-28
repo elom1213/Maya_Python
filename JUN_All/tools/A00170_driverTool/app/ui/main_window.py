@@ -1618,7 +1618,7 @@ class MainWindow(QWidget):
         desc = QLabel(
             "Close the lips from a corner toward the centre (lip zip).\n"
             "sealR and sealL are independent, so both corners can zip in at once.\n"
-            "List the curve-attached nulls (or their joints) of each lip line.\n"
+            "List the curve- or surface-attached nulls (or their joints) of each lip line.\n"
             "Build with the lips in their closed (neutral) pose - that pose IS "
             "the shape they seal to.")
         desc.setAlignment(Qt.AlignCenter)
@@ -1906,15 +1906,15 @@ class MainWindow(QWidget):
                 self._log("       One curve around both lips? Then list each "
                           "lip's nulls separately, not the whole curve in both.")
                 return
-            self._log("[WARN] Upper/Lower need curve-attached drivers "
+            self._log("[WARN] Upper/Lower need curve- or surface-attached drivers "
                       "(found {0} / {1}).".format(len(up), len(lo)))
             self._log("       List the nulls, their _ctl / _tgt, the joints, "
-                      "the null group, or the attach curve - anything that "
-                      "traces back to a pointOnCurveInfo.")
+                      "the null group, or the attach curve / surface - anything "
+                      "that traces back to a pointOnCurveInfo or pointOnSurfaceInfo.")
             return
 
         if info["shared_curve"]:
-            self._log("One shared {0} curve - each lip re-spanned to its own "
+            self._log("One shared {0} curve / surface - each lip re-spanned to its own "
                       "0-1 arc.".format("closed" if info["closed"] else "open"))
         flipped = info["flipped"]
         metric = self._seal_metric()
@@ -1971,7 +1971,7 @@ class MainWindow(QWidget):
         self._log("Sealed {0} pair(s) | nodes: {1} | set: {2}".format(
             len(report["pairs"]), len(report["nodes"]), report["set"]))
         if report["shared_curve"]:
-            self._log("Upper and Lower share one {0} curve - each lip was "
+            self._log("Upper and Lower share one {0} curve / surface - each lip was "
                       "re-spanned to its own 0-1 arc.".format(
                           "closed" if report["closed"] else "open"))
         self._log("Closed pose captured from the current scene pose, in {0} "
@@ -2013,7 +2013,7 @@ class MainWindow(QWidget):
             self._log("[WARN] Nothing to remove for prefix '{0}' "
                       "({1}).".format(prefix, seal_set_name(prefix)))
             return
-        self._log("Removed {0} node(s); {1} curve connection(s) restored. "
+        self._log("Removed {0} node(s); {1} attach connection(s) restored. "
                   "Controller attributes kept.".format(deleted, restored))
 
     def on_seal_recapture(self):
@@ -2087,7 +2087,7 @@ class MainWindow(QWidget):
             "    Default Distance object and wired to the network, so you can tune the\n"
             "    sigmoid live in the scene.\n"
             "\n"
-            "[Seal] (lip zip on a curve-attached lip rig)\n"
+            "[Seal] (lip zip on a curve- or NURBS-surface-attached lip rig)\n"
             "- Build Seal: sealR / sealL close each lip from a corner toward the\n"
             "  centre, independently. The pose the lips are in at build time is the\n"
             "  shape they seal to, stored in the Reference (head) space - so a sealed\n"
