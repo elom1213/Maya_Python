@@ -1,5 +1,16 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.35 (2026-09-29)
+
+- **[Feature] `Select > By Weight` 의 Bound Joints 리스트에 조인트 이름 필터** (공용 `JUN_mod_filter_qt_v01`).
+  - 리스트 바로 아래 `Filter` 칸 — 부분 일치 · 대소문자 무시 · 공백으로 나눈 여러 단어 AND. `Clear` 로 전부 보기.
+  - 리스트 머리의 `Number` 가 `보이는 수 / 전체 수` 로 바뀐다.
+  - `Check All` / `Uncheck All` / 고른 행 체크 전파는 **보이는 행에만** 걸린다.
+  - **가려진 조인트의 체크는 그대로 유지되고 `Select Vertices` 에도 들어간다** — 필터로 찾아 체크하고 다른
+    이름으로 또 찾아 체크하는 식으로 모으기 위해서다. 그런 조인트가 있으면 로그에 `[INFO]` 로 수를 알린다.
+  - 메시를 다시 불러와도 입력한 필터가 새 목록에 바로 걸린다.
+  - 검증(오프스크린 Qt, mayapy): 필터 중 Check All 이 보이는 행만 체크, 필터 해제 후 체크 유지, Number 표시.
+
 ## v01.34 (2026-09-28)
 
 - **[Feature] `UPDATE BIND POSE` 가 진행률 팝업을 띄운다** (공용 `JUN_mod_progress_qt_v01`, Transfer 와 같은 창).

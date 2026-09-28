@@ -2,7 +2,7 @@
 title: A00275_skinTool_V01 사용법
 aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose, Move Joints, Edit Mesh, Expand Bind, Smooth Weights]
 tags: [maya-python, tool-guide, skin, skincluster, bind-pose, rigging]
-updated: 2026-09-28
+updated: 2026-09-29
 ---
 
 # A00275_skinTool_V01 사용법
@@ -10,7 +10,7 @@ updated: 2026-09-28
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.32 — Transfer 에 **`Target mode`**(소스↔타겟 리스트 1:1) + **진행률 팝업** · v01.31 — **`Weights > Smooth`** 신규: Kangaroo `SkinCluster > Smooth` 이식(플러그인 무의존) · v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
+- **버전**: `app/config/version.py` (v01.35 — By Weight 조인트 리스트에 **이름 필터** · v01.32 — Transfer 에 **`Target mode`**(소스↔타겟 리스트 1:1) + **진행률 팝업** · v01.31 — **`Weights > Smooth`** 신규: Kangaroo `SkinCluster > Smooth` 이식(플러그인 무의존) · v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
   (v01.22 는 아래 레이어 lock 이 사라졌다) · v01.22 — **`Weights > Layer`** 신규: 버텍스 순서가 같은 메시 N 개의
   웨이트를 메시마다 lock + Blend 로 레이어처럼 합성해 새 메시로 만들거나 기존 메시를 갱신 · v01.15 — **탭 재분류**:
   평평한 탭 7개를 `카테고리 3 → 기능 7` 의 2단 구조로, 아래 표)
@@ -467,6 +467,11 @@ Border Mask Steps 활성 규칙 · 라디오→옵션 · Loop Curve 버튼 3개(
 2. **Bound Joints** 리스트에서 조인트를 체크한다. **Check All / Uncheck All**.
    여러 행을 골라 두고(Shift/Ctrl) 그중 하나의 체크박스(또는 `Space`)를 누르면 **고른 행 전부**가 같은 상태로 바뀐다(Layer 탭 Lock 과 같은 조작).
    v01.28 부터 Framework 공용 동작 [`MOD_checkList_qt`](Framework_MOD_checkList_qt.md) 을 쓴다.
+   - **Filter** (v01.35~) — 리스트 아래 칸에 이름 일부를 치면 맞는 조인트만 남는다(대소문자 무시, 공백으로 여러 단어 AND).
+     공용 [`MOD_filter_qt`](Framework_MOD_filter_qt.md). `Number` 가 `보이는 수 / 전체 수` 로 바뀐다.
+   - 체크 조작(Check All / Uncheck All / 고른 행 전파)은 **보이는 행에만** 걸린다.
+   - **가려진 조인트의 체크는 유지되고 Select Vertices 에 들어간다** — `spine` 으로 찾아 체크, `neck` 으로 찾아 체크하는 식으로
+     모을 수 있다. 가려진 채 체크된 조인트가 있으면 실행 때 `[INFO]` 로 수를 알린다.
 3. **Condition**
    - `Weight >= Value` / `Weight <= Value` — **경계값은 포함**(float 오차 1e-6 허용, 1.0 이 0.99999994 로 읽혀도 `>= 1.0` 에 걸린다).
    - `Value` — 0~1 (스핀 박스 + 슬라이더).

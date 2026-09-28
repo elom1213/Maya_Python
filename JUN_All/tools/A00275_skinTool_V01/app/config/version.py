@@ -21,5 +21,9 @@
 #                           skinCluster 마다 읽기 · 스킨 측정 · 행렬 · 굽기 · 노멀 · 타겟 · bindPose
 #                           단계가 보이고, 스킨 측정과 타겟 갱신은 그 안에서도 게이지가 오른다
 
-VERSION = "01.34"
-LAST_UPDATE = "2026-09-28"
+# 01.35  Select > By Weight - Bound Joints 리스트 아래에 조인트 이름 필터 (공용 JUN_mod_filter_qt).
+#                           Number 가 `보이는 수 / 전체 수`. Check All / Uncheck All 은 보이는 행만.
+#                           가려진 조인트의 체크는 유지되고 Select Vertices 에도 들어간다
+
+VERSION = "01.35"
+LAST_UPDATE = "2026-09-29"

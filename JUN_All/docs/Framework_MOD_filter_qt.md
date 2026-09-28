@@ -184,6 +184,7 @@ self.flt_se.filtered.connect(self._on_se_filtered)   # 개수 라벨 등 후처�
 | `A00170_driverTool` | Remap Value 탭, Stretch 탭 2개 그룹 | `QListWidget`(TSL 내부) | v01.13 |
 | `A00330_NamingTool` | Set Rename 탭 | **`tree_widget`** | v01.02 |
 | `A00130_ControlRig_V02` | Orient & Place 표 (Joint · Rule · Note + `In` 콤보) | **`tree_widget` + `tree_columns`** | v02.26 |
+| `A00275_skinTool_V01` | Select > By Weight 의 Bound Joints (체크박스 리스트 — 체크는 가려져도 유지) | `QListWidget`(TSL 내부) | v01.35 |
 
 > **TSL(`JUN_mod_tsl_qt_v01`) 안의 리스트에 붙일 때**는 `tsl.list_widget` 을 넘긴다.
 > 단, TSL 의 `get_all_items()` / `selected_items()` 는 **숨김을 모른다** — 작업 대상은

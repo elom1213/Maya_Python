@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-18
+# last Update date : 2026-09-29
 # A00275_skinTool_V01 - Select > By Weight 탭 UI
 """
 Select > By Weight - 체크한 조인트의 웨이트가 기준값 이상 / 이하인 버텍스를 고르는 탭.
@@ -19,12 +19,18 @@ QListWidget 기본 처리에 맡기면(오프스크린 QTest 실측) 체크 전�
 풀려서** 다음 클릭부터 한 행씩만 바뀐다 - 그래서 체크박스 위 클릭은 eventFilter 에서 직접 처리한다.
 v01.28 에서 이 처리를 Framework 공용 동작 `JUN_mod_checkList_qt` 로 옮겼다(이 탭의 코드가 원본이다).
 
+조인트 필터(v01.35): 공용 `JUN_mod_filter_qt` 를 리스트 아래에 붙였다. 체크 조작(Check All /
+Uncheck All / 고른 행 체크 전파)은 **보이는 행에만** 걸린다. 반면 **체크 상태는 필터와 무관하게
+유지되고 Select Vertices 에도 들어간다** - 필터로 하나 찾아 체크하고, 다른 이름으로 또 찾아 체크하는
+식으로 쓰기 때문이다. 가려진 채 체크된 조인트가 있으면 실행 로그에 그 수를 알린다.
+
 모든 UI 문자열은 영어. (한국어는 주석/독스트링만)
 """
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_checkList_qt
+from Framework.qt import JUN_mod_filter_qt
 
 import maya.cmds as cmds
 
@@ -106,6 +112,12 @@ class WeightSelectTab(QWidget):
         self.chk_joints = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(
             self.tsl_joints.list_widget)
         root.addWidget(self.tsl_joints, 1)
+        # 조인트 이름 필터 - 개수 라벨은 TSL 머리의 Number 를 `보이는 수 / 전체 수` 로 쓴다.
+        self.flt_joints = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.tsl_joints.list_widget,
+            placeholder="Type any part of a joint name (e.g. spine)",
+            number_label=self.tsl_joints.lbl_number)
+        root.addWidget(self.flt_joints)
 
         # --- 조건 ---
         cond_box = QGroupBox("Condition")
@@ -198,6 +210,7 @@ class WeightSelectTab(QWidget):
             item.setData(JOINT_UUID_ROLE, uuid)
             item.setCheckState(Qt.Checked if uuid in keep_checked else Qt.Unchecked)
         lw.blockSignals(False)
+        self.flt_joints.refresh()       # 새 항목은 숨김이 풀려 있다 - 입력된 필터를 다시 건다
 
     def checked_joints(self):
         """체크된 조인트의 현재 롱네임. 씬에서 사라진 것은 빠진다."""
@@ -210,11 +223,13 @@ class WeightSelectTab(QWidget):
         return out
 
     def _set_all_checked(self, checked):
+        """보이는(필터에 걸린) 행만 체크/해제한다. 가려진 행의 체크는 그대로 둔다."""
         state = Qt.Checked if checked else Qt.Unchecked
         lw = self.tsl_joints.list_widget
         lw.blockSignals(True)
         for item in self._items():
-            item.setCheckState(state)
+            if not item.isHidden():
+                item.setCheckState(state)
         lw.blockSignals(False)
 
     # ==============================================================
@@ -283,6 +298,12 @@ class WeightSelectTab(QWidget):
         if not joints:
             self._log("[Warning] By Weight : check at least one joint.")
             return
+
+        hidden_checked = sum(1 for item in self._items()
+                             if item.isHidden() and item.checkState() == Qt.Checked)
+        if hidden_checked:
+            self._log("[INFO] By Weight : {0} checked joint(s) hidden by the filter are "
+                      "included.".format(hidden_checked))
 
         mode = self.current_mode()
         value = self.spn_value.value()

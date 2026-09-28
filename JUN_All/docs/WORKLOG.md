@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-09-28
+updated: 2026-09-29
 ---
 
 # 작업 일지 (WORKLOG)
@@ -29,7 +29,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-09-28 (오늘)
+## 2026-09-29 (오늘)
+
+> [!summary] A00275 Select > By Weight — **Bound Joints 이름 필터** (공용 `JUN_mod_filter_qt_v01`, v01.34->01.35)
+- 요청: By Weight 탭 Bound Joints TSL 에 리스트업된 조인트를 검색할 수 있는 필터.
+- 리스트 아래 공용 Filter, TSL 의 Number 를 `보이는 수 / 전체 수` 로. Check All / Uncheck All 은 보이는 행만(체크 전파는 공용 checkList 가 이미 숨긴 행을 건너뛴다).
+- 체크는 필터와 무관하게 유지 → 필터로 나눠 찾아 체크를 모을 수 있다. 가려진 체크 조인트가 실행에 들어가면 `[INFO]` 로 알림.
+- 검증: 오프스크린 Qt(mayapy, cmds 스텁) — 필터 중 Check All 이 `spine_*` 만 체크, 해제 후 유지, Number `2 / 4`.
+
+## 2026-09-28
 
 > [!summary] A00275 Bind Pose — **UPDATE BIND POSE 진행률 팝업** (공용 `JUN_mod_progress_qt_v01`, v01.33->01.34)
 - 요청: Update Bind Pose 를 누르면 게이지 팝업으로 진행도를 보이게, 공용 위젯 코드로.
