@@ -1,5 +1,18 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.34 (2026-09-28)
+
+- **[Feature] `UPDATE BIND POSE` 가 진행률 팝업을 띄운다** (공용 `JUN_mod_progress_qt_v01`, Transfer 와 같은 창).
+  - skinCluster 하나마다 7 단계가 차례로 보인다 — `Reading the skin` · `Measuring the skin for blendShape
+    targets` · `Setting bind matrices` · `Baking the current shape` · `Re-baking locked normals` ·
+    `Updating blendShape targets` · `Rebuilding the bindPose node`. 문구 앞에 skinCluster 이름이 붙는다.
+  - 무거운 두 단계(스킨 측정 3 회 · 타겟 항목마다)는 **그 안에서도** 게이지가 오른다.
+  - 코어는 위젯을 모른다 - `update_bind_pose(..., progress=None)` 콜백 하나만 받는다(없으면 예전 그대로).
+  - 에러가 나도 팝업은 닫히고 로그로 남는다. 끝 줄에 걸린 시간(`in 0.9s`)이 붙는다.
+  - 검증(mayapy 2024) 17 항목: 보고 값이 줄지 않고 100% 에서 끝남 · 단계 문구 · skinCluster 2 개 ·
+    blendShape 없는 메시는 타겟 단계가 없음 · 콜백 없이도 동작 · 팝업이 떴다가 100 까지 차고 닫힘 ·
+    걸린 시간 로그. 기존 25 항목 회귀 통과.
+
 ## v01.33 (2026-09-28)
 
 - **[Feature] `Bind > Bind Pose` 에 `Update blendShape targets` (기본 켬, `Keep current shape` 전용).**

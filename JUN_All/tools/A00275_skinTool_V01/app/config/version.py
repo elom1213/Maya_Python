@@ -17,5 +17,9 @@
 #                           (in-between 포함)은 노드 값을, 라이브 타겟은 타겟 메시를 고친다.
 #                           중립(envelope 0)에서 재므로 갱신할 때 weight 가 켜져 있어도 된다
 
-VERSION = "01.33"
+# 01.34  Bind > Bind Pose  - UPDATE BIND POSE 가 진행률 팝업을 띄운다 (공용 JUN_mod_progress_qt_v01).
+#                           skinCluster 마다 읽기 · 스킨 측정 · 행렬 · 굽기 · 노멀 · 타겟 · bindPose
+#                           단계가 보이고, 스킨 측정과 타겟 갱신은 그 안에서도 게이지가 오른다
+
+VERSION = "01.34"
 LAST_UPDATE = "2026-09-28"

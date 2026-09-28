@@ -1063,18 +1063,35 @@ class MainWindow(QWidget):
 
         keep = self.rb_bp_keep.isChecked()
 
-        count, messages = bp_mgr.update_bind_pose(
-            self.bp_targets,
-            keep_shape=keep,
-            rebuild_dag_pose=self.cb_bp_rebuild.isChecked(),
-            keep_normals=self.cb_bp_normals.isChecked(),
-            update_targets=self.cb_bp_targets.isChecked())
+        # 진행률 팝업 (v01.34, 공용 JUN_mod_progress_qt_v01) - skinCluster 마다 단계가 보인다.
+        dlg = JUN_mod_progress_qt_v01(
+            self, title="Skin Tool - Update Bind Pose",
+            message="Updating the bind pose...",
+            phases=[("Updating bind pose", 100)])
+        dlg.start()
+        dlg.begin_phase()
+        count, messages = 0, []
+        try:
+            count, messages = bp_mgr.update_bind_pose(
+                self.bp_targets,
+                keep_shape=keep,
+                rebuild_dag_pose=self.cb_bp_rebuild.isChecked(),
+                keep_normals=self.cb_bp_normals.isChecked(),
+                update_targets=self.cb_bp_targets.isChecked(),
+                progress=dlg.callback())
+        except Exception as exc:                            # noqa: BLE001
+            # 코어는 실패를 메시지로 돌려주지만, 뚫고 올라온 것이 있으면 로그로 남긴다 -
+            # 모달 팝업이 뜬 채로 트레이스백만 나오면 사용자는 창이 멈춘 것으로 본다.
+            messages = ["[Error] {0}".format(exc)]
+        finally:
+            elapsed = dlg.elapsed()
+            dlg.finish()
 
         for m in messages:
             self.log(m)
 
         self.log(f"[Done] {count} skinCluster(s) updated "
-                 f"({'shape kept' if keep else 'snapped to rest'}).")
+                 f"({'shape kept' if keep else 'snapped to rest'}) in {elapsed:.1f}s.")
 
     # --------------------------------------------------
     # Edit > Move Joints (Edit 토글 - 메시를 건드리지 않고 조인트 이동)

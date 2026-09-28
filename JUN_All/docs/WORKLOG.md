@@ -31,6 +31,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-28 (오늘)
 
+> [!summary] A00275 Bind Pose — **UPDATE BIND POSE 진행률 팝업** (공용 `JUN_mod_progress_qt_v01`, v01.33->01.34)
+- 요청: Update Bind Pose 를 누르면 게이지 팝업으로 진행도를 보이게, 공용 위젯 코드로.
+- 코어 `update_bind_pose(..., progress=None)` 콜백 - skinCluster 마다 7 단계(읽기 · 스킨 측정 · 행렬 · 굽기 · 노멀 · 타겟 · bindPose), 스킨 측정(축마다)과 타겟 갱신(항목마다)은 안에서도 보고. UI 는 Transfer 와 같은 팝업 + finally 로 닫기, 끝 줄에 걸린 시간.
+- 검증(mayapy 2024) 17항목 + 기존 25항목 회귀. (테스트의 게이지 감시가 갱신 **전** 값을 읽어 86 으로 보였던 것은 테스트 쪽 문제였다.)
+
 > [!summary] A00275 Bind Pose — **`Update blendShape targets`**: 스킨 앞 blendShape 타겟도 새 바인드 포즈에 맞게 (v01.32->01.33)
 - 질문(먼저 검증): blendShape → skinCluster 메시를 조인트 이동 · 회전 뒤 Update Bind Pose 하면 타겟이 틀어진다. 타겟 메시에 같은 웨이트 → 같은 포즈로 변형 → 그걸 타겟으로 쓰면 되지 않나?
 - 실측: 사용자 방식 = 의도한 결과(차이 0, linear/DQ/blended). 지금 툴은 회전·스케일에서 0.40~0.52 틀림, 이동만이면 0. 원인 `f(orig+d) = f(orig) + A·d` 인데 d 를 안 돌렸다.

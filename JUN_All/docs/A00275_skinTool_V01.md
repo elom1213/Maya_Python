@@ -523,6 +523,10 @@ Border Mask Steps 활성 규칙 · 라디오→옵션 · Loop Curve 버튼 3개(
 1. 조인트를 원하는 대로 이동·회전한다.
 2. **바인드된 메시를 선택**하거나 **그 조인트들을 선택**한 뒤 **Load Selection**.
 3. 모드를 고르고 **UPDATE BIND POSE**. 전체가 **한 번의 Ctrl+Z** 로 되돌아간다.
+   도는 동안 **진행률 팝업**이 뜬다(v01.34~, 공용 `JUN_mod_progress_qt_v01`). skinCluster 마다
+   `Reading the skin` → `Measuring the skin for blendShape targets` → `Setting bind matrices` →
+   `Baking the current shape` → `Re-baking locked normals` → `Updating blendShape targets` →
+   `Rebuilding the bindPose node` 가 차례로 보이고, 끝나면 닫힌다. 해당 없는 단계는 건너뛴다.
 
 ### 두 가지 모드
 

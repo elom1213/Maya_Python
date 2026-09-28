@@ -739,7 +739,7 @@ def _write_tweaks(shape, values):
     cmds.setAttr("{0}.pnts[0:{1}]".format(shape, n - 1), *flat, type="double3")
 
 
-def _skin_jacobian(sc, geo_index, head, n, base_out):
+def _skin_jacobian(sc, geo_index, head, n, base_out, report=None):
     """버텍스별 스킨 선형부 A_v 의 세 열 (x, y, z 방향 단위 오프셋이 출력에서 되는 벡터).
 
     헤드 셰이프 pnts 에 단위 오프셋을 더해 스킨 출력을 다시 읽는다 - 스킨 평가 3 번.
@@ -751,6 +751,8 @@ def _skin_jacobian(sc, geo_index, head, n, base_out):
     columns = []
     try:
         for axis in range(3):
+            if report:
+                report(axis / 3.0)
             unit = [0.0, 0.0, 0.0]
             unit[axis] = 1.0
             _write_tweaks(head, [(v[0] + unit[0], v[1] + unit[1], v[2] + unit[2])
@@ -820,7 +822,7 @@ def _restore_envelopes(info):
             pass
 
 
-def _update_targets(sc, info, columns, delta, mesh):
+def _update_targets(sc, info, columns, delta, mesh, report=None):
     """저장된 타겟 델타는 A_v d 로, 라이브 타겟 메시는 메시 점을 고친다.
 
     반환: 메시지 리스트
@@ -831,12 +833,19 @@ def _update_targets(sc, info, columns, delta, mesh):
     base_parent = (cmds.listRelatives(mesh, parent=True, f=True) or [None])[0]
     edited_meshes = set()
 
-    for bs, geo, bs_in in info["blendshapes"]:
+    work = [(bs, geo, bs_in, _target_items(bs, geo)) for bs, geo, bs_in in info["blendshapes"]]
+    total = sum(len(items) for _b, _g, _i, items in work) or 1
+    done = 0
+
+    for bs, geo, bs_in, items in work:
         stored = live = 0
         origin_world = (cmds.attributeQuery("origin", node=bs, exists=True)
                         and cmds.getAttr(bs + ".origin") == 0)
 
-        for t, it, item in _target_items(bs, geo):
+        for t, it, item in items:
+            if report:
+                report(done / float(total))
+            done += 1
             name = _alias_of(bs, t)
             sources = cmds.listConnections(item + ".inputGeomTarget", s=True, d=False,
                                            sh=True) or []
@@ -914,8 +923,14 @@ def _update_targets(sc, info, columns, delta, mesh):
 # 메인 동작
 # =========================
 
+# 진행률 보고 단계 (skinCluster 하나당). 문구는 UI 팝업에 그대로 나간다.
+_STEP_READ, _STEP_MEASURE, _STEP_MATRICES, _STEP_BAKE, _STEP_NORMALS, _STEP_TARGETS, \
+    _STEP_DAGPOSE = range(7)
+_STEPS = 7
+
+
 def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True,
-                     keep_normals=True, update_targets=True):
+                     keep_normals=True, update_targets=True, progress=None):
     """현재 조인트 포즈를 새 바인드 포즈로 만든다.
 
     keep_shape=True  : 지금 보이는(변형된) 형상을 그대로 유지한 채 rest 로 굳힌다.
@@ -926,6 +941,9 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True,
     update_targets   : (v01.33, keep_shape 일 때만) 스킨 **앞** blendShape 의 타겟도 새 바인드
                        포즈에 맞게 돌린다 - 조인트를 회전 · 스케일해도 타겟을 켠 모양이 그 포즈에서
                        타겟을 켠 모양과 같다. 라이브로 연결된 타겟은 타겟 메시를 직접 고친다.
+    progress         : (v01.34) `progress(done, total, message)` 콜백 - UI 게이지 팝업용.
+                       skinCluster 마다 7 단계(읽기 · 측정 · 행렬 · 굽기 · 노멀 · 타겟 · bindPose)를
+                       보고한다. None 이면 아무것도 안 한다.
 
     반환: (처리한 skinCluster 수, 메시지 리스트)
     """
@@ -936,10 +954,18 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True,
         return 0, ["[Warning] No skinCluster found. Select a bound mesh or its joints."]
 
     done = 0
+    total_steps = len(skin_clusters) * _STEPS
+
+    def _report(ci, sc, step, label, fraction=0.0):
+        if progress:
+            progress(ci * _STEPS + step + fraction, total_steps,
+                     "{0}: {1}".format(sc, label))
 
     with undo_chunk():
 
-        for sc in skin_clusters:
+        for ci, sc in enumerate(skin_clusters):
+
+            _report(ci, sc, _STEP_READ, "Reading the skin")
 
             try:
                 mesh = mesh_of_skin_cluster(sc)
@@ -1003,8 +1029,11 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True,
 
                                 # 타겟을 돌릴 버텍스별 스킨 선형부 A_v (스킨 평가 3 번).
                                 if target_info and target_info["blendshapes"]:
-                                    columns = _skin_jacobian(sc, geo_index, head,
-                                                             len(skin_in), skin_out)
+                                    columns = _skin_jacobian(
+                                        sc, geo_index, head, len(skin_in), skin_out,
+                                        report=lambda f, ci=ci, sc=sc: _report(
+                                            ci, sc, _STEP_MEASURE,
+                                            "Measuring the skin for blendShape targets", f))
 
                                 # 잠긴(user) 노멀은 스킨 행렬을 따라 돌고 있었다.
                                 # 바인드를 갱신하면 그 회전이 사라진다. 헤드 셰이프를
@@ -1051,6 +1080,7 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True,
                             sc, reason))
 
                 # ---- 1) bindPreMatrix = 현재 worldInverseMatrix -------------
+                _report(ci, sc, _STEP_MATRICES, "Setting bind matrices")
                 # 인덱스는 반드시 matrix[] 연결에서 얻는다 (아래 함수 주석 참고).
                 index_map = _influence_index_map(sc)
 
@@ -1081,10 +1111,12 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True,
 
                 # ---- 2) 현재 형상을 체인 입력에 굽는다 -----------------------
                 if keep_shape and head is not None and delta is not None:
+                    _report(ci, sc, _STEP_BAKE, "Baking the current shape")
                     _bake_delta(head, delta)
 
                     # ---- 2-b) 잠긴 노멀도 현재 값으로 다시 굽는다 ------------
                     if keep_normals and out_normals and head_state:
+                        _report(ci, sc, _STEP_NORMALS, "Re-baking locked normals")
                         count = _restore_locked_normals(head, out_normals,
                                                         head_state, messages)
                         if count:
@@ -1112,10 +1144,14 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True,
                                 "[Warning] {0}: {1} sit between the blendShape and the "
                                 "skin - the target update is an approximation there."
                                 .format(sc, ", ".join(target_info["loose"])))
-                        messages.extend(_update_targets(sc, target_info, columns, delta, mesh))
+                        messages.extend(_update_targets(
+                            sc, target_info, columns, delta, mesh,
+                            report=lambda f, ci=ci, sc=sc: _report(
+                                ci, sc, _STEP_TARGETS, "Updating blendShape targets", f)))
 
                 # ---- 3) bindPose 노드 재생성 -------------------------------
                 if rebuild_dag_pose:
+                    _report(ci, sc, _STEP_DAGPOSE, "Rebuilding the bindPose node")
                     bp_msg = _rebuild_bind_pose(sc, list(index_map.values()))
                     if bp_msg:
                         messages.append(bp_msg)
@@ -1138,6 +1174,8 @@ def update_bind_pose(skin_clusters, keep_shape=True, rebuild_dag_pose=True,
 
             except Exception as e:
                 messages.append("[Error] {0}: {1}".format(sc, e))
+
+            _report(ci, sc, _STEPS, "Done")
 
     return done, messages
 
