@@ -36,5 +36,15 @@
 #        TSL paints them; Connect > Match calls the same helper). It used to
 #        be grey in one list only, and plain text in the Pair tab.
 
-VERSION = "01.56"
-LAST_UPDATE = "2026-09-23"
+# 01.57  Constrain : the Constraint and Skin Weight sub tabs are merged into one
+#        "Constraint" sub tab with a Mode row (Default / Skin Weight). Both screens and
+#        their Options are unchanged.
+#        Constrain > Transfer gets a Mode row too : Default (the old Transfer - move)
+#        and Copy (new) - read each constraint on the left (any type) and set the same
+#        constraint on every object on the right, the original stays. Copied : type,
+#        targets, driven axes (skip), weights, aim / up / world up, interpType, rest
+#        values, pointOnPoly U / V; offsets are re-made (Maintain Offset on) or copied
+#        as values (off). Mapping All -> Each Object / Row to Row.
+
+VERSION = "01.57"
+LAST_UPDATE = "2026-09-28"

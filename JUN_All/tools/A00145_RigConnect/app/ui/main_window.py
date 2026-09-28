@@ -40,6 +40,7 @@ from tools.A00145_RigConnect.app.core import stream_manager as stm_mgr
 from tools.A00145_RigConnect.app.core import skin_constraint_manager as skn_mgr
 from tools.A00145_RigConnect.app.core import group_create_manager as grp_mgr
 from tools.A00145_RigConnect.app.core import constraint_transfer_manager as cxfer_mgr
+from tools.A00145_RigConnect.app.core import constraint_copy_manager as ccopy_mgr
 from tools.A00145_RigConnect.app.core import constraint_target_manager as ctgt_mgr
 from tools.A00145_RigConnect.app.core import constraint_update_manager as cupd_mgr
 from tools.A00145_RigConnect.app.core import attr_match
@@ -572,15 +573,17 @@ class MainWindow(QWidget):
     # Constrain 하위 탭: (탭 라벨, 툴팁 = 전체 이름/설명, 빌더 메서드 이름).
     # 라벨을 짧게 두는 이유는 탭 바가 창 폭(기본 560)을 넘기지 않게 하기 위해서다.
     # 전체 이름은 툴팁에 싣는다.
+    # v01.57 : Constraint 와 Skin Weight 를 한 탭(모드 Default / Skin Weight)으로 합쳤다.
+    #          Transfer 는 모드 Default(옮기기) / Copy(복사) 둘.
     CONSTRAIN_PAGES = (
-        ("Constraint", "Multi target -> follower constraints (+ Matrix Constraint)",
-         "_build_constraint_page"),
-        ("Skin Weight", "Skin Weight to Constraint - constrain by the skin weights "
-         "of the selected vertices", "_build_skin_constraint_page"),
+        ("Constraint", "Mode Default: multi target -> follower constraints (+ Matrix "
+         "Constraint)\nMode Skin Weight: constrain by the skin weights of the selected "
+         "vertices", "_build_constraint_mode_page"),
         ("Group Create", "Insert zero-out offset nodes above / below each object",
          "_build_group_create_page"),
-        ("Transfer", "Constraint Transfer - move an existing constraint onto "
-         "another object", "_build_constraint_transfer_page"),
+        ("Transfer", "Mode Default: Constraint Transfer - move an existing constraint "
+         "onto another object\nMode Copy: copy a constraint's settings onto other "
+         "objects (the original stays)", "_build_transfer_mode_page"),
         ("Target Edit", "Replace / add / remove the targets (drivers) of existing "
          "constraints", "_build_target_edit_page"),
         ("Update", "Update Offset - re-bake the maintain offset of existing "
@@ -612,6 +615,60 @@ class MainWindow(QWidget):
             tabs.setTabToolTip(index, tip)
 
         return tabs
+
+    def _build_mode_page(self, modes):
+        """Mode 라디오 줄 + 모드별 화면 스택 (v01.57).
+
+        modes : (라벨, 툴팁, 빌더 메서드 이름) 목록 - 첫 모드가 기본.
+        하위 탭 하나에 기능이 둘 이상일 때 쓴다. 각 모드 화면(= 예전 하위 탭 페이지)은 그대로 만든다.
+        반환: (페이지, QButtonGroup, QStackedWidget)
+        """
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        box = QGroupBox("Mode")
+        row = QHBoxLayout(box)
+        group = QButtonGroup(self)
+        stack = QStackedWidget()
+        for index, (label, tip, builder) in enumerate(modes):
+            rb = QRadioButton(label)
+            rb.setToolTip(tip)
+            group.addButton(rb, index)
+            row.addWidget(rb)
+            rb.toggled.connect(
+                lambda checked, i=index: checked and stack.setCurrentIndex(i))
+
+            inner = getattr(self, builder)()
+            # 바깥 페이지가 이미 여백을 갖는다 - 안쪽 여백은 뺀다.
+            inner.layout().setContentsMargins(0, 0, 0, 0)
+            stack.addWidget(inner)
+        row.addStretch(1)
+        group.button(0).setChecked(True)
+
+        layout.addWidget(box)
+        layout.addWidget(stack)
+        return page, group, stack
+
+    def _build_constraint_mode_page(self):
+        """Constraint 하위 탭 = 모드 Default(기존 Constraint) / Skin Weight(기존 Skin Weight 탭)."""
+        page, self.rb_con_mode, self.stack_con_mode = self._build_mode_page((
+            ("Default", "Multi target -> follower constraints (+ Matrix Constraint)",
+             "_build_constraint_page"),
+            ("Skin Weight", "Skin Weight to Constraint - constrain the followers by the "
+             "skin weights of the selected vertices", "_build_skin_constraint_page"),
+        ))
+        return page
+
+    def _build_transfer_mode_page(self):
+        """Transfer 하위 탭 = 모드 Default(기존 Transfer, 옮기기) / Copy(복사, v01.57)."""
+        page, self.rb_cxfer_mode, self.stack_cxfer_mode = self._build_mode_page((
+            ("Default", "Transfer - delete each constraint and re-create it on the "
+             "right-side object", "_build_constraint_transfer_page"),
+            ("Copy", "Copy - read each constraint's settings and set the same constraint "
+             "on every right-side object.\nThe original constraint is not touched.",
+             "_build_constraint_copy_page"),
+        ))
+        return page
 
     def _scrolled(self, widget):
         """위젯을 스크롤 영역에 담아 돌려준다 (창이 작아도 겹치지 않도록)."""
@@ -938,6 +995,76 @@ class MainWindow(QWidget):
             "Left items may be constraint nodes or objects that carry constraints.\n"
             "Mapping: 1 object -> all constraints go to it; equal counts -> 1:1.")
         btn.clicked.connect(self.on_transfer_constraint)
+        layout.addWidget(btn)
+
+        return page
+
+    def _build_constraint_copy_page(self):
+        """Transfer > Copy 모드 (v01.57) - constraint 의 성질을 읽어 다른 오브젝트에 똑같이 건다.
+
+        왼쪽 = constraint(종류 무관, constraint 가 걸린 트랜스폼이면 걸린 것 전부),
+        오른쪽 = 새로 constraint 를 받을 오브젝트. 원본은 그대로 둔다.
+        """
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        self.tsl_ccopy_cons = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Constraints", select_label="Select",
+            list_min_height=180, log_callback=self.log)
+        self.tsl_ccopy_cons.setToolTip(
+            "Constraints to copy - any type. An object that carries constraints\n"
+            "stands for all of its constraints.")
+        self.tsl_ccopy_objs = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", select_label="Select",
+            list_min_height=180, log_callback=self.log)
+        self.tsl_ccopy_objs.setToolTip("Objects that receive the copied constraints.")
+
+        list_row = QHBoxLayout()
+        list_row.addWidget(self.tsl_ccopy_cons)
+        list_row.addWidget(self.tsl_ccopy_objs)
+        layout.addLayout(list_row)
+
+        opt_box = QGroupBox("Options")
+        opt_layout = QVBoxLayout(opt_box)
+
+        self.cb_ccopy_maintain = QCheckBox("Maintain Offset")
+        self.cb_ccopy_maintain.setChecked(True)
+        self.cb_ccopy_maintain.setToolTip(
+            "On : the offset is taken from where each object is now - nothing jumps.\n"
+            "Off: the original constraint's offset values are copied as they are -\n"
+            "     the object takes the same relation to the targets (it may move).")
+        opt_layout.addWidget(self.cb_ccopy_maintain)
+
+        map_row = QHBoxLayout()
+        map_row.addWidget(QLabel("Mapping"))
+        self.rb_ccopy_map = QButtonGroup(self)
+        rb_each = QRadioButton("All -> Each Object")
+        rb_each.setToolTip(
+            "Every constraint on the left is copied onto every object on the right\n"
+            "(e.g. a point + orient pair goes onto each object together).")
+        rb_each.setProperty("map_key", ccopy_mgr.MAP_EACH)
+        rb_pair = QRadioButton("Row to Row (1:1)")
+        rb_pair.setToolTip("Row i on the left is copied onto row i on the right only.")
+        rb_pair.setProperty("map_key", ccopy_mgr.MAP_PAIR)
+        rb_each.setChecked(True)
+        self.rb_ccopy_map.addButton(rb_each, 0)
+        self.rb_ccopy_map.addButton(rb_pair, 1)
+        map_row.addWidget(rb_each)
+        map_row.addWidget(rb_pair)
+        map_row.addStretch(1)
+        opt_layout.addLayout(map_row)
+
+        layout.addWidget(opt_box)
+
+        btn = QPushButton("Copy Constraint")
+        btn.setMinimumHeight(32)
+        btn.setToolTip(
+            "Read each constraint on the left - type, targets, driven axes, weights,\n"
+            "aim / up vectors, interpolation, rest values (and the offsets when\n"
+            "Maintain Offset is off) - and set the same constraint on the objects\n"
+            "on the right. The original constraint stays.\n"
+            "An object that already has a constraint of the same type is skipped.")
+        btn.clicked.connect(self.on_copy_constraint)
         layout.addWidget(btn)
 
         return page
@@ -3023,6 +3150,27 @@ class MainWindow(QWidget):
             self.log("       {0} constraint(s) transferred".format(len(created)))
 
         self._run("Constraint Transfer", _do)
+
+    def on_copy_constraint(self):
+        cons = self.tsl_ccopy_cons.get_all_items()
+        objs = self.tsl_ccopy_objs.get_all_items()
+        maintain = self.cb_ccopy_maintain.isChecked()
+        button = self.rb_ccopy_map.checkedButton()
+        mapping = button.property("map_key") if button else ccopy_mgr.MAP_EACH
+
+        def _do():
+            created, warns, lines = ccopy_mgr.copy_constraints(
+                cons, objs, maintain_offset=maintain, mapping=mapping)
+            for line in lines:
+                self.log("       " + line)
+            for w in warns:
+                self.log("[WARN] {0}".format(w))
+            self.log("       {0} constraint(s) copied ({1})".format(
+                len(created), "maintain offset" if maintain else "offset values copied"))
+            if created:
+                cmds.select(created, replace=True)
+
+        self._run("Copy Constraint", _do)
 
     # ==============================================================
     # Handlers : Target Replace

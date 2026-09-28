@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.56` (`app/config/version.py`) — Attribute > Set Value 에 **`Include Non-Common`**: 일부 오브젝트만 가진 어트리뷰트도 나열, 행마다 **`[k/n]`**(§Set Value) · v01.55 는 창 기본 높이 900 → **980**(Match 탭이 스크롤 없이 다 보이게) · v01.54 는 리스트의 **`(Null)` 자리표시를 빨간 글씨로**(공용 TSL, 아래 메모) · v01.53 은 Match 에 **`Keep Children in Place`**(기본 OFF):
+- 버전: `v01.57` (`app/config/version.py`) — Constrain 의 **Constraint · Skin Weight 하위 탭을 하나로**(모드 `Default` / `Skin Weight`), Transfer 에 모드 **`Copy`** — constraint 의 성질을 읽어 다른 오브젝트에 똑같이 건다, 원본 유지(§Transfer) · v01.56 은 Attribute > Set Value 에 **`Include Non-Common`**: 일부 오브젝트만 가진 어트리뷰트도 나열, 행마다 **`[k/n]`**(§Set Value) · v01.55 는 창 기본 높이 900 → **980**(Match 탭이 스크롤 없이 다 보이게) · v01.54 는 리스트의 **`(Null)` 자리표시를 빨간 글씨로**(공용 TSL, 아래 메모) · v01.53 은 Match 에 **`Keep Children in Place`**(기본 OFF):
   팔로워만 움직이고 **그 아래 오브젝트는 있던 월드 자리에 그대로** 둔다. Mirror 탭의 같은 이름
   체크박스와 **같은 코어**(`app/core/keep_children.py`)를 쓴다 (§Match)
   · v01.52 는 Attribute 가 만든 어트리뷰트는 **반드시 채널 박스에
@@ -308,19 +308,22 @@ Targets                       Number: 4212
 끝나면 함께 버려지므로 씬이 바뀌어도 낡은 값이 남지 않는다.
 
 ### Constrain
-기능별 **하위 탭 6개**로 나뉜다(v01.22 에 5개, v01.36 에 `Update` 추가).
+기능별 **하위 탭 5개**로 나뉜다(v01.22 에 5개, v01.36 에 `Update` 추가, **v01.57 에 Constraint · Skin Weight 를 합침**).
 
 ```
 [ Match ][ Constrain ][ Connect ][ Attribute ]
-          └─ [ Constraint ][ Skin Weight ][ Group Create ][ Transfer ][ Target Edit ][ Update ]
+          └─ [ Constraint ][ Group Create ][ Transfer ][ Target Edit ][ Update ]
+               Mode: (•)Default ( )Skin Weight        Mode: (•)Default ( )Copy
 ```
 
 | 하위 탭 | 내용 |
 |---------|------|
-| **Constraint** | 타겟 → 팔로워 constraint (+ Matrix Constraint, v01.07) |
-| **Skin Weight** | Skin Weight to Constraint — 선택 버텍스의 스킨 웨이트로 구속 (+ Locators) |
+| **Constraint** | 모드 **`Default`** — 타겟 → 팔로워 constraint (+ Matrix Constraint, v01.07) · 모드 **`Skin Weight`** — Skin Weight to Constraint, 선택 버텍스의 스킨 웨이트로 구속 (+ Locators) |
 | **Group Create** | 오프셋(zero-out) 노드 삽입 (v01.12, 옵션 확장 v01.13) |
-| **Transfer** | Constraint Transfer — 기존 constraint 를 다른 오브젝트로 이관 (v01.14) |
+| **Transfer** | 모드 **`Default`** — Constraint Transfer, 기존 constraint 를 다른 오브젝트로 이관 (v01.14) · 모드 **`Copy`** — constraint 를 다른 오브젝트에 **복사**(원본 유지, v01.57) |
+
+> **모드 (v01.57)**: 하위 탭 맨 위 `Mode` 줄의 라디오로 화면을 바꾼다. 각 모드 화면은 예전 하위 탭 그대로이고
+> **Options 도 그대로**다 — 모드마다 리스트와 옵션을 따로 가지므로, 모드를 바꿔도 적어 둔 리스트가 지워지지 않는다.
 | **Target Edit** | 타깃(드라이버) **교체**(v01.20) / **추가 · 삭제**(v01.26) |
 | **Update** | 기존 constraint 의 **maintain offset 을 지금 포즈로 다시 굽기** (v01.36) |
 
@@ -339,7 +342,7 @@ Targets                       Number: 4212
 > 담았다. 기능이 5개로 늘면서 원하는 것을 보려면 접었다 폈다 해야 해서 하위 탭으로 바꿨다.
 > (Connect 탭의 Source/Destination 섹션은 여전히 접이식이다.)
 
-#### Constraint
+#### Constraint — 모드 Default
 타겟(드라이버) → 팔로워로 constraint 를 건다.
 
 - `Targets` / `Followers` 리스트에 오브젝트 추가(Select/Add/Del/Up/Down).
@@ -395,7 +398,7 @@ Targets                       Number: 4212
 - 원본 대비 수정: scale 채널이 translate 플래그로 잘못 게이팅되던 버그, `Maintain Offset` 이 무시되던
   버그를 고쳤다.
 
-#### Skin Weight — Skin Weight to Constraint
+#### Constraint — 모드 Skin Weight (Skin Weight to Constraint, v01.56 까지는 따로 하위 탭)
 선택한 버텍스의 **스킨 웨이트 비율**대로 영향 joint 들을 weight 로 follower 에 constraint 한다.
 (예: 버텍스 웨이트가 `hip:0.2 / spine_01:0.5 / spine_02:0.3` 이면 세 joint 를 그 비율의
 constraint weight 로 연결.)
@@ -458,7 +461,7 @@ Child       :  obj 와 그 자식들 사이에 삽입 (자식들이 아래로 �
   해석**해 조작한다(중복 이름이면 경고를 남기고 첫 매치 사용).
 - 존재하지 않거나(이름 못 찾음) 잠금/참조 등으로 재부모가 실패한 오브젝트는 건너뛰고 경고를 로그에 남긴다.
 
-#### Transfer — Constraint Transfer (v01.14)
+#### Transfer — 모드 Default : Constraint Transfer (v01.14)
 이미 걸려 있는 constraint 를 **다른 오브젝트에 걸리도록 옮긴다**. 원본 constraint 를 지우고, **세팅이
 같은** constraint 를 오른쪽(대상) 오브젝트에 새로 만든다.
 
@@ -481,6 +484,32 @@ after :  [targets] ─(parentConstraint, MO)→ objB     (원본 삭제, objB �
   여럿이어도** 안전하게 동작한다(중복 이름이면 경고 후 첫 매치 사용).
 - 어떤 종류의 constraint 든 동작한다(parent/point/orient/scale/aim/poleVector/geometry/pointOnPoly/
   normal/tangent). 읽기/재생성이 불가한 항목은 건너뛰고 경고를 남긴다.
+
+#### Transfer — 모드 Copy : Copy Constraint (v01.57)
+왼쪽 constraint 의 **성질을 읽어**, 오른쪽의 **각 오브젝트에 똑같은 constraint 를 새로 건다.**
+Default(Transfer)와 달리 **원본은 그대로** 둔다 — 복사 · 붙여넣기다.
+
+```
+before:  [drvA, drvB] ─(parentConstraint, skipRotate y, W 0.3/0.7)→ objA
+after :  [drvA, drvB] ─(parentConstraint, skipRotate y, W 0.3/0.7)→ objA   (원본 그대로)
+         [drvA, drvB] ─(parentConstraint, skipRotate y, W 0.3/0.7)→ objB, objC   (새로)
+```
+
+- 왼쪽 `Constraints`: **종류 무관** constraint 노드. constraint 가 걸린 **트랜스폼**을 넣으면 걸린 것 **전부**.
+  오른쪽 `Objects`: constraint 를 받을 오브젝트. `Copy Constraint` → 새로 만든 constraint 들이 선택된다.
+- **복사하는 성질**: 종류 · 타깃 목록(순서) · **구동 축**(원본이 x 만 구동하면 복사본도 x 만 — 원본 출력이 꽂힌
+  채널을 읽어 skip 으로) · 타깃별 **weight** · aim 계열(aim / normal / tangent)의 aim · up · worldUp 설정과
+  worldUpObject · `interpType` · rest 값 · pointOnPoly 의 **U / V** 값.
+- **Maintain Offset**(기본 ON): 오프셋은 **각 오브젝트의 지금 자리**로 새로 잡는다 → 오브젝트가 튀지 않는다.
+  **끄면 원본의 오프셋 값을 그대로** 넣는다(point · orient · aim · scale 의 `offset`, parent 의 타깃별
+  `targetOffsetTranslate/Rotate`) → 원본과 똑같은 관계로 붙어 오브젝트가 **원본 driven 과 같은 자리로 갈 수 있다**.
+- **Mapping**: `All -> Each Object`(기본) — 왼쪽 **전부**를 오른쪽 **하나하나**에(point + orient 조합을 통째로) ·
+  `Row to Row (1:1)` — 왼쪽 i 번째 줄 → 오른쪽 i 번째 오브젝트만(줄 수가 다르면 적은 쪽만큼 하고 경고).
+- **건너뛰는 것**(`[WARN]`): 원본의 driven 자신 · 원본의 타깃 중 하나(자기를 구동하게 됨) ·
+  **같은 종류의 constraint 가 이미 있는 오브젝트** — 마야는 새로 만들지 않고 그 constraint 에 타깃을 더해 버려서
+  원본 성질과 다른 결과가 된다.
+- 로그 한 줄에 무엇이 어디로 갔는지: `srcObj_parentConstraint1 -> objB : objB_parentConstraint1 [drvA, drvB] (skipRotate=y)`.
+- undo 한 번에 전부 되돌아간다. 로직: `app/core/constraint_copy_manager.py` (읽기 함수는 Transfer 매니저와 공유).
 
 #### Target Edit (v01.20 교체 · v01.26 추가/삭제)
 Constraint Transfer 가 **driven(구속당하는 쪽)** 을 옮긴다면, 이쪽은 **타깃(드라이버)** 을 다룬다.

@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-28 (오늘)
 
+> [!summary] A00145 **Constrain 하위 탭 정리** — Constraint · Skin Weight 를 한 탭의 **모드**(Default / Skin Weight)로, Transfer 에 모드 **Copy**(constraint 성질 복사, 원본 유지) (v01.56->01.57)
+- 요청: Constraint 와 SkinWeight 하위 탭을 Constraint 하나로 합쳐 두 모드를 고르게, 기존 Options UI 는 그대로. Transfer 에 Default / Copy 모드 — Copy 는 좌 TSL constraint(종류 무관) · 우 TSL 오브젝트, `Copy Constraint` 로 좌측 constraint 와 똑같은 constraint 를 우측 각 오브젝트에.
+- UI: 공통 골격 `_build_mode_page` — `Mode` 라디오 줄 + QStackedWidget, 모드 화면은 예전 하위 탭 빌더 그대로(리스트 · 옵션 모드별 유지). 하위 탭 6 → 5.
+- 새 `core/constraint_copy_manager.py`: 종류 · 타깃 · **구동 축(출력 연결을 읽어 skip)** · weight 와 pointOnPoly U/V(동적 어트리뷰트) · aim/normal/tangent 벡터 · worldUpObject · interpType · rest. Maintain Offset 켬 = 지금 자리로, 끔 = 원본 offset 값 그대로. Mapping All -> Each / Row to Row. 건너뜀: driven 자신 · 타깃 · 같은 종류 이미 있음(마야가 타깃을 더해 버림).
+- 검증(mayapy 2024) 38항목: parent(2 타깃 · weight · skipRotate y · interpType · 튀지 않음 · 원본 유지 · 드라이버 따라감) · MO 끔 = 원본 자리 · point skip x + offset · orient · 트랜스폼 줄 = 걸린 것 전부 · 건너뜀 3종 · Row to Row · aim worldUp object · pointOnPoly U/V · geometry · poleVector · scale · UI 탭/모드 전환/옵션 유지 · 핸들러 + undo 한 번 · 기존 Transfer 동작.
+- 문서: 가이드 §Constrain (하위 탭 표 · 모드 · Transfer Copy 절), version.py.
+
 > [!summary] **공용 토큰 이름 위젯** `Framework/qt/MOD_tokenName_qt_v01` + `Framework/core/token_naming` — A00330 Token 탭(v01.09->01.10) · A00480 Export Naming(v01.05->01.06) 이 함께 쓴다
 - 요청: A00480 Naming 칸을 A00330 이름 짓기 UI 처럼 토큰 단위 생성/삭제 + Profile 저장으로. 같은 UI·기능에 SK · MANU · CH · Name · Basic · Version 이 그대로 나오게, A00480 의 `Set's Name` 규칙도 추가. 두 툴이 공유하는 코드는 공용 위젯으로.
 - 공용 core `token_naming`: `TokenRuleSet`(규칙 묶음 · 검사 · 이름 계획 · 미리보기) — `MAYA_NODE_RULES`(Custom/Numbering, 마야 글자 검사) · `FILE_NAME_RULES`(+Set's Name, Numbering = 세트 순번 하나, Windows 파일명 검사). `TokenProfileStore(data_dir, 기본 토큰, 묶음)`.
