@@ -49,6 +49,8 @@ DEFAULTS = {
     "author": "",
     "recursive": False,
     "show_recorded_only": False,
+    # Path Structure 탭 'Recreate To' 목적지. project_root 와 무관한 별도 값(v01.32).
+    "recreate_to": "",
 }
 
 # 비어 있으면 번들 기본값으로 보정할 동기화 키들(예전 파일에 없던 키 대비).

@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-28 (오늘)
 
+> [!summary] A00210 **Help 메뉴 바** · **Path Structure `Recreate To` 를 Project Root 와 분리** (v01.31->01.32)
+- 요청: help 메뉴 바를 만들어 기본 목록을 넣을 것 · Recreate 가 `Recreate To` 가 아니라 File Manager 탭 `Project Root` 쪽에 생성되니, Project Root 와 무관하게 `Recreate To` 에 만들 것.
+- 원인: `recreate()` 호출 자체는 이미 `Recreate To` 값을 썼다. 문제는 `_show_preview` 가 구조를 선택할 때마다(저장 후 · Refresh · 프로파일 전환 새로고침 포함) 칸을 `<Project Root>/<base_rel>` 로 **덮어쓴** 것 — 적어 둔 경로가 조용히 바뀌었다.
+- 고침: 자동 채움·`clear()` 제거, 칸은 사용자 값만. 프로파일에 `recreate_to` 로 저장/복원(`prefs.DEFAULTS` 추가). 툴팁 갱신.
+- 메뉴: 공용 `JUN_mod_menuBar_qt_v01` + `Help`(`setMenuBar` 라 배치 불변) — `COMMON_MENUS` 의 `Copy Tool Name` 이 붙는다.
+- 검증(오프스크린, 임시 USERPROFILE): 메뉴 `['Help']` · 저장+새로고침 뒤에도 `Recreate To` 유지 · 그 경로에 생성 · 새 창에서 복원. 문서 가이드 §4-C · 메뉴 바 절, CHANGELOG.
+
 > [!summary] A00060 **IK Edit `Keep offset`**(v03.12->03.13) · A00130 **Match IK 세션이 폴 벡터 offset 을 지킨다 + 바뀐 길이를 쓴다**(v02.27->02.28) — 둘 다 새 기본
 - 사용자 답(계획서 6장): 새 방식 기본 · X→다음 조인트, up = Y/Z 중 월드 +Y 를 더 향한 축 · 반대편은 거울 반사 · poleTgt 는 자유 로케이터, 새 위치는 매칭 세트 · 긴 체인은 전부 투영 · 축 맞추기 유지 · 실제 케이지 경로. 추가 둘: **바꾼 체인 길이로 `Arm_L` 도 갱신**, up 축은 **폴 평면 법선 쪽**.
 - 코어(`ik_edit_manager`): `PV_MODE_KEEP` — offset 불변, 중간 조인트를 폴 평면에 투영, 뼈 축 재정렬(−X 규약 유지 · 수직 뼈는 지금 법선에 가까운 축), parentConstraint 로 도는 루트는 타깃 offset 재고정(`constraintRotateOrder`), 구동되는 끝 조인트 축은 리그에, **2조인트 체인은 솔버의 비틀림을 굳힘**, 부모 체인부터, IK 는 한꺼번에. 계산/놓기 분리 + `after_fit` 콜백. 옛 두 모드는 순서까지 그대로.

@@ -10,6 +10,9 @@
 # v01.29 : 파일도 함께 캡처/재생성. 두 지점에 체크박스(둘 다 기본 켬) —
 #          저장 쪽 "Include files"(캡처가 파일 목록도 기록) / 재생성 쪽 "Create files"
 #          (기록된 파일을 0 바이트 빈 파일로 생성, 이름 끝에 "__" 표식).
+# v01.32 : 'Recreate To' 를 Project Root(File Manager 탭)와 완전히 분리. 구조를 선택/새로고침해도
+#          칸을 <Project Root>/<base_rel> 로 덮어쓰거나 지우지 않는다 - Recreate 는 오직 이 칸의
+#          경로에 생성한다. 값은 프로파일에 따로 저장돼 다음 실행에 복원된다.
 
 import os
 import time
@@ -210,15 +213,15 @@ class PathStructureTab(QWidget):
         layout.addLayout(btn_row)
 
         # Recreate 목적지: 체크된 폴더가 이 폴더 '바로 안'에 생성된다.
-        # 구조를 선택하면 <Project Root>/<base_rel> 로 자동 채워지고, 다른 곳으로 바꿀 수 있다.
+        # Project Root / File Manager 탭과 무관하다 - 구조를 골라도 이 칸은 바뀌지 않는다(v01.32).
         recreate_row = QHBoxLayout()
         recreate_row.addWidget(QLabel("Recreate To"))
         self.ipf_recreate_to = QLineEdit()
         self.ipf_recreate_to.setPlaceholderText("Destination base folder for Recreate")
         self.ipf_recreate_to.setToolTip(
             "Destination base folder. Checked folders are created directly inside it.\n"
-            "Auto-filled to <Project Root>/<base_rel> when a structure is selected; "
-            "edit or Browse to redirect anywhere.")
+            "Independent of the Project Root (File Manager tab) - selecting a structure "
+            "never changes this field.")
         btn_recreate_browse = QPushButton("Browse...")
         btn_recreate_browse.clicked.connect(lambda: self._browse_dir(self.ipf_recreate_to))
         recreate_row.addWidget(self.ipf_recreate_to)
@@ -287,6 +290,14 @@ class PathStructureTab(QWidget):
         return super().eventFilter(obj, event)
 
     # ============================================================ helpers
+
+    def recreate_to(self):
+        """'Recreate To' 칸 값. MainWindow 가 프로파일에 저장할 때 읽는다."""
+        return self.ipf_recreate_to.text().strip()
+
+    def set_recreate_to(self, path):
+        """프로파일에서 복원한 'Recreate To' 값을 칸에 넣는다."""
+        self.ipf_recreate_to.setText(path or "")
 
     def _browse_dir(self, line_edit):
         start = line_edit.text().strip() or os.path.expanduser("~")
@@ -506,16 +517,14 @@ class PathStructureTab(QWidget):
         self._cur_base_abs = ""
         self._excluded = set()
         self.tree_preview.clear()
-        self.ipf_recreate_to.clear()
 
     def _show_preview(self, structure, base_abs=""):
         """새 구조를 Preview 대상으로 삼는다(제외 목록 초기화 후 트리 렌더)."""
         self._cur_structure = structure
         self._cur_base_abs = base_abs or ""
         self._excluded = set()
-        # Recreate 목적지를 이 구조의 기본 경로(<Project Root>/<base_rel>, 또는 캡처 소스)로
-        # 자동 채운다. 사용자가 그대로 두면 기존 동작과 동일, 바꾸면 그 폴더에 생성된다.
-        self.ipf_recreate_to.setText(self._cur_base_abs)
+        # 'Recreate To' 는 건드리지 않는다(v01.32). 예전에는 여기서 <Project Root>/<base_rel> 로
+        # 덮어써서, 경로를 적어 둬도 구조 선택/새로고침 한 번에 Project Root 쪽에 생성됐다.
         self._fill_preview_tree(self.tree_preview)
 
     def _view_depth(self):

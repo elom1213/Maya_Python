@@ -2,6 +2,17 @@
 
 All notable changes to this tool are documented here.
 
+## [01.32] - 2026-09-28
+### Added
+- **Help menu bar** - the shared Framework menu bar (`JUN_mod_menuBar_qt_v01`), so the window gets
+  the same common `Help` items as every other tool (`Copy Tool Name`, ...).
+### Fixed
+- **Path Structure - Recreate always builds in `Recreate To`.** Selecting a structure (or any list
+  refresh, e.g. after a profile switch) used to overwrite the field with `<Project Root>/<base_rel>`,
+  so a typed destination was silently replaced and the structure landed under the Project Root.
+  The field is now independent of the File Manager tab: nothing auto-fills or clears it, and its
+  value is saved per profile (`recreate_to`) and restored on the next launch.
+
 ## [01.31] - 2026-09-18
 ### Added
 - **Shift / Ctrl multi-select + multi-check** on the two check lists - Lineage `Add Node from Scan...`

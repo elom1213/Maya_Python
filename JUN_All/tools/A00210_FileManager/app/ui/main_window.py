@@ -39,6 +39,7 @@ from Framework.qt.qt import (
     Qt,
 )
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
+from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 
 from ..config.version import VERSION, LAST_UPDATE
 from ..config.app_meta import icon_path
@@ -231,6 +232,12 @@ class MainWindow(QWidget):
 
     def _build_ui(self):
         root = QVBoxLayout(self)
+
+        # 메뉴 바 (v01.32) - 공용 위젯이라 모든 툴과 같은 Help 공통 항목(Copy Tool Name 등)이
+        # 저절로 붙는다. setMenuBar 는 레이아웃 항목이 아니라서 아래 위젯 배치가 그대로다.
+        self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
+        self.menu_bar.addMenu("Help")
+        root.setMenuBar(self.menu_bar)
 
         # 로그 위젯은 탭 밖(하단)에 두어 모든 탭에서 보이게 한다.
         # 새 탭이 self.log 를 캡처하므로 탭보다 먼저 생성한다.
@@ -526,6 +533,9 @@ class MainWindow(QWidget):
         self.chk_recorded_only.setChecked(
             bool(self._prefs.get("show_recorded_only", False)))
 
+        # Path Structure 탭의 Recreate 목적지(Project Root 와 별개 값, v01.32).
+        self.path_structure_tab.set_recreate_to(self._prefs.get("recreate_to", ""))
+
         # Source Mode 별 경로를 슬롯에 채우고, 활성 모드 경로를 공유 입력 칸에 로드한다.
         self._path_values["git"] = self._prefs.get("store_dir", "")
         self._path_values["local"] = self._prefs.get("local_dir", "")
@@ -557,6 +567,7 @@ class MainWindow(QWidget):
             "author": self.ipf_author.text().strip(),
             "recursive": self.chk_recursive.isChecked(),
             "show_recorded_only": self.chk_recorded_only.isChecked(),
+            "recreate_to": self.path_structure_tab.recreate_to(),
         }
 
     def on_save_settings(self):

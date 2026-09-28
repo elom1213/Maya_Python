@@ -1,11 +1,16 @@
 ---
 name: wip-a00210-recreate-to-rename
-description: "A00210_FileManager Path Structure tab — explicit \"Recreate To\" destination field + Rename button (v01.28)"
+description: "A00210_FileManager Path Structure tab — explicit \"Recreate To\" destination field + Rename button (v01.28); v01.32 field is independent of Project Root — never auto-fill it"
 metadata: 
   node_type: memory
   type: project
   originSessionId: 746d699d-9d82-44da-b966-14caefd575fd
 ---
+
+**★ v01.32 (2026-09-28) — 자동 채움 제거.** 사용자 보고: Recreate 가 `Recreate To` 가 아니라 Project Root 쪽에 생성된다.
+원인은 아래 v01.28 설계의 `_show_preview` 자동 채움 — 구조 선택·Refresh·저장 후·프로파일 전환 새로고침마다 칸을
+`<Project Root>/<base_rel>` 로 덮어써 적어 둔 경로가 조용히 바뀌었다. **이제 칸은 Project Root/File Manager 와 무관**,
+자동 채움·clear 없음, 프로파일 `recreate_to` 로 저장/복원. **다시 자동 채움을 넣지 말 것.** 같은 버전에 공용 Help 메뉴 바.
 
 DONE (verified + pushed Dnable/dev, commit 57111a8), v01.28: A00210_FileManager **Path Structure** tab.
 
