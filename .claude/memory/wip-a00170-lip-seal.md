@@ -79,6 +79,9 @@ AttachCrv > Edge Loop 로 만든 위/아래 입술 리그를 **지퍼처럼** �
 - ★ **만남점 = 널 translate 소스 × `parentMatrix`**(`pointMatrixMult`). 어태치 fbf 로 재면 **Maintain offset 어태치**에서
   빌드 즉시 튄다(널이 fbf 점에서 떨어져 있다). 커브 리그 결과는 HEAD 와 소수점까지 동일.
 
+**v01.28**: Preview Pairing 줄 더블클릭 = 그 짝 두 노드 선택(UUID 를 `Qt.UserRole` 에).
+오프스크린 QTest 로 실제 더블클릭을 흉내 내려면 `QT_QPA_PLATFORM=offscreen` + **`mouseClick` 먼저, 그 뒤 `mouseDClick`** — 더블클릭만 보내면 안 잡혔다.
+
 검증: 코어 26 + UI 26 + 짝짓기 21 + 회전 15 + 닫힌 커브 30 + **v01.20~21 81항목**
 (rest 캡처·회전 보존·간격 유지·sealMerge·bias·머리 회전+이동 불변·반대 방향 커브 재현·
 Update Rest Pose·기준 공간 경고 9·UI 22)([[mayapy-headless-verify]]).

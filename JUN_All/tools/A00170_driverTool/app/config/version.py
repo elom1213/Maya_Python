@@ -7,5 +7,8 @@
 #        now seals at the null (it failed to build before), and the live meeting point
 #        is read from what the null really gets, so a Maintain-offset attach no longer jumps.
 
-VERSION = "01.27"
+# 01.28  Seal : double-click a row of the Preview Pairing list to select that pair's
+#        upper and lower node in the scene (held by UUID, so renames / duplicate names are fine).
+
+VERSION = "01.28"
 LAST_UPDATE = "2026-09-28"

@@ -31,6 +31,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-09-28 (오늘)
 
+> [!summary] A00170 Seal — **Preview Pairing 줄 더블클릭 = 그 짝 두 노드 선택** (v01.27->01.28)
+- 요청: Preview Pairing 뒤 리스트 줄을 더블클릭하면 두 오브젝트가 씬에서 선택되게.
+- 줄마다 위/아래 노드 **UUID** 를 `Qt.UserRole` 에 담아 `itemDoubleClicked` → `select(replace)`. 로그에 `Selected: a, b`. 하나가 지워졌으면 남은 것 + `[WARN]`, 둘 다 없으면 경고만(선택 유지).
+- 검증(mayapy 2024) 6항목: 신호 · 실제 마우스 더블클릭(오프스크린, 클릭 뒤 더블클릭) · Preview 뒤 rename · 같은 이름 노드 · 하나 삭제 · 둘 삭제.
+
 > [!summary] A00170 **Seal 이 NURBS 서피스에 어태치된 입술 리그를 받는다** — Preview · Build · Update Rest Pose · Remove (v01.26->01.27)
 - 요청: Edge Loop 식으로 서피스에 붙은 조인트를 Upper/Lower 에 넣으면 `[WARN] Upper/Lower need curve-attached drivers (found 0 / 0).` — 서피스여도 Seal 탭 전 기능이 되게.
 - 원인: `poci_of` 가 `pointOnCurveInfo` 만 찾았다. mayapy 로 재현(found 0 / 0).

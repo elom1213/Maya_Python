@@ -1765,6 +1765,9 @@ class MainWindow(QWidget):
 
         self.seal_pair_view = QListWidget()
         self.seal_pair_view.setMinimumHeight(90)
+        # 줄을 더블클릭하면 그 짝(위/아래 두 노드)을 씬에서 선택한다 (v01.28).
+        self.seal_pair_view.setToolTip("Double-click a pair to select both nodes in the scene.")
+        self.seal_pair_view.itemDoubleClicked.connect(self.on_seal_pair_double_clicked)
         pair_lay.addWidget(self.seal_pair_view)
         root.addWidget(pair_box)
 
@@ -1924,11 +1927,15 @@ class MainWindow(QWidget):
         skipped = list(info["dropped"]) + skipped
 
         for u_entry, l_entry, u in pairs:
-            self.seal_pair_view.addItem(
+            item = QListWidgetItem(
                 "{0}   <->   {1}      u = {2:.3f}   gap = {3:.3f}".format(
                     u_entry["node"].split("|")[-1],
                     l_entry["node"].split("|")[-1], u,
                     seal_pair_cost(u_entry, l_entry, metric)))
+            # 더블클릭 선택용 - 이름 대신 UUID (같은 이름 · 이후 rename 에도 안전).
+            item.setData(Qt.UserRole, [
+                (cmds.ls(e["node"], uuid=True) or [None])[0] for e in (u_entry, l_entry)])
+            self.seal_pair_view.addItem(item)
         self._log("Pairing: {0} pair(s), {1} skipped.{2}".format(
             len(pairs), len(skipped),
             "  (u flipped to match the axis)" if any(flipped) else ""))
@@ -1936,6 +1943,22 @@ class MainWindow(QWidget):
             self._log("  skip {0} ({1})".format(node.split("|")[-1], why))
         for warning in seal_rest_space_warnings(up + lo, self._seal_reference()):
             self._log("[WARN] " + warning)
+
+    def on_seal_pair_double_clicked(self, item):
+        """Preview 줄 더블클릭 -> 그 짝의 위/아래 노드 두 개를 씬에서 선택."""
+        uuids = item.data(Qt.UserRole) or []
+        nodes = []
+        for uuid in uuids:
+            found = cmds.ls(uuid, long=True) if uuid else []
+            if found:
+                nodes.append(found[0])
+        if not nodes:
+            self._log("[WARN] This pair is no longer in the scene - run Preview Pairing again.")
+            return
+        cmds.select(nodes, replace=True)
+        self._log("Selected: {0}".format(", ".join(n.split("|")[-1] for n in nodes)))
+        if len(nodes) < len(uuids):
+            self._log("[WARN] One node of this pair is gone - selected what is left.")
 
     def on_seal_build(self):
         self._log("--- Build Seal ---")

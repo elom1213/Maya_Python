@@ -296,6 +296,8 @@ A00170_driverTool/
 4. **Corner Axis**(기본 World X)와 **sealR starts at**(Min / Max 끝)으로 지퍼 방향을 정하고
    **Preview Pairing** 으로 짝을 확인한다(씬은 건드리지 않는다). 각 줄에 `u`(입술 위 위치)와
    `gap`(짝의 벌어진 정도)이 함께 나온다.
+   **줄을 더블클릭하면 그 짝의 위/아래 노드 두 개가 씬에서 선택된다**(v01.28~). 노드는 UUID 로 기억하므로
+   Preview 뒤에 이름을 바꾸거나 같은 이름이 있어도 그 노드가 잡힌다. 지워졌으면 로그로 알리고 남은 것만 고른다.
 5. **Restore the closed-pose rotation**(기본 켜짐, v01.20~) — 다물릴 때 회전을 **다물린 모양의
    회전**으로 되돌릴지.
 6. **Build Seal**.
