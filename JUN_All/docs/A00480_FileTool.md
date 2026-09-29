@@ -2,7 +2,7 @@
 title: A00480_FileTool 사용법
 aliases: [File Tool, FileTool, A00480]
 tags: [maya-python, tool-guide, file, fbx, export, import, path, pyside]
-updated: 2026-09-28
+updated: 2026-09-29
 ---
 
 # A00480_FileTool 사용법
@@ -16,7 +16,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 | **Import** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` |
 | **Path** | `Copy Scene Folder` · `Open Scene Folder` | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `File` |
 
-- **버전**: `app/config/version.py` (v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
+- **버전**: `app/config/version.py` (v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
 - **설치**: `__dragDrop_A00480.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **FileTool** → `tools.A00480_FileTool.run(True)`
 - **테마**: `slate_dark`
 - **원본 두 툴은 그대로 남아 있다.** quickTool 의 File · Import option 버튼도 지워지지 않았다.
@@ -53,6 +53,12 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
   Profile 과 Add/Delete Token 을 한 줄에, Set Name 을 미리보기 줄 오른쪽에 둬서 높이를 줄였다(988 → 970).
   - 테마 qss 는 `show()` 뒤에야 자식 위젯에 입혀지므로, 그 전에 재면 글자가 큰 상태의 최소 크기(약 1290 폭)로 창이 커진다.
     `launch.py` 가 show 다음 이벤트 루프에서 `fit_to_content()` 로 레이아웃 최소 크기에 맞춘다.
+  - **v01.07 — 화면보다 크면 화면에 맞춘다.** 내용 높이가 약 1070px(+ 타이틀 바)이라 1080 모니터나 배율 125/150% 에서는
+    창이 작업 영역을 넘었다. 윈도우가 잘라낸 아래쪽을 Qt 가 그리지 못해 **로그창 잔상(Win10 · Maya 2023) / 흰 영역(Win11 · Maya 2024)**
+    이 남아 로그창이 두 개처럼 보였다. 이제 탭은 `QScrollArea` 안에 있고, 창 높이는 `min(내용 높이, 모니터 작업 영역)` 이다.
+    - 탭 높이는 `sizeHint` 로 잰다 — 스크롤 칸이 없던 때 레이아웃이 탭에 준 높이와 같다(`minimumSizeHint` 면 리스트가 92px 줄어든다).
+    - 줄일 때는 리스트가 먼저 줄고, 탭 최소 높이보다 작을 때만 세로 스크롤바가 생긴다(그때만 스크롤바 폭만큼 넓힌다).
+    - 창 아래가 화면 밖이면 위로 올린다. 로그창과 푸터는 늘 화면 안에 있다.
   - 탭 테두리만큼 늘어나는 것은 Export 페이지 여백 0 · 창 좌우 여백 -2 · Pin 높이 22 로 상쇄했다.
   - Pin 버튼은 22px 높이라 테마의 `padding: 8px` 이면 글자 자리가 4px 뿐이다 → 이 버튼만 위아래 padding 0(v01.02).
 

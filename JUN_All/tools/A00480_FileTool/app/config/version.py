@@ -28,5 +28,8 @@
 #        칸마다 규칙 Custom / Numbering(세트 순번) / Set's Name, Add / Delete Token, Profile(json, data/).
 #        기본 프로파일 Default = SK_MANU_CH_Name_Basic_Version. Set Name 버튼은 미리보기 줄 오른쪽.
 
-VERSION = "01.06"
-LAST_UPDATE = "2026-09-28"
+# 01.07  창이 화면보다 커서 아래에 로그창 잔상(Win10 · Maya 2023) / 흰 영역(Win11 · Maya 2024)이
+#        생기던 문제 수정. 탭을 스크롤 칸에 담고, fit_to_content 가 창 높이를 모니터 작업 영역에 맞춘다.
+
+VERSION = "01.07"
+LAST_UPDATE = "2026-09-29"

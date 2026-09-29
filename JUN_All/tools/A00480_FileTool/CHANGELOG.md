@@ -1,5 +1,17 @@
 # Changelog — A00480_FileTool
 
+## v01.07 (2026-09-29)
+- **Fixed a second, broken log box under the window** (a ghost of the log on Windows 10 / Maya 2023,
+  a white strip on Windows 11 / Maya 2024).
+  - Cause: the window opened at its full content height (about 1070px + title bar), taller than a
+    1080 screen's work area. Windows cut the window at the screen edge and Qt never painted the part
+    below, so the log was drawn a second time (or left white) there.
+  - The tabs now sit in a scroll area. `fit_to_content()` still opens the window at the old size when it fits,
+    otherwise at the monitor's work-area height (taskbar excluded) and moves it up if its bottom is off screen.
+    The lists shrink first; a vertical scrollbar appears only below the tabs' minimum height
+    (the window is widened by the bar then, so nothing is cut sideways).
+  - The log and the footer always stay on screen.
+
 ## v01.06 (2026-09-28)
 - **Naming works like A00330_NamingTool Rename > Token.** The six fixed boxes are replaced by the
   shared token widget (`Framework/qt/MOD_tokenName_qt_v01`):

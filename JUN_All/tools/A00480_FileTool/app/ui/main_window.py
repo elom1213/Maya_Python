@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-17
+# last Update date : 2026-09-29
 # A00480_FileTool - Qt UI (in-Maya)
 #
 # 파일을 들여오고 · 내보내고 · 경로를 다루는 툴.
@@ -19,6 +19,11 @@ from Framework.qt.qt import (
     QMessageBox,
     QPushButton,
     QTabWidget,
+    QScrollArea,
+    QFrame,
+    QStyle,
+    QGuiApplication,
+    QSize,
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
@@ -56,8 +61,47 @@ class MainWindow(QWidget):
 
         테마 qss 는 show() 뒤 polish 때 자식에 적용되므로, 그 전에 재면 글자가 큰 상태의
         최소 크기(약 1280 폭)로 창이 커진다. launch.py 가 show() 다음 이벤트 루프에서 부른다.
+
+        v01.07: 내용 높이(약 1070px)가 **화면보다 크면** 화면 높이로 줄이고 탭은 스크롤한다.
+        예전에는 창이 화면 밖으로 넘쳤고, 윈도우가 잘라낸 아래쪽을 Qt 가 그리지 못해
+        로그창 잔상(Win10 · Maya 2023) / 흰 영역(Win11 · Maya 2024)이 남아 로그창이 두 개처럼 보였다.
         """
-        self.resize(self.minimumSizeHint())
+        # 폭은 최소 폭, 높이는 sizeHint - 스크롤 칸이 없던 때 창이 탭에 준 높이와 같다
+        # (그때 레이아웃은 탭의 sizeHint 를 최소로 썼다. minimumSizeHint 면 리스트가 92px 줄어든다).
+        content = QSize(self.tabs.minimumSizeHint().width(), self.tabs.sizeHint().height())
+        # 스크롤 칸이 탭 내용보다 좁아지지 않게 - 가로 스크롤 없이 원본과 같은 폭.
+        self.tabs_scroll.setMinimumWidth(content.width())
+        # 스크롤 칸은 최소 높이가 작으므로, 창 높이 = 창 최소 높이 - 스크롤 칸 몫 + 탭 내용 높이.
+        full_h = (self.minimumSizeHint().height()
+                  - self.tabs_scroll.minimumSizeHint().height() + content.height())
+
+        avail = self._available_geometry()
+        # 타이틀 바 · 테두리 (show() 뒤라 frameGeometry 가 실제 값이다)
+        frame_h = self.frameGeometry().height() - self.geometry().height()
+        max_h = avail.height() - max(frame_h, 0)
+
+        height = min(full_h, max_h)
+        # 줄일 때는 리스트가 먼저 줄어든다(탭 최소 높이까지). 그보다 작을 때만 세로 스크롤바가
+        # 생기므로 그 폭만큼 넓혀 내용이 가로로 잘리지 않게 한다.
+        least_h = full_h - content.height() + self.tabs.minimumSizeHint().height()
+        if height < least_h:
+            bar = self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
+            self.tabs_scroll.setMinimumWidth(content.width() + bar)
+        self.resize(self.minimumSizeHint().width(), height)
+
+        # 창 아래가 화면 밖이면 위로 올린다.
+        frame = self.frameGeometry()
+        if frame.bottom() > avail.bottom() or frame.top() < avail.top():
+            self.move(frame.left(), max(avail.top(), avail.bottom() - frame.height() + 1))
+
+    def _available_geometry(self):
+        """창이 떠 있는 모니터의 작업 영역(작업 표시줄 제외)."""
+        screen = self.screen() if hasattr(self, "screen") else None
+        if screen is None:
+            screen = QGuiApplication.screenAt(self.frameGeometry().center())
+        if screen is None:
+            screen = QGuiApplication.primaryScreen()
+        return screen.availableGeometry()
 
     # ==================================================================
     # UI
@@ -109,7 +153,14 @@ class MainWindow(QWidget):
         self.tabs.setTabToolTip(1, "Import settings.")
         self.tabs.setTabToolTip(2, "Scene folder and path helpers.")
 
-        main_layout.addWidget(self.tabs, stretch=1)
+        # 탭은 스크롤 칸에 담는다 - 화면이 작거나(1080 · 배율 125/150%) 창을 줄여도 창이 화면을
+        # 넘지 않는다. 내용이 다 들어가면 스크롤바는 안 보인다. (fit_to_content 참고)
+        self.tabs_scroll = QScrollArea()
+        self.tabs_scroll.setWidgetResizable(True)
+        self.tabs_scroll.setFrameShape(QFrame.NoFrame)
+        self.tabs_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.tabs_scroll.setWidget(self.tabs)
+        main_layout.addWidget(self.tabs_scroll, stretch=1)
         main_layout.addWidget(self.log_view)
 
         # 저작권
