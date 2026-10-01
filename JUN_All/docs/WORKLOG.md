@@ -32,6 +32,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-01 (오늘)
 
+> [!summary] A00490 KeyboardTool — **신규: 키 시퀀스 자동 입력 + 대상 창 지정** (v01.00)
+- 요청: 키 여러 개를 키마다 횟수 · 간격으로 누르기(예 Down 10 · Up 10, 1초) + 루프 + **고른 창에만**(크롬 A, B 만, C 는 그대로). Windows 10 · 11 둘 다. 아이콘 포함.
+- 구조: standalone PySide6(A00240 배치). core = `keys`(이름 <-> VK, `Ctrl+C` 파싱) · `win32`(ctypes 창 열거 / PostMessage / SendInput / activate) · `runner`(스레드, Stop 이벤트 + F9 감시) · `presets`(data/presets). UI = 시퀀스 표(키 캡처 칸) · 대상 창 체크 목록(공용 checkList) · Run · 공용 로그.
+- 전송 방식 2개: **Background**(PostMessage, 포커스 유지, 여러 창 동시 · 조합키는 안 먹음) / **Foreground**(AttachThreadInput 으로 앞으로 + SendInput, 끝나면 원래 창 복귀).
+- Win10/11: Vista~ 고정 user32 API 만, DWM cloaked 로 숨은 UWP 창 제외, 64bit `INPUT` 40바이트 맞춤.
+- 검증(별도 프로세스 수신 창 A/B/C): Background · Foreground 둘 다 A · B 만 받고 C 0건, Foreground 는 Ctrl 수식키 포함 + 포커스 복귀, Stop · F9 · 대상 창 닫힘 처리. **실제 크롬은 미확인.**
+- 문서: [A00490_KeyboardTool.md](A00490_KeyboardTool.md).
+
 > [!summary] A00210 FileManager Path Structure — **Preview 트리 맨 위를 `.` 로** (v01.33->01.34)
 - 요청: Base Folder `A`(아래 `B/B_01` · `B/B_02` · `C`)를 Capture · Save 하면 트리 맨 위에 `A` 가 보인다. 재생성 때 `A` 가 새로 생긴다고 오해하므로 `.` 아래에 `B` · `C` 가 보이게.
 - 사실관계: 저장 내용(`folders = B, B/B_01, B/B_02, C`)과 재생성(Recreate To 바로 안)은 이미 `A` 를 만들지 않았다 — **표시만** 원본 이름이었다(`build_structure_tree` 의 루트 이름).

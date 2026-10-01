@@ -1,0 +1,10 @@
+{
+  "steps": [
+    {"key": "Down", "count": 10, "interval": 1.0},
+    {"key": "Up", "count": 10, "interval": 1.0}
+  ],
+  "loop": true,
+  "loop_count": 0,
+  "start_delay": 0.0,
+  "method": "background"
+}
