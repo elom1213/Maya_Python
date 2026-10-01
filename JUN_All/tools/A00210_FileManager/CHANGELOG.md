@@ -2,6 +2,16 @@
 
 All notable changes to this tool are documented here.
 
+## [01.34] - 2026-10-01
+### Changed
+- **Path Structure: the Preview tree's top item is now `.` instead of the Base Folder's name.**
+  Capturing `A` (with `B/B_01`, `B/B_02`, `C` under it) used to show `A` at the top, which read as if
+  Recreate would make a new `A` folder. The saved items were always relative to the base, and
+  Recreate creates them directly inside `Recreate To`, so the top is now `.` = the Recreate To folder.
+  Its tooltip says so and shows the folder it was captured from.
+- The Expand window title shows the structure name (or `(not saved)`) instead of the base path.
+- What is saved and what Recreate creates are unchanged.
+
 ## [01.33] - 2026-10-01
 ### Changed
 - **Path Structure: Capture works from any folder.** It no longer needs a Project Root (File Manager tab)

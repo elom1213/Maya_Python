@@ -16,6 +16,9 @@ metadata:
 를 늘 기록, `base_rel` 은 루트 안일 때만(밖 · 루트 없음 · 다른 드라이브 = ""). **Path Structure 탭에 Project Root 검사를 다시 넣지 말 것.**
 `store.make_key` 는 다른 드라이브에서 ValueError 를 던지므로 core `base_rel_in_root` 를 쓴다.
 
+**v01.34 (2026-10-01) — Preview 트리 루트는 `.`**(베이스 이름 아님). 사용자: 맨 위에 `A` 가 보이면 재생성 때 A 가 생긴다고 오해.
+루트 = Recreate To 자신. 원본 경로는 루트 툴팁에만. 다시 베이스 이름을 루트에 쓰지 말 것.
+
 DONE (verified + pushed Dnable/dev, commit 57111a8), v01.28: A00210_FileManager **Path Structure** tab.
 
 **Problem the user reported:** Recreate was confusing — it created folders at `<File Manager tab Project Root>/<base_rel>`, and the user couldn't tell if it targeted the File Manager tab's `Scan Dir` or this tab's `Base Folder` (capture source). Also wanted a Rename button for saved structures.

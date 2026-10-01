@@ -18,6 +18,9 @@
 #          절대경로를 base_path 에 늘 기록하고, base_rel 은 그 폴더가 Project Root 안일 때만
 #          채운다(밖이거나 루트가 비었으면 ""). 재생성은 v01.32 부터 'Recreate To' 칸만 쓰므로
 #          base_rel 이 없어도 동작한다.
+# v01.34 : Preview 트리의 루트는 베이스 폴더 이름이 아니라 "." (ROOT_LABEL). 기록된 항목은 전부
+#          베이스 기준 상대경로라, 이름(A)을 보이면 재생성 때 A 폴더가 새로 생긴다고 오해한다.
+#          "." = Recreate To 폴더 자신. 원본 경로는 툴팁으로만 보인다.
 
 import os
 import json
@@ -36,6 +39,9 @@ _ILLEGAL = '\\/:*?"<>|'
 # 확장자를 바꾸지 않고 덧붙이는 이유: 원래 이름을 눈으로 그대로 읽을 수 있고,
 # DCC/탐색기가 이 파일을 진짜 씬 파일로 오해해 열려고 하지 않는다.
 RECREATED_SUFFIX = "__"
+
+# Preview 트리 루트 표시 (v01.34). 재생성 목적지(Recreate To) 자신 - 이 아래에 하위 폴더가 생긴다.
+ROOT_LABEL = "."
 
 
 def marked_name(name, suffix=RECREATED_SUFFIX):
@@ -401,9 +407,8 @@ def build_structure_tree(structure, base_abs=None, show_files=False, max_depth=0
     show_files: 파일을 트리에 넣을지. structure.files 가 있으면 그것을,
                 없으면 base_abs 의 실제 파일을(표시 전용) 채운다.
     """
-    label = base_label(structure)
-    root_name = os.path.basename(label.rstrip("/")) or label or "(base)"
-    root = {"name": root_name, "rel": "", "path": base_abs or "",
+    # 루트는 베이스 폴더 이름이 아니라 "." - 하위 항목이 '선택한 경로 안'에 생긴다는 뜻 (v01.34).
+    root = {"name": ROOT_LABEL, "rel": "", "path": base_abs or "",
             "is_dir": True, "recorded": True, "children": []}
 
     nodes = {"": root}

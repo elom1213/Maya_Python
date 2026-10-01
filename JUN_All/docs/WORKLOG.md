@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-01 (오늘)
 
+> [!summary] A00210 FileManager Path Structure — **Preview 트리 맨 위를 `.` 로** (v01.33->01.34)
+- 요청: Base Folder `A`(아래 `B/B_01` · `B/B_02` · `C`)를 Capture · Save 하면 트리 맨 위에 `A` 가 보인다. 재생성 때 `A` 가 새로 생긴다고 오해하므로 `.` 아래에 `B` · `C` 가 보이게.
+- 사실관계: 저장 내용(`folders = B, B/B_01, B/B_02, C`)과 재생성(Recreate To 바로 안)은 이미 `A` 를 만들지 않았다 — **표시만** 원본 이름이었다(`build_structure_tree` 의 루트 이름).
+- 수정: 루트 이름 = `ROOT_LABEL "."`, 루트 툴팁 = `'.' = the Recreate To folder itself ...` + `Captured from: <원본>`. Expand 창 제목은 원본 경로 대신 구조 이름(`(not saved)`).
+- 검증(오프스크린, 임시 A/B/C): Capture 직후 · Save 후 목록 선택 둘 다 `. > B > B_01, B_02 / C` · JSON folders 그대로 · Recreate To 에 `B, B/B_01, B/B_02, C` 만 생성(`A` 없음).
+
 > [!summary] A00210 FileManager Path Structure — **Capture 가 Project Root 와 무관하게 어느 경로에서든** (v01.32->01.33)
 - 요청: Base Folder 를 채우고 Capture 하면 File Manager 탭 Project Root 하위 경로만 되고 그 위 경로는 안 된다. 제약을 없애 원하는 어느 경로든 캡처되게.
 - 원인: `capture()` 가 베이스를 `store.make_key()`(루트 기준 키)로만 저장해서, 루트 밖이면 `OutsideProjectRootError` → `Base folder is outside the project root`, 루트가 비면 탭이 `Set Project Root first` 로 막았다. 다른 드라이브면 `relpath` 가 `ValueError` 를 던져 잡히지도 않았다.

@@ -577,6 +577,14 @@ class PathStructureTab(QWidget):
                 item.setToolTip(0, "On disk in the base folder - not part of this "
                                    "structure, so Recreate does not create it.")
 
+        if not node["rel"]:
+            # 루트 "." (v01.34) - 베이스 폴더 이름(A)을 보이면 재생성 때 A 가 새로 생긴다고 읽힌다.
+            source = ps_mod.base_label(self._cur_structure) if self._cur_structure else ""
+            tip = "'.' = the Recreate To folder itself - the items below are created inside it."
+            if source:
+                tip += "\nCaptured from: " + source
+            item.setToolTip(0, tip)
+
         for child in node["children"]:
             item.addChild(self._make_preview_item(child))
         return item
@@ -678,7 +686,7 @@ class PathStructureTab(QWidget):
             return
 
         dlg = QDialog(self)
-        dlg.setWindowTitle(f"Path Structure — {ps_mod.base_label(self._cur_structure)}")
+        dlg.setWindowTitle(f"Path Structure — {self._cur_structure.name or '(not saved)'}")
         dlg.resize(700, 600)
 
         v = QVBoxLayout(dlg)
