@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-01 (오늘)
 
+> [!summary] A00490 KeyboardTool — **체크한 크롬 창 전부에 키가 가게** (v01.00->01.01)
+- 문제(사용자 확인): 크롬 창 2개를 체크하면 **클릭한 창만** 동작. 재현: 비활성 크롬은 PostMessage 를 무시 — 안쪽 `Chrome_RenderWidgetHostHWND` 로 보내도 무시. 가짜 `WM_ACTIVATE` 는 테스트 크롬이 꺼진 적이 있어 기각.
+- 수정: Send Method **Auto**(기본) = 크롬 계열(`Chrome_WidgetWin_*`)은 Foreground, 나머지 Background. Foreground 는 창을 차례로 앞으로 가져오고 **그 창이 키를 읽을 때까지 대기** — 대상 스레드에 AttachThreadInput 후 `GetKeyState` 가 눌림/떼짐을 보일 때까지(크롬 창들은 UI 스레드 하나라 바로 넘어가면 키가 다음 창으로 샌다).
+- 실측(크롬 3창 × 20): 대기 0 = 25ms/바퀴 · 1/1/25(샘) · 고정 30ms = 106ms · **읽기 대기 = 32ms · 20/20/20**. Interval 은 바퀴 시작 간격으로.
+- 검증(UI, Auto, 크롬 3 + Qt 1, Loop 2): 크롬 각 30 · Qt 30 · 6.47초 · 포커스 복귀. 문서 4장 · 8장 갱신.
+
 > [!summary] A00490 KeyboardTool — **신규: 키 시퀀스 자동 입력 + 대상 창 지정** (v01.00)
 - 요청: 키 여러 개를 키마다 횟수 · 간격으로 누르기(예 Down 10 · Up 10, 1초) + 루프 + **고른 창에만**(크롬 A, B 만, C 는 그대로). Windows 10 · 11 둘 다. 아이콘 포함.
 - 구조: standalone PySide6(A00240 배치). core = `keys`(이름 <-> VK, `Ctrl+C` 파싱) · `win32`(ctypes 창 열거 / PostMessage / SendInput / activate) · `runner`(스레드, Stop 이벤트 + F9 감시) · `presets`(data/presets). UI = 시퀀스 표(키 캡처 칸) · 대상 창 체크 목록(공용 checkList) · Run · 공용 로그.

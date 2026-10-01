@@ -3,6 +3,8 @@
 # A00490_KeyboardTool - key sequence runner (Qt/DCC 비의존, 백그라운드 스레드)
 #
 # 순서:  for loop:  for step:  repeat step.count:  (모든 대상 창에) 누르기 -> step.interval 대기
+# interval 은 **한 바퀴 시작 ~ 다음 바퀴 시작** 이다 (v01.01). 창이 많아 한 바퀴가 오래 걸려도
+# 1초 간격이면 1초마다 시작한다 (바퀴가 interval 보다 길면 쉬지 않고 바로 다음 바퀴).
 # 대기는 짧게 쪼개 자면서 Stop(이벤트) 과 Stop 단축키(F9) 를 본다.
 # UI 는 on_log / on_progress / on_finished 콜백만 넘긴다 (Qt 신호의 emit 을 넘기면
 # 큐 연결로 메인 스레드에서 처리된다).
@@ -13,6 +15,7 @@ import threading
 from . import keys
 from . import win32
 
+METHOD_AUTO = "auto"
 METHOD_BACKGROUND = "background"
 METHOD_FOREGROUND = "foreground"
 
@@ -64,7 +67,7 @@ class SequenceRunner(object):
     loop_count : loop=True 일 때 반복 횟수, 0 = 무한.
     """
 
-    def __init__(self, steps, targets, method=METHOD_BACKGROUND, loop=False,
+    def __init__(self, steps, targets, method=METHOD_AUTO, loop=False,
                  loop_count=0, start_delay=0.0,
                  on_log=None, on_progress=None, on_finished=None):
         self.steps = list(steps)
@@ -76,12 +79,14 @@ class SequenceRunner(object):
         self._log = on_log or (lambda msg: None)
         self._progress = on_progress or (lambda text: None)
         self._finished = on_finished or (lambda reason: None)
+        self._fg_flags = {}
+        self._slow_warned = set()
         self._stop = threading.Event()
         self._thread = None
         self._stop_reason = ""
         # SendInput 으로 보낸 F9 는 GetAsyncKeyState 에도 잡혀 Stop 으로 읽힌다
         # -> SendInput 을 쓰고(foreground / 대상 없음) 시퀀스에 F9 가 있으면 감시를 끈다.
-        injects = method == METHOD_FOREGROUND or not self.targets
+        injects = self.foreground_targets() or not self.targets
         has_f9 = any(keys.parse_key(s.key)[1] == STOP_HOTKEY_VK for s in self.steps)
         self._watch_hotkey = not (injects and has_f9)
 
@@ -102,6 +107,17 @@ class SequenceRunner(object):
 
     def hotkey_enabled(self):
         return self._watch_hotkey
+
+    def _uses_foreground(self, hwnd):
+        if self.method == METHOD_FOREGROUND:
+            return True
+        if self.method == METHOD_AUTO:
+            return win32.is_chromium(hwnd)
+        return False
+
+    def foreground_targets(self):
+        """앞으로 가져와서 보낼 대상 [(hwnd, label)] - 시작 로그 · F9 판단용."""
+        return [(h, l) for h, l in self.targets if self._uses_foreground(h)]
 
     # ------------------------------------------------------------ 내부
 
@@ -135,11 +151,13 @@ class SequenceRunner(object):
                 self._log("[WARN] Window closed, removed from targets: %s" % label)
                 continue
             alive.append((hwnd, label))
-            if self.method == METHOD_FOREGROUND:
-                if win32.activate(hwnd):
-                    win32.send_key(vk, mods, KEY_HOLD, self._hold)
-                else:
+            if self._fg_flags.get(hwnd):
+                res = win32.press_on_window(hwnd, vk, mods, self._hold)
+                if res == "no_front":
                     self._log("[WARN] Could not bring to front, skipped: %s" % label)
+                elif res == "timeout" and hwnd not in self._slow_warned:
+                    self._slow_warned.add(hwnd)
+                    self._log("[WARN] Window is slow to read keys (busy?): %s" % label)
             else:
                 if not win32.post_key(hwnd, vk, mods, KEY_HOLD, self._hold):
                     self._log("[WARN] Send failed: %s" % label)
@@ -149,6 +167,9 @@ class SequenceRunner(object):
     def _run(self):
         reason = "Finished."
         prev_fg = win32.foreground_window()
+        # 창마다 앞으로 가져올지 - 실행 중 클래스가 바뀔 일은 없으니 한 번만 판단
+        self._fg_flags = {h: self._uses_foreground(h) for h, _l in self.targets}
+        self._slow_warned = set()
         try:
             if self.start_delay > 0:
                 self._log("Starting in %.1f s ..." % self.start_delay)
@@ -173,10 +194,11 @@ class SequenceRunner(object):
                         self._progress("%s | Step %d/%d | %s %d/%d"
                                        % (loop_text, si + 1, len(parsed), step.key,
                                           n + 1, step.count))
+                        t0 = time.perf_counter()
                         if self._press(vk, mods) == 0:
                             reason = "All target windows are closed."
                             return
-                        if not self._sleep(step.interval):
+                        if not self._sleep(step.interval - (time.perf_counter() - t0)):
                             return
                 if not self.loop or (self.loop_count and loop_no >= self.loop_count):
                     return
@@ -187,7 +209,7 @@ class SequenceRunner(object):
             if self._stop.is_set():
                 reason = self._stop_reason or "Stopped."
             # foreground 는 원래 쓰던 창으로 돌려준다
-            if self.method == METHOD_FOREGROUND and self.targets and prev_fg:
+            if any(self._fg_flags.values()) and prev_fg:
                 try:
                     win32.activate(prev_fg)
                 except Exception:

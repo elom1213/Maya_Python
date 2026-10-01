@@ -29,8 +29,8 @@ from Framework.qt.MOD_checkList_qt_v01 import JUN_mod_checkList_qt_v01
 from ..config.version import VERSION
 from ..config.app_meta import icon_path
 from ..core import keys, win32, presets
-from ..core.runner import (SequenceRunner, Step, validate, METHOD_BACKGROUND,
-                           METHOD_FOREGROUND, STOP_HOTKEY_NAME)
+from ..core.runner import (SequenceRunner, Step, validate, METHOD_AUTO,
+                           METHOD_BACKGROUND, METHOD_FOREGROUND, STOP_HOTKEY_NAME)
 from .key_capture import KeyCaptureEdit
 
 
@@ -276,14 +276,20 @@ class MainWindow(QWidget):
         meth_row = QHBoxLayout()
         meth_row.addWidget(QLabel("Send Method"))
         self.method_combo = QComboBox()
+        self.method_combo.addItem("Auto (Chrome-type windows: Foreground, others: Background)",
+                                  METHOD_AUTO)
         self.method_combo.addItem("Background (no focus change)", METHOD_BACKGROUND)
         self.method_combo.addItem("Foreground (bring each window to front)", METHOD_FOREGROUND)
         self.method_combo.setToolTip(
+            "Auto: Chrome-type windows (Chrome, Edge, Whale, VS Code, Discord ...) only take\n"
+            "keys while they are the active window, so they are sent Foreground. Other\n"
+            "windows are sent Background.\n\n"
             "Background: posts key messages to each window. Focus is not touched and\n"
-            "all checked windows get the key at the same time. Works for browsers and\n"
-            "most apps; key combos (Ctrl+...) and some games may ignore it.\n\n"
-            "Foreground: brings each window to the front and presses the key like a real\n"
-            "keyboard. Works almost everywhere, but focus jumps between the windows.")
+            "all checked windows get the key at the same time. Key combos (Ctrl+...),\n"
+            "Chrome-type windows that are not active and some games ignore it.\n\n"
+            "Foreground: brings the windows to the front one after another (about 10 ms\n"
+            "each) and presses the key like a real keyboard, so they look like they move\n"
+            "together. Works almost everywhere, but focus jumps between the windows.")
         meth_row.addWidget(self.method_combo, 1)
         lay.addLayout(meth_row)
         return box
@@ -414,9 +420,15 @@ class MainWindow(QWidget):
                          "'Whatever window is active'.")
                 return
             targets = [(it.data(Qt.UserRole), it.text()) for it in items]
-            if method == METHOD_BACKGROUND and any(keys.parse_key(s.key)[0] for s in steps):
-                self.log("[WARN] Key combos (Ctrl/Shift/Alt+...) often do not work in "
-                         "Background mode. Use Foreground if nothing happens.")
+            if method == METHOD_BACKGROUND:
+                n_chrome = sum(1 for h, _l in targets if win32.is_chromium(h))
+                if n_chrome:
+                    self.log("[WARN] %d Chrome-type window(s) checked. They only take keys "
+                             "while active - use Auto or Foreground to drive all of them."
+                             % n_chrome)
+            if method != METHOD_FOREGROUND and any(keys.parse_key(s.key)[0] for s in steps):
+                self.log("[WARN] Key combos (Ctrl/Shift/Alt+...) often do not work on "
+                         "Background windows. Use Foreground if nothing happens.")
         else:
             method = METHOD_FOREGROUND
 
@@ -427,12 +439,14 @@ class MainWindow(QWidget):
             on_log=self._bridge.log.emit, on_progress=self._bridge.progress.emit,
             on_finished=self._bridge.finished.emit)
 
-        self.log("[OK] Start - %d step(s), %s, %s" % (
-            len(steps),
-            "%d window(s)" % len(targets) if targets else "active window",
-            "foreground" if method == METHOD_FOREGROUND else "background"))
-        for _h, label in targets:
-            self.log("    target: %s" % label)
+        fg = set(h for h, _l in self._runner.foreground_targets())
+        self.log("[OK] Start - %d step(s), %s" % (
+            len(steps), "%d window(s)" % len(targets) if targets else "active window"))
+        for h, label in targets:
+            self.log("    %-8s %s" % ("[front]" if h in fg else "[back]", label))
+        if len(fg) > 1:
+            self.log("    %d windows are brought to the front one after another - "
+                     "do not type while it runs." % len(fg))
         if not self._runner.hotkey_enabled():
             self.log("[WARN] %s is in the sequence, so the %s stop key is off for this run. "
                      "Use the Stop button." % (STOP_HOTKEY_NAME, STOP_HOTKEY_NAME))
@@ -481,7 +495,7 @@ class MainWindow(QWidget):
         self.loop_check.setChecked(bool(data.get("loop", False)))
         self.loop_count.setValue(int(data.get("loop_count", 0)))
         self.delay_spin.setValue(float(data.get("start_delay", 0.0)))
-        idx = self.method_combo.findData(data.get("method", METHOD_BACKGROUND))
+        idx = self.method_combo.findData(data.get("method", METHOD_AUTO))
         if idx >= 0:
             self.method_combo.setCurrentIndex(idx)
         self.log("[OK] Preset loaded: %s" % name)

@@ -11,11 +11,15 @@
 #                여러 창에 동시에 보낼 수 있다. 단, 키보드 상태(Ctrl/Shift)는 못 바꾸므로
 #                조합키는 안 먹는 앱이 많다. 앱이 직접 GetAsyncKeyState 로 읽으면(게임 등) 안 먹는다.
 #   foreground : 대상 창을 앞으로 가져와 SendInput. 실제 키보드와 같아서 거의 다 먹지만
-#                누를 때마다 포커스가 그 창으로 옮겨진다.
+#                누를 때마다 포커스가 그 창으로 옮겨진다. 창이 키를 읽을 때까지 기다린 뒤
+#                다음 창으로 넘어가므로(press_on_window) 여러 창을 빠르게 돌아도 키가 안 샌다.
+#   auto       : 크롬 계열 창(is_chromium)은 foreground, 나머지는 background (v01.01).
+#                크롬 계열은 활성 창일 때만 키를 받는다 - 배경으로 보내면 클릭한 창 하나만 움직인다.
 #
 # 관리자 권한으로 뜬 창에는 둘 다 안 들어간다 (UIPI). 이 툴도 관리자로 실행해야 한다.
 
 import sys
+import time
 import ctypes
 from ctypes import wintypes
 
@@ -98,6 +102,8 @@ if IS_WINDOWS:
     user32.GetAncestor.restype = wintypes.HWND
     user32.GetAsyncKeyState.argtypes = [ctypes.c_int]
     user32.GetAsyncKeyState.restype = ctypes.c_short
+    user32.GetKeyState.argtypes = [ctypes.c_int]
+    user32.GetKeyState.restype = ctypes.c_short
     kernel32.GetCurrentThreadId.restype = wintypes.DWORD
     kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
     kernel32.OpenProcess.restype = wintypes.HANDLE
@@ -296,23 +302,20 @@ def foreground_window():
     return int(user32.GetForegroundWindow() or 0) if IS_WINDOWS else 0
 
 
-def activate(hwnd):
-    """hwnd 를 앞으로. 성공하면 True.
+def _activate_attached(hwnd, me, keep_thread):
+    """SetForegroundWindow. 현재 포그라운드 스레드에 잠깐 붙어서 허용받는다.
 
-    Windows 는 포그라운드가 아닌 프로세스의 SetForegroundWindow 를 막는다(깜빡임만).
-    현재 포그라운드 스레드에 입력을 잠깐 붙이면(AttachThreadInput) 허용된다 - Win10/11 동일.
+    keep_thread 는 호출 측이 이미 붙여 둔 스레드 - 같은 스레드면 여기서 붙였다 떼지 않는다
+    (떼면 호출 측의 붙임까지 풀린다).
     """
-    if not is_window(hwnd):
-        return False
     if foreground_window() == int(hwnd):
         return True
     if user32.IsIconic(hwnd):
         user32.ShowWindow(hwnd, SW_RESTORE)
-    me = kernel32.GetCurrentThreadId()
     fg = user32.GetForegroundWindow()
     fg_thread = _thread_of(fg) if fg else 0
     attached = False
-    if fg_thread and fg_thread != me:
+    if fg_thread and fg_thread not in (me, keep_thread):
         attached = bool(user32.AttachThreadInput(me, fg_thread, True))
     try:
         user32.BringWindowToTop(hwnd)
@@ -321,3 +324,64 @@ def activate(hwnd):
         if attached:
             user32.AttachThreadInput(me, fg_thread, False)
     return foreground_window() == int(hwnd)
+
+
+def activate(hwnd):
+    """hwnd 를 앞으로. 성공하면 True.
+
+    Windows 는 포그라운드가 아닌 프로세스의 SetForegroundWindow 를 막는다(깜빡임만).
+    현재 포그라운드 스레드에 입력을 잠깐 붙이면(AttachThreadInput) 허용된다 - Win10/11 동일.
+    """
+    if not is_window(hwnd):
+        return False
+    return _activate_attached(hwnd, kernel32.GetCurrentThreadId(), 0)
+
+
+def _wait_key_state(vk, down, sleep, timeout):
+    end = time.perf_counter() + timeout
+    while True:
+        if bool(user32.GetKeyState(vk) & 0x8000) == down:
+            return True
+        if time.perf_counter() >= end:
+            return False
+        sleep(0.001)
+
+
+def press_on_window(hwnd, vk, mods, sleep, timeout=0.3):
+    """hwnd 를 앞으로 가져와 한 번 누르고, **그 창이 키를 읽을 때까지** 기다린다.
+
+    반환: 'ok' / 'no_front'(앞으로 못 가져옴) / 'timeout'(앱이 키를 제때 안 읽음 - 그래도 진행).
+
+    왜 기다리나 (v01.01): 크롬 창 여러 개는 **UI 스레드 하나**를 같이 쓴다. 키를 보내고 바로
+    다음 창을 앞으로 가져오면, 크롬이 앞 키를 아직 안 읽은 상태라 그 키가 **다음 창으로 샌다**
+    (실측: 대기 0 이면 60 번 중 27 번만, 그것도 한 창에 몰려 들어갔다).
+    대상 스레드에 입력을 붙이면(AttachThreadInput) GetKeyState 가 **그 스레드가 읽은 만큼의** 키
+    상태를 돌려준다 - 눌림이 보이면 KEYDOWN 을, 떼짐이 보이면 KEYUP 을 읽은 것이다.
+    고정 대기(30ms)보다 빠르고(창 하나 ~10ms) 바쁜 창에는 저절로 더 기다린다.
+    """
+    if not is_window(hwnd):
+        return "no_front"
+    me = kernel32.GetCurrentThreadId()
+    th = _thread_of(hwnd)
+    attached = bool(th and th != me and user32.AttachThreadInput(me, th, True))
+    try:
+        if not _activate_attached(hwnd, me, th if attached else 0):
+            return "no_front"
+        mod_vks = keys.modifier_vks(mods)
+        _send([_kb_input(m, False) for m in mod_vks] + [_kb_input(vk, False)])
+        ok = _wait_key_state(vk, True, sleep, timeout)
+        _send([_kb_input(vk, True)] + [_kb_input(m, True) for m in reversed(mod_vks)])
+        for code in [vk] + mod_vks:
+            ok = _wait_key_state(code, False, sleep, timeout) and ok
+        return "ok" if ok else "timeout"
+    finally:
+        if attached:
+            user32.AttachThreadInput(me, th, False)
+
+
+def is_chromium(hwnd):
+    """크롬 계열 창인가 - Chrome · Edge · Whale · Opera 와 Electron 앱(VSCode, Discord ...).
+
+    이 창들은 **활성 창일 때만** 키 메시지를 받는다 (배경 PostMessage 는 무시).
+    """
+    return _class_name(hwnd).startswith("Chrome_WidgetWin_") if is_window(hwnd) else False
