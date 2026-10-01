@@ -11,6 +11,8 @@
 #   - 수정/삭제/정렬은 우클릭 컨텍스트 메뉴로 한다(카테고리·버튼 모두
 #     Move Up/Move Down 으로 순서 변경 가능). 화면을 깨끗하게 유지하고
 #     항목이 늘어나도 잘 확장된다.
+#   - 카테고리 헤더(빈 곳)를 좌클릭하면 "Change Profile" 메뉴가 뜬다. 고른
+#     프로파일로 카테고리와 그 안의 버튼 전부를 옮긴다(우클릭 메뉴에도 있음).
 
 import os
 
@@ -87,6 +89,25 @@ class AddPathDialog(QDialog):
             self.ipf_name.text().strip(),
             self.ipf_path.text().strip(),
         )
+
+
+class _CategoryBox(QGroupBox):
+    """좌클릭을 콜백으로 넘기는 카테고리 QGroupBox.
+
+    Path 버튼은 자기 클릭을 소비하므로, 콜백은 헤더나 버튼 사이 빈 곳을
+    눌렀을 때만 불린다. Qt 바인딩(Framework.qt)에 Signal 이 없어 콜백으로 둔다.
+    """
+
+    def __init__(self, title, on_left_click, parent=None):
+        super().__init__(title, parent)
+        self._on_left_click = on_left_click
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and self.rect().contains(event.pos()):
+            self._on_left_click(event.pos())
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
 
 class ShortcutTab(QWidget):
@@ -187,9 +208,13 @@ class ShortcutTab(QWidget):
             self._cat_layout.addWidget(self._build_category_box(cat))
 
     def _build_category_box(self, cat):
-        box = QGroupBox(cat["name"])
-        box.setContextMenuPolicy(Qt.CustomContextMenu)
         cat_name = cat["name"]
+        box = _CategoryBox(
+            cat_name,
+            lambda pos, n=cat_name: self._show_category_left_menu(n, box, pos),
+        )
+        box.setToolTip("Left-click: Change Profile / Right-click: edit")
+        box.setContextMenuPolicy(Qt.CustomContextMenu)
         box.customContextMenuRequested.connect(
             lambda pos, b=box, n=cat_name: self._show_category_menu(n, b, pos)
         )
@@ -403,6 +428,7 @@ class ShortcutTab(QWidget):
         act_down = menu.addAction("Move Down")
         menu.addSeparator()
         act_rename = menu.addAction("Rename Category")
+        act_profile = menu.addAction("Change Profile")
         act_delete = menu.addAction("Delete Category")
 
         cats = self._data.get("categories", [])
@@ -417,8 +443,17 @@ class ShortcutTab(QWidget):
             self._move_category(cat_name, +1)
         elif chosen == act_rename:
             self._rename_category(cat_name)
+        elif chosen == act_profile:
+            self._change_category_profile(cat_name)
         elif chosen == act_delete:
             self._delete_category(cat_name)
+
+    def _show_category_left_menu(self, cat_name, box, pos):
+        """카테고리 좌클릭 메뉴 — 지금은 Change Profile 하나."""
+        menu = QMenu(box)
+        act_profile = menu.addAction("Change Profile")
+        if menu.exec_(box.mapToGlobal(pos)) == act_profile:
+            self._change_category_profile(cat_name)
 
     def _show_button_menu(self, cat_name, btn_name, btn_widget, pos):
         menu = QMenu(btn_widget)
@@ -592,6 +627,53 @@ class ShortcutTab(QWidget):
 
         src["buttons"] = [b for b in src["buttons"] if b["name"] != btn_name]
         target["buttons"].append(moved)
+        self._save_and_render()
+
+    def _change_category_profile(self, cat_name):
+        """카테고리와 그 안의 버튼 전부를 다른 프로파일로 옮긴다(Change Profile).
+
+        대상은 현재 프로파일을 뺀 나머지 중에서 고른다. 대상에 같은 이름 카테고리가
+        있으면 그 끝에 버튼을 합치고, 겹치는 버튼 이름이 있으면 아무것도 옮기지 않는다.
+        저장은 대상 → 원본 순(중간에 실패해도 버튼이 사라지지 않게).
+        """
+        if self._find_category(cat_name) is None:
+            return
+
+        others = [n for n in prefs_mod.list_profiles() if n != self._profile]
+        if not others:
+            QMessageBox.information(
+                self, "Path Tool",
+                "There is no other profile to move to. Create one first.")
+            return
+
+        target_name, ok = QInputDialog.getItem(
+            self, "Change Profile",
+            f"Move category '{cat_name}' and its paths to profile:",
+            others, 0, False)
+        if not ok or not target_name:
+            return
+
+        dst_data = prefs_mod.load_profile(target_name)
+        conflicts = prefs_mod.move_category(self._data, dst_data, cat_name)
+        if conflicts is None:
+            return
+        if conflicts:
+            QMessageBox.warning(
+                self, "Path Tool",
+                f"Category '{cat_name}' already exists in '{target_name}' "
+                f"with the same button name(s):\n  " + "\n  ".join(conflicts)
+                + "\nRename or remove them first. Nothing was moved.")
+            return
+
+        try:
+            prefs_mod.save_profile(target_name, dst_data)
+        except OSError as exc:
+            # 대상 저장 실패 → 원본은 디스크에서 다시 읽어 메모리 변경을 되돌린다.
+            self._data = prefs_mod.load_profile(self._profile)
+            self._render_categories()
+            QMessageBox.warning(
+                self, "Path Tool", f"Could not save profile '{target_name}':\n{exc}")
+            return
         self._save_and_render()
 
     def _change_button_path(self, cat_name, btn_name):

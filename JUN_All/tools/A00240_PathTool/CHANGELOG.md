@@ -2,6 +2,18 @@
 
 All notable changes to this tool are documented here.
 
+## [01.14] - 2026-10-01
+### Added
+- **Change Profile - move a category to another profile.** Left-click a category (its header or
+  the empty space between its buttons) and a small menu shows **Change Profile**; it is also in the
+  right-click menu. Pick one of the other profiles and the category moves there with every path
+  button in it. Clicking a path button still just opens its path.
+- If the target profile already has a category with the same name, the buttons are added to the
+  end of that category. If any button name is already taken there, nothing moves and the
+  clashing names are listed.
+- The target profile is saved first, then the current one - if saving fails half way, the buttons
+  end up in both profiles rather than in neither.
+
 ## [01.13] - 2026-09-18
 ### Changed
 - **Shrink is now as tall as A00220_BackupTool's shrink: 350 x 155** (was 350 x 78 - too small).

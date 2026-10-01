@@ -151,6 +151,38 @@ def rename_profile(old, new):
         set_active(new)
 
 
+def move_category(src_data, dst_data, cat_name):
+    """카테고리(와 그 안의 버튼 전부)를 src_data 에서 dst_data 로 옮긴다. 메모리만 바꾼다.
+
+    - 대상에 같은 이름 카테고리가 없으면 카테고리째 끝에 붙인다.
+    - 있으면 그 카테고리 끝에 버튼들을 붙인다(합치기). 이때 이름이 겹치는 버튼이
+      하나라도 있으면 아무것도 바꾸지 않고 겹친 이름 목록을 돌려준다.
+    반환: 겹친 버튼 이름 리스트(비었으면 성공). 원본에 카테고리가 없으면 None.
+    저장(save_profile)은 호출 측이 대상 → 원본 순으로 한다 — 중간에 실패해도
+    버튼이 사라지지 않고 양쪽에 남는 쪽이 낫다.
+    """
+    src_cats = src_data.setdefault("categories", [])
+    cat = next((c for c in src_cats if c["name"] == cat_name), None)
+    if cat is None:
+        return None
+
+    dst_cats = dst_data.setdefault("categories", [])
+    existing = next((c for c in dst_cats if c["name"] == cat_name), None)
+    buttons = cat.get("buttons", [])
+
+    if existing is None:
+        dst_cats.append(cat)
+    else:
+        taken = {b["name"] for b in existing.get("buttons", [])}
+        conflicts = [b["name"] for b in buttons if b["name"] in taken]
+        if conflicts:
+            return conflicts
+        existing.setdefault("buttons", []).extend(buttons)
+
+    src_data["categories"] = [c for c in src_cats if c["name"] != cat_name]
+    return []
+
+
 # ------------------------------------------------------------ active profile
 
 def _read_active_raw():
