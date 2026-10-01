@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-01 (오늘)
 
+> [!summary] A00210 FileManager Path Structure — **Capture 가 Project Root 와 무관하게 어느 경로에서든** (v01.32->01.33)
+- 요청: Base Folder 를 채우고 Capture 하면 File Manager 탭 Project Root 하위 경로만 되고 그 위 경로는 안 된다. 제약을 없애 원하는 어느 경로든 캡처되게.
+- 원인: `capture()` 가 베이스를 `store.make_key()`(루트 기준 키)로만 저장해서, 루트 밖이면 `OutsideProjectRootError` → `Base folder is outside the project root`, 루트가 비면 탭이 `Set Project Root first` 로 막았다. 다른 드라이브면 `relpath` 가 `ValueError` 를 던져 잡히지도 않았다.
+- 수정: JSON 에 캡처한 절대경로 `base_path` 를 늘 기록하고, `base_rel` 은 루트 안일 때만 채운다(`base_rel_in_root` — 루트 없음 · 밖 · 다른 드라이브 모두 "", 루트 자신은 예전처럼 "."). 탭의 두 경고 삭제. Preview 의 실제 폴더는 `project_root/base_rel` 우선, 없으면 `base_path`. 트리 루트 이름 · Expand 창 제목은 `base_label()`. 재생성은 v01.32 부터 `Recreate To` 만 쓰므로 그대로.
+- 검증(오프스크린, 임시 폴더): 루트 안 / 루트 자신 / 루트 밖 / 루트 비움 / store 없음 / 다른 드라이브 캡처 · 실제 탭에서 루트 비움 · 루트 밖 Base 로 Capture → Save 경고 0, `base_path` 저장, 트리 루트 = `Asset` · 그 구조를 Recreate To 로 재생성 · 구버전 JSON 로드.
+
 > [!summary] A00480 FileTool · A00330 NamingTool — **토큰 칸을 고쳐도 프로파일에 저장 안 함, `Save` 버튼으로만** (A00480 v01.07->01.08 · A00330 v01.10->01.11)
 - 요청: A00480 Naming 에서 프로파일을 골라 칸에 글자를 넣고 툴을 닫았다 열면 고친 칸이 그 프로파일의 기본이 돼 있다(알림 없이). 버튼을 눌렀을 때만 기본이 되게, 누르지 않으면 어떤 프로파일도 바뀌지 않게.
 - 원인: 공용 위젯 `Framework/qt/MOD_tokenName_qt_v01.py` 의 `_after_edit()` 가 칸이 바뀔 때마다 `store.save_profile()` 을 불렀다.

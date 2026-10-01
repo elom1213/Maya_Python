@@ -259,12 +259,21 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 
 ---
 
-## 4-C. Path Structure 탭 — 폴더 구조 템플릿 (v01.01, 선택 기록 v01.07, 깊이·선택 재생성 v01.24, Rename·Recreate To v01.28, 파일 재생성 v01.29, Recreate To 독립 v01.32)
+## 4-C. Path Structure 탭 — 폴더 구조 템플릿 (v01.01, 선택 기록 v01.07, 깊이·선택 재생성 v01.24, Rename·Recreate To v01.28, 파일 재생성 v01.29, Recreate To 독립 v01.32, Capture 경로 제약 없음 v01.33)
 
 베이스 폴더의 **하위 폴더 구조**(v01.29~ **파일 목록도**)를 JSON 으로 저장
 (`<store_dir>/path_structures/<name>.json`, git 동기화)하고, 다른 PC 에서 **원하는 목적지 폴더**
-(`Recreate To`) 안에 재생성한다. 베이스는 project_root 상대경로(`base_rel`)로도 저장되어 목적지를
-자동 제안하는 데 쓰인다.
+(`Recreate To`) 안에 재생성한다.
+
+**Capture 는 어느 경로에서든 된다(v01.33~).** `Project Root`(File Manager 탭)가 비어 있어도, Base Folder 가
+그 밖(위 · 옆 · 다른 드라이브)이어도 캡처한다. v01.32 까지는 루트가 비면 `Set Project Root first`,
+루트 밖이면 `Base folder is outside the project root` 로 막았다.
+
+- JSON 에는 캡처한 폴더의 절대경로 `base_path` 가 늘 기록된다(v01.33~).
+- Base Folder 가 Project Root **안**이면 루트 기준 상대경로 `base_rel` 도 함께 기록된다 — 루트 위치가 다른
+  PC 에서도 Preview 트리가 그 PC 의 실제 폴더를 찾는다. 루트 **밖**이면 `base_rel` 은 비고, Preview 는
+  `base_path` 를 본다(다른 PC 에 그 경로가 없으면 기록된 폴더 · 파일만 보인다).
+- 재생성은 `Recreate To` 칸만 쓰므로(v01.32~) 어디서 캡처했든 같다.
 
 ```
 ┌ Save Structure ───────────────────────────────────────┐
@@ -306,7 +315,7 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
   단, **base 직속 파일은 최상위 폴더 체크리스트와 무관하게 항상 포함**된다(어느 최상위 폴더에도 속하지
   않는, base 폴더 자체의 내용물이라서).
 - **Capture**: 체크된 폴더를 지정 깊이까지 모아 (미저장 상태로) Preview 트리에 보여준다. 폴더가 있는데
-  하나도 체크 안 하면 경고. → **Name** 입력 후 **Save** 로 JSON 저장(File Manager 탭의 **Push** 로 동기화).
+  하나도 체크 안 하면 경고. **Base Folder 는 어느 경로든 된다**(v01.33 — Project Root 와 무관). → **Name** 입력 후 **Save** 로 JSON 저장(File Manager 탭의 **Push** 로 동기화).
 
 **Preview 트리뷰(v01.24)**: 선택한(또는 방금 Capture 한) 구조를 **트리 위젯**으로 보여준다
 (A00240 PathTool 의 *Tree* 탭과 동일한 형태).

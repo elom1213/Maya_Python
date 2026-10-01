@@ -14,13 +14,17 @@
 #          재생성되는 파일은 **0 바이트 빈 파일**이고 이름 끝에 RECREATED_SUFFIX("__")
 #          가 붙는다(test.ma -> test.ma__). 원본과 생성물을 이름만 보고 구분하기 위한
 #          표식이며, 실제 데이터를 담은 파일을 덮어쓸 일이 없게 해준다.
+# v01.33 : Capture 가 Project Root 와 무관하다 - 어느 경로든 캡처한다. 캡처한 원본 폴더의
+#          절대경로를 base_path 에 늘 기록하고, base_rel 은 그 폴더가 Project Root 안일 때만
+#          채운다(밖이거나 루트가 비었으면 ""). 재생성은 v01.32 부터 'Recreate To' 칸만 쓰므로
+#          base_rel 이 없어도 동작한다.
 
 import os
 import json
 
 from dataclasses import dataclass, field, asdict
 
-from .store import MetaStore, OutsideProjectRootError
+from .store import MetaStore
 
 
 STRUCTS_DIR = "path_structures"
@@ -46,7 +50,8 @@ class PathStructure:
     """저장된 폴더 구조 템플릿 1개."""
 
     name: str = ""             # 표시 이름(파일명 생성의 원본)
-    base_rel: str = ""         # project_root 기준 베이스 폴더 상대경로 (POSIX)
+    base_rel: str = ""         # project_root 기준 베이스 폴더 상대경로 (POSIX). 루트 밖이면 ""
+    base_path: str = ""        # 캡처한 원본 베이스 폴더 절대경로 (POSIX, v01.33). 이 PC 기준
     recursive: bool = False    # 캡처된 깊이(중첩 트리 여부) — 하위호환용(max_depth 로 대체)
     max_depth: int = 0         # 캡처 깊이(base 기준, top=1). 0 = 무제한(전체 트리)
     folders: list = field(default_factory=list)   # base_rel 기준 하위 폴더 상대경로(POSIX) 목록
@@ -67,6 +72,8 @@ class PathStructure:
         return PathStructure(
             name=data.get("name", ""),
             base_rel=data.get("base_rel", ""),
+            # base_path 없는 구버전 JSON → "" (base_rel 로 표시, 기존 동작 그대로).
+            base_path=data.get("base_path", "") or "",
             recursive=recursive,
             max_depth=int(max_depth),
             folders=list(data.get("folders", [])),
@@ -85,6 +92,33 @@ def _sanitize_name(name):
     cleaned = "_".join(cleaned.split())          # 공백 런 → 단일 _
     cleaned = cleaned.strip("_.")
     return cleaned or "structure"
+
+
+def base_rel_in_root(base_abs, project_root):
+    """base_abs 가 project_root 안이면 그 상대경로(POSIX), 아니면 "".
+
+    루트 미설정 · 루트 밖 · 다른 드라이브(relpath 가 ValueError) 모두 "" - 예외를 던지지 않는다.
+    루트 자신이면 "." (v01.32 까지의 make_key 와 같은 값).
+    """
+    if not project_root or not base_abs:
+        return ""
+    try:
+        rel = os.path.relpath(os.path.abspath(base_abs), os.path.abspath(project_root))
+    except ValueError:      # Windows: 드라이브가 다르면 relpath 가 실패한다
+        return ""
+    if rel.startswith("..") or os.path.isabs(rel):
+        return ""
+    return rel.replace("\\", "/")
+
+
+def base_label(structure):
+    """화면에 보일 베이스 경로 - base_rel(루트 기준) 이 있으면 그것, 없으면 base_path.
+
+    base_rel 이 "." (루트 자신을 캡처)이면 이름이 안 보이므로 base_path 가 있으면 그쪽.
+    """
+    if structure.base_rel and structure.base_rel != ".":
+        return structure.base_rel
+    return structure.base_path or structure.base_rel
 
 
 def structures_dir(store_dir):
@@ -201,19 +235,23 @@ def limit_depth(folders, max_depth):
 
 
 def capture(base_abs, store, max_depth, include_top=None, include_files=False):
-    """베이스 폴더의 하위 구조를 PathStructure 로 캡처.
+    """베이스 폴더의 하위 구조를 PathStructure 로 캡처. **어느 경로든 된다**(v01.33).
 
-    store : MetaStore (project_root 보유). base 가 루트 밖이면 OutsideProjectRootError.
+    store : MetaStore (project_root 보유) 또는 None. project_root 는 base_rel 을 채울지만
+            정한다 - 루트 밖이거나 루트가 비어도 캡처는 그대로 된다(base_rel = "").
     max_depth : 캡처 깊이(최상위=1, 0=무제한).
     include_top : 기록할 최상위 폴더 이름의 컬렉션(체크된 것만). None 이면 전체(하위호환).
     include_files : True 면 파일 목록도 함께 기록한다(내용은 기록하지 않는다 — 이름뿐).
     name / created_* 는 호출자가 채운다.
     """
-    base_rel = store.make_key(base_abs)   # project_root 상대 POSIX 키 (밖이면 예외)
+    project_root = getattr(store, "project_root", "") if store is not None else ""
+    base_rel = base_rel_in_root(base_abs, project_root)
+    base_path = os.path.abspath(base_abs).replace("\\", "/")
     folders = _collect_folders(base_abs, max_depth, include_top)
     files = _collect_files(base_abs, max_depth, include_top) if include_files else []
     return PathStructure(
         base_rel=base_rel,
+        base_path=base_path,
         recursive=(max_depth != 1),
         max_depth=max_depth,
         folders=folders,
@@ -363,8 +401,8 @@ def build_structure_tree(structure, base_abs=None, show_files=False, max_depth=0
     show_files: 파일을 트리에 넣을지. structure.files 가 있으면 그것을,
                 없으면 base_abs 의 실제 파일을(표시 전용) 채운다.
     """
-    root_name = os.path.basename(structure.base_rel.rstrip("/")) or (
-        structure.base_rel or "(base)")
+    label = base_label(structure)
+    root_name = os.path.basename(label.rstrip("/")) or label or "(base)"
     root = {"name": root_name, "rel": "", "path": base_abs or "",
             "is_dir": True, "recorded": True, "children": []}
 
@@ -497,6 +535,9 @@ def recreate(structure, project_root, folders=None, base_abs=None,
     if base_abs is None:
         if not project_root:
             raise ValueError("Project root is not set")
+        if not structure.base_rel:
+            # 루트 밖에서 캡처한 구조(v01.33~)는 루트 기준 위치가 없다 - 목적지를 줘야 한다.
+            raise ValueError("Structure has no path under the project root - pass base_abs")
         base_abs = os.path.join(
             os.path.abspath(project_root),
             *structure.base_rel.split("/"),

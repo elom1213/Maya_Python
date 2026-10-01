@@ -2,6 +2,18 @@
 
 All notable changes to this tool are documented here.
 
+## [01.33] - 2026-10-01
+### Changed
+- **Path Structure: Capture works from any folder.** It no longer needs a Project Root (File Manager tab)
+  and the Base Folder no longer has to be inside it - before, an empty root gave
+  "Set Project Root first" and a folder above or outside the root gave "Base folder is outside the project root".
+- A saved structure now also records the absolute path it was captured from (`base_path`).
+  `base_rel` (path under the Project Root) is still filled when the folder is inside the root, so
+  structures captured there keep working on other PCs as before; it is empty for folders outside the root.
+- Recreate is unchanged - it has used only the `Recreate To` field since v01.32, so structures captured
+  outside the root recreate the same way.
+- Older JSON files without `base_path` load as before.
+
 ## [01.32] - 2026-09-28
 ### Added
 - **Help menu bar** - the shared Framework menu bar (`JUN_mod_menuBar_qt_v01`), so the window gets

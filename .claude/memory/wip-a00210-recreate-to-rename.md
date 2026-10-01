@@ -12,6 +12,10 @@ metadata:
 `<Project Root>/<base_rel>` 로 덮어써 적어 둔 경로가 조용히 바뀌었다. **이제 칸은 Project Root/File Manager 와 무관**,
 자동 채움·clear 없음, 프로파일 `recreate_to` 로 저장/복원. **다시 자동 채움을 넣지 말 것.** 같은 버전에 공용 Help 메뉴 바.
 
+**★ v01.33 (2026-10-01) — Capture 도 Project Root 와 무관.** 사용자 요청: 루트 위 · 밖 경로도 캡처되게. JSON 에 `base_path`(절대)
+를 늘 기록, `base_rel` 은 루트 안일 때만(밖 · 루트 없음 · 다른 드라이브 = ""). **Path Structure 탭에 Project Root 검사를 다시 넣지 말 것.**
+`store.make_key` 는 다른 드라이브에서 ValueError 를 던지므로 core `base_rel_in_root` 를 쓴다.
+
 DONE (verified + pushed Dnable/dev, commit 57111a8), v01.28: A00210_FileManager **Path Structure** tab.
 
 **Problem the user reported:** Recreate was confusing — it created folders at `<File Manager tab Project Root>/<base_rel>`, and the user couldn't tell if it targeted the File Manager tab's `Scan Dir` or this tab's `Base Folder` (capture source). Also wanted a Rename button for saved structures.

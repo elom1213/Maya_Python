@@ -13,6 +13,8 @@
 # v01.32 : 'Recreate To' 를 Project Root(File Manager 탭)와 완전히 분리. 구조를 선택/새로고침해도
 #          칸을 <Project Root>/<base_rel> 로 덮어쓰거나 지우지 않는다 - Recreate 는 오직 이 칸의
 #          경로에 생성한다. 값은 프로파일에 따로 저장돼 다음 실행에 복원된다.
+# v01.33 : Capture 도 Project Root 와 무관하다 - Base Folder 가 어느 경로든 캡처한다
+#          (예전엔 Project Root 가 비었거나 Base Folder 가 그 밖이면 막았다).
 
 import os
 import time
@@ -47,7 +49,6 @@ from Framework.qt.qt import (
 )
 
 from ..core import path_structure as ps_mod
-from ..core.store import OutsideProjectRootError
 
 
 class PathStructureTab(QWidget):
@@ -389,9 +390,7 @@ class PathStructureTab(QWidget):
         if not base or not os.path.isdir(base):
             QMessageBox.warning(self, "Path Structure", "Select a valid Base Folder.")
             return
-        if not self._get_project_root():
-            QMessageBox.warning(self, "Path Structure", "Set Project Root first (File Manager tab).")
-            return
+        # Project Root 와 무관하다(v01.33) - 루트가 비었거나 Base Folder 가 그 밖이어도 캡처한다.
 
         # base 가 바뀐 채 Scan 을 안 눌렀을 수 있으니 목록을 최신화한다.
         self._scan_if_changed()
@@ -404,15 +403,10 @@ class PathStructureTab(QWidget):
                 "No folders checked. Check the folders to record (or 'All').")
             return
 
-        store = self._get_store()
-        try:
-            structure = ps_mod.capture(
-                base, store, self.spn_capture_depth.value(),
-                include_top=include_top,
-                include_files=self.chk_include_files.isChecked())
-        except OutsideProjectRootError:
-            QMessageBox.warning(self, "Path Structure", "Base folder is outside the project root.")
-            return
+        structure = ps_mod.capture(
+            base, self._get_store(), self.spn_capture_depth.value(),
+            include_top=include_top,
+            include_files=self.chk_include_files.isChecked())
 
         self._pending = structure
 
@@ -505,12 +499,17 @@ class PathStructureTab(QWidget):
     # -------------------------------------------------------- preview (tree)
 
     def _saved_base_abs(self, structure):
-        """저장된 구조의 로컬 base 절대경로(project_root/base_rel). 파일 표시/스캔용."""
+        """저장된 구조의 로컬 base 절대경로. 파일 표시/스캔용.
+
+        Project Root 안에서 캡처한 구조는 project_root/base_rel (PC 마다 루트가 달라도 맞는다).
+        루트 밖에서 캡처한 구조(v01.33~)는 기록된 base_path 그대로 - 다른 PC 엔 없을 수 있고,
+        없으면 트리는 기록된 폴더 · 파일만 보여준다.
+        """
         project_root = self._get_project_root()
-        if not project_root or not structure.base_rel:
-            return ""
-        return os.path.join(
-            os.path.abspath(project_root), *structure.base_rel.split("/"))
+        if project_root and structure.base_rel:
+            return os.path.join(
+                os.path.abspath(project_root), *structure.base_rel.split("/"))
+        return os.path.normpath(structure.base_path) if structure.base_path else ""
 
     def _clear_preview(self):
         self._cur_structure = None
@@ -679,7 +678,7 @@ class PathStructureTab(QWidget):
             return
 
         dlg = QDialog(self)
-        dlg.setWindowTitle(f"Path Structure — {self._cur_structure.base_rel}")
+        dlg.setWindowTitle(f"Path Structure — {ps_mod.base_label(self._cur_structure)}")
         dlg.resize(700, 600)
 
         v = QVBoxLayout(dlg)
