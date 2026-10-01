@@ -75,7 +75,7 @@
 ## 공용 위젯 · 프레임워크
 
 - [zero-arg super after reload](reload-stale-instance-super.md) — Framework 클래스는 `super()` 만, `super(Class, self)` 는 reload 뒤 옛 인스턴스에서 TypeError
-- [token name widget](framework-token-name-widget.md) — 토큰 이름 화면(Profile + 칸)은 `MOD_tokenName_qt_v01` + `core/token_naming` 하나, A00330 Token · A00480 Naming 공유, 툴은 규칙 묶음 · data 폴더만 고른다
+- [token name widget](framework-token-name-widget.md) — 토큰 이름 화면(Profile + 칸)은 `MOD_tokenName_qt_v01` + `core/token_naming` 하나, A00330 Token · A00480 Naming 공유, 툴은 규칙 묶음 · data 폴더만 고른다, **칸 편집은 저장 안 함 — `Save` 버튼만**(2026-10-01)
 - [control shapes](framework-control-shapes.md) — 컨트롤러 커브 셰이프 34종 공용 json(좌표 반올림 금지)
 
 - TSL — [(Null) is red](framework-tsl-null-placeholder-red.md)(자리표시 행은 빨간 글씨 · 직접 addItems 한 리스트는 `mark_null_items()` 를 부를 것) · [UUID selection](wip-tsl-uuid-selection.md)((uuid, component) 보관) · [attach_uuids](framework-tsl-attach-uuids.md)(씬 노드 아닌 리스트는 False) · [list_limit summary](framework-tsl-list-limit.md)(500+ 요약) · [max-height squeezes buttons](tsl-widget-max-height-squeezes-buttons.md)(`list_widget` 에만) · [selection order](tsl-selection-order.md)(`trackSelectionOrder` 꺼지면 `ls(os)` 도 인덱스 순) · [select_no_expand](wip-a00440-find-tab.md)(세트를 담은 리스트는 켤 것 — 안 켜면 행 클릭이 멤버를 고른다)

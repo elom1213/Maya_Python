@@ -16,7 +16,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 | **Import** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` |
 | **Path** | `Copy Scene Folder` · `Open Scene Folder` | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `File` |
 
-- **버전**: `app/config/version.py` (v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
+- **버전**: `app/config/version.py` (v01.08 — Naming 칸을 고쳐도 저장 안 함, **`Save` 버튼**으로만 프로파일 기본이 된다(§2-4) · v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
 - **설치**: `__dragDrop_A00480.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **FileTool** → `tools.A00480_FileTool.run(True)`
 - **테마**: `slate_dark`
 - **원본 두 툴은 그대로 남아 있다.** quickTool 의 File · Import option 버튼도 지워지지 않았다.
@@ -35,7 +35,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 │ ┌ Export ┬ Import ┬ Path ┐                              │
 │ │ Export Path [.................] [Browse][Paste][Scene]│
 │ │ Set Up      [Set's Name]   [File name]                │
-│ │ Naming      Profile [Default▾][New][Rename][Delete] [Add Token][Delete Token]
+│ │ Naming      Profile [Default▾][Save][New][Rename][Delete] [Add Token][Delete Token]
 │ │             [Token 1][Token 2]...  (칸마다 규칙 콤보)  │
 │ │             Preview : SK_MANU_CH_Name_Basic_Version [Set Name]
 │ │ Export      □ Move to scene root □ Joints only ...    │
@@ -144,7 +144,12 @@ Type Filter : [Include Types v]  Rules : [Rules (1/1) v] [Check]        [      E
 | `Set's Name` | 그 세트의 이름 (네임스페이스 · 경로 없이 — `ns:SET_body` → `SET_body`) |
 
 - 칸 머리 `Token N` 을 눌러 고른 뒤 `Add Token`(오른쪽에 새 칸) / `Delete Token`(마지막 한 칸은 남는다). 넘치면 가로 스크롤.
-- **Profile** — `New`(지금 칸 복사) / `Rename` / `Delete`. 칸을 고치면 현재 프로파일에 **바로 저장**된다.
+- **Profile** — `Save` / `New`(지금 칸 복사) / `Rename` / `Delete`.
+  - **칸을 고쳐도 저장하지 않는다**(v01.08~). **`Save` 를 눌러야** 지금 칸이 그 프로파일의 기본이 된다.
+    v01.06 ~ 01.07 은 고칠 때마다 바로 저장돼서, 툴을 다시 열면 마지막으로 고친 칸이 알림 없이 기본으로 나왔다.
+  - `Save` 는 저장 안 한 변경이 있을 때만 켜진다(고쳤다가 원래대로 되돌리면 다시 꺼진다).
+  - 저장 안 한 칸은 **프로파일을 바꾸면**(`[WARN] ... unsaved edits ... were dropped.`) 또는 **툴을 닫으면** 버려진다.
+  - `New` 는 지금 칸을 새 프로파일에 저장하고 그쪽으로 바꾼다 — 떠나온 프로파일은 건드리지 않는다.
   파일은 툴 폴더 `data/token_profiles/<이름>.json`(PC 별, git 추적 안 함).
 - **기본 프로파일 `Default` = 옛 6칸 글자 그대로** `SK_MANU_CH_Name_Basic_Version`(전부 Custom).
   옛 화면의 `Name` 칸을 `Set's Name` 으로 쓰던 방식은 그 칸의 규칙만 `Set's Name` 으로 바꾸면 된다.
@@ -258,6 +263,6 @@ A00480_FileTool/
 - **플러그인 없는 Export** — `[FAIL]` 로그, 파일 안 생김, 트레이스백 없음
 
 **v01.06 Naming** (mayapy 2024): 기본 6칸 · 규칙 콤보 3개 · 미리보기 · 기본 `SK_MANU_CH_Name_Basic_Version` ·
-Set's Name 칸 · Numbering(세트 순번, pad) · 프로파일 즉시 저장 · Numbering 2 개 차단 · 파일명 금지 글자 차단 · 숫자로 시작 허용.
+Set's Name 칸 · Numbering(세트 순번, pad) · 프로파일은 `Save` 로만 저장(v01.08, 편집 → 재오픈 시 원래 칸) · Numbering 2 개 차단 · 파일명 금지 글자 차단 · 숫자로 시작 허용.
 
 > 실제 Maya GUI 육안 확인은 아직이다.

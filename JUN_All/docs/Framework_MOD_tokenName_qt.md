@@ -15,8 +15,8 @@
 
 ```
 framed=True (A00330)                          framed=False (A00480, 그룹 박스 안)
-┌ Profile ───────────────────────────────┐    Profile [Default ▾][New][Rename][Delete]  [Add Token][Delete Token]
-│ [Default        ▾] [New][Rename][Delete]│    ┌Token 1┐┌Token 2┐┌Token 3┐ ...  <- 가로 스크롤 ->
+┌ Profile ───────────────────────────────┐    Profile [Default ▾][Save][New][Rename][Delete]  [Add Token][Delete Token]
+│ [Default  ▾] [Save][New][Rename][Delete]│    ┌Token 1┐┌Token 2┐┌Token 3┐ ...  <- 가로 스크롤 ->
 └─────────────────────────────────────────┘    │Custom▾││Custom▾││Set's▾ │
 ┌ Tokens ────────────────────────────────┐    │ SK    ││ MANU  ││<Set>  │
 │ [Add Token] [Delete Token]              │    └───────┘└───────┘└───────┘
@@ -27,7 +27,10 @@ framed=True (A00330)                          framed=False (A00480, 그룹 박�
 
 - 칸 머리(`Token N`)를 누르면 그 칸이 골라진다(노랗게). **Add Token** = 고른 칸 **오른쪽**에 빈 Custom 칸,
   **Delete Token** = 고른 칸 삭제(마지막 한 칸은 남는다). 칸 폭 80px, 넘치면 가로 스크롤.
-- 칸을 고치면 **현재 프로파일에 바로 저장**된다. `New` 는 지금 칸을 복사한 새 프로파일.
+- **칸을 고쳐도 저장하지 않는다**(2026-10-01~). Profile 줄의 **`Save`**(`save_profile()`)를 눌러야 지금 칸이 그 프로파일의
+  기본이 된다. `Save` 는 저장 안 한 변경이 있을 때만 켜지고(`is_dirty()`), 저장 안 한 칸은 프로파일 전환(`[WARN]` 로그)
+  · 창 닫기 때 버려진다. 예전엔 고칠 때마다 바로 저장돼서 다시 열면 고친 칸이 알림 없이 기본이 됐다.
+- `New` 는 지금 칸을 복사한 새 프로파일(떠나온 프로파일은 그대로).
 - `framed=False` 는 Profile 과 Add/Delete Token 을 **한 줄**에 둬서 세로를 아낀다.
 - `preview_row`(QHBoxLayout) 오른쪽에 툴 실행 버튼을 붙일 수 있다.
 

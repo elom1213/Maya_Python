@@ -20,4 +20,8 @@ metadata:
 - `framed=False` = Profile 과 Add/Delete Token 한 줄 + `preview_row` 에 툴 버튼(A00480 Set Name). 세로를 아끼려고.
 - **Numbering 칸이 4줄이라 칸 줄 높이를 정한다** — A00480 창이 960x853 → 868x970(오프스크린). 사용자에게 보고함, 마야 GUI 확인 전.
 
+- **칸 편집은 저장하지 않는다 — `Save` 버튼만 저장**(2026-10-01, A00480 v01.08 · A00330 v01.11). 사용자 요청: 고친 칸이 알림 없이
+  프로파일 기본이 되는 게 싫다, 버튼을 눌렀을 때만. `_after_edit()` 에 저장을 다시 넣지 말 것. 기준 `_saved_tokens` 는 로드 직후 `tokens()`
+  (json 원본과 비교하면 형식 차이로 늘 dirty). Save 때문에 A00480 창 폭 882 → 954(오프스크린).
+
 관련: [[wip-a00330-token-tab]], [[wip-a00480-filetool]], [[offscreen-size-needs-theme]]

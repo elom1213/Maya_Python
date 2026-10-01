@@ -1,5 +1,15 @@
 # Changelog — A00480_FileTool
 
+## v01.08 (2026-10-01)
+- **Export > Naming: editing a token no longer saves it to the profile.** A new **Save** button on the
+  Profile row saves the tokens shown now as that profile's default; nothing else does.
+  - Before, every edit was written to the profile right away, so after closing and reopening the tool
+    the last edit came back as the profile's default, with no notice.
+  - Save is enabled only while there are unsaved edits (edit a token back and it turns off again).
+  - Unsaved edits are dropped when you switch profile (`[WARN]` in the log) or close the tool.
+  - `New` still copies the tokens shown now into the new profile; the profile you came from is not touched.
+  - The change is in the shared widget `Framework/qt/MOD_tokenName_qt_v01.py`, so A00330 Token gets it too.
+
 ## v01.07 (2026-09-29)
 - **Fixed a second, broken log box under the window** (a ghost of the log on Windows 10 / Maya 2023,
   a white strip on Windows 11 / Maya 2024).

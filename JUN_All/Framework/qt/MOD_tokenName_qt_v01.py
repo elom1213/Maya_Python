@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-28
+# last Update date : 2026-10-01
 # Framework - 토큰 이름 위젯 (공용, PySide). A00330_NamingTool Rename > Token 탭(v01.08)에서 올려 왔다.
 #
 # 이름을 `_` 로 이은 토큰 칸으로 짓는 화면 한 벌.
-#   - Profile : 토큰 규칙 한 벌을 json 으로 저장/불러오기 (New / Rename / Delete).
-#               칸을 고치면 **현재 프로파일에 바로 저장**된다. 새 프로파일은 지금 칸을 복사한다.
+#   - Profile : 토큰 규칙 한 벌을 json 으로 저장/불러오기 (Save / New / Rename / Delete).
+#               칸을 고쳐도 **저장하지 않는다** - `Save` 를 눌러야 지금 칸이 그 프로파일의 기본이 된다
+#               (2026-10-01, 예전엔 고칠 때마다 바로 저장돼서 다시 열면 고친 칸이 기본으로 나왔다).
+#               저장 안 한 칸은 프로파일을 바꾸거나 창을 닫으면 버려진다. 새 프로파일은 지금 칸을 복사한다.
 #   - Tokens  : 칸마다 규칙 콤보 (Custom / Numbering / Set's Name - 툴이 고른 것만).
 #               칸 머리(Token N)를 눌러 고른 뒤
 #                 Add Token    : 고른 칸 **오른쪽**에 새 칸
@@ -200,6 +202,9 @@ class JUN_mod_tokenName_qt_v01(QWidget):
     preview_row : 미리보기 줄 QHBoxLayout - 툴 버튼을 오른쪽에 붙일 자리.
 
     신호 tokensChanged(list) : 칸이 바뀔 때마다(프로파일 전환 포함) 지금 토큰 목록.
+
+    칸을 고쳐도 프로파일 json 은 그대로다 - `Save` 버튼(save_profile)을 눌러야 저장된다.
+    is_dirty() : 저장된 칸과 지금 칸이 다른지.
     """
 
     tokensChanged = Signal(list)
@@ -214,6 +219,9 @@ class JUN_mod_tokenName_qt_v01(QWidget):
         self.columns = []
         self._profile = store.get_active()
         self._loading = False
+        # 프로파일에 저장된 칸 (Save 를 누르기 전까지의 기준). 칸 형식 그대로 비교하려고
+        # json 이 아니라 로드 직후 tokens() 로 잡는다.
+        self._saved_tokens = []
 
         self.build_ui()
         self.load_tokens(store.load_profile(self._profile))
@@ -257,9 +265,17 @@ class JUN_mod_tokenName_qt_v01(QWidget):
         self.cmb_profile.setToolTip(
             "Active profile - a saved set of token rules\n"
             "(each profile is its own JSON under the tool's data folder).\n"
-            "Editing the tokens saves them to this profile right away.")
+            "Edited tokens are NOT saved until you click Save.")
         self.cmb_profile.currentTextChanged.connect(self.on_profile_changed)
         row.addWidget(self.cmb_profile, stretch=1)
+
+        self.btn_save_profile = QPushButton("Save")
+        self.btn_save_profile.setToolTip(
+            "Save the tokens shown now as this profile's default.\n"
+            "Until you click it, edits are not saved - switching profile\n"
+            "or closing the tool drops them.")
+        self.btn_save_profile.clicked.connect(self.on_save_profile)
+        row.addWidget(self.btn_save_profile)
 
         for label, tip, slot in (
                 ("New", "Create a new profile from the tokens shown now", self.on_new_profile),
@@ -336,7 +352,8 @@ class JUN_mod_tokenName_qt_v01(QWidget):
         self._loading = False
         if self.columns:
             self.select_column(len(self.columns) - 1)
-        self._after_edit(save=False)
+        self._saved_tokens = self.tokens()
+        self._after_edit()
 
     def _insert_column(self, index, token):
         column = TokenColumn(token, self.ruleset, self._on_token_changed)
@@ -396,12 +413,16 @@ class JUN_mod_tokenName_qt_v01(QWidget):
         if not self._loading:
             self._after_edit()
 
-    def _after_edit(self, save=True):
+    def _after_edit(self):
+        # 미리보기 · Save 버튼 상태만 갱신한다. 저장은 Save 버튼(save_profile)만 한다.
         tokens = self.tokens()
         self.lbl_preview.setText("Preview : " + self.ruleset.preview(tokens))
-        if save and self._profile:
-            self.store.save_profile(self._profile, tokens)
+        self.btn_save_profile.setEnabled(tokens != self._saved_tokens)
         self.tokensChanged.emit(tokens)
+
+    def is_dirty(self):
+        """저장 안 한 칸 변경이 있는지."""
+        return self.tokens() != self._saved_tokens
 
     # ================================================================
     # Profile
@@ -416,9 +437,26 @@ class JUN_mod_tokenName_qt_v01(QWidget):
             self.cmb_profile.setCurrentIndex(index)
         self.cmb_profile.blockSignals(False)
 
+    def on_save_profile(self):
+        self.save_profile()
+
+    def save_profile(self):
+        """지금 칸을 현재 프로파일의 기본으로 저장한다 (Save 버튼)."""
+        if not self._profile:
+            return
+        tokens = self.tokens()
+        self.store.save_profile(self._profile, tokens)
+        self._saved_tokens = tokens
+        self.btn_save_profile.setEnabled(False)
+        self._log("[OK] {0} profile : saved '{1}' ({2} token(s)).".format(
+            self._prefix, self._profile, len(tokens)))
+
     def on_profile_changed(self, name):
         if not name or name == self._profile:
             return
+        if self.is_dirty():
+            self._log("[WARN] {0} profile : unsaved edits to '{1}' were dropped.".format(
+                self._prefix, self._profile))
         self._profile = name
         self.store.set_active(name)
         tokens = self.store.load_profile(name)
@@ -446,9 +484,13 @@ class JUN_mod_tokenName_qt_v01(QWidget):
 
     def create_profile(self, name):
         """지금 칸을 복사해 새 프로파일을 만들고 그쪽으로 바꾼다."""
-        self.store.save_profile(name, self.tokens())
+        tokens = self.tokens()
+        self.store.save_profile(name, tokens)
         self.store.set_active(name)
         self._profile = name
+        # 새 프로파일엔 지금 칸이 저장됐다. 원래 프로파일은 Save 전 그대로다.
+        self._saved_tokens = tokens
+        self.btn_save_profile.setEnabled(False)
         self._refresh_profiles()
         self._log("[OK] {0} profile : created '{1}'.".format(self._prefix, name))
 

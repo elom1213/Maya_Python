@@ -26,5 +26,8 @@
 #                   MOD_tokenName_qt_v01 (rules/profiles: Framework.core.token_naming), also used by
 #                   A00480_FileTool Export > Naming. Same look and behaviour, same profile files (v01.10)
 
-VERSION = "01.10"
-LAST_UPDATE = "2026-09-28"
+#   - Token       : editing a token no longer saves it to the profile - the new Save button on the
+#                   Profile row does (shared widget change, same as A00480 v01.08) (v01.11)
+
+VERSION = "01.11"
+LAST_UPDATE = "2026-10-01"
