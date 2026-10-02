@@ -67,5 +67,7 @@
 #   - Quick Rename: Insert - Position slider next to the number field (like A00110 Stagger
 #                   Offset per Item); its range follows the longest listed name (v01.24)
 
-VERSION = "01.24"
+#   - Quick Rename: Insert - the Position slider uses this tool's brown_dark theme colors (v01.25)
+
+VERSION = "01.25"
 LAST_UPDATE = "2026-10-02"

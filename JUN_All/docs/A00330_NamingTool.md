@@ -296,7 +296,8 @@ Selection 탭의 Front Insert / Last Add 가 앞·끝만 되는 것을 **임의�
 | `99` / `-99` | 이름 밖 → 끝 / 앞에 붙임 (Status 에 적힘) | `arm_jntX` / `Xarm_jnt` |
 
 - Position 줄 아래에 뜻(`front` / `after the first 3 character(s)` …)이 한 줄로 나온다.
-- **슬라이더**(v01.24) — A00110_animTool_V02 Timing > Stagger 의 `Offset per Item` 과 같은 모양(슬라이더 + 숫자 칸, 같은 홈 · 손잡이 색).
+- **슬라이더**(v01.24) — A00110_animTool_V02 Timing > Stagger 의 `Offset per Item` 과 같은 모양(슬라이더 + 숫자 칸).
+  색은 이 툴의 테마 brown_dark 에 맞춘다(v01.25) — 홈은 입력칸처럼, 손잡이는 버튼처럼.
   둘은 같은 값이다. 슬라이더 범위는 **리스트에서 가장 긴 이름**에 맞춘다 — 이름이 n 글자면 `-(n+1)` ~ `n`
   (오른쪽 절반 = 앞에서 센 자리, 왼쪽 절반 = 끝에서 센 자리), 리스트가 비면 20 글자 기준. 리스트가 바뀌면 다시 맞춘다.
   이름 밖 자리(예 `99`)는 숫자 칸으로만 넣고, 그때 슬라이더는 끝에 붙어 있다.

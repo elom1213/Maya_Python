@@ -32,6 +32,9 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00330 NamingTool — **Position 슬라이더 색을 brown_dark 테마로** (v01.24->01.25)
+- A00110 의 파란 슬라이더 색 -> brown_dark.qss 값: 홈 #38352f + 테두리 #ad9276(입력칸), 손잡이 #9c8266 / hover #ad9276 / 누름 #856e55(버튼). 캡처 확인.
+
 > [!summary] A00330 NamingTool — **Quick Rename > Insert Position 슬라이더** (v01.23->01.24)
 - 요청: Position 에 가로 슬라이더, A00110_animTool_V02 Stagger `Offset per Item` 과 같은 UI.
 - [슬라이더(늘어남)] [숫자 칸 78px] + A00110 `STAGGER_SLIDER_STYLE` 같은 값. 슬라이더 <-> 숫자 칸 동기(blockSignals), 범위 = 가장 긴 이름 n -> -(n+1)..n, 범위 밖 숫자는 슬라이더를 끝에.

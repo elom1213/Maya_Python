@@ -1,5 +1,9 @@
 # Changelog — A00330_NamingTool
 
+## v01.25 (2026-10-02)
+**[Change] Insert 탭 Position 슬라이더 색을 이 툴의 테마(brown_dark)로.** 홈 = 입력칸(#38352f, 테두리 #ad9276),
+손잡이 = 버튼(#9c8266, hover #ad9276, 누름 #856e55). v01.24 는 A00110 의 파란 색이었다.
+
 ## v01.24 (2026-10-02)
 **[Add] Quick Rename > Insert - Position 슬라이더.**
 

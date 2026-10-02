@@ -41,18 +41,22 @@ WINDOW_OBJECT_NAME = "JUN_A00330_NamingTool_window"
 
 # Quick Rename > Insert 의 Position 슬라이더 (v01.24) - A00110_animTool_V02 Timing > Stagger 의
 # `Offset per Item` 과 같은 모양: [이름] [슬라이더] [숫자 칸]. 테마 qss 가 슬라이더 홈을 안 그려
-# 바탕에 묻히므로 직접 그린다(A00110 STAGGER_SLIDER_STYLE 과 같은 값).
+# 바탕에 묻히므로 직접 그린다.
+# v01.25 : 색은 이 툴의 테마 **brown_dark** (Framework/styles/brown_dark.qss) 에 맞춘다 -
+#          홈 = 입력칸(#38352f + 테두리 #ad9276), 손잡이 = 버튼(#9c8266, hover #ad9276, 누름 #856e55).
+#          (v01.24 는 A00110 의 파란 색을 그대로 썼다.) 테마를 바꾸면 이 값도 맞출 것.
 INS_POSITION_SLIDER_STYLE = (
     "QSlider:horizontal { min-height: 20px; }"
     "QSlider::groove:horizontal {"
     " height: 6px; margin: 0 4px;"
-    " background: #34373d; border: 1px solid #7f9ec8; border-radius: 3px; }"
+    " background: #38352f; border: 1px solid #ad9276; border-radius: 3px; }"
     "QSlider::sub-page:horizontal, QSlider::add-page:horizontal {"
-    " background: #34373d; border: 1px solid #7f9ec8; border-radius: 3px; }"
+    " background: #38352f; border: 1px solid #ad9276; border-radius: 3px; }"
     "QSlider::handle:horizontal {"
     " width: 12px; margin: -6px 0;"
-    " background: #a9c4e6; border: 1px solid #7f9ec8; border-radius: 3px; }"
-    "QSlider::handle:horizontal:hover { background: #ffffff; }"
+    " background: #9c8266; border: 1px solid #ad9276; border-radius: 3px; }"
+    "QSlider::handle:horizontal:hover { background: #ad9276; }"
+    "QSlider::handle:horizontal:pressed { background: #856e55; }"
     "QSlider::groove:horizontal:disabled,"
     " QSlider::sub-page:horizontal:disabled,"
     " QSlider::add-page:horizontal:disabled {"
