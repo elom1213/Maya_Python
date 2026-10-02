@@ -29,4 +29,7 @@ metadata:
   (프로파일 `Dnable_Set_v001`). **A00330 `data/` 는 개발 저장소에서 gitignore — 프로파일은 이 PC · 릴리즈 저장소에만 있다.**
   릴리즈 빌더는 툴 폴더를 지우고 다시 복사하며 docs 는 `JUN_All/docs/<번호>*.md` 에서 가져오므로, 릴리즈용 문서도 원본은 `JUN_All/docs/` 에.
 
+- **칸 페이지는 모두 [이름 줄] -> [입력칸] -> stretch, 입력칸 높이는 `_match_input_heights` 로 하나** (2026-10-02, A00330 v01.13,
+  `ref/ref_02.png`). 새 규칙 페이지를 만들 때 이름 줄 · stretch 를 빼면 입력칸이 어긋난다. padding 을 줄인 콤보는 낮아지므로 높이를 고정해야 한다.
+
 관련: [[wip-a00330-token-tab]], [[wip-a00480-filetool]], [[offscreen-size-needs-theme]]

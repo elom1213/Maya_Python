@@ -1,5 +1,14 @@
 # Changelog — A00330_NamingTool
 
+## v01.13 (2026-10-02)
+**[Fix] Token 탭 - 칸마다 입력칸 높이 · 위치가 달랐던 것 (`ref/ref_02.png`).**
+
+- 높이: Enum 값 콤보가 다른 입력칸보다 낮았다(80px 칸에 글자를 넣으려고 padding 을 줄였기 때문). 이제 글자 칸 · Enum 값 ·
+  Start · Pad 0 · Set's Name 이 **같은 높이** — 테마를 입힌 QLineEdit / QSpinBox 중 큰 높이로 맞추고, 테마가 바뀌면 다시 맞춘다.
+- 위치: Enum(`character`) · Numbering(`Start`) 칸은 입력칸 위에 이름 줄이 있고 Custom 은 없어서, Custom 입력칸이 한 줄 위에 붙었다.
+  이제 모든 칸에 이름 줄이 있다(Custom = `Text`, Set's Name = `Set`).
+- 실측(brown_dark · green_light · dark): 6칸의 입력칸 y · 높이가 모두 같다. 공용 위젯 수정 — A00480 Export > Naming 의 칸 줄 높이는 전후 같다(163px).
+
 ## v01.12 (2026-10-02)
 **[Add] Token 탭 - `Enum` 규칙: 정해진 값 중 하나를 콤보로 고른다(타이핑하지 않는다).**
 

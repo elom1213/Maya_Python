@@ -132,19 +132,21 @@ class TokenColumn(QFrame):
 
         self.stack = QStackedWidget()
 
+        # 규칙별 페이지는 모두 [이름 줄] -> [입력칸] 순서다 (2026-10-02). 이름 줄이 없는 페이지가 있으면
+        # 입력칸이 한 줄 위로 붙어 옆 칸과 어긋난다(ref_02.png - Custom 의 SetXXX 가 Enum 의 CHN 보다 위).
+        # 입력칸 높이는 _match_input_heights 가 하나로 맞춘다.
+
         # Custom
         self.le_text = QLineEdit()
         self.le_text.setPlaceholderText("text")
-        custom_page = QWidget()
-        custom_layout = QVBoxLayout(custom_page)
-        custom_layout.setContentsMargins(0, 0, 0, 0)
+        custom_page, custom_layout = self._new_page()
+        custom_layout.addWidget(self._caption("Text"))
         custom_layout.addWidget(self.le_text)
         custom_layout.addStretch(1)
         self._add_page("custom", custom_page)
 
         # Enum - 칸 이름 / 값 콤보 / Values... (Numbering 페이지 4줄보다 낮아 칸 높이는 그대로)
-        self.lbl_role = QLabel()
-        self.lbl_role.setAlignment(Qt.AlignCenter)
+        self.lbl_role = self._caption("")
         self.cmb_value = QComboBox()
         self.cmb_value.setStyleSheet(
             "QComboBox { padding: 1px 1px; } QComboBox::drop-down { width: 12px; }")
@@ -153,10 +155,7 @@ class TokenColumn(QFrame):
         self.btn_values.setStyleSheet("QPushButton { padding: 2px; }")
         self.btn_values.setToolTip("Edit this token's name and the list of values.")
         self.btn_values.clicked.connect(self._edit_enum_values)
-        enum_page = QWidget()
-        enum_layout = QVBoxLayout(enum_page)
-        enum_layout.setContentsMargins(0, 0, 0, 0)
-        enum_layout.setSpacing(1)
+        enum_page, enum_layout = self._new_page()
         enum_layout.addWidget(self.lbl_role)
         enum_layout.addWidget(self.cmb_value)
         enum_layout.addWidget(self.btn_values)
@@ -171,28 +170,29 @@ class TokenColumn(QFrame):
         self.sp_pad = QSpinBox()
         self.sp_pad.setRange(0, 10)
         self.sp_pad.setToolTip("Zero padding - 2 gives 00, 01, 02 ...")
-        number_page = QWidget()
-        number_layout = QVBoxLayout(number_page)
-        number_layout.setContentsMargins(0, 0, 0, 0)
-        number_layout.setSpacing(1)
-        number_layout.addWidget(QLabel("Start"))
+        number_page, number_layout = self._new_page()
+        number_layout.addWidget(self._caption("Start"))
         number_layout.addWidget(self.sp_start)
-        number_layout.addWidget(QLabel("Pad 0"))
+        number_layout.addWidget(self._caption("Pad 0"))
         number_layout.addWidget(self.sp_pad)
+        # 다른 페이지처럼 아래 stretch - 없으면 남는 높이가 이름 줄로 나뉘어 입력칸이 6px 내려간다(실측)
+        number_layout.addStretch(1)
         self._add_page("numbering", number_page)
 
         # Set's Name - 입력 없음. 칸이 무엇으로 채워지는지만 보인다.
-        setname_page = QWidget()
-        setname_layout = QVBoxLayout(setname_page)
-        setname_layout.setContentsMargins(0, 0, 0, 0)
+        setname_page, setname_layout = self._new_page()
         self.le_setname = QLineEdit(ruleset.sample_context)
         self.le_setname.setEnabled(False)
         self.le_setname.setToolTip("Filled with each set's name.")
+        setname_layout.addWidget(self._caption("Set"))
         setname_layout.addWidget(self.le_setname)
         setname_layout.addStretch(1)
         self._add_page("setname", setname_page)
 
         layout.addWidget(self.stack)
+
+        # 높이를 맞출 입력칸 - 값이 보이는 칸 전부
+        self._inputs = (self.le_text, self.cmb_value, self.sp_start, self.sp_pad, self.le_setname)
 
         self.set_token(token)
 
@@ -201,6 +201,42 @@ class TokenColumn(QFrame):
         self.sp_start.valueChanged.connect(self._emit)
         self.sp_pad.valueChanged.connect(self._emit)
         self.cmb_value.currentIndexChanged.connect(self._emit)
+
+    @staticmethod
+    def _new_page():
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+        page_layout.setSpacing(1)
+        return page, page_layout
+
+    @staticmethod
+    def _caption(text):
+        """입력칸 위 이름 줄 (Text / character / Start ...). 모든 페이지가 같은 모양."""
+        label = QLabel(text)
+        label.setAlignment(Qt.AlignCenter)
+        return label
+
+    def _match_input_heights(self):
+        """입력칸(글자 · Enum 값 · 스핀박스) 높이를 하나로 (2026-10-02, ref_02.png).
+
+        Enum 값 콤보는 80px 칸에 글자가 들어가도록 padding 을 줄여서 테마 그대로인 QLineEdit /
+        QSpinBox 보다 낮았다. 테마마다 높이가 다르므로 고정값이 아니라 **테마를 입힌 뒤의**
+        QLineEdit · QSpinBox 높이 중 큰 값으로 맞춘다 (테마가 바뀌면 다시 맞춘다).
+        """
+        if not getattr(self, "_inputs", None):
+            return
+        for widget in self._inputs:
+            widget.ensurePolished()
+        height = max(self.le_text.sizeHint().height(), self.sp_start.sizeHint().height())
+        for widget in self._inputs:
+            if widget.minimumHeight() != height or widget.maximumHeight() != height:
+                widget.setFixedHeight(height)
+
+    def event(self, event):
+        if event.type() in (QEvent.Polish, QEvent.StyleChange, QEvent.Show):
+            self._match_input_heights()
+        return super().event(event)
 
     def _add_page(self, key, page):
         self._pages[key] = self.stack.addWidget(page)

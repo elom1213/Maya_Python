@@ -81,3 +81,6 @@ groups = STORE.ruleset.plan_names([2, 3], tokens)      # 오브젝트마다 노�
 - 가로 전용 `QScrollArea` 는 레이아웃이 테마 전 높이를 캐시해 칸 아래가 잘린다 → `TokenScrollArea` 가
   LayoutRequest / Polish 때 높이를 직접 고정한다.
 - Numbering 칸은 `Start` / `Pad 0` 라벨을 스핀박스 위에 둔 4줄이라, 칸 줄 높이는 이 칸이 정한다.
+- **규칙 페이지는 모두 [이름 줄] -> [입력칸] -> ... -> stretch** (2026-10-02). 이름 줄이 없는 페이지가 있으면 입력칸이 한 줄 위로
+  붙고, stretch 가 없는 페이지는 남는 높이가 이름 줄로 나뉘어 입력칸이 내려간다(실측 6px). 입력칸 높이는
+  `TokenColumn._match_input_heights` 가 테마를 입힌 QLineEdit / QSpinBox 중 큰 값으로 고정한다(Polish · StyleChange · Show 때).

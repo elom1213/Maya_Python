@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00330 NamingTool — **Token 칸 입력칸 높이 · 위치 통일** (v01.12->01.13)
+- 요청(`ref/ref_02.png`): CHN · n 과 SetXXX, Top 과 Numbering `1` 의 입력칸 높이가 다르다 — 같게.
+- 원인 둘: Enum 값 콤보는 80px 에 글자를 넣으려 padding 을 줄여 낮았다 / Custom 페이지엔 이름 줄이 없어 입력칸이 한 줄 위에 붙었다. 고치는 중 하나 더 — Numbering 페이지엔 stretch 가 없어 남는 높이가 이름 줄로 나뉘어 입력칸이 6px 내려갔다.
+- 수정(공용 `MOD_tokenName_qt_v01`): 모든 페이지 = 이름 줄(`Text` / role / `Start` / `Set`) -> 입력칸 -> stretch. `_match_input_heights` 가 입력칸 5종을 테마 입힌 QLineEdit / QSpinBox 중 큰 높이로 고정(Polish · StyleChange · Show).
+- 실측: brown_dark · green_light 6칸 y 83 · 높이 32 전부 같음, dark 높이 26 같음(페이지 안 y 17 동일). A00480 칸 줄 높이 전후 163px.
+
 > [!summary] A00030 QuickTool V02 — **`Print Hierarchy` -> `Copy Hierarchy`** (v02.03->02.04)
 - 요청: 버튼 이름을 Copy Hierarchy 로, 로그 출력은 그대로 두고 계층 트리를 클립보드에도 복사.
 - 수정: 버튼 표 라벨 · 핸들러 `on_copy_hierarchy` — 트리를 로그에 찍은 뒤 같은 텍스트를 `QApplication.clipboard()` 로(Copy Scene Folder 와 같은 방식), 코어 로그 문구 `Copy Hierarchy : n node(s).`, About · 가이드 문서 갱신.

@@ -33,5 +33,8 @@
 #                   (Values... edits the list). Profile Dnable_Set_v001 uses it for character /
 #                   side / part / type. Team naming rule doc: docs/A00330_NamingRule_Set.md (v01.12)
 
-VERSION = "01.12"
+#   - Token       : every token's input box (text / Enum value / Start / Pad 0) has the same height
+#                   and sits on the same row - each column has a caption row above it (v01.13)
+
+VERSION = "01.13"
 LAST_UPDATE = "2026-10-02"
