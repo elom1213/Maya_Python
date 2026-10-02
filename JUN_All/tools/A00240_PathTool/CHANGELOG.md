@@ -2,6 +2,16 @@
 
 All notable changes to this tool are documented here.
 
+## [01.17] - 2026-10-02
+### Added
+- **Tree tab: read ahead in the background** (Adaptive). Folders that are on screen but not
+  read yet are read one level in the background, so opening them is instant. Only one level
+  ahead - opening a folder starts reading its own subfolders. Up to 2000 subfolders per folder
+  are read ahead; the rest are read when opened.
+- **Empty folders lose their arrow before you open them** - including folders whose files are
+  all hidden by *Show files* / *File Types*.
+- Folders read ahead are also searched by **Filter**.
+
 ## [01.16] - 2026-10-02
 ### Added
 - **Tree tab: Adaptive** (on by default). Build reads only the first level under the path, and a

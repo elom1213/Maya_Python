@@ -16,6 +16,8 @@
 #   8) Adaptive (v01.16, 기본 켜짐) : 빌드 때 루트 한 겹만 읽고, 폴더를 펼칠 때 그 폴더 한 겹만
 #               읽는다(Depth 무시). 끄면 예전처럼 Depth 까지 미리 읽는다.
 #   9) 더블클릭 (v01.16) : 그 경로를 탐색기에서 연다(Reveal 과 같다). 펼치기는 화살표로.
+#  10) 선읽기 (v01.17, Adaptive) : 보이는(안 읽은) 폴더의 한 겹을 백그라운드에서 미리 읽는다 -
+#               펼칠 때 기다리지 않고, 빈 폴더는 펼치기 전에 화살표가 사라진다.
 
 import os
 
@@ -40,10 +42,17 @@ from Framework.qt.qt import (
     QFileDialog,
     QMessageBox,
     QStyle,
+    QTimer,
 )
 
 from ..core import tree_scanner
 from ..core import path_opener
+from ..core.prefetcher import Prefetcher
+
+# 선읽기 (v01.17) - 폴더 하나를 펼쳤을 때 미리 읽을 하위 폴더 수의 상한.
+# 하위 폴더가 수만 개인 곳을 열어도 백그라운드가 그것만 붙들지 않게 한다(넘는 것은 펼칠 때 읽는다).
+PREFETCH_MAX_PER_FOLDER = 2000
+PREFETCH_TICK_MS = 50     # 결과를 모아 화면에 반영하는 주기
 
 
 class _CheckableMenu(QMenu):
@@ -73,6 +82,13 @@ class TreeTab(QWidget):
         # Shift 로 한꺼번에 펼치는 중에는 itemExpanded 가 다시 들어와도 무시한다.
         # (안 그러면 자식마다 같은 작업을 반복해 깊은 트리에서 폭발한다)
         self._bulk = False
+
+        # v01.17 : 선읽기 - 스레드가 읽고, 타이머가 메인 스레드에서 모아 반영한다.
+        self._prefetcher = Prefetcher()
+        self._prefetch_timer = QTimer(self)
+        self._prefetch_timer.setInterval(PREFETCH_TICK_MS)
+        self._prefetch_timer.timeout.connect(self._on_prefetch_tick)
+        self.destroyed.connect(lambda *_a, pf=self._prefetcher: pf.stop())
 
         # 폴더/파일 구분용 표준 아이콘(테마 무관). 1회 만들어 재사용한다.
         self._icon_dir = self.style().standardIcon(QStyle.SP_DirIcon)
@@ -114,6 +130,8 @@ class TreeTab(QWidget):
         self.chk_adaptive.setToolTip(
             "On  : read only the first level now, and each folder when you open it\n"
             "      (one level at a time). Big or deep folders open right away.\n"
+            "      Folders on screen are read ahead in the background, so they open\n"
+            "      without waiting and empty ones lose their arrow.\n"
             "Off : read everything down to Depth before showing the tree.")
         self.chk_adaptive.toggled.connect(self._on_adaptive_toggled)
         opt_row.addWidget(self.chk_adaptive)
@@ -244,6 +262,8 @@ class TreeTab(QWidget):
         if self._adaptive() and not self._bulk:
             if self._load_item(item):
                 self._after_load()
+            # 이제 보이게 된 하위 폴더들을 미리 읽어 둔다 (v01.17)
+            self._prefetch_children(self._node(item.data(0, Qt.UserRole)))
         if self._shift_held():
             self._set_expanded_deep(item, True)
 
@@ -313,6 +333,7 @@ class TreeTab(QWidget):
             return
 
         self._root_path = os.path.abspath(path)
+        self._prefetcher.reset()                  # 이전 트리의 선읽기는 버린다 (v01.17)
         # 확장자 필터는 뷰 단계에서 적용하므로 스캔은 항상 전체 파일을 담는다.
         if self._adaptive():
             # v01.16 : 루트 바로 아래 한 겹만. 나머지는 펼칠 때 읽는다.
@@ -323,6 +344,8 @@ class TreeTab(QWidget):
         self._reindex()
         self._rebuild_type_menu(sorted(tree_scanner.collect_extensions(self._tree)))
         self._fill_tree(self.tree)
+        if self._adaptive():
+            self._prefetch_children(self._tree)
 
     def _on_depth_changed(self, _value):
         # 깊이는 스캔에 영향 → 이미 빌드한 경로가 있으면 다시 빌드한다(Adaptive 면 Depth 는 안 쓴다).
@@ -405,6 +428,90 @@ class TreeTab(QWidget):
         """
         for tree in list(self._trees):
             self._apply_filter(tree, fold=False)
+
+    # ------------------------------------------------- 선읽기 (v01.17)
+
+    def _prefetch_children(self, node):
+        """node 바로 아래의 **안 읽은 폴더**들을 백그라운드에서 한 겹씩 읽도록 요청한다.
+
+        한 단계 앞만 읽는다 - 미리 읽은 폴더의 하위까지 또 읽으면 결국 트리 전체를 읽는다.
+        (그 하위는 그 폴더를 펼칠 때 요청된다.)
+        """
+        if node is None or not node.get("loaded"):
+            return
+        paths = [c["path"] for c in node["children"]
+                 if c["is_dir"] and not c.get("loaded")]
+        if not paths:
+            return
+        self._prefetcher.request(paths[:PREFETCH_MAX_PER_FOLDER])
+        if not self._prefetch_timer.isActive():
+            self._prefetch_timer.start()
+
+    def _on_prefetch_tick(self):
+        """백그라운드에서 읽힌 폴더들을 캐시와 트리에 **한꺼번에** 반영한다(메인 스레드).
+
+        - 그새 펼쳐서 이미 읽은 폴더는 버린다(펼칠 때 동기로 읽은 쪽이 이긴다).
+        - 항목에 자식을 바로 달아 둔다 - 그래야 화살표가 **실제 자식 수**를 따른다
+          (빈 폴더 · 다 걸러지는 폴더는 화살표가 사라진다). 접혀 있으므로 보이지는 않는다.
+        - 결과마다가 아니라 틱마다 한 번만 트리를 훑는다 - 수천 개가 오면 매번 훑기는 제곱이다.
+        """
+        if not self._prefetcher.busy():
+            self._prefetch_timer.stop()
+        results = self._prefetcher.take_results()
+        if not results or self._tree is None or not self._adaptive():
+            return
+
+        changed = []
+        found_exts = set()
+        for path, children in results:
+            node = self._index.get(path)
+            if node is None or node.get("loaded", True):
+                continue
+            node["children"] = children
+            node["loaded"] = True
+            for child in children:
+                self._index[child["path"]] = child
+                if not child["is_dir"]:
+                    found_exts.add(child["ext"])
+            changed.append(node)
+        if not changed:
+            return
+
+        # 새 확장자는 항목을 만들기 전에 (_load_item 과 같은 이유)
+        new_exts = found_exts - set(self._type_states)
+        if new_exts:
+            self._rebuild_type_menu(sorted(set(self._type_states) | new_exts))
+
+        show_files = self.chk_show_files.isChecked()
+        exts = self._checked_exts()
+        filtering = bool(self._filter_tokens())
+        for tree in list(self._trees):
+            items = self._item_map(tree)
+            for node in changed:
+                item = items.get(node["path"])
+                if item is None or item.childCount():
+                    continue
+                fresh = self._make_item(node, show_files, exts)
+                item.addChildren(fresh.takeChildren())
+                item.setChildIndicatorPolicy(fresh.childIndicatorPolicy())
+            if filtering:
+                self._apply_filter(tree, fold=False)   # 새 항목도 걸러지게
+
+    def _item_map(self, tree):
+        """tree 의 경로 -> 항목 사전(한 번 훑어서 만든다)."""
+        out = {}
+        root = tree.topLevelItem(0)
+        if root is None:
+            return out
+        stack = [root]
+        while stack:
+            item = stack.pop()
+            path = item.data(0, Qt.UserRole)
+            if path:
+                out[path] = item
+            for i in range(item.childCount()):
+                stack.append(item.child(i))
+        return out
 
     def _on_show_files_toggled(self, checked):
         # 파일을 안 보이면 File Types 선택은 의미가 없으므로 비활성화.
@@ -557,6 +664,11 @@ class TreeTab(QWidget):
                 self._rebuild_children(tree, node)
             self._restore_view_state(tree, state)
             self._apply_filter(tree, fold=False)
+
+        # 갱신으로 새로 생긴(안 읽은) 폴더도 미리 읽는다 (v01.17)
+        if self._adaptive():
+            for node in nodes:
+                self._prefetch_children(node)
 
     def _refresh_target_nodes(self):
         """갱신할 캐시 노드 목록. 고를 수 없으면 안내하고 None."""
