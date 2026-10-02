@@ -43,5 +43,8 @@
 #                   that Rename will touch, as a tree, with Current / New name / Status. Rename now
 #                   skips locked / referenced nodes instead of stopping, and refreshes the list (v01.15)
 
-VERSION = "01.15"
+#   - Token       : the Preview table's three columns have their own colors (blue / purple / gray),
+#                   header included, so Current, New name and Status are easy to tell apart (v01.16)
+
+VERSION = "01.16"
 LAST_UPDATE = "2026-10-02"

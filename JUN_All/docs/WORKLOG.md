@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00330 NamingTool — **Preview 표 세 칸 색 구분** (v01.15->01.16)
+- 요청: Current / New name / Status 칸 색을 서로 다르게.
+- 칸 배경 파랑 · 보라 · 회색(반투명, 어두운 테마 alpha 70 / 밝은 50 - 같은 값이면 brown_dark 에서 거의 안 보였다), Status 글자색과 안 겹치는 계열.
+- 머리글: `headerItem().setBackground` 는 테마 qss 의 section 배경에 덮여 brown_dark 에서 안 보임 → 테마가 그린 위에 덧칠하는 `TintedHeader(QHeaderView)`. 새 QHeaderView 는 stretchLastSection 이 False 라 True 로.
+- 확인: brown_dark · green_light 캡처.
+
 > [!summary] A00330 NamingTool — **Token 탭 Preview 표** (v01.14->01.15)
 - 요청: Quick Rename > Insert 의 Preview 창처럼 Rename > Token 탭에서도 이름을 바꾼 결과를 미리 보게.
 - core `preview_tokens`: `rename_tokens` 와 같은 순서 · 같은 이름, 행마다 Current / New name / Status(Insert 와 같은 규칙 + `token error`). `name taken` 은 부모별 이름 칸을 씬대로 채우고 rename 순서대로 바꾸는 흉내로 판정.

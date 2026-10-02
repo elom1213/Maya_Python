@@ -1,5 +1,12 @@
 # Changelog — A00330_NamingTool
 
+## v01.16 (2026-10-02)
+**[Change] Token 탭 Preview 표 - 세 칸의 색을 다르게.** Current = 파랑, New name = 보라, Status = 회색(머리글 포함).
+
+- 반투명 배경이라 테마 바탕 · 줄 바꿈 색 위에 얹힌다. 어두운 테마는 alpha 70, 밝은 테마는 50(같은 값이면 어두운 바탕에서 거의 안 보였다).
+- Status 글자색(OK 초록 · name taken 노랑 · 오류 빨강)과 겹치지 않는 색 계열.
+- 머리글은 테마 qss 가 배경을 덮어써서(brown_dark) 테마가 그린 위에 색을 덧칠하는 `TintedHeader` 로.
+
 ## v01.15 (2026-10-02)
 **[Add] Token 탭 - Preview 표 (Quick Rename > Insert 와 같은 모양).**
 

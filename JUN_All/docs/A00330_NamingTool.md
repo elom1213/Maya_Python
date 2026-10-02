@@ -133,6 +133,8 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 
 - 계산은 `core.preview_tokens` — Rename(`rename_tokens`)과 **같은 순서 · 같은 이름**이다(Maya 2024 에서 미리보기 = 실제 결과 대조).
 - 토큰을 칠 때마다 씬을 조회하지 않도록 갱신을 150ms 모은다.
+- **세 칸은 색이 다르다**(v01.16) — Current 파랑 · New name 보라 · Status 회색, 머리글까지. 반투명이라 테마 바탕 위에 얹힌다
+  (어두운 테마는 조금 진하게). 머리글은 테마 qss 가 배경을 덮어쓰므로 테마가 그린 위에 덧칠한다(`TintedHeader`).
 
 **토큰 규칙** (칸 밑의 콤보)
 

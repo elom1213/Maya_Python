@@ -35,10 +35,47 @@ from tools.A00330_NamingTool.app.core import token_profile_prefs as tprefs
 from tools.A00330_NamingTool.app.config import dev_mode
 
 
+class TintedHeader(QHeaderView):
+    """칸마다 색을 **덧칠**하는 머리글 (v01.16).
+
+    테마 qss 의 `QHeaderView::section { background ... }` 가 있으면 headerItem().setBackground 는 무시된다
+    (실측: brown_dark 에서 안 보이고 green_light 에서만 보였다). 그래서 테마가 그린 머리글 위에
+    반투명 색을 한 겹 더 칠한다 - 어느 테마든 같은 칸 색이 나온다.
+    """
+
+    def __init__(self, tints, parent=None):
+        super(TintedHeader, self).__init__(Qt.Horizontal, parent)
+        self._tints = tints          # {logical index: (r, g, b, a)}
+
+    def paintSection(self, painter, rect, logical_index):
+        super(TintedHeader, self).paintSection(painter, rect, logical_index)
+        rgba = self._tints.get(logical_index)
+        if rgba:
+            painter.save()
+            painter.fillRect(rect, QColor(*rgba))
+            painter.restore()
+
+
 class TokenTab(QWidget):
 
     #: 미리보기 표 컬럼
     COL_NAME, COL_NEW, COL_STATUS = range(3)
+
+    #: 칸마다 다른 배경 (v01.16) - 세 칸을 한눈에 가르려고. 반투명이라 그 테마 바탕 위에 얹히고
+    #: 줄 바꿈 색(alternating rows)도 그대로 보인다. Status 글자색(OK 초록 · name taken 노랑 · 오류 빨강)과
+    #: 겹치지 않게 파랑 · 보라 · 회색 계열. 어두운 바탕에서는 같은 alpha 가 거의 안 보여(실측) 진하게 쓴다.
+    COLUMN_COLORS = {
+        COL_NAME: (90, 140, 220),      # Current  - 파랑
+        COL_NEW: (170, 100, 210),      # New name - 보라
+        COL_STATUS: (140, 140, 140),   # Status   - 회색
+    }
+    TINT_ALPHA = {"light": 50, "dark": 70}
+    HEADER_ALPHA = 110
+
+    @classmethod
+    def column_tints(cls, dark, alpha=None):
+        a = alpha if alpha is not None else cls.TINT_ALPHA["dark" if dark else "light"]
+        return {col: rgb + (a,) for col, rgb in cls.COLUMN_COLORS.items()}
 
     #: 토큰을 칠 때마다 씬을 조회하지 않도록 미리보기 갱신을 모은다 (ms)
     PREVIEW_DELAY_MS = 150
@@ -74,6 +111,11 @@ class TokenTab(QWidget):
         self.preview_tree.setToolTip(
             "What each object and its transform descendants will be renamed to.\n"
             "Nothing is renamed until you press Rename.")
+        # 머리글도 칸 색으로 (v01.16) - 테마 위에 덧칠
+        header = TintedHeader(self.column_tints(False, self.HEADER_ALPHA), self.preview_tree)
+        header.setStretchLastSection(True)   # QTreeWidget 기본 머리글과 같게 (새 QHeaderView 는 False)
+        self.preview_tree.setHeader(header)
+        self.preview_tree.setHeaderLabels(["Current", "New name", "Status"])
 
         preview_box = QWidget()
         preview_layout = QVBoxLayout(preview_box)
@@ -144,6 +186,7 @@ class TokenTab(QWidget):
             st.ST_SAME: log_levels.color("SKIP", dark),
         }
         error_color = log_levels.color("ERROR", dark)
+        tints = self.column_tints(dark)
 
         items = {}      # 롱 경로 -> 표 항목 (자손을 그 부모 밑에 단다)
         for row in rows:
@@ -163,6 +206,8 @@ class TokenTab(QWidget):
                 parent_item.addChild(item)
             else:
                 self.preview_tree.addTopLevelItem(item)
+            for col, rgba in tints.items():
+                item.setBackground(col, QBrush(QColor(*rgba)))
             items[row["path"]] = item
         self.preview_tree.expandAll()
         for col in range(3):
