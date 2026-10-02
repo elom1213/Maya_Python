@@ -154,6 +154,7 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 | Enum 칸의 규칙 콤보 | 바꿀 수 있음 | **잠김**(회색) — Custom 으로 바꿔 아무 글자나 넣는 길을 막는다 |
 | `Add Token` / `Delete Token` | 있음 | **없음** (v01.17) — 칸 구성 자체가 정해진 규칙이다 |
 | Profile 줄 `Save` / `New` | 있음 | **없음** (v01.20) — 고친 칸을 프로파일로 남기지 못한다. 칸 편집은 이번 Rename 에만 쓰인다 |
+| Profile 줄 `Rename` / `Delete` | 있음 | **없음** (v01.21) — 정해진 프로파일을 지우거나 이름을 바꾸지 못한다. Profile 줄은 고르는 콤보만 |
 | Enum 칸 삭제 | 됨 | **안 됨** (코드에서도 막는다 — `[WARN] Token N is a fixed rule and cannot be deleted.`) |
 | 다른 칸의 규칙 콤보 | Custom / Enum / Numbering | Custom / Numbering (값 목록을 만들 수 없으니 Enum 을 뺀다) |
 | Enum 값 고르기 · Custom · Numbering · Profile 고르기 | 됨 | 됨 |

@@ -32,6 +32,10 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00330 NamingTool — **배포 화면에서 프로파일 Rename / Delete 도 숨김** (v01.20->01.21)
+- 요청: 배포모드에서 Rename · Delete 버튼 없애기. `_apply_mode_buttons` 숨김 목록에 추가 → 배포본 Profile 줄은 콤보만.
+- 검증(mayapy 2024): dev 토글 · 임시 배포본 둘 다 6버튼(Save · New · Rename · Delete · Add / Delete Token) 숨김, A00480 형태는 보임.
+
 > [!summary] A00330 NamingTool — **배포 화면에서 Save / New 숨김** (v01.19->01.20)
 - 요청: 배포모드에서 Save · New 를 없애 사용자가 규칙을 임의로 수정하지 못하게.
 - 공용 위젯 `_apply_mode_buttons` 가 Add / Delete Token 과 함께 Save / New 도 숨긴다(`btn_new_profile` 보관). Rename / Delete(프로파일)는 그대로.

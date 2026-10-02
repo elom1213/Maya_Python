@@ -57,5 +57,7 @@
 
 #   - Release view: no Save / New on the Profile row - edited tokens cannot become a profile (v01.20)
 
-VERSION = "01.20"
+#   - Release view: no Rename / Delete on the Profile row either - only the profile combo (v01.21)
+
+VERSION = "01.21"
 LAST_UPDATE = "2026-10-02"

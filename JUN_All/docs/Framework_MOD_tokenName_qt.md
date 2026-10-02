@@ -41,7 +41,7 @@ framed=True (A00330)                          framed=False (A00480, 그룹 박�
 | `Custom` | `{"rule": "custom", "text": "SK"}` | 적은 글자 그대로. 비면 건너뛴다(`__` 없음) |
 | `Numbering` | `{"rule": "numbering", "start": 0, "pad": 2}` | Start 부터 올라가는 번호, Pad 0 자리수 |
 | `Set's Name` | `{"rule": "setname"}` | 대상마다 주어진 이름(세트 이름 - 네임스페이스 · 경로 없이) |
-| `Enum` (2026-10-02) | `{"rule": "enum", "role": "part", "values": ["Top", "Pants"], "value": "Top"}` | 정해진 값 중 고른 하나(콤보). 칸에 칸 이름(role) · 값 콤보 · `Values...`(칸 이름 · 값 목록 편집). 목록에 없는 value 는 첫 값으로, 값이 없으면 검사에서 막는다. 키는 A00470 이름 규칙 json 과 같다. `rules_editable=False` 면 `Values...` 없음 · Enum 칸 규칙 잠금 · 삭제 불가 · 다른 칸 콤보에서 Enum 제외 · Add / Delete Token 없음 · Profile 줄 Save / New 없음. `mode_toggle=True` 면 `Dev Mode` 토글(set_rules_editable, 신호 rulesEditableChanged) |
+| `Enum` (2026-10-02) | `{"rule": "enum", "role": "part", "values": ["Top", "Pants"], "value": "Top"}` | 정해진 값 중 고른 하나(콤보). 칸에 칸 이름(role) · 값 콤보 · `Values...`(칸 이름 · 값 목록 편집). 목록에 없는 value 는 첫 값으로, 값이 없으면 검사에서 막는다. 키는 A00470 이름 규칙 json 과 같다. `rules_editable=False` 면 `Values...` 없음 · Enum 칸 규칙 잠금 · 삭제 불가 · 다른 칸 콤보에서 Enum 제외 · Add / Delete Token 없음 · Profile 줄 Save / New / Rename / Delete 없음(콤보만). `mode_toggle=True` 면 `Dev Mode` 토글(set_rules_editable, 신호 rulesEditableChanged) |
 
 툴은 **규칙 묶음**을 고른다.
 

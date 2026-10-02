@@ -452,8 +452,8 @@ class JUN_mod_tokenName_qt_v01(QWidget):
             btn.setToolTip(tip)
             btn.clicked.connect(slot)
             row.addWidget(btn)
-            if label == "New":
-                self.btn_new_profile = btn   # 배포 화면에서 숨긴다 (A00330 v01.20)
+            # 배포 화면에서 숨긴다 (A00330 New v01.20, Rename / Delete v01.21)
+            setattr(self, "btn_{0}_profile".format(label.lower()), btn)
 
     def _add_token_buttons(self, buttons):
         self.btn_add_token = QPushButton("Add Token")
@@ -514,13 +514,16 @@ class JUN_mod_tokenName_qt_v01(QWidget):
         self.rulesEditableChanged.emit(editable)
 
     def _apply_mode_buttons(self):
-        """배포 화면에서는 Add / Delete Token (v01.17) 과 Save / New (A00330 v01.20) 를 숨긴다.
+        """배포 화면에서는 Add / Delete Token (v01.17) 과 Profile 줄의 Save / New (A00330 v01.20) ·
+        Rename / Delete (v01.21) 를 숨긴다 - Profile 줄에는 고르는 콤보만 남는다.
 
-        Save · New 가 있으면 고친 칸을 프로파일로 남길 수 있다 - 공유받은 사람이 규칙을 임의로
-        바꾸지 못하게 한다. 칸 편집은 이번 Rename 에만 쓰이고 프로파일 json 은 그대로다.
+        Save · New 가 있으면 고친 칸을 프로파일로 남길 수 있고, Rename · Delete 가 있으면 정해진
+        프로파일(규칙)을 지우거나 이름을 바꿀 수 있다 - 공유받은 사람이 규칙을 임의로 바꾸지 못하게 한다.
+        칸 편집은 이번 Rename 에만 쓰이고 프로파일 json 은 그대로다.
         """
         for button in (self.btn_add_token, self.btn_delete_token,
-                       self.btn_save_profile, self.btn_new_profile):
+                       self.btn_save_profile, self.btn_new_profile,
+                       self.btn_rename_profile, self.btn_delete_profile):
             button.setVisible(self._rules_editable)
 
     def _add_token_area(self, outer):
