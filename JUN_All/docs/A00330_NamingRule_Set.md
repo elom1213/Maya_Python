@@ -90,10 +90,10 @@ SIN_n_Set008_xx_grp
 캐릭터 · 좌우 · 파츠 · 오브젝트종류는 **타이핑하지 않고 콤보에서 고른다**(`Enum` 칸) — 오타가 날 수 없다.
 
 ```
- [Enum]      [Enum]    [Custom]   [Enum]      [Numbering] [Enum]
- character   side                 part        Start [1]   type
- [SIN    v]  [n  v]    [Set008]   [Shoes  v]  Pad 0 [2]   [geo v]
- Preview : SIN_n_Set008_Shoes_01_geo -> next node SIN_n_Set008_Shoes_02_geo
+ [Enum]      [Enum]    [Custom]   [Enum]      [Custom]    [Enum]
+ character   side      Text       part        Text        type
+ [SIN    v]  [n  v]    [Set008]   [Shoes  v]  [xx    ]    [geo v]
+ Preview : SIN_n_Set008_Shoes_xx_geo
 ```
 
 칸은 왼쪽부터 순서대로이고, 칸 위에 칸 이름이 적혀 있다.
@@ -104,7 +104,7 @@ SIN_n_Set008_xx_grp
 | 2 `side` | `n` / `l` / `r` 고르기 |
 | 3 `Text` | 세트 이름을 **직접 입력** (예: `Set008`) |
 | 4 `part` | 파츠 고르기 |
-| 5 `Start` / `Pad 0` (넘버링) | 번호 — Start `1`, Pad 0 `2` 면 `01, 02, 03 …` |
+| 5 `Text` (넘버링) | 처음엔 `xx` (하나뿐인 오브젝트). 여러 개면 번호로 바꾼다 — 아래 5-2 의 3 |
 | 6 `type` | `geo` / `grp` 고르기 |
 
 - 캐릭터 · 좌우 · 파츠 · 오브젝트종류 칸은 **정해진 규칙이라 바꿀 수 없다** — 값 목록을 고치거나, 다른 종류의 칸으로 바꿀 수
@@ -123,8 +123,9 @@ Token 탭은 Objects 리스트의 오브젝트를 **위에서부터 차례로** 
 1. 이름을 지을 지오메트리를 선택 → Objects 의 **Select Base** (리스트 순서 = 번호 순서).
 2. 칸을 고른다 — 캐릭터 · 좌우 · `SetXXX` · 파츠 · `geo`.
 3. 넘버링:
-   - **여러 개**(예시 2) — 5번째 칸(넘버링)을 `Numbering` 그대로 (`01, 02, 03`).
-   - **하나뿐**(예시 1, 3) — 5번째 칸 맨 위 콤보를 `Numbering` 에서 `Custom` 으로 바꾸고 `xx` 를 적는다.
+   - **하나뿐**(예시 1, 3) — 5번째 칸 그대로 (`xx`).
+   - **여러 개**(예시 2) — 5번째 칸 맨 위 콤보를 `Custom` 에서 **`Numbering`** 으로 바꾸고 **Start `1`, Pad 0 `2`** 로 맞춘다
+     (`01, 02, 03`). 바꾼 직후에는 Start 0 · Pad 0 이라 `0, 1, 2` 가 된다 — Preview 에서 `_01_` 인지 확인한다.
 4. Rename 버튼 왼쪽의 **`Hierarchy`** 를 확인한다.
    - **꺼짐**(기본): **리스트의 오브젝트만** 바뀌고 자식은 그대로다. 지오메트리 이름은 보통 이대로 짓는다.
    - **켜짐**: 리스트의 오브젝트와 **그 아래 자식 오브젝트까지** 이름이 바뀐다.
