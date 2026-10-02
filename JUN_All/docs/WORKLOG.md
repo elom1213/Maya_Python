@@ -32,6 +32,10 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00330 NamingTool — **배포 화면에서 칸 머리 Token 1~N 숨김** (v01.21->01.22)
+- 요청: 배포 모드에서 Token 버튼도 없애기(칸 머리 Token 1~6 으로 확인). `TokenColumn._apply_rule_lock` 에서 header 숨김.
+- 칸 줄 183 -> 145px(brown_dark), 입력칸은 여전히 y · 높이 하나. 팀 문서의 "Token 5" 안내를 화면에 보이는 칸 이름(왼쪽부터 순서 · `Start` 등)으로 바꿈.
+
 > [!summary] A00330 NamingTool — **배포 화면에서 프로파일 Rename / Delete 도 숨김** (v01.20->01.21)
 - 요청: 배포모드에서 Rename · Delete 버튼 없애기. `_apply_mode_buttons` 숨김 목록에 추가 → 배포본 Profile 줄은 콤보만.
 - 검증(mayapy 2024): dev 토글 · 임시 배포본 둘 다 6버튼(Save · New · Rename · Delete · Add / Delete Token) 숨김, A00480 형태는 보임.

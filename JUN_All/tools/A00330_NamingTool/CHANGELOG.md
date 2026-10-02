@@ -1,5 +1,9 @@
 # Changelog — A00330_NamingTool
 
+## v01.22 (2026-10-02)
+**[Change] 배포 화면 - 칸 머리 `Token 1` ~ `Token N` 없음.** Add / Delete Token 의 기준 칸을 고르는 버튼이라 배포 화면에서는
+할 일이 없다. 칸 줄이 머리만큼 낮아지고(183 -> 145px, brown_dark) 입력칸은 여전히 같은 줄 · 같은 높이. Dev Mode 토글에도 따른다.
+
 ## v01.21 (2026-10-02)
 **[Change] 배포 화면 - Profile 줄의 `Rename` / `Delete` 도 없음.** 정해진 프로파일을 지우거나 이름을 바꾸지 못한다.
 배포본의 Profile 줄은 프로파일 콤보만 남는다. Dev Mode 토글에도 따른다. A00480 은 그대로.

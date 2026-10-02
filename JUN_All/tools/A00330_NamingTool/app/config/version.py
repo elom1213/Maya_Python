@@ -59,5 +59,7 @@
 
 #   - Release view: no Rename / Delete on the Profile row either - only the profile combo (v01.21)
 
-VERSION = "01.21"
+#   - Release view: no Token 1..N header buttons above the token columns (v01.22)
+
+VERSION = "01.22"
 LAST_UPDATE = "2026-10-02"

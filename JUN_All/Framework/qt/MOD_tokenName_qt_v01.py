@@ -256,11 +256,14 @@ class TokenColumn(QFrame):
         - `Values...` 를 숨긴다 - 칸 이름 · 값 목록 편집 불가.
         - Enum 칸은 규칙 콤보를 잠근다 - Custom 으로 바꿔 아무 글자나 넣는 길을 막는다.
         - Enum 이 아닌 칸의 규칙 콤보에서는 Enum 을 뺀다 - 값 목록을 만들 수 없으니 빈 Enum 만 생긴다.
+        - 칸 머리(Token N)를 숨긴다 (A00330 v01.22) - Add / Delete Token 의 기준 칸을 고르는 버튼이라
+          배포 화면(Add / Delete Token 없음)에서는 할 일이 없다.
         Enum 칸 삭제는 위젯(on_delete_token)이 막는다.
         """
         if self._rules_editable:
             return
         self.btn_values.hide()
+        self.header.hide()
         if self.is_enum():
             self.combo.setEnabled(False)
             self.combo.setToolTip("This token is a fixed rule - pick one of its values below.")
