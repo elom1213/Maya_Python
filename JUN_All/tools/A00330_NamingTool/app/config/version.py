@@ -61,5 +61,8 @@
 
 #   - Release view: no Token 1..N header buttons above the token columns (v01.22)
 
-VERSION = "01.22"
+#   - Token       : new profile "Custom" - "free_tokens": true lets anyone (also in the shared tool)
+#                   add / delete tokens; save / rename / delete of profiles stay locked (v01.23)
+
+VERSION = "01.23"
 LAST_UPDATE = "2026-10-02"

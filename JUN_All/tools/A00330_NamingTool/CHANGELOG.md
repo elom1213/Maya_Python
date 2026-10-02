@@ -1,5 +1,14 @@
 # Changelog — A00330_NamingTool
 
+## v01.23 (2026-10-02)
+**[Add] 프로파일 `Custom` - 배포본에서도 칸을 더하고 뺄 수 있는 특수 프로파일.**
+
+- `Custom` 을 고르면 배포 화면에서도 `Add Token` / `Delete Token` 과 칸 머리(`Token N`, 칸 고르기)가 보인다.
+  칸 규칙은 Custom / Numbering. Save / New / Rename / Delete 는 여전히 없어 프로파일 파일은 바뀌지 않는다.
+- 특수 모드는 프로파일 json 의 `"free_tokens": true` 로 켠다(`TokenProfileStore.profile_flag`). `save_profile` 이 이 키를 지킨다.
+- `data/token_profiles/Custom.json` = Custom `Name` + Numbering(Start 1, Pad 0 2).
+- 팀 문서 5-4 `Custom` 프로파일 안내 추가(규칙 밖의 이름에만).
+
 ## v01.22 (2026-10-02)
 **[Change] 배포 화면 - 칸 머리 `Token 1` ~ `Token N` 없음.** Add / Delete Token 의 기준 칸을 고르는 버튼이라 배포 화면에서는
 할 일이 없다. 칸 줄이 머리만큼 낮아지고(183 -> 145px, brown_dark) 입력칸은 여전히 같은 줄 · 같은 높이. Dev Mode 토글에도 따른다.

@@ -379,6 +379,8 @@ class JUN_mod_tokenName_qt_v01(QWidget):
         self._rules_editable = rules_editable
         self._mode_toggle = mode_toggle
         self.btn_dev_mode = None
+        # 지금 프로파일이 free_tokens 인가 (A00330 `Custom` 프로파일, v01.23) - load_tokens 가 정한다
+        self._free_tokens = False
         self.ruleset = store.ruleset
         self._log_callback = log
         self._prefix = log_prefix
@@ -524,10 +526,19 @@ class JUN_mod_tokenName_qt_v01(QWidget):
         프로파일(규칙)을 지우거나 이름을 바꿀 수 있다 - 공유받은 사람이 규칙을 임의로 바꾸지 못하게 한다.
         칸 편집은 이번 Rename 에만 쓰이고 프로파일 json 은 그대로다.
         """
-        for button in (self.btn_add_token, self.btn_delete_token,
-                       self.btn_save_profile, self.btn_new_profile,
+        for button in (self.btn_save_profile, self.btn_new_profile,
                        self.btn_rename_profile, self.btn_delete_profile):
             button.setVisible(self._rules_editable)
+        # Add / Delete Token 과 칸 머리(칸 고르기)는 free_tokens 프로파일이면 배포 화면에서도 보인다 (v01.23)
+        free = self.tokens_addable()
+        for button in (self.btn_add_token, self.btn_delete_token):
+            button.setVisible(free)
+        for column in self.columns:
+            column.header.setVisible(free)
+
+    def tokens_addable(self):
+        """칸을 더하고 뺄 수 있는가 - 개발 화면이거나, 지금 프로파일이 free_tokens(`Custom`) 이면."""
+        return self._rules_editable or self._free_tokens
 
     def _add_token_area(self, outer):
         # 토큰 칸 줄 - 칸이 늘면 가로 스크롤
@@ -572,6 +583,7 @@ class JUN_mod_tokenName_qt_v01(QWidget):
 
     def load_tokens(self, tokens):
         """칸을 전부 다시 만든다 (프로파일 전환)."""
+        self._free_tokens = self.store.profile_flag(self._profile, "free_tokens")
         self._loading = True
         for column in self.columns:
             self.header_group.removeButton(column.header)
@@ -585,11 +597,15 @@ class JUN_mod_tokenName_qt_v01(QWidget):
             self.select_column(len(self.columns) - 1)
         self._saved_tokens = self.tokens()
         self._after_edit()
+        if hasattr(self, "btn_add_token"):
+            self._apply_mode_buttons()
 
     def _insert_column(self, index, token):
         column = TokenColumn(token, self.ruleset, self._on_token_changed,
                              rules_editable=self._rules_editable)
         self.header_group.addButton(column.header)
+        # 배포 화면이면 칸이 머리를 숨기지만, free_tokens 프로파일은 칸을 골라야 하므로 보인다
+        column.header.setVisible(self.tokens_addable())
         self.columns.insert(index, column)
         # 마지막 항목은 stretch 라서 칸은 그 앞에 넣는다
         self.column_layout.insertWidget(index, column)

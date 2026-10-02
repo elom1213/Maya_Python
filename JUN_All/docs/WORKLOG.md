@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00330 NamingTool — **`Custom` 프로파일: 배포본에서도 칸 추가 · 삭제** (v01.22->01.23)
+- 요청: 특수 프로파일 Custom — 배포받은 사람도 Add / Delete Token 이 보여 토큰을 추가 · 제거.
+- 프로파일 json `"free_tokens": true` 로 켠다(이름 하드코딩 대신 데이터). `TokenProfileStore.profile_flag` + `save_profile` 이 다른 키를 지키게(개발자 Save 로 표시가 사라지지 않게).
+- 위젯 `tokens_addable()` = 개발 화면 or free_tokens → Add / Delete Token · 칸 머리 보임. Save / New / Rename / Delete 는 개발 화면에서만 그대로.
+- 검증: 오프스크린(배포 화면 Set ↔ Custom 전환 · Add / Delete · 파일 불변 · 개발 Save 후 free_tokens 유지), mayapy 2024 임시 배포본 전체 창.
+
 > [!summary] A00330 NamingTool — **배포 화면에서 칸 머리 Token 1~N 숨김** (v01.21->01.22)
 - 요청: 배포 모드에서 Token 버튼도 없애기(칸 머리 Token 1~6 으로 확인). `TokenColumn._apply_rule_lock` 에서 header 숨김.
 - 칸 줄 183 -> 145px(brown_dark), 입력칸은 여전히 y · 높이 하나. 팀 문서의 "Token 5" 안내를 화면에 보이는 칸 이름(왼쪽부터 순서 · `Start` 등)으로 바꿈.

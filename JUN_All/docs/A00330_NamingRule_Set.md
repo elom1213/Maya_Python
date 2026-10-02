@@ -142,7 +142,18 @@ Token 탭은 Objects 리스트의 오브젝트를 **위에서부터 차례로** 
 
 > 공유된 툴에는 **Rename > Token 탭만** 있다.
 
-### 5-4. 프로파일 파일
+### 5-4. 규칙 밖의 이름 — `Custom` 프로파일
+
+SetXXX 규칙에 맞지 않는 오브젝트(임시 오브젝트, 다른 작업용 이름 등)는 Profile 에서 **`Custom`** 을 고른다.
+
+- `Custom` 은 **칸을 직접 더하고 뺄 수 있는** 프로파일이다 — `Add Token` / `Delete Token` 과 칸 위 `Token 1`, `Token 2` … 버튼이 보인다.
+  1. 칸 위 `Token N` 버튼을 눌러 칸을 고른다(노랗게 표시).
+  2. **Add Token** — 고른 칸 오른쪽에 새 칸 / **Delete Token** — 고른 칸 삭제(마지막 한 칸은 남는다).
+  3. 칸마다 `Custom`(글자) 또는 `Numbering`(번호)을 고른다.
+- 칸 구성은 이번 Rename 에만 쓰인다. 툴을 다시 열면 `Custom` 은 처음 칸(`Name` + 번호)으로 돌아온다.
+- **SetXXX 오브젝트에는 `Dnable_Set_v001` 을 쓴다** — Custom 은 규칙 밖의 이름에만.
+
+### 5-5. 프로파일 파일
 
 프로파일은 툴 폴더의 `data/token_profiles/Dnable_Set_v001.json` 이다. Enum 칸의 값 목록은 이 파일에 있다.
 **규칙(캐릭터 추가 등)은 툴 관리자만 바꾼다** — 공유된 툴에는 값 목록을 고치는 버튼이 없다.

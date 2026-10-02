@@ -389,12 +389,25 @@ class TokenProfileStore(object):
         return tokens or self.default_tokens()
 
     def save_profile(self, name, tokens):
+        """토큰만 바꿔 저장한다. 파일에 있던 **다른 키(free_tokens 등)는 그대로 둔다** (2026-10-02)
+        - 개발자가 Custom 프로파일을 Save 해도 특수 표시가 사라지지 않게."""
         os.makedirs(self.profiles_dir, exist_ok=True)
         path = self._profile_path(name)
+        data = _read_json(path, None)
+        data = data if isinstance(data, dict) else {}
+        data["tokens"] = self.ruleset.normalize_tokens(tokens)
         with open(path, "w", encoding="utf-8") as f:
-            json.dump({"tokens": self.ruleset.normalize_tokens(tokens)}, f,
-                      ensure_ascii=False, indent=2)
+            json.dump(data, f, ensure_ascii=False, indent=2)
         return path
+
+    def profile_flag(self, name, key):
+        """프로파일 json 의 참/거짓 표시 하나 (없으면 False).
+
+        free_tokens : True 면 배포 화면에서도 칸을 더하고 뺄 수 있다(Add / Delete Token · 칸 머리) -
+                      A00330 의 `Custom` 프로파일 (v01.23). 값 목록 · 저장은 여전히 잠긴다.
+        """
+        data = _read_json(self._profile_path(name), None)
+        return bool(isinstance(data, dict) and data.get(key) is True)
 
     def delete_profile(self, name):
         try:
