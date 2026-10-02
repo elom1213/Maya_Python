@@ -30,7 +30,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-10-01 (오늘)
+## 2026-10-02 (오늘)
+
+> [!summary] A00240 PathTool — **버튼 색 지정** (A00340 색 기능 이식, v01.14->01.15)
+- 요청: A00340_SelectionTool 처럼 경로 버튼마다 색을 정할 수 있게 — A00340 기능을 그대로 옮겨도 된다.
+- 이식: 버튼 우클릭 `Set Color...`(QColorDialog = 팔레트 + Pick Screen Color 스포이드) / `Reset Color`, `Color` 그룹 `Color Select` 모드(체크형 버튼으로 카테고리를 넘나들며 체크 → `Apply...` / `Clear`, 켜진 동안 클릭은 경로를 안 연다), 글자색 흑/백 자동, 버튼 dict 에 `"color"` 저장. 체크 상태는 위젯의 실제 `isChecked()` 로 다시 맞춘 뒤 적용(A00340 v01.03 안전장치 그대로).
+- 다른 점: 색 버튼 여백을 테마 값 `padding 8px · radius 4px` 로 — A00340 값(4px · 3px)이면 색 버튼이 기본 버튼보다 낮다(실측 후 34px 로 같음). 라벨 `Apply Color...`/`Clear Color` -> `Apply...`/`Clear` — 그대로면 Color 그룹(오프스크린 534px)이 Profile 그룹(468px)보다 넓어 창 최소 폭이 는다(줄인 뒤 390px).
+- 검증(오프스크린, 임시 프로파일 폴더 — 실제 data/ 불변): 개별 지정 · 평소 클릭 = 경로 열기 · 모드 중 클릭 = 체크만(열기 0) · C1/C2 걸친 체크 → Apply 한 색 · 체크 유지 · Clear · 모드 끄면 다시 열기 · Reset.
+
+## 2026-10-01
 
 > [!summary] A00490 KeyboardTool — **체크한 크롬 창 전부에 키가 가게** (v01.00->01.01)
 - 문제(사용자 확인): 크롬 창 2개를 체크하면 **클릭한 창만** 동작. 재현: 비활성 크롬은 PostMessage 를 무시 — 안쪽 `Chrome_RenderWidgetHostHWND` 로 보내도 무시. 가짜 `WM_ACTIVATE` 는 테스트 크롬이 꺼진 적이 있어 기각.

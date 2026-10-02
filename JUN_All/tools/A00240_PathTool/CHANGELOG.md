@@ -2,6 +2,17 @@
 
 All notable changes to this tool are documented here.
 
+## [01.15] - 2026-10-02
+### Added
+- **Button colors** (same feature as A00340_SelectionTool). Right-click a path button ->
+  **Set Color...** opens a color palette (its *Pick Screen Color* is an eyedropper); **Reset Color**
+  goes back to the theme color.
+- **Color Select** in the new `Color` group: turn it on, click buttons in any category to check them
+  (blue border), then **Apply...** paints them all with one color or **Clear** removes their color.
+  While it is on, clicking a button does not open its path.
+- The text color switches to black or white for readability. Colors are saved per button in the
+  profile JSON and move with the button to another category or profile.
+
 ## [01.14] - 2026-10-01
 ### Added
 - **Change Profile - move a category to another profile.** Left-click a category (its header or

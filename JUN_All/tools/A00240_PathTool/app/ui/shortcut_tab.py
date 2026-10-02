@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-19
+# last Update date : 2026-10-02
 # A00240_PathTool - "ShortCut" tab (Qt, standalone)
 #
 # 사용자가 카테고리와 경로 버튼을 직접 만들고, 버튼을 누르면 그 경로가
@@ -13,6 +13,12 @@
 #     항목이 늘어나도 잘 확장된다.
 #   - 카테고리 헤더(빈 곳)를 좌클릭하면 "Change Profile" 메뉴가 뜬다. 고른
 #     프로파일로 카테고리와 그 안의 버튼 전부를 옮긴다(우클릭 메뉴에도 있음).
+#   - 색 지정(v01.15, A00340_SelectionTool 의 기능을 그대로 옮김):
+#       * 버튼 우클릭 'Set Color...'(팔레트+스포이드) / 'Reset Color' 로 개별 지정.
+#       * 'Color' 그룹의 'Color Select' 를 켜면 카테고리를 넘나들며 여러 버튼을
+#         체크해 'Apply Color...' 로 한 번에 칠한다('Clear Color' 로 해제).
+#         켜져 있는 동안 버튼 클릭은 경로를 열지 않고 체크만 한다.
+#       * 색은 프로파일 JSON 의 버튼 dict 에 "color": "#rrggbb" 로 저장(없으면 테마 기본).
 
 import os
 
@@ -33,11 +39,62 @@ from Framework.qt.qt import (
     QFileDialog,
     QMessageBox,
     QMenu,
+    QCheckBox,
+    QColorDialog,
+    QColor,
     Qt,
 )
 
 from ..core import prefs as prefs_mod
 from ..core import path_opener
+
+
+TITLE = "Path Tool"
+
+# ---------------------------------------------------------------- 버튼 색
+# A00340_SelectionTool/app/ui/selection_tab.py 와 같은 규칙 (그대로 옮김).
+
+# 색이 지정되지 않은(=아직 한 번도 칠하지 않은) 버튼의 컬러 다이얼로그 시작값.
+DEFAULT_PICK_HEX = "#5a5a5a"
+
+# 색칠 모드에서 '체크됨' 을 표시하는 강조 테두리 색(색 유무와 무관하게 일관).
+CHECK_HILITE_HEX = "#4a90d9"
+
+# 색이 없는(테마 기본) 버튼이 체크됐을 때만 테두리로 강조하는 스타일시트.
+CHECK_ONLY_QSS = (
+    "QPushButton:checked {{ border: 2px solid {c}; }}".format(c=CHECK_HILITE_HEX)
+)
+
+
+def _contrast_text_hex(qcolor):
+    """배경색(qcolor) 위에서 잘 읽히는 글자색(검정/흰색) 을 밝기로 고른다."""
+    lum = (qcolor.red() * 299 + qcolor.green() * 587 + qcolor.blue() * 114) / 1000.0
+    return "#000000" if lum > 140 else "#FFFFFF"
+
+
+def _button_stylesheet(hex_str):
+    """버튼에 입힐 배경/글자/테두리/hover 스타일시트를 hex 색 하나로 만든다.
+
+    색칠 모드에서 checkable 로 바뀐 버튼이 체크되면 :checked 규칙으로 강조
+    테두리가 뜬다(일반 모드에서는 checkable 이 아니라 규칙이 적용되지 않는다).
+
+    padding 8px · radius 4px 는 Framework/styles/*.qss 의 QPushButton 과 같은 값이다.
+    (A00340 은 4px · 3px 라 색 버튼이 기본 버튼보다 낮다 - 여기서는 높이를 맞췄다.)
+    """
+    bg = QColor(hex_str)
+    text = _contrast_text_hex(bg)
+    border = bg.darker(150).name()
+    hover = bg.lighter(115).name()
+    pressed = bg.darker(115).name()
+    return (
+        "QPushButton {{"
+        " background-color: {bg}; color: {text};"
+        " border: 1px solid {border}; border-radius: 4px; padding: 8px; }}"
+        "QPushButton:hover {{ background-color: {hover}; }}"
+        "QPushButton:pressed {{ background-color: {pressed}; }}"
+        "QPushButton:checked {{ border: 2px solid {check}; }}"
+    ).format(bg=bg.name(), text=text, border=border, hover=hover,
+             pressed=pressed, check=CHECK_HILITE_HEX)
 
 
 class AddPathDialog(QDialog):
@@ -119,6 +176,13 @@ class ShortcutTab(QWidget):
         self._profile = prefs_mod.get_active()
         self._data = prefs_mod.load_profile(self._profile)
 
+        # 색칠 모드 상태. _checked 는 체크된 (카테고리, 버튼) 이름 쌍 - 재렌더에도 유지된다.
+        # _color_buttons 는 지금 그려진 체크형 버튼 (위젯, cat, name) - Apply/Clear 직전에
+        # 위젯의 실제 isChecked() 로 _checked 를 다시 맞춘다(A00340 v01.03 과 같은 안전장치).
+        self._color_mode = False
+        self._checked = set()
+        self._color_buttons = []
+
         self._build_ui()
         self._refresh_profiles()
         self._render_categories()
@@ -130,6 +194,7 @@ class ShortcutTab(QWidget):
 
         root.addWidget(self._build_profile_group())
         root.addWidget(self._build_create_group())
+        root.addWidget(self._build_color_group())
 
         # 카테고리가 계속 늘어나므로 스크롤 영역에 담는다.
         self._cat_container = QWidget()
@@ -187,10 +252,46 @@ class ShortcutTab(QWidget):
 
         return group
 
+    def _build_color_group(self):
+        # 색칠 모드: 카테고리를 넘나들며 여러 버튼을 골라 한 색으로 칠한다.
+        group = QGroupBox("Color")
+        row = QHBoxLayout(group)
+
+        # 모드 토글. 켜면 버튼이 체크형이 되고 클릭이 '경로 열기' 대신 '체크'로 바뀐다.
+        self.chk_color_mode = QCheckBox("Color Select")
+        self.chk_color_mode.setToolTip(
+            "Pick multiple buttons across categories (click to check), "
+            "then apply one color to all of them at once.\n"
+            "While this is on, clicking a button does not open its path.")
+        self.chk_color_mode.toggled.connect(self.on_color_mode_toggled)
+
+        # 체크된 버튼들에 색을 지정 / 색을 지운다. 모드가 켜져 있을 때만 활성.
+        # 라벨은 A00340 의 'Apply Color...' / 'Clear Color' 를 줄였다 - 그대로 두면 이 그룹이
+        # Profile 그룹보다 넓어져 창 최소 폭이 늘어난다(그룹 제목이 이미 Color).
+        self.btn_apply_color = QPushButton("Apply...")
+        self.btn_apply_color.setToolTip(
+            "Apply a picked color to all checked buttons")
+        self.btn_apply_color.clicked.connect(self.on_apply_color_to_checked)
+        self.btn_apply_color.setEnabled(False)
+
+        self.btn_clear_color = QPushButton("Clear")
+        self.btn_clear_color.setToolTip(
+            "Reset all checked buttons to the default (theme) style")
+        self.btn_clear_color.clicked.connect(self.on_clear_color_from_checked)
+        self.btn_clear_color.setEnabled(False)
+
+        row.addWidget(self.chk_color_mode)
+        row.addStretch(1)
+        row.addWidget(self.btn_apply_color)
+        row.addWidget(self.btn_clear_color)
+
+        return group
+
     # ============================================================ rendering
 
     def _render_categories(self):
         # 기존 위젯 제거 후 데이터 기준으로 다시 그린다.
+        self._color_buttons = []
         while self._cat_layout.count():
             item = self._cat_layout.takeAt(0)
             w = item.widget()
@@ -238,8 +339,26 @@ class ShortcutTab(QWidget):
 
         path = btn_data["path"]
         name = btn_data["name"]
+        color_hex = btn_data.get("color")
 
-        btn.clicked.connect(lambda *_a, p=path: self._open_path(p))
+        if self._color_mode:
+            # 색칠 모드: 버튼을 체크형으로. 클릭은 '경로 열기' 대신 '체크 토글'.
+            btn.setCheckable(True)
+            # setChecked 는 아래 toggled 연결 '전'에 호출해야 초기 복원이 콜백을 안 부른다.
+            btn.setChecked((cat_name, name) in self._checked)
+            # 색이 있으면 색 스타일(+:checked 강조), 없으면 강조 테두리만.
+            btn.setStyleSheet(
+                _button_stylesheet(color_hex) if color_hex else CHECK_ONLY_QSS)
+            # 체크 상태 추적은 clicked 가 아니라 toggled(새 상태를 확실히 전달)로 한다.
+            btn.toggled.connect(
+                lambda checked, c=cat_name, n=name:
+                self._on_color_check(c, n, checked))
+            self._color_buttons.append((btn, cat_name, name))
+        else:
+            # 일반 모드: 지정색이 있으면 입히고, 클릭하면 경로를 연다.
+            if color_hex:
+                btn.setStyleSheet(_button_stylesheet(color_hex))
+            btn.clicked.connect(lambda *_a, p=path: self._open_path(p))
 
         btn.setContextMenuPolicy(Qt.CustomContextMenu)
         btn.customContextMenuRequested.connect(
@@ -256,6 +375,12 @@ class ShortcutTab(QWidget):
             if cat["name"] == name:
                 return cat
         return None
+
+    def _find_button(self, cat_name, btn_name):
+        cat = self._find_category(cat_name)
+        if cat is None:
+            return None
+        return next((b for b in cat.get("buttons", []) if b["name"] == btn_name), None)
 
     def _category_names(self):
         return [cat["name"] for cat in self._data.get("categories", [])]
@@ -283,6 +408,7 @@ class ShortcutTab(QWidget):
         self._profile = name
         prefs_mod.set_active(name)
         self._data = prefs_mod.load_profile(name)
+        self._checked.clear()  # 프로파일이 바뀌면 체크 상태는 무효
         self._render_categories()
 
     def on_new_profile(self):
@@ -302,6 +428,7 @@ class ShortcutTab(QWidget):
         prefs_mod.set_active(name)
         self._profile = name
         self._data = prefs_mod.load_profile(name)
+        self._checked.clear()
         self._refresh_profiles()
         self._render_categories()
 
@@ -343,6 +470,7 @@ class ShortcutTab(QWidget):
         self._profile = remaining[0]
         prefs_mod.set_active(self._profile)
         self._data = prefs_mod.load_profile(self._profile)
+        self._checked.clear()
         self._refresh_profiles()
         self._render_categories()
 
@@ -464,6 +592,10 @@ class ShortcutTab(QWidget):
         act_rename = menu.addAction("Rename")
         act_path = menu.addAction("Change Path")
         act_category = menu.addAction("Change Category")
+        menu.addSeparator()
+        act_set_color = menu.addAction("Set Color...")
+        act_reset_color = menu.addAction("Reset Color")
+        menu.addSeparator()
         act_delete = menu.addAction("Delete")
 
         cat = self._find_category(cat_name)
@@ -473,6 +605,8 @@ class ShortcutTab(QWidget):
         )
         act_up.setEnabled(idx > 0)
         act_down.setEnabled(0 <= idx < len(buttons) - 1)
+        btn_data = buttons[idx] if idx >= 0 else None
+        act_reset_color.setEnabled(bool(btn_data and btn_data.get("color")))
 
         chosen = menu.exec_(btn_widget.mapToGlobal(pos))
         if chosen == act_up:
@@ -485,6 +619,10 @@ class ShortcutTab(QWidget):
             self._change_button_path(cat_name, btn_name)
         elif chosen == act_category:
             self._change_button_category(cat_name, btn_name)
+        elif chosen == act_set_color:
+            self._set_button_color(cat_name, btn_name)
+        elif chosen == act_reset_color:
+            self._reset_button_color(cat_name, btn_name)
         elif chosen == act_delete:
             self._delete_button(cat_name, btn_name)
 
@@ -707,4 +845,120 @@ class ShortcutTab(QWidget):
             return
 
         cat["buttons"] = [b for b in cat["buttons"] if b["name"] != btn_name]
+        self._save_and_render()
+
+    # =============================================================== color
+    # A00340_SelectionTool 의 색 기능을 그대로 옮겼다. 다른 점: 이 툴은 로그창이 없어
+    # 성공 메시지는 남기지 않는다(색이 바뀐 게 바로 보인다).
+
+    def _pick_color(self, initial_hex, title):
+        """컬러 다이얼로그(팔레트 + 내장 'Pick Screen Color' 스포이드)를 띄운다.
+
+        유효한 색을 고르면 '#rrggbb' 문자열을, 취소하면 None 을 돌려준다.
+        """
+        initial = QColor(initial_hex or DEFAULT_PICK_HEX)
+        chosen = QColorDialog.getColor(initial, self, title)
+        if not chosen.isValid():
+            return None
+        return chosen.name()
+
+    def _set_button_color(self, cat_name, btn_name):
+        """버튼 하나의 색을 팔레트/스포이드로 지정한다."""
+        btn_data = self._find_button(cat_name, btn_name)
+        if btn_data is None:
+            return
+
+        hex_str = self._pick_color(btn_data.get("color"), "Pick Button Color")
+        if hex_str is None:
+            return
+
+        btn_data["color"] = hex_str
+        self._save_and_render()
+
+    def _reset_button_color(self, cat_name, btn_name):
+        """버튼의 지정색을 지워 테마 기본 스타일로 되돌린다."""
+        btn_data = self._find_button(cat_name, btn_name)
+        if btn_data is None or not btn_data.get("color"):
+            return
+
+        btn_data.pop("color", None)
+        self._save_and_render()
+
+    # -------------------------------------------------- color select mode
+
+    def on_color_mode_toggled(self, on):
+        """색칠 모드 토글. 켜면 버튼이 체크형이 되어 여러 개를 골라 칠할 수 있다."""
+        self._color_mode = on
+        if not on:
+            self._checked.clear()
+        self.btn_apply_color.setEnabled(on)
+        self.btn_clear_color.setEnabled(on)
+        self._render_categories()
+
+    def _on_color_check(self, cat_name, btn_name, checked):
+        """색칠 모드에서 버튼을 토글하면 (cat, btn) 을 체크 집합에 넣고 뺀다."""
+        key = (cat_name, btn_name)
+        if checked:
+            self._checked.add(key)
+        else:
+            self._checked.discard(key)
+
+    def _sync_checked_from_widgets(self):
+        """화면 버튼의 실제 isChecked() 로 self._checked 를 다시 맞춘다.
+
+        시그널 누락/타이밍과 무관하게 '지금 눈에 보이는 체크 상태' 를 진실의 원천으로
+        삼기 위한 안전장치. 삭제된 위젯은 건너뛴다.
+        """
+        checked = set()
+        for btn, cat_name, btn_name in self._color_buttons:
+            try:
+                if btn.isChecked():
+                    checked.add((cat_name, btn_name))
+            except RuntimeError:
+                # 재렌더로 이미 폐기된 위젯 - 무시.
+                continue
+        self._checked = checked
+
+    def _checked_buttons(self):
+        """체크된 (cat, btn) 중 실제 존재하는 버튼 dict 만 추려서 돌려준다."""
+        found = []
+        for cat_name, btn_name in self._checked:
+            bd = self._find_button(cat_name, btn_name)
+            if bd is not None:
+                found.append(bd)
+        return found
+
+    def on_apply_color_to_checked(self):
+        """체크된 모든 버튼에 팔레트/스포이드로 고른 한 색을 일괄 적용한다."""
+        self._sync_checked_from_widgets()
+        targets = self._checked_buttons()
+        if not targets:
+            QMessageBox.information(self, TITLE, "Check one or more buttons first.")
+            return
+
+        # 체크된 것 중 이미 색이 있으면 그 색을 다이얼로그 시작값으로.
+        current = next((b.get("color") for b in targets if b.get("color")), None)
+        hex_str = self._pick_color(current, "Pick Color for Checked Buttons")
+        if hex_str is None:
+            return
+
+        for b in targets:
+            b["color"] = hex_str
+        self._save_and_render()  # 체크 상태(_checked)는 그대로라 재렌더 후에도 유지
+
+    def on_clear_color_from_checked(self):
+        """체크된 버튼들의 지정색을 지워 테마 기본 스타일로 되돌린다."""
+        self._sync_checked_from_widgets()
+        targets = self._checked_buttons()
+        if not targets:
+            QMessageBox.information(self, TITLE, "Check one or more buttons first.")
+            return
+
+        changed = 0
+        for b in targets:
+            if b.pop("color", None) is not None:
+                changed += 1
+        if not changed:
+            return
+
         self._save_and_render()
