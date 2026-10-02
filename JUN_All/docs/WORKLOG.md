@@ -51,6 +51,10 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 요청 2: 더블클릭 = 탐색기에서 열기(Reveal 과 같음), 더블클릭 펼치기는 끔.
 - 검증(PySide6 offscreen, 8^4 폴더 · 약 1만 노드): Adaptive Build 0.001 초 vs Depth All 0.23~0.35 초, 펼치기 = 한 겹, 손자 미로드, 부분 확장자 필터 + 새 `.fbx` 표시, Shift 전체 펼치기 9947 노드 0.6 초, Refresh Recursive 로 새 폴더 반영 · 펼침 유지, 더블클릭 -> reveal 호출 · 안 펼쳐짐.
 
+> [!summary] A00010 humanIKTool_V02 — **Bone Chain 콤보 순서 정리** (버전 변경 없음)
+- `BONE_CHAINS` 키 순서만: Spine, Neck to head, 왼쪽(팔 / 손가락 / 다리), 오른쪽. 슬롯 ID 는 그대로 - 순서는 Assign 탭 Bone Chain 콤보 표시에만 쓰인다.
+- 검증(mayapy 2024): 8 체인 모두 할당 슬롯 일치, Selected Chain 미러 정상.
+
 > [!summary] A00010 humanIKTool_V02 — **Neck to head 하나로 + Mirror in same root** (v02.03->02.04)
 - 요청 1: Neck 1 / Neck 2 to head 를 없애고 Neck to head - 리스트 앞 n-1 개 = 목 체인, 마지막 = 머리. `chain_slots(label, n)` 이 Neck(20) · Neck1~9(32~40) 중 앞 n-1 개 + Head(15), 목 10 개 초과는 경고.
 - 요청 2: Mirror `Mirror in same root` 체크 - 켜면 HIK 할당 조인트의 최상위 조인트(부모가 조인트인 동안 올라감) 아래만, 끄면 씬 전체 조인트(동명 여럿이면 ambiguous). `MirrorResolver(search=ROOTS|SCENE, roots)`, 컨트롤러 미러는 예전 그대로(HIERARCHY).
