@@ -116,10 +116,10 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 2. **Profile** 에서 규칙을 고른다. 처음 열면 레거시 규칙 그대로인 **`Default`** 가 만들어져 있다
    (`dyn_asset_side_{번호}_{번호}`, Pad 0 은 둘 다 2).
 3. 필요하면 토큰 칸을 고친다 — **고쳐도 저장되지 않는다**(v01.11~). 기본으로 남기려면 Profile 줄의 **`Save`**. `Preview` 줄에서 결과 이름을 미리 본다.
-4. 오른쪽 **Preview 표**(v01.15)에서 결과를 본다 — Rename 으로 바뀔 노드 **전부**(오브젝트 + transform 자손)가 계층 그대로
+4. 오른쪽 **Preview 표**(v01.15)에서 결과를 본다 — Rename 으로 바뀔 노드 **전부**(Hierarchy 가 켜져 있으면 transform 자손까지)가 계층 그대로
    `Current` → `New name` 과 `Status` 로 나온다. 리스트나 토큰 칸이 바뀌면 바로 다시 계산한다(씬은 그대로).
-5. **Rename** → 각 오브젝트와 그 transform 자손이 토큰을 `_` 로 이은 이름으로 바뀐다. **Undo 한 번**으로 되돌아간다.
-   Rename 왼쪽 **`Hierarchy`**(v01.18) 를 끄면 **리스트의 오브젝트만** 바뀌고 자손은 그대로다(기본은 켜짐 = 예전 동작).
+5. **Rename** → 각 오브젝트가 토큰을 `_` 로 이은 이름으로 바뀐다. **Undo 한 번**으로 되돌아간다.
+   Rename 왼쪽 **`Hierarchy`**(v01.18) — **꺼짐(기본, v01.19)** = 리스트의 오브젝트만, 켜짐 = transform 자손까지(v01.17 까지의 동작).
    Preview 표도 체크를 따라간다.
    바뀐 뒤 Objects 리스트는 새 이름으로 갱신된다(v01.15).
 
@@ -156,13 +156,14 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 | Enum 칸 삭제 | 됨 | **안 됨** (코드에서도 막는다 — `[WARN] Token N is a fixed rule and cannot be deleted.`) |
 | 다른 칸의 규칙 콤보 | Custom / Enum / Numbering | Custom / Numbering (값 목록을 만들 수 없으니 Enum 을 뺀다) |
 | Enum 값 고르기 · Custom · Numbering · Save | 됨 | 됨 |
-| 다른 탭 (Set Rename · Copy Name · Quick Rename) | 됨 | **잠김**(회색 글자, 툴팁에 `Not available in the shared tool`) — Rename > Token 만 (v01.17) |
+| 다른 탭 (Set Rename · Copy Name · Quick Rename) | 됨 | **보이지 않는다**(v01.19, v01.17 은 회색으로 잠갔다) — Rename > Token 만 |
 | `Dev Mode` 토글 (Tokens 줄 오른쪽) | **있음** — 끄면 배포 화면을 그대로 본다, 다시 켜면 개발 화면 | 없음 |
 
 - 판정은 `app/config/dev_mode.py` — `launch.py` 와 같은 규칙: 툴 폴더 안에 `Framework` 가 동봉돼 있으면 배포본(항상 잠금),
   아니면 `JUN_All/config.py` 의 `DEV_MODE`(경로로 읽는다 - `import config` 는 다른 툴의 config.py 를 집을 수 있다).
 - 프로파일 json 을 직접 고치는 것까지 막지는 않는다 — 화면에서 규칙을 바꾸는 길만 닫았다.
-- `Dev Mode` 를 바꿔도 지금 칸 · 저장 안 한 변경(Save 상태)은 그대로다. 잠글 때는 Rename > Token 탭으로 옮긴다.
+- `Dev Mode` 를 바꿔도 지금 칸 · 저장 안 한 변경(Save 상태)은 그대로다. 탭을 숨길 때는 Rename > Token 탭으로 옮긴다.
+- 탭 숨김은 `QTabWidget.setTabVisible`(Qt 5.15+, Maya 2022+). 없는 버전에서는 탭을 빼고(removeTab) 다시 끼운다(insertTab) — 원래 자리 · 툴팁 그대로.
 
 > **팀 이름 규칙(SetXXX)** 은 프로파일 **`Dnable_Set_v001`** 로 짓는다 — 캐릭터 · 좌우 · 파츠 · 오브젝트종류가 Enum 칸이다.
 > 규칙과 쓰는 법은 [A00330_NamingRule_Set.md](A00330_NamingRule_Set.md) (팀 공유용).

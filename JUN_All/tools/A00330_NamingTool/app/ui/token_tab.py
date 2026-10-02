@@ -22,7 +22,8 @@
 #          Rename 을 누르면 바뀔 노드 전부(오브젝트 + transform 자손)를 계층 그대로 보여 주고
 #          Current / New name / Status 를 적는다. 리스트나 토큰이 바뀌면 다시 계산한다 - 씬은 그대로.
 #          계산은 core.preview_tokens (rename_tokens 와 같은 순서 · 같은 이름).
-# v01.18 : Rename 왼쪽 **Hierarchy** 체크 - 켜면 자손까지(예전 동작, 기본), 끄면 리스트 오브젝트만.
+# v01.18 : Rename 왼쪽 **Hierarchy** 체크 - 켜면 자손까지(예전 동작), 끄면 리스트 오브젝트만.
+# v01.19 : Hierarchy 기본은 **꺼짐** (사용자 요청) - 리스트에 담은 것만 바뀌는 쪽이 안전하다.
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
@@ -154,9 +155,9 @@ class TokenTab(QWidget):
         root.addWidget(self.token_widget)
 
         # v01.18 : Hierarchy - 켜면 리스트 오브젝트의 transform 자손까지, 끄면 리스트 오브젝트만.
-        #          기본은 켜짐(예전 동작 그대로). Preview 도 따라간다.
+        #          v01.19 부터 기본은 꺼짐(리스트 오브젝트만). Preview 도 따라간다.
         self.chk_hierarchy = QCheckBox("Hierarchy")
-        self.chk_hierarchy.setChecked(True)
+        self.chk_hierarchy.setChecked(False)
         self.chk_hierarchy.setToolTip(
             "On  : rename each listed object AND its transform descendants.\n"
             "Off : rename only the listed objects - their children keep their names.")

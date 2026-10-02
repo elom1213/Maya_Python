@@ -100,31 +100,36 @@ class MainWindow(QWidget):
         main_layout.addWidget(footer)
 
     # ================================================================
-    # 배포 화면 - Rename > Token 탭만 (v01.17)
+    # 배포 화면 - Rename > Token 탭만 (v01.17, v01.19 숨김)
     # ================================================================
 
-    _RELEASE_TAB_NOTE = "Not available in the shared tool - use Rename > Token."
-
     def apply_release_tabs(self, editable):
-        """editable=False (배포본 · Dev Mode 꺼짐) 면 Rename > Token 말고 다른 탭을 잠근다.
+        """editable=False (배포본 · Dev Mode 꺼짐) 면 Rename > Token 말고 다른 탭을 **숨긴다**.
 
-        숨기지 않고 **회색으로 잠근다** - 공유받은 사람이 기능이 막혀 있다는 걸 알 수 있게.
-        잠글 때는 Token 탭으로 옮긴다(다른 탭이 열려 있었으면 그 화면에 갇힌다).
+        v01.17 은 회색으로 잠갔다 - 사용자 요청(v01.19): 탭이 있다는 것 자체가 보이지 않게.
+        숨길 때는 Token 탭으로 옮긴다(다른 탭이 열려 있었으면 그 화면에 갇힌다).
+
+        `QTabWidget.setTabVisible` 은 Qt 5.15+ (Maya 2022+) 에만 있다. 없으면 탭을 빼고(removeTab)
+        다시 끼운다(insertTab) - 그래서 처음 부를 때 페이지 · 제목 · 툴팁 · 자리를 기억해 둔다.
         """
-        locked = [(self.tabs, 1), (self.tabs, 2), (self.rename_tabs, 1)]   # Copy Name · Quick Rename · Set Rename
-        if not hasattr(self, "_tab_tips"):
-            self._tab_tips = {(id(w), i): w.tabToolTip(i) for w, i in locked}
-            # 테마 qss 에 잠긴 탭 모양이 없어 보통 탭과 구분이 안 된다(실측 brown_dark) → 글자만 흐리게
-            for tab_widget in (self.tabs, self.rename_tabs):
-                tab_widget.setStyleSheet("QTabBar::tab:disabled { color: #6e6e6e; }")
-        for widget, index in locked:
-            widget.setTabEnabled(index, editable)
-            tip = self._tab_tips[(id(widget), index)]
-            widget.setTabToolTip(index, tip if editable else
-                                 (tip + "\n\n" if tip else "") + self._RELEASE_TAB_NOTE)
+        if not hasattr(self, "_release_tabs"):
+            # (탭 위젯, 페이지, 제목, 툴팁, 원래 자리) - Copy Name · Quick Rename · Set Rename
+            self._release_tabs = [
+                (tw, tw.widget(i), tw.tabText(i), tw.tabToolTip(i), i)
+                for tw, i in ((self.tabs, 1), (self.tabs, 2), (self.rename_tabs, 1))]
         if not editable:
             self.tabs.setCurrentIndex(0)
             self.rename_tabs.setCurrentIndex(0)
+        for tab_widget, page, title, tip, index in self._release_tabs:
+            current = tab_widget.indexOf(page)
+            if hasattr(tab_widget, "setTabVisible"):
+                tab_widget.setTabVisible(current, editable)
+                tab_widget.setTabEnabled(current, editable)
+            elif editable and current < 0:
+                tab_widget.insertTab(index, page, title)
+                tab_widget.setTabToolTip(index, tip)
+            elif not editable and current >= 0:
+                tab_widget.removeTab(current)
 
     # ================================================================
     # Tab : Rename  (v01.07) - 하위 탭 Token / Set Rename

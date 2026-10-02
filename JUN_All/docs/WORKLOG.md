@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00330 NamingTool — **배포 화면 다른 탭 숨김 + Hierarchy 기본 꺼짐** (v01.18->01.19)
+- 요청: 배포모드에선 Token 말고 다른 탭이 UI 상 존재하는 것도 안 보이게 / Hierarchy 체크 기본 해제.
+- `apply_release_tabs`: 회색 잠금 → `setTabVisible`(Qt 5.15+), 없으면 removeTab / insertTab(처음 부를 때 페이지 · 제목 · 툴팁 · 자리 기억).
+- 검증(mayapy 2024): setTabVisible 경로 · `hasattr` 를 막아 흉내 낸 옛 Qt 경로 둘 다 — 배포 화면 Rename / Token 만, 개발 화면 원래 순서 · 툴팁 복원, 토글 반복 OK. Hierarchy 기본 False.
+
 > [!summary] A00330 NamingTool — **Token 탭 `Hierarchy` 체크** (v01.17->01.18)
 - 요청: 체크하면 Objects 리스트 오브젝트의 자식까지, 해제하면 그 오브젝트만 rename.
 - `build_hierarchy_groups(objects, hierarchy)` — False 면 [root] 만. `rename_tokens` · `preview_tokens` 가 넘겨받는다. UI 는 Rename 왼쪽 체크(기본 켜짐 = 예전 동작), 토글하면 Preview 갱신.

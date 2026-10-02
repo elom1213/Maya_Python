@@ -53,5 +53,7 @@
 #   - Token       : Hierarchy check box next to Rename - on: the listed objects and their transform
 #                   descendants (as before), off: only the listed objects (v01.18)
 
-VERSION = "01.18"
+#   - Release view: the other tabs are hidden instead of grayed out. Hierarchy is off by default (v01.19)
+
+VERSION = "01.19"
 LAST_UPDATE = "2026-10-02"

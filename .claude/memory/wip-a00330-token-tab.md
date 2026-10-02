@@ -42,3 +42,4 @@ Token 칸마다 규칙 콤보(A00480 Export Naming 처럼), Add/Delete Token 으
 rename 순서대로 옛 이름 빼고 새 이름 넣는 **흉내**로 판정. Maya 2024 에서 미리보기 = 실제 결과.
 같이 고친 것: 잠긴/레퍼런스 노드에서 `cmds.rename` RuntimeError 로 Rename 이 멈추던 것 → 건너뛰고 [Warning]. Rename 뒤 리스트 갱신.
 **v01.18 — `Hierarchy` 체크**(Rename 왼쪽, 기본 켜짐 = 예전 동작): 끄면 `build_hierarchy_groups(..., hierarchy=False)` 가 [root] 만 → 리스트 오브젝트만 rename.
+**v01.19** — Hierarchy **기본 꺼짐**(사용자 요청). 배포 화면의 다른 탭은 **숨김**(회색 잠금은 "탭이 있는 게 보인다"고 거절됨) — `setTabVisible`(Qt 5.15+), 없으면 removeTab/insertTab.

@@ -1,5 +1,11 @@
 # Changelog — A00330_NamingTool
 
+## v01.19 (2026-10-02)
+**[Change] 배포 화면 - Token 말고 다른 탭은 아예 보이지 않는다** (v01.17 은 회색으로 잠갔다 - 탭이 있다는 게 보였다).
+- `setTabVisible`(Qt 5.15+, Maya 2022+), 없으면 removeTab / insertTab 으로 원래 자리 · 툴팁 그대로 되돌린다. Dev Mode 토글도 같다.
+
+**[Change] Token 탭 `Hierarchy` 기본값 꺼짐** — 리스트에 담은 오브젝트만 바뀐다. 자손까지 바꾸려면 켠다.
+
 ## v01.18 (2026-10-02)
 **[Add] Token 탭 - `Hierarchy` 체크 (Rename 왼쪽).**
 
