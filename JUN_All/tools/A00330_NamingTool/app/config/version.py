@@ -29,5 +29,9 @@
 #   - Token       : editing a token no longer saves it to the profile - the new Save button on the
 #                   Profile row does (shared widget change, same as A00480 v01.08) (v01.11)
 
-VERSION = "01.11"
-LAST_UPDATE = "2026-10-01"
+#   - Token       : new Enum rule - pick one of a fixed list of values instead of typing
+#                   (Values... edits the list). Profile Dnable_Set_v001 uses it for character /
+#                   side / part / type. Team naming rule doc: docs/A00330_NamingRule_Set.md (v01.12)
+
+VERSION = "01.12"
+LAST_UPDATE = "2026-10-02"

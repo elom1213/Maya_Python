@@ -6,7 +6,8 @@
 token_ops - 토큰 목록으로 마야 노드 이름을 만든다.
 
 v01.10 : 규칙 본체는 공용 **`Framework.core.token_naming`** 로 올렸다(A00480_FileTool 과 공유).
-이 모듈은 이 툴의 규칙 묶음(`MAYA_NODE_RULES` = Custom / Numbering)과 레거시 기본값만 갖고,
+이 모듈은 이 툴의 규칙 묶음(`MAYA_NODE_RULES` = Custom / Enum / Numbering, Enum 은 v01.12)과
+레거시 기본값만 갖고,
 예전 함수 이름을 그대로 노출한다.
 
   Custom    : 적은 글자를 그대로 쓴다.            {"rule": "custom", "text": "dyn"}

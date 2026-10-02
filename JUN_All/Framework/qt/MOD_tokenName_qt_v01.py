@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-01
+# last Update date : 2026-10-02
 # Framework - 토큰 이름 위젯 (공용, PySide). A00330_NamingTool Rename > Token 탭(v01.08)에서 올려 왔다.
 #
 # 이름을 `_` 로 이은 토큰 칸으로 짓는 화면 한 벌.
@@ -8,7 +8,9 @@
 #               칸을 고쳐도 **저장하지 않는다** - `Save` 를 눌러야 지금 칸이 그 프로파일의 기본이 된다
 #               (2026-10-01, 예전엔 고칠 때마다 바로 저장돼서 다시 열면 고친 칸이 기본으로 나왔다).
 #               저장 안 한 칸은 프로파일을 바꾸거나 창을 닫으면 버려진다. 새 프로파일은 지금 칸을 복사한다.
-#   - Tokens  : 칸마다 규칙 콤보 (Custom / Numbering / Set's Name - 툴이 고른 것만).
+#   - Tokens  : 칸마다 규칙 콤보 (Custom / Enum / Numbering / Set's Name - 툴이 고른 것만).
+#               Enum (2026-10-02) : 정해진 값 중 하나를 콤보로 고른다. 칸 이름(role) 은 콤보 위에,
+#               값 목록 · 칸 이름은 `Values...` 로 고친다 (Save 를 눌러야 프로파일에 남는다).
 #               칸 머리(Token N)를 눌러 고른 뒤
 #                 Add Token    : 고른 칸 **오른쪽**에 새 칸
 #                 Delete Token : 고른 칸 삭제 (마지막 한 칸은 남긴다)
@@ -64,10 +66,36 @@ class TokenScrollArea(QScrollArea):
         return super().event(event)
 
 
+class EnumValuesDialog(QDialog):
+    """Enum 칸의 이름(role) 과 값 목록을 고치는 창. 값은 쉼표로 나눈다."""
+
+    def __init__(self, role, values, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Enum Values")
+        self.setMinimumWidth(380)
+        form = QFormLayout(self)
+        self.le_role = QLineEdit(role)
+        self.le_role.setPlaceholderText("e.g. character")
+        self.le_role.setToolTip("What this token is (shown above the values). Not part of the name.")
+        form.addRow("Token name:", self.le_role)
+        self.le_values = QLineEdit(", ".join(values))
+        self.le_values.setPlaceholderText("e.g. CHN, DHA, LUN, SIN, TBM")
+        self.le_values.setToolTip("The values to pick from, separated by commas.")
+        form.addRow("Values:", self.le_values)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        form.addRow(buttons)
+
+    def result_values(self):
+        return (self.le_role.text().strip(),
+                [v.strip() for v in self.le_values.text().split(",")])
+
+
 class TokenColumn(QFrame):
     """토큰 칸 하나 - 머리 버튼 / 규칙 콤보 / 규칙별 입력.
 
-    Custom 글자 · Numbering Start + Pad 0 · Set's Name(입력 없음 - 안내 글자만).
+    Custom 글자 · Enum 값 콤보 · Numbering Start + Pad 0 · Set's Name(입력 없음 - 안내 글자만).
     """
 
     def __init__(self, token, ruleset, on_changed, parent=None):
@@ -75,6 +103,8 @@ class TokenColumn(QFrame):
         self._ruleset = ruleset
         self._on_changed = on_changed
         self._pages = {}          # rule key -> stack index
+        self._enum_values = []    # Enum 값 목록 (콤보 항목과 같다)
+        self._enum_role = ""      # Enum 칸 이름 - 이름에는 안 들어간다
         self.setFixedWidth(COLUMN_WIDTH)
 
         layout = QVBoxLayout(self)
@@ -112,6 +142,28 @@ class TokenColumn(QFrame):
         custom_layout.addStretch(1)
         self._add_page("custom", custom_page)
 
+        # Enum - 칸 이름 / 값 콤보 / Values... (Numbering 페이지 4줄보다 낮아 칸 높이는 그대로)
+        self.lbl_role = QLabel()
+        self.lbl_role.setAlignment(Qt.AlignCenter)
+        self.cmb_value = QComboBox()
+        self.cmb_value.setStyleSheet(
+            "QComboBox { padding: 1px 1px; } QComboBox::drop-down { width: 12px; }")
+        self.cmb_value.setToolTip("Pick one of the fixed values.")
+        self.btn_values = QPushButton("Values...")
+        self.btn_values.setStyleSheet("QPushButton { padding: 2px; }")
+        self.btn_values.setToolTip("Edit this token's name and the list of values.")
+        self.btn_values.clicked.connect(self._edit_enum_values)
+        enum_page = QWidget()
+        enum_layout = QVBoxLayout(enum_page)
+        enum_layout.setContentsMargins(0, 0, 0, 0)
+        enum_layout.setSpacing(1)
+        enum_layout.addWidget(self.lbl_role)
+        enum_layout.addWidget(self.cmb_value)
+        enum_layout.addWidget(self.btn_values)
+        enum_layout.addStretch(1)
+        self._add_page("enum", enum_page)
+        self._set_enum("", [], "")   # Custom 칸을 Enum 으로 바꿨을 때의 빈 상태
+
         # Numbering
         self.sp_start = QSpinBox()
         self.sp_start.setRange(0, 999999)
@@ -148,6 +200,7 @@ class TokenColumn(QFrame):
         self.le_text.textChanged.connect(self._emit)
         self.sp_start.valueChanged.connect(self._emit)
         self.sp_pad.valueChanged.connect(self._emit)
+        self.cmb_value.currentIndexChanged.connect(self._emit)
 
     def _add_page(self, key, page):
         self._pages[key] = self.stack.addWidget(page)
@@ -160,16 +213,42 @@ class TokenColumn(QFrame):
         self.combo.blockSignals(True)
         self.combo.setCurrentIndex(max(0, self.combo.findData(token["rule"])))
         self.combo.blockSignals(False)
-        for widget in (self.le_text, self.sp_start, self.sp_pad):
+        for widget in (self.le_text, self.sp_start, self.sp_pad, self.cmb_value):
             widget.blockSignals(True)
         if token["rule"] == "numbering":
             self.sp_start.setValue(token["start"])
             self.sp_pad.setValue(token["pad"])
         elif token["rule"] == "custom":
             self.le_text.setText(token["text"])
-        for widget in (self.le_text, self.sp_start, self.sp_pad):
+        elif token["rule"] == "enum":
+            self._set_enum(token.get("role", ""), token["values"], token["value"])
+        for widget in (self.le_text, self.sp_start, self.sp_pad, self.cmb_value):
             widget.blockSignals(False)
         self._show_page()
+
+    def _set_enum(self, role, values, value):
+        """Enum 칸 이름 · 값 목록 · 고른 값을 화면에. 신호는 호출 측이 막는다."""
+        self._enum_role = role
+        self._enum_values = list(values)
+        self.lbl_role.setText(role or "(enum)")
+        self.lbl_role.setToolTip(role or "No token name - set one with Values...")
+        self.cmb_value.clear()
+        self.cmb_value.addItems(self._enum_values)
+        index = self.cmb_value.findText(value)
+        self.cmb_value.setCurrentIndex(index if index >= 0 else (0 if values else -1))
+
+    def _edit_enum_values(self):
+        dialog = EnumValuesDialog(self._enum_role, self._enum_values, self)
+        if dialog.exec_() != QDialog.Accepted:
+            return
+        role, raw_values = dialog.result_values()
+        token = self._ruleset.normalize_token({
+            "rule": "enum", "role": role, "values": raw_values,
+            "value": self.cmb_value.currentText()})
+        self.cmb_value.blockSignals(True)
+        self._set_enum(token.get("role", ""), token["values"], token["value"])
+        self.cmb_value.blockSignals(False)
+        self._emit()
 
     def token(self):
         rule = self.combo.currentData()
@@ -178,6 +257,12 @@ class TokenColumn(QFrame):
                     "start": self.sp_start.value(), "pad": self.sp_pad.value()}
         if rule == "setname":
             return {"rule": "setname"}
+        if rule == "enum":
+            token = {"rule": "enum", "values": list(self._enum_values),
+                     "value": self.cmb_value.currentText()}
+            if self._enum_role:
+                token["role"] = self._enum_role
+            return token
         return {"rule": "custom", "text": self.le_text.text()}
 
     def _on_rule_changed(self, _index):

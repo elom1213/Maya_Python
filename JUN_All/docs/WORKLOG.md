@@ -32,6 +32,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00330 NamingTool — **Token `Enum` 규칙 + 팀 이름 규칙 문서** (v01.11->01.12)
+- 요청: SetXXX 오브젝트 이름 규칙(`{캐릭터}_{좌우}_{세트}_{파츠}_{넘버링}_{오브젝트종류}`)을 팀에 공유할 문서 + `Dnable_Set_v001` 의 캐릭터 · 좌우 · 파츠 · 오브젝트종류를 타이핑 대신 정해진 값에서 고르게. A00470 이름 규칙 json 참고.
+- 공용 `token_naming` 에 `RULE_ENUM` — `{"rule": "enum", "role", "values", "value"}`(키는 A00470 `{"type": "enum", "role", "values"}` 와 같게). 목록 밖 value 는 첫 값, 빈 목록은 검사에서 막음, 값도 마야 글자 검사. `MAYA_NODE_RULES` 에만 추가 → A00480 규칙 목록 불변.
+- 위젯: Enum 칸 = 칸 이름(role) · 값 콤보 · `Values...`(칸 이름 + 쉼표 값 목록). 칸 높이 불변(Numbering 4줄이 정함), 80px 에 `Accessory` 들어감.
+- 프로파일 `Dnable_Set_v001`: CHN/DHA/LUN/SIN/TBM · n/l/r · Top/Pants/Shoes/Accessory · geo/grp. **이 파일은 개발 저장소에선 `.gitignore`(data/) — 이 PC 와 릴리즈 저장소에만 있다.**
+- 문서 `docs/A00330_NamingRule_Set.md`(팀 공유): 규칙 표 · 그룹은 파츠 생략 · 예시 1~3 · 자주 틀리는 것 · 툴 사용법. Token 탭은 transform 자손까지 바꾸므로 **그룹은 Quick Rename Change New(선택 1개 + Start 비움 = 이름 그대로)** 로 안내(코드 확인).
+- 검증: 오프스크린(검사 · 미리보기 · Values... · Save 왕복), **mayapy 2024 rename** — `SIN_n_Set008_Accessory_01~03_geo`, `SIN_l_Set008_Shoes_xx_geo`.
+- 릴리즈: release_builder 로직으로 A00330 만 다시 복사 → 릴리즈 저장소 변경 8개 파일(문서 2 포함), 로컬 커밋.
+
 > [!summary] A00240 PathTool — **버튼 색 지정** (A00340 색 기능 이식, v01.14->01.15)
 - 요청: A00340_SelectionTool 처럼 경로 버튼마다 색을 정할 수 있게 — A00340 기능을 그대로 옮겨도 된다.
 - 이식: 버튼 우클릭 `Set Color...`(QColorDialog = 팔레트 + Pick Screen Color 스포이드) / `Reset Color`, `Color` 그룹 `Color Select` 모드(체크형 버튼으로 카테고리를 넘나들며 체크 → `Apply...` / `Clear`, 켜진 동안 클릭은 경로를 안 연다), 글자색 흑/백 자동, 버튼 dict 에 `"color"` 저장. 체크 상태는 위젯의 실제 `isChecked()` 로 다시 맞춘 뒤 적용(A00340 v01.03 안전장치 그대로).

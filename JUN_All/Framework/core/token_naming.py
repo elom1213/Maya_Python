@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-28
+# last Update date : 2026-10-02
 # Framework - 토큰 이름 규칙 + 토큰 프로파일(json) 저장소 (공용, UI/DCC 비의존)
 """
 token_naming - 토큰 목록으로 이름을 만든다. A00330_NamingTool(Rename > Token) 에서 올려 왔다.
@@ -12,6 +12,12 @@ token_naming - 토큰 목록으로 이름을 만든다. A00330_NamingTool(Rename
                                                     {"rule": "numbering", "start": 0, "pad": 2}
   Set's Name : 이름을 지을 대상마다 주어지는 글자(세트 이름 등)를 그대로 쓴다.
                                                     {"rule": "setname"}
+  Enum       : 정해진 값(values) 중 고른 하나(value). 타이핑하지 않고 콤보로 고른다 (2026-10-02).
+                 {"rule": "enum", "role": "character",
+                  "values": ["CHN", "DHA", "LUN", "SIN", "TBM"], "value": "SIN"}
+               `values` · `role` 키는 A00470_MaterialTool 의 이름 규칙 json
+               (data/profiles/*.json 의 {"type": "enum", "role": ..., "values": [...]}) 과 같다.
+               role 은 칸 이름(무슨 자리인지)일 뿐 이름에는 안 들어간다.
 
 툴마다 쓸 수 있는 규칙 · 이름 종류가 다르므로 **`TokenRuleSet`** 에 묶어 넘긴다.
 
@@ -39,12 +45,14 @@ import json
 RULE_CUSTOM = "custom"
 RULE_NUMBERING = "numbering"
 RULE_SETNAME = "setname"
+RULE_ENUM = "enum"
 
 #: 규칙 key -> UI 라벨
 RULE_LABELS = {
     RULE_CUSTOM: "Custom",
     RULE_NUMBERING: "Numbering",
     RULE_SETNAME: "Set's Name",
+    RULE_ENUM: "Enum",
 }
 
 #: 규칙 key -> 콤보 툴팁 한 줄
@@ -52,6 +60,7 @@ RULE_TIPS = {
     RULE_CUSTOM: "Custom     : the text as typed",
     RULE_NUMBERING: "Numbering  : a number counting up from Start, zero-padded to Pad 0 digits",
     RULE_SETNAME: "Set's Name : the name of each set (namespace and path removed)",
+    RULE_ENUM: "Enum       : pick one of a fixed list of values (no typing)",
 }
 
 NAME_MAYA = "maya"   # 마야 노드 이름 - [A-Za-z0-9_], 숫자로 시작 금지
@@ -71,6 +80,18 @@ def _as_int(value, fallback):
         return int(value)
     except (TypeError, ValueError):
         return fallback
+
+
+def clean_values(values):
+    """Enum 값 목록 - 글자만, 앞뒤 공백 제거, 빈 값 · 중복 제거 (순서 유지)."""
+    out = []
+    for value in values if isinstance(values, (list, tuple)) else []:
+        if not isinstance(value, str):
+            continue
+        value = value.strip()
+        if value and value not in out:
+            out.append(value)
+    return out
 
 
 def pad_number(value, pad):
@@ -122,6 +143,18 @@ class TokenRuleSet(object):
             return {"rule": RULE_NUMBERING, "start": _as_int(raw.get("start"), 0), "pad": pad}
         if rule == RULE_SETNAME and rule in self.rules:
             return {"rule": RULE_SETNAME}
+        if rule == RULE_ENUM and rule in self.rules:
+            values = clean_values(raw.get("values"))
+            value = raw.get("value")
+            value = value.strip() if isinstance(value, str) else ""
+            if value not in values:
+                # 목록에 없는 값(옛 값 · 오타)은 첫 값으로. 목록이 비면 빈 값 - validate 가 막는다.
+                value = values[0] if values else ""
+            token = {"rule": RULE_ENUM, "values": values, "value": value}
+            role = raw.get("role")
+            if isinstance(role, str) and role.strip():
+                token["role"] = role.strip()
+            return token
         text = raw.get("text")
         return {"rule": RULE_CUSTOM, "text": text.strip() if isinstance(text, str) else ""}
 
@@ -161,6 +194,14 @@ class TokenRuleSet(object):
         for index, token in enumerate(tokens):
             if token["rule"] == RULE_CUSTOM and self._bad_text(token["text"]):
                 errors.append(self._bad_text_message(index, token["text"]))
+            if token["rule"] == RULE_ENUM:
+                if not token["values"]:
+                    errors.append("Token {0} : Enum has no values - add values to pick from."
+                                  .format(index + 1))
+                else:
+                    for value in token["values"]:
+                        if self._bad_text(value):
+                            errors.append(self._bad_text_message(index, value))
             if token["rule"] == RULE_NUMBERING and token["start"] < 0:
                 errors.append("Token {0} : Start must be 0 or more (a '-' is not allowed "
                               "in a name).".format(index + 1))
@@ -198,6 +239,10 @@ class TokenRuleSet(object):
             if rule == RULE_CUSTOM:
                 if token["text"]:
                     parts.append(token["text"])
+                continue
+            if rule == RULE_ENUM:
+                if token["value"]:
+                    parts.append(token["value"])
                 continue
             if rule == RULE_SETNAME:
                 value = short_name(context_name)
@@ -259,9 +304,9 @@ class TokenRuleSet(object):
             first, self.serial_label)
 
 
-#: 마야 노드 이름 (A00330 Rename > Token)
+#: 마야 노드 이름 (A00330 Rename > Token). Enum 은 2026-10-02 (A00330 v01.12).
 MAYA_NODE_RULES = TokenRuleSet(
-    rules=(RULE_CUSTOM, RULE_NUMBERING), max_numbering=2, name_kind=NAME_MAYA,
+    rules=(RULE_CUSTOM, RULE_ENUM, RULE_NUMBERING), max_numbering=2, name_kind=NAME_MAYA,
     serial_label="node", object_label="object")
 
 #: 세트마다 파일 이름 하나 (A00480 Export > Naming). Numbering 은 세트 순번 하나만.

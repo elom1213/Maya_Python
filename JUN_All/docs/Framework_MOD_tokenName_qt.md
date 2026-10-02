@@ -41,12 +41,13 @@ framed=True (A00330)                          framed=False (A00480, 그룹 박�
 | `Custom` | `{"rule": "custom", "text": "SK"}` | 적은 글자 그대로. 비면 건너뛴다(`__` 없음) |
 | `Numbering` | `{"rule": "numbering", "start": 0, "pad": 2}` | Start 부터 올라가는 번호, Pad 0 자리수 |
 | `Set's Name` | `{"rule": "setname"}` | 대상마다 주어진 이름(세트 이름 - 네임스페이스 · 경로 없이) |
+| `Enum` (2026-10-02) | `{"rule": "enum", "role": "part", "values": ["Top", "Pants"], "value": "Top"}` | 정해진 값 중 고른 하나(콤보). 칸에 칸 이름(role) · 값 콤보 · `Values...`(칸 이름 · 값 목록 편집). 목록에 없는 value 는 첫 값으로, 값이 없으면 검사에서 막는다. 키는 A00470 이름 규칙 json 과 같다 |
 
 툴은 **규칙 묶음**을 고른다.
 
 | 묶음 | 규칙 | Numbering | 글자 검사 |
 |------|------|-----------|-----------|
-| `MAYA_NODE_RULES` | Custom · Numbering | 1 개 = 전체 순번, 2 개 = 오브젝트 / 오브젝트 안 노드 | `[A-Za-z0-9_]`, 숫자로 시작 금지 (마야가 조용히 지운다) |
+| `MAYA_NODE_RULES` | Custom · Enum · Numbering | 1 개 = 전체 순번, 2 개 = 오브젝트 / 오브젝트 안 노드 | `[A-Za-z0-9_]`, 숫자로 시작 금지 (마야가 조용히 지운다) |
 | `FILE_NAME_RULES` | Custom · Numbering · Set's Name | 1 개 = 세트 순번 | Windows 파일명 금지 문자 `\ / : * ? " < > \|` |
 
 새 묶음은 `TokenRuleSet(rules=..., max_numbering=..., name_kind=NAME_MAYA|NAME_FILE, ...)` 한 줄.

@@ -1,5 +1,19 @@
 # Changelog — A00330_NamingTool
 
+## v01.12 (2026-10-02)
+**[Add] Token 탭 - `Enum` 규칙: 정해진 값 중 하나를 콤보로 고른다(타이핑하지 않는다).**
+
+- 칸 규칙 콤보에 `Enum` 추가 (Custom / Enum / Numbering). 칸에는 칸 이름(role) · 값 콤보 · `Values...` 버튼.
+  `Values...` 로 칸 이름과 값 목록(쉼표로 구분)을 고친다 — 다른 칸처럼 `Save` 를 눌러야 프로파일에 남는다.
+- json : `{"rule": "enum", "role": "character", "values": ["CHN", ...], "value": "SIN"}` — `values` · `role` 은
+  A00470_MaterialTool 이름 규칙 json 과 같은 키. 목록에 없는 값은 첫 값으로 읽고, 값 목록이 비면 실행하지 않는다(`[WARN]`).
+  값에도 마야 이름 글자 검사(영문 · 숫자 · `_`)를 한다.
+- 프로파일 **`Dnable_Set_v001`** : 캐릭터 `CHN DHA LUN SIN TBM` · 좌우 `n l r` · 파츠 `Top Pants Shoes Accessory` ·
+  오브젝트종류 `geo grp` 를 Enum 으로 (세트 이름 칸은 Custom, 넘버링은 그대로).
+- 팀 공유용 이름 규칙 문서 **`docs/A00330_NamingRule_Set.md`** 신규.
+- 공용 위젯 수정(`Framework/core/token_naming.py`, `Framework/qt/MOD_tokenName_qt_v01.py`). Enum 은 `MAYA_NODE_RULES` 에만 넣어
+  A00480_FileTool Export > Naming 의 규칙 목록은 그대로다.
+
 ## v01.11 (2026-10-01)
 **[Change] Token 탭 - 칸을 고쳐도 프로파일에 저장하지 않는다. Profile 줄의 `Save` 를 눌러야 저장된다.**
 

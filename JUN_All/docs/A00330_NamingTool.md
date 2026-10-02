@@ -121,7 +121,11 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 | 규칙 | 입력 | 결과 |
 |------|------|------|
 | `Custom` | 글자 | 적은 글자 그대로. **비워 두면 그 토큰은 건너뛴다**(`a__b` 가 생기지 않는다) |
+| `Enum` (v01.12) | 값 콤보 · `Values...` | **정해진 값 중 고른 하나**. 타이핑하지 않으므로 오타가 없다. 칸 위에 칸 이름(role, 예: `character`)이 보인다. `Values...` 로 칸 이름과 값 목록(쉼표로 구분)을 고친다 |
 | `Numbering` | `Start`(시작 정수) · `Pad 0`(자리수) | Start 부터 올라가는 번호, Pad 0 자리까지 0 을 채운다(Pad 2 → `00, 01, …`, 자리수를 넘으면 `123` 그대로) |
+
+> **팀 이름 규칙(SetXXX)** 은 프로파일 **`Dnable_Set_v001`** 로 짓는다 — 캐릭터 · 좌우 · 파츠 · 오브젝트종류가 Enum 칸이다.
+> 규칙과 쓰는 법은 [A00330_NamingRule_Set.md](A00330_NamingRule_Set.md) (팀 공유용).
 
 **Numbering 토큰 개수 = 무엇을 세는지** — 레거시 Index 1 / Index 2 와 같은 규칙이다.
 
@@ -163,6 +167,8 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
   ]}
   ```
   깨진 파일이나 빈 목록은 `Default` 규칙으로 읽는다.
+  Enum 칸은 `{"rule": "enum", "role": "character", "values": ["CHN", "DHA", "LUN", "SIN", "TBM"], "value": "SIN"}`
+  — `values` · `role` 키는 A00470_MaterialTool 의 이름 규칙 json 과 같다. 목록에 없는 `value` 는 첫 값으로 읽는다.
 
 **실행 전에 막는 것** — 마야는 잘못된 이름을 **에러 없이 다른 이름으로 바꿔 버린다**(Maya 2024 실측):
 
