@@ -2,7 +2,7 @@
 title: A00030_quickTool_V02 사용법
 aliases: [Quick Tool V02, QuickToolV2, 퀵툴 V02]
 tags: [maya-python, tool-guide, quicktool, pyside, qt]
-updated: 2026-09-17
+updated: 2026-10-02
 ---
 
 # A00030_quickTool_V02 — Quick Tool (PySide 재작성)
@@ -11,7 +11,7 @@ updated: 2026-09-17
 다시 쓴 버전이다. **버튼도 동작도 그대로**고 달라진 것은 그릇이다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`slate_dark` 테마)
-- **버전**: `app/config/version.py` (v02.03)
+- **버전**: `app/config/version.py` (v02.04)
 - **설치**: `__dragDrop_A00030_V02.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **QuickToolV2**
   → `tools.A00030_quickTool_V02.run(True)`
 - **V01 과 동시에 띄울 수 있다** — 창과 로그 확장창의 `objectName` 이 갈렸다.
@@ -40,12 +40,12 @@ updated: 2026-09-17
 ## 2. 화면 구성
 
 ```
-┌ Quick Tool v02.03 ──────────────────┐
+┌ Quick Tool v02.04 ──────────────────┐
 │ Help                        [ Pin ] │   ← 메뉴 + 항상 위 토글
 │ ┌ Update window ────────────────┐   │
 │ │ [ Selected ] [ All Windows ]  │   │
 │ ├ Print ────────────────────────┤   │
-│ │ [ Print Selected ] [ Print H… ]│  │
+│ │ [ Print Selected ] [ Copy Hi… ]│  │
 │ ├ Import option ────────────────┤   │
 │ │ [ Import FBX normal ]         │   │   ← 버튼 하나면 가로를 다 쓴다
 │ ├ Create ──────────────────────┤    │
@@ -75,10 +75,11 @@ updated: 2026-09-17
 재생 중 갱신할 뷰포트를 정한다(`playbackOptions -view`). **`Selected`** 는 활성 뷰만 갱신해
 무거운 씬에서 재생이 눈에 띄게 빨라진다. `All Windows` 가 마야 기본이다.
 
-### Print — `Print Selected` / `Print Hierarchy`
+### Print — `Print Selected` / `Copy Hierarchy`
 
 - **`Print Selected`** — 현재 선택의 이름을 로그에 적는다.
-- **`Print Hierarchy`** — 선택과 그 아래 자식들의 **부모 관계를 트리로** 그린다. 씬은 안 건드린다.
+- **`Copy Hierarchy`** (v02.04~, 옛 `Print Hierarchy`) — 선택과 그 아래 자식들의 **부모 관계를 트리로**
+  로그에 그리고, **같은 텍스트를 클립보드에도 복사한다.** 씬은 안 건드린다.
 
 ```
 qt_j1
@@ -179,7 +180,7 @@ A00030_quickTool_V02/
 ├── __dragDrop_A00030_V02.py    # 셸프 설치 (TOOL_LABEL = "QuickToolV2")
 ├── icon/                       # A00030_quickTool_V02.svg / .png
 └── app/
-    ├── config/version.py       # VERSION = "02.03"
+    ├── config/version.py       # VERSION = "02.04"
     ├── core/quick_ops.py       # ★ 버튼이 하는 일 전부 (maya.cmds/mel, UI 비의존)
     └── ui/main_window.py       # 창 · 섹션 · 버튼 · 로그
 ```
@@ -200,6 +201,8 @@ A00030_quickTool_V02/
 - `Selected` / `All Windows` 가 `playbackOptions -view` 를 실제로 바꾼다
 - `Print Selected` — 선택 없으면 경고, 있으면 이름 로그
 - `Print Hierarchy` — 조인트 3단 트리를 그리고, 이미 다른 트리 안이면 건너뛴다
+- `Copy Hierarchy`(v02.04) — 라벨이 바뀌었고(`Print Hierarchy` 없음), 조인트 3단 트리가 로그에
+  그대로 찍히고 **클립보드 내용이 로그의 트리와 같다** · 선택 없으면 경고만(클립보드 안 건드림)
 - `Import FBX normal` — 플러그인을 올려 설정하고, **트레이스백이 로그로 새지 않는다**
 - `Create texture file` — `file` 1개 생성 + `place2dTexture` 가 `uv` · `coverage` 에 연결됨
 - `Cluster Each` — 선택 2개면 **클러스터 2개**(하나가 아니라), 선택 없으면 경고

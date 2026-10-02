@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-17
+# last Update date : 2026-10-02
 # A00030_quickTool_V02 - Qt UI (in-Maya)
 #
 # 레거시 maya.cmds 툴 `A00030_quickTool`(V01.16) 을 PySide 로 재작성했다.
@@ -12,7 +12,7 @@
 #
 # 버튼 구성(레거시 그대로) — 섹션 6 / 버튼 10 (+ 신규 2):
 #   Update window : Selected · All Windows
-#   Print         : Print Selected · Print Hierarchy
+#   Print         : Print Selected · Copy Hierarchy  (v02.04~ 로그 + 클립보드)
 #   Import option : Import FBX normal
 #   Create        : Create texture file · Cluster Each
 #   File          : Copy Scene Folder · Open Scene Folder  (v02.03~ Open 신규)
@@ -63,8 +63,8 @@ class MainWindow(QWidget):
         ("Print", (
             ("Print Selected", "on_print_selected",
              "Log the names of the current selection."),
-            ("Print Hierarchy", "on_print_hierarchy",
-             "Log the parent/child tree of the selection.\n"
+            ("Copy Hierarchy", "on_copy_hierarchy",
+             "Log the parent/child tree of the selection and copy it to the clipboard.\n"
              "Objects already inside another printed tree are skipped."),
         )),
         ("Import option", (
@@ -196,12 +196,23 @@ class MainWindow(QWidget):
         _names, logs = core.selected_names()
         self._log_all(logs)
 
-    def on_print_hierarchy(self):
+    def on_copy_hierarchy(self):
+        """트리를 로그에 찍고(옛 Print Hierarchy 그대로), 같은 텍스트를 클립보드로."""
         text, logs = core.print_hierarchy()
         if text:
             # 트리는 여러 줄이라 로그에 그대로 붙인다(Expand 로 크게 볼 수 있다).
             self._log_all(text.splitlines())
         self._log_all(logs)
+        if not text:
+            return
+
+        clipboard = QApplication.clipboard()
+        if clipboard is None:
+            self._log("[WARN] Could not access the system clipboard.")
+            return
+
+        clipboard.setText(text)
+        self._log("Copied to clipboard : {0} line(s).".format(len(text.splitlines())))
 
     def on_import_fbx_normal(self):
         self._log_all(core.import_fbx_normal())
@@ -270,7 +281,8 @@ class MainWindow(QWidget):
             "\n"
             "[Update window] Selected / All Windows - which viewports refresh\n"
             "  while playing.\n"
-            "[Print] Print Selected / Print Hierarchy - names and the parent tree.\n"
+            "[Print] Print Selected / Copy Hierarchy - names and the parent tree\n"
+            "  (Copy Hierarchy also puts the tree on the clipboard).\n"
             "[Import option] Import FBX normal - use the normals in the file.\n"
             "[Create] Create texture file / Cluster Each.\n"
             "[File] Copy Scene Folder - the scene's folder to the clipboard.\n"

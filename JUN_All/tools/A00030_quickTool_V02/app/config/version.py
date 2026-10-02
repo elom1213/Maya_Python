@@ -9,6 +9,8 @@
 # 02.02  공용 메뉴 바(JUN_mod_menuBar_qt_v01) 적용 — Help 에 Copy Tool Name.
 # 02.03  File > Open Scene Folder 추가 : 씬이 저장된 폴더를 탐색기로 연다
 #        (씬 파일이 있으면 그 파일을 선택한 채로).
+# 02.04  Print > Print Hierarchy -> Copy Hierarchy : 로그 출력은 그대로 두고
+#        같은 트리 텍스트를 클립보드에도 복사한다.
 
-VERSION = "02.03"
-LAST_UPDATE = "2026-09-17"
+VERSION = "02.04"
+LAST_UPDATE = "2026-10-02"

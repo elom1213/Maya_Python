@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00030 QuickTool V02 — **`Print Hierarchy` -> `Copy Hierarchy`** (v02.03->02.04)
+- 요청: 버튼 이름을 Copy Hierarchy 로, 로그 출력은 그대로 두고 계층 트리를 클립보드에도 복사.
+- 수정: 버튼 표 라벨 · 핸들러 `on_copy_hierarchy` — 트리를 로그에 찍은 뒤 같은 텍스트를 `QApplication.clipboard()` 로(Copy Scene Folder 와 같은 방식), 코어 로그 문구 `Copy Hierarchy : n node(s).`, About · 가이드 문서 갱신.
+- 검증(mayapy 2024 + 오프스크린): 라벨 교체 · 조인트 3단 트리 로그 그대로 · 클립보드 = 로그 트리 · 선택 없으면 경고만.
+
 > [!summary] A00330 NamingTool — **Token `Enum` 규칙 + 팀 이름 규칙 문서** (v01.11->01.12)
 - 요청: SetXXX 오브젝트 이름 규칙(`{캐릭터}_{좌우}_{세트}_{파츠}_{넘버링}_{오브젝트종류}`)을 팀에 공유할 문서 + `Dnable_Set_v001` 의 캐릭터 · 좌우 · 파츠 · 오브젝트종류를 타이핑 대신 정해진 값에서 고르게. A00470 이름 규칙 json 참고.
 - 공용 `token_naming` 에 `RULE_ENUM` — `{"rule": "enum", "role", "values", "value"}`(키는 A00470 `{"type": "enum", "role", "values"}` 와 같게). 목록 밖 value 는 첫 값, 빈 목록은 검사에서 막음, 값도 마야 글자 검사. `MAYA_NODE_RULES` 에만 추가 → A00480 규칙 목록 불변.

@@ -153,7 +153,7 @@ def print_hierarchy():
         return u"", ["[WARN] Select one or more objects first."]
 
     text, total = hierarchy_text(selection)
-    return text, ["Print Hierarchy : {0} node(s).".format(total)]
+    return text, ["Copy Hierarchy : {0} node(s).".format(total)]
 
 
 # ==========================================================================
