@@ -1,5 +1,9 @@
 # Changelog — A00330_NamingTool
 
+## v01.20 (2026-10-02)
+**[Change] 배포 화면 - Profile 줄의 `Save` / `New` 없음.** 공유받은 사람이 고친 칸을 프로파일로 남겨 규칙을 바꾸지 못한다.
+칸에서 고른 값은 이번 Rename 에만 쓰이고 프로파일 json 은 그대로. Dev Mode 토글에도 따른다. A00480 은 그대로(기본 = 개발 화면).
+
 ## v01.19 (2026-10-02)
 **[Change] 배포 화면 - Token 말고 다른 탭은 아예 보이지 않는다** (v01.17 은 회색으로 잠갔다 - 탭이 있다는 게 보였다).
 - `setTabVisible`(Qt 5.15+, Maya 2022+), 없으면 removeTab / insertTab 으로 원래 자리 · 툴팁 그대로 되돌린다. Dev Mode 토글도 같다.

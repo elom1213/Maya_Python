@@ -153,9 +153,10 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 | `Values...` (칸 이름 · 값 목록 편집) | 있음 | **없음** |
 | Enum 칸의 규칙 콤보 | 바꿀 수 있음 | **잠김**(회색) — Custom 으로 바꿔 아무 글자나 넣는 길을 막는다 |
 | `Add Token` / `Delete Token` | 있음 | **없음** (v01.17) — 칸 구성 자체가 정해진 규칙이다 |
+| Profile 줄 `Save` / `New` | 있음 | **없음** (v01.20) — 고친 칸을 프로파일로 남기지 못한다. 칸 편집은 이번 Rename 에만 쓰인다 |
 | Enum 칸 삭제 | 됨 | **안 됨** (코드에서도 막는다 — `[WARN] Token N is a fixed rule and cannot be deleted.`) |
 | 다른 칸의 규칙 콤보 | Custom / Enum / Numbering | Custom / Numbering (값 목록을 만들 수 없으니 Enum 을 뺀다) |
-| Enum 값 고르기 · Custom · Numbering · Save | 됨 | 됨 |
+| Enum 값 고르기 · Custom · Numbering · Profile 고르기 | 됨 | 됨 |
 | 다른 탭 (Set Rename · Copy Name · Quick Rename) | 됨 | **보이지 않는다**(v01.19, v01.17 은 회색으로 잠갔다) — Rename > Token 만 |
 | `Dev Mode` 토글 (Tokens 줄 오른쪽) | **있음** — 끄면 배포 화면을 그대로 본다, 다시 켜면 개발 화면 | 없음 |
 

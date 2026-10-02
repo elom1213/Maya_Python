@@ -40,4 +40,6 @@ metadata:
   `set_rules_editable()` 은 칸을 다시 만들되 지금 칸 · `_saved_tokens` 를 지킨다. 툴은 `rulesEditableChanged` 를 받아 다른 UI 를 잠근다
   (A00330 = Token 말고 탭 전부 setTabEnabled(False)). 탭을 잠그면 문서가 그 탭을 안내하지 않는지 볼 것(팀 문서 5-3 이 Quick Rename 을 안내했었다).
 
+- 배포 화면 숨김 버튼 목록(`_apply_mode_buttons`): Add / Delete Token + Profile 줄 **Save / New**(A00330 v01.20). 프로파일 Rename / Delete 는 아직 보인다.
+
 관련: [[wip-a00330-token-tab]], [[wip-a00480-filetool]], [[offscreen-size-needs-theme]]

@@ -55,5 +55,7 @@
 
 #   - Release view: the other tabs are hidden instead of grayed out. Hierarchy is off by default (v01.19)
 
-VERSION = "01.19"
+#   - Release view: no Save / New on the Profile row - edited tokens cannot become a profile (v01.20)
+
+VERSION = "01.20"
 LAST_UPDATE = "2026-10-02"

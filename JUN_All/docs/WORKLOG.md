@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00330 NamingTool — **배포 화면에서 Save / New 숨김** (v01.19->01.20)
+- 요청: 배포모드에서 Save · New 를 없애 사용자가 규칙을 임의로 수정하지 못하게.
+- 공용 위젯 `_apply_mode_buttons` 가 Add / Delete Token 과 함께 Save / New 도 숨긴다(`btn_new_profile` 보관). Rename / Delete(프로파일)는 그대로.
+- 팀 문서 5-1: "Save 를 눌러야 저장" 안내 → "칸 값은 이번 Rename 에만, 공유 툴엔 Save / New 없음".
+- 검증(mayapy 2024): dev 토글 끄면 4버튼 숨김 · 켜면 복원, 임시 배포본 처음부터 숨김, A00480 형태(기본값)는 보임.
+
 > [!summary] A00330 NamingTool — **배포 화면 다른 탭 숨김 + Hierarchy 기본 꺼짐** (v01.18->01.19)
 - 요청: 배포모드에선 Token 말고 다른 탭이 UI 상 존재하는 것도 안 보이게 / Hierarchy 체크 기본 해제.
 - `apply_release_tabs`: 회색 잠금 → `setTabVisible`(Qt 5.15+), 없으면 removeTab / insertTab(처음 부를 때 페이지 · 제목 · 툴팁 · 자리 기억).
