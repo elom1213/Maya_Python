@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00010 humanIKTool_V02 — **Neck to head 하나로 + Mirror in same root** (v02.03->02.04)
+- 요청 1: Neck 1 / Neck 2 to head 를 없애고 Neck to head - 리스트 앞 n-1 개 = 목 체인, 마지막 = 머리. `chain_slots(label, n)` 이 Neck(20) · Neck1~9(32~40) 중 앞 n-1 개 + Head(15), 목 10 개 초과는 경고.
+- 요청 2: Mirror `Mirror in same root` 체크 - 켜면 HIK 할당 조인트의 최상위 조인트(부모가 조인트인 동안 올라감) 아래만, 끄면 씬 전체 조인트(동명 여럿이면 ambiguous). `MirrorResolver(search=ROOTS|SCENE, roots)`, 컨트롤러 미러는 예전 그대로(HIERARCHY).
+- **덤으로 찾은 버그**: 찾은 조인트를 짧은 이름으로 setCharacterObject → 동명 조인트가 있으면 `No object matches name` 으로 할당 실패. 풀 패스로 할당 · 비교(`_same_node`).
+- 검증(mayapy 2024 + mayaHIK, 같은 이름 스켈레톤 두 벌): Neck 4 개 -> Neck · Neck1 · Neck2 · Head, 1 개 -> Head, 12 개 -> 경고 / same_root 켬 -> charA 의 R_* 3 개 이름 매칭 · 적용 성공 · 재실행 skip, 끔 + Name -> ambiguous, 끔 + Auto -> 위치. 체크박스는 Options 둘째 줄(한 줄이면 최소 폭 1008 -> 1362).
+
 > [!summary] A00480 FileTool — **Naming 토큰에 Enum + 토큰 규칙 공용화(`COMMON_RULES`)** (v01.08->01.09)
 - 요청: A00480 Token 에도 Enum, A00330 과 같은 규칙을 다른 툴도 함께 쓰는 공용 규칙으로.
 - `Framework/core/token_naming.py`: `COMMON_RULES = (Custom, Enum, Numbering)` 신설, `TokenRuleSet` 기본값. `MAYA_NODE_RULES = COMMON_RULES`, `FILE_NAME_RULES = COMMON_RULES + Set's Name`.

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-25
+# last Update date : 2026-10-02
 # A00010_humanIKTool_V02 - HumanIK 캐릭터라이제이션 핵심 로직 (maya.cmds / mel, UI 비의존)
 #
 # 레거시 A00010_humanIKTool(maya.cmds UI)의 JUN_get_HIK_node / JUN_assign_joints 를
@@ -13,6 +13,10 @@
 # v02.01 : 좌 -> 우 Mirror Assign 추가 (mirror_joints). 슬롯 테이블은 hik_nodes.py,
 #          반대쪽 노드를 고르는 규칙은 mirror_resolver.py 에 있다.
 #
+# v02.04 : Neck 1 to head / Neck 2 to head -> **Neck to head** 하나. 조인트 n 개 중 앞 n-1 개 = 목 체인
+#          (Neck, Neck1, Neck2 ... 슬롯 순서), 마지막 1 개 = Head. 목 슬롯은 HumanIK 에 10 개(Neck ~ Neck9).
+#          Mirror : same_root - HIK 에 할당된 조인트의 최상위 조인트 아래에서만 반대쪽을 찾는다.
+#
 # CopyKeyManager(A00110) 와 동일한 스타일: 정적 메서드 + undoInfo 청크 + (count, msg) 반환.
 
 import maya.cmds as cmds
@@ -21,7 +25,8 @@ import maya.mel as mel
 from Framework.core.maya_undo import undo_chunk
 
 from tools.A00010_humanIKTool_V02.app.core.hik_nodes import HIKNodes
-from tools.A00010_humanIKTool_V02.app.core.mirror_resolver import MirrorResolver, MODE_AUTO
+from tools.A00010_humanIKTool_V02.app.core.mirror_resolver import (
+    MirrorResolver, MODE_AUTO, SEARCH_ROOTS, SEARCH_SCENE, top_joint)
 
 
 class HIKManager:
@@ -39,11 +44,17 @@ class HIKManager:
         "Fingers : Left":           [50, 51, 52, 54, 55, 56, 58, 59, 60, 62, 63, 64, 66, 67, 68],
         "Shoulder to hand : Right": [19, 12, 13, 14],
         "Fingers : Right":          [74, 75, 76, 78, 79, 80, 82, 83, 84, 86, 87, 88, 90, 91, 92],
-        "Neck 1 to head":           [20, 15],
-        "Neck 2 to head":           [20, 32, 15],
+        # 목 체인 + 머리. 실제 할당 슬롯은 조인트 수로 정한다 - chain_slots() (v02.04).
+        # 여기 값은 목 슬롯 전부 + Head (Mirror 의 Selected Chain 범위용).
+        "Neck to head":             [20, 32, 33, 34, 35, 36, 37, 38, 39, 40, 15],
         "Leg : Left":               [2, 3, 4, 16],
         "Leg : Right":              [5, 6, 7, 17],
     }
+
+    # Neck to head (v02.04) : 목 슬롯은 Neck(20) 다음 Neck1 ~ Neck9(32 ~ 40) - 최대 10 개, 머리는 Head(15).
+    NECK_TO_HEAD = "Neck to head"
+    NECK_SLOTS = [20, 32, 33, 34, 35, 36, 37, 38, 39, 40]
+    HEAD_SLOT = 15
 
     # Mirror 대상 범위. 값은 슬롯 ID 목록이고 None 이면 "방향이 있는 슬롯 전부".
     SCOPE_ALL = "All Sided Slots"
@@ -61,6 +72,27 @@ class HIKManager:
     def chain_labels():
         """UI 라디오/콤보가 그대로 쓰는 본 체인 라벨 목록(정의 순서 유지)."""
         return list(HIKManager.BONE_CHAINS.keys())
+
+    @staticmethod
+    def chain_slots(chain_label, joint_count):
+        """조인트 joint_count 개를 할당할 슬롯 ID 목록. 못 하면 (None, 이유).
+
+        고정 체인은 BONE_CHAINS 그대로. **Neck to head** 는 조인트 수로 정한다 (v02.04):
+          [jnt_01 ... jnt_(n-1)] = 목 체인 -> NECK_SLOTS 앞에서부터 n-1 개 (Neck, Neck1, Neck2 ...)
+          jnt_n                  = 머리   -> HEAD_SLOT
+        반환 : (slot_ids, "") / (None, 이유)
+        """
+        if chain_label != HIKManager.NECK_TO_HEAD:
+            return HIKManager.BONE_CHAINS.get(chain_label), ""
+        neck_count = joint_count - 1
+        if neck_count < 0:
+            return None, "no joints"
+        if neck_count > len(HIKManager.NECK_SLOTS):
+            return None, ("{0} neck joints - HumanIK has only {1} neck slots (Neck ~ Neck9). "
+                          "List at most {2} joints (necks + head).".format(
+                              neck_count, len(HIKManager.NECK_SLOTS),
+                              len(HIKManager.NECK_SLOTS) + 1))
+        return HIKManager.NECK_SLOTS[:neck_count] + [HIKManager.HEAD_SLOT], ""
 
     @staticmethod
     def get_hik_nodes():
@@ -100,9 +132,19 @@ class HIKManager:
         assigned = HIKNodes.assigned_node(hik_node, slot_id)
         if not assigned:
             return False, "slot stayed empty after setCharacterObject"
-        if assigned.split("|")[-1].split(":")[-1] != joint.split("|")[-1].split(":")[-1]:
+        # v02.04 : 같은 이름의 조인트가 여럿일 수 있으니 이름이 아니라 **풀 패스**로 비교한다.
+        if not HIKManager._same_node(assigned, joint):
             return False, "slot holds '{0}'".format(assigned)
         return True, ""
+
+    @staticmethod
+    def _same_node(a, b):
+        """두 이름(짧은 이름 · 부분 경로 · 풀 패스)이 같은 노드인가. 하나라도 못 찾으면 이름으로 비교."""
+        pa = cmds.ls(a, long=True) or []
+        pb = cmds.ls(b, long=True) or []
+        if len(pa) == 1 and len(pb) == 1:
+            return pa[0] == pb[0]
+        return a.split("|")[-1].split(":")[-1] == b.split("|")[-1].split(":")[-1]
 
     @staticmethod
     def assign_joints(joints, hik_node, chain_label):
@@ -127,7 +169,9 @@ class HIKManager:
             return (0, "[Warning] '{0}' has a Control Rig ('{1}'). HumanIK refuses definition "
                        "edits while a rig exists - delete it first.".format(hik_node, rig))
 
-        slot_ids = HIKManager.BONE_CHAINS[chain_label]
+        slot_ids, why = HIKManager.chain_slots(chain_label, len(joints))
+        if slot_ids is None:
+            return (0, "[Warning] [{0}] {1}".format(chain_label, why))
 
         # 매칭 가능한 쌍 수(짧은 쪽 기준). 레거시 zip 은 여기서 조용히 잘렸으므로 경고로 노출.
         pair_count = min(len(joints), len(slot_ids))
@@ -173,9 +217,24 @@ class HIKManager:
         return None
 
     @staticmethod
+    def hik_root_joints(hik_node, assigned=None):
+        """HIK 에 할당된 조인트들의 **최상위 조인트**(풀 패스, 정렬). 할당된 게 없으면 [].
+
+        보통 하나(Reference 또는 Hips 위로 이어진 맨 위 조인트)다. 정의가 여러 계층에 걸쳐 있으면
+        그 계층마다 하나씩 - Mirror in same root 는 그 아래를 모두 본다.
+        """
+        assigned = assigned if assigned is not None else HIKNodes.definition(hik_node)
+        roots = set()
+        for node in assigned.values():
+            top = top_joint(node)
+            if top:
+                roots.add(top)
+        return sorted(roots)
+
+    @staticmethod
     def mirror_joints(hik_node, direction=DIRECTION_L2R, scope=SCOPE_ALL, chain_label=None,
                       mode=MODE_AUTO, axis="X", tolerance=1.0,
-                      overwrite=False, dry_run=False):
+                      overwrite=False, dry_run=False, same_root=True):
         """이미 할당된 한쪽 슬롯을 근거로 반대쪽 슬롯을 자동 할당한다.
 
         hik_node   : 대상 HIKCharacterNode.
@@ -184,6 +243,9 @@ class HIKManager:
         mode       : mirror_resolver 의 MODE_NAME / MODE_POSITION / MODE_AUTO.
         overwrite  : 반대쪽 슬롯에 이미 뭔가 있을 때 덮어쓸지.
         dry_run    : True 면 아무것도 바꾸지 않고 계획만 돌려준다(Preview).
+        same_root  : True(Mirror in same root) 면 HIK 에 할당된 조인트의 최상위 조인트 **아래에서만**
+                     반대쪽을 찾는다 - 같은 이름의 조인트가 씬에 더 있어도 이 캐릭터 것만 (v02.04).
+                     False 면 씬의 모든 조인트에서 찾고, 같은 이름이 여럿이면 실패로 보고한다.
 
         반환 : (records, message)
           record = {slot, slot_name, src, dst_slot, dst_slot_name, dst, status, reason}
@@ -205,8 +267,11 @@ class HIKManager:
         allowed = HIKManager.scope_slots(scope, chain_label)
 
         assigned = HIKNodes.definition(hik_node)
+        roots = HIKManager.hik_root_joints(hik_node, assigned) if same_root else []
         resolver = MirrorResolver(mode=mode, to_side=to_side, axis=axis,
-                                  tolerance=tolerance, node_type="joint")
+                                  tolerance=tolerance, node_type="joint",
+                                  search=SEARCH_ROOTS if same_root else SEARCH_SCENE,
+                                  roots=roots)
 
         records = []
         for slot_id in sorted(assigned):
@@ -227,6 +292,7 @@ class HIKManager:
                 "dst_slot": dst_slot,
                 "dst_slot_name": HIKNodes.name(dst_slot),
                 "dst": None,
+                "dst_path": None,
                 "status": "fail",
                 "reason": "",
             }
@@ -241,16 +307,19 @@ class HIKManager:
                 continue
 
             short = found.split("|")[-1]
-            rec["dst"] = short
+            rec["dst"] = short          # 표시용
+            # v02.04 : 할당은 **풀 패스**로 - 짧은 이름은 같은 이름의 조인트가 씬에 여럿이면
+            # setCharacterObject 가 "No object matches name" 으로 실패한다(실측).
+            rec["dst_path"] = found
 
-            if short == src.split("|")[-1]:
+            if HIKManager._same_node(found, src):
                 rec["status"] = "fail"
                 rec["reason"] = "resolved to the source itself"
                 records.append(rec)
                 continue
 
             if existing:
-                if existing.split("|")[-1] == short:
+                if HIKManager._same_node(existing, found):
                     rec["status"] = "skip"
                     rec["reason"] = "already assigned"
                     records.append(rec)
@@ -271,7 +340,8 @@ class HIKManager:
             if todo:
                 with undo_chunk():
                     for r in todo:
-                        ok, why = HIKManager._set_slot(r["dst"], hik_node, r["dst_slot"])
+                        ok, why = HIKManager._set_slot(r.get("dst_path") or r["dst"],
+                                                       hik_node, r["dst_slot"])
                         if ok:
                             r["status"] = "ok"
                         else:
@@ -279,7 +349,13 @@ class HIKManager:
                             r["reason"] = why
                 HIKManager.refresh_hik_ui()
 
-        return (records, HIKManager.summarize(records, hik_node, dry_run))
+        msg = HIKManager.summarize(records, hik_node, dry_run)
+        if same_root:
+            msg += " Searched under: {0}.".format(
+                ", ".join(r.split("|")[-1] for r in roots) if roots else "(no HIK root joint)")
+        else:
+            msg += " Searched: every joint in the scene."
+        return (records, msg)
 
     @staticmethod
     def summarize(records, hik_node, dry_run=False):

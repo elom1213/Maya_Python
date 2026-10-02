@@ -39,3 +39,7 @@ metadata:
 - Custom Rig 자체는 이 툴이 만들지 않는다 — HIK 창에서 만들어 둔 리타게터를 읽어 쓴다.
 
 관련: [[mayapy-headless-verify]] · [[undo-chunk-by-default]] · [[push-includes-tool-guide-docs]]
+
+**v02.04 (2026-10-02)** — `Neck to head` 하나(앞 n-1 = 목 Neck/Neck1~9, 마지막 = Head, `chain_slots`).
+Mirror `Mirror in same root`(기본 켬): HIK 할당 조인트의 최상위 조인트 아래만 / 끄면 씬 전체(동명이면 ambiguous).
+**★ HumanIK 할당은 풀 패스로** — 짧은 이름으로 `setCharacterObject` 하면 동명 조인트가 있을 때 `No object matches name` 으로 실패한다(실측).

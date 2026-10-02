@@ -229,7 +229,10 @@ class MainWindow(QWidget):
 
         # --- 옵션 ---
         grp_opt = QGroupBox("Options")
-        opt_layout = QHBoxLayout(grp_opt)
+        # 두 줄 (v02.04) - 한 줄에 다 두면 창 최소 폭이 1008 -> 1362 로 늘었다(실측).
+        opt_rows = QVBoxLayout(grp_opt)
+        opt_layout = QHBoxLayout()
+        opt_rows.addLayout(opt_layout)
 
         self.chk_overwrite = QCheckBox("Overwrite existing")
         self.chk_overwrite.setToolTip(
@@ -243,7 +246,21 @@ class MainWindow(QWidget):
             "right-side controllers are built with a different orientation convention.")
         opt_layout.addWidget(self.chk_copy_offset)
 
+        # v02.04 : 반대쪽 조인트를 찾을 범위. 켜면 HIK 에 할당된 조인트의 최상위 조인트 아래만.
+        self.chk_same_root = QCheckBox("Mirror in same root")
+        self.chk_same_root.setChecked(True)
+        self.chk_same_root.setToolTip(
+            "Joints only.\n"
+            "On  : look for the mirrored joint only under the top joint of the joints already\n"
+            "      assigned to this HIK character - a joint with the same name elsewhere in the\n"
+            "      scene (another character, a reference) is ignored.\n"
+            "Off : look among every joint in the scene. If the name exists more than once,\n"
+            "      the row fails as ambiguous instead of guessing.")
         opt_layout.addStretch(1)
+        same_root_row = QHBoxLayout()
+        same_root_row.addWidget(self.chk_same_root)
+        same_root_row.addStretch(1)
+        opt_rows.addLayout(same_root_row)
         layout.addWidget(grp_opt)
 
         # --- 실행 ---
@@ -356,6 +373,7 @@ class MainWindow(QWidget):
             tolerance=self.spn_tolerance.value(),
             overwrite=self.chk_overwrite.isChecked(),
             dry_run=dry_run,
+            same_root=self.chk_same_root.isChecked(),
         )
 
         self._fill_result([

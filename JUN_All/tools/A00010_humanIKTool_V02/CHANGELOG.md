@@ -1,5 +1,18 @@
 # Changelog — A00010_humanIKTool_V02
 
+## v02.04 (2026-10-02)
+**[Change] `Neck 1 to head` / `Neck 2 to head` -> `Neck to head` 하나.**
+- Joints 리스트 `[jnt_01 ... jnt_n]` 중 `jnt_01` ~ `jnt_(n-1)` 은 목 체인(Neck, Neck1, Neck2 ... 슬롯 순서), 마지막 `jnt_n` 은 Head.
+- 목 슬롯은 HumanIK 에 10 개(Neck ~ Neck9) - 목 조인트가 10 개를 넘으면 할당하지 않고 경고.
+
+**[Add] Mirror 탭 - `Mirror in same root` (기본 켜짐, 조인트 전용).**
+- 켜면 HIK 에 할당된 조인트의 최상위 조인트 아래에서만 반대쪽 조인트를 찾는다 - 같은 이름의 조인트가 씬에 더 있어도 이 캐릭터 것만.
+- 끄면 씬의 모든 조인트에서 찾고, 같은 이름이 여럿이면 `ambiguous` 로 실패(Auto 면 위치로 넘어감).
+- 결과 요약에 찾은 범위(`Searched under: ...` / `Searched: every joint in the scene`).
+
+**[Fix] 같은 이름의 조인트가 씬에 있으면 Mirror 할당이 실패하던 것.**
+- 찾은 조인트를 짧은 이름으로 `setCharacterObject` 에 넘겨 `No object matches name` 이 났다(실측) -> 풀 패스로 할당, 성공 판정도 풀 패스 비교.
+
 ## v02.01 (2026-08-25)
 **[Feature] `Mirror` 탭 신규 — 한쪽을 할당하면 반대쪽은 버튼 하나로.**
 

@@ -43,6 +43,11 @@ SIDE_TOKEN_PAIRS = [
     ("l", "r"),
 ]
 
+#: 후보를 어디서 찾나 (A00010 v02.04, MirrorResolver(search=...))
+SEARCH_HIERARCHY = "hierarchy"   # 예전 그대로 (컨트롤러 미러가 쓴다)
+SEARCH_ROOTS = "roots"           # 주어진 최상위 조인트들 아래만
+SEARCH_SCENE = "scene"           # 씬 전체 - 동명이 여럿이면 실패
+
 MODE_NAME = "name"
 MODE_POSITION = "position"
 MODE_AUTO = "auto"
@@ -188,6 +193,27 @@ def candidate_pool(reference, node_type=None):
     return pool
 
 
+def top_joint(node):
+    """node 위로 조인트가 이어지는 동안 올라간 맨 위 조인트(풀 패스). node 가 조인트가 아니면 None.
+
+    HIK 스켈레톤의 '최상위 조인트' - 그 위의 그룹 · 트랜스폼에서는 멈춘다 (A00010 v02.04).
+    """
+    paths = cmds.ls(node, long=True, type="joint") or []
+    if not paths:
+        return None
+    current = paths[0]
+    while True:
+        parent = (cmds.listRelatives(current, parent=True, fullPath=True) or [None])[0]
+        if not parent or cmds.nodeType(parent) != "joint":
+            return current
+        current = parent
+
+
+def under_roots(path, roots):
+    """path 가 roots 중 하나이거나 그 아래인가 (풀 패스 비교)."""
+    return any(path == r or path.startswith(r + "|") for r in roots)
+
+
 def _world_position(node):
     try:
         return cmds.xform(node, q=True, ws=True, t=True)
@@ -242,20 +268,34 @@ class MirrorResolver:
     axis      : 위치 미러 축
     tolerance : 위치 모드에서 허용할 최대 거리(씬 단위)
     node_type : 후보 풀을 좁히는 타입("joint" / None 이면 모든 트랜스폼)
+    search    : 후보를 어디서 찾나 (A00010 v02.04)
+                SEARCH_HIERARCHY (기본) - 예전 그대로: 같은 부모 -> 씬 -> 동명이면 같은 DAG 최상위 아래
+                SEARCH_ROOTS     - roots(풀 패스 목록) 아래에서만 (Mirror in same root 켜짐)
+                SEARCH_SCENE     - 씬 전체. 동명이 여럿이면 추측하지 않고 실패 (Mirror in same root 꺼짐)
     """
 
     def __init__(self, mode=MODE_AUTO, to_side="Right", axis="X",
-                 tolerance=1.0, node_type=None):
+                 tolerance=1.0, node_type=None, search=None, roots=None):
         self.mode = mode
         self.to_side = to_side
         self.axis = axis
         self.tolerance = tolerance
         self.node_type = node_type
+        self.search = search or SEARCH_HIERARCHY
+        self.roots = list(roots or [])
         self._pool_cache = {}
+
+    def _named(self, leaf):
+        """leaf 이름인 노드들(풀 패스) - node_type 이 있으면 그 타입만."""
+        if self.node_type:
+            return cmds.ls(leaf, long=True, type=self.node_type) or []
+        return cmds.ls(leaf, long=True) or []
 
     # -------------------------------------------------- 이름
 
     def _resolve_by_name(self, node):
+        if self.search in (SEARCH_ROOTS, SEARCH_SCENE):
+            return self._resolve_by_name_scoped(node)
         paths = cmds.ls(node, long=True) or []
         parent_path = paths[0].rsplit("|", 1)[0] if paths else ""
 
@@ -278,9 +318,46 @@ class MirrorResolver:
                 return None, "ambiguous name ({0} nodes named '{1}')".format(len(found), leaf)
         return None, "no side token in name"
 
+    def _resolve_by_name_scoped(self, node):
+        """SEARCH_ROOTS / SEARCH_SCENE - 범위 안에서 그 이름이 **딱 하나**일 때만 고른다."""
+        if self.search == SEARCH_ROOTS and not self.roots:
+            return None, "no HIK root joint to search under"
+        for cand in mirror_name_candidates(node, self.to_side):
+            leaf = cand.split("|")[-1]
+            found = self._named(leaf)
+            if self.search == SEARCH_ROOTS:
+                found = [f for f in found if under_roots(f, self.roots)]
+            if len(found) == 1:
+                return found[0], "name"
+            if len(found) > 1:
+                where = "under the HIK root" if self.search == SEARCH_ROOTS else "in the scene"
+                return None, "ambiguous name ({0} nodes named '{1}' {2})".format(
+                    len(found), leaf, where)
+        if self.search == SEARCH_ROOTS:
+            return None, "no mirrored name under the HIK root"
+        return None, "no side token in name"
+
     # -------------------------------------------------- 위치
 
     def _pool(self, node):
+        if self.search == SEARCH_ROOTS:
+            if "<roots>" not in self._pool_cache:
+                pool = []
+                for r in self.roots:
+                    if self.node_type:
+                        pool += cmds.ls(r, dag=True, long=True, type=self.node_type) or []
+                    else:
+                        pool += cmds.ls(r, dag=True, long=True, transforms=True) or []
+                self._pool_cache["<roots>"] = pool
+            return self._pool_cache["<roots>"]
+        if self.search == SEARCH_SCENE:
+            if "<scene>" not in self._pool_cache:
+                if self.node_type:
+                    pool = cmds.ls(long=True, type=self.node_type) or []
+                else:
+                    pool = cmds.ls(long=True, transforms=True) or []
+                self._pool_cache["<scene>"] = pool
+            return self._pool_cache["<scene>"]
         key = hierarchy_root(node) or "<scene>"
         if key not in self._pool_cache:
             self._pool_cache[key] = candidate_pool(node, self.node_type)

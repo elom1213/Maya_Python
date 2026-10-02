@@ -2,7 +2,7 @@
 title: A00010_humanIKTool_V02 사용법
 aliases: [HumanIK Tool, HumanIKTool, A00010, Mirror Assign, Custom Rig Mirror]
 tags: [maya-python, tool-guide, humanik, hik, characterization, retarget, mirror]
-updated: 2026-09-16
+updated: 2026-10-02
 ---
 
 # A00010_humanIKTool_V02 사용법
@@ -12,7 +12,7 @@ HumanIK **캐릭터라이제이션**(어느 조인트가 어느 슬롯인지 정
 끝나는 `Mirror` 탭이 있고, 조인트뿐 아니라 **Custom Rig 의 컨트롤러 매핑**도 같은 방식으로
 미러한다.
 
-- 버전: `v02.01` (`app/config/version.py`)
+- 버전: `v02.04` (`app/config/version.py`)
 - 위치: `JUN_All/tools/A00010_humanIKTool_V02`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴
 
@@ -59,10 +59,23 @@ HumanIK Character Node      <- Assign / Mirror 두 탭이 공유한다
 | `Spine` | Hips · Spine · Spine1 … Spine6 |
 | `Shoulder to hand : Left` / `: Right` | Shoulder · Arm · ForeArm · Hand |
 | `Fingers : Left` / `: Right` | Thumb1~3 · Index1~3 · Middle1~3 · Ring1~3 · Pinky1~3 |
-| `Neck 1 to head` / `Neck 2 to head` | Neck (· Neck1) · Head |
+| `Neck to head` (v02.04) | **조인트 수로 정한다** — 아래 |
 | `Leg : Left` / `: Right` | UpLeg · Leg · Foot · ToeBase |
 
 조인트 수와 슬롯 수가 다르면 **짧은 쪽까지만** 붙이고 그 사실을 경고로 남긴다.
+
+**`Neck to head`** (v02.04, 옛 `Neck 1 to head` / `Neck 2 to head` 를 하나로) — 리스트 `[jnt_01, jnt_02, … jnt_n]` 에서
+
+- `jnt_01` ~ `jnt_(n-1)` = **목 체인** → `Neck` · `Neck1` · `Neck2` … 순서로 (슬롯 20 · 32 · 33 …)
+- `jnt_n` (리스트 마지막) = **머리** → `Head` (슬롯 15)
+
+| 리스트 | 할당 |
+|---|---|
+| `neck, head` | Neck · Head |
+| `neck_01, neck_02, neck_03, head` | Neck · Neck1 · Neck2 · Head |
+| `head` 하나 | Head 만 |
+
+HumanIK 의 목 슬롯은 **10 개**(Neck ~ Neck9)뿐이라 목 조인트가 10 개를 넘으면(리스트 12 개 이상) **아무것도 붙이지 않고** 경고한다.
 
 > [!warning] Control Rig 이 있으면 정의를 못 고친다
 > HumanIK 은 캐릭터에 Control Rig 이 붙어 있으면 정의 변경을 **거부한다** — 그런데
@@ -97,6 +110,10 @@ HumanIK Character Node      <- Assign / Mirror 두 탭이 공유한다
 | `Mirror Axis` · `Tolerance` | 위치 매칭용. `Name only` 에서는 비활성화된다 |
 | `Overwrite existing` | 끄면(기본) 이미 차 있는 슬롯은 건드리지 않고 `skip` 으로 보고 |
 | `Copy mapping offsets` | Custom Rig 전용 (6장) |
+| `Mirror in same root` (v02.04, 기본 켜짐) | **조인트 전용.** 켜면 **HIK 에 할당된 조인트의 최상위 조인트 아래에서만** 반대쪽 조인트를 찾는다 — 같은 이름의 조인트가 씬에 더 있어도(다른 캐릭터 · 레퍼런스) 이 캐릭터 것만 고른다. 끄면 **씬의 모든 조인트**에서 찾고, 같은 이름이 여럿이면 추측하지 않고 `ambiguous` 로 실패한다(`Auto` 면 그때 위치로 넘어간다). 결과 줄 끝에 `Searched under: <최상위 조인트>` / `Searched: every joint in the scene` |
+
+- **최상위 조인트** = 할당된 조인트에서 부모가 조인트인 동안 올라간 맨 위 조인트(그 위 그룹에서는 멈춘다). 정의가 여러 계층에 걸치면 각 계층의 맨 위 조인트 아래를 모두 본다.
+- v02.03 까지는 같은 이름이 여럿일 때 "같은 DAG 최상위 노드" 아래 것을 골랐고, 찾은 조인트를 **짧은 이름**으로 할당해서 동명 조인트가 있으면 `No object matches name` 으로 **할당이 실패**했다 — v02.04 부터 풀 패스로 할당한다.
 
 ### 4-3. 결과 표
 
