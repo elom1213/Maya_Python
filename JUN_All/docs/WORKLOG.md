@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # 작업 일지 (WORKLOG)
@@ -31,6 +31,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 ---
 
 ## 2026-10-02 (오늘)
+
+> [!summary] A00240 PathTool — **Tree 탭 Adaptive(펼칠 때만 읽기) + 더블클릭 탐색기 열기** (v01.15->01.16)
+- 요청 1: Depth 를 크게 두면 Build 가 오래 걸림 -> `Adaptive` 체크(기본 켬) 시 Build 는 루트 한 겹만, 폴더를 펼칠 때 그 폴더 한 겹만 읽고 재귀적으로 반복. 끄면 예전처럼 Depth 까지 미리. Shift + 펼치기는 아래 전부 읽기.
+- `tree_scanner.build_tree_lazy()` / `scan_children()` + 폴더 노드 `loaded` 플래그, UI 는 경로->노드 색인(`_reindex`) - 매번 캐시 훑기는 Shift 펼치기에서 제곱(폴더 6천 개 16 초). Refresh 는 읽은 폴더만(`_rescan_lazy`), Filter 는 읽은 범위 안에서만.
+- 새 확장자는 항목을 만들기 **전에** File Types 에 넣는다 - 일부만 체크한 상태에서 펼친 폴더의 새 확장자 파일이 숨던 문제.
+- 요청 2: 더블클릭 = 탐색기에서 열기(Reveal 과 같음), 더블클릭 펼치기는 끔.
+- 검증(PySide6 offscreen, 8^4 폴더 · 약 1만 노드): Adaptive Build 0.001 초 vs Depth All 0.23~0.35 초, 펼치기 = 한 겹, 손자 미로드, 부분 확장자 필터 + 새 `.fbx` 표시, Shift 전체 펼치기 9947 노드 0.6 초, Refresh Recursive 로 새 폴더 반영 · 펼침 유지, 더블클릭 -> reveal 호출 · 안 펼쳐짐.
 
 > [!summary] A00010 humanIKTool_V02 — **Neck to head 하나로 + Mirror in same root** (v02.03->02.04)
 - 요청 1: Neck 1 / Neck 2 to head 를 없애고 Neck to head - 리스트 앞 n-1 개 = 목 체인, 마지막 = 머리. `chain_slots(label, n)` 이 Neck(20) · Neck1~9(32~40) 중 앞 n-1 개 + Head(15), 목 10 개 초과는 경고.

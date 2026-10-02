@@ -2,6 +2,22 @@
 
 All notable changes to this tool are documented here.
 
+## [01.16] - 2026-10-02
+### Added
+- **Tree tab: Adaptive** (on by default). Build reads only the first level under the path, and a
+  folder is read the first time you open it - one level at a time. A big or deep folder now shows
+  right away instead of waiting for everything down to Depth. **Shift + open** still reads
+  everything below that folder. Depth is used only when Adaptive is off.
+- Folders not read yet show an open arrow; it disappears if the folder turns out empty.
+  Extensions found while opening folders are added to **File Types** (checked).
+- **Tree tab: double-click a path to open it in File Explorer** (same as *Reveal in File Explorer*:
+  a folder opens, a file is selected in its folder). Double-click no longer opens/closes the
+  folder in the tree - use the arrow or the Left/Right keys.
+### Changed
+- With Adaptive on, **Filter** searches only folders read so far, and **Refresh** re-reads only
+  folders already read.
+- Refresh now also adds newly found extensions to File Types.
+
 ## [01.15] - 2026-10-02
 ### Added
 - **Button colors** (same feature as A00340_SelectionTool). Right-click a path button ->
