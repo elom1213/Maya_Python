@@ -25,6 +25,7 @@ from Framework.qt.MOD_tokenName_qt_v01 import JUN_mod_tokenName_qt_v01
 from tools.A00330_NamingTool.app import core
 from tools.A00330_NamingTool.app.core import token_ops
 from tools.A00330_NamingTool.app.core import token_profile_prefs as tprefs
+from tools.A00330_NamingTool.app.config import dev_mode
 
 
 class TokenTab(QWidget):
@@ -47,9 +48,12 @@ class TokenTab(QWidget):
             log_callback=self._log)
         root.addWidget(self.tsl, stretch=1)
 
-        # Profile + Tokens (공용 위젯)
+        # Profile + Tokens (공용 위젯).
+        # v01.14 : 개발자 모드가 아니면(배포본) 정해진 규칙을 못 바꾼다 - Enum 칸의 Values... 가 없고,
+        #          Enum 칸은 규칙 콤보가 잠기고 지울 수 없다. 값 중에서 고르기만 한다.
         self.token_widget = JUN_mod_tokenName_qt_v01(
-            tprefs.STORE, log=self._log, log_prefix="Token")
+            tprefs.STORE, log=self._log, log_prefix="Token",
+            rules_editable=dev_mode.is_dev_mode())
         root.addWidget(self.token_widget)
 
         self.btn_rename = QPushButton("Rename")

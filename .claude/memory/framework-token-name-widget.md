@@ -32,4 +32,8 @@ metadata:
 - **칸 페이지는 모두 [이름 줄] -> [입력칸] -> stretch, 입력칸 높이는 `_match_input_heights` 로 하나** (2026-10-02, A00330 v01.13,
   `ref/ref_02.png`). 새 규칙 페이지를 만들 때 이름 줄 · stretch 를 빼면 입력칸이 어긋난다. padding 을 줄인 콤보는 낮아지므로 높이를 고정해야 한다.
 
+- **`rules_editable=False` = 배포본 잠금** (A00330 v01.14): Values... 숨김 · Enum 칸 규칙 잠금 · 삭제 불가 · 다른 칸에서 Enum 제외.
+  A00330 은 `app/config/dev_mode.is_dev_mode()` 로 넘긴다(동봉 Framework = 배포본). 배포본 검증은 릴리즈 빌더로 임시 폴더에 만들고
+  dev 경로를 sys.path 에서 빼서 — Framework 는 네임스페이스 패키지라 `__file__` 이 None, 위치는 `__path__` 로 확인.
+
 관련: [[wip-a00330-token-tab]], [[wip-a00480-filetool]], [[offscreen-size-needs-theme]]

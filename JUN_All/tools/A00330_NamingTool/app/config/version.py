@@ -36,5 +36,8 @@
 #   - Token       : every token's input box (text / Enum value / Start / Pad 0) has the same height
 #                   and sits on the same row - each column has a caption row above it (v01.13)
 
-VERSION = "01.13"
+#   - Token       : outside developer mode (the shared release) the fixed rules cannot be changed -
+#                   no Values... button, an Enum token's rule is locked and it cannot be deleted (v01.14)
+
+VERSION = "01.14"
 LAST_UPDATE = "2026-10-02"

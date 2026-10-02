@@ -1,5 +1,15 @@
 # Changelog — A00330_NamingTool
 
+## v01.14 (2026-10-02)
+**[Change] 배포본에서는 정해진 규칙(Enum 칸)을 바꿀 수 없다 — `Values...` 는 개발자 모드에서만.**
+
+- 개발자 모드(`JUN_All/config.py` 의 `DEV_MODE = True`)일 때만 Enum 칸에 `Values...` 가 있다.
+- 배포본(툴 폴더에 Framework 동봉 = 릴리즈 저장소) 또는 `DEV_MODE = False` 이면:
+  `Values...` 없음 · Enum 칸 규칙 콤보 잠김 · Enum 칸 `Delete Token` 막음(`[WARN]`) · 다른 칸 규칙 콤보에서 Enum 제외.
+  값 고르기 · Custom · Numbering · Add Token · Save 는 그대로.
+- 판정 `app/config/dev_mode.py`(launch.py 와 같은 규칙). 공용 위젯에 `rules_editable` 인자(기본 True — A00480 은 그대로).
+- 팀 문서 `docs/A00330_NamingRule_Set.md` 5장: 규칙 칸은 바꿀 수 없다 · 규칙 변경은 툴 관리자가 업데이트로.
+
 ## v01.13 (2026-10-02)
 **[Fix] Token 탭 - 칸마다 입력칸 높이 · 위치가 달랐던 것 (`ref/ref_02.png`).**
 

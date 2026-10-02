@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00330 NamingTool — **배포본에선 Enum 규칙 잠금, `Values...` 는 개발자 모드만** (v01.13->01.14)
+- 요청: Enum 칸의 `Values...`(칸 이름 · 값 목록 편집)는 개발자 모드에서만, 배포용 툴에서는 없애서 공유받은 사람이 규칙을 못 바꾸게.
+- 판정 `app/config/dev_mode.py` — launch.py 와 같은 규칙(툴 폴더에 Framework 동봉 = 배포본 → False, 아니면 `JUN_All/config.py` DEV_MODE 를 **경로로** 읽음).
+- 공용 위젯 `rules_editable`(기본 True): False 면 `Values...` 숨김 · Enum 칸 규칙 콤보 잠금(Custom 으로 바꿔 우회 차단) · Enum 칸 Delete Token 막음 · 다른 칸 콤보에서 Enum 제외. 값 고르기 · Save 등은 그대로. A00480 은 기본값이라 불변.
+- 검증: dev 트리 `dev True`, **릴리즈 빌더로 임시 폴더에 만든 배포본**(dev 경로 sys.path 제거, 동봉 Framework 로딩 확인) `IS_RELEASE True dev False` → Values 4칸 숨김 · 콤보 잠김 · Enum 삭제 [WARN] · 값 고르기 정상. 팀 문서 5장 갱신(규칙은 관리자만).
+
 > [!summary] A00330 NamingTool — **Token 칸 입력칸 높이 · 위치 통일** (v01.12->01.13)
 - 요청(`ref/ref_02.png`): CHN · n 과 SetXXX, Top 과 Numbering `1` 의 입력칸 높이가 다르다 — 같게.
 - 원인 둘: Enum 값 콤보는 80px 에 글자를 넣으려 padding 을 줄여 낮았다 / Custom 페이지엔 이름 줄이 없어 입력칸이 한 줄 위에 붙었다. 고치는 중 하나 더 — Numbering 페이지엔 stretch 가 없어 남는 높이가 이름 줄로 나뉘어 입력칸이 6px 내려갔다.

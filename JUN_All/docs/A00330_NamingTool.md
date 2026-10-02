@@ -121,8 +121,22 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 | 규칙 | 입력 | 결과 |
 |------|------|------|
 | `Custom` | 글자 | 적은 글자 그대로. **비워 두면 그 토큰은 건너뛴다**(`a__b` 가 생기지 않는다) |
-| `Enum` (v01.12) | 값 콤보 · `Values...` | **정해진 값 중 고른 하나**. 타이핑하지 않으므로 오타가 없다. 칸 위에 칸 이름(role, 예: `character`)이 보인다. `Values...` 로 칸 이름과 값 목록(쉼표로 구분)을 고친다 |
+| `Enum` (v01.12) | 값 콤보 · `Values...` | **정해진 값 중 고른 하나**. 타이핑하지 않으므로 오타가 없다. 칸 위에 칸 이름(role, 예: `character`)이 보인다. `Values...` 로 칸 이름과 값 목록(쉼표로 구분)을 고친다 — **개발자 모드에서만**(v01.14, 아래) |
 | `Numbering` | `Start`(시작 정수) · `Pad 0`(자리수) | Start 부터 올라가는 번호, Pad 0 자리까지 0 을 채운다(Pad 2 → `00, 01, …`, 자리수를 넘으면 `123` 그대로) |
+
+**개발자 모드 / 배포본** (v01.14) — 정해진 규칙(Enum 칸)을 공유받은 사람이 바꾸지 못하게 한다.
+
+| | 개발자 모드 (`JUN_All/config.py` 의 `DEV_MODE = True`) | 배포본 (릴리즈 저장소) · `DEV_MODE = False` |
+|---|---|---|
+| `Values...` (칸 이름 · 값 목록 편집) | 있음 | **없음** |
+| Enum 칸의 규칙 콤보 | 바꿀 수 있음 | **잠김**(회색) — Custom 으로 바꿔 아무 글자나 넣는 길을 막는다 |
+| Enum 칸 `Delete Token` | 됨 | **안 됨** — `[WARN] Token N is a fixed rule and cannot be deleted.` |
+| 다른 칸의 규칙 콤보 | Custom / Enum / Numbering | Custom / Numbering (값 목록을 만들 수 없으니 Enum 을 뺀다) |
+| Enum 값 고르기 · Custom · Numbering · Add Token · Save | 됨 | 됨 |
+
+- 판정은 `app/config/dev_mode.py` — `launch.py` 와 같은 규칙: 툴 폴더 안에 `Framework` 가 동봉돼 있으면 배포본(항상 잠금),
+  아니면 `JUN_All/config.py` 의 `DEV_MODE`(경로로 읽는다 - `import config` 는 다른 툴의 config.py 를 집을 수 있다).
+- 프로파일 json 을 직접 고치는 것까지 막지는 않는다 — 화면에서 규칙을 바꾸는 길만 닫았다.
 
 > **팀 이름 규칙(SetXXX)** 은 프로파일 **`Dnable_Set_v001`** 로 짓는다 — 캐릭터 · 좌우 · 파츠 · 오브젝트종류가 Enum 칸이다.
 > 규칙과 쓰는 법은 [A00330_NamingRule_Set.md](A00330_NamingRule_Set.md) (팀 공유용).

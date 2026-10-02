@@ -11,6 +11,8 @@
 #   - Tokens  : 칸마다 규칙 콤보 (Custom / Enum / Numbering / Set's Name - 툴이 고른 것만).
 #               Enum (2026-10-02) : 정해진 값 중 하나를 콤보로 고른다. 칸 이름(role) 은 콤보 위에,
 #               값 목록 · 칸 이름은 `Values...` 로 고친다 (Save 를 눌러야 프로파일에 남는다).
+#               rules_editable=False (배포본, A00330 v01.14) : `Values...` 가 없고, Enum 칸은 규칙을 못 바꾸고
+#               지울 수 없다 - 공유받은 사람은 정해진 값 중에서 고르기만 한다.
 #               칸 머리(Token N)를 눌러 고른 뒤
 #                 Add Token    : 고른 칸 **오른쪽**에 새 칸
 #                 Delete Token : 고른 칸 삭제 (마지막 한 칸은 남긴다)
@@ -98,10 +100,11 @@ class TokenColumn(QFrame):
     Custom 글자 · Enum 값 콤보 · Numbering Start + Pad 0 · Set's Name(입력 없음 - 안내 글자만).
     """
 
-    def __init__(self, token, ruleset, on_changed, parent=None):
+    def __init__(self, token, ruleset, on_changed, rules_editable=True, parent=None):
         super().__init__(parent)
         self._ruleset = ruleset
         self._on_changed = on_changed
+        self._rules_editable = rules_editable
         self._pages = {}          # rule key -> stack index
         self._enum_values = []    # Enum 값 목록 (콤보 항목과 같다)
         self._enum_role = ""      # Enum 칸 이름 - 이름에는 안 들어간다
@@ -195,6 +198,7 @@ class TokenColumn(QFrame):
         self._inputs = (self.le_text, self.cmb_value, self.sp_start, self.sp_pad, self.le_setname)
 
         self.set_token(token)
+        self._apply_rule_lock()
 
         self.combo.currentIndexChanged.connect(self._on_rule_changed)
         self.le_text.textChanged.connect(self._emit)
@@ -240,6 +244,30 @@ class TokenColumn(QFrame):
 
     def _add_page(self, key, page):
         self._pages[key] = self.stack.addWidget(page)
+
+    def is_enum(self):
+        return self.combo.currentData() == "enum"
+
+    def _apply_rule_lock(self):
+        """rules_editable=False 면 정해진 규칙(Enum 칸)을 못 바꾸게 한다 (배포본).
+
+        - `Values...` 를 숨긴다 - 칸 이름 · 값 목록 편집 불가.
+        - Enum 칸은 규칙 콤보를 잠근다 - Custom 으로 바꿔 아무 글자나 넣는 길을 막는다.
+        - Enum 이 아닌 칸의 규칙 콤보에서는 Enum 을 뺀다 - 값 목록을 만들 수 없으니 빈 Enum 만 생긴다.
+        Enum 칸 삭제는 위젯(on_delete_token)이 막는다.
+        """
+        if self._rules_editable:
+            return
+        self.btn_values.hide()
+        if self.is_enum():
+            self.combo.setEnabled(False)
+            self.combo.setToolTip("This token is a fixed rule - pick one of its values below.")
+            return
+        index = self.combo.findData("enum")
+        if index >= 0:
+            self.combo.blockSignals(True)
+            self.combo.removeItem(index)
+            self.combo.blockSignals(False)
 
     def _show_page(self):
         self.stack.setCurrentIndex(self._pages.get(self.combo.currentData(), 0))
@@ -320,6 +348,9 @@ class JUN_mod_tokenName_qt_v01(QWidget):
                  False = 테두리 없이, Profile 과 Add / Delete Token 을 **한 줄**에 - 이미 그룹 박스
                  안에 넣을 때, 세로 공간을 아낄 때 (A00480 Export > Naming).
 
+    rules_editable : False = 배포본처럼 정해진 규칙을 못 바꾸게 (Enum 칸의 Values... 없음 · 규칙 잠금 ·
+                 삭제 불가). 툴이 개발자 모드 여부로 넘긴다 (A00330 v01.14).
+
     preview_row : 미리보기 줄 QHBoxLayout - 툴 버튼을 오른쪽에 붙일 자리.
 
     신호 tokensChanged(list) : 칸이 바뀔 때마다(프로파일 전환 포함) 지금 토큰 목록.
@@ -330,9 +361,11 @@ class JUN_mod_tokenName_qt_v01(QWidget):
 
     tokensChanged = Signal(list)
 
-    def __init__(self, store, log=None, log_prefix="Token", framed=True, parent=None):
+    def __init__(self, store, log=None, log_prefix="Token", framed=True, rules_editable=True,
+                 parent=None):
         super().__init__(parent)
         self.store = store
+        self._rules_editable = rules_editable
         self.ruleset = store.ruleset
         self._log_callback = log
         self._prefix = log_prefix
@@ -477,7 +510,8 @@ class JUN_mod_tokenName_qt_v01(QWidget):
         self._after_edit()
 
     def _insert_column(self, index, token):
-        column = TokenColumn(token, self.ruleset, self._on_token_changed)
+        column = TokenColumn(token, self.ruleset, self._on_token_changed,
+                             rules_editable=self._rules_editable)
         self.header_group.addButton(column.header)
         self.columns.insert(index, column)
         # 마지막 항목은 stretch 라서 칸은 그 앞에 넣는다
@@ -520,6 +554,10 @@ class JUN_mod_tokenName_qt_v01(QWidget):
         if index < 0:
             self._log("[WARN] {0} : click a token's header to pick the one to delete.".format(
                 self._prefix))
+            return
+        if not self._rules_editable and self.columns[index].is_enum():
+            self._log("[WARN] {0} : Token {1} is a fixed rule and cannot be deleted.".format(
+                self._prefix, index + 1))
             return
         column = self.columns.pop(index)
         self.header_group.removeButton(column.header)
