@@ -26,3 +26,6 @@ maya.cmds 툴은 `JUN_mod_menu.add_common_items('Help', tool_file=__file__)` 가
 **★ mayapy standalone 에서 `cmds.window`/`cmds.menu` 를 만들면 프로세스가 Fatal Error 로 죽는다**
 (untitled[Recovered].ma 저장 시도). cmds UI 는 헤드리스 검증 불가 — `cmds.menuItem` 을 가짜로 바꿔 인자만 확인하고
 실물은 마야 GUI 에서. (마야 GUI 확인 아직 — cmds 툴 7개 메뉴, 실제 마야 창의 PySide 메뉴 모양.)
+
+**공통 메뉴(Help) 오른쪽에 툴 메뉴를 두려면** `addMenu("제목")` 이 아니라 `addMenu(QMenu(...))` — 문자열 버전은 공통 메뉴 **왼쪽**에 끼운다,
+QMenu 버전은 Qt 기본 동작대로 맨 오른쪽. A00330 `Dev Mode` 메뉴(v01.26, 2026-10-02)가 이렇게 Help 오른쪽에 있다.

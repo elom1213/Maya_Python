@@ -1,5 +1,12 @@
 # Changelog — A00330_NamingTool
 
+## v01.26 (2026-10-02)
+**[Change] 개발 / 배포 화면 전환을 메뉴 바의 `Dev Mode` 메뉴로.**
+
+- 창 맨 위 메뉴 바 `Help` **오른쪽**에 `Dev Mode` 메뉴 - `Developer` / `Release (shared tool)` 중 하나(체크 표시).
+- Tokens 줄 오른쪽의 `Dev Mode` 토글 버튼은 없앴다. 개발자 모드에서만 메뉴가 있고 배포본에는 없다.
+- 코드에서 모드가 바뀌어도 메뉴 체크가 따라간다(`rulesEditableChanged`).
+
 ## v01.25 (2026-10-02)
 **[Change] Insert 탭 Position 슬라이더 색을 이 툴의 테마(brown_dark)로.** 홈 = 입력칸(#38352f, 테두리 #ad9276),
 손잡이 = 버튼(#9c8266, hover #ad9276, 누름 #856e55). v01.24 는 A00110 의 파란 색이었다.

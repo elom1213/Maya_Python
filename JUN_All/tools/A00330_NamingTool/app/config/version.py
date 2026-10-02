@@ -69,5 +69,8 @@
 
 #   - Quick Rename: Insert - the Position slider uses this tool's brown_dark theme colors (v01.25)
 
-VERSION = "01.25"
+#   - Dev Mode    : moved from the toggle button in the Tokens row to a "Dev Mode" menu right of
+#                   Help - Developer / Release (shared tool) (v01.26)
+
+VERSION = "01.26"
 LAST_UPDATE = "2026-10-02"

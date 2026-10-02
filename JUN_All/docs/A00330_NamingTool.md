@@ -165,12 +165,14 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 | 다른 칸의 규칙 콤보 | Custom / Enum / Numbering | Custom / Numbering (값 목록을 만들 수 없으니 Enum 을 뺀다) |
 | Enum 값 고르기 · Custom · Numbering · Profile 고르기 | 됨 | 됨 |
 | 다른 탭 (Set Rename · Copy Name · Quick Rename) | 됨 | **보이지 않는다**(v01.19, v01.17 은 회색으로 잠갔다) — Rename > Token 만 |
-| `Dev Mode` 토글 (Tokens 줄 오른쪽) | **있음** — 끄면 배포 화면을 그대로 본다, 다시 켜면 개발 화면 | 없음 |
+| 메뉴 바 `Dev Mode` (Help 오른쪽, v01.26) | **있음** — `Developer` / `Release (shared tool)` 중 하나를 고른다. Release 를 고르면 배포 화면을 그대로 본다 | 없음 (메뉴 자체가 없다) |
 
 - 판정은 `app/config/dev_mode.py` — `launch.py` 와 같은 규칙: 툴 폴더 안에 `Framework` 가 동봉돼 있으면 배포본(항상 잠금),
   아니면 `JUN_All/config.py` 의 `DEV_MODE`(경로로 읽는다 - `import config` 는 다른 툴의 config.py 를 집을 수 있다).
 - 프로파일 json 을 직접 고치는 것까지 막지는 않는다 — 화면에서 규칙을 바꾸는 길만 닫았다.
-- `Dev Mode` 를 바꿔도 지금 칸 · 저장 안 한 변경(Save 상태)은 그대로다. 탭을 숨길 때는 Rename > Token 탭으로 옮긴다.
+- v01.17 ~ v01.25 는 Tokens 줄 오른쪽 `Dev Mode` 토글 버튼이었다 - v01.26 에 메뉴 바로 옮겼다.
+  공용 메뉴 바의 `addMenu("제목")` 은 새 메뉴를 Help **왼쪽**에 끼우므로 QMenu 를 직접 넘겨 맨 오른쪽에 붙인다.
+- 모드를 바꿔도 지금 칸 · 저장 안 한 변경(Save 상태)은 그대로다. 탭을 숨길 때는 Rename > Token 탭으로 옮긴다.
 - 탭 숨김은 `QTabWidget.setTabVisible`(Qt 5.15+, Maya 2022+). 없는 버전에서는 탭을 빼고(removeTab) 다시 끼운다(insertTab) — 원래 자리 · 툴팁 그대로.
 
 > **팀 이름 규칙(SetXXX)** 은 프로파일 **`Dnable_Set_v001`** 로 짓는다 — 캐릭터 · 좌우 · 파츠 · 오브젝트종류가 Enum 칸이다.

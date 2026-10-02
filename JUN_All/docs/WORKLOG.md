@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00330 NamingTool — **Dev Mode 를 메뉴 바로 (Help 오른쪽)** (v01.25->01.26)
+- 요청: Dev Mode 버튼을 툴 맨 위 Help 메뉴 오른쪽의 별도 메뉴로, 메뉴에서 모드를 고르게.
+- `Dev Mode` 메뉴 = 배타 QActionGroup `Developer` / `Release (shared tool)`, 개발자 모드에서만 생성. 공용 메뉴 바 `addMenu("제목")` 은 Help **왼쪽**에 끼우므로 QMenu 를 직접 넘겨 오른쪽에. Tokens 줄 토글 버튼은 제거(mode_toggle=False).
+- 검증(mayapy 2024): dev 메뉴 순서 Help, Dev Mode · Release/Developer 전환 시 탭 · 버튼 따라감 · 코드 전환 시 체크 동기, 임시 배포본은 Help 만. 메뉴 캡처.
+
 > [!summary] A00330 NamingTool — **Position 슬라이더 색을 brown_dark 테마로** (v01.24->01.25)
 - A00110 의 파란 슬라이더 색 -> brown_dark.qss 값: 홈 #38352f + 테두리 #ad9276(입력칸), 손잡이 #9c8266 / hover #ad9276 / 누름 #856e55(버튼). 캡처 확인.
 

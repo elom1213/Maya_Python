@@ -32,6 +32,7 @@ from Framework.core import log_levels
 from Framework.themes.theme_manager import ThemeManager
 
 from tools.A00330_NamingTool.app.config.version import VERSION, LAST_UPDATE
+from tools.A00330_NamingTool.app.config import dev_mode
 from tools.A00330_NamingTool.app import core
 from tools.A00330_NamingTool.app.ui.token_tab import TokenTab
 
@@ -117,6 +118,9 @@ class MainWindow(QWidget):
         self.token_tab.token_widget.rulesEditableChanged.connect(self.apply_release_tabs)
         self.apply_release_tabs(self.token_tab.token_widget.rules_editable())
 
+        # v01.26 : 개발 / 배포 화면 전환은 메뉴 바의 `Dev Mode` 메뉴 (개발자 모드에서만 만든다)
+        self._build_dev_mode_menu()
+
         # 로그창
         log_group = QGroupBox("Log")
         log_layout = QVBoxLayout(log_group)
@@ -131,6 +135,42 @@ class MainWindow(QWidget):
     # ================================================================
     # 배포 화면 - Rename > Token 탭만 (v01.17, v01.19 숨김)
     # ================================================================
+
+    def _build_dev_mode_menu(self):
+        """메뉴 바 Help **오른쪽**의 `Dev Mode` 메뉴 - Developer / Release (shared tool) 중 하나 (v01.26).
+
+        개발자 모드(dev_mode.is_dev_mode)에서만 만든다 - 배포본에는 메뉴 자체가 없다.
+        공용 메뉴 바의 addMenu("제목") 은 새 메뉴를 공통 메뉴(Help) **왼쪽**에 끼우므로,
+        QMenu 를 직접 넘겨 Qt 기본 동작(맨 오른쪽에 붙이기)을 쓴다.
+        """
+        self.dev_mode_menu = None
+        if not dev_mode.is_dev_mode():
+            return
+        widget = self.token_tab.token_widget
+        menu = QMenu("Dev Mode", self.menu_bar)
+        menu.setToolTipsVisible(True)
+        group = QActionGroup(menu)
+        group.setExclusive(True)
+        self._act_developer = QAction("Developer", menu)
+        self._act_developer.setToolTip(
+            "Developer view - every tab, Values..., Add / Delete Token, Save / New / Rename / Delete.")
+        self._act_release = QAction("Release (shared tool)", menu)
+        self._act_release.setToolTip(
+            "The view people get in the shared tool - Rename > Token only, fixed rules.")
+        for action in (self._act_developer, self._act_release):
+            action.setCheckable(True)
+            group.addAction(action)
+            menu.addAction(action)
+        self._act_developer.triggered.connect(lambda _c=False: widget.set_rules_editable(True))
+        self._act_release.triggered.connect(lambda _c=False: widget.set_rules_editable(False))
+        # 다른 길로 바뀌어도(코드 · 위젯) 메뉴 체크를 맞춘다
+        widget.rulesEditableChanged.connect(self._sync_dev_mode_menu)
+        self._sync_dev_mode_menu(widget.rules_editable())
+        self.menu_bar.addMenu(menu)
+        self.dev_mode_menu = menu
+
+    def _sync_dev_mode_menu(self, editable):
+        (self._act_developer if editable else self._act_release).setChecked(True)
 
     def apply_release_tabs(self, editable):
         """editable=False (배포본 · Dev Mode 꺼짐) 면 Rename > Token 말고 다른 탭을 **숨긴다**.

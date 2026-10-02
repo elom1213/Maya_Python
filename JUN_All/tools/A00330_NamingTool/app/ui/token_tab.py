@@ -147,10 +147,11 @@ class TokenTab(QWidget):
         #          Enum 칸은 규칙 콤보가 잠기고 지울 수 없다. 값 중에서 고르기만 한다.
         # v01.17 : 배포본에서는 Add / Delete Token 도 없다. 개발자 모드면 `Dev Mode` 토글로
         #          개발 화면 / 배포 화면을 번갈아 본다(배포본에는 토글 자체가 없다).
+        # v01.26 : 토글은 Tokens 줄 버튼이 아니라 창 맨 위 메뉴 바의 `Dev Mode` 메뉴(main_window)로 옮겼다.
         is_dev = dev_mode.is_dev_mode()
         self.token_widget = JUN_mod_tokenName_qt_v01(
             tprefs.STORE, log=self._log, log_prefix="Token",
-            rules_editable=is_dev, mode_toggle=is_dev)
+            rules_editable=is_dev, mode_toggle=False)
         self.token_widget.tokensChanged.connect(self.schedule_preview)
         root.addWidget(self.token_widget)
 
