@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00330 NamingTool — **Token 탭 `Hierarchy` 체크** (v01.17->01.18)
+- 요청: 체크하면 Objects 리스트 오브젝트의 자식까지, 해제하면 그 오브젝트만 rename.
+- `build_hierarchy_groups(objects, hierarchy)` — False 면 [root] 만. `rename_tokens` · `preview_tokens` 가 넘겨받는다. UI 는 Rename 왼쪽 체크(기본 켜짐 = 예전 동작), 토글하면 Preview 갱신.
+- 검증(mayapy 2024, 그룹 2개 · 한쪽에 자식 2개): 켜짐 → 4개 rename, 꺼짐 → 그룹 2개만 · 자식 kid0/kid1 그대로, 둘 다 미리보기 = 실제.
+
 > [!summary] A00330 NamingTool — **배포 화면: Add/Delete Token 없음 · Token 탭만, 개발자 모드엔 `Dev Mode` 토글** (v01.16->01.17)
 - 요청: 배포모드에선 Add / Delete Token 빼기, 개발자 모드엔 Dev Mode 토글로 개발 / 배포 화면을 번갈아 보기. 이어서 배포모드에선 Rename > Token 말고 다른 탭 못 쓰게.
 - 공용 위젯: `mode_toggle` · `set_rules_editable()`(칸을 다시 만들되 지금 칸 · 저장 기준 유지) · 신호 `rulesEditableChanged`. 배포 화면은 Add / Delete Token 숨김.

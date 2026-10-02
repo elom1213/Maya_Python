@@ -111,13 +111,15 @@ class undo_chunk(object):
 # Tab 1 : Naming Dynamics  (JUN_cmd_rename_for_dyn_02 이식)
 # ================================================================
 
-def build_hierarchy_groups(objects):
+def build_hierarchy_groups(objects, hierarchy=True):
     """각 루트 오브젝트마다 [root, 자손...] 리스트를 만든다.
 
     원본 규칙 그대로:
       - allDescendents 를 모으되, 루트가 transform 이면 자손 중 transform 만 남긴다
         (shape 노드 제외).
       - [자손...] + [root] 후 reverse → [root, 얕은자손 ... 깊은자손] 순서.
+
+    hierarchy=False (v01.18, Token 탭 Hierarchy 체크 해제) : 자손을 모으지 않는다 - [root] 만.
     """
     cmds = _cmds()
     if cmds is None:
@@ -129,6 +131,9 @@ def build_hierarchy_groups(objects):
         # 짧은 이름은 모호하므로 fullPath 로 다뤄야 rename 이 실패하지 않는다.
         roots = cmds.ls(obj, long=True) or []
         for root in roots:
+            if not hierarchy:
+                groups.append([root])
+                continue
             descendants = cmds.listRelatives(
                 root, allDescendents=True, fullPath=True) or []
             if descendants and cmds.objectType(root) == "transform":
@@ -183,8 +188,10 @@ def rename_dynamics(objects, token1, token2, token3,
     return count
 
 
-def rename_tokens(objects, tokens):
+def rename_tokens(objects, tokens, hierarchy=True):
     """Rename > Token 탭 (v01.07). 토큰 규칙으로 오브젝트와 transform 자손을 일괄 rename.
+
+    hierarchy=False (v01.18) : 자손은 그대로 두고 리스트의 오브젝트만 바꾼다.
 
     `rename_dynamics` 의 일반화다 - 토큰 개수와 종류가 자유롭고, 번호를 세는 규칙은
     `token_ops` 에 있다(Numbering 1 개 = 전체 순번, 2 개 = 오브젝트 / 오브젝트 안의 노드).
@@ -204,7 +211,7 @@ def rename_tokens(objects, tokens):
     if cmds is None:
         return 0, ["[WARN] Maya not available."]
 
-    groups = build_hierarchy_groups(objects)
+    groups = build_hierarchy_groups(objects, hierarchy)
     names = token_ops.plan_names([len(g) for g in groups], tokens)
 
     # rename 전에 UUID 로 전부 잡아 둔다 - 부모를 바꾸면 자식 경로가 바뀐다.
@@ -238,8 +245,10 @@ def rename_tokens(objects, tokens):
 # Rename > Token 미리보기 (v01.15)
 # ================================================================
 
-def preview_tokens(objects, tokens):
+def preview_tokens(objects, tokens, hierarchy=True):
     """Rename 을 누르면 무엇이 어떻게 바뀌는지 - **씬은 바꾸지 않는다** (v01.15).
+
+    hierarchy : rename_tokens 와 같다 (v01.18).
 
     `rename_tokens` 와 같은 순서로 노드를 모으고(`build_hierarchy_groups`) 같은 이름을 계획한다.
     상태 규칙은 Quick Rename > Insert 와 같다(`set_rename_ops` 의 ST_*).
@@ -265,7 +274,7 @@ def preview_tokens(objects, tokens):
     tokens = token_ops.normalize_tokens(tokens)
     errors = token_ops.validate(tokens)
 
-    groups = build_hierarchy_groups(objects)
+    groups = build_hierarchy_groups(objects, hierarchy)
     if errors:
         names = [[""] * len(g) for g in groups]
     else:

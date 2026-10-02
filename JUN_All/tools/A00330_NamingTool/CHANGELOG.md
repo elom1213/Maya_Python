@@ -1,5 +1,12 @@
 # Changelog — A00330_NamingTool
 
+## v01.18 (2026-10-02)
+**[Add] Token 탭 - `Hierarchy` 체크 (Rename 왼쪽).**
+
+- 켜짐(기본, 예전 동작): 리스트 오브젝트와 그 transform 자손까지 rename. 꺼짐: 리스트 오브젝트만, 자손은 그대로.
+- Preview 표도 체크를 따라간다. `core.build_hierarchy_groups` · `rename_tokens` · `preview_tokens` 에 `hierarchy` 인자(기본 True).
+- 팀 문서 5-2: 지오메트리 아래에 다른 오브젝트가 붙어 있으면 Hierarchy 를 끈다.
+
 ## v01.17 (2026-10-02)
 **[Change] 배포 화면 - Add / Delete Token 없음, Rename > Token 탭만 쓸 수 있다. 개발자 모드에 `Dev Mode` 토글.**
 

@@ -119,6 +119,8 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 4. 오른쪽 **Preview 표**(v01.15)에서 결과를 본다 — Rename 으로 바뀔 노드 **전부**(오브젝트 + transform 자손)가 계층 그대로
    `Current` → `New name` 과 `Status` 로 나온다. 리스트나 토큰 칸이 바뀌면 바로 다시 계산한다(씬은 그대로).
 5. **Rename** → 각 오브젝트와 그 transform 자손이 토큰을 `_` 로 이은 이름으로 바뀐다. **Undo 한 번**으로 되돌아간다.
+   Rename 왼쪽 **`Hierarchy`**(v01.18) 를 끄면 **리스트의 오브젝트만** 바뀌고 자손은 그대로다(기본은 켜짐 = 예전 동작).
+   Preview 표도 체크를 따라간다.
    바뀐 뒤 Objects 리스트는 새 이름으로 갱신된다(v01.15).
 
 **Preview 표의 Status** (v01.15) — Quick Rename > Insert 와 같은 규칙.

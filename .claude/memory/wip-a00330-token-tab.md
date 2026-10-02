@@ -41,3 +41,4 @@ Token 칸마다 규칙 콤보(A00480 Export Naming 처럼), Add/Delete Token 으
 자식 번호가 **역순**(acc2=02, acc1=03 …)으로 나온다, 기존 동작 그대로. `name taken` 은 부모별 이름 칸을 씬 그대로 채우고
 rename 순서대로 옛 이름 빼고 새 이름 넣는 **흉내**로 판정. Maya 2024 에서 미리보기 = 실제 결과.
 같이 고친 것: 잠긴/레퍼런스 노드에서 `cmds.rename` RuntimeError 로 Rename 이 멈추던 것 → 건너뛰고 [Warning]. Rename 뒤 리스트 갱신.
+**v01.18 — `Hierarchy` 체크**(Rename 왼쪽, 기본 켜짐 = 예전 동작): 끄면 `build_hierarchy_groups(..., hierarchy=False)` 가 [root] 만 → 리스트 오브젝트만 rename.

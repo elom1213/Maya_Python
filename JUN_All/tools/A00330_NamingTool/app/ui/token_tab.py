@@ -22,6 +22,7 @@
 #          Rename 을 누르면 바뀔 노드 전부(오브젝트 + transform 자손)를 계층 그대로 보여 주고
 #          Current / New name / Status 를 적는다. 리스트나 토큰이 바뀌면 다시 계산한다 - 씬은 그대로.
 #          계산은 core.preview_tokens (rename_tokens 와 같은 순서 · 같은 이름).
+# v01.18 : Rename 왼쪽 **Hierarchy** 체크 - 켜면 자손까지(예전 동작, 기본), 끄면 리스트 오브젝트만.
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
@@ -152,18 +153,35 @@ class TokenTab(QWidget):
         self.token_widget.tokensChanged.connect(self.schedule_preview)
         root.addWidget(self.token_widget)
 
+        # v01.18 : Hierarchy - 켜면 리스트 오브젝트의 transform 자손까지, 끄면 리스트 오브젝트만.
+        #          기본은 켜짐(예전 동작 그대로). Preview 도 따라간다.
+        self.chk_hierarchy = QCheckBox("Hierarchy")
+        self.chk_hierarchy.setChecked(True)
+        self.chk_hierarchy.setToolTip(
+            "On  : rename each listed object AND its transform descendants.\n"
+            "Off : rename only the listed objects - their children keep their names.")
+        self.chk_hierarchy.toggled.connect(self.schedule_preview)
+
         self.btn_rename = QPushButton("Rename")
         self.btn_rename.setMinimumHeight(32)
         self.btn_rename.setToolTip(
-            "Rename each listed object and its transform descendants with the tokens,\n"
-            "joined by '_'. With two Numbering tokens the first counts objects and the\n"
-            "second counts nodes inside each object (restarting per object).\n"
-            "One undo step.")
+            "Rename each listed object (and its transform descendants when Hierarchy\n"
+            "is on) with the tokens, joined by '_'. With two Numbering tokens the first\n"
+            "counts objects and the second counts nodes inside each object\n"
+            "(restarting per object). One undo step.")
         self.btn_rename.clicked.connect(self.on_rename)
-        root.addWidget(self.btn_rename)
+
+        rename_row = QHBoxLayout()
+        rename_row.addWidget(self.chk_hierarchy)
+        rename_row.addWidget(self.btn_rename, stretch=1)
+        root.addLayout(rename_row)
 
     def tokens(self):
         return self.token_widget.tokens()
+
+    def hierarchy(self):
+        """Hierarchy 체크 - True 면 자손까지 (v01.18)."""
+        return self.chk_hierarchy.isChecked()
 
     # ================================================================
     # Preview (v01.15)
@@ -179,7 +197,7 @@ class TokenTab(QWidget):
         objects = self.tsl.get_all_nodes()
         if not objects:
             return
-        rows, _errors = core.preview_tokens(objects, self.tokens())
+        rows, _errors = core.preview_tokens(objects, self.tokens(), self.hierarchy())
 
         dark = ThemeManager.is_dark_theme()
         st = core.set_rename_ops
@@ -234,7 +252,7 @@ class TokenTab(QWidget):
             return
 
         with core.undo_chunk():
-            count, notes = core.rename_tokens(objects, tokens)
+            count, notes = core.rename_tokens(objects, tokens, self.hierarchy())
         for note in notes:
             self._log(note)
         self._log("Token : {0} node(s) renamed (profile '{1}').".format(

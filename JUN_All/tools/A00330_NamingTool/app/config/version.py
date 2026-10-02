@@ -50,5 +50,8 @@
 #                   tabs are locked). In developer mode a Dev Mode toggle switches between the
 #                   developer view and the release view (v01.17)
 
-VERSION = "01.17"
+#   - Token       : Hierarchy check box next to Rename - on: the listed objects and their transform
+#                   descendants (as before), off: only the listed objects (v01.18)
+
+VERSION = "01.18"
 LAST_UPDATE = "2026-10-02"
