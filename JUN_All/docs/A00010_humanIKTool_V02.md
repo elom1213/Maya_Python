@@ -12,7 +12,7 @@ HumanIK **캐릭터라이제이션**(어느 조인트가 어느 슬롯인지 정
 끝나는 `Mirror` 탭이 있고, 조인트뿐 아니라 **Custom Rig 의 컨트롤러 매핑**도 같은 방식으로
 미러한다.
 
-- 버전: `v02.04` (`app/config/version.py`)
+- 버전: `v02.05` (`app/config/version.py`)
 - 위치: `JUN_All/tools/A00010_humanIKTool_V02`
 - 형태: 아키텍처 (B) — Maya 내 PySide 툴
 
@@ -52,7 +52,7 @@ HumanIK Character Node      <- Assign / Mirror 두 탭이 공유한다
 1. `Joints (order = slot order)` 리스트에 조인트를 담는다. **리스트 순서가 슬롯 순서**이므로
    `Up` / `Down` 으로 맞춘다.
 2. `Bone Chain` 에서 체인을 고른다.
-3. `Assign Joints`.
+3. `Assign Joints`. 열려 있는 HumanIK 창의 Definition 탭에 바로 반영된다(v02.05 — 전에는 탭을 바꿔야 보였다).
 
 | 체인 | 슬롯 순서 |
 |---|---|
@@ -275,7 +275,8 @@ Maya 2024 기준 **212개**(`0~171` 정의 슬롯, `172~211` Leaf roll).
 | `GetHIKNodeName(id)` · `hikGetNodeCount()` | mayaHIK 플러그인 | 슬롯 테이블 |
 | `hikGetControlRig(char)` | mayaHIK 플러그인 | Control Rig 존재 확인 |
 | `RetargeterAddMapping / DeleteMapping / Connect / Disconnect` | `retargeter.mel` | Custom Rig 매핑 |
-| `hikUpdateDefinitionUI` · `hikUpdateCustomRigUI` | `hik*UI.mel` | HIK 창 갱신(`catchQuiet` 로 감쌈) |
+| `hikUpdateCharacterControlsUI(false)` · `hikUpdateCharacterControlsUIEvalDeferred` | `hikCharacterControlsUI.mel` | Assign · Mirror 뒤 HIK 창 갱신 — 탭 전환과 같은 경로(v02.05, `exists` 확인 후 호출). `hikUpdateDefinitionUI` 만으로는 Definition 탭이 안 바뀌었다 |
+| `hikUpdateCustomRigUI` | `hik*UI.mel` | Custom Rig 창 갱신(`catchQuiet` 로 감쌈) |
 
 ---
 

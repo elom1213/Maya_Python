@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00010 humanIKTool_V02 — **Assign Joints 직후 HumanIK 창 즉시 갱신** (v02.04->02.05)
+- 요청: Assign Joints 뒤 HumanIK 창이 Definition 탭을 보고 있어도 갱신이 안 돼 Controls 로 갔다가 돌아와야 보임 -> 버튼 누르면 바로 보이게.
+- 원인: `assign_joints` 에 HIK 창 갱신 호출이 없었고, Mirror 의 `hikUpdateDefinitionUI` 단독 호출은 현재 캐릭터를 씬에서 다시 읽지 않는다. 탭 전환은 `hikUpdateCharacterControlsUI(false)` 를 탄다(Maya 2024 `hikCharacterControlsUI.mel` 확인).
+- `refresh_hik_ui()` = `hikUpdateCharacterControlsUI(false)` 즉시 + `hikUpdateCharacterControlsUIEvalDeferred()`, 둘 다 `exists` 확인 후. Assign · Mirror 공통.
+- 검증: 컴파일만. 마야 GUI 에서 HIK 창을 띄운 확인은 아직.
+
 > [!summary] A00240 PathTool — **Tree 탭 백그라운드 선읽기 + 빈 폴더 화살표 미리 제거** (v01.16->01.17)
 - 요청: v01.16 보고의 개선안 1(선읽기) · 2(빈 폴더 미리 확인) 추가.
 - `core/prefetcher.py` 신설 - 작업 스레드 4 개, LIFO(최근 요청 먼저), 세대(`reset`)로 이전 빌드 결과 폐기. Qt 비의존.

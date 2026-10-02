@@ -1,5 +1,10 @@
 # Changelog — A00010_humanIKTool_V02
 
+## v02.05 (2026-10-02)
+**[Fix] `Assign Joints` 를 눌러도 HumanIK 창 Definition 탭이 바로 갱신되지 않던 것.**
+- Controls 탭으로 갔다가 Definition 으로 돌아와야 할당이 보였다. Assign 경로에는 HIK 창 갱신 호출이 아예 없었고, Mirror 가 부르던 `hikUpdateDefinitionUI` 만으로는 부족했다.
+- 이제 Assign · Mirror 둘 다 탭 전환이 타는 경로 `hikUpdateCharacterControlsUI(false)` 를 바로 한 번 부르고, `evalDeferred` 로 한 번 더 부른다. HIK 창이 닫혀 있으면 아무 일도 하지 않는다.
+
 ## v02.04 (2026-10-02)
 **[Change] `Neck 1 to head` / `Neck 2 to head` -> `Neck to head` 하나.**
 - Joints 리스트 `[jnt_01 ... jnt_n]` 중 `jnt_01` ~ `jnt_(n-1)` 은 목 체인(Neck, Neck1, Neck2 ... 슬롯 순서), 마지막 `jnt_n` 은 Head.

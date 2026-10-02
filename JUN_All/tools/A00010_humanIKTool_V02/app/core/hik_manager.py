@@ -17,6 +17,9 @@
 #          (Neck, Neck1, Neck2 ... 슬롯 순서), 마지막 1 개 = Head. 목 슬롯은 HumanIK 에 10 개(Neck ~ Neck9).
 #          Mirror : same_root - HIK 에 할당된 조인트의 최상위 조인트 아래에서만 반대쪽을 찾는다.
 #
+# v02.05 : Assign Joints 직후 HumanIK 창 Definition 탭이 갱신되지 않던 것 - refresh_hik_ui() 가
+#          탭 전환과 같은 경로(hikUpdateCharacterControlsUI)를 즉시 + evalDeferred 로 부른다.
+#
 # CopyKeyManager(A00110) 와 동일한 스타일: 정적 메서드 + undoInfo 청크 + (count, msg) 반환.
 
 import maya.cmds as cmds
@@ -189,6 +192,9 @@ class HIKManager:
                 else:
                     failed += 1
                     print("[HIK assign] FAILED {0} -> slot {1}: {2}".format(jnt, slot_id, why))
+
+        # v02.05 : 열려 있는 HumanIK 창(Definition 탭)에 바로 보이게
+        HIKManager.refresh_hik_ui()
 
         msg = "[{0}] {1} joint(s) assigned to '{2}'.".format(chain_label, done, hik_node)
         if failed:
@@ -376,9 +382,17 @@ class HIKManager:
     def refresh_hik_ui():
         """HumanIK Character Controls 창이 떠 있으면 정의 표시를 갱신한다.
 
-        창이 없을 때 호출하면 MEL 이 에러를 내므로 catchQuiet 으로 감싼다.
+        v02.05 : hikUpdateDefinitionUI 만으로는 Definition 탭이 안 바뀌었다(탭을 Controls 로 갔다가
+        돌아와야 보임). 탭 전환이 타는 경로는 hikUpdateCharacterControlsUI(false) 다 -
+        현재 캐릭터를 씬에서 다시 읽고(hikUpdateCurrentCharacterFromScene) 보이는 탭을 다시 그린다.
+        그걸 즉시 한 번, setCharacterObject 가 남긴 콜백이 끝난 뒤(evalDeferred) 한 번 더 부른다.
+        창이 없으면 그 proc 이 스스로 return 한다. HIK 스크립트가 아직 안 읽혔으면 exists 로 건너뛴다.
         """
-        try:
-            mel.eval('catchQuiet( `hikUpdateDefinitionUI` );')
-        except Exception:
-            pass
+        for proc, call in (("hikUpdateCharacterControlsUI", "hikUpdateCharacterControlsUI(false);"),
+                           ("hikUpdateCharacterControlsUIEvalDeferred",
+                            "hikUpdateCharacterControlsUIEvalDeferred();")):
+            try:
+                if mel.eval('exists "{0}"'.format(proc)):
+                    mel.eval(call)
+            except Exception:
+                pass
