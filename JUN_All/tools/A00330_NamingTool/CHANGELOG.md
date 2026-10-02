@@ -1,5 +1,13 @@
 # Changelog — A00330_NamingTool
 
+## v01.24 (2026-10-02)
+**[Add] Quick Rename > Insert - Position 슬라이더.**
+
+- Position 줄 = [슬라이더] [숫자 칸] — A00110_animTool_V02 Timing > Stagger 의 `Offset per Item` 과 같은 모양 · 스타일.
+  슬라이더를 끄는 동안 Preview 가 따라와 글자가 들어갈 자리를 보며 고른다.
+- 범위는 리스트에서 가장 긴 이름에 맞춘다(n 글자 -> `-(n+1)` ~ `n`, 빈 리스트 20). 이름 밖 자리는 숫자 칸으로.
+- 자리 설명(`end` 등)은 Position 줄 아래로. 창 최소 크기는 그대로(820 x 916).
+
 ## v01.23 (2026-10-02)
 **[Add] 프로파일 `Custom` - 배포본에서도 칸을 더하고 뺄 수 있는 특수 프로파일.**
 

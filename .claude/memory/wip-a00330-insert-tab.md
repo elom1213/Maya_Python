@@ -22,3 +22,6 @@ metadata:
   칸 글자는 비우고(겹쳐 그려짐) 이름은 `UserRole` 에. `resizeColumnToContents` 는 얹은 위젯 폭도 센다(실측).
   코어 행의 `insert_span` = new_name 안의 [start, end), 네임스페이스 길이+1 포함.
 - 검증 mayapy 39항목 통과. **마야 UI 실사용 확인은 아직.**
+
+**v01.24 (2026-10-02) — Position 슬라이더** (A00110 Stagger `Offset per Item` 모양 · 스타일 복사). 범위 = 리스트에서 가장 긴 이름 n -> -(n+1)..n
+(0 = 앞, -1 = 끝), 숫자 칸과 동기, 이름 밖 값은 숫자 칸으로만.

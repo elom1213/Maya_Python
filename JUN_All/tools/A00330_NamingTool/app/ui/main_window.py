@@ -39,6 +39,31 @@ from tools.A00330_NamingTool.app.ui.token_tab import TokenTab
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
 WINDOW_OBJECT_NAME = "JUN_A00330_NamingTool_window"
 
+# Quick Rename > Insert 의 Position 슬라이더 (v01.24) - A00110_animTool_V02 Timing > Stagger 의
+# `Offset per Item` 과 같은 모양: [이름] [슬라이더] [숫자 칸]. 테마 qss 가 슬라이더 홈을 안 그려
+# 바탕에 묻히므로 직접 그린다(A00110 STAGGER_SLIDER_STYLE 과 같은 값).
+INS_POSITION_SLIDER_STYLE = (
+    "QSlider:horizontal { min-height: 20px; }"
+    "QSlider::groove:horizontal {"
+    " height: 6px; margin: 0 4px;"
+    " background: #34373d; border: 1px solid #7f9ec8; border-radius: 3px; }"
+    "QSlider::sub-page:horizontal, QSlider::add-page:horizontal {"
+    " background: #34373d; border: 1px solid #7f9ec8; border-radius: 3px; }"
+    "QSlider::handle:horizontal {"
+    " width: 12px; margin: -6px 0;"
+    " background: #a9c4e6; border: 1px solid #7f9ec8; border-radius: 3px; }"
+    "QSlider::handle:horizontal:hover { background: #ffffff; }"
+    "QSlider::groove:horizontal:disabled,"
+    " QSlider::sub-page:horizontal:disabled,"
+    " QSlider::add-page:horizontal:disabled {"
+    " background: #2f2f2f; border: 1px solid #454545; }"
+    "QSlider::handle:horizontal:disabled {"
+    " background: #5a5a5a; border: 1px solid #454545; }"
+)
+
+#: 리스트가 비었을 때 슬라이더가 담당할 이름 길이
+INS_POSITION_DEFAULT_LENGTH = 20
+
 
 class MainWindow(QWidget):
 
@@ -473,18 +498,39 @@ class MainWindow(QWidget):
         self.ins_le_text.textChanged.connect(self._ins_update_preview)
         form.addWidget(self.ins_le_text, 0, 1, 1, 2)
 
+        # Position = 슬라이더 + 숫자 칸 (v01.24, A00110 `Offset per Item` 과 같은 모양).
+        # 둘은 같은 값을 가리킨다. 슬라이더는 리스트에서 가장 긴 이름의 자리(-(n+1) .. n)만 담당하고,
+        # 그 밖의 값(이름 밖 - 끝 / 앞에 붙는다)은 숫자 칸으로 넣는다.
         form.addWidget(QLabel("Position"), 1, 0)
+        self.ins_sld_position = QSlider(Qt.Horizontal)
+        self.ins_sld_position.setTickPosition(QSlider.TicksBelow)
+        self.ins_sld_position.setSingleStep(1)
+        self.ins_sld_position.setPageStep(1)
+        self.ins_sld_position.setMinimumWidth(140)
+        self.ins_sld_position.setStyleSheet(INS_POSITION_SLIDER_STYLE)
+        self.ins_sld_position.setToolTip(
+            "Drag to move where the text goes - the preview follows.\n"
+            "Right half: counted from the front (0 = front).\n"
+            "Left half: counted from the end (-1 = end).\n"
+            "The range follows the longest listed name.")
+        form.addWidget(self.ins_sld_position, 1, 1)
+
         self.ins_sb_position = QSpinBox()
         self.ins_sb_position.setRange(-999, 999)
         self.ins_sb_position.setValue(0)
+        self.ins_sb_position.setFixedWidth(78)
         self.ins_sb_position.setToolTip(position_tip)
-        self.ins_sb_position.valueChanged.connect(self._ins_update_preview)
-        form.addWidget(self.ins_sb_position, 1, 1)
+        self.ins_sb_position.valueChanged.connect(self._ins_on_position_spin)
+        form.addWidget(self.ins_sb_position, 1, 2)
+
         self.ins_lbl_position = QLabel("")
         self.ins_lbl_position.setToolTip(position_tip)
-        form.addWidget(self.ins_lbl_position, 1, 2)
-        form.setColumnStretch(2, 1)
+        form.addWidget(self.ins_lbl_position, 2, 1, 1, 2)
+        form.setColumnStretch(1, 1)
         root.addLayout(form)
+
+        self._ins_set_slider_range(INS_POSITION_DEFAULT_LENGTH)
+        self.ins_sld_position.valueChanged.connect(self._ins_on_position_slider)
 
         self.ins_btn_apply = QPushButton("Apply")
         self.ins_btn_apply.setMinimumHeight(32)
@@ -514,6 +560,37 @@ class MainWindow(QWidget):
             self.ins_le_text.text(),
             self.ins_sb_position.value())
 
+    # ---- Position 슬라이더 <-> 숫자 칸 (v01.24) ----
+
+    def _ins_set_slider_range(self, length):
+        """슬라이더가 길이 length 인 이름의 모든 자리를 담당하게 한다: -(length+1) .. length.
+
+        양수 = 앞에서 센 자리(0 = 맨 앞, length = 맨 끝), 음수 = 끝에서 센 자리(-1 = 맨 끝,
+        -(length+1) = 맨 앞) - 숫자 칸 규칙 그대로다. 눈금은 왼쪽 끝과 0 (0 = 맨 앞을 눈으로 찾게).
+        """
+        length = max(1, int(length))
+        sld = self.ins_sld_position
+        sld.blockSignals(True)
+        sld.setRange(-(length + 1), length)
+        sld.setTickInterval(length + 1)
+        sld.setValue(max(sld.minimum(), min(sld.maximum(), self.ins_sb_position.value())))
+        sld.blockSignals(False)
+
+    def _ins_on_position_slider(self, value):
+        # 슬라이더 -> 숫자 칸. 숫자 칸의 valueChanged 가 미리보기를 다시 그린다.
+        if self.ins_sb_position.value() != value:
+            self.ins_sb_position.setValue(value)
+
+    def _ins_on_position_spin(self, value):
+        # 숫자 칸 -> 슬라이더(범위 밖 값이면 끝에 붙여 둔다) -> 미리보기
+        sld = self.ins_sld_position
+        clamped = max(sld.minimum(), min(sld.maximum(), value))
+        if sld.value() != clamped:
+            sld.blockSignals(True)
+            sld.setValue(clamped)
+            sld.blockSignals(False)
+        self._ins_update_preview()
+
     def _ins_update_preview(self, *args):
         """미리보기 표를 다시 채운다. 씬은 건드리지 않는다."""
         if not hasattr(self, "ins_btn_apply"):
@@ -523,6 +600,9 @@ class MainWindow(QWidget):
         self.ins_lbl_position.setText(self._ins_position_hint(position))
 
         rows = self._ins_rows()
+        # 슬라이더 범위 = 리스트에서 가장 긴 이름 (v01.24). 리스트가 비면 기본 길이.
+        longest = max((len(r["leaf"]) for r in rows), default=0)
+        self._ins_set_slider_range(longest or INS_POSITION_DEFAULT_LENGTH)
         dark = ThemeManager.is_dark_theme()
         colors = {
             core.insert_ops.ST_OK: log_levels.color("OK", dark),

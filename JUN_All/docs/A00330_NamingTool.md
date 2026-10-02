@@ -277,7 +277,8 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 Selection 탭의 Front Insert / Last Add 가 앞·끝만 되는 것을 **임의의 자리**로 넓힌 것이다.
 
 1. 씬에서 오브젝트를 고르고 **Select Objects**(또는 Add)로 왼쪽 `Objects` 리스트에 담는다.
-2. **Text** 에 넣을 글자, **Position** 에 자리를 적는다.
+2. **Text** 에 넣을 글자를 적고, **Position** 은 **슬라이더를 끌거나**(v01.24) 오른쪽 숫자 칸에 적는다.
+   슬라이더를 끄는 동안 오른쪽 Preview 가 계속 따라와서, 글자가 들어갈 자리를 눈으로 보며 고른다.
 3. 오른쪽 **Preview** 표에 `Current` → `New name` 과 `Status` 가 **바로** 보인다
    (Text · Position · 리스트가 바뀔 때마다 다시 계산한다). 이때 씬은 그대로다.
    `New name` 에서 **새로 넣은 글자만 초록색**이다(`arm_`**`Up`**`jnt`) — 자리가 맞는지 한눈에 보인다.
@@ -294,7 +295,11 @@ Selection 탭의 Front Insert / Last Add 가 앞·끝만 되는 것을 **임의�
 | `-4` | 뒤 3 글자 앞 | `arm_Xjnt` |
 | `99` / `-99` | 이름 밖 → 끝 / 앞에 붙임 (Status 에 적힘) | `arm_jntX` / `Xarm_jnt` |
 
-- Position 칸 옆에 뜻(`front` / `after the first 3 character(s)` …)이 한 줄로 나온다.
+- Position 줄 아래에 뜻(`front` / `after the first 3 character(s)` …)이 한 줄로 나온다.
+- **슬라이더**(v01.24) — A00110_animTool_V02 Timing > Stagger 의 `Offset per Item` 과 같은 모양(슬라이더 + 숫자 칸, 같은 홈 · 손잡이 색).
+  둘은 같은 값이다. 슬라이더 범위는 **리스트에서 가장 긴 이름**에 맞춘다 — 이름이 n 글자면 `-(n+1)` ~ `n`
+  (오른쪽 절반 = 앞에서 센 자리, 왼쪽 절반 = 끝에서 센 자리), 리스트가 비면 20 글자 기준. 리스트가 바뀌면 다시 맞춘다.
+  이름 밖 자리(예 `99`)는 숫자 칸으로만 넣고, 그때 슬라이더는 끝에 붙어 있다.
 - 이름 밖을 가리켜도 막지 않는다 — 길이가 다른 여러 이름에 한 번에 쓰기 때문이다. 대신 그 행의 Status 에
   `position is outside the name - put at the end` 로 적는다.
 - **DAG 경로와 네임스페이스는 세지 않고 그대로 둔다** — `NS:hand` 에 `-1`,`_L` → `NS:hand_L`.

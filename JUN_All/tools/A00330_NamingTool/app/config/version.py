@@ -64,5 +64,8 @@
 #   - Token       : new profile "Custom" - "free_tokens": true lets anyone (also in the shared tool)
 #                   add / delete tokens; save / rename / delete of profiles stay locked (v01.23)
 
-VERSION = "01.23"
+#   - Quick Rename: Insert - Position slider next to the number field (like A00110 Stagger
+#                   Offset per Item); its range follows the longest listed name (v01.24)
+
+VERSION = "01.24"
 LAST_UPDATE = "2026-10-02"

@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00330 NamingTool — **Quick Rename > Insert Position 슬라이더** (v01.23->01.24)
+- 요청: Position 에 가로 슬라이더, A00110_animTool_V02 Stagger `Offset per Item` 과 같은 UI.
+- [슬라이더(늘어남)] [숫자 칸 78px] + A00110 `STAGGER_SLIDER_STYLE` 같은 값. 슬라이더 <-> 숫자 칸 동기(blockSignals), 범위 = 가장 긴 이름 n -> -(n+1)..n, 범위 밖 숫자는 슬라이더를 끝에.
+- 검증(mayapy 2024, arm_jnt / hand + `X`): 범위 -8..7, 슬라이더 3 / -1 / -4 / -8 -> 숫자 · 미리보기 일치, 숫자 99 -> 슬라이더 7 · `arm_jntX`, Apply = 미리보기. 창 최소 820x916 전후 같음.
+
 > [!summary] A00330 NamingTool — **`Dnable_Set_v001` 업데이트를 배포용에 반영** (프로파일 데이터, 버전 변경 없음)
 - 사용자가 개발 PC 에서 고친 프로파일: 넘버링 칸 Numbering(1, 2) -> **Custom `xx`**(나머지는 키 순서만 다름). 처음 이름 `CHN_n_SetXXX_Top_xx_geo`.
 - 팀 문서 5-1 · 5-2 반대로 고침: 하나뿐이면 그대로 `xx`, 여러 개면 Numbering 으로 바꾸고 **Start 1 · Pad 0 2** (바꾼 직후는 0 · 0).
