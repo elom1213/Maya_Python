@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00480 FileTool — **Naming 토큰에 Enum + 토큰 규칙 공용화(`COMMON_RULES`)** (v01.08->01.09)
+- 요청: A00480 Token 에도 Enum, A00330 과 같은 규칙을 다른 툴도 함께 쓰는 공용 규칙으로.
+- `Framework/core/token_naming.py`: `COMMON_RULES = (Custom, Enum, Numbering)` 신설, `TokenRuleSet` 기본값. `MAYA_NODE_RULES = COMMON_RULES`, `FILE_NAME_RULES = COMMON_RULES + Set's Name`.
+- 검증: A00330 규칙 그대로, A00480 콤보 Custom / Enum / Numbering / Set's Name, `names_for` -> `SK_SIN_Set008_grp_001`, Enum 값에 파일명 금지 문자 검사(`a:b` 막음, `a-b` 통과), 위젯 Enum 칸 · Values... 표시.
+- A00330 릴리즈의 Framework 사본도 같은 파일로(동작 차이 없음). A00480 은 릴리즈 저장소에 없다.
+
 > [!summary] A00330 NamingTool — **Dev Mode 를 메뉴 바로 (Help 오른쪽)** (v01.25->01.26)
 - 요청: Dev Mode 버튼을 툴 맨 위 Help 메뉴 오른쪽의 별도 메뉴로, 메뉴에서 모드를 고르게.
 - `Dev Mode` 메뉴 = 배타 QActionGroup `Developer` / `Release (shared tool)`, 개발자 모드에서만 생성. 공용 메뉴 바 `addMenu("제목")` 은 Help **왼쪽**에 끼우므로 QMenu 를 직접 넘겨 오른쪽에. Tokens 줄 토글 버튼은 제거(mode_toggle=False).

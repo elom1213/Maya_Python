@@ -34,5 +34,7 @@
 # 01.08  Naming 토큰 칸을 고쳐도 프로파일에 저장하지 않는다 - Profile 줄의 Save 버튼을 눌러야 저장(기본이 된다).
 #        예전엔 고칠 때마다 바로 저장돼서, 다시 열면 고친 칸이 그 프로파일의 기본으로 나왔다. 공용 위젯 수정.
 
-VERSION = "01.08"
-LAST_UPDATE = "2026-10-01"
+# 01.09  Naming 토큰 규칙에 Enum (정해진 값 중 고르기) - A00330 과 같은 공용 규칙 COMMON_RULES (Framework.core.token_naming).
+
+VERSION = "01.09"
+LAST_UPDATE = "2026-10-02"

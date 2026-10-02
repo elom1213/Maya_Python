@@ -45,4 +45,7 @@ metadata:
 - **`"free_tokens": true` 프로파일 = 배포 화면에서도 칸 추가 · 삭제** (A00330 `Custom`, v01.23). `store.profile_flag`, `tokens_addable()`.
   `save_profile` 은 json 의 다른 키를 지킨다 — 토큰만 덮어쓰면 개발자 Save 가 특수 표시를 지운다.
 
+- **`COMMON_RULES` = Custom · Enum · Numbering — 모든 토큰 툴 공용** (2026-10-02, 사용자 요청 "공용 규칙으로"). `TokenRuleSet` 기본값,
+  A00330 = COMMON_RULES, A00480 = COMMON_RULES + Set's Name(A00480 v01.09). 새 규칙을 모든 툴에 주려면 여기에.
+
 관련: [[wip-a00330-token-tab]], [[wip-a00480-filetool]], [[offscreen-size-needs-theme]]

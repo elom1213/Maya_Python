@@ -1,5 +1,12 @@
 # Changelog — A00480_FileTool
 
+## v01.09 (2026-10-02)
+- **Export > Naming: new token rule `Enum`** - pick one of a fixed list of values instead of typing
+  (`Values...` edits the token name and the list). It is the same rule as A00330 Token's Enum.
+  - The shared token rules are now one set, `COMMON_RULES` (Custom / Enum / Numbering) in
+    `Framework/core/token_naming.py`; this tool adds Set's Name on top. New token tools get Enum by default.
+  - Enum values are checked like the rest of a file name (no `\ / : * ? " < > |`).
+
 ## v01.08 (2026-10-01)
 - **Export > Naming: editing a token no longer saves it to the profile.** A new **Save** button on the
   Profile row saves the tokens shown now as that profile's default; nothing else does.

@@ -45,10 +45,13 @@ framed=True (A00330)                          framed=False (A00480, 그룹 박�
 
 툴은 **규칙 묶음**을 고른다.
 
+**`COMMON_RULES` = Custom · Enum · Numbering** (2026-10-02) — 모든 토큰 툴이 함께 쓰는 공용 규칙. `TokenRuleSet` 의 기본값이라
+새 툴은 따로 고르지 않아도 Enum 까지 쓴다. 툴 고유 규칙은 덧붙인다(`COMMON_RULES + (RULE_SETNAME,)`).
+
 | 묶음 | 규칙 | Numbering | 글자 검사 |
 |------|------|-----------|-----------|
-| `MAYA_NODE_RULES` | Custom · Enum · Numbering | 1 개 = 전체 순번, 2 개 = 오브젝트 / 오브젝트 안 노드 | `[A-Za-z0-9_]`, 숫자로 시작 금지 (마야가 조용히 지운다) |
-| `FILE_NAME_RULES` | Custom · Numbering · Set's Name | 1 개 = 세트 순번 | Windows 파일명 금지 문자 `\ / : * ? " < > \|` |
+| `MAYA_NODE_RULES` | `COMMON_RULES` (Custom · Enum · Numbering) | 1 개 = 전체 순번, 2 개 = 오브젝트 / 오브젝트 안 노드 | `[A-Za-z0-9_]`, 숫자로 시작 금지 (마야가 조용히 지운다) |
+| `FILE_NAME_RULES` | `COMMON_RULES` + Set's Name (Enum 은 2026-10-02, A00480 v01.09) | 1 개 = 세트 순번 | Windows 파일명 금지 문자 `\ / : * ? " < > \|` |
 
 새 묶음은 `TokenRuleSet(rules=..., max_numbering=..., name_kind=NAME_MAYA|NAME_FILE, ...)` 한 줄.
 묶음에 없는 규칙이 json 에 있으면 `Custom`(빈 글자)으로 읽는다.

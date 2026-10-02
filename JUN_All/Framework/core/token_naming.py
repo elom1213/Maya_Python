@@ -21,8 +21,10 @@ token_naming - 토큰 목록으로 이름을 만든다. A00330_NamingTool(Rename
 
 툴마다 쓸 수 있는 규칙 · 이름 종류가 다르므로 **`TokenRuleSet`** 에 묶어 넘긴다.
 
-  MAYA_NODE_RULES  : 마야 노드 이름 (Custom / Numbering)            - A00330 Token 탭
-  FILE_NAME_RULES  : 파일 이름     (Custom / Numbering / Set's Name) - A00480 Export Naming
+  COMMON_RULES     : **모든 토큰 툴이 함께 쓰는 공용 규칙** (Custom / Enum / Numbering) - 2026-10-02.
+                     TokenRuleSet 의 기본값이라 새 툴은 따로 고르지 않아도 Enum 까지 쓴다.
+  MAYA_NODE_RULES  : 마야 노드 이름 = COMMON_RULES                        - A00330 Token 탭
+  FILE_NAME_RULES  : 파일 이름     = COMMON_RULES + Set's Name             - A00480 Export Naming
 
 Numbering 토큰이 **몇 개냐**에 따라 무엇을 세는지가 정해진다 (레거시 Naming Dyn 과 같은 규칙):
 
@@ -46,6 +48,10 @@ RULE_CUSTOM = "custom"
 RULE_NUMBERING = "numbering"
 RULE_SETNAME = "setname"
 RULE_ENUM = "enum"
+
+#: 모든 토큰 툴이 함께 쓰는 공용 규칙 (2026-10-02, A00330 v01.12 의 Enum 을 공용으로).
+#: 툴 고유 규칙(Set's Name 등)은 이 뒤에 덧붙인다 - COMMON_RULES + (RULE_SETNAME,).
+COMMON_RULES = (RULE_CUSTOM, RULE_ENUM, RULE_NUMBERING)
 
 #: 규칙 key -> UI 라벨
 RULE_LABELS = {
@@ -115,7 +121,7 @@ class TokenRuleSet(object):
     sample_context : 미리보기 · 검사에서 Set's Name 자리에 넣을 보기 글자
     """
 
-    def __init__(self, rules=(RULE_CUSTOM, RULE_NUMBERING), max_numbering=2,
+    def __init__(self, rules=COMMON_RULES, max_numbering=2,
                  name_kind=NAME_MAYA, serial_label="node", object_label="object",
                  sample_context="<Set>"):
         self.rules = tuple(rules)
@@ -304,14 +310,15 @@ class TokenRuleSet(object):
             first, self.serial_label)
 
 
-#: 마야 노드 이름 (A00330 Rename > Token). Enum 은 2026-10-02 (A00330 v01.12).
+#: 마야 노드 이름 (A00330 Rename > Token) = 공용 규칙 그대로.
 MAYA_NODE_RULES = TokenRuleSet(
-    rules=(RULE_CUSTOM, RULE_ENUM, RULE_NUMBERING), max_numbering=2, name_kind=NAME_MAYA,
+    rules=COMMON_RULES, max_numbering=2, name_kind=NAME_MAYA,
     serial_label="node", object_label="object")
 
 #: 세트마다 파일 이름 하나 (A00480 Export > Naming). Numbering 은 세트 순번 하나만.
+#: 공용 규칙 + Set's Name (Enum 은 2026-10-02, A00480 v01.09).
 FILE_NAME_RULES = TokenRuleSet(
-    rules=(RULE_CUSTOM, RULE_NUMBERING, RULE_SETNAME), max_numbering=1, name_kind=NAME_FILE,
+    rules=COMMON_RULES + (RULE_SETNAME,), max_numbering=1, name_kind=NAME_FILE,
     serial_label="set", object_label="set")
 
 

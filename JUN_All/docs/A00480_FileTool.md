@@ -16,7 +16,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 | **Import** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` |
 | **Path** | `Copy Scene Folder` · `Open Scene Folder` | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `File` |
 
-- **버전**: `app/config/version.py` (v01.08 — Naming 칸을 고쳐도 저장 안 함, **`Save` 버튼**으로만 프로파일 기본이 된다(§2-4) · v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
+- **버전**: `app/config/version.py` (v01.09 — Naming 토큰 규칙에 **`Enum`**(정해진 값 중 고르기, A00330 과 같은 공용 규칙, §2-4) · v01.08 — Naming 칸을 고쳐도 저장 안 함, **`Save` 버튼**으로만 프로파일 기본이 된다(§2-4) · v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
 - **설치**: `__dragDrop_A00480.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **FileTool** → `tools.A00480_FileTool.run(True)`
 - **테마**: `slate_dark`
 - **원본 두 툴은 그대로 남아 있다.** quickTool 의 File · Import option 버튼도 지워지지 않았다.
@@ -140,6 +140,7 @@ Type Filter : [Include Types v]  Rules : [Rules (1/1) v] [Check]        [      E
 | 규칙 | 값 |
 |------|-----|
 | `Custom` | 적은 글자 그대로 (비면 건너뜀) |
+| `Enum` (v01.09) | **정해진 값 중 고른 하나** — 콤보로 고르므로 오타가 없다. 칸 위에 칸 이름(예 `character`), `Values...` 로 칸 이름 · 값 목록(쉼표로 구분)을 고친다. A00330 Token 의 Enum 과 **같은 공용 규칙**(`Framework/core/token_naming.py` 의 `COMMON_RULES`) |
 | `Numbering` | Set's Name 리스트의 **세트 순번** — Start 부터, Pad 0 자리수. **한 이름에 하나만** |
 | `Set's Name` | 그 세트의 이름 (네임스페이스 · 경로 없이 — `ns:SET_body` → `SET_body`) |
 
