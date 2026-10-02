@@ -1,5 +1,18 @@
 # Changelog — A00330_NamingTool
 
+## v01.15 (2026-10-02)
+**[Add] Token 탭 - Preview 표 (Quick Rename > Insert 와 같은 모양).**
+
+- Objects 리스트 오른쪽에 `Current` / `New name` / `Status` 표. Rename 이 바꿀 노드 전부(오브젝트 + transform 자손)를
+  **계층 그대로** 보여 준다. 리스트 · 토큰 칸이 바뀌면 다시 계산한다(씬은 그대로, 150ms 모아서).
+- Status: `OK` · `name taken`(이름을 차례로 바꾸는 과정을 흉내 내서 판정) · `no change` · `token error` · `invalid name` ·
+  `locked` · `referenced` · `default node` · `gone`. 색은 Insert 탭과 같다.
+- 계산 `core.preview_tokens` = `rename_tokens` 와 같은 순서 · 같은 이름 (Maya 2024 에서 미리보기와 실제 결과 대조).
+
+**[Fix] Token 탭 Rename**
+- 잠긴 · 레퍼런스 노드에서 `RuntimeError` 로 **그 자리에서 멈추던** 것 → 그 노드만 건너뛰고 `[Warning]` 로그.
+- Rename 뒤 Objects 리스트를 새 이름으로 갱신(Insert 탭과 같다). 대상은 표시 이름이 아니라 UUID 로 찾은 지금 경로.
+
 ## v01.14 (2026-10-02)
 **[Change] 배포본에서는 정해진 규칙(Enum 칸)을 바꿀 수 없다 — `Values...` 는 개발자 모드에서만.**
 

@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00330 NamingTool — **Token 탭 Preview 표** (v01.14->01.15)
+- 요청: Quick Rename > Insert 의 Preview 창처럼 Rename > Token 탭에서도 이름을 바꾼 결과를 미리 보게.
+- core `preview_tokens`: `rename_tokens` 와 같은 순서 · 같은 이름, 행마다 Current / New name / Status(Insert 와 같은 규칙 + `token error`). `name taken` 은 부모별 이름 칸을 씬대로 채우고 rename 순서대로 바꾸는 흉내로 판정.
+- UI: Objects | Preview(QSplitter, 계층 트리), 리스트 · 토큰 변경 시 150ms 모아 갱신. 창 최소 크기 전후 820x916.
+- 덤으로 고친 것: 잠긴 노드에서 Rename 이 `RuntimeError` 로 멈추던 것 → 건너뛰고 [Warning] / Rename 뒤 리스트를 새 이름으로.
+- 검증(mayapy 2024): 큐브 3 + 단독 → 01~04 OK / 그룹 → 트리 + 월드 동명 `name taken` / `Set-8` → token error / 잠긴 노드 locked, Rename 후 미리보기 = 실제 이름, 잠긴 노드만 건너뜀.
+
 > [!summary] A00330 NamingTool — **배포본에선 Enum 규칙 잠금, `Values...` 는 개발자 모드만** (v01.13->01.14)
 - 요청: Enum 칸의 `Values...`(칸 이름 · 값 목록 편집)는 개발자 모드에서만, 배포용 툴에서는 없애서 공유받은 사람이 규칙을 못 바꾸게.
 - 판정 `app/config/dev_mode.py` — launch.py 와 같은 규칙(툴 폴더에 Framework 동봉 = 배포본 → False, 아니면 `JUN_All/config.py` DEV_MODE 를 **경로로** 읽음).

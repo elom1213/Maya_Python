@@ -91,8 +91,10 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 > [A00480_FileTool](A00480_FileTool.md) Export > Naming 도 같은 위젯을 쓴다(그쪽은 규칙 `Set's Name` 이 하나 더 있다). 보이는 것 · 동작 · 프로파일 파일은 v01.09 와 같다.
 
 ```
-┌ Objects ───────────────────────────────┐
-│ (Select Base / Add / Del / Up / Down / Sort)
+┌ Objects ──────────────┬ Preview (v01.15) ──────────────────────────────┐
+│ (Select Base / Add /  │ Current │ New name                    │ Status  │
+│  Del / Up / Down /    │ v setGrp│ SIN_n_Set008_..._01_geo     │ OK      │
+│  Sort)                │    acc1 │ SIN_n_Set008_..._02_geo     │ OK      │
 ├ Profile ───────────────────────────────┤
 │ [Default        v] [Save] [New] [Rename] [Delete]
 ├ Tokens ────────────────────────────────┤
@@ -114,7 +116,23 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 2. **Profile** 에서 규칙을 고른다. 처음 열면 레거시 규칙 그대로인 **`Default`** 가 만들어져 있다
    (`dyn_asset_side_{번호}_{번호}`, Pad 0 은 둘 다 2).
 3. 필요하면 토큰 칸을 고친다 — **고쳐도 저장되지 않는다**(v01.11~). 기본으로 남기려면 Profile 줄의 **`Save`**. `Preview` 줄에서 결과 이름을 미리 본다.
-4. **Rename** → 각 오브젝트와 그 transform 자손이 토큰을 `_` 로 이은 이름으로 바뀐다. **Undo 한 번**으로 되돌아간다.
+4. 오른쪽 **Preview 표**(v01.15)에서 결과를 본다 — Rename 으로 바뀔 노드 **전부**(오브젝트 + transform 자손)가 계층 그대로
+   `Current` → `New name` 과 `Status` 로 나온다. 리스트나 토큰 칸이 바뀌면 바로 다시 계산한다(씬은 그대로).
+5. **Rename** → 각 오브젝트와 그 transform 자손이 토큰을 `_` 로 이은 이름으로 바뀐다. **Undo 한 번**으로 되돌아간다.
+   바뀐 뒤 Objects 리스트는 새 이름으로 갱신된다(v01.15).
+
+**Preview 표의 Status** (v01.15) — Quick Rename > Insert 와 같은 규칙.
+
+| Status | 뜻 |
+|---|---|
+| `OK` (초록) | 그대로 바뀐다 |
+| `name taken` (노랑) | 같은 부모 아래에 그 이름이 이미 있다 → 마야가 번호를 붙인다. **이름을 차례로 바꾸는 과정을 흉내 내서** 판정한다 — 곧 다른 이름으로 바뀔 형제의 이름을 받는 건 괜찮고, 이 배치에서 이미 쓴 이름이나 배치 밖 노드의 이름과 겹칠 때만 |
+| `no change` (회색) | 이미 그 이름이다 |
+| `token error` | 토큰 칸 문제(Preview 줄의 `[WARN]` 과 같은 내용) — Rename 이 실행되지 않는다 |
+| `invalid name` / `locked` / `referenced` / `default node` / `gone` | 바꿀 수 없는 노드 — Rename 이 **그 노드만 건너뛰고** 로그에 `[Warning]`. v01.14 까지는 잠긴 노드에서 예외로 멈췄다 |
+
+- 계산은 `core.preview_tokens` — Rename(`rename_tokens`)과 **같은 순서 · 같은 이름**이다(Maya 2024 에서 미리보기 = 실제 결과 대조).
+- 토큰을 칠 때마다 씬을 조회하지 않도록 갱신을 150ms 모은다.
 
 **토큰 규칙** (칸 밑의 콤보)
 

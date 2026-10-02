@@ -39,5 +39,9 @@
 #   - Token       : outside developer mode (the shared release) the fixed rules cannot be changed -
 #                   no Values... button, an Enum token's rule is locked and it cannot be deleted (v01.14)
 
-VERSION = "01.14"
+#   - Token       : Preview table next to the Objects list (like Quick Rename > Insert) - every node
+#                   that Rename will touch, as a tree, with Current / New name / Status. Rename now
+#                   skips locked / referenced nodes instead of stopping, and refreshes the list (v01.15)
+
+VERSION = "01.15"
 LAST_UPDATE = "2026-10-02"

@@ -35,3 +35,9 @@ Token 칸마다 규칙 콤보(A00480 Export Naming 처럼), Add/Delete Token 으
 
 검증: mayapy 61항목(Default = 레거시 rename_dynamics 결과, 프로파일 전 흐름, 스크롤·최소 폭 불변). 마야 GUI 확인 전.
 관련: [[wip-a00330-set-rename]], [[qt-exclusive-radio-uncheck-ignored]], [[offscreen-size-needs-theme]], [[wip-a00480-filetool]]
+
+**v01.15 (2026-10-02) — Preview 표** (Insert 탭과 같은 모양, Objects 오른쪽 QSplitter). `core.preview_tokens(objects, tokens)` 가
+`rename_tokens` 와 같은 순서(`build_hierarchy_groups`: 루트 -> reversed allDescendents)로 계층 트리 행을 준다 — 그래서 그룹 아래
+자식 번호가 **역순**(acc2=02, acc1=03 …)으로 나온다, 기존 동작 그대로. `name taken` 은 부모별 이름 칸을 씬 그대로 채우고
+rename 순서대로 옛 이름 빼고 새 이름 넣는 **흉내**로 판정. Maya 2024 에서 미리보기 = 실제 결과.
+같이 고친 것: 잠긴/레퍼런스 노드에서 `cmds.rename` RuntimeError 로 Rename 이 멈추던 것 → 건너뛰고 [Warning]. Rename 뒤 리스트 갱신.

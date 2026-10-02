@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-30
+# last Update date : 2026-10-02
 # A00330_NamingTool - core logic (maya.cmds)
 #
 # 레거시 두 소스의 네이밍 로직을 순수 함수로 이식한다.
@@ -15,6 +15,10 @@ from . import token_ops
 #: 세트를 대상으로 이름을 복사할 때 기본으로 붙는 접미사.
 #: 세트는 DG 노드라 **같은 이름을 그대로 쓸 수 없다**(실측: 마야가 조용히 `name1` 로 바꾼다).
 DEFAULT_SET_COPY_SUFFIX = "_copy"
+
+#: Token 미리보기 전용 상태 (나머지는 set_rename_ops 의 ST_* 를 쓴다)
+ST_TOKEN = "token error"          # 토큰 칸 문제로 Rename 이 실행되지 않는다
+ST_DEFAULT_NODE = "default node"  # 마야 기본 노드 (insert_ops.ST_DEFAULT 와 같은 글자)
 
 
 def _cmds():
@@ -213,7 +217,13 @@ def rename_tokens(objects, tokens):
     count = 0
     notes = []
     for uuid, namespace, leaf, original in plan:
-        new_name = _rename_by_uuid(uuid, join_namespace(namespace, leaf))
+        # 잠긴 · 레퍼런스 노드는 cmds.rename 이 RuntimeError 를 낸다 - 그 노드만 건너뛰고 계속한다
+        # (v01.15 전에는 예외가 나서 거기서 멈췄다. 미리보기 표에 미리 locked / referenced 로 보인다).
+        try:
+            new_name = _rename_by_uuid(uuid, join_namespace(namespace, leaf))
+        except RuntimeError as e:
+            notes.append("[Warning] {0}: not renamed - {1}".format(original, str(e).strip()))
+            continue
         if new_name is None:
             notes.append("[Warning] {0}: node no longer exists.".format(original))
             continue
@@ -222,6 +232,109 @@ def rename_tokens(objects, tokens):
             notes.append("[Warning] {0} -> {1} (asked for '{2}' - Maya changed it, "
                          "the name is already used).".format(original, new_name, leaf))
     return count, notes
+
+
+# ================================================================
+# Rename > Token 미리보기 (v01.15)
+# ================================================================
+
+def preview_tokens(objects, tokens):
+    """Rename 을 누르면 무엇이 어떻게 바뀌는지 - **씬은 바꾸지 않는다** (v01.15).
+
+    `rename_tokens` 와 같은 순서로 노드를 모으고(`build_hierarchy_groups`) 같은 이름을 계획한다.
+    상태 규칙은 Quick Rename > Insert 와 같다(`set_rename_ops` 의 ST_*).
+
+    반환: `(rows, errors)`
+        rows   : 노드마다 dict - path · parent(롱 경로, 월드면 '') · old_name · new_name ·
+                 status · note · group(몇 번째 오브젝트) · root(그 오브젝트의 루트인가)
+        errors : 토큰 문제(있으면 new_name 은 비고 status 는 ST_TOKEN)
+
+    **name taken 은 이름을 차례로 바꾸는 과정을 흉내 내서** 판정한다. 같은 부모 아래 이름 칸을
+    지금 씬 그대로 채워 두고, rename 순서대로 옛 이름을 빼고 새 이름을 넣는다 - 그래서
+    "곧 다른 이름으로 바뀔 형제" 의 이름을 받는 경우는 막지 않고, 이미 이 배치에서 쓴 이름이나
+    배치 밖 노드의 이름과 겹칠 때만 name taken 이다(마야가 뒤에 번호를 붙인다).
+    """
+    from .set_rename_ops import (
+        invalid_characters, ST_OK, ST_SAME, ST_INVALID, ST_COLLISION,
+        ST_LOCKED, ST_REFERENCED, ST_GONE)
+
+    cmds = _cmds()
+    if cmds is None:
+        return [], ["Maya not available."]
+
+    tokens = token_ops.normalize_tokens(tokens)
+    errors = token_ops.validate(tokens)
+
+    groups = build_hierarchy_groups(objects)
+    if errors:
+        names = [[""] * len(g) for g in groups]
+    else:
+        names = token_ops.plan_names([len(g) for g in groups], tokens)
+
+    default_nodes = set(cmds.ls(defaultNodes=True) or [])
+    occupancy = {}      # 부모 롱 경로('' = 월드) -> 그 아래 지금 쓰이는 짧은 이름(네임스페이스 포함)
+
+    def _names_under(parent):
+        if parent not in occupancy:
+            if parent:
+                children = cmds.listRelatives(parent, children=True, fullPath=True) or []
+            else:
+                children = cmds.ls(assemblies=True, long=True) or []
+            occupancy[parent] = set(c.split("|")[-1] for c in children)
+        return occupancy[parent]
+
+    rows = []
+    for group_index, (group, group_names) in enumerate(zip(groups, names)):
+        for node_index, (path, leaf) in enumerate(zip(group, group_names)):
+            parent = path.rpartition("|")[0]
+            old_name = short_name_with_namespace(path)
+            namespace, _old_leaf = split_namespace(old_name)
+            new_name = join_namespace(namespace, leaf) if leaf else ""
+            row = {"path": path, "parent": parent, "old_name": old_name, "new_name": new_name,
+                   "status": "", "note": "", "group": group_index, "root": node_index == 0}
+            rows.append(row)
+
+            if errors:
+                row["status"] = ST_TOKEN
+                row["note"] = errors[0]
+                continue
+            if not cmds.objExists(path):
+                row["status"] = ST_GONE
+                row["note"] = "node no longer exists"
+                continue
+            short = (cmds.ls(path) or [path])[0]
+            if short in default_nodes or path in default_nodes:
+                row["status"] = ST_DEFAULT_NODE
+                row["note"] = "Maya refuses to rename its default nodes"
+                continue
+            if cmds.referenceQuery(path, isNodeReferenced=True):
+                row["status"] = ST_REFERENCED
+                row["note"] = "referenced nodes cannot be renamed"
+                continue
+            if (cmds.lockNode(path, q=True, lock=True) or [False])[0]:
+                row["status"] = ST_LOCKED
+                row["note"] = "unlock the node first"
+                continue
+            problem = invalid_characters(leaf)
+            if problem:
+                row["status"] = ST_INVALID
+                row["note"] = problem
+                continue
+
+            # 부모 경로는 아직 옛 이름 기준이다 - 부모 행도 같은 occupancy 키(옛 경로)를 쓰므로 맞물린다.
+            taken = _names_under(parent)
+            taken.discard(old_name)
+            if new_name == old_name:
+                row["status"] = ST_SAME
+                row["note"] = "already this name"
+            elif new_name in taken:
+                row["status"] = ST_COLLISION
+                row["note"] = "Maya will append a number"
+            else:
+                row["status"] = ST_OK
+            taken.add(new_name)
+
+    return rows, errors
 
 
 def short_name_with_namespace(path):
