@@ -13,6 +13,8 @@
 #               값 목록 · 칸 이름은 `Values...` 로 고친다 (Save 를 눌러야 프로파일에 남는다).
 #               rules_editable=False (배포본, A00330 v01.14) : `Values...` 가 없고, Enum 칸은 규칙을 못 바꾸고
 #               지울 수 없다 - 공유받은 사람은 정해진 값 중에서 고르기만 한다.
+#               v01.17 : 배포본에서는 `Add Token` / `Delete Token` 도 없다 - 칸 구성 자체가 정해진 규칙이다.
+#               mode_toggle=True (개발자 모드에서만) : `Dev Mode` 토글 버튼 - 개발 / 배포 화면을 번갈아 본다.
 #               칸 머리(Token N)를 눌러 고른 뒤
 #                 Add Token    : 고른 칸 **오른쪽**에 새 칸
 #                 Delete Token : 고른 칸 삭제 (마지막 한 칸은 남긴다)
@@ -349,7 +351,9 @@ class JUN_mod_tokenName_qt_v01(QWidget):
                  안에 넣을 때, 세로 공간을 아낄 때 (A00480 Export > Naming).
 
     rules_editable : False = 배포본처럼 정해진 규칙을 못 바꾸게 (Enum 칸의 Values... 없음 · 규칙 잠금 ·
-                 삭제 불가). 툴이 개발자 모드 여부로 넘긴다 (A00330 v01.14).
+                 삭제 불가 · Add / Delete Token 없음). 툴이 개발자 모드 여부로 넘긴다 (A00330 v01.14, v01.17).
+    mode_toggle : True = `Dev Mode` 토글 버튼을 단다 - 켜면 개발 화면, 끄면 배포 화면 (A00330 v01.17).
+                 개발자 모드인 툴만 True 로 넘긴다 (배포본에는 버튼이 없다). set_rules_editable() 로도 바꾼다.
 
     preview_row : 미리보기 줄 QHBoxLayout - 툴 버튼을 오른쪽에 붙일 자리.
 
@@ -361,11 +365,17 @@ class JUN_mod_tokenName_qt_v01(QWidget):
 
     tokensChanged = Signal(list)
 
+    #: 개발 / 배포 화면이 바뀔 때 (set_rules_editable · Dev Mode 토글). True = 개발 화면.
+    #: 툴이 배포 화면에 맞춰 다른 UI 를 막는 데 쓴다 (A00330 v01.17 - Token 말고 다른 탭 잠금).
+    rulesEditableChanged = Signal(bool)
+
     def __init__(self, store, log=None, log_prefix="Token", framed=True, rules_editable=True,
-                 parent=None):
+                 mode_toggle=False, parent=None):
         super().__init__(parent)
         self.store = store
         self._rules_editable = rules_editable
+        self._mode_toggle = mode_toggle
+        self.btn_dev_mode = None
         self.ruleset = store.ruleset
         self._log_callback = log
         self._prefix = log_prefix
@@ -380,6 +390,7 @@ class JUN_mod_tokenName_qt_v01(QWidget):
         self.build_ui()
         self.load_tokens(store.load_profile(self._profile))
         self._refresh_profiles()
+        self._apply_mode_buttons()
 
     # ================================================================
     # UI
@@ -398,6 +409,7 @@ class JUN_mod_tokenName_qt_v01(QWidget):
             buttons = QHBoxLayout()
             self._add_token_buttons(buttons)
             buttons.addStretch(1)
+            self._add_mode_toggle(buttons)
             token_layout.addLayout(buttons)
             self._add_token_area(token_layout)
             root.addWidget(token_box)
@@ -409,6 +421,7 @@ class JUN_mod_tokenName_qt_v01(QWidget):
         self._add_profile_widgets(row)
         row.addSpacing(16)
         self._add_token_buttons(row)
+        self._add_mode_toggle(row)
         root.addLayout(row)
         self._add_token_area(root)
 
@@ -451,6 +464,57 @@ class JUN_mod_tokenName_qt_v01(QWidget):
         self.btn_delete_token.setToolTip("Delete the picked token. One token always stays.")
         self.btn_delete_token.clicked.connect(self.on_delete_token)
         buttons.addWidget(self.btn_delete_token)
+
+    def _add_mode_toggle(self, row):
+        """`Dev Mode` 토글 (mode_toggle=True 일 때만). 켜짐 = 개발 화면, 꺼짐 = 배포 화면."""
+        if not self._mode_toggle:
+            return
+        self.btn_dev_mode = QPushButton("Dev Mode")
+        self.btn_dev_mode.setCheckable(True)
+        self.btn_dev_mode.setChecked(self._rules_editable)
+        self.btn_dev_mode.setToolTip(
+            "On  : developer view - Values..., Add Token / Delete Token, Enum rules can change.\n"
+            "Off : the view people get in the shared tool - fixed rules, pick values only.\n"
+            "Only shown in developer mode. Tokens shown now are kept when you switch.")
+        # 테마 qss 에 :checked 가 없어 켜진 게 안 보인다 → 칸 머리와 같은 강조색
+        self.btn_dev_mode.setStyleSheet(
+            "QPushButton:checked { background-color: #d9a441; color: #1e1e1e;"
+            " border: 1px solid #f0c060; font-weight: bold; }")
+        self.btn_dev_mode.toggled.connect(self.set_rules_editable)
+        row.addWidget(self.btn_dev_mode)
+
+    def rules_editable(self):
+        return self._rules_editable
+
+    def set_rules_editable(self, editable):
+        """개발 화면(True) / 배포 화면(False) 으로 바꾼다. 지금 칸 · 저장 기준은 그대로 둔다.
+
+        Enum 칸의 잠금은 칸을 만들 때 정해지므로(콤보에서 Enum 을 빼는 등) 칸을 다시 만든다.
+        """
+        editable = bool(editable)
+        if self.btn_dev_mode is not None and self.btn_dev_mode.isChecked() != editable:
+            self.btn_dev_mode.blockSignals(True)
+            self.btn_dev_mode.setChecked(editable)
+            self.btn_dev_mode.blockSignals(False)
+        if editable == self._rules_editable:
+            return
+        self._rules_editable = editable
+        tokens, saved = self.tokens(), self._saved_tokens
+        picked = self.selected_index()
+        self.load_tokens(tokens)
+        self._saved_tokens = saved      # load_tokens 가 지금 칸을 저장 기준으로 잡으므로 되돌린다
+        if 0 <= picked < len(self.columns):
+            self.select_column(picked)
+        self._after_edit()
+        self._apply_mode_buttons()
+        self._log("{0} : {1} view.".format(
+            self._prefix, "developer" if editable else "release (shared tool)"))
+        self.rulesEditableChanged.emit(editable)
+
+    def _apply_mode_buttons(self):
+        """배포 화면에서는 Add / Delete Token 을 숨긴다 (v01.17)."""
+        for button in (self.btn_add_token, self.btn_delete_token):
+            button.setVisible(self._rules_editable)
 
     def _add_token_area(self, outer):
         # 토큰 칸 줄 - 칸이 늘면 가로 스크롤

@@ -150,13 +150,17 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 |---|---|---|
 | `Values...` (칸 이름 · 값 목록 편집) | 있음 | **없음** |
 | Enum 칸의 규칙 콤보 | 바꿀 수 있음 | **잠김**(회색) — Custom 으로 바꿔 아무 글자나 넣는 길을 막는다 |
-| Enum 칸 `Delete Token` | 됨 | **안 됨** — `[WARN] Token N is a fixed rule and cannot be deleted.` |
+| `Add Token` / `Delete Token` | 있음 | **없음** (v01.17) — 칸 구성 자체가 정해진 규칙이다 |
+| Enum 칸 삭제 | 됨 | **안 됨** (코드에서도 막는다 — `[WARN] Token N is a fixed rule and cannot be deleted.`) |
 | 다른 칸의 규칙 콤보 | Custom / Enum / Numbering | Custom / Numbering (값 목록을 만들 수 없으니 Enum 을 뺀다) |
-| Enum 값 고르기 · Custom · Numbering · Add Token · Save | 됨 | 됨 |
+| Enum 값 고르기 · Custom · Numbering · Save | 됨 | 됨 |
+| 다른 탭 (Set Rename · Copy Name · Quick Rename) | 됨 | **잠김**(회색 글자, 툴팁에 `Not available in the shared tool`) — Rename > Token 만 (v01.17) |
+| `Dev Mode` 토글 (Tokens 줄 오른쪽) | **있음** — 끄면 배포 화면을 그대로 본다, 다시 켜면 개발 화면 | 없음 |
 
 - 판정은 `app/config/dev_mode.py` — `launch.py` 와 같은 규칙: 툴 폴더 안에 `Framework` 가 동봉돼 있으면 배포본(항상 잠금),
   아니면 `JUN_All/config.py` 의 `DEV_MODE`(경로로 읽는다 - `import config` 는 다른 툴의 config.py 를 집을 수 있다).
 - 프로파일 json 을 직접 고치는 것까지 막지는 않는다 — 화면에서 규칙을 바꾸는 길만 닫았다.
+- `Dev Mode` 를 바꿔도 지금 칸 · 저장 안 한 변경(Save 상태)은 그대로다. 잠글 때는 Rename > Token 탭으로 옮긴다.
 
 > **팀 이름 규칙(SetXXX)** 은 프로파일 **`Dnable_Set_v001`** 로 짓는다 — 캐릭터 · 좌우 · 파츠 · 오브젝트종류가 Enum 칸이다.
 > 규칙과 쓰는 법은 [A00330_NamingRule_Set.md](A00330_NamingRule_Set.md) (팀 공유용).

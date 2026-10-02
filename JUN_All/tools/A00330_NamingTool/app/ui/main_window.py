@@ -84,6 +84,10 @@ class MainWindow(QWidget):
             "Set Rename - search and replace inside set names.")
         main_layout.addWidget(self.tabs, stretch=1)
 
+        # v01.17 : 배포 화면에서는 Rename > Token 탭만 쓴다. Dev Mode 토글(개발자 모드에서만)에도 따른다.
+        self.token_tab.token_widget.rulesEditableChanged.connect(self.apply_release_tabs)
+        self.apply_release_tabs(self.token_tab.token_widget.rules_editable())
+
         # 로그창
         log_group = QGroupBox("Log")
         log_layout = QVBoxLayout(log_group)
@@ -94,6 +98,33 @@ class MainWindow(QWidget):
         footer = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
         footer.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(footer)
+
+    # ================================================================
+    # 배포 화면 - Rename > Token 탭만 (v01.17)
+    # ================================================================
+
+    _RELEASE_TAB_NOTE = "Not available in the shared tool - use Rename > Token."
+
+    def apply_release_tabs(self, editable):
+        """editable=False (배포본 · Dev Mode 꺼짐) 면 Rename > Token 말고 다른 탭을 잠근다.
+
+        숨기지 않고 **회색으로 잠근다** - 공유받은 사람이 기능이 막혀 있다는 걸 알 수 있게.
+        잠글 때는 Token 탭으로 옮긴다(다른 탭이 열려 있었으면 그 화면에 갇힌다).
+        """
+        locked = [(self.tabs, 1), (self.tabs, 2), (self.rename_tabs, 1)]   # Copy Name · Quick Rename · Set Rename
+        if not hasattr(self, "_tab_tips"):
+            self._tab_tips = {(id(w), i): w.tabToolTip(i) for w, i in locked}
+            # 테마 qss 에 잠긴 탭 모양이 없어 보통 탭과 구분이 안 된다(실측 brown_dark) → 글자만 흐리게
+            for tab_widget in (self.tabs, self.rename_tabs):
+                tab_widget.setStyleSheet("QTabBar::tab:disabled { color: #6e6e6e; }")
+        for widget, index in locked:
+            widget.setTabEnabled(index, editable)
+            tip = self._tab_tips[(id(widget), index)]
+            widget.setTabToolTip(index, tip if editable else
+                                 (tip + "\n\n" if tip else "") + self._RELEASE_TAB_NOTE)
+        if not editable:
+            self.tabs.setCurrentIndex(0)
+            self.rename_tabs.setCurrentIndex(0)
 
     # ================================================================
     # Tab : Rename  (v01.07) - 하위 탭 Token / Set Rename

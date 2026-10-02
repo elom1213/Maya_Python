@@ -46,5 +46,9 @@
 #   - Token       : the Preview table's three columns have their own colors (blue / purple / gray),
 #                   header included, so Current, New name and Status are easy to tell apart (v01.16)
 
-VERSION = "01.16"
+#   - Release view: no Add Token / Delete Token, and only Rename > Token can be used (the other
+#                   tabs are locked). In developer mode a Dev Mode toggle switches between the
+#                   developer view and the release view (v01.17)
+
+VERSION = "01.17"
 LAST_UPDATE = "2026-10-02"

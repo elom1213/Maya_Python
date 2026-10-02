@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-02 (오늘)
 
+> [!summary] A00330 NamingTool — **배포 화면: Add/Delete Token 없음 · Token 탭만, 개발자 모드엔 `Dev Mode` 토글** (v01.16->01.17)
+- 요청: 배포모드에선 Add / Delete Token 빼기, 개발자 모드엔 Dev Mode 토글로 개발 / 배포 화면을 번갈아 보기. 이어서 배포모드에선 Rename > Token 말고 다른 탭 못 쓰게.
+- 공용 위젯: `mode_toggle` · `set_rules_editable()`(칸을 다시 만들되 지금 칸 · 저장 기준 유지) · 신호 `rulesEditableChanged`. 배포 화면은 Add / Delete Token 숨김.
+- 메인 창 `apply_release_tabs`: Set Rename · Copy Name · Quick Rename 을 `setTabEnabled(False)` + 툴팁 안내 + Token 탭으로 이동. 테마에 잠긴 탭 모양이 없어 `QTabBar::tab:disabled` 글자만 흐리게.
+- 팀 문서: 그룹 이름을 Quick Rename 으로 안내하던 5-3 절 → 배포본에선 Quick Rename 이 잠기므로 **마야에서 직접**으로 바꿈.
+- 검증(mayapy 2024 전체 창): dev — 토글 끄면 탭 3개 잠김 · Token 으로 이동 · Add 숨김, 켜면 원복 / **임시 배포본**(동봉 Framework) — 토글 없음 · 탭 잠김 · Add 숨김. 칸 편집 · 미저장 상태가 토글 전후 유지.
+
 > [!summary] A00330 NamingTool — **Preview 표 세 칸 색 구분** (v01.15->01.16)
 - 요청: Current / New name / Status 칸 색을 서로 다르게.
 - 칸 배경 파랑 · 보라 · 회색(반투명, 어두운 테마 alpha 70 / 밝은 50 - 같은 값이면 brown_dark 에서 거의 안 보였다), Status 글자색과 안 겹치는 계열.

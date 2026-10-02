@@ -1,5 +1,14 @@
 # Changelog — A00330_NamingTool
 
+## v01.17 (2026-10-02)
+**[Change] 배포 화면 - Add / Delete Token 없음, Rename > Token 탭만 쓸 수 있다. 개발자 모드에 `Dev Mode` 토글.**
+
+- 배포본(또는 Dev Mode 꺼짐): `Add Token` / `Delete Token` 숨김. Set Rename · Copy Name · Quick Rename 탭은 회색으로 잠기고
+  툴팁에 `Not available in the shared tool - use Rename > Token.` 잠글 때 Rename > Token 으로 옮긴다.
+- 개발자 모드에서만 Tokens 줄 오른쪽에 **`Dev Mode`** 토글 — 끄면 배포 화면, 켜면 개발 화면. 지금 칸 · 저장 안 한 변경은 그대로.
+- 공용 위젯: `mode_toggle` 인자 · `set_rules_editable()` · 신호 `rulesEditableChanged(bool)`. A00480 은 기본값이라 그대로.
+- 팀 문서: 그룹 이름은 Quick Rename 대신 **마야에서 직접**(배포본에서 Quick Rename 이 잠기므로), 공유 툴은 Token 탭만.
+
 ## v01.16 (2026-10-02)
 **[Change] Token 탭 Preview 표 - 세 칸의 색을 다르게.** Current = 파랑, New name = 보라, Status = 회색(머리글 포함).
 

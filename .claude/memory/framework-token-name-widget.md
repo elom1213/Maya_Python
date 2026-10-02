@@ -36,4 +36,8 @@ metadata:
   A00330 은 `app/config/dev_mode.is_dev_mode()` 로 넘긴다(동봉 Framework = 배포본). 배포본 검증은 릴리즈 빌더로 임시 폴더에 만들고
   dev 경로를 sys.path 에서 빼서 — Framework 는 네임스페이스 패키지라 `__file__` 이 None, 위치는 `__path__` 로 확인.
 
+- **배포 화면(A00330 v01.17)**: rules_editable=False 면 Add / Delete Token 도 숨김. `mode_toggle=True`(개발자 모드인 툴만) = `Dev Mode` 토글,
+  `set_rules_editable()` 은 칸을 다시 만들되 지금 칸 · `_saved_tokens` 를 지킨다. 툴은 `rulesEditableChanged` 를 받아 다른 UI 를 잠근다
+  (A00330 = Token 말고 탭 전부 setTabEnabled(False)). 탭을 잠그면 문서가 그 탭을 안내하지 않는지 볼 것(팀 문서 5-3 이 Quick Rename 을 안내했었다).
+
 관련: [[wip-a00330-token-tab]], [[wip-a00480-filetool]], [[offscreen-size-needs-theme]]
