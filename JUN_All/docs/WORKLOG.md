@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00500_reloader — **dev 의 리로더를 셸프 버튼 툴로 정리** (신규 v01.00)
+- 요청: `dev/reloader_mayaScript_v02.py` 를 복사해 마야 툴로 쓰고 있다 — 다른 툴처럼 `__dragDrop_AXXXXX.py` 로 셸프에 설치하고 `AXXXXX_reloader` 폴더로 관리. tools 가 더 맞으면 tools 로, 아니면 dev 에 정리.
+- 판단: `config.DEV_MODE` 에 의존하고 릴리즈본(dev 제외)에 실리지 않는 개발 전용이라 **`dev/A00500_reloader`** (release_builder_QT 와 같은 자리). 40여 개 launch.py 가 `from dev.reloader_v02 import reload_for_tool` 을 쓰므로 **`dev/reloader_v02.py` 는 얇은 재노출**로 남겨 호출부는 손대지 않았다.
+- 이동(git mv): `reloader_v02.py` → `app/core/reloader.py`(`reload_package` 가 (ok, failed) 를 돌려주게), `reload_path_list.py` → `app/config/reload_packages.py`, 붙여넣기 스크립트 v01/v02 · v01 리로더 · 모듈 목록 → `legacy/`(README, import 안 됨). 신규: `__init__` · `launch.run(True)`(config → 리로더 자신 → Framework/tools 순, 뷰포트에 개수 보고, DEV_MODE 꺼짐이면 건너뜀) · `__dragDrop_A00500.py`(라벨 Reload) · 아이콘 svg+png(원형 화살표).
+- 문서: `docs/A00500_reloader.md` 신설, README 배치 표 한 줄, Release_Layout 표 한 줄.
+- 검증: mayapy 2024 — run(True) 로 Framework·tools 모듈 리로드와 개수, 재노출 import 와 reload_for_tool, DEV_MODE 꺼짐 경로, 드롭 파일의 셸프 명령 실행. 마야 GUI 드롭 설치는 아직.
+
 > [!summary] A00240 PathTool — **Tree 탭: 정션 우클릭에 Reveal (Junction) / (Origin)** (v01.20->01.21, Framework `path_context`)
 - 요청: Tree 에서 정션 항목(`main\tgt_0010`)을 더블클릭하면 정션을 거친 경로가 열린다. 우클릭에 `Reveal in File Explorer (Junction)` / `(Origin)` 두 항목을 두어 후자가 원본(`...\tgt_0010`)을 열게 — 좋은 생각이면 그대로.
 - 판단: 그대로 구현. 더블클릭은 **보이는 경로 그대로**(= Junction) 유지 — 트리에 적힌 것이 열려야 놀랍지 않고 원본은 메뉴에서 고른다.

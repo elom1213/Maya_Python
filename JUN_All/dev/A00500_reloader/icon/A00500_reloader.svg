@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- A00500_reloader shelf icon: one circular arrow (reload) -->
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+  <!-- arc, centre (16,16) r 7.5 : starts at the right (0 deg), runs clockwise round the bottom and left,
+       ends at -70 deg (upper right). The arrow head continues along the tangent there, closing the ring. -->
+  <path d="M23.5 16 A7.5 7.5 0 1 1 18.6 8.95" fill="none" stroke="#5ad67d" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M21.9 10.1 L19.4 6.6 L17.7 11.3 Z" fill="#5ad67d"/>
+</svg>

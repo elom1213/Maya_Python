@@ -72,6 +72,7 @@
 |------|------|------|
 | **릴리즈 배치** | dev 트리와 릴리즈본은 **폴더 모양이 다르다** — `Framework` 는 툴 안에 동봉되고 `config.py` · `dev/` 는 실리지 않는다. 진입 파일(`launch.py` · `launcher.py`)이 지켜야 할 규약과 "남의 PC" 검증법 | [Release_Layout](Release_Layout.md) |
 | **릴리즈 빌더** | 릴리즈본을 만드는 개발 툴(`JUN_All/dev/release_builder_QT`) | [release_builder_QT](release_builder_QT.md) |
+| **리로더** | Framework / tools 모듈을 전부 다시 읽는 개발용 셸프 버튼(`JUN_All/dev/A00500_reloader`, `__dragDrop_A00500.py` 로 설치). 각 툴 `launch.py` 의 `dev.reloader_v02` 는 이것의 재노출 | [A00500_reloader](A00500_reloader.md) |
 
 ---
 

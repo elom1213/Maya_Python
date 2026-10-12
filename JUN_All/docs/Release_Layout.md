@@ -16,7 +16,7 @@ updated: 2026-09-22
 | 툴 | `JUN_All/tools/<툴>` | `<repo>/tools/<툴>` |
 | `Framework` | `JUN_All/Framework` — 모든 툴이 **공유** | `<툴 폴더>/Framework` — 툴마다 **사본** |
 | `config.py` (`DEV_MODE`) | `JUN_All/config.py` | **없음** |
-| `dev/reloader_v02` | 있음 | **없음** (빌더가 `dev` 를 제외한다) |
+| `dev/reloader_v02` (= `dev/A00500_reloader` 재노출) | 있음 | **없음** (빌더가 `dev` 를 제외한다) |
 | 안내 문서 | `JUN_All/docs/*.md` | `<툴 폴더>/docs/*.md` |
 
 `..`/`..` 를 올라가면 dev 에서는 `JUN_All`, 릴리즈본에서는 **저장소 루트**가 나온다.
