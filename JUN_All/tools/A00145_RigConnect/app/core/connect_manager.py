@@ -6,7 +6,7 @@ MEL ConnectionTool V04.02 의 attribute 연결 proc 포팅:
   - JUN_cmd_upd_tsl_attr      -> list_attrs (compound/multi 펼치기)
   - JUN_cmd_upd_tsl_search    -> find_matching / list_attrs(search)
   - JUN_cmd_connect_attr      -> connect_attrs (3가지 브로드캐스트 패턴)
-  - JUN_cmd_connect_52Facial  -> connect_52_facial
+  - JUN_cmd_connect_52Facial  -> (v01.59) 규칙 JSON app/rules/connect/*.json + connect_rules.connect_by_rule
 
 UI 비의존: 위젯에서 읽은 list/str 값만 받는다.
 """
@@ -15,26 +15,6 @@ import maya.cmds as cmds
 import maya.mel as mel
 
 from tools.A00145_RigConnect.app.core import blendshape_utils as bsu
-
-
-# MEL JUN_cmd_connect_52Facial 의 하드코딩 52 ARKit 페이셜 어트리뷰트(순서/철자 보존).
-# source / target 동일 이름으로 연결한다.
-FACIAL_52 = [
-    "browInnerUp", "browDownLeft", "browDownRight", "browOuterUpLeft",
-    "browOuterUpRight", "eyeLookUpLeft", "eyeLookUpRight", "eyeLookDownLeft",
-    "eyeLookDownRight", "eyeLookInLeft", "eyeLookInRight", "eyeLookOutLeft",
-    "eyeLookOutRight", "eyeBlinkLeft", "eyeBlinkRight", "eyeSquintLeft",
-    "eyeSquintRight", "eyeWideLeft", "eyeWideRight", "cheekPuff",
-    "cheekSquintLeft", "cheekSquintRight", "noseSneerLeft", "noseSneerRight",
-    "jawOpen", "jawForward", "jawLeft", "jawRight", "mouthFunnel",
-    "mouthPucker", "mouthLeft", "mouthRight", "mouthRollUpper",
-    "mouthRollLower", "mouthShrugUpper", "mouthShrugLower", "mouthClose",
-    "mouthSmileLeft", "mouthSmileRight", "mouthFrownLeft", "mouthFrownRight",
-    "mouthDimpleLeft", "mouthDimpleRight", "mouthUpperUpLeft",
-    "mouthUpperUpRight", "mouthLowerDownLeft", "mouthLowerDownRight",
-    "mouthPressLeft", "mouthPressRight", "mouthStretchLeft",
-    "mouthStretchRight", "tongueOut",
-]
 
 
 def channel_box_attrs(obj):
@@ -242,36 +222,3 @@ def connect_attrs(src_objs, dst_objs, src_attrs, dst_attrs):
     }
 
     return count, mode, report
-
-
-def connect_52_facial(src_objs, dst_objs):
-    """52 ARKit 페이셜 어트리뷰트를 src -> dst 로 일괄 연결 (MEL JUN_cmd_connect_52Facial 포팅).
-
-    obj 쌍을 min 길이만큼 1:1 로 묶고, 각 쌍에서 52개 어트리뷰트를 같은 이름으로 연결한다.
-    없는 어트리뷰트는 건너뛴다.
-
-    Returns:
-        (connected_count, skipped_count).
-    """
-    if not src_objs or not dst_objs:
-        raise ValueError("Source/Destination object list is empty.")
-
-    smaller = min(len(src_objs), len(dst_objs))
-    connected = 0
-    skipped = 0
-
-    for i in range(smaller):
-        bs_src = src_objs[i]
-        bs_dst = dst_objs[i]
-        for name in FACIAL_52:
-            try:
-                cmds.connectAttr(
-                    "{0}.{1}".format(bs_src, name),
-                    "{0}.{1}".format(bs_dst, name),
-                    force=True)
-                connected += 1
-            except Exception:
-                # 소스/타겟에 해당 어트리뷰트가 없으면 스킵 (MEL catch 동작).
-                skipped += 1
-
-    return connected, skipped

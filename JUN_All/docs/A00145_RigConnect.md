@@ -725,7 +725,7 @@ Filter [ inner              ] [Clear]   [Select All]
 
 | 하위 탭 | 내용 |
 |---------|------|
-| **Connect** | 어트리뷰트 **양방향** 연결(Source ↔ Destination) (+ Match from Source / Match Same Name, 52 facial) |
+| **Connect** | 어트리뷰트 **양방향** 연결(Source ↔ Destination) (+ Match from Source / Match Same Name, Connect by Rule) |
 | **List Connected** | 오브젝트의 up/down stream 노드를 타입별로 탐색 |
 | **Pair** | Driver ↔ Driven 을 **거리** 또는 **이름**으로 1:1 짝짓고 constraint (A00140 이식 + v01.37 이름 매칭) |
 | **Transfer Connection** | Source 어트리뷰트의 연결을 **같은 이름의 어트리뷰트**를 가진 Destination 으로 옮김 (upstream / downstream, v01.58) |
@@ -797,8 +797,23 @@ Constrain 탭과 같은 방식이다(§Constrain 참고) — 짧은 라벨 + 툴
 > **driver/driven** 인 이유: 이 함수는 양방향으로 쓰여서 역방향에서는 "src" 가 Destination 을
 > 가리켜 헷갈리기 때문.
 
-- `Connect 52 Facial Target`: 52 ARKit 페이셜 어트리뷰트를 같은 이름끼리 obj 쌍 1:1 로 일괄 연결(없는
-  attr 은 스킵). 이 버튼은 **Source → Destination 한 방향**이다.
+- `Connect by Rule` (v01.59, 예전 `Connect 52 Facial Target` 버튼 자리): 정해진 어트리뷰트 묶음을 **규칙 json**
+  으로 관리한다. `Rule` 콤보에서 고르고 `Connect by Rule` — 규칙의 어트리뷰트를 같은 이름끼리 obj 쌍 1:1(행 순서,
+  짧은 쪽 길이만큼) 로 일괄 연결하고 없는 attr 은 스킵한다. **Source → Destination 한 방향**이다.
+  - 규칙 파일은 `app/rules/connect/<rule>.json`, **파일 하나 = 규칙 하나**. 첫 규칙은 `apple_arkit_52_facial.json`
+    = `Apple ARKit 52 Facial Target` (예전 버튼과 같은 52개, 같은 동작).
+  - 새 규칙은 json 을 폴더에 더하고 `Reload` — 코드는 손대지 않는다. 콤보 툴팁에 설명 · 짝 수 · 파일 경로가 보인다.
+    깨진 파일은 `[WARN]` 으로 알리고 건너뛴다.
+
+    ```json
+    {
+      "name": "Apple ARKit 52 Facial Target",
+      "description": "...",
+      "attributes": ["browInnerUp", "browDownLeft", ...],   // 같은 이름끼리 Source.X -> Destination.X
+      "pairs": [["srcAttr", "dstAttr"]]                     // 이름이 다를 때 (선택, attributes 와 함께 가능)
+    }
+    ```
+  - 로직은 `app/core/connect_rules.py` — `load_rules()` / `find_rule(name)` / `connect_by_rule(src, dst, rule)`.
 
 ##### Match from Source — 이름이 비슷한 어트리뷰트 찾기 (v01.21)
 
@@ -1865,6 +1880,7 @@ A00145_RigConnect/
 ├── __dragDrop_A00145.py            # 셸프 설치 (RigConnect)
 └── app/
     ├── config/version.py
+    ├── rules/connect/*.json        # Connect by Rule 규칙 (apple_arkit_52_facial.json ...)
     ├── core/                       # UI 비의존 maya.cmds 로직
     │   ├── match_manager.py        # Match (MEL Match Tool 포팅: 위치/회전 매칭·컨트롤 생성·버텍스 노말, 대량 매칭용 _Ctx 캐시, capture(), resolve_pairs())
     │   ├── keep_children.py        # Match · Mirror 공용 (부모를 옮겨도 직계 자식을 월드 자리에 붙잡아 둔다: 사전 읽기 -> 되돌리기, 잠긴/연결된 채널은 건너뛰고 보고)
@@ -1876,7 +1892,8 @@ A00145_RigConnect/
     │   ├── constraint_update_manager.py # Update (AE 의 Update 버튼 = <type>Constraint -e -mo 를 리스트 전체에, 타깃은 연결에서 역추적)
     │   ├── constraint_target_manager.py # Target Edit (타깃(드라이버) 교체 = target[i] 입력 연결만 rewire / 추가·삭제 = constraint 명령의 add·remove, offset 재계산, UUID 기반)
     │   ├── attr_match.py           # Match from Source (이름 유사 어트리뷰트 검색: 토큰 역색인 + IDF, maya 비의존 순수 파이썬)
-    │   ├── connect_manager.py      # Connect    (MEL 포팅: attr 나열/검색/연결, 52 facial)
+    │   ├── connect_manager.py      # Connect    (MEL 포팅: attr 나열/검색/연결)
+    │   ├── connect_rules.py        # Connect > Connect by Rule (app/rules/connect/*.json 규칙 로드 + 규칙대로 이름 연결, 예전 52 facial 버튼)
     │   ├── attribute_manager.py    # Attribute > Edit   (정의를 읽어 다른 오브젝트에 재생성 prefix/suffix + 여러 오브젝트 합집합 나열 list_attributes_multi)
     │   ├── attr_order_manager.py   # Attribute > Edit   (Up/Down = 채널 박스 나열 순서 변경. 마야엔 재정렬 명령이 없어 deleteAttr+undo 로 맨 뒤로 보내는 방식)
     │   ├── attr_profile_prefs.py   # Attribute > Create (프로파일 JSON 저장 + 스펙 정규화, maya 비의존)

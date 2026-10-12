@@ -75,6 +75,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - Remove 는 축별/sealBase 까지 되돌림. 검증 mayapy 52(정적 · JO 컨스트레인트 조인트 · X 키 · Attached 는 HEAD 와 월드 행렬 동일) + UI 오프스크린 19, 전부 통과.
 - 문서: `docs/A00170_driverTool.md` Free 모드 절, 포트폴리오 EN/KR 3-4 한 단락.
 
+> [!summary] A00145 RigConnect — **Connect 52 Facial Target 버튼 → 규칙 json `Connect by Rule`** (v01.58->01.59)
+- 요청: 버튼을 없애고 정해진 연결을 규칙 json 으로 관리. 첫 규칙 `Apple ARKit 52 Facial Target` 이 예전 버튼과 같은 연결을 하도록, 규칙이 늘어날 것을 염두.
+- `app/rules/connect/<rule>.json` 파일 하나 = 규칙 하나(`name` / `description` / `attributes` 같은 이름 / `pairs` 다른 이름). 코드의 `FACIAL_52` 목록을 json 으로 뽑아 `apple_arkit_52_facial.json` 으로, `connect_manager.connect_52_facial` 은 지움.
+- `app/core/connect_rules.py`: `load_rules()`(이름순, 깨진 파일은 errors 로) · `find_rule` · `connect_by_rule`(행 순서 1:1, 없는 attr 스킵 — MEL 동작 그대로). UI 는 Connect 페이지 `Connect by Rule` 그룹(Rule 콤보 + Reload + Connect by Rule), 콤보 툴팁에 설명 · 짝 수 · 경로.
+- 검증: mayapy 2024 — 규칙 52 짝 로드, 깨진/모양 틀린 json 은 errors · attributes+pairs 혼합 정규화, 오브젝트 2:1 에서 51 연결 1 스킵, 오프스크린 UI 콤보 · Reload · 연결 · undo.
+
 > [!summary] A00145 RigConnect — **Connect > Transfer Connection 하위 탭 (연결 전이)** (v01.57->01.58)
 - 요청: A.attr_01 ↔ Tgt.attr_tgt_n 연결을 끊고 같은 이름 attr 을 가진 B.attr_01 ↔ Tgt.attr_tgt_n 으로 옮기는 기능. Source 어트리뷰트 목록(Channel Box Only / Connected Only, 체크박스, 전체 체크/해제) → 연결된 노드 목록(체크박스) → Destination → Transfer. upstream/downstream 둘 다. 불필요·중복 UI 는 제안하라고 했다.
 - 제안해 반영한 것: ① "A·B 공통 어트리뷰트" 목록을 따로 두지 않고 Destination 을 담는 순간 어트리뷰트 목록에서 **없는 행을 빨갛게**(툴팁에 누가 없는지) — 같은 집합을 두 번 체크할 일이 없다. ② List UpStream / DownStream 두 버튼 대신 **Direction 체크박스 둘 + List Nodes 하나** — 두 방향이 한 목록에 들어 한 번의 Transfer 로 양쪽을 옮긴다(노드 행 `drives: attr_02    driven by: attr_01`).

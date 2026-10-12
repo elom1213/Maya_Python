@@ -55,5 +55,12 @@
 #        Destination lacks turn red and are skipped; a Destination attribute already
 #        driven by something else is skipped too. One undo step.
 
-VERSION = "01.58"
+# 01.59  Connect > Connect : "Connect 52 Facial Target" button is gone. Fixed attribute sets
+#        are now RULES - json files in app/rules/connect/ (one file = one rule, name /
+#        description / attributes / pairs). The Connect by Rule row (combo + Reload +
+#        Connect by Rule) lists them; the first rule is "Apple ARKit 52 Facial Target",
+#        wired exactly like the old button (objects row by row, same-name attributes,
+#        missing ones skipped). New rules = drop a json in the folder, no code change.
+
+VERSION = "01.59"
 LAST_UPDATE = "2026-10-12"

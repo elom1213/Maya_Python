@@ -38,6 +38,7 @@ from tools.A00145_RigConnect.app.core import connect_manager as cnt_mgr
 from tools.A00145_RigConnect.app.core import attribute_manager as att_mgr
 from tools.A00145_RigConnect.app.core import stream_manager as stm_mgr
 from tools.A00145_RigConnect.app.core import connection_transfer_manager as cxm_mgr
+from tools.A00145_RigConnect.app.core import connect_rules as crule_mgr
 from tools.A00145_RigConnect.app.core import skin_constraint_manager as skn_mgr
 from tools.A00145_RigConnect.app.core import group_create_manager as grp_mgr
 from tools.A00145_RigConnect.app.core import constraint_transfer_manager as cxfer_mgr
@@ -1289,7 +1290,7 @@ class MainWindow(QWidget):
     # Connect 하위 탭: (탭 라벨, 툴팁 = 설명, 빌더 메서드 이름).
     CONNECT_PAGES = (
         ("Connect", "Connect attributes from the source objects to the "
-         "destination objects (+ Match from Source, 52 facial)",
+         "destination objects (+ Match from Source, Connect by Rule)",
          "_build_connect_page"),
         ("List Connected", "Explore the nodes up / down stream of the listed "
          "objects, by node type", "_build_list_connected_page"),
@@ -1340,11 +1341,31 @@ class MainWindow(QWidget):
 
         layout.addLayout(dir_row)
 
-        btn_facial = QPushButton("Connect 52 Facial Target")
-        btn_facial.setToolTip(
-            "Connect the 52 ARKit facial attributes by name, Source -> Destination.")
-        btn_facial.clicked.connect(self.on_connect_52_facial)
-        layout.addWidget(btn_facial)
+        # v01.59 : 정해진 어트리뷰트 묶음은 규칙 json (app/rules/connect/*.json) 으로 관리한다.
+        # 예전 'Connect 52 Facial Target' 버튼은 'Apple ARKit 52 Facial Target' 규칙이 됐다.
+        rule_box = QGroupBox("Connect by Rule")
+        rule_row = QHBoxLayout(rule_box)
+        rule_row.addWidget(QLabel("Rule"))
+        self.cmb_connect_rule = QComboBox()
+        self.cmb_connect_rule.setToolTip(
+            "A rule is a json file in app/rules/connect/ - a fixed set of attribute\n"
+            "names to connect Source -> Destination by name (objects paired row by row).\n"
+            "Add a json file and press Reload to see it here.")
+        self.cmb_connect_rule.currentIndexChanged.connect(self._on_connect_rule_changed)
+        rule_row.addWidget(self.cmb_connect_rule, 1)
+        btn_rule_reload = QPushButton("Reload")
+        btn_rule_reload.setToolTip("Read the rule folder again (app/rules/connect/).")
+        btn_rule_reload.clicked.connect(self._load_connect_rules)
+        rule_row.addWidget(btn_rule_reload)
+        btn_rule = QPushButton("Connect by Rule")
+        btn_rule.setToolTip(
+            "Connect every attribute of the chosen rule, Source -> Destination,\n"
+            "object pairs row by row. Attributes missing on either side are skipped.")
+        btn_rule.clicked.connect(self.on_connect_by_rule)
+        rule_row.addWidget(btn_rule)
+        layout.addWidget(rule_box)
+        self._connect_rules = []
+        self._load_connect_rules()
 
         layout.addStretch(1)
         return page
@@ -2961,7 +2982,8 @@ class MainWindow(QWidget):
             "Connect     : sub-tabs -\n"
             "              Connect      : connect attributes BOTH ways\n"
             "                             (Source -> Destination and back),\n"
-            "                             3 broadcast patterns + 52 facial\n"
+            "                             3 broadcast patterns + Connect by\n"
+            "                             Rule (json, e.g. ARKit 52 facial)\n"
             "                             + Match from Source (find look-alike\n"
             "                             destination attributes, in order)\n"
             "              List Conn.   : explore up/down stream nodes by type\n"
@@ -4141,17 +4163,59 @@ class MainWindow(QWidget):
             self.log("[WARN] could not connect {0} -> {1} : {2}".format(
                 src_plug, dst_plug, reason))
 
-    def on_connect_52_facial(self):
+    # --- Connect by Rule (v01.59) ---
+
+    def _load_connect_rules(self):
+        """app/rules/connect/*.json 을 읽어 콤보를 채운다. 고르던 규칙은 이름으로 유지."""
+        keep = self.cmb_connect_rule.currentText()
+        rules, errors = crule_mgr.load_rules()
+        self._connect_rules = rules
+
+        self.cmb_connect_rule.blockSignals(True)
+        self.cmb_connect_rule.clear()
+        for rule in rules:
+            self.cmb_connect_rule.addItem(rule.name)
+        index = self.cmb_connect_rule.findText(keep) if keep else -1
+        self.cmb_connect_rule.setCurrentIndex(index if index >= 0 else 0)
+        self.cmb_connect_rule.blockSignals(False)
+        self._on_connect_rule_changed()
+
+        for file_name, message in errors:
+            self.log("[WARN] Connect rule '{0}' not loaded : {1}".format(file_name, message))
+        if not rules:
+            self.log("[WARN] No connect rule found in {0}".format(crule_mgr.RULES_DIR))
+
+    def _current_connect_rule(self):
+        index = self.cmb_connect_rule.currentIndex()
+        if 0 <= index < len(self._connect_rules):
+            return self._connect_rules[index]
+        return None
+
+    def _on_connect_rule_changed(self, *_args):
+        """콤보 툴팁에 고른 규칙의 설명과 어트리뷰트 수를 보여준다."""
+        rule = self._current_connect_rule()
+        if rule is None:
+            return
+        self.cmb_connect_rule.setToolTip(
+            "{0}\n{1} attribute pair(s)\n{2}\n\n{3}".format(
+                rule.name, len(rule.pairs), rule.path, rule.description or "(no description)"))
+
+    def on_connect_by_rule(self):
+        rule = self._current_connect_rule()
+        if rule is None:
+            self.log("[ERR] Connect by Rule : no rule selected")
+            return
         src = self._connect_widgets["src"]
         dst = self._connect_widgets["dst"]
         src_objs = src["tsl"].get_all_items()
         dst_objs = dst["tsl"].get_all_items()
 
         def _do():
-            connected, skipped = cnt_mgr.connect_52_facial(src_objs, dst_objs)
-            self.log("       {0} connected, {1} skipped".format(connected, skipped))
+            connected, skipped, pairs = crule_mgr.connect_by_rule(src_objs, dst_objs, rule)
+            self.log("       {0} object pair(s) : {1} connected, {2} skipped".format(
+                pairs, connected, skipped))
 
-        self._run("Connect 52 Facial Target", _do)
+        self._run("Connect by Rule '{0}'".format(rule.name), _do)
 
     # ==============================================================
     # Handlers : List Connected
