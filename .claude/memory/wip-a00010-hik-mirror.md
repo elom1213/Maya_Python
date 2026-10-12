@@ -1,6 +1,6 @@
 ---
 name: wip-a00010-hik-mirror
-description: A00010_humanIKTool_V02 Mirror 탭 — 한쪽 슬롯을 읽어 반대쪽 자동 할당(조인트 + Custom Rig 컨트롤러), 근거는 이름 1순위·위치 폴백
+description: "A00010_humanIKTool_V02 Mirror 탭 — 한쪽 슬롯을 읽어 반대쪽 자동 할당(조인트 + Custom Rig 컨트롤러), 근거는 이름 1순위·위치 폴백; v02.06 부터 후보는 소스와 같은 타입(컨트롤러 캐릭터는 컨트롤러로), 토큰은 공용 mirror_tokens.json"
 metadata:
   type: project
 ---
@@ -43,3 +43,11 @@ metadata:
 **v02.04 (2026-10-02)** — `Neck to head` 하나(앞 n-1 = 목 Neck/Neck1~9, 마지막 = Head, `chain_slots`).
 Mirror `Mirror in same root`(기본 켬): HIK 할당 조인트의 최상위 조인트 아래만 / 끄면 씬 전체(동명이면 ambiguous).
 **★ HumanIK 할당은 풀 패스로** — 짧은 이름으로 `setCharacterObject` 하면 동명 조인트가 있을 때 `No object matches name` 으로 실패한다(실측).
+
+**v02.06 (2026-10-12)** — 사용자: "HIK 에 조인트가 아니라 +X 컨트롤러를 assign 하면 Mirror Joints 가 -X 컨트롤러가 아닌
+조인트를 집는다, `rules/mirror_tokens.json` 규칙대로 반대편 컨트롤러가 미러되게". 원인은 `node_type="joint"` 고정 + 루트가
+`top_joint` 뿐. 고친 것: **`NODE_TYPE_SOURCE`** = 소스와 같은 타입을 `ls -exactType` 으로(transform 이면 조인트가 빠진다 —
+`-type transform` 은 조인트를 포함하므로 exactType 이어야 한다, 실측) · `top_node` = 조인트면 최상위 조인트, 아니면 DAG 최상위 ·
+**이름 토큰은 자체 표를 지우고 공용 `MirrorTokenStore.opposite_name`**([[framework-mirror-tokens]]) — 가는 방향의 출발 토큰이
+걸렸을 때만 후보. 버튼 `Preview / Mirror Definition`, 코어 `mirror_definition` / `hik_roots`(옛 이름은 별칭). mayapy 에서
+`hikCreateCharacter` + `setCharacterObject` 로 컨트롤러 캐릭터를 만들어 검증했다(mayaHIK 로드만 하면 된다).

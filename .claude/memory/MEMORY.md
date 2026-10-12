@@ -90,7 +90,7 @@
 
 ## 툴 작업
 
-- A00010 — [HIK Mirror](wip-a00010-hik-mirror.md)(이름 1순위·위치 폴백, v02.01)
+- A00010 — [HIK Mirror](wip-a00010-hik-mirror.md)(이름 1순위·위치 폴백, v02.01 · 후보는 소스와 같은 타입 `ls -exactType`(컨트롤러 캐릭터는 컨트롤러로) · 토큰은 공용 mirror_tokens.json · Preview/Mirror Definition, v02.06)
 - A00040 — [Joints only export](wip-a00040-joints-only-export.md)(FBX 옵션으로 non-joint 제외, v02.06) · 새 파일 기능은 A00480 으로
 - A00480 — · [FileTool](wip-a00480-filetool.md)(A00040_V02 + quickTool File/Import 를 Export/Import/Path 탭으로, 원본 보존, 창 크기 = A00040_V02 960x853, v01.02 · Export 규칙 레지스트리 + Check Hide Mesh(메시 자신만, 조상 안 봄), 걸리면 파일 0개 · 걸린 메시 선택, v01.05 · Naming = 공용 토큰 위젯, 기본 프로파일 SK_MANU_CH_Name_Basic_Version + Set's Name 규칙, v01.06)
 - A00050 — [uvTool V02](wip-a00050-uvtool-v02.md)(V01 PySide 이식 · 규칙 위반을 사유와 함께 로그+선택 · rename 은 before->after 와 실패 사유, v02.00 · 바꿀 세트 이름을 화면에서 입력, 칸 하나가 Catch 의 규칙도 정한다, v02.01 · UV Sets 표 + `[wrong_name]` 빨강, **A00380 으로 이식 예정**(표 파일+코어 그대로), v02.02 · Delete UV Sets, 첫(기본) 세트는 못 지움, v02.03 · **A00380 UV Sets 탭으로 이식 완료** — 두 툴의 코어·표 파일은 같은 내용 유지)

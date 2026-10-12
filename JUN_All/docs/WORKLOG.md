@@ -110,6 +110,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - Remove 는 축별/sealBase 까지 되돌림. 검증 mayapy 52(정적 · JO 컨스트레인트 조인트 · X 키 · Attached 는 HEAD 와 월드 행렬 동일) + UI 오프스크린 19, 전부 통과.
 - 문서: `docs/A00170_driverTool.md` Free 모드 절, 포트폴리오 EN/KR 3-4 한 단락.
 
+> [!summary] A00010 humanIKTool_V02 — **Mirror 탭: 컨트롤러를 할당한 캐릭터도 반대쪽 컨트롤러로 · 토큰은 공용 mirror_tokens.json** (v02.05->02.06)
+- 요청: HIK 슬롯에 조인트가 아니라 +X 컨트롤러를 assign 하면 Mirror Joints 가 -X 컨트롤러가 아닌 조인트를 집는다 — `rules/mirror_tokens.json` 규칙대로 반대편 컨트롤러가 미러되게.
+- 원인: `mirror_joints` 가 후보 풀을 `node_type="joint"` 로 못 박고 `Mirror in same root` 의 루트도 `top_joint`(조인트만)라 컨트롤러 캐릭터는 루트가 없고 조인트만 후보였다.
+- `mirror_resolver`: `NODE_TYPE_SOURCE` = 소스와 같은 노드 타입(`ls -exactType` — transform 이면 조인트 제외) · `top_node` = 조인트면 최상위 조인트, 아니면 DAG 최상위 · 이름 토큰은 자체 표 대신 **`MirrorTokenStore.opposite_name`**(가는 방향의 출발 토큰이어야 후보). `hik_manager.mirror_definition` / `hik_roots`(옛 이름 별칭 유지), `custom_rig_manager` 도 NODE_TYPE_SOURCE. 버튼 `Preview / Mirror Definition`.
+- 검증: mayapy 2024 + mayaHIK — 컨트롤러 캐릭터(ctrl_grp 아래, 같은 자리에 조인트 스켈레톤 + 동명 미끼) 4 슬롯 전부 반대쪽 **컨트롤러**(이름 3 · 위치 1, 같은 자리 조인트 미끼 안 집음) · undo · 조인트 캐릭터는 그대로 조인트 · same root 끄면 동명 ambiguous · 공용 토큰(`_l` `_L` `_lf` `Left`, `leftover` 는 없음, 반대쪽 토큰은 후보 없음) · UI 버튼 이름. 마야 GUI 확인은 아직.
+
 > [!summary] A00060 jointTool_V03 — **Create > From Object `Match Rotation`** (v03.13->03.14)
 - 요청: Separate 일 때 조인트가 오브젝트의 회전값과 일치하게 생기는 체크박스, 기본 꺼짐.
 - `obj_joint_manager.joints_to_objs(..., match_rotation=False)` — separate 에서만, 조인트마다 `xform -ws -rotation` 으로 월드 회전을 주고 `makeIdentity -apply -rotate` 로 jointOrient 에 굳힌다(rotate 0). 컴포넌트(`.`)는 건너뜀. Connect 는 무시.

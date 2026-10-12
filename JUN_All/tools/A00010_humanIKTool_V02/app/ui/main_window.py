@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-25
+# last Update date : 2026-10-12
 # A00010_humanIKTool_V02 - Qt UI (PySide)
+#
+# v02.06 : Mirror 탭 'Preview / Mirror Joints' -> 'Preview / Mirror Definition'. 슬롯에 컨트롤러를
+#          할당한 캐릭터도 반대쪽 컨트롤러로 미러된다 (코어가 소스와 같은 타입에서 찾는다).
 # 레거시 A00010_humanIKTool 의 maya.cmds UI 를 PySide(arch B)로 마이그레이션.
 #
 # v02.01 : 상위 탭 2개(Assign / Mirror). HIK 캐릭터 노드 선택은 두 탭이 공유하므로
@@ -246,16 +249,18 @@ class MainWindow(QWidget):
             "right-side controllers are built with a different orientation convention.")
         opt_layout.addWidget(self.chk_copy_offset)
 
-        # v02.04 : 반대쪽 조인트를 찾을 범위. 켜면 HIK 에 할당된 조인트의 최상위 조인트 아래만.
+        # v02.04 : 반대쪽 노드를 찾을 범위. 켜면 HIK 에 할당된 노드의 최상위 아래만.
+        # v02.06 : 조인트만이 아니다 - 컨트롤러를 할당한 캐릭터는 컨트롤러 계층의 맨 위가 루트.
         self.chk_same_root = QCheckBox("Mirror in same root")
         self.chk_same_root.setChecked(True)
         self.chk_same_root.setToolTip(
-            "Joints only.\n"
-            "On  : look for the mirrored joint only under the top joint of the joints already\n"
-            "      assigned to this HIK character - a joint with the same name elsewhere in the\n"
-            "      scene (another character, a reference) is ignored.\n"
-            "Off : look among every joint in the scene. If the name exists more than once,\n"
-            "      the row fails as ambiguous instead of guessing.")
+            "Definition mirror (Preview / Mirror Definition).\n"
+            "On  : look for the opposite node only under the top of what is already assigned\n"
+            "      to this HIK character - the top joint for joints, the top of the hierarchy\n"
+            "      for controllers. A node with the same name elsewhere in the scene (another\n"
+            "      character, a reference) is ignored.\n"
+            "Off : look among every node of the source's type in the scene. If the name exists\n"
+            "      more than once, the row fails as ambiguous instead of guessing.")
         opt_layout.addStretch(1)
         same_root_row = QHBoxLayout()
         same_root_row.addWidget(self.chk_same_root)
@@ -267,12 +272,21 @@ class MainWindow(QWidget):
         grp_run = QGroupBox("Run")
         run_layout = QGridLayout(grp_run)
 
-        self.btn_preview_joints = QPushButton("Preview Joints")
-        self.btn_preview_joints.setToolTip("Show what would be assigned. Changes nothing.")
+        # v02.06 : 'Preview / Mirror Joints' -> 'Definition'. 슬롯에 든 것이 조인트든 컨트롤러든
+        # 캐릭터 정의를 미러한다 - 반대쪽은 소스와 같은 타입의 노드에서 찾는다.
+        self.btn_preview_joints = QPushButton("Preview Definition")
+        self.btn_preview_joints.setToolTip(
+            "Show what would be assigned to the opposite slots. Changes nothing.\n"
+            "Works with whatever the slots hold - joints or controllers. The opposite\n"
+            "node is looked for among nodes of the same type as the source, with the\n"
+            "side tokens of Framework/rules/mirror_tokens.json.")
         self.btn_preview_joints.clicked.connect(lambda: self.on_mirror_joints(True))
         run_layout.addWidget(self.btn_preview_joints, 0, 0)
 
-        self.btn_mirror_joints = QPushButton("Mirror Joints")
+        self.btn_mirror_joints = QPushButton("Mirror Definition")
+        self.btn_mirror_joints.setToolTip(
+            "Assign the opposite slots of the character definition - joints or controllers,\n"
+            "whatever the source slots hold. One undo step.")
         self.btn_mirror_joints.clicked.connect(lambda: self.on_mirror_joints(False))
         run_layout.addWidget(self.btn_mirror_joints, 0, 1)
 
@@ -363,7 +377,7 @@ class MainWindow(QWidget):
     def on_mirror_joints(self, dry_run):
         hik_node = self.selected_hik_node()
 
-        records, msg = HIKManager.mirror_joints(
+        records, msg = HIKManager.mirror_definition(
             hik_node,
             direction=self.cmb_direction.currentText(),
             scope=self.cmb_scope.currentText(),

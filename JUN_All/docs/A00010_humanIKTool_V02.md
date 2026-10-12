@@ -94,9 +94,10 @@ HumanIK 의 목 슬롯은 **10 개**(Neck ~ Neck9)뿐이라 목 조인트가 10 
 
 1. `Direction` 을 고른다 — 이미 할당해 둔 쪽이 소스다.
 2. `Scope` 로 범위를 정한다.
-3. **`Preview Joints` 를 먼저 누른다.** 씬은 전혀 바뀌지 않고 결과 표만 채워진다.
+3. **`Preview Definition` 을 먼저 누른다.** 씬은 전혀 바뀌지 않고 결과 표만 채워진다.
+   (v02.05 까지 `Preview Joints` — v02.06 부터 슬롯에 든 것이 조인트든 컨트롤러든 캐릭터 정의를 미러한다.)
 4. 표를 확인한다. 줄을 고르면 그 **대상 노드가 씬에서 선택**되므로 눈으로 확인할 수 있다.
-5. 문제가 없으면 `Mirror Joints`.
+5. 문제가 없으면 `Mirror Definition`.
 
 ### 4-2. 옵션
 
@@ -110,9 +111,10 @@ HumanIK 의 목 슬롯은 **10 개**(Neck ~ Neck9)뿐이라 목 조인트가 10 
 | `Mirror Axis` · `Tolerance` | 위치 매칭용. `Name only` 에서는 비활성화된다 |
 | `Overwrite existing` | 끄면(기본) 이미 차 있는 슬롯은 건드리지 않고 `skip` 으로 보고 |
 | `Copy mapping offsets` | Custom Rig 전용 (6장) |
-| `Mirror in same root` (v02.04, 기본 켜짐) | **조인트 전용.** 켜면 **HIK 에 할당된 조인트의 최상위 조인트 아래에서만** 반대쪽 조인트를 찾는다 — 같은 이름의 조인트가 씬에 더 있어도(다른 캐릭터 · 레퍼런스) 이 캐릭터 것만 고른다. 끄면 **씬의 모든 조인트**에서 찾고, 같은 이름이 여럿이면 추측하지 않고 `ambiguous` 로 실패한다(`Auto` 면 그때 위치로 넘어간다). 결과 줄 끝에 `Searched under: <최상위 조인트>` / `Searched: every joint in the scene` |
+| `Mirror in same root` (v02.04, 기본 켜짐) | 정의 미러용. 켜면 **HIK 에 할당된 노드의 최상위 아래에서만** 반대쪽을 찾는다 — 조인트는 최상위 조인트, 컨트롤러는 그 계층의 맨 위 트랜스폼(v02.06). 같은 이름의 노드가 씬에 더 있어도(다른 캐릭터 · 레퍼런스) 이 캐릭터 것만 고른다. 끄면 **씬에서 소스와 같은 타입의 노드 전부**에서 찾고, 같은 이름이 여럿이면 추측하지 않고 `ambiguous` 로 실패한다(`Auto` 면 그때 위치로 넘어간다). 결과 줄 끝에 `Searched under: <최상위>` / `Searched: every node of the source's type in the scene` |
 
 - **최상위 조인트** = 할당된 조인트에서 부모가 조인트인 동안 올라간 맨 위 조인트(그 위 그룹에서는 멈춘다). 정의가 여러 계층에 걸치면 각 계층의 맨 위 조인트 아래를 모두 본다.
+- **★ 슬롯에 컨트롤러를 할당한 캐릭터 (v02.06)** — +X 쪽 컨트롤러를 HIK 슬롯에 할당해 두고 미러하면 **-X 쪽 컨트롤러**가 나온다. v02.05 까지는 반대쪽을 **조인트에서만** 찾아서(후보 풀 `joint`, 루트도 최상위 조인트) 컨트롤러 캐릭터는 같은 자리의 조인트를 집었다. 지금은 반대쪽을 **소스와 같은 노드 타입**(exactType — 조인트 → 조인트, transform → 조인트가 아닌 transform)에서 찾고, 루트는 컨트롤러 계층의 맨 위다.
 - v02.03 까지는 같은 이름이 여럿일 때 "같은 DAG 최상위 노드" 아래 것을 골랐고, 찾은 조인트를 **짧은 이름**으로 할당해서 동명 조인트가 있으면 `No object matches name` 으로 **할당이 실패**했다 — v02.04 부터 풀 패스로 할당한다.
 
 ### 4-3. 결과 표
@@ -157,9 +159,11 @@ HumanIK 의 목 슬롯은 **10 개**(Neck ~ Neck9)뿐이라 목 조인트가 10 
 | `arm_lf_ctrl` → `arm_rt_ctrl` | `ARMLeft` |
 | `L_arm_L_end` → `R_arm_R_end` (전부) | |
 
-- 인식하는 쌍: `left/right`, `lft/rgt`, `lt/rt`, `lf/rt`, `l/r`.
-  `rt` 처럼 두 쌍에 걸치는 토큰은 후보를 여러 개 만들어 **실제로 존재하는 첫 후보**를 쓴다.
-- 대소문자 꼴을 보존한다 — `LEFT`→`RIGHT`, `Left`→`Right`, `l`→`r`.
+- **토큰 쌍은 공용 규칙 `Framework/rules/mirror_tokens.json`** (v02.06, [`Framework_mirror_tokens.md`](Framework_mirror_tokens.md)) —
+  A00110 Mirror Key · A00145 Mirror 와 같은 파일, 같은 경계 판정(`MirrorTokenStore.opposite_name`). 기본 쌍은
+  `_l/_r`, `_L/_R`, `_lf/_rt`, `Left/Right` 이고 json 에서 더하거나 끌 수 있다. v02.05 까지 이 툴이 따로 갖던
+  표(`left/right, lft/rgt, lt/rt, lf/rt, l/r`, 대소문자 보존)는 지웠다 — 규칙을 한 곳에서 관리하기 위해서다.
+- 가는 방향의 **출발 쪽 토큰**이 들어 있어야 후보가 난다 — `Left -> Right` 에서 `arm_r_ctrl` 은 후보 없음.
 - **네임스페이스와 DAG 패스는 건드리지 않는다.** `ns:L_hand_CTRL` → `ns:R_hand_CTRL`.
 - 같은 이름의 노드가 여럿이면 **먼저 같은 부모 아래**를 보고, 그다음 소스와 같은 계층
   루트 아래를 본다. 그래도 못 좁히면 `ambiguous name` 으로 보고하고 건드리지 않는다.
@@ -169,8 +173,8 @@ HumanIK 의 목 슬롯은 **10 개**(Neck ~ Neck9)뿐이라 목 조인트가 10 
 `Mirror Axis`(기본 `X`) 기준으로 월드 좌표를 뒤집고 가장 가까운 후보를 고른다.
 
 - 후보는 **소스와 같은 계층 루트 아래**로 좁힌다 — 레퍼런스가 여러 개 걸린 씬에서 옆
-  캐릭터의 조인트를 집는 사고를 막는다. 조인트 미러는 `joint` 타입만, 컨트롤러 미러는
-  모든 트랜스폼을 후보로 본다.
+  캐릭터의 조인트를 집는 사고를 막는다. 후보는 **소스와 같은 노드 타입**(exactType)만 — 조인트 소스는
+  조인트, 컨트롤러(transform) 소스는 조인트가 아닌 트랜스폼(v02.06, 정의 미러 · 컨트롤러 미러 공통).
 - **`Tolerance` 밖이면 채택하지 않고 실제 거리를 적어 `fail` 로 보고한다.**
   포즈가 들어간 리그에서 조용히 엉뚱한 조인트를 집는 것이 이 방식의 유일한 위험이라,
   추측하는 대신 실패시키는 쪽을 골랐다.
@@ -237,8 +241,8 @@ app/
 ├── config/version.py
 ├── core/
 │   ├── hik_nodes.py           # 슬롯 ID <-> 이름 테이블, 좌/우 짝짓기, 정의 읽기
-│   ├── mirror_resolver.py     # "한쪽 노드 -> 반대쪽 노드" (조인트/컨트롤러 공용)
-│   ├── hik_manager.py         # 체인 할당 + 조인트 미러
+│   ├── mirror_resolver.py     # "한쪽 노드 -> 반대쪽 노드" (조인트/컨트롤러 공용, 토큰은 Framework/rules/mirror_tokens.json, 후보는 소스와 같은 타입)
+│   ├── hik_manager.py         # 체인 할당 + 정의 미러 (mirror_definition, 옛 이름 mirror_joints)
 │   └── custom_rig_manager.py  # 리타게터 읽기 + 컨트롤러 매핑 미러
 └── ui/main_window.py          # 탭 2개 (Assign / Mirror)
 ```

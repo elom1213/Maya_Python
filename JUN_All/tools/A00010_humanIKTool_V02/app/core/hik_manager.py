@@ -10,7 +10,7 @@
 #   - 실패해도 무조건 "succeeded" 출력하던 문제 -> 성공/실패 카운트로 정확히 보고
 #   - cmds.ls(fl=True) 전체 노드 순회 -> cmds.ls(type="HIKCharacterNode") 직접 조회
 #
-# v02.01 : 좌 -> 우 Mirror Assign 추가 (mirror_joints). 슬롯 테이블은 hik_nodes.py,
+# v02.01 : 좌 -> 우 Mirror Assign 추가 (mirror_joints -> v02.06 mirror_definition). 슬롯 테이블은 hik_nodes.py,
 #          반대쪽 노드를 고르는 규칙은 mirror_resolver.py 에 있다.
 #
 # v02.04 : Neck 1 to head / Neck 2 to head -> **Neck to head** 하나. 조인트 n 개 중 앞 n-1 개 = 목 체인
@@ -29,7 +29,7 @@ from Framework.core.maya_undo import undo_chunk
 
 from tools.A00010_humanIKTool_V02.app.core.hik_nodes import HIKNodes
 from tools.A00010_humanIKTool_V02.app.core.mirror_resolver import (
-    MirrorResolver, MODE_AUTO, SEARCH_ROOTS, SEARCH_SCENE, top_joint)
+    MirrorResolver, MODE_AUTO, SEARCH_ROOTS, SEARCH_SCENE, NODE_TYPE_SOURCE, top_node)
 
 
 class HIKManager:
@@ -223,25 +223,33 @@ class HIKManager:
         return None
 
     @staticmethod
-    def hik_root_joints(hik_node, assigned=None):
-        """HIK 에 할당된 조인트들의 **최상위 조인트**(풀 패스, 정렬). 할당된 게 없으면 [].
+    def hik_roots(hik_node, assigned=None):
+        """HIK 에 할당된 노드들의 **최상위**(풀 패스, 정렬). 할당된 게 없으면 [].
 
-        보통 하나(Reference 또는 Hips 위로 이어진 맨 위 조인트)다. 정의가 여러 계층에 걸쳐 있으면
-        그 계층마다 하나씩 - Mirror in same root 는 그 아래를 모두 본다.
+        조인트는 최상위 조인트(Reference 또는 Hips 위로 이어진 맨 위, 그 위 그룹에서 멈춤),
+        컨트롤러 같은 조인트 아닌 노드는 그 DAG 계층의 맨 위 트랜스폼 (v02.06). 정의가 여러 계층에
+        걸쳐 있으면 그 계층마다 하나씩 - Mirror in same root 는 그 아래를 모두 본다.
         """
         assigned = assigned if assigned is not None else HIKNodes.definition(hik_node)
         roots = set()
         for node in assigned.values():
-            top = top_joint(node)
+            top = top_node(node)
             if top:
                 roots.add(top)
         return sorted(roots)
 
+    # 옛 이름 (v02.04~05) - 호출부 호환.
+    hik_root_joints = hik_roots
+
     @staticmethod
-    def mirror_joints(hik_node, direction=DIRECTION_L2R, scope=SCOPE_ALL, chain_label=None,
-                      mode=MODE_AUTO, axis="X", tolerance=1.0,
-                      overwrite=False, dry_run=False, same_root=True):
-        """이미 할당된 한쪽 슬롯을 근거로 반대쪽 슬롯을 자동 할당한다.
+    def mirror_definition(hik_node, direction=DIRECTION_L2R, scope=SCOPE_ALL, chain_label=None,
+                          mode=MODE_AUTO, axis="X", tolerance=1.0,
+                          overwrite=False, dry_run=False, same_root=True):
+        """이미 할당된 한쪽 슬롯을 근거로 반대쪽 슬롯을 자동 할당한다 (캐릭터 정의).
+
+        v02.06 : 슬롯에 든 것이 조인트든 컨트롤러든 상관없다. 반대쪽은 **소스와 같은 노드 타입**
+        에서 찾고(조인트 -> 조인트, transform -> 조인트 아닌 transform), 이름 토큰은 공용
+        `Framework/rules/mirror_tokens.json` 규칙을 따른다. 옛 이름 mirror_joints 는 별칭으로 남긴다.
 
         hik_node   : 대상 HIKCharacterNode.
         direction  : DIRECTION_L2R / DIRECTION_R2L.
@@ -249,9 +257,10 @@ class HIKManager:
         mode       : mirror_resolver 의 MODE_NAME / MODE_POSITION / MODE_AUTO.
         overwrite  : 반대쪽 슬롯에 이미 뭔가 있을 때 덮어쓸지.
         dry_run    : True 면 아무것도 바꾸지 않고 계획만 돌려준다(Preview).
-        same_root  : True(Mirror in same root) 면 HIK 에 할당된 조인트의 최상위 조인트 **아래에서만**
-                     반대쪽을 찾는다 - 같은 이름의 조인트가 씬에 더 있어도 이 캐릭터 것만 (v02.04).
-                     False 면 씬의 모든 조인트에서 찾고, 같은 이름이 여럿이면 실패로 보고한다.
+        same_root  : True(Mirror in same root) 면 HIK 에 할당된 노드의 최상위(조인트는 최상위 조인트,
+                     컨트롤러는 그 계층의 맨 위) **아래에서만** 반대쪽을 찾는다 - 같은 이름의 노드가
+                     씬에 더 있어도 이 캐릭터 것만 (v02.04). False 면 씬에서 소스와 같은 타입의 노드
+                     전부에서 찾고, 같은 이름이 여럿이면 실패로 보고한다.
 
         반환 : (records, message)
           record = {slot, slot_name, src, dst_slot, dst_slot_name, dst, status, reason}
@@ -273,9 +282,9 @@ class HIKManager:
         allowed = HIKManager.scope_slots(scope, chain_label)
 
         assigned = HIKNodes.definition(hik_node)
-        roots = HIKManager.hik_root_joints(hik_node, assigned) if same_root else []
+        roots = HIKManager.hik_roots(hik_node, assigned) if same_root else []
         resolver = MirrorResolver(mode=mode, to_side=to_side, axis=axis,
-                                  tolerance=tolerance, node_type="joint",
+                                  tolerance=tolerance, node_type=NODE_TYPE_SOURCE,
                                   search=SEARCH_ROOTS if same_root else SEARCH_SCENE,
                                   roots=roots)
 
@@ -358,10 +367,13 @@ class HIKManager:
         msg = HIKManager.summarize(records, hik_node, dry_run)
         if same_root:
             msg += " Searched under: {0}.".format(
-                ", ".join(r.split("|")[-1] for r in roots) if roots else "(no HIK root joint)")
+                ", ".join(r.split("|")[-1] for r in roots) if roots else "(no HIK root)")
         else:
-            msg += " Searched: every joint in the scene."
+            msg += " Searched: every node of the source's type in the scene."
         return (records, msg)
+
+    # 옛 이름 (v02.01~05) - 호출부 호환. 슬롯에 조인트만 있던 때의 이름이다.
+    mirror_joints = mirror_definition
 
     @staticmethod
     def summarize(records, hik_node, dry_run=False):

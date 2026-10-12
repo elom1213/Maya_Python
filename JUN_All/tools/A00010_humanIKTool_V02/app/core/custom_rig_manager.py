@@ -37,7 +37,8 @@ import maya.mel as mel
 from Framework.core.maya_undo import undo_chunk
 
 from tools.A00010_humanIKTool_V02.app.core.hik_nodes import HIKNodes
-from tools.A00010_humanIKTool_V02.app.core.mirror_resolver import MirrorResolver, MODE_AUTO
+from tools.A00010_humanIKTool_V02.app.core.mirror_resolver import (
+    MirrorResolver, MODE_AUTO, NODE_TYPE_SOURCE)
 
 
 class CustomRigManager:
@@ -144,8 +145,9 @@ class CustomRigManager:
         mappings = CustomRigManager.get_mappings(retargeter)
         existing_keys = set((m["body"], m["type"]) for m in mappings)
 
+        # v02.06 : 후보는 소스 컨트롤러와 같은 노드 타입(exactType) - 조인트를 집지 않는다.
         resolver = MirrorResolver(mode=mode, to_side=to_side, axis=axis,
-                                  tolerance=tolerance, node_type=None)
+                                  tolerance=tolerance, node_type=NODE_TYPE_SOURCE)
 
         records = []
         for m in mappings:

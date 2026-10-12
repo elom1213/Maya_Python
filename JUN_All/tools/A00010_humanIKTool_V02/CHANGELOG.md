@@ -1,5 +1,16 @@
 # Changelog — A00010_humanIKTool_V02
 
+## v02.06 (2026-10-12)
+**[Fix] 슬롯에 컨트롤러를 할당한 캐릭터를 미러하면 반대쪽 컨트롤러가 아니라 조인트를 집던 것.**
+- 반대쪽 후보를 `joint` 로 못 박고 루트도 최상위 조인트만 봐서, +X 컨트롤러를 할당한 캐릭터는 -X 의 조인트가 나왔다.
+- 이제 반대쪽은 **소스와 같은 노드 타입**(exactType)에서 찾는다 — 조인트 → 조인트, transform → 조인트가 아닌 transform. `Mirror in same root` 의 루트는 조인트면 최상위 조인트, 컨트롤러면 그 계층의 맨 위.
+- 컨트롤러 매핑 미러(Custom Rig)도 같은 규칙 — 전에는 모든 트랜스폼(조인트 포함)이 후보였다.
+
+**[Change] 이름 토큰은 공용 `Framework/rules/mirror_tokens.json`.**
+- A00110 Mirror Key · A00145 Mirror 와 같은 파일, 같은 경계 판정. 이 툴이 따로 갖던 토큰 표(left/right, lft/rgt, lt/rt, lf/rt, l/r)는 지웠다.
+
+**[Change] 버튼 이름 `Preview Joints` / `Mirror Joints` → `Preview Definition` / `Mirror Definition`.** 코어 `mirror_joints` / `hik_root_joints` 는 `mirror_definition` / `hik_roots` 의 별칭으로 남는다.
+
 ## v02.05 (2026-10-02)
 **[Fix] `Assign Joints` 를 눌러도 HumanIK 창 Definition 탭이 바로 갱신되지 않던 것.**
 - Controls 탭으로 갔다가 Definition 으로 돌아와야 할당이 보였다. Assign 경로에는 HIK 창 갱신 호출이 아예 없었고, Mirror 가 부르던 `hikUpdateDefinitionUI` 만으로는 부족했다.

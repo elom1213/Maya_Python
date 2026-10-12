@@ -12,7 +12,7 @@ updated: 2026-09-07
 
 - **모듈**: `JUN_All/Framework/core/mirror_tokens.py`
 - **규칙 파일**: `JUN_All/Framework/rules/mirror_tokens.json`
-- **쓰는 곳**: `A00110_animTool_V02`(Mirror Key), `A00145_RigConnect`(Mirror 탭)
+- **쓰는 곳**: `A00110_animTool_V02`(Mirror Key), `A00145_RigConnect`(Mirror 탭), `A00010_humanIKTool_V02`(Mirror 탭, v02.06)
 
 ---
 

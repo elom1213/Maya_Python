@@ -1,15 +1,23 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-25
+# last Update date : 2026-10-12
 # A00010_humanIKTool_V02 - "왼쪽 노드에 대응하는 오른쪽 노드" 를 찾는 해석기.
 #
 # 조인트 Mirror 와 컨트롤러(Custom Rig) Mirror 가 같은 이 모듈을 쓴다. 대상만 다를 뿐
 # "이미 할당된 한쪽 노드를 보고 반대쪽 노드를 고른다" 는 문제는 완전히 동일하기 때문이다.
 #
+# v02.06 (2026-10-12)
+#   - 이름 토큰은 **공용 규칙 `Framework/rules/mirror_tokens.json`**(Framework.core.mirror_tokens)
+#     을 쓴다. 이 모듈이 따로 갖던 토큰 표(left/right, lft/rgt, lt/rt, lf/rt, l/r)는 지웠다 -
+#     A00110 Mirror Key · A00145 Mirror 와 같은 파일, 같은 경계 판정.
+#   - 후보 풀은 "조인트" 로 못 박지 않고 **소스와 같은 노드 타입**(NODE_TYPE_SOURCE) 으로 좁힌다.
+#     HIK 슬롯에 조인트가 아니라 컨트롤러(transform)를 할당해 둔 캐릭터는 반대쪽도 컨트롤러에서
+#     찾는다. 조인트 소스면 전처럼 조인트만.
+#
 # -- 무엇을 근거로 짝을 찾을 것인가 -------------------------------------------
 #
 # (1) 이름 (NAME)  * 기본값
-#     리깅 이름에는 사실상 예외 없이 방향 토큰이 들어간다 - L_arm_JNT / arm_lf_ctrl /
+#     리깅 이름에는 사실상 예외 없이 방향 토큰이 들어간다 - arm_l_JNT / arm_lf_ctrl /
 #     LeftArm / arm_L. 그 토큰만 뒤집으면 짝이 나온다.
 #     - 포즈에 의존하지 않는다. 애님이 들어가 있든 T 포즈가 아니든 결과가 같다.
 #     - 좌우가 비대칭인 리그(한쪽에만 보조 조인트가 있는 등)에서도 맞는다.
@@ -32,21 +40,16 @@
 
 import maya.cmds as cmds
 
+from Framework.core.mirror_tokens import MirrorTokenStore
 
-# 이름 안의 방향 토큰 쌍. (왼쪽, 오른쪽) 이고 전부 소문자로 적는다 - 실제 이름의 대소문자는
-# 매칭된 글자에서 그대로 복원한다. 긴 토큰이 먼저 와야 "left" 가 "l" 로 잘못 잡히지 않는다.
-SIDE_TOKEN_PAIRS = [
-    ("left", "right"),
-    ("lft", "rgt"),
-    ("lt", "rt"),
-    ("lf", "rt"),
-    ("l", "r"),
-]
 
 #: 후보를 어디서 찾나 (A00010 v02.04, MirrorResolver(search=...))
 SEARCH_HIERARCHY = "hierarchy"   # 예전 그대로 (컨트롤러 미러가 쓴다)
-SEARCH_ROOTS = "roots"           # 주어진 최상위 조인트들 아래만
+SEARCH_ROOTS = "roots"           # 주어진 최상위 노드들 아래만
 SEARCH_SCENE = "scene"           # 씬 전체 - 동명이 여럿이면 실패
+
+#: node_type 에 주면 "소스와 같은 노드 타입"(exactType) 으로 후보를 좁힌다 (v02.06).
+NODE_TYPE_SOURCE = "<source>"
 
 MODE_NAME = "name"
 MODE_POSITION = "position"
@@ -58,60 +61,6 @@ AXIS_INDEX = {"X": 0, "Y": 1, "Z": 2}
 # --------------------------------------------------------------------------
 # 이름
 # --------------------------------------------------------------------------
-
-def _token_spans(text, token, blockers=()):
-    """text 안에서 token 이 독립된 방향 토큰으로 등장하는 (start, end) 목록.
-
-    단순 문자열 치환을 쓰면 elbow 의 l, clavicle 의 l 까지 바뀐다. 그래서 토큰의
-    앞뒤 경계를 직접 본다.
-      - 앞: 문자열 시작 / 숫자 / 구분자(_ : - 등) / 카멜 경계(소문자 뒤의 대문자 토큰)
-      - 뒤: 문자열 끝 / 숫자 / 구분자 / 대문자(카멜 경계)
-    즉 L_arm, arm_L, arm01L, LeftArm, myLeftArm 은 잡고,
-    Larm, elbow, leftover, ARMLeft 는 잡지 않는다.
-
-    blockers 는 "더 긴 방향 토큰" 목록이다. LEFT_arm 의 첫 글자 L 은 뒤가 대문자 E 라
-    경계 판정만으로는 통과해 버려 REFT_arm 이라는 헛 후보가 나온다. 그 자리에서 더 긴
-    토큰(left)이 시작하면 짧은 토큰의 매칭으로 보지 않는다.
-    """
-    spans = []
-    low = text.lower()
-    tlen = len(token)
-    start = 0
-    while True:
-        i = low.find(token, start)
-        if i < 0:
-            break
-        start = i + 1
-        j = i + tlen
-
-        if any(low.startswith(b, i) for b in blockers):
-            continue
-
-        prev = text[i - 1] if i > 0 else ""
-        if prev and prev.isalpha():
-            # 알파벳 뒤라면 카멜 경계(소문자 + 대문자 토큰) 일 때만 인정한다.
-            if not (prev.islower() and text[i].isupper()):
-                continue
-
-        nxt = text[j] if j < len(text) else ""
-        if nxt and nxt.isalpha() and nxt.islower():
-            # 뒤에 소문자가 이어지면 더 긴 단어의 일부다 (Leftover, Larm).
-            continue
-
-        spans.append((i, j))
-    return spans
-
-
-def _match_case(sample, replacement):
-    """sample 의 대소문자 꼴을 replacement 에 입힌다. (LEFT -> RIGHT, Left -> Right)"""
-    if sample.isupper():
-        return replacement.upper()
-    if sample.islower():
-        return replacement.lower()
-    if sample[0].isupper():
-        return replacement.capitalize()
-    return replacement
-
 
 def split_name(node):
     """DAG 패스/네임스페이스를 분리해 (prefix, leaf) 로. 미러는 leaf 만 건드린다.
@@ -126,37 +75,35 @@ def split_name(node):
     return "", short
 
 
-def mirror_name_candidates(node, to_side):
+def load_token_pairs():
+    """공용 규칙 파일의 enabled 토큰 쌍. 반환 (pairs, message)."""
+    return MirrorTokenStore.load()
+
+
+def mirror_name_candidates(node, to_side, token_pairs=None):
     """node 이름의 방향 토큰을 뒤집은 후보 이름들(우선순위 순, 중복 제거).
 
-    to_side : "Right" 면 왼쪽 토큰 -> 오른쪽 토큰. "Left" 면 반대.
-    rt 처럼 한 토큰이 두 쌍에 걸치는 경우가 있어 후보를 여러 개 돌려주고,
-    실제로 존재하는 노드를 만드는 첫 후보를 호출부가 고른다.
+    v02.06 : 토큰 쌍과 경계 판정은 **공용 `MirrorTokenStore.opposite_name`** 그대로다
+    (`Framework/rules/mirror_tokens.json`, 위에서 아래 순서로 처음 걸리는 쌍의 경계 occurrence 를
+    전부 바꾼다). 후보는 보통 하나지만 목록으로 돌려주는 인터페이스는 유지한다.
+
+    to_side : "Right" 면 왼쪽 토큰이 들어 있어야 하고, "Left" 면 오른쪽 토큰. 반대쪽 토큰만
+              들어 있는 이름(이미 반대편인 노드)은 후보를 내지 않는다.
     """
     prefix, leaf = split_name(node)
+    if token_pairs is None:
+        token_pairs, _ = load_token_pairs()
 
     to_right = (to_side != "Left")
-    src_tokens = [p[0] if to_right else p[1] for p in SIDE_TOKEN_PAIRS]
+    mirrored, token = MirrorTokenStore.opposite_name(leaf, token_pairs)
+    if not mirrored:
+        return []
 
-    out = []
-    for left_tok, right_tok in SIDE_TOKEN_PAIRS:
-        src_tok, dst_tok = (left_tok, right_tok) if to_right else (right_tok, left_tok)
-        blockers = [t for t in src_tokens if len(t) > len(src_tok)]
-        spans = _token_spans(leaf, src_tok, blockers)
-        if not spans:
-            continue
-        # 찾은 토큰을 전부 바꾼다 (L_arm_L_end).
-        buf = []
-        cursor = 0
-        for s, e in spans:
-            buf.append(leaf[cursor:s])
-            buf.append(_match_case(leaf[s:e], dst_tok))
-            cursor = e
-        buf.append(leaf[cursor:])
-        cand = prefix + "".join(buf)
-        if cand != prefix + leaf and cand not in out:
-            out.append(cand)
-    return out
+    # 걸린 토큰이 가고자 하는 방향의 **출발 쪽** 토큰인지 확인한다.
+    src_tokens = {(left if to_right else right) for left, right in token_pairs}
+    if token not in src_tokens:
+        return []
+    return [prefix + mirrored]
 
 
 # --------------------------------------------------------------------------
@@ -172,24 +119,34 @@ def hierarchy_root(node):
     return "|" + parts[1] if len(parts) > 1 else None
 
 
+def node_type_of(node):
+    """node 의 노드 타입. 없으면 None."""
+    try:
+        return cmds.nodeType(node)
+    except Exception:
+        return None
+
+
+def _ls_typed(node_type, *args, **kwargs):
+    """cmds.ls 에 타입 조건을 붙인다. None 이면 모든 트랜스폼."""
+    if node_type:
+        return cmds.ls(*args, long=True, exactType=node_type, **kwargs) or []
+    return cmds.ls(*args, long=True, transforms=True, **kwargs) or []
+
+
 def candidate_pool(reference, node_type=None):
     """reference 와 같은 계층 아래의 노드들. 없으면 씬 전체로 넓힌다.
 
     같은 리그 안으로 좁히면 레퍼런스가 여러 개 걸린 씬에서 옆 캐릭터의 조인트를 집는
-    사고를 막는다.
+    사고를 막는다. node_type 은 **정확한 타입**(exactType)으로 본다 - "transform" 이면 조인트는
+    빠진다(컨트롤러 소스가 조인트를 집지 않도록, v02.06).
     """
     root = hierarchy_root(reference)
     pool = []
     if root:
-        if node_type:
-            pool = cmds.ls(root, dag=True, long=True, type=node_type) or []
-        else:
-            pool = cmds.ls(root, dag=True, long=True, transforms=True) or []
+        pool = _ls_typed(node_type, root, dag=True)
     if not pool:
-        if node_type:
-            pool = cmds.ls(long=True, type=node_type) or []
-        else:
-            pool = cmds.ls(long=True, transforms=True) or []
+        pool = _ls_typed(node_type)
     return pool
 
 
@@ -207,6 +164,21 @@ def top_joint(node):
         if not parent or cmds.nodeType(parent) != "joint":
             return current
         current = parent
+
+
+def top_node(node):
+    """node 가 속한 '최상위' (풀 패스) - 조인트면 top_joint, 아니면 DAG 최상위 트랜스폼 (v02.06).
+
+    HIK 슬롯에 컨트롤러를 할당한 캐릭터는 컨트롤러가 든 리그 계층의 맨 위가 '같은 루트' 다.
+    """
+    top = top_joint(node)
+    if top:
+        return top
+    root = hierarchy_root(node)
+    if root:
+        return root
+    paths = cmds.ls(node, long=True) or []
+    return paths[0] if paths else None
 
 
 def under_roots(path, roots):
@@ -267,7 +239,9 @@ class MirrorResolver:
     to_side   : "Left" / "Right" (이름 토큰을 어느 쪽으로 뒤집을지)
     axis      : 위치 미러 축
     tolerance : 위치 모드에서 허용할 최대 거리(씬 단위)
-    node_type : 후보 풀을 좁히는 타입("joint" / None 이면 모든 트랜스폼)
+    node_type : 후보 풀을 좁히는 타입. None 이면 모든 트랜스폼, "joint" 처럼 고정 타입,
+                NODE_TYPE_SOURCE 면 **소스 노드와 같은 타입**(exactType) - 조인트 소스는 조인트에서,
+                컨트롤러(transform) 소스는 조인트가 아닌 트랜스폼에서 찾는다 (v02.06).
     search    : 후보를 어디서 찾나 (A00010 v02.04)
                 SEARCH_HIERARCHY (기본) - 예전 그대로: 같은 부모 -> 씬 -> 동명이면 같은 DAG 최상위 아래
                 SEARCH_ROOTS     - roots(풀 패스 목록) 아래에서만 (Mirror in same root 켜짐)
@@ -275,7 +249,8 @@ class MirrorResolver:
     """
 
     def __init__(self, mode=MODE_AUTO, to_side="Right", axis="X",
-                 tolerance=1.0, node_type=None, search=None, roots=None):
+                 tolerance=1.0, node_type=None, search=None, roots=None,
+                 token_pairs=None):
         self.mode = mode
         self.to_side = to_side
         self.axis = axis
@@ -283,12 +258,20 @@ class MirrorResolver:
         self.node_type = node_type
         self.search = search or SEARCH_HIERARCHY
         self.roots = list(roots or [])
+        # 공용 규칙은 한 번만 읽는다 (해석기 하나가 슬롯 수십 개를 푼다).
+        self.token_pairs = token_pairs if token_pairs is not None else load_token_pairs()[0]
         self._pool_cache = {}
 
-    def _named(self, leaf):
-        """leaf 이름인 노드들(풀 패스) - node_type 이 있으면 그 타입만."""
-        if self.node_type:
-            return cmds.ls(leaf, long=True, type=self.node_type) or []
+    def _type_for(self, node):
+        """이 소스에 쓸 후보 타입."""
+        if self.node_type == NODE_TYPE_SOURCE:
+            return node_type_of(node)
+        return self.node_type
+
+    def _named(self, leaf, node_type):
+        """leaf 이름인 노드들(풀 패스) - node_type 이 있으면 그 타입(exactType)만."""
+        if node_type:
+            return cmds.ls(leaf, long=True, exactType=node_type) or []
         return cmds.ls(leaf, long=True) or []
 
     # -------------------------------------------------- 이름
@@ -299,7 +282,7 @@ class MirrorResolver:
         paths = cmds.ls(node, long=True) or []
         parent_path = paths[0].rsplit("|", 1)[0] if paths else ""
 
-        for cand in mirror_name_candidates(node, self.to_side):
+        for cand in mirror_name_candidates(node, self.to_side, self.token_pairs):
             leaf = cand.split("|")[-1]
             # 같은 부모 아래를 먼저 본다 - 동명 노드가 있어도 제 짝을 집는다.
             if parent_path:
@@ -316,15 +299,16 @@ class MirrorResolver:
                 if len(same) == 1:
                     return same[0], "name"
                 return None, "ambiguous name ({0} nodes named '{1}')".format(len(found), leaf)
-        return None, "no side token in name"
+        return None, "no side token in name (Framework/rules/mirror_tokens.json)"
 
     def _resolve_by_name_scoped(self, node):
         """SEARCH_ROOTS / SEARCH_SCENE - 범위 안에서 그 이름이 **딱 하나**일 때만 고른다."""
         if self.search == SEARCH_ROOTS and not self.roots:
-            return None, "no HIK root joint to search under"
-        for cand in mirror_name_candidates(node, self.to_side):
+            return None, "no HIK root to search under"
+        node_type = self._type_for(node)
+        for cand in mirror_name_candidates(node, self.to_side, self.token_pairs):
             leaf = cand.split("|")[-1]
-            found = self._named(leaf)
+            found = self._named(leaf, node_type)
             if self.search == SEARCH_ROOTS:
                 found = [f for f in found if under_roots(f, self.roots)]
             if len(found) == 1:
@@ -335,32 +319,28 @@ class MirrorResolver:
                     len(found), leaf, where)
         if self.search == SEARCH_ROOTS:
             return None, "no mirrored name under the HIK root"
-        return None, "no side token in name"
+        return None, "no side token in name (Framework/rules/mirror_tokens.json)"
 
     # -------------------------------------------------- 위치
 
     def _pool(self, node):
+        node_type = self._type_for(node)
         if self.search == SEARCH_ROOTS:
-            if "<roots>" not in self._pool_cache:
+            key = ("<roots>", node_type)
+            if key not in self._pool_cache:
                 pool = []
                 for r in self.roots:
-                    if self.node_type:
-                        pool += cmds.ls(r, dag=True, long=True, type=self.node_type) or []
-                    else:
-                        pool += cmds.ls(r, dag=True, long=True, transforms=True) or []
-                self._pool_cache["<roots>"] = pool
-            return self._pool_cache["<roots>"]
+                    pool += _ls_typed(node_type, r, dag=True)
+                self._pool_cache[key] = pool
+            return self._pool_cache[key]
         if self.search == SEARCH_SCENE:
-            if "<scene>" not in self._pool_cache:
-                if self.node_type:
-                    pool = cmds.ls(long=True, type=self.node_type) or []
-                else:
-                    pool = cmds.ls(long=True, transforms=True) or []
-                self._pool_cache["<scene>"] = pool
-            return self._pool_cache["<scene>"]
-        key = hierarchy_root(node) or "<scene>"
+            key = ("<scene>", node_type)
+            if key not in self._pool_cache:
+                self._pool_cache[key] = _ls_typed(node_type)
+            return self._pool_cache[key]
+        key = (hierarchy_root(node) or "<scene>", node_type)
         if key not in self._pool_cache:
-            self._pool_cache[key] = candidate_pool(node, self.node_type)
+            self._pool_cache[key] = candidate_pool(node, node_type)
         return self._pool_cache[key]
 
     def _resolve_by_position(self, node):
