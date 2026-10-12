@@ -31,5 +31,13 @@
 #        the usual matrix network drives the follower (curves use nearestPointOnCurve).
 #        Widgets of the other modes are hidden; Orient / Aim / norCrv / set are shared.
 
-VERSION = "01.31"
+# 01.32  Seal (Free mode) : sealing now also returns the ROTATION of every driver to the
+#        closed pose. A rotate with no incoming connection gets a 'sealBaseRotate'
+#        (doubleAngle3) attribute - its open rotation - feeding pairBlend.inRotate1, with
+#        the rest rotation on inRotate2 (same pattern as 'sealBase' for translate). Before,
+#        only connected rotates were blended, so a static driver rotated after the build
+#        kept that rotation when the lips closed. Remove Seal writes the value back and
+#        deletes the attribute; Attached mode is unchanged.
+
+VERSION = "01.32"
 LAST_UPDATE = "2026-10-12"

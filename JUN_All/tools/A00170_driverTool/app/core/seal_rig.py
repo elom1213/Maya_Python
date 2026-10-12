@@ -89,6 +89,11 @@
 #      `sealBase`(double3) 어트리뷰트로 노드에 심고 그걸 pairBlend in1 과 라이브 위치의 소스로 쓴다
 #      (자기 어트리뷰트가 자기 translate 를 구동하는 것은 사이클이 아니다 — mayapy 로 확인).
 #      다물리기 전 자리를 옮기려면 `sealBase` 를 고친다. Remove 가 값을 translate 로 되돌리고 지운다.
+#      **회전도 같다**(v01.32) : rotate 에 연결이 없는 정적 노드는 `sealBaseRotate`(doubleAngle3) 를
+#      심어 pairBlend.inRotate1 로 받고, inRotate2 는 rest 회전이다. v01.31 까지는 rotate 를 연결이 있을
+#      때만 섞어서, 정적 노드의 회전을 바꾼 뒤 다물면 바뀐 회전이 그대로 남았다(translate 만 rest 로
+#      돌아갔다). 이제 다물면 회전도 빌드 포즈로 돌아간다. 다물리기 전 회전을 바꾸려면 `sealBaseRotate` 를
+#      고친다(rotate 채널은 pairBlend 가 구동한다). Attached 모드는 그대로다(연결 없는 rotate 는 안 섞음).
 #   담은 노드가 곧 드라이버다 — 어태치 모드의 "그룹을 담으면 자손 널" · "커브를 담으면 그 널들" 확장은
 #   근거(어태치)가 없어 Free 모드에서는 하지 않는다. 조인트를 직접 다물 때 jointOrient 가 있으면 rest
 #   회전을 `R = local x JO^-1` 로 구해 넣는다(JO 를 무시하면 회전이 틀어진다).
@@ -138,7 +143,9 @@ MODE_FREE = "free"             # 담은 트랜스폼 그대로, u 는 월드 위
 MODES = (MODE_ATTACHED, MODE_FREE)
 
 # Free 모드에서 연결이 없는 정적 노드에 심는 "다물리기 전 자리" 어트리뷰트
-FREE_BASE_ATTR = "sealBase"
+FREE_BASE_ATTR = "sealBase"                 # translate (double3)
+FREE_BASE_ROTATE_ATTR = "sealBaseRotate"    # rotate (doubleAngle3, v01.32)
+FREE_BASE_ATTRS = {"translate": FREE_BASE_ATTR, "rotate": FREE_BASE_ROTATE_ATTR}
 
 # 나중에 rest 를 다시 잡을 수 있도록 남기는 표식(message 어트리뷰트).
 REST_NULL_TAG = "sealRestNull"      # rest 행렬 노드 -> 그 널
@@ -777,19 +784,24 @@ def _source_plugs(node, attr):
     return (compound[0] if compound else None), children
 
 
-def _ensure_base_attr(node):
-    """Free 모드의 정적 노드에 `sealBase`(double3) 를 심고 **지금 translate** 를 넣는다. (플러그)
+def _ensure_base_attr(node, attr="translate"):
+    """Free 모드의 정적 노드에 `sealBase`(translate) / `sealBaseRotate`(rotate) 를 심고 **지금 값**을
+    넣는다. (플러그)
 
-    빌드 포즈가 곧 rest 이므로 지금 값이 "다물리기 전 자리"다. 이미 있으면 값만 갱신한다.
+    빌드 포즈가 곧 rest 이므로 지금 값이 "다물리기 전 자리/회전"다. 이미 있으면 값만 갱신한다.
+    rotate 는 자식을 `doubleAngle` 로 만들어 pairBlend 의 각도 플러그에 단위 변환 없이 바로 잇는다
+    (double 로 만들면 Maya 가 unitConversion 을 끼운다).
     """
-    if not cmds.attributeQuery(FREE_BASE_ATTR, node=node, exists=True):
-        cmds.addAttr(node, longName=FREE_BASE_ATTR, attributeType="double3")
+    name = FREE_BASE_ATTRS[attr]
+    if not cmds.attributeQuery(name, node=node, exists=True):
+        child_type = "doubleAngle" if attr == "rotate" else "double"
+        cmds.addAttr(node, longName=name, attributeType="double3")
         for axis in "XYZ":
-            cmds.addAttr(node, longName=FREE_BASE_ATTR + axis, attributeType="double",
-                         parent=FREE_BASE_ATTR, keyable=True)
-    plug = node + "." + FREE_BASE_ATTR
+            cmds.addAttr(node, longName=name + axis, attributeType=child_type,
+                         parent=name, keyable=True)
+    plug = node + "." + name
     if cmds.getAttr(plug, settable=True):
-        cmds.setAttr(plug, *cmds.getAttr(node + ".translate")[0])
+        cmds.setAttr(plug, *cmds.getAttr(node + "." + attr)[0])
     return plug
 
 
@@ -797,9 +809,9 @@ def input_feed(node, attr, allow_static=False):
     """`node.attr` 의 "다물리기 전" 공급원. ([(축, 소스 플러그 | 상수)], 종류)
 
     종류 : 'compound'(컴파운드 연결 하나 — 어태치 네트워크) / 'children'(축별 연결 — 컨스트레인트 · 키,
-    연결 없는 축은 지금 값을 상수로) / 'static'(연결이 전혀 없음 — translate 면 `sealBase` 를 심어
-    그걸 소스로, `allow_static` 일 때만) / None(정적인데 허용하지 않음).
-    축은 "" (컴파운드) 또는 "X" | "Y" | "Z".
+    연결 없는 축은 지금 값을 상수로) / 'static'(연결이 전혀 없음 — `sealBase`(translate) /
+    `sealBaseRotate`(rotate, v01.32) 를 심어 그걸 소스로, `allow_static` 일 때만) / None(정적인데
+    허용하지 않음). 축은 "" (컴파운드) 또는 "X" | "Y" | "Z".
     """
     compound, children = _source_plugs(node, attr)
     if compound:
@@ -809,8 +821,8 @@ def input_feed(node, attr, allow_static=False):
         for axis, plug in zip("XYZ", children):
             feed.append((axis, plug if plug else cmds.getAttr(node + "." + attr + axis)))
         return feed, "children"
-    if allow_static and attr == "translate":
-        return [("", _ensure_base_attr(node))], "static"
+    if allow_static and attr in FREE_BASE_ATTRS:
+        return [("", _ensure_base_attr(node, attr))], "static"
     return [], None
 
 
@@ -1081,6 +1093,15 @@ def rotation_driven(null):
     return bool(compound or any(children))
 
 
+def rotation_sealable(null, allow_static=False):
+    """다물릴 때 회전을 섞을 수 있나 — 구동되고 있거나, Free 모드(`allow_static`)면 정적이어도(v01.32).
+
+    Free 모드의 정적 노드는 `sealBaseRotate` 를 심어 받으므로 늘 섞을 수 있다. Attached 모드는
+    v01.31 과 같이 구동되는 rotate 만(연결 없는 rotate 는 이미 rest 회전이라 건드리지 않는다).
+    """
+    return allow_static or rotation_driven(null)
+
+
 def _insert_pair_blend(null, seal_t, seal_r, weight_plug, name, allow_static=False):
     """원래 구동과 seal 자리 사이에 pairBlend 를 끼운다. (pairBlend, 회전도 섞었나)
 
@@ -1090,7 +1111,7 @@ def _insert_pair_blend(null, seal_t, seal_r, weight_plug, name, allow_static=Fal
 
     축별 연결(컨스트레인트 · 키)은 축별로 in1 에 잇고, 출력을 컴파운드로 잇기 전에 **자식 연결을
     먼저 끊는다**(force 로 이어도 자식 연결이 남아 두 소스가 다툰다 — 실측). `allow_static`(Free 모드)
-    이면 연결 없는 translate 도 `sealBase` 로 받는다.
+    이면 연결 없는 translate 도 `sealBase` 로, 연결 없는 rotate 도 `sealBaseRotate` 로 받는다(v01.32).
     """
     feed_t, _kind = input_feed(null, "translate", allow_static)
     if not feed_t:
@@ -1106,7 +1127,7 @@ def _insert_pair_blend(null, seal_t, seal_r, weight_plug, name, allow_static=Fal
 
     rotated = False
     if seal_r:
-        feed_r, _kind = input_feed(null, "rotate")
+        feed_r, kind_r = input_feed(null, "rotate", allow_static)
         if feed_r:
             _connect_feed(feed_r, pb + ".inRotate{0}1")
             cmds.connectAttr(seal_r, pb + ".inRotate2", f=True)
@@ -1114,7 +1135,7 @@ def _insert_pair_blend(null, seal_t, seal_r, weight_plug, name, allow_static=Fal
             cmds.setAttr(pb + ".rotInterpolation", 1)
             _disconnect_children(null, "rotate")
             cmds.connectAttr(pb + ".outRotate", null + ".rotate", f=True)
-            rotated = True
+            rotated = kind_r            # 'compound' | 'children' | 'static'
     return pb, rotated
 
 
@@ -1141,13 +1162,16 @@ def build_seal(upper, lower, controller, prefix=DEFAULT_PREFIX, axis="x",
         bias / band / merge: 어트리뷰트 초기값.
         metric / tolerance: 짝짓기 척도와 최대 허용치(`pair_drivers` 참고).
         blend_rotation: True 면 다물릴 때 회전을 **rest(다물리기 전) 회전**으로 되돌린다.
-            커브가 회전까지 구동하고 있는 널에만 노드가 붙는다(Edge Loop 의 orient 옵션).
+            Attached 모드는 커브가 회전까지 구동하고 있는 널에만 노드가 붙는다(Edge Loop 의 orient
+            옵션). Free 모드는 **모든** 드라이버에 붙는다 — 연결 없는 rotate 는 `sealBaseRotate` 를
+            심어 받는다(v01.32).
         reference: rest 를 저장할 기준 노드(보통 머리 조인트). None 이면 각 널의 **부모**.
             널 그룹이 이미 머리를 따라간다면 None 으로 충분하다.
         merge: `sealMerge` 초기값. 0 = 위/아래가 rest 간격을 지킨 채 만난다(기본),
             1 = 위/아래 널이 만남점 한 점에서 정확히 일치한다(v01.19 까지의 동작).
         mode: MODE_ATTACHED(기본, 커브/서피스 어태치 널) / MODE_FREE(담은 트랜스폼 그대로,
-            u 는 `axis` 월드 위치, 연결 없는 노드는 `sealBase` 를 심어 받는다 — v01.29).
+            u 는 `axis` 월드 위치, 연결 없는 노드는 `sealBase` / `sealBaseRotate` 를 심어 받는다
+            — v01.29 / v01.32).
 
     Returns:
         report dict — pairs / nodes / set / attrs / skipped / flipped / mode / static_based.
@@ -1195,6 +1219,7 @@ def build_seal(upper, lower, controller, prefix=DEFAULT_PREFIX, axis="x",
     created = []
     rotated_count = 0
     static_based = []          # Free 모드에서 sealBase 를 심은 노드들
+    static_rotated = []        # Free 모드에서 sealBaseRotate 를 심은 노드들 (v01.32)
     # band 는 여러 쌍이 공유한다 : 1 - band 를 한 번만 만든다.
     omb = _node("plusMinusAverage", "{0}_seal_oneMinusBand".format(prefix))
     cmds.setAttr(omb + ".operation", 2)
@@ -1256,7 +1281,7 @@ def build_seal(upper, lower, controller, prefix=DEFAULT_PREFIX, axis="x",
             created += nodes
 
             seal_r = None
-            if blend_rotation and rotation_driven(null):
+            if blend_rotation and rotation_sealable(null, free):
                 seal_r, rot_nodes = _rest_local_rotate(world_mx, null, side_name)
                 created += rot_nodes
 
@@ -1265,6 +1290,8 @@ def build_seal(upper, lower, controller, prefix=DEFAULT_PREFIX, axis="x",
             created += [pb]
             if rotated:
                 rotated_count += 1
+                if rotated == "static":
+                    static_rotated.append(null)
 
     node_set = cmds.sets(created, name=seal_set_name(prefix))
     # Update Rest Pose 가 컨트롤러를 다시 찾을 수 있도록.
@@ -1291,6 +1318,7 @@ def build_seal(upper, lower, controller, prefix=DEFAULT_PREFIX, axis="x",
         "mode": mode,
         "u_space": info["u_space"],
         "static_based": [_leaf(n) for n in static_based],
+        "static_rotated": [_leaf(n) for n in static_rotated],
     }
 
 
@@ -1369,8 +1397,9 @@ def _restore_input(pb, in_attr, out_attr):
     """pairBlend 의 in1 을 원래 자리(널 translate / rotate)로 되돌린다. (되돌린 개수, sealBase 를 쓴 노드)
 
     in1 이 컴파운드 연결이면 그 소스를 다시 잇고, 축별 연결이면 축별로 잇고, 연결 없는 축은 in1 의
-    값을 되쓴다. 소스가 그 노드 자신의 `sealBase`(Free 모드의 정적 노드)면 값을 translate 에 쓰고
-    어트리뷰트는 지울 대상으로 돌려준다(pairBlend 가 아직 물고 있어 여기서 지우지 않는다).
+    값을 되쓴다. 소스가 그 노드 자신의 `sealBase` / `sealBaseRotate`(Free 모드의 정적 노드)면 값을
+    translate / rotate 에 쓰고 그 어트리뷰트 플러그를 지울 대상으로 돌려준다(pairBlend 가 아직 물고
+    있어 여기서 지우지 않는다).
     """
     dst = cmds.listConnections(pb + "." + out_attr, s=False, d=True, plugs=True) or []
     if not dst:
@@ -1387,9 +1416,9 @@ def _restore_input(pb, in_attr, out_attr):
     if compound:
         src = compound[0]
         src_node, src_attr = src.split(".", 1)
-        if src_attr == FREE_BASE_ATTR and _long(src_node) == _long(node):
+        if src_attr in FREE_BASE_ATTRS.values() and _long(src_node) == _long(node):
             cmds.setAttr(dst_plug, *cmds.getAttr(src)[0])
-            return 1, _long(node)
+            return 1, _long(node) + "." + src_attr
         cmds.connectAttr(src, dst_plug, force=True)
         return 1, None
 
@@ -1412,8 +1441,8 @@ def remove_seal(prefix=DEFAULT_PREFIX):
     """빌드한 seal 네트워크를 걷어내고 **원래 구동 연결로 되돌린다**.
 
     pairBlend 의 in1(원래 구동 — 어태치 네트워크 / 컨스트레인트 / 키 / `sealBase`)을 다시 널
-    translate · rotate 로 이어 준 뒤 노드를 지운다. Free 모드의 정적 노드는 `sealBase` 값을
-    translate 로 되쓰고 어트리뷰트를 지운다(v01.29).
+    translate · rotate 로 이어 준 뒤 노드를 지운다. Free 모드의 정적 노드는 `sealBase` /
+    `sealBaseRotate` 값을 translate / rotate 로 되쓰고 어트리뷰트를 지운다(v01.29 / v01.32).
     컨트롤러의 어트리뷰트는 **지우지 않는다**(키가 걸려 있을 수 있다).
     Returns (restored_count, deleted_count)
     """
@@ -1438,9 +1467,9 @@ def remove_seal(prefix=DEFAULT_PREFIX):
         cmds.delete(alive)
     if cmds.objExists(node_set):
         cmds.delete(node_set)
-    for node in based:
+    for plug in based:
         try:
-            cmds.deleteAttr(node + "." + FREE_BASE_ATTR)
+            cmds.deleteAttr(plug)
         except Exception:
             pass
     return (restored, len(alive))

@@ -476,7 +476,7 @@ Attached 모드는 드라이버가 `pointOnCurveInfo` / `pointOnSurfaceInfo` 까
 |---|---|
 | 입술 위 진행도 `u` | **Corner Axis 방향 위치**를 Upper + Lower **합집합의 양 끝**으로 0~1. 위치는 **Reference 공간**에서 잰다(비우면 월드) — 머리가 기울어진 포즈에서 빌드해도 위/아래가 어긋나지 않는다. |
 | 다물리기 전 라이브 위치 | translate 에 들어오는 연결(컨스트레인트 · 키 · 다른 노드망)을 그대로 쓴다. 컨스트레인트와 키는 **축별** 연결이라 축별로 받는다. |
-| `pairBlend` 를 끼울 연결 | 연결이 **전혀 없는** 노드는 자기 자신을 읽으면 사이클이라, 빌드 시점 translate 를 **`sealBase`** 어트리뷰트로 노드에 심고 그걸 소스로 쓴다. 다물리기 전 자리를 옮기려면 `sealBase` 를 고친다. |
+| `pairBlend` 를 끼울 연결 | 연결이 **전혀 없는** 노드는 자기 자신을 읽으면 사이클이라, 빌드 시점 translate 를 **`sealBase`** 어트리뷰트로 노드에 심고 그걸 소스로 쓴다. 다물리기 전 자리를 옮기려면 `sealBase` 를 고친다. **회전도 같다(v01.32)** — 연결 없는 rotate 는 **`sealBaseRotate`** 를 심어 받는다. |
 
 - **담은 노드가 곧 드라이버다.** Attached 의 "그룹을 담으면 자손 널", "커브를 담으면 그 널들" 확장은 Free 에서는 하지 않는다
   (근거인 어태치가 없다). 조인트를 담으면 조인트에 직접 끼운다 — `jointOrient` 가 있어도 rest 회전을 `R = local × JO⁻¹` 로
@@ -484,8 +484,20 @@ Attached 모드는 드라이버가 `pointOnCurveInfo` / `pointOnSurfaceInfo` 까
 - **Skip the corner joints** 의 뜻: Free 의 `u` 는 담은 것의 양 끝이 정확히 0 / 1 이다. 입꼬리를 **양쪽 리스트에 다** 담으면
   지금처럼 코너로 빠지고, 한쪽에만 담았거나 아예 안 담았으면 끝 노드 두 개가 코너로 건너뛰어진다 — 끝까지 다물려면 끈다.
 - **Pair by** 의 첫 항목은 Free 에서 `Axis position (u)` 로 이름이 바뀐다(커브 파라미터가 아니라 축 위치 차이).
-- **Remove Seal** 은 어태치 연결 · 컨스트레인트 · 키를 축별로 되돌리고, `sealBase` 는 값을 translate 에 되쓴 뒤 지운다.
-  **Update Rest Pose** 는 두 모드 공통.
+- **회전도 다물린 포즈로 돌아간다 (v01.32).** v01.31 까지는 rotate 에 연결이 있는 드라이버만 회전을 섞어서,
+  Free 모드의 정적 오브젝트는 **회전을 바꾼 뒤 다물면 바뀐 회전이 그대로 남았다**(translate 만 rest 로 돌아갔다).
+  이제 `Restore the closed-pose rotation` 이 켜져 있으면 Free 모드의 **모든** 드라이버가 회전을 섞는다 — 연결 없는
+  rotate 는 translate 의 `sealBase` 와 같은 방식으로 **`sealBaseRotate`**(doubleAngle3, 빌드 시점 회전) 를 심어
+  `pairBlend.inRotate1` 로 받고, `inRotate2` 는 rest 회전(기준 공간에 저장, 조인트는 JO 를 벗긴 값)이다. 다물면
+  회전이 **빌드 포즈로**, 열면 `sealBaseRotate` 값으로. **다물리기 전 회전을 바꾸려면 `sealBaseRotate` 를 고친다**
+  (rotate 채널은 pairBlend 가 구동하므로 직접 돌릴 수 없다 — translate 와 같은 규칙). 로그에 `sealBaseRotate` 를
+  심은 노드가 적힌다. Attached 모드는 그대로다(연결 없는 rotate 는 이미 rest 회전이라 건드리지 않는다).
+  검증(mayapy 28항목): 정적 로케이터 10개 — 빌드 시 무변화 · `sealBaseRotate` 를 고친 뒤 다물면 rest 회전, 열면 바뀐
+  회전 · 절반 가중치는 둘 사이 · 머리를 돌려도 로컬 rest 유지 · Update Rest Pose 가 바뀐 회전을 새 rest 로 · Remove 가
+  값을 rotate 에 되쓰고 attr 삭제 · JO 조인트는 채널·월드 회전 모두 rest · translate 는 컨스트레인트 + rotate 정적 혼합 ·
+  `Restore` 끄면 rotate 자유 · Attached 회귀(정적 rotate 안 섞음). 마야 GUI 확인은 아직.
+- **Remove Seal** 은 어태치 연결 · 컨스트레인트 · 키를 축별로 되돌리고, `sealBase` / `sealBaseRotate` 는 값을
+  translate / rotate 에 되쓴 뒤 지운다. **Update Rest Pose** 는 두 모드 공통.
 - 검증(mayapy): 정적 널 / JO 있는 컨스트레인트 조인트 / X 에만 키 걸린 널 세 입력 + Attached 회귀(HEAD 와 월드 행렬 동일) 52항목,
   UI 오프스크린 19항목.
 

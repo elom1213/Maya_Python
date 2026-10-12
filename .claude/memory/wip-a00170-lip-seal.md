@@ -99,3 +99,10 @@ Update Rest Pose·기준 공간 경고 9·UI 22)([[mayapy-headless-verify]]).
   출력 컴파운드 연결 전 `_disconnect_children` 필수. Remove 는 `_restore_input` 이 축별/상수/sealBase 를 되돌리고 attr 삭제.
 - 리포트 `mode` · `u_space` · `static_based`. UI: 모드 바꾸면 Pair by 첫 항목이 `Axis position (u)`, Attached 0/0 경고에 Free 안내 한 줄.
 - 검증 mayapy 52(정적 널 · JO 컨스트레인트 조인트 · X 키 널 · 가드 · Attached HEAD 회귀) + UI 오프스크린 19. 마야 GUI 실기는 아직.
+
+**v01.32 (2026-10-12, 사용자 요청) — Free 모드 회전도 다물면 rest 로.**
+정적 오브젝트의 rotate 는 연결이 없어 `rotation_driven` 이 False → 회전 pairBlend 가 안 끼워져, 회전을 바꾼 뒤 다물면
+바뀐 회전이 남았다. `sealBaseRotate`(doubleAngle3 — double 자식은 unitConversion 이 끼어든다) 를 translate 의 `sealBase`
+와 같은 패턴으로 심고 `input_feed(..., allow_static)` 가 rotate 도 static 을 받는다. `rotation_sealable(null, free)` =
+Free 면 늘 True. 리포트 `static_rotated`. Remove 는 `_restore_input` 이 `(node.attr)` plug 를 돌려줘 둘 다 지운다.
+**열린 회전을 바꾸려면 `sealBaseRotate` 를 고친다**(rotate 채널은 pairBlend 가 구동). Attached 모드 불변. mayapy 28.

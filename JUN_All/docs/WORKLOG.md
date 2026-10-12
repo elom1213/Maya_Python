@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00170 driverTool — **Seal Free 모드: 다물면 회전도 빌드 포즈로** (v01.31->01.32)
+- 요청: Free 모드로 빌드한 뒤 Seal R/L 로 다물면 translate 는 기대대로인데, 입술 오브젝트의 회전을 바꾼 뒤 다물면 바뀐 회전이 그대로 남는다. 회전도 바꾸기 전 값으로 돌아가게.
+- 원인: `build_seal` 이 `rotation_driven(null)`(rotate 에 연결이 있을 때)만 회전 pairBlend 를 끼웠고, `input_feed` 의 static 경로는 translate 만 `sealBase` 를 심었다. Free 모드의 정적 오브젝트는 rotate 가 그대로 자유 채널.
+- 고침: `FREE_BASE_ROTATE_ATTR = "sealBaseRotate"`(doubleAngle3 — double 이면 unitConversion 이 끼어든다), `_ensure_base_attr(node, attr)` 일반화, `input_feed` 가 rotate 도 static 허용, `rotation_sealable(null, allow_static)` 로 Free 면 모든 드라이버에 `_rest_local_rotate` + pairBlend 회전. `_insert_pair_blend` 가 회전 feed 종류를 돌려줘 리포트 `static_rotated` 추가, UI 로그 한 줄. `_restore_input` 이 `sealBase`/`sealBaseRotate` 둘 다 값을 되쓰고 plug 단위로 삭제. Attached 모드는 불변.
+- 검증: mayapy 2024 28 항목 — 정적 로케이터 10개(sealBaseRotate 고친 뒤 다물면 rest, 열면 바뀐 값, 절반 가중치는 사이, 머리 회전 불변, Update Rest Pose, Remove 되쓰기+attr 삭제) · JO 조인트(채널·월드 모두 rest) · pointConstraint translate + 정적 rotate 혼합 · `blend_rotation=False` · Attached 회귀. 마야 GUI 확인은 아직.
+- 문서: `docs/A00170_driverTool.md` Free 모드 절 불릿 + 표, UI 툴팁/About. 포트폴리오는 손대지 않음.
+
 > [!summary] A00480 FileTool — **Maya 탭 > Reference: 마야 파일들의 레퍼런스를 트리로 보고 체크한 것을 각 파일에 임포트해 제자리 저장** (v01.09->01.10) · A00240 Tree 탭을 Framework 로 승격 (v01.19->01.20)
 - 요청: 계획서 먼저(`docs/plans/A00480_FileTool_maya_tab_reference_plan.md`, §12 에 사용자 결정 11개 · §13 재개용 진행표). 나중에 독립 툴로 뗄 수 있게 → `app/maya/{core,ui}` 한 폴더, 밖은 Framework 만.
 - Framework: A00240 Tree 탭 + tree_scanner + prefetcher 를 `MOD_fileTree_qt_v01` 로 승격(A00240 은 re-export, 동작 동일) + `checkable_files`(파일 행 체크박스, 경로로 기억 · Expand 창 공유) · `default_types`. 트리용 다중 체크 동작 `MOD_checkTree_qt_v01`(checkList 의 트리 판 — **QTreeWidgetItem 은 기본 플래그가 checkable 이라 `CheckStateRole` 데이터로 판정**). Reveal / Copy file path 공용 `path_context.py`.

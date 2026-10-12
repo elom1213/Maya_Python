@@ -1786,8 +1786,9 @@ class MainWindow(QWidget):
             "so the outermost nodes get u = 0 / 1 (list the mouth corners in both\n"
             "lists, or turn 'Skip the corner joints' off to seal them too).\n"
             "Drivers with an incoming connection (constraint, keys, any network) keep it;\n"
-            "a node with no connection gets a 'sealBase' attribute holding its un-sealed\n"
-            "translate - edit that to move it. Remove Seal puts everything back.")
+            "a node with no connection gets 'sealBase' / 'sealBaseRotate' attributes holding\n"
+            "its un-sealed translate / rotation - edit those to move or rotate it while the\n"
+            "lips are open. Remove Seal puts everything back.")
         self.seal_cmb_mode.currentIndexChanged.connect(self.on_seal_mode_changed)
         mode_row.addWidget(self.seal_cmb_mode, 1)
         root.addLayout(mode_row)
@@ -1948,9 +1949,11 @@ class MainWindow(QWidget):
         self.seal_cb_rotate.setToolTip(
             "On (default): a sealed driver ends up with exactly the orientation it had when\n"
             "the seal was built - closing the lips never twists a null into a new direction.\n"
-            "Only applies where the curve drives rotation too (Edge Loop built with Orient);\n"
-            "drivers without a rotation connection already keep their rotation and are skipped.\n"
-            "Off: rotation is left to the curve while the lips close.")
+            "Attached mode: only where the curve drives rotation too (Edge Loop built with\n"
+            "Orient); drivers without a rotation connection already keep their rotation.\n"
+            "Free mode: every driver - a rotate with no connection gets a 'sealBaseRotate'\n"
+            "attribute (its open rotation), so sealing always returns to the closed-pose rotation.\n"
+            "Off: rotation is left to its input while the lips close.")
         root.addWidget(self.seal_cb_rotate)
 
         value_row = QHBoxLayout()
@@ -2210,6 +2213,13 @@ class MainWindow(QWidget):
                       "(edit that to move it; Remove Seal writes it back): {1}".format(
                           len(report["static_based"]),
                           ", ".join(report["static_based"])))
+        if report.get("static_rotated"):
+            self._log("{0} node(s) had no incoming rotate connection - each got a "
+                      "'sealBaseRotate' attribute holding its un-sealed rotation "
+                      "(edit that to rotate it; sealing returns to the closed-pose "
+                      "rotation; Remove Seal writes it back): {1}".format(
+                          len(report["static_rotated"]),
+                          ", ".join(report["static_rotated"])))
         if report["shared_curve"]:
             self._log("Upper and Lower share one {0} curve / surface - each lip was "
                       "re-spanned to its own 0-1 arc.".format(
@@ -2344,8 +2354,9 @@ class MainWindow(QWidget):
             "  sealMerge 1 brings back the old 'exactly the same point' behaviour.\n"
             "- Mode: Attached (drivers found through their curve / surface attach) or\n"
             "  Free (any transforms - nulls, joints, locators; u = position along the\n"
-            "  Corner Axis in the Reference space; nodes without an input get a\n"
-            "  'sealBase' attribute; constraint / keyed inputs are kept per axis).\n"
+            "  Corner Axis in the Reference space; nodes without an input get\n"
+            "  'sealBase' / 'sealBaseRotate' attributes so sealing returns translate AND\n"
+            "  rotation to the closed pose; constraint / keyed inputs are kept per axis).\n"
             "- Update Rest Pose: re-take the closed shape from the current pose.\n"
             "\n"
             "Each build is one undo step. All UI text is English.\n"
