@@ -7,7 +7,7 @@ updated: 2026-09-22
 
 # 릴리즈 배치 — dev 트리와 릴리즈본은 폴더 모양이 다르다
 
-`JUN_All/dev/release_builder_QT` 가 만드는 **릴리즈본**은 개발 트리를 그대로 복사한 것이 아니다.
+`JUN_All/dev/A00510_release_builder` 가 만드는 **릴리즈본**은 개발 트리를 그대로 복사한 것이 아니다.
 **툴 하나가 혼자 설 수 있게** 다시 포장한 것이라 폴더 모양이 다르고, 그래서 툴의 진입 파일
 (`launch.py` · `launcher.py`)은 **두 배치에서 모두 돌아야 한다.**
 
@@ -224,7 +224,7 @@ subprocess.run(cmd, cwd=ROOT, capture_output=True, encoding="utf-8", errors="rep
 
 ## 7. 관련 문서
 
-- [`release_builder_QT.md`](release_builder_QT.md) — 릴리즈를 만드는 개발 툴
+- [`A00510_release_builder.md`](A00510_release_builder.md) — 릴리즈를 만드는 개발 툴
 - [`A00470_MaterialTool.md`](A00470_MaterialTool.md) — 이 문제가 처음 드러난 툴
 - [`plans/release_install_dragdrop_fix_plan.md`](plans/release_install_dragdrop_fix_plan.md) — 5·6장 작업의 계획서
 - [`WORKLOG.md`](WORKLOG.md) — 2026-09-21 · 2026-09-22 항목

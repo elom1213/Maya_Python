@@ -3,7 +3,7 @@
 # A00210_FileManager - bundled default data-repo config
 #
 # 이 파일은 '중앙 데이터 리포'(records/thumbs/lineage/path_structures)의 기본 위치를
-# 툴과 함께 배포한다. release_builder_QT 가 app/ 전체를 복사하므로 자동으로 배포에 포함된다.
+# 툴과 함께 배포한다. A00510_release_builder 가 app/ 전체를 복사하므로 자동으로 배포에 포함된다.
 # 배포받은 사용자는 Store Repo 를 따로 clone/설정하지 않아도 Pull 한 번이면 아래 URL 을
 # DEFAULT_STORE_DIR 로 자동 clone 한 뒤 동기화한다(main_window.on_pull 참고).
 #

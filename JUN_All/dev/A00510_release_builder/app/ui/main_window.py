@@ -138,7 +138,7 @@ class MainWindow(QWidget):
         # 크게 볼 수 있다.
         self.log_widget = JUN_mod_log_qt_v01(
             window_title="Release Builder - Log",
-            object_name="JUN_release_builder_QT_log_window")
+            object_name="JUN_A00510_release_builder_log_window")
         self.layout.addWidget(self.log_widget, 1)
 
     # ---------------------------------------------------------------- helpers

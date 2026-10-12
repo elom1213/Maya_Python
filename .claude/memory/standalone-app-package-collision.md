@@ -17,11 +17,11 @@ named 'app.core.X'` or shows the wrong window.
 **Correct pattern** (matches in-Maya tools A00110 and templates A00004/A00008):
 - `launch.py`: keep `JUN_All` on `sys.path`, import via the tool's unique path —
   `from tools.<ToolName>.app.ui.main_window import MainWindow`
-  (release_builder_QT lives under `dev/` → `from dev.release_builder_QT.app...`).
+  (A00510_release_builder lives under `dev/` → `from dev.A00510_release_builder.app...`).
 - Internal modules: use **relative imports** — `from ..core import …`,
   `from ..config.version import VERSION`, `from .file_table import FileTable`.
 - Do NOT add the tool folder itself (`TOOL_ROOT`) to `sys.path`.
 
-Fixed 2026-06-18 in A00080, A00210, A00220, release_builder_QT. This is the same
+Fixed 2026-06-18 in A00080, A00210, A00220, A00510_release_builder. This is the same
 class of bug as the dragDrop `config.py`/basename collision noted in CLAUDE.md §3.
 Related: [[prefer-pyside-for-new-tools]], [[worklog-maintenance]].

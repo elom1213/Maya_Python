@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-`release_builder_QT`(= 옛 `dev/build_release.py`)가 만드는 릴리즈본은 dev 트리와 **배치가 다르다**.
+`A00510_release_builder`(= 옛 `dev/build_release.py`)가 만드는 릴리즈본은 dev 트리와 **배치가 다르다**.
 
 | | dev 트리 | 릴리즈본 (`Maya_Tool_Release`) |
 |---|---|---|

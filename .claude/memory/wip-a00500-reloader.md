@@ -11,9 +11,9 @@ metadata:
 2026-10-12 사용자: "`dev/reloader_mayaScript_v02.py` 를 복사해 마야 툴로 쓰고 있다, 다른 툴처럼 `__dragDrop_AXXXXX.py` 로
 셸프에 설치하고 `AXXXXX_reloader` 폴더로 관리. tools 가 더 맞으면 tools 로 옮겨도 되고 dev 에 정리해도 된다."
 
-- **dev 에 두었다** (`dev/A00500_reloader`, release_builder_QT 와 같은 자리): `config.DEV_MODE` 에 의존하고 릴리즈본은
+- **dev 에 두었다** (`dev/A00500_reloader`, A00510_release_builder 와 같은 자리): `config.DEV_MODE` 에 의존하고 릴리즈본은
   `dev/` 를 통째로 제외한다([[release-layout-launch-py]]). 번호는 tools 의 다음 번호(A00490 다음) 를 썼다 — **A00500 은
-  이 툴이 쓴다**, 새 tools 는 A00510 부터.
+  이 툴이, A00510 은 release_builder 가 쓴다**, 새 tools 는 A00520 부터.
 - **`dev/reloader_v02.py` 는 지우지 말 것** — 40여 개 툴의 `launch.py` 가 `from dev.reloader_v02 import reload_for_tool` 을
   쓴다. 로직은 `app/core/reloader.py` 로 옮기고 그 파일은 얇은 재노출. `reload_path_list.py` 는 `app/config/reload_packages.py`.
 - `launch.run(True)` 순서: `config` 리로드(DEV_MODE 변경 반영) → 리로더 자신 → `Framework`, `tools`(sys.modules 에 있는 것만,

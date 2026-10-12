@@ -13,7 +13,7 @@
 - [WORKLOG maintenance](worklog-maintenance.md) — 최신이 위, 날짜 헤딩 중복 금지, 월 롤링
 - [Docs go in JUN_All/docs](docs-go-in-jun-all-docs.md) — 툴 안내 = docs/, 계획 = docs/plans/, 학습 = JUN_Study
 - [A00500_reloader](wip-a00500-reloader.md) — dev 리로더는 `dev/A00500_reloader` 셸프 툴, `dev/reloader_v02` 는 재노출(launch.py 들이 쓴다) · 전부 리로드는 다른 툴 창을 닫을 수 있다
-- [release_builder_QT](wip-release-builder-qt.md) — 릴리즈 복사 개발툴(dev/)
+- [A00510_release_builder](wip-release-builder-qt.md) — 릴리즈 복사 개발툴(dev/, 옛 release_builder_QT, v01.03 부터 A 번호 + __dragDrop_A00510)
 - [Release layout & launch.py](release-layout-launch-py.md) — 릴리즈본은 Framework 동봉 · config/dev 없음, launch.py 가 두 배치 구분. **툴 간 import 금지**
 - [Release install scripts](release-install-scripts.md) — userSetup 이름 고정, git 출력 UTF-8 vs 콘솔 cp949
 - [Update portfolio on tool work](update-portfolio-on-tool-work.md) — portfolio EN/KR 동기, 커밋 통계 건드리지 않기

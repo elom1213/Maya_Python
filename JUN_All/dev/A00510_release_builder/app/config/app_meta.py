@@ -15,11 +15,11 @@ from Framework.qt.qt import QIcon
 APP_USER_MODEL_ID = "Junny.MayaPython.ReleaseBuilder"
 
 #: 아이콘 이름(확장자 뺀 것). icon/ 폴더에 .svg / .png / .ico 가 함께 있다.
-ICON_STEM = "release_builder_QT"
+ICON_STEM = "A00510_release_builder"
 
 
 def icon_dir():
-    """<release_builder_QT>/icon 절대 경로."""
+    """<A00510_release_builder>/icon 절대 경로."""
     return os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
         "icon")

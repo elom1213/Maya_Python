@@ -1,24 +1,29 @@
-# release_builder_QT — Release Builder (사용 안내)
+# A00510_release_builder — Release Builder (사용 안내)
+
+> v01.03 (2026-10-12) 까지 폴더 이름은 `dev/release_builder_QT` 였다. dev 의 툴도 tools 와 같은 `A00XXX_` 번호 규칙으로 관리한다.
 
 툴을 **골라서 릴리즈 폴더로 복사**하는 개발용 Qt 창이다. 손으로 `dev/build_release.py` 의
 `TOOL_PATH` 를 고쳐 가며 돌리던 일을 대체한다.
 
-- 버전: `v01.02` (`app/config/version.py`) — **목록 검색(Filter)** · **공용 로그창** · **아이콘**
-- 위치: `JUN_All/dev/release_builder_QT` (배포 대상이 아니라 **개발 도구**다)
+- 버전: `v01.03` (`app/config/version.py`) — v01.02 에 **목록 검색(Filter)** · **공용 로그창** · **아이콘**, v01.03 에 이름 변경 + 셸프 설치
+- 위치: `JUN_All/dev/A00510_release_builder` (배포 대상이 아니라 **개발 도구**다)
 - 형태: 아키텍처 (B) — PySide. 복사 로직(`app/core/release_builder.py`)은 **Qt 비의존**
 
 ---
 
 ## 1. 실행
 
+마야 셸프: `dev/A00510_release_builder/__dragDrop_A00510.py` 를 뷰포트로 드래그&드롭하면 `Release` 버튼이 생긴다
+(`dev.A00510_release_builder.run()`). 터미널:
+
 ```bash
-python JUN_All/dev/release_builder_QT/launch.py
+python JUN_All/dev/A00510_release_builder/launch.py
 ```
 
 마야 안에서도 뜬다(이미 도는 이벤트 루프를 감지해 창만 돌려준다).
 
 ```python
-from dev.release_builder_QT.launch import run
+from dev.A00510_release_builder.launch import run
 run()
 ```
 
@@ -84,7 +89,7 @@ Qt 는 **숨긴 항목의 체크를 유지한다.** 그래서 두 가지를 정�
 
 ## 5. 아이콘 (v01.02~)
 
-`icon/release_builder_QT.svg` · `.png`(32px) · `.ico`(16·24·32·48·64·128·256).
+`icon/A00510_release_builder.svg` · `.png`(32px) · `.ico`(16·24·32·48·64·128·256).
 
 - 그림: 공통 배경 틀(rx=6) 위에 **열린 상자 + 위로 나가는 화살표**(= 내보내기).
 - 창 아이콘은 `MainWindow` 가, 앱 아이콘은 `launch.py` 가 건다.
@@ -100,9 +105,9 @@ Qt 는 **숨긴 항목의 체크를 유지한다.** 그래서 두 가지를 정�
 ## 6. 구조
 
 ```
-dev/release_builder_QT/
+dev/A00510_release_builder/
 ├─ launch.py                 # AppUserModelID -> QApplication -> 테마 -> 창
-├─ icon/release_builder_QT.svg|.png|.ico
+├─ icon/A00510_release_builder.svg|.png|.ico
 └─ app/
    ├─ config/version.py
    ├─ config/app_meta.py     # 아이콘 경로 + AppUserModelID

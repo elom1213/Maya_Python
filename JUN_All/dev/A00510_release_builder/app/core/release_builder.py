@@ -2,8 +2,8 @@
 # release_builder.py - 릴리즈 복사 로직 (Qt 비의존)
 #
 # 이 파일 경로:
-#   JUN_All/dev/release_builder_QT/app/core/release_builder.py
-# parents[4] == JUN_All  (core -> app -> release_builder_QT -> dev -> JUN_All)
+#   JUN_All/dev/A00510_release_builder/app/core/release_builder.py
+# parents[4] == JUN_All  (core -> app -> A00510_release_builder -> dev -> JUN_All)
 
 import shutil
 from pathlib import Path

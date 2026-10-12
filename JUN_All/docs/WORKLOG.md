@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00510_release_builder — **`dev/release_builder_QT` 이름을 A 번호 규칙으로 + 셸프 설치** (v01.02->01.03)
+- 요청: release_builder_QT 도 `AXXXXX_release_builder` 로. dev 의 코드를 tools 와 같은 방식으로 관리하는 것이 좋은지, 더 나은 방법이 있는지도.
+- git mv `dev/release_builder_QT` → `dev/A00510_release_builder`, 아이콘 3개 · `docs/release_builder_QT.md` → `docs/A00510_release_builder.md` 도 git mv. 코드(`launch` import 경로 · `ICON_STEM` · 로그창 objectName) · 문서(README · Release_Layout · A00500 · A00210 주석) · 메모 5개의 옛 이름 34곳 치환 — 지난 WORKLOG 본문은 그대로.
+- 추가: `__dragDrop_A00510.py`(라벨 Release) + 패키지 `__init__.run()` — launch 최상단이 AppUserModelID 를 지정하므로 **늦게 import** 해 마야에서 패키지 import 만으로 작업 표시줄 묶음이 바뀌지 않게.
+- 검증: mayapy 2024 오프스크린 — 패키지 import 시 launch 미로드, 아이콘 ico/png 탐색, 창 생성, 릴리즈 대상 목록에 dev 툴 없음, 드롭 파일의 셸프 명령 실행.
+
 > [!summary] A00500_reloader — **dev 의 리로더를 셸프 버튼 툴로 정리** (신규 v01.00)
 - 요청: `dev/reloader_mayaScript_v02.py` 를 복사해 마야 툴로 쓰고 있다 — 다른 툴처럼 `__dragDrop_AXXXXX.py` 로 셸프에 설치하고 `AXXXXX_reloader` 폴더로 관리. tools 가 더 맞으면 tools 로, 아니면 dev 에 정리.
 - 판단: `config.DEV_MODE` 에 의존하고 릴리즈본(dev 제외)에 실리지 않는 개발 전용이라 **`dev/A00500_reloader`** (release_builder_QT 와 같은 자리). 40여 개 launch.py 가 `from dev.reloader_v02 import reload_for_tool` 을 쓰므로 **`dev/reloader_v02.py` 는 얇은 재노출**로 남겨 호출부는 손대지 않았다.

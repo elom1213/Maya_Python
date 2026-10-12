@@ -6,7 +6,7 @@
 
 - 버전: `v01.00` (`app/config/version.py`)
 - 위치: `JUN_All/dev/A00500_reloader` — 배포 대상이 아니라 **개발 도구**라 `tools/` 가 아닌 `dev/` 에 있다
-  (`release_builder_QT` 와 같은 자리). 릴리즈본에는 `dev/` 가 실리지 않는다 — [Release_Layout](Release_Layout.md)
+  (`A00510_release_builder` 와 같은 자리). 릴리즈본에는 `dev/` 가 실리지 않는다 — [Release_Layout](Release_Layout.md)
 - 창이 없다. 누르면 리로드하고 결과를 뷰포트 메시지와 스크립트 에디터에 적는다.
 
 ---
