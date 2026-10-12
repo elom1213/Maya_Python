@@ -2,6 +2,17 @@
 
 All notable changes to this tool are documented here.
 
+## v01.08 — 2026-10-12
+
+- **Side-by-side layout**: the splitter is now horizontal - the control panel
+  (Profile / Create / Color / Log) sits on the **left**, the button collection on
+  the **right**. Profile / Create / Color are laid out in two rows each (widget
+  row + button row) so they fit the narrow column. The window opens wider
+  (760 x 600) and the Log group takes the spare height of the left column
+  instead of a fixed 90 px. Collapsing the
+  `Controls` bar now shrinks the left column to the header's width; `View > Show
+  Controls` still removes it entirely.
+
 ## v01.07 — 2026-10-12
 
 - **View > Show Controls**: a new `View` menu (left of `Help`) with a checkable

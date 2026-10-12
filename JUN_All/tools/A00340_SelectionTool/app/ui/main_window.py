@@ -7,11 +7,12 @@
 #   - 버튼은 현재 선택을 캡처해 만든다. 클릭하면 그 오브젝트들이 씬에서 선택된다.
 #   - A00240_PathTool 처럼 카테고리/버튼을 자유롭게 추가·삭제·순서변경 하고,
 #     Profile 로 원하는 종류끼리 버튼 세트를 나눠 보관한다.
-#   - 화면은 상하 스플리터로 [컨트롤(Profile/Create/Color/Log)] / [버튼 모음] 분리.
+#   - 화면은 좌우 스플리터로 [컨트롤(Profile/Create/Color/Log)] | [버튼 모음] 분리
+#     (v01.08~, 그 전엔 상하).
 #     컨트롤 4칸은 하나의 접이식 'Controls' 박스로 묶여 한 번에 접힌다. 로그창도
 #     그 안에 들어가므로 log_view 를 탭에 넘겨준다.
 #   - View > Show Controls (v01.07~): 접어도 남던 Controls 영역을 아예 없앤다.
-#     끄면 위 pane 과 스플리터 핸들이 사라지고 버튼 모음이 창 전체를 쓴다.
+#     끄면 왼쪽 pane 과 스플리터 핸들이 사라지고 버튼 모음이 창 전체를 쓴다.
 # 창은 마야 메인 윈도우에 parent 되어 뷰포트 위에 뜬다. 모든 UI 문자열/로그는 영어.
 
 from Framework.qt.qt import (
@@ -46,7 +47,8 @@ class MainWindow(QWidget):
 
         self.setWindowTitle("Selection Tool v{0}".format(VERSION))
         self.setWindowFlags(Qt.Window)
-        self.resize(360, 620)
+        # 좌우 배치라 가로가 넓다 (v01.07 까지 360 x 620).
+        self.resize(760, 600)
 
         self.build_ui()
 
@@ -91,9 +93,10 @@ class MainWindow(QWidget):
         self.log_view = JUN_mod_log_qt_v01(
             window_title="Selection Tool - Log",
             object_name="JUN_A00340_SelectionTool_log_window")
-        self.log_view.setFixedHeight(90)
+        # 왼쪽 칸의 남는 높이를 Log 가 받으므로 최소만 정한다(옛 고정 90).
+        self.log_view.setMinimumHeight(90)
 
-        # 선택 버튼 탭 (컨트롤 pane + 버튼 pane 을 상하 스플리터로 분리, 로그도 그 안에)
+        # 선택 버튼 탭 (컨트롤 pane | 버튼 pane 을 좌우 스플리터로 분리, 로그도 그 안에)
         self.selection_tab = SelectionTab(
             log_callback=self._log, log_widget=self.log_view)
         main_layout.addWidget(self.selection_tab, stretch=1)
@@ -149,9 +152,9 @@ class MainWindow(QWidget):
             "- Set Color uses a palette with an eyedropper (Pick Screen\n"
             "  Color). Turn on 'Color Select' to check multiple buttons\n"
             "  across categories and Apply one color to all of them.\n"
-            "- Layout : drag the splitter between the control panel and the\n"
-            "  button area; click the 'Controls' bar to collapse Profile /\n"
-            "  Create / Color / Log all at once.\n"
+            "- Layout : controls on the left, buttons on the right; drag the\n"
+            "  splitter between them. Click the 'Controls' bar to collapse\n"
+            "  Profile / Create / Color / Log all at once.\n"
             "- View > Show Controls : hide the whole control pane so the\n"
             "  button area fills the window (remembered for next time).\n"
             "\n"

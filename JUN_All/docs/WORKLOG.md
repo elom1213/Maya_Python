@@ -32,6 +32,18 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00340 SelectionTool — **배치를 좌우로: Controls 왼쪽 | 버튼 모음 오른쪽** (v01.07->01.08)
+- 요청: Controls 가 위, 나머지가 아래인 구성을 Controls 왼쪽 · 나머지 오른쪽으로.
+- `QSplitter(Qt.Vertical)` → `Horizontal`, 기본 너비 `CONTROLS_WIDTH = 300` | 480, 창 360x620 → **760x600**.
+  한 줄짜리 Profile / Create / Color 는 좁은 칸에 안 맞아(오프스크린 최소 547px) **두 줄**(위젯 행 + 버튼 행)로.
+  폰트에 따라 버튼 폭이 달라 상수로 못 박으므로 **처음 보일 때(`showEvent`) 내용의 최소 너비를 재서** 왼쪽 칸을 그 이상으로
+  연다(세로 스크롤바 폭을 여유로 더함 - 세로 바가 뷰포트를 좁혀 가로 바를 부르던 것).
+  왼쪽 칸의 남는 높이는 Log 그룹이 받는다(`setFixedHeight(90)` → 최소 90 + stretch). 접기는 헤더 **너비**로 줄이고
+  펴면 직전 너비 복원(`_controls_expanded_w`). View > Show Controls 는 그대로(숨기면 오른쪽이 전체).
+- CHANGELOG v01.08 · 문서 8항 · About · 주석의 위/아래 표현을 왼쪽/오른쪽으로.
+- 검증: mayapy 2024 오프스크린 — 스플리터 가로, 왼쪽 x < 오른쪽 x · 두 pane 높이 같음, 접으면 왼쪽 너비가 헤더 폭 근처,
+  펴면 복원, Show Controls 끄면 오른쪽 너비 = 스플리터 전체, Log 가 왼쪽 칸 남는 높이를 받음. GUI 확인 아직.
+
 > [!summary] A00030 quickTool_V02 — **Attribute > Attribute Lock: 채널박스에서 고른 어트리뷰트를 선택 오브젝트 전부에 lock/unlock 토글** (v02.05->02.06)
 - 요청: 토글 버튼 하나로, 선택한 오브젝트들의 선택한 어트리뷰트를 lock · unlock.
 - `quick_ops.channel_box_plugs()` — 채널박스 네 구역(main · shape · history · output)의 선택 어트리뷰트 × 그 구역의
