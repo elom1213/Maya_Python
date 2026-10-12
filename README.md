@@ -279,7 +279,7 @@ JUN_All/
 - **GitHub**: [github.com/elom1213](https://github.com/elom1213)
 - **Portfolio — 리깅 (Rigging)**: [Notion](https://early-aletopelta-1fe.notion.site/2d8c7945011c805f85f7de708797b440)
 - **Portfolio — 애니메이션 (Animation)**: [Notion](https://early-aletopelta-1fe.notion.site/2d8c7945011c808da505d821605f8ed7)
-- **Portfolio (Web)**: [junnyparkall.myportfolio.com](https://junnyparkall.myportfolio.com/)
+- **Portfolio (Web)**: [Notion](https://early-aletopelta-1fe.notion.site/JUNNY-PARK-125c7945011c8310a004018da042623b?pvs=74)
 
 ---
 
