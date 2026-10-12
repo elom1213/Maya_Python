@@ -10,5 +10,11 @@
 # 01.28  Seal : double-click a row of the Preview Pairing list to select that pair's
 #        upper and lower node in the scene (held by UUID, so renames / duplicate names are fine).
 
-VERSION = "01.28"
-LAST_UPDATE = "2026-09-28"
+# 01.29  Seal : Mode combo - Attached (v01.28 behaviour, unchanged) / Free (any transform).
+#        Free mode seals the listed transforms as they are: u = position along the Corner
+#        Axis in the Reference space between the outermost listed nodes; constraint / keyed
+#        inputs are kept per axis; nodes with no input get a 'sealBase' attribute that Remove
+#        writes back. Joints sealed directly keep their jointOrient out of the rest rotation.
+
+VERSION = "01.29"
+LAST_UPDATE = "2026-10-12"

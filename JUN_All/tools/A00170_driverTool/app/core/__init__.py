@@ -33,6 +33,7 @@ from .seal_rig import (
     AXES as SEAL_AXES, DEFAULT_PREFIX as SEAL_DEFAULT_PREFIX,
     METRICS as SEAL_METRICS, METRIC_PARAM as SEAL_METRIC_PARAM,
     METRIC_DISTANCE as SEAL_METRIC_DISTANCE, pair_cost as seal_pair_cost,
+    MODES as SEAL_MODES, MODE_ATTACHED as SEAL_MODE_ATTACHED, MODE_FREE as SEAL_MODE_FREE,
 )
 from .stretch import (
     build_stretch as run_build_stretch,
@@ -55,6 +56,7 @@ __all__ = [
     "seal_orient_u", "seal_prepare_sides", "seal_pair_drivers", "seal_set_name",
     "SEAL_AXES", "SEAL_DEFAULT_PREFIX", "SEAL_METRICS",
     "SEAL_METRIC_PARAM", "SEAL_METRIC_DISTANCE", "seal_pair_cost",
+    "SEAL_MODES", "SEAL_MODE_ATTACHED", "SEAL_MODE_FREE",
     "LOOP_CONTROL_SCALE",
     "run_build_stretch",
     "FUNCTIONS", "FUNC_POS", "FUNC_NEG", "FUNC_SIGMOID", "FUNC_SIGMOID_REV",

@@ -32,6 +32,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00170 driverTool — **Seal 탭 Free 모드**: 어태치 없는 트랜스폼도 지퍼로 다문다 (v01.28->01.29)
+- 요청: Build Seal 이 커브/서피스 어태치 드라이버에만 동작(`found 0 / 0`). 기존 동작은 그대로 두고 **다른 모드**로 어태치 없는 오브젝트도 되게.
+- 판단: 어태치는 ① 입술 위 u ② 다물리기 전 라이브 위치 ③ pairBlend 끼울 연결 세 가지만 공급 — 셋을 대체하면 지퍼 계산은 그대로 쓸 수 있다.
+- `Mode` 콤보 `Attached (curve / surface)` / `Free (any transform)`. Free = 담은 트랜스폼이 곧 드라이버. u = Corner Axis 위치를 **Reference 공간**에서 양쪽 합집합 양 끝으로 0~1(월드로 재면 머리가 기운 포즈에서 짝이 한 칸 밀렸다 — 실측).
+- 연결 있는 노드(컨스트레인트 · 키)는 **축별** 플러그로 받는다 — 컴파운드 `listConnections(node.translate)` 는 자식 연결을 안 돌려주고, 컴파운드를 force 로 이어도 자식 연결이 남아 두 소스가 다툰다(실측, 먼저 끊는다). 연결 없는 정적 노드는 `sealBase` double3 를 심어 소스로(자기 어트리뷰트 → 자기 translate 는 사이클 아님).
+- 조인트 직접 다물기: rest 회전 `R = local × JO⁻¹` — `inverseMatrix` 는 matrixNodes 플러그인 노드라 **각 음수 + zyx 순서 composeMatrix** 로 대체.
+- Remove 는 축별/sealBase 까지 되돌림. 검증 mayapy 52(정적 · JO 컨스트레인트 조인트 · X 키 · Attached 는 HEAD 와 월드 행렬 동일) + UI 오프스크린 19, 전부 통과.
+- 문서: `docs/A00170_driverTool.md` Free 모드 절, 포트폴리오 EN/KR 3-4 한 단락.
+
 > [!summary] A00120 FKIK — **Setup Manual / Auto · 접이식 리스트 · Dev Mode · Bake 진행률 팝업** (v01.10->01.11)
 - 요청: Setup 을 Manual(Select Objects) / Auto(Refresh 로 씬을 네임스페이스 단위 조사) 로, Targets/Followers 는 접이식(기본 접힘) · Search 는 코드만 두고 숨김, A00330 의 Dev Mode 메뉴를 공용 위젯으로 올려 FKIK 도 쓰기, 배포 화면(Auto 기본 · 리스트 없음 · Bake (Constraint) 없음 · 로그 접힘 · Force Refresh 없음), Bake IK/FK 진행률 팝업.
 - Auto : `app/core/fkik_scan.py` `FKIKScanner.scan` — `ls("*BlendFKIKPos_grp*", recursive=True)` 로 모든 네임스페이스에서 찾아 네임스페이스마다 `FKIKSetup.resolve(톱 노드들)`. 한 네임스페이스에 리그가 여럿이면 톱 노드마다 `(root) | rigB_grp` 로 나눈다. 검증에 걸린 리그는 `[WARN] Skipped`. Auto 로 바꾸는 순간에도 조사하고, Refresh 는 전에 고른 단위를 유지한다. 리스트는 공용 TSL(버튼 없음 · `attach_uuids=False`).

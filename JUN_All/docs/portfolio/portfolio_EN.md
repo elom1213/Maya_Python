@@ -1,14 +1,14 @@
 ---
-title: Portfolio — Work Summary (2026-05-06 ~ 2026-09-23)
+title: Portfolio — Work Summary (2026-05-06 ~ 2026-10-12)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-09-23
+updated: 2026-10-12
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
 
 > **Author**: Ji Hun Park (Junny)
-> **Period**: 2026-05-06 – 2026-09-23 (~20 weeks)
+> **Period**: 2026-05-06 – 2026-10-12 (~23 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
 > **Volume**: 50+ in-house tools (64 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
@@ -260,6 +260,12 @@ Default Distance attribute (driver signal x)
   is therefore **exactly** the rotation before it, the two lips keep their closed-pose gap (lip thickness),
   and the contact point follows the head when it turns or the character moves. The old "one point"
   behaviour was kept as a live `sealMerge` attribute rather than deleted.
+- **Extended to rigs without a curve** (Free mode): the attach network only feeds the zip three things —
+  progress along the lip, the un-sealed position, and a connection to splice into — so those three were
+  replaced by axis position, the node's existing input connection, and a base attribute stored on the node.
+  The same network now goes onto hand-placed nulls or constraint-driven joints. Measured along the way:
+  constraints and keys connect per axis, and forcing a compound connection over them leaves both sources
+  fighting; the original mode was checked against the previous version to identical world matrices.
 - **The optional input tells you when it is needed**: the tool finds what actually moves the attach curve
   (skin influences, constraint targets) and warns — naming the joint — when the drivers do not live under
   it, because that is exactly when leaving Reference empty goes silently wrong.

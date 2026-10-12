@@ -33,6 +33,7 @@ from tools.A00170_driverTool.app.core import (
     seal_collect_drivers, seal_orient_u, seal_prepare_sides,
     seal_pair_drivers, seal_set_name, SEAL_AXES, SEAL_DEFAULT_PREFIX,
     SEAL_METRIC_PARAM, SEAL_METRIC_DISTANCE, seal_pair_cost,
+    SEAL_MODE_ATTACHED, SEAL_MODE_FREE,
     run_build_stretch, FUNCTIONS, SIGMOID_FUNCTIONS, INFINITY_TYPES, DEFAULT_INFINITY,
     DEFAULT_BASE, DEFAULT_THRESHOLD_MIN, DEFAULT_THRESHOLD_MAX,
 )
@@ -1618,22 +1619,48 @@ class MainWindow(QWidget):
         desc = QLabel(
             "Close the lips from a corner toward the centre (lip zip).\n"
             "sealR and sealL are independent, so both corners can zip in at once.\n"
-            "List the curve- or surface-attached nulls (or their joints) of each lip line.\n"
+            "Attached mode: list the curve- or surface-attached nulls (or their joints) "
+            "of each lip line.\n"
+            "Free mode: list any transforms (nulls, joints, locators) - no attach needed.\n"
             "Build with the lips in their closed (neutral) pose - that pose IS "
             "the shape they seal to.")
         desc.setAlignment(Qt.AlignCenter)
         root.addWidget(desc)
+
+        # ---- 모드 (v01.29) : 어태치 리그 / 아무 트랜스폼
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Mode"))
+        self.seal_cmb_mode = QComboBox()
+        self.seal_cmb_mode.addItems(["Attached (curve / surface)", "Free (any transform)"])
+        self.seal_cmb_mode.setToolTip(
+            "Attached (default): the drivers must trace back to a pointOnCurveInfo /\n"
+            "pointOnSurfaceInfo (AttachCrv rigs). u comes from the curve parameter,\n"
+            "and anything on the lip line can be listed (nulls, _ctl / _tgt, joints,\n"
+            "the null group, the curve itself).\n"
+            "Free: the listed transforms ARE the drivers - no attach needed. u is the\n"
+            "position along the Corner Axis, measured in the Reference space (world\n"
+            "when Reference is empty) between the outermost listed nodes of both lists,\n"
+            "so the outermost nodes get u = 0 / 1 (list the mouth corners in both\n"
+            "lists, or turn 'Skip the corner joints' off to seal them too).\n"
+            "Drivers with an incoming connection (constraint, keys, any network) keep it;\n"
+            "a node with no connection gets a 'sealBase' attribute holding its un-sealed\n"
+            "translate - edit that to move it. Remove Seal puts everything back.")
+        self.seal_cmb_mode.currentIndexChanged.connect(self.on_seal_mode_changed)
+        mode_row.addWidget(self.seal_cmb_mode, 1)
+        root.addLayout(mode_row)
 
         list_row = QHBoxLayout()
         self.seal_up_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Upper", select_label="Select", list_min_height=120)
         self.seal_lo_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Lower", select_label="Select", list_min_height=120)
-        hint = ("Anything on the lip line works: the nulls, their controllers "
-                "(_ctl / _tgt), the joints, the whole null group, or even "
+        hint = ("Attached mode - anything on the lip line works: the nulls, their "
+                "controllers (_ctl / _tgt), the joints, the whole null group, or even "
                 "just the attach curve.\n"
                 "One curve per lip or a single closed curve wrapping both - "
-                "either way, just split its nulls into Upper and Lower.")
+                "either way, just split its nulls into Upper and Lower.\n"
+                "Free mode - the listed transforms themselves are sealed, in the order "
+                "of their position along the Corner Axis.")
         self.seal_up_tsl.setToolTip(hint)
         self.seal_lo_tsl.setToolTip(hint)
         list_row.addWidget(self.seal_up_tsl)
@@ -1727,7 +1754,8 @@ class MainWindow(QWidget):
             "How 'closest' is measured when matching an upper driver with a "
             "lower one.\n"
             "Curve parameter (default): same progress along the lip - works "
-            "even if the two\nlines have different joint counts or lengths.\n"
+            "even if the two\nlines have different joint counts or lengths. "
+            "In Free mode this is the position\nalong the Corner Axis (u).\n"
             "World distance: straight distance between the drivers - use it "
             "when the two\nlines are spaced very differently.\n"
             "Either way the positions do NOT have to match exactly; the "
@@ -1865,6 +1893,21 @@ class MainWindow(QWidget):
         return (SEAL_METRIC_DISTANCE if self.seal_cmb_metric.currentIndex() == 1
                 else SEAL_METRIC_PARAM)
 
+    def _seal_mode(self):
+        return (SEAL_MODE_FREE if self.seal_cmb_mode.currentIndex() == 1
+                else SEAL_MODE_ATTACHED)
+
+    def on_seal_mode_changed(self, index):
+        """모드에 따라 짝짓기 척도의 첫 항목 이름을 맞춘다(뜻이 다르다)."""
+        free = index == 1
+        self.seal_cmb_metric.setItemText(
+            0, "Axis position (u)" if free else "Curve parameter")
+        self.seal_pair_view.clear()
+        self._log("Seal mode: {0}".format(
+            "Free - the listed transforms are sealed as they are (u = position "
+            "along the Corner Axis)." if free else
+            "Attached - drivers are found through their curve / surface attach."))
+
     def _seal_tolerance(self):
         value = self.seal_dsb_tol.value()
         return value if value > 0.0 else None
@@ -1900,8 +1943,11 @@ class MainWindow(QWidget):
 
         axis = self._seal_axis()
         start_min = self.seal_rb_min.isChecked()
+        mode = self._seal_mode()
+        free = mode == SEAL_MODE_FREE
         # Build 과 같은 준비 과정을 거친다(닫힌 커브 재정규화 포함).
-        up, lo, info = seal_prepare_sides(upper, lower, axis, start_min)
+        up, lo, info = seal_prepare_sides(upper, lower, axis, start_min, mode,
+                                          self._seal_reference())
         if not up or not lo:
             if info["dropped"]:
                 self._log("[WARN] Upper and Lower resolve to the same {0} "
@@ -1909,13 +1955,24 @@ class MainWindow(QWidget):
                 self._log("       One curve around both lips? Then list each "
                           "lip's nulls separately, not the whole curve in both.")
                 return
+            if free:
+                self._log("[WARN] Upper/Lower need at least one transform each "
+                          "(found {0} / {1}).".format(len(up), len(lo)))
+                return
             self._log("[WARN] Upper/Lower need curve- or surface-attached drivers "
                       "(found {0} / {1}).".format(len(up), len(lo)))
             self._log("       List the nulls, their _ctl / _tgt, the joints, "
                       "the null group, or the attach curve / surface - anything "
                       "that traces back to a pointOnCurveInfo or pointOnSurfaceInfo.")
+            self._log("       Not attached to anything? Switch Mode to "
+                      "'Free (any transform)'.")
             return
 
+        if free:
+            self._log("Free mode: u = position along {0} {1} between the outermost "
+                      "listed nodes of both lists.".format(
+                          "world" if info["u_space"] == "world"
+                          else "'" + info["u_space"] + "'", axis.upper()))
         if info["shared_curve"]:
             self._log("One shared {0} curve / surface - each lip re-spanned to its own "
                       "0-1 arc.".format("closed" if info["closed"] else "open"))
@@ -1986,13 +2043,30 @@ class MainWindow(QWidget):
                     tolerance=self._seal_tolerance(),
                     blend_rotation=self.seal_cb_rotate.isChecked(),
                     reference=reference,
-                    merge=self.seal_dsb_merge.value())
+                    merge=self.seal_dsb_merge.value(),
+                    mode=self._seal_mode())
             except Exception as exc:
                 self._log("[ERROR] Build Seal failed: {0}".format(exc))
+                if self._seal_mode() == SEAL_MODE_ATTACHED:
+                    self._log("       Drivers not attached to a curve / surface? "
+                              "Switch Mode to 'Free (any transform)'.")
                 return
 
-        self._log("Sealed {0} pair(s) | nodes: {1} | set: {2}".format(
-            len(report["pairs"]), len(report["nodes"]), report["set"]))
+        self._log("Sealed {0} pair(s) | nodes: {1} | set: {2} | mode: {3}".format(
+            len(report["pairs"]), len(report["nodes"]), report["set"],
+            "Free" if report["mode"] == SEAL_MODE_FREE else "Attached"))
+        if report["mode"] == SEAL_MODE_FREE:
+            self._log("u = position along {0} {1} between the outermost listed "
+                      "nodes of both lists.".format(
+                          "world" if report["u_space"] == "world"
+                          else "'" + report["u_space"] + "'",
+                          self._seal_axis().upper()))
+        if report["static_based"]:
+            self._log("{0} node(s) had no incoming translate connection - each got "
+                      "a 'sealBase' attribute holding its un-sealed translate "
+                      "(edit that to move it; Remove Seal writes it back): {1}".format(
+                          len(report["static_based"]),
+                          ", ".join(report["static_based"])))
         if report["shared_curve"]:
             self._log("Upper and Lower share one {0} curve / surface - each lip was "
                       "re-spanned to its own 0-1 arc.".format(
@@ -2036,7 +2110,8 @@ class MainWindow(QWidget):
             self._log("[WARN] Nothing to remove for prefix '{0}' "
                       "({1}).".format(prefix, seal_set_name(prefix)))
             return
-        self._log("Removed {0} node(s); {1} attach connection(s) restored. "
+        self._log("Removed {0} node(s); {1} translate / rotate input(s) restored "
+                  "(attach connections, constraints, keys or sealBase values). "
                   "Controller attributes kept.".format(deleted, restored))
 
     def on_seal_recapture(self):
@@ -2117,6 +2192,10 @@ class MainWindow(QWidget):
             "  driver keeps its closed-pose rotation and the two lips keep their\n"
             "  closed-pose gap instead of collapsing onto one point.\n"
             "  sealMerge 1 brings back the old 'exactly the same point' behaviour.\n"
+            "- Mode: Attached (drivers found through their curve / surface attach) or\n"
+            "  Free (any transforms - nulls, joints, locators; u = position along the\n"
+            "  Corner Axis in the Reference space; nodes without an input get a\n"
+            "  'sealBase' attribute; constraint / keyed inputs are kept per axis).\n"
             "- Update Rest Pose: re-take the closed shape from the current pose.\n"
             "\n"
             "Each build is one undo step. All UI text is English.\n"

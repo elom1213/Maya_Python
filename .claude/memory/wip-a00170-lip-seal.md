@@ -1,6 +1,6 @@
 ---
 name: wip-a00170-lip-seal
-description: A00170 Seal 탭 — 입술 지퍼(끝에서 중앙으로 다물기). 다물리는 목표는 빌드 시점 포즈(rest)를 머리 공간에 저장한 것, sealMerge 로 예전 "한 점 일치" 동작 (v01.21)
+description: A00170 Seal 탭 — 입술 지퍼(끝에서 중앙으로 다물기). 다물리는 목표는 빌드 시점 포즈(rest)를 머리 공간에 저장한 것, sealMerge 로 예전 "한 점 일치" 동작 (v01.21) · v01.29 Free 모드(어태치 없는 트랜스폼)
 metadata:
   node_type: memory
   type: project
@@ -85,3 +85,17 @@ AttachCrv > Edge Loop 로 만든 위/아래 입술 리그를 **지퍼처럼** �
 검증: 코어 26 + UI 26 + 짝짓기 21 + 회전 15 + 닫힌 커브 30 + **v01.20~21 81항목**
 (rest 캡처·회전 보존·간격 유지·sealMerge·bias·머리 회전+이동 불변·반대 방향 커브 재현·
 Update Rest Pose·기준 공간 경고 9·UI 22)([[mayapy-headless-verify]]).
+
+**v01.29 (2026-10-12) — `Mode` 콤보: Attached(= v01.28 동작, HEAD 와 월드 행렬 동일 회귀) / Free(어태치 없는 트랜스폼).**
+사용자 요청: "지금 기능은 그대로 간직하고 다른 모드를 만들어서" 어태치 안 된 오브젝트도 Seal 되게.
+- 핵심 판단: 어태치는 ① u ② 다물리기 전 라이브 위치 ③ pairBlend 끼울 연결 **세 가지만 공급**한다. 지퍼 계산은 그대로.
+- Free u = Corner Axis 위치를 **Reference 공간**(비우면 월드)에서 Upper+Lower **합집합** 양 끝으로 0~1
+  (`prepare_sides(..., mode, reference)` → `upos`). 월드로 재면 머리가 (10,20,30) 기운 포즈에서 짝이 한 칸 밀렸다(실측).
+  양 끝이 정확히 0/1 이라 **Skip Corners 는 "양 끝 노드"** 를 건너뛴다 — 입꼬리를 양쪽에 다 담으면 코너로 빠짐.
+- 담은 노드가 곧 드라이버(`free_driver`) — 그룹/커브 확장 없음. 조인트 직접이면 rest 회전 `R = local × JO⁻¹`
+  (`_rest_local_rotate`, composeMatrix 음수각+zyx; `inverseMatrix` 는 플러그인 — [[compound-connect-leaves-child-connections]]).
+- 입력 연결은 `input_feed(node, attr, allow_static)` 로 셋 중 하나: compound / children(축별, 빈 축은 상수) /
+  static(**`sealBase`** double3 를 노드에 심고 소스로 — 자기 어트리뷰트→자기 translate 는 사이클 아님).
+  출력 컴파운드 연결 전 `_disconnect_children` 필수. Remove 는 `_restore_input` 이 축별/상수/sealBase 를 되돌리고 attr 삭제.
+- 리포트 `mode` · `u_space` · `static_based`. UI: 모드 바꾸면 Pair by 첫 항목이 `Axis position (u)`, Attached 0/0 경고에 Free 안내 한 줄.
+- 검증 mayapy 52(정적 널 · JO 컨스트레인트 조인트 · X 키 널 · 가드 · Attached HEAD 회귀) + UI 오프스크린 19. 마야 GUI 실기는 아직.

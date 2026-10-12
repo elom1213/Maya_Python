@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-28
+# last Update date : 2026-10-12
 # A00170_driverTool - Seal : 커브(또는 NURBS 서피스)에 어태치된 입술 리그를 "끝에서 중앙으로"
 #                            다물리는 지퍼 셋업.
 #
@@ -71,6 +71,29 @@
 # 입술이 튀었다. 이제 `pairBlend` 에 들어가는 원래 translate 소스 × `parentMatrix` 로 월드 위치를
 # 만든다 — 오프셋이 있든 없든 빌드 순간 rest 와 정확히 같고, 널보다 상류라 사이클도 없다.
 #
+# ## Free 모드 — 어태치 없는 트랜스폼도 다문다 (v01.29)
+#
+# 위 전제(POCI / POSI 어태치)는 세 가지를 공급할 뿐이다 — ① 입술 위 진행도 u, ② 다물리기 전의
+# 라이브 위치(만남점용), ③ pairBlend 를 끼울 translate 연결. `mode=MODE_FREE` 는 이 셋을 다른 데서
+# 얻어 **아무 트랜스폼(널 · 조인트 · 로케이터)** 에나 같은 지퍼를 끼운다:
+#   ① u = Corner Axis 방향 위치를 Upper + Lower **합집합의 양 끝**으로 0~1 정규화한다.
+#      그래서 양 끝 노드가 정확히 u=0 / 1 이다 — 입꼬리를 양쪽 리스트에 다 담으면 코너로 빠지고,
+#      안 담았으면 Skip Corners 가 끝 노드 두 개를 건너뛴다(끝까지 다물려면 끄면 된다).
+#      위치는 **Reference(머리) 공간**에서 잰다(비우면 월드) — 머리가 기울어진 포즈에서 빌드해도
+#      윗입술과 아랫입술의 축 투영이 서로 어긋나지 않는다(실측: 머리를 (10,20,30) 돌린 채 월드로
+#      재면 짝이 한 칸 밀렸다).
+#   ② ③ translate 에 들어오는 연결이 있으면(컨스트레인트 · 키 · 다른 노드망) 그 연결을 그대로 쓴다.
+#      컨스트레인트와 키는 translateX/Y/Z **축별**로 연결되므로 축별 플러그도 받는다(실측: 컴파운드
+#      `listConnections(node.translate)` 는 자식 연결을 돌려주지 않는다).
+#      연결이 전혀 없는 **정적 노드**는 자기 자신을 읽으면 사이클이라, 빌드 시점 translate 값을
+#      `sealBase`(double3) 어트리뷰트로 노드에 심고 그걸 pairBlend in1 과 라이브 위치의 소스로 쓴다
+#      (자기 어트리뷰트가 자기 translate 를 구동하는 것은 사이클이 아니다 — mayapy 로 확인).
+#      다물리기 전 자리를 옮기려면 `sealBase` 를 고친다. Remove 가 값을 translate 로 되돌리고 지운다.
+#   담은 노드가 곧 드라이버다 — 어태치 모드의 "그룹을 담으면 자손 널" · "커브를 담으면 그 널들" 확장은
+#   근거(어태치)가 없어 Free 모드에서는 하지 않는다. 조인트를 직접 다물 때 jointOrient 가 있으면 rest
+#   회전을 `R = local x JO^-1` 로 구해 넣는다(JO 를 무시하면 회전이 틀어진다).
+#   기본 모드(MODE_ATTACHED)의 동작은 v01.28 과 같다.
+#
 # UI 비의존: 위젯에서 읽은 이름/옵션 값만 받는다.
 
 import maya.cmds as cmds
@@ -108,6 +131,14 @@ METRIC_DISTANCE = "distance"
 METRICS = (METRIC_PARAM, METRIC_DISTANCE)
 
 DEFAULT_PREFIX = "lipSeal"
+
+# 드라이버를 어디서 찾나 (v01.29)
+MODE_ATTACHED = "attached"     # 커브 / 서피스 어태치(POCI / POSI)에서 — v01.28 까지의 동작
+MODE_FREE = "free"             # 담은 트랜스폼 그대로, u 는 월드 위치에서
+MODES = (MODE_ATTACHED, MODE_FREE)
+
+# Free 모드에서 연결이 없는 정적 노드에 심는 "다물리기 전 자리" 어트리뷰트
+FREE_BASE_ATTR = "sealBase"
 
 # 나중에 rest 를 다시 잡을 수 있도록 남기는 표식(message 어트리뷰트).
 REST_NULL_TAG = "sealRestNull"      # rest 행렬 노드 -> 그 널
@@ -339,20 +370,89 @@ def _surface_tracks(entries):
             e["closed"] = closed
 
 
-def collect_drivers(nodes):
-    """이름 목록 -> [{node, poci, u, pos, ...}] (커브/서피스에 어태치된 것만, 중복 제거).
+def _check_mode(mode):
+    if mode not in MODES:
+        raise ValueError("Unknown seal mode '{0}' (expected {1}).".format(
+            mode, " / ".join(MODES)))
+    return mode
 
-    무엇을 담아도 되게 세 단계로 넓혀 가며 찾는다:
+
+def free_driver(node):
+    """Free 모드의 드라이버 : 담은 노드 자체(트랜스폼 · 조인트). 셰이프를 담았으면 그 트랜스폼."""
+    node = _long(node)
+    if node is None:
+        return None
+    if cmds.objectType(node, isAType="transform"):
+        return node
+    parents = cmds.listRelatives(node, p=True, f=True, type="transform") or []
+    return parents[0] if parents else None
+
+
+def free_u(entries, axis="x", extent=None):
+    """Free 모드의 u : 지정 축 월드 위치를 0~1 로. `extent=(lo, hi)` 를 주면 그 범위 기준.
+
+    `prepare_sides` 는 Upper + Lower 합집합의 양 끝을 extent 로 넘긴다 — 두 리스트가 **같은 척도**를
+    써야 Param 짝짓기가 맞고, 양 끝 노드가 정확히 u = 0 / 1 이 된다.
+    """
+    if not entries:
+        return
+    index = _AXIS_INDEX.get(axis, 0)
+    values = [_upos(e)[index] for e in entries]
+    lo, hi = extent if extent is not None else (min(values), max(values))
+    for e in entries:
+        value = _upos(e)[index]
+        e["u"] = e["u_raw"] = (value - lo) / (hi - lo) if hi > lo else 0.5
+
+
+def _upos(entry):
+    """u 와 축 방향 판정에 쓰는 위치 — Free 모드에서 기준 공간으로 옮긴 `upos`, 없으면 월드 `pos`."""
+    return entry.get("upos") or entry["pos"]
+
+
+def _to_reference_space(entries, reference):
+    """Free 모드 : 각 엔트리의 월드 위치를 `reference` 로컬로 옮겨 `upos` 에 둔다(없으면 월드 그대로)."""
+    if not reference or not entries:
+        return
+    inverse = cmds.getAttr(reference + ".worldInverseMatrix[0]")
+    for e in entries:
+        x, y, z = e["pos"]
+        e["upos"] = [x * inverse[0] + y * inverse[4] + z * inverse[8] + inverse[12],
+                     x * inverse[1] + y * inverse[5] + z * inverse[9] + inverse[13],
+                     x * inverse[2] + y * inverse[6] + z * inverse[10] + inverse[14]]
+
+
+def collect_drivers(nodes, mode=MODE_ATTACHED, axis="x"):
+    """이름 목록 -> [{node, poci, u, pos, ...}] (중복 제거).
+
+    **MODE_ATTACHED** (기본) : 커브/서피스에 어태치된 널만. 무엇을 담아도 되게 세 단계로 넓혀 가며 찾는다:
       1. 그 노드(또는 그 조상/컨스트레인트 타깃)가 어태치 구동인가 -> `resolve_driver`
       2. 그 **아래(자손)** 에 어태치 구동 널이 있는가            -> 그룹을 통째로 담은 경우
       3. 그 노드가 **커브 / 서피스**인가                          -> 거기 붙은 널 전부
 
-    엔트리 키: node · poci(어태치 노드) · kind('curve'|'surface') · shape(커브/서피스 셰이프) ·
-    curve(트랙 키 - 커브는 셰이프, 서피스는 '셰이프@U|V') · u · u_raw · closed · pos
-    (+ 서피스는 uv · row).
+    **MODE_FREE** (v01.29) : 담은 트랜스폼 그대로(`free_driver`). u 는 `axis` 월드 위치에서
+    (`free_u`, 이 리스트만의 범위 — `prepare_sides` 가 양쪽 합집합 범위로 다시 잡는다).
+
+    엔트리 키: node · poci(어태치 노드, free 는 None) · kind('curve'|'surface'|'free') ·
+    shape(커브/서피스 셰이프, free 는 None) · curve(트랙 키 - 커브는 셰이프, 서피스는 '셰이프@U|V',
+    free 는 None) · u · u_raw · closed · pos (+ 서피스는 uv · row).
     """
+    _check_mode(mode)
     out = []
     seen = set()
+
+    if mode == MODE_FREE:
+        for name in nodes or []:
+            driver = free_driver(name)
+            if not driver or driver in seen:
+                continue
+            seen.add(driver)
+            out.append({
+                "node": driver, "poci": None, "shape": None, "kind": "free",
+                "curve": None, "u": None, "u_raw": None, "closed": False,
+                "pos": cmds.xform(driver, q=True, ws=True, t=True),
+            })
+        free_u(out, axis)
+        return out
 
     def _add(driver):
         if not driver or driver in seen:
@@ -463,17 +563,35 @@ def respan_shared_curve(upper, lower):
     return done_up or done_lo
 
 
-def prepare_sides(upper, lower, axis="x", start_at_min=True):
+def prepare_sides(upper, lower, axis="x", start_at_min=True, mode=MODE_ATTACHED,
+                  reference=None):
     """Upper/Lower 이름 목록 -> 짝짓기에 바로 넣을 수 있는 엔트리 두 벌.
 
     한 커브에 위/아래가 다 붙어 있는 경우(닫힌 입술 커브)를 여기서 흡수하므로,
     미리보기와 빌드가 **같은 결과**를 본다.
 
+    MODE_FREE 면 u 를 **양쪽 합집합**의 축 범위로 잡는다(양쪽에 다 담은 입꼬리도 범위에 들어간다).
+    축은 `reference` 가 있으면 그 노드의 로컬 축, 없으면 월드 축이다(어태치 모드는 `reference` 를
+    쓰지 않는다 — u 가 커브 파라미터에서 오므로).
+
     Returns: (up_entries, lo_entries, info)
-        info = {shared_curve, closed, respanned, flipped, dropped}
+        info = {mode, shared_curve, closed, respanned, flipped, dropped, u_space}
     """
-    up = collect_drivers(upper)
-    lo = collect_drivers(lower)
+    _check_mode(mode)
+    up = collect_drivers(upper, mode, axis)
+    lo = collect_drivers(lower, mode, axis)
+    u_space = None
+
+    if mode == MODE_FREE and (up or lo):
+        reference = _long(reference) if reference else None
+        _to_reference_space(up, reference)
+        _to_reference_space(lo, reference)
+        u_space = _leaf(reference) if reference else "world"
+        index = _AXIS_INDEX.get(axis, 0)
+        values = [_upos(e)[index] for e in up + lo]
+        extent = (min(values), max(values))
+        free_u(up, axis, extent)
+        free_u(lo, axis, extent)
 
     up_curves = set(e["curve"] for e in up if e["curve"])
     lo_curves = set(e["curve"] for e in lo if e["curve"])
@@ -503,6 +621,8 @@ def prepare_sides(upper, lower, axis="x", start_at_min=True):
     flipped = (orient_u(up, axis, start_at_min),
                orient_u(lo, axis, start_at_min))
     return up, lo, {
+        "mode": mode,
+        "u_space": u_space,
         "shared_curve": sorted(shared),
         "closed": any(e["closed"] for e in up + lo if e["curve"] in shared),
         "respanned": respanned,
@@ -523,8 +643,8 @@ def orient_u(entries, axis="x", start_at_min=True):
     index = _AXIS_INDEX.get(axis, 0)
     lo = min(entries, key=lambda e: e["u"])
     hi = max(entries, key=lambda e: e["u"])
-    # u=0 쪽이 축의 작은 값이어야 하는데 그 반대면 뒤집는다.
-    flip = (lo["pos"][index] > hi["pos"][index]) == bool(start_at_min)
+    # u=0 쪽이 축의 작은 값이어야 하는데 그 반대면 뒤집는다. (Free 모드는 기준 공간 위치로)
+    flip = (_upos(lo)[index] > _upos(hi)[index]) == bool(start_at_min)
     if flip:
         for e in entries:
             e["u"] = 1.0 - e["u"]
@@ -642,24 +762,95 @@ def _node(kind, name):
     return cmds.createNode(kind, name=name)
 
 
-def live_position_plug(null, name):
-    """어태치가 **지금** 널에게 주는 월드 위치 플러그. (플러그, 새로 만든 노드들)
+def _source_plugs(node, attr):
+    """`node.attr`(double3) 에 들어오는 연결. (컴파운드 소스 | None, [X, Y, Z 자식 소스 | None])
 
-    널 translate 의 원래 소스(어태치 네트워크의 decomposeMatrix) × 널의 `parentMatrix`.
+    컴파운드가 연결돼 있으면 자식 조회는 None 을 돌려주고, 컨스트레인트 · 키는 자식에만 연결된다
+    (mayapy 실측). 둘을 다 봐야 "구동되는가"를 안다.
+    """
+    compound = cmds.listConnections(node + "." + attr, s=True, d=False, plugs=True) or []
+    children = []
+    for axis in "XYZ":
+        found = cmds.listConnections(node + "." + attr + axis, s=True, d=False,
+                                     plugs=True) or []
+        children.append(found[0] if found else None)
+    return (compound[0] if compound else None), children
+
+
+def _ensure_base_attr(node):
+    """Free 모드의 정적 노드에 `sealBase`(double3) 를 심고 **지금 translate** 를 넣는다. (플러그)
+
+    빌드 포즈가 곧 rest 이므로 지금 값이 "다물리기 전 자리"다. 이미 있으면 값만 갱신한다.
+    """
+    if not cmds.attributeQuery(FREE_BASE_ATTR, node=node, exists=True):
+        cmds.addAttr(node, longName=FREE_BASE_ATTR, attributeType="double3")
+        for axis in "XYZ":
+            cmds.addAttr(node, longName=FREE_BASE_ATTR + axis, attributeType="double",
+                         parent=FREE_BASE_ATTR, keyable=True)
+    plug = node + "." + FREE_BASE_ATTR
+    if cmds.getAttr(plug, settable=True):
+        cmds.setAttr(plug, *cmds.getAttr(node + ".translate")[0])
+    return plug
+
+
+def input_feed(node, attr, allow_static=False):
+    """`node.attr` 의 "다물리기 전" 공급원. ([(축, 소스 플러그 | 상수)], 종류)
+
+    종류 : 'compound'(컴파운드 연결 하나 — 어태치 네트워크) / 'children'(축별 연결 — 컨스트레인트 · 키,
+    연결 없는 축은 지금 값을 상수로) / 'static'(연결이 전혀 없음 — translate 면 `sealBase` 를 심어
+    그걸 소스로, `allow_static` 일 때만) / None(정적인데 허용하지 않음).
+    축은 "" (컴파운드) 또는 "X" | "Y" | "Z".
+    """
+    compound, children = _source_plugs(node, attr)
+    if compound:
+        return [("", compound)], "compound"
+    if any(children):
+        feed = []
+        for axis, plug in zip("XYZ", children):
+            feed.append((axis, plug if plug else cmds.getAttr(node + "." + attr + axis)))
+        return feed, "children"
+    if allow_static and attr == "translate":
+        return [("", _ensure_base_attr(node))], "static"
+    return [], None
+
+
+def _connect_feed(feed, dst_format):
+    """공급원을 `dst_format.format(axis)` 플러그에 잇는다(상수면 setAttr). pairBlend 는 `inTranslate{0}1`."""
+    for axis, src in feed:
+        dst = dst_format.format(axis)
+        if isinstance(src, str):
+            cmds.connectAttr(src, dst, f=True)
+        else:
+            cmds.setAttr(dst, src)
+
+
+def _disconnect_children(node, attr):
+    """축별로 들어오는 연결을 끊는다 — 컴파운드를 `force` 로 이어도 자식 연결은 **남는다**(실측)."""
+    _compound, children = _source_plugs(node, attr)
+    for axis, plug in zip("XYZ", children):
+        if plug:
+            cmds.disconnectAttr(plug, node + "." + attr + axis)
+
+
+def live_position_plug(null, name, allow_static=False):
+    """구동이 **지금** 널에게 주는 월드 위치 플러그. (플러그, 새로 만든 노드들, 공급원 종류)
+
+    널 translate 의 원래 소스(어태치 네트워크의 decomposeMatrix / 컨스트레인트 / sealBase) ×
+    널의 `parentMatrix`.
     - 널의 worldMatrix 를 쓰면 우리가 다시 널을 구동하므로 **사이클** — 반드시 널보다 상류에서.
     - v01.26 까지는 어태치 `fourByFourMatrix.output`(커브/서피스 위 점)을 썼는데, 어태치를
       **Maintain offset** 으로 만들면 널은 그 점에서 떨어져 있어 빌드하자마자 입술이 튀었다.
       이 방식은 오프셋 · 커브 · 서피스 무관하게 빌드 순간 rest 와 정확히 같다.
+    - `allow_static`(Free 모드) 이면 연결 없는 노드도 `sealBase` 를 심어 받는다(v01.29).
     """
-    src = cmds.listConnections(null + ".translate", s=True, d=False,
-                               plugs=True) or []
-    if not src:
+    feed, kind = input_feed(null, "translate", allow_static)
+    if not feed:
         raise RuntimeError(
             "'{0}' translate is not driven by an attach network.".format(_leaf(null)))
     pmm = _node("pointMatrixMult", name + "_live")
-    cmds.connectAttr(src[0], pmm + ".inPoint", f=True)
+    _connect_feed(feed, pmm + ".inPoint{0}")
     cmds.connectAttr(null + ".parentMatrix[0]", pmm + ".inMatrix", f=True)
-    return pmm + ".output", [pmm]
+    return pmm + ".output", [pmm], kind
 
 
 def _mat_mul(a, b):
@@ -792,15 +983,31 @@ def _rest_frame(null, ref, name):
 
 
 def _rest_local_rotate(rest_world_plug, null, name):
-    """rest 회전을 널의 **부모 공간**으로 (pairBlend.inRotate2 용)."""
+    """rest 회전을 널의 **부모 공간**으로 (pairBlend.inRotate2 용).
+
+    조인트면 `jointOrient` 를 벗긴다(v01.29) : 조인트 로컬 행렬은 `R x JO` 라 rotate 채널에 넣을 값은
+    `R = local x JO^-1`. JO^-1 는 `inverseMatrix`(matrixNodes 플러그인) 대신 **각을 음수로 하고 회전
+    순서를 뒤집은(zyx) composeMatrix** 로 만든다 — 플러그인 없이 되고 JO 가 바뀌어도 따라간다.
+    """
     mmx = _node("multMatrix", name + "_restLocMx")
     cmds.connectAttr(rest_world_plug, mmx + ".matrixIn[0]", f=True)
     cmds.connectAttr(null + ".parentInverseMatrix[0]", mmx + ".matrixIn[1]", f=True)
+    made = [mmx]
+    if cmds.nodeType(null) == "joint":
+        neg = _node("multiplyDivide", name + "_restJoNeg")
+        cmds.connectAttr(null + ".jointOrient", neg + ".input1", f=True)
+        cmds.setAttr(neg + ".input2", -1.0, -1.0, -1.0)
+        inv = _node("composeMatrix", name + "_restJoInv")
+        cmds.connectAttr(neg + ".output", inv + ".inputRotate", f=True)
+        cmds.setAttr(inv + ".inputRotateOrder", 5)            # 5 = zyx : xyz 회전의 역
+        cmds.connectAttr(inv + ".outputMatrix", mmx + ".matrixIn[2]", f=True)
+        made += [neg, inv]
     dcm = _node("decomposeMatrix", name + "_restLocDcm")
     cmds.connectAttr(mmx + ".matrixSum", dcm + ".inputMatrix", f=True)
     # 널의 회전 순서를 그대로 따라간다(기본 xyz 가 아닐 수도 있다).
     cmds.connectAttr(null + ".rotateOrder", dcm + ".inputRotateOrder", f=True)
-    return dcm + ".outputRotate", [mmx, dcm]
+    made.append(dcm)
+    return dcm + ".outputRotate", made
 
 
 def _meeting_point(up_plug, lo_plug, ctrl, name):
@@ -869,39 +1076,43 @@ def _zip_weight(ctrl, seal_attr, u, one_minus_band, name):
 
 
 def rotation_driven(null):
-    """그 널의 rotate 를 커브(또는 무엇이든)가 구동하고 있나."""
-    return bool(cmds.listConnections(null + ".rotate", s=True, d=False,
-                                     plugs=True))
+    """그 널의 rotate 를 커브(또는 무엇이든 — 컨스트레인트처럼 축별이어도)가 구동하고 있나."""
+    compound, children = _source_plugs(null, "rotate")
+    return bool(compound or any(children))
 
 
-def _insert_pair_blend(null, seal_t, seal_r, weight_plug, name):
-    """커브 구동과 seal 자리 사이에 pairBlend 를 끼운다. (pairBlend, 회전도 섞었나)
+def _insert_pair_blend(null, seal_t, seal_r, weight_plug, name, allow_static=False):
+    """원래 구동과 seal 자리 사이에 pairBlend 를 끼운다. (pairBlend, 회전도 섞었나)
 
-    회전은 **커브가 회전까지 구동하고 있을 때만** 끼운다(`seal_r` 이 있을 때).
+    회전은 **원래 구동이 회전까지 구동하고 있을 때만** 끼운다(`seal_r` 이 있을 때).
     Edge Loop 를 `orient` 없이 만들었으면 널의 rotate 는 연결 없는 정적 값 —
     그게 이미 rest 회전이라 건드릴 이유가 없다.
+
+    축별 연결(컨스트레인트 · 키)은 축별로 in1 에 잇고, 출력을 컴파운드로 잇기 전에 **자식 연결을
+    먼저 끊는다**(force 로 이어도 자식 연결이 남아 두 소스가 다툰다 — 실측). `allow_static`(Free 모드)
+    이면 연결 없는 translate 도 `sealBase` 로 받는다.
     """
-    src_t = cmds.listConnections(null + ".translate", s=True, d=False,
-                                 plugs=True) or []
-    if not src_t:
+    feed_t, _kind = input_feed(null, "translate", allow_static)
+    if not feed_t:
         raise RuntimeError(
             "'{0}' translate is not driven by a curve network.".format(_leaf(null)))
 
     pb = _node("pairBlend", name + "_pb")
-    cmds.connectAttr(src_t[0], pb + ".inTranslate1", f=True)
+    _connect_feed(feed_t, pb + ".inTranslate{0}1")
     cmds.connectAttr(seal_t, pb + ".inTranslate2", f=True)
     cmds.connectAttr(weight_plug, pb + ".weight", f=True)
+    _disconnect_children(null, "translate")
     cmds.connectAttr(pb + ".outTranslate", null + ".translate", f=True)
 
     rotated = False
     if seal_r:
-        src_r = cmds.listConnections(null + ".rotate", s=True, d=False,
-                                     plugs=True) or []
-        if src_r:
-            cmds.connectAttr(src_r[0], pb + ".inRotate1", f=True)
+        feed_r, _kind = input_feed(null, "rotate")
+        if feed_r:
+            _connect_feed(feed_r, pb + ".inRotate{0}1")
             cmds.connectAttr(seal_r, pb + ".inRotate2", f=True)
             # 0 = Euler, 1 = Quaternion. 회전 블렌드는 쿼터니언이 안정적이다.
             cmds.setAttr(pb + ".rotInterpolation", 1)
+            _disconnect_children(null, "rotate")
             cmds.connectAttr(pb + ".outRotate", null + ".rotate", f=True)
             rotated = True
     return pb, rotated
@@ -916,7 +1127,7 @@ def seal_set_name(prefix):
 def build_seal(upper, lower, controller, prefix=DEFAULT_PREFIX, axis="x",
                start_at_min=True, skip_corners=True, bias=0.5, band=0.35,
                metric=METRIC_PARAM, tolerance=None, blend_rotation=True,
-               reference=None, merge=0.0):
+               reference=None, merge=0.0, mode=MODE_ATTACHED):
     """입술 지퍼 셋업을 만든다.
 
     **씬은 입술이 다물린(중립) 포즈여야 한다** — 지금 포즈가 곧 다물렸을 때의 자리(rest)다.
@@ -935,17 +1146,22 @@ def build_seal(upper, lower, controller, prefix=DEFAULT_PREFIX, axis="x",
             널 그룹이 이미 머리를 따라간다면 None 으로 충분하다.
         merge: `sealMerge` 초기값. 0 = 위/아래가 rest 간격을 지킨 채 만난다(기본),
             1 = 위/아래 널이 만남점 한 점에서 정확히 일치한다(v01.19 까지의 동작).
+        mode: MODE_ATTACHED(기본, 커브/서피스 어태치 널) / MODE_FREE(담은 트랜스폼 그대로,
+            u 는 `axis` 월드 위치, 연결 없는 노드는 `sealBase` 를 심어 받는다 — v01.29).
 
     Returns:
-        report dict — pairs / nodes / set / attrs / skipped / flipped.
+        report dict — pairs / nodes / set / attrs / skipped / flipped / mode / static_based.
     """
     prefix = (prefix or DEFAULT_PREFIX).strip() or DEFAULT_PREFIX
+    _check_mode(mode)
+    free = mode == MODE_FREE
     if reference:
         reference = _long(reference)
         if reference is None:
             raise ValueError("Reference node not found in the scene.")
 
-    up_entries, lo_entries, info = prepare_sides(upper, lower, axis, start_at_min)
+    up_entries, lo_entries, info = prepare_sides(upper, lower, axis, start_at_min,
+                                                 mode, reference)
     if not up_entries or not lo_entries:
         if info["dropped"]:
             # 닫힌 커브를 양쪽 리스트에 통째로 담으면 두 쪽이 같은 널 집합이 된다.
@@ -953,6 +1169,10 @@ def build_seal(upper, lower, controller, prefix=DEFAULT_PREFIX, axis="x",
                 "Upper and Lower resolve to the same {0} driver(s). With one "
                 "curve around both lips, list each lip's nulls separately "
                 "instead of the whole curve in both.".format(len(info["dropped"])))
+        if free:
+            raise ValueError("Both Upper and Lower need at least one transform "
+                             "(got {0} / {1}).".format(len(up_entries),
+                                                       len(lo_entries)))
         raise ValueError("Both Upper and Lower need curve- or surface-attached "
                          "drivers (got {0} / {1}).".format(len(up_entries),
                                                            len(lo_entries)))
@@ -974,6 +1194,7 @@ def build_seal(upper, lower, controller, prefix=DEFAULT_PREFIX, axis="x",
 
     created = []
     rotated_count = 0
+    static_based = []          # Free 모드에서 sealBase 를 심은 노드들
     # band 는 여러 쌍이 공유한다 : 1 - band 를 한 번만 만든다.
     omb = _node("plusMinusAverage", "{0}_seal_oneMinusBand".format(prefix))
     cmds.setAttr(omb + ".operation", 2)
@@ -986,11 +1207,14 @@ def build_seal(upper, lower, controller, prefix=DEFAULT_PREFIX, axis="x",
         name = "{0}_seal_{1:02d}".format(prefix, i + 1)
 
         # (1) 어태치가 지금 주는 위/아래 자리 -> sealBias 로 섞은 **만남점**.
-        up_live, n_up = live_position_plug(up["node"], name + "_upLive")
-        lo_live, n_lo = live_position_plug(lo["node"], name + "_loLive")
+        up_live, n_up, kind_up = live_position_plug(up["node"], name + "_upLive", free)
+        lo_live, n_lo, kind_lo = live_position_plug(lo["node"], name + "_loLive", free)
         live_point, n_live = _meeting_point(up_live, lo_live, controller,
                                             name + "_liveMid")
         created += n_up + n_lo + n_live
+        for entry, kind in ((up, kind_up), (lo, kind_lo)):
+            if kind == "static":
+                static_based.append(entry["node"])
 
         # (2) rest(= 지금 씬 포즈)를 기준 공간에 담아 라이브로 재생 + 그 만남점.
         #     pairBlend 를 끼우기 **전에** 읽어야 커브가 주는 자리를 그대로 잡는다.
@@ -1037,7 +1261,7 @@ def build_seal(upper, lower, controller, prefix=DEFAULT_PREFIX, axis="x",
                 created += rot_nodes
 
             pb, rotated = _insert_pair_blend(null, seal_t, seal_r, weight_plug,
-                                             side_name)
+                                             side_name, free)
             created += [pb]
             if rotated:
                 rotated_count += 1
@@ -1064,6 +1288,9 @@ def build_seal(upper, lower, controller, prefix=DEFAULT_PREFIX, axis="x",
         "shared_curve": info["shared_curve"],
         "closed": info["closed"],
         "respanned": info["respanned"],
+        "mode": mode,
+        "u_space": info["u_space"],
+        "static_based": [_leaf(n) for n in static_based],
     }
 
 
@@ -1138,10 +1365,55 @@ def recapture_rest(prefix=DEFAULT_PREFIX):
     return len(updates), controller
 
 
-def remove_seal(prefix=DEFAULT_PREFIX):
-    """빌드한 seal 네트워크를 걷어내고 **원래 커브 연결로 되돌린다**.
+def _restore_input(pb, in_attr, out_attr):
+    """pairBlend 의 in1 을 원래 자리(널 translate / rotate)로 되돌린다. (되돌린 개수, sealBase 를 쓴 노드)
 
-    pairBlend 의 in1(원래 커브 구동)을 다시 널 translate 로 이어 준 뒤 노드를 지운다.
+    in1 이 컴파운드 연결이면 그 소스를 다시 잇고, 축별 연결이면 축별로 잇고, 연결 없는 축은 in1 의
+    값을 되쓴다. 소스가 그 노드 자신의 `sealBase`(Free 모드의 정적 노드)면 값을 translate 에 쓰고
+    어트리뷰트는 지울 대상으로 돌려준다(pairBlend 가 아직 물고 있어 여기서 지우지 않는다).
+    """
+    dst = cmds.listConnections(pb + "." + out_attr, s=False, d=True, plugs=True) or []
+    if not dst:
+        return 0, None
+    dst_plug = dst[0]
+    node, _attr = dst_plug.split(".", 1)
+    try:
+        cmds.disconnectAttr(pb + "." + out_attr, dst_plug)
+    except Exception:
+        return 0, None
+
+    compound = cmds.listConnections(pb + "." + in_attr + "1", s=True, d=False,
+                                    plugs=True) or []
+    if compound:
+        src = compound[0]
+        src_node, src_attr = src.split(".", 1)
+        if src_attr == FREE_BASE_ATTR and _long(src_node) == _long(node):
+            cmds.setAttr(dst_plug, *cmds.getAttr(src)[0])
+            return 1, _long(node)
+        cmds.connectAttr(src, dst_plug, force=True)
+        return 1, None
+
+    restored = 0
+    for axis in "XYZ":
+        in_plug = "{0}.{1}{2}1".format(pb, in_attr, axis)
+        src = cmds.listConnections(in_plug, s=True, d=False, plugs=True) or []
+        try:
+            if src:
+                cmds.connectAttr(src[0], dst_plug + axis, force=True)
+            else:
+                cmds.setAttr(dst_plug + axis, cmds.getAttr(in_plug))
+            restored += 1
+        except Exception:
+            pass
+    return restored, None
+
+
+def remove_seal(prefix=DEFAULT_PREFIX):
+    """빌드한 seal 네트워크를 걷어내고 **원래 구동 연결로 되돌린다**.
+
+    pairBlend 의 in1(원래 구동 — 어태치 네트워크 / 컨스트레인트 / 키 / `sealBase`)을 다시 널
+    translate · rotate 로 이어 준 뒤 노드를 지운다. Free 모드의 정적 노드는 `sealBase` 값을
+    translate 로 되쓰고 어트리뷰트를 지운다(v01.29).
     컨트롤러의 어트리뷰트는 **지우지 않는다**(키가 걸려 있을 수 있다).
     Returns (restored_count, deleted_count)
     """
@@ -1151,26 +1423,24 @@ def remove_seal(prefix=DEFAULT_PREFIX):
 
     members = cmds.sets(node_set, q=True) or []
     restored = 0
+    based = []
     for pb in cmds.ls(members, type="pairBlend") or []:
         # translate 와 rotate 를 모두 원래 소스로 되돌린다(회전을 섞은 경우 대비).
-        for in_attr, out_attr in (("inTranslate1", "outTranslate"),
-                                  ("inRotate1", "outRotate")):
-            src = cmds.listConnections(pb + "." + in_attr, s=True, d=False,
-                                       plugs=True) or []
-            dst = cmds.listConnections(pb + "." + out_attr, s=False, d=True,
-                                       plugs=True) or []
-            if not src or not dst:
-                continue
-            for plug in dst:
-                try:
-                    cmds.connectAttr(src[0], plug, force=True)
-                    restored += 1
-                except Exception:
-                    pass
+        for in_attr, out_attr in (("inTranslate", "outTranslate"),
+                                  ("inRotate", "outRotate")):
+            count, base_node = _restore_input(pb, in_attr, out_attr)
+            restored += count
+            if base_node and base_node not in based:
+                based.append(base_node)
 
     alive = [n for n in members if cmds.objExists(n)]
     if alive:
         cmds.delete(alive)
     if cmds.objExists(node_set):
         cmds.delete(node_set)
+    for node in based:
+        try:
+            cmds.deleteAttr(node + "." + FREE_BASE_ATTR)
+        except Exception:
+            pass
     return (restored, len(alive))
