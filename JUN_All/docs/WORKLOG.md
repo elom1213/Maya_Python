@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00240 PathTool — **Junction 탭(Create / Remove) + Tree 정션 연한 빨강** (v01.18->01.19)
+- 요청: `cmd /c mklink /J` 를 UI 로. 소스/타깃 선택 UI, 두 리스트로 n->1 · n->n, 원본은 두고 정션만 안전 삭제, Tree 에서 정션은 연한 빨강. 요청 번호 배치는 1·2·3(생성) = Create, 4(삭제) = Remove 로 읽었다.
+- `core/junction.py`(UI 비의존): `is_junction` = lstat 리파스 태그(`islink` 는 정션에 False, `isjunction` 은 3.12+), `plan()` 이 행마다 ready/사유(파일 · 없음 · 이미 있음 · 자기 안 순환 · 중복), `create_junction` = subprocess mklink(CREATE_NO_WINDOW, oem 디코드) 뒤 되읽기, `remove_junction` = 정션 확인 후 `os.rmdir`(빈 실제 폴더도 지우는 명령이라 확인이 전부), `find_junctions`.
+- `ui/junction_tab.py`: 공용 TSL 에 Add.../Paste/드롭을 얹은 `_PathList` 둘 + 미리보기 표 + Create → 만든 정션은 Remove 탭에 자동 담김. Remove 는 Junction|Target 표(정션 아니면 빨강·건너뜀) + Scan + 확인 다이얼로그.
+- Tree: `tree_scanner` 가 scandir stat(follow_symlinks=False) 로 `junction`/`target` 을 노드에 적고(추가 디스크 접근 없음), `_walk` 는 실제 위치를 따라가며 자기 조상을 가리키는 정션은 안 내려간다(Depth All 이 끝난다). `tree_tab` 은 아이콘을 SourceAtop 으로 물들이고 글자색 `#f08a8a`, 툴팁 `Junction -> 타깃`.
+- 검증: 오프스크린 PySide6 — plan 사유 7종, 생성/삭제(원본 파일 유지), n->1 · n->n(타깃=정션 경로), 실제 폴더 섞어 Remove 해도 안 지움, Scan, Tree 색/툴팁/Omit 과 조합/순환 정션. 창 최소 폭(오프스크린) 887 → 940.
+
 > [!summary] A00170 driverTool — **Seal 탭 Free 모드**: 어태치 없는 트랜스폼도 지퍼로 다문다 (v01.28->01.29)
 - 요청: Build Seal 이 커브/서피스 어태치 드라이버에만 동작(`found 0 / 0`). 기존 동작은 그대로 두고 **다른 모드**로 어태치 없는 오브젝트도 되게.
 - 판단: 어태치는 ① 입술 위 u ② 다물리기 전 라이브 위치 ③ pairBlend 끼울 연결 세 가지만 공급 — 셋을 대체하면 지퍼 계산은 그대로 쓸 수 있다.

@@ -20,6 +20,8 @@
 #               펼칠 때 기다리지 않고, 빈 폴더는 펼치기 전에 화살표가 사라진다.
 #  11) Omit (v01.18) : 루트 아래 N 단계(2 이상)를 `...` 한 줄로 접어 생략한다 -
 #               A/B/C/D/E 에서 Omit 2 면 A / ... / D / E. 늘 같은 고정 경로를 건너뛰고 본다.
+#  12) 정션 (v01.19) : 디렉터리 정션은 폴더 아이콘과 글자를 **연한 빨강**으로 그린다.
+#               툴팁에 가리키는 경로. 판별은 tree_scanner 가 노드에 적는다(junction/target).
 
 import os
 
@@ -45,6 +47,10 @@ from Framework.qt.qt import (
     QMessageBox,
     QStyle,
     QTimer,
+    QIcon,
+    QPainter,
+    QColor,
+    QBrush,
 )
 
 from ..core import tree_scanner
@@ -56,10 +62,27 @@ from ..core.prefetcher import Prefetcher
 PREFETCH_MAX_PER_FOLDER = 2000
 PREFETCH_TICK_MS = 50     # 결과를 모아 화면에 반영하는 주기
 
+# 정션 표시색 (v01.19) - 연한 빨강. 아이콘은 이 색으로 물들이고 글자도 이 색이다.
+JUNCTION_COLOR = "#f08a8a"
+
 # Omit (v01.18) - 생략 단계의 최솟값(사용자 요청: 2 이상의 양의 정수) 과 `...` 항목 표시.
 OMIT_MIN = 2
 OMIT_LABEL = "..."
 ROLE_OMIT = Qt.UserRole + 1   # `...` 항목 표식(경로 역할은 비워 둔다 - 열기/복사가 안 되게)
+
+
+def _tinted_icon(icon, color, size=16):
+    """icon 의 픽셀을 color 로 물들인 새 아이콘(모양·음영은 남는다)."""
+    pixmap = icon.pixmap(size, size)
+    if pixmap.isNull():
+        return icon
+    painter = QPainter(pixmap)
+    painter.setCompositionMode(QPainter.CompositionMode_SourceAtop)
+    tint = QColor(color)
+    tint.setAlpha(190)
+    painter.fillRect(pixmap.rect(), tint)
+    painter.end()
+    return QIcon(pixmap)
 
 
 class _CheckableMenu(QMenu):
@@ -100,6 +123,9 @@ class TreeTab(QWidget):
         # 폴더/파일 구분용 표준 아이콘(테마 무관). 1회 만들어 재사용한다.
         self._icon_dir = self.style().standardIcon(QStyle.SP_DirIcon)
         self._icon_file = self.style().standardIcon(QStyle.SP_FileIcon)
+        # 정션용 - 폴더 아이콘을 연한 빨강으로 물들인 것 (v01.19)
+        self._icon_junction = _tinted_icon(self._icon_dir, JUNCTION_COLOR)
+        self._brush_junction = QBrush(QColor(JUNCTION_COLOR))
 
         self._build_ui()
 
@@ -711,6 +737,8 @@ class TreeTab(QWidget):
         item = QTreeWidgetItem([node["name"]])
         item.setData(0, Qt.UserRole, node["path"])
         item.setIcon(0, self._icon_dir)
+        if node.get("junction"):
+            self._paint_junction(item, node)
         # Adaptive : 아직 안 읽은 폴더는 자식이 없어도 펼침 화살표를 단다(눌러야 읽는다) (v01.16).
         if self._adaptive() and not node.get("loaded", True):
             item.setChildIndicatorPolicy(QTreeWidgetItem.ShowIndicator)
@@ -759,7 +787,17 @@ class TreeTab(QWidget):
         for i in range(ell.childCount()):
             child = ell.child(i)
             rel = os.path.relpath(child.data(0, Qt.UserRole), self._root_path)
-            child.setToolTip(0, rel.replace("\\", "/"))
+            tip = rel.replace("\\", "/")
+            if child.toolTip(0):                 # 정션 툴팁은 뒤에 붙인다 (v01.19)
+                tip += "\n" + child.toolTip(0)
+            child.setToolTip(0, tip)
+
+    def _paint_junction(self, item, node):
+        """정션 항목 - 아이콘·글자를 연한 빨강으로, 툴팁에 가리키는 경로 (v01.19)."""
+        item.setIcon(0, self._icon_junction)
+        item.setForeground(0, self._brush_junction)
+        target = node.get("target") or ""
+        item.setToolTip(0, "Junction -> {0}".format(target) if target else "Junction")
 
     # ============================================================== Refresh
 

@@ -2,6 +2,25 @@
 
 All notable changes to this tool are documented here.
 
+## [01.19] - 2026-10-12
+### Added
+- **Junction tab** - `cmd /c mklink /J` from the UI, with **Create** and **Remove** sub-tabs.
+  - **Create**: a *Sources* list (original folders) and a *Create In* list (folders to create the
+    junctions in). Fill them with **Add...**, **Paste** (paths on the clipboard, one per line) or by
+    **dragging folders from File Explorer**. **n -> 1** puts a junction for every source inside the
+    first *Create In* folder; **n -> n** pairs the rows by order. The junction is named after the
+    source folder; in n -> n, *Target row is the junction path* lets each row name the junction
+    itself (like mklink's `<Link>`). A preview table shows every row with a reason when it cannot be
+    made (source is a file, target folder missing, already exists, would loop inside its own
+    source...). **Create Junctions** makes the `ready` rows and lists them in the Remove tab.
+  - **Remove**: a *Junction | Target* table. Add rows the same ways, or **Scan** a folder (optionally
+    recursive) for junctions. **Remove Junctions** deletes **only the links** - the original folders
+    and their contents are never touched. A row that is not a junction is shown in red and skipped,
+    and a confirmation says how many will be removed.
+- **Tree tab: junctions are drawn in light red** (folder icon and name) with the target path in the
+  tooltip. The non-Adaptive walk no longer follows a junction that points at its own ancestor
+  (a loop), so Depth `All` finishes.
+
 ## [01.18] - 2026-10-12
 ### Added
 - **Tree tab: Omit** - skip the first N levels under the root and show them as one `...` row.

@@ -2,7 +2,8 @@
 
 자주 쓰는 **폴더 경로를 버튼으로 만들어 두고, 클릭하면 그 경로를 탐색기로 여는** 런처 툴.
 버튼을 **카테고리**로 묶고, 다시 집/회사처럼 환경별 **프로파일**로 나눠 관리한다.
-탭은 **ShortCut**(경로 버튼 런처)과 **Tree**(입력 경로를 트리뷰로 탐색, 10장)로 구성된다.
+탭은 **ShortCut**(경로 버튼 런처) · **Tree**(입력 경로를 트리뷰로 탐색, 10장) · **Junction**(폴더 정션
+만들기/지우기, 11장)으로 구성된다.
 
 > 이 툴은 Maya 안에서 도는 툴이 아니라 `A00210_FileManager`·`A00220_BackupTool` 처럼
 > **Windows 에서 독립 실행되는 PySide6 앱** 이다. Maya 설치/실행 없이 동작한다.
@@ -214,6 +215,9 @@
 - **File Types ▾**: 스캔에서 발견된 확장자 중 **표시할 것만 체크**(All 포함). 여러 개 연속 토글해도
   메뉴가 닫히지 않고, 버튼 라벨에 선택 요약이 보인다. (A00210 File Manager 와 동일 동작.)
 - **폴더/파일 구분**: 폴더·파일에 각각 폴더/파일 **아이콘**이 붙어 한눈에 구분된다.
+- **정션은 연한 빨강** (v01.19~): 디렉터리 정션(mklink /J)은 폴더 아이콘과 이름이 연한 빨강으로 그려지고,
+  마우스를 올리면 가리키는 경로가 보인다. Adaptive 를 끈 Depth 탐색은 **자기 조상을 가리키는 정션**
+  (순환) 안으로는 내려가지 않는다.
 - **Expand**: 창이 작을 때 **큰 창**(리사이즈 가능)에서 같은 트리를 본다.
 - **우클릭 메뉴**: 트리 항목을 우클릭하면 두 가지가 나온다. 메인 트리와 Expand 창 모두 지원.
   - **Reveal in File Explorer** — 그 경로를 **탐색기에서 연다**(폴더는 폴더 열기, 파일은 폴더를
@@ -355,6 +359,70 @@ A                         Omit 2                 Omit 3
 > 같은 순서). 펼침·선택 상태는 `_item_key()` 로 적는다 — `...` 은 경로 대신 `"..."` 열쇠.
 
 
+## 11. Junction 탭 — 폴더 정션 만들기 / 지우기 (v01.19~)
+
+`cmd /c mklink /J <정션> <원본>` 을 화면에서 한다. 정션(junction)은 **폴더에만** 걸 수 있는 링크라
+(파일은 안 된다) 소스로 파일을 주면 미리보기에서 사유와 함께 걸러진다. 하위 탭은 **Create** 와 **Remove**,
+로그창은 둘이 함께 쓴다.
+
+### 11-1. Create
+
+```
+┌ Sources ──────────────┐ ┌ Create In ─────────────┐
+│ D:\Proj\Content\Char  │ │ C:\Work\Links          │
+│ D:\Proj\Content\Env   │ │                        │
+│ [Add...][Paste][Del][Up][Down]   (양쪽 같음)       │
+└────────────────────────┘ └────────────────────────┘
+Mode (•) n -> 1  ( ) n -> n   [ ] Target row is the junction path
+┌ Source            │ Junction                │ Status ┐
+│ ...\Content\Char  │ C:\Work\Links\Char      │ ready  │
+│ ...\Content\Env   │ C:\Work\Links\Env       │ ready  │
+└──────────────────────────────────────────────────────┘
+2 ready / 2 row(s)                        [Create Junctions]
+```
+
+- **Sources**: 원본 폴더들. **Create In**: 정션을 **만들 폴더**들. 두 리스트 모두 **Add...**(폴더 선택),
+  **Paste**(클립보드의 경로, 한 줄에 하나), **탐색기에서 끌어다 놓기**로 채운다. Del/Up/Down 으로 정리.
+- **n -> 1**: 소스 전부가 Create In **첫 행** 폴더 안에 정션으로 생긴다. **n -> n**: 소스 i 행 ↔ Create In
+  i 행. 정션 이름은 **원본 폴더 이름**이다.
+- **Target row is the junction path** (n -> n 에서만): Create In 행을 "만들 폴더" 가 아니라 **정션 경로 그
+  자체**로 본다 — mklink 의 `<Link>` 처럼 이름까지 정하고 싶을 때. 그 부모 폴더는 있어야 한다.
+- **미리보기 표**는 리스트·모드를 바꿀 때마다 다시 계산된다. `ready` 만 만들어지고, 나머지는 사유가 적힌다:
+  원본 없음 · 원본이 파일 · 만들 폴더 없음 · 같은 이름의 폴더/파일이 이미 있음 · 이미 이 원본을 가리키는
+  정션 · 다른 폴더를 가리키는 정션이 있음 · 원본 안에 자기 정션을 만들어 순환 · 앞 행과 같은 정션 경로.
+- **Create Junctions**: `ready` 행마다 mklink 를 치고(콘솔 창 없이) 만들어진 뒤 **정션인지 되읽어** 확인한다.
+  결과는 로그에 `[OK] 정션 <<===>> 원본`. 만든 정션은 **Remove 탭에 바로 담긴다** — 되돌리기 쉽게.
+
+### 11-2. Remove
+
+```
+┌ Junctions ─────────────────────────────────────────┐
+│ Junction               │ Target (original folder)  │
+│ C:\Work\Links\Char     │ D:\Proj\Content\Char      │
+│ C:\Work\Real            │ (not a junction)   ← 빨강 │
+│ [Add...][Paste][Del][Clear][Recheck]                │
+└─────────────────────────────────────────────────────┘
+┌ Scan a folder for junctions ───────────────────────┐
+│ [C:\Work\Links        ][Browse...] [ ] Recursive [Scan] │
+└─────────────────────────────────────────────────────┘
+                                   [Remove Junctions]
+```
+
+- 표의 행은 Add... / Paste / 끌어다 놓기 / **Scan**(폴더 안의 정션을 찾아 담는다, Recursive 면 하위까지 —
+  정션 안은 안 들어간다)으로 담는다. 더블클릭하면 탐색기에서 연다.
+- **Target 열**이 안전장치다: 정션이면 가리키는 폴더(초록, 끊긴 정션은 노랑), **정션이 아니면 빨간
+  `(not a junction)`** 으로 보이고 **건너뛴다.** Recheck 로 디스크에서 다시 읽는다.
+- **Remove Junctions**: 몇 개를 지울지 묻는 확인 뒤, 행마다 **정션인지 다시 확인하고** `rmdir` 로 **링크만**
+  걷어낸다. 원본 폴더와 그 내용은 건드리지 않는다. 지운 행은 표에서 빠지고 로그에 `[OK] ... original folder
+  kept: <원본>`.
+
+> **구현 메모** — `core/junction.py` (UI 비의존). 판별은 `os.lstat` 의 리파스 태그
+> (`IO_REPARSE_TAG_MOUNT_POINT`) — `os.path.islink` 는 정션에 False 고, `os.path.isjunction` 은 3.12 부터라
+> Maya 2024(3.10) 에 없다. 타깃은 `os.readlink`(`\\?\` 접두사를 벗긴다). 생성은 `subprocess` 로
+> `cmd /c mklink /J`(`CREATE_NO_WINDOW`, 출력은 OEM 코드페이지라 `oem` 으로 디코드), 성공은 반환 코드가 아니라
+> **만든 뒤 정션인지**로 본다. 삭제는 `os.rmdir` — 정션에서는 링크만 걷어내지만 **빈 실제 폴더도 지워지는
+> 명령**이라 `is_junction` 확인이 안전장치의 전부다(툴은 표를 담을 때 · 지우기 직전 두 번 본다).
+
 ## 8. 저장 위치 (개발 참고)
 
 설정은 **툴 폴더 내부 `data/`** 에 저장된다(`%USERPROFILE%` 아님).
@@ -387,11 +455,13 @@ A00240_PathTool/
     │   ├── prefs.py          # 프로파일 영속화(목록/로드/저장/이름변경/삭제/active)
     │   ├── path_opener.py    # 경로를 탐색기로 열기 (Win/mac/linux)
     │   ├── tree_scanner.py   # 경로를 깊이 제한으로 / 한 겹씩 훑어 트리 노드(dict) 생성 (Tree 탭)
-    │   └── prefetcher.py     # Adaptive 선읽기 - 작업 스레드로 폴더 한 겹씩 미리 읽기 (v01.17)
+    │   ├── prefetcher.py     # Adaptive 선읽기 - 작업 스레드로 폴더 한 겹씩 미리 읽기 (v01.17)
+    │   └── junction.py       # 정션 판별/계획/생성(mklink /J)/안전 삭제(rmdir)/찾기 (v01.19)
     └── ui/
-        ├── main_window.py    # QTabWidget (ShortCut + Tree)
+        ├── main_window.py    # QTabWidget (ShortCut + Tree + Junction)
         ├── shortcut_tab.py   # ShortCut 탭 본체 + AddPathDialog
-        └── tree_tab.py       # Tree 탭 본체 (트리뷰 + 깊이/파일토글/확장자필터/Omit/Expand/Reveal)
+        ├── tree_tab.py       # Tree 탭 본체 (트리뷰 + 깊이/파일토글/확장자필터/Omit/Expand/Reveal)
+        └── junction_tab.py   # Junction 탭 (Create / Remove 하위 탭 + 공용 로그창) (v01.19)
 ```
 
 - `app/core`(로직)와 `app/ui`(화면)를 분리한다(`prefs`/`path_opener` 는 표준 라이브러리만 사용).

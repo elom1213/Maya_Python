@@ -28,6 +28,7 @@ from ..config.version import VERSION
 from ..config.app_meta import icon_path
 from .shortcut_tab import ShortcutTab
 from .tree_tab import TreeTab
+from .junction_tab import JunctionTab
 from .file_tree_anim import FileTreeAnimWidget
 
 
@@ -111,6 +112,10 @@ class MainWindow(QWidget):
         # Tree 탭: 입력 경로를 트리뷰로(깊이 제한·파일 토글·확장자 필터·Expand·우클릭 Reveal).
         self.tree_tab = TreeTab()
         self.tabs.addTab(self.tree_tab, "Tree")
+
+        # Junction 탭 (v01.19): mklink /J 를 화면에서 - Create / Remove 하위 탭.
+        self.junction_tab = JunctionTab()
+        self.tabs.addTab(self.junction_tab, "Junction")
 
         root.addWidget(self.tabs)
 
