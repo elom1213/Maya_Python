@@ -15,5 +15,9 @@
 # 02.05  Select > Select Shapes 추가 : 선택한 오브젝트 대신 그 셰이프를 선택한다
 #        (커브 -> nurbsCurve, 메시 -> mesh, 트랜스폼 아래 셰이프 전부, Orig 는 제외).
 
-VERSION = "02.05"
+# 02.06  Attribute > Attribute Lock 추가 : 채널박스에서 고른 어트리뷰트를 선택한 오브젝트
+#        전부에 대해 lock/unlock 토글(전부 잠겨 있으면 풀고, 아니면 잠근다. undo 한 번).
+#        부모 복합이 잠겨 있으면 자식 unlock 이 조용히 무시되므로 부모를 풀고 형제를 다시 잠근다.
+
+VERSION = "02.06"
 LAST_UPDATE = "2026-10-12"

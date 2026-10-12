@@ -10,10 +10,11 @@
 #     스크립트 에디터를 안 열어도 결과가 보인다.
 #   - Pin(항상 위)은 레거시가 창을 Qt 위젯으로 감싸서 하던 것을, 이제 창이 Qt 라 바로 한다.
 #
-# 버튼 구성(레거시 그대로) — 섹션 6 / 버튼 10 (+ 신규 3):
+# 버튼 구성(레거시 그대로) — 섹션 6 / 버튼 10 (+ 신규 4):
 #   Update window : Selected · All Windows
 #   Print         : Print Selected · Copy Hierarchy  (v02.04~ 로그 + 클립보드)
 #   Select        : Select Shapes  (v02.05~ 신규 - 선택한 오브젝트의 셰이프를 대신 선택)
+#   Attribute     : Attribute Lock  (v02.06~ 신규 - 채널박스에서 고른 어트리뷰트 lock 토글)
 #   Import option : Import FBX normal
 #   Create        : Create texture file · Cluster Each
 #   File          : Copy Scene Folder · Open Scene Folder  (v02.03~ Open 신규)
@@ -74,6 +75,12 @@ class MainWindow(QWidget):
              "mesh for meshes, locator for locators. Every shape of a transform is taken,\n"
              "intermediate (Orig) shapes are skipped. Components select their shape."),
         )),
+        ("Attribute", (
+            ("Attribute Lock", "on_attribute_lock",
+             "Toggle the lock of the attributes selected in the Channel Box,\n"
+             "on every selected object. All locked -> unlock them, otherwise -> lock them.\n"
+             "One undo step. A locked parent (translate) is unlocked too, siblings stay locked."),
+        )),
         ("Import option", (
             ("Import FBX normal", "on_import_fbx_normal",
              "Make FBX import use the normals stored in the file.\n"
@@ -115,7 +122,7 @@ class MainWindow(QWidget):
 
         self.setWindowTitle("Quick Tool v{0}".format(VERSION))
         self.setWindowFlags(Qt.Window)
-        self.resize(360, 660)
+        self.resize(360, 700)
 
         self.build_ui()
 
@@ -225,6 +232,10 @@ class MainWindow(QWidget):
         _shapes, logs = core.select_shapes()
         self._log_all(logs)
 
+    def on_attribute_lock(self):
+        _locked, logs = core.toggle_attribute_lock()
+        self._log_all(logs)
+
     def on_import_fbx_normal(self):
         self._log_all(core.import_fbx_normal())
 
@@ -296,6 +307,8 @@ class MainWindow(QWidget):
             "  (Copy Hierarchy also puts the tree on the clipboard).\n"
             "[Select] Select Shapes - select the shapes of the selected objects\n"
             "  (curve -> nurbsCurve, mesh -> mesh, every shape of a transform).\n"
+            "[Attribute] Attribute Lock - toggle the lock of the Channel Box\n"
+            "  attributes on the selected objects (all locked -> unlock, else lock).\n"
             "[Import option] Import FBX normal - use the normals in the file.\n"
             "[Create] Create texture file / Cluster Each.\n"
             "[File] Copy Scene Folder - the scene's folder to the clipboard.\n"

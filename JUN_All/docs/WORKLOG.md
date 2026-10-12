@@ -32,6 +32,19 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00030 quickTool_V02 — **Attribute > Attribute Lock: 채널박스에서 고른 어트리뷰트를 선택 오브젝트 전부에 lock/unlock 토글** (v02.05->02.06)
+- 요청: 토글 버튼 하나로, 선택한 오브젝트들의 선택한 어트리뷰트를 lock · unlock.
+- `quick_ops.channel_box_plugs()` — 채널박스 네 구역(main · shape · history · output)의 선택 어트리뷰트 × 그 구역의
+  오브젝트 목록을 `node.attr` 플러그로. 없는 어트리뷰트는 건너뛰고 개수만. 채널박스가 없으면(헤드리스) 경고 한 줄.
+- `quick_ops.toggle_attribute_lock(plugs=None)` — 지금 상태를 보고 **전부 잠겨 있으면 풀고, 아니면 전부 잠근다**(섞여 있으면
+  안내 한 줄). `undo_chunk` 하나. 레퍼런스 노드 · 연결된 어트리뷰트도 잠긴다.
+- ★ mayapy 실측: **부모 복합(`translate`)이 잠겨 있으면 자식 `tx` 의 `setAttr -lock 0` 은 조용히 성공하지만 그대로 잠겨 있다.**
+  `_unlock_plug` 가 풀고 나서도 잠겨 있으면 부모를 풀고 요청에 없는 형제는 다시 잠근다(위로 반복). 메모 `maya-attr-lock-parent-compound`.
+- UI: `Attribute` 섹션을 `Select` 다음에(버튼 하나라 가로를 다 씀), About 한 줄, 창 기본 높이 660→700.
+- 문서 `A00030_quickTool_V02.md` 섹션 · 화면 · 검증 갱신.
+- 검증: mayapy 2024 오프스크린 27항목 — lock / unlock / mixed / undo 한 번 / 부모 잠금 자식 unlock / 연결 / 레퍼런스 / 없는 플러그 /
+  채널박스 없음 경고 / 섹션 순서 · 버튼 클릭 로그. **채널박스에서 실제로 읽는 경로와 GUI 는 아직.**
+
 > [!summary] A00340 SelectionTool — **View > Show Controls: Controls pane 을 통째로 숨기기** (v01.06->01.07)
 - 요청: Controls 를 접어도 차지하는 영역이 너무 크다. Help 옆 메뉴에서 토글하고, 안 보일 때는 영역이 아예 없어야 한다.
 - 원인: 접기는 `CollapsibleBox` 헤더 줄 + 위 pane 인 `QScrollArea` 의 최소 높이가 남는다(스플리터 `setCollapsible(0, False)`).

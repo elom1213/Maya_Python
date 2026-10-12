@@ -213,6 +213,183 @@ def select_shapes():
 
 
 # ==========================================================================
+# Attribute
+# ==========================================================================
+
+CHANNEL_BOX = "mainChannelBox"
+
+# 채널박스 네 구역 - (선택한 어트리뷰트 질의 플래그, 그 구역이 보여 주는 오브젝트 목록 플래그).
+# 보통 쓰는 것은 첫 줄(선택 오브젝트 본체)이지만, 셰이프 · 히스토리 · 출력 구역에서 고른
+# 어트리뷰트도 같은 버튼으로 다룬다.
+_CHANNEL_BOX_SECTIONS = (
+    ("selectedMainAttributes", "mainObjectList"),
+    ("selectedShapeAttributes", "shapeObjectList"),
+    ("selectedHistoryAttributes", "historyObjectList"),
+    ("selectedOutputAttributes", "outputObjectList"),
+)
+
+
+def _cb_query(**flag):
+    """`channelBox -q` 한 번. 채널박스가 없거나(헤드리스) 질의가 실패하면 빈 리스트."""
+    try:
+        return cmds.channelBox(CHANNEL_BOX, query=True, **flag) or []
+    except (RuntimeError, TypeError):
+        return []
+
+
+def channel_box_plugs():
+    """채널박스에서 **지금 선택한 어트리뷰트**를 `node.attr` 플러그 목록으로. (플러그, 로그)
+
+    - 어트리뷰트는 채널박스가 주는 짧은 이름(`tx`) 그대로, 오브젝트는 **그 구역의 오브젝트
+      목록**(main 구역 = 선택한 오브젝트들)에 곱한다 - 채널박스에 마지막 선택의 채널만 보여도
+      마야처럼 **선택 전체**에 적용한다.
+    - 오브젝트에 그 어트리뷰트가 없으면(타입이 섞인 선택) 그 조합만 건너뛰고 몇 개인지 로그로.
+    - 채널박스가 없으면(마야 UI 밖) 경고 한 줄.
+    """
+    if not cmds.channelBox(CHANNEL_BOX, exists=True):
+        return [], ["[WARN] Channel Box is not available (Maya UI only)."]
+
+    plugs = []
+    skipped = 0
+    picked_any = False
+    for attr_flag, obj_flag in _CHANNEL_BOX_SECTIONS:
+        attrs = _cb_query(**{attr_flag: True})
+        if not attrs:
+            continue
+        picked_any = True
+
+        objects = _cb_query(**{obj_flag: True})
+        if attr_flag == "selectedMainAttributes" and not objects:
+            # main 구역의 오브젝트 = 선택. 채널박스 목록이 비어 있으면 선택으로 대신한다.
+            objects = cmds.ls(sl=True, objectsOnly=True) or []
+
+        for obj in objects:
+            for attr in attrs:
+                if not cmds.attributeQuery(attr, node=obj, exists=True):
+                    skipped += 1
+                    continue
+                plug = "{0}.{1}".format(obj, attr)
+                if plug not in plugs:
+                    plugs.append(plug)
+
+    if not picked_any:
+        return [], ["[WARN] Select attribute(s) in the Channel Box first."]
+    if not plugs:
+        return [], ["[WARN] None of the selected objects has the selected attribute(s)."]
+
+    logs = []
+    if skipped:
+        logs.append("[Info] {0} object/attribute pair(s) skipped - attribute not on that "
+                    "object.".format(skipped))
+    return plugs, logs
+
+
+def _split_plug(plug):
+    node, attr = plug.split(".", 1)
+    return node, attr
+
+
+def _long_attr(node, attr):
+    found = cmds.attributeQuery(attr, node=node, longName=True)
+    return found or attr
+
+
+def _unlock_plug(plug):
+    """플러그 하나를 **실제로** 풀린 상태로 만든다.
+
+    ★ mayapy 실측 - 부모 복합(`translate`)이 잠겨 있으면 자식(`tx`)에 `setAttr -lock 0` 은
+    **조용히 성공하지만 자식은 그대로 잠겨 있다**(부모 잠금이 덮는다). 그래서 풀고 나서도
+    잠겨 있으면 부모를 풀고, **요청에 없는 형제는 다시 잠가** 겉으로 보이는 상태가 "tx 만
+    풀렸다" 가 되게 한다. 부모의 부모가 또 잠겨 있을 수 있어 위로 올라가며 반복한다.
+    """
+    cmds.setAttr(plug, lock=False)
+    if not cmds.getAttr(plug, lock=True):
+        return
+
+    node, attr = _split_plug(plug)
+    child = _long_attr(node, attr)
+    while cmds.getAttr(plug, lock=True):
+        parents = cmds.attributeQuery(child, node=node, listParent=True) or []
+        if not parents:
+            raise RuntimeError("still locked after unlock : {0}".format(plug))
+        parent = parents[0]
+        siblings = cmds.attributeQuery(parent, node=node, listChildren=True) or []
+        cmds.setAttr("{0}.{1}".format(node, parent), lock=False)
+        for sibling in siblings:
+            if sibling != child:
+                cmds.setAttr("{0}.{1}".format(node, sibling), lock=True)
+        child = parent
+
+
+def toggle_attribute_lock(plugs=None):
+    """채널박스에서 고른 어트리뷰트의 lock 을 **토글**한다. (잠갔으면 True / 풀었으면 False / 안 했으면 None, 로그)
+
+    버튼 하나로 lock 과 unlock 을 다 한다 - 상태는 씬에 있으므로 **지금 상태를 보고** 정한다.
+      - 고른 플러그가 **전부 잠겨 있으면** → 전부 푼다
+      - 하나라도 풀려 있으면(섞여 있으면) → 전부 잠근다 (마야의 채널박스 Lock 과 같은 방향)
+    `plugs` 를 넘기지 않으면 `channel_box_plugs()` 로 채널박스에서 읽는다(넘기면 그대로 - 테스트용).
+    여러 오브젝트 · 어트리뷰트여도 undo 한 번으로 되돌아간다.
+    """
+    logs = []
+    if plugs is None:
+        plugs, logs = channel_box_plugs()
+        if not plugs:
+            return None, logs
+
+    states = {}
+    for plug in plugs:
+        try:
+            states[plug] = bool(cmds.getAttr(plug, lock=True))
+        except (RuntimeError, ValueError):
+            states[plug] = None     # 플러그가 없다 - 아래에서 실패로 센다
+
+    known = [plug for plug in plugs if states[plug] is not None]
+    if not known:
+        return None, logs + ["[WARN] No valid attribute to lock : {0}".format(plugs)]
+
+    lock = not all(states[plug] for plug in known)
+    mixed = lock and any(states[plug] for plug in known)
+
+    changed = []
+    failed = []
+    with undo_chunk():
+        for plug in plugs:
+            if states[plug] is None:
+                failed.append(plug)
+                continue
+            if states[plug] == lock:
+                continue
+            try:
+                if lock:
+                    cmds.setAttr(plug, lock=True)
+                else:
+                    _unlock_plug(plug)
+            except RuntimeError:
+                failed.append(plug)
+            else:
+                changed.append(plug)
+
+    nodes = []
+    attrs = []
+    for plug in known:
+        node, attr = _split_plug(plug)
+        if node not in nodes:
+            nodes.append(node)
+        if attr not in attrs:
+            attrs.append(attr)
+
+    logs.append("Attribute Lock : {0} {1} of {2} attribute(s) on {3} object(s) - {4}".format(
+        "LOCKED" if lock else "UNLOCKED", len(changed), len(known), len(nodes), attrs))
+    if mixed:
+        logs.append("[Info] Lock state was mixed - everything is locked now. "
+                    "Press again to unlock.")
+    if failed:
+        logs.append("[WARN] Could not change {0} attribute(s) : {1}".format(
+            len(failed), failed))
+    return lock, logs
+
+
+# ==========================================================================
 # Import option
 # ==========================================================================
 

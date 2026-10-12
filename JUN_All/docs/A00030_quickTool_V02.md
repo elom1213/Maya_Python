@@ -11,7 +11,7 @@ updated: 2026-10-12
 다시 쓴 버전이다. **버튼도 동작도 그대로**고 달라진 것은 그릇이다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`slate_dark` 테마)
-- **버전**: `app/config/version.py` (v02.05)
+- **버전**: `app/config/version.py` (v02.06)
 - **설치**: `__dragDrop_A00030_V02.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **QuickToolV2**
   → `tools.A00030_quickTool_V02.run(True)`
 - **V01 과 동시에 띄울 수 있다** — 창과 로그 확장창의 `objectName` 이 갈렸다.
@@ -34,14 +34,14 @@ updated: 2026-10-12
 
 **V01 의 기능은 하나도 빠지지 않았다** — 섹션 6개, 버튼 10개 그대로다.
 새로 붙은 것은 레거시에 없던 **`Shelf > Update Shelves`**(v02.01), **`File > Open Scene Folder`**(v02.03),
-**`Select > Select Shapes`**(v02.05) 세 개다.
+**`Select > Select Shapes`**(v02.05), **`Attribute > Attribute Lock`**(v02.06) 네 개다.
 
 ---
 
 ## 2. 화면 구성
 
 ```
-┌ Quick Tool v02.05 ──────────────────┐
+┌ Quick Tool v02.06 ──────────────────┐
 │ Help                        [ Pin ] │   ← 메뉴 + 항상 위 토글
 │ ┌ Update window ────────────────┐   │
 │ │ [ Selected ] [ All Windows ]  │   │
@@ -49,6 +49,8 @@ updated: 2026-10-12
 │ │ [ Print Selected ] [ Copy Hi… ]│  │
 │ ├ Select ──────────────────────┤    │
 │ │ [ Select Shapes ]             │   │
+│ ├ Attribute ───────────────────┤    │
+│ │ [ Attribute Lock ]            │   │   ← 토글: 전부 잠겨 있으면 풀고, 아니면 잠근다
 │ ├ Import option ────────────────┤   │
 │ │ [ Import FBX normal ]         │   │   ← 버튼 하나면 가로를 다 쓴다
 │ ├ Create ──────────────────────┤    │
@@ -113,6 +115,32 @@ qt_j1
 Selected 4 shape(s) : locator 1, mesh 1, nurbsCurve 2
 [WARN] No shape (left out) : ['jnt', 'grp']
 ```
+
+### Attribute — `Attribute Lock` (v02.06~, 레거시에 없던 것)
+
+**채널박스에서 고른 어트리뷰트**를 **선택한 오브젝트 전부**에 대해 lock / unlock 한다. 버튼 하나가 **토글**이다 —
+상태는 씬에 있으므로 지금 상태를 보고 방향을 정한다.
+
+| 고른 어트리뷰트의 현재 상태 | 누르면 |
+|---|---|
+| 전부 잠겨 있다 | **전부 푼다** |
+| 하나라도 풀려 있다(섞여 있다) | **전부 잠근다** — 한 번 더 누르면 푼다 (마야 채널박스 `Lock Selected` 와 같은 방향) |
+
+- 채널박스에 **마지막 선택의 채널만 보여도** 마야처럼 **선택 전체**에 적용한다. 그 어트리뷰트가 없는 오브젝트
+  (타입이 섞인 선택)는 그 조합만 건너뛰고 몇 개인지 로그에 적는다.
+- 채널박스의 **셰이프 · 히스토리 · 출력 구역**에서 고른 어트리뷰트도 같이 다룬다(그 구역의 오브젝트에).
+- 여러 오브젝트 · 어트리뷰트여도 **Ctrl+Z 한 번**으로 돌아온다. 레퍼런스 노드 · 연결된 어트리뷰트도 잠긴다.
+- 채널박스에서 아무것도 안 골랐으면 `[WARN] Select attribute(s) in the Channel Box first.` 만 남긴다.
+
+```
+Attribute Lock : LOCKED 6 of 6 attribute(s) on 2 object(s) - ['tx', 'ty', 'tz']
+Attribute Lock : LOCKED 3 of 4 attribute(s) on 2 object(s) - ['tx', 'ty']
+[Info] Lock state was mixed - everything is locked now. Press again to unlock.
+```
+
+> **부모 복합이 잠긴 자식** — `translate` 를 통째로 잠근 오브젝트에서 `tx` 만 풀려고 `setAttr -lock 0` 을 하면
+> **조용히 성공하지만 `tx` 는 그대로 잠겨 있다**(부모 잠금이 덮는다 · mayapy 실측). 그래서 풀고 나서도 잠겨 있으면
+> **부모를 풀고, 요청에 없는 형제(`ty` `tz`)는 다시 잠가** 겉으로 보이는 결과가 "`tx` 만 풀렸다" 가 되게 한다.
 
 ### Import option — `Import FBX normal`
 
@@ -200,7 +228,7 @@ A00030_quickTool_V02/
 ├── __dragDrop_A00030_V02.py    # 셸프 설치 (TOOL_LABEL = "QuickToolV2")
 ├── icon/                       # A00030_quickTool_V02.svg / .png
 └── app/
-    ├── config/version.py       # VERSION = "02.05"
+    ├── config/version.py       # VERSION = "02.06"
     ├── core/quick_ops.py       # ★ 버튼이 하는 일 전부 (maya.cmds/mel, UI 비의존)
     └── ui/main_window.py       # 창 · 섹션 · 버튼 · 로그
 ```
@@ -214,9 +242,9 @@ A00030_quickTool_V02/
 
 ## 5. 검증 (mayapy 2024 + 오프스크린 Qt)
 
-**22 + 12 + 8 + 17항목 통과.**
+**22 + 12 + 8 + 17 + 27항목 통과.**
 
-- 섹션 7개와 버튼 11개(레거시 10 + `Update Shelves`)가 **레거시와 같은 순서**(v02.05 부터 `Select` 섹션이 더해져 8개 · 13개),
+- 섹션 7개와 버튼 11개(레거시 10 + `Update Shelves`)가 **레거시와 같은 순서**(v02.05 부터 `Select` 섹션이 더해져 8개 · 13개, v02.06 부터 `Attribute` 가 더해져 9개 · 14개),
   전 버튼에 툴팁, Pin 토글과 로그창 존재
 - `Selected` / `All Windows` 가 `playbackOptions -view` 를 실제로 바꾼다
 - `Print Selected` — 선택 없으면 경고, 있으면 이름 로그
@@ -234,6 +262,11 @@ A00030_quickTool_V02/
   커브+메시+로케이터+조인트+빈 그룹을 섞으면 셰이프 4개를 고르고 **조인트·그룹은 경고에 이름으로** · 스킨 메시는
   **Orig 를 빼고** 하나 · 컴포넌트 선택은 그 오브젝트의 셰이프 · 셰이프를 이미 골랐으면 그대로 · **Ctrl+Z 로 이전 선택 복원** ·
   섹션이 `Print` 다음에 오고 버튼을 누르면 로그에 요약과 경고
+- `Attribute Lock`(v02.06, 27항목) — 전부 풀린 4플러그(2오브젝트×tx·ty)는 **잠기고**, 전부 잠긴 것은 **풀리고**,
+  섞인 것은 **전부 잠기며 안내 한 줄** · **undo 한 번**으로 4개가 섞인 상태로 복원 · `translate` 가 잠긴 오브젝트의 `tx` 만
+  풀면 **실제로 풀리고 부모는 풀리고 `ty` `tz` 는 잠긴 채**, undo 로 부모 잠금 복원 · 연결된 어트리뷰트 · 레퍼런스 노드 lock/unlock ·
+  없는 플러그는 경고로 보고하고 나머지는 처리 · 채널박스가 없으면(헤드리스) **경고 한 줄, 트레이스백 없음** ·
+  섹션이 `Select` 다음, 버튼 클릭 → 로그. **채널박스에서 실제로 고른 어트리뷰트를 읽는 경로는 GUI 에서만 확인 가능 — 아직.**
 - `Local Axis ON/OFF` — 실제 `displayLocalAxis` 값이 바뀌고, **컴포넌트를 골라도 부모 transform**
   으로 올라간다. 선택 없으면 경고
 - `Pin` — 켜면 `Pinned` + `WindowStaysOnTopHint`, 끄면 원복
