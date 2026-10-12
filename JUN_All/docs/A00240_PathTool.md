@@ -189,6 +189,10 @@
 입력한 폴더 경로를 **트리뷰**로 펼쳐 본다(A00210 Path Structure 의 트리 표시와 같은 취지의
 탐색용 뷰). 저장/동기화는 없고, 그때그때 경로를 훑어 보여준다.
 
+> **v01.20** — 이 탭의 본체는 Framework 공용 위젯 `JUN_mod_fileTree_qt_v01`
+> (`Framework/qt/MOD_fileTree_qt_v01.py`) 로 올라갔다. `A00480_FileTool` 의 Maya 탭이 같은 트리로
+> 마야 파일을 고른다. 이 툴에서의 동작은 그대로다. 위젯 안내는 [`Framework_MOD_fileTree_qt.md`](Framework_MOD_fileTree_qt.md).
+
 ```
 ┌ Path Tree ────────────────────────────────────────────┐
 │ Path [................................]  [Browse]      │
@@ -454,13 +458,13 @@ A00240_PathTool/
     ├── core/
     │   ├── prefs.py          # 프로파일 영속화(목록/로드/저장/이름변경/삭제/active)
     │   ├── path_opener.py    # 경로를 탐색기로 열기 (Win/mac/linux)
-    │   ├── tree_scanner.py   # 경로를 깊이 제한으로 / 한 겹씩 훑어 트리 노드(dict) 생성 (Tree 탭)
-    │   ├── prefetcher.py     # Adaptive 선읽기 - 작업 스레드로 폴더 한 겹씩 미리 읽기 (v01.17)
+    │   ├── tree_scanner.py   # re-export - 본체는 Framework/core/tree_scanner.py (v01.20)
+    │   ├── prefetcher.py     # re-export - 본체는 Framework/core/prefetcher.py (v01.20)
     │   └── junction.py       # 정션 판별/계획/생성(mklink /J)/안전 삭제(rmdir)/찾기 (v01.19)
     └── ui/
         ├── main_window.py    # QTabWidget (ShortCut + Tree + Junction)
         ├── shortcut_tab.py   # ShortCut 탭 본체 + AddPathDialog
-        ├── tree_tab.py       # Tree 탭 본체 (트리뷰 + 깊이/파일토글/확장자필터/Omit/Expand/Reveal)
+        ├── tree_tab.py       # re-export - 본체는 Framework/qt/MOD_fileTree_qt_v01.py (v01.20)
         └── junction_tab.py   # Junction 탭 (Create / Remove 하위 탭 + 공용 로그창) (v01.19)
 ```
 

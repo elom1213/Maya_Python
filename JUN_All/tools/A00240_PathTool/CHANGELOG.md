@@ -2,6 +2,14 @@
 
 All notable changes to this tool are documented here.
 
+## [01.20] - 2026-10-12
+### Changed
+- **Tree tab moved to the shared Framework** as `JUN_mod_fileTree_qt_v01`
+  (`Framework/qt/MOD_fileTree_qt_v01.py`, with `Framework/core/tree_scanner.py` and
+  `Framework/core/prefetcher.py`). A00480_FileTool's new Maya tab uses the same tree to pick Maya files.
+  Nothing changes in this tool: `app/ui/tree_tab.py`, `app/core/tree_scanner.py` and `app/core/prefetcher.py`
+  only re-export the shared code (like `path_opener.py` already did).
+
 ## [01.19] - 2026-10-12
 ### Added
 - **Junction tab** - `cmd /c mklink /J` from the UI, with **Create** and **Remove** sub-tabs.
