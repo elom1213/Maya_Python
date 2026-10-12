@@ -52,5 +52,12 @@
 #                           `Display > Shape Edit` 이 담당한다(v01.21 에 합쳐진 옛
 #                           `Line Width` 탭). 같은 기능이 두 곳에 있던 것을 한 곳으로
 
-VERSION = "01.24"
-LAST_UPDATE = "2026-09-22"
+# 01.25  Display > Shape Edit - edits on **referenced** curves now survive save / reopen.
+#                           `cmds.curve -replace` on a referenced shape only lasts for the
+#                           session (no reference edit is recorded), so referenced shapes are
+#                           written CV by CV with `xform` (absolute, saved as reference edits,
+#                           still one undo step) - the same path Display > Replace uses since
+#                           v01.22. Local curves keep the fast `curve -replace` write.
+
+VERSION = "01.25"
+LAST_UPDATE = "2026-10-12"

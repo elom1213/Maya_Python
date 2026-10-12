@@ -27,6 +27,13 @@
 #    이음매가 어긋나지 않는다.
 #  * 트랜스폼 아래에 셰이프가 여러 개면(합쳐진 컨트롤) **전부** 같은 피벗 기준으로 함께
 #    변환한다 — 모양 하나만 움직여 어긋나지 않게.
+#  * **레퍼런스 커브는 `cmds.curve -replace` 로 쓰면 그 세션에만 먹는다**(v01.25 에서 고침) —
+#    레퍼런스 edit 로 기록되지 않아 **씬을 저장했다 다시 열면 원래 모양으로 돌아간다.**
+#    `setAttr .controlPoints[i]` 는 저장은 되지만 히스토리가 있으면 트윅(델타)이 된다. 그래서
+#    레퍼런스 셰이프만 `cmds.xform(cv, objectSpace=True, translation=...)` 으로 **CV 하나씩** 쓴다
+#    (절대 위치 + 레퍼런스 edit + undo, `Display > Replace` v01.22 와 같은 판단). 주기 커브는
+#    컴포넌트 `cv[i]` 가 **spans 개까지만** 유효하다 — 그 뒤 인덱스는 조용히 마지막 CV 로
+#    클램프돼 엉뚱한 CV 를 덮어쓰므로 `ls(shape.cv[*])` 개수만 쓴다(복사본 CV 는 마야가 따라온다).
 
 import contextlib
 import math
@@ -120,8 +127,35 @@ def _moved_points(points, pivot, scale, rotate_matrix, translate):
     return result
 
 
+def _is_referenced(shape):
+    """레퍼런스에서 들어온 셰이프인가(판정 실패는 False)."""
+    try:
+        return bool(cmds.referenceQuery(shape, isNodeReferenced=True))
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
+def _writable_cv_count(shape):
+    """컴포넌트 `cv[i]` 로 **쓸 수 있는** CV 개수 — 주기 커브는 spans 까지뿐이다(머리말 참고)."""
+    return len(cmds.ls(shape + ".cv[*]", flatten=True) or [])
+
+
+def _write_points_referenced(shape, points):
+    """레퍼런스 셰이프 — CV 하나씩 `xform` 으로 쓴다(레퍼런스 edit 로 저장된다, 머리말 참고)."""
+    for index, point in enumerate(points[:_writable_cv_count(shape)]):
+        cmds.xform("{0}.cv[{1}]".format(shape, index), objectSpace=True,
+                   translation=(point[0], point[1], point[2]))
+
+
 def _write_points(shape, points):
-    """CV 전체를 한 번에 쓴다(undo 가능). 닫힌 커브는 매듭까지 같이 넘긴다."""
+    """CV 전체를 쓴다(undo 가능). 닫힌 커브는 매듭까지 같이 넘긴다.
+
+    레퍼런스 셰이프는 `curve -replace` 가 저장되지 않으므로 `xform` 경로로 간다(v01.25).
+    """
+    if _is_referenced(shape):
+        _write_points_referenced(shape, points)
+        return
+
     degree = int(cmds.getAttr(shape + ".degree"))
     periodic = int(cmds.getAttr(shape + ".form")) == 2
 
@@ -281,7 +315,7 @@ class ShapeTransformSession(object):
                 _write_points(shape, moved)
                 written += 1
             except Exception:                               # noqa: BLE001
-                # 레퍼런스·잠김 등으로 못 쓰는 셰이프는 조용히 건너뛴다(미리보기 중이다).
+                # 잠김 등으로 못 쓰는 셰이프는 조용히 건너뛴다(미리보기 중이다).
                 continue
 
         self.applied = (tuple(scale or SCALE_NEUTRAL),
@@ -373,7 +407,8 @@ def transform_shapes(nodes, scale=None, rotate=None, translate=None):
 
     Returns (changed, skipped)
       changed : 실제로 CV 를 바꾼 셰이프 롱네임 리스트
-      skipped : (이름, 사유) 리스트 — 없는 노드 / 커브 아님 / 쓰기 실패(레퍼런스·잠김 등)
+      skipped : (이름, 사유) 리스트 — 없는 노드 / 커브 아님 / 쓰기 실패(잠김 등)
+    레퍼런스 커브도 쓴다(v01.25) — CV 를 `xform` 으로 하나씩 써서 레퍼런스 edit 로 저장된다.
     """
     rotate_matrix = _rotation_matrix(rotate)
 

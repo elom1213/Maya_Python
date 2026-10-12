@@ -71,3 +71,12 @@ metadata:
   적용(드래그 한 번 = undo 한 스텝). 그래서 버튼 줄 **아래**에 둔다.
 - 파일·클래스도 이름을 맞췄다(`shape_edit_tab.py` / `ShapeEditTab`, `git mv`). 코어
   `shape_xform_manager.py` 는 변환 계산이라 그대로.
+
+**레퍼런스 커브 저장 (v01.25, 2026-10-12, 사용자 요청)**
+
+레퍼런스로 불러온 커브를 Shape Edit 으로 고치고 저장 → 다시 열면 원래 모양으로 돌아갔다. 원인은
+`_write_points` 의 `cmds.curve -replace` — 레퍼런스 셰이프에서는 **그 세션에만** 먹고 레퍼런스 edit 가
+안 남는다([[referenced-curve-cv-write]]). 고침: 셰이프마다 `referenceQuery -isNodeReferenced` 로 보고
+레퍼런스면 `xform(cv, objectSpace=True, translation=...)` 으로 하나씩, `ls(shape.cv[*])` 개수까지만
+(주기 커브 클램프). 로컬은 `curve -replace` 그대로(빠름). Apply · 라이브 세션 모두 `_write_points` 하나를
+지나므로 둘 다 고쳐졌다. mayapy 25 항목(저장 → 재열기 → 재편집 → 재열기까지 절대 위치 유지). GUI 확인 아직.

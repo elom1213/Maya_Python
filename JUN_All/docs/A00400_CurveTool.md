@@ -669,7 +669,7 @@ v01.22 부터 **대상이 레퍼런스면 셰이프는 그대로 두고 CV 만 �
 - 트랜스폼 · 이름 · 연결은 그대로고, 변경은 **레퍼런스 edit**(`setAttr ....controlPoints[i]`)로
   저장돼 **씬을 다시 열어도 남는다**. 역시 **undo 한 스텝**.
 
-> **왜 `xform` 으로 쓰나** (mayapy 2024 로 확인) — `cmds.curve -replace`(`Shape Edit` 탭의 방법)는
+> **왜 `xform` 으로 쓰나** (mayapy 2024 로 확인) — `cmds.curve -replace`(`Shape Edit` 탭이 **로컬** 커브에 쓰는 방법)는
 > 레퍼런스 커브에서 **그 세션에만** 먹고 저장되지 않는다. `setAttr .controlPoints[i]` 는 저장은
 > 되지만 히스토리가 살아 있는 커브에서 **델타(트윅)** 로 들어가 값이 두 배가 된다.
 > `cmds.xform(cv, objectSpace=True, translation=...)` 만 세 가지(절대 위치 · 저장 · undo)를 다 만족한다.
@@ -802,6 +802,19 @@ new_cv = pivot + T + R * (S * (cv - pivot))          # 스케일 → 회전 → 
   (API 의 `setCVPositions` 는 undo 큐에 안 남는다) 히스토리가 살아 있는 커브(예: `makeNurbCircle` 이
   붙은 원)에서도 통하며 degree · CV 수를 보존한다. `setAttr .controlPoints` 는 히스토리가 있으면
   **절대 위치가 아니라 트윅**이 되므로 쓰지 않는다(같은 판단이 `Edit > Smooth` 에도 있다).
+- **레퍼런스로 불러온 커브는 CV 를 `xform` 으로 하나씩 쓴다 (v01.25~).** v01.24 까지는 레퍼런스 커브도
+  `curve -replace` 로 썼는데, 이 명령은 레퍼런스 셰이프에서 **그 세션에만** 먹고 레퍼런스 edit 로
+  기록되지 않아 **씬을 저장했다 다시 열면 원래 모양으로 돌아갔다.** 이제 셰이프마다 레퍼런스인지 보고
+  (`referenceQuery -isNodeReferenced`) 레퍼런스면 `cmds.xform(cv, objectSpace=True, translation=...)` 으로
+  쓴다 — 절대 위치 · 레퍼런스 edit 로 저장 · undo 한 스텝 세 가지가 다 되는 유일한 방법이고,
+  `Display > Replace` 가 v01.22 부터 쓰는 경로와 같다. 주기 커브는 컴포넌트 `cv[i]` 가 **spans 개까지만**
+  유효해(그 위는 조용히 마지막 CV 로 클램프된다) `ls(shape.cv[*])` 개수만 쓰고 복사본 CV 는 마야가
+  따라온다. 로컬 커브는 빠른 `curve -replace` 그대로. 라이브 슬라이더(미리보기 · settle) 도 같은 경로를
+  타므로 드래그로 고친 모양도 저장된다. **켜고 끌 것이 없다** — 셰이프마다 자동으로 갈린다.
+  mayapy 2024 로 확인: 열린 3차 · 히스토리 살아 있는 원(주기) · 1차 사각 · 셰이프 2개 컨트롤을 레퍼런스로
+  불러와 Apply(scale/rotate/move) 와 라이브 세션(preview x3 → settle)으로 고친 뒤 **저장 → 다시 열기 →
+  한 번 더 고치고 저장 → 다시 열기** 까지 CV 가 계산값과 일치(두 번째 편집도 절대 위치, 두 배 아님) ·
+  undo/redo 한 스텝 · 트랜스폼 채널 불변 · 로컬 커브 회귀 — 25 항목. 수정 전 코드는 재열기 항목이 실패.
 - **닫힌(주기) 커브**는 `replace=True` 만으로는 거절된다("Must specify knots with the -per option") →
   `periodic` + `degree` + `knot` 까지 같이 넘긴다. 모든 CV 에 **같은 변환**을 걸어 이음매도 어긋나지 않는다.
 - 커브가 아닌 항목 · 없는 노드는 건너뛰고 **사유를 로그에 적는다**. 전체가 **undo 한 스텝**.

@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00400 CurveTool — **Shape Edit: 레퍼런스 커브의 셰이프 수정이 저장 후에도 유지** (v01.24->01.25)
+- 요청: Display > Shape Edit 으로 레퍼런스 커브의 셰이프를 고치고 저장 → 다시 열면 반영이 안 됨. 레퍼런스 커브도 고쳐지고 저장 후에도 유지되게.
+- 원인: `shape_xform_manager._write_points` 가 `cmds.curve -replace` 로만 썼다. 이 명령은 레퍼런스 셰이프에서 그 세션에만 먹고 레퍼런스 edit 로 기록되지 않는다([[referenced-curve-cv-write]] — Replace 탭은 v01.22 에 이미 우회).
+- 고침: 셰이프마다 `referenceQuery -isNodeReferenced` 로 보고 레퍼런스면 `xform(cv, objectSpace, translation)` 으로 CV 하나씩(절대 위치 · 레퍼런스 edit · undo 한 스텝), `ls(shape.cv[*])` 개수까지만(주기 커브 클램프 함정). 로컬 커브는 `curve -replace` 그대로. Apply 와 라이브 세션(preview/settle/restore) 모두 같은 `_write_points` 를 지나므로 둘 다 고쳐짐.
+- 검증: mayapy 2024 — 열린 3차 · 히스토리 있는 원 · 1차 사각 · 셰이프 2개 컨트롤을 레퍼런스로, Apply + 라이브 세션 → 저장 → 재열기 → 재편집 → 저장 → 재열기, 25 항목 통과(수정 전 코드는 재열기 5 항목 실패). 마야 GUI 확인은 아직.
+- 문서: `docs/A00400_CurveTool.md` Shape Edit 알아둘 것 + Replace 절 문구. 포트폴리오는 손대지 않음(버그 수정).
+
 > [!summary] A00470 MaterialTool — **Name Check: Select Materials / Select Faces + Listed meshes only** (v01.09->01.10)
 - 요청: 레거시 `JUN_PY_ShaderTool_V01_04.py` 의 Select Shader / Select Faces 를 Name Check 탭에 이식. UI 안 셋(표 아래 한 줄 · Selection 그룹박스 · 표 오른쪽 세로 버튼 열) 중 **표 아래 한 줄**, 페이스 범위는 **체크박스 토글 기본 ON** 으로 사용자가 골랐다.
 - 표 아래 `[Select Materials] [Select Faces] ☑ Listed meshes only`. 고른 행이 대상, 아무 행도 안 골랐으면 표 전부(로그로 알림). 더블클릭 동작은 그대로(같은 `select_materials`).

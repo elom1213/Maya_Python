@@ -15,7 +15,8 @@ read-only children`). 셰이프 교체 대신 **CV 만 옮겨야** 하는데, �
 | `setAttr .controlPoints[i]` | **X — 히스토리 있으면 델타(트윅), 값이 두 배** | O | O |
 | `cmds.xform(cv, objectSpace=True, translation=...)` | O | O | O |
 
-→ **레퍼런스 커브 CV 는 `xform` 으로 하나씩 쓴다.** 레퍼런스가 아닌 커브는
+→ **레퍼런스 커브 CV 는 `xform` 으로 하나씩 쓴다.** (A00400 Replace v01.22 · **Shape Edit v01.25** —
+Shape Edit 은 v01.24 까지 `curve -replace` 만 써서 레퍼런스 수정이 저장 뒤 사라졌다.) 레퍼런스가 아닌 커브는
 `cmds.curve -replace` 가 한 번에 쓰고 빨라서 그대로 둔다([[shape-pnts-is-post-deformation]] 과
 같은 계열의 구분).
 
