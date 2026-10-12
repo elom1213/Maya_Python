@@ -420,8 +420,8 @@ Get Reference 도 같은 팝업(`.mb` 를 열 때만 체감이 되지만 통일)
 | 1 Tree 승격 (`Framework/qt/MOD_fileTree_qt_v01` · `core/tree_scanner` · `core/prefetcher`, A00240 re-export, v01.20) | **완료** | `f48070e` | 오프스크린: A00240 창 · Build · 필터 · Refresh OK |
 | 2 `MOD_checkTree_qt_v01` + Tree `checkable_files` · `default_types` · `checked_paths` | **완료** | (3 과 같은 커밋) | QTest 21 항목 통과. **함정**: QTreeWidgetItem 은 기본 플래그에 ItemIsUserCheckable 이 있어 체크박스 유무는 `data(CheckStateRole)` 로 가른다 |
 | 3 `Framework/qt/path_context.py` (Reveal · Copy · 더블클릭 공용) | **완료** | 2 와 같은 커밋 | 폴더 트리가 먼저 쓴다 |
-| 4 `app/maya/core/ma_parser.py` · `ref_scanner.py` | 대기 | | mayapy 검증 |
-| 5 `app/maya/core/ref_importer.py` · `scene_guard.py` · 백업 | 대기 | | mayapy 검증, 테스트 파일 ⑪ 은 복사본으로 |
+| 4 `app/maya/core/ma_parser.py` · `ref_scanner.py` | **완료** | (5 와 같은 커밋) | mayapy 2024: 샘플(중첩 · fbx · 순환 · 끊김) 통과. `.ma` 는 머리글만 읽지만 **중첩이 .mb 면 그건 연다** → UI 는 스캔 전에도 늘 씬 보호 |
+| 5 `app/maya/core/ref_importer.py` · `scene_guard.py` · `backup.py` | **완료** | 커밋 참조 git log | mayapy: 샘플 41 항목 + 실제 파일 ⑪ 복사본(스캔 10s · 임포트 17s · 재열기 refs 0 · ns 0 · 원본 무수정). **함정**: `loadReferenceDepth none` 으로 열어 저장하면 체크 안 한 레퍼런스가 언로드로 굳는다 → 임포트는 기본 열기, 스캔만 none |
 | 6 UI (`maya_tab.py` · `reference_tab.py` · `reference_tree.py`, main_window 연결, v01.10) | 대기 | | offscreen 검증 |
 | 7 문서 · CHANGELOG · WORKLOG · 포트폴리오 · 메모 | 대기 | | |
 | 8 마야 GUI 확인 | 사용자 | | |
