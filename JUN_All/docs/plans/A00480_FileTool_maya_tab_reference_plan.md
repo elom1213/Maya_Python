@@ -388,4 +388,40 @@ Get Reference 도 같은 팝업(`.mb` 를 열 때만 체감이 되지만 통일)
 | ⑩ | 임포트 뒤 **원래 열려 있던 씬을 다시 여는** 옵션 기본 ON? | ON |
 | ⑪ | 테스트용 **실제 마야 파일 묶음**(레퍼런스 · 중첩 · fbx 가 섞인 것)이 있으면 경로를 알려 달라. 없으면 §3 의 생성 스크립트로 만든 샘플로 검증한다 | 샘플 |
 
-결정이 오면 §7 순서로 시작한다.
+결정은 §12 에 있다. 진행 상태는 §13.
+
+## 12. 결정 (2026-10-12, 사용자 답)
+
+§11 의 질문에 대한 답. **구현은 이 표를 따른다** — 위 §4·§5 와 다르면 이 표가 우선.
+
+| # | 결정 |
+|---|------|
+| ① | **A00240 Tree 를 Framework 로 승격**하고 A00240 버전을 올린다 (v01.19 → 01.20) |
+| ② | **현재 마야 세션에서** 스캔 · 임포트한다. 사용 형태: 마야를 이 작업을 위해 띄우고, **여러 마야 파일을 지정 → 레퍼런스를 한꺼번에 임포트 → 같은 파일에 덮어쓰기 저장**. 작업 중인 씬이 열려 있는 경우는 거의 없다 (씬 보호 §4.8 은 그대로 두되 가볍게) |
+| ③ | **Backup 체크박스, 기본 ON.** 백업본은 각 파일의 폴더 아래 **`backup/`** (없으면 생성, 있으면 그대로) — **A00220_BackupTool 과 같은 폴더**를 쓴다. A00220 은 `<이름>_BU.mb` · `<이름>_BU_NN.mb` 를 쓰므로 이 툴은 **`<이름>_REF_NN.mb`** (번호는 비어 있는 다음 번호, 삭제 안 함) 로 구분한다 |
+| ④ | 중첩(자식) 행에 **체크박스 없음** |
+| ⑤ | Import Reference 대상 = **Get Reference 로 리스트업된 레퍼런스 중 체크된 것**. 각 체크된 레퍼런스를, 그것을 부르는(스캔된) 마야 파일마다 임포트한다 (§4.7 그대로) |
+| ⑥ | 임포트한 레퍼런스의 네임스페이스만 지우는 게 아니라, **`Remove All Namespace` 체크박스(기본 ON)** — 체크면 임포트 뒤 **씬의 모든 네임스페이스**를 제거한다(`UI` · `shared` 제외, 깊은 것부터, 루트로 병합. 로드된 레퍼런스의 네임스페이스처럼 지울 수 없는 것은 건너뛰고 `[WARN]`) |
+| ⑦ | 두 리스트는 **좌우** |
+| ⑧ | Tree File Types 기본 체크 = **`.ma` · `.mb` · `.fbx`** |
+| ⑨ | Maya File 에 **Browse...** 도 둔다 |
+| ⑩ | (제안대로) 끝나면 원래 씬 다시 열기 ON |
+| ⑪ | 테스트 파일 (**원본 수정 금지 — 스크래치로 복사해서 테스트**): `D:\D__02.Art\D__Asset\D__Character\D__CHN_Set_008\JP__Ctl\JP__Revision_0010_Defualt0_CHN_Ctl_Set008_0030.mb` · `D:\D__02.Art\D__Asset\D__Character\D__DHA_Set_008\JP__Ctl\JP__Revision_0010_Defualt0_DHA_Ctl_Set008_0020.mb`. 둘 다 레퍼런스를 여럿 부른다. 레퍼런스 경로가 절대경로라면 복사본에서도 풀린다 — 아니면 레퍼런스 파일도 함께 복사해 경로를 맞춘다 |
+
+---
+
+## 13. 진행 상태 (재개용 — 단계가 끝날 때마다 갱신)
+
+> 강제 종료 뒤에는 **이 표와 `git log`** 만 보고 이어 간다. 각 단계는 끝나면 로컬 커밋한다.
+
+| 단계 (§7) | 상태 | 커밋 | 메모 |
+|-----------|------|------|------|
+| 0 결정 | **완료** | 이 문서 | §12 |
+| 1 Tree 승격 (`Framework/qt/MOD_fileTree_qt_v01` · `core/tree_scanner` · `core/prefetcher`, A00240 re-export, v01.20) | 대기 | | |
+| 2 `MOD_checkTree_qt_v01` + Tree `checkable_files` · `default_types` · `checked_paths` | 대기 | | |
+| 3 `Framework/qt/path_context.py` (Reveal · Copy · 더블클릭 공용) | 대기 | | |
+| 4 `app/maya/core/ma_parser.py` · `ref_scanner.py` | 대기 | | mayapy 검증 |
+| 5 `app/maya/core/ref_importer.py` · `scene_guard.py` · 백업 | 대기 | | mayapy 검증, 테스트 파일 ⑪ 은 복사본으로 |
+| 6 UI (`maya_tab.py` · `reference_tab.py` · `reference_tree.py`, main_window 연결, v01.10) | 대기 | | offscreen 검증 |
+| 7 문서 · CHANGELOG · WORKLOG · 포트폴리오 · 메모 | 대기 | | |
+| 8 마야 GUI 확인 | 사용자 | | |
