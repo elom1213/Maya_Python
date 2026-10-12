@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-02
+# last Update date : 2026-10-12
 # A00340_SelectionTool - "Buttons" tab (Qt, in-Maya)
 #
 # 사용자가 카테고리와 선택 버튼을 직접 만들고, 버튼을 누르면 그 버튼에 저장된
@@ -17,6 +17,10 @@
 #   - 색 지정       : 버튼 우클릭 'Set Color...'(팔레트+스포이드)로 개별 지정.
 #                     'Color Select' 모드를 켜면 카테고리를 넘나들며 여러 버튼을
 #                     체크해 'Apply Color...'로 한 번에 칠한다('Clear Color'로 해제).
+#   - Controls 숨김  : main_window 의 View > Show Controls 가 set_controls_visible() 을
+#                     부른다. 접기(CollapsibleBox)는 헤더와 스크롤 영역의 최소 높이가
+#                     남지만, 숨김은 위 pane 자체를 숨겨 핸들까지 사라지고 버튼 모음이
+#                     창 전체를 쓴다. 상태는 prefs(active.json) 에 남아 다음에도 유지.
 
 from Framework.qt.qt import (
     QWidget,
@@ -47,6 +51,9 @@ from ..core import maya_select
 
 
 TITLE = "Selection Tool"
+
+# active.json 에 저장하는 창 설정 키: Controls pane 표시 여부(View > Show Controls).
+SHOW_CONTROLS_KEY = "show_controls"
 
 # 색이 지정되지 않은(=아직 한 번도 칠하지 않은) 버튼의 컬러 다이얼로그 시작값.
 DEFAULT_PICK_HEX = "#5a5a5a"
@@ -220,6 +227,10 @@ class SelectionTab(QWidget):
 
         root.addWidget(splitter)
 
+        # 지난번에 Controls 를 숨겨 두었으면 그대로 숨긴 채 연다(저장은 다시 하지 않는다).
+        if not prefs_mod.get_setting(SHOW_CONTROLS_KEY, True):
+            self._controls_pane.setVisible(False)
+
     def _build_controls_pane(self):
         """상단 pane: Profile/Create/Color/Log 를 '하나의' 접이식 박스로 묶는다.
 
@@ -242,7 +253,40 @@ class SelectionTab(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(self._controls_box)
+        # View > Show Controls 가 통째로 숨기고 보이는 위 pane.
+        self._controls_pane = scroll
         return scroll
+
+    # ---------------------------------------------------- Controls 숨김/표시
+
+    def controls_visible(self):
+        """위 pane(Controls)이 보이는가. main_window 의 View 메뉴 체크 상태와 맞춘다."""
+        return not self._controls_pane.isHidden()
+
+    def set_controls_visible(self, visible):
+        """Controls pane 을 통째로 숨기거나 보인다. 돌려주는 값은 적용된 상태.
+
+        접기(CollapsibleBox)와 다르다 - 접기는 헤더 줄과 스크롤 영역의 최소 높이가
+        남지만, 숨기면 스플리터가 그 위젯과 핸들을 없는 것으로 치고 버튼 모음이 전체를
+        쓴다. 다시 보일 때는 숨기기 직전의 스플리터 비율로 돌아간다.
+        상태는 prefs 에 저장해 다음에 열 때도 같다.
+        """
+        visible = bool(visible)
+        if visible == self.controls_visible():
+            prefs_mod.set_setting(SHOW_CONTROLS_KEY, visible)
+            return visible
+
+        if visible:
+            self._controls_pane.setVisible(True)
+            sizes = getattr(self, "_sizes_before_hide", None)
+            if sizes and sum(sizes) > 0:
+                self._splitter.setSizes(sizes)
+        else:
+            self._sizes_before_hide = self._splitter.sizes()
+            self._controls_pane.setVisible(False)
+
+        prefs_mod.set_setting(SHOW_CONTROLS_KEY, visible)
+        return visible
 
     def _on_controls_toggled(self, expanded):
         """Controls 박스를 접으면 위 pane 을 헤더만 남기고 아래 pane 을 넓힌다."""

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-02
+# last Update date : 2026-10-12
 # A00340_SelectionTool - selection-button config persistence (UI/DCC 비의존)
 #
 # 사용자가 만든 카테고리/선택 버튼을 "프로파일" 단위로 로컬에 저장한다.
@@ -11,7 +11,8 @@
 # 저장 위치는 툴 폴더 내부의 data/ 다.
 #   <A00340_SelectionTool>/data/
 #     ├── profiles/<profile>.json   # 예: BodyRig.json, FaceRig.json
-#     └── active.json               # {"active": "<현재 프로파일>"}
+#     └── active.json               # {"active": "<현재 프로파일>", "show_controls": true, ...}
+#                                   #   active 외의 키는 창 설정(get_setting / set_setting)
 #
 # 프로파일 JSON 자료 구조:
 #   {
@@ -150,7 +151,28 @@ def get_active():
 
 
 def set_active(name):
-    """활성 프로파일 이름을 저장."""
+    """활성 프로파일 이름을 저장. 같은 파일의 다른 설정(show_controls 등)은 보존한다."""
+    set_setting("active", name)
+
+
+# ------------------------------------------------------------- window settings
+# 프로파일과 무관한 창 설정(Controls 표시 여부 등)도 active.json 에 함께 둔다.
+# 파일 하나 = dict 하나. 키를 하나 바꿀 때 나머지 키는 그대로 다시 쓴다.
+
+def _read_active_dict():
+    data = _read_json(ACTIVE_PATH, None)
+    return dict(data) if isinstance(data, dict) else {}
+
+
+def get_setting(key, default=None):
+    """active.json 의 설정값 하나. 없으면 default."""
+    return _read_active_dict().get(key, default)
+
+
+def set_setting(key, value):
+    """active.json 의 설정값 하나를 쓴다(다른 키는 보존)."""
     os.makedirs(PREFS_DIR, exist_ok=True)
+    data = _read_active_dict()
+    data[key] = value
     with open(ACTIVE_PATH, "w", encoding="utf-8") as f:
-        json.dump({"active": name}, f, ensure_ascii=False, indent=2)
+        json.dump(data, f, ensure_ascii=False, indent=2)

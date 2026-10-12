@@ -4,7 +4,7 @@
 A00240_PathTool 처럼 버튼을 자유롭게 추가·삭제·순서변경 하고, Profile 로 원하는
 종류끼리 버튼 세트를 나눠 보관한다.
 
-- **버전**: v01.04 (2026-07-06)
+- **버전**: v01.07 (2026-10-12)
 - **아키텍처**: (B) Standalone/Qt 앱형 구조지만 마야 안에서 실행(PySide, `maya.cmds`).
 - **참고**: 구성/편집 흐름은 `A00240_PathTool`, 마야 연동(셸프 설치·창 parenting·리로드)은
   `A00310_SearchTool` 를 이식.
@@ -76,6 +76,11 @@ A00340_SelectionTool/data/
    드래그해 두 영역의 비율을 조절한다. 컨트롤 4칸은 **하나의 접이식 `Controls` 박스**로
    묶여 있어, 제목 바(▾/▸)를 클릭하면 네 칸을 **한 번에** 접었다 편다. 접으면 위 pane 이
    헤더만 남게 줄고 그만큼 버튼 영역이 넓어진다(펴면 원위치). 로그창도 이 박스 안에 있다.
+   - **`View > Show Controls`** (v01.07~) — 접어도 헤더 줄과 스크롤 영역의 최소 높이는 남아
+     버튼 영역이 충분히 넓어지지 않는다. 메뉴 바의 `View`(Help 왼쪽) 에서 체크를 끄면 **위 pane
+     자체를 숨겨** 스플리터 핸들까지 사라지고 버튼 모음이 창 전체를 쓴다. 다시 켜면 숨기기
+     직전의 비율로 돌아온다. 상태는 `data/active.json` 의 `show_controls` 에 남아 **다음에 열
+     때도 같다.** 로그창이 Controls 안에 있으므로 숨긴 동안은 로그도 보이지 않는다.
 9. **Always on Top** — 상단 헤더 행 오른쪽의 `Pin` 버튼(체크형). 켜면 창이 다른 마야
    창들보다 항상 위에 유지되고(`Qt.WindowStaysOnTopHint`) 라벨이 `Pinned` 로 바뀐다.
    다시 누르면 해제. 버튼은 고정 크기라 토글해도 위치·크기가 변하지 않는다.
@@ -96,10 +101,10 @@ A00340_SelectionTool/
 └── app/
     ├── config/version.py       # VERSION / LAST_UPDATE
     ├── core/
-    │   ├── prefs.py            # 프로파일/카테고리/버튼 영속화 (UI·DCC 비의존)
+    │   ├── prefs.py            # 프로파일/카테고리/버튼 영속화 + 창 설정(get/set_setting) (UI·DCC 비의존)
     │   └── maya_select.py      # 선택 캡처 / 오브젝트 선택 (maya.cmds 어댑터)
     └── ui/
-        ├── main_window.py      # 마야 parent 창 + 로그 위젯 생성 + About
+        ├── main_window.py      # 마야 parent 창 + 로그 위젯 생성 + View/Help 메뉴 + About
         └── selection_tab.py    # 상하 스플리터(접이식 Controls 박스 + 버튼 pane) UI + 편집
                                 #   CollapsibleBox: 제목 바 하나로 컨트롤 4칸을 한 번에 접기
 ```

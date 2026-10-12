@@ -32,6 +32,17 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00340 SelectionTool — **View > Show Controls: Controls pane 을 통째로 숨기기** (v01.06->01.07)
+- 요청: Controls 를 접어도 차지하는 영역이 너무 크다. Help 옆 메뉴에서 토글하고, 안 보일 때는 영역이 아예 없어야 한다.
+- 원인: 접기는 `CollapsibleBox` 헤더 줄 + 위 pane 인 `QScrollArea` 의 최소 높이가 남는다(스플리터 `setCollapsible(0, False)`).
+- `View` 메뉴(공용 메뉴 바가 Help 왼쪽에 놓음) 에 체크형 `Show Controls`. 끄면 `SelectionTab.set_controls_visible(False)` 가
+  위 pane 을 `setVisible(False)` — 스플리터가 그 위젯과 핸들을 없는 것으로 쳐 버튼 모음이 창 전체를 쓴다. 켜면 직전 비율 복원.
+- 상태는 `prefs.set_setting("show_controls")` 로 `data/active.json` 에(다른 키 보존하도록 `set_active` 도 merge 로). 다음 실행 때
+  숨긴 채 열고 메뉴 체크를 실제 상태에 맞춘다(시그널 막고).
+- CHANGELOG · 문서 8항 · About 갱신.
+- 검증: mayapy 2024 오프스크린 — 메뉴 순서 View | Help, 끄면 pane 숨김 · 핸들 숨김 · 버튼 pane 높이 = 스플리터 전체,
+  켜면 비율 복원, active.json 에 키 저장 + `active` 보존, 새 창이 저장값대로 숨긴 채 열리고 체크도 꺼짐. GUI 확인 아직.
+
 > [!summary] A00030 quickTool_V02 — **Select > Select Shapes: 선택한 오브젝트 대신 그 셰이프를 선택** (v02.04->02.05)
 - 요청: 커브를 고르고 있으면 커브 셰이프를, 메시면 메시 셰이프를 선택하는 버튼.
 - `quick_ops.select_shapes()` — `ls -objectsOnly` 로 받은 선택마다 `listRelatives -s -ni` 로 셰이프를 모아 `select -r`.

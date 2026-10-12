@@ -2,6 +2,18 @@
 
 All notable changes to this tool are documented here.
 
+## v01.07 — 2026-10-12
+
+- **View > Show Controls**: a new `View` menu (left of `Help`) with a checkable
+  `Show Controls` item. Unchecking it hides the whole control pane (Profile /
+  Create / Color / Log) **and the splitter handle**, so the button collection fills
+  the window. Collapsing the `Controls` bar still left its header and the scroll
+  area's minimum height; hiding removes the area entirely. Re-checking restores
+  the pane at the sizes it had before. The state is saved in `data/active.json`
+  (`show_controls`) and applied on the next launch.
+- `prefs.get_setting` / `set_setting` for window settings in `active.json`;
+  `set_active` now preserves the other keys of that file.
+
 ## v01.04 — 2026-07-06
 
 - **Split layout + one-click collapsible controls**: the window is now a vertical

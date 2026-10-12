@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-06
+# last Update date : 2026-10-12
 # A00340_SelectionTool - Qt UI (in-Maya)
 #
 # 마야에서 선택된 오브젝트들을 버튼 하나로 빠르게 다시 선택하는 툴.
@@ -10,6 +10,8 @@
 #   - 화면은 상하 스플리터로 [컨트롤(Profile/Create/Color/Log)] / [버튼 모음] 분리.
 #     컨트롤 4칸은 하나의 접이식 'Controls' 박스로 묶여 한 번에 접힌다. 로그창도
 #     그 안에 들어가므로 log_view 를 탭에 넘겨준다.
+#   - View > Show Controls (v01.07~): 접어도 남던 Controls 영역을 아예 없앤다.
+#     끄면 위 pane 과 스플리터 핸들이 사라지고 버튼 모음이 창 전체를 쓴다.
 # 창은 마야 메인 윈도우에 parent 되어 뷰포트 위에 뜬다. 모든 UI 문자열/로그는 영어.
 
 from Framework.qt.qt import (
@@ -54,6 +56,18 @@ class MainWindow(QWidget):
         # 상단 헤더 행 : 메뉴 바(좌) + Always on Top 토글(우)
         # 코너 위젯 대신 QHBoxLayout 으로 배치해 토글 시 위치/크기가 고정되도록 한다.
         self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
+
+        # View : Controls pane 표시/숨김. 공용 메뉴 바가 툴 메뉴를 Help 왼쪽에 놓는다.
+        # 체크 상태는 탭을 만든 뒤 실제 상태로 맞춘다(지난번에 숨겨 두었을 수 있다).
+        view_menu = self.menu_bar.addMenu("View")
+        view_menu.setToolTipsVisible(True)      # QMenu 는 기본으로 항목 툴팁을 숨긴다
+        self.act_show_controls = view_menu.addAction("Show Controls")
+        self.act_show_controls.setCheckable(True)
+        self.act_show_controls.setToolTip(
+            "Show or hide the Controls pane (Profile / Create / Color / Log).\n"
+            "Hidden, it takes no space at all - the button area fills the window.")
+        self.act_show_controls.toggled.connect(self.on_show_controls_toggled)
+
         help_menu = self.menu_bar.addMenu("Help")
         act_about = help_menu.addAction("About")
         act_about.triggered.connect(self.show_about)
@@ -84,6 +98,12 @@ class MainWindow(QWidget):
             log_callback=self._log, log_widget=self.log_view)
         main_layout.addWidget(self.selection_tab, stretch=1)
 
+        # 메뉴 체크를 탭의 실제 상태(저장된 설정)에 맞춘다. 시그널은 막고 맞춘다 -
+        # 여기서 토글 핸들러가 돌면 같은 값을 다시 저장하고 로그만 남긴다.
+        self.act_show_controls.blockSignals(True)
+        self.act_show_controls.setChecked(self.selection_tab.controls_visible())
+        self.act_show_controls.blockSignals(False)
+
         # 저작권
         footer = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
         footer.setAlignment(Qt.AlignCenter)
@@ -95,6 +115,11 @@ class MainWindow(QWidget):
 
     def _log(self, message):
         self.log_view.appendPlainText(message)
+
+    def on_show_controls_toggled(self, checked):
+        """View > Show Controls. 로그창은 Controls 안에 있어 숨기면 로그도 안 보인다."""
+        visible = self.selection_tab.set_controls_visible(checked)
+        self._log("Controls pane: {0}".format("shown" if visible else "hidden"))
 
     def toggle_always_on_top(self, enabled):
         # WindowStaysOnTopHint 를 켜고/끄고, 플래그 변경 후 다시 show() (안 하면 창이 사라짐)
@@ -127,6 +152,8 @@ class MainWindow(QWidget):
             "- Layout : drag the splitter between the control panel and the\n"
             "  button area; click the 'Controls' bar to collapse Profile /\n"
             "  Create / Color / Log all at once.\n"
+            "- View > Show Controls : hide the whole control pane so the\n"
+            "  button area fills the window (remembered for next time).\n"
             "\n"
             "All UI text is English.\n"
             "\n"
