@@ -2,7 +2,7 @@
 
 > v01.03 (2026-10-12) 까지 폴더 이름은 `dev/release_builder_QT` 였다. dev 의 툴도 tools 와 같은 `A00XXX_` 번호 규칙으로 관리한다.
 
-툴을 **골라서 릴리즈 폴더로 복사**하는 개발용 Qt 창이다. 손으로 `dev/build_release.py` 의
+툴을 **골라서 릴리즈 폴더로 복사**하는 개발용 Qt 창이다. 손으로 `dev/build_release.py`(지금은 `legacy/` 에 보존)의
 `TOOL_PATH` 를 고쳐 가며 돌리던 일을 대체한다.
 
 - 버전: `v01.03` (`app/config/version.py`) — v01.02 에 **목록 검색(Filter)** · **공용 로그창** · **아이콘**, v01.03 에 이름 변경 + 셸프 설치

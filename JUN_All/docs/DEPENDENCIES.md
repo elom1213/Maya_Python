@@ -10,7 +10,7 @@ JUN_All의 모든 툴을 쓴다고 가정했을 때 필요한 외부 코드와 �
 | **standalone / .exe 빌드** | venv에 직접 설치 | 필요 (`PySide6`, `pyinstaller`) |
 
 > 그래서 "외부 코드 목록"을 단순 텍스트로 두는 것보다, **설치 가능한 매니페스트**(루트
-> `requirements.txt`)와 **import 가능 여부를 검증하는 doctor 스크립트**(`dev/check_dependencies.py`)로
+> `requirements.txt`)와 **import 가능 여부를 검증하는 doctor 스크립트**(`dev/A00530_dependency_check`, 옛 `dev/check_dependencies.py` 는 재노출)로
 > 나누는 편이 실제 쓸모가 있다.
 
 ---
@@ -49,7 +49,7 @@ JUN_All의 모든 툴을 쓴다고 가정했을 때 필요한 외부 코드와 �
 | 2024 | 3.10/3.11 | PySide2 |
 | 2025+ | 3.11 | PySide6 |
 
-정확한 값은 환경마다 다를 수 있으므로, **`dev/check_dependencies.py`가 런타임에 실제로 잡힌
+정확한 값은 환경마다 다를 수 있으므로, **`dev/A00530_dependency_check`(옛 `dev/check_dependencies.py`)가 런타임에 실제로 잡힌
 바인딩을 출력**한다. 위 표는 안내용이다.
 
 `Framework/qt/qt.py`가 PySide6를 먼저, 실패 시 PySide2를 import 하는 폴백을 제공하므로,

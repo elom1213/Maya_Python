@@ -67,3 +67,21 @@ def run(reload_module=True):
         _in_view("<hl>Reload</hl> {0} module(s) reloaded".format(len(ok)))
 
     return ok, failed
+
+
+def clean_pycache(root=None):
+    """두 번째 셸프 버튼(__dragDrop_A00500_pycache.py) : JUN_All 아래 __pycache__ 전부 삭제.
+
+    옛 dev/remove_pycache.py. 리로드가 .pyc 를 다시 쓰므로 보통은 필요 없고, 옛 .pyc 가 섞여
+    이상할 때(파일을 옮긴 뒤 등)만 누른다. 반환 (지운 경로들, 실패들).
+    """
+    from dev.A00500_reloader.app.core import pycache
+
+    removed, failed = pycache.remove_pycache(root)
+    print("[Reload] __pycache__ : {0} removed, {1} failed (under {2})".format(
+        len(removed), len(failed), root or pycache.JUN_ALL_ROOT))
+    for path, error in failed:
+        print("[Reload]   FAILED {0} : {1}".format(path, error))
+    _in_view("<hl>__pycache__</hl> {0} folder(s) removed{1}".format(
+        len(removed), ", <hl>{0} failed</hl>".format(len(failed)) if failed else ""))
+    return removed, failed

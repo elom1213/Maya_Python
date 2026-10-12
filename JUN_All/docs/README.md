@@ -72,7 +72,9 @@
 |------|------|------|
 | **릴리즈 배치** | dev 트리와 릴리즈본은 **폴더 모양이 다르다** — `Framework` 는 툴 안에 동봉되고 `config.py` · `dev/` 는 실리지 않는다. 진입 파일(`launch.py` · `launcher.py`)이 지켜야 할 규약과 "남의 PC" 검증법 | [Release_Layout](Release_Layout.md) |
 | **릴리즈 빌더** | 릴리즈본을 만드는 개발 툴(`JUN_All/dev/A00510_release_builder`, 옛 `release_builder_QT`, `__dragDrop_A00510.py` 로 셸프 설치) | [A00510_release_builder](A00510_release_builder.md) |
-| **리로더** | Framework / tools 모듈을 전부 다시 읽는 개발용 셸프 버튼(`JUN_All/dev/A00500_reloader`, `__dragDrop_A00500.py` 로 설치). 각 툴 `launch.py` 의 `dev.reloader_v02` 는 이것의 재노출 | [A00500_reloader](A00500_reloader.md) |
+| **아이콘 빌더** | `tools/*/icon/*.svg` 와 `dev/*/icon/*.svg` 를 32px png 로(옵션 .ico), 셸프 `Icons` 버튼 또는 mayapy (`dev/A00520_icon_builder`, 옛 `dev/build_icons.py`) | [A00520_icon_builder](A00520_icon_builder.md) |
+| **의존성 체크** | Qt 바인딩 · pymel · maya.cmds 가 이 인터프리터에서 import 되는지 표로 (`dev/A00530_dependency_check`, 옛 `dev/check_dependencies.py` 는 재노출) | [A00530_dependency_check](A00530_dependency_check.md) · [DEPENDENCIES](DEPENDENCIES.md) |
+| **리로더** | Framework / tools 모듈을 전부 다시 읽는 개발용 셸프 버튼(`JUN_All/dev/A00500_reloader`, `__dragDrop_A00500.py` 로 설치, `__dragDrop_A00500_pycache.py` 는 `__pycache__` 비우기). 각 툴 `launch.py` 의 `dev.reloader_v02` 는 이것의 재노출 | [A00500_reloader](A00500_reloader.md) |
 
 ---
 

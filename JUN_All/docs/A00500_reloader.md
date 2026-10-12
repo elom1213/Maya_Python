@@ -8,6 +8,7 @@
 - 위치: `JUN_All/dev/A00500_reloader` — 배포 대상이 아니라 **개발 도구**라 `tools/` 가 아닌 `dev/` 에 있다
   (`A00510_release_builder` 와 같은 자리). 릴리즈본에는 `dev/` 가 실리지 않는다 — [Release_Layout](Release_Layout.md)
 - 창이 없다. 누르면 리로드하고 결과를 뷰포트 메시지와 스크립트 에디터에 적는다.
+- 두 번째 드롭 파일 `__dragDrop_A00500_pycache.py` 는 `Clear pyc` 버튼 — `JUN_All` 아래 `__pycache__` 전부 삭제(옛 `dev/remove_pycache.py`). 파일을 옮긴 뒤 옛 .pyc 가 섞여 이상할 때만 누른다.
 
 ---
 
@@ -54,12 +55,14 @@ dev/
 └── A00500_reloader/
     ├── __init__.py                 # from .launch import run
     ├── __dragDrop_A00500.py        # 셸프 설치 (Reload)
+    ├── __dragDrop_A00500_pycache.py # 셸프 설치 (Clear pyc)
     ├── launch.py                   # run(reload_module=True) -> (ok, failed)
     ├── icon/A00500_reloader.svg|.png
     ├── app/
     │   ├── config/version.py
     │   ├── config/reload_packages.py   # RELOAD_PACKAGES = ["Framework", "tools"]  (옛 dev/reload_path_list.py)
-    │   └── core/reloader.py            # modules_of / reload_package / reload_all / reload_for_tool  (옛 dev/reloader_v02.py)
+    │   ├── core/reloader.py            # modules_of / reload_package / reload_all / reload_for_tool  (옛 dev/reloader_v02.py)
+    │   └── core/pycache.py             # find_pycache / remove_pycache  (옛 dev/remove_pycache.py)
     └── legacy/                     # 옛 세대 보존 (README 참고, import 되지 않는다)
         ├── reloader_mayaScript_v02.py  # 붙여 넣어 쓰던 네 줄
         ├── reloader_v01.py · reload_moduleList_v01.py · reloader_mayaScript_v01.py

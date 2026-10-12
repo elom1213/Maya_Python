@@ -15,7 +15,7 @@
 `__dragDrop_A00450.py` 를 Maya 뷰포트로 드래그&드롭 → 현재 셸프에 **`ManipTool`** 버튼 설치.
 
 셸프 아이콘은 `icon/A00450_manipulatorTool.png`(32×32). 없으면 마야 기본 `pythonFamily.png` 로
-폴백한다. 벡터 원본은 같은 폴더의 `.svg` 이고, 고칠 때는 svg 를 고친 뒤 `dev/build_icons.py` 로
+폴백한다. 벡터 원본은 같은 폴더의 `.svg` 이고, 고칠 때는 svg 를 고친 뒤 `dev/A00520_icon_builder` 로
 다시 래스터화한다.
 
 ### 코드로 실행

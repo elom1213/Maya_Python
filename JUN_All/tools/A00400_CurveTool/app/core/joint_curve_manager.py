@@ -40,7 +40,7 @@
 #
 # -- A00460 의 스택을 여기 다시 둔 이유 --------------------------------------
 # 노드 구성은 A00460_ControllerTool 의 fk_manager 와 같지만 그 모듈을 import 하지 않는다.
-# dev/build_release.py 는 **툴 하나 + Framework** 만 릴리스 폴더로 복사하므로, 다른 툴의
+# 릴리즈 빌더(dev/A00510_release_builder)는 **툴 하나 + Framework** 만 릴리스 폴더로 복사하므로, 다른 툴의
 # core 를 참조하면 릴리스에서 곧바로 깨진다. 툴 사이에서 정말 공유해야 해지면 그때
 # Framework 로 올릴 자리다.
 

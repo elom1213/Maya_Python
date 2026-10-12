@@ -554,7 +554,7 @@ Peak/Match 처럼 `app/core/<name>_manager.py` 에 세션 모델(preview/restore
 **누운 와이어프레임 격자**(대상 메시) · **버텍스 하나를 노말 방향으로 끌어올리는 화살표**(Peak/Match = 편집) ·
 **오른쪽 아래 십자 배지**(MeshDoctor = 진단·수정). 32px 에서 뭉개지지 않게 요소는 셋으로 제한했고,
 배지는 격자와 겹치지 않는 모서리에 둔다. `icon/A00380_MeshTool.svg` 가 원본이고
-PNG 는 `dev/build_icons.py` 와 같은 방식(Qt `QSvgRenderer`)으로 32x32 ARGB 로 굽는다.
+PNG 는 `dev/A00520_icon_builder` 와 같은 방식(Qt `QSvgRenderer`)으로 32x32 ARGB 로 굽는다.
 
 ---
 

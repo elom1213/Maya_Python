@@ -991,7 +991,7 @@ Direction U, Across 0.5            Direction V, Across 0.25
   값이 곧 월드 방향이 된다. `rotate` 에 넣으면 애니메이터가 채널을 0 으로 돌리는 순간
   방향이 풀린다.
 - **`A00460_ControllerTool` 의 `fk_manager` 를 import 하지 않는다.** 노드 구성은 같지만
-  `dev/build_release.py` 가 **툴 하나 + Framework** 만 릴리스로 복사하므로, 다른 툴의 core 를
+  릴리즈 빌더(`dev/A00510_release_builder`, 옛 `dev/build_release.py`)가 **툴 하나 + Framework** 만 릴리스로 복사하므로, 다른 툴의 core 를
   참조하면 릴리스에서 곧바로 깨진다. 정말 공유해야 해지면 `Framework` 로 올릴 자리다.
 - 커브·서피스가 아닌 항목(메시 등), 씬에 없는 이름, 이미 바인드된 것은 **사유와 함께 건너뛴다** — 나머지
   처리는 계속된다.

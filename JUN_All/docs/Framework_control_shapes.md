@@ -22,7 +22,7 @@ updated: 2026-09-18
 한 툴의 것이 아니다** — `A00460_ControllerTool` 의 FK 컨트롤, `A00130_ControlRig_V02` 의 케이지,
 `A00145_RigConnect` 어디서든 같은 라이브러리를 쓰는 편이 맞다.
 
-`dev/build_release.py` 는 **툴 하나 + Framework** 를 릴리스로 복사하므로, Framework 에 두면 어느 툴을
+릴리즈 빌더(`dev/A00510_release_builder`, 옛 `dev/build_release.py`)는 **툴 하나 + Framework** 를 릴리스로 복사하므로, Framework 에 두면 어느 툴을
 릴리스해도 따라간다. (반대로 다른 툴의 `app/core` 를 참조하면 릴리스에서 곧바로 깨진다.)
 
 ---

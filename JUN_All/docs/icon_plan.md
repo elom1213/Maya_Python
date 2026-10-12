@@ -118,7 +118,7 @@ Python 3.11 만 존재. 반면 **Maya 2024 설치됨** → `mayapy` 의 PySide2 
 - **대안(폴백)**: `pip install svglib reportlab`(Windows 휠 존재, cairo 네이티브 DLL 불필요).
   cairosvg 는 Windows 에서 cairo DLL 의존이라 비권장.
 
-### 빌드 스크립트 `JUN_All/dev/build_icons.py`
+### 빌드 스크립트 `JUN_All/dev/build_icons.py` (2026-10-12 부터 `dev/A00520_icon_builder`)
 - `tools/` 순회 → 각 `icon/*.svg` 를 같은 폴더 `*.png`(32×32)로 래스터화.
 - 래스터러 자동 검출: mayapy/QtSvg → svglib/reportlab → 둘 다 없으면 안내 후 종료.
 - 멱등(재실행 안전). 개발 편의 스크립트라 릴리스 제외 관례 따름.

@@ -14,6 +14,7 @@
 _archive/
 ├── legacy_tools/   # 옛 Maya 툴 (현행 JUN_All 툴로 이미 대체됨)
 └── study_notes/    # Python/Maya 학습 메모 (프로덕션 코드 아님)
+                    #   100_Memo/05_·06_Memo_dev_*_2026-01.py = JUN_All/dev 에 있던 userSetup 스니펫 · 셸프 메모 (2026-10-12 이동)
 ```
 
 ## `legacy_tools/` — 옛 Maya 툴 → 현행 대응

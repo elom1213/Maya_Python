@@ -32,6 +32,16 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] dev 정리 — **낱개 스크립트 9개를 A 번호 툴로: A00520_icon_builder · A00530_dependency_check 신규, pycache 는 A00500 에, build_release 는 A00510 legacy, 메모는 _archive** 
+- 요청: dev 의 코드를 조사해 `AXXXXX_{툴이름}` 단위로 분류할 수 있는 것을 정리 → 제안대로 진행.
+- **A00520_icon_builder** (v01.00, 옛 `build_icons.py`): `tools/*/icon` 에 더해 **`dev/*/icon` 도** 훑는다(옛 것은 tools 만), `--only <툴>` 필터, `--ico`(16~256 다중 크기, Pillow 있을 때만 · mayapy 엔 없어 건너뛰고 알림), 셸프 `Icons` 버튼. `app/core/icon_builder.build_all` 이 (ok, failed, ico) 보고서.
+- **A00530_dependency_check** (v01.00, 옛 `check_dependencies.py`): 검사 표는 그대로, 셸프 `DepCheck` 버튼 + 뷰포트 요약. **`dev/check_dependencies.py` 는 재노출**(DEPENDENCIES.md · 계획서가 그 경로를 적어 둠).
+- **A00500_reloader**: `remove_pycache.py` → `app/core/pycache.py`(find/remove, 루트는 파일 기준 JUN_All), `clean_pycache()` + 두 번째 드롭 파일 `__dragDrop_A00500_pycache.py`(`Clear pyc`). `remove_pycache_for_dev.py`(G: 고정 경로)는 삭제.
+- **A00510_release_builder**: 전신 `build_release.py` 를 `legacy/` 로(README). 문서·주석의 "`dev/build_release.py` 가 툴 하나 + Framework 만 복사" 는 A00510 으로 바꿈(A00400 · Framework_control_shapes · control_shapes.py · joint_curve_manager.py).
+- `__userSetup.py` · `__memo.py`(2026-01 스니펫, G: 경로) → `_archive/study_notes/100_Memo/05_·06_Memo_dev_*_2026-01.py`. dev/ 에는 `__init__` · `reloader_v02`(재노출) · `check_dependencies`(재노출) · 툴 폴더 4개만 남는다.
+- 아이콘 3개 신규(이미지 틀 · 체크 링 · 빗자루 선), A00520 자신으로 `--only A005` 렌더. 문서 `A00520_icon_builder.md` · `A00530_dependency_check.md` 신설, README 배치 표 2줄, 옛 스크립트를 가리키던 문서 7곳 갱신.
+- 검증: mayapy 2024 — A00520 `only=A005` 로 dev 아이콘 5개 png, tools+dev 둘 다 탐색, A00530 in-Maya 표 + 재노출 동일 모듈, clean_pycache 임시 폴더(중첩 포함) 삭제, 드롭 파일 3개 명령 문자열 · 아이콘, A00530 셸프 명령 실행. 마야 GUI 드롭은 아직.
+
 > [!summary] A00510_release_builder — **`dev/release_builder_QT` 이름을 A 번호 규칙으로 + 셸프 설치** (v01.02->01.03)
 - 요청: release_builder_QT 도 `AXXXXX_release_builder` 로. dev 의 코드를 tools 와 같은 방식으로 관리하는 것이 좋은지, 더 나은 방법이 있는지도.
 - git mv `dev/release_builder_QT` → `dev/A00510_release_builder`, 아이콘 3개 · `docs/release_builder_QT.md` → `docs/A00510_release_builder.md` 도 git mv. 코드(`launch` import 경로 · `ICON_STEM` · 로그창 objectName) · 문서(README · Release_Layout · A00500 · A00210 주석) · 메모 5개의 옛 이름 34곳 치환 — 지난 WORKLOG 본문은 그대로.
