@@ -21,7 +21,9 @@
      조인트를 center(+) 또는 front(-) 조인트로 수렴시키고, 바인드된 곡선이 반지름 R 구 표면에
      놓이도록 `scaleX/Y` 를 구동한다.
 3. **AttachCrv** — 커브에 오브젝트를 라이브 어태치한다. **하위 탭 2개**로 나뉜다(v01.14).
-   - **Default** — 아래 두 모드(기존 기능 그대로).
+   - **Default** — **Mode 콤보**(v01.31~)로 세 동작 — Attach Objects to Closest Point /
+     Distribute New Drivers Evenly / **Create Followers at Live Closest Point**(오브젝트마다 새
+     팔로워를 만들어, 오브젝트가 움직여도 그에 가장 가까운 표면 지점을 따라가게).
    - **Edge Loop** — 엣지 루프 → 커브 → 버텍스 자리 널 → 어태치(+조인트)를 **버튼 하나로**. (§4.3.1)
 
    (`ref/ref_01.mel` 의 `attachDriverOnCurve` 이식)
@@ -144,6 +146,15 @@ A00170_driverTool/
 
 #### Default
 
+**Mode 콤보**(v01.31~)로 세 동작 중 하나를 고른다. 그 모드가 쓰는 위젯만 보이고 나머지는 숨는다.
+Orient / Aim Axis / norCrv / set 옵션은 세 모드가 **공유**한다.
+
+| Mode | 뜻 | 쓰는 것 |
+|------|----|---------|
+| **Attach Objects to Closest Point** | Objects 의 **기존** 오브젝트를 빌드 시점에 가장 가까운 지점에 어태치(파라미터는 상수, 커브/서피스가 변형되면 따라감). 아래 1~4 | Objects · Maintain offset · `Attach to Closest Point` |
+| **Distribute New Drivers Evenly** | **새** 드라이버 N 개를 균일 간격으로(ref 원래 동작). [아래](#distribute-새-드라이버-균일-배치) | Count · Driver Type · Surface Axis · full range · `Distribute Drivers on Curve` |
+| **Create Followers at Live Closest Point** | Objects 의 오브젝트마다 **새 팔로워**를 만들고, 그 팔로워가 **오브젝트의 현재 위치에 가장 가까운 표면 지점**을 라이브로 따라간다(오브젝트를 옮기면 표면 위를 미끄러진다). [아래](#followers-at-live-closest-point-오브젝트를-따라-표면-위를-미끄러지는-팔로워-v0131) | Objects · Follower Type · Name Suffix · `Create Closest-Point Followers` |
+
 1. 커브 **또는 NURBS surface** 를 선택하고 **Get** → **Attachment Curve / Surface** 설정
    (transform 이든 shape 든 된다. 둘 다 아니면 로그로 경고하고 빌드하지 않는다).
 2. **Objects** 리스트에 커브에 붙일 오브젝트들을 추가(`Select`/`Add`).
@@ -206,8 +217,9 @@ A00170_driverTool/
 
 #### Distribute (새 드라이버 균일 배치)
 
-위 옵션(Orient / Aim Axis / norCrv / set)을 그대로 공유하며, **Objects 리스트는 필요 없다**
-(드라이버를 새로 만든다). **Distribute new drivers uniformly** 그룹에서:
+Mode 를 **Distribute New Drivers Evenly** 로. 위 옵션(Orient / Aim Axis / norCrv / set)을 그대로
+공유하며, **Objects 리스트는 필요 없다**(드라이버를 새로 만든다). **Distribute new drivers uniformly**
+그룹에서:
 
 - **Count**: 만들 드라이버 개수(양의 정수).
 - **Driver Type**: `Locator`(spaceLocator) 또는 `Null`(빈 그룹).
@@ -224,6 +236,43 @@ A00170_driverTool/
 > 어태치는 오브젝트의 `translate`(옵션 `rotate`)에 노드를 **연결**한다(Maintain offset 이어도
 > 같다, v01.26~). Closest 모드에서 이미 연결/잠금된 채널이 있으면 해당 오브젝트만
 > 실패 처리(로그 경고)하고 나머지는 계속한다.
+
+#### Followers at Live Closest Point — 오브젝트를 따라 표면 위를 미끄러지는 팔로워 (v01.31)
+
+Mode 를 **Create Followers at Live Closest Point** 로. Attachment 칸의 서피스(커브도 된다)를 `sfc`,
+Objects 의 오브젝트를 `obj_i` 라 하면, 오브젝트마다 **새 팔로워 `obj_i_attach`** 를 만들어
+**`obj_i` 에 가장 가까운 `sfc` 표면 위 지점**의 위치(Orient 면 회전까지)에 둔다. 다른 두 모드와
+다른 점은 **파라미터가 상수가 아니라 연결**이라는 것 — `obj_i` 가 움직이면 팔로워가 새 최근접 지점으로
+표면 위를 미끄러진다. `obj_i` 자신은 **건드리지 않는다**(연결도 값도).
+
+```
+obj_i.worldMatrix[0] ─▶ decomposeMatrix(<fol>_atc_objDCM).outputTranslate
+                       ─▶ closestPointOnSurface(<fol>_atc_CPOS).inPosition   ◀─ sfc.worldSpace[0]
+                             .parameterU / .parameterV
+                       ─▶ pointOnSurfaceInfo(<fol>_atc_POSI).parameterU / V  ◀─ sfc.worldSpace[0]
+                       ─▶ fourByFourMatrix ─▶ multMatrix(× fol.parentInverseMatrix) ─▶ decomposeMatrix
+                       ─▶ fol.translate (+ fol.rotate, Orient)
+```
+
+- **Follower Type** `Locator` / `Null`, **Name Suffix**(기본 `_attach`) — 이름은 `<오브젝트 짧은 이름>` +
+  접미사(경로 · 네임스페이스는 뗀다, 겹치면 마야가 번호를 붙인다). 팔로워는 월드 아래에 생긴다 —
+  다른 부모 밑으로 옮겨도 `parentInverseMatrix` 가 들어 있어 자리는 그대로다.
+- **커브**를 넣으면 같은 구조로 `nearestPointOnCurve.parameter → pointOnCurveInfo.parameter`.
+  norCrv 옵션도 그대로(커브 전용).
+- Orient / Aim Axis 는 다른 모드와 같다(서피스: X = tangentU, Y = normal). 조인트를 Objects 에 담아도
+  팔로워는 새 로케이터/널이라 JO 문제가 없다(오브젝트는 **위치만** 읽는다 — `worldMatrix` 의 translate).
+- 세트 옵션을 켜면 POSI(커브는 POCI)가 `<surface>_atcPOSI_SET` 에 담긴다(다른 모드와 같은 이름 규칙).
+- 오브젝트가 트랜스폼이 아니거나 씬에 없으면 건너뛰고 사유를 로그에 적는다. 한 오브젝트가 실패하면
+  그 오브젝트의 팔로워 · 최근접 노드만 치우고 나머지는 계속한다. 전체가 **undo 한 스텝**.
+- **쓰임새** — 메시 위를 미끄러지는 컨트롤의 보조 드라이버(예: 입술 컨트롤을 움직이면 그 자리의 피부
+  위에 붙는 널), 두 번째 리그 레이어의 "표면 투영" 등. Maintain offset 은 없다(팔로워가 새 노드라
+  지킬 자리가 없다).
+
+**검증** (mayapy 2024 + 오프스크린 PySide2, **48 항목 통과**) — 로케이터 3 + 네임스페이스 조인트 1 → 팔로워 4 가
+각자 `closestPointOnSurface` 로 따로 구한 지점과 일치 · X 축 = tangentU · 오브젝트 연결 없음 · 오브젝트를
+세 번 옮겨도 / 부모를 돌려도 / 서피스 CV 를 밀어도 / 팔로워를 다른 부모에 넣어도 최근접 지점 유지 · Null
+타입 + 접미사 + Orient off · `-X` · 커브 + norCrv + POCI 세트 · 커브 아닌 대상은 에러 · undo 한 덩어리로 전부
+사라짐 · 기존 두 모드 회귀 · Mode 콤보 3개와 모드별 위젯 가시성 · 핸들러로 Null 팔로워 생성. 마야 GUI 확인은 아직.
 
 #### 4.3.1 Edge Loop — 루프에서 드라이버 셋업 한 번에 (v01.14~)
 

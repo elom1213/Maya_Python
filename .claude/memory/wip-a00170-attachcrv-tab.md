@@ -86,6 +86,13 @@ translate/rotate 만으로 만든 행렬(스케일 1)이라 빌드 순간 decomp
 (`_atc_joNeg/joInv`, 라이브). `_local_matrix_from_channels` 도 조인트면 `R0 × JO` (Maintain 빌드 순간 제자리).
 rotateAxis 는 여전히 무시(로케이터도 같다). mayapy 85 항목 — 같은 자리 로케이터/조인트 월드 행렬 동일, 수정 전엔 30 실패.
 
+**UPDATE 2026-10-12 (v01.31)**: Default 탭에 **Mode 콤보** — `Attach Objects to Closest Point` / `Distribute New Drivers
+Evenly` / `Create Followers at Live Closest Point`(`ATTACH_MODES`). 모드별 위젯만 보임(`_atc_sync_mode`), Orient/Aim/norCrv/set 공유.
+새 모드 `build_attach_followers`: 오브젝트마다 새 Locator/Null `<obj>_attach` 를 만들고 `obj.worldMatrix -> decomposeMatrix ->
+closestPointOnSurface.inPosition`, `parameterU/V -> POSI.parameterU/V` 로 **파라미터 자체를 연결**해 오브젝트가 움직이면 표면 위를
+미끄러진다(커브는 nearestPointOnCurve). `_attach_one(param_plugs=)` 확장 하나로 기존 네트워크 재사용. 오브젝트는 안 건드림.
+Maintain offset 없음(새 노드). mayapy+오프스크린 48 항목.
+
 **남은 일**: Maya 실기 검증 + 푸시(기본 푸시처: [[push-target-dnable-dev]]). 검증/푸시 끝나면 이 메모 삭제.
 규약: [[ui-text-english-only]], [[prefer-pyside-for-new-tools]], [[push-includes-tool-guide-docs]],
 [[worklog-maintenance]], [[maya-2023-compat]].

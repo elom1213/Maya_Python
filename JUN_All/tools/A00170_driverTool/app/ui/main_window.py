@@ -24,8 +24,9 @@ from tools.A00170_driverTool.app.core import (
     MayaScene,
     run_build_slerp, run_build_wave,
     run_build_spherical, run_build_nodes,
-    run_attach_to_closest, run_attach_uniform, AIM_AXES, DRIVER_TYPES,
-    SURFACE_AXES, attach_target_kind,
+    run_attach_to_closest, run_attach_uniform, run_attach_followers,
+    AIM_AXES, DRIVER_TYPES, SURFACE_AXES, attach_target_kind,
+    ATTACH_MODES, MODE_CLOSEST, MODE_DISTRIBUTE, MODE_FOLLOWER, FOLLOWER_SUFFIX,
     run_build_loop_drivers, loop_parse_edges, loop_parse_vertices, loop_alive,
     group_loop_edges, CURVE_DEGREES, LOOP_DEFAULT_PREFIX, LOOP_CONTROL_SCALE,
     run_build_seal, run_remove_seal, run_seal_recapture_rest,
@@ -646,8 +647,9 @@ class MainWindow(QWidget):
     def _build_attach_tab(self):
         """AttachCrv 는 하위 탭 2개다.
 
-        - Default   : 기존 기능 그대로(커브를 지정해 오브젝트를 최근접 지점에 어태치 /
-                      균일 분배). 아래 `_build_attach_default_page`.
+        - Default   : Mode 콤보로 세 동작 중 하나(v01.31) — 오브젝트를 최근접 지점에 어태치 /
+                      새 드라이버 균일 분배 / 오브젝트마다 라이브 최근접 팔로워 생성.
+                      아래 `_build_attach_default_page`.
         - Edge Loop : 엣지 루프 -> 커브 -> 버텍스 자리 널 -> 어태치(+조인트)를 한 번에.
         """
         tabs = QTabWidget()
@@ -662,10 +664,17 @@ class MainWindow(QWidget):
         return tabs
 
     def _build_attach_default_page(self):
-        """TSL 에 나열된 오브젝트들을 커브에서 '가장 가까운 지점'에 라이브 어태치한다.
+        """Default 페이지 — `Mode` 콤보(v01.31)로 세 동작 중 하나를 고른다.
 
-        ref 는 커브에 일정 간격으로 새 로케이터를 어태치했지만, 여기서는 기존
-        오브젝트들을 각자 최근접 파라미터 지점에 붙인다(커브 변형을 따라감).
+        - Attach Objects to Closest Point   : TSL 의 기존 오브젝트를 빌드 시점 최근접 지점에
+                                              어태치(파라미터 상수). Maintain offset 은 여기만.
+        - Distribute New Drivers Evenly     : 새 드라이버 N 개를 균일 간격으로(ref 원래 동작).
+        - Create Followers at Live Closest Point : TSL 의 오브젝트마다 새 팔로워를 만들고,
+                                              오브젝트가 움직여도 그에 가장 가까운 표면 지점을
+                                              따라가게 한다(closestPointOnSurface 가 파라미터를
+                                              라이브로 공급).
+        Orient / Aim Axis / norCrv / set 옵션은 세 모드가 공유한다. 모드마다 쓰는 위젯만
+        보이게 `_atc_sync_mode` 가 가린다.
         """
         tab = QWidget()
         root = QVBoxLayout(tab)
@@ -685,12 +694,32 @@ class MainWindow(QWidget):
         row.addWidget(self.atc_btn_get_curve)
         root.addLayout(row)
 
-        # Objects (커브에 붙일 기존 오브젝트들)
+        # Mode (v01.31) : 세 동작 중 하나. 아래 위젯들은 모드에 따라 보이고 숨는다.
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Mode"))
+        self.atc_cb_mode = QComboBox()
+        self.atc_cb_mode.addItems(list(ATTACH_MODES))
+        self.atc_cb_mode.setToolTip(
+            "Attach Objects to Closest Point: drive each listed object onto the "
+            "point of the curve / surface closest to it at build time (the "
+            "parameter is fixed; the object follows the curve / surface as it "
+            "deforms).\n"
+            "Distribute New Drivers Evenly: create Count new Locator / Null drivers "
+            "spread evenly along the curve (or along the chosen Surface Axis).\n"
+            "Create Followers at Live Closest Point: for each listed object create "
+            "a new follower that keeps sliding to the surface point closest to the "
+            "object - move the object and the follower tracks it "
+            "(closestPointOnSurface -> pointOnSurfaceInfo, parameters live).")
+        row.addWidget(self.atc_cb_mode, stretch=1)
+        root.addLayout(row)
+
+        # Objects (커브에 붙일 기존 오브젝트들 / Follower 모드에서는 팔로워를 만들 기준 오브젝트들)
         group = QGroupBox("Objects (attach to closest point)")
         group_layout = QVBoxLayout(group)
         self.atc_objs_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(title="Objects")
         group_layout.addWidget(self.atc_objs_tsl)
         root.addWidget(group, stretch=1)
+        self.atc_objs_group = group
 
         # Options : Orient to tangent + Aim Axis
         row = QHBoxLayout()
@@ -761,7 +790,7 @@ class MainWindow(QWidget):
             "channel box shows at a glance that the object is attached.\n"
             "Off: snap translate (and rotate, with Orient) onto the closest "
             "point of the curve.\n"
-            "Applies to Attach to Closest Point only.")
+            "Attach Objects to Closest Point mode only.")
         root.addWidget(self.atc_cb_maintain_offset)
 
         # Build : Attach the listed objects to their closest point.
@@ -823,17 +852,78 @@ class MainWindow(QWidget):
             "matrix network, live as the curve deforms).")
         dist_layout.addWidget(self.atc_btn_distribute)
         root.addWidget(dist_group)
+        self.atc_dist_group = dist_group
+
+        # Follower (v01.31) : 오브젝트마다 새 팔로워를 만들어 라이브 최근접 지점을 따라가게.
+        fol_group = QGroupBox("Followers at the live closest point")
+        fol_layout = QVBoxLayout(fol_group)
+
+        fol_row = QHBoxLayout()
+        fol_row.addWidget(QLabel("Follower Type"))
+        self.atc_cb_follower_type = QComboBox()
+        self.atc_cb_follower_type.addItems(["Locator", "Null"])
+        self.atc_cb_follower_type.setToolTip(
+            "Locator: spaceLocator followers (visible). Null: empty groups.")
+        fol_row.addWidget(self.atc_cb_follower_type)
+        fol_row.addWidget(QLabel("Name Suffix"))
+        self.atc_le_follower_suffix = QLineEdit(FOLLOWER_SUFFIX)
+        self.atc_le_follower_suffix.setFixedWidth(110)
+        self.atc_le_follower_suffix.setToolTip(
+            "Each follower is named '<object>' + this suffix "
+            "(namespace and path of the object are dropped).")
+        fol_row.addWidget(self.atc_le_follower_suffix)
+        fol_row.addStretch(1)
+        fol_layout.addLayout(fol_row)
+
+        self.atc_btn_followers = QPushButton("Create Closest-Point Followers")
+        self.atc_btn_followers.setMinimumHeight(34)
+        self.atc_btn_followers.setToolTip(
+            "For each listed object: create a follower and connect\n"
+            "  object.worldMatrix -> decomposeMatrix -> closestPointOnSurface.inPosition\n"
+            "  closestPointOnSurface.parameterU / V -> pointOnSurfaceInfo.parameterU / V\n"
+            "  pointOnSurfaceInfo -> matrix network -> follower.translate (+ rotate with Orient).\n"
+            "The follower sits on the surface point closest to the object and keeps "
+            "tracking it as the object (or the surface) moves. The listed object "
+            "itself is not changed. A NURBS curve works the same way "
+            "(nearestPointOnCurve -> pointOnCurveInfo).")
+        fol_layout.addWidget(self.atc_btn_followers)
+        root.addWidget(fol_group)
+        self.atc_follower_group = fol_group
 
         # Signals
         self.atc_btn_get_curve.clicked.connect(self.on_atc_get_curve)
         self.atc_btn_build.clicked.connect(self.on_atc_build)
         self.atc_btn_distribute.clicked.connect(self.on_atc_distribute)
+        self.atc_btn_followers.clicked.connect(self.on_atc_followers)
         self.atc_cb_orient.toggled.connect(self._atc_sync_orient_enabled)
         self.atc_cb_norcrv.toggled.connect(self._atc_sync_orient_enabled)
         self.atc_le_curve.textChanged.connect(self._atc_sync_orient_enabled)
+        self.atc_cb_mode.currentIndexChanged.connect(self._atc_sync_mode)
         self._atc_sync_orient_enabled()
+        self._atc_sync_mode()
 
         return tab
+
+    def _atc_sync_mode(self, *args):
+        """Mode 콤보에 맞춰 그 모드가 쓰는 위젯만 보인다(v01.31).
+
+        Objects 리스트는 Closest / Follower 모드에서, Maintain offset 과 Attach 버튼은 Closest
+        에서만, Distribute 그룹은 Distribute 에서만, Follower 그룹은 Follower 에서만.
+        Orient / Aim / norCrv / set 은 늘 보인다.
+        """
+        mode = self.atc_cb_mode.currentText()
+        closest = mode == MODE_CLOSEST
+        distribute = mode == MODE_DISTRIBUTE
+        follower = mode == MODE_FOLLOWER
+
+        self.atc_objs_group.setVisible(closest or follower)
+        self.atc_objs_group.setTitle(
+            "Objects (attach to closest point)" if closest
+            else "Objects (one follower is created per object)")
+        self.atc_cb_maintain_offset.setVisible(closest)
+        self.atc_btn_build.setVisible(closest)
+        self.atc_dist_group.setVisible(distribute)
+        self.atc_follower_group.setVisible(follower)
 
     def _atc_sync_orient_enabled(self, *args):
         """Orient/norCrv 토글과 대상 종류(커브/서피스)에 따라 종속 위젯 활성 상태를 동기화한다.
@@ -1322,6 +1412,59 @@ class MainWindow(QWidget):
                 "(rotate/reshape it to control up & twist)".format(norcrv))
         for drv, param in created:
             self._log("  {0} -> {1}".format(drv, self._atc_param_text(param)))
+        if set_node:
+            self._log("Point info nodes grouped into set: {0}".format(set_node))
+
+    def on_atc_followers(self):
+        """Follower 모드(v01.31) : 오브젝트마다 새 팔로워를 만들어 라이브 최근접 지점에 어태치."""
+        self._log("--- Create Closest-Point Followers ---")
+        curve = self.atc_le_curve.text().strip()
+        objects = self.atc_objs_tsl.get_all_items()
+
+        kind = self._atc_check_target(curve)
+        if kind is None:
+            return
+        if not objects:
+            self._log("[WARN] Objects list is empty. Add objects first.")
+            return
+
+        driver_type = self.atc_cb_follower_type.currentText().lower()
+        suffix = self.atc_le_follower_suffix.text().strip() or FOLLOWER_SUFFIX
+        orient = self.atc_cb_orient.isChecked()
+        aim_axis = self.atc_cb_aim.currentText()
+        use_norcrv = self.atc_cb_norcrv.isChecked()
+        norcrv_len = self.atc_dsb_norcrv_len.value()
+        create_set = self.atc_cb_make_set.isChecked()
+
+        with undo_chunk():
+            try:
+                created, failed, set_node, norcrv = run_attach_followers(
+                    curve, objects, driver_type=driver_type, suffix=suffix,
+                    orient=orient, aim_axis=aim_axis,
+                    use_normal_curve=use_norcrv,
+                    normal_curve_length=norcrv_len,
+                    create_set=create_set)
+            except Exception as exc:
+                self._log("[ERROR] Create followers failed: {0}".format(exc))
+                return
+
+        surface = kind == "surface"
+        self._log(
+            "Created {n} {t} follower(s) on {k} '{c}' | orient: {o}{axis}{nc} | "
+            "each follower tracks the point closest to its object (live)".format(
+                n=len(created), t=driver_type, k=kind, c=curve,
+                o="on" if orient else "off",
+                axis=" ({0})".format(aim_axis) if orient else "",
+                nc=" | norCrv" if (orient and use_norcrv and not surface) else ""))
+        if norcrv:
+            self._log(
+                "Normal curve created: {0} "
+                "(rotate/reshape it to control up & twist)".format(norcrv))
+        for obj, follower, param in created:
+            self._log("  {0} -> {1} @ {2}".format(obj, follower,
+                                                  self._atc_param_text(param)))
+        for obj, reason in failed:
+            self._log("[WARN] Skipped {0}: {1}".format(obj, reason))
         if set_node:
             self._log("Point info nodes grouped into set: {0}".format(set_node))
 
@@ -2153,7 +2296,9 @@ class MainWindow(QWidget):
             "  on a sphere of radius R.\n"
             "\n"
             "[AttachCrv] (ported from ref attachDriverOnCurve)\n"
-            "- Attach to Closest Point: drives each listed object onto its closest\n"
+            "- Default tab Mode combo (v01.31): Attach Objects to Closest Point /\n"
+            "  Distribute New Drivers Evenly / Create Followers at Live Closest Point.\n"
+            "- Attach Objects to Closest Point: drives each listed object onto its closest\n"
             "  parameter on the curve via a pointOnCurveInfo -> matrix network\n"
             "  (parent-safe, live as the curve deforms). Optional orient to tangent.\n"
             "  Maintain offset (default on): objects stay where they are instead of\n"
@@ -2163,9 +2308,14 @@ class MainWindow(QWidget):
             "  field instead. Objects pin to the closest (u, v) via pointOnSurfaceInfo\n"
             "  (X = tangent U, Y = normal, Z = X cross Y). Distribute spreads along the\n"
             "  chosen Surface Axis at the middle of the other direction.\n"
-            "- Distribute Drivers on Curve (ref original): create N new Locator/Null\n"
+            "- Distribute New Drivers Evenly (ref original): create N new Locator/Null\n"
             "  drivers spread evenly from the curve start to its end (Count, full /\n"
             "  open-ended range), attached with the same matrix network.\n"
+            "- Create Followers at Live Closest Point: one new Locator/Null per listed\n"
+            "  object, pinned to the surface point closest to that object. The object's\n"
+            "  worldMatrix feeds a closestPointOnSurface whose parameter U/V drive the\n"
+            "  pointOnSurfaceInfo, so moving the object slides the follower on the\n"
+            "  surface (curves: nearestPointOnCurve -> pointOnCurveInfo).\n"
             "- Create Normal Curve (norCrv, default, ref-faithful): adds one straight\n"
             "  norCrv under the curve; rotate/reshape it to control up & twist. Off:\n"
             "  self-contained world-up frame.\n"

@@ -22,5 +22,14 @@
 #        JO^-1 from a negated zyx composeMatrix so it follows later jointOrient edits);
 #        Maintain offset's local0 includes JO so the joint stays in place at build time.
 
-VERSION = "01.30"
+# 01.31  AttachCrv > Default : Mode combo with three modes - Attach Objects to Closest
+#        Point (existing) / Distribute New Drivers Evenly (existing) / Create Followers at
+#        Live Closest Point (new). The new mode creates one Locator / Null follower per
+#        listed object and keeps it on the surface point closest to that object:
+#        object.worldMatrix -> decomposeMatrix -> closestPointOnSurface.inPosition and
+#        closestPointOnSurface.parameterU/V -> pointOnSurfaceInfo.parameterU/V (live), then
+#        the usual matrix network drives the follower (curves use nearestPointOnCurve).
+#        Widgets of the other modes are hidden; Orient / Aim / norCrv / set are shared.
+
+VERSION = "01.31"
 LAST_UPDATE = "2026-10-12"

@@ -47,6 +47,18 @@ NURBS surface (v01.23~) — `_archive/legacy_tools/01_Modules/JUN_PY_matrixPinni
     composeMatrix** 로 만든다 — 플러그인 없이 되고 `jointOrient` 를 나중에 고쳐도 따라간다.
   - Maintain offset 의 `local0` 도 조인트면 `R0 x JO` 로 만든다 — 빌드 순간의 rotate 가 지금 값과
     같아야 제자리에 남는다.
+
+모드 (v01.31~) — Default 탭은 `ATTACH_MODES` 세 가지 중 하나로 동작한다.
+  - MODE_CLOSEST   : `build_attach_to_closest` — 리스트의 **기존** 오브젝트를 빌드 시점의 최근접
+                     파라미터에 붙인다(파라미터는 상수).
+  - MODE_DISTRIBUTE: `build_attach_uniform` — **새** 드라이버 N 개를 균일 간격으로.
+  - MODE_FOLLOWER  : `build_attach_followers` — 리스트의 오브젝트마다 **새** 팔로워를 만들고,
+                     그 팔로워가 **오브젝트의 현재 위치에 가장 가까운 표면 지점**을 라이브로 따라간다.
+                     `obj.worldMatrix -> decomposeMatrix -> closestPointOnSurface.inPosition`,
+                     `closestPointOnSurface.parameterU/V -> pointOnSurfaceInfo.parameterU/V` 로
+                     파라미터 자체가 연결되어 있어 오브젝트를 옮기면 팔로워가 표면 위를 미끄러진다
+                     (커브는 nearestPointOnCurve.parameter -> pointOnCurveInfo.parameter).
+                     나머지(프레임 · parentInverse · decompose · orient)는 다른 모드와 같은 네트워크.
 """
 
 import maya.api.OpenMaya as om
@@ -63,6 +75,15 @@ SURFACE_AXES = ("U", "V")
 
 # 직교 프레임의 업벡터 시드(월드 +Y).
 _WORLD_UP = (0.0, 1.0, 0.0)
+
+# Default 탭의 동작 모드(콤보 표시 문구 = 값). 순서가 콤보 순서다.
+MODE_CLOSEST = "Attach Objects to Closest Point"
+MODE_DISTRIBUTE = "Distribute New Drivers Evenly"
+MODE_FOLLOWER = "Create Followers at Live Closest Point"
+ATTACH_MODES = (MODE_CLOSEST, MODE_DISTRIBUTE, MODE_FOLLOWER)
+
+# Follower 모드가 만드는 팔로워 이름 접미사 기본값 : `<obj>_attach`.
+FOLLOWER_SUFFIX = "_attach"
 
 
 def _shape_of_curve(curve):
@@ -321,7 +342,7 @@ def _offset_matrix(obj, frame_plug):
 
 
 def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=None,
-                maintain_offset=False, kind="curve"):
+                maintain_offset=False, kind="curve", param_plugs=None):
     """오브젝트 하나를 커브(또는 서피스) 위 한 지점에 라이브 어태치한다(노드 네트워크 구성).
 
     kind == 'surface' 면 curve_shape 는 nurbsSurface shape 이고 param 은 (u, v) 다.
@@ -329,6 +350,9 @@ def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=Non
 
     param 이 None 이면 오브젝트의 월드 위치에서 최근접 파라미터를 구해 쓰고(closest 모드),
     값이 주어지면 그 파라미터 지점에 그대로 붙인다(distribute 모드).
+    param_plugs 가 주어지면(follower 모드, v01.31) 파라미터를 상수로 두지 않고 **그 플러그를
+    연결**한다 — 서피스는 (u_plug, v_plug), 커브는 plug 하나. 그러면 반환 param 은 빌드 시점의
+    읽은 값이다(로그용).
     norcrv_shape 가 주어지면(use_normal_curve) up/side 를 그 norCrv 에서 가져오고(ref 원본),
     없으면 커브 접선 기반 자족 직교 프레임을 쓴다.
 
@@ -342,7 +366,7 @@ def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=Non
 
     surface = kind == "surface"
 
-    if param is None:
+    if param is None and param_plugs is None:
         world_pos = cmds.xform(obj, query=True, worldSpace=True, rotatePivot=True)
         if surface:
             param = _closest_uv(curve_shape, world_pos)
@@ -356,14 +380,25 @@ def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=Non
         cmds.connectAttr(curve_shape + ".worldSpace[0]", poci + ".inputSurface",
                          force=True)
         cmds.setAttr(poci + ".turnOnPercentage", 0)
-        cmds.setAttr(poci + ".parameterU", param[0])
-        cmds.setAttr(poci + ".parameterV", param[1])
+        if param_plugs is not None:
+            # follower 모드 : 파라미터가 라이브다(closestPointOnSurface.parameterU/V).
+            cmds.connectAttr(param_plugs[0], poci + ".parameterU", force=True)
+            cmds.connectAttr(param_plugs[1], poci + ".parameterV", force=True)
+            param = (cmds.getAttr(poci + ".parameterU"),
+                     cmds.getAttr(poci + ".parameterV"))
+        else:
+            cmds.setAttr(poci + ".parameterU", param[0])
+            cmds.setAttr(poci + ".parameterV", param[1])
     else:
         poci = cmds.createNode("pointOnCurveInfo", n="{0}_atc_POCI".format(obj))
         cmds.connectAttr(curve_shape + ".worldSpace[0]", poci + ".inputCurve",
                          force=True)
         cmds.setAttr(poci + ".turnOnPercentage", 0)
-        cmds.setAttr(poci + ".parameter", param)
+        if param_plugs is not None:
+            cmds.connectAttr(param_plugs, poci + ".parameter", force=True)
+            param = cmds.getAttr(poci + ".parameter")
+        else:
+            cmds.setAttr(poci + ".parameter", param)
 
     fbf = cmds.createNode("fourByFourMatrix", n="{0}_atc_FBF".format(obj))
     cmds.connectAttr(poci + ".positionX", fbf + ".in30", force=True)
@@ -644,3 +679,115 @@ def build_attach_uniform(curve, count, driver_type="locator", name_prefix=None,
         set_node = cmds.sets(pocis, name=_set_name(base, kind))
 
     return created, set_node, norcrv
+
+
+# ----------------------------------------------------------------------------
+# Follower 모드 (v01.31) : 오브젝트마다 새 팔로워를 만들고, 그 팔로워가 오브젝트의 **현재**
+# 위치에 가장 가까운 표면 지점을 라이브로 따라간다(파라미터 자체가 연결된 네트워크).
+# ----------------------------------------------------------------------------
+
+def _follower_name(obj, suffix):
+    """`<obj 짧은 이름>` + suffix. 경로 · 네임스페이스는 뗀다(Maya 가 겹치면 번호를 붙인다)."""
+    base = obj.split("|")[-1].split(":")[-1]
+    return "{0}{1}".format(base, suffix or FOLLOWER_SUFFIX)
+
+
+def _live_closest_plugs(curve_shape, obj, follower, kind):
+    """obj 의 월드 위치를 받아 최근접 파라미터를 **라이브로** 내는 노드들을 만들고 플러그를 반환.
+
+    obj.worldMatrix[0] -> decomposeMatrix.outputTranslate -> closestPointOnSurface.inPosition
+    (커브는 nearestPointOnCurve). 서피스는 (parameterU, parameterV), 커브는 parameter 플러그.
+    인풋 서피스/커브는 worldSpace 라 월드 위치와 같은 공간이다.
+    Returns (plugs, [made nodes])
+    """
+    dcm = cmds.createNode("decomposeMatrix", n="{0}_atc_objDCM".format(follower))
+    cmds.connectAttr(obj + ".worldMatrix[0]", dcm + ".inputMatrix", force=True)
+
+    if kind == "surface":
+        finder = cmds.createNode("closestPointOnSurface",
+                                 n="{0}_atc_CPOS".format(follower))
+        cmds.connectAttr(curve_shape + ".worldSpace[0]", finder + ".inputSurface",
+                         force=True)
+        cmds.connectAttr(dcm + ".outputTranslate", finder + ".inPosition", force=True)
+        plugs = (finder + ".parameterU", finder + ".parameterV")
+    else:
+        finder = cmds.createNode("nearestPointOnCurve",
+                                 n="{0}_atc_NPOC".format(follower))
+        cmds.connectAttr(curve_shape + ".worldSpace[0]", finder + ".inputCurve",
+                         force=True)
+        cmds.connectAttr(dcm + ".outputTranslate", finder + ".inPosition", force=True)
+        plugs = finder + ".parameter"
+
+    return plugs, [dcm, finder]
+
+
+def build_attach_followers(curve, objects, driver_type="locator", suffix=FOLLOWER_SUFFIX,
+                           orient=True, aim_axis="+X", use_normal_curve=True,
+                           normal_curve_length=1.0, create_set=True):
+    """objects 의 오브젝트마다 **새 팔로워**를 만들어, 그 오브젝트에 가장 가까운 표면 지점에
+    라이브 어태치한다. 오브젝트를 옮기면 팔로워가 표면 위를 따라 미끄러진다(파라미터가 연결).
+
+    curve 에는 NURBS surface(의도된 용도) 또는 NURBS curve 를 줄 수 있다. 오브젝트 자체는
+    **건드리지 않는다** — 팔로워(driver_type: 'locator' | 'null')가 `<obj>{suffix}` 이름으로
+    월드 아래에 생기고, 그 translate(Orient 면 rotate)가 네트워크로 구동된다.
+    orient / aim_axis / norCrv / create_set 은 다른 모드와 같은 의미(서피스는 norCrv 무시).
+
+    Returns (created, failed, set_node, norcrv):
+      created  = [(obj, follower, parameter), ...]  (parameter 는 빌드 시점 값, 서피스면 (u, v))
+      failed   = [(obj, reason), ...]
+      set_node = 생성한 point-info 세트 이름(미생성이면 None)
+      norcrv   = 생성한 norCrv transform 이름(미생성이면 None)
+    한 오브젝트가 실패해도 나머지는 계속 진행한다.
+    """
+    curve_shape, kind = resolve_target(curve)
+    if curve_shape is None:
+        raise ValueError(
+            "'{0}' is not a NURBS curve or NURBS surface.".format(curve))
+    if aim_axis not in AIM_AXES:
+        aim_axis = "+X"
+    if driver_type not in DRIVER_TYPES:
+        driver_type = "locator"
+
+    base = _transform_of_curve(curve).split("|")[-1].split(":")[-1]
+
+    norcrv = None
+    norcrv_shape = None
+    if orient and use_normal_curve and kind == "curve":
+        norcrv, norcrv_shape = _create_normal_curve(
+            _transform_of_curve(curve), aim_axis, normal_curve_length, base)
+
+    created = []
+    failed = []
+    pocis = []
+    for obj in objects:
+        if not obj or not cmds.objExists(obj):
+            failed.append((obj, "not found in scene"))
+            continue
+        if not cmds.ls(obj, type="transform"):
+            failed.append((obj, "not a transform (needs a worldMatrix)"))
+            continue
+
+        follower = None
+        made = []
+        try:
+            follower = cmds.rename(_create_driver(driver_type),
+                                   _follower_name(obj, suffix))
+            plugs, made = _live_closest_plugs(curve_shape, obj, follower, kind)
+            param, poci = _attach_one(curve_shape, follower, orient, aim_axis,
+                                      norcrv_shape, kind=kind, param_plugs=plugs)
+            created.append((obj, follower, param))
+            pocis.append(poci)
+        except Exception as exc:                       # noqa: BLE001
+            # 반쯤 만든 것은 치운다(팔로워 · 최근접 노드). 어태치 노드는 팔로워를 지우면
+            # 연결이 끊긴 채 남을 수 있어 함께 지운다.
+            leftovers = [n for n in made + [follower]
+                         if n and cmds.objExists(n)]
+            if leftovers:
+                cmds.delete(leftovers)
+            failed.append((obj, str(exc)))
+
+    set_node = None
+    if create_set and pocis:
+        set_node = cmds.sets(pocis, name=_set_name(base, kind))
+
+    return created, failed, set_node, norcrv

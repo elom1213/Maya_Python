@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00170 driverTool — **AttachCrv Default 탭 Mode 콤보 3개 + Create Followers at Live Closest Point** (v01.30->01.31)
+- 요청: Default 탭에 모드 3개를 콤보로 — 기존 Attach to Closest Point · Distribute Drivers 를 두 모드로, 세 번째는 Objects 의 `obj_i` 마다 `sfc` 표면의 최근접 위치·회전에 새 `obj_attach_i` 를 만들고 `obj_i` 가 움직여도 최근접 지점을 따라가게. 제안대로 `closestPointOnSurface` 의 U/V 를 POSI 에 연결하는 구조.
+- 모드 이름: `Attach Objects to Closest Point` / `Distribute New Drivers Evenly` / `Create Followers at Live Closest Point` (`attach_curve.ATTACH_MODES`). 모드별 위젯만 보이게(`_atc_sync_mode`) — Objects 는 Closest·Follower, Maintain offset 은 Closest 만, Distribute 그룹 · Follower 그룹(Follower Type · Name Suffix · 버튼)은 각자 모드만. Orient/Aim/norCrv/set 은 공유.
+- 코어 `build_attach_followers`: `obj.worldMatrix -> decomposeMatrix -> closestPointOnSurface.inPosition`, `parameterU/V -> POSI.parameterU/V`(커브는 `nearestPointOnCurve.parameter -> POCI`), 나머지는 기존 `_attach_one` 네트워크 — `_attach_one(param_plugs=)` 로 파라미터를 상수 대신 플러그로 받게 확장. 팔로워 이름 `<obj 짧은 이름>_attach`, Locator/Null, 오브젝트는 안 건드림, 실패한 오브젝트의 노드만 치움.
+- 검증: mayapy 2024 + 오프스크린 PySide2 48 항목 — 팔로워 위치 = 따로 구한 최근접 · X = tangentU · 오브젝트/부모/서피스/팔로워 부모를 바꿔도 유지 · Null·접미사·`-X`·커브+norCrv · undo 한 덩어리 · 회귀 · 콤보 가시성 · 핸들러. 마야 GUI 확인은 아직.
+- 문서: `docs/A00170_driverTool.md` Default 절 Mode 표 + Followers 절, 포트폴리오 EN/KR 한 구절.
+
 > [!summary] A00470 MaterialTool — **Check Names · Rename 한 줄 + Report Options 접이식(기본 접힘)** (v01.11->01.12)
 - 요청: Check Names / Rename to Suggested 를 가로 한 줄로, Report 체크박스 셋을 접이식에 넣고 기본 접힘.
 - Report `QGroupBox` → 공용 `JUN_mod_collapsible_qt_v01("Report Options", expanded=False)`, 체크박스는 `body` 에 그대로. 접혀 있어도 `isChecked()` 는 살아 있어 Check Names 가 기본값(클립보드 복사 켬)으로 동작. 두 실행 버튼은 `QHBoxLayout`.
