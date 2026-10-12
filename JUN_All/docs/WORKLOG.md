@@ -32,18 +32,17 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00010 humanIKTool_V02 — **Mirror 탭: 컨트롤러를 할당한 캐릭터도 반대쪽 컨트롤러로 · 토큰은 공용 mirror_tokens.json** (v02.05->02.06)
+- 요청: HIK 슬롯에 조인트가 아니라 +X 컨트롤러를 assign 하면 Mirror Joints 가 -X 컨트롤러가 아닌 조인트를 집는다 — `rules/mirror_tokens.json` 규칙대로 반대편 컨트롤러가 미러되게.
+- 원인: `mirror_joints` 가 후보 풀을 `node_type="joint"` 로 못 박고 `Mirror in same root` 의 루트도 `top_joint`(조인트만)라 컨트롤러 캐릭터는 루트가 없고 조인트만 후보였다.
+- `mirror_resolver`: `NODE_TYPE_SOURCE` = 소스와 같은 노드 타입(`ls -exactType` — transform 이면 조인트 제외) · `top_node` = 조인트면 최상위 조인트, 아니면 DAG 최상위 · 이름 토큰은 자체 표 대신 **`MirrorTokenStore.opposite_name`**(가는 방향의 출발 토큰이어야 후보). `hik_manager.mirror_definition` / `hik_roots`(옛 이름 별칭 유지), `custom_rig_manager` 도 NODE_TYPE_SOURCE. 버튼 `Preview / Mirror Definition`.
+- 검증: mayapy 2024 + mayaHIK — 컨트롤러 캐릭터(ctrl_grp 아래, 같은 자리에 조인트 스켈레톤 + 동명 미끼) 4 슬롯 전부 반대쪽 **컨트롤러**(이름 3 · 위치 1, 같은 자리 조인트 미끼 안 집음) · undo · 조인트 캐릭터는 그대로 조인트 · same root 끄면 동명 ambiguous · 공용 토큰(`_l` `_L` `_lf` `Left`, `leftover` 는 없음, 반대쪽 토큰은 후보 없음) · UI 버튼 이름. 마야 GUI 확인은 아직.
+
 > [!summary] A00170 driverTool — **AttachCrv Default: Distribute 모드 빈 공간 정리** (v01.32->01.33)
 - 요청: Distribute New Drivers Evenly 모드에서 `Distribute new drivers uniformly` 그룹에 빈 공간이 너무 많다. 정렬·정돈.
 - 원인: Objects 그룹(stretch 1)이 숨으면 남는 세로 공간이 늘어날 수 있는 QGroupBox 로 흘러들어 Distribute 그룹이 키만 커졌다.
 - 고침: Distribute · Follower 그룹은 세로 size policy `Maximum`(sizeHint 높이만), root 끝에 trailing stretch 를 두고 `_atc_sync_mode` 가 Objects 가 보이면 0 / 숨으면 1 로 토글(Closest · Follower 는 Objects 리스트가 공간을 다 받고, Distribute 는 빈 칸이 아래로). 그룹 안은 HBox 한 줄 → 라벨 오른쪽 정렬 QGridLayout(한 줄에 하나, 값 위젯 폭 110 통일). Follower 그룹도 같은 모양.
 - 검증: 오프스크린 PySide2(테마 입힘) 12 항목 — Distribute 그룹 높이 == sizeHint(190, 페이지 888) · 위젯 x/폭 정렬 · Closest/Follower 는 Objects 가 공간을 받고 마지막 위젯이 바닥 근처 · 모드 왕복. 마야 GUI 확인은 아직.
-
-> [!summary] A00170 driverTool — **Seal Free 모드: 다물면 회전도 빌드 포즈로** (v01.31->01.32)
-- 요청: Free 모드로 빌드한 뒤 Seal R/L 로 다물면 translate 는 기대대로인데, 입술 오브젝트의 회전을 바꾼 뒤 다물면 바뀐 회전이 그대로 남는다. 회전도 바꾸기 전 값으로 돌아가게.
-- 원인: `build_seal` 이 `rotation_driven(null)`(rotate 에 연결이 있을 때)만 회전 pairBlend 를 끼웠고, `input_feed` 의 static 경로는 translate 만 `sealBase` 를 심었다. Free 모드의 정적 오브젝트는 rotate 가 그대로 자유 채널.
-- 고침: `FREE_BASE_ROTATE_ATTR = "sealBaseRotate"`(doubleAngle3 — double 이면 unitConversion 이 끼어든다), `_ensure_base_attr(node, attr)` 일반화, `input_feed` 가 rotate 도 static 허용, `rotation_sealable(null, allow_static)` 로 Free 면 모든 드라이버에 `_rest_local_rotate` + pairBlend 회전. `_insert_pair_blend` 가 회전 feed 종류를 돌려줘 리포트 `static_rotated` 추가, UI 로그 한 줄. `_restore_input` 이 `sealBase`/`sealBaseRotate` 둘 다 값을 되쓰고 plug 단위로 삭제. Attached 모드는 불변.
-- 검증: mayapy 2024 28 항목 — 정적 로케이터 10개(sealBaseRotate 고친 뒤 다물면 rest, 열면 바뀐 값, 절반 가중치는 사이, 머리 회전 불변, Update Rest Pose, Remove 되쓰기+attr 삭제) · JO 조인트(채널·월드 모두 rest) · pointConstraint translate + 정적 rotate 혼합 · `blend_rotation=False` · Attached 회귀. 마야 GUI 확인은 아직.
-- 문서: `docs/A00170_driverTool.md` Free 모드 절 불릿 + 표, UI 툴팁/About. 포트폴리오는 손대지 않음.
 
 > [!summary] A00210 FileManager — **Maya 탭 > Reference: 마야 파일들의 레퍼런스를 트리로 보고 체크한 것을 각 파일에 임포트해 제자리 저장, 마야 일은 mayapy 워커** (v01.34->01.35) · A00240 Tree 탭을 Framework 로 승격 (v01.19->01.20) · A00480 은 원상복구
 - 요청: 계획서 먼저(`docs/plans/A00210_FileManager_maya_reference_plan.md`, §12 사용자 결정 11개 · §13 재개용 진행표 · §14 이식). **처음 A00480_FileTool 에 만들었는데 사용자가 "실수, A00210 으로" 라고 바꿔** A00480 은 v01.09 로 되돌리고(커밋으로) `app/maya` 를 A00210 으로 옮겼다. 나중에 독립 툴로 뗄 수 있게 → `app/maya/{core,ui}` 한 폴더, 밖은 Framework · prefs 만.
@@ -54,6 +53,19 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - UI: 공용 폴더 트리(ma/mb/fbx 기본) → Add Checked / Browse... → Maya File(공용 TSL) | Reference 트리(Reference | Used by, 중첩 접힘 · 체크 없음, 끊김 빨강) → Get Reference / Import Reference(확인 팝업 · 진행률 팝업). 옵션 Remove All Namespace · Backup 기본 ON.
 - 검증: mayapy 2024 코어 샘플 41 + 실제 컨트롤 파일 2개 복사본(스캔 10s · 임포트 17s · 재열기 refs 0 · ns 0 · 원본 무수정) · 실제 mayapy 워커 왕복 17(스캔 · 임포트 · 재스캔 · 취소 · 에러) · 오프스크린 QTest 21(트리 체크) + 14(A00210 UI, 가짜 워커). A00210 GUI 에서 실제 mayapy 로 돌려 본 것은 아직.
 - 문서: `docs/A00210_FileManager.md` §4-D 신설, `Framework_MOD_fileTree_qt.md` · `Framework_MOD_checkTree_qt.md` 신설, README · CHANGELOG(A00210 · A00240) · 포트폴리오 EN/KR · 메모 2개. A00480 문서 · CHANGELOG · 버전은 원래대로.
+
+> [!summary] A00170 driverTool — **Seal Free 모드: 다물면 회전도 빌드 포즈로** (v01.31->01.32)
+- 요청: Free 모드로 빌드한 뒤 Seal R/L 로 다물면 translate 는 기대대로인데, 입술 오브젝트의 회전을 바꾼 뒤 다물면 바뀐 회전이 그대로 남는다. 회전도 바꾸기 전 값으로 돌아가게.
+- 원인: `build_seal` 이 `rotation_driven(null)`(rotate 에 연결이 있을 때)만 회전 pairBlend 를 끼웠고, `input_feed` 의 static 경로는 translate 만 `sealBase` 를 심었다. Free 모드의 정적 오브젝트는 rotate 가 그대로 자유 채널.
+- 고침: `FREE_BASE_ROTATE_ATTR = "sealBaseRotate"`(doubleAngle3 — double 이면 unitConversion 이 끼어든다), `_ensure_base_attr(node, attr)` 일반화, `input_feed` 가 rotate 도 static 허용, `rotation_sealable(null, allow_static)` 로 Free 면 모든 드라이버에 `_rest_local_rotate` + pairBlend 회전. `_insert_pair_blend` 가 회전 feed 종류를 돌려줘 리포트 `static_rotated` 추가, UI 로그 한 줄. `_restore_input` 이 `sealBase`/`sealBaseRotate` 둘 다 값을 되쓰고 plug 단위로 삭제. Attached 모드는 불변.
+- 검증: mayapy 2024 28 항목 — 정적 로케이터 10개(sealBaseRotate 고친 뒤 다물면 rest, 열면 바뀐 값, 절반 가중치는 사이, 머리 회전 불변, Update Rest Pose, Remove 되쓰기+attr 삭제) · JO 조인트(채널·월드 모두 rest) · pointConstraint translate + 정적 rotate 혼합 · `blend_rotation=False` · Attached 회귀. 마야 GUI 확인은 아직.
+- 문서: `docs/A00170_driverTool.md` Free 모드 절 불릿 + 표, UI 툴팁/About. 포트폴리오는 손대지 않음.
+
+> [!summary] A00060 jointTool_V03 — **Create > From Object `Match Rotation`** (v03.13->03.14)
+- 요청: Separate 일 때 조인트가 오브젝트의 회전값과 일치하게 생기는 체크박스, 기본 꺼짐.
+- `obj_joint_manager.joints_to_objs(..., match_rotation=False)` — separate 에서만, 조인트마다 `xform -ws -rotation` 으로 월드 회전을 주고 `makeIdentity -apply -rotate` 로 jointOrient 에 굳힌다(rotate 0). 컴포넌트(`.`)는 건너뜀. Connect 는 무시.
+- UI: Connect/Separate 라디오 줄에 `Match Rotation` 체크박스, Separate 일 때만 활성(`buttonToggled`).
+- 검증: mayapy 2024 — 회전·이동 그룹 아래 로케이터의 월드 회전 행렬 일치(jointOrient 65.3/-9.4/116.5, rotate 0), 월드 로케이터 (0,-30,0), 버텍스 0, 꺼짐 0, Connect 무시, UI 활성 전환 · 실행 · undo.
 
 > [!summary] A00170 driverTool — **AttachCrv Default 탭 Mode 콤보 3개 + Create Followers at Live Closest Point** (v01.30->01.31)
 - 요청: Default 탭에 모드 3개를 콤보로 — 기존 Attach to Closest Point · Distribute Drivers 를 두 모드로, 세 번째는 Objects 의 `obj_i` 마다 `sfc` 표면의 최근접 위치·회전에 새 `obj_attach_i` 를 만들고 `obj_i` 가 움직여도 최근접 지점을 따라가게. 제안대로 `closestPointOnSurface` 의 U/V 를 POSI 에 연결하는 구조.
@@ -66,6 +78,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 요청: Check Names / Rename to Suggested 를 가로 한 줄로, Report 체크박스 셋을 접이식에 넣고 기본 접힘.
 - Report `QGroupBox` → 공용 `JUN_mod_collapsible_qt_v01("Report Options", expanded=False)`, 체크박스는 `body` 에 그대로. 접혀 있어도 `isChecked()` 는 살아 있어 Check Names 가 기본값(클립보드 복사 켬)으로 동작. 두 실행 버튼은 `QHBoxLayout`.
 - 오프스크린 teal_dark 실측: 탭 최소 높이 750 → **641px**(접힘) / 709px(펼침), 버튼 30px 유지, 두 버튼 같은 y. 46항목 회귀 통과. 마야 GUI 확인은 아직.
+
+> [!summary] A00145 RigConnect — **Connect 52 Facial Target 버튼 → 규칙 json `Connect by Rule`** (v01.58->01.59)
+- 요청: 버튼을 없애고 정해진 연결을 규칙 json 으로 관리. 첫 규칙 `Apple ARKit 52 Facial Target` 이 예전 버튼과 같은 연결을 하도록, 규칙이 늘어날 것을 염두.
+- `app/rules/connect/<rule>.json` 파일 하나 = 규칙 하나(`name` / `description` / `attributes` 같은 이름 / `pairs` 다른 이름). 코드의 `FACIAL_52` 목록을 json 으로 뽑아 `apple_arkit_52_facial.json` 으로, `connect_manager.connect_52_facial` 은 지움.
+- `app/core/connect_rules.py`: `load_rules()`(이름순, 깨진 파일은 errors 로) · `find_rule` · `connect_by_rule`(행 순서 1:1, 없는 attr 스킵 — MEL 동작 그대로). UI 는 Connect 페이지 `Connect by Rule` 그룹(Rule 콤보 + Reload + Connect by Rule), 콤보 툴팁에 설명 · 짝 수 · 경로.
+- 검증: mayapy 2024 — 규칙 52 짝 로드, 깨진/모양 틀린 json 은 errors · attributes+pairs 혼합 정규화, 오브젝트 2:1 에서 51 연결 1 스킵, 오프스크린 UI 콤보 · Reload · 연결 · undo.
 
 > [!summary] A00470 MaterialTool — **Name Check 버튼 글자 잘림 수정 · Sort / Reverse / List Materials 한 줄** (v01.10->01.11)
 - 요청: Select Materials / Select Faces 세로가 작아 글자가 안 보임. Sort · Reverse · List Materials 를 가로 한 줄로, 바꾼 뒤 세로가 줄었는지 확인.
@@ -87,12 +105,28 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 실측 함정: **`sets -q` 면별 멤버는 트랜스폼 기준**(`sphere.f[0:199]`) → 셰이프로 풀어 비교(노드별 캐시 없으면 2만 멤버에 2.3초). 셰이프 둘인 트랜스폼의 `t.f[0:2]` 배정은 두 셰이프 모두. **면을 전부 재배정한 메시는 `initialShadingGroup` 연결이 남아** `listConnections` 에 보이고 `listSets` 엔 없다 → `shading_engines()` 가 멤버 있는 엔진만 남기도록 고침(쓰지 않는 `standardSurface1` 가짜 행 제거).
 - 검증: mayapy 2024 + 오프스크린 Qt 46항목 — 통째/면별/NURBS 제외/네임스페이스/빈 리스트/SG 없는 머티리얼/A+B/체커보드 2만/API == cmds 결과/셰이프 2개/UI(버튼·기본값·행 없음=전부·범위 토글·더블클릭). 마야 GUI 확인은 아직. 문서 `docs/A00470_MaterialTool.md` §1.2.
 
+> [!summary] A00145 RigConnect — **Connect > Transfer Connection 하위 탭 (연결 전이)** (v01.57->01.58)
+- 요청: A.attr_01 ↔ Tgt.attr_tgt_n 연결을 끊고 같은 이름 attr 을 가진 B.attr_01 ↔ Tgt.attr_tgt_n 으로 옮기는 기능. Source 어트리뷰트 목록(Channel Box Only / Connected Only, 체크박스, 전체 체크/해제) → 연결된 노드 목록(체크박스) → Destination → Transfer. upstream/downstream 둘 다. 불필요·중복 UI 는 제안하라고 했다.
+- 제안해 반영한 것: ① "A·B 공통 어트리뷰트" 목록을 따로 두지 않고 Destination 을 담는 순간 어트리뷰트 목록에서 **없는 행을 빨갛게**(툴팁에 누가 없는지) — 같은 집합을 두 번 체크할 일이 없다. ② List UpStream / DownStream 두 버튼 대신 **Direction 체크박스 둘 + List Nodes 하나** — 두 방향이 한 목록에 들어 한 번의 Transfer 로 양쪽을 옮긴다(노드 행 `drives: attr_02    driven by: attr_01`).
+- `app/core/connection_transfer_manager.py`(UI 비의존): `connections_of` = `listConnections -c -p -shapes`(-shapes 없으면 쉐입이 트랜스폼 이름으로 바뀜, blendShape 타겟은 별칭 이름으로 나와 list_attrs 와 맞음), `list_rows`(합집합 · 연결 수), `list_nodes`, `missing_on`, `pair_objects`(목적지 1 = 전부, 같은 수 = 행 순서), `transfer`(먼저 목적지에 잇고 Source 를 끊는다 · 목적지가 이미 다른 것에 구동되면 건너뜀 · downstream 은 `connectAttr -force` 한 번).
+- UI: 체크 목록은 공용 `JUN_mod_checkList_qt_v01`, 행 값은 UserRole(표시 글과 분리), Destination TSL 의 model 신호로 빨강 재칠(QTimer 로 한 번), 옮긴 뒤 두 목록 재조회(체크는 이름으로 유지), `undo_chunk` 하나.
+- 검증: mayapy 2024 — 코어(down 2 + up 1 전이, 체크 안 한 노드 유지, 목적지 충돌 건너뜀, undo, blendShape 별칭 행) · 오프스크린 UI(teal_dark) 탭 4개, 목록/옵션 토글/노드 행/빨강 표시/전이/재조회/빨강 해제/undo/행 클릭 씬 선택, 페이지 최소 폭 1189(Pair 1203 보다 좁음). 마야 GUI 확인은 아직.
+
 > [!summary] A00170 driverTool — **AttachCrv: jointOrient 가 있는 조인트도 로케이터와 같게 회전** (v01.29->01.30)
 - 요청: Default 탭에서 로케이터와 조인트를 같은 자리에 Orient + Attach to Closest Point 로 서피스에 붙이고 서피스를 변형하면 둘이 다르게 돈다(조인트 JO ≠ 0). 조인트도 로케이터와 같은 값으로 돌게.
 - 원인: 네트워크가 `decomposeMatrix.outputRotate` 를 조인트 `rotate` 에 그대로 넣었다. 조인트 로컬 회전은 `R × JO` 라 프레임 뒤에 JO 가 다시 얹힌다(JO = 0 이면 같아서 안 보였다).
 - `attach_curve._attach_one`: 조인트면 `rotate = rot(M) × JO⁻¹` — translate 는 기존 dcm 그대로 두고 rotate 만 `_atc_rotMMX(× JO⁻¹) → _atc_rotDCM` 에서 뽑는다(JO⁻¹ 를 오른쪽에 곱하면 translate 가 돌아가므로 분리). JO⁻¹ 는 seal v01.29 와 같이 **각 음수 + zyx composeMatrix**(라이브 — JO 를 나중에 고쳐도 따라감). `_local_matrix_from_channels` 도 조인트면 `R0 × JO` 를 넣어 Maintain offset 빌드 순간 제자리.
 - 검증: mayapy 2024 — 같은 자리의 로케이터/조인트(JO (23,−41,67), rotate (10,20,30)) 서피스·커브 × `±X` × Maintain ON/OFF × rotateOrder zxy/yzx × 회전한 부모, 어태치 직후·변형 뒤·JO 를 바꾼 뒤 **월드 회전/위치 동일**, JO=0 회귀, orient OFF, Distribute — 85 항목 통과. 수정 전 코드에서는 같은 테스트 30 항목 실패(테스트가 버그를 잡는다). 마야 GUI 확인은 아직.
 - 문서: `docs/A00170_driverTool.md` Maintain offset 절의 "조인트는 널에 붙이는 편이 안전하다" 문장을 v01.30 동작으로 교체. 포트폴리오는 손대지 않음(버그 수정).
+
+> [!summary] A00120 FKIK — **Setup 칸 높이를 v01.10 으로 되돌림** (v01.11->01.12)
+- 요청: v01.11 뒤 Setup 칸 세로가 길어졌다 — 기존과 같게.
+- 원인(오프스크린 실측 108 → 166): Manual/Auto 라디오 행(36) + Auto 리스트를 헤더 있는 공용 TSL 로 만든 것(22). 테마의 라디오는 패딩·테두리가 있는 버튼 모양이라 라디오와 버튼을 세로로 겹쳐도 50px 안에 못 든다.
+- 한 줄 `[리스트(50 고정)] (Manual) (Auto) [Select Objects | Refresh]` — Auto 리스트는 일반 `QListWidget`(툴팁으로 설명), 버튼은 모드에 맞는 하나만 `setVisible`. `_selected_texts` / `_select_list_text` 헬퍼로 TSL 호출을 대체.
+- 검증: mayapy 2024 오프스크린(blue_dark) — 옛/새 Setup 둘 다 108, Auto 전환 시 Refresh 버튼·빈 씬 상태 메시지, Manual 복귀, 리스트 행 선택으로 단위 로드. 마야 GUI 확인은 아직.
+
+> [!summary] README — **Portfolio (Web) 링크를 Notion 포트폴리오 페이지로 교체** (f48db0b)
+- 루트 `README.md` 의 Portfolio (Web) 링크 한 줄만. 코드 변경 없음.
 
 > [!summary] A00240 PathTool — **Junction 탭(Create / Remove) + Tree 정션 연한 빨강** (v01.18->01.19)
 - 요청: `cmd /c mklink /J` 를 UI 로. 소스/타깃 선택 UI, 두 리스트로 n->1 · n->n, 원본은 두고 정션만 안전 삭제, Tree 에서 정션은 연한 빨강. 요청 번호 배치는 1·2·3(생성) = Create, 4(삭제) = Remove 로 읽었다.
@@ -109,37 +143,6 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 조인트 직접 다물기: rest 회전 `R = local × JO⁻¹` — `inverseMatrix` 는 matrixNodes 플러그인 노드라 **각 음수 + zyx 순서 composeMatrix** 로 대체.
 - Remove 는 축별/sealBase 까지 되돌림. 검증 mayapy 52(정적 · JO 컨스트레인트 조인트 · X 키 · Attached 는 HEAD 와 월드 행렬 동일) + UI 오프스크린 19, 전부 통과.
 - 문서: `docs/A00170_driverTool.md` Free 모드 절, 포트폴리오 EN/KR 3-4 한 단락.
-
-> [!summary] A00010 humanIKTool_V02 — **Mirror 탭: 컨트롤러를 할당한 캐릭터도 반대쪽 컨트롤러로 · 토큰은 공용 mirror_tokens.json** (v02.05->02.06)
-- 요청: HIK 슬롯에 조인트가 아니라 +X 컨트롤러를 assign 하면 Mirror Joints 가 -X 컨트롤러가 아닌 조인트를 집는다 — `rules/mirror_tokens.json` 규칙대로 반대편 컨트롤러가 미러되게.
-- 원인: `mirror_joints` 가 후보 풀을 `node_type="joint"` 로 못 박고 `Mirror in same root` 의 루트도 `top_joint`(조인트만)라 컨트롤러 캐릭터는 루트가 없고 조인트만 후보였다.
-- `mirror_resolver`: `NODE_TYPE_SOURCE` = 소스와 같은 노드 타입(`ls -exactType` — transform 이면 조인트 제외) · `top_node` = 조인트면 최상위 조인트, 아니면 DAG 최상위 · 이름 토큰은 자체 표 대신 **`MirrorTokenStore.opposite_name`**(가는 방향의 출발 토큰이어야 후보). `hik_manager.mirror_definition` / `hik_roots`(옛 이름 별칭 유지), `custom_rig_manager` 도 NODE_TYPE_SOURCE. 버튼 `Preview / Mirror Definition`.
-- 검증: mayapy 2024 + mayaHIK — 컨트롤러 캐릭터(ctrl_grp 아래, 같은 자리에 조인트 스켈레톤 + 동명 미끼) 4 슬롯 전부 반대쪽 **컨트롤러**(이름 3 · 위치 1, 같은 자리 조인트 미끼 안 집음) · undo · 조인트 캐릭터는 그대로 조인트 · same root 끄면 동명 ambiguous · 공용 토큰(`_l` `_L` `_lf` `Left`, `leftover` 는 없음, 반대쪽 토큰은 후보 없음) · UI 버튼 이름. 마야 GUI 확인은 아직.
-
-> [!summary] A00060 jointTool_V03 — **Create > From Object `Match Rotation`** (v03.13->03.14)
-- 요청: Separate 일 때 조인트가 오브젝트의 회전값과 일치하게 생기는 체크박스, 기본 꺼짐.
-- `obj_joint_manager.joints_to_objs(..., match_rotation=False)` — separate 에서만, 조인트마다 `xform -ws -rotation` 으로 월드 회전을 주고 `makeIdentity -apply -rotate` 로 jointOrient 에 굳힌다(rotate 0). 컴포넌트(`.`)는 건너뜀. Connect 는 무시.
-- UI: Connect/Separate 라디오 줄에 `Match Rotation` 체크박스, Separate 일 때만 활성(`buttonToggled`).
-- 검증: mayapy 2024 — 회전·이동 그룹 아래 로케이터의 월드 회전 행렬 일치(jointOrient 65.3/-9.4/116.5, rotate 0), 월드 로케이터 (0,-30,0), 버텍스 0, 꺼짐 0, Connect 무시, UI 활성 전환 · 실행 · undo.
-
-> [!summary] A00145 RigConnect — **Connect 52 Facial Target 버튼 → 규칙 json `Connect by Rule`** (v01.58->01.59)
-- 요청: 버튼을 없애고 정해진 연결을 규칙 json 으로 관리. 첫 규칙 `Apple ARKit 52 Facial Target` 이 예전 버튼과 같은 연결을 하도록, 규칙이 늘어날 것을 염두.
-- `app/rules/connect/<rule>.json` 파일 하나 = 규칙 하나(`name` / `description` / `attributes` 같은 이름 / `pairs` 다른 이름). 코드의 `FACIAL_52` 목록을 json 으로 뽑아 `apple_arkit_52_facial.json` 으로, `connect_manager.connect_52_facial` 은 지움.
-- `app/core/connect_rules.py`: `load_rules()`(이름순, 깨진 파일은 errors 로) · `find_rule` · `connect_by_rule`(행 순서 1:1, 없는 attr 스킵 — MEL 동작 그대로). UI 는 Connect 페이지 `Connect by Rule` 그룹(Rule 콤보 + Reload + Connect by Rule), 콤보 툴팁에 설명 · 짝 수 · 경로.
-- 검증: mayapy 2024 — 규칙 52 짝 로드, 깨진/모양 틀린 json 은 errors · attributes+pairs 혼합 정규화, 오브젝트 2:1 에서 51 연결 1 스킵, 오프스크린 UI 콤보 · Reload · 연결 · undo.
-
-> [!summary] A00145 RigConnect — **Connect > Transfer Connection 하위 탭 (연결 전이)** (v01.57->01.58)
-- 요청: A.attr_01 ↔ Tgt.attr_tgt_n 연결을 끊고 같은 이름 attr 을 가진 B.attr_01 ↔ Tgt.attr_tgt_n 으로 옮기는 기능. Source 어트리뷰트 목록(Channel Box Only / Connected Only, 체크박스, 전체 체크/해제) → 연결된 노드 목록(체크박스) → Destination → Transfer. upstream/downstream 둘 다. 불필요·중복 UI 는 제안하라고 했다.
-- 제안해 반영한 것: ① "A·B 공통 어트리뷰트" 목록을 따로 두지 않고 Destination 을 담는 순간 어트리뷰트 목록에서 **없는 행을 빨갛게**(툴팁에 누가 없는지) — 같은 집합을 두 번 체크할 일이 없다. ② List UpStream / DownStream 두 버튼 대신 **Direction 체크박스 둘 + List Nodes 하나** — 두 방향이 한 목록에 들어 한 번의 Transfer 로 양쪽을 옮긴다(노드 행 `drives: attr_02    driven by: attr_01`).
-- `app/core/connection_transfer_manager.py`(UI 비의존): `connections_of` = `listConnections -c -p -shapes`(-shapes 없으면 쉐입이 트랜스폼 이름으로 바뀜, blendShape 타겟은 별칭 이름으로 나와 list_attrs 와 맞음), `list_rows`(합집합 · 연결 수), `list_nodes`, `missing_on`, `pair_objects`(목적지 1 = 전부, 같은 수 = 행 순서), `transfer`(먼저 목적지에 잇고 Source 를 끊는다 · 목적지가 이미 다른 것에 구동되면 건너뜀 · downstream 은 `connectAttr -force` 한 번).
-- UI: 체크 목록은 공용 `JUN_mod_checkList_qt_v01`, 행 값은 UserRole(표시 글과 분리), Destination TSL 의 model 신호로 빨강 재칠(QTimer 로 한 번), 옮긴 뒤 두 목록 재조회(체크는 이름으로 유지), `undo_chunk` 하나.
-- 검증: mayapy 2024 — 코어(down 2 + up 1 전이, 체크 안 한 노드 유지, 목적지 충돌 건너뜀, undo, blendShape 별칭 행) · 오프스크린 UI(teal_dark) 탭 4개, 목록/옵션 토글/노드 행/빨강 표시/전이/재조회/빨강 해제/undo/행 클릭 씬 선택, 페이지 최소 폭 1189(Pair 1203 보다 좁음). 마야 GUI 확인은 아직.
-
-> [!summary] A00120 FKIK — **Setup 칸 높이를 v01.10 으로 되돌림** (v01.11->01.12)
-- 요청: v01.11 뒤 Setup 칸 세로가 길어졌다 — 기존과 같게.
-- 원인(오프스크린 실측 108 → 166): Manual/Auto 라디오 행(36) + Auto 리스트를 헤더 있는 공용 TSL 로 만든 것(22). 테마의 라디오는 패딩·테두리가 있는 버튼 모양이라 라디오와 버튼을 세로로 겹쳐도 50px 안에 못 든다.
-- 한 줄 `[리스트(50 고정)] (Manual) (Auto) [Select Objects | Refresh]` — Auto 리스트는 일반 `QListWidget`(툴팁으로 설명), 버튼은 모드에 맞는 하나만 `setVisible`. `_selected_texts` / `_select_list_text` 헬퍼로 TSL 호출을 대체.
-- 검증: mayapy 2024 오프스크린(blue_dark) — 옛/새 Setup 둘 다 108, Auto 전환 시 Refresh 버튼·빈 씬 상태 메시지, Manual 복귀, 리스트 행 선택으로 단위 로드. 마야 GUI 확인은 아직.
 
 > [!summary] A00120 FKIK — **Setup Manual / Auto · 접이식 리스트 · Dev Mode · Bake 진행률 팝업** (v01.10->01.11)
 - 요청: Setup 을 Manual(Select Objects) / Auto(Refresh 로 씬을 네임스페이스 단위 조사) 로, Targets/Followers 는 접이식(기본 접힘) · Search 는 코드만 두고 숨김, A00330 의 Dev Mode 메뉴를 공용 위젯으로 올려 FKIK 도 쓰기, 배포 화면(Auto 기본 · 리스트 없음 · Bake (Constraint) 없음 · 로그 접힘 · Force Refresh 없음), Bake IK/FK 진행률 팝업.
