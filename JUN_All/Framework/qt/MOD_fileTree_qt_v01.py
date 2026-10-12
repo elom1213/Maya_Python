@@ -28,6 +28,15 @@
 #               A/B/C/D/E 에서 Omit 2 면 A / ... / D / E. 늘 같은 고정 경로를 건너뛰고 본다.
 #  12) 정션 (v01.19) : 디렉터리 정션은 폴더 아이콘과 글자를 **연한 빨강**으로 그린다.
 #               툴팁에 가리키는 경로. 판별은 tree_scanner 가 노드에 적는다(junction/target).
+#
+# Framework 로 올리며 덧붙인 것 (2026-10-12, A00480 Maya 탭용 · 기본값은 전부 꺼져 있어 A00240 은 그대로):
+#   - checkable_files=True : **파일 행에 체크박스**(폴더 · `...` 에는 없다). Shift 로 여러 행을 고른 뒤
+#     체크 하나로 전부 체크/해제 - 공용 `JUN_mod_checkTree_qt_v01` 동작. 체크 상태는 **경로로 기억**해
+#     Build · Refresh · 필터 · File Types 로 행이 다시 만들어져도 남고, Expand 창과도 공유한다.
+#     `checked_paths()` 가 체크된 파일 절대경로 목록, `checksChanged(list)` 가 바뀔 때의 신호.
+#   - default_types=("ma", "mb") : 처음 발견된 확장자 중 **체크해 둘 것**. 나머지는 보이되 꺼진다.
+#     None 이면 지금처럼 전부 체크.
+#   - 우클릭 메뉴 · 더블클릭은 공용 `Framework/qt/path_context.py` 로 (문구 · 실패 안내 동일).
 
 import os
 
@@ -57,11 +66,13 @@ from Framework.qt.qt import (
     QPainter,
     QColor,
     QBrush,
+    Signal,
 )
 
 from Framework.core import tree_scanner
-from Framework.core import file_opener as path_opener
 from Framework.core.prefetcher import Prefetcher
+from Framework.qt import path_context
+from Framework.qt.MOD_checkTree_qt_v01 import JUN_mod_checkTree_qt_v01
 
 # 선읽기 (v01.17) - 폴더 하나를 펼쳤을 때 미리 읽을 하위 폴더 수의 상한.
 # 하위 폴더가 수만 개인 곳을 열어도 백그라운드가 그것만 붙들지 않게 한다(넘는 것은 펼칠 때 읽는다).
@@ -103,10 +114,23 @@ class _CheckableMenu(QMenu):
 
 
 class JUN_mod_fileTree_qt_v01(QWidget):
-    """폴더 트리 위젯 - A00240 Tree 탭 본체. 생성 후 `on_build()` 전까지는 빈 트리다."""
+    """폴더 트리 위젯 - A00240 Tree 탭 본체. 생성 후 `on_build()` 전까지는 빈 트리다.
 
-    def __init__(self, parent=None):
+    checkable_files : 파일 행에 체크박스 (Shift 다중 체크, 경로로 기억). 기본 False.
+    default_types   : 처음 발견된 확장자 중 체크해 둘 것(점 없는 소문자 모음). None = 전부.
+    """
+
+    #: 체크 상태가 바뀌었다 - 지금 체크된 파일 절대경로 목록 (checkable_files 일 때만)
+    checksChanged = Signal(list)
+
+    def __init__(self, parent=None, checkable_files=False, default_types=None):
         super().__init__(parent)
+
+        self.checkable_files = bool(checkable_files)
+        self.default_types = (None if default_types is None
+                              else {str(x).lstrip(".").lower() for x in default_types})
+        self._checked = set()     # 체크된 파일 경로 (행이 다시 만들어져도 남는다)
+        self._check_behaviors = []  # 트리마다 붙인 JUN_mod_checkTree_qt_v01 (참조 유지)
 
         self._root_path = ""      # 마지막으로 빌드한 경로
         self._tree = None         # tree_scanner.build_tree() 결과(모든 파일 포함, 필터 전)
@@ -293,16 +317,21 @@ class JUN_mod_fileTree_qt_v01(QWidget):
         """우클릭 Reveal 컨텍스트 메뉴가 붙은 QTreeWidget 을 만든다(메인/Expand 공용)."""
         tree = QTreeWidget()
         tree.setHeaderLabels(["Name"])
-        tree.setContextMenuPolicy(Qt.CustomContextMenu)
-        tree.customContextMenuRequested.connect(self._on_tree_context_menu)
-        # v01.16 : 더블클릭 = 탐색기에서 열기(폴더는 그 폴더, 파일은 그 폴더에서 선택 - Reveal 과 같다).
-        # Qt 기본인 "더블클릭으로 펼치기/접기" 는 끈다 - 열 때마다 트리까지 같이 펼쳐졌다 접힌다
+        # 우클릭 Reveal / Copy file path + 더블클릭 = Reveal (v01.16) - 공용 헬퍼.
+        # Qt 기본인 "더블클릭으로 펼치기/접기" 는 헬퍼가 끈다 - 열 때마다 트리까지 같이 펼쳐졌다 접힌다
         # (Adaptive 면 펼치기가 디스크 읽기까지 부른다). 펼치기는 화살표 · 키보드(←/→) 로 한다.
-        tree.setExpandsOnDoubleClick(False)
-        tree.itemDoubleClicked.connect(
-            lambda item, _col: self._reveal(item.data(0, Qt.UserRole)))
-        tree.setToolTip("Double-click: open in File Explorer.\n"
-                        "Click the arrow to open a folder (Shift = everything below).")
+        # `...` 은 경로가 비어 있어 메뉴도 더블클릭도 무시된다 (v01.18).
+        path_context.attach_path_context(
+            tree, lambda item: item.data(0, Qt.UserRole) or "", title="Tree")
+        tip = ("Double-click: open in File Explorer.\n"
+               "Click the arrow to open a folder (Shift = everything below).")
+        if self.checkable_files:
+            tip += ("\nCheck files to pick them. Select several rows (Shift / Ctrl) and\n"
+                    "click one check box to check or uncheck them all.")
+            behavior = JUN_mod_checkTree_qt_v01(tree)
+            behavior.checksChanged.connect(self._on_items_checked)
+            self._check_behaviors.append(behavior)
+        tree.setToolTip(tip)
         # Shift 를 누른 채 펼치면/접으면 그 아래 전부에 같은 것을 적용한다.
         tree.itemExpanded.connect(self._on_item_expanded)
         tree.itemCollapsed.connect(self._on_item_collapsed)
@@ -657,7 +686,11 @@ class JUN_mod_fileTree_qt_v01(QWidget):
 
     def _rebuild_type_menu(self, exts):
         """발견된 확장자들로 File Types 메뉴를 다시 만든다(이전 선택은 이름 기준 보존)."""
-        self._type_states = {x: self._type_states.get(x, True) for x in exts}
+        # 처음 보는 확장자의 기본값 - default_types 가 있으면 그 안의 것만 켠다.
+        self._type_states = {
+            x: self._type_states.get(
+                x, True if self.default_types is None else (x in self.default_types))
+            for x in exts}
 
         self._types_menu.clear()
         self._type_actions = {}
@@ -744,6 +777,9 @@ class JUN_mod_fileTree_qt_v01(QWidget):
         item = QTreeWidgetItem([node["name"]])
         item.setData(0, Qt.UserRole, node["path"])
         item.setIcon(0, self._icon_dir)
+        if self.checkable_files:
+            # 폴더는 고를 대상이 아니다 - 기본 플래그의 ItemIsUserCheckable 을 벗긴다(체크박스 없음).
+            item.setFlags(item.flags() & ~Qt.ItemIsUserCheckable)
         if node.get("junction"):
             self._paint_junction(item, node)
         # Adaptive : 아직 안 읽은 폴더는 자식이 없어도 펼침 화살표를 단다(눌러야 읽는다) (v01.16).
@@ -771,6 +807,10 @@ class JUN_mod_fileTree_qt_v01(QWidget):
                 leaf = QTreeWidgetItem([child["name"]])
                 leaf.setData(0, Qt.UserRole, child["path"])
                 leaf.setIcon(0, self._icon_file)
+                if self.checkable_files:
+                    leaf.setFlags(leaf.flags() | Qt.ItemIsUserCheckable)
+                    leaf.setCheckState(0, Qt.Checked if child["path"] in self._checked
+                                       else Qt.Unchecked)
                 item.addChild(leaf)
 
     def _add_omitted_children(self, root_item, omit, show_files, exts):
@@ -1177,48 +1217,78 @@ class JUN_mod_fileTree_qt_v01(QWidget):
                 self._trees.remove(big)
 
     def _on_tree_context_menu(self, pos):
+        """(호환) 우클릭 메뉴 - 지금은 path_context 가 트리에 직접 붙인다."""
         tree = self.sender()
         item = tree.itemAt(pos)
-        if item is None or not item.data(0, Qt.UserRole):
-            return                              # `...` 은 열거나 복사할 경로가 없다 (v01.18)
-
-        menu = QMenu(tree)
-        act_reveal = menu.addAction("Reveal in File Explorer")
-        act_copy = menu.addAction("Copy file path")
-        chosen = menu.exec_(tree.viewport().mapToGlobal(pos))
-
-        if chosen == act_reveal:
-            self._reveal(item.data(0, Qt.UserRole))
-        elif chosen == act_copy:
-            self._copy_path(item.data(0, Qt.UserRole))
+        if item is None:
+            return
+        path_context.show_path_menu(
+            tree, tree.viewport().mapToGlobal(pos), item.data(0, Qt.UserRole) or "", "Tree")
 
     def _copy_path(self, path):
-        """그 항목(폴더든 파일이든)의 **절대 경로**를 클립보드에 넣는다.
-
-        경로는 OS 네이티브 모양(윈도우는 `\\`)으로 바꿔 탐색기 주소창·파일 다이얼로그에
-        그대로 붙여넣을 수 있게 한다(`ShortCut` 탭이 경로를 다루는 방식과 같다).
-        """
-        if not path:
-            return
-
-        text = os.path.normpath(os.path.abspath(path))
-
-        clipboard = QApplication.clipboard()
-        if clipboard is None:
-            QMessageBox.warning(self, "Tree", "Could not access the system clipboard.")
-            return
-
-        clipboard.setText(text)
+        path_context.copy_path(self, path, "Tree")
 
     def _reveal(self, path):
-        if not path:
+        path_context.reveal_path(self, path, "Tree")
+
+    # ====================================================== 파일 체크 (checkable_files)
+
+    def _on_items_checked(self, items):
+        """사용자가 체크를 바꿨다(한 트리에서) - 경로 집합을 고치고 다른 트리에도 같은 상태를 입힌다."""
+        changed = {}
+        for item in items:
+            path = item.data(0, Qt.UserRole)
+            if not path:
+                continue
+            on = item.checkState(0) == Qt.Checked
+            changed[path] = on
+            if on:
+                self._checked.add(path)
+            else:
+                self._checked.discard(path)
+        if not changed:
             return
+        sender_tree = items[0].treeWidget() if items else None
+        for tree in list(self._trees):
+            if tree is sender_tree:
+                continue
+            self._apply_checks(tree, changed)
+        self.checksChanged.emit(self.checked_paths())
+
+    def _apply_checks(self, tree, states):
+        """tree 의 파일 행들에 {path: bool} 을 신호 없이 입힌다."""
+        if not self.checkable_files:
+            return
+        tree.blockSignals(True)
         try:
-            path_opener.open_path(path)
-        except FileNotFoundError:
-            QMessageBox.warning(self, "Tree", f"Path does not exist:\n{path}")
-        except Exception as exc:  # noqa: BLE001 - 어떤 OS 오류도 사용자에게 안내
-            QMessageBox.warning(self, "Tree", f"Could not open path:\n{exc}")
+            for path, item in self._item_map(tree).items():
+                if path in states and item.flags() & Qt.ItemIsUserCheckable:
+                    item.setCheckState(0, Qt.Checked if states[path] else Qt.Unchecked)
+        finally:
+            tree.blockSignals(False)
+
+    def checked_paths(self):
+        """체크된 파일 절대경로 목록(대소문자 무시 정렬). 캐시에 없어진 경로는 뺀다."""
+        return sorted((p for p in self._checked if p in self._index), key=str.lower)
+
+    def set_checked_paths(self, paths, checked=True):
+        """코드로 체크/해제한다(모든 트리에 반영, checksChanged 를 쏜다)."""
+        if not self.checkable_files:
+            return
+        states = {}
+        for path in paths:
+            states[path] = bool(checked)
+            if checked:
+                self._checked.add(path)
+            else:
+                self._checked.discard(path)
+        for tree in list(self._trees):
+            self._apply_checks(tree, states)
+        self.checksChanged.emit(self.checked_paths())
+
+    def clear_checks(self):
+        """전부 해제."""
+        self.set_checked_paths(list(self._checked), False)
 
 
 # A00240 tree_tab.py 가 쓰던 이름 - 기존 호출부 호환.

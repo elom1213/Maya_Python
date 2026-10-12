@@ -417,9 +417,9 @@ Get Reference 도 같은 팝업(`.mb` 를 열 때만 체감이 되지만 통일)
 | 단계 (§7) | 상태 | 커밋 | 메모 |
 |-----------|------|------|------|
 | 0 결정 | **완료** | 이 문서 | §12 |
-| 1 Tree 승격 (`Framework/qt/MOD_fileTree_qt_v01` · `core/tree_scanner` · `core/prefetcher`, A00240 re-export, v01.20) | 대기 | | |
-| 2 `MOD_checkTree_qt_v01` + Tree `checkable_files` · `default_types` · `checked_paths` | 대기 | | |
-| 3 `Framework/qt/path_context.py` (Reveal · Copy · 더블클릭 공용) | 대기 | | |
+| 1 Tree 승격 (`Framework/qt/MOD_fileTree_qt_v01` · `core/tree_scanner` · `core/prefetcher`, A00240 re-export, v01.20) | **완료** | `f48070e` | 오프스크린: A00240 창 · Build · 필터 · Refresh OK |
+| 2 `MOD_checkTree_qt_v01` + Tree `checkable_files` · `default_types` · `checked_paths` | **완료** | (3 과 같은 커밋) | QTest 21 항목 통과. **함정**: QTreeWidgetItem 은 기본 플래그에 ItemIsUserCheckable 이 있어 체크박스 유무는 `data(CheckStateRole)` 로 가른다 |
+| 3 `Framework/qt/path_context.py` (Reveal · Copy · 더블클릭 공용) | **완료** | 2 와 같은 커밋 | 폴더 트리가 먼저 쓴다 |
 | 4 `app/maya/core/ma_parser.py` · `ref_scanner.py` | 대기 | | mayapy 검증 |
 | 5 `app/maya/core/ref_importer.py` · `scene_guard.py` · 백업 | 대기 | | mayapy 검증, 테스트 파일 ⑪ 은 복사본으로 |
 | 6 UI (`maya_tab.py` · `reference_tab.py` · `reference_tree.py`, main_window 연결, v01.10) | 대기 | | offscreen 검증 |
