@@ -36,5 +36,10 @@
 
 # 01.09  Naming 토큰 규칙에 Enum (정해진 값 중 고르기) - A00330 과 같은 공용 규칙 COMMON_RULES (Framework.core.token_naming).
 
-VERSION = "01.09"
-LAST_UPDATE = "2026-10-02"
+# 01.10  Maya 탭 (하위탭 Reference) - 마야 파일들이 부르는 레퍼런스를 트리로 보고, 체크한 레퍼런스를 각 파일에
+#        임포트해 제자리 저장. 마야 파일은 공용 폴더 트리(A00240 Tree 를 Framework 로 승격, 파일 체크박스)로 고른다.
+#        중첩 레퍼런스도 함께 임포트, Remove All Namespace, backup/<이름>_REF_NN, 원래 씬 다시 열기.
+#        코드는 app/maya (core/ui) 한 폴더 - 나중에 독립 툴로 뗄 수 있게 Framework 외 의존 없음.
+
+VERSION = "01.10"
+LAST_UPDATE = "2026-10-12"

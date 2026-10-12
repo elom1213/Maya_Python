@@ -1,0 +1,432 @@
+# -*- coding: utf-8 -*-
+# Python Script by Ji Hun Park
+# last Update date : 2026-10-12
+# A00480_FileTool / Maya 탭 > Reference 하위탭 (PySide, in-Maya)
+#
+# 여러 마야 파일이 부르는 레퍼런스를 보고, 체크한 레퍼런스를 각 파일 안으로 임포트해 제자리 저장한다.
+#
+#   ┌ Tree (공용 폴더 트리 + 파일 체크박스, File Types 기본 ma/mb/fbx) ┐   <- 마야 파일을 고른다
+#   [Add Checked] [Browse...]
+#   ┌ Maya File (공용 TSL) ┐  ┌ Reference (트리, 체크박스, 중첩은 접힘) ┐
+#   Scanned: ...
+#   [x] Remove All Namespace  [x] Backup  [x] Reopen current scene
+#   [Get Reference]                         [Import Reference]
+#
+# 로직은 ../core (ref_scanner · ref_importer · scene_guard · backup). 이 파일은 화면과 흐름만.
+# 설계 · 결정: docs/plans/A00480_FileTool_maya_tab_reference_plan.md (§12 결정표).
+
+import os
+
+from Framework.qt.qt import (
+    Qt,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QGroupBox,
+    QLabel,
+    QPushButton,
+    QCheckBox,
+    QSplitter,
+    QFileDialog,
+    QMessageBox,
+    QBrush,
+    QColor,
+)
+from Framework.qt import path_context
+from Framework.qt.MOD_fileTree_qt_v01 import JUN_mod_fileTree_qt_v01
+from Framework.qt.MOD_tsl_qt_v01 import JUN_mod_tsl_qt_v01, null_item_color
+from Framework.qt.MOD_progress_qt_v01 import JUN_mod_progress_qt_v01
+
+from ..core import ref_scanner
+from ..core import ref_importer
+from ..core import scene_guard
+from .reference_tree import ReferenceTree
+
+DEFAULT_TYPES = ("ma", "mb", "fbx")        # 결정 ⑧
+FILE_FILTER = "Maya Files (*.ma *.mb);;All Files (*)"
+
+
+class ReferenceTab(QWidget):
+
+    def __init__(self, log=None, parent=None):
+        super().__init__(parent)
+        self._log_callback = log
+        self._scan = None                 # 마지막 Get Reference 결과
+        self.build_ui()
+
+    # ==================================================================
+    # UI
+    # ==================================================================
+
+    def build_ui(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(4, 4, 4, 4)
+
+        self.splitter = QSplitter(Qt.Vertical)
+        root.addWidget(self.splitter, stretch=1)
+
+        # ---- 위: 폴더 트리 (공용) -------------------------------------
+        self.file_tree = JUN_mod_fileTree_qt_v01(
+            checkable_files=True, default_types=DEFAULT_TYPES)
+        self.file_tree.tree.setMinimumHeight(140)
+        self.file_tree.checksChanged.connect(self._on_tree_checks_changed)
+        self.splitter.addWidget(self.file_tree)
+
+        # ---- 아래: Maya File | Reference ------------------------------
+        lower = QWidget()
+        lower_layout = QVBoxLayout(lower)
+        lower_layout.setContentsMargins(0, 0, 0, 0)
+
+        add_row = QHBoxLayout()
+        self.btn_add_checked = QPushButton("Add Checked")
+        self.btn_add_checked.setToolTip(
+            "Add the files checked in the tree above to the Maya File list.")
+        self.btn_add_checked.clicked.connect(self.on_add_checked)
+        self.btn_browse = QPushButton("Browse...")
+        self.btn_browse.setToolTip("Pick Maya files with a file dialog (several at once).")
+        self.btn_browse.clicked.connect(self.on_browse)
+        self.lbl_checked = QLabel("Checked in tree: 0")
+        add_row.addWidget(self.btn_add_checked)
+        add_row.addWidget(self.btn_browse)
+        add_row.addWidget(self.lbl_checked)
+        add_row.addStretch(1)
+        lower_layout.addLayout(add_row)
+
+        lists = QSplitter(Qt.Horizontal)
+
+        # Maya File - 공용 TSL. 씬 노드가 아니므로 UUID · 선택 동기화 · 재정렬 버튼은 끈다
+        # (Up/Down/Sort 는 UUID 역할만 옮겨 경로 데이터를 잃는다).
+        self.maya_list = JUN_mod_tsl_qt_v01(
+            title="Maya File", show_select=False, show_add=False, show_del=True,
+            show_up=False, show_down=False, show_sort=False, show_order=False,
+            attach_uuids=False, list_min_height=120, log_callback=self._log)
+        self.maya_list.list_widget.setToolTip(
+            "Maya files to work on. Select rows and press Get Reference.\n"
+            "Double-click: open in File Explorer.")
+        try:
+            self.maya_list.list_widget.itemSelectionChanged.disconnect(
+                self.maya_list._on_selection_changed)
+        except (RuntimeError, TypeError):
+            pass
+        self.maya_list.add_button("Clear", self.on_clear_files)
+        path_context.attach_path_context(
+            self.maya_list.list_widget, lambda item: item.data(Qt.UserRole) or "",
+            title="Maya File")
+        lists.addWidget(self.maya_list)
+
+        ref_box = QGroupBox("Reference")
+        ref_layout = QVBoxLayout(ref_box)
+        self.ref_tree = ReferenceTree()
+        self.ref_tree.setMinimumHeight(120)
+        self.ref_tree.checksChanged.connect(self._update_counts)
+        ref_layout.addWidget(self.ref_tree, stretch=1)
+        ref_btns = QHBoxLayout()
+        self.btn_check_all = QPushButton("Check All")
+        self.btn_check_all.clicked.connect(lambda: self.ref_tree.set_all_checked(True))
+        self.btn_uncheck_all = QPushButton("Uncheck All")
+        self.btn_uncheck_all.clicked.connect(lambda: self.ref_tree.set_all_checked(False))
+        self.lbl_ref_count = QLabel("Checked: 0 / 0")
+        ref_btns.addWidget(self.btn_check_all)
+        ref_btns.addWidget(self.btn_uncheck_all)
+        ref_btns.addStretch(1)
+        ref_btns.addWidget(self.lbl_ref_count)
+        ref_layout.addLayout(ref_btns)
+        lists.addWidget(ref_box)
+        lists.setStretchFactor(0, 2)
+        lists.setStretchFactor(1, 3)
+        lower_layout.addWidget(lists, stretch=1)
+
+        self.lbl_scanned = QLabel("Scanned: -")
+        self.lbl_scanned.setWordWrap(True)
+        self.lbl_scanned.setToolTip(
+            "The Maya files the Reference list was read from. Import Reference works on these.")
+        lower_layout.addWidget(self.lbl_scanned)
+
+        self.splitter.addWidget(lower)
+        self.splitter.setStretchFactor(0, 1)
+        self.splitter.setStretchFactor(1, 1)
+
+        # ---- 맨 아래: 옵션 행 + 동작 행 (한 줄이면 1024px 로 창을 넓힌다 - Export 탭은 918) ----
+        opt_row = QHBoxLayout()
+        self.chk_remove_ns = QCheckBox("Remove All Namespace")
+        self.chk_remove_ns.setChecked(True)
+        self.chk_remove_ns.setToolTip(
+            "After importing, merge every namespace in the scene into the root\n"
+            "(namespaces of references that stay referenced cannot be removed and are kept).")
+        opt_row.addWidget(self.chk_remove_ns)
+
+        self.chk_backup = QCheckBox("Backup")
+        self.chk_backup.setChecked(True)
+        self.chk_backup.setToolTip(
+            "Before saving, copy the original to <folder>/backup/<name>_REF_NN<ext>\n"
+            "(the same backup folder A00220_BackupTool uses; _BU files are its own).")
+        opt_row.addWidget(self.chk_backup)
+
+        self.chk_reopen = QCheckBox("Reopen current scene")
+        self.chk_reopen.setChecked(True)
+        self.chk_reopen.setToolTip(
+            "When done, open the scene that was open before (a new scene if it was untitled).")
+        opt_row.addWidget(self.chk_reopen)
+        opt_row.addStretch(1)
+        root.addLayout(opt_row)
+
+        act_row = QHBoxLayout()
+        self.btn_get = QPushButton("Get Reference")
+        self.btn_get.setToolTip(
+            "Read the references of the selected Maya files (all files if nothing is selected).\n"
+            ".ma files are read from their header; .mb files (and nested .mb) are opened to read them,\n"
+            "so the current scene is closed - you are asked to save it first.")
+        self.btn_get.clicked.connect(self.on_get_reference)
+        act_row.addWidget(self.btn_get, stretch=1)
+
+        self.btn_import = QPushButton("Import Reference")
+        self.btn_import.setToolTip(
+            "For every scanned Maya file: open it, import the checked references it uses\n"
+            "(nested references come along), remove namespaces, and save it in place.")
+        self.btn_import.clicked.connect(self.on_import_reference)
+        act_row.addWidget(self.btn_import, stretch=1)
+        root.addLayout(act_row)
+
+    # ==================================================================
+    # Maya File list
+    # ==================================================================
+
+    def file_rows(self):
+        """[(표시 이름, 절대경로), ...]"""
+        lw = self.maya_list.list_widget
+        out = []
+        for i in range(lw.count()):
+            item = lw.item(i)
+            out.append((item.text(), item.data(Qt.UserRole) or ""))
+        return out
+
+    def file_paths(self):
+        return [p for _n, p in self.file_rows() if p]
+
+    def selected_file_paths(self):
+        return [item.data(Qt.UserRole) for item in self.maya_list.list_widget.selectedItems()
+                if item.data(Qt.UserRole)]
+
+    def add_files(self, paths):
+        """중복 없이 담는다(경로 기준). 같은 이름이 다른 폴더에 있으면 이름 뒤에 폴더를 붙인다."""
+        existing = {ref_scanner.norm_path(p) for p in self.file_paths()}
+        names = {n for n, _p in self.file_rows()}
+        added = 0
+        for path in paths or []:
+            if not path:
+                continue
+            path = os.path.normpath(os.path.abspath(path))
+            key = ref_scanner.norm_path(path)
+            if key in existing:
+                self._log("{0} is already in the list.".format(os.path.basename(path)))
+                continue
+            if not ref_scanner.is_maya_scene(path):
+                self._log("[WARN] Not a Maya scene, skipped : {0}".format(path))
+                continue
+            name = os.path.basename(path)
+            if name in names:
+                name = "{0}  ({1})".format(name, os.path.basename(os.path.dirname(path)))
+            item = self.maya_list._add_item(name)
+            item.setData(Qt.UserRole, path)
+            item.setToolTip(path)
+            if not os.path.isfile(path):
+                item.setForeground(QBrush(QColor(null_item_color())))
+                item.setToolTip(path + "\nFile not found")
+            existing.add(key)
+            names.add(name)
+            added += 1
+        self.maya_list._update_number()
+        if added:
+            self._log("Added {0} Maya file(s).".format(added))
+        return added
+
+    def on_add_checked(self):
+        paths = self.file_tree.checked_paths()
+        if not paths:
+            self._log("Nothing is checked in the tree.")
+            return
+        self.add_files(paths)
+
+    def on_browse(self):
+        start = ""
+        rows = self.file_paths()
+        if rows:
+            start = os.path.dirname(rows[-1])
+        paths, _flt = QFileDialog.getOpenFileNames(self, "Select Maya Files", start, FILE_FILTER)
+        if paths:
+            self.add_files(paths)
+
+    def on_clear_files(self):
+        self.maya_list.clear()
+
+    def _on_tree_checks_changed(self, paths):
+        self.lbl_checked.setText("Checked in tree: {0}".format(len(paths)))
+
+    # ==================================================================
+    # Get Reference
+    # ==================================================================
+
+    def on_get_reference(self):
+        paths = self.selected_file_paths() or self.file_paths()
+        if not paths:
+            self._log("[WARN] Add Maya files first (Add Checked / Browse...).")
+            return
+        paths = [p for p in paths if os.path.isfile(p)]
+        if not paths:
+            self._log("[WARN] None of the files exists on disk.")
+            return
+
+        scene = self._guard_scene()
+        if scene is None:
+            return
+
+        dlg = JUN_mod_progress_qt_v01(self, title="File Tool - Get Reference",
+                                      message="Reading references...")
+        dlg.start()
+        try:
+            result = ref_scanner.scan(paths, progress=dlg.callback(), log=self._log)
+        except Exception as exc:  # noqa: BLE001
+            self._log("[WARN] Get Reference failed : {0}".format(exc))
+            result = None
+        finally:
+            dlg.finish()
+
+        if result is not None:
+            self._scan = result
+            self.ref_tree.load(result)
+            self._update_counts()
+            names = [os.path.basename(f) for f in result["files"]]
+            self.lbl_scanned.setText("Scanned: {0} ({1})".format(", ".join(names), len(names)))
+            self._log("[OK] Get Reference : {0} file(s), {1} reference(s) listed.".format(
+                len(result["files"]), self.ref_tree.topLevelItemCount()))
+            self._restore_scene(scene, result.get("opened_scene", False))
+
+    # ==================================================================
+    # Import Reference
+    # ==================================================================
+
+    def on_import_reference(self):
+        if not self._scan:
+            self._log("[WARN] Press Get Reference first.")
+            return
+        checked = self.ref_tree.checked_keys()
+        if not checked:
+            self._log("[WARN] Check at least one reference to import.")
+            return
+        jobs = ref_importer.plan(self._scan, checked)
+        if not jobs:
+            self._log("[WARN] None of the scanned files uses a checked reference.")
+            return
+
+        lines = ["{0}  <-  {1}".format(
+            os.path.basename(f), ", ".join(self._scan["nodes"][k]["name"] for k in keys))
+            for f, keys in jobs]
+        answer = QMessageBox.question(
+            self, "Import Reference",
+            "{0} Maya file(s) will be opened, modified and saved in place:\n\n{1}\n\n"
+            "Backup : {2}\nRemove All Namespace : {3}\n\nContinue?".format(
+                len(jobs), "\n".join(lines),
+                "ON" if self.chk_backup.isChecked() else "OFF",
+                "ON" if self.chk_remove_ns.isChecked() else "OFF"),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            self._log("Import Reference cancelled.")
+            return
+
+        scene = self._guard_scene()
+        if scene is None:
+            return
+
+        dlg = JUN_mod_progress_qt_v01(self, title="File Tool - Import Reference",
+                                      message="Importing references...", cancellable=True)
+        dlg.start()
+        summary = None
+        try:
+            summary = ref_importer.import_references(
+                self._scan, checked,
+                remove_namespaces=self.chk_remove_ns.isChecked(),
+                make_backup=self.chk_backup.isChecked(),
+                log=self._log, progress=dlg.callback(), should_cancel=dlg.was_cancelled)
+        except Exception as exc:  # noqa: BLE001
+            self._log("[WARN] Import Reference failed : {0}".format(exc))
+        finally:
+            dlg.finish()
+
+        self._restore_scene(scene, True)
+        if summary:
+            tag = "[OK]" if not summary["failed"] and not summary["cancelled"] else "[WARN]"
+            self._log("{0} Import Reference done - {1} saved, {2} skipped, {3} failed{4}.".format(
+                tag, summary["saved"], summary["skipped"], summary["failed"],
+                " (cancelled)" if summary["cancelled"] else ""))
+            self._log("Press Get Reference again to refresh the list.")
+
+    # ==================================================================
+    # 현재 씬 보호
+    # ==================================================================
+
+    def _guard_scene(self):
+        """현재 씬 상태를 적어 두고, 수정돼 있으면 저장 여부를 묻는다. 취소면 None."""
+        try:
+            info = scene_guard.current_scene()
+        except Exception as exc:  # noqa: BLE001 - Maya 밖
+            self._log("[WARN] Maya is not available : {0}".format(exc))
+            return None
+        if not info["modified"]:
+            return info
+
+        if info["untitled"]:
+            box = QMessageBox(QMessageBox.Warning, "Current scene",
+                              "The current (untitled) scene has unsaved changes.\n"
+                              "It will be closed and cannot be saved by this tool.",
+                              parent=self)
+            drop = box.addButton("Don't Save", QMessageBox.DestructiveRole)
+            box.addButton(QMessageBox.Cancel)
+            box.exec_()
+            if box.clickedButton() is not drop:
+                self._log("Cancelled - current scene kept.")
+                return None
+            return info
+
+        answer = QMessageBox.question(
+            self, "Current scene",
+            "The current scene has unsaved changes:\n{0}\n\nSave it before continuing?".format(
+                info["path"]),
+            QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Save)
+        if answer == QMessageBox.Cancel:
+            self._log("Cancelled - current scene kept.")
+            return None
+        if answer == QMessageBox.Save:
+            try:
+                scene_guard.save_current()
+                self._log("Saved current scene : {0}".format(info["path"]))
+            except Exception as exc:  # noqa: BLE001
+                self._log("[WARN] Could not save the current scene : {0}".format(exc))
+                return None
+        return info
+
+    def _restore_scene(self, info, scene_changed):
+        """작업이 씬을 바꿨으면 원래 씬으로(옵션)."""
+        if not scene_changed:
+            return
+        if not self.chk_reopen.isChecked():
+            self._log("Current scene is the last file worked on (Reopen current scene is off).")
+            return
+        try:
+            path = scene_guard.restore(info)
+            self._log("Reopened : {0}".format(path or "(new scene)"))
+        except Exception as exc:  # noqa: BLE001
+            self._log("[WARN] Could not reopen the previous scene : {0}".format(exc))
+
+    # ==================================================================
+    # helpers
+    # ==================================================================
+
+    def _update_counts(self, *_args):
+        total = sum(1 for it in self.ref_tree.top_items()
+                    if it.data(0, Qt.CheckStateRole) is not None)
+        self.lbl_ref_count.setText("Checked: {0} / {1}".format(
+            len(self.ref_tree.checked_keys()), total))
+
+    def _log(self, message):
+        if self._log_callback:
+            self._log_callback(message)
