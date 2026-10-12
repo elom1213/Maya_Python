@@ -12,5 +12,10 @@
 #                           (같은 방향이 90/270/356 도로 보고되던 것).
 #                           계획서: docs/plans/A00060_A00130_ik_edit_keep_pv_offset_plan.md
 
-VERSION = "03.13"
-LAST_UPDATE = "2026-09-28"
+# 03.14  Create > From Object - `Match Rotation` checkbox (off by default, enabled for Separate
+#                           only). On : each separate joint takes the world rotation of its
+#                           object, stored in jointOrient (rotate stays 0). Vertices are left
+#                           as they are. Connect (chain) ignores it.
+
+VERSION = "03.14"
+LAST_UPDATE = "2026-10-12"

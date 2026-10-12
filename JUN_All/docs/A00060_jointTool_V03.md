@@ -138,6 +138,10 @@ A00060_jointTool_V03.run(True)   # True 면 DEV_MODE 에서 reload 후 실행
 `Objects` 리스트의 오브젝트/버텍스 위치마다 조인트를 만든다.
 
 - `Connect` : 조인트들을 체인으로 연결 / `Separate` : 각각 분리(루트)
+- `Match Rotation` (v03.14, 기본 **꺼짐**, `Separate` 에서만 활성) : 켜면 분리 조인트가 **오브젝트의 월드 회전**을
+  받는다 — 값은 `jointOrient` 에 들어가고 `rotate` 는 0 (루트 조인트라 월드 오일러가 그대로). 회전·이동된 그룹
+  아래의 오브젝트도 월드 기준으로 맞는다. 버텍스는 회전이 없으니 그대로 둔다. `Connect` 는 체인 방향으로
+  orient 되므로 이 옵션을 무시한다.
 - `Foward axis` / `Secondary axis` / `Secondary axis orient` : orient 축 옵션
 - `Match to Obj` : **리스트에 담긴 항목**으로 실행
 - `Match to Sel` : **지금 씬에서 선택한** 오브젝트/버텍스로 바로 실행 (리스트 불필요, §7).

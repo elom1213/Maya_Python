@@ -87,6 +87,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - Remove 는 축별/sealBase 까지 되돌림. 검증 mayapy 52(정적 · JO 컨스트레인트 조인트 · X 키 · Attached 는 HEAD 와 월드 행렬 동일) + UI 오프스크린 19, 전부 통과.
 - 문서: `docs/A00170_driverTool.md` Free 모드 절, 포트폴리오 EN/KR 3-4 한 단락.
 
+> [!summary] A00060 jointTool_V03 — **Create > From Object `Match Rotation`** (v03.13->03.14)
+- 요청: Separate 일 때 조인트가 오브젝트의 회전값과 일치하게 생기는 체크박스, 기본 꺼짐.
+- `obj_joint_manager.joints_to_objs(..., match_rotation=False)` — separate 에서만, 조인트마다 `xform -ws -rotation` 으로 월드 회전을 주고 `makeIdentity -apply -rotate` 로 jointOrient 에 굳힌다(rotate 0). 컴포넌트(`.`)는 건너뜀. Connect 는 무시.
+- UI: Connect/Separate 라디오 줄에 `Match Rotation` 체크박스, Separate 일 때만 활성(`buttonToggled`).
+- 검증: mayapy 2024 — 회전·이동 그룹 아래 로케이터의 월드 회전 행렬 일치(jointOrient 65.3/-9.4/116.5, rotate 0), 월드 로케이터 (0,-30,0), 버텍스 0, 꺼짐 0, Connect 무시, UI 활성 전환 · 실행 · undo.
+
 > [!summary] A00145 RigConnect — **Connect 52 Facial Target 버튼 → 규칙 json `Connect by Rule`** (v01.58->01.59)
 - 요청: 버튼을 없애고 정해진 연결을 규칙 json 으로 관리. 첫 규칙 `Apple ARKit 52 Facial Target` 이 예전 버튼과 같은 연결을 하도록, 규칙이 늘어날 것을 염두.
 - `app/rules/connect/<rule>.json` 파일 하나 = 규칙 하나(`name` / `description` / `attributes` 같은 이름 / `pairs` 다른 이름). 코드의 `FACIAL_52` 목록을 json 으로 뽑아 `apple_arkit_52_facial.json` 으로, `connect_manager.connect_52_facial` 은 지움.

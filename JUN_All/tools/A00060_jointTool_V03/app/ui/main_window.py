@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-28
+# last Update date : 2026-10-12
 # A00060_jointTool_V03 - Qt UI
+#
+# v03.14 (2026-10-12) Create > From Object : `Match Rotation` 체크박스(기본 꺼짐, Separate 에서만 활성)
+#   - 켜면 분리 조인트가 오브젝트의 월드 회전을 jointOrient 로 받는다.
 #
 # A00060_jointTool_V02 의 **탭 재분류판**.
 # 기능은 하나도 빼거나 더하지 않고, 평평한 상위 탭 5개(그 안에 접이식 6섹션)를
@@ -371,6 +374,22 @@ class MainWindow(QWidget):
                 rb.setChecked(True)
             self.rb_match_group.addButton(rb, i)
             match_row.addWidget(rb)
+
+        # v03.14 : Separate 일 때만 - 조인트의 회전을 오브젝트의 월드 회전과 맞춘다 (기본 꺼짐).
+        # 체인(Connect)은 조인트가 다음 조인트를 보도록 orient 되므로 여기서는 쓰지 않는다.
+        self.cb_match_rotation = QCheckBox("Match Rotation")
+        self.cb_match_rotation.setChecked(False)
+        self.cb_match_rotation.setEnabled(False)
+        self.cb_match_rotation.setToolTip(
+            "Separate only : each joint takes the WORLD rotation of its object\n"
+            "(stored in jointOrient, rotate stays 0). Vertices have no rotation and\n"
+            "are left as they are. Off : joints are created with zero orientation.\n"
+            "Connect ignores this - a chain is oriented along the chain.")
+        match_row.addWidget(self.cb_match_rotation)
+        match_row.addStretch(1)
+        self.rb_match_group.buttonToggled.connect(
+            lambda _btn, _on: self.cb_match_rotation.setEnabled(
+                self.rb_match_group.checkedId() == 1))
         layout.addLayout(match_row)
 
         self.cmb_fwd_axis = self._axis_combo(["+X", "+Y", "+Z"], "+X")
@@ -1395,8 +1414,10 @@ class MainWindow(QWidget):
         fwd = self.cmb_fwd_axis.currentIndex() + 1
         secd = self.cmb_secd_axis.currentIndex() + 1
         secd_ori = self.cmb_secd_ori.currentIndex() + 1
+        match_rotation = separate and self.cb_match_rotation.isChecked()
         self._run(label,
-                  lambda: obj_mgr.joints_to_objs(objs, separate, fwd, secd, secd_ori))
+                  lambda: obj_mgr.joints_to_objs(objs, separate, fwd, secd, secd_ori,
+                                                 match_rotation=match_rotation))
 
     def on_match_to_obj(self):
         self._match_to_objs("Match to Obj", self.tsl_create_obj.get_all_items())

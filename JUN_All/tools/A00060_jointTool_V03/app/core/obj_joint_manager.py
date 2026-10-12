@@ -25,12 +25,31 @@ def _joint_at_obj(obj):
     return jnt
 
 
-def joints_to_objs(objs, separate, fwd_axis, secd_axis, secd_ori):
+def _match_world_rotation(jnt, obj):
+    """v03.14 - 분리 조인트에 obj 의 월드 회전을 준다 (jointOrient 로, rotate 는 0).
+
+    버텍스 등 컴포넌트는 회전이 없으니 그대로 둔다. xform 으로 월드 회전을 rotate 에 넣고
+    makeIdentity(rotate) 로 jointOrient 에 굳힌다 - 루트 조인트이므로 월드 오일러가 그대로 들어간다.
+    """
+    if "." in obj:
+        return False
+    try:
+        rot = cmds.xform(obj, q=True, ws=True, rotation=True)
+    except Exception:
+        return False
+    cmds.xform(jnt, ws=True, rotation=rot)
+    cmds.makeIdentity(jnt, apply=True, rotate=True, translate=False, scale=False)
+    return True
+
+
+def joints_to_objs(objs, separate, fwd_axis, secd_axis, secd_ori, match_rotation=False):
     """MEL JUN_cmd_create_joints_toObj - 오브젝트마다 joint 생성, 축 옵션으로 orient.
 
     fwd_axis / secd_axis : 1-base (1=X, 2=Y, 3=Z)  (콤보 index + 1)
     secd_ori             : 1-base (1=+X,2=-X,3=+Y,4=-Y,5=+Z,6=-Z)
     separate             : True 면 각 joint 를 분리(루트), False 면 체인 연결
+    match_rotation       : (v03.14) separate 일 때만 - 조인트의 회전을 오브젝트의 월드 회전과
+                           맞춘다(jointOrient). 체인(connect)에서는 무시한다.
     """
     # MEL 의 축 인덱스 계산을 그대로 이식
     last_axis = 3 - (fwd_axis + secd_axis - 2)  # 0-base 세 번째 축
@@ -49,6 +68,8 @@ def joints_to_objs(objs, separate, fwd_axis, secd_axis, secd_ori):
         prev = cur
 
         if separate:
+            if match_rotation:
+                _match_world_rotation(cur, obj)
             cmds.select(clear=True)
 
     # 마지막 joint orient -> world
