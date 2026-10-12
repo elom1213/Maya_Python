@@ -46,5 +46,14 @@
 #        values, pointOnPoly U / V; offsets are re-made (Maintain Offset on) or copied
 #        as values (off). Mapping All -> Each Object / Row to Row.
 
-VERSION = "01.57"
-LAST_UPDATE = "2026-09-28"
+# 01.58  Connect > Transfer Connection (new sub tab) : move the connections of the Source
+#        objects' attributes to a Destination that has the same attribute names, upstream
+#        (node -> Source) and / or downstream (Source -> node). Source attributes are
+#        listed with their connection counts (Channel Box Only / Connected Only), the
+#        nodes connected to the checked attributes are listed with check boxes, and
+#        Transfer moves only checked attributes x checked nodes. Attributes the
+#        Destination lacks turn red and are skipped; a Destination attribute already
+#        driven by something else is skipped too. One undo step.
+
+VERSION = "01.58"
+LAST_UPDATE = "2026-10-12"

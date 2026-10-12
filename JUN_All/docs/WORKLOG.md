@@ -55,6 +55,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - Remove 는 축별/sealBase 까지 되돌림. 검증 mayapy 52(정적 · JO 컨스트레인트 조인트 · X 키 · Attached 는 HEAD 와 월드 행렬 동일) + UI 오프스크린 19, 전부 통과.
 - 문서: `docs/A00170_driverTool.md` Free 모드 절, 포트폴리오 EN/KR 3-4 한 단락.
 
+> [!summary] A00145 RigConnect — **Connect > Transfer Connection 하위 탭 (연결 전이)** (v01.57->01.58)
+- 요청: A.attr_01 ↔ Tgt.attr_tgt_n 연결을 끊고 같은 이름 attr 을 가진 B.attr_01 ↔ Tgt.attr_tgt_n 으로 옮기는 기능. Source 어트리뷰트 목록(Channel Box Only / Connected Only, 체크박스, 전체 체크/해제) → 연결된 노드 목록(체크박스) → Destination → Transfer. upstream/downstream 둘 다. 불필요·중복 UI 는 제안하라고 했다.
+- 제안해 반영한 것: ① "A·B 공통 어트리뷰트" 목록을 따로 두지 않고 Destination 을 담는 순간 어트리뷰트 목록에서 **없는 행을 빨갛게**(툴팁에 누가 없는지) — 같은 집합을 두 번 체크할 일이 없다. ② List UpStream / DownStream 두 버튼 대신 **Direction 체크박스 둘 + List Nodes 하나** — 두 방향이 한 목록에 들어 한 번의 Transfer 로 양쪽을 옮긴다(노드 행 `drives: attr_02    driven by: attr_01`).
+- `app/core/connection_transfer_manager.py`(UI 비의존): `connections_of` = `listConnections -c -p -shapes`(-shapes 없으면 쉐입이 트랜스폼 이름으로 바뀜, blendShape 타겟은 별칭 이름으로 나와 list_attrs 와 맞음), `list_rows`(합집합 · 연결 수), `list_nodes`, `missing_on`, `pair_objects`(목적지 1 = 전부, 같은 수 = 행 순서), `transfer`(먼저 목적지에 잇고 Source 를 끊는다 · 목적지가 이미 다른 것에 구동되면 건너뜀 · downstream 은 `connectAttr -force` 한 번).
+- UI: 체크 목록은 공용 `JUN_mod_checkList_qt_v01`, 행 값은 UserRole(표시 글과 분리), Destination TSL 의 model 신호로 빨강 재칠(QTimer 로 한 번), 옮긴 뒤 두 목록 재조회(체크는 이름으로 유지), `undo_chunk` 하나.
+- 검증: mayapy 2024 — 코어(down 2 + up 1 전이, 체크 안 한 노드 유지, 목적지 충돌 건너뜀, undo, blendShape 별칭 행) · 오프스크린 UI(teal_dark) 탭 4개, 목록/옵션 토글/노드 행/빨강 표시/전이/재조회/빨강 해제/undo/행 클릭 씬 선택, 페이지 최소 폭 1189(Pair 1203 보다 좁음). 마야 GUI 확인은 아직.
+
 > [!summary] A00120 FKIK — **Setup 칸 높이를 v01.10 으로 되돌림** (v01.11->01.12)
 - 요청: v01.11 뒤 Setup 칸 세로가 길어졌다 — 기존과 같게.
 - 원인(오프스크린 실측 108 → 166): Manual/Auto 라디오 행(36) + Auto 리스트를 헤더 있는 공용 TSL 로 만든 것(22). 테마의 라디오는 패딩·테두리가 있는 버튼 모양이라 라디오와 버튼을 세로로 겹쳐도 50px 안에 못 든다.

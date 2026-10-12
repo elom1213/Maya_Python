@@ -10,7 +10,7 @@
 #   Match
 #   Constrain : Constraint / Skin Weight / Group Create / Transfer / Target Edit /
 #               Update
-#   Connect   : Connect / List Connected / Pair
+#   Connect   : Connect / List Connected / Pair / Transfer Connection
 #   Attribute : Edit / Create / Set Value
 #
 # 로직은 app/core 에 위임하고 이 모듈은 위젯 구성/시그널 연결/로그 출력만 담당한다.
@@ -37,6 +37,7 @@ from tools.A00145_RigConnect.app.core import matrix_constraint_manager as mtx_mg
 from tools.A00145_RigConnect.app.core import connect_manager as cnt_mgr
 from tools.A00145_RigConnect.app.core import attribute_manager as att_mgr
 from tools.A00145_RigConnect.app.core import stream_manager as stm_mgr
+from tools.A00145_RigConnect.app.core import connection_transfer_manager as cxm_mgr
 from tools.A00145_RigConnect.app.core import skin_constraint_manager as skn_mgr
 from tools.A00145_RigConnect.app.core import group_create_manager as grp_mgr
 from tools.A00145_RigConnect.app.core import constraint_transfer_manager as cxfer_mgr
@@ -1295,6 +1296,9 @@ class MainWindow(QWidget):
         ("Pair", "Pair Driver <-> Driven by name or by proximity, then "
          "constrain the pairs (was 'Connect Closest')",
          "_build_connect_closest_page"),
+        ("Transfer Connection", "Move the connections of the source objects' "
+         "attributes to another object that has the same attributes "
+         "(upstream and downstream)", "_build_transfer_connection_page"),
     )
 
     def _build_connect_tab(self):
@@ -2566,6 +2570,183 @@ class MainWindow(QWidget):
         layout.addLayout(row)
         layout.addStretch(1)
         return tab
+
+    # --------------------------------------------------------------
+    # Connect > Transfer Connection  (v01.58 연결 전이)
+    # --------------------------------------------------------------
+
+    def _build_transfer_connection_page(self):
+        """연결 전이 — Source 의 어트리뷰트에 걸린 연결을 같은 이름의 어트리뷰트를 가진
+        Destination 으로 옮긴다 (upstream / downstream 모두).
+
+        화면은 위에서 아래로 작업 순서다:
+          1. Source Objects  ->  List Attributes  ->  어트리뷰트 체크
+          2. Direction(Upstream / Downstream)  ->  List Nodes  ->  노드 체크
+          3. Destination Objects  ->  Transfer Connection
+
+        요청과 다르게 둔 것 (중복을 줄이려고):
+          - "A·B 공통 어트리뷰트" 목록을 따로 두지 않는다. Destination 을 담는 순간 위 어트리뷰트
+            목록에서 **Destination 에 없는 행이 빨갛게** 되고, 전이는 체크한 행 중 Destination 에
+            있는 것만 한다. 같은 어트리뷰트 집합을 두 목록에 두 번 체크할 일이 없어진다.
+          - List UpStream / List DownStream 두 버튼 대신 **Direction 체크박스 둘 + List Nodes 하나**.
+            두 방향을 한 목록에 담아 한 번의 Transfer 로 양쪽을 옮긴다(버튼 둘이면 목록이 한 방향씩만
+            남아 두 번 해야 한다).
+        """
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        # ---------- 1. Source + Attributes ----------
+        top = QHBoxLayout()
+
+        self.tsl_xfer_src = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Source Objects", select_label="Select",
+            list_min_height=150, log_callback=self.log)
+        self.tsl_xfer_src.setToolTip(
+            "The objects whose connections you want to move away (A).\n"
+            "Several objects : their attributes are listed as a union.")
+        top.addWidget(self.tsl_xfer_src)
+
+        right = QVBoxLayout()
+        head = QHBoxLayout()
+        head.addWidget(QLabel("Attributes"))
+        head.addStretch(1)
+        self.lbl_xfer_attr_number = QLabel("Number: 0")
+        head.addWidget(self.lbl_xfer_attr_number)
+        right.addLayout(head)
+
+        self.lw_xfer_attrs = QListWidget()
+        self.lw_xfer_attrs.setMinimumHeight(150)
+        self.lw_xfer_attrs.setToolTip(
+            "Check the attributes whose connections you want to move.\n"
+            "[in n  out m] = n incoming (node -> Source) / m outgoing (Source -> node).\n"
+            "Shift / Ctrl click to select several rows - the check box of a selected\n"
+            "row (or Space) checks / unchecks every selected row.\n"
+            "RED = the Destination objects do not have this attribute (it is skipped).")
+        self.chk_xfer_attrs = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(
+            self.lw_xfer_attrs)
+        right.addWidget(self.lw_xfer_attrs, 1)
+
+        opt_row = QHBoxLayout()
+        self.cb_xfer_channel_box = QCheckBox("Channel Box Only")
+        self.cb_xfer_channel_box.setChecked(True)
+        self.cb_xfer_channel_box.setToolTip(
+            "List only the attributes shown in the Channel Box (keyable + channel box,\n"
+            "not hidden). Blend shape targets are kept.\n"
+            "Uncheck to list every attribute, including connected multi elements.")
+        opt_row.addWidget(self.cb_xfer_channel_box)
+        self.cb_xfer_connected = QCheckBox("Connected Only")
+        self.cb_xfer_connected.setChecked(True)
+        self.cb_xfer_connected.setToolTip(
+            "List only the attributes that have at least one connection.\n"
+            "Unconnected attributes have nothing to transfer.")
+        opt_row.addWidget(self.cb_xfer_connected)
+        opt_row.addStretch(1)
+        right.addLayout(opt_row)
+
+        btn_row = QHBoxLayout()
+        btn_list = QPushButton("List Attributes")
+        btn_list.setToolTip("List the attributes of the Source Objects.")
+        btn_list.clicked.connect(self.on_xfer_list_attrs)
+        btn_row.addWidget(btn_list)
+        btn_all = QPushButton("Check All")
+        btn_all.clicked.connect(lambda: self._xfer_set_all(self.lw_xfer_attrs, True))
+        btn_row.addWidget(btn_all)
+        btn_none = QPushButton("Clear Checks")
+        btn_none.clicked.connect(lambda: self._xfer_set_all(self.lw_xfer_attrs, False))
+        btn_row.addWidget(btn_none)
+        right.addLayout(btn_row)
+
+        # 이미 목록이 있으면 토글 즉시 다시 채운다 (Connect 탭과 같은 동작).
+        for cb in (self.cb_xfer_channel_box, self.cb_xfer_connected):
+            cb.toggled.connect(
+                lambda _checked: self.lw_xfer_attrs.count() and self.on_xfer_list_attrs())
+
+        top.addLayout(right)
+        layout.addLayout(top)
+
+        # ---------- 2. Connected Nodes ----------
+        box = QGroupBox("Connected Nodes")
+        box_layout = QVBoxLayout(box)
+
+        dir_row = QHBoxLayout()
+        dir_row.addWidget(QLabel("Direction"))
+        self.cb_xfer_up = QCheckBox("Upstream")
+        self.cb_xfer_up.setChecked(True)
+        self.cb_xfer_up.setToolTip(
+            "Nodes that DRIVE the checked attributes (node -> Source).\n"
+            "Transfer re-wires them to drive the Destination instead.")
+        dir_row.addWidget(self.cb_xfer_up)
+        self.cb_xfer_down = QCheckBox("Downstream")
+        self.cb_xfer_down.setChecked(True)
+        self.cb_xfer_down.setToolTip(
+            "Nodes DRIVEN by the checked attributes (Source -> node).\n"
+            "Transfer re-wires them to be driven by the Destination instead.")
+        dir_row.addWidget(self.cb_xfer_down)
+        dir_row.addStretch(1)
+        self.lbl_xfer_node_number = QLabel("Number: 0")
+        dir_row.addWidget(self.lbl_xfer_node_number)
+        box_layout.addLayout(dir_row)
+
+        self.lw_xfer_nodes = QListWidget()
+        self.lw_xfer_nodes.setMinimumHeight(130)
+        self.lw_xfer_nodes.setToolTip(
+            "Check the nodes whose connections to the Source should move.\n"
+            "drives: X  = the node drives Source.X (upstream)\n"
+            "driven by: Y = Source.Y drives the node (downstream)\n"
+            "Clicking a row selects the node in the scene.")
+        self.chk_xfer_nodes = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(
+            self.lw_xfer_nodes)
+        self.lw_xfer_nodes.itemSelectionChanged.connect(self.on_xfer_nodes_selection_changed)
+        box_layout.addWidget(self.lw_xfer_nodes)
+
+        node_btn_row = QHBoxLayout()
+        btn_nodes = QPushButton("List Nodes")
+        btn_nodes.setToolTip(
+            "List the nodes connected to the CHECKED attributes,\n"
+            "in the directions ticked above.")
+        btn_nodes.clicked.connect(self.on_xfer_list_nodes)
+        node_btn_row.addWidget(btn_nodes)
+        btn_nall = QPushButton("Check All")
+        btn_nall.clicked.connect(lambda: self._xfer_set_all(self.lw_xfer_nodes, True))
+        node_btn_row.addWidget(btn_nall)
+        btn_nnone = QPushButton("Clear Checks")
+        btn_nnone.clicked.connect(lambda: self._xfer_set_all(self.lw_xfer_nodes, False))
+        node_btn_row.addWidget(btn_nnone)
+        box_layout.addLayout(node_btn_row)
+
+        layout.addWidget(box)
+
+        # ---------- 3. Destination + Transfer ----------
+        self.tsl_xfer_dst = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Destination Objects", select_label="Select",
+            list_min_height=90, log_callback=self.log)
+        self.tsl_xfer_dst.setToolTip(
+            "The objects that take over the connections (B). They must have the\n"
+            "same attribute names as the Source.\n"
+            "One destination : every Source goes to it.\n"
+            "Several : paired with the Source rows in order (same count).")
+        layout.addWidget(self.tsl_xfer_dst)
+
+        # Destination 이 바뀌면 위 어트리뷰트 목록에 "없는 행" 을 빨갛게 표시한다.
+        model = self.tsl_xfer_dst.list_widget.model()
+        for signal in (model.rowsInserted, model.rowsRemoved, model.modelReset):
+            signal.connect(lambda *_a: self._xfer_mark_destination_later())
+        self._xfer_mark_pending = False
+        self._xfer_rows = []
+
+        btn_transfer = QPushButton("Transfer Connection")
+        btn_transfer.setMinimumHeight(36)
+        btn_transfer.setToolTip(
+            "Move the connections between the CHECKED attributes and the CHECKED nodes\n"
+            "from the Source to the Destination, in the ticked directions.\n"
+            "Attributes the Destination lacks are skipped. A Destination attribute that\n"
+            "is already driven by something else is skipped too (the Source keeps it).\n"
+            "One undo step.")
+        btn_transfer.clicked.connect(self.on_xfer_transfer)
+        layout.addWidget(btn_transfer)
+
+        layout.addStretch(1)
+        return page
 
     # --------------------------------------------------------------
     # Connect > Pair  (A00140 ConnectClosest 이식 + 이름 매칭)
@@ -4022,6 +4203,244 @@ class MainWindow(QWidget):
                 cmds.select(clear=True)
         except Exception as e:
             cmds.warning(str(e))
+
+    # ==============================================================
+    # Handlers : Transfer Connection (v01.58)
+    # ==============================================================
+
+    # 행이 품은 값 : UserRole = 어트리뷰트 / 노드 이름, UserRole+1 = 기본 툴팁(표시 전).
+    _XFER_NAME_ROLE = Qt.UserRole
+    _XFER_TIP_ROLE = Qt.UserRole + 1
+
+    @staticmethod
+    def _xfer_set_all(list_widget, checked):
+        """Check All (보이는 행만) / Clear Checks (전부)."""
+        state = Qt.Checked if checked else Qt.Unchecked
+        for i in range(list_widget.count()):
+            item = list_widget.item(i)
+            if checked and item.isHidden():
+                continue
+            item.setCheckState(state)
+
+    def _xfer_checked(self, list_widget):
+        """체크된 행의 이름(UserRole)."""
+        names = []
+        for i in range(list_widget.count()):
+            item = list_widget.item(i)
+            if item.checkState() == Qt.Checked:
+                names.append(item.data(self._XFER_NAME_ROLE))
+        return names
+
+    def _xfer_add_row(self, list_widget, name, text, tip, checked=False):
+        item = QListWidgetItem(text)
+        item.setData(self._XFER_NAME_ROLE, name)
+        item.setData(self._XFER_TIP_ROLE, tip)
+        item.setToolTip(tip)
+        item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+        item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+        list_widget.addItem(item)
+        return item
+
+    def on_xfer_list_attrs(self):
+        """Source 오브젝트들의 어트리뷰트를 연결 개수와 함께 나열한다. 체크는 이름으로 유지."""
+        objects = self.tsl_xfer_src.get_all_items()
+        if not objects:
+            self.log("[ERR] List Attributes : Source Objects list is empty")
+            return
+
+        keep = set(self._xfer_checked(self.lw_xfer_attrs))
+        channel_box = self.cb_xfer_channel_box.isChecked()
+        connected = self.cb_xfer_connected.isChecked()
+        try:
+            rows, missing = cxm_mgr.list_rows(
+                objects, channel_box_only=channel_box, connected_only=connected)
+        except Exception as e:
+            self.log("[ERR] List Attributes : {0}".format(e))
+            cmds.warning(str(e))
+            return
+        self._xfer_rows = rows
+
+        total_objs = len(objects) - len(missing)
+        self.lw_xfer_attrs.blockSignals(True)
+        self.lw_xfer_attrs.clear()
+        for row in rows:
+            n_in = sum(len(p) for p in row["in"].values())
+            n_out = sum(len(p) for p in row["out"].values())
+            text = row["name"]
+            if n_in or n_out:
+                text += "   [in {0}  out {1}]".format(n_in, n_out)
+            if total_objs > 1:
+                text += "   [{0}/{1}]".format(len(row["owners"]), total_objs)
+
+            lines = []
+            for obj, plugs in row["in"].items():
+                lines.extend("{0}  ->  {1}.{2}".format(p, obj, row["name"]) for p in plugs)
+            for obj, plugs in row["out"].items():
+                lines.extend("{0}.{1}  ->  {2}".format(obj, row["name"], p) for p in plugs)
+            if not lines:
+                lines.append("no connection")
+            if total_objs > 1:
+                lines.append("")
+                lines.append("on {0} of {1} object(s): {2}".format(
+                    len(row["owners"]), total_objs, ", ".join(row["owners"][:12])))
+            self._xfer_add_row(self.lw_xfer_attrs, row["name"], text, "\n".join(lines),
+                               checked=row["name"] in keep)
+        self.lw_xfer_attrs.blockSignals(False)
+        self.lbl_xfer_attr_number.setText("Number: {0}".format(len(rows)))
+
+        for obj in missing:
+            self.log("[WARN] {0} : object not found in scene".format(obj))
+        self.log("[OK] List Attributes : {0} attr(s) on {1} object(s){2}{3}".format(
+            len(rows), total_objs,
+            ", channel box" if channel_box else "",
+            ", connected" if connected else ""))
+
+        self._xfer_mark_destination()
+
+    def on_xfer_list_nodes(self):
+        """체크한 어트리뷰트에 연결된 노드를 나열한다 (방향은 체크박스). 체크는 이름으로 유지."""
+        attrs = self._xfer_checked(self.lw_xfer_attrs)
+        if not attrs:
+            self.log("[ERR] List Nodes : check one or more attributes first")
+            return
+        upstream = self.cb_xfer_up.isChecked()
+        downstream = self.cb_xfer_down.isChecked()
+        if not (upstream or downstream):
+            self.log("[ERR] List Nodes : tick Upstream and / or Downstream")
+            return
+
+        keep = set(self._xfer_checked(self.lw_xfer_nodes))
+        nodes = cxm_mgr.list_nodes(self._xfer_rows, attrs, upstream, downstream)
+
+        self.lw_xfer_nodes.blockSignals(True)
+        self.lw_xfer_nodes.clear()
+        for entry in nodes:
+            parts = []
+            drives = []
+            for _obj, attr, _plug in entry["in"]:
+                if attr not in drives:
+                    drives.append(attr)
+            driven = []
+            for _obj, attr, _plug in entry["out"]:
+                if attr not in driven:
+                    driven.append(attr)
+            if drives:
+                parts.append("drives: " + ", ".join(drives))
+            if driven:
+                parts.append("driven by: " + ", ".join(driven))
+            text = "{0}    {1}".format(entry["node"], "    ".join(parts))
+
+            lines = ["{0}  ->  {1}.{2}".format(plug, obj, attr)
+                     for obj, attr, plug in entry["in"]]
+            lines += ["{0}.{1}  ->  {2}".format(obj, attr, plug)
+                      for obj, attr, plug in entry["out"]]
+            self._xfer_add_row(self.lw_xfer_nodes, entry["node"], text, "\n".join(lines),
+                               checked=entry["node"] in keep)
+        self.lw_xfer_nodes.blockSignals(False)
+        self.lbl_xfer_node_number.setText("Number: {0}".format(len(nodes)))
+
+        self.log("[OK] List Nodes : {0} node(s) on {1} attribute(s) ({2})".format(
+            len(nodes), len(attrs),
+            " + ".join(d for d, on in (("upstream", upstream), ("downstream", downstream)) if on)))
+
+    def on_xfer_nodes_selection_changed(self):
+        """노드 행을 누르면 씬에서도 고른다 (List Connected 와 같다)."""
+        names = [it.data(self._XFER_NAME_ROLE) for it in self.lw_xfer_nodes.selectedItems()]
+        try:
+            if names:
+                cmds.select(names)
+            else:
+                cmds.select(clear=True)
+        except Exception as e:
+            cmds.warning(str(e))
+
+    def _xfer_mark_destination_later(self):
+        """Destination 목록이 바뀔 때 (행마다 신호가 오므로) 한 번만 다시 칠한다."""
+        if self._xfer_mark_pending:
+            return
+        self._xfer_mark_pending = True
+        QTimer.singleShot(0, self._xfer_mark_destination)
+
+    def _xfer_mark_destination(self):
+        """어트리뷰트 행 중 Destination 에 없는 것을 빨갛게 표시한다 (없으면 기본색)."""
+        self._xfer_mark_pending = False
+        if not hasattr(self, "lw_xfer_attrs"):
+            return
+        dests = [d for d in self.tsl_xfer_dst.get_all_items() if cmds.objExists(d)]
+        names = [self.lw_xfer_attrs.item(i).data(self._XFER_NAME_ROLE)
+                 for i in range(self.lw_xfer_attrs.count())]
+        missing = cxm_mgr.missing_on(dests, names) if dests else {}
+
+        for i in range(self.lw_xfer_attrs.count()):
+            item = self.lw_xfer_attrs.item(i)
+            name = item.data(self._XFER_NAME_ROLE)
+            tip = item.data(self._XFER_TIP_ROLE) or ""
+            lacking = missing.get(name)
+            if lacking:
+                item.setForeground(QBrush(QColor("#e05050")))
+                item.setToolTip(tip + "\n\nNOT on destination: " + ", ".join(lacking)
+                                + "\n(skipped by Transfer)")
+            else:
+                item.setData(Qt.ForegroundRole, None)
+                item.setToolTip(tip)
+
+    def on_xfer_transfer(self):
+        """체크한 어트리뷰트 x 체크한 노드의 연결을 Source 에서 Destination 으로 옮긴다."""
+        self.log("--- Transfer Connection ---")
+        sources = self.tsl_xfer_src.get_all_items()
+        dests = self.tsl_xfer_dst.get_all_items()
+        attrs = self._xfer_checked(self.lw_xfer_attrs)
+        nodes = self._xfer_checked(self.lw_xfer_nodes)
+        upstream = self.cb_xfer_up.isChecked()
+        downstream = self.cb_xfer_down.isChecked()
+
+        if not sources:
+            self.log("[ERR] Transfer : Source Objects list is empty")
+            return
+        if not dests:
+            self.log("[ERR] Transfer : Destination Objects list is empty")
+            return
+        if not attrs:
+            self.log("[ERR] Transfer : check one or more attributes")
+            return
+        if not nodes:
+            self.log("[ERR] Transfer : check one or more nodes (List Nodes first)")
+            return
+        if not (upstream or downstream):
+            self.log("[ERR] Transfer : tick Upstream and / or Downstream")
+            return
+        try:
+            pairs = cxm_mgr.pair_objects(sources, dests)
+        except ValueError as e:
+            self.log("[ERR] Transfer : {0}".format(e))
+            return
+
+        try:
+            with undo_chunk():
+                report = cxm_mgr.transfer(pairs, attrs, nodes, upstream, downstream)
+        except Exception as e:
+            self.log("[ERR] Transfer : {0}".format(e))
+            cmds.warning(str(e))
+            return
+
+        for direction, other, src_plug, dst_plug in report["moved"]:
+            if direction == "upstream":
+                self.log("[OK] {0} -> {1}   ==>   {0} -> {2}".format(other, src_plug, dst_plug))
+            else:
+                self.log("[OK] {0} -> {1}   ==>   {2} -> {1}".format(src_plug, other, dst_plug))
+        for src_plug, reason in report["skipped"]:
+            self.log("[WARN] skipped {0} : {1}".format(src_plug, reason))
+        for src_plug, other, error in report["failed"]:
+            self.log("[ERR] {0} <-> {1} : {2}".format(src_plug, other, error))
+
+        self.log("Transfer Connection : {0} moved, {1} skipped, {2} failed ({3} pair(s))".format(
+            len(report["moved"]), len(report["skipped"]), len(report["failed"]), len(pairs)))
+
+        # 옮긴 뒤 Source 의 연결이 달라졌으니 두 목록을 다시 읽는다 (체크는 이름으로 유지).
+        if report["moved"]:
+            self.on_xfer_list_attrs()
+            if self.lw_xfer_nodes.count():
+                self.on_xfer_list_nodes()
 
     # ==============================================================
     # Handlers : Pair (Get Closest / Match by Name / Connect)

@@ -716,11 +716,11 @@ Filter [ inner              ] [Clear]   [Select All]
 > (`List Attributes` 가 전체 재조회를 담당한다).
 
 ### Connect
-"연결" 작업을 묶은 상위 탭. **하위 탭 3개**로 나뉜다(v01.23).
+"연결" 작업을 묶은 상위 탭. **하위 탭 4개**로 나뉜다(v01.23 에 3개, v01.58 에 Transfer Connection).
 
 ```
 [ Match ][ Constrain ][ Connect ][ Attribute ]
-                       └─ [ Connect ][ List Connected ][ Pair ]
+                       └─ [ Connect ][ List Connected ][ Pair ][ Transfer Connection ]
 ```
 
 | 하위 탭 | 내용 |
@@ -728,6 +728,7 @@ Filter [ inner              ] [Clear]   [Select All]
 | **Connect** | 어트리뷰트 **양방향** 연결(Source ↔ Destination) (+ Match from Source / Match Same Name, 52 facial) |
 | **List Connected** | 오브젝트의 up/down stream 노드를 타입별로 탐색 |
 | **Pair** | Driver ↔ Driven 을 **거리** 또는 **이름**으로 1:1 짝짓고 constraint (A00140 이식 + v01.37 이름 매칭) |
+| **Transfer Connection** | Source 어트리뷰트의 연결을 **같은 이름의 어트리뷰트**를 가진 Destination 으로 옮김 (upstream / downstream, v01.58) |
 
 Constrain 탭과 같은 방식이다(§Constrain 참고) — 짧은 라벨 + 툴팁, `ElideRight`, **하위 탭별 스크롤**.
 
@@ -1377,6 +1378,39 @@ SRC.stretch  (double, min 0 / max 1, default 0.5, keyable, 현재값 0.75)
 - `Types` 에서 타입 선택 후 `Search`: 해당 타입의 **노드들**을 `Nodes` 에 표시.
 - `Nodes` 목록에서 항목을 선택하면 씬에서도 선택된다.
 
+#### Transfer Connection — 연결 전이 (v01.58)
+Source 의 어트리뷰트에 걸린 연결을 **같은 이름의 어트리뷰트를 가진** Destination 으로 옮긴다.
+A.attr_01 ↔ Tgt.attr_tgt_n 이 이어져 있을 때, 그 연결을 끊고 B.attr_01 ↔ Tgt.attr_tgt_n 으로 잇는다.
+방향은 둘 다 된다 — **upstream**(Tgt → A 를 Tgt → B 로) 과 **downstream**(A → Tgt 를 B → Tgt 로).
+
+화면은 위에서 아래로 작업 순서다.
+
+1. `Source Objects` 에 A 를 담고 `List Attributes`. 어트리뷰트마다 `[in n  out m]`(들어오는 / 나가는 연결 수)이
+   붙고, 체크박스로 고른다(Shift/Ctrl 다중 선택 + 고른 행 한꺼번에 체크, `Check All` / `Clear Checks`).
+   - `Channel Box Only`(기본 ON) — 채널 박스에 보이는 어트리뷰트만. 끄면 연결된 멀티 원소까지 전부.
+   - `Connected Only`(기본 ON) — 연결이 하나라도 있는 것만.
+   - 행 툴팁에 연결된 플러그가 그대로 적힌다 (`Tgt.attr_tgt_2  ->  A.attr_02`).
+2. `Connected Nodes` — `Direction` 의 `Upstream` / `Downstream` 을 고르고 `List Nodes`. **체크한 어트리뷰트**에
+   연결된 노드가 노드마다 한 행으로 선다 — `Tgt    drives: attr_02    driven by: attr_01`
+   (drives = 노드가 Source.attr 을 구동, driven by = Source.attr 이 노드를 구동). 행을 누르면 씬에서 선택된다.
+   여기서도 체크박스로 고른다.
+3. `Destination Objects` 에 B 를 담는다. 담는 순간 **위 어트리뷰트 목록에서 B 에 없는 행이 빨갛게** 되고
+   툴팁에 어느 오브젝트에 없는지 적힌다 — 그 행은 전이에서 건너뛴다. Destination 이 하나면 모든 Source 가 그
+   하나로, 개수가 같으면 행 순서대로 1:1, 그 밖에는 에러.
+4. `Transfer Connection` — **체크한 어트리뷰트 × 체크한 노드**의 연결만, 고른 방향으로 옮긴다. 한 번의 undo.
+   - 먼저 Destination 에 잇고 그다음 Source 를 끊는다 — 잇기에 실패하면 Source 는 그대로다.
+   - Destination 의 어트리뷰트가 **이미 다른 것에 구동**되고 있으면 건너뛴다(`[WARN]`, Source 유지).
+   - 옮긴 뒤 두 목록을 다시 읽는다(체크는 이름으로 유지). `Connected Only` 가 켜져 있으면 연결이 다 옮겨진
+     어트리뷰트는 목록에서 사라진다.
+
+> 요청과 다르게 둔 것 — "A·B 공통 어트리뷰트" 목록을 따로 두지 않고 어트리뷰트 목록의 빨강 표시로 대신했다
+> (같은 집합을 두 목록에 두 번 체크할 일이 없다). `List UpStream` / `List DownStream` 두 버튼 대신
+> Direction 체크박스 둘 + `List Nodes` 하나 — 두 방향을 한 목록에 담아 **한 번의 Transfer 로 양쪽을** 옮긴다.
+
+로직은 `app/core/connection_transfer_manager.py` — `list_rows` / `list_nodes` / `missing_on` / `pair_objects` /
+`transfer`. 플러그 이름은 `listConnections -connections -plugs -shapes` 로 읽는다(`-shapes` 가 없으면 쉐입이
+트랜스폼 이름으로 바뀐다). blendShape 타겟은 플러그에 별칭 이름으로 나오므로 Connect 탭의 타겟 이름과 그대로 맞는다.
+
 #### Pair — Driver ↔ Driven 짝짓기 (v01.37 이름 매칭, 예전 이름 `Connect Closest`)
 두 리스트를 **1:1 로 짝짓고** 그 짝을 constraint 로 연결한다. 짝을 세우는 방법이 둘이다 —
 **거리**(`Get Closest`, A00140 이식)와 **이름**(`Match by Name`, v01.37).
@@ -1852,6 +1886,7 @@ A00145_RigConnect/
     │   ├── attr_value_manager.py   # Attribute > Set Value (공통 어트리뷰트 교집합 · Start/Step/Repeat 값 계산 · enum 은 이름으로 · 키 걸린 plug 는 키+setAttr)
     │   ├── blendshape_utils.py     # blendShape 타겟(weight 별칭) 조회 — Attribute / Connect 탭 공용
     │   ├── stream_manager.py       # List Connected (MEL 포팅: hyperShade up/down)
+    │   ├── connection_transfer_manager.py # Transfer Connection (어트리뷰트별 in/out 연결 조회, 체크한 노드와의 연결을 같은 이름 어트리뷰트의 다른 오브젝트로 전이, 목적지에 없는 어트리뷰트 판정)
     │   ├── maya_scene.py           # Pair (A00140 복사)
     │   ├── closest_connector.py    # Pair (A00140 복사 + 짝짓기 모드: 거리 / 리스트 자리)
     │   └── object_match.py         # Pair > Match by Name (이름으로 오브젝트 짝짓기 — attr_match 엔진 재사용, 비교는 말단 이름·반환은 전체 경로)
@@ -1862,7 +1897,7 @@ A00145_RigConnect/
     └── ui/
         ├── collapsible.py          # CollapsibleBox
         ├── attr_spec_dialog.py     # Attribute > Create 의 어트리뷰트 정의 편집 창
-        └── main_window.py          # QTabWidget 최상위 5탭(Constrain 6 / Connect 3 / Attribute 3 하위 탭) + 공유 로그 + Help>About
+        └── main_window.py          # QTabWidget 최상위 5탭(Constrain 6 / Connect 4 / Attribute 3 하위 탭) + 공유 로그 + Help>About
 ```
 
 - 모든 textScrollList 는 `Framework.qt.JUN_mod_tsl_qt_v01` 위젯으로 대체.
