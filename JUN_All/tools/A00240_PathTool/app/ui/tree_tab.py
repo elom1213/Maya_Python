@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-02
+# last Update date : 2026-10-12
 # A00240_PathTool - "Tree" tab (Qt, standalone)
 #
 # 사용자가 입력한 경로를 트리뷰로 보여준다(A00210 Path Structure 의 트리 표시와 동일 취지).
@@ -18,6 +18,8 @@
 #   9) 더블클릭 (v01.16) : 그 경로를 탐색기에서 연다(Reveal 과 같다). 펼치기는 화살표로.
 #  10) 선읽기 (v01.17, Adaptive) : 보이는(안 읽은) 폴더의 한 겹을 백그라운드에서 미리 읽는다 -
 #               펼칠 때 기다리지 않고, 빈 폴더는 펼치기 전에 화살표가 사라진다.
+#  11) Omit (v01.18) : 루트 아래 N 단계(2 이상)를 `...` 한 줄로 접어 생략한다 -
+#               A/B/C/D/E 에서 Omit 2 면 A / ... / D / E. 늘 같은 고정 경로를 건너뛰고 본다.
 
 import os
 
@@ -53,6 +55,11 @@ from ..core.prefetcher import Prefetcher
 # 하위 폴더가 수만 개인 곳을 열어도 백그라운드가 그것만 붙들지 않게 한다(넘는 것은 펼칠 때 읽는다).
 PREFETCH_MAX_PER_FOLDER = 2000
 PREFETCH_TICK_MS = 50     # 결과를 모아 화면에 반영하는 주기
+
+# Omit (v01.18) - 생략 단계의 최솟값(사용자 요청: 2 이상의 양의 정수) 과 `...` 항목 표시.
+OMIT_MIN = 2
+OMIT_LABEL = "..."
+ROLE_OMIT = Qt.UserRole + 1   # `...` 항목 표식(경로 역할은 비워 둔다 - 열기/복사가 안 되게)
 
 
 class _CheckableMenu(QMenu):
@@ -205,6 +212,24 @@ class TreeTab(QWidget):
         ref_row.addWidget(self.chk_ref_recursive)
 
         ref_row.addStretch(1)
+
+        # v01.18 : Omit - 루트 아래 N 단계를 `...` 한 줄로 접는다(늘 같은 고정 경로를 건너뛴다).
+        self.chk_omit = QCheckBox("Omit")
+        self.chk_omit.setToolTip(
+            "Skip the first N levels under the root and show them as one '...' row.\n"
+            "A/B/C/D/E with Omit 2 shows  A / ... / D / E.\n"
+            "Branches that end inside the skipped levels are not shown.")
+        self.chk_omit.toggled.connect(self._on_omit_toggled)
+        ref_row.addWidget(self.chk_omit)
+
+        self.spn_omit = QSpinBox()
+        self.spn_omit.setRange(OMIT_MIN, 99)
+        self.spn_omit.setValue(OMIT_MIN)
+        self.spn_omit.setToolTip("How many levels under the root to skip (2 or more).")
+        self.spn_omit.valueChanged.connect(self._on_omit_changed)
+        self.spn_omit.setEnabled(False)               # Omit 기본 꺼짐
+        ref_row.addWidget(self.spn_omit)
+
         layout.addLayout(ref_row)
 
         # 필터 행: 경로/파일 이름으로 찾기
@@ -315,6 +340,7 @@ class TreeTab(QWidget):
         if root is not None:
             self._set_expanded_deep(root, False)
             root.setExpanded(True)
+            self._expand_omit_row(root)
 
     # ============================================================== actions
 
@@ -362,6 +388,78 @@ class TreeTab(QWidget):
         # 읽는 방식이 바뀌므로 다시 빌드한다(지연 캐시 <-> Depth 캐시는 섞지 않는다).
         if self._root_path:
             self.on_build()
+
+    # ------------------------------------------------- Omit (v01.18)
+
+    def _omit_levels(self):
+        """생략할 단계 수. 꺼져 있으면 0."""
+        return self.spn_omit.value() if self.chk_omit.isChecked() else 0
+
+    def _on_omit_toggled(self, checked):
+        self.spn_omit.setEnabled(checked)
+        self._on_omit_changed(self.spn_omit.value())
+
+    def _on_omit_changed(self, _value):
+        # 캐시는 그대로, 보이는 모양만 바뀐다 - 다시 그린다(Show files 토글과 같은 길).
+        if self._tree is None:
+            return
+        self._fill_tree(self.tree)
+        if self._adaptive():
+            self._prefetch_children(self._tree)
+
+    def _is_omit_item(self, item):
+        return bool(item.data(0, ROLE_OMIT))
+
+    def _item_key(self, item):
+        """펼침·선택 상태를 적어 둘 때 쓰는 열쇠 - 경로. `...` 항목은 경로가 없어 OMIT_LABEL."""
+        path = item.data(0, Qt.UserRole)
+        if path:
+            return path
+        return OMIT_LABEL if self._is_omit_item(item) else None
+
+    def _expand_omit_row(self, root):
+        """`...` 줄은 펼쳐 둔다 - 접히면 루트와 `...` 만 남아 아무것도 안 보인다."""
+        for i in range(root.childCount()):
+            child = root.child(i)
+            if self._is_omit_item(child):
+                child.setExpanded(True)
+
+    def _ensure_omit_loaded(self):
+        """Omit 이 켜져 있으면(Adaptive) 루트 아래 생략 단계까지의 폴더를 **지금** 읽는다.
+
+        생략한 단계는 화면에 없어 펼칠 수 없으니, 그 아래를 보이려면 여기서 읽어야 한다.
+        항목을 만들기 **전에** 부른다 - 새 확장자를 File Types 에 먼저 넣기 위해(_load_item 과 같은
+        이유). 이미 읽은 폴더는 다시 읽지 않는다.
+        """
+        omit = self._omit_levels()
+        if not omit or self._tree is None or not self._adaptive():
+            return
+        new_exts = set()
+        level = [self._tree]
+        for _ in range(omit + 1):               # 0(루트) ~ omit 단계의 폴더 - 그 자식이 omit+1 단계
+            nxt = []
+            for node in level:
+                if not node["is_dir"]:
+                    continue
+                if not node.get("loaded", True):
+                    node["children"] = tree_scanner.scan_children(node["path"])
+                    node["loaded"] = True
+                    for child in node["children"]:
+                        self._index[child["path"]] = child
+                        if not child["is_dir"]:
+                            new_exts.add(child["ext"])
+                nxt.extend(node["children"])
+            level = nxt
+        new_exts -= set(self._type_states)
+        if new_exts:
+            self._rebuild_type_menu(sorted(set(self._type_states) | new_exts))
+
+    def _nodes_at_depth(self, depth):
+        """루트에서 정확히 depth 단계 아래의 노드들(폴더·파일, 부모 순서대로). 읽지는 않는다."""
+        level = [self._tree]
+        for _ in range(depth):
+            level = [c for n in level if n["is_dir"] for c in n["children"]]
+        return level
 
     def _reindex(self):
         """경로 -> 캐시 노드 색인을 다시 만든다 (v01.16).
@@ -439,8 +537,12 @@ class TreeTab(QWidget):
         """
         if node is None or not node.get("loaded"):
             return
-        paths = [c["path"] for c in node["children"]
-                 if c["is_dir"] and not c.get("loaded")]
+        children = node["children"]
+        # Omit : 루트 바로 아래는 화면에 없다 - `...` 밑에 보이는 노드들을 미리 읽는다 (v01.18)
+        omit = self._omit_levels() if node is self._tree else 0
+        if omit:
+            children = self._nodes_at_depth(omit + 1)
+        paths = [c["path"] for c in children if c["is_dir"] and not c.get("loaded")]
         if not paths:
             return
         self._prefetcher.request(paths[:PREFETCH_MAX_PER_FOLDER])
@@ -593,6 +695,7 @@ class TreeTab(QWidget):
         if self._tree is None:
             return
 
+        self._ensure_omit_loaded()              # 확장자 메뉴보다 먼저 (v01.18)
         show_files = self.chk_show_files.isChecked()
         exts = self._checked_exts()
 
@@ -612,7 +715,17 @@ class TreeTab(QWidget):
         if self._adaptive() and not node.get("loaded", True):
             item.setChildIndicatorPolicy(QTreeWidgetItem.ShowIndicator)
 
-        for child in node["children"]:
+        # v01.18 : 루트에 Omit 이 걸려 있으면 아래 N 단계를 `...` 한 줄로 접는다.
+        omit = self._omit_levels() if node is self._tree else 0
+        if omit:
+            self._add_omitted_children(item, omit, show_files, exts)
+        else:
+            self._add_child_items(item, node["children"], show_files, exts)
+        return item
+
+    def _add_child_items(self, item, children, show_files, exts):
+        """children(노드들)을 필터에 맞춰 item 의 자식 항목으로 단다(폴더는 재귀)."""
+        for child in children:
             if child["is_dir"]:
                 item.addChild(self._make_item(child, show_files, exts))
             else:
@@ -625,7 +738,28 @@ class TreeTab(QWidget):
                 leaf.setIcon(0, self._icon_file)
                 item.addChild(leaf)
 
-        return item
+    def _add_omitted_children(self, root_item, omit, show_files, exts):
+        """루트 항목 아래에 `...` 한 줄을 달고, 그 밑에 루트에서 omit+1 단계의 노드들을 단다 (v01.18).
+
+        - 가지가 여럿이어도 `...` 은 **하나**다 - 생략한 단계의 모든 가지에서 모은다. 어느 가지에서
+          왔는지는 항목 툴팁(루트 기준 상대 경로)으로 보인다.
+        - 생략한 단계보다 얕게 끝나는 가지(와 중간 단계의 파일)는 보이지 않는다 - 그 단계가 통째로
+          생략되므로.
+        - `...` 은 경로가 없다 - 더블클릭/우클릭 열기·복사는 되지 않고, 펼침 상태는 OMIT_LABEL 로 적는다.
+        """
+        if not self._tree["children"]:
+            return                              # 루트가 비어 있으면 `...` 도 없다
+        ell = QTreeWidgetItem([OMIT_LABEL])
+        ell.setData(0, Qt.UserRole, "")
+        ell.setData(0, ROLE_OMIT, True)
+        ell.setToolTip(0, "{0} level(s) under the root are omitted.".format(omit))
+        root_item.addChild(ell)
+
+        self._add_child_items(ell, self._nodes_at_depth(omit + 1), show_files, exts)
+        for i in range(ell.childCount()):
+            child = ell.child(i)
+            rel = os.path.relpath(child.data(0, Qt.UserRole), self._root_path)
+            child.setToolTip(0, rel.replace("\\", "/"))
 
     # ============================================================== Refresh
 
@@ -658,9 +792,17 @@ class TreeTab(QWidget):
         # 새로 생긴 확장자도 File Types 에 (v01.16 - 예전에는 Refresh 뒤에도 메뉴가 그대로였다)
         self._rebuild_type_menu(sorted(tree_scanner.collect_extensions(self._tree)))
 
+        # Omit : 생략된 단계(루트 ~ N 단계) 를 갱신했으면 `...` 아래가 바뀐다. 그 항목들은 화면에
+        # 없으므로 루트의 자식(`...` 포함)을 통째로 다시 만든다 (v01.18).
+        omit = self._omit_levels()
+        if omit and any(self._rel_depth(n["path"]) <= omit for n in nodes):
+            view_nodes = [self._tree]
+        else:
+            view_nodes = nodes
+
         for tree in list(self._trees):
             state = self._capture_view_state(tree)
-            for node in nodes:
+            for node in view_nodes:
                 self._rebuild_children(tree, node)
             self._restore_view_state(tree, state)
             self._apply_filter(tree, fold=False)
@@ -682,10 +824,9 @@ class TreeTab(QWidget):
                 continue
             node = self._node(path)
             # 파일을 골랐으면 그 파일이 든 폴더를 갱신한다.
+            # (경로로 찾는다 - Omit 이면 부모 항목이 `...` 이라 항목에는 폴더가 없다, v01.18)
             if node is not None and not node["is_dir"]:
-                parent = item.parent()
-                path = parent.data(0, Qt.UserRole) if parent is not None else None
-                node = self._node(path) if path else None
+                node = self._node(os.path.dirname(node["path"]))
             if node is not None and node["is_dir"] and node["path"] not in paths:
                 paths.append(node["path"])
 
@@ -809,6 +950,8 @@ class TreeTab(QWidget):
         if item is None:
             return
 
+        if node is self._tree:
+            self._ensure_omit_loaded()          # 확장자 메뉴보다 먼저 (v01.18)
         show_files = self.chk_show_files.isChecked()
         exts = self._checked_exts()
 
@@ -827,7 +970,7 @@ class TreeTab(QWidget):
             stack = [root]
             while stack:
                 item = stack.pop()
-                path = item.data(0, Qt.UserRole)
+                path = self._item_key(item)      # `...` 도 적는다 (v01.18)
                 if path:
                     if item.isExpanded():
                         expanded.add(path)
@@ -849,7 +992,7 @@ class TreeTab(QWidget):
             stack = [root]
             while stack:
                 item = stack.pop()
-                path = item.data(0, Qt.UserRole)
+                path = self._item_key(item)
                 if path:
                     item.setExpanded(path in expanded)
                     item.setSelected(path in selected)
@@ -940,7 +1083,10 @@ class TreeTab(QWidget):
         keep = {}          # id(item) -> 보여야 하는가
 
         for node in order:
-            path = (node.data(0, Qt.UserRole) or node.text(0) or "")
+            if self._is_omit_item(node):
+                path = ""                            # `...` 은 글자로 맞지 않는다 (v01.18)
+            else:
+                path = (node.data(0, Qt.UserRole) or node.text(0) or "")
             path = path.lower().replace("\\", "/")   # 토큰과 같은 구분자로
             self_hit = all(t in path for t in tokens)
             child_hit = any(keep.get(id(node.child(i)), False)
@@ -988,8 +1134,8 @@ class TreeTab(QWidget):
     def _on_tree_context_menu(self, pos):
         tree = self.sender()
         item = tree.itemAt(pos)
-        if item is None:
-            return
+        if item is None or not item.data(0, Qt.UserRole):
+            return                              # `...` 은 열거나 복사할 경로가 없다 (v01.18)
 
         menu = QMenu(tree)
         act_reveal = menu.addAction("Reveal in File Explorer")

@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-10-02
+updated: 2026-10-12
 ---
 
 # 작업 일지 (WORKLOG)
@@ -30,7 +30,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-10-02 (오늘)
+## 2026-10-12 (오늘)
+
+> [!summary] A00240 PathTool — **Tree 탭 Omit: 루트 아래 N 단계를 `...` 한 줄로 생략** (v01.17->01.18)
+- 요청: `A/B/C/D/E` 에서 Omit 2 면 `A / ... / D / E`, 3 이면 `A / ... / E` 로 — 늘 같은 고정 경로를 건너뛰고 본다. 2 이상의 정수 입력 UI.
+- Refresh 행 오른쪽에 `Omit` 체크 + 스핀(2~99). 루트 항목 아래 `...` 하나(경로 없음, `ROLE_OMIT`)를 달고 N+1 단계의 폴더·파일을 전부 그 밑에 모은다 — 가지가 여럿이어도 `...` 은 하나, 툴팁에 루트 기준 상대 경로.
+- Adaptive 면 생략 단계는 펼칠 수 없으니 `_ensure_omit_loaded()` 가 0~N 단계를 항목 만들기 전에 읽는다(새 확장자를 File Types 에 먼저). `...` 아래 폴더는 평소처럼 선읽기. 펼침·선택 상태는 `_item_key()` 로 `...` 도 적어 Refresh 뒤에도 열린 채. 생략 단계 안 폴더를 Refresh 하면 루트 자식을 통째로 다시 만든다.
+- 검증: 오프스크린 PySide6 — Omit 2/3 결과, 가지 여럿 모으기, Filter(`...` 는 글자로 안 맞음), Refresh(루트 · `...` 밑 파일 Selected), Show files, Adaptive 끈 Depth All, Expand 창. 처음엔 0~N-1 단계만 읽어 `...` 밑이 비었다 — N 단계까지 읽어야 그 자식이 보인다.
+
+## 2026-10-02
 
 > [!summary] A00010 humanIKTool_V02 — **Assign Joints 직후 HumanIK 창 즉시 갱신** (v02.04->02.05)
 - 요청: Assign Joints 뒤 HumanIK 창이 Definition 탭을 보고 있어도 갱신이 안 돼 Controls 로 갔다가 돌아와야 보임 -> 버튼 누르면 바로 보이게.

@@ -2,6 +2,19 @@
 
 All notable changes to this tool are documented here.
 
+## [01.18] - 2026-10-12
+### Added
+- **Tree tab: Omit** - skip the first N levels under the root and show them as one `...` row.
+  With `A/B/C/D/E` and Omit `2` the tree shows `A / ... / D / E`; with `3` it shows
+  `A / ... / E`. Check **Omit** (on the Refresh row) and set the number (2 or more).
+  Useful when a project always starts with the same fixed folders.
+- The `...` row is one row even when the root has several branches - everything at the
+  first shown level is gathered under it, and each item's tooltip shows where it came from
+  (`B/C/D`). Branches and files that end inside the skipped levels are not shown.
+- With Adaptive on, the skipped levels are read right away (they cannot be opened), and the
+  folders under `...` are read ahead as usual. Refresh, Filter, Show files and File Types
+  work on the omitted tree; `...` itself cannot be opened or copied.
+
 ## [01.17] - 2026-10-02
 ### Added
 - **Tree tab: read ahead in the background** (Adaptive). Folders that are on screen but not
