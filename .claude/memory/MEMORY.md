@@ -26,6 +26,7 @@
 
 - [FBX export selected scope](fbx-export-selected-scope.md) — 내용은 `FBXExportIncludeChildren`/`InputConnections` 로 통제
 - [mayapy headless verify](mayapy-headless-verify.md) — maya.cmds 동작은 mayapy + standalone 으로 확인
+- [maya reference import traps](maya-reference-import-traps.md) — `loadReferenceDepth none` 으로 열어 저장하면 레퍼런스가 언로드로 굳는다(스캔만 none, 저장 작업은 기본 열기) · 언로드는 import 불가(먼저 load) · 부모 import 시 중첩이 최상위로 올라온다 · `.ma` 머리글 file 문장은 여러 줄
 - [offscreen size needs theme](offscreen-size-needs-theme.md) — 창 크기는 테마 qss 를 입히고 재라 (한 줄에 나란히 둔 것이 최소 폭) · **테마를 입혀도 오프스크린 px > 마야 px — 잰 최소 폭을 창 크기로 박지 말 것**
 - [window taller than screen](window-taller-than-screen-ghost.md) — 창을 레이아웃 크기로 맞추면 화면을 넘어 잘린 아래에 로그창 잔상/흰 영역 → "로그창 2개" 보고, 탭 스크롤 + 작업 영역 높이로 제한
 - [QApplication before standalone](qapplication-before-maya-standalone.md) — `QApplication` 을 `initialize()` 앞에
@@ -91,7 +92,7 @@
 
 - A00010 — [HIK Mirror](wip-a00010-hik-mirror.md)(이름 1순위·위치 폴백, v02.01)
 - A00040 — [Joints only export](wip-a00040-joints-only-export.md)(FBX 옵션으로 non-joint 제외, v02.06) · 새 파일 기능은 A00480 으로
-- A00480 — [FileTool](wip-a00480-filetool.md)(A00040_V02 + quickTool File/Import 를 Export/Import/Path 탭으로, 원본 보존, 창 크기 = A00040_V02 960x853, v01.02 · Export 규칙 레지스트리 + Check Hide Mesh(메시 자신만, 조상 안 봄), 걸리면 파일 0개 · 걸린 메시 선택, v01.05 · Naming = 공용 토큰 위젯, 기본 프로파일 SK_MANU_CH_Name_Basic_Version + Set's Name 규칙, v01.06)
+- A00480 — [Maya > Reference](wip-a00480-maya-reference-tab.md)(마야 파일들의 레퍼런스 트리 → 체크한 것을 각 파일에 임포트해 제자리 저장, `app/maya` 폴더째 분리 가능, 공용 폴더 트리 = A00240 Tree 승격 `MOD_fileTree_qt` + 트리 다중 체크 `MOD_checkTree_qt` + `path_context`, backup/_REF_NN, v01.10 · 마야 GUI 확인 아직) · [FileTool](wip-a00480-filetool.md)(A00040_V02 + quickTool File/Import 를 Export/Import/Path 탭으로, 원본 보존, 창 크기 = A00040_V02 960x853, v01.02 · Export 규칙 레지스트리 + Check Hide Mesh(메시 자신만, 조상 안 봄), 걸리면 파일 0개 · 걸린 메시 선택, v01.05 · Naming = 공용 토큰 위젯, 기본 프로파일 SK_MANU_CH_Name_Basic_Version + Set's Name 규칙, v01.06)
 - A00050 — [uvTool V02](wip-a00050-uvtool-v02.md)(V01 PySide 이식 · 규칙 위반을 사유와 함께 로그+선택 · rename 은 before->after 와 실패 사유, v02.00 · 바꿀 세트 이름을 화면에서 입력, 칸 하나가 Catch 의 규칙도 정한다, v02.01 · UV Sets 표 + `[wrong_name]` 빨강, **A00380 으로 이식 예정**(표 파일+코어 그대로), v02.02 · Delete UV Sets, 첫(기본) 세트는 못 지움, v02.03 · **A00380 UV Sets 탭으로 이식 완료** — 두 툴의 코어·표 파일은 같은 내용 유지)
 - A00060 — [From Object Match Rotation](wip-a00060-from-object-match-rotation.md)(Separate 만, 월드 회전을 jointOrient 로 = xform ws rotation + makeIdentity rotate, 기본 꺼짐, v03.14) · [Curve By Count](wip-a00060-curve-by-count.md)(개수로 커브에 조인트 · POCI turnOnPercentage 0~1 등분 = pointOnCurve = API kWorld · **길이 등분이 아니다** · 닫힌 커브는 끝이 겹친다, v03.12) · [Aim Root mode](wip-a00060-aim-root-mode.md)(Chain/Root, 분기는 첫 자식 · X 조준은 자식이 X 축 위일 때만 위치 보존 → 움직인 자식 원위치, v03.11) · [V03 tab reorg](wip-a00060-v03-tab-reorg.md) · [IK Edit](wip-a00060-ik-edit.md)(폴 벡터 역산) · [Pole Target](wip-a00060-pole-target.md)(pointConstraint 하나, Slide, v03.08) · [world-space joint pos](wip-a00060-world-space-joint-pos.md)
 - A00090 — [PoseWrangler bundle](wip-a00090-posewrangler-bundle.md)(`<driver>_default`, v01.07) · [rule versions](wip-a00090-rule-versions.md)

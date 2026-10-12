@@ -592,6 +592,12 @@ Default Distance attribute (driver signal x)
   the same scene exported with four option combinations through both tools gave **identical file lists, identical hierarchies
   when the FBX files were re-imported, and identical logs** (verified in mayapy). Pasted-path cleanup moved from the UI into
   the core so it can be tested without Maya, and a missing FBX plugin is now reported in the log instead of raising.
+  Its **Maya > Reference** tab (v01.10) batch-processes scene files on disk: pick Maya files in a folder tree, list the
+  references they use (nested references fold under their parent), check the ones to bake in and the tool **opens each
+  file, imports those references (nested ones too), merges namespaces, backs the original up and saves it in place**.
+  Two Maya facts shaped the implementation and were measured in mayapy rather than assumed: an unloaded reference cannot be
+  imported (load first), and a scene opened with `loadReferenceDepth none` saves its untouched references **as unloaded** -
+  so scanning opens files that way for speed, but importing opens them normally to keep the saved load state.
 - **`A00440_SetTool`** — **set algebra between Maya object sets whose elements are components**: union `∪`,
   intersection `∩` and difference `∖`, folded over any number of sets in list order. On top of those it can
   **split a set in two** using the current scene selection — in set-theoretic terms `{A∖S, A∩S}` is the
