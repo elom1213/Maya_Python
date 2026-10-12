@@ -39,5 +39,11 @@
 #        kept that rotation when the lips closed. Remove Seal writes the value back and
 #        deletes the attribute; Attached mode is unchanged.
 
-VERSION = "01.32"
+# 01.33  AttachCrv > Default : tidy layout. The Distribute / Follower groups keep their own
+#        height (vertical size policy Maximum) and a trailing stretch below them takes the
+#        space the hidden Objects list leaves in Distribute mode - no more tall empty group.
+#        Count / Driver Type / Surface Axis (and Follower Type / Name Suffix) sit in an
+#        aligned label + widget grid, one per row, same widget width.
+
+VERSION = "01.33"
 LAST_UPDATE = "2026-10-12"

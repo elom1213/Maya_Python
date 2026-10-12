@@ -806,33 +806,39 @@ class MainWindow(QWidget):
         # Distribute : create N new drivers uniformly along the curve
         # (ref attachDriverOnCurve original behaviour). Shares the orient / Aim
         # Axis / norCrv / set options above.
+        # v01.33 : 그룹은 자기 sizeHint 높이만 쓴다(세로로 늘어나지 않는다). Objects 그룹이 숨는
+        # Distribute 모드에서 남는 세로 공간은 아래 trailing stretch 가 받는다(`_atc_sync_mode`).
         dist_group = QGroupBox("Distribute new drivers uniformly")
+        dist_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         dist_layout = QVBoxLayout(dist_group)
 
-        dist_row = QHBoxLayout()
-        dist_row.addWidget(QLabel("Count"))
+        # 라벨은 오른쪽 정렬된 한 열, 값 위젯은 그 옆 한 열 — 세 줄이 같은 폭으로 정렬된다.
+        dist_grid = QGridLayout()
+        dist_grid.setHorizontalSpacing(8)
+        dist_grid.setColumnStretch(2, 1)
         self.atc_sb_count = QSpinBox()
         self.atc_sb_count.setRange(1, 1000)
         self.atc_sb_count.setValue(5)
-        self.atc_sb_count.setFixedWidth(70)
         self.atc_sb_count.setToolTip(
             "How many new drivers to create and spread evenly along the curve.")
-        dist_row.addWidget(self.atc_sb_count)
-        dist_row.addWidget(QLabel("Driver Type"))
         self.atc_cb_drvtype = QComboBox()
         self.atc_cb_drvtype.addItems(["Locator", "Null"])
         self.atc_cb_drvtype.setToolTip(
             "Locator: spaceLocator drivers (visible). Null: empty groups.")
-        dist_row.addWidget(self.atc_cb_drvtype)
-        dist_row.addWidget(QLabel("Surface Axis"))
         self.atc_cb_surface_axis = QComboBox()
         self.atc_cb_surface_axis.addItems(list(SURFACE_AXES))
         self.atc_cb_surface_axis.setToolTip(
             "Surfaces only: spread the drivers evenly along U or V. The other "
             "direction stays at the middle of its parameter range.")
-        dist_row.addWidget(self.atc_cb_surface_axis)
-        dist_row.addStretch(1)
-        dist_layout.addLayout(dist_row)
+        for row, (text, widget) in enumerate((("Count", self.atc_sb_count),
+                                              ("Driver Type", self.atc_cb_drvtype),
+                                              ("Surface Axis", self.atc_cb_surface_axis))):
+            label = QLabel(text)
+            label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            widget.setFixedWidth(110)
+            dist_grid.addWidget(label, row, 0)
+            dist_grid.addWidget(widget, row, 1)
+        dist_layout.addLayout(dist_grid)
 
         self.atc_cb_fullrange = QCheckBox("Distribute across full range (open curve)")
         self.atc_cb_fullrange.setChecked(True)
@@ -856,24 +862,28 @@ class MainWindow(QWidget):
 
         # Follower (v01.31) : 오브젝트마다 새 팔로워를 만들어 라이브 최근접 지점을 따라가게.
         fol_group = QGroupBox("Followers at the live closest point")
+        fol_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         fol_layout = QVBoxLayout(fol_group)
 
-        fol_row = QHBoxLayout()
-        fol_row.addWidget(QLabel("Follower Type"))
+        fol_grid = QGridLayout()
+        fol_grid.setHorizontalSpacing(8)
+        fol_grid.setColumnStretch(2, 1)
         self.atc_cb_follower_type = QComboBox()
         self.atc_cb_follower_type.addItems(["Locator", "Null"])
         self.atc_cb_follower_type.setToolTip(
             "Locator: spaceLocator followers (visible). Null: empty groups.")
-        fol_row.addWidget(self.atc_cb_follower_type)
-        fol_row.addWidget(QLabel("Name Suffix"))
         self.atc_le_follower_suffix = QLineEdit(FOLLOWER_SUFFIX)
-        self.atc_le_follower_suffix.setFixedWidth(110)
         self.atc_le_follower_suffix.setToolTip(
             "Each follower is named '<object>' + this suffix "
             "(namespace and path of the object are dropped).")
-        fol_row.addWidget(self.atc_le_follower_suffix)
-        fol_row.addStretch(1)
-        fol_layout.addLayout(fol_row)
+        for row, (text, widget) in enumerate((("Follower Type", self.atc_cb_follower_type),
+                                              ("Name Suffix", self.atc_le_follower_suffix))):
+            label = QLabel(text)
+            label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            widget.setFixedWidth(110)
+            fol_grid.addWidget(label, row, 0)
+            fol_grid.addWidget(widget, row, 1)
+        fol_layout.addLayout(fol_grid)
 
         self.atc_btn_followers = QPushButton("Create Closest-Point Followers")
         self.atc_btn_followers.setMinimumHeight(34)
@@ -889,6 +899,11 @@ class MainWindow(QWidget):
         fol_layout.addWidget(self.atc_btn_followers)
         root.addWidget(fol_group)
         self.atc_follower_group = fol_group
+
+        # Objects 그룹이 숨는 모드(Distribute)에서 남는 세로 공간을 받는 빈 칸.
+        # Objects 가 보이는 모드에서는 stretch 0 으로 내려 Objects 리스트가 공간을 다 쓴다.
+        root.addStretch(0)
+        self.atc_root_layout = root
 
         # Signals
         self.atc_btn_get_curve.clicked.connect(self.on_atc_get_curve)
@@ -924,6 +939,9 @@ class MainWindow(QWidget):
         self.atc_btn_build.setVisible(closest)
         self.atc_dist_group.setVisible(distribute)
         self.atc_follower_group.setVisible(follower)
+        # 남는 세로 공간 : Objects 가 보이면 Objects 리스트가, 숨으면(Distribute) 맨 아래 빈 칸이 받는다.
+        layout = self.atc_root_layout
+        layout.setStretch(layout.count() - 1, 0 if (closest or follower) else 1)
 
     def _atc_sync_orient_enabled(self, *args):
         """Orient/norCrv 토글과 대상 종류(커브/서피스)에 따라 종속 위젯 활성 상태를 동기화한다.

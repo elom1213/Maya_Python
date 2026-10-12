@@ -93,6 +93,11 @@ closestPointOnSurface.inPosition`, `parameterU/V -> POSI.parameterU/V` 로 **파
 미끄러진다(커브는 nearestPointOnCurve). `_attach_one(param_plugs=)` 확장 하나로 기존 네트워크 재사용. 오브젝트는 안 건드림.
 Maintain offset 없음(새 노드). mayapy+오프스크린 48 항목.
 
+**UPDATE 2026-10-12 (v01.33)**: Distribute 모드에서 그룹이 키만 커지던 것 — Objects(stretch 1)가 숨으면 남는 공간이
+QGroupBox 로 간다. Distribute/Follower 그룹 세로 policy `Maximum` + root 끝 trailing stretch 를 `_atc_sync_mode` 가
+Objects 보이면 0 / 숨으면 1 로 토글. 그룹 안은 라벨 정렬 QGridLayout(위젯 폭 110). **패턴**: 모드로 stretch 위젯을
+숨기는 화면은 trailing stretch 토글이 필요하다.
+
 **남은 일**: Maya 실기 검증 + 푸시(기본 푸시처: [[push-target-dnable-dev]]). 검증/푸시 끝나면 이 메모 삭제.
 규약: [[ui-text-english-only]], [[prefer-pyside-for-new-tools]], [[push-includes-tool-guide-docs]],
 [[worklog-maintenance]], [[maya-2023-compat]].

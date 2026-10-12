@@ -219,7 +219,8 @@ Orient / Aim Axis / norCrv / set 옵션은 세 모드가 **공유**한다.
 
 Mode 를 **Distribute New Drivers Evenly** 로. 위 옵션(Orient / Aim Axis / norCrv / set)을 그대로
 공유하며, **Objects 리스트는 필요 없다**(드라이버를 새로 만든다). **Distribute new drivers uniformly**
-그룹에서:
+그룹에서(v01.33~ Count / Driver Type / Surface Axis 가 라벨 정렬된 한 열에 한 줄씩, 그룹은 제 높이만 쓰고
+남는 세로 공간은 그룹 아래 빈 칸으로 — Objects 리스트가 숨어도 그룹이 늘어나지 않는다):
 
 - **Count**: 만들 드라이버 개수(양의 정수).
 - **Driver Type**: `Locator`(spaceLocator) 또는 `Null`(빈 그룹).

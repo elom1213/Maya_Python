@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00170 driverTool — **AttachCrv Default: Distribute 모드 빈 공간 정리** (v01.32->01.33)
+- 요청: Distribute New Drivers Evenly 모드에서 `Distribute new drivers uniformly` 그룹에 빈 공간이 너무 많다. 정렬·정돈.
+- 원인: Objects 그룹(stretch 1)이 숨으면 남는 세로 공간이 늘어날 수 있는 QGroupBox 로 흘러들어 Distribute 그룹이 키만 커졌다.
+- 고침: Distribute · Follower 그룹은 세로 size policy `Maximum`(sizeHint 높이만), root 끝에 trailing stretch 를 두고 `_atc_sync_mode` 가 Objects 가 보이면 0 / 숨으면 1 로 토글(Closest · Follower 는 Objects 리스트가 공간을 다 받고, Distribute 는 빈 칸이 아래로). 그룹 안은 HBox 한 줄 → 라벨 오른쪽 정렬 QGridLayout(한 줄에 하나, 값 위젯 폭 110 통일). Follower 그룹도 같은 모양.
+- 검증: 오프스크린 PySide2(테마 입힘) 12 항목 — Distribute 그룹 높이 == sizeHint(190, 페이지 888) · 위젯 x/폭 정렬 · Closest/Follower 는 Objects 가 공간을 받고 마지막 위젯이 바닥 근처 · 모드 왕복. 마야 GUI 확인은 아직.
+
 > [!summary] A00170 driverTool — **Seal Free 모드: 다물면 회전도 빌드 포즈로** (v01.31->01.32)
 - 요청: Free 모드로 빌드한 뒤 Seal R/L 로 다물면 translate 는 기대대로인데, 입술 오브젝트의 회전을 바꾼 뒤 다물면 바뀐 회전이 그대로 남는다. 회전도 바꾸기 전 값으로 돌아가게.
 - 원인: `build_seal` 이 `rotation_driven(null)`(rotate 에 연결이 있을 때)만 회전 pairBlend 를 끼웠고, `input_feed` 의 static 경로는 translate 만 `sealBase` 를 심었다. Free 모드의 정적 오브젝트는 rotate 가 그대로 자유 채널.
