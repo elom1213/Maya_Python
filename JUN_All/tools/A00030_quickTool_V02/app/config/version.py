@@ -12,5 +12,8 @@
 # 02.04  Print > Print Hierarchy -> Copy Hierarchy : 로그 출력은 그대로 두고
 #        같은 트리 텍스트를 클립보드에도 복사한다.
 
-VERSION = "02.04"
-LAST_UPDATE = "2026-10-02"
+# 02.05  Select > Select Shapes 추가 : 선택한 오브젝트 대신 그 셰이프를 선택한다
+#        (커브 -> nurbsCurve, 메시 -> mesh, 트랜스폼 아래 셰이프 전부, Orig 는 제외).
+
+VERSION = "02.05"
+LAST_UPDATE = "2026-10-12"

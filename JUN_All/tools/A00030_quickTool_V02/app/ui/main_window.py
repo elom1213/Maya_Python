@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-02
+# last Update date : 2026-10-12
 # A00030_quickTool_V02 - Qt UI (in-Maya)
 #
 # 레거시 maya.cmds 툴 `A00030_quickTool`(V01.16) 을 PySide 로 재작성했다.
@@ -10,9 +10,10 @@
 #     스크립트 에디터를 안 열어도 결과가 보인다.
 #   - Pin(항상 위)은 레거시가 창을 Qt 위젯으로 감싸서 하던 것을, 이제 창이 Qt 라 바로 한다.
 #
-# 버튼 구성(레거시 그대로) — 섹션 6 / 버튼 10 (+ 신규 2):
+# 버튼 구성(레거시 그대로) — 섹션 6 / 버튼 10 (+ 신규 3):
 #   Update window : Selected · All Windows
 #   Print         : Print Selected · Copy Hierarchy  (v02.04~ 로그 + 클립보드)
+#   Select        : Select Shapes  (v02.05~ 신규 - 선택한 오브젝트의 셰이프를 대신 선택)
 #   Import option : Import FBX normal
 #   Create        : Create texture file · Cluster Each
 #   File          : Copy Scene Folder · Open Scene Folder  (v02.03~ Open 신규)
@@ -67,6 +68,12 @@ class MainWindow(QWidget):
              "Log the parent/child tree of the selection and copy it to the clipboard.\n"
              "Objects already inside another printed tree are skipped."),
         )),
+        ("Select", (
+            ("Select Shapes", "on_select_shapes",
+             "Replace the selection with the shapes under it - nurbsCurve for curves,\n"
+             "mesh for meshes, locator for locators. Every shape of a transform is taken,\n"
+             "intermediate (Orig) shapes are skipped. Components select their shape."),
+        )),
         ("Import option", (
             ("Import FBX normal", "on_import_fbx_normal",
              "Make FBX import use the normals stored in the file.\n"
@@ -108,7 +115,7 @@ class MainWindow(QWidget):
 
         self.setWindowTitle("Quick Tool v{0}".format(VERSION))
         self.setWindowFlags(Qt.Window)
-        self.resize(360, 620)
+        self.resize(360, 660)
 
         self.build_ui()
 
@@ -214,6 +221,10 @@ class MainWindow(QWidget):
         clipboard.setText(text)
         self._log("Copied to clipboard : {0} line(s).".format(len(text.splitlines())))
 
+    def on_select_shapes(self):
+        _shapes, logs = core.select_shapes()
+        self._log_all(logs)
+
     def on_import_fbx_normal(self):
         self._log_all(core.import_fbx_normal())
 
@@ -283,6 +294,8 @@ class MainWindow(QWidget):
             "  while playing.\n"
             "[Print] Print Selected / Copy Hierarchy - names and the parent tree\n"
             "  (Copy Hierarchy also puts the tree on the clipboard).\n"
+            "[Select] Select Shapes - select the shapes of the selected objects\n"
+            "  (curve -> nurbsCurve, mesh -> mesh, every shape of a transform).\n"
             "[Import option] Import FBX normal - use the normals in the file.\n"
             "[Create] Create texture file / Cluster Each.\n"
             "[File] Copy Scene Folder - the scene's folder to the clipboard.\n"

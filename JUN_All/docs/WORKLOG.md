@@ -32,6 +32,16 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00030 quickTool_V02 — **Select > Select Shapes: 선택한 오브젝트 대신 그 셰이프를 선택** (v02.04->02.05)
+- 요청: 커브를 고르고 있으면 커브 셰이프를, 메시면 메시 셰이프를 선택하는 버튼.
+- `quick_ops.select_shapes()` — `ls -objectsOnly` 로 받은 선택마다 `listRelatives -s -ni` 로 셰이프를 모아 `select -r`.
+  타입을 가리지 않고(nurbsCurve · mesh · locator …) **한 트랜스폼의 셰이프 전부**, **Orig 는 제외**, 컴포넌트는 그 셰이프,
+  이미 셰이프면 그대로. 셰이프 없는 것(조인트 · 빈 그룹)은 빠지고 이름을 경고로. 로그는 타입별 개수 요약 한 줄.
+- UI: `Select` 섹션을 `Print` 다음에(버튼 하나라 가로를 다 씀), About 한 줄, 창 기본 높이 620→660.
+- 문서 `A00030_quickTool_V02.md` 섹션 · 화면 · 검증 갱신.
+- 검증: mayapy 2024 오프스크린 17항목 — 셰이프 둘인 컨트롤러 커브 2개 · 스킨 메시 Orig 제외 · 컴포넌트 · 섞인 선택의 경고 ·
+  undo 로 선택 복원 · 섹션 순서와 버튼 클릭 로그. 실제 마야 GUI 확인은 아직.
+
 > [!summary] dev 정리 — **낱개 스크립트 9개를 A 번호 툴로: A00520_icon_builder · A00530_dependency_check 신규, pycache 는 A00500 에, build_release 는 A00510 legacy, 메모는 _archive** 
 - 요청: dev 의 코드를 조사해 `AXXXXX_{툴이름}` 단위로 분류할 수 있는 것을 정리 → 제안대로 진행.
 - **A00520_icon_builder** (v01.00, 옛 `build_icons.py`): `tools/*/icon` 에 더해 **`dev/*/icon` 도** 훑는다(옛 것은 tools 만), `--only <툴>` 필터, `--ico`(16~256 다중 크기, Pillow 있을 때만 · mayapy 엔 없어 건너뛰고 알림), 셸프 `Icons` 버튼. `app/core/icon_builder.build_all` 이 (ok, failed, ico) 보고서.

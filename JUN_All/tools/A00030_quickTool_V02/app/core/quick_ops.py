@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-16
+# last Update date : 2026-10-12
 # A00030_quickTool_V02 - 핵심 로직 (maya.cmds / mel, UI 비의존)
 """
 quick_ops - Quick Tool 의 버튼 하나하나가 실제로 하는 일.
@@ -154,6 +154,62 @@ def print_hierarchy():
 
     text, total = hierarchy_text(selection)
     return text, ["Copy Hierarchy : {0} node(s).".format(total)]
+
+
+# ==========================================================================
+# Select
+# ==========================================================================
+
+def _shapes_of(node):
+    """`node` 가 가리키는 non-intermediate 셰이프 롱네임들.
+
+    트랜스폼이면 바로 아래 셰이프 전부, 이미 셰이프면 그대로(사용자가 Orig 를 골랐어도
+    존중한다). 컴포넌트 선택은 호출부가 `ls(objectsOnly=True)` 로 셰이프로 바꿔 넘긴다.
+    """
+    if cmds.objectType(node, isAType="shape"):
+        return [node]
+    return cmds.listRelatives(node, shapes=True, fullPath=True, noIntermediate=True) or []
+
+
+def select_shapes():
+    """선택한 오브젝트 대신 **그 셰이프**를 선택한다. (셰이프 롱네임 목록, 로그)
+
+    커브를 고르고 있으면 nurbsCurve 셰이프, 메시면 mesh 셰이프, 로케이터면 locator ...
+    타입을 가리지 않고 트랜스폼 바로 아래 셰이프를 전부 고른다 — 한 트랜스폼에 셰이프가
+    여럿인 컨트롤러 커브도 빠짐없이. 중간(intermediate, `*Orig`) 셰이프는 건너뛴다.
+
+    컴포넌트를 고르고 있으면 그 오브젝트의 셰이프, 이미 셰이프면 그대로 둔다.
+    셰이프가 없는 것(조인트 · 빈 그룹)은 선택에서 빠지고 경고로 알린다.
+    """
+    nodes = cmds.ls(sl=True, long=True, objectsOnly=True) or []
+    if not nodes:
+        return [], ["[WARN] Select object(s) first."]
+
+    shapes = []
+    no_shape = []
+    for node in nodes:
+        found = _shapes_of(node)
+        if not found:
+            no_shape.append(_short_name(node))
+        for shape in found:
+            if shape not in shapes:
+                shapes.append(shape)
+
+    if not shapes:
+        return [], ["[WARN] No shape under the selection : {0}".format(no_shape)]
+
+    cmds.select(shapes, replace=True)
+
+    counts = {}
+    for shape in shapes:
+        kind = cmds.nodeType(shape)
+        counts[kind] = counts.get(kind, 0) + 1
+    summary = ", ".join("{0} {1}".format(kind, counts[kind]) for kind in sorted(counts))
+
+    logs = ["Selected {0} shape(s) : {1}".format(len(shapes), summary)]
+    if no_shape:
+        logs.append("[WARN] No shape (left out) : {0}".format(no_shape))
+    return shapes, logs
 
 
 # ==========================================================================

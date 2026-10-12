@@ -2,7 +2,7 @@
 title: A00030_quickTool_V02 사용법
 aliases: [Quick Tool V02, QuickToolV2, 퀵툴 V02]
 tags: [maya-python, tool-guide, quicktool, pyside, qt]
-updated: 2026-10-02
+updated: 2026-10-12
 ---
 
 # A00030_quickTool_V02 — Quick Tool (PySide 재작성)
@@ -11,7 +11,7 @@ updated: 2026-10-02
 다시 쓴 버전이다. **버튼도 동작도 그대로**고 달라진 것은 그릇이다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`slate_dark` 테마)
-- **버전**: `app/config/version.py` (v02.04)
+- **버전**: `app/config/version.py` (v02.05)
 - **설치**: `__dragDrop_A00030_V02.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **QuickToolV2**
   → `tools.A00030_quickTool_V02.run(True)`
 - **V01 과 동시에 띄울 수 있다** — 창과 로그 확장창의 `objectName` 이 갈렸다.
@@ -33,19 +33,22 @@ updated: 2026-10-02
 | FBX 버튼 | 플러그인이 없으면 **트레이스백** | 플러그인을 올려 보고, 안 되면 **로그로 이유** |
 
 **V01 의 기능은 하나도 빠지지 않았다** — 섹션 6개, 버튼 10개 그대로다.
-새로 붙은 것은 레거시에 없던 **`Shelf > Update Shelves`**(v02.01)와 **`File > Open Scene Folder`**(v02.03) 두 개다.
+새로 붙은 것은 레거시에 없던 **`Shelf > Update Shelves`**(v02.01), **`File > Open Scene Folder`**(v02.03),
+**`Select > Select Shapes`**(v02.05) 세 개다.
 
 ---
 
 ## 2. 화면 구성
 
 ```
-┌ Quick Tool v02.04 ──────────────────┐
+┌ Quick Tool v02.05 ──────────────────┐
 │ Help                        [ Pin ] │   ← 메뉴 + 항상 위 토글
 │ ┌ Update window ────────────────┐   │
 │ │ [ Selected ] [ All Windows ]  │   │
 │ ├ Print ────────────────────────┤   │
 │ │ [ Print Selected ] [ Copy Hi… ]│  │
+│ ├ Select ──────────────────────┤    │
+│ │ [ Select Shapes ]             │   │
 │ ├ Import option ────────────────┤   │
 │ │ [ Import FBX normal ]         │   │   ← 버튼 하나면 가로를 다 쓴다
 │ ├ Create ──────────────────────┤    │
@@ -93,6 +96,23 @@ qt_j1
 > 트리를 만드는 코드는 **재귀를 쓰지 않는다.** 조인트 체인은 수백 단계로 깊어질 수 있는데
 > 재귀로 짜면 파이썬 재귀 한계(기본 1000, 마야 콜백 스택 위라 여유가 더 적다)에 걸린다.
 > 명시적 스택으로 훑는다.
+
+### Select — `Select Shapes` (v02.05~, 레거시에 없던 것)
+
+선택한 오브젝트 **대신 그 셰이프를 선택**한다. 커브를 고르고 있으면 `nurbsCurve` 셰이프, 메시면 `mesh`
+셰이프, 로케이터면 `locator` — 타입을 가리지 않고 트랜스폼 바로 아래 셰이프를 전부 고른다.
+아웃라이너에서 셰이프를 펼쳐 하나씩 클릭하거나 `pickWalk` 로 내려가던 일을 버튼 하나로 한다.
+
+- **한 트랜스폼에 셰이프가 여럿**이면(셰이프를 여럿 합친 컨트롤러 커브) 전부 고른다.
+- **중간(intermediate, `*Orig`) 셰이프는 건너뛴다** — 스킨·블렌드셰이프가 붙은 메시에서 Orig 가 딸려 오지 않는다.
+- **컴포넌트**를 고르고 있으면 그 오브젝트의 셰이프, **이미 셰이프**면 그대로 둔다.
+- 셰이프가 없는 것(조인트 · 빈 그룹)은 선택에서 빠지고 어느 것이 빠졌는지 경고로 적는다.
+- `cmds.select` 라 **Ctrl+Z 로 이전 선택**으로 돌아간다.
+
+```
+Selected 4 shape(s) : locator 1, mesh 1, nurbsCurve 2
+[WARN] No shape (left out) : ['jnt', 'grp']
+```
 
 ### Import option — `Import FBX normal`
 
@@ -180,7 +200,7 @@ A00030_quickTool_V02/
 ├── __dragDrop_A00030_V02.py    # 셸프 설치 (TOOL_LABEL = "QuickToolV2")
 ├── icon/                       # A00030_quickTool_V02.svg / .png
 └── app/
-    ├── config/version.py       # VERSION = "02.04"
+    ├── config/version.py       # VERSION = "02.05"
     ├── core/quick_ops.py       # ★ 버튼이 하는 일 전부 (maya.cmds/mel, UI 비의존)
     └── ui/main_window.py       # 창 · 섹션 · 버튼 · 로그
 ```
@@ -194,9 +214,9 @@ A00030_quickTool_V02/
 
 ## 5. 검증 (mayapy 2024 + 오프스크린 Qt)
 
-**22 + 12 + 8항목 통과.**
+**22 + 12 + 8 + 17항목 통과.**
 
-- 섹션 7개와 버튼 11개(레거시 10 + `Update Shelves`)가 **레거시와 같은 순서**,
+- 섹션 7개와 버튼 11개(레거시 10 + `Update Shelves`)가 **레거시와 같은 순서**(v02.05 부터 `Select` 섹션이 더해져 8개 · 13개),
   전 버튼에 툴팁, Pin 토글과 로그창 존재
 - `Selected` / `All Windows` 가 `playbackOptions -view` 를 실제로 바꾼다
 - `Print Selected` — 선택 없으면 경고, 있으면 이름 로그
@@ -210,6 +230,10 @@ A00030_quickTool_V02/
 - `Open Scene Folder`(8항목, 탐색기 호출은 가로채서 확인) — 미저장 씬은 **경고만, 탐색기 안 띄움** ·
   저장된 씬은 **씬 파일 경로**로 연다(선택 상태) · 파일이 지워지면 **폴더**로 연다 · 폴더가 없으면 경고 ·
   탐색기 호출이 실패해도 트레이스백 없이 경고 · File 섹션 버튼 2개 · 클릭하면 로그에 결과
+- `Select Shapes`(v02.05, 17항목) — 선택 없으면 경고 · 셰이프 둘인 커브는 **nurbsCurve 2개** · 메시는 mesh 셰이프 ·
+  커브+메시+로케이터+조인트+빈 그룹을 섞으면 셰이프 4개를 고르고 **조인트·그룹은 경고에 이름으로** · 스킨 메시는
+  **Orig 를 빼고** 하나 · 컴포넌트 선택은 그 오브젝트의 셰이프 · 셰이프를 이미 골랐으면 그대로 · **Ctrl+Z 로 이전 선택 복원** ·
+  섹션이 `Print` 다음에 오고 버튼을 누르면 로그에 요약과 경고
 - `Local Axis ON/OFF` — 실제 `displayLocalAxis` 값이 바뀌고, **컴포넌트를 골라도 부모 transform**
   으로 올라간다. 선택 없으면 경고
 - `Pin` — 켜면 `Pinned` + `WindowStaysOnTopHint`, 끄면 원복
