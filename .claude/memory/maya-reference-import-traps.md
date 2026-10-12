@@ -8,7 +8,7 @@ metadata:
   modified: 2026-10-12T01:59:01.168Z
 ---
 
-mayapy 2024 실측 (2026-10-12, A00480 Maya > Reference 만들며). 코드는 `tools/A00480_FileTool/app/maya/core`.
+mayapy 2024 실측 (2026-10-12, A00210 Maya > Reference 만들며 — 처음엔 A00480 에). 코드는 `tools/A00210_FileManager/app/maya/core`.
 
 - **`file -o -loadReferenceDepth none` 으로 연 씬을 저장하면 레퍼런스가 전부 언로드로 굳는다** — 다음에 기본 열기 해도
   안 보인다. 기본 열기는 저장된 로드 상태를 지킨다(A 로드 · B 언로드 → 그대로). 그래서 **읽기만 할 때(스캔)는 none,
@@ -26,5 +26,8 @@ mayapy 2024 실측 (2026-10-12, A00480 Maya > Reference 만들며). 코드는 `t
 - FBX 는 `file -r -type FBX` 로 레퍼런스가 되고 importReference 도 된다(fbxmaya 플러그인 필요). 레퍼런스를 가질 수 없는 잎.
 - `file -q -type` 이 `mayaAscii`/`mayaBinary` → 그 타입으로 제자리 저장. `-executeScriptNodes false` 로 남의 파일 스크립트 실행 방지.
 - mayapy 배치에서 실제 리그 파일을 열면 renderSetup 콜백 트레이스백 · 레거시 렌더 레이어 경고가 뜨지만 작업엔 영향 없다.
+- **mayapy 하위 프로세스 워커**: `maya.standalone.initialize()` 뒤 `uninitialize()` 없이 끝내면(에러 경로 포함) 종료 코드가
+  0xC000000D(3221225485) 로 깨진다. 모든 경로에서 uninitialize → `os._exit(code)`. stdout 은 `-u` 로 버퍼링 해제, 프로토콜 줄은
+  접두어(`JUNMSG `)로 마야 소음과 구별. 한 번 기동에 4~5초(2024, 플러그인 적음).
 
-관련: [[wip-a00480-maya-reference-tab]], [[mayapy-headless-verify]]
+관련: [[wip-a00210-maya-reference-tab]], [[mayapy-headless-verify]]

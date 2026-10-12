@@ -1,25 +1,5 @@
 # Changelog — A00480_FileTool
 
-## v01.10 (2026-10-12)
-- **New `Maya` tab** for working on Maya scene files on disk, with a first sub-tab **`Reference`**:
-  - Pick Maya files in a folder tree (the shared tree from A00240 PathTool, now with **check boxes on file rows** -
-    select several rows with Shift / Ctrl and one click checks them all; File Types defaults to `.ma .mb .fbx`),
-    then `Add Checked` (or `Browse...`) puts them in the **Maya File** list.
-  - **`Get Reference`** lists the references the selected files use. Nested references (a reference's own references)
-    fold under their parent; the `Used by` column names the Maya files. Missing files are red and cannot be checked.
-    `.ma` files are read from their header; `.mb` files are opened (references unloaded) - the current scene is
-    closed, so you are asked to save it first.
-  - **`Import Reference`** opens every scanned file, imports the **checked** references it uses (nested ones come
-    along, unloaded ones are loaded first), merges namespaces and **saves the file in place** in its original type.
-    A confirmation lists what will change; a progress popup shows the files; a file that fails is not saved.
-  - Options, all on by default: **Remove All Namespace** (every namespace in the scene; those of references that
-    stay referenced are kept), **Backup** (`<folder>/backup/<name>_REF_NN.<ext>` - the same `backup/` folder as
-    A00220_BackupTool, which uses `_BU`), **Reopen current scene**.
-  - Right-click `Reveal in File Explorer` / `Copy file path` and double-click on all three lists, like the A00240 tree.
-- The Maya tab lives in its own package `app/maya/` (core + ui, depends on Framework only) so it can become a
-  separate tool later. Shared pieces went to the Framework: `MOD_fileTree_qt_v01`, `MOD_checkTree_qt_v01`,
-  `path_context`.
-
 ## v01.09 (2026-10-02)
 - **Export > Naming: new token rule `Enum`** - pick one of a fixed list of values instead of typing
   (`Values...` edits the token name and the list). It is the same rule as A00330 Token's Enum.

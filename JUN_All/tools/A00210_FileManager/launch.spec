@@ -1,7 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('../../Framework/styles', 'Framework/styles')]
+datas = [('../../Framework/styles', 'Framework/styles'),
+         # Maya 탭의 mayapy 워커와 그 코어 - mayapy 가 디스크의 .py 를 읽어야 하므로 그대로 싣는다 (v01.35)
+         ('app/maya/core', 'tools/A00210_FileManager/app/maya/core')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('PySide6')

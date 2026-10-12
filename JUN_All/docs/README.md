@@ -29,7 +29,7 @@
 | `A00150_remapVal` | 리깅 | [A00150_remapVal](A00150_remapVal.md) |
 | `A00160_sphericalEye` | 리깅 / 페이셜 | [A00160_sphericalEye](A00160_sphericalEye.md) |
 | `A00180_abSymMesh` | 모델링 / 블렌드셰이프 | [A00180_abSymMesh](A00180_abSymMesh.md) |
-| `A00210_FileManager` | 파이프라인 / 파일·버전 기록 (standalone) | [A00210_FileManager](A00210_FileManager.md) |
+| `A00210_FileManager` | 파이프라인 / 파일·버전 기록 (standalone) · **Maya > Reference**(마야 파일들의 레퍼런스를 트리로 보고 체크한 것을 각 파일에 임포트해 제자리 저장, 마야 일은 mayapy 워커) | [A00210_FileManager](A00210_FileManager.md) |
 | `A00260_ConstraintConverter` | 리깅 / 언리얼 | [A00260_ConstraintConverter](A00260_ConstraintConverter.md) |
 | `A00270_skinMigrate` | 리깅 / 스킨 | [A00270_skinMigrate](A00270_skinMigrate.md) |
 | `A00280_correctiveFromCache` | 페이셜·리깅 / RBF 코렉티브 | [A00280_correctiveFromCache](A00280_correctiveFromCache.md) |
@@ -39,7 +39,7 @@
 | `A00340_SelectionTool` | 선택 / 리깅·애니 (오브젝트 재선택 버튼) | [A00340_SelectionTool](A00340_SelectionTool.md) |
 | `A00410_SecondaryMotion` | 애니메이션 / 2차 모션 (FK 체인 관성·찰랑임) | [A00410_SecondaryMotion](A00410_SecondaryMotion.md) |
 | `A00420_Wrapper` | 모델링·페이셜 / 커브 가이드 래핑 (다른 토폴로지 메시 맞추기) | [A00420_Wrapper](A00420_Wrapper.md) |
-| `A00480_FileTool` | 파일 입출력 · 경로 (Export / Import / Path — A00040_V02 + quickTool File·Import 통합) · **Maya > Reference**(마야 파일들의 레퍼런스를 트리로 보고 체크한 것을 각 파일에 임포트해 제자리 저장) | [A00480_FileTool](A00480_FileTool.md) |
+| `A00480_FileTool` | 파일 입출력 · 경로 (Export / Import / Path — A00040_V02 + quickTool File·Import 통합) | [A00480_FileTool](A00480_FileTool.md) |
 | `A00380_MeshTool` | 모델링 / 메시 진단 · 편집 (MeshDoctor · Peak · Match) | [A00380_MeshTool](A00380_MeshTool.md) |
 | `A00300_meshDoctor` | 〃 (A00380 의 MeshDoctor 탭으로 이식됨 · 보존) | [A00300_meshDoctor](A00300_meshDoctor.md) |
 
@@ -52,7 +52,7 @@
 |------|------|------|
 | `Framework/qt/MOD_tsl_qt_v01.py` | 공용 리스트(TSL) 위젯 — Select/Add/Del/Up/Down/Sort, **Order(선택 순서 유지)**, UUID 보관, **요약 모드(`list_limit`)** | [Framework_MOD_tsl_qt](Framework_MOD_tsl_qt.md) |
 | `Framework/qt/MOD_filter_qt_v01.py` | 공용 **검색/필터** 위젯 — 입력 즉시 일치 항목만 표시, "보이는 것이 작업 대상" 헬퍼 | [Framework_MOD_filter_qt](Framework_MOD_filter_qt.md) |
-| `Framework/qt/MOD_fileTree_qt_v01.py` + `Framework/core/tree_scanner.py` · `prefetcher.py` | 공용 **폴더 트리** 위젯 — A00240 Tree 탭을 그대로 승격(Adaptive · File Types · Omit · Refresh · Expand · Reveal/Copy · 정션). `checkable_files` 로 파일 행 체크박스(Shift 다중 체크, 경로로 기억), `default_types`. A00240 · A00480 Maya 탭이 쓴다 | [Framework_MOD_fileTree_qt](Framework_MOD_fileTree_qt.md) |
+| `Framework/qt/MOD_fileTree_qt_v01.py` + `Framework/core/tree_scanner.py` · `prefetcher.py` | 공용 **폴더 트리** 위젯 — A00240 Tree 탭을 그대로 승격(Adaptive · File Types · Omit · Refresh · Expand · Reveal/Copy · 정션). `checkable_files` 로 파일 행 체크박스(Shift 다중 체크, 경로로 기억), `default_types`. A00240 · A00210 Maya 탭이 쓴다 | [Framework_MOD_fileTree_qt](Framework_MOD_fileTree_qt.md) |
 | `Framework/qt/MOD_checkTree_qt_v01.py` | 체크박스 `QTreeWidget` 에 붙이는 **다중 선택 + 다중 체크** 동작 — checkList 의 트리 판. 체크박스 유무는 `CheckStateRole` 데이터로 가른다(QTreeWidgetItem 은 기본 플래그가 checkable) | [Framework_MOD_checkTree_qt](Framework_MOD_checkTree_qt.md) |
 | `Framework/qt/MOD_checkList_qt_v01.py` | 체크박스 `QListWidget` 에 붙이는 **다중 선택 + 다중 체크** 동작 — Shift/Ctrl 로 고른 행을 체크박스 한 번(또는 Space)으로 함께 켜고 끈다 | [Framework_MOD_checkList_qt](Framework_MOD_checkList_qt.md) |
 | `Framework/qt/MOD_tokenName_qt_v01.py` + `Framework/core/token_naming.py` | **토큰 이름 위젯** — Profile(json) + 토큰 칸(Custom / Numbering / Set's Name, Add · Delete Token, 가로 스크롤, 미리보기). 규칙 묶음 · 프로파일 저장은 core. A00330 Token · A00480 Naming 이 공유 | [Framework_MOD_tokenName_qt](Framework_MOD_tokenName_qt.md) |

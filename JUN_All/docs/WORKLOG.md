@@ -39,14 +39,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 검증: mayapy 2024 28 항목 — 정적 로케이터 10개(sealBaseRotate 고친 뒤 다물면 rest, 열면 바뀐 값, 절반 가중치는 사이, 머리 회전 불변, Update Rest Pose, Remove 되쓰기+attr 삭제) · JO 조인트(채널·월드 모두 rest) · pointConstraint translate + 정적 rotate 혼합 · `blend_rotation=False` · Attached 회귀. 마야 GUI 확인은 아직.
 - 문서: `docs/A00170_driverTool.md` Free 모드 절 불릿 + 표, UI 툴팁/About. 포트폴리오는 손대지 않음.
 
-> [!summary] A00480 FileTool — **Maya 탭 > Reference: 마야 파일들의 레퍼런스를 트리로 보고 체크한 것을 각 파일에 임포트해 제자리 저장** (v01.09->01.10) · A00240 Tree 탭을 Framework 로 승격 (v01.19->01.20)
-- 요청: 계획서 먼저(`docs/plans/A00480_FileTool_maya_tab_reference_plan.md`, §12 에 사용자 결정 11개 · §13 재개용 진행표). 나중에 독립 툴로 뗄 수 있게 → `app/maya/{core,ui}` 한 폴더, 밖은 Framework 만.
+> [!summary] A00210 FileManager — **Maya 탭 > Reference: 마야 파일들의 레퍼런스를 트리로 보고 체크한 것을 각 파일에 임포트해 제자리 저장, 마야 일은 mayapy 워커** (v01.34->01.35) · A00240 Tree 탭을 Framework 로 승격 (v01.19->01.20) · A00480 은 원상복구
+- 요청: 계획서 먼저(`docs/plans/A00210_FileManager_maya_reference_plan.md`, §12 사용자 결정 11개 · §13 재개용 진행표 · §14 이식). **처음 A00480_FileTool 에 만들었는데 사용자가 "실수, A00210 으로" 라고 바꿔** A00480 은 v01.09 로 되돌리고(커밋으로) `app/maya` 를 A00210 으로 옮겼다. 나중에 독립 툴로 뗄 수 있게 → `app/maya/{core,ui}` 한 폴더, 밖은 Framework · prefs 만.
+- **A00210 은 standalone** → maya.cmds 가 필요한 일(.mb 읽기 · 임포트)은 `core/maya_worker.py` 를 mayapy.exe 로 띄워(`ui/mayapy_process.py` QProcess) 한다. stdout `JUNMSG {json}` 프로토콜(log/progress/result/error), 결과 json, Cancel = 플래그 파일(파일 경계) → 120초 뒤 kill. `.ma` 만이면 머리글 파싱으로 즉시(`scan(allow_open=False)` → `.mb` 를 만나면 `needs_maya`). mayapy 칸(Browse/Detect, 프로파일 `mayapy_path`). 워커는 에러 경로에서도 `uninitialize` 해야 종료 코드가 안 깨진다(0xC000000D). exe 는 `launch.spec` datas 로 `app/maya/core` 동봉.
 - Framework: A00240 Tree 탭 + tree_scanner + prefetcher 를 `MOD_fileTree_qt_v01` 로 승격(A00240 은 re-export, 동작 동일) + `checkable_files`(파일 행 체크박스, 경로로 기억 · Expand 창 공유) · `default_types`. 트리용 다중 체크 동작 `MOD_checkTree_qt_v01`(checkList 의 트리 판 — **QTreeWidgetItem 은 기본 플래그가 checkable 이라 `CheckStateRole` 데이터로 판정**). Reveal / Copy file path 공용 `path_context.py`.
 - core: `.ma` 는 머리글 `file -r` 문장(여러 줄) 파싱, `.mb` 는 `loadReferenceDepth none` 으로 열어 읽기, 중첩은 재귀(한 파일 한 번, 순환 가드). 임포트는 파일마다 백업(`backup/<이름>_REF_NN`, A00220 과 같은 폴더) → **기본 열기** → 체크된 레퍼런스 load/import → 올라온 중첩도 import → 모든 네임스페이스 병합(남는 레퍼런스 것은 건너뜀) → 원래 타입으로 저장. 실패 파일은 저장 안 함.
 - 실측 함정: 언로드 레퍼런스는 import 에러(먼저 load) · 부모 import 시 중첩이 최상위로 올라온다 · **none 으로 열어 저장하면 체크 안 한 레퍼런스가 언로드로 굳는다**(처음 구현에서 File_03 의 fbx 가 사라졌다 → 임포트는 기본 열기로).
-- UI: 공용 폴더 트리(ma/mb/fbx 기본) → Add Checked / Browse... → Maya File(공용 TSL) | Reference 트리(Reference | Used by, 중첩 접힘 · 체크 없음, 끊김 빨강) → Get Reference / Import Reference(확인 팝업 · 진행률 팝업 · 씬 보호 Save/Don't Save/Cancel). 옵션 Remove All Namespace · Backup · Reopen current scene 기본 ON. 동작 행을 두 줄로 나눠 창 폭 유지(954).
-- 검증: mayapy 2024 샘플 41 + 실제 컨트롤 파일 2개 복사본(스캔 10s · 임포트 17s · 재열기 refs 0 · ns 0 · 원본 무수정) · 오프스크린 QTest 21(트리 체크) + 24(UI). 마야 GUI 확인은 아직.
-- 문서: `docs/A00480_FileTool.md` §5 신설, `Framework_MOD_fileTree_qt.md` · `Framework_MOD_checkTree_qt.md` 신설, README · CHANGELOG(A00480 · A00240) · 포트폴리오 EN/KR · 메모 2개.
+- UI: 공용 폴더 트리(ma/mb/fbx 기본) → Add Checked / Browse... → Maya File(공용 TSL) | Reference 트리(Reference | Used by, 중첩 접힘 · 체크 없음, 끊김 빨강) → Get Reference / Import Reference(확인 팝업 · 진행률 팝업). 옵션 Remove All Namespace · Backup 기본 ON.
+- 검증: mayapy 2024 코어 샘플 41 + 실제 컨트롤 파일 2개 복사본(스캔 10s · 임포트 17s · 재열기 refs 0 · ns 0 · 원본 무수정) · 실제 mayapy 워커 왕복 17(스캔 · 임포트 · 재스캔 · 취소 · 에러) · 오프스크린 QTest 21(트리 체크) + 14(A00210 UI, 가짜 워커). A00210 GUI 에서 실제 mayapy 로 돌려 본 것은 아직.
+- 문서: `docs/A00210_FileManager.md` §4-D 신설, `Framework_MOD_fileTree_qt.md` · `Framework_MOD_checkTree_qt.md` 신설, README · CHANGELOG(A00210 · A00240) · 포트폴리오 EN/KR · 메모 2개. A00480 문서 · CHANGELOG · 버전은 원래대로.
 
 > [!summary] A00170 driverTool — **AttachCrv Default 탭 Mode 콤보 3개 + Create Followers at Live Closest Point** (v01.30->01.31)
 - 요청: Default 탭에 모드 3개를 콤보로 — 기존 Attach to Closest Point · Distribute Drivers 를 두 모드로, 세 번째는 Objects 의 `obj_i` 마다 `sfc` 표면의 최근접 위치·회전에 새 `obj_attach_i` 를 만들고 `obj_i` 가 움직여도 최근접 지점을 따라가게. 제안대로 `closestPointOnSurface` 의 U/V 를 POSI 에 연결하는 구조.

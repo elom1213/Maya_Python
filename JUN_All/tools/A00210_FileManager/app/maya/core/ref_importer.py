@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
 # last Update date : 2026-10-12
-# A00480_FileTool / Maya 탭 - 체크한 레퍼런스를 마야 파일마다 임포트하고 같은 파일에 저장 (maya.cmds)
+# A00210_FileManager / Maya 탭 - 체크한 레퍼런스를 마야 파일마다 임포트하고 같은 파일에 저장 (maya.cmds)
+# (A00210 은 standalone 이라 이 모듈은 mayapy 워커(maya_worker.py) 안에서 돈다.)
 #
 # 입력은 ref_scanner.scan() 결과 + 체크된 레퍼런스 키(norm) 집합. **마야 파일마다**:
 #   1. 백업 (backup.py, 옵션)           5. 중첩이 올라오면 그것도 load -> import (요청: 중첩까지)
@@ -18,12 +19,16 @@
 #     남는 레퍼런스 것은 건너뛰고 개수만 알린다. 그 밖에 못 지운 것은 [WARN].
 #   - 실패한 파일은 **저장하지 않고** 다음 파일로(반쯤 임포트된 채 저장 금지).
 #
-# 현재 씬은 바뀐다 - 호출부가 scene_guard 로 전후를 지킨다.
+# mayapy 워커 안에서 도니 현재 씬 걱정은 없다.
 
 import os
 
-from . import backup as backup_mod
-from . import ref_scanner
+try:
+    from . import backup as backup_mod
+    from . import ref_scanner
+except ImportError:          # mayapy 워커가 평범한 모듈로 import 할 때
+    import backup as backup_mod
+    import ref_scanner
 
 # 지우지 않는 네임스페이스(마야 내부).
 _PROTECTED_NS = ("UI", "shared")

@@ -1,11 +1,15 @@
 ---
-title: A00480_FileTool — Maya 탭 · Reference 하위탭 계획서
-aliases: [FileTool Maya tab, Reference import plan, A00480 Maya plan]
-tags: [plan, maya-python, file, reference, namespace, A00480_FileTool, A00240_PathTool, framework]
+title: A00210_FileManager — Maya 탭 · Reference 하위탭 계획서 (처음엔 A00480_FileTool 기준)
+aliases: [FileManager Maya tab, Reference import plan, A00210 Maya plan, A00480 Maya plan]
+tags: [plan, maya-python, file, reference, namespace, mayapy, A00210_FileManager, A00480_FileTool, A00240_PathTool, framework]
 updated: 2026-10-12
 ---
 
 # Maya 탭 · Reference 하위탭 계획서
+
+> **2026-10-12 이식**: 아래 §1~§13 은 A00480_FileTool 기준으로 쓰고 구현한 기록이다. 사용자가 "실수였다, **A00210_FileManager** 에
+> 이식해 달라" 고 해 A00480 은 원상복구하고 A00210 으로 옮겼다. **A00210 은 standalone 이라 설계가 바뀐 부분(mayapy 워커)은 §14** 에 있다.
+> 지금 코드의 기준은 §14 > §12 > 나머지 순이다.
 
 A00480_FileTool 에 **`Maya` 탭**을 추가한다. 마야 파일(씬 파일 자체)을 다루는 명령을 모으는 탭이며,
 첫 하위탭은 **`Reference`** — 여러 마야 파일이 어떤 파일을 레퍼런스로 부르는지 보고, 고른 레퍼런스를
@@ -425,3 +429,27 @@ Get Reference 도 같은 팝업(`.mb` 를 열 때만 체감이 되지만 통일)
 | 6 UI (`maya_tab.py` · `reference_tab.py` · `reference_tree.py`, main_window 연결, v01.10) | **완료** | `9446660` | 오프스크린 24 항목(가짜 maya · 가짜 코어). 동작 행을 두 줄로 나눠 창 폭 유지 |
 | 7 문서 · CHANGELOG · WORKLOG · 포트폴리오 · 메모 | **완료** | git log | `docs/A00480_FileTool.md` §5 · Framework 위젯 문서 2 · README · 포트폴리오 EN/KR · 메모 2 |
 | 8 마야 GUI 확인 | **사용자 — 대기** | | 창 크기 · 스플리터 · 진행률 팝업 · 실제 파일. 구현 분량은 다 끝남 |
+
+---
+
+## 14. A00210_FileManager 로 이식 (2026-10-12, 사용자 정정)
+
+사용자: "A00480 에 요청한 건 실수였다. A00480 을 원상복구하고 요청한 모든 기능을 A00210_FileManager 로 이식해."
+
+| 항목 | 한 일 |
+|------|------|
+| A00480 원상복구 | `main_window.py` · `version.py`(01.09) · `CHANGELOG.md` · `docs/A00480_FileTool.md` 를 세션 전 상태로(히스토리 재작성 없이 새 커밋). `app/maya` 는 `git mv` 로 A00210 으로 |
+| 코드 위치 | `tools/A00210_FileManager/app/maya/{core,ui}` — 배치 원칙(§4.1) 그대로. 밖 import 는 Framework + A00210 prefs(mayapy 경로) |
+| **설계 변경** | A00210 은 **마야 밖 standalone** → §4.8 의 대안이었던 **mayapy 하위 프로세스**로 간다. `core/maya_worker.py`(mayapy 가 실행, scan / import) + `core/mayapy_runner.py`(mayapy 찾기 · job.json · 명령줄 · 프로토콜 파싱, Qt 없음) + `ui/mayapy_process.py`(QProcess + 진행률 팝업, Cancel = 플래그 파일 → 파일 경계에서 정지, 120초 뒤 kill). 프로토콜: stdout `JUNMSG {json}` (log / progress / result / error), 결과는 job 폴더 `result.json`, 마야 소음은 `raw.log` |
+| 스캔 | 먼저 이 프로세스에서 `ref_scanner.scan(allow_open=False)` — `.ma` 머리글만. `.mb` 를 만나면 `needs_maya` → mayapy 로 다시 |
+| 씬 보호 | 불필요(워커 프로세스 안에서 열린다) → `scene_guard.py` 삭제, Reopen 옵션 삭제. 결정 ⑩ 은 무의미해짐 |
+| mayapy 경로 | Reference 탭의 `mayapy` 칸 + Browse / Detect(`Program Files\Autodesk\Maya*\bin\mayapy.exe`, 새 버전 먼저). A00210 prefs 프로파일 `mayapy_path`(비면 자동) |
+| 워커 import | 코어 모듈은 `from . import x` 가 실패하면 `import x` 로 폴백 — 워커가 폴더를 sys.path 에 올리고 평범하게 import. 얼린 exe 는 `launch.spec` datas 로 `app/maya/core` 를 `tools/A00210_FileManager/app/maya/core` 에 싣는다 (`worker_path()` 가 `_MEIPASS` 를 본다) |
+| 함정 | 워커가 에러 경로에서 `uninitialize` 없이 끝나면 종료 코드 0xC000000D → 모든 경로에서 정리 후 `os._exit` |
+| 검증 | 실제 mayapy 워커 왕복 17 항목(스캔 · 임포트 2 저장 · 재스캔 · 취소 플래그 · 에러 종료 코드), A00210 오프스크린 UI 14 항목(탭 4개 · prefs 왕복 · `.ma` 머리글 경로 · 가짜 워커로 QProcess 스캔/임포트 · 프로토콜 아닌 줄 무시 · mayapy 없음 경고). **A00210 GUI 에서 실제 mayapy 로 돌려 본 것은 사용자 몫** |
+| 문서 | `docs/A00210_FileManager.md` §4-D, A00210 CHANGELOG v01.35, README, WORKLOG, 포트폴리오(A00480 단락 → A00210 항목으로), 메모(`wip-a00210-maya-reference-tab`) |
+
+### §13 진행표 보정
+
+단계 4~7 의 "A00480" 은 이제 A00210 을 가리킨다. 5 의 `scene_guard.py` 는 삭제됐다. 8(GUI 확인)은 **A00210 을 띄워 mayapy 칸이 자동으로
+채워지는지 → 실제 파일(⑪ 복사본)로 Get Reference → Import Reference** 를 사용자가 확인한다.

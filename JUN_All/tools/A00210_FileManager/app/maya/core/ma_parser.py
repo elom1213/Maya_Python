@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
 # last Update date : 2026-10-12
-# A00480_FileTool / Maya 탭 - .ma 헤더의 reference 문장 파서 (UI/DCC 비의존, 순수 파이썬)
+# A00210_FileManager / Maya 탭 - .ma 헤더의 reference 문장 파서 (UI/DCC 비의존, 순수 파이썬)
 #
 # Maya ASCII 는 머리글에 레퍼런스를 이렇게 적는다 (2026-10-12 mayapy 2024 실측):
 #

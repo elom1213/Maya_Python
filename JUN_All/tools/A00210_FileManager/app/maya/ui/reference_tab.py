@@ -1,19 +1,22 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
 # last Update date : 2026-10-12
-# A00480_FileTool / Maya 탭 > Reference 하위탭 (PySide, in-Maya)
+# A00210_FileManager / Maya 탭 > Reference 하위탭 (PySide, standalone)
 #
 # 여러 마야 파일이 부르는 레퍼런스를 보고, 체크한 레퍼런스를 각 파일 안으로 임포트해 제자리 저장한다.
+# A00210 은 마야 밖에서 도는 앱이라, maya.cmds 가 필요한 일(.mb 읽기 · 임포트)은 **mayapy 하위 프로세스**
+# (core/maya_worker.py, ui/mayapy_process.py)로 한다. .ma 만 있으면 머리글 파싱으로 이 프로세스에서 바로 읽는다.
 #
 #   ┌ Tree (공용 폴더 트리 + 파일 체크박스, File Types 기본 ma/mb/fbx) ┐   <- 마야 파일을 고른다
 #   [Add Checked] [Browse...]
 #   ┌ Maya File (공용 TSL) ┐  ┌ Reference (트리, 체크박스, 중첩은 접힘) ┐
 #   Scanned: ...
-#   [x] Remove All Namespace  [x] Backup  [x] Reopen current scene
+#   mayapy [............................] [Browse...] [Detect]
+#   [x] Remove All Namespace  [x] Backup
 #   [Get Reference]                         [Import Reference]
 #
-# 로직은 ../core (ref_scanner · ref_importer · scene_guard · backup). 이 파일은 화면과 흐름만.
-# 설계 · 결정: docs/plans/A00480_FileTool_maya_tab_reference_plan.md (§12 결정표).
+# 로직은 ../core (ref_scanner · ref_importer · backup · mayapy_runner). 이 파일은 화면과 흐름만.
+# 설계 · 결정: docs/plans/A00210_FileManager_maya_reference_plan.md (§12 결정표, §14 A00210 이식).
 
 import os
 
@@ -24,6 +27,7 @@ from Framework.qt.qt import (
     QHBoxLayout,
     QGroupBox,
     QLabel,
+    QLineEdit,
     QPushButton,
     QCheckBox,
     QSplitter,
@@ -35,24 +39,28 @@ from Framework.qt.qt import (
 from Framework.qt import path_context
 from Framework.qt.MOD_fileTree_qt_v01 import JUN_mod_fileTree_qt_v01
 from Framework.qt.MOD_tsl_qt_v01 import JUN_mod_tsl_qt_v01, null_item_color
-from Framework.qt.MOD_progress_qt_v01 import JUN_mod_progress_qt_v01
 
 from ..core import ref_scanner
 from ..core import ref_importer
-from ..core import scene_guard
+from ..core import mayapy_runner
+from . import mayapy_process
 from .reference_tree import ReferenceTree
 
 DEFAULT_TYPES = ("ma", "mb", "fbx")        # 결정 ⑧
 FILE_FILTER = "Maya Files (*.ma *.mb);;All Files (*)"
+MAYAPY_FILTER = "mayapy (mayapy.exe);;All Files (*)"
 
 
 class ReferenceTab(QWidget):
 
-    def __init__(self, log=None, parent=None):
+    def __init__(self, log=None, prefs=None, parent=None):
+        """prefs : {"load": fn()->dict, "save": fn(dict)} - mayapy 경로를 기억할 곳(없으면 세션 안에서만)."""
         super().__init__(parent)
         self._log_callback = log
+        self._prefs = prefs
         self._scan = None                 # 마지막 Get Reference 결과
         self.build_ui()
+        self._load_mayapy_pref()
 
     # ==================================================================
     # UI
@@ -146,7 +154,27 @@ class ReferenceTab(QWidget):
         self.splitter.setStretchFactor(0, 1)
         self.splitter.setStretchFactor(1, 1)
 
-        # ---- 맨 아래: 옵션 행 + 동작 행 (한 줄이면 1024px 로 창을 넓힌다 - Export 탭은 918) ----
+        # ---- mayapy 행 ---------------------------------------------------
+        py_row = QHBoxLayout()
+        py_row.addWidget(QLabel("mayapy"))
+        self.ipf_mayapy = QLineEdit()
+        self.ipf_mayapy.setPlaceholderText("mayapy.exe - reads .mb files and imports references (auto-detected)")
+        self.ipf_mayapy.setToolTip(
+            "This app runs outside Maya. Reading .mb files and importing references is done by\n"
+            "mayapy.exe (Maya's Python) in the background. Leave empty to use the newest Maya found\n"
+            "under Program Files\\Autodesk. Saved with the profile.")
+        self.ipf_mayapy.editingFinished.connect(self._save_mayapy_pref)
+        py_row.addWidget(self.ipf_mayapy, stretch=1)
+        self.btn_mayapy_browse = QPushButton("Browse...")
+        self.btn_mayapy_browse.clicked.connect(self.on_browse_mayapy)
+        py_row.addWidget(self.btn_mayapy_browse)
+        self.btn_mayapy_detect = QPushButton("Detect")
+        self.btn_mayapy_detect.setToolTip("Find mayapy.exe under Program Files\\Autodesk (newest Maya first).")
+        self.btn_mayapy_detect.clicked.connect(self.on_detect_mayapy)
+        py_row.addWidget(self.btn_mayapy_detect)
+        root.addLayout(py_row)
+
+        # ---- 옵션 행 + 동작 행 ----------------------------------------------
         opt_row = QHBoxLayout()
         self.chk_remove_ns = QCheckBox("Remove All Namespace")
         self.chk_remove_ns.setChecked(True)
@@ -161,12 +189,6 @@ class ReferenceTab(QWidget):
             "Before saving, copy the original to <folder>/backup/<name>_REF_NN<ext>\n"
             "(the same backup folder A00220_BackupTool uses; _BU files are its own).")
         opt_row.addWidget(self.chk_backup)
-
-        self.chk_reopen = QCheckBox("Reopen current scene")
-        self.chk_reopen.setChecked(True)
-        self.chk_reopen.setToolTip(
-            "When done, open the scene that was open before (a new scene if it was untitled).")
-        opt_row.addWidget(self.chk_reopen)
         opt_row.addStretch(1)
         root.addLayout(opt_row)
 
@@ -174,18 +196,73 @@ class ReferenceTab(QWidget):
         self.btn_get = QPushButton("Get Reference")
         self.btn_get.setToolTip(
             "Read the references of the selected Maya files (all files if nothing is selected).\n"
-            ".ma files are read from their header; .mb files (and nested .mb) are opened to read them,\n"
-            "so the current scene is closed - you are asked to save it first.")
+            ".ma files are read from their header right here; .mb files (and nested .mb) are read\n"
+            "by mayapy in the background (takes a moment to start Maya).")
         self.btn_get.clicked.connect(self.on_get_reference)
         act_row.addWidget(self.btn_get, stretch=1)
 
         self.btn_import = QPushButton("Import Reference")
         self.btn_import.setToolTip(
-            "For every scanned Maya file: open it, import the checked references it uses\n"
+            "For every scanned Maya file: open it in mayapy, import the checked references it uses\n"
             "(nested references come along), remove namespaces, and save it in place.")
         self.btn_import.clicked.connect(self.on_import_reference)
         act_row.addWidget(self.btn_import, stretch=1)
         root.addLayout(act_row)
+
+    # ==================================================================
+    # mayapy
+    # ==================================================================
+
+    def mayapy_path(self):
+        """칸의 경로가 실제 파일이면 그것, 아니면 자동 탐색. 없으면 ""."""
+        return mayapy_runner.find_mayapy(self.ipf_mayapy.text().strip())
+
+    def on_browse_mayapy(self):
+        start = os.path.dirname(self.ipf_mayapy.text().strip()) or r"C:\Program Files\Autodesk"
+        path, _flt = QFileDialog.getOpenFileName(self, "Select mayapy.exe", start, MAYAPY_FILTER)
+        if path:
+            self.ipf_mayapy.setText(os.path.normpath(path))
+            self._save_mayapy_pref()
+
+    def on_detect_mayapy(self):
+        found = mayapy_runner.candidates()
+        if not found:
+            self._log("[WARN] No mayapy.exe found under Program Files\\Autodesk. Use Browse...")
+            return
+        self.ipf_mayapy.setText(found[0])
+        self._save_mayapy_pref()
+        self._log("mayapy : {0}{1}".format(
+            found[0], "" if len(found) == 1 else "  (+{0} more)".format(len(found) - 1)))
+
+    def _load_mayapy_pref(self):
+        if not self._prefs:
+            return
+        try:
+            path = (self._prefs["load"]() or {}).get("mayapy_path", "") or ""
+        except Exception:  # noqa: BLE001
+            path = ""
+        self.ipf_mayapy.setText(path)
+
+    def _save_mayapy_pref(self):
+        if not self._prefs:
+            return
+        try:
+            data = self._prefs["load"]() or {}
+            text = self.ipf_mayapy.text().strip()
+            if data.get("mayapy_path", "") != text:
+                data["mayapy_path"] = text
+                self._prefs["save"](data)
+        except Exception as exc:  # noqa: BLE001
+            self._log("[WARN] Could not save the mayapy path : {0}".format(exc))
+
+    def _require_mayapy(self):
+        mayapy = self.mayapy_path()
+        if not mayapy:
+            self._log("[WARN] mayapy.exe not found - set it in the mayapy box (Browse... / Detect).")
+            QMessageBox.warning(self, "mayapy", "mayapy.exe was not found.\n\n"
+                                "Reading .mb files and importing references needs Maya's Python.\n"
+                                "Set the path in the mayapy box (Browse... or Detect).")
+        return mayapy
 
     # ==================================================================
     # Maya File list
@@ -276,30 +353,32 @@ class ReferenceTab(QWidget):
             self._log("[WARN] None of the files exists on disk.")
             return
 
-        scene = self._guard_scene()
-        if scene is None:
-            return
+        # 1) 이 프로세스에서 머리글만 읽어 본다 - .mb 를 만나면 needs_maya.
+        result = ref_scanner.scan(paths, log=None, allow_open=False)
+        if result.get("needs_maya"):
+            mayapy = self._require_mayapy()
+            if not mayapy:
+                return
+            self._log("Get Reference : .mb file(s) involved - reading with mayapy...")
+            outcome = mayapy_process.run_job(
+                self, mayapy, {"job": "scan", "files": paths},
+                title="File Manager - Get Reference", message="Starting mayapy...", log=self._log)
+            if outcome.error or outcome.result is None:
+                self._log("[WARN] Get Reference failed : {0}".format(outcome.error or "no result"))
+                return
+            result = outcome.result
+        else:
+            for line in result.get("logs", []):
+                self._log(line)
+            self._log("Get Reference : read from file headers (no .mb involved).")
 
-        dlg = JUN_mod_progress_qt_v01(self, title="File Tool - Get Reference",
-                                      message="Reading references...")
-        dlg.start()
-        try:
-            result = ref_scanner.scan(paths, progress=dlg.callback(), log=self._log)
-        except Exception as exc:  # noqa: BLE001
-            self._log("[WARN] Get Reference failed : {0}".format(exc))
-            result = None
-        finally:
-            dlg.finish()
-
-        if result is not None:
-            self._scan = result
-            self.ref_tree.load(result)
-            self._update_counts()
-            names = [os.path.basename(f) for f in result["files"]]
-            self.lbl_scanned.setText("Scanned: {0} ({1})".format(", ".join(names), len(names)))
-            self._log("[OK] Get Reference : {0} file(s), {1} reference(s) listed.".format(
-                len(result["files"]), self.ref_tree.topLevelItemCount()))
-            self._restore_scene(scene, result.get("opened_scene", False))
+        self._scan = result
+        self.ref_tree.load(result)
+        self._update_counts()
+        names = [os.path.basename(f) for f in result["files"]]
+        self.lbl_scanned.setText("Scanned: {0} ({1})".format(", ".join(names), len(names)))
+        self._log("[OK] Get Reference : {0} file(s), {1} reference(s) listed.".format(
+            len(result["files"]), self.ref_tree.topLevelItemCount()))
 
     # ==================================================================
     # Import Reference
@@ -317,13 +396,16 @@ class ReferenceTab(QWidget):
         if not jobs:
             self._log("[WARN] None of the scanned files uses a checked reference.")
             return
+        mayapy = self._require_mayapy()
+        if not mayapy:
+            return
 
         lines = ["{0}  <-  {1}".format(
             os.path.basename(f), ", ".join(self._scan["nodes"][k]["name"] for k in keys))
             for f, keys in jobs]
         answer = QMessageBox.question(
             self, "Import Reference",
-            "{0} Maya file(s) will be opened, modified and saved in place:\n\n{1}\n\n"
+            "{0} Maya file(s) will be opened in mayapy, modified and saved in place:\n\n{1}\n\n"
             "Backup : {2}\nRemove All Namespace : {3}\n\nContinue?".format(
                 len(jobs), "\n".join(lines),
                 "ON" if self.chk_backup.isChecked() else "OFF",
@@ -333,89 +415,23 @@ class ReferenceTab(QWidget):
             self._log("Import Reference cancelled.")
             return
 
-        scene = self._guard_scene()
-        if scene is None:
+        outcome = mayapy_process.run_job(
+            self, mayapy,
+            {"job": "import", "scan": self._scan, "checked": list(checked),
+             "remove_namespaces": self.chk_remove_ns.isChecked(),
+             "make_backup": self.chk_backup.isChecked()},
+            title="File Manager - Import Reference", message="Starting mayapy...", log=self._log)
+
+        summary = outcome.result
+        if outcome.error and summary is None:
+            self._log("[WARN] Import Reference failed : {0}".format(outcome.error))
             return
-
-        dlg = JUN_mod_progress_qt_v01(self, title="File Tool - Import Reference",
-                                      message="Importing references...", cancellable=True)
-        dlg.start()
-        summary = None
-        try:
-            summary = ref_importer.import_references(
-                self._scan, checked,
-                remove_namespaces=self.chk_remove_ns.isChecked(),
-                make_backup=self.chk_backup.isChecked(),
-                log=self._log, progress=dlg.callback(), should_cancel=dlg.was_cancelled)
-        except Exception as exc:  # noqa: BLE001
-            self._log("[WARN] Import Reference failed : {0}".format(exc))
-        finally:
-            dlg.finish()
-
-        self._restore_scene(scene, True)
         if summary:
             tag = "[OK]" if not summary["failed"] and not summary["cancelled"] else "[WARN]"
             self._log("{0} Import Reference done - {1} saved, {2} skipped, {3} failed{4}.".format(
                 tag, summary["saved"], summary["skipped"], summary["failed"],
                 " (cancelled)" if summary["cancelled"] else ""))
             self._log("Press Get Reference again to refresh the list.")
-
-    # ==================================================================
-    # 현재 씬 보호
-    # ==================================================================
-
-    def _guard_scene(self):
-        """현재 씬 상태를 적어 두고, 수정돼 있으면 저장 여부를 묻는다. 취소면 None."""
-        try:
-            info = scene_guard.current_scene()
-        except Exception as exc:  # noqa: BLE001 - Maya 밖
-            self._log("[WARN] Maya is not available : {0}".format(exc))
-            return None
-        if not info["modified"]:
-            return info
-
-        if info["untitled"]:
-            box = QMessageBox(QMessageBox.Warning, "Current scene",
-                              "The current (untitled) scene has unsaved changes.\n"
-                              "It will be closed and cannot be saved by this tool.",
-                              parent=self)
-            drop = box.addButton("Don't Save", QMessageBox.DestructiveRole)
-            box.addButton(QMessageBox.Cancel)
-            box.exec_()
-            if box.clickedButton() is not drop:
-                self._log("Cancelled - current scene kept.")
-                return None
-            return info
-
-        answer = QMessageBox.question(
-            self, "Current scene",
-            "The current scene has unsaved changes:\n{0}\n\nSave it before continuing?".format(
-                info["path"]),
-            QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Save)
-        if answer == QMessageBox.Cancel:
-            self._log("Cancelled - current scene kept.")
-            return None
-        if answer == QMessageBox.Save:
-            try:
-                scene_guard.save_current()
-                self._log("Saved current scene : {0}".format(info["path"]))
-            except Exception as exc:  # noqa: BLE001
-                self._log("[WARN] Could not save the current scene : {0}".format(exc))
-                return None
-        return info
-
-    def _restore_scene(self, info, scene_changed):
-        """작업이 씬을 바꿨으면 원래 씬으로(옵션)."""
-        if not scene_changed:
-            return
-        if not self.chk_reopen.isChecked():
-            self._log("Current scene is the last file worked on (Reopen current scene is off).")
-            return
-        try:
-            path = scene_guard.restore(info)
-            self._log("Reopened : {0}".format(path or "(new scene)"))
-        except Exception as exc:  # noqa: BLE001
-            self._log("[WARN] Could not reopen the previous scene : {0}".format(exc))
 
     # ==================================================================
     # helpers

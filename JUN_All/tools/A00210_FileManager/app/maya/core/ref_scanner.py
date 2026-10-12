@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
 # last Update date : 2026-10-12
-# A00480_FileTool / Maya 탭 - 디스크의 마야 파일들이 부르는 레퍼런스를 (중첩까지) 모은다
+# A00210_FileManager / Maya 탭 - 디스크의 마야 파일들이 부르는 레퍼런스를 (중첩까지) 모은다
+# (A00480_FileTool 에 먼저 만들었다가 2026-10-12 A00210 으로 옮겼다 - A00210 은 마야 밖 standalone 이라
+#  maya.cmds 가 필요한 부분은 mayapy 워커(maya_worker.py)에서 이 모듈을 그대로 돌린다.)
 #
 # 파일 하나의 **직접** 레퍼런스를 읽는 방법은 확장자로 갈린다 (2026-10-12 mayapy 2024 실측):
 #   .ma  : 머리글 텍스트만 파싱(ma_parser) - 씬을 열지 않는다.
@@ -11,9 +13,9 @@
 # 중첩은 **재귀**다 - 직접 레퍼런스 파일마다 같은 함수를 다시 부른다. 한 파일은 한 번만 읽고(캐시),
 # 조상에 있는 파일이 또 나오면 순환으로 보고 내려가지 않는다.
 #
-# .mb 가 하나라도 있으면 **현재 씬이 바뀐다**(마지막에 연 파일이 남는다). 호출부(UI)가 scene_guard 로
-# 전후를 지킨다. maya.cmds 는 함수 안에서 lazy import 한다 - .ma 만 스캔할 때와 Maya 밖 테스트에서는
-# maya 가 없어도 돈다.
+# maya.cmds 는 함수 안에서 lazy import 한다 - .ma 만 스캔할 때와 Maya 밖에서는 maya 가 없어도 돈다.
+# `allow_open=False` 로 부르면 .mb 를 만나는 순간 NeedsMayaError 를 내고 결과에 needs_maya=True 를 적는다 -
+# A00210(standalone) 은 먼저 이렇게 돌려 보고, 마야가 필요하면 mayapy 워커로 다시 돌린다.
 #
 # 결과(dict):
 #   {
@@ -28,7 +30,14 @@
 
 import os
 
-from . import ma_parser
+try:
+    from . import ma_parser
+except ImportError:          # mayapy 워커가 평범한 모듈로 import 할 때
+    import ma_parser
+
+
+class NeedsMayaError(RuntimeError):
+    """maya.cmds 없이는 읽을 수 없는 파일(.mb)을 만났다 - mayapy 워커로 다시 돌려야 한다."""
 
 MAYA_SCENE_EXTS = (".ma", ".mb")
 
@@ -129,6 +138,8 @@ def direct_references(path, log=None, allow_open=True):
     elif ext != ".mb":
         return [], False
 
+    if not allow_open:
+        raise NeedsMayaError(path)
     open_scene_no_refs(path)
     return [ma_parser.resolve_path(p, base_dir) for p in scene_direct_references()], True
 
@@ -162,7 +173,8 @@ def scan(files, progress=None, log=None, allow_open=True):
         if log:
             log(message)
 
-    result = {"files": [], "roots": {}, "nodes": {}, "opened_scene": False, "logs": logs}
+    result = {"files": [], "roots": {}, "nodes": {}, "opened_scene": False, "logs": logs,
+              "needs_maya": False}
     nodes = result["nodes"]
 
     todo = [os.path.abspath(f) for f in (files or []) if f]
@@ -182,6 +194,10 @@ def scan(files, progress=None, log=None, allow_open=True):
 
         try:
             refs, opened = direct_references(abs_file, log=_log, allow_open=allow_open)
+        except NeedsMayaError:
+            result["needs_maya"] = True
+            result["roots"][abs_file] = []
+            continue
         except Exception as exc:  # noqa: BLE001
             _log("[WARN] Could not read references of {0} : {1}".format(
                 os.path.basename(abs_file), exc))
@@ -232,6 +248,10 @@ def _scan_nested(key, nodes, ancestors, result, _log, allow_open, progress, i, t
         progress(i, total, "Scanning nested {0}".format(node["name"]))
     try:
         refs, opened = direct_references(node["path"], log=_log, allow_open=allow_open)
+    except NeedsMayaError:
+        result["needs_maya"] = True
+        node["scanned"] = False
+        return
     except Exception as exc:  # noqa: BLE001
         node["error"] = str(exc)
         _log("[WARN] Could not read references of {0} : {1}".format(node["name"], exc))

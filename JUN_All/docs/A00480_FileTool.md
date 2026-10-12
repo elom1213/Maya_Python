@@ -1,8 +1,8 @@
 ---
 title: A00480_FileTool 사용법
 aliases: [File Tool, FileTool, A00480]
-tags: [maya-python, tool-guide, file, fbx, export, import, path, reference, pyside]
-updated: 2026-10-12
+tags: [maya-python, tool-guide, file, fbx, export, import, path, pyside]
+updated: 2026-09-29
 ---
 
 # A00480_FileTool 사용법
@@ -15,9 +15,8 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 | **Export** | objectSet 마다 FBX 한 파일로 일괄 익스포트 (Export Path · Set Up · Naming · Type Filter · Joints only) | [`A00040_file_exporter_V02`](A00040_file_exporter_V02.md) 화면 전체 |
 | **Import** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` |
 | **Path** | `Copy Scene Folder` · `Open Scene Folder` | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `File` |
-| **Maya** | 마야 파일(씬 파일 자체)을 다루는 탭. 하위탭 **Reference** — 여러 마야 파일의 레퍼런스를 트리로 보고, 체크한 것을 각 파일에 임포트해 제자리 저장 (§5) | 신규 v01.10 |
 
-- **버전**: `app/config/version.py` (v01.10 — **Maya 탭 > Reference**(§5) · v01.09 — Naming 토큰 규칙에 **`Enum`**(정해진 값 중 고르기, A00330 과 같은 공용 규칙, §2-4) · v01.08 — Naming 칸을 고쳐도 저장 안 함, **`Save` 버튼**으로만 프로파일 기본이 된다(§2-4) · v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
+- **버전**: `app/config/version.py` (v01.09 — Naming 토큰 규칙에 **`Enum`**(정해진 값 중 고르기, A00330 과 같은 공용 규칙, §2-4) · v01.08 — Naming 칸을 고쳐도 저장 안 함, **`Save` 버튼**으로만 프로파일 기본이 된다(§2-4) · v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
 - **설치**: `__dragDrop_A00480.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **FileTool** → `tools.A00480_FileTool.run(True)`
 - **테마**: `slate_dark`
 - **원본 두 툴은 그대로 남아 있다.** quickTool 의 File · Import option 버튼도 지워지지 않았다.
@@ -204,76 +203,7 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
 
 ---
 
-## 5. Maya 탭 — Reference (v01.10)
-
-**여러 마야 파일이 어떤 파일을 레퍼런스로 부르는지 보고, 고른 레퍼런스를 각 파일 안으로 임포트해 같은 파일에 저장**한다.
-주 사용 형태: 마야를 이 작업을 위해 띄우고, 파일 여러 개를 한 번에 처리한다. 작업 중 **현재 씬은 닫힌다**(아래 씬 보호).
-
-```
-┌ Path Tree (공용 폴더 트리 + 파일 체크박스, File Types 기본 .ma .mb .fbx) ──────────┐
-│ Path [..........] [Browse...]  Adaptive  Depth  Show files  File Types  [Build Tree] [Expand] │
-│ ▸ 📁 Characters                                                                │
-│     [v] File_01.mb   [v] File_03.ma   [ ] File_02.mb   (Shift 로 여러 행 고른 뒤 체크 하나로 전부) │
-└────────────────────────────────────────────────────────────────────────────────┘
-[Add Checked] [Browse...]  Checked in tree: 2
-┌ Maya File ─────────────┐  ┌ Reference ──────────────────── Used by ─────────────┐
-│ File_01.mb             │  │ [v] Ref_maya_01.mb              File_01.mb          │
-│ File_03.ma             │  │   ▸   Ref_maya_02.mb (nested)                       │
-│ [Del] [Clear]          │  │ [v] Ref_maya_02.mb              File_01.mb, File_03.ma │
-│                        │  │ [ ] Ref_fbx_01.fbx              File_03.ma          │
-└────────────────────────┘  │ [Check All] [Uncheck All]        Checked: 2 / 3     │
-Scanned: File_01.mb, File_03.ma (2)
-[x] Remove All Namespace  [x] Backup  [x] Reopen current scene
-[Get Reference]                                   [Import Reference]
-```
-
-### 흐름
-
-1. **마야 파일 담기** — 위 트리에서 파일 행의 체크박스를 켜고 `Add Checked`(또는 `Browse...` 로 파일 다이얼로그).
-   같은 이름이 다른 폴더에 있으면 `File_01.mb  (폴더명)` 으로 구분한다. `Del`(선택 행) · `Clear`(전부).
-   트리는 [`A00240_PathTool` Tree 탭](A00240_PathTool.md#10-tree-탭--경로를-트리뷰로-보기) 과 같다(공용 위젯
-   [`JUN_mod_fileTree_qt`](Framework_MOD_fileTree_qt.md)) — Shift / Ctrl 로 여러 행을 고른 뒤 체크 하나로 전부 체크/해제.
-2. **`Get Reference`** — Maya File 에서 **선택한** 파일(선택이 없으면 전부)의 레퍼런스를 읽어 Reference 트리에 채운다.
-   - 최상위 행 = 그 파일들이 **직접** 부르는 레퍼런스(경로로 중복 제거). `Used by` 열에 부르는 마야 파일들.
-   - 행을 펼치면 **그 레퍼런스가 또 부르는 레퍼런스**(중첩, `(nested)` 회색). 기본은 전부 접힘. 중첩 행엔 체크박스가 없다 —
-     부모를 임포트하면 중첩은 **자동으로 함께** 임포트된다.
-   - 디스크에 없는 레퍼런스는 **빨강** + 체크 불가. 순환은 `[cycle]` 로 표시하고 더 내려가지 않는다.
-   - `.ma` 는 파일 머리글만 읽는다(씬을 열지 않는다). **`.mb` 는 열어야 읽힌다**(레퍼런스는 로드하지 않아 빠르다) —
-     중첩 중 `.mb` 가 있어도 열린다. 그래서 **현재 씬이 닫힌다**.
-3. **체크** — 임포트할 레퍼런스를 체크한다. `Check All` / `Uncheck All`. 다시 Get Reference 해도 같은 파일은 체크가 남는다.
-4. **`Import Reference`** — 확인 팝업(파일 ← 레퍼런스 목록, Backup · Remove All Namespace 상태) 뒤, **스캔한 마야 파일마다**:
-   백업 → 열기 → 그 파일이 부르는 **체크된** 레퍼런스를 임포트(언로드면 먼저 로드) → 올라온 중첩 레퍼런스도 임포트 →
-   네임스페이스 병합 → **원래 타입(.ma / .mb)으로 제자리 저장**. 진행률 팝업(파일 단위, Cancel 은 파일 경계에서).
-   체크한 레퍼런스를 안 부르는 파일은 건너뛴다. 실패한 파일은 **저장하지 않는다.**
-
-| 옵션 (기본 ON) | 뜻 |
-|---|---|
-| `Remove All Namespace` | 임포트 뒤 **씬의 모든 네임스페이스**를 루트로 병합한다. 레퍼런스로 남는 것의 네임스페이스는 지울 수 없으니 건너뛰고 개수만 로그. 이름이 겹치면 마야가 끝 숫자를 올린다(`cube02` → `cube03`, 로그는 없다) |
-| `Backup` | 저장 전에 원본을 **그 파일 폴더의 `backup/`** 에 복사한다 — [`A00220_BackupTool`](A00220_BackupTool.md) 과 **같은 폴더**. A00220 은 `<이름>_BU.mb` / `_BU_NN`, 이 툴은 **`<이름>_REF_NN.mb`**(빈 다음 번호, 지우지 않음). `log.txt` 에 한 줄 |
-| `Reopen current scene` | 끝나면 작업 전에 열려 있던 씬을 다시 연다(untitled 였으면 새 씬). 끄면 마지막으로 저장한 파일이 열린 채로 남는다 |
-
-### 씬 보호
-
-Get Reference(.mb 포함) · Import Reference 는 다른 파일을 열어 작업한다. 현재 씬이 **수정돼 있으면** 먼저 묻는다 —
-`Save / Don't Save / Cancel` (untitled 면 `Don't Save / Cancel`). 열리는 파일은 전부 프롬프트 없음 · 스크립트 노드 실행 안 함.
-
-### 우클릭 · 더블클릭
-
-트리 · Maya File · Reference 전부 **`Reveal in File Explorer`**(폴더를 열고 파일 선택) · **`Copy file path`**, 더블클릭 = Reveal —
-A00240 Tree 탭과 같다(공용 `Framework/qt/path_context.py`).
-
-### 알아 둘 것
-
-- **임포트는 파일을 덮어쓴다.** Backup 을 켜 두는 것이 기본이다. 실패한 파일은 저장하지 않지만, 성공한 파일은 되돌릴 방법이
-  백업본뿐이다.
-- 체크하지 않은 레퍼런스는 **손대지 않는다** — 로드 상태도 저장될 때 그대로다(원래 언로드였으면 언로드로).
-- 레퍼런스 경로가 끊긴 파일은 체크할 수 없다. 경로를 고치는 기능은 없다(다음 하위탭 후보).
-- 코드는 `app/maya/` 한 폴더(core/ui)에 있고 폴더 밖 의존은 Framework 뿐이다 — 나중에 **독립 툴로 뗄 수 있게** 한 배치다.
-  계획 · 결정 · 실측은 [`plans/A00480_FileTool_maya_tab_reference_plan.md`](plans/A00480_FileTool_maya_tab_reference_plan.md).
-
----
-
-## 6. 구조
+## 5. 구조
 
 ```
 A00480_FileTool/
@@ -283,7 +213,7 @@ A00480_FileTool/
 ├── icon/                       # A00480_FileTool.svg / .png (폴더 + 들어오고 나가는 화살표)
 ├── CHANGELOG.md
 └── app/
-    ├── config/version.py       # VERSION = "01.10"
+    ├── config/version.py       # VERSION = "01.06"
     ├── core/                   # UI 비의존 (결과는 로그 문자열 리스트)
     │   ├── fbx_plugin.py       # ensure_fbx_plugin() — Export · Import 공용
     │   ├── export_ops.py       # A00040_V02 export_ops 이식 (타입 필터 · 파일명 · FBX export)
@@ -299,17 +229,6 @@ A00480_FileTool/
         ├── button_section.py   # SECTIONS 표 → 두 칸 버튼 그리드 (quickTool 방식)
         ├── type_filter_button.py
         └── rules_button.py     # Rules (n/m) 드롭다운 - EXPORT_RULES 에서 항목을 만든다 (v01.03)
-    └── maya/                   # Maya 탭 (v01.10) - 이 폴더가 통째로 분리 단위 (밖은 Framework 만 본다)
-        ├── core/
-        │   ├── ma_parser.py    # .ma 머리글의 file -r / -rdi 문장 파싱 (여러 줄)
-        │   ├── ref_scanner.py  # 마야 파일들 -> 레퍼런스 트리 (.ma 파싱 / .mb 는 열어서, 중첩 재귀, 순환 가드)
-        │   ├── ref_importer.py # 파일마다 백업 -> 열기 -> 체크된 레퍼런스(+중첩) 임포트 -> 네임스페이스 -> 저장
-        │   ├── backup.py       # backup/<이름>_REF_NN (A00220 과 같은 폴더)
-        │   └── scene_guard.py  # 현재 씬 기록 · 저장 · 복원
-        └── ui/
-            ├── maya_tab.py     # 하위탭 컨테이너 (다음 하위탭은 여기에 addTab)
-            ├── reference_tab.py# Reference 하위탭 (흐름 · 씬 보호 · 확인 팝업 · 진행률)
-            └── reference_tree.py # Reference 트리 (Reference | Used by, 체크, 중첩 접힘)
 ```
 
 ### 기능 더하기
@@ -318,21 +237,14 @@ A00480_FileTool/
   로직은 `app/core/*_ops.py` 에 두고 **로그 문자열 리스트**를 돌려준다.
 - **섹션이 3~4개를 넘으면** 접이식으로 쌓지 말고 하위 탭으로 나눈다.
 - **새 탭** — `app/ui/<name>_tab.py` 에 `QWidget(log=...)` 를 만들고 `main_window.build_ui` 에서 `addTab`.
-- **Maya 탭의 새 하위탭** — `app/maya/ui/<name>_tab.py` + `maya_tab.py` 에 `addTab` 한 줄. 로직은 `app/maya/core`.
 - **Export 의 타입 필터 타입** — `export_ops.FILTER_TYPES` + `_TYPE_MATCHERS` 두 곳(원본과 같다).
 - **Export 규칙** — `export_rules.EXPORT_RULES` 에 한 줄 + 검사 함수(§2-2).
 
 ---
 
-## 7. 검증 (mayapy 2024 + 오프스크린 Qt)
+## 6. 검증 (mayapy 2024 + 오프스크린 Qt)
 
 **54항목 통과.** 창 크기는 원본과 나란히 띄워 **둘 다 960 x 853** 인 것을 확인(v01.01).
-
-- **Maya > Reference (v01.10)** — mayapy 2024: 샘플(중첩 · fbx · 순환 · 끊긴 경로 · 이름 충돌 · 백업 번호 · 네임스페이스 유지 옵션)
-  41 항목 — 저장 뒤 **다시 열어** 레퍼런스 0 · 노드 이름에 네임스페이스 없음 · 체크 안 한 fbx 레퍼런스는 로드된 채 남음 ·
-  `.ma` 타입 유지 · 백업본은 원본 그대로. 실제 캐릭터 컨트롤 파일 2개(복사본)도 스캔 10s · 임포트 17s 에 레퍼런스 0 · 네임스페이스 0,
-  원본 무수정. 오프스크린 UI 24 항목(탭 4개 · 창 폭 불변 954 · Add Checked / 중복 / 같은 이름 · Get Reference 트리 · Used by ·
-  접힘 · 체크 유지 · 옵션 전달 · 요약 로그). **마야 GUI 확인은 아직.**
 
 - **창** — `run()` 을 두 번 불러도 보이는 창은 하나 · 제목 · 탭 `Export / Import / Path` 순서, Export 가 기본 ·
   원본 두 툴과 objectName 이 다름 · 버튼 라벨과 툴팁 · Pin 켜기/끄기

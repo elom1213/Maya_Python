@@ -39,4 +39,4 @@ self.chk_tree.checksChanged.connect(lambda items: ...)                         #
 ## 쓰는 곳
 
 - [`JUN_mod_fileTree_qt_v01`](Framework_MOD_fileTree_qt.md) (`checkable_files=True`) — 파일 행
-- `A00480_FileTool` Maya > Reference 트리 — 최상위 레퍼런스 행 (중첩 행은 체크 없음)
+- `A00210_FileManager` Maya > Reference 트리 — 최상위 레퍼런스 행 (중첩 행은 체크 없음)

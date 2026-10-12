@@ -2,5 +2,5 @@
 # last Update date : 2026-08-03
 # A00210_FileManager - version info
 
-VERSION = "01.34"
-LAST_UPDATE = "2026-10-01"
+VERSION = "01.35"
+LAST_UPDATE = "2026-10-12"

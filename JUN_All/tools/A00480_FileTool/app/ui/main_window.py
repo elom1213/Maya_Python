@@ -7,7 +7,6 @@
 #   Export : A00040_file_exporter_V02 화면 그대로 (+ Export Path 의 Scene 버튼)
 #   Import : A00030_quickTool_V02 의 Import FBX normal
 #   Path   : A00030_quickTool_V02 의 Copy Scene Folder · Open Scene Folder
-#   Maya   : 마야 파일 자체를 다루는 탭 (v01.10, app/maya - 폴더째 분리 가능). 하위탭 Reference.
 #
 # 창은 메뉴 · Pin · 탭 · **공용 로그창 하나** · 푸터를 갖고, 탭은 log 콜백만 받는다.
 # 원본 두 툴과 objectName 이 달라 동시에 띄울 수 있다. 모든 UI 문자열/로그는 영어.
@@ -35,7 +34,6 @@ from tools.A00480_FileTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00480_FileTool.app.ui.export_tab import ExportTab
 from tools.A00480_FileTool.app.ui.import_tab import ImportTab
 from tools.A00480_FileTool.app.ui.path_tab import PathTab
-from tools.A00480_FileTool.app.maya.ui.maya_tab import MayaTab
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -148,15 +146,12 @@ class MainWindow(QWidget):
         self.export_tab = ExportTab(log=self._log)
         self.import_tab = ImportTab(log=self._log)
         self.path_tab = PathTab(log=self._log)
-        self.maya_tab = MayaTab(log=self._log)
         self.tabs.addTab(self.export_tab, "Export")
         self.tabs.addTab(self.import_tab, "Import")
         self.tabs.addTab(self.path_tab, "Path")
-        self.tabs.addTab(self.maya_tab, "Maya")
         self.tabs.setTabToolTip(0, "Export objectSets to FBX, one file per set.")
         self.tabs.setTabToolTip(1, "Import settings.")
         self.tabs.setTabToolTip(2, "Scene folder and path helpers.")
-        self.tabs.setTabToolTip(3, "Maya scene files on disk - references.")
 
         # 탭은 스크롤 칸에 담는다 - 화면이 작거나(1080 · 배율 125/150%) 창을 줄여도 창이 화면을
         # 넘지 않는다. 내용이 다 들어가면 스크롤바는 안 보인다. (fit_to_content 참고)
@@ -200,10 +195,6 @@ class MainWindow(QWidget):
             "  out of the FBX. 'Scene' fills the export path with the scene folder.\n"
             "[Import] Import FBX normal - use the normals stored in the file.\n"
             "[Path] Copy Scene Folder / Open Scene Folder.\n"
-            "[Maya > Reference] Pick Maya files in a folder tree, list the references\n"
-            "  they use (nested ones fold under their parent) and import the checked\n"
-            "  references into each file - nested references come along, namespaces are\n"
-            "  merged, the file is backed up to backup/<name>_REF_NN and saved in place.\n"
             "\n"
             "Merged from A00040_file_exporter_V02 and the File / Import option\n"
             "buttons of A00030_quickTool_V02 (both tools are still available).\n"

@@ -52,6 +52,7 @@ from .file_table import FileTable
 from .region_capture import RegionCapture
 from .path_structure_tab import PathStructureTab
 from .lineage_tab import LineageTab
+from ..maya.ui.maya_tab import MayaTab
 
 
 THUMB_W = 320
@@ -268,6 +269,10 @@ class MainWindow(QWidget):
             log=self.log,
         )
         self.tabs.addTab(self.lineage_tab, "Lineage")
+
+        # Maya 탭 (v01.35) - 마야 파일 자체를 다룬다. 마야 일은 mayapy 하위 프로세스로.
+        self.maya_tab = MayaTab(log=self.log)
+        self.tabs.addTab(self.maya_tab, "Maya")
 
         root.addWidget(self.tabs, stretch=1)
         root.addWidget(self.log_widget)

@@ -388,6 +388,80 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 
 ---
 
+## 4-D. Maya 탭 — Reference (v01.35)
+
+**여러 마야 파일이 어떤 파일을 레퍼런스로 부르는지 보고, 고른 레퍼런스를 각 파일 안으로 임포트해 같은 파일에 저장**한다.
+이 앱은 마야 밖에서 돌므로 **마야가 필요한 일은 `mayapy.exe` 를 백그라운드로 띄워** 한다(아래 "mayapy").
+
+```
+┌ Path Tree (공용 폴더 트리 + 파일 체크박스, File Types 기본 .ma .mb .fbx) ──────────┐
+│ Path [..........] [Browse...]  Adaptive  Depth  Show files  File Types  [Build Tree] [Expand] │
+│ ▸ 📁 Characters                                                                │
+│     [v] File_01.mb   [v] File_03.ma   [ ] File_02.mb   (Shift 로 여러 행 고른 뒤 체크 하나로 전부) │
+└────────────────────────────────────────────────────────────────────────────────┘
+[Add Checked] [Browse...]  Checked in tree: 2
+┌ Maya File ─────────────┐  ┌ Reference ──────────────────── Used by ─────────────┐
+│ File_01.mb             │  │ [v] Ref_maya_01.mb              File_01.mb          │
+│ File_03.ma             │  │   ▸   Ref_maya_02.mb (nested)                       │
+│ [Del] [Clear]          │  │ [v] Ref_maya_02.mb              File_01.mb, File_03.ma │
+│                        │  │ [ ] Ref_fbx_01.fbx              File_03.ma          │
+└────────────────────────┘  │ [Check All] [Uncheck All]        Checked: 2 / 3     │
+Scanned: File_01.mb, File_03.ma (2)
+mayapy [C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe] [Browse...] [Detect]
+[x] Remove All Namespace  [x] Backup
+[Get Reference]                                   [Import Reference]
+```
+
+### 흐름
+
+1. **마야 파일 담기** — 위 트리에서 파일 행의 체크박스를 켜고 `Add Checked`(또는 `Browse...` 로 파일 다이얼로그).
+   같은 이름이 다른 폴더에 있으면 `File_01.mb  (폴더명)` 으로 구분한다. `Del`(선택 행) · `Clear`(전부).
+   트리는 [`A00240_PathTool` Tree 탭](A00240_PathTool.md#10-tree-탭--경로를-트리뷰로-보기) 과 같다(공용 위젯
+   [`JUN_mod_fileTree_qt`](Framework_MOD_fileTree_qt.md)) — Shift / Ctrl 로 여러 행을 고른 뒤 체크 하나로 전부 체크/해제.
+2. **`Get Reference`** — Maya File 에서 **선택한** 파일(선택이 없으면 전부)의 레퍼런스를 읽어 Reference 트리에 채운다.
+   - 최상위 행 = 그 파일들이 **직접** 부르는 레퍼런스(경로로 중복 제거). `Used by` 열에 부르는 마야 파일들.
+   - 행을 펼치면 **그 레퍼런스가 또 부르는 레퍼런스**(중첩, `(nested)` 회색). 기본은 전부 접힘. 중첩 행엔 체크박스가 없다 —
+     부모를 임포트하면 중첩은 **자동으로 함께** 임포트된다.
+   - 디스크에 없는 레퍼런스는 **빨강** + 체크 불가. 순환은 `[cycle]` 로 표시하고 더 내려가지 않는다.
+   - `.ma` 는 파일 머리글만 **이 앱에서 바로** 읽는다. **`.mb` 가 하나라도 끼면(중첩 포함) mayapy 가 읽는다** — 마야 기동에
+     몇 초가 걸리고 진행률 팝업이 `Starting mayapy...` 를 보인다.
+3. **체크** — 임포트할 레퍼런스를 체크한다. `Check All` / `Uncheck All`. 다시 Get Reference 해도 같은 파일은 체크가 남는다.
+4. **`Import Reference`** — 확인 팝업(파일 ← 레퍼런스 목록, Backup · Remove All Namespace 상태) 뒤, mayapy 가 **스캔한 마야
+   파일마다**: 백업 → 열기 → 그 파일이 부르는 **체크된** 레퍼런스를 임포트(언로드면 먼저 로드) → 올라온 중첩 레퍼런스도 임포트 →
+   네임스페이스 병합 → **원래 타입(.ma / .mb)으로 제자리 저장**. 진행률 팝업(파일 단위). Cancel 은 **지금 파일을 끝내고** 멈춘다
+   (2분 안에 안 끝나면 프로세스를 끊는다). 체크한 레퍼런스를 안 부르는 파일은 건너뛴다. 실패한 파일은 **저장하지 않는다.**
+
+| 옵션 (기본 ON) | 뜻 |
+|---|---|
+| `Remove All Namespace` | 임포트 뒤 **씬의 모든 네임스페이스**를 루트로 병합한다. 레퍼런스로 남는 것의 네임스페이스는 지울 수 없으니 건너뛰고 개수만 로그. 이름이 겹치면 마야가 끝 숫자를 올린다(`cube02` → `cube03`, 로그는 없다) |
+| `Backup` | 저장 전에 원본을 **그 파일 폴더의 `backup/`** 에 복사한다 — [`A00220_BackupTool`](A00220_BackupTool.md) 과 **같은 폴더**. A00220 은 `<이름>_BU.mb` / `_BU_NN`, 이 툴은 **`<이름>_REF_NN.mb`**(빈 다음 번호, 지우지 않음). `log.txt` 에 한 줄 |
+
+### mayapy
+
+- `mayapy` 칸이 비어 있으면 `Program Files\Autodesk\Maya*\bin\mayapy.exe` 중 **가장 새 버전**을 쓴다. `Detect` 가 같은 탐색을
+  해서 칸에 넣고, `Browse...` 로 직접 고를 수 있다. 값은 **프로파일에 저장**된다(`mayapy_path`).
+- mayapy 는 `app/maya/core/maya_worker.py` 를 실행한다. 워커는 표준 출력으로 `JUNMSG {json}` 줄(로그 · 진행률 · 결과 · 에러)을
+  보내고, 결과는 임시 작업 폴더(`%TEMP%\jun_fm_maya_*`)의 `result.json` 에 쓴다. 마야 자체 출력은 같은 폴더의 `raw.log` 에만
+  남는다 — 실패하면 로그에 그 경로가 찍힌다.
+- mayapy 가 없으면(마야 미설치 PC) `.ma` 머리글 읽기만 되고, `.mb` 읽기 · 임포트는 안내만 하고 멈춘다.
+
+### 우클릭 · 더블클릭
+
+트리 · Maya File · Reference 전부 **`Reveal in File Explorer`**(폴더를 열고 파일 선택) · **`Copy file path`**, 더블클릭 = Reveal —
+A00240 Tree 탭과 같다(공용 `Framework/qt/path_context.py`).
+
+### 알아 둘 것
+
+- **임포트는 파일을 덮어쓴다.** Backup 을 켜 두는 것이 기본이다. 실패한 파일은 저장하지 않지만, 성공한 파일은 되돌릴 방법이
+  백업본뿐이다.
+- 체크하지 않은 레퍼런스는 **손대지 않는다** — 로드 상태도 저장될 때 그대로다(원래 언로드였으면 언로드로).
+- 레퍼런스 경로가 끊긴 파일은 체크할 수 없다. 경로를 고치는 기능은 없다(다음 하위탭 후보).
+- 코드는 `app/maya/` 한 폴더(core/ui)에 있고 폴더 밖 의존은 Framework 와 prefs 뿐이다 — 나중에 **독립 툴로 뗄 수 있게** 한 배치다.
+  계획 · 결정 · 실측은 [`plans/A00210_FileManager_maya_reference_plan.md`](plans/A00210_FileManager_maya_reference_plan.md).
+  (같은 날 A00480_FileTool 에 먼저 만들었다가 옮겼다 — A00480 은 그대로다.)
+
+---
+
 ## 5. 구조 (개발자용)
 
 ```
@@ -408,12 +482,25 @@ A00210_FileManager/
     │   ├── git_sync.py      # GitSync: ensure/clone, pull, push (subprocess git)
     │   ├── path_structure.py# 폴더 구조 템플릿 캡처/재생성
     │   └── lineage.py       # 브랜치/병합 DAG 모델 + 레인/색상 계산 (compute_lanes)
-    └── ui/
-        ├── main_window.py   # MainWindow(QWidget) 조립 + 핸들러
-        ├── file_table.py    # 파일 목록 위젯
-        ├── region_capture.py# 화면 영역 캡쳐 오버레이
-        ├── path_structure_tab.py # Path Structure 탭
-        └── lineage_tab.py   # Lineage 탭 (QGraphicsView 캔버스 + 노드/엣지 아이템)
+    ├── ui/
+    │   ├── main_window.py   # MainWindow(QWidget) 조립 + 핸들러
+    │   ├── file_table.py    # 파일 목록 위젯
+    │   ├── region_capture.py# 화면 영역 캡쳐 오버레이
+    │   ├── path_structure_tab.py # Path Structure 탭
+    │   └── lineage_tab.py   # Lineage 탭 (QGraphicsView 캔버스 + 노드/엣지 아이템)
+    └── maya/                # Maya 탭 (v01.35) - 이 폴더가 통째로 분리 단위 (밖은 Framework · prefs 만 본다)
+        ├── core/            # Qt 없음. maya.cmds 를 쓰는 모듈은 mayapy 워커 안에서 돈다
+        │   ├── ma_parser.py     # .ma 머리글의 file -r / -rdi 문장 파싱 (여러 줄)
+        │   ├── ref_scanner.py   # 마야 파일들 -> 레퍼런스 트리 (.ma 파싱 / .mb 는 열어서, 중첩 재귀, 순환 가드, needs_maya)
+        │   ├── ref_importer.py  # 파일마다 백업 -> 열기 -> 체크된 레퍼런스(+중첩) 임포트 -> 네임스페이스 -> 저장
+        │   ├── backup.py        # backup/<이름>_REF_NN (A00220 과 같은 폴더)
+        │   ├── mayapy_runner.py # mayapy 찾기 · job.json · 명령줄 · JUNMSG 프로토콜 파싱
+        │   └── maya_worker.py   # mayapy 가 실행하는 워커 (scan / import) - launch.spec datas 로 exe 에도 실린다
+        └── ui/
+            ├── maya_tab.py      # 하위탭 컨테이너 (다음 하위탭은 여기에 addTab)
+            ├── reference_tab.py # Reference 하위탭 (흐름 · mayapy 칸 · 확인 팝업)
+            ├── reference_tree.py# Reference 트리 (Reference | Used by, 체크, 중첩 접힘)
+            └── mayapy_process.py# QProcess 로 워커를 띄우고 진행률 팝업 · 로그에 잇는다 (Cancel = 플래그 파일)
 ```
 
 - **core 는 Qt/Maya 를 import 하지 않는다** → 단위 테스트·exe 빌드 용이. 화면 캡쳐만 Qt(`QScreen.grabWindow`)에 의존.

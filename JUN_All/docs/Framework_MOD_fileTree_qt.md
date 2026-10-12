@@ -10,7 +10,7 @@ updated: 2026-10-12
 `JUN_All/Framework/qt/MOD_fileTree_qt_v01.py` (+ `Framework/core/tree_scanner.py` · `Framework/core/prefetcher.py`)
 
 **A00240_PathTool 의 Tree 탭을 그대로 Framework 로 올린 것**이다 (2026-10-12, A00240 v01.20).
-A00480_FileTool 의 Maya 탭이 같은 트리로 마야 파일을 고르기 때문에 한 벌만 둔다 — 릴리즈본은
+A00210_FileManager 의 Maya 탭이 같은 트리로 마야 파일을 고르기 때문에 한 벌만 둔다 — 릴리즈본은
 툴마다 Framework 사본만 동봉하므로 툴 간 import 는 남의 PC 에서 열리지 않는다.
 A00240 의 `tree_tab.py` · `core/tree_scanner.py` · `core/prefetcher.py` 는 re-export 한 줄만 남았다.
 
@@ -45,13 +45,13 @@ Build · Refresh · 필터 · File Types · Show files 로 행이 **다시 만�
 ## 우클릭 · 더블클릭은 공용 헬퍼
 
 `Framework/qt/path_context.py` — `attach_path_context(view, path_of_item, title)` 가 `Reveal in File Explorer` /
-`Copy file path` 메뉴와 더블클릭(= Reveal) 을 QListWidget · QTreeWidget 에 붙인다. A00480 Maya 탭의
+`Copy file path` 메뉴와 더블클릭(= Reveal) 을 QListWidget · QTreeWidget 에 붙인다. A00210 Maya 탭의
 Maya File 리스트 · Reference 트리도 같은 헬퍼를 써서 문구 · 실패 안내가 같다.
 
 ## 쓰는 곳
 
 - `A00240_PathTool` Tree 탭 (re-export, 옵션 없음)
-- `A00480_FileTool` Maya > Reference (`checkable_files=True, default_types=("ma","mb","fbx")`)
+- `A00210_FileManager` Maya > Reference (`checkable_files=True, default_types=("ma","mb","fbx")`)
 
 ## 검증 (오프스크린 PySide6 QTest, 2026-10-12)
 

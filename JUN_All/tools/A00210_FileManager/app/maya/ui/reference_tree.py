@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
 # last Update date : 2026-10-12
-# A00480_FileTool / Maya 탭 - Reference 트리 위젯 (QTreeWidget)
+# A00210_FileManager / Maya 탭 - Reference 트리 위젯 (QTreeWidget)
 #
 # 스캔 결과(ref_scanner.scan)를 보여 준다.
 #   최상위 행 = 스캔한 마야 파일들이 **직접** 부르는 레퍼런스 파일(경로로 중복 제거) - 체크박스.

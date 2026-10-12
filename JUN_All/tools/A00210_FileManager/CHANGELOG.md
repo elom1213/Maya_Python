@@ -2,6 +2,29 @@
 
 All notable changes to this tool are documented here.
 
+## [01.35] - 2026-10-12
+### Added
+- **New `Maya` tab** for working on Maya scene files on disk, with a first sub-tab **`Reference`**.
+  - Pick Maya files in a folder tree (the shared tree from A00240 PathTool, now with **check boxes on file rows** -
+    select several rows with Shift / Ctrl and one click checks them all; File Types defaults to `.ma .mb .fbx`),
+    then `Add Checked` (or `Browse...`) puts them in the **Maya File** list.
+  - **`Get Reference`** lists the references the selected files use. Nested references (a reference's own references)
+    fold under their parent; the `Used by` column names the Maya files. Missing files are red and cannot be checked.
+  - **`Import Reference`** opens every scanned file, imports the **checked** references it uses (nested ones come
+    along, unloaded ones are loaded first), merges namespaces and **saves the file in place** in its original type.
+    A confirmation lists what will change; a progress popup follows the files; a file that fails is not saved.
+  - Options, on by default: **Remove All Namespace** (every namespace in the scene; those of references that stay
+    referenced are kept) and **Backup** (`<folder>/backup/<name>_REF_NN.<ext>` - the same `backup/` folder as
+    A00220_BackupTool, which uses `_BU`).
+  - Right-click `Reveal in File Explorer` / `Copy file path` and double-click on all three lists, like the tree tab.
+- **This app runs outside Maya, so Maya work runs in `mayapy`**: `.ma` files are read from their header right here;
+  anything that needs Maya (`.mb` files, importing) is handed to a small worker script started with `mayapy.exe`
+  in the background. The progress popup follows it; Cancel stops after the current file. The **mayapy** box
+  (Browse... / Detect) is saved with the profile; empty means the newest Maya under Program Files.
+- The Maya tab lives in its own package `app/maya/` (core + ui) so it can become a separate tool later. Shared pieces
+  went to the Framework: `MOD_fileTree_qt_v01`, `MOD_checkTree_qt_v01`, `path_context`.
+  (It was first built into A00480_FileTool the same day and moved here; A00480 is unchanged.)
+
 ## [01.34] - 2026-10-01
 ### Changed
 - **Path Structure: the Preview tree's top item is now `.` instead of the Base Folder's name.**

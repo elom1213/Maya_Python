@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
 # last Update date : 2026-10-12
-# A00480_FileTool / Maya 탭 - 저장 전 원본 백업 (UI/DCC 비의존)
+# A00210_FileManager / Maya 탭 - 저장 전 원본 백업 (UI/DCC 비의존)
 #
 # 백업본은 원본 파일의 폴더 아래 `backup/` 에 둔다 - **A00220_BackupTool 과 같은 폴더**다(없으면 만들고
 # 있으면 그대로). A00220 은 `<이름>_BU<확장자>` · `<이름>_BU_NN<확장자>` 를 쓰므로, 이 툴의 백업은
