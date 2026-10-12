@@ -3,6 +3,9 @@
 # last Update date : 2026-10-12
 # A00120_FKIK - Qt UI (레거시 PY_JUN_makeUI_FKIKTool 대체)
 #
+# v01.12 (2026-10-12)
+#   - Setup 칸을 v01.10 높이로 되돌렸다. 리스트 · Manual/Auto 라디오 · 버튼을 한 줄에 두고,
+#     Auto 리스트는 TSL 위젯 대신 50px 고정 QListWidget. 모드에 맞는 버튼 하나만 보인다.
 # v01.11 (2026-10-12)
 #   - Setup 에 Manual / Auto 모드. Manual 은 예전처럼 Select Objects, Auto 는 Refresh 로 씬을
 #     네임스페이스 단위로 조사해 FK/IK 스위칭이 되는 리그를 리스트에 올린다 (core/fkik_scan.py).
@@ -101,8 +104,33 @@ class MainWindow(QWidget):
         box = QGroupBox("Setup")
         layout = QVBoxLayout(box)
 
+        # v01.12 : 한 줄 - [리스트(50px)] (Manual)(Auto) [Select Objects | Refresh].
+        # 라디오 행을 따로 두고 Auto 리스트를 TSL 위젯(헤더 포함)으로 만들었더니 칸이 v01.10 보다
+        # 58px 길어졌다. 리스트 50px 이 줄 높이를 정하고 나머지는 그 안에 들어가므로 세로는 v01.10 과 같다.
+        row = QHBoxLayout()
+
+        # 리스트 자리 : Manual = 선택한 오브젝트 / Auto = 네임스페이스 단위 리그
+        self.setup_stack = QStackedWidget()
+        self.setup_stack.setFixedHeight(50)
+
+        self.lw_rig = QListWidget()
+        self.lw_rig.setFixedHeight(50)
+        self.lw_rig.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.setup_stack.addWidget(self.lw_rig)
+
+        # 항목은 네임스페이스 라벨이라 씬 노드가 아니다 - 일반 QListWidget (편집 버튼 · UUID 없음).
+        self.lw_units = QListWidget()
+        self.lw_units.setFixedHeight(50)
+        self.lw_units.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.lw_units.setToolTip(
+            "Rigs found in the scene, by namespace.\n"
+            "Pick one to load its Targets / Followers.")
+        self.lw_units.itemSelectionChanged.connect(self.on_unit_selected)
+        self.setup_stack.addWidget(self.lw_units)
+
+        row.addWidget(self.setup_stack, 1)
+
         # 모드 : Manual (선택한 오브젝트) / Auto (씬 조사)
-        mode_row = QHBoxLayout()
         self.rb_manual = QRadioButton("Manual")
         self.rb_manual.setToolTip(
             "Select the rig (top node or any controls) in the scene,\n"
@@ -112,52 +140,21 @@ class MainWindow(QWidget):
             "Scan the scene by namespace and list every rig that can switch FK / IK.\n"
             "Press Refresh to scan again. Pick a rig in the list to load it.")
         self.rb_manual.setChecked(True)
-        mode_row.addWidget(self.rb_manual)
-        mode_row.addWidget(self.rb_auto)
-        mode_row.addStretch(1)
-        layout.addLayout(mode_row)
+        row.addWidget(self.rb_manual)
+        row.addWidget(self.rb_auto)
 
-        self.setup_stack = QStackedWidget()
-
-        # -- Manual : 선택 리스트 + Select Objects
-        manual_page = QWidget()
-        manual_row = QHBoxLayout(manual_page)
-        manual_row.setContentsMargins(0, 0, 0, 0)
-
-        self.lw_rig = QListWidget()
-        self.lw_rig.setFixedHeight(50)
-        self.lw_rig.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        manual_row.addWidget(self.lw_rig)
-
+        # 버튼 : 모드에 맞는 하나만 보인다
         self.btn_setup = QPushButton("Select Objects")
         self.btn_setup.clicked.connect(self.on_setup)
-        manual_row.addWidget(self.btn_setup)
-
-        self.setup_stack.addWidget(manual_page)
-
-        # -- Auto : 네임스페이스 단위 리그 리스트 + Refresh
-        auto_page = QWidget()
-        auto_row = QHBoxLayout(auto_page)
-        auto_row.setContentsMargins(0, 0, 0, 0)
-
-        # 항목은 네임스페이스 라벨이라 씬 노드가 아니다 - UUID 를 붙이지 않고, 편집 버튼도 없다.
-        self.tsl_units = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Rigs (by namespace)",
-            show_select=False, show_add=False, show_del=False,
-            show_up=False, show_down=False, show_sort=False, show_order=False,
-            multi_select=False, attach_uuids=False, list_min_height=50,
-            log_callback=self.log)
-        self.tsl_units.list_widget.itemSelectionChanged.connect(self.on_unit_selected)
-        auto_row.addWidget(self.tsl_units, 1)
+        row.addWidget(self.btn_setup)
 
         self.btn_refresh = QPushButton("Refresh")
         self.btn_refresh.setToolTip("Scan the scene again (by namespace).")
         self.btn_refresh.clicked.connect(self.on_refresh)
-        auto_row.addWidget(self.btn_refresh, 0, Qt.AlignTop)
+        self.btn_refresh.setVisible(False)
+        row.addWidget(self.btn_refresh)
 
-        self.setup_stack.addWidget(auto_page)
-
-        layout.addWidget(self.setup_stack)
+        layout.addLayout(row)
 
         self.lbl_state = QLabel("State : Waiting...")
         self.lbl_state.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
@@ -434,11 +431,27 @@ class MainWindow(QWidget):
         self.lbl_state.setStyleSheet(color)
 
     def _set_list_items(self, lw, items):
-        # Setup 의 lw_rig(일반 QListWidget) 채우기용. (Targets/Followers 는 tsl 위젯 사용)
+        # Setup 의 lw_rig / lw_units(일반 QListWidget) 채우기용. (Targets/Followers 는 tsl 위젯 사용)
         lw.blockSignals(True)
         lw.clear()
         for it in items:
             lw.addItem(it)
+        lw.blockSignals(False)
+
+    @staticmethod
+    def _selected_texts(lw):
+        return [it.text() for it in lw.selectedItems()]
+
+    @staticmethod
+    def _select_list_text(lw, text):
+        """시그널 없이 글이 같은 행 하나를 고른다 (없으면 아무것도 안 한다)."""
+        lw.blockSignals(True)
+        lw.clearSelection()
+        for i in range(lw.count()):
+            if lw.item(i).text() == text:
+                lw.setCurrentRow(i)
+                lw.item(i).setSelected(True)
+                break
         lw.blockSignals(False)
 
     def _load_unit(self, unit):
@@ -457,6 +470,8 @@ class MainWindow(QWidget):
     def _on_mode_toggled(self, auto):
         """Manual <-> Auto. Auto 로 들어올 때마다 씬을 새로 조사한다."""
         self.setup_stack.setCurrentIndex(1 if auto else 0)
+        self.btn_setup.setVisible(not auto)
+        self.btn_refresh.setVisible(auto)
         if auto:
             self.on_refresh()
 
@@ -486,14 +501,14 @@ class MainWindow(QWidget):
 
         전에 골라 둔 단위가 여전히 있으면 그것을, 없으면 첫 단위를 고른다(고르면 바로 로드된다).
         """
-        previous = self.tsl_units.selected_items()
+        previous = self._selected_texts(self.lw_units)
         previous = previous[0] if previous else None
 
         result = FKIKScanner.scan()
         units = result["units"]
         self._units = {u["label"]: u for u in units}
 
-        self.tsl_units.set_items([u["label"] for u in units])
+        self._set_list_items(self.lw_units, [u["label"] for u in units])
 
         for unit in result["skipped"]:
             self.log("[WARN] Skipped '%s' : %s" % (unit["label"], unit["message"]))
@@ -508,13 +523,13 @@ class MainWindow(QWidget):
         self.log("Refresh : %d rig(s) found." % len(units))
 
         pick = previous if previous in self._units else units[0]["label"]
-        # select_by_texts 는 시그널을 막으므로 로드는 직접 부른다.
-        self.tsl_units.select_by_texts([pick])
+        # _select_list_text 는 시그널을 막으므로 로드는 직접 부른다.
+        self._select_list_text(self.lw_units, pick)
         self._load_unit(self._units[pick])
 
     def on_unit_selected(self):
         """Auto 리스트에서 리그를 고르면 그 단위를 로드한다."""
-        selected = self.tsl_units.selected_items()
+        selected = self._selected_texts(self.lw_units)
         if not selected:
             return
         unit = self._units.get(selected[0])

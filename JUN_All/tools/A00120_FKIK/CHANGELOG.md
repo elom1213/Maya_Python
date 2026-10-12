@@ -2,6 +2,14 @@
 
 All notable changes to this tool are documented here.
 
+## [01.12] - 2026-10-12
+### Fixed
+- **Setup box is back to its v01.10 height.** v01.11 put the Manual / Auto radios on their own
+  row and used the shared tsl widget (with its header) for the Auto list, which made the box
+  58 px taller. The box is now one row - `[list] (Manual) (Auto) [Select Objects | Refresh]` -
+  with both lists fixed at 50 px (plain `QListWidget` for the Auto rigs, tooltip instead of the
+  `Rigs (by namespace)` title) and only the button that matches the mode visible.
+
 ## [01.11] - 2026-10-12
 ### Added
 - **Setup > Manual / Auto.** Manual is the old flow (select the rig, `Select Objects`). Auto

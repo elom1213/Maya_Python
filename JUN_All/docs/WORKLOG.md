@@ -48,6 +48,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - Remove 는 축별/sealBase 까지 되돌림. 검증 mayapy 52(정적 · JO 컨스트레인트 조인트 · X 키 · Attached 는 HEAD 와 월드 행렬 동일) + UI 오프스크린 19, 전부 통과.
 - 문서: `docs/A00170_driverTool.md` Free 모드 절, 포트폴리오 EN/KR 3-4 한 단락.
 
+> [!summary] A00120 FKIK — **Setup 칸 높이를 v01.10 으로 되돌림** (v01.11->01.12)
+- 요청: v01.11 뒤 Setup 칸 세로가 길어졌다 — 기존과 같게.
+- 원인(오프스크린 실측 108 → 166): Manual/Auto 라디오 행(36) + Auto 리스트를 헤더 있는 공용 TSL 로 만든 것(22). 테마의 라디오는 패딩·테두리가 있는 버튼 모양이라 라디오와 버튼을 세로로 겹쳐도 50px 안에 못 든다.
+- 한 줄 `[리스트(50 고정)] (Manual) (Auto) [Select Objects | Refresh]` — Auto 리스트는 일반 `QListWidget`(툴팁으로 설명), 버튼은 모드에 맞는 하나만 `setVisible`. `_selected_texts` / `_select_list_text` 헬퍼로 TSL 호출을 대체.
+- 검증: mayapy 2024 오프스크린(blue_dark) — 옛/새 Setup 둘 다 108, Auto 전환 시 Refresh 버튼·빈 씬 상태 메시지, Manual 복귀, 리스트 행 선택으로 단위 로드. 마야 GUI 확인은 아직.
+
 > [!summary] A00120 FKIK — **Setup Manual / Auto · 접이식 리스트 · Dev Mode · Bake 진행률 팝업** (v01.10->01.11)
 - 요청: Setup 을 Manual(Select Objects) / Auto(Refresh 로 씬을 네임스페이스 단위 조사) 로, Targets/Followers 는 접이식(기본 접힘) · Search 는 코드만 두고 숨김, A00330 의 Dev Mode 메뉴를 공용 위젯으로 올려 FKIK 도 쓰기, 배포 화면(Auto 기본 · 리스트 없음 · Bake (Constraint) 없음 · 로그 접힘 · Force Refresh 없음), Bake IK/FK 진행률 팝업.
 - Auto : `app/core/fkik_scan.py` `FKIKScanner.scan` — `ls("*BlendFKIKPos_grp*", recursive=True)` 로 모든 네임스페이스에서 찾아 네임스페이스마다 `FKIKSetup.resolve(톱 노드들)`. 한 네임스페이스에 리그가 여럿이면 톱 노드마다 `(root) | rigB_grp` 로 나눈다. 검증에 걸린 리그는 `[WARN] Skipped`. Auto 로 바꾸는 순간에도 조사하고, Refresh 는 전에 고른 단위를 유지한다. 리스트는 공용 TSL(버튼 없음 · `attach_uuids=False`).
