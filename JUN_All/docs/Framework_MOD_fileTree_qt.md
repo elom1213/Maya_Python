@@ -45,7 +45,9 @@ Build · Refresh · 필터 · File Types · Show files 로 행이 **다시 만�
 ## 우클릭 · 더블클릭은 공용 헬퍼
 
 `Framework/qt/path_context.py` — `attach_path_context(view, path_of_item, title)` 가 `Reveal in File Explorer` /
-`Copy file path` 메뉴와 더블클릭(= Reveal) 을 QListWidget · QTreeWidget 에 붙인다. A00210 Maya 탭의
+`Copy file path` 메뉴와 더블클릭(= Reveal) 을 QListWidget · QTreeWidget 에 붙인다. 경로가 **정션을 거치면**
+(`origin_of(path)` — `realpath` 가 다른 곳을 가리킴) Reveal 이 `(Junction)`(보이는 경로) / `(Origin)`(실제 폴더)
+둘로 갈린다(2026-10-12, A00240 v01.21). `build_path_menu(view, path)` 는 메뉴를 만들기만 한다(테스트 · 항목 추가용). A00210 Maya 탭의
 Maya File 리스트 · Reference 트리도 같은 헬퍼를 써서 문구 · 실패 안내가 같다.
 
 ## 쓰는 곳

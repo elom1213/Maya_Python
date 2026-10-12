@@ -2,6 +2,15 @@
 
 All notable changes to this tool are documented here.
 
+## [01.21] - 2026-10-12
+### Added
+- **Tree tab: junction-aware Reveal.** Right-clicking a junction (or any path that goes *through*
+  a junction) now offers **Reveal in File Explorer (Junction)** - the path as shown in the tree - and
+  **Reveal in File Explorer (Origin)** - the real folder the junction points to. Plain paths keep the
+  single *Reveal in File Explorer*. Double-click still opens the path as shown (same as *Junction*).
+  Lives in the shared `Framework/qt/path_context.py` (`origin_of`, `build_path_menu`), so the Expand
+  window and the other tools using that helper get it too.
+
 ## [01.20] - 2026-10-12
 ### Changed
 - **Tree tab moved to the shared Framework** as `JUN_mod_fileTree_qt_v01`

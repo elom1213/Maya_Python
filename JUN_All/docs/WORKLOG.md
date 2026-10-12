@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00240 PathTool — **Tree 탭: 정션 우클릭에 Reveal (Junction) / (Origin)** (v01.20->01.21, Framework `path_context`)
+- 요청: Tree 에서 정션 항목(`main\tgt_0010`)을 더블클릭하면 정션을 거친 경로가 열린다. 우클릭에 `Reveal in File Explorer (Junction)` / `(Origin)` 두 항목을 두어 후자가 원본(`...\tgt_0010`)을 열게 — 좋은 생각이면 그대로.
+- 판단: 그대로 구현. 더블클릭은 **보이는 경로 그대로**(= Junction) 유지 — 트리에 적힌 것이 열려야 놀랍지 않고 원본은 메뉴에서 고른다.
+- `Framework/qt/path_context.py`(공용): `origin_of(path)` = `realpath` 가 정규화 경로와 다르면 실제 경로(정션 · 심볼릭 링크, **정션을 거친 하위 경로도**), `build_path_menu(view, path)` 가 origin 있으면 Junction/Origin 두 Reveal + Copy, 없으면 기존 Reveal + Copy. `show_path_menu` 는 그걸 띄우기만. Tree 탭 · Expand 창 · A00210 Maya 탭 리스트가 같은 헬퍼라 모두 적용.
+- 검증: 오프스크린 PySide6 + 임시 폴더 실제 `mklink /J` 18 항목 — origin_of 6 경우, 메뉴 문구 · 각 항목이 여는 경로(open_path 가로채기) · 툴팁 · 일반 폴더 메뉴 불변 · Copy · 정션을 거친 파일 · 트리 위젯에서 정션 항목 툴팁과 더블클릭. 마야/실기 탐색기 팝업 확인은 아직.
+- 문서: `docs/A00240_PathTool.md` 더블클릭 · 우클릭 절, `docs/Framework_MOD_fileTree_qt.md`, CHANGELOG 01.21.
+
 > [!summary] A00210 FileManager — **창 크기를 가장자리로 자유롭게 조절** (v01.35->01.36)
 - 문제(사용자): 가장자리를 끌어도 창 크기가 안 바뀐다. 원인: `QTabWidget` 최소 크기 = **숨은 페이지까지** 모든 페이지 최소의 최댓값(오프스크린 1752 x 1206 — File Manager 탭 세로 1032, Lineage 탭 가로 1726, Maya 탭은 842 x 660 으로 무관). 창이 최소에 붙어 못 줄이고, 화면만큼 크면 못 늘린다.
 - 수정: 탭을 `QScrollArea` 에 담고(최소 266 x 213), 첫 showEvent 다음 루프의 `fit_to_content()` 가 예전 자연 크기를 모니터 작업 영역까지로 잘라 연다(A00480 v01.07 과 같은 길). 여는 크기는 그대로, 그 뒤 자유.

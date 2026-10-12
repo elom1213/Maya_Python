@@ -2,5 +2,5 @@
 # last Update date : 2026-07-03
 # A00240_PathTool - version info
 
-VERSION = "01.20"
+VERSION = "01.21"
 LAST_UPDATE = "2026-10-12"

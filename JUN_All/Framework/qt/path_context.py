@@ -9,9 +9,19 @@
 #
 #   attach_path_context(view, path_of_item)   # 우클릭 메뉴 + 더블클릭(= Reveal) 을 뷰에 붙인다
 #   show_path_menu(view, global_pos, path)    # 메뉴만 띄운다(직접 customContextMenuRequested 를 받을 때)
+#   build_path_menu(view, path)               # 메뉴를 만들기만(테스트 · 항목을 더 얹을 때)
 #   reveal_path(parent, path) / copy_path(parent, path)
+#   origin_of(path)                           # 정션을 거친 경로면 실제(원본) 경로, 아니면 None
 #
 # 탐색기 열기 자체는 Framework/core/file_opener.open_path (OS 비의존) 다.
+#
+# ## 정션 (2026-10-12, A00240 v01.21)
+# 경로가 디렉터리 정션(mklink /J)이거나 정션을 **거친** 경로면(`os.path.realpath` 가 다른 곳을 가리키면)
+# Reveal 이 두 개로 갈린다 — `Reveal in File Explorer (Junction)` 은 보이는 그 경로(정션을 거친 경로)를,
+# `Reveal in File Explorer (Origin)` 은 실제 폴더를 탐색기에서 연다. 더블클릭은 그대로 보이는 경로(= Junction)
+# 다 — 트리에 적힌 그대로가 열려야 놀랍지 않고, 원본은 메뉴에서 고른다.
+# `realpath` 는 Windows 에서 정션 · 심볼릭 링크를 모두 푼다(Python 3.8+). 중간에 정션이 끼어 있는 하위 경로도
+# 같은 방식으로 원본이 나온다(`main\tgt\sub` -> `<tgt 원본>\sub`).
 
 import os
 
@@ -24,7 +34,31 @@ from Framework.qt.qt import (
 from Framework.core import file_opener
 
 MENU_REVEAL = "Reveal in File Explorer"
+MENU_REVEAL_JUNCTION = "Reveal in File Explorer (Junction)"
+MENU_REVEAL_ORIGIN = "Reveal in File Explorer (Origin)"
 MENU_COPY = "Copy file path"
+
+
+def origin_of(path):
+    """path 가 정션(또는 심볼릭 링크)을 거치면 **실제 경로**를, 아니면 None.
+
+    `os.path.realpath` 로 푼 경로가 정규화한 원래 경로와 다를 때만 돌려준다(대소문자 무시 — Windows).
+    경로가 없거나 풀 수 없으면 None(메뉴는 평소대로 Reveal 하나).
+    """
+    if not path:
+        return None
+    try:
+        norm = os.path.normpath(os.path.abspath(path))
+        if not os.path.exists(norm):
+            return None
+        real = os.path.normpath(os.path.realpath(norm))
+    except (OSError, ValueError):
+        return None
+    if real.startswith("\\\\?\\"):
+        real = real[4:]
+    if os.path.normcase(real) == os.path.normcase(norm):
+        return None
+    return real
 
 
 def reveal_path(parent, path, title="Path"):
@@ -57,18 +91,39 @@ def copy_path(parent, path, title="Path"):
     return True
 
 
+def build_path_menu(view, path, title="Path"):
+    """Reveal / Copy 메뉴를 만든다(띄우지는 않는다). (QMenu, {action: 실행 함수})
+
+    path 가 정션을 거치면(`origin_of`) Reveal 이 `(Junction)` / `(Origin)` 둘로 갈린다 —
+    전자는 보이는 경로, 후자는 실제 폴더. 아니면 Reveal 하나.
+    """
+    menu = QMenu(view)
+    handlers = {}
+    origin = origin_of(path)
+    if origin:
+        act = menu.addAction(MENU_REVEAL_JUNCTION)
+        act.setToolTip(path)
+        handlers[act] = lambda: reveal_path(view, path, title)
+        act = menu.addAction(MENU_REVEAL_ORIGIN)
+        act.setToolTip(origin)
+        handlers[act] = lambda: reveal_path(view, origin, title)
+    else:
+        act = menu.addAction(MENU_REVEAL)
+        handlers[act] = lambda: reveal_path(view, path, title)
+    act = menu.addAction(MENU_COPY)
+    handlers[act] = lambda: copy_path(view, path, title)
+    return menu, handlers
+
+
 def show_path_menu(view, global_pos, path, title="Path"):
-    """Reveal / Copy 두 항목짜리 메뉴를 띄우고 고른 것을 실행한다. path 가 비면 아무것도 안 한다."""
+    """Reveal(정션이면 Junction / Origin 둘) / Copy 메뉴를 띄우고 고른 것을 실행한다. path 가 비면 아무것도 안 한다."""
     if not path:
         return None
-    menu = QMenu(view)
-    act_reveal = menu.addAction(MENU_REVEAL)
-    act_copy = menu.addAction(MENU_COPY)
+    menu, handlers = build_path_menu(view, path, title)
     chosen = menu.exec_(global_pos)
-    if chosen == act_reveal:
-        reveal_path(view, path, title)
-    elif chosen == act_copy:
-        copy_path(view, path, title)
+    handler = handlers.get(chosen)
+    if handler:
+        handler()
     return chosen
 
 

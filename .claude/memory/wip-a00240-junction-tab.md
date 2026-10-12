@@ -34,3 +34,8 @@ A00240_PathTool v01.19 (2026-10-12) **Junction** 탭 — Create / Remove 하위 
 **How to apply:** 정션을 다루는 다른 툴(A00210 · A00220)도 판별/삭제는 `tools.A00240_PathTool.app.core.junction`
 을 그대로 가져다 쓰면 된다(UI 비의존). 검증은 오프스크린 PySide6 + 임시 폴더에 실제 mklink.
 관련: [[wip-a00240-tree-omit]] · [[framework-tsl-attach-uuids]](경로 리스트는 `attach_uuids=False`).
+
+**v01.21 (2026-10-12, 사용자 요청)** — Tree 정션 우클릭 `Reveal in File Explorer (Junction)` / `(Origin)`.
+공용 `Framework/qt/path_context.py` 에 `origin_of(path)`(= `realpath` 가 다르면 실제 경로; 정션을 **거친** 하위 경로도 잡힘)
+와 `build_path_menu` 를 두어 Tree · Expand · A00210 Maya 탭이 함께 받는다. 더블클릭은 보이는 경로 그대로(사용자 제안대로).
+검증은 오프스크린 PySide6 + 실제 mklink /J, `file_opener.open_path` 를 가로채 어느 경로가 열리는지 본다.
