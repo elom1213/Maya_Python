@@ -35,3 +35,8 @@ qss 패딩이 더해져 30px 가 되고 그제서야 25px 로 눌린 게 보인�
 
 관련: [[framework-tsl-list-limit]], [[wip-tsl-uuid-selection]], [[mayapy-headless-verify]],
 [[qapplication-before-maya-standalone]], [[prefer-subtabs-over-stacked-collapsibles]].
+
+**같은 계열 (2026-10-12, A00470 v01.11)** — TSL 이 아니라도 **버튼에 테마 sizeHint 보다 낮은
+`setMinimumHeight(26)` 을 주는 것 자체가 같은 사고**다. 창이 탭 내용보다 작으면 레이아웃이 **명시한 바닥까지**
+눌러 글자가 잘린다(teal_dark 버튼 sizeHint 30 → 26 으로 실측). 바닥을 주지 않으면 Fixed 정책이 sizeHint 를
+지켜 눌리지 않으므로, 버튼을 "크게" 보이게 하려는 목적이 아니면 `setMinimumHeight` 를 쓰지 말 것.

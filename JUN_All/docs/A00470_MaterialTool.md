@@ -16,7 +16,8 @@ Maya 안에서 도는 **머티리얼 이름 진단** PySide 툴이다(arch B, in
 | **Name Check** (v01.00) | 메시 → 머티리얼 수집 → 프로파일(JSON) 규칙으로 진단 → 리포트(클립보드 복사) → **제안한 이름으로 바꾸기**(v01.07) · **Select Materials / Select Faces**(v01.10) |
 | **Copy Material** (v01.05) | 소스 메시 M 을 **UUID 로 기억** → 리스트의 메시 M_i 에 **면마다 같은 머티리얼**을 건다 |
 
-- **버전**: `app/config/version.py` (v01.10 — **`Select Materials` / `Select Faces`**(§1.2)
+- **버전**: `app/config/version.py` (v01.11 — 버튼 글자 잘림 수정 · **Sort · Reverse · List Materials 한 줄**(§1.3)
+  · v01.10 — **`Select Materials` / `Select Faces`**(§1.2)
   · v01.09 — 기본 프로파일 **`Set_v001`**
   · v01.08 — **릴리즈본이 다른 PC 에서 안 열리던 문제** 수정(§5-B)
   · v01.07 — **`Rename to Suggested`** 버튼 + 리포트 순서·색
@@ -29,7 +30,8 @@ Maya 안에서 도는 **머티리얼 이름 진단** PySide 툴이다(arch B, in
 ## 1. 쓰는 법
 
 1. 씬에서 메시를 고르고 **`Select Meshes`** (또는 `Add`) 로 리스트에 담는다.
-2. **`List Materials`** — 리스트의 메시에 붙은 머티리얼을 모아 표에 띄운다.
+2. **`List Materials`** — 리스트의 메시에 붙은 머티리얼을 모아 표에 띄운다. 리스트 아래
+   `[Sort] [Reverse] [List Materials]` 한 줄에 있다(v01.11).
    - **더블클릭하면** 그 **머티리얼 노드**가 씬에서 선택된다. 여러 행을 골라 둔 상태면 **고른 것
      전부**가 선택된다. **한 번 클릭으로는 씬 선택이 바뀌지 않는다** — 목록을 훑어보는 동안
      선택이 딸려 바뀌지 않도록 한 것이다(v01.03 에서 바뀐 동작).
@@ -105,6 +107,16 @@ v01.10 은 (`app/core/maya_materials.py`):
 3. 선택은 **API `MGlobal.setActiveSelectionList`** — 인덱스를 `MFnSingleIndexedComponent` 에 담아 한 번에.
    `cmds.select(문자열 2만 개)` 는 **1.4초**, API 는 **0.001초**(4만 면 체커보드, mayapy 2024 실측).
    API 가 실패하면 `cmds.select` 로 폴백한다.
+
+### 1.3 레이아웃 (v01.11) — 버튼 글자 잘림 · Sort / Reverse / List Materials 한 줄
+
+- **버튼 글자가 잘리던 것** — `Select Materials` / `Select Faces` 에 `setMinimumHeight(26)` 을 줘 두었는데
+  테마(`teal_dark`) 버튼은 패딩 때문에 **30px 가 필요**하다. 창이 탭 내용보다 작으면 레이아웃이 **명시한
+  바닥(26)까지** 눌러 글자가 잘렸다(오프스크린 실측 26px, 다른 버튼은 30px). 탭의 버튼에서 명시 최소 높이를
+  모두 걷어냈다 — 바닥을 안 주면 Fixed 정책이 sizeHint 를 지켜 눌리지 않는다.
+- **Sort · Reverse · List Materials 한 줄** — TSL 이 세로로 두던 Sort / Reverse 를 빼내어 `List Materials` 와
+  가로 한 줄로(TSL 그룹 안 맨 아래). 세로 두 줄이 줄어 탭 최소 높이 **816 → 750px**(테마 입힌 오프스크린,
+  버튼 8개 모두 30px 유지).
 
 ### 옵션
 

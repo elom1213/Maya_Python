@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00470 MaterialTool — **Name Check 버튼 글자 잘림 수정 · Sort / Reverse / List Materials 한 줄** (v01.10->01.11)
+- 요청: Select Materials / Select Faces 세로가 작아 글자가 안 보임. Sort · Reverse · List Materials 를 가로 한 줄로, 바꾼 뒤 세로가 줄었는지 확인.
+- 원인(오프스크린 teal_dark 실측): 테마 버튼 sizeHint 30px 인데 `setMinimumHeight(26/28)` 이 바닥을 낮춰, 창(520x820)이 탭 내용(최소 816)보다 작을 때 레이아웃이 그 버튼들만 26/28 로 눌렀다. 탭 버튼의 명시 최소 높이를 전부 제거 → 8개 모두 30px.
+- 한 줄: TSL 레이아웃에서 `btn_sort`/`btn_reverse` 를 `removeWidget` 으로 빼내 `List Materials` 와 QHBoxLayout 에 담고 TSL 안 맨 아래에 붙임(그룹 안 유지). Sort/Reverse/List 클릭 동작 확인.
+- 결과: 탭 최소 높이 **816 → 750px**(−66), 창 minimumSizeHint 1109 → 1043. 46항목 회귀 통과. 마야 GUI 확인은 아직.
+
 > [!summary] A00400 CurveTool — **Shape Edit: 레퍼런스 커브의 셰이프 수정이 저장 후에도 유지** (v01.24->01.25)
 - 요청: Display > Shape Edit 으로 레퍼런스 커브의 셰이프를 고치고 저장 → 다시 열면 반영이 안 됨. 레퍼런스 커브도 고쳐지고 저장 후에도 유지되게.
 - 원인: `shape_xform_manager._write_points` 가 `cmds.curve -replace` 로만 썼다. 이 명령은 레퍼런스 셰이프에서 그 세션에만 먹고 레퍼런스 edit 로 기록되지 않는다([[referenced-curve-cv-write]] — Replace 탭은 v01.22 에 이미 우회).

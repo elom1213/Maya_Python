@@ -108,3 +108,8 @@ metadata:
   에 보이지만 `listSets(object=shape)` 엔 없다. 멤버 있는 엔진만 남기도록 해 `standardSurface1` 가짜 행을 없앴다.
 - 셰이프 둘인 트랜스폼에 `t.f[0:2]` 를 배정하면 마야는 **두 셰이프 모두**에 넣고 멤버도 셰이프 기준으로 준다.
 - 검증 mayapy 2024 + 오프스크린 46항목. 마야 GUI 확인 아직. 관련: [[shading-per-face-assignment]].
+
+**레이아웃 (v01.11, 2026-10-12)** — ★ **버튼에 테마 sizeHint(30px) 보다 낮은 `setMinimumHeight(26)` 을 주면 창이
+작을 때 그 바닥까지 눌려 글자가 잘린다.** Fixed 정책 버튼은 바닥을 안 주면 sizeHint 를 지킨다 — 탭 버튼의 명시
+최소 높이를 전부 뺐다. Sort · Reverse · List Materials 는 TSL 레이아웃에서 `removeWidget` 으로 빼내 한 줄로(TSL 안
+맨 아래). 탭 최소 높이 816 → 750. 관련: [[tsl-widget-max-height-squeezes-buttons]], [[offscreen-size-needs-theme]].

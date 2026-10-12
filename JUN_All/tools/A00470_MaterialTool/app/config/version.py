@@ -24,5 +24,9 @@
 #        셰이딩 세트의 멤버 구간(`f[0:511]`)을 그대로 모아 select 한 번 - 오브젝트째 배정도
 #        페이스로, 기본은 리스트의 메시로 범위를 좁힌다(끄면 씬 전체 = 레거시 동작).
 
-VERSION = "01.10"
+# 01.11  Name Check 레이아웃 : 버튼의 명시 setMinimumHeight 제거 - 테마 sizeHint(30px) 보다 낮은 바닥이
+#        창이 작을 때 Select Materials / Select Faces 글자를 잘랐다(실측 26px). Sort · Reverse ·
+#        List Materials 를 TSL 안 한 줄로 - 탭 최소 높이 816 -> 750px (오프스크린 teal_dark 실측).
+
+VERSION = "01.11"
 LAST_UPDATE = "2026-10-12"

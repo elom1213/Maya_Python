@@ -86,14 +86,26 @@ class NameCheckTab(QWidget):
         )
         layout.addWidget(self.tsl)
 
+        # ★ 버튼에 `setMinimumHeight(26)` 같은 **sizeHint(테마 30px) 보다 낮은 바닥**을 주지 말 것.
+        #   창이 탭 내용보다 작으면 레이아웃이 바닥까지 눌러 **글자가 잘린다**(v01.10 에서 실측).
+        #   바닥을 안 주면 Fixed 정책이 sizeHint 를 지켜 눌리지 않는다.
         self.btn_list = QPushButton("List Materials")
-        self.btn_list.setMinimumHeight(28)
         self.btn_list.setToolTip(
             "Collect the materials assigned to the listed meshes.\n"
             "Every non-intermediate shape under a transform is read, so a mesh with\n"
             "several shapes does not hide a material.")
         self.btn_list.clicked.connect(self.on_list_materials)
-        layout.addWidget(self.btn_list)
+
+        # TSL 의 Sort / Reverse 와 List Materials 를 **한 줄**로 (v01.11) - 세로 두 줄을 아낀다.
+        # TSL 이 자기 레이아웃에 세로로 둔 두 버튼을 빼내어 가로 행에 다시 담고, 그 행을 TSL 안
+        # 맨 아래에 붙인다(그룹 안에 머물러 리스트 조작 버튼으로 읽힌다).
+        tsl_layout = self.tsl.layout()
+        tool_row = QHBoxLayout()
+        for button in (self.tsl.btn_sort, self.tsl.btn_reverse):
+            tsl_layout.removeWidget(button)
+            tool_row.addWidget(button)
+        tool_row.addWidget(self.btn_list, stretch=1)
+        tsl_layout.addLayout(tool_row)
 
         # ---- 프로파일 ------------------------------------------------
         profile_box = QGroupBox("Rule Profile")
@@ -150,7 +162,6 @@ class NameCheckTab(QWidget):
         select_row = QHBoxLayout()
 
         self.btn_select_materials = QPushButton("Select Materials")
-        self.btn_select_materials.setMinimumHeight(26)
         self.btn_select_materials.setToolTip(
             "Select the material nodes of the rows chosen in the table\n"
             "(every listed material when no row is chosen).\n"
@@ -159,7 +170,6 @@ class NameCheckTab(QWidget):
         select_row.addWidget(self.btn_select_materials)
 
         self.btn_select_faces = QPushButton("Select Faces")
-        self.btn_select_faces.setMinimumHeight(26)
         self.btn_select_faces.setToolTip(
             "Select every face that uses the chosen materials\n"
             "(every listed material when no row is chosen).\n"
@@ -205,7 +215,6 @@ class NameCheckTab(QWidget):
         layout.addWidget(options_box)
 
         self.btn_check = QPushButton("Check Names")
-        self.btn_check.setMinimumHeight(30)
         self.btn_check.setToolTip(
             "Diagnose every listed material name against the selected profile.\n"
             "Nothing in the scene is changed.")
@@ -213,7 +222,6 @@ class NameCheckTab(QWidget):
         layout.addWidget(self.btn_check)
 
         self.btn_rename = QPushButton("Rename to Suggested")
-        self.btn_rename.setMinimumHeight(30)
         self.btn_rename.setToolTip(
             "Rename every listed material that has a suggested name, to that name.\n"
             "Names that already follow the rule are left alone, and so is any\n"
