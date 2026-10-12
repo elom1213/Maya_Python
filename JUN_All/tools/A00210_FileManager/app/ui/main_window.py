@@ -36,6 +36,10 @@ from Framework.qt.qt import (
     QMenu,
     QPixmap,
     QIcon,
+    QFrame,
+    QStyle,
+    QGuiApplication,
+    QTimer,
     Qt,
 )
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
@@ -274,8 +278,62 @@ class MainWindow(QWidget):
         self.maya_tab = MayaTab(log=self.log)
         self.tabs.addTab(self.maya_tab, "Maya")
 
-        root.addWidget(self.tabs, stretch=1)
+        # v01.36 : 탭을 스크롤 칸에 담는다. QTabWidget 의 최소 크기는 **안 보이는 페이지까지 포함한** 모든
+        # 페이지 최소 크기의 최댓값이라(File Manager 탭의 세로, Lineage 탭의 가로), 창이 그 크기에 붙어
+        # 가장자리를 끌어도 줄지 않았고 화면보다 크면 늘지도 않았다. 스크롤 칸은 최소 크기가 작아 창을
+        # 자유롭게 줄일 수 있고, 내용보다 작아지면 스크롤바가 생긴다. 여는 크기는 fit_to_content 가
+        # 예전과 같은 값(탭 최소 크기, 화면 작업 영역까지)으로 맞춘다.
+        self.tabs_scroll = QScrollArea()
+        self.tabs_scroll.setWidgetResizable(True)
+        self.tabs_scroll.setFrameShape(QFrame.NoFrame)
+        self.tabs_scroll.setWidget(self.tabs)
+        root.addWidget(self.tabs_scroll, stretch=1)
         root.addWidget(self.log_widget)
+        self._fitted = False
+
+    # ============================================================== 창 크기
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self._fitted:
+            self._fitted = True
+            # 테마가 자식에 입혀진(polish) 뒤에 재야 글자 크기가 맞는다 - 다음 이벤트 루프에서.
+            QTimer.singleShot(0, self.fit_to_content)
+
+    def fit_to_content(self):
+        """처음 열 때의 크기 = 탭을 스크롤 칸에 담기 전과 같은 크기(탭 최소 크기 + 로그 + 여백),
+        단 모니터 작업 영역을 넘지 않는다. 그 뒤로는 사용자가 가장자리를 끌어 자유롭게 바꾼다 (v01.36)."""
+        content = self.tabs.minimumSizeHint()
+        base = self.minimumSizeHint()
+        scroll_min = self.tabs_scroll.minimumSizeHint()
+        full_w = base.width() - scroll_min.width() + content.width()
+        full_h = base.height() - scroll_min.height() + content.height()
+
+        screen = self.screen() if hasattr(self, "screen") else None
+        if screen is None:
+            screen = QGuiApplication.screenAt(self.frameGeometry().center())
+        if screen is None:
+            screen = QGuiApplication.primaryScreen()
+        avail = screen.availableGeometry()
+        frame_w = self.frameGeometry().width() - self.geometry().width()
+        frame_h = self.frameGeometry().height() - self.geometry().height()
+        max_w = avail.width() - max(frame_w, 0)
+        max_h = avail.height() - max(frame_h, 0)
+
+        width, height = min(full_w, max_w), min(full_h, max_h)
+        # 내용보다 작게 열리면 스크롤바가 생긴다 - 그 폭만큼 넓혀 내용이 가로로 잘리지 않게(높이도 같은 이유).
+        bar = self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
+        if height < full_h:
+            width = min(width + bar, max_w)
+        if width < full_w:
+            height = min(height + bar, max_h)
+        self.resize(width, height)
+
+        frame = self.frameGeometry()
+        x = min(max(frame.left(), avail.left()), max(avail.left(), avail.right() - frame.width() + 1))
+        y = min(max(frame.top(), avail.top()), max(avail.top(), avail.bottom() - frame.height() + 1))
+        if (x, y) != (frame.left(), frame.top()):
+            self.move(x, y)
 
     def _build_file_manager_tab(self):
         page = QWidget()

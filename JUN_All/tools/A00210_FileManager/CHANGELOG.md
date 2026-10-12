@@ -2,6 +2,15 @@
 
 All notable changes to this tool are documented here.
 
+## [01.36] - 2026-10-12
+### Fixed
+- **The window can be resized again by dragging its edges.** It opens at the same size as before, but that
+  size is no longer its minimum. Cause: a `QTabWidget`'s minimum size is the largest minimum of **all** its
+  pages, hidden ones included (the File Manager page sets the height, the Lineage page the width), so the
+  window sat on its minimum and could not shrink - and could not grow either when it was already as tall
+  as the screen. The tabs now sit in a scroll area; `fit_to_content()` opens the window at the old natural
+  size, capped to the monitor's work area, and a scrollbar appears only if you make it smaller than the content.
+
 ## [01.35] - 2026-10-12
 ### Added
 - **New `Maya` tab** for working on Maya scene files on disk, with a first sub-tab **`Reference`**.

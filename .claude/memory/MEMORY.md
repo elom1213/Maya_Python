@@ -28,6 +28,7 @@
 - [mayapy headless verify](mayapy-headless-verify.md) — maya.cmds 동작은 mayapy + standalone 으로 확인
 - [maya reference import traps](maya-reference-import-traps.md) — `loadReferenceDepth none` 으로 열어 저장하면 레퍼런스가 언로드로 굳는다(스캔만 none, 저장 작업은 기본 열기) · 언로드는 import 불가(먼저 load) · 부모 import 시 중첩이 최상위로 올라온다 · `.ma` 머리글 file 문장은 여러 줄 · mayapy 워커는 모든 경로에서 `uninitialize` 해야 종료 코드가 안 깨진다
 - [offscreen size needs theme](offscreen-size-needs-theme.md) — 창 크기는 테마 qss 를 입히고 재라 (한 줄에 나란히 둔 것이 최소 폭) · **테마를 입혀도 오프스크린 px > 마야 px — 잰 최소 폭을 창 크기로 박지 말 것**
+- [QTabWidget min size = all pages](qtabwidget-min-size-hidden-pages.md) — 숨은 페이지까지 최소의 최댓값이라 창이 거기 붙어 가장자리로 못 줄인다 → 탭을 QScrollArea 에, 여는 크기는 fit_to_content 로 (A00210 v01.36)
 - [window taller than screen](window-taller-than-screen-ghost.md) — 창을 레이아웃 크기로 맞추면 화면을 넘어 잘린 아래에 로그창 잔상/흰 영역 → "로그창 2개" 보고, 탭 스크롤 + 작업 영역 높이로 제한
 - [QApplication before standalone](qapplication-before-maya-standalone.md) — `QApplication` 을 `initialize()` 앞에
 - [undo_chunk by default](undo-chunk-by-default.md) — 반복 씬 변경은 `undo_chunk()` 로
