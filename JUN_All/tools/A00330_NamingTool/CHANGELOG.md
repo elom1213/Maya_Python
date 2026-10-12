@@ -1,5 +1,14 @@
 # Changelog — A00330_NamingTool
 
+## v01.27 (2026-10-12)
+**[Change] `Dev Mode` 메뉴를 공용 위젯으로.**
+
+- 메뉴 바 Help 오른쪽의 `Dev Mode` (Developer / Release (shared tool)) 는 이제 `Framework/qt/MOD_devMode_qt_v01.py`
+  (`JUN_mod_devMode_qt_v01`) 다. A00120_FKIK 도 같은 메뉴를 쓴다. 보이는 모양 · 동작은 v01.26 과 같다.
+- 개발자 모드 판정(`app/config/dev_mode.py`)은 `Framework/core/dev_mode.py` 의 공용 규칙을 부르는 얇은 껍데기가 됐다
+  (규칙 자체는 같다 - 툴 폴더 안에 Framework 가 동봉돼 있으면 배포본, 아니면 `JUN_All/config.py` 의 `DEV_MODE`).
+- 메뉴 <-> Token 위젯(`rules_editable`)은 양방향으로 맞춘다 - 어느 쪽에서 바뀌어도 다른 쪽이 따라간다.
+
 ## v01.26 (2026-10-02)
 **[Change] 개발 / 배포 화면 전환을 메뉴 바의 `Dev Mode` 메뉴로.**
 

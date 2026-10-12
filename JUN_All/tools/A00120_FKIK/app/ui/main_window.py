@@ -1,15 +1,26 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-05
+# last Update date : 2026-10-12
 # A00120_FKIK - Qt UI (레거시 PY_JUN_makeUI_FKIKTool 대체)
+#
+# v01.11 (2026-10-12)
+#   - Setup 에 Manual / Auto 모드. Manual 은 예전처럼 Select Objects, Auto 는 Refresh 로 씬을
+#     네임스페이스 단위로 조사해 FK/IK 스위칭이 되는 리그를 리스트에 올린다 (core/fkik_scan.py).
+#   - Targets / Followers 두 리스트는 접이식(기본 접힘). Search 는 코드만 남기고 화면에서 숨겼다.
+#   - 메뉴 바 `Dev Mode` (공용 JUN_mod_devMode_qt_v01) 로 Developer / Release 화면을 번갈아 본다.
+#     Release 화면 = Auto 기본 · 두 리스트 없음 · Bake (Constraint) 없음 · 로그 접힘 · Force Refresh 없음.
+#   - Bake IK / Bake FK 는 공용 진행률 팝업(JUN_mod_progress_qt_v01)으로 프레임 진행을 보인다.
 
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_timeRange_qt
+from Framework.qt import JUN_mod_collapsible_qt
+from Framework.qt import JUN_mod_progress_qt
 from Framework.core.maya_refresh import force_refresh
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_devMode_qt_v01 import JUN_mod_devMode_qt_v01
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -18,6 +29,7 @@ import maya.cmds as cmds
 from tools.A00120_FKIK.app.config.version import VERSION, LAST_UPDATE
 from tools.A00120_FKIK.app.core import (
     FKIKSetup,
+    FKIKScanner,
     FKIKMatcher,
     search_by_token,
 )
@@ -32,6 +44,10 @@ class MainWindow(QWidget):
         self.win_width  = 480
         self.win_height = 760
         self.win_title  = f"FKIK Tool v{VERSION}"
+
+        # Auto 모드가 찾은 단위들 - 리스트 표시 라벨 -> unit dict (core/fkik_scan.py)
+        self._units = {}
+        self._fitted_once = False
 
         self.resize(self.win_width, self.win_height)
 
@@ -61,6 +77,20 @@ class MainWindow(QWidget):
         self._build_search_section(root)
         self._build_match_bake_section(root)
         self._build_log_section(root)
+        root.addStretch(1)
+
+        # Help 오른쪽의 `Dev Mode` 메뉴 (공용 위젯, 개발자 모드에서만 생긴다).
+        # 배포본은 메뉴가 없고 is_developer() 가 늘 False 라 Release 화면으로 고정된다.
+        self.dev_mode = JUN_mod_devMode_qt_v01(
+            self.menu_bar, tool_file=__file__,
+            developer_tooltip=(
+                "Developer view - Manual / Auto setup, Targets / Followers lists,\n"
+                "Bake (Constraint), full log, Force Refresh."),
+            release_tooltip=(
+                "The view people get in the shared tool - Auto setup only,\n"
+                "no lists, no Bake (Constraint), log collapsed."))
+        self.dev_mode.modeChanged.connect(self.apply_view)
+        self.apply_view(self.dev_mode.is_developer())
 
     # --------------------------------------------------
     # Setup
@@ -71,23 +101,70 @@ class MainWindow(QWidget):
         box = QGroupBox("Setup")
         layout = QVBoxLayout(box)
 
-        row = QHBoxLayout()
+        # 모드 : Manual (선택한 오브젝트) / Auto (씬 조사)
+        mode_row = QHBoxLayout()
+        self.rb_manual = QRadioButton("Manual")
+        self.rb_manual.setToolTip(
+            "Select the rig (top node or any controls) in the scene,\n"
+            "then press Select Objects to resolve Targets / Followers.")
+        self.rb_auto = QRadioButton("Auto")
+        self.rb_auto.setToolTip(
+            "Scan the scene by namespace and list every rig that can switch FK / IK.\n"
+            "Press Refresh to scan again. Pick a rig in the list to load it.")
+        self.rb_manual.setChecked(True)
+        mode_row.addWidget(self.rb_manual)
+        mode_row.addWidget(self.rb_auto)
+        mode_row.addStretch(1)
+        layout.addLayout(mode_row)
+
+        self.setup_stack = QStackedWidget()
+
+        # -- Manual : 선택 리스트 + Select Objects
+        manual_page = QWidget()
+        manual_row = QHBoxLayout(manual_page)
+        manual_row.setContentsMargins(0, 0, 0, 0)
 
         self.lw_rig = QListWidget()
         self.lw_rig.setFixedHeight(50)
         self.lw_rig.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        row.addWidget(self.lw_rig)
+        manual_row.addWidget(self.lw_rig)
 
         self.btn_setup = QPushButton("Select Objects")
         self.btn_setup.clicked.connect(self.on_setup)
-        row.addWidget(self.btn_setup)
+        manual_row.addWidget(self.btn_setup)
 
-        layout.addLayout(row)
+        self.setup_stack.addWidget(manual_page)
+
+        # -- Auto : 네임스페이스 단위 리그 리스트 + Refresh
+        auto_page = QWidget()
+        auto_row = QHBoxLayout(auto_page)
+        auto_row.setContentsMargins(0, 0, 0, 0)
+
+        # 항목은 네임스페이스 라벨이라 씬 노드가 아니다 - UUID 를 붙이지 않고, 편집 버튼도 없다.
+        self.tsl_units = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Rigs (by namespace)",
+            show_select=False, show_add=False, show_del=False,
+            show_up=False, show_down=False, show_sort=False, show_order=False,
+            multi_select=False, attach_uuids=False, list_min_height=50,
+            log_callback=self.log)
+        self.tsl_units.list_widget.itemSelectionChanged.connect(self.on_unit_selected)
+        auto_row.addWidget(self.tsl_units, 1)
+
+        self.btn_refresh = QPushButton("Refresh")
+        self.btn_refresh.setToolTip("Scan the scene again (by namespace).")
+        self.btn_refresh.clicked.connect(self.on_refresh)
+        auto_row.addWidget(self.btn_refresh, 0, Qt.AlignTop)
+
+        self.setup_stack.addWidget(auto_page)
+
+        layout.addWidget(self.setup_stack)
 
         self.lbl_state = QLabel("State : Waiting...")
         self.lbl_state.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self._set_state("State : Waiting...", ok=None)
         layout.addWidget(self.lbl_state)
+
+        self.rb_auto.toggled.connect(self._on_mode_toggled)
 
         root.addWidget(box)
 
@@ -122,22 +199,30 @@ class MainWindow(QWidget):
         root.addLayout(row)
 
     # --------------------------------------------------
-    # Targets / Followers lists
+    # Targets / Followers lists (접이식, 기본 접힘)
     # --------------------------------------------------
 
     def _build_lists_section(self, root):
-
-        row = QHBoxLayout()
 
         # 재사용 PySide tsl 위젯(Framework.qt.MOD_tsl_qt_v01) 사용.
         # A00140_ConnectClosest 와 동일한 형식. Select/Add/Del/Up/Down/Sort/씬 선택은 위젯이 자체 처리한다.
         self.tsl_targets = self._make_edit_list("Targets")
         self.tsl_followers = self._make_edit_list("Followers")
 
+        row = QHBoxLayout()
         row.addWidget(self.tsl_targets)
         row.addWidget(self.tsl_followers)
 
-        root.addLayout(row)
+        # v01.11 : 두 리스트는 펼쳐야 보인다. 평소에는 Setup 결과를 확인할 일이 드물다.
+        self.lists_box = JUN_mod_collapsible_qt.JUN_mod_collapsible_qt_v01(
+            "Targets / Followers", expanded=False)
+        self.lists_box.header.setToolTip(
+            "Show the Targets / Followers that Setup resolved.\n"
+            "Edit them here only when the automatic result needs a fix.")
+        self.lists_box.add_layout(row)
+        self.lists_box.toggled.connect(lambda _e: self._fit_height_later())
+
+        root.addWidget(self.lists_box)
 
     def _make_edit_list(self, title):
         """A00140_ConnectClosest 와 동일한 형식의 재사용 tsl 위젯(Select/Add/Del/Up/Down/Sort)."""
@@ -145,7 +230,7 @@ class MainWindow(QWidget):
         return JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(title=title)
 
     # --------------------------------------------------
-    # Search
+    # Search (v01.11 : 화면에서 숨김 - 코드는 남긴다)
     # --------------------------------------------------
 
     def _build_search_section(self, root):
@@ -163,6 +248,10 @@ class MainWindow(QWidget):
         self.btn_search = QPushButton("Search")
         self.btn_search.clicked.connect(self.on_search)
         row.addWidget(self.btn_search)
+
+        # 사용자 요청(v01.11) : Search 는 쓰지 않는다. 지우지 않고 숨긴다 - on_search 는 그대로 동작한다.
+        box.setVisible(False)
+        self.search_box = box
 
         root.addWidget(box)
 
@@ -241,22 +330,83 @@ class MainWindow(QWidget):
             "\n"
             "Match and bake FK/IK controls on a rig.\n"
             "\n"
-            "- Setup : resolve Targets / Followers from the selected rig.\n"
+            "- Setup > Manual : select the rig and press Select Objects to\n"
+            "  resolve Targets / Followers from the selection.\n"
+            "- Setup > Auto : Refresh scans the scene by namespace and lists\n"
+            "  every rig that can switch FK / IK. Pick one to load it.\n"
             "- Match IK / Match FK : snap the pose once at the current frame.\n"
             "- Bake IK / Bake FK : bake the Start-End range constraint-free,\n"
             "  per frame via matchTransform (rotateOrder-safe, keeps keys on\n"
-            "  other ranges and animation layers untouched).\n"
+            "  other ranges and animation layers untouched). A progress popup\n"
+            "  shows the frames as they go.\n"
             "- Get Current : fill that Start / End field with the current frame.\n"
             "- Get Sel Range : fill Start and End from the first / last\n"
             "  selected keyframe.\n"
             "- Bake (Constraint) : optional parentConstraint + bakeSimulation\n"
             "  path for selected pairs over the playback range.\n"
+            "- Dev Mode (developers only) : switch between the Developer view\n"
+            "  and the Release view people get in the shared tool.\n"
             "\n"
             "All UI text is English.\n"
             "\n"
             "Written by Ji Hun Park."
         ).format(version=VERSION, update=LAST_UPDATE)
         QMessageBox.information(self, "About", message)
+
+    # ==================================================
+    # Developer / Release 화면 (v01.11)
+    # ==================================================
+
+    def apply_view(self, developer):
+        """Developer(True) / Release(False) 화면.
+
+        Release 화면 = 배포본을 받은 사람이 보는 것:
+          - Setup 은 Auto 가 기본 (Manual 라디오는 남는다)
+          - Targets / Followers 접이식 자체가 없다
+          - Bake (Constraint) 없음
+          - 로그는 접힌 상태(Show 로 펼 수 있다)
+          - Force Refresh 없음
+        Developer 로 돌아오면 전부 되살린다 (Setup 모드는 건드리지 않는다).
+        """
+        developer = bool(developer)
+
+        self.lists_box.setVisible(developer)
+        self.btn_bake_constraint.setVisible(developer)
+        self.btn_force_refresh.setVisible(developer)
+        self.te_log.set_shrunk(not developer)
+
+        if not developer and not self.rb_auto.isChecked():
+            self.rb_auto.setChecked(True)      # -> _on_mode_toggled -> Auto 조사
+
+        self._fit_height_later()
+
+    # ==================================================
+    # 창 높이
+    # ==================================================
+
+    def _fit_height(self):
+        """창 높이를 지금 보이는 내용에 맞춘다 (접이식 토글 · 화면 전환 뒤)."""
+        layout = QWidget.layout(self)
+        if layout is None:
+            return
+        layout.activate()
+        target = max(layout.sizeHint().height(), self.minimumSizeHint().height())
+        # 화면보다 큰 창은 아래가 잘려 로그창 잔상이 남는다 - 작업 영역 높이 안으로.
+        screen = QApplication.primaryScreen() if QApplication.instance() else None
+        if screen is not None:
+            target = min(target, screen.availableGeometry().height() - 80)
+        self.resize(self.width(), target)
+
+    def _fit_height_later(self):
+        if self.isVisible():
+            QTimer.singleShot(0, self._fit_height)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # 테마(qss)가 입혀진 뒤 처음 보일 때 한 번 - 접힌 리스트 · 숨긴 Search 만큼 창을 줄인다.
+        if not self._fitted_once:
+            self._fitted_once = True
+            self._fit_height()
 
     # ==================================================
     # Helpers
@@ -291,9 +441,24 @@ class MainWindow(QWidget):
             lw.addItem(it)
         lw.blockSignals(False)
 
+    def _load_unit(self, unit):
+        """Auto 모드가 찾은 단위 하나를 Targets / Followers 에 올린다."""
+        self.tsl_targets.set_items(unit["targets"])
+        self.tsl_followers.set_items(unit["followers"])
+        self._set_state("State : Success (%s)" % unit["label"], ok=True)
+        self.log(
+            "Loaded '%s' : %d targets / %d followers"
+            % (unit["label"], len(unit["targets"]), len(unit["followers"])))
+
     # ==================================================
     # Handlers
     # ==================================================
+
+    def _on_mode_toggled(self, auto):
+        """Manual <-> Auto. Auto 로 들어올 때마다 씬을 새로 조사한다."""
+        self.setup_stack.setCurrentIndex(1 if auto else 0)
+        if auto:
+            self.on_refresh()
 
     def on_setup(self):
         selection = cmds.ls(sl=True, fl=True)
@@ -315,6 +480,47 @@ class MainWindow(QWidget):
             f"Setup success : {len(result['targets'])} targets / "
             f"{len(result['followers'])} followers"
         )
+
+    def on_refresh(self):
+        """Auto : 씬을 네임스페이스 단위로 조사해 리그 리스트를 다시 채운다.
+
+        전에 골라 둔 단위가 여전히 있으면 그것을, 없으면 첫 단위를 고른다(고르면 바로 로드된다).
+        """
+        previous = self.tsl_units.selected_items()
+        previous = previous[0] if previous else None
+
+        result = FKIKScanner.scan()
+        units = result["units"]
+        self._units = {u["label"]: u for u in units}
+
+        self.tsl_units.set_items([u["label"] for u in units])
+
+        for unit in result["skipped"]:
+            self.log("[WARN] Skipped '%s' : %s" % (unit["label"], unit["message"]))
+
+        if not units:
+            self.tsl_targets.set_items([])
+            self.tsl_followers.set_items([])
+            self._set_state("State : No FK / IK rig found in the scene", ok=False)
+            self.log("Refresh : no FK / IK rig found (0 units).")
+            return
+
+        self.log("Refresh : %d rig(s) found." % len(units))
+
+        pick = previous if previous in self._units else units[0]["label"]
+        # select_by_texts 는 시그널을 막으므로 로드는 직접 부른다.
+        self.tsl_units.select_by_texts([pick])
+        self._load_unit(self._units[pick])
+
+    def on_unit_selected(self):
+        """Auto 리스트에서 리그를 고르면 그 단위를 로드한다."""
+        selected = self.tsl_units.selected_items()
+        if not selected:
+            return
+        unit = self._units.get(selected[0])
+        if unit is None:
+            return
+        self._load_unit(unit)
 
     def on_search(self):
         token = self.le_search.text().strip()
@@ -387,9 +593,19 @@ class MainWindow(QWidget):
         self.tsl_targets.select_by_texts(tgt)
         self.tsl_followers.select_by_texts(flw)
 
-        frames = FKIKMatcher.bake(tgt, flw, start, end)
-
         mode = "IK" if ik_to_fk else "FK"
+
+        # v01.11 : 공용 진행률 팝업 - core 의 bake 가 프레임마다 콜백을 부른다.
+        dlg = JUN_mod_progress_qt.JUN_mod_progress_qt_v01(
+            self, title="FKIK Tool - Bake %s" % mode,
+            message="Starting...", phases=[("Baking frames", 1)])
+        dlg.start()
+        try:
+            dlg.begin_phase()
+            frames = FKIKMatcher.bake(tgt, flw, start, end, progress=dlg.callback())
+        finally:
+            dlg.finish()
+
         self.log(f"Bake {mode} : {frames} frames baked [{start}-{end}]")
 
     def on_bake_constraint(self):

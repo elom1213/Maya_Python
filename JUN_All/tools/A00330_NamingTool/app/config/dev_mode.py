@@ -1,8 +1,12 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-02
-# A00330_NamingTool - 개발자 모드 판정 (v01.14)
+# last Update date : 2026-10-12
+# A00330_NamingTool - 개발자 모드 판정 (v01.14, v01.27 공용화)
 #
-# launch.py 와 같은 규칙이다 (docs/Release_Layout.md):
+# v01.27 : 판정 규칙을 Framework.core.dev_mode 로 올렸다 (다른 툴도 같은 규칙을 쓴다 - A00120 등).
+#          이 모듈은 그 공용 함수를 이 툴의 경로로 부르는 얇은 껍데기다. 이름(`is_dev_mode()`,
+#          `IS_RELEASE`, `TOOL_ROOT`)은 token_tab / main_window 가 쓰므로 그대로 둔다.
+#
+# 규칙 (docs/Release_Layout.md):
 #   릴리즈본 : 툴 폴더 안에 Framework 가 동봉돼 있다 -> 항상 False (config.py 가 실리지 않는다)
 #   dev 트리 : JUN_All/config.py 의 DEV_MODE
 #
@@ -10,31 +14,15 @@
 # (Dnable_Set_v001 의 값 목록)을 바꾸지 못한다.
 
 import os
-import importlib.util
+
+from Framework.core import dev_mode as _dev_mode
 
 # app/config/dev_mode.py -> app/config -> app -> <tool>
 TOOL_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-IS_RELEASE = os.path.isdir(os.path.join(TOOL_ROOT, "Framework"))
-
-
-def _read_dev_mode():
-    if IS_RELEASE:
-        return False
-    # JUN_All/config.py 를 **경로로** 읽는다 - `import config` 는 흔한 이름이라 다른 툴 폴더의
-    # config.py 를 집을 수 있다(Release_Layout.md). 못 읽으면 개발자 모드가 아닌 것으로 본다.
-    path = os.path.join(os.path.dirname(os.path.dirname(TOOL_ROOT)), "config.py")
-    if not os.path.isfile(path):
-        return False
-    try:
-        spec = importlib.util.spec_from_file_location("_jun_all_config_for_A00330", path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-    except Exception:
-        return False
-    return bool(getattr(module, "DEV_MODE", False))
+IS_RELEASE = _dev_mode.is_release(__file__)
 
 
 def is_dev_mode():
     """개발자 모드면 True. 부를 때마다 config.py 를 다시 읽는다(DEV_MODE 를 바꾸고 툴만 다시 열면 된다)."""
-    return _read_dev_mode()
+    return _dev_mode.is_dev_mode(__file__)

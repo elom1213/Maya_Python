@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-22
+# last Update date : 2026-10-12
 # A00120_FKIK - 매칭 / 베이크 로직 (maya.cmds, UI 무관)
 #
 # 2026-06-15: bake() 를 Python 프레임 루프 -> native bakeResults 로 교체(대규모 구간 속도 개선).
@@ -19,6 +19,8 @@
 #             프레임마다 matchTransform 매칭 후 키를 찍는 방식으로 되돌림. match_transforms 도
 #             xform rotateOrder 스왑 대신 cmds.matchTransform 으로 교체(A00145 Match 탭 방식).
 #             _snapshot/_restore 는 bake_constraint() 전용으로만 남는다.
+#
+# 2026-10-12: bake() 에 progress 콜백(선택) - UI 진행률 팝업이 프레임마다 게이지를 올린다 (v01.11).
 #
 # 레거시 JUN_MATCH_twoObjects / JUN_matcher_FKIK / JUN_cmd_match_IK_and_FK /
 #        JUN_cmd_bake_IK_FK / JUN_cmd_bake_IK_to_FK 를 현대화.
@@ -225,9 +227,13 @@ class FKIKMatcher:
                             pass
 
     @staticmethod
-    def bake(tgt_list, flw_list, start, end):
+    def bake(tgt_list, flw_list, start, end, progress=None):
         """
         [start, end] 구간을 **컨스트레인트 없이** 프레임마다 매칭+키 해서 베이크한다.
+
+        progress : `progress(done, total, message=None)` 콜백(선택). 프레임마다 부른다 -
+                   UI 의 진행률 팝업(JUN_mod_progress_qt_v01.callback())을 그대로 넘기면 된다.
+                   None 이면 아무 일도 하지 않는다 (v01.11).
 
         2026-06-29: 임시 parentConstraint + bakeResults 방식을 폐기하고 레거시
         JUN_cmd_bake_IK_FK 의 per-frame 매칭 방식으로 되돌렸다. parentConstraint 를 거는
@@ -261,11 +267,14 @@ class FKIKMatcher:
             return 0
 
         cur = cmds.currentTime(q=True)
+        total_frames = end_i - start_i + 1
 
         with undo_chunk():
             # 프레임마다 리드로우하지 않도록 suspend_refresh 로 감싼다(블록 종료 시 복원).
             with suspend_refresh():
                 for frame in range(start_i, end_i + 1):
+                    if progress is not None:
+                        progress(frame - start_i, total_frames, "Frame %d / %d" % (frame, end_i))
                     cmds.currentTime(frame, edit=True)
 
                     for i in range(count):
@@ -292,7 +301,10 @@ class FKIKMatcher:
 
             cmds.currentTime(cur, edit=True)
 
-        return end_i - start_i + 1
+        if progress is not None:
+            progress(total_frames, total_frames, "Done")
+
+        return total_frames
 
     @staticmethod
     def bake_constraint(tgt_list, flw_list):

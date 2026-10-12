@@ -72,5 +72,8 @@
 #   - Dev Mode    : moved from the toggle button in the Tokens row to a "Dev Mode" menu right of
 #                   Help - Developer / Release (shared tool) (v01.26)
 
-VERSION = "01.26"
-LAST_UPDATE = "2026-10-02"
+#   - Dev Mode    : the menu is now the shared Framework widget MOD_devMode_qt_v01 (same menu in
+#                   A00120_FKIK); the developer-mode judgement moved to Framework.core.dev_mode (v01.27)
+
+VERSION = "01.27"
+LAST_UPDATE = "2026-10-12"

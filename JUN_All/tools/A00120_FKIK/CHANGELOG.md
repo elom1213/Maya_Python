@@ -2,6 +2,33 @@
 
 All notable changes to this tool are documented here.
 
+## [01.11] - 2026-10-12
+### Added
+- **Setup > Manual / Auto.** Manual is the old flow (select the rig, `Select Objects`). Auto
+  scans the scene **by namespace** (`app/core/fkik_scan.py`, `FKIKScanner.scan`) and lists every
+  rig that can switch FK / IK in a `Rigs (by namespace)` list; `Refresh` scans again, picking a
+  row loads its Targets / Followers. A namespace that holds several rigs is split per top node
+  (`(root) | rigB_grp`). Rigs that fail the count check are logged as `[WARN] Skipped`.
+- **`Dev Mode` menu** (right of Help) — the shared `JUN_mod_devMode_qt_v01`. Developers switch
+  between the **Developer** view and the **Release (shared tool)** view; the release build has no
+  menu and is fixed to the Release view.
+  - Release view = Auto is the default setup mode, no Targets / Followers lists, no
+    `Bake (Constraint)`, log collapsed (Shrink), no `Force Refresh`.
+- **Progress popup on Bake IK / Bake FK** — the shared `JUN_mod_progress_qt_v01`; `FKIKMatcher.bake`
+  got an optional `progress(done, total, message)` callback that fires per frame.
+### Changed
+- **Targets / Followers are collapsible** (`JUN_mod_collapsible_qt_v01`, collapsed by default).
+  The window height follows the collapsed / expanded state (capped to the screen).
+- **Search is hidden** — the group box and `on_search` stay in the code, only `setVisible(False)`.
+
+## [01.10] - 2026-09-17
+### Changed
+- Menu bar is the shared `JUN_mod_menuBar_qt_v01` (Help > Copy Tool Name on every tool).
+
+## [01.09] - 2026-09-16
+### Changed
+- Log is the shared `JUN_mod_log_qt_v01` (Expand / Shrink / Clear / Copy).
+
 ## [01.08] - 2026-08-05
 ### Changed
 - **Bake range UI replaced with the shared time-range widget.** The hand-rolled

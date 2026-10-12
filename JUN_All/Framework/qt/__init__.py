@@ -14,6 +14,7 @@ from Framework.qt import MOD_log_qt_v01 as JUN_mod_log_qt
 from Framework.qt import MOD_menuBar_qt_v01 as JUN_mod_menuBar_qt
 from Framework.qt import MOD_checkList_qt_v01 as JUN_mod_checkList_qt
 from Framework.qt import MOD_tokenName_qt_v01 as JUN_mod_tokenName_qt
+from Framework.qt import MOD_devMode_qt_v01 as JUN_mod_devMode_qt
 
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "JUN_mod_menuBar_qt",
     "JUN_mod_checkList_qt",
     "JUN_mod_tokenName_qt",
+    "JUN_mod_devMode_qt",
 ]

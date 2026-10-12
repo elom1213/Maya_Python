@@ -167,6 +167,8 @@ data/                      # (git 추적 안 함) Token 프로파일 - token_pro
 | 다른 탭 (Set Rename · Copy Name · Quick Rename) | 됨 | **보이지 않는다**(v01.19, v01.17 은 회색으로 잠갔다) — Rename > Token 만 |
 | 메뉴 바 `Dev Mode` (Help 오른쪽, v01.26) | **있음** — `Developer` / `Release (shared tool)` 중 하나를 고른다. Release 를 고르면 배포 화면을 그대로 본다 | 없음 (메뉴 자체가 없다) |
 
+- v01.27 : 이 메뉴는 공용 위젯 `Framework/qt/MOD_devMode_qt_v01.py` (`JUN_mod_devMode_qt_v01`) 다 — A00120_FKIK 도 같은 메뉴를 쓴다
+  ([`Framework_MOD_devMode_qt`](Framework_MOD_devMode_qt.md)). 판정도 `Framework/core/dev_mode.py` 로 올라갔고 `app/config/dev_mode.py` 는 그것을 부르는 껍데기다.
 - 판정은 `app/config/dev_mode.py` — `launch.py` 와 같은 규칙: 툴 폴더 안에 `Framework` 가 동봉돼 있으면 배포본(항상 잠금),
   아니면 `JUN_All/config.py` 의 `DEV_MODE`(경로로 읽는다 - `import config` 는 다른 툴의 config.py 를 집을 수 있다).
 - 프로파일 json 을 직접 고치는 것까지 막지는 않는다 — 화면에서 규칙을 바꾸는 길만 닫았다.

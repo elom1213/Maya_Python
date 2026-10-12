@@ -28,6 +28,7 @@ from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_filter_qt
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_devMode_qt_v01 import JUN_mod_devMode_qt_v01
 from Framework.core import log_levels
 from Framework.themes.theme_manager import ThemeManager
 
@@ -119,6 +120,7 @@ class MainWindow(QWidget):
         self.apply_release_tabs(self.token_tab.token_widget.rules_editable())
 
         # v01.26 : 개발 / 배포 화면 전환은 메뉴 바의 `Dev Mode` 메뉴 (개발자 모드에서만 만든다)
+        # v01.27 : 그 메뉴는 공용 위젯 JUN_mod_devMode_qt_v01 (A00120 도 같은 메뉴를 쓴다)
         self._build_dev_mode_menu()
 
         # 로그창
@@ -139,38 +141,26 @@ class MainWindow(QWidget):
     def _build_dev_mode_menu(self):
         """메뉴 바 Help **오른쪽**의 `Dev Mode` 메뉴 - Developer / Release (shared tool) 중 하나 (v01.26).
 
-        개발자 모드(dev_mode.is_dev_mode)에서만 만든다 - 배포본에는 메뉴 자체가 없다.
-        공용 메뉴 바의 addMenu("제목") 은 새 메뉴를 공통 메뉴(Help) **왼쪽**에 끼우므로,
-        QMenu 를 직접 넘겨 Qt 기본 동작(맨 오른쪽에 붙이기)을 쓴다.
+        v01.27 : 메뉴는 공용 위젯 `JUN_mod_devMode_qt_v01` 이다. 개발자 모드(dev_mode.is_dev_mode)에서만
+        메뉴를 만들고 배포본에는 메뉴 자체가 없다 - 판정도 위젯이 같은 규칙(Framework.core.dev_mode)으로 한다.
+        이 툴에서 "화면" 은 Token 위젯의 rules_editable 이므로, 메뉴 <-> 위젯을 양방향으로 맞춘다.
         """
-        self.dev_mode_menu = None
-        if not dev_mode.is_dev_mode():
-            return
         widget = self.token_tab.token_widget
-        menu = QMenu("Dev Mode", self.menu_bar)
-        menu.setToolTipsVisible(True)
-        group = QActionGroup(menu)
-        group.setExclusive(True)
-        self._act_developer = QAction("Developer", menu)
-        self._act_developer.setToolTip(
-            "Developer view - every tab, Values..., Add / Delete Token, Save / New / Rename / Delete.")
-        self._act_release = QAction("Release (shared tool)", menu)
-        self._act_release.setToolTip(
-            "The view people get in the shared tool - Rename > Token only, fixed rules.")
-        for action in (self._act_developer, self._act_release):
-            action.setCheckable(True)
-            group.addAction(action)
-            menu.addAction(action)
-        self._act_developer.triggered.connect(lambda _c=False: widget.set_rules_editable(True))
-        self._act_release.triggered.connect(lambda _c=False: widget.set_rules_editable(False))
-        # 다른 길로 바뀌어도(코드 · 위젯) 메뉴 체크를 맞춘다
+        self.dev_mode = JUN_mod_devMode_qt_v01(
+            self.menu_bar, tool_file=__file__, developer=widget.rules_editable(),
+            developer_tooltip=(
+                "Developer view - every tab, Values..., Add / Delete Token, Save / New / Rename / Delete."),
+            release_tooltip=(
+                "The view people get in the shared tool - Rename > Token only, fixed rules."))
+        self.dev_mode_menu = self.dev_mode.menu
+        # 메뉴 -> 위젯
+        self.dev_mode.modeChanged.connect(widget.set_rules_editable)
+        # 위젯 -> 메뉴 (다른 길로 바뀌어도 - 코드 · 위젯 - 메뉴 체크를 맞춘다)
         widget.rulesEditableChanged.connect(self._sync_dev_mode_menu)
         self._sync_dev_mode_menu(widget.rules_editable())
-        self.menu_bar.addMenu(menu)
-        self.dev_mode_menu = menu
 
     def _sync_dev_mode_menu(self, editable):
-        (self._act_developer if editable else self._act_release).setChecked(True)
+        self.dev_mode.set_developer(editable)
 
     def apply_release_tabs(self, editable):
         """editable=False (배포본 · Dev Mode 꺼짐) 면 Rename > Token 말고 다른 탭을 **숨긴다**.

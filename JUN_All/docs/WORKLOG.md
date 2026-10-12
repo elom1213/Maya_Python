@@ -32,6 +32,22 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00120 FKIK — **Setup Manual / Auto · 접이식 리스트 · Dev Mode · Bake 진행률 팝업** (v01.10->01.11)
+- 요청: Setup 을 Manual(Select Objects) / Auto(Refresh 로 씬을 네임스페이스 단위 조사) 로, Targets/Followers 는 접이식(기본 접힘) · Search 는 코드만 두고 숨김, A00330 의 Dev Mode 메뉴를 공용 위젯으로 올려 FKIK 도 쓰기, 배포 화면(Auto 기본 · 리스트 없음 · Bake (Constraint) 없음 · 로그 접힘 · Force Refresh 없음), Bake IK/FK 진행률 팝업.
+- Auto : `app/core/fkik_scan.py` `FKIKScanner.scan` — `ls("*BlendFKIKPos_grp*", recursive=True)` 로 모든 네임스페이스에서 찾아 네임스페이스마다 `FKIKSetup.resolve(톱 노드들)`. 한 네임스페이스에 리그가 여럿이면 톱 노드마다 `(root) | rigB_grp` 로 나눈다. 검증에 걸린 리그는 `[WARN] Skipped`. Auto 로 바꾸는 순간에도 조사하고, Refresh 는 전에 고른 단위를 유지한다. 리스트는 공용 TSL(버튼 없음 · `attach_uuids=False`).
+- 화면 : `apply_view(developer)` 하나가 다섯 가지를 숨기고 보인다. 창 높이는 `showEvent`(테마 입힌 뒤) 와 토글 · 전환 뒤 `sizeHint` 로 다시 잡고 화면 작업 영역 높이로 자른다(창이 화면을 넘으면 로그창 잔상이 남는 함정 대비).
+- Bake : `FKIKMatcher.bake(..., progress=None)` — 프레임마다 콜백, UI 는 `JUN_mod_progress_qt_v01` 단계 하나.
+- 검증: mayapy 2024 오프스크린 — 합성 리그 3개(네임스페이스 1 + 루트 2) 조사 → 단위 3개 · 각 24/24, Release 전환 시 Auto 라디오 · 숨김 다섯 가지 · 창 660→520, 접이식 펼침 902, bake 5 프레임 콜백 6회 · 팝업 경로로 120 프레임. 마야 GUI 확인은 아직.
+
+> [!summary] Framework — **`Dev Mode` 메뉴 공용 위젯 `JUN_mod_devMode_qt_v01` + 판정 `Framework/core/dev_mode.py`** (신규)
+- A00330 v01.26 `_build_dev_mode_menu` 를 `Framework/qt/MOD_devMode_qt_v01.py` 로. 개발자 모드에서만 메뉴(Help 오른쪽, QMenu 직접 addMenu), `modeChanged(bool)` · `set_developer()` · `is_developer()`. 화면 전환은 툴의 일.
+- 판정은 A00330 `app/config/dev_mode.py` 규칙 그대로를 `Framework/core/dev_mode.py` 로 — `is_dev_mode(tool_file)` (릴리즈본 = 툴 안에 Framework 동봉 → False, dev = `JUN_All/config.py` 의 `DEV_MODE` 를 경로로 읽음). 툴 폴더는 `tool_menu.tool_dir_from_path`.
+- 문서 [`Framework_MOD_devMode_qt.md`](Framework_MOD_devMode_qt.md), README 표 한 줄. `Framework/qt/__init__` 별칭 `JUN_mod_devMode_qt`.
+
+> [!summary] A00330 NamingTool — **Dev Mode 메뉴를 공용 위젯으로 교체** (v01.26->01.27)
+- `_build_dev_mode_menu` 가 `JUN_mod_devMode_qt_v01` 을 만들고 메뉴 <-> Token 위젯 `rules_editable` 을 양방향으로 잇는다. `app/config/dev_mode.py` 는 공용 판정을 부르는 껍데기(이름 유지).
+- 검증: mayapy 오프스크린 — 메뉴 → 탭 숨김 · 규칙 잠금, 위젯 → 메뉴 체크, `act_release.trigger()`. 모양 · 동작은 v01.26 과 같다.
+
 > [!summary] A00410 SecondaryMotion — **자식 없는 컨트롤러/조인트도 혼자 찰랑이게: Virtual Child** (v01.10->01.11)
 - 요청: 자식이 없는 컨트롤러 하나를 TSL 에 올리고 Apply 하면 키가 전혀 안 찍히고, 자식 컨트롤러를 붙여야 회전함 -> 자식이 없어도 있는 것처럼 찰랑이게. 가상 자식의 축·거리는 사용자 UI 로. 조인트도 같으면 같이.
 - 원인: `resolve_chains` 가 노드 2개 미만이면 체인을 안 만들고, 가상 팁(`Rotate last node`)은 마지막 뼈를 **연장**하는 방식이라 뼈가 없는 단일 노드엔 방향이 없었다. 조인트도 같은 경로.
