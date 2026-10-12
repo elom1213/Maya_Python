@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-30
+# last Update date : 2026-10-12
 # A00410_SecondaryMotion - Qt UI
 #
 # FK 로 애니메이션된 컨트롤러/조인트 체인에 KawaiiPhysics 식 관성(2차 모션)을 얹어
@@ -165,7 +165,7 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
 
         self.win_title = "Secondary Motion v{0}".format(VERSION)
-        self.resize(400, 780)
+        self.resize(400, 840)
 
         self.session = bake_mgr.SecondaryMotionSession(log=self.log)
         self._dirty = True          # 캐시 무효 — 다음 프리뷰에서 다시 샘플링
@@ -352,6 +352,47 @@ class MainWindow(QWidget):
         self.chk_tip.toggled.connect(self._invalidate)
         pl.addWidget(self.chk_tip)
 
+        # 자식이 없는 노드(홀로 올린 컨트롤러 / 조인트, 자손 없는 루트)를 위한 가상 자식.
+        # 뼈가 없으면 "마지막 뼈 연장" 가상 팁을 만들 수 없어 체인이 아예 해석되지
+        # 않았다 — 그래서 자식 컨트롤러를 붙여야만 흔들렸다. 노드 로컬 축으로
+        # Length 만큼 떨어진 가상 자식을 붙여 2점 체인으로 푼다.
+        vc_box = QGroupBox("Virtual Child (nodes without children)")
+        vc_box.setToolTip(
+            "A node with NO child has no bone to extend, so on its own it could\n"
+            "not swing at all (it only moved once a child controller was added).\n"
+            "For such a node a virtual child is attached in the node's LOCAL\n"
+            "space - 'Length' units along 'Axis' - and the node is solved as a\n"
+            "2-point chain, so a single controller or joint jiggles by itself.\n"
+            "Nodes that do have children are not affected.\n"
+            "Longer = swings less for the same motion (and feels heavier under\n"
+            "Gravity). Set Length to 0 to turn this off.")
+        vc_lay = QHBoxLayout(vc_box)
+        vc_lay.addWidget(QLabel("Axis"))
+        self.cb_vc_axis = QComboBox()
+        self.cb_vc_axis.addItems(list(scene_sampler.VC_AXES))
+        self.cb_vc_axis.setCurrentIndex(
+            list(scene_sampler.VC_AXES).index(scene_sampler.VC_DEFAULT_AXIS))
+        self.cb_vc_axis.setToolTip(
+            "Local axis of the node the virtual child sits on.\n"
+            "Joints: usually +X (the bone axis). Controllers: the axis that\n"
+            "points 'down' the part you want to swing.")
+        self.cb_vc_axis.currentIndexChanged.connect(self._invalidate)
+        vc_lay.addWidget(self.cb_vc_axis)
+        vc_lay.addSpacing(8)
+        vc_lay.addWidget(QLabel("Length"))
+        self.sb_vc_len = QDoubleSpinBox()
+        self.sb_vc_len.setDecimals(3)
+        self.sb_vc_len.setRange(0.0, 100000.0)
+        self.sb_vc_len.setSingleStep(1.0)
+        self.sb_vc_len.setValue(scene_sampler.VC_DEFAULT_LENGTH)
+        self.sb_vc_len.setToolTip(
+            "Distance (scene units) from the node to its virtual child, in the\n"
+            "node's local space. 0 = no virtual child (a node without children\n"
+            "then gets no keys, as before).")
+        self.sb_vc_len.valueChanged.connect(self._invalidate)
+        vc_lay.addWidget(self.sb_vc_len, 1)
+        pl.addWidget(vc_box)
+
         # 구간을 사이클로 보고 푼다 — 샘플링은 그대로라 다시 풀기만 하면 된다.
         self.chk_loop = QCheckBox("Loop (cycle the range)")
         self.chk_loop.setToolTip(
@@ -511,6 +552,11 @@ class MainWindow(QWidget):
         return (scene_sampler.MODE_ROOT if self.rb_root.isChecked()
                 else scene_sampler.MODE_CHAIN)
 
+    def _virtual_child(self):
+        """자식 없는 노드에 붙일 가상 자식의 로컬 오프셋. Length 0 이면 None(끔)."""
+        return scene_sampler.virtual_child_offset(
+            self.cb_vc_axis.currentText(), self.sb_vc_len.value())
+
     def _output(self):
         """선택된 출력 id. 라디오는 outputs 레지스트리에서 생성된다."""
         for rb, oid in self._out_buttons.items():
@@ -545,7 +591,8 @@ class MainWindow(QWidget):
         try:
             chains, count, frames = self.session.prepare(
                 nodes, self._mode(), self._target(), rng[0], rng[1],
-                dummy_tip=self.chk_tip.isChecked(), progress=progress)
+                dummy_tip=self.chk_tip.isChecked(), progress=progress,
+                virtual_child=self._virtual_child())
         except Exception as e:
             self.log("Prepare failed: {0}".format(e), warn=True)
             return False
@@ -554,6 +601,11 @@ class MainWindow(QWidget):
         if self.session.missing:
             self.log("Not in the scene: {0}".format(
                 ", ".join(self.session.missing)), warn=True)
+        if self.session.single:
+            self.log("No children under: {0} - solved with a virtual child "
+                     "({1}, {2:g} units).".format(
+                         ", ".join(self.session.single),
+                         self.cb_vc_axis.currentText(), self.sb_vc_len.value()))
         if self.session.empty_roots:
             self.log("No chain under: {0} - a root needs at least one child "
                      "(check the Target type).".format(

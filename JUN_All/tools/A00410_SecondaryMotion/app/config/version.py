@@ -1,3 +1,3 @@
 # Secondary Motion Tool
-VERSION = "01.10"
-LAST_UPDATE = "2026-09-17"
+VERSION = "01.11"
+LAST_UPDATE = "2026-10-12"

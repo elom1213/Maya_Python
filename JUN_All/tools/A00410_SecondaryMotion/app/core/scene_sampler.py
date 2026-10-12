@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-30
+# last Update date : 2026-10-12
 # A00410_SecondaryMotion core - 체인 수집 + 프레임별 원본 포즈 샘플링 (maya.cmds/API, UI 비의존).
 #
 # 왜 "한 번 샘플링해서 캐시" 인가
@@ -42,6 +42,33 @@ MODE_LIST = MODE_CHAIN
 #           jointOrient 를 벗겨낸다.
 TARGET_CTRL = "ctrl"
 TARGET_JOINT = "joint"
+
+# 가상 자식(virtual child) 의 방향 — 노드 **로컬 축** 이름. UI 콤보와 같은 순서.
+#
+# 자식이 하나도 없는 노드(TSL 에 홀로 올린 컨트롤러, Bone Root 에서 자손이 없는 루트,
+# 단일 조인트)는 뼈가 없어서 "마지막 뼈를 연장하는" 가상 팁도 못 만든다 — 체인이
+# 아예 해석되지 않아 키가 전혀 찍히지 않았다(자식 컨트롤러를 하나 붙이면 그제서야
+# 움직이던 현상). 그래서 이런 노드에는 **로컬 축으로 length 만큼 떨어진 가상 자식**을
+# 붙여 2점 체인으로 푼다. 가상 자식은 노드의 worldMatrix 를 타고 움직이므로
+# (`offset * worldMatrix`), 노드가 흔들리면 자식이 뒤처지고 그 방향 차이가 회전 키가 된다.
+VC_AXES = ("+X", "-X", "+Y", "-Y", "+Z", "-Z")
+VC_DEFAULT_AXIS = "+X"
+VC_DEFAULT_LENGTH = 10.0
+
+
+def virtual_child_offset(axis, length):
+    """UI 의 (축 이름, 길이) -> 노드 로컬 오프셋 (x, y, z). 길이 0 이하는 None."""
+    axis = str(axis).strip().upper()
+    if axis not in VC_AXES:
+        raise RuntimeError("Unknown virtual child axis '{0}'.".format(axis))
+    length = float(length)
+    if length <= 0.0:
+        return None
+    sign = -1.0 if axis[0] == "-" else 1.0
+    idx = "XYZ".index(axis[-1])
+    off = [0.0, 0.0, 0.0]
+    off[idx] = sign * length
+    return tuple(off)
 
 # Maya rotateOrder(0~5) -> MEulerRotation 열거값. 값이 같은 순서로 대응된다.
 _ROTATE_ORDERS = (om.MEulerRotation.kXYZ, om.MEulerRotation.kYZX,
@@ -121,20 +148,27 @@ class ChainResolveResult(object):
         self.missing = []       # 씬에 없는 이름
         self.branched = []      # 분기로 여러 체인이 된 루트(경고용)
         self.empty_roots = []   # 자식이 없어 체인이 안 된 루트(경고용)
+        # 자식이 없어 **가상 자식**으로 푸는 단일 노드 체인(안내용). allow_single 일 때만.
+        self.single = []
 
     def __iter__(self):
         # 예전 3-튜플 언패킹 호환.
         return iter((self.chains, self.missing, self.branched))
 
 
-def resolve_chains(nodes, mode, target_type):
+def resolve_chains(nodes, mode, target_type, allow_single=False):
     """UI 리스트 -> ChainResolveResult.
 
     chain 모드: 리스트 순서 그대로 체인 1개.
     root  모드: 리스트업한 각 노드를 최상위 부모로 보고 자손을 따라 체인을 만든다
                (A00390_WindTool 의 Bone Root 와 같은 개념).
+
+    allow_single=True 면 **노드 1개짜리 체인**도 허용한다 — 자식이 없는 노드는
+    `sample_chain(virtual_child=...)` 가 가상 자식을 붙여 푼다. 그렇게 된 노드는
+    `res.single` 에 담긴다(UI 안내용). False 면 예전처럼 2개 미만은 체인이 아니다.
     """
     res = ChainResolveResult()
+    min_len = 1 if allow_single else 2
 
     if mode == MODE_ROOT:
         for n in nodes or []:
@@ -150,6 +184,11 @@ def resolve_chains(nodes, mode, target_type):
                 paths = [p for p in _paths_from_root(full, target_type,
                                                      control_filter=False)
                          if len(p) >= 2]
+            if not paths and allow_single:
+                # 자손이 정말 없다(또는 Target 타입의 자손이 없다) — 루트 혼자를
+                # 체인으로 두고 가상 자식으로 푼다.
+                paths = [[full]]
+                res.single.append(full.split("|")[-1])
             if not paths:
                 res.empty_roots.append(full.split("|")[-1])
                 continue
@@ -167,8 +206,10 @@ def resolve_chains(nodes, mode, target_type):
             res.missing.append(n)
             continue
         chain.append(full)
-    if len(chain) >= 2:
+    if len(chain) >= min_len:
         res.chains.append(chain)
+        if len(chain) == 1:
+            res.single.append(chain[0].split("|")[-1])
     return res
 
 
@@ -192,6 +233,9 @@ class ChainSample(object):
         # 팁도 회전시키기 위해 마지막 뼈를 한 번 더 연장한 **가상 점**을 붙였는가.
         # (KawaiiPhysics 의 dummy bone 과 같은 역할)
         self.dummy_tip = False
+        # 노드가 1개라 **가상 자식**(로컬 오프셋 점)으로 가상 점을 만들었는가.
+        # 이때 가상 점은 "마지막 뼈 연장" 이 아니라 `offset * worldMatrix` 다.
+        self.virtual_child = None     # 붙였으면 로컬 오프셋 (x, y, z)
 
     def count(self):
         """실제 노드 수(가상 팁 제외)."""
@@ -236,7 +280,7 @@ def _static_info(node, target_type):
 
 
 def sample_chain(chain, frames, target_type=TARGET_CTRL, dummy_tip=True,
-                 progress=None):
+                 progress=None, virtual_child=None):
     """체인의 프레임별 원본 월드 포즈를 읽어 ChainSample 로 담는다.
 
     `getAttr -time` 을 쓰므로 현재 시간을 바꾸지 않는다(= 씬 상태를 건드리지 않는다).
@@ -247,10 +291,21 @@ def sample_chain(chain, frames, target_type=TARGET_CTRL, dummy_tip=True,
     팁 노드도 '자식' 이 생겨 회전을 정의할 수 있게 되므로, 체인의 마지막 컨트롤러/조인트도
     다른 노드처럼 회전한다(KawaiiPhysics 의 dummy bone 과 같은 방식).
 
+    virtual_child=(x, y, z) 는 **노드가 1개일 때만** 쓰인다 — 뼈가 없어 연장할 방향이
+    없으므로, 노드 로컬 공간의 이 오프셋 자리에 가상 자식 점을 붙인다
+    (월드 = `offset * worldMatrix`, 프레임마다). 노드가 2개 이상이면 무시하고 예전
+    그대로 마지막 뼈를 연장한다. 노드가 1개인데 None 이면 가상 점이 없어 아무 회전도
+    나오지 않는다(호출부가 막는다).
+
     progress(done, total, message=None) 를 주면 **프레임마다** 진행을 보고한다.
     이 함수가 이 툴에서 유일하게 오래 걸리는 단계라서, 진행률 표시가 붙는 곳도 여기다.
     """
     s = ChainSample(chain, frames)
+    use_vc = (len(chain) == 1 and virtual_child is not None)
+    if use_vc:
+        s.virtual_child = tuple(float(v) for v in virtual_child)
+        vc_point = om.MPoint(s.virtual_child[0], s.virtual_child[1],
+                             s.virtual_child[2])
 
     for node in chain:
         jo_inv, ra_inv, order, rest = _static_info(node, target_type)
@@ -277,10 +332,16 @@ def sample_chain(chain, frames, target_type=TARGET_CTRL, dummy_tip=True,
         quats = {}
         pos_row, quat_row = [], []
         for node in chain:
-            p, q = _decompose(cmds.getAttr(node + ".worldMatrix[0]", time=f))
+            wm = cmds.getAttr(node + ".worldMatrix[0]", time=f)
+            p, q = _decompose(wm)
             pos_row.append(p)
             quat_row.append(q)
             quats[node] = q
+        if use_vc:
+            # 가상 자식 = 노드 로컬 오프셋을 그 프레임의 worldMatrix 로 옮긴 점.
+            # 노드의 스케일도 그대로 타므로 "로컬 공간에서 length 만큼" 이 유지된다.
+            vp = vc_point * om.MMatrix(wm)
+            pos_row.append((vp.x, vp.y, vp.z))
         for node in extra:
             _, q = _decompose(cmds.getAttr(node + ".worldMatrix[0]", time=f))
             quats[node] = q
@@ -293,7 +354,11 @@ def sample_chain(chain, frames, target_type=TARGET_CTRL, dummy_tip=True,
         if progress:
             progress(fi + 1, total_frames)
 
-    if dummy_tip and len(chain) >= 2:
+    if use_vc:
+        # 가상 자식이 곧 가상 팁이다(점 2개 = 노드 + 가상 자식). `Rotate last node`
+        # 와 무관하게 붙는다 — 노드 하나뿐이면 이것 말고는 회전시킬 것이 없다.
+        s.dummy_tip = True
+    elif dummy_tip and len(chain) >= 2:
         s.dummy_tip = True
         for row in s.positions:
             a, b = row[-2], row[-1]

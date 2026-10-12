@@ -5,10 +5,10 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 023af178-09b0-4514-8e85-069cf18e3ef9
-  modified: 2026-09-10T00:00:00.000Z
+  modified: 2026-10-12T00:00:00.000Z
 ---
 
-`A00410_SecondaryMotion` (2026-09-10, v01.08, 헤드리스 검증 완료, **마야 실기 UI 테스트 대기**)
+`A00410_SecondaryMotion` (2026-10-12, v01.11, 헤드리스 검증 완료, **마야 실기 UI 테스트 대기**)
 — FK 컨트롤러/조인트 체인에 언리얼 KawaiiPhysics 식 **관성(찰랑임)** 을 얹어 **키로 굽는** in-Maya PySide 툴.
 
 **Why:** 마야 nucleus 계열은 성능 이전에 **작업 흐름**이 안 맞는다 — 시작 프레임부터 순차 재생해야
@@ -95,6 +95,16 @@ Jiggle 은 메시 포인트 전용(조인트에 못 씀), spring 컨스트레인
     **promote 판정 앜에** 축을 확정해야 예전 축의 프리뷰가 승격되지 않는다.
   - UI 는 **마지막 한 축을 둆 수 없게** 되돌린다 — "축 0개" 예외 경로 자체를 없앨다.
   - 결과의 뜻: "그 평면으로 시뮬레이션" 이 아니라 **3차원 해의 그 축 오일러 성분만** 쓴 것.
+- **v01.11 `Virtual Child` (자식 없는 노드 혼자 찰랑이기)**: 컨트롤러/조인트 **하나만** 올리면 키가
+  전혀 안 찍히던 원인은 둘 — `resolve_chains` 가 2노드 미만을 체인으로 안 잡고, 가상 팁은 **마지막
+  뼈 연장**이라 뼈가 없으면 방향이 없다. 해결은 노드 로컬 `Axis`×`Length` 자리의 **가상 자식 점**을
+  프레임마다 `offset * worldMatrix` 로 샘플에 붙여 2점 체인으로 푸는 것(`sample_chain(virtual_child=)`,
+  `resolve_chains(allow_single=)`, `res.single`). 단일 노드 체인에만 적용 — 2노드 이상은 무회귀.
+  - **★ Length 는 물리에 들어간다**: 각도 ≈ 변위/길이라 길수록 덜 휜다(10→40 에서 61°→20°).
+    이동 구동(translate 만 애니)에서도 흔들린다 — 스프링이 위치 공간이라서.
+  - Axis/Length 는 샘플에 들어가므로 바꾸면 **재샘플링**(`_invalidate`), 슬라이더처럼 `_schedule` 로 두면 안 된다.
+  - `Rotate last node` 와 독립 — 노드 하나면 끌 이유가 없다. Length 0 = 예전 동작(에러 메시지가 Length 를 안내).
+  - 검증 관용구 그대로: 구운 회전으로 계산한 `offset * worldMatrix` == 솔버의 점[1] (5e-14 / 조인트 9e-15).
 - 문서: `JUN_All/docs/A00410_SecondaryMotion.md`, 계획서 `docs/plans/A00410_ChainPhysics_plan.md`.
 - 미해결: 빠른 구동 + Substeps=3 에서 왕복 오차 4.7e-05(~3ppm), 원인 미특정. 콜라이더/키 감축 없음(v01.03~04 예정).
 

@@ -2,7 +2,7 @@
 title: A00410_SecondaryMotion 사용법
 aliases: [Secondary Motion, SecondaryMotion, A00410, 찰랑이, 관성 툴]
 tags: [maya-python, tool-guide, animation, secondary-motion, physics, kawaiiphysics]
-updated: 2026-09-16
+updated: 2026-10-12
 ---
 
 # A00410_SecondaryMotion 사용법
@@ -14,7 +14,7 @@ FK 로 애니메이션된 **컨트롤러/조인트 체인**에 언리얼 **Kawai
 부모를 더 따라간다.** 마야의 시뮬레이션 솔버(nucleus/nHair/nCloth)를 **쓰지 않는다** — 게임 에셋
 작업에 맞춰 가볍고 빠르며, 스크럽/되감기가 자유롭다.
 
-- **버전**: `app/config/version.py` (v01.08)
+- **버전**: `app/config/version.py` (v01.11)
 - **설치**: `__dragDrop_A00410.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **SecondMotion** →
   `tools.A00410_SecondaryMotion.run(True)`
 - **설계 배경**: [plans/A00410_ChainPhysics_plan](plans/A00410_ChainPhysics_plan.md)
@@ -64,6 +64,9 @@ FK 로 애니메이션된 **컨트롤러/조인트 체인**에 언리얼 **Kawai
 │ │ Substeps    [1]                       │ │
 │ │ Rotate Axis [x] X [x] Y [x] Z         │ │
 │ │ [x] Rotate last node (dummy bone)     │ │
+│ │ ┌ Virtual Child (nodes w/o children)┐│ │
+│ │ │ Axis [+X v]   Length [10.000]     ││ │
+│ │ └───────────────────────────────────┘│ │
 │ │ [ ] Loop (cycle the range)            │ │
 │ └───────────────────────────────────────┘ │
 │ [x] Live Preview              [ Reset ]   │
@@ -116,7 +119,9 @@ Apply 를 누르면 뜨는 진행률 팝업 ↓
 - **조인트 대상**: 계층 탐색이 joint 로 제한된다.
 - **분기**: 자식이 여럿이면 **루트→말단 경로마다 체인**이 되고, 공유되는 앞 구간은 **가장 긴 체인이
   소유**한다(중복 기록 없음). 로그로 알린다.
-- 담은 노드에 **자식이 없으면** 체인이 안 되므로 로그로 알린다(`No chain under: ...`).
+- 담은 노드에 **자식이 없으면** 그 노드 혼자를 체인으로 두고 **가상 자식**(4.4 참고)으로 푼다
+  (`No children under: ... - solved with a virtual child`). `Virtual Child` 의 Length 가 0 이면
+  예전처럼 체인이 안 되고 `No chain under: ...` 로 알린다.
 
 ---
 
@@ -137,6 +142,7 @@ Apply 를 누르면 뜨는 진행률 팝업 ↓
 | **Substeps** | — | 프레임당 서브스텝. 빠른 모션에서 불안정하면 올린다 |
 | **Rotate Axis** | — | 결과를 기록할 회전 축. 체크가 빠진 축은 **손대지 않는다**(4.3 참고) |
 | **Rotate last node** | `DummyBone` | 켜짐(기본) = 마지막 뼈를 한 번 더 연장한 **가상 점**을 붙여 **팁도 회전하고 키를 받는다**. 끄면 팁은 원본 회전 유지 |
+| **Virtual Child** `Axis` / `Length` | `DummyBone` (뼈가 없을 때) | **자식이 없는 노드**(홀로 올린 컨트롤러/조인트)에 로컬 축 `Axis` 로 `Length` 만큼 떨어진 **가상 자식**을 붙여 혼자서도 찰랑이게 한다(4.4 참고). 0 = 끔 |
 
 > **먼저 만질 것은 Falloff 와 Stiffness** 다. Falloff 를 올리면 팁이 늘어지고, Stiffness 를 올리면
 > 전체가 부모를 바짝 따라간다. Damping 은 멎는 속도를 정한다.
@@ -238,6 +244,28 @@ Loop: still settling after 16 pre-roll pass(es), seam error 8.362341 (> 0.000018
   살아 있는 레이어에는 예전 축의 커브가 남아 있어서, 그대로 두면 끈 축이 계속
   원본을 덮어쓴다.
 
+### 4.4 Virtual Child — 자식이 없는 노드 혼자 흔들기
+
+컨트롤러(또는 조인트) **하나만** 리스트에 올리고 Apply 하면 예전에는 **키가 전혀 찍히지 않았다** —
+자식 컨트롤러를 하나 붙여야 그제서야 회전하며 찰랑였다. 이 툴은 "부모 → 자식" 방향의 변화를 회전으로
+바꾸는데, 자식이 없으면 **방향 자체가 없기** 때문이다. `Rotate last node` 의 가상 점도 "마지막 뼈를
+한 번 더 연장" 하는 것이라 뼈가 하나도 없으면 만들 수 없었다.
+
+v01.11 부터는 자식이 없는 노드에 **가상 자식**을 붙여 2점 체인으로 푼다.
+
+- **어디에 붙는가**: 노드의 **로컬 공간**에서 `Axis` 방향으로 `Length`(씬 유닛)만큼 떨어진 점.
+  프레임마다 노드의 `worldMatrix` 를 타고 움직이므로(`offset * worldMatrix`), 노드가 회전하든 이동하든
+  가상 자식이 뒤처지고 **그 방향 차이가 그 노드의 회전 키**가 된다.
+- **`Axis`**: 조인트는 보통 **`+X`**(뼈 축). 컨트롤러는 "흔들리게 하고 싶은 부위가 뻗은 방향" 의 로컬 축.
+  축을 잘못 고르면 흔들림의 평면이 달라질 뿐 동작은 한다.
+- **`Length`**: 같은 움직임이면 **길수록 덜 휜다**(각도 ≈ 변위 / 길이). 무겁고 둔한 느낌이면 길게,
+  가볍게 많이 흔들리면 짧게. **0 이면 끔** — 그 노드는 예전처럼 키를 받지 않는다.
+- **언제 적용되나**: Bone Chain 에 **노드 하나만** 올렸을 때, Bone Root 의 루트에 **자손이 없을 때**
+  (Target 타입의 자손이 없을 때 포함). 컨트롤러 · 조인트 공통. **자식이 있는 노드에는 아무 영향이
+  없다** — 2노드 이상 체인은 예전과 완전히 같다. `Rotate last node` 체크와도 무관하게 붙는다.
+- `Axis` / `Length` 를 바꾸면 **다시 샘플링**한다(가상 자식의 위치가 샘플에 들어가므로).
+- 로그: `No children under: ctl_a - solved with a virtual child (+X, 10 units).`
+
 ---
 
 ## 5. 출력 모드
@@ -289,6 +317,8 @@ Apply 는 구간과 체인 길이에 따라 몇 초씩 걸릴 수 있어서, 누
 - **팁(마지막 노드)도 회전한다.** 자식이 없어 방향을 정의할 수 없으므로, 마지막 뼈를 같은 방향/길이로
   한 번 더 연장한 **가상 점**을 붙여 방향을 만든다(KawaiiPhysics 의 dummy bone). `Rotate last node`
   를 끄면 팁은 원본 회전을 유지한다.
+- **자식이 없는 노드도 회전한다.** 뼈가 없어 연장할 방향이 없으면, 노드 로컬 축으로 `Length` 만큼
+  떨어진 **가상 자식**을 붙여 2점 체인으로 푼다(4.4). `Virtual Child` Length 가 0 이면 예전처럼 체인이 안 된다.
 - **원래 포즈에서 출발한다.** 각 노드의 로컬 회전은 **실제 DAG 부모** 기준으로 계산하므로,
   `ctl_01 > ctl_01_offset > ctl_02` 처럼 **중간에 오프셋 그룹이 껴 있어도** 원래 포즈가 보존된다.
   구간 첫 프레임의 결과는 원본과 정확히 같고, `Blend=0` 이면 하위 자식까지 원본 그대로다.
@@ -331,11 +361,13 @@ Apply 는 구간과 체인 길이에 따라 몇 초씩 걸릴 수 있어서, 누
 | 로그 / 증상 | 뜻 · 대처 |
 |-------------|-----------|
 | `Sampled N chain(s), M nodes, F frames.` | 정상. 캐시가 만들어졌다 |
-| `No chain resolved...` | 체인은 **2개 이상**의 노드가 필요하다(루트 + 자식 하나) |
+| `No chain resolved...` | 체인은 **2개 이상**의 노드가 필요하다(루트 + 자식 하나). 노드 하나를 혼자 흔들려면 `Virtual Child` 의 Length 를 0 보다 크게(4.4) |
+| `No children under: ... - solved with a virtual child` | 자식이 없는 노드를 **가상 자식**으로 풀었다는 안내. `Axis` / `Length` 로 흔들림의 평면과 크기를 잡는다 |
+| 컨트롤러 하나만 올렸는데 안 움직인다 | `Virtual Child` Length 가 0 인지 확인. 0 보다 크면 가상 자식이 붙어 혼자서도 흔들린다(v01.11) |
 | `At least one rotate axis has to stay on.` | `Rotate Axis` 를 세 개 다 끄려 했다. 마지막 체크는 되돌려진다 |
 | `Rotate axis: X, Z only - ...` | Apply 가 그 축에만 썼다는 안내. 나머지 축은 원본 그대로다 |
 | `Branching under: ...` | 분기가 있어 체인이 쪼개졌다. 공유 노드는 가장 긴 체인이 소유한다 |
-| `No chain under: ...` | Bone Root 로 담은 노드에 자식이 없다. Target(Controller/Joint)이 맞는지 확인 |
+| `No chain under: ...` | Bone Root 로 담은 노드에 자식이 없고 `Virtual Child` 도 꺼져(Length 0) 있다. Target(Controller/Joint)이 맞는지, 아니면 Length 를 올릴지 |
 | `Chain list is empty.` | 리스트에 담고 **Select Chain** 을 누른다 |
 | 흔들림이 거의 없다 | **Falloff** 를 올리거나 **Stiffness** 를 낮춘다. Blend 가 0 인지도 확인 |
 | 너무 출렁인다 | **Damping** 을 올린다. 빠른 모션이면 **Substeps** 를 2~4 로 |

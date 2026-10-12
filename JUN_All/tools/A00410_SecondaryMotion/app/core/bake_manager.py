@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-30
+# last Update date : 2026-10-12
 # A00410_SecondaryMotion core - 샘플링 캐시 / 솔브 / 기록(프리뷰 레이어 · 확정) 오케스트레이션.
 #
 # 흐름
@@ -94,6 +94,8 @@ class SecondaryMotionSession(object):
         self.branched = []
         self.missing = []
         self.empty_roots = []
+        # 자식이 없어 가상 자식으로 푼 단일 노드(짧은 이름). UI 안내용.
+        self.single = []
         # 마지막 solve() 의 체인별 루프 진단(Loop 가 꺼져 있으면 빈 목록).
         self.loop_infos = []
 
@@ -157,10 +159,14 @@ class SecondaryMotionSession(object):
     # ------------------------------------------------------------ prepare
 
     def prepare(self, nodes, mode, target_type, start, end, step=1.0,
-                dummy_tip=True, progress=None):
+                dummy_tip=True, progress=None, virtual_child=None):
         """체인 해석 + 프레임별 원본 포즈 샘플링(비싼 단계, 한 번만).
 
         dummy_tip=True 면 체인 끝에 가상 점을 붙여 **마지막 노드도 회전**하게 한다.
+        virtual_child=(x, y, z) 를 주면 **자식이 없는 노드**(노드 1개짜리 체인)에
+        노드 로컬 공간의 그 자리에 가상 자식을 붙여 혼자서도 흔들리게 한다
+        (`scene_sampler.virtual_child_offset()` 으로 만든다). None 이면 예전처럼
+        노드 1개는 체인이 아니다.
         progress(done, total, message=None) 를 주면 체인 x 프레임 단위로 진행을 보고한다.
 
         반환: (체인 수, 노드 수, 프레임 수). 실패하면 예외를 던진다.
@@ -168,16 +174,21 @@ class SecondaryMotionSession(object):
         # 프리뷰 레이어가 살아 있으면 자기 출력을 되먹으므로 먼저 지운다.
         self.clear_preview()
 
-        res = scene_sampler.resolve_chains(nodes, mode, target_type)
+        res = scene_sampler.resolve_chains(
+            nodes, mode, target_type, allow_single=virtual_child is not None)
         chains = res.chains
         self.missing = res.missing
         self.branched = res.branched
         self.empty_roots = res.empty_roots
+        self.single = res.single
 
         if not chains:
-            raise RuntimeError(
-                "No chain resolved. A chain needs at least 2 nodes "
-                "(root + one child).")
+            if virtual_child is None:
+                raise RuntimeError(
+                    "No chain resolved. A chain needs at least 2 nodes "
+                    "(root + one child), or set a Virtual Child length > 0 "
+                    "to solve a node without children on its own.")
+            raise RuntimeError("No chain resolved.")
 
         if start > end:
             start, end = end, start
@@ -217,7 +228,7 @@ class SecondaryMotionSession(object):
 
             sample = scene_sampler.sample_chain(
                 chain, frames, target_type, dummy_tip=dummy_tip,
-                progress=chain_progress)
+                progress=chain_progress, virtual_child=virtual_child)
             done_units += len(frames)
             own = []
             for node in chain:

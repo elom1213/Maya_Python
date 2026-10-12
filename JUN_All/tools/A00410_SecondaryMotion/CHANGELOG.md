@@ -1,5 +1,44 @@
 # Changelog — A00410_SecondaryMotion
 
+## v01.11 (2026-10-12)
+
+- **[Fix/Add] 자식이 없는 노드도 혼자 찰랑인다 — `Virtual Child` 박스** (Physics 박스,
+  `Rotate last node` 아래). 컨트롤러 하나를 TSL 에 올리고 Apply 하면 **키가 전혀 안 찍히고**,
+  자식 컨트롤러를 하나 붙여야 그제서야 회전하던 현상을 고쳤다. 조인트도 같았다.
+  - **원인**: 체인 해석이 **노드 2개 미만이면 체인을 만들지 않았고**(`No chain resolved`),
+    가상 팁(`Rotate last node`)은 **마지막 뼈를 연장**하는 방식이라 뼈가 하나도 없는 단일
+    노드에는 방향을 정할 수 없었다. 그래서 자식이 생겨야만 체인이 됐다.
+  - **해결**: 자식이 없는 노드(Bone Chain 에 홀로 올린 노드, Bone Root 에서 자손이 없는
+    루트, 둘 다 컨트롤러/조인트 공통)에는 노드 **로컬 공간**에서 `Axis` 방향으로 `Length`
+    만큼 떨어진 **가상 자식 점**을 붙여 2점 체인으로 푼다. 가상 자식은 프레임마다
+    `offset * worldMatrix` 로 노드를 따라가므로, 노드가 움직이면 자식이 뒤처지고 그 방향
+    차이가 **그 노드의 회전 키**가 된다(회전 구동 · 이동 구동 모두).
+  - **UI**: `Axis` 콤보 `+X / -X / +Y / -Y / +Z / -Z`(기본 `+X` — 조인트의 뼈 축) +
+    `Length` 스핀(씬 유닛, 기본 10). `Length` 가 길수록 같은 움직임에 **덜 휜다**(각도 =
+    변위 / 길이) — 무거운 느낌을 원하면 길게. 0 이면 끔(예전처럼 단일 노드는 키 없음).
+    바꾸면 재샘플링(캐시 무효) — 가상 자식 위치가 샘플에 들어가기 때문.
+  - 자식이 **있는** 노드는 아무 영향이 없다(2노드 이상 체인은 예전과 **완전히 동일**).
+    `Rotate last node` 와도 무관하게 붙는다 — 노드 하나뿐이면 이것 말고는 회전시킬 것이 없다.
+  - 로그: `No children under: ctl_a - solved with a virtual child (+X, 10 units).`
+- core API: `scene_sampler.virtual_child_offset(axis, length)` · `VC_AXES` ·
+  `resolve_chains(..., allow_single=)` · `ChainResolveResult.single` ·
+  `sample_chain(..., virtual_child=)` · `ChainSample.virtual_child` ·
+  `SecondaryMotionSession.prepare(..., virtual_child=)` / `.single`.
+
+### 검증 (mayapy 2024 헤드리스 — 33 항목 통과)
+
+- 단일 컨트롤러(부모 그룹 회전 + rotateAxis + rotateOrder yxz): 체인 1 · 점 2, 회전 키가
+  실제로 바뀌고(최대 36deg), 첫 프레임은 원본과 같다. **왕복 검증** — 구운 회전으로 계산한
+  가상 자식의 실제 월드 위치 == 솔버 위치, 오차 5e-14. 노드 자신의 월드 위치는 불변.
+- 단일 조인트(jointOrient 20/-35/50 + rotateAxis + rotateOrder yzx, Bone Root + Joint):
+  왕복 오차 9e-15.
+- 이동만 있는 컨트롤러도 흔들린다(61deg). Length 10 -> 40 이면 각도가 줄어든다(61 -> 20deg).
+- 무회귀: 2노드 체인은 `virtual_child` 를 줘도 결과가 1e-12 안에서 동일, Bone Root 에 진짜
+  자식이 있으면 가상 자식을 쓰지 않는다. `virtual_child=None` 이면 예전처럼 예외.
+- Override Layer(프리뷰 -> 승격) · Bake Keys(Z 만) 둘 다 단일 노드에서 동작.
+- UI: 기본 `(10,0,0)`, 콤보 `-Y` -> `(0,-10,0)`, Length 변경이 캐시를 무효화, 0 -> None,
+  단일 노드 Live Preview 가 프리뷰 레이어를 만들고 로그에 가상 자식 안내.
+
 ## v01.08 (2026-09-10)
 
 - **[Add] `Rotate Axis` 체크박스 `X` / `Y` / `Z`** (Physics 박스, `Substeps` 아래) —
