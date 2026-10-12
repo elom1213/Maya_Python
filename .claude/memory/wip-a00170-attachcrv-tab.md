@@ -79,6 +79,13 @@ translate/rotate 만으로 만든 행렬(스케일 1)이라 빌드 순간 decomp
 (노드 만들기 전). `scale` 은 구동하지 않는다. norCrv maintain 경로의 직교 정규 프레임은 그대로
 (shear·부호 뒤집힘 때문). 검증 headless 코어 24 + 오프스크린 UI 13.
 
+**UPDATE 2026-10-12 (v01.30)**: Orient 로 붙인 **조인트가 로케이터와 다르게 돌았다**(JO ≠ 0). 조인트 로컬 회전은
+ 라  를 rotate 에 그대로 넣으면 JO 가 프레임 **뒤에** 다시 얹힌다(JO = 0 이면 같아 안 보임).
+고침: 조인트면  — translate 는 기존 dcm, rotate 만 
+(JO⁻¹ 를 오른쪽에 곱하면 translate 가 돌아가므로 dcm 을 나눈다). JO⁻¹ 는 seal v01.29 처럼 **각 음수 + zyx composeMatrix**
+(, 라이브).  도 조인트면  (Maintain 빌드 순간 제자리).
+rotateAxis 는 여전히 무시(로케이터도 같다). mayapy 85 항목 — 같은 자리 로케이터/조인트 월드 행렬 동일, 수정 전엔 30 실패.
+
 **남은 일**: Maya 실기 검증 + 푸시(기본 푸시처: [[push-target-dnable-dev]]). 검증/푸시 끝나면 이 메모 삭제.
 규약: [[ui-text-english-only]], [[prefer-pyside-for-new-tools]], [[push-includes-tool-guide-docs]],
 [[worklog-maintenance]], [[maya-2023-compat]].

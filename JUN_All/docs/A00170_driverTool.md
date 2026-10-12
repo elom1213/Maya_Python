@@ -171,8 +171,18 @@ A00170_driverTool/
        (v01.25 까지는 `offsetParentMatrix` 를 구동해 채널박스에 아무 변화가 없었다.)
      - `decomposeMatrix.inputRotateOrder` 에 오브젝트의 `rotateOrder` 를 연결한다(v01.26~) —
        회전 순서가 XYZ 가 아닌 오브젝트도 제 값이 나온다.
-     - `scale` 은 구동하지 않는다(빌드 전 값 그대로). 조인트의 `jointOrient` 는 회전에 상수로
-       얹히므로, 회전을 그대로 들고 가려면 널/로케이터에 붙이는 편이 안전하다.
+     - `scale` 은 구동하지 않는다(빌드 전 값 그대로).
+     - **조인트도 로케이터와 똑같이 돈다**(v01.30~). 조인트 로컬 회전은 `R × JO`(rotate × jointOrient)
+       라, v01.29 까지는 프레임 회전을 `rotate` 에 그대로 넣어 **JO 가 프레임 뒤에 다시 얹혔다** —
+       같은 자리에 붙인 로케이터와 조인트가 서피스를 변형하면 서로 다르게 돌았다(JO 가 0 이면 같다).
+       이제 `rotate = rot(프레임 × parentInverse) × JO⁻¹` 로 넣어 조인트의 **월드 회전이 같은 자리의
+       로케이터와 정확히 같다**. translate 는 기존 decomposeMatrix 그대로, rotate 만
+       `<obj>_atc_rotMMX(× JO⁻¹) → <obj>_atc_rotDCM` 한 쌍에서 뽑는다(JO⁻¹ 를 오른쪽에 곱하면
+       translate 가 JO 로 돌아가므로 나눈다). JO⁻¹ 는 `inverseMatrix`(matrixNodes 플러그인) 대신
+       **각을 음수로 하고 회전 순서를 뒤집은(zyx) composeMatrix**(`<obj>_atc_joNeg/joInv`) — 플러그인
+       없이 되고 **나중에 `jointOrient` 를 고쳐도 따라간다**. Maintain offset 의 `local0` 도 조인트면
+       `R0 × JO` 로 만들어 빌드 순간 제자리에 남는다. Default(Closest) · 커브/서피스 · `±X` · Maintain
+       ON/OFF · rotateOrder · 회전한 부모에서 mayapy 로 로케이터와 월드 행렬이 같음을 확인했다.
      - 오프셋을 들고 가는 프레임은 **직교 정규**로 다시 짠다 — X=커브 접선, 업 시드=norCrv 접선(norCrv
        OFF 면 월드 +Y). ref 프레임(Y=norCrv 접선, Z=norCrv **노멀**)은 X 와 직교가 아니라 커브가 휘면
        shear 가 오브젝트로 새고, **직선 norCrv 의 노멀은 커브를 평행 이동만 해도 부호가 뒤집힌다**

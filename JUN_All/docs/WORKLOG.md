@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00170 driverTool — **AttachCrv: jointOrient 가 있는 조인트도 로케이터와 같게 회전** (v01.29->01.30)
+- 요청: Default 탭에서 로케이터와 조인트를 같은 자리에 Orient + Attach to Closest Point 로 서피스에 붙이고 서피스를 변형하면 둘이 다르게 돈다(조인트 JO ≠ 0). 조인트도 로케이터와 같은 값으로 돌게.
+- 원인: 네트워크가 `decomposeMatrix.outputRotate` 를 조인트 `rotate` 에 그대로 넣었다. 조인트 로컬 회전은 `R × JO` 라 프레임 뒤에 JO 가 다시 얹힌다(JO = 0 이면 같아서 안 보였다).
+- `attach_curve._attach_one`: 조인트면 `rotate = rot(M) × JO⁻¹` — translate 는 기존 dcm 그대로 두고 rotate 만 `_atc_rotMMX(× JO⁻¹) → _atc_rotDCM` 에서 뽑는다(JO⁻¹ 를 오른쪽에 곱하면 translate 가 돌아가므로 분리). JO⁻¹ 는 seal v01.29 와 같이 **각 음수 + zyx composeMatrix**(라이브 — JO 를 나중에 고쳐도 따라감). `_local_matrix_from_channels` 도 조인트면 `R0 × JO` 를 넣어 Maintain offset 빌드 순간 제자리.
+- 검증: mayapy 2024 — 같은 자리의 로케이터/조인트(JO (23,−41,67), rotate (10,20,30)) 서피스·커브 × `±X` × Maintain ON/OFF × rotateOrder zxy/yzx × 회전한 부모, 어태치 직후·변형 뒤·JO 를 바꾼 뒤 **월드 회전/위치 동일**, JO=0 회귀, orient OFF, Distribute — 85 항목 통과. 수정 전 코드에서는 같은 테스트 30 항목 실패(테스트가 버그를 잡는다). 마야 GUI 확인은 아직.
+- 문서: `docs/A00170_driverTool.md` Maintain offset 절의 "조인트는 널에 붙이는 편이 안전하다" 문장을 v01.30 동작으로 교체. 포트폴리오는 손대지 않음(버그 수정).
+
 > [!summary] A00240 PathTool — **Junction 탭(Create / Remove) + Tree 정션 연한 빨강** (v01.18->01.19)
 - 요청: `cmd /c mklink /J` 를 UI 로. 소스/타깃 선택 UI, 두 리스트로 n->1 · n->n, 원본은 두고 정션만 안전 삭제, Tree 에서 정션은 연한 빨강. 요청 번호 배치는 1·2·3(생성) = Create, 4(삭제) = Remove 로 읽었다.
 - `core/junction.py`(UI 비의존): `is_junction` = lstat 리파스 태그(`islink` 는 정션에 False, `isjunction` 은 3.12+), `plan()` 이 행마다 ready/사유(파일 · 없음 · 이미 있음 · 자기 안 순환 · 중복), `create_junction` = subprocess mklink(CREATE_NO_WINDOW, oem 디코드) 뒤 되읽기, `remove_junction` = 정션 확인 후 `os.rmdir`(빈 실제 폴더도 지우는 명령이라 확인이 전부), `find_junctions`.

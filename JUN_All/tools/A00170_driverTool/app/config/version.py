@@ -16,5 +16,11 @@
 #        inputs are kept per axis; nodes with no input get a 'sealBase' attribute that Remove
 #        writes back. Joints sealed directly keep their jointOrient out of the rest rotation.
 
-VERSION = "01.29"
+# 01.30  AttachCrv : joints attached with Orient now rotate exactly like a locator at the
+#        same spot when the curve / surface deforms, even with a non-zero jointOrient.
+#        rotate = rot(frame x parentInverse) x JO^-1 (second multMatrix/decomposeMatrix,
+#        JO^-1 from a negated zyx composeMatrix so it follows later jointOrient edits);
+#        Maintain offset's local0 includes JO so the joint stays in place at build time.
+
+VERSION = "01.30"
 LAST_UPDATE = "2026-10-12"

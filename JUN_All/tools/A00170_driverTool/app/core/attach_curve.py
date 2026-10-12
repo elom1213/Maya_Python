@@ -35,6 +35,18 @@ NURBS surface (v01.23~) — `_archive/legacy_tools/01_Modules/JUN_PY_matrixPinni
     (= -tangentV 방향)인 오른손 직교 정규 프레임을 만든다(normal 이 업 시드, shear 도 없음).
   - norCrv 는 커브 전용이다(서피스는 normal 이 업 벡터라 필요 없다).
   - Distribute 는 ref 'Pin by given number' 처럼 한 방향(U 또는 V)으로 균일, 다른 방향은 가운데.
+
+조인트 (v01.30~) — orient 로 **조인트**를 붙이면 `jointOrient` 를 벗긴 회전을 넣는다.
+  - 조인트 로컬 회전은 `R x JO`(rotate 채널 x jointOrient) 라, 로케이터처럼 프레임 회전을
+    rotate 에 그대로 넣으면 JO 가 프레임 **뒤에** 다시 얹혀 서피스가 변형될 때 로케이터와 다르게
+    돈다(JO = 0 이면 같다). 그래서 `rotate = rot(frame x parentInverse) x JO^-1` 로 넣는다 —
+    그러면 조인트의 월드 회전이 같은 자리에 붙인 로케이터와 **정확히 같다**.
+  - translate 는 기존 decomposeMatrix 그대로, rotate 만 `multMatrix(x JO^-1) -> decomposeMatrix`
+    한 쌍을 더 둬서 뽑는다(JO^-1 를 오른쪽에 곱하면 translate 가 JO 로 돌아가므로 나눈다).
+  - JO^-1 는 `inverseMatrix`(matrixNodes 플러그인) 대신 **각을 음수로 하고 회전 순서를 뒤집은(zyx)
+    composeMatrix** 로 만든다 — 플러그인 없이 되고 `jointOrient` 를 나중에 고쳐도 따라간다.
+  - Maintain offset 의 `local0` 도 조인트면 `R0 x JO` 로 만든다 — 빌드 순간의 rotate 가 지금 값과
+    같아야 제자리에 남는다.
 """
 
 import maya.api.OpenMaya as om
@@ -242,20 +254,49 @@ def _check_channels_free(obj, orient):
                 raise ValueError("{0} is locked".format(plug.split(".")[-1]))
 
 
-def _local_matrix_from_channels(obj):
-    """obj 의 현재 translate / rotate 만으로 만든 로컬 행렬(스케일 1, shear 0).
+def _is_joint(obj):
+    return cmds.nodeType(obj) == "joint"
 
-    decomposeMatrix 가 이 행렬을 받으면 outputTranslate / outputRotate 가 지금 채널 값
-    그대로 나온다(회전 순서는 `<obj>.rotateOrder` 를 dcm 에 연결해 맞춘다).
-    """
+
+def _euler_matrix(obj, attr, order):
+    """`<obj>.<attr>`(도 단위 double3) 를 order 순서의 오일러 회전 행렬(MMatrix)로."""
     radians = [om.MAngle(v, om.MAngle.kDegrees).asRadians()
-               for v in cmds.getAttr(obj + ".rotate")[0]]
-    xform = om.MTransformationMatrix()
-    xform.setRotation(om.MEulerRotation(radians,
-                                        cmds.getAttr(obj + ".rotateOrder")))
+               for v in cmds.getAttr(obj + "." + attr)[0]]
+    return om.MEulerRotation(radians, order).asMatrix()
+
+
+def _local_matrix_from_channels(obj):
+    """obj 의 현재 translate / rotate(조인트면 jointOrient 까지)로 만든 로컬 행렬(스케일 1, shear 0).
+
+    네트워크의 decomposeMatrix 가 이 행렬을 받으면 outputTranslate / outputRotate 가 지금 채널 값
+    그대로 나온다(회전 순서는 `<obj>.rotateOrder` 를 dcm 에 연결해 맞춘다).
+
+    조인트의 로컬 회전은 `R x JO` 다(v01.30) — 네트워크가 rotate 를 `rot(...) x JO^-1` 로 뽑으므로
+    여기서 JO 를 넣어야 빌드 순간 `R0 x JO x JO^-1 = R0` 으로 지금 값이 그대로 나온다.
+    jointOrient 의 회전 순서는 rotateOrder 와 무관하게 늘 xyz 다.
+    """
+    rot = _euler_matrix(obj, "rotate", cmds.getAttr(obj + ".rotateOrder"))
+    if _is_joint(obj):
+        rot = rot * _euler_matrix(obj, "jointOrient", om.MEulerRotation.kXYZ)
+    xform = om.MTransformationMatrix(rot)
     xform.setTranslation(om.MVector(*cmds.getAttr(obj + ".translate")[0]),
                          om.MSpace.kTransform)
     return xform.asMatrix()
+
+
+def _joint_orient_inverse(obj):
+    """`<obj>.jointOrient` 의 역행렬을 내는 composeMatrix 의 outputMatrix 플러그(라이브).
+
+    xyz 오일러 (a, b, c) 의 역은 (-a, -b, -c) 를 **zyx** 순서로 돈 것이라 `inverseMatrix`
+    (matrixNodes 플러그인) 없이 composeMatrix 하나로 된다. seal_rig `_rest_local_rotate` 와 같다.
+    """
+    neg = cmds.createNode("multiplyDivide", n="{0}_atc_joNeg".format(obj))
+    cmds.connectAttr(obj + ".jointOrient", neg + ".input1", force=True)
+    cmds.setAttr(neg + ".input2", -1.0, -1.0, -1.0, type="double3")
+    inv = cmds.createNode("composeMatrix", n="{0}_atc_joInv".format(obj))
+    cmds.connectAttr(neg + ".output", inv + ".inputRotate", force=True)
+    cmds.setAttr(inv + ".inputRotateOrder", 5)             # 5 = zyx : xyz 회전의 역
+    return inv + ".outputMatrix"
 
 
 def _offset_matrix(obj, frame_plug):
@@ -383,7 +424,23 @@ def _attach_one(curve_shape, obj, orient, aim_axis, norcrv_shape=None, param=Non
 
     cmds.connectAttr(dcp + ".outputTranslate", obj + ".translate", force=True)
     if orient:
-        cmds.connectAttr(dcp + ".outputRotate", obj + ".rotate", force=True)
+        rot_src = dcp + ".outputRotate"
+        if _is_joint(obj):
+            # 조인트 로컬 회전은 R x JO 라 rotate 에 넣을 값은 rot(M) x JO^-1 (v01.30).
+            # JO^-1 를 오른쪽에 곱하면 translate 도 JO 로 돌아가므로 translate 는 위 dcm 그대로 두고
+            # rotate 만 따로 뽑는다. 이렇게 하면 조인트의 월드 회전이 같은 자리의 로케이터와 같다.
+            rot_mul = cmds.createNode("multMatrix", n="{0}_atc_rotMMX".format(obj))
+            cmds.connectAttr(mul + ".matrixSum", rot_mul + ".matrixIn[0]", force=True)
+            cmds.connectAttr(_joint_orient_inverse(obj), rot_mul + ".matrixIn[1]",
+                             force=True)
+            rot_dcp = cmds.createNode("decomposeMatrix",
+                                      n="{0}_atc_rotDCM".format(obj))
+            cmds.connectAttr(rot_mul + ".matrixSum", rot_dcp + ".inputMatrix",
+                             force=True)
+            cmds.connectAttr(obj + ".rotateOrder", rot_dcp + ".inputRotateOrder",
+                             force=True)
+            rot_src = rot_dcp + ".outputRotate"
+        cmds.connectAttr(rot_src, obj + ".rotate", force=True)
 
     return param, poci
 
