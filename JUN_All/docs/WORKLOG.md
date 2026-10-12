@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00470 MaterialTool — **Name Check: Select Materials / Select Faces + Listed meshes only** (v01.09->01.10)
+- 요청: 레거시 `JUN_PY_ShaderTool_V01_04.py` 의 Select Shader / Select Faces 를 Name Check 탭에 이식. UI 안 셋(표 아래 한 줄 · Selection 그룹박스 · 표 오른쪽 세로 버튼 열) 중 **표 아래 한 줄**, 페이스 범위는 **체크박스 토글 기본 ON** 으로 사용자가 골랐다.
+- 표 아래 `[Select Materials] [Select Faces] ☑ Listed meshes only`. 고른 행이 대상, 아무 행도 안 골랐으면 표 전부(로그로 알림). 더블클릭 동작은 그대로(같은 `select_materials`).
+- `core/maya_materials.py`: `faces_of(materials, meshes|None)` = 머티리얼 → 셰이딩 엔진 → `sets -q` 멤버(마야가 `f[0:199]` 구간으로 압축해 준다) → 범위 안 메시 셰이프만, 오브젝트째는 `shape.f[*]`. `select_faces` 는 **API `MGlobal.setActiveSelectionList`**(인덱스 → `MFnSingleIndexedComponent`) — 4만 면 체커보드에서 `cmds.select(문자열 2만)` 1.4초 → 0.001초, 실패 시 `cmds.select` 폴백. 레거시 `select(SG)` 는 씬 전체 + 오브젝트째 배정은 오브젝트가 선택되던 것을 둘 다 고쳤다.
+- 실측 함정: **`sets -q` 면별 멤버는 트랜스폼 기준**(`sphere.f[0:199]`) → 셰이프로 풀어 비교(노드별 캐시 없으면 2만 멤버에 2.3초). 셰이프 둘인 트랜스폼의 `t.f[0:2]` 배정은 두 셰이프 모두. **면을 전부 재배정한 메시는 `initialShadingGroup` 연결이 남아** `listConnections` 에 보이고 `listSets` 엔 없다 → `shading_engines()` 가 멤버 있는 엔진만 남기도록 고침(쓰지 않는 `standardSurface1` 가짜 행 제거).
+- 검증: mayapy 2024 + 오프스크린 Qt 46항목 — 통째/면별/NURBS 제외/네임스페이스/빈 리스트/SG 없는 머티리얼/A+B/체커보드 2만/API == cmds 결과/셰이프 2개/UI(버튼·기본값·행 없음=전부·범위 토글·더블클릭). 마야 GUI 확인은 아직. 문서 `docs/A00470_MaterialTool.md` §1.2.
+
 > [!summary] A00170 driverTool — **AttachCrv: jointOrient 가 있는 조인트도 로케이터와 같게 회전** (v01.29->01.30)
 - 요청: Default 탭에서 로케이터와 조인트를 같은 자리에 Orient + Attach to Closest Point 로 서피스에 붙이고 서피스를 변형하면 둘이 다르게 돈다(조인트 JO ≠ 0). 조인트도 로케이터와 같은 값으로 돌게.
 - 원인: 네트워크가 `decomposeMatrix.outputRotate` 를 조인트 `rotate` 에 그대로 넣었다. 조인트 로컬 회전은 `R × JO` 라 프레임 뒤에 JO 가 다시 얹힌다(JO = 0 이면 같아서 안 보였다).

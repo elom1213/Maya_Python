@@ -99,7 +99,8 @@ class MainWindow(QWidget):
             "About",
             "Material Tool v{0}\nLast update : {1}\n\n"
             "Name Check  Collect the materials of the listed meshes and check their\n"
-            "names against a rule profile. The scene is only read, never changed.\n\n"
+            "names against a rule profile. Select Materials / Select Faces pick the\n"
+            "chosen materials, or the faces that use them, in the scene.\n\n"
             "Copy Material  Remember a source mesh, then give the listed target meshes\n"
             "the same material on every face.".format(
                 VERSION, LAST_UPDATE),

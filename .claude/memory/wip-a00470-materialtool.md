@@ -1,6 +1,6 @@
 ---
 name: wip-a00470-materialtool
-description: "A00470_MaterialTool - 머티리얼 이름 규칙 진단(JSON 프로파일). 토큰을 앞에서부터 붙이지 말고 정렬 DP 로 맞춰야 \"생략된 토큰\" 이 나온다 (v01.03)"
+description: "A00470_MaterialTool - 머티리얼 이름 규칙 진단(JSON 프로파일). 토큰을 앞에서부터 붙이지 말고 정렬 DP 로 맞춰야 \"생략된 토큰\" 이 나온다 (v01.03) · Select Faces 는 sets -q 멤버 + API 선택 (v01.10)"
 metadata: 
   node_type: memory
   type: project
@@ -94,3 +94,17 @@ metadata:
 바꿔 첫 번째로 올리면 프로파일이 늘 때마다 "이름순인 줄 알았는데 아닌" 목록이 된다. `reload_profiles()`
 는 **사용자가 고른 것을 먼저 지키고**, 그게 목록에 없을 때만 기본값으로 간다(Reload 가 선택을 되돌리지
 않는다). 그 이름의 JSON 이 없으면 목록의 첫 번째, 폴더가 비면 빈 문자열.
+
+**`Select Materials` / `Select Faces` (v01.10, 2026-10-12)** — 레거시 `JUN_PY_ShaderTool_V01_04` 이식.
+사용자가 UI 안 셋 중 **표 아래 버튼 한 줄 + `Listed meshes only` 체크(기본 ON)** 를 골랐다. 고른 행이 대상,
+행을 안 골랐으면 표 전부(로그로 알림). 더블클릭은 그대로 `select_materials` 를 탄다.
+
+- `faces_of()` : 머티리얼 → SG → **`sets -q`**(구간 압축된 멤버) → 범위 안 메시 셰이프만, 오브젝트째는 `shape.f[*]`.
+  ★ **`sets -q` 의 면별 멤버는 트랜스폼 기준**(`sphere.f[0:199]`) — 셰이프 집합과 바로 비교하면 전부 걸러진다.
+  멤버 노드 → 셰이프 조회는 **노드별 캐시** 필수(체커보드 2만 멤버에 2.3초 → 0.1초).
+- `select_faces()` : **API `MGlobal.setActiveSelectionList`** — `cmds.select(문자열 2만)` 1.4초 vs 0.001초.
+  대신 **선택이 undo 큐에 안 들어간다**(Ctrl+Z 가 이전 선택을 못 되돌림). 실패 시 `cmds.select` 폴백.
+- ★ `shading_engines()` 고침 — 면을 전부 재배정한 메시는 `initialShadingGroup` 연결이 남아 `listConnections`
+  에 보이지만 `listSets(object=shape)` 엔 없다. 멤버 있는 엔진만 남기도록 해 `standardSurface1` 가짜 행을 없앴다.
+- 셰이프 둘인 트랜스폼에 `t.f[0:2]` 를 배정하면 마야는 **두 셰이프 모두**에 넣고 멤버도 셰이프 기준으로 준다.
+- 검증 mayapy 2024 + 오프스크린 46항목. 마야 GUI 확인 아직. 관련: [[shading-per-face-assignment]].

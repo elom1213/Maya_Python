@@ -44,5 +44,17 @@ names = [om.MFnDependencyNode(e).absoluteName() for e in engines]
   (`sets -q` 로는 멤버 아님). 빈 면 판정은 `listSets(object="shape.f[i]", type=1)` 로.
 - 마야 2024 기본 머티리얼은 `standardSurface1` (`lambert1` 아님).
 
+**머티리얼 → 페이스 선택 (2026-10-12, A00470 v01.10 Select Faces 에서 실측)**
+
+- **`sets -q <SG>` 의 면별 멤버는 트랜스폼에 붙어 나온다**(`sphere.f[0:199]`, 셰이프 아님). 연속한 면은 구간으로
+  압축돼 있고, 체커보드처럼 안 이어지면 면 하나씩(4만 면에 2만 항목). 셰이프 집합과 비교하려면 노드를 셰이프로
+  풀어야 하고, 그 조회는 **노드별 캐시**로(멤버마다 조회하면 2만 개에 2.3초).
+- **`cmds.select` 는 컴포넌트 문자열 개수에 비례해 느리다**(2만 개 1.4초). 인덱스를 `MFnSingleIndexedComponent`
+  (`kMeshPolygonComponent`) 에 담아 `MGlobal.setActiveSelectionList` 로 넘기면 0.001초. 단 **undo 큐에 안 들어간다.**
+- **면을 전부 다른 SG 로 재배정한 메시는 `initialShadingGroup` 연결이 그대로 남는다** — `listConnections(shape,
+  type="shadingEngine")` 에 보이지만 `listSets(object=shape, type=1)` 엔 없다. "붙은 머티리얼" 을 셀 땐 멤버십으로 걸러야
+  쓰지 않는 `standardSurface1` 이 끼지 않는다.
+- 셰이프 둘인 트랜스폼에 `t.f[0:2]` 를 배정하면 **두 셰이프 모두**에 들어가고, 멤버는 셰이프 기준으로 나온다.
+
 관련: [[wip-a00470-materialtool]], [[framework-log-widget]], [[utility-nodes-inherit-shadingdependnode]],
 [[wip-a00275-layer-tab]]

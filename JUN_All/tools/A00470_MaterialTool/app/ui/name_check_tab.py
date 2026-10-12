@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-16
+# last Update date : 2026-10-12
 # A00470_MaterialTool - Name Check 탭 (in-Maya)
 #
 # 흐름은 한 줄이다 : **메시를 담는다 -> 머티리얼을 모은다 -> 규칙으로 진단한다
@@ -13,6 +13,11 @@
 # `Rename to Suggested` (v01.07) 는 이 탭에서 **처음으로 씬을 바꾸는 버튼**이다. 그래서
 # 무엇을 바꾸고 무엇을 왜 건너뛰었는지 한 줄씩 남긴다 — 특히 **값을 모르는 자리**
 # (`{character}`)가 남은 제안은 사람이 정해야 하므로 바꾸지 않는다.
+#
+# `Select Materials` / `Select Faces` (v01.10) 는 레거시 `JUN_PY_ShaderTool_V01_04` 의
+# Select Shader / Select Faces 이식이다. 표에서 고른 머티리얼의 **노드**를, 또는 그 머티리얼이
+# 붙은 **페이스**를 씬에서 선택한다. 페이스는 기본으로 **리스트에 담은 메시로 범위를 좁힌다**
+# (`Listed meshes only`) — 끄면 레거시처럼 씬 전체. 수집은 core/maya_materials.faces_of().
 
 from Framework.qt.qt import (
     QWidget,
@@ -122,7 +127,8 @@ class NameCheckTab(QWidget):
         self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tree.setMinimumHeight(150)
         self.tree.setToolTip(
-            "Double-click a material to select its node in the scene.\n"
+            "Double-click a material to select its node in the scene\n"
+            "(same as the Select Materials button).\n"
             "Drag the header edges to resize the columns.")
         # 더블클릭으로만 씬 선택을 바꾼다 - 행을 훑어보는 동안 선택이 따라 바뀌지 않도록.
         self.tree.itemDoubleClicked.connect(self.on_tree_double_clicked)
@@ -138,6 +144,38 @@ class NameCheckTab(QWidget):
         self.tree.setColumnWidth(2, 70)
 
         layout.addWidget(self.tree, stretch=1)
+
+        # ---- 선택 버튼 (v01.10) ---------------------------------------
+        # 표에서 고른 행이 대상이다. 아무 행도 안 골랐으면 표 전부.
+        select_row = QHBoxLayout()
+
+        self.btn_select_materials = QPushButton("Select Materials")
+        self.btn_select_materials.setMinimumHeight(26)
+        self.btn_select_materials.setToolTip(
+            "Select the material nodes of the rows chosen in the table\n"
+            "(every listed material when no row is chosen).\n"
+            "Same as double-clicking a row.")
+        self.btn_select_materials.clicked.connect(self.on_select_materials)
+        select_row.addWidget(self.btn_select_materials)
+
+        self.btn_select_faces = QPushButton("Select Faces")
+        self.btn_select_faces.setMinimumHeight(26)
+        self.btn_select_faces.setToolTip(
+            "Select every face that uses the chosen materials\n"
+            "(every listed material when no row is chosen).\n"
+            "A mesh assigned as a whole is selected as faces too, not as an object.\n"
+            "One select call - the face ranges come straight from the shading sets.")
+        self.btn_select_faces.clicked.connect(self.on_select_faces)
+        select_row.addWidget(self.btn_select_faces)
+
+        self.chk_listed_only = QCheckBox("Listed meshes only")
+        self.chk_listed_only.setChecked(True)
+        self.chk_listed_only.setToolTip(
+            "On  : Select Faces stays on the meshes in the list above.\n"
+            "Off : every face in the scene that uses the material.")
+        select_row.addWidget(self.chk_listed_only)
+
+        layout.addLayout(select_row)
 
         # ---- 옵션 ----------------------------------------------------
         options_box = QGroupBox("Report")
@@ -326,6 +364,25 @@ class NameCheckTab(QWidget):
                 item.setText(1, "{0} issue(s)".format(issues))
                 item.setForeground(1, COLOR_BAD)
 
+    def chosen_materials(self, extra=None):
+        """표에서 고른 행의 머티리얼 롱네임. **아무 행도 안 골랐으면 표 전부.**
+
+        `extra` 는 더블클릭된 행처럼 꼭 포함할 것 하나.
+        """
+        names = [i.data(0, NODE_ROLE) for i in self.tree.selectedItems()]
+        names = [n for n in names if n]
+
+        if extra and extra not in names:
+            names.append(extra)
+
+        if not names:
+            rows = (self.tree.topLevelItem(k) for k in range(self.tree.topLevelItemCount()))
+            names = [n for n in (row.data(0, NODE_ROLE) for row in rows) if n]
+            if names:
+                self.log("(no row chosen - using all {0} listed material(s))".format(len(names)))
+
+        return names
+
     def on_tree_double_clicked(self, item=None, column=0):
         """더블클릭한 머티리얼 노드를 씬에서 선택한다.
 
@@ -333,29 +390,70 @@ class NameCheckTab(QWidget):
         한 번 클릭으로는 선택이 바뀌지 않는다 - 목록을 훑어보다 씬 선택이 딸려 바뀌는 것을
         막기 위해서다.
         """
+        clicked = item.data(0, NODE_ROLE) if item is not None else None
         names = [i.data(0, NODE_ROLE) for i in self.tree.selectedItems()]
         names = [n for n in names if n]
-
-        clicked = item.data(0, NODE_ROLE) if item is not None else None
         if clicked and clicked not in names:
             names.append(clicked)
 
+        self.select_materials(names)
+
+    def on_select_materials(self):
+        """`Select Materials` 버튼 (v01.10) - 고른 행(없으면 전부)의 머티리얼 노드를 선택."""
+        return self.select_materials(self.chosen_materials())
+
+    def select_materials(self, names):
         if not names:
-            return
+            self.log("[warning] No material to select - list the materials first.")
+            return []
 
         try:
             selected = maya_materials.select_nodes(names)
         except Exception as e:
             self.log("Failed to select in the scene : {0}".format(e))
-            return
+            return []
 
         if not selected:
             self.log("Not in the scene anymore : {0}".format(
                 ", ".join(n.split("|")[-1] for n in names)))
-            return
+            return []
 
         self.log("Selected {0} material(s) : {1}".format(
             len(selected), ", ".join(n.split("|")[-1] for n in selected)))
+        return selected
+
+    def on_select_faces(self):
+        """`Select Faces` 버튼 (v01.10) - 고른 머티리얼이 붙은 페이스를 선택한다.
+
+        `Listed meshes only` 가 켜져 있으면 위 리스트의 메시로 범위를 좁힌다(기본).
+        끄면 씬 전체에서 그 머티리얼을 쓰는 모든 면 - 레거시 Shader Tool 과 같다.
+        """
+        names = self.chosen_materials()
+        if not names:
+            self.log("[warning] No material to select faces for - list the materials first.")
+            return []
+
+        meshes = self.tsl.get_all_nodes() if self.chk_listed_only.isChecked() else None
+
+        try:
+            faces, warnings = maya_materials.faces_of(names, meshes)
+            for warning in warnings:
+                self.log("[warning] " + warning)
+            selected = maya_materials.select_faces(faces)
+        except Exception as e:
+            self.log("Failed to select faces : {0}".format(e))
+            return []
+
+        if not selected:
+            self.log("No face uses {0}{1}.".format(
+                ", ".join(n.split("|")[-1] for n in names),
+                " on the listed meshes" if meshes is not None else ""))
+            return []
+
+        self.log("Selected {0} face(s) on {1} mesh(es) for {2} material(s){3}.".format(
+            maya_materials.count_faces(selected), len(maya_materials.meshes_of(selected)), len(names),
+            " (listed meshes only)" if meshes is not None else " (whole scene)"))
+        return selected
 
     # ==================================================================
     # 진단

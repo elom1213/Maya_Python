@@ -2,7 +2,7 @@
 title: A00470_MaterialTool 사용법
 aliases: [Material Tool, MaterialTool, A00470, Material Name Check]
 tags: [maya-python, tool-guide, material, naming, convention, qc, json-profile]
-updated: 2026-09-21
+updated: 2026-10-12
 ---
 
 # A00470_MaterialTool 사용법
@@ -13,10 +13,11 @@ Maya 안에서 도는 **머티리얼 이름 진단** PySide 툴이다(arch B, in
 
 | 상위 탭 | 내용 |
 |---------|------|
-| **Name Check** (v01.00) | 메시 → 머티리얼 수집 → 프로파일(JSON) 규칙으로 진단 → 리포트(클립보드 복사) → **제안한 이름으로 바꾸기**(v01.07) |
+| **Name Check** (v01.00) | 메시 → 머티리얼 수집 → 프로파일(JSON) 규칙으로 진단 → 리포트(클립보드 복사) → **제안한 이름으로 바꾸기**(v01.07) · **Select Materials / Select Faces**(v01.10) |
 | **Copy Material** (v01.05) | 소스 메시 M 을 **UUID 로 기억** → 리스트의 메시 M_i 에 **면마다 같은 머티리얼**을 건다 |
 
-- **버전**: `app/config/version.py` (v01.09 — 기본 프로파일 **`Set_v001`**
+- **버전**: `app/config/version.py` (v01.10 — **`Select Materials` / `Select Faces`**(§1.2)
+  · v01.09 — 기본 프로파일 **`Set_v001`**
   · v01.08 — **릴리즈본이 다른 PC 에서 안 열리던 문제** 수정(§5-B)
   · v01.07 — **`Rename to Suggested`** 버튼 + 리포트 순서·색
   · v01.05 — `Copy Material` 탭 · v01.03 — 표의 칸 폭 조절 · 더블클릭 선택)
@@ -34,6 +35,8 @@ Maya 안에서 도는 **머티리얼 이름 진단** PySide 툴이다(arch B, in
      선택이 딸려 바뀌지 않도록 한 것이다(v01.03 에서 바뀐 동작).
    - 칸 경계(`Material` / `Status` / `Meshes` 헤더의 세로선)를 **드래그해 폭을 조절**할 수 있고,
      목록을 다시 채워도 그 폭은 유지된다.
+   - 표 아래 **`Select Materials`** / **`Select Faces`** 버튼(v01.10) — 고른 행의 머티리얼 노드, 또는
+     그 머티리얼이 붙은 **페이스**를 선택한다. 아래 §1.2.
 3. **`Profile`** 콤보에서 규칙을 고른다(기본 제공 `Basic_v001` · `Set_v001`). 아래에 그 규칙의 패턴이 보인다.
    툴을 켜면 **`Set_v001`** 이 골라져 있다(v01.09) — 목록은 이름순이지만 기본 규칙은 따로 정해져 있다.
 4. **`Check Names`** — 진단해서 로그창에 리포트를 찍고, 기본값으로 **클립보드에 복사**한다.
@@ -71,6 +74,37 @@ Maya 안에서 도는 **머티리얼 이름 진단** PySide 툴이다(arch B, in
   (1 name(s) already follow the rule)
 renamed : 1   failed : 0   skipped : 2
 ```
+
+### 1.2 `Select Materials` / `Select Faces` (v01.10) — 레거시 Shader Tool 이식
+
+`_archive/legacy_tools/01_Modules/JUN_PY_ShaderTool_V01_04.py` 의 `Select Shader` / `Select Faces` 를
+Name Check 탭으로 옮긴 것이다. 표 바로 아래 한 줄 — `[Select Materials] [Select Faces] ☑ Listed meshes only`.
+
+| 버튼 | 동작 |
+|------|------|
+| `Select Materials` | 표에서 **고른 행**의 머티리얼 노드를 씬에서 선택한다(더블클릭과 같다). **아무 행도 안 골랐으면 표 전부** — 로그에 `(no row chosen - using all N listed material(s))` 로 알린다 |
+| `Select Faces` | 고른(없으면 전부) 머티리얼이 **붙은 페이스**를 선택한다. **오브젝트째 배정된 메시도 오브젝트가 아니라 페이스로** 선택된다 |
+| `Listed meshes only` (기본 **켬**) | `Select Faces` 가 위 Meshes 리스트의 메시로 범위를 좁힌다. 끄면 **씬 전체**에서 그 머티리얼을 쓰는 모든 면(= 레거시 동작) |
+
+```
+(no row chosen - using all 2 listed material(s))
+Selected 406 face(s) on 2 mesh(es) for 2 material(s) (listed meshes only).
+```
+
+> 리스트가 비어 있는데 `Listed meshes only` 가 켜져 있으면 아무것도 고르지 않고 경고만 남긴다
+> (메시를 담거나 체크를 끄라고). `Select Faces` 는 **선택을 바꾸는 것뿐** 노드·어트리뷰트는 건드리지 않는다.
+> 단, 선택이 API 로 들어가므로 **Ctrl+Z 로 이전 선택이 되돌아오지 않는다**(`cmds.select` 와 다른 점).
+
+**레거시보다 빨라진 자리** — 레거시는 `cmds.select(셰이딩엔진)` 한 줄이었다. 세트 멤버가 통째로 선택되므로
+① 씬 전체가 잡혀 리스트의 메시로 범위를 못 좁히고 ② 오브젝트째 배정된 메시는 **오브젝트**가 선택됐다.
+v01.10 은 (`app/core/maya_materials.py`):
+
+1. 머티리얼 → 물린 셰이딩 엔진(여럿일 수 있다) → **`sets -q`** 로 멤버. 마야가 연속한 면을 `sphere.f[0:199]`
+   처럼 **구간으로 압축해서** 돌려주므로 페이스 문자열을 새로 만들 일이 없고, 엔진 하나에 질의 하나다.
+2. 범위 안의 **메시** 셰이프만 남기고(NURBS 등은 제외), 오브젝트째 멤버는 `shape.f[*]` 로.
+3. 선택은 **API `MGlobal.setActiveSelectionList`** — 인덱스를 `MFnSingleIndexedComponent` 에 담아 한 번에.
+   `cmds.select(문자열 2만 개)` 는 **1.4초**, API 는 **0.001초**(4만 면 체커보드, mayapy 2024 실측).
+   API 가 실패하면 `cmds.select` 로 폴백한다.
 
 ### 옵션
 
@@ -166,6 +200,12 @@ M 의 `f[0]` · `f[1]` · `f[2]` 에 서로 다른 머티리얼이 붙어 있으
 - **면별 배정을 걷어낸 메시에서 `getConnectedShaders` 는 어느 세트에도 없는 면을 `initialShadingGroup` 으로 보고한다**
   (`sets -q` 로는 멤버가 아니다). 그래서 비어 있어야 할 면은 `listSets(object="shape.f[i]")` 로 다시 확인한다.
 - 마야 2024 의 기본 머티리얼은 `lambert1` 이 아니라 `standardSurface1` 이다(`initialShadingGroup.surfaceShader`).
+- (v01.10, Select Faces) **`sets -q` 의 면별 멤버는 셰이프가 아니라 트랜스폼에 붙어 나온다**(`sphere.f[0:199]`).
+  범위를 셰이프로 들고 있으면 멤버의 노드를 셰이프로 풀어서 비교해야 한다. 트랜스폼 아래 셰이프가 둘이면
+  `transform.f[0:2]` 배정은 **두 셰이프 모두**에 들어가고 멤버는 셰이프 기준으로 나온다.
+- (v01.10) **면을 전부 다른 머티리얼로 다시 배정한 메시는 `initialShadingGroup` 연결이 남는다** — `listConnections`
+  에는 보이지만 `listSets(object=shape)` 에는 없다. `shading_engines()` 는 이제 **멤버가 있는 엔진만** 남긴다.
+  그 전엔 쓰지도 않는 `standardSurface1` 이 표에 한 줄 올라왔다.
 
 **검증(mayapy + 오프스크린 Qt, 24항목)**: 면 3개에 다른 머티리얼 → 대상 2개 동일 · 원래 면별 배정이 있던 대상 ·
 머티리얼 보고 · 단일 Undo · **소스 이름 변경 + 부모 변경 후 UUID 로 찾기** · 단일 머티리얼 = 셰이프째 ·
@@ -300,6 +340,7 @@ A00470_MaterialTool/
    │  ├─ name_rules.py      # 규칙 · 정렬 · 진단 · 제안      (Maya 무의존)
    │  ├─ reporter.py        # 진단 결과 -> 사람이 읽는 글    (Maya 무의존)
    │  ├─ maya_materials.py  # 메시 -> 셰이딩 엔진 -> 머티리얼 (씬 읽기 전용)
+   │  │                     #  + 머티리얼 -> 페이스 수집 · API 선택 (v01.10)
    │  └─ material_copy.py   # Copy Material : 면별 배정 읽기 · 적용 · 되읽어 확인
    └─ ui/
       ├─ main_window.py     # 창 · 탭 · 메뉴(Help > Profile Format) · Pin

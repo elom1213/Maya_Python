@@ -19,5 +19,10 @@
 # 01.09  Name Check : Profile 콤보가 처음 열릴 때 기본 규칙 `Set_v001` 을 고른다
 #        (`profiles.DEFAULT_PROFILE`). 목록은 그대로 이름순이고, 그 이름이 없으면 첫 번째.
 
-VERSION = "01.09"
-LAST_UPDATE = "2026-09-21"
+# 01.10  Name Check : `Select Materials` / `Select Faces` 버튼 + `Listed meshes only` 체크박스
+#        (레거시 JUN_PY_ShaderTool_V01_04 의 Select Shader / Select Faces 이식). 페이스는
+#        셰이딩 세트의 멤버 구간(`f[0:511]`)을 그대로 모아 select 한 번 - 오브젝트째 배정도
+#        페이스로, 기본은 리스트의 메시로 범위를 좁힌다(끄면 씬 전체 = 레거시 동작).
+
+VERSION = "01.10"
+LAST_UPDATE = "2026-10-12"
