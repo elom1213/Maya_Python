@@ -37,6 +37,7 @@ from Framework.qt.qt import (
     Qt,
 )
 from Framework.qt.MOD_tsl_qt_v01 import JUN_mod_tsl_qt_v01
+from Framework.qt.MOD_collapsible_qt_v01 import JUN_mod_collapsible_qt_v01
 
 from tools.A00470_MaterialTool.app.core import (
     maya_materials,
@@ -187,9 +188,12 @@ class NameCheckTab(QWidget):
 
         layout.addLayout(select_row)
 
-        # ---- 옵션 ----------------------------------------------------
-        options_box = QGroupBox("Report")
-        options_layout = QVBoxLayout(options_box)
+        # ---- 옵션 (v01.12 접이식, 기본 접힘) --------------------------
+        # 체크박스 셋은 기본값으로 쓰는 일이 대부분이라 평소엔 접어 두고 세로를 아낀다.
+        options_box = JUN_mod_collapsible_qt_v01("Report Options", expanded=False)
+        options_box.header.setToolTip(
+            "Options for the Check Names report. Click to show or hide them.")
+        options_layout = options_box.body
 
         self.chk_detailed = QCheckBox("Detailed report (why each token is wrong)")
         self.chk_detailed.setToolTip(
@@ -212,14 +216,18 @@ class NameCheckTab(QWidget):
             "default.")
         options_layout.addWidget(self.chk_clipboard)
 
+        self.options_box = options_box
         layout.addWidget(options_box)
+
+        # ---- 실행 버튼 한 줄 (v01.12) ----------------------------------
+        action_row = QHBoxLayout()
 
         self.btn_check = QPushButton("Check Names")
         self.btn_check.setToolTip(
             "Diagnose every listed material name against the selected profile.\n"
             "Nothing in the scene is changed.")
         self.btn_check.clicked.connect(self.on_check)
-        layout.addWidget(self.btn_check)
+        action_row.addWidget(self.btn_check)
 
         self.btn_rename = QPushButton("Rename to Suggested")
         self.btn_rename.setToolTip(
@@ -231,7 +239,9 @@ class NameCheckTab(QWidget):
             "This one DOES change the scene. It runs as a single undo step, and the\n"
             "names are checked again afterwards.")
         self.btn_rename.clicked.connect(self.on_rename_suggested)
-        layout.addWidget(self.btn_rename)
+        action_row.addWidget(self.btn_rename)
+
+        layout.addLayout(action_row)
 
     # ==================================================================
     # 로그

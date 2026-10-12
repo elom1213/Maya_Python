@@ -28,5 +28,8 @@
 #        창이 작을 때 Select Materials / Select Faces 글자를 잘랐다(실측 26px). Sort · Reverse ·
 #        List Materials 를 TSL 안 한 줄로 - 탭 최소 높이 816 -> 750px (오프스크린 teal_dark 실측).
 
-VERSION = "01.11"
+# 01.12  Name Check 레이아웃 : Check Names · Rename to Suggested 를 가로 한 줄로, Report 체크박스 셋은
+#        공용 접이식(`JUN_mod_collapsible_qt_v01`, 기본 접힘) 안으로. 탭 최소 높이 750 -> 641px(접힘).
+
+VERSION = "01.12"
 LAST_UPDATE = "2026-10-12"

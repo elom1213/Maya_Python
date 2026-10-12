@@ -113,3 +113,8 @@ metadata:
 작을 때 그 바닥까지 눌려 글자가 잘린다.** Fixed 정책 버튼은 바닥을 안 주면 sizeHint 를 지킨다 — 탭 버튼의 명시
 최소 높이를 전부 뺐다. Sort · Reverse · List Materials 는 TSL 레이아웃에서 `removeWidget` 으로 빼내 한 줄로(TSL 안
 맨 아래). 탭 최소 높이 816 → 750. 관련: [[tsl-widget-max-height-squeezes-buttons]], [[offscreen-size-needs-theme]].
+
+**v01.12 (2026-10-12)** — `Check Names` · `Rename to Suggested` 한 줄, Report 체크박스 셋은 공용 접이식
+`JUN_mod_collapsible_qt_v01("Report Options", expanded=False)` 안(기본 접힘). 접혀 있어도 체크 값은 그대로
+읽힌다. 탭 최소 높이 750 → 641(접힘)/709(펼침). 사용자가 Name Check 탭 세로를 계속 줄이는 방향으로
+요청하고 있다(v01.11 · v01.12 연속) — 다음 UI 추가도 세로를 늘리지 않는 쪽으로.

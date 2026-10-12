@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-12 (오늘)
 
+> [!summary] A00470 MaterialTool — **Check Names · Rename 한 줄 + Report Options 접이식(기본 접힘)** (v01.11->01.12)
+- 요청: Check Names / Rename to Suggested 를 가로 한 줄로, Report 체크박스 셋을 접이식에 넣고 기본 접힘.
+- Report `QGroupBox` → 공용 `JUN_mod_collapsible_qt_v01("Report Options", expanded=False)`, 체크박스는 `body` 에 그대로. 접혀 있어도 `isChecked()` 는 살아 있어 Check Names 가 기본값(클립보드 복사 켬)으로 동작. 두 실행 버튼은 `QHBoxLayout`.
+- 오프스크린 teal_dark 실측: 탭 최소 높이 750 → **641px**(접힘) / 709px(펼침), 버튼 30px 유지, 두 버튼 같은 y. 46항목 회귀 통과. 마야 GUI 확인은 아직.
+
 > [!summary] A00470 MaterialTool — **Name Check 버튼 글자 잘림 수정 · Sort / Reverse / List Materials 한 줄** (v01.10->01.11)
 - 요청: Select Materials / Select Faces 세로가 작아 글자가 안 보임. Sort · Reverse · List Materials 를 가로 한 줄로, 바꾼 뒤 세로가 줄었는지 확인.
 - 원인(오프스크린 teal_dark 실측): 테마 버튼 sizeHint 30px 인데 `setMinimumHeight(26/28)` 이 바닥을 낮춰, 창(520x820)이 탭 내용(최소 816)보다 작을 때 레이아웃이 그 버튼들만 26/28 로 눌렀다. 탭 버튼의 명시 최소 높이를 전부 제거 → 8개 모두 30px.

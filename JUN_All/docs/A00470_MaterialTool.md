@@ -16,7 +16,8 @@ Maya 안에서 도는 **머티리얼 이름 진단** PySide 툴이다(arch B, in
 | **Name Check** (v01.00) | 메시 → 머티리얼 수집 → 프로파일(JSON) 규칙으로 진단 → 리포트(클립보드 복사) → **제안한 이름으로 바꾸기**(v01.07) · **Select Materials / Select Faces**(v01.10) |
 | **Copy Material** (v01.05) | 소스 메시 M 을 **UUID 로 기억** → 리스트의 메시 M_i 에 **면마다 같은 머티리얼**을 건다 |
 
-- **버전**: `app/config/version.py` (v01.11 — 버튼 글자 잘림 수정 · **Sort · Reverse · List Materials 한 줄**(§1.3)
+- **버전**: `app/config/version.py` (v01.12 — **Check Names · Rename 한 줄 + Report Options 접이식**(§1.3)
+  · v01.11 — 버튼 글자 잘림 수정 · **Sort · Reverse · List Materials 한 줄**(§1.3)
   · v01.10 — **`Select Materials` / `Select Faces`**(§1.2)
   · v01.09 — 기본 프로파일 **`Set_v001`**
   · v01.08 — **릴리즈본이 다른 PC 에서 안 열리던 문제** 수정(§5-B)
@@ -42,7 +43,8 @@ Maya 안에서 도는 **머티리얼 이름 진단** PySide 툴이다(arch B, in
 3. **`Profile`** 콤보에서 규칙을 고른다(기본 제공 `Basic_v001` · `Set_v001`). 아래에 그 규칙의 패턴이 보인다.
    툴을 켜면 **`Set_v001`** 이 골라져 있다(v01.09) — 목록은 이름순이지만 기본 규칙은 따로 정해져 있다.
 4. **`Check Names`** — 진단해서 로그창에 리포트를 찍고, 기본값으로 **클립보드에 복사**한다.
-   **씬은 바뀌지 않는다.**
+   **씬은 바뀌지 않는다.** 리포트 체크박스 셋은 **`Report Options`** 접이식 안에 있고 기본으로 접혀 있다
+   (v01.12) — 접혀 있어도 체크 값은 그대로 적용된다.
 5. **`Rename to Suggested`** (v01.07) — 제안 이름이 **완전한** 머티리얼의 이름을 그 이름으로 바꾼다.
    **이 버튼만 씬을 바꾼다** (undo 한 스텝). 아래 §1.1.
 
@@ -117,8 +119,12 @@ v01.10 은 (`app/core/maya_materials.py`):
 - **Sort · Reverse · List Materials 한 줄** — TSL 이 세로로 두던 Sort / Reverse 를 빼내어 `List Materials` 와
   가로 한 줄로(TSL 그룹 안 맨 아래). 세로 두 줄이 줄어 탭 최소 높이 **816 → 750px**(테마 입힌 오프스크린,
   버튼 8개 모두 30px 유지).
+- **(v01.12) `Check Names` · `Rename to Suggested` 한 줄** + **`Report Options` 접이식**(공용
+  `JUN_mod_collapsible_qt_v01`, 기본 접힘). 체크박스 셋(`Detailed` · `Include the names that pass` ·
+  `Copy the report to the clipboard`)은 헤더를 클릭하면 펼쳐진다. 탭 최소 높이 **750 → 641px**(접힘) /
+  709px(펼침).
 
-### 옵션
+### 옵션 (`Report Options`, 기본 접힘)
 
 | 체크박스 | 기본 | 뜻 |
 |----------|------|-----|
