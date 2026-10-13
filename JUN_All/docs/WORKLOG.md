@@ -32,6 +32,20 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-13 (오늘)
 
+> [!summary] A00480_FileTool — **Import 탭을 하위 탭 CSV / FBX 로, CSV = A00200_CSV_tool(ARKit Facial Import) 이식** (v01.09->01.10) `#A00480_FileTool`
+- 요청: A00200 을 A00480 으로 전부 이식, UI 전부 영어, 블렌드셰이프뿐 아니라 ARKit 52 어트리뷰트를 가진 노드에도 키 임포트, Import 하위 탭 CSV · FBX.
+  **원본 A00200 은 보존**(다른 이식들과 같은 방침).
+- 코어 `core/csv_ops.py` — `node_targets(node)`(블렌드셰이프 = weight 별칭 · 그 밖 = 스칼라 어트리뷰트, 소문자 키) · `list_candidate_nodes()`
+  (`ls(type=blendShape)` + `ls("*.jawOpen", recursive=True)` 류 대표 5개로 ARKit 노드 탐색, 네임스페이스 포함) · `detect_best_node` · `import_facial`
+  (다운샘플 step · 씬 FPS · 키 · 타임라인 확장 · 오디오) · `resolve_audio`(같은 stem WAV, `_raw` 뗀 stem, 동영상에서 ffmpeg 추출) · `summary_lines`.
+  **키 · 타임라인 · 사운드를 한 undo 청크로** — `playbackOptions` 도 undo 항목이라 원본처럼 키만 묶으면 첫 undo 가 타임라인만 되돌린다(mayapy 실측).
+- UI `ui/import_csv_page.py`(`CsvImportPage`: CSV File · Node 콤보 `(n ARKit, 타입)` + Detect / Selected · Start Frame · FPS Recorded/Output · Audio ·
+  Import Animation) · `ui/import_tab.py` = `QTabWidget(CSV, FBX)`, FBX 는 예전 SECTIONS 표(`FbxImportPage`), `ImportTab.buttons` · 핸들러 이름 호환 유지.
+- 검증: mayapy 2024 47항목 — 52 이름 · 컨트롤/블렌드셰이프/네임스페이스 후보 · 헤더 매칭 · 60→30 다운샘플 값/프레임 · HeadYaw 같은 이름도 키 ·
+  씬 FPS · 타임라인 · undo 한 번 · 60→60 블렌드셰이프 · 오류 3종 · 오디오 stem/WAV · ImportTab 하위 탭 · Detect/Selected · 페이지 임포트/오류 로그 영어.
+  ffmpeg 추출 · 마야 GUI 는 미확인. standalone 은 `undoInfo(state=True)` 를 켜야 undo 검사가 된다.
+- 문서 `A00480_FileTool.md` §3-1 · 표 · 구조 · 기능 더하기, CHANGELOG v01.10, About.
+
 > [!summary] A00240_PathTool — **Junction > Create `Tree...`: Tree 탭과 같은 트리 팝업에서 폴더를 체크해 Sources / Create In 에 담기** (v01.22->01.23) `#A00240_PathTool` `#Framework`
 - 요청: Create 탭의 TSL 에 경로를 넣을 때 Tree 탭 UI 를 그대로 쓰는 팝업, 차이는 경로마다 체크박스.
 - Framework `JUN_mod_fileTree_qt_v01` 에 **`checkable_folders=True`** 추가 — 폴더 행(루트 포함)에 체크박스, 기억·신호·다중 체크는 `checkable_files` 와

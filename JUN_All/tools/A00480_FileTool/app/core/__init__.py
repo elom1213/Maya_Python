@@ -21,6 +21,7 @@ from .export_rules import (
     run_rules,
 )
 from .import_ops import import_fbx_normal
+from . import csv_ops
 from .path_ops import scene_folder, open_scene_folder, normalize_pasted_path
 
 __all__ = [
@@ -42,6 +43,7 @@ __all__ = [
     "ExportRule",
     "run_rules",
     "import_fbx_normal",
+    "csv_ops",
     "scene_folder",
     "open_scene_folder",
     "normalize_pasted_path",

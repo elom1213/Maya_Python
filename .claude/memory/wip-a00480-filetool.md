@@ -43,3 +43,13 @@ metadata:
 
 **선택 (v01.05)** — `RuleResult.nodes`(문제 노드 전체 경로) → `run_rules` 는 **`(passed, logs, nodes)`** 3개를 돌려준다.
 UI 가 Check 와 규칙에 막힌 Export 뒤에 `select(replace)`. 통과면 선택을 건드리지 않는다. 새 규칙은 nodes 만 채우면 된다.
+
+**Import 하위 탭 CSV / FBX (v01.10, 2026-10-13, 사용자 요청)** — `A00200_CSV_tool`(ARKit Facial Import) 을 **CSV 하위 탭으로 이식, 원본 보존**.
+사용자 요구 둘: UI 전부 영어 · **블렌드셰이프뿐 아니라 ARKit 52 어트리뷰트를 가진 노드에도** 키 임포트.
+- `core/csv_ops.py`: `node_targets(node)`(블렌드셰이프 = aliasAttr weight 별칭, 그 밖 = `listAttr(scalar)` 소문자 키) · `list_candidate_nodes()`
+  = `ls(type="blendShape")` + `ls("*.jawOpen", recursive=True)` 류 대표 5개(`PROBE_ATTRS`) — 씬 전체 listAttr 보다 싸고 네임스페이스도 잡힌다.
+- **undo 함정 (mayapy 실측)**: `playbackOptions` 는 undo 항목이다. 원본처럼 키만 청크로 묶고 타임라인 확장을 밖에 두면 **첫 undo 가 타임라인만** 되돌린다
+  → 키 · 타임라인 · 사운드를 한 청크에. standalone 은 undo 큐가 꺼져 있어 테스트에서 `undoInfo(state=True, infinity=True)` 필요.
+- UI: `ui/import_csv_page.CsvImportPage`(Node 콤보 글자 `node   (n ARKit, 타입)`, `Detect` / `Selected`), `ui/import_tab.ImportTab` = `QTabWidget(CSV, FBX)`,
+  FBX 는 옛 SECTIONS 표(`FbxImportPage`). `ImportTab.buttons` · `on_import_fbx_normal` 이름은 호환 유지.
+- ffmpeg 추출 · 마야 GUI 는 미확인.

@@ -13,10 +13,11 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 | 탭 | 내용 | 출처 |
 |----|------|------|
 | **Export** | objectSet 마다 FBX 한 파일로 일괄 익스포트 (Export Path · Set Up · Naming · Type Filter · Joints only) | [`A00040_file_exporter_V02`](A00040_file_exporter_V02.md) 화면 전체 |
-| **Import** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` |
+| **Import > CSV** (v01.10) | ARKit 페이셜 CSV(Live Link Face) → 노드 키프레임 + 오디오. **블렌드셰이프뿐 아니라 ARKit 어트리뷰트를 가진 아무 노드** | `A00200_CSV_tool` (ARKit Facial Import) 이식, 원본 보존 |
+| **Import > FBX** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` |
 | **Path** | `Copy Scene Folder` · `Open Scene Folder` | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `File` |
 
-- **버전**: `app/config/version.py` (v01.09 — Naming 토큰 규칙에 **`Enum`**(정해진 값 중 고르기, A00330 과 같은 공용 규칙, §2-4) · v01.08 — Naming 칸을 고쳐도 저장 안 함, **`Save` 버튼**으로만 프로파일 기본이 된다(§2-4) · v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
+- **버전**: `app/config/version.py` (v01.10 — Import 탭이 하위 탭 **CSV / FBX**, CSV = `A00200_CSV_tool` 이식(영어 UI, 아무 노드에 키, §3-1) · v01.09 — Naming 토큰 규칙에 **`Enum`**(정해진 값 중 고르기, A00330 과 같은 공용 규칙, §2-4) · v01.08 — Naming 칸을 고쳐도 저장 안 함, **`Save` 버튼**으로만 프로파일 기본이 된다(§2-4) · v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
 - **설치**: `__dragDrop_A00480.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **FileTool** → `tools.A00480_FileTool.run(True)`
 - **테마**: `slate_dark`
 - **원본 두 툴은 그대로 남아 있다.** quickTool 의 File · Import option 버튼도 지워지지 않았다.
@@ -172,7 +173,50 @@ Type Filter : [Include Types v]  Rules : [Rules (1/1) v] [Check]        [      E
 
 ## 3. Import 탭
 
-### `Import FBX normal`
+v01.10 부터 **하위 탭 둘** — `CSV` / `FBX`. FBX 는 예전 Import 탭 그대로다.
+
+### 3-1. CSV — ARKit 페이셜 CSV 임포트 (v01.10, `A00200_CSV_tool` 이식)
+
+Live Link Face 앱이 내보낸 **ARKit 페이셜 CSV** 를 노드의 **키프레임**으로 임포트하고, CSV 와 같은 이름의
+WAV(또는 같은 이름의 동영상에서 ffmpeg 로 추출한 WAV)를 **씬 사운드**로 함께 넣는다.
+`A00200_CSV_tool`(ARKit Facial Import 창)을 하위 탭으로 옮긴 것이고 **원본 툴은 그대로 남아 있다.**
+
+```
+┌ ARKit Facial CSV ──────────────────────────────────────────────┐
+│ CSV File    [D:/mocap/take01_Face_raw.csv        ] [Browse]     │
+│ Node        [faceCtrl   (52 ARKit, transform) ▾] [Detect][Selected]
+│ Start Frame [ 1 ]   FPS  Recorded [60]  Output [30 ▾]           │
+│ Audio       [✓] Import audio   [ ] Overwrite WAV                │
+└────────────────────────────────────────────────────────────────┘
+[ Import Animation ]
+```
+
+1. `CSV File` — `Browse` 로 CSV 를 고른다. 헤더 줄이 어트리뷰트 이름이다(`Timecode` · `BlendShapeCount` 같은 메타 열은
+   건너뛴다).
+2. `Node` — 키를 받을 노드. **원본과 다른 점**: 블렌드셰이프 노드만이 아니라 **CSV 열과 같은 이름의 어트리뷰트를 가진
+   아무 노드**가 된다(ARKit 52 어트리뷰트를 단 페이셜 컨트롤 등). 블렌드셰이프는 weight 별칭을, 그 밖의 노드는 스칼라
+   어트리뷰트를 이름으로 맞춘다(대소문자 무시, 열 순서 무관).
+   - `Detect` — 씬의 **모든 블렌드셰이프 + ARKit 이름 어트리뷰트를 가진 노드**(네임스페이스 안도)를 콤보에 담고, ARKit
+     이름을 가장 많이 가진 것을 고른다. 항목 글자의 `(n ARKit, 타입)` 이 52개 중 몇 개를 갖는지다.
+   - `Selected` — 씬에서 선택한 노드를 콤보에 더하고 고른다(목록에 없는 노드도 된다).
+3. `Start Frame` — 첫 행이 놓일 프레임. 오디오도 여기서 시작한다.
+4. `FPS` — `Recorded`(녹화, Live Link Face 는 60) / `Output`(30 · 60). 행은 `round(Recorded / Output)` 간격으로
+   다운샘플되고(60→30 이면 한 행 걸러), **씬 FPS 가 Output 으로 바뀐다.**
+5. `Audio` — `Import audio` 면 CSV 와 같은 stem 의 WAV 를 찾는다(`..._Face_raw.csv` 는 `..._Face.wav` 도 본다). 없으면
+   같은 stem 의 동영상(MOV · MP4 · M4V · MKV · AVI · MXF · WEBM)에서 **PATH 의 ffmpeg** 로 추출한다. `Overwrite WAV` 는 이미
+   있어도 다시 추출. ffmpeg 가 없거나 오디오 스트림이 없으면 로그에 적고 건너뛴다.
+6. `Import Animation` — 매칭된 어트리뷰트 전부에 키, 타임라인 in/out 을 임포트 구간까지 넓히고(줄이지 않음), 오디오를
+   넣는다. **키 · 타임라인 · 사운드 노드가 한 번의 undo** 다(원본은 키만 묶였다). 로그에 프레임 수 · 적용/미매칭 어트리뷰트 수가
+   적힌다. 매칭되는 열이 하나도 없으면 아무것도 하지 않고 `[ERR]`.
+
+> **구현 메모** — `app/core/csv_ops.py` (UI 비의존, maya.cmds 는 함수 안에서만). `node_targets(node)` 가 노드 종류에 따라
+> `{ 소문자이름: 플러그 }` 를 만들고, `list_candidate_nodes()` 는 `ls(type="blendShape")` + `ls("*.jawOpen", recursive=True)`
+> 류의 대표 어트리뷰트 5개로 찔러 ARKit 노드를 찾는다(씬 전체 listAttr 보다 싸다). 로직은 원본 `arkit_facial_import.py` 와
+> 같고 로그만 영어다.
+
+### 3-2. FBX
+
+#### `Import FBX normal`
 
 FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`OverrideNormalsLock` = 1).
 **다음 임포트부터 적용되는 전역 FBX 설정**이라 지금 씬은 바뀌지 않는다.
@@ -220,11 +264,13 @@ A00480_FileTool/
     │   ├── export_rules.py     # Export 규칙 레지스트리 + Check Hide Mesh (v01.03)
     │   ├── naming_ops.py       # Naming 규칙 묶음(FILE_NAME_RULES) · 기본 토큰 · TOKEN_STORE · build_file_names (v01.06)
     │   ├── import_ops.py       # import_fbx_normal
+    │   ├── csv_ops.py          # Import > CSV : ARKit CSV -> 키프레임(아무 노드) · 후보 노드 탐색 · 오디오(ffmpeg) (v01.10, A00200 이식)
     │   └── path_ops.py         # scene_folder · open_scene_folder · normalize_pasted_path
     └── ui/
         ├── main_window.py      # 메뉴 · Pin · QTabWidget · 공용 로그 · 푸터
         ├── export_tab.py       # A00040_V02 화면 + Scene 버튼 · Naming = 공용 토큰 위젯 (v01.06)
-        ├── import_tab.py       # SECTIONS 표
+        ├── import_tab.py       # 하위 탭 CSV / FBX (FBX = SECTIONS 표, v01.10)
+        ├── import_csv_page.py  # Import > CSV 화면 (v01.10)
         ├── path_tab.py         # SECTIONS 표
         ├── button_section.py   # SECTIONS 표 → 두 칸 버튼 그리드 (quickTool 방식)
         ├── type_filter_button.py
@@ -233,8 +279,10 @@ A00480_FileTool/
 
 ### 기능 더하기
 
-- **Import · Path 탭에 버튼** — 탭 클래스의 `SECTIONS` 에 `(라벨, 핸들러 이름, 툴팁)` 한 줄 + 핸들러 메서드.
-  로직은 `app/core/*_ops.py` 에 두고 **로그 문자열 리스트**를 돌려준다.
+- **Import > FBX · Path 탭에 버튼** — 페이지 클래스(`FbxImportPage` · `PathTab`)의 `SECTIONS` 에 `(라벨, 핸들러 이름, 툴팁)`
+  한 줄 + 핸들러 메서드. 로직은 `app/core/*_ops.py` 에 두고 **로그 문자열 리스트**를 돌려준다.
+- **Import 에 새 파일 형식** — `ui/import_<형식>_page.py` 에 `QWidget(log=...)` 페이지를 만들고 `ImportTab.build_ui` 에
+  `addTab` 한 줄 (CSV 가 본보기).
 - **섹션이 3~4개를 넘으면** 접이식으로 쌓지 말고 하위 탭으로 나눈다.
 - **새 탭** — `app/ui/<name>_tab.py` 에 `QWidget(log=...)` 를 만들고 `main_window.build_ui` 에서 `addTab`.
 - **Export 의 타입 필터 타입** — `export_ops.FILTER_TYPES` + `_TYPE_MATCHERS` 두 곳(원본과 같다).

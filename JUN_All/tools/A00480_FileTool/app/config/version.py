@@ -36,5 +36,11 @@
 
 # 01.09  Naming 토큰 규칙에 Enum (정해진 값 중 고르기) - A00330 과 같은 공용 규칙 COMMON_RULES (Framework.core.token_naming).
 
-VERSION = "01.09"
-LAST_UPDATE = "2026-10-02"
+# 01.10  Import 탭이 하위 탭 둘 - CSV / FBX. CSV = A00200_CSV_tool(ARKit Facial Import) 이식(원본 보존):
+#        Live Link Face CSV 를 노드의 키프레임으로 + 같은 이름의 WAV(또는 동영상에서 ffmpeg 추출)를 씬 사운드로.
+#        원본과 다른 점 - UI · 로그 전부 영어, 키를 받는 노드가 블렌드셰이프만이 아니라 **CSV 열과 같은 이름의
+#        어트리뷰트를 가진 아무 노드**(ARKit 52 어트리뷰트를 단 컨트롤 등). Detect 가 블렌드셰이프 + ARKit
+#        어트리뷰트 노드를 모두 찾고 Selected 로 씬 선택을 넣는다. FBX = 예전 Import 탭(Import FBX normal) 그대로.
+
+VERSION = "01.10"
+LAST_UPDATE = "2026-10-13"

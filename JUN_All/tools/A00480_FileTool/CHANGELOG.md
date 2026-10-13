@@ -1,5 +1,20 @@
 # Changelog — A00480_FileTool
 
+## v01.10 (2026-10-13)
+- **Import tab is now two sub tabs : `CSV` and `FBX`.** FBX holds the old Import tab as it was
+  (`Import FBX normal`).
+- **Import > CSV - ARKit facial CSV import, ported from `A00200_CSV_tool`** (the original tool stays).
+  A CSV exported by Live Link Face becomes keyframes : columns are matched to the node's attributes by
+  name (case-insensitive), `Recorded` / `Output` FPS set the downsample step and the scene FPS, the
+  timeline is extended to the imported range, and the WAV next to the CSV (`_raw` ignored) - or one
+  extracted from a video next to it with ffmpeg - is imported as the scene sound.
+  - **Different from the original :** every UI string and log line is English; and the keys can go to
+    **any node whose attributes are named like the CSV columns**, not only a blendShape - e.g. a facial
+    control carrying the 52 ARKit attributes. `Detect` lists every blendShape and every node with ARKit
+    attributes (`(n ARKit)` = how many of the 52 names it has) and picks the best; `Selected` adds the node
+    selected in the scene.
+  - Keys, timeline and sound node are **one undo step** (the original only undid the keys together).
+
 ## v01.09 (2026-10-02)
 - **Export > Naming: new token rule `Enum`** - pick one of a fixed list of values instead of typing
   (`Values...` edits the token name and the list). It is the same rule as A00330 Token's Enum.

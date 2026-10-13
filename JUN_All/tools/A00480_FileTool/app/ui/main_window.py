@@ -5,7 +5,7 @@
 #
 # 파일을 들여오고 · 내보내고 · 경로를 다루는 툴.
 #   Export : A00040_file_exporter_V02 화면 그대로 (+ Export Path 의 Scene 버튼)
-#   Import : A00030_quickTool_V02 의 Import FBX normal
+#   Import : 하위 탭 CSV (A00200_CSV_tool 이식, v01.10) / FBX (A00030_quickTool_V02 의 Import FBX normal)
 #   Path   : A00030_quickTool_V02 의 Copy Scene Folder · Open Scene Folder
 #
 # 창은 메뉴 · Pin · 탭 · **공용 로그창 하나** · 푸터를 갖고, 탭은 log 콜백만 받는다.
@@ -150,7 +150,7 @@ class MainWindow(QWidget):
         self.tabs.addTab(self.import_tab, "Import")
         self.tabs.addTab(self.path_tab, "Path")
         self.tabs.setTabToolTip(0, "Export objectSets to FBX, one file per set.")
-        self.tabs.setTabToolTip(1, "Import settings.")
+        self.tabs.setTabToolTip(1, "Import : CSV (ARKit facial keys + audio) / FBX settings.")
         self.tabs.setTabToolTip(2, "Scene folder and path helpers.")
 
         # 탭은 스크롤 칸에 담는다 - 화면이 작거나(1080 · 배율 125/150%) 창을 줄여도 창이 화면을
@@ -193,7 +193,10 @@ class MainWindow(QWidget):
             "  built from tokens (Custom / Numbering / Set's Name) kept in profiles.\n"
             "  Type Filter excludes node types; 'Joints only under joints' keeps non-joints under a joint\n"
             "  out of the FBX. 'Scene' fills the export path with the scene folder.\n"
-            "[Import] Import FBX normal - use the normals stored in the file.\n"
+            "[Import > CSV] ARKit facial CSV (Live Link Face) -> keyframes on a blendShape\n"
+            "  or any node with the ARKit attributes, scene FPS / downsample, audio from a\n"
+            "  WAV or video next to the CSV (ffmpeg).\n"
+            "[Import > FBX] Import FBX normal - use the normals stored in the file.\n"
             "[Path] Copy Scene Folder / Open Scene Folder.\n"
             "\n"
             "Merged from A00040_file_exporter_V02 and the File / Import option\n"
