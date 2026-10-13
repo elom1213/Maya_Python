@@ -11,7 +11,11 @@
 #   Remove : 정션 목록(Junction | Target 표) -> Remove. **정션인 행만** 지운다 - 실제 폴더는 표에서
 #            빨갛게 "not a junction" 으로 보이고 건드리지 않는다. Scan 으로 폴더 안의 정션을 찾아 담는다.
 #
-# 리스트에는 Add...(폴더 선택) · Paste(클립보드의 경로 줄들) · 탐색기에서 **끌어다 놓기**로 담는다.
+# 리스트에는 Add...(폴더 선택) · Paste(클립보드의 경로 줄들) · 탐색기에서 **끌어다 놓기** ·
+# Tree...(v01.23, Tree 탭과 같은 트리 팝업에서 폴더를 **체크**해 담기) 로 담는다.
+#   Tree 팝업은 공용 `JUN_mod_fileTree_qt_v01(checkable_folders=True)` - Sources 와 Create In 이
+#   **하나의 팝업을 같이 쓴다**(한 번 만든 트리가 남아 다음에 열 때 그대로). 처음 열 때 경로가 비면
+#   Tree 탭에 적힌 경로를 가져온다. `Add Checked` 는 체크한 폴더를 그 리스트에 담고 체크를 비운 뒤 닫는다.
 # 로직은 core/junction.py (UI 비의존). 로그창은 하위 탭 둘이 함께 쓴다.
 
 import os
@@ -36,11 +40,13 @@ from Framework.qt.qt import (
     QHeaderView,
     QFileDialog,
     QMessageBox,
+    QDialog,
     QColor,
     QBrush,
 )
 from Framework.qt.MOD_tsl_qt_v01 import JUN_mod_tsl_qt_v01
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
+from Framework.qt.MOD_fileTree_qt_v01 import JUN_mod_fileTree_qt_v01
 from Framework.core import log_levels
 from Framework.themes.theme_manager import ThemeManager
 
@@ -83,11 +89,13 @@ class _PathList(QWidget):
     항목은 경로 문자열 그대로다(UUID 부착 없음).
     """
 
-    def __init__(self, title, log, browse_title="Select Folder", parent=None):
+    def __init__(self, title, log, browse_title="Select Folder", parent=None, on_tree=None):
+        """on_tree : 주어지면 `Tree...` 버튼이 생기고, 누르면 on_tree(self) 를 부른다 (v01.23)."""
         super().__init__(parent)
         self._log = log
         self._browse_title = browse_title
         self._last_dir = os.path.expanduser("~")
+        self.title = title
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -98,6 +106,11 @@ class _PathList(QWidget):
         self.tsl.add_button("Add...", self._on_browse, index=0)
         btn_paste = self.tsl.add_button("Paste", self._on_paste, index=1)
         btn_paste.setToolTip("Add the paths on the clipboard (one per line).")
+        if callable(on_tree):
+            btn_tree = self.tsl.add_button("Tree...", lambda: on_tree(self), index=2)
+            btn_tree.setToolTip(
+                "Pick folders in a tree (the same tree as the Tree tab, with a check box\n"
+                "on every folder). 'Add Checked' puts the checked folders in this list.")
         layout.addWidget(self.tsl)
 
         self.list_widget = self.tsl.list_widget
@@ -154,25 +167,111 @@ class _PathList(QWidget):
         return super().eventFilter(watched, event)
 
 
+# ====================================================================== Tree picker
+
+class _TreePickDialog(QDialog):
+    """Tree 탭과 같은 트리에서 폴더를 **체크**해 리스트에 담는 팝업 (v01.23).
+
+    공용 `JUN_mod_fileTree_qt_v01(checkable_folders=True)` 를 그대로 올린다 - Tree 탭의 모든 기능
+    (Adaptive · Depth · Show files · File Types · Expand · Refresh · Omit · Filter · 우클릭 Reveal)이
+    그대로 있고, 차이는 **폴더 행마다 체크박스**가 있다는 것뿐이다(정션은 폴더에만 걸리므로 파일엔 없다).
+
+    Sources 와 Create In 이 이 팝업 하나를 같이 쓴다 - 한 번 만든 트리와 체크는 닫아도 남아 다음에
+    열 때 그대로다. `open_for(target)` 가 어느 리스트에 담을지 정하고 모달로 띄운다.
+    """
+
+    def __init__(self, log, tree_path_getter=None, parent=None):
+        super().__init__(parent)
+        self._log = log
+        self._tree_path_getter = tree_path_getter
+        self._target = None
+        self.setWindowTitle("Add Folders by Tree")
+        self.resize(760, 640)
+
+        layout = QVBoxLayout(self)
+        self.tree = JUN_mod_fileTree_qt_v01(checkable_folders=True)
+        # 정션은 폴더에만 - 파일은 기본으로 감춘다(필요하면 Show files 로 켤 수 있다).
+        self.tree.chk_show_files.setChecked(False)
+        self.tree.checksChanged.connect(self._on_checks_changed)
+        layout.addWidget(self.tree, stretch=1)
+
+        row = QHBoxLayout()
+        self.lbl_checked = QLabel("Checked: 0")
+        row.addWidget(self.lbl_checked)
+        row.addStretch(1)
+        btn_clear = QPushButton("Clear Checks")
+        btn_clear.setToolTip("Uncheck every folder.")
+        btn_clear.clicked.connect(self.tree.clear_checks)
+        row.addWidget(btn_clear)
+        self.btn_add = QPushButton("Add Checked")
+        self.btn_add.setMinimumHeight(32)
+        self.btn_add.clicked.connect(self._on_add)
+        row.addWidget(self.btn_add)
+        btn_close = QPushButton("Close")
+        btn_close.clicked.connect(self.reject)
+        row.addWidget(btn_close)
+        layout.addLayout(row)
+        self._on_checks_changed([])
+
+    def open_for(self, target):
+        """target(_PathList) 에 담을 폴더를 고르게 띄운다. 처음이고 경로가 비면 Tree 탭의 경로를 가져온다."""
+        self._target = target
+        self.setWindowTitle("Add Folders by Tree  ->  {0}".format(target.title))
+        self.btn_add.setText("Add Checked to {0}".format(target.title))
+        self.btn_add.setToolTip(
+            "Put every checked folder in the '{0}' list (duplicates are skipped),\n"
+            "clear the checks and close.".format(target.title))
+        if not self.tree.ipf_path.text().strip() and callable(self._tree_path_getter):
+            start = (self._tree_path_getter() or "").strip()
+            if start and os.path.isdir(start):
+                self.tree.ipf_path.setText(start)
+                self.tree.on_build()
+        self.exec_()
+
+    def _on_checks_changed(self, paths):
+        n = len(paths)
+        self.lbl_checked.setText("Checked: {0}".format(n))
+        self.btn_add.setEnabled(n > 0)
+
+    def _on_add(self):
+        paths = self.tree.checked_paths()
+        if not paths or self._target is None:
+            self._log("[WARN] Tree : check one or more folders first.")
+            return
+        before = len(self._target.paths())
+        self._target.add_paths(paths)
+        added = len(self._target.paths()) - before
+        self._log("[OK] Tree : {0} folder(s) added to {1} ({2} checked{3}).".format(
+            added, self._target.title, len(paths),
+            ", {0} already there".format(len(paths) - added) if added < len(paths) else ""))
+        self.tree.clear_checks()
+        self.accept()
+
+
 # ====================================================================== Create
 
 class _CreateTab(QWidget):
 
-    def __init__(self, log, on_created=None, parent=None):
+    def __init__(self, log, on_created=None, parent=None, tree_path_getter=None):
+        """tree_path_getter : Tree 탭의 현재 경로를 돌려주는 함수 - Tree 팝업의 첫 경로로 쓴다 (v01.23)."""
         super().__init__(parent)
         self._log = log
         self._on_created = on_created
+        self._tree_path_getter = tree_path_getter
+        self._tree_dialog = None
         self._build_ui()
 
     def _build_ui(self):
         root = QVBoxLayout(self)
 
         lists = QHBoxLayout()
-        self.src_list = _PathList("Sources", self._log, "Select Source Folder")
+        self.src_list = _PathList("Sources", self._log, "Select Source Folder",
+                                  on_tree=self._pick_by_tree)
         self.src_list.list_widget.setToolTip(
-            "Original folders to link. Drag from File Explorer, Add..., or Paste.\n"
+            "Original folders to link. Drag from File Explorer, Add..., Paste or Tree....\n"
             "A junction links a folder - a file here is skipped.")
-        self.tgt_list = _PathList("Create In", self._log, "Select Folder to Create Junctions In")
+        self.tgt_list = _PathList("Create In", self._log, "Select Folder to Create Junctions In",
+                                  on_tree=self._pick_by_tree)
         self.tgt_list.list_widget.setToolTip(
             "Folders where the junctions are created (named after the source).\n"
             "n -> 1 uses the first row only; n -> n pairs rows by order.")
@@ -235,6 +334,14 @@ class _CreateTab(QWidget):
         self.rad_n1.toggled.connect(self._on_mode_changed)
         self.chk_target_is_link.toggled.connect(self._refresh)
         self._refresh()
+
+    # ---- tree picker (v01.23)
+
+    def _pick_by_tree(self, target):
+        """`Tree...` - 폴더 체크 팝업을 target 리스트용으로 띄운다. 팝업은 하나를 만들어 두고 다시 쓴다."""
+        if self._tree_dialog is None:
+            self._tree_dialog = _TreePickDialog(self._log, self._tree_path_getter, parent=self)
+        self._tree_dialog.open_for(target)
 
     # ---- plan
 
@@ -521,7 +628,8 @@ class _RemoveTab(QWidget):
 
 class JunctionTab(QWidget):
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, tree_path_getter=None):
+        """tree_path_getter : Tree 탭의 현재 경로를 돌려주는 함수 (Create 의 Tree 팝업 첫 경로, v01.23)."""
         super().__init__(parent)
 
         root = QVBoxLayout(self)
@@ -533,7 +641,8 @@ class JunctionTab(QWidget):
 
         self.tabs = QTabWidget()
         self.remove_tab = _RemoveTab(self._log)
-        self.create_tab = _CreateTab(self._log, on_created=self._on_created)
+        self.create_tab = _CreateTab(self._log, on_created=self._on_created,
+                                     tree_path_getter=tree_path_getter)
         self.tabs.addTab(self.create_tab, "Create")
         self.tabs.addTab(self.remove_tab, "Remove")
         root.addWidget(self.tabs, stretch=1)

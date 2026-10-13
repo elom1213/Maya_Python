@@ -32,6 +32,16 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-13 (오늘)
 
+> [!summary] A00240_PathTool — **Junction > Create `Tree...`: Tree 탭과 같은 트리 팝업에서 폴더를 체크해 Sources / Create In 에 담기** (v01.22->01.23) `#A00240_PathTool` `#Framework`
+- 요청: Create 탭의 TSL 에 경로를 넣을 때 Tree 탭 UI 를 그대로 쓰는 팝업, 차이는 경로마다 체크박스.
+- Framework `JUN_mod_fileTree_qt_v01` 에 **`checkable_folders=True`** 추가 — 폴더 행(루트 포함)에 체크박스, 기억·신호·다중 체크는 `checkable_files` 와
+  같은 규칙, `...` 생략 행은 체크 없음. 기본값 꺼짐이라 A00240 Tree 탭 · A00210 · A00480 은 그대로.
+- A00240 `junction_tab._TreePickDialog` — 두 리스트가 팝업 하나를 공유(트리가 남는다), 처음 열 때 Tree 탭 경로로 시작, `Add Checked to <list>` 가 담고 체크를
+  비운 뒤 닫는다. 파일은 체크박스 없음 · 기본 감춤(정션은 폴더만). `_PathList(on_tree=...)` 로 `Tree...` 버튼.
+- 검증: 오프스크린 PySide6 — 두 버튼 · 시작 경로 · 폴더/루트 체크박스 · 파일 체크박스 없음 · 체크(공용 checkTree `set_checked`) → 라벨/버튼 → Add → TSL
+  → 체크 비움/닫힘 · 재사용 · Create In · 빈 Add 유지 · 중복 건너뜀 · Tree 탭 영향 없음. 테스트에서 모달 창은 `QTimer` 드라이버 + 워치독으로 돈다.
+- 문서 `A00240_PathTool.md` 11-1 · `Framework_MOD_fileTree_qt.md` 옵션 표 · CHANGELOG.
+
 > [!summary] A00145_RigConnect — **Connect by Rule `Manage...`: 규칙을 체크해 json 파일 삭제** (v01.60->01.61) `#A00145_RigConnect`
 - 요청: 규칙 중 일부를 골라 지우는 기능. `Rule` 콤보 옆 `Manage...` → 규칙 표(체크 | Name | Pairs | File, 툴팁에 설명·경로·짝) →
   `Delete Checked` 가 이름을 나열해 한 번 묻고 파일을 지운다. 창을 닫으면 콤보 재로드.

@@ -37,6 +37,8 @@
 #   - default_types=("ma", "mb") : 처음 발견된 확장자 중 **체크해 둘 것**. 나머지는 보이되 꺼진다.
 #     None 이면 지금처럼 전부 체크.
 #   - 우클릭 메뉴 · 더블클릭은 공용 `Framework/qt/path_context.py` 로 (문구 · 실패 안내 동일).
+#   - checkable_folders=True (2026-10-13, A00240 v01.23 Junction "Tree..." 용) : **폴더 행(루트 포함)에 체크박스**.
+#     checkable_files 와 같은 기억·신호·다중 체크 규칙이고 둘을 함께 켤 수도 있다. `...` 생략 행은 체크 없음.
 
 import os
 
@@ -116,20 +118,25 @@ class _CheckableMenu(QMenu):
 class JUN_mod_fileTree_qt_v01(QWidget):
     """폴더 트리 위젯 - A00240 Tree 탭 본체. 생성 후 `on_build()` 전까지는 빈 트리다.
 
-    checkable_files : 파일 행에 체크박스 (Shift 다중 체크, 경로로 기억). 기본 False.
-    default_types   : 처음 발견된 확장자 중 체크해 둘 것(점 없는 소문자 모음). None = 전부.
+    checkable_files   : 파일 행에 체크박스 (Shift 다중 체크, 경로로 기억). 기본 False.
+    checkable_folders : 폴더 행(루트 포함)에 체크박스. 기본 False. 둘을 함께 켤 수도 있다.
+                        (2026-10-13, A00240 Junction 의 "Tree..." 폴더 고르기용. `...` 생략 행은 없다.)
+    default_types     : 처음 발견된 확장자 중 체크해 둘 것(점 없는 소문자 모음). None = 전부.
     """
 
-    #: 체크 상태가 바뀌었다 - 지금 체크된 파일 절대경로 목록 (checkable_files 일 때만)
+    #: 체크 상태가 바뀌었다 - 지금 체크된 절대경로 목록 (checkable_files / checkable_folders 일 때만)
     checksChanged = Signal(list)
 
-    def __init__(self, parent=None, checkable_files=False, default_types=None):
+    def __init__(self, parent=None, checkable_files=False, default_types=None,
+                 checkable_folders=False):
         super().__init__(parent)
 
         self.checkable_files = bool(checkable_files)
+        self.checkable_folders = bool(checkable_folders)
+        self._checkable = self.checkable_files or self.checkable_folders
         self.default_types = (None if default_types is None
                               else {str(x).lstrip(".").lower() for x in default_types})
-        self._checked = set()     # 체크된 파일 경로 (행이 다시 만들어져도 남는다)
+        self._checked = set()     # 체크된 경로 (행이 다시 만들어져도 남는다)
         self._check_behaviors = []  # 트리마다 붙인 JUN_mod_checkTree_qt_v01 (참조 유지)
 
         self._root_path = ""      # 마지막으로 빌드한 경로
@@ -325,9 +332,11 @@ class JUN_mod_fileTree_qt_v01(QWidget):
             tree, lambda item: item.data(0, Qt.UserRole) or "", title="Tree")
         tip = ("Double-click: open in File Explorer.\n"
                "Click the arrow to open a folder (Shift = everything below).")
-        if self.checkable_files:
-            tip += ("\nCheck files to pick them. Select several rows (Shift / Ctrl) and\n"
-                    "click one check box to check or uncheck them all.")
+        if self._checkable:
+            what = ("files and folders" if self.checkable_files and self.checkable_folders
+                    else "folders" if self.checkable_folders else "files")
+            tip += ("\nCheck {0} to pick them. Select several rows (Shift / Ctrl) and\n"
+                    "click one check box to check or uncheck them all.".format(what))
             behavior = JUN_mod_checkTree_qt_v01(tree)
             behavior.checksChanged.connect(self._on_items_checked)
             self._check_behaviors.append(behavior)
@@ -777,7 +786,10 @@ class JUN_mod_fileTree_qt_v01(QWidget):
         item = QTreeWidgetItem([node["name"]])
         item.setData(0, Qt.UserRole, node["path"])
         item.setIcon(0, self._icon_dir)
-        if self.checkable_files:
+        if self.checkable_folders:
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(0, Qt.Checked if node["path"] in self._checked else Qt.Unchecked)
+        elif self.checkable_files:
             # 폴더는 고를 대상이 아니다 - 기본 플래그의 ItemIsUserCheckable 을 벗긴다(체크박스 없음).
             item.setFlags(item.flags() & ~Qt.ItemIsUserCheckable)
         if node.get("junction"):
@@ -811,6 +823,9 @@ class JUN_mod_fileTree_qt_v01(QWidget):
                     leaf.setFlags(leaf.flags() | Qt.ItemIsUserCheckable)
                     leaf.setCheckState(0, Qt.Checked if child["path"] in self._checked
                                        else Qt.Unchecked)
+                elif self.checkable_folders:
+                    # 폴더만 고르는 트리 - 파일 행엔 체크박스를 두지 않는다.
+                    leaf.setFlags(leaf.flags() & ~Qt.ItemIsUserCheckable)
                 item.addChild(leaf)
 
     def _add_omitted_children(self, root_item, omit, show_files, exts):
@@ -827,6 +842,8 @@ class JUN_mod_fileTree_qt_v01(QWidget):
         ell = QTreeWidgetItem([OMIT_LABEL])
         ell.setData(0, Qt.UserRole, "")
         ell.setData(0, ROLE_OMIT, True)
+        if self._checkable:
+            ell.setFlags(ell.flags() & ~Qt.ItemIsUserCheckable)   # `...` 은 경로가 없다 - 체크 없음
         ell.setToolTip(0, "{0} level(s) under the root are omitted.".format(omit))
         root_item.addChild(ell)
 
@@ -1256,8 +1273,8 @@ class JUN_mod_fileTree_qt_v01(QWidget):
         self.checksChanged.emit(self.checked_paths())
 
     def _apply_checks(self, tree, states):
-        """tree 의 파일 행들에 {path: bool} 을 신호 없이 입힌다."""
-        if not self.checkable_files:
+        """tree 의 체크 가능한 행들에 {path: bool} 을 신호 없이 입힌다."""
+        if not self._checkable:
             return
         tree.blockSignals(True)
         try:
@@ -1273,7 +1290,7 @@ class JUN_mod_fileTree_qt_v01(QWidget):
 
     def set_checked_paths(self, paths, checked=True):
         """코드로 체크/해제한다(모든 트리에 반영, checksChanged 를 쏜다)."""
-        if not self.checkable_files:
+        if not self._checkable:
             return
         states = {}
         for path in paths:

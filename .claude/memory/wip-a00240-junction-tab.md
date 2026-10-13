@@ -46,3 +46,9 @@ A00240_PathTool v01.19 (2026-10-12) **Junction** 탭 — Create / Remove 하위 
 (`ProjA_Content`; 더 겹치면 한 단계 더, 다 써도 같으면 `_2`). 같은 소스 중복 행은 이름 계산에서 빼고
 `same source as an earlier row` 로 거른다 — 안 빼면 둘을 가르려고 이름이 전체 경로까지 길어진다.
 드라이브 루트 `D:\` 는 이름 `D`(전엔 `D:` 가 나와 폴더 이름으로 못 쓰는 꼴이었다). 검증은 plan 시나리오 + 실제 mklink 왕복 + 오프스크린 Create 탭.
+
+**v01.23 (2026-10-13, 사용자 요청) — Create `Tree...`**: Tree 탭과 같은 트리 팝업(`_TreePickDialog`)에서 폴더를 체크해 Sources / Create In 에 담는다.
+공용 `JUN_mod_fileTree_qt_v01` 에 **`checkable_folders=True`** 를 더했다(폴더 행에 체크박스, `checkable_files` 와 같은 기억/신호, 함께 켤 수 있음).
+설계: 두 리스트가 팝업 하나를 공유(트리 유지) · 처음 열 때 Tree 탭 경로로 시작 · Add 뒤 체크 비우고 닫음 · 파일은 체크 없음 + 기본 감춤.
+**테스트 함정**: 공용 checkTree 는 마우스를 viewport 필터로 먹어 `item.setCheckState` 로는 위젯에 알려지지 않는다 → `tree._check_behaviors[0].set_checked(items, Qt.Checked)` 로
+사용자 클릭을 흉내낸다. 모달 `exec_()` 는 `QTimer.singleShot` 드라이버 + 워치독(`os._exit`)으로 돌리고, 드라이버가 `accept()` 에 못 가면 영원히 멈춘다.

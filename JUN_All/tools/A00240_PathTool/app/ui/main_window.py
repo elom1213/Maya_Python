@@ -114,7 +114,9 @@ class MainWindow(QWidget):
         self.tabs.addTab(self.tree_tab, "Tree")
 
         # Junction 탭 (v01.19): mklink /J 를 화면에서 - Create / Remove 하위 탭.
-        self.junction_tab = JunctionTab()
+        # Create 의 Tree 팝업은 처음 열 때 Tree 탭에 적힌 경로로 시작한다 (v01.23).
+        self.junction_tab = JunctionTab(
+            tree_path_getter=lambda: self.tree_tab.ipf_path.text())
         self.tabs.addTab(self.junction_tab, "Junction")
 
         root.addWidget(self.tabs)

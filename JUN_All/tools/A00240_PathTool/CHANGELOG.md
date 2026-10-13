@@ -2,6 +2,16 @@
 
 All notable changes to this tool are documented here.
 
+## [01.23] - 2026-10-13
+### Added
+- **Junction > Create: `Tree...` on both lists.** Opens a popup with the **same tree as the Tree tab**
+  (Adaptive, Depth, Show files, File Types, Expand, Refresh, Omit, Filter, right-click Reveal) - the one
+  difference is a **check box on every folder**. `Add Checked to Sources` / `Add Checked to Create In`
+  puts the checked folders in that list (duplicates skipped), clears the checks and closes. Files have no
+  check box (a junction links a folder) and are hidden by default (Show files turns them on). The two lists
+  share one popup, so the tree you built stays for the next open; the first open starts from the path typed
+  in the Tree tab. Uses the shared `JUN_mod_fileTree_qt_v01` with its new `checkable_folders=True`.
+
 ## [01.22] - 2026-10-13
 ### Fixed
 - **Junction > Create: sources with the same folder name no longer block each other.** The junction is

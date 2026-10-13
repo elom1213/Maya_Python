@@ -394,7 +394,16 @@ Mode (•) n -> 1  ( ) n -> n   [ ] Target row is the junction path
 ```
 
 - **Sources**: 원본 폴더들. **Create In**: 정션을 **만들 폴더**들. 두 리스트 모두 **Add...**(폴더 선택),
-  **Paste**(클립보드의 경로, 한 줄에 하나), **탐색기에서 끌어다 놓기**로 채운다. Del/Up/Down 으로 정리.
+  **Paste**(클립보드의 경로, 한 줄에 하나), **탐색기에서 끌어다 놓기**, **Tree...**(아래) 로 채운다. Del/Up/Down 으로 정리.
+- **Tree... — 트리에서 폴더를 체크해 담기 (v01.23~)**: 두 리스트 각각에 있는 버튼. 누르면 **Tree 탭과 똑같은 트리**
+  (Adaptive · Depth · Show files · File Types · Expand · Refresh · Omit · Filter · 우클릭 Reveal)가 팝업으로 뜬다.
+  Tree 탭과의 차이는 **폴더 행마다 체크박스**가 있다는 것 하나다 — 정션은 폴더에만 걸리므로 파일엔 체크박스가 없고,
+  파일은 기본으로 감춰진다(`Show files` 로 켤 수 있다). Shift/Ctrl 로 여러 행을 고른 뒤 체크 하나로 전부 체크/해제.
+  - `Add Checked to Sources` / `Add Checked to Create In` — 체크한 폴더를 그 리스트에 담고(이미 있는 것은 건너뜀),
+    체크를 비운 뒤 닫는다. 아래 `Checked: n` 이 개수를 보여 주고, 0 이면 버튼이 꺼진다. `Clear Checks` 로 전부 해제.
+  - 두 리스트가 **팝업 하나를 같이 쓴다** — 한 번 만든 트리는 닫아도 남아 다음에 열 때 그대로다. 처음 열 때 경로가
+    비어 있으면 **Tree 탭에 적힌 경로**로 시작한다. 공용 위젯의 `checkable_folders=True`
+    ([`Framework_MOD_fileTree_qt.md`](Framework_MOD_fileTree_qt.md)).
 - **n -> 1**: 소스 전부가 Create In **첫 행** 폴더 안에 정션으로 생긴다. **n -> n**: 소스 i 행 ↔ Create In
   i 행. 정션 이름은 **원본 폴더 이름**이다.
   - **끝 폴더 이름이 같은 소스들 (v01.22~)**: `D:\ProjA\Content` 와 `D:\ProjB\Content` 를 한 폴더에 만들면
