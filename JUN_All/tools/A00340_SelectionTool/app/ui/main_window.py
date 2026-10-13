@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-12
+# last Update date : 2026-10-13
 # A00340_SelectionTool - Qt UI (in-Maya)
 #
 # 마야에서 선택된 오브젝트들을 버튼 하나로 빠르게 다시 선택하는 툴.
 #   - 버튼은 현재 선택을 캡처해 만든다. 클릭하면 그 오브젝트들이 씬에서 선택된다.
 #   - A00240_PathTool 처럼 카테고리/버튼을 자유롭게 추가·삭제·순서변경 하고,
 #     Profile 로 원하는 종류끼리 버튼 세트를 나눠 보관한다.
-#   - 화면은 좌우 스플리터로 [컨트롤(Profile/Create/Color/Log)] | [버튼 모음] 분리
-#     (v01.08~, 그 전엔 상하).
-#     컨트롤 4칸은 하나의 접이식 'Controls' 박스로 묶여 한 번에 접힌다. 로그창도
-#     그 안에 들어가므로 log_view 를 탭에 넘겨준다.
+#   - 화면은 상하 스플리터로 [컨트롤(Profile/Create/Color)] / [버튼 모음] 분리.
+#     컨트롤 3칸은 하나의 접이식 'Controls' 박스로 묶여 한 번에 접힌다.
+#     로그창은 v01.09 부터 창 맨 아래(스플리터 밖) - Controls 를 숨겨도 보인다.
+#     위 칸은 처음 보일 때 Controls 내용 높이에 맞춰져 스크롤 없이 전부 보인다.
 #   - View > Show Controls (v01.07~): 접어도 남던 Controls 영역을 아예 없앤다.
-#     끄면 왼쪽 pane 과 스플리터 핸들이 사라지고 버튼 모음이 창 전체를 쓴다.
+#     끄면 위 pane 과 스플리터 핸들이 사라지고 버튼 모음이 창 전체를 쓴다.
 # 창은 마야 메인 윈도우에 parent 되어 뷰포트 위에 뜬다. 모든 UI 문자열/로그는 영어.
 
 from Framework.qt.qt import (
@@ -21,6 +21,7 @@ from Framework.qt.qt import (
     QHBoxLayout,
     QLabel,
     QMenuBar,
+    QGroupBox,
     QPlainTextEdit,
     QMessageBox,
     QPushButton,
@@ -47,8 +48,7 @@ class MainWindow(QWidget):
 
         self.setWindowTitle("Selection Tool v{0}".format(VERSION))
         self.setWindowFlags(Qt.Window)
-        # 좌우 배치라 가로가 넓다 (v01.07 까지 360 x 620).
-        self.resize(760, 600)
+        self.resize(360, 620)
 
         self.build_ui()
 
@@ -66,7 +66,7 @@ class MainWindow(QWidget):
         self.act_show_controls = view_menu.addAction("Show Controls")
         self.act_show_controls.setCheckable(True)
         self.act_show_controls.setToolTip(
-            "Show or hide the Controls pane (Profile / Create / Color / Log).\n"
+            "Show or hide the Controls pane (Profile / Create / Color).\n"
             "Hidden, it takes no space at all - the button area fills the window.")
         self.act_show_controls.toggled.connect(self.on_show_controls_toggled)
 
@@ -89,17 +89,21 @@ class MainWindow(QWidget):
         header_row.addWidget(self.pin_button)
         main_layout.addLayout(header_row)
 
-        # 공용 로그창. 탭이 상단 컨트롤의 접이식 'Log' 섹션에 담으므로 탭보다 먼저 생성.
+        # 공용 로그창. 탭의 콜백이 여기에 쓰므로 탭보다 먼저 만든다. 자리는 창 맨 아래.
         self.log_view = JUN_mod_log_qt_v01(
             window_title="Selection Tool - Log",
             object_name="JUN_A00340_SelectionTool_log_window")
-        # 왼쪽 칸의 남는 높이를 Log 가 받으므로 최소만 정한다(옛 고정 90).
-        self.log_view.setMinimumHeight(90)
+        self.log_view.setFixedHeight(90)
 
-        # 선택 버튼 탭 (컨트롤 pane | 버튼 pane 을 좌우 스플리터로 분리, 로그도 그 안에)
-        self.selection_tab = SelectionTab(
-            log_callback=self._log, log_widget=self.log_view)
+        # 선택 버튼 탭 (컨트롤 pane + 버튼 pane 을 상하 스플리터로 분리)
+        self.selection_tab = SelectionTab(log_callback=self._log)
         main_layout.addWidget(self.selection_tab, stretch=1)
+
+        # 로그는 툴 맨 아래 고정 - Controls 를 접거나 숨겨도 늘 보인다.
+        log_group = QGroupBox("Log")
+        log_layout = QVBoxLayout(log_group)
+        log_layout.addWidget(self.log_view)
+        main_layout.addWidget(log_group)
 
         # 메뉴 체크를 탭의 실제 상태(저장된 설정)에 맞춘다. 시그널은 막고 맞춘다 -
         # 여기서 토글 핸들러가 돌면 같은 값을 다시 저장하고 로그만 남긴다.
@@ -120,7 +124,7 @@ class MainWindow(QWidget):
         self.log_view.appendPlainText(message)
 
     def on_show_controls_toggled(self, checked):
-        """View > Show Controls. 로그창은 Controls 안에 있어 숨기면 로그도 안 보인다."""
+        """View > Show Controls. 로그창은 창 맨 아래라 숨겨도 그대로 보인다."""
         visible = self.selection_tab.set_controls_visible(checked)
         self._log("Controls pane: {0}".format("shown" if visible else "hidden"))
 
@@ -152,9 +156,9 @@ class MainWindow(QWidget):
             "- Set Color uses a palette with an eyedropper (Pick Screen\n"
             "  Color). Turn on 'Color Select' to check multiple buttons\n"
             "  across categories and Apply one color to all of them.\n"
-            "- Layout : controls on the left, buttons on the right; drag the\n"
-            "  splitter between them. Click the 'Controls' bar to collapse\n"
-            "  Profile / Create / Color / Log all at once.\n"
+            "- Layout : controls on top, buttons below, log at the bottom.\n"
+            "  Drag the splitter to rebalance; click the 'Controls' bar to\n"
+            "  collapse Profile / Create / Color all at once.\n"
             "- View > Show Controls : hide the whole control pane so the\n"
             "  button area fills the window (remembered for next time).\n"
             "\n"

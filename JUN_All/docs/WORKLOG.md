@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-10-12
+updated: 2026-10-13
 ---
 
 # 작업 일지 (WORKLOG)
@@ -30,7 +30,19 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-10-12 (오늘)
+## 2026-10-13 (오늘)
+
+> [!summary] A00340 SelectionTool — **좌우 배치 취소 → 상하 복귀 · Controls 가 스크롤 없이 전부 보이게 · 로그는 창 맨 아래** (v01.08->01.09)
+- 요청: 어제의 좌우 배치 요청을 취소하고 원래(상하)대로. Controls 가 보일 땐 스크롤 없이 전체가 보이게. 로그창은 툴 맨 밑에.
+- UI 두 파일을 v01.07(`fa9f38b`) 로 되돌린 뒤 다시 작업: 로그 그룹을 Controls 에서 빼 `main_window` 의 스플리터 아래 `Log` 그룹으로
+  (고정 90px, Controls 를 접거나 숨겨도 보인다). `SelectionTab(log_callback)` 만 받는다. 창 360x620.
+- **위 칸 높이 맞춤** `_fit_controls_height`: 처음 보일 때(`showEvent`) Controls 내용의 최소 높이 + 프레임 + 가로 스크롤바 두께를
+  위 칸으로 잡아 스크롤 없이 전부 보인다. 접었다 펴면 그 높이로, 숨긴 채 열었다 보여도 맞춘다.
+- CHANGELOG v01.09 · 문서 8항 · About · 주석.
+- 검증: mayapy 2024 오프스크린 — 세로 스플리터, 위 칸 높이 ≥ 내용 높이 · 세로 스크롤바 없음, 로그가 스플리터 아래 ·
+  Show Controls 꺼도 로그 보임, 접기/펴기 복원, 숨긴 채 열었다 보일 때 맞춤, v01.07 테스트 19항목 통과. GUI 확인 아직.
+
+## 2026-10-12
 
 > [!summary] A00340 SelectionTool — **배치를 좌우로: Controls 왼쪽 | 버튼 모음 오른쪽** (v01.07->01.08)
 - 요청: Controls 가 위, 나머지가 아래인 구성을 Controls 왼쪽 · 나머지 오른쪽으로.

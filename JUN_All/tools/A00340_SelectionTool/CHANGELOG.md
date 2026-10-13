@@ -2,6 +2,18 @@
 
 All notable changes to this tool are documented here.
 
+## v01.09 — 2026-10-13
+
+- **Back to the stacked layout**: the side-by-side layout of v01.08 is reverted -
+  the control panel is on top again, the button collection below, and the window
+  opens at 360 x 620 as before (Profile / Create / Color are single rows again).
+- **Controls fully visible by default**: on first show the top pane is sized to
+  the control panel's content height, so Profile / Create / Color are all visible
+  without scrolling. Expanding the collapsed `Controls` bar restores that height.
+- **Log at the bottom of the window**: the Log view moved out of the control
+  panel to a fixed group at the bottom, so it stays visible when `Controls` is
+  collapsed or hidden via `View > Show Controls`.
+
 ## v01.08 — 2026-10-12
 
 - **Side-by-side layout**: the splitter is now horizontal - the control panel

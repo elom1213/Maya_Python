@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-12
+# last Update date : 2026-10-13
 # A00340_SelectionTool - "Buttons" tab (Qt, in-Maya)
 #
 # 사용자가 카테고리와 선택 버튼을 직접 만들고, 버튼을 누르면 그 버튼에 저장된
@@ -17,12 +17,14 @@
 #   - 색 지정       : 버튼 우클릭 'Set Color...'(팔레트+스포이드)로 개별 지정.
 #                     'Color Select' 모드를 켜면 카테고리를 넘나들며 여러 버튼을
 #                     체크해 'Apply Color...'로 한 번에 칠한다('Clear Color'로 해제).
-#   - 배치(v01.08~)  : 좌우 스플리터. 왼쪽 = Controls(Profile/Create/Color/Log), 오른쪽 =
-#                     버튼 모음. v01.07 까지는 상하(위 = Controls)였는데 버튼이 늘수록
-#                     세로가 모자라고 Controls 가 높이를 먹어 옆으로 눕혔다.
+#   - 배치            : 상하 스플리터. 위 = Controls(Profile/Create/Color), 아래 = 버튼 모음.
+#                     로그창은 이 탭 밖, 창 맨 아래(main_window). v01.08 에서 좌우로 눕혔다가
+#                     v01.09 에서 되돌렸다.
+#   - 위 칸 높이      : 처음 보일 때 Controls 내용의 최소 높이를 재서 그만큼 연다 - 기본
+#                     상태에서 스크롤 없이 Controls 전체가 보인다(_fit_controls_height).
 #   - Controls 숨김  : main_window 의 View > Show Controls 가 set_controls_visible() 을
 #                     부른다. 접기(CollapsibleBox)는 헤더와 스크롤 영역의 최소 높이가
-#                     남지만, 숨김은 왼쪽 pane 자체를 숨겨 핸들까지 사라지고 버튼 모음이
+#                     남지만, 숨김은 위 pane 자체를 숨겨 핸들까지 사라지고 버튼 모음이
 #                     창 전체를 쓴다. 상태는 prefs(active.json) 에 남아 다음에도 유지.
 
 from Framework.qt.qt import (
@@ -59,9 +61,8 @@ TITLE = "Selection Tool"
 # active.json 에 저장하는 창 설정 키: Controls pane 표시 여부(View > Show Controls).
 SHOW_CONTROLS_KEY = "show_controls"
 
-# 왼쪽 Controls pane 의 기본 너비(px). 스플리터로 끌어 바꿀 수 있다.
-# 그룹들은 이 너비에 맞춰 두 줄(위젯 행 + 버튼 행)로 짜여 있다.
-CONTROLS_WIDTH = 300
+# 위 Controls 칸의 높이 기본값(px). 실제로는 처음 보일 때 내용 높이로 다시 잡는다.
+CONTROLS_HEIGHT_FALLBACK = 230
 
 # 색이 지정되지 않은(=아직 한 번도 칠하지 않은) 버튼의 컬러 다이얼로그 시작값.
 DEFAULT_PICK_HEX = "#5a5a5a"
@@ -188,14 +189,11 @@ class AddSelectionDialog(QDialog):
 
 class SelectionTab(QWidget):
 
-    def __init__(self, log_callback=None, log_widget=None, parent=None):
+    def __init__(self, log_callback=None, parent=None):
         super().__init__(parent)
 
         # 로그/상태 보고용 콜백(없으면 무시). main_window 의 공용 로그로 흘려보낸다.
         self._log = log_callback or (lambda _msg: None)
-
-        # main_window 가 만든 로그 위젯. 있으면 상단 컨트롤의 접이식 'Log' 섹션에 담는다.
-        self._log_widget = log_widget
 
         # 활성 프로파일과 그 데이터를 읽는다(없으면 Default 자동 생성).
         self._profile = prefs_mod.get_active()
@@ -219,8 +217,8 @@ class SelectionTab(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(4, 4, 4, 4)
 
-        # 컨트롤(왼쪽)과 버튼 모음(오른쪽)을 드래그로 비율 조절하는 좌우 스플리터로 나눈다.
-        splitter = QSplitter(Qt.Horizontal)
+        # 컨트롤(위)과 버튼 모음(아래)을 드래그로 비율 조절하는 상하 스플리터로 나눈다.
+        splitter = QSplitter(Qt.Vertical)
         self._splitter = splitter
 
         splitter.addWidget(self._build_controls_pane())
@@ -231,7 +229,8 @@ class SelectionTab(QWidget):
         splitter.setStretchFactor(1, 1)
         splitter.setCollapsible(0, False)
         splitter.setCollapsible(1, False)
-        splitter.setSizes([CONTROLS_WIDTH, 480])
+        # 처음 보일 때 _fit_controls_height 가 위 칸을 내용 높이로 다시 잡는다.
+        splitter.setSizes([CONTROLS_HEIGHT_FALLBACK, 430])
 
         root.addWidget(splitter)
 
@@ -240,9 +239,10 @@ class SelectionTab(QWidget):
             self._controls_pane.setVisible(False)
 
     def _build_controls_pane(self):
-        """왼쪽 pane: Profile/Create/Color/Log 를 '하나의' 접이식 박스로 묶는다.
+        """상단 pane: Profile/Create/Color 를 '하나의' 접이식 박스로 묶는다.
 
-        네 칸을 개별로 접는 대신 Controls 박스 헤더 하나로 전부 접었다 편다.
+        세 칸을 개별로 접는 대신 Controls 박스 헤더 하나로 전부 접었다 편다.
+        (로그창은 v01.09 부터 창 맨 아래 - Controls 를 숨겨도 로그는 보인다.)
         """
         inner = QVBoxLayout()
         inner.setContentsMargins(6, 2, 6, 6)
@@ -251,55 +251,50 @@ class SelectionTab(QWidget):
         inner.addWidget(self._build_profile_group())
         inner.addWidget(self._build_create_group())
         inner.addWidget(self._build_color_group())
-        # 세로 칸이라 남는 높이는 Log 가 받는다(로그가 없으면 빈 공간으로).
-        if self._log_widget is not None:
-            inner.addWidget(self._build_log_group(), stretch=1)
-        else:
-            inner.addStretch(1)
 
         self._controls_box = CollapsibleBox("Controls", inner)
-        # 접으면 스플리터의 왼쪽 pane 도 헤더 너비로 줄여 버튼 영역에 공간을 넘긴다.
+        # 접으면 스플리터의 위 pane 도 헤더 높이로 줄여 버튼 영역에 공간을 넘긴다.
         self._controls_box.toggled.connect(self._on_controls_toggled)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(self._controls_box)
-        # View > Show Controls 가 통째로 숨기고 보이는 왼쪽 pane.
+        # View > Show Controls 가 통째로 숨기고 보이는 위 pane.
         self._controls_pane = scroll
         return scroll
 
-    # ---------------------------------------------------- 왼쪽 칸 너비 맞춤
+    # ---------------------------------------------------- 위 칸 높이 맞춤
 
     def showEvent(self, event):
         super().showEvent(event)
-        # 처음 보일 때 한 번: 테마(폰트)가 입혀진 뒤라 그룹들의 실제 최소 너비를 잴 수 있다.
+        # 처음 보일 때 한 번: 테마(폰트)가 입혀진 뒤라 그룹들의 실제 높이를 잴 수 있다.
         if not getattr(self, "_fitted", False):
             self._fitted = True
-            self._fit_controls_width()
+            self._fit_controls_height()
 
-    def _fit_controls_width(self):
-        """왼쪽 칸을 내용(그룹들)의 최소 너비 이상으로 맞춰 가로 스크롤바가 생기지 않게 한다.
+    def _fit_controls_height(self):
+        """위 칸을 Controls 내용의 최소 높이에 맞춰 **스크롤 없이 전부 보이게** 연다.
 
-        폰트·테마에 따라 버튼 너비가 달라 상수로 박을 수 없다. 기본 CONTROLS_WIDTH 보다
-        내용이 넓으면 내용 너비로 연다. 사용자가 핸들로 더 좁히는 것은 막지 않는다.
+        폰트·테마에 따라 높이가 달라 상수로 박을 수 없다. 가로 스크롤바가 생기면 그 두께가
+        뷰포트를 깎아 세로 스크롤바를 부르므로 그 두께(PM_ScrollBarExtent)를 여유로 더한다.
+        사용자가 핸들로 더 줄이는 것은 막지 않는다. 반환: 적용한 위 칸 높이.
         """
-        if self._controls_pane.isHidden():
-            return
-        # 세로 스크롤바가 생기면 그 폭만큼 뷰포트가 좁아져 가로 스크롤바까지 따라온다 -
-        # 그 폭(PM_ScrollBarExtent)을 여유로 더해 둔다.
         pane = self._controls_pane
-        need = (self._controls_box.minimumSizeHint().width()
+        need = (self._controls_box.minimumSizeHint().height()
                 + 2 * pane.frameWidth()
                 + pane.style().pixelMetric(QStyle.PM_ScrollBarExtent) + 4)
+        self._controls_fit_h = need
+        if pane.isHidden() or not self._controls_box._header.isChecked():
+            return need
         sizes = self._splitter.sizes()
-        total = sum(sizes) or (CONTROLS_WIDTH + 480)
-        left = max(CONTROLS_WIDTH, need)
-        self._splitter.setSizes([left, max(40, total - left)])
+        total = sum(sizes) or (need + 430)
+        self._splitter.setSizes([need, max(40, total - need)])
+        return need
 
     # ---------------------------------------------------- Controls 숨김/표시
 
     def controls_visible(self):
-        """왼쪽 pane(Controls)이 보이는가. main_window 의 View 메뉴 체크 상태와 맞춘다."""
+        """위 pane(Controls)이 보이는가. main_window 의 View 메뉴 체크 상태와 맞춘다."""
         return not self._controls_pane.isHidden()
 
     def set_controls_visible(self, visible):
@@ -321,8 +316,8 @@ class SelectionTab(QWidget):
             if sizes and sum(sizes) > 0:
                 self._splitter.setSizes(sizes)
             else:
-                # 숨긴 채로 열렸다가 처음 보이는 경우 - 내용 너비에 맞춘다.
-                self._fit_controls_width()
+                # 숨긴 채로 열렸다가 처음 보이는 경우 - 내용 높이에 맞춘다.
+                self._fit_controls_height()
         else:
             self._sizes_before_hide = self._splitter.sizes()
             self._controls_pane.setVisible(False)
@@ -331,27 +326,25 @@ class SelectionTab(QWidget):
         return visible
 
     def _on_controls_toggled(self, expanded):
-        """Controls 박스를 접으면 왼쪽 pane 을 헤더 너비만 남기고 오른쪽 pane 을 넓힌다.
-
-        스플리터가 좌우라 사이즈는 너비다. 통째로 없애려면 View > Show Controls.
-        """
+        """Controls 박스를 접으면 위 pane 을 헤더만 남기고 아래 pane 을 넓힌다."""
         splitter = getattr(self, "_splitter", None)
         if splitter is None:
             return
         sizes = splitter.sizes()
         total = sum(sizes) or 1
         if expanded:
-            # 접기 직전 너비로 복원(없으면 기본값).
-            left = getattr(self, "_controls_expanded_w", CONTROLS_WIDTH)
-            left = min(left, max(40, total - 40))
-            splitter.setSizes([left, max(40, total - left)])
+            # 접기 직전 높이로 복원(없으면 내용에 맞춘 높이).
+            top = getattr(self, "_controls_expanded_h",
+                          getattr(self, "_controls_fit_h", CONTROLS_HEIGHT_FALLBACK))
+            top = min(top, max(40, total - 40))
+            splitter.setSizes([top, max(40, total - top)])
         else:
-            self._controls_expanded_w = sizes[0]
-            header_w = self._controls_box._header.sizeHint().width() + 12
-            splitter.setSizes([header_w, max(40, total - header_w)])
+            self._controls_expanded_h = sizes[0]
+            header_h = self._controls_box._header.sizeHint().height() + 6
+            splitter.setSizes([header_h, max(40, total - header_h)])
 
     def _build_buttons_pane(self):
-        """오른쪽 pane: 생성한 카테고리/버튼 모음(계속 늘어나므로 스크롤)."""
+        """하단 pane: 생성한 카테고리/버튼 모음(계속 늘어나므로 스크롤)."""
         self._cat_container = QWidget()
         self._cat_layout = QVBoxLayout(self._cat_container)
         self._cat_layout.setAlignment(Qt.AlignTop)
@@ -361,19 +354,10 @@ class SelectionTab(QWidget):
         scroll.setWidget(self._cat_container)
         return scroll
 
-    def _build_log_group(self):
-        # main_window 의 로그 위젯을 'Log' 그룹에 담는다(컨트롤 박스와 함께 접힌다).
-        group = QGroupBox("Log")
-        lay = QVBoxLayout(group)
-        lay.addWidget(self._log_widget)
-        return group
-
     def _build_profile_group(self):
         # 프로파일(캐릭터/에셋처럼 JSON 별로 나뉜 선택 버튼 묶음) 선택 + 관리.
         group = QGroupBox("Profile")
-        # 좁은 왼쪽 칸에 맞춰 두 줄: 콤보 / 버튼 셋.
-        col = QVBoxLayout(group)
-        row = QHBoxLayout()
+        row = QHBoxLayout(group)
 
         self.cmb_profile = QComboBox()
         self.cmb_profile.setToolTip("Active profile (each is its own JSON)")
@@ -391,20 +375,16 @@ class SelectionTab(QWidget):
         btn_delete.setToolTip("Delete the current profile")
         btn_delete.clicked.connect(self.on_delete_profile)
 
+        row.addWidget(self.cmb_profile, stretch=1)
         row.addWidget(btn_new)
         row.addWidget(btn_rename)
         row.addWidget(btn_delete)
-
-        col.addWidget(self.cmb_profile)
-        col.addLayout(row)
 
         return group
 
     def _build_create_group(self):
         group = QGroupBox("Create")
-        # 두 줄: 버튼 둘 / Add 체크.
-        col = QVBoxLayout(group)
-        row = QHBoxLayout()
+        row = QHBoxLayout(group)
 
         btn_category = QPushButton("Category")
         btn_category.setToolTip("Create a new category")
@@ -423,18 +403,15 @@ class SelectionTab(QWidget):
 
         row.addWidget(btn_category)
         row.addWidget(btn_selection)
-
-        col.addLayout(row)
-        col.addWidget(self.chk_add)
+        row.addStretch(1)
+        row.addWidget(self.chk_add)
 
         return group
 
     def _build_color_group(self):
         # 색칠 모드: 카테고리를 넘나들며 여러 버튼을 골라 한 색으로 칠한다.
         group = QGroupBox("Color")
-        # 두 줄: 모드 체크 / 버튼 둘.
-        col = QVBoxLayout(group)
-        row = QHBoxLayout()
+        row = QHBoxLayout(group)
 
         # 모드 토글. 켜면 버튼이 체크형이 되고 클릭이 '선택' 대신 '체크'로 바뀐다.
         self.chk_color_mode = QCheckBox("Color Select")
@@ -456,11 +433,10 @@ class SelectionTab(QWidget):
         self.btn_clear_color.clicked.connect(self.on_clear_color_from_checked)
         self.btn_clear_color.setEnabled(False)
 
+        row.addWidget(self.chk_color_mode)
+        row.addStretch(1)
         row.addWidget(self.btn_apply_color)
         row.addWidget(self.btn_clear_color)
-
-        col.addWidget(self.chk_color_mode)
-        col.addLayout(row)
 
         return group
 
