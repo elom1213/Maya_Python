@@ -32,6 +32,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-13 (오늘)
 
+> [!summary] A00145_RigConnect — **Connect by Rule `Manage...`: 규칙을 체크해 json 파일 삭제** (v01.60->01.61) `#A00145_RigConnect`
+- 요청: 규칙 중 일부를 골라 지우는 기능. `Rule` 콤보 옆 `Manage...` → 규칙 표(체크 | Name | Pairs | File, 툴팁에 설명·경로·짝) →
+  `Delete Checked` 가 이름을 나열해 한 번 묻고 파일을 지운다. 창을 닫으면 콤보 재로드.
+- 코어 `connect_rules.delete_rules(rules)` — **규칙 폴더 안의 .json 만** 지운다(밖의 경로 · 다른 확장자는 failed 로 돌려주고 안 건드림),
+  이미 없는 파일은 지운 것으로. 깨진 json 은 표 아래 빨간 줄로만 알리고 건드리지 않는다.
+- 검증: mayapy 2024 — delete_rules(선택 삭제 · txt/폴더 밖/빈 경로 거절 · 없는 파일) + 다이얼로그 오프스크린(표 · 체크 · 삭제 후 갱신 · 비면 버튼 비활성)
+  + MainWindow 콤보 재로드. 마야 GUI 확인 아직.
+
 > [!summary] A00145_RigConnect — **Connect > Transfer Connection `Save as Rule...`: 체크한 연결을 Connect by Rule 규칙 json 으로 저장** (v01.59->01.60) `#A00145_RigConnect`
 - 요청: Transfer Connection 탭의 Source Objects + Attributes · Connected Nodes 체크 관계만으로 규칙을 만들고 싶다 (더 좋은 방법이 있으면 제안).
   이 방식을 그대로 채택하고 두 가지를 더했다 — **방향 선택**(규칙은 `Source.a -> Destination.b` 한 방향이라 downstream / upstream 중 하나) 과

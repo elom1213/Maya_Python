@@ -70,5 +70,11 @@
 #        and lets you drop pairs. Same-name pairs are written as "attributes", the rest
 #        as "pairs". The Connect page's Rule combo is reloaded and set to the new rule.
 
-VERSION = "01.60"
+# 01.61  Connect > Connect by Rule : "Manage..." button. A table of every rule (name, pair
+#        count, file; description and pairs in the tooltip) with check boxes - "Delete
+#        Checked" removes the checked json files after one confirmation (only files inside
+#        app/rules/connect/). Broken files are listed in red but left alone. The combo is
+#        reloaded when the window closes.
+
+VERSION = "01.61"
 LAST_UPDATE = "2026-10-13"

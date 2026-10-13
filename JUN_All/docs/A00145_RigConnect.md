@@ -818,6 +818,10 @@ Constrain 탭과 같은 방식이다(§Constrain 참고) — 짧은 라벨 + 툴
   - **규칙을 손으로 적지 않고 씬에서 뽑기 (v01.60)**: 이미 연결된 리그가 있으면 `Transfer Connection` 탭의
     `Save as Rule...` 로 체크한 연결을 규칙 json 으로 저장한다 — 아래 Transfer Connection 5번. 저장되면 이 콤보가
     다시 읽혀 새 규칙이 골라진다.
+  - **`Manage...` — 규칙 지우기 (v01.61)**: 규칙 전부를 표(체크 | Name | Pairs | File)로 보여 준다. 툴팁에 설명 · 파일
+    경로 · 짝 목록. 체크하고 `Delete Checked` — 지울 규칙 이름을 나열해 한 번 묻고 **json 파일을 지운다**(되돌릴 수
+    없다). 규칙 폴더 안의 `.json` 만 지우고, 깨진 파일은 빨간 줄로 알리되 건드리지 않는다(폴더에서 직접 고치거나
+    지운다). 창을 닫으면 콤보가 다시 읽힌다. 로직은 `connect_rules.delete_rules(rules)`.
 
 ##### Match from Source — 이름이 비슷한 어트리뷰트 찾기 (v01.21)
 
@@ -1932,6 +1936,7 @@ A00145_RigConnect/
         ├── collapsible.py          # CollapsibleBox
         ├── attr_spec_dialog.py     # Attribute > Create 의 어트리뷰트 정의 편집 창
         ├── rule_save_dialog.py     # Connect > Transfer Connection 의 Save as Rule 미리보기 창 (방향 하나 · 이름/파일 · 짝 체크, v01.60)
+        ├── rule_manage_dialog.py   # Connect > Connect by Rule 의 Manage... 창 (규칙 표 + 체크한 규칙 json 삭제, v01.61)
         └── main_window.py          # QTabWidget 최상위 5탭(Constrain 6 / Connect 4 / Attribute 3 하위 탭) + 공유 로그 + Help>About
 ```
 

@@ -32,4 +32,8 @@ downstream `[Source attr, node attr]` / upstream `[node attr, Source attr]` 중 
   같은 이름 규칙은 경고. 저장 뒤 `_load_connect_rules()` + 새 규칙 선택.
 - 검증: mayapy 2024 core + 오프스크린 다이얼로그(QApplication 을 standalone 전에!). 마야 GUI 확인 아직.
 
+**v01.61 (2026-10-13, 사용자 요청) — Connect by Rule `Manage...`**: 규칙 표 + 체크한 규칙 json 삭제(`ui/rule_manage_dialog.RuleManageDialog`).
+`connect_rules.delete_rules(rules, rules_dir)` 는 **규칙 폴더 안의 .json 만** 지운다(밖/다른 확장자는 failed). 깨진 json 은 빨간 줄로만
+알리고 안 건드린다(load_rules 가 ConnectRule 을 못 만들어 표에 못 올린다). 창 닫힌 뒤 `deleted_count()` 보고 콤보 재로드. 테스트는 `on_delete(confirm=False)`.
+
 관련: [[wip-a00145-transfer-connection]], [[wip-a00145-connect-both-directions]], [[wip-a00090-rule-versions]], [[qapplication-before-maya-standalone]]

@@ -61,6 +61,7 @@ from tools.A00145_RigConnect.app.core import (
 from tools.A00145_RigConnect.app.ui.collapsible import CollapsibleBox
 from tools.A00145_RigConnect.app.ui.attr_spec_dialog import AttrSpecDialog
 from tools.A00145_RigConnect.app.ui.rule_save_dialog import RuleSaveDialog
+from tools.A00145_RigConnect.app.ui.rule_manage_dialog import RuleManageDialog
 
 
 # 재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -1358,6 +1359,13 @@ class MainWindow(QWidget):
         btn_rule_reload.setToolTip("Read the rule folder again (app/rules/connect/).")
         btn_rule_reload.clicked.connect(self._load_connect_rules)
         rule_row.addWidget(btn_rule_reload)
+        # v01.61 : 규칙 목록을 보고 체크한 규칙 파일을 지우는 창.
+        btn_rule_manage = QPushButton("Manage...")
+        btn_rule_manage.setToolTip(
+            "List every rule in app/rules/connect/ and delete the checked ones\n"
+            "(the json files are removed - this cannot be undone).")
+        btn_rule_manage.clicked.connect(self.on_manage_connect_rules)
+        rule_row.addWidget(btn_rule_manage)
         btn_rule = QPushButton("Connect by Rule")
         btn_rule.setToolTip(
             "Connect every attribute of the chosen rule, Source -> Destination,\n"
@@ -4210,6 +4218,14 @@ class MainWindow(QWidget):
         self.cmb_connect_rule.setToolTip(
             "{0}\n{1} attribute pair(s)\n{2}\n\n{3}".format(
                 rule.name, len(rule.pairs), rule.path, rule.description or "(no description)"))
+
+    def on_manage_connect_rules(self):
+        """Manage... - 규칙 목록 창. 체크한 규칙 파일을 지운 뒤 콤보를 다시 읽는다 (v01.61)."""
+        dialog = RuleManageDialog(parent=self, log=self.log)
+        dialog.exec_()
+        if dialog.deleted_count():
+            self.log("[OK] Manage Rules : {0} rule(s) deleted".format(dialog.deleted_count()))
+            self._load_connect_rules()
 
     def on_connect_by_rule(self):
         rule = self._current_connect_rule()

@@ -195,6 +195,36 @@ def save_rule(name, pairs, description="", file_name=None, rules_dir=None, overw
     return path
 
 
+def delete_rules(rules, rules_dir=None):
+    """규칙 파일들을 지운다 (v01.61 - Connect by Rule > Manage...).
+
+    **규칙 폴더 안의 .json 만** 지운다 - 그 밖의 경로(규칙 폴더 밖, 확장자 다름)는 건드리지 않고
+    failed 로 돌려준다. 파일이 이미 없으면 지운 것으로 친다.
+
+    Args:
+        rules: ConnectRule 목록이거나 파일 경로 문자열 목록.
+
+    Returns:
+        (deleted_paths, failed) - failed = [(path, reason)...]
+    """
+    folder = os.path.normcase(os.path.normpath(rules_dir or RULES_DIR))
+    deleted = []
+    failed = []
+    for rule in rules or []:
+        path = rule.path if isinstance(rule, ConnectRule) else str(rule or "")
+        norm = os.path.normcase(os.path.normpath(path)) if path else ""
+        if not norm or os.path.dirname(norm) != folder or not norm.endswith(".json"):
+            failed.append((path, "not a rule file in {0}".format(rules_dir or RULES_DIR)))
+            continue
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+            deleted.append(path)
+        except OSError as e:
+            failed.append((path, str(e)))
+    return deleted, failed
+
+
 def connect_by_rule(src_objs, dst_objs, rule):
     """규칙의 어트리뷰트 짝을 src -> dst 로 일괄 연결.
 
