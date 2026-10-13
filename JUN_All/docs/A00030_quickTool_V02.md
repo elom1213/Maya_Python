@@ -2,7 +2,7 @@
 title: A00030_quickTool_V02 사용법
 aliases: [Quick Tool V02, QuickToolV2, 퀵툴 V02]
 tags: [maya-python, tool-guide, quicktool, pyside, qt]
-updated: 2026-10-12
+updated: 2026-10-13
 ---
 
 # A00030_quickTool_V02 — Quick Tool (PySide 재작성)
@@ -11,13 +11,14 @@ updated: 2026-10-12
 다시 쓴 버전이다. **버튼도 동작도 그대로**고 달라진 것은 그릇이다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`slate_dark` 테마)
-- **버전**: `app/config/version.py` (v02.06)
+- **버전**: `app/config/version.py` (v02.07)
 - **설치**: `__dragDrop_A00030_V02.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **QuickToolV2**
   → `tools.A00030_quickTool_V02.run(True)`
 - **V01 과 동시에 띄울 수 있다** — 창과 로그 확장창의 `objectName` 이 갈렸다.
 
 > `File` · `Import option` 버튼은 [`A00480_FileTool`](A00480_FileTool.md) 의 `Path` · `Import` 탭에도 있다
-> (2026-09-17~). 이 툴의 버튼은 그대로 둔다.
+> (2026-09-17~). **v02.07 부터 `File` 섹션은 이 툴의 창에서 숨긴다** — 코어 함수 · 핸들러 · `SECTIONS` 표의
+> 줄은 그대로고, `MainWindow.HIDDEN_SECTIONS` 에서 `"File"` 을 빼면 바로 다시 보인다. `Import option` 은 그대로.
 
 ---
 
@@ -35,13 +36,14 @@ updated: 2026-10-12
 **V01 의 기능은 하나도 빠지지 않았다** — 섹션 6개, 버튼 10개 그대로다.
 새로 붙은 것은 레거시에 없던 **`Shelf > Update Shelves`**(v02.01), **`File > Open Scene Folder`**(v02.03),
 **`Select > Select Shapes`**(v02.05), **`Attribute > Attribute Lock`**(v02.06) 네 개다.
+단, **`File` 섹션은 v02.07 부터 창에 그리지 않는다**(코드는 남아 있다 — 위 안내 참고).
 
 ---
 
 ## 2. 화면 구성
 
 ```
-┌ Quick Tool v02.06 ──────────────────┐
+┌ Quick Tool v02.07 ──────────────────┐
 │ Help                        [ Pin ] │   ← 메뉴 + 항상 위 토글
 │ ┌ Update window ────────────────┐   │
 │ │ [ Selected ] [ All Windows ]  │   │
@@ -55,8 +57,6 @@ updated: 2026-10-12
 │ │ [ Import FBX normal ]         │   │   ← 버튼 하나면 가로를 다 쓴다
 │ ├ Create ──────────────────────┤    │
 │ │ [ Create texture file ] [ Cl… ]│  │
-│ ├ File ────────────────────────┤    │
-│ │ [ Copy Scene F… ] [ Open Sce… ]│  │
 │ ├ Shelf ──────────────────────┤    │
 │ │ [ Update Shelves ]            │   │
 │ ├ Display ─────────────────────┤    │
@@ -70,6 +70,7 @@ updated: 2026-10-12
 
 버튼은 레거시의 `paneLayout(configuration="vertical2")` 와 같이 **두 칸 그리드**로 놓인다.
 버튼이 하나뿐인 섹션은 그 칸이 가로를 다 쓴다.
+`File` 섹션(`Copy Scene Folder` · `Open Scene Folder`)은 v02.07 부터 **숨김** — `Create` 와 `Shelf` 사이에 있던 자리다.
 
 ---
 
@@ -160,7 +161,11 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
   `cmds.cluster` 는 선택 전체에 **하나**를 만들기 때문에 오브젝트마다 따로 선택해 호출한다.
   여러 개여도 **Ctrl+Z 한 번**으로 되돌아간다.
 
-### File — `Copy Scene Folder` / `Open Scene Folder`
+### File — `Copy Scene Folder` / `Open Scene Folder` (v02.07~ **UI 에서 숨김**)
+
+> v02.07 부터 이 섹션은 창에 **그리지 않는다.** [`A00480_FileTool`](A00480_FileTool.md) 의 `Path` 탭과 겹치기 때문이다.
+> 아래 동작의 코드(`quick_ops.scene_folder` · `open_scene_folder`, 핸들러, `SECTIONS` 의 줄)는 그대로 있고,
+> `MainWindow.HIDDEN_SECTIONS = ("File",)` 에서 빼면 같은 자리에 다시 나온다.
 
 **`Copy Scene Folder`** — 현재 씬이 저장된 **폴더** 경로를 클립보드에 넣는다(파일 이름은 뺀다). 경로는 OS 네이티브 모양
 (윈도우는 `\`)으로 바꿔 탐색기·파일 다이얼로그에 그대로 붙여넣을 수 있다.
@@ -228,7 +233,7 @@ A00030_quickTool_V02/
 ├── __dragDrop_A00030_V02.py    # 셸프 설치 (TOOL_LABEL = "QuickToolV2")
 ├── icon/                       # A00030_quickTool_V02.svg / .png
 └── app/
-    ├── config/version.py       # VERSION = "02.06"
+    ├── config/version.py       # VERSION = "02.07"
     ├── core/quick_ops.py       # ★ 버튼이 하는 일 전부 (maya.cmds/mel, UI 비의존)
     └── ui/main_window.py       # 창 · 섹션 · 버튼 · 로그
 ```
@@ -237,14 +242,17 @@ A00030_quickTool_V02/
   UI 가 그대로 로그창에 쌓고, 마야 없이도 함수 단위로 테스트할 수 있다.
 - **버튼 표는 `MainWindow.SECTIONS`** — `(섹션 제목, [(라벨, 핸들러 이름, 툴팁), ...])`.
   버튼을 더하거나 옮기는 일은 이 표 한 줄이다.
+- **`MainWindow.HIDDEN_SECTIONS`** — 표에는 두되 창에 그리지 않을 섹션 제목(v02.07~ `("File",)`).
+  `build_ui` 가 이 제목은 건너뛴다. 숨긴 섹션의 버튼은 `self.buttons` 에도 없다.
 
 ---
 
 ## 5. 검증 (mayapy 2024 + 오프스크린 Qt)
 
-**22 + 12 + 8 + 17 + 27항목 통과.**
+**22 + 12 + 8 + 17 + 27 + 6항목 통과.**
 
-- 섹션 7개와 버튼 11개(레거시 10 + `Update Shelves`)가 **레거시와 같은 순서**(v02.05 부터 `Select` 섹션이 더해져 8개 · 13개, v02.06 부터 `Attribute` 가 더해져 9개 · 14개),
+- 섹션 7개와 버튼 11개(레거시 10 + `Update Shelves`)가 **레거시와 같은 순서**(v02.05 부터 `Select` 섹션이 더해져 8개 · 13개, v02.06 부터 `Attribute` 가 더해져 9개 · 14개,
+  v02.07 부터 `File` 을 숨겨 **보이는 것은 8개 · 12개**),
   전 버튼에 툴팁, Pin 토글과 로그창 존재
 - `Selected` / `All Windows` 가 `playbackOptions -view` 를 실제로 바꾼다
 - `Print Selected` — 선택 없으면 경고, 있으면 이름 로그
@@ -257,7 +265,10 @@ A00030_quickTool_V02/
 - `Copy Scene Folder` — 미저장 씬이면 경고
 - `Open Scene Folder`(8항목, 탐색기 호출은 가로채서 확인) — 미저장 씬은 **경고만, 탐색기 안 띄움** ·
   저장된 씬은 **씬 파일 경로**로 연다(선택 상태) · 파일이 지워지면 **폴더**로 연다 · 폴더가 없으면 경고 ·
-  탐색기 호출이 실패해도 트레이스백 없이 경고 · File 섹션 버튼 2개 · 클릭하면 로그에 결과
+  탐색기 호출이 실패해도 트레이스백 없이 경고 · File 섹션 버튼 2개 · 클릭하면 로그에 결과 (v02.06 까지의 화면 기준)
+- `File` 숨김(v02.07, 6항목) — 그룹박스 제목에 `File` 없음 · `self.buttons` 에 두 버튼 없음 · 보이는 섹션 순서
+  `Update window · Print · Select · Attribute · Import option · Create · Shelf · Display` · `SECTIONS` 표에는 `File` 줄이 남아 있음 ·
+  핸들러 `on_copy_scene_folder` 를 직접 부르면 그대로 동작(미저장 씬 경고) · `HIDDEN_SECTIONS` 를 비우면 `File` 과 버튼이 다시 보임. GUI 확인 아직.
 - `Select Shapes`(v02.05, 17항목) — 선택 없으면 경고 · 셰이프 둘인 커브는 **nurbsCurve 2개** · 메시는 mesh 셰이프 ·
   커브+메시+로케이터+조인트+빈 그룹을 섞으면 셰이프 4개를 고르고 **조인트·그룹은 경고에 이름으로** · 스킨 메시는
   **Orig 를 빼고** 하나 · 컴포넌트 선택은 그 오브젝트의 셰이프 · 셰이프를 이미 골랐으면 그대로 · **Ctrl+Z 로 이전 선택 복원** ·

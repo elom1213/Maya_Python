@@ -32,6 +32,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-13 (오늘)
 
+> [!summary] A00030 quickTool_V02 — **File 섹션(Copy Scene Folder · Open Scene Folder)을 UI 에서 숨김, 코드는 그대로** (v02.06->02.07)
+- 요청: File 관련 버튼 UI 를 없애되 내부 기능 코드는 남긴다.
+- `MainWindow.HIDDEN_SECTIONS = ("File",)` — `build_ui` 가 이 제목의 섹션을 건너뛴다. `SECTIONS` 표의 `File` 줄 ·
+  핸들러 `on_copy_scene_folder` / `on_open_scene_folder` · `quick_ops.scene_folder` / `open_scene_folder` 는 그대로(튜플에서 빼면 바로 복귀).
+  About 의 `[File]` 두 줄 삭제, 창 기본 높이 700→640. A00480_FileTool 의 Path 탭과 겹치는 기능이라 숨겼다.
+- 문서 `A00030_quickTool_V02.md` 안내 · 화면 · File 절 · 구조 · 검증 갱신.
+- 검증: mayapy 2024 오프스크린 6항목 — 그룹박스에 `File` 없음 · `buttons` 에 두 버튼 없음 · 보이는 섹션 8개 순서 · 표에 줄 남음 ·
+  핸들러 직접 호출 동작 · `HIDDEN_SECTIONS` 비우면 복귀. GUI 확인 아직.
+
 > [!summary] A00340 SelectionTool — **좌우 배치 취소 → 상하 복귀 · Controls 가 스크롤 없이 전부 보이게 · 로그는 창 맨 아래** (v01.08->01.09)
 - 요청: 어제의 좌우 배치 요청을 취소하고 원래(상하)대로. Controls 가 보일 땐 스크롤 없이 전체가 보이게. 로그창은 툴 맨 밑에.
 - UI 두 파일을 v01.07(`fa9f38b`) 로 되돌린 뒤 다시 작업: 로그 그룹을 Controls 에서 빼 `main_window` 의 스플리터 아래 `Log` 그룹으로

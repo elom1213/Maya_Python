@@ -19,5 +19,8 @@
 #        전부에 대해 lock/unlock 토글(전부 잠겨 있으면 풀고, 아니면 잠근다. undo 한 번).
 #        부모 복합이 잠겨 있으면 자식 unlock 이 조용히 무시되므로 부모를 풀고 형제를 다시 잠근다.
 
-VERSION = "02.06"
-LAST_UPDATE = "2026-10-12"
+# 02.07  File 섹션(Copy Scene Folder · Open Scene Folder)을 UI 에서 숨김 - HIDDEN_SECTIONS.
+#        코어 함수 · 핸들러 · SECTIONS 표의 줄은 그대로(A00480_FileTool 의 Path 탭과 겹쳐서).
+
+VERSION = "02.07"
+LAST_UPDATE = "2026-10-13"

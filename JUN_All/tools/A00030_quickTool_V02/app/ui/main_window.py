@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-12
+# last Update date : 2026-10-13
 # A00030_quickTool_V02 - Qt UI (in-Maya)
 #
 # 레거시 maya.cmds 툴 `A00030_quickTool`(V01.16) 을 PySide 로 재작성했다.
@@ -17,7 +17,8 @@
 #   Attribute     : Attribute Lock  (v02.06~ 신규 - 채널박스에서 고른 어트리뷰트 lock 토글)
 #   Import option : Import FBX normal
 #   Create        : Create texture file · Cluster Each
-#   File          : Copy Scene Folder · Open Scene Folder  (v02.03~ Open 신규)
+#   File          : Copy Scene Folder · Open Scene Folder  (v02.03~ Open 신규,
+#                   v02.07~ UI 에서 숨김 - HIDDEN_SECTIONS. 코어 · 핸들러는 그대로)
 #   Shelf         : Update Shelves  (v02.01~ 신규 - 레거시에 없던 것)
 #   Display       : Local Axis ON · Local Axis OFF
 #
@@ -115,6 +116,10 @@ class MainWindow(QWidget):
         )),
     )
 
+    # 표에는 남겨 두되 **창에 그리지 않는** 섹션 제목. 코어 함수와 핸들러는 그대로라
+    # 여기서 빼면 바로 다시 보인다. (v02.07~ `File` - A00480_FileTool 의 Path 탭과 겹친다)
+    HIDDEN_SECTIONS = ("File",)
+
     def __init__(self):
         super().__init__(maya_main_window())
 
@@ -122,7 +127,7 @@ class MainWindow(QWidget):
 
         self.setWindowTitle("Quick Tool v{0}".format(VERSION))
         self.setWindowFlags(Qt.Window)
-        self.resize(360, 700)
+        self.resize(360, 640)
 
         self.build_ui()
 
@@ -163,6 +168,8 @@ class MainWindow(QWidget):
         # 섹션들
         self.buttons = {}
         for title, specs in self.SECTIONS:
+            if title in self.HIDDEN_SECTIONS:
+                continue
             main_layout.addWidget(self._build_section(title, specs))
 
         main_layout.addStretch(1)
@@ -311,8 +318,6 @@ class MainWindow(QWidget):
             "  attributes on the selected objects (all locked -> unlock, else lock).\n"
             "[Import option] Import FBX normal - use the normals in the file.\n"
             "[Create] Create texture file / Cluster Each.\n"
-            "[File] Copy Scene Folder - the scene's folder to the clipboard.\n"
-            "  Open Scene Folder - open that folder in the file explorer.\n"
             "[Shelf] Update Shelves - write the shelves to disk now, so a Maya\n"
             "  started later sees them (Maya only saves them on exit).\n"
             "[Display] Local Axis ON / OFF - batch show or hide local axes.\n"
