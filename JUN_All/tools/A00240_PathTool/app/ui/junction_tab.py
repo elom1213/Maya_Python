@@ -1,10 +1,11 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-12
+# last Update date : 2026-10-13
 # A00240_PathTool - "Junction" tab (Qt, standalone)
 #
 # `cmd /c mklink /J` 를 화면에서 한다. 하위 탭 둘:
 #   Create : Sources 리스트(원본 폴더들) x Create In 리스트(만들 폴더들) -> 미리보기 표 -> Create.
-#            n -> 1 (전부 한 폴더 안에) / n -> n (행 순서로 짝). 정션 이름은 원본 폴더 이름.
+#            n -> 1 (전부 한 폴더 안에) / n -> n (행 순서로 짝). 정션 이름은 원본 폴더 이름 - 같은 폴더에
+#            만들 소스들의 끝 이름이 겹치면 상위 폴더 이름을 앞에 붙여 구분한다(v01.22, core.unique_names).
 #            n -> n 에서 "Target row is the junction path" 를 켜면 타깃 행이 정션 경로 그 자체가 된다
 #            (mklink 의 <Link> 처럼 이름까지 정한다).
 #   Remove : 정션 목록(Junction | Target 표) -> Remove. **정션인 행만** 지운다 - 실제 폴더는 표에서
@@ -183,10 +184,15 @@ class _CreateTab(QWidget):
         mode_row = QHBoxLayout()
         mode_row.addWidget(QLabel("Mode"))
         self.rad_n1 = QRadioButton("n -> 1")
-        self.rad_n1.setToolTip("Every source gets a junction inside the first 'Create In' folder.")
+        self.rad_n1.setToolTip(
+            "Every source gets a junction inside the first 'Create In' folder.\n"
+            "The junction is named after the source folder; sources that share a name\n"
+            "(A\\Content, B\\Content) get the parent folder prefixed (A_Content, B_Content).")
         self.rad_n1.setChecked(True)
         self.rad_nn = QRadioButton("n -> n")
-        self.rad_nn.setToolTip("Source row i gets its junction in 'Create In' row i.")
+        self.rad_nn.setToolTip(
+            "Source row i gets its junction in 'Create In' row i.\n"
+            "Sources sharing a name inside the same folder get the parent folder prefixed.")
         mode_row.addWidget(self.rad_n1)
         mode_row.addWidget(self.rad_nn)
         self.chk_target_is_link = QCheckBox("Target row is the junction path")

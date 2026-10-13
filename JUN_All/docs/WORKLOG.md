@@ -32,6 +32,17 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-13 (오늘)
 
+> [!summary] A00240_PathTool — **Junction > Create: 끝 폴더 이름이 같은 소스들이 서로를 막던 문제 수정** (v01.21->01.22) `#A00240_PathTool`
+- 증상: n -> 1 로 서로 다른 소스를 여러 개 담았는데 두 번째부터 `same junction path as an earlier row`.
+- 원인: 정션 이름 = 소스의 **끝 폴더 이름**(`basename`)이라 `ProjA/Content` 와 `ProjB/Content` 가 같은 폴더 안에서
+  둘 다 `Content` 로 겹쳤다. 상태 문구는 맞았지만 하나만 만들어지는 결과가 문제.
+- 수정: `core/junction.unique_names()` — 같은 폴더에 만들 소스들 중 **겹치는 것만** 상위 폴더 이름을 앞에 붙여
+  `ProjA_Content` · `ProjB_Content`(그래도 같으면 한 단계 더, 다 써도 같으면 `_2`). 겹치지 않는 소스는 그대로.
+  같은 소스를 두 번 담으면 `same source as an earlier row` 로 거른다(이름 계산에서는 빼서 이름이 길어지지 않게).
+  n -> n 에서 두 행이 같은 Create In 폴더를 쓸 때도 같은 규칙. `Target row is the junction path` 는 그대로.
+- 검증: 임시 폴더에 plan 시나리오 6종 + 실제 `mklink /J` 왕복(만든 뒤 재계획 = already a junction, rmdir) +
+  오프스크린 PySide6 로 Create 탭 미리보기 표 확인(3 ready / 3 rows). 문서 11-1 · CHANGELOG · 툴팁 갱신.
+
 > [!summary] A00030 quickTool_V02 — **File 섹션(Copy Scene Folder · Open Scene Folder)을 UI 에서 숨김, 코드는 그대로** (v02.06->02.07)
 - 요청: File 관련 버튼 UI 를 없애되 내부 기능 코드는 남긴다.
 - `MainWindow.HIDDEN_SECTIONS = ("File",)` — `build_ui` 가 이 제목의 섹션을 건너뛴다. `SECTIONS` 표의 `File` 줄 ·

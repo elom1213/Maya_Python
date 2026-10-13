@@ -2,6 +2,16 @@
 
 All notable changes to this tool are documented here.
 
+## [01.22] - 2026-10-13
+### Fixed
+- **Junction > Create: sources with the same folder name no longer block each other.** The junction is
+  named after the source folder, so in **n -> 1** (and in n -> n when two rows share a *Create In* folder)
+  `D:\ProjA\Content` and `D:\ProjB\Content` both became `...\Content` and every row after the first was
+  refused with *same junction path as an earlier row*. Now only the colliding rows get the parent folder
+  prefixed - `ProjA_Content`, `ProjB_Content` (one more level when that still collides, `_2` as a last
+  resort). Sources that do not collide keep their plain name. The same source listed twice is reported as
+  *same source as an earlier row* instead of being renamed. `core/junction.unique_names()` holds the rule.
+
 ## [01.21] - 2026-10-12
 ### Added
 - **Tree tab: junction-aware Reveal.** Right-clicking a junction (or any path that goes *through*

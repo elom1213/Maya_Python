@@ -1,6 +1,6 @@
 ---
 name: wip-a00240-junction-tab
-description: "A00240 Junction 탭(v01.19) — mklink /J 를 UI 로, 정션 판별은 lstat 리파스 태그, 삭제는 is_junction 확인 후 os.rmdir(빈 실제 폴더도 지우는 명령), Tree 는 정션 연한 빨강 + 순환 가드"
+description: "A00240 Junction 탭(v01.19~22) — mklink /J 를 UI 로, 정션 판별은 lstat 리파스 태그, 삭제는 is_junction 확인 후 os.rmdir(빈 실제 폴더도 지우는 명령), Tree 는 정션 연한 빨강 + 순환 가드, 끝 이름 같은 소스는 unique_names 로 상위 폴더 접두"
 metadata:
   node_type: memory
   type: project
@@ -39,3 +39,10 @@ A00240_PathTool v01.19 (2026-10-12) **Junction** 탭 — Create / Remove 하위 
 공용 `Framework/qt/path_context.py` 에 `origin_of(path)`(= `realpath` 가 다르면 실제 경로; 정션을 **거친** 하위 경로도 잡힘)
 와 `build_path_menu` 를 두어 Tree · Expand · A00210 Maya 탭이 함께 받는다. 더블클릭은 보이는 경로 그대로(사용자 제안대로).
 검증은 오프스크린 PySide6 + 실제 mklink /J, `file_opener.open_path` 를 가로채 어느 경로가 열리는지 본다.
+
+**v01.22 (2026-10-13, 사용자 버그 신고)** — n -> 1 에서 서로 다른 소스가 `same junction path as an earlier row` 로 막힘.
+원인은 정션 이름이 **끝 폴더 이름만**이라 `ProjA/Content` · `ProjB/Content` 가 겹친 것(상태 문구 자체는 맞았다).
+`core/junction.unique_names(sources)` — 같은 폴더에 만들 소스 중 **겹치는 것만** 상위 폴더 이름을 `_` 로 앞에 붙임
+(`ProjA_Content`; 더 겹치면 한 단계 더, 다 써도 같으면 `_2`). 같은 소스 중복 행은 이름 계산에서 빼고
+`same source as an earlier row` 로 거른다 — 안 빼면 둘을 가르려고 이름이 전체 경로까지 길어진다.
+드라이브 루트 `D:\` 는 이름 `D`(전엔 `D:` 가 나와 폴더 이름으로 못 쓰는 꼴이었다). 검증은 plan 시나리오 + 실제 mklink 왕복 + 오프스크린 Create 탭.
