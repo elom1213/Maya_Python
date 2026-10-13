@@ -32,6 +32,19 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-13 (오늘)
 
+> [!summary] A00145_RigConnect — **Connect > Transfer Connection `Save as Rule...`: 체크한 연결을 Connect by Rule 규칙 json 으로 저장** (v01.59->01.60) `#A00145_RigConnect`
+- 요청: Transfer Connection 탭의 Source Objects + Attributes · Connected Nodes 체크 관계만으로 규칙을 만들고 싶다 (더 좋은 방법이 있으면 제안).
+  이 방식을 그대로 채택하고 두 가지를 더했다 — **방향 선택**(규칙은 `Source.a -> Destination.b` 한 방향이라 downstream / upstream 중 하나) 과
+  **저장 전 미리보기 창**(이름 · 파일 · 설명 · 짝 체크).
+- 코어: `connection_transfer_manager.rule_pairs(rows, attrs, nodes, upstream, downstream)` — cmds 없이 list_rows 결과만 읽어
+  `(driver_attr, driven_attr)` 짝을 모은다(오브젝트가 여럿이면 같은 짝은 한 행 + 개수 + 플러그 목록). `connect_rules.save_rule` /
+  `rule_file_name` / `rule_path` — 같은 이름 짝은 `attributes`, 다른 이름은 `pairs`, 파일명은 이름 슬러그, 덮어쓰기는 플래그로만.
+- UI: `ui/rule_save_dialog.py` (`RuleSaveDialog`) — Direction 라디오(짝 없는 쪽은 비활성), 짝 표, 적용 안내 문구, 파일 이름은 이름을 따라가되
+  손대면 고정, 파일 존재 / 같은 이름 규칙은 확인·경고. 저장 뒤 Connect 페이지 `Rule` 콤보 재로드 + 새 규칙 선택.
+- 검증: mayapy 2024 — rows/nodes → rule_pairs(down · up · 노드 필터) → save_rule(attributes/pairs 분리 · 중복 · 덮어쓰기 거절 · ValueError) →
+  load_rules → connect_by_rule 로 다른 오브젝트에 재연결 확인, 다이얼로그 오프스크린(방향 전환 · 파일명 추종 · 체크 해제 · result). 마야 GUI 확인 아직.
+- 문서 `A00145_RigConnect.md` Connect by Rule 절 · Transfer Connection 5번 · 구조 갱신.
+
 > [!summary] A00240_PathTool — **Junction > Create: 끝 폴더 이름이 같은 소스들이 서로를 막던 문제 수정** (v01.21->01.22) `#A00240_PathTool`
 - 증상: n -> 1 로 서로 다른 소스를 여러 개 담았는데 두 번째부터 `same junction path as an earlier row`.
 - 원인: 정션 이름 = 소스의 **끝 폴더 이름**(`basename`)이라 `ProjA/Content` 와 `ProjB/Content` 가 같은 폴더 안에서

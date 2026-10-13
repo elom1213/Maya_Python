@@ -22,12 +22,19 @@ connect_rules - Connect 탭의 **규칙 연결** (v01.59).
 오브젝트는 행 순서대로 1:1 (짧은 쪽 길이만큼). 쌍마다 모든 어트리뷰트 짝을 `connectAttr -force` 로
 잇고, 어느 한쪽에 없는 어트리뷰트는 건너뛴다.
 
-UI 비의존: maya.cmds 는 connect_by_rule 에서만 쓴다 (load_rules 는 standalone 에서도 돈다).
+규칙 만들기 (v01.60)
+-------------------
+Connect > Transfer Connection 의 `Save as Rule...` 가 체크한 연결(어트리뷰트 x 노드)을 `save_rule` 로
+같은 모양의 json 으로 쓴다 — 같은 이름 짝은 `attributes`, 다른 이름 짝은 `pairs`. 파일 이름은
+`rule_file_name(name)` (영문자·숫자 외는 `_`). 저장 뒤 Connect 페이지의 콤보가 다시 읽는다.
+
+UI 비의존: maya.cmds 는 connect_by_rule 에서만 쓴다 (load_rules / save_rule 은 standalone 에서도 돈다).
 """
 
 import io
 import json
 import os
+import re
 
 # app/rules/connect/ - 이 파일(app/core/connect_rules.py) 기준.
 RULES_DIR = os.path.normpath(os.path.join(
@@ -114,6 +121,78 @@ def find_rule(name, rules_dir=None):
         if rule.name == name:
             return rule
     return None
+
+
+# ----------------------------------------------------------------------
+# 규칙 저장 (v01.60 - Transfer Connection > Save as Rule)
+# ----------------------------------------------------------------------
+
+def rule_file_name(name):
+    """규칙 이름 -> 파일 이름 (확장자 없이). 영문자·숫자 외는 `_` 로, 소문자.
+
+    'Apple ARKit 52 Facial Target' -> 'apple_arkit_52_facial_target'. 비면 'rule'.
+    """
+    out = re.sub(r"[^0-9A-Za-z]+", "_", str(name or "")).strip("_").lower()
+    return out or "rule"
+
+
+def rule_path(file_name, rules_dir=None):
+    """파일 이름 (확장자 있어도 됨) -> 규칙 폴더 안의 절대 경로."""
+    file_name = str(file_name or "").strip()
+    if not file_name.lower().endswith(".json"):
+        file_name += ".json"
+    return os.path.join(rules_dir or RULES_DIR, file_name)
+
+
+def save_rule(name, pairs, description="", file_name=None, rules_dir=None, overwrite=False):
+    """규칙 json 을 쓴다. 반환: 쓴 파일의 절대 경로.
+
+    같은 이름의 짝 (a, a) 은 `attributes` 로, 이름이 다른 짝은 `pairs` 로 나눠 적는다 (읽을 때와 같은 모양).
+    같은 짝이 두 번 오면 한 번만 적는다 (첫 등장 순서).
+
+    Args:
+        name: 규칙 이름 (화면에 보이는 이름). 비면 ValueError.
+        pairs: [(source_attr, destination_attr), ...]. 비면 ValueError.
+        description: 툴팁 설명.
+        file_name: 파일 이름 (없으면 rule_file_name(name)).
+        overwrite: False 면 파일이 이미 있을 때 ValueError.
+    """
+    name = str(name or "").strip()
+    if not name:
+        raise ValueError("rule name is empty")
+
+    seen = set()
+    attributes = []
+    others = []
+    for pair in pairs or []:
+        src, dst = (str(pair[0]).strip(), str(pair[1]).strip())
+        if not src or not dst or (src, dst) in seen:
+            continue
+        seen.add((src, dst))
+        if src == dst:
+            attributes.append(src)
+        else:
+            others.append([src, dst])
+    if not attributes and not others:
+        raise ValueError("rule has no attribute pair")
+
+    path = rule_path(file_name or rule_file_name(name), rules_dir)
+    if os.path.exists(path) and not overwrite:
+        raise ValueError("file already exists: {0}".format(path))
+
+    data = {"name": name, "description": str(description or "")}
+    if attributes:
+        data["attributes"] = attributes
+    if others:
+        data["pairs"] = others
+
+    folder = os.path.dirname(path)
+    if not os.path.isdir(folder):
+        os.makedirs(folder)
+    with io.open(path, "w", encoding="utf-8") as fh:
+        fh.write(json.dumps(data, indent=2, ensure_ascii=False))
+        fh.write("\n")
+    return path
 
 
 def connect_by_rule(src_objs, dst_objs, rule):

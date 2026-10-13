@@ -12,6 +12,7 @@ UI 비의존: 위젯에서 읽은 list/str 값만 받는다.
 
   - list_rows(objs, ...)         : 소스 오브젝트들의 어트리뷰트 행 (연결 정보 포함)
   - list_nodes(rows, attrs, ...) : 체크한 어트리뷰트에 연결된 노드들
+  - rule_pairs(rows, attrs, nodes, ...) : 체크한 연결을 Connect by Rule 규칙 짝으로 (v01.60, cmds 없음)
   - missing_on(objs, attrs)      : 목적지에 없는 어트리뷰트
   - transfer(pairs, attrs, nodes, ...) : 전이 실행 (보고서 반환)
 
@@ -167,6 +168,57 @@ def list_nodes(rows, attrs, upstream=True, downstream=True):
             _take("out", row)
 
     return [nodes[n] for n in order]
+
+
+def rule_pairs(rows, attrs, nodes, upstream=False, downstream=True):
+    """체크한 어트리뷰트 x 체크한 노드의 연결을 **규칙 짝** (driver_attr, driven_attr) 으로 뽑는다 (v01.60).
+
+    Connect by Rule 의 규칙은 "Source.a -> Destination.b" 짝의 목록이라 방향이 하나다. 그래서
+    downstream (Source.attr -> node.x) 은 (attr, x), upstream (node.x -> Source.attr) 은 (x, attr) 로
+    적는다. 둘을 한 규칙에 섞으면 적용할 때 누가 Source 인지 갈리므로 UI 는 한 방향만 고르게 한다.
+
+    maya.cmds 를 쓰지 않는다 - list_rows 가 돌려준 행만 읽는다.
+
+    Args:
+        rows: list_rows 가 돌려준 행들.
+        attrs: 체크한 어트리뷰트 이름들.
+        nodes: 체크한 노드 이름들 (list_nodes 의 "node").
+        upstream / downstream: 어느 방향의 연결을 짝으로 뽑을지.
+
+    Returns:
+        [{"src": driver_attr, "dst": driven_attr, "count": n, "plugs": ["A.attr -> Tgt.x", ...]}]
+        첫 등장 순서, 같은 (src, dst) 는 한 행으로 모은다.
+    """
+    wanted_attrs = set(attrs)
+    wanted_nodes = set(nodes)
+    pairs = {}
+    order = []
+
+    def _add(src_attr, dst_attr, line):
+        key = (src_attr, dst_attr)
+        entry = pairs.get(key)
+        if entry is None:
+            entry = pairs[key] = {"src": src_attr, "dst": dst_attr, "count": 0, "plugs": []}
+            order.append(key)
+        entry["count"] += 1
+        entry["plugs"].append(line)
+
+    for row in rows:
+        name = row["name"]
+        if name not in wanted_attrs:
+            continue
+        if downstream:
+            for obj, plugs in row["out"].items():
+                for plug in plugs:
+                    if plug_node(plug) in wanted_nodes:
+                        _add(name, plug_attr(plug), "{0}.{1}  ->  {2}".format(obj, name, plug))
+        if upstream:
+            for obj, plugs in row["in"].items():
+                for plug in plugs:
+                    if plug_node(plug) in wanted_nodes:
+                        _add(plug_attr(plug), name, "{0}  ->  {1}.{2}".format(plug, obj, name))
+
+    return [pairs[k] for k in order]
 
 
 def missing_on(objs, attrs):

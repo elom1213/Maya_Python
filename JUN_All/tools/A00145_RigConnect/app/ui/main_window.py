@@ -60,6 +60,7 @@ from tools.A00145_RigConnect.app.core import (
     connect_closest, find_closest_for_drivers)
 from tools.A00145_RigConnect.app.ui.collapsible import CollapsibleBox
 from tools.A00145_RigConnect.app.ui.attr_spec_dialog import AttrSpecDialog
+from tools.A00145_RigConnect.app.ui.rule_save_dialog import RuleSaveDialog
 
 
 # 재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -2733,6 +2734,16 @@ class MainWindow(QWidget):
         btn_nnone = QPushButton("Clear Checks")
         btn_nnone.clicked.connect(lambda: self._xfer_set_all(self.lw_xfer_nodes, False))
         node_btn_row.addWidget(btn_nnone)
+        node_btn_row.addStretch(1)
+        # v01.60 : 체크한 어트리뷰트 x 체크한 노드의 연결을 Connect by Rule 규칙 json 으로 저장.
+        btn_rule = QPushButton("Save as Rule...")
+        btn_rule.setToolTip(
+            "Turn the connections between the CHECKED attributes and the CHECKED nodes\n"
+            "into a Connect by Rule rule (a json in app/rules/connect/).\n"
+            "A preview lets you pick the direction, name the rule and drop pairs.\n"
+            "The Connect page's Rule combo is reloaded after saving.")
+        btn_rule.clicked.connect(self.on_xfer_save_rule)
+        node_btn_row.addWidget(btn_rule)
         box_layout.addLayout(node_btn_row)
 
         layout.addWidget(box)
@@ -4406,6 +4417,57 @@ class MainWindow(QWidget):
         self.log("[OK] List Nodes : {0} node(s) on {1} attribute(s) ({2})".format(
             len(nodes), len(attrs),
             " + ".join(d for d, on in (("upstream", upstream), ("downstream", downstream)) if on)))
+
+    def on_xfer_save_rule(self):
+        """체크한 어트리뷰트 x 체크한 노드의 연결을 Connect by Rule 규칙으로 저장한다 (v01.60).
+
+        규칙은 한 방향(Source.a -> Destination.b)이라 다이얼로그에서 downstream / upstream 중 하나를
+        고른다. 저장 뒤 Connect 페이지의 Rule 콤보를 다시 읽고 새 규칙을 고른다.
+        """
+        attrs = self._xfer_checked(self.lw_xfer_attrs)
+        nodes = self._xfer_checked(self.lw_xfer_nodes)
+        if not attrs:
+            self.log("[ERR] Save as Rule : check one or more attributes")
+            return
+        if not nodes:
+            self.log("[ERR] Save as Rule : check one or more nodes (List Nodes first)")
+            return
+
+        down = cxm_mgr.rule_pairs(self._xfer_rows, attrs, nodes, upstream=False, downstream=True)
+        up = cxm_mgr.rule_pairs(self._xfer_rows, attrs, nodes, upstream=True, downstream=False)
+        if not down and not up:
+            self.log("[ERR] Save as Rule : no connection between the checked attributes "
+                     "and the checked nodes")
+            return
+
+        dialog = RuleSaveDialog(down, up, parent=self, existing_rules=self._connect_rules)
+        if dialog.exec_() != QDialog.Accepted:
+            return
+        result = dialog.result_rule()
+        if not result:
+            return
+
+        try:
+            path = crule_mgr.save_rule(
+                result["name"], result["pairs"], description=result["description"],
+                file_name=result["file_name"], overwrite=result["overwrite"])
+        except Exception as e:
+            self.log("[ERR] Save as Rule : {0}".format(e))
+            cmds.warning(str(e))
+            return
+
+        self.log("[OK] Save as Rule : '{0}' ({1} pair(s), {2})  ->  {3}".format(
+            result["name"], len(result["pairs"]),
+            "Source objects drive the nodes" if result["direction"] == "down"
+            else "nodes drive the Source objects", path))
+        for src_attr, dst_attr in result["pairs"]:
+            self.log("       {0}  ->  {1}".format(src_attr, dst_attr))
+
+        # Connect 페이지의 콤보를 다시 읽고 새 규칙을 고른다.
+        self._load_connect_rules()
+        index = self.cmb_connect_rule.findText(result["name"])
+        if index >= 0:
+            self.cmb_connect_rule.setCurrentIndex(index)
 
     def on_xfer_nodes_selection_changed(self):
         """노드 행을 누르면 씬에서도 고른다 (List Connected 와 같다)."""

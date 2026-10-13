@@ -62,5 +62,13 @@
 #        wired exactly like the old button (objects row by row, same-name attributes,
 #        missing ones skipped). New rules = drop a json in the folder, no code change.
 
-VERSION = "01.59"
-LAST_UPDATE = "2026-10-12"
+# 01.60  Connect > Transfer Connection : "Save as Rule..." (Connected Nodes row). The
+#        connections between the CHECKED attributes and the CHECKED nodes become a
+#        Connect by Rule json (app/rules/connect/). A preview dialog picks ONE direction
+#        (Source objects drive the nodes = pairs [Source attr, node attr] / nodes drive
+#        the Source objects = [node attr, Source attr]), names the rule and the file,
+#        and lets you drop pairs. Same-name pairs are written as "attributes", the rest
+#        as "pairs". The Connect page's Rule combo is reloaded and set to the new rule.
+
+VERSION = "01.60"
+LAST_UPDATE = "2026-10-13"

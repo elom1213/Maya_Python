@@ -813,7 +813,11 @@ Constrain 탭과 같은 방식이다(§Constrain 참고) — 짧은 라벨 + 툴
       "pairs": [["srcAttr", "dstAttr"]]                     // 이름이 다를 때 (선택, attributes 와 함께 가능)
     }
     ```
-  - 로직은 `app/core/connect_rules.py` — `load_rules()` / `find_rule(name)` / `connect_by_rule(src, dst, rule)`.
+  - 로직은 `app/core/connect_rules.py` — `load_rules()` / `find_rule(name)` / `connect_by_rule(src, dst, rule)` /
+    `save_rule(name, pairs, ...)`(v01.60).
+  - **규칙을 손으로 적지 않고 씬에서 뽑기 (v01.60)**: 이미 연결된 리그가 있으면 `Transfer Connection` 탭의
+    `Save as Rule...` 로 체크한 연결을 규칙 json 으로 저장한다 — 아래 Transfer Connection 5번. 저장되면 이 콤보가
+    다시 읽혀 새 규칙이 골라진다.
 
 ##### Match from Source — 이름이 비슷한 어트리뷰트 찾기 (v01.21)
 
@@ -1417,6 +1421,19 @@ A.attr_01 ↔ Tgt.attr_tgt_n 이 이어져 있을 때, 그 연결을 끊고 B.at
    - Destination 의 어트리뷰트가 **이미 다른 것에 구동**되고 있으면 건너뛴다(`[WARN]`, Source 유지).
    - 옮긴 뒤 두 목록을 다시 읽는다(체크는 이름으로 유지). `Connected Only` 가 켜져 있으면 연결이 다 옮겨진
      어트리뷰트는 목록에서 사라진다.
+5. `Save as Rule...` (`Connected Nodes` 버튼 줄 오른쪽, v01.60) — **체크한 어트리뷰트 × 체크한 노드**의 연결을
+   `Connect by Rule` 규칙 json 으로 저장한다. Destination 은 필요 없다(1·2 번까지만 하면 된다). 손으로 json 을 적는
+   대신 **이미 연결해 둔 리그에서 규칙을 뽑는** 길이다.
+   - 미리보기 창이 뜬다: `Name`(콤보에 보이는 이름) · `File`(이름에서 자동, 손대면 그 뒤로는 안 따라감) · `Description`
+     · `Direction` · 짝 표(체크 | Source attr | Destination attr | Connections) · `Check All` / `Clear Checks` · `Save`.
+   - **규칙은 한 방향**(`Source.a -> Destination.b`)이라 `Direction` 을 하나만 고른다.
+     `Source objects DRIVE the nodes`(downstream) 는 짝이 `[Source attr, node attr]` — 적용할 때 Connect 페이지의
+     Source Objects 에 지금의 Source 오브젝트 쪽을, Destination Objects 에 노드 쪽을 담는다.
+     `Nodes DRIVE the Source objects`(upstream) 는 반대로 `[node attr, Source attr]`. 한쪽 방향에 짝이 없으면 그
+     라디오는 꺼진다. 같은 짝은 오브젝트가 여럿이어도 한 행으로 모이고 `Connections` 에 개수, 툴팁에 실제 플러그가 보인다.
+   - 표에서 체크를 끈 짝은 빠진다. 같은 이름 짝은 json 의 `attributes` 로, 다른 이름 짝은 `pairs` 로 적힌다.
+   - 파일이 이미 있으면 덮어쓸지 묻고, 같은 이름의 규칙이 다른 파일에 있으면 경고한다. 저장되면 로그에 짝이 적히고
+     Connect 페이지의 `Rule` 콤보가 다시 읽혀 새 규칙이 골라진다.
 
 > 요청과 다르게 둔 것 — "A·B 공통 어트리뷰트" 목록을 따로 두지 않고 어트리뷰트 목록의 빨강 표시로 대신했다
 > (같은 집합을 두 목록에 두 번 체크할 일이 없다). `List UpStream` / `List DownStream` 두 버튼 대신
@@ -1893,7 +1910,7 @@ A00145_RigConnect/
     │   ├── constraint_target_manager.py # Target Edit (타깃(드라이버) 교체 = target[i] 입력 연결만 rewire / 추가·삭제 = constraint 명령의 add·remove, offset 재계산, UUID 기반)
     │   ├── attr_match.py           # Match from Source (이름 유사 어트리뷰트 검색: 토큰 역색인 + IDF, maya 비의존 순수 파이썬)
     │   ├── connect_manager.py      # Connect    (MEL 포팅: attr 나열/검색/연결)
-    │   ├── connect_rules.py        # Connect > Connect by Rule (app/rules/connect/*.json 규칙 로드 + 규칙대로 이름 연결, 예전 52 facial 버튼)
+    │   ├── connect_rules.py        # Connect > Connect by Rule (app/rules/connect/*.json 규칙 로드 + 규칙대로 이름 연결, 예전 52 facial 버튼 · save_rule 로 규칙 json 쓰기 v01.60)
     │   ├── attribute_manager.py    # Attribute > Edit   (정의를 읽어 다른 오브젝트에 재생성 prefix/suffix + 여러 오브젝트 합집합 나열 list_attributes_multi)
     │   ├── attr_order_manager.py   # Attribute > Edit   (Up/Down = 채널 박스 나열 순서 변경. 마야엔 재정렬 명령이 없어 deleteAttr+undo 로 맨 뒤로 보내는 방식)
     │   ├── attr_profile_prefs.py   # Attribute > Create (프로파일 JSON 저장 + 스펙 정규화, maya 비의존)
@@ -1914,6 +1931,7 @@ A00145_RigConnect/
     └── ui/
         ├── collapsible.py          # CollapsibleBox
         ├── attr_spec_dialog.py     # Attribute > Create 의 어트리뷰트 정의 편집 창
+        ├── rule_save_dialog.py     # Connect > Transfer Connection 의 Save as Rule 미리보기 창 (방향 하나 · 이름/파일 · 짝 체크, v01.60)
         └── main_window.py          # QTabWidget 최상위 5탭(Constrain 6 / Connect 4 / Attribute 3 하위 탭) + 공유 로그 + Help>About
 ```
 
