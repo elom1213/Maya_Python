@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-12
+# last Update date : 2026-10-16
 # A00060_jointTool_V03 - Qt UI
+#
+# v03.15 (2026-10-16) Orient > Orient / Rotate : rotate 와 jointOrient 가 둘 다 값이 있어도
+#   버튼 전후 회전이 같다 (축별 덧셈 -> 행렬 합성). 잠김 · 연결 채널은 건너뛰고 로그.
 #
 # v03.14 (2026-10-12) Create > From Object : `Match Rotation` 체크박스(기본 꺼짐, Separate 에서만 활성)
 #   - 켜면 분리 조인트가 오브젝트의 월드 회전을 jointOrient 로 받는다.
@@ -576,13 +579,15 @@ class MainWindow(QWidget):
 
         self.btn_ori_to_rot = QPushButton("joint orient to rotate")
         self.btn_ori_to_rot.setToolTip(
-            "Zero jointOrient and add its value into rotate.")
+            "Zero jointOrient and fold it into rotate.\n"
+            "The joint keeps the same orientation even when both have values.")
         self.btn_ori_to_rot.clicked.connect(self.on_swap_ori_to_rot)
         layout.addWidget(self.btn_ori_to_rot)
 
         self.btn_rot_to_ori = QPushButton("rotate to joint orient")
         self.btn_rot_to_ori.setToolTip(
-            "Zero rotate and add its value into jointOrient.")
+            "Zero rotate and fold it into jointOrient.\n"
+            "The joint keeps the same orientation even when both have values.")
         self.btn_rot_to_ori.clicked.connect(self.on_swap_rot_to_ori)
         layout.addWidget(self.btn_rot_to_ori)
 
@@ -1544,14 +1549,22 @@ class MainWindow(QWidget):
                   lambda: obj_mgr.set_joint_orient(joints, axis_idx, deg))
 
     def on_swap_ori_to_rot(self):
-        joints = self.tsl_orient_swap.get_all_items()
-        self._run("joint orient -> rotate",
-                  lambda: obj_mgr.swap_rotate_orient(joints, "jointOrient", "rotate"))
+        self._swap_orient("joint orient -> rotate", "jointOrient", "rotate")
 
     def on_swap_rot_to_ori(self):
+        self._swap_orient("rotate -> joint orient", "rotate", "jointOrient")
+
+    def _swap_orient(self, title, attr_zero, attr_sum):
+        """v03.15 - 두 값을 행렬로 합쳐 보이는 회전은 그대로 (core 참고)"""
         joints = self.tsl_orient_swap.get_all_items()
-        self._run("rotate -> joint orient",
-                  lambda: obj_mgr.swap_rotate_orient(joints, "rotate", "jointOrient"))
+        result = {}
+
+        def _do():
+            result["messages"] = obj_mgr.swap_rotate_orient(joints, attr_zero, attr_sum)
+
+        self._run(title, _do)
+        for message in result.get("messages", []):
+            self.log(message)
 
     # ==============================================================
     # Handlers : Chain

@@ -17,5 +17,10 @@
 #                           object, stored in jointOrient (rotate stays 0). Vertices are left
 #                           as they are. Connect (chain) ignores it.
 
-VERSION = "03.14"
-LAST_UPDATE = "2026-10-12"
+# 03.15  Orient > Orient / Rotate - the two buttons keep the joint's orientation when both rotate
+#                           and jointOrient have values. They used to add the Euler angles per
+#                           axis; now R x JO is composed as a matrix and decomposed in the
+#                           remaining channel's order. Locked / connected channels are skipped.
+
+VERSION = "03.15"
+LAST_UPDATE = "2026-10-16"

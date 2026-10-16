@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-16 (오늘)
 
+> [!summary] A00060_jointTool_V03 — **Orient / Rotate 가 둘 다 값이 있는 조인트의 회전을 바꾸지 않음** (v03.14->03.15) `#A00060_jointTool_V03`
+- 요청: `rotate to joint orient` 를 누르면 rotate 와 jointOrient 가 둘 다 값이 있는 조인트가 보이는 회전이 달라진다 → 전후 변화 없게.
+- 원인: 오일러 각을 축별로 더함(옛 MEL 포팅). 수정: `R x JO` 행렬 합성 → 남는 쪽 순서로 분해, 옛 합에 가장 가까운 등가 해
+  (`setToClosestSolution` 은 짐벌 근처에서 다른 회전을 줘서 `setToClosestCut` 두 후보로). 반대 버튼도 같이, 잠김 · 연결은 건너뜀.
+- 검증(mayapy 2024): 무작위 240 + 짐벌 조합 371건 월드 행렬 불변, 한쪽만 값 → 예전 숫자, undo 복귀. 마야 GUI 는 미확인.
+
 > [!summary] A00480_FileTool — **Import > CSV 에 Value Scale (CSV 값 x 배율)** (v01.10->01.11) `#A00480_FileTool`
 - 요청: CSV 는 [0, 1] 값뿐인데 AdvancedSkeleton 페이셜 컨트롤은 [0, 10] 키를 요구 → 임포트 때 사용자가 넣은 수를 곱하는 UI.
 - UI `Value Scale` 줄(QDoubleSpinBox, 기본 1, 빠른 버튼 `x1` / `x10`) → `csv_ops.import_facial(value_scale=)` 가 `float(raw) * value_scale` 로 키. 1 이 아니면 로그 · 요약에 배율.

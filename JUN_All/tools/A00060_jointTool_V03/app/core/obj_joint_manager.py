@@ -78,21 +78,81 @@ def joints_to_objs(objs, separate, fwd_axis, secd_axis, secd_ori, match_rotation
     cmds.select(clear=True)
 
 
+def _blocked_channels(jnt, attr):
+    """attr(rotate / jointOrient) 중 잠기거나 입력 연결이 있는 채널 이름 목록"""
+    blocked = []
+    for name in [attr] + [attr + ax for ax in "XYZ"]:
+        plug = "{0}.{1}".format(jnt, name)
+        if cmds.getAttr(plug, lock=True) or cmds.listConnections(plug, s=True, d=False):
+            blocked.append(name)
+    return blocked
+
+
+def _closest_equivalent(euler, target, mat):
+    """euler 와 같은 회전인 해 중 target 에 가장 가까운 것.
+
+    옛 축별 합(target)에 맞춰, 한쪽만 값이 있던 경우 숫자가 예전과 같게 나온다
+    (예: 190 이 -170 으로 바뀌지 않음). MEulerRotation.setToClosestSolution 은 짐벌 근처에서
+    다른 회전을 돌려주므로(0,90,0 x 45,0,0 -> 22.5,45,22.5) 쓰지 않는다 - 두 등가 해에
+    360 도 배수만 맞추는 setToClosestCut 을 걸고, 행렬이 같은 것만 고른다.
+    """
+    best = euler
+    best_d = None
+    for cand in (euler, euler.alternateSolution()):
+        cand = cand.setToClosestCut(target)
+        if not cand.asMatrix().isEquivalent(mat, 1e-9):
+            continue
+        dist = sum(abs(a - b) for a, b in zip((cand.x, cand.y, cand.z),
+                                              (target.x, target.y, target.z)))
+        if best_d is None or dist < best_d:
+            best, best_d = cand, dist
+    return best
+
+
 def swap_rotate_orient(joints, attr_zero, attr_sum):
-    """MEL JUN_cmd_joint_swap_rotate - attr_zero 를 0 으로, attr_sum 에 두 값을 합산.
+    """MEL JUN_cmd_joint_swap_rotate - attr_zero 를 0 으로, attr_sum 에 두 값을 합친다.
 
     'joint orient -> rotate' : attr_zero="jointOrient", attr_sum="rotate"
     'rotate -> joint orient'  : attr_zero="rotate",      attr_sum="jointOrient"
+
+    v03.15 - 축별 덧셈(옛 MEL 방식)은 rotate 와 jointOrient 가 둘 다 값이 있으면 회전이
+    바뀐다(오일러는 더해지지 않는다). 조인트 로컬 회전은 [rotateAxis][rotate][jointOrient]
+    (행 벡터) 이므로 R x JO 행렬을 만들어 남는 쪽의 회전 순서로 분해한다.
+      rotate -> jointOrient : JO' = R x JO   (jointOrient 는 항상 XYZ)
+      jointOrient -> rotate : R'  = R x JO   (조인트의 rotateOrder 로)
+    rotateAxis 는 앞에 곱해지므로 그대로 둔다. 분해 결과는 _closest_equivalent 참고.
+
+    반환 : 메시지 목록 (잠김 · 연결로 건너뛴 조인트)
     """
+    from maya.api import OpenMaya as om
+
+    messages = []
+    to_jo = attr_sum == "jointOrient"
     for jnt in joints:
-        zero_v = [cmds.getAttr("{0}.{1}{2}".format(jnt, attr_zero, ax)) for ax in "XYZ"]
-        sum_v = [cmds.getAttr("{0}.{1}{2}".format(jnt, attr_sum, ax)) for ax in "XYZ"]
+        if cmds.nodeType(jnt) != "joint":
+            messages.append("[Warning] {0}: not a joint - skipped.".format(jnt))
+            continue
+        blocked = _blocked_channels(jnt, "rotate") + _blocked_channels(jnt, "jointOrient")
+        if blocked:
+            messages.append("[Warning] {0}: {1} locked or connected - skipped.".format(
+                jnt, ", ".join(blocked)))
+            continue
 
-        for ax in "XYZ":
-            cmds.setAttr("{0}.{1}{2}".format(jnt, attr_zero, ax), 0)
+        rot = cmds.getAttr(jnt + ".rotate")[0]
+        jo = cmds.getAttr(jnt + ".jointOrient")[0]
+        rot_order = cmds.getAttr(jnt + ".rotateOrder")
 
-        for i, ax in enumerate("XYZ"):
-            cmds.setAttr("{0}.{1}{2}".format(jnt, attr_sum, ax), zero_v[i] + sum_v[i])
+        r_mat = om.MEulerRotation([math.radians(v) for v in rot], rot_order).asMatrix()
+        jo_mat = om.MEulerRotation([math.radians(v) for v in jo],
+                                   om.MEulerRotation.kXYZ).asMatrix()
+        out_order = om.MEulerRotation.kXYZ if to_jo else rot_order
+        mat = r_mat * jo_mat
+        naive = om.MEulerRotation([math.radians(a + b) for a, b in zip(rot, jo)], out_order)
+        euler = _closest_equivalent(om.MEulerRotation.decompose(mat, out_order), naive, mat)
+
+        cmds.setAttr(jnt + "." + attr_zero, 0, 0, 0)
+        cmds.setAttr(jnt + "." + attr_sum, *[math.degrees(v) for v in (euler.x, euler.y, euler.z)])
+    return messages
 
 
 def set_joint_orient(joints, axis_idx, degree):

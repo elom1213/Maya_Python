@@ -3,6 +3,21 @@
 `A00060_jointTool_V02` 를 복제해 갈라낸 **탭 재분류판**이다.
 아래 `v01.xx` 항목은 갈라 나오기 전 V02 의 이력이다.
 
+## v03.15 (2026-10-16)
+**[Fix] `Orient > Orient / Rotate` — rotate 와 jointOrient 가 둘 다 값이 있어도 버튼 전후 회전이 같다.**
+
+- 원인: 옛 MEL 그대로 **오일러 각을 축별로 더했다**(`jo + rot`). 한쪽이 0 일 때만 맞고, 둘 다 값이 있으면
+  회전이 바뀐다(예: rotate `0,90,0` + jointOrient `45,0,0` → 옛 결과 `45,90,0` 은 다른 방향).
+- 수정: 조인트 로컬 회전 `[rotateAxis][rotate][jointOrient]` 에서 **`R x JO` 를 행렬로 합성**해 남는 쪽 순서로
+  분해한다 — `rotate → joint orient` 는 XYZ(jointOrient 는 항상 XYZ), `joint orient → rotate` 는 조인트의
+  `rotateOrder`. rotateAxis 는 그대로. 분해 해는 옛 축별 합에 가장 가까운 **등가 해**를 고른다 — 한쪽만 값이
+  있던 경우 숫자가 예전과 같다(`190` 이 `-170` 으로 안 바뀜). `MEulerRotation.setToClosestSolution` 은 짐벌
+  근처에서 다른 회전을 돌려줘서(`22.5,45,22.5`) 쓰지 않고, 두 등가 해에 `setToClosestCut` 을 건다.
+- rotate / jointOrient 채널이 잠겼거나 입력 연결이 있으면 그 조인트는 건너뛰고 로그에 `[Warning]`. 조인트 아닌 노드도.
+- 검증(mayapy 2024): rotateOrder 6종 × rotateAxis 유무 × 두 방향 무작위 240건 + 0/±90/180/45 조합 371건 —
+  조인트와 자식의 월드 행렬 불변. 한쪽만 값 → 예전 숫자, 잠김 · 연결 · 비조인트 건너뜀, undo 한 번에 복귀.
+  마야 GUI 는 미확인.
+
 ## v03.13 (2026-09-28)
 **[Add] `Chain > IK Edit` — Pole vector `Keep offset - fit the chain to the pole plane` (새 기본).**
 계획서: `JUN_All/docs/plans/A00060_A00130_ik_edit_keep_pv_offset_plan.md`

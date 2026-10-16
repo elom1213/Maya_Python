@@ -48,6 +48,7 @@
 - skin — [weights: physical index](skincluster-weight-index-physical.md) · [deforms user normals](skincluster-deforms-user-normals.md)(노멀 쓰기는 MFnMesh + dgdirty)
 - blendShape — [delta space = origin](blendshape-delta-space-origin.md) · [target name vs alias](blendshape-target-name-vs-alias.md) · [live target deltas](blendshape-live-target-inputpointstarget.md) · [sculpt target: pnts redirect](sculpt-target-pnts-redirect.md) · [shape.pnts is post-deformation](shape-pnts-is-post-deformation.md)
 - shapes/curves — [parent -s -add = instance](parent-shape-add-is-instance.md) · [extendToShape picks wrong shape](extendtoshape-picks-wrong-shape.md)(공용 `maya_shape`) · [pointPosition: points only](pointposition-points-only.md) · [cmds -pivot is world](cmds-scale-rotate-pivot-is-world.md) · [referenced curve CV write](referenced-curve-cv-write.md)(xform 으로만)
+- [Euler closestSolution not equivalent](euler-closest-solution-not-equivalent.md) — 짐벌 근처 다른 회전, closestCut + alternate 로 · 오일러는 축별로 안 더해진다
 - API lifetime — [MPlug.asMObject](mplug-asmobject-lifetime.md) · [MFn cvPositions](mfn-cvpositions-lifetime.md)(읽는 즉시 tuple 로)
 
 ## 공용 위젯 · 프레임워크

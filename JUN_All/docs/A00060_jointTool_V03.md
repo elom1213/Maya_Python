@@ -4,7 +4,9 @@
 평평하던 상위 탭 5개(그 안에 접이식 6섹션)를 **상위 탭 = 카테고리 / 하위 탭 = 기능**
 의 2단 구조로 다시 나눠 담았다.
 
-- 버전: `v03.13` (`app/config/version.py`) — `Chain > IK Edit` 의 새 기본 **`Keep offset`**: 폴 벡터 offset 을
+- 버전: `v03.15` (`app/config/version.py`) — `Orient > Orient / Rotate` 가 rotate 와 jointOrient 가
+  **둘 다 값이 있어도 회전을 바꾸지 않는다**(축별 덧셈 → 행렬 합성) (§Orient / Rotate)
+- `v03.13` — `Chain > IK Edit` 의 새 기본 **`Keep offset`**: 폴 벡터 offset 을
   안 바꾸고 체인을 폴 평면에 맞춘다(중간 조인트 투영 · 뼈 축 재정렬) (§8.3b)
 - `v03.12` — `Create > From Curve` 에 **`By Count`**:
   개수(2 이상)를 정해 **POCI parameter 0~1 등분** 자리에 조인트, 체크박스로 체인/분리 (§From Curve)
@@ -202,8 +204,14 @@ Root  :  [ Root        ] [ pole tgt ]
 #### Orient > Orient / Rotate
 `Joints` 리스트 조인트에 대해
 
-- `joint orient to rotate` : jointOrient 값을 0 으로, rotate 에 합산
-- `rotate to joint orient` : 반대로 합산
+- `joint orient to rotate` : jointOrient 를 0 으로, 그 회전을 rotate 에 합친다
+- `rotate to joint orient` : 반대로 rotate 를 0 으로, jointOrient 에 합친다
+
+**버튼 전후로 조인트(와 자식)의 방향은 바뀌지 않는다** — 둘 다 값이 있어도 (v03.15).
+오일러 각은 축별로 더해지지 않으므로(rotate `0,90,0` + jointOrient `45,0,0` 은 `45,90,0` 이 아니다)
+`rotate x jointOrient` 를 행렬로 합성해 남는 쪽 순서(jointOrient = XYZ, rotate = 조인트의 rotateOrder)로
+나눈다. 한쪽만 값이 있던 경우 숫자는 예전처럼 그대로 옮겨진다. rotateAxis 는 건드리지 않는다.
+rotate · jointOrient 채널이 잠겼거나 연결된 조인트는 건너뛰고 로그에 `[Warning]` 을 남긴다.
 
 ### 4.3 Chain — 체인 구조를 고친다
 
