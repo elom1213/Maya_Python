@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-22
+# last Update date : 2026-10-16
 # A00400_CurveTool - Create > Controls 탭 (컨트롤러 커브 만들기 · 색 · 팔레트)
 #
 # Brandon Schaal 의 `bs_controls` / `bs_controlsUI` 를 옮긴 화면이다. 원본 창의 세 섹션 중
@@ -13,6 +13,7 @@
 # 이 툴의 다른 탭과 같은 모양을 유지한다.
 
 from Framework.qt.qt import *
+from Framework.qt import JUN_mod_filter_qt
 
 from tools.A00400_CurveTool.app.core import control_manager as ctl_mgr
 
@@ -78,6 +79,18 @@ class ControlsTab(QWidget):
         if names:
             self.lw_shapes.setCurrentRow(0)
         self.lw_shapes.itemDoubleClicked.connect(lambda *_: self.on_create(ctl_mgr.MODE_ORIGIN))
+
+        # v01.27 - 셰이프 이름 필터(공용 위젯). 34종을 스크롤로 찾지 않고 이름 일부로 좁힌다.
+        self.lbl_shape_count = QLabel()
+        self.flt_shapes = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_shapes, placeholder="Type any part of a shape name (e.g. arrow)",
+            number_label=self.lbl_shape_count)
+        self.flt_shapes.filtered.connect(self._on_shapes_filtered)
+        filter_row = QHBoxLayout()
+        filter_row.addWidget(self.flt_shapes, 1)
+        filter_row.addWidget(self.lbl_shape_count)
+        layout.addLayout(filter_row)
+
         layout.addWidget(self.lw_shapes, 1)
 
         grid = QGridLayout()
@@ -187,9 +200,28 @@ class ControlsTab(QWidget):
     # 동작
     # ==================================================================
 
+    def _on_shapes_filtered(self, shown, _total):
+        """필터로 현재 셰이프가 가려지면 보이는 첫 셰이프로 옮긴다.
+
+        ★ Qt 는 숨긴 항목도 current 로 남겨 둔다. 그대로 두면 화면에 안 보이는 셰이프로
+        컨트롤이 만들어진다 - "보이는 것이 작업 대상" 규칙([[framework-filter-widget]]).
+        """
+        item = self.lw_shapes.currentItem()
+        if item is not None and not item.isHidden():
+            return
+        if not shown:
+            self.lw_shapes.setCurrentItem(None)
+            return
+        for row in range(self.lw_shapes.count()):
+            if not self.lw_shapes.item(row).isHidden():
+                self.lw_shapes.setCurrentRow(row)
+                return
+
     def _shape(self):
         item = self.lw_shapes.currentItem()
-        return item.text() if item else ""
+        if item is None or item.isHidden():
+            return ""
+        return item.text()
 
     def on_create(self, mode):
         shape = self._shape()

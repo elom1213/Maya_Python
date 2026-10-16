@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-16 (오늘)
 
+> [!summary] A00400_CurveTool — **Create > Controls 셰이프 목록에 Filter** (v01.26->01.27) `#A00400_CurveTool`
+- 요청: Controls 에서 필터로 원하는 컨트롤러를 검색.
+- 공용 `JUN_mod_filter_qt_v01` 을 셰이프 목록(QListWidget)에 붙임 + `Number: N / 34`. 현재 셰이프가 가려지면 보이는 첫 셰이프로 옮기고,
+  `_shape()` 는 숨은 항목을 돌려주지 않는다(보이는 것이 작업 대상).
+- 검증(mayapy 2024, offscreen UI): `arrow` → 15 / 34 · current 이동, 불일치 → 만들기 경고, Origin 으로 필터된 셰이프 생성. 마야 GUI 는 미확인.
+
 > [!summary] A00060_jointTool_V03 — **Orient / Rotate 가 둘 다 값이 있는 조인트의 회전을 바꾸지 않음** (v03.14->03.15) `#A00060_jointTool_V03`
 - 요청: `rotate to joint orient` 를 누르면 rotate 와 jointOrient 가 둘 다 값이 있는 조인트가 보이는 회전이 달라진다 → 전후 변화 없게.
 - 원인: 오일러 각을 축별로 더함(옛 MEL 포팅). 수정: `R x JO` 행렬 합성 → 남는 쪽 순서로 분해, 옛 합에 가장 가까운 등가 해

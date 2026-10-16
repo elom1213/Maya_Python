@@ -65,5 +65,10 @@
 #                           with Mirror on/off and on referenced targets (CV matching path,
 #                           which used to leave the old width; saved as a reference edit).
 
-VERSION = "01.26"
+# 01.27  Create > Controls  - shape list **filter** (shared `JUN_mod_filter_qt`): type part of
+#                           a shape name to narrow the 34 shapes (space-separated words = AND,
+#                           `Number: shown / total`). If the current shape gets hidden the
+#                           first visible one becomes current, so a hidden shape is never built.
+
+VERSION = "01.27"
 LAST_UPDATE = "2026-10-16"

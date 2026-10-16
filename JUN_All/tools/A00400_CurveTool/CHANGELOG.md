@@ -1,5 +1,13 @@
 # Changelog — A00400_CurveTool
 
+## v01.27 (2026-10-16)
+**[Feature] `Create > Controls` — 셰이프 목록 필터.**
+
+- 셰이프 목록 위에 공용 `Filter` 위젯(`JUN_mod_filter_qt_v01`)을 붙였다. 이름 일부를 치면 34종 중 맞는 것만
+  남는다(대소문자 무시, 공백으로 나눈 단어는 AND). 옆에 `Number: 보이는 수 / 전체`.
+- 지금 고른 셰이프가 필터에 가려지면 **보이는 첫 셰이프가 현재 셰이프**가 된다 — Qt 는 숨은 항목을 current 로
+  남겨 두므로, 그대로면 화면에 없는 셰이프로 컨트롤이 만들어진다. 하나도 안 맞으면 만들기는 경고만.
+
 ## v01.24 (2026-09-22)
 **[Change] `Create > Controls` 의 `Thickness` 칸 삭제 — 선 굵기는 `Display > Shape Edit` 하나로.**
 

@@ -2,7 +2,7 @@
 title: A00400_CurveTool 사용법
 aliases: [Curve Tool, CurveTool, A00400]
 tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve, lineWidth, wrap, blendShape, editPoint, laplacian, smoothCurve, softSelect, joint, skinCluster, controller, shape-transform]
-updated: 2026-09-22
+updated: 2026-10-16
 ---
 
 # A00400_CurveTool 사용법
@@ -515,6 +515,7 @@ bsCon.bsControlsUI()
 | 칸 | 뜻 |
 |----|-----|
 | **Name** | 비우면 `<오브젝트>_ANIM`. **한 단어**면 오브젝트 이름의 흔한 접미사(`_jnt` `_loc` `_grp` …)를 그 단어로 바꾼다(`spine_jnt` + `ctl` → `spine_ctl`). **`_` 가 들어 있으면** 그 이름을 그대로 쓴다(공백은 `_`) |
+| **Filter** (v01.27~) | 셰이프 이름 일부로 목록을 좁힌다(`arrow` → 화살표 15종). 대소문자 무시, 공백으로 나눈 단어는 모두 맞아야 한다(`circle arrow`). 옆 `Number: 보이는 수 / 전체`. 고른 셰이프가 가려지면 **보이는 첫 셰이프**로 바뀐다 — 숨은 셰이프로 만들어지는 일은 없다 |
 | **셰이프 목록** | 34종. **더블클릭하면 원점에** 하나 만든다 |
 
 > **선 굵기 칸은 v01.24 에 없앴다** — `nurbsCurve.lineWidth` 는
