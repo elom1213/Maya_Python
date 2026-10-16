@@ -59,5 +59,12 @@
 #                           still one undo step) - the same path Display > Replace uses since
 #                           v01.22. Local curves keep the fast `curve -replace` write.
 
-VERSION = "01.25"
-LAST_UPDATE = "2026-10-12"
+# 01.26  Display > Replace  - the replaced control **keeps its own line width**
+#                           (`nurbsCurve.lineWidth`). Local targets get a copy of the
+#                           replacement's shape, so the replacement's width used to come
+#                           along - a control thickened in Shape Edit went thin again.
+#                           The old width is read before the old shape is deleted and
+#                           written onto the new shape. Referenced targets already kept it.
+
+VERSION = "01.26"
+LAST_UPDATE = "2026-10-16"

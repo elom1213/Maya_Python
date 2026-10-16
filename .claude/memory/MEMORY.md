@@ -10,6 +10,7 @@
 - [Push target Dnable/dev](push-target-dnable-dev.md) — push 대상은 Dnable_repo 의 dev
 - [No history rewrite / master on request](no-history-rewrite-master-on-request.md) — 재작성 금지, master 최신화는 그 턴 요청 시만
 - [Push includes tool guide docs](push-includes-tool-guide-docs.md) — 툴 push 에 docs 가이드 · version · WORKLOG 함께
+- [Push refreshes README date](push-refresh-readme-date.md) — 푸시 때 루트 README 의 `최근 갱신` 날짜 진단 · 최신화해 함께 담기
 - [WORKLOG maintenance](worklog-maintenance.md) — 최신이 위, 날짜 헤딩 중복 금지, 월 롤링
 - [Docs go in JUN_All/docs](docs-go-in-jun-all-docs.md) — 툴 안내 = docs/, 계획 = docs/plans/, 학습 = JUN_Study
 - [A00500_reloader](wip-a00500-reloader.md) — dev 리로더는 `dev/A00500_reloader` 셸프 툴, `dev/reloader_v02` 는 재노출(launch.py 들이 쓴다) · 전부 리로드는 다른 툴 창을 닫을 수 있다

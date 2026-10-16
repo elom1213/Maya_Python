@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-10-13
+updated: 2026-10-16
 ---
 
 # 작업 일지 (WORKLOG)
@@ -30,7 +30,16 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-10-13 (오늘)
+## 2026-10-16 (오늘)
+
+> [!summary] A00400_CurveTool — **Display > Replace 후에도 대상의 선 굵기 유지** (v01.25->01.26) `#A00400_CurveTool`
+- 요청: Shape Edit 으로 굵게 한 커브가 Replace 로 모양을 바꾸면 원래 굵기(얇게)로 돌아간다 → 교체 전 굵기를 유지.
+- 원인: 로컬 대상의 `replace_shape` 는 옛 셰이프를 지우고 **교체본 셰이프의 복제본**을 붙이므로 `nurbsCurve.lineWidth` 도 교체본 값이 따라왔다.
+  레퍼런스 대상(CV 매칭)은 셰이프를 그대로 두므로 영향 없음.
+- 수정: `control_manager._line_widths` / `_restore_line_widths` — 옛 셰이프를 지우기 전에 굵기를 읽어 새 셰이프에 쓴다(같은 순번, 모자라면 첫 값).
+- 검증(mayapy 2024): 굵기 4.5 인 원 → 기본 굵기(-1) 직선 커브로 교체, Mirror 끔/켬 둘 다 결과 4.5 · undo 정상.
+
+## 2026-10-13
 
 > [!summary] A00480_FileTool — **Import 탭을 하위 탭 CSV / FBX 로, CSV = A00200_CSV_tool(ARKit Facial Import) 이식** (v01.09->01.10) `#A00480_FileTool`
 - 요청: A00200 을 A00480 으로 전부 이식, UI 전부 영어, 블렌드셰이프뿐 아니라 ARKit 52 어트리뷰트를 가진 노드에도 키 임포트, Import 하위 탭 CSV · FBX.

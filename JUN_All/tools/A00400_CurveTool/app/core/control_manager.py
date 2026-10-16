@@ -454,6 +454,44 @@ def match_cv_positions(target, replacement, mirror=False):
     return len(plans), None
 
 
+# --------------------------------------------------------------- 선 굵기 유지 (v01.26)
+#
+# 로컬 대상의 셰이프 교체는 "기존 셰이프 삭제 -> 교체본 셰이프 복제본을 붙이기" 라서
+# `nurbsCurve.lineWidth` 도 **교체본의 값**이 따라온다. Shape Edit 탭에서 굵게 해 둔
+# 컨트롤이 Replace 한 번에 얇아지던 원인이다. 굵기는 모양이 아니라 그 컨트롤의 표시
+# 설정이므로, 지우기 전에 읽어 두었다가 새 셰이프에 다시 쓴다.
+# (레퍼런스 대상은 셰이프를 그대로 두고 CV 만 옮기므로 원래 유지된다.)
+
+def _line_widths(shapes):
+    """셰이프마다의 lineWidth. 커브가 아니거나 속성이 없으면 None."""
+    widths = []
+    for shape in shapes:
+        try:
+            if (cmds.objectType(shape, isAType="nurbsCurve")
+                    and cmds.attributeQuery("lineWidth", node=shape, exists=True)):
+                widths.append(cmds.getAttr(shape + ".lineWidth"))
+                continue
+        except Exception:                                   # noqa: BLE001
+            pass
+        widths.append(None)
+    return widths
+
+
+def _restore_line_widths(shapes, widths):
+    """새 셰이프에 옛 굵기를 쓴다. 같은 순번의 값, 없으면 첫 값을 쓴다."""
+    known = [w for w in widths if w is not None]
+    if not known:
+        return
+    for index, shape in enumerate(shapes):
+        width = widths[index] if index < len(widths) and widths[index] is not None else known[0]
+        try:
+            if (cmds.objectType(shape, isAType="nurbsCurve")
+                    and cmds.attributeQuery("lineWidth", node=shape, exists=True)):
+                cmds.setAttr(shape + ".lineWidth", width)
+        except Exception:                                   # noqa: BLE001
+            pass
+
+
 def replace_shape(target, replacement, mirror=False):
     """`target` 의 커브 셰이프를 `replacement` 의 모양으로 바꾼다(트랜스폼은 그대로).
 
@@ -487,6 +525,8 @@ def replace_shape(target, replacement, mirror=False):
 
     new_shapes = cmds.listRelatives(duplicate, shapes=True, fullPath=True) or []
     old_shapes = cmds.listRelatives(target, shapes=True, fullPath=True) or []
+    # 교체 전 굵기를 새 셰이프로 옮긴다(v01.26) - 교체본의 굵기가 따라오지 않게.
+    _restore_line_widths(new_shapes, _line_widths(old_shapes))
     if old_shapes:
         cmds.delete(old_shapes)
 
