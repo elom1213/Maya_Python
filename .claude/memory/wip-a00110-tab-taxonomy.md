@@ -94,3 +94,4 @@ Manipulator Space(버튼 + Tab 핫키로 Move/Rotate/Scale 공간 Object <-> Wor
 예외 카테고리다 — 기준이 **툴이 열린 동안 거는 단축키**. `HotkeyManager` 는 키마다 인스턴스(`hold()` / `manip_space()`).
 manip mode 번호가 툴마다 다르다(Rotate World = 1, Move/Scale World = 2). standalone 에는 툴 컨텍스트·핫키 세트가 없어
 **GUI 에서만 확인 가능** — 아직 미확인. 사용자의 "Tap 버튼" 은 키보드 Tab 키로 읽고, UI 토글 버튼도 함께 뒀다.
+**v02.20** — Tab 이 안 먹던 것 수정: 뷰포트 Tab 은 MTK 가 가로챈다 → [[maya-viewport-tab-is-mtk]]. Tab 경로는 `TabKeyManager`.

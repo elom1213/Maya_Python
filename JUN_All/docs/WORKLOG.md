@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-16 (오늘)
 
+> [!summary] A00110_animTool_V02 — **Tab 이 매니퓰레이터 공간 토글 대신 페인트 선택을 하던 것 수정** (v02.19->02.20) `#A00110_animTool_V02`
+- 보고: `Tab : ON` 상태로 Tab 을 누르면 스크립트 에디터에 `dR_paintPress; selectPref -paintSelect 1 ...` 만 찍히고 토글이 안 된다.
+- 원인: 뷰포트 Tab 은 핫키가 아니라 Modeling Toolkit 이 가로채 `nexOpt mayaTabPressCmd / mayaTabReleaseCmd` 를 실행한다(`modelingToolkit.mll` 문자열에서 확인) → `hotkey -keyShortcut Tab` 은 한 번도 불리지 않았다.
+- 수정: `TabKeyManager` — 그 nexOpt 넷(use 플래그 + 명령)을 툴 명령(`run_tab_press` / `run_tab_release`)으로 바꿔 끼우고 끄거나 닫을 때 복원. 키 자동 반복은 한 번만 토글, 크래시로 남은 값은 MTK 기본으로 복원, MTK 미로드면 예전 핫키.
+- 검증(mayapy 2024): `nexOpt` 는 GUI 전용 명령이라 가짜 저장소로 — 설치 · 실제 MEL 로 press/repeat/release 실행(토글 2회) · 복원 · 잔존값 복구 · 폴백. **마야 GUI 에서 Tab 실제 동작은 미확인**.
+
 > [!summary] A00110_animTool_V02 — **최상위 Hot Key 탭 신설: Main = Hold 이식 + Tab 으로 매니퓰레이터 공간 Object/World 토글** (v02.18->02.19) `#A00110_animTool_V02`
 - 요청: Hold 탭을 없애고 최상위 `Hot Key` > 하위 `Main` 으로 이식, Tap(Tab) 으로 매니퓰레이터 공간 Object / World 토글.
 - `Timing > Hold` 삭제 → `Hot Key > Main` 에 Hold 그룹(버튼 + Shift+A) + Manipulator Space 그룹(토글 버튼 + `Tab hotkey`, 기본 켬).

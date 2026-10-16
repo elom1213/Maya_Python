@@ -1619,6 +1619,12 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   기준은 **지금 쓰는 툴**의 공간 — World 면 **Object** 로, 그 밖(Object · Gimbal · Parent …)이면 **World** 로.
   결과 공간은 **세 툴 모두에** 맞춘다(툴을 바꿔도 같은 공간). Move / Rotate / Scale 이 아닌 툴(선택 툴 등)에서는 Move 기준.
 - **Tab hotkey** 체크박스(기본 켬): 켜면 `Tab` 이 같은 토글을 한다. 결과는 뷰포트 상단 메시지로 뜬다.
+  누르고 있어도(키 자동 반복) **한 번 누름 = 한 번 토글**.
+- **뷰포트의 Tab 은 마야 핫키가 아니다**(v02.20) — Modeling Toolkit 이 선택 · Move · Rotate · Scale 툴에서 Tab 을 먼저
+  가로채 `nexOpt` 의 `mayaTabPressCmd` / `mayaTabReleaseCmd`(기본 `dR_paintPress` / `dR_paintRelease` = 페인트 선택)를
+  실행한다. 그래서 툴은 핫키 대신 **이 두 명령을 잠시 바꿔 끼우고**, 체크를 끄거나 창을 닫으면 원래 값으로 되돌린다
+  (`nexOpt -e` 는 메모리 값이라 마야가 죽어도 다음 세션은 원래 Tab). Modeling Toolkit 이 로드되지 않았으면 일반 핫키로 건다.
+  툴이 켜져 있는 동안 **Tab 페인트 선택은 쓸 수 없다** — 필요하면 체크를 끈다.
 - 마야 mode 값: Move / Scale 은 Object `0` · World `2`, **Rotate 는 Object `0` · World `1`**(`2` 는 Gimbal) — 번호가 다르다.
 
 ---
