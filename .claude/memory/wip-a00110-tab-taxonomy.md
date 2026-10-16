@@ -24,7 +24,7 @@ metadata:
 | 카테고리 | 무엇이 바뀌나 | 기능 |
 |---|---|---|
 | **Key** | 키의 존재 | Pose Key · Fill Keys(+from Selection) · Delete All |
-| **Timing** | 키의 시점 | Move · Hold · Offset · Stagger |
+| **Timing** | 키의 시점 | Move · Offset · Stagger (Hold 는 v02.19 에 Hot Key 로) |
 | **Curve** | 커브의 값·형태 | Euler · **Filters**(Smooth·Intensity·Interp 한 화면, v02.01) |
 | **Transfer** | 오브젝트 간 이동 | Copy Key · Mirror Key · Follow |
 | **Bake** | 키로 굽기 | Bake |
@@ -88,3 +88,9 @@ json 으로 스냅샷 → 재분류 후 다시 떠서 **diff**. 109/110 보존(�
 ② **고른 키가 없으면 실행하지 않는다**(전 구간을 조용히 건드리는 쪽이 위험). 새 기능에도 이대로 적용.
 - 쿼터니언 되돌리기는 **원래 값에 가장 가까운 해**를 골라 ±360 점프를 없앤다. 축별 키 시간이
   다르면 그 오브젝트만 채널별 폴백.
+
+**v02.19 (2026-10-16, 사용자 요청) 최상위 `Hot Key` 탭** — 하위 `Main` = Hold(옛 Timing > Hold, Shift+A) +
+Manipulator Space(버튼 + Tab 핫키로 Move/Rotate/Scale 공간 Object <-> World). "사용자가 무엇을 바꾸려 하는가" 분류의
+예외 카테고리다 — 기준이 **툴이 열린 동안 거는 단축키**. `HotkeyManager` 는 키마다 인스턴스(`hold()` / `manip_space()`).
+manip mode 번호가 툴마다 다르다(Rotate World = 1, Move/Scale World = 2). standalone 에는 툴 컨텍스트·핫키 세트가 없어
+**GUI 에서만 확인 가능** — 아직 미확인. 사용자의 "Tap 버튼" 은 키보드 Tab 키로 읽고, UI 토글 버튼도 함께 뒀다.

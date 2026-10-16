@@ -19,8 +19,7 @@
    **리스트업한 오브젝트의 모든 키프레임을 일괄 삭제**.
 2. **Timing** — 키의 **시점**을 다룬다(값은 그대로 두고 언제 일어나는지를 바꾼다).
    **Move**: 키를 시간 범위로 **이동(앞/뒤 offset)·삭제**. Start / End 를 비우면 **그래프 에디터에서 고른 키만**
-   이동(v02.17~). **Hold**: 그래프 에디터에서 선택한
-   키 구간을 **평평하게 유지**(`Shift+A` 핫키 호출 가능). **Offset**(Offset & Hold, v01.13~):
+   이동(v02.17~). (옛 **Hold** 는 v02.19 에 **Hot Key > Main** 으로 옮겼다.) **Offset**(Offset & Hold, v01.13~):
    **리스트업한 컨트롤러**의 키를 **포즈 유지(hold) + 보간(offset)** 구조로 재배치.
    **Stagger**(Stagger Offset, v01.31~): 구간 키를 **리스트 순서 × Offset** 만큼 **계단식으로 밀어**
    팔로우스루·웨이브를 만든다(**슬라이더 + 스핀박스** 실시간 조절, 조작이 멎으면 자동 기록되어
@@ -79,6 +78,9 @@
    다 보여주는 대신, **현재 프레임 기준 ± margin 프레임**만 그래프 에디터에 확대해서 보여준다
    (예: 현재 500f, margin 80 → `420f~580f`). **Auto-Focus 토글**을 켜면 **컨트롤러(오브젝트)를
    새로 선택할 때만** 자동으로 프레이밍하고(v01.30~), margin 값은 **스핀박스로 사용자가 지정**한다.
+8. **Hot Key** (v02.19~) — 툴이 **열려 있는 동안만** 거는 키보드 단축키. 창을 닫으면 원래 바인딩으로 돌아간다.
+   **Main**: **Hold**(옛 Timing > Hold — 그래프 에디터에서 고른 키 구간을 평평하게, `Shift+A`) +
+   **Manipulator Space**(`Tab` 또는 버튼으로 Move / Rotate / Scale 매니퓰레이터 공간을 **Object ↔ World** 토글).
 
 하위 탭이나 상위 탭을 바꾸면 **창 크기가 지금 보이는 페이지에 맞춰 자동 조정**된다.
 
@@ -655,7 +657,8 @@ A00110_animTool_V02/
     │                             # (좌/우 토큰 쌍은 Framework/rules/mirror_tokens.json 으로 이전)
     ├── core/              # 로직 (UI 비의존, maya.cmds)
     │   ├── keyframe_manager.py   # 키 이동 / 구간삭제 / 전체삭제 / Hold (Timing · Key 탭)
-    │   ├── hotkey_manager.py     # Shift+A 핫키 설치 / 복원 → Hold 호출
+    │   ├── hotkey_manager.py     # 툴 전용 핫키 설치 / 복원 (Shift+A → Hold, Tab → 공간 토글)
+    │   ├── manip_space_manager.py # 매니퓰레이터 공간 Object ↔ World 토글 (Hot Key > Main)
     │   ├── pose_key_manager.py   # 현재 프레임 6축 pose 키 (Pose Key 탭)
     │   ├── copykey_manager.py    # Base→Target 키 복사 + 축 Reverse (Copy Key 탭)
     │   ├── layer_key_manager.py  # 애님 레이어 사이 키 복사 / 잘라내기 (Transfer > Layer)
@@ -716,11 +719,12 @@ A00110_animTool_V02.run(True)   # True = reload
 | 상위 탭 | 무엇을 바꾸나 | 하위 탭 (기능) |
 |---------|--------------|----------------|
 | **Key** | 키의 **존재** | Pose Key · Fill Keys · Delete All |
-| **Timing** | 키의 **시점** | Move · Hold · Offset · Stagger |
+| **Timing** | 키의 **시점** | Move · Offset · Stagger |
 | **Curve** | 커브의 **값·형태** | Euler · Filters(Smooth · Intensity · Interp) |
 | **Transfer** | **다른 오브젝트로** 옮기기 | Copy Key · Mirror Key · Follow |
 | **Bake** | 결과를 **키로 굽기** | Bake |
 | **View** | **보기**(씬 불변) | Graph Focus |
+| **Hot Key** (v02.19~) | 툴이 열린 동안의 **단축키** | Main(Hold · Manipulator Space) |
 
 - **Help > About**: 작성자·업데이트 날짜 팝업.
 - 하단 **로그창**과 저작권 라벨은 **모든 탭이 공유**한다(모든 결과/경고가 여기 출력).
@@ -734,7 +738,7 @@ A00110_animTool_V02.run(True)   # True = reload
 | Key Edit > Fill Keys | **Key > Fill Keys** |
 | Key Edit > Delete All | **Key > Delete All** |
 | Key Edit > Move Keys | **Timing > Move** |
-| Key Edit > **Graph** | **Timing > Hold** (라벨 변경 — 하는 일이 Hold 이고 `Graph Focus` 와 헷갈렸다) |
+| Key Edit > **Graph** | **Timing > Hold** (라벨 변경 — 하는 일이 Hold 이고 `Graph Focus` 와 헷갈렸다) → v02.19 에 **Hot Key > Main** |
 | Key Edit > Offset & Hold | **Timing > Offset** |
 | Key Edit > Stagger | **Timing > Stagger** |
 | Key Edit > Euler | **Curve > Euler** |
@@ -904,12 +908,7 @@ Fill Keys: 18 key(s) added, 2 frame(s) already keyed (left alone)  [1-10f, 1 cha
 - **채널 스코프**: 채널박스(`mainChannelBox`)에서 **어트리뷰트를 선택해 두면 그 채널만**,
   선택이 없으면 **오브젝트의 모든 애니메이션 커브**가 대상이 된다(이동/삭제 공통).
 
-#### Hold — 그래프 에디터에서 고른 키 구간 Hold
-
-- **Hold Selected Range**: 그래프 에디터에서 **선택한 키들**을 커브별로, 선택 구간의 시작 값으로
-  **평평하게(flat) 유지**한다(아래 7장 규칙 참고).
-- **Shift+A hotkey** 체크박스: 켜면 Shift+A 를 Hold 에 바인딩, 끄면 원래 바인딩으로 복원.
-  옆 라벨에 `Shift+A : ON / OFF / unavailable` 상태를 표시한다.
+> **Hold 는 v02.19 에 [Hot Key > Main](#59-hot-key-탭--툴이-열린-동안의-단축키-v0219) 으로 옮겼다.**
 
 #### Offset — Offset & Hold (v01.13~)
 
@@ -1601,6 +1600,27 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 > 프레이밍한 **오브젝트 선택 목록**(`cmds.ls(sl=True, long=True)`)을 캐시해두고, 목록이 실제로
 > 달라졌을 때만 프레이밍한다 — 키 선택/해제·undo 로 온 `SelectionChanged` 는 목록이 그대로라 무시된다.
 
+### 5.9 Hot Key 탭 — 툴이 열린 동안의 단축키 (v02.19~)
+
+단축키는 **현재 핫키 세트에만(메모리)** 걸고 `.mhk` 파일은 건드리지 않는다. 걸기 전 바인딩을 저장해 두었다가
+체크를 끄거나 **창을 닫으면 그대로 복원**한다. 활성 세트가 잠겨 있으면(Maya Default) 라벨이 `unavailable` 이 되고
+버튼은 그대로 쓸 수 있다 — 단축키를 쓰려면 사용자 핫키 세트로 바꾼다.
+
+#### Main > Hold (옛 Timing > Hold)
+
+- **Hold Selected Range**: 그래프 에디터에서 **선택한 키들**을 커브별로, 선택 구간의 시작 값으로
+  **평평하게(flat) 유지**한다(아래 7장 규칙 참고).
+- **Shift+A hotkey** 체크박스(기본 켬): 켜면 Shift+A 를 Hold 에 바인딩, 끄면 원래 바인딩으로 복원.
+  옆 라벨에 `Shift+A : ON / OFF / unavailable` 상태를 표시한다.
+
+#### Main > Manipulator Space
+
+- **Toggle Manipulator Space (Object / World)**: Move / Rotate / Scale 매니퓰레이터의 공간을 토글한다.
+  기준은 **지금 쓰는 툴**의 공간 — World 면 **Object** 로, 그 밖(Object · Gimbal · Parent …)이면 **World** 로.
+  결과 공간은 **세 툴 모두에** 맞춘다(툴을 바꿔도 같은 공간). Move / Rotate / Scale 이 아닌 툴(선택 툴 등)에서는 Move 기준.
+- **Tab hotkey** 체크박스(기본 켬): 켜면 `Tab` 이 같은 토글을 한다. 결과는 뷰포트 상단 메시지로 뜬다.
+- 마야 mode 값: Move / Scale 은 Object `0` · World `2`, **Rotate 는 Object `0` · World `1`**(`2` 는 Gimbal) — 번호가 다르다.
+
 ---
 
 ## 6. 사용 순서
@@ -1613,7 +1633,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 선택한 키만 옮기려면(v02.17~): 그래프 에디터에서 키를 선택 → **Start / End 를 비우고** Offset 만 입력 →
 **◀ Earlier (-)** / **Later (+) ▶**.
 
-### Timing > Hold
+### Hot Key > Main — Hold
 1. 그래프 에디터에서 평평하게 만들 **키 구간을 선택**(커브마다 2개 이상).
 2. **Hold Selected Range** 클릭(또는 Shift+A) → 각 커브가 시작 값으로 평평하게 유지된다.
 
@@ -2045,7 +2065,7 @@ Euler filter: 3 object(s), 27 key(s) changed in [20-40f].  Anchored to the key b
 ### 경고 메시지
 - `No objects selected.` — (Timing > Move / Key > Pose Key) 선택된 오브젝트 없음.
 - `Offset is 0.` — (Timing > Move) Offset 이 0.
-- `No keys selected in Graph Editor.` — (Timing > Hold / Timing > Move 의 선택 키 모드) 그래프 에디터에 선택된 키 없음.
+- `No keys selected in Graph Editor.` — (Hot Key > Main 의 Hold / Timing > Move 의 선택 키 모드) 그래프 에디터에 선택된 키 없음.
 - `[WARN] ... curve(s) not moved - a key already exists at the destination: <curves>` — (Timing > Move 선택 키 모드) 도착 프레임에 키가 있어 건너뛴 커브.
 - `Shift+A not bound: active hotkey set is locked. ...` — 핫키 세트가 잠김(커스텀 세트로 전환 필요).
 - `No axis checked.` / `[Warning] <attr> is checked but empty.` — (Key > Pose Key) 축 미체크 / 값 비어 있음.

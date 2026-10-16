@@ -32,6 +32,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-16 (오늘)
 
+> [!summary] A00110_animTool_V02 — **최상위 Hot Key 탭 신설: Main = Hold 이식 + Tab 으로 매니퓰레이터 공간 Object/World 토글** (v02.18->02.19) `#A00110_animTool_V02`
+- 요청: Hold 탭을 없애고 최상위 `Hot Key` > 하위 `Main` 으로 이식, Tap(Tab) 으로 매니퓰레이터 공간 Object / World 토글.
+- `Timing > Hold` 삭제 → `Hot Key > Main` 에 Hold 그룹(버튼 + Shift+A) + Manipulator Space 그룹(토글 버튼 + `Tab hotkey`, 기본 켬).
+- `HotkeyManager` 를 키마다 인스턴스로 일반화(`hold()` / `manip_space()`), 창 닫을 때 둘 다 원래 바인딩 복원. 새 `manip_space_manager.ManipSpaceManager.toggle()` —
+  현재 툴 공간이 World 면 Object, 아니면 World 로 Move / Rotate / Scale 세 컨텍스트를 함께 맞춘다(Rotate 의 World 는 mode 1, Move / Scale 은 2).
+- 검증(mayapy 2024, offscreen UI): 탭 구성(Timing = Move / Offset / Stagger, Hot Key = Main), 가짜 컨텍스트로 토글 4경우, 가짜 `cmds.hotkey` 로 Tab / Shift+A 설치 · 복원.
+  standalone 에는 툴 컨텍스트 · 핫키 세트가 없어 **실제 공간 전환과 Tab 바인딩은 마야 GUI 미확인**.
+
 > [!summary] A00400_CurveTool — **Create > Controls 셰이프 목록에 Filter** (v01.26->01.27) `#A00400_CurveTool`
 - 요청: Controls 에서 필터로 원하는 컨트롤러를 검색.
 - 공용 `JUN_mod_filter_qt_v01` 을 셰이프 목록(QListWidget)에 붙임 + `Number: N / 34`. 현재 셰이프가 가려지면 보이는 첫 셰이프로 옮기고,

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-23
+# last Update date : 2026-10-16
 # A00110_animTool_V02 - Qt UI
 
 from Framework.qt.qt import *
@@ -21,6 +21,7 @@ import maya.cmds as cmds
 from tools.A00110_animTool_V02.app.config.version import VERSION, LAST_UPDATE
 from tools.A00110_animTool_V02.app.core import KeyframeManager
 from tools.A00110_animTool_V02.app.core import HotkeyManager
+from tools.A00110_animTool_V02.app.core import ManipSpaceManager
 from tools.A00110_animTool_V02.app.core import PoseKeyManager
 from tools.A00110_animTool_V02.app.core import CopyKeyManager
 from tools.A00110_animTool_V02.app.core import MirrorKeyManager
@@ -133,11 +134,16 @@ class MainWindow(QWidget):
         self._stagger_settle_timer.setInterval(STAGGER_SETTLE_MS)
         self._stagger_settle_timer.timeout.connect(self._stagger_settle)
 
+        # 툴 실행 중 핫키 바인딩 (창 종료 시 closeEvent 에서 복원). Hot Key > Main 탭.
+        #   Shift+A -> Hold Selected Range,  Tab -> 매니퓰레이터 공간 Object <-> World
+        # build_ui 보다 먼저 만든다 - 체크박스 시그널이 이 값을 참조한다.
+        self.hotkey_mgr = HotkeyManager.hold()
+        self.space_hotkey_mgr = HotkeyManager.manip_space()
+
         self.build_ui()
 
-        # 툴 실행 중 Shift+A 핫키 바인딩 (창 종료 시 closeEvent 에서 복원)
-        self.hotkey_mgr = HotkeyManager()
         self._enable_hotkey(self.cb_hotkey.isChecked())
+        self._enable_space_hotkey(self.cb_space_hotkey.isChecked())
 
         # 선택 시 그래프 에디터 자동 프레이밍 (기본 OFF, 창 종료 시 scriptJob 정리)
         self.graph_focus_mgr = GraphFocusManager()
@@ -306,8 +312,6 @@ class MainWindow(QWidget):
         ("Move", "Move Keys - shift the keys in a frame range (or, with "
          "Start / End empty, the keys selected in the Graph Editor), or "
          "delete that range", "_build_move_keys_page"),
-        ("Hold", "Hold - hold the key range selected in the Graph Editor "
-         "(+ Shift+A hotkey)", "_build_graph_editor_page"),
         ("Offset", "Offset & Hold - rebuild the listed controllers' keys "
          "as a hold + offset structure", "_build_offset_hold_page"),
         ("Stagger", "Stagger Offset - shift each listed controller by "
@@ -356,6 +360,13 @@ class MainWindow(QWidget):
          "_build_graph_focus_tab"),
     )
 
+    # v02.19 - 툴이 열려 있는 동안 거는 **키보드 단축키**를 모은다. Timing > Hold 를 여기로 옮겼다
+    # (Hold 는 버튼보다 Shift+A 로 쓰는 기능이고, 같은 성격의 Tab 토글이 생겨서).
+    HOTKEY_PAGES = (
+        ("Main", "Main - Shift+A holds the Graph Editor key range, Tab toggles "
+         "the manipulator space Object / World", "_build_hotkey_main_page"),
+    )
+
     # (상위 탭 라벨, 툴팁, 하위 페이지 표, 하위 QTabWidget 을 담을 속성 이름)
     CATEGORIES = (
         ("Key", "Key - create and delete keys", KEY_PAGES, "key_tabs"),
@@ -370,6 +381,8 @@ class MainWindow(QWidget):
         ("Bake", "Bake - bake the result down to keys", BAKE_PAGES, "bake_tabs"),
         ("View", "View - viewing helpers; these change nothing in the scene",
          VIEW_PAGES, "view_tabs"),
+        ("Hot Key", "Hot Key - keyboard shortcuts bound while this tool is open "
+         "(restored when it closes)", HOTKEY_PAGES, "hotkey_tabs"),
     )
 
     def _build_category_tab(self, pages, attr):
@@ -570,26 +583,67 @@ class MainWindow(QWidget):
         layout.addStretch(1)
         return page
 
-    # ---------------- Timing > Hold ----------------
+    # ---------------- Hot Key > Main ----------------
 
-    def _build_graph_editor_page(self):
-        """그래프 에디터에서 선택한 키 구간 Hold (Timing > Hold)."""
+    def _build_hotkey_main_page(self):
+        """툴이 열려 있는 동안 거는 단축키 (Hot Key > Main).
+
+        v02.19 - 옛 Timing > Hold 를 그대로 옮기고(Hold), 매니퓰레이터 공간 토글(Tab)을 더했다.
+        단축키는 체크박스로 켜고 끄며, 창을 닫으면 원래 바인딩으로 돌아간다.
+        """
         page, layout = self._sub_page()
 
-        self.btn_hold = QPushButton("Hold Selected Range")
-        layout.addWidget(self.btn_hold)
+        # ---- Hold (옛 Timing > Hold) ----
+        hold_box = QGroupBox("Hold")
+        hold_layout = QVBoxLayout(hold_box)
 
+        self.btn_hold = QPushButton("Hold Selected Range")
+        self.btn_hold.setToolTip(
+            "Hold the keys selected in the Graph Editor flat at the value of the\n"
+            "first selected key, curve by curve.")
+        hold_layout.addWidget(self.btn_hold)
+
+        hold_row = QHBoxLayout()
         self.cb_hotkey = QCheckBox("Shift+A hotkey")
         self.cb_hotkey.setChecked(True)
-        layout.addWidget(self.cb_hotkey)
-
+        self.cb_hotkey.setToolTip(
+            "While this tool is open, Shift+A runs Hold Selected Range.\n"
+            "The previous Shift+A binding comes back when it closes.")
+        hold_row.addWidget(self.cb_hotkey)
         self.lbl_hotkey = QLabel("")
-        layout.addWidget(self.lbl_hotkey)
+        hold_row.addWidget(self.lbl_hotkey, 1)
+        hold_layout.addLayout(hold_row)
+        layout.addWidget(hold_box)
+
+        # ---- Manipulator Space (v02.19) ----
+        space_box = QGroupBox("Manipulator Space")
+        space_layout = QVBoxLayout(space_box)
+
+        self.btn_toggle_space = QPushButton("Toggle Manipulator Space (Object / World)")
+        self.btn_toggle_space.setToolTip(
+            "Switch the Move / Rotate / Scale manipulators between Object and World.\n"
+            "Based on the current tool: World -> Object, anything else -> World.\n"
+            "All three tools are set to the same space.")
+        space_layout.addWidget(self.btn_toggle_space)
+
+        space_row = QHBoxLayout()
+        self.cb_space_hotkey = QCheckBox("Tab hotkey")
+        self.cb_space_hotkey.setChecked(True)
+        self.cb_space_hotkey.setToolTip(
+            "While this tool is open, Tab toggles the manipulator space.\n"
+            "The previous Tab binding comes back when it closes.")
+        space_row.addWidget(self.cb_space_hotkey)
+        self.lbl_space_hotkey = QLabel("")
+        space_row.addWidget(self.lbl_space_hotkey, 1)
+        space_layout.addLayout(space_row)
+        layout.addWidget(space_box)
 
         layout.addStretch(1)
 
         self.btn_hold.clicked.connect(self.on_hold)
         self.cb_hotkey.toggled.connect(self.on_toggle_hotkey)
+        self.btn_toggle_space.clicked.connect(self.on_toggle_space)
+        self.cb_space_hotkey.toggled.connect(self._enable_space_hotkey)
 
         return page
 
@@ -2614,6 +2668,11 @@ class MainWindow(QWidget):
         count, msg = KeyframeManager.hold_selected_keys()
         self.log(msg)
 
+    def on_toggle_space(self):
+
+        space, msg = ManipSpaceManager.toggle()
+        self.log(msg)
+
     def on_set_pose(self):
 
         # 체크된 축만 모은다. 체크됐는데 값이 비어 있으면 경고 후 중단.
@@ -4169,6 +4228,18 @@ class MainWindow(QWidget):
 
         self.log(msg)
 
+    def _enable_space_hotkey(self, on):
+        """체크 상태에 따라 Tab 핫키(매니퓰레이터 공간 토글)를 설치/복원."""
+        if on:
+            ok, msg = self.space_hotkey_mgr.install()
+            self.lbl_space_hotkey.setText("Tab : ON" if ok else "Tab : unavailable")
+        else:
+            self.space_hotkey_mgr.restore()
+            msg = "Tab hotkey disabled."
+            self.lbl_space_hotkey.setText("Tab : OFF")
+
+        self.log(msg)
+
     # --------------------------------------------------
     # Graph Focus (선택 시 그래프 에디터 자동 프레이밍)
     # --------------------------------------------------
@@ -4225,10 +4296,12 @@ class MainWindow(QWidget):
             self._fit_window_later()
 
     def closeEvent(self, event):
-        # 창이 닫힐 때 Shift+A 를 원래 바인딩으로 복원 + 그래프 포커스 scriptJob 정리
+        # 창이 닫힐 때 Shift+A / Tab 을 원래 바인딩으로 복원 + 그래프 포커스 scriptJob 정리
         try:
             if getattr(self, "hotkey_mgr", None):
                 self.hotkey_mgr.restore()
+            if getattr(self, "space_hotkey_mgr", None):
+                self.space_hotkey_mgr.restore()
             if getattr(self, "graph_focus_mgr", None):
                 self.graph_focus_mgr.uninstall()
             # 아직 기록되지 않은 Stagger 미리보기가 남아 있으면 마지막으로 기록해 둔다.
