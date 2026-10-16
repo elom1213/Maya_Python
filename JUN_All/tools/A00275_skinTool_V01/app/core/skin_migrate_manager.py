@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-24
+# last Update date : 2026-10-16
 # A00275_skinTool_V01 - 스킨 마이그레이션 핵심 로직 (maya.cmds / maya.api, UI 비의존)
 #
 # 토폴로지가 다른 두 리깅 메시 A, B 사이에서 다음 2단계를 버튼 한 번으로 처리한다.
@@ -20,6 +20,8 @@ import maya.cmds as cmds
 from Framework.core.maya_undo import undo_chunk
 from Framework.core import maya_shape
 from Framework.core import maya_skin
+
+from . import weight_transfer_manager as wt
 
 
 class SkinMigrateManager:
@@ -146,12 +148,16 @@ class SkinMigrateManager:
 
     @staticmethod
     def _move_joints_native(joints_from, joints_to):
-        """Native: 현재 선택 메시의 skinCluster 에서 From 본 컬럼을 To 본 컬럼으로 이동."""
-        sel = cmds.ls(sl=True, o=True, l=True) or []
-        mesh = next((SkinMigrateManager._as_mesh(s) for s in sel
-                     if SkinMigrateManager._as_mesh(s)), None)
-        if not mesh:
-            return (0, "[Warning] Select the skinned mesh in the scene first.")
+        """Native: 현재 선택 메시의 skinCluster 에서 From 본 컬럼을 To 본 컬럼으로 이동.
+
+        메시를 통째로 선택하면 전체 버텍스, **버텍스(컴포넌트)를 선택하면 그 버텍스만**
+        옮긴다(v01.36~). 소프트 셀렉션이 켜져 있으면 falloff 비율만큼만 옮긴다
+        (Transfer 탭과 같은 선택 파싱 - weight_transfer_manager.parse_target_selections).
+        """
+        targets = [t for t in wt.parse_target_selections() if wt._is_mesh(t[0])]
+        if not targets:
+            return (0, "[Warning] Select the skinned mesh (or its vertices) in the scene first.")
+        mesh, vtx_ids, soft = targets[0]
 
         sc = SkinMigrateManager._find_skincluster(mesh)
         if not sc:
@@ -170,14 +176,18 @@ class SkinMigrateManager:
                     if SkinMigrateManager._leaf(jt) not in existing:
                         cmds.skinCluster(sc, edit=True, addInfluence=jt, weight=0.0)
                         existing.add(SkinMigrateManager._leaf(jt))
-                moved = SkinMigrateManager._native_move_columns(
-                    sc, mesh, list(zip(joints_from, joints_to)))
+                moved, n_done = SkinMigrateManager._native_move_columns(
+                    sc, mesh, list(zip(joints_from, joints_to)),
+                    vtx_ids=vtx_ids, soft=soft)
         except Exception as exc:
             return (0, "[Error] {0}".format(exc))
 
-        return (1, "[classic/native] Moved {0} joint pair(s) on '{1}'. "
+        where = "all {0} vertices".format(n_done)
+        if vtx_ids:
+            where = "{0} selected vertices".format(n_done) + (" (soft)" if soft else "")
+        return (1, "[classic/native] Moved {0} joint pair(s) on '{1}', {2}. "
                    "(uses maya.api setWeights; undo is one step)".format(
-                       moved, SkinMigrateManager._leaf(mesh)))
+                       moved, SkinMigrateManager._leaf(mesh), where))
 
     @staticmethod
     def transfer_meshes(meshes_from, meshes_to, transfer_mode=2, engine="kangaroo"):
@@ -226,8 +236,23 @@ class SkinMigrateManager:
 
     @staticmethod
     def _transfer_meshes_native(meshes_from, meshes_to, transfer_mode):
-        """Native: 각 쌍을 rebind + copySkinWeights 로 전이."""
+        """Native: 각 쌍을 rebind + copySkinWeights 로 전이.
+
+        To 메시의 **버텍스를 선택**해 두면 부분 전이가 된다(v01.36~).
+          - 버텍스를 고른 To 메시 : 기존 skinCluster 를 두고 **선택 버텍스만** 바꾼다
+                                    (소프트 셀렉션이면 falloff 로 블렌드). 나머지 버텍스는 그대로.
+          - 통째로 선택한 To 메시 : 예전처럼 전체 전이.
+          - 선택하지 않은 To 메시 : 건너뛴다.
+        어느 To 메시에도 컴포넌트 선택이 없으면 선택과 무관하게 모든 쌍을 전체 전이(예전 동작).
+        """
+        partial = SkinMigrateManager._classic_partial_targets(meshes_to)
+        prev_sel = cmds.ls(sl=True, l=True) or []
+        surface_assoc = SkinMigrateManager._NATIVE_SURFACE_ASSOC.get(
+            transfer_mode, "closestPoint")
+
         done = 0
+        detail = []
+        skipped = []
         try:
             with undo_chunk():
                 for mesh_from, mesh_to in zip(meshes_from, meshes_to):
@@ -238,14 +263,62 @@ class SkinMigrateManager:
                     sc_from = SkinMigrateManager._find_skincluster(mesh_from)
                     if not sc_from:
                         return (0, "[Warning] '{0}' has no skinCluster.".format(mesh_from))
-                    SkinMigrateManager._native_transfer_mesh(
-                        mesh_from, mesh_to, transfer_mode)
+
+                    to_leaf = SkinMigrateManager._leaf(mesh_to)
+                    vtx_ids, soft = None, None
+                    if partial is not None:
+                        key = wt._mesh_transform(mesh_to)
+                        if key not in partial:
+                            skipped.append(to_leaf)
+                            continue
+                        vtx_ids, soft = partial[key]
+
+                    # 버텍스 선택이 있어도 지킬 skinCluster 가 없으면 전체 전이로 바인드한다.
+                    if vtx_ids and SkinMigrateManager._find_skincluster(mesh_to):
+                        inf_from = cmds.skinCluster(sc_from, q=True, influence=True) or []
+                        note = wt._transfer_one_native(
+                            [mesh_from], inf_from, mesh_to, vtx_ids, soft,
+                            surface_association=surface_assoc)
+                    else:
+                        SkinMigrateManager._native_transfer_mesh(
+                            mesh_from, mesh_to, transfer_mode)
+                        note = "whole"
+                        if vtx_ids:
+                            note += " (no skinCluster to keep)"
+                    detail.append("{0}({1})".format(to_leaf, note))
                     done += 1
+
+                # copySkinWeights 를 위해 바꾼 선택을 되돌린다(같은 버텍스로 다시 누를 수 있게).
+                existing = [s for s in prev_sel if cmds.objExists(s)]
+                if existing:
+                    cmds.select(existing, r=True)
         except Exception as exc:
             return (0, "[Error] {0} (after {1} mesh(es))".format(exc, done))
 
-        return (1, "[classic/native] Transferred {0} mesh pair(s) (mode={1}).".format(
-            done, SkinMigrateManager.TRANSFER_MODES[transfer_mode]))
+        msg = "[classic/native] Transferred {0} mesh pair(s) (mode={1}): {2}".format(
+            done, SkinMigrateManager.TRANSFER_MODES[transfer_mode], ", ".join(detail))
+        if skipped:
+            msg += "  Skipped (not selected): {0}".format(", ".join(skipped))
+        return (1 if done else 0, msg)
+
+    @staticmethod
+    def _classic_partial_targets(meshes_to):
+        """To 메시 기준 선택 파싱. {To 트랜스폼 풀패스: (vtx_ids or None, soft or None)}.
+
+        To 메시 중 어느 것에도 컴포넌트(버텍스) 선택이 없으면 None(= 전체 전이 모드).
+        """
+        to_keys = set()
+        for m in meshes_to:
+            if SkinMigrateManager._is_mesh(m):
+                to_keys.add(wt._mesh_transform(m))
+
+        picked = {}
+        for mesh, ids, soft in wt.parse_target_selections():
+            if mesh in to_keys:
+                picked[mesh] = (ids, soft)
+        if not any(ids for ids, _soft in picked.values()):
+            return None
+        return picked
 
     @staticmethod
     def _native_transfer_mesh(mesh_from, mesh_to, transfer_mode):
@@ -268,18 +341,6 @@ class SkinMigrateManager:
             noMirror=True, surfaceAssociation=surface_assoc,
             influenceAssociation=["name", "closestJoint", "oneToOne"])
         return sc_to
-
-    @staticmethod
-    def _as_mesh(node):
-        """노드가 메시(또는 메시 트랜스폼)면 트랜스폼을, 아니면 None."""
-        if not cmds.objExists(node):
-            return None
-        if cmds.objectType(node) == "mesh":
-            p = cmds.listRelatives(node, p=True, f=True)
-            return p[0] if p else node
-        if cmds.listRelatives(node, s=True, type="mesh", f=True):
-            return node
-        return None
 
     # ==================================================
     # Validation
@@ -403,15 +464,19 @@ class SkinMigrateManager:
                 cmds.skinCluster(sc_b, edit=True, addInfluence=jb, weight=0.0)
                 existing.add(SkinMigrateManager._leaf(jb))
 
-        moved = SkinMigrateManager._native_move_columns(
+        moved, _n = SkinMigrateManager._native_move_columns(
             sc_b, mesh_b, list(zip(joints_a, joints_b)))
         logs.append("Move done (native column move, {0} pair(s)).".format(moved))
         logs.append("(Native move uses maya.api setWeights; not granularly undoable.)")
 
     @staticmethod
-    def _native_move_columns(sc_name, mesh, pairs):
+    def _native_move_columns(sc_name, mesh, pairs, vtx_ids=None, soft=None):
         """maya.api 로 전체 웨이트 행렬을 읽어, From 본 컬럼을 To 본 컬럼에 더하고
         From 컬럼을 0 으로 만든 뒤 다시 쓴다 (본 1:1 이동).
+
+        vtx_ids : 주면 그 버텍스만 읽고 쓴다(나머지는 건드리지 않음). None 이면 전체.
+        soft    : {vtx: falloff} - 주면 From 웨이트의 그 비율만 To 로 옮긴다.
+        반환    : (옮긴 본 쌍 수, 처리한 버텍스 수)
 
         주의: MFnSkinCluster.setWeights 는 일반적으로 Ctrl+Z 로 세밀하게 되돌릴 수 없다.
         세밀한 undo 가 필요하면 Kangaroo 엔진을 권장한다.
@@ -429,10 +494,17 @@ class SkinMigrateManager:
         # "(kInvalidParameter): Object is incompatible with this method" 로 죽는다.
         dag = maya_shape.shape_dag(mesh, deformer=sc_name)
 
-        n_verts = maya_shape.vertex_count(mesh, deformer=sc_name)
+        n_all = maya_shape.vertex_count(mesh, deformer=sc_name)
+        if vtx_ids:
+            ids = sorted({v for v in vtx_ids if 0 <= v < n_all})
+        else:
+            ids = list(range(n_all))
+        n_verts = len(ids)
+        if not n_verts:
+            return 0, 0
         comp_fn = om.MFnSingleIndexedComponent()
         comp = comp_fn.create(om.MFn.kMeshVertComponent)
-        comp_fn.addElements(list(range(n_verts)))
+        comp_fn.addElements(ids)
 
         # influenceObjects() 순서 = getWeights 의 컬럼 순서 = get/setWeights 에 넘길
         # **물리** 인덱스. logical index(indexForInfluenceObject)를 넘기면 undo 등으로
@@ -444,7 +516,9 @@ class SkinMigrateManager:
             leaf_to_col[infl_dags[i].partialPathName().split("|")[-1].split(":")[-1]] = i
         infl_indices = maya_skin.weight_indices(inf_count)
 
-        weights, _ = fn.getWeights(dag, comp)   # MDoubleArray, 길이 = n_verts * inf_count
+        # MDoubleArray, 길이 = n_verts * inf_count. 행 순서 = comp 의 ids 순서.
+        weights, _ = fn.getWeights(dag, comp)
+        falloff = [soft.get(v, 0.0) for v in ids] if soft else None
 
         moved = 0
         for ja, jb in pairs:
@@ -452,16 +526,18 @@ class SkinMigrateManager:
             cb = leaf_to_col.get(SkinMigrateManager._leaf(jb))
             if ca is None or cb is None:
                 continue
-            for v in range(n_verts):
-                base = v * inf_count
+            for r in range(n_verts):
+                base = r * inf_count
                 w = weights[base + ca]
                 if w != 0.0:
+                    if falloff is not None:
+                        w *= falloff[r]
                     weights[base + cb] += w
-                    weights[base + ca] = 0.0
+                    weights[base + ca] -= w
             moved += 1
 
         fn.setWeights(dag, comp, infl_indices, weights, False)
-        return moved
+        return moved, n_verts
 
     # ==================================================
     # Helpers

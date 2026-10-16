@@ -1,5 +1,19 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.36 (2026-10-16)
+
+- **[Feature] `Weights > Classic` 의 Native 엔진이 선택 버텍스만 처리한다.** Kangaroo 엔진은 그대로.
+  - `Joints to Joints (single mesh)` — 메시를 통째 선택하면 전체(예전), **버텍스 · 엣지 · 페이스를 선택하면 그 버텍스만**
+    From 본 → To 본으로 옮긴다. 선택 버텍스만 읽고 써서 나머지는 손대지 않는다. 소프트 셀렉션이면 falloff 비율만큼만 옮긴다.
+  - `Meshes to Meshes` — **To 메시에 버텍스를 고르면 그 버텍스만** 전이하고 To 의 skinCluster 는 지운 뒤 다시 바인드하지 않고 유지한다
+    (From 본은 weight 0 으로 추가). 통째 선택한 To 는 전체 전이, 선택하지 않은 To 는 건너뛰고 로그에 `Skipped` 로 남긴다.
+    어느 To 에도 컴포넌트 선택이 없으면 예전처럼 모든 쌍 전체 전이. 버텍스를 골랐지만 To 에 skinCluster 가 없으면 전체 전이로 바인드.
+    `Transfer Mode` 의 surfaceAssociation 을 그대로 쓴다. 끝나면 원래 선택을 되돌린다.
+  - 선택 파싱 · 부분 전이는 `Weights > Transfer` 와 같은 코드(`weight_transfer_manager.parse_target_selections` /
+    `_transfer_one_native`, 후자에 `surface_association` 인자 추가 - Transfer 탭은 기본 closestPoint 그대로).
+  - 검증(mayapy 2024) 20 항목: 버텍스/페이스/오브젝트 선택별 이동 범위 · 부분 전이 범위 · skinCluster 유지 · 미선택 쌍 건너뜀 ·
+    오브젝트+버텍스 섞은 선택 · 선택 없음 = 예전 동작 · From 메시 버텍스만 선택 = 전체 모드 · 선택 복원. 마야 GUI · 소프트 셀렉션은 미확인.
+
 ## v01.35 (2026-09-29)
 
 - **[Feature] `Select > By Weight` 의 Bound Joints 리스트에 조인트 이름 필터** (공용 `JUN_mod_filter_qt_v01`).

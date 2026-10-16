@@ -25,5 +25,10 @@
 #                           Number 가 `보이는 수 / 전체 수`. Check All / Uncheck All 은 보이는 행만.
 #                           가려진 조인트의 체크는 유지되고 Select Vertices 에도 들어간다
 
-VERSION = "01.35"
-LAST_UPDATE = "2026-09-29"
+# 01.36  Weights > Classic - Native 엔진에서 **선택 버텍스만**. Joints to Joints 는 선택 메시의
+#                           버텍스(엣지/페이스 변환)만 본 컬럼 이동, Meshes to Meshes 는 To 메시에
+#                           고른 버텍스만 전이하고 skinCluster 는 유지(고르지 않은 To 는 건너뜀).
+#                           소프트 셀렉션은 falloff 비율. 컴포넌트 선택이 없으면 예전 그대로
+
+VERSION = "01.36"
+LAST_UPDATE = "2026-10-16"

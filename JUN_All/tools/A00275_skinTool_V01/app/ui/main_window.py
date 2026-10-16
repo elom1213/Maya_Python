@@ -345,14 +345,19 @@ class MainWindow(QWidget):
         self.btn_joints_to_joints.setMinimumHeight(34)
         self.btn_joints_to_joints.setToolTip(
             "Move skin weights From-joint[i] -> To-joint[i] on the currently\n"
-            "selected mesh. Select the bound mesh in the scene first.")
+            "selected mesh. Select the bound mesh in the scene first.\n"
+            "Native: select vertices (or edges/faces) to move only those;\n"
+            "soft selection moves the falloff fraction.")
         self.btn_joints_to_joints.clicked.connect(self.on_move_joints)
         layout.addWidget(self.btn_joints_to_joints)
 
         self.btn_meshes_to_meshes = QPushButton("Meshes to Meshes")
         self.btn_meshes_to_meshes.setMinimumHeight(34)
         self.btn_meshes_to_meshes.setToolTip(
-            "Transfer skinCluster From-mesh[i] -> To-mesh[i] using Transfer Mode.")
+            "Transfer skinCluster From-mesh[i] -> To-mesh[i] using Transfer Mode.\n"
+            "Native: select vertices on To meshes to transfer only those\n"
+            "(their skinCluster is kept). To meshes not selected are skipped;\n"
+            "with no component selection every pair is transferred whole.")
         self.btn_meshes_to_meshes.clicked.connect(self.on_transfer_meshes)
         layout.addWidget(self.btn_meshes_to_meshes)
 

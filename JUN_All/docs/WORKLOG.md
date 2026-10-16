@@ -32,6 +32,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-16 (오늘)
 
+> [!summary] A00275_skinTool_V01 — **Weights > Classic 의 Native 엔진이 선택 버텍스만 처리** (v01.35->01.36) `#A00275_skinTool_V01`
+- 요청: Classic 탭 Native 모드에서 선택한 버텍스만 웨이트 전이 — Joints to Joints 먼저, Meshes to Meshes 도 오래 걸리지 않으면.
+- `Joints to Joints`: 선택 파싱을 Transfer 탭의 `parse_target_selections` 로 바꿔 버텍스 · 엣지 · 페이스 선택이면 그 버텍스만
+  `_native_move_columns(vtx_ids, soft)` 로 읽고 써서 본 컬럼 이동(소프트 셀렉션 = falloff 비율). 메시 통째 선택은 예전 그대로 전체.
+- `Meshes to Meshes`: To 메시에 버텍스를 고르면 `_transfer_one_native` 재사용(전체 copySkinWeights 후 미선택 복원, `surface_association` 인자 추가로
+  Transfer Mode 반영) - To 의 skinCluster 는 유지. 통째 선택한 To = 전체, 선택 안 한 To = Skipped, 컴포넌트 선택이 아예 없으면 예전 동작. 끝나면 선택 복원.
+- 검증(mayapy 2024) 20 항목 통과. 마야 GUI · 소프트 셀렉션은 미확인.
+
 > [!summary] A00400_CurveTool — **Display > Replace 후에도 대상의 선 굵기 유지** (v01.25->01.26) `#A00400_CurveTool`
 - 요청: Shape Edit 으로 굵게 한 커브가 Replace 로 모양을 바꾸면 원래 굵기(얇게)로 돌아간다 → 교체 전 굵기를 유지.
 - 원인: 로컬 대상의 `replace_shape` 는 옛 셰이프를 지우고 **교체본 셰이프의 복제본**을 붙이므로 `nurbsCurve.lineWidth` 도 교체본 값이 따라왔다.

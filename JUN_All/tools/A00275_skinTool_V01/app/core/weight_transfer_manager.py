@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-22
+# last Update date : 2026-10-16
 # A00275_skinTool_V01 - 단일 메시 웨이트 전이 (Transfer 탭 코어, UI 비의존)
 #
 # Kangaroo 의 SkinCluster > Transfer 탭을 흉내낸 기능이되, **Kangaroo 없이** 동작한다.
@@ -433,8 +433,13 @@ def _copy_selection(sources, target):
     return picked
 
 
-def _transfer_one_native(sources, union, target, vtx_ids, soft):
-    """소스들 → 대상 메시 하나에 전이한다(부분/소프트 마스킹 포함). 짧은 설명 문자열 반환."""
+def _transfer_one_native(sources, union, target, vtx_ids, soft,
+                         surface_association="closestPoint"):
+    """소스들 → 대상 메시 하나에 전이한다(부분/소프트 마스킹 포함). 짧은 설명 문자열 반환.
+
+    surface_association : copySkinWeights 의 최근접 기준. Transfer 탭은 기본값(closestPoint),
+                          Weights > Classic 의 Native 부분 전이는 Transfer Mode 에 맞춘 값을 넘긴다.
+    """
 
     sc_t, created = _prepare_target_skin(target, union)
 
@@ -443,7 +448,7 @@ def _transfer_one_native(sources, union, target, vtx_ids, soft):
     if not vtx_ids:
         cmds.select(_copy_selection(sources, target), r=True)
         cmds.copySkinWeights(
-            noMirror=True, surfaceAssociation="closestPoint",
+            noMirror=True, surfaceAssociation=surface_association,
             influenceAssociation=["name", "closestJoint", "oneToOne"])
         return "whole" + (", new sc" if created else "")
 
@@ -459,7 +464,7 @@ def _transfer_one_native(sources, union, target, vtx_ids, soft):
 
     cmds.select(_copy_selection(sources, target), r=True)
     cmds.copySkinWeights(
-        noMirror=True, surfaceAssociation="closestPoint",
+        noMirror=True, surfaceAssociation=surface_association,
         influenceAssociation=["name", "closestJoint", "oneToOne"])
 
     after, _n, _idx2, n_inf2 = _get_all_weights(sc_t, target)

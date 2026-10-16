@@ -2,7 +2,7 @@
 title: A00275_skinTool_V01 사용법
 aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose, Move Joints, Edit Mesh, Expand Bind, Smooth Weights]
 tags: [maya-python, tool-guide, skin, skincluster, bind-pose, rigging]
-updated: 2026-09-29
+updated: 2026-10-16
 ---
 
 # A00275_skinTool_V01 사용법
@@ -10,7 +10,7 @@ updated: 2026-09-29
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.35 — By Weight 조인트 리스트에 **이름 필터** · v01.32 — Transfer 에 **`Target mode`**(소스↔타겟 리스트 1:1) + **진행률 팝업** · v01.31 — **`Weights > Smooth`** 신규: Kangaroo `SkinCluster > Smooth` 이식(플러그인 무의존) · v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
+- **버전**: `app/config/version.py` (v01.36 — Classic Native 가 **선택 버텍스만** (Joints to Joints · Meshes to Meshes) · v01.35 — By Weight 조인트 리스트에 **이름 필터** · v01.32 — Transfer 에 **`Target mode`**(소스↔타겟 리스트 1:1) + **진행률 팝업** · v01.31 — **`Weights > Smooth`** 신규: Kangaroo `SkinCluster > Smooth` 이식(플러그인 무의존) · v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
   (v01.22 는 아래 레이어 lock 이 사라졌다) · v01.22 — **`Weights > Layer`** 신규: 버텍스 순서가 같은 메시 N 개의
   웨이트를 메시마다 lock + Blend 로 레이어처럼 합성해 새 메시로 만들거나 기존 메시를 갱신 · v01.15 — **탭 재분류**:
   평평한 탭 7개를 `카테고리 3 → 기능 7` 의 2단 구조로, 아래 표)
@@ -22,7 +22,7 @@ updated: 2026-09-29
 
 | 상위 탭 | 뜻 | 하위 탭 | 내용 |
 |---|---|---|---|
-| **Weights** | 이미 있는 웨이트를 다른 곳으로 옮긴다 | **Classic** | 레거시 2버튼 UI — `Joints to Joints (single mesh)` / `Meshes to Meshes`. **Engine(Kangaroo/Native) 선택**(v01.04~) |
+| **Weights** | 이미 있는 웨이트를 다른 곳으로 옮긴다 | **Classic** | 레거시 2버튼 UI — `Joints to Joints (single mesh)` / `Meshes to Meshes`. **Engine(Kangaroo/Native) 선택**(v01.04~). Native 는 **선택 버텍스만**(v01.36~) |
 | 〃 | 〃 | **Transfer** (v01.04~) | **여러 소스 메시 → 타겟**으로 웨이트 전이. **Engine(Native/Kangaroo) 선택**(v01.05~). 선택 버텍스에만/소프트 falloff 반영(Native). **v01.32~ `Target mode`** — 씬 선택 대신 **타겟 리스트와 1:1** 로 짝지어 여러 벌을 한 번에 |
 | 〃 | 〃 | **Migrate A -> B** | 토폴로지가 다른 두 메시 사이 Transfer + Move 통합 마이그레이션 |
 | 〃 | 〃 | **Copy Weights** (v01.17~) | **같은 메시 안에서** 버텍스 → 버텍스로 웨이트 복사. 목표마다 가장 가까운 소스 버텍스의 웨이트 행을 베낀다. 최근접 기준은 **Surface / Topology / Volume**, 실리는 정도는 **`Blend` 0~1**(v01.18~) |
@@ -54,6 +54,20 @@ Migrate 탭 사용법은 [[A00270_skinMigrate]] 문서와 동일하다.
   - `Joints to Joints` = 선택 메시 skinCluster 에서 **From 본 컬럼 → To 본 컬럼**으로 이동(`maya.api`).
   - `Meshes to Meshes` = rebind 후 `cmds.copySkinWeights`(Transfer Mode 의 surfaceAssociation).
   - Native 이동은 `setWeights` 를 써서 undo 가 세밀하지 않다(전체가 한 스텝).
+
+### Native — 선택 버텍스만 (v01.36~)
+
+| 버튼 | 선택 | 결과 |
+|------|------|------|
+| `Joints to Joints` | 메시 통째 | 전체 버텍스 이동 (예전) |
+| 〃 | 버텍스 · 엣지 · 페이스 | **그 버텍스만** From 본 → To 본. 소프트 셀렉션이면 falloff 비율만큼 |
+| `Meshes to Meshes` | To 메시의 버텍스 | **그 버텍스만** 전이, To 의 skinCluster 는 유지 |
+| 〃 | To 메시 통째 | 그 쌍은 전체 전이 (rebind) |
+| 〃 | 선택 안 한 To 메시 | 건너뜀 (`Skipped` 로그) — 단, 어느 To 에도 컴포넌트 선택이 없으면 모든 쌍 전체 전이(예전) |
+
+- 부분 전이는 Transfer 탭과 같은 방식 — 전체 `copySkinWeights`(Transfer Mode 의 surfaceAssociation) 후 고르지 않은 버텍스를 원래 값으로 되돌린다.
+- 버텍스를 골랐는데 To 에 skinCluster 가 없으면 지킬 웨이트가 없으므로 전체 전이로 바인드한다.
+- Kangaroo 엔진은 예전 그대로다.
 
 ---
 
