@@ -454,13 +454,14 @@ def match_cv_positions(target, replacement, mirror=False):
     return len(plans), None
 
 
-# --------------------------------------------------------------- 선 굵기 유지 (v01.26)
+# --------------------------------------------------------------- 선 굵기 복사 (v01.26)
 #
-# 로컬 대상의 셰이프 교체는 "기존 셰이프 삭제 -> 교체본 셰이프 복제본을 붙이기" 라서
-# `nurbsCurve.lineWidth` 도 **교체본의 값**이 따라온다. Shape Edit 탭에서 굵게 해 둔
-# 컨트롤이 Replace 한 번에 얇아지던 원인이다. 굵기는 모양이 아니라 그 컨트롤의 표시
-# 설정이므로, 지우기 전에 읽어 두었다가 새 셰이프에 다시 쓴다.
-# (레퍼런스 대상은 셰이프를 그대로 두고 CV 만 옮기므로 원래 유지된다.)
+# Replace 는 **모양과 함께 교체본의 선 굵기(`nurbsCurve.lineWidth`)도 대상에 복사**한다.
+# Shape Edit 에서 굵게 만든 커브를 교체본으로 쓰면 결과도 그 굵기여야 한다(사용자 요청).
+#   * 로컬 대상  - 복제본에 굵기가 딸려 오지만 그것에 기대지 않고 교체본 값을 명시적으로 쓴다.
+#   * 레퍼런스 대상 - 셰이프를 그대로 두고 CV 만 옮기므로 굵기는 따로 써 줘야 한다
+#                     (setAttr 이라 레퍼런스 edit 로 저장된다).
+# 셰이프가 여럿이면 같은 순번의 값, 모자라면 첫 값을 쓴다. 미러 여부와 무관하다.
 
 def _line_widths(shapes):
     """셰이프마다의 lineWidth. 커브가 아니거나 속성이 없으면 None."""
@@ -478,18 +479,22 @@ def _line_widths(shapes):
 
 
 def _restore_line_widths(shapes, widths):
-    """새 셰이프에 옛 굵기를 쓴다. 같은 순번의 값, 없으면 첫 값을 쓴다."""
+    """셰이프들에 굵기를 쓴다. 같은 순번의 값, 없으면 첫 값을 쓴다. 쓴 셰이프 수."""
     known = [w for w in widths if w is not None]
+    written = 0
     if not known:
-        return
+        return written
     for index, shape in enumerate(shapes):
         width = widths[index] if index < len(widths) and widths[index] is not None else known[0]
         try:
             if (cmds.objectType(shape, isAType="nurbsCurve")
                     and cmds.attributeQuery("lineWidth", node=shape, exists=True)):
-                cmds.setAttr(shape + ".lineWidth", width)
+                if cmds.getAttr(shape + ".lineWidth") != width:
+                    cmds.setAttr(shape + ".lineWidth", width)
+                written += 1
         except Exception:                                   # noqa: BLE001
             pass
+    return written
 
 
 def replace_shape(target, replacement, mirror=False):
@@ -499,6 +504,9 @@ def replace_shape(target, replacement, mirror=False):
     -> target 밑으로 -> freeze -> 기존 셰이프 삭제 -> 셰이프를 target 에 붙이고 이름 정리.
     mirror 면 자리를 맞추는 대신 `scaleX = -1` 인 그룹에 넣었다 빼 **반대 모양**으로 만든다.
     """
+    # 교체본의 굵기 - 복제 전에 원본에서 읽는다(v01.26).
+    source_widths = _line_widths(curve_shapes(replacement))
+
     duplicate = cmds.duplicate(replacement, returnRootsOnly=True,
                                renameChildren=True, name="temp_CRV")[0]
     _unlock_transform(duplicate)
@@ -525,8 +533,8 @@ def replace_shape(target, replacement, mirror=False):
 
     new_shapes = cmds.listRelatives(duplicate, shapes=True, fullPath=True) or []
     old_shapes = cmds.listRelatives(target, shapes=True, fullPath=True) or []
-    # 교체 전 굵기를 새 셰이프로 옮긴다(v01.26) - 교체본의 굵기가 따라오지 않게.
-    _restore_line_widths(new_shapes, _line_widths(old_shapes))
+    # 교체본의 굵기를 새 셰이프에 쓴다(v01.26).
+    _restore_line_widths(new_shapes, source_widths)
     if old_shapes:
         cmds.delete(old_shapes)
 
@@ -606,6 +614,9 @@ def replace_shapes(targets, replacements, mirror=False):
                     "swapping the shape node.".format(
                         short, sum(len(_cv_points(s)) for s in curve_shapes(target)),
                         source.split("|")[-1]))
+                # CV 만 옮기는 경로라 굵기는 따로 복사한다(v01.26).
+                _restore_line_widths(curve_shapes(target),
+                                     _line_widths(curve_shapes(source)))
                 matched += 1
                 continue
 

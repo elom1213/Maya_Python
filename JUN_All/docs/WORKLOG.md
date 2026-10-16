@@ -40,12 +40,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   Transfer Mode 반영) - To 의 skinCluster 는 유지. 통째 선택한 To = 전체, 선택 안 한 To = Skipped, 컴포넌트 선택이 아예 없으면 예전 동작. 끝나면 선택 복원.
 - 검증(mayapy 2024) 20 항목 통과. 마야 GUI · 소프트 셀렉션은 미확인.
 
-> [!summary] A00400_CurveTool — **Display > Replace 후에도 대상의 선 굵기 유지** (v01.25->01.26) `#A00400_CurveTool`
-- 요청: Shape Edit 으로 굵게 한 커브가 Replace 로 모양을 바꾸면 원래 굵기(얇게)로 돌아간다 → 교체 전 굵기를 유지.
-- 원인: 로컬 대상의 `replace_shape` 는 옛 셰이프를 지우고 **교체본 셰이프의 복제본**을 붙이므로 `nurbsCurve.lineWidth` 도 교체본 값이 따라왔다.
-  레퍼런스 대상(CV 매칭)은 셰이프를 그대로 두므로 영향 없음.
-- 수정: `control_manager._line_widths` / `_restore_line_widths` — 옛 셰이프를 지우기 전에 굵기를 읽어 새 셰이프에 쓴다(같은 순번, 모자라면 첫 값).
-- 검증(mayapy 2024): 굵기 4.5 인 원 → 기본 굵기(-1) 직선 커브로 교체, Mirror 끔/켬 둘 다 결과 4.5 · undo 정상.
+> [!summary] A00400_CurveTool — **Display > Replace 가 교체본의 선 굵기도 복사** (v01.25->01.26) `#A00400_CurveTool`
+- 요청: Shape Edit 으로 굵게 한 커브의 셰이프로 Replace 하면 결과가 얇게 나온다 → 교체본 굵기를 그대로 복사.
+  (처음엔 "대상의 교체 전 굵기 유지" 로 읽고 고쳤다가, 같은 날 사용자 확인으로 **교체본 굵기 복사**로 바꿨다.)
+- 원인: 레퍼런스 대상은 셰이프를 못 지워 CV 만 옮기므로 굵기가 옛 값으로 남는다. 로컬 대상은 복제본에 굵기가 딸려 왔지만 명시적으로 쓰지 않았다.
+- 수정: `control_manager._line_widths` / `_restore_line_widths` — 교체본 굵기를 로컬 경로(복제 전에 읽어 새 셰이프에)와 레퍼런스 경로(CV 매칭 뒤 setAttr) 모두에 쓴다.
+- 검증(mayapy 2024): 굵기 6.0 교체본 → 기본 굵기(-1) 대상. 로컬 Mirror 끔/켬 · 레퍼런스 Mirror 끔/켬 전부 6.0, 레퍼런스는 저장 후 다시 열어도 6.0, 로컬 undo 시 -1 복귀.
 
 ## 2026-10-13
 
