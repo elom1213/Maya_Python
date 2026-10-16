@@ -4,7 +4,7 @@
 독립 실행(standalone) Qt 앱을 직접 설계·개발한 포트폴리오 저장소입니다.
 
 > 작성자: **Ji Hun Park (Junny)** · Technical Artist / Rigging & Pipeline Tools Developer
-> 최근 갱신: 2026-09-16 · 툴 폴더 **64개**(템플릿·구버전 포함, **현행 50종**) · 공용 프레임워크 1개
+> 최근 갱신: 2026-10-16 · 툴 폴더 **67개**(템플릿·구버전 포함, **현행 52종**) · 공용 프레임워크 1개
 
 ---
 
@@ -13,7 +13,7 @@
 A portfolio of **production-grade Python tooling for Autodesk Maya and game pipelines**, written and
 maintained by **Ji Hun Park (Junny)**, a Technical Artist focused on rigging, facial, and pipeline automation.
 
-It contains **64 tool folders (50 actively maintained)** spanning two architectures — **in-Maya
+It contains **67 tool folders (52 actively maintained)** spanning two architectures — **in-Maya
 `maya.cmds` / PySide UIs** and **standalone PySide (Qt) desktop apps** — built on a **shared framework**
 (reusable widgets, theming, path management, undo handling, drag-&-drop installers).
 
@@ -172,6 +172,8 @@ A narrative work summary lives in
 
 | 시기 | 내용 |
 |------|------|
+| 2026-10 중순 | **`A00480` Import > CSV** — `A00200` ARKit 페이셜 CSV 임포트를 이식, 블렌드셰이프뿐 아니라 **ARKit 어트리뷰트를 가진 아무 노드**에 키 · **`Value Scale`**(AdvancedSkeleton 페이셜 컨트롤은 `x10`) · **`A00145`** 연결을 규칙 json 으로 저장 · **`A00240`** Junction 탭 |
+| 2026-10 초 | **`A00490_KeyboardTool` 신규**(키 시퀀스 자동 입력 + 대상 창) · 토큰 이름 규칙 **`Enum`** 공용화(`A00330` · `A00480`) · Framework **`Dev Mode` 메뉴 위젯** · **`A00170`** Seal Free 모드 · dev 스크립트를 A 번호 툴(`A00500`~`A00530`)로 |
 | 2026-09 하순 | **`A00275` Weights > Smooth 신규** — Kangaroo `SkinCluster > Smooth` 를 플러그인 없이 이식 · **Transfer `Target mode`**(타겟 리스트와 행 순서 1:1) + 진행률 팝업 |
 | 2026-09 하순 | **`A00380` MeshDoctor 탭** — `A00300_meshDoctor` 를 통째로 이식 · **Match > By Weight**(스킨 웨이트를 마스크로 메시를 타깃 쪽으로) · Match 좌(Source) / 우(Targets) 리스트 |
 | 2026-09 하순 | **`A00330` Quick Rename > Insert** — 리스트 이름의 **n 번째 자리**(음수는 끝에서부터)에 글자를 넣고, 넣은 글자를 초록으로 **미리보기** 후 Apply · **`A00060_V03` From Curve `By Count`** · **`A00440`** 전부를 담은 세트 하나 + Find 탭 |
