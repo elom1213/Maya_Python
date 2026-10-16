@@ -121,7 +121,7 @@ A narrative work summary lives in
   **키 애니메이션으로 굽는다**. 마야 시뮬레이션 솔버(nucleus/nHair)를 쓰지 않아 게임 에셋에 그대로 사용.
 
 ### 애니메이션 · 모델링 · 메시
-- **`A00110_animTool_V02`** — 애니메이션 키 통합 툴(카테고리 7 × 기능 14). 키 복사/미러/베이크 ·
+- **`A00110_animTool_V02`** — 애니메이션 키 통합 툴(카테고리 8 × 기능 14). 키 복사/미러/베이크 ·
   Follow · Fill Keys · 구간 한정 Euler Filter · **Stagger Offset**(팔로우스루) ·
   **Curve Filters**(Smooth / Intensity / Interp, 쿼터니언 처리로 짐벌 점프 방지) ·
   **Noise**(결정론적 · 심리스 노이즈를 내보내는 노드) · Graph Focus.
@@ -172,7 +172,7 @@ A narrative work summary lives in
 
 | 시기 | 내용 |
 |------|------|
-| 2026-10 중순 | **`A00480` Import > CSV** — `A00200` ARKit 페이셜 CSV 임포트를 이식, 블렌드셰이프뿐 아니라 **ARKit 어트리뷰트를 가진 아무 노드**에 키 · **`Value Scale`**(AdvancedSkeleton 페이셜 컨트롤은 `x10`) · **`A00145`** 연결을 규칙 json 으로 저장 · **`A00240`** Junction 탭 |
+| 2026-10 중순 | **`A00480` Import > CSV** — `A00200` ARKit 페이셜 CSV 임포트를 이식, 블렌드셰이프뿐 아니라 **ARKit 어트리뷰트를 가진 아무 노드**에 키 · **`Value Scale`**(AdvancedSkeleton 페이셜 컨트롤은 `x10`) · **`A00145`** 연결을 규칙 json 으로 저장 · **`A00240`** Junction 탭 · **`A00110_V02` Hot Key 탭**(Shift+A Hold + Tab 으로 매니퓰레이터 Object / World 토글) · **`A00400`** Controls 셰이프 Filter |
 | 2026-10 초 | **`A00490_KeyboardTool` 신규**(키 시퀀스 자동 입력 + 대상 창) · 토큰 이름 규칙 **`Enum`** 공용화(`A00330` · `A00480`) · Framework **`Dev Mode` 메뉴 위젯** · **`A00170`** Seal Free 모드 · dev 스크립트를 A 번호 툴(`A00500`~`A00530`)로 |
 | 2026-09 하순 | **`A00275` Weights > Smooth 신규** — Kangaroo `SkinCluster > Smooth` 를 플러그인 없이 이식 · **Transfer `Target mode`**(타겟 리스트와 행 순서 1:1) + 진행률 팝업 |
 | 2026-09 하순 | **`A00380` MeshDoctor 탭** — `A00300_meshDoctor` 를 통째로 이식 · **Match > By Weight**(스킨 웨이트를 마스크로 메시를 타깃 쪽으로) · Match 좌(Source) / 우(Targets) 리스트 |
