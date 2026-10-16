@@ -42,5 +42,8 @@
 #        어트리뷰트를 가진 아무 노드**(ARKit 52 어트리뷰트를 단 컨트롤 등). Detect 가 블렌드셰이프 + ARKit
 #        어트리뷰트 노드를 모두 찾고 Selected 로 씬 선택을 넣는다. FBX = 예전 Import 탭(Import FBX normal) 그대로.
 
-VERSION = "01.10"
-LAST_UPDATE = "2026-10-13"
+# 01.11  Import > CSV 에 Value Scale - 키 값 = CSV 값 x 배율 (기본 1, 버튼 x1 / x10).
+#        CSV 는 [0, 1] 이지만 AdvancedSkeleton 페이셜 컨트롤은 [0, 10] 을 받는다 -> x10.
+
+VERSION = "01.11"
+LAST_UPDATE = "2026-10-16"

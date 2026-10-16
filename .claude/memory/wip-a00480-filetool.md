@@ -53,3 +53,6 @@ UI 가 Check 와 규칙에 막힌 Export 뒤에 `select(replace)`. 통과면 선
 - UI: `ui/import_csv_page.CsvImportPage`(Node 콤보 글자 `node   (n ARKit, 타입)`, `Detect` / `Selected`), `ui/import_tab.ImportTab` = `QTabWidget(CSV, FBX)`,
   FBX 는 옛 SECTIONS 표(`FbxImportPage`). `ImportTab.buttons` · `on_import_fbx_normal` 이름은 호환 유지.
 - ffmpeg 추출 · 마야 GUI 는 미확인.
+
+**Import > CSV Value Scale (v01.11, 2026-10-16, 사용자 요청)** — 키 값 = CSV 값 x 배율(`import_facial(value_scale=)`, UI 스핀 + `x1`/`x10`).
+이유: CSV 는 [0, 1], **AdvancedSkeleton 페이셜 컨트롤은 [0, 10]** 을 받는다. 기본 1 은 블렌드셰이프 weight 용으로 유지.

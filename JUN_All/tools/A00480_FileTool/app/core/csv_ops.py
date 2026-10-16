@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-13
+# last Update date : 2026-10-16
 # A00480_FileTool - Import > CSV 로직 (ARKit 페이셜 CSV -> 키프레임, 오디오)
 """
 csv_ops - Live Link Face 가 내보낸 ARKit 페이셜 CSV 를 노드의 키프레임으로 임포트한다 (v01.10).
@@ -13,6 +13,7 @@ csv_ops - Live Link Face 가 내보낸 ARKit 페이셜 CSV 를 노드의 키프�
      그 밖의 노드는 스칼라 어트리뷰트를 `node_targets` 가 { 소문자 이름: 플러그 } 로 모은다.
      후보 노드 탐색(`list_candidate_nodes`)도 블렌드셰이프 + ARKit 이름 어트리뷰트를 가진 노드 전부.
   3. 결과는 summary dict + 로그 콜백 - UI 는 로그창에 쌓기만 한다.
+  4. (v01.11) Value Scale - CSV 값에 곱해서 키를 건다 (`import_facial(value_scale=)`).
 
 동작 (원본 그대로)
   - CSV 열 <-> 어트리뷰트 이름을 대소문자 무시로 매칭 (열 순서 무관). 메타 열(Timecode 등)은 건너뛴다.
@@ -321,10 +322,12 @@ def match_columns(columns, targets):
 
 
 def import_facial(csv_path, node, start_frame=1, source_fps=60, target_fps=30,
-                  do_audio=True, overwrite_wav=False, log=None):
+                  do_audio=True, overwrite_wav=False, value_scale=1.0, log=None):
     """ARKit CSV 를 node 의 키프레임으로 임포트한다. 반환: summary dict.
 
     node : 블렌드셰이프 노드 또는 CSV 열과 같은 이름의 어트리뷰트를 가진 아무 노드.
+    value_scale : 키 값 = CSV 값 x value_scale (v01.11). CSV 는 [0, 1] 이라, [0, 10] 을 받는
+                  AdvancedSkeleton 페이셜 컨트롤에는 10. 기본 1.0 = 그대로.
     """
     cmds = _cmds()
     if log is None:
@@ -349,6 +352,10 @@ def import_facial(csv_path, node, start_frame=1, source_fps=60, target_fps=30,
         log("Scene FPS : {0} ({1})".format(target_fps, unit))
     except RuntimeError:
         log("Scene FPS not changed (unit '{0}' refused) - scene default kept".format(unit))
+
+    value_scale = float(value_scale)
+    if value_scale != 1.0:
+        log("Value scale : x{0:g} (key = CSV value x {0:g})".format(value_scale))
 
     step = max(1, int(round(float(source_fps) / float(target_fps))))
     log("Downsample step {0} (recorded {1} fps -> output {2} fps)".format(
@@ -381,7 +388,7 @@ def import_facial(csv_path, node, start_frame=1, source_fps=60, target_fps=30,
                     if raw is None or raw.strip() == "":
                         continue
                     try:
-                        value = float(raw)
+                        value = float(raw) * value_scale
                     except ValueError:
                         bad_values += 1
                         continue
@@ -411,6 +418,7 @@ def import_facial(csv_path, node, start_frame=1, source_fps=60, target_fps=30,
         "unmatched_cols": unmatched,
         "bad_values": bad_values,
         "audio_node": audio_node,
+        "value_scale": value_scale,
     }
 
 
@@ -419,6 +427,9 @@ def summary_lines(summary):
     lines = ["[OK] CSV import : {0} frame(s) ({1} ~ {2}), {3} attribute(s) keyed on {4}".format(
         summary["frames"], summary["start_frame"], summary["end_frame"],
         len(summary["applied"]), summary["node"])]
+    scale = summary.get("value_scale", 1.0)
+    if scale != 1.0:
+        lines.append("       values scaled x{0:g}".format(scale))
     if summary["unmatched_cols"]:
         lines.append("       unmatched (skipped) {0} : {1}".format(
             len(summary["unmatched_cols"]), ", ".join(summary["unmatched_cols"])))

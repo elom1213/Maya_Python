@@ -1,5 +1,10 @@
 # Changelog — A00480_FileTool
 
+## v01.11 (2026-10-16)
+- **Import > CSV : new `Value Scale` row** - every CSV value is multiplied by it before it is keyed
+  (default 1, quick buttons `x1` / `x10`). The CSV holds 0 ~ 1, while AdvancedSkeleton facial controls
+  expect 0 ~ 10 - use `x10` for them. A scale other than 1 is written to the log.
+
 ## v01.10 (2026-10-13)
 - **Import tab is now two sub tabs : `CSV` and `FBX`.** FBX holds the old Import tab as it was
   (`Import FBX normal`).

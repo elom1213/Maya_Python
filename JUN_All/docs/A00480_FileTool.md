@@ -2,7 +2,7 @@
 title: A00480_FileTool 사용법
 aliases: [File Tool, FileTool, A00480]
 tags: [maya-python, tool-guide, file, fbx, export, import, path, pyside]
-updated: 2026-09-29
+updated: 2026-10-16
 ---
 
 # A00480_FileTool 사용법
@@ -17,7 +17,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 | **Import > FBX** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` |
 | **Path** | `Copy Scene Folder` · `Open Scene Folder` | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `File` |
 
-- **버전**: `app/config/version.py` (v01.10 — Import 탭이 하위 탭 **CSV / FBX**, CSV = `A00200_CSV_tool` 이식(영어 UI, 아무 노드에 키, §3-1) · v01.09 — Naming 토큰 규칙에 **`Enum`**(정해진 값 중 고르기, A00330 과 같은 공용 규칙, §2-4) · v01.08 — Naming 칸을 고쳐도 저장 안 함, **`Save` 버튼**으로만 프로파일 기본이 된다(§2-4) · v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
+- **버전**: `app/config/version.py` (v01.11 — Import > CSV 에 **`Value Scale`**: CSV 값 x 배율로 키(AdvancedSkeleton 페이셜 컨트롤 = `x10`, §3-1) · v01.10 — Import 탭이 하위 탭 **CSV / FBX**, CSV = `A00200_CSV_tool` 이식(영어 UI, 아무 노드에 키, §3-1) · v01.09 — Naming 토큰 규칙에 **`Enum`**(정해진 값 중 고르기, A00330 과 같은 공용 규칙, §2-4) · v01.08 — Naming 칸을 고쳐도 저장 안 함, **`Save` 버튼**으로만 프로파일 기본이 된다(§2-4) · v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
 - **설치**: `__dragDrop_A00480.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **FileTool** → `tools.A00480_FileTool.run(True)`
 - **테마**: `slate_dark`
 - **원본 두 툴은 그대로 남아 있다.** quickTool 의 File · Import option 버튼도 지워지지 않았다.
@@ -186,6 +186,7 @@ WAV(또는 같은 이름의 동영상에서 ffmpeg 로 추출한 WAV)를 **씬 �
 │ CSV File    [D:/mocap/take01_Face_raw.csv        ] [Browse]     │
 │ Node        [faceCtrl   (52 ARKit, transform) ▾] [Detect][Selected]
 │ Start Frame [ 1 ]   FPS  Recorded [60]  Output [30 ▾]           │
+│ Value Scale [ 10.000 ] [x1] [x10]                               │
 │ Audio       [✓] Import audio   [ ] Overwrite WAV                │
 └────────────────────────────────────────────────────────────────┘
 [ Import Animation ]
@@ -202,10 +203,13 @@ WAV(또는 같은 이름의 동영상에서 ffmpeg 로 추출한 WAV)를 **씬 �
 3. `Start Frame` — 첫 행이 놓일 프레임. 오디오도 여기서 시작한다.
 4. `FPS` — `Recorded`(녹화, Live Link Face 는 60) / `Output`(30 · 60). 행은 `round(Recorded / Output)` 간격으로
    다운샘플되고(60→30 이면 한 행 걸러), **씬 FPS 가 Output 으로 바뀐다.**
-5. `Audio` — `Import audio` 면 CSV 와 같은 stem 의 WAV 를 찾는다(`..._Face_raw.csv` 는 `..._Face.wav` 도 본다). 없으면
+5. `Value Scale` (v01.11) — **키 값 = CSV 값 x 배율.** CSV 는 `0 ~ 1` 실수뿐인데 AdvancedSkeleton 페이셜 컨트롤은
+   `0 ~ 10` 을 받으므로 `x10` 을 누르고 임포트한다. `x1` = CSV 값 그대로(블렌드셰이프 weight). 아무 수나 직접 넣어도
+   된다(-1000 ~ 1000, 음수 = 방향 반전). 1 이 아니면 로그에 `values scaled x10` 처럼 적힌다.
+6. `Audio` — `Import audio` 면 CSV 와 같은 stem 의 WAV 를 찾는다(`..._Face_raw.csv` 는 `..._Face.wav` 도 본다). 없으면
    같은 stem 의 동영상(MOV · MP4 · M4V · MKV · AVI · MXF · WEBM)에서 **PATH 의 ffmpeg** 로 추출한다. `Overwrite WAV` 는 이미
    있어도 다시 추출. ffmpeg 가 없거나 오디오 스트림이 없으면 로그에 적고 건너뛴다.
-6. `Import Animation` — 매칭된 어트리뷰트 전부에 키, 타임라인 in/out 을 임포트 구간까지 넓히고(줄이지 않음), 오디오를
+7. `Import Animation` — 매칭된 어트리뷰트 전부에 키, 타임라인 in/out 을 임포트 구간까지 넓히고(줄이지 않음), 오디오를
    넣는다. **키 · 타임라인 · 사운드 노드가 한 번의 undo** 다(원본은 키만 묶였다). 로그에 프레임 수 · 적용/미매칭 어트리뷰트 수가
    적힌다. 매칭되는 열이 하나도 없으면 아무것도 하지 않고 `[ERR]`.
 

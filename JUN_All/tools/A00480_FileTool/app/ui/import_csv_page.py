@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-13
+# last Update date : 2026-10-16
 # A00480_FileTool - Import > CSV 하위 탭 (in-Maya)
 #
 # A00200_CSV_tool (ARKit Facial Import) 의 창을 **하위 탭**으로 옮긴 것이다 (v01.10, 원본은 보존).
@@ -8,6 +8,7 @@
 #   CSV File   [...........................] [Browse]
 #   Node       [ faceCtrl (52 ARKit)     v ] [Detect] [Selected]
 #   Start Frame[ 1 ]   FPS  Recorded [60]  Output [30 v]
+#   Value Scale[ 1.000 ] [x1] [x10]      <- v01.11, 키 값 = CSV 값 x 배율
 #   Audio      [x] Import audio (WAV, or extracted from a video next to the CSV)  [ ] Overwrite WAV
 #   [ Import Animation ]
 #
@@ -31,6 +32,7 @@ from Framework.qt.qt import (
     QPushButton,
     QComboBox,
     QSpinBox,
+    QDoubleSpinBox,
     QCheckBox,
     QFileDialog,
     Qt,
@@ -119,8 +121,31 @@ class CsvImportPage(QWidget):
         fps_row.addStretch(1)
         grid.addLayout(fps_row, 2, 1, 1, 2)
 
+        # 값 배율 (v01.11) - CSV 는 [0, 1], AdvancedSkeleton 페이셜 컨트롤은 [0, 10]
+        grid.addWidget(QLabel("Value Scale"), 3, 0)
+        scale_row = QHBoxLayout()
+        self.spn_scale = QDoubleSpinBox()
+        self.spn_scale.setDecimals(3)
+        self.spn_scale.setRange(-1000.0, 1000.0)
+        self.spn_scale.setSingleStep(1.0)
+        self.spn_scale.setValue(1.0)
+        self.spn_scale.setKeyboardTracking(False)
+        self.spn_scale.setToolTip(
+            "Every CSV value is multiplied by this before it is keyed.\n"
+            "The CSV holds 0 ~ 1. Use 10 for controls that expect 0 ~ 10\n"
+            "(e.g. AdvancedSkeleton facial controls). 1 = keep the CSV values.")
+        scale_row.addWidget(self.spn_scale)
+        for label, value, tip in (("x1", 1.0, "Keep the CSV values (0 ~ 1)."),
+                                  ("x10", 10.0, "0 ~ 1 -> 0 ~ 10 (AdvancedSkeleton facial controls).")):
+            btn = QPushButton(label)
+            btn.setToolTip(tip)
+            btn.clicked.connect(lambda _checked=False, v=value: self.spn_scale.setValue(v))
+            scale_row.addWidget(btn)
+        scale_row.addStretch(1)
+        grid.addLayout(scale_row, 3, 1, 1, 2)
+
         # 오디오
-        grid.addWidget(QLabel("Audio"), 3, 0)
+        grid.addWidget(QLabel("Audio"), 4, 0)
         audio_row = QHBoxLayout()
         self.chk_audio = QCheckBox("Import audio")
         self.chk_audio.setChecked(True)
@@ -133,7 +158,7 @@ class CsvImportPage(QWidget):
         self.chk_overwrite_wav.setToolTip("Extract again even if the WAV already exists.")
         audio_row.addWidget(self.chk_overwrite_wav)
         audio_row.addStretch(1)
-        grid.addLayout(audio_row, 3, 1, 1, 2)
+        grid.addLayout(audio_row, 4, 1, 1, 2)
 
         grid.setColumnStretch(1, 1)
         layout.addWidget(box)
@@ -223,6 +248,7 @@ class CsvImportPage(QWidget):
                 target_fps=int(self.cmb_target_fps.currentText()),
                 do_audio=self.chk_audio.isChecked(),
                 overwrite_wav=self.chk_overwrite_wav.isChecked(),
+                value_scale=self.spn_scale.value(),
                 log=self._log)
         except Exception as e:
             self._log("[ERR] CSV import failed : {0}".format(e))

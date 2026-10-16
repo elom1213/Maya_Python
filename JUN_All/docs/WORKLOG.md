@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-16 (오늘)
 
+> [!summary] A00480_FileTool — **Import > CSV 에 Value Scale (CSV 값 x 배율)** (v01.10->01.11) `#A00480_FileTool`
+- 요청: CSV 는 [0, 1] 값뿐인데 AdvancedSkeleton 페이셜 컨트롤은 [0, 10] 키를 요구 → 임포트 때 사용자가 넣은 수를 곱하는 UI.
+- UI `Value Scale` 줄(QDoubleSpinBox, 기본 1, 빠른 버튼 `x1` / `x10`) → `csv_ops.import_facial(value_scale=)` 가 `float(raw) * value_scale` 로 키. 1 이 아니면 로그 · 요약에 배율.
+- 검증(mayapy 2024, offscreen UI): `x10` 클릭 → jawOpen 0~1 이 0~10 으로 키, 한 번 undo 로 키 전부 제거. 마야 GUI 는 미확인.
+
 > [!summary] A00275_skinTool_V01 — **Weights > Classic 의 Native 엔진이 선택 버텍스만 처리** (v01.35->01.36) `#A00275_skinTool_V01`
 - 요청: Classic 탭 Native 모드에서 선택한 버텍스만 웨이트 전이 — Joints to Joints 먼저, Meshes to Meshes 도 오래 걸리지 않으면.
 - `Joints to Joints`: 선택 파싱을 Transfer 탭의 `parse_target_selections` 로 바꿔 버텍스 · 엣지 · 페이스 선택이면 그 버텍스만
