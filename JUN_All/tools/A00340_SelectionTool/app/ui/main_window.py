@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-13
+# last Update date : 2026-10-19
 # A00340_SelectionTool - Qt UI (in-Maya)
 #
 # 마야에서 선택된 오브젝트들을 버튼 하나로 빠르게 다시 선택하는 툴.
@@ -30,8 +30,10 @@ from Framework.qt.qt import (
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.core import file_opener
 
 from tools.A00340_SelectionTool.app.config.version import VERSION, LAST_UPDATE
+from tools.A00340_SelectionTool.app.core import prefs as prefs_mod
 from tools.A00340_SelectionTool.app.ui.selection_tab import SelectionTab
 
 
@@ -69,6 +71,14 @@ class MainWindow(QWidget):
             "Show or hide the Controls pane (Profile / Create / Color).\n"
             "Hidden, it takes no space at all - the button area fills the window.")
         self.act_show_controls.toggled.connect(self.on_show_controls_toggled)
+
+        # Show Profile (v01.10) : 이 PC 에서 쓰는 활성 프로파일 json 을 탐색기에서 선택한 채로 연다.
+        view_menu.addSeparator()
+        act_show_profile = view_menu.addAction("Show Profile")
+        act_show_profile.setToolTip(
+            "Open Explorer with the active profile's JSON file selected\n"
+            "(the file this tool reads and writes on this PC).")
+        act_show_profile.triggered.connect(self.on_show_profile)
 
         help_menu = self.menu_bar.addMenu("Help")
         act_about = help_menu.addAction("About")
@@ -128,6 +138,26 @@ class MainWindow(QWidget):
         visible = self.selection_tab.set_controls_visible(checked)
         self._log("Controls pane: {0}".format("shown" if visible else "hidden"))
 
+    def on_show_profile(self, *args):
+        """View > Show Profile. 활성 프로파일 json 을 탐색기에서 선택해 연다.
+
+        파일이 없으면(지워졌거나 아직 저장 전) profiles 폴더를, 그것도 없으면 data 폴더를 연다.
+        """
+        name = prefs_mod.get_active()
+        path = prefs_mod.profile_path(name)
+        for candidate in (path, prefs_mod.PROFILES_DIR, prefs_mod.PREFS_DIR):
+            try:
+                file_opener.open_path(candidate)
+            except (OSError, ValueError):
+                continue
+            if candidate == path:
+                self._log("Show Profile: '{0}' -> {1}".format(name, path))
+            else:
+                self._log("[WARN] Profile file not found: {0} - opened {1}".format(
+                    path, candidate))
+            return
+        self._log("[ERR] Show Profile: cannot open {0}".format(path))
+
     def toggle_always_on_top(self, enabled):
         # WindowStaysOnTopHint 를 켜고/끄고, 플래그 변경 후 다시 show() (안 하면 창이 사라짐)
         self.setWindowFlag(Qt.WindowStaysOnTopHint, enabled)
@@ -161,6 +191,8 @@ class MainWindow(QWidget):
             "  collapse Profile / Create / Color all at once.\n"
             "- View > Show Controls : hide the whole control pane so the\n"
             "  button area fills the window (remembered for next time).\n"
+            "- View > Show Profile : open Explorer with the active profile's\n"
+            "  JSON file selected.\n"
             "\n"
             "All UI text is English.\n"
             "\n"

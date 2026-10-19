@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-13
+# last Update date : 2026-10-19
 # A00340_SelectionTool - version info
 
 # 01.07  View > Show Controls : Controls pane 을 통째로 숨기고 보인다(접기와 달리 영역이
@@ -12,5 +12,8 @@
 # 01.09  v01.08 의 좌우 배치를 취소하고 상하로 복귀. 위 칸은 처음 보일 때 Controls 내용
 #        높이에 맞춰 스크롤 없이 전부 보이고, 로그창은 Controls 밖 창 맨 아래로.
 
-VERSION = "01.09"
-LAST_UPDATE = "2026-10-13"
+# 01.10  View > Show Profile : Explorer 를 열어 활성 프로파일 json 을 선택해 보여 준다
+#        (이 PC 에서 툴이 읽고 쓰는 파일). 파일이 없으면 profiles 폴더를 연다.
+
+VERSION = "01.10"
+LAST_UPDATE = "2026-10-19"

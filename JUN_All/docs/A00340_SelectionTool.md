@@ -4,7 +4,7 @@
 A00240_PathTool 처럼 버튼을 자유롭게 추가·삭제·순서변경 하고, Profile 로 원하는
 종류끼리 버튼 세트를 나눠 보관한다.
 
-- **버전**: v01.09 (2026-10-13)
+- **버전**: v01.10 (2026-10-19)
 - **아키텍처**: (B) Standalone/Qt 앱형 구조지만 마야 안에서 실행(PySide, `maya.cmds`).
 - **참고**: 구성/편집 흐름은 `A00240_PathTool`, 마야 연동(셸프 설치·창 parenting·리로드)은
   `A00310_SearchTool` 를 이식.
@@ -86,6 +86,10 @@ A00340_SelectionTool/data/
      자체를 숨겨** 스플리터 핸들까지 사라지고 버튼 모음이 창 전체를 쓴다. 다시 켜면 숨기기
      직전의 비율로 돌아온다. 상태는 `data/active.json` 의 `show_controls` 에 남아 **다음에 열
      때도 같다.** 로그창은 창 맨 아래라 숨겨도 그대로 보인다.
+   - **`View > Show Profile`** (v01.10~) — 탐색기를 열어 **지금 활성인 프로파일 json** 을 선택(하이라이트)한
+     채로 보여 준다. 이 PC 에서 툴이 실제로 읽고 쓰는 파일(`<툴>/data/profiles/<프로파일>.json`)이라 백업 ·
+     다른 PC 로 복사할 때 쓴다. 파일이 없으면 `profiles` 폴더를 열고 로그에 `[WARN]` 을 남긴다.
+     탐색기 열기는 공용 `Framework.core.file_opener.open_path`.
 9. **Always on Top** — 상단 헤더 행 오른쪽의 `Pin` 버튼(체크형). 켜면 창이 다른 마야
    창들보다 항상 위에 유지되고(`Qt.WindowStaysOnTopHint`) 라벨이 `Pinned` 로 바뀐다.
    다시 누르면 해제. 버튼은 고정 크기라 토글해도 위치·크기가 변하지 않는다.

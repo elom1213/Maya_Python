@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-19 (오늘)
 
+> [!summary] A00340_SelectionTool — **View > Show Profile: 활성 프로파일 json 을 탐색기에서 선택해 연다** (v01.09->01.10) `#A00340_SelectionTool`
+- 요청: 메뉴바에 `Show Profile` — 누르면 이 PC 에서 툴이 참조하는 profile 경로가 탐색기에 표시된 채 팝업.
+- `View` 메뉴에 항목 추가, `prefs.profile_path(get_active())` 를 공용 `file_opener.open_path` 로(파일 선택). 파일이 없으면 profiles → data 폴더 폴백 + `[WARN]`.
+- 검증(mayapy 2024, offscreen UI): 메뉴 항목 존재, `open_path` 에 넘어가는 경로 = 활성 json, 파일 없을 때 폴백. 실제 `explorer /select` 호출은 에러 없이 실행됨, 마야 GUI 메뉴에서 눌러 보는 것은 미확인.
+
 > [!summary] A00145_RigConnect — **Constrain > Constraint 에 `All Targets -> Each Follower` 옵션** (v01.61->01.62) `#A00145_RigConnect`
 - 요청: Targets 에 `tgt_i` 여러 개, Followers 에 하나를 담고 Constrain 하면 타깃이 하나만 생긴다 → 모든 `tgt_i` 를 타깃으로 갖는 constraint 를 만드는 옵션.
 - 원인: 짝짓기가 인덱스 1:1(타깃 1개면 브로드캐스트)이라 follower 하나엔 `tgt_0` 만 걸렸다.

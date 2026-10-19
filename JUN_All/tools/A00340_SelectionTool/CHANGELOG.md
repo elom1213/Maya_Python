@@ -2,6 +2,13 @@
 
 All notable changes to this tool are documented here.
 
+## v01.10 — 2026-10-19
+
+- **View > Show Profile**: opens Explorer with the active profile's JSON file
+  selected - the file this tool reads and writes on this PC
+  (`<tool>/data/profiles/<profile>.json`). If the file is missing, the
+  `profiles` folder is opened instead and the Log says so.
+
 ## v01.09 — 2026-10-13
 
 - **Back to the stacked layout**: the side-by-side layout of v01.08 is reverted -

@@ -57,6 +57,11 @@ def _profile_path(name):
     return os.path.join(PROFILES_DIR, name + ".json")
 
 
+def profile_path(name):
+    """프로파일 JSON 의 절대 경로 (v01.10, View > Show Profile 이 탐색기로 연다)."""
+    return _profile_path(name)
+
+
 def _read_json(path, fallback):
     if os.path.isfile(path):
         try:
