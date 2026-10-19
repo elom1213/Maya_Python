@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-16
+# last Update date : 2026-10-19
 # A00110_animTool_V02 - Qt UI
 
 from Framework.qt.qt import *
@@ -9,6 +9,7 @@ from Framework.qt import JUN_mod_collapsible_qt
 from Framework.qt import JUN_mod_timeRange_qt
 from Framework.qt import JUN_mod_filter_qt
 from Framework.qt import JUN_mod_expand_qt
+from Framework.qt import JUN_mod_checkList_qt
 from Framework.qt.maya_window import maya_main_window
 from Framework.core.maya_refresh import force_refresh
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
@@ -23,6 +24,7 @@ from tools.A00110_animTool_V02.app.core import KeyframeManager
 from tools.A00110_animTool_V02.app.core import HotkeyManager
 from tools.A00110_animTool_V02.app.core import ManipSpaceManager
 from tools.A00110_animTool_V02.app.core import PoseKeyManager
+from tools.A00110_animTool_V02.app.core import AttrKeyManager
 from tools.A00110_animTool_V02.app.core import CopyKeyManager
 from tools.A00110_animTool_V02.app.core import MirrorKeyManager
 from tools.A00110_animTool_V02.app.core import MirrorTokenStore
@@ -306,6 +308,8 @@ class MainWindow(QWidget):
          "_build_fill_keys_page"),
         ("Delete All", "Delete All Keys - delete every keyframe of the listed "
          "objects", "_build_delete_all_page"),
+        ("Key Attrs", "Key Attrs - key the checked attributes one after another, "
+         "0 -> 1 -> 0 (Key every target for any attribute)", "_build_attr_key_page"),
     )
 
     TIMING_PAGES = (
@@ -899,6 +903,101 @@ class MainWindow(QWidget):
         self.btn_set_pose.clicked.connect(self.on_set_pose)
 
         return tab
+
+    # ---------------- Key > Key Attrs ----------------
+
+    def _build_attr_key_page(self):
+        """체크한 어트리뷰트를 차례대로 0 -> 1 -> 0 키하는 페이지 (Key > Key Attrs).
+
+        A00290_BSTool_V02 의 Key every target 과 같은 규칙인데, 대상이 blendShape weight 가 아니라
+        **리스트업한 오브젝트 x 체크한 어트리뷰트** 다. n 번째 플러그가 프레임 Start+n 에서 1 이 되고
+        앞뒤 프레임에서 0 이 되어, 프레임을 넘기면 어트리뷰트가 하나씩 따로 보인다.
+        """
+        page, layout = self._sub_page()
+
+        self.ak_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", select_label="List Selected Objects",
+            list_min_height=90, log_callback=self.log)
+        layout.addWidget(self.ak_tsl)
+
+        attr_grp = QGroupBox("Attributes")
+        attr_box = QVBoxLayout(attr_grp)
+
+        head = QHBoxLayout()
+        # 기본값 ON : 애니메이터가 키를 거는 것은 거의 항상 채널박스에 보이는 것이다.
+        self.cb_ak_cb_only = QCheckBox("Channel Box only")
+        self.cb_ak_cb_only.setChecked(True)
+        self.cb_ak_cb_only.setToolTip(
+            "On (default): only attributes shown in the Channel Box.\n"
+            "Off: every unlocked numeric attribute that can take a key.\n"
+            "Toggling re-lists the attributes and keeps the checks by name.")
+        self.cb_ak_cb_only.toggled.connect(lambda *_: self.on_ak_list_attrs(quiet=True))
+        head.addWidget(self.cb_ak_cb_only)
+        head.addStretch(1)
+        self.lbl_ak_number = QLabel("Number: 0")
+        head.addWidget(self.lbl_ak_number)
+        attr_box.addLayout(head)
+
+        self.lw_ak_attrs = QListWidget()
+        self.lw_ak_attrs.setMinimumHeight(120)
+        self.lw_ak_attrs.setToolTip(
+            "Check the attributes to key. They are keyed in this order.\n"
+            "Shift / Ctrl click to select several rows - clicking the check box of a\n"
+            "selected row (or Space) checks or unchecks every selected row.\n"
+            "Hover a row to see which objects carry it.")
+        # Shift/Ctrl 다중 선택 + 고른 행 한꺼번에 체크 (Framework 공용 동작)
+        self.chk_ak_attrs = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(self.lw_ak_attrs)
+        attr_box.addWidget(self.lw_ak_attrs, 1)
+
+        search_row = QHBoxLayout()
+        self.flt_ak = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            self.lw_ak_attrs, placeholder="Type any part of an attribute name",
+            number_label=self.lbl_ak_number)
+        search_row.addWidget(self.flt_ak, 1)
+        btn_check_all = QPushButton("Check All")
+        btn_check_all.setToolTip("Check every attribute currently visible.")
+        btn_check_all.clicked.connect(lambda: self._ak_set_all(True))
+        search_row.addWidget(btn_check_all)
+        btn_uncheck = QPushButton("Clear Checks")
+        btn_uncheck.setToolTip("Uncheck everything, visible or not.")
+        btn_uncheck.clicked.connect(lambda: self._ak_set_all(False))
+        search_row.addWidget(btn_uncheck)
+        attr_box.addLayout(search_row)
+
+        btn_list = QPushButton("List Attributes")
+        btn_list.setToolTip(
+            "List the keyable attributes of the listed objects (union).\n"
+            "Checks are kept by name when you list again.")
+        btn_list.clicked.connect(lambda *_: self.on_ak_list_attrs())
+        attr_box.addWidget(btn_list)
+
+        layout.addWidget(attr_grp)
+
+        start_row = QHBoxLayout()
+        start_row.addWidget(QLabel("Start Frame"))
+        self.le_ak_start = QLineEdit("0")
+        self.le_ak_start.setValidator(QIntValidator(-1000000, 1000000, self))
+        self.le_ak_start.setToolTip(
+            "Frame of the first attribute's 1 key (0 = same as BSTool Key every target).")
+        start_row.addWidget(self.le_ak_start)
+        start_row.addStretch(1)
+        layout.addLayout(start_row)
+
+        self.btn_ak_key = QPushButton("Key Every Checked Attribute")
+        self.btn_ak_key.setMinimumHeight(32)
+        self.btn_ak_key.setToolTip(
+            "Key each checked attribute of each listed object in turn:\n"
+            "the n-th one is 1 at frame Start+n and 0 one frame before and after.\n"
+            "Order: object list order, then attribute list order.\n"
+            "Locked, missing or driven (constraint / driven key / expression) plugs are\n"
+            "skipped and take no frame. Only checked attributes visible in the filter\n"
+            "are keyed. Runs as a single undo step.")
+        self.btn_ak_key.clicked.connect(self.on_ak_key_every)
+        layout.addWidget(self.btn_ak_key)
+
+        layout.addStretch(1)
+
+        return page
 
     # ---------------- Create > Noise ----------------
 
@@ -2692,6 +2791,93 @@ class MainWindow(QWidget):
 
         count, msg = PoseKeyManager.set_pose_keys(axis_values)
         self.log(msg)
+
+    # --------------------------------------------------
+    # Key > Key Attrs
+    # --------------------------------------------------
+
+    def _ak_checked_names(self, visible_only=False):
+        """체크된 어트리뷰트 이름들 (목록 순서). visible_only 면 필터에 가려진 것은 뺀다."""
+        names = []
+        for i in range(self.lw_ak_attrs.count()):
+            item = self.lw_ak_attrs.item(i)
+            if item.checkState() != Qt.Checked:
+                continue
+            if visible_only and item.isHidden():
+                continue
+            names.append(item.text())
+        return names
+
+    def _ak_set_all(self, checked):
+        """Check All / Clear Checks. 켤 때는 보이는 것만, 끌 때는 전부 (A00145 와 같은 규칙)."""
+        state = Qt.Checked if checked else Qt.Unchecked
+        for i in range(self.lw_ak_attrs.count()):
+            item = self.lw_ak_attrs.item(i)
+            if checked and item.isHidden():
+                continue
+            item.setCheckState(state)
+
+    def on_ak_list_attrs(self, quiet=False):
+        """리스트업한 오브젝트들의 키 가능 어트리뷰트를 합집합으로 나열한다. 체크는 이름으로 유지."""
+        objs = self.ak_tsl.get_all_items()
+        if not objs:
+            if not quiet:
+                self.log("[Warning] Add objects to the Objects list first.")
+            return
+
+        keep = set(self._ak_checked_names())
+        names, owners = AttrKeyManager.list_attrs(
+            objs, channel_box_only=self.cb_ak_cb_only.isChecked())
+
+        self.lw_ak_attrs.clear()
+        for name in names:
+            item = QListWidgetItem(name)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Checked if name in keep else Qt.Unchecked)
+            holders = owners[name]
+            tip = ", ".join(holders[:10])
+            if len(holders) > 10:
+                tip += " ... (+{0})".format(len(holders) - 10)
+            item.setToolTip("{0}/{1} object(s): {2}".format(len(holders), len(objs), tip))
+            self.lw_ak_attrs.addItem(item)
+        shown, total = self.flt_ak.refresh()
+
+        if not names:
+            self.log("[Warning] No keyable attribute found on the listed objects.")
+            return
+
+        msg = "{0} attribute(s) from {1} object(s) ({2}).".format(
+            total, len(objs),
+            "Channel Box only" if self.cb_ak_cb_only.isChecked() else "all keyable")
+        if shown != total:
+            msg += " Filter '{0}' shows {1}.".format(self.flt_ak.text().strip(), shown)
+        self.log(msg)
+
+    def on_ak_key_every(self):
+        """체크된(보이는) 어트리뷰트를 오브젝트 순 -> 어트리뷰트 순으로 0 -> 1 -> 0 키한다."""
+        objs = self.ak_tsl.get_all_items()
+        if not objs:
+            self.log("[Warning] Add objects to the Objects list first.")
+            return
+
+        attrs = self._ak_checked_names(visible_only=True)
+        hidden = len(self._ak_checked_names()) - len(attrs)
+        if hidden:
+            self.log("[Info] {0} checked attribute(s) hidden by the filter were "
+                     "skipped.".format(hidden))
+        if not attrs:
+            self.log("[Warning] No attribute checked.")
+            return
+
+        txt = self.le_ak_start.text().strip()
+        start = int(txt) if txt not in ("", "-") else 0
+
+        count, msg, skipped = AttrKeyManager.key_every_attr(objs, attrs, start)
+        self.log(msg)
+        for plug in skipped[:20]:
+            self.log("    skipped: " + plug)
+        if len(skipped) > 20:
+            self.log("    ... (+{0} more)".format(len(skipped) - 20))
 
     # --------------------------------------------------
     # Create > Noise
