@@ -130,6 +130,10 @@ updated: 2026-10-19
 - **Result**: lip-sync keys on a JALI rig from an audio file alone (14.9 s of speech: ~4 s inference, 0.2 s keying).
   Verified with 42 converter core/UI checks and 34 mayapy checks for the Maya tool. Next: comparing **Korean / Japanese**
   quality on an English-trained model.
+- **Follow-up — `A00550_PoseMapper`**: tune phoneme → ARKit blendShape poses with sliders (solo preview, capture the result
+  of any existing network), save them as json and **reconnect them to another avatar by name**. While tuning I measured why a
+  `blendWeighted` input connected in the Node Editor misbehaves (its weight element does not exist, so it is hidden yet
+  computed as 1.0, and a plain `getAttr` of it silently creates it) and added a tab that finds and fixes those.
 - **Keywords**: VisemeNet, JALI (Jaw/Lip viseme field), audio-driven lip sync, TensorFlow frozen-graph patching,
   dropout at inference, multilingual dubbing, PySide standalone + QThread, ARKit 52 mapping, fork management
 

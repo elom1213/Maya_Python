@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-19 (오늘)
 
+> [!summary] A00550_PoseMapper **신규** — 음소 어트리뷰트 → 블렌드셰이프 포즈 (Pose Map) + blendWeighted weight 편집 (Blend Weights) `#A00550_PoseMapper`
+- 요청: `JALI_IN` 같은 음소 노드 · 음소 · 블렌드셰이프(`BS_arkit`)를 골라 음소별 타겟 값을 조정 → 관계 저장 → 임의의 노드 쌍에 연결. 그리고 blendWeighted 에 UI 에서 보이는 weight 를 추가하는 탭. 기준값 기본 10 + 임의 실수, 이미 연결된 타겟은 Skip.
+- 원인 실측: Node Editor 에서 `input[5]` 만 연결하면 `weight[5]` 원소가 없어 안 보이지만 **1.0 으로 계산**된다. `getAttr weight[5]` 는 **읽기만 해도 원소를 만든다** → 검사는 `-mi` 로만. 테스트 씬 `JALI1:bw_mouthFunnel [5] OHH` 가 정확히 이 상태였다.
+- Pose Map: 타겟마다 blendWeighted(+clamp), weight = 포즈 / Ref, `pm_NET` network 가 message 로 묶음. 슬라이더 = 그 타겟 체인만 sync, Solo preview(연결된 음소는 값을 넣을 수 있는 위쪽 plug 로 · 원복), Capture(어떤 노드망이든 결과를 포즈로), json 저장, Connect To(Skip / Replace / Add). 음소 목록 체크 — `Jaw` · `Lip` 기본 해제.
+- Blend Weights: input · weight 표, weight 없는 input 빨강, Add = 연결 + weight 같이, Create Missing(1.0, 결과 그대로), Remove = 둘 다.
+- 검증(mayapy 2024 + 테스트 씬 `JP__CHN_Basic_1070_JALI_test.mb`, 열기만): 74항목. 계획서 `docs/plans/A00550_PoseMapper_plan.md` §10 에 단계별 진행 기록(중단 복구용). **마야 GUI 미확인**.
+
 > [!summary] A00110_animTool_V02 — **Key > Key Attrs: 체크한 어트리뷰트만 Key every target** (v02.20->02.21) `#A00110_animTool_V02`
 - 요청: 선택 오브젝트를 리스트업하고 키 가능한 어트리뷰트를 체크박스 목록으로 — 필터 검색, 채널박스에 보이는 것만 볼지 토글, 체크된 어트리뷰트를 차례대로 0 → 1 키 (A00290_BSTool_V02 Key every target 의 일반화).
 - 새 `attr_key_manager.AttrKeyManager` — 목록은 오브젝트들의 합집합(`Channel Box only` 기본 켬 = keyable + channelBox, 끄면 잠기지 않은 수치형 전부). multi 는 원소로 펴고 별칭을 붙여 blendShape 타겟이 이름으로 보인다.

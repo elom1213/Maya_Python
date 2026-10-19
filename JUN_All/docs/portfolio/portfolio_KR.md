@@ -124,6 +124,9 @@ updated: 2026-10-19
   세우고(실측 2개 파일 일치), 시작 정렬은 맞다는 것을 확인해 마야에서 소리와 입이 어긋나지 않음을 보장했다.
 - **결과**: 음성 파일만으로 JALI 리그 립싱크 키가 나온다(14.9초 음성 추론 약 4초, 키 0.2초). 검증: 변환기 코어 · UI 시험 42항목,
   마야 툴 mayapy 34항목. 남은 과제는 영어 학습 모델의 **한국어 · 일본어 품질 비교**.
+- **후속 — `A00550_PoseMapper`**: 음소 → ARKit 블렌드셰이프 포즈를 슬라이더로 다듬어(Solo preview · 기존 노드망 결과 Capture) json 으로 저장하고
+  **이름만으로 다른 아바타에 다시 연결**한다. 작업 중 막힌 `blendWeighted` 문제(연결만 한 input 의 weight 는 UI 에 안 보이지만 1.0 으로 계산되고,
+  `getAttr` 로 읽기만 해도 원소가 생긴다)를 실측으로 밝혀 검출 · 수정 탭도 같이 만들었다.
 - **키워드**: VisemeNet, JALI (Jaw/Lip viseme field), 오디오 구동 립싱크, TensorFlow frozen graph 패치, dropout 추론, 다국어 더빙,
   PySide 스탠드얼론 + QThread, ARKit 52 매핑, 포크 관리
 

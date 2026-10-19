@@ -1,6 +1,6 @@
 # A00550_PoseMapper — 계획서 (음소 포즈 매핑 + blendWeighted 가중치 탭)
 
-> **작성** 2026-10-19 · 상태: **구현 중** (진행 기록 §10 — 중단되면 §10 의 첫 미완료 항목부터 이어서) · 대상 Maya 2024
+> **작성** 2026-10-19 · 상태: **v01.00 완료** (2026-10-19, 진행 기록 §10 — 사용 안내 `docs/A00550_PoseMapper.md`) · 대상 Maya 2024
 > 배경: JUN_JALI `out/jali_arkit_mapping_ctl.ma` 에서 JALI 음소 → ARKit 가중치를 손으로 다듬다가 나온 요청.
 > 관련: `A00540_JaliLipSync`(음성 → JALI 키) · JUN_JALI `docs/0040_jali_arkit_mapping.md`(실측 시작 가중치) ·
 > JUN_JALI `examples/build_jali_arkit_node.py`(지금 쓰는 bw → md → clamp 노드망)
@@ -315,4 +315,4 @@ Blend Weights 를 먼저 하는 이유: 지금 막힌 문제(R6)를 바로 풀�
 - [x] 4. `app/core/attrs.py` · `library.py` · `network.py` + `tests/test_network.py` (P2 · P3 · P4 · P5 · P7, ref 2.5 포함) — 20/20. 핵심 API: `network.build(lib, src, tgt, prefix, on_existing)` → (net, report), `network.sync(net, lib, on_existing, only_targets)`(슬라이더는 only_targets=[t]), `network.remove(net)`, `network.read_library(net)`. weight 는 float32 라 되읽은 값은 소수 4자리까지
 - [x] 5. `app/core/capture.py`(`preview.py` 는 만들지 않고 `capture.PhonemeDriver` 로 합침 — solo / all_zero / restore) + `app/libraries/jali_arkit_0040_default.json`(JUN_JALI `examples/build_jali_arkit_node.py` 의 MAPPING 을 ast 로 읽어 좌우 펼침) + `tests/test_capture.py` 12/12. 음소 plug 가 연결돼 있으면 값을 넣을 수 있는 위쪽 plug 로 올라간다(테스트 씬: `JALI1:JALI_IN.AAA` → `JALI1:CNT_PHONEMES.AAA`). ref 가 그 plug 의 max 를 넘으면 CaptureError. Capture = (음소 ref, 나머지 0) − (전부 0)
 - [x] 6. `app/ui/pose_map_tab.py` + `connect_dialog.py` (P4 · P5 · U — Skip 기본, 테스트 씬은 Replace 로) — `tests/test_ui_pose_map.py` 19/19 (테스트 씬: Capture · Used only · Solo · Build(Replace) · 슬라이더 실시간 · ref 5 / 7.25 · 음소 전환 · 원복 · 저장 · Connect 다른 쌍 · Remove · 기본 라이브러리 Load). 계획 대비 추가: 음소 목록에 **체크박스** — 체크 = 음소(Solo · Capture 대상), 기본으로 `Jaw` · `Lip` 해제(같은 노드의 배율 입력을 0 으로 만들면 출력 전체가 0)
-- [ ] 7. 아이콘 · `docs/A00550_PoseMapper.md` · WORKLOG · README(툴 69 / 현행 54) · 포트폴리오 · 메모리 · 이 계획서 상태 갱신
+- [x] 7. 아이콘 · `docs/A00550_PoseMapper.md` · WORKLOG · README(툴 69 / 현행 54) · 포트폴리오 · 메모리 · 이 계획서 상태 갱신 — 남은 것: 마야 GUI 확인(드롭 설치 · 실제 얼굴 Solo preview)
