@@ -32,6 +32,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-19 (오늘)
 
+> [!summary] A00110_animTool_V02 — **Key > Key Attrs: 체크한 어트리뷰트만 Key every target** (v02.20->02.21) `#A00110_animTool_V02`
+- 요청: 선택 오브젝트를 리스트업하고 키 가능한 어트리뷰트를 체크박스 목록으로 — 필터 검색, 채널박스에 보이는 것만 볼지 토글, 체크된 어트리뷰트를 차례대로 0 → 1 키 (A00290_BSTool_V02 Key every target 의 일반화).
+- 새 `attr_key_manager.AttrKeyManager` — 목록은 오브젝트들의 합집합(`Channel Box only` 기본 켬 = keyable + channelBox, 끄면 잠기지 않은 수치형 전부). multi 는 원소로 펴고 별칭을 붙여 blendShape 타겟이 이름으로 보인다.
+- 키 규칙은 BSTool 과 같다: n 번째 플러그가 `Start+n` 에서 1, 앞뒤 0. 순서 = 오브젝트 → 어트리뷰트. 없음 · 잠김 · 구동(컨스트레인트 / 드리븐 키 / 익스프레션 — 키를 걸면 pairBlend 가 끼어 리그가 바뀐다) 플러그는 건너뛰고 프레임도 쓰지 않는다. 필터에 가려진 체크는 제외 + 로그. Undo 한 번.
+- UI: 공용 TSL · `JUN_mod_checkList_qt`(Shift/Ctrl 다중 체크) · `JUN_mod_filter_qt`, Check All(보이는 것만) / Clear Checks(전부), Start Frame, 행 툴팁에 그 어트리뷰트를 가진 오브젝트.
+- 발견: mayapy 에서 `maya.standalone.initialize()` 가 `QGuiApplication` 을 먼저 만들어 위젯 생성이 조용히 죽는다(exit 127) → 오프스크린 UI 테스트는 `QApplication` 을 initialize **전에** 만들어야 한다.
+- 검증(mayapy 2024, offscreen UI): 코어 13 (채널박스 / 전체 목록, blendShape 별칭, 순차 프레임, 잠김 · 구동 · 없음 건너뜀, pairBlend 미생성, Undo 한 번) · UI 6 (탭 존재, 리스트업, Check All 보이는 것만, 필터 제외, 버튼 경로, 토글 재나열 + 체크 유지) — 19/19. 마야 GUI 는 미확인.
+
 > [!summary] A00540_JaliLipSync **신규** + JUN_JALI(VisemeNet 포크) 툴 3종 — **음성 → JALI 리그 립싱크** `#A00540_JaliLipSync`
 - 요청: JUN_JALI 계획서(`docs/0030_tool_plan.md`)대로 — 더블클릭 추론 환경 설치, wav → txt 스탠드얼론 변환기(TSL + 저장 경로, 오류 시 중단 + 로그), 마야 키 툴(드래그&드롭 셸프), JALI ↔ ARKit 매칭.
 - JUN_JALI: `setup_env.bat`(64bit Python 3.9~3.11 탐색 · winget 제안 · `.venv` · 자가 검사) · `Run_VisemeNet_Converter.bat` + `tools/VisemeNet_Converter`(검사 규칙 E01~E11 · 사전 검사 실패면 변환 0 · 변환 중 오류 즉시 중단 · QThread) · `vendor/Framework`(이 저장소 Framework 복사본).
