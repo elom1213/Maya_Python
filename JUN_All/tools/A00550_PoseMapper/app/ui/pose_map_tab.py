@@ -156,7 +156,9 @@ class PoseMapTab(QWidget):
         lib_row = QHBoxLayout()
         lib_row.addWidget(QLabel("Library"))
         self.cmb_lib = QComboBox()
-        self.cmb_lib.setMinimumWidth(200)
+        # 콤보의 최소 폭이 가장 긴 항목 이름을 따라가지 않게 (v01.04) - Save 로 긴 이름이 생기면 창이 커지던 원인
+        self.cmb_lib.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.cmb_lib.setMinimumContentsLength(16)
         lib_row.addWidget(self.cmb_lib, 1)
         for label, slot in (("Load", self.on_load), ("Save", self.on_save), ("Save As...", self.on_save_as),
                             ("New", self.on_new)):
@@ -190,6 +192,8 @@ class PoseMapTab(QWidget):
         net_row.addWidget(b_remove, 1)
         layout.addLayout(net_row)
         self.lb_status = QLabel("No network")
+        # 상태 글자(라이브러리 경로 포함)가 길어져도 폭을 요구하지 않는다 (v01.04) - 넘치면 잘리고 툴팁으로 전부
+        self.lb_status.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         layout.addWidget(self.lb_status)
 
     # ================================================================== 도우미
@@ -219,12 +223,23 @@ class PoseMapTab(QWidget):
 
     def _status(self):
         if self.net and cmds.objExists(self.net):
-            self.lb_status.setText("Network {0}: {1} target chain(s), ref {2:g}  |  library '{3}'{4}".format(
+            off = network.detached(self.net)
+            self.lb_status.setText("Network {0}: {1} target chain(s){5}, ref {2:g}  |  library '{3}'{4}".format(
                 self.net, len(network.chains(self.net)), self.lib.ref_value, self.lib.name,
-                "  ({0})".format(self.lib_path) if self.lib_path else ""))
+                "  ({0})".format(self.lib_path) if self.lib_path else "",
+                "  [!] {0} not driving the target".format(len(off)) if off else ""))
+            if off and off != getattr(self, "_detached_warned", None):
+                self._detached_warned = off
+                others = [n for n in network.find_networks(target=self.target()) if n != self.net]
+                self._log("[WARN] {0} chain(s) of {1} no longer drive {2} ({3}){4} - sliders here will not move "
+                          "the face. Build / Update Network with 'Replace' to take them back.".format(
+                              len(off), self.net, self.target(), ", ".join(off[:6]) + (" ..." if len(off) > 6 else ""),
+                              " - another network drives them: " + ", ".join(others) if others else ""))
         else:
             self.net = None
-            self.lb_status.setText("No network  |  library '{0}'".format(self.lib.name))
+            self.lb_status.setText("No network  |  library '{0}'{1}".format(
+                self.lib.name, "  ({0})".format(self.lib_path) if self.lib_path else ""))
+        self.lb_status.setToolTip(self.lb_status.text())     # 폭이 모자라 잘리면 툴팁으로 전부
 
     # ================================================================== 노드
 

@@ -45,6 +45,9 @@ try:
     cmds.file(sys.argv[1], o=True, force=True, executeScriptNodes=False, ignoreVersion=True)
 except RuntimeError:
     pass
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import scene_fixture   # noqa: E402
+scene_fixture.reset_to_original_wiring()
 import tools.A00550_PoseMapper as tool   # noqa: E402
 from tools.A00550_PoseMapper.app.core import library, network   # noqa: E402
 win = tool.run(False)
@@ -121,6 +124,22 @@ check("log reports missing", "Targets not on avatar:ARKIT" in win.log_view.toPla
 n_bw = len(cmds.ls(type="blendWeighted"))
 tab.on_remove()
 check("remove network", tab.net is None and len(cmds.ls(type="blendWeighted")) < n_bw)
+
+# 같은 타겟을 다른 노드망이 Replace 로 가져가면, 원래 노드망을 골랐을 때 경고 (v01.04)
+tab.le_source.setText(SRC)
+tab.le_target.setText(BS)
+tab.on_nodes_changed()
+tab.cmb_existing.setCurrentIndex(1)
+tab.on_build()
+net_a = tab.net
+tab.le_source.setText("JALI1:CNT_PHONEMES")
+tab.on_nodes_changed()
+tab.lib = library.load(path)
+tab.on_build()
+tab.le_source.setText(SRC)
+tab.on_nodes_changed()
+check("detached chains reported", tab.net == net_a and network.detached(net_a) and "[!]" in tab.lb_status.text()
+      and "no longer drive" in win.log_view.toPlainText())
 
 tab.cmb_lib.setCurrentText("jali_arkit_0040_default")
 tab.on_load()

@@ -24,6 +24,9 @@ try:
     cmds.file(sys.argv[1], o=True, force=True, executeScriptNodes=False, ignoreVersion=True)
 except RuntimeError:
     pass
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import scene_fixture   # noqa: E402
+scene_fixture.reset_to_original_wiring()
 src, bs = "JALI1:JALI_IN", "CHN_n_Face_xx_bs"
 phon = ["AHH", "AAA", "Eh", "IEE", "OHH", "UUU", "WWW", "RRR", "SSS", "SSH", "FFF", "TTH", "MBP", "Schwa", "LNTD", "GK"]
 print("  JaLi now:", cmds.getAttr("JALI1:CNT_JaLi.tx"), cmds.getAttr("JALI1:CNT_JaLi.ty"),

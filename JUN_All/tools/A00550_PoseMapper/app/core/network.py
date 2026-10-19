@@ -84,6 +84,30 @@ def _phoneme_inputs(bw, source):
     return out
 
 
+def chain_output(bw):
+    """체인의 마지막 출력 plug (clamp 가 있으면 clamp.outputR)."""
+    cl = _clamp_of(bw)
+    return cl + ".outputR" if cl else bw + ".output"
+
+
+def detached(net):
+    """타겟을 더 이상 구동하지 않는 체인의 타겟 이름 (v01.04).
+
+    같은 타겟에 다른 노드망을 Replace 로 연결하면 이 노드망의 체인은 남아 있지만 출력이 타겟에 닿지 않는다
+    -> 이 노드망의 슬라이더를 움직여도 얼굴이 안 바뀐다. 그걸 알려 주려고 쓴다.
+    """
+    target = net_target(net)
+    out = []
+    for t, bw in chains(net).items():
+        dst = attrs_mod.plug(target, t)
+        if not cmds.objExists(dst):
+            continue
+        src = attrs_mod.incoming(dst)
+        if src is None or src.split(".", 1)[0] != chain_output(bw).split(".", 1)[0]:
+            out.append(t)
+    return out
+
+
 def read_library(net, name=None):
     """노드망의 weight x ref 로 라이브러리를 다시 만든다."""
     info = net_info(net)

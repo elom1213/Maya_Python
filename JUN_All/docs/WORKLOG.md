@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-19 (오늘)
 
+> [!summary] A00550_PoseMapper — **창 크기를 언제든 자유롭게 · Save 등이 크기를 바꾸지 않게** (v01.03->01.04) `#A00550_PoseMapper`
+- 보고: Save 뒤 창 크기를 드래그로 못 바꾼다, Save 를 누르면 크기가 저절로 바뀐다.
+- 원인: ① `QTabWidget` 최소 크기(안 보이는 탭 포함 최댓값)가 창 최소로 강제 — 처음부터 그 이하로 못 줄였다(메모리 qtabwidget-min-size) ② Save 가 라이브러리 콤보에 긴 이름을, 상태 줄에 경로를 넣어 그 최소를 키움 → 창이 저절로 넓어지고 못 줄임.
+- 수정: 탭을 `QScrollArea` 에 담음(**최소 폭을 걸지 않음** — A00480 방식과 달리 가로도 자유롭게, 작으면 스크롤바), 콤보는 `AdjustToMinimumContentsLengthWithIcon`, 상태 줄은 가로 `Ignored` + 툴팁. 처음 열 때만 내용에 맞춤.
+- 덤: 테스트 씬 16:20 저장본에 노드망이 두 개(`pm_NET` 이 `pm_NET1` 의 Replace 에 밀려 BS 를 구동하지 않음) — 밀린 노드망을 고르면 상태 줄 `[!]` + 로그 경고. 시험은 `tests/scene_fixture.py` 로 원래 배선에서 시작.
+- 검증(mayapy 오프스크린): `tests/test_ui_size.py` 8/8 + 나머지 7종 통과. 마야 GUI 미확인. 사용자 라이브러리 json 변경분은 커밋하지 않음.
+
 > [!summary] A00550_PoseMapper — **Solo preview 가 저절로 꺼지던 문제** (v01.02->01.03) `#A00550_PoseMapper`
 - 보고: Solo 를 켜고 음소를 고른 뒤 Target 값을 0 에서 올렸다 다시 0 으로 하면 Solo 가 꺼진다 → 체크박스를 눌러 끌 때만 꺼지게.
 - 원인: 타겟 값을 바꾸면 음소 줄 글자가 `AHH` → `AHH (1)` 로 바뀌는데, **`QListWidget` 은 글자만 바뀌어도 `itemChanged` 를 쏜다** → 체크 변경으로 읽혀 Solo 를 껐다(v01.01 에서 넣은 동작). 같은 식으로 탭 이동 · 노드 칸 포커스 아웃(`editingFinished` 는 글자 그대로여도 온다) · Capture · Remove Network 도 껐다.

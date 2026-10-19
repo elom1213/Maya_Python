@@ -30,7 +30,7 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
         self.setWindowTitle("Pose Mapper v{0}".format(VERSION))
         self.setWindowFlags(Qt.Window)
-        self.resize(760, 820)
+        self.resize(760, 820)                       # 처음 보일 때 fit_to_content 가 내용에 맞춘다
         self._build()
 
     def _build(self):
@@ -60,7 +60,15 @@ class MainWindow(QWidget):
         self.tabs.addTab(self.pose_tab, "Pose Map")
         self.tabs.addTab(self.bw_tab, "Blend Weights")
         self.tabs.currentChanged.connect(self._on_tab_changed)
-        layout.addWidget(self.tabs, 1)
+        # 탭을 스크롤 칸에 담는다 (v01.04). QTabWidget 의 최소 크기(안 보이는 탭까지 포함한 최댓값)가 창 최소로
+        # 강제되면 창을 그보다 줄일 수 없고, Save 처럼 콤보 · 라벨 글자가 길어지는 명령이 그 최소를 키워 창이
+        # 저절로 커졌다. 스크롤 칸은 최소가 작으므로 창은 언제든 자유롭게 줄이고 늘릴 수 있다(작으면 스크롤바).
+        # 스크롤 칸에 최소 폭을 걸지 않는다 - 걸면 다시 그 폭 아래로 못 줄인다.
+        self.tabs_scroll = QScrollArea()
+        self.tabs_scroll.setWidgetResizable(True)
+        self.tabs_scroll.setFrameShape(QFrame.NoFrame)
+        self.tabs_scroll.setWidget(self.tabs)
+        layout.addWidget(self.tabs_scroll, 1)
 
         log_box = QGroupBox("Log")
         log_layout = QVBoxLayout(log_box)
@@ -74,6 +82,27 @@ class MainWindow(QWidget):
         # Solo preview 는 탭을 옮겨도 유지한다 - 끄는 것은 체크박스 클릭(과 창 닫기)뿐 (v01.03).
         if self.tabs.widget(index) is self.bw_tab:
             self.bw_tab.refresh_nodes()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not getattr(self, "_fitted", False):
+            self._fitted = True
+            # 테마 qss 가 입은 뒤(다음 이벤트 루프) 글자 크기로 재야 여는 크기가 맞다.
+            QTimer.singleShot(0, self.fit_to_content)
+
+    def fit_to_content(self):
+        """처음 열 때만 창을 내용 크기에 맞춘다(화면 작업 영역까지). 그 뒤로는 크기를 건드리지 않는다."""
+        content = QSize(self.tabs.minimumSizeHint().width(), self.tabs.sizeHint().height())
+        extra_w = self.minimumSizeHint().width() - self.tabs_scroll.minimumSizeHint().width()
+        extra_h = self.minimumSizeHint().height() - self.tabs_scroll.minimumSizeHint().height()
+        width, height = max(content.width() + max(extra_w, 0), 360), content.height() + max(extra_h, 0)
+        screen = self.screen() if hasattr(self, "screen") else None
+        if screen is not None:
+            avail = screen.availableGeometry()
+            frame_h = max(self.frameGeometry().height() - self.geometry().height(), 0)
+            width = min(width, avail.width())
+            height = min(height, avail.height() - frame_h)
+        self.resize(width, height)
 
     def closeEvent(self, event):
         if hasattr(self.pose_tab, "stop_preview"):

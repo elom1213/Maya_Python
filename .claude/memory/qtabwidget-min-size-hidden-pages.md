@@ -21,6 +21,11 @@ metadata:
 테마 polish 뒤 글자 크기로 잰다. 내용보다 작게 열리면 스크롤바 폭만큼 더해 잘림을 막는다.
 구현: `tools/A00210_FileManager/app/ui/main_window.py` `fit_to_content`, `tools/A00480_FileTool/app/ui/main_window.py` 동일.
 
+**변형 — 가로도 자유롭게 (A00550 v01.04)**: 사용자가 "언제든 자유롭게 조절" 을 원하면 A00480 처럼 스크롤 칸에
+`setMinimumWidth(content)` 를 걸지 **말 것** — 걸면 다시 그 폭 아래로 못 줄인다. 여는 크기만 맞추고 작으면 스크롤바.
+**명령이 창을 키우는 경우**: 콤보 최소 폭은 가장 긴 항목을 따라간다(`AdjustToMinimumContentsLengthWithIcon` 로 막기),
+라벨은 글자 폭을 요구한다(경로 표시 라벨은 가로 `QSizePolicy.Ignored` + 툴팁). Save 가 둘 다 늘려 창이 저절로 커졌다.
+
 **검증**: 오프스크린에서 `minimumSizeHint` 가 작아졌는지 · `resize(600, 400)` 이 먹는지 · 여는 높이가 `min(탭 최소, 화면)` 인지.
 
 관련: [[window-taller-than-screen-ghost]], [[offscreen-size-needs-theme]]

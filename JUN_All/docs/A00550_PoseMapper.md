@@ -4,7 +4,7 @@
 음소를 하나 골라 타겟 값을 슬라이더로 정하고, 그 관계를 json 으로 저장해 **아무 노드 쌍에나 다시 연결**한다.
 두 번째 탭은 `blendWeighted` 의 **input / weight 편집기** — Node Editor 에서 weight 가 안 보이는 문제를 푼다.
 
-- **버전**: v01.03 (2026-10-19)
+- **버전**: v01.04 (2026-10-19)
 - **아키텍처**: (B) in-Maya PySide (`maya.cmds`), 드래그&드롭 셸프 설치
 - **계획 · 진행 기록**: `docs/plans/A00550_PoseMapper_plan.md`
 - **관련**: `A00540_JaliLipSync`(음성 → JALI 키) · JUN_JALI `docs/0040_jali_arkit_mapping.md`(JALI ↔ ARKit 실측 시작 가중치)
@@ -12,6 +12,9 @@
 ---
 
 ## 1. 설치 · 실행
+
+창 크기는 **언제든 드래그로 자유롭게** 바꿀 수 있다(v01.04). 처음 열 때만 내용 크기(화면 작업 영역까지)에 맞추고,
+그 뒤로 Save · Build · Capture · 탭 이동이 창 크기를 바꾸지 않는다. 내용보다 작게 줄이면 탭 안에 스크롤바가 생긴다.
 
 `__dragDrop_A00550.py` 를 뷰포트로 드래그&드롭 → 현재 셸프에 `PoseMapper` 버튼. 버튼 = `tools.A00550_PoseMapper.run(True)`.
 
@@ -104,6 +107,9 @@ Target already driven: (•) Skip ( ) Replace ( ) Add (sum)
 - 계산: `타겟 = clamp( Σ (음소값 / Ref) × 포즈[음소][타겟] )`. 예: Ref 10, AHH 포즈 jawOpen 0.8 → AHH = 10 일 때 jawOpen 0.8, AHH = 5 일 때 0.4.
 - **weight 는 항상 input 과 같이 만든다** — Blend Weights 탭의 문제가 이 노드망에는 생기지 않는다.
 - 같은 Source · Target 쌍을 다시 고르면 기존 `pm_NET` 을 찾아 **그 weight 를 라이브러리로 읽어 온다**(노드 이름을 바꿔도 message 로 따라간다).
+- **같은 타겟을 노드망 두 개가 노리면** 나중에 Replace 로 연결한 쪽이 이긴다. 진 쪽 노드망을 고르면 상태 줄에 `[!] N not driving the target`,
+  로그에 어느 노드망이 가져갔는지 경고가 뜬다(v01.04) — 그 슬라이더는 얼굴을 움직이지 않는다. 테스트 씬 16:20 저장본이 이 상태다
+  (`pm_NET`: `JALI1:JALI_IN` → BS 가 `pm_NET1`: `JALI1:CNT_PHONEMES` → BS 에 밀림).
 - `Remove Network` = 이 툴이 만든 노드만 삭제. Replace 로 끊었던 원래 연결은 되살리지 않는다(Undo 로는 돌아온다).
 - 기본 라이브러리 `jali_arkit_0040_default` = JUN_JALI 0040 표(angela 리그 실측, 음소 10 · JaLi 9/9 기준). `tongueOut` 0.30 은 임시값.
 
@@ -163,7 +169,9 @@ A00550_PoseMapper/
 ├── icon/A00550_PoseMapper.svg / .png
 └── tests/  (mayapy 로 실행, 테스트 씬은 열기만)
     test_blend_weights.py 13 · test_network.py 20 · test_capture.py 12 · test_ui_blend_weights.py 10 · test_ui_pose_map.py 19 ·
-    test_ui_checks.py 12 (v01.01, 합성 씬 · QTest 클릭) · test_ui_solo.py 15 (v01.03, Solo 유지 경로 전부)
+    test_ui_checks.py 12 (v01.01, 합성 씬 · QTest 클릭) · test_ui_solo.py 15 (v01.03, Solo 유지 경로 전부) ·
+    test_ui_size.py 8 (v01.04, 자유 리사이즈 · 명령 뒤 크기 유지). 테스트 씬을 쓰는 시험은 `scene_fixture.py` 로
+    이 툴의 노드망을 지우고 원래 배선(ARKIT_OUT → BS)으로 되돌린 뒤 돈다(메모리 안에서만 — 사용자가 씬을 다시 저장해도 같은 출발점)
 ```
 
 **확인 기록 (2026-10-19, mayapy 2024 + 테스트 씬)**: 위 시험 74항목 전부 통과. **마야 GUI 에서 드롭 설치 · 실제 얼굴로 Solo preview 하며 조정은 사용자 확인 전.**

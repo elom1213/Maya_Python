@@ -26,5 +26,13 @@
 #        fields, on Capture and on Remove Network. Now those keep it on and re-apply it
 #        (new source / new checks / after Capture).
 
-VERSION = "01.03"
+# 01.04  The window can always be resized freely, and Save / Build / Capture / tab changes no
+#        longer change its size. The tabs sit in a scroll area (the QTabWidget minimum - the
+#        largest of all pages - used to become the window minimum), the Library / node combos
+#        no longer grow with their longest item, and the status line no longer asks for the
+#        width of the library path (full text in its tooltip). Opens fitted to the content.
+#        Status + log warn when chains of the picked network no longer drive the target
+#        (another network took them with Replace).
+
+VERSION = "01.04"
 LAST_UPDATE = "2026-10-19"
