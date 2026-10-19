@@ -4,7 +4,7 @@
 음소를 하나 골라 타겟 값을 슬라이더로 정하고, 그 관계를 json 으로 저장해 **아무 노드 쌍에나 다시 연결**한다.
 두 번째 탭은 `blendWeighted` 의 **input / weight 편집기** — Node Editor 에서 weight 가 안 보이는 문제를 푼다.
 
-- **버전**: v01.04 (2026-10-19)
+- **버전**: v01.05 (2026-10-19)
 - **아키텍처**: (B) in-Maya PySide (`maya.cmds`), 드래그&드롭 셸프 설치
 - **계획 · 진행 기록**: `docs/plans/A00550_PoseMapper_plan.md`
 - **관련**: `A00540_JaliLipSync`(음성 → JALI 키) · JUN_JALI `docs/0040_jali_arkit_mapping.md`(JALI ↔ ARKit 실측 시작 가중치)
@@ -58,6 +58,32 @@
 7. **Save / Save As...** — json 으로 저장(`app/libraries/<이름>.json` 또는 고른 경로). `Load` = 콤보의 라이브러리.
    메뉴 **`Library > Show Libraries Folder`** (v01.02) = 그 `app/libraries` 폴더를 탐색기로 연다(json 복사 · 백업 · 다른 PC 로 옮길 때).
 
+### JaLi — 턱 / 입술 비중을 타겟마다 (v01.05)
+
+v01.04 까지는 Pose Map 노드망이 음소 값만 더해서 **`CNT_JaLi` 가 얼굴에 영향을 주지 않았다**(테스트 씬 실측: JaLi 를 2~15 로 바꿔도
+jawOpen · mouthFunnel 그대로). 이제 타겟마다 JaLi 축과 세기를 정한다.
+
+```
+타겟 = clamp( Σ(음소/Ref × 포즈) × factor ),   factor = 1 + Strength × (축값 / Neutral − 1)
+```
+
+| Strength | 의미 | 예: Jaw 축, Neutral 9, CNT_JaLi Jaw 2 |
+|----------|------|-----------------------------------|
+| 1 | 원래 JALI 노드망과 같다(축값에 비례) | × 0.222 |
+| 0.5 | 절반만 | × 0.611 |
+| 0 | JaLi 무시 | × 1 |
+
+1. **Source 박스 아래 `JaLi` 칸** — `Node` 에 JaLi 컨트롤을 `<< Sel`(테스트 씬: `JALI1:CNT_JaLi`). `Jaw` / `Lip` 어트리뷰트는
+   라이브러리 이름(기본 `Jaw` / `Lip`)이 있으면 그것, 없으면 `translateX` / `translateY` 를 자동으로 고른다. Source 에 `Jaw` / `Lip` 이 있으면
+   (예: `JALI_IN`) 칸이 비어 있을 때 Source 가 들어간다. `Neutral` = 포즈를 만들 때의 JaLi 값(factor 1, 기본 9 = 0040 실측).
+2. **Target 표의 `Axis` · `Strength` 열** — 타겟마다(음소와 무관). `-` 면 JaLi 무시. 바꾸면 그 타겟 체인만 바로 갱신.
+3. **`JALI Defaults`** — jawOpen · jawForward · tongueOut = Jaw, 포즈가 있는 나머지 = Lip, Strength 1 (원래 JALI 노드망과 같은 출발점).
+   **`Clear Axes`** — 전부 `-`.
+4. 저장하면 라이브러리 json 의 `"jali"` 에 축 · 세기 · 어트리뷰트 이름 · Neutral 이 들어간다(노드 이름은 안 들어감).
+   `Connect To...` 에 `JaLi node` 칸이 있다 — 비우면 Source 에 `Jaw` / `Lip` 이 있을 때 Source. 옛 json(v01.04 이전)은 축 없이 그대로 열린다.
+5. **Capture 는 JaLi 를 Neutral 에 두고** — 아니면 그 배율이 포즈에 섞인다(로그 경고). Capture 는 축 · 세기 설정을 그대로 이어받는다.
+6. JaLi 노드를 정하지 않은 채 축을 주면 축은 저장되지만 효과가 없다(factor 1) — 로그 경고.
+
 ### Capture — 지금 씬의 결과를 포즈로
 
 노드망이 어떤 구조든(예: JUN_JALI 의 `bw → md(× Jaw/9) → clamp → ARKIT_OUT → 블렌드셰이프`) **체크된 음소를 하나씩 Ref 로 올리고
@@ -100,8 +126,12 @@ Target already driven: (•) Skip ( ) Replace ( ) Add (sum)
 
 ```
 <prefix>pm_bw_<타겟>   blendWeighted   input[i] <- <source>.<음소>, weight[i] = 포즈 / Ref
+<prefix>pm_jb_<타겟>   blendTwoAttr    (축이 있을 때) input[0] = 1, input[1] <- ratio, attributesBlender = Strength
+<prefix>pm_jm_<타겟>   multDoubleLinear (축이 있을 때) bw.output x jb.output
 <prefix>pm_cl_<타겟>   clamp 0~1 (Clamp 0-1 켜면)  -> <target>.<타겟>
-<prefix>pm_NET         network         message 로 source · target · 체인들을 묶음, pmLibrary · pmRef · pmClamp
+<prefix>pm_ratio_Jaw / _Lip  multDoubleLinear  <JaLi 노드>.<축 attr> x (1 / Neutral)   (노드망당 하나씩)
+<prefix>pm_NET         network         message 로 source · target · JaLi 노드 · 체인 · ratio 를 묶음,
+                                       pmLibrary · pmRef · pmClamp · pmJawAttr · pmLipAttr · pmNeutral
 ```
 
 - 계산: `타겟 = clamp( Σ (음소값 / Ref) × 포즈[음소][타겟] )`. 예: Ref 10, AHH 포즈 jawOpen 0.8 → AHH = 10 일 때 jawOpen 0.8, AHH = 5 일 때 0.4.
@@ -118,6 +148,8 @@ Target already driven: (•) Skip ( ) Replace ( ) Add (sum)
 이 씬은 `jali_arkit_mapping_ctl.ma` 를 `JALI1:` 로 레퍼런스하고, 블렌드셰이프 `CHN_n_Face_xx_bs`(ARKit 51개, `tongueOut` 없음)의
 **타겟 51개가 전부 이미 `JALI1:ARKIT_OUT` 쪽에서 구동**된다.
 
+0. (v01.05) JaLi 까지 쓰려면: Source `JALI1:CNT_PHONEMES`, JaLi `Node` = `JALI1:CNT_JaLi`(translateX / Y 자동), CNT_JaLi 를 9, 9 에 두고
+   `Capture` → `JALI Defaults` → Replace 로 Build. 실측: CNT_JaLi (2, 9) · (9, 4) · (12, 6) 에서 원래 JALI 노드망과 같은 값.
 1. Source `JALI1:JALI_IN`, Target `CHN_n_Face_xx_bs` → `Capture` (지금 노드망 결과가 포즈로 — AHH → jawOpen 1.0 등).
 2. `If target is driven` = **Replace** → `Build / Update Network` (기본 Skip 이면 51개 전부 건너뛴다).
 3. 음소를 고르고 `Solo preview` 를 켠 채 슬라이더로 다듬는다 → `Save As...`.
@@ -161,8 +193,8 @@ A00550_PoseMapper/
 ├── app/core/
 │   ├── blend_weights.py   rows · missing_weights(-mi 만 봄) · add_input(weight 같이) · create_missing · remove
 │   ├── attrs.py           numeric_user_attrs · blendshape_targets(별칭) · incoming
-│   ├── library.py         PoseLibrary(희소 poses · ref · clamp) · load / save json (jun.posemap/1)
-│   ├── network.py         build · sync(only_targets) · remove · read_library · find_networks (pm_NET message)
+│   ├── library.py         PoseLibrary(희소 poses · ref · clamp · jali 축 / 세기 / neutral) · load / save json (jun.posemap/1)
+│   ├── network.py         build(jali_node) · sync(only_targets) · set_jali · chain_axis · detached · remove · read_library
 │   └── capture.py         settable_plug(위쪽으로 최대 4단계) · PhonemeDriver(solo / restore) · capture
 ├── app/libraries/jali_arkit_0040_default.json
 ├── app/ui/{main_window.py, pose_map_tab.py, connect_dialog.py, blend_weights_tab.py}
@@ -170,9 +202,10 @@ A00550_PoseMapper/
 └── tests/  (mayapy 로 실행, 테스트 씬은 열기만)
     test_blend_weights.py 13 · test_network.py 20 · test_capture.py 12 · test_ui_blend_weights.py 10 · test_ui_pose_map.py 19 ·
     test_ui_checks.py 12 (v01.01, 합성 씬 · QTest 클릭) · test_ui_solo.py 15 (v01.03, Solo 유지 경로 전부) ·
-    test_ui_size.py 8 (v01.04, 자유 리사이즈 · 명령 뒤 크기 유지). 테스트 씬을 쓰는 시험은 `scene_fixture.py` 로
+    test_ui_size.py 8 (v01.04, 자유 리사이즈 · 명령 뒤 크기 유지) · test_jali.py 24 · test_ui_jali.py 14 (v01.05).
+    테스트 씬을 쓰는 시험은 `scene_fixture.py` 로
     이 툴의 노드망을 지우고 원래 배선(ARKIT_OUT → BS)으로 되돌린 뒤 돈다(메모리 안에서만 — 사용자가 씬을 다시 저장해도 같은 출발점)
 ```
 
-**확인 기록 (2026-10-19, mayapy 2024 + 테스트 씬)**: 위 시험 74항목 전부 통과. **마야 GUI 에서 드롭 설치 · 실제 얼굴로 Solo preview 하며 조정은 사용자 확인 전.**
-2단계 후보(계획서 §8): Jaw / Lip 축 배율, 이름이 다른 타겟 자동 대응, 코렉티브(음소 2개 조합), Blend Weights 자동 갱신(scriptJob).
+**확인 기록 (2026-10-19, mayapy 2024 + 테스트 씬)**: 위 시험 전부 통과(v01.05 기준 147항목). **마야 GUI 에서 드롭 설치 · 실제 얼굴로 Solo preview 하며 조정은 사용자 확인 전.**
+2단계 후보(계획서 §8): 이름이 다른 타겟 자동 대응, 코렉티브(음소 2개 조합), Blend Weights 자동 갱신(scriptJob).

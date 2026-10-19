@@ -34,5 +34,12 @@
 #        Status + log warn when chains of the picked network no longer drive the target
 #        (another network took them with Replace).
 
-VERSION = "01.04"
+# 01.05  Pose Map : JaLi control. Each target can get a JaLi axis (- / Jaw / Lip) and a Strength
+#        (0-1): target x (1 + Strength x (axis value / Neutral - 1)). Strength 1 = like the
+#        original JALI network (Jaw 2 -> jawOpen 0.222), 0 = JaLi ignored. JaLi box: node
+#        (e.g. CNT_JaLi), Jaw / Lip attributes (translateX / Y picked automatically), Neutral
+#        (default 9). Buttons JALI Defaults / Clear Axes. Saved in the library json ("jali"),
+#        Connect To... has a JaLi node field. Older libraries / networks open unchanged.
+
+VERSION = "01.05"
 LAST_UPDATE = "2026-10-19"

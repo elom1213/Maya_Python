@@ -19,6 +19,10 @@ metadata:
   라벨만 바꿀 때는 `blockSignals`, 체크 핸들러는 저장해 둔 상태와 비교해 실제 변경만. `editingFinished` 도 글자 그대로 포커스만 빠져도 온다.
   Solo 는 사용자가 체크박스를 끌 때 · 창 닫을 때만 끈다(사용자 요구).
 - blendWeighted 의 weight 는 float32 — 되읽은 값 비교는 소수 4자리.
-- 시험: tests/ 5개 74항목(mayapy). 마야 GUI 확인 전. 2단계: Jaw/Lip 축 배율 · 이름 유사 매칭 · 코렉티브.
+- **v01.05 JaLi**: 타겟별 Axis(jaw/lip) · Strength, factor = 1 + s(축값/neutral − 1). 노드망당 `pm_ratio_Jaw/Lip`, 체인 `pm_jb_`(blendTwoAttr) · `pm_jm_`.
+  체인 노드는 bw 의 message(`pmClampNode`/`pmAxisMul`/`pmAxisBlend`)로 찾는다. 테스트 씬에서 원래 JALI 노드망과 같은 값 확인.
+  Pose Map 노드망만 쓰면 JaLi 가 안 먹던 것(v01.04 이전)이 이것으로 해결.
+- 시험: tests/ 11개 147항목(mayapy). 테스트 씬 시험은 `scene_fixture.reset_to_original_wiring()` 로 시작(사용자가 씬을 다시 저장함).
+  마야 GUI 확인 전. 2단계: 이름 유사 매칭 · 코렉티브.
 
 관련: [[wip-a00540-jalilipsync]], [[jun-jali-repo]], [[mayapy-headless-verify]]

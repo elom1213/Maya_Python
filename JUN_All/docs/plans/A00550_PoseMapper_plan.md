@@ -1,6 +1,6 @@
 # A00550_PoseMapper — 계획서 (음소 포즈 매핑 + blendWeighted 가중치 탭)
 
-> **작성** 2026-10-19 · 상태: v01.04 완료 · **v01.05 (JaLi 조절) 구현 중** — §11, 중단되면 §11 진행 기록의 첫 미완료 항목부터 · 대상 Maya 2024
+> **작성** 2026-10-19 · 상태: **v01.05 완료** (2026-10-19, JaLi 조절 — §11) · 대상 Maya 2024
 > 배경: JUN_JALI `out/jali_arkit_mapping_ctl.ma` 에서 JALI 음소 → ARKit 가중치를 손으로 다듬다가 나온 요청.
 > 관련: `A00540_JaliLipSync`(음성 → JALI 키) · JUN_JALI `docs/0040_jali_arkit_mapping.md`(실측 시작 가중치) ·
 > JUN_JALI `examples/build_jali_arkit_node.py`(지금 쓰는 bw → md → clamp 노드망)
@@ -14,7 +14,7 @@
 | 툴 | **새 툴 `JUN_All/tools/A00550_PoseMapper`** (Q1) |
 | 기준값(ref) | **기본 10, 사용자가 임의의 실수**를 입력 (`QDoubleSpinBox`, 0.001 ~ 100000, 소수 3자리). Solo preview 도 이 값으로 음소를 켠다. 라이브러리 json 의 `ref_value` 에 저장되고, Connect 때 라이브러리 값을 기본으로 보여 주되 바꿀 수 있다 (Q2) |
 | 이미 연결된 타겟 | **기본 Skip** — Replace / Add 는 고를 수 있게 남긴다 (Q3) |
-| Jaw / Lip 축 배율 | 답 없음 → **2단계** (§8) (Q4) |
+| Jaw / Lip 축 배율 | 답 없음 → **2단계** (§8) (Q4) → 2026-10-19 사용자 요청으로 **v01.05 에서 구현** (§11) |
 | 테스트 씬 | **`D:\D__02.Art\D__Asset\D__Character\D__CHN\D__Rig\D__Revision_Rig_0010	mp\JP__CHN_Basic_1070_JALI_test.mb`** (Q5) — §0-B. **원본을 저장 · 덮어쓰지 않는다** (mayapy 에서 열기만, 결과 씬은 scratchpad 로) |
 
 ## 0-B. 테스트 씬 구성 (2026-10-19 mayapy 로 읽음)
@@ -285,7 +285,7 @@ Blend Weights 를 먼저 하는 이유: 지금 막힌 문제(R6)를 바로 풀�
 
 ## 8. 범위 밖 (2단계 후보)
 
-- JALI **Jaw / Lip 축 배율**(지금 씬의 `md_<타겟>` = × Jaw/9 · Lip/9)을 Pose Map 노드망에도 넣기 — 타겟마다 "Jaw / Lip / 없음" 을 고르는 열.
+- ✅ v01.05 에서 구현(§11) — JALI **Jaw / Lip 축 배율**(지금 씬의 `md_<타겟>` = × Jaw/9 · Lip/9)을 Pose Map 노드망에도 넣기 — 타겟마다 "Jaw / Lip / 없음" 을 고르는 열.
 - 이름이 다른 타겟 자동 대응(`A00145` 의 이름 유사 매칭).
 - 음소 2개 조합 포즈(코렉티브) · 비선형(SDK 커브) 응답.
 - scriptJob 으로 Blend Weights 표 자동 갱신.
@@ -386,4 +386,4 @@ factor = 1 + strength × (축값 / neutral − 1)        축 = 없음 / Jaw / Li
 
 - [x] J-1. `library.py` jali 필드 + json 호환 · `network.py` 축 노드(만들기 · 바꾸기 · 지우기 · read_library · remove · detached) + `tests/test_jali.py`(J1~J5) — 24/24, 테스트 씬 J6 포함(JaLi (2,9) (9,4) (12,6) 에서 원래 노드망과 같은 값)
 - [x] J-2. `pose_map_tab.py` JaLi 줄 · 표 열 2개 · 버튼 2개 · `connect_dialog.py` JaLi 노드 + `tests/test_ui_jali.py`(J7) + 테스트 씬 J6 — 14/14 (CNT_JaLi 고르기 → translateX/Y 자동, Capture → JALI Defaults → Replace Build → Jaw 2 = 0.222, Axis - / Strength 0.5 / Neutral 4, 저장, Connect 가 그 쌍의 Jaw 를 따름, 다시 고르면 노드망에서 JaLi 칸 채움, neutral 아닌 Capture 경고). 기존 시험 9종 회귀 통과
-- [ ] J-3. 기존 시험 8종 회귀 · 버전 01.05 · 사용 안내 · WORKLOG · 메모리 · 이 계획서 상태
+- [x] J-3. 기존 시험 8종 회귀 · 버전 01.05 · 사용 안내 · WORKLOG · 메모리 · 이 계획서 상태

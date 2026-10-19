@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-19 (오늘)
 
+> [!summary] A00550_PoseMapper — **Pose Map 에 JaLi 조절** (v01.04->01.05) `#A00550_PoseMapper`
+- 배경: 테스트 씬에서 Pose Map 노드망(`pm_NET1`)이 BS 를 구동하는 동안 `CNT_JaLi` 를 2~15 로 바꿔도 얼굴이 그대로(실측) — 노드망이 음소 값만 더했다. 원래 JALI 노드망은 타겟마다 축만 있고 세기 조절이 없다.
+- 추가: 타겟마다 `Axis`(- / Jaw / Lip) · `Strength`(0~1), factor = 1 + Strength × (축값 / Neutral − 1). JaLi 칸(노드 · Jaw / Lip 어트리뷰트 — translateX / Y 자동 · Neutral 9), `JALI Defaults` / `Clear Axes`, Connect 에 JaLi 노드. 씬 노드 = 노드망당 `pm_ratio_Jaw/Lip` + 축 있는 체인마다 `pm_jb_`(blendTwoAttr) · `pm_jm_`(mult). json `"jali"`, 옛 json · 노드망 호환.
+- 검증(mayapy 2024 + 테스트 씬): `tests/test_jali.py` 24 · `test_ui_jali.py` 14 — **CNT_JaLi (2,9) (9,4) (12,6) 에서 원래 JALI 노드망과 같은 값**(Jaw 2 → jawOpen 0.222), 기존 시험 9종 회귀 통과. 계획서 §11 단계별 커밋. 마야 GUI 미확인.
+
 > [!summary] A00550_PoseMapper — **창 크기를 언제든 자유롭게 · Save 등이 크기를 바꾸지 않게** (v01.03->01.04) `#A00550_PoseMapper`
 - 보고: Save 뒤 창 크기를 드래그로 못 바꾼다, Save 를 누르면 크기가 저절로 바뀐다.
 - 원인: ① `QTabWidget` 최소 크기(안 보이는 탭 포함 최댓값)가 창 최소로 강제 — 처음부터 그 이하로 못 줄였다(메모리 qtabwidget-min-size) ② Save 가 라이브러리 콤보에 긴 이름을, 상태 줄에 경로를 넣어 그 최소를 키움 → 창이 저절로 넓어지고 못 줄임.
