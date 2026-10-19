@@ -26,6 +26,8 @@ from .connect_dialog import ConnectDialog, log_report
 SLIDER_STEPS = 1000                 # 슬라이더 0~1000 = 값 0~1
 VALUE_RANGE = (-2.0, 2.0)           # 스핀 박스 범위 (블렌드셰이프 과다 · 반대 방향 허용)
 EXISTING = [("Skip", "skip"), ("Replace", "replace"), ("Add (sum)", "add")]
+AXIS_ITEMS = [("-", None), ("Jaw", "jaw"), ("Lip", "lip")]      # v01.05 Target 표의 Axis 열
+COL_AXIS, COL_STRENGTH = 3, 4
 # 음소가 아닌 입력(JALI 의 턱 / 입술 배율 등) - 기본으로 체크 해제. Solo · Capture 가 0 으로 만들면 출력이 통째로 0 이 된다.
 NOT_PHONEME_DEFAULT = ("jaw", "lip")
 
@@ -105,6 +107,40 @@ class PoseMapTab(QWidget):
                                 "Turning it off (or leaving the tab) restores the previous values.")
         self.cb_solo.toggled.connect(self.on_solo_toggled)
         sl.addWidget(self.cb_solo)
+
+        # JaLi (v01.05) - 타겟별 Axis / Strength 가 쓰는 턱 · 입술 입력
+        jali_box = QGroupBox("JaLi (jaw / lip weight)")
+        jali_box.setToolTip("Targets with an Axis are multiplied by\n"
+                            "  1 + Strength x (axis value / Neutral - 1)\n"
+                            "Strength 1 = like the original JALI network, 0 = JaLi ignored.")
+        jg = QGridLayout(jali_box)
+        self.le_jali = QLineEdit()
+        self.le_jali.setPlaceholderText("node with jaw / lip (e.g. CNT_JaLi)")
+        self.le_jali.editingFinished.connect(self.on_jali_changed)
+        b = QPushButton("<< Sel")
+        b.clicked.connect(self.on_pick_jali)
+        self.cmb_jaw = QComboBox()
+        self.cmb_lip = QComboBox()
+        for cmb in (self.cmb_jaw, self.cmb_lip):
+            cmb.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+            cmb.setMinimumContentsLength(8)
+            cmb.currentTextChanged.connect(lambda *_: self.on_jali_changed())
+        self.ds_neutral = QDoubleSpinBox()
+        self.ds_neutral.setDecimals(3)
+        self.ds_neutral.setRange(0.001, 100000.0)
+        self.ds_neutral.setValue(lib_mod.DEFAULT_NEUTRAL)
+        self.ds_neutral.setToolTip("JaLi value at which the poses were made (factor 1). JALI measured at 9.")
+        self.ds_neutral.editingFinished.connect(self.on_jali_changed)
+        jg.addWidget(QLabel("Node"), 0, 0)
+        jg.addWidget(self.le_jali, 0, 1, 1, 3)
+        jg.addWidget(b, 0, 4)
+        jg.addWidget(QLabel("Jaw"), 1, 0)
+        jg.addWidget(self.cmb_jaw, 1, 1)
+        jg.addWidget(QLabel("Lip"), 1, 2)
+        jg.addWidget(self.cmb_lip, 1, 3)
+        jg.addWidget(QLabel("Neutral"), 2, 0)
+        jg.addWidget(self.ds_neutral, 2, 1)
+        sl.addWidget(jali_box)
         top.addWidget(src_box, 1)
 
         # --- Target
@@ -130,20 +166,27 @@ class PoseMapTab(QWidget):
         row.addWidget(self.le_filter, 1)
         row.addWidget(self.cb_used)
         tl.addLayout(row)
-        self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["Target", "", "Value"])
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(["Target", "", "Value", "Axis", "Strength"])
+        self.table.horizontalHeaderItem(COL_AXIS).setToolTip("JaLi axis of this target (all phonemes): - / Jaw / Lip")
+        self.table.horizontalHeaderItem(COL_STRENGTH).setToolTip("How much the JaLi axis scales this target (0-1)")
         self.table.verticalHeader().setVisible(False)
         hdr = self.table.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         hdr.setSectionResizeMode(1, QHeaderView.Stretch)
         hdr.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(COL_AXIS, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(COL_STRENGTH, QHeaderView.ResizeToContents)
         tl.addWidget(self.table, 1)
         row = QHBoxLayout()
         for label, slot, tip in (
                 ("Zero Pose", self.on_zero_pose, "Set every target of the selected phoneme to 0"),
                 ("Mirror L > R", self.on_mirror, "Copy ...Left values to ...Right for the selected phoneme"),
                 ("Capture", self.on_capture, "Read the current scene result into the library:\n"
-                                             "each listed phoneme = Ref value, others 0, minus all-zero")):
+                                             "each listed phoneme = Ref value, others 0, minus all-zero"),
+                ("JALI Defaults", self.on_jali_defaults, "Axis: jawOpen / jawForward / tongueOut = Jaw,\n"
+                                                         "every other posed target = Lip, Strength 1"),
+                ("Clear Axes", self.on_clear_axes, "Remove the JaLi axis from every target")):
             b = QPushButton(label)
             b.setToolTip(tip)
             b.clicked.connect(slot)
@@ -269,6 +312,10 @@ class PoseMapTab(QWidget):
                 self.cb_clamp.setChecked(self.lib.clamp)
                 self.cb_clamp.blockSignals(False)
                 self._log("[INFO] Found network {0} - the library now shows its weights.".format(self.net))
+                self._fill_jali(network.net_jali(self.net)[0] or "")
+        if not self.net and src and not self.le_jali.text().strip() and \
+                cmds.attributeQuery(self.lib.jaw_attr, node=src, exists=True):
+            self._fill_jali(src)
         self._fill_phonemes()
         self._fill_targets()
         self._status()
@@ -328,6 +375,17 @@ class PoseMapTab(QWidget):
             spin.valueChanged.connect(lambda v, name=t, sl=slider: self._on_value(name, v, sl))
             self.table.setCellWidget(r, 1, slider)
             self.table.setCellWidget(r, 2, spin)
+            cmb = QComboBox()
+            for label, _a in AXIS_ITEMS:
+                cmb.addItem(label)
+            sp = QDoubleSpinBox()
+            sp.setDecimals(2)
+            sp.setRange(0.0, 1.0)
+            sp.setSingleStep(0.05)
+            cmb.currentIndexChanged.connect(lambda _i, name=t, c=cmb, x=sp: self._on_axis(name, c, x))
+            sp.valueChanged.connect(lambda _v, name=t, c=cmb, x=sp: self._on_axis(name, c, x))
+            self.table.setCellWidget(r, COL_AXIS, cmb)
+            self.table.setCellWidget(r, COL_STRENGTH, sp)
         self._updating = False
         self._load_pose_values()
 
@@ -342,6 +400,11 @@ class PoseMapTab(QWidget):
             slider.blockSignals(True)
             slider.setValue(int(round(max(0.0, min(1.0, v)) * SLIDER_STEPS)))
             slider.blockSignals(False)
+            axis = self.lib.axis(t)
+            cmb, sp = self.table.cellWidget(r, COL_AXIS), self.table.cellWidget(r, COL_STRENGTH)
+            cmb.setCurrentIndex([a for _l, a in AXIS_ITEMS].index(axis))
+            sp.setValue(self.lib.strength(t))
+            sp.setEnabled(axis is not None)
         self._updating = False
         self._apply_filter()
 
@@ -353,6 +416,111 @@ class PoseMapTab(QWidget):
             t = self.table.item(r, 0).text()
             hide = (text and text not in t.lower()) or (used and abs(self.lib.get(p, t)) < lib_mod.EPS)
             self.table.setRowHidden(r, bool(hide))
+
+    # ================================================================== JaLi (v01.05)
+
+    def jali_node(self):
+        n = self.le_jali.text().strip()
+        return n if n and cmds.objExists(n) else None
+
+    @staticmethod
+    def _jali_attr_list(node):
+        """숫자형 사용자 어트리뷰트 + keyable 스칼라(translateX 등 - CNT_JaLi 용)."""
+        names = list(attrs_mod.numeric_user_attrs(node))
+        for a in cmds.listAttr(node, keyable=True, scalar=True) or []:
+            if a not in names:
+                names.append(a)
+        return names
+
+    def _fill_jali(self, node=None):
+        """JaLi 칸 채우기. node 를 주면 그 노드로, 아니면 지금 칸의 노드로. 콤보는 라이브러리 어트리뷰트 이름을 고른다."""
+        self._updating_jali = True
+        if node is not None:
+            self.le_jali.setText(node)
+        n = self.jali_node()
+        names = self._jali_attr_list(n) if n else []
+        for cmb, want, fallback in ((self.cmb_jaw, self.lib.jaw_attr, "translateX"),
+                                    (self.cmb_lip, self.lib.lip_attr, "translateY")):
+            cmb.clear()
+            cmb.addItems(names)
+            pick = want if want in names else fallback if fallback in names else (names[0] if names else "")
+            if pick:
+                cmb.setCurrentText(pick)
+        self.ds_neutral.setValue(self.lib.jali_neutral)
+        self._updating_jali = False
+
+    def on_pick_jali(self, *args):
+        sel = cmds.ls(sl=True) or []
+        if not sel:
+            self._log("[WARN] Select the JaLi node first (e.g. CNT_JaLi).")
+            return
+        self._fill_jali(sel[0])
+        self.on_jali_changed()
+
+    def on_jali_changed(self, *args):
+        if getattr(self, "_updating_jali", False):
+            return
+        if self.le_jali.text().strip() and not self.jali_node():
+            self._log("[ERROR] JaLi node not found: {0}".format(self.le_jali.text().strip()))
+        if self.jali_node() and self.cmb_jaw.count() == 0:
+            self._fill_jali()
+        jaw, lip = self.cmb_jaw.currentText(), self.cmb_lip.currentText()
+        changed = (jaw, lip, round(self.ds_neutral.value(), 6)) != (
+            self.lib.jaw_attr, self.lib.lip_attr, round(self.lib.jali_neutral, 6))
+        if jaw:
+            self.lib.jaw_attr = jaw
+        if lip:
+            self.lib.lip_attr = lip
+        self.lib.jali_neutral = self.ds_neutral.value()
+        if self.net and cmds.objExists(self.net):
+            node = self.jali_node()
+            if changed or not network._same(network.net_jali(self.net)[0], node):
+                network.set_jali(self.net, node, self.lib.jaw_attr, self.lib.lip_attr, self.lib.jali_neutral)
+                self._log("[OK] JaLi: {0}.{1} / .{2}, neutral {3:g}".format(
+                    node or "(none - axes have no effect)", self.lib.jaw_attr, self.lib.lip_attr, self.lib.jali_neutral))
+
+    def _on_axis(self, target_name, cmb, spin):
+        if self._updating:
+            return
+        axis = AXIS_ITEMS[cmb.currentIndex()][1]
+        spin.setEnabled(axis is not None)
+        self.lib.set_axis(target_name, axis, spin.value() if axis else None)
+        if self.net and cmds.objExists(self.net):
+            try:
+                rep = network.sync(self.net, self.lib, self.existing_mode(), only_targets=[target_name])
+            except (ValueError, RuntimeError) as e:
+                self._log("[ERROR] {0}".format(str(e).strip()))
+                return
+            self._warn_jali(rep)
+
+    def _warn_jali(self, rep):
+        if rep.get("jali_missing") and not getattr(self, "_jali_warned", False):
+            self._jali_warned = True
+            self._log("[WARN] JaLi node / attributes not set - axes have no effect until you pick them "
+                      "(JaLi box: Node, Jaw, Lip).")
+
+    def _sync_all(self):
+        if self.net and cmds.objExists(self.net):
+            rep = network.sync(self.net, self.lib, self.existing_mode())
+            self._warn_jali(rep)
+
+    def on_jali_defaults(self, *args):
+        names = [self.table.item(r, 0).text() for r in range(self.table.rowCount())]
+        posed = set(self.lib.targets_used())
+        self.lib.jali_defaults([t for t in names if t in posed])
+        self._sync_all()
+        self._load_pose_values()
+        jaw = sorted(t for t, a in self.lib.target_axis.items() if a == "jaw")
+        self._log("[OK] JALI Defaults: {0} Jaw ({1}), {2} Lip, Strength 1".format(
+            len(jaw), ", ".join(jaw), len(self.lib.target_axis) - len(jaw)))
+        if not self.jali_node():
+            self._log("[WARN] Pick the JaLi node (e.g. CNT_JaLi) - without it the axes have no effect.")
+
+    def on_clear_axes(self, *args):
+        self.lib.clear_axes()
+        self._sync_all()
+        self._load_pose_values()
+        self._log("[OK] JaLi axes cleared")
 
     # ================================================================== 편집
 
@@ -565,6 +733,12 @@ class PoseMapTab(QWidget):
         finally:
             QApplication.restoreOverrideCursor()
         lib.clamp = self.cb_clamp.isChecked()
+        # 포즈만 새로 읽는다 - JaLi 축 · 세기 · 어트리뷰트 · neutral 은 지금 설정을 이어받는다
+        lib.jaw_attr, lib.lip_attr, lib.jali_neutral = self.lib.jaw_attr, self.lib.lip_attr, self.lib.jali_neutral
+        lib.target_axis, lib.target_strength = dict(self.lib.target_axis), dict(self.lib.target_strength)
+        if self.lib.target_axis and abs(self._jali_value_ratio() - 1.0) > 1e-3:
+            self._log("[WARN] JaLi is not at Neutral while capturing - the captured poses include that factor. "
+                      "Set the JaLi control to Neutral ({0:g}) for clean poses.".format(self.lib.jali_neutral))
         self.lib = lib
         for p, why in info["problems"]:
             self._log("[WARN] {0}: {1} - not captured".format(p, why))
@@ -587,9 +761,23 @@ class PoseMapTab(QWidget):
         if keep:
             self.cmb_lib.setCurrentText(keep)
 
+    def _jali_value_ratio(self):
+        """지금 JaLi 값 / neutral (Jaw · Lip 중 1 에서 더 먼 쪽). 노드가 없으면 1."""
+        node = self.jali_node()
+        if not node:
+            return 1.0
+        out = 1.0
+        for attr in (self.lib.jaw_attr, self.lib.lip_attr):
+            if cmds.attributeQuery(attr, node=node, exists=True):
+                r = cmds.getAttr("{0}.{1}".format(node, attr)) / self.lib.jali_neutral
+                if abs(r - 1.0) > abs(out - 1.0):
+                    out = r
+        return out
+
     def _set_library(self, lib, path):
         self.lib = lib
         self.lib_path = path
+        self._fill_jali()
         self.ds_ref.setValue(lib.ref_value)
         self.cb_clamp.blockSignals(True)
         self.cb_clamp.setChecked(lib.clamp)
@@ -651,20 +839,24 @@ class PoseMapTab(QWidget):
             return
         self.lib.ref_value = self.ds_ref.value()
         self.lib.clamp = self.cb_clamp.isChecked()
+        self.lib.jali_neutral = self.ds_neutral.value()
         try:
-            net, rep = network.build(self.lib, src, tgt, on_existing=self.existing_mode())
+            net, rep = network.build(self.lib, src, tgt, on_existing=self.existing_mode(),
+                                     jali_node=self.jali_node())
         except (ValueError, RuntimeError) as e:
             self._log("[ERROR] {0}".format(str(e).strip()))
             return
         self.net = net
         log_report(self._log, rep, src, tgt)
+        self._jali_warned = False
+        self._warn_jali(rep)
         self._status()
 
     def on_connect_to(self, *args):
         if not self.lib.poses:
             self._log("[WARN] The library is empty.")
             return
-        dlg = ConnectDialog(self.lib, self._log, self)
+        dlg = ConnectDialog(self.lib, self._log, self, jali_node=self.le_jali.text().strip())
         dlg.exec_() if hasattr(dlg, "exec_") else dlg.exec()
 
     def on_remove(self, *args):

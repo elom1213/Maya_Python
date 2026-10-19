@@ -18,11 +18,12 @@ from ..core import network
 
 class ConnectDialog(QDialog):
 
-    def __init__(self, lib, log, parent=None):
+    def __init__(self, lib, log, parent=None, jali_node=""):
         super().__init__(parent)
         self.setWindowTitle("Connect Library")
         self.lib = lib
         self._log = log
+        self._jali_default = jali_node or ""
         self.result_net = None
         self._build()
         self.update_preview()
@@ -43,6 +44,15 @@ class ConnectDialog(QDialog):
             btn.clicked.connect(lambda _=False, w=le: self._pick(w))
             grid.addWidget(btn, row, 2)
             le.editingFinished.connect(self.update_preview)
+        self.le_jali = QLineEdit(self._jali_default)
+        self.le_jali.setPlaceholderText("JaLi node (empty = the source if it has {0} / {1})".format(
+            self.lib.jaw_attr, self.lib.lip_attr))
+        self.le_jali.editingFinished.connect(self.update_preview)
+        b_jali = QPushButton("<< Sel")
+        b_jali.clicked.connect(lambda _=False: self._pick(self.le_jali))
+        grid.addWidget(QLabel("JaLi node"), 4, 0)
+        grid.addWidget(self.le_jali, 4, 1)
+        grid.addWidget(b_jali, 4, 2)
         self.le_prefix = QLineEdit()
         self.le_prefix.setPlaceholderText("node name prefix, e.g. avatarA_")
         grid.addWidget(QLabel("Prefix"), 2, 0)
@@ -115,6 +125,13 @@ class ConnectDialog(QDialog):
                 lines.append("{0} target(s) already driven -> {1}".format(len(driven), self.on_existing()))
         else:
             lines.append("Target: not found" if tgt else "Target: -")
+        if self.lib.target_axis:
+            node = self.le_jali.text().strip() or src
+            ok = node and cmds.objExists(node) and all(
+                cmds.attributeQuery(a, node=node, exists=True) for a in (self.lib.jaw_attr, self.lib.lip_attr))
+            lines.append("JaLi: {0}.{1} / .{2}".format(node, self.lib.jaw_attr, self.lib.lip_attr) if ok else
+                         "JaLi: not found ({0} / {1}) - {2} axis target(s) will ignore JaLi".format(
+                             self.lib.jaw_attr, self.lib.lip_attr, len(self.lib.target_axis)))
         self.lb_preview.setText("\n".join(lines))
 
     def on_connect(self):
@@ -122,8 +139,10 @@ class ConnectDialog(QDialog):
         lib = copy.deepcopy(self.lib)
         lib.ref_value = self.ds_ref.value()
         try:
+            jali = self.le_jali.text().strip()
             net, rep = network.build(lib, src, tgt, prefix=self.le_prefix.text().strip(),
-                                     on_existing=self.on_existing())
+                                     on_existing=self.on_existing(),
+                                     jali_node=jali if jali and cmds.objExists(jali) else None)
         except (ValueError, RuntimeError) as e:
             self._log("[ERROR] {0}".format(str(e).strip()))
             return
@@ -148,3 +167,6 @@ def log_report(log, rep, src, tgt):
         log("[WARN] Targets not on {0}: {1}".format(tgt, ", ".join(rep["missing_targets"])))
     if rep["missing_sources"]:
         log("[WARN] Phonemes not on {0}: {1}".format(src, ", ".join(rep["missing_sources"])))
+    if rep.get("jali_missing"):
+        log("[WARN] JaLi node / attributes not found - {0} axis target(s) ignore JaLi for now".format(
+            len(rep["jali_missing"])))
