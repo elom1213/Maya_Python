@@ -13,5 +13,9 @@
 #        element (computed as 1.0 but hidden in the UI), add an input together with its
 #        weight, create the missing weights (1.0 - result unchanged), remove input + weight.
 
-VERSION = "01.00"
+# 01.01  Pose Map > Source list : Shift / Ctrl multi-select (shared checkList behaviour - clicking
+#        the check box of a selected row checks / unchecks every selected row), "Check Sel" /
+#        "Uncheck Sel" buttons, and a "Check All" <-> "Uncheck All" toggle.
+
+VERSION = "01.01"
 LAST_UPDATE = "2026-10-19"

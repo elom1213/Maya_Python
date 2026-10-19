@@ -4,7 +4,7 @@
 음소를 하나 골라 타겟 값을 슬라이더로 정하고, 그 관계를 json 으로 저장해 **아무 노드 쌍에나 다시 연결**한다.
 두 번째 탭은 `blendWeighted` 의 **input / weight 편집기** — Node Editor 에서 weight 가 안 보이는 문제를 푼다.
 
-- **버전**: v01.00 (2026-10-19)
+- **버전**: v01.01 (2026-10-19)
 - **아키텍처**: (B) in-Maya PySide (`maya.cmds`), 드래그&드롭 셸프 설치
 - **계획 · 진행 기록**: `docs/plans/A00550_PoseMapper_plan.md`
 - **관련**: `A00540_JaliLipSync`(음성 → JALI 키) · JUN_JALI `docs/0040_jali_arkit_mapping.md`(JALI ↔ ARKit 실측 시작 가중치)
@@ -23,7 +23,8 @@
 │ Ref value [10.000]          │ │ Filter [mouth__]  [x] Used only         │
 │ ☐ Jaw   ☐ Lip              │ │ jawOpen        [=========|  ] 0.800     │
 │ ☑ AHH (3)  ◀ 선택           │ │ mouthLowerDownL[===|        ] 0.340     │
-│ ☑ AAA (6)  ...              │ │ ...                                     │
+│ ☑ AAA (6)  ...              │
+│ [Check Sel][Uncheck Sel][Check All] │ │ ...                                     │
 │ [x] Solo preview            │ │ [Zero Pose] [Mirror L > R] [Capture]    │
 └─────────────────────────────┘ └─────────────────────────────────────────┘
  Library [jali_arkit_0040_default ▼] [Load] [Save] [Save As...] [New] [x] Clamp 0-1
@@ -33,6 +34,9 @@
 ### 순서
 
 1. **Source** — 음소 어트리뷰트가 모인 노드를 선택하고 `<< Sel`. 숫자형 사용자 어트리뷰트가 목록에 뜬다.
+   **여러 개를 한 번에 체크 / 해제 (v01.01)** — Shift / Ctrl 로 여러 줄을 고른 뒤 `Check Sel` / `Uncheck Sel`, 또는 고른 줄 중 하나의
+   체크박스를 누르거나 Space(고른 줄 전부가 같이 바뀐다, 공용 `JUN_mod_checkList_qt`). `Check All` 은 토글 — 전부 체크돼 있으면
+   `Uncheck All` 로 바뀐다. 체크가 바뀌면 켜져 있던 Solo preview 는 꺼지고 값이 원복된다.
    **체크 = 음소.** `Jaw` · `Lip` 은 기본으로 체크 해제 — Solo preview · Capture 가 체크된 것만 0 / Ref 로 바꾸므로,
    같은 노드에 있는 배율 입력(JALI 의 턱 / 입술)은 건드리지 않는다. 괄호 숫자 = 그 음소의 포즈에 들어간 타겟 수.
 2. **Target** — 블렌드셰이프(타겟 별칭) 또는 숫자 어트리뷰트를 가진 아무 노드(예: `ARKIT_OUT`)를 `<< Sel`.
@@ -127,7 +131,8 @@ A00550_PoseMapper/
 ├── app/ui/{main_window.py, pose_map_tab.py, connect_dialog.py, blend_weights_tab.py}
 ├── icon/A00550_PoseMapper.svg / .png
 └── tests/  (mayapy 로 실행, 테스트 씬은 열기만)
-    test_blend_weights.py 13 · test_network.py 20 · test_capture.py 12 · test_ui_blend_weights.py 10 · test_ui_pose_map.py 19
+    test_blend_weights.py 13 · test_network.py 20 · test_capture.py 12 · test_ui_blend_weights.py 10 · test_ui_pose_map.py 19 ·
+    test_ui_checks.py 12 (v01.01, 합성 씬 · QTest 클릭)
 ```
 
 **확인 기록 (2026-10-19, mayapy 2024 + 테스트 씬)**: 위 시험 74항목 전부 통과. **마야 GUI 에서 드롭 설치 · 실제 얼굴로 Solo preview 하며 조정은 사용자 확인 전.**

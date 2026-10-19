@@ -14,6 +14,7 @@ import os
 import maya.cmds as cmds
 
 from Framework.qt.qt import *
+from Framework.qt import JUN_mod_checkList_qt
 
 from ..core import attrs as attrs_mod
 from ..core import capture as capture_mod
@@ -81,7 +82,24 @@ class PoseMapTab(QWidget):
                                     "untouched (e.g. JALI Jaw / Lip multipliers stay as they are).")
         self.lw_phonemes.itemChanged.connect(self._on_check_changed)
         self.lw_phonemes.currentItemChanged.connect(lambda *_: self.on_phoneme_changed())
+        # 다중 선택 + 다중 체크 (공용 동작): Shift/Ctrl 로 고르고, 고른 행의 체크박스 하나(또는 Space) = 고른 행 전부.
+        # 여러 행이 한 번에 바뀌면 checksChanged(바뀐 행 전부) 가 먼저 오고 itemChanged 는 누른 행 하나만 온다.
+        self.chk_phonemes = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(self.lw_phonemes)
+        self.chk_phonemes.checksChanged.connect(self._on_checks_changed)
         sl.addWidget(self.lw_phonemes, 1)
+        chk_row = QHBoxLayout()
+        b_on = QPushButton("Check Sel")
+        b_on.setToolTip("Check the selected attributes (Shift / Ctrl click to select several)")
+        b_on.clicked.connect(lambda: self._set_checks(self._selected_items(), True))
+        b_off = QPushButton("Uncheck Sel")
+        b_off.setToolTip("Uncheck the selected attributes")
+        b_off.clicked.connect(lambda: self._set_checks(self._selected_items(), False))
+        self.btn_check_all = QPushButton("Check All")
+        self.btn_check_all.setToolTip("Toggle: check every attribute / uncheck every attribute")
+        self.btn_check_all.clicked.connect(self.on_toggle_all)
+        for b in (b_on, b_off, self.btn_check_all):
+            chk_row.addWidget(b)
+        sl.addLayout(chk_row)
         self.cb_solo = QCheckBox("Solo preview")
         self.cb_solo.setToolTip("Only the selected phoneme = Ref value, all others = 0.\n"
                                 "Turning it off (or leaving the tab) restores the previous values.")
@@ -248,6 +266,7 @@ class PoseMapTab(QWidget):
             item.setCheckState(Qt.Checked if on else Qt.Unchecked)
             self.lw_phonemes.addItem(item)
         self.lw_phonemes.blockSignals(False)
+        self._update_check_all_label()
         for i in range(self.lw_phonemes.count()):
             if self.lw_phonemes.item(i).data(Qt.UserRole) == keep:
                 self.lw_phonemes.setCurrentRow(i)
@@ -396,10 +415,49 @@ class PoseMapTab(QWidget):
                 out.append(item.data(Qt.UserRole))
         return out
 
+    def _all_items(self):
+        return [self.lw_phonemes.item(i) for i in range(self.lw_phonemes.count())]
+
+    def _selected_items(self):
+        """보이는 선택 행 (공용 체크 동작과 같은 기준)."""
+        return self.chk_phonemes.visible_selected()
+
     def _on_check_changed(self, item):
-        self._checked[item.data(Qt.UserRole)] = item.checkState() == Qt.Checked
+        self._on_checks_changed([item])
+
+    def _on_checks_changed(self, items):
+        for item in items:
+            self._checked[item.data(Qt.UserRole)] = item.checkState() == Qt.Checked
         if self.driver is not None:
             self.stop_preview()
+        self._update_check_all_label()
+
+    def _set_checks(self, items, on):
+        """코드로 여러 행을 한 번에 체크 / 해제 (itemChanged 를 행마다 쏘지 않는다)."""
+        if not items:
+            self._log("[WARN] Select attributes in the Source list first (Shift / Ctrl click).")
+            return
+        state = Qt.Checked if on else Qt.Unchecked
+        self.lw_phonemes.blockSignals(True)
+        for item in items:
+            item.setCheckState(state)
+        self.lw_phonemes.blockSignals(False)
+        self._on_checks_changed(items)
+        self._log("[OK] {0} {1} attribute(s): {2}".format(
+            "Checked" if on else "Unchecked", len(items),
+            ", ".join(i.data(Qt.UserRole) for i in items[:12]) + (" ..." if len(items) > 12 else "")))
+
+    def on_toggle_all(self, *args):
+        items = self._all_items()
+        if not items:
+            return
+        on = not all(i.checkState() == Qt.Checked for i in items)    # 전부 체크돼 있으면 전부 해제
+        self._set_checks(items, on)
+
+    def _update_check_all_label(self):
+        items = self._all_items()
+        all_on = bool(items) and all(i.checkState() == Qt.Checked for i in items)
+        self.btn_check_all.setText("Uncheck All" if all_on else "Check All")
 
     def _solo(self, phoneme):
         try:

@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-19 (오늘)
 
+> [!summary] A00550_PoseMapper — **Source 목록 다중 선택 · 체크 / 해제 · 전체 토글** (v01.00->01.01) `#A00550_PoseMapper`
+- 요청: Source tsl 에서 여러 어트리뷰트를 골라 한 번에 체크 / 해제, 전체 체크 / 해제 토글.
+- 공용 `JUN_mod_checkList_qt_v01` 을 붙임(Shift / Ctrl 선택, 고른 줄의 체크박스 하나 · Space = 고른 줄 전부) + `Check Sel` / `Uncheck Sel` + `Check All` ⇄ `Uncheck All` 토글. 여러 줄이 한 번에 바뀌면 `checksChanged` 로 받아 상태를 전부 기억, 체크가 바뀌면 Solo preview 원복.
+- 검증(mayapy 2024 오프스크린): `tests/test_ui_checks.py` 12/12(실제 체크박스 클릭 포함) + 테스트 씬 Pose Map 시험 회귀 통과. 마야 GUI 미확인.
+
 > [!summary] A00550_PoseMapper **신규** — 음소 어트리뷰트 → 블렌드셰이프 포즈 (Pose Map) + blendWeighted weight 편집 (Blend Weights) `#A00550_PoseMapper`
 - 요청: `JALI_IN` 같은 음소 노드 · 음소 · 블렌드셰이프(`BS_arkit`)를 골라 음소별 타겟 값을 조정 → 관계 저장 → 임의의 노드 쌍에 연결. 그리고 blendWeighted 에 UI 에서 보이는 weight 를 추가하는 탭. 기준값 기본 10 + 임의 실수, 이미 연결된 타겟은 Skip.
 - 원인 실측: Node Editor 에서 `input[5]` 만 연결하면 `weight[5]` 원소가 없어 안 보이지만 **1.0 으로 계산**된다. `getAttr weight[5]` 는 **읽기만 해도 원소를 만든다** → 검사는 `-mi` 로만. 테스트 씬 `JALI1:bw_mouthFunnel [5] OHH` 가 정확히 이 상태였다.
