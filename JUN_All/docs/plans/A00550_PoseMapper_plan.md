@@ -1,6 +1,6 @@
 # A00550_PoseMapper — 계획서 (음소 포즈 매핑 + blendWeighted 가중치 탭)
 
-> **작성** 2026-10-19 · 상태: **v01.00 완료** (2026-10-19, 진행 기록 §10 — 사용 안내 `docs/A00550_PoseMapper.md`) · 대상 Maya 2024
+> **작성** 2026-10-19 · 상태: v01.04 완료 · **v01.05 (JaLi 조절) 구현 중** — §11, 중단되면 §11 진행 기록의 첫 미완료 항목부터 · 대상 Maya 2024
 > 배경: JUN_JALI `out/jali_arkit_mapping_ctl.ma` 에서 JALI 음소 → ARKit 가중치를 손으로 다듬다가 나온 요청.
 > 관련: `A00540_JaliLipSync`(음성 → JALI 키) · JUN_JALI `docs/0040_jali_arkit_mapping.md`(실측 시작 가중치) ·
 > JUN_JALI `examples/build_jali_arkit_node.py`(지금 쓰는 bw → md → clamp 노드망)
@@ -316,3 +316,74 @@ Blend Weights 를 먼저 하는 이유: 지금 막힌 문제(R6)를 바로 풀�
 - [x] 5. `app/core/capture.py`(`preview.py` 는 만들지 않고 `capture.PhonemeDriver` 로 합침 — solo / all_zero / restore) + `app/libraries/jali_arkit_0040_default.json`(JUN_JALI `examples/build_jali_arkit_node.py` 의 MAPPING 을 ast 로 읽어 좌우 펼침) + `tests/test_capture.py` 12/12. 음소 plug 가 연결돼 있으면 값을 넣을 수 있는 위쪽 plug 로 올라간다(테스트 씬: `JALI1:JALI_IN.AAA` → `JALI1:CNT_PHONEMES.AAA`). ref 가 그 plug 의 max 를 넘으면 CaptureError. Capture = (음소 ref, 나머지 0) − (전부 0)
 - [x] 6. `app/ui/pose_map_tab.py` + `connect_dialog.py` (P4 · P5 · U — Skip 기본, 테스트 씬은 Replace 로) — `tests/test_ui_pose_map.py` 19/19 (테스트 씬: Capture · Used only · Solo · Build(Replace) · 슬라이더 실시간 · ref 5 / 7.25 · 음소 전환 · 원복 · 저장 · Connect 다른 쌍 · Remove · 기본 라이브러리 Load). 계획 대비 추가: 음소 목록에 **체크박스** — 체크 = 음소(Solo · Capture 대상), 기본으로 `Jaw` · `Lip` 해제(같은 노드의 배율 입력을 0 으로 만들면 출력 전체가 0)
 - [x] 7. 아이콘 · `docs/A00550_PoseMapper.md` · WORKLOG · README(툴 69 / 현행 54) · 포트폴리오 · 메모리 · 이 계획서 상태 갱신 — 남은 것: 마야 GUI 확인(드롭 설치 · 실제 얼굴 Solo preview)
+
+---
+
+## 11. v01.05 — Pose Map 에 JaLi 조절 (2026-10-19 사용자 요청: "계획대로 업데이트")
+
+### 11.1 왜
+
+v01.04 까지 Pose Map 노드망은 음소 값만 더한다 → **`CNT_JaLi`(턱 / 입술 비중)가 얼굴에 영향을 주지 않는다.**
+테스트 씬 16:20 저장본 실측: `pm_NET1`(`JALI1:CNT_PHONEMES` → BS, Replace) 이 BS 를 구동하는 동안 `CNT_JaLi` 를 (2~15, 2~15) 로
+바꿔도 AHH=10 → jawOpen 1.000, UUU=10 → mouthFunnel 1.000 그대로. 원래 노드망(`JALI1:...md_<타겟>` × Jaw/9 · Lip/9)은
+Jaw 2 → `ARKIT_OUT.jawOpen` 0.222 로 반영하지만 Replace 로 BS 에서 끊겼다. 원래 노드망은 타겟마다 축(Jaw / Lip)만 정해져 있고
+세기는 조절할 수 없다.
+
+### 11.2 계산
+
+```
+타겟 = clamp( Σ(음소/Ref × 포즈) × factor )
+factor = 1 + strength × (축값 / neutral − 1)        축 = 없음 / Jaw / Lip,  strength 0~1,  neutral 기본 9
+```
+- strength 0 = JaLi 무시, 1 = 원래 노드망과 같다(Jaw 9 → ×1, Jaw 2 → ×0.222), 0.5 = 중간.
+- neutral = 포즈를 만들 때의 JaLi 값(0040 실측 9, 9). Capture 는 JaLi 가 neutral 일 때 하는 것이 맞다(문서에 적는다).
+
+### 11.3 씬 노드 (체인에 끼워 넣기)
+
+```
+공용(노드망당 축 하나씩)  <prefix>pm_ratio_Jaw / _Lip   multDoubleLinear  input1 <- <JaLi 노드>.<Jaw/Lip attr>, input2 = 1/neutral
+체인(축이 있는 타겟만)    <prefix>pm_jb_<t>  blendTwoAttr       input[0] = 1, input[1] <- ratio.output, attributesBlender = strength
+                          <prefix>pm_jm_<t>  multDoubleLinear   input1 <- bw.output, input2 <- jb.output   -> clamp (또는 타겟)
+```
+- 체인 노드는 bw 의 message 어트리뷰트(`pmAxisMul`, `pmAxisBlend`, `pmClampNode`)로 찾는다 — 연결 순서로 찾지 않는다.
+- 축을 없음으로 바꾸면 jb · jm 을 지우고 bw → clamp 로 다시 잇는다. 축을 바꾸면 jb.input[1] 만 다른 ratio 로.
+- `pm_NET` 에 `pmJaliNode`(message), `pmJawAttr` · `pmLipAttr`(string), `pmNeutral`(double) 추가. JaLi 노드를 바꾸면 ratio 입력만 다시 잇는다.
+- JaLi 노드가 없거나 축 어트리뷰트가 없으면 축이 있는 타겟도 factor 없이 만들고 report `jali_missing` 으로 경고.
+
+### 11.4 라이브러리 json (호환 유지 — 없으면 v01.04 와 같다)
+
+```json
+"jali": {"jaw_attr": "Jaw", "lip_attr": "Lip", "neutral": 9.0,
+         "axis": {"jawOpen": "jaw", "mouthFunnel": "lip"},
+         "strength": {"jawOpen": 1.0, "mouthFunnel": 0.5}}
+```
+노드 이름은 저장하지 않는다(어트리뷰트 이름만) — Connect 대화상자에서 JaLi 노드를 고른다.
+기본 라이브러리 json 파일은 **고치지 않는다**(사용자 튜닝본이 작업 트리에 있다) — 대신 `JALI Defaults` 버튼.
+
+### 11.5 UI
+
+- Source 박스 아래 **JaLi** 줄: `Node [ ] [<< Sel]` · `Jaw [attr ▼]` · `Lip [attr ▼]` · `Neutral [9.0]`.
+  어트리뷰트 목록 = 숫자형 사용자 어트리뷰트 + keyable 스칼라(`translateX` 등, `CNT_JaLi` 용). Source 를 고를 때 비어 있으면
+  Source 에 `Jaw` / `Lip` 이 있으면 자동으로 채운다.
+- Target 표에 열 2개: `Axis`(- / Jaw / Lip) · `Strength`(0~1). **타겟마다**(음소와 무관). 바꾸면 그 타겟 체인만 sync.
+- 버튼: `JALI Defaults`(jawOpen · jawForward · tongueOut = Jaw, 포즈가 있는 나머지 = Lip, strength 1) · `Clear Axes`.
+- Connect 대화상자: `JaLi node` 칸 추가(기본 = Source 에 Jaw 어트리뷰트가 있으면 Source).
+
+### 11.6 검증
+
+| # | 확인 |
+|---|------|
+| J1 | 합성: AHH 포즈 jawOpen 0.67, 축 Jaw, s=1 → Jaw 9: 0.67 · Jaw 4.5: 0.335 · s=0.5, Jaw 4.5: 0.5025 · s=0: 0.67 |
+| J2 | 축 Jaw → Lip → 없음: 노드 생기고 · 바뀌고 · 지워지며 값 복귀, bw → clamp 재연결 |
+| J3 | neutral 6 → ratio input2 = 1/6, JaLi 노드 교체 → ratio 입력만 교체 |
+| J4 | read_library / save / load 에 축 · strength · neutral 왕복, 옛 json(jali 없음) 그대로 열림 |
+| J5 | remove 가 jb · jm · ratio 까지 삭제, Undo 복귀, detached() 가 jm 경로에서도 맞음 |
+| J6 | 테스트 씬: Source `JALI1:CNT_PHONEMES`, JaLi `JALI1:CNT_JaLi`(translateX / Y), JALI Defaults, Replace Build →
+      Jaw 2 일 때 AHH=10 jawOpen **0.222**(원래 노드망과 같다) |
+| J7 | 오프스크린 UI: JaLi 줄 자동 채움 · 표 Axis / Strength 편집 → 씬 반영 · JALI Defaults · Connect 의 JaLi 노드 |
+
+### 11.7 진행 기록
+
+- [ ] J-1. `library.py` jali 필드 + json 호환 · `network.py` 축 노드(만들기 · 바꾸기 · 지우기 · read_library · remove · detached) + `tests/test_jali.py`(J1~J5)
+- [ ] J-2. `pose_map_tab.py` JaLi 줄 · 표 열 2개 · 버튼 2개 · `connect_dialog.py` JaLi 노드 + `tests/test_ui_jali.py`(J7) + 테스트 씬 J6
+- [ ] J-3. 기존 시험 8종 회귀 · 버전 01.05 · 사용 안내 · WORKLOG · 메모리 · 이 계획서 상태
