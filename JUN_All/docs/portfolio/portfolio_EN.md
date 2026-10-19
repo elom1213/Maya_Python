@@ -2,13 +2,13 @@
 title: Portfolio — Work Summary (2026-05-06 ~ 2026-10-12)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-10-12
+updated: 2026-10-19
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
 
 > **Author**: Ji Hun Park (Junny)
-> **Period**: 2026-05-06 – 2026-10-12 (~23 weeks)
+> **Period**: 2026-05-06 – 2026-10-19 (~23 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
 > **Volume**: 50+ in-house tools (64 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
@@ -108,6 +108,30 @@ updated: 2026-10-12
   changed the minimum**.
 - **Keywords**: PoseWrangler / PoseDriverConnect, RBF Pose Driver, delta serializer, `cmds.objExists` guard,
   MMatrix delta restore, third-party plugin fork & patch management, MetaHuman → custom avatar
+
+### 1-7. Speech → JALI lip-sync pipeline — multilingual dialogue from audio only (VisemeNet fork + Maya tool)
+
+- **Problem**: live-service games dub the same lines into many languages; keying faces per line and per language does
+  not scale (Cyberpunk 2077 used JALI's procedural approach for 10 languages). The research model **VisemeNet**
+  (SIGGRAPH 2018, audio → JALI visemes) is public, but it is 2018 TF1 code, and its rig script hard-codes paths and
+  assumes 25 fps.
+- **What I did**: forked the model (`JUN_JALI`) and built **three pieces** — ① a double-click installer
+  (`setup_env.bat`: Python discovery, virtual env, self test) ② a standalone **converter** (WAV list → preflight with
+  13 rules such as 44.1 kHz / 16-bit → if any file fails, nothing is converted and the reason is logged) ③ a Maya shelf
+  tool **`A00540_JaliLipSync`** (pick TXT + WAV, key the JALI rig sampled at the scene fps, json mappings, one undo).
+  On the JALI rig (the paper's public `angela_JALI.ma`) I **measured the jaw / muscle-channel / tongue change of every
+  viseme** and built an ARKit 52 mapping (JALI Jaw axis = `jawOpen`, Lip axis = `mouth*`, MBP = `mouthClose` + `jawOpen`).
+- **Found (two hidden properties of the original model)**: ① the graph hard-codes dropout 0.5 as a **constant** in seven
+  `net2` LSTMs, so **inference was random** (same audio twice → max difference 0.64; the author's reference output is one
+  such sample) → a **deterministic mode** that only rewrites that constant to 1.0 when loading the frozen graph (original
+  code untouched) is the default. ② the output is **0.32 s shorter** than the audio — I traced `net2`'s 64-row window and
+  32-row padding to a row-count formula (matches both test files) and confirmed the start is aligned, so sound and mouth
+  stay in sync in Maya.
+- **Result**: lip-sync keys on a JALI rig from an audio file alone (14.9 s of speech: ~4 s inference, 0.2 s keying).
+  Verified with 42 converter core/UI checks and 34 mayapy checks for the Maya tool. Next: comparing **Korean / Japanese**
+  quality on an English-trained model.
+- **Keywords**: VisemeNet, JALI (Jaw/Lip viseme field), audio-driven lip sync, TensorFlow frozen-graph patching,
+  dropout at inference, multilingual dubbing, PySide standalone + QThread, ARKit 52 mapping, fork management
 
 ---
 

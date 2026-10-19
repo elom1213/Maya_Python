@@ -4,7 +4,7 @@
 독립 실행(standalone) Qt 앱을 직접 설계·개발한 포트폴리오 저장소입니다.
 
 > 작성자: **Ji Hun Park (Junny)** · Technical Artist / Rigging & Pipeline Tools Developer
-> 최근 갱신: 2026-10-19 · 툴 폴더 **67개**(템플릿·구버전 포함, **현행 52종**) · 공용 프레임워크 1개
+> 최근 갱신: 2026-10-19 · 툴 폴더 **68개**(템플릿·구버전 포함, **현행 53종**) · 공용 프레임워크 1개
 
 ---
 
@@ -13,7 +13,7 @@
 A portfolio of **production-grade Python tooling for Autodesk Maya and game pipelines**, written and
 maintained by **Ji Hun Park (Junny)**, a Technical Artist focused on rigging, facial, and pipeline automation.
 
-It contains **67 tool folders (52 actively maintained)** spanning two architectures — **in-Maya
+It contains **68 tool folders (53 actively maintained)** spanning two architectures — **in-Maya
 `maya.cmds` / PySide UIs** and **standalone PySide (Qt) desktop apps** — built on a **shared framework**
 (reusable widgets, theming, path management, undo handling, drag-&-drop installers).
 
@@ -67,6 +67,9 @@ A narrative work summary lives in
   최종 리깅 메시에 일괄 반영하는 **Mix Targets**, 디포머 뒤에 남은 `deleteComponent` 를 중립 셰이프로
   옮겨 **리그 전체(타겟 · 스킨 웨이트 · 디포머 멤버십)에 반영**하는 **Bake Delete** 탭.
 - **`A00100_jsonEditor_MH`** — MetaHuman용 JSON 정렬·편집 도구.
+- **`A00540_JaliLipSync`** — **음성 → JALI 립싱크**. 짝 저장소 [`JUN_JALI`](https://github.com/elom1213/JUN_JALI)(VisemeNet 포크,
+  더블클릭 설치 + 스탠드얼론 wav → 비짐 변환기)가 만든 커브를 JALI 리그(`CNT_JaLi` · `CNT_PHONEMES` · `CNT_COARTIC`)에 키로.
+  씬 fps 샘플 · 매핑 json · 오디오 노드. 원본 모델의 **추론 무작위성(dropout 상수)** 을 찾아 결정적 모드로.
 
 <!-- ![ConnectionBuilder](JUN_All/docs/assets/A00090_ConnectionBuilder.png) -->
 
@@ -172,6 +175,7 @@ A narrative work summary lives in
 
 | 시기 | 내용 |
 |------|------|
+| 2026-10 중순 | **`A00540_JaliLipSync` 신규 + `JUN_JALI`(VisemeNet 포크)** — 다국어 음성을 오디오만으로 JALI 리그 립싱크: 더블클릭 설치 · 스탠드얼론 변환기(사전 검사, 오류 시 중단) · 마야 셸프 툴, JALI ↔ ARKit 52 매칭(리그 실측) |
 | 2026-10 중순 | **`A00480` Import > CSV** — `A00200` ARKit 페이셜 CSV 임포트를 이식, 블렌드셰이프뿐 아니라 **ARKit 어트리뷰트를 가진 아무 노드**에 키 · **`Value Scale`**(AdvancedSkeleton 페이셜 컨트롤은 `x10`) · **`A00145`** 연결을 규칙 json 으로 저장 · **`A00240`** Junction 탭 · **`A00110_V02` Hot Key 탭**(Shift+A Hold + Tab 으로 매니퓰레이터 Object / World 토글) · **`A00400`** Controls 셰이프 Filter · **`A00145`** Constraint `All Targets -> Each Follower`(follower 하나에 타깃 여러 개) · **`A00340`** `View > Show Profile`(프로파일 json 을 탐색기로) |
 | 2026-10 초 | **`A00490_KeyboardTool` 신규**(키 시퀀스 자동 입력 + 대상 창) · 토큰 이름 규칙 **`Enum`** 공용화(`A00330` · `A00480`) · Framework **`Dev Mode` 메뉴 위젯** · **`A00170`** Seal Free 모드 · dev 스크립트를 A 번호 툴(`A00500`~`A00530`)로 |
 | 2026-09 하순 | **`A00275` Weights > Smooth 신규** — Kangaroo `SkinCluster > Smooth` 를 플러그인 없이 이식 · **Transfer `Target mode`**(타겟 리스트와 행 순서 1:1) + 진행률 팝업 |

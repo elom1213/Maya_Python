@@ -1,0 +1,32 @@
+{
+  "name": "angela_jali_visemenet",
+  "description": "VisemeNet 22 columns -> angela_JALI.ma JALI rig (same as the original VisemeNet_tensorflow maya_animation.py). WWW uses the U column; COARTIC.YA_PEDAL, Eu and JY are not used.",
+  "model_columns": ["Jaw", "Lip", "Ah", "Aa", "Eh", "Ee", "Ih", "Oh", "Uh", "U", "Eu", "Schwa", "R", "S",
+                    "ShChZh", "Th", "JY", "LNTD", "GK", "MBP", "FV", "W"],
+  "clamp": [0.0, 1.0],
+  "targets": [
+    {"attr": "CNT_JaLi.translateX",  "from": ["Jaw"], "scale": 10, "role": "jali"},
+    {"attr": "CNT_JaLi.translateY",  "from": ["Lip"], "scale": 10, "role": "jali"},
+    {"attr": "CNT_PHONEMES.AAA",     "from": ["Aa"], "scale": 10},
+    {"attr": "CNT_PHONEMES.Eh",      "from": ["Eh"], "scale": 10},
+    {"attr": "CNT_PHONEMES.AHH",     "from": ["Ah"], "scale": 10},
+    {"attr": "CNT_PHONEMES.OHH",     "from": ["Oh", "Uh"], "combine": "max", "scale": 10},
+    {"attr": "CNT_PHONEMES.UUU",     "from": ["U"], "scale": 10},
+    {"attr": "CNT_PHONEMES.IEE",     "from": ["Ee", "Ih"], "combine": "max", "scale": 10},
+    {"attr": "CNT_PHONEMES.RRR",     "from": ["R"], "scale": 10},
+    {"attr": "CNT_PHONEMES.WWW",     "from": ["U"], "scale": 10},
+    {"attr": "CNT_PHONEMES.SSS",     "from": ["S"], "scale": 10},
+    {"attr": "CNT_PHONEMES.FFF",     "from": ["FV"], "scale": 10},
+    {"attr": "CNT_PHONEMES.TTH",     "from": ["Th"], "scale": 10},
+    {"attr": "CNT_PHONEMES.MBP",     "from": ["MBP"], "scale": 10},
+    {"attr": "CNT_PHONEMES.SSH",     "from": ["ShChZh"], "scale": 10},
+    {"attr": "CNT_PHONEMES.Schwa",   "from": ["Schwa"], "scale": 10},
+    {"attr": "CNT_PHONEMES.GK",      "from": ["GK"], "scale": 10},
+    {"attr": "CNT_PHONEMES.LNTD",    "from": ["LNTD"], "scale": 10},
+    {"attr": "CNT_COARTIC.LNTD",     "from": ["LNTD"], "scale": 10},
+    {"attr": "CNT_COARTIC.GK",       "from": ["GK"], "scale": 10},
+    {"attr": "CNT_COARTIC.MMM",      "from": ["MBP"], "scale": 10},
+    {"attr": "CNT_COARTIC.FFF",      "from": ["FV"], "scale": 10},
+    {"attr": "CNT_COARTIC.WA_PEDAL", "from": ["W"], "scale": 10}
+  ]
+}

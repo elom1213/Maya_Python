@@ -14,6 +14,9 @@ metadata:
 - 리그: `C:\Users\USER\Desktop\JP\0001_PJ_portfolio\0040_JULI\scenes\angela_JALI.ma`(Maya 2015, film 24fps) — `CNT_PHONEMES` /
   `CNT_COARTIC` / `CNT_JaLi.tx`(Jaw) `.ty`(Lip). VisemeNet 원본 매핑 이름이 그대로 맞는다. 적용 = `examples/maya_apply_visemenet.py`.
 - 문서: `docs/0010_visemenet_feasibility.md`(진단 · M1~M7 계획) · `docs/0020_usage_example_maya.md`(사용법). 결과물 `out/` 은 gitignore.
+- **2026-10-19 툴 3종**: `setup_env.bat`(더블클릭 설치 · 자가 검사) · `Run_VisemeNet_Converter.bat` + `tools/VisemeNet_Converter`
+  (사전 검사 E01~E11, 실패면 변환 0, 결정적 모드 기본) · `vendor/Framework`(Maya_Python Framework 복사본, `tools/sync_framework.py` 로 갱신).
+  마야 쪽은 Maya_Python `A00540_JaliLipSync` [[wip-a00540-jalilipsync]]. 문서 0050 = 설치 · 변환기 안내.
 - 남은 핵심 리스크: 영어 학습 모델이라 한국어 ㅓ · ㅡ, 일본어 う 품질 미검증. 라이선스: 원본 GPLv3/상용(UMass).
 
 관련: [[mayapy-headless-verify]], [[posewrangler-plugin-fork-patch]]

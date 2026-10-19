@@ -2,13 +2,13 @@
 title: 포트폴리오 작업 내역 (2026-05-06 ~ 2026-10-12)
 aliases: [Portfolio KR, 포트폴리오 국문]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-10-12
+updated: 2026-10-19
 ---
 
 # Technical Artist / Pipeline TD 작업 내역 — 국문
 
 > **작성자**: 박지훈 (Ji Hun Park / Junny)
-> **기간**: 2026-05-06 ~ 2026-10-12 (약 23주)
+> **기간**: 2026-05-06 ~ 2026-10-19 (약 23주)
 > **범위**: Autodesk Maya 툴 개발 · 언리얼 엔진 연동 자동화 · MetaHuman 페이셜 · 파이프라인 인프라
 > **규모**: 사내 툴 50여 종(툴 폴더 64개) · 전 툴 공용 프레임워크 1식 · 커밋 299건(2026-07-15 기준 집계)
 > **스택**: Python 3, `maya.cmds` / OpenMaya, PySide2·PySide6(Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF), Houdini Alembic 캐시 연동
@@ -107,6 +107,25 @@ updated: 2026-10-12
   블랙박스로 두고 우회하는 대신 **원인 지점을 특정해 최소한으로 수정**했습니다.
 - **키워드**: PoseWrangler / PoseDriverConnect, RBF Pose Driver, 델타 직렬화(serializer), `cmds.objExists` 가드,
   MMatrix 델타 복원, 서드파티 플러그인 포크·패치 관리, MetaHuman → 커스텀 아바타
+
+### 1-7. 음성 → JALI 립싱크 파이프라인 — 다국어 대사를 오디오만으로 (VisemeNet 포크 + 마야 툴)
+
+- **문제**: 라이브 서비스 게임은 같은 대사를 여러 언어로 더빙한다. 문장 · 언어마다 페이셜을 키로 잡는 것은 비현실적이다
+  (Cyberpunk 2077 은 JALI 절차적 생성으로 10개 언어를 처리했다). 연구 모델 **VisemeNet**(SIGGRAPH 2018, 오디오 → JALI 비짐)은
+  공개돼 있지만 2018년 TF1 코드라 그대로는 쓰기 어렵고, 리그에 거는 스크립트도 경로 하드코딩 · 25fps 가정이었다.
+- **한 일**: 모델을 포크(`JUN_JALI`)해 **세 가지를 만들었다** — ① 더블클릭 설치(`setup_env.bat`: 파이썬 탐색 · 가상환경 ·
+  자가 검사) ② 스탠드얼론 **변환기**(wav 목록 → 사전 검사(44.1kHz · 16bit 등 13개 규칙) → 하나라도 걸리면 아무것도 변환하지 않고
+  이유를 로그로) ③ 마야 셸프 툴 **`A00540_JaliLipSync`**(txt · wav 를 골라 JALI 리그에 키, 씬 fps 로 샘플, 매핑은 json, Undo 한 번).
+  JALI 리그(논문 공개 `angela_JALI.ma`)에서 **음소마다 턱 · 근육 채널 · 혀 변화를 실측**해 ARKit 52 매칭표도 만들었다
+  (JALI 의 Jaw 축 = `jawOpen`, Lip 축 = `mouth*`, MBP = `mouthClose` + `jawOpen`).
+- **발견한 것 (원본 모델의 숨은 성질 2개)**: ① 원본 그래프가 `net2` LSTM 7개에 dropout 0.5 를 **상수로** 박아 **추론도 무작위**였다
+  (같은 음성 두 번 → 최대 차 0.64, 저자의 참조 출력도 그 중 하나) → frozen 그래프를 불러올 때 그 상수만 1.0 으로 바꾸는
+  **결정적 모드**를 기본으로(원본 코드 무수정). ② 출력이 음성 끝 **0.32초 짧다** — `net2` 의 64줄 창 · 32줄 패딩을 추적해 줄 수 공식을
+  세우고(실측 2개 파일 일치), 시작 정렬은 맞다는 것을 확인해 마야에서 소리와 입이 어긋나지 않음을 보장했다.
+- **결과**: 음성 파일만으로 JALI 리그 립싱크 키가 나온다(14.9초 음성 추론 약 4초, 키 0.2초). 검증: 변환기 코어 · UI 시험 42항목,
+  마야 툴 mayapy 34항목. 남은 과제는 영어 학습 모델의 **한국어 · 일본어 품질 비교**.
+- **키워드**: VisemeNet, JALI (Jaw/Lip viseme field), 오디오 구동 립싱크, TensorFlow frozen graph 패치, dropout 추론, 다국어 더빙,
+  PySide 스탠드얼론 + QThread, ARKit 52 매핑, 포크 관리
 
 ---
 

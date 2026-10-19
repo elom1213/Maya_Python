@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-19 (오늘)
 
+> [!summary] A00540_JaliLipSync **신규** + JUN_JALI(VisemeNet 포크) 툴 3종 — **음성 → JALI 리그 립싱크** `#A00540_JaliLipSync`
+- 요청: JUN_JALI 계획서(`docs/0030_tool_plan.md`)대로 — 더블클릭 추론 환경 설치, wav → txt 스탠드얼론 변환기(TSL + 저장 경로, 오류 시 중단 + 로그), 마야 키 툴(드래그&드롭 셸프), JALI ↔ ARKit 매칭.
+- JUN_JALI: `setup_env.bat`(64bit Python 3.9~3.11 탐색 · winget 제안 · `.venv` · 자가 검사) · `Run_VisemeNet_Converter.bat` + `tools/VisemeNet_Converter`(검사 규칙 E01~E11 · 사전 검사 실패면 변환 0 · 변환 중 오류 즉시 중단 · QThread) · `vendor/Framework`(이 저장소 Framework 복사본).
+- 발견: 원본 그래프가 `net2` dropout 0.5 를 **상수로** 박아 추론이 무작위(같은 wav 최대 차 0.64) → 불러올 때 상수만 1.0 으로 바꾸는 결정적 모드 기본. 출력은 음성 끝 **0.32초 짧다**(64줄 창 · 32줄 패딩, 시작은 맞음) → 줄 수 공식으로 E23 검사.
+- 마야: `A00540_JaliLipSync` — txt 고르면 json / 같은 이름으로 wav 자동, 리그 네임스페이스 콤보, 매핑 json, 시작 프레임 · 비짐 배율 · JaLi 데이터/고정, 씬 fps 샘플, 구간 지우고 키, Undo 한 번, 사운드 노드.
+- 검증: 변환기 검사 13 · 코어 17 · 오프스크린 UI 12, `setup_env.bat` 새 설치 84초 · 재실행 8초 · 파이썬 없을 때 안내 / mayapy 2024 코어 19 · UI 15. **미확인**: 변환기 창 실제 표시, winget 설치, Win10, 마야 GUI 드롭 · 소리 재생.
+
 > [!summary] A00340_SelectionTool — **View > Show Profile: 활성 프로파일 json 을 탐색기에서 선택해 연다** (v01.09->01.10) `#A00340_SelectionTool`
 - 요청: 메뉴바에 `Show Profile` — 누르면 이 PC 에서 툴이 참조하는 profile 경로가 탐색기에 표시된 채 팝업.
 - `View` 메뉴에 항목 추가, `prefs.profile_path(get_active())` 를 공용 `file_opener.open_path` 로(파일 선택). 파일이 없으면 profiles → data 폴더 폴백 + `[WARN]`.

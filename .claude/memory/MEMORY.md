@@ -96,3 +96,4 @@
 - A00470 — [MaterialTool](wip-a00470-materialtool.md)(이름 규칙 진단 · Copy Material · Rename to Suggested · Select Materials/Faces 는 API 선택 · 세로 줄이는 방향 유지)
 - A00480 — [FileTool](wip-a00480-filetool.md)(Export/Import/Path, Export 규칙, Naming = 공용 토큰 위젯. Maya 탭은 A00210 으로 감)
 - A00490 — [KeyboardTool](wip-a00490-keyboardtool.md)(크롬 계열은 활성 창만 키를 받는다 → Auto)
+- A00540 — [JaliLipSync](wip-a00540-jalilipsync.md)(VisemeNet txt → JALI 리그 키, 짝 = JUN_JALI 변환기 · 원본 모델은 추론도 무작위 · 끝 0.32초 짧음)
