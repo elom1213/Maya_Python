@@ -36,6 +36,11 @@ class MainWindow(QWidget):
     def _build(self):
         layout = QVBoxLayout(self)
         self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
+        lib_menu = self.menu_bar.addMenu("Library")
+        lib_menu.setToolTipsVisible(True)
+        act = lib_menu.addAction("Show Libraries Folder")
+        act.setToolTip("Open the folder of the saved pose libraries (app/libraries/*.json) in Explorer")
+        act.triggered.connect(self.on_show_libraries)
         help_menu = self.menu_bar.addMenu("Help")
         help_menu.addAction("Open Guide", self.on_open_guide)
         help_menu.addAction("About", self.show_about)
@@ -76,6 +81,17 @@ class MainWindow(QWidget):
         if hasattr(self.pose_tab, "stop_preview"):
             self.pose_tab.stop_preview()
         super().closeEvent(event)
+
+    def on_show_libraries(self, *args):
+        """Library > Show Libraries Folder. 저장한 포즈 라이브러리 json 폴더를 탐색기로 연다 (없으면 만든다)."""
+        from tools.A00550_PoseMapper.app.core.library import LIB_DIR
+        try:
+            os.makedirs(LIB_DIR, exist_ok=True)
+            file_opener.open_path(LIB_DIR)
+        except (OSError, ValueError) as e:
+            self._log("[ERROR] Cannot open {0}: {1}".format(LIB_DIR, e))
+            return
+        self._log("[OK] Libraries folder: {0}".format(LIB_DIR))
 
     def on_open_guide(self, *args):
         try:

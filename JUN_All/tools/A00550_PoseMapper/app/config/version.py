@@ -17,5 +17,8 @@
 #        the check box of a selected row checks / unchecks every selected row), "Check Sel" /
 #        "Uncheck Sel" buttons, and a "Check All" <-> "Uncheck All" toggle.
 
-VERSION = "01.01"
+# 01.02  Menu "Library > Show Libraries Folder" : opens app/libraries (the saved pose library
+#        json files) in Explorer.
+
+VERSION = "01.02"
 LAST_UPDATE = "2026-10-19"

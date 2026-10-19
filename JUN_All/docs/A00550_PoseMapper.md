@@ -4,7 +4,7 @@
 음소를 하나 골라 타겟 값을 슬라이더로 정하고, 그 관계를 json 으로 저장해 **아무 노드 쌍에나 다시 연결**한다.
 두 번째 탭은 `blendWeighted` 의 **input / weight 편집기** — Node Editor 에서 weight 가 안 보이는 문제를 푼다.
 
-- **버전**: v01.01 (2026-10-19)
+- **버전**: v01.02 (2026-10-19)
 - **아키텍처**: (B) in-Maya PySide (`maya.cmds`), 드래그&드롭 셸프 설치
 - **계획 · 진행 기록**: `docs/plans/A00550_PoseMapper_plan.md`
 - **관련**: `A00540_JaliLipSync`(음성 → JALI 키) · JUN_JALI `docs/0040_jali_arkit_mapping.md`(JALI ↔ ARKit 실측 시작 가중치)
@@ -50,6 +50,7 @@
 6. **Build / Update Network** — 지금 라이브러리대로 노드망을 만든다 / 고친다(§4).
    `If target is driven` = 타겟에 이미 다른 연결이 있을 때 **Skip(기본)** / Replace(끊고 연결) / Add(기존 것을 합산 입력으로 유지).
 7. **Save / Save As...** — json 으로 저장(`app/libraries/<이름>.json` 또는 고른 경로). `Load` = 콤보의 라이브러리.
+   메뉴 **`Library > Show Libraries Folder`** (v01.02) = 그 `app/libraries` 폴더를 탐색기로 연다(json 복사 · 백업 · 다른 PC 로 옮길 때).
 
 ### Capture — 지금 씬의 결과를 포즈로
 

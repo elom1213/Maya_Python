@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-19 (오늘)
 
+> [!summary] A00550_PoseMapper — **메뉴 `Library > Show Libraries Folder`** (v01.01->01.02) `#A00550_PoseMapper`
+- 요청: libraries 경로를 탐색기에서 팝업하는 메뉴.
+- 메뉴 바에 `Library` 메뉴(Help 왼쪽) → `app/libraries` 를 공용 `file_opener.open_path` 로 연다(폴더가 없으면 만든다), 로그에 경로.
+- 검증(mayapy 오프스크린, open_path 가짜로 바꿔): 메뉴 항목 · 넘어간 경로 = `LIB_DIR` · 로그. 실제 탐색기 팝업은 마야 GUI 미확인.
+
 > [!summary] A00550_PoseMapper — **Source 목록 다중 선택 · 체크 / 해제 · 전체 토글** (v01.00->01.01) `#A00550_PoseMapper`
 - 요청: Source tsl 에서 여러 어트리뷰트를 골라 한 번에 체크 / 해제, 전체 체크 / 해제 토글.
 - 공용 `JUN_mod_checkList_qt_v01` 을 붙임(Shift / Ctrl 선택, 고른 줄의 체크박스 하나 · Space = 고른 줄 전부) + `Check Sel` / `Uncheck Sel` + `Check All` ⇄ `Uncheck All` 토글. 여러 줄이 한 번에 바뀌면 `checksChanged` 로 받아 상태를 전부 기억, 체크가 바뀌면 Solo preview 원복.
