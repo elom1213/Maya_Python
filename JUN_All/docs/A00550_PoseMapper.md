@@ -184,6 +184,39 @@ Source 목록의 **고르기(줄 클릭)** 와 **체크(체크박스)** 는 하�
 **여러 줄을 골랐을 때** — Shift / Ctrl 로 여러 줄을 골라도 슬라이더가 고치는 것은 **마지막에 클릭한 한 줄**(목록에 테두리로 표시)이다.
 여러 줄 선택은 체크 / 해제를 한 번에 하기 위한 기능이다(`Check Sel` / `Uncheck Sel`).
 
+### Q. `CNT_JaLi` 가 각 타겟에 미치는 영향력을 이 툴로 조절하려면? (2026-10-19, v01.05 에서 가능)
+
+**Target 표의 `Axis` · `Strength` 열로 타겟마다 정한다.** v01.04 까지는 방법이 없었다.
+
+**v01.04 까지 왜 안 됐나** — Pose Map 노드망은 음소 값만 더했다. 테스트 씬 16:20 저장본에서 `pm_NET1`(`JALI1:CNT_PHONEMES` → BS, Replace)이
+BS 를 구동하는 동안 `CNT_JaLi` 를 (2, 9) · (15, 9) · (9, 2) · (9, 15) 로 바꿔도 AHH=10 → jawOpen **1.000**, UUU=10 → mouthFunnel **1.000** 그대로였다(실측).
+원래 JALI 노드망(`JALI1:md_<타겟>` × Jaw/9 · Lip/9)은 JaLi 를 반영하지만(Jaw 2 → `ARKIT_OUT.jawOpen` 0.222) Replace 로 BS 에서 끊겼고,
+그 노드망은 타겟마다 축(Jaw / Lip)만 정해져 있어 **세기는 조절할 수 없다**(Blend Weights 탭으로 고칠 수 있는 것도 음소 weight 뿐).
+
+**v01.05 에서 하는 법**
+
+1. Source 아래 **JaLi 칸** `Node` 에 JaLi 컨트롤(`JALI1:CNT_JaLi`)을 `<< Sel` → `Jaw` / `Lip` 은 `translateX` / `translateY` 로 자동.
+   `Neutral` 은 포즈를 만들 때의 JaLi 값(기본 9).
+2. 처음이면 **`JALI Defaults`** — jawOpen · jawForward · tongueOut = Jaw, 포즈가 있는 나머지 = Lip, Strength 1(원래 JALI 노드망과 같은 결과).
+3. 타겟 줄의 **`Axis`** 로 축을, **`Strength`** 로 세기를 고친다. 바로 씬에 반영된다.
+
+| 하고 싶은 것 | 설정 |
+|-------------|------|
+| 이 타겟은 JaLi 에 원래만큼 반응 | Axis Jaw 또는 Lip, Strength **1** |
+| 반응을 절반으로 | Strength **0.5** |
+| JaLi 와 무관하게 (늘 포즈 값 그대로) | Axis **`-`** (또는 Strength 0) |
+| 입술 타겟인데 턱 비중을 따르게 | Axis **Jaw** 로 바꾼다 |
+| JaLi 기준점을 바꾼다 (예: 6 에서 포즈를 만들었다) | `Neutral` 6 |
+
+계산: `타겟 = clamp( Σ(음소/Ref × 포즈) × (1 + Strength × (축값 / Neutral − 1)) )`.
+예) Jaw 축, Neutral 9, CNT_JaLi Jaw 2 → Strength 1: × 0.222 · 0.5: × 0.611 · 0: × 1.
+
+**주의**
+- `Axis` · `Strength` 는 **타겟 단위**다 — 어떤 음소를 고른 상태든 같은 값이 보이고, 그 타겟의 모든 음소 기여에 함께 곱해진다.
+- **Capture 는 CNT_JaLi 를 Neutral(9, 9)에 두고** 한다. 아니면 그 배율이 포즈에 섞인다(로그 `[WARN] JaLi is not at Neutral while capturing`).
+- JaLi 노드를 정하지 않으면 축은 저장되지만 효과가 없다(로그 경고).
+- 설정은 라이브러리 json 의 `"jali"` 에 저장되고, `Connect To...` 의 `JaLi node` 칸으로 다른 아바타의 JaLi 컨트롤에 연결된다.
+
 ## 6. 구조 (개발자용)
 
 ```
