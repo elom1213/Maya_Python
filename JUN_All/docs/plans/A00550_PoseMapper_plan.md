@@ -312,7 +312,7 @@ Blend Weights 를 먼저 하는 이유: 지금 막힌 문제(R6)를 바로 풀�
 - [x] 1. 툴 골격: `__init__` · `launch.py` · `__dragDrop_A00550.py` · `app/config/version.py` (A00540 에서 이름만 바꿔 복제)
 - [x] 2. `app/core/blend_weights.py` + `tests/test_blend_weights.py` (B1~B3, 합성 씬 + 테스트 씬 `JALI1:bw_mouthFunnel`) — 14/14. 테스트 씬에 실제로 `JALI1:bw_mouthFunnel` `[5] OHH` 가 weight 원소 없이 저장돼 있다(사용자가 겪은 상태)
 - [x] 3. `app/ui/blend_weights_tab.py` + `main_window.py`(탭 2개 틀) — 오프스크린 UI 확인 (`tests/test_ui_blend_weights.py` 10/10, 테스트 씬). Pose Map 탭이 없으면 main_window 가 자리표시 라벨을 넣는다
-- [ ] 4. `app/core/attrs.py` · `library.py` · `network.py` + `tests/test_network.py` (P2 · P3 · P7, ref 실수 포함)
+- [x] 4. `app/core/attrs.py` · `library.py` · `network.py` + `tests/test_network.py` (P2 · P3 · P4 · P5 · P7, ref 2.5 포함) — 20/20. 핵심 API: `network.build(lib, src, tgt, prefix, on_existing)` → (net, report), `network.sync(net, lib, on_existing, only_targets)`(슬라이더는 only_targets=[t]), `network.remove(net)`, `network.read_library(net)`. weight 는 float32 라 되읽은 값은 소수 4자리까지
 - [ ] 5. `app/core/capture.py` · `preview.py` + `app/libraries/jali_arkit_0040_default.json` (P1 · P6 — 테스트 씬에서 Capture)
 - [ ] 6. `app/ui/pose_map_tab.py` + `connect_dialog.py` (P4 · P5 · U — Skip 기본, 테스트 씬은 Replace 로)
 - [ ] 7. 아이콘 · `docs/A00550_PoseMapper.md` · WORKLOG · README(툴 69 / 현행 54) · 포트폴리오 · 메모리 · 이 계획서 상태 갱신
