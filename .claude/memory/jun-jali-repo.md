@@ -17,6 +17,9 @@ metadata:
 - **2026-10-19 툴 3종**: `setup_env.bat`(더블클릭 설치 · 자가 검사) · `Run_VisemeNet_Converter.bat` + `tools/VisemeNet_Converter`
   (사전 검사 E01~E11, 실패면 변환 0, 결정적 모드 기본) · `vendor/Framework`(Maya_Python Framework 복사본, `tools/sync_framework.py` 로 갱신).
   마야 쪽은 Maya_Python `A00540_JaliLipSync` [[wip-a00540-jalilipsync]]. 문서 0050 = 설치 · 변환기 안내.
+- **Python 3.14 PC (2026-10-20, Win10 보고)**: 새 Python 설치 관리자의 `py -3.11` 은 3.11 이 없어도 오류만 찍고 **종료 코드 0** →
+  setup 은 후보를 실행해 출력(JUNPY 3 11 64)으로 판단. 없으면 **전용 Python 3.11.9** (python.org NuGet, SHA-256 `9283876d…`) 를 `.python\` 에
+  .NET 으로 받아 푼다(`Lib\site-packages` 는 건너뜀 - 260자). bat 의 `call :say "... -> ..."` 처럼 메시지에 `>` 를 쓰면 리다이렉트된다.
 - 남은 핵심 리스크: 영어 학습 모델이라 한국어 ㅓ · ㅡ, 일본어 う 품질 미검증. 라이선스: 원본 GPLv3/상용(UMass).
 
 관련: [[mayapy-headless-verify]], [[posewrangler-plugin-fork-patch]]
