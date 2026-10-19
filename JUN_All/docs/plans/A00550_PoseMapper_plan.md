@@ -309,8 +309,8 @@ Blend Weights 를 먼저 하는 이유: 지금 막힌 문제(R6)를 바로 풀�
 이어서 할 때: `git log --oneline -- JUN_All/tools/A00550_PoseMapper` 로 마지막 커밋을 보고, 아래 첫 미완료 항목부터.
 검증 스크립트는 `JUN_All/tools/A00550_PoseMapper/tests/` 에 둔다(mayapy 로 실행, 테스트 씬은 열기만).
 
-- [ ] 1. 툴 골격: `__init__` · `launch.py` · `__dragDrop_A00550.py` · `app/config/version.py` (A00540 에서 이름만 바꿔 복제)
-- [ ] 2. `app/core/blend_weights.py` + `tests/test_blend_weights.py` (B1~B3, 합성 씬 + 테스트 씬 `JALI1:bw_mouthFunnel`)
+- [x] 1. 툴 골격: `__init__` · `launch.py` · `__dragDrop_A00550.py` · `app/config/version.py` (A00540 에서 이름만 바꿔 복제)
+- [x] 2. `app/core/blend_weights.py` + `tests/test_blend_weights.py` (B1~B3, 합성 씬 + 테스트 씬 `JALI1:bw_mouthFunnel`) — 14/14. 테스트 씬에 실제로 `JALI1:bw_mouthFunnel` `[5] OHH` 가 weight 원소 없이 저장돼 있다(사용자가 겪은 상태)
 - [ ] 3. `app/ui/blend_weights_tab.py` + `main_window.py`(탭 2개 틀) — 오프스크린 UI 확인
 - [ ] 4. `app/core/attrs.py` · `library.py` · `network.py` + `tests/test_network.py` (P2 · P3 · P7, ref 실수 포함)
 - [ ] 5. `app/core/capture.py` · `preview.py` + `app/libraries/jali_arkit_0040_default.json` (P1 · P6 — 테스트 씬에서 Capture)
