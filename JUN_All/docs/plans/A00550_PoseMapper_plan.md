@@ -1,11 +1,32 @@
 # A00550_PoseMapper — 계획서 (음소 포즈 매핑 + blendWeighted 가중치 탭)
 
-> **작성** 2026-10-19 · 상태: **계획** (구현 전) · 대상 Maya 2024
+> **작성** 2026-10-19 · 상태: **구현 중** (진행 기록 §10 — 중단되면 §10 의 첫 미완료 항목부터 이어서) · 대상 Maya 2024
 > 배경: JUN_JALI `out/jali_arkit_mapping_ctl.ma` 에서 JALI 음소 → ARKit 가중치를 손으로 다듬다가 나온 요청.
 > 관련: `A00540_JaliLipSync`(음성 → JALI 키) · JUN_JALI `docs/0040_jali_arkit_mapping.md`(실측 시작 가중치) ·
 > JUN_JALI `examples/build_jali_arkit_node.py`(지금 쓰는 bw → md → clamp 노드망)
 
 ---
+
+## 0-A. 확정 사항 (2026-10-19 사용자 답)
+
+| 항목 | 확정 |
+|------|------|
+| 툴 | **새 툴 `JUN_All/tools/A00550_PoseMapper`** (Q1) |
+| 기준값(ref) | **기본 10, 사용자가 임의의 실수**를 입력 (`QDoubleSpinBox`, 0.001 ~ 100000, 소수 3자리). Solo preview 도 이 값으로 음소를 켠다. 라이브러리 json 의 `ref_value` 에 저장되고, Connect 때 라이브러리 값을 기본으로 보여 주되 바꿀 수 있다 (Q2) |
+| 이미 연결된 타겟 | **기본 Skip** — Replace / Add 는 고를 수 있게 남긴다 (Q3) |
+| Jaw / Lip 축 배율 | 답 없음 → **2단계** (§8) (Q4) |
+| 테스트 씬 | **`D:\D__02.Art\D__Asset\D__Character\D__CHN\D__Rig\D__Revision_Rig_0010	mp\JP__CHN_Basic_1070_JALI_test.mb`** (Q5) — §0-B. **원본을 저장 · 덮어쓰지 않는다** (mayapy 에서 열기만, 결과 씬은 scratchpad 로) |
+
+## 0-B. 테스트 씬 구성 (2026-10-19 mayapy 로 읽음)
+
+- Maya 2024 `.mb` 357MB, 시간 단위 **ntsc (30fps)**. 열 때 `internalTimeUnitStringToDisplayFPSString` 오류 2줄은 mayapy 전용 무해.
+- **레퍼런스** `C:/Users/USER/Desktop/JP/0030_maya_python_JUN/JUN_JALI/out/jali_arkit_mapping_ctl.ma` → 네임스페이스 **`JALI1:`**
+  - `JALI1:JALI_IN` — 사용자 어트리뷰트 20개: `Jaw Lip AHH AAA Eh IEE OHH UUU WWW RRR SSS SSH FFF TTH MBP Schwa LNTD GK WA_PEDAL YA_PEDAL`
+  - `JALI1:CNT_PHONEMES`(16) · `JALI1:CNT_COARTIC`(6) · `JALI1:CNT_JaLi`(tx/ty) · `JALI1:ARKIT_OUT`(52)
+  - `JALI1:bw_*` blendWeighted **15개** (cheekPuff, jawForward, jawOpen, mouthClose, mouthDimple, mouthFunnel, mouthLowerDown, mouthPress, mouthPucker, mouthRollLower, mouthShrugLower, mouthSmile, mouthStretch, mouthUpperUp, tongueOut)
+- 블렌드셰이프 **`CHN_n_Face_xx_bs`** (geo `CHN_n_Face_xx_geoShape`) — ARKit 타겟 **51개(`tongueOut` 없음)**, **51개 전부 이미 구동 중**(ARKIT_OUT 쪽에서).
+  → 이 씬에서 Pose Map 을 BS 에 직접 Build 하면 기본 Skip 으로 전부 건너뛴다 — **검증 · 실사용은 `Replace` 로**(또는 Capture 로 지금 결과를 읽어 오기만).
+- 레퍼런스 노드(`JALI1:bw_*`)의 weight 수정 · input 연결은 레퍼런스 편집으로 가능 — Blend Weights 탭이 이 씬의 `JALI1:bw_*` 를 바로 다룬다.
 
 ## 0. 요청
 
@@ -275,8 +296,23 @@ Blend Weights 를 먼저 하는 이유: 지금 막힌 문제(R6)를 바로 풀�
 
 | # | 질문 | 권장 / 기본값 |
 |---|------|--------------|
-| Q1 | **새 툴 `A00550_PoseMapper`** 로 만들까, `A00540_JaliLipSync` 의 탭으로 넣을까 | 새 툴 (D1) |
-| Q2 | 기준값(ref) 기본 **10** 으로 괜찮나 (음소 = 10 일 때의 포즈) | 10 |
-| Q3 | 연결 대상에 이미 연결이 있을 때 기본 동작 | Skip |
-| Q4 | **Jaw / Lip 축 배율**을 1단계에 넣을까 (지금 씬은 이것까지 하고 있다) | 2단계 (§8) — 1단계는 음소 → 타겟만 |
-| Q5 | 실제로 튜닝할 **ARKit 아바타 씬**이 있나 (`BS_arkit` 를 가진 메시) | 없으면 합성 씬 + `ARKIT_OUT` 노드로 검증 |
+| Q1 | **새 툴 `A00550_PoseMapper`** 로 만들까, `A00540_JaliLipSync` 의 탭으로 넣을까 | ✅ 새 툴 |
+| Q2 | 기준값(ref) 기본 **10** 으로 괜찮나 (음소 = 10 일 때의 포즈) | ✅ 기본 10 + 사용자 실수 입력 |
+| Q3 | 연결 대상에 이미 연결이 있을 때 기본 동작 | ✅ Skip |
+| Q4 | **Jaw / Lip 축 배율**을 1단계에 넣을까 (지금 씬은 이것까지 하고 있다) | 답 없음 → 2단계 |
+| Q5 | 실제로 튜닝할 **ARKit 아바타 씬**이 있나 (`BS_arkit` 를 가진 메시) | ✅ §0-B 테스트 씬 |
+
+---
+
+## 10. 진행 기록 (중단 복구용 — 항목을 끝낼 때마다 체크하고 커밋)
+
+이어서 할 때: `git log --oneline -- JUN_All/tools/A00550_PoseMapper` 로 마지막 커밋을 보고, 아래 첫 미완료 항목부터.
+검증 스크립트는 `JUN_All/tools/A00550_PoseMapper/tests/` 에 둔다(mayapy 로 실행, 테스트 씬은 열기만).
+
+- [ ] 1. 툴 골격: `__init__` · `launch.py` · `__dragDrop_A00550.py` · `app/config/version.py` (A00540 에서 이름만 바꿔 복제)
+- [ ] 2. `app/core/blend_weights.py` + `tests/test_blend_weights.py` (B1~B3, 합성 씬 + 테스트 씬 `JALI1:bw_mouthFunnel`)
+- [ ] 3. `app/ui/blend_weights_tab.py` + `main_window.py`(탭 2개 틀) — 오프스크린 UI 확인
+- [ ] 4. `app/core/attrs.py` · `library.py` · `network.py` + `tests/test_network.py` (P2 · P3 · P7, ref 실수 포함)
+- [ ] 5. `app/core/capture.py` · `preview.py` + `app/libraries/jali_arkit_0040_default.json` (P1 · P6 — 테스트 씬에서 Capture)
+- [ ] 6. `app/ui/pose_map_tab.py` + `connect_dialog.py` (P4 · P5 · U — Skip 기본, 테스트 씬은 Replace 로)
+- [ ] 7. 아이콘 · `docs/A00550_PoseMapper.md` · WORKLOG · README(툴 69 / 현행 54) · 포트폴리오 · 메모리 · 이 계획서 상태 갱신
