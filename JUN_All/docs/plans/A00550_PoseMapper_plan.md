@@ -384,6 +384,6 @@ factor = 1 + strength × (축값 / neutral − 1)        축 = 없음 / Jaw / Li
 
 ### 11.7 진행 기록
 
-- [ ] J-1. `library.py` jali 필드 + json 호환 · `network.py` 축 노드(만들기 · 바꾸기 · 지우기 · read_library · remove · detached) + `tests/test_jali.py`(J1~J5)
+- [x] J-1. `library.py` jali 필드 + json 호환 · `network.py` 축 노드(만들기 · 바꾸기 · 지우기 · read_library · remove · detached) + `tests/test_jali.py`(J1~J5) — 24/24, 테스트 씬 J6 포함(JaLi (2,9) (9,4) (12,6) 에서 원래 노드망과 같은 값)
 - [ ] J-2. `pose_map_tab.py` JaLi 줄 · 표 열 2개 · 버튼 2개 · `connect_dialog.py` JaLi 노드 + `tests/test_ui_jali.py`(J7) + 테스트 씬 J6
 - [ ] J-3. 기존 시험 8종 회귀 · 버전 01.05 · 사용 안내 · WORKLOG · 메모리 · 이 계획서 상태
