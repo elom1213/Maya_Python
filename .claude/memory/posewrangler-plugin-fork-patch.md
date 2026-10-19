@@ -25,3 +25,9 @@ Epic Games 공식 Maya 플러그인 **PoseDriverConnect**(= PoseWrangler)를 로
 **How to apply:** 엔진 플러그인 업데이트 시 벤더 원본 위에 위 3군데만 다시 얹으면 됨.
 포트폴리오 서술은 `JUN_All/docs/portfolio/portfolio_KR.md` / `_EN.md` 의 1-6 절 참고
 ([[update-portfolio-on-tool-work]]).
+
+**드래그&드롭 설치 (포크 `d261446`, 2026-10-19)** — 사용자 요청: `.mod`/플러그인 경로 등록 대신 내 다른 툴처럼
+파일 하나 드롭 → 셸프 버튼. `python/__dragDrop_PoseWrangler.py` + `JUN__pose_wrangler_launch.py`(run():
+`plug-ins/<win|linux>/<버전>/MayaUERBFPlugin.mll` 을 **절대 경로 loadPlugin** → `main.PoseWrangler()`) + `icon/`.
+드롭 시 Auto load 도 켬. 검증: `MAYA_APP_DIR` 을 빈 폴더로 둬 `.mod` 를 끈 mayapy 에서 셸프 명령 그대로 실행 → 로드 · 창 생성.
+`.mod` 파일은 사용자 modules 폴더에 그대로 둠(같이 있어도 충돌 없음). 벤더 업데이트 때 이 3개 파일도 다시 얹을 것.
