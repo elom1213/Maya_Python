@@ -21,6 +21,7 @@
 - [Update portfolio on tool work](update-portfolio-on-tool-work.md) — portfolio EN/KR 동기, 커밋 통계 건드리지 않기
 - [Launcher buttons follow current version](launcher-buttons-follow-current-version.md) — 새 버전 폴더면 A00370 버튼도 옮길 것
 - [Prefer PySide for new tools](prefer-pyside-for-new-tools.md) — 신규 툴은 PySide(arch B)
+- [JUN_JALI repo](jun-jali-repo.md) — VisemeNet 포크, 푸시는 origin main, `.venv` 추론 · angela_JALI 리그 적용
 - [kangaroo plugin read-only](kangaroo-plugin-external-readonly.md) · [PoseWrangler fork patch](posewrangler-plugin-fork-patch.md)
 
 ## 검증 · 창 크기
