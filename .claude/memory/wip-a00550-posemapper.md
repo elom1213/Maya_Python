@@ -15,6 +15,9 @@ metadata:
   Ref 기본 10, 임의 실수(사용자 확정). 이미 구동된 타겟 기본 Skip(사용자 확정). 슬라이더 = `network.sync(only_targets=[t])`.
 - Solo / Capture: 음소 plug 가 연결돼 있으면 값을 넣을 수 있는 위쪽 plug 로 올라간다(`JALI1:JALI_IN.AAA` → `JALI1:CNT_PHONEMES.AAA`).
   음소 목록 체크로 `Jaw` · `Lip` 같은 배율 입력은 기본 제외(0 으로 만들면 출력 전체 0).
+- **Qt 함정 (v01.03)**: `QListWidget` 은 `item.setText()` 만으로도 `itemChanged` 를 쏜다 → 체크 변경 핸들러가 라벨 갱신에 반응해 Solo 를 껐다.
+  라벨만 바꿀 때는 `blockSignals`, 체크 핸들러는 저장해 둔 상태와 비교해 실제 변경만. `editingFinished` 도 글자 그대로 포커스만 빠져도 온다.
+  Solo 는 사용자가 체크박스를 끌 때 · 창 닫을 때만 끈다(사용자 요구).
 - blendWeighted 의 weight 는 float32 — 되읽은 값 비교는 소수 4자리.
 - 시험: tests/ 5개 74항목(mayapy). 마야 GUI 확인 전. 2단계: Jaw/Lip 축 배율 · 이름 유사 매칭 · 코렉티브.
 

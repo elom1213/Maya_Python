@@ -71,9 +71,7 @@ class MainWindow(QWidget):
         self.log_view.appendPlainText(message)
 
     def _on_tab_changed(self, index):
-        # 다른 탭으로 가면 Pose Map 의 Solo preview 를 원복한다.
-        if self.tabs.widget(index) is not self.pose_tab and hasattr(self.pose_tab, "stop_preview"):
-            self.pose_tab.stop_preview()
+        # Solo preview 는 탭을 옮겨도 유지한다 - 끄는 것은 체크박스 클릭(과 창 닫기)뿐 (v01.03).
         if self.tabs.widget(index) is self.bw_tab:
             self.bw_tab.refresh_nodes()
 

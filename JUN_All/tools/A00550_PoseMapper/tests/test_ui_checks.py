@@ -80,14 +80,14 @@ for x in range(rect.left(), rect.left() + 30):
 QTest.mouseClick(lw.viewport(), Qt.LeftButton, Qt.NoModifier, pos)
 check("click checkbox of a selected row -> all 3 checked", checked() == ["AAA", "Eh", "OHH"] and tab._checked["OHH"] is True)
 
-# Solo 중 체크가 바뀌면 미리보기를 끄고 원복
+# Solo 중 체크가 바뀌어도 Solo 는 켜진 채 - 체크 해제된 음소만 원복 (v01.03)
 lw.setCurrentRow(2)                                  # AHH
 lw.item(2).setCheckState(Qt.Checked)
 tab.cb_solo.setChecked(True)
 check("solo on", tab.driver is not None and cmds.getAttr(src + ".AHH") == 10.0)
 select(["AHH"])
 tab._set_checks(tab._selected_items(), False)
-check("check change stops solo + restores", tab.driver is None and cmds.getAttr(src + ".AHH") == 0.0)
+check("check change keeps solo (v01.03), unchecked AHH restored", tab.cb_solo.isChecked() and tab.driver is not None and cmds.getAttr(src + ".AHH") == 0.0)
 
 lw.clearSelection()
 tab._set_checks(tab._selected_items(), True)

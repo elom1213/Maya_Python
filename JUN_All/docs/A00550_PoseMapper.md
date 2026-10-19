@@ -4,7 +4,7 @@
 음소를 하나 골라 타겟 값을 슬라이더로 정하고, 그 관계를 json 으로 저장해 **아무 노드 쌍에나 다시 연결**한다.
 두 번째 탭은 `blendWeighted` 의 **input / weight 편집기** — Node Editor 에서 weight 가 안 보이는 문제를 푼다.
 
-- **버전**: v01.02 (2026-10-19)
+- **버전**: v01.03 (2026-10-19)
 - **아키텍처**: (B) in-Maya PySide (`maya.cmds`), 드래그&드롭 셸프 설치
 - **계획 · 진행 기록**: `docs/plans/A00550_PoseMapper_plan.md`
 - **관련**: `A00540_JaliLipSync`(음성 → JALI 키) · JUN_JALI `docs/0040_jali_arkit_mapping.md`(JALI ↔ ARKit 실측 시작 가중치)
@@ -44,7 +44,10 @@
 4. **음소를 고르고 슬라이더로 타겟 값을 정한다** — "이 음소 = Ref 일 때 이 타겟 = 이 값". 슬라이더는 0~1, 숫자 칸은 −2~2.
    - 노드망이 있으면 **움직이는 즉시 씬에 반영**된다(그 타겟 체인만 갱신, 노드를 다시 만들지 않는다).
    - `Used only` = 지금 음소에서 0 이 아닌 타겟만. `Zero Pose` = 지금 음소 비우기. `Mirror L > R` = `...Left` 값을 `...Right` 로.
-5. **Solo preview** — 켜면 고른 음소만 Ref, 다른 음소는 0. 음소를 바꾸면 따라 바뀐다. **끄거나 · 탭을 옮기거나 · 창을 닫으면 원래 값으로.**
+5. **Solo preview** — 켜면 고른 음소만 Ref, 다른 음소는 0. 음소를 바꾸면 따라 바뀐다.
+   **체크박스를 직접 눌러 끌 때(또는 창을 닫을 때)만 꺼지고 원래 값으로 돌아간다** (v01.03). 슬라이더 · 체크 변경 · 탭 이동 · Ref 변경 ·
+   Capture · Build / Remove 중에도 켜진 채 유지되고, Source 를 바꾸면 이전 Source 는 원복하고 새 Source 에 다시 건다.
+   목록에서 체크 안 된 줄을 고르면 체크된 음소를 전부 0 으로 둔다.
    음소 어트리뷰트가 다른 노드에 연결돼 있으면(예: `JALI_IN.AAA` ← `CNT_PHONEMES.AAA`) **값을 넣을 수 있는 위쪽 어트리뷰트**를 대신 바꾼다.
    Ref 가 그 어트리뷰트의 max 를 넘으면 `[ERROR] Reference value 15 is above the max 12 of ...`.
 6. **Build / Update Network** — 지금 라이브러리대로 노드망을 만든다 / 고친다(§4).
@@ -133,7 +136,7 @@ A00550_PoseMapper/
 ├── icon/A00550_PoseMapper.svg / .png
 └── tests/  (mayapy 로 실행, 테스트 씬은 열기만)
     test_blend_weights.py 13 · test_network.py 20 · test_capture.py 12 · test_ui_blend_weights.py 10 · test_ui_pose_map.py 19 ·
-    test_ui_checks.py 12 (v01.01, 합성 씬 · QTest 클릭)
+    test_ui_checks.py 12 (v01.01, 합성 씬 · QTest 클릭) · test_ui_solo.py 15 (v01.03, Solo 유지 경로 전부)
 ```
 
 **확인 기록 (2026-10-19, mayapy 2024 + 테스트 씬)**: 위 시험 74항목 전부 통과. **마야 GUI 에서 드롭 설치 · 실제 얼굴로 Solo preview 하며 조정은 사용자 확인 전.**

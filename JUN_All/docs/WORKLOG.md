@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-19 (오늘)
 
+> [!summary] A00550_PoseMapper — **Solo preview 가 저절로 꺼지던 문제** (v01.02->01.03) `#A00550_PoseMapper`
+- 보고: Solo 를 켜고 음소를 고른 뒤 Target 값을 0 에서 올렸다 다시 0 으로 하면 Solo 가 꺼진다 → 체크박스를 눌러 끌 때만 꺼지게.
+- 원인: 타겟 값을 바꾸면 음소 줄 글자가 `AHH` → `AHH (1)` 로 바뀌는데, **`QListWidget` 은 글자만 바뀌어도 `itemChanged` 를 쏜다** → 체크 변경으로 읽혀 Solo 를 껐다(v01.01 에서 넣은 동작). 같은 식으로 탭 이동 · 노드 칸 포커스 아웃(`editingFinished` 는 글자 그대로여도 온다) · Capture · Remove Network 도 껐다.
+- 수정: 라벨 갱신은 신호를 막고, 체크는 **실제로 바뀐 경우만** 처리. 끄는 것은 체크박스 클릭과 창 닫기뿐 — 나머지는 유지하며 다시 건다(Source 변경 = 이전 원복 + 새로 / 체크 변경 = 새 체크 목록으로 / Capture = 잠시 원복 후 다시).
+- 검증(mayapy 오프스크린): `tests/test_ui_solo.py` 15/15 + 기존 6종 회귀 통과(테스트 씬 포함). 마야 GUI 미확인.
+
 > [!summary] A00550_PoseMapper — **메뉴 `Library > Show Libraries Folder`** (v01.01->01.02) `#A00550_PoseMapper`
 - 요청: libraries 경로를 탐색기에서 팝업하는 메뉴.
 - 메뉴 바에 `Library` 메뉴(Help 왼쪽) → `app/libraries` 를 공용 `file_opener.open_path` 로 연다(폴더가 없으면 만든다), 로그에 경로.

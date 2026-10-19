@@ -229,7 +229,14 @@ class PoseMapTab(QWidget):
     # ================================================================== 노드
 
     def on_nodes_changed(self):
-        self.stop_preview()
+        # editingFinished 는 글자가 그대로여도(포커스만 빠져도) 온다 - 바뀐 게 없으면 아무것도 안 한다.
+        key = (self.le_source.text().strip(), self.le_target.text().strip())
+        if key == getattr(self, "_nodes_key", None):
+            return
+        self._nodes_key = key
+        if self.driver is not None:                  # 이전 Source 의 음소 값은 먼저 원복
+            self.driver.restore()
+            self.driver = None
         src, tgt = self.source(), self.target()
         if self.le_source.text().strip() and not src:
             self._log("[ERROR] Source not found: {0}".format(self.le_source.text().strip()))
@@ -250,6 +257,7 @@ class PoseMapTab(QWidget):
         self._fill_phonemes()
         self._fill_targets()
         self._status()
+        self._refresh_solo()
 
     def _fill_phonemes(self):
         keep = self.current_phoneme()
@@ -280,7 +288,10 @@ class PoseMapTab(QWidget):
             item = self.lw_phonemes.item(i)
             if item.data(Qt.UserRole) == phoneme:
                 n = len(self.lib.pose(phoneme))
+                # QListWidget 은 글자만 바뀌어도 itemChanged 를 쏜다 - 체크 변경으로 오인하지 않게 막는다.
+                self.lw_phonemes.blockSignals(True)
                 item.setText("{0}   ({1})".format(phoneme, n) if n else phoneme)
+                self.lw_phonemes.blockSignals(False)
 
     def _fill_targets(self):
         self._updating = True
@@ -332,8 +343,7 @@ class PoseMapTab(QWidget):
 
     def on_phoneme_changed(self):
         self._load_pose_values()
-        if self.driver is not None and self.driver.active and self.current_phoneme():
-            self._solo(self.current_phoneme())
+        self._apply_solo()
 
     def _on_value(self, target_name, value, slider):
         slider.blockSignals(True)
@@ -367,8 +377,7 @@ class PoseMapTab(QWidget):
         if self.net and cmds.objExists(self.net):
             network.sync(self.net, self.lib, self.existing_mode())
             self._log("[OK] Ref value {0:g} - all weights recomputed".format(ref))
-        if self.driver is not None and self.driver.active and self.current_phoneme():
-            self._solo(self.current_phoneme())
+        self._apply_solo()
         self._status()
 
     def on_clamp_toggled(self, on):
@@ -426,11 +435,15 @@ class PoseMapTab(QWidget):
         self._on_checks_changed([item])
 
     def _on_checks_changed(self, items):
+        changed = False
         for item in items:
-            self._checked[item.data(Qt.UserRole)] = item.checkState() == Qt.Checked
-        if self.driver is not None:
-            self.stop_preview()
+            name, on = item.data(Qt.UserRole), item.checkState() == Qt.Checked
+            if self._checked.get(name, name.lower() not in NOT_PHONEME_DEFAULT) != on:
+                changed = True
+            self._checked[name] = on
         self._update_check_all_label()
+        if changed:
+            self._refresh_solo()
 
     def _set_checks(self, items, on):
         """코드로 여러 행을 한 번에 체크 / 해제 (itemChanged 를 행마다 쏘지 않는다)."""
@@ -465,6 +478,30 @@ class PoseMapTab(QWidget):
         except capture_mod.CaptureError as e:
             self._log("[ERROR] {0}".format(e))
 
+    def _apply_solo(self):
+        """Solo 가 켜져 있으면 지금 음소로 다시 건다. 고른 줄이 체크 안 된 어트리뷰트면 체크된 음소를 전부 0 으로."""
+        if not self.cb_solo.isChecked() or self.driver is None:
+            return
+        p = self.current_phoneme()
+        if p in self.driver.plugs:
+            self._solo(p)
+        else:
+            self.driver.all_zero()
+
+    def _refresh_solo(self):
+        """Solo 가 켜져 있으면 지금 Source · 체크 목록으로 드라이버를 새로 만들어 다시 건다 (끄지 않는다)."""
+        if not self.cb_solo.isChecked():
+            return
+        if self.driver is not None:
+            self.driver.restore()
+            self.driver = None
+        src = self.source()
+        if not src:
+            self._log("[WARN] Solo preview is on but there is no source node - pick one to continue.")
+            return
+        self.driver = capture_mod.PhonemeDriver(src, self._phoneme_names())
+        self._apply_solo()
+
     def on_solo_toggled(self, on):
         if on:
             src = self.source()
@@ -478,7 +515,7 @@ class PoseMapTab(QWidget):
             for p, why in self.driver.problems:
                 self._log("[WARN] {0}: {1} - not previewed".format(p, why))
             self._solo(self.current_phoneme())
-            self._log("[INFO] Solo preview on ({0:g}). Turn it off to restore the phoneme values.".format(
+            self._log("[INFO] Solo preview on ({0:g}). It stays on until you uncheck it.".format(
                 self.ds_ref.value()))
         else:
             self.stop_preview()
@@ -498,7 +535,9 @@ class PoseMapTab(QWidget):
         if not src or not tgt:
             self._log("[ERROR] Pick a source and a target first.")
             return
-        self.stop_preview()
+        if self.driver is not None:                  # 캡처는 원래 값에서 - Solo 는 끝나고 다시 건다
+            self.driver.restore()
+            self.driver = None
         phon = self._phoneme_names()
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
@@ -506,6 +545,7 @@ class PoseMapTab(QWidget):
                                             name=self.lib.name)
         except capture_mod.CaptureError as e:
             self._log("[ERROR] {0}".format(e))
+            self._refresh_solo()
             return
         finally:
             QApplication.restoreOverrideCursor()
@@ -522,6 +562,7 @@ class PoseMapTab(QWidget):
         self._fill_phonemes()
         self._load_pose_values()
         self._status()
+        self._refresh_solo()
 
     # ================================================================== 라이브러리
 
@@ -615,7 +656,6 @@ class PoseMapTab(QWidget):
         if not self.net or not cmds.objExists(self.net):
             self._log("[WARN] No network for this source / target.")
             return
-        self.stop_preview()
         n = network.remove(self.net)
         self._log("[OK] Removed network {0} ({1} node(s)). Ctrl+Z brings it back.".format(self.net, n))
         self.net = None

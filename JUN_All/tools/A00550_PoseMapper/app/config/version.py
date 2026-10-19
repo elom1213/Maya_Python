@@ -20,5 +20,11 @@
 # 01.02  Menu "Library > Show Libraries Folder" : opens app/libraries (the saved pose library
 #        json files) in Explorer.
 
-VERSION = "01.02"
+# 01.03  Solo preview stays on until its check box is clicked off (or the window closes). It used
+#        to turn itself off when a target value changed (the phoneme label "AHH" -> "AHH (1)" fires
+#        QListWidget.itemChanged, read as a check change), on tab change, on focus-out of the node
+#        fields, on Capture and on Remove Network. Now those keep it on and re-apply it
+#        (new source / new checks / after Capture).
+
+VERSION = "01.03"
 LAST_UPDATE = "2026-10-19"
