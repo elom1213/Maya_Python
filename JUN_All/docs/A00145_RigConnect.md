@@ -4,7 +4,8 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.57` (`app/config/version.py`) — Constrain 의 **Constraint · Skin Weight 하위 탭을 하나로**(모드 `Default` / `Skin Weight`), Transfer 에 모드 **`Copy`** — constraint 의 성질을 읽어 다른 오브젝트에 똑같이 건다, 원본 유지(§Transfer) · v01.56 은 Attribute > Set Value 에 **`Include Non-Common`**: 일부 오브젝트만 가진 어트리뷰트도 나열, 행마다 **`[k/n]`**(§Set Value) · v01.55 는 창 기본 높이 900 → **980**(Match 탭이 스크롤 없이 다 보이게) · v01.54 는 리스트의 **`(Null)` 자리표시를 빨간 글씨로**(공용 TSL, 아래 메모) · v01.53 은 Match 에 **`Keep Children in Place`**(기본 OFF):
+- 버전: `v01.62` (`app/config/version.py`) — Constrain > Constraint 에 **`All Targets -> Each Follower`** 옵션(follower 마다 Targets **전부**를 타깃으로 갖는 constraint 하나, §Constraint)
+  · v01.57 은 Constrain 의 **Constraint · Skin Weight 하위 탭을 하나로**(모드 `Default` / `Skin Weight`), Transfer 에 모드 **`Copy`** — constraint 의 성질을 읽어 다른 오브젝트에 똑같이 건다, 원본 유지(§Transfer) · v01.56 은 Attribute > Set Value 에 **`Include Non-Common`**: 일부 오브젝트만 가진 어트리뷰트도 나열, 행마다 **`[k/n]`**(§Set Value) · v01.55 는 창 기본 높이 900 → **980**(Match 탭이 스크롤 없이 다 보이게) · v01.54 는 리스트의 **`(Null)` 자리표시를 빨간 글씨로**(공용 TSL, 아래 메모) · v01.53 은 Match 에 **`Keep Children in Place`**(기본 OFF):
   팔로워만 움직이고 **그 아래 오브젝트는 있던 월드 자리에 그대로** 둔다. Mirror 탭의 같은 이름
   체크박스와 **같은 코어**(`app/core/keep_children.py`)를 쓴다 (§Match)
   · v01.52 는 Attribute 가 만든 어트리뷰트는 **반드시 채널 박스에
@@ -350,6 +351,23 @@ Targets                       Number: 4212
   (`Parent` / `Scale` / `Point` / `Orient` / `Point On Poly`, 기본은 `Parent` 하나).
 - `Constrain` 클릭.
 - **브로드캐스트**: target 이 1개면 모든 follower 에 동일 target 적용, 아니면 인덱스 1:1.
+
+##### All Targets -> Each Follower — 멀티 타깃 constraint (v01.62)
+
+`Options` 의 **`All Targets -> Each Follower`**(기본 OFF) 를 켜면 짝짓기 대신 **follower 마다 constraint
+하나에 Targets 리스트 전부**를 타깃으로 넣는다. 마야에서 드라이버 여러 개 + 드리븐 하나를 선택하고 constraint 를
+거는 것과 같다(weight 는 타깃마다 1, 위치는 평균).
+
+| Targets | Followers | OFF (예전) | ON |
+|---------|-----------|------------|----|
+| `tgt_0` `tgt_1` `tgt_2` | `flw` | `flw` ← `tgt_0` 하나 | `flw` ← `tgt_0, tgt_1, tgt_2` |
+| `tgt_0` `tgt_1` `tgt_2` | `flw_0` `flw_1` | 1:1 (`tgt_0`, `tgt_1`) | 둘 다 ← 타깃 3개 |
+| `tgt_0` | `flw_0` `flw_1` | 브로드캐스트 | 같음 |
+
+- 체크한 종류마다 하나씩이다 — `Parent` + `Scale` 이면 follower 마다 `parentConstraint`(타깃 3) + `scaleConstraint`(타깃 3).
+- 로그에 `All Targets : 3 target(s) -> each of 1 follower(s)` 가 남는다. 실패 경고는 타깃을 `,` 로 이어 적는다.
+- `Matrix Constraint` 모드에선 꺼진다(매트릭스 네트워크는 타깃 하나짜리).
+- 짝짓기는 코어 `constrain_manager.resolve_pairs(targets, followers, all_targets)` 하나에 있다.
 
 ##### 여러 종류를 함께 걸기 (v01.47)
 

@@ -706,6 +706,18 @@ class MainWindow(QWidget):
         self.cb_con_maintain.setChecked(True)
         opt_layout.addWidget(self.cb_con_maintain)
 
+        # 멀티 타깃 (v01.62) - 켜면 follower 마다 Targets **전부**를 타깃으로 갖는 constraint 하나.
+        # 끄면 예전대로 target 1개 브로드캐스트 / 인덱스 1:1. 기본 OFF(예전 동작 유지).
+        self.cb_con_all_targets = QCheckBox("All Targets -> Each Follower")
+        self.cb_con_all_targets.setChecked(False)
+        self.cb_con_all_targets.setToolTip(
+            "On : every follower gets ONE constraint that has every object in the\n"
+            "Targets list as a target (weights shared, like selecting several\n"
+            "drivers + one driven in Maya).\n"
+            "Off : one target per follower - a single target goes to every follower,\n"
+            "otherwise row to row.")
+        opt_layout.addWidget(self.cb_con_all_targets)
+
         # 종류는 체크박스 (v01.47, 예전엔 라디오) - 채널이 겹치지 않으면 여러 개를 함께 건다.
         # Parent + Scale / Point · Orient · Scale 중 2~3개. 겹치는 것(Parent 와 Point 등)을 체크하면
         # 먼저 체크돼 있던 쪽을 끈다 - 마야가 둘째를 `already connected` 로 거절하기 때문이다.
@@ -758,6 +770,8 @@ class MainWindow(QWidget):
             cb.setEnabled(enabled)
         for cb in self.cb_con_types.values():
             cb.setEnabled(not enabled)
+        # Matrix 네트워크는 타깃 하나짜리라 멀티 타깃 옵션을 쓰지 않는다.
+        self.cb_con_all_targets.setEnabled(not enabled)
 
     _CHANNEL_WORDS = {"t": "translate", "r": "rotate", "s": "scale"}
 
@@ -3286,10 +3300,14 @@ class MainWindow(QWidget):
 
         con_types = self._checked_con_types()
         labels = dict(con_mgr.CONSTRAIN_TYPES)
+        all_targets = self.cb_con_all_targets.isChecked()
 
         def _do():
             made, errors = con_mgr.constrain_types(
-                targets, followers, con_types, maintain_offset)
+                targets, followers, con_types, maintain_offset, all_targets)
+            if all_targets:
+                self.log("       All Targets : {0} target(s) -> each of {1} follower(s)".format(
+                    len(targets), len(followers)))
             for err in errors:
                 self.log("[WARN] {0}".format(err))
             for key in con_types:

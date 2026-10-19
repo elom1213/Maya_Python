@@ -76,5 +76,11 @@
 #        app/rules/connect/). Broken files are listed in red but left alone. The combo is
 #        reloaded when the window closes.
 
-VERSION = "01.61"
-LAST_UPDATE = "2026-10-13"
+# 01.62  Constrain > Constraint : "All Targets -> Each Follower" checkbox (off by default) -
+#        every follower gets ONE constraint per checked type with EVERY object in the
+#        Targets list as a target (like selecting several drivers + one driven in Maya).
+#        Off keeps the old pairing (one target = broadcast, otherwise row to row).
+#        Disabled in Matrix Constraint mode.
+
+VERSION = "01.62"
+LAST_UPDATE = "2026-10-19"

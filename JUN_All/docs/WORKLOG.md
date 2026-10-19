@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-10-16
+updated: 2026-10-19
 ---
 
 # 작업 일지 (WORKLOG)
@@ -30,7 +30,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-10-16 (오늘)
+## 2026-10-19 (오늘)
+
+> [!summary] A00145_RigConnect — **Constrain > Constraint 에 `All Targets -> Each Follower` 옵션** (v01.61->01.62) `#A00145_RigConnect`
+- 요청: Targets 에 `tgt_i` 여러 개, Followers 에 하나를 담고 Constrain 하면 타깃이 하나만 생긴다 → 모든 `tgt_i` 를 타깃으로 갖는 constraint 를 만드는 옵션.
+- 원인: 짝짓기가 인덱스 1:1(타깃 1개면 브로드캐스트)이라 follower 하나엔 `tgt_0` 만 걸렸다.
+- 수정: 체크박스(기본 OFF) — 켜면 follower 마다 종류별 constraint 하나에 Targets 전부. 짝짓기를 `constrain_manager.resolve_pairs()` 로 뽑아 두 모드가 공유. Matrix 모드에선 비활성.
+- 검증(mayapy 2024, offscreen UI): Parent+Scale 타깃 3개, 2 follower × Point+Orient, mo off 평균 위치, OFF 시 예전 1:1, UI `on_constrain()` 경로 · Undo 한 번 · Matrix 비활성 — 12/12. 마야 GUI 는 미확인.
+
+## 2026-10-16
 
 > [!summary] A00110_animTool_V02 — **Tab 이 매니퓰레이터 공간 토글 대신 페인트 선택을 하던 것 수정** (v02.19->02.20) `#A00110_animTool_V02`
 - 보고: `Tab : ON` 상태로 Tab 을 누르면 스크립트 에디터에 `dR_paintPress; selectPref -paintSelect 1 ...` 만 찍히고 토글이 안 된다.

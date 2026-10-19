@@ -122,8 +122,34 @@ def constrain(targets, followers, con_type, maintain_offset=True):
     return made
 
 
-def constrain_types(targets, followers, con_types, maintain_offset=True):
+def resolve_pairs(targets, followers, all_targets=False):
+    """follower 마다 걸 타깃 묶음을 정한다 (v01.62).
+
+    all_targets=False : 예전 규칙 - target 1개면 브로드캐스트, 아니면 인덱스 1:1
+                        (target 이 모자라면 남는 follower 는 건너뛴다).
+    all_targets=True  : **모든 follower 가 모든 target** 을 갖는 constraint 하나씩
+                        (마야 기본 동작 - 타깃 여러 개 = weight 를 나눠 갖는 멀티 타깃).
+
+    Returns:
+        [(follower, [target, ...]), ...]
+    """
+    if all_targets:
+        return [(follower, list(targets)) for follower in followers]
+    pairs = []
+    for i, follower in enumerate(followers):
+        idx_tgt = 0 if len(targets) == 1 else i
+        if idx_tgt >= len(targets):
+            break
+        pairs.append((follower, [targets[idx_tgt]]))
+    return pairs
+
+
+def constrain_types(targets, followers, con_types, maintain_offset=True,
+                    all_targets=False):
     """targets -> followers 로 **여러 종류**의 constraint 를 함께 건다 (v01.47).
+
+    all_targets=True 면 각 follower 에 **모든 target 을 타깃으로 갖는** constraint 를 건다 (v01.62).
+    짝짓기는 `resolve_pairs()` 하나에만 둔다.
 
     예) ["parent", "scale"] / ["point", "orient"] / ["point", "orient", "scale"].
     target/follower 짝을 맞추는 규칙은 `constrain()` 과 같다(target 1개면 브로드캐스트, 아니면 1:1).
@@ -150,17 +176,14 @@ def constrain_types(targets, followers, con_types, maintain_offset=True):
 
     made = []
     errors = []
-    for i, follower in enumerate(followers):
-        idx_tgt = 0 if len(targets) == 1 else i
-        if idx_tgt >= len(targets):
-            break
-        target = targets[idx_tgt]
+    for follower, tgts in resolve_pairs(targets, followers, all_targets):
         for con_type in ordered:
             try:
-                result = get_constraint_func(con_type)(target, follower, mo=maintain_offset)
+                result = get_constraint_func(con_type)(*(tgts + [follower]),
+                                                       mo=maintain_offset)
             except Exception as e:
                 errors.append("{0} <- {1} ({2}): {3}".format(
-                    follower, target, labels[con_type], str(e).strip()))
+                    follower, ", ".join(tgts), labels[con_type], str(e).strip()))
                 continue
             if result:
                 made.append((con_type, result[0]))
