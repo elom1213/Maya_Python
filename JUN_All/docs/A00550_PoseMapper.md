@@ -102,6 +102,8 @@ Target already driven: (•) Skip ( ) Replace ( ) Add (sum)
                                    [Check] [Connect] [Cancel]
 ```
 
+창은 **마야를 막지 않는다**(v01.06) — 열어 둔 채 씬에서 노드를 고르고 `<< Sel` 로 칸을 채운다. 다시 열면 이전 창은 닫힌다.
+
 **이름이 같은 것만** 연결한다(블렌드셰이프는 타겟 별칭). 없는 이름은 미리 보이고 건너뛴다. 전체가 Undo 한 번.
 
 ## 3. Blend Weights 탭

@@ -41,5 +41,9 @@
 #        (default 9). Buttons JALI Defaults / Clear Axes. Saved in the library json ("jali"),
 #        Connect To... has a JaLi node field. Older libraries / networks open unchanged.
 
-VERSION = "01.05"
-LAST_UPDATE = "2026-10-19"
+# 01.06  Connect To... no longer blocks Maya : the dialog is modeless, so objects can be selected in
+#        the scene while it is open and put into Source / Target / JaLi node with "<< Sel".
+#        Opening it again closes the previous one.
+
+VERSION = "01.06"
+LAST_UPDATE = "2026-10-20"

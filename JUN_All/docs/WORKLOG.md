@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-10-19
+updated: 2026-10-20
 ---
 
 # 작업 일지 (WORKLOG)
@@ -30,7 +30,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-10-19 (오늘)
+## 2026-10-20 (오늘)
+
+> [!summary] A00550_PoseMapper — **Connect To... 창이 마야를 막지 않게** (v01.05->01.06) `#A00550_PoseMapper`
+- 보고: `Connect To...` 를 열면 아래 마야 창이 막혀 씬에서 오브젝트를 골라 Source / Target 을 채울 수 없다.
+- 원인: 대화상자를 `exec_()`(모달)로 열었다.
+- 수정: `show()` 모델리스 + `WA_DeleteOnClose`, 탭이 참조를 들고 있고 다시 열면 이전 창을 닫는다. `<< Sel` 은 그대로 `cmds.ls(sl=True)` 첫 노드.
+- 검증(mayapy 2024 오프스크린): isModal False · 보이는 채로 `<< Sel` 이 Source / Target 을 채움 · 재오픈 시 새 창. 마야 GUI 미확인.
+
+## 2026-10-19
 
 > [!summary] A00550_PoseMapper — **Pose Map 에 JaLi 조절** (v01.04->01.05) `#A00550_PoseMapper`
 - 배경: 테스트 씬에서 Pose Map 노드망(`pm_NET1`)이 BS 를 구동하는 동안 `CNT_JaLi` 를 2~15 로 바꿔도 얼굴이 그대로(실측) — 노드망이 음소 값만 더했다. 원래 JALI 노드망은 타겟마다 축만 있고 세기 조절이 없다.

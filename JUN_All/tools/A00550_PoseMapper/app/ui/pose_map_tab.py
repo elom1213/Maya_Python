@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-19
+# last Update date : 2026-10-20
 # A00550_PoseMapper - Pose Map 탭 (계획서 §3)
 #
 # Source(음소 노드) · Target(blendShape / 아무 노드) 를 고르고, 음소 하나를 골라 타겟 값을 슬라이더로 정한다.
@@ -856,8 +856,20 @@ class PoseMapTab(QWidget):
         if not self.lib.poses:
             self._log("[WARN] The library is empty.")
             return
+        # 모델리스 - 열어 둔 채 마야 씬에서 선택하고 << Sel 로 Source / Target 을 채운다.
+        old = getattr(self, "_connect_dlg", None)
+        if old is not None:
+            try:
+                old.close()
+            except RuntimeError:
+                pass
         dlg = ConnectDialog(self.lib, self._log, self, jali_node=self.le_jali.text().strip())
-        dlg.exec_() if hasattr(dlg, "exec_") else dlg.exec()
+        dlg.setModal(False)
+        dlg.setAttribute(Qt.WA_DeleteOnClose, True)
+        self._connect_dlg = dlg
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
 
     def on_remove(self, *args):
         if not self.net or not cmds.objExists(self.net):
