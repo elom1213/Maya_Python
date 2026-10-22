@@ -1,22 +1,31 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-19
+# last Update date : 2026-10-22
 # A00540_JaliLipSync - 씬 도우미: JALI 리그 찾기 · 오디오 노드 (maya.cmds, UI 비의존)
+#
+# v01.01 리그 표식은 코드에 박지 않고 매핑 json 의 nodes["phonemes"] 를 받는다.
 
 import maya.cmds as cmds
 import maya.mel as mel
 
 
-RIG_MARKER = "CNT_PHONEMES"
 SOUND_NODE = "jali_lipsync_audio"
 
 
-def find_rigs():
-    """CNT_PHONEMES 가 있는 네임스페이스 목록 ("" = 루트, "angela:" 처럼 콜론까지)."""
-    names = cmds.ls("*" + RIG_MARKER, "*:" + RIG_MARKER, recursive=True, type="transform") or []
+def marker_of(mapping):
+    """Auto 탐색 표식 노드 이름 — nodes["phonemes"], 없으면 nodes 의 첫 값."""
+    nodes = mapping["nodes"]
+    return nodes.get("phonemes") or list(nodes.values())[0]
+
+
+def find_rigs(marker):
+    """marker 이름의 트랜스폼이 있는 네임스페이스 목록 ("" = 루트, "angela:" 처럼 콜론까지)."""
+    names = cmds.ls("*" + marker, "*:" + marker, recursive=True, type="transform") or []
     found = []
     for name in names:
         short = name.split("|")[-1]
+        if short.rsplit(":", 1)[-1] != marker:
+            continue
         ns = short.rsplit(":", 1)[0] + ":" if ":" in short else ""
         if ns not in found:
             found.append(ns)

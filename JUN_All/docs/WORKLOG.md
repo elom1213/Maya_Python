@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-10-20
+updated: 2026-10-22
 ---
 
 # 작업 일지 (WORKLOG)
@@ -30,7 +30,18 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-10-20 (오늘)
+## 2026-10-22 (오늘)
+
+> [!summary] A00540_JaliLipSync — **규칙 json 역할표 · Target Auto / Manual · JaLi scale** (v01.00->01.01) `#A00540_JaliLipSync`
+- 배경: JUN_JALI 쪽에서 만든 슬라이더 리그 `A0020_jali_slider_ctl.ma`(angela 어트리뷰트 1:1 슬라이더 22 + JaLi 박스, `DUMMY_IN_*` 입력 허브 0~1, `DUMMY_OUT_*` 출력 허브 — 계획 `JUN_JALI/docs/0090`, 어트리뷰트 안내 `0100`)에 VisemeNet 키를 걸려면 툴이 `CNT_PHONEMES` 이름과 angela 단위(scale 10 · Jaw/Lip 0~15)에 묶여 있는 것을 풀어야 했다. 계획서 `docs/plans/A00540_JaliLipSync_v0101_rules_manual_plan.md`.
+- 매핑 json v2: `nodes`(역할 → 노드 이름) · `viseme_scale` · `jali{scale, range, fixed_default}`. 리그 표식은 코드가 아니라 json 의 phonemes 노드. 새 규칙 `jali_slider_dummy_in.json`(scale 1 · JaLi 0~1 · Fixed 0.6), angela json 보강. 타겟 해석은 `keyer.resolve_targets()` 한 곳(Auto 네임스페이스 / Manual node_map).
+- UI: Target **Auto**(규칙의 phonemes 노드로 찾기) / **Manual**(Phonemes · Coartic · JaLi 칸 `<< Sel`, 빈 역할은 건너뛰고 로그에 `skipped:`). `JaLi scale` 스핀박스. 규칙을 바꾸면 배율 · Fixed 범위가 json 기본값으로 리셋. 적용 배율 > 어트리뷰트 max 면 `[WARN] exceeds`. 출력 세기(`output_max` · `global_scale`)는 리그에서 조절 — 규칙에 두지 않음(사용자 결정).
+- 리그: A0020 의 `CNT_JaLi` 휴식 위치 0, 기본 9 는 `DUMMY_IN_JALI.Jaw/Lip` 기본값 0.6 이 민다 — 데이터 키가 그 자리를 덮어 더해지지 않는다(JUN_JALI `build_jali_slider_ctl.py`, 검증 305).
+- 검증(mayapy 2024): `tests/run_all.py` — 매핑 21 · 코어 22 · UI 18(오프스크린) · 실제 파일 18(A0020 Auto/Manual, angela 키값 v01.00 과 동일). 마야 GUI 미확인.
+
+---
+
+## 2026-10-20
 
 > [!summary] A00550_PoseMapper — **Connect To... 창이 마야를 막지 않게** (v01.05->01.06) `#A00550_PoseMapper`
 - 보고: `Connect To...` 를 열면 아래 마야 창이 막혀 씬에서 오브젝트를 골라 Source / Target 을 채울 수 없다.

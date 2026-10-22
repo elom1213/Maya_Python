@@ -1,6 +1,7 @@
 # A00540_JaliLipSync v01.01 — 규칙(json) 역할표 · Auto / Manual 타겟 · 스케일 json 기본값 + A0020 리그 JaLi 기본값 이동
 
-> **작성** 2026-10-22 · 상태: **계획 (착수 전)** · 대상 Maya 2024 · 이 문서만 보고 작업할 수 있게 쓴다.
+> **작성** 2026-10-22 · 상태: **S1~S7 완료 (2026-10-22) — S8 사용자 마야 GUI 확인 대기** · 대상 Maya 2024 · 이 문서만 보고 작업할 수 있게 쓴다.
+> 결과: `tests/run_all.py` 매핑 21 · 코어 22 · UI 18 · 실제 파일 18 전부 통과. 출력 세기 규칙(`output_max` 10 등)은 **만들지 않는다** — 사용자가 리그에서 직접(2026-10-22 결정, C8 보강).
 > 배경: JUN_JALI `docs/0090`(A0020 슬라이더 리그) 의 후속 S6. 새 리그의 입력 허브 `DUMMY_IN_*` 에 VisemeNet 키를 걸려면 툴이 `CNT_PHONEMES` 이름과 angela 단위(scale 10 · Jaw/Lip 0~15) 에 묶여 있는 것을 풀어야 한다.
 > 관련: `docs/A00540_JaliLipSync.md`(사용 안내) · JUN_JALI `docs/0090_jali_slider_ctl_plan.md` · `docs/0100_jali_dummy_out_attrs_guide.md` · 메모리 `wip-a00540-jalilipsync` · `wip-jali-slider-ctl`
 
@@ -19,6 +20,7 @@
 | C7 | 리그(A0020): 2D 박스 컨트롤러 `CNT_JaLi` 의 기본 위치를 **0, 0** 으로, `DUMMY_IN_JALI.Jaw/Lip` 의 기본값을 **0.6** 으로 옮긴다 (출력 기본 9 유지). 이름은 그대로 `CNT_JaLi` | 평가 끝 |
 | C8 | 매핑 json 의 `targets[].scale` 은 **하위 호환으로 남기되** 새 json 에서는 쓰지 않는다 (최상위 `viseme_scale` · `jali.scale` 이 기본) | 이 계획 |
 | C9 | A00550 PoseMapper 의 Solo / Capture 가 `DUMMY_OUT_*` 을 Source 로 못 쓰는 문제는 **이번 범위 밖** (§9) | 이 계획 |
+| C10 | 출력 세기(`DUMMY_OUT_*` 최종값 — `output_max` · `global_scale`)는 **규칙에 두지 않고** 사용자가 마야에서 직접 조절. Viseme scale 1 = txt 1.0 이 슬라이더 끝 | 사용자 (2026-10-22) |
 
 ---
 
@@ -191,13 +193,13 @@ JaLi  ( ) From data  JaLi scale [1.0]   ( ) Fixed  Jaw [0.60] Lip [0.60]
 
 | 단계 | 할 일 | 끝났다는 기준 |
 |------|-------|---------------|
-| S1 | 리그 C7 (§5) → A0020 재생성 · `--verify` 통과 | 301+ 항목 0 실패, `DUMMY_IN_JALI` 기본 0.6 |
-| S2 | `mapping.py` v2 읽기 · 검사, 두 json (angela 보강 · 새 규칙 추가) | §7 T-M 통과 |
-| S3 | `keyer.py` `resolve_targets` · `node_map` · `jali_scale` · `scale_warnings`, `scene.find_rigs(marker)` | §7 T-K 통과 |
-| S4 | UI (§4) | §7 T-U 통과 |
-| S5 | 실제 파일로 끝까지: `A0020_jali_slider_ctl.ma` 를 열고 Auto + 새 규칙으로 Apply → `DUMMY_IN_*` 키 확인, Manual 로 Phonemes 만 → 나머지 건너뜀 확인, angela 파일 + angela 규칙으로 Apply → v01.00 과 같은 키값 | §7 T-E 통과 |
-| S6 | 문서: `docs/A00540_JaliLipSync.md` §2 · §3 · §4 · §5 확인 기록, `version.py` 01.01, `docs/WORKLOG.md` 오늘 항목(최신이 위, 날짜 헤딩 중복 금지), JUN_JALI 0090 §0-A · §9, 메모리 `wip-a00540-jalilipsync` · `wip-jali-slider-ctl` | — |
-| S7 | 커밋 (§8). **푸시 없음** | — |
+| S1 ✅ | 리그 C7 (§5) → A0020 재생성 · `--verify` 통과 | 305 항목 0 실패, `DUMMY_IN_JALI` 기본 0.6 |
+| S2 ✅ | `mapping.py` v2 읽기 · 검사, 두 json (angela 보강 · 새 규칙 추가) | T-M 21 통과 |
+| S3 ✅ | `keyer.py` `resolve_targets`(→ `(targets, skipped)` 튜플) · `node_map` · `jali_scale` · `scale_warnings`, `scene.marker_of` · `find_rigs(marker)` | T-K 22 통과 |
+| S4 ✅ | UI (§4) | T-U 18 통과 |
+| S5 ✅ | 실제 파일로 끝까지 (T-E 18 통과, JUN_JALI `out/visemenet_intro.txt` 로): `A0020_jali_slider_ctl.ma` 를 열고 Auto + 새 규칙으로 Apply → `DUMMY_IN_*` 키 확인, Manual 로 Phonemes 만 → 나머지 건너뜀 확인, angela 파일 + angela 규칙으로 Apply → v01.00 과 같은 키값 | §7 T-E 통과 |
+| S6 ✅ | 문서: `docs/A00540_JaliLipSync.md` §2 · §3 · §4 · §5 확인 기록, `version.py` 01.01, `docs/WORKLOG.md` 오늘 항목(최신이 위, 날짜 헤딩 중복 금지), JUN_JALI 0090 §0-A · §9, 메모리 `wip-a00540-jalilipsync` · `wip-jali-slider-ctl` | — |
+| S7 ✅ | 커밋 (§8). **푸시 없음** | — |
 | S8 | 사용자 GUI 확인: 드롭 설치, Auto/Manual 전환, 스핀박스 리셋, 실제 재생 | 사용자 |
 
 ---

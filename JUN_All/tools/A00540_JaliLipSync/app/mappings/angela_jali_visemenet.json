@@ -4,6 +4,9 @@
   "model_columns": ["Jaw", "Lip", "Ah", "Aa", "Eh", "Ee", "Ih", "Oh", "Uh", "U", "Eu", "Schwa", "R", "S",
                     "ShChZh", "Th", "JY", "LNTD", "GK", "MBP", "FV", "W"],
   "clamp": [0.0, 1.0],
+  "nodes": {"phonemes": "CNT_PHONEMES", "coartic": "CNT_COARTIC", "jali": "CNT_JaLi"},
+  "viseme_scale": 10.0,
+  "jali": {"scale": 10.0, "range": [0.0, 15.0], "fixed_default": [9.0, 9.0]},
   "targets": [
     {"attr": "CNT_JaLi.translateX",  "from": ["Jaw"], "scale": 10, "role": "jali"},
     {"attr": "CNT_JaLi.translateY",  "from": ["Lip"], "scale": 10, "role": "jali"},
