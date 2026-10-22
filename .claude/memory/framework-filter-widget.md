@@ -37,6 +37,8 @@ metadata:
   **A00170 에선 살아 있어**(`worldMatrix` 처럼 애초에 리스트업 안 되는 attr) **`Reveal` 버튼으로 분리**해
   보존했다 — 비슷한 툴을 이전할 때 재질의 경로가 실제로 쓸모 있는지 먼저 확인할 것.
 - 문서: `JUN_All/docs/Framework_MOD_filter_qt.md` (docs/README.md "공용 위젯" 섹션에 등록).
+- **A00370_ToolLauncher v01.08**(2026-10-22) 도 rows_provider — 버튼 더미 + 카테고리 QGroupBox. 그룹 단위 숨김은
+  `filtered` 시그널로 호출부가 한다(위젯은 행만 안다). 보임 판정은 `isHidden()`(오프스크린 · 미표시 창에서 `isVisible()` 은 False).
 
 관련: [[tsl-selection-order]], [[qtreewidgetitem-checkable-default-flag]], [[wip-a00290-shape-editor-tab]]
 

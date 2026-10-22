@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-08
+# last Update date : 2026-10-22
 # A00370_ToolLauncher - "Buttons" tab (Qt, in-Maya)
 #
 # 사용자가 카테고리와 툴 버튼을 직접 만들고, 버튼을 누르면 그 버튼에 저장된 툴 폴더
@@ -18,6 +18,9 @@
 #   - 색 지정       : 버튼 우클릭 'Set Color...'(팔레트+스포이드)로 개별 지정.
 #                     'Color Select' 모드를 켜면 카테고리를 넘나들며 여러 버튼을
 #                     체크해 'Apply Color...'로 한 번에 칠한다('Clear Color'로 해제).
+#   - 검색(Filter)   : 버튼 영역 위의 공용 Filter(JUN_mod_filter_qt_v01, rows_provider).
+#                     버튼 이름 · 카테고리 이름 · 툴 폴더명으로 걸러 맞는 버튼만 남기고,
+#                     남은 버튼이 없는 카테고리는 통째로 숨긴다(v01.08).
 
 import os
 
@@ -47,6 +50,8 @@ from Framework.qt.qt import (
     QMenu,
     Qt,
 )
+
+from Framework.qt import JUN_mod_filter_qt
 
 from ..core import prefs as prefs_mod
 from ..core import tool_launcher
@@ -217,6 +222,11 @@ class LauncherTab(QWidget):
         self._checked = set()
         self._color_buttons = []
 
+        # 검색용: 렌더마다 다시 채운다. _tool_rows = [(찾을 글자, 행 위젯)],
+        # _cat_boxes = [(카테고리 박스, [그 안의 행 위젯들])].
+        self._tool_rows = []
+        self._cat_boxes = []
+
         self._build_ui()
         self._refresh_profiles()
         self._render_categories()
@@ -283,7 +293,7 @@ class LauncherTab(QWidget):
             splitter.setSizes([header_h, max(40, total - header_h)])
 
     def _build_buttons_pane(self):
-        """하단 pane: 생성한 카테고리/버튼 모음(계속 늘어나므로 스크롤)."""
+        """하단 pane: Filter 줄 + 생성한 카테고리/버튼 모음(계속 늘어나므로 스크롤)."""
         self._cat_container = QWidget()
         self._cat_layout = QVBoxLayout(self._cat_container)
         self._cat_layout.setAlignment(Qt.AlignTop)
@@ -291,7 +301,63 @@ class LauncherTab(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(self._cat_container)
-        return scroll
+
+        # 검색(v01.08): 공용 Filter 를 rows_provider 모드로 쓴다 - 버튼 모음은 QListWidget 이
+        # 아니라 행 위젯을 쌓은 것이라서. 찾는 글자는 버튼 이름 · 카테고리 이름 · 툴 폴더명
+        # (_row_haystack). Controls 를 접어도 쓸 수 있게 Controls 박스 밖, 버튼 영역 바로 위에 둔다.
+        self.lbl_filter_number = QLabel("")
+        self._filter = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+            rows_provider=lambda: list(self._tool_rows),
+            placeholder="Search tools (name, category, folder)",
+            number_label=self.lbl_filter_number)
+        self._filter.le_filter.setToolTip(
+            "Show only the tool buttons whose name, category or tool folder\n"
+            "contains this text (case-insensitive). Space-separated words all\n"
+            "have to match. Categories with no match are hidden too.")
+        self._filter.filtered.connect(self._on_filtered)
+
+        filter_row = QHBoxLayout()
+        filter_row.setContentsMargins(0, 0, 0, 0)
+        filter_row.addWidget(self._filter, stretch=1)
+        filter_row.addWidget(self.lbl_filter_number)
+
+        pane = QWidget()
+        lay = QVBoxLayout(pane)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
+        lay.addLayout(filter_row)
+        lay.addWidget(scroll, stretch=1)
+        return pane
+
+    # ============================================================== filter
+
+    @staticmethod
+    def _row_haystack(cat_name, btn_data):
+        """한 버튼을 찾을 때 볼 글자: 버튼 이름 + 카테고리 이름 + 툴 폴더명.
+
+        폴더명을 넣는 이유: 버튼 이름을 'KWI' 처럼 줄여 둬도 'A00080' 같은 번호로 찾아진다."""
+        folder = os.path.basename(
+            (btn_data.get("path") or "").replace("\\", "/").rstrip("/"))
+        return " ".join(x for x in (btn_data.get("name", ""), cat_name, folder) if x)
+
+    def _on_filtered(self, shown, total):
+        """필터가 걸릴 때마다: 남은 버튼이 하나도 없는 카테고리는 통째로 숨긴다.
+
+        필터가 비어 있으면 모든 카테고리를 다시 보인다(버튼 없는 카테고리 포함)."""
+        active = bool(self._filter.text().strip())
+        for box, rows in self._cat_boxes:
+            box.setVisible(
+                not active or any(not w.isHidden() for w in rows))
+
+    def refresh_filter(self):
+        """목록을 다시 그린 뒤 필터를 다시 먹인다(새 위젯은 숨김 상태가 초기화돼 있다)."""
+        flt = getattr(self, "_filter", None)
+        if flt is not None:
+            flt.refresh()
+
+    def visible_tool_rows(self):
+        """지금 필터를 통과해 보이는 (찾을 글자, 행 위젯) 쌍."""
+        return [(n, w) for n, w in self._tool_rows if not w.isHidden()]
 
     def _build_log_group(self):
         # main_window 의 로그 위젯을 'Log' 그룹에 담는다(컨트롤 박스와 함께 접힌다).
@@ -446,6 +512,8 @@ class LauncherTab(QWidget):
     def _render_categories(self):
         # 재렌더하면 옛 체크형 버튼 위젯은 폐기되므로 목록을 비우고 다시 채운다.
         self._color_buttons = []
+        self._tool_rows = []
+        self._cat_boxes = []
         # 기존 위젯 제거 후 데이터 기준으로 다시 그린다.
         while self._cat_layout.count():
             item = self._cat_layout.takeAt(0)
@@ -458,10 +526,13 @@ class LauncherTab(QWidget):
             hint = QLabel("No categories yet — click 'Category' to create one.")
             hint.setEnabled(False)
             self._cat_layout.addWidget(hint)
+            self.refresh_filter()
             return
 
         for cat in categories:
             self._cat_layout.addWidget(self._build_category_box(cat))
+        # 새로 만든 행 위젯에 현재 필터를 다시 적용한다(필터가 걸린 채 편집해도 유지).
+        self.refresh_filter()
 
     def _build_category_box(self, cat):
         box = QGroupBox(cat["name"])
@@ -474,13 +545,19 @@ class LauncherTab(QWidget):
         v = QVBoxLayout(box)
 
         buttons = cat.get("buttons", [])
+        rows = []
         if not buttons:
             empty = QLabel("(no buttons — use 'Tool' to add)")
             empty.setEnabled(False)
             v.addWidget(empty)
         else:
             for btn_data in buttons:
-                v.addWidget(self._build_tool_button(cat_name, btn_data))
+                row = self._build_tool_button(cat_name, btn_data)
+                v.addWidget(row)
+                rows.append(row)
+                self._tool_rows.append(
+                    (self._row_haystack(cat_name, btn_data), row))
+        self._cat_boxes.append((box, rows))
 
         return box
 

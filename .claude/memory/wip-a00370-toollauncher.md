@@ -64,3 +64,9 @@ button. Resolved at render time (updates on path change).
 
 Next tool number after A00360_SortTool. Follows [[ui-text-english-only]],
 [[prefer-pyside-for-new-tools]], [[docs-go-in-jun-all-docs]].
+
+v01.08 (2026-10-22) — **검색(Filter)**: 버튼 영역 위, Controls 박스 밖에 공용 `JUN_mod_filter_qt_v01`
+**rows_provider** 모드([[framework-filter-widget]]). 렌더마다 `_tool_rows=[(haystack, row)]` 와
+`_cat_boxes=[(box, rows)]` 를 다시 채우고 `refresh_filter()`. haystack = 버튼 이름 + 카테고리 + 툴 폴더명.
+빈 카테고리 숨김은 `filtered` 시그널에서 `box.setVisible(any(not w.isHidden()))` — `isVisible()` 은
+창이 안 떠 있으면 늘 False 라 `isHidden()` 으로 판정. 오프스크린 15항목, 마야 GUI 미확인.

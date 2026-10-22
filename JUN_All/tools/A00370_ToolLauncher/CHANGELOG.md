@@ -2,6 +2,23 @@
 
 All notable changes to this tool are documented here.
 
+## v01.08 — 2026-10-22
+
+- **Search (Filter).** A `Filter` row sits right above the button area (outside the
+  collapsible `Controls`, so it is there even when Controls is folded). Type any part
+  of a **button name, category name or tool folder name** (`A00080`, `unreal`, `skin`),
+  case-insensitive; space-separated words all have to match. Only matching buttons stay,
+  and a **category with no remaining button is hidden** as a whole. `Number: shown / total`
+  on the right, `Clear` restores everything. The filter survives re-rendering (rename,
+  move, Color Select on/off, profile switch).
+  - Built on the shared `JUN_mod_filter_qt_v01` in `rows_provider` mode (the button
+    area is stacked row widgets, not a `QListWidget`) - no tool-local search code.
+  - Verified offscreen (PySide6, 15 checks). Not yet checked inside Maya.
+
+## v01.07 — 2026-09-22
+
+- Default profiles cleaned up to point at current tools (data only; see `version.py`).
+
 ## v01.04 — 2026-07-20
 
 - **Relative button paths — no more cross-PC git churn.** Buttons now store their
