@@ -14,6 +14,10 @@ metadata:
   `DUMMY_IN.X → CTL_<tag>.ty → rv → gs → DUMMY_OUT` (JaLi 는 `CNT_JaLi.tx/ty` 직결, 휴식 위치가 0.6 으로 보인다). 컨트롤러 ty 가 연결 상태라
   손 조작 불가 → `bake_ctl_keys(nodes=None, mode='copy'|'bake')` 로 베이크하면 DUMMY_IN 의 animCurve 가 **통째로 복사**돼 컨트롤러에 남고
   DUMMY_OUT 은 컨트롤러를 따라간다 (`--verify --direct` 473 항목, T7 베이크). 사용자가 drv 합산 버전 대신 이걸 요청한 이유: "컨트롤러를 베이크하면 키가 컨트롤러에 그대로 남게".
+- **direct + ARKit 버전 (2026-10-22, 0090 §0-A C9)**: `A0030_jali_slider_ctl_direct_arkit.ma` = `--direct --arkit`. `JALI_DUMMY_GRP` 아래 `ARKIT_OUT`(52, 0~1)
+  + A0010 노드망(`build_jali_arkit_node.build(src_plugs=DUMMY_OUT_*, out_node=ARKIT_OUT)`, angela 단위라 jali_unit 9 · phoneme_unit 10, weight_plug 없음)을
+  DUMMY_OUT 에 직접 붙임 → **A0010 을 거칠 필요 없음**, 한 파일이 JALI 규칙 값(DUMMY_OUT_*)과 ARKit 52(ARKIT_OUT) 둘 다 출력. output_max · global_scale 이
+  ARKit 에도 먹는다. 검증 495 항목(T8). 사용 흐름(사용자 설명): A00540 이 DUMMY_IN 에 키 → 컨트롤러에 베이크 → DUMMY_OUT / ARKIT_OUT 을 RigConnect 규칙으로 연결.
 A0010(`jali_arkit_mapping_ctl.ma`) 의 채널박스 전용 `CNT_PHONEMES/COARTIC` 를 뷰포트 슬라이더로 바꾼 것. **사용자 GUI 확인(S5) 아직.**
 
 - 구조: `JALI_SLIDER_RIG`(`global_scale`) > `JALI_CTL_GRP`(`PH_<attr>_grp` 16 · `CO_<attr>_grp` 6 · `JALI_box_grp`/`CNT_JaLi`) + `JALI_DUMMY_GRP`
