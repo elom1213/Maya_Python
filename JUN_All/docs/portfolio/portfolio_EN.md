@@ -2,13 +2,13 @@
 title: Portfolio — Work Summary (2026-05-06 ~ 2026-10-12)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-10-19
+updated: 2026-10-22
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
 
 > **Author**: Ji Hun Park (Junny)
-> **Period**: 2026-05-06 – 2026-10-19 (~23 weeks)
+> **Period**: 2026-05-06 – 2026-10-22 (~24 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
 > **Volume**: 50+ in-house tools (64 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
@@ -723,7 +723,7 @@ I designed the common foundation alongside the tools, not as an afterthought.
   - **PyInstaller `.exe` builds**, a release builder (tool + framework + docs packaged automatically), and Windows taskbar icon handling.
 - **Standalone pipeline utilities**
   - `A00210_FileManager` — file/version manager that **visualises file reference relationships as a node graph (Lineage)**, switches between Remote (Git) and Local (NAS) source modes, **captures and recreates folder structures** (files included, restored as **0-byte placeholders** with a marker appended to the name so they can never be mistaken for the real scene — the tool never shares actual scene files), and records thumbnails and logs. (`A00211_RefLineage` exports a Maya scene's reference graph straight into it.) Its **Maya > Reference** tab (v01.35) batch-processes scene files on disk: pick Maya files in a folder tree, list the references they use (nested references fold under their parent), check the ones to bake in and the tool **opens each file, imports those references (nested ones too), merges namespaces, backs the original up and saves it in place**. The app runs outside Maya, so that work is handed to a small worker started with **`mayapy`** in the background and followed through a line protocol on its stdout (log / progress / result, cancel through a flag file at a file boundary). Two Maya facts shaped it and were measured in mayapy rather than assumed: an unloaded reference cannot be imported (load first), and a scene opened with `loadReferenceDepth none` saves its untouched references **as unloaded** - so scanning opens files that way for speed, but importing opens them normally to keep the saved load state.
-  - `A00220_BackupTool` — periodic and on-save **automatic backup** of watched files (crash insurance).
+  - `A00220_BackupTool` — periodic and on-save **automatic backup** of watched files (crash insurance); targets are picked with a dialog or dragged in from File Explorer.
   - `A00240_PathTool` · `A00370_ToolLauncher` · `A00230_StartupTool` — launch frequently used folders/tools from buttons and profiles, auto-start them on Windows login, and **re-map paths automatically when the workstation changes**. PathTool also carries a **path tree** (filter by name or path, `Shift` to expand/collapse a whole branch, copy the absolute path, **Omit** to fold the first N fixed levels into one `...` row, junctions drawn in light red) that **reads a folder only when it is opened** and reads one level ahead on background threads, so huge or deep trees show and open instantly. A **Junction** tab wraps `mklink /J`: list source folders and target folders (n -> 1 or n -> n, drag & drop), preview every row with the reason it cannot be made, and remove junctions **without touching the original folders**.
 - **Documentation** — every tool carries a usage guide, a CHANGELOG and a version file, backed by a daily WORKLOG.
 

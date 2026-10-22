@@ -1,5 +1,21 @@
 # Changelog — A00220_BackupTool
 
+## [01.18] - 2026-10-22
+
+### Added
+- **Drag & drop from File Explorer.** Drop files anywhere on the `Target Files` group (the list,
+  its empty area or the button row) and they are added, the same as `Add...`. A dropped **folder**
+  adds the files directly inside it (one level, no sub-folders). Paths already listed are skipped
+  (case-insensitive), and the Log gets one line per drop
+  (`Dropped: 3 file(s), 1 folder(s) expanded, 1 already listed.`).
+  - Drops are received through an event filter on the list **viewport** (where Qt delivers them)
+    and on the group box, so it also works while a backup is running and the list is disabled -
+    `Add...` already worked then. Files added while running with Auto Backup on are put on the
+    file watcher right away.
+  - `Add...` and the drop share one `add_paths()`; non-file drags (text) are left alone.
+  - Verified offscreen (PySide6, 16 checks: files, duplicates, folder one level, missing path,
+    text drag ignored, drop on the group with the list disabled, watcher pick-up).
+
 ## [01.17] - 2026-09-18
 
 ### Changed

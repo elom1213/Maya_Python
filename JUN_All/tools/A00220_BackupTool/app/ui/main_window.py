@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-18
+# last Update date : 2026-10-22
 # A00220_BackupTool - main window (Qt, standalone)
 #
 # 컴퓨터 비정상 종료에 대비해 지정 파일들을 주기적으로 자동 백업한다.
@@ -7,6 +7,7 @@
 #  - 덮어쓰기 또는 버전업(최근 N개 유지) 모드
 #  - 상태 표시: Chrome-Dino 애니메이션(정지=서있음 / 동작=달리기 /
 #    저장 감지=강조색 톡 점프 / 백업 성공=공중 360° 회전)
+#  - 대상 파일은 Add... 외에 탐색기에서 Target Files 로 드래그&드롭해도 담긴다(v01.18)
 
 import os
 import time
@@ -32,6 +33,7 @@ from Framework.qt.qt import (
     QFileDialog,
     QMessageBox,
     QTimer,
+    QEvent,
     QFileSystemWatcher,
     QApplication,
     QIcon,
@@ -52,6 +54,18 @@ from .dino_widget import DinoWidget
 STATE_DEACTIVE = "deactive"
 STATE_ACTIVE = "active"
 STATE_SAVING = "saving"
+
+
+def _dropped_paths(event):
+    """드롭 이벤트에서 로컬 경로들을 꺼낸다(파일 URL 만, A00240 과 같은 모양)."""
+    mime = event.mimeData()
+    if mime is None or not mime.hasUrls():
+        return []
+    out = []
+    for url in mime.urls():
+        if url.isLocalFile():
+            out.append(os.path.normpath(url.toLocalFile()))
+    return out
 
 
 class MainWindow(QWidget):
@@ -225,7 +239,21 @@ class MainWindow(QWidget):
         self.list_files.setContextMenuPolicy(Qt.CustomContextMenu)
         self.list_files.customContextMenuRequested.connect(
             self._on_files_context_menu)
+        self.list_files.setToolTip(
+            "Drag files here from File Explorer, or use Add...")
         layout.addWidget(self.list_files)
+
+        # 탐색기 드래그&드롭(v01.18). 드롭 이벤트는 QListWidget 본체가 아니라 **뷰포트**에
+        # 오므로 뷰포트에 이벤트 필터를 건다(A00240 Junction 탭과 같은 방식). 실행 중에는
+        # 목록이 비활성이라 뷰포트가 드롭을 받지 못하므로, 그룹 박스에도 같은 필터를 걸어
+        # 그룹 어디에 떨어뜨려도(버튼 줄 · 여백 포함) 담기게 한다 - Add... 가 실행 중에도
+        # 되는 것과 맞춘다.
+        group.setAcceptDrops(True)
+        group.installEventFilter(self)
+        self.list_files.setAcceptDrops(True)
+        self.list_files.viewport().setAcceptDrops(True)
+        self.list_files.viewport().installEventFilter(self)
+        self._files_group = group
 
         btn_row = QHBoxLayout()
         btn_add = QPushButton("Add...")
@@ -484,11 +512,76 @@ class MainWindow(QWidget):
         paths, _ = QFileDialog.getOpenFileNames(
             self, "Select Files to Back Up", os.path.expanduser("~")
         )
-        existing = set(self._files())
-        for path in paths:
-            if path not in existing:
-                self._add_file_item(path)
-                existing.add(path)
+        self.add_paths(paths)
+
+    def add_paths(self, paths, source="Added"):
+        """경로들을 대상 목록에 담는다(Add... 와 드롭이 함께 쓴다).
+
+        - 파일은 그대로, **폴더는 그 안의 파일만**(하위 폴더로 내려가지 않음) 담는다.
+          폴더째 떨어뜨렸을 때 하위 트리 전체를 끌어오면 수백 개가 들어올 수 있어 1단계만.
+        - 이미 있는 경로(정규화 후 대소문자 무시, Windows)는 건너뛴다.
+        - 실행 중(Active)이면 새 파일을 감시 목록에도 바로 올린다. mtime 폴링은 처음 본
+          파일을 기준선만 잡고 넘어가므로 바로 저장으로 오인하지 않는다.
+        반환: 실제로 추가된 경로 리스트."""
+        files, folders, missing = [], 0, 0
+        for path in paths or []:
+            if not path:
+                continue
+            path = os.path.normpath(path)
+            if os.path.isfile(path):
+                files.append(path)
+            elif os.path.isdir(path):
+                folders += 1
+                try:
+                    names = sorted(os.listdir(path))
+                except OSError:
+                    names = []
+                files.extend(
+                    os.path.join(path, n) for n in names
+                    if os.path.isfile(os.path.join(path, n)))
+            else:
+                missing += 1
+
+        existing = {os.path.normcase(f) for f in self._files()}
+        added, dup = [], 0
+        for f in files:
+            key = os.path.normcase(f)
+            if key in existing:
+                dup += 1
+                continue
+            existing.add(key)
+            self._add_file_item(f)
+            added.append(f)
+
+        if added and self._state != STATE_DEACTIVE and self.chk_auto.isChecked():
+            self._rewatch_files()
+
+        if files or folders or missing:
+            parts = [f"{source}: {len(added)} file(s)"]
+            if folders:
+                parts.append(f"{folders} folder(s) expanded")
+            if dup:
+                parts.append(f"{dup} already listed")
+            if missing:
+                parts.append(f"{missing} not found")
+            self.log(", ".join(parts) + ".")
+        return added
+
+    def eventFilter(self, watched, event):
+        """Target Files 그룹 · 목록 뷰포트에 떨어지는 탐색기 드롭을 받는다(v01.18)."""
+        et = event.type()
+        if et in (QEvent.DragEnter, QEvent.DragMove):
+            mime = event.mimeData()
+            if mime is not None and mime.hasUrls():
+                event.acceptProposedAction()
+                return True
+        elif et == QEvent.Drop:
+            paths = _dropped_paths(event)
+            if paths:
+                self.add_paths(paths, source="Dropped")
+                event.acceptProposedAction()
+                return True
+        return super().eventFilter(watched, event)
 
     def on_remove_selected(self):
         for item in self.list_files.selectedItems():

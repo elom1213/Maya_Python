@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-22 (오늘)
 
+> [!summary] A00220_BackupTool — **탐색기 드래그&드롭으로 대상 파일 추가** (v01.17->01.18) `#A00220_BackupTool`
+- 요청: `Add...` 대화상자 말고 탐색기에서 파일을 끌어다 놓아도 Target Files 에 담기게.
+- `Target Files` 그룹 어디에든(목록 · 빈 자리 · 버튼 줄) 놓으면 담긴다. 폴더는 **바로 안의 파일만**(하위 폴더 X). 이미 있는 경로는 건너뛰고(대소문자 무시) 로그 한 줄 `Dropped: N file(s), ...`. `Add...` 와 드롭이 `add_paths()` 하나를 쓴다.
+- 드롭 이벤트는 `QListWidget` 뷰포트로 오므로 뷰포트 + 그룹 박스에 이벤트 필터(A00240 Junction 방식). 그룹에도 거는 이유: 실행 중엔 목록이 비활성이라 드롭을 못 받는데 `Add...` 는 실행 중에도 되므로 맞췄다. Auto Backup 중 추가한 파일은 바로 감시에 올린다(폴링은 처음 본 파일을 기준선만 잡아 저장으로 오인하지 않음).
+- 검증(오프스크린 PySide6): 16항목 — 파일 2개 · 대소문자 다른 중복 · 폴더 1단계 · 없는 경로 · 텍스트 드래그 무시 · 목록 비활성 상태에서 그룹 드롭 · Active 때 watcher 등록 · 툴팁. 실제 탐색기 드롭은 GUI 미확인.
+
 > [!summary] A00540_JaliLipSync — **규칙 json 역할표 · Target Auto / Manual · JaLi scale** (v01.00->01.01) `#A00540_JaliLipSync`
 - 배경: JUN_JALI 쪽에서 만든 슬라이더 리그 `A0020_jali_slider_ctl.ma`(angela 어트리뷰트 1:1 슬라이더 22 + JaLi 박스, `DUMMY_IN_*` 입력 허브 0~1, `DUMMY_OUT_*` 출력 허브 — 계획 `JUN_JALI/docs/0090`, 어트리뷰트 안내 `0100`)에 VisemeNet 키를 걸려면 툴이 `CNT_PHONEMES` 이름과 angela 단위(scale 10 · Jaw/Lip 0~15)에 묶여 있는 것을 풀어야 했다. 계획서 `docs/plans/A00540_JaliLipSync_v0101_rules_manual_plan.md`.
 - 매핑 json v2: `nodes`(역할 → 노드 이름) · `viseme_scale` · `jali{scale, range, fixed_default}`. 리그 표식은 코드가 아니라 json 의 phonemes 노드. 새 규칙 `jali_slider_dummy_in.json`(scale 1 · JaLi 0~1 · Fixed 0.6), angela json 보강. 타겟 해석은 `keyer.resolve_targets()` 한 곳(Auto 네임스페이스 / Manual node_map).
