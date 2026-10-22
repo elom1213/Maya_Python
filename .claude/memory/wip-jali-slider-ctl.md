@@ -19,6 +19,7 @@ A0010(`jali_arkit_mapping_ctl.ma`) 의 채널박스 전용 `CNT_PHONEMES/COARTIC
 - 라벨은 ref 식(`LNTDm GKm MMMm FFFm WAp YAp`) + 머리글 `PHONEMES/COARTIC/JALI`. JaLi 박스는 tx/ty 0~1(기본 0.6 = 9), 보이는 크기는 부모 scale 2.
 - **실측 (mayapy 2024)**: `textCurves(f="Arial")` 헤드리스에서 된다(폰트 크기 경고만) · `remapValue`/`setRange` 둘 다 입력을 범위로 클램프(1.3 → outputMax) · 부모 ty 연결돼도 자식 ty 는 settable.
 - 미리보기 그림: CV 덤프 → 시스템 python(PIL 있음)으로 그렸다. JUN_JALI `.mfa/env/python.exe` 는 matplotlib 임포트에서 죽는다(exit 127, conda 미활성).
+- 안내 문서 JUN_JALI `docs/0100_jali_dummy_out_attrs_guide.md`(2026-10-22): 어트리뷰트마다 angela 실측(음소 = 10, Jaw/Lip 9)으로 턱 각도 · 입술 근육 · 혀 조인트 변화. **COARTIC 실측 정정**: `LNTD` `GK` 는 혀만(음소 쪽보다 1.6배 · 3배, 턱 0), `MMM` `FFF` 는 `EXP_COARTIC_Lip` = (턱 각도)/30 이 곱해져 **턱이 닫히면 0** (0040 의 "단독 변화 없음" 은 혀를 빼고 잰 것), `WA/YA_PEDAL` 은 음소와 무관하게 상수(0.48 / 0.37·0.27·0.12).
 - 후속(S6): `A00540` 은 `CNT_PHONEMES` 를 리그 표식으로 찾아 새 파일을 인식 못 함 → `DUMMY_IN_*` 매핑 json(scale 1) + `scene.RIG_MARKER` 설정화.
 
 관련: [[jun-jali-repo]], [[wip-a00540-jalilipsync]], [[wip-a00550-posemapper]], [[mayapy-headless-verify]]
