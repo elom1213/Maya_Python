@@ -42,3 +42,7 @@ downstream `[Source attr, node attr]` / upstream `[node attr, Source attr]` 중 
 (`Ah Aa Eh Ee Ih Oh Uh U Eu Schwa R S ShChZh Th JY LNTD GK MBP FV W`), 사용자가 준 순서 그대로. 이 22개 이름은
 JUN_JALI 의 angela 리그(`AHH AAA IEE …`)와 **다른 철자 체계**다 — 리그마다 json 을 따로 두는 A00540 과 같은 사정.
 규칙 이름은 "<체계> <개수> <대상>" 꼴(ARKit 52 와 맞춤). 데이터만, mayapy 22/22 확인.
+
+**2026-10-22 실측 — 부분 연결은 안전하다**: `connect_by_rule` 은 짝마다 try/except 라 없는 attr · 잠긴 dst · 타입 불일치 ·
+없는 오브젝트 행 · 자기 연결 모두 그 짝만 skipped 로 세고 나머지는 전부 연결(mayapy 16항목). 단 **skipped 는 사유를
+구분하지 않고 로그에 attr 이름이 안 나온다** — 사용자가 "뭐가 안 붙었나" 를 물으면 그게 후속 작업.
