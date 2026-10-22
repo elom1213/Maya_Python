@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 # A00145_RigConnect - version info
 
+# 01.65  Connect > Connect by Rule : rule `JALI 22 Viseme` also carries the 16 angela /
+#        A0020_jali_slider_ctl DUMMY_OUT_PHONEMES names (AAA AHH OHH UUU IEE RRR WWW SSS
+#        FFF TTH SSH added; Eh Schwa LNTD GK MBP were already there) - 33 attributes, so a
+#        DUMMY_OUT_PHONEMES node connects by the same rule. Data only, no code change.
 # 01.64  Connect > Connect by Rule : a row whose object name does not resolve to exactly one
 #        node (missing, or a duplicate leaf name like grp1|A:dup / grp2|A:dup given as 'A:dup')
 #        is skipped as a whole - connectAttr would otherwise silently connect the FIRST
@@ -91,5 +95,5 @@
 #        Off keeps the old pairing (one target = broadcast, otherwise row to row).
 #        Disabled in Matrix Constraint mode.
 
-VERSION = "01.64"
+VERSION = "01.65"
 LAST_UPDATE = "2026-10-22"

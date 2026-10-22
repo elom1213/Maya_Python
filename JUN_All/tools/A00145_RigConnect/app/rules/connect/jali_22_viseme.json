@@ -1,6 +1,6 @@
 {
   "name": "JALI 22 Viseme",
-  "description": "Connect the 22 JALI lip-sync attributes by the same name, Source -> Destination: Jaw and Lip (the JA-LI control axes) plus the 20 visemes (Ah Aa Eh Ee Ih Oh Uh U Eu Schwa R S ShChZh Th JY LNTD GK MBP FV W). Objects are paired row by row (Source[i] -> Destination[i]); an attribute missing on either side is skipped.",
+  "description": "Connect the JALI lip-sync attributes by the same name, Source -> Destination. 22 VisemeNet-style names: Jaw and Lip (the JA-LI control axes) plus the 20 visemes (Ah Aa Eh Ee Ih Oh Uh U Eu Schwa R S ShChZh Th JY LNTD GK MBP FV W). Plus the 16 angela / A0020_jali_slider_ctl DUMMY_OUT_PHONEMES names (AAA Eh AHH OHH UUU IEE RRR WWW SSS FFF TTH MBP SSH Schwa GK LNTD) so a DUMMY_OUT_PHONEMES node connects too. Objects are paired row by row (Source[i] -> Destination[i]); an attribute missing on either side is skipped.",
   "attributes": [
     "Jaw",
     "Lip",
@@ -23,6 +23,17 @@
     "GK",
     "MBP",
     "FV",
-    "W"
+    "W",
+    "AAA",
+    "AHH",
+    "OHH",
+    "UUU",
+    "IEE",
+    "RRR",
+    "WWW",
+    "SSS",
+    "FFF",
+    "TTH",
+    "SSH"
   ]
 }

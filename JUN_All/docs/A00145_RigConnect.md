@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.64` (`app/config/version.py`) — Connect by Rule **겹치는 이름 보호 + 스킵 사유 로그**(§Connect by Rule). v01.63 — Connect by Rule 두 번째 규칙 **`JALI 22 Viseme`**(§Connect by Rule). v01.62 — Constrain > Constraint 에 **`All Targets -> Each Follower`** 옵션(follower 마다 Targets **전부**를 타깃으로 갖는 constraint 하나, §Constraint)
+- 버전: `v01.65` (`app/config/version.py`) — Connect by Rule 규칙 `JALI 22 Viseme` 에 **A0020 `DUMMY_OUT_PHONEMES` 16개 이름 추가**(33개, §Connect by Rule). v01.64 — Connect by Rule **겹치는 이름 보호 + 스킵 사유 로그**(§Connect by Rule). v01.63 — Connect by Rule 두 번째 규칙 **`JALI 22 Viseme`**(§Connect by Rule). v01.62 — Constrain > Constraint 에 **`All Targets -> Each Follower`** 옵션(follower 마다 Targets **전부**를 타깃으로 갖는 constraint 하나, §Constraint)
   · v01.57 은 Constrain 의 **Constraint · Skin Weight 하위 탭을 하나로**(모드 `Default` / `Skin Weight`), Transfer 에 모드 **`Copy`** — constraint 의 성질을 읽어 다른 오브젝트에 똑같이 건다, 원본 유지(§Transfer) · v01.56 은 Attribute > Set Value 에 **`Include Non-Common`**: 일부 오브젝트만 가진 어트리뷰트도 나열, 행마다 **`[k/n]`**(§Set Value) · v01.55 는 창 기본 높이 900 → **980**(Match 탭이 스크롤 없이 다 보이게) · v01.54 는 리스트의 **`(Null)` 자리표시를 빨간 글씨로**(공용 TSL, 아래 메모) · v01.53 은 Match 에 **`Keep Children in Place`**(기본 OFF):
   팔로워만 움직이고 **그 아래 오브젝트는 있던 월드 자리에 그대로** 둔다. Mirror 탭의 같은 이름
   체크박스와 **같은 코어**(`app/core/keep_children.py`)를 쓴다 (§Match)
@@ -824,6 +824,12 @@ Constrain 탭과 같은 방식이다(§Constrain 참고) — 짧은 라벨 + 툴
     `Jaw` `Lip`(JA-LI 축) + 비즘 20 `Ah Aa Eh Ee Ih Oh Uh U Eu Schwa R S ShChZh Th JY LNTD GK MBP FV W`.
     JALI 입력 허브 → 리그 컨트롤처럼 **같은 22개를 가진 두 노드**를 잇는다(없는 attr 은 스킵).
     mayapy 검증: 22/22 연결, 한쪽에 attr 이 하나 없으면 21 + skipped 1.
+    - **v01.65 (2026-10-22)**: 같은 파일에 `02_Cage_JALI/A0020_jali_slider_ctl.ma` 의 `DUMMY_OUT_PHONEMES` 16개 이름
+      (`AAA Eh AHH OHH UUU IEE RRR WWW SSS FFF TTH MBP SSH Schwa GK LNTD`, angela `CNT_PHONEMES` 와 같음)을 더해 **33개**.
+      겹치는 `Eh Schwa LNTD GK MBP` 는 그대로 두고 11개만 추가. 이름이 겹치지 않는 쪽은 스킵되므로 VisemeNet 식 허브와
+      A0020 더미 허브 어느 쪽을 Source 로 잡아도 같은 규칙 하나로 된다. mayapy 검증: `DUMMY_OUT_PHONEMES` → 같은 16 attr
+      노드 16/16 연결 + skipped 17(Source 에 없는 이름), 값도 흐른다(`AAA` 1 → 12). `DUMMY_OUT_COARTIC` 의 `MMM WA_PEDAL
+      YA_PEDAL` 은 **아직 없다**(요청 범위 밖).
   - **중단 없음 · 있는 것은 전부 연결** (2026-10-22 실측): 짝마다 따로 시도하므로 어느 한쪽에 attr 이 없거나, 잠겨 있거나,
     타입이 안 맞거나, 행의 오브젝트가 없어도 **그 짝 · 그 행만 건너뛰고** 나머지는 전부 연결된다. 네임스페이스는 1중 · 2중 ·
     3중 · 레퍼런스(`REF:A:B:node`) 모두 그대로 통과한다.
