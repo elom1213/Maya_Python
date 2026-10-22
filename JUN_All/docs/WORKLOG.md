@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-22 (오늘)
 
+> [!summary] A00370_ToolLauncher — **프로파일 분류 · 미등록 툴 등록 계획서** (착수 전) `#A00370_ToolLauncher`
+- 요청: `data/profiles` 의 기존 분류(ANIM · Mesh · RIG · UE)를 참고해, 자주 쓰는 툴 중 버튼이 없는 툴을 등록하는 작업의 계획서.
+- `docs/plans/A00370_ToolLauncher_profile_classification_plan.md` — 현황(등록 13, 카테고리는 전부 Main), 분류 축(D1 `FACIAL` · `UTIL` 신설 · D2 카테고리 2~3개 · D3 중복 등록 허용), 후보 25종을 프로파일별 표로(활동량 = 커밋 수, 사용 빈도 아님), 제외(구버전 · 템플릿 · **standalone 은 `__init__.py` 가 없어 등록 불가** · dev 툴은 `tools` 앵커 없어 절대경로로 저장됨), 절차 S1~S5(json 만, 코드 변경 없음), 확인 질문 Q1~Q5.
+- 선검사: 후보 25종 전부 `validate` OK, 아이콘은 `A00430_DemBone` 만 없음.
+
 > [!summary] A00370_ToolLauncher — **메뉴 `Profile > Show Profiles Folder`** (v01.08->01.09) `#A00370_ToolLauncher`
 - 요청: 프로파일 json 저장 경로를 탐색기로 팝업하는 메뉴 문구.
 - 메뉴 바에 `Profile` 메뉴(Help 왼쪽) → `data/profiles/` 를 공용 `file_opener.open_path` 로 연다(없으면 만든다), 로그에 경로. A00550 `Library > Show Libraries Folder` 와 같은 모양, `main_window.py` 만.
