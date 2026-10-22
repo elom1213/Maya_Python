@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 # A00145_RigConnect - version info
 
+# 01.66  Connect > Connect by Rule : rule `JALI 22 Viseme` + the A0020 DUMMY_OUT_COARTIC names
+#        MMM WA_PEDAL YA_PEDAL (LNTD GK FFF already there) - 36 attributes, so DUMMY_OUT_COARTIC
+#        connects by the same rule too. Data only, no code change.
 # 01.65  Connect > Connect by Rule : rule `JALI 22 Viseme` also carries the 16 angela /
 #        A0020_jali_slider_ctl DUMMY_OUT_PHONEMES names (AAA AHH OHH UUU IEE RRR WWW SSS
 #        FFF TTH SSH added; Eh Schwa LNTD GK MBP were already there) - 33 attributes, so a
@@ -95,5 +98,5 @@
 #        Off keeps the old pairing (one target = broadcast, otherwise row to row).
 #        Disabled in Matrix Constraint mode.
 
-VERSION = "01.65"
+VERSION = "01.66"
 LAST_UPDATE = "2026-10-22"
