@@ -4256,9 +4256,28 @@ class MainWindow(QWidget):
         dst_objs = dst["tsl"].get_all_items()
 
         def _do():
-            connected, skipped, pairs = crule_mgr.connect_by_rule(src_objs, dst_objs, rule)
+            skips = []
+            connected, skipped, pairs = crule_mgr.connect_by_rule(
+                src_objs, dst_objs, rule, on_skip=lambda *a: skips.append(a))
             self.log("       {0} object pair(s) : {1} connected, {2} skipped".format(
                 pairs, connected, skipped))
+            # 건너뛴 것은 무엇을 왜 건너뛰었는지 (v01.64). 행 단위(없는 · 겹치는 이름)는 attr 이 None 로
+            # 한 줄, attr 단위는 같은 행 · 같은 사유를 한 줄로 묶어 attr 이름을 나열한다.
+            grouped = []   # [(src, dst, reason, [attr...])] - 순서 유지
+            for src, dst, attr, reason in skips:
+                if attr is None:
+                    self.log("       [skip] {0} -> {1} (whole row) : {2}".format(src, dst, reason))
+                    continue
+                for g in grouped:
+                    if g[0] == src and g[1] == dst and g[2] == reason:
+                        g[3].append(attr[0] if attr[0] == attr[1] else "{0}->{1}".format(*attr))
+                        break
+                else:
+                    grouped.append([src, dst, reason,
+                                    [attr[0] if attr[0] == attr[1] else "{0}->{1}".format(*attr)]])
+            for src, dst, reason, attrs in grouped:
+                self.log("       [skip] {0} -> {1} : {2} ({3}) : {4}".format(
+                    src, dst, reason, len(attrs), ", ".join(attrs)))
 
         self._run("Connect by Rule '{0}'".format(rule.name), _do)
 

@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-22 (오늘)
 
+> [!summary] A00145_RigConnect — **Connect by Rule 겹치는 이름 보호 + 스킵 사유 로그 · 레퍼런스 간 연결 실측** (v01.63->01.64) `#A00145_RigConnect`
+- 요청: 중복 이름 케이스 문제 해결 + 레퍼런스로 불러온 노드끼리 규칙 연결이 되는지 조사.
+- 문제: `connectAttr` 는 짧은 이름이 겹쳐도(`grp1|A:dup` · `grp2|A:dup` 를 `A:dup`) 에러 없이 첫 노드에 붙어 성공으로 셌다. 수정: 행마다 `resolve_node`(`ls -long`) 로 하나로 확정, 없음 · 겹침이면 **행 통째 스킵**, 확정된 긴 이름으로 연결. `on_skip(src, dst, attr, reason)` 콜백으로 사유 전달, UI 는 행 단위 한 줄 + attr 단위는 같은 행 · 사유를 묶어 한 줄(`no such attribute on Source (19) : Oh, Uh, ...`). 반환값은 그대로.
+- 레퍼런스 조사(mayapy 2024): 레퍼런스 → 레퍼런스(다른 파일 · 같은 파일 두 번) · 중첩 레퍼런스(`OUT:SUB:node`) → 레퍼런스 전부 22/22, **저장 후 재오픈 유지**(`referenceQuery -editStrings` 에 connectAttr 편집), 언로드된 레퍼런스는 행 스킵 — 된다.
+- 검증: 코어 10항목(겹침 행 스킵 · 긴 경로 행 연결 · 행/attr 사유 · 레퍼런스 6) + 이전 16항목 회귀 + UI 1(오프스크린 mayapy, 로그 줄). 마야 GUI 미확인.
+
 > [!summary] A00145_RigConnect — **Connect by Rule: 어트리뷰트가 일부 없어도 끝까지 연결되는지 확인** (코드 변경 없음) `#A00145_RigConnect`
 - 요청: 규칙 연결 도중 어트리뷰트가 일부 없어도 있는 것은 전부 연결되고 코드가 중단되지 않는지 확인, 중단되면 고칠 것.
 - `connect_by_rule` 은 짝마다 `connectAttr -force` 를 try/except 로 감싸 실패를 skipped 로 세고 계속 간다 → **중단 없음, 고칠 것 없음**.

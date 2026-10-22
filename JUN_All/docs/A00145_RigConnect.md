@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.63` (`app/config/version.py`) — Connect by Rule 두 번째 규칙 **`JALI 22 Viseme`**(§Connect by Rule). v01.62 — Constrain > Constraint 에 **`All Targets -> Each Follower`** 옵션(follower 마다 Targets **전부**를 타깃으로 갖는 constraint 하나, §Constraint)
+- 버전: `v01.64` (`app/config/version.py`) — Connect by Rule **겹치는 이름 보호 + 스킵 사유 로그**(§Connect by Rule). v01.63 — Connect by Rule 두 번째 규칙 **`JALI 22 Viseme`**(§Connect by Rule). v01.62 — Constrain > Constraint 에 **`All Targets -> Each Follower`** 옵션(follower 마다 Targets **전부**를 타깃으로 갖는 constraint 하나, §Constraint)
   · v01.57 은 Constrain 의 **Constraint · Skin Weight 하위 탭을 하나로**(모드 `Default` / `Skin Weight`), Transfer 에 모드 **`Copy`** — constraint 의 성질을 읽어 다른 오브젝트에 똑같이 건다, 원본 유지(§Transfer) · v01.56 은 Attribute > Set Value 에 **`Include Non-Common`**: 일부 오브젝트만 가진 어트리뷰트도 나열, 행마다 **`[k/n]`**(§Set Value) · v01.55 는 창 기본 높이 900 → **980**(Match 탭이 스크롤 없이 다 보이게) · v01.54 는 리스트의 **`(Null)` 자리표시를 빨간 글씨로**(공용 TSL, 아래 메모) · v01.53 은 Match 에 **`Keep Children in Place`**(기본 OFF):
   팔로워만 움직이고 **그 아래 오브젝트는 있던 월드 자리에 그대로** 둔다. Mirror 탭의 같은 이름
   체크박스와 **같은 코어**(`app/core/keep_children.py`)를 쓴다 (§Match)
@@ -824,6 +824,20 @@ Constrain 탭과 같은 방식이다(§Constrain 참고) — 짧은 라벨 + 툴
     `Jaw` `Lip`(JA-LI 축) + 비즘 20 `Ah Aa Eh Ee Ih Oh Uh U Eu Schwa R S ShChZh Th JY LNTD GK MBP FV W`.
     JALI 입력 허브 → 리그 컨트롤처럼 **같은 22개를 가진 두 노드**를 잇는다(없는 attr 은 스킵).
     mayapy 검증: 22/22 연결, 한쪽에 attr 이 하나 없으면 21 + skipped 1.
+  - **중단 없음 · 있는 것은 전부 연결** (2026-10-22 실측): 짝마다 따로 시도하므로 어느 한쪽에 attr 이 없거나, 잠겨 있거나,
+    타입이 안 맞거나, 행의 오브젝트가 없어도 **그 짝 · 그 행만 건너뛰고** 나머지는 전부 연결된다. 네임스페이스는 1중 · 2중 ·
+    3중 · 레퍼런스(`REF:A:B:node`) 모두 그대로 통과한다.
+  - **레퍼런스 간 연결도 된다**: 레퍼런스 → 레퍼런스(다른 파일 · 같은 파일 두 번), 중첩 레퍼런스(`OUT:SUB:node`) → 레퍼런스 모두
+    연결되고, 저장 뒤 다시 열어도 **레퍼런스 편집(connectAttr edit)** 으로 남는다. 언로드된 레퍼런스 노드는 "없는 오브젝트"
+    로 그 행만 스킵.
+  - **겹치는 이름 보호 (v01.64)**: 마야의 `connectAttr` 는 짧은 이름이 여러 노드에 해당해도(`grp1|A:dup` · `grp2|A:dup` 를
+    `A:dup` 로) **에러 없이 첫 노드에 붙는다**. 그래서 행마다 이름을 `ls` 로 확정해(`connect_rules.resolve_node`) 정확히 하나가
+    아니면(없음 · 겹침) **그 행을 통째로 건너뛰고** 긴 이름으로 연결한다. 목록은 선택 시 `ls` 의 최단 유일 이름(`grp2|A:dup`)을
+    담으므로 보통은 걸리지 않고, 담은 뒤 리네임 · 복제로 겹치게 됐을 때 잡힌다.
+  - **스킵 사유 로그 (v01.64)**: 건너뛴 것은 로그에 사유와 함께 남는다 — 행 단위는
+    `[skip] A:dup -> X:t (whole row) : Source 'A:dup': ambiguous name, 2 objects match: ...`, attr 단위는 같은 행 · 같은 사유를
+    한 줄로 묶어 `[skip] X:s -> X:t2 : no such attribute on Source (19) : Oh, Uh, ...`. 사유: `object not found` ·
+    `ambiguous name` · `no such attribute on Source / Destination` · 마야 메시지(`... is locked and cannot be connected.` 등).
   - 새 규칙은 json 을 폴더에 더하고 `Reload` — 코드는 손대지 않는다. 콤보 툴팁에 설명 · 짝 수 · 파일 경로가 보인다.
     깨진 파일은 `[WARN]` 으로 알리고 건너뛴다.
 

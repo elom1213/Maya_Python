@@ -1,6 +1,12 @@
 # -*- coding: utf-8 -*-
 # A00145_RigConnect - version info
 
+# 01.64  Connect > Connect by Rule : a row whose object name does not resolve to exactly one
+#        node (missing, or a duplicate leaf name like grp1|A:dup / grp2|A:dup given as 'A:dup')
+#        is skipped as a whole - connectAttr would otherwise silently connect the FIRST
+#        match. Resolved nodes are connected by long name. Every skip is logged with its
+#        reason (row: not found / ambiguous; attribute: missing on Source / Destination,
+#        locked, type mismatch ...), grouped per row and reason.
 # 01.63  Connect > Connect by Rule : second rule `JALI 22 Viseme` (app/rules/connect/
 #        jali_22_viseme.json) - Jaw, Lip + 20 visemes connected by the same name, Source ->
 #        Destination. Data only, no code change.
@@ -85,5 +91,5 @@
 #        Off keeps the old pairing (one target = broadcast, otherwise row to row).
 #        Disabled in Matrix Constraint mode.
 
-VERSION = "01.63"
+VERSION = "01.64"
 LAST_UPDATE = "2026-10-22"

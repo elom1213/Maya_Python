@@ -225,10 +225,51 @@ def delete_rules(rules, rules_dir=None):
     return deleted, failed
 
 
-def connect_by_rule(src_objs, dst_objs, rule):
+def resolve_node(name):
+    """이름 하나를 씬의 노드 **하나**로 확정한다. (긴 이름, 실패 사유) 반환.
+
+    `cmds.connectAttr` 은 짧은 이름이 여러 노드에 해당해도(`grp1|A:dup` · `grp2|A:dup` 를 `A:dup` 로)
+    **에러 없이 첫 노드에 붙는다**(Maya 2024 실측). 이름으로 잇는 규칙 연결에서는 엉뚱한 노드에 붙고도
+    성공으로 세게 되므로, 연결 전에 이름이 정확히 하나로 해석되는지 보고 아니면 그 행을 건너뛴다.
+    네임스페이스(`A:B:C:node`) · 레퍼런스(`REF:node`) · 긴 경로(`|grp|node`)는 그대로 통과한다.
+    """
+    import maya.cmds as cmds
+
+    name = str(name or "").strip()
+    if not name:
+        return None, "empty name"
+    try:
+        found = cmds.ls(name, long=True) or []
+    except Exception as e:  # noqa: BLE001 - 잘못된 이름 문자열
+        return None, "invalid name ({0})".format(e)
+    if not found:
+        return None, "object not found"
+    if len(found) > 1:
+        return None, "ambiguous name, {0} objects match: {1}".format(
+            len(found), ", ".join(found))
+    return found[0], ""
+
+
+def _skip_reason(cmds, src_plug, dst_plug, exc):
+    """connectAttr 실패 사유를 사람이 읽을 한 줄로."""
+    if not cmds.objExists(src_plug):
+        return "no such attribute on Source"
+    if not cmds.objExists(dst_plug):
+        return "no such attribute on Destination"
+    msg = str(exc).strip().splitlines()
+    return msg[-1] if msg else "connectAttr failed"
+
+
+def connect_by_rule(src_objs, dst_objs, rule, on_skip=None):
     """규칙의 어트리뷰트 짝을 src -> dst 로 일괄 연결.
 
     오브젝트는 행 순서대로 1:1 (짧은 쪽 길이만큼). 어느 한쪽에 없는 어트리뷰트는 건너뛴다.
+    한 짝이 실패해도 멈추지 않는다 — 다음 짝 · 다음 행을 계속 처리한다.
+
+    v01.64: 행의 오브젝트 이름이 씬에서 **하나로 확정되지 않으면**(없음 · 겹치는 잎 이름) 그 행의 짝을
+    전부 건너뛴다(`resolve_node`). 확정된 긴 이름으로 연결하므로 같은 잎 이름이 있어도 엉뚱한 노드에
+    붙지 않는다. `on_skip(src, dst, attr, reason)` 콜백을 주면 건너뛴 짝마다 사유를 알린다
+    (행 단위 스킵은 attr=None 로 한 번).
 
     Returns:
         (connected_count, skipped_count, object_pairs)
@@ -244,18 +285,38 @@ def connect_by_rule(src_objs, dst_objs, rule):
     connected = 0
     skipped = 0
 
-    for i in range(smaller):
-        src = src_objs[i]
-        dst = dst_objs[i]
-        for src_attr, dst_attr in rule.pairs:
+    def _notify(src, dst, attr, reason):
+        if on_skip is not None:
             try:
-                cmds.connectAttr(
-                    "{0}.{1}".format(src, src_attr),
-                    "{0}.{1}".format(dst, dst_attr),
-                    force=True)
+                on_skip(src, dst, attr, reason)
+            except Exception:  # noqa: BLE001 - 콜백 오류가 연결을 막지 않게
+                pass
+
+    for i in range(smaller):
+        src_name = src_objs[i]
+        dst_name = dst_objs[i]
+        src, why_src = resolve_node(src_name)
+        dst, why_dst = resolve_node(dst_name)
+        if src is None or dst is None:
+            skipped += len(rule.pairs)
+            why = []
+            if src is None:
+                why.append("Source '{0}': {1}".format(src_name, why_src))
+            if dst is None:
+                why.append("Destination '{0}': {1}".format(dst_name, why_dst))
+            _notify(src_name, dst_name, None, "; ".join(why))
+            continue
+
+        for src_attr, dst_attr in rule.pairs:
+            src_plug = "{0}.{1}".format(src, src_attr)
+            dst_plug = "{0}.{1}".format(dst, dst_attr)
+            try:
+                cmds.connectAttr(src_plug, dst_plug, force=True)
                 connected += 1
-            except Exception:
-                # 소스/타겟에 해당 어트리뷰트가 없으면 스킵 (MEL catch 동작).
+            except Exception as e:  # noqa: BLE001
+                # 없는 attr · 잠김 · 타입 불일치 등 - 그 짝만 스킵하고 계속 (MEL catch 동작).
                 skipped += 1
+                _notify(src_name, dst_name, (src_attr, dst_attr),
+                        _skip_reason(cmds, src_plug, dst_plug, e))
 
     return connected, skipped, smaller

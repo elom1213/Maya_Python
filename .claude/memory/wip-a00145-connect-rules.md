@@ -46,3 +46,9 @@ JUN_JALI 의 angela 리그(`AHH AAA IEE …`)와 **다른 철자 체계**다 —
 **2026-10-22 실측 — 부분 연결은 안전하다**: `connect_by_rule` 은 짝마다 try/except 라 없는 attr · 잠긴 dst · 타입 불일치 ·
 없는 오브젝트 행 · 자기 연결 모두 그 짝만 skipped 로 세고 나머지는 전부 연결(mayapy 16항목). 단 **skipped 는 사유를
 구분하지 않고 로그에 attr 이름이 안 나온다** — 사용자가 "뭐가 안 붙었나" 를 물으면 그게 후속 작업.
+
+**v01.64 (2026-10-22)** — 겹치는 이름 보호 + 스킵 사유: `resolve_node(name)` → (긴 이름, 사유). 행의 src/dst 가 하나로 안 잡히면
+(없음 · `ambiguous name, N objects match`) **행 통째 스킵**, 아니면 긴 이름으로 `connectAttr -force`. `connect_by_rule(..., on_skip=cb)`
+콜백 `(src, dst, attr|None, reason)`; attr 사유는 `no such attribute on Source/Destination` 또는 마야 메시지 마지막 줄(잠김 · 타입).
+UI 는 행 단위 한 줄, attr 단위는 (행, 사유) 로 묶어 한 줄. **레퍼런스 ↔ 레퍼런스 · 중첩 레퍼런스 연결 OK, 저장 후 레퍼런스 편집으로 유지**
+(mayapy 실측). 관련: [[connectattr-ambiguous-short-name-silent]]

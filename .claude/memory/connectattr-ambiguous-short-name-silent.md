@@ -18,4 +18,4 @@ metadata:
 **How to apply:** 오브젝트 목록은 `cmds.ls(sl=True)` 가 주는 **최단 유일 이름**(`grp2|A:dup`)을 그대로 보관한다 — TSL 이 그렇게 한다.
 목록을 담은 뒤 리네임 · 복제로 이름이 겹치면 텍스트가 애매해질 수 있으니, 이름 문자열 대신 `tsl.get_all_nodes()`(UUID 해석)를
 쓰거나 연결 전에 `cmds.ls(name)` 가 1개인지 검사해 애매하면 스킵 + 로그가 안전하다([[wip-tsl-uuid-selection]], [[uuid-safe-rename-duplicate-names]]).
-관련: [[wip-a00145-connect-rules]]
+A00145 Connect by Rule 은 v01.64 에서 `resolve_node` 로 이렇게 막았다. 관련: [[wip-a00145-connect-rules]]
