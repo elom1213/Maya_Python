@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 # A00145_RigConnect - version info
 
+# 01.63  Connect > Connect by Rule : second rule `JALI 22 Viseme` (app/rules/connect/
+#        jali_22_viseme.json) - Jaw, Lip + 20 visemes connected by the same name, Source ->
+#        Destination. Data only, no code change.
 # 01.53  Match : "Keep Children in Place" checkbox (off by default) - the children of a
 #        follower stay at the world place they had before the Match, only the follower
 #        moves. Same core as the Mirror tab's checkbox (app/core/keep_children.py).
@@ -82,5 +85,5 @@
 #        Off keeps the old pairing (one target = broadcast, otherwise row to row).
 #        Disabled in Matrix Constraint mode.
 
-VERSION = "01.62"
-LAST_UPDATE = "2026-10-19"
+VERSION = "01.63"
+LAST_UPDATE = "2026-10-22"

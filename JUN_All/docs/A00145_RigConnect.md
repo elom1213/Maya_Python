@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.62` (`app/config/version.py`) — Constrain > Constraint 에 **`All Targets -> Each Follower`** 옵션(follower 마다 Targets **전부**를 타깃으로 갖는 constraint 하나, §Constraint)
+- 버전: `v01.63` (`app/config/version.py`) — Connect by Rule 두 번째 규칙 **`JALI 22 Viseme`**(§Connect by Rule). v01.62 — Constrain > Constraint 에 **`All Targets -> Each Follower`** 옵션(follower 마다 Targets **전부**를 타깃으로 갖는 constraint 하나, §Constraint)
   · v01.57 은 Constrain 의 **Constraint · Skin Weight 하위 탭을 하나로**(모드 `Default` / `Skin Weight`), Transfer 에 모드 **`Copy`** — constraint 의 성질을 읽어 다른 오브젝트에 똑같이 건다, 원본 유지(§Transfer) · v01.56 은 Attribute > Set Value 에 **`Include Non-Common`**: 일부 오브젝트만 가진 어트리뷰트도 나열, 행마다 **`[k/n]`**(§Set Value) · v01.55 는 창 기본 높이 900 → **980**(Match 탭이 스크롤 없이 다 보이게) · v01.54 는 리스트의 **`(Null)` 자리표시를 빨간 글씨로**(공용 TSL, 아래 메모) · v01.53 은 Match 에 **`Keep Children in Place`**(기본 OFF):
   팔로워만 움직이고 **그 아래 오브젝트는 있던 월드 자리에 그대로** 둔다. Mirror 탭의 같은 이름
   체크박스와 **같은 코어**(`app/core/keep_children.py`)를 쓴다 (§Match)
@@ -820,6 +820,10 @@ Constrain 탭과 같은 방식이다(§Constrain 참고) — 짧은 라벨 + 툴
   짧은 쪽 길이만큼) 로 일괄 연결하고 없는 attr 은 스킵한다. **Source → Destination 한 방향**이다.
   - 규칙 파일은 `app/rules/connect/<rule>.json`, **파일 하나 = 규칙 하나**. 첫 규칙은 `apple_arkit_52_facial.json`
     = `Apple ARKit 52 Facial Target` (예전 버튼과 같은 52개, 같은 동작).
+  - 두 번째 규칙 (v01.63) `jali_22_viseme.json` = **`JALI 22 Viseme`** — JALI 립싱크 어트리뷰트 22개를 같은 이름끼리:
+    `Jaw` `Lip`(JA-LI 축) + 비즘 20 `Ah Aa Eh Ee Ih Oh Uh U Eu Schwa R S ShChZh Th JY LNTD GK MBP FV W`.
+    JALI 입력 허브 → 리그 컨트롤처럼 **같은 22개를 가진 두 노드**를 잇는다(없는 attr 은 스킵).
+    mayapy 검증: 22/22 연결, 한쪽에 attr 이 하나 없으면 21 + skipped 1.
   - 새 규칙은 json 을 폴더에 더하고 `Reload` — 코드는 손대지 않는다. 콤보 툴팁에 설명 · 짝 수 · 파일 경로가 보인다.
     깨진 파일은 `[WARN]` 으로 알리고 건너뛴다.
 

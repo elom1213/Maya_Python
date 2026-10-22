@@ -37,3 +37,8 @@ downstream `[Source attr, node attr]` / upstream `[node attr, Source attr]` 중 
 알리고 안 건드린다(load_rules 가 ConnectRule 을 못 만들어 표에 못 올린다). 창 닫힌 뒤 `deleted_count()` 보고 콤보 재로드. 테스트는 `on_delete(confirm=False)`.
 
 관련: [[wip-a00145-transfer-connection]], [[wip-a00145-connect-both-directions]], [[wip-a00090-rule-versions]], [[qapplication-before-maya-standalone]]
+
+**v01.63 (2026-10-22)** — 두 번째 규칙 `jali_22_viseme.json` = **`JALI 22 Viseme`**: `Jaw` `Lip` + 비즘 20
+(`Ah Aa Eh Ee Ih Oh Uh U Eu Schwa R S ShChZh Th JY LNTD GK MBP FV W`), 사용자가 준 순서 그대로. 이 22개 이름은
+JUN_JALI 의 angela 리그(`AHH AAA IEE …`)와 **다른 철자 체계**다 — 리그마다 json 을 따로 두는 A00540 과 같은 사정.
+규칙 이름은 "<체계> <개수> <대상>" 꼴(ARKit 52 와 맞춤). 데이터만, mayapy 22/22 확인.

@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-22 (오늘)
 
+> [!summary] A00145_RigConnect — **Connect by Rule 규칙 `JALI 22 Viseme`** (v01.62->01.63, 데이터만) `#A00145_RigConnect`
+- 요청: Jaw · Lip + 비즘 20(Ah Aa Eh Ee Ih Oh Uh U Eu Schwa R S ShChZh Th JY LNTD GK MBP FV W)을 가진 두 노드를 같은 이름끼리 잇는 규칙, 이름은 JALI 또는 더 좋은 것.
+- `app/rules/connect/jali_22_viseme.json` — 이름 `JALI 22 Viseme`(개수를 이름에 넣어 ARKit 52 규칙과 같은 꼴). 코드 변경 없음, 콤보 `Reload` 로 뜬다.
+- 검증(mayapy 2024): 로더 errors 0 · 규칙 2개 · 22개 attr 노드 두 개 사이 22/22 연결 · 한쪽에 attr 하나 없는 노드는 21 + skipped 1. 마야 GUI 미확인.
+
 > [!summary] A00370_ToolLauncher — **프로파일 정리 반영** (v01.09->01.10, 데이터만) `#A00370_ToolLauncher`
 - 확정(사용자): 계획서 제안대로 · humanIK · CurveTool 은 RIG 만, SetTool 은 UTIL, MaterialTool 은 MESH · FACIAL/UTIL 신설 동의 · standalone 제외 · 색 입힘 · **기존 버튼 순서 유지, 추가만** · `Mesh` → `MESH`.
 - `data/profiles`: `Mesh.json` → `MESH.json`(git mv), `FACIAL.json` · `UTIL.json` 신설. 기존 버튼은 `Main` 에 그대로, 새 툴 22종은 뒤에 붙인 카테고리(RIG Control · Skin & Motion, ANIM Motion, MESH Edit, FACIAL Shape · Lip Sync, UTIL Select & Name · Scene · File). 버튼 13 → 38. 프로파일별 색(RIG 파랑 · ANIM 주황 · MESH 초록 · FACIAL 분홍 · UTIL 회색 · UE 보라). `A00430_DemBone` 아이콘 없어 svg/png 신규(icon builder, mayapy).
