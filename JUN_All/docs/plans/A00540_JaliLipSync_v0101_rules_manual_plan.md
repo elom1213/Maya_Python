@@ -3,7 +3,7 @@
 > **작성** 2026-10-22 · 상태: **S1~S7 완료 (2026-10-22) — S8 사용자 마야 GUI 확인 대기** · 대상 Maya 2024 · 이 문서만 보고 작업할 수 있게 쓴다.
 > 결과: `tests/run_all.py` 매핑 21 · 코어 22 · UI 18 · 실제 파일 18 전부 통과. 출력 세기 규칙(`output_max` 10 등)은 **만들지 않는다** — 사용자가 리그에서 직접(2026-10-22 결정, C8 보강).
 > 배경: JUN_JALI `docs/0090`(A0020 슬라이더 리그) 의 후속 S6. 새 리그의 입력 허브 `DUMMY_IN_*` 에 VisemeNet 키를 걸려면 툴이 `CNT_PHONEMES` 이름과 angela 단위(scale 10 · Jaw/Lip 0~15) 에 묶여 있는 것을 풀어야 한다.
-> 관련: `docs/A00540_JaliLipSync.md`(사용 안내) · JUN_JALI `docs/0090_jali_slider_ctl_plan.md` · `docs/0100_jali_dummy_out_attrs_guide.md` · 메모리 `wip-a00540-jalilipsync` · `wip-jali-slider-ctl`
+> 관련: `docs/A00540_JaliLipSync.md`(사용 안내) · JUN_JALI `docs/0090_jali_slider_ctl_plan.md` · `docs/0120_jali_dummy_out_attrs_guide.md` · 메모리 `wip-a00540-jalilipsync` · `wip-jali-slider-ctl`
 
 ---
 
@@ -185,7 +185,7 @@ JaLi  ( ) From data  JaLi scale [1.0]   ( ) Fixed  Jaw [0.60] Lip [0.60]
 | 헤더 주석 · 0090 §2 표 | "기본 위치 (0.6, 0.6) = 9, 9" | "DUMMY_IN_JALI 기본 0.6 = 9, 컨트롤러 휴식 0" |
 
 - 결과: `A0020_jali_slider_ctl.ma` 를 **다시 생성 · 검증** 후 덮어쓴다 (`mayapy build_jali_slider_ctl.py <경로>` → `--verify`). 박스의 십자는 전과 같은 자리(0.6)에 보인다.
-- 0090 계획서 §0-A 에 C7 한 줄, §9 S6 상태 갱신. 0100 안내 §0 의 "`DUMMY_OUT_JALI` 기본 9" 는 그대로 맞다.
+- 0090 계획서 §0-A 에 C7 한 줄, §9 S6 상태 갱신. 0120 안내 §0 의 "`DUMMY_OUT_JALI` 기본 9" 는 그대로 맞다.
 
 ---
 

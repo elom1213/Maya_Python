@@ -9,7 +9,7 @@ txt 는 짝 저장소 **`JUN_JALI`** 의 스탠드얼론 `VisemeNet Converter` �
 - **짝**: `JUN_JALI` (https://github.com/elom1213/JUN_JALI) — 설치 · 변환은 `JUN_JALI/docs/0050_converter_guide.md`,
   계획은 `0030_tool_plan.md`, JALI ↔ ARKit 매칭은 `0040_jali_arkit_mapping.md`
 - **대상 리그**: 매핑 json 하나 = 리그 하나 — `angela_JALI.ma` (JALI 논문 공개 리그, `CNT_JaLi` / `CNT_PHONEMES` / `CNT_COARTIC`) ·
-  `A0020_jali_slider_ctl.ma` (슬라이더 리그, `DUMMY_IN_JALI` / `DUMMY_IN_PHONEMES` / `DUMMY_IN_COARTIC`, JUN_JALI `docs/0090` · `0100`)
+  `A0020_jali_slider_ctl.ma` (슬라이더 리그, `DUMMY_IN_JALI` / `DUMMY_IN_PHONEMES` / `DUMMY_IN_COARTIC`, JUN_JALI `docs/0090` · `0120`)
 
 ---
 
