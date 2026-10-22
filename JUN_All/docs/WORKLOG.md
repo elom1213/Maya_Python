@@ -37,6 +37,7 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - `connect_by_rule` 은 짝마다 `connectAttr -force` 를 try/except 로 감싸 실패를 skipped 로 세고 계속 간다 → **중단 없음, 고칠 것 없음**.
 - 검증(mayapy 2024, JALI 22 · ARKit 52 두 규칙 × 8 = 16항목): Source 에 처음 · 가운데 · 끝 attr 없음 / Destination 에 절반 없음 / 양쪽에 서로 다른 것 없음 / Destination 잠김 / 타입 불일치(string) / 이미 연결됨(force 교체) / 여러 행 중 없는 오브젝트 행(그 행만 스킵, 다음 행 계속) / 자기 자신 연결 — 모두 나머지는 전부 연결.
 - 알아 둘 것: skipped 수는 "없는 attr" 과 "잠김 · 타입 불일치 · 없는 오브젝트" 를 구분하지 않고, 로그에 어느 attr 이 스킵됐는지는 안 나온다(원하면 후속).
+- 네임스페이스 질문(사용자): 1중 `A:` · 2중 `A:B:` · 3중 `A:B:C:` · 레퍼런스 `REF:A:B:`(소스 · 데스티네이션 양쪽) · 같은 잎 이름이 네임스페이스만 다른 경우 전부 연결 OK(mayapy 7항목). **함정**: 잎 이름이 겹치는 DAG 노드(`grp1|A:dup` · `grp2|A:dup`)를 짧은 이름 `A:dup` 로 주면 `connectAttr` 가 에러 없이 첫 노드에 붙는다 — 목록은 `ls` 의 최단 유일 이름이라 보통 안전, 담은 뒤 리네임 · 복제하면 애매해질 수 있음(메모리 `connectattr-ambiguous-short-name-silent`).
 
 > [!summary] A00145_RigConnect — **Connect by Rule 규칙 `JALI 22 Viseme`** (v01.62->01.63, 데이터만) `#A00145_RigConnect`
 - 요청: Jaw · Lip + 비즘 20(Ah Aa Eh Ee Ih Oh Uh U Eu Schwa R S ShChZh Th JY LNTD GK MBP FV W)을 가진 두 노드를 같은 이름끼리 잇는 규칙, 이름은 JALI 또는 더 좋은 것.
