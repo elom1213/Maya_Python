@@ -19,4 +19,6 @@ metadata:
 - 검증: mayapy 2024 코어 19 (레퍼런스 리그 `angela:` 포함) + 오프스크린 UI 15. **마야 GUI 드롭 설치 · 소리 재생은 사용자 확인 전.**
 - 테스트 함정: 비짐 배율 시험에서 "최댓값이 10 을 넘는다" 를 가정했다가 틀렸다(데이터 최댓값 < 1) — `keyer.sample()` 로 기대값을 계산할 것.
 
+- **v01.01 계획서** `JUN_All/docs/plans/A00540_JaliLipSync_v0101_rules_manual_plan.md` (2026-10-22, 착수 전): 매핑 json v2(`nodes` 역할표 · `viseme_scale` · `jali{scale,range,fixed_default}`), Target Auto/Manual(역할 3칸, 빈 역할 건너뜀), JaLi scale 스핀박스, 매핑 바꾸면 스핀박스 리셋, scale > attr max 경고, `tests/` 신설. A0020 리그는 `CNT_JaLi` 휴식 0 + `DUMMY_IN_JALI` 기본 0.6 으로. A00550 Solo 는 `DUMMY_OUT` 에서 안 됨(`settable_plug` 가 유틸리티 output 에서 멈춤) → 별도.
+
 관련: [[mayapy-headless-verify]], [[qapplication-before-maya-standalone]], [[new-tool-needs-icon]]
