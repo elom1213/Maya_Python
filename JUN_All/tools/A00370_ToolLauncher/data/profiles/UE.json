@@ -5,15 +5,18 @@
       "buttons": [
         {
           "name": "KWI_creator_V03",
-          "path": "tools/A00080_KWI_creator_V03"
+          "path": "tools/A00080_KWI_creator_V03",
+          "color": "#7a5bbf"
         },
         {
           "name": "ConstraintConverter",
-          "path": "tools/A00260_ConstraintConverter"
+          "path": "tools/A00260_ConstraintConverter",
+          "color": "#7a5bbf"
         },
         {
           "name": "ArrayCreator",
-          "path": "tools/A00350_ArrayCreator"
+          "path": "tools/A00350_ArrayCreator",
+          "color": "#7a5bbf"
         }
       ]
     }

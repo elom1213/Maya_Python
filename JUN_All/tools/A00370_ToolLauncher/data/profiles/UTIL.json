@@ -1,0 +1,69 @@
+{
+  "categories": [
+    {
+      "name": "Select & Name",
+      "buttons": [
+        {
+          "name": "NamingTool",
+          "path": "tools/A00330_NamingTool",
+          "color": "#6b7280"
+        },
+        {
+          "name": "SelectionTool",
+          "path": "tools/A00340_SelectionTool",
+          "color": "#6b7280"
+        },
+        {
+          "name": "SearchTool",
+          "path": "tools/A00310_SearchTool",
+          "color": "#6b7280"
+        },
+        {
+          "name": "SortTool",
+          "path": "tools/A00360_SortTool",
+          "color": "#6b7280"
+        },
+        {
+          "name": "SetTool",
+          "path": "tools/A00440_SetTool",
+          "color": "#6b7280"
+        }
+      ]
+    },
+    {
+      "name": "Scene",
+      "buttons": [
+        {
+          "name": "SceneMemo",
+          "path": "tools/A00250_SceneMemo",
+          "color": "#6b7280"
+        },
+        {
+          "name": "manipulatorTool",
+          "path": "tools/A00450_manipulatorTool",
+          "color": "#6b7280"
+        },
+        {
+          "name": "RefLineage",
+          "path": "tools/A00211_RefLineage",
+          "color": "#6b7280"
+        },
+        {
+          "name": "quickTool_V02",
+          "path": "tools/A00030_quickTool_V02",
+          "color": "#6b7280"
+        }
+      ]
+    },
+    {
+      "name": "File",
+      "buttons": [
+        {
+          "name": "FileTool",
+          "path": "tools/A00480_FileTool",
+          "color": "#6b7280"
+        }
+      ]
+    }
+  ]
+}

@@ -74,3 +74,8 @@ v01.08 (2026-10-22) — **검색(Filter)**: 버튼 영역 위, Controls 박스 �
 v01.09 (2026-10-22) — 메뉴 **`Profile > Show Profiles Folder`**(Help 왼쪽): `prefs.PROFILES_DIR` 을
 공용 `file_opener.open_path` 로 연다. A00550 `Library > Show Libraries Folder` 와 같은 패턴 — 사용자가
 "json 저장 경로를 탐색기로 팝업하는 메뉴" 를 툴마다 원한다(A00550 v01.02, A00370 v01.09). 마야 GUI 미확인.
+
+v01.10 (2026-10-22) — **프로파일 정리(데이터만)**: `Mesh` → `MESH`, `FACIAL` · `UTIL` 신설, 버튼 13 → 38, 프로파일별 색.
+사용자 원칙: **기존 버튼 순서는 절대 안 바꾸고 추가만** → 기존은 `Main` 그대로, 새 툴은 뒤에 붙인 새 카테고리.
+standalone 툴은 `__init__.py` 가 없어 등록 불가(제외 확정), dev 툴은 `tools` 앵커 없어 절대경로가 되므로 제외.
+계획서 `docs/plans/A00370_ToolLauncher_profile_classification_plan.md` §0-A. 마야 GUI 미확인.

@@ -5,19 +5,63 @@
       "buttons": [
         {
           "name": "jointTool_V03",
-          "path": "tools/A00060_jointTool_V03"
+          "path": "tools/A00060_jointTool_V03",
+          "color": "#3f6fb5"
         },
         {
           "name": "RigConnect",
-          "path": "tools/A00145_RigConnect"
+          "path": "tools/A00145_RigConnect",
+          "color": "#3f6fb5"
         },
         {
           "name": "driverTool",
-          "path": "tools/A00170_driverTool"
+          "path": "tools/A00170_driverTool",
+          "color": "#3f6fb5"
         },
         {
           "name": "SkinTool_V01",
-          "path": "tools/A00275_skinTool_V01"
+          "path": "tools/A00275_skinTool_V01",
+          "color": "#3f6fb5"
+        }
+      ]
+    },
+    {
+      "name": "Control",
+      "buttons": [
+        {
+          "name": "ControlRig_V02",
+          "path": "tools/A00130_ControlRig_V02",
+          "color": "#3f6fb5"
+        },
+        {
+          "name": "ControllerTool",
+          "path": "tools/A00460_ControllerTool",
+          "color": "#3f6fb5"
+        },
+        {
+          "name": "CurveTool",
+          "path": "tools/A00400_CurveTool",
+          "color": "#3f6fb5"
+        },
+        {
+          "name": "humanIKTool_V02",
+          "path": "tools/A00010_humanIKTool_V02",
+          "color": "#3f6fb5"
+        }
+      ]
+    },
+    {
+      "name": "Skin & Motion",
+      "buttons": [
+        {
+          "name": "DemBone",
+          "path": "tools/A00430_DemBone",
+          "color": "#3f6fb5"
+        },
+        {
+          "name": "SecondaryMotion",
+          "path": "tools/A00410_SecondaryMotion",
+          "color": "#3f6fb5"
         }
       ]
     }

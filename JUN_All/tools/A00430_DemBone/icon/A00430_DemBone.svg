@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- A00430_DemBone shelf icon: a bone (rigid bone decomposition) emerging from a vertex cloud -->
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+
+  <!-- vertex cloud (animated mesh samples) -->
+  <g fill="#3fc1c9">
+    <circle cx="7" cy="8" r="1.4"/>
+    <circle cx="11" cy="6.5" r="1.4"/>
+    <circle cx="6.5" cy="13" r="1.4"/>
+    <circle cx="25.5" cy="19" r="1.4"/>
+    <circle cx="24" cy="25" r="1.4"/>
+    <circle cx="19.5" cy="26" r="1.4"/>
+  </g>
+
+  <!-- bone: shaft with two knuckle ends, diagonal -->
+  <g stroke="#feca57" stroke-width="2.6" stroke-linecap="round" fill="none">
+    <line x1="11.5" y1="20.5" x2="20.5" y2="11.5"/>
+  </g>
+  <g fill="#feca57">
+    <circle cx="9.6" cy="19.2" r="2.4"/>
+    <circle cx="12.8" cy="22.4" r="2.4"/>
+    <circle cx="19.2" cy="9.6" r="2.4"/>
+    <circle cx="22.4" cy="12.8" r="2.4"/>
+  </g>
+
+  <!-- weight arrows: cloud -> bone (decomposition) -->
+  <g stroke="#5fd35f" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="9.5,10.5 13.5,14.5"/>
+    <polyline points="11.2,14.3 13.5,14.5 13.3,12.2"/>
+  </g>
+</svg>

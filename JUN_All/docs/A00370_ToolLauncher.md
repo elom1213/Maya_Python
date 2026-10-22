@@ -5,7 +5,7 @@
 `A00340_SelectionTool` 과 UI·기능(카테고리 / 프로파일 / 버튼 색)은 거의 같고, 버튼을
 누르면 **오브젝트 선택** 대신 **지정한 툴이 실행**되는 점만 다르다.
 
-- **버전**: v01.09 (2026-10-22 — 메뉴 `Profile > Show Profiles Folder`, 아래 7) · v01.08 (2026-10-22 — 버튼 영역 위 **검색(Filter)**, 아래 10). v01.07 (2026-09-22) 은 기본 프로파일의 버튼을 현행 툴로 정리("기본 프로파일").
+- **버전**: v01.10 (2026-10-22 — 프로파일 정리: `MESH` 이름 · `FACIAL` `UTIL` 신설 · 툴 22종 추가 · 프로파일별 색, 아래 8-1) · v01.09 (2026-10-22 — 메뉴 `Profile > Show Profiles Folder`, 아래 7) · v01.08 (2026-10-22 — 버튼 영역 위 **검색(Filter)**, 아래 10). v01.07 (2026-09-22) 은 기본 프로파일의 버튼을 현행 툴로 정리("기본 프로파일").
 - **아키텍처**: (B) Standalone/Qt 앱형 구조지만 마야 안에서 실행(PySide, `maya.cmds`).
 - **참고**: 프로파일/카테고리/색/레이아웃은 `A00340_SelectionTool` 을 이식.
   버튼 클릭이 툴을 실행하는 로직은 `app/core/tool_launcher.py`.
@@ -149,9 +149,29 @@ JUN_All 루트로 resolve 한다.
 > **계속 추적·공유**한다. PC별 상태인 `data/local_env.json`(루트 오버라이드)와
 > `data/active.json`(마지막 연 프로파일)은 **gitignore** 되어 추적하지 않는다.
 
-### 8-1) 기본으로 딸려 오는 프로파일 (2026-09-22 기준)
+### 8-1) 기본으로 딸려 오는 프로파일 (2026-10-22 기준, v01.10)
 
 프로파일은 git 으로 공유되므로 **저장소에 들어 있는 버튼 세트가 곧 모든 PC 의 기본값**이다.
+v01.10 에서 정리했다 — 계획서 [`plans/A00370_ToolLauncher_profile_classification_plan.md`](plans/A00370_ToolLauncher_profile_classification_plan.md).
+기존 버튼은 **카테고리 `Main` 에 원래 순서 그대로** 두고, 새 툴은 뒤에 붙인 새 카테고리에 넣었다.
+버튼 색은 프로파일마다 하나다.
+
+| 프로파일 | 색 | 카테고리 → 버튼 |
+|---|---|---|
+| `RIG` | 파랑 `#3f6fb5` | **Main** jointTool_V03 · RigConnect · driverTool · SkinTool_V01 / **Control** ControlRig_V02 · ControllerTool · CurveTool · humanIKTool_V02 / **Skin & Motion** DemBone · SecondaryMotion |
+| `ANIM` | 주황 `#c7762e` | **Main** AnimTool_V02 · FKIK / **Motion** SecondaryMotion · WindTool_V03 |
+| `MESH` (옛 `Mesh`) | 초록 `#3f9a5a` | **Main** MeshTool · uvTool_V02 · abSymMesh · BSTool_V02 / **Edit** Wrapper · MaterialTool |
+| `FACIAL` (신설) | 분홍 `#c25a86` | **Shape** BSTool_V02 · abSymMesh · correctiveFromCache / **Lip Sync** PoseMapper · JaliLipSync |
+| `UTIL` (신설) | 회색 `#6b7280` | **Select & Name** NamingTool · SelectionTool · SearchTool · SortTool · SetTool / **Scene** SceneMemo · manipulatorTool · RefLineage · quickTool_V02 / **File** FileTool |
+| `UE` | 보라 `#7a5bbf` | **Main** KWI_creator_V03 · ConstraintConverter · ArrayCreator |
+| `Default` | — | (비어 있음) |
+
+- 한 툴이 두 프로파일에 있는 것은 의도다(`SecondaryMotion` RIG · ANIM, `BSTool_V02` · `abSymMesh` MESH · FACIAL).
+- standalone 툴(FileManager · BackupTool · PathTool · StartupTool · KeyboardTool · ConnectionBuilder · jsonEditor_MH · ARKitCurveTool)은
+  `__init__.py` 가 없어 **등록할 수 없다** — `A00230_StartupTool` · `A00240_PathTool` 이 맡는다. dev 툴은 `tools` 앵커가 없어 제외.
+- 이전 PC 에서 `active.json` 이 `Mesh` 를 가리키고 있으면 첫 실행 때 목록의 첫 프로파일로 자동 보정된다(`prefs.get_active`).
+
+#### 2026-09-22 정리 (v01.07)
 
 | 프로파일 | 버튼 |
 |---|---|

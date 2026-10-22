@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-22 (오늘)
 
+> [!summary] A00370_ToolLauncher — **프로파일 정리 반영** (v01.09->01.10, 데이터만) `#A00370_ToolLauncher`
+- 확정(사용자): 계획서 제안대로 · humanIK · CurveTool 은 RIG 만, SetTool 은 UTIL, MaterialTool 은 MESH · FACIAL/UTIL 신설 동의 · standalone 제외 · 색 입힘 · **기존 버튼 순서 유지, 추가만** · `Mesh` → `MESH`.
+- `data/profiles`: `Mesh.json` → `MESH.json`(git mv), `FACIAL.json` · `UTIL.json` 신설. 기존 버튼은 `Main` 에 그대로, 새 툴 22종은 뒤에 붙인 카테고리(RIG Control · Skin & Motion, ANIM Motion, MESH Edit, FACIAL Shape · Lip Sync, UTIL Select & Name · Scene · File). 버튼 13 → 38. 프로파일별 색(RIG 파랑 · ANIM 주황 · MESH 초록 · FACIAL 분홍 · UTIL 회색 · UE 보라). `A00430_DemBone` 아이콘 없어 svg/png 신규(icon builder, mayapy).
+- 검증(헤드리스): 38개 전부 validate OK · 아이콘 · 중복 없음 · 경로 portable · 기존 13개 순서 HEAD 와 동일. 오프스크린 캡처로 색 · 아이콘 · 카테고리 확인. 마야 GUI 미확인. `active.json` 은 안 건드림.
+
 > [!summary] A00370_ToolLauncher — **프로파일 분류 · 미등록 툴 등록 계획서** (착수 전) `#A00370_ToolLauncher`
 - 요청: `data/profiles` 의 기존 분류(ANIM · Mesh · RIG · UE)를 참고해, 자주 쓰는 툴 중 버튼이 없는 툴을 등록하는 작업의 계획서.
 - `docs/plans/A00370_ToolLauncher_profile_classification_plan.md` — 현황(등록 13, 카테고리는 전부 Main), 분류 축(D1 `FACIAL` · `UTIL` 신설 · D2 카테고리 2~3개 · D3 중복 등록 허용), 후보 25종을 프로파일별 표로(활동량 = 커밋 수, 사용 빈도 아님), 제외(구버전 · 템플릿 · **standalone 은 `__init__.py` 가 없어 등록 불가** · dev 툴은 `tools` 앵커 없어 절대경로로 저장됨), 절차 S1~S5(json 만, 코드 변경 없음), 확인 질문 Q1~Q5.

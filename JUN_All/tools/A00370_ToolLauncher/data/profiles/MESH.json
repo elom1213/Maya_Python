@@ -1,0 +1,44 @@
+{
+  "categories": [
+    {
+      "name": "Main",
+      "buttons": [
+        {
+          "name": "MeshTool",
+          "path": "tools/A00380_MeshTool",
+          "color": "#3f9a5a"
+        },
+        {
+          "name": "uvTool_V02",
+          "path": "tools/A00050_uvTool_V02",
+          "color": "#3f9a5a"
+        },
+        {
+          "name": "abSymMesh",
+          "path": "tools/A00180_abSymMesh",
+          "color": "#3f9a5a"
+        },
+        {
+          "name": "BSTool_V02",
+          "path": "tools/A00290_BSTool_V02",
+          "color": "#3f9a5a"
+        }
+      ]
+    },
+    {
+      "name": "Edit",
+      "buttons": [
+        {
+          "name": "Wrapper",
+          "path": "tools/A00420_Wrapper",
+          "color": "#3f9a5a"
+        },
+        {
+          "name": "MaterialTool",
+          "path": "tools/A00470_MaterialTool",
+          "color": "#3f9a5a"
+        }
+      ]
+    }
+  ]
+}

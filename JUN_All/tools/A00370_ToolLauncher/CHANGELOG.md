@@ -2,6 +2,22 @@
 
 All notable changes to this tool are documented here.
 
+## v01.10 — 2026-10-22
+
+- **Profiles reorganised (data only, no code change).** Plan:
+  `docs/plans/A00370_ToolLauncher_profile_classification_plan.md`.
+  - `Mesh` renamed to **`MESH`** (file `data/profiles/MESH.json`).
+  - New profiles **`FACIAL`** (Shape · Lip Sync) and **`UTIL`** (Select & Name · Scene · File).
+  - Existing buttons keep their category (`Main`) and order; new tools go into **new categories
+    appended after `Main`** - RIG `Control` · `Skin & Motion`, ANIM `Motion`, MESH `Edit`.
+    Buttons: 13 -> **38** (22 tools added, `SecondaryMotion` · `BSTool_V02` · `abSymMesh` listed in two
+    profiles on purpose).
+  - **Every button is coloured per profile**: RIG `#3f6fb5` · ANIM `#c7762e` · MESH `#3f9a5a` ·
+    FACIAL `#c25a86` · UTIL `#6b7280` · UE `#7a5bbf`.
+  - `A00430_DemBone` had no icon; `icon/A00430_DemBone.svg/.png` added (icon builder).
+  - Verified headless: all 38 buttons `validate` OK, icon found, no duplicate path inside a profile,
+    paths portable (`tools/...`), the 13 old buttons keep their order. Not yet checked inside Maya.
+
 ## v01.09 — 2026-10-22
 
 - **Menu `Profile > Show Profiles Folder`.** New `Profile` menu left of `Help`. The item

@@ -1,0 +1,39 @@
+{
+  "categories": [
+    {
+      "name": "Shape",
+      "buttons": [
+        {
+          "name": "BSTool_V02",
+          "path": "tools/A00290_BSTool_V02",
+          "color": "#c25a86"
+        },
+        {
+          "name": "abSymMesh",
+          "path": "tools/A00180_abSymMesh",
+          "color": "#c25a86"
+        },
+        {
+          "name": "correctiveFromCache",
+          "path": "tools/A00280_correctiveFromCache",
+          "color": "#c25a86"
+        }
+      ]
+    },
+    {
+      "name": "Lip Sync",
+      "buttons": [
+        {
+          "name": "PoseMapper",
+          "path": "tools/A00550_PoseMapper",
+          "color": "#c25a86"
+        },
+        {
+          "name": "JaliLipSync",
+          "path": "tools/A00540_JaliLipSync",
+          "color": "#c25a86"
+        }
+      ]
+    }
+  ]
+}

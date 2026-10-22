@@ -2,6 +2,9 @@
 # last Update date : 2026-10-22
 # A00370_ToolLauncher - version info
 
+# 01.10  프로파일 정리(데이터만, 코드 변경 없음): Mesh -> MESH 이름 변경, FACIAL · UTIL 신설,
+#        기존 버튼 순서 그대로 두고 새 카테고리에 툴 22종 추가(버튼 13 -> 38), 프로파일별 버튼 색.
+#        계획서 docs/plans/A00370_ToolLauncher_profile_classification_plan.md
 # 01.09  메뉴 Profile > Show Profiles Folder - 프로파일 json 폴더(data/profiles)를 탐색기로.
 # 01.08  버튼 영역 위에 검색(Filter) 줄 - 공용 JUN_mod_filter_qt_v01(rows_provider).
 #        버튼 이름 · 카테고리 이름 · 툴 폴더명으로 걸러 맞는 버튼만 남기고, 남은 버튼이
@@ -11,5 +14,5 @@
 #        meshDoctor(A00380 의 MeshDoctor 탭으로 이식됨)는 삭제, uvTool / BSTool /
 #        AnimTool / jointTool 은 현행 버전 폴더로 교체. 코드 변경은 없다(data/profiles).
 
-VERSION = "01.09"
+VERSION = "01.10"
 LAST_UPDATE = "2026-10-22"

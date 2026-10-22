@@ -5,11 +5,28 @@
       "buttons": [
         {
           "name": "AnimTool_V02",
-          "path": "tools/A00110_animTool_V02"
+          "path": "tools/A00110_animTool_V02",
+          "color": "#c7762e"
         },
         {
           "name": "FKIK",
-          "path": "tools/A00120_FKIK"
+          "path": "tools/A00120_FKIK",
+          "color": "#c7762e"
+        }
+      ]
+    },
+    {
+      "name": "Motion",
+      "buttons": [
+        {
+          "name": "SecondaryMotion",
+          "path": "tools/A00410_SecondaryMotion",
+          "color": "#c7762e"
+        },
+        {
+          "name": "WindTool_V03",
+          "path": "tools/A00390_WindTool_V03",
+          "color": "#c7762e"
         }
       ]
     }
