@@ -1,7 +1,7 @@
 {
   "format": "jun.posemap/1",
   "name": "jali_arkit_0040_default",
-  "description": "JALI phonemes -> ARKit 52 starting weights from JUN_JALI docs/0040 (measured on angela_JALI.ma at phoneme 10, CNT_JaLi 9/9). tongueOut 0.30 is a placeholder.",
+  "description": "",
   "ref_value": 10.0,
   "clamp": true,
   "source_attrs": [
@@ -13,16 +13,16 @@
     "UUU",
     "WWW",
     "RRR",
-    "SSS",
-    "SSH",
     "FFF",
     "TTH",
     "MBP",
     "Schwa",
     "LNTD",
     "GK",
-    "WA_PEDAL",
-    "YA_PEDAL"
+    "SSS",
+    "SSH",
+    "YA_PEDAL",
+    "WA_PEDAL"
   ],
   "poses": {
     "AHH": {
@@ -84,21 +84,6 @@
       "mouthPucker": 0.27,
       "mouthFunnel": 0.42
     },
-    "SSS": {
-      "mouthLowerDownLeft": 0.66,
-      "mouthLowerDownRight": 0.66,
-      "mouthFunnel": 0.09
-    },
-    "SSH": {
-      "mouthLowerDownLeft": 0.25,
-      "mouthLowerDownRight": 0.25,
-      "mouthStretchLeft": 0.11,
-      "mouthStretchRight": 0.11,
-      "mouthUpperUpLeft": 0.24,
-      "mouthUpperUpRight": 0.24,
-      "mouthPucker": 0.29,
-      "mouthFunnel": 0.44
-    },
     "FFF": {
       "jawOpen": 0.11,
       "mouthDimpleLeft": 0.56,
@@ -110,7 +95,6 @@
     },
     "TTH": {
       "jawOpen": 0.13,
-      "tongueOut": 0.3,
       "mouthDimpleLeft": 0.54,
       "mouthDimpleRight": 0.54,
       "mouthUpperUpLeft": 0.25,
@@ -133,8 +117,20 @@
     "GK": {
       "jawOpen": 0.3
     },
-    "WA_PEDAL": {
-      "mouthPucker": 0.48
+    "SSS": {
+      "mouthLowerDownLeft": 0.66,
+      "mouthLowerDownRight": 0.66,
+      "mouthFunnel": 0.09
+    },
+    "SSH": {
+      "mouthLowerDownLeft": 0.25,
+      "mouthLowerDownRight": 0.25,
+      "mouthStretchLeft": 0.11,
+      "mouthStretchRight": 0.11,
+      "mouthUpperUpLeft": 0.24,
+      "mouthUpperUpRight": 0.24,
+      "mouthPucker": 0.29,
+      "mouthFunnel": 0.44
     },
     "YA_PEDAL": {
       "mouthDimpleLeft": 0.27,
@@ -143,6 +139,16 @@
       "mouthStretchRight": 0.37,
       "mouthSmileLeft": 0.12,
       "mouthSmileRight": 0.12
+    },
+    "WA_PEDAL": {
+      "mouthPucker": 0.48
     }
+  },
+  "jali": {
+    "jaw_attr": "translateX",
+    "lip_attr": "translateY",
+    "neutral": 9.0,
+    "axis": {},
+    "strength": {}
   }
 }
