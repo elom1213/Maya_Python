@@ -1,6 +1,6 @@
 ---
 name: wip-jali-slider-ctl
-description: "JALI 슬라이더 컨트롤러 리그 A0020_jali_slider_ctl.ma (2026-10-22) — angela 어트리뷰트 1:1 슬라이더 22 + JaLi 박스, output_min/max 리맵(remapValue), DUMMY_IN/OUT 3쌍, global_scale. 생성·검증은 JUN_JALI examples/build_jali_slider_ctl.py. 실측: textCurves 는 mayapy 에서 된다, remapValue 는 입력을 클램프"
+description: "JALI 슬라이더 컨트롤러 리그 A0020_jali_slider_ctl.ma (2026-10-22) — angela 어트리뷰트 1:1 슬라이더 22 + JaLi 박스, output_min/max 리맵(remapValue), DUMMY_IN/OUT 3쌍, global_scale. 생성·검증은 JUN_JALI examples/build_jali_slider_ctl.py (--direct 로 drv 없이 DUMMY_IN→CTL.ty 직결 버전 _direct.ma + bake_ctl_keys). 실측: textCurves 는 mayapy 에서 된다, remapValue 는 입력을 클램프, standalone 은 setKeyframe 뒤 하류 갱신에 dgdirty 필요"
 metadata:
   node_type: memory
   type: project
@@ -9,7 +9,11 @@ metadata:
 ---
 
 `C:\Users\USER\Desktop\JP\0035_maya_src_rig\02_Cage_JALI\A0020_jali_slider_ctl.ma` (2026-10-22, Maya 2024). 계획서 JUN_JALI `docs/0090_jali_slider_ctl_plan.md`
-(§0-A 확정표 · §0-B 실측). 생성 · 검증 = JUN_JALI `examples/build_jali_slider_ctl.py` (`mayapy … <out.ma>` / `--verify <out.ma>` T1~T6 301항목).
+(§0-A 확정표 · §0-B 실측). 생성 · 검증 = JUN_JALI `examples/build_jali_slider_ctl.py` (`mayapy … <out.ma>` / `--verify <out.ma>` T1~T6 305항목).
+- **direct 버전 (2026-10-22, 0090 §0-A C8)**: `A0020_jali_slider_ctl_direct.ma` = 같은 스크립트 `--direct`. `_drv` · `pma_*` 없이
+  `DUMMY_IN.X → CTL_<tag>.ty → rv → gs → DUMMY_OUT` (JaLi 는 `CNT_JaLi.tx/ty` 직결, 휴식 위치가 0.6 으로 보인다). 컨트롤러 ty 가 연결 상태라
+  손 조작 불가 → `bake_ctl_keys(nodes=None, mode='copy'|'bake')` 로 베이크하면 DUMMY_IN 의 animCurve 가 **통째로 복사**돼 컨트롤러에 남고
+  DUMMY_OUT 은 컨트롤러를 따라간다 (`--verify --direct` 473 항목, T7 베이크). 사용자가 drv 합산 버전 대신 이걸 요청한 이유: "컨트롤러를 베이크하면 키가 컨트롤러에 그대로 남게".
 A0010(`jali_arkit_mapping_ctl.ma`) 의 채널박스 전용 `CNT_PHONEMES/COARTIC` 를 뷰포트 슬라이더로 바꾼 것. **사용자 GUI 확인(S5) 아직.**
 
 - 구조: `JALI_SLIDER_RIG`(`global_scale`) > `JALI_CTL_GRP`(`PH_<attr>_grp` 16 · `CO_<attr>_grp` 6 · `JALI_box_grp`/`CNT_JaLi`) + `JALI_DUMMY_GRP`
