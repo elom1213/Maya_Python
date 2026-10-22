@@ -2,6 +2,13 @@
 
 All notable changes to this tool are documented here.
 
+## v01.09 — 2026-10-22
+
+- **Menu `Profile > Show Profiles Folder`.** New `Profile` menu left of `Help`. The item
+  opens the folder that holds the profile JSON files (`data/profiles/*.json`) in File
+  Explorer (creating it if missing) and writes the path to the Log. Same shape as
+  `A00550_PoseMapper`'s `Library > Show Libraries Folder`. `main_window.py` only.
+
 ## v01.08 — 2026-10-22
 
 - **Search (Filter).** A `Filter` row sits right above the button area (outside the

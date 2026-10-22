@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-22 (오늘)
 
+> [!summary] A00370_ToolLauncher — **메뉴 `Profile > Show Profiles Folder`** (v01.08->01.09) `#A00370_ToolLauncher`
+- 요청: 프로파일 json 저장 경로를 탐색기로 팝업하는 메뉴 문구.
+- 메뉴 바에 `Profile` 메뉴(Help 왼쪽) → `data/profiles/` 를 공용 `file_opener.open_path` 로 연다(없으면 만든다), 로그에 경로. A00550 `Library > Show Libraries Folder` 와 같은 모양, `main_window.py` 만.
+- 검증(오프스크린 PySide6, open_path 가짜로 바꿔): 메뉴 순서 Profile · Help · 항목 문구 · 넘어간 경로 = `PROFILES_DIR` · 로그 · 실패 시 `[ERROR]`. 실제 탐색기 팝업은 마야 GUI 미확인.
+
 > [!summary] A00370_ToolLauncher — **검색(Filter) 추가** (v01.07->01.08) `#A00370_ToolLauncher`
 - 요청: 필터로 툴 버튼을 검색할 수 있게.
 - 버튼 영역 바로 위(Controls 박스 밖, 접어도 보임)에 공용 `JUN_mod_filter_qt_v01` 을 **rows_provider** 모드로 — 버튼 영역이 QListWidget 이 아니라 행 위젯 더미라서. 찾는 글자는 버튼 이름 + 카테고리 이름 + 툴 폴더명(`A00080` 으로도 찾힘), 부분 일치 · 대소문자 무시 · 여러 단어 AND. **남은 버튼이 없는 카테고리는 통째로 숨김**(`filtered` 시그널), `Number: n / N`.

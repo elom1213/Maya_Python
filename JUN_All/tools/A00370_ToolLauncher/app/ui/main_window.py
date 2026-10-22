@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-08
+# last Update date : 2026-10-22
 # A00370_ToolLauncher - Qt UI (in-Maya)
 #
 # 자주 쓰는 JUN 툴들을 버튼 하나로 팝업시키는 숏컷 런처.
@@ -11,7 +11,10 @@
 #   - 화면은 상하 스플리터로 [컨트롤(Profile/Create/Color/Log)] / [버튼 모음] 분리.
 #     컨트롤 4칸은 하나의 접이식 'Controls' 박스로 묶여 한 번에 접힌다. 로그창도
 #     그 안에 들어가므로 log_view 를 탭에 넘겨준다.
+#   - 메뉴 바: Profile > Show Profiles Folder (프로파일 json 폴더를 탐색기로, v01.09) · Help.
 # 창은 마야 메인 윈도우에 parent 되어 뷰포트 위에 뜬다. 모든 UI 문자열/로그는 영어.
+
+import os
 
 from Framework.qt.qt import (
     QWidget,
@@ -24,11 +27,13 @@ from Framework.qt.qt import (
     QPushButton,
     Qt,
 )
+from Framework.core import file_opener
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 
 from tools.A00370_ToolLauncher.app.config.version import VERSION, LAST_UPDATE
+from tools.A00370_ToolLauncher.app.core import prefs as prefs_mod
 from tools.A00370_ToolLauncher.app.ui.launcher_tab import LauncherTab
 
 
@@ -55,6 +60,14 @@ class MainWindow(QWidget):
         # 상단 헤더 행 : 메뉴 바(좌) + Always on Top 토글(우)
         # 코너 위젯 대신 QHBoxLayout 으로 배치해 토글 시 위치/크기가 고정되도록 한다.
         self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
+        # Profile 메뉴(Help 왼쪽): 프로파일 json 이 저장된 폴더를 탐색기로 연다(v01.09).
+        # A00550 의 Library > Show Libraries Folder 와 같은 모양.
+        profile_menu = self.menu_bar.addMenu("Profile")
+        profile_menu.setToolTipsVisible(True)
+        act_profiles = profile_menu.addAction("Show Profiles Folder")
+        act_profiles.setToolTip(
+            "Open the folder of the saved profile JSON files (data/profiles/*.json) in Explorer")
+        act_profiles.triggered.connect(self.on_show_profiles_folder)
         help_menu = self.menu_bar.addMenu("Help")
         act_about = help_menu.addAction("About")
         act_about.triggered.connect(self.show_about)
@@ -96,6 +109,17 @@ class MainWindow(QWidget):
     def _log(self, message):
         self.log_view.appendPlainText(message)
 
+    def on_show_profiles_folder(self, *args):
+        """Profile > Show Profiles Folder. 프로파일 json 폴더를 탐색기로 연다(없으면 만든다)."""
+        folder = prefs_mod.PROFILES_DIR
+        try:
+            os.makedirs(folder, exist_ok=True)
+            file_opener.open_path(folder)
+        except (OSError, ValueError) as exc:
+            self._log("[ERROR] Cannot open {0}: {1}".format(folder, exc))
+            return
+        self._log("[OK] Profiles folder: {0}".format(folder))
+
     def toggle_always_on_top(self, enabled):
         # WindowStaysOnTopHint 를 켜고/끄고, 플래그 변경 후 다시 show() (안 하면 창이 사라짐)
         self.setWindowFlag(Qt.WindowStaysOnTopHint, enabled)
@@ -122,7 +146,8 @@ class MainWindow(QWidget):
             "- Category : groups buttons; right-click to rename / reorder /\n"
             "  delete.\n"
             "- Profile  : separate button sets per situation (rigging /\n"
-            "  facial / UE export). Each is its own JSON under data/.\n"
+            "  facial / UE export). Each is its own JSON under data/profiles/;\n"
+            "  menu 'Profile > Show Profiles Folder' opens it in Explorer.\n"
             "- Right-click a button to rename, reorder, change its path or\n"
             "  category, reveal its folder, set / reset its color, or delete.\n"
             "- Color Select mode paints many buttons across categories at once.\n"

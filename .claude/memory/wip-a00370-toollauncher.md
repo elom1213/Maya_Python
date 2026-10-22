@@ -70,3 +70,7 @@ v01.08 (2026-10-22) — **검색(Filter)**: 버튼 영역 위, Controls 박스 �
 `_cat_boxes=[(box, rows)]` 를 다시 채우고 `refresh_filter()`. haystack = 버튼 이름 + 카테고리 + 툴 폴더명.
 빈 카테고리 숨김은 `filtered` 시그널에서 `box.setVisible(any(not w.isHidden()))` — `isVisible()` 은
 창이 안 떠 있으면 늘 False 라 `isHidden()` 으로 판정. 오프스크린 15항목, 마야 GUI 미확인.
+
+v01.09 (2026-10-22) — 메뉴 **`Profile > Show Profiles Folder`**(Help 왼쪽): `prefs.PROFILES_DIR` 을
+공용 `file_opener.open_path` 로 연다. A00550 `Library > Show Libraries Folder` 와 같은 패턴 — 사용자가
+"json 저장 경로를 탐색기로 팝업하는 메뉴" 를 툴마다 원한다(A00550 v01.02, A00370 v01.09). 마야 GUI 미확인.
