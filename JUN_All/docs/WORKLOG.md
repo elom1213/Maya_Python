@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-22 (오늘)
 
+> [!summary] A00540_JaliLipSync — **클립 여러 개를 순서대로 한 씬에: 클립 표 · Hold · 합친 wav** (v01.01->01.02) `#A00540_JaliLipSync`
+- 요청: txt · wav 여러 개를 한꺼번에 넣고, 원하는 순서로 나열해 그 순서로 키가 한 씬에 들어가게. 음성도 여럿을 순서대로 재생. 파일 사이 `Hold` 프레임을 사용자가 정하게.
+- 코어 `sequence.py`(Maya 비의존): `Clip` · `load_clip`(wav 자동) · `layout(clips, start, hold, fps)` — 클립 길이는 **wav 길이**(모델 출력은 끝 0.32 s 가 빠져 txt 길이로 이으면 다음 음성이 일찍 시작된다), 다음 시작 = 끝 + 1 + hold · `write_sequence_wav()` — 클립 wav 를 각자 프레임 자리에 놓은 wav 하나(마야 타임슬라이더는 사운드 노드 하나만 보여 준다). `keyer.apply_sequence()` — 전체 구간 cutKey 한 번, 클립별 키, hold 는 **끝 값을 end + hold 에 한 번 더 키**로 붙들어 정지 구간(안 붙들면 마야가 사이를 보간), 전체 Undo 한 번. `apply()` 는 단일 클립 래퍼.
+- UI: TXT/WAV 한 줄 → 클립 표(# · Start · TXT · WAV · Length) + Add TXT(다중, 이름순) / Set WAV / No WAV / Remove / Up / Down / Clear, `Hold (frames)`, `Sequence WAV` 경로. Apply 로그에 클립별 구간. Remove Keys 는 표의 전체 구간.
+- 함정: `int(2.3 s × 30 fps)` = 68 (68.99999…) — `key_frames` · `layout` 에 1e-6 을 더했다.
+- 검증(mayapy 2024, `tests/run_all.py` 132항목 — 매핑 21 · sequence 17 · 코어 33 · UI 36 · 실제 파일 25): 합성 리그 + `out_en_002` 실제 5 클립(A0020, hold 12, 합친 wav 31.10 s). 마야 GUI 미확인.
+
 > [!summary] A00145_RigConnect — **Connect by Rule 겹치는 이름 보호 + 스킵 사유 로그 · 레퍼런스 간 연결 실측** (v01.63->01.64) `#A00145_RigConnect`
 - 요청: 중복 이름 케이스 문제 해결 + 레퍼런스로 불러온 노드끼리 규칙 연결이 되는지 조사.
 - 문제: `connectAttr` 는 짧은 이름이 겹쳐도(`grp1|A:dup` · `grp2|A:dup` 를 `A:dup`) 에러 없이 첫 노드에 붙어 성공으로 셌다. 수정: 행마다 `resolve_node`(`ls -long`) 로 하나로 확정, 없음 · 겹침이면 **행 통째 스킵**, 확정된 긴 이름으로 연결. `on_skip(src, dst, attr, reason)` 콜백으로 사유 전달, UI 는 행 단위 한 줄 + attr 단위는 같은 행 · 사유를 묶어 한 줄(`no such attribute on Source (19) : Oh, Uh, ...`). 반환값은 그대로.

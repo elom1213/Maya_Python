@@ -12,12 +12,16 @@
 #   Auto   : namespace 를 매핑 json 의 노드 이름 앞에 붙인다 ("angela:CNT_PHONEMES.AAA")
 #   Manual : node_map {"phonemes": 노드, "coartic": None, "jali": 노드} 로 json 의 노드 이름을 치환한다.
 #            None 인 역할의 타겟은 건너뛴다(skipped).
+# v01.02 여러 클립은 apply_sequence() - sequence.layout() 이 놓은 Segment 들을 한 Undo 로 건다. 클립 사이 hold 프레임은
+#   클립 끝 값을 다음 클립 직전까지 키로 붙들어 정지 구간으로 만든다(안 붙들면 마야가 두 클립 사이를 천천히 보간한다).
+#   apply() 는 클립 하나짜리 apply_sequence().
 
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
 
 from . import mapping as mapping_mod
+from . import sequence
 
 
 _FPS = {"game": 15.0, "film": 24.0, "pal": 25.0, "ntsc": 30.0, "show": 48.0,
@@ -134,7 +138,7 @@ def sample(data, mapping, fps, viseme_scale=None, jali_scale=None, targets=None)
     idx = data.column_index()
     lo, hi = mapping.get("clamp", [0.0, 1.0])
     v_scale, j_scale = _scales(mapping, viseme_scale, jali_scale)
-    n_frames = int(len(data.rows) / data.fps * fps)
+    n_frames = sequence.key_frames(data, fps)
     out = {}
     for t in targets:
         cols = [idx[c] for c in t["from"]]
@@ -148,19 +152,25 @@ def sample(data, mapping, fps, viseme_scale=None, jali_scale=None, targets=None)
     return out, n_frames
 
 
-def apply(data, mapping, namespace="", start=1, viseme_scale=None, jali_scale=None, jali_fixed=None,
-          node_map=None, progress=None):
-    """키를 건다.
+def apply_sequence(segments, mapping, namespace="", viseme_scale=None, jali_scale=None, jali_fixed=None,
+                   node_map=None, hold=0, progress=None):
+    """여러 클립(sequence.layout 의 Segment 목록)을 순서대로 건다. 전체가 Undo 한 번.
 
     Args:
         viseme_scale / jali_scale: None = 매핑 json 의 기본값.
-        jali_fixed: None = 데이터대로. (jaw, lip) = role "jali" 대상은 구간 처음과 끝에 그 값으로만 키 (리그 단위).
+        jali_fixed: None = 데이터대로. (jaw, lip) = role "jali" 대상은 클립마다 처음과 끝에 그 값으로만 키 (리그 단위).
         node_map: Manual 모드 역할 -> 노드. None = Auto (namespace 사용).
+        hold: 클립 사이 정지 프레임 수. 0 보다 크면 클립 끝 값을 end + hold 프레임에 한 번 더 키로 붙든다(마지막 클립 제외).
         progress: progress(done, total, message) 또는 None.
 
     Returns:
-        dict(start, end, fps, keys, attrs, skipped)
+        dict(start, end, fps, keys, attrs, skipped, clips=[(label, start, end)])
     """
+    if not segments:
+        raise KeyingError("No clip - add at least one TXT")
+    hold = int(hold)
+    if hold < 0:
+        raise KeyingError("Hold must be 0 or more frames")
     targets, skipped = resolve_targets(mapping, namespace, node_map)
     if not targets:
         raise KeyingError("No target node - fill at least one of Phonemes / Coartic / JaLi")
@@ -170,29 +180,48 @@ def apply(data, mapping, namespace="", start=1, viseme_scale=None, jali_scale=No
             len(problems), ", ".join("{0} ({1})".format(a, why) for a, why in problems)))
 
     fps = scene_fps()
-    values, n_frames = sample(data, mapping, fps, viseme_scale, jali_scale, targets)
-    end = start + n_frames
-    total = len(targets)
-    keys = 0
+    first, last = segments[0].start, segments[-1].end
     fixed_default = mapping["jali"]["fixed_default"]
-    jali_iter = iter(jali_fixed) if jali_fixed else None
+    total = len(targets) * len(segments)
+    done = 0
+    keys = 0
+    clips = []
 
     with undo_chunk():
-        for i, t in enumerate(targets):
-            attr = t["attr"]
-            cmds.cutKey(attr, time=(start, end), clear=True)
-            if jali_iter is not None and t["role"] == mapping_mod.JALI_ROLE:
-                fixed = float(next(jali_iter, fixed_default[0]))
-                for frame in (start, end):
-                    cmds.setKeyframe(attr, time=frame, value=fixed)
-                keys += 2
-            else:
-                for f, v in enumerate(values[attr]):
-                    cmds.setKeyframe(attr, time=start + f, value=v)
-                keys += len(values[attr])
-            if progress:
-                progress(i + 1, total, attr)
-    return {"start": start, "end": end, "fps": fps, "keys": keys, "attrs": total, "skipped": skipped}
+        for t in targets:
+            cmds.cutKey(t["attr"], time=(first, last), clear=True)
+        for si, seg in enumerate(segments):
+            values, n_frames = sample(seg.data, mapping, fps, viseme_scale, jali_scale, targets)
+            hold_frame = seg.end + hold if (hold > 0 and si < len(segments) - 1) else None
+            jali_iter = iter(jali_fixed) if jali_fixed else None
+            for t in targets:
+                attr = t["attr"]
+                if jali_iter is not None and t["role"] == mapping_mod.JALI_ROLE:
+                    last_value = float(next(jali_iter, fixed_default[0]))
+                    for frame in (seg.start, seg.start + n_frames):
+                        cmds.setKeyframe(attr, time=frame, value=last_value)
+                    keys += 2
+                else:
+                    for f, v in enumerate(values[attr]):
+                        cmds.setKeyframe(attr, time=seg.start + f, value=v)
+                    keys += len(values[attr])
+                    last_value = values[attr][-1]
+                if hold_frame is not None:
+                    cmds.setKeyframe(attr, time=hold_frame, value=last_value)
+                    keys += 1
+                done += 1
+                if progress:
+                    progress(done, total, "{0}: {1}".format(seg.label, attr))
+            clips.append((seg.label, seg.start, seg.end))
+    return {"start": first, "end": last, "fps": fps, "keys": keys, "attrs": len(targets), "skipped": skipped,
+            "clips": clips}
+
+
+def apply(data, mapping, namespace="", start=1, viseme_scale=None, jali_scale=None, jali_fixed=None,
+          node_map=None, progress=None):
+    """클립 하나를 start 부터 건다 (apply_sequence 의 단일 클립 형태). Returns apply_sequence 와 같은 dict."""
+    seg = sequence.layout([sequence.Clip(getattr(data, "txt_path", ""), data)], start, 0, scene_fps())
+    return apply_sequence(seg, mapping, namespace, viseme_scale, jali_scale, jali_fixed, node_map, 0, progress)
 
 
 def remove(mapping, namespace="", start=None, end=None, node_map=None):

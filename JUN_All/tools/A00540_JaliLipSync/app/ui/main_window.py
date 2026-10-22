@@ -4,15 +4,18 @@
 # A00540_JaliLipSync - Qt UI (in-Maya)
 #
 # JUN_JALI 의 VisemeNet Converter 가 만든 txt(+json) 와 음성 wav 를 골라 JALI 리그에 키를 건다.
-#   Data    : Viseme TXT / Audio WAV (txt 를 고르면 json 의 source_wav 또는 같은 이름 wav 를 자동으로)
+#   Data    : 클립 표 (v01.02) - TXT 여러 개를 Add 로 넣고 Up / Down 으로 순서를 정한다. WAV 는 json 의 source_wav 또는
+#             같은 이름 wav 를 자동으로 찾고, Set WAV 로 바꿀 수 있다. 표의 Start 열 = 그 클립이 시작하는 프레임.
 #   Target  : Auto(리그 네임스페이스 콤보 — 매핑 json 의 phonemes 노드를 표식으로 찾는다)
 #             / Manual(역할 3칸 Phonemes · Coartic · JaLi 를 씬 선택으로 채움, 빈 역할은 건너뜀) + 매핑 json 콤보
-#   Options : 시작 프레임 · 비짐 배율 · JaLi(데이터 + JaLi 배율 / 고정 Jaw Lip) · 오디오 붙이기 · 재생 범위
+#   Options : 시작 프레임 · Hold(클립 사이 정지 프레임) · 비짐 배율 · JaLi(데이터 + JaLi 배율 / 고정 Jaw Lip)
+#             · 오디오 붙이기(클립이 여럿이면 wav 하나로 합쳐 Sequence WAV 경로에 쓴다) · 재생 범위
 #             배율 · Fixed 범위의 기본값은 매핑 json 이 정하고, 매핑을 바꾸면 스핀박스가 리셋된다.
 #   Apply / Remove Keys / Select Controls + 로그
 # 모든 UI 문자열 · 로그는 영어. 계획: JUN_JALI/docs/0030_tool_plan.md §5, docs/plans/A00540_JaliLipSync_v0101_rules_manual_plan.md
 
 import os
+import re
 
 import maya.cmds as cmds
 
@@ -23,7 +26,7 @@ from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 from Framework.core import file_opener
 
 from tools.A00540_JaliLipSync.app.config.version import VERSION, LAST_UPDATE
-from tools.A00540_JaliLipSync.app.core import lipsync_data, mapping as mapping_mod, keyer, scene
+from tools.A00540_JaliLipSync.app.core import lipsync_data, mapping as mapping_mod, keyer, scene, sequence
 
 
 WINDOW_OBJECT_NAME = "JUN_A00540_JaliLipSync_window"
@@ -31,6 +34,13 @@ OPT_LAST_DIR = "JUN_A00540_lastDir"
 GUIDE_DOC = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))), "docs", "A00540_JaliLipSync.md")
 ROLE_LABELS = (("phonemes", "Phonemes"), ("coartic", "Coartic"), ("jali", "JaLi"))
+COLUMNS = ("#", "Start", "Viseme TXT", "Audio WAV", "Length")
+COL_NUM, COL_START, COL_TXT, COL_WAV, COL_LEN = range(5)
+
+
+def _natural_key(path):
+    """파일 이름의 숫자를 숫자로 비교 (clip_2 < clip_10)."""
+    return [int(p) if p.isdigit() else p.lower() for p in re.split(r"(\d+)", os.path.basename(path))]
 
 
 class MainWindow(QWidget):
@@ -40,12 +50,12 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
         self.setWindowTitle("JALI LipSync v{0}".format(VERSION))
         self.setWindowFlags(Qt.Window)
-        self.resize(480, 700)
+        self.resize(560, 760)
 
-        self._data = None
+        self.clips = []                     # [sequence.Clip] - 표의 순서 = 타임라인 순서
         self._build_ui()
         self.on_mapping_changed()
-        self._log("[INFO] Pick a VisemeNet TXT (from the JUN_JALI VisemeNet Converter).")
+        self._log("[INFO] Add one or more VisemeNet TXT files (from the JUN_JALI VisemeNet Converter).")
 
     # ------------------------------------------------------------------ UI
 
@@ -58,29 +68,51 @@ class MainWindow(QWidget):
         help_menu.addAction("About", self.show_about)
         layout.setMenuBar(self.menu_bar)
 
-        # --- Data
-        data_box = QGroupBox("Data")
-        grid = QGridLayout(data_box)
-        self.le_txt = QLineEdit()
-        self.le_txt.setPlaceholderText("<name>.txt from VisemeNet Converter")
-        self.le_txt.editingFinished.connect(self._on_txt_edited)
-        btn_txt = QPushButton("...")
-        btn_txt.setFixedWidth(32)
-        btn_txt.clicked.connect(self.on_browse_txt)
-        self.le_wav = QLineEdit()
-        self.le_wav.setPlaceholderText("Optional - the same speech (44.1 kHz WAV)")
-        btn_wav = QPushButton("...")
-        btn_wav.setFixedWidth(32)
-        btn_wav.clicked.connect(self.on_browse_wav)
-        grid.addWidget(QLabel("Viseme TXT"), 0, 0)
-        grid.addWidget(self.le_txt, 0, 1)
-        grid.addWidget(btn_txt, 0, 2)
-        grid.addWidget(QLabel("Audio WAV"), 1, 0)
-        grid.addWidget(self.le_wav, 1, 1)
-        grid.addWidget(btn_wav, 1, 2)
-        self.lb_info = QLabel("No data")
+        # --- Data (클립 표)
+        data_box = QGroupBox("Data - clips in timeline order")
+        dlay = QVBoxLayout(data_box)
+        self.table = QTableWidget(0, len(COLUMNS))
+        self.table.setHorizontalHeaderLabels(COLUMNS)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setMinimumHeight(90)
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(COL_TXT, QHeaderView.Stretch)
+        header.setSectionResizeMode(COL_WAV, QHeaderView.Stretch)
+        for c in (COL_NUM, COL_START, COL_LEN):
+            header.setSectionResizeMode(c, QHeaderView.ResizeToContents)
+        self.table.setToolTip("Clips are keyed in this order. Start = first frame of the clip (Start frame + "
+                              "previous clips + Hold). Double-click a row to change its WAV.")
+        self.table.itemDoubleClicked.connect(lambda _item: self.on_set_wav())
+        dlay.addWidget(self.table)
+
+        brow = QHBoxLayout()
+        self.btn_add = QPushButton("Add TXT...")
+        self.btn_add.setToolTip("Add one or more <name>.txt files (sorted by name). The WAV is found from the "
+                                ".visemenet.json or a file with the same name.")
+        self.btn_add.clicked.connect(self.on_add_txt)
+        btn_wav = QPushButton("Set WAV...")
+        btn_wav.setToolTip("Pick the audio for the selected clip (optional).")
+        btn_wav.clicked.connect(self.on_set_wav)
+        btn_nowav = QPushButton("No WAV")
+        btn_nowav.setToolTip("Remove the audio from the selected clips (keys only).")
+        btn_nowav.clicked.connect(self.on_clear_wav)
+        btn_remove = QPushButton("Remove")
+        btn_remove.clicked.connect(self.on_remove_clip)
+        btn_up = QPushButton("Up")
+        btn_up.clicked.connect(lambda _=False: self.on_move(-1))
+        btn_down = QPushButton("Down")
+        btn_down.clicked.connect(lambda _=False: self.on_move(1))
+        btn_clear = QPushButton("Clear")
+        btn_clear.clicked.connect(self.on_clear_clips)
+        for b in (self.btn_add, btn_wav, btn_nowav, btn_remove, btn_up, btn_down, btn_clear):
+            brow.addWidget(b)
+        dlay.addLayout(brow)
+        self.lb_info = QLabel("No clips")
         self.lb_info.setWordWrap(True)
-        grid.addWidget(self.lb_info, 2, 0, 1, 3)
+        dlay.addWidget(self.lb_info)
         layout.addWidget(data_box)
 
         # --- Target
@@ -110,9 +142,9 @@ class MainWindow(QWidget):
             btn_sel = QPushButton("<< Sel")
             btn_sel.setToolTip("Use the first selected node")
             btn_sel.clicked.connect(lambda _=False, r=role: self.on_pick_role(r))
-            btn_clear = QPushButton("x")
-            btn_clear.setFixedWidth(24)
-            btn_clear.clicked.connect(lambda _=False, w=le: w.clear())
+            btn_clear_role = QPushButton("x")
+            btn_clear_role.setFixedWidth(24)
+            btn_clear_role.clicked.connect(lambda _=False, w=le: w.clear())
             row = 1 + i
             if i == 0:
                 tgrid.addWidget(self.rb_manual, row, 0)
@@ -122,10 +154,10 @@ class MainWindow(QWidget):
             hb = QHBoxLayout()
             hb.setContentsMargins(0, 0, 0, 0)
             hb.addWidget(btn_sel)
-            hb.addWidget(btn_clear)
+            hb.addWidget(btn_clear_role)
             tgrid.addLayout(hb, row, 3)
             self.le_roles[role] = le
-            self.manual_widgets += [lb, le, btn_sel, btn_clear]
+            self.manual_widgets += [lb, le, btn_sel, btn_clear_role]
 
         self.cmb_mapping = QComboBox()
         self.cmb_mapping.addItems(mapping_mod.list_mappings())
@@ -143,15 +175,29 @@ class MainWindow(QWidget):
         self.sb_start = QSpinBox()
         self.sb_start.setRange(-100000, 100000)
         self.sb_start.setValue(1)
+        self.sb_start.setToolTip("First frame of the first clip.")
+        self.sb_start.valueChanged.connect(self._refresh_table)
+        self.sb_hold = QSpinBox()
+        self.sb_hold.setRange(0, 100000)
+        self.sb_hold.setValue(0)
+        self.sb_hold.setToolTip("Frames of pause between clips. The last value of a clip is held until the "
+                                "next clip starts (silence in the audio).")
+        self.sb_hold.valueChanged.connect(self._refresh_table)
         self.ds_scale = QDoubleSpinBox()
         self.ds_scale.setRange(0.0, 100.0)
         self.ds_scale.setDecimals(2)
         self.ds_scale.setSingleStep(0.1)
         self.ds_scale.setToolTip("Model values (0-1) x this = viseme keys. Default comes from the mapping.")
+        srow = QHBoxLayout()
+        srow.addWidget(self.sb_start)
+        srow.addSpacing(8)
+        srow.addWidget(QLabel("Hold (frames)"))
+        srow.addWidget(self.sb_hold)
+        srow.addSpacing(8)
+        srow.addWidget(QLabel("Viseme scale"))
+        srow.addWidget(self.ds_scale)
         ogrid.addWidget(QLabel("Start frame"), 0, 0)
-        ogrid.addWidget(self.sb_start, 0, 1)
-        ogrid.addWidget(QLabel("Viseme scale"), 0, 2)
-        ogrid.addWidget(self.ds_scale, 0, 3)
+        ogrid.addLayout(srow, 0, 1, 1, 3)
 
         self.rb_jali_data = QRadioButton("From data")
         self.rb_jali_fixed = QRadioButton("Fixed")
@@ -189,6 +235,18 @@ class MainWindow(QWidget):
         self.cb_range.setChecked(True)
         ogrid.addWidget(self.cb_audio, 2, 1)
         ogrid.addWidget(self.cb_range, 2, 2, 1, 2)
+
+        self.le_seq_wav = QLineEdit()
+        self.le_seq_wav.setPlaceholderText("<first clip folder>/jali_sequence.wav")
+        self.le_seq_wav.setToolTip("With more than one clip the clip WAVs are written into this one WAV at their "
+                                   "frame positions (silence in the holds) and attached as one sound node.\n"
+                                   "Empty = jali_sequence.wav next to the first TXT. A single clip uses its own WAV.")
+        btn_seq = QPushButton("...")
+        btn_seq.setFixedWidth(32)
+        btn_seq.clicked.connect(self.on_browse_seq_wav)
+        ogrid.addWidget(QLabel("Sequence WAV"), 3, 0)
+        ogrid.addWidget(self.le_seq_wav, 3, 1, 1, 2)
+        ogrid.addWidget(btn_seq, 3, 3)
         layout.addWidget(opt_box)
 
         # --- 버튼
@@ -196,13 +254,13 @@ class MainWindow(QWidget):
         self.btn_apply = QPushButton("Apply")
         self.btn_apply.setMinimumHeight(32)
         self.btn_apply.clicked.connect(self.on_apply)
-        btn_remove = QPushButton("Remove Keys")
-        btn_remove.setToolTip("Delete the keys of every mapped attribute in the data range.")
-        btn_remove.clicked.connect(self.on_remove)
+        btn_remove_keys = QPushButton("Remove Keys")
+        btn_remove_keys.setToolTip("Delete the keys of every mapped attribute in the sequence range.")
+        btn_remove_keys.clicked.connect(self.on_remove)
         btn_select = QPushButton("Select Controls")
         btn_select.clicked.connect(self.on_select_controls)
         row.addWidget(self.btn_apply, 2)
-        row.addWidget(btn_remove, 1)
+        row.addWidget(btn_remove_keys, 1)
         row.addWidget(btn_select, 1)
         layout.addLayout(row)
 
@@ -210,7 +268,7 @@ class MainWindow(QWidget):
         log_layout = QVBoxLayout(log_box)
         self.log_view = JUN_mod_log_qt_v01(window_title="JALI LipSync - Log",
                                            object_name="JUN_A00540_JaliLipSync_log_window")
-        self.log_view.setMinimumHeight(140)
+        self.log_view.setMinimumHeight(120)
         log_layout.addWidget(self.log_view)
         layout.addWidget(log_box, 1)
 
@@ -251,68 +309,132 @@ class MainWindow(QWidget):
             return self._namespace() or "(root)"
         return ", ".join("{0}={1}".format(r, n) for r, n in node_map.items() if n)
 
+    def _segments(self):
+        """현재 표 · Start frame · Hold · 씬 fps 로 클립을 배치한 [Segment]."""
+        return sequence.layout(self.clips, self.sb_start.value(), self.sb_hold.value(), keyer.scene_fps())
+
+    def _selected_rows(self):
+        return sorted({i.row() for i in self.table.selectedIndexes()})
+
+    def _seq_wav_path(self):
+        return self.le_seq_wav.text().strip() or sequence.sequence_wav_path(self.clips)
+
     # ------------------------------------------------------------------ Data
 
-    def on_browse_txt(self, *args):
-        path, _ = QFileDialog.getOpenFileName(self, "Viseme TXT", self._last_dir(),
-                                              "VisemeNet output (*.txt);;All files (*.*)")
-        if path:
-            cmds.optionVar(sv=(OPT_LAST_DIR, os.path.dirname(path)))
-            self.le_txt.setText(os.path.normpath(path))
-            self._load_txt(auto_wav=True)
-
-    def _on_txt_edited(self):
-        if self.le_txt.text().strip() and (self._data is None or
-                                           os.path.normpath(self._data.txt_path) != os.path.normpath(self.le_txt.text().strip())):
-            self._load_txt(auto_wav=not self.le_wav.text().strip())
-
-    def on_browse_wav(self, *args):
-        start = os.path.dirname(self.le_txt.text()) or self._last_dir()
-        path, _ = QFileDialog.getOpenFileName(self, "Audio WAV", start, "WAV (*.wav);;All files (*.*)")
-        if path:
-            self.le_wav.setText(os.path.normpath(path))
-            self._update_info()
-
-    def _load_txt(self, auto_wav):
-        path = self.le_txt.text().strip()
+    def add_txt(self, path, wav_path=None):
+        """txt 하나를 표 끝에 넣는다. wav_path None = 자동. 실패하면 로그 후 None. Returns Clip."""
+        path = os.path.normpath(path)
         try:
-            self._data = lipsync_data.load(path)
+            clip = sequence.load_clip(path, wav_path)
         except ValueError as e:
-            self._data = None
-            self.lb_info.setText("No data")
             self._log("[ERROR] {0}".format(e))
-            return
-        if auto_wav:
-            wav = lipsync_data.find_wav(path, self._data)
-            self.le_wav.setText(os.path.normpath(wav) if wav else "")
-            if wav:
-                self._log("[INFO] Audio found: {0}".format(wav))
-            else:
-                self._log("[WARN] No matching WAV found - pick it with '...' (optional).")
-        self._log("[OK] {0}: {1} rows ({2:.2f} s @ {3:g} fps){4}".format(
-            os.path.basename(path), len(self._data.rows), self._data.seconds, self._data.fps,
-            " + json" if self._data.meta else ""))
-        self._update_info()
+            return None
+        self.clips.append(clip)
+        if clip.wav_path:
+            self._log("[OK] {0}: {1} rows ({2:.2f} s){3} + {4}".format(
+                clip.label, len(clip.data.rows), clip.data.seconds, " + json" if clip.data.meta else "",
+                os.path.basename(clip.wav_path)))
+        else:
+            self._log("[WARN] {0}: {1} rows ({2:.2f} s) - no matching WAV found (Set WAV..., optional)".format(
+                clip.label, len(clip.data.rows), clip.data.seconds))
+        self._refresh_table()
+        return clip
 
-    def _update_info(self):
-        if self._data is None:
-            self.lb_info.setText("No data")
+    def on_add_txt(self, *args):
+        paths, _ = QFileDialog.getOpenFileNames(self, "Viseme TXT (one or more)", self._last_dir(),
+                                                "VisemeNet output (*.txt);;All files (*.*)")
+        if not paths:
             return
+        cmds.optionVar(sv=(OPT_LAST_DIR, os.path.dirname(paths[0])))
+        for path in sorted(paths, key=_natural_key):
+            self.add_txt(path)
+        self.table.selectRow(self.table.rowCount() - 1)
+
+    def on_set_wav(self, *args):
+        rows = self._selected_rows()
+        if not rows:
+            self._log("[WARN] Select a clip first.")
+            return
+        clip = self.clips[rows[-1]]
+        start = os.path.dirname(clip.wav_path or clip.txt_path)
+        path, _ = QFileDialog.getOpenFileName(self, "Audio WAV for {0}".format(clip.label), start,
+                                              "WAV (*.wav);;All files (*.*)")
+        if path:
+            clip.set_wav(os.path.normpath(path))
+            self._log("[OK] {0}: audio {1}".format(clip.label, os.path.basename(clip.wav_path)))
+            self._refresh_table()
+
+    def on_clear_wav(self, *args):
+        rows = self._selected_rows()
+        if not rows:
+            self._log("[WARN] Select a clip first.")
+            return
+        for r in rows:
+            self.clips[r].set_wav("")
+        self._refresh_table()
+
+    def on_remove_clip(self, *args):
+        rows = self._selected_rows()
+        if not rows:
+            self._log("[WARN] Select a clip first.")
+            return
+        for r in reversed(rows):
+            del self.clips[r]
+        self._refresh_table()
+
+    def on_move(self, delta):
+        rows = self._selected_rows()
+        if not rows:
+            self._log("[WARN] Select a clip first.")
+            return
+        r = rows[-1] if delta > 0 else rows[0]
+        new = r + delta
+        if new < 0 or new >= len(self.clips):
+            return
+        self.clips[r], self.clips[new] = self.clips[new], self.clips[r]
+        self._refresh_table()
+        self.table.selectRow(new)
+
+    def on_clear_clips(self, *args):
+        self.clips = []
+        self._refresh_table()
+
+    def on_browse_seq_wav(self, *args):
+        path, _ = QFileDialog.getSaveFileName(self, "Sequence WAV", self._seq_wav_path() or self._last_dir(),
+                                              "WAV (*.wav)")
+        if path:
+            self.le_seq_wav.setText(os.path.normpath(path))
+
+    def _refresh_table(self, *args):
+        """표를 다시 채운다 (Start 열은 layout 결과). 정보 줄도 갱신."""
         fps = keyer.scene_fps()
-        frames = int(self._data.seconds * fps)
-        text = "{0} rows = {1:.2f} s -> {2} frames at {3:g} fps".format(
-            len(self._data.rows), self._data.seconds, frames, fps)
-        wav = self.le_wav.text().strip()
-        if wav:
-            sec = lipsync_data.wav_seconds(wav)
-            if sec is None:
-                text += "  |  WAV: cannot read length"
-            else:
-                text += "  |  WAV {0:.2f} s".format(sec)
-                gap = sec - self._data.seconds
-                if gap > 0.5 or gap < -0.05:
-                    text += " (check the pair: {0:+.2f} s)".format(gap)
-        self.lb_info.setText(text)
+        segments = self._segments()
+        self.table.setRowCount(len(segments))
+        for i, seg in enumerate(segments):
+            clip = seg.clip
+            items = [QTableWidgetItem(str(i + 1)), QTableWidgetItem(str(seg.start)),
+                     QTableWidgetItem(clip.label),
+                     QTableWidgetItem(os.path.basename(clip.wav_path) if clip.wav_path else "(none)"),
+                     QTableWidgetItem("{0:.2f} s / {1} f".format(clip.seconds, seg.span))]
+            items[COL_TXT].setToolTip(clip.txt_path)
+            items[COL_WAV].setToolTip(clip.wav_path or "No audio - keys only")
+            if clip.wav_path and clip.wav_seconds is None:
+                items[COL_WAV].setText(items[COL_WAV].text() + " (cannot read)")
+            gap = (clip.wav_seconds or 0) - clip.data.seconds
+            if clip.wav_seconds is not None and (gap > 0.5 or gap < -0.05):
+                items[COL_LEN].setText(items[COL_LEN].text() + " (check the pair: {0:+.2f} s)".format(gap))
+            for c, item in enumerate(items):
+                if c in (COL_NUM, COL_START, COL_LEN):
+                    item.setTextAlignment(Qt.AlignCenter)
+                self.table.setItem(i, c, item)
+        if not segments:
+            self.lb_info.setText("No clips")
+            return
+        total = segments[-1].end - segments[0].start + 1
+        self.lb_info.setText("{0} clip(s): frames {1}-{2} ({3} frames = {4:.2f} s at {5:g} fps), hold {6}, "
+                             "audio on {7} clip(s)".format(
+                                 len(segments), segments[0].start, segments[-1].end, total, total / fps, fps,
+                                 self.sb_hold.value(), sum(1 for s in segments if s.wav_path)))
 
     # ------------------------------------------------------------------ Target
 
@@ -375,12 +497,9 @@ class MainWindow(QWidget):
     # ------------------------------------------------------------------ 실행
 
     def on_apply(self, *args):
-        if self._data is None:
-            if self.le_txt.text().strip():
-                self._load_txt(auto_wav=not self.le_wav.text().strip())
-            if self._data is None:
-                self._log("[ERROR] No viseme data - pick a TXT first.")
-                return
+        if not self.clips:
+            self._log("[ERROR] No clips - add at least one TXT.")
+            return
         try:
             mapping = self._mapping()
         except ValueError as e:
@@ -398,12 +517,14 @@ class MainWindow(QWidget):
                 return
 
         ns = self._namespace()
-        start = self.sb_start.value()
+        hold = self.sb_hold.value()
         jali = (self.ds_jaw.value(), self.ds_lip.value()) if self.rb_jali_fixed.isChecked() else None
-        wav = self.le_wav.text().strip()
-        if wav and not os.path.isfile(wav):
-            self._log("[ERROR] WAV not found: {0}".format(wav))
-            return
+        for clip in self.clips:
+            if clip.wav_path and not os.path.isfile(clip.wav_path):
+                self._log("[ERROR] WAV not found: {0}".format(clip.wav_path))
+                return
+        segments = self._segments()
+        self._refresh_table()
 
         targets, _ = keyer.resolve_targets(mapping, ns, node_map)
         for attr, scale, mx in keyer.scale_warnings(targets, mapping, self.ds_scale.value(),
@@ -412,27 +533,46 @@ class MainWindow(QWidget):
 
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
-            res = keyer.apply(self._data, mapping, ns, start, viseme_scale=self.ds_scale.value(),
-                              jali_scale=self.ds_jali_scale.value(), jali_fixed=jali, node_map=node_map)
+            res = keyer.apply_sequence(segments, mapping, ns, viseme_scale=self.ds_scale.value(),
+                                       jali_scale=self.ds_jali_scale.value(), jali_fixed=jali, node_map=node_map,
+                                       hold=hold)
+            for i, (label, s, e) in enumerate(res["clips"]):
+                self._log("[OK] {0}/{1} {2}: frames {3}-{4}".format(i + 1, len(res["clips"]), label, s, e))
             if self.cb_range.isChecked():
                 cmds.playbackOptions(minTime=res["start"], maxTime=res["end"])
-            if wav and self.cb_audio.isChecked():
-                node = scene.attach_sound(wav, start)
-                self._log("[OK] Audio '{0}' at frame {1}".format(node, start))
+            if self.cb_audio.isChecked():
+                self._attach_audio(segments)
         except keyer.KeyingError as e:
             self._log("[ERROR] {0}".format(e))
             return
-        except RuntimeError as e:
+        except (RuntimeError, ValueError) as e:
             self._log("[ERROR] {0}".format(str(e).strip()))
             return
         finally:
             QApplication.restoreOverrideCursor()
 
-        self._log("[DONE] {0} attributes keyed on '{1}': frames {2}-{3} @ {4:g} fps ({5} keys, JaLi {6}){7}".format(
-            res["attrs"], self._target_desc(node_map), res["start"], res["end"], res["fps"], res["keys"],
-            "fixed {0:g} / {1:g}".format(*jali) if jali else "from data x {0:g}".format(self.ds_jali_scale.value()),
-            ", skipped: {0}".format(", ".join(res["skipped"])) if res["skipped"] else ""))
-        self._log("[INFO] The model output ends about 0.32 s before the audio (VisemeNet limit).")
+        self._log("[DONE] {0} attributes keyed on '{1}': {2} clip(s), frames {3}-{4} @ {5:g} fps, hold {6} "
+                  "({7} keys, JaLi {8}){9}".format(
+                      res["attrs"], self._target_desc(node_map), len(res["clips"]), res["start"], res["end"],
+                      res["fps"], hold, res["keys"],
+                      "fixed {0:g} / {1:g}".format(*jali) if jali else "from data x {0:g}".format(self.ds_jali_scale.value()),
+                      ", skipped: {0}".format(", ".join(res["skipped"])) if res["skipped"] else ""))
+        self._log("[INFO] The model output ends about 0.32 s before each clip's audio (VisemeNet limit).")
+
+    def _attach_audio(self, segments):
+        """클립이 하나면 그 wav 를, 여럿이면 합친 wav 를 사운드 노드 하나로 붙인다."""
+        with_wav = [s for s in segments if s.wav_path]
+        if not with_wav:
+            self._log("[WARN] No clip has audio - nothing attached.")
+            return
+        if len(segments) == 1:
+            wav = segments[0].wav_path
+        else:
+            wav = self._seq_wav_path()
+            sequence.write_sequence_wav(segments, wav, keyer.scene_fps())
+            self._log("[OK] Sequence WAV written: {0} ({1} clip(s) with audio)".format(wav, len(with_wav)))
+        node = scene.attach_sound(wav, segments[0].start)
+        self._log("[OK] Audio '{0}' at frame {1}".format(node, segments[0].start))
 
     def on_remove(self, *args):
         try:
@@ -444,9 +584,9 @@ class MainWindow(QWidget):
         if node_map is not None and not any(node_map.values()):
             self._log("[ERROR] Manual target: fill at least one node (Phonemes / Coartic / JaLi).")
             return
-        if self._data is not None:
-            start = self.sb_start.value()
-            end = start + int(self._data.seconds * keyer.scene_fps())
+        if self.clips:
+            segments = self._segments()
+            start, end = segments[0].start, segments[-1].end
             n = keyer.remove(mapping, self._namespace(), start, end, node_map=node_map)
             self._log("[OK] Removed keys on {0} attribute(s), frames {1}-{2}".format(n, start, end))
         else:
@@ -479,12 +619,13 @@ class MainWindow(QWidget):
             "JALI LipSync v{0}\nUpdate date: {1}\n\n"
             "Keys VisemeNet viseme curves onto a JALI rig - the nodes named\n"
             "in the mapping json (e.g. CNT_PHONEMES or DUMMY_IN_PHONEMES).\n\n"
-            "1. Make the TXT with VisemeNet Converter (JUN_JALI).\n"
-            "2. Pick the TXT - the WAV is found from the .visemenet.json\n"
-            "   or a file with the same name.\n"
-            "3. Target: Auto finds the rig by name, Manual lets you pick\n"
+            "1. Make the TXT files with VisemeNet Converter (JUN_JALI).\n"
+            "2. Add the TXT files and put them in order (Up / Down) - the WAV\n"
+            "   is found from the .visemenet.json or a file with the same name.\n"
+            "3. Hold = frames of pause between clips (last pose held).\n"
+            "4. Target: Auto finds the rig by name, Manual lets you pick\n"
             "   the Phonemes / Coartic / JaLi nodes (empty = skipped).\n"
-            "4. Apply (one undo step).\n\n"
+            "5. Apply (one undo step). Several clips -> one sequence WAV.\n\n"
             "Keys are sampled at the scene fps. Re-applying clears the range first.\n"
             "Scales and the Fixed range reset to the mapping's defaults.\n"
             "New rigs = a new json in app/mappings.\n\n"

@@ -10,7 +10,7 @@ import maya.cmds as cmds
 
 JUN_ALL = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, JUN_ALL)
-from tools.A00540_JaliLipSync.app.core import mapping as mapping_mod, keyer, scene, lipsync_data   # noqa: E402
+from tools.A00540_JaliLipSync.app.core import mapping as mapping_mod, keyer, scene, lipsync_data, sequence   # noqa: E402
 
 R = []
 
@@ -33,6 +33,10 @@ def make_node(name, attrs, parent_ns=""):
 
 def key_count(attr):
     return cmds.keyframe(attr, q=True, keyframeCount=True) or 0
+
+
+def value_at(attr, frame):
+    return cmds.keyframe(attr, q=True, eval=True, t=(frame, frame))[0]
 
 
 new = mapping_mod.load_mapping("jali_slider_dummy_in")
@@ -85,8 +89,8 @@ check("K4 WA_PEDAL <- W column 0.2", abs(max(vals["DUMMY_IN_COARTIC.WA_PEDAL"]) 
 res = keyer.apply(data, new, start=1, node_map={"phonemes": "A", "coartic": None, "jali": "C"})
 check("K5 manual: A and C keyed, B not", key_count("A.AAA") == 13 and key_count("C.Jaw") == 13 and key_count("B.MMM") == 0)
 check("K5 skipped == [coartic]", res["skipped"] == ["coartic"] and res["attrs"] == 18)
-check("K5 key value AAA 0.7, Jaw 0.9", abs(cmds.keyframe("A.AAA", q=True, eval=True, t=(5, 5))[0] - 0.7) < 1e-6
-      and abs(cmds.keyframe("C.Jaw", q=True, eval=True, t=(5, 5))[0] - 0.9) < 1e-6)
+check("K5 key value AAA 0.7, Jaw 0.9", abs(value_at("A.AAA", 5) - 0.7) < 1e-6 and abs(value_at("C.Jaw", 5) - 0.9) < 1e-6)
+check("K5 apply() reports one clip", res["clips"] == [("synthetic.txt", 1, 13)] and res["start"] == 1 and res["end"] == 13)
 keyer.remove(new, node_map={"phonemes": "A", "coartic": "B", "jali": "C"})
 res = keyer.apply(data, new, start=1, node_map={"phonemes": "A", "coartic": None, "jali": None})
 check("K5 jali None too -> skipped [coartic, jali], C has no keys", res["skipped"] == ["coartic", "jali"] and key_count("C.Jaw") == 0)
@@ -118,6 +122,54 @@ try:
 except keyer.KeyingError as e:
     check("K9 locked attr -> KeyingError names it", "A.Eh (locked)" in str(e))
 cmds.setAttr("A.Eh", lock=False)
+
+# ---------------------------------------------------------------- v01.02 여러 클립
+# 클립 b: 30줄(0.3초) — Aa 0.2, Jaw 0.1
+row_b = [0.0] * 22
+row_b[idx["Aa"]], row_b[idx["Jaw"]] = 0.2, 0.1
+data_b = lipsync_data.LipsyncData("b.txt", [list(row_b) for _ in range(30)], list(lipsync_data.MODEL_COLUMNS), 100.0)
+clips = [sequence.Clip("synthetic.txt", data), sequence.Clip("b.txt", data_b)]
+AAA, JAW = "rigA:DUMMY_IN_PHONEMES.AAA", "rigA:DUMMY_IN_JALI.Jaw"
+
+# K10 hold 5: a = 1-13 (키 13개), hold 키 18, b = 19-26 (키 8개). 전체가 Undo 한 번
+keyer.remove(new, "rigA:")
+cmds.undoInfo(state=True, infinity=True)
+segs = sequence.layout(clips, 1, 5, 24.0)
+res = keyer.apply_sequence(segs, new, "rigA:", hold=5)
+check("K10 clips placed with hold 5", res["clips"] == [("synthetic.txt", 1, 13), ("b.txt", 19, 26)]
+      and res["start"] == 1 and res["end"] == 26 and res["attrs"] == 23)
+check("K10 keys: 13 + hold 1 + 8 = 22 on AAA", key_count(AAA) == 22 and 18.0 in cmds.keyframe(AAA, q=True, tc=True))
+check("K10 held value through the gap (frames 13, 16, 18 = 0.7), b starts at 19 = 0.2",
+      abs(value_at(AAA, 13) - 0.7) < 1e-6 and abs(value_at(AAA, 16) - 0.7) < 1e-6
+      and abs(value_at(AAA, 18) - 0.7) < 1e-6 and abs(value_at(AAA, 19) - 0.2) < 1e-6)
+check("K10 Jaw from data per clip (0.9 then 0.1)", abs(value_at(JAW, 5) - 0.9) < 1e-6 and abs(value_at(JAW, 22) - 0.1) < 1e-6)
+cmds.undo()
+check("K10 one undo removes the whole sequence", key_count(AAA) == 0 and key_count(JAW) == 0)
+
+# K11 hold 0: b 가 바로 이어진다 (14-21), hold 키 없음
+segs = sequence.layout(clips, 1, 0, 24.0)
+res = keyer.apply_sequence(segs, new, "rigA:", hold=0)
+check("K11 hold 0 -> b at 14-21, 21 keys on AAA", res["clips"][1] == ("b.txt", 14, 21) and key_count(AAA) == 21
+      and abs(value_at(AAA, 14) - 0.2) < 1e-6)
+
+# K12 jali_fixed 로 여러 클립: Jaw 는 클립마다 처음 · 끝 + hold 키
+segs = sequence.layout(clips, 1, 5, 24.0)
+res = keyer.apply_sequence(segs, new, "rigA:", jali_fixed=(0.6, 0.6), hold=5)
+check("K12 fixed Jaw: keys at 1, 13, 18, 19, 26 all 0.6", cmds.keyframe(JAW, q=True, tc=True) == [1.0, 13.0, 18.0, 19.0, 26.0]
+      and cmds.keyframe(JAW, q=True, valueChange=True) == [0.6] * 5)
+check("K12 re-apply cleared the hold-0 layout first (no key at 14 from K11 with b's value)", abs(value_at(AAA, 14) - 0.7) < 1e-6)
+
+# K13 빈 목록 · 음수 hold
+try:
+    keyer.apply_sequence([], new, "rigA:")
+    check("K13 empty -> KeyingError", False)
+except keyer.KeyingError as e:
+    check("K13 empty -> KeyingError", "No clip" in str(e))
+try:
+    keyer.apply_sequence(segs, new, "rigA:", hold=-1)
+    check("K13 hold -1 -> KeyingError", False)
+except keyer.KeyingError:
+    check("K13 hold -1 -> KeyingError", True)
 
 print("RESULT", "OK" if all(R) else "%d FAILED" % R.count(False))
 maya.standalone.uninitialize()
