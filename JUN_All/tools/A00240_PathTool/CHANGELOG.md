@@ -2,6 +2,18 @@
 
 All notable changes to this tool are documented here.
 
+## [01.24] - 2026-10-23
+### Added
+- **`File > Add to Start Menu`.** Creates a Start menu shortcut for this tool (`JUN Path Tool.lnk` in
+  `%APPDATA%\Microsoft\Windows\Start Menu\Programs`) and tries to pin it to Start, the same as
+  JUN Video Tool. The shortcut runs `pythonw.exe launch.py` (no console window; the exe itself when
+  built with PyInstaller) with the tool icon and the tool's AppUserModelID, so a window started from
+  the shortcut shares the taskbar button and icon with one started from a terminal. Click again after
+  moving the tool folder to refresh the path. Windows 10 and 11: the shortcut always appears in the
+  Start app list and search; where Windows hides the "Pin to Start" verb the dialog explains the
+  one right-click to pin it by hand. The result line goes to the Junction tab's Log (the same place
+  as `Help > Copy Tool Name`). Shared code: `Framework/core/shell_integration.py`.
+
 ## [01.23] - 2026-10-13
 ### Added
 - **Junction > Create: `Tree...` on both lists.** Opens a popup with the **same tree as the Tree tab**

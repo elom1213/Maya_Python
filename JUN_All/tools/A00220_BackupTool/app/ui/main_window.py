@@ -8,6 +8,7 @@
 #  - 상태 표시: Chrome-Dino 애니메이션(정지=서있음 / 동작=달리기 /
 #    저장 감지=강조색 톡 점프 / 백업 성공=공중 360° 회전)
 #  - 대상 파일은 Add... 외에 탐색기에서 Target Files 로 드래그&드롭해도 담긴다(v01.18)
+#  - File > Add to Start Menu : 시작 메뉴 바로가기 (공용 shell_integration, Windows 10 · 11) (v01.19)
 
 import os
 import time
@@ -37,15 +38,18 @@ from Framework.qt.qt import (
     QFileSystemWatcher,
     QApplication,
     QIcon,
+    QAction,
     Qt,
 )
+from Framework.core import shell_integration
 
 from Framework.qt import JUN_mod_collapsible_qt
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 
 from ..config.version import VERSION
-from ..config.app_meta import icon_path
+from ..config.app_meta import (
+    icon_path, APP_NAME, APP_USER_MODEL_ID, APP_DESCRIPTION, start_menu_launch_spec)
 from ..core import backup_manager, prefs as prefs_mod
 from .dino_widget import DinoWidget
 
@@ -145,6 +149,16 @@ class MainWindow(QWidget):
         self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
         self.menu_bar.addMenu("Help")
         root.setMenuBar(self.menu_bar)
+
+        # File 메뉴 (v01.19) - 시작 메뉴 바로가기. 공용 메뉴 바라 Help 의 **왼쪽**에 끼워진다.
+        file_menu = self.menu_bar.addMenu("File")
+        self.act_start_menu = QAction("Add to Start Menu", self)
+        self.act_start_menu.setToolTip(
+            "Create a Start menu shortcut for this tool (and try to pin it to Start).\n"
+            "Windows 10 / 11. Click again after moving the tool folder.")
+        self.act_start_menu.setEnabled(shell_integration.is_supported())
+        self.act_start_menu.triggered.connect(self.add_to_start_menu)
+        file_menu.addAction(self.act_start_menu)
 
         # -------------------------
         # 상단 헤더 행 : Always on Top(Pin) 토글(우측). A00110_animTool 과 동일 패턴 —
@@ -394,6 +408,40 @@ class MainWindow(QWidget):
         layout.addWidget(self.lbl_countdown)
 
         return group
+
+    # ============================================================ start menu
+
+    def add_to_start_menu(self):
+        """File > Add to Start Menu - 시작 메뉴에 이 툴의 바로가기(.lnk)를 만들고 시작 화면 고정을 시도한다.
+
+        공용 Framework.core.shell_integration (JUN_Video_Tool 과 같은 방식, Windows 10 · 11).
+        바로가기 대상은 pythonw.exe + launch.py(콘솔 창 없음) 또는 exe 자신, AppUserModelID 가
+        들어가므로 바로가기로 띄운 창도 같은 작업표시줄 버튼 · 툴 아이콘으로 묶인다.
+        툴 폴더를 옮겼으면 다시 눌러 경로를 갱신한다. 고정 동사가 없는 OS/빌드에선 수동 고정을 안내한다.
+        """
+        error = None
+        pinned = "unavailable"
+        lnk = ""
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            lnk = shell_integration.add_to_start_menu(
+                APP_NAME, APP_USER_MODEL_ID, start_menu_launch_spec(), APP_DESCRIPTION)
+            pinned = shell_integration.pin_shortcut(lnk, "start")
+        except shell_integration.ShellIntegrationError as exc:
+            error = exc
+        finally:
+            QApplication.restoreOverrideCursor()
+
+        if error is not None:
+            self.log("Could not create the Start menu shortcut: {0}".format(error))
+            QMessageBox.warning(
+                self, "Start Menu",
+                "Could not create the Start menu shortcut:\n{0}".format(error))
+            return
+
+        self.log("Start menu shortcut: {0} (pin to Start: {1})".format(lnk, pinned))
+        QMessageBox.information(
+            self, "Start Menu", shell_integration.start_menu_message(APP_NAME, pinned))
 
     # ========================================================== always-on-top
 

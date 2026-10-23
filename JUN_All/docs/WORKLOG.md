@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-23 (오늘)
 
+> [!summary] A00240_PathTool · A00220_BackupTool — **File > Add to Start Menu: 시작 메뉴 바로가기** (A00240 v01.23->01.24 · A00220 v01.18->01.19) + 공용 `Framework/core/shell_integration.py` `#A00240_PathTool` `#A00220_BackupTool` `#Framework`
+- 요청: 두 standalone 툴에 JUN Video Tool(0110) 과 같은 "시작화면 바로가기 추가" 기능. **Windows 10 에서도 동작할 것.**
+- 공용 모듈 `Framework/core/shell_integration.py`(Qt · Maya 비의존): 비디오툴 `app/core/shell_integration.py` 이식(타입 힌트 제거). `launch_spec`(dev = pythonw + launch.py / frozen = exe) · `create_shortcut`(PowerShell `Add-Type` C# → IShellLinkW + IPropertyStore 로 .lnk + **AppUserModelID**) · `add_to_start_menu` · `pin_shortcut("start")` · `start_menu_message`. Win10/11 공통 재료만 쓴다(PowerShell 5.1 · COM · `%APPDATA%`). PS 출력 UTF-8 지정 + cp949 폴백(비디오툴엔 없던 것 — 한국어 오류가 깨졌다).
+- 툴: `app_meta.py` 에 `APP_NAME` · `APP_DESCRIPTION` · `tool_root()` · `start_menu_launch_spec()`. 메인 창에 `File` 메뉴(공용 메뉴 바라 Help 왼쪽) + `Add to Start Menu` → 만들고 고정 시도 → 로그 한 줄(A00240 은 Junction 탭 Log) + 안내 창(수동 고정 방법, 폴더 옮기면 다시 누르기).
+- 검증: 실제 .lnk 생성(스크래치, WScript 되읽기 · AUMID 되읽기 · 덮어쓰기 · 오류) + 두 창 offscreen 배선 테스트 24항목. **두 툴에서의 실기 클릭 · Win10 실기는 아직.** 문서 `docs/Framework_shell_integration.md` 신규, 두 툴 가이드 · CHANGELOG · docs/README 색인.
+
 > [!summary] A00370_ToolLauncher — **Shrink + 줄었을 때 로켓 발사 애니메이션** (v01.10->01.11) `#A00370_ToolLauncher`
 - 요청: A00220_BackupTool 처럼 Shrink 를 만들고, 줄었을 때 이 툴 아이콘의 로켓이 위로 발사되는 애니메이션을 무한 반복.
 - `main_window.py`: `Pin` 왼쪽 체크형 `Shrink`(72x28). 메뉴 바 · 런처 영역 · 저작권 줄을 `hide()` → `invalidate/activate` → **350 x 155**(A00220 · A00240 과 같은 크기). 끄면 줄이기 전 크기로. 화면만 감추므로 프로파일 · 로그 유지.

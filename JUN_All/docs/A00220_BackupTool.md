@@ -38,6 +38,23 @@
   `launch.py` 가 Windows **AppUserModelID**(`Dnable.JUN.A00220.BackupTool`)를 지정해 터미널 실행 시에도
   python 아이콘 대신 이 앱 아이콘이 작업표시줄에 뜬다. 방식: [taskbar_icon_guide.md](taskbar_icon_guide.md).
 
+### File > Add to Start Menu — 시작 메뉴 바로가기 (v01.19~)
+
+**JUN Video Tool 과 같은 기능.** `File > Add to Start Menu` 를 누르면 시작 메뉴에 이 툴의 바로가기
+(`JUN Backup Tool.lnk`, `%APPDATA%\Microsoft\Windows\Start Menu\Programs`)가 생기고 시작 화면 고정을 시도한다.
+그 뒤로는 시작 메뉴 앱 목록 · 검색에서 **JUN Backup Tool** 으로 바로 띄울 수 있다.
+
+- 바로가기 대상은 **`pythonw.exe` + `launch.py`**(콘솔 창 없음). PyInstaller exe 로 돌리는 중이면 exe 자신.
+  작업 폴더는 툴 폴더, 아이콘은 `icon/A00220_BackupTool.ico`.
+- 바로가기에 이 툴의 **AppUserModelID**(`Dnable.JUN.A00220.BackupTool`)가 들어가므로 바로가기로 띄운 창도 터미널에서 띄운
+  창과 같은 작업표시줄 버튼 · 같은 아이콘으로 묶인다.
+- **툴 폴더를 옮겼으면 다시 누른다** — 같은 .lnk 를 덮어써 경로가 갱신된다.
+- **Windows 10 · 11 공통.** 바로가기(앱 목록 · 검색)는 늘 만들어진다. "시작 화면에 고정" 은 Windows 가 그 셸 동사를
+  보여 주는 환경에서만 자동으로 되고, 아니면 안내 창의 한 줄대로 앱 목록에서 우클릭 → **시작 화면에 고정** 하면 된다
+  (Windows 11 은 고정 결과를 돌려주지 않아 "요청했다" 까지만 말한다).
+- 결과는 Log 한 줄 + 안내 창. 실패하면 경고 창에 PowerShell 오류 첫 줄을 보여 준다.
+- 공용 모듈 [`Framework_shell_integration`](Framework_shell_integration.md).
+
 ---
 
 ## 3. 화면 구성
