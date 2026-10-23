@@ -126,6 +126,7 @@ class RocketAnimWidget(QWidget):
     def stop(self):
         """타이머를 멈추고 처음 모습(발사대 위)으로 되돌린다."""
         self._timer.stop()
+        self._resume = False
         self._frozen = None
         self._elapsed = 0.0
         self._drawn = None
@@ -183,9 +184,17 @@ class RocketAnimWidget(QWidget):
             self.update()
 
     def hideEvent(self, event):
-        # 줄어든 상태를 풀면 숨겨진다 - 그때 타이머도 세운다.
+        # 줄어든 상태를 풀면 숨겨진다 - 그때 타이머도 세운다. 단, Pin 토글처럼 창 플래그가 바뀌어
+        # 잠깐 숨었다 다시 보이는 경우가 있으므로, 돌던 중이었으면 기억해 두고 showEvent 에서 잇는다.
+        self._resume = self._timer.isActive()
         self._timer.stop()
         super(RocketAnimWidget, self).hideEvent(event)
+
+    def showEvent(self, event):
+        super(RocketAnimWidget, self).showEvent(event)
+        if getattr(self, "_resume", False):
+            self._resume = False
+            self._timer.start()
 
     # ------------------------------------------------------------------ 배치
 

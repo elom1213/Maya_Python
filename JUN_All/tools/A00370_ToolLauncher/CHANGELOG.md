@@ -2,6 +2,13 @@
 
 All notable changes to this tool are documented here.
 
+## v01.14 — 2026-10-23
+
+- **Fixed: toggling `Pin` while shrunk stopped the rocket.** Changing the window flag hides and
+  re-shows the window, and the animation widget's hide stopped its timer for good. It now remembers
+  that it was running and resumes on show (an explicit stop - Shrink off - still stays stopped).
+  Same fix in `A00240_PathTool` v01.27 and `A00210_FileManager` v01.38.
+
 ## v01.13 — 2026-10-23
 
 - **`Pin` turns light red while pinned.** The checkable `Pin` button had only its label change to

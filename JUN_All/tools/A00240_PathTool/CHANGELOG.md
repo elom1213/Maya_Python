@@ -2,6 +2,13 @@
 
 All notable changes to this tool are documented here.
 
+## [01.27] - 2026-10-23
+### Fixed
+- **Toggling `Pin` while shrunk stopped the file-tree animation.** Changing the window flag hides and
+  re-shows the window, and the animation widget's hide stopped its timer for good. It now remembers
+  that it was running and resumes on show (Shrink off still stops it). Same fix in
+  `A00370_ToolLauncher` v01.14 and `A00210_FileManager` v01.38.
+
 ## [01.26] - 2026-10-23
 ### Changed
 - **`Pin` turns light red while pinned.** The checkable `Pin` button had only its label change to

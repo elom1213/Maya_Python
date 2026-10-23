@@ -38,6 +38,16 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 검증: offscreen 에서 A00240(yellow_mid) · A00220(green_mid) 실제 창과 A00370 과 같은 테마의 버튼을 그려 가운데 픽셀 — 꺼짐 = 테마 색, 켜짐 = 연한 빨강. 마야 · 실기 확인 아직. A00210_FileManager 의 Pin(v01.37)은 요청에 없어 그대로.
 - 문서 `docs/Framework_pin_style.md` 신규, 세 툴 가이드 · CHANGELOG · docs/README 색인.
 
+> [!summary] A00370_ToolLauncher · A00240_PathTool — **줄어든 채 Pin 을 누르면 애니메이션이 멈추던 것 수정** (A00370 v01.13->01.14 · A00240 v01.26->01.27) `#A00370_ToolLauncher` `#A00240_PathTool`
+- A00210 애니메이션 테스트에서 발견: Pin 토글은 창 플래그를 바꾸며 창을 숨겼다 다시 보이는데, 애니메이션 위젯의 `hideEvent` 가 타이머를 세워 버려 그 뒤로 멈춰 있었다. 세 위젯(`rocket_anim` · `file_tree_anim` · `folder_anim`) 모두 `hideEvent` 에서 돌던 중이었는지 `_resume` 에 기억하고 `showEvent` 에서 잇는다. 명시 `stop()`(Shrink 끔)은 `_resume=False`.
+- 검증: 세 툴 오프스크린 테스트에 "Pin 중 애니메이션 계속" 항목 추가(A00370 32 · A00240/A00220 35 · A00210 25 전부 통과).
+
+> [!summary] A00210_FileManager — **줄었을 때 폴더 · 기록 카드 애니메이션** (v01.37->01.38) `#A00210_FileManager`
+- 확정(사용자): 제안 4안 중 **1번(아이콘 모티프)**.
+- `app/ui/folder_anim.py` `FolderAnimWidget`(신규, A00370 `RocketAnimWidget` 과 같은 꼴): 30x32 칸 비트맵 — 폴더 뒷판 · 탭 / 기록 카드(테마 글자색, 썸네일 · 제목 · 작업자 · 로그 2줄은 아이콘 파랑) / 폴더 앞판 / 9x9 동기화 뱃지(링 24칸 위를 8칸짜리 호 둘이 2칸씩 12프레임에 한 바퀴). 한 바퀴 3.0초 — 올라옴 0.5(ease-out) → 채움 3단계(0.3초 간격) → 동기화 0.8 → 내려감 0.5(ease-in) → 쉼 0.3. 켤 때마다 처음부터, 끄면 정지, 상태(카드 높이 · 채움 수 · 뱃지 프레임)가 바뀔 때만 update.
+- `main_window.py`: 빈 `QWidget` 자리를 `FolderAnimWidget` 으로, Shrink 켤 때 `start()` · 끌 때 `stop()`.
+- 검증(오프스크린 PySide6, 27항목): 단계 · 카드 높이 단조 · 채움 단계 · 뱃지 한 바퀴(12프레임) · 루프 되감기 + v01.37 Shrink/Pin 회귀 + 시각별 캡처 6장 눈 확인. 실제 앱 눈 확인은 아직.
+
 > [!summary] A00210_FileManager — **Shrink · Pin 추가** (v01.36->01.37) `#A00210_FileManager`
 - 요청: A00210 에도 Shrink · Pin 기능 추가 + 줄었을 때 반복 애니메이션 아이디어 제시(제시만, 구현은 아직).
 - `main_window.py`: 탭 위 헤더 행(A00240 과 같은 모양) — `Pin`(WindowStaysOnTopHint, show() 재호출) · `Shrink`(메뉴 바 · `tabs_scroll` · 로그 `hide()` → `invalidate/activate` → **272 x 155**, Pin 은 `button_grid` (0,1) ↔ (1,0)). 복원은 `_full_size`. 버튼 왼쪽 `anim_area` 는 빈 `QWidget`(Expanding) — 애니메이션 정하면 바꿔 끼운다. `fit_to_content` 는 첫 show 에만 돌아 Pin 의 show() 와 충돌 없음.

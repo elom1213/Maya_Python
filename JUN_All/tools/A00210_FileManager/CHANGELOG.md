@@ -2,6 +2,20 @@
 
 All notable changes to this tool are documented here.
 
+## [01.38] - 2026-10-23
+### Added
+- **Folder animation while shrunk** (`app/ui/folder_anim.py`, `FolderAnimWidget`). The tool icon's
+  folder, record card and sync badge are drawn as a code bitmap in the space left of the two buttons
+  and **loop forever** (one loop 3.0 s): the record card rises out of the folder (0.5 s, ease-out) ->
+  its thumbnail, title and log lines fill in one step at a time (0.3 s apart) -> the sync badge's two
+  arrows run one full turn around the ring (0.8 s) -> the card slides back into the folder (0.5 s,
+  ease-in) -> a short rest with the closed folder -> again. Card body in the theme text colour,
+  everything else in the icon's blues. Restarts from the closed folder every time Shrink is turned
+  on, stops when it is turned off, repaints only when the picture changes.
+- Verified offscreen (PySide6, 27 checks: phases, card height, fill steps, badge turn, loop wrap, plus
+  the v01.37 Shrink / Pin checks) and captures at several times. Not yet checked by eye in the running
+  tool.
+
 ## [01.37] - 2026-10-23
 ### Added
 - **`Shrink` and `Pin` buttons** in a header row above the tabs (right side, 72 x 28 each) - the same

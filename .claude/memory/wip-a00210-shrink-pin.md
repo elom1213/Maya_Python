@@ -1,6 +1,6 @@
 ---
 name: wip-a00210-shrink-pin
-description: "A00210_FileManager v01.37 — 탭 위 헤더 행 Shrink · Pin(272x155, Pin 은 Shrunk 아래), 버튼 왼쪽 anim_area 는 빈 QWidget — 반복 애니메이션은 아직 미정(제안만 함)"
+description: "A00210_FileManager v01.37~38 — 탭 위 헤더 행 Shrink · Pin(272x155, Pin 은 Shrunk 아래) + 줄었을 때 아이콘의 폴더 · 기록 카드 · 동기화 뱃지 애니메이션 무한 반복(app/ui/folder_anim.py)"
 metadata:
   node_type: memory
   type: project
@@ -13,14 +13,14 @@ A00210_FileManager **v01.37** (2026-10-23) — 탭 위에 헤더 행 추가, [[w
 `hide()` → `invalidate/activate` → **272 x 155**, `button_grid` 에서 Pin 만 (0,1) ↔ (1,0)).
 복원은 `_full_size`. `fit_to_content` 는 첫 showEvent 에서만 돌므로 Pin 의 `show()` 와 충돌 없다.
 
-**`anim_area` 는 빈 `QWidget`(Expanding, 줄었을 때만 show).** 반복 애니메이션은 사용자가
-"어떻게 만들면 좋을지 제시해" 라고만 했고 아직 고르지 않았다. 제안한 안(2026-10-23):
-1. 아이콘 모티프 — 폴더에서 기록 카드(썸네일 + 로그 줄)가 올라왔다가 들어가고 동기화 뱃지가 도는 반복
-   (추천, A00370 로켓 = 아이콘 과 같은 원칙)
-2. 스캔 — 파일 행이 하나씩 채워지고 썸네일이 들어오는 진행 막대
-3. Lineage 그래프 — 커밋 점이 선을 따라 올라가며 분기 · 병합
-4. Pull/Push — 두 화살표가 서버와 PC 사이를 오가는 동기화
-구현은 `RocketAnimWidget`([[wip-a00370-shrink-rocket]]) 꼴(코드 비트맵, start/stop/set_elapsed,
-바뀔 때만 update, 테마 글자색 + 아이콘 파랑 `#4c8dff` / `#7fb0ff`)로 바꿔 끼우면 된다.
+**v01.38 — `anim_area` = `FolderAnimWidget`(`app/ui/folder_anim.py`).** 제안 4안(아이콘 모티프 /
+스캔 진행 / Lineage 그래프 / Pull·Push) 중 사용자가 **1번 아이콘 모티프**를 골랐다.
+`RocketAnimWidget`([[wip-a00370-shrink-rocket]]) 과 같은 꼴(start / stop / set_elapsed / is_running,
+상태가 바뀔 때만 update). 30 x 32 칸 비트맵, 칸 크기 `min(h // 32, w // 30)` → 155px 창에서 4.
+- 그리는 순서: 폴더 뒷판 + 탭(`#2f6bd6`) → 기록 카드(몸체 = 테마 글자색, `CARD_PARTS` 썸네일 · 제목 ·
+  작업자 · 로그 2줄은 아이콘 파랑, 단계 0/1/2) → 폴더 앞판(`#4c8dff`, 카드를 가린다) → 9x9 뱃지
+  (`BADGE_RING` 24칸 시계 방향, 8칸 호 둘이 `ARC_STEP` 2칸씩 12프레임에 한 바퀴).
+- 한 바퀴 **3.0초**: 올라옴 0.5(ease-out, 카드 y 24 → 3칸) → 채움 0.6/0.9/1.2 → 동기화 1.4~2.2 →
+  내려감 0.5(ease-in) → 쉼 2.7~3.0. 속도를 바꾸려면 클래스 상수 `RISE / FILL_* / SYNC_* / LOWER` 만.
 
-검증: 오프스크린 PySide6 16항목 + 캡처. **실제 앱 눈 확인 아직.**
+검증: 오프스크린 PySide6 27항목 + 시각별 캡처 6장. **실제 앱 눈 확인 아직.**

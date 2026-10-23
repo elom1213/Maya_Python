@@ -9,7 +9,8 @@
 #  - 기록(records/thumbs)을 git 으로 pull/push (원본 mb/ma 는 push 대상 아님)
 #  - 헤더 행 Shrink · Pin (v01.37): A00220 · A00240 · A00370 과 같은 모양. Shrink 는 메뉴 바 · 탭 ·
 #    로그를 감추고 창을 272 x 155 로 줄이며 Pin 이 Shrunk 아래로 내려간다. 줄어든 동안 버튼 왼쪽
-#    자리(`anim_area`)는 비워 두었다 - 반복 애니메이션은 아직 정하지 않았다.
+#    자리(`anim_area`)에서 툴 아이콘의 폴더 · 기록 카드 · 동기화 뱃지가 움직이기를 무한 반복한다
+#    (v01.38, app/ui/folder_anim.py).
 
 import os
 import time
@@ -60,6 +61,7 @@ from .file_table import FileTable
 from .region_capture import RegionCapture
 from .path_structure_tab import PathStructureTab
 from .lineage_tab import LineageTab
+from .folder_anim import FolderAnimWidget
 from ..maya.ui.maya_tab import MayaTab
 
 
@@ -272,9 +274,9 @@ class MainWindow(QWidget):
         self.shrink_button.setFixedSize(72, 28)
         self.shrink_button.toggled.connect(self.toggle_shrink)
 
-        # 줄어든 동안만 보이는 자리 - 반복 애니메이션이 들어갈 칸(아직 비어 있다). 남는 가로 · 세로를
-        # 전부 차지해야 그릴 자리가 나온다(안 그러면 버튼 높이 28px 로 묶인다). 나중에 위젯을 바꿔 끼운다.
-        self.anim_area = QWidget()
+        # 줄어든 동안만 보이는 자리 - 폴더 · 기록 카드 애니메이션(v01.38). 남는 가로 · 세로를
+        # 전부 차지해야 그릴 자리가 나온다(안 그러면 버튼 높이 28px 로 묶인다).
+        self.anim_area = FolderAnimWidget()
         self.anim_area.setObjectName("A00210_shrink_anim_area")
         self.anim_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.anim_area.hide()
@@ -375,6 +377,7 @@ class MainWindow(QWidget):
             self.button_grid.addWidget(self.pin_button, 1, 0)
             self.anim_area.show()
         else:
+            self.anim_area.stop()
             self.anim_area.hide()
             self.button_grid.addWidget(self.pin_button, 0, 1)
             self.menu_bar.show()
@@ -387,6 +390,8 @@ class MainWindow(QWidget):
         root.activate()
         if enabled:
             self.resize(SHRINK_WIDTH, SHRINK_HEIGHT)
+            # 켤 때마다 처음부터 - 닫힌 폴더에서 카드가 올라오기를 되풀이한다.
+            self.anim_area.start()
         elif self._full_size:
             self.resize(*self._full_size)
 
