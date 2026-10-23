@@ -2,6 +2,30 @@
 
 All notable changes to this tool are documented here.
 
+## [01.29] - 2026-10-23
+### Changed
+- **The window can be resized freely.** The tabs now sit in a scroll area, so the window is no longer
+  held at the widest tab's minimum width (the Junction tab's two side-by-side lists) - drag any edge to
+  make it as narrow or short as you like; when it is smaller than the content a scrollbar appears.
+  Opening size is unchanged (`fit_to_content`, clipped to the monitor's work area), the same approach
+  `A00210_FileManager` v01.36 uses. Shrink / Pin keep working (Shrink hides the scroll area).
+- Verified offscreen (PySide6): minimum width 1004 -> 172 px, `resize(300, 400)` / `(250, 300)` stick,
+  opening size fits the screen, Shrink 272 x 155 and restore. Not yet checked by eye in the running tool.
+
+## [01.28] - 2026-10-23
+### Added
+- **Drag a path button to move it.** Press a path button, hold, move and release - inside its category to
+  reorder, or onto another category to move it there (same rule as `Change Category`: a button with the
+  same name in the target blocks the move). A thin line shows where it will land, the cursor becomes a
+  closed hand, and the list auto-scrolls near the top / bottom edge. `Esc` cancels. A press that moves
+  less than the drag threshold is still a plain click (opens the path). While `Color Select` is on,
+  buttons only check / uncheck - no dragging. `Move Up / Move Down` and `Change Category` remain.
+- Implemented with mouse events on a button subclass (`_PathButton`), not native `QDrag`; buttons are
+  addressed by (category index, button index), so duplicate names cannot move the wrong one.
+- Verified offscreen (PySide6, 33 checks): click vs drag threshold, reorder down / up, drop on own slot,
+  cross-category move, name conflict, Esc cancel + swallowed release, Color Select off, auto-scroll,
+  profile JSON saved. Not yet checked by eye in the running tool.
+
 ## [01.27] - 2026-10-23
 ### Fixed
 - **Toggling `Pin` while shrunk stopped the file-tree animation.** Changing the window flag hides and

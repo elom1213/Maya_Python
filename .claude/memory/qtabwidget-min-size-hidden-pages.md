@@ -19,7 +19,8 @@ metadata:
 `fit_to_content()` 로 — `tabs.minimumSizeHint()` + (창 최소 − 스크롤 칸 최소) 를 모니터 `availableGeometry` 까지로 잘라
 `resize`, 창 아래/오른쪽이 화면 밖이면 `move`. 첫 `showEvent` 다음 이벤트 루프(`QTimer.singleShot(0, ...)`)에서 재야
 테마 polish 뒤 글자 크기로 잰다. 내용보다 작게 열리면 스크롤바 폭만큼 더해 잘림을 막는다.
-구현: `tools/A00210_FileManager/app/ui/main_window.py` `fit_to_content`, `tools/A00480_FileTool/app/ui/main_window.py` 동일.
+구현: `tools/A00210_FileManager/app/ui/main_window.py` `fit_to_content`, `tools/A00480_FileTool/app/ui/main_window.py` 동일,
+`tools/A00240_PathTool` v01.29 도 같은 코드(Junction 탭 가로가 바닥이었다, [[wip-a00240-drag-reorder]]).
 
 **변형 — 가로도 자유롭게 (A00550 v01.04)**: 사용자가 "언제든 자유롭게 조절" 을 원하면 A00480 처럼 스크롤 칸에
 `setMinimumWidth(content)` 를 걸지 **말 것** — 걸면 다시 그 폭 아래로 못 줄인다. 여는 크기만 맞추고 작으면 스크롤바.
