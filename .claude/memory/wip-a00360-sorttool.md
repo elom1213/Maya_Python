@@ -1,6 +1,6 @@
 ---
 name: wip-a00360-sorttool
-description: A00360_SortTool — new in-Maya PySide tool; sort listed objects by world X/Y/Z / name / type and reorder outliner + TSL (v01.00)
+description: A00360_SortTool — in-Maya PySide tool; sort listed objects by world X/Y/Z / name / type / selection order and reorder outliner + TSL (v01.03)
 metadata: 
   node_type: memory
   type: project
@@ -21,3 +21,10 @@ Verified the slot-swap by hand on 3 cases (ascending/full-reverse/partial) — c
 **Icon made** (repo pattern = `icon/<tool>.svg` source + 32x32 `icon/<tool>.png`): coral decreasing sort-bars + light down-arrow on the standard dark rounded-rect (#2d2d30/#4a4a4f). PNG rendered via PIL 8x supersample→LANCZOS (no SVG renderer installed: cairosvg/svglib absent). Shelf dragDrop already points at `icon/A00360_SortTool.png`.
 
 **Next:** user verifies in Maya (list joints/meshes/curves/clusters under various hierarchies, sort by each axis + name + type, toggle outliner checkbox) → then push Dnable/dev + WORKLOG + create guide doc `JUN_All/docs/A00360_SortTool.md` (none yet). NOTE: an unrelated untracked `A00350_ArrayCreator/` exists in the tree — do NOT stage it (git add the A00360 paths explicitly). See [[uuid-safe-rename-duplicate-names]], [[prefer-pyside-for-new-tools]], [[push-includes-tool-guide-docs]], [[worklog-maintenance]], [[ui-text-english-only]].
+
+**v01.03 (2026-10-23, verified mayapy, committed locally, NOT pushed):** `MODE_SELECTION` = Ari
+`Selects` radio. Key = index of the item in `items` (list order == Select Objects selection order; objects
+keep pick order without the trackSelectionOrder pref, see [[tsl-selection-order]]). No new reorder code —
+same slot-swap. Position-less DG nodes are NOT skipped in this mode. UI: 6th radio "Selection" fills the
+2x3 grid; all radios got tooltips. Verify script: scratchpad `verify_a00360_selection.py` (20 checks;
+remember to drop persp/top/front/side from `ls(assemblies=True)` when asserting top-level order).

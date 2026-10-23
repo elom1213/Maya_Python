@@ -2,13 +2,13 @@
 title: Portfolio — Work Summary (2026-05-06 ~ 2026-10-12)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-10-22
+updated: 2026-10-23
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
 
 > **Author**: Ji Hun Park (Junny)
-> **Period**: 2026-05-06 – 2026-10-22 (~24 weeks)
+> **Period**: 2026-05-06 – 2026-10-23 (~24 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
 > **Volume**: 50+ in-house tools (64 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
@@ -699,7 +699,7 @@ Default Distance attribute (driver signal x)
   **`setCharacterObject` does nothing but print a warning when the character has a Control Rig, and raises no
   exception**, so the tool had been reporting those as assigned — it now blocks up front and **reads the
   connection back** to judge every assignment.
-- **`A00050_uvTool`**, **`A00030_quickTool_V02`** (PySide rewrite of the legacy `maya.cmds` quick tool - same buttons and behaviour, but results go to a log panel inside the window instead of the script editor, and the logic moved into `core`), **`A00330_NamingTool`** (legacy naming tool port + Quick Rename. **Insert** puts text at the **n-th position** of every listed name (negative counts from the end); a **preview table** that never touches the scene shows the inserted text in green, and nothing is renamed until Apply. Names Maya would silently alter (leading digit, spaces) and clashes under the same parent are flagged up front, and parents and children can be listed together - the **deepest node is renamed first**, so no stored path goes stale), **`A00310_SearchTool`** (select by **type, name or state in the scene** - the state rules live in a registry as data, so a new rule is **one function plus one line of registration** and the UI is untouched), **`A00360_SortTool`** (sort by world X/Y/Z, name or type and reorder the Outliner).
+- **`A00050_uvTool`**, **`A00030_quickTool_V02`** (PySide rewrite of the legacy `maya.cmds` quick tool - same buttons and behaviour, but results go to a log panel inside the window instead of the script editor, and the logic moved into `core`), **`A00330_NamingTool`** (legacy naming tool port + Quick Rename. **Insert** puts text at the **n-th position** of every listed name (negative counts from the end); a **preview table** that never touches the scene shows the inserted text in green, and nothing is renamed until Apply. Names Maya would silently alter (leading digit, spaces) and clashes under the same parent are flagged up front, and parents and children can be listed together - the **deepest node is renamed first**, so no stored path goes stale), **`A00310_SearchTool`** (select by **type, name or state in the scene** - the state rules live in a registry as data, so a new rule is **one function plus one line of registration** and the UI is untouched), **`A00360_SortTool`** (sort by world X/Y/Z, name, type or **selection order** and reorder the Outliner).
 
 ---
 

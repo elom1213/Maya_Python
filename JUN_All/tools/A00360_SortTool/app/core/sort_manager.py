@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 # A00360_SortTool core - 선택 오브젝트 정렬 로직 (maya.cmds, UI 비의존)
 #
-# 월드 X/Y/Z 위치 · 이름 · 타입 기준으로 오브젝트를 정렬하고, 아웃라이너의 형제
-# 순서(위->아래)를 그 순서로 바꾼다.
+# 월드 X/Y/Z 위치 · 이름 · 타입 · 선택 순서 기준으로 오브젝트를 정렬하고, 아웃라이너의
+# 형제 순서(위->아래)를 그 순서로 바꾼다.
+#
+# 선택 순서(MODE_SELECTION)는 AriSortOutlinerOptions 의 'Selects' 라디오와 같은 동작이다:
+# 정렬 키를 새로 계산하지 않고 들어온 리스트 순서(= 사용자가 고른 순서)를 그대로 결과
+# 순서로 삼아 아웃라이너에 입힌다.
 #
 # 아웃라이너 재정렬은 AriSortOutliner.mel 의 '슬롯 스왑' 방식을 이식했다: 선택
 # 오브젝트가 '원래 차지하던 슬롯'들을 정렬 순서로 다시 채운다. Maya 의 reorder 는
@@ -17,6 +21,7 @@ MODE_Y = "y"
 MODE_Z = "z"
 MODE_NAME = "name"
 MODE_TYPE = "type"
+MODE_SELECTION = "selection"   # 리스트(선택) 순서 그대로 — Ari 'Selects'
 
 _AXIS_INDEX = {MODE_X: 0, MODE_Y: 1, MODE_Z: 2}
 
@@ -45,17 +50,19 @@ def _world_pos(full):
         return None
 
 
-def _compute_key(full, mode):
-    """정렬 키. 위치=float, 이름=소문자 str, 타입=(타입, 이름) 튜플.
+def _compute_key(full, mode, index=0):
+    """정렬 키. 위치=float, 이름=소문자 str, 타입=(타입, 이름) 튜플, 선택=리스트 인덱스.
 
     위치 모드에서 위치를 못 구하는 노드는 None 을 돌려주어 정렬에서 제외(스킵)한다.
-    이름/타입 모드는 어떤 노드든 이름/타입이 있으므로 항상 키가 나온다.
+    이름/타입/선택 모드는 어떤 노드든 키가 나온다(선택 모드는 들어온 순서 index 그대로).
     """
     if mode in _AXIS_INDEX:
         pos = _world_pos(full)
         return None if pos is None else pos[_AXIS_INDEX[mode]]
     if mode == MODE_TYPE:
         return (_type_name(full).lower(), _short(full).lower())
+    if mode == MODE_SELECTION:
+        return index
     # MODE_NAME
     return _short(full).lower()
 
@@ -137,7 +144,7 @@ def _reorder_outliner(ordered_fulls):
 def sort_objects(items, mode, reverse=False, reorder_outliner=True):
     """items(표시 이름) 를 mode 기준으로 정렬한다.
 
-    mode  : MODE_X/Y/Z(월드 위치) · MODE_NAME · MODE_TYPE
+    mode  : MODE_X/Y/Z(월드 위치) · MODE_NAME · MODE_TYPE · MODE_SELECTION(리스트 순서 그대로)
     반환   : (ordered_texts, missing_texts)
       ordered_texts : 정렬된(해석 성공) 표시 이름 리스트 — TSL 재구성용(위->아래)
       missing_texts : 씬에서 못 찾은(삭제/이름변경/중복 모호) 표시 이름 리스트
@@ -145,13 +152,13 @@ def sort_objects(items, mode, reverse=False, reorder_outliner=True):
     """
     keyed = []      # (text, full, key)
     missing = []
-    for text in items:
+    for index, text in enumerate(items):
         found = cmds.ls(text, long=True) or []
         if len(found) != 1:
             missing.append(text)     # 0개(없음) 또는 2개+(이름 모호) -> 건너뜀
             continue
         full = found[0]
-        key = _compute_key(full, mode)
+        key = _compute_key(full, mode, index)
         if key is None:
             missing.append(text)     # 위치를 알 수 없는 노드(위치 정렬 대상 아님)
             continue

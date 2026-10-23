@@ -2,18 +2,19 @@
 title: A00360_SortTool 사용법
 aliases: [Sort Tool, SortTool, A00360]
 tags: [maya-python, tool-guide, outliner, sort]
-updated: 2026-09-16
+updated: 2026-10-23
 ---
 
 # A00360_SortTool 사용법
 
 Maya 안에서 도는 **오브젝트 정렬** PySide 툴이다(arch B, in-Maya). 리스트업한 오브젝트들을
-**월드 X/Y/Z 위치 · 이름 · 타입** 기준으로 정렬해, **아웃라이너 순서(위→아래)** 와 **TSL 리스트 순서**
-를 함께 바꾼다. 위치를 가진 노드면 **조인트·메시·커브·로케이터·클러스터/래티스 핸들** 등 무엇이든 동작한다.
+**월드 X/Y/Z 위치 · 이름 · 타입 · 선택 순서** 기준으로 정렬해, **아웃라이너 순서(위→아래)** 와
+**TSL 리스트 순서** 를 함께 바꾼다. 위치를 가진 노드면 **조인트·메시·커브·로케이터·클러스터/래티스 핸들** 등 무엇이든 동작한다.
 
-- **버전**: `app/config/version.py` (v01.00)
+- **버전**: `app/config/version.py` (v01.03)
 - **설치**: `__dragDrop_A00360.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **SortTool** → `tools.A00360_SortTool.run(True)`
-- **참고**: 이름/타입 정렬 방식과 아웃라이너 슬롯 스왑 재정렬은 `AriSortOutliner.mel` / `AriSortOutlinerOptions.mel` 을 이식.
+- **참고**: 이름/타입/선택 순서 정렬 방식과 아웃라이너 슬롯 스왑 재정렬은 `AriSortOutliner.mel` /
+  `AriSortOutlinerOptions.mel` 을 이식. **Selection** 라디오 = Ari 옵션창의 **Selects** 라디오.
 
 ---
 
@@ -32,7 +33,7 @@ Maya 안에서 도는 **오브젝트 정렬** PySide 툴이다(arch B, in-Maya).
 │ [Add][Del][Up][Down]               │
 │ ┌ Sort By ───────────────────────┐ │
 │ │ (o)World X ( )World Y ( )World Z│ │
-│ │ ( )Name    ( )Type             │ │
+│ │ ( )Name    ( )Type  ( )Selection│ │
 │ └────────────────────────────────┘ │
 │ [ ] Reverse (descending)           │
 │ [x] Reorder in Outliner            │  ← 기본 켜짐
@@ -51,6 +52,10 @@ Maya 안에서 도는 **오브젝트 정렬** PySide 툴이다(arch B, in-Maya).
    - **World X / World Y / World Z** — 각 오브젝트의 **월드 절대 위치**(`xform -ws -t`) 해당 축 값.
    - **Name** — 오브젝트 짧은 이름(대소문자 무시).
    - **Type** — 오브젝트 타입(shape 가 있으면 shape 의 nodeType, 없으면 자신), 같은 타입은 이름순.
+   - **Selection** (v01.03) — **리스트 순서를 그대로** 아웃라이너에 입힌다. 리스트는 **Select Objects** 를
+     누른 시점의 **선택 순서**로 담기므로(오브젝트는 Maya 가 고른 순서를 유지한다), 결국 **오브젝트를 선택한
+     순서대로** 아웃라이너가 정렬된다. `AriSortOutlinerOptions` 의 **Selects** 라디오와 같은 동작.
+     Sort 전에 Up/Down 으로 순서를 손볼 수 있고, 위치가 없는 DG 노드도 건너뛰지 않는다.
 3. 옵션:
    - **Reverse (descending)** — 내림차순(위 = 큰 값/뒤 이름). 기본은 오름차순(위 = 작은 값/앞 이름).
    - **Reorder in Outliner**(**기본 켜짐**) — 켜면 아웃라이너의 형제 순서를 정렬 순서(위→아래)로 바꾼다.
@@ -86,7 +91,8 @@ tools/A00360_SortTool/
 ```
 
 - 핵심 API: `sort_manager.sort_objects(items, mode, reverse, reorder_outliner)` → `(ordered_texts, missing)`.
-  `mode` = `MODE_X/Y/Z/NAME/TYPE`. 위치는 `xform(ws)`, 이름은 짧은이름, 타입은 (shape nodeType, 이름).
+  `mode` = `MODE_X/Y/Z/NAME/TYPE/SELECTION`. 위치는 `xform(ws)`, 이름은 짧은이름, 타입은 (shape nodeType, 이름),
+  선택은 `items` 의 인덱스(들어온 순서 그대로).
 
 ---
 
@@ -101,3 +107,12 @@ tools/A00360_SortTool/
 | `Copy` | 로그 **전문**을 클립보드로 |
 
 자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).
+
+## 버전 이력
+
+| 버전 | 날짜 | 내용 |
+|------|------|------|
+| 01.03 | 2026-10-23 | **Sort By > Selection** — 선택(리스트) 순서대로 아웃라이너 정렬 (Ari `Selects` 와 동일). 라디오 툴팁 추가 |
+| 01.02 | 2026-09-17 | 공용 메뉴 바 · 릴리즈 배치 대응 |
+| 01.01 | — | 로그창 공용 위젯 교체 |
+| 01.00 | 2026-07-08 | 신규 |

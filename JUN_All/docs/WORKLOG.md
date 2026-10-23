@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-10-22
+updated: 2026-10-23
 ---
 
 # 작업 일지 (WORKLOG)
@@ -30,7 +30,16 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-10-22 (오늘)
+## 2026-10-23 (오늘)
+
+> [!summary] A00360_SortTool — **Sort By > Selection: 선택한 순서대로 아웃라이너 정렬** (v01.02->01.03) `#A00360_SortTool`
+- 요청: 오브젝트를 **선택한 순서대로** 아웃라이너 정렬 순서를 바꾸는 기능. `AriSortOutlinerOptions` 의 **Selects** 라디오와 같은 동작.
+- 코어 `sort_manager.py`: `MODE_SELECTION` 추가 — 정렬 키를 새로 계산하지 않고 `items` 의 **인덱스**(= 들어온 리스트 순서)를 키로 쓴다. 리스트는 Select Objects 시점의 선택 순서이므로 결국 선택 순서. 아웃라이너 적용은 기존 슬롯 스왑(부모별 그룹) 그대로, Reverse · Reorder in Outliner 옵션도 그대로 먹는다. 위치 없는 DG 노드도 이 모드에선 건너뛰지 않는다(아웃라이너는 DAG 만).
+- UI: Sort By 그리드에 **Selection** 라디오(2행 3열 꽉 참) + 라디오 6개 툴팁. About 문구.
+- 검증(mayapy 2024, 20항목): 최상위 선택 순서 → `A D C B E`, Reverse, 부모 다른 섞인 선택(로케이터·조인트), blendShape 포함, 없는 이름 missing, 아웃라이너 off, Name 모드 회귀. 마야 GUI 미확인.
+- 문서 `docs/A00360_SortTool.md` 갱신(버전 이력 표 추가).
+
+## 2026-10-22
 
 > [!summary] A00540_JaliLipSync — **클립 여러 개를 순서대로 한 씬에: 클립 표 · Hold · 합친 wav** (v01.01->01.02) `#A00540_JaliLipSync`
 - 요청: txt · wav 여러 개를 한꺼번에 넣고, 원하는 순서로 나열해 그 순서로 키가 한 씬에 들어가게. 음성도 여럿을 순서대로 재생. 파일 사이 `Hold` 프레임을 사용자가 정하게.

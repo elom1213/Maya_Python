@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-08
+# last Update date : 2026-10-23
 # A00360_SortTool - Qt UI
 #
-# 선택 오브젝트를 TSL 에 리스트업하고 월드 X/Y/Z 위치 · 이름 · 타입 기준으로 정렬해
-# 아웃라이너 순서(위->아래)와 TSL 순서를 함께 바꾼다. 아웃라이너 재정렬은 체크박스로
+# 선택 오브젝트를 TSL 에 리스트업하고 월드 X/Y/Z 위치 · 이름 · 타입 · 선택 순서 기준으로
+# 정렬해 아웃라이너 순서(위->아래)와 TSL 순서를 함께 바꾼다. 아웃라이너 재정렬은 체크박스로
 # on/off(기본 on). 위치를 가진 노드면 조인트/메시/커브/클러스터/래티스 핸들 등 무엇이든 동작.
-# 정렬 기준(이름/타입)과 순서 방식은 AriSortOutliner.mel 을 참고했다.
+# 정렬 기준(이름/타입/선택 순서)과 순서 방식은 AriSortOutliner.mel 을 참고했다.
+# Selection 모드 = AriSortOutlinerOptions 의 'Selects' 라디오: 리스트 순서(= 고른 순서)를
+# 그대로 아웃라이너에 입힌다.
 
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
@@ -23,13 +25,17 @@ from tools.A00360_SortTool.app.core import sort_manager as sort_mgr
 
 WINDOW_OBJECT_NAME = "JUN_A00360_SortTool_window"
 
-# 정렬 기준 라디오 (label, mode). 2행 x 3열 그리드로 배치.
+# 정렬 기준 라디오 (label, mode, tooltip). 2행 x 3열 그리드로 배치.
 _SORT_MODES = [
-    ("World X", sort_mgr.MODE_X),
-    ("World Y", sort_mgr.MODE_Y),
-    ("World Z", sort_mgr.MODE_Z),
-    ("Name", sort_mgr.MODE_NAME),
-    ("Type", sort_mgr.MODE_TYPE),
+    ("World X", sort_mgr.MODE_X, "World-space X position (xform -ws -t)."),
+    ("World Y", sort_mgr.MODE_Y, "World-space Y position (xform -ws -t)."),
+    ("World Z", sort_mgr.MODE_Z, "World-space Z position (xform -ws -t)."),
+    ("Name", sort_mgr.MODE_NAME, "Short name, case-insensitive."),
+    ("Type", sort_mgr.MODE_TYPE, "Node type (shape type if any), then name."),
+    ("Selection", sort_mgr.MODE_SELECTION,
+     "Keep the list order as it is (= the order you selected the objects)\n"
+     "and apply that order to the outliner. Same as 'Selects' in\n"
+     "AriSortOutlinerOptions. Use Up/Down to adjust the order before Sort."),
 ]
 
 _WARN_COLOR = "#ffb454"
@@ -72,9 +78,10 @@ class MainWindow(QWidget):
         box = QGroupBox("Sort By")
         grid = QGridLayout(box)
         self.rb_group = QButtonGroup(self)
-        for i, (label, mode) in enumerate(_SORT_MODES):
+        for i, (label, mode, tip) in enumerate(_SORT_MODES):
             rb = QRadioButton(label)
             rb.setProperty("mode", mode)
+            rb.setToolTip(tip)
             if i == 0:
                 rb.setChecked(True)
             self.rb_group.addButton(rb, i)
@@ -118,7 +125,7 @@ class MainWindow(QWidget):
         return btn.property("mode") if btn else sort_mgr.MODE_X
 
     def _mode_label(self, mode):
-        for label, m in _SORT_MODES:
+        for label, m, _tip in _SORT_MODES:
             if m == mode:
                 return label
         return mode
@@ -171,6 +178,6 @@ class MainWindow(QWidget):
         QMessageBox.information(
             self, "About",
             "Sort Tool\nv{0}  ({1})\n\n"
-            "Sort listed objects by world X/Y/Z position, name, or type and\n"
-            "reorder them in the outliner (top->bottom).\n"
+            "Sort listed objects by world X/Y/Z position, name, type, or\n"
+            "selection order and reorder them in the outliner (top->bottom).\n"
             "by Ji Hun Park".format(VERSION, LAST_UPDATE))
