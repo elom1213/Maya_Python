@@ -1,6 +1,6 @@
 ---
 name: wip-a00370-shrink-rocket
-description: "A00370_ToolLauncher v01.11 — Pin 왼쪽 Shrink(350x155, A00220 · A00240 과 같은 크기) + 줄었을 때 툴 아이콘 로켓이 위로 발사되기를 무한 반복(app/ui/rocket_anim.py)"
+description: "A00370_ToolLauncher v01.11~12 — Pin 왼쪽 Shrink(272x155, 줄면 Pin 이 Shrunk 아래로) + 줄었을 때 툴 아이콘 로켓이 위로 발사되기를 무한 반복(app/ui/rocket_anim.py)"
 metadata:
   node_type: memory
   type: project
@@ -9,9 +9,13 @@ metadata:
 ---
 
 A00370_ToolLauncher **v01.11** (2026-10-23) — `Pin` 왼쪽 체크형 **Shrink**(72x28). 켜면 메뉴 바 ·
-`launcher_tab`(Controls / Filter / 버튼) · 저작권 줄을 `hide()` → `invalidate/activate` → **350 x 155**
-([[wip-a00220-shrink]] · [[wip-a00240-shrink-anim]] 과 같은 크기 · 같은 순서). 끄면 줄이기 전 크기
+`launcher_tab`(Controls / Filter / 버튼) · 저작권 줄을 `hide()` → `invalidate/activate` → **272 x 155**
+(세로는 [[wip-a00220-shrink]] · [[wip-a00240-shrink-anim]] 과 같고 순서도 같다). 끄면 줄이기 전 크기
 (`_full_size`, 가로 · 세로 둘 다)로. 화면만 감추므로 프로파일 · 로그는 그대로.
+
+**v01.12 (같은 날)** — 사용자 요청으로 줄었을 때 **`Pin` 이 `Shrunk` 아래**로 간다. 버튼 둘은
+`QGridLayout`(`button_grid`) 에 있고 토글에서 `Pin` 만 (0,1) ↔ (1,0) 으로 옮긴다(removeWidget →
+addWidget). 비는 Pin 칸(72 + 간격 6)만큼 가로를 줄여 350 → 272. 로켓 영역 166 x 133 은 그대로.
 
 **로켓 발사 애니메이션** — `app/ui/rocket_anim.py` `RocketAnimWidget`. A00240 `FileTreeAnimWidget`
 과 같은 꼴(start / stop / set_elapsed / is_running, 바뀔 때만 update). 헤더 행에서 메뉴 바 자리를

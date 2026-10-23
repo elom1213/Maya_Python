@@ -2,6 +2,15 @@
 
 All notable changes to this tool are documented here.
 
+## v01.12 — 2026-10-23
+
+- **Shrunk window is narrower: 272 x 155.** While shrunk, `Pin` now sits **under** `Shrunk`
+  (the two buttons stack in a small grid) instead of to its right, and the window loses the
+  column `Pin` used to take (72 px + 6 px gap: 350 -> 272). Height and the rocket area are
+  unchanged. Restoring puts `Pin` back to the right of `Shrink` on one row.
+- Verified offscreen (PySide6, 32 checks incl. Pin position in both states, no empty column).
+  Not yet checked inside Maya.
+
 ## v01.11 — 2026-10-23
 
 - **Shrink.** A checkable `Shrink` button left of `Pin` (same 72 x 28). On, it hides the

@@ -13,7 +13,8 @@
 #     그 안에 들어가므로 log_view 를 탭에 넘겨준다.
 #   - 메뉴 바: Profile > Show Profiles Folder (프로파일 json 폴더를 탐색기로, v01.09) · Help.
 #   - Shrink(v01.11): A00220_BackupTool · A00240_PathTool 의 Shrink 를 따른다. 메뉴 바 · 탭 ·
-#     저작권 줄을 감추고 창을 **A00220 이 줄었을 때와 같은 350 x 155** 로 줄인다. 줄어든 동안
+#     저작권 줄을 감추고 창을 **272 x 155** 로 줄인다(세로는 A00220 과 같고, 가로는 Pin 이
+#     Shrunk 아래로 내려가 한 칸 좁다 - v01.12). 줄어든 동안
 #     헤더 행 왼쪽 자리(`anim_area`)에서 이 툴 아이콘의 로켓이 발사되기를 무한 반복한다
 #     (app/ui/rocket_anim.py).
 # 창은 마야 메인 윈도우에 parent 되어 뷰포트 위에 뜬다. 모든 UI 문자열/로그는 영어.
@@ -24,6 +25,7 @@ from Framework.qt.qt import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
+    QGridLayout,
     QLabel,
     QMenuBar,
     QPlainTextEdit,
@@ -46,8 +48,10 @@ from tools.A00370_ToolLauncher.app.ui.rocket_anim import RocketAnimWidget
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
 WINDOW_OBJECT_NAME = "JUN_A00370_ToolLauncher_window"
 
-# Shrink 로 줄었을 때 창 크기 - A00220_BackupTool · A00240_PathTool 이 줄었을 때와 같다.
-SHRINK_WIDTH = 350
+# Shrink 로 줄었을 때 창 크기. 세로는 A00220_BackupTool · A00240_PathTool 이 줄었을 때와 같고,
+# 가로는 거기서 Pin 버튼 한 칸(72 + 간격 6)만큼 더 좁다 - 줄었을 때 Pin 이 Shrunk 아래로
+# 내려가 그 자리가 비기 때문이다(v01.12).
+SHRINK_WIDTH = 272
 SHRINK_HEIGHT = 155
 
 
@@ -109,12 +113,19 @@ class MainWindow(QWidget):
         self.anim_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.anim_area.hide()
 
+        # 버튼 둘은 작은 그리드에 둔다 - 평소엔 한 줄 [Shrink][Pin], 줄었을 때는 Pin 을
+        # Shrink 아래 칸으로 옮겨 세로로 쌓는다(v01.12). 그래서 줄었을 때 가로가 한 칸 좁다.
+        self.button_grid = QGridLayout()
+        self.button_grid.setContentsMargins(0, 0, 0, 0)
+        self.button_grid.addWidget(self.shrink_button, 0, 0)
+        self.button_grid.addWidget(self.pin_button, 0, 1)
+
         header_row = QHBoxLayout()
         header_row.setContentsMargins(0, 0, 6, 0)
         header_row.addWidget(self.menu_bar, stretch=1)
         header_row.addWidget(self.anim_area, stretch=1)
-        header_row.addWidget(self.shrink_button, 0, Qt.AlignTop)
-        header_row.addWidget(self.pin_button, 0, Qt.AlignTop)
+        header_row.addLayout(self.button_grid)
+        header_row.setAlignment(self.button_grid, Qt.AlignTop)
         main_layout.addLayout(header_row)
 
         # 공용 로그창. 탭이 상단 컨트롤의 접이식 'Log' 섹션에 담으므로 탭보다 먼저 생성.
@@ -172,14 +183,18 @@ class MainWindow(QWidget):
         프로파일 · 버튼 · 로그는 그대로다.
         """
         root = self.layout()
+        # Pin 버튼 자리: 줄었을 때는 Shrink 아래(1, 0), 평소엔 오른쪽(0, 1).
+        self.button_grid.removeWidget(self.pin_button)
         if enabled:
             self._full_size = (self.width(), self.height())
             for widget in self._shrink_hidden:
                 widget.hide()
+            self.button_grid.addWidget(self.pin_button, 1, 0)
             self.anim_area.show()
         else:
             self.anim_area.stop()
             self.anim_area.hide()
+            self.button_grid.addWidget(self.pin_button, 0, 1)
             for widget in self._shrink_hidden:
                 widget.show()
 
@@ -219,8 +234,9 @@ class MainWindow(QWidget):
             "  category, reveal its folder, set / reset its color, or delete.\n"
             "- Color Select mode paints many buttons across categories at once.\n"
             "- 'Reload on launch' re-imports the tool before showing it (dev).\n"
-            "- 'Shrink' folds the window down to a small box (350 x 155) with\n"
-            "  a looping rocket-launch animation; press again to restore.\n"
+            "- 'Shrink' folds the window down to a small box (272 x 155, Pin\n"
+            "  moves under Shrunk) with a looping rocket-launch animation;\n"
+            "  press again to restore.\n"
             "\n"
             "All UI text is English.\n"
             "\n"

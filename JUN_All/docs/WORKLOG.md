@@ -38,6 +38,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 툴: `app_meta.py` 에 `APP_NAME` · `APP_DESCRIPTION` · `tool_root()` · `start_menu_launch_spec()`. 메인 창에 `File` 메뉴(공용 메뉴 바라 Help 왼쪽) + `Add to Start Menu` → 만들고 고정 시도 → 로그 한 줄(A00240 은 Junction 탭 Log) + 안내 창(수동 고정 방법, 폴더 옮기면 다시 누르기).
 - 검증: 실제 .lnk 생성(스크래치, WScript 되읽기 · AUMID 되읽기 · 덮어쓰기 · 오류) + 두 창 offscreen 배선 테스트 24항목. **두 툴에서의 실기 클릭 · Win10 실기는 아직.** 문서 `docs/Framework_shell_integration.md` 신규, 두 툴 가이드 · CHANGELOG · docs/README 색인.
 
+> [!summary] A00370_ToolLauncher — **줄었을 때 Pin 을 Shrunk 아래로, 창 272 x 155** (v01.11->01.12) `#A00370_ToolLauncher`
+- 요청: 줄어든 뒤 `Shrunk` 버튼 밑에 `Pin` 이 오게 하고, 원래 `Pin` 이 차지하던 가로 칸을 없애 줄었을 때 가로를 줄일 것.
+- `main_window.py`: 버튼 둘을 `QGridLayout`(`button_grid`)에 두고 Shrink 토글에서 `Pin` 만 (0,1) ↔ (1,0) 으로 옮긴다(removeWidget → addWidget). `SHRINK_WIDTH` 350 → **272**(Pin 칸 72 + 간격 6). 로켓 영역(166 x 133) · 세로는 그대로.
+- 검증(오프스크린 PySide6, 32항목): 줄었을 때 Pin 이 Shrunk 와 같은 x · 아래, Shrunk 가 오른쪽 끝(빈 열 없음), 복원 시 한 줄로 복귀 + 캡처. 마야 GUI 미확인.
+
 > [!summary] A00370_ToolLauncher — **Shrink + 줄었을 때 로켓 발사 애니메이션** (v01.10->01.11) `#A00370_ToolLauncher`
 - 요청: A00220_BackupTool 처럼 Shrink 를 만들고, 줄었을 때 이 툴 아이콘의 로켓이 위로 발사되는 애니메이션을 무한 반복.
 - `main_window.py`: `Pin` 왼쪽 체크형 `Shrink`(72x28). 메뉴 바 · 런처 영역 · 저작권 줄을 `hide()` → `invalidate/activate` → **350 x 155**(A00220 · A00240 과 같은 크기). 끄면 줄이기 전 크기로. 화면만 감추므로 프로파일 · 로그 유지.
