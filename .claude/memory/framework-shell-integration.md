@@ -1,13 +1,13 @@
 ---
 name: framework-shell-integration
-description: Framework/core/shell_integration.py — standalone 툴의 File > Add to Start Menu (시작 메뉴 .lnk + AUMID, Windows 10/11). A00240 · A00220 에 적용 (2026-10-23)
+description: Framework/core/shell_integration.py — standalone 툴의 File > Add to Start Menu (시작 메뉴 .lnk + AUMID, Windows 10/11). A00240 · A00220 · A00210 에 적용 (2026-10-23)
 metadata:
   type: project
 ---
 
 **standalone PySide 툴의 "시작 메뉴 바로가기" 는 `Framework/core/shell_integration.py` 로.** JUN_Video_Tool(0110)
-`app/core/shell_integration.py` 를 공용으로 옮긴 것(2026-10-23). 첫 적용 A00240_PathTool v01.24 · A00220_BackupTool v01.19
-(`File > Add to Start Menu`). 문서 `JUN_All/docs/Framework_shell_integration.md`.
+`app/core/shell_integration.py` 를 공용으로 옮긴 것(2026-10-23). 첫 적용 A00240_PathTool v01.24 · A00220_BackupTool v01.19,
+이어 A00210_FileManager v01.39 (`File > Add to Start Menu`, 로그는 창의 `self.log`). 문서 `JUN_All/docs/Framework_shell_integration.md`.
 
 **How to apply (새 standalone 툴에 붙일 때):**
 - `app/config/app_meta.py` 에 `APP_NAME`(= .lnk 이름) · `APP_DESCRIPTION` · `start_menu_launch_spec()`(lazy import 로 Framework).

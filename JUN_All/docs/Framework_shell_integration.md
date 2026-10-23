@@ -9,7 +9,7 @@ updated: 2026-10-23
 
 standalone PySide 툴이 **자기 바로가기(.lnk)를 시작 메뉴에 만들고 시작 화면 고정을 시도**하는 공용 모듈이다.
 `JUN_Video_Tool`(0110) 의 `app/core/shell_integration.py` 를 Framework 로 옮긴 것(타입 힌트 제거, PySide2 툴에서도 import 됨).
-Qt · Maya 비의존. 첫 사용처: `A00240_PathTool` v01.24 · `A00220_BackupTool` v01.19 의 `File > Add to Start Menu`.
+Qt · Maya 비의존. 사용처: `A00240_PathTool` v01.24 · `A00220_BackupTool` v01.19 · `A00210_FileManager` v01.39 의 `File > Add to Start Menu`.
 
 ## 동작
 

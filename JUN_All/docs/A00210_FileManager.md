@@ -52,6 +52,22 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
   `launch.py` 가 Windows **AppUserModelID**(`Dnable.JUN.A00210.FileManager`)를 지정해 **이 앱 아이콘**이
   작업표시줄에 뜨도록 한다. 아이콘 경로 해석은 dev·exe 양쪽 대응(`app/config/app_meta.py`).
 
+### File > Add to Start Menu — 시작 메뉴 바로가기 (v01.39~)
+
+**[A00240_PathTool](A00240_PathTool.md) · [A00220_BackupTool](A00220_BackupTool.md) 과 같은 기능.** `File > Add to Start Menu` 를
+누르면 시작 메뉴에 이 툴의 바로가기(`JUN File Manager.lnk`, `%APPDATA%\Microsoft\Windows\Start Menu\Programs`)가 생기고
+시작 화면 고정을 시도한다. 그 뒤로는 시작 메뉴 앱 목록 · 검색에서 **JUN File Manager** 로 바로 띄울 수 있다.
+공용 모듈은 [`Framework/core/shell_integration`](Framework_shell_integration.md).
+
+- 바로가기 대상은 **`pythonw.exe` + `launch.py`**(콘솔 창 없음). PyInstaller exe 로 돌리는 중이면 exe 자신.
+  작업 폴더는 툴 폴더, 아이콘은 `icon/A00210_FileManager.ico`.
+- 바로가기에 이 툴의 **AppUserModelID**(`Dnable.JUN.A00210.FileManager`)가 들어가므로 바로가기로 띄운 창도 터미널에서 띄운
+  창과 같은 작업표시줄 버튼 · 같은 아이콘으로 묶인다.
+- **툴 폴더를 옮겼으면 다시 누른다** — 같은 .lnk 를 덮어써 경로가 갱신된다.
+- **Windows 10 · 11 공통.** 바로가기(앱 목록 · 검색)는 늘 만들어진다. "시작 화면에 고정" 은 Windows 가 그 셸 동사를
+  보여 주는 환경에서만 자동으로 되고, 아니면 안내 창의 한 줄대로 앱 목록에서 우클릭 → **시작 화면에 고정** 하면 된다.
+- 결과는 하단 로그 한 줄 + 안내 창. 실패하면 경고 창에 원인.
+
 ---
 
 ## 3. 화면 구성
@@ -521,12 +537,13 @@ A00210_FileManager/
 
 ---
 
-## Shrink · Pin (v01.37) + 폴더 애니메이션 (v01.38)
+## Shrink · Pin (v01.37, Pinned 색 v01.39) + 폴더 애니메이션 (v01.38)
 
 탭 위 오른쪽에 체크형 버튼 둘 — 다른 Qt 툴([A00220_BackupTool](A00220_BackupTool.md) · [A00240_PathTool](A00240_PathTool.md) ·
 [A00370_ToolLauncher](A00370_ToolLauncher.md))과 같은 자리 · 크기(72 x 28).
 
 - **Pin** — 이 창을 다른 창들보다 **항상 위**에 둔다(라벨 `Pinned`). 다시 누르면 해제. standalone 앱이라 OS 의 다른 창들 위에 선다.
+  켜진 동안 버튼이 **연한 빨강**(v01.39~) — 다른 세 툴과 같은 공용 [`Framework/qt/pin_style`](Framework_pin_style.md).
 - **Shrink** — 메뉴 바 · 탭 · 로그를 감추고 창을 **272 x 155 px** 로 줄인다. 줄었을 때는 **`Pin` 이 `Shrunk` 아래**로 내려간다.
   다시 누르면 줄이기 전 크기(가로 · 세로 둘 다)로 돌아간다. 감추는 것은 화면뿐이라 프로파일 · 스캔 결과 · 로그는 그대로다.
 

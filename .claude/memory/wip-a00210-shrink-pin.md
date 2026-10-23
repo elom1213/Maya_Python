@@ -1,6 +1,6 @@
 ---
 name: wip-a00210-shrink-pin
-description: "A00210_FileManager v01.37~38 — 탭 위 헤더 행 Shrink · Pin(272x155, Pin 은 Shrunk 아래) + 줄었을 때 아이콘의 폴더 · 기록 카드 · 동기화 뱃지 애니메이션 무한 반복(app/ui/folder_anim.py)"
+description: "A00210_FileManager v01.37~39 — 탭 위 헤더 행 Shrink · Pin(272x155, Pin 은 Shrunk 아래) + 줄었을 때 아이콘의 폴더 · 기록 카드 · 동기화 뱃지 애니메이션 무한 반복(app/ui/folder_anim.py)"
 metadata:
   node_type: memory
   type: project
@@ -24,3 +24,6 @@ A00210_FileManager **v01.37** (2026-10-23) — 탭 위에 헤더 행 추가, [[w
   내려감 0.5(ease-in) → 쉼 2.7~3.0. 속도를 바꾸려면 클래스 상수 `RISE / FILL_* / SYNC_* / LOWER` 만.
 
 검증: 오프스크린 PySide6 27항목 + 시각별 캡처 6장. **실제 앱 눈 확인 아직.**
+
+**v01.39** (2026-10-23) — Pin 켜짐 색은 공용 [[framework-pin-style]] 한 줄, `File > Add to Start Menu` 는 공용
+[[framework-shell-integration]](A00240 과 같은 꼴, `APP_NAME` = JUN File Manager). 실기 클릭 아직.

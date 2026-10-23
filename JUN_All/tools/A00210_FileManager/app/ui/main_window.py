@@ -11,6 +11,7 @@
 #    로그를 감추고 창을 272 x 155 로 줄이며 Pin 이 Shrunk 아래로 내려간다. 줄어든 동안 버튼 왼쪽
 #    자리(`anim_area`)에서 툴 아이콘의 폴더 · 기록 카드 · 동기화 뱃지가 움직이기를 무한 반복한다
 #    (v01.38, app/ui/folder_anim.py).
+#  - File > Add to Start Menu (v01.39): 공용 Framework/core/shell_integration, Windows 10 · 11.
 
 import os
 import time
@@ -43,15 +44,20 @@ from Framework.qt.qt import (
     QFrame,
     QStyle,
     QGuiApplication,
+    QApplication,
+    QAction,
     QSizePolicy,
     QTimer,
     Qt,
 )
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.pin_style import apply_pin_style
+from Framework.core import shell_integration
 
 from ..config.version import VERSION, LAST_UPDATE
-from ..config.app_meta import icon_path
+from ..config.app_meta import (
+    icon_path, APP_NAME, APP_USER_MODEL_ID, APP_DESCRIPTION, start_menu_launch_spec)
 from ..config import data_repo
 from ..core import scanner, prefs as prefs_mod
 from ..core.store import MetaStore, OutsideProjectRootError
@@ -257,6 +263,16 @@ class MainWindow(QWidget):
         self.menu_bar.addMenu("Help")
         root.setMenuBar(self.menu_bar)
 
+        # File 메뉴 (v01.39) - 시작 메뉴 바로가기. 공용 메뉴 바라 Help 의 **왼쪽**에 끼워진다 (A00240 · A00220 과 같음).
+        file_menu = self.menu_bar.addMenu("File")
+        self.act_start_menu = QAction("Add to Start Menu", self)
+        self.act_start_menu.setToolTip(
+            "Create a Start menu shortcut for this tool (and try to pin it to Start).\n"
+            "Windows 10 / 11. Click again after moving the tool folder.")
+        self.act_start_menu.setEnabled(shell_integration.is_supported())
+        self.act_start_menu.triggered.connect(self.add_to_start_menu)
+        file_menu.addAction(self.act_start_menu)
+
         # 상단 헤더 행 : Shrink · Pin(항상 위) 토글 (v01.37) - 다른 Qt 툴들과 같은 자리 · 크기.
         # 탭의 코너 위젯 대신 별도 행에 둔다 - 토글로 라벨이 바뀌어도 위치·크기가 흔들리지 않는다.
         self.pin_button = QPushButton("Pin")
@@ -265,6 +281,8 @@ class MainWindow(QWidget):
         # 고정 크기 - "Pin"/"Pinned" 토글 시 버튼 크기가 변하지 않도록(넓은 라벨 기준).
         self.pin_button.setFixedSize(72, 28)
         self.pin_button.toggled.connect(self.toggle_always_on_top)
+        # 켜진 동안(Pinned) 연한 빨강 - 공용 Framework/qt/pin_style (v01.39, A00240 · A00220 · A00370 과 같은 색).
+        apply_pin_style(self.pin_button)
 
         self.shrink_button = QPushButton("Shrink")
         self.shrink_button.setCheckable(True)
@@ -346,6 +364,38 @@ class MainWindow(QWidget):
         self._fitted = False
 
     # ============================================================== Pin / Shrink
+
+    def add_to_start_menu(self):
+        """File > Add to Start Menu - 시작 메뉴에 이 툴의 바로가기(.lnk)를 만들고 시작 화면 고정을 시도한다.
+
+        공용 Framework.core.shell_integration (A00240 · A00220 · JUN_Video_Tool 과 같은 방식, Windows 10 · 11).
+        바로가기 대상은 pythonw.exe + launch.py(콘솔 창 없음) 또는 exe 자신, AppUserModelID 가
+        들어가므로 바로가기로 띄운 창도 같은 작업표시줄 버튼 · 툴 아이콘으로 묶인다.
+        툴 폴더를 옮겼으면 다시 눌러 경로를 갱신한다. 고정 동사가 없는 OS/빌드에선 수동 고정을 안내한다.
+        """
+        error = None
+        pinned = "unavailable"
+        lnk = ""
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            lnk = shell_integration.add_to_start_menu(
+                APP_NAME, APP_USER_MODEL_ID, start_menu_launch_spec(), APP_DESCRIPTION)
+            pinned = shell_integration.pin_shortcut(lnk, "start")
+        except shell_integration.ShellIntegrationError as exc:
+            error = exc
+        finally:
+            QApplication.restoreOverrideCursor()
+
+        if error is not None:
+            self.log("Could not create the Start menu shortcut: {0}".format(error))
+            QMessageBox.warning(
+                self, "Start Menu",
+                "Could not create the Start menu shortcut:\n{0}".format(error))
+            return
+
+        self.log("Start menu shortcut: {0} (pin to Start: {1})".format(lnk, pinned))
+        QMessageBox.information(
+            self, "Start Menu", shell_integration.start_menu_message(APP_NAME, pinned))
 
     def toggle_always_on_top(self, enabled):
         """Pin - 이 창을 다른 창 위에 고정한다.
