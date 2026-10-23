@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-23 (오늘)
 
+> [!summary] A00210_FileManager — **Shrink · Pin 추가** (v01.36->01.37) `#A00210_FileManager`
+- 요청: A00210 에도 Shrink · Pin 기능 추가 + 줄었을 때 반복 애니메이션 아이디어 제시(제시만, 구현은 아직).
+- `main_window.py`: 탭 위 헤더 행(A00240 과 같은 모양) — `Pin`(WindowStaysOnTopHint, show() 재호출) · `Shrink`(메뉴 바 · `tabs_scroll` · 로그 `hide()` → `invalidate/activate` → **272 x 155**, Pin 은 `button_grid` (0,1) ↔ (1,0)). 복원은 `_full_size`. 버튼 왼쪽 `anim_area` 는 빈 `QWidget`(Expanding) — 애니메이션 정하면 바꿔 끼운다. `fit_to_content` 는 첫 show 에만 돌아 Pin 의 show() 와 충돌 없음.
+- 검증(오프스크린 PySide6, 15항목): 버튼 자리 · 크기, 감춘 위젯, 272x155, Pin 이 Shrunk 아래, 복원 크기 · 자리, 반복 토글, Shrink 중 Pin + 캡처. 실제 앱 눈 확인은 아직.
+- 문서 `docs/A00210_FileManager.md` "Shrink · Pin" 절, CHANGELOG, version.
+
 > [!summary] A00240_PathTool · A00220_BackupTool — **줄었을 때 Pin 을 Shrunk 아래로, 창 272 x 155** (A00240 v01.24->01.25 · A00220 v01.19->01.20) `#A00240_PathTool` `#A00220_BackupTool`
 - 요청: A00370 v01.12 와 똑같이 두 툴도 줄었을 때 가로를 줄일 것.
 - 둘 다 버튼 둘을 `QGridLayout`(`button_grid`)에 두고 Shrink 토글에서 `Pin` 만 (0,1) ↔ (1,0) 으로 옮긴다. `SHRINK_WIDTH` 350 → **272**. A00220 은 공룡을 헤더 행 아래(root index 1)가 아니라 **헤더 행 왼쪽(index 0)** 으로 옮겨 세로 155 를 유지, `_full_height` → `_full_size`(가로도 복원). 세 툴(A00220 · A00240 · A00370)이 줄었을 때 같은 모양 · 같은 크기.

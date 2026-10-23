@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-19
+# last Update date : 2026-10-23
 # A00210_FileManager - main window (Qt, standalone)
 #
 # Maya 씬 파일(.mb/.ma)의 작업 기록을 관리한다.
@@ -7,6 +7,9 @@
 #  - 파일별 작업자 / 작업 기록(log) 보기·편집
 #  - 화면 영역 캡쳐로 썸네일 저장
 #  - 기록(records/thumbs)을 git 으로 pull/push (원본 mb/ma 는 push 대상 아님)
+#  - 헤더 행 Shrink · Pin (v01.37): A00220 · A00240 · A00370 과 같은 모양. Shrink 는 메뉴 바 · 탭 ·
+#    로그를 감추고 창을 272 x 155 로 줄이며 Pin 이 Shrunk 아래로 내려간다. 줄어든 동안 버튼 왼쪽
+#    자리(`anim_area`)는 비워 두었다 - 반복 애니메이션은 아직 정하지 않았다.
 
 import os
 import time
@@ -39,6 +42,7 @@ from Framework.qt.qt import (
     QFrame,
     QStyle,
     QGuiApplication,
+    QSizePolicy,
     QTimer,
     Qt,
 )
@@ -61,6 +65,10 @@ from ..maya.ui.maya_tab import MayaTab
 
 THUMB_W = 320
 THUMB_H = 180
+
+#: 줄어든 창 크기 - A00220_BackupTool · A00240_PathTool · A00370_ToolLauncher 가 줄었을 때와 같다(v01.37).
+SHRINK_WIDTH = 272
+SHRINK_HEIGHT = 155
 
 
 class _BranchComboBox(QComboBox):
@@ -229,6 +237,9 @@ class MainWindow(QWidget):
         self._path_values = {"git": "", "local": ""}
         self._active_mode = "git"       # 현재 입력 칸이 담고 있는 모드
 
+        # Shrink 전 창 크기 (되돌릴 때 쓴다)
+        self._full_size = None
+
         self._build_ui()
         self._load_prefs_to_ui()
         self._refresh_profiles()
@@ -243,6 +254,47 @@ class MainWindow(QWidget):
         self.menu_bar = JUN_mod_menuBar_qt_v01(tool_file=__file__)
         self.menu_bar.addMenu("Help")
         root.setMenuBar(self.menu_bar)
+
+        # 상단 헤더 행 : Shrink · Pin(항상 위) 토글 (v01.37) - 다른 Qt 툴들과 같은 자리 · 크기.
+        # 탭의 코너 위젯 대신 별도 행에 둔다 - 토글로 라벨이 바뀌어도 위치·크기가 흔들리지 않는다.
+        self.pin_button = QPushButton("Pin")
+        self.pin_button.setCheckable(True)
+        self.pin_button.setToolTip("Keep this window above other windows")
+        # 고정 크기 - "Pin"/"Pinned" 토글 시 버튼 크기가 변하지 않도록(넓은 라벨 기준).
+        self.pin_button.setFixedSize(72, 28)
+        self.pin_button.toggled.connect(self.toggle_always_on_top)
+
+        self.shrink_button = QPushButton("Shrink")
+        self.shrink_button.setCheckable(True)
+        self.shrink_button.setToolTip(
+            "Hide the tabs and the log and make the window small.\n"
+            "Press again to bring them back.")
+        self.shrink_button.setFixedSize(72, 28)
+        self.shrink_button.toggled.connect(self.toggle_shrink)
+
+        # 줄어든 동안만 보이는 자리 - 반복 애니메이션이 들어갈 칸(아직 비어 있다). 남는 가로 · 세로를
+        # 전부 차지해야 그릴 자리가 나온다(안 그러면 버튼 높이 28px 로 묶인다). 나중에 위젯을 바꿔 끼운다.
+        self.anim_area = QWidget()
+        self.anim_area.setObjectName("A00210_shrink_anim_area")
+        self.anim_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.anim_area.hide()
+
+        # 버튼 둘은 작은 그리드에 둔다 - 평소엔 한 줄 [Shrink][Pin], 줄었을 때는 Pin 을
+        # Shrink 아래 칸으로 옮겨 세로로 쌓는다. 그래서 줄었을 때 가로가 한 칸 좁다(272).
+        self.button_grid = QGridLayout()
+        self.button_grid.setContentsMargins(0, 0, 0, 0)
+        self.button_grid.addWidget(self.shrink_button, 0, 0)
+        self.button_grid.addWidget(self.pin_button, 0, 1)
+
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(0, 0, 0, 0)
+        header_row.addWidget(self.anim_area, 1)
+        # 가중치 0 : 평소(anim_area 숨김)에는 버튼을 오른쪽으로 밀고, 줄었을 때는
+        # 남는 폭을 anim_area(가중치 1)가 전부 가져간다.
+        header_row.addStretch(0)
+        header_row.addLayout(self.button_grid)
+        header_row.setAlignment(self.button_grid, Qt.AlignTop)
+        root.addLayout(header_row)
 
         # 로그 위젯은 탭 밖(하단)에 두어 모든 탭에서 보이게 한다.
         # 새 탭이 self.log 를 캡처하므로 탭보다 먼저 생성한다.
@@ -290,6 +342,55 @@ class MainWindow(QWidget):
         root.addWidget(self.tabs_scroll, stretch=1)
         root.addWidget(self.log_widget)
         self._fitted = False
+
+    # ============================================================== Pin / Shrink
+
+    def toggle_always_on_top(self, enabled):
+        """Pin - 이 창을 다른 창 위에 고정한다.
+
+        플래그를 바꾸면 창이 숨으므로 **반드시 다시 show()** 한다(Qt 규칙).
+        standalone 앱이라 마야 창이 아니라 OS 의 다른 창들 위에 선다.
+        """
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, enabled)
+        self.pin_button.setText("Pinned" if enabled else "Pin")
+        self.show()
+        self.log("Always on Top: {0}".format("ON" if enabled else "OFF"))
+
+    def toggle_shrink(self, enabled):
+        """Shrink 토글 - 메뉴 바 · 탭 · 로그를 감추고 창을 SHRINK_WIDTH x SHRINK_HEIGHT 로.
+
+        A00220 · A00240 · A00370 과 같은 순서다: 감추기 -> 레이아웃 최소 크기 다시 계산 -> resize.
+        (다시 계산하지 않으면 옛 최소 크기에 막혀 창이 줄지 않는다.)
+        되돌릴 때는 줄이기 전 크기(가로 · 세로 둘 다)로 돌아간다. 감추는 것은 화면뿐이라
+        프로파일 · 스캔 결과 · 로그는 그대로다.
+        """
+        root = self.layout()
+        # Pin 버튼 자리: 줄었을 때는 Shrink 아래(1, 0), 평소엔 오른쪽(0, 1).
+        self.button_grid.removeWidget(self.pin_button)
+        if enabled:
+            self._full_size = (self.width(), self.height())
+            self.menu_bar.hide()
+            self.tabs_scroll.hide()
+            self.log_widget.hide()
+            self.button_grid.addWidget(self.pin_button, 1, 0)
+            self.anim_area.show()
+        else:
+            self.anim_area.hide()
+            self.button_grid.addWidget(self.pin_button, 0, 1)
+            self.menu_bar.show()
+            self.tabs_scroll.show()
+            self.log_widget.show()
+
+        self.shrink_button.setText("Shrunk" if enabled else "Shrink")
+
+        root.invalidate()
+        root.activate()
+        if enabled:
+            self.resize(SHRINK_WIDTH, SHRINK_HEIGHT)
+        elif self._full_size:
+            self.resize(*self._full_size)
+
+        self.log("Shrink: {0}".format("ON" if enabled else "OFF"))
 
     # ============================================================== 창 크기
 

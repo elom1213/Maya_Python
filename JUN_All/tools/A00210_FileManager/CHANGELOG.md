@@ -2,6 +2,19 @@
 
 All notable changes to this tool are documented here.
 
+## [01.37] - 2026-10-23
+### Added
+- **`Shrink` and `Pin` buttons** in a header row above the tabs (right side, 72 x 28 each) - the same
+  pair `A00220_BackupTool`, `A00240_PathTool` and `A00370_ToolLauncher` have.
+  - **`Pin`** keeps this window above other windows (`Pinned` while on); press again to release.
+  - **`Shrink`** hides the menu bar, the tabs and the log and resizes the window to **272 x 155**,
+    with `Pin` moved **under** `Shrunk`. Press again to restore the previous window size (width and
+    height). Only the display is hidden: profile, scan results and the log stay as they were.
+  - The space left of the two buttons is reserved for a looping animation while shrunk; it is
+    still empty in this version.
+  - Verified offscreen (PySide6, 15 checks: button place / size, hidden widgets, 272 x 155, Pin under
+    Shrunk, restore, repeated toggles, Pin while shrunk). Not yet checked by eye in the running tool.
+
 ## [01.36] - 2026-10-12
 ### Fixed
 - **The window can be resized again by dragging its edges.** It opens at the same size as before, but that
