@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-23 (오늘)
 
+> [!summary] A00370_ToolLauncher — **Shrink + 줄었을 때 로켓 발사 애니메이션** (v01.10->01.11) `#A00370_ToolLauncher`
+- 요청: A00220_BackupTool 처럼 Shrink 를 만들고, 줄었을 때 이 툴 아이콘의 로켓이 위로 발사되는 애니메이션을 무한 반복.
+- `main_window.py`: `Pin` 왼쪽 체크형 `Shrink`(72x28). 메뉴 바 · 런처 영역 · 저작권 줄을 `hide()` → `invalidate/activate` → **350 x 155**(A00220 · A00240 과 같은 크기). 끄면 줄이기 전 크기로. 화면만 감추므로 프로파일 · 로그 유지.
+- `app/ui/rocket_anim.py` `RocketAnimWidget`(신규): 코드 비트맵 로켓 11x14(몸체 = 테마 글자색, 창문 · 날개 · 불꽃 = 아이콘 코랄). 한 바퀴 2.4초 — 점화 0.6초(불꽃 깜빡임 + 떨림) → 상승 1.2초(ease-in, 연기 점 꼬리) → 빈 하늘 0.6초 → 반복. 켤 때마다 처음부터, 끄면 정지, 모습이 바뀔 때만 다시 그린다. A00240 `FileTreeAnimWidget` 과 같은 꼴(start/stop/set_elapsed).
+- 검증(오프스크린 PySide6, 29항목): 버튼 자리 · 크기, 감춘 위젯, 350x155, 왕복 복원, 반복 토글, shrink 중 Pin, 단계 · 루프 되감기 · 연기 + 시각별 캡처로 눈 확인. 마야 GUI 미확인.
+- 문서: `docs/A00370_ToolLauncher.md` 11) 절, CHANGELOG, version.
+
 > [!summary] A00360_SortTool — **Sort By > Selection: 선택한 순서대로 아웃라이너 정렬** (v01.02->01.03) `#A00360_SortTool`
 - 요청: 오브젝트를 **선택한 순서대로** 아웃라이너 정렬 순서를 바꾸는 기능. `AriSortOutlinerOptions` 의 **Selects** 라디오와 같은 동작.
 - 코어 `sort_manager.py`: `MODE_SELECTION` 추가 — 정렬 키를 새로 계산하지 않고 `items` 의 **인덱스**(= 들어온 리스트 순서)를 키로 쓴다. 리스트는 Select Objects 시점의 선택 순서이므로 결국 선택 순서. 아웃라이너 적용은 기존 슬롯 스왑(부모별 그룹) 그대로, Reverse · Reorder in Outliner 옵션도 그대로 먹는다. 위치 없는 DG 노드도 이 모드에선 건너뛰지 않는다(아웃라이너는 DAG 만).

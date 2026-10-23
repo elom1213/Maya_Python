@@ -2,6 +2,24 @@
 
 All notable changes to this tool are documented here.
 
+## v01.11 — 2026-10-23
+
+- **Shrink.** A checkable `Shrink` button left of `Pin` (same 72 x 28). On, it hides the
+  menu bar, the whole launcher area (Controls / Filter / buttons) and the copyright line and
+  resizes the window to **350 x 155** - the same size `A00220_BackupTool` and `A00240_PathTool`
+  get when shrunk. Press again (`Shrunk`) to restore the previous window size (width and height).
+  Only the display is hidden: profiles, buttons and the log stay as they were.
+- **Rocket launch animation while shrunk** (`app/ui/rocket_anim.py`, `RocketAnimWidget`).
+  The tool icon's rocket is drawn as a code bitmap (body in the theme text colour, window /
+  fins / flame in the icon's coral) in the space left of the two buttons, and **loops forever**:
+  0.6 s ignition on the pad (flickering flame, slight shake) -> 1.2 s lift-off accelerating
+  (ease-in) out of the top, leaving a fading exhaust trail -> 0.6 s empty sky -> again. One loop
+  is 2.4 s. Restarts from the pad every time Shrink is turned on, stops when it is turned off.
+  Repaints only when the picture changes (no redraw during the idle phases).
+- Verified offscreen (PySide6, 29 checks: button place / size, hidden widgets, 350 x 155,
+  round-trip restore, repeated toggles, Pin while shrunk, animation phases / loop wrap / trail)
+  plus captures at several times. Not yet checked inside Maya.
+
 ## v01.10 — 2026-10-22
 
 - **Profiles reorganised (data only, no code change).** Plan:

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-22
+# last Update date : 2026-10-23
 # A00370_ToolLauncher - Qt UI (in-Maya)
 #
 # 자주 쓰는 JUN 툴들을 버튼 하나로 팝업시키는 숏컷 런처.
@@ -12,6 +12,10 @@
 #     컨트롤 4칸은 하나의 접이식 'Controls' 박스로 묶여 한 번에 접힌다. 로그창도
 #     그 안에 들어가므로 log_view 를 탭에 넘겨준다.
 #   - 메뉴 바: Profile > Show Profiles Folder (프로파일 json 폴더를 탐색기로, v01.09) · Help.
+#   - Shrink(v01.11): A00220_BackupTool · A00240_PathTool 의 Shrink 를 따른다. 메뉴 바 · 탭 ·
+#     저작권 줄을 감추고 창을 **A00220 이 줄었을 때와 같은 350 x 155** 로 줄인다. 줄어든 동안
+#     헤더 행 왼쪽 자리(`anim_area`)에서 이 툴 아이콘의 로켓이 발사되기를 무한 반복한다
+#     (app/ui/rocket_anim.py).
 # 창은 마야 메인 윈도우에 parent 되어 뷰포트 위에 뜬다. 모든 UI 문자열/로그는 영어.
 
 import os
@@ -25,6 +29,7 @@ from Framework.qt.qt import (
     QPlainTextEdit,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     Qt,
 )
 from Framework.core import file_opener
@@ -35,10 +40,15 @@ from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 from tools.A00370_ToolLauncher.app.config.version import VERSION, LAST_UPDATE
 from tools.A00370_ToolLauncher.app.core import prefs as prefs_mod
 from tools.A00370_ToolLauncher.app.ui.launcher_tab import LauncherTab
+from tools.A00370_ToolLauncher.app.ui.rocket_anim import RocketAnimWidget
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
 WINDOW_OBJECT_NAME = "JUN_A00370_ToolLauncher_window"
+
+# Shrink 로 줄었을 때 창 크기 - A00220_BackupTool · A00240_PathTool 이 줄었을 때와 같다.
+SHRINK_WIDTH = 350
+SHRINK_HEIGHT = 155
 
 
 class MainWindow(QWidget):
@@ -51,6 +61,9 @@ class MainWindow(QWidget):
         self.setWindowTitle("Tool Launcher v{0}".format(VERSION))
         self.setWindowFlags(Qt.Window)
         self.resize(380, 640)
+
+        # Shrink 전 창 크기 (되돌릴 때 쓴다)
+        self._full_size = None
 
         self.build_ui()
 
@@ -80,10 +93,28 @@ class MainWindow(QWidget):
         self.pin_button.setFixedSize(72, 28)
         self.pin_button.toggled.connect(self.toggle_always_on_top)
 
+        # Shrink : 켜면 메뉴 바 · 탭 · 저작권 줄을 감추고 창을 작게 (아래 toggle_shrink, v01.11).
+        self.shrink_button = QPushButton("Shrink")
+        self.shrink_button.setCheckable(True)
+        self.shrink_button.setToolTip(
+            "Hide the buttons and make the window small.\n"
+            "Press again to bring them back.")
+        self.shrink_button.setFixedSize(72, 28)
+        self.shrink_button.toggled.connect(self.toggle_shrink)
+
+        # 줄어든 동안만 보이는 자리 - 로켓 발사 애니메이션(v01.11). 메뉴 바가 있던 자리를
+        # 그대로 물려받아 남는 가로 · 세로를 전부 차지한다(안 그러면 버튼 높이 28px 로 묶인다).
+        self.anim_area = RocketAnimWidget()
+        self.anim_area.setObjectName("A00370_shrink_anim_area")
+        self.anim_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.anim_area.hide()
+
         header_row = QHBoxLayout()
         header_row.setContentsMargins(0, 0, 6, 0)
         header_row.addWidget(self.menu_bar, stretch=1)
-        header_row.addWidget(self.pin_button)
+        header_row.addWidget(self.anim_area, stretch=1)
+        header_row.addWidget(self.shrink_button, 0, Qt.AlignTop)
+        header_row.addWidget(self.pin_button, 0, Qt.AlignTop)
         main_layout.addLayout(header_row)
 
         # 공용 로그창. 탭이 상단 컨트롤의 접이식 'Log' 섹션에 담으므로 탭보다 먼저 생성.
@@ -98,9 +129,12 @@ class MainWindow(QWidget):
         main_layout.addWidget(self.launcher_tab, stretch=1)
 
         # 저작권
-        footer = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
-        footer.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(footer)
+        self.footer = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
+        self.footer.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(self.footer)
+
+        # Shrink 가 감추는 것들 (로켓과 Shrink · Pin 버튼만 남는다)
+        self._shrink_hidden = (self.menu_bar, self.launcher_tab, self.footer)
 
     # ================================================================
     # Helper / About
@@ -129,6 +163,39 @@ class MainWindow(QWidget):
             "Always on Top: {0}".format("ON" if enabled else "OFF")
         )
 
+    def toggle_shrink(self, enabled):
+        """Shrink 토글 - 메뉴 바 · 탭 · 저작권 줄을 감추고 창을 SHRINK_WIDTH x SHRINK_HEIGHT 로.
+
+        A00220 · A00240 과 같은 순서다: 감추기 -> 레이아웃 최소 크기 다시 계산 -> resize.
+        (다시 계산하지 않으면 옛 최소 크기에 막혀 창이 줄지 않는다.)
+        되돌릴 때는 줄이기 전 크기(가로 · 세로 둘 다)로 돌아간다. 감추는 것은 화면뿐이라
+        프로파일 · 버튼 · 로그는 그대로다.
+        """
+        root = self.layout()
+        if enabled:
+            self._full_size = (self.width(), self.height())
+            for widget in self._shrink_hidden:
+                widget.hide()
+            self.anim_area.show()
+        else:
+            self.anim_area.stop()
+            self.anim_area.hide()
+            for widget in self._shrink_hidden:
+                widget.show()
+
+        self.shrink_button.setText("Shrunk" if enabled else "Shrink")
+
+        root.invalidate()
+        root.activate()
+        if enabled:
+            self.resize(SHRINK_WIDTH, SHRINK_HEIGHT)
+            # 켤 때마다 처음부터 - 발사대에서 점화한 뒤 위로 날아가기를 되풀이한다.
+            self.anim_area.start()
+        elif self._full_size:
+            self.resize(*self._full_size)
+
+        self._log("Shrink: {0}".format("ON" if enabled else "OFF"))
+
     def show_about(self, *args):
         message = (
             "Tool Launcher v{version}\n"
@@ -152,6 +219,8 @@ class MainWindow(QWidget):
             "  category, reveal its folder, set / reset its color, or delete.\n"
             "- Color Select mode paints many buttons across categories at once.\n"
             "- 'Reload on launch' re-imports the tool before showing it (dev).\n"
+            "- 'Shrink' folds the window down to a small box (350 x 155) with\n"
+            "  a looping rocket-launch animation; press again to restore.\n"
             "\n"
             "All UI text is English.\n"
             "\n"

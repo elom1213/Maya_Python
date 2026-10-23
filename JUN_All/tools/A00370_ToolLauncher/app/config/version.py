@@ -1,7 +1,10 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-22
+# last Update date : 2026-10-23
 # A00370_ToolLauncher - version info
 
+# 01.11  Shrink 토글(Pin 왼쪽) - 메뉴 바 · 탭 · 저작권 줄을 감추고 창을 350 x 155 로
+#        (A00220 · A00240 이 줄었을 때와 같은 크기). 줄어든 동안 버튼 왼쪽 자리에서 툴
+#        아이콘의 로켓이 발사되기를 무한 반복(app/ui/rocket_anim.py, 한 바퀴 2.4초).
 # 01.10  프로파일 정리(데이터만, 코드 변경 없음): Mesh -> MESH 이름 변경, FACIAL · UTIL 신설,
 #        기존 버튼 순서 그대로 두고 새 카테고리에 툴 22종 추가(버튼 13 -> 38), 프로파일별 버튼 색.
 #        계획서 docs/plans/A00370_ToolLauncher_profile_classification_plan.md
@@ -14,5 +17,5 @@
 #        meshDoctor(A00380 의 MeshDoctor 탭으로 이식됨)는 삭제, uvTool / BSTool /
 #        AnimTool / jointTool 은 현행 버전 폴더로 교체. 코드 변경은 없다(data/profiles).
 
-VERSION = "01.10"
-LAST_UPDATE = "2026-10-22"
+VERSION = "01.11"
+LAST_UPDATE = "2026-10-23"
