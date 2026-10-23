@@ -1,6 +1,6 @@
 ---
 name: wip-a00220-shrink
-description: "A00220_BackupTool v01.15 — Pin 옆 Shrink 토글, 공룡만 남기고 창 788→155px. 숨길 그룹 안의 위젯은 레이아웃 사이를 옮겨서 살린다"
+description: "A00220_BackupTool v01.15 — Pin 옆 Shrink 토글, 공룡만 남기고 창 788→155px. 숨길 그룹 안의 위젯은 레이아웃 사이를 옮겨서 살린다. v01.20: 272x155, Pin 은 Shrunk 아래 · 공룡은 헤더 행 왼쪽"
 metadata: 
   node_type: memory
   type: project
@@ -26,3 +26,8 @@ metadata:
 접힌 Settings 유지, 반복 토글, shrink 중 Pin) + `QT_QPA_PLATFORM=windows` + `WA_DontShowOnScreen`
 으로 **실제 폰트 캡처**해 눈으로 확인. 마야와 무관한 standalone 툴이라 mayapy 불필요.
 관련: [[wip-a00220-pin]], [[wip-a00220-dino-save-pulse]]
+
+**v01.20 (2026-10-23)** — A00370 v01.12 · A00240 v01.25 와 같은 모양으로: 버튼 둘을 `QGridLayout`
+(`button_grid`)에 두고 토글에서 `Pin` 만 (0,1) ↔ (1,0) 으로 옮긴다. 공룡은 root index 1 이 아니라
+**`header_row` index 0(버튼 왼쪽, 같은 행)** 으로 옮긴다 — 그래야 세로 155 가 유지된다. 창은
+`SHRINK_WIDTH/HEIGHT` = **272 x 155**(Pin 칸 72 + 6 만큼 좁힘), 복원은 `_full_size`(가로 · 세로).

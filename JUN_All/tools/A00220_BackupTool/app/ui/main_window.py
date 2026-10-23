@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-22
+# last Update date : 2026-10-23
 # A00220_BackupTool - main window (Qt, standalone)
 #
 # 컴퓨터 비정상 종료에 대비해 지정 파일들을 주기적으로 자동 백업한다.
@@ -58,6 +58,11 @@ from .dino_widget import DinoWidget
 STATE_DEACTIVE = "deactive"
 STATE_ACTIVE = "active"
 STATE_SAVING = "saving"
+
+#: 줄어든 창 크기 - A00240_PathTool · A00370_ToolLauncher 가 줄었을 때와 같다(v01.20).
+#: 세로 155 는 v01.15 의 green_mid 실측, 가로는 Pin 이 Shrunk 아래로 내려가 350 → 272.
+SHRINK_WIDTH = 272
+SHRINK_HEIGHT = 155
 
 
 def _dropped_paths(event):
@@ -181,12 +186,20 @@ class MainWindow(QWidget):
         self.shrink_button.setFixedSize(72, 28)
         self.shrink_button.toggled.connect(self.toggle_shrink)
 
-        header_row = QHBoxLayout()
-        header_row.setContentsMargins(0, 0, 0, 0)
-        header_row.addStretch(1)
-        header_row.addWidget(self.shrink_button)
-        header_row.addWidget(self.pin_button)
-        root.addLayout(header_row)
+        # 버튼 둘은 작은 그리드에 둔다 - 평소엔 한 줄 [Shrink][Pin], 줄었을 때는 Pin 을
+        # Shrink 아래 칸으로 옮겨 세로로 쌓는다(v01.20). 그래서 줄었을 때 가로가 한 칸 좁다.
+        self.button_grid = QGridLayout()
+        self.button_grid.setContentsMargins(0, 0, 0, 0)
+        self.button_grid.addWidget(self.shrink_button, 0, 0)
+        self.button_grid.addWidget(self.pin_button, 0, 1)
+
+        # 줄었을 때 공룡이 이 행의 왼쪽(인덱스 0)으로 들어온다 - 그래서 행을 기억해 둔다.
+        self.header_row = QHBoxLayout()
+        self.header_row.setContentsMargins(0, 0, 0, 0)
+        self.header_row.addStretch(1)
+        self.header_row.addLayout(self.button_grid)
+        self.header_row.setAlignment(self.button_grid, Qt.AlignTop)
+        root.addLayout(self.header_row)
 
         self._files_group = self._build_files_group()
         self._control_group = self._build_control_group()
@@ -206,7 +219,8 @@ class MainWindow(QWidget):
         self._shrink_hidden = (
             self._files_group, self._settings_section, self._control_group,
             self.lbl_log, self.log_widget)
-        self._full_height = None
+        # Shrink 전 창 크기 (되돌릴 때 쓴다 - v01.20 부터 가로도 줄이므로 둘 다)
+        self._full_size = None
 
     def _on_settings_toggled(self, expanded):
         """Settings 를 접고/펼칠 때, 사라지거나 나타나는 본문 높이만큼만 '창'을
@@ -456,27 +470,34 @@ class MainWindow(QWidget):
     # ============================================================== shrink
 
     def toggle_shrink(self, enabled):
-        """Shrink 토글 — 공룡(과 Shrink · Pin 버튼)만 남기고 창을 그만큼 줄인다.
+        """Shrink 토글 — 공룡(과 Shrink · Pin 버튼)만 남기고 창을 SHRINK_WIDTH x SHRINK_HEIGHT 로.
 
         공룡은 `Control` 그룹 안에 있는데 그 그룹을 통째로 숨기면 공룡도 사라지므로,
-        **공룡만 창의 최상위 레이아웃으로 잠깐 옮긴다**(복제가 아니라 이동 - 애니메이션과
+        **공룡만 헤더 행의 왼쪽으로 잠깐 옮긴다**(복제가 아니라 이동 - 애니메이션과
         타이머가 그대로 이어진다). 되돌릴 때 원래 자리(`_dino_index`)로 돌려놓는다.
+        v01.20 부터 Pin 이 Shrunk 아래로 내려가고(그리드 칸 이동) 공룡은 그 왼쪽, 같은 행에
+        선다 - 비는 Pin 칸만큼 가로도 줄어 A00240 · A00370 과 같은 272 x 155 가 된다.
+        (v01.15 ~ 01.19 는 공룡을 헤더 행 아래에 두고 세로만 줄였다 - 350 x 155.)
 
         백업은 계속 돈다 - 감추는 것은 화면뿐이다.
         """
         root = self.layout()
         # 메뉴 바도 줄어든 동안은 감춘다 - 줄인 크기(155px)를 메뉴 바가 생기기 전과 같게 둔다.
         self.menu_bar.setVisible(not enabled)
+        # Pin 버튼 자리: 줄었을 때는 Shrink 아래(1, 0), 평소엔 오른쪽(0, 1).
+        self.button_grid.removeWidget(self.pin_button)
         if enabled:
-            self._full_height = self.height()
+            self._full_size = (self.width(), self.height())
             for widget in self._shrink_hidden:
                 widget.hide()
+            self.button_grid.addWidget(self.pin_button, 1, 0)
             self._dino_layout.removeWidget(self.dino)
-            root.insertWidget(1, self.dino)     # 0 = 헤더 행
+            self.header_row.insertWidget(0, self.dino)     # 버튼 왼쪽
             self.dino.show()
         else:
-            root.removeWidget(self.dino)
+            self.header_row.removeWidget(self.dino)
             self._dino_layout.insertWidget(self._dino_index, self.dino)
+            self.button_grid.addWidget(self.pin_button, 0, 1)
             for widget in self._shrink_hidden:
                 # 접혀 있던 Settings 본문까지 펼치지 않도록 섹션 자체만 보이게 한다.
                 widget.show()
@@ -489,9 +510,9 @@ class MainWindow(QWidget):
         root.invalidate()
         root.activate()
         if enabled:
-            self.resize(self.width(), root.sizeHint().height())
-        elif self._full_height:
-            self.resize(self.width(), self._full_height)
+            self.resize(SHRINK_WIDTH, SHRINK_HEIGHT)
+        elif self._full_size:
+            self.resize(*self._full_size)
 
         self.log(f"Shrink: {'ON' if enabled else 'OFF'}")
 

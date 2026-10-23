@@ -48,8 +48,8 @@ from tools.A00370_ToolLauncher.app.ui.rocket_anim import RocketAnimWidget
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
 WINDOW_OBJECT_NAME = "JUN_A00370_ToolLauncher_window"
 
-# Shrink 로 줄었을 때 창 크기. 세로는 A00220_BackupTool · A00240_PathTool 이 줄었을 때와 같고,
-# 가로는 거기서 Pin 버튼 한 칸(72 + 간격 6)만큼 더 좁다 - 줄었을 때 Pin 이 Shrunk 아래로
+# Shrink 로 줄었을 때 창 크기 - A00220_BackupTool(v01.20) · A00240_PathTool(v01.25) 이 줄었을 때와
+# 같다. 가로는 350 에서 Pin 버튼 한 칸(72 + 간격 6)만큼 좁힌 값 - 줄었을 때 Pin 이 Shrunk 아래로
 # 내려가 그 자리가 비기 때문이다(v01.12).
 SHRINK_WIDTH = 272
 SHRINK_HEIGHT = 155

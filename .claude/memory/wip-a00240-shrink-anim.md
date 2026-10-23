@@ -1,6 +1,6 @@
 ---
 name: wip-a00240-shrink-anim
-description: "A00240 Shrink(350x78 = A00220 줄었을 때 가로 · 세로 절반) + 파일 트리 애니메이션(v01.11) — 버튼 옆 자리, 줄었을 때만 여백 2px, 다 자라면 타이머 정지"
+description: "A00240 Shrink(v01.25 부터 272x155, Pin 은 Shrunk 아래) + 파일 트리 애니메이션(v01.11) — 버튼 옆 자리, 무한 반복"
 metadata: 
   node_type: memory
   type: project
@@ -22,3 +22,7 @@ A00220_BackupTool 이 줄었을 때와 **같은 크기**(green_mid 오프스크�
 
 **Why:** 사용자가 계획서를 받고 "계획대로 진행" — 확인 5가지는 전부 추천안으로 정했다.
 **How to apply:** 속도·반복·색을 바꿔 달라면 `FileTreeAnimWidget` 클래스 상수(STEP_DELAY/UNFOLD)와 `paintEvent` 색만 보면 된다.
+
+**v01.25 (2026-10-23)** — 줄었을 때 **`Pin` 이 `Shrunk` 아래**(`QGridLayout` `button_grid`, 토글에서
+Pin 만 (0,1) ↔ (1,0)), 비는 Pin 칸만큼 `SHRINK_WIDTH` 350 → **272**. A00220 v01.20 · A00370 v01.12 와
+같은 모양 · 크기([[wip-a00370-shrink-rocket]]). 트리 영역 172 x 133.

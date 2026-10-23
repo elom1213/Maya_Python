@@ -1,5 +1,16 @@
 # Changelog — A00220_BackupTool
 
+## [01.20] - 2026-10-23
+
+### Changed
+- **Shrunk window is narrower: 272 x 155.** While shrunk, `Pin` now sits **under** `Shrunk`
+  (the two buttons stack in a small grid) and the **dino moves into the header row, left of the
+  buttons**, instead of below them. The window loses the column `Pin` used to take
+  (72 px + 6 px gap: 350 -> 272); height stays 155. Restoring puts `Pin` back to the right of
+  `Shrink` and the dino back into the Control group. Same shape as `A00370_ToolLauncher` v01.12 and
+  `A00240_PathTool` v01.25. Backups keep running as before. Verified offscreen (PySide6); not yet
+  checked by eye in the running tool.
+
 ## [01.19] - 2026-10-23
 
 ### Added

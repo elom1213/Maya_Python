@@ -2,6 +2,15 @@
 
 All notable changes to this tool are documented here.
 
+## [01.25] - 2026-10-23
+### Changed
+- **Shrunk window is narrower: 272 x 155.** While shrunk, `Pin` now sits **under** `Shrunk`
+  (the two buttons stack in a small grid) instead of to its right, and the window loses the column
+  `Pin` used to take (72 px + 6 px gap: 350 -> 272). Height and the file-tree area are unchanged.
+  Restoring puts `Pin` back to the right of `Shrink` on one row. Same shape as `A00370_ToolLauncher`
+  v01.12 and `A00220_BackupTool` v01.20. Verified offscreen (PySide6); not yet checked by eye in the
+  running tool.
+
 ## [01.24] - 2026-10-23
 ### Added
 - **`File > Add to Start Menu`.** Creates a Start menu shortcut for this tool (`JUN Path Tool.lnk` in

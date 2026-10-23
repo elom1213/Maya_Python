@@ -18,6 +18,7 @@ from Framework.qt.qt import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
+    QGridLayout,
     QPushButton,
     QTabWidget,
     QIcon,
@@ -38,10 +39,11 @@ from .junction_tab import JunctionTab
 from .file_tree_anim import FileTreeAnimWidget
 
 
-#: 줄어든 창 크기. A00220_BackupTool 이 줄었을 때 350 x 155 (green_mid 테마 실측) 와 **같게**.
-#: (v01.10 ~ 01.12 는 세로를 절반(78)으로 했다 - 너무 작다는 피드백으로 v01.13 에 155 로.
-#:  그때 7행을 넣으려고 줄였던 창 여백 2px 도 필요 없어져 기본 여백으로 돌아갔다.)
-SHRINK_WIDTH = 350
+#: 줄어든 창 크기. A00220_BackupTool · A00370_ToolLauncher 가 줄었을 때와 **같게**.
+#: 세로 155 는 A00220 의 green_mid 테마 실측(v01.10 ~ 01.12 는 절반(78)이라 너무 작다는 피드백으로
+#: v01.13 에 155 로). 가로는 v01.25 에 350 → 272 - 줄었을 때 Pin 이 Shrunk 아래로 내려가
+#: 비는 Pin 칸(72 + 간격 6)만큼 좁혔다(A00370 v01.12 와 같은 모양).
+SHRINK_WIDTH = 272
 SHRINK_HEIGHT = 155
 
 
@@ -109,14 +111,21 @@ class MainWindow(QWidget):
         self.anim_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.anim_area.hide()
 
+        # 버튼 둘은 작은 그리드에 둔다 - 평소엔 한 줄 [Shrink][Pin], 줄었을 때는 Pin 을
+        # Shrink 아래 칸으로 옮겨 세로로 쌓는다(v01.25). 그래서 줄었을 때 가로가 한 칸 좁다.
+        self.button_grid = QGridLayout()
+        self.button_grid.setContentsMargins(0, 0, 0, 0)
+        self.button_grid.addWidget(self.shrink_button, 0, 0)
+        self.button_grid.addWidget(self.pin_button, 0, 1)
+
         header_row = QHBoxLayout()
         header_row.setContentsMargins(0, 0, 0, 0)
         header_row.addWidget(self.anim_area, 1)
         # 가중치 0 : 평소(anim_area 숨김)에는 버튼을 오른쪽으로 밀고, 줄었을 때는
         # 남는 폭을 anim_area(가중치 1)가 전부 가져간다.
         header_row.addStretch(0)
-        header_row.addWidget(self.shrink_button, 0, Qt.AlignTop)
-        header_row.addWidget(self.pin_button, 0, Qt.AlignTop)
+        header_row.addLayout(self.button_grid)
+        header_row.setAlignment(self.button_grid, Qt.AlignTop)
         root.addLayout(header_row)
 
         self.tabs = QTabWidget()
@@ -195,14 +204,18 @@ class MainWindow(QWidget):
         되돌릴 때는 줄이기 전 크기(가로 · 세로 둘 다)로 돌아간다.
         """
         root = self.layout()
+        # Pin 버튼 자리: 줄었을 때는 Shrink 아래(1, 0), 평소엔 오른쪽(0, 1).
+        self.button_grid.removeWidget(self.pin_button)
         if enabled:
             self._full_size = (self.width(), self.height())
             self.tabs.hide()
             self.menu_bar.hide()
+            self.button_grid.addWidget(self.pin_button, 1, 0)
             self.anim_area.show()
         else:
             self.anim_area.stop()
             self.anim_area.hide()
+            self.button_grid.addWidget(self.pin_button, 0, 1)
             self.menu_bar.show()
             self.tabs.show()
 

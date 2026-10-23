@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-23 (오늘)
 
+> [!summary] A00240_PathTool · A00220_BackupTool — **줄었을 때 Pin 을 Shrunk 아래로, 창 272 x 155** (A00240 v01.24->01.25 · A00220 v01.19->01.20) `#A00240_PathTool` `#A00220_BackupTool`
+- 요청: A00370 v01.12 와 똑같이 두 툴도 줄었을 때 가로를 줄일 것.
+- 둘 다 버튼 둘을 `QGridLayout`(`button_grid`)에 두고 Shrink 토글에서 `Pin` 만 (0,1) ↔ (1,0) 으로 옮긴다. `SHRINK_WIDTH` 350 → **272**. A00220 은 공룡을 헤더 행 아래(root index 1)가 아니라 **헤더 행 왼쪽(index 0)** 으로 옮겨 세로 155 를 유지, `_full_height` → `_full_size`(가로도 복원). 세 툴(A00220 · A00240 · A00370)이 줄었을 때 같은 모양 · 같은 크기.
+- 검증(오프스크린 PySide6, 34항목 + A00370 회귀 32항목): 두 툴 모두 272x155, Pin 이 Shrunk 아래, 빈 열 없음, 복원 크기 · 자리, 공룡 행 이동 · 복귀, 파일 트리 애니메이션 유지, 반복 토글 + 캡처. 실제 앱 눈 확인은 아직.
+- 문서 `docs/A00240_PathTool.md` · `docs/A00220_BackupTool.md` Shrink 절, 두 CHANGELOG · version.
+
 > [!summary] A00240_PathTool · A00220_BackupTool — **File > Add to Start Menu: 시작 메뉴 바로가기** (A00240 v01.23->01.24 · A00220 v01.18->01.19) + 공용 `Framework/core/shell_integration.py` `#A00240_PathTool` `#A00220_BackupTool` `#Framework`
 - 요청: 두 standalone 툴에 JUN Video Tool(0110) 과 같은 "시작화면 바로가기 추가" 기능. **Windows 10 에서도 동작할 것.**
 - 공용 모듈 `Framework/core/shell_integration.py`(Qt · Maya 비의존): 비디오툴 `app/core/shell_integration.py` 이식(타입 힌트 제거). `launch_spec`(dev = pythonw + launch.py / frozen = exe) · `create_shortcut`(PowerShell `Add-Type` C# → IShellLinkW + IPropertyStore 로 .lnk + **AppUserModelID**) · `add_to_start_menu` · `pin_shortcut("start")` · `start_menu_message`. Win10/11 공통 재료만 쓴다(PowerShell 5.1 · COM · `%APPDATA%`). PS 출력 UTF-8 지정 + cp949 폴백(비디오툴엔 없던 것 — 한국어 오류가 깨졌다).

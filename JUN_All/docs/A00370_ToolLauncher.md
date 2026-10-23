@@ -236,8 +236,8 @@ Filter [ a00080            ] [Clear]   Number: 1 / 9
 ### 11) Shrink — 작게 접기 + 로켓 발사 (v01.11~)
 
 `Pin` 왼쪽의 체크형 **`Shrink`**. 켜면 메뉴 바 · 런처 영역(Controls / Filter / 버튼) · 저작권 줄을 감추고
-창을 **272 x 155 px** 로 줄인다 — 세로는 [A00220_BackupTool](A00220_BackupTool.md) · [A00240_PathTool](A00240_PathTool.md)
-이 줄었을 때와 같고, 가로는 **`Pin` 이 `Shrunk` 아래로 내려가** 그 칸(72 + 6px)만큼 더 좁다(v01.12, v01.11 은 350).
+창을 **272 x 155 px** 로 줄인다 — [A00220_BackupTool](A00220_BackupTool.md) · [A00240_PathTool](A00240_PathTool.md)
+이 줄었을 때와 같은 크기. **`Pin` 이 `Shrunk` 아래로 내려가** 비는 그 칸(72 + 6px)만큼 가로가 좁다(v01.12, v01.11 은 350).
 다시 누르면(`Shrunk`) `Pin` 이 오른쪽 한 줄로 돌아오고 창도 줄이기 전 크기(가로 · 세로 둘 다)로 돌아간다.
 감추는 것은 화면뿐이라 프로파일 · 버튼 · 로그는 그대로다.
 
