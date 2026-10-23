@@ -177,7 +177,7 @@ A narrative work summary lives in
 
 | 시기 | 내용 |
 |------|------|
-| 2026-10 하순 | **`A00370_ToolLauncher` Shrink + 로켓 발사 애니메이션**(줄였을 때 272 x 155, `A00220` · `A00240` 도 같은 모양으로) · **`A00210_FileManager` Shrink · Pin + 폴더 · 기록 카드 애니메이션** · **`A00240` · `A00220`** `File > Add to Start Menu` · **`A00360`** Sort By > Selection · **`A00540`** 클립 여러 개를 순서대로 한 씬에 · **`A00145`** Connect by Rule 겹치는 이름 보호 + `JALI 22 Viseme` 규칙 |
+| 2026-10 하순 | **`A00370_ToolLauncher` Shrink + 로켓 발사 애니메이션**(줄였을 때 272 x 155, `A00220` · `A00240` 도 같은 모양으로) · **`A00210_FileManager` Shrink · Pin + 폴더 · 기록 카드 애니메이션** · **`A00240` · `A00220` · `A00210`** `File > Add to Start Menu` + Pinned 동안 Pin 버튼 연한 빨강 · **`A00360`** Sort By > Selection · **`A00540`** 클립 여러 개를 순서대로 한 씬에 · **`A00145`** Connect by Rule 겹치는 이름 보호 + `JALI 22 Viseme` 규칙 |
 | 2026-10 중순 | **`A00550_PoseMapper` 신규** — 음소 → ARKit 블렌드셰이프 포즈를 슬라이더로 다듬고 json 으로 저장 · 다른 노드 쌍에 연결, `blendWeighted` weight 편집 탭 |
 | 2026-10 중순 | **`A00540_JaliLipSync` 신규 + `JUN_JALI`(VisemeNet 포크)** — 다국어 음성을 오디오만으로 JALI 리그 립싱크: 더블클릭 설치 · 스탠드얼론 변환기(사전 검사, 오류 시 중단) · 마야 셸프 툴, JALI ↔ ARKit 52 매칭(리그 실측) |
 | 2026-10 중순 | **`A00480` Import > CSV** — `A00200` ARKit 페이셜 CSV 임포트를 이식, 블렌드셰이프뿐 아니라 **ARKit 어트리뷰트를 가진 아무 노드**에 키 · **`Value Scale`**(AdvancedSkeleton 페이셜 컨트롤은 `x10`) · **`A00145`** 연결을 규칙 json 으로 저장 · **`A00240`** Junction 탭 · **`A00110_V02` Hot Key 탭**(Shift+A Hold + Tab 으로 매니퓰레이터 Object / World 토글) · **`A00400`** Controls 셰이프 Filter · **`A00145`** Constraint `All Targets -> Each Follower`(follower 하나에 타깃 여러 개) · **`A00340`** `View > Show Profile`(프로파일 json 을 탐색기로) |
