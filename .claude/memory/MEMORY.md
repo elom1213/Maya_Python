@@ -99,5 +99,6 @@
 - A00480 — [FileTool](wip-a00480-filetool.md)(Export/Import/Path, Export 규칙, Naming = 공용 토큰 위젯. Maya 탭은 A00210 으로 감)
 - A00490 — [KeyboardTool](wip-a00490-keyboardtool.md)(크롬 계열은 활성 창만 키를 받는다 → Auto)
 - A00540 — [JaliLipSync](wip-a00540-jalilipsync.md)(VisemeNet txt → JALI 리그 키, 짝 = JUN_JALI 변환기 · 원본 모델은 추론도 무작위 · 끝 0.32초 짧음 · v01.01 규칙 json `nodes` 역할표 + Target Auto/Manual, 리그마다 json 하나)
+- A00560 · A00570 — [JaliBatch 계획](wip-a00560-jalibatch.md)(2026-10-23 계획만, 코드 전 · 레퍼런스 animCurve 편집은 saveReference 로만 클립에 저장 · 같은 이름 편집이 교체 때 전파 · M0 실측 8항목 먼저)
 - A00550 — [PoseMapper](wip-a00550-posemapper.md)(음소 → BS 포즈 json · Connect, blendWeighted 의 weight 원소 없는 input = 안 보이고 1.0 · getAttr 가 원소를 만든다)
 - JALI 슬라이더 리그 — [A0020_jali_slider_ctl](wip-jali-slider-ctl.md)(angela 1:1 슬라이더 22 + JaLi 박스, remapValue 리맵, DUMMY_IN/OUT 3쌍, global_scale · 생성/검증은 JUN_JALI examples · GUI 확인 아직)

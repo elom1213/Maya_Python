@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-23 (오늘)
 
+> [!summary] JALI 대량 파이프라인 — **계획 평가 + A00560_JaliBatch · A00570_JaliReview 제작 계획서** (코드 전, 문서만) `#A00560_JaliBatch` `#A00570_JaliReview` `#JALI`
+- 요청: wav · 대본 N 개 → JALI 툴(JUN_JALI 변환기) → JALI 컨트롤러(`A0030_jali_slider_ctl_direct_arkit.ma`) 레퍼런스 + DUMMY_IN 키 → 컨트롤러 베이크한 클립 `.mb` N 개를 만드는 standalone 툴, 검수는 빈 씬에 클립 + 아바타를 레퍼런스하고 ARKIT_OUT → 블렌드셰이프 연결, 레퍼런스 교체로 다른 클립 — 이 계획을 평가하고 개선안과 제작 계획서를 문서로.
+- `docs/plans/A00560_JaliBatch_pipeline_review.md`: 뼈대(클립 = 컨트롤러 레퍼런스 + 자기 animCurve, 레퍼런스 교체 검수, 변환 · 마야 프로세스 분리)는 유지. **틀어진 곳 둘** — ① 레퍼런스된 animCurve 편집은 검수 씬의 레퍼런스 편집으로 쌓여 클립 `.mb` 가 Ctrl+S 로 안 바뀐다 → `file -saveReference`(Save Reference Edits) 를 명시 버튼으로 ② 편집은 노드 이름으로 기록되고 모든 클립이 같은 이름이라 저장 안 한 채 교체하면 다음 클립에 묻어 간다 → Swap 앞 편집 0건 검사. 더한 것: Validate(failedEdits · 도장) · 네임스페이스 고정(`CLIP:JALI:`) · 시작 프레임 = 파일 이름 `_f0105_0429`(30fps 원본 구간, wav 길이와 일치) · fps 명시 · 매니페스트 json · 베이크 뒤 DUMMY_IN 커브 삭제 · 덮어쓰기 정책 · 변환은 2단계 · Open Clip 대안.
+- `docs/plans/A00560_JaliBatch_plan.md`: P0 공용 승격(`Framework/jali/` ← A00540 코어 · `mayapy_runner`/`MOD_mayapyProcess` ← A00210 · `bake.py` ← JUN_JALI `bake_ctl_keys`) → P1 `A00560_JaliBatch` standalone(Batch · Validate, mayapy 워커 한 프로세스) → P3 `A00570_JaliReview` in-Maya(Swap · Save Clip Edits · Connect) → P4 변환기 CLI. 결정 D1~D14, **M0 실측 8항목**(optionVar 이름 · 편집 문장 · saveReference 되읽기 · 교체 시 편집 전파 · 레퍼런스 사운드 · 클립 왕복 · 컨트롤러 갱신 · 시간) 을 코드 전에 확정, 단계 M0~M7, 검증 T1~T9, 질문 Q1~Q8(권장안 포함). 사용자 요청으로 A00540 코어를 그대로 쓰는 쪽으로 설계.
+
 > [!summary] A00240_PathTool — **Path 버튼 드래그로 자리 옮기기 + 창 크기 자유롭게 + 버튼이 창 폭을 따라 말줄임** (v01.27->01.28->01.29->01.30) `#A00240_PathTool`
 - 요청: (1) 생성된 버튼의 위치를 마우스 클릭 · 홀드 · 이동 · 해제로 바꾸고 싶다 → 진단 후 "버튼 서브클래스에서 마우스 이벤트만으로" 로 확정. (2) 일정 가로 아래로 창이 줄지 않는다 → 진단: `QTabWidget` 최소 = 숨은 탭 포함 최댓값, Junction 탭(TSL 둘 나란히 978) 이 바닥 → 탭을 QScrollArea 에.
 - v01.28 `shortcut_tab.py`: `_PathButton(QPushButton)` — press 에 전역 좌표 기억, move 가 `startDragDistance` 넘으면 `begin_drag`, 이후 `update_drag`(가로줄 `_drop_line` + 가장자리 자동 스크롤 40ms 틱), release 는 `end_drag`(super 안 불러 clicked 안 나감), Esc 는 `cancel_drag` + 다음 release 삼킴. 자리 계산 `_drop_target_at` = 커서 y 를 품는 카테고리 박스(없으면 가장 가까운) + 가운데 y 가 위인 버튼 수. `_drop_button` 은 같은 카테고리면 pop/insert(인덱스 보정), 다른 카테고리면 Change Category 와 같은 이름 충돌 규칙. 버튼은 `(cat_index, btn_index)` 키 — 같은 이름 둘이어도 안전. 색칠 모드는 `drag_enabled=False`.
