@@ -32,12 +32,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-23 (오늘)
 
-> [!summary] A00240_PathTool — **Path 버튼 드래그로 자리 옮기기 + 창 크기 자유롭게** (v01.27->01.28->01.29) `#A00240_PathTool`
+> [!summary] A00240_PathTool — **Path 버튼 드래그로 자리 옮기기 + 창 크기 자유롭게 + 버튼이 창 폭을 따라 말줄임** (v01.27->01.28->01.29->01.30) `#A00240_PathTool`
 - 요청: (1) 생성된 버튼의 위치를 마우스 클릭 · 홀드 · 이동 · 해제로 바꾸고 싶다 → 진단 후 "버튼 서브클래스에서 마우스 이벤트만으로" 로 확정. (2) 일정 가로 아래로 창이 줄지 않는다 → 진단: `QTabWidget` 최소 = 숨은 탭 포함 최댓값, Junction 탭(TSL 둘 나란히 978) 이 바닥 → 탭을 QScrollArea 에.
 - v01.28 `shortcut_tab.py`: `_PathButton(QPushButton)` — press 에 전역 좌표 기억, move 가 `startDragDistance` 넘으면 `begin_drag`, 이후 `update_drag`(가로줄 `_drop_line` + 가장자리 자동 스크롤 40ms 틱), release 는 `end_drag`(super 안 불러 clicked 안 나감), Esc 는 `cancel_drag` + 다음 release 삼킴. 자리 계산 `_drop_target_at` = 커서 y 를 품는 카테고리 박스(없으면 가장 가까운) + 가운데 y 가 위인 버튼 수. `_drop_button` 은 같은 카테고리면 pop/insert(인덱스 보정), 다른 카테고리면 Change Category 와 같은 이름 충돌 규칙. 버튼은 `(cat_index, btn_index)` 키 — 같은 이름 둘이어도 안전. 색칠 모드는 `drag_enabled=False`.
 - v01.29 `main_window.py`: `tabs_scroll`(NoFrame) + `showEvent` 1회 `fit_to_content`(A00210 v01.36 과 동일 — 탭 최소 + 헤더, 모니터 작업 영역까지), Shrink 는 `tabs_scroll` 을 감춘다.
 - 검증(오프스크린 PySide6 42항목, 스크래치 프로파일로 실데이터 안 건드림): 창 최소 가로 1004 → 172, `resize(300,400)`·`(250,300)` 먹음, 여는 크기 화면 안, Shrink 272x155 · 복원 / 클릭 vs 드래그, 아래 · 위 이동, 제자리 놓기 무변화, 카테고리 간 이동, 이름 충돌 경고, Esc 취소 + 놓음 삼킴 + 다음 클릭 정상, 색칠 모드 드래그 없음, 자동 스크롤, JSON 저장. **실기 눈 확인 아직.**
 - 문서 `docs/A00240_PathTool.md` "창 크기" · "5-2 드래그" 절, CHANGELOG 01.28 · 01.29, version, 메모리 `wip-a00240-drag-reorder` 신규 + `qtabwidget-min-size-hidden-pages` 사용처.
+- **v01.30 (같은 날, 후속 요청)** — "창을 줄이면 버튼도 함께 줄고 글자가 안 잘리게". 원인 둘: (1) v01.29 의 바깥 스크롤 칸 하나가 탭 위젯을 가장 넓은 페이지 폭(Junction 982)으로 유지해 ShortCut 페이지가 좁아지지 않았다 → **페이지마다** `QScrollArea`(`_wrap_page`, `fit_to_content` 는 `_pages_min_size` 로 페이지 최소의 축별 최댓값). (2) QPushButton 최소 폭 = 글자 폭 → `_ElideButton`: `setMinimumWidth(40)`(Qt 는 명시 최소가 있으면 minimumSizeHint 를 안 쓴다) + `resizeEvent` 에서 `elidedText`, 전체 이름은 `full_text` · 툴팁 첫 줄. 함정 둘: 말줄임된 글자로 힌트를 재면 되먹임으로 한 행이 고르지 않게 줄어 **전체 라벨 기준 힌트를 캐시**(`_refresh_hints`, 생성 · setText · StyleChange/FontChange 때만 — sizeHint 안에서 setText 금지), 라벨 여백은 상수(24) 대신 **힌트 폭 − 글자 폭**으로 잰다(Category 는 18 이라 상수로는 힌트 폭 그대로인 버튼도 말줄임됐다). `_PathButton` 은 `_ElideButton` 상속, Profile · Create · Color 행 버튼 7개도 교체, 콤보 `AdjustToMinimumContentsLengthWithIcon(4)`. ShortCut 페이지 바닥 410 → 296(offscreen, Color 행).
+- 검증(오프스크린 21항목 + 42항목 회귀): 넓을 때 전체 라벨 · 좁을 때 말줄임 + 툴팁 · 글자가 버튼 안에 · 페이지 폭이 창을 따름 · 눌린 행은 고르게 줄고 stretch 있는 행은 전체 라벨 · 힌트 안정 · 드래그 정렬 유지. **실기 눈 확인 아직.**
 
 > [!summary] A00210_FileManager — **Pinned 동안 Pin 버튼 연한 빨강 + File > Add to Start Menu** (v01.38->01.39) `#A00210_FileManager`
 - 요청(두 턴): A00240 처럼 A00210 도 (1) Pin 이 켜져 있을 때 버튼을 빨강으로, (2) 시작 메뉴 바로가기 추가 기능.

@@ -1,6 +1,6 @@
 ---
 name: wip-a00240-drag-reorder
-description: A00240_PathTool v01.28 — Path 버튼 드래그 정렬은 QDrag 아닌 _PathButton 마우스 이벤트(press/move/release)로, (cat_index, btn_index) 키, 색칠 모드는 끔 · v01.29 탭 QScrollArea 로 창 자유 크기
+description: A00240_PathTool v01.28 — Path 버튼 드래그 정렬은 QDrag 아닌 _PathButton 마우스 이벤트(press/move/release)로, (cat_index, btn_index) 키, 색칠 모드는 끔 · v01.29 창 자유 크기 · v01.30 페이지별 QScrollArea + _ElideButton(setMinimumWidth + 말줄임, 전체 라벨 힌트 캐시)
 metadata:
   type: project
 ---
@@ -24,6 +24,19 @@ A00240_PathTool **v01.28** (2026-10-23) — Shortcut 탭의 Path 버튼을 누�
 **v01.29** — 창이 어느 폭 아래로 안 줄던 것은 [[qtabwidget-min-size-hidden-pages]] (Junction 탭 TSL 둘 나란히 = 978 이 바닥).
 탭을 `QScrollArea`(NoFrame) 에 담고 `fit_to_content` 를 A00210 에서 그대로 — 최소 가로 1004 → 172. Shrink 는 `tabs_scroll` 을 감춘다.
 
-검증: 오프스크린 PySide6 42항목(스크래치 `verify_a00240.py`). **실기 눈 확인 아직.**
+**v01.30 — 버튼이 창 폭을 따른다 (말줄임).** 사용자: "창을 줄이면 버튼도 줄고 글자가 안 잘리게".
+- 바깥 스크롤 칸 하나는 **페이지를 좁히지 못한다** — `QScrollArea(widgetResizable)` 는 위젯을 `max(뷰포트, 최소)` 로 두므로 탭 위젯이
+  가장 넓은 페이지 폭으로 남는다. 페이지를 창 폭에 따르게 하려면 **페이지마다** 스크롤 칸(`_wrap_page`). `fit_to_content` 는 페이지
+  최소의 축별 최댓값(`_pages_min_size`)으로.
+- QPushButton 이 창을 막는 이유는 최소 폭 = 글자 폭. `setMinimumWidth(n)` 을 걸면 Qt 레이아웃(`qSmartMinSize`)이 minimumSizeHint 를
+  안 쓴다 → `_ElideButton`: 최소 40 + `resizeEvent` 말줄임 + `full_text` · 툴팁 첫 줄. **가로 sizePolicy Ignored 는 쓰지 말 것** —
+  QHBox 에서 stretch 있는 이웃이 남는 폭을 다 가져가 버튼이 0 폭이 된다(VBox 에서만 무해).
+- 함정 1: 말줄임된 글자로 sizeHint 를 재면 힌트↓ → 레이아웃이 덜 줌 → 더 말줄임 되먹임, 한 행이 고르지 않게 줄어든다. **전체 라벨 기준
+  힌트를 캐시**하고(`_refresh_hints`), 재는 건 생성 · setText · StyleChange/FontChange 때만 — sizeHint() 안에서 setText(updateGeometry) 금지.
+  QPushButton 힌트에는 스타일 최소 폭 바닥이 있어 "글자 폭 차로 보정" 은 틀린다(New 54 바닥) — 전체 라벨을 잠깐 넣고 잰다.
+- 함정 2: 라벨 여백을 상수(24)로 두면 힌트 폭 그대로인 버튼도 말줄임된다(Category 여백 18). **힌트 폭 − 글자 폭**으로 잰다.
+- ShortCut 페이지 바닥 410 → 296(offscreen) = Color 행(체크박스 + 버튼 둘). 그 아래는 가로 스크롤바.
+
+검증: 오프스크린 PySide6 42항목(`verify_a00240.py`) + 21항목(`verify_a00240_elide.py`). **실기 눈 확인 아직.**
 
 관련: [[wip-a00240-button-colors]], [[wip-a00240-shrink-anim]], [[qtabwidget-min-size-hidden-pages]], [[tsl-selection-order]]

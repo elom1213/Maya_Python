@@ -15,6 +15,9 @@
 # v01.29 : 탭을 QScrollArea 에 담아 창을 자유롭게 줄일 수 있게(A00210 v01.36 과 같은 방식).
 #   QTabWidget 의 최소 크기는 안 보이는 페이지까지 포함한 모든 페이지 최소의 최댓값이라(Junction 탭의
 #   가로) 창이 그 폭 아래로 줄지 않았다. 여는 크기는 fit_to_content 가 예전과 같게 맞춘다.
+# v01.30 : 스크롤 칸을 탭 전체 하나가 아니라 **페이지마다** 둔다. 바깥 하나로 감싸면 창을 좁혀도 탭 위젯이
+#   가장 넓은 페이지(Junction) 폭으로 남아 ShortCut 페이지가 좁아지지 않았고(버튼 글자가 잘려 안 보임),
+#   페이지마다 두면 각 페이지가 창 폭을 따라 줄다가 자기 최소 폭 아래에서만 가로 스크롤바가 생긴다.
 
 from Framework.qt.qt import (
     Qt,
@@ -142,29 +145,49 @@ class MainWindow(QWidget):
         root.addLayout(header_row)
 
         self.tabs = QTabWidget()
+        # 페이지마다의 스크롤 칸 (v01.30). fit_to_content 가 페이지 최소 크기를 여기서 읽는다.
+        self._page_scrolls = []
 
         # ShortCut 탭. 탭 추가 시 여기에 addTab 한 줄만 더하면 된다.
         self.shortcut_tab = ShortcutTab()
-        self.tabs.addTab(self.shortcut_tab, "ShortCut")
+        self.tabs.addTab(self._wrap_page(self.shortcut_tab), "ShortCut")
 
         # Tree 탭: 입력 경로를 트리뷰로(깊이 제한·파일 토글·확장자 필터·Expand·우클릭 Reveal).
         self.tree_tab = TreeTab()
-        self.tabs.addTab(self.tree_tab, "Tree")
+        self.tabs.addTab(self._wrap_page(self.tree_tab), "Tree")
 
         # Junction 탭 (v01.19): mklink /J 를 화면에서 - Create / Remove 하위 탭.
         # Create 의 Tree 팝업은 처음 열 때 Tree 탭에 적힌 경로로 시작한다 (v01.23).
         self.junction_tab = JunctionTab(
             tree_path_getter=lambda: self.tree_tab.ipf_path.text())
-        self.tabs.addTab(self.junction_tab, "Junction")
+        self.tabs.addTab(self._wrap_page(self.junction_tab), "Junction")
 
-        # v01.29 : 탭을 스크롤 칸에 담는다. 스크롤 칸은 최소 크기가 작아 창을 가로 · 세로 어디로든
-        # 자유롭게 줄일 수 있고, 내용보다 작아지면 스크롤바가 생긴다. 스크롤 칸에 최소 폭을 걸지
-        # 않는다(걸면 다시 그 아래로 못 줄인다 - A00550 v01.04 에서 겪은 것).
-        self.tabs_scroll = QScrollArea()
-        self.tabs_scroll.setWidgetResizable(True)
-        self.tabs_scroll.setFrameShape(QFrame.NoFrame)
-        self.tabs_scroll.setWidget(self.tabs)
-        root.addWidget(self.tabs_scroll, stretch=1)
+        root.addWidget(self.tabs, stretch=1)
+
+    def _wrap_page(self, page):
+        """탭 페이지를 자기 스크롤 칸에 담는다 (v01.30).
+
+        v01.29 는 탭 위젯 전체를 스크롤 칸 하나에 담았는데, 그러면 창을 좁혀도 탭 위젯이 가장 넓은
+        페이지 폭으로 남아 ShortCut 페이지가 좁아지지 않았다. 페이지마다 담으면 QTabWidget 의 최소 크기가
+        작아져 창이 자유롭고, 각 페이지는 창 폭을 따라 줄다가 **자기** 최소 폭 아래에서만 가로 스크롤바가
+        생긴다. 스크롤 칸에 최소 폭을 걸지 않는다(걸면 그 아래로 못 줄인다 - A00550 v01.04).
+        """
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidget(page)
+        self._page_scrolls.append(scroll)
+        return scroll
+
+    def _pages_min_size(self):
+        """모든 페이지 최소 크기의 축별 최댓값과, 스크롤 칸 자체의 최소 크기 (fit_to_content 용)."""
+        width = height = 0
+        for scroll in self._page_scrolls:
+            hint = scroll.widget().minimumSizeHint()
+            width = max(width, hint.width())
+            height = max(height, hint.height())
+        scroll_min = self._page_scrolls[0].minimumSizeHint() if self._page_scrolls else None
+        return width, height, scroll_min
 
     # ------------------------------------------------------------------
 
@@ -176,14 +199,15 @@ class MainWindow(QWidget):
             QTimer.singleShot(0, self.fit_to_content)
 
     def fit_to_content(self):
-        """처음 열 때의 크기 = 탭을 스크롤 칸에 담기 전과 같은 크기(탭 최소 크기 + 헤더 행 + 여백),
-        단 모니터 작업 영역을 넘지 않는다. 그 뒤로는 사용자가 가장자리를 끌어 자유롭게 바꾼다 (v01.29,
-        A00210 v01.36 의 fit_to_content 와 같다)."""
-        content = self.tabs.minimumSizeHint()
+        """처음 열 때의 크기 = 페이지를 스크롤 칸에 담기 전과 같은 크기(가장 넓은/높은 페이지 최소 + 탭 바 +
+        헤더 행 + 여백), 단 모니터 작업 영역을 넘지 않는다. 그 뒤로는 사용자가 가장자리를 끌어 자유롭게 바꾼다
+        (v01.29, A00210 v01.36 의 fit_to_content 와 같은 흐름 · v01.30 부터 페이지별 스크롤 칸 기준)."""
         base = self.minimumSizeHint()
-        scroll_min = self.tabs_scroll.minimumSizeHint()
-        full_w = base.width() - scroll_min.width() + content.width()
-        full_h = base.height() - scroll_min.height() + content.height()
+        page_w, page_h, scroll_min = self._pages_min_size()
+        if scroll_min is None:
+            return
+        full_w = base.width() - scroll_min.width() + page_w
+        full_h = base.height() - scroll_min.height() + page_h
 
         screen = self.screen() if hasattr(self, "screen") else None
         if screen is None:
@@ -271,7 +295,7 @@ class MainWindow(QWidget):
         self.button_grid.removeWidget(self.pin_button)
         if enabled:
             self._full_size = (self.width(), self.height())
-            self.tabs_scroll.hide()
+            self.tabs.hide()
             self.menu_bar.hide()
             self.button_grid.addWidget(self.pin_button, 1, 0)
             self.anim_area.show()
@@ -280,7 +304,7 @@ class MainWindow(QWidget):
             self.anim_area.hide()
             self.button_grid.addWidget(self.pin_button, 0, 1)
             self.menu_bar.show()
-            self.tabs_scroll.show()
+            self.tabs.show()
 
         self.shrink_button.setText("Shrunk" if enabled else "Shrink")
 

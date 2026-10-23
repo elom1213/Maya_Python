@@ -2,6 +2,24 @@
 
 All notable changes to this tool are documented here.
 
+## [01.30] - 2026-10-23
+### Changed
+- **Buttons follow the window width.** Narrowing the window now narrows the ShortCut buttons with it;
+  a label that no longer fits is elided (`...`) and the full name moves to the first line of the tooltip.
+  In v01.29 the tab page kept the widest tab's width inside one outer scroll area, so the buttons stayed
+  wide and their text was cut off as the window shrank.
+  - Every tab page now has **its own** scroll area (instead of one around the whole tab widget), so each
+    page follows the window down to its own minimum and only then shows a horizontal scrollbar.
+  - All ShortCut buttons (`_ElideButton`: path buttons and the Profile / Create / Color rows) have a small
+    minimum width (40 px) instead of their label width, keep full-label size hints so a squeezed row shrinks
+    evenly, and elide the label to the current width. The profile combo no longer demands its longest item.
+  - Remaining floor of the ShortCut page is the `Color` row (checkbox + two buttons), about 300 px
+    offscreen; below that a horizontal scrollbar appears.
+- Verified offscreen (PySide6, 21 checks + the 42 v01.28/29 checks): full label when wide, elided label +
+  tooltip when narrow, elided text fits, page width follows the window, squeezed rows shrink evenly, rows
+  with a stretch keep full labels, hints stay full-label based, drag reorder still works. Not yet checked
+  by eye in the running tool.
+
 ## [01.29] - 2026-10-23
 ### Changed
 - **The window can be resized freely.** The tabs now sit in a scroll area, so the window is no longer

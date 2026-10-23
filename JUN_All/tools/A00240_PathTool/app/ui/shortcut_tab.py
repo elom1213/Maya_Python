@@ -24,6 +24,10 @@
 #     이벤트만으로 처리한다 - 누른 채 startDragDistance 이상 움직이면 드래그, 그 안에서 놓으면
 #     평소 클릭(경로 열기). 끄는 동안 놓일 자리에 가로줄이 보이고, 스크롤 가장자리에서는 저절로
 #     스크롤된다. Esc 로 취소. 색칠 모드(체크형)에서는 드래그하지 않는다(체크만).
+#   - 버튼 폭은 창 폭을 따른다(v01.30): 모든 버튼(_ElideButton)이 최소 폭을 작게(28px) 두어 라벨 길이가
+#     최소 폭을 만들지 않고, 창이 좁아지면 버튼도 함께 좁아지며 라벨은 말줄임(…)된다(전체 이름은 툴팁).
+#     Qt 는 setMinimumWidth 가 있으면 minimumSizeHint(글자 폭)를 쓰지 않는다. 프로파일 콤보도 가장 긴 항목
+#     폭을 요구하지 않는다. 그래야 창을 줄일 때 버튼 글자가 잘려 안 보이는 일이 없다.
 
 import os
 
@@ -50,6 +54,7 @@ from Framework.qt.qt import (
     QCheckBox,
     QColorDialog,
     QColor,
+    QEvent,
     Qt,
 )
 
@@ -112,7 +117,86 @@ def _global_pos(event):
     return event.globalPos()
 
 
-class _PathButton(QPushButton):
+class _ElideButton(QPushButton):
+    """창 폭을 따라 줄어드는 버튼 (v01.30) - 라벨이 안 들어가면 말줄임(…)한다.
+
+    QPushButton 의 최소 폭은 글자 폭이라 라벨이 길면 창이 그 아래로 줄지 않고, 억지로 줄이면 글자가
+    잘린다. setMinimumWidth(MIN_WIDTH) 를 걸면 Qt 레이아웃이 minimumSizeHint 대신 그 값을 최소로 쓰므로
+    버튼이 작아질 수 있고, resizeEvent 에서 라벨을 지금 폭에 맞춰 말줄임한다. 전체 이름은 full_text,
+    말줄임 중이면 툴팁 첫 줄에 보인다. 평소(넓을 때) 모양 · 선호 크기는 QPushButton 그대로다.
+    """
+
+    #: 이 아래로는 안 줄어든다 (… 하나는 보이게)
+    MIN_WIDTH = 40
+
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.full_text = text
+        self._base_tooltip = ""
+        self._full_hints = None
+        self._text_margin = 0      # 힌트 폭 - 전체 라벨 글자 폭 = 테마 padding · 테두리 · 스타일 여백
+        self.setMinimumWidth(self.MIN_WIDTH)
+        self._refresh_hints()
+
+    def setText(self, text):
+        self.full_text = text
+        self._refresh_hints()
+        self._apply_elide()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        # 테마(qss) · 글꼴이 바뀌면 전체 라벨 기준 힌트를 다시 잰다.
+        if event.type() in (QEvent.StyleChange, QEvent.FontChange):
+            self._refresh_hints()
+            self._apply_elide()
+
+    def setToolTip(self, text):
+        """기본 툴팁을 기억해 두고, 말줄임 중이면 전체 이름을 첫 줄에 붙인다."""
+        self._base_tooltip = text
+        self._apply_elide()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._apply_elide()
+
+    def _apply_elide(self):
+        avail = max(self.width() - self._text_margin, 0)
+        shown = self.fontMetrics().elidedText(self.full_text, Qt.ElideRight, avail) if avail else self.full_text
+        if shown != QPushButton.text(self):
+            QPushButton.setText(self, shown)
+        tip = self._base_tooltip
+        if shown != self.full_text:
+            tip = self.full_text + ("\n" + tip if tip else "")
+        if tip != QPushButton.toolTip(self):
+            QPushButton.setToolTip(self, tip)
+
+    def is_elided(self):
+        return QPushButton.text(self) != self.full_text
+
+    # 선호 · 최소 크기는 **전체 라벨** 기준으로 고정한다. 말줄임된 글자로 재면 힌트가 줄고, 레이아웃이
+    # 그만큼 덜 주고, 더 말줄임되는 되먹임이 생겨 한 행의 버튼들이 고르지 않게 줄었다. QPushButton 의
+    # 힌트에는 스타일의 최소 폭 바닥이 있어 글자 폭 차로 보정하면 틀리므로, 전체 라벨을 잠깐 넣고 잰다
+    # (sizeHint 안이 아니라 생성 · setText · 테마 변경 때만 - 레이아웃 계산 중 updateGeometry 를 피한다).
+    def _refresh_hints(self):
+        shown = QPushButton.text(self)
+        if shown != self.full_text:
+            QPushButton.setText(self, self.full_text)
+        self._full_hints = (QPushButton.sizeHint(self), QPushButton.minimumSizeHint(self))
+        # 라벨 양옆 여백은 테마마다 다르므로(padding · 테두리 · 스타일 여백) 힌트에서 글자 폭을 빼 잰다.
+        # 상수로 두면(처음 24px) 힌트 폭 그대로인 버튼도 말줄임되는 일이 있었다(Category: 여백 18).
+        self._text_margin = max(
+            self._full_hints[0].width() - self.fontMetrics().horizontalAdvance(self.full_text), 0)
+        if shown != self.full_text:
+            QPushButton.setText(self, shown)
+
+    def sizeHint(self):
+        return self._full_hints[0] if self._full_hints else super().sizeHint()
+
+    def minimumSizeHint(self):
+        return self._full_hints[1] if self._full_hints else super().minimumSizeHint()
+
+
+class _PathButton(_ElideButton):
     """드래그로 자리를 옮길 수 있는 경로 버튼 (v01.28).
 
     왼쪽 버튼을 누른 채 QApplication.startDragDistance() 이상 움직이면 드래그로 보고 owner(ShortcutTab)의
@@ -121,6 +205,7 @@ class _PathButton(QPushButton):
     Qt 는 누른 위젯에 이동 · 놓음을 계속 보내므로(암묵 grab) 커서가 버튼 밖으로 나가도 끝까지 받는다.
     drag_key 는 (카테고리 인덱스, 버튼 인덱스) - 같은 이름의 버튼이 있어도 어느 것이 움직였는지 틀리지 않는다.
     색칠 모드(체크형)에서는 drag_enabled=False 로 두어 체크만 한다.
+    폭은 창을 따르고 라벨은 말줄임된다 (_ElideButton, v01.30).
     """
 
     def __init__(self, text, owner, drag_key, parent=None):
@@ -311,17 +396,20 @@ class ShortcutTab(QWidget):
 
         self.cmb_profile = QComboBox()
         self.cmb_profile.setToolTip("Active profile (each is its own JSON)")
+        # 가장 긴 프로파일 이름이 최소 폭을 만들지 않게 (v01.30) - 좁으면 콤보 글자가 말줄임된다.
+        self.cmb_profile.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.cmb_profile.setMinimumContentsLength(4)
         self.cmb_profile.currentTextChanged.connect(self.on_profile_changed)
 
-        btn_new = QPushButton("New")
+        btn_new = _ElideButton("New")
         btn_new.setToolTip("Create a new profile")
         btn_new.clicked.connect(self.on_new_profile)
 
-        btn_rename = QPushButton("Rename")
+        btn_rename = _ElideButton("Rename")
         btn_rename.setToolTip("Rename the current profile")
         btn_rename.clicked.connect(self.on_rename_profile)
 
-        btn_delete = QPushButton("Delete")
+        btn_delete = _ElideButton("Delete")
         btn_delete.setToolTip("Delete the current profile")
         btn_delete.clicked.connect(self.on_delete_profile)
 
@@ -336,11 +424,11 @@ class ShortcutTab(QWidget):
         group = QGroupBox("Create")
         row = QHBoxLayout(group)
 
-        btn_category = QPushButton("Category")
+        btn_category = _ElideButton("Category")
         btn_category.setToolTip("Create a new category")
         btn_category.clicked.connect(self.on_create_category)
 
-        btn_path = QPushButton("Path")
+        btn_path = _ElideButton("Path")
         btn_path.setToolTip("Add a path button into a category")
         btn_path.clicked.connect(self.on_create_path)
 
@@ -366,13 +454,13 @@ class ShortcutTab(QWidget):
         # 체크된 버튼들에 색을 지정 / 색을 지운다. 모드가 켜져 있을 때만 활성.
         # 라벨은 A00340 의 'Apply Color...' / 'Clear Color' 를 줄였다 - 그대로 두면 이 그룹이
         # Profile 그룹보다 넓어져 창 최소 폭이 늘어난다(그룹 제목이 이미 Color).
-        self.btn_apply_color = QPushButton("Apply...")
+        self.btn_apply_color = _ElideButton("Apply...")
         self.btn_apply_color.setToolTip(
             "Apply a picked color to all checked buttons")
         self.btn_apply_color.clicked.connect(self.on_apply_color_to_checked)
         self.btn_apply_color.setEnabled(False)
 
-        self.btn_clear_color = QPushButton("Clear")
+        self.btn_clear_color = _ElideButton("Clear")
         self.btn_clear_color.setToolTip(
             "Reset all checked buttons to the default (theme) style")
         self.btn_clear_color.clicked.connect(self.on_clear_color_from_checked)
