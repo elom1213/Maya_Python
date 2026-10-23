@@ -98,7 +98,8 @@
     필터를 건다. 텍스트 등 URL 이 아닌 드래그는 받지 않는다.
 
 - **Pin (Always on Top, v01.13~)**: 우상단의 체크형 `Pin` 버튼을 켜면 이 창이 다른 창들보다 **항상
-  위**에 유지된다(`Qt.WindowStaysOnTopHint`, 라벨이 `Pinned` 로 바뀜). 다시 누르면 해제. 기본은 정상
+  위**에 유지된다(`Qt.WindowStaysOnTopHint`, 라벨이 `Pinned` 로 바뀌고 **버튼이 연한 빨강**이 된다 —
+  v01.21~, 공용 [`pin_style`](Framework_pin_style.md)). 다시 누르면 해제. 기본은 정상
   Z-order(밑 창을 클릭하면 위로 올라옴)라 필요할 때만 켠다. (`A00110_animTool` 과 동일 패턴.)
 
 - **Help 메뉴 (v01.16~)**: 모든 툴과 같은 공용 메뉴 바([`MOD_menuBar_qt`](Framework_MOD_menuBar_qt.md)).

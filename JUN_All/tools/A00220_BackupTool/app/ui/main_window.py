@@ -46,6 +46,7 @@ from Framework.core import shell_integration
 from Framework.qt import JUN_mod_collapsible_qt
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.pin_style import apply_pin_style
 
 from ..config.version import VERSION
 from ..config.app_meta import (
@@ -176,6 +177,8 @@ class MainWindow(QWidget):
         # 고정 크기 — "Pin"/"Pinned" 토글 시 버튼 크기가 변하지 않도록 (넓은 라벨 기준)
         self.pin_button.setFixedSize(72, 28)
         self.pin_button.toggled.connect(self.toggle_always_on_top)
+        # 켜진 동안(Pinned) 연한 빨강 - 공용 Framework/qt/pin_style (v01.21).
+        apply_pin_style(self.pin_button)
 
         # Shrink : 켜면 공룡만 남기고 나머지를 감춰 창 세로를 줄인다(아래 toggle_shrink).
         self.shrink_button = QPushButton("Shrink")

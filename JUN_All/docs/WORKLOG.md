@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-23 (오늘)
 
+> [!summary] A00240_PathTool · A00220_BackupTool · A00370_ToolLauncher — **Pinned 동안 Pin 버튼 연한 빨강** (A00240 v01.25->01.26 · A00220 v01.20->01.21 · A00370 v01.12->01.13) + 공용 `Framework/qt/pin_style.py` `#A00240_PathTool` `#A00220_BackupTool` `#A00370_ToolLauncher` `#Framework`
+- 요청: 세 툴의 `Pin` 이 켜져(`Pinned`) 있을 때 버튼을 연한 빨강으로 바꿔 핀 상태가 보이게.
+- 공용 `Framework/qt/pin_style.py` — `apply_pin_style(button)` 이 `QPushButton:checked`(+hover/pressed) 색만 적은 qss 를 버튼에 붙인다(바탕 `#f2a0a0` · 글자 `#4a1414`). padding 을 안 적어 버튼 크기 · 테마 모양은 그대로. 세 툴은 Pin 생성 직후 한 줄.
+- 검증: offscreen 에서 A00240(yellow_mid) · A00220(green_mid) 실제 창과 A00370 과 같은 테마의 버튼을 그려 가운데 픽셀 — 꺼짐 = 테마 색, 켜짐 = 연한 빨강. 마야 · 실기 확인 아직. A00210_FileManager 의 Pin(v01.37)은 요청에 없어 그대로.
+- 문서 `docs/Framework_pin_style.md` 신규, 세 툴 가이드 · CHANGELOG · docs/README 색인.
+
 > [!summary] A00210_FileManager — **Shrink · Pin 추가** (v01.36->01.37) `#A00210_FileManager`
 - 요청: A00210 에도 Shrink · Pin 기능 추가 + 줄었을 때 반복 애니메이션 아이디어 제시(제시만, 구현은 아직).
 - `main_window.py`: 탭 위 헤더 행(A00240 과 같은 모양) — `Pin`(WindowStaysOnTopHint, show() 재호출) · `Shrink`(메뉴 바 · `tabs_scroll` · 로그 `hide()` → `invalidate/activate` → **272 x 155**, Pin 은 `button_grid` (0,1) ↔ (1,0)). 복원은 `_full_size`. 버튼 왼쪽 `anim_area` 는 빈 `QWidget`(Expanding) — 애니메이션 정하면 바꿔 끼운다. `fit_to_content` 는 첫 show 에만 돌아 Pin 의 show() 와 충돌 없음.

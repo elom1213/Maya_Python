@@ -66,6 +66,7 @@
 | `Framework/core/log_levels.py` | 로그 줄의 **`[LEVEL]` 표식 -> 색** 공용 규칙 — `[WARN]` 노랑 · `[OK]` 초록. 밝은/어두운 테마용 색 한 쌍을 갖는다 | [Framework_log_levels](Framework_log_levels.md) |
 | `Framework/core/mirror_tokens.py` | 좌/우 미러 **토큰 규칙 공용화**(`Framework/rules/mirror_tokens.json`) — 이름 미러링은 **경계 매칭**으로 `arm_lower` 같은 오탐을 막는다 | [Framework_mirror_tokens](Framework_mirror_tokens.md) |
 | `Framework/core/shell_integration.py` | Windows **시작 메뉴 바로가기**(.lnk + AppUserModelID, PowerShell `Add-Type` C#) + 시작 화면 고정 시도. standalone 툴의 `File > Add to Start Menu`(A00240 · A00220). Windows 10 · 11 | [Framework_shell_integration](Framework_shell_integration.md) |
+| `Framework/qt/pin_style.py` | 체크형 **`Pin`(Always on Top) 버튼의 켜짐 색** — `apply_pin_style(button)` 한 줄로 켜진 동안 연한 빨강(`:checked` 색만, 크기는 테마 그대로). A00240 · A00220 · A00370 | [Framework_pin_style](Framework_pin_style.md) |
 
 ### 배치 · 패키징 (툴 하나가 아니라 전체에 걸친 것)
 

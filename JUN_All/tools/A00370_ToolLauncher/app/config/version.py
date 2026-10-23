@@ -2,6 +2,7 @@
 # last Update date : 2026-10-23
 # A00370_ToolLauncher - version info
 
+# 01.13  Pinned 동안 Pin 버튼이 연한 빨강 - 공용 Framework/qt/pin_style (A00240 · A00220 과 같은 색).
 # 01.12  Shrink 때 Pin 을 Shrunk 아래로 내리고 빈 칸만큼 창을 좁힌다 - 350 -> 272 x 155.
 # 01.11  Shrink 토글(Pin 왼쪽) - 메뉴 바 · 탭 · 저작권 줄을 감추고 창을 350 x 155 로
 #        (A00220 · A00240 이 줄었을 때와 같은 크기). 줄어든 동안 버튼 왼쪽 자리에서 툴
@@ -18,5 +19,5 @@
 #        meshDoctor(A00380 의 MeshDoctor 탭으로 이식됨)는 삭제, uvTool / BSTool /
 #        AnimTool / jointTool 은 현행 버전 폴더로 교체. 코드 변경은 없다(data/profiles).
 
-VERSION = "01.12"
+VERSION = "01.13"
 LAST_UPDATE = "2026-10-23"

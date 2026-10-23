@@ -1,5 +1,14 @@
 # Changelog — A00220_BackupTool
 
+## [01.21] - 2026-10-23
+### Changed
+- **`Pin` turns light red while pinned.** The checkable `Pin` button had only its label change to
+  `Pinned`; now the button itself turns **light red** (dark text) while Always on Top is on, in every
+  state (hover / pressed stay in the same red family), so the pinned state is visible at a glance.
+  Shared rule `Framework/qt/pin_style.py` (`apply_pin_style`), the same color in `A00240_PathTool`,
+  `A00220_BackupTool` and `A00370_ToolLauncher`. Only the `:checked` colors are set, so the button's
+  size and the theme look are unchanged.
+
 ## [01.20] - 2026-10-23
 
 ### Changed

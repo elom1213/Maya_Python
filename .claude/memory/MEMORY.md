@@ -59,6 +59,7 @@
 - [token name widget](framework-token-name-widget.md) — Profile + 칸, A00330 · A00480 공유, 칸 편집은 `Save` 버튼으로만 저장
 - [control shapes](framework-control-shapes.md) · [mirror tokens](framework-mirror-tokens.md)(공용 json, 경계 매칭)
 - TSL — [(Null) is red](framework-tsl-null-placeholder-red.md) · [UUID selection](wip-tsl-uuid-selection.md) · [attach_uuids](framework-tsl-attach-uuids.md)(씬 노드 아니면 False) · [list_limit summary](framework-tsl-list-limit.md) · [max-height squeezes buttons](tsl-widget-max-height-squeezes-buttons.md) · [selection order](tsl-selection-order.md) · [select_no_expand](wip-a00440-find-tab.md)(세트 리스트는 켤 것)
+- [pin_style: Pinned = 연한 빨강](framework-pin-style.md) — 체크형 Pin 버튼은 `apply_pin_style` 한 줄, `:checked` 색만(padding 금지), A00240 · A00220 · A00370
 - [shell_integration: Add to Start Menu](framework-shell-integration.md) — standalone 툴 시작 메뉴 .lnk + AUMID (PowerShell C#), Win10/11, A00240 · A00220 `File` 메뉴 · PS 출력 cp949 폴백
 - [Menu bar + common items](framework-menubar-widget.md)(`tool_menu.COMMON_MENUS` 한 줄) · [Dev Mode menu widget](framework-devmode-widget.md) · [Sub-tabs over collapsibles](prefer-subtabs-over-stacked-collapsibles.md)
 - [checkList behavior](framework-checklist-behavior.md) — QListWidget 다중 체크는 `JUN_mod_checkList_qt_v01(lw)` 한 줄. 트리 판은 `MOD_checkTree_qt_v01`, 폴더 트리는 `MOD_fileTree_qt_v01`(A00240 Tree 승격) — [[wip-a00210-maya-reference-tab]]
