@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-23 (오늘)
 
+> [!summary] JUN_JALI STT Converter v01.00 — **음성 → 대본 변환기 완성 (T1 설치 bat · T2 코어 + UI · T4 cli) + 0140 사용 안내** `#JUN_JALI` `#STT_Converter` `#JALI`
+- 저장소는 `JUN_JALI`(`dev`). 한 · 일 · 영 wav 여러 개 → VisemeNet Converter Correct 모드용 대본 `<이름>.lab`(+ `.stt.json`). faster-whisper `large-v3-turbo`(CTranslate2) 로컬, `Device` Auto / CUDA float16 / CUDA int8_float16 / CPU int8 + CPU 폴백, 언어는 사람이 강제, 정규화(숫자 → 수사 · 漢数字 · num2words, 사용자 사전, W23 로 남은 토큰 보고), 기존 대본 Skip 기본, VAD 는 10 초 미만 클립에서 자동 off(실측 근거). `setup_stt.bat` 은 `setup_env.bat` 의 Python 3.11 확보 루틴(`.python\` 공유 · 3.14 PC 는 전용 다운로드)을 그대로 씀. `cli.py`(종료 코드 0 / 1 / 2, `[LEVEL]` 로그) 는 A00560 JaliBatch P4 가 부를 형식.
+- 시험 4종 통과: 정규화 65 · 코어 24(가짜 엔진) · 오프스크린 UI 23(진행 팝업 · Stop · 사용자 사전 · 설정 복원) · 실제 모델 CPU 스모크 8. 개발 PC 는 CUDA 기동 중 강제 종료가 반복돼 **CPU 로만** 확인(`data/force_cpu.flag`), 기준 PC(A2000) · Python 3.14 PC 는 미확인.
+- 사고 둘: ① `setup_stt.bat --force` 재설치 + 0140 문서 작성 중 PC 가 꺼져 `.venv_stt` 파일 285개가 0 바이트로 남음(`null bytes` SyntaxError) → `--force --offline` 로 복구, 문서는 다시 씀 ② 새 bat 이 LF 줄바꿈이라 cmd 의 `call :label` 복귀가 어긋나 로그 첫머리에 다른 블록 문장이 찍힘 → CRLF 로 변환(`.gitattributes` 가 `*.bat eol=crlf` 로 보장).
+- 문서: `JUN_JALI/docs/0140_stt_converter_guide.md`(설치 · 창 · 정규화 · 코드표 E40 ~ · W20 ~ · cli · 실측 · 개발자용 · 확인 기록), 0130 계획서 체크리스트 · §11 환경 복구 행, README 표 · 빠른 시작.
+
 > [!summary] JALI 대량 파이프라인 — **계획 평가 + A00560_JaliBatch · A00570_JaliReview 제작 계획서** (코드 전, 문서만) `#A00560_JaliBatch` `#A00570_JaliReview` `#JALI`
 - 요청: wav · 대본 N 개 → JALI 툴(JUN_JALI 변환기) → JALI 컨트롤러(`A0030_jali_slider_ctl_direct_arkit.ma`) 레퍼런스 + DUMMY_IN 키 → 컨트롤러 베이크한 클립 `.mb` N 개를 만드는 standalone 툴, 검수는 빈 씬에 클립 + 아바타를 레퍼런스하고 ARKIT_OUT → 블렌드셰이프 연결, 레퍼런스 교체로 다른 클립 — 이 계획을 평가하고 개선안과 제작 계획서를 문서로.
 - `docs/plans/A00560_JaliBatch_pipeline_review.md`: 뼈대(클립 = 컨트롤러 레퍼런스 + 자기 animCurve, 레퍼런스 교체 검수, 변환 · 마야 프로세스 분리)는 유지. **틀어진 곳 둘** — ① 레퍼런스된 animCurve 편집은 검수 씬의 레퍼런스 편집으로 쌓여 클립 `.mb` 가 Ctrl+S 로 안 바뀐다 → `file -saveReference`(Save Reference Edits) 를 명시 버튼으로 ② 편집은 노드 이름으로 기록되고 모든 클립이 같은 이름이라 저장 안 한 채 교체하면 다음 클립에 묻어 간다 → Swap 앞 편집 0건 검사. 더한 것: Validate(failedEdits · 도장) · 네임스페이스 고정(`CLIP:JALI:`) · 시작 프레임은 **파일 이름에서 읽지 않고** 전 클립 공통값 + 표에서 개별 수정(처음엔 `_f0105_0429` 를 읽으려 했으나 사용자 정정 — 이름에 프레임이 없는 파일이 일반적) · fps 명시 · 매니페스트 json · 베이크 뒤 DUMMY_IN 커브 삭제 · 덮어쓰기 정책 · 변환은 2단계 · Open Clip 대안.
