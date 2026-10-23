@@ -26,4 +26,4 @@ A00210_FileManager **v01.37** (2026-10-23) — 탭 위에 헤더 행 추가, [[w
 검증: 오프스크린 PySide6 27항목 + 시각별 캡처 6장. **실제 앱 눈 확인 아직.**
 
 **v01.39** (2026-10-23) — Pin 켜짐 색은 공용 [[framework-pin-style]] 한 줄, `File > Add to Start Menu` 는 공용
-[[framework-shell-integration]](A00240 과 같은 꼴, `APP_NAME` = JUN File Manager). 실기 클릭 아직.
+[[framework-shell-integration]](A00240 과 같은 꼴, `APP_NAME` = JUN File Manager). 실기 확인됨(2026-10-23, 색 변화 · 바로가기 생성).

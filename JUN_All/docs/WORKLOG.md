@@ -36,7 +36,7 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 요청(두 턴): A00240 처럼 A00210 도 (1) Pin 이 켜져 있을 때 버튼을 빨강으로, (2) 시작 메뉴 바로가기 추가 기능.
 - Pin 색: `main_window.py` Pin 생성 직후 공용 `Framework/qt/pin_style.apply_pin_style` 한 줄. 색 · 크기 규칙은 세 툴과 같다(`:checked` 색만, padding 없음).
 - Start Menu: `app_meta.py` 에 `APP_NAME`(JUN File Manager) · `APP_DESCRIPTION` · `tool_root()` · `start_menu_launch_spec()`, `main_window.py` 에 `File` 메뉴(공용 메뉴 바라 Help 왼쪽) + `Add to Start Menu` → 공용 `shell_integration.add_to_start_menu` · `pin_shortcut` → 하단 로그 한 줄 + 안내/경고 창. A00240 의 핸들러와 같은 꼴(로그만 이 창의 `self.log`).
-- 검증(15항목): offscreen PySide6 실제 창 — Pin 바탕 픽셀 꺼짐 = 테마 색 · 켜짐 = `#f2a0a0` · 72 x 28 유지, File 메뉴가 Help 왼쪽에 있고 액션 enabled, `start_menu_launch_spec()` 이 pythonw + launch.py + .ico 를 가리킴. .lnk 실제 생성은 A00240 때 확인한 공용 모듈 그대로 — 이 툴에서 실기 클릭은 아직.
+- 검증(15항목): offscreen PySide6 실제 창 — Pin 바탕 픽셀 꺼짐 = 테마 색 · 켜짐 = `#f2a0a0` · 72 x 28 유지, File 메뉴가 Help 왼쪽에 있고 액션 enabled, `start_menu_launch_spec()` 이 pythonw + launch.py + .ico 를 가리킴. **실기 확인(사용자, 같은 날)**: Pin 색이 바뀌고 시작 메뉴 바로가기도 생긴다.
 - 문서 `docs/A00210_FileManager.md` Pin 줄 + "File > Add to Start Menu" 소절, `docs/Framework_pin_style.md` · `docs/Framework_shell_integration.md` 사용처, CHANGELOG, version.
 
 > [!summary] A00240_PathTool · A00220_BackupTool · A00370_ToolLauncher — **Pinned 동안 Pin 버튼 연한 빨강** (A00240 v01.25->01.26 · A00220 v01.20->01.21 · A00370 v01.12->01.13) + 공용 `Framework/qt/pin_style.py` `#A00240_PathTool` `#A00220_BackupTool` `#A00370_ToolLauncher` `#Framework`

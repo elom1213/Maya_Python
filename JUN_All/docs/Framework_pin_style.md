@@ -30,4 +30,4 @@ apply_pin_style(self.pin_button)          # 켜진 동안 연한 빨강
 - 버튼 자신의 qss 는 테마 위에 겹쳐지므로 standalone(앱 qss, `load_theme_dev`) · in-Maya(창 qss, `load_theme_to_widget`) 둘 다 같다.
 - 사용처: `A00240_PathTool` v01.26 · `A00220_BackupTool` v01.21 · `A00370_ToolLauncher` v01.13 · `A00210_FileManager` v01.39.
 - 검증(2026-10-23, offscreen PySide6): 세 테마(yellow_mid · green_mid)에서 버튼을 그려 가운데 픽셀을 읽어 꺼짐 = 테마 색,
-  켜짐 = `#f2a0a0` 확인. 마야 · 실기 확인 아직.
+  켜짐 = `#f2a0a0` 확인. 실기는 A00210 에서 확인(2026-10-23). 마야(in-Maya 창) 확인 아직.

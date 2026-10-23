@@ -11,14 +11,14 @@ All notable changes to this tool are documented here.
   same taskbar button. Click again after moving the tool folder to refresh the path. The result is logged
   and shown in a dialog (with the manual pin step when Windows does not expose the pin verb).
 - `app/config/app_meta.py`: `APP_NAME`, `APP_DESCRIPTION`, `tool_root()`, `start_menu_launch_spec()`.
-- Not yet clicked in the running tool; the shell module itself was verified when A00240 / A00220 got it.
+- Confirmed in the running tool (2026-10-23): the Start menu shortcut is created.
 
 ### Changed
 - **`Pin` button turns light red while on** (`Pinned`), the same colour `A00240_PathTool`, `A00220_BackupTool`
   and `A00370_ToolLauncher` use - shared `Framework/qt/pin_style.py` (`apply_pin_style`). Only the `:checked`
   colours are set, so the button keeps its 72 x 28 size and the theme look while off.
 - Verified offscreen (PySide6): background pixel of the real window's Pin button = theme colour off, `#f2a0a0` on,
-  size unchanged. Not yet checked by eye in the running tool.
+  size unchanged. Confirmed by eye in the running tool (2026-10-23).
 
 ## [01.38] - 2026-10-23
 ### Added

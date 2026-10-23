@@ -20,6 +20,6 @@ metadata:
 - 트랩: frozen(PyInstaller) 이면 아이콘을 `_MEIPASS` 의 .ico 로 두지 말 것(실행마다 바뀌는 임시 폴더) — exe 자신을 아이콘으로.
 - A00240 은 로그창이 없어 결과 한 줄이 Junction 탭의 공용 로그(`menu_bar.log` 가 `findChildren` 으로 찾는 곳)에 간다.
 - 작업표시줄 고정(`Pin to Taskbar` + `set_window_relaunch`)은 옮기지 않았다 — 요청 범위 밖. 필요하면 비디오툴 `main_window.pin_to_taskbar` 를 같은 식으로.
-- 검증: 스크래치 폴더에 실제 .lnk 만들어 WScript/AUMID 되읽기 + 두 창 offscreen. **실기 클릭 · Win10 실기 아직.**
+- 검증: 스크래치 폴더에 실제 .lnk 만들어 WScript/AUMID 되읽기 + 두 창 offscreen. **실기 클릭은 A00210 에서 확인(2026-10-23, Win11) · Win10 실기 아직.**
 
 관련: [[standalone-taskbar-icon-method]], [[framework-menubar-widget]], [[release-layout-launch-py]], [[wip-a00220-pin]]
