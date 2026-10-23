@@ -1,6 +1,6 @@
 # A00560_JaliBatch — 툴 제작 계획서 (대량 wav → JALI 클립 .mb 생성 + 레퍼런스 검수)
 
-> **작성** 2026-10-23 · 상태: **계획 (실측 M0 전)** · 대상 Maya 2024 (mayapy) · PySide6 standalone + in-Maya 검수 툴
+> **작성** 2026-10-23 · **갱신** 2026-10-23 (D7 — 시작 프레임을 파일 이름에서 읽지 않는다, 사용자 지시) · 상태: **계획 (실측 M0 전)** · 대상 Maya 2024 (mayapy) · PySide6 standalone + in-Maya 검수 툴
 > 평가 문서 [A00560_JaliBatch_pipeline_review.md](A00560_JaliBatch_pipeline_review.md) 의 개선안(§2-1 ~ 2-11)을 **그대로 반영**한 계획이다.
 > 참고 코드: `A00540_JaliLipSync/app/core`(keyer · mapping · lipsync_data · sequence · scene — **이 코어를 그대로 쓴다**, 사용자 요청) ·
 > `A00210_FileManager/app/maya`(mayapy 워커 · QProcess · 진행률 · 취소) · JUN_JALI `examples/build_jali_slider_ctl.py`(`bake_ctl_keys`) ·
@@ -34,7 +34,7 @@
 | **D4** | 베이크 코드 | JUN_JALI `bake_ctl_keys` 를 **`Framework/jali/bake.py` 로 이식**(출처 주석) + DUMMY_IN 커브 삭제 추가 | JUN_JALI 는 별도 공개 저장소라 import 할 수 없다. 이식 뒤 JUN_JALI 쪽은 그대로 둔다(검증 스크립트가 쓴다) |
 | **D5** | 클립 한 개 = 작업 단위, 워커 **한 프로세스**가 N 개 순서대로 | 기동 1회(4~5초), 클립 경계에서 취소 | A00210 워커 프로토콜(`JUNMSG` log/progress/result/error + cancel 플래그 파일) 그대로 |
 | **D6** | 클립 씬 설정 | `currentUnit -time <fps>`(기본 **ntsc 30**) → 컨트롤러 레퍼런스(ns **`JALI`**) → 재생 범위 → 키 → 베이크 → 소리 → fileInfo 도장 → `.mb` 저장 | fps 를 먼저 — A00540 keyer 가 씬 fps 로 샘플한다. 네임스페이스 고정은 평가서 §2-4 |
-| **D7** | 시작 프레임 | **Filename**(`_f(\d+)_(\d+)` → 첫 수) / `1` / Custom, 기본 Filename, 패턴이 없으면 1 로 폴백하고 WARN | 평가서 §2-5 (30fps 원본 영상 구간과 맞음) |
+| **D7** | 시작 프레임 | **모든 클립 같은 값 하나**(스핀박스, 기본 `1`) + 표의 `Start` 열을 클립마다 **손으로 수정** 가능(매니페스트에 저장). **파일 이름은 읽지 않는다** | 사용자 지시(2026-10-23): 예시 자료의 `_f0105_0429` 는 그 자료만의 표기, 이름에 프레임이 없는 파일이 일반적일 수 있다 — 이름 규칙에 의존하면 다른 폴더에서 조용히 틀린다. 이름은 클립 `.mb` 이름에만 쓴다 (평가서 §2-5) |
 | **D8** | 베이크 모드 | `copy`(DUMMY_IN 커브를 컨트롤러로 통째 복사) 고정, 뒤에 DUMMY_IN 커브 삭제 · animCurve 이름 `JALI_<ctl>_<attr>` | 키 수 · 탄젠트 그대로. `bake` 샘플은 프레임마다 키가 생겨 손질이 힘들다 |
 | **D9** | 덮어쓰기 | **Skip** 기본 / Overwrite / Overwrite with backup(`backup/`). `edited` 클립은 한 번 더 묻기 | 평가서 §2-8 |
 | **D10** | 기록 | 출력 폴더 `jali_clips.manifest.json` + 클립 `fileInfo jun_jali_clip` | 평가서 §2-3 · 2-6. A00570 이 목록을 여기서 읽는다 |
@@ -91,9 +91,10 @@ JUN_All/
 
 ```
 job.json  { "job": "generate", "controller": <A0030 .ma>, "mapping": "jali_slider_dummy_in", "fps": 30,
-            "start_mode": "filename" | "one" | "custom", "custom_start": 1, "jali": {"mode": "data" | "fixed", "fixed": [0.6, 0.6]},
+            "default_start": 1, "jali": {"mode": "data" | "fixed", "fixed": [0.6, 0.6]},
             "viseme_scale": 1.0, "overwrite": "skip" | "overwrite" | "backup", "copy_wav": true,
-            "clips": [{"name", "txt", "json", "wav", "out_mb", "start"}], "manifest": <경로>,
+            "clips": [{"name", "txt", "json", "wav", "out_mb", "start"}],   # start = 표의 값 (기본 default_start, 이름에서 안 읽음)
+            "manifest": <경로>,
             "result": <결과 json>, "cancel_flag": <경로> }
 ```
 
@@ -122,10 +123,10 @@ job.json  { "job": "generate", "controller": <A0030 .ma>, "mapping": "jali_slide
 │ │ Controller [A0030….ma ][…] │ │ ┌ Clip | Controller | Edits | Keys |   │ │
 │ │ Output   [out_en_002/maya][…]│ │ │ … failedEdits 빨강, stamp 불일치 노랑 │ │
 │ │ ┌ ☑ Clip | Start | Frames | wav | Status ┐ │ │ └───────────────────────┘ │ │
-│ │ │ ☑ 0030_vivian_en_01_f0105_0429 | 105 | 324 | ● | - │ │ │ Repath controller [ … ] ☐ │ │
-│ │ │ ☑ 0030_vivian_en_02_f0445_0490 | 445 | 135 | ● | exists │ │ │ [Validate] [Repath]      │ │
+│ │ │ ☑ 0030_vivian_en_01_f0105_0429 |   1 | 324 | ● | - │ │ │ Repath controller [ … ] ☐ │ │
+│ │ │ ☑ 0030_vivian_en_02_f0445_0490 |   1 | 135 | ● | exists │ │ │ [Validate] [Repath]      │ │
 │ │ └──────────────────────────────┘ │ └────────────────────────────────────┘ │
-│ │ Start [Filename ▾] [  1 ] fps [30 ▾] Mapping [jali_slider_dummy_in ▾]    │
+│ │ Start [  1 ] (all clips, Start cell editable) fps [30 ▾] Mapping [jali_slider_dummy_in ▾] │
 │ │ JaLi [Data ▾] [0.60][0.60]  Existing [Skip ▾]  ☑ Copy WAV                │
 │ │ mayapy [C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe][…][Detect]    │
 │ │ [Run]  [Cancel]  ▓▓▓▓▓▓░░░░ 3 / 5  0030_vivian_en_03…                     │
@@ -134,7 +135,7 @@ job.json  { "job": "generate", "controller": <A0030 .ma>, "mapping": "jali_slide
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Source 스캔**(`source_scan`): 22열 txt 가 있는 이름만 클립 후보. json 없음 → WARN(길이는 wav 로), wav 없음 → ERROR(제외), 이름에 `_fNNNN_NNNN` 없음 → start 1 + WARN. 22열이 하나도 없으면 "Run VisemeNet Converter first (JUN_JALI)" 안내.
+- **Source 스캔**(`source_scan`): 22열 txt 가 있는 이름만 클립 후보. json 없음 → WARN(길이는 wav 로), wav 없음 → ERROR(제외). **파일 이름에서 프레임을 읽지 않는다** — `Start` 는 스핀박스 값으로 채우고 표에서 클립마다 고칠 수 있다(매니페스트에 저장돼 다음 Run 에도 남는다). 22열이 하나도 없으면 "Run VisemeNet Converter first (JUN_JALI)" 안내.
 - 표는 공용 TSL 이 아니라 `QTableWidget`(체크 · 상태 열) — A00540 클립 표와 같은 모양. 상태: `-` / `exists` / `edited`(매니페스트) / `failed`.
 - 공용: 메뉴 바 + `shell_integration`(Add to Start Menu) · `pin_style` · Shrink(272×155, A00240 v01.25 방식) · 로그 · `MOD_mayapyProcess`(진행률 팝업 · Cancel) · 페이지별 `QScrollArea`(A00240 v01.30 방식으로 창 자유 크기).
 - 끝나면 결과 표 갱신 + "N generated, M skipped, K failed" + 출력 폴더 열기(`file_opener`).
@@ -205,7 +206,7 @@ M0 스크립트는 scratchpad 에 두고 결과를 이 문서 §10 에 적는다
 | ID | 무엇을 | 어떻게 |
 |----|--------|--------|
 | T1 | `Framework/jali` 승격 뒤 A00540 동작 불변 | A00540 tests 132 + 매핑 json 경로 변경 확인 |
-| T2 | `source_scan` | out_en_002(정상 5) · src_en(22열 없음 → 안내) · json 없는 txt · 이름 패턴 없는 파일 |
+| T2 | `source_scan` | out_en_002(정상 5) · src_en(22열 없음 → 안내) · json 없는 txt · `_fNNNN` 이 없는 이름도 **같은 결과**(이름을 안 읽는다) · 표에서 고친 Start 가 job 에 그대로 |
 | T3 | generate 5 클립 | 키 수 · ARKIT_OUT 기대값(A0030 verify T8 의 공식) · DUMMY_IN 연결 0 · fileInfo 도장 · 소리 노드 offset = start · fps ntsc · 재생 범위 |
 | T4 | 덮어쓰기 정책 | Skip 은 mtime 불변, Overwrite 는 바뀜, backup 은 `backup/<이름>_01.mb` |
 | T5 | 취소 · 실패 | 3번째에서 cancel_flag → 2개 생성 후 멈춤, 종료 코드 0; 깨진 txt 하나 → 그 클립만 failed |
@@ -221,8 +222,8 @@ M0 스크립트는 scratchpad 에 두고 결과를 이 문서 §10 에 적는다
 | # | 질문 | 권장 |
 |---|------|------|
 | Q1 | 툴 배치 — standalone `A00560` + in-Maya `A00570` 두 개로 가나, 하나로 묶나 | **두 개** (D1) |
-| Q2 | 시작 프레임 기본 | **Filename**(`_f0105` → 105) (D7) |
-| Q3 | fps 기본 | **30 (ntsc)** — 파일 이름 구간과 wav 길이가 30 으로 맞는다 (D6) |
+| Q2 | 시작 프레임 기본 | **모든 클립 1**, 표의 Start 열에서 개별 수정 (D7, 파일 이름은 읽지 않음 — 사용자 확정) |
+| Q3 | fps 기본 | **30 (ntsc)** — 예시 자료의 원본 영상이 30fps 였다. 다른 자료는 UI 에서 고른다 (D6) |
 | Q4 | JaLi(Jaw/Lip) 키 | **Data**(VisemeNet 값) 기본, Fixed 0.6/0.6 선택 (D13) |
 | Q5 | wav 를 클립 옆에 복사 | **ON** (D14) |
 | Q6 | `Open Clip` 보조(클립 직접 열어 깊은 수정) | **포함** — M0-3 이 틀리면 이것이 기본이 된다 |
@@ -236,3 +237,4 @@ M0 스크립트는 scratchpad 에 두고 결과를 이 문서 §10 에 적는다
 | 날짜 | 단계 | 내용 |
 |------|------|------|
 | 2026-10-23 | 계획 | 평가서 + 이 계획서 작성. M0 전 |
+| 2026-10-23 | 계획 수정 | 사용자 지시 — 시작 프레임을 파일 이름(`_f0105_0429`)에서 읽지 않는다. D7 · job json · UI · T2 · Q2 · Q3 갱신 |

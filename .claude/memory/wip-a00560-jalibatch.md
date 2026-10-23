@@ -17,7 +17,7 @@ metadata:
 
 - 사용자 계획 = 클립 `.mb`(빈 씬 + 컨트롤러 레퍼런스 ns `JALI` + DUMMY_IN 키 → `bake_ctl_keys(copy)` 로 컨트롤러에 베이크) N 개, 검수 = 빈 씬 + 클립 레퍼런스(ns `CLIP`) + 아바타 레퍼런스, `CLIP:JALI:ARKIT_OUT.*` → 블렌드셰이프, 클립 교체는 `file -loadReference`. 뼈대는 유지.
 - **틀어진 곳 (마야 레퍼런스 동작)**: ① 레퍼런스된 animCurve 키 수정("Allow edits on referenced animation curves")은 **검수 씬의 레퍼런스 편집**으로 쌓인다 — 클립 파일은 Reference Editor **Save Reference Edits** (`cmds.file(saveReference=True, referenceNode=…)`) 를 해야 바뀐다. ② 편집은 노드 이름 기준이고 모든 클립의 컨트롤러 · 커브 이름이 같으므로 **저장 안 한 편집이 교체 뒤 다음 클립에 적용**될 것으로 예상 → Swap 은 편집 0건일 때만(Save/Discard/Cancel). 둘 다 **M0 실측으로 확정할 것**(계획서 §6 M0-1 ~ M0-4, 아직 안 함).
-- 파일 이름 `_f0105_0429` = 원본 영상 **30fps 프레임 구간**(클립 01 wav 10.80 s × 30 = 324 = 429 − 105) → 시작 프레임 기본 Filename, fps 기본 ntsc 30 을 **컨트롤러 레퍼런스 전에** 설정(mayapy 새 씬 · 컨트롤러 .ma 는 film 24, A00540 keyer 는 씬 fps 샘플).
+- **시작 프레임은 파일 이름에서 읽지 않는다** (사용자 정정 2026-10-23). 예시 자료의 `_f0105_0429` 는 그 자료만의 표기(30fps 원본 구간, wav 길이와 맞긴 한다)이고 이름에 프레임이 없는 파일이 일반적일 수 있다 → 전 클립 공통 Start(기본 1) + 표에서 개별 수정. **파일 이름 규칙에 의존해 데이터를 만들지 말 것** — 이 사용자의 일반 원칙으로 볼 것. fps 기본 ntsc 30 은 **컨트롤러 레퍼런스 전에** 설정(mayapy 새 씬 · 컨트롤러 .ma 는 film 24, A00540 keyer 는 씬 fps 샘플).
 - `bake_ctl_keys(mode='copy')` 는 DUMMY_IN → CTL 연결을 끊고 키를 복사하지만 DUMMY_IN 커브는 남긴다 → 클립에선 삭제. 커브 이름 `JALI_<ctl>_<attr>`.
 - 공용 승격 계획(P0): `Framework/jali/`(keyer · mapping · lipsync_data · sequence · bake · mappings) · `Framework/core/mayapy_runner.py` · `Framework/qt/MOD_mayapyProcess_qt_v01.py`(A00210 `app/maya` 에서) — A00540 tests 132 · A00210 워커 시험 그대로 통과가 완료 조건.
 - 변환(TensorFlow .venv · MFA) 은 1단계에서 호출하지 않는다 — 변환기 출력 폴더가 입력. 2단계 P4 = JUN_JALI `cli.py`(`converter.run_batch` 헤드리스).
