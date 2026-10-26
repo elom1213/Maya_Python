@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A00560_JaliBatch icon - a stack of clip cards (one .mb per line) with a mouth / viseme wave on the front card.
+     teal_dark 테마에 맞춘 청록 계열. standalone 툴이라 작업표시줄용 .ico 도 이 svg 에서 사이즈별 렌더한다 (docs/taskbar_icon_guide.md). -->
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f3d3f"/>
+      <stop offset="1" stop-color="#121f22"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3fc1b0"/>
+      <stop offset="1" stop-color="#1f8f85"/>
+    </linearGradient>
+    <linearGradient id="cardBack" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f9a90"/>
+      <stop offset="1" stop-color="#1b6f69"/>
+    </linearGradient>
+  </defs>
+
+  <!-- rounded-square background -->
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#bg)"/>
+
+  <!-- back cards (the batch) -->
+  <rect x="78" y="46" width="134" height="96" rx="14" fill="url(#cardBack)" opacity="0.55"/>
+  <rect x="62" y="66" width="134" height="96" rx="14" fill="url(#cardBack)" opacity="0.8"/>
+
+  <!-- front card -->
+  <rect x="44" y="88" width="136" height="104" rx="14" fill="url(#card)"/>
+
+  <!-- mouth (lips) on the front card -->
+  <path d="M68 140 Q112 108 156 140 Q112 172 68 140 Z" fill="#102a2c"/>
+  <path d="M76 140 Q112 122 148 140 Q112 156 76 140 Z" fill="#e8fff9"/>
+
+  <!-- viseme wave under the stack (keys baked onto the timeline) -->
+  <path d="M40 214 L64 214 L76 196 L88 222 L100 204 L112 214 L140 214 L150 198 L162 220 L172 214 L216 214"
+        fill="none" stroke="#9ff0e2" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

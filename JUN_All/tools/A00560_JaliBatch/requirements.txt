@@ -1,0 +1,4 @@
+# Single source of truth: JUN_All/requirements.txt
+PySide6
+pyinstaller
+# 마야 일은 mayapy.exe 하위 프로세스(app/maya/worker.py)가 한다 - 이 프로세스에는 maya 가 필요 없다.
