@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A00570_JaliReview icon (32px shelf, common frame) - a clip card with a mouth and a magnifier (review). teal family like A00540 · A00560. -->
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+  <!-- clip card -->
+  <rect x="5" y="7" width="17" height="13" rx="2.5" fill="#2fa89b"/>
+  <!-- mouth on the card -->
+  <path d="M8 13.5 Q13.5 9.5 19 13.5 Q13.5 17.5 8 13.5 Z" fill="#102a2c"/>
+  <path d="M9.5 13.5 Q13.5 11.5 17.5 13.5 Q13.5 15.5 9.5 13.5 Z" fill="#e8fff9"/>
+  <!-- magnifier -->
+  <circle cx="21.5" cy="20.5" r="5" fill="none" stroke="#f0f0f0" stroke-width="2.4"/>
+  <line x1="25" y1="24" x2="29" y2="28" stroke="#f0f0f0" stroke-width="3" stroke-linecap="round"/>
+</svg>
