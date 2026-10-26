@@ -1,6 +1,7 @@
 # Facial ARKit 52 컨트롤러 V05 — 작업 계획서 (Ctl_Only_V04 → V05, Maya + Unreal 공용 보드)
 
-> **작성** 2026-10-26 · 상태: **계획 (코드 · 파일 생성 전, §7 M0 실측 전)** · 대상 Maya 2024 (mayapy 빌드 · 검증) · Unreal 5.x Control Rig (2단계)
+> **작성** 2026-10-26 · **갱신** 2026-10-26 (Q1~Q8 답 반영 · M0 실측 · M1~M5 완료) · 상태: **Maya 보드 완성 — `Ctl_Only_V05.ma/.mb` 생성 · 검증 1582 항목 통과 · GUI 눈 확인 전** · 대상 Maya 2024 (mayapy 빌드 · 검증) · Unreal 5.x Control Rig (2단계, M6)
+> 사용 안내: [`../A00580_FacialBoardBuilder.md`](../A00580_FacialBoardBuilder.md)
 > 원본 `C:\Users\USER\Desktop\JP\0035_maya_src_rig\01_Module_01_Facial\Ctl_Only_V04.mb` (Maya 2024 · cm · 레퍼런스 없음 · 플러그인 의존 없음)
 > 참고 `07_MH_sample_02\0010_sample_0030.mb` 의 MetaHuman 페이셜 GUI 보드(`GRP_faceGUI`, CTRL 181개)
 > 전례 `02_Cage_JALI\A0030_jali_slider_ctl_direct_arkit.ma` — JUN_JALI `examples/build_jali_slider_ctl.py` 로 **스크립트 생성 + 검증**한 슬라이더 리그(메모리 `wip-jali-slider-ctl`)
@@ -79,7 +80,7 @@ CTRL_expressions (user attr 252)  ←  animCurveUU `CTRL_expressions_<attr>`  �
 | ID | 결정 | 권장 | 이유 |
 |----|------|------|------|
 | **D1** | 파일 · 버전 | `Ctl_Only_V05.ma` + `.mb`, V04 보존 | 관례(버전은 파일명에). `.ma` 는 UE 빌더 · diff 용, `.mb` 는 작업용 |
-| **D2** | 더미 노드 | `BS_Face_CSV`(blendShape, 타겟 52 별칭 · 순서) · `BS_Face_Connect_01`(transform, attr 52 · 순서) · 둘이 걸린 `FaicalMesh_geo` 를 **이름 그대로** | R2. CSV 임포트 · RigConnect 규칙 `Apple ARKit 52 Facial Target` · 기존 키 베이크 흐름이 이 이름을 본다. 메시는 글자 메시 대신 **작은 평면**으로 바꾸되 이름 유지 (오타도 유지 — 바꾸면 임포트가 깨질 수 있다, Q2) |
+| **D2** | 더미 노드 | `BS_Face_CSV`(blendShape, 별칭 52 · **인덱스 = V04 실측**) · `BS_Face_Connect_01`(transform, attr 52 · 순서) **이름 그대로**. `FaicalMesh_geo` 는 **없앤다**(Q2: FileTool 은 `BS_Face_CSV` 만 본다) — 대신 **숨긴 4점 평면 `BS_Face_CSV_geo`** 에 blendShape 를 건다 | R2. **지오메트리 없는 blendShape 는 연결된 animCurve · pma 를 지우거나 `cutKey` 만 해도 Maya 가 노드째 지운다**(M0 실측, 메모리 `maya-delete-cascades-geoless-blendshape`). V04 의 글자 메시가 그 역할을 하고 있었다 |
 | **D3** | 컨트롤 이름 | **`CTRL_<L|R|C>_<region>_<motion>`** (MetaHuman 관례), 그룹 `GRP_<region>GUI`, 틀 `FRM_<ctl>`, 루트 `GRP_faceBoard` | UE Control Rig 에서 같은 이름으로 만든다. L/R 은 **캐릭터 기준**(ARKit 과 같음), 보드에서 L 은 +x |
 | **D4** | 배치 | **얼굴 지도형 2D 보드**, 좌우 대칭, 부위 자리에 컨트롤 (§2-1 표 · §2-2 그림). 보드 로컬 좌표(가로 −7 ~ 7 · 세로 0 ~ 26), 루트가 세상 자리 결정 | R1. UE 에서는 로컬 좌표가 그대로 쓰인다 |
 | **D5** | 컨트롤 종류 셋 | **슬라이더 0~1**(ty) · **슬라이더 ±1**(ty, 반대 표현 둘) · **2D 패드**(tx/ty ±1, 표현 넷). `transformLimits` 로 고정, 나머지 채널 lock + hide | MetaHuman 과 같다. 클램프 노드 대신 **리밋이 범위를 보장**하므로 손 애니가 범위 밖으로 못 간다 |
@@ -88,8 +89,10 @@ CTRL_expressions (user attr 252)  ←  animCurveUU `CTRL_expressions_<attr>`  �
 | **D8** | 생성 방법 | **손으로 만들지 않고 빌더 스크립트**(mayapy) 가 json 명세에서 생성 + 검증 스크립트 | JALI 슬라이더 리그 전례(305 ~ 495 항목 검증). 자리 수정 = json 수정 → 재생성. UE 빌더가 **같은 json** 을 읽는다(R3) |
 | **D9** | 빌더 위치 | Maya_Python `JUN_All/tools/A00580_FacialBoardBuilder/`(헤드리스 `build.py` + `verify.py` + `spec/arkit52_board_v05.json` + `migrate_v04.json`), UI 없이 시작 | 라우팅 규칙(마야 파이썬 → Maya_Python). A00560/A00570 다음 번호. 나중에 in-Maya UI 를 얹을 수 있게 (B) 폴더 모양 |
 | **D10** | 색 | L **빨강** · R **파랑** · C **노랑**, 슬라이더 트랙 · 틀은 Reference 표시(선택 안 됨), 라벨 = `textCurves` | 좌우가 한눈에. textCurves 는 mayapy 에서 된다(JALI 실측) |
-| **D11** | 루트 attr `Head / Global / World` | **유지하되 연결하지 않음**(지금도 연결 없음) + 보드 전체 `visibility` · `boardScale` | 무엇에 쓰는지 확인 뒤(Q5) 연결 |
-| **D12** | V04 호환 | `migrate_v04.json`(V04 `ctl.attr` → V05 `CTRL.attr` + 부호) 제공 → 옛 키 애니는 A00110 Copy Key / A00145 Connect by Rule 로 이관 | 이름이 전부 바뀌므로 옛 `.ma` 애니가 바로 안 붙는다 — 표로 건너가게 |
+| **D11** | 루트 attr `Head / Global / World` | **따라가기 가중치**(Q5 답: Head = 머리 회전 · 이동, Global = 아바타 루트 본, World = 안 따라감). `GRP_faceGUI` 를 `FOLLOW_Head_loc` / `FOLLOW_Global_loc` / `FOLLOW_World_loc` 에 parentConstraint, 가중치 ← `CTRL_faceGUI.Head/Global/World`(0~1, 기본 Head 1). 사용자가 Head 로케이터를 머리 조인트에, Global 을 루트 본에 constraint | 리그마다 조인트 이름이 달라 로케이터를 사이에 둔다 |
+| **D12** | V04 호환 | `spec/migrate_v04.json`(V04 `ctl.attr` → V05 `CTRL.attr` + 부호, `v05 = v04 × multiplier`, 한 축으로 모이는 묶음은 `merged_v05_plugs` 합) → 옛 키 애니는 A00110 Copy Key / A00145 Connect by Rule 로 이관. verify T7b 가 동치를 확인 | 이름이 전부 바뀌므로 옛 `.ma` 애니가 바로 안 붙는다 — 표로 건너가게 |
+| **D13** | 예비 컨트롤 (Q3) | `CTRL_L/R_cheek_puff` 두 개를 만들되 **어디에도 연결하지 않고 회색**(`colors.unused`), `notConnected` 표시 attr. `cheekPuff` 는 `CTRL_C_cheek_puff` 하나 | 뒤에 좌우를 따로 연결할 때를 위해 (사용자 결정) |
+| **D14** | 값 1 의 이동 거리 | `board.unit` 0.8 cm — 컨트롤을 담은 `FRM_<ctl>` 의 scale. 컨트롤 값 범위는 그대로 −1~1 / 0~1 | 미리보기에서 0.6 은 트랙이 원에 가려 안 보였다. UE 로 갈 때도 값 범위는 같다 |
 
 ### 2-1. 52 attr → 컨트롤 매핑표 (컨트롤 **33개**)
 
@@ -276,14 +279,14 @@ Maya_Python/JUN_All/tools/A00580_FacialBoardBuilder/
 
 | Q | 질문 | 권장 |
 |---|------|------|
-| **Q1** | 뒤로 경로: **direct**(CSV → ctl 직결, 베이크로 끊음) 유지? 아니면 `_drv` 합산(컨트롤러 늘 자유, 베이크 = 복사)? | direct (현행 · JALI 와 같은 선택) |
-| **Q2** | CSV 임포트에 쓰는 툴은 무엇인가 (레거시 스크립트? A00110?) — 그것이 `FaicalMesh_geo` · `BS_Face_CSV` 이름을 참조하는지 | M0-1 에서 확인, 이름은 전부 유지 |
-| **Q3** | `cheekPuff` 하나를 어디에 — 중앙(코 아래) 하나 / 양쪽 볼에 두 개(둘 다 같은 attr, 베이크 때 하나만) | 중앙 하나 |
-| **Q4** | `mouthFunnel` · `mouthPucker` 를 입 중앙 양옆 두 슬라이더로 / 한 ± 슬라이더(+ funnel · − pucker)로 | 두 슬라이더 (둘이 반대 표현이 아니다) |
-| **Q5** | 루트의 `Head / Global / World` attr 용도 (머리 따라가기 스위치?) | 유지 · 미연결, 용도를 알려주면 M2 에서 연결 |
-| **Q6** | 끌어내리는 표현(browDown · mouthLowerDown · jawOpen · eyeBlink) 을 **−ty** 로(손이 아래로 가면 내려가게) / 전부 +ty 0~1 로 통일 | 아래 표현은 −ty (MetaHuman 식, 직관) — 표 §2-1 이 그 기준 |
-| **Q7** | 컨트롤 색 · 크기 · 보드 가로 14 cm 가 지금 작업 화면에 맞는지 (V04 는 13.3 × 25) | 그대로, M1 png 로 확인 |
-| **Q8** | UE 빌더(M6)를 이번 묶음에 넣을지, 명세만 맞추고 다음으로 | 다음 (별도 계획서) |
+| **Q1** | 뒤로 경로: **direct**(CSV → ctl 직결, 베이크로 끊음) 유지? 아니면 `_drv` 합산(컨트롤러 늘 자유, 베이크 = 복사)? | **답: 권장대로 direct** |
+| **Q2** | CSV 임포트에 쓰는 툴은 무엇인가 — 그것이 `FaicalMesh_geo` · `BS_Face_CSV` 이름을 참조하는지 | **답: A00480_FileTool `Import > CSV`. `BS_Face_CSV` 만 참조(aliasAttr 별칭), `FaicalMesh_geo` 는 안 봄 → 글자 메시 제거.** 코드 실측: `csv_ops.blendshape_targets` = `aliasAttr -q`, 후보 = 씬의 모든 blendShape |
+| **Q3** | `cheekPuff` 하나를 어디에 — 중앙 하나 / 양쪽 두 개 | **답: 중앙 하나가 동작, 좌우 예비 컨트롤 둘은 만들되 미연결 + 다른 색** (D13) |
+| **Q4** | `mouthFunnel` · `mouthPucker` 를 두 슬라이더로 / 한 ± 슬라이더로 | **답: 두 슬라이더** |
+| **Q5** | 루트의 `Head / Global / World` attr 용도 | **답: Head = 머리 회전 · 이동 따라감, Global = 아바타 root 본 따라감, World = 안 따라감** → D11 로 구현 |
+| **Q6** | 끌어내리는 표현을 **−ty** 로 / 전부 +ty 로 통일 | **답: −ty** (browDown · mouthLowerDown · jawOpen · eyeBlink · mouthRollUpper · mouthShrugLower · mouthFrown · eyeLookDown) |
+| **Q7** | 컨트롤 색 · 크기 · 보드 크기 | **답: 권장대로** — 보드 15 × 24.4 cm(틀 x −7.5~7.5 · y 2~26.4), 루트 기본 위치 (20, 140, 0) → 세상 y 142~166.4 (V04 와 같은 자리) |
+| **Q8** | UE 빌더(M6)를 이번 묶음에 넣을지 | **답: 다음에** |
 
 ---
 
@@ -292,6 +295,8 @@ Maya_Python/JUN_All/tools/A00580_FacialBoardBuilder/
 | 날짜 | 단계 | 내용 |
 |------|------|------|
 | 2026-10-26 | 계획 | V04 · MetaHuman 0030 실측(관찰 스크립트 3개) → 이 문서. 코드 · 파일 생성 전 |
+| 2026-10-26 | Q 답 · M0 | 사용자 답 Q1~Q8(§9). M0 실측: ① FileTool 은 `BS_Face_CSV` 별칭만 ② V04 부호표 52 → `spec/v04_backward_table.json` ③ **리밋이 연결값도 자른다**(2 → 1) ④ CSV 샘플이 없어 ± 동시 발생 통계는 못 냄(베이크는 합으로 처리, 안내에 적음) ⑤ 색 · 리밋 · textCurves 왕복 OK ⑥ ± 합산 키는 두 커브 키 시각 합집합, auto 탄젠트 ⑦ 이관 동치 T7b ⑧ UE API 는 M6 로 |
+| 2026-10-26 | M1~M5 완료 | `A00580_FacialBoardBuilder`(board_spec · build · bake · verify · preview · migrate + spec 3) → `Ctl_Only_V05.ma/.mb/_board.png`. 빌드 중 발견: 지오메트리 없는 blendShape 가 연결 노드 delete 로 사라짐 → 숨긴 평면(D2), pma 는 입력을 떼고 delete · `aliasAttr -q` 순서는 plug 문자열 순(별칭↔인덱스로 비교) · V04 별칭 인덱스 = ARKit 52 순서. **verify 1582 항목 통과**(T1~T8 + .mb 왕복 + V04 이관 동치). GUI 눈 확인 아직 |
 
 ---
 

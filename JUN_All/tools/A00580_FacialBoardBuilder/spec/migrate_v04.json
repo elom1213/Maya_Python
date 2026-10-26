@@ -1,0 +1,1081 @@
+{
+ "per_attr": {
+  "eyeBlinkLeft": {
+   "v04": {
+    "plug": "l_eyelid_Up_ctl.ty",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_L_eye_blinkWide.ty",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "eyeBlinkRight": {
+   "v04": {
+    "plug": "r_eyelid_Up_ctl.ty",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_R_eye_blinkWide.ty",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "eyeLookUpLeft": {
+   "v04": {
+    "plug": "l_eyeball_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_L_eye.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "eyeLookUpRight": {
+   "v04": {
+    "plug": "r_eyeball_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_R_eye.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "eyeLookDownLeft": {
+   "v04": {
+    "plug": "l_eyeball_ctl.ty",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_L_eye.ty",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "eyeLookDownRight": {
+   "v04": {
+    "plug": "r_eyeball_ctl.ty",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_R_eye.ty",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "eyeLookInLeft": {
+   "v04": {
+    "plug": "l_eyeball_ctl.tx",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_L_eye.tx",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "eyeLookInRight": {
+   "v04": {
+    "plug": "r_eyeball_ctl.tx",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_R_eye.tx",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "eyeLookOutLeft": {
+   "v04": {
+    "plug": "l_eyeball_ctl.tx",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_L_eye.tx",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "eyeLookOutRight": {
+   "v04": {
+    "plug": "r_eyeball_ctl.tx",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_R_eye.tx",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "eyeWideLeft": {
+   "v04": {
+    "plug": "l_eyeWide_Up_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_L_eye_blinkWide.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "eyeWideRight": {
+   "v04": {
+    "plug": "r_eyeWide_Up_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_R_eye_blinkWide.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "eyeSquintLeft": {
+   "v04": {
+    "plug": "l_eyelid_Dw_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_L_eye_squint.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "eyeSquintRight": {
+   "v04": {
+    "plug": "r_eyelid_Dw_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_R_eye_squint.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "cheekSquintLeft": {
+   "v04": {
+    "plug": "l_cheekSquint_Dw_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_L_cheek_squint.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "cheekSquintRight": {
+   "v04": {
+    "plug": "r_cheekSquintRight_Dw_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_R_cheek_squint.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "browDownLeft": {
+   "v04": {
+    "plug": "BS_eyebrowLeft_inn_ctl.ty",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_L_brow_down.ty",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "browDownRight": {
+   "v04": {
+    "plug": "BS_eyebrowRight_inn_1_ctl.ty",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_R_brow_down.ty",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "browInnerUp": {
+   "v04": {
+    "plug": "BS_eyebrowInnerUp_inn_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_C_brow_raiseIn.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "browOuterUpLeft": {
+   "v04": {
+    "plug": "BS_eyebrowLeft_out_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_L_brow_raiseOut.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "browOuterUpRight": {
+   "v04": {
+    "plug": "BS_eyebrowRight_out_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_R_brow_raiseOut.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "mouthLeft": {
+   "v04": {
+    "plug": "BS_lipLow_ctl.tx",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_C_mouth_move.tx",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "mouthRight": {
+   "v04": {
+    "plug": "BS_lipLow_ctl.tx",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_C_mouth_move.tx",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "jawForward": {
+   "v04": {
+    "plug": "c_jaw_forward_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_C_jaw_fwd.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "jawLeft": {
+   "v04": {
+    "plug": "c_jaw_rot_ctl.tx",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_C_jaw.tx",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "jawRight": {
+   "v04": {
+    "plug": "c_jaw_rot_ctl.tx",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_C_jaw.tx",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "mouthUpperUpLeft": {
+   "v04": {
+    "plug": "BS_lipTop_leSide_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_L_mouth_upperLipRaise.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "mouthUpperUpRight": {
+   "v04": {
+    "plug": "BS_lipTop_riSide_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_R_mouth_upperLipRaise.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "mouthLowerDownLeft": {
+   "v04": {
+    "plug": "BS_lipLow_leSide_ctl.ty",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_L_mouth_lowerLipDepress.ty",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "mouthLowerDownRight": {
+   "v04": {
+    "plug": "BS_lipLow_riSide_ctl.ty",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_R_mouth_lowerLipDepress.ty",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "mouthClose": {
+   "v04": {
+    "plug": "c_mouthClose_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_C_mouth_close.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "mouthPucker": {
+   "v04": {
+    "plug": "BS_mouthPucker_ctl.tx",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_C_mouth_pucker.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "mouthFunnel": {
+   "v04": {
+    "plug": "BS_mouthFunnel_ctl.tx",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_C_mouth_funnel.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "mouthPressLeft": {
+   "v04": {
+    "plug": "BS_lipTop_leOut_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_L_mouth_press.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "mouthPressRight": {
+   "v04": {
+    "plug": "BS_lipTop_riOut_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_R_mouth_press.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "jawOpen": {
+   "v04": {
+    "plug": "c_jaw_rot_ctl.ty",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_C_jaw.ty",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "mouthSmileLeft": {
+   "v04": {
+    "plug": "BS_lipLeft_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_L_mouth_corner.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "mouthSmileRight": {
+   "v04": {
+    "plug": "BS_lipRight_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_R_mouth_corner.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "mouthFrownLeft": {
+   "v04": {
+    "plug": "BS_lipLeft_ctl.ty",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_L_mouth_corner.ty",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "mouthFrownRight": {
+   "v04": {
+    "plug": "BS_lipRight_ctl.ty",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_R_mouth_corner.ty",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "mouthStretchLeft": {
+   "v04": {
+    "plug": "BS_lipLow_leOut_ctl.ty",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_L_mouth_corner.tx",
+    "sign": 1
+   },
+   "multiplier": -1
+  },
+  "mouthStretchRight": {
+   "v04": {
+    "plug": "BS_lipLow_riOut_ctl.ty",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_R_mouth_corner.tx",
+    "sign": -1
+   },
+   "multiplier": 1
+  },
+  "mouthRollUpper": {
+   "v04": {
+    "plug": "BS_lipTop_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_C_mouth_upperLip.ty",
+    "sign": -1
+   },
+   "multiplier": -1
+  },
+  "mouthRollLower": {
+   "v04": {
+    "plug": "BS_lipLow_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_C_mouth_lowerLip.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "mouthShrugUpper": {
+   "v04": {
+    "plug": "c_jaw_mouthShrugUpper_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_C_mouth_upperLip.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "mouthShrugLower": {
+   "v04": {
+    "plug": "c_jaw_mouthShrugLower_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_C_mouth_lowerLip.ty",
+    "sign": -1
+   },
+   "multiplier": -1
+  },
+  "noseSneerLeft": {
+   "v04": {
+    "plug": "l_noseSneerLeft_Dw_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_L_nose_sneer.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "noseSneerRight": {
+   "v04": {
+    "plug": "r_noseSneer_Dw_ctl.ty",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_R_nose_sneer.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "cheekPuff": {
+   "v04": {
+    "plug": "BS_checkPuff_ctl.tx",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_C_cheek_puff.ty",
+    "sign": 1
+   },
+   "multiplier": 1
+  },
+  "tongueOut": {
+   "v04": {
+    "plug": "c_tongueOut_ctl.ty",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_C_tongue_out.ty",
+    "sign": 1
+   },
+   "multiplier": -1
+  },
+  "mouthDimpleLeft": {
+   "v04": {
+    "plug": "BS_lipLeft_ctl.tx",
+    "sign": 1
+   },
+   "v05": {
+    "plug": "CTRL_L_mouth_corner.tx",
+    "sign": -1
+   },
+   "multiplier": -1
+  },
+  "mouthDimpleRight": {
+   "v04": {
+    "plug": "BS_lipRight_ctl.tx",
+    "sign": -1
+   },
+   "v05": {
+    "plug": "CTRL_R_mouth_corner.tx",
+    "sign": 1
+   },
+   "multiplier": -1
+  }
+ },
+ "per_plug": {
+  "l_eyelid_Up_ctl.ty": {
+   "to": "CTRL_L_eye_blinkWide.ty",
+   "multiplier": 1
+  },
+  "r_eyelid_Up_ctl.ty": {
+   "to": "CTRL_R_eye_blinkWide.ty",
+   "multiplier": 1
+  },
+  "l_eyeball_ctl.ty": {
+   "to": "CTRL_L_eye.ty",
+   "multiplier": 1
+  },
+  "r_eyeball_ctl.ty": {
+   "to": "CTRL_R_eye.ty",
+   "multiplier": 1
+  },
+  "l_eyeball_ctl.tx": {
+   "to": "CTRL_L_eye.tx",
+   "multiplier": 1
+  },
+  "r_eyeball_ctl.tx": {
+   "to": "CTRL_R_eye.tx",
+   "multiplier": 1
+  },
+  "l_eyeWide_Up_ctl.ty": {
+   "to": "CTRL_L_eye_blinkWide.ty",
+   "multiplier": 1
+  },
+  "r_eyeWide_Up_ctl.ty": {
+   "to": "CTRL_R_eye_blinkWide.ty",
+   "multiplier": 1
+  },
+  "l_eyelid_Dw_ctl.ty": {
+   "to": "CTRL_L_eye_squint.ty",
+   "multiplier": 1
+  },
+  "r_eyelid_Dw_ctl.ty": {
+   "to": "CTRL_R_eye_squint.ty",
+   "multiplier": 1
+  },
+  "l_cheekSquint_Dw_ctl.ty": {
+   "to": "CTRL_L_cheek_squint.ty",
+   "multiplier": 1
+  },
+  "r_cheekSquintRight_Dw_ctl.ty": {
+   "to": "CTRL_R_cheek_squint.ty",
+   "multiplier": 1
+  },
+  "BS_eyebrowLeft_inn_ctl.ty": {
+   "to": "CTRL_L_brow_down.ty",
+   "multiplier": 1
+  },
+  "BS_eyebrowRight_inn_1_ctl.ty": {
+   "to": "CTRL_R_brow_down.ty",
+   "multiplier": 1
+  },
+  "BS_eyebrowInnerUp_inn_ctl.ty": {
+   "to": "CTRL_C_brow_raiseIn.ty",
+   "multiplier": 1
+  },
+  "BS_eyebrowLeft_out_ctl.ty": {
+   "to": "CTRL_L_brow_raiseOut.ty",
+   "multiplier": 1
+  },
+  "BS_eyebrowRight_out_ctl.ty": {
+   "to": "CTRL_R_brow_raiseOut.ty",
+   "multiplier": 1
+  },
+  "BS_lipLow_ctl.tx": {
+   "to": "CTRL_C_mouth_move.tx",
+   "multiplier": 1
+  },
+  "c_jaw_forward_ctl.ty": {
+   "to": "CTRL_C_jaw_fwd.ty",
+   "multiplier": 1
+  },
+  "c_jaw_rot_ctl.tx": {
+   "to": "CTRL_C_jaw.tx",
+   "multiplier": 1
+  },
+  "BS_lipTop_leSide_ctl.ty": {
+   "to": "CTRL_L_mouth_upperLipRaise.ty",
+   "multiplier": 1
+  },
+  "BS_lipTop_riSide_ctl.ty": {
+   "to": "CTRL_R_mouth_upperLipRaise.ty",
+   "multiplier": 1
+  },
+  "BS_lipLow_leSide_ctl.ty": {
+   "to": "CTRL_L_mouth_lowerLipDepress.ty",
+   "multiplier": 1
+  },
+  "BS_lipLow_riSide_ctl.ty": {
+   "to": "CTRL_R_mouth_lowerLipDepress.ty",
+   "multiplier": 1
+  },
+  "c_mouthClose_ctl.ty": {
+   "to": "CTRL_C_mouth_close.ty",
+   "multiplier": 1
+  },
+  "BS_mouthPucker_ctl.tx": {
+   "to": "CTRL_C_mouth_pucker.ty",
+   "multiplier": 1
+  },
+  "BS_mouthFunnel_ctl.tx": {
+   "to": "CTRL_C_mouth_funnel.ty",
+   "multiplier": 1
+  },
+  "BS_lipTop_leOut_ctl.ty": {
+   "to": "CTRL_L_mouth_press.ty",
+   "multiplier": 1
+  },
+  "BS_lipTop_riOut_ctl.ty": {
+   "to": "CTRL_R_mouth_press.ty",
+   "multiplier": 1
+  },
+  "c_jaw_rot_ctl.ty": {
+   "to": "CTRL_C_jaw.ty",
+   "multiplier": 1
+  },
+  "BS_lipLeft_ctl.ty": {
+   "to": "CTRL_L_mouth_corner.ty",
+   "multiplier": 1
+  },
+  "BS_lipRight_ctl.ty": {
+   "to": "CTRL_R_mouth_corner.ty",
+   "multiplier": 1
+  },
+  "BS_lipLow_leOut_ctl.ty": {
+   "to": "CTRL_L_mouth_corner.tx",
+   "multiplier": -1
+  },
+  "BS_lipLow_riOut_ctl.ty": {
+   "to": "CTRL_R_mouth_corner.tx",
+   "multiplier": 1
+  },
+  "BS_lipTop_ctl.ty": {
+   "to": "CTRL_C_mouth_upperLip.ty",
+   "multiplier": -1
+  },
+  "BS_lipLow_ctl.ty": {
+   "to": "CTRL_C_mouth_lowerLip.ty",
+   "multiplier": 1
+  },
+  "c_jaw_mouthShrugUpper_ctl.ty": {
+   "to": "CTRL_C_mouth_upperLip.ty",
+   "multiplier": 1
+  },
+  "c_jaw_mouthShrugLower_ctl.ty": {
+   "to": "CTRL_C_mouth_lowerLip.ty",
+   "multiplier": -1
+  },
+  "l_noseSneerLeft_Dw_ctl.ty": {
+   "to": "CTRL_L_nose_sneer.ty",
+   "multiplier": 1
+  },
+  "r_noseSneer_Dw_ctl.ty": {
+   "to": "CTRL_R_nose_sneer.ty",
+   "multiplier": 1
+  },
+  "BS_checkPuff_ctl.tx": {
+   "to": "CTRL_C_cheek_puff.ty",
+   "multiplier": 1
+  },
+  "c_tongueOut_ctl.ty": {
+   "to": "CTRL_C_tongue_out.ty",
+   "multiplier": -1
+  },
+  "BS_lipLeft_ctl.tx": {
+   "to": "CTRL_L_mouth_corner.tx",
+   "multiplier": -1
+  },
+  "BS_lipRight_ctl.tx": {
+   "to": "CTRL_R_mouth_corner.tx",
+   "multiplier": -1
+  }
+ },
+ "per_v05_plug": {
+  "CTRL_L_eye_blinkWide.ty": [
+   [
+    "l_eyeWide_Up_ctl.ty",
+    1
+   ],
+   [
+    "l_eyelid_Up_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_R_eye_blinkWide.ty": [
+   [
+    "r_eyeWide_Up_ctl.ty",
+    1
+   ],
+   [
+    "r_eyelid_Up_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_L_eye.ty": [
+   [
+    "l_eyeball_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_R_eye.ty": [
+   [
+    "r_eyeball_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_L_eye.tx": [
+   [
+    "l_eyeball_ctl.tx",
+    1
+   ]
+  ],
+  "CTRL_R_eye.tx": [
+   [
+    "r_eyeball_ctl.tx",
+    1
+   ]
+  ],
+  "CTRL_L_eye_squint.ty": [
+   [
+    "l_eyelid_Dw_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_R_eye_squint.ty": [
+   [
+    "r_eyelid_Dw_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_L_cheek_squint.ty": [
+   [
+    "l_cheekSquint_Dw_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_R_cheek_squint.ty": [
+   [
+    "r_cheekSquintRight_Dw_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_L_brow_down.ty": [
+   [
+    "BS_eyebrowLeft_inn_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_R_brow_down.ty": [
+   [
+    "BS_eyebrowRight_inn_1_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_C_brow_raiseIn.ty": [
+   [
+    "BS_eyebrowInnerUp_inn_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_L_brow_raiseOut.ty": [
+   [
+    "BS_eyebrowLeft_out_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_R_brow_raiseOut.ty": [
+   [
+    "BS_eyebrowRight_out_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_C_mouth_move.tx": [
+   [
+    "BS_lipLow_ctl.tx",
+    1
+   ]
+  ],
+  "CTRL_C_jaw_fwd.ty": [
+   [
+    "c_jaw_forward_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_C_jaw.tx": [
+   [
+    "c_jaw_rot_ctl.tx",
+    1
+   ]
+  ],
+  "CTRL_L_mouth_upperLipRaise.ty": [
+   [
+    "BS_lipTop_leSide_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_R_mouth_upperLipRaise.ty": [
+   [
+    "BS_lipTop_riSide_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_L_mouth_lowerLipDepress.ty": [
+   [
+    "BS_lipLow_leSide_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_R_mouth_lowerLipDepress.ty": [
+   [
+    "BS_lipLow_riSide_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_C_mouth_close.ty": [
+   [
+    "c_mouthClose_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_C_mouth_pucker.ty": [
+   [
+    "BS_mouthPucker_ctl.tx",
+    1
+   ]
+  ],
+  "CTRL_C_mouth_funnel.ty": [
+   [
+    "BS_mouthFunnel_ctl.tx",
+    1
+   ]
+  ],
+  "CTRL_L_mouth_press.ty": [
+   [
+    "BS_lipTop_leOut_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_R_mouth_press.ty": [
+   [
+    "BS_lipTop_riOut_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_C_jaw.ty": [
+   [
+    "c_jaw_rot_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_L_mouth_corner.ty": [
+   [
+    "BS_lipLeft_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_R_mouth_corner.ty": [
+   [
+    "BS_lipRight_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_L_mouth_corner.tx": [
+   [
+    "BS_lipLeft_ctl.tx",
+    -1
+   ],
+   [
+    "BS_lipLow_leOut_ctl.ty",
+    -1
+   ]
+  ],
+  "CTRL_R_mouth_corner.tx": [
+   [
+    "BS_lipLow_riOut_ctl.ty",
+    1
+   ],
+   [
+    "BS_lipRight_ctl.tx",
+    -1
+   ]
+  ],
+  "CTRL_C_mouth_upperLip.ty": [
+   [
+    "BS_lipTop_ctl.ty",
+    -1
+   ],
+   [
+    "c_jaw_mouthShrugUpper_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_C_mouth_lowerLip.ty": [
+   [
+    "BS_lipLow_ctl.ty",
+    1
+   ],
+   [
+    "c_jaw_mouthShrugLower_ctl.ty",
+    -1
+   ]
+  ],
+  "CTRL_L_nose_sneer.ty": [
+   [
+    "l_noseSneerLeft_Dw_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_R_nose_sneer.ty": [
+   [
+    "r_noseSneer_Dw_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_C_cheek_puff.ty": [
+   [
+    "BS_checkPuff_ctl.tx",
+    1
+   ]
+  ],
+  "CTRL_C_tongue_out.ty": [
+   [
+    "c_tongueOut_ctl.ty",
+    -1
+   ]
+  ]
+ },
+ "merged_v05_plugs": {
+  "CTRL_L_eye_blinkWide.ty": [
+   [
+    "l_eyeWide_Up_ctl.ty",
+    1
+   ],
+   [
+    "l_eyelid_Up_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_R_eye_blinkWide.ty": [
+   [
+    "r_eyeWide_Up_ctl.ty",
+    1
+   ],
+   [
+    "r_eyelid_Up_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_L_mouth_corner.tx": [
+   [
+    "BS_lipLeft_ctl.tx",
+    -1
+   ],
+   [
+    "BS_lipLow_leOut_ctl.ty",
+    -1
+   ]
+  ],
+  "CTRL_R_mouth_corner.tx": [
+   [
+    "BS_lipLow_riOut_ctl.ty",
+    1
+   ],
+   [
+    "BS_lipRight_ctl.tx",
+    -1
+   ]
+  ],
+  "CTRL_C_mouth_upperLip.ty": [
+   [
+    "BS_lipTop_ctl.ty",
+    -1
+   ],
+   [
+    "c_jaw_mouthShrugUpper_ctl.ty",
+    1
+   ]
+  ],
+  "CTRL_C_mouth_lowerLip.ty": [
+   [
+    "BS_lipLow_ctl.ty",
+    1
+   ],
+   [
+    "c_jaw_mouthShrugLower_ctl.ty",
+    -1
+   ]
+  ]
+ },
+ "conflicts": [],
+ "v04_unused_controls": [
+  "BS_cheekLeft_innOut_ctl",
+  "BS_cheekRight_innOut_ctl",
+  "BS_eyebrowLeft_mid_ctl",
+  "BS_eyebrowRight_mid_ctl",
+  "BS_lipTop_frontBack_ctl",
+  "BS_noseLeft_ctl",
+  "BS_noseRight_ctl"
+ ],
+ "_about": "V04 Ctl_Only_V04 control plug -> V05 board plug. v05 = v04 * multiplier. Built by migrate.py from v04_backward_table.json (mayapy measurement 2026-10-26) and the board spec."
+}

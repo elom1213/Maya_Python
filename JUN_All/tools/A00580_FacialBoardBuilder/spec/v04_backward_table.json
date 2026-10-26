@@ -1,0 +1,210 @@
+{
+ "eyeBlinkLeft": [
+  "l_eyelid_Up_ctl.ty",
+  -1
+ ],
+ "eyeBlinkRight": [
+  "r_eyelid_Up_ctl.ty",
+  -1
+ ],
+ "eyeLookUpLeft": [
+  "l_eyeball_ctl.ty",
+  1
+ ],
+ "eyeLookUpRight": [
+  "r_eyeball_ctl.ty",
+  1
+ ],
+ "eyeLookDownLeft": [
+  "l_eyeball_ctl.ty",
+  -1
+ ],
+ "eyeLookDownRight": [
+  "r_eyeball_ctl.ty",
+  -1
+ ],
+ "eyeLookInLeft": [
+  "l_eyeball_ctl.tx",
+  -1
+ ],
+ "eyeLookInRight": [
+  "r_eyeball_ctl.tx",
+  1
+ ],
+ "eyeLookOutLeft": [
+  "l_eyeball_ctl.tx",
+  1
+ ],
+ "eyeLookOutRight": [
+  "r_eyeball_ctl.tx",
+  -1
+ ],
+ "eyeWideLeft": [
+  "l_eyeWide_Up_ctl.ty",
+  1
+ ],
+ "eyeWideRight": [
+  "r_eyeWide_Up_ctl.ty",
+  1
+ ],
+ "eyeSquintLeft": [
+  "l_eyelid_Dw_ctl.ty",
+  1
+ ],
+ "eyeSquintRight": [
+  "r_eyelid_Dw_ctl.ty",
+  1
+ ],
+ "cheekSquintLeft": [
+  "l_cheekSquint_Dw_ctl.ty",
+  1
+ ],
+ "cheekSquintRight": [
+  "r_cheekSquintRight_Dw_ctl.ty",
+  1
+ ],
+ "browDownLeft": [
+  "BS_eyebrowLeft_inn_ctl.ty",
+  -1
+ ],
+ "browDownRight": [
+  "BS_eyebrowRight_inn_1_ctl.ty",
+  -1
+ ],
+ "browInnerUp": [
+  "BS_eyebrowInnerUp_inn_ctl.ty",
+  1
+ ],
+ "browOuterUpLeft": [
+  "BS_eyebrowLeft_out_ctl.ty",
+  1
+ ],
+ "browOuterUpRight": [
+  "BS_eyebrowRight_out_ctl.ty",
+  1
+ ],
+ "mouthLeft": [
+  "BS_lipLow_ctl.tx",
+  1
+ ],
+ "mouthRight": [
+  "BS_lipLow_ctl.tx",
+  -1
+ ],
+ "jawForward": [
+  "c_jaw_forward_ctl.ty",
+  1
+ ],
+ "jawLeft": [
+  "c_jaw_rot_ctl.tx",
+  1
+ ],
+ "jawRight": [
+  "c_jaw_rot_ctl.tx",
+  -1
+ ],
+ "mouthUpperUpLeft": [
+  "BS_lipTop_leSide_ctl.ty",
+  1
+ ],
+ "mouthUpperUpRight": [
+  "BS_lipTop_riSide_ctl.ty",
+  1
+ ],
+ "mouthLowerDownLeft": [
+  "BS_lipLow_leSide_ctl.ty",
+  -1
+ ],
+ "mouthLowerDownRight": [
+  "BS_lipLow_riSide_ctl.ty",
+  -1
+ ],
+ "mouthClose": [
+  "c_mouthClose_ctl.ty",
+  1
+ ],
+ "mouthPucker": [
+  "BS_mouthPucker_ctl.tx",
+  1
+ ],
+ "mouthFunnel": [
+  "BS_mouthFunnel_ctl.tx",
+  1
+ ],
+ "mouthPressLeft": [
+  "BS_lipTop_leOut_ctl.ty",
+  1
+ ],
+ "mouthPressRight": [
+  "BS_lipTop_riOut_ctl.ty",
+  1
+ ],
+ "jawOpen": [
+  "c_jaw_rot_ctl.ty",
+  -1
+ ],
+ "mouthSmileLeft": [
+  "BS_lipLeft_ctl.ty",
+  1
+ ],
+ "mouthSmileRight": [
+  "BS_lipRight_ctl.ty",
+  1
+ ],
+ "mouthFrownLeft": [
+  "BS_lipLeft_ctl.ty",
+  -1
+ ],
+ "mouthFrownRight": [
+  "BS_lipRight_ctl.ty",
+  -1
+ ],
+ "mouthStretchLeft": [
+  "BS_lipLow_leOut_ctl.ty",
+  -1
+ ],
+ "mouthStretchRight": [
+  "BS_lipLow_riOut_ctl.ty",
+  -1
+ ],
+ "mouthRollUpper": [
+  "BS_lipTop_ctl.ty",
+  1
+ ],
+ "mouthRollLower": [
+  "BS_lipLow_ctl.ty",
+  1
+ ],
+ "mouthShrugUpper": [
+  "c_jaw_mouthShrugUpper_ctl.ty",
+  1
+ ],
+ "mouthShrugLower": [
+  "c_jaw_mouthShrugLower_ctl.ty",
+  1
+ ],
+ "noseSneerLeft": [
+  "l_noseSneerLeft_Dw_ctl.ty",
+  1
+ ],
+ "noseSneerRight": [
+  "r_noseSneer_Dw_ctl.ty",
+  1
+ ],
+ "cheekPuff": [
+  "BS_checkPuff_ctl.tx",
+  1
+ ],
+ "tongueOut": [
+  "c_tongueOut_ctl.ty",
+  -1
+ ],
+ "mouthDimpleLeft": [
+  "BS_lipLeft_ctl.tx",
+  1
+ ],
+ "mouthDimpleRight": [
+  "BS_lipRight_ctl.tx",
+  -1
+ ]
+}

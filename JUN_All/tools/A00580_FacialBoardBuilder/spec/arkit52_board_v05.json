@@ -1,0 +1,112 @@
+{
+  "version": "05",
+  "description": "ARKit 52 facial control board - one json drives the Maya builder (build.py) and, later, the Unreal Control Rig builder. Board-local coordinates: x -7..7 (right = character LEFT), y 0..26 (up). Control values are always -1..1 / 0..1; 'unit' is how many cm one value unit travels on the board.",
+  "board": {
+    "unit": 0.8,
+    "ctl_radius": 0.3,
+    "pad_margin": 0.3,
+    "frame": [-7.5, 2.0, 7.5, 26.4],
+    "default_root_translate": [20.0, 140.0, 0.0],
+    "labels": true,
+    "label_scale": 0.22,
+    "region_labels": {"BROW": [-6.3, 24.0], "EYE": [-6.3, 19.9], "NOSE": [-6.3, 16.4], "MOUTH": [-6.3, 11.4], "JAW": [-6.3, 4.6]}
+  },
+  "names": {
+    "root_grp": "GRP_faceGUI",
+    "root_ctl": "CTRL_faceGUI",
+    "frame_grp": "FRM_faceGUI",
+    "follow_grp": "GRP_faceGUI_follow",
+    "follow_targets": ["Head", "Global", "World"],
+    "follow_default": {"Head": 1.0, "Global": 0.0, "World": 0.0},
+    "csv_node": "BS_Face_CSV",
+    "out_node": "BS_Face_Connect_01",
+    "spec_attr": "boardSpec"
+  },
+  "colors": {
+    "L": [0.90, 0.25, 0.25],
+    "R": [0.25, 0.45, 0.95],
+    "C": [0.95, 0.85, 0.20],
+    "unused": [0.45, 0.45, 0.45],
+    "root": [0.80, 0.80, 0.80]
+  },
+  "arkit52": [
+    "eyeBlinkLeft", "eyeBlinkRight", "eyeLookUpLeft", "eyeLookUpRight", "eyeLookDownLeft", "eyeLookDownRight",
+    "eyeLookInLeft", "eyeLookInRight", "eyeLookOutLeft", "eyeLookOutRight", "eyeWideLeft", "eyeWideRight",
+    "eyeSquintLeft", "eyeSquintRight", "cheekSquintLeft", "cheekSquintRight", "browDownLeft", "browDownRight",
+    "browInnerUp", "browOuterUpLeft", "browOuterUpRight", "mouthLeft", "mouthRight", "jawForward", "jawLeft",
+    "jawRight", "mouthUpperUpLeft", "mouthUpperUpRight", "mouthLowerDownLeft", "mouthLowerDownRight", "mouthClose",
+    "mouthPucker", "mouthFunnel", "mouthPressLeft", "mouthPressRight", "jawOpen", "mouthSmileLeft", "mouthSmileRight",
+    "mouthFrownLeft", "mouthFrownRight", "mouthStretchLeft", "mouthStretchRight", "mouthRollUpper", "mouthRollLower",
+    "mouthShrugUpper", "mouthShrugLower", "noseSneerLeft", "noseSneerRight", "cheekPuff", "tongueOut",
+    "mouthDimpleLeft", "mouthDimpleRight"
+  ],
+  "csv_alias_order": [
+    "eyeBlinkLeft", "eyeBlinkRight", "eyeLookUpLeft", "eyeLookUpRight", "eyeLookDownLeft", "eyeLookDownRight",
+    "eyeLookInLeft", "eyeLookInRight", "eyeLookOutLeft", "eyeLookOutRight", "eyeWideLeft", "eyeWideRight",
+    "eyeSquintLeft", "eyeSquintRight", "cheekSquintLeft", "cheekSquintRight", "browDownLeft", "browDownRight",
+    "browInnerUp", "browOuterUpLeft", "browOuterUpRight", "mouthLeft", "mouthRight", "jawForward",
+    "jawLeft", "jawRight", "mouthUpperUpLeft", "mouthUpperUpRight", "mouthLowerDownLeft", "mouthLowerDownRight",
+    "mouthClose", "mouthPucker", "mouthFunnel", "mouthPressLeft", "mouthPressRight", "jawOpen",
+    "mouthSmileLeft", "mouthSmileRight", "mouthFrownLeft", "mouthFrownRight", "mouthStretchLeft", "mouthStretchRight",
+    "mouthRollUpper", "mouthRollLower", "mouthShrugUpper", "mouthShrugLower", "noseSneerLeft", "noseSneerRight",
+    "cheekPuff", "tongueOut", "mouthDimpleLeft", "mouthDimpleRight"
+  ],
+  "regions": ["brow", "eye", "cheek", "nose", "mouth", "jaw", "tongue"],
+  "controls": [
+    {"name": "CTRL_C_brow_raiseIn", "region": "brow", "type": "slider", "pos": [0.0, 24.0], "label": "raiseIn",
+     "axes": {"ty+": "browInnerUp"}, "limits": {"tx": [0, 0], "ty": [0, 1]}, "color": "C"},
+    {"name": "CTRL_L_brow_down", "region": "brow", "type": "slider", "pos": [1.6, 24.0], "label": "down", "mirror": true,
+     "axes": {"ty-": "browDownLeft"}, "limits": {"tx": [0, 0], "ty": [-1, 0]}, "color": "L"},
+    {"name": "CTRL_L_brow_raiseOut", "region": "brow", "type": "slider", "pos": [3.4, 24.4], "label": "raiseOut", "mirror": true,
+     "axes": {"ty+": "browOuterUpLeft"}, "limits": {"tx": [0, 0], "ty": [0, 1]}, "color": "L"},
+
+    {"name": "CTRL_L_eye_blinkWide", "region": "eye", "type": "slider", "pos": [2.4, 23.0], "label": "blink/wide", "mirror": true,
+     "axes": {"ty-": "eyeBlinkLeft", "ty+": "eyeWideLeft"}, "limits": {"tx": [0, 0], "ty": [-1, 1]}, "color": "L"},
+    {"name": "CTRL_L_eye", "region": "eye", "type": "pad", "pos": [2.4, 19.9], "label": "look", "mirror": true,
+     "axes": {"ty+": "eyeLookUpLeft", "ty-": "eyeLookDownLeft", "tx+": "eyeLookOutLeft", "tx-": "eyeLookInLeft"},
+     "limits": {"tx": [-1, 1], "ty": [-1, 1]}, "color": "L"},
+    {"name": "CTRL_L_eye_squint", "region": "eye", "type": "slider", "pos": [2.4, 17.3], "label": "squint", "mirror": true,
+     "axes": {"ty+": "eyeSquintLeft"}, "limits": {"tx": [0, 0], "ty": [0, 1]}, "color": "L"},
+
+    {"name": "CTRL_L_cheek_squint", "region": "cheek", "type": "slider", "pos": [4.2, 17.6], "label": "cheekSquint", "mirror": true,
+     "axes": {"ty+": "cheekSquintLeft"}, "limits": {"tx": [0, 0], "ty": [0, 1]}, "color": "L"},
+    {"name": "CTRL_C_cheek_puff", "region": "cheek", "type": "slider", "pos": [0.0, 15.0], "label": "cheekPuff",
+     "axes": {"ty+": "cheekPuff"}, "limits": {"tx": [0, 0], "ty": [0, 1]}, "color": "C"},
+    {"name": "CTRL_L_cheek_puff", "region": "cheek", "type": "slider", "pos": [4.2, 15.0], "label": "puff (n/c)", "mirror": true,
+     "axes": {}, "limits": {"tx": [0, 0], "ty": [0, 1]}, "color": "unused", "unused": true,
+     "note": "Reserved for a future per-side cheekPuff. Not connected on purpose (user decision 2026-10-26, Q3)."},
+
+    {"name": "CTRL_L_nose_sneer", "region": "nose", "type": "slider", "pos": [1.3, 16.4], "label": "sneer", "mirror": true,
+     "axes": {"ty+": "noseSneerLeft"}, "limits": {"tx": [0, 0], "ty": [0, 1]}, "color": "L"},
+
+    {"name": "CTRL_C_mouth_upperLip", "region": "mouth", "type": "slider", "pos": [0.0, 13.2], "label": "shrug/roll",
+     "axes": {"ty+": "mouthShrugUpper", "ty-": "mouthRollUpper"}, "limits": {"tx": [0, 0], "ty": [-1, 1]}, "color": "C"},
+    {"name": "CTRL_L_mouth_upperLipRaise", "region": "mouth", "type": "slider", "pos": [1.6, 13.2], "label": "upperUp", "mirror": true,
+     "axes": {"ty+": "mouthUpperUpLeft"}, "limits": {"tx": [0, 0], "ty": [0, 1]}, "color": "L"},
+    {"name": "CTRL_L_mouth_press", "region": "mouth", "type": "slider", "pos": [3.0, 13.0], "label": "press", "mirror": true,
+     "axes": {"ty+": "mouthPressLeft"}, "limits": {"tx": [0, 0], "ty": [0, 1]}, "color": "L"},
+    {"name": "CTRL_C_mouth_funnel", "region": "mouth", "type": "slider", "pos": [-1.5, 11.4], "label": "funnel",
+     "axes": {"ty+": "mouthFunnel"}, "limits": {"tx": [0, 0], "ty": [0, 1]}, "color": "C"},
+    {"name": "CTRL_C_mouth_move", "region": "mouth", "type": "slider_x", "pos": [0.0, 11.4], "label": "move",
+     "axes": {"tx+": "mouthLeft", "tx-": "mouthRight"}, "limits": {"tx": [-1, 1], "ty": [0, 0]}, "color": "C"},
+    {"name": "CTRL_C_mouth_pucker", "region": "mouth", "type": "slider", "pos": [1.5, 11.4], "label": "pucker",
+     "axes": {"ty+": "mouthPucker"}, "limits": {"tx": [0, 0], "ty": [0, 1]}, "color": "C"},
+    {"name": "CTRL_L_mouth_corner", "region": "mouth", "type": "pad", "pos": [4.2, 11.4], "label": "corner", "mirror": true,
+     "axes": {"ty+": "mouthSmileLeft", "ty-": "mouthFrownLeft", "tx+": "mouthStretchLeft", "tx-": "mouthDimpleLeft"},
+     "limits": {"tx": [-1, 1], "ty": [-1, 1]}, "color": "L"},
+    {"name": "CTRL_C_mouth_close", "region": "mouth", "type": "slider", "pos": [0.0, 9.9], "label": "close",
+     "axes": {"ty+": "mouthClose"}, "limits": {"tx": [0, 0], "ty": [0, 1]}, "color": "C"},
+    {"name": "CTRL_L_mouth_lowerLipDepress", "region": "mouth", "type": "slider", "pos": [1.6, 9.4], "label": "lowerDown", "mirror": true,
+     "axes": {"ty-": "mouthLowerDownLeft"}, "limits": {"tx": [0, 0], "ty": [-1, 0]}, "color": "L"},
+    {"name": "CTRL_C_mouth_lowerLip", "region": "mouth", "type": "slider", "pos": [0.0, 8.4], "label": "roll/shrug",
+     "axes": {"ty+": "mouthRollLower", "ty-": "mouthShrugLower"}, "limits": {"tx": [0, 0], "ty": [-1, 1]}, "color": "C"},
+
+    {"name": "CTRL_C_tongue_out", "region": "tongue", "type": "slider", "pos": [0.0, 6.6], "label": "tongueOut",
+     "axes": {"ty+": "tongueOut"}, "limits": {"tx": [0, 0], "ty": [0, 1]}, "color": "C"},
+
+    {"name": "CTRL_C_jaw", "region": "jaw", "type": "pad", "pos": [0.0, 4.6], "label": "jaw",
+     "axes": {"ty-": "jawOpen", "tx+": "jawLeft", "tx-": "jawRight"}, "limits": {"tx": [-1, 1], "ty": [-1, 0]}, "color": "C"},
+    {"name": "CTRL_C_jaw_fwd", "region": "jaw", "type": "slider", "pos": [2.4, 4.6], "label": "forward",
+     "axes": {"ty+": "jawForward"}, "limits": {"tx": [0, 0], "ty": [0, 1]}, "color": "C"}
+  ]
+}
