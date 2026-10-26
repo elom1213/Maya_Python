@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-26 (오늘)
 
+> [!summary] A00145_RigConnect — **Connect 탭 `Force (replace existing connections)` 체크박스, 기본 OFF = 이미 연결된 어트리뷰트는 그대로 둔다** (v01.66->01.67) `#A00145_RigConnect`
+- 요청: Connect 탭의 `Source -> Destination` / `Destination -> Source` 로 연결할 때 이미 연결된 노드를 강제로 다시 걸지, 그대로 둘지 고르는 체크박스 하나. 기본은 **끊지 않고 방치**.
+- `app/core/connect_manager.py`: `connect_attrs(..., force=False)` — 짝마다 대상 plug 를 `incoming_plug()`(`connectionInfo -isDestination` → `-sourceFromDestination`) 로 보고, 입력이 있으면 `report["kept"]` 에 `(드라이버, 대상, 기존 입력)` 으로 적고 넘긴다. `force=True` 는 종전 `connectAttr -force`. 판정은 **대상 쪽만**(드라이버 팬아웃은 막지 않음). 같은 드라이버가 이미 걸린 짝도 kept.
+- `main_window.py`: 방향 버튼 위 `QCheckBox` `cb_connect_force`(기본 OFF, 툴팁), `_connect_in_direction` 이 `force=` 로 넘기고 로그 첫 줄에 `(Force)` 표시, `_log_connect_report` 가 kept 를 `B.tx  <-  X.translateX   (skipped A.tx)` 꼴로 20개까지 찍는다. Connect by Rule · Transfer Connection 은 그대로.
+- 실측(mayapy 2024): 코어 23 항목 — 기본은 자유 attr 만 연결 · 기존 입력 유지 · 같은 드라이버 재연결은 kept(실패 아님) · Force 는 끊고 교체 · **부모 compound 연결된 자식은 `isDestination` True + 소스는 부모 plug**, Force 면 `connectAttr -force` 가 부모 연결을 끊고 자식에 건다 · 팬아웃 드라이버는 연결 · 없는 attr 은 failed · 브로드캐스트 대상별 kept · undo. 오프스크린 UI 18 항목 — 체크박스 기본 OFF · 양방향 모두 옵션 적용(역방향 로그는 Source 를 kept 쪽으로) · 로그 문구 · undo 한 덩어리. **실기 눈 확인 아직.**
+- 문서 `docs/A00145_RigConnect.md` §연결 방향 아래 "이미 연결된 어트리뷰트" 소절 + 머리 버전 줄, `version.py` 01.67, 메모리 `connectioninfo-isdestination-compound-child` 신규.
+
 > [!summary] 포트폴리오 EN · KR — **1-7 음성 → JALI 립싱크 절을 `JUN_JALI` 현황으로 최신화** `#docs` `#portfolio` `#JALI`
 - 요청: 포트폴리오 두 문서의 1-7 을 `JUN_JALI` 저장소 내용을 참고해 최신화. 기존 절은 1차(음성만 · 변환기 v01.00 · A00540 v01.00 · 모델 숨은 성질 2개 · A00550)까지였다.
 - 더한 것: ★ 2차 **대본 보정**(변환기 Correct 모드 v01.01 ~ 01.05 — MFA 음소 구간 보정 규칙 안 B, IPA 매핑 json 하나로 영 · 한 · 일, 잠금 파일 재현, 입술 컨트롤 8 이상 10 → 21, 넓은 beam 재시도 · 0.5 s 음소 = 대본 불일치 신호 W12, 일본어 공백, AdvancedSkeleton MEL 조사) ·

@@ -136,7 +136,24 @@ def find_matching(attrs, search):
     return [a for a in attrs if search in a]
 
 
-def connect_attrs(src_objs, dst_objs, src_attrs, dst_attrs):
+def incoming_plug(plug):
+    """plug 로 들어오는 연결의 소스 plug 이름. 없으면 "".
+
+    ``connectionInfo -isDestination`` 은 plug 자신뿐 아니라 **부모 compound 가 연결돼
+    간접으로 구동되는 자식**(예: ``.t`` 가 연결된 노드의 ``.tx``)에도 True 를 준다 —
+    그 자식에 connectAttr 을 걸면 어차피 실패하므로 "이미 연결됨" 으로 함께 다룬다.
+    그 경우 소스는 부모 plug 로 돌아온다(``sourceFromDestination``).
+    plug 가 없는 등 질의가 실패하면 "" 를 돌려주고, 판단은 뒤의 connectAttr 에 맡긴다.
+    """
+    try:
+        if not cmds.connectionInfo(plug, isDestination=True):
+            return ""
+        return cmds.connectionInfo(plug, sourceFromDestination=True) or ""
+    except Exception:
+        return ""
+
+
+def connect_attrs(src_objs, dst_objs, src_attrs, dst_attrs, force=False):
     """source -> destination 어트리뷰트 연결 (MEL JUN_cmd_connect_attr 포팅).
 
     src_attrs / dst_attrs 는 리스트에서 "선택된" 어트리뷰트들이다.
@@ -157,6 +174,19 @@ def connect_attrs(src_objs, dst_objs, src_attrs, dst_attrs):
     어느 쪽이 드라이버인지는 인자 순서가 정하므로, report 의 키는 src/dst 가 아니라
     driver/driven 으로 쓴다.
 
+    **이미 연결된 대상 어트리뷰트** (v01.67):
+      - ``force=False`` (기본): 대상 플러그에 들어오는 연결이 이미 있으면 **끊지 않고 그대로 둔다.**
+        건너뛴 짝은 ``report["kept"]`` 에 (드라이버 plug, 대상 plug, 지금 들어오는 plug) 로 담아
+        호출부가 로그로 알릴 수 있게 한다. 이미 같은 드라이버가 걸려 있어도(바꿀 게 없음)
+        여기 든다. 부모 compound 가 연결돼 자식이 구동되는 경우도 "연결됨" 으로 본다
+        (``connectionInfo -isDestination`` 이 그렇게 답한다, mayapy 실측).
+      - ``force=True``: 예전 동작. ``connectAttr -force`` 로 기존 연결을 끊고 새로 건다.
+      - 판정은 **드라이버 쪽이 아니라 대상 쪽**만 본다. 드라이버 어트리뷰트가 다른 곳으로
+        이미 나가고 있는 것은 팬아웃이라 막을 이유가 없다.
+
+    Args:
+        force: 이미 연결된 대상 어트리뷰트를 끊고 다시 걸지(True) 그대로 둘지(False).
+
     Returns:
         (count, mode_label, report)
         report = {
@@ -165,6 +195,7 @@ def connect_attrs(src_objs, dst_objs, src_attrs, dst_attrs):
             "unused_driver_objs":  [...],   # 짝이 없어 쓰지 않은 드라이버 오브젝트
             "unused_driven_objs":  [...],   # 짝이 없어 쓰지 않은 대상 오브젝트
             "failed": [(src plug, dst plug, 사유), ...],
+            "kept":   [(src plug, dst plug, 기존 입력 plug), ...],  # force=False 로 둔 것
         }
 
     Raises:
@@ -180,11 +211,20 @@ def connect_attrs(src_objs, dst_objs, src_attrs, dst_attrs):
     obj_pairs = min(len(src_objs), len(dst_objs))
 
     failed = []
+    kept = []
 
     def _connect(src_obj, src_attr, dst_obj, dst_attr):
-        """한 쌍을 연결한다. 실패해도 예외를 올리지 않고 기록만 남긴다."""
+        """한 쌍을 연결한다. 실패해도 예외를 올리지 않고 기록만 남긴다.
+
+        force 가 꺼져 있고 대상에 이미 입력 연결이 있으면 건드리지 않고 kept 에 적는다.
+        """
         src_plug = "{0}.{1}".format(src_obj, src_attr)
         dst_plug = "{0}.{1}".format(dst_obj, dst_attr)
+        if not force:
+            existing = incoming_plug(dst_plug)
+            if existing:
+                kept.append((src_plug, dst_plug, existing))
+                return 0
         try:
             cmds.connectAttr(src_plug, dst_plug, force=True)
             return 1
@@ -219,6 +259,7 @@ def connect_attrs(src_objs, dst_objs, src_attrs, dst_attrs):
         "unused_driver_objs": unused_src_objs,
         "unused_driven_objs": unused_dst_objs,
         "failed": failed,
+        "kept": kept,
     }
 
     return count, mode, report

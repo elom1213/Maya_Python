@@ -1335,6 +1335,19 @@ class MainWindow(QWidget):
         layout.addWidget(self._build_connect_io("src", "Source Objects"))
         layout.addWidget(self._build_connect_io("dst", "Destination Objects"))
 
+        # v01.67 : 이미 입력 연결이 있는 대상 어트리뷰트를 어떻게 할지. 기본은 **그대로 둔다** —
+        # 리그에서 한 번 건 연결을 다른 짝으로 덮어쓰는 사고가 더 흔하기 때문.
+        self.cb_connect_force = QCheckBox("Force (replace existing connections)")
+        self.cb_connect_force.setChecked(False)
+        self.cb_connect_force.setToolTip(
+            "OFF (default) : a driven attribute that is already connected is left as it is\n"
+            "                and reported in the log - nothing is disconnected.\n"
+            "ON            : the existing connection is broken and replaced\n"
+            "                (connectAttr -force).\n"
+            "Applies to both direction buttons below. Only the DRIVEN side is checked;\n"
+            "a driver that already feeds other attributes is fine (fan-out).")
+        layout.addWidget(self.cb_connect_force)
+
         # 두 방향을 나란히 둔다. 어느 쪽이 드라이버인지 화살표로 바로 읽힌다.
         dir_row = QHBoxLayout()
 
@@ -1342,7 +1355,9 @@ class MainWindow(QWidget):
         btn_connect.setMinimumHeight(32)
         btn_connect.setToolTip(
             "Connect the selected Source attributes to the selected Destination\n"
-            "attributes (Source drives Destination).")
+            "attributes (Source drives Destination).\n"
+            "Destination attributes that are already connected are kept unless\n"
+            "'Force' is checked.")
         btn_connect.clicked.connect(self.on_connect_attrs)
         dir_row.addWidget(btn_connect)
 
@@ -1351,7 +1366,9 @@ class MainWindow(QWidget):
         btn_connect_rev.setToolTip(
             "The other way round: connect the selected Destination attributes to\n"
             "the selected Source attributes (Destination drives Source).\n"
-            "Same pairing rules, only the direction is flipped.")
+            "Same pairing rules, only the direction is flipped.\n"
+            "Source attributes that are already connected are kept unless\n"
+            "'Force' is checked.")
         btn_connect_rev.clicked.connect(self.on_connect_attrs_reverse)
         dir_row.addWidget(btn_connect_rev)
 
@@ -4169,11 +4186,14 @@ class MainWindow(QWidget):
                              from_label, to_label, attr_match.NULL_TARGET))
                 return
 
+        force = self.cb_connect_force.isChecked()
+
         def _do():
             count, mode, report = cnt_mgr.connect_attrs(
-                from_objs, to_objs, from_attrs, to_attrs)
-            self.log("       {0} connection(s) [{1}]  {2} -> {3}".format(
-                count, mode, from_label, to_label))
+                from_objs, to_objs, from_attrs, to_attrs, force=force)
+            self.log("       {0} connection(s) [{1}]  {2} -> {3}{4}".format(
+                count, mode, from_label, to_label,
+                "  (Force)" if force else ""))
             self._log_connect_report(report, from_label, to_label)
 
         self._run("Connect {0} to {1}".format(from_label, to_label), _do)
@@ -4195,6 +4215,17 @@ class MainWindow(QWidget):
                 shown += ", ... (+{0})".format(len(left) - 8)
             self.log("[INFO] {0} {1}(s) had no counterpart and were left "
                      "untouched: {2}".format(len(left), label, shown))
+
+        # v01.67 : Force 가 꺼져 있어 그대로 둔 대상. 무엇이 걸려 있어서 넘겼는지 함께 찍는다.
+        kept = report.get("kept") or []
+        if kept:
+            self.log("[INFO] {0} {1} attribute(s) already connected - kept as is "
+                     "(check 'Force' to replace):".format(len(kept), to_label))
+            for src_plug, dst_plug, existing in kept[:20]:
+                self.log("       {0}  <-  {1}   (skipped {2})".format(
+                    dst_plug, existing, src_plug))
+            if len(kept) > 20:
+                self.log("       ... (+{0} more)".format(len(kept) - 20))
 
         for src_plug, dst_plug, reason in (report.get("failed") or []):
             self.log("[WARN] could not connect {0} -> {1} : {2}".format(

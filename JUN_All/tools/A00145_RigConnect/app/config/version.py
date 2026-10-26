@@ -98,5 +98,12 @@
 #        Off keeps the old pairing (one target = broadcast, otherwise row to row).
 #        Disabled in Matrix Constraint mode.
 
-VERSION = "01.66"
-LAST_UPDATE = "2026-10-22"
+# 01.67  Connect > Connect : "Force (replace existing connections)" checkbox, OFF by default.
+#        Off, a driven attribute that already has an incoming connection is left untouched
+#        (nothing is disconnected) and listed in the log with what drives it; on, the old
+#        connection is broken and replaced (connectAttr -force, the previous behaviour).
+#        Applies to both Source -> Destination and Destination -> Source. Only the driven
+#        side is checked - a driver already feeding other attributes still connects.
+
+VERSION = "01.67"
+LAST_UPDATE = "2026-10-26"

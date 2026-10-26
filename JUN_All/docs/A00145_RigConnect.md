@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.66` (`app/config/version.py`) — Connect by Rule 규칙 `JALI 22 Viseme` 에 **A0020 `DUMMY_OUT_COARTIC` 의 `MMM WA_PEDAL YA_PEDAL` 추가**(36개, §Connect by Rule). v01.65 — 같은 규칙에 **`DUMMY_OUT_PHONEMES` 16개 이름 추가**(33개). v01.64 — Connect by Rule **겹치는 이름 보호 + 스킵 사유 로그**(§Connect by Rule). v01.63 — Connect by Rule 두 번째 규칙 **`JALI 22 Viseme`**(§Connect by Rule). v01.62 — Constrain > Constraint 에 **`All Targets -> Each Follower`** 옵션(follower 마다 Targets **전부**를 타깃으로 갖는 constraint 하나, §Constraint)
+- 버전: `v01.67` (`app/config/version.py`) — Connect > Connect 에 **`Force (replace existing connections)`** 체크박스(기본 OFF): 이미 입력 연결이 있는 대상 어트리뷰트는 **끊지 않고 그대로 두고** 로그로 알린다, 켜면 예전처럼 끊고 교체(§연결 방향). v01.66 — Connect by Rule 규칙 `JALI 22 Viseme` 에 **A0020 `DUMMY_OUT_COARTIC` 의 `MMM WA_PEDAL YA_PEDAL` 추가**(36개, §Connect by Rule). v01.65 — 같은 규칙에 **`DUMMY_OUT_PHONEMES` 16개 이름 추가**(33개). v01.64 — Connect by Rule **겹치는 이름 보호 + 스킵 사유 로그**(§Connect by Rule). v01.63 — Connect by Rule 두 번째 규칙 **`JALI 22 Viseme`**(§Connect by Rule). v01.62 — Constrain > Constraint 에 **`All Targets -> Each Follower`** 옵션(follower 마다 Targets **전부**를 타깃으로 갖는 constraint 하나, §Constraint)
   · v01.57 은 Constrain 의 **Constraint · Skin Weight 하위 탭을 하나로**(모드 `Default` / `Skin Weight`), Transfer 에 모드 **`Copy`** — constraint 의 성질을 읽어 다른 오브젝트에 똑같이 건다, 원본 유지(§Transfer) · v01.56 은 Attribute > Set Value 에 **`Include Non-Common`**: 일부 오브젝트만 가진 어트리뷰트도 나열, 행마다 **`[k/n]`**(§Set Value) · v01.55 는 창 기본 높이 900 → **980**(Match 탭이 스크롤 없이 다 보이게) · v01.54 는 리스트의 **`(Null)` 자리표시를 빨간 글씨로**(공용 TSL, 아래 메모) · v01.53 은 Match 에 **`Keep Children in Place`**(기본 OFF):
   팔로워만 움직이고 **그 아래 오브젝트는 있던 월드 자리에 그대로** 둔다. Mirror 탭의 같은 이름
   체크박스와 **같은 코어**(`app/core/keep_children.py`)를 쓴다 (§Match)
@@ -780,6 +780,37 @@ Constrain 탭과 같은 방식이다(§Constrain 참고) — 짧은 라벨 + 툴
 - 로그에 `... 6 connection(s) [패턴]  Destination -> Source` 처럼 **방향이 함께** 찍힌다.
 - 리스트를 다시 채울 필요 없이 버튼만 바꿔 누르면 된다. 한쪽에서 `List Attributes` /
   `Match from Source` 로 짝을 맞춰 놓고 방향만 고르는 흐름이 된다.
+
+##### 이미 연결된 어트리뷰트 — `Force (replace existing connections)` (v01.67)
+
+두 방향 버튼 바로 위의 체크박스. **기본은 OFF** 다.
+
+| 상태 | 대상(구동되는 쪽) 어트리뷰트에 이미 입력 연결이 있으면 |
+|------|------|
+| **OFF (기본)** | **건드리지 않는다.** 아무것도 끊지 않고, 그 짝만 넘기고 나머지는 계속 연결한다. 넘긴 것은 로그에 **무엇이 걸려 있어서 넘겼는지**까지 찍는다 |
+| ON | 예전 동작. `connectAttr -force` 로 기존 연결을 끊고 새로 건다. 로그 첫 줄에 `(Force)` 가 붙는다 |
+
+```
+       1 connection(s) [1 obj -> #objs, attr set matched]  Source -> Destination
+[INFO] 1 Destination attribute(s) already connected - kept as is (check 'Force' to replace):
+       B.tx  <-  X.translateX   (skipped A.tx)
+```
+
+- v01.66 까지는 늘 `-force` 였다 — 리그에서 한 번 걸어 둔 연결을 다른 짝으로 **소리 없이 덮어쓰는** 사고가
+  더 흔해서 기본을 "그대로 둔다" 로 바꿨다. 이전처럼 덮어쓰려면 체크를 켠다.
+- **대상 쪽만 본다.** 드라이버 어트리뷰트가 이미 다른 곳으로 나가고 있는 것(팬아웃)은 막을 이유가 없어
+  그대로 연결된다. 같은 드라이버가 이미 걸려 있는 짝(바꿀 게 없음)도 "kept" 로 센다.
+- **부모 compound 가 연결된 자식**(예: `.t` 가 연결된 노드의 `.tx`)도 "연결됨" 으로 본다 — 자식에 바로 걸면
+  어차피 실패하기 때문. Maya 의 `connectionInfo -isDestination` 이 그렇게 답하고, 소스는 부모 plug(`X.translate`)
+  로 보고된다. 반대로 Force 를 켜면 `connectAttr -force` 가 **부모 연결을 끊고 자식에 건다**(mayapy 실측).
+- `Connect by Rule` 과 Transfer Connection 은 이 체크박스와 무관하다 — Rule 은 종전처럼 `-force`,
+  Transfer 는 이미 다른 것이 구동하는 대상을 건너뛴다(v01.58).
+- mayapy 실측 (2026-10-26): 코어 23 항목(기본 유지 · 같은 드라이버 재연결 = kept · Force 교체 · compound 자식 ·
+  팬아웃 · 없는 attr 은 failed · 브로드캐스트 · undo) + 오프스크린 UI 18 항목(기본 OFF · 양방향 · 로그 문구 ·
+  undo 한 덩어리). **실기 눈 확인 아직.**
+
+> `connect_attrs(..., force=False)` — report 에 `kept` 키가 더해졌다: `[(드라이버 plug, 대상 plug, 지금 들어오는 plug), ...]`.
+> 판정은 `connect_manager.incoming_plug(plug)` (`connectionInfo -isDestination` → `-sourceFromDestination`).
 
 **브로드캐스트 패턴** — 3가지:
 
