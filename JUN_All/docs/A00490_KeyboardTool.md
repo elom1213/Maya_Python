@@ -7,12 +7,24 @@
 크롬 창 A, B, C 가 떠 있을 때 A, B 만 체크하면 A, B 에만 들어가고 C 는 그대로다.
 
 > Maya 안에서 도는 툴이 아니라 `A00240_PathTool` 처럼 **Windows 에서 독립 실행되는 PySide6 앱** 이다.
+> **버전**: v01.02 (2026-10-26) — 더블클릭 실행 `Run_KeyboardTool.bat`. v01.01 Send Method Auto · v01.00 첫 버전.
 > **Windows 10 · 11 둘 다** 동작한다 — 키 전송은 두 OS 에 똑같이 있는 user32 API 만 쓴다(5장).
 
 ---
 
 ## 1. 실행
 
+- **더블클릭 실행 (v01.02)**: 툴 폴더의 **`Run_KeyboardTool.bat`**. 콘솔 없이 창이 뜬다(`pythonw`).
+  파이썬을 이 순서로 고른다 — ① 툴 전용 환경 `%USERPROFILE%\.jun_keyboardtool\venv` ② **PySide6 가 이미 깔린**
+  설치 파이썬(`py -3.14 … -3.10` → PATH 의 `python`, 스토어 바로가기는 건너뜀. 각각 **실제로 실행해 버전을 읽는다** —
+  `py -3.12` 는 없어도 종료 코드 0) ③ 둘 다 없으면 가장 새 64-bit 3.10+ 로 ① 을 **한 번** 만든다(venv + PySide6 Essentials,
+  콘솔 창 1 ~ 2 분, `app/selftest.py` 자가 검사). 이 PC 처럼 PySide6 가 있는 파이썬이 있으면 아무것도 설치하지 않는다.
+  - 환경을 툴 폴더 밖에 두는 이유: PySide6 휠 안에 151자 경로가 있어 깊은 폴더면 pip 가 260자 한도로 실패한다
+    (A00560 과 같은 실측, 이 툴도 150자 폴더에서 재현). 짧은 다른 폴더로 바꾸려면 환경 변수 `JUN_KEYBOARDTOOL_HOME`.
+  - 옵션: `--setup`(환경 만들기/고치기) · `--force`(환경 다시) · `--console`(python.exe 로 띄워 오류를 화면에 남김) ·
+    `--no-launch`(검사만, `READY - <인터프리터>` 출력). 설치 기록은 툴 폴더의 `setup_env.log`(git 제외).
+  - 설치가 중간에 실패하면 **반쯤 깔린 환경을 지운다** — 안 지우면 `QtWidgets` 는 import 되어 다음 실행이 정상으로 본다(실측).
+    환경을 만든 파이썬을 지웠으면 다음 실행이 알아서 다시 만든다.
 - **개발 실행**: `python JUN_All/tools/A00490_KeyboardTool/launch.py`
 - **exe 빌드**: 툴 폴더의 `build_exe.bat` → `dist/A00490_KeyboardTool.exe`
 - 필요 패키지: `PySide6`(+ 빌드용 `pyinstaller`). 키 전송은 표준 라이브러리 `ctypes` 만 쓴다.
@@ -153,9 +165,11 @@ for loop (Loop 꺼짐 = 1번, Times 0 = Stop 까지):
 
 ```
 A00490_KeyboardTool/
+├── Run_KeyboardTool.bat      # 더블클릭 실행 (1장) - PySide6 있는 파이썬 → 없으면 전용 venv 한 번
 ├── launch.py                 # AppUserModelID → QApplication → teal_dark 테마 → MainWindow
 ├── app/
 │   ├── config/version.py · app_meta.py
+│   ├── selftest.py           # Run_KeyboardTool.bat 4단계: 버전 · PySide6 · import · 오프스크린 창
 │   ├── core/                 # Qt 비의존
 │   │   ├── keys.py           # 키 이름 <-> 가상 키 코드, 'Ctrl+C' 파싱
 │   │   ├── win32.py          # 창 열거 + PostMessage / SendInput / activate (ctypes)
@@ -182,6 +196,13 @@ A00490_KeyboardTool/
 - 실행 중 대상 창을 닫음 → `[WARN] Window closed ...` → `All target windows are closed.` 로 끝남.
 - F9 (SendInput 으로 시스템에 주입) → `Stopped by F9.`
 - (v01.00 시점) 실제 크롬은 미확인 → 사용자 확인 결과 **클릭한 크롬 창만 동작** → v01.01 에서 고침.
+
+### v01.02 (2026-10-26, Windows 11) — `Run_KeyboardTool.bat`
+
+- 이 PC(py 3.11 + PySide6 6.11): `--no-launch` → `READY - …\Python311\pythonw.exe`, 설치 없음.
+- `JUN_KEYBOARDTOOL_HOME` 을 짧은 임시 폴더로 → `--setup`: py -3.11 발견 · venv 생성 · PySide6 Essentials 6.12 · 자가 검사 4/4 통과,
+  두 번째 실행은 그 venv 를 고름. 실제 실행은 오프스크린으로 venv 의 `pythonw launch.py` 프로세스가 뜨는 것까지.
+- 150자 스크래치 폴더로 → pip 가 `[WinError 3]`(260자 한도)로 실패 → 힌트 출력 · 반쯤 깔린 venv 삭제 · 다음 실행은 설치 파이썬으로 폴백.
 
 ### v01.01 (2026-10-01, Windows 11, Chrome)
 

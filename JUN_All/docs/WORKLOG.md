@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-26 (오늘)
 
+> [!summary] A00490_KeyboardTool **v01.02 — 더블클릭 실행 `Run_KeyboardTool.bat`**: PySide6 가 있는 설치 파이썬이면 바로, 없으면 `~/.jun_keyboardtool/venv` 를 한 번 만들어 `pythonw` 로 `#A00490_KeyboardTool` `#standalone`
+- 요청: "A00490_KeyboardTool 을 클릭으로 실행하는 파일을 만들어".
+- A00560 의 `Run_JaliBatch.bat` 모양을 따르되 한 파일로: ① 전용 venv ② `py -3.14…-3.10` · PATH `python` 중 **`import PySide6.QtWidgets` 가 되는 것**(실행해 버전을 읽음, 스토어 stub 제외) ③ 없으면 venv + PySide6 Essentials + `app/selftest.py`. 전용 파이썬 다운로드는 넣지 않았다(필요하면 A00560 것을 Framework 로 올려 공유).
+- 실측 두 가지: 150자 폴더에서 pip 가 260자 한도로 중간 실패하면 **`QtWidgets` 는 이미 import 되어 다음 실행이 정상으로 봤다** → 실패 시 venv 삭제 + pip 뒤 import 재확인. 로그 꼬리를 보이기 전에 `:say` 로 적으면 그 줄이 꼬리에 또 나온다 → 순서 바꿈.
+- 검증: 이 PC 는 설치 없이 `READY`(py 3.11), 짧은 임시 폴더 셋업 → 자가 검사 4/4 · venv 재사용 · 오프스크린 실행 프로세스 확인, 긴 폴더 실패 → 힌트 · 정리 · 폴백. 문서 §1 · §7 · 검증, CHANGELOG, README, 메모리.
+
 > [!summary] A00480_FileTool **v01.12 — `Reference` 탭 (하위 탭 `Default`)**: 씬 레퍼런스를 **중첩(이중 · 삼중)까지 트리**로, 고른 파일 탐색기 열기 · 경로 복사 `#A00480_FileTool` `#reference`
 - 요청: "Reference 탭 + 하위 Default 탭 — 씬의 레퍼런스를 리스트업, 원하는 파일들을 탐색기에서 열고 경로 복사, 이중 · 삼중 레퍼런스도".
 - `core/reference_ops.py`: `ls(type="reference")` 는 중첩 노드까지 다 준다(`MID_A:LEAFRN`) → `referenceQuery -parent` 로 트리, 최상위 순서는 `file -q -reference`(Reference Editor 순), `withoutCopyNumber` 로 실제 경로 + `{n}` 따로, `unresolvedName` 은 툴팁. **부모가 언로드면 중첩 노드가 없다**(mayapy 실측) → `nested_hidden` 안내. 상태 Loaded / Unloaded(회색) / Missing(빨강 — `isLoaded` False 라 `isfile` 로 구분). 열기는 파일마다 탐색기(같은 파일 한 번, 없으면 폴더), 복사는 한 줄에 하나(윈도우 모양).

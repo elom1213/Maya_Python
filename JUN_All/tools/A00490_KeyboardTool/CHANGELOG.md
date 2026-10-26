@@ -2,6 +2,17 @@
 
 All notable changes to this tool are documented here.
 
+## [01.02] - 2026-10-26
+### Added
+- **`Run_KeyboardTool.bat` - double-click to open the tool.** Picks, in order: the tool's own
+  environment `%USERPROFILE%\.jun_keyboardtool\venv`, then an installed 64-bit Python 3.10+ that
+  already has PySide6 (`py -3.14 .. -3.10`, `python` on PATH - each one is run and its version read),
+  and only when none has PySide6 builds the environment once (venv + PySide6 Essentials, outside the
+  tool folder because of the 260-character path limit) and runs `app/selftest.py`. Then opens the
+  window with `pythonw` (no console). Options `--setup` / `--force` / `--console` / `--no-launch`.
+  A half-installed environment is removed on failure so the next run does not treat it as ready.
+- `app/selftest.py` - Python / PySide6 / tool imports / offscreen window check (exit code 0 = pass).
+
 ## [01.01] - 2026-10-01
 ### Fixed
 - **Every checked Chrome window now gets the keys, not only the one you clicked.** Chrome-type

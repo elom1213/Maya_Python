@@ -1,6 +1,6 @@
 ---
 name: wip-a00490-keyboardtool
-description: "A00490_KeyboardTool (2026-10-01 신규, v01.00) - 키 시퀀스 자동 입력, 고른 창에만. Background(PostMessage)는 조합키가 안 먹고 Foreground(SendInput)는 포커스를 옮긴다"
+description: "A00490_KeyboardTool (2026-10-01 신규, v01.02 2026-10-26 Run_KeyboardTool.bat) - 키 시퀀스 자동 입력, 고른 창에만. Background(PostMessage)는 조합키가 안 먹고 Foreground(SendInput)는 포커스를 옮긴다. 더블클릭 실행은 PySide6 있는 파이썬 → 없으면 전용 venv"
 metadata:
   node_type: memory
   type: project
@@ -25,6 +25,12 @@ metadata:
 - 크롬 테스트는 **임시 `--user-data-dir` 크롬 + 키를 받으면 탭 제목에 횟수를 적는 html** 로 한다(제목은 GetWindowText 로 읽힘).
   창 목록은 Z 순서라 활성화마다 순서가 바뀐다 — **비교는 hwnd 기준으로**.
 - 테스트는 사용자 앱 대신 **별도 프로세스 Qt 수신 창 A/B/C** 로 했다(받은 VK 를 파일에 기록). 크롬 탭은 창이 아니라 분리해야 따로 보낼 수 있다.
+
+- **v01.02 (2026-10-26) — `Run_KeyboardTool.bat` 더블클릭 실행.** A00560 `Run_JaliBatch.bat` 모양이지만 한 파일: ① `~/.jun_keyboardtool/venv`
+  ② `import PySide6.QtWidgets` 가 되는 설치 파이썬(py -3.14…-3.10, PATH python — 실행해 버전 읽기, 스토어 stub 제외) ③ 없으면 venv +
+  PySide6 Essentials + `app/selftest.py`, 그 뒤 `pythonw`. 전용 파이썬 다운로드는 없다. **실패하면 venv 를 지울 것** — 반쯤 깔린
+  venv 도 QtWidgets 는 import 되어 다음 실행이 정상으로 본다(실측). 환경은 툴 폴더 밖(PySide6 휠 151자 × 260 한도, 150자 폴더에서 재현).
+  두 툴에 같은 bat 이 생겼으니 세 번째가 필요하면 Framework 로 올려 공유할 것.
 
 **Why:** 사용자 요청(2026-10-01) — 크롬 창 A, B 에만 Down/Up 반복, C 는 그대로.
 **How to apply:** 기능 추가 시 core(`keys`/`win32`/`runner`)는 Qt 비의존 유지. 관련 [[standalone-taskbar-icon-method]] · [[new-tool-needs-icon]] · [[framework-checklist-behavior]].

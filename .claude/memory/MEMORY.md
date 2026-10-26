@@ -100,7 +100,7 @@
 - A00440 — [SetTool](wip-a00440-settool.md) · [Sets x Objects](wip-a00440-sets-x-objects.md) · [Find tab](wip-a00440-find-tab.md) · A00450 — [ManipulatorTool](wip-a00450-manipulatortool.md) · A00460 — [FK & IK](wip-a00460-fk-ik.md)
 - A00470 — [MaterialTool](wip-a00470-materialtool.md)(이름 규칙 진단 · Copy Material · Rename to Suggested · Select Materials/Faces 는 API 선택 · 세로 줄이는 방향 유지)
 - A00480 — [FileTool](wip-a00480-filetool.md)(Export/Import/Path/Reference, Export 규칙, Naming = 공용 토큰 위젯, v01.12 Reference > Default = 씬 레퍼런스 중첩 트리 · 열기 · 복사 — 부모 언로드면 중첩 노드 없음 · 오프스크린 QMenu.exec_ 는 멈춘다. 디스크 스캔은 A00210)
-- A00490 — [KeyboardTool](wip-a00490-keyboardtool.md)(크롬 계열은 활성 창만 키를 받는다 → Auto)
+- A00490 — [KeyboardTool](wip-a00490-keyboardtool.md)(크롬 계열은 활성 창만 키를 받는다 → Auto · v01.02 `Run_KeyboardTool.bat` 더블클릭 = PySide6 있는 파이썬 → 없으면 `~/.jun_keyboardtool/venv`, 실패 시 venv 삭제)
 - A00540 — [JaliLipSync](wip-a00540-jalilipsync.md)(VisemeNet txt → JALI 리그 키, 짝 = JUN_JALI 변환기 · 원본 모델은 추론도 무작위 · 끝 0.32초 짧음 · v01.01 규칙 json `nodes` 역할표 + Target Auto/Manual, 리그마다 json 하나)
 - A00560 · A00570 — [JaliBatch · JaliReview](wip-a00560-jalibatch.md)(2026-10-26 v01.01 `Run_JaliBatch.bat` 더블클릭 · Python 3.14 OK(abi3) · **환경은 ~/.jun_jalibatch/venv — PySide6 휠 151자 경로 × 260 한도** · 코어는 Framework/jali · Swap 은 편집 0 일 때만 · 실기 눈 확인 · exe · P4 아직)
 - STT Converter — [wav → 대본 변환기 계획](wip-stt-converter.md)(JUN_JALI docs/0130, 2026-10-23 계획만 · faster-whisper turbo 1차 · Qwen3-ASR 2차 · 기준 PC Ryzen 9 3900X + RTX A2000 12GB · Win10 · Python 3.14 전용 PC 지원 조건)
