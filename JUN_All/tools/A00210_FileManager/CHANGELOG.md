@@ -2,6 +2,37 @@
 
 All notable changes to this tool are documented here.
 
+## [01.41] - 2026-10-26
+### Added
+- **Maya > `Export` sub tab** - pick several Maya files, choose a **set rule** (one json per rule, e.g. set `Bake`,
+  exact / contains / regex, ignore namespace, rules folder changeable and shareable), press `Check Sets` and the table
+  shows per file whether a matching set exists (top level or inside another set), its playback range, fps and the
+  Maya version it was saved with. Files without the set are unchecked and skipped.
+- **`Bake & Export`** - for every ready file mayapy opens it, imports loaded references and removes namespaces (option,
+  default ON - FBX keeps `CHN:root` otherwise), finds the set, collects its members and all descendants (`Joints Only`
+  drops non-joints under joints, constraints always dropped), bakes translate / rotate / scale over Start - End with
+  one `bakeResults` call, **moves top bones that sit under a group to the scene root** (world motion baked through a
+  temporary locator - exact even when the group is animated), and exports one FBX per file. The Maya file itself is
+  never saved. **`Export Only`** does the same without baking.
+- Output names: Find / Replace + Insert (`Token` after token k / `Char` at position, default `bake` as the first token
+  -> `bake_anim_01.fbx`), live preview in the table, name collisions and invalid characters block the run. Export Folder
+  (empty = next to the source). Existing FBX files are listed in a warning popup with `Overwrite` / `Cancel`.
+- Range per file (`Timeline` / `Animation range` / `Custom`), editable Start / End cells, `Euler Filter` option,
+  progress popup (per file + open / import / bake / export steps; the bake call itself shows no inner progress), cancel at
+  a file boundary (grace 30 min), report json next to the FBX files, `Resources` line (CPU / RAM / GPU, read-only).
+- `app/maya/core`: `set_rules`, `export_naming`, `export_jobs`, `set_match`, `scene_probe`, `bake_export`, `hw_info`;
+  worker jobs `probe` / `export`; `ref_importer.import_loaded_references`. `tests/` : core 50, worker 31 (real mayapy
+  worker process, FBX re-import, world matrices), UI 32 (offscreen).
+
+### Changed
+- The mayapy box moved from the Reference tab to the bottom of the Maya tab (`mayapy_bar.py`) - one box for all sub tabs.
+  File picking (tree + Add Checked / Browse + Maya File list) is now `maya_file_picker.py`, shared by Reference and Export
+  (behaviour unchanged).
+- FBX helpers that A00480_FileTool had (`fbx_options`, `collect_export_nodes`, `ensure_fbx_plugin`, ...) were promoted to
+  `Framework/core/maya_fbx.py`; the worker imports Framework (`launch.spec` datas += `Framework/core`, `Framework/jali`).
+- The probe reads the saved playback range from `sceneConfigurationScriptNode` because scenes are opened with
+  `executeScriptNodes=False` (`playbackOptions -q` would return the previous scene's values, unit-converted).
+
 ## [01.39] - 2026-10-23
 ### Added
 - **`File > Add to Start Menu`** - creates a Start menu shortcut (`JUN File Manager.lnk`) for this tool and

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-12
+# last Update date : 2026-10-26
 # A00210_FileManager / Maya 탭 > Reference 하위탭 (PySide, standalone)
 #
 # 여러 마야 파일이 부르는 레퍼런스를 보고, 체크한 레퍼런스를 각 파일 안으로 임포트해 제자리 저장한다.
@@ -11,10 +11,12 @@
 #   [Add Checked] [Browse...]
 #   ┌ Maya File (공용 TSL) ┐  ┌ Reference (트리, 체크박스, 중첩은 접힘) ┐
 #   Scanned: ...
-#   mayapy [............................] [Browse...] [Detect]
 #   [x] Remove All Namespace  [x] Backup
 #   [Get Reference]                         [Import Reference]
+#   (mayapy 칸은 v01.41 부터 Maya 탭 아래에 하나 - mayapy_bar.py, 하위탭 공용)
 #
+# v01.41 : 파일 고르기(트리 · Add Checked · Maya File)를 maya_file_picker.MayaFilePicker 로, mayapy 칸을 mayapy_bar.MayapyBar 로 뽑아
+#          Export 하위탭과 같이 쓴다. 동작은 그대로다 - file_rows / file_paths / selected_file_paths / add_files 는 picker 로 위임.
 # 로직은 ../core (ref_scanner · ref_importer · backup · mayapy_runner). 이 파일은 화면과 흐름만.
 # 설계 · 결정: docs/plans/A00210_FileManager_maya_reference_plan.md (§12 결정표, §14 A00210 이식).
 
@@ -27,40 +29,30 @@ from Framework.qt.qt import (
     QHBoxLayout,
     QGroupBox,
     QLabel,
-    QLineEdit,
     QPushButton,
     QCheckBox,
     QSplitter,
-    QFileDialog,
     QMessageBox,
-    QBrush,
-    QColor,
 )
-from Framework.qt import path_context
-from Framework.qt.MOD_fileTree_qt_v01 import JUN_mod_fileTree_qt_v01
-from Framework.qt.MOD_tsl_qt_v01 import JUN_mod_tsl_qt_v01, null_item_color
 
 from ..core import ref_scanner
 from ..core import ref_importer
-from ..core import mayapy_runner
 from . import mayapy_process
+from .maya_file_picker import MayaFilePicker
 from .reference_tree import ReferenceTree
-
-DEFAULT_TYPES = ("ma", "mb", "fbx")        # 결정 ⑧
-FILE_FILTER = "Maya Files (*.ma *.mb);;All Files (*)"
-MAYAPY_FILTER = "mayapy (mayapy.exe);;All Files (*)"
 
 
 class ReferenceTab(QWidget):
 
-    def __init__(self, log=None, prefs=None, parent=None):
-        """prefs : {"load": fn()->dict, "save": fn(dict)} - mayapy 경로를 기억할 곳(없으면 세션 안에서만)."""
+    def __init__(self, log=None, prefs=None, mayapy_path=None, parent=None):
+        """prefs : {"load", "save"} (지금은 mayapy_bar 가 쓴다 - 호환용으로 받아 둔다).
+        mayapy_path : () -> mayapy 경로("" 가능) 콜러블 (MayaTab 의 MayapyBar.path). 없으면 자동 탐색."""
         super().__init__(parent)
         self._log_callback = log
         self._prefs = prefs
+        self._mayapy_path = mayapy_path
         self._scan = None                 # 마지막 Get Reference 결과
         self.build_ui()
-        self._load_mayapy_pref()
 
     # ==================================================================
     # UI
@@ -70,56 +62,23 @@ class ReferenceTab(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(4, 4, 4, 4)
 
+        self.picker = MayaFilePicker(
+            log=self._log, parent=self,
+            list_tooltip="Maya files to work on. Select rows and press Get Reference.\nDouble-click: open in File Explorer.")
+        self.file_tree = self.picker.tree
+        self.maya_list = self.picker.maya_list
+
         self.splitter = QSplitter(Qt.Vertical)
         root.addWidget(self.splitter, stretch=1)
-
-        # ---- 위: 폴더 트리 (공용) -------------------------------------
-        self.file_tree = JUN_mod_fileTree_qt_v01(
-            checkable_files=True, default_types=DEFAULT_TYPES)
-        self.file_tree.tree.setMinimumHeight(140)
-        self.file_tree.checksChanged.connect(self._on_tree_checks_changed)
         self.splitter.addWidget(self.file_tree)
 
         # ---- 아래: Maya File | Reference ------------------------------
         lower = QWidget()
         lower_layout = QVBoxLayout(lower)
         lower_layout.setContentsMargins(0, 0, 0, 0)
-
-        add_row = QHBoxLayout()
-        self.btn_add_checked = QPushButton("Add Checked")
-        self.btn_add_checked.setToolTip(
-            "Add the files checked in the tree above to the Maya File list.")
-        self.btn_add_checked.clicked.connect(self.on_add_checked)
-        self.btn_browse = QPushButton("Browse...")
-        self.btn_browse.setToolTip("Pick Maya files with a file dialog (several at once).")
-        self.btn_browse.clicked.connect(self.on_browse)
-        self.lbl_checked = QLabel("Checked in tree: 0")
-        add_row.addWidget(self.btn_add_checked)
-        add_row.addWidget(self.btn_browse)
-        add_row.addWidget(self.lbl_checked)
-        add_row.addStretch(1)
-        lower_layout.addLayout(add_row)
+        lower_layout.addWidget(self.picker.add_bar)
 
         lists = QSplitter(Qt.Horizontal)
-
-        # Maya File - 공용 TSL. 씬 노드가 아니므로 UUID · 선택 동기화 · 재정렬 버튼은 끈다
-        # (Up/Down/Sort 는 UUID 역할만 옮겨 경로 데이터를 잃는다).
-        self.maya_list = JUN_mod_tsl_qt_v01(
-            title="Maya File", show_select=False, show_add=False, show_del=True,
-            show_up=False, show_down=False, show_sort=False, show_order=False,
-            attach_uuids=False, list_min_height=120, log_callback=self._log)
-        self.maya_list.list_widget.setToolTip(
-            "Maya files to work on. Select rows and press Get Reference.\n"
-            "Double-click: open in File Explorer.")
-        try:
-            self.maya_list.list_widget.itemSelectionChanged.disconnect(
-                self.maya_list._on_selection_changed)
-        except (RuntimeError, TypeError):
-            pass
-        self.maya_list.add_button("Clear", self.on_clear_files)
-        path_context.attach_path_context(
-            self.maya_list.list_widget, lambda item: item.data(Qt.UserRole) or "",
-            title="Maya File")
         lists.addWidget(self.maya_list)
 
         ref_box = QGroupBox("Reference")
@@ -153,26 +112,6 @@ class ReferenceTab(QWidget):
         self.splitter.addWidget(lower)
         self.splitter.setStretchFactor(0, 1)
         self.splitter.setStretchFactor(1, 1)
-
-        # ---- mayapy 행 ---------------------------------------------------
-        py_row = QHBoxLayout()
-        py_row.addWidget(QLabel("mayapy"))
-        self.ipf_mayapy = QLineEdit()
-        self.ipf_mayapy.setPlaceholderText("mayapy.exe - reads .mb files and imports references (auto-detected)")
-        self.ipf_mayapy.setToolTip(
-            "This app runs outside Maya. Reading .mb files and importing references is done by\n"
-            "mayapy.exe (Maya's Python) in the background. Leave empty to use the newest Maya found\n"
-            "under Program Files\\Autodesk. Saved with the profile.")
-        self.ipf_mayapy.editingFinished.connect(self._save_mayapy_pref)
-        py_row.addWidget(self.ipf_mayapy, stretch=1)
-        self.btn_mayapy_browse = QPushButton("Browse...")
-        self.btn_mayapy_browse.clicked.connect(self.on_browse_mayapy)
-        py_row.addWidget(self.btn_mayapy_browse)
-        self.btn_mayapy_detect = QPushButton("Detect")
-        self.btn_mayapy_detect.setToolTip("Find mayapy.exe under Program Files\\Autodesk (newest Maya first).")
-        self.btn_mayapy_detect.clicked.connect(self.on_detect_mayapy)
-        py_row.addWidget(self.btn_mayapy_detect)
-        root.addLayout(py_row)
 
         # ---- 옵션 행 + 동작 행 ----------------------------------------------
         opt_row = QHBoxLayout()
@@ -210,50 +149,14 @@ class ReferenceTab(QWidget):
         root.addLayout(act_row)
 
     # ==================================================================
-    # mayapy
+    # mayapy (MayaTab 의 MayapyBar 에 위임)
     # ==================================================================
 
     def mayapy_path(self):
-        """칸의 경로가 실제 파일이면 그것, 아니면 자동 탐색. 없으면 ""."""
-        return mayapy_runner.find_mayapy(self.ipf_mayapy.text().strip())
-
-    def on_browse_mayapy(self):
-        start = os.path.dirname(self.ipf_mayapy.text().strip()) or r"C:\Program Files\Autodesk"
-        path, _flt = QFileDialog.getOpenFileName(self, "Select mayapy.exe", start, MAYAPY_FILTER)
-        if path:
-            self.ipf_mayapy.setText(os.path.normpath(path))
-            self._save_mayapy_pref()
-
-    def on_detect_mayapy(self):
-        found = mayapy_runner.candidates()
-        if not found:
-            self._log("[WARN] No mayapy.exe found under Program Files\\Autodesk. Use Browse...")
-            return
-        self.ipf_mayapy.setText(found[0])
-        self._save_mayapy_pref()
-        self._log("mayapy : {0}{1}".format(
-            found[0], "" if len(found) == 1 else "  (+{0} more)".format(len(found) - 1)))
-
-    def _load_mayapy_pref(self):
-        if not self._prefs:
-            return
-        try:
-            path = (self._prefs["load"]() or {}).get("mayapy_path", "") or ""
-        except Exception:  # noqa: BLE001
-            path = ""
-        self.ipf_mayapy.setText(path)
-
-    def _save_mayapy_pref(self):
-        if not self._prefs:
-            return
-        try:
-            data = self._prefs["load"]() or {}
-            text = self.ipf_mayapy.text().strip()
-            if data.get("mayapy_path", "") != text:
-                data["mayapy_path"] = text
-                self._prefs["save"](data)
-        except Exception as exc:  # noqa: BLE001
-            self._log("[WARN] Could not save the mayapy path : {0}".format(exc))
+        if self._mayapy_path:
+            return self._mayapy_path()
+        from ..core import mayapy_runner
+        return mayapy_runner.find_mayapy("")
 
     def _require_mayapy(self):
         mayapy = self.mayapy_path()
@@ -265,79 +168,29 @@ class ReferenceTab(QWidget):
         return mayapy
 
     # ==================================================================
-    # Maya File list
+    # Maya File list (picker 위임)
     # ==================================================================
 
     def file_rows(self):
-        """[(표시 이름, 절대경로), ...]"""
-        lw = self.maya_list.list_widget
-        out = []
-        for i in range(lw.count()):
-            item = lw.item(i)
-            out.append((item.text(), item.data(Qt.UserRole) or ""))
-        return out
+        return self.picker.file_rows()
 
     def file_paths(self):
-        return [p for _n, p in self.file_rows() if p]
+        return self.picker.file_paths()
 
     def selected_file_paths(self):
-        return [item.data(Qt.UserRole) for item in self.maya_list.list_widget.selectedItems()
-                if item.data(Qt.UserRole)]
+        return self.picker.selected_file_paths()
 
     def add_files(self, paths):
-        """중복 없이 담는다(경로 기준). 같은 이름이 다른 폴더에 있으면 이름 뒤에 폴더를 붙인다."""
-        existing = {ref_scanner.norm_path(p) for p in self.file_paths()}
-        names = {n for n, _p in self.file_rows()}
-        added = 0
-        for path in paths or []:
-            if not path:
-                continue
-            path = os.path.normpath(os.path.abspath(path))
-            key = ref_scanner.norm_path(path)
-            if key in existing:
-                self._log("{0} is already in the list.".format(os.path.basename(path)))
-                continue
-            if not ref_scanner.is_maya_scene(path):
-                self._log("[WARN] Not a Maya scene, skipped : {0}".format(path))
-                continue
-            name = os.path.basename(path)
-            if name in names:
-                name = "{0}  ({1})".format(name, os.path.basename(os.path.dirname(path)))
-            item = self.maya_list._add_item(name)
-            item.setData(Qt.UserRole, path)
-            item.setToolTip(path)
-            if not os.path.isfile(path):
-                item.setForeground(QBrush(QColor(null_item_color())))
-                item.setToolTip(path + "\nFile not found")
-            existing.add(key)
-            names.add(name)
-            added += 1
-        self.maya_list._update_number()
-        if added:
-            self._log("Added {0} Maya file(s).".format(added))
-        return added
+        return self.picker.add_files(paths)
 
     def on_add_checked(self):
-        paths = self.file_tree.checked_paths()
-        if not paths:
-            self._log("Nothing is checked in the tree.")
-            return
-        self.add_files(paths)
+        self.picker.on_add_checked()
 
     def on_browse(self):
-        start = ""
-        rows = self.file_paths()
-        if rows:
-            start = os.path.dirname(rows[-1])
-        paths, _flt = QFileDialog.getOpenFileNames(self, "Select Maya Files", start, FILE_FILTER)
-        if paths:
-            self.add_files(paths)
+        self.picker.on_browse()
 
     def on_clear_files(self):
-        self.maya_list.clear()
-
-    def _on_tree_checks_changed(self, paths):
-        self.lbl_checked.setText("Checked in tree: {0}".format(len(paths)))
+        self.picker.clear()
 
     # ==================================================================
     # Get Reference
