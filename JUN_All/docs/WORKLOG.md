@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-26 (오늘)
 
+> [!summary] A00210_FileManager — **Maya > Export 하위탭 작업 계획서** (문서만, 코드 전) `#A00210_FileManager` `#plan` `#FBX`
+- 요청: 마야 파일 여러 개에서 **규칙(세트 이름, 예 `Bake`) 에 맞는 세트**를 솎아내고(최상위 · 다른 세트의 자식 모두), 파일마다 **타임라인 범위 · fps** 를 진단해 보이고, `Bake & Export` 로 세트 안 오브젝트 · 하위의 T/R/S 를 **베이크 → FBX**(아바타 최상위 본 → 언리얼), 베이크 없는 `Export Only`, 원본 이름의 **원하는 자리 글자 삽입 · 찾기/바꾸기 · 미리보기**, 진행률 팝업, 하드웨어 선택(미룰 수 있음).
+- `docs/plans/A00210_FileManager_maya_export_plan.md`: 결정 D1~D18(코드 배치 `app/maya/{core,ui}` · A00480 FBX 헬퍼를 `Framework/core/maya_fbx.py` 로 승격 · 파일 고르기 `MayaFilePicker` · mayapy 칸을 MayaTab 공용 `MayapyBar` 로 · 규칙 하나 = json 하나 `~/.jun_filemanager/export_rules/` + 폴더 변경 · 세트 매칭 exact/contains/regex + ignore namespace · `Import References & Remove Namespaces` 기본 ON(레퍼런스 편집 회피 · UE 본 이름) · `bakeResults(simulation, disableImplicitControl)` 한 호출 · FBX 선택 내보내기(IncludeChildren/InputConnections/BakeComplexAnimation off, playback = 범위) · 이름 규칙 Find/Replace → Insert(Token/Char) 기본 `anim_01 → anim_bake_01` · Existing Overwrite/Skip/backup · 보고서 json · 원본 저장 안 함), job/result json 형식, 함수 시그니처, UI 배치, 진행률(베이크 한 호출은 안이 안 보인다 · 파일 경계 취소 · 유예 1800 s), M0 실측 10 항목, 단계 M1~M7, 검증 A/B/C, 질문 Q1~Q9.
+- **하드웨어 선택(R8) 은 v2** — 조인트 베이크는 CPU 단일 스레드 DG 평가라 GPU 는 무관, 실효 수단은 mayapy 워커 N 개 병렬 + CPU 친화도(§12.1). 메모리 `wip-a00210-maya-export-tab` 신규.
+
 > [!summary] A00560_JaliBatch · A00570_JaliReview **신규 (v01.00)** + Framework/jali · mayapy 러너 승격 — **변환 결과 폴더 → JALI 클립 .mb N 개 → 레퍼런스 검수** `#A00560_JaliBatch` `#A00570_JaliReview` `#Framework` `#JALI`
 - 요청: 계획서(`docs/plans/A00560_JaliBatch_plan.md`) 질문 답 — Q1 두 툴, Q3 30fps 기본 + UI 수정 가능, 나머지 권장안 — 으로 제작.
 - **M0 실측 먼저** (mayapy 2024, 3회): `refAnimCurvesEditable` · 편집은 `relationship fcurve` 로 CLIP RN 에(`-onReferenceNode` 로 가른다) · `cmds.file(경로, saveReference=True)` · Discard 는 unload 뒤 removeEdits · 연결 편집은 아바타 RN · **미저장 편집을 들고 교체하면 시각이 24fps 기준으로 환산(10 → 12.5)되는 마야 버그** → Swap 은 편집 0 일 때만. 계획서 §11.
