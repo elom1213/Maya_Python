@@ -2,6 +2,25 @@
 
 All notable changes to this tool are documented here.
 
+## v01.11 — 2026-10-26
+
+- **Top-level tabs `Buttons` / `Rules`**: everything that existed is the `Buttons`
+  tab; the last tab you looked at is remembered (`active_tab` in `data/active.json`).
+- **Rules tab**: a rule is a named list of objects saved as ONE json file
+  (`data/rules/<name>.json` with `name` / `description` / `objects`), so sharing
+  rules between PCs is copying files. `New Rule from Selection` saves the current
+  Maya selection; `Select` (or double-click) selects those objects in any scene -
+  several highlighted rules select their union, `Add to current selection`
+  accumulates. Missing names are skipped (red in the Objects list, `[WARN]` in the
+  Log); a name that matches several nodes selects all of them with a warning
+  (orange). `Update Objects` / right-click `Add Objects` recapture the selection,
+  `Rename` renames the json file too, `Delete` removes the file(s) after one
+  confirmation, `Description` is saved when the field loses focus, `Reload` /
+  `Show Folder` / `View > Show Rules Folder` for files dropped in from outside.
+- Core: `app/core/select_rules.py` (pure json, DCC-free) and
+  `maya_select.name_status` / `select_names` (per-name `cmds.ls` so duplicate
+  short names do not make `cmds.select` fail).
+
 ## v01.10 — 2026-10-19
 
 - **View > Show Profile**: opens Explorer with the active profile's JSON file

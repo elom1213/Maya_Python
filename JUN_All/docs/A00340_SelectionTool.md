@@ -4,7 +4,7 @@
 A00240_PathTool 처럼 버튼을 자유롭게 추가·삭제·순서변경 하고, Profile 로 원하는
 종류끼리 버튼 세트를 나눠 보관한다.
 
-- **버전**: v01.10 (2026-10-19)
+- **버전**: v01.11 (2026-10-26) — 최상위 탭 **`Buttons` / `Rules`**. Rules = 규칙 하나가 json 파일 하나, 어느 씬에서든 그 이름 목록을 선택(§Rules 탭)
 - **아키텍처**: (B) Standalone/Qt 앱형 구조지만 마야 안에서 실행(PySide, `maya.cmds`).
 - **참고**: 구성/편집 흐름은 `A00240_PathTool`, 마야 연동(셸프 설치·창 parenting·리로드)은
   `A00310_SearchTool` 를 이식.
@@ -97,6 +97,53 @@ A00340_SelectionTool/data/
 
 ---
 
+## Rules 탭 (v01.11)
+
+**규칙(rule)** 은 어느 씬에서든 다시 선택할 **오브젝트 이름 목록** 하나다. `Buttons` 탭의 버튼과 하는 일은 같지만
+저장 단위가 다르다 — 버튼은 프로파일 json 하나에 여러 개가 들어가고, **규칙은 json 파일 하나 = 규칙 하나**다.
+폴더만 봐도 어떤 규칙이 있는지 보이고, 다른 PC 와는 **파일을 복사하는 것으로 공유가 끝난다.**
+
+```
+<A00340_SelectionTool>/data/rules/<rule name>.json
+{
+  "name": "rule_01",
+  "description": "left arm fk joints",
+  "objects": ["jnt_01", "jnt_02", "jnt_03"]
+}
+```
+
+| 버튼 / 동작 | 하는 일 |
+|------|------|
+| `New Rule from Selection` | 현재 마야 선택을 이름을 물어 규칙 json 으로 저장. 파일 이름은 규칙 이름을 따른다(Windows 금지 문자만 `_`) |
+| `Select` / 규칙 **더블클릭** | 고른 규칙의 오브젝트를 씬에서 선택. 여러 규칙을 Ctrl/Shift 로 고르면 **합집합**. `Add to current selection` 이면 누적 |
+| `Update Objects` · 우클릭 `Add Objects (append)` | 규칙의 오브젝트를 현재 선택으로 **교체** / 뒤에 **추가** |
+| `Rename` | 규칙 이름을 바꾼다 — json 안의 `name` 과 **파일 이름을 함께**. 같은 이름 · 같은 파일 이름이 있으면 거부 |
+| `Delete` | 고른 규칙(여러 개 가능)의 json 을 한 번 확인한 뒤 지운다. **되돌릴 수 없다**(규칙 폴더 안의 .json 만 지움) |
+| `Description` | 메모. 포커스를 잃을 때 json 에 저장(규칙 하나를 골랐을 때만 편집) |
+| `Reload` · `Show Folder` · `View > Show Rules Folder` | 밖에서 json 을 넣었으면 Reload. 탭을 다시 열 때도 폴더를 다시 읽는다 |
+
+오른쪽 `Objects` 목록은 고른 규칙의 이름을 저장 순서로 보여 주고 **지금 씬 기준**으로 색을 칠한다:
+
+| 색 | 뜻 | Select 때 |
+|----|----|----------|
+| 기본 | 씬에 하나 있다 | 선택 |
+| **빨강** | 씬에 없다 | 건너뛰고 `[WARN] n missing` 로그 |
+| **주황** | 같은 이름이 둘 이상 | **전부 선택**하고 `[WARN] 'x' matches 2 nodes` 로그 |
+
+- 오브젝트는 캡처 당시의 **짧은 이름**(`cmds.ls` 기본값)으로 저장한다 — 네임스페이스나 그룹이 달라진 씬에서도
+  이름이 같으면 맞는다. 동명이 있을 때 `cmds.select(짧은이름)` 은 "More than one object matches name" 으로
+  **실패**하므로(`objExists` 는 True 를 주는데도) 이름마다 `cmds.ls(name, long=True)` 로 펼쳐 고른다 (mayapy 실측).
+- 깨진 json 은 `[WARN] Rule 'x.json' not loaded` 로만 알리고 건드리지 않는다. `name` 이 없는 손으로 만든 json 은
+  파일 이름을 규칙 이름으로 쓴다.
+- 마지막에 보던 탭(`Buttons` / `Rules`)은 `data/active.json` 의 `active_tab` 에 남아 다음에 그 탭으로 열린다.
+- `data/` 는 git 제외(사용자 데이터). 규칙을 저장소로 나누고 싶으면 `data/rules/` 의 json 을 다른 경로에 두고
+  복사해 쓴다.
+- mayapy 실측(2026-10-26): 코어 29 항목(저장 · 금지 문자 · 파일 충돌 · 깨진 json · update · rename(대소문자만 포함) ·
+  delete 범위 · union · name_status · select_names) + 오프스크린 UI 26 항목(새 규칙 · 없는/동명 선택 + 색 · Add ·
+  Description · Update/Append · Rename · 합집합 · Delete · Reload · 메인 창 탭 기억). **실기 눈 확인 아직.**
+
+---
+
 ## 코드 구성
 
 ```
@@ -106,16 +153,18 @@ A00340_SelectionTool/
 ├── __dragDrop_A00340.py        # 셸프 설치(드롭 진입점)
 ├── icon/                       # 셸프 아이콘 (png + svg, 파란 선택 마퀴+커서)
 ├── CHANGELOG.md
-├── data/                       # 프로파일 JSON 저장소
+├── data/                       # 프로파일 JSON(profiles/) + 규칙 JSON(rules/, v01.11) 저장소 - git 제외
 └── app/
     ├── config/version.py       # VERSION / LAST_UPDATE
     ├── core/
     │   ├── prefs.py            # 프로파일/카테고리/버튼 영속화 + 창 설정(get/set_setting) (UI·DCC 비의존)
-    │   └── maya_select.py      # 선택 캡처 / 오브젝트 선택 (maya.cmds 어댑터)
+    │   ├── select_rules.py     # 규칙 json (data/rules/<name>.json) load/save/update/rename/delete (v01.11, DCC 비의존)
+    │   └── maya_select.py      # 선택 캡처 / 오브젝트 선택 + name_status / select_names (maya.cmds 어댑터)
     └── ui/
-        ├── main_window.py      # 마야 parent 창 + View/Help 메뉴 + 맨 아래 로그 + About
-        └── selection_tab.py    # 상하 스플리터(접이식 Controls 박스 + 버튼 pane) UI + 편집
-                                #   CollapsibleBox: 제목 바 하나로 컨트롤 3칸을 한 번에 접기
+        ├── main_window.py      # 마야 parent 창 + 최상위 탭 Buttons/Rules + View/Help 메뉴 + 맨 아래 로그 + About
+        ├── selection_tab.py    # Buttons 탭: 상하 스플리터(접이식 Controls 박스 + 버튼 pane) UI + 편집
+        │                       #   CollapsibleBox: 제목 바 하나로 컨트롤 3칸을 한 번에 접기
+        └── rules_tab.py        # Rules 탭: 규칙 표 + Objects 목록(없음 빨강/동명 주황) + 편집 · Select (v01.11)
 ```
 
 - `core` 는 UI 와 분리. `prefs.py` 는 마야 비의존(순수 JSON), `maya_select.py` 만

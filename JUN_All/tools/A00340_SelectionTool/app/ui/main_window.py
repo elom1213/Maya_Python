@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-19
+# last Update date : 2026-10-26
 # A00340_SelectionTool - Qt UI (in-Maya)
 #
 # 마야에서 선택된 오브젝트들을 버튼 하나로 빠르게 다시 선택하는 툴.
@@ -13,6 +13,8 @@
 #     위 칸은 처음 보일 때 Controls 내용 높이에 맞춰져 스크롤 없이 전부 보인다.
 #   - View > Show Controls (v01.07~): 접어도 남던 Controls 영역을 아예 없앤다.
 #     끄면 위 pane 과 스플리터 핸들이 사라지고 버튼 모음이 창 전체를 쓴다.
+#   - v01.11: 최상위 탭 `Buttons`(기존 전부) / `Rules`(규칙 하나 = json 하나, 어느 씬에서든
+#     그 이름 목록을 선택). 마지막에 보던 탭은 active.json 에 남긴다.
 # 창은 마야 메인 윈도우에 parent 되어 뷰포트 위에 뜬다. 모든 UI 문자열/로그는 영어.
 
 from Framework.qt.qt import (
@@ -25,6 +27,7 @@ from Framework.qt.qt import (
     QPlainTextEdit,
     QMessageBox,
     QPushButton,
+    QTabWidget,
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
@@ -35,10 +38,15 @@ from Framework.core import file_opener
 from tools.A00340_SelectionTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00340_SelectionTool.app.core import prefs as prefs_mod
 from tools.A00340_SelectionTool.app.ui.selection_tab import SelectionTab
+from tools.A00340_SelectionTool.app.ui.rules_tab import RulesTab
+from tools.A00340_SelectionTool.app.core import select_rules as rules_mod
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
 WINDOW_OBJECT_NAME = "JUN_A00340_SelectionTool_window"
+
+# active.json 에 저장하는 창 설정 키: 마지막에 보던 최상위 탭 인덱스 (v01.11).
+ACTIVE_TAB_KEY = "active_tab"
 
 
 class MainWindow(QWidget):
@@ -80,6 +88,13 @@ class MainWindow(QWidget):
             "(the file this tool reads and writes on this PC).")
         act_show_profile.triggered.connect(self.on_show_profile)
 
+        # Show Rules Folder (v01.11) : 규칙 json 들이 있는 폴더. 다른 PC 와는 이 폴더를 복사해 공유.
+        act_show_rules = view_menu.addAction("Show Rules Folder")
+        act_show_rules.setToolTip(
+            "Open Explorer at the rules folder (one json per rule).\n"
+            "Copy files from here to share rules with another PC.")
+        act_show_rules.triggered.connect(self.on_show_rules_folder)
+
         help_menu = self.menu_bar.addMenu("Help")
         act_about = help_menu.addAction("About")
         act_about.triggered.connect(self.show_about)
@@ -105,9 +120,21 @@ class MainWindow(QWidget):
             object_name="JUN_A00340_SelectionTool_log_window")
         self.log_view.setFixedHeight(90)
 
-        # 선택 버튼 탭 (컨트롤 pane + 버튼 pane 을 상하 스플리터로 분리)
+        # 최상위 탭 (v01.11) : Buttons = 기존 선택 버튼 화면 전부, Rules = 규칙 json.
+        self.tabs = QTabWidget()
         self.selection_tab = SelectionTab(log_callback=self._log)
-        main_layout.addWidget(self.selection_tab, stretch=1)
+        self.tabs.addTab(self.selection_tab, "Buttons")
+        self.rules_tab = RulesTab(log_callback=self._log)
+        self.tabs.addTab(self.rules_tab, "Rules")
+        self.tabs.setTabToolTip(0, "Buttons grouped in categories, one profile json per set.")
+        self.tabs.setTabToolTip(1, "Named object lists, one json file per rule - select them in any scene.")
+        main_layout.addWidget(self.tabs, stretch=1)
+
+        # 마지막에 보던 탭으로 연다. 바뀌면 저장.
+        last_tab = prefs_mod.get_setting(ACTIVE_TAB_KEY, 0)
+        if isinstance(last_tab, int) and 0 <= last_tab < self.tabs.count():
+            self.tabs.setCurrentIndex(last_tab)
+        self.tabs.currentChanged.connect(self._on_tab_changed)
 
         # 로그는 툴 맨 아래 고정 - Controls 를 접거나 숨겨도 늘 보인다.
         log_group = QGroupBox("Log")
@@ -132,6 +159,13 @@ class MainWindow(QWidget):
 
     def _log(self, message):
         self.log_view.appendPlainText(message)
+
+    def _on_tab_changed(self, index):
+        prefs_mod.set_setting(ACTIVE_TAB_KEY, int(index))
+
+    def on_show_rules_folder(self, *args):
+        """View > Show Rules Folder. 규칙 폴더를 탐색기로 연다 (없으면 만든다)."""
+        self.rules_tab.on_show_folder()
 
     def on_show_controls_toggled(self, checked):
         """View > Show Controls. 로그창은 창 맨 아래라 숨겨도 그대로 보인다."""
@@ -193,6 +227,15 @@ class MainWindow(QWidget):
             "  button area fills the window (remembered for next time).\n"
             "- View > Show Profile : open Explorer with the active profile's\n"
             "  JSON file selected.\n"
+            "\n"
+            "Rules tab (v01.11) : a rule is a named list of objects saved as\n"
+            "  ONE json file (data/rules/<name>.json). 'New Rule from\n"
+            "  Selection' saves the current selection; 'Select' (or double-\n"
+            "  click) selects those objects in any scene - missing names are\n"
+            "  skipped, duplicate names select every match with a warning.\n"
+            "  Rename changes the file name too; Delete removes the file.\n"
+            "  Share rules between PCs by copying the json files\n"
+            "  (View > Show Rules Folder), then press Reload.\n"
             "\n"
             "All UI text is English.\n"
             "\n"

@@ -9,6 +9,14 @@ metadata:
 
 A00340_SelectionTool v01.00 DONE (Maya-verified + pushed 2026-07-02, Dnable/dev commit 2c7d04f). 사용자 data/ 는 .gitignore 처리(A00240 선례), README 목록 등록.
 
+**v01.11 (2026-10-26) `Rules` 탭** — 최상위 탭 `Buttons`(기존 전부) / `Rules`. 규칙 = 이름 목록 하나, **json 파일 하나 =
+규칙 하나**(`data/rules/<name>.json`, `name/description/objects`) 라 다른 PC 공유는 파일 복사. 사용자가 "어느 툴에 이식할지"
+를 먼저 물었고 A00340 을 권장했다(버튼이 이미 같은 일, 저장 단위만 프로파일 json). A00310 Rules 탭은 **조건 함수**(다른 물건),
+A00440 은 씬 안 objectSet 이라 "어느 씬에서든" 을 못 채움. 코어 `select_rules.py`(DCC 비의존, A00145 connect_rules 패턴),
+UI `rules_tab.py`. 결정: 이름 ↔ 파일 이름 동행(Rename 이 파일도 바꿈, 금지 문자만 `_`), **짧은 이름 저장 + 동명은 전부 선택
+하고 경고**(`maya_select.select_names` — `objExists` 는 동명에 True 인데 `cmds.select(짧은이름)` 은 실패하므로 `cmds.ls(long=True)`
+로 펼친다). 여러 규칙 고르면 합집합. GUI 확인 아직.
+
 New in-Maya PySide tool: click a button to re-select a saved set of Maya objects.
 Buttons are freely add/remove/reorder-able and grouped into Categories; Profiles
 keep separate button sets per character/asset (JSON per profile in the tool's

@@ -32,6 +32,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-26 (오늘)
 
+> [!summary] A00340_SelectionTool — **`Rules` 탭: 규칙 하나 = json 하나, 어느 씬에서든 저장한 이름 목록을 선택** (v01.10->01.11) `#A00340_SelectionTool`
+- 요청: 씬에서 고른 `["jnt_01","jnt_02","jnt_03"]` 을 `rule_01` 로 저장하고, 어떤 씬에서든 그 규칙 + 버튼으로 그 목록만 선택. 이름 변경 · 삭제 가능, **규칙당 json 하나**로 다른 PC 와 공유가 직관적이게. 먼저 "어느 툴에 이식할지" 판단 요청 → A00340 권장(이미 버튼 = 저장한 선택 재선택, 저장 단위만 프로파일 json 이라 다름) · A00310 Rules 는 조건 함수 · A00440 은 씬 안 objectSet 이라 제외. 권장안(이름 ↔ 파일 이름 동행, 짧은 이름 저장 + 동명 경고) 그대로 진행.
+- `app/core/select_rules.py`(신규, DCC 비의존): `data/rules/<name>.json` = `{name, description, objects}`. `load_rules`(이름순, 깨진 파일은 errors) · `save_rule`(중복 제거 · 같은 파일/같은 이름 거부) · `update_rule` · `rename_rule`(json name + 파일 이름, 대소문자만 바꾸기도 OK) · `delete_rules`(규칙 폴더 안 .json 만) · `union_objects`. 파일 이름은 `prefs.sanitize_name`(금지 문자만 `_`, 대소문자 유지).
+- `maya_select.name_status / select_names`(신규): **동명 노드는 `objExists` 가 True 인데 `cmds.select(짧은이름)` 은 실패**(실측) → 이름마다 `cmds.ls(long=True)` 로 펼쳐 전부 고르고 ambiguous 로 보고, missing 은 건너뜀.
+- `app/ui/rules_tab.py`(신규): 규칙 표(Name · Objects · File, 다중 선택) | Objects 목록(없음 빨강 · 동명 주황 + 요약) / Description / `New Rule from Selection` `Update Objects` `Rename` `Delete` / `Select` + `Add to current selection` / `Reload` `Show Folder`. 우클릭 Select · Update · Add Objects(append) · Rename · Show File · Delete. 더블클릭 = Select, 여러 규칙 = 합집합. showEvent 마다 폴더 재읽기. `main_window.py`: `QTabWidget` Buttons/Rules, `active_tab` 기억, `View > Show Rules Folder`, About.
+- 실측(mayapy 2024 오프스크린, 임시 폴더): 코어 29 + UI 26 = **55 항목 통과**. **실기 눈 확인 아직.**
+- 문서 `docs/A00340_SelectionTool.md` §Rules 탭 + 코드 구성, CHANGELOG 01.11, version, 메모리 `wip-a00340-selectiontool` 갱신.
+
 > [!summary] A00145_RigConnect — **Connect 탭 `Force (replace existing connections)` 체크박스, 기본 OFF = 이미 연결된 어트리뷰트는 그대로 둔다** (v01.66->01.67) `#A00145_RigConnect`
 - 요청: Connect 탭의 `Source -> Destination` / `Destination -> Source` 로 연결할 때 이미 연결된 노드를 강제로 다시 걸지, 그대로 둘지 고르는 체크박스 하나. 기본은 **끊지 않고 방치**.
 - `app/core/connect_manager.py`: `connect_attrs(..., force=False)` — 짝마다 대상 plug 를 `incoming_plug()`(`connectionInfo -isDestination` → `-sourceFromDestination`) 로 보고, 입력이 있으면 `report["kept"]` 에 `(드라이버, 대상, 기존 입력)` 으로 적고 넘긴다. `force=True` 는 종전 `connectAttr -force`. 판정은 **대상 쪽만**(드라이버 팬아웃은 막지 않음). 같은 드라이버가 이미 걸린 짝도 kept.
