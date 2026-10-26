@@ -26,6 +26,7 @@ standalone(A00560 UI 프로세스)은 **순수 파이썬 모듈만** import 한�
 | `Framework/qt/MOD_mayapyProcess_qt_v01.py` | `run_job(parent, mayapy, job, worker, title, message, log)` — QProcess + 공용 진행률 팝업 + Cancel(플래그 파일, 작업 단위 경계에서 멈춤, 120 초 뒤 kill) |
 
 A00210 의 `app/maya/core/mayapy_runner.py` · `ui/mayapy_process.py` 는 자기 워커(`maya_worker.py`) 경로를 채워 넘기는 재노출이다.
+`run_job(..., cancel_grace_sec=)` 로 Cancel 뒤 kill 까지의 유예를 바꿀 수 있다 - A00210 Maya > Export 는 베이크 한 호출이 수 분이라 1800 초를 넘긴다 (2026-10-26).
 워커 규약: `maya.standalone.initialize` 뒤 **모든 경로에서 `uninitialize` → `os._exit(code)`**, stdout 은 `-u`.
 
 ## 쓰는 법 (A00560 워커의 클립 한 개)

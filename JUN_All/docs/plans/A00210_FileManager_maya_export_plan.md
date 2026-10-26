@@ -520,13 +520,13 @@ ReferenceTab 의 `mayapy_path()` · `_require_mayapy()` 는 콜러블을 쓰도�
 | 단계 (§9) | 상태 | 커밋 | 메모 |
 |-----------|------|------|------|
 | 계획서 | **완료** | `0de1218` | §13 답 받음 (2026-10-26) |
-| M0 실측 | 대기 | | §15 에 기록 |
-| M1 Framework `maya_fbx` | 대기 | | |
-| M2 순수 모듈 | 대기 | | |
-| M3 워커 | 대기 | | |
-| M4 UI | 대기 | | |
-| M5 문서 | 대기 | | |
-| M6 사용자 GUI 확인 | 대기 | | |
+| M0 실측 | **완료** | (문서) | §15. 루트 월드 이동은 두 단계로 확정 |
+| M1 Framework `maya_fbx` | **완료** | git log `refactor(Framework)` | mayapy 11 항목 (A00480 export_sets 동작 동일) |
+| M2 순수 모듈 | **완료** | git log `feat(A00210)` ① | test_export_core 50/50 |
+| M3 워커 | **완료** | 같은 커밋 | test_export_worker 31/31 (실제 워커 프로세스 · FBX 재임포트 · 월드 행렬 1e-6 · 취소). **함정**: `executeScriptNodes=False` 라 `playbackOptions -q` 가 이전 씬 값 → script node 문장 파싱 · FBX 익스포터는 `.fbx` 가 아닌 이름에 `.fbx` 를 덧붙인다 |
+| M4 UI | **완료** | git log `feat(A00210)` ② | test_export_ui 32/32, Export 탭 최소 폭 928 px (Reference 864) |
+| M5 문서 | **완료** | git log `docs(A00210)` | docs §4-E · 구조 · Framework_maya_fbx · README · CHANGELOG 01.41 · WORKLOG · 포트폴리오 · 메모리 |
+| M6 사용자 GUI 확인 | **사용자 — 대기** | | 실제 애니 파일 여러 개 + 언리얼 임포트 (사용자 답 Q9) |
 | M7 (v2) 병렬 · 자원 | 미착수 | | 별도 계획서 |
 
 ---
@@ -535,13 +535,14 @@ ReferenceTab 의 `mayapy_path()` · `_require_mayapy()` 는 콜러블을 쓰도�
 
 | # | 결과 | 설계에 반영 |
 |---|------|------------|
-| M0-1 | | |
-| M0-2 | | |
-| M0-3 | | |
-| M0-4 | | |
-| M0-5 | | |
-| M0-6 | | |
-| M0-7 | | |
-| M0-8 | | |
-| M0-9 | | |
-| M0-10 | | |
+| M0-1 | `cmds.fileInfo("version", q=True)` → `['2024']`(.ma · .mb 둘 다), `product` → `Maya 2024`. `cmds.file(q, version)` 플래그는 없다 | `Version` 열 = fileInfo version |
+| M0-2 | `currentUnit -q time` : 30 → `ntsc`, 24 → `film`, 60 → `ntscf`, 29.97 → `29.97fps`. `time_units.fps_of_unit` 이 전부 받는다 | 그대로 |
+| M0-3 | 레퍼런스 조인트(`CHN:root`)를 그대로 FBX 로 → 재임포트 이름 **`CHN:root`**(ascii FBX Model 이름에도 `CHN:`). 임포트 + ns 제거 뒤 → `root` | **D7 기본 ON 확정** |
+| M0-4 | 컨스트레인트 조인트 78 × 1000 프레임: simulation=True **6.8 s**, False 12.7 s(둘 다 월드 행렬 동치 1e-14) · 78 × 6000: **41.3 s**, 커브 702, 컨스트레인트 78 개 전부 끊김 | `simulation=True` 한 호출. 팝업 안내 "수 분" |
+| M0-5 | 하지 않음 (한 호출 41 s 면 청크가 필요 없다) | v2 보류 |
+| M0-6 | `FBXExportBakeComplexAnimation -q` 기본 **false**(문자열!) · IncludeChildren · InputConnections 기본 1. ascii FBX `Takes/LocalTime` = **100 ~ 500 = playback min/max**. 마야 재임포트는 playback 을 안 바꾸고 키는 범위 밖도 전부 들어온다 | D10 확정. `fbx_options._to_bool` |
+| M0-7 | 실제 애니 파일 없음 — M6 에서 사용자 파일로 | — |
+| M0-8 | 레퍼런스 안 세트 `CHN:Bake` · `CHN:Sets` 가 `ls -type objectSet` 에 나온다, 멤버 `|CHN:rig_grp|CHN:root`(long). importReference + `namespace -rm :CHN -mnr` 뒤 `Bake` / `root`. 다른 세트 안의 `Bake` 도 같다 | D6 · D8 확정 |
+| M0-9 | `collect_export_nodes(joints_only=True)` : 체인 10 조인트 유지, 메시 · 로케이터 · `sub_grp`(안의 `extra_jnt` 포함) · **컨스트레인트 3 개** 가지치기. joints_only=False 면 컨스트레인트가 kept 에 남는다 → `prune_constraints` 인자 추가 | 컨스트레인트는 늘 뺀다 |
+| M0-10 | 컨스트레인트 조인트를 베이크 없이 FBX → 재임포트 animCurve 는 `rig_grp` · `root` 것만, `spine_01` 키 없음 | Export Only `[WARN]` 문구 |
+| Q4 | 루트 월드 이동: 1 단계(루트 뺀 전부 + 월드 로케이터 베이크) → 2 단계(`parent -w` → 키 · 입력 비우기 → 로케이터에 parent/scaleConstraint → 루트 재베이크) = 월드 행렬 **1e-13 동치**(애니된 그룹 · jointOrient 30/45/10 · rotateOrder 3). 단순 unparent 는 50 cm 틀림. **키가 있는 채널엔 scaleConstraint 가 안 붙는다**(`not writable`) → 2 단계 전에 cutKey + disconnect | D9b 구현 그대로 |

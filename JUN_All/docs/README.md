@@ -29,7 +29,7 @@
 | `A00150_remapVal` | 리깅 | [A00150_remapVal](A00150_remapVal.md) |
 | `A00160_sphericalEye` | 리깅 / 페이셜 | [A00160_sphericalEye](A00160_sphericalEye.md) |
 | `A00180_abSymMesh` | 모델링 / 블렌드셰이프 | [A00180_abSymMesh](A00180_abSymMesh.md) |
-| `A00210_FileManager` | 파이프라인 / 파일·버전 기록 (standalone) · **Maya > Reference**(마야 파일들의 레퍼런스를 트리로 보고 체크한 것을 각 파일에 임포트해 제자리 저장, 마야 일은 mayapy 워커) | [A00210_FileManager](A00210_FileManager.md) |
+| `A00210_FileManager` | 파이프라인 / 파일·버전 기록 (standalone) · **Maya > Reference**(마야 파일들의 레퍼런스를 트리로 보고 체크한 것을 각 파일에 임포트해 제자리 저장, 마야 일은 mayapy 워커) · **Maya > Export**(세트 규칙 `Bake` 가 있는 파일 솎아내기 · 재생 범위 · fps · 버전 표 · `bakeResults` → FBX / FBX 만, 최상위 본은 월드로, 이름 Find/Replace + Insert, Overwrite 팝업) | [A00210_FileManager](A00210_FileManager.md) |
 | `A00260_ConstraintConverter` | 리깅 / 언리얼 | [A00260_ConstraintConverter](A00260_ConstraintConverter.md) |
 | `A00270_skinMigrate` | 리깅 / 스킨 | [A00270_skinMigrate](A00270_skinMigrate.md) |
 | `A00280_correctiveFromCache` | 페이셜·리깅 / RBF 코렉티브 | [A00280_correctiveFromCache](A00280_correctiveFromCache.md) |
@@ -70,6 +70,7 @@
 | `Framework/core/mirror_tokens.py` | 좌/우 미러 **토큰 규칙 공용화**(`Framework/rules/mirror_tokens.json`) — 이름 미러링은 **경계 매칭**으로 `arm_lower` 같은 오탐을 막는다 | [Framework_mirror_tokens](Framework_mirror_tokens.md) |
 | `Framework/core/shell_integration.py` | Windows **시작 메뉴 바로가기**(.lnk + AppUserModelID, PowerShell `Add-Type` C#) + 시작 화면 고정 시도. standalone 툴의 `File > Add to Start Menu`(A00240 · A00220). Windows 10 · 11 | [Framework_shell_integration](Framework_shell_integration.md) |
 | `Framework/jali/` + `Framework/core/mayapy_runner.py` · `Framework/qt/MOD_mayapyProcess_qt_v01.py` | **JALI 립싱크 공용 코어**(A00540 app/core 승격: lipsync_data · mapping · sequence · keyer · scene + bake · clip_stamp · clip_manifest · time_units, 매핑 json) 와 **mayapy 워커 러너**(A00210 승격, `JUNMSG` 프로토콜 · QProcess 진행률 팝업). A00540 · A00560 · A00570 · A00210 | [Framework_jali](Framework_jali.md) |
+| `Framework/core/maya_fbx.py` | **FBX 플러그인 · "선택한 것만" FBX 내보내기 헬퍼**(A00480 승격: `ensure_fbx_plugin` · 타입 필터 · `collect_export_nodes` · `fbx_options`(IncludeChildren / InputConnections / BakeComplexAnimation 한시 변경) · `export_selected`). A00480 Export · A00210 Maya > Export | [Framework_maya_fbx](Framework_maya_fbx.md) |
 | `Framework/qt/pin_style.py` | 체크형 **`Pin`(Always on Top) 버튼의 켜짐 색** — `apply_pin_style(button)` 한 줄로 켜진 동안 연한 빨강(`:checked` 색만, 크기는 테마 그대로). A00240 · A00220 · A00370 | [Framework_pin_style](Framework_pin_style.md) |
 
 ### 배치 · 패키징 (툴 하나가 아니라 전체에 걸친 것)

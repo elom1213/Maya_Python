@@ -423,9 +423,9 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 │                        │  │ [ ] Ref_fbx_01.fbx              File_03.ma          │
 └────────────────────────┘  │ [Check All] [Uncheck All]        Checked: 2 / 3     │
 Scanned: File_01.mb, File_03.ma (2)
-mayapy [C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe] [Browse...] [Detect]
 [x] Remove All Namespace  [x] Backup
 [Get Reference]                                   [Import Reference]
+mayapy [C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe] [Browse...] [Detect]      <- v01.41 부터 Maya 탭 아래에 하나 (하위탭 공용)
 ```
 
 ### 흐름
@@ -478,6 +478,87 @@ A00240 Tree 탭과 같다(공용 `Framework/qt/path_context.py`).
 
 ---
 
+## 4-E. Maya 탭 — Export (v01.41)
+
+**마야 파일 여러 개 중 규칙에 맞는 세트(예 `Bake`)가 있는 파일을 솎아내고, 파일마다 재생 범위 · fps · 저장 버전을 보인 뒤,
+세트 안 오브젝트와 그 하위의 translate · rotate · scale 을 베이크해 파일마다 FBX 하나로 내보낸다**(또는 베이크 없이 FBX 만).
+아바타의 최상위 본을 `Bake` 세트에 넣어 두고 전 본을 베이크 → 언리얼 임포트가 목적이다. 마야 일은 전부 **mayapy 워커**가 하고
+**원본 마야 파일은 저장하지 않는다**(베이크 · 레퍼런스 임포트는 메모리에서만). 계획 · 결정 · 실측은
+[`plans/A00210_FileManager_maya_export_plan.md`](plans/A00210_FileManager_maya_export_plan.md).
+
+```
+┌ Path Tree (공용 폴더 트리 + 파일 체크박스) ─────────────────────────────────────────────┐
+[Add Checked] [Browse...]  Checked in tree: 0
+┌ Maya File ───────────┐ ┌ Rule ───────────────────────────────────────────────────────────┐
+│ anim_01.mb           │ │ [Bake ▾] [New] [Edit] [Rename] [Delete] [Rules Folder...]        │
+│ anim_02.mb           │ │ set "Bake" · exact · ignore namespace  -  avatar root bone set    │
+│ anim_03.mb   [Clear] │ │ [Check Sets]                                                      │
+┌ Files ──────────────────────────────────────────────────────────────────────────────────────┐
+│ ☑ │ File       │ Set            │ Start │ End  │ FPS │ Ver  │ Output            │ Status   │
+│ ☑ │ anim_01.mb │ Bake (1 -> 78) │ 0     │ 6000 │ 30  │ 2024 │ bake_anim_01.fbx  │ ready    │
+│ ☐ │ anim_02.mb │ -              │ 2     │ 5000 │ 30  │ 2024 │ bake_anim_02.fbx  │ no set   │
+│ ☑ │ anim_03.mb │ Bake (1 -> 78) │ 0     │ 7000 │ 30  │ 2023 │ bake_anim_03.fbx  │ ready    │
+│ Range [Timeline (per file) ▾]  Custom Start [0] End [100]                                   │
+┌ Naming ─ Find [    ] Replace [    ] [x] Case  /  Insert [Token ▾] after token [0] text [bake] ┐
+│ Preview: anim_01.mb  ->  bake_anim_01.fbx                                                   │
+Export Folder [D:/out                       ] [Browse...] [Open]
+Bake [x] Translate [x] Rotate [x] Scale   [x] Joints Only   [ ] Euler Filter
+[x] Import References & Remove Namespaces
+Resources: CPU AMD Ryzen 7 7800X3D 8C/16T · RAM 31 GB · GPU NVIDIA GeForce RTX 5070
+[        Bake & Export        ]  [        Export Only        ]
+mayapy [C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe] [Browse...] [Detect]      <- Maya 탭 공용 (Reference 와 같은 칸)
+```
+
+### 흐름
+
+1. **마야 파일 담기** — Reference 하위탭과 같은 트리 · `Add Checked` · `Browse...`. 담기면 Files 표에 행이 생기고 `Output`(FBX 이름)이
+   바로 보인다. `Set · Start · End · FPS · Ver` 는 아직 `-`.
+2. **규칙 고르기** — `Rule` 콤보. 규칙 = **어떤 이름의 objectSet 을 찾을지**. **규칙 하나 = json 파일 하나**(`Rules Folder`, 기본
+   `~/.jun_filemanager/export_rules/`, 폴더를 복사하면 다른 PC 와 공유 · `Rules Folder...` 로 NAS 등 공유 폴더를 가리킬 수 있다 — 프로파일에
+   저장). `New` / `Edit` : Name · Set name · Match(`Exact` / `Contains` / `Regex`) · `Ignore namespace` · Description. `Rename` 은 json 의
+   이름과 파일 이름을 함께, `Delete` 는 확인 뒤 파일을 지운다. 비어 있으면 기본 규칙 `Bake` 가 만들어진다.
+   세트는 **최상위든 다른 세트의 자식이든** 씬의 모든 objectSet 을 잎 이름으로 맞춘다(레퍼런스 안의 `CHN:Bake` 도 `Ignore namespace` 로).
+   규칙을 바꾸면 `Set` 열이 비워진다 — 다시 Check Sets.
+3. **`Check Sets`** — 파일마다 mayapy 가 열어(저장된 레퍼런스 로드 상태 그대로, 스크립트 노드는 실행하지 않음) 세트 유무(`Bake (멤버 -> 트랜스폼
+   수)`) · 재생 범위 · fps · 저장한 마야 버전을 읽어 표를 채운다. **세트가 없는 파일은 체크가 꺼지고 `no set`** — 그대로 넘어간다. 열지 못한
+   파일은 `failed (...)`. 2023 미만 버전은 노랑. 로그에 `anim_01.mb : Bake (1 -> 78) | 0 - 6000 @ 30 fps | Maya 2024` 한 줄씩.
+4. **범위** — `Range` 콤보: `Timeline (per file)`(파일의 재생 범위 min/max, 기본) · `Animation range (per file)`(ast/aet) ·
+   `Custom (all files)`(두 스핀 값을 전부에). 그 뒤 `Start` · `End` 셀을 손으로 고칠 수 있다.
+5. **이름** — `Naming`: ① `Find` / `Replace`(평문, 전부, `Case`) → ② `Insert` — `Token` 모드는 `_` 로 나눈 토큰 사이에 새 토큰으로
+   (`after token 0` = 맨 앞, `k` = k 번째 토큰 뒤, `-1` = 끝), `Char` 모드는 글자 자리(A00330 Insert 와 같은 규칙: 0 앞 · n 앞 n 글자 뒤 · −1 끝).
+   기본 `Token · 0 · bake` → `anim_01` → **`bake_anim_01.fbx`**. 글자는 바꿀 수 있다. `Output` 열이 라이브 미리보기 — 두 파일의 결과가
+   같으면 두 행이 빨강 + `name collision`, 금지 문자면 `invalid name`(둘 다 실행이 막힌다).
+6. **`Export Folder`** — 비어 있으면 **원본 옆**. `Open` 으로 탐색기.
+7. **옵션** — `Bake` 채널(Translate · Rotate · Scale, 기본 전부) · `Joints Only`(기본 ON: joint 아래의 메시 · 로케이터 · 그룹과 그 아래를
+   베이크 · FBX 에서 뺀다. 컨스트레인트 노드는 늘 뺀다) · `Euler Filter`(베이크한 회전 커브에 `filterCurve`) ·
+   `Import References & Remove Namespaces`(기본 ON — 아래 "알아 둘 것").
+8. **`Bake & Export`** / **`Export Only`** — Check Sets 를 안 한 체크 파일이 있으면 먼저 하라고 막는다. **이미 있는 출력 FBX 가 있으면 경고
+   팝업**(목록, `Overwrite` / `Cancel`). 확인 팝업(파일 · 범위 · 출력 이름 · 폴더 · 옵션) 뒤 mayapy 가 파일마다:
+   열기 → (레퍼런스 임포트 · 네임스페이스 제거) → 세트 찾기 → 멤버 + 자손 수집 → 재생 범위 = Start/End → **`bakeResults` 한 호출**
+   (translate/rotate/scale, `simulation`, 매 프레임) → **최상위 본이 그룹의 자식이면 마야 최상위로 뺀다**(월드 궤적 그대로, 아래) →
+   FBX 선택 내보내기. `Export Only` 는 베이크만 건너뛴다(파일 안 키가 그대로 나간다 — 컨스트레인트로만 움직이는 본은 애니가 없다,
+   `[WARN]`). 진행률 팝업은 파일 단위 + 파일 안 단계(open · import · bake · export). **베이크는 한 호출이라 그 안의 진행은 안 보이고 경과
+   시간만 간다**(78 본 × 6000 프레임 ≈ 41 초, mayapy 2024 실측 — 실제 리그는 더 걸릴 수 있다). Cancel 은 **지금 파일을 끝내고** 멈춘다
+   (30 분 안에 안 끝나면 프로세스를 끊는다). 끝나면 표 `Status` 에 `exported` / `skipped` / `failed (사유)`, 로그 요약, 보고서
+   `<Export Folder>/_bake_export_report_<시각>.json`(파일 · 세트 · 범위 · 노드 수 · 단계별 초 · 상태).
+
+### 알아 둘 것
+
+- **원본 마야 파일은 저장하지 않는다.** 베이크 · 임포트 · 루트 이동은 mayapy 메모리 안에서 끝나고 다음 파일을 열면 사라진다.
+- **`Import References & Remove Namespaces` 기본 ON 인 이유**(실측): ① 레퍼런스 노드를 그대로 내보내면 FBX 본 이름에 네임스페이스가
+  남는다(`CHN:root` → 언리얼 스켈레톤 매칭 실패) ② 레퍼런스 노드에 6000 프레임을 베이크하면 레퍼런스 **편집**이 수만 개 생긴다.
+  언로드 레퍼런스는 손대지 않는다(노드가 없다).
+- **최상위 본을 월드로** (사용자 결정): 세트에서 모은 루트가 어떤 그룹의 자식이면 두 단계로 뺀다 — 월드 로케이터를 루트에 constraint 해
+  함께 베이크 → 루트 `parent -w` → 로케이터에 constraint → 루트만 재베이크 → 임시 삭제. 그룹이 애니되어 있어도 루트의 **월드 궤적이
+  그대로** FBX 에 담긴다(실측 1e-13, 단순 unparent 는 틀린다). `Export Only` 는 `parent -w` 만 하고, 그 부모가 애니 · 연결돼 있으면 `[WARN]`.
+- `Joints Only` 는 joint 밑 **그룹 안의 joint 도 그룹과 함께 뺀다**(계층을 재배치하지 않는다, A00480 과 같은 규칙). 그런 리그면 끈다.
+- FBX 의 타임스팬(언리얼 "Exported Time")은 Start/End 다. 키는 매 프레임(`preserveOutsideKeys` 끔).
+- `Resources` 줄은 읽기 전용이다. 조인트 베이크는 CPU 단일 스레드 DG 평가라 GPU 는 쓰이지 않는다 — 자원 선택 · mayapy 병렬은 다음 버전.
+- 검증: 순수 파이썬 50 · mayapy 워커 31(실제 워커 프로세스 · FBX 재임포트 · 월드 행렬 동치 · 취소) · 오프스크린 UI 32 항목.
+  **실제 애니 파일 · 언리얼 임포트는 사용자 확인 예정.**
+
+---
+
 ## 5. 구조 (개발자용)
 
 ```
@@ -487,6 +568,7 @@ A00210_FileManager/
 ├── build_exe.bat
 ├── requirements.txt
 ├── CHANGELOG.md
+├── tests/               # test_export_core (python) · test_export_worker (mayapy, 실제 워커) · test_export_ui (오프스크린)
 └── app/
     ├── config/version.py    # VERSION, LAST_UPDATE
     ├── config/data_repo.py  # 번들 데이터 리포 기본값(URL/branch/기본 clone 경로) — 배포에 포함
@@ -504,18 +586,30 @@ A00210_FileManager/
     │   ├── region_capture.py# 화면 영역 캡쳐 오버레이
     │   ├── path_structure_tab.py # Path Structure 탭
     │   └── lineage_tab.py   # Lineage 탭 (QGraphicsView 캔버스 + 노드/엣지 아이템)
-    └── maya/                # Maya 탭 (v01.35) - 이 폴더가 통째로 분리 단위 (밖은 Framework · prefs 만 본다)
+    └── maya/                # Maya 탭 (v01.35, Export v01.41) - 이 폴더가 통째로 분리 단위 (밖은 Framework · prefs 만 본다)
         ├── core/            # Qt 없음. maya.cmds 를 쓰는 모듈은 mayapy 워커 안에서 돈다
         │   ├── ma_parser.py     # .ma 머리글의 file -r / -rdi 문장 파싱 (여러 줄)
         │   ├── ref_scanner.py   # 마야 파일들 -> 레퍼런스 트리 (.ma 파싱 / .mb 는 열어서, 중첩 재귀, 순환 가드, needs_maya)
-        │   ├── ref_importer.py  # 파일마다 백업 -> 열기 -> 체크된 레퍼런스(+중첩) 임포트 -> 네임스페이스 -> 저장
+        │   ├── ref_importer.py  # 파일마다 백업 -> 열기 -> 체크된 레퍼런스(+중첩) 임포트 -> 네임스페이스 -> 저장 · import_loaded_references (Export 가 씀)
         │   ├── backup.py        # backup/<이름>_REF_NN (A00220 과 같은 폴더)
+        │   ├── set_rules.py     # (Export) 세트 규칙 json - 규칙 하나 = 파일 하나, exact/contains/regex, ignore namespace, 매칭 (순수 파이썬)
+        │   ├── export_naming.py # (Export) 출력 이름 - Find/Replace -> Insert(Token/Char) -> .fbx, 미리보기 · 충돌 · 금지 문자 (순수 파이썬)
+        │   ├── export_jobs.py   # (Export) UI 설정 -> probe / export job dict · 검사 (순수 파이썬)
+        │   ├── set_match.py     # (Export) 씬에서 규칙에 맞는 세트 · 멤버 펼치기 · 자손 수집(Framework.core.maya_fbx) · 루트
+        │   ├── scene_probe.py   # (Export) 파일 열어 버전 · fps · 재생 범위(sceneConfigurationScriptNode 파싱) · 세트
+        │   ├── bake_export.py   # (Export) 열기 -> 레퍼런스 임포트 · ns 제거 -> bakeResults -> 루트 월드 이동 -> FBX (원본 저장 안 함)
+        │   ├── hw_info.py       # (Export) Resources 한 줄 (PowerShell Get-CimInstance, 읽기 전용)
         │   ├── mayapy_runner.py # (v01.40 재노출) 본체는 Framework/core/mayapy_runner.py - mayapy 찾기 · job.json · 명령줄 · JUNMSG 프로토콜 파싱
-        │   └── maya_worker.py   # mayapy 가 실행하는 워커 (scan / import) - launch.spec datas 로 exe 에도 실린다
+        │   └── maya_worker.py   # mayapy 가 실행하는 워커 (scan / import / probe / export) - launch.spec datas 로 exe 에도 실린다 (Framework/core · jali 함께)
         └── ui/
-            ├── maya_tab.py      # 하위탭 컨테이너 (다음 하위탭은 여기에 addTab)
-            ├── reference_tab.py # Reference 하위탭 (흐름 · mayapy 칸 · 확인 팝업)
+            ├── maya_tab.py      # 하위탭 컨테이너 + MayapyBar 하나 (다음 하위탭은 여기에 addTab)
+            ├── mayapy_bar.py    # mayapy 칸 (Browse / Detect, prefs mayapy_path) - 하위탭 공용 (v01.41)
+            ├── maya_file_picker.py # 폴더 트리 + Add Checked / Browse + Maya File TSL - 하위탭 공용 (v01.41)
+            ├── reference_tab.py # Reference 하위탭 (흐름 · 확인 팝업)
             ├── reference_tree.py# Reference 트리 (Reference | Used by, 체크, 중첩 접힘)
+            ├── export_tab.py    # Export 하위탭 (규칙 · Check Sets · 표 · Range · Naming · 옵션 · Bake & Export / Export Only · Overwrite 팝업)
+            ├── export_table.py  # Files 표 (☑ File Set Start End FPS Ver Output Status)
+            ├── set_rule_dialog.py # 규칙 New / Edit 대화상자
             └── mayapy_process.py# (v01.40 재노출) 본체는 Framework/qt/MOD_mayapyProcess_qt_v01.py - QProcess 로 워커를 띄우고 진행률 팝업 · 로그에 잇는다 (Cancel = 플래그 파일)
 ```
 

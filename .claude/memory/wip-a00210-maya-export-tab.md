@@ -1,21 +1,26 @@
 ---
 name: wip-a00210-maya-export-tab
-description: A00210 FileManager Maya > Export 하위탭 (계획만, 2026-10-26) - 마야 파일 N 개에서 세트 규칙(Bake) 솎아내기 · 타임라인/fps 진단 · bakeResults -> FBX (UE) · Export Only · 이름 삽입/치환 미리보기 · mayapy 워커 probe/export. 하드웨어 선택은 v2(병렬 워커)
+description: A00210 FileManager v01.41 Maya > Export 하위탭 (2026-10-26 구현 완료, 사용자 실기 · UE 확인 대기) - 세트 규칙(json 하나) 솎아내기 · 재생 범위/fps/버전 · bakeResults 한 호출 → FBX · 최상위 본 월드 이동 두 단계 · 레퍼런스 임포트 + ns 제거 기본 ON · Overwrite 팝업 · mayapy 워커 probe/export · 하드웨어 선택은 v2
 metadata:
   type: project
 ---
 
-**A00210_FileManager Maya 탭 > `Export` 하위탭 — 계획서만 작성 (2026-10-26, 코드 전).**
-계획서 `docs/plans/A00210_FileManager_maya_export_plan.md` (§2 결정 D1~D18 · §3 json 형식 · §5 함수 · §6 UI · §8 M0 · §13 질문 Q1~Q9 · §14 진행표).
+**A00210_FileManager v01.41 (2026-10-26) — Maya 탭 > `Export` 하위탭 구현 완료.** 계획서 `docs/plans/A00210_FileManager_maya_export_plan.md`
+(§2 D1~D18 · §13 사용자 답 · §14 진행표 · §15 M0 실측), 사용 안내 `docs/A00210_FileManager.md` §4-E.
 
-- 요청: 마야 파일 여러 개 → **규칙(세트 이름 `Bake`, 최상위든 다른 세트 안이든)** 이 있는 파일만 골라, 파일마다 **타임라인 min/max · fps · 버전** 표 →
-  `Bake & Export`(세트 멤버 + 자손 T/R/S `bakeResults` → FBX, 아바타 루트 본 → UE, 30fps 6000 프레임급) / `Export Only` / 이름 **자리 삽입 + 찾기/바꾸기 + 미리보기**
-  (`anim_01` → `anim_bake_01`) / 진행률 팝업 / 하드웨어 선택(미뤄도 됨 → **v2**).
-- 권장 결정: 코드는 `app/maya/{core,ui}`(Reference 와 같은 분리 단위) · A00480 FBX 헬퍼 **`Framework/core/maya_fbx.py` 승격**(툴 간 import 금지) · 파일 고르기 `MayaFilePicker` · mayapy 칸은 MayaTab 공용 `MayapyBar` ·
-  규칙 하나 = json 하나(`~/.jun_filemanager/export_rules/`, 폴더 변경 가능, A00340 select_rules 태도) · `Import References & Remove Namespaces` 기본 ON(레퍼런스 노드 베이크 = 편집 수만 개 · UE 본 이름 `CHN:`) ·
-  `bakeResults(simulation=True, disableImplicitControl=True)` **한 호출**(안의 진행률은 못 보임 → 경과 시간 · 파일 경계 취소 · `cancel_grace_sec=1800`) · FBX 는 선택 내보내기 + `playbackOptions` = 범위 · **원본 마야 파일은 저장하지 않는다**.
-- **하드웨어(R8)**: 조인트 베이크는 CPU 단일 스레드 DG 평가 → GPU 선택은 무의미. 실효 = mayapy 워커 N 개 병렬 + CPU 친화도(공용 러너 `run_jobs` 확장, 별도 계획서).
-- 다음: 사용자 Q1~Q9 답 → **M0 실측**(FBX 네임스페이스 · bakeResults 6000 프레임 시간 · fileInfo version · FBX 타임스팬) → M1~M6.
+- 흐름: 파일 담기(공용 `MayaFilePicker`) → 규칙(`set_rules`, json 하나 = 규칙 하나, `~/.jun_filemanager/export_rules/` 또는 지정 폴더) →
+  `Check Sets`(워커 `probe`: 세트 유무 · playback · fps · fileInfo version) → Range · Naming(Find/Replace → Insert Token/Char, 기본 `bake` 첫 토큰) →
+  `Bake & Export` / `Export Only`(워커 `export`). **원본 마야 파일은 저장하지 않는다.**
+- 사용자 결정: 레퍼런스 임포트 + ns 제거 **기본 ON**(FBX 가 `CHN:root` 를 남긴다, 실측) · Joints Only ON · **최상위 본이 그룹의 자식이면 마야 최상위로**
+  (두 단계: 월드 로케이터 constraint + 베이크 → `parent -w` → 키 · 입력 비우고 로케이터에 constraint → 루트 재베이크; 1e-13 동치, 단순 unparent 는 틀림) ·
+  기존 FBX 는 경고 팝업 **Overwrite / Cancel**(Existing 콤보 없음) · 하드웨어 선택은 **v2**(mayapy 병렬 + 친화도, GPU 는 무관).
+- 함정(실측): `executeScriptNodes=False` 로 열면 `playbackOptions -q` 가 **이전 씬 값(단위 환산)** → `sceneConfigurationScriptNode.before` 문장 파싱 ·
+  FBX 익스포터는 `.fbx` 아닌 이름에 `.fbx` 를 덧붙인다(임시는 `<stem>__part.fbx`) · `FBXExportBakeComplexAnimation -q` 는 문자열 'false' ·
+  키 있는 채널엔 scaleConstraint 가 안 붙는다 · `bakeResults(simulation=True)` 가 False 보다 빠르다(78 × 6000 = 41 s).
+- 공용화: `Framework/core/maya_fbx.py`(A00480 재노출) · `MayapyBar` 는 Maya 탭 아래 하나 · 워커는 Framework 를 import(spec datas) · `mayapy_process.run_job(cancel_grace_sec=1800)`.
+- 검증: tests/test_export_core 50 · test_export_worker 31(실제 워커 프로세스) · test_export_ui 32(오프스크린). **실제 애니 파일 · UE 임포트는 사용자 확인 대기(Q9).**
+- 같은 날 다른 세션이 A00560_JaliBatch 를 고치고 있었다 — A00560 경로는 손대지 않았고 커밋에도 넣지 않았다.
 
-**Why:** 요청이 길고 결정이 많아 계획서를 먼저 받기로 했다(사용자: "작업 계획서만 보고도 기능을 바로 만들 수 있을 정도").
-**How to apply:** 구현 세션은 계획서 §14 진행표와 `git log` 로 이어 간다. 관련: [[wip-a00210-maya-reference-tab]] · [[fbx-export-selected-scope]] · [[mayapy-headless-verify]] · [[wip-a00560-jalibatch]] · [[release-layout-launch-py]]
+**Why:** 아바타 루트 본을 세트에 넣고 전 본을 베이크해 언리얼로 보내는 일괄 작업. 사용자가 계획서 → 답 → 구현 순서를 택했다.
+**How to apply:** 레이아웃 · 동작을 바꿀 땐 계획서 §2 결정표 ID 로 말하고 §14 를 갱신. 관련: [[wip-a00210-maya-reference-tab]] · [[fbx-export-selected-scope]] ·
+[[mayapy-headless-verify]] · [[wip-a00560-jalibatch]] · [[release-layout-launch-py]]

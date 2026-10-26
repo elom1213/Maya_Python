@@ -160,7 +160,7 @@ A narrative work summary lives in
 - **`A00250_SceneMemo`** — 오브젝트별 메모를 씬에 저장.
 
 ### 독립 실행(Standalone) / in-Maya PySide 앱
-- **`A00210_FileManager`** — 파일/버전 매니저(파일 참조관계 **Lineage 그래프 시각화**, Remote Git ↔ Local/NAS Source Mode, 폴더 구조 캡처·재생성). · **`A00211_RefLineage`** — 씬 reference → Lineage 내보내기.
+- **`A00210_FileManager`** — 파일/버전 매니저(파일 참조관계 **Lineage 그래프 시각화**, Remote Git ↔ Local/NAS Source Mode, 폴더 구조 캡처·재생성, **Maya > Reference**(레퍼런스 일괄 임포트) · **Maya > Export**(세트 규칙으로 솎아 **베이크 → FBX**, mayapy 워커)). · **`A00211_RefLineage`** — 씬 reference → Lineage 내보내기.
 - **`A00220_BackupTool`** — 지정 파일 **주기적/저장 시점 자동 백업**(크래시 대비). · **`A00240_PathTool`** — 자주 쓰는 폴더를 버튼/프로파일로 빠르게 열기 + **경로 트리**(이름·경로 필터, Shift 로 한꺼번에 펼치기, 경로 복사).
 - **`A00370_ToolLauncher`** — 툴 폴더 경로를 버튼에 담아 JUN 툴을 즉시 실행(PC가 바뀌어도 경로 자동 재매핑).
 - **`A00230_StartupTool`** — Windows 로그인 시 폴더 팝업 + standalone 툴 자동 실행.
@@ -181,6 +181,7 @@ A narrative work summary lives in
 
 | 시기 | 내용 |
 |------|------|
+| 2026-10 하순 | **`A00210_FileManager` Maya > Export 하위탭** — 마야 파일 N 개에서 세트 규칙(`Bake`, json 하나 = 규칙 하나)에 맞는 파일을 솎아 재생 범위 · fps · 버전을 보이고 `bakeResults` → **FBX**(최상위 본은 월드로, 레퍼런스 임포트 · 네임스페이스 제거, 이름 Find/Replace + Insert, Overwrite 팝업) / FBX 만 · **`Framework/core/maya_fbx`** 승격(A00480 재노출) |
 | 2026-10 하순 | **`A00560_JaliBatch` · `A00570_JaliReview` 신규** — 변환 결과 폴더 → JALI 클립 `.mb` N 개(mayapy 워커) → 레퍼런스 검수(Swap · Save Clip Edits · ARKIT_OUT 연결), **`Framework/jali`** · mayapy 러너 승격(A00540 v01.03 · A00210 v01.40 재노출) |
 | 2026-10 하순 | **`A00370_ToolLauncher` Shrink + 로켓 발사 애니메이션**(줄였을 때 272 x 155, `A00220` · `A00240` 도 같은 모양으로) · **`A00210_FileManager` Shrink · Pin + 폴더 · 기록 카드 애니메이션** · **`A00240` · `A00220` · `A00210`** `File > Add to Start Menu` + Pinned 동안 Pin 버튼 연한 빨강 · **`A00240`** Path 버튼 드래그 정렬 + 창 자유 크기 · **`A00360`** Sort By > Selection · **`A00540`** 클립 여러 개를 순서대로 한 씬에 · **`A00145`** Connect by Rule 겹치는 이름 보호 + `JALI 22 Viseme` 규칙 |
 | 2026-10 중순 | **`A00550_PoseMapper` 신규** — 음소 → ARKit 블렌드셰이프 포즈를 슬라이더로 다듬고 json 으로 저장 · 다른 노드 쌍에 연결, `blendWeighted` weight 편집 탭 |
