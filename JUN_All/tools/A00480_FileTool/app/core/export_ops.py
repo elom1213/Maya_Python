@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-17
+# last Update date : 2026-10-26
 # A00480_FileTool - Export 탭 로직 (maya.cmds)
 #
-# A00040_file_exporter_V02(v02.09) export_ops 를 옮겼다. **동작은 같다.** 바뀐 것:
+# 2026-10-26 : 타입 필터 레지스트리 · 계층 펼치기(collect_export_nodes) · FBXExport* 옵션 한시 변경(fbx_options) · 고유 경로 ·
+#   short_name 을 **`Framework.core.maya_fbx` 로 올렸다** (A00210_FileManager Maya > Export 하위탭이 같은 코드를 쓴다 -
+#   릴리즈본은 툴 간 import 금지). 이 모듈은 그 이름들을 재노출하고, 세트 단위 내보내기(export_sets · _export_fbx)만 갖는다.
+#   **동작은 같다** (collect_export_nodes 의 새 인자 prune_constraints 는 기본 False = 옛 동작).
+#
+# A00040_file_exporter_V02(v02.09) export_ops 를 옮겼다. 바뀐 것:
 #   - 자체 undo_chunk 복제를 지웠다 → UI 가 공용 Framework.core.maya_undo.undo_chunk 를 쓴다.
-#   - FBX 플러그인 로드를 공용 fbx_plugin.ensure_fbx_plugin 으로. 플러그인이 없으면
-#     export_sets 가 트레이스백 대신 [FAIL] 로그를 돌려준다.
+#   - FBX 플러그인 로드를 공용 ensure_fbx_plugin 으로. 플러그인이 없으면 export_sets 가 트레이스백 대신 [FAIL] 로그를 돌려준다.
 #
 # --- 원본 헤더 ---
 # 레거시 A00040_file_exporter/utility.py 의 내보내기 로직을 순수 함수로 이식하고,
@@ -16,9 +20,13 @@
 #   FBXExportIncludeChildren 을 꺼서 처리한다 → 씬 계층은 export 전후로 동일하다.
 # UI 는 이 함수들만 호출한다(thin UI). Maya 밖에서도 import 가능하도록 cmds 는 lazy.
 
-import os
-
-from .fbx_plugin import ensure_fbx_plugin
+from Framework.core.maya_fbx import (  # noqa: F401 - 재노출 (UI · 다른 모듈이 export_ops.X 로 부른다)
+    ensure_fbx_plugin,
+    FILTER_TYPES, _TYPE_MATCHERS, member_matches_type, filter_members,
+    short_name, is_type as _is_type, is_joint as _is_joint, JOINT_TYPE,
+    collect_export_nodes, get_unique_filepath,
+    fbx_options, _FBX_OPTIONS,
+)
 
 
 def _cmds():
@@ -28,129 +36,6 @@ def _cmds():
         return cmds
     except Exception:
         return None
-
-
-def _mel():
-    """maya.mel 을 lazy import. Maya 밖이면 None 반환."""
-    try:
-        import maya.mel as mel
-        return mel
-    except Exception:
-        return None
-
-
-# ================================================================
-# 타입 필터 레지스트리
-# ================================================================
-#
-# 내보낼 때 "포함/제외"를 개별 토글할 수 있는 타입 목록.
-# - 여기에 등록된 타입만 UI 드롭다운에 체크박스로 노출된다.
-# - 등록되지 않은 타입(curve, nurbsSurface 등)은 항상 포함(내보냄)된다.
-# - 필터는 오직 "제외"만 한다: 체크 해제된 타입에 해당하는 멤버만 빠지고 나머지는 그대로.
-#
-# 새 타입을 추가하려면:
-#   1) FILTER_TYPES 에 {"key", "label"} 항목 추가
-#   2) _TYPE_MATCHERS 에 같은 key 로 판별 함수 추가
-# 두 곳만 손대면 UI·로직 모두 자동 반영된다.
-
-FILTER_TYPES = [
-    {"key": "mesh",  "label": "Mesh"},
-    {"key": "joint", "label": "Joint"},
-]
-
-
-def _shapes_of(node):
-    """node(트랜스폼) 아래의 (intermediate 제외) shape 목록. 없으면 빈 리스트."""
-    cmds = _cmds()
-    if cmds is None:
-        return []
-    return cmds.listRelatives(
-        node, shapes=True, fullPath=True, noIntermediate=True) or []
-
-
-def _is_type(node, node_type):
-    """node 자체가 node_type 이거나, 그 shape 중 하나가 node_type 이면 True.
-
-    (mesh/nurbsCurve 등은 트랜스폼 아래 shape 로 존재하고, joint 는 노드 자체가 타입이다.)
-    """
-    cmds = _cmds()
-    if cmds is None:
-        return False
-    try:
-        if cmds.objectType(node) == node_type:
-            return True
-    except Exception:
-        return False
-    for shape in _shapes_of(node):
-        if cmds.objectType(shape) == node_type:
-            return True
-    return False
-
-
-# key -> 멤버 판별 함수. 새 타입 추가 시 여기에 항목을 더한다.
-_TYPE_MATCHERS = {
-    "mesh":  lambda node: _is_type(node, "mesh"),
-    "joint": lambda node: _is_type(node, "joint"),
-}
-
-
-def member_matches_type(node, key):
-    """멤버 node 가 필터 타입 key 에 해당하는지."""
-    matcher = _TYPE_MATCHERS.get(key)
-    return bool(matcher and matcher(node))
-
-
-def filter_members(members, excluded_keys):
-    """excluded_keys(체크 해제된 필터 타입)에 해당하는 멤버를 제외한다.
-
-    반환: (kept, dropped) — 내보낼 멤버 목록, 제외된 멤버 목록.
-    excluded_keys 가 비면 전부 유지한다.
-    """
-    if not excluded_keys:
-        return list(members), []
-    kept, dropped = [], []
-    excluded = set(excluded_keys)
-    for member in members:
-        if any(member_matches_type(member, key) for key in excluded):
-            dropped.append(member)
-        else:
-            kept.append(member)
-    return kept, dropped
-
-
-# ================================================================
-# 파일명 조립 (Naming)
-# ================================================================
-
-def short_name(name):
-    """DAG 경로/네임스페이스를 제거하고 leaf 이름만 반환. 'a|b:c' -> 'c'."""
-    return name.split("|")[-1].split(":")[-1]
-
-
-# 세트마다 파일명을 짓는 토큰 규칙은 naming_ops.build_file_names (v01.06, 공용 토큰 규칙).
-
-
-# ================================================================
-# 경로 헬퍼
-# ================================================================
-
-def get_unique_filepath(filepath):
-    """이미 존재하면 _000, _001 ... 을 붙여 겹치지 않는 경로를 반환."""
-    filepath = filepath.replace("\\", "/")
-    if not os.path.exists(filepath):
-        return filepath
-
-    directory = os.path.dirname(filepath)
-    filename = os.path.basename(filepath)
-    name, ext = os.path.splitext(filename)
-
-    index = 1
-    while True:
-        new_path = os.path.join(directory, "{0}_{1:03d}{2}".format(name, index, ext))
-        new_path = new_path.replace("\\", "/")
-        if not os.path.exists(new_path):
-            return new_path
-        index += 1
 
 
 # ================================================================
@@ -185,126 +70,6 @@ def _safe_parent_to_world(node_path):
         return False
 
 
-JOINT_TYPE = "joint"
-
-
-def _is_joint(node):
-    """node 가 joint 타입인지. (joint 는 shape 이 아니라 노드 자체가 타입이다.)"""
-    cmds = _cmds()
-    try:
-        return cmds.objectType(node) == JOINT_TYPE
-    except Exception:
-        return False
-
-
-def collect_export_nodes(root, excluded_keys, joints_only=True):
-    """root 계층을 펼쳐 FBX 에 담을 노드와 뺄 노드를 가른다. **씬은 건드리지 않는다.**
-
-    - joints_only=True : joint 아래(자손)에 있는 non-joint 노드를 통째로(그 자손까지) 뺀다.
-      조인트를 뽑을 때 그 밑에 매달린 메시 · 로케이터 · 컨스트레인트 노드 · 그룹이 FBX 에
-      섞이지 않게 한다. joint 밑의 그룹 안에 다시 joint 가 있어도, 그 그룹이 빠지면 부모를
-      잃으므로 하위 joint 까지 함께 뺀다(계층을 임의로 재배치하지 않는다).
-    - excluded_keys : 타입 필터에서 체크 해제된 타입도 같은 방식으로 뺀다(자손 포함).
-    - root(세트 멤버) 자신은 여기서 거르지 않는다 — filter_members 가 이미 걸렀다.
-
-    반환: (kept, pruned) — 둘 다 fullPath 리스트.
-    """
-    cmds = _cmds()
-    if cmds is None:
-        return [root], []
-
-    kept, pruned = [], []
-    stack = [(root, False)]  # (fullPath, 조상 중에 joint 가 있는가)
-    while stack:
-        node, under_joint = stack.pop()
-
-        if node != root:
-            if excluded_keys and any(member_matches_type(node, key)
-                                     for key in excluded_keys):
-                pruned.append(node)
-                continue
-            if joints_only and under_joint and not _is_joint(node):
-                pruned.append(node)
-                continue
-
-        kept.append(node)
-
-        try:
-            children = cmds.listRelatives(
-                node, children=True, fullPath=True, type="transform") or []
-        except Exception:
-            children = []
-        child_under_joint = under_joint or _is_joint(node)
-        for child in children:
-            stack.append((child, child_under_joint))
-
-    return kept, pruned
-
-
-# ================================================================
-# FBX 익스포터 옵션 (MEL FBXExport*)
-# ================================================================
-#
-# cmds.file(typ="FBX export") 는 FBX 플러그인의 현재 옵션을 그대로 따른다.
-# 아래 옵션을 잠깐 바꿨다가 export 후 원래 값으로 되돌린다.
-#   FBXExportIncludeChildren  : False 면 "선택한 노드만" 내보낸다(자손 자동 포함 안 함).
-#                               → 선택 목록으로 FBX 내용을 정확히 통제할 수 있고, 씬 계층을
-#                                 전혀 건드리지 않아도 된다. 선택 안 한 조상(부모 그룹)은
-#                                 계층 유지용으로 그대로 따라 나온다.
-#   FBXExportInputConnections : False 면 선택 노드에 입력으로 연결된 노드(컨스트레인트
-#                               드라이버 등)를 딸려 보내지 않는다. joint 만 뽑을 때 컨트롤러
-#                               로케이터가 FBX 루트에 섞여 들어오는 것을 막는다.
-
-_FBX_OPTIONS = {
-    "include_children": "FBXExportIncludeChildren",
-    "input_connections": "FBXExportInputConnections",
-}
-
-
-class fbx_options(object):
-    """with fbx_options(include_children=False): ... 로 FBX 옵션을 한시적으로 바꾼다.
-
-    None 인 항목은 손대지 않는다. 플러그인이 없거나 명령이 실패하면 조용히 넘어간다
-    (그 경우 기존 동작 그대로 export 된다).
-    """
-
-    def __init__(self, include_children=None, input_connections=None):
-        self._wanted = {
-            "include_children": include_children,
-            "input_connections": input_connections,
-        }
-        self._previous = {}
-
-    def _eval(self, command):
-        mel = _mel()
-        if mel is None:
-            return None
-        try:
-            return mel.eval(command)
-        except Exception:
-            return None
-
-    def __enter__(self):
-        ensure_fbx_plugin()
-        for key, value in self._wanted.items():
-            if value is None:
-                continue
-            command = _FBX_OPTIONS[key]
-            current = self._eval("{0} -q".format(command))
-            if current is None:
-                continue
-            self._previous[key] = bool(current)
-            self._eval("{0} -v {1}".format(command, "true" if value else "false"))
-        return self
-
-    def __exit__(self, *args):
-        for key, value in self._previous.items():
-            self._eval("{0} -v {1}".format(
-                _FBX_OPTIONS[key], "true" if value else "false"))
-        self._previous = {}
-        return False
-
-
 def _export_fbx(members, filepath, excluded_keys, keep_hierarchy=False,
                 joints_only=True):
     """members 를 FBX 로 내보낸다.
@@ -327,7 +92,6 @@ def _export_fbx(members, filepath, excluded_keys, keep_hierarchy=False,
     cmds = _cmds()
 
     # 1) 멤버 원부모를 UUID 로 기록 (월드 최상위면 None) 후 (기본 모드면) 월드로 빼내기.
-    #    빼내기에 성공한 멤버만 moved 에 담아, 복원 대상을 그것으로 한정한다.
     member_infos = []  # [(member_uuid, parent_uuid|None), ...]
     for member in members:
         parents = cmds.listRelatives(member, parent=True, fullPath=True) or []
@@ -353,11 +117,8 @@ def _export_fbx(members, filepath, excluded_keys, keep_hierarchy=False,
         pruned.extend(dropped)
 
     # 3) 선택 후 export selected.
-    #    - 뺄 게 있으면 펼친 목록을 그대로 선택하고 IncludeChildren 을 끈다.
-    #    - 뺄 게 없으면 기존과 동일하게 멤버만 선택하고 옵션도 건드리지 않는다.
     has_joint = any(_is_joint(node) for node in export_nodes)
     include_children = False if pruned else None
-    # joint 를 내보낼 때는 컨스트레인트 드라이버 등 입력 연결 노드가 딸려오지 않게 한다.
     input_connections = False if (joints_only and has_joint) else None
 
     cmds.select(export_nodes if pruned else member_paths)
@@ -366,7 +127,7 @@ def _export_fbx(members, filepath, excluded_keys, keep_hierarchy=False,
         cmds.file(filepath, force=True, options="v=0;",
                   typ="FBX export", pr=True, es=True)
 
-    # 4) 복원: 월드로 빼낸 멤버를 원부모로. (필터/joints_only 는 씬을 건드리지 않았다.)
+    # 4) 복원: 월드로 빼낸 멤버를 원부모로.
     for member_uuid, parent_uuid in member_infos:
         if parent_uuid is None or member_uuid not in moved_members:
             continue
@@ -397,7 +158,6 @@ def export_sets(set_names, file_names, excluded_keys, export_path,
     if not export_path:
         return ["[FAIL] Check export path."]
 
-    # FBX 플러그인이 없으면 cmds.file(typ="FBX export") 가 트레이스백으로 죽는다 → 미리 알린다.
     plugin_ok, plugin_logs = ensure_fbx_plugin()
     if not plugin_ok:
         return plugin_logs + ["[FAIL] Cannot export FBX without the plugin."]
@@ -436,7 +196,6 @@ def export_sets(set_names, file_names, excluded_keys, export_path,
         logs.append("[OK] {0}  ->  {1}".format(set_name, mainpath))
         logs.append("     exported {0} member(s): {1}".format(
             len(kept), ", ".join(short_name(k) for k in kept)))
-        # 필터/joints_only 로 빠진 것: 세트에 직접 든 멤버(dropped) + 하위 노드(excluded_desc)
         excluded_all = [short_name(d) for d in dropped] + excluded_desc
         if excluded_all:
             logs.append("     excluded {0} object(s): {1}".format(

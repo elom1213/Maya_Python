@@ -1,6 +1,6 @@
 # A00210_FileManager — Maya > **Export** 하위탭 작업 계획서 (세트 규칙 솎아내기 · 범위 진단 · Bake & Export FBX)
 
-> **작성** 2026-10-26 · 상태: **계획 — 구현 전** (§13 질문의 답이 없으면 권장안으로 진행) · 대상 Maya **2023 이상** 파일, 실행은 이 PC 의 mayapy(2024)
+> **작성** 2026-10-26 · **갱신** 2026-10-26 (Q1~Q9 답 반영 — §13 · D9 · D12 · D13 · D14) · 상태: **구현 중** (§14 진행표) · 대상 Maya **2023 이상** 파일, 실행은 이 PC 의 mayapy(2024)
 > 선례: [`A00210_FileManager_maya_reference_plan.md`](A00210_FileManager_maya_reference_plan.md) (Maya 탭 · mayapy 워커 · 코드 배치) ·
 > [`A00560_JaliBatch_plan.md`](A00560_JaliBatch_plan.md) (표 + 워커 배치 처리 · Skip/Overwrite/backup) ·
 > A00480_FileTool Export 탭 (`export_ops` FBX 선택 내보내기 · 메모리 `fbx-export-selected-scope`) · A00330 Quick Rename > Insert (`insert_ops` 자리 규칙) ·
@@ -67,12 +67,13 @@
 | **D6** | 규칙 내용 | `set_name` + `match`(`exact` 기본 / `contains` / `regex`) + `ignore_namespace`(기본 true). 세트의 **부모 세트는 보지 않는다** — 씬의 모든 `objectSet` 을 잎 이름으로 맞춘다 | "최상위에도, 임의 세트의 자식으로도" 를 한 번에 덮는다(세트는 DG 노드라 `ls -type objectSet` 에 다 나온다) |
 | **D7** | 네임스페이스 · 레퍼런스 | 옵션 **`Import References & Remove Namespaces`** 기본 ON. export 작업에서 **베이크 전에** 로드된 최상위 레퍼런스를 전부 `importReference`(올라온 중첩까지) → `remove_all_namespaces`. 언로드 레퍼런스는 그대로(노드가 없다) | ① 레퍼런스 노드에 6000 프레임 베이크 = 레퍼런스 **편집** 수만 개(느림 · 메모리) ② 언리얼 본 이름에 `CHN:` 이 남지 않게 (M0-3 실측) |
 | **D8** | 세트 찾기 시점 | `probe` 는 **열자마자**(임포트 전) `ls -type objectSet` 로 찾는다(`ignore_namespace` 로 `CHN:Bake` 도 `Bake`). `export` 는 D7 뒤에 다시 찾는다(이름이 바뀌었으므로) | probe 는 빨라야 한다. export 는 정확해야 한다 |
-| **D9** | 베이크 대상 · 방법 | 대상 = 매칭 세트들의 멤버(트랜스폼 · 조인트, 컴포넌트는 그 오브젝트, 하위 세트는 펼침) + **모든 자손 트랜스폼**. `Joints Only` 기본 ON = joint 아래 non-joint 가지치기(`collect_export_nodes`). 채널 = T · R · S 체크(기본 전부). `cmds.bakeResults(nodes, time=(s,e), attribute=[...], simulation=True, sampleBy=1, disableImplicitControl=True, preserveOutsideKeys=False, minimizeRotation=True, sparseAnimCurveBake=False)` **한 번 호출**. `Euler Filter` 옵션(기본 OFF) → `filterCurve` | 사용자 의도(전 본 베이크 → UE). `simulation=True` 가 컨스트레인트 · HIK · IK 리그에서 안전. 한 번 호출 = 가장 빠르다(M0-4 가 시간을 잰다) |
+| **D9** | 베이크 대상 · 방법 | 대상 = 매칭 세트들의 멤버(트랜스폼 · 조인트, 컴포넌트는 그 오브젝트, 하위 세트는 펼침) + **모든 자손 트랜스폼**. `Joints Only` 기본 ON = joint 아래 non-joint 가지치기(`collect_export_nodes`). 컨스트레인트 노드는 늘 뺀다. 채널 = T · R · S 체크(기본 전부). `cmds.bakeResults(nodes, time=(s,e), attribute=[...], simulation=True, sampleBy=1, disableImplicitControl=True, preserveOutsideKeys=False, minimizeRotation=True, sparseAnimCurveBake=False)` **한 번 호출**(+ 루트 재베이크 1 회, D9b). `Euler Filter` 옵션(기본 OFF) → `filterCurve` | 사용자 의도(전 본 베이크 → UE). `simulation=True` 가 컨스트레인트 · HIK · IK 리그에서 안전. 한 번 호출 = 가장 빠르다(M0-4 가 시간을 잰다) |
+| **D9b** | **최상위 본을 월드로** (사용자 답 Q4, 2026-10-26) | 세트에서 모은 **루트**(조상이 대상에 없는 노드)가 어떤 그룹의 자식이면 **마야 최상위 계층으로 뺀다**. Bake & Export 는 **두 단계**: ① 월드 로케이터 `TMP_<root>_world` 를 루트에 parent+scaleConstraint → 대상 전부 + 로케이터 베이크 ② 루트 `parent -w` → 로케이터에 constraint → 루트만 다시 베이크 → 임시 노드 삭제. Export Only 는 `parent -w` 만(현재 프레임 월드 유지) + 부모 체인에 애니 · 연결이 있으면 `[WARN]` | 그룹이 애니되어 있어도 루트의 **월드 궤적이 그대로** FBX 에 담긴다(M0 실측 · 단순 unparent 는 틀린다). 저장하지 않으니 복원 불필요 |
 | **D10** | FBX 내보내기 | 베이크한 노드를 **명시 선택** + `FBXExportIncludeChildren false`(가지친 게 있을 때) + `FBXExportInputConnections false` + `FBXExportBakeComplexAnimation false` + `playbackOptions min/max` = 범위(FBX 타임스팬 = UE "Exported Time"). 그 밖 FBX 옵션은 플러그인 현재값 | A00480 과 같은 "씬 안 건드리는" 방식. 원본 파일은 **저장하지 않는다**(베이크 · 임포트는 메모리에서만) |
 | **D11** | 범위 | 표 `Start` · `End` 는 probe 가 채운 **타임라인(min/max)**, 셀 편집 가능. `Range` 콤보: `Timeline (per file)` 기본 / `Animation range (per file)`(ast/aet) / `Custom (all files)` 두 스핀 | 요청 그대로(타임라인). 손으로 고칠 길을 남긴다 |
-| **D12** | 이름 규칙 | 순서: ① Find/Replace(평문, 전부, Case 토글) → ② Insert — `Token` 모드(기본, `_` 로 나눈 토큰 사이, `after token k`, `-1` = 끝) / `Char` 모드(A00330 Position 규칙) → `.fbx`. 기본값 Token · k=1 · text `bake` → `anim_01` → `anim_bake_01`. 결과 이름이 겹치면 두 행 빨강 + 실행 막음 | 요청 예시를 기본값 한 번에 재현. Prefix/Suffix 는 k=0 / −1 로 덮인다 |
-| **D13** | 출력 폴더 · 기존 파일 | `Export Folder` 한 칸(prefs `export_fbx_dir`, 비면 **원본 옆**). `Existing`: `Overwrite`(기본) / `Skip existing` / `Overwrite with backup`(`backup/<name>_NN.fbx`, `backup.py` 재사용) | UE 로 보내는 FBX 는 보통 덮어쓴다. 백업은 선택지로 |
-| **D14** | 두 버튼 | `Bake & Export` / `Export Only` — 같은 `export` 작업, `bake` 플래그만 다르다. Export Only 는 파일 안 키가 그대로 나간다(컨스트레인트로만 움직이는 조인트는 애니가 없다 — 툴팁에 적는다) | R7 |
+| **D12** | 이름 규칙 | 순서: ① Find/Replace(평문, 전부, Case 토글) → ② Insert — `Token` 모드(기본, `_` 로 나눈 토큰 사이, `after token k`, `-1` = 끝) / `Char` 모드(A00330 Position 규칙) → `.fbx`. 기본값 **Token · k=0(맨 앞) · text `bake`** → `anim_01` → `bake_anim_01` (사용자 답 Q6: bake 토큰은 첫 토큰, 글자는 사용자가 바꾼다). 결과 이름이 겹치면 두 행 빨강 + 실행 막음 | Prefix/Suffix 는 k=0 / −1 로 덮인다 |
+| **D13** | 출력 폴더 · 기존 파일 | `Export Folder` 한 칸(prefs `export_fbx_dir`, 비면 **원본 옆**). 실행 전에 **이미 있는 출력 파일을 미리 진단**해 있으면 **경고 팝업**(목록 + `Overwrite` / `Cancel` 두 버튼, 사용자 답 Q5). Overwrite 면 전부 덮어쓴다. Existing 콤보 · 백업은 없다 | 사용자 결정. 보이는 확인 한 번으로 충분 |
+| **D14** | 두 버튼 | `Bake & Export` / `Export Only` — 같은 `export` 작업, `bake` 플래그만 다르다. `Import References & Remove Namespaces` 는 둘 다 적용(Q7). Export Only 는 파일 안 키가 그대로 나간다(컨스트레인트로만 움직이는 조인트는 애니가 없다 — 툴팁 · `[WARN]`), 루트는 `parent -w` 만(D9b) | R7 |
 | **D15** | 진행률 · 취소 | 팝업 1 개, 전체 = 파일 수. 파일 안 비중 open 0.10 · import 0.15 · bake 0.60 · export 0.15. **`bakeResults` 는 한 호출이라 그 안의 진행은 못 보인다** → 메시지 `anim_01.mb : baking 6001 frames x 78 nodes...` + 팝업의 경과 시간. Cancel 은 **파일 경계**에서(워커 플래그) | 공용 러너 그대로. 베이크 안 취소는 M0-5 (청크 베이크) 결과가 좋을 때만 v2 |
 | **D16** | 결과 기록 | 워커 result json 을 UI 로그에 요약 + `<Export Folder>/_bake_export_report_<YYYYMMDD_HHMMSS>.json` 에 그대로 저장(파일 · 세트 · 범위 · 노드 수 · 소요 초 · 상태 · 에러) | 6000 프레임 × N 파일은 오래 돈다 — 끝난 뒤 무엇이 됐는지 남아야 한다 |
 | **D17** | 버전 2023+ | probe 가 `fileInfo -q version`(저장한 마야) 을 읽어 `Version` 열에. **2023 미만은 노랑 경고, 막지 않는다**. mayapy 버전보다 새 파일도 경고(`ignoreVersion` 으로 열린다) | 요청은 "2023 이상 파일" 가정 — 가정 밖 파일을 알려 주는 선에서 |
@@ -135,7 +136,6 @@ result:
  "joints_only": true,
  "euler_filter": false,
  "import_references": true,
- "existing": "overwrite",
  "report": "D:/out/_bake_export_report_20261026_153000.json",
  "items": [
    {"file": "C:/.../anim_01.mb", "start": 0, "end": 6000, "out_fbx": "D:/out/anim_bake_01.fbx"},
@@ -157,7 +157,7 @@ result:
  "exported": 1, "skipped": 0, "failed": 1, "cancelled": false}
 ```
 
-`status` ∈ `exported` / `skipped`(세트 없음 · existing=skip 에 파일 있음) / `failed`. 실패한 파일은 **다음 파일로 계속**(A00560 Q7 과 같다).
+`status` ∈ `exported` / `skipped`(세트 없음) / `failed`. 실패한 파일은 **다음 파일로 계속**(A00560 Q7 과 같다).
 
 ### 3.4 prefs 프로파일 키 (`app/core/prefs.py` `DEFAULTS` 에 추가)
 
@@ -166,8 +166,7 @@ result:
 | `export_rules_dir` | `""` → `~/.jun_filemanager/export_rules` | 규칙 폴더 |
 | `export_rule` | `"Bake"` | 마지막에 고른 규칙 이름 |
 | `export_fbx_dir` | `""` | Export Folder (비면 원본 옆) |
-| `export_existing` | `"overwrite"` | `overwrite` / `skip` / `backup` |
-| `export_naming` | `{"find": "", "replace": "", "case": true, "mode": "token", "position": 1, "text": "bake"}` | 이름 규칙 |
+| `export_naming` | `{"find": "", "replace": "", "case": true, "mode": "token", "position": 0, "text": "bake"}` | 이름 규칙 (Q6: 첫 토큰) |
 | `export_range_mode` | `"timeline"` | `timeline` / `anim` / `custom` |
 | `export_custom_range` | `[0, 100]` | Custom 범위 |
 | `export_bake_channels` | `["translate", "rotate", "scale"]` | |
@@ -274,22 +273,24 @@ def probe(files, rule, log, progress, should_cancel) -> dict    # 파일마다, 
 CHANNEL_ATTRS = {"translate": ("tx","ty","tz"), "rotate": ("rx","ry","rz"), "scale": ("sx","sy","sz")}
 
 def export_one(item, job, log, step) -> dict          # §3.3 results 한 항목. 예외는 잡아 status failed
-    # 0. existing 정책: skip 이면 파일 있을 때 바로 skipped. backup 이면 backup.backup_file(out_fbx) (확장자 .fbx 그대로)
+    # 0. (기존 파일 덮어쓰기는 UI 가 실행 전에 팝업으로 확인했다 - D13)
     # 1. open      step(0.00) ref_scanner.open_scene(file); maya_fbx.ensure_fbx_plugin()
     # 2. import    step(0.10) job["import_references"] 면: 로드된 최상위 레퍼런스 노드 큐 -> importReference (올라온 중첩도) -> ref_importer.remove_all_namespaces()
     #              (ref_importer.import_into_file 의 4~6 단계와 같은 코드 - 함수로 뽑아 재사용: ref_importer.import_loaded_references(log) 신설)
     # 3. sets      step(0.25) set_match.find_sets(rule)  -> 없으면 status skipped, error "set not found"
-    # 4. targets   collect_targets(sets, joints_only) -> kept (베이크 · 내보낼 노드), pruned
+    # 4. targets   collect_targets(sets, joints_only) -> kept (베이크 · 내보낼 노드), pruned ; roots = kept 중 조상이 kept 에 없는 것
     #              kept 가 비면 failed "nothing to export"
+    # 4b. roots    D9b: 부모가 있는 루트마다 - bake 면 TMP_<root>_world 로케이터 + parent/scaleConstraint(root -> loc) 를 만들어 6 의 베이크 목록에 넣고,
+    #              베이크 뒤 root 를 parent -w → loc 에 constraint → root 만 재베이크 → 임시 삭제. Export Only 면 parent -w 만 (+ 부모 체인 애니 [WARN])
     # 5. range     cmds.playbackOptions(min=start, max=end, ast=start, aet=end)    # FBX 타임스팬 (D10)
     # 6. bake      step(0.25) job["bake"] 면:
     #                 attrs = [a for ch in channels for a in CHANNEL_ATTRS[ch]]
-    #                 cmds.bakeResults(kept, time=(start, end), attribute=attrs, simulation=True, sampleBy=1,
+    #                 cmds.bakeResults(kept_without_roots + tmp_locs, time=(start, end), attribute=attrs, simulation=True, sampleBy=1,
     #                                  disableImplicitControl=True, preserveOutsideKeys=False, minimizeRotation=True,
     #                                  sparseAnimCurveBake=False, removeBakedAttributeFromLayer=False, bakeOnOverrideLayer=False,
     #                                  controlPoints=False, shape=False)
     #                 euler_filter 면 cmds.filterCurve(kept 의 rx/ry/rz 커브)
-    #              아니면 (Export Only) 건너뛴다
+    #              아니면 (Export Only) 건너뛴다. 그 뒤 4b 의 루트 이동.
     # 7. export    step(0.85) cmds.select(kept)
     #                 with maya_fbx.fbx_options(include_children=False if pruned else None, input_connections=False,
     #                                           bake_complex_animation=False):     # fbx_options 에 이 키 추가 (D10)
@@ -341,16 +342,16 @@ elif kind == "export":
 │ └───────────────────────────┘                                                                       │
 │ ┌ Files ─────────────────────────────────────────────────────────────────────────────────────────┐ │
 │ │ ☑ │ File        │ Set            │ Start │ End  │ FPS │ Ver  │ Output             │ Status      │ │
-│ │ ☑ │ anim_01.mb  │ Bake (1 → 78)  │ 0     │ 6000 │ 30  │ 2024 │ anim_bake_01.fbx   │ ready       │ │
-│ │ ☐ │ anim_02.mb  │ -              │ 2     │ 5000 │ 30  │ 2024 │ anim_bake_02.fbx   │ no set      │ │
-│ │ ☑ │ anim_03.mb  │ Bake (1 → 78)  │ 0     │ 7000 │ 30  │ 2023 │ anim_bake_03.fbx   │ ready       │ │
+│ │ ☑ │ anim_01.mb  │ Bake (1 → 78)  │ 0     │ 6000 │ 30  │ 2024 │ bake_anim_01.fbx   │ ready       │ │
+│ │ ☐ │ anim_02.mb  │ -              │ 2     │ 5000 │ 30  │ 2024 │ bake_anim_02.fbx   │ no set      │ │
+│ │ ☑ │ anim_03.mb  │ Bake (1 → 78)  │ 0     │ 7000 │ 30  │ 2023 │ bake_anim_03.fbx   │ ready       │ │
 │ └────────────────────────────────────────────────────────────────────────────────────────────────┘ │
 │ Range [Timeline (per file) ▾]  Custom Start [0   ] End [100 ]                                       │
 │ ┌ Naming ───────────────────────────────────────────────────────────────────────────────────────┐  │
-│ │ Find [        ] Replace [        ] [x] Case     Insert [Token ▾] after token [1 ] text [bake ] │  │
-│ │ Preview: anim_01.mb  ->  anim_bake_01.fbx                                                      │  │
+│ │ Find [        ] Replace [        ] [x] Case     Insert [Token ▾] after token [0 ] text [bake ] │  │
+│ │ Preview: anim_01.mb  ->  bake_anim_01.fbx                                                      │  │
 │ └───────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│ Export Folder [D:/out                                   ] [Browse...] [Open]  Existing [Overwrite ▾] │
+│ Export Folder [D:/out                                   ] [Browse...] [Open]                        │
 │ Bake [x] Translate [x] Rotate [x] Scale   [x] Joints Only   [ ] Euler Filter   [x] Import References & Remove Namespaces │
 │ Resources: CPU AMD Ryzen 9 3900X 12C/24T · RAM 64 GB · GPU NVIDIA RTX A2000          (v1 읽기 전용) │
 │ [        Bake & Export        ]  [        Export Only        ]                                       │
@@ -364,13 +365,13 @@ elif kind == "export":
 2. 규칙을 고른다. `New` / `Edit` 는 §6.3 대화상자. 규칙을 바꾸면 표의 `Set` 열이 `-` 로 돌아간다(다시 Check Sets).
 3. **`Check Sets`** → `probe` 작업(mayapy, 진행률 팝업). 끝나면 행마다 Set · 범위 · fps · 버전 채움. 세트 없는 행 = 체크 해제 · Status `no set`. 범위 콤보가 `Timeline` 이면 playback, `Animation range` 면 ast/aet 로 Start/End 셀을 채운다(이후 셀 편집 가능). 로그 `[OK] Check Sets : 3 file(s), 2 with set "Bake", 1 without.`
 4. 이름 · 폴더 · 옵션을 고친다. `Output` 열은 Naming 칸이 바뀔 때마다 갱신. 충돌 행은 빨강 + Status `name collision`, 금지 문자는 `invalid name`.
-5. **`Bake & Export`** / **`Export Only`** → 확인 팝업(파일 n 개 · 범위 · 출력 폴더 · Existing · 옵션 요약) → `export` 작업. 체크된 행 중 Status 가 `ready` 인 것만. probe 를 안 했으면(Set 열 `-`) **먼저 Check Sets 를 하라고 막는다** — 범위를 모르면 베이크할 수 없다.
+5. **`Bake & Export`** / **`Export Only`** → 이미 있는 출력 파일이 있으면 **경고 팝업(목록, `Overwrite` / `Cancel`)** → 확인 팝업(파일 n 개 · 범위 · 출력 폴더 · 옵션 요약) → `export` 작업. 체크된 행 중 Status 가 `ready` 인 것만. probe 를 안 했으면(Set 열 `-`) **먼저 Check Sets 를 하라고 막는다** — 범위를 모르면 베이크할 수 없다.
 6. 끝나면 행 Status `exported` / `skipped` / `failed (사유)`, 로그 요약, 보고서 json 경로 로그. `Open` 으로 출력 폴더.
 
 ### 6.2 `export_table.py` — `ExportTable(QTableWidget)`
 
 - 열 `("", "File", "Set", "Start", "End", "FPS", "Ver", "Output", "Status")`. 편집 가능 = ☑ · Start · End 만(`QTableWidgetItem` 플래그). File 은 `UserRole` 에 절대 경로, 툴팁 경로, 더블클릭 = Reveal(`path_context`).
-- API: `set_files(paths)`(기존 행 유지 · 새 행 추가 · 빠진 행 제거) · `apply_probe(result)` · `set_output_names(rows)` · `checked_rows()` → `[{"file","start","end","out_fbx","status"}]` · `set_status(file, text, color)` · `fill_range(mode, custom)`.
+- API: `set_files(paths)`(기존 행 유지 · 새 행 추가 · 빠진 행 제거) · `apply_probe(result)` · `set_output_names(rows)` · `checked_rows()` → `[{"file","start","end","out_fbx","status"}]` · `set_status(file, text, color)` · `fill_range(mode, custom)`. 실행 전 `existing_outputs()` 로 이미 있는 출력 파일 목록(D13 팝업).
 - 색: 세트 없음 · 충돌 · 실패 = `null_item_color()`(빨강 계열), Version < 2023 = `[WARN]` 노랑(`Framework.core.log_levels` 색), exported = `[OK]` 초록.
 - 열 폭: File · Output 은 Stretch, 숫자 열은 ResizeToContents.
 
@@ -445,7 +446,7 @@ ReferenceTab 의 `mayapy_path()` · `_require_mayapy()` 는 콜러블을 쓰도�
 ## 10. 검증 목록
 
 ### A. 순수 파이썬 (Maya 없이, `python -I`)
-- `export_naming`: `anim_01` + token(1,`bake`) → `anim_bake_01` · char(4,`_bake`) 동일 · token(0) 앞 · token(-1) 끝 · 토큰 수보다 큰 k 는 끝(clamped 노트) · 토큰 없는 이름(`anim`) · find/replace 전부 치환 · Case 토글 · 빈 text 는 그대로 · 금지 문자 → invalid · 두 파일이 같은 결과 → collision · out_dir 비면 원본 폴더 · 확장자 `.ma`/`.mb` 둘 다 `.fbx`.
+- `export_naming`: `anim_01` + token(0,`bake`) → `bake_anim_01` · token(1) → `anim_bake_01` · char(4,`_bake`) 동일 · token(0) 앞 · token(-1) 끝 · 토큰 수보다 큰 k 는 끝(clamped 노트) · 토큰 없는 이름(`anim`) · find/replace 전부 치환 · Case 토글 · 빈 text 는 그대로 · 금지 문자 → invalid · 두 파일이 같은 결과 → collision · out_dir 비면 원본 폴더 · 확장자 `.ma`/`.mb` 둘 다 `.fbx`.
 - `set_rules`: 기본 폴더 생성 + `Bake` 기본 규칙 · save/load 왕복 · rename 이 파일 이름도 · delete 는 폴더 밖 경로 거부 · 깨진 json 은 errors · regex 틀리면 ValueError · 이름 금지 문자 sanitize.
 - `export_jobs`: start > end 거부 · channels 비면 거부 · report 경로 형식.
 
@@ -455,14 +456,14 @@ ReferenceTab 의 `mayapy_path()` · `_require_mayapy()` 는 콜러블을 쓰도�
 3. `export` 베이크: 컨스트레인트 체인 → 베이크 뒤 월드 행렬 50 프레임 샘플 == 베이크 전(1e-4) · FBX 재임포트 조인트 수 == kept · 키 범위 == (start, end) · 노드 이름에 `:` 없음(D7 ON).
 4. `joints_only`: 조인트 아래 로케이터 · 메시가 FBX 에 없다. OFF 면 있다.
 5. `Export Only`: 키가 직접 있는 체인은 키 그대로 · 컨스트레인트 체인은 애니 없음 + `[WARN]` 로그.
-6. `existing`: skip 은 있는 파일을 두고 `skipped` · overwrite 는 mtime 갱신 · backup 은 `backup/<name>_01.fbx`.
+6. 루트가 그룹 아래(애니된 그룹)일 때 두 단계 이동 뒤 루트 · 자손 월드 행렬 == 원래(1e-4) · FBX 안 루트의 부모 없음 · Export Only 는 `parent -w` + `[WARN]`.
 7. 원본 .mb 의 mtime · 내용 해시가 **전후 동일**(저장 안 함).
 8. 세트 없는 파일은 `skipped` 로 다음 파일 계속 · 깨진 파일(없는 경로) 은 `failed` 로 계속 · 취소 플래그를 1 번째 파일 뒤에 만들면 2 번째에서 멈춤 · `cancelled: true`.
 9. 보고서 json 이 result 와 같다.
 10. 워커 종료 코드 0 · 에러 경로에서도 `uninitialize` 뒤 종료.
 
 ### C. 오프스크린 UI (PySide6, 가짜 워커)
-- 파일 담기 → 표 행 · Output 미리보기 즉시 · Naming 변경 → Output 갱신 · 충돌 두 행 빨강 + 버튼 막힘 · 규칙 New/Edit/Rename/Delete → 콤보 · prefs 저장 · Check Sets(가짜 probe 결과) → 열 채움 · 세트 없는 행 체크 해제 · Range 콤보 → Start/End 재채움 · 셀 편집 값이 job 에 들어감 · probe 전 Bake & Export 막힘 · Existing/옵션이 job 에 들어감 · mayapy 없음 안내 · Reference 탭 기존 동작(스캔 · 임포트 흐름) 변화 없음 · 창 최소 크기가 지금 A00210 창에서 늘지 않음(표는 Stretch, Naming 은 한 줄).
+- 파일 담기 → 표 행 · Output 미리보기 즉시 · Naming 변경 → Output 갱신 · 충돌 두 행 빨강 + 버튼 막힘 · 규칙 New/Edit/Rename/Delete → 콤보 · prefs 저장 · Check Sets(가짜 probe 결과) → 열 채움 · 세트 없는 행 체크 해제 · Range 콤보 → Start/End 재채움 · 셀 편집 값이 job 에 들어감 · probe 전 Bake & Export 막힘 · 기존 출력 파일 팝업(Cancel 이면 실행 안 함) · 옵션이 job 에 들어감 · mayapy 없음 안내 · Reference 탭 기존 동작(스캔 · 임포트 흐름) 변화 없음 · 창 최소 크기가 지금 A00210 창에서 늘지 않음(표는 Stretch, Naming 은 한 줄).
 
 ---
 
@@ -498,7 +499,7 @@ ReferenceTab 의 `mayapy_path()` · `_require_mayapy()` 는 콜러블을 쓰도�
 
 ---
 
-## 13. 질문 (답이 없으면 권장안으로)
+## 13. 질문 — **사용자 답 (2026-10-26)**: Q1 권장 · **Q2 기본 ON** · Q3 권장 · **Q4 기본 ON + 최상위 본이 그룹의 자식이면 마야 최상위로 뺀다(D9b)** · **Q5 미리 진단해 있으면 경고 팝업, `Cancel` / `Overwrite` 버튼(D13)** · **Q6 bake 토큰은 첫 토큰, 글자는 사용자 입력(D12)** · Q7 권장 · Q8 권장 · Q9 완성 뒤 사용자가 애니 파일 여러 개 + UE 임포트로 확인. 그리고 "다른 세션이 A00560_JaliBatch 를 고치고 있다 — 충돌 내지 말 것" → A00560 경로는 손대지 않고 커밋에도 넣지 않는다.
 
 | # | 질문 | 권장 |
 |---|------|------|
@@ -518,7 +519,7 @@ ReferenceTab 의 `mayapy_path()` · `_require_mayapy()` 는 콜러블을 쓰도�
 
 | 단계 (§9) | 상태 | 커밋 | 메모 |
 |-----------|------|------|------|
-| 계획서 | **완료** | 이 문서 | §13 답 대기 |
+| 계획서 | **완료** | `0de1218` | §13 답 받음 (2026-10-26) |
 | M0 실측 | 대기 | | §15 에 기록 |
 | M1 Framework `maya_fbx` | 대기 | | |
 | M2 순수 모듈 | 대기 | | |
