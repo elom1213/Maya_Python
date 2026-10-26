@@ -1,8 +1,8 @@
 ---
 title: A00480_FileTool 사용법
 aliases: [File Tool, FileTool, A00480]
-tags: [maya-python, tool-guide, file, fbx, export, import, path, pyside]
-updated: 2026-10-16
+tags: [maya-python, tool-guide, file, fbx, export, import, path, reference, pyside]
+updated: 2026-10-26
 ---
 
 # A00480_FileTool 사용법
@@ -16,8 +16,9 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 | **Import > CSV** (v01.10) | ARKit 페이셜 CSV(Live Link Face) → 노드 키프레임 + 오디오. **블렌드셰이프뿐 아니라 ARKit 어트리뷰트를 가진 아무 노드** | `A00200_CSV_tool` (ARKit Facial Import) 이식, 원본 보존 |
 | **Import > FBX** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` |
 | **Path** | `Copy Scene Folder` · `Open Scene Folder` | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `File` |
+| **Reference > Default** (v01.12) | 현재 씬의 레퍼런스를 **중첩(이중 · 삼중)까지 트리**로 → 고른 파일을 탐색기에서 열기 · 경로 복사 | 신규 (§5) |
 
-- **버전**: `app/config/version.py` (v01.11 — Import > CSV 에 **`Value Scale`**: CSV 값 x 배율로 키(AdvancedSkeleton 페이셜 컨트롤 = `x10`, §3-1) · v01.10 — Import 탭이 하위 탭 **CSV / FBX**, CSV = `A00200_CSV_tool` 이식(영어 UI, 아무 노드에 키, §3-1) · v01.09 — Naming 토큰 규칙에 **`Enum`**(정해진 값 중 고르기, A00330 과 같은 공용 규칙, §2-4) · v01.08 — Naming 칸을 고쳐도 저장 안 함, **`Save` 버튼**으로만 프로파일 기본이 된다(§2-4) · v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
+- **버전**: `app/config/version.py` (v01.12 — **`Reference` 탭**(하위 탭 `Default`): 씬 레퍼런스를 중첩까지 트리로, `Open in Explorer` · `Copy Path`(§5) · v01.11 — Import > CSV 에 **`Value Scale`**: CSV 값 x 배율로 키(AdvancedSkeleton 페이셜 컨트롤 = `x10`, §3-1) · v01.10 — Import 탭이 하위 탭 **CSV / FBX**, CSV = `A00200_CSV_tool` 이식(영어 UI, 아무 노드에 키, §3-1) · v01.09 — Naming 토큰 규칙에 **`Enum`**(정해진 값 중 고르기, A00330 과 같은 공용 규칙, §2-4) · v01.08 — Naming 칸을 고쳐도 저장 안 함, **`Save` 버튼**으로만 프로파일 기본이 된다(§2-4) · v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
 - **설치**: `__dragDrop_A00480.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **FileTool** → `tools.A00480_FileTool.run(True)`
 - **테마**: `slate_dark`
 - **원본 두 툴은 그대로 남아 있다.** quickTool 의 File · Import option 버튼도 지워지지 않았다.
@@ -33,7 +34,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 ```
 ┌ File Tool v01.02 ───────────────────────────── [ Pin ] ┐
 │ Help                                                    │
-│ ┌ Export ┬ Import ┬ Path ┐                              │
+│ ┌ Export ┬ Import ┬ Path ┬ Reference ┐                  │
 │ │ Export Path [.................] [Browse][Paste][Scene]│
 │ │ Set Up      [Set's Name]   [File name]                │
 │ │ Naming      Profile [Default▾][Save][New][Rename][Delete] [Add Token][Delete Token]
@@ -47,7 +48,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 └──────────────────────────────────────────────────────────┘
 ```
 
-- **로그창은 세 탭이 함께 쓴다.** 어느 탭에서 누른 결과든 같은 곳에 쌓인다.
+- **로그창은 네 탭이 함께 쓴다.** 어느 탭에서 누른 결과든 같은 곳에 쌓인다.
 - **표식은 색으로 보인다** (2026-09-22~) — `[WARN]` 노랑 · `[OK]` 초록 · `[FAIL]` 빨강 · `[SKIP]` 회색 · `[Info]` 파랑. 이 툴만의 장식이 아니라 **저장소 공용 규칙**이다 — [Framework_log_levels](Framework_log_levels.md).
 - **창 크기** — v01.01~01.05 는 원본 `A00040_file_exporter_V02` 와 같았다(slate_dark 기준 960 x 853, 폭은 Naming 6칸 줄이 정했다).
   **v01.06 부터 868 x 970**(오프스크린 측정) — Naming 이 토큰 칸이 되면서 Numbering 칸(4줄)만큼 높아지고, 고정 6칸이 없어져 좁아졌다.
@@ -68,7 +69,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 ## 2. Export 탭
 
 **원본 `A00040_file_exporter_V02` v02.09 와 동작이 같다** — 같은 씬 · 같은 옵션이면 같은 FBX 가 나온다
-(§6 검증). 사용법 전체는 원본 문서를 그대로 따른다:
+(§7 검증). 사용법 전체는 원본 문서를 그대로 따른다:
 
 - 흐름 → [A00040 §5](A00040_file_exporter_V02.md#5-사용-흐름). **Naming 만은 v01.06 부터 원본과 다르다** → §2-4
 - Type Filter · Joints only under joints → [A00040 §6](A00040_file_exporter_V02.md#6-내보낼-대상-고르기-type-filter--joints-only)
@@ -251,7 +252,47 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
 
 ---
 
-## 5. 구조
+## 5. Reference 탭 (v01.12)
+
+하위 탭 **`Default`** 하나다(앞으로 경로 바꾸기 등이 하위 탭으로 는다).
+
+```
+┌ Reference ─────────────────────────────────────────────────┐
+│ ┌ Default ┐                                                 │
+│ │ References : 6 (nested 2, missing 1)          [Refresh]  │
+│ │ Reference        File                          Status     │
+│ │ ▾ MID_A          D:\...\mid.ma                  Loaded     │
+│ │     MID_A:LEAF   D:\...\leaf.ma                 Loaded     │
+│ │ ▾ MID_B{1}       D:\...\mid.ma                  Loaded     │
+│ │     MID_B:LEAF   D:\...\leaf.ma                 Loaded     │
+│ │   LEAF_TOP{2}    D:\...\leaf.ma                 Unloaded   │  (회색 — 안의 중첩은 로드돼야 보인다)
+│ │   GONE{3}        D:\...\gone.ma                 Missing    │  (빨강 — 파일이 디스크에 없다)
+│ │ [ Open in Explorer ]            [ Copy Path ]             │
+└─┴───────────────────────────────────────────────────────────┘
+```
+
+- **목록** — 현재 씬의 레퍼런스 **전부**. 레퍼런스 안의 레퍼런스(중첩, 깊이 제한 없음)는 부모 행 아래 자식 행으로 들어간다(기본 전부 펼침).
+  `Reference` 열은 네임스페이스(같은 파일을 여러 번 레퍼런스하면 마야가 붙이는 `{1}` `{2}` 복사 번호를 뒤에), `File` 은 실제 경로
+  (복사 번호 뺀 것, 윈도우 모양), `Status` 는 `Loaded` / `Unloaded`(회색) / `Missing`(빨강). 툴팁에 레퍼런스 노드 이름 · 씬에 적힌 원래 경로(환경 변수 · 상대 경로면 다를 수 있다).
+  최상위 순서는 Reference Editor 와 같다.
+- **탭을 열 때마다 씬을 다시 읽는다.** 다른 씬을 열고 와도 `Refresh` 를 안 눌러도 된다(눌러도 된다). 레퍼런스가 없으면 `[Info] No references in the current scene.`
+- **`Open in Explorer`** — 고른 행들의 파일을 탐색기에서 연다. **파일마다 창 하나**, 그 파일이 선택된 채로. 더블클릭은 그 행 하나, 우클릭 메뉴 `Reveal in File Explorer (n files)` 는 고른 것 전부.
+  같은 파일을 여러 행이 가리키면(복사 번호 · 중첩) **한 번만** 연다. 파일이 없으면(`Missing`) **그 폴더**를 열고 `[WARN] File is missing - opening its folder instead`, 폴더도 없으면 경고만.
+- **`Copy Path`** — 고른 행들의 경로를 클립보드에, **한 줄에 하나**(윈도우 모양 `\`, 같은 파일은 한 번). 우클릭 `Copy file path (n files)` 도 같다. 로그 `Copied to clipboard : 2 paths`.
+- 여러 행은 Shift / Ctrl 로 고른다. 아무것도 안 고르고 누르면 `[WARN] No reference selected.`
+
+| 상황 | 결과 |
+|------|------|
+| 부모 레퍼런스가 **언로드** | 그 안의 중첩 레퍼런스는 **목록에 없다** — 마야가 로드돼야 노드를 만든다. 툴팁에 안내, 로드하고 Refresh |
+| 같은 파일을 두 번 레퍼런스 | 행 둘(`MID_A`, `MID_B{1}`), 열기 · 복사는 한 번 |
+| 파일이 디스크에 없음 | `Missing` 빨강, 열기는 폴더로 |
+| 마야 밖(maya.cmds 없음) | `[WARN] maya.cmds is not available` |
+
+> 마야 밖에서 **디스크의 파일들**이 부르는 레퍼런스를 모으고 임포트하는 것은 [`A00210_FileManager`](A00210_FileManager.md) Maya > Reference 다. 이 탭은 **열려 있는 씬**이다.
+
+---
+
+## 6. 구조
 
 ```
 A00480_FileTool/
@@ -260,6 +301,7 @@ A00480_FileTool/
 ├── __dragDrop_A00480.py        # 셸프 설치 (TOOL_LABEL = "FileTool")
 ├── icon/                       # A00480_FileTool.svg / .png (폴더 + 들어오고 나가는 화살표)
 ├── CHANGELOG.md
+├── tests/test_reference.py     # Reference 탭 시험 (mayapy 오프스크린, v01.12)
 └── app/
     ├── config/version.py       # VERSION = "01.06"
     ├── core/                   # UI 비의존 (결과는 로그 문자열 리스트)
@@ -269,13 +311,15 @@ A00480_FileTool/
     │   ├── naming_ops.py       # Naming 규칙 묶음(FILE_NAME_RULES) · 기본 토큰 · TOKEN_STORE · build_file_names (v01.06)
     │   ├── import_ops.py       # import_fbx_normal
     │   ├── csv_ops.py          # Import > CSV : ARKit CSV -> 키프레임(아무 노드) · 후보 노드 탐색 · 오디오(ffmpeg) (v01.10, A00200 이식)
-    │   └── path_ops.py         # scene_folder · open_scene_folder · normalize_pasted_path
+    │   ├── path_ops.py         # scene_folder · open_scene_folder · normalize_pasted_path
+    │   └── reference_ops.py    # Reference : scene_references(중첩 트리 순 행) · open_reference_files · clipboard_text (v01.12)
     └── ui/
         ├── main_window.py      # 메뉴 · Pin · QTabWidget · 공용 로그 · 푸터
         ├── export_tab.py       # A00040_V02 화면 + Scene 버튼 · Naming = 공용 토큰 위젯 (v01.06)
         ├── import_tab.py       # 하위 탭 CSV / FBX (FBX = SECTIONS 표, v01.10)
         ├── import_csv_page.py  # Import > CSV 화면 (v01.10)
         ├── path_tab.py         # SECTIONS 표
+        ├── reference_tab.py    # Reference 탭 = 하위 탭 Default (트리 · Open in Explorer · Copy Path · 우클릭) (v01.12)
         ├── button_section.py   # SECTIONS 표 → 두 칸 버튼 그리드 (quickTool 방식)
         ├── type_filter_button.py
         └── rules_button.py     # Rules (n/m) 드롭다운 - EXPORT_RULES 에서 항목을 만든다 (v01.03)
@@ -289,12 +333,21 @@ A00480_FileTool/
   `addTab` 한 줄 (CSV 가 본보기).
 - **섹션이 3~4개를 넘으면** 접이식으로 쌓지 말고 하위 탭으로 나눈다.
 - **새 탭** — `app/ui/<name>_tab.py` 에 `QWidget(log=...)` 를 만들고 `main_window.build_ui` 에서 `addTab`.
+- **Reference 에 새 하위 탭** — `ui/reference_tab.py` 에 페이지 `QWidget(log=...)` 를 만들고 `ReferenceTab.build_ui` 에 `addTab` 한 줄.
+  씬을 읽는 것은 `core/reference_ops.scene_references()`(행 dict 목록)를 같이 쓴다.
 - **Export 의 타입 필터 타입** — `export_ops.FILTER_TYPES` + `_TYPE_MATCHERS` 두 곳(원본과 같다).
 - **Export 규칙** — `export_rules.EXPORT_RULES` 에 한 줄 + 검사 함수(§2-2).
 
 ---
 
-## 6. 검증 (mayapy 2024 + 오프스크린 Qt)
+## 7. 검증 (mayapy 2024 + 오프스크린 Qt)
+
+**v01.12 Reference** — `tests/test_reference.py` **35항목 통과** (`mayapy tests/test_reference.py`). 합성 씬 `leaf.ma ← mid.ma ← top`
+(mid 를 두 번 = 복사 번호, leaf 를 최상위에도, 없는 파일로 바꾼 레퍼런스 하나):
+- core — 6행(중첩 2) · 최상위 순서 = Reference Editor · 자식은 부모 바로 아래 depth 1 · 경로에 복사 번호 없음(`{1}` 따로) · 네임스페이스 앞 `:` 없음 ·
+  Loaded / Missing · 요약 로그 · **부모 언로드 → 중첩 행 사라짐 + `nested_hidden`** · 열기(중복 한 번 · 없는 파일은 폴더 · 폴더도 없으면 경고 · 탐색기 실패는 경고) · 복사 문자열(한 줄 하나 · 중복 제거)
+- UI — 탭을 보이면 채움(4 최상위 + 중첩 2, 펼침) · 글자(`MID_B{1}` · 윈도우 경로 · 상태) · Missing 빨강 / Unloaded 회색 · 툴팁에 노드 · 선택 순서 · Copy Path → 클립보드 두 줄 ·
+  Open in Explorer → 파일마다 한 번 · 더블클릭 한 파일 · 빈 선택 경고 · Refresh 뒤 언로드 반영 · 우클릭 메뉴 항목 · 빈 씬 안내 · 메인 창 탭 4개 + Default · About
 
 **54항목 통과.** 창 크기는 원본과 나란히 띄워 **둘 다 960 x 853** 인 것을 확인(v01.01).
 

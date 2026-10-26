@@ -1,5 +1,17 @@
 # Changelog — A00480_FileTool
 
+## v01.12 (2026-10-26)
+- **New `Reference` tab with a `Default` sub tab.** Every reference of the current scene is listed as a
+  tree - a reference inside a reference (nested, any depth) sits under its parent. Columns `Reference`
+  (namespace, plus `{n}` when the same file is referenced more than once), `File`, `Status`
+  (`Loaded` / `Unloaded` in grey / `Missing` in red).
+  - `Open in Explorer` (also double-click and the right-click menu) opens the selected files in File
+    Explorer, one window per file with the file selected; a missing file opens its folder instead.
+  - `Copy Path` puts the selected paths on the clipboard, one per line, in Windows form.
+  - Several rows can be selected (Shift / Ctrl); the same file is opened or copied once.
+  - The list is read again every time the tab is shown, and with `Refresh`. An unloaded reference hides
+    its nested references until it is loaded (Maya does not create their nodes).
+
 ## v01.11 (2026-10-16)
 - **Import > CSV : new `Value Scale` row** - every CSV value is multiplied by it before it is keyed
   (default 1, quick buttons `x1` / `x10`). The CSV holds 0 ~ 1, while AdvancedSkeleton facial controls

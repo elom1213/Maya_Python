@@ -99,7 +99,7 @@
 - A00410 — [SecondaryMotion](wip-a00410-secondarymotion.md)(Virtual Child) · A00420 — [Wrapper](wip-a00420-wrapper.md) · A00430 — [DemBone](wip-a00430-dembone.md)
 - A00440 — [SetTool](wip-a00440-settool.md) · [Sets x Objects](wip-a00440-sets-x-objects.md) · [Find tab](wip-a00440-find-tab.md) · A00450 — [ManipulatorTool](wip-a00450-manipulatortool.md) · A00460 — [FK & IK](wip-a00460-fk-ik.md)
 - A00470 — [MaterialTool](wip-a00470-materialtool.md)(이름 규칙 진단 · Copy Material · Rename to Suggested · Select Materials/Faces 는 API 선택 · 세로 줄이는 방향 유지)
-- A00480 — [FileTool](wip-a00480-filetool.md)(Export/Import/Path, Export 규칙, Naming = 공용 토큰 위젯. Maya 탭은 A00210 으로 감)
+- A00480 — [FileTool](wip-a00480-filetool.md)(Export/Import/Path/Reference, Export 규칙, Naming = 공용 토큰 위젯, v01.12 Reference > Default = 씬 레퍼런스 중첩 트리 · 열기 · 복사 — 부모 언로드면 중첩 노드 없음 · 오프스크린 QMenu.exec_ 는 멈춘다. 디스크 스캔은 A00210)
 - A00490 — [KeyboardTool](wip-a00490-keyboardtool.md)(크롬 계열은 활성 창만 키를 받는다 → Auto)
 - A00540 — [JaliLipSync](wip-a00540-jalilipsync.md)(VisemeNet txt → JALI 리그 키, 짝 = JUN_JALI 변환기 · 원본 모델은 추론도 무작위 · 끝 0.32초 짧음 · v01.01 규칙 json `nodes` 역할표 + Target Auto/Manual, 리그마다 json 하나)
 - A00560 · A00570 — [JaliBatch · JaliReview](wip-a00560-jalibatch.md)(2026-10-26 v01.01 `Run_JaliBatch.bat` 더블클릭 · Python 3.14 OK(abi3) · **환경은 ~/.jun_jalibatch/venv — PySide6 휠 151자 경로 × 260 한도** · 코어는 Framework/jali · Swap 은 편집 0 일 때만 · 실기 눈 확인 · exe · P4 아직)

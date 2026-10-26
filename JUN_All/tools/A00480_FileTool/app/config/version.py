@@ -45,5 +45,10 @@
 # 01.11  Import > CSV 에 Value Scale - 키 값 = CSV 값 x 배율 (기본 1, 버튼 x1 / x10).
 #        CSV 는 [0, 1] 이지만 AdvancedSkeleton 페이셜 컨트롤은 [0, 10] 을 받는다 -> x10.
 
-VERSION = "01.11"
-LAST_UPDATE = "2026-10-16"
+# 01.12  Reference 탭 (하위 탭 Default) - 현재 씬의 레퍼런스를 중첩(이중 · 삼중)까지 트리로 보여 주고,
+#        고른 파일들을 탐색기에서 열거나(Open in Explorer · 더블클릭 · 우클릭) 경로를 복사한다(한 줄에 하나).
+#        상태 Loaded / Unloaded(회색, 그 안의 중첩은 로드돼야 보인다) / Missing(빨강, 폴더만 연다).
+#        탭을 열 때마다 씬을 다시 읽는다(Refresh 버튼도).
+
+VERSION = "01.12"
+LAST_UPDATE = "2026-10-26"

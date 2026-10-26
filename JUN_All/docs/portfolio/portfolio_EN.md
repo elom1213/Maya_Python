@@ -683,7 +683,8 @@ Default Distance attribute (driver signal x)
     curve has history.
 - **`A00040_file_exporter_V02`** — export automation: type filters (applied through group hierarchies), referenced-mesh handling, and a choice of flattening to scene root or preserving hierarchy.
 - **`A00480_FileTool`** — **merged file import / export / path features that lived in two tools into one tabbed window**
-  (Export / Import / Path). When moving the exporter I **checked the result against the original** rather than assuming it:
+  (Export / Import / Path / Reference). The Reference tab lists the open scene's references as a tree, **nested references
+  included**, and opens the chosen files in File Explorer or copies their paths. When moving the exporter I **checked the result against the original** rather than assuming it:
   the same scene exported with four option combinations through both tools gave **identical file lists, identical hierarchies
   when the FBX files were re-imported, and identical logs** (verified in mayapy). Pasted-path cleanup moved from the UI into
   the core so it can be tested without Maya, and a missing FBX plugin is now reported in the log instead of raising.

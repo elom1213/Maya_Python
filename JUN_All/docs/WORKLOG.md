@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-26 (오늘)
 
+> [!summary] A00480_FileTool **v01.12 — `Reference` 탭 (하위 탭 `Default`)**: 씬 레퍼런스를 **중첩(이중 · 삼중)까지 트리**로, 고른 파일 탐색기 열기 · 경로 복사 `#A00480_FileTool` `#reference`
+- 요청: "Reference 탭 + 하위 Default 탭 — 씬의 레퍼런스를 리스트업, 원하는 파일들을 탐색기에서 열고 경로 복사, 이중 · 삼중 레퍼런스도".
+- `core/reference_ops.py`: `ls(type="reference")` 는 중첩 노드까지 다 준다(`MID_A:LEAFRN`) → `referenceQuery -parent` 로 트리, 최상위 순서는 `file -q -reference`(Reference Editor 순), `withoutCopyNumber` 로 실제 경로 + `{n}` 따로, `unresolvedName` 은 툴팁. **부모가 언로드면 중첩 노드가 없다**(mayapy 실측) → `nested_hidden` 안내. 상태 Loaded / Unloaded(회색) / Missing(빨강 — `isLoaded` False 라 `isfile` 로 구분). 열기는 파일마다 탐색기(같은 파일 한 번, 없으면 폴더), 복사는 한 줄에 하나(윈도우 모양).
+- `ui/reference_tab.py`: `ReferenceTab` = QTabWidget(`Default`), 트리 3열 + `Open in Explorer` · `Copy Path` · `Refresh`, 더블클릭 = 열기, 우클릭 메뉴는 공용 `path_context` 문구 + `(n files)`, **탭을 보일 때마다 다시 읽는다**(showEvent). `build_context_menu` 를 `exec_` 와 분리(오프스크린 시험은 `exec_` 에서 영원히 멈춘다).
+- 검증: `tests/test_reference.py` mayapy 2024 오프스크린 **35/35**(합성 씬 leaf ← mid ← top, 복사 번호 · 언로드 · 없는 파일). 문서 §5 · 구조 · 검증, README, CHANGELOG. 마야 GUI 눈 확인은 아직.
+
 > [!summary] A00210_FileManager **v01.41 — Maya > Export 하위탭 완성** (세트 규칙 솎아내기 · 범위 진단 · `bakeResults` → FBX) + **Framework/core/maya_fbx** 승격 `#A00210_FileManager` `#Framework` `#FBX` `#mayapy`
 - 사용자 답(Q1~Q9): 레퍼런스 임포트 · ns 제거 기본 ON, Joints Only ON + **최상위 본이 그룹의 자식이면 마야 최상위로**, 기존 FBX 는 **경고 팝업 Overwrite / Cancel**, `bake` 는 **첫 토큰**(글자 변경 가능), 나머지 권장안. "다른 세션이 A00560 을 고치는 중 — 충돌 금지" → A00560 경로 미접촉.
 - **M0 실측**(mayapy 2024): fileInfo version `2024` · FBX 는 레퍼런스 네임스페이스를 본 이름에 **남긴다**(`CHN:root`) · 78 조인트 × 6000 프레임 `bakeResults(simulation=True)` **41 s**(False 가 더 느림) · FBX 타임스팬 = playback min/max · `BakeComplexAnimation -q` 는 문자열 · 루트 월드 이동 두 단계(로케이터 베이크 → `parent -w` → 재베이크) 1e-13 동치, 단순 unparent 는 50 cm 틀림 · 키 있는 채널엔 scaleConstraint 안 붙음.

@@ -56,3 +56,12 @@ UI 가 Check 와 규칙에 막힌 Export 뒤에 `select(replace)`. 통과면 선
 
 **Import > CSV Value Scale (v01.11, 2026-10-16, 사용자 요청)** — 키 값 = CSV 값 x 배율(`import_facial(value_scale=)`, UI 스핀 + `x1`/`x10`).
 이유: CSV 는 [0, 1], **AdvancedSkeleton 페이셜 컨트롤은 [0, 10]** 을 받는다. 기본 1 은 블렌드셰이프 weight 용으로 유지.
+
+**Reference 탭 > Default (v01.12, 2026-10-26, 사용자 요청)** — 열려 있는 씬의 레퍼런스를 중첩까지 트리로, 고른 파일 탐색기 열기 · 경로 복사.
+- `core/reference_ops.scene_references()` → 트리 순 행 dict(node · parent · depth · namespace · path · copy `{n}` · loaded · exists · status · nested_hidden).
+  mayapy 실측: `ls(type="reference")` 가 중첩 노드까지 준다, 부모는 `referenceQuery -parent -referenceNode`, **부모 언로드면 중첩 노드가 없다**, 복사 번호는 `withoutCopyNumber`,
+  없는 파일은 `isLoaded` False 이므로 `os.path.isfile` 로 Missing 구분. `sharedReferenceNode` · `_UNKNOWN_REF_NODE_` 제외.
+- 열기 = 파일마다 `file_opener.open_path`(선택된 채), 같은 파일 한 번, Missing 은 폴더. `open_reference_files(paths, opener=None)` 의 opener 는 **호출 시점**에 잡는다(기본 인자로 박으면 시험에서 못 바꾼다).
+- UI 는 `ReferenceTab`(QTabWidget) 안 `ReferenceDefaultPage`; **showEvent 마다 refresh**; 우클릭 메뉴는 `build_context_menu()`(만들기) 와 `_on_context_menu`(exec_) 분리 —
+  **오프스크린 시험에서 `QMenu.exec_` 는 영원히 멈추고, PySide2 는 클래스 속성 패치로도 못 막는다.** 새 하위 탭은 `ReferenceTab.build_ui` 에 addTab.
+- `tests/test_reference.py` 35항목. 마야 GUI 눈 확인 아직. 마야 밖 디스크 파일 스캔은 A00210 Maya > Reference([[wip-a00210-maya-reference-tab]]).

@@ -23,6 +23,7 @@ from .export_rules import (
 from .import_ops import import_fbx_normal
 from . import csv_ops
 from .path_ops import scene_folder, open_scene_folder, normalize_pasted_path
+from . import reference_ops
 
 __all__ = [
     "FBX_PLUGIN",
@@ -47,4 +48,5 @@ __all__ = [
     "scene_folder",
     "open_scene_folder",
     "normalize_pasted_path",
+    "reference_ops",
 ]

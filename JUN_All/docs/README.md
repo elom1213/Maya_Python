@@ -39,7 +39,7 @@
 | `A00340_SelectionTool` | 선택 / 리깅·애니 (오브젝트 재선택 버튼) | [A00340_SelectionTool](A00340_SelectionTool.md) |
 | `A00410_SecondaryMotion` | 애니메이션 / 2차 모션 (FK 체인 관성·찰랑임) | [A00410_SecondaryMotion](A00410_SecondaryMotion.md) |
 | `A00420_Wrapper` | 모델링·페이셜 / 커브 가이드 래핑 (다른 토폴로지 메시 맞추기) | [A00420_Wrapper](A00420_Wrapper.md) |
-| `A00480_FileTool` | 파일 입출력 · 경로 (Export / Import / Path — A00040_V02 + quickTool File·Import 통합) | [A00480_FileTool](A00480_FileTool.md) |
+| `A00480_FileTool` | 파일 입출력 · 경로 (Export / Import / Path / **Reference** — A00040_V02 + quickTool File·Import 통합, 씬 레퍼런스 중첩 트리 · 탐색기 열기 · 경로 복사) | [A00480_FileTool](A00480_FileTool.md) |
 | `A00560_JaliBatch` | 페이셜 / 립싱크 **대량** (standalone) — VisemeNet 변환 결과 폴더 → 대사마다 JALI 컨트롤러를 레퍼런스하고 키를 베이크한 **클립 `.mb`**(mayapy 워커 한 프로세스, 도장 + 매니페스트) · Validate / Repath | [A00560_JaliBatch](A00560_JaliBatch.md) |
 | `A00570_JaliReview` | 페이셜 / 립싱크 **검수** (in-Maya) — 아바타 + 클립 레퍼런스(ns CLIP), Prev/Next/Swap, 레퍼런스 커브 편집 → Save Clip Edits(`saveReference`), ARKIT_OUT → 블렌드셰이프 연결 | [A00570_JaliReview](A00570_JaliReview.md) |
 | `A00580_FacialBoardBuilder` | 페이셜 — ARKit 52 컨트롤 보드(`Ctl_Only_V05`)를 명세 json 에서 생성 · CSV 베이크 · 검증 (헤드리스, UE Control Rig 는 2단계) | [A00580_FacialBoardBuilder](A00580_FacialBoardBuilder.md) |

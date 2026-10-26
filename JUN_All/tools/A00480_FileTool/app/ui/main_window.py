@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-29
+# last Update date : 2026-10-26
 # A00480_FileTool - Qt UI (in-Maya)
 #
 # 파일을 들여오고 · 내보내고 · 경로를 다루는 툴.
 #   Export : A00040_file_exporter_V02 화면 그대로 (+ Export Path 의 Scene 버튼)
 #   Import : 하위 탭 CSV (A00200_CSV_tool 이식, v01.10) / FBX (A00030_quickTool_V02 의 Import FBX normal)
 #   Path   : A00030_quickTool_V02 의 Copy Scene Folder · Open Scene Folder
+#   Reference : 하위 탭 Default - 씬 레퍼런스(중첩 포함) 트리 · 탐색기 열기 · 경로 복사 (v01.12)
 #
 # 창은 메뉴 · Pin · 탭 · **공용 로그창 하나** · 푸터를 갖고, 탭은 log 콜백만 받는다.
 # 원본 두 툴과 objectName 이 달라 동시에 띄울 수 있다. 모든 UI 문자열/로그는 영어.
@@ -34,6 +35,7 @@ from tools.A00480_FileTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00480_FileTool.app.ui.export_tab import ExportTab
 from tools.A00480_FileTool.app.ui.import_tab import ImportTab
 from tools.A00480_FileTool.app.ui.path_tab import PathTab
+from tools.A00480_FileTool.app.ui.reference_tab import ReferenceTab
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -146,12 +148,15 @@ class MainWindow(QWidget):
         self.export_tab = ExportTab(log=self._log)
         self.import_tab = ImportTab(log=self._log)
         self.path_tab = PathTab(log=self._log)
+        self.reference_tab = ReferenceTab(log=self._log)
         self.tabs.addTab(self.export_tab, "Export")
         self.tabs.addTab(self.import_tab, "Import")
         self.tabs.addTab(self.path_tab, "Path")
+        self.tabs.addTab(self.reference_tab, "Reference")
         self.tabs.setTabToolTip(0, "Export objectSets to FBX, one file per set.")
         self.tabs.setTabToolTip(1, "Import : CSV (ARKit facial keys + audio) / FBX settings.")
         self.tabs.setTabToolTip(2, "Scene folder and path helpers.")
+        self.tabs.setTabToolTip(3, "References of the current scene (nested included) : open in File Explorer, copy paths.")
 
         # 탭은 스크롤 칸에 담는다 - 화면이 작거나(1080 · 배율 125/150%) 창을 줄여도 창이 화면을
         # 넘지 않는다. 내용이 다 들어가면 스크롤바는 안 보인다. (fit_to_content 참고)
@@ -198,6 +203,9 @@ class MainWindow(QWidget):
             "  WAV or video next to the CSV (ffmpeg).\n"
             "[Import > FBX] Import FBX normal - use the normals stored in the file.\n"
             "[Path] Copy Scene Folder / Open Scene Folder.\n"
+            "[Reference > Default] Every reference of the current scene as a tree (nested\n"
+            "  references under their parent). Open the selected files in File Explorer or\n"
+            "  copy their paths.\n"
             "\n"
             "Merged from A00040_file_exporter_V02 and the File / Import option\n"
             "buttons of A00030_quickTool_V02 (both tools are still available).\n"
