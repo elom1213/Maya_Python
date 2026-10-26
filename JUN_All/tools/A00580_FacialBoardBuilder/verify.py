@@ -124,6 +124,11 @@ def t2_limits(ck, spec):
             ck.ok(cmds.getAttr("{0}.{1}".format(c, ch), lock=True), "T2 {0}.{1} not locked".format(c, ch))
         keyable = cmds.listAttr(c, keyable=True) or []
         ck.ok(set(keyable) <= {"translateX", "translateY"}, "T2 {0} keyable {1}".format(c, keyable))
+        # 트랜스폼 자신이 normal 표시여야 뷰포트 클릭이 셰이프가 아니라 트랜스폼을 고른다 (부모 FRM 은 Reference)
+        ck.ok(cmds.getAttr(c + ".overrideEnabled") and cmds.getAttr(c + ".overrideDisplayType") == 0,
+              "T2 {0} transform is not selectable (inherits Reference from FRM)".format(c))
+        parent = cmds.listRelatives(c, parent=True)[0]
+        ck.ok(cmds.getAttr(parent + ".overrideDisplayType") == 2, "T2 {0} frame should be Reference".format(parent))
         # 리밋이 setAttr 를 자른다
         for axis in ("tx", "ty"):
             lo, hi = lim.get(axis, [0, 0])

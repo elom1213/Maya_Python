@@ -50,6 +50,7 @@
 - skin — [weights: physical index](skincluster-weight-index-physical.md) · [deforms user normals](skincluster-deforms-user-normals.md)(노멀 쓰기는 MFnMesh + dgdirty)
 - blendShape — [geo-less blendShape dies on connected delete](maya-delete-cascades-geoless-blendshape.md)(숨긴 평면에 붙일 것 · pma 는 입력 떼고 delete · aliasAttr 순서는 plug 문자열 순 · 리밋은 연결값도 자름) · [delta space = origin](blendshape-delta-space-origin.md) · [target name vs alias](blendshape-target-name-vs-alias.md) · [live target deltas](blendshape-live-target-inputpointstarget.md) · [sculpt target: pnts redirect](sculpt-target-pnts-redirect.md) · [shape.pnts is post-deformation](shape-pnts-is-post-deformation.md)
 - shapes/curves — [parent -s -add = instance](parent-shape-add-is-instance.md) · [extendToShape picks wrong shape](extendtoshape-picks-wrong-shape.md)(공용 `maya_shape`) · [pointPosition: points only](pointposition-points-only.md) · [cmds -pivot is world](cmds-scale-rotate-pivot-is-world.md) · [referenced curve CV write](referenced-curve-cv-write.md)(xform 으로만)
+- [Reference parent → click selects shape](maya-reference-parent-selects-shape.md) — 틀이 Reference 면 컨트롤 트랜스폼에도 override normal 을 줄 것
 - [viewport Tab is MTK](maya-viewport-tab-is-mtk.md) — 뷰포트 Tab 은 hotkey 무시, `nexOpt mayaTabPressCmd` 를 바꿔 끼울 것 (GUI 전용)
 - [Euler closestSolution not equivalent](euler-closest-solution-not-equivalent.md) — 짐벌 근처 다른 회전, closestCut + alternate 로 · 오일러는 축별로 안 더해진다
 - API lifetime — [MPlug.asMObject](mplug-asmobject-lifetime.md) · [MFn cvPositions](mfn-cvpositions-lifetime.md)(읽는 즉시 tuple 로)
@@ -103,5 +104,5 @@
 - A00560 · A00570 — [JaliBatch 계획](wip-a00560-jalibatch.md)(2026-10-23 계획만, 코드 전 · 레퍼런스 animCurve 편집은 saveReference 로만 클립에 저장 · 같은 이름 편집이 교체 때 전파 · M0 실측 8항목 먼저)
 - STT Converter — [wav → 대본 변환기 계획](wip-stt-converter.md)(JUN_JALI docs/0130, 2026-10-23 계획만 · faster-whisper turbo 1차 · Qwen3-ASR 2차 · 기준 PC Ryzen 9 3900X + RTX A2000 12GB · Win10 · Python 3.14 전용 PC 지원 조건)
 - A00550 — [PoseMapper](wip-a00550-posemapper.md)(음소 → BS 포즈 json · Connect, blendWeighted 의 weight 원소 없는 input = 안 보이고 1.0 · getAttr 가 원소를 만든다)
-- A00580 — [FacialBoardBuilder · Ctl_Only_V05](wip-facial-arkit52-ctl-v05.md)(ARKit 52 보드를 json 명세에서 빌드 · CSV 베이크 · verify 1582 · 더미 `BS_Face_CSV` 는 숨긴 평면에 · GUI 확인 아직 · UE 빌더는 다음)
+- A00580 — [FacialBoardBuilder · Ctl_Only_V05](wip-facial-arkit52-ctl-v05.md)(ARKit 52 보드를 json 명세에서 빌드 · CSV 베이크 · verify 1722 · 더미 `BS_Face_CSV` 는 숨긴 평면에 · 컨트롤 트랜스폼은 override normal · GUI 확인 아직 · UE 빌더는 다음)
 - JALI 슬라이더 리그 — [A0020_jali_slider_ctl](wip-jali-slider-ctl.md)(angela 1:1 슬라이더 22 + JaLi 박스, remapValue 리맵, DUMMY_IN/OUT 3쌍, global_scale · 생성/검증은 JUN_JALI examples · GUI 확인 아직)

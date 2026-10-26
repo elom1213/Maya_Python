@@ -81,7 +81,7 @@ python migrate.py                                                # spec/migrate_
 - 명세 `spec/arkit52_board_v05.json` — `board`(unit · 반지름 · 틀 · 라벨 · 기본 위치) · `names` · `colors` · `arkit52` · `csv_alias_order`
   · `controls[]`. L 컨트롤에 `"mirror": true` 만 적으면 R 은 빌더가 만든다(x 반전 · Left→Right · **tx 부호 거울** — 양쪽 다 "바깥으로 끌면 Out").
 - `board_spec.check_spec()` 이 52 attr 가 정확히 한 번씩 나오는지 · 리밋과 축 부호가 맞는지 먼저 본다.
-- 검증 **1582 항목 통과**(2026-10-26, mayapy 2024): T1 구조 · 더미 이름 · 별칭↔인덱스 = V04 · T2 리밋/잠금 · T3 앞으로(축마다 그 attr 만 1)
+- 검증 **1722 항목 통과**(2026-10-26, mayapy 2024): T1 구조 · 더미 이름 · 별칭↔인덱스 = V04 · T2 리밋/잠금 · T3 앞으로(축마다 그 attr 만 1)
   · T4 뒤로 · T5 왕복 + ± 상쇄 + 범위 밖 클램프 · T6 베이크 → 프레임별 출력 동일 → 재연결 · T7 거울 · Head/World 따라가기 · T7b V04 키 →
   이관표 → 동치 · T8 .ma/.mb 왕복 · unknown 0. **실제 Maya GUI 눈 확인 아직.**
 - `spec/migrate_v04.json` — V04 `ctl.axis` → V05 `CTRL.axis` + 부호(`v05 = v04 × multiplier`). 한 V05 축으로 모이는 V04 플러그 묶음은
@@ -112,3 +112,5 @@ A00580_FacialBoardBuilder/
   → 숨긴 평면에 붙였다. pma 는 입력을 먼저 떼고 지운다(`disconnect_backward_plug`).
 - `aliasAttr -q` 의 순서는 저장 뒤 plug 문자열 순(`weight[0]`, `weight[10]` …)으로 바뀐다 — 순서가 아니라 별칭↔인덱스 대응을 비교한다.
 - 색(`overrideColorRGB`) · 리밋 · lock/keyable · `textCurves` 는 `.ma` ↔ `.mb` 왕복에서 보존된다.
+- **뷰포트 클릭이 셰이프를 고르던 문제** (사용자 확인 2026-10-26): 컨트롤 트랜스폼이 부모 `FRM_`(Reference) 의 표시를 물려받아 선택 불가가 되고
+  셰이프만 normal 이라 Maya 가 셰이프를 골랐다. 컨트롤 트랜스폼에도 `overrideEnabled` + `overrideDisplayType 0` 을 명시한다(`_selectable`, T2 검사).

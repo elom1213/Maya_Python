@@ -68,11 +68,22 @@ def _line(name, points, parent, closed=False):
     return crv
 
 
+def _selectable(node):
+    """트랜스폼 자신의 표시를 normal 로 명시한다.
+
+    ★ 부모(FRM_)가 Reference 면 자식 트랜스폼은 그 표시를 물려받아 **선택 불가**가 되고, 셰이프만 normal 로 덮어쓰면
+    뷰포트 클릭이 셰이프를 고른다(사용자 확인 2026-10-26). 트랜스폼에도 override 를 켜 normal 로 두면 트랜스폼이 선택된다.
+    """
+    cmds.setAttr(node + ".overrideEnabled", 1)
+    cmds.setAttr(node + ".overrideDisplayType", 0)
+
+
 def _circle(name, radius, parent, rgb):
     crv = cmds.circle(n=name, nr=(0, 0, 1), r=radius, ch=False)[0]
     shp = cmds.listRelatives(crv, s=True)[0]
     shp = cmds.rename(shp, name + "Shape")
     cmds.parent(crv, parent, r=True)
+    _selectable(crv)
     _color(shp, rgb)
     return crv
 
@@ -335,6 +346,7 @@ def build(spec):
     cmds.parent(shp, root_ctl, r=True, s=True)
     cmds.delete(crv)
     shp = cmds.rename(shp, root_ctl + "Shape")
+    _selectable(root_ctl)
     _color(shp, colors["root"])
     t = board.get("default_root_translate", [0, 0, 0])
     cmds.setAttr(root_ctl + ".t", t[0], t[1], t[2])
