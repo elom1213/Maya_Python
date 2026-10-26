@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-22
+# last Update date : 2026-10-26
 # A00540_JaliLipSync - Qt UI (in-Maya)
 #
 # JUN_JALI 의 VisemeNet Converter 가 만든 txt(+json) 와 음성 wav 를 골라 JALI 리그에 키를 건다.
@@ -26,7 +26,7 @@ from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 from Framework.core import file_opener
 
 from tools.A00540_JaliLipSync.app.config.version import VERSION, LAST_UPDATE
-from tools.A00540_JaliLipSync.app.core import lipsync_data, mapping as mapping_mod, keyer, scene, sequence
+from Framework.jali import lipsync_data, mapping as mapping_mod, keyer, scene, sequence   # v01.03: 공용 코어
 
 
 WINDOW_OBJECT_NAME = "JUN_A00540_JaliLipSync_window"
@@ -161,7 +161,7 @@ class MainWindow(QWidget):
 
         self.cmb_mapping = QComboBox()
         self.cmb_mapping.addItems(mapping_mod.list_mappings())
-        self.cmb_mapping.setToolTip("Model columns -> rig attributes (app/mappings/*.json). "
+        self.cmb_mapping.setToolTip("Model columns -> rig attributes (Framework/jali/mappings/*.json). "
                                     "Sets the default scales and the JaLi Fixed range.")
         self.cmb_mapping.currentTextChanged.connect(self.on_mapping_changed)
         tgrid.addWidget(QLabel("Mapping"), 4, 1)
@@ -292,7 +292,7 @@ class MainWindow(QWidget):
     def _mapping(self):
         name = self.cmb_mapping.currentText()
         if not name:
-            raise ValueError("No mapping json in app/mappings")
+            raise ValueError("No mapping json in Framework/jali/mappings")
         return mapping_mod.load_mapping(name)
 
     def is_manual(self):
@@ -628,5 +628,5 @@ class MainWindow(QWidget):
             "5. Apply (one undo step). Several clips -> one sequence WAV.\n\n"
             "Keys are sampled at the scene fps. Re-applying clears the range first.\n"
             "Scales and the Fixed range reset to the mapping's defaults.\n"
-            "New rigs = a new json in app/mappings.\n\n"
+            "New rigs = a new json in Framework/jali/mappings.\n\n"
             "Written by Ji Hun Park.").format(VERSION, LAST_UPDATE))

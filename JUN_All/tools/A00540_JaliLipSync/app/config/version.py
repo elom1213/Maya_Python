@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-22
+# last Update date : 2026-10-26
 # A00540_JaliLipSync - version info
 
 # 01.00  VisemeNet viseme curves (txt from JUN_JALI's VisemeNet Converter) -> keys on a JALI
@@ -20,5 +20,9 @@
 #        (silence in the holds) and attached as one sound node, so playback follows the clip order.
 #        One undo step for the whole sequence. Remove Keys clears the whole sequence range.
 
-VERSION = "01.02"
-LAST_UPDATE = "2026-10-22"
+# 01.03  Core promoted to Framework/jali (lipsync_data · mapping · sequence · keyer · scene + mappings/*.json) so
+#        A00560_JaliBatch and A00570_JaliReview share it. app/core/*.py re-export the Framework modules; mapping json
+#        files now live in Framework/jali/mappings. No behaviour change.
+
+VERSION = "01.03"
+LAST_UPDATE = "2026-10-26"

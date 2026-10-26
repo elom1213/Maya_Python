@@ -510,13 +510,13 @@ A00210_FileManager/
         │   ├── ref_scanner.py   # 마야 파일들 -> 레퍼런스 트리 (.ma 파싱 / .mb 는 열어서, 중첩 재귀, 순환 가드, needs_maya)
         │   ├── ref_importer.py  # 파일마다 백업 -> 열기 -> 체크된 레퍼런스(+중첩) 임포트 -> 네임스페이스 -> 저장
         │   ├── backup.py        # backup/<이름>_REF_NN (A00220 과 같은 폴더)
-        │   ├── mayapy_runner.py # mayapy 찾기 · job.json · 명령줄 · JUNMSG 프로토콜 파싱
+        │   ├── mayapy_runner.py # (v01.40 재노출) 본체는 Framework/core/mayapy_runner.py - mayapy 찾기 · job.json · 명령줄 · JUNMSG 프로토콜 파싱
         │   └── maya_worker.py   # mayapy 가 실행하는 워커 (scan / import) - launch.spec datas 로 exe 에도 실린다
         └── ui/
             ├── maya_tab.py      # 하위탭 컨테이너 (다음 하위탭은 여기에 addTab)
             ├── reference_tab.py # Reference 하위탭 (흐름 · mayapy 칸 · 확인 팝업)
             ├── reference_tree.py# Reference 트리 (Reference | Used by, 체크, 중첩 접힘)
-            └── mayapy_process.py# QProcess 로 워커를 띄우고 진행률 팝업 · 로그에 잇는다 (Cancel = 플래그 파일)
+            └── mayapy_process.py# (v01.40 재노출) 본체는 Framework/qt/MOD_mayapyProcess_qt_v01.py - QProcess 로 워커를 띄우고 진행률 팝업 · 로그에 잇는다 (Cancel = 플래그 파일)
 ```
 
 - **core 는 Qt/Maya 를 import 하지 않는다** → 단위 테스트·exe 빌드 용이. 화면 캡쳐만 Qt(`QScreen.grabWindow`)에 의존.

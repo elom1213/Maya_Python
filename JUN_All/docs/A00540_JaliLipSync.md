@@ -4,7 +4,7 @@
 txt 는 짝 저장소 **`JUN_JALI`** 의 스탠드얼론 `VisemeNet Converter` 가 만든다(wav → txt, TensorFlow 필요).
 이 툴은 txt · wav 만 읽으므로 마야 안에 TensorFlow 가 없어도 된다.
 
-- **버전**: v01.02 (2026-10-22) — 클립 여러 개를 순서대로 한 씬에 (Hold · 합친 wav)
+- **버전**: v01.03 (2026-10-26) — 코어를 `Framework/jali` 로 승격(A00560 · A00570 과 공유, 동작 변화 없음). v01.02 클립 여러 개를 순서대로 한 씬에 (Hold · 합친 wav)
 - **아키텍처**: (B) in-Maya PySide (`maya.cmds`), 드래그&드롭 셸프 설치
 - **짝**: `JUN_JALI` (https://github.com/elom1213/JUN_JALI) — 설치 · 변환은 `JUN_JALI/docs/0050_converter_guide.md`,
   계획은 `0030_tool_plan.md`, JALI ↔ ARKit 매칭은 `0040_jali_arkit_mapping.md`
@@ -88,7 +88,7 @@ txt 는 짝 저장소 **`JUN_JALI`** 의 스탠드얼론 `VisemeNet Converter` �
 
 ## 4. 새 리그 · ARKit 아바타 — 매핑 json (v01.01 형식)
 
-`app/mappings/<이름>.json` 하나를 추가하면 `Mapping` 콤보에 나온다(코드 수정 없음). 들어 있는 것: `angela_jali_visemenet`(angela 리그) · `jali_slider_dummy_in`(A0020 슬라이더 리그).
+`Framework/jali/mappings/<이름>.json` 하나를 추가하면 `Mapping` 콤보에 나온다(코드 수정 없음, v01.03 부터 이 위치 — A00560 · A00570 과 공용). 들어 있는 것: `angela_jali_visemenet`(angela 리그) · `jali_slider_dummy_in`(A0020 슬라이더 리그).
 
 ```json
 {"name": "...", "model_columns": ["Jaw", "Lip", "Ah", ...22개],
@@ -118,15 +118,17 @@ ARKit 블렌드셰이프 아바타라면 `nodes` 를 `{"phonemes": "blendShape1"
 A00540_JaliLipSync/
 ├── __init__.py · launch.py · __dragDrop_A00540.py
 ├── app/config/version.py
-├── app/core/
+├── app/core/              v01.03: 다섯 모듈 전부 Framework/jali 재노출(얇은 파일) - 본체는 아래
+├── app/ui/main_window.py  클립 표(QTableWidget) + Target + Options  (from Framework.jali import ...)
+├── (공용) JUN_All/Framework/jali/        A00540 · A00560_JaliBatch · A00570_JaliReview 가 같이 쓴다 - docs/Framework_jali.md
 │   ├── lipsync_data.py   txt(22열) + json 읽기 · 검증, find_wav(), wav_seconds()   (Maya 비의존)
-│   ├── mapping.py        app/mappings/*.json 읽기 · 검증(nodes 역할표 · 배율 기본값 채움), combine()   (Maya 비의존)
+│   ├── mapping.py        mappings/*.json 읽기 · 검증(nodes 역할표 · 배율 기본값 채움), combine()   (Maya 비의존)
 │   ├── sequence.py       Clip(txt + wav) · load_clip · layout(clips, start, hold, fps) -> [Segment] · write_sequence_wav()   (Maya 비의존)
 │   ├── keyer.py          resolve_targets(Auto 네임스페이스 / Manual node_map) · sample · check_targets · scale_warnings
 │   │                     · apply_sequence(segments, hold) · apply(클립 하나) · remove · controls (undo_chunk)
-│   └── scene.py          marker_of(mapping) · find_rigs(marker), attach_sound()
-├── app/mappings/angela_jali_visemenet.json · jali_slider_dummy_in.json
-├── app/ui/main_window.py  클립 표(QTableWidget) + Target + Options
+│   ├── scene.py          marker_of(mapping) · find_rigs(marker), attach_sound()
+│   ├── bake.py · clip_stamp.py   (A00560 · A00570 용 - 베이크 · 도장)
+│   └── mappings/angela_jali_visemenet.json · jali_slider_dummy_in.json
 ├── tests/run_all.py      test_mapping · test_sequence · test_keyer · test_ui · test_end_to_end (mayapy, 실제 파일은 열기만)
 └── icon/A00540_JaliLipSync.svg / .png
 ```
