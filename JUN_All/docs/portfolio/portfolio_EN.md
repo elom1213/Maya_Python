@@ -2,13 +2,13 @@
 title: Portfolio — Work Summary (2026-05-06 ~ 2026-10-12)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-10-23
+updated: 2026-10-26
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
 
 > **Author**: Ji Hun Park (Junny)
-> **Period**: 2026-05-06 – 2026-10-23 (~24 weeks)
+> **Period**: 2026-05-06 – 2026-10-26 (~25 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
 > **Volume**: 50+ in-house tools (64 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
@@ -109,33 +109,97 @@ updated: 2026-10-23
 - **Keywords**: PoseWrangler / PoseDriverConnect, RBF Pose Driver, delta serializer, `cmds.objExists` guard,
   MMatrix delta restore, third-party plugin fork & patch management, MetaHuman → custom avatar
 
-### 1-7. Speech → JALI lip-sync pipeline — multilingual dialogue from audio only (VisemeNet fork + Maya tool)
+### 1-7. Speech → JALI lip-sync pipeline — multilingual dialogue from audio to a Maya rig (VisemeNet fork · MFA transcript correction · local STT · Maya tools)
 
 - **Problem**: live-service games dub the same lines into many languages; keying faces per line and per language does
   not scale (Cyberpunk 2077 used JALI's procedural approach for 10 languages). The research model **VisemeNet**
   (SIGGRAPH 2018, audio → JALI visemes) is public, but it is 2018 TF1 code, and its rig script hard-codes paths and
   assumes 25 fps.
-- **What I did**: forked the model (`JUN_JALI`) and built **three pieces** — ① a double-click installer
-  (`setup_env.bat`: Python discovery, virtual env, self test) ② a standalone **converter** (WAV list → preflight with
-  13 rules such as 44.1 kHz / 16-bit → if any file fails, nothing is converted and the reason is logged) ③ a Maya shelf
-  tool **`A00540_JaliLipSync`** (pick TXT + WAV, key the JALI rig sampled at the scene fps, json mappings, one undo).
-  On the JALI rig (the paper's public `angela_JALI.ma`) I **measured the jaw / muscle-channel / tongue change of every
-  viseme** and built an ARKit 52 mapping (JALI Jaw axis = `jawOpen`, Lip axis = `mouth*`, MBP = `mouthClose` + `jawOpen`).
+- **Stage 1 — audio only (`JUN_JALI` fork, three pieces)**: ① a double-click installer (`setup_env.bat`: Python discovery,
+  virtual env, self test; on a PC that only has Python 3.14 it downloads a folder-private 3.11 — added after a Windows 10
+  report) ② a standalone **converter** (WAV list → preflight with 13 rules such as 44.1 kHz / 16-bit → if any file fails,
+  nothing is converted and the reason is logged; progress popup) ③ a Maya shelf tool **`A00540_JaliLipSync`** (pick TXT +
+  WAV, key the JALI rig sampled at the scene fps, json mappings, one undo). On the JALI rig (the paper's public
+  `angela_JALI.ma`) I **measured the jaw / muscle-channel / tongue change of every viseme** and built an ARKit 52 mapping
+  (JALI Jaw axis = `jawOpen`, Lip axis = `mouth*`, MBP = `mouthClose` + `jawOpen`).
 - **Found (two hidden properties of the original model)**: ① the graph hard-codes dropout 0.5 as a **constant** in seven
   `net2` LSTMs, so **inference was random** (same audio twice → max difference 0.64; the author's reference output is one
   such sample) → a **deterministic mode** that only rewrites that constant to 1.0 when loading the frozen graph (original
   code untouched) is the default. ② the output is **0.32 s shorter** than the audio — I traced `net2`'s 64-row window and
   32-row padding to a row-count formula (matches both test files) and confirmed the start is aligned, so sound and mouth
   stay in sync in Maya.
-- **Result**: lip-sync keys on a JALI rig from an audio file alone (14.9 s of speech: ~4 s inference, 0.2 s keying).
-  Verified with 42 converter core/UI checks and 34 mayapy checks for the Maya tool. Next: comparing **Korean / Japanese**
-  quality on an English-trained model.
+- **★ Stage 2 — lips that audio alone leaves open, corrected from the transcript (converter `Correct` mode, v01.01–01.05)**:
+  with audio only, the lips **did not close on p · b · m**. The same line's transcript is aligned to the audio with the
+  **Montreal Forced Aligner (MFA)** to get a start / end time per phoneme (MFA's 10 ms grid meshes directly with the
+  model's 100 fps rows), and only those spans are corrected — a **guaranteed minimum** for the phoneme's viseme (0.6, lip
+  visemes MBP · FV 0.8), other visemes in the span ×0.5, silence ×0.2, a 30 ms ramp at boundaries; words that fail both the
+  dictionary and G2P, and neutral phonemes, keep the model's values; the Jaw / Lip axes are left alone. Phoneme → viseme is
+  **one IPA-based mapping json** shared by English, Korean and Japanese (it covers all 92 / 104 / 84 phonemes of the three
+  dictionaries). Install is a double-click `setup_mfa.bat` plus a **lock file** (a reinstall in a second folder reproduced
+  all 230 packages identically). Measured: of 21 lip phonemes in the English sample, the rig control reaching 8+ (0–10)
+  went **10 → 21** (mean 5.4 → 8.4). To see how a commercial tool solves it I **read AdvancedSkeleton's MEL source**: its Auto
+  lipsync is MFA 1.1 and Audio2Face is a retarget of NVIDIA output, so I kept the same structure.
+  - **The converter flags files whose transcript is wrong**: if the default beam finds no alignment path
+    (`NoAlignmentsError`) it **re-runs only that file with a wide beam** and still warns when it passes — beam is a pruning
+    width, so widening never makes an alignment worse; **needing it at all is the signal of a transcript mismatch**. It also
+    reports any **phoneme longer than 0.5 s** with its timestamp (spoken phonemes stay under 0.3 s; a long one is a
+    neighbour forced to cover speech the transcript lacks — measured: 33 s of English with 6 s not in the transcript → one
+    vowel 2.3 s). Japanese transcripts fail MFA if they contain spaces or line breaks, so the converter strips them.
+- **★ Stage 3 — no hand-typed transcripts either: a local speech → transcript converter (STT Converter v01.00)**: the
+  transcript that Correct mode needs, until now typed by hand, comes from **faster-whisper `large-v3-turbo`** (CTranslate2,
+  fully offline). Korean / Japanese / English, `Device` Auto / CUDA / CPU fallback, a separate `.venv_stt` (both
+  installers share the Python 3.11 bootstrap), and the user's constraints — Windows 10, a **Ryzen 9 3900X + RTX A2000
+  12 GB** reference PC, and **PCs that only have Python 3.14** — were design inputs. The hard part is not the STT but
+  **normalization**: the MFA dictionary only knows words spelled as pronounced, so numbers become numerals — Korean picks
+  **native vs Sino-Korean by the following counter** (`1등` → `일등`, `3개` → `세개`, `10시` → `열시`), Japanese uses kanji
+  numerals, English handles years, ordinals, %, $ and clock times. Tokens it cannot decide (Latin acronyms, romanized
+  words) are **left as warnings = candidates for the user dictionary** (which also fixes proper nouns the model hears
+  differently). A headless `cli.py` (exit codes 0 / 1 / 2) is the form the batch pipeline of the next stage calls.
+  - **Measured**: GPU (RTX 5070) 35.9 s of Korean → 0.9 s, CPU int8 → 6.8 s, and **the text is identical character for
+    character** (CPU is only slower). Character error rate against hand transcripts: English **0.33 %**, Korean **6.59 %**
+    (all from one proper noun → 0 with the dictionary), Japanese 11.05 % (orthographic variants such as `わたし`/`私`, same
+    pronunciation). On clips under 10 s the VAD cut the first word (72 % CER) → **VAD auto-off for short clips**. The dev PC
+    hard-reset three times while CUDA was starting, so I worked behind a **force-CPU switch**; one reset hit mid-install
+    and left 285 venv files **with their size but zero bytes**, which I documented with cause and recovery. 120 automated
+    checks (normalization 65 · core 24 · UI 23 · real model 8). The reference-PC measurement is still pending.
+- **Rig side — the place that receives the keys, built as a rig (`mayapy` build + verify scripts)**:
+  ① **JALI slider controller rig**: 22 viewport sliders mapped 1:1 to angela's attributes + a 2D JaLi box, per-slider
+  `output_min/max` (`remapValue`; I measured that it clamps its input, so no clamp node), `global_scale` (visemes only —
+  Jaw / Lip are a ratio, not an intensity), and **three pairs of dummy I/O nodes** (external keys land on `DUMMY_IN_*` in
+  one go; blendShapes pull from `DUMMY_OUT_*` in one go). At the user's request a **direct version** whose keys land on
+  the controllers themselves plus a **bake** function that leaves them there, and a version where the same file also
+  **outputs ARKit 52**, all as flags of one script (301 → 495 checks, run on the saved `.ma` reopened).
+  ② **MetaHuman facial dummy asset**: measured Epic's ARKit mapping asset to build an ARKit 52 dummy → 68-controller
+  network, then put **three JALI phoneme dummies** on top — a composed via-ARKit table, plus what ARKit cannot carry
+  (**tongue, lip bite, jaw-proportional coarticulation**) mapped directly through four new axes. 25 cases × 252 channels
+  verified, no cycles, hand control still free. Dummy names and 0–1 units match A00540's rule json, so **the same tool keys
+  angela, the slider rig and the MetaHuman unchanged.**
+  ③ **`A00540` v01.01–01.02**: a `nodes` **role table** in the mapping json frees the tool from the `CNT_PHONEMES` name and
+  angela's units (Target Auto / Manual); **multiple clips** in table order in one scene — clip length comes from the **WAV**,
+  not the txt (the model output is 0.32 s short), and since Maya's time slider shows only one sound node, a **merged WAV**
+  bakes the playback order into a file (132 checks).
+  ④ Around it: a `JALI 22 Viseme` connection rule (one json) in `A00145_RigConnect`, and a JaLi axis / strength in
+  `A00550_PoseMapper` (the original JALI network has no intensity control).
+- **Result**: **audio file → (auto transcript) → transcript-corrected visemes → Maya rig keys** is reachable with three
+  install bats, two windows and one shelf tool (14.9 s of speech: ~4 s inference, 0.2 s keying). Everything is verified
+  by headless automated checks (converter 42 · Maya tool 132 · STT 120 · rig 495 · MetaHuman dummy 25 × 252). **Visual
+  confirmation** (do the lips really close naturally, tongue sign) and the reference-PC run remain, and the docs say so
+  as "unverified". Comparing **Korean / Japanese** viseme quality on an English-trained model is also still open.
+- **Next — batch pipeline (`A00560_JaliBatch` · `A00570_JaliReview`, plan stage)**: N WAVs → N **clip `.mb` files** that
+  reference the controller rig and bake the keys → a review scene references a clip + an avatar and steps through clips by
+  **swapping the reference**. The plan review caught two Maya reference traps up front — edits to referenced animCurves
+  accumulate as reference edits of the review scene, so **the clip does not change without `saveReference`**, and edits are
+  recorded by node name, so with every clip named the same an **unsaved edit leaks into the next clip** → an edit check
+  before every swap. The start frame is never read from the file name (no data derived from naming conventions).
+  A00540's core is promoted to a shared `Framework/jali` used by all three tools.
 - **Follow-up — `A00550_PoseMapper`**: tune phoneme → ARKit blendShape poses with sliders (solo preview, capture the result
   of any existing network), save them as json and **reconnect them to another avatar by name**. While tuning I measured why a
   `blendWeighted` input connected in the Node Editor misbehaves (its weight element does not exist, so it is hidden yet
   computed as 1.0, and a plain `getAttr` of it silently creates it) and added a tab that finds and fixes those.
-- **Keywords**: VisemeNet, JALI (Jaw/Lip viseme field), audio-driven lip sync, TensorFlow frozen-graph patching,
-  dropout at inference, multilingual dubbing, PySide standalone + QThread, ARKit 52 mapping, fork management
+- **Keywords**: VisemeNet, JALI (Jaw/Lip viseme field), audio-driven lip sync, TensorFlow frozen-graph patching, dropout at
+  inference, Montreal Forced Aligner (forced alignment), IPA phoneme mapping, faster-whisper / CTranslate2 local STT, text
+  normalization (numerals · kanji numerals), multilingual dubbing (EN · KO · JA), PySide standalone + QThread, ARKit 52
+  mapping, MetaHuman facial, dummy hub-node rig, `remapValue`, Maya reference edits, fork · lock file · installer bats
 
 ---
 

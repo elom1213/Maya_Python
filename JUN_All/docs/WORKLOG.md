@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-10-23
+updated: 2026-10-26
 ---
 
 # 작업 일지 (WORKLOG)
@@ -30,7 +30,19 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-10-23 (오늘)
+## 2026-10-26 (오늘)
+
+> [!summary] 포트폴리오 EN · KR — **1-7 음성 → JALI 립싱크 절을 `JUN_JALI` 현황으로 최신화** `#docs` `#portfolio` `#JALI`
+- 요청: 포트폴리오 두 문서의 1-7 을 `JUN_JALI` 저장소 내용을 참고해 최신화. 기존 절은 1차(음성만 · 변환기 v01.00 · A00540 v01.00 · 모델 숨은 성질 2개 · A00550)까지였다.
+- 더한 것: ★ 2차 **대본 보정**(변환기 Correct 모드 v01.01 ~ 01.05 — MFA 음소 구간 보정 규칙 안 B, IPA 매핑 json 하나로 영 · 한 · 일, 잠금 파일 재현, 입술 컨트롤 8 이상 10 → 21, 넓은 beam 재시도 · 0.5 s 음소 = 대본 불일치 신호 W12, 일본어 공백, AdvancedSkeleton MEL 조사) ·
+  ★ 3차 **STT Converter v01.00**(faster-whisper `large-v3-turbo` 로컬, 사용자 조건 Win10 · A2000 · Python 3.14 PC, 정규화 = 단위명사 수사 · 漢数字 · W23 사용자 사전, 실측 GPU 0.9 s / CPU 6.8 s 동일 텍스트 · CER 0.33 / 6.59 / 11.05 % · VAD 자동 off, CUDA 크래시 → 강제 CPU · 0 바이트 venv 복구, 시험 120) ·
+  **리그 쪽**(JALI 슬라이더 컨트롤러 리그 — remapValue · global_scale · DUMMY 3쌍 · direct · bake · ARKit 52, 검증 301 → 495; MetaHuman ARKit 52 + JALI 음소 더미 에셋 25 × 252; A00540 v01.01 ~ 01.02 역할표 · 클립 순서 · 합친 wav 132; A00145 `JALI 22 Viseme`; A00550 JaLi 축 · 세기) ·
+  **결과**(설치 bat 3 + 창 2 + 셸프 툴 1, 미확인 항목은 미확인으로) · **다음**(A00560 JaliBatch · A00570 JaliReview 계획 — saveReference · 편집 전파 · 파일 이름 비의존). 제목 · 키워드도 갱신. EN/KR 같은 내용.
+- 메타: frontmatter `updated` · 상단 기간 끝 날짜를 2026-10-26 으로(25주). 커밋 통계 수치는 건드리지 않음.
+
+---
+
+## 2026-10-23
 
 > [!summary] JUN_JALI STT Converter v01.00 — **음성 → 대본 변환기 완성 (T1 설치 bat · T2 코어 + UI · T4 cli) + 0140 사용 안내** `#JUN_JALI` `#STT_Converter` `#JALI`
 - 저장소는 `JUN_JALI`(`dev`). 한 · 일 · 영 wav 여러 개 → VisemeNet Converter Correct 모드용 대본 `<이름>.lab`(+ `.stt.json`). faster-whisper `large-v3-turbo`(CTranslate2) 로컬, `Device` Auto / CUDA float16 / CUDA int8_float16 / CPU int8 + CPU 폴백, 언어는 사람이 강제, 정규화(숫자 → 수사 · 漢数字 · num2words, 사용자 사전, W23 로 남은 토큰 보고), 기존 대본 Skip 기본, VAD 는 10 초 미만 클립에서 자동 off(실측 근거). `setup_stt.bat` 은 `setup_env.bat` 의 Python 3.11 확보 루틴(`.python\` 공유 · 3.14 PC 는 전용 다운로드)을 그대로 씀. `cli.py`(종료 코드 0 / 1 / 2, `[LEVEL]` 로그) 는 A00560 JaliBatch P4 가 부를 형식.
