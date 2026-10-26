@@ -103,4 +103,5 @@
 - A00560 · A00570 — [JaliBatch 계획](wip-a00560-jalibatch.md)(2026-10-23 계획만, 코드 전 · 레퍼런스 animCurve 편집은 saveReference 로만 클립에 저장 · 같은 이름 편집이 교체 때 전파 · M0 실측 8항목 먼저)
 - STT Converter — [wav → 대본 변환기 계획](wip-stt-converter.md)(JUN_JALI docs/0130, 2026-10-23 계획만 · faster-whisper turbo 1차 · Qwen3-ASR 2차 · 기준 PC Ryzen 9 3900X + RTX A2000 12GB · Win10 · Python 3.14 전용 PC 지원 조건)
 - A00550 — [PoseMapper](wip-a00550-posemapper.md)(음소 → BS 포즈 json · Connect, blendWeighted 의 weight 원소 없는 input = 안 보이고 1.0 · getAttr 가 원소를 만든다)
+- Facial ARKit 52 보드 — [Ctl_Only_V04 → V05 계획](wip-facial-arkit52-ctl-v05.md)(2026-10-26 계획만 · V04 는 CSV→ctl · ctl→Connect_01 두 경로 동시 연결 · 더미 이름 유지 · json 명세 → Maya + UE 빌더)
 - JALI 슬라이더 리그 — [A0020_jali_slider_ctl](wip-jali-slider-ctl.md)(angela 1:1 슬라이더 22 + JaLi 박스, remapValue 리맵, DUMMY_IN/OUT 3쌍, global_scale · 생성/검증은 JUN_JALI examples · GUI 확인 아직)
