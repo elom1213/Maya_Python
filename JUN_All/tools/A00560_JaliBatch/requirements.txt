@@ -1,4 +1,7 @@
-# Single source of truth: JUN_All/requirements.txt
-PySide6
-pyinstaller
-# 마야 일은 mayapy.exe 하위 프로세스(app/maya/worker.py)가 한다 - 이 프로세스에는 maya 가 필요 없다.
+# A00560_JaliBatch - what setup_env.bat installs into %USERPROFILE%\.jun_jalibatch\venv (64-bit Python 3.10+, 3.14 included: abi3 wheels)
+# Maya work runs in mayapy (app/maya/worker.py) - this environment does not need maya.
+# PySide6_Essentials (QtWidgets · QtGui · QtCore · QtSvg, ~90 MB) instead of the full PySide6 (~250 MB with WebEngine / QML).
+# Both wheels contain a 151-character path (PySide6\qml\Qt\labs\assetdownloader\...), which is why the venv is kept at a
+# short path outside the tool folder - Windows' 260-character limit (measured 2026-10-26).
+PySide6_Essentials>=6.9
+# pyinstaller is only needed for build_exe.bat (not installed by setup_env.bat):  pip install pyinstaller

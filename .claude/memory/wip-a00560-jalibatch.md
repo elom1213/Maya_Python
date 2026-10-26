@@ -1,6 +1,6 @@
 ---
 name: wip-a00560-jalibatch
-description: "A00560_JaliBatch v01.00(standalone, 변환 결과 폴더 → JALI 클립 .mb N 개, mayapy 워커) · A00570_JaliReview v01.00(in-Maya 레퍼런스 검수: Swap · Save Clip Edits · ARKIT_OUT → BS) — 2026-10-26 제작 완료, 코어는 Framework/jali 공용. GUI 눈 확인 · exe 빌드 · P4(변환기 CLI) 아직"
+description: "A00560_JaliBatch v01.01(standalone, 변환 결과 폴더 → JALI 클립 .mb N 개, mayapy 워커, Run_JaliBatch.bat 더블클릭 · Python 3.14 OK · 환경은 ~/.jun_jalibatch/venv) · A00570_JaliReview v01.00(in-Maya 레퍼런스 검수: Swap · Save Clip Edits · ARKIT_OUT → BS) — 2026-10-26 제작 완료, 코어는 Framework/jali 공용. GUI 눈 확인 · exe 빌드 · P4(변환기 CLI) 아직"
 metadata:
   type: project
 ---
@@ -22,6 +22,11 @@ metadata:
   Open Clip(임시 아바타 ns `REVIEW_AVATAR`) + Save Clip & Close. 재생 범위 · 상태는 매니페스트(레퍼런스된 클립의 fileInfo 는 안 보임).
 - 마야 레퍼런스 편집의 함정(시각 24fps 환산 · onReferenceNode · refAnimCurvesEditable)은 [[maya-reference-fcurve-edit-traps]].
 - 검증: A00560 core 33(python) · worker 32(실제 mayapy 하위 프로세스) · UI 30(PySide6 오프스크린 + 실제 mayapy 1회); A00570 core 33 · UI 24(mayapy 오프스크린).
+- **v01.01 실행 파일 (사용자 조건: Windows 10 + Python 3.14 만 있는 PC)**: `Run_JaliBatch.bat` 더블클릭 → `setup_env.bat`(파이썬 후보를 **실행해 버전을 읽는다** —
+  새 Python 설치 관리자의 `py -3.11` 은 없는 버전이어도 오류 찍고 종료 코드 0 · 없으면 NuGet 3.11.9 를 SHA 확인해 받음 · venv · `pip install -r` · `app/selftest.py`) → pythonw 로 창.
+  **PySide6 6.12 는 `cp310-abi3` 휠이라 3.14 에 설치된다.** 환경은 **`%USERPROFILE%\.jun_jalibatch\venv`**(`JUN_JALIBATCH_HOME` 으로 바꿈) — PySide6 휠(Essentials 도)
+  안에 151자 경로(`qml\Qt\labs\assetdownloader\…`)가 있어 **툴 폴더(86자) 안 `.venv` 는 260자 한도로 pip 실패**(실측). 전체 PySide6 → Essentials 교체만으로는 안 됐다.
+  bat 은 CRLF(`.gitattributes`), `--no-launch` 때는 pause 금지(스크립트가 멈춘다). 모사 환경(가짜 `py` + PATH 3.14 만 + PYTHONPATH 오염)으로 검증, 실제 Win10 · 다운로드 경로 미확인.
 - **남은 것**: 실제 화면 확인(두 창 · 셸프 드롭 · 타임슬라이더 소리 · 그래프 에디터 편집 흐름) · `build_exe.bat` 미실행 · **P4(2단계)** JUN_JALI `cli.py` 호출 + Convert 단계 안 함.
 - 테스트 함정: `arkit_connect.plan` 은 연결 전에 계획을 다 세우므로 규칙으로 두 소스가 같은 타겟을 노리면 `claimed` 로 먼저 온 쪽만(안 그러면 force 가 덮는다).
   A00560 test_ui 에서 fake 워커가 Overwrite 로 다시 만들면 `edited` 가 `generated` 로 돌아간다(실제 워커와 같다).

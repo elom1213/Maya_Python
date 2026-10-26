@@ -14,5 +14,12 @@
 #        keys, DUMMY_IN leftovers and whether the controller file changed since the stamp; Repath switches the controller.
 #        Shrink / Pin, File > Add to Start Menu, shared log, prefs in ~/.jun_jalibatch.
 
-VERSION = "01.00"
+# 01.01  Double-click launcher: Run_JaliBatch.bat (first run builds the environment via setup_env.bat, then opens the
+#        window without a console) and setup_env.bat (finds 64-bit Python 3.10+ - 3.14 included, PySide6 abi3 wheels;
+#        with no usable Python it downloads a private Python 3.11.9 like JUN_JALI; app/selftest.py). Windows 10 / 11.
+#        The environment lives in %USERPROFILE%\.jun_jalibatch\venv (JUN_JALIBATCH_HOME overrides) - the PySide6 wheel
+#        has a 151-character path, so a venv inside this (86-character) tool folder breaks the Windows 260 limit.
+#        requirements.txt = PySide6_Essentials (pyinstaller just for build_exe.bat). Verified on Python 3.14.9 + PySide6 6.12.
+
+VERSION = "01.01"
 LAST_UPDATE = "2026-10-26"

@@ -4,7 +4,7 @@ VisemeNet Converter(`JUN_JALI`) 가 만든 **변환 결과 폴더**(대사마다
 **대사마다 마야 클립 `.mb` 하나**를 만드는 standalone PySide 툴. 마야 밖에서 돌고, 마야 일은 **mayapy 워커 한 프로세스**가
 클립 N 개를 순서대로 처리한다. 만든 클립은 짝 툴 **`A00570_JaliReview`** 가 마야 안에서 레퍼런스로 검수한다.
 
-- **버전**: v01.00 (2026-10-26)
+- **버전**: v01.01 (2026-10-26) — 더블클릭 실행 파일 `Run_JaliBatch.bat`, Python 3.14 · Windows 10 지원. v01.00 첫 버전
 - **아키텍처**: (B) standalone PySide6 (`python launch.py` / `build_exe.bat`), 마야 일은 `app/maya/worker.py` (mayapy)
 - **짝**: `A00570_JaliReview`(검수) · `A00540_JaliLipSync`(마야 안에서 클립 하나를 바로 키) · `JUN_JALI`(변환기 · STT)
 - **공용 코어**: `Framework/jali` ([Framework_jali](Framework_jali.md)) · mayapy 러너 `Framework/core/mayapy_runner.py` + `Framework/qt/MOD_mayapyProcess_qt_v01.py`
@@ -25,13 +25,38 @@ VisemeNet Converter(`JUN_JALI`) 가 만든 **변환 결과 폴더**(대사마다
 - 출력 폴더에 `jali_clips.manifest.json` — 설정 + 클립마다 `start · end · frames · status(generated / edited / failed) · 시각`.
   A00570 의 클립 목록 · 재생 범위가 여기서 나온다(레퍼런스된 클립의 fileInfo 는 검수 씬에서 보이지 않는다).
 
-## 2. 실행
+## 2. 실행 — `Run_JaliBatch.bat` 더블클릭
 
 ```
-python JUN_All/tools/A00560_JaliBatch/launch.py        (개발)      build_exe.bat → dist/A00560_JaliBatch.exe
+tools/A00560_JaliBatch/
+├── Run_JaliBatch.bat   ← 이것을 더블클릭. 처음 한 번은 환경을 만들고(콘솔 창, 1 ~ 2 분) 그 다음부터는 바로 창이 뜬다(콘솔 없음)
+├── setup_env.bat       환경만 다시 만들 때 (옵션 --force = 환경 다시, --yes = 묻지 않고 전용 파이썬 다운로드)
+└── setup_env.log       설치 기록 (문제가 생기면 이 파일)
+
+%USERPROFILE%\.jun_jalibatch\      ← 만들어지는 것은 전부 여기 (툴 폴더 밖)
+├── venv\                 PySide6 Essentials 가 든 파이썬 환경 (약 90 MB)
+├── python\               쓸 수 있는 파이썬이 없을 때만 — 전용 Python 3.11.9
+└── prefs.json            툴 설정 (mayapy 경로 등)
 ```
-`File > Add to Start Menu` 로 시작 메뉴 바로가기(Windows 10 · 11). mayapy 는 `Program Files\Autodesk\Maya*\bin\mayapy.exe` 중 최신을
-자동으로 잡고, 칸에서 바꿀 수 있다(설정은 `%USERPROFILE%\.jun_jalibatch\prefs.json`).
+
+- **필요한 것**: Windows 10 / 11 + **64-bit Python 3.10 이상** (Python **3.14** 만 있는 PC 도 된다 — PySide6 는 abi3 휠이라 3.14 에 그대로 설치된다).
+  `setup_env.bat` 이 `py -3.14 … -3.10` → PATH 의 `python` → `.jun_jalibatch\python\` 순으로 **실제로 실행해 버전을 읽어** 고른다(새 Python 설치 관리자의
+  `py -3.11` 은 없는 버전이어도 오류만 찍고 종료 코드 0 이라 종료 코드를 믿지 않는다 — Windows 10 보고). 쓸 수 있는 파이썬이 없으면
+  **전용 Python 3.11.9** 를 `.jun_jalibatch\python\` 에 받아 쓴다(python.org NuGet, 17 MB, SHA-256 확인, 시스템에 설치하지 않음 — JUN_JALI 와 같은 루틴).
+- **환경은 툴 폴더 밖** `%USERPROFILE%\.jun_jalibatch\venv\` 에 만든다(환경 변수 `JUN_JALIBATCH_HOME` 으로 바꿀 수 있다). 이유는 **Windows 260자 경로 한도**:
+  PySide6 휠(Essentials 도) 안에 151자짜리 경로(`PySide6\qml\Qt\labs\assetdownloader\…\…init.cpp.obj`)가 있어 환경 루트가 약 85자를 넘으면 롱패스를 켜지 않은 PC 에서
+  pip 가 `No such file or directory` 로 실패한다(실측 — 이 저장소의 툴 폴더는 86자). 패키지는 PySide6 **Essentials**(QtWidgets · QtGui · QtCore · QtSvg, 약 90 MB) —
+  전체 PySide6(WebEngine · QML 포함 250 MB)는 쓰지 않는다. PC 의 다른 파이썬 · conda 환경 변수(`PYTHONPATH` 등)는 bat 이 비우고 시작한다.
+- 자가 검사(`app/selftest.py`): PySide6 import → Framework · 툴 import → 창을 오프스크린으로 생성 → mayapy 탐색(없으면 경고만).
+- **마야는 mayapy 만 쓴다** — `Program Files\Autodesk\Maya*\bin\mayapy.exe` 중 최신을 자동으로 잡고 칸에서 바꿀 수 있다
+  (설정은 `%USERPROFILE%\.jun_jalibatch\prefs.json`). 마야가 없는 PC 에서는 창은 뜨지만 Run · Validate 가 mayapy 를 요구한다.
+- 창 안 `File > Add to Start Menu` 로 시작 메뉴 바로가기(venv 의 pythonw 를 가리킨다). 환경을 만든 파이썬을 지우면 `Run_JaliBatch.bat` 이
+  깨진 환경을 알아서 다시 만든다. 개발 실행은 `python launch.py`(PySide6 가 있는 파이썬), exe 는 `build_exe.bat`(pyinstaller 별도 설치).
+
+**확인 (2026-10-26)**: 이 PC(Python 3.11 + 3.14 NuGet 사본)에서 **가짜 `py` 런처(오류 출력 · 종료 코드 0) + PATH 에 Python 3.14.9 만 + `PYTHONPATH` 오염**
+환경을 꾸며 `Run_JaliBatch.bat --no-launch` → 3.14 발견 · `.jun_jalibatch\venv` 생성 · PySide6 Essentials 6.12 설치 · 자가 검사 통과, 그 3.14 환경으로 test_core 33 · test_ui 30 통과.
+(첫 시도는 툴 폴더 안 `.venv` 였고 전체 PySide6 도, Essentials 도 260자 한도에 걸려 실패 → 환경을 사용자 폴더로 옮겨 통과.)
+실제 Windows 10 PC 와 전용 파이썬 다운로드 경로(이 PC 에는 3.14 가 있어 다운로드가 일어나지 않는다)는 미확인 — JUN_JALI 의 같은 루틴은 모사 검증됨.
 
 ## 3. Batch 탭
 
