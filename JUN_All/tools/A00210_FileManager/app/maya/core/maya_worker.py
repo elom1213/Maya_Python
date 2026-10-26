@@ -1,31 +1,36 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-12
+# last Update date : 2026-10-26
 # A00210_FileManager / Maya 탭 - mayapy 워커 (mayapy.exe 가 실행한다. UI 프로세스에서 import 하지 않는다)
 #
 #   mayapy -u maya_worker.py <job.json>
 #
 # job.json:
-#   {"job": "scan",   "files": [...]}
-#   {"job": "import", "scan": <scan 결과 dict>, "checked": [norm...],
-#                     "remove_namespaces": bool, "make_backup": bool}
+#   {"job": "scan",   "files": [...]}                                                          Reference 하위탭
+#   {"job": "import", "scan": <scan 결과 dict>, "checked": [norm...], "remove_namespaces": bool, "make_backup": bool}
+#   {"job": "probe",  "files": [...], "rule": {"set_name", "match", "ignore_namespace"}}      Export 하위탭 (v01.41, 계획서 §3.2)
+#   {"job": "export", "rule": {...}, "bake": bool, "channels": [...], "joints_only": bool, "euler_filter": bool,
+#                     "import_references": bool, "report": path, "items": [{"file", "start", "end", "out_fbx"}]}   (§3.3)
 #   + "result": 결과 json 경로, "cancel_flag": 이 파일이 생기면 파일 경계에서 멈춘다  (mayapy_runner.write_job 이 넣는다)
 #
-# stdout 에 `JUNMSG {...}` 프로토콜 줄을 찍는다(mayapy_runner 머리글 참고). 마야 자체 출력은 섞여 나오지만
-# 프로토콜 줄은 접두어로 구별된다. 결과는 result 경로에 json 으로 쓰고 마지막에 result 메시지를 찍는다.
+# stdout 에 `JUNMSG {...}` 프로토콜 줄을 찍는다(Framework/core/mayapy_runner.py 머리글). 결과는 result 경로에 json 으로 쓰고
+# 마지막에 result 메시지를 찍는다.
 #
-# 같은 폴더의 ref_scanner / ref_importer / ma_parser / backup 을 **평범한 모듈로** import 한다 - 이 폴더를
-# sys.path 에 올리고. (그 모듈들은 상대 import 가 안 되면 평범한 import 로 폴백한다.) 얼린 exe 에서도
-# launch.spec 의 datas 로 이 폴더가 통째로 풀리므로 같은 방식이 된다.
+# sys.path (v01.41): 같은 폴더(ref_scanner 등을 평범한 모듈로) + Framework 가 있는 루트 - dev 트리(JUN_All) 또는 릴리즈본(툴 폴더 안
+# Framework), A00560 워커와 같은 규칙. 얼린 exe 는 launch.spec datas 로 이 폴더 · Framework/core · Framework/jali 가 디스크에 풀린다.
 
 import os
 import sys
 import json
 import traceback
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
+HERE = os.path.dirname(os.path.abspath(__file__))                                   # .../app/maya/core
+TOOL_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))                 # .../A00210_FileManager
+ROOT = os.path.dirname(os.path.dirname(TOOL_ROOT))                                   # JUN_All (dev) 또는 저장소 루트 (릴리즈)
+# 얼린 exe 의 datas 도 같은 모양이다: <_MEIPASS>/tools/A00210_FileManager/app/maya/core 와 <_MEIPASS>/Framework -> ROOT = _MEIPASS
+for _path in ((HERE, TOOL_ROOT, ROOT) if os.path.isdir(os.path.join(TOOL_ROOT, "Framework")) else (HERE, ROOT)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 PREFIX = "JUNMSG "
 
@@ -71,22 +76,28 @@ def main(argv):
         return 3
     log("Maya ready.")
 
-    import ref_scanner
-    import ref_importer
-
     def should_cancel():
         return bool(cancel_flag) and os.path.exists(cancel_flag)
 
     try:
         kind = job.get("job")
         if kind == "scan":
+            import ref_scanner
             result = ref_scanner.scan(job.get("files", []), progress=progress, log=log, allow_open=True)
         elif kind == "import":
+            import ref_importer
             result = ref_importer.import_references(
                 job["scan"], set(job.get("checked", [])),
                 remove_namespaces=bool(job.get("remove_namespaces", True)),
                 make_backup=bool(job.get("make_backup", True)),
                 log=log, progress=progress, should_cancel=should_cancel)
+        elif kind == "probe":
+            import scene_probe
+            result = scene_probe.probe(job.get("files", []), job.get("rule") or {}, log=log, progress=progress,
+                                       should_cancel=should_cancel)
+        elif kind == "export":
+            import bake_export
+            result = bake_export.export_all(job, log=log, progress=progress, should_cancel=should_cancel)
         else:
             emit(type="error", text="unknown job : {0!r}".format(kind))
             _shutdown()

@@ -132,6 +132,36 @@ def remove_all_namespaces(log=None):
     return removed, failed
 
 
+# ------------------------------------------------------------------ import every loaded reference (Export 하위탭, v01.41)
+
+def import_loaded_references(log=None):
+    """현재 씬의 **로드된** 최상위 레퍼런스를 전부 임포트한다(올라온 중첩도). 언로드 레퍼런스는 그대로.
+
+    Maya > Export 가 베이크 전에 부른다 - 레퍼런스 노드에 6000 프레임을 베이크하면 레퍼런스 **편집**이 수만 개 생기고,
+    FBX 가 노드 이름에 네임스페이스(`CHN:root`)를 남긴다(2026-10-26 실측). 저장은 하지 않는다(호출부가 안 한다).
+    반환: 임포트한 레퍼런스 파일 이름 목록.
+    """
+    cmds = _cmds()
+    _ensure_fbx_plugin()
+    imported = []
+    queue = [n for n in ref_scanner.top_level_reference_nodes() if _is_loaded(n)]
+    while queue:
+        node = queue.pop(0)
+        ref_file = ref_scanner.reference_file(node)
+        if not _is_loaded(node):
+            continue
+        before = set(ref_scanner.top_level_reference_nodes())
+        cmds.file(referenceNode=node, importReference=True)
+        after = set(ref_scanner.top_level_reference_nodes())
+        surfaced = sorted(after - before)
+        imported.append(os.path.basename(ref_file))
+        if log:
+            log("  imported reference {0}{1}".format(
+                os.path.basename(ref_file), " (+{0} nested)".format(len(surfaced)) if surfaced else ""))
+        queue.extend(n for n in surfaced if _is_loaded(n))
+    return imported
+
+
 # ------------------------------------------------------------------ import one file
 
 def import_into_file(maya_file, checked_keys, remove_namespaces=True, make_backup=True,

@@ -53,6 +53,17 @@ DEFAULTS = {
     "recreate_to": "",
     # Maya 탭이 레퍼런스 스캔 · 임포트에 쓰는 mayapy.exe (v01.35). 비어 있으면 자동 탐색.
     "mayapy_path": "",
+    # Maya > Export 하위탭 (v01.41). 규칙 폴더가 비면 ~/.jun_filemanager/export_rules, Export Folder 가 비면 원본 옆.
+    "export_rules_dir": "",
+    "export_rule": "Bake",
+    "export_fbx_dir": "",
+    "export_naming": {"find": "", "replace": "", "case": True, "mode": "token", "position": 0, "text": "bake"},
+    "export_range_mode": "timeline",
+    "export_custom_range": [0, 100],
+    "export_bake_channels": ["translate", "rotate", "scale"],
+    "export_joints_only": True,
+    "export_euler_filter": False,
+    "export_import_references": True,
 }
 
 # 비어 있으면 번들 기본값으로 보정할 동기화 키들(예전 파일에 없던 키 대비).
