@@ -1,6 +1,7 @@
 # A00560_JaliBatch — 툴 제작 계획서 (대량 wav → JALI 클립 .mb 생성 + 레퍼런스 검수)
 
-> **작성** 2026-10-23 · **갱신** 2026-10-23 (D7 — 시작 프레임을 파일 이름에서 읽지 않는다, 사용자 지시) · 상태: **계획 (실측 M0 전)** · 대상 Maya 2024 (mayapy) · PySide6 standalone + in-Maya 검수 툴
+> **작성** 2026-10-23 · **갱신** 2026-10-26 (M0 ~ M6 완료 — §10 · §11) · 상태: **A00560 v01.00 · A00570 v01.00 제작 완료 (M7 2단계 · 실기 눈 확인 남음)** · 대상 Maya 2024 (mayapy) · PySide6 standalone + in-Maya 검수 툴
+> 사용자 답 (2026-10-26): Q1 두 개 · Q3 **30 fps 기본, UI 에서 수정 가능** · 나머지 권장안. 안내 문서 [A00560_JaliBatch](../A00560_JaliBatch.md) · [A00570_JaliReview](../A00570_JaliReview.md) · [Framework_jali](../Framework_jali.md)
 > 평가 문서 [A00560_JaliBatch_pipeline_review.md](A00560_JaliBatch_pipeline_review.md) 의 개선안(§2-1 ~ 2-11)을 **그대로 반영**한 계획이다.
 > 참고 코드: `A00540_JaliLipSync/app/core`(keyer · mapping · lipsync_data · sequence · scene — **이 코어를 그대로 쓴다**, 사용자 요청) ·
 > `A00210_FileManager/app/maya`(mayapy 워커 · QProcess · 진행률 · 취소) · JUN_JALI `examples/build_jali_slider_ctl.py`(`bake_ctl_keys`) ·
@@ -238,3 +239,26 @@ M0 스크립트는 scratchpad 에 두고 결과를 이 문서 §10 에 적는다
 |------|------|------|
 | 2026-10-23 | 계획 | 평가서 + 이 계획서 작성. M0 전 |
 | 2026-10-23 | 계획 수정 | 사용자 지시 — 시작 프레임을 파일 이름(`_f0105_0429`)에서 읽지 않는다. D7 · job json · UI · T2 · Q2 · Q3 갱신 |
+| 2026-10-26 | 답 · M0 | 사용자 답(Q1 두 개 · Q3 30fps + UI 수정 · 나머지 권장). M0 실측 3회(§11) — **D12 확정 + 강화**: 교체 전 저장 필수(미저장 편집은 재로드 때 시각이 24fps 기준으로 환산되는 마야 버그) |
+| 2026-10-26 | M1 | P0 승격 커밋 `refactor(Framework): jali · mayapy 승격` — Framework/jali(5 모듈 + mappings + bake · clip_stamp) · Framework/core/mayapy_runner · Framework/qt/MOD_mayapyProcess_qt_v01. A00540 v01.03 tests 132 통과 · A00210 v01.40 스모크 12 |
+| 2026-10-26 | M2 | A00560 코어 + 워커 — test_core 33 · test_worker 32 (5 클립 5.5 s, Skip/Overwrite/backup, 3번째 취소, 깨진 txt 하나만 failed, Validate · Repath failedEdits) |
+| 2026-10-26 | M3 · M4 | A00560 UI(Batch · Validate, Shrink/Pin, Start Menu, 아이콘 svg/png/ico, exe spec) — test_ui 30 (가짜 워커 + 실제 mayapy 1회) |
+| 2026-10-26 | M5 · M6 | A00570 코어(review_scene · arkit_connect) + UI + 드롭 설치 + 아이콘 — test_review 33 · test_ui 24. Framework/jali 에 clip_manifest · time_units 추가(A00560 manifest 재노출). 문서 3종 · README · WORKLOG · 메모리 |
+| — | M7 | **안 함 (2단계)** — JUN_JALI `cli.py` 호출 + Convert 단계. 실기 눈 확인(T9) · `build_exe.bat` 도 남음 |
+
+---
+
+## 11. M0 실측 결과 (2026-10-26, mayapy 2024, 스크립트 3개 scratchpad)
+
+| # | 결과 | 설계에 준 영향 |
+|---|------|----------------|
+| M0-1 | `animDisplay -e -refAnimCurvesEditable 1` (optionVar `refAnimCurvesEditable`). **꺼져 있으면 keyframe -e 가 조용히 무시** | A00570 체크박스 + "OFF" 표시 |
+| M0-2 | 키 편집은 `relationship "fcurve" "<curve>" -relationshipData "add <t> <v> ..." / "cut <t>"` 로 **CLIP 레퍼런스 노드에 저장**. `referenceQuery -editStrings` 만 쓰면 클립 파일 자체의 중첩 편집 23건이 섞여 보인다 → **`-onReferenceNode CLIPRN`** 으로 검수 편집만 | `pending_edits()` |
+| M0-3 | `cmds.file(<클립 경로>, saveReference=True)` 가 맞는 형식(referenceNode 인자는 "No file name given"). 저장 뒤 편집 0, 클립 재열기에서 값 · 추가 키 확인, 중첩 JALI 레퍼런스 무사, 아바타 편집 미유출 | D12 그대로, Open Clip 은 보조 |
+| M0-4 | 편집을 남기고 교체하면 편집이 **유지되지만 시각이 1.25배(30/24)** 로 재적용된다(10 → 12.5, 5000 → 6250) — 같은 파일 재로드도 같다, film 씬에선 안 생긴다 → **마야 버그**. 저장 직후면 정확 | **Swap 은 pending 0 일 때만**(Save / Discard / Cancel). 검수 씬을 편집 남긴 채 저장 · 재열기 금지(안내) |
+| M0-4b | Discard: `referenceEdit -removeEdits` 는 로드 상태에서 안 지워진다 → unload → removeEdits(onReferenceNode) → load. 연결(아바타 편집) 유지 | `discard_edits()` |
+| M0-5 | 레퍼런스된 사운드 노드는 `CLIP:jali_lipsync_audio` 로 보인다(timeControl 연결은 GUI 미확인). 레퍼런스된 클립의 **fileInfo 는 안 보인다** | 재생 범위 · 상태는 매니페스트에서 |
+| M0-6 | 클립 왕복: ntsc → 레퍼런스 → apply_sequence → bake(copy) → DUMMY_IN 커브 삭제 → 저장 → 재열기: failedEdits 0, `CTL_PH_AAA.ty` 키 = 프레임 + 1, DUMMY_IN 커브 0, `ARKIT_OUT.jawOpen` 시간에 따라 변함, 도장 읽힘, 사운드 offset = start | 워커 §3 그대로 |
+| M0-7 | 같은 내용 다른 경로로 loadReference → 키 · 연결 그대로, failedEdits 0. `CTL_PH_AAA` 이름을 바꾼 파일 → failedEdits 2(disconnect · connect), 다른 채널 멀쩡 | Validate 의 Failed edits 열 · Repath |
+| M0-8 | 클립 1개 0.2 ~ 0.3 s(기동 제외), `.mb` 51 ~ 151 KB. 5 클립 워커 전체 5.5 s | 진행률 단위 = 클립 |
+| M0-9(추가) | 두 레퍼런스 사이 connectAttr(클립 → 아바타 BS) 편집은 **아바타 RN** 에 저장(순서 무관). 교체 뒤에도 연결이 산다 | Connect 는 교체와 무관, Discard 에도 안전 |

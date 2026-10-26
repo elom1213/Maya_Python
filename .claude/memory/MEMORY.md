@@ -38,6 +38,7 @@
 ## 마야 공통 함정
 
 - [maya reference import traps](maya-reference-import-traps.md) — `loadReferenceDepth none` 저장은 언로드로 굳음 · 언로드는 import 불가 · 부모 import 시 중첩이 최상위로 · `.ma` 머리글 file 문장 여러 줄 · mayapy 워커는 uninitialize 필수
+- [reference fcurve edit traps](maya-reference-fcurve-edit-traps.md) — 레퍼런스 커브 편집은 `saveReference` 로만 파일에, **미저장 편집은 재로드 때 24fps 기준 시각 환산(마야 버그)**, 편집 수는 `-onReferenceNode`, Discard 는 unload 뒤 removeEdits, 두 레퍼런스 사이 연결 편집은 목적지 RN
 - [FBX export selected scope](fbx-export-selected-scope.md) · [Maya 2023 compat](maya-2023-compat.md)(sin/cos 노드 없음) · [Maya loadPlugin no __file__](maya-loadplugin-no-file.md)
 - [undo_chunk by default](undo-chunk-by-default.md) · [cmds.toggle not undoable](maya-toggle-cmd-not-undoable.md) · [attr reorder = deleteAttr + undo](maya-attr-reorder-deleteattr-undo.md)
 - attrs — [channel box & references](attr-channelbox-and-references.md)(레퍼런스 어트리뷰트 표시 상태 못 바꿈) · [lock: parent compound overrides child unlock](maya-attr-lock-parent-compound.md) · [addAttr min/max raises](addattr-min-max-raises-not-clamps.md) · [xform silent on locked](xform-silent-on-locked-channels.md) · [getAttr settable lies](getattr-settable-lies-for-constrained.md) · [list_attrs multi detection](list-attrs-multi-detection.md) · [setAttr Int32Array no count](setattr-int32array-no-count.md)
@@ -101,7 +102,7 @@
 - A00480 — [FileTool](wip-a00480-filetool.md)(Export/Import/Path, Export 규칙, Naming = 공용 토큰 위젯. Maya 탭은 A00210 으로 감)
 - A00490 — [KeyboardTool](wip-a00490-keyboardtool.md)(크롬 계열은 활성 창만 키를 받는다 → Auto)
 - A00540 — [JaliLipSync](wip-a00540-jalilipsync.md)(VisemeNet txt → JALI 리그 키, 짝 = JUN_JALI 변환기 · 원본 모델은 추론도 무작위 · 끝 0.32초 짧음 · v01.01 규칙 json `nodes` 역할표 + Target Auto/Manual, 리그마다 json 하나)
-- A00560 · A00570 — [JaliBatch 계획](wip-a00560-jalibatch.md)(2026-10-23 계획만, 코드 전 · 레퍼런스 animCurve 편집은 saveReference 로만 클립에 저장 · 같은 이름 편집이 교체 때 전파 · M0 실측 8항목 먼저)
+- A00560 · A00570 — [JaliBatch · JaliReview](wip-a00560-jalibatch.md)(2026-10-26 v01.00 완료 · 코어는 Framework/jali · Swap 은 편집 0 일 때만 · 실기 눈 확인 · exe · P4 아직)
 - STT Converter — [wav → 대본 변환기 계획](wip-stt-converter.md)(JUN_JALI docs/0130, 2026-10-23 계획만 · faster-whisper turbo 1차 · Qwen3-ASR 2차 · 기준 PC Ryzen 9 3900X + RTX A2000 12GB · Win10 · Python 3.14 전용 PC 지원 조건)
 - A00550 — [PoseMapper](wip-a00550-posemapper.md)(음소 → BS 포즈 json · Connect, blendWeighted 의 weight 원소 없는 input = 안 보이고 1.0 · getAttr 가 원소를 만든다)
 - A00580 — [FacialBoardBuilder · Ctl_Only_V05](wip-facial-arkit52-ctl-v05.md)(ARKit 52 보드를 json 명세에서 빌드 · CSV 베이크 · verify 1722 · 더미 `BS_Face_CSV` 는 숨긴 평면에 · 컨트롤 트랜스폼은 override normal · GUI 확인 아직 · UE 빌더는 다음)

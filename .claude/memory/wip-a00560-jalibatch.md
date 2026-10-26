@@ -1,26 +1,29 @@
 ---
 name: wip-a00560-jalibatch
-description: "A00560_JaliBatch(standalone, wav N개 → JALI 컨트롤러 레퍼런스 + 베이크 클립 .mb) · A00570_JaliReview(in-Maya 검수) — 2026-10-23 계획서만 작성, 코드 전. 핵심 판정: 레퍼런스된 animCurve 편집은 검수 씬 편집으로 쌓여 file -saveReference 없이는 클립이 안 바뀜, 같은 이름이라 교체 때 전파 → Swap 앞 편집 검사. M0 실측 8항목 먼저"
+description: "A00560_JaliBatch v01.00(standalone, 변환 결과 폴더 → JALI 클립 .mb N 개, mayapy 워커) · A00570_JaliReview v01.00(in-Maya 레퍼런스 검수: Swap · Save Clip Edits · ARKIT_OUT → BS) — 2026-10-26 제작 완료, 코어는 Framework/jali 공용. GUI 눈 확인 · exe 빌드 · P4(변환기 CLI) 아직"
 metadata:
-  node_type: memory
   type: project
-  originSessionId: 798f0898-035e-4b92-917a-642be0114c7a
-  modified: 2026-10-23T06:39:52.997Z
 ---
 
-**2026-10-23 — 계획 단계.** 사용자 용어: **JALI 툴** = `JUN_JALI`(VisemeNet 변환기 + MFA), **JALI 컨트롤러** =
-`C:\Users\USER\Desktop\JP\0035_maya_src_rig\02_Cage_JALI\A0030_jali_slider_ctl_direct_arkit.ma`. 예시 자료
-`JUN_JALI_Voice/0060_Vivian_voice/src_en`(wav + 대본 5쌍) · `out_en_002`(변환 결과 22열 txt · .visemenet.json · wav).
+**2026-10-26 완료 (사용자 답 Q1 두 개 · Q3 30fps + UI 수정 가능 · 나머지 권장안).** 계획서 `JUN_All/docs/plans/A00560_JaliBatch_plan.md`
+(§10 진행표 · §11 M0 실측), 안내 `docs/A00560_JaliBatch.md` · `docs/A00570_JaliReview.md` · `docs/Framework_jali.md`.
+용어: **JALI 툴** = `JUN_JALI`, **JALI 컨트롤러** = `0035_maya_src_rig\02_Cage_JALI\A0030_jali_slider_ctl_direct_arkit.ma`, **클립** = 대사 하나의 `.mb`.
+예시 자료 `JUN_JALI_Voice/0060_Vivian_voice/out_en_002`(5 클립).
 
-문서: `JUN_All/docs/plans/A00560_JaliBatch_pipeline_review.md`(계획 평가 · 개선 11개) · `A00560_JaliBatch_plan.md`(제작 계획 D1~D14, M0~M7, T1~T9, Q1~Q8).
-사용자 요청: **A00540_JaliLipSync 코어를 참고 · 그대로 쓸 것** → 계획은 `Framework/jali/` 로 승격해 A00540 · A00560 워커 · A00570 이 공유(툴 간 import 금지 때문).
+- **P0 공용 승격 (커밋 "refactor(Framework): jali · mayapy 승격")**: A00540 `app/core` 5 모듈 + `mappings/*.json` → `Framework/jali`(A00540 v01.03 은 얇은 재노출,
+  tests 132 그대로), 새 `bake.py`(JUN_JALI `bake_ctl_keys` 이식 + cleanup_dummy_in · rename_curves) · `clip_stamp.py` · `time_units.py` · `clip_manifest.py`.
+  A00210 `mayapy_runner` → `Framework/core`, `mayapy_process` → `Framework/qt/MOD_mayapyProcess_qt_v01`(`run_job(..., worker=경로)`), A00210 v01.40 재노출.
+- **A00560 클립** = 빈 씬(fps 먼저!) + 컨트롤러 레퍼런스 ns `JALI` + `keyer.apply_sequence` → `bake(copy)` + DUMMY_IN 커브 삭제 + 커브 이름 `JALI_<ctl>_<attr>`
+  + wav 복사 사운드 + fileInfo 도장 + `jali_clips.manifest.json`. 베이크 채널 24(슬라이더 22 + JaLi 2 — 매핑에 없는 coartic 하나는 bakeResults 로 평평하게).
+  Start 는 전 클립 공통값 + 표에서 개별 수정(매니페스트에 저장), **파일 이름은 읽지 않는다**. 실패 클립은 다음 계속, 취소는 클립 경계. Skip/Overwrite/backup.
+  Validate 탭(열기만: failedEdits · 베이크 채널 · DUMMY_IN 잔여 · 도장 mtime) + Repath(그때만 저장). 5 클립 5.5 s, .mb 50~150 KB.
+- **A00570** = 빈 씬 + 아바타 레퍼런스 + 클립 레퍼런스 ns `CLIP`. Swap 은 **pending 0 일 때만**(아니면 Save/Discard/Cancel), Save Clip Edits = `cmds.file(<클립 경로>, saveReference=True)`,
+  Discard = unload → `referenceEdit -removeEdits -onReferenceNode` → load. Connect 는 별칭 일치, 연결 편집은 **아바타 RN** 에 남아 교체 뒤에도 산다.
+  Open Clip(임시 아바타 ns `REVIEW_AVATAR`) + Save Clip & Close. 재생 범위 · 상태는 매니페스트(레퍼런스된 클립의 fileInfo 는 안 보임).
+- 마야 레퍼런스 편집의 함정(시각 24fps 환산 · onReferenceNode · refAnimCurvesEditable)은 [[maya-reference-fcurve-edit-traps]].
+- 검증: A00560 core 33(python) · worker 32(실제 mayapy 하위 프로세스) · UI 30(PySide6 오프스크린 + 실제 mayapy 1회); A00570 core 33 · UI 24(mayapy 오프스크린).
+- **남은 것**: 실제 화면 확인(두 창 · 셸프 드롭 · 타임슬라이더 소리 · 그래프 에디터 편집 흐름) · `build_exe.bat` 미실행 · **P4(2단계)** JUN_JALI `cli.py` 호출 + Convert 단계 안 함.
+- 테스트 함정: `arkit_connect.plan` 은 연결 전에 계획을 다 세우므로 규칙으로 두 소스가 같은 타겟을 노리면 `claimed` 로 먼저 온 쪽만(안 그러면 force 가 덮는다).
+  A00560 test_ui 에서 fake 워커가 Overwrite 로 다시 만들면 `edited` 가 `generated` 로 돌아간다(실제 워커와 같다).
 
-- 사용자 계획 = 클립 `.mb`(빈 씬 + 컨트롤러 레퍼런스 ns `JALI` + DUMMY_IN 키 → `bake_ctl_keys(copy)` 로 컨트롤러에 베이크) N 개, 검수 = 빈 씬 + 클립 레퍼런스(ns `CLIP`) + 아바타 레퍼런스, `CLIP:JALI:ARKIT_OUT.*` → 블렌드셰이프, 클립 교체는 `file -loadReference`. 뼈대는 유지.
-- **틀어진 곳 (마야 레퍼런스 동작)**: ① 레퍼런스된 animCurve 키 수정("Allow edits on referenced animation curves")은 **검수 씬의 레퍼런스 편집**으로 쌓인다 — 클립 파일은 Reference Editor **Save Reference Edits** (`cmds.file(saveReference=True, referenceNode=…)`) 를 해야 바뀐다. ② 편집은 노드 이름 기준이고 모든 클립의 컨트롤러 · 커브 이름이 같으므로 **저장 안 한 편집이 교체 뒤 다음 클립에 적용**될 것으로 예상 → Swap 은 편집 0건일 때만(Save/Discard/Cancel). 둘 다 **M0 실측으로 확정할 것**(계획서 §6 M0-1 ~ M0-4, 아직 안 함).
-- **시작 프레임은 파일 이름에서 읽지 않는다** (사용자 정정 2026-10-23). 예시 자료의 `_f0105_0429` 는 그 자료만의 표기(30fps 원본 구간, wav 길이와 맞긴 한다)이고 이름에 프레임이 없는 파일이 일반적일 수 있다 → 전 클립 공통 Start(기본 1) + 표에서 개별 수정. **파일 이름 규칙에 의존해 데이터를 만들지 말 것** — 이 사용자의 일반 원칙으로 볼 것. fps 기본 ntsc 30 은 **컨트롤러 레퍼런스 전에** 설정(mayapy 새 씬 · 컨트롤러 .ma 는 film 24, A00540 keyer 는 씬 fps 샘플).
-- `bake_ctl_keys(mode='copy')` 는 DUMMY_IN → CTL 연결을 끊고 키를 복사하지만 DUMMY_IN 커브는 남긴다 → 클립에선 삭제. 커브 이름 `JALI_<ctl>_<attr>`.
-- 공용 승격 계획(P0): `Framework/jali/`(keyer · mapping · lipsync_data · sequence · bake · mappings) · `Framework/core/mayapy_runner.py` · `Framework/qt/MOD_mayapyProcess_qt_v01.py`(A00210 `app/maya` 에서) — A00540 tests 132 · A00210 워커 시험 그대로 통과가 완료 조건.
-- 변환(TensorFlow .venv · MFA) 은 1단계에서 호출하지 않는다 — 변환기 출력 폴더가 입력. 2단계 P4 = JUN_JALI `cli.py`(`converter.run_batch` 헤드리스).
-- Bash 툴 heredoc 으로 긴 마크다운을 쓰면 "unexpected EOF" 로 깨진다(이 세션 2회) → 문서는 Write 도구로, 치환 스크립트는 scratchpad .py 로.
-
-관련: [[wip-a00540-jalilipsync]], [[wip-jali-slider-ctl]], [[wip-a00210-maya-reference-tab]], [[maya-reference-import-traps]], [[release-layout-launch-py]], [[jun-jali-repo]]
+관련: [[wip-a00540-jalilipsync]], [[wip-jali-slider-ctl]], [[wip-a00210-maya-reference-tab]], [[maya-reference-import-traps]], [[release-layout-launch-py]], [[jun-jali-repo]], [[no-filename-dependent-data]]

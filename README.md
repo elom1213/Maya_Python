@@ -4,7 +4,7 @@
 독립 실행(standalone) Qt 앱을 직접 설계·개발한 포트폴리오 저장소입니다.
 
 > 작성자: **Ji Hun Park (Junny)** · Technical Artist / Rigging & Pipeline Tools Developer
-> 최근 갱신: 2026-10-26 · 툴 폴더 **70개**(템플릿·구버전 포함, **현행 55종**) · 공용 프레임워크 1개
+> 최근 갱신: 2026-10-26 · 툴 폴더 **72개**(템플릿·구버전 포함, **현행 57종**) · 공용 프레임워크 1개
 
 ---
 
@@ -72,6 +72,10 @@ A narrative work summary lives in
   씬 fps 샘플 · 매핑 json · 오디오 노드. 원본 모델의 **추론 무작위성(dropout 상수)** 을 찾아 결정적 모드로.
 - **`A00550_PoseMapper`** — 음소 어트리뷰트(예: JALI `JALI_IN`) → **블렌드셰이프 포즈** 관계를 슬라이더로 만들고(Solo preview · 지금 결과 Capture)
   json 으로 저장해 **아무 노드 쌍에 다시 연결**. 둘째 탭은 `blendWeighted` 의 **weight 원소가 빠진 input**(계산은 1.0, UI 엔 안 보임)을 찾아 고친다.
+- **`A00560_JaliBatch`** (standalone) — 변환 결과 폴더(대사 N 개) → 대사마다 **JALI 컨트롤러를 레퍼런스하고 키를 베이크한 클립 `.mb`**.
+  mayapy 워커 한 프로세스(실패 클립은 건너뛰고 계속 · 취소는 클립 경계), 도장 + 매니페스트, Validate(`failedEdits` · 도장 mtime) · Repath. 코어는 공용 `Framework/jali`.
+- **`A00570_JaliReview`** — 아바타 + 클립 **레퍼런스** 검수 씬. 다음 대사는 레퍼런스 교체뿐, 레퍼런스 커브 편집은 **Save Clip Edits**(`saveReference`)로 클립에.
+  미저장 편집을 들고 교체하면 마야가 시각을 24 fps 기준으로 다시 환산하는 버그를 실측으로 잡아 교체를 막는다. `ARKIT_OUT` → 블렌드셰이프 별칭 연결.
 
 <!-- ![ConnectionBuilder](JUN_All/docs/assets/A00090_ConnectionBuilder.png) -->
 
@@ -177,6 +181,7 @@ A narrative work summary lives in
 
 | 시기 | 내용 |
 |------|------|
+| 2026-10 하순 | **`A00560_JaliBatch` · `A00570_JaliReview` 신규** — 변환 결과 폴더 → JALI 클립 `.mb` N 개(mayapy 워커) → 레퍼런스 검수(Swap · Save Clip Edits · ARKIT_OUT 연결), **`Framework/jali`** · mayapy 러너 승격(A00540 v01.03 · A00210 v01.40 재노출) |
 | 2026-10 하순 | **`A00370_ToolLauncher` Shrink + 로켓 발사 애니메이션**(줄였을 때 272 x 155, `A00220` · `A00240` 도 같은 모양으로) · **`A00210_FileManager` Shrink · Pin + 폴더 · 기록 카드 애니메이션** · **`A00240` · `A00220` · `A00210`** `File > Add to Start Menu` + Pinned 동안 Pin 버튼 연한 빨강 · **`A00240`** Path 버튼 드래그 정렬 + 창 자유 크기 · **`A00360`** Sort By > Selection · **`A00540`** 클립 여러 개를 순서대로 한 씬에 · **`A00145`** Connect by Rule 겹치는 이름 보호 + `JALI 22 Viseme` 규칙 |
 | 2026-10 중순 | **`A00550_PoseMapper` 신규** — 음소 → ARKit 블렌드셰이프 포즈를 슬라이더로 다듬고 json 으로 저장 · 다른 노드 쌍에 연결, `blendWeighted` weight 편집 탭 |
 | 2026-10 중순 | **`A00540_JaliLipSync` 신규 + `JUN_JALI`(VisemeNet 포크)** — 다국어 음성을 오디오만으로 JALI 리그 립싱크: 더블클릭 설치 · 스탠드얼론 변환기(사전 검사, 오류 시 중단) · 마야 셸프 툴, JALI ↔ ARKit 52 매칭(리그 실측) |

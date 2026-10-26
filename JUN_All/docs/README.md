@@ -40,6 +40,8 @@
 | `A00410_SecondaryMotion` | 애니메이션 / 2차 모션 (FK 체인 관성·찰랑임) | [A00410_SecondaryMotion](A00410_SecondaryMotion.md) |
 | `A00420_Wrapper` | 모델링·페이셜 / 커브 가이드 래핑 (다른 토폴로지 메시 맞추기) | [A00420_Wrapper](A00420_Wrapper.md) |
 | `A00480_FileTool` | 파일 입출력 · 경로 (Export / Import / Path — A00040_V02 + quickTool File·Import 통합) | [A00480_FileTool](A00480_FileTool.md) |
+| `A00560_JaliBatch` | 페이셜 / 립싱크 **대량** (standalone) — VisemeNet 변환 결과 폴더 → 대사마다 JALI 컨트롤러를 레퍼런스하고 키를 베이크한 **클립 `.mb`**(mayapy 워커 한 프로세스, 도장 + 매니페스트) · Validate / Repath | [A00560_JaliBatch](A00560_JaliBatch.md) |
+| `A00570_JaliReview` | 페이셜 / 립싱크 **검수** (in-Maya) — 아바타 + 클립 레퍼런스(ns CLIP), Prev/Next/Swap, 레퍼런스 커브 편집 → Save Clip Edits(`saveReference`), ARKIT_OUT → 블렌드셰이프 연결 | [A00570_JaliReview](A00570_JaliReview.md) |
 | `A00580_FacialBoardBuilder` | 페이셜 — ARKit 52 컨트롤 보드(`Ctl_Only_V05`)를 명세 json 에서 생성 · CSV 베이크 · 검증 (헤드리스, UE Control Rig 는 2단계) | [A00580_FacialBoardBuilder](A00580_FacialBoardBuilder.md) |
 | `A00380_MeshTool` | 모델링 / 메시 진단 · 편집 (MeshDoctor · Peak · Match) | [A00380_MeshTool](A00380_MeshTool.md) |
 | `A00300_meshDoctor` | 〃 (A00380 의 MeshDoctor 탭으로 이식됨 · 보존) | [A00300_meshDoctor](A00300_meshDoctor.md) |
@@ -67,6 +69,7 @@
 | `Framework/core/log_levels.py` | 로그 줄의 **`[LEVEL]` 표식 -> 색** 공용 규칙 — `[WARN]` 노랑 · `[OK]` 초록. 밝은/어두운 테마용 색 한 쌍을 갖는다 | [Framework_log_levels](Framework_log_levels.md) |
 | `Framework/core/mirror_tokens.py` | 좌/우 미러 **토큰 규칙 공용화**(`Framework/rules/mirror_tokens.json`) — 이름 미러링은 **경계 매칭**으로 `arm_lower` 같은 오탐을 막는다 | [Framework_mirror_tokens](Framework_mirror_tokens.md) |
 | `Framework/core/shell_integration.py` | Windows **시작 메뉴 바로가기**(.lnk + AppUserModelID, PowerShell `Add-Type` C#) + 시작 화면 고정 시도. standalone 툴의 `File > Add to Start Menu`(A00240 · A00220). Windows 10 · 11 | [Framework_shell_integration](Framework_shell_integration.md) |
+| `Framework/jali/` + `Framework/core/mayapy_runner.py` · `Framework/qt/MOD_mayapyProcess_qt_v01.py` | **JALI 립싱크 공용 코어**(A00540 app/core 승격: lipsync_data · mapping · sequence · keyer · scene + bake · clip_stamp · clip_manifest · time_units, 매핑 json) 와 **mayapy 워커 러너**(A00210 승격, `JUNMSG` 프로토콜 · QProcess 진행률 팝업). A00540 · A00560 · A00570 · A00210 | [Framework_jali](Framework_jali.md) |
 | `Framework/qt/pin_style.py` | 체크형 **`Pin`(Always on Top) 버튼의 켜짐 색** — `apply_pin_style(button)` 한 줄로 켜진 동안 연한 빨강(`:checked` 색만, 크기는 테마 그대로). A00240 · A00220 · A00370 | [Framework_pin_style](Framework_pin_style.md) |
 
 ### 배치 · 패키징 (툴 하나가 아니라 전체에 걸친 것)

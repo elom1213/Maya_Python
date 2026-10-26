@@ -185,13 +185,16 @@ updated: 2026-10-26
   by headless automated checks (converter 42 · Maya tool 132 · STT 120 · rig 495 · MetaHuman dummy 25 × 252). **Visual
   confirmation** (do the lips really close naturally, tongue sign) and the reference-PC run remain, and the docs say so
   as "unverified". Comparing **Korean / Japanese** viseme quality on an English-trained model is also still open.
-- **Next — batch pipeline (`A00560_JaliBatch` · `A00570_JaliReview`, plan stage)**: N WAVs → N **clip `.mb` files** that
-  reference the controller rig and bake the keys → a review scene references a clip + an avatar and steps through clips by
-  **swapping the reference**. The plan review caught two Maya reference traps up front — edits to referenced animCurves
-  accumulate as reference edits of the review scene, so **the clip does not change without `saveReference`**, and edits are
-  recorded by node name, so with every clip named the same an **unsaved edit leaks into the next clip** → an edit check
-  before every swap. The start frame is never read from the file name (no data derived from naming conventions).
-  A00540's core is promoted to a shared `Framework/jali` used by all three tools.
+- **★ Batch pipeline — `A00560_JaliBatch` (standalone) · `A00570_JaliReview` (in-Maya)**: a converter output folder (N lines) →
+  **one mayapy worker process** builds a **clip `.mb`** per line (controller referenced, keys baked, failed clips skipped and the
+  rest continues, cancel at clip boundaries, stamp + manifest), and Validate checks all N at once (a renamed controller shows up
+  as `failedEdits`). The review scene is avatar + clip references; the next line is just a **reference swap**. Before writing code
+  I **measured Maya's reference edits in mayapy** and changed the design: key edits on referenced curves only reach the file via
+  `saveReference`, and **swapping with unsaved edits makes Maya re-apply them with times rescaled to 24 fps** (frame 10 → 12.5
+  in a 30 fps scene, a Maya bug) → swap only with zero pending edits (Save / Discard / Cancel). Pending edits are separated from
+  the clip's own nested edits with `-onReferenceNode`, and connection edits between two references were confirmed to live on the
+  destination (avatar) side, so they survive swaps. The start frame is never read from the file name. A00540's core and A00210's
+  mayapy runner were promoted to the shared `Framework/jali` · `Framework/core` used by all three tools (95 + 57 automated checks).
 - **Follow-up — `A00550_PoseMapper`**: tune phoneme → ARKit blendShape poses with sliders (solo preview, capture the result
   of any existing network), save them as json and **reconnect them to another avatar by name**. While tuning I measured why a
   `blendWeighted` input connected in the Node Editor misbehaves (its weight element does not exist, so it is hidden yet

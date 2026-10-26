@@ -32,6 +32,16 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-26 (오늘)
 
+> [!summary] A00560_JaliBatch · A00570_JaliReview **신규 (v01.00)** + Framework/jali · mayapy 러너 승격 — **변환 결과 폴더 → JALI 클립 .mb N 개 → 레퍼런스 검수** `#A00560_JaliBatch` `#A00570_JaliReview` `#Framework` `#JALI`
+- 요청: 계획서(`docs/plans/A00560_JaliBatch_plan.md`) 질문 답 — Q1 두 툴, Q3 30fps 기본 + UI 수정 가능, 나머지 권장안 — 으로 제작.
+- **M0 실측 먼저** (mayapy 2024, 3회): `refAnimCurvesEditable` · 편집은 `relationship fcurve` 로 CLIP RN 에(`-onReferenceNode` 로 가른다) · `cmds.file(경로, saveReference=True)` · Discard 는 unload 뒤 removeEdits · 연결 편집은 아바타 RN · **미저장 편집을 들고 교체하면 시각이 24fps 기준으로 환산(10 → 12.5)되는 마야 버그** → Swap 은 편집 0 일 때만. 계획서 §11.
+- **M1 승격** (`refactor(Framework)`): A00540 `app/core` 5 모듈 + 매핑 json → `Framework/jali`(+ `bake.py` JUN_JALI 이식 · `clip_stamp.py` · `time_units.py` · `clip_manifest.py`), A00210 `mayapy_runner` → `Framework/core` · `mayapy_process` → `Framework/qt/MOD_mayapyProcess_qt_v01`(워커 경로 인자). A00540 v01.03 · A00210 v01.40 재노출, A00540 tests 132 그대로.
+- **A00560_JaliBatch** (standalone PySide6, `python launch.py`): Batch(Source 스캔 — 22열 txt 만 · wav 없으면 제외 · **이름에서 프레임 안 읽음**, 표 Start 개별 수정, fps 콤보 30, Mapping, JaLi, Skip/Overwrite/backup, Keep edited) → mayapy 워커 한 프로세스가 클립마다 fps → 컨트롤러 레퍼런스 ns JALI → keyer → bake(copy) + DUMMY_IN 커브 삭제 + `JALI_<ctl>_<attr>` → wav 복사 사운드 → 도장 → `.mb` + 매니페스트. Validate(failedEdits · 베이크 채널 · DUMMY_IN · 도장 mtime) + Repath. Shrink/Pin · Start Menu · 아이콘 svg/png/ico · exe spec.
+- **A00570_JaliReview** (in-Maya PySide, `__dragDrop_A00570`): 매니페스트 클립 표 · Build Review Scene(아바타 + CLIP 레퍼런스, fps · 범위 · 소리) · Prev/Next/Swap(미저장 편집은 Save/Discard/Cancel) · Allow edits 체크 · 편집 목록 · Save Clip Edits(saveReference → 매니페스트 edited) · Discard · Connect ARKIT_OUT → BS(별칭 일치 · 규칙 json · 이미 구동 skip · 없는 타겟 보고 · undo 한 번) · Open Clip(임시 아바타) / Save Clip & Close.
+- 검증: A00560 core 33 · worker 32(실제 mayapy 하위 프로세스, out_en_002 5 클립 5.5 s) · UI 30(PySide6 오프스크린 + 실제 mayapy 1회) / A00570 core 33 · UI 24(mayapy 오프스크린). 커밋 4개(승격 · 코어+워커 · UI · A00570).
+- 문서: `docs/A00560_JaliBatch.md` · `docs/A00570_JaliReview.md` · `docs/Framework_jali.md` 신설, A00540 · A00210 안내 갱신, README 표, 계획서 §10 · §11, 메모리 `wip-a00560-jalibatch` · `maya-reference-fcurve-edit-traps`.
+- **남은 것**: 실제 화면 확인(두 창 · 셸프 드롭 · 타임슬라이더 소리 · 그래프 에디터 편집) · `build_exe.bat` · M7(2단계, JUN_JALI `cli.py` 호출)은 안 함.
+
 > [!summary] A00580_FacialBoardBuilder 신규 — **ARKit 52 페이셜 보드 `Ctl_Only_V05.ma/.mb` 생성** (명세 json → 빌드 · 베이크 · 검증 1582 항목) `#A00580_FacialBoardBuilder` `#Facial` `#ARKit52`
 - 계획서 Q1~Q8 답(direct 유지 · FileTool 은 `BS_Face_CSV` 만 · cheekPuff 중앙 + 좌우 예비 미연결 회색 · funnel/pucker 두 슬라이더 · Head/Global/World = 따라가기 · 아래 표현 −ty · 크기 권장 · UE 는 다음) 그대로 진행.
 - M0 실측(mayapy 2024): `transformLimits` 가 **연결된 입력값도** 자른다(2 → 1, −1 → 0) · 지오메트리 없는 blendShape 별칭은 저장 왕복에서 살고 FileTool 이 찾는다 · V04 부호표 52(`BS_Face_CSV.a=1` → 어느 컨트롤 축이 ±1) · 색/리밋/textCurves 왕복 OK. **빌드 중 발견**: 지오메트리 없는 blendShape 는 연결된 animCurve delete · `cutKey -clear` · 입력 걸린 pma delete 로 **노드째 사라진다** → 숨긴 4점 평면 `BS_Face_CSV_geo` 에 건다, pma 는 입력을 떼고 지운다. `aliasAttr -q` 순서는 저장 뒤 plug 문자열 순 → 별칭↔인덱스 대응으로 비교. V04 별칭 인덱스는 ARKit 52 순서 그대로였다(처음 읽은 순서는 문자열 순이었음).
