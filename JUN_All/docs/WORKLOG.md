@@ -37,7 +37,7 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 실측(mayapy): FBX 를 순수 파이썬으로 파싱해 정답을 직접 계산 → 블렌더가 맞고 마야 직접 임포트가 틀림(CHOEUN Head 1001f 37cm). 전수 조사로 CHOEUN `Hips` 1-5493 · `RightArm` 3707-6285 만 틀리고, 뒤집힌 키가 전부 XYZ 동치 공식 `(x+180, 180-y, z+180)` 을 XZY 조인트에 적용한 값. `FBXImportQuaternion` 3모드 전부 틀림(euler 모드 = 사용자 씬과 8072 조인트·프레임 일치), 끄는 옵션 없음.
 - 블렌더 경유도 손실: 키 6285 → 약 4600, 월드 최대 1.27cm, 타임라인 1프레임 당김, `_end` 리프 본 13개.
 - 시제품: 임포트 뒤 원본 회전 키로 커브 재생성 → 5명 365조인트 불일치 0 · 월드 오차 0.00000cm · 7초. 원본의 ±360 래핑 1603곳은 회전 순서를 고려한 언랩으로 0(행렬 차 2e-15).
-- 결정: 새 툴 대신 `A00480_FileTool` Import > FBX 섹션(v01.13), 코어는 `Framework/core`(`fbx_binary` · `euler_math` · `maya_fbx_exact`) — A00210 일괄 처리 재사용 대비. 결정 필요 Q1~Q5(Normalize 기본 ON 추천 등).
+- 결정: 새 툴 대신 `A00480_FileTool` Import > FBX 섹션(v01.13), 코어는 `Framework/core`(`fbx_binary` · `euler_math` · `maya_fbx_exact`) — A00210 일괄 처리 재사용 대비. 결정 Q1~Q5 확정 — Normalize 기본 ON(0020 처럼) · Skeletons only ON · 타임라인 파일 그대로 · undo 기록 안 함 · A00210 일괄은 요청 시. §11-1 에 "동치 공식으로 뒤집힌 키를 되돌릴 수 있나" 답(못 한다, 원본 키로 덮는 이유).
 - 문서: [plans/A00480_FileTool_fbx_exact_import_plan.md](plans/A00480_FileTool_fbx_exact_import_plan.md). 구현 전.
 
 ## 2026-10-26

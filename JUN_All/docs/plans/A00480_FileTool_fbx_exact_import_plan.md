@@ -7,7 +7,7 @@ updated: 2026-10-27
 
 # A00480_FileTool — Mocap FBX 정확 임포트 (Exact Rotation) 계획서
 
-> 작성 2026-10-27 · 상태: **설계 완료 · 구현 전** · 아키텍처 (B) Maya 내 PySide 툴(기존 툴에 기능 추가)
+> 작성 2026-10-27 · 상태: **설계 완료 · 결정 Q1~Q5 확정(§11) · 구현 전** · 아키텍처 (B) Maya 내 PySide 툴(기존 툴에 기능 추가)
 >
 > 이 문서의 수치는 전부 이 PC 의 `Maya2024/bin/mayapy.exe` 헤드리스 실측이다(FBX 플러그인 2020.3.4).
 > 시제품 스크립트는 저장소에 넣지 않았다. 핵심 알고리즘은 §8 에 코드로 옮겨 두었다.
@@ -33,7 +33,7 @@ updated: 2026-10-27
   로직은 **`Framework/core`** 에 둔다. 나중에 `A00210_FileManager` 의 mayapy 일괄 처리에서도 같은 코드를 쓸 수 있다(Phase 2).
   새 툴은 만들지 않는다(§5).
 - 사용자가 바라는 **"0020 처럼"** 은 옵션 `Normalize joints`(jointOrient 0 · rotateOrder xyz)로 맞춘다.
-  위치와 방향은 정답과 같고, 조인트 표현은 블렌더 경유 결과와 같아진다(§6-3, Q1).
+  위치와 방향은 정답과 같고, 조인트 표현은 블렌더 경유 결과와 같아진다(§6-3). **기본 ON 으로 확정**(§11).
 
 ---
 
@@ -257,7 +257,7 @@ A00480(마야 안)과 A00210(mayapy 워커)가 함께 쓰려면 Framework 에 �
 | 월드 자세 | 정답 | 정답 (같다) |
 
 `0020_CHOEUN_0010.mb` 와 같지 **않게 남기는** 것: `_end` 리프 본(블렌더가 만든 것이라 만들지 않는다),
-키 감소(하지 않는다), 1프레임 당김(하지 않는다), 모든 본의 T·S 키(파일에 있는 것만). → Q1 · Q3
+키 감소(하지 않는다), 1프레임 당김(하지 않는다), 모든 본의 T·S 키(파일에 있는 것만). (Q1 · Q3 확정)
 
 ### 6-4. `Fix Scene From FBX` (이미 임포트해 둔 씬 고치기)
 
@@ -330,12 +330,12 @@ matrix(v, order) / mat_mul / max_abs_diff   # 3x3 리스트 행렬 (검증용)
 scan(path) -> (info: dict, logs: list)
 import_exact(path, skeletons=None, skeletons_only=True, unwrap=True, normalize=True, verify=True)
     -> (ok: bool, logs: list, report: dict)
-fix_scene_from_fbx(path, roots=None, unwrap=True, normalize=False, verify=True) -> (ok, logs, report)
+fix_scene_from_fbx(path, roots=None, unwrap=True, normalize=True, verify=True) -> (ok, logs, report)
 ```
 
 - 반환 규약은 기존 `maya_fbx` 와 같다 — `(성공, 로그 리스트)`. 로그 표식은 [Framework_log_levels](../Framework_log_levels.md).
 - **undo**: 키 수백만 개를 undo 큐에 올리지 않는다. 덮기 · 언랩 · 정규화 구간은 `cmds.undoInfo(stateWithoutFlush=False)` 로 감싸고 `finally` 에서 되돌린다.
-  로그에 `[Info] Undo is not recorded for this import.` 를 남긴다. 사전 검사(이름 충돌 `[FAIL]`)가 기존 씬을 보호한다. → Q4
+  로그에 `[Info] Undo is not recorded for this import.` 를 남긴다. 사전 검사(이름 충돌 `[FAIL]`)가 기존 씬을 보호한다. (Q4 확정)
 
 ### 7-4. `maya_fbx.import_options(...)`
 
@@ -484,15 +484,32 @@ e = om.MEulerRotation.decompose(m, om.MEulerRotation.kXYZ).closestSolution(prev)
 
 ---
 
-## 11. 결정이 필요한 것
+## 11. 결정 사항 (사용자 확정 2026-10-27)
 
-| # | 질문 | 추천 |
+| # | 질문 | 결정 |
 |---|------|------|
-| Q1 | `Normalize joints` 기본값 | **ON** — 요청이 "0020 처럼" 이고, 지금까지 쓰던 블렌더 경유 결과와 표현이 같아야 뒤 공정(리타깃 등)이 그대로 돈다. 원본 표현(jo · 회전 순서)이 필요하면 끄면 된다 |
-| Q2 | `Skeletons only` 기본값 | **ON** — 블렌더 경유도 스켈레톤만 남겼고, 마커 390개와 카메라 67개는 보통 필요 없다 |
-| Q3 | 타임라인 | **파일 그대로(1 ~ 6285)**. 블렌더 경유는 0 ~ 6284 로 1프레임 당겨진다. 기존 작업과 프레임을 맞춰야 하면 `Start Frame` 칸을 Phase 2 로 더한다 |
-| Q4 | undo | **기록하지 않는다**(키 560만 개). 대신 이름 충돌이면 `[FAIL]` 로 막아 기존 씬을 보호한다 |
-| Q5 | Phase 2 — `A00210_FileManager` 에서 FBX 폴더를 일괄 `.mb` 로 | 요청이 있을 때. 코어가 Framework 에 있으니 mayapy 워커 잡 하나다 |
+| Q1 | `Normalize joints` | **0020 처럼 — 기본 ON.** `Import FBX (Exact)` · `Fix Scene From FBX` 둘 다 기본 ON(jointOrient 0 · rotateOrder xyz). 끌 수는 있다 |
+| Q2 | `Skeletons only` 기본값 | **ON** — 마커 · 카메라 · `System` 은 지운다 |
+| Q3 | 타임라인 | **파일 그대로(1 ~ 6285).** 블렌더식 1프레임 당김 · `Start Frame` 칸은 만들지 않는다 |
+| Q4 | undo | **기록하지 않는다.** 덮기 · 언랩 · 정규화 구간은 undo 를 끄고 `finally` 에서 되돌린다. 이름 충돌 `[FAIL]` 로 기존 씬을 보호한다 |
+| Q5 | Phase 2 — `A00210_FileManager` 일괄 처리 | **요청이 있을 때만.** 이번 범위에서 뺀다 |
+
+### 11-1. 보충 — 뒤집힌 키를 공식으로 되돌릴 수 있나 (2026-10-27 사용자 질문)
+
+`(first+180, 180−middle, last+180)` 꼴의 동치 공식(XZY 라면 `(x+180, y+180, 180−z)`)은 **연속화(언랩) 때 고를 수 있는 후보**일 뿐이다.
+**마야가 망가뜨린 값에 적용하면 복원되지 않는다.**
+
+| RightArm f3707 (XZY) | 값 | 정답과 각도 차 |
+|------|------|------|
+| 파일(정답) | (3.472, 34.422, 88.554) | 0° |
+| 마야 임포트 | (543.472, −574.422, −91.446) | **177.6°** |
+| 정답에 XZY 동치 적용 | (183.472, 214.422, 91.446) | 0° (같은 자세, 값만 다름) |
+| **마야 값에 XZY 동치 적용** | (723.472, −394.422, 271.446) | **177.6°** (여전히 틀림) |
+| 마야 값에 XYZ 공식을 거꾸로 적용 `(x−180, 180−y, z−180)` | (363.472, 754.422, −271.446) | 0° |
+
+마지막 줄처럼 XYZ 공식을 되돌리면 그 키는 복원된다. 하지만 **어느 키가 뒤집혔는지**는 커브만 보고 알 수 없다.
+뒤집힌 구간도 연속 곡선이고, 시작 · 끝 프레임은 파일마다 다르다. 그래서 이 계획은 공식으로 추측하지 않고 **파일의 원본 키로 덮는다**(§4).
+회전 순서는 공식이 정하는 것이 아니라 파일의 `RotationOrder` 가 정한다. 공식의 모양이 회전 순서에 따라 달라질 뿐이다.
 
 ---
 
