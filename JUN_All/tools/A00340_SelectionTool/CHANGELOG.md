@@ -2,6 +2,11 @@
 
 All notable changes to this tool are documented here.
 
+## v01.13 — 2026-10-27
+
+- The `Pin` button turns light red while it is on (`Pinned`), like the other tools
+  (shared `Framework.qt.pin_style`).
+
 ## v01.12 — 2026-10-27
 
 - **The window can be made narrow freely by dragging.** The Rules tab status line printed the

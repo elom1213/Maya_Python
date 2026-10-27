@@ -32,6 +32,9 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-27 (오늘)
 
+> [!summary] A00340_SelectionTool **v01.13 — Pinned 연한 빨강**: 공용 `Framework.qt.pin_style.apply_pin_style` 적용 (다른 standalone 툴과 같은 색) `#A00340_SelectionTool`
+- 오프스크린 확인: 꺼짐 = 테마 색(#9c8266), 켜짐 = #f2a0a0 · 라벨 Pinned · 크기 72 x 28 그대로.
+
 > [!summary] A00340_SelectionTool **v01.12 — 창 가로 길이를 자유롭게**: Rules 상태 줄의 폴더 전체 경로가 창 최소 폭을 잡고 있던 것 수정 (1494 → 286px) `#A00340_SelectionTool` `#qt`
 - 요청: "가로길이를 자유롭게 드래그로 조절할 수 있게, 지금은 일정 길이만큼 줄이질 못해".
 - 원인(오프스크린 측정): Rules 탭 상태 줄 `N rule(s) in <전체 경로>` - 공백 없는 한 단어라 wordWrap 이 안 먹고, `QTabWidget` 이 안 보이는 탭까지 가장 넓은 페이지 최소 폭을 따라 Buttons 탭에서도 안 줄었다.

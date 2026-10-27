@@ -33,6 +33,7 @@ from Framework.qt.qt import (
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
+from Framework.qt.pin_style import apply_pin_style
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 from Framework.core import file_opener
@@ -108,6 +109,8 @@ class MainWindow(QWidget):
         # 고정 크기 — "Pin"/"Pinned" 토글 시 버튼 크기가 변하지 않도록 (넓은 라벨 기준)
         # 높이는 글씨가 잘리지 않도록 넉넉히 (테마 qss padding 포함).
         self.pin_button.setFixedSize(72, 28)
+        # v01.13 : 켜진(Pinned) 동안 연한 빨강 - 다른 툴과 같은 공용 qss (Framework.qt.pin_style)
+        apply_pin_style(self.pin_button)
         self.pin_button.toggled.connect(self.toggle_always_on_top)
 
         header_row = QHBoxLayout()
