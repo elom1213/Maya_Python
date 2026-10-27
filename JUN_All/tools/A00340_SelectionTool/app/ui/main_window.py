@@ -153,6 +153,9 @@ class MainWindow(QWidget):
         log_layout = QVBoxLayout(log_group)
         log_layout.addWidget(self.log_view)
         main_layout.addWidget(log_group)
+        # v01.14 : 로그는 **접힌 채(Shrink 켜짐)** 로 시작한다 - 버튼 줄만 보이고 `Show` 로 편다.
+        #          공용 위젯의 set_shrunk 가 버튼 체크 · 라벨까지 맞춘다.
+        self.log_view.set_shrunk(True)
 
         # 메뉴 체크를 탭의 실제 상태(저장된 설정)에 맞춘다. 시그널은 막고 맞춘다 -
         # 여기서 토글 핸들러가 돌면 같은 값을 다시 저장하고 로그만 남긴다.

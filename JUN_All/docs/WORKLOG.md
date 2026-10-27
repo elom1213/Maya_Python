@@ -32,6 +32,9 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-27 (오늘)
 
+> [!summary] A00340_SelectionTool **v01.14 — 로그창 접힌 채 시작**: 공용 로그 위젯 `set_shrunk(True)` 를 창 생성 때 `#A00340_SelectionTool`
+- 오프스크린 확인: 시작 = 접힘 · 버튼 `Show`(체크) · 로그 높이 20 · 창 높이 620 -> 528, `Show` 누르면 펴지고 창 620 으로 복원, 다시 접기 정상, 접힌 동안에도 로그는 쌓인다.
+
 > [!summary] A00340_SelectionTool **v01.13 — Pinned 연한 빨강**: 공용 `Framework.qt.pin_style.apply_pin_style` 적용 (다른 standalone 툴과 같은 색) `#A00340_SelectionTool`
 - 오프스크린 확인: 꺼짐 = 테마 색(#9c8266), 켜짐 = #f2a0a0 · 라벨 Pinned · 크기 72 x 28 그대로.
 

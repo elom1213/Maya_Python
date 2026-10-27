@@ -2,6 +2,10 @@
 
 All notable changes to this tool are documented here.
 
+## v01.14 — 2026-10-27
+
+- The log panel starts collapsed (Shrink on): only its button row shows; press `Show` to open it.
+
 ## v01.13 — 2026-10-27
 
 - The `Pin` button turns light red while it is on (`Pinned`), like the other tools

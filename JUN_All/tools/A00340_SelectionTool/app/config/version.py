@@ -28,5 +28,7 @@
 
 # 01.13  Pin 버튼이 켜진(Pinned) 동안 연한 빨강 - 다른 툴과 같은 공용 Framework.qt.pin_style.
 
-VERSION = "01.13"
+# 01.14  로그창이 접힌 채(Shrink 켜짐) 시작한다 - 버튼 줄만 보이고 `Show` 로 편다.
+
+VERSION = "01.14"
 LAST_UPDATE = "2026-10-27"
