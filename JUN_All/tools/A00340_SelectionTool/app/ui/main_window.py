@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-26
+# last Update date : 2026-10-27
 # A00340_SelectionTool - Qt UI (in-Maya)
 #
 # 마야에서 선택된 오브젝트들을 버튼 하나로 빠르게 다시 선택하는 툴.
@@ -28,6 +28,8 @@ from Framework.qt.qt import (
     QMessageBox,
     QPushButton,
     QTabWidget,
+    QScrollArea,
+    QFrame,
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
@@ -125,7 +127,14 @@ class MainWindow(QWidget):
         self.selection_tab = SelectionTab(log_callback=self._log)
         self.tabs.addTab(self.selection_tab, "Buttons")
         self.rules_tab = RulesTab(log_callback=self._log)
-        self.tabs.addTab(self.rules_tab, "Rules")
+        # v01.12 : Rules 페이지는 스크롤 칸에 담는다(Buttons 탭은 원래 스크롤 칸). 탭 위젯의 최소 폭은
+        # 안 보이는 페이지까지 가장 넓은 것을 따르므로, 버튼 줄이 긴 Rules 가 창을 그 폭 아래로 못 줄이게 했다.
+        # 이제 좁히면 Rules 에 가로 스크롤바가 생기고 창은 자유롭게 줄어든다.
+        rules_scroll = QScrollArea()
+        rules_scroll.setWidgetResizable(True)
+        rules_scroll.setFrameShape(QFrame.NoFrame)
+        rules_scroll.setWidget(self.rules_tab)
+        self.tabs.addTab(rules_scroll, "Rules")
         self.tabs.setTabToolTip(0, "Buttons grouped in categories, one profile json per set.")
         self.tabs.setTabToolTip(1, "Named object lists, one json file per rule - select them in any scene.")
         main_layout.addWidget(self.tabs, stretch=1)
@@ -151,6 +160,7 @@ class MainWindow(QWidget):
         # 저작권
         footer = QLabel("Copyright (c) Park Ji Hun. All rights reserved.")
         footer.setAlignment(Qt.AlignCenter)
+        footer.setWordWrap(True)        # v01.12 : 좁히면 두 줄로 - 한 줄 폭이 창의 최소 폭이 되지 않게
         main_layout.addWidget(footer)
 
     # ================================================================

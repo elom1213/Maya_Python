@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-26
+# last Update date : 2026-10-27
 # A00340_SelectionTool - "Rules" tab (Qt, in-Maya)  (v01.11)
 #
 # 규칙(rule) = 어느 씬에서든 다시 선택할 오브젝트 이름 목록 하나. **규칙 하나 = json 파일 하나**
@@ -36,6 +36,7 @@ from Framework.qt.qt import (
     QCheckBox,
     QPushButton,
     QSplitter,
+    QSizePolicy,
     QTreeWidget,
     QTreeWidgetItem,
     QListWidget,
@@ -59,6 +60,12 @@ TITLE = "Selection Tool"
 
 MISSING_HEX = "#e05050"      # 씬에 없는 오브젝트 행 글자색 (공용 TSL 의 (Null) 빨강과 같은 뜻)
 AMBIGUOUS_HEX = "#e0a040"    # 같은 이름이 둘 이상인 오브젝트 행 글자색
+
+
+def _short_dir(path):
+    """'.../data/rules' - 경로의 끝 두 폴더만 (상태 줄이 창 폭을 잡아 늘리지 않게)."""
+    parts = [p for p in os.path.normpath(path).replace("\\", "/").split("/") if p]
+    return ".../" + "/".join(parts[-2:]) if len(parts) > 2 else path
 
 
 class RulesTab(QWidget):
@@ -180,6 +187,10 @@ class RulesTab(QWidget):
         self.lbl_folder = QLabel()
         self.lbl_folder.setWordWrap(True)
         self.lbl_folder.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        # v01.12 : 폴더 **전체 경로**를 여기 쓰면 공백 없는 한 단어라 줄이 안 바뀌고, 그 길이가 창의 최소
+        # 폭이 됐다(탭 위젯은 안 보이는 탭까지 가장 넓은 페이지에 맞춘다 - Buttons 탭에서도 창이 안 줄었다).
+        # 글자는 짧게(끝 두 폴더), 전체 경로는 툴팁 · Show Folder 로. 가로 크기 요구도 무시하게 둔다.
+        self.lbl_folder.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         folder_row.addWidget(self.lbl_folder, 1)
         btn_reload = QPushButton("Reload")
         btn_reload.setToolTip("Read the rules folder again (after copying json files into it).")
@@ -224,7 +235,8 @@ class RulesTab(QWidget):
                 item.setSelected(True)
         self.tree.blockSignals(False)
 
-        self.lbl_folder.setText("{0} rule(s) in {1}".format(len(self._rules), self._rules_dir))
+        self.lbl_folder.setText("{0} rule(s) in {1}".format(len(self._rules), _short_dir(self._rules_dir)))
+        self.lbl_folder.setToolTip(self._rules_dir)
         for file_name, message in errors:
             self._log("[WARN] Rule '{0}' not loaded : {1}".format(file_name, message))
         self._on_rule_selection_changed()

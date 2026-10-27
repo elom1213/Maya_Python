@@ -2,6 +2,19 @@
 
 All notable changes to this tool are documented here.
 
+## v01.12 — 2026-10-27
+
+- **The window can be made narrow freely by dragging.** The Rules tab status line printed the
+  full rules folder path - one long word that never wraps - and that set the window's minimum
+  width (a tab widget keeps the widest page's minimum, so it happened on the Buttons tab too).
+  - The status line now shows the last two folders (`3 rule(s) in .../data/rules`); the full path
+    is its tooltip (and `Show Folder` opens it).
+  - The Rules page sits in a scroll area like the Buttons page: narrower than its button rows, a
+    horizontal scroll bar appears instead of the window refusing to shrink.
+  - The copyright line wraps.
+  - Minimum width went from 1494 to 286 px (offscreen measure). What is left is the shared log
+    panel's button row.
+
 ## v01.11 — 2026-10-26
 
 - **Top-level tabs `Buttons` / `Rules`**: everything that existed is the `Buttons`

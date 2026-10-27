@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-27 (오늘)
 
+> [!summary] A00340_SelectionTool **v01.12 — 창 가로 길이를 자유롭게**: Rules 상태 줄의 폴더 전체 경로가 창 최소 폭을 잡고 있던 것 수정 (1494 → 286px) `#A00340_SelectionTool` `#qt`
+- 요청: "가로길이를 자유롭게 드래그로 조절할 수 있게, 지금은 일정 길이만큼 줄이질 못해".
+- 원인(오프스크린 측정): Rules 탭 상태 줄 `N rule(s) in <전체 경로>` - 공백 없는 한 단어라 wordWrap 이 안 먹고, `QTabWidget` 이 안 보이는 탭까지 가장 넓은 페이지 최소 폭을 따라 Buttons 탭에서도 안 줄었다.
+- 수정: 상태 줄은 끝 두 폴더 + 툴팁 전체 경로 + 가로 크기 요구 무시, Rules 페이지를 스크롤 칸에(좁으면 가로 스크롤바), 저작권 줄 줄바꿈. 남은 하한은 공용 로그창 버튼 줄.
+- 검증: 두 탭 모두 286px 까지 줄어듦 · Rules 는 좁을 때만 가로 스크롤바 · 상태 줄 글자/툴팁. **마야 GUI 확인 아직.**
+
 > [!summary] A00275_skinTool_V01 **v01.37 — `Weights > Move`**: 조인트 n 개 → k 개 웨이트 이동, Kangaroo `SkinCluster > Move` 이식 + Respect selection `#A00275_skinTool_V01` `#kangaroo`
 - 요청: "모두 권장대로해. 또한 선택 영역 respect 기능도 구현해. 툴 제작해" (계획서 Q1~Q6 전부 추천안).
 - 구현: 새 하위 탭 `Move` (Engine Native / Kangaroo, From n · To k 리스트, Smooth Steps · Blend · Joint Lines 3 · Joint Locks 4 · Border 3 + Mask Steps · Respect selection · 소프트 · skinParent · 섬 검사). 코어 `weight_move_manager.py`, Smooth 공용 함수는 `skin_weights_common.py` 로 옮김(회귀 9 설정 차이 0).
