@@ -20,7 +20,7 @@ from .export_rules import (
     ExportRule,
     run_rules,
 )
-from .import_ops import import_fbx_normal
+from .import_ops import import_fbx_normal, scan_fbx_exact, import_fbx_exact, fix_scene_from_fbx
 from . import csv_ops
 from .path_ops import scene_folder, open_scene_folder, normalize_pasted_path
 from . import reference_ops
@@ -44,6 +44,9 @@ __all__ = [
     "ExportRule",
     "run_rules",
     "import_fbx_normal",
+    "scan_fbx_exact",
+    "import_fbx_exact",
+    "fix_scene_from_fbx",
     "csv_ops",
     "scene_folder",
     "open_scene_folder",

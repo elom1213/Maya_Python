@@ -50,5 +50,12 @@
 #        상태 Loaded / Unloaded(회색, 그 안의 중첩은 로드돼야 보인다) / Missing(빨강, 폴더만 연다).
 #        탭을 열 때마다 씬을 다시 읽는다(Refresh 버튼도).
 
-VERSION = "01.12"
-LAST_UPDATE = "2026-10-26"
+# 01.13  Import > FBX 에 Mocap FBX Import (Exact Rotation) 섹션. 마야 FBX 임포터가 비 XYZ 회전 순서 조인트
+#        (Vicon 모캡 Hips · RightArm 등)의 회전 키를 XYZ 동치 공식으로 뒤집어 자세가 틀리는 문제를, FBX 파일의
+#        원본 키로 회전(+ 이동) 커브를 다시 써서 고친다. Normalize joints(기본 ON) = jointOrient 0 · rotateOrder xyz
+#        (블렌더 경유 결과와 같은 표현). Skeletons only · 회전 순서를 고려한 언랩 · 파일과 비교 검증.
+#        Fix Scene From FBX = 이미 임포트한 씬을 같은 방법으로. 로직은 Framework.core.maya_fbx_exact
+#        (+ fbx_binary · euler_math). 계획서 docs/plans/A00480_FileTool_fbx_exact_import_plan.md.
+
+VERSION = "01.13"
+LAST_UPDATE = "2026-10-27"

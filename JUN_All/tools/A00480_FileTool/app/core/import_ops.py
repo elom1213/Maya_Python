@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-17
+# last Update date : 2026-10-27
 # A00480_FileTool - Import 탭 로직 (maya.mel, UI 비의존)
 """
 import_ops - 임포트 설정.
@@ -38,3 +38,35 @@ def import_fbx_normal():
                 "cannot set the import option.".format(FBX_PLUGIN)]
 
     return ["FBX import : OverrideNormalsLock ON (applies to the next import)."]
+
+
+# ================================================================
+# Mocap FBX Import (Exact Rotation) - v01.13
+# ================================================================
+#
+# 본체는 Framework.core.maya_fbx_exact (A00210 일괄 처리가 요청되면 같은 코드를 쓴다).
+# 마야 FBX 임포터가 비 XYZ 회전 순서 조인트의 회전 키를 뒤집는 문제를 파일 원본 키로 덮어 고친다
+# (계획서 docs/plans/A00480_FileTool_fbx_exact_import_plan.md).
+
+def scan_fbx_exact(path):
+    """FBX 요약 (씬을 건드리지 않는다). 반환 (info | None, 로그 리스트)."""
+    from Framework.core import maya_fbx_exact
+    return maya_fbx_exact.scan(path)
+
+
+def import_fbx_exact(path, skeletons=None, skeletons_only=True, unwrap=True, normalize=True, verify=True,
+                     progress=None):
+    """FBX 임포트 + 회전 커브를 파일 값으로. 반환 (ok, 로그 리스트)."""
+    from Framework.core import maya_fbx_exact
+    ok, logs, _report = maya_fbx_exact.import_exact(
+        path, skeletons=skeletons, skeletons_only=skeletons_only, unwrap=unwrap, normalize=normalize,
+        verify=verify, progress=progress)
+    return ok, logs
+
+
+def fix_scene_from_fbx(path, roots=None, unwrap=True, normalize=True, verify=True, progress=None):
+    """이미 임포트한 씬의 회전 커브를 FBX 원본으로. roots 가 없으면 이름이 같은 최상위 노드. 반환 (ok, 로그 리스트)."""
+    from Framework.core import maya_fbx_exact
+    ok, logs, _report = maya_fbx_exact.fix_scene_from_fbx(
+        path, roots=roots, unwrap=unwrap, normalize=normalize, verify=verify, progress=progress)
+    return ok, logs

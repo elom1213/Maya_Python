@@ -1,5 +1,24 @@
 # Changelog — A00480_FileTool
 
+## v01.13 (2026-10-27)
+- **Import > FBX : new `Mocap FBX Import (Exact Rotation)` section.** The Maya FBX importer flips the
+  rotation keys of joints whose rotate order is not XYZ when the values cross +-180 deg (e.g. Vicon
+  mocap `Hips` / `RightArm`), so the pose is wrong - in every Quaternion Interpolation mode. This section
+  imports the FBX with the Maya importer and then rebuilds the joint rotation (and translation) curves
+  from the keys stored in the file.
+  - `Browse` reads the file at once (no scene change) : `Info` line and one checkbox per skeleton.
+  - Options : `Skeletons only` (delete markers, cameras and other top nodes), `Normalize joints`
+    (jointOrient 0 / rotateOrder xyz - the layout of a Blender round trip; on by default),
+    `Unwrap rotations` (360 deg jumps removed with the rotate order's own equivalent solutions; when
+    Normalize is off), `Verify against file`.
+  - `Import FBX (Exact)` logs which joints Maya had wrong and the largest error after the rebuild.
+    It stops if the scene already has a node named like a checked skeleton root. Undo is not recorded.
+    The timeline is the file's own range.
+  - `Fix Scene From FBX` does the same for a scene that was already imported straight from the FBX
+    (selected roots, or every top node named like a skeleton in the file).
+  - Logic lives in `Framework.core.maya_fbx_exact` with the pure Python `fbx_binary` reader and
+    `euler_math`.
+
 ## v01.12 (2026-10-26)
 - **New `Reference` tab with a `Default` sub tab.** Every reference of the current scene is listed as a
   tree - a reference inside a reference (nested, any depth) sits under its parent. Columns `Reference`

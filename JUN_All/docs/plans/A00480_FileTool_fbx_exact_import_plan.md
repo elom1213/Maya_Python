@@ -7,7 +7,9 @@ updated: 2026-10-27
 
 # A00480_FileTool — Mocap FBX 정확 임포트 (Exact Rotation) 계획서
 
-> 작성 2026-10-27 · 상태: **설계 완료 · 결정 Q1~Q5 확정(§11) · 구현 전** · 아키텍처 (B) Maya 내 PySide 툴(기존 툴에 기능 추가)
+> 작성 2026-10-27 · 상태: **v01.13 구현 완료(2026-10-27, mayapy 순수 45 · 통합 29 통과) · 마야 GUI · Maya 2023 실기 확인 전** · 결정 Q1~Q5 확정(§11) · 구현 결과 §12 · 아키텍처 (B) Maya 내 PySide 툴(기존 툴에 기능 추가)
+>
+> **대상 환경: Windows 10 · Maya 2023 에서도 동작해야 한다**(사용자 요구 2026-10-27).
 >
 > 이 문서의 수치는 전부 이 PC 의 `Maya2024/bin/mayapy.exe` 헤드리스 실측이다(FBX 플러그인 2020.3.4).
 > 시제품 스크립트는 저장소에 넣지 않았다. 핵심 알고리즘은 §8 에 코드로 옮겨 두었다.
@@ -479,7 +481,7 @@ e = om.MEulerRotation.decompose(m, om.MEulerRotation.kXYZ).closestSolution(prev)
 | Cubic 키 | §8-3 근사 + `[WARN]` |
 | LimbNode 가 아닌 노드(Null · Marker)의 회전 | 덮지 않는다(같은 버그가 있을 수 있지만 이번 요청 밖이다. Marker 는 이동만 있다) |
 | 이동 · 스케일 커브 | 덮지 않는다. euler 모드에서는 파일 키 그대로 들어오는 것을 확인했다(A2) |
-| Maya 2023 | 이 PC 에 없어서 확인 못 한다. API 는 2023 에도 있는 것만 쓴다(`MFnAnimCurve.addKeys` · `MEulerRotation`) |
+| Maya 2023 · Windows 10 | **반드시 동작해야 한다**(사용자 요구). 이 PC 에 없어서 실기 확인은 못 한다 — Python 3.7 문법(ast 검사) · 2023 에도 있는 API 만(`MFnAnimCurve.addKeys/evaluate` · FBX MEL 명령 · PySide2) · numpy 안 씀 |
 | 다른 FBX 플러그인 버전 | §3 — 확인 안 했다 |
 
 ---
@@ -526,3 +528,32 @@ e = om.MEulerRotation.decompose(m, om.MEulerRotation.kXYZ).closestSolution(prev)
 
 > 시제품을 돌리다 겪은 함정: 스크립트 폴더에 `imp.py` 를 두면 표준 라이브러리 `imp` 를 가려서 mayapy 가
 > `Python is unable to find Maya's Python modules` 를 내며 망가진다. 테스트 · 도구 파일 이름이 표준 모듈과 겹치지 않게 한다.
+
+---
+
+## 12. 구현 결과 (2026-10-27, v01.13)
+
+계획과 같게 간 것: 파일 배치(§7), 흐름(§6-2), 결정 Q1~Q5, 받아들임 기준 A1~A7. 계획과 달라진 것은 실측 때문이다.
+
+| 항목 | 계획 | 구현 | 이유 |
+|------|------|------|------|
+| 씬 fps (§6-2 2단계) | 실측 뒤 확정 | **맞추지 않고 로그만** | 마야 임포터가 씬 fps 를 파일 fps 로 바꾼다(ntsc → ntscf, T3 실측) |
+| 이동 커브 | 덮지 않음(§10) | **파일에 이동 커브가 있는 축은 덮는다**(파일 · 씬 cm 일 때) | 사용자 씬(`0010_motion_0010.mb`)은 임포터가 키를 줄여 이동이 최대 0.016cm 어긋나 있었다 - 회전만 고치면 "온전" 하지 않다 |
+| 진단 기준 | 회전 행렬 차 | **버그 지문(XYZ 동치와 일치) 또는 1° 초과 = wrong**, 나머지 = 미세 차이 | 각도만 쓰면 뒤집힌 구간 안에서 우연히 차이가 작은 프레임이 빠져 구간이 쪼개진다 |
+| Fix 의 키 시간 검사 | 같아야 함 | **부분집합이면 OK** | 마야 임포터가 같은 값이 이어지는 키를 줄인다(Hips rx 6276/6285) |
+| 짐벌 근처 분해 | — | `atan2(-m20, cy)` | 어깨(PreRotation Y 90°)를 정규화하면 y ≈ 90°, asin + 근사 분기는 0.05° 틀렸다 |
+
+### 받아들임 기준 결과 (mayapy 2024, 이 PC)
+
+| # | 결과 |
+|---|------|
+| A1 | ✅ 5명 전 프레임 회전 불일치 0 (도구 자체 검증 + 별도 전수 조사) |
+| A2 | ✅ 월드 위치 최대 0.000004cm (365조인트 × 131프레임, 47,815 샘플) |
+| A3 | ✅ 180° 초과 튐 0 (Normalize ON · OFF 둘 다) |
+| A4 | ✅ Normalize ON: 365조인트 모두 jo 0 · ro xyz, A1 · A2 만족 |
+| A5 | ✅ 5명 34초 (임포트 6.7 + 재생성 22.5 + 검증 3.5), CHOEUN 하나 12초 |
+| A6 | ✅ 블렌더 출력 `0020_CHOEUN_0010.fbx`: `no wrong rotations found` · 검증 0, 7초 |
+| A7 | ✅ `FBXImportQuaternion` · `FBXImportMode` · undo 상태가 실행 전과 같다 |
+| T6 | ✅ `Fix Scene From FBX` 로 `0010_motion_0010.mb` 5명 고침 → 검증 0 · 별도 검사 0.000004cm, 32초 |
+
+남은 확인: **마야 GUI(창 · 로그 · 대기 커서)**, **Maya 2023 · Windows 10 실기**.

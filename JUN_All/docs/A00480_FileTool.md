@@ -1,8 +1,8 @@
 ---
 title: A00480_FileTool 사용법
 aliases: [File Tool, FileTool, A00480]
-tags: [maya-python, tool-guide, file, fbx, export, import, path, reference, pyside]
-updated: 2026-10-26
+tags: [maya-python, tool-guide, file, fbx, export, import, path, reference, mocap, pyside]
+updated: 2026-10-27
 ---
 
 # A00480_FileTool 사용법
@@ -14,11 +14,11 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 |----|------|------|
 | **Export** | objectSet 마다 FBX 한 파일로 일괄 익스포트 (Export Path · Set Up · Naming · Type Filter · Joints only) | [`A00040_file_exporter_V02`](A00040_file_exporter_V02.md) 화면 전체 |
 | **Import > CSV** (v01.10) | ARKit 페이셜 CSV(Live Link Face) → 노드 키프레임 + 오디오. **블렌드셰이프뿐 아니라 ARKit 어트리뷰트를 가진 아무 노드** | `A00200_CSV_tool` (ARKit Facial Import) 이식, 원본 보존 |
-| **Import > FBX** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` |
+| **Import > FBX** | `Import FBX normal` — FBX 임포트가 파일의 노멀을 그대로 쓰게 · **`Mocap FBX Import (Exact Rotation)`**(v01.13) — 마야 임포터가 뒤집는 회전 키를 FBX 원본 키로 다시 써서 모캡을 정확하게 | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `Import option` · 신규 (§3-2) |
 | **Path** | `Copy Scene Folder` · `Open Scene Folder` | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `File` |
 | **Reference > Default** (v01.12) | 현재 씬의 레퍼런스를 **중첩(이중 · 삼중)까지 트리**로 → 고른 파일을 탐색기에서 열기 · 경로 복사 | 신규 (§5) |
 
-- **버전**: `app/config/version.py` (v01.12 — **`Reference` 탭**(하위 탭 `Default`): 씬 레퍼런스를 중첩까지 트리로, `Open in Explorer` · `Copy Path`(§5) · v01.11 — Import > CSV 에 **`Value Scale`**: CSV 값 x 배율로 키(AdvancedSkeleton 페이셜 컨트롤 = `x10`, §3-1) · v01.10 — Import 탭이 하위 탭 **CSV / FBX**, CSV = `A00200_CSV_tool` 이식(영어 UI, 아무 노드에 키, §3-1) · v01.09 — Naming 토큰 규칙에 **`Enum`**(정해진 값 중 고르기, A00330 과 같은 공용 규칙, §2-4) · v01.08 — Naming 칸을 고쳐도 저장 안 함, **`Save` 버튼**으로만 프로파일 기본이 된다(§2-4) · v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
+- **버전**: `app/config/version.py` (v01.13 — Import > FBX 에 **`Mocap FBX Import (Exact Rotation)`**: 마야 FBX 임포터가 비 XYZ 회전 순서 조인트의 회전 키를 뒤집는 문제를 FBX 원본 키로 고침 · `Fix Scene From FBX`(§3-2) · v01.12 — **`Reference` 탭**(하위 탭 `Default`): 씬 레퍼런스를 중첩까지 트리로, `Open in Explorer` · `Copy Path`(§5) · v01.11 — Import > CSV 에 **`Value Scale`**: CSV 값 x 배율로 키(AdvancedSkeleton 페이셜 컨트롤 = `x10`, §3-1) · v01.10 — Import 탭이 하위 탭 **CSV / FBX**, CSV = `A00200_CSV_tool` 이식(영어 UI, 아무 노드에 키, §3-1) · v01.09 — Naming 토큰 규칙에 **`Enum`**(정해진 값 중 고르기, A00330 과 같은 공용 규칙, §2-4) · v01.08 — Naming 칸을 고쳐도 저장 안 함, **`Save` 버튼**으로만 프로파일 기본이 된다(§2-4) · v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
 - **설치**: `__dragDrop_A00480.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **FileTool** → `tools.A00480_FileTool.run(True)`
 - **테마**: `slate_dark`
 - **원본 두 툴은 그대로 남아 있다.** quickTool 의 File · Import option 버튼도 지워지지 않았다.
@@ -229,6 +229,69 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
 - `FBXProperty` 는 `fbxmaya` 플러그인이 등록하는 프로시저라, **플러그인을 먼저 올려 보고** 안 되면 로그에 이유를 남긴다.
 - 로그: `FBX import : OverrideNormalsLock ON (applies to the next import).`
 
+#### `Mocap FBX Import (Exact Rotation)` (v01.13)
+
+**마야 FBX 임포터가 일부 조인트의 회전을 뒤집는 문제**를 고쳐서, 모캡 FBX 를 블렌더를 거치지 않고 정확하게 임포트한다.
+배경 · 실측은 [계획서](plans/A00480_FileTool_fbx_exact_import_plan.md).
+
+- **왜** — 마야 임포터는 회전 키를 "이전 키에 가까운 동치 오일러" 로 바꿀 때 회전 순서와 상관없이 XYZ 꼴 `(x+180, 180−y, z+180)` 을 쓴다.
+  Vicon 모캡처럼 조인트 회전 순서가 XZY 등이고 값이 ±180° 를 넘나들면 **자세가 틀린다**(`BCM_01_004.fbx` CHOEUN: Hips 1-5493 · RightArm 3707-6285,
+  손끝 최대 200cm). 임포트 옵션 `Quaternion Interpolation` 세 모드 다 틀리고 끄는 옵션이 없다.
+- **어떻게** — 마야 임포터로 평소처럼 임포트한 뒤(`Set As Euler` 모드, 끝나면 사용자 설정으로 되돌림), **같은 FBX 를 순수 파이썬으로 읽어**
+  조인트의 회전 커브(파일에 이동 커브가 있으면 이동도)를 **파일 키 그대로** 다시 쓴다.
+
+```
+┌ Mocap FBX Import (Exact Rotation) ─────────────────────────────────┐
+│ FBX File   [C:/.../BCM_01_004.fbx                        ] [Browse] │
+│ Info       FBX 7700, Z-up, cm, 60 fps, frames 1-6285, 5 skeletons,  │
+│            365 joints, 390 markers, 67 cameras                       │
+│ Skeletons  [x] CHOEUN (73)  [x] SUA (73)  [x] ZHAN (73)      [All]   │
+│            [x] IVI (73)     [x] KANA (73)                    [None]  │
+│ Options    [x] Skeletons only        [x] Verify against file         │
+│            [x] Normalize joints (jointOrient 0, rotateOrder xyz)     │
+│            [ ] Unwrap rotations (rotate order aware)   <- Normalize 끌 때만 │
+│ [ Import FBX (Exact) ]               [ Fix Scene From FBX ]          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+1. `Browse` — FBX 를 고르면 **바로 읽는다**(씬은 안 건드림, 108MB 0.2초). `Info` 줄과 스켈레톤마다 체크박스(괄호 = 조인트 수)가 생긴다.
+   스켈레톤 = 자손에 조인트(LimbNode)가 있는 최상위 노드. ASCII FBX 는 아직 안 된다(`[FAIL]`).
+2. `Skeletons` — 임포트할 캐릭터. 체크 안 한 스켈레톤은 임포트 뒤 지운다.
+3. `Options`
+   - `Skeletons only`(기본 ON) — 스켈레톤 루트 아래의 마커 · 조인트 없는 가지와 카메라 · `System` 같은 다른 최상위 노드를 지운다.
+   - `Normalize joints`(기본 ON) — jointOrient(FBX PreRotation)와 회전 순서를 회전 값에 녹여 **모든 조인트를 jointOrient 0 · rotateOrder xyz** 로.
+     블렌더 경유(`0020_CHOEUN_0010.mb`)와 같은 표현이다. 자세는 켜든 끄든 같다. 끄면 파일 그대로(jointOrient = PreRotation, 조인트별 회전 순서).
+   - `Unwrap rotations` — 키 사이 360° 튐(원본 데이터에도 1603곳)을 **그 조인트 회전 순서의 동치 해**로 없앤다. Normalize 는 늘 이렇게 하므로 Normalize 를 끌 때만 켜진다.
+   - `Verify against file` — 샘플 프레임에서 파일 수식과 비교해 최대 오차를 로그에 남긴다(허용 0.001° · 0.001cm, 넘으면 `[FAIL]`).
+4. `Import FBX (Exact)` — 체크한 스켈레톤 루트와 **같은 이름이 씬 최상위에 있으면 `[FAIL]` 로 멈춘다**(새 씬에서 쓰거나 이름을 바꾼다).
+   임포트 → 정리 → 진단(마야가 틀린 조인트 · 구간을 로그) → 커브 재생성 → 정규화/언랩 → 검증. 타임라인은 **파일 범위 그대로**(1 ~ 6285),
+   씬 fps 는 임포터가 파일 fps 로 바꾼다. **undo 는 기록하지 않는다**(키 수백만 개). 임포터가 만드는 빈 네임스페이스(이 파일은 827개)는 지운다.
+5. `Fix Scene From FBX` — **이미 FBX 를 마야로 바로 임포트해 둔 씬**(`0010_motion_0010.mb` 같은)을 같은 방법으로 고친다. 씬에서 루트(또는 그 아래 아무
+   노드)를 선택하면 그 루트만, 선택이 없으면 FBX 스켈레톤과 이름이 같은 최상위 노드 전부. 회전 순서 · jointOrient 가 파일과 다른 조인트(이미 정규화한 씬 등)는
+   `[SKIP]`, 키 시간이 파일 키 시간의 부분집합이 아니면(리타임 · 오프셋) `[FAIL]` 로 멈춘다. 마야 임포터가 줄여 둔 키 · 탄젠트 때문에 생긴 미세 차이(최대 0.5° · 0.016cm)도 함께 고친다.
+
+로그 예 (`BCM_01_004.fbx`, 5명 전부, 이 PC 34초):
+
+```
+[Info] FBX 7700, Z-up, cm, 60 fps, frames 1-6285, 5 skeletons, 365 joints, 390 markers, 67 cameras
+[Info] Undo is not recorded for this import.
+[Info] Imported in 6.7s. Scene time unit film -> ntscf (from the file).
+[Info] Removed : 395 marker / non-joint branches, 1 other top nodes (cameras ...), 827 empty namespaces.
+[WARN] CHOEUN : Maya had wrong rotations on 2 joints - Hips (1-5493), RightArm (3707-6285). Rebuilt from the file.
+...
+[OK] Curves rebuilt from the file : 365 joints, 900 rotation + 15 translation curves, 5,750,775 keys (22.5s).
+[OK] Normalized joints : jointOrient 0, rotateOrder xyz.
+[OK] Verify : max 0.0000 deg rotation, 0.0000 cm position (3.5s).
+```
+
+- **알아 둘 것**
+  - 회전 · 이동 커브를 다시 쓰는 것은 **조인트(LimbNode)** 만이다. 이동은 파일 · 씬 단위가 둘 다 cm 일 때만 다시 쓴다(아니면 임포터 결과 그대로 + `[Info]`).
+  - Cubic 키(마야가 내보낸 FBX 등)는 auto 탄젠트로 쓰고 `[WARN]` — 키 위치 값은 정확하고 키 사이 모양이 근사다. 모캡(Linear)은 해당 없다.
+  - PostRotation 이 있는 조인트는 `[SKIP]`(아직 지원 안 함). 애니 스택 · 레이어가 여럿이면 첫 것만 쓴다(`[WARN]`).
+  - **Maya 2023 · Windows 10 에서도 써야 한다**(사용자 요구 2026-10-27). 코드는 Python 3.7 문법 · Maya 2023 에도 있는 API 만 쓰고 numpy 를 쓰지 않는다.
+    다만 이 PC 에는 Maya 2024 만 있어 **2023 실기 확인은 아직**이다.
+  - 로직은 `Framework.core.maya_fbx_exact`(+ `fbx_binary` · `euler_math`) — [Framework_fbx_binary](Framework_fbx_binary.md).
+
 ---
 
 ## 4. Path 탭
@@ -302,14 +365,16 @@ A00480_FileTool/
 ├── icon/                       # A00480_FileTool.svg / .png (폴더 + 들어오고 나가는 화살표)
 ├── CHANGELOG.md
 ├── tests/test_reference.py     # Reference 탭 시험 (mayapy 오프스크린, v01.12)
+├── tests/test_fbx_core.py      # FBX 리더 · 오일러 수학 시험 (순수 파이썬, 작은 FBX 를 직접 씀, v01.13)
+├── tests/test_fbx_exact.py     # Mocap FBX Import (Exact Rotation) 시험 (mayapy 오프스크린, v01.13)
 └── app/
-    ├── config/version.py       # VERSION = "01.06"
+    ├── config/version.py       # VERSION = "01.13"
     ├── core/                   # UI 비의존 (결과는 로그 문자열 리스트)
     │   ├── fbx_plugin.py       # ensure_fbx_plugin() — Export · Import 공용
     │   ├── export_ops.py       # A00040_V02 export_ops 이식 (타입 필터 · 파일명 · FBX export)
     │   ├── export_rules.py     # Export 규칙 레지스트리 + Check Hide Mesh (v01.03)
     │   ├── naming_ops.py       # Naming 규칙 묶음(FILE_NAME_RULES) · 기본 토큰 · TOKEN_STORE · build_file_names (v01.06)
-    │   ├── import_ops.py       # import_fbx_normal
+    │   ├── import_ops.py       # import_fbx_normal · scan_fbx_exact · import_fbx_exact · fix_scene_from_fbx (v01.13, 본체는 Framework.core.maya_fbx_exact)
     │   ├── csv_ops.py          # Import > CSV : ARKit CSV -> 키프레임(아무 노드) · 후보 노드 탐색 · 오디오(ffmpeg) (v01.10, A00200 이식)
     │   ├── path_ops.py         # scene_folder · open_scene_folder · normalize_pasted_path
     │   └── reference_ops.py    # Reference : scene_references(중첩 트리 순 행) · open_reference_files · clipboard_text (v01.12)
@@ -318,6 +383,7 @@ A00480_FileTool/
         ├── export_tab.py       # A00040_V02 화면 + Scene 버튼 · Naming = 공용 토큰 위젯 (v01.06)
         ├── import_tab.py       # 하위 탭 CSV / FBX (FBX = SECTIONS 표, v01.10)
         ├── import_csv_page.py  # Import > CSV 화면 (v01.10)
+        ├── import_fbx_exact.py # Import > FBX 의 Mocap FBX Import (Exact Rotation) 섹션 (v01.13)
         ├── path_tab.py         # SECTIONS 표
         ├── reference_tab.py    # Reference 탭 = 하위 탭 Default (트리 · Open in Explorer · Copy Path · 우클릭) (v01.12)
         ├── button_section.py   # SECTIONS 표 → 두 칸 버튼 그리드 (quickTool 방식)

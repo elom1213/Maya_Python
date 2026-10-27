@@ -16,3 +16,6 @@ metadata:
 입력 회전 φ(rad)에 대해 `outputQuatX=sin(φ/2)`, `outputQuatW=cos(φ/2)` 이므로, θ(도)에 `π/90` 을
 곱해 넣으면 deg→rad 변환과 반각 ×2 가 한 번에 처리되어 `quatX=sin θ`, `quatW=cos θ` 를 얻는다.
 참고: [[ui-text-english-only]]
+
+**A00480 Mocap FBX Import (Exact Rotation)** 도 Windows 10 · Maya 2023 에서 동작해야 한다(사용자 2026-10-27).
+Python 3.9 / PySide2 기준으로 쓰고(새 문법 · numpy 금지), FBX MEL 명령 · API 2.0 은 2023 에도 있는 것만.

@@ -2,7 +2,7 @@
 title: Framework.core.maya_fbx — FBX 플러그인 · "선택한 것만" FBX 내보내기 헬퍼
 aliases: [maya_fbx, fbx_options, collect_export_nodes, FBXExportIncludeChildren]
 tags: [maya-python, framework, fbx, export]
-updated: 2026-10-26
+updated: 2026-10-27
 ---
 
 # `Framework.core.maya_fbx`
@@ -22,6 +22,8 @@ with maya_fbx.fbx_options(include_children=False, input_connections=False, bake_
 maya_fbx.export_selected(nodes, path, include_children=False, input_connections=False, bake_complex_animation=False)
 maya_fbx.filter_members(members, excluded_keys)                 # 타입 필터(FILTER_TYPES: mesh · joint)
 maya_fbx.get_unique_filepath(path)  ·  maya_fbx.short_name(name)  ·  maya_fbx.is_joint(n)  ·  maya_fbx.is_constraint(n)
+with maya_fbx.import_options(quaternion="euler", mode="add", fill_timeline=None):   # 2026-10-27
+    mel.eval('FBXImport -f "..."')
 ```
 
 | 이름 | 하는 일 |
@@ -32,6 +34,7 @@ maya_fbx.get_unique_filepath(path)  ·  maya_fbx.short_name(name)  ·  maya_fbx.
 | `export_selected(nodes, path, ...)` | 폴더를 만들고 nodes 를 선택해 export selected. 옵션은 위 셋 |
 | `FILTER_TYPES` · `member_matches_type` · `filter_members` | A00480 Export 탭 드롭다운의 타입 필터(제외만 한다). 새 타입 = 두 곳에 한 줄 |
 | `get_unique_filepath` · `short_name` · `is_type` · `is_joint` · `is_constraint` | 보조 |
+| `import_options(quaternion, mode, fill_timeline)` (2026-10-27) | `with` 블록 안에서만 `FBXImportQuaternion` · `FBXImportMode` · `FBXImportFillTimeline` 을 바꾸고 `-q` 로 읽어 둔 값으로 되돌린다. [maya_fbx_exact](Framework_fbx_binary.md) 가 `euler` 모드로 임포트할 때 |
 
 ## 실측으로 정한 것 (mayapy 2024)
 

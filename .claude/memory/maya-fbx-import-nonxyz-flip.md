@@ -13,6 +13,9 @@ euler · resample(기본) · quaternion 셋 다 틀리고, 끄는 옵션이 없�
 
 **Why:** 2026-10-27 mayapy 실측(FBX 직접 파싱 정답 비교 · 전수 조사). 계획서 `JUN_All/docs/plans/A00480_FileTool_fbx_exact_import_plan.md`.
 
-**How to apply:** 모캡 FBX 가 마야에서 이상하게 들어오면 이 버그부터 의심. 해법은 임포트(euler 모드) 뒤 원본 `Lcl Rotation` 키로
+**구현(2026-10-27):** A00480_FileTool v01.13 Import > FBX `Mocap FBX Import (Exact Rotation)` · `Fix Scene From FBX`,
+코어 `Framework/core/maya_fbx_exact.py`(+ `fbx_binary` · `euler_math`). 마야 GUI · Maya 2023 실기 확인 아직.
+
+**How to apply:** 모캡 FBX 가 마야에서 이상하게 들어오면 이 버그부터 의심하고 위 기능을 쓴다. 해법은 임포트(euler 모드) 뒤 원본 `Lcl Rotation` 키로
 커브를 `MFnAnimCurve.addKeys` 로 다시 쓰고, 언랩은 순서별 동치 `(first+180, 180-middle, last+180)` + 2π 로 한다.
 이 PC 의 numpy 는 Maya 번들이 아니라 사용자 site-packages 라 in-Maya 코어는 numpy 없이. 관련 [[fbx-export-selected-scope]]

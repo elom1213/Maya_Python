@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-13
+# last Update date : 2026-10-27
 # A00480_FileTool - Import 탭 (in-Maya)
 #
 # v01.10 부터 **하위 탭** 둘이다:
 #   CSV : A00200_CSV_tool (ARKit Facial Import) 이식 - ui/import_csv_page.py
 #   FBX : A00030_quickTool_V02 `Import option` 의 Import FBX normal (SECTIONS 표, 예전 Import 탭 내용 그대로)
+#         + v01.13 `Mocap FBX Import (Exact Rotation)` 섹션 - ui/import_fbx_exact.py
 #
 # FBX 쪽에 버튼을 더할 때는 SECTIONS 에 한 줄. 새 파일 형식은 하위 탭 하나를 더한다.
 
@@ -18,10 +19,11 @@ from Framework.qt.qt import (
 from tools.A00480_FileTool.app import core
 from tools.A00480_FileTool.app.ui.button_section import build_button_section
 from tools.A00480_FileTool.app.ui.import_csv_page import CsvImportPage
+from tools.A00480_FileTool.app.ui.import_fbx_exact import FbxExactImportSection
 
 
 class FbxImportPage(QWidget):
-    """Import > FBX : 임포트 설정 버튼들 (SECTIONS 표)."""
+    """Import > FBX : 임포트 설정 버튼들 (SECTIONS 표) + 모캡 FBX 정확 임포트 섹션 (v01.13)."""
 
     # (섹션 제목, [(라벨, 핸들러 이름, 툴팁), ...])
     SECTIONS = (
@@ -42,6 +44,8 @@ class FbxImportPage(QWidget):
         layout = QVBoxLayout(self)
         for title, specs in self.SECTIONS:
             layout.addWidget(build_button_section(self, title, specs, self.buttons))
+        self.exact_section = FbxExactImportSection(log=self._log_callback)
+        layout.addWidget(self.exact_section)
         layout.addStretch(1)
 
     # ---- Handlers ----------------------------------------------------
@@ -75,7 +79,7 @@ class ImportTab(QWidget):
         self.tabs.addTab(self.csv_page, "CSV")
         self.tabs.addTab(self.fbx_page, "FBX")
         self.tabs.setTabToolTip(0, "ARKit facial CSV (Live Link Face) -> keyframes on a node, plus audio.")
-        self.tabs.setTabToolTip(1, "FBX import settings.")
+        self.tabs.setTabToolTip(1, "FBX import settings, and mocap FBX import with exact rotations.")
         layout.addWidget(self.tabs)
 
         # 예전 ImportTab.buttons 와 같은 접근 경로 유지 (테스트 · 외부 접근용)

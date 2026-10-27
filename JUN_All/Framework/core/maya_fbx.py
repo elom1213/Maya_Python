@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-26
+# last Update date : 2026-10-27
 # Framework.core.maya_fbx - FBX 플러그인 · "선택한 것만" FBX 내보내기 헬퍼 (maya.cmds lazy, Maya 밖에서 import 가능)
+# 2026-10-27 import_options() 추가 - FBXImport* 옵션 한시 변경 (maya_fbx_exact 가 euler 모드로 임포트할 때)
 #
 # 2026-10-26 A00480_FileTool `app/core/fbx_plugin.py` + `export_ops.py` 의 FBX 부분(타입 필터 · 계층 펼치기 · FBXExport*
 # 옵션 한시 변경 · 고유 경로)을 공용으로 올렸다. A00480 두 모듈은 재노출(동작 동일). A00210_FileManager Maya > Export
@@ -271,6 +272,61 @@ class fbx_options(object):
     def __exit__(self, *args):
         for key, value in self._previous.items():
             self._eval("{0} -v {1}".format(_FBX_OPTIONS[key], "true" if value else "false"))
+        self._previous = {}
+        return False
+
+
+# ================================================================
+# FBXImport* 옵션 한시 변경 (2026-10-27, maya_fbx_exact 가 쓴다)
+# ================================================================
+
+class import_options(object):
+    """with import_options(quaternion="euler", mode="add"): ... - None 인 항목은 손대지 않고, 나갈 때 원래 값으로.
+
+    - quaternion    : "euler" (Set As Euler) / "resample" (기본) / "quaternion" - `FBXImportQuaternion`
+    - mode          : "add" / "merge" / "exmerge" - `FBXImportMode`
+    - fill_timeline : bool - `FBXImportFillTimeline`
+    사용자가 평소 쓰는 임포트 설정을 이 블록이 바꿔 놓지 않는다(-q 로 읽어 두었다가 되돌린다).
+    """
+
+    _STRING = {"quaternion": "FBXImportQuaternion", "mode": "FBXImportMode"}
+    _BOOL = {"fill_timeline": "FBXImportFillTimeline"}
+
+    def __init__(self, quaternion=None, mode=None, fill_timeline=None):
+        self._wanted = {"quaternion": quaternion, "mode": mode, "fill_timeline": fill_timeline}
+        self._previous = {}
+
+    def _eval(self, command):
+        mel = _mel()
+        if mel is None:
+            return None
+        try:
+            return mel.eval(command)
+        except Exception:
+            return None
+
+    def _set(self, key, value):
+        if key in self._STRING:
+            self._eval('{0} -v "{1}"'.format(self._STRING[key], value))
+        else:
+            self._eval("{0} -v {1}".format(self._BOOL[key], "true" if value else "false"))
+
+    def __enter__(self):
+        ensure_fbx_plugin()
+        for key, value in self._wanted.items():
+            if value is None:
+                continue
+            command = self._STRING.get(key) or self._BOOL[key]
+            current = self._eval("{0} -q".format(command))
+            if current is None:
+                continue
+            self._previous[key] = current if key in self._STRING else fbx_options._to_bool(current)
+            self._set(key, value)
+        return self
+
+    def __exit__(self, *args):
+        for key, value in self._previous.items():
+            self._set(key, value)
         self._previous = {}
         return False
 

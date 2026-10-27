@@ -32,6 +32,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-27 (오늘)
 
+> [!summary] A00480_FileTool **v01.13 — `Mocap FBX Import (Exact Rotation)`**: 마야 FBX 임포터가 뒤집는 비 XYZ 조인트 회전을 FBX 원본 키로 다시 써서 모캡을 정확하게 · `Fix Scene From FBX` `#A00480_FileTool` `#Framework` `#fbx`
+- 요청: "계획서 푸시하고 작업 진행해" (계획서는 `Dnable_repo/dev` 로 푸시) + "윈도우 10, 마야 2023 에서도 동작해야 해".
+- Framework 신규: `fbx_binary`(순수 파이썬 바이너리 FBX 리더, 108MB 0.2초, numpy 없음) · `euler_math`(순서별 동치 · 언랩 · XYZ 정규화) · `maya_fbx_exact`(scan / import_exact / fix_scene_from_fbx) · `maya_fbx.import_options`(FBXImport* 한시 변경).
+- A00480 Import > FBX 섹션: 파일 스캔 → 스켈레톤 체크 · Skeletons only · Normalize joints(기본 ON) · Unwrap · Verify → `Import FBX (Exact)` / `Fix Scene From FBX`. undo 기록 안 함, 이름 충돌이면 `[FAIL]`.
+- 실측으로 바뀐 것: 임포터가 씬 fps 를 파일 fps 로 바꿈(맞추지 않음) · 사용자 씬은 임포터 키 감소로 이동도 0.016cm 어긋나 **이동 커브도 덮음** · 진단 = 버그 지문(XYZ 동치) 또는 1° 초과 · 어깨(PreRotation Y 90°) 정규화 짐벌 근처 0.05° 오차 → `atan2(-m20, cy)` 로 1e-9°.
+- 검증(mayapy 2024): BCM 5명 34초 · 검증 0.0000° / 0.0000cm · 별도 월드 검사 0.000004cm · 튐 0 · 사용자 씬 고치기 32초 동일 · 블렌더 FBX 이상 없음. 테스트 순수 45 · mayapy 29. Python 3.7 문법 검사 통과. **마야 GUI · Maya 2023 실기 확인 아직.**
+- 문서: A00480_FileTool §3-2 · `Framework_fbx_binary.md`(신규) · Framework_maya_fbx · README · 계획서 §12 · CHANGELOG.
+
 > [!summary] **Mocap FBX 정확 임포트 계획서** — 마야 FBX 임포터가 비 XYZ 회전 순서 조인트를 XYZ 공식으로 "연속화"해 뒤집는 문제를 실측하고, A00480 Import > FBX 에 원본 회전 키로 덮는 기능을 설계 `#A00480_FileTool` `#plan` `#fbx`
 - 요청: `BCM_01_004.fbx` 가 블렌더와 마야에서 다르게 들어온다. 블렌더 경유 없이 마야에서 바로 `0020_CHOEUN_0010.mb` 처럼 불러오는 기능의 설계.
 - 실측(mayapy): FBX 를 순수 파이썬으로 파싱해 정답을 직접 계산 → 블렌더가 맞고 마야 직접 임포트가 틀림(CHOEUN Head 1001f 37cm). 전수 조사로 CHOEUN `Hips` 1-5493 · `RightArm` 3707-6285 만 틀리고, 뒤집힌 키가 전부 XYZ 동치 공식 `(x+180, 180-y, z+180)` 을 XZY 조인트에 적용한 값. `FBXImportQuaternion` 3모드 전부 틀림(euler 모드 = 사용자 씬과 8072 조인트·프레임 일치), 끄는 옵션 없음.
