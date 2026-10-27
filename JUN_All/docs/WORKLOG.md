@@ -32,6 +32,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-27 (오늘)
 
+> [!summary] **A00275 조인트 n -> k 웨이트 이동 계획서** — Kangaroo `SkinCluster > Move`(moveSkinClusterWeights) 를 읽고 Native 이식 설계 `#A00275_skinTool_V01` `#plan` `#kangaroo`
+- 요청: Weights > Classic 에서 From n 개 · To k 개 조인트를 나열하고, From 이 영향을 미치는 범위의 웨이트를 To 로 옮기기 — Kangaroo Move 와 같게. 계획서만.
+- 원본 분석: 버텍스마다 최근접 To(조인트 → 자식 선분, 0.999 단축, Joint Lines 3모드, skinParent 투영) → From 마다 분배 → k ≥ 2 면 **선택 안 이웃만** 으로 5회 스무딩 + 버텍스별 합 보존 → Blend · 소프트 · Joint Locks · Border 마스크. From 마다 따로 돌아야 결과가 같다.
+- 재사용: Smooth 탭(Kangaroo Smooth 이식)의 선택 파싱 · 이웃 · 보더 · 락 · undo 되는 구간 setAttr · numpy 선택 경로 → `skin_weights_common.py` 로 옮겨 공유.
+- 검증 길: Kangaroo 를 mayapy 에서 헤드리스로 돌리는 것 확인(kt_cmdUndo 로드 + report 더미) → Native 와 12 케이스 1e-6 대조 예정.
+- 추천: UI 는 `Weights > Move` 새 하위 탭(대안: Classic 에 버튼), 엔진 Native + Kangaroo. 결정 Q1~Q6 대기.
+- 문서: [plans/A00275_skinTool_V01_move_n_to_k_plan.md](plans/A00275_skinTool_V01_move_n_to_k_plan.md).
+
 > [!summary] A00480_FileTool **v01.13 — `Mocap FBX Import (Exact Rotation)`**: 마야 FBX 임포터가 뒤집는 비 XYZ 조인트 회전을 FBX 원본 키로 다시 써서 모캡을 정확하게 · `Fix Scene From FBX` `#A00480_FileTool` `#Framework` `#fbx`
 - 요청: "계획서 푸시하고 작업 진행해" (계획서는 `Dnable_repo/dev` 로 푸시) + "윈도우 10, 마야 2023 에서도 동작해야 해".
 - Framework 신규: `fbx_binary`(순수 파이썬 바이너리 FBX 리더, 108MB 0.2초, numpy 없음) · `euler_math`(순서별 동치 · 언랩 · XYZ 정규화) · `maya_fbx_exact`(scan / import_exact / fix_scene_from_fbx) · `maya_fbx.import_options`(FBXImport* 한시 변경).
