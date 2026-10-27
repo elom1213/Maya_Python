@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-10-26
+updated: 2026-10-27
 ---
 
 # 작업 일지 (WORKLOG)
@@ -30,7 +30,17 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-10-26 (오늘)
+## 2026-10-27 (오늘)
+
+> [!summary] **Mocap FBX 정확 임포트 계획서** — 마야 FBX 임포터가 비 XYZ 회전 순서 조인트를 XYZ 공식으로 "연속화"해 뒤집는 문제를 실측하고, A00480 Import > FBX 에 원본 회전 키로 덮는 기능을 설계 `#A00480_FileTool` `#plan` `#fbx`
+- 요청: `BCM_01_004.fbx` 가 블렌더와 마야에서 다르게 들어온다. 블렌더 경유 없이 마야에서 바로 `0020_CHOEUN_0010.mb` 처럼 불러오는 기능의 설계.
+- 실측(mayapy): FBX 를 순수 파이썬으로 파싱해 정답을 직접 계산 → 블렌더가 맞고 마야 직접 임포트가 틀림(CHOEUN Head 1001f 37cm). 전수 조사로 CHOEUN `Hips` 1-5493 · `RightArm` 3707-6285 만 틀리고, 뒤집힌 키가 전부 XYZ 동치 공식 `(x+180, 180-y, z+180)` 을 XZY 조인트에 적용한 값. `FBXImportQuaternion` 3모드 전부 틀림(euler 모드 = 사용자 씬과 8072 조인트·프레임 일치), 끄는 옵션 없음.
+- 블렌더 경유도 손실: 키 6285 → 약 4600, 월드 최대 1.27cm, 타임라인 1프레임 당김, `_end` 리프 본 13개.
+- 시제품: 임포트 뒤 원본 회전 키로 커브 재생성 → 5명 365조인트 불일치 0 · 월드 오차 0.00000cm · 7초. 원본의 ±360 래핑 1603곳은 회전 순서를 고려한 언랩으로 0(행렬 차 2e-15).
+- 결정: 새 툴 대신 `A00480_FileTool` Import > FBX 섹션(v01.13), 코어는 `Framework/core`(`fbx_binary` · `euler_math` · `maya_fbx_exact`) — A00210 일괄 처리 재사용 대비. 결정 필요 Q1~Q5(Normalize 기본 ON 추천 등).
+- 문서: [plans/A00480_FileTool_fbx_exact_import_plan.md](plans/A00480_FileTool_fbx_exact_import_plan.md). 구현 전.
+
+## 2026-10-26
 
 > [!summary] A00490_KeyboardTool **v01.02 — 더블클릭 실행 `Run_KeyboardTool.bat`**: PySide6 가 있는 설치 파이썬이면 바로, 없으면 `~/.jun_keyboardtool/venv` 를 한 번 만들어 `pythonw` 로 `#A00490_KeyboardTool` `#standalone`
 - 요청: "A00490_KeyboardTool 을 클릭으로 실행하는 파일을 만들어".
