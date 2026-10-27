@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-27 (오늘)
 
+> [!summary] A00275_skinTool_V01 **v01.37 — `Weights > Move`**: 조인트 n 개 → k 개 웨이트 이동, Kangaroo `SkinCluster > Move` 이식 + Respect selection `#A00275_skinTool_V01` `#kangaroo`
+- 요청: "모두 권장대로해. 또한 선택 영역 respect 기능도 구현해. 툴 제작해" (계획서 Q1~Q6 전부 추천안).
+- 구현: 새 하위 탭 `Move` (Engine Native / Kangaroo, From n · To k 리스트, Smooth Steps · Blend · Joint Lines 3 · Joint Locks 4 · Border 3 + Mask Steps · Respect selection · 소프트 · skinParent · 섬 검사). 코어 `weight_move_manager.py`, Smooth 공용 함수는 `skin_weights_common.py` 로 옮김(회귀 9 설정 차이 0).
+- Kangaroo 대조(mayapy 헤드리스): 15 케이스 차이 0 ~ 2.2e-16, 엔진 래퍼 = Native. 실측으로 고친 것 — 점 좌표를 원본처럼 `xform vtx[*]` 로(대칭 메시 동률이 갈렸다), Kangaroo 는 To 를 `list(set())` 로 만들어 진짜 동률에서 자체 비결정적, Kangaroo Border Edges 는 numpy 2 에서 원본 버그로 죽어 성질로 검증.
+- 시험: Move 45(Kangaroo 포함) · UI 15 · Smooth 회귀. 성능 19,881 버텍스 1.2초. Python 3.7 문법. **마야 GUI 확인 아직.**
+- 문서: A00275_skinTool_V01 `Weights > Move` 절 · 계획서 §11 · 메모리.
+
 > [!summary] **A00275 조인트 n -> k 웨이트 이동 계획서** — Kangaroo `SkinCluster > Move`(moveSkinClusterWeights) 를 읽고 Native 이식 설계 `#A00275_skinTool_V01` `#plan` `#kangaroo`
 - 요청: Weights > Classic 에서 From n 개 · To k 개 조인트를 나열하고, From 이 영향을 미치는 범위의 웨이트를 To 로 옮기기 — Kangaroo Move 와 같게. 계획서만.
 - 원본 분석: 버텍스마다 최근접 To(조인트 → 자식 선분, 0.999 단축, Joint Lines 3모드, skinParent 투영) → From 마다 분배 → k ≥ 2 면 **선택 안 이웃만** 으로 5회 스무딩 + 버텍스별 합 보존 → Blend · 소프트 · Joint Locks · Border 마스크. From 마다 따로 돌아야 결과가 같다.

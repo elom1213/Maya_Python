@@ -1,8 +1,8 @@
 ---
 title: A00275_skinTool_V01 사용법
-aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose, Move Joints, Edit Mesh, Expand Bind, Smooth Weights]
+aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose, Move Joints, Edit Mesh, Expand Bind, Smooth Weights, Move Weights n to k]
 tags: [maya-python, tool-guide, skin, skincluster, bind-pose, rigging]
-updated: 2026-10-16
+updated: 2026-10-27
 ---
 
 # A00275_skinTool_V01 사용법
@@ -10,7 +10,7 @@ updated: 2026-10-16
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.36 — Classic Native 가 **선택 버텍스만** (Joints to Joints · Meshes to Meshes) · v01.35 — By Weight 조인트 리스트에 **이름 필터** · v01.32 — Transfer 에 **`Target mode`**(소스↔타겟 리스트 1:1) + **진행률 팝업** · v01.31 — **`Weights > Smooth`** 신규: Kangaroo `SkinCluster > Smooth` 이식(플러그인 무의존) · v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
+- **버전**: `app/config/version.py` (v01.37 — **`Weights > Move`** 신규: 조인트 n 개 → k 개 웨이트 이동, Kangaroo `SkinCluster > Move` 이식(플러그인 무의존 · Kangaroo 엔진 선택) + Respect selection · v01.36 — Classic Native 가 **선택 버텍스만** (Joints to Joints · Meshes to Meshes) · v01.35 — By Weight 조인트 리스트에 **이름 필터** · v01.32 — Transfer 에 **`Target mode`**(소스↔타겟 리스트 1:1) + **진행률 팝업** · v01.31 — **`Weights > Smooth`** 신규: Kangaroo `SkinCluster > Smooth` 이식(플러그인 무의존) · v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
   (v01.22 는 아래 레이어 lock 이 사라졌다) · v01.22 — **`Weights > Layer`** 신규: 버텍스 순서가 같은 메시 N 개의
   웨이트를 메시마다 lock + Blend 로 레이어처럼 합성해 새 메시로 만들거나 기존 메시를 갱신 · v01.15 — **탭 재분류**:
   평평한 탭 7개를 `카테고리 3 → 기능 7` 의 2단 구조로, 아래 표)
@@ -26,6 +26,7 @@ updated: 2026-10-16
 | 〃 | 〃 | **Transfer** (v01.04~) | **여러 소스 메시 → 타겟**으로 웨이트 전이. **Engine(Native/Kangaroo) 선택**(v01.05~). 선택 버텍스에만/소프트 falloff 반영(Native). **v01.32~ `Target mode`** — 씬 선택 대신 **타겟 리스트와 1:1** 로 짝지어 여러 벌을 한 번에 |
 | 〃 | 〃 | **Migrate A -> B** | 토폴로지가 다른 두 메시 사이 Transfer + Move 통합 마이그레이션 |
 | 〃 | 〃 | **Copy Weights** (v01.17~) | **같은 메시 안에서** 버텍스 → 버텍스로 웨이트 복사. 목표마다 가장 가까운 소스 버텍스의 웨이트 행을 베낀다. 최근접 기준은 **Surface / Topology / Volume**, 실리는 정도는 **`Blend` 0~1**(v01.18~) |
+| 〃 | 〃 | **Move** (v01.37~) | **조인트 n 개(From) → k 개(To)** 로 웨이트 이동. Kangaroo `SkinCluster > Move` 이식 — 버텍스마다 **최근접 To(뼈 선분)**, To 경계 `Smooth Steps` · `Blend` · `Joint Lines`(3) · `Joint Locks`(4) · `Border Edges`(3) · **`Respect selection`** · 소프트 셀렉션 · 섬 검사. Engine Native / Kangaroo |
 | 〃 | 〃 | **Smooth** (v01.31~) | 선택 버텍스의 웨이트를 **이웃과 평균**해 매끄럽게. Kangaroo `SkinCluster > Smooth` 이식 — `Iterations` · `Blend` · `Rigid` · `Keep Value One` · `Joint Locks`(4) · `Border Edges`(3) + `Border Mask Steps` · `Loop Curve` · 소프트 셀렉션 falloff |
 | **Bind** | 바인드를 새로 만들거나 바인드 상태를 갱신한다 | **Bind Pose** | **조인트를 이동·회전한 현재 상태를 새 바인드 포즈로** |
 | 〃 | 〃 | **Expand Bind** (v01.09~) | 저장한 버텍스 집합 → 저장한 조인트들에 바인드. 조인트 사이가 **엣지 길이에 비례해 고르게** 분배 (Kangaroo `ClosestExpand` 대체). **엣지 루프 입력**(v01.10~)으로 밴드 전체가 루프와 같은 비율 유지, **Even distribution**(v01.16~)으로 간격·폭이 제각각이어도 같은 분배 + 조인트 버텍스 웨이트 1 |
@@ -464,6 +465,94 @@ Border Mask Steps 활성 규칙 · 라디오→옵션 · Loop Curve 버튼 3개(
 
 
 ---
+
+## Weights > Move — 조인트 n 개 → k 개 웨이트 이동 (v01.37~)
+
+From 에 조인트 **n 개**, To 에 조인트 **k 개**를 넣고(n, k 는 아무 양의 정수, 같아도 된다) 누르면,
+**From 조인트들이 웨이트를 가진 범위**의 웨이트가 To 조인트들로 옮겨간다. Kangaroo `SkinCluster > Move` 를 **플러그인 없이** 옮긴 탭이고,
+같은 씬에서 Kangaroo 와 **숫자로 대조**해 같은 결과임을 고정했다(아래 검증). 계획서 [plans/A00275_skinTool_V01_move_n_to_k_plan.md](plans/A00275_skinTool_V01_move_n_to_k_plan.md).
+
+> Classic 의 `Joints to Joints` 는 **From[i] → To[i] 1:1** 이다(개수가 같아야 한다). Move 는 n 개 전체를 k 개 전체로 **거리에 따라 나눠** 준다.
+
+```
+Engine    (o) Native  ( ) Kangaroo
+┌ From (n) ──────────┐ ┌ To (k) ───────────┐
+│ fA                 │ │ t1                │
+│ fB                 │ │ t2                │
+│ [Select From] ...  │ │ [Select To] ...   │
+└────────────────────┘ └───────────────────┘
+┌ Options ───────────────────────────────────────────────┐
+│ Smooth Steps [====|      ] 5     Blend [==========] 1.000│
+│ [x] Respect selection   [x] Use soft selection          │
+│ [x] Project squash joints (skinParent)  [x] Island check │
+└──────────────────────────────────────────────────────────┘
+┌ Joint Lines ───────┐┌ Joint Locks ──────────┐┌ Border Edges ─────────┐
+│ (o) Children in To ││ (o) Ignore locks      ││ (o) Everything        │
+│ ( ) All children   ││ ( ) Keep locked ...   ││ ( ) Ignore border ... │
+│ ( ) Points only    ││ ( ) Only add / remove ││ ( ) Only border ...   │
+└────────────────────┘└───────────────────────┘│ Border Mask Steps [2] │
+[        Move weights  2 -> 3        ] [Reset Options]
+```
+
+### 사용법
+
+1. `From (n)` 에 옮길 조인트들, `To (k)` 에 받을 조인트들을 담는다(씬에서 고르고 `Select From` / `Select To`).
+   버튼 글자가 `Move weights 2 -> 3` 처럼 개수를 보여 준다.
+2. 씬에서 **스킨된 메시**(여러 개 가능) 또는 그 **버텍스 · 엣지 · 페이스**를 고른다.
+3. `Move weights n -> k` — **한 번 = undo 한 스텝**(Native). 로그에 메시마다 바뀐 버텍스 수가 적힌다.
+
+### 동작 (Kangaroo 와 같다)
+
+| 단계 | 내용 |
+|------|------|
+| 최근접 To | 버텍스(지금 **변형된** 메시의 월드 위치)마다 가장 가까운 To. 거리는 `Joint Lines` 에 따라 **조인트 → 자식 조인트 선분**(끝을 0.999 로 줄임) 또는 점 |
+| 분배 | From 조인트마다 따로, 그 웨이트를 최근접 To 에 주고 From 은 0 |
+| 스무딩 | k ≥ 2 면 To 사이 경계를 **선택 안 이웃만으로** `Smooth Steps` 번 평균, 버텍스마다 옮기는 양의 합은 그대로 |
+| 섞기 | `Blend` x 소프트 falloff → `Joint Locks` → `Border Edges` 마스크 (원본 순서) |
+
+- **From 이 웨이트를 갖지 않은 버텍스는 바뀌지 않는다**(요청의 "n 개 조인트가 영향을 미치는 범위"). 경계 스무딩으로 번진 값도 그 자리 합이 0 이라 0 으로 돌아간다.
+- To 가 skinCluster 인플루언스가 아니면 **웨이트 0 으로 자동 추가**하고 로그에 적는다.
+- From 이 인플루언스가 아니거나 선택 범위에 웨이트가 없으면 `[SKIP]` 으로 알리고 나머지로 계속한다.
+- 같은 조인트가 From 과 To 에 다 있으면 원본처럼 계산한다(그 조인트의 웨이트도 To 들 사이에 거리대로 다시 나뉜다) + `[Info]`.
+- 포즈를 잡은 상태에서 누르면 **그 포즈 기준**으로 최근접 To 가 정해진다(원본과 같다).
+
+### 옵션
+
+| 옵션 | 기본 | 원본 인자 | 뜻 |
+|------|------|-----------|----|
+| Smooth Steps | 5 | `iSmoothSteps` | To 경계 평균 횟수, 0 = 칼 경계. k = 1 이면 무시 |
+| Blend | 1.0 | `fBlend` | 결과를 원래 웨이트와 섞는 비율 |
+| Joint Lines | Children in To list | `iJointLines` | 뼈 선분의 자식을 To 목록 안에서만 / 모든 자식 / 점만 |
+| Joint Locks | Ignore | `iJointLocks` | 잠긴(`liw`) 조인트: 무시 / 값 고정 / 늘기만 / 줄기만 |
+| Border Edges + Mask Steps | Everything, 2 | `iBorderEdges` · `iSmoothBorderMask` | 열린 경계를 빼고 / 경계만, 마스크가 번지는 칸 수 |
+| **Respect selection** | ON | (이 툴이 더함) | 켜면 버텍스를 고른 경우 **그 버텍스만**, 끄면 컴포넌트를 골랐어도 **메시 전체** |
+| Use soft selection | ON | (원본은 늘 켬) | 소프트 셀렉션 falloff 를 옮기는 양으로. Respect selection 을 끄면 같이 꺼진다 |
+| Project squash joints | ON | `bProjectSquashToMainJoints` | To 조인트에 `skinParent` 문자열 어트리뷰트가 있으면 그 조인트 위치로 잰다(Kangaroo 리그). 없으면 아무 일 없음 |
+| Island check | ON | `bDisableIslandCheck` 의 반대 | 고른 버텍스가 여러 섬이면 진행할지 묻는다 |
+| Engine | Native | — | Kangaroo = `moveSkinClusterWeights` 를 같은 옵션으로 부른다(플러그인 필요) |
+
+원본에 있으나 옮기지 않은 것: `xDistanceMeshes`(마스크 메시, kangaroo `kt_findClosestPoints` 플러그인 명령 필요 - Smooth 와 같은 결정) ·
+이름 패턴(`*` · `?` · `"찾기, 바꾸기"`) — 리스트에 든 정확한 이름만 쓴다. 패턴이 필요하면 Engine = Kangaroo.
+
+### 알아 둘 것
+
+- **동률 처리** — 버텍스가 두 To 와 거리가 **정확히** 같으면(대칭 메시 등) 이 툴은 **To 리스트 순서**로 앞의 것을 고른다.
+  Kangaroo 는 To 를 `list(set(...))` 로 만들어 그 순서가 실행마다(파이썬 문자열 해시) 달라질 수 있다 — 그런 자리에서는 Kangaroo 끼리도 결과가 다를 수 있다.
+- **Kangaroo 의 Border Edges 는 numpy 2.x 에서 죽는다**(`getBorderMask` → `smoothValues2d` 의 불리언 인덱스 길이가 패딩 행만큼 어긋남, 예전 numpy 는 허용).
+  Native 는 Smooth 탭과 같은 보더 마스크를 쓰므로 문제없다.
+- 웨이트 쓰기는 Smooth 와 같이 **구간 `setAttr`**(undo 됨), 읽기는 API bulk. numpy 가 없으면 같은 식의 순수 파이썬으로 돈다.
+- 성능: 19,881 버텍스 · From 2 → To 9, **1.2초**(numpy) / 1.8초(순수 파이썬), mayapy 2024.
+- 공용 함수(선택 파싱 · 이웃 · 보더 · 락 · 읽기/쓰기)는 v01.37 에 `core/skin_weights_common.py` 로 옮겨 Smooth 와 같이 쓴다(Smooth 동작 불변, 회귀 시험).
+
+### 검증 (mayapy 2024)
+
+- `tests/test_weight_move.py` — **Kangaroo 대조**(환경 변수 `JUN_KANGAROO_DIR`): 기본 · k = 1 · 원통 Joint Lines 3모드 · 컴포넌트 선택 · 소프트 셀렉션 ·
+  Smooth Steps 0 / 20 · Blend 0.5 · Joint Locks 3모드 · To 미인플루언스 · skinParent → **15 케이스 차이 0 ~ 2.2e-16**, Kangaroo 엔진 래퍼 = Native(차이 0).
+  Border 2 케이스는 Kangaroo 가 죽으므로 성질(경계만 / 경계 빼고)로 확인. 그 밖에 행 합 1 · 선택 밖 불변 · From 이 전부 옮겨감 · **undo 한 번에 복원** ·
+  Respect selection 끔 = 메시 전체 · From 웨이트 없는 버텍스 불변 · numpy = 순수 파이썬 · 섬 검사 · 방어. 45 항목.
+- `tests/test_move_ui.py` — 오프스크린: 탭 위치(기존 하위 탭 불변) · 기본값 · 버튼 글자 · 옵션 활성 규칙 · Reset · **실제 클릭 = 이동 + undo 한 스텝** · 섬 대화상자. 15 항목.
+- `tests/test_weight_smooth_regression.py` — Smooth 9 설정이 공용 모듈로 옮기기 전과 같음.
+
 
 ## Select > By Weight — 웨이트로 버텍스 고르기 (v01.27~)
 

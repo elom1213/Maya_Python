@@ -39,6 +39,7 @@
 
 - [maya reference import traps](maya-reference-import-traps.md) — `loadReferenceDepth none` 저장은 언로드로 굳음 · 언로드는 import 불가 · 부모 import 시 중첩이 최상위로 · `.ma` 머리글 file 문장 여러 줄 · mayapy 워커는 uninitialize 필수
 - [reference fcurve edit traps](maya-reference-fcurve-edit-traps.md) — 레퍼런스 커브 편집은 `saveReference` 로만 파일에, **미저장 편집은 재로드 때 24fps 기준 시각 환산(마야 버그)**, 편집 수는 `-onReferenceNode`, Discard 는 unload 뒤 removeEdits, 두 레퍼런스 사이 연결 편집은 목적지 RN
+- [Kangaroo headless golden test](kangaroo-headless-golden-test.md) — Kangaroo 원본을 mayapy 에서 돌려 이식 결과를 숫자로 대조(kt_cmdUndo 로드 + report 더미), 점은 xform vtx[*], To 는 list(set) 라 동률 비결정, Border 는 numpy 2 에서 죽음
 - [Maya FBX import flips non-XYZ joints](maya-fbx-import-nonxyz-flip.md) — 임포터가 XYZ 동치 공식으로 연속화 → 비 XYZ 조인트(Hips 등) 자세가 틀림, 쿼터니언 3모드 다, 해법 = 원본 키로 커브 재생성(계획서 A00480 fbx_exact)
 - [FBX export selected scope](fbx-export-selected-scope.md)(공용 `Framework/core/maya_fbx`, FBX 타임스팬 = playback, 레퍼런스 ns 는 본 이름에 남는다, `-q` 는 옵션마다 int/문자열) · [Maya 2023 compat](maya-2023-compat.md)(sin/cos 노드 없음 · A00480 모캡 FBX 임포트도 2023 · Win10) · [Maya loadPlugin no __file__](maya-loadplugin-no-file.md)
 - [undo_chunk by default](undo-chunk-by-default.md) · [cmds.toggle not undoable](maya-toggle-cmd-not-undoable.md) · [attr reorder = deleteAttr + undo](maya-attr-reorder-deleteattr-undo.md)

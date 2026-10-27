@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-07
+# last Update date : 2026-10-27
 # A00275_skinTool_V01 - Qt UI
 #
 # 스킨 관련 범용 툴. **상위 탭 = 카테고리, 하위 탭 = 기능** 으로 통일돼 있다(v01.15~).
@@ -18,6 +18,9 @@
 #                          이식). Iterations / Blend / Rigid / Joint Locks /
 #                          Border Edges / Loop Curve
 #                          (core/weight_smooth_manager.py, ui/smooth_tab.py).
+#     - "Move"           : 조인트 n 개(From) -> k 개(To) 웨이트 이동(Kangaroo SkinCluster > Move 이식, v01.37).
+#                          버텍스마다 최근접 To(뼈 선분) + 경계 스무딩 + Blend / Locks / Border
+#                          (core/weight_move_manager.py, ui/move_tab.py). 공용 헬퍼는 core/skin_weights_common.py.
 #     - "Copy Weights"   : **한 메시 안에서** 버텍스 -> 버텍스로 웨이트를 그대로 복사.
 #                          목표마다 가장 가까운 소스 버텍스의 웨이트 행을 통째로 베낀다.
 #                          "가깝다" 의 기준은 Expand Bind 와 같은 세 가지
@@ -210,6 +213,9 @@ class MainWindow(QWidget):
          "with their neighbours. Kangaroo SkinCluster > Smooth ported : iterations, "
          "blend, rigid, keep-value-one, joint locks, border edges, loop curve",
          "_build_smooth_tab"),
+        ("Move", "Move - move the skin weights of n joints (From) to k joints (To): each vertex "
+         "goes to its closest To joint by bone and the seams are smoothed. Kangaroo SkinCluster > "
+         "Move ported", "_build_move_tab"),
     )
 
     BIND_PAGES = (
@@ -2043,6 +2049,17 @@ class MainWindow(QWidget):
 
         self.smooth_tab = SmoothTab(log_callback=self.log)
         return self.smooth_tab
+
+    # --------------------------------------------------
+    # Weights > Move (조인트 n -> k, Kangaroo SkinCluster > Move 이식, v01.37)
+    # --------------------------------------------------
+
+    def _build_move_tab(self):
+        """Smooth 탭처럼 app/ui/move_tab.py 의 위젯 하나로 둔다."""
+        from tools.A00275_skinTool_V01.app.ui.move_tab import MoveTab
+
+        self.move_tab = MoveTab(log_callback=self.log)
+        return self.move_tab
 
     # --------------------------------------------------
     # Select > By Weight (웨이트 기준으로 버텍스 선택)

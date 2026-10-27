@@ -7,7 +7,7 @@ updated: 2026-10-27
 
 # A00275_skinTool_V01 — 조인트 n 개 → k 개 웨이트 이동 계획서
 
-> 작성 2026-10-27 · 상태: **설계 완료 · 결정 Q1~Q6 대기(§10) · 구현 전** · 아키텍처 (B) Maya 내 PySide 툴(기존 툴에 기능 추가)
+> 작성 2026-10-27 · 상태: **v01.37 구현 완료(2026-10-27, mayapy Kangaroo 대조 · UI 오프스크린) · 마야 GUI 확인 전** · 결정 Q1~Q6 = 전부 추천대로(§10) · 구현 결과 §11 · 아키텍처 (B) Maya 내 PySide 툴(기존 툴에 기능 추가)
 >
 > 원본(읽기 전용, 저장소 밖): `0020_maya_plugin/0010_kangaroo/scripts/`
 > `kangarooTabTools/weights.py` `moveSkinClusterWeights()` (2767~2938행) ·
@@ -310,7 +310,7 @@ ktw.moveSkinClusterWeights(xJoints={"['fA','fB']": "['t1','t2','t3']"}, bDisable
 
 ---
 
-## 10. 결정이 필요한 것
+## 10. 결정 (사용자 2026-10-27: "모두 권장대로해" + 선택 영역 respect 기능 추가)
 
 | # | 질문 | 추천 |
 |---|------|------|
@@ -320,3 +320,23 @@ ktw.moveSkinClusterWeights(xJoints={"['fA','fB']": "['t1','t2','t3']"}, bDisable
 | Q4 | To 가 인플루언스가 아닐 때 | **묻지 않고 weight 0 으로 더한다** + 로그 (Classic Native 와 같은 동작). 원본은 묻는다 |
 | Q5 | From · To 겹침 | **원본처럼 계산**(겹친 조인트의 웨이트도 To 들 사이에 거리대로 재분배) + 로그. "Kangaroo 와 정확히 같게" 가 요청이라서다. 빼면 그 조인트의 웨이트가 그대로 남아 결과가 달라진다 |
 | Q6 | 버텍스 위치 | **원본처럼 지금 변형된 메시** 기준. 포즈를 잡은 상태에서 돌리면 그 포즈 기준으로 최근접이 정해진다는 것을 문서에 적는다 |
+
+---
+
+## 11. 구현 결과 (2026-10-27, v01.37)
+
+| 항목 | 결과 |
+|------|------|
+| 파일 | `core/skin_weights_common.py`(Smooth 에서 옮김) · `core/weight_move_manager.py` · `ui/move_tab.py` · `main_window.WEIGHTS_PAGES` 한 줄 · `tests/test_weight_move.py` · `test_move_ui.py` · `test_weight_smooth_regression.py` |
+| 추가 요청 — **Respect selection** | 켜면(기본) 컴포넌트를 고른 경우 그 버텍스만, 끄면 메시 전체. 소프트 셀렉션 체크는 이것을 따라 꺼진다 |
+| Kangaroo 대조 | 15 케이스 차이 0 ~ 2.2e-16, Kangaroo 엔진 래퍼 = Native |
+| T1 회귀 | Smooth 9 설정, 옮기기 전과 차이 0 |
+| 성능 | 19,881 버텍스 · 2 → 9: 1.2초(numpy) / 1.8초(순수 파이썬) |
+
+구현하며 알게 된 것 (계획과 달라진 점):
+
+- **점 좌표는 원본과 같은 명령으로** — `MFnMesh.getPoints` 대신 `xform vtx[*] ws` 를 쓴다. 처음엔 대칭 원통에서 0.30 차이가 났다.
+- **진짜 동률에서는 Kangaroo 자체가 비결정적이다** — To 목록이 `list(set(...))` 라서 순서가 실행마다 바뀔 수 있다.
+  이 툴은 리스트 순서로 정하고, 대조 시험은 동률 없는 씬을 쓴다.
+- **Kangaroo Border Edges 는 numpy 2.x 에서 죽는다**(원본 버그) → 그 두 케이스는 성질로 검증했다(§8-2 의 9번).
+- §8-2 의 12번(메시 2개 동시)은 시험에서 빠졌다. 코드는 메시마다 따로 도는 구조이고(Smooth 와 같음), UI 시험의 실제 클릭은 메시 하나로 확인했다.

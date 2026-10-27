@@ -30,5 +30,11 @@
 #                           고른 버텍스만 전이하고 skinCluster 는 유지(고르지 않은 To 는 건너뜀).
 #                           소프트 셀렉션은 falloff 비율. 컴포넌트 선택이 없으면 예전 그대로
 
-VERSION = "01.36"
-LAST_UPDATE = "2026-10-16"
+# 01.37  Weights > Move 신규 - 조인트 n 개(From) -> k 개(To) 웨이트 이동, Kangaroo SkinCluster > Move 이식(플러그인 무의존,
+#        Kangaroo 엔진도 선택). 버텍스마다 최근접 To(조인트 -> 자식 뼈 선분) + To 경계 스무딩(선택 안 이웃, 합 보존)
+#        + Blend · 소프트 · Joint Locks · Border Edges. Respect selection(선택 버텍스만 / 메시 전체), 섬 검사, To 자동 추가.
+#        Kangaroo 와 대조 시험(17 케이스 중 15 는 차이 0 ~ 2e-16, Border 2 는 Kangaroo 가 numpy 2 에서 죽어 성질로 확인).
+#        Smooth 의 공용 함수를 core/skin_weights_common.py 로 옮김(동작 불변, 회귀 시험).
+
+VERSION = "01.37"
+LAST_UPDATE = "2026-10-27"
