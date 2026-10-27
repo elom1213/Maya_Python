@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-13
+# last Update date : 2026-10-27
 # A00340_SelectionTool - "Buttons" tab (Qt, in-Maya)
 #
 # 사용자가 카테고리와 선택 버튼을 직접 만들고, 버튼을 누르면 그 버튼에 저장된
@@ -26,8 +26,16 @@
 #                     부른다. 접기(CollapsibleBox)는 헤더와 스크롤 영역의 최소 높이가
 #                     남지만, 숨김은 위 pane 자체를 숨겨 핸들까지 사라지고 버튼 모음이
 #                     창 전체를 쓴다. 상태는 prefs(active.json) 에 남아 다음에도 유지.
+#   - 드래그로 순서 바꾸기(v01.15, A00240_PathTool v01.28 과 같은 방식): 선택 버튼을 누른 채 끌어 같은
+#     카테고리의 다른 자리나 다른 카테고리에 놓는다. 네이티브 QDrag 가 아니라 버튼 서브클래스(_DragButton)의
+#     마우스 이벤트만으로 처리한다 - 누른 채 startDragDistance 이상 움직이면 드래그, 그 안에서 놓으면 평소
+#     클릭(선택). 끄는 동안 놓일 자리에 가로줄, 스크롤 가장자리에서 자동 스크롤, Esc 로 취소.
+#     색칠 모드(체크형)에서는 드래그하지 않는다(체크만).
 
 from Framework.qt.qt import (
+    QApplication,
+    QFrame,
+    QTimer,
     QWidget,
     QDialog,
     QDialogButtonBox,
@@ -102,6 +110,77 @@ def _button_stylesheet(hex_str):
         "QPushButton:checked {{ border: 2px solid {check}; }}"
     ).format(bg=bg.name(), text=text, border=border, hover=hover,
              pressed=pressed, check=CHECK_HILITE_HEX)
+
+
+def _global_pos(event):
+    """마우스 이벤트의 전역 좌표(QPoint). PySide6 는 globalPosition(), PySide2 는 globalPos()."""
+    if hasattr(event, "globalPosition"):
+        return event.globalPosition().toPoint()
+    return event.globalPos()
+
+
+class _DragButton(QPushButton):
+    """드래그로 자리를 옮길 수 있는 선택 버튼 (v01.15, A00240 _PathButton 과 같은 방식).
+
+    왼쪽 버튼을 누른 채 QApplication.startDragDistance() 이상 움직이면 드래그로 보고 owner(SelectionTab)의
+    begin_drag / update_drag / end_drag 를 부른다. 그 거리 안에서 놓으면 평소 클릭이라 clicked 가 나가
+    오브젝트가 선택된다. 드래그로 끝난 놓음은 QPushButton 에 넘기지 않아 clicked 가 나가지 않는다.
+    Qt 는 누른 위젯에 이동 · 놓음을 계속 보내므로(암묵 grab) 커서가 버튼 밖으로 나가도 끝까지 받는다.
+    drag_key 는 (카테고리 인덱스, 버튼 인덱스) - 같은 이름의 버튼이 있어도 어느 것이 움직였는지 틀리지 않는다.
+    색칠 모드(체크형)에서는 drag_enabled=False 로 두어 체크만 한다.
+    """
+
+    def __init__(self, text, owner, drag_key, parent=None):
+        super().__init__(text, parent)
+        self._owner = owner
+        self.drag_key = drag_key
+        self.drag_enabled = drag_key is not None
+        self._press_pos = None          # 누른 전역 좌표 (None = 안 누름)
+        self._dragging = False
+        self._swallow_release = False   # Esc 로 취소한 뒤 오는 놓음은 클릭이 아니다
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and self.drag_enabled:
+            self._press_pos = _global_pos(event)
+            self._dragging = False
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._press_pos is not None and (event.buttons() & Qt.LeftButton):
+            pos = _global_pos(event)
+            if not self._dragging:
+                if (pos - self._press_pos).manhattanLength() >= QApplication.startDragDistance():
+                    self._dragging = True
+                    self._owner.begin_drag(self)
+            if self._dragging:
+                self._owner.update_drag(pos)
+                event.accept()
+                return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and (self._dragging or self._swallow_release):
+            dragging = self._dragging
+            self._dragging = False
+            self._swallow_release = False
+            self._press_pos = None
+            self.setDown(False)
+            if dragging:
+                self._owner.end_drag(_global_pos(event))
+            event.accept()
+            return
+        self._press_pos = None
+        super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event):
+        if self._dragging and event.key() == Qt.Key_Escape:
+            self._dragging = False
+            self._swallow_release = True
+            self.setDown(False)
+            self._owner.cancel_drag()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
 
 class CollapsibleBox(QWidget):
@@ -206,6 +285,11 @@ class SelectionTab(QWidget):
         self._color_mode = False
         self._checked = set()
         self._color_buttons = []
+
+        # 드래그로 순서 바꾸기 (v01.15). _cat_boxes = [(QGroupBox, 카테고리 인덱스, [버튼 위젯])]
+        self._cat_boxes = []
+        self._drag_source = None        # (카테고리 인덱스, 버튼 인덱스) - 드래그 중이 아니면 None
+        self._drag_last_pos = None
 
         self._build_ui()
         self._refresh_profiles()
@@ -352,6 +436,20 @@ class SelectionTab(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(self._cat_container)
+        self._scroll = scroll
+
+        # 드래그 중 놓일 자리를 보여 주는 가로줄 (v01.15). 레이아웃 항목이 아닌 컨테이너의 자식이라
+        # 재렌더(_render_categories)에 지워지지 않고, 컨테이너와 함께 스크롤된다.
+        self._drop_line = QFrame(self._cat_container)
+        self._drop_line.setObjectName("A00340_drop_line")
+        self._drop_line.setStyleSheet(
+            "QFrame#A00340_drop_line {{ background-color: {c}; border: none; }}".format(c=CHECK_HILITE_HEX))
+        self._drop_line.hide()
+
+        # 드래그 중 가장자리 자동 스크롤 - 커서가 멈춰 있어도 내용이 움직이므로 틱마다 다시 계산한다.
+        self._drag_timer = QTimer(self)
+        self._drag_timer.setInterval(40)
+        self._drag_timer.timeout.connect(self._on_drag_tick)
         return scroll
 
     def _build_profile_group(self):
@@ -445,6 +543,8 @@ class SelectionTab(QWidget):
     def _render_categories(self):
         # 재렌더하면 옛 체크형 버튼 위젯은 폐기되므로 목록을 비우고 다시 채운다.
         self._color_buttons = []
+        self._cat_boxes = []
+        self._drop_line.hide()
         # 기존 위젯 제거 후 데이터 기준으로 다시 그린다.
         while self._cat_layout.count():
             item = self._cat_layout.takeAt(0)
@@ -459,11 +559,12 @@ class SelectionTab(QWidget):
             self._cat_layout.addWidget(hint)
             return
 
-        for cat in categories:
-            self._cat_layout.addWidget(self._build_category_box(cat))
+        for cat_index, cat in enumerate(categories):
+            self._cat_layout.addWidget(self._build_category_box(cat_index, cat))
 
-    def _build_category_box(self, cat):
+    def _build_category_box(self, cat_index, cat):
         box = QGroupBox(cat["name"])
+        box.setToolTip("Right-click: edit\nDrag a button to reorder it or move it to another category")
         box.setContextMenuPolicy(Qt.CustomContextMenu)
         cat_name = cat["name"]
         box.customContextMenuRequested.connect(
@@ -473,19 +574,23 @@ class SelectionTab(QWidget):
         v = QVBoxLayout(box)
 
         buttons = cat.get("buttons", [])
+        btn_widgets = []
         if not buttons:
             empty = QLabel("(no buttons — use 'Selection' to add)")
             empty.setEnabled(False)
             v.addWidget(empty)
         else:
-            for btn_data in buttons:
-                v.addWidget(self._build_selection_button(cat_name, btn_data))
+            for btn_index, btn_data in enumerate(buttons):
+                btn = self._build_selection_button(cat_name, btn_data, (cat_index, btn_index))
+                v.addWidget(btn)
+                btn_widgets.append(btn)
 
+        self._cat_boxes.append((box, cat_index, btn_widgets))
         return box
 
-    def _build_selection_button(self, cat_name, btn_data):
+    def _build_selection_button(self, cat_name, btn_data, drag_key=None):
         objects = btn_data.get("objects", [])
-        btn = QPushButton("{0}  ({1})".format(btn_data["name"], len(objects)))
+        btn = _DragButton("{0}  ({1})".format(btn_data["name"], len(objects)), self, drag_key)
 
         # 툴팁에 담긴 오브젝트를 보여준다(너무 길면 앞부분만).
         preview = "\n".join(objects[:20])
@@ -497,7 +602,8 @@ class SelectionTab(QWidget):
         color_hex = btn_data.get("color")
 
         if self._color_mode:
-            # 색칠 모드: 버튼을 체크형으로. 클릭은 '선택' 대신 '체크 토글'.
+            # 색칠 모드: 버튼을 체크형으로. 클릭은 '선택' 대신 '체크 토글'. 드래그는 끈다.
+            btn.drag_enabled = False
             btn.setCheckable(True)
             # setChecked 는 아래 toggled 연결 '전'에 호출해야 초기 복원이 콜백을 안 부른다.
             btn.setChecked((cat_name, name) in self._checked)
@@ -789,6 +895,154 @@ class SelectionTab(QWidget):
             self._delete_button(cat_name, btn_name)
 
     # ============================================================ edit/delete
+
+    # ===================================================== drag to reorder (v01.15)
+
+    def begin_drag(self, button):
+        """_DragButton 이 드래그 시작을 알린다. 커서를 손 모양으로, 자동 스크롤 틱 시작."""
+        self._drag_source = button.drag_key
+        self._drag_last_pos = None
+        QApplication.setOverrideCursor(Qt.ClosedHandCursor)
+        self._drag_timer.start()
+
+    def update_drag(self, global_pos):
+        """커서가 움직였다 - 놓일 자리를 다시 구해 가로줄을 옮기고, 가장자리면 스크롤한다."""
+        if self._drag_source is None:
+            return
+        self._drag_last_pos = global_pos
+        self._show_drop_line(self._drop_target_at(global_pos))
+        self._auto_scroll(global_pos)
+
+    def end_drag(self, global_pos):
+        """놓았다 - 자리를 구해 데이터를 옮기고 저장 · 재렌더."""
+        source = self._drag_source
+        target = self._drop_target_at(global_pos) if source is not None else None
+        self.cancel_drag()
+        if source is not None and target is not None:
+            self._drop_button(source, target)
+
+    def cancel_drag(self):
+        """드래그 상태를 모두 걷는다 (Esc · 놓음 공통)."""
+        self._drag_timer.stop()
+        if self._drag_source is not None:
+            QApplication.restoreOverrideCursor()
+        self._drag_source = None
+        self._drag_last_pos = None
+        self._drop_line.hide()
+
+    def _on_drag_tick(self):
+        if self._drag_source is not None and self._drag_last_pos is not None:
+            self.update_drag(self._drag_last_pos)
+
+    def _drop_target_at(self, global_pos):
+        """전역 커서 좌표 -> (카테고리 인덱스, 삽입 인덱스). 카테고리가 없으면 None.
+
+        세로 위치만 본다. 커서 y 를 품는 카테고리 박스를 고르고(없으면 세로로 가장 가까운 박스),
+        그 안에서 가운데 y 가 커서보다 위인 버튼 수가 삽입 인덱스다.
+        """
+        if not self._cat_boxes:
+            return None
+        y = self._cat_container.mapFromGlobal(global_pos).y()
+
+        chosen = None
+        best = None
+        for entry in self._cat_boxes:
+            g = entry[0].geometry()
+            if g.top() <= y <= g.bottom():
+                chosen = entry
+                break
+            dist = g.top() - y if y < g.top() else y - g.bottom()
+            if best is None or dist < best[0]:
+                best = (dist, entry)
+        if chosen is None:
+            chosen = best[1]
+
+        _box, cat_index, btn_widgets = chosen
+        insert = 0
+        for btn in btn_widgets:
+            if btn.mapTo(self._cat_container, btn.rect().center()).y() < y:
+                insert += 1
+        return (cat_index, insert)
+
+    def _show_drop_line(self, target):
+        """target 자리에 가로줄을 그린다 (컨테이너 좌표)."""
+        if target is None:
+            self._drop_line.hide()
+            return
+        cat_index, insert = target
+        entry = next((e for e in self._cat_boxes if e[1] == cat_index), None)
+        if entry is None:
+            self._drop_line.hide()
+            return
+        box, _ci, btn_widgets = entry
+        bg = box.geometry()
+        m = box.layout().contentsMargins() if box.layout() is not None else None
+        left = bg.left() + (m.left() if m else 8)
+        width = bg.width() - ((m.left() + m.right()) if m else 16)
+        spacing = box.layout().spacing() if box.layout() is not None else 6
+        if spacing < 0:
+            spacing = 6
+
+        if not btn_widgets:
+            y = bg.top() + bg.height() // 2         # 빈 카테고리 - 안내 라벨 자리 가운데
+        elif insert < len(btn_widgets):
+            nxt = btn_widgets[insert]
+            y = nxt.mapTo(self._cat_container, nxt.rect().topLeft()).y() - spacing // 2
+        else:
+            last = btn_widgets[-1]
+            y = last.mapTo(self._cat_container, last.rect().bottomLeft()).y() + spacing // 2
+
+        self._drop_line.setGeometry(left, y - 1, max(width, 10), 3)
+        self._drop_line.show()
+        self._drop_line.raise_()
+
+    AUTO_SCROLL_MARGIN = 24   # px, 뷰포트 위/아래 이 안에 커서가 오면 스크롤
+    AUTO_SCROLL_STEP = 12     # px / 틱
+
+    def _auto_scroll(self, global_pos):
+        viewport = self._scroll.viewport()
+        p = viewport.mapFromGlobal(global_pos)
+        bar = self._scroll.verticalScrollBar()
+        if p.y() < self.AUTO_SCROLL_MARGIN:
+            bar.setValue(bar.value() - self.AUTO_SCROLL_STEP)
+        elif p.y() > viewport.height() - self.AUTO_SCROLL_MARGIN:
+            bar.setValue(bar.value() + self.AUTO_SCROLL_STEP)
+
+    def _drop_button(self, source, target):
+        """(cat, idx) 의 버튼을 (cat, insert) 자리로 옮긴다. 같은 자리면 아무 일 없음.
+
+        같은 카테고리 안이면 pop -> insert (인덱스 보정). 다른 카테고리면 Change Category 와 같은
+        규칙 - 대상에 같은 이름이 있으면 막는다. 바뀌었으면 저장 · 재렌더.
+        """
+        s_cat, s_idx = source
+        t_cat, t_idx = target
+        cats = self._data.get("categories", [])
+        if not (0 <= s_cat < len(cats) and 0 <= t_cat < len(cats)):
+            return
+        src = cats[s_cat].setdefault("buttons", [])
+        if not (0 <= s_idx < len(src)):
+            return
+
+        if s_cat == t_cat:
+            if t_idx in (s_idx, s_idx + 1):
+                return
+            moved = src.pop(s_idx)
+            if t_idx > s_idx:
+                t_idx -= 1
+            src.insert(max(0, min(t_idx, len(src))), moved)
+        else:
+            dst = cats[t_cat].setdefault("buttons", [])
+            moved = src[s_idx]
+            if any(b["name"] == moved["name"] for b in dst):
+                QMessageBox.warning(
+                    self, TITLE,
+                    "Button '{0}' already exists in '{1}'.".format(moved["name"], cats[t_cat]["name"]))
+                return
+            src.pop(s_idx)
+            dst.insert(max(0, min(t_idx, len(dst))), moved)
+            self._log("Moved '{0}' to category '{1}'.".format(moved["name"], cats[t_cat]["name"]))
+
+        self._save_and_render()
 
     def _move_category(self, name, delta):
         """카테고리를 목록에서 delta(-1=위, +1=아래)만큼 옮겨 정렬 순서를 바꾼다."""

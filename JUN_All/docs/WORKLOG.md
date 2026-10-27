@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-27 (오늘)
 
+> [!summary] A00340_SelectionTool **v01.15 — 버튼 드래그로 옮기기**: A00240_PathTool v01.28 과 같은 방식(버튼 서브클래스 마우스 이벤트, 가로줄 · 자동 스크롤 · Esc) `#A00340_SelectionTool` `#qt`
+- 요청: "Buttons 탭의 버튼들도 A00240_PathTool 처럼 드래그 드랍으로 순서를 바꿀 수 있게".
+- `_DragButton` + `begin/update/end/cancel_drag` · `_drop_target_at` · `_show_drop_line` · `_auto_scroll` · `_drop_button` 를 A00240 에서 옮김. 다른 카테고리로도 이동(같은 이름이면 막음), 색칠 모드는 드래그 끔.
+- 검증(오프스크린, QMouseEvent 직접 전송, 프로파일 저장은 메모리로 막음): 12/12. **마야 GUI 확인 아직.**
+
 > [!summary] A00340_SelectionTool **v01.14 — 로그창 접힌 채 시작**: 공용 로그 위젯 `set_shrunk(True)` 를 창 생성 때 `#A00340_SelectionTool`
 - 오프스크린 확인: 시작 = 접힘 · 버튼 `Show`(체크) · 로그 높이 20 · 창 높이 620 -> 528, `Show` 누르면 펴지고 창 620 으로 복원, 다시 접기 정상, 접힌 동안에도 로그는 쌓인다.
 

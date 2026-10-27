@@ -2,6 +2,16 @@
 
 All notable changes to this tool are documented here.
 
+## v01.15 — 2026-10-27
+
+- **Drag a selection button to reorder it** (same as A00240_PathTool): press, hold, move and
+  release - inside a category it changes the order, onto another category it moves there (blocked
+  with a message when that category already has a button with the same name). While dragging, a
+  line shows where it will land and the list scrolls by itself at the top / bottom edge. `Esc`
+  cancels. A press-and-release without moving is still a normal click (selects the objects).
+  In Color Select mode buttons are only checked, not dragged. `Move Up / Down` and
+  `Change Category` stay in the right-click menu. The new order is saved to the profile JSON.
+
 ## v01.14 — 2026-10-27
 
 - The log panel starts collapsed (Shrink on): only its button row shows; press `Show` to open it.
