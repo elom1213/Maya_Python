@@ -30,7 +30,16 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-10-28 (오늘)
+## 2026-10-29 (오늘)
+
+> [!summary] A00470_MaterialTool **v01.13 — Copy Material 두 리스트: 1 → n 과 n 쌍(행 순서)** `#A00470_MaterialTool`
+- 요청: "Copy Material 탭을 왼쪽 · 오른쪽 TSL 로 바꿔 n 개 메시끼리 복사, 1 => n 도 그대로 되게".
+- UI: `Set Source` 칸 → 왼쪽 `Source Meshes` TSL. 개수로 방식 결정(1 → n / n = n 쌍 / 다르면 비활성 + 빨간 `Mode` 줄). 한 번의 Undo.
+- core: `copy_material_from(노드, 대상들)` 로 본문을 떼고 `copy_material(uuid)` 는 그걸 부른다. `copy_material_pairs([(소스, 대상)])` 추가.
+- ★ 공용 TSL `get_all_nodes()` 는 사라진 행을 빼서 짝이 밀린다 → 행마다 `_node_of` 로 해석, 사라진 행은 그 쌍만 건너뜀.
+- 검증: `tests/test_copy_material_pairs.py` 19/19 (시험 중 건너뛴 쌍의 머티리얼까지 세던 것 발견 → 복사된 쌍만). **마야 GUI 확인 아직.**
+
+## 2026-10-28
 
 > [!summary] A00340_SelectionTool **v01.18 — 네임스페이스 교체로 다른 아바타 선택**: `Namespace` 콤보 · `Map...` · 프로파일별 기억 · 캡처 되돌리기 `#A00340_SelectionTool` `#plan`
 - 요청: "MUE_BCM 의 test:ZIHAN:Cage 를 다른 네임스페이스로 바꿔 다른 아바타도 고르게, UI 에서 네임스페이스 고르기" → 설계 제안 → "계획서 먼저, 권장안대로, 토큰 진단".

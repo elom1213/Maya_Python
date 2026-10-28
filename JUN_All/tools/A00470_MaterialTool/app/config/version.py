@@ -31,5 +31,9 @@
 # 01.12  Name Check 레이아웃 : Check Names · Rename to Suggested 를 가로 한 줄로, Report 체크박스 셋은
 #        공용 접이식(`JUN_mod_collapsible_qt_v01`, 기본 접힘) 안으로. 탭 최소 높이 750 -> 641px(접힘).
 
-VERSION = "01.12"
-LAST_UPDATE = "2026-10-12"
+# 01.13  Copy Material 탭 = 왼쪽 Source · 오른쪽 Target 리스트 두 개. Source 1 개면 1 -> n(예전과 같다),
+#        Source n 개 = Target n 개면 행 순서로 n 쌍, 개수가 다르면 실행 안 함. 사라진 행은 그 쌍만 건너뛴다.
+#        Set Source 칸 · Select 버튼은 Source 리스트(UUID 기억 · Select Sources)로 대체.
+
+VERSION = "01.13"
+LAST_UPDATE = "2026-10-29"

@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-17
+# last Update date : 2026-10-29
 # A00470_MaterialTool - Copy Material : 소스 메시 M 의 **면별** 머티리얼 배정을 M_i 에 그대로.
+# v01.13 : copy_material_from(소스 노드, 대상들) 로 나누고 copy_material_pairs([(소스, 대상)]) 추가 -
+#          탭이 왼쪽 · 오른쪽 리스트 두 개가 되어 1 -> n 과 n 쌍(행 순서) 둘 다 이 함수들로 한다.
 #
 # 전제 : M_i 는 M 과 **같은 메시**(토폴로지 동일, 면 번호가 같은 자리를 가리킨다).
 #
@@ -193,13 +195,60 @@ def copy_material(source_uuid, targets):
     반환: dict(ok, message, copied=[target], skipped=[(target, why)], warnings=[str],
                materials=[머티리얼 이름])
     """
+    source = node_from_uuid(source_uuid)
+    if not source:
+        return {"ok": False, "copied": [], "skipped": [], "warnings": [], "materials": [],
+                "message": "The source mesh is not in the scene anymore. Set the source again."}
+    return copy_material_from(source, targets)
+
+
+def copy_material_pairs(pairs):
+    """(소스, 대상) 쌍마다 copy_material_from (v01.13 - n 개 메시끼리, 행 순서로 짝).
+
+    pairs = [(source, target)]. 소스 · 대상은 노드 이름(None 이면 '씬에서 사라진 행' 으로 그 쌍만 건너뛴다).
+    반환: dict(ok, message, copied=[(source, target)], skipped=[(source, target, why)], warnings=[str],
+               materials=[머티리얼 이름]) - 호출하는 쪽이 undo 청크로 감싼다.
+    """
+    result = {"ok": False, "message": "", "copied": [], "skipped": [], "warnings": [], "materials": []}
+    for source, target in pairs:
+        if not source or not target:
+            result["skipped"].append((source, target, "a mesh in this row is not in the scene anymore"))
+            continue
+        source_t = mesh_transform(source)
+        if not source_t:
+            result["skipped"].append((source, target, "the source is not a mesh"))
+            continue
+        one = copy_material_from(source_t, [target])
+        for warning in one["warnings"]:
+            result["warnings"].append(warning)
+        if one["copied"]:
+            result["copied"].append((source_t, one["copied"][0]))
+            # 실제로 복사된 쌍의 머티리얼만 센다(건너뛴 쌍의 소스 머티리얼은 빼고).
+            for material in one["materials"]:
+                if material not in result["materials"]:
+                    result["materials"].append(material)
+        elif one["skipped"]:
+            for skipped_target, why in one["skipped"]:
+                result["skipped"].append((source_t, skipped_target, why))
+        else:
+            result["skipped"].append((source_t, target, one["message"]))
+    if not result["copied"]:
+        result["message"] = "Nothing was copied."
+        return result
+    result["ok"] = True
+    result["message"] = "Copy Material : {0} pair(s) copied, {1} material(s).".format(
+        len(result["copied"]), len(result["materials"]))
+    return result
+
+
+def copy_material_from(source, targets):
+    """소스 메시(노드 이름)의 면별 머티리얼 배정을 targets 에 똑같이 건다. 반환은 copy_material 과 같다."""
     result = {"ok": False, "message": "", "copied": [], "skipped": [],
               "warnings": [], "materials": []}
 
-    source = node_from_uuid(source_uuid)
+    source = mesh_transform(source)
     if not source:
-        result["message"] = ("The source mesh is not in the scene anymore. "
-                             "Set the source again.")
+        result["message"] = "The source is not a mesh."
         return result
 
     source_shapes = mesh_shapes(source)
