@@ -1,0 +1,69 @@
+{
+  "categories": [
+    {
+      "name": "ZIHAN",
+      "buttons": [
+        {
+          "name": "Root",
+          "objects": [
+            "test:ZIHAN:Cage:CH_n_MainRoot_xx_ctl"
+          ]
+        },
+        {
+          "name": "Fingers_R",
+          "objects": [
+            "test:ZIHAN:Cage:CH_Ring_proximal_r_xx_ctl",
+            "test:ZIHAN:Cage:CH_Index_proxinal_r_xx_ctl",
+            "test:ZIHAN:Cage:CH_Ring_distal_r_xx_ctl",
+            "test:ZIHAN:Cage:CH_Lttle_distal_r_xx_ctl",
+            "test:ZIHAN:Cage:CH_Thumb_intermediate_r_xx_ctl",
+            "test:ZIHAN:Cage:CH_Lttle_intermediate_r_xx_ctl",
+            "test:ZIHAN:Cage:CH_Thumb_proxinal_r_xx_ctl",
+            "test:ZIHAN:Cage:CH_Lttle_proximal_r_xx_ctl",
+            "test:ZIHAN:Cage:CH_Middle_distal_r_xx_ctl",
+            "test:ZIHAN:Cage:CH_Middle_intermideate_r_xx_ctl",
+            "test:ZIHAN:Cage:CH_Middle_proximal_r_xx_ctl",
+            "test:ZIHAN:Cage:CH_Ring_intermediate_r_xx_ctl",
+            "test:ZIHAN:Cage:CH_Index_distal_r_xx_ctl",
+            "test:ZIHAN:Cage:CH_Thumb_distal_r_xx_ctl",
+            "test:ZIHAN:Cage:CH_Index_intermediate_r_xx_ctl"
+          ],
+          "color": "#55aaff"
+        },
+        {
+          "name": "Fingers_L",
+          "objects": [
+            "test:ZIHAN:Cage:CH_Index_intermediate_l_xx_ctl",
+            "test:ZIHAN:Cage:CH_Index_distal_l_xx_ctl",
+            "test:ZIHAN:Cage:CH_Ring_distal_l_xx_ctl",
+            "test:ZIHAN:Cage:CH_Thumb_proxinal_l_xx_ctl",
+            "test:ZIHAN:Cage:CH_Thumb_intermediate_l_xx_ctl",
+            "test:ZIHAN:Cage:CH_Lttle_distal_l_xx_ctl",
+            "test:ZIHAN:Cage:CH_Lttle_intermediate_l_xx_ctl",
+            "test:ZIHAN:Cage:CH_Ring_proximal_l_xx_ctl",
+            "test:ZIHAN:Cage:CH_Index_proxinal_l_xx_ctl",
+            "test:ZIHAN:Cage:CH_Thumb_distal_l_xx_ctl",
+            "test:ZIHAN:Cage:CH_Ring_intermediate_l_xx_ctl",
+            "test:ZIHAN:Cage:CH_Middle_proximal_l_xx_ctl",
+            "test:ZIHAN:Cage:CH_Middle_distal_l_xx_ctl",
+            "test:ZIHAN:Cage:CH_Lttle_proximal_l_xx_ctl",
+            "test:ZIHAN:Cage:CH_Middle_intermideate_l_xx_ctl"
+          ],
+          "color": "#aa0000"
+        },
+        {
+          "name": "Foot_R",
+          "objects": [
+            "test:ZIHAN:Cage:CH_r_foot_xx_ctl"
+          ]
+        },
+        {
+          "name": "Foot_L",
+          "objects": [
+            "test:ZIHAN:Cage:CH_l_foot_xx_ctl"
+          ]
+        }
+      ]
+    }
+  ]
+}
