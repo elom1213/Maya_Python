@@ -9,6 +9,7 @@
 #
 #   - 상단 "Profile" 그룹 : 선택 버튼 세트를 캐릭터/에셋별 JSON 으로 나눠 관리.
 #   - 상단 "Create" 그룹  : [Category] / [Selection] 버튼.
+#   - `Add` 체크 (v01.16~) : 버튼 모음 pane 맨 위 - Controls 를 접거나 숨겨도 보인다.
 #       * Category  : 새 카테고리(QGroupBox) 생성.
 #       * Selection : 현재 마야 선택을 캡처해 새 선택 버튼으로 만든다.
 #   - 각 카테고리는 QGroupBox, 그 안에 선택 버튼이 쌓인다.
@@ -450,7 +451,25 @@ class SelectionTab(QWidget):
         self._drag_timer = QTimer(self)
         self._drag_timer.setInterval(40)
         self._drag_timer.timeout.connect(self._on_drag_tick)
-        return scroll
+
+        # v01.16 : `Add` 체크를 Create 그룹에서 이 pane 맨 위로 옮겼다. 버튼을 누를 때마다 쓰는 옵션인데
+        #          Controls 를 접거나(View > Show Controls 로) 숨기면 같이 사라졌다. 이 pane 은 늘 보인다.
+        self.chk_add = QCheckBox("Add")
+        self.chk_add.setToolTip(
+            "When on, clicking a button adds to the current selection "
+            "instead of replacing it.")
+        add_row = QHBoxLayout()
+        add_row.setContentsMargins(2, 0, 2, 0)
+        add_row.addWidget(self.chk_add)
+        add_row.addStretch(1)
+
+        pane = QWidget()
+        pane_layout = QVBoxLayout(pane)
+        pane_layout.setContentsMargins(0, 0, 0, 0)
+        pane_layout.setSpacing(2)
+        pane_layout.addLayout(add_row)
+        pane_layout.addWidget(scroll, 1)
+        return pane
 
     def _build_profile_group(self):
         # 프로파일(캐릭터/에셋처럼 JSON 별로 나뉜 선택 버튼 묶음) 선택 + 관리.
@@ -493,16 +512,10 @@ class SelectionTab(QWidget):
             "Capture the current Maya selection into a new button")
         btn_selection.clicked.connect(self.on_create_selection)
 
-        # 버튼 클릭 시 현재 선택을 지우지 않고 누적 선택할지.
-        self.chk_add = QCheckBox("Add")
-        self.chk_add.setToolTip(
-            "When on, clicking a button adds to the current selection "
-            "instead of replacing it.")
-
+        # `Add` 체크는 v01.16 부터 버튼 모음 pane 위(_build_buttons_pane) - Controls 를 접어도 보이게.
         row.addWidget(btn_category)
         row.addWidget(btn_selection)
         row.addStretch(1)
-        row.addWidget(self.chk_add)
 
         return group
 

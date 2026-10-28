@@ -2,6 +2,11 @@
 
 All notable changes to this tool are documented here.
 
+## v01.16 — 2026-10-28
+
+- The `Add` checkbox moved from the Create group to the top of the button area, so it stays
+  visible when Controls is collapsed or hidden (View > Show Controls).
+
 ## v01.15 — 2026-10-27
 
 - **Drag a selection button to reorder it** (same as A00240_PathTool): press, hold, move and

@@ -30,7 +30,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-10-27 (오늘)
+## 2026-10-28 (오늘)
+
+> [!summary] A00340_SelectionTool **v01.16 — `Add` 체크를 버튼 모음 위로**: Create 그룹(Controls 안)에 있어 Controls 를 접으면 같이 사라지던 것 `#A00340_SelectionTool`
+- 버튼 모음 pane 을 [Add 줄] + [스크롤] 로 감쌌다. 오프스크린 확인: Controls 접힘 · 숨김 모두에서 보임, Add 켬 = 누적 선택 / 끔 = 교체, 드래그 회귀 12/12. **마야 GUI 확인 아직.**
+
+## 2026-10-27
 
 > [!summary] A00340_SelectionTool **v01.15 — 버튼 드래그로 옮기기**: A00240_PathTool v01.28 과 같은 방식(버튼 서브클래스 마우스 이벤트, 가로줄 · 자동 스크롤 · Esc) `#A00340_SelectionTool` `#qt`
 - 요청: "Buttons 탭의 버튼들도 A00240_PathTool 처럼 드래그 드랍으로 순서를 바꿀 수 있게".
