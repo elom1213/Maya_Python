@@ -166,8 +166,8 @@ tests/test_namespace_remap.py    # 신규
 
 - [x] **N1** 이 계획서 커밋
 - [x] **N2** `namespace_map.py` + prefs 매핑 저장 (rename/share/delete 키 이동)
-- [ ] **N3** Buttons 탭 Namespace 콤보 · ⟳ · 강조 · 툴팁 · 클릭 적용 · 기억
-- [ ] **N4** `Map...` 대화상자 (여러 ns) + 캡처 되돌리기
+- [x] **N3** Buttons 탭 Namespace 콤보 · ⟳ · 강조 · 툴팁 · 클릭 적용 · 기억
+- [x] **N4** `Map...` 대화상자 (여러 ns) + 캡처 되돌리기
 - [ ] **N5** 시험 `tests/test_namespace_remap.py` + 회귀 46 + 실제 씬 확인
 - [ ] **N6** 버전 01.18 · CHANGELOG · 사용 안내 · WORKLOG · 이 문서 상태 = 구현 완료
 

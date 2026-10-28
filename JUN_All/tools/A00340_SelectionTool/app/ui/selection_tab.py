@@ -63,6 +63,7 @@ from Framework.qt.qt import (
 
 from ..core import prefs as prefs_mod
 from ..core import maya_select
+from ..core import namespace_map as ns_mod
 
 
 TITLE = "Selection Tool"
@@ -267,6 +268,54 @@ class AddSelectionDialog(QDialog):
         )
 
 
+class NamespaceMapDialog(QDialog):
+    """원래 네임스페이스마다 대상 네임스페이스를 고르는 창 (v01.18).
+
+    rows = [(원래 ns, 오브젝트 수, [(후보 ns, found, total), ...])], current = {원래: 대상}.
+    """
+
+    KEEP = "(keep - as saved)"
+
+    def __init__(self, rows, current, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Namespace Map")
+        self.setMinimumWidth(360)
+        form = QFormLayout(self)
+        info = QLabel("Select the objects saved in each namespace (left) from another\n"
+                      "namespace (right). Only this PC remembers it; the profile is not changed.")
+        info.setEnabled(False)
+        form.addRow(info)
+        self._combos = []
+        for src, count, cands in rows:
+            combo = QComboBox()
+            combo.addItem(self.KEEP, None)
+            for ns, found, total in cands:
+                if ns == src:
+                    continue
+                combo.addItem("{0}  ({1}/{2})".format(ns or "(no namespace)", found, total), ns)
+            target = (current or {}).get(src)
+            if target is not None and target != src:
+                idx = combo.findData(target)
+                if idx < 0:                       # 지금 씬 후보엔 없지만 저장돼 있던 값 - 보이게 넣는다
+                    combo.addItem("{0}  (not found)".format(target), target)
+                    idx = combo.count() - 1
+                combo.setCurrentIndex(idx)
+            form.addRow("{0}  ({1})".format(src, count), combo)
+            self._combos.append((src, combo))
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        form.addRow(buttons)
+
+    def mapping(self):
+        out = {}
+        for src, combo in self._combos:
+            target = combo.currentData()
+            if target is not None and target != src:
+                out[src] = target
+        return out
+
+
 class SelectionTab(QWidget):
 
     def __init__(self, log_callback=None, parent=None):
@@ -293,8 +342,14 @@ class SelectionTab(QWidget):
         self._drag_source = None        # (카테고리 인덱스, 버튼 인덱스) - 드래그 중이 아니면 None
         self._drag_last_pos = None
 
+        # 네임스페이스 교체 (v01.18) : {원래 ns: 대상 ns}. 프로파일마다 prefs 에 기억한다.
+        self._ns_map = {}
+        self._ns_filling = False        # 콤보를 코드로 채우는 동안 변경 시그널 무시
+
         self._build_ui()
+        self._ns_map = prefs_mod.get_namespace_map(self._scope, self._profile)
         self._refresh_profiles()
+        self.refresh_namespace_choices()
         self._render_categories()
 
     # ============================================================== build
@@ -464,11 +519,34 @@ class SelectionTab(QWidget):
         add_row.addWidget(self.chk_add)
         add_row.addStretch(1)
 
+        # v01.18 : 네임스페이스 교체 - 같은 리그의 다른 아바타를 고른다 (프로파일 json 은 그대로).
+        ns_row = QHBoxLayout()
+        ns_row.setContentsMargins(2, 0, 2, 0)
+        ns_label = QLabel("Namespace")
+        ns_row.addWidget(ns_label)
+        self.cmb_ns = QComboBox()
+        # 긴 네임스페이스 이름이 창의 최소 폭을 만들지 않게(v01.12 와 같은 이유) - 콤보는 줄어든다.
+        self.cmb_ns.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.cmb_ns.setMinimumContentsLength(6)
+        self.cmb_ns.currentIndexChanged.connect(self._on_ns_combo_changed)
+        ns_row.addWidget(self.cmb_ns, 1)
+        self.btn_ns_map = QPushButton("Map...")
+        self.btn_ns_map.setToolTip(
+            "Choose a target namespace for each namespace this profile uses\n"
+            "(needed when the profile uses more than one).")
+        self.btn_ns_map.clicked.connect(self.on_namespace_map_dialog)
+        ns_row.addWidget(self.btn_ns_map)
+        self.btn_ns_refresh = QPushButton("Refresh")
+        self.btn_ns_refresh.setToolTip("Read the scene's namespaces again (after loading / referencing).")
+        self.btn_ns_refresh.clicked.connect(lambda *_: self.refresh_namespace_choices())
+        ns_row.addWidget(self.btn_ns_refresh)
+
         pane = QWidget()
         pane_layout = QVBoxLayout(pane)
         pane_layout.setContentsMargins(0, 0, 0, 0)
         pane_layout.setSpacing(2)
         pane_layout.addLayout(add_row)
+        pane_layout.addLayout(ns_row)
         pane_layout.addWidget(scroll, 1)
         return pane
 
@@ -631,9 +709,13 @@ class SelectionTab(QWidget):
         btn = _DragButton("{0}  ({1})".format(btn_data["name"], len(objects)), self, drag_key)
 
         # 툴팁에 담긴 오브젝트를 보여준다(너무 길면 앞부분만).
-        preview = "\n".join(objects[:20])
-        if len(objects) > 20:
-            preview += "\n... (+{0} more)".format(len(objects) - 20)
+        mapping = self.current_mapping()
+        shown = ns_mod.remap_names(objects, mapping) if mapping else objects
+        preview = "\n".join(shown[:20])
+        if len(shown) > 20:
+            preview += "\n... (+{0} more)".format(len(shown) - 20)
+        if mapping and shown:
+            preview = "(namespace: {0})\n".format(self._mapping_text(mapping)) + preview
         btn.setToolTip(preview or "(empty)")
 
         name = btn_data["name"]
@@ -725,6 +807,9 @@ class SelectionTab(QWidget):
         prefs_mod.set_active(name, scope)
         self._data = prefs_mod.load_profile(name, scope)
         self._checked.clear()  # 프로파일이 바뀌면 체크 상태는 무효
+        # 그 프로파일의 네임스페이스 매핑 (v01.18) - 후보도 다시 읽는다(버튼 툴팁이 매핑을 따른다)
+        self._ns_map = prefs_mod.get_namespace_map(scope, name)
+        self.refresh_namespace_choices()
 
     def on_profile_changed(self, index):
         """콤보에서 다른 프로파일을 고르면 그 프로파일을 로드한다."""
@@ -843,7 +928,9 @@ class SelectionTab(QWidget):
         self._scope, self._profile = prefs_mod.get_active_ref()
         self._data = prefs_mod.load_profile(self._profile, self._scope)
         self._checked.clear()
+        self._ns_map = prefs_mod.get_namespace_map(self._scope, self._profile)
         self._refresh_profiles()
+        self.refresh_namespace_choices()
         self._render_categories()
 
     # ============================================================== create
@@ -879,6 +966,7 @@ class SelectionTab(QWidget):
             QMessageBox.information(
                 self, TITLE, "Select objects in Maya first.")
             return
+        objects, _outside = self._to_saved_names(objects)    # v01.18 : 매핑이 켜져 있으면 원래 ns 로
 
         # 카테고리 / 버튼 이름을 한 다이얼로그에서 입력받는다(중복 시 재시도).
         dlg = AddSelectionDialog(names, len(objects), self)
@@ -917,10 +1005,15 @@ class SelectionTab(QWidget):
             return
 
         objects = btn_data.get("objects", [])
+        mapping = self.current_mapping()
+        if mapping:
+            objects = ns_mod.remap_names(objects, mapping)      # v01.18 : 다른 아바타로
         add = self.chk_add.isChecked()
         found, missing = maya_select.select_objects(objects, add=add)
 
         msg = "Selected {0} object(s)".format(len(found))
+        if mapping:
+            msg += " via {0}".format(self._mapping_text(mapping))
         if add:
             msg += " (added)"
         if missing:
@@ -1004,6 +1097,144 @@ class SelectionTab(QWidget):
             self._delete_button(cat_name, btn_name)
 
     # ============================================================ edit/delete
+
+    # ===================================================== namespace remap (v01.18)
+    # 계획서 docs/plans/A00340_SelectionTool_namespace_remap_plan.md. 프로파일 json 은 그대로 두고
+    # 선택할 때만 {원래 ns: 대상 ns} 로 바꿔 끼운다. 캡처는 거꾸로 되돌려 원래 ns 로 저장한다.
+
+    NS_AS_SAVED = "(as saved)"
+    NS_MAPPED = "__mapped__"
+    NS_HILITE_QSS = "QComboBox { background-color: #cfe3ff; color: #102a50; font-weight: bold; }"
+
+    def current_mapping(self):
+        """실제로 바뀌는 쌍만 {원래: 대상}."""
+        return ns_mod.effective(self._ns_map)
+
+    @staticmethod
+    def _mapping_text(mapping):
+        return ", ".join("{0} -> {1}".format(s or "(no namespace)", d or "(no namespace)")
+                         for s, d in sorted(mapping.items()))
+
+    def _used_namespaces(self):
+        """이 프로파일이 쓰는 네임스페이스(빈 것 제외), 많이 쓰는 순."""
+        counts = ns_mod.profile_namespaces(self._data)
+        return [ns for ns, _n in counts.most_common() if ns], counts
+
+    def _save_ns_map(self):
+        prefs_mod.set_namespace_map(self._scope, self._profile, self._ns_map)
+
+    def refresh_namespace_choices(self):
+        """Namespace 콤보를 지금 프로파일 · 씬으로 다시 채운다. 씬에 없는 저장 대상은 버린다(알림)."""
+        used, counts = self._used_namespaces()
+        objects = ns_mod.profile_objects(self._data)
+        self._ns_single_src = used[0] if len(used) == 1 else None
+        dropped = []
+        self._ns_filling = True
+        try:
+            self.cmb_ns.clear()
+            self.cmb_ns.addItem(self.NS_AS_SAVED, None)
+            if not used:
+                self.cmb_ns.setEnabled(False)
+                self.btn_ns_map.setEnabled(False)
+                self.cmb_ns.setToolTip("This profile's objects have no namespace - nothing to swap."
+                                       if objects else "This profile has no objects yet.")
+                if self._ns_map:
+                    self._ns_map = {}
+                    self._save_ns_map()
+            elif self._ns_single_src is not None:
+                src = self._ns_single_src
+                cands = ns_mod.candidates(objects, src)
+                for ns, found, total in cands:
+                    self.cmb_ns.addItem("{0}  ({1}/{2})".format(ns or "(no namespace)", found, total), ns)
+                target = self._ns_map.get(src)
+                cand_ns = [c[0] for c in cands]
+                if target is not None and target != src and target not in cand_ns:
+                    dropped.append(target)
+                    self._ns_map = {}
+                    self._save_ns_map()
+                    target = None
+                idx = self.cmb_ns.findData(target) if target not in (None, src) else 0
+                self.cmb_ns.setCurrentIndex(max(0, idx))
+                self.cmb_ns.setEnabled(True)
+                self.btn_ns_map.setEnabled(True)
+                self.cmb_ns.setToolTip(
+                    "Select these buttons' objects in another namespace (same rig, another avatar).\n"
+                    "Saved: {0} ({1} objects). The list shows namespaces in this scene that have\n"
+                    "them - found / total. The profile file is not changed.".format(src, counts[src]))
+            else:
+                scene = set(ns_mod.scene_namespaces())
+                for src, dst in list(self._ns_map.items()):
+                    if dst and dst not in scene:
+                        dropped.append(dst)
+                        del self._ns_map[src]
+                if dropped:
+                    self._save_ns_map()
+                if self.current_mapping():
+                    self.cmb_ns.addItem("(mapped: {0})".format(len(self.current_mapping())), self.NS_MAPPED)
+                    self.cmb_ns.setCurrentIndex(1)
+                self.cmb_ns.setEnabled(False)
+                self.btn_ns_map.setEnabled(True)
+                self.cmb_ns.setToolTip(
+                    "This profile uses {0} namespaces ({1}) - use 'Map...' to choose a target for each.".format(
+                        len(used), ", ".join(used)))
+        finally:
+            self._ns_filling = False
+        for ns in dropped:
+            self._log("[Info] Namespace '{0}' is not in this scene - using the saved names.".format(ns))
+        self._apply_ns_highlight()
+
+    def _apply_ns_highlight(self):
+        mapping = self.current_mapping()
+        self.cmb_ns.setStyleSheet(self.NS_HILITE_QSS if mapping else "")
+        if mapping:
+            self.btn_ns_map.setToolTip("Now: " + self._mapping_text(mapping))
+
+    def _on_ns_combo_changed(self, index):
+        if self._ns_filling or self._ns_single_src is None or index < 0:
+            return
+        src = self._ns_single_src
+        target = self.cmb_ns.itemData(index)
+        self._ns_map = {} if target in (None, src) else {src: target}
+        self._save_ns_map()
+        self._apply_ns_highlight()
+        self._render_categories()       # 버튼 툴팁이 교체한 이름을 보이게
+        mapping = self.current_mapping()
+        self._log("Namespace: {0}".format(self._mapping_text(mapping) if mapping else "as saved"))
+
+    def on_namespace_map_dialog(self, *args):
+        """Map... - 원래 ns 마다 대상 ns 를 고른다 (여러 ns 를 쓰는 프로파일)."""
+        used, counts = self._used_namespaces()
+        if not used:
+            return
+        objects = ns_mod.profile_objects(self._data)
+        rows = [(ns, counts[ns], ns_mod.candidates(objects, ns)) for ns in used]
+        dlg = NamespaceMapDialog(rows, self._ns_map, self)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+        self._ns_map = dlg.mapping()
+        self._save_ns_map()
+        self.refresh_namespace_choices()
+        self._render_categories()
+        mapping = self.current_mapping()
+        self._log("Namespace map: {0}".format(self._mapping_text(mapping) if mapping else "as saved"))
+
+    def _to_saved_names(self, captured):
+        """캡처한 이름을 원래 ns 로 되돌린다 (매핑이 켜져 있을 때). 반환 (이름 목록, 되돌리지 못한 수)."""
+        mapping = self.current_mapping()
+        if not mapping:
+            return list(captured), 0
+        reverse = ns_mod.reverse_mapping(mapping)
+        out, outside = [], 0
+        for name in captured:
+            ns = ns_mod.split_ns(name.split("|")[-1])[0]
+            if ns in reverse:
+                out.append(ns_mod.remap_name(name, reverse))
+            else:
+                out.append(name)
+                outside += 1
+        if outside:
+            self._log("[WARN] {0} object(s) are outside the mapped namespace(s) - saved as they are.".format(outside))
+        return out, outside
 
     # ===================================================== drag to reorder (v01.15)
 
@@ -1257,6 +1488,7 @@ class SelectionTab(QWidget):
             QMessageBox.information(
                 self, TITLE, "Select objects in Maya first.")
             return
+        objects, _outside = self._to_saved_names(objects)    # v01.18 : 매핑이 켜져 있으면 원래 ns 로
 
         if append:
             existing = btn_data.get("objects", [])
