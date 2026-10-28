@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-27
+# last Update date : 2026-10-28
 # A00340_SelectionTool - "Rules" tab (Qt, in-Maya)  (v01.11)
 #
 # 규칙(rule) = 어느 씬에서든 다시 선택할 오브젝트 이름 목록 하나. **규칙 하나 = json 파일 하나**
@@ -22,6 +22,10 @@
 #   - Rename 은 json 안의 name 과 파일 이름을 함께 바꾼다. Delete 는 한 번 확인한 뒤 파일을 지운다.
 #   - Description 은 포커스를 잃을 때 저장된다 (고른 규칙이 하나일 때만 편집 가능).
 #   - 폴더를 밖에서 고쳤으면 Reload. 이 탭은 열릴 때마다 폴더를 다시 읽는다 (showEvent).
+#   - v01.17 : 로컬(data/rules) + 공유(shared/rules, git 추적 · PC 별 경로 가능) 두 폴더를 함께 보인다.
+#     Scope 열 Local / Shared, 행은 파일 경로로 가른다(같은 이름이 양쪽에 있어도 두 줄). Rename · Delete ·
+#     Update 는 규칙이 있는 폴더 안에서, 공유 규칙은 한 번 더 묻는다. Share(로컬 -> 공유 이동) ·
+#     Copy to Local(공유 -> 로컬 복사). New Rule 은 로컬에.
 # 모든 UI 문자열/로그는 영어.
 
 import os
@@ -52,6 +56,7 @@ from Framework.qt.qt import (
 )
 from Framework.core import file_opener
 
+from ..core import prefs as prefs_mod
 from ..core import select_rules as rules_mod
 from ..core import maya_select
 
@@ -69,18 +74,33 @@ def _short_dir(path):
 
 
 class RulesTab(QWidget):
-    """규칙 목록 + 고른 규칙의 오브젝트 + 편집 버튼. 규칙은 data/rules/*.json."""
+    """규칙 목록 + 고른 규칙의 오브젝트 + 편집 버튼. 규칙은 data/rules/*.json (로컬) + 공유 rules/*.json (v01.17)."""
 
-    COL_NAME, COL_COUNT, COL_FILE = 0, 1, 2
+    COL_NAME, COL_SCOPE, COL_COUNT, COL_FILE = 0, 1, 2, 3
 
-    def __init__(self, log_callback=None, rules_dir=None, parent=None):
+    def __init__(self, log_callback=None, rules_dir=None, shared_dir=None, parent=None):
         super().__init__(parent)
         self._log = log_callback or (lambda _msg: None)
         # 테스트가 임시 폴더를 넘길 수 있게 둔다. None 이면 툴의 data/rules.
-        self._rules_dir = rules_dir or rules_mod.RULES_DIR
+        self._rules_dir = rules_dir or prefs_mod.rules_dir(prefs_mod.SCOPE_LOCAL)
+        # 공유 폴더 (v01.17) : 직접 주면 그것. rules_dir 만 준 경우(시험)는 공유를 안 본다 - 실제 공유 폴더를
+        # 건드리지 않게. 둘 다 None 이면 매번 prefs 에서 읽는다(View > Shared Folder... 로 바뀔 수 있다).
+        self._shared_dir_fixed = shared_dir
+        self._shared_from_prefs = rules_dir is None and shared_dir is None
         self._rules = []
         self._build_ui()
         self.reload()
+
+    def shared_dir(self):
+        """지금 보는 공유 규칙 폴더 (없으면 None)."""
+        if self._shared_dir_fixed:
+            return self._shared_dir_fixed
+        if self._shared_from_prefs:
+            return prefs_mod.rules_dir(prefs_mod.SCOPE_SHARED)
+        return None
+
+    def _is_shared_rule(self, rule):
+        return getattr(rule, "scope", prefs_mod.SCOPE_LOCAL) == prefs_mod.SCOPE_SHARED
 
     # ============================================================== build
 
@@ -95,18 +115,20 @@ class RulesTab(QWidget):
         rules_box = QGroupBox("Rules")
         rules_lay = QVBoxLayout(rules_box)
         self.tree = QTreeWidget()
-        self.tree.setColumnCount(3)
-        self.tree.setHeaderLabels(["Name", "Objects", "File"])
+        self.tree.setColumnCount(4)
+        self.tree.setHeaderLabels(["Name", "Scope", "Objects", "File"])
         self.tree.setRootIsDecorated(False)
         self.tree.setAlternatingRowColors(True)
         self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
         header = self.tree.header()
         header.setSectionResizeMode(self.COL_NAME, QHeaderView.Stretch)
+        header.setSectionResizeMode(self.COL_SCOPE, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(self.COL_COUNT, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(self.COL_FILE, QHeaderView.ResizeToContents)
         self.tree.setToolTip(
             "One rule = one json file in the rules folder.\n"
+            "Scope 'Local' = this PC (data/rules), 'Shared' = the shared folder (tracked by git).\n"
             "Click a rule to see its objects, double-click to select them in Maya.\n"
             "Ctrl / Shift click several rules and 'Select' selects all of them together.")
         self.tree.itemSelectionChanged.connect(self._on_rule_selection_changed)
@@ -168,6 +190,22 @@ class RulesTab(QWidget):
         edit_row.addWidget(self.btn_delete)
         root.addLayout(edit_row)
 
+        # 로컬 <-> 공유 (v01.17)
+        share_row = QHBoxLayout()
+        self.btn_share = QPushButton("Share")
+        self.btn_share.setToolTip(
+            "Move the highlighted LOCAL rule(s) into the shared folder,\n"
+            "so they can be committed / pushed (or read from your shared path on other PCs).")
+        self.btn_share.clicked.connect(self.on_share)
+        self.btn_copy_local = QPushButton("Copy to Local")
+        self.btn_copy_local.setToolTip(
+            "Copy the highlighted SHARED rule(s) into this PC's local rules (data/rules).")
+        self.btn_copy_local.clicked.connect(self.on_copy_to_local)
+        share_row.addStretch(1)
+        share_row.addWidget(self.btn_share)
+        share_row.addWidget(self.btn_copy_local)
+        root.addLayout(share_row)
+
         # Select 행
         sel_row = QHBoxLayout()
         self.btn_select = QPushButton("Select")
@@ -215,49 +253,81 @@ class RulesTab(QWidget):
         return self._rules_dir
 
     def reload(self, *_args):
-        """규칙 폴더를 다시 읽어 표를 채운다. 고르던 규칙은 이름으로 유지."""
-        keep = set(r.name for r in self.selected_rules())
-        self._rules, errors = rules_mod.load_rules(self._rules_dir)
+        """로컬 + 공유 규칙 폴더를 다시 읽어 표를 채운다. 고르던 규칙은 파일 경로로 유지.
+
+        규칙마다 `scope` 속성("local" / "shared")을 붙인다. 같은 이름이 양쪽에 있어도 두 줄이다.
+        """
+        keep = set(os.path.normcase(r.path) for r in self.selected_rules())
+        local, errors = rules_mod.load_rules(self._rules_dir)
+        for rule in local:
+            rule.scope = prefs_mod.SCOPE_LOCAL
+        shared, shared_errors = [], []
+        shared_dir = self.shared_dir()
+        if shared_dir:
+            shared, shared_errors = rules_mod.load_rules(shared_dir)
+            for rule in shared:
+                rule.scope = prefs_mod.SCOPE_SHARED
+        self._rules = local + shared
 
         self.tree.blockSignals(True)
         self.tree.clear()
         for rule in self._rules:
-            item = QTreeWidgetItem([rule.name, str(len(rule.objects)), rule.file_name])
+            scope_text = "Shared" if self._is_shared_rule(rule) else "Local"
+            item = QTreeWidgetItem([rule.name, scope_text, str(len(rule.objects)), rule.file_name])
             item.setTextAlignment(self.COL_COUNT, Qt.AlignRight | Qt.AlignVCenter)
             tip = rule.path
             if rule.description:
                 tip = rule.description + "\n" + tip
-            for col in range(3):
+            for col in range(4):
                 item.setToolTip(col, tip)
-            item.setData(0, Qt.UserRole, rule.name)
+            item.setData(0, Qt.UserRole, rule.path)
             self.tree.addTopLevelItem(item)
-            if rule.name in keep:
+            if os.path.normcase(rule.path) in keep:
                 item.setSelected(True)
         self.tree.blockSignals(False)
 
-        self.lbl_folder.setText("{0} rule(s) in {1}".format(len(self._rules), _short_dir(self._rules_dir)))
-        self.lbl_folder.setToolTip(self._rules_dir)
-        for file_name, message in errors:
+        text = "{0} local".format(len(local))
+        if shared_dir:
+            text += " + {0} shared".format(len(shared))
+        self.lbl_folder.setText(text + " rule(s)  ({0})".format(_short_dir(self._rules_dir)))
+        self.lbl_folder.setToolTip("Local : {0}\nShared : {1}".format(self._rules_dir, shared_dir or "-"))
+        for file_name, message in errors + shared_errors:
             self._log("[WARN] Rule '{0}' not loaded : {1}".format(file_name, message))
         self._on_rule_selection_changed()
 
     def selected_rules(self):
-        """표에서 고른 규칙들 (표 순서)."""
+        """표에서 고른 규칙들 (표 순서). 행은 파일 경로로 가른다 (같은 이름이 로컬 · 공유에 있어도)."""
         picked = set()
         for item in self.tree.selectedItems():
-            picked.add(item.data(0, Qt.UserRole))
-        return [r for r in self._rules if r.name in picked]
+            picked.add(os.path.normcase(item.data(0, Qt.UserRole) or ""))
+        return [r for r in self._rules if os.path.normcase(r.path) in picked]
 
-    def select_rule_by_name(self, name):
-        """표에서 이름으로 규칙 하나를 고른다 (새로 만든 뒤 등)."""
+    def select_rule_by_name(self, name, scope=None):
+        """표에서 이름으로 규칙 하나를 고른다 (새로 만든 뒤 등). scope 를 주면 그 scope 에서만."""
         self.tree.clearSelection()
         for i in range(self.tree.topLevelItemCount()):
             item = self.tree.topLevelItem(i)
-            if item.data(0, Qt.UserRole) == name:
-                item.setSelected(True)
-                self.tree.setCurrentItem(item)
-                return True
+            rule = self._rules[i] if i < len(self._rules) else None
+            if rule is None or rule.name != name:
+                continue
+            if scope is not None and getattr(rule, "scope", None) != scope:
+                continue
+            item.setSelected(True)
+            self.tree.setCurrentItem(item)
+            return True
         return False
+
+    def _confirm_shared(self, action, rules):
+        """공유 규칙이 섞여 있으면 한 번 더 묻는다 (v01.17). 공유가 없으면 True."""
+        shared = [r for r in rules if self._is_shared_rule(r)]
+        if not shared:
+            return True
+        return QMessageBox.question(
+            self, TITLE,
+            "{0} SHARED rule(s) (shared folder, tracked by git):\n  {1}\n"
+            "{2} them here changes them for everyone who pulls them. Continue?".format(
+                len(shared), "\n  ".join(r.name for r in shared[:8]), action),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes
 
     def _single_rule(self, action):
         """정확히 하나를 골랐을 때 그 규칙, 아니면 안내하고 None."""
@@ -284,6 +354,8 @@ class RulesTab(QWidget):
         self.btn_rename.setEnabled(single)
         self.btn_delete.setEnabled(bool(rules))
         self.btn_select.setEnabled(bool(rules))
+        self.btn_share.setEnabled(any(not self._is_shared_rule(r) for r in rules) and bool(self.shared_dir()))
+        self.btn_copy_local.setEnabled(any(self._is_shared_rule(r) for r in rules))
 
     def _fill_objects(self, objects):
         """오른쪽 목록. 없는 것은 빨강, 동명은 주황으로 칠한다 (씬 상태는 지금 기준)."""
@@ -325,7 +397,7 @@ class RulesTab(QWidget):
             QMessageBox.warning(self, TITLE, "Cannot create rule: {0}".format(e))
             return
         self.reload()
-        self.select_rule_by_name(rule.name)
+        self.select_rule_by_name(rule.name, prefs_mod.SCOPE_LOCAL)
         self._log("Rule '{0}' saved with {1} object(s) -> {2}".format(
             rule.name, len(rule.objects), rule.file_name))
 
@@ -354,14 +426,18 @@ class RulesTab(QWidget):
         name = self._ask_name("Rename Rule", "New name:", rule.name)
         if name is None or name == rule.name:
             return
+        if not self._confirm_shared("Renaming", [rule]):
+            return
         old_file = rule.file_name
+        scope = getattr(rule, "scope", prefs_mod.SCOPE_LOCAL)
         try:
-            rules_mod.rename_rule(rule, name, rules_dir=self._rules_dir)
+            # 규칙이 있는 폴더 안에서 (로컬 / 공유)
+            rules_mod.rename_rule(rule, name, rules_dir=os.path.dirname(rule.path))
         except (ValueError, OSError) as e:
             QMessageBox.warning(self, TITLE, "Cannot rename rule: {0}".format(e))
             return
         self.reload()
-        self.select_rule_by_name(rule.name)
+        self.select_rule_by_name(rule.name, scope)
         self._log("Rule renamed -> '{0}' ({1} -> {2})".format(rule.name, old_file, rule.file_name))
 
     def on_delete(self, confirm=True):
@@ -380,7 +456,13 @@ class RulesTab(QWidget):
                 QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if answer != QMessageBox.Yes:
                 return
-        deleted, failed = rules_mod.delete_rules(rules, rules_dir=self._rules_dir)
+            if not self._confirm_shared("Deleting", rules):
+                return
+        deleted, failed = [], []
+        for rule in rules:                           # 규칙마다 자기 폴더 안에서만 지운다
+            d, f = rules_mod.delete_rules([rule], rules_dir=os.path.dirname(rule.path))
+            deleted += d
+            failed += f
         self.reload()
         for path in deleted:
             self._log("Rule deleted : {0}".format(os.path.basename(path)))
@@ -410,6 +492,43 @@ class RulesTab(QWidget):
                 name, len(matches), ", ".join(matches[:4]) + (", ..." if len(matches) > 4 else "")))
         # 씬이 바뀌었을 수 있으니 오른쪽 색을 다시 칠한다.
         self._fill_objects(objects)
+
+    def on_share(self, *_args):
+        """고른 로컬 규칙을 공유 폴더로 옮긴다 (v01.17). 공유 규칙은 건너뛴다."""
+        shared_dir = self.shared_dir()
+        rules = [r for r in self.selected_rules() if not self._is_shared_rule(r)]
+        if not shared_dir or not rules:
+            return
+        moved = []
+        for rule in rules:
+            try:
+                new = rules_mod.share_rule(rule, shared_dir)
+                moved.append(new)
+            except (ValueError, OSError) as e:
+                self._log("[WARN] Cannot share rule '{0}' : {1}".format(rule.name, e))
+        self.reload()
+        for rule in moved:
+            self._log("[OK] Shared rule '{0}' -> {1}".format(rule.name, rule.path))
+        if moved:
+            self._log("    Commit and push those files to share them through git.")
+            self.select_rule_by_name(moved[0].name, prefs_mod.SCOPE_SHARED)
+
+    def on_copy_to_local(self, *_args):
+        """고른 공유 규칙을 로컬로 복사한다 (v01.17). 로컬 규칙은 건너뛴다."""
+        rules = [r for r in self.selected_rules() if self._is_shared_rule(r)]
+        if not rules:
+            return
+        copied = []
+        for rule in rules:
+            try:
+                copied.append(rules_mod.copy_rule_to(rule, self._rules_dir))
+            except (ValueError, OSError) as e:
+                self._log("[WARN] Cannot copy rule '{0}' : {1}".format(rule.name, e))
+        self.reload()
+        for rule in copied:
+            self._log("[OK] Copied shared rule '{0}' to local -> {1}".format(rule.name, rule.path))
+        if copied:
+            self.select_rule_by_name(copied[0].name, prefs_mod.SCOPE_LOCAL)
 
     def on_show_folder(self, *_args):
         folder = self._rules_dir
@@ -458,6 +577,13 @@ class RulesTab(QWidget):
         act_rename.triggered.connect(self.on_rename)
         for act in (act_update, act_append, act_rename):
             act.setEnabled(len(rules) == 1)
+        menu.addSeparator()
+        act_share = menu.addAction("Share")
+        act_share.setEnabled(self.btn_share.isEnabled())
+        act_share.triggered.connect(self.on_share)
+        act_copy = menu.addAction("Copy to Local")
+        act_copy.setEnabled(self.btn_copy_local.isEnabled())
+        act_copy.triggered.connect(self.on_copy_to_local)
         menu.addSeparator()
         act_show = menu.addAction("Show File")
         act_show.setEnabled(len(rules) == 1)
