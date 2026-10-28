@@ -165,7 +165,7 @@ tests/test_namespace_remap.py    # 신규
 ## 10. 진행 체크리스트 (단계마다 로컬 커밋, 제목에 `[N번호]`)
 
 - [x] **N1** 이 계획서 커밋
-- [ ] **N2** `namespace_map.py` + prefs 매핑 저장 (rename/share/delete 키 이동)
+- [x] **N2** `namespace_map.py` + prefs 매핑 저장 (rename/share/delete 키 이동)
 - [ ] **N3** Buttons 탭 Namespace 콤보 · ⟳ · 강조 · 툴팁 · 클릭 적용 · 기억
 - [ ] **N4** `Map...` 대화상자 (여러 ns) + 캡처 되돌리기
 - [ ] **N5** 시험 `tests/test_namespace_remap.py` + 회귀 46 + 실제 씬 확인

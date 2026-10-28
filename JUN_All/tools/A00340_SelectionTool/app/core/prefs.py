@@ -186,11 +186,12 @@ def save_profile(name, data, scope=SCOPE_LOCAL):
 
 
 def delete_profile(name, scope=SCOPE_LOCAL):
-    """프로파일 JSON 삭제(없으면 무시)."""
+    """프로파일 JSON 삭제(없으면 무시). 그 프로파일의 네임스페이스 매핑도 지운다(v01.18)."""
     try:
         os.remove(_profile_path(name, scope))
     except OSError:
         pass
+    _move_namespace_map((scope, name), None)
 
 
 def rename_profile(old, new, scope=SCOPE_LOCAL):
@@ -199,6 +200,7 @@ def rename_profile(old, new, scope=SCOPE_LOCAL):
     # 바꿔버리므로, 활성 여부는 rename 전에 raw 로 읽어둔다.
     was_active = (_read_active_raw() == (scope, old))
     os.replace(_profile_path(old, scope), _profile_path(new, scope))
+    _move_namespace_map((scope, old), (scope, new))
     if was_active:
         set_active(new, scope)
 
@@ -214,6 +216,7 @@ def share_profile(name):
     was_active = (_read_active_raw() == (SCOPE_LOCAL, name))
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     shutil.move(src, dst)
+    _move_namespace_map((SCOPE_LOCAL, name), (SCOPE_SHARED, name))
     if was_active:
         set_active(name, SCOPE_SHARED)
     return dst
@@ -292,4 +295,52 @@ def set_setting(key, value):
     """active.json 의 설정값 하나를 쓴다(다른 키는 보존)."""
     data = _read_active_dict()
     data[key] = value
+    _write_active_dict(data)
+
+
+# ------------------------------------------------------------ namespace maps (v01.18)
+# 선택할 때 바꿔 끼울 {원래 ns: 대상 ns} 를 프로파일마다 · PC 마다 기억한다 (active.json - git 제외).
+#   "namespace_maps": {"shared:MUE_BCM": {"test:ZIHAN:Cage": "test:IVI:Cage"}, ...}
+
+NAMESPACE_MAPS_KEY = "namespace_maps"
+
+
+def _map_key(scope, name):
+    return "{0}:{1}".format(scope, name)
+
+
+def get_namespace_map(scope, name):
+    """그 프로파일에 저장된 매핑 {원래: 대상} (없으면 {})."""
+    maps = get_setting(NAMESPACE_MAPS_KEY, {})
+    value = maps.get(_map_key(scope, name)) if isinstance(maps, dict) else None
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def set_namespace_map(scope, name, mapping):
+    """매핑을 저장한다. 원래 == 대상 인 쌍은 빼고, 비면 키를 지운다."""
+    data = _read_active_dict()
+    maps = data.get(NAMESPACE_MAPS_KEY)
+    maps = dict(maps) if isinstance(maps, dict) else {}
+    clean = dict((s, d) for s, d in (mapping or {}).items() if s != d)
+    key = _map_key(scope, name)
+    if clean:
+        maps[key] = clean
+    else:
+        maps.pop(key, None)
+    data[NAMESPACE_MAPS_KEY] = maps
+    _write_active_dict(data)
+
+
+def _move_namespace_map(old_ref, new_ref):
+    """프로파일 이름 바꾸기 · Share 때 매핑 키를 옮긴다. new_ref 가 None 이면 지운다(Delete)."""
+    data = _read_active_dict()
+    maps = data.get(NAMESPACE_MAPS_KEY)
+    if not isinstance(maps, dict):
+        return
+    value = maps.pop(_map_key(*old_ref), None)
+    if value is None:
+        return
+    if new_ref is not None:
+        maps[_map_key(*new_ref)] = value
+    data[NAMESPACE_MAPS_KEY] = maps
     _write_active_dict(data)
