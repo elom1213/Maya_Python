@@ -172,7 +172,7 @@ def copy_profile_to_local(name)       # 공유 -> 로컬 **복사**. 로컬에 �
 - [x] **T2** `prefs.py` scope · 공유 루트 · share/copy + `select_rules.py` share/copy + `shared/*/.gitkeep`
 - [x] **T3** Buttons 탭 (콤보 (scope, name) · Share / Copy to Local · 공유 확인)
 - [x] **T4** Rules 탭 (Scope 열 · 두 폴더 · Share / Copy to Local)
-- [ ] **T5** main_window 메뉴 (Show Profile scope · Show Shared Folder · Shared Folder... · Use Default)
+- [x] **T5** main_window 메뉴 (Show Profile scope · Show Shared Folder · Shared Folder... · Use Default)
 - [ ] **T6** 시험 `tests/test_shared_profiles.py` + 회귀(드래그 · Add) 통과
 - [ ] **T7** 버전 01.17 · CHANGELOG · `docs/A00340_SelectionTool.md` 공유 절 · WORKLOG · 이 문서 상태 = 구현 완료
 

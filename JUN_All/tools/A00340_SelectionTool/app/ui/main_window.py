@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-27
+# last Update date : 2026-10-28
 # A00340_SelectionTool - Qt UI (in-Maya)
 #
 # 마야에서 선택된 오브젝트들을 버튼 하나로 빠르게 다시 선택하는 툴.
@@ -15,7 +15,10 @@
 #     끄면 위 pane 과 스플리터 핸들이 사라지고 버튼 모음이 창 전체를 쓴다.
 #   - v01.11: 최상위 탭 `Buttons`(기존 전부) / `Rules`(규칙 하나 = json 하나, 어느 씬에서든
 #     그 이름 목록을 선택). 마지막에 보던 탭은 active.json 에 남긴다.
+#   - v01.17: View > Show Shared Folder / Shared Folder... / Use Default Shared Folder - 공유 프로파일 · 규칙.
 # 창은 마야 메인 윈도우에 parent 되어 뷰포트 위에 뜬다. 모든 UI 문자열/로그는 영어.
+
+import os
 
 from Framework.qt.qt import (
     QWidget,
@@ -30,6 +33,7 @@ from Framework.qt.qt import (
     QTabWidget,
     QScrollArea,
     QFrame,
+    QFileDialog,
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
@@ -98,6 +102,22 @@ class MainWindow(QWidget):
             "Copy files from here to share rules with another PC.")
         act_show_rules.triggered.connect(self.on_show_rules_folder)
 
+        # 공유 폴더 (v01.17) : 공유 프로파일 · 규칙(shared/profiles, shared/rules). 경로는 PC 별 설정.
+        view_menu.addSeparator()
+        act_show_shared = view_menu.addAction("Show Shared Folder")
+        act_show_shared.setToolTip(
+            "Open Explorer at the shared folder (shared profiles and rules).\n"
+            "Default = the tool's 'shared' folder, which is tracked by git.")
+        act_show_shared.triggered.connect(self.on_show_shared_folder)
+        act_set_shared = view_menu.addAction("Shared Folder...")
+        act_set_shared.setToolTip(
+            "Point the shared folder somewhere else on this PC (a NAS, another data repo ...).\n"
+            "Per PC setting (data/active.json). It must contain / will get 'profiles' and 'rules'.")
+        act_set_shared.triggered.connect(self.on_set_shared_folder)
+        act_default_shared = view_menu.addAction("Use Default Shared Folder")
+        act_default_shared.setToolTip("Go back to the tool's own 'shared' folder (tracked by git).")
+        act_default_shared.triggered.connect(lambda *_: self._apply_shared_folder(""))
+
         help_menu = self.menu_bar.addMenu("Help")
         act_about = help_menu.addAction("About")
         act_about.triggered.connect(self.show_about)
@@ -157,6 +177,12 @@ class MainWindow(QWidget):
         #          공용 위젯의 set_shrunk 가 버튼 체크 · 라벨까지 맞춘다.
         self.log_view.set_shrunk(True)
 
+        # v01.17 : 이 PC 에 지정된 공유 경로가 없으면(다른 PC 의 경로 등) 기본 shared/ 를 쓰고 한 번 알린다.
+        missing = prefs_mod.shared_root_missing()
+        if missing:
+            self._log("[WARN] Shared folder not found: {0} - using {1}. View > Shared Folder... to fix.".format(
+                missing, prefs_mod.shared_root()))
+
         # 메뉴 체크를 탭의 실제 상태(저장된 설정)에 맞춘다. 시그널은 막고 맞춘다 -
         # 여기서 토글 핸들러가 돌면 같은 값을 다시 저장하고 로그만 남긴다.
         self.act_show_controls.blockSignals(True)
@@ -193,9 +219,9 @@ class MainWindow(QWidget):
 
         파일이 없으면(지워졌거나 아직 저장 전) profiles 폴더를, 그것도 없으면 data 폴더를 연다.
         """
-        name = prefs_mod.get_active()
-        path = prefs_mod.profile_path(name)
-        for candidate in (path, prefs_mod.PROFILES_DIR, prefs_mod.PREFS_DIR):
+        scope, name = prefs_mod.get_active_ref()
+        path = prefs_mod.profile_path(name, scope)
+        for candidate in (path, prefs_mod.profiles_dir(scope), prefs_mod.PREFS_DIR):
             try:
                 file_opener.open_path(candidate)
             except (OSError, ValueError):
@@ -207,6 +233,34 @@ class MainWindow(QWidget):
                     path, candidate))
             return
         self._log("[ERR] Show Profile: cannot open {0}".format(path))
+
+    # ---------------------------------------------------------------- shared folder (v01.17)
+
+    def on_show_shared_folder(self, *args):
+        """View > Show Shared Folder. 공유 루트를 탐색기로 연다 (없으면 만든다)."""
+        folder = prefs_mod.shared_root()
+        try:
+            if not os.path.isdir(folder):
+                os.makedirs(folder)
+            file_opener.open_path(folder)
+            self._log("Show Shared Folder: {0}".format(folder))
+        except (OSError, ValueError) as exc:
+            self._log("[ERR] Show Shared Folder: {0}".format(exc))
+
+    def on_set_shared_folder(self, *args):
+        """View > Shared Folder... - 이 PC 의 공유 루트를 고른다."""
+        start = prefs_mod.shared_root()
+        folder = QFileDialog.getExistingDirectory(self, "Shared Folder", start)
+        if folder:
+            self._apply_shared_folder(folder)
+
+    def _apply_shared_folder(self, folder):
+        """공유 루트를 바꾸고("" = 기본) 두 탭을 다시 읽는다."""
+        prefs_mod.set_shared_root(folder)
+        self.selection_tab.reload_profiles()
+        self.rules_tab.reload()
+        self._log("Shared folder: {0}{1}".format(
+            prefs_mod.shared_root(), "" if folder else " (default)"))
 
     def toggle_always_on_top(self, enabled):
         # WindowStaysOnTopHint 를 켜고/끄고, 플래그 변경 후 다시 show() (안 하면 창이 사라짐)
@@ -243,6 +297,12 @@ class MainWindow(QWidget):
             "  button area fills the window (remembered for next time).\n"
             "- View > Show Profile : open Explorer with the active profile's\n"
             "  JSON file selected.\n"
+            "\n"
+            "Shared (v01.17) : profiles and rules live in two places - local\n"
+            "  (data/, this PC only) and shared (the tool's 'shared' folder,\n"
+            "  tracked by git). '[Shared]' / Scope 'Shared' marks the shared ones.\n"
+            "  'Share' moves a local one there, 'Copy to Local' copies one back.\n"
+            "  View > Shared Folder... points it elsewhere on this PC (a NAS ...).\n"
             "\n"
             "Rules tab (v01.11) : a rule is a named list of objects saved as\n"
             "  ONE json file (data/rules/<name>.json). 'New Rule from\n"
