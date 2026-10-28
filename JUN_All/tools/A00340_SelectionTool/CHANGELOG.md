@@ -2,6 +2,23 @@
 
 All notable changes to this tool are documented here.
 
+## v01.18 — 2026-10-28
+
+- **Select another avatar by swapping the namespace.** A new `Namespace` row under `Add`:
+  `(as saved)` or one of the namespaces in this scene that have the profile's objects, shown as
+  `test:IVI:Cage  (35/35)` (found / total, best first). Pick one and every button selects its
+  objects in that namespace instead - the profile file itself is not changed.
+  - Profiles that use several namespaces: `Map...` opens a small window to choose a target for
+    each one (the combo then shows `(mapped: N)`).
+  - The combo is highlighted while a swap is on; button tooltips show the swapped names; the log
+    says `Selected n object(s) via A -> B`. `Refresh` re-reads the scene's namespaces.
+  - The choice is remembered per profile on this PC (`data/active.json`). If that namespace is
+    not in the scene next time, it falls back to `(as saved)` with a note in the log.
+  - `Selection` / `Update` / `Add Objects` while a swap is on save the names back in the original
+    namespace, so a profile never mixes avatars. Objects outside the swapped namespace are saved as
+    they are, with a warning.
+  - Rename / Share / Delete of a profile carry its remembered swap along.
+
 ## v01.17 — 2026-10-28
 
 - **Shared profiles and rules.** Besides the local ones in `data/` (this PC only, not tracked by

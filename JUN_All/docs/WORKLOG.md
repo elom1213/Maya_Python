@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-28 (오늘)
 
+> [!summary] A00340_SelectionTool **v01.18 — 네임스페이스 교체로 다른 아바타 선택**: `Namespace` 콤보 · `Map...` · 프로파일별 기억 · 캡처 되돌리기 `#A00340_SelectionTool` `#plan`
+- 요청: "MUE_BCM 의 test:ZIHAN:Cage 를 다른 네임스페이스로 바꿔 다른 아바타도 고르게, UI 에서 네임스페이스 고르기" → 설계 제안 → "계획서 먼저, 권장안대로, 토큰 진단".
+- 토큰 진단: 남은 약 1,499만, 예상 15~25만 → 충분. 그래도 단계마다(N1 ~ N6) 로컬 커밋.
+- 구현: `core/namespace_map.py`(정확한 ns 교체 · 후보 = 씬 ns 마다 찾은 수) · prefs `namespace_maps`(rename/share/delete 때 따라감) · Buttons 탭 Namespace 줄 + `NamespaceMapDialog` + 캡처 시 원래 ns 로.
+- 검증: 30/30 + 회귀 46/46, 실제 ZIHAN 씬 `MUE_BCM` 후보 다섯 아바타 모두 35/35. **마야 GUI 확인 아직.** 작업 트리의 `shared/profiles/MUE_BCM.json` 변경은 사용자가 툴로 고친 것 - 커밋 안 함.
+
 > [!summary] A00340_SelectionTool **v01.17 — 공유 프로파일 · 규칙**: 로컬 `data/`(git 제외) + 공유 `shared/`(git 추적) 함께, Share / Copy to Local, PC 별 공유 경로 `#A00340_SelectionTool` `#plan`
 - 요청: "profiles_share 같은 폴더를 git 대상으로 두고 두 경로 json 을 함께 보여 주는 설계 판단 + 더 좋은 방법" → 추천안(폴더는 data/ 밖 `shared/`, (scope, 이름), Share / Copy to Local, 공유 편집 허용 · 이름 변경 / 삭제만 확인, Rules 탭도, PC 별 공유 경로) 그대로 "모두 추천대로, 계획서 먼저".
 - **이 PC 가 저절로 꺼질 수 있어** 계획서를 먼저 커밋하고 T1 ~ T7 단계마다 로컬 커밋(제목 `[T번호]`), 계획서에 체크리스트.

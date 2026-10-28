@@ -7,7 +7,7 @@ updated: 2026-10-28
 
 # A00340_SelectionTool — 네임스페이스 교체로 다른 아바타 선택 계획서
 
-> 작성 2026-10-28 · 대상 버전 **v01.18** · 상태: **구현 중** (진행은 §10 체크리스트)
+> 작성 2026-10-28 · 대상 버전 **v01.18** · 상태: **구현 완료(2026-10-28, mayapy 오프스크린 30 + 회귀 46) · 마야 GUI 확인 전** (진행은 §10 체크리스트)
 >
 > **이 PC 는 작업 중에 저절로 꺼질 수 있다.** 이 문서만 보고 이어서 작업할 수 있게 썼고, 단계마다 로컬 커밋한다(제목에 `[N번호]`).
 > 이어서 할 때는 §10 체크와 `git log --oneline -10` 을 먼저 본다.
@@ -139,7 +139,7 @@ def candidates(objects, source_ns)     # [(ns, found, total)] - source_ns 오브
 4. 캡처 되돌리기 : 매핑 켠 채 B 선택으로 Update → 저장은 A ns, 밖의 오브젝트는 그대로 + 경고
 5. 프로파일 Rename / Share / Delete 시 매핑 키 따라감
 6. 회귀 : `tests/test_shared_profiles.py` 46 항목 그대로 통과
-7. 실제 씬(읽기만) : ZIHAN 씬에서 `MUE_BCM` 후보 = IVI · KANA · SUA · ZIHAN 33/33, CHOEUN 은 목록에 없거나 0
+7. 실제 씬(읽기만) : ZIHAN 씬에서 `MUE_BCM` 후보 → **결과: CHOEUN · IVI · KANA · SUA · ZIHAN 모두 35/35**(프로파일이 35개로 늘어 있었다. CHOEUN 도 이 컨트롤러들은 이름이 같다)
 
 ---
 
@@ -169,6 +169,6 @@ tests/test_namespace_remap.py    # 신규
 - [x] **N3** Buttons 탭 Namespace 콤보 · ⟳ · 강조 · 툴팁 · 클릭 적용 · 기억
 - [x] **N4** `Map...` 대화상자 (여러 ns) + 캡처 되돌리기
 - [x] **N5** 시험 `tests/test_namespace_remap.py` + 회귀 46 + 실제 씬 확인
-- [ ] **N6** 버전 01.18 · CHANGELOG · 사용 안내 · WORKLOG · 이 문서 상태 = 구현 완료
+- [x] **N6** 버전 01.18 · CHANGELOG · 사용 안내 · WORKLOG · 이 문서 상태 = 구현 완료
 
 커밋은 로컬만. **푸시는 사용자가 그 턴에 말할 때만.**

@@ -42,5 +42,10 @@
 #        공유 루트는 PC 별로 바꿀 수 있다(View > Shared Folder..., data/active.json 의 shared_dir).
 #        계획서 docs/plans/A00340_SelectionTool_shared_profiles_plan.md.
 
-VERSION = "01.17"
+# 01.18  네임스페이스 교체 - Buttons 탭 `Namespace` 콤보(+ Map... · Refresh)로 같은 리그의 다른 아바타를 고른다.
+#        프로파일 json 은 그대로, 선택할 때만 {원래 ns: 대상 ns} 로 바꿔 끼운다. 후보 = 씬에서 이 프로파일 컨트롤러가
+#        있는 네임스페이스(찾은 수/전체). 프로파일마다 · PC 마다 기억(active.json), 캡처는 원래 ns 로 되돌려 저장.
+#        계획서 docs/plans/A00340_SelectionTool_namespace_remap_plan.md.
+
+VERSION = "01.18"
 LAST_UPDATE = "2026-10-28"
