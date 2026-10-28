@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-26
+# last Update date : 2026-10-28
 # A00340_SelectionTool - selection RULES persistence (UI/DCC 비의존)  (v01.11)
 #
 # "규칙(rule)" 은 어느 씬에서든 다시 선택할 오브젝트 **이름 목록** 하나다.
@@ -29,7 +29,7 @@ import json
 from . import prefs as prefs_mod
 
 
-RULES_DIR = os.path.join(prefs_mod.PREFS_DIR, "rules")
+RULES_DIR = prefs_mod.LOCAL_RULES_DIR   # 로컬 규칙. 공유는 prefs_mod.rules_dir("shared") 를 rules_dir= 로 (v01.17)
 
 
 class SelectRule(object):
@@ -237,6 +237,38 @@ def delete_rules(rules, rules_dir=None):
         except OSError as e:
             failed.append((path, str(e)))
     return deleted, failed
+
+
+def _transfer_rule(rule, target_dir, move):
+    """규칙 파일을 target_dir 로 옮기거나(move) 복사한다. 대상에 같은 파일 · 같은 이름이 있으면 ValueError."""
+    if not rule.path or not os.path.isfile(rule.path):
+        raise ValueError("rule file not found: {0}".format(rule.path))
+    target = rule_path(rule.name, target_dir)
+    if os.path.normcase(os.path.normpath(os.path.dirname(target))) == \
+            os.path.normcase(os.path.normpath(os.path.dirname(rule.path))):
+        raise ValueError("the rule is already in {0}".format(target_dir))
+    if os.path.exists(target):
+        raise ValueError("file already exists: {0}".format(os.path.basename(target)))
+    if find_rule(rule.name, target_dir) is not None:
+        raise ValueError("a rule named '{0}' already exists there".format(rule.name))
+    copied = SelectRule(rule.name, rule.objects, rule.description, target)
+    _write(copied)
+    if move:
+        try:
+            os.remove(rule.path)
+        except OSError:
+            pass
+    return copied
+
+
+def share_rule(rule, shared_dir):
+    """로컬 규칙을 공유 폴더로 **옮긴다** (v01.17). 반환: 새 SelectRule."""
+    return _transfer_rule(rule, shared_dir, move=True)
+
+
+def copy_rule_to(rule, target_dir):
+    """규칙을 다른 폴더로 **복사한다** (v01.17, 공유 -> 로컬 'Copy to Local'). 반환: 새 SelectRule."""
+    return _transfer_rule(rule, target_dir, move=False)
 
 
 def union_objects(rules):

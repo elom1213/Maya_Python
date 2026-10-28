@@ -169,7 +169,7 @@ def copy_profile_to_local(name)       # 공유 -> 로컬 **복사**. 로컬에 �
 ## 9. 진행 체크리스트 (단계마다 로컬 커밋, 제목에 `[T번호]`)
 
 - [x] **T1** 이 계획서 커밋
-- [ ] **T2** `prefs.py` scope · 공유 루트 · share/copy + `select_rules.py` share/copy + `shared/*/.gitkeep`
+- [x] **T2** `prefs.py` scope · 공유 루트 · share/copy + `select_rules.py` share/copy + `shared/*/.gitkeep`
 - [ ] **T3** Buttons 탭 (콤보 (scope, name) · Share / Copy to Local · 공유 확인)
 - [ ] **T4** Rules 탭 (Scope 열 · 두 폴더 · Share / Copy to Local)
 - [ ] **T5** main_window 메뉴 (Show Profile scope · Show Shared Folder · Shared Folder... · Use Default)
