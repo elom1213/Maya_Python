@@ -30,6 +30,7 @@ from Framework.qt.qt import (
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.pin_style import apply_pin_style
 
 from tools.A00480_FileTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00480_FileTool.app.ui.export_tab import ExportTab
@@ -128,7 +129,8 @@ class MainWindow(QWidget):
         self.pin_button.setFixedSize(72, 22)
         # 테마 qss 의 QPushButton padding(8px)이면 22px 높이에 글자 자리가 4px 뿐이라 글자가 잘린다.
         # 이 버튼만 위아래 padding 을 뺀다(색 · 테두리 등 나머지는 테마 규칙이 그대로 적용된다).
-        self.pin_button.setStyleSheet("QPushButton { padding: 0px 4px; }")
+        # 켜진 동안(Pinned) 연한 빨강은 공용 Framework/qt/pin_style - padding 규칙과 함께 붙인다.
+        apply_pin_style(self.pin_button, extra_qss="QPushButton { padding: 0px 4px; }")
         self.pin_button.toggled.connect(self.toggle_always_on_top)
 
         header_row = QHBoxLayout()

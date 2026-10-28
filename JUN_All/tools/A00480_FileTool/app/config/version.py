@@ -57,5 +57,7 @@
 #        Fix Scene From FBX = 이미 임포트한 씬을 같은 방법으로. 로직은 Framework.core.maya_fbx_exact
 #        (+ fbx_binary · euler_math). 계획서 docs/plans/A00480_FileTool_fbx_exact_import_plan.md.
 
-VERSION = "01.13"
-LAST_UPDATE = "2026-10-27"
+# 01.14  Pin 켜짐(Pinned) = 연한 빨강 - 공용 Framework/qt/pin_style (A00240_PathTool 과 같은 색).
+
+VERSION = "01.14"
+LAST_UPDATE = "2026-10-29"

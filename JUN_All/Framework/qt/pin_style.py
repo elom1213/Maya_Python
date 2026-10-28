@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-23
+# last Update date : 2026-10-29
 # Framework - Pin(Always on Top) 토글 버튼의 "켜짐" 표시 색.
 #
 # 여러 툴(A00240_PathTool · A00220_BackupTool · A00370_ToolLauncher …)이 같은 모양의 체크형
@@ -42,7 +42,11 @@ QPushButton:checked:pressed {{
            hover=PINNED_BG_HOVER, pressed=PINNED_BG_PRESSED)
 
 
-def apply_pin_style(button):
-    """체크형 Pin 버튼에 "켜짐 = 연한 빨강" qss 를 붙인다. 버튼을 그대로 돌려준다."""
-    button.setStyleSheet(PIN_BUTTON_QSS)
+def apply_pin_style(button, extra_qss=""):
+    """체크형 Pin 버튼에 "켜짐 = 연한 빨강" qss 를 붙인다. 버튼을 그대로 돌려준다.
+
+    extra_qss : 이 버튼에만 따로 필요한 규칙(예: A00480 의 `padding: 0px 4px`). setStyleSheet 는
+    덮어쓰기라 따로 부르면 한쪽이 사라지므로 여기서 함께 붙인다(2026-10-29).
+    """
+    button.setStyleSheet((extra_qss + "\n" if extra_qss else "") + PIN_BUTTON_QSS)
     return button

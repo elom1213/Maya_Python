@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-29 (오늘)
 
+> [!summary] **Pin 켜짐 = 연한 빨강** - Pin 버튼이 있는 툴 9개에 공용 `Framework/qt/pin_style` 적용 (A00240_PathTool 과 같은 색) `#Framework`
+- 대상 · 버전: A00030_quickTool_V02 02.08 · A00050_uvTool_V02 02.04 · A00110_animTool 01.44 · A00110_animTool_V02 02.22 · A00440_SetTool 01.06 · A00450_manipulatorTool 01.03 · A00470_MaterialTool 01.14 · A00480_FileTool 01.14 · A00490_KeyboardTool 01.03.
+- 이미 쓰던 툴: A00210 · A00220 · A00240 · A00340 · A00370 · A00560. A00030_quickTool(v01, cmds 체크박스)은 Qt 버튼이 아니라 제외.
+- `apply_pin_style(button, extra_qss="")` 추가 - A00480 은 Pin 버튼에 `padding: 0px 4px` 를 따로 걸고 있어 setStyleSheet 덮어쓰기로 하나가 사라지지 않게 함께 붙인다.
+- 검증: mayapy 오프스크린으로 10개 창(9 + A00240) 띄워 Pin 토글 - qss 색 · 라벨 Pin/Pinned · 버튼 크기 불변 10/10. **마야 GUI 확인 아직.**
+
 > [!summary] A00470_MaterialTool **v01.13 — Copy Material 두 리스트: 1 → n 과 n 쌍(행 순서)** `#A00470_MaterialTool`
 - 요청: "Copy Material 탭을 왼쪽 · 오른쪽 TSL 로 바꿔 n 개 메시끼리 복사, 1 => n 도 그대로 되게".
 - UI: `Set Source` 칸 → 왼쪽 `Source Meshes` TSL. 개수로 방식 결정(1 → n / n = n 쌍 / 다르면 비활성 + 빨간 `Mode` 줄). 한 번의 Undo.

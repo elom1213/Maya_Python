@@ -22,5 +22,7 @@
 # 02.07  File 섹션(Copy Scene Folder · Open Scene Folder)을 UI 에서 숨김 - HIDDEN_SECTIONS.
 #        코어 함수 · 핸들러 · SECTIONS 표의 줄은 그대로(A00480_FileTool 의 Path 탭과 겹쳐서).
 
-VERSION = "02.07"
-LAST_UPDATE = "2026-10-13"
+# 02.08  Pin 켜짐(Pinned) = 연한 빨강 - 공용 Framework/qt/pin_style (A00240_PathTool 과 같은 색).
+
+VERSION = "02.08"
+LAST_UPDATE = "2026-10-29"

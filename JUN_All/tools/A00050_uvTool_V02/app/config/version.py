@@ -20,5 +20,7 @@
 #        첫(기본) 세트는 마야가 못 지우므로, 규칙 이름이 없는 메시는 건드리지 않고
 #        첫 세트가 규칙 이름이 아닌 메시는 지울 수 있는 것만 지우고 알린다
 
-VERSION = "02.03"
-LAST_UPDATE = "2026-09-23"
+# 02.04  Pin 켜짐(Pinned) = 연한 빨강 - 공용 Framework/qt/pin_style (A00240_PathTool 과 같은 색).
+
+VERSION = "02.04"
+LAST_UPDATE = "2026-10-29"

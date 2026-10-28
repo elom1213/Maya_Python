@@ -35,5 +35,7 @@
 #        Source n 개 = Target n 개면 행 순서로 n 쌍, 개수가 다르면 실행 안 함. 사라진 행은 그 쌍만 건너뛴다.
 #        Set Source 칸 · Select 버튼은 Source 리스트(UUID 기억 · Select Sources)로 대체.
 
-VERSION = "01.13"
+# 01.14  Pin 켜짐(Pinned) = 연한 빨강 - 공용 Framework/qt/pin_style (A00240_PathTool 과 같은 색).
+
+VERSION = "01.14"
 LAST_UPDATE = "2026-10-29"

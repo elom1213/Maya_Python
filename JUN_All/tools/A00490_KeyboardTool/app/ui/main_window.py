@@ -25,6 +25,7 @@ from Framework.qt.qt import (
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_checkList_qt_v01 import JUN_mod_checkList_qt_v01
+from Framework.qt.pin_style import apply_pin_style
 
 from ..config.version import VERSION
 from ..config.app_meta import icon_path
@@ -87,6 +88,8 @@ class MainWindow(QWidget):
         self.pin_button.setToolTip("Keep this window above other windows")
         self.pin_button.setFixedSize(72, 28)
         self.pin_button.toggled.connect(self.toggle_always_on_top)
+        # 켜진 동안(Pinned) 연한 빨강 - 공용 Framework/qt/pin_style (A00240 과 같은 색).
+        apply_pin_style(self.pin_button)
 
         splitter = QSplitter(Qt.Vertical)
         splitter.addWidget(self._build_sequence_box())

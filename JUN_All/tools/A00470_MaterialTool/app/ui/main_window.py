@@ -21,6 +21,7 @@ from Framework.qt.qt import (
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.pin_style import apply_pin_style
 
 from tools.A00470_MaterialTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00470_MaterialTool.app.core import profiles
@@ -59,6 +60,8 @@ class MainWindow(QWidget):
         self.pin_button.setToolTip("Keep this window above other Maya windows")
         self.pin_button.setFixedSize(72, 28)
         self.pin_button.toggled.connect(self.toggle_always_on_top)
+        # 켜진 동안(Pinned) 연한 빨강 - 공용 Framework/qt/pin_style (A00240 과 같은 색).
+        apply_pin_style(self.pin_button)
 
         header_row = QHBoxLayout()
         header_row.setContentsMargins(0, 0, 6, 0)

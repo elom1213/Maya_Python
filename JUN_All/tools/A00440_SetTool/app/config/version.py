@@ -11,5 +11,7 @@
 #        Edit 탭에 Objects 리스트(Sets 우측) + `Add Objects to Sets` - 세트가
 #        하나면 전부 그 하나에, 여럿이면 행 순서로 1:1(적은 쪽만큼)
 
-VERSION = "01.05"
-LAST_UPDATE = "2026-09-22"
+# 01.06  Pin 켜짐(Pinned) = 연한 빨강 - 공용 Framework/qt/pin_style (A00240_PathTool 과 같은 색).
+
+VERSION = "01.06"
+LAST_UPDATE = "2026-10-29"
