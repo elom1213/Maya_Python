@@ -4,7 +4,7 @@
 A00240_PathTool 처럼 버튼을 자유롭게 추가·삭제·순서변경 하고, Profile 로 원하는
 종류끼리 버튼 세트를 나눠 보관한다.
 
-- **버전**: v01.16 (2026-10-28) — **`Add` 체크를 버튼 모음 위로** 옮겨 Controls 를 접거나 숨겨도 보이게 · v01.15 (2026-10-27) — Buttons 탭 버튼을 **드래그로 옮겨** 순서 · 카테고리 변경(A00240 과 같은 방식) · v01.14 (2026-10-27) — 로그창이 **접힌 채(Shrink 켜짐) 시작**, `Show` 로 편다 · v01.13 (2026-10-27) — `Pin` 이 켜진(`Pinned`) 동안 **연한 빨강**(공용 `Framework.qt.pin_style`, 다른 툴과 같음) · v01.12 (2026-10-27) — **창 가로 길이를 드래그로 자유롭게** 줄일 수 있게(Rules 상태 줄의 긴 폴더 경로가 최소 폭을 잡고 있었다, 최소 폭 1494 → 286px) · v01.11 (2026-10-26) — 최상위 탭 **`Buttons` / `Rules`**. Rules = 규칙 하나가 json 파일 하나, 어느 씬에서든 그 이름 목록을 선택(§Rules 탭)
+- **버전**: v01.17 (2026-10-28) — **공유 프로파일 · 규칙**: 로컬 `data/`(git 제외) + 공유 `shared/`(git 추적) 를 함께, `Share` / `Copy to Local`, PC 별 공유 경로(§공유) · v01.16 (2026-10-28) — **`Add` 체크를 버튼 모음 위로** 옮겨 Controls 를 접거나 숨겨도 보이게 · v01.15 (2026-10-27) — Buttons 탭 버튼을 **드래그로 옮겨** 순서 · 카테고리 변경(A00240 과 같은 방식) · v01.14 (2026-10-27) — 로그창이 **접힌 채(Shrink 켜짐) 시작**, `Show` 로 편다 · v01.13 (2026-10-27) — `Pin` 이 켜진(`Pinned`) 동안 **연한 빨강**(공용 `Framework.qt.pin_style`, 다른 툴과 같음) · v01.12 (2026-10-27) — **창 가로 길이를 드래그로 자유롭게** 줄일 수 있게(Rules 상태 줄의 긴 폴더 경로가 최소 폭을 잡고 있었다, 최소 폭 1494 → 286px) · v01.11 (2026-10-26) — 최상위 탭 **`Buttons` / `Rules`**. Rules = 규칙 하나가 json 파일 하나, 어느 씬에서든 그 이름 목록을 선택(§Rules 탭)
 - **아키텍처**: (B) Standalone/Qt 앱형 구조지만 마야 안에서 실행(PySide, `maya.cmds`).
 - **참고**: 구성/편집 흐름은 `A00240_PathTool`, 마야 연동(셸프 설치·창 parenting·리로드)은
   `A00310_SearchTool` 를 이식.
@@ -96,6 +96,34 @@ A00340_SelectionTool/data/
    (플래그 변경 후 창이 숨는 Qt 특성을 피하려 내부에서 `show()` 재호출)
 
 ---
+
+## 공유 프로파일 · 규칙 (v01.17)
+
+`data/` 는 git 이 추적하지 않는다(`.gitignore` 의 `**/A00340_SelectionTool/data/`). 공유하고 싶은 프로파일 · 규칙만 골라
+**`shared/`** 로 옮기면 git 으로 올라간다. 계획서 [plans/A00340_SelectionTool_shared_profiles_plan.md](plans/A00340_SelectionTool_shared_profiles_plan.md).
+
+```
+A00340_SelectionTool/
+├── data/        # 이 PC 전용 (git 제외) - profiles/ · rules/ · active.json
+└── shared/      # 공유 (git 추적)       - profiles/ · rules/
+```
+
+| 화면 | 동작 |
+|------|------|
+| Buttons > Profile 콤보 | 로컬은 `Name`, 공유는 `Name  [Shared]`. **같은 이름이 양쪽에 있어도 따로** 보이고 고른 쪽이 열린다. 공유가 열려 있으면 그룹 제목이 `Profile (shared)` |
+| `New` | **로컬**에 만든다 (시험용이 공유 폴더에 생기지 않게) |
+| `Share` | 지금 로컬 프로파일을 공유 폴더로 **옮긴다**. 공유에 같은 이름이 있으면 막는다. 로그에 파일 경로 - 커밋 · 푸시하면 공유된다 |
+| `Copy to Local` | 지금 공유 프로파일을 로컬로 **복사**하고 그 복사본으로 바꾼다. 로컬에 같은 이름이 있으면 막는다 |
+| `Rename` / `Delete` | 그 프로파일이 있는 쪽에서. **공유면 한 번 더 묻는다**. 로컬 + 공유 합쳐 하나는 남아야 한다 |
+| Rules 탭 | `Scope` 열(`Local` / `Shared`), 같은 이름이 양쪽에 있어도 두 줄. `Share` · `Copy to Local` 버튼과 우클릭. 공유 규칙의 Rename · Delete 는 한 번 더 묻는다. `New Rule` 은 로컬에 |
+| View > `Show Shared Folder` | 공유 폴더를 탐색기로 |
+| View > `Shared Folder...` / `Use Default Shared Folder` | **이 PC 의** 공유 폴더를 다른 곳(NAS · 별도 데이터 저장소 …)으로 / 기본(툴 안 `shared/`)으로. `data/active.json` 의 `shared_dir` 에 저장. 지정한 경로가 없는 PC 에서는 기본을 쓰고 시작할 때 `[WARN]` |
+| View > `Show Profile` | 공유 프로파일이면 공유 쪽 json 을 연다 |
+
+- 공유 json 을 툴에서 고치면 git 변경으로 보인다. 올리려면 그 파일을 커밋 · 푸시한다.
+- `active.json` 에 `active_scope` 가 더해졌다. 없으면(옛 파일) 로컬로 본다.
+- 검증: `tests/test_shared_profiles.py` (mayapy 오프스크린, 경로는 임시 폴더) — prefs 12 · 규칙 코어 3 · Buttons 9 · Rules 7 · 메뉴 6 +
+  회귀(드래그 7 · Add 2) = **46 항목**. 실제 데이터(로컬 프로파일 6개)로 띄워 그대로 열리는 것 · `active.json` 불변도 확인.
 
 ## 드래그로 버튼 옮기기 (v01.15)
 

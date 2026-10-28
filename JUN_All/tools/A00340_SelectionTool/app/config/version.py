@@ -36,5 +36,11 @@
 
 # 01.16  `Add` 체크를 Create 그룹에서 버튼 모음 pane 맨 위로 - Controls 를 접거나 숨겨도 보인다.
 
-VERSION = "01.16"
-LAST_UPDATE = "2026-10-27"
+# 01.17  공유 프로파일 · 규칙 - 로컬(data/, git 제외) + 공유(shared/, git 추적) 를 함께 보여 준다.
+#        프로파일 정체 = (scope, 이름), 콤보에 `[Shared]`, Rules 탭에 Scope 열. Share(로컬 -> 공유 이동) ·
+#        Copy to Local(공유 -> 로컬 복사), 공유 것의 이름 변경 · 삭제는 한 번 더 확인. New 는 로컬에.
+#        공유 루트는 PC 별로 바꿀 수 있다(View > Shared Folder..., data/active.json 의 shared_dir).
+#        계획서 docs/plans/A00340_SelectionTool_shared_profiles_plan.md.
+
+VERSION = "01.17"
+LAST_UPDATE = "2026-10-28"

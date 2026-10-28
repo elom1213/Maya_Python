@@ -7,7 +7,7 @@ updated: 2026-10-28
 
 # A00340_SelectionTool — 공유 프로파일 · 규칙 (shared/) 계획서
 
-> 작성 2026-10-28 · 대상 버전 **v01.17** · 상태: **구현 중** (진행은 §9 체크리스트)
+> 작성 2026-10-28 · 대상 버전 **v01.17** · 상태: **구현 완료(2026-10-28, mayapy 오프스크린 46 항목) · 마야 GUI 확인 전** (진행은 §9 체크리스트)
 >
 > **이 PC 는 작업 중에 저절로 꺼질 수 있다.** 그래서 이 문서만 보고 이어서 작업할 수 있게 썼고, 단계마다 로컬 커밋한다.
 > 이어서 할 때는 §9 의 체크 상태와 `git log --oneline -10`(커밋 제목에 `[T번호]`)을 먼저 본다.
@@ -174,6 +174,6 @@ def copy_profile_to_local(name)       # 공유 -> 로컬 **복사**. 로컬에 �
 - [x] **T4** Rules 탭 (Scope 열 · 두 폴더 · Share / Copy to Local)
 - [x] **T5** main_window 메뉴 (Show Profile scope · Show Shared Folder · Shared Folder... · Use Default)
 - [x] **T6** 시험 `tests/test_shared_profiles.py` + 회귀(드래그 · Add) 통과
-- [ ] **T7** 버전 01.17 · CHANGELOG · `docs/A00340_SelectionTool.md` 공유 절 · WORKLOG · 이 문서 상태 = 구현 완료
+- [x] **T7** 버전 01.17 · CHANGELOG · `docs/A00340_SelectionTool.md` 공유 절 · WORKLOG · 이 문서 상태 = 구현 완료
 
 커밋은 로컬만. **푸시는 사용자가 그 턴에 말할 때만**(전역 규칙 2장).

@@ -2,6 +2,24 @@
 
 All notable changes to this tool are documented here.
 
+## v01.17 — 2026-10-28
+
+- **Shared profiles and rules.** Besides the local ones in `data/` (this PC only, not tracked by
+  git), the tool now also reads the `shared/` folder (`shared/profiles`, `shared/rules`), which IS
+  tracked by git - commit and push a file there and other PCs get it.
+  - Buttons tab: shared profiles appear as `Name  [Shared]` in the profile list (a local and a
+    shared profile may have the same name). The group title reads `Profile (shared)` while one is
+    open. New profiles are created locally.
+  - `Share` moves the current local profile into the shared folder; `Copy to Local` copies the
+    current shared profile to this PC. Both refuse when the other side already has that name.
+  - Renaming or deleting a shared profile asks once more.
+  - Rules tab: new `Scope` column (`Local` / `Shared`), `Share` / `Copy to Local` buttons and
+    right-click items, the same extra question for shared rules.
+  - View > `Show Shared Folder`, `Shared Folder...` (point it somewhere else on this PC - a NAS
+    or another data repo; saved in `data/active.json`), `Use Default Shared Folder`.
+    `Show Profile` opens the shared file for a shared profile.
+  - Old `active.json` files keep working (no scope = local).
+
 ## v01.16 — 2026-10-28
 
 - The `Add` checkbox moved from the Create group to the top of the button area, so it stays

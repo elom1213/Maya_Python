@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-28 (오늘)
 
+> [!summary] A00340_SelectionTool **v01.17 — 공유 프로파일 · 규칙**: 로컬 `data/`(git 제외) + 공유 `shared/`(git 추적) 함께, Share / Copy to Local, PC 별 공유 경로 `#A00340_SelectionTool` `#plan`
+- 요청: "profiles_share 같은 폴더를 git 대상으로 두고 두 경로 json 을 함께 보여 주는 설계 판단 + 더 좋은 방법" → 추천안(폴더는 data/ 밖 `shared/`, (scope, 이름), Share / Copy to Local, 공유 편집 허용 · 이름 변경 / 삭제만 확인, Rules 탭도, PC 별 공유 경로) 그대로 "모두 추천대로, 계획서 먼저".
+- **이 PC 가 저절로 꺼질 수 있어** 계획서를 먼저 커밋하고 T1 ~ T7 단계마다 로컬 커밋(제목 `[T번호]`), 계획서에 체크리스트.
+- git 제약: 무시된 폴더 안은 `!` 로 다시 포함 못 함 → `data/profiles_share` 대신 `shared/`. `shared/*/.gitkeep` 만 새로 추적, `data/` 는 그대로 제외.
+- 검증: `tests/test_shared_profiles.py` 46/46 (임시 폴더), 실제 데이터로 띄워 프로파일 6개 · 활성 그대로 · active.json 불변. **마야 GUI 확인 아직.**
+
 > [!summary] A00340_SelectionTool **v01.16 — `Add` 체크를 버튼 모음 위로**: Create 그룹(Controls 안)에 있어 Controls 를 접으면 같이 사라지던 것 `#A00340_SelectionTool`
 - 버튼 모음 pane 을 [Add 줄] + [스크롤] 로 감쌌다. 오프스크린 확인: Controls 접힘 · 숨김 모두에서 보임, Add 켬 = 누적 선택 / 끔 = 교체, 드래그 회귀 12/12. **마야 GUI 확인 아직.**
 
