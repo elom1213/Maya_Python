@@ -276,8 +276,9 @@ class SelectionTab(QWidget):
         self._log = log_callback or (lambda _msg: None)
 
         # 활성 프로파일과 그 데이터를 읽는다(없으면 Default 자동 생성).
-        self._profile = prefs_mod.get_active()
-        self._data = prefs_mod.load_profile(self._profile)
+        # v01.17 : 프로파일 정체는 (scope, 이름) - 로컬(data/) 과 공유(shared/) 에 같은 이름이 있어도 따로.
+        self._scope, self._profile = prefs_mod.get_active_ref()
+        self._data = prefs_mod.load_profile(self._profile, self._scope)
 
         # 색칠 모드 상태: 켜지면 버튼이 체크형으로 바뀌어 여러 개를 골라 한 번에 칠한다.
         # 체크된 버튼은 (category, button) 이름 쌍으로 들고 있어 재렌더 후에도 유지된다.
@@ -474,11 +475,18 @@ class SelectionTab(QWidget):
     def _build_profile_group(self):
         # 프로파일(캐릭터/에셋처럼 JSON 별로 나뉜 선택 버튼 묶음) 선택 + 관리.
         group = QGroupBox("Profile")
-        row = QHBoxLayout(group)
+        self._profile_group = group
+        outer = QVBoxLayout(group)
+        row = QHBoxLayout()
+        outer.addLayout(row)
 
         self.cmb_profile = QComboBox()
-        self.cmb_profile.setToolTip("Active profile (each is its own JSON)")
-        self.cmb_profile.currentTextChanged.connect(self.on_profile_changed)
+        self.cmb_profile.setToolTip(
+            "Active profile (each is its own JSON).\n"
+            "'[Shared]' = in the shared folder (tracked by git / your shared path) - others get it too.\n"
+            "The rest are local to this PC (data/profiles, not tracked).")
+        # v01.17 : 글자가 아니라 인덱스 - 같은 이름이 로컬과 공유에 있어도 고른 쪽이 열린다(itemData = (scope, name)).
+        self.cmb_profile.currentIndexChanged.connect(self.on_profile_changed)
 
         btn_new = QPushButton("New")
         btn_new.setToolTip("Create a new profile")
@@ -496,6 +504,23 @@ class SelectionTab(QWidget):
         row.addWidget(btn_new)
         row.addWidget(btn_rename)
         row.addWidget(btn_delete)
+
+        # v01.17 : 로컬 <-> 공유. 지금 프로파일의 scope 에 맞는 하나만 켜진다.
+        share_row = QHBoxLayout()
+        self.btn_share = QPushButton("Share")
+        self.btn_share.setToolTip(
+            "Move this local profile into the shared folder, so it can be committed / pushed\n"
+            "(or read from your shared path on other PCs).")
+        self.btn_share.clicked.connect(self.on_share_profile)
+        self.btn_copy_local = QPushButton("Copy to Local")
+        self.btn_copy_local.setToolTip(
+            "Copy this shared profile into this PC's local profiles (data/profiles).\n"
+            "The shared one stays as it is.")
+        self.btn_copy_local.clicked.connect(self.on_copy_profile_to_local)
+        share_row.addStretch(1)
+        share_row.addWidget(self.btn_share)
+        share_row.addWidget(self.btn_copy_local)
+        outer.addLayout(share_row)
 
         return group
 
@@ -663,49 +688,80 @@ class SelectionTab(QWidget):
         return [cat["name"] for cat in self._data.get("categories", [])]
 
     def _save_and_render(self):
-        prefs_mod.save_profile(self._profile, self._data)
+        prefs_mod.save_profile(self._profile, self._data, self._scope)
         self._render_categories()
 
     # ============================================================= profiles
 
+    @staticmethod
+    def _profile_label(scope, name):
+        return name + "  [Shared]" if scope == prefs_mod.SCOPE_SHARED else name
+
+    def _is_shared(self):
+        return self._scope == prefs_mod.SCOPE_SHARED
+
     def _refresh_profiles(self):
-        """콤보를 현재 프로파일 목록으로 다시 채우고 활성 항목을 선택한다."""
+        """콤보를 로컬 + 공유 프로파일로 다시 채우고 활성 항목을 선택한다 (itemData = (scope, name))."""
         self.cmb_profile.blockSignals(True)
         self.cmb_profile.clear()
-        self.cmb_profile.addItems(prefs_mod.list_profiles())
-        idx = self.cmb_profile.findText(self._profile)
-        if idx >= 0:
-            self.cmb_profile.setCurrentIndex(idx)
+        for scope, name in prefs_mod.list_all_profiles():
+            self.cmb_profile.addItem(self._profile_label(scope, name), (scope, name))
+        for i in range(self.cmb_profile.count()):
+            if tuple(self.cmb_profile.itemData(i)) == (self._scope, self._profile):
+                self.cmb_profile.setCurrentIndex(i)
+                break
         self.cmb_profile.blockSignals(False)
+        self._sync_profile_scope_ui()
 
-    def on_profile_changed(self, name):
-        """콤보에서 다른 프로파일을 고르면 그 프로파일을 로드한다."""
-        if not name or name == self._profile:
-            return
-        self._profile = name
-        prefs_mod.set_active(name)
-        self._data = prefs_mod.load_profile(name)
+    def _sync_profile_scope_ui(self):
+        """Share / Copy to Local 중 지금 scope 에 맞는 하나만, 그룹 제목에 (shared)."""
+        shared = self._is_shared()
+        self.btn_share.setEnabled(not shared)
+        self.btn_copy_local.setEnabled(shared)
+        self._profile_group.setTitle("Profile (shared)" if shared else "Profile")
+
+    def _switch_profile(self, scope, name):
+        self._scope, self._profile = scope, name
+        prefs_mod.set_active(name, scope)
+        self._data = prefs_mod.load_profile(name, scope)
         self._checked.clear()  # 프로파일이 바뀌면 체크 상태는 무효
+
+    def on_profile_changed(self, index):
+        """콤보에서 다른 프로파일을 고르면 그 프로파일을 로드한다."""
+        ref = self.cmb_profile.itemData(index) if index >= 0 else None
+        if not ref:
+            return
+        scope, name = tuple(ref)
+        if (scope, name) == (self._scope, self._profile):
+            return
+        self._switch_profile(scope, name)
         self._render_categories()
-        self._log("Switched to profile '{0}'.".format(name))
+        self._sync_profile_scope_ui()
+        self._log("Switched to profile '{0}'.".format(self._profile_label(scope, name)))
+
+    def _confirm_shared(self, action):
+        """공유 프로파일 · 규칙의 이름 바꾸기 / 지우기 전 한 번 더 묻는다."""
+        return QMessageBox.question(
+            self, TITLE,
+            "This profile is SHARED (shared folder, tracked by git).\n"
+            "{0} it here changes it for everyone who pulls it. Continue?".format(action)
+        ) == QMessageBox.Yes
 
     def on_new_profile(self):
-        raw, ok = QInputDialog.getText(self, "New Profile", "Profile name:")
+        """새 프로파일은 **로컬**에 만든다 - 공유는 Share 로 올린다 (시험용이 공유 폴더에 생기지 않게)."""
+        raw, ok = QInputDialog.getText(self, "New Profile", "Profile name (created locally):")
         if not ok:
             return
         name = prefs_mod.sanitize_name(raw)
         if not name:
             return
-        if name in prefs_mod.list_profiles():
+        if name in prefs_mod.list_profiles(prefs_mod.SCOPE_LOCAL):
             QMessageBox.warning(
                 self, TITLE, "Profile '{0}' already exists.".format(name))
             return
 
-        prefs_mod.save_profile(name, {"categories": []})
-        prefs_mod.set_active(name)
-        self._profile = name
-        self._data = prefs_mod.load_profile(name)
-        self._checked.clear()
+        prefs_mod.save_profile(name, {"categories": []}, prefs_mod.SCOPE_LOCAL)
+        self._switch_profile(prefs_mod.SCOPE_LOCAL, name)
         self._refresh_profiles()
         self._render_categories()
 
@@ -719,33 +775,73 @@ class SelectionTab(QWidget):
         new = prefs_mod.sanitize_name(raw)
         if not new or new == old:
             return
-        if new in prefs_mod.list_profiles():
+        if new in prefs_mod.list_profiles(self._scope):
             QMessageBox.warning(
                 self, TITLE, "Profile '{0}' already exists.".format(new))
             return
+        if self._is_shared() and not self._confirm_shared("Renaming"):
+            return
 
-        prefs_mod.rename_profile(old, new)
+        prefs_mod.rename_profile(old, new, self._scope)
         self._profile = new
         self._refresh_profiles()
 
     def on_delete_profile(self):
         name = self._profile
-        if len(prefs_mod.list_profiles()) <= 1:
+        if len(prefs_mod.list_all_profiles()) <= 1:
             QMessageBox.information(
                 self, TITLE, "At least one profile must remain.")
             return
         if QMessageBox.question(
             self, TITLE,
-            "Delete profile '{0}' and all its buttons?".format(name)
+            "Delete profile '{0}' and all its buttons?".format(self._profile_label(self._scope, name))
         ) != QMessageBox.Yes:
             return
+        if self._is_shared() and not self._confirm_shared("Deleting"):
+            return
 
-        prefs_mod.delete_profile(name)
+        prefs_mod.delete_profile(name, self._scope)
         # 남은 프로파일 중 첫 번째로 전환.
-        remaining = prefs_mod.list_profiles()
-        self._profile = remaining[0]
-        prefs_mod.set_active(self._profile)
-        self._data = prefs_mod.load_profile(self._profile)
+        scope, first = prefs_mod.list_all_profiles()[0]
+        self._switch_profile(scope, first)
+        self._refresh_profiles()
+        self._render_categories()
+
+    def on_share_profile(self):
+        """로컬 프로파일을 공유 폴더로 옮긴다 (v01.17)."""
+        if self._is_shared():
+            return
+        name = self._profile
+        try:
+            path = prefs_mod.share_profile(name)
+        except (ValueError, OSError) as exc:
+            QMessageBox.warning(self, TITLE, "Cannot share '{0}':\n{1}".format(name, exc))
+            return
+        self._scope = prefs_mod.SCOPE_SHARED
+        prefs_mod.set_active(name, self._scope)
+        self._refresh_profiles()
+        self._log("[OK] Shared profile '{0}' -> {1}".format(name, path))
+        self._log("    Commit and push that file to share it through git.")
+
+    def on_copy_profile_to_local(self):
+        """공유 프로파일을 로컬로 복사하고 그 복사본으로 전환한다 (v01.17)."""
+        if not self._is_shared():
+            return
+        name = self._profile
+        try:
+            path = prefs_mod.copy_profile_to_local(name)
+        except (ValueError, OSError) as exc:
+            QMessageBox.warning(self, TITLE, "Cannot copy '{0}':\n{1}".format(name, exc))
+            return
+        self._switch_profile(prefs_mod.SCOPE_LOCAL, name)
+        self._refresh_profiles()
+        self._render_categories()
+        self._log("[OK] Copied shared profile '{0}' to local -> {1}".format(name, path))
+
+    def reload_profiles(self):
+        """공유 폴더 경로가 바뀌었을 때 (View > Shared Folder...) 다시 읽는다."""
+        self._scope, self._profile = prefs_mod.get_active_ref()
+        self._data = prefs_mod.load_profile(self._profile, self._scope)
         self._checked.clear()
         self._refresh_profiles()
         self._render_categories()
