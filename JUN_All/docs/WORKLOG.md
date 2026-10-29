@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-29 (오늘)
 
+> [!summary] A00275_skinTool_V01 **v01.38 — 탭마다 창 높이 자동 맞춤** + 공용 `Framework/qt/MOD_tabFit_qt_v01` 신규(첫 적용 툴) `#A00275_skinTool_V01` `#Framework`
+- 요청: "세로가 길면 스크롤로 보는 대신, 탭마다 세로 길이에 맞춰 창 길이가 자동으로 조절되어 스크롤 없이 다 보이게. A00275 에 먼저, 잘 되면 모든 툴".
+- 원리: 안 보이는 탭 페이지의 세로 size policy 를 `Ignored` 로 → `QStackedLayout` 이 그 페이지를 0 으로 쳐서 탭 sizeHint 가 현재 페이지만 따른다(중첩 탭 포함). 탭 전환 다음 이벤트 루프에 `resize`(폭 유지), 모니터 작업 영역 − 타이틀 바로 자르고 화면 밖이면 위로.
+- ★ `QScrollArea.sizeHint()` 는 글자 높이 24배(약 350px)로 **잘려** 있다(`boundedTo`, sizeAdjustPolicy 무관) → 보이는 스크롤 페이지는 (내용 sizeHint + 테두리) − 스크롤 sizeHint 를 더한다. 로그창이 최대 높이까지 남는 공간을 나눠 가져 8px 모자라던 것은 뷰포트를 재서 보정.
+- 검증: `tests/test_tab_fit_ui.py` 34/34 - 하위 탭 12개 전부 창 높이 = 내용 · 스크롤바 없음, 긴 → 짧은 탭에 줄어듦, 손으로 줄이면 스크롤, 작은 화면 제한, 끄면 정책 복원. `test_move_ui.py` 15/15. **마야 GUI 확인 아직.** 문서 `Framework_MOD_tabFit_qt.md`.
+
 > [!summary] A00110_animTool_V02 **v02.24 — Follow 탭 `Maintain Offset` 기본 켜짐** `#A00110_animTool`
 - 요청 그대로 `setChecked(True)`. 따라서 Point 체크박스도 처음부터 켤 수 있는 상태(체크는 꺼짐).
 - 검증: `tests/test_follow_point.py` 14/14 (기본값 항목 갱신 + Offset 끄면 Point 비활성 항목 추가). 문서 UI 그림 · 옵션 설명 · 사용 순서 · 문제 해결 갱신.

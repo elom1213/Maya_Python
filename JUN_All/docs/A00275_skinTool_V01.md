@@ -2,7 +2,7 @@
 title: A00275_skinTool_V01 사용법
 aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose, Move Joints, Edit Mesh, Expand Bind, Smooth Weights, Move Weights n to k]
 tags: [maya-python, tool-guide, skin, skincluster, bind-pose, rigging]
-updated: 2026-10-27
+updated: 2026-10-29
 ---
 
 # A00275_skinTool_V01 사용법
@@ -1182,6 +1182,7 @@ mayapy 로 확인한, 전부 **조용히 틀리는** 종류의 함정이다.
 - **`tabs.widget(i)` 는 페이지가 아니라 `QScrollArea` 를 돌려준다**(`_scrolled` 가 감쌌다).
   페이지 위젯이 필요하면 `.widget()` 을 한 번 더 벗긴다.
 - **스크롤은 하위 페이지에만.** 상위 카테고리 페이지에도 씌우면 스크롤바가 두 겹으로 보인다.
+  v01.38 부터 창 높이는 `tab_fit` 이 현재 페이지에 맞추므로 스크롤은 **화면보다 길거나 손으로 줄였을 때**만 보인다.
 - TSL 위젯에 `setMaximumHeight` 를 **위젯 전체로** 걸지 말 것(리스트 최소 높이가 안 줄어
   버튼에서 높이를 빼앗아 글자가 잘린다). 필요하면 `list_widget` 에만 건다.
 
@@ -1311,6 +1312,19 @@ Even distribution (v01.16) — 43항목:
 - 코어 51항목은 **손대지 않았고 그대로 통과**
 
 ---
+
+## 창 높이 자동 맞춤 (v01.38~)
+
+상위(카테고리) · 하위(기능) 어느 탭을 눌러도 **창 높이가 지금 보이는 페이지에 맞게 늘거나 줄어** 스크롤 없이 페이지
+전체가 보인다. 예전에는 710px 고정이고 긴 페이지(Expand Bind · Layer · Move)는 스크롤해야 했다.
+
+- 공용 위젯 [`JUN_mod_tabFit_qt_v01`](Framework_MOD_tabFit_qt.md) 한 줄(`self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)`).
+  **이 툴이 첫 적용** — 잘 되면 모든 PySide 툴에 같은 방식으로 붙인다.
+- 페이지가 모니터 작업 영역보다 길면 화면 높이에서 멈추고 **그 페이지만 스크롤**된다. 창 아래가 화면 밖이면 위로 올린다.
+- 창을 손으로 줄이면 예전처럼 스크롤이 생기고, 다음 탭 전환 때 다시 맞춘다. **폭은 건드리지 않는다**(기본 620).
+- 로그창은 90 ~ 160px 사이에서 예전과 같다.
+- 검증은 `tests/test_tab_fit_ui.py` 34/34(mayapy 오프스크린, 하위 탭 12개 전부 창 높이 = 내용 높이 · 스크롤바 없음 · 줄어듦 · 화면 제한).
+  **마야 GUI 확인 아직.**
 
 ## 로그창 (v01.24)
 

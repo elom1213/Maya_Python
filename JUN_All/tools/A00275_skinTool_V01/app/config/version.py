@@ -36,5 +36,9 @@
 #        Kangaroo 와 대조 시험(17 케이스 중 15 는 차이 0 ~ 2e-16, Border 2 는 Kangaroo 가 numpy 2 에서 죽어 성질로 확인).
 #        Smooth 의 공용 함수를 core/skin_weights_common.py 로 옮김(동작 불변, 회귀 시험).
 
-VERSION = "01.37"
-LAST_UPDATE = "2026-10-27"
+# 01.38  창 높이 자동 맞춤 - 탭을 바꿀 때마다(상위 · 하위) 창 높이를 지금 보이는 페이지에 맞춘다.
+#        스크롤 없이 페이지 전체가 보이고, 짧은 페이지로 가면 창이 줄어든다. 페이지가 화면보다 길면
+#        화면 높이에서 멈추고 스크롤. 공용 Framework/qt/MOD_tabFit_qt_v01 (첫 적용 툴, 잘 되면 전 툴로).
+
+VERSION = "01.38"
+LAST_UPDATE = "2026-10-29"

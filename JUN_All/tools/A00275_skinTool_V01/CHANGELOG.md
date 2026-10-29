@@ -1,5 +1,22 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.38 (2026-10-29)
+
+- **[UI] 탭마다 창 높이가 자동으로 맞춰진다.** 상위(카테고리) · 하위(기능) 어느 탭을 눌러도 창 높이가 **지금 보이는 페이지**에
+  맞게 늘거나 줄어, 스크롤 없이 페이지 전체가 보인다(예전에는 710px 고정에 긴 페이지는 스크롤).
+  - 공용 `Framework/qt/MOD_tabFit_qt_v01.JUN_mod_tabFit_qt_v01(self, self.tabs)` 한 줄 — 이 툴이 첫 적용. 안 보이는 페이지의
+    세로 size policy 를 `Ignored` 로 두어 탭 위젯 sizeHint 가 현재 페이지만 따르게 하고, 탭 전환 다음 이벤트 루프에서 `resize`.
+  - 페이지가 모니터 작업 영역보다 길면 화면 높이에서 멈추고 그 페이지만 스크롤된다. 창 아래가 화면 밖이면 위로 올린다.
+  - 창을 손으로 줄이면 예전처럼 스크롤이 생긴다(최소 높이는 늘리지 않았다). 폭은 건드리지 않는다.
+  - 검증: mayapy 오프스크린 — 하위 탭 12개 전부 창 높이 = 내용 높이(스크롤바 없음), 긴 → 짧은 탭 전환 때 줄어듦,
+    화면 제한 경로, 손으로 줄인 뒤 스크롤. **마야 GUI 확인 아직.**
+
+## v01.37 (2026-10-27)
+
+- **[Feature] `Weights > Move` 신규** — 조인트 n 개(From) → k 개(To) 웨이트 이동, Kangaroo `SkinCluster > Move` 이식(플러그인 무의존).
+  버텍스마다 최근접 To(뼈 선분) + 경계 스무딩 + Blend · 소프트 · Joint Locks · Border Edges, Respect selection.
+  Smooth 의 공용 함수를 `core/skin_weights_common.py` 로 옮김. (자세한 내용은 `docs/A00275_skinTool_V01.md` Weights > Move 절)
+
 ## v01.36 (2026-10-16)
 
 - **[Feature] `Weights > Classic` 의 Native 엔진이 선택 버텍스만 처리한다.** Kangaroo 엔진은 그대로.

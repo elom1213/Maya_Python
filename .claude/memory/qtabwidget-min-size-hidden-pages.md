@@ -30,3 +30,5 @@ metadata:
 **검증**: 오프스크린에서 `minimumSizeHint` 가 작아졌는지 · `resize(600, 400)` 이 먹는지 · 여는 높이가 `min(탭 최소, 화면)` 인지.
 
 관련: [[window-taller-than-screen-ghost]], [[offscreen-size-needs-theme]]
+
+**2026-10-29 이후**: 탭마다 창 높이를 현재 페이지에 맞추는 공용 [[framework-tabfit-widget]] 이 생겼다 - 숨은 페이지를 세로 Ignored 로 두므로 최소 크기 문제도 같이 풀린다. 새로 손대는 툴은 그쪽.

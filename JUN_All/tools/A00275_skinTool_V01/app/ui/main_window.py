@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-27
+# last Update date : 2026-10-29
 # A00275_skinTool_V01 - Qt UI
 #
 # 스킨 관련 범용 툴. **상위 탭 = 카테고리, 하위 탭 = 기능** 으로 통일돼 있다(v01.15~).
@@ -69,6 +69,7 @@ from Framework.core import falloff_curve as falloff   # 2026-09-09 Framework 로
 from Framework.qt import JUN_mod_falloffCurve_qt
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -99,8 +100,9 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
 
         self.win_width = 620
-        # 하위 탭 바가 한 줄 더 생긴 만큼(v01.15) 높였다. 페이지가 이보다 길면
-        # 잘리지 않고 스크롤된다(_scrolled) — 가장 긴 Expand Bind 가 약 850px 다.
+        # 보이기 전의 임시 높이. v01.38 부터는 창이 보이는 순간과 탭을 바꿀 때마다
+        # 공용 JUN_mod_tabFit_qt_v01 이 **지금 보이는 페이지 높이**로 창을 다시 맞춘다
+        # (스크롤 없이 페이지 전체가 보인다). 페이지가 화면보다 길 때만 스크롤(_scrolled)이 남는다.
         self.win_height = 710
         self.win_title = f"Skin Tool v{VERSION}"
 
@@ -172,6 +174,9 @@ class MainWindow(QWidget):
         self.edit_tabs.currentChanged.connect(self._on_tab_changed)
 
         main_layout.addWidget(self.tabs)
+
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v01.38, 공용 위젯 - 중첩 탭 · 스크롤 페이지 모두 따라간다).
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
 
         # 공유 로그
         main_layout.addWidget(self.te_log)
@@ -284,8 +289,11 @@ class MainWindow(QWidget):
         """페이지를 스크롤 영역에 담아 돌려준다 (창이 작아도 위젯이 겹치지 않도록).
 
         스크롤은 **하위 페이지에만** 씌운다. 상위 카테고리 페이지에도 씌우면 스크롤바가
-        두 겹으로 보인다. (이 툴은 A00110 처럼 창을 콘텐츠에 맞춰 자동으로 늘리지 않으므로
-        fit page 가 아니라 스크롤이 맞다.)
+        두 겹으로 보인다.
+
+        v01.38 부터 창 높이는 `JUN_mod_tabFit_qt_v01` 이 현재 페이지에 맞추므로 평소엔
+        스크롤바가 보이지 않는다. 스크롤 영역은 **페이지가 화면보다 길거나 사용자가 창을
+        손으로 줄였을 때**의 안전망이다.
         """
 
         scroll = QScrollArea()
