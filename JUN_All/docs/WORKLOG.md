@@ -32,6 +32,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-29 (오늘)
 
+> [!summary] A00110_animTool_V02 **`Bake > Counter Layer` Stationary spans only 모드 계획서** — 글로벌 이동은 살리고 **발이 땅을 짚어 정지하던 구간만 월드 고정**, 허공 구간이 차이를 흡수(실제 ZIHAN 씬 실측) `#A00110_animTool`
+- 요청: `CH_n_Global_xx_ctl` 이 `global_lyr` 로 이동하면 IK 발 `CH_l/r_foot_xx_ctl` 의 정지 구간이 월드에서 미끄러진다. **최종 위치는 글로벌 결과대로**, 정지 구간은 정지. 새 탭 vs 기존 확장 판단 · 다른 방법 제시 · SmartLayer 참고 가능.
+- 관찰(mayapy, `00010_cleanup_ZIHAN_00120_tmp.mb` 저장 없음): 글로벌 `tx` 0 → −21.72(4271→4312 ease), 발 로컬은 뮤트 전후 동일(부모만 바뀜). 정지 구간 L `4277-4282 · 4297-4304`, R `4262-4271 · 4287-4290 · 4303-4305`, 그 안에서 2.6 / 4.4 / 1.6 / 1.0 유닛 미끄럼. 두 발이 동시에 떠 있는 프레임이 짧아 "글로벌을 허공에서만 움직이기" 대안은 불가.
+- 판단: **새 탭 아님 — v02.26 Counter Layer 탭에 `Hold: Everywhere / Stationary spans only` 라디오** + 톨러런스 · 최소 길이 · Anchor(Touchdown/Middle/Lift-off) · Blend(By travel/Ease/Linear) · `Preview Spans`. 입력 · 엔진(뮤트 스냅샷 · 청크 · `xform -m` · `setKeyframe -animLayer` 역산) 전부 재사용, 새 코드는 구간 탐지 · 앵커 · 델타 분배만. additive 레이어가 맞고 로케이터 핀/override/글로벌 수정은 거부(계획서 §2).
+- 알고리즘: ① 레이어 뮤트 스트리밍으로 정지 구간(포즈 변화 < tol) ② 앵커 프레임 월드 포즈 = 구간 목표, 구간 시작/끝 델타 ③ 허공은 발 이동량 비례로 델타 보간(위치 더하기 · 회전 월드 후곱 slerp) ④ **Start·End 에서 델타 0**(경계에 걸친 구간은 앵커 강제) ⑤ 쓰기는 기존 청크 루프. 메모리 = 프레임당 double 2 + 구간당 포즈 3 + 200f 청크.
+- 실측: 정지 구간 월드 오차 1.7e-6 · 범위 밖 변화 0 · 4313 최종 위치 차 0 · 프레임 간 최대 이동량 보정 전후 동일(스파이크 없음) · `global_lyr` 불변 · 뮤트/삭제 시 원상 · Middle 앵커는 흡수 델타 절반(2.33) · 1000f × 2 발 10.5 s, 파이썬 피크 0.4 MB · 프레임마다 뮤트 토글은 16 ms/f(5배)라 청크 유지. 함정: 경계 0 을 `end+1` 에 두면 마지막 프레임에 0.44 잔여 + 한 프레임 계단 → `end`.
+- 산출: `docs/plans/A00110_animTool_V02_counter_layer_stationary_plan.md`, 재현 `tests/exp_plant_hold_zihan.py`(씬 경로 상수, 구현 때 흡수·삭제). 구현은 다음 턴(v02.29).
+
 > [!summary] A00110_animTool_V02 **v02.28 Transfer > Layer `Cut Keys to Layer (Move)` 월드 결과 보존** — Base 에만 키가 있는 ctl 을 Base → a 로 옮기면 월드가 달라지던 것 수정(`Keep Result`, 기본 ON) `#A00110_animTool`
 - 요청: "Base 와 a 에 키가 있을 때 a → b Move 는 월드가 안 변하는데, Base 에만 키가 있을 때 Base → a/b Move 는 월드 위치·회전이 달라지는 것 같다. 사실인지 확인하고 사실이면 같도록 수정."
 - 확인(mayapy 2024): **사실.** Base → a 6.03 어긋남. 실측으로는 **a → b · a → Base 도 어긋난다**(8.0 · 14.1) — 원인이 같아서. ① **커브를 다 지우면 blend 노드 입력에 지우던 순간의 값이 정적으로 남는다**(Base 커브 → 맨 아래 `inputA`, 레이어 커브 → 그 노드 `inputB`). 마야 `animLayer -extractAnimation` 도 같은 상태(6.03). `setAttr` 로 plug 에 쓰면 활성 레이어 `inputB` 로 가서 소용없고, **그 입력 plug 에 identity(0 · Multiply 스케일 1)를 쓰면 0.0**. ② 대상이 커브 없이 들던 정적값(Base 정적값 · 멤버 정적값)을 붙여넣기가 덮는다 → 붙여넣은 키에 합성(`keyframe -r -vc` / `scaleKey -vs`): by-component 8.9e-16, by-layer 회전에 0 아닌 회전은 0.30(근사 → 경고).

@@ -1,6 +1,6 @@
 ---
 name: wip-a00110-counter-layer
-description: "A00110_animTool_V02 v02.26 Bake > Counter Layer (2026-10-29) — 글로벌 레이어가 바꾼 자식의 월드 T/R 을 되돌리는 보정 additive 레이어 = 뮤트 스냅샷 worldMatrix + xform -ws -m + setKeyframe -animLayer -value 역산; 200 프레임 청크로 메모리 고정; 회귀 51/51, GUI 확인 아직"
+description: "A00110_animTool_V02 v02.26 Bake > Counter Layer (2026-10-29) — 글로벌 레이어가 바꾼 자식의 월드 T/R 을 되돌리는 보정 additive 레이어 = 뮤트 스냅샷 worldMatrix + xform -ws -m + setKeyframe -animLayer -value 역산; 200 프레임 청크로 메모리 고정; 회귀 51/51, GUI 확인 아직. 같은 날 Stationary spans only 모드(정지 구간만 고정, 최종 위치는 글로벌대로) 계획서 — 실제 ZIHAN 씬 실측, 구현은 v02.29 예정"
 metadata:
   node_type: memory
   type: project
@@ -28,5 +28,14 @@ metadata:
 - UI = `Bake > Counter Layer`(위젯 접두 `cl_`: `cl_tsl` · `lw_cl_layers`+`chk_cl_layers` · `rb_cl_timeline/custom` · `cl_range` · `cb_cl_t/r` · `sb_cl_step` · `le_cl_name` · `cb_cl_zero/skip/select` · `btn_cl_create`). 오브젝트 × 프레임 > `PROGRESS_THRESHOLD`(2000) 이면 `JUN_mod_progress_qt` 팝업 한 단계.
 - `_SmartLayer` 는 `.pyc` — **디컴파일 금지**, 툴팁·Starter Guide 텍스트만 참고. 속도 비례 분배(Linear Offset 등)는 v2 후보.
 - 같은 날 [[wip-a00110-layer-range-merge]] 도 `Bake` 하위 탭 계획 — 그쪽 구현 때 `BAKE_PAGES` 튜플 · `version.py` 에 이 탭이 이미 있음을 전제로.
+
+**Stationary spans only 모드 계획 (2026-10-29 오후, 구현 전 · v02.29 예정)** — `docs/plans/A00110_animTool_V02_counter_layer_stationary_plan.md`.
+사용자 씬 `C:/JUN/JUN_MUE/00_04_02_ANI_00_PJ_010/scenes/5010_cleanup_BCM_ZIHAN/00010_cleanup_ZIHAN_00120_tmp.mb`(레퍼런스 1개, 열기 22 s) 의
+`test:ZIHAN:Cage:CH_n_Global_xx_ctl`(`global_lyr`, tx 0→−21.72 @4271→4312) 아래 IK 발 `CH_l/r_foot_xx_ctl`(`AnimLayer1`) — 글로벌 이동은 살리고
+**발이 정지하던 구간만 월드 고정**, 허공이 차이 흡수. 요청 원문의 "최종 위치 유지" = 범위 End 에서 글로벌 결과와 같아야 한다.
+- **같은 탭의 `Hold` 라디오로**(새 탭 아님): Everywhere(기존) / Stationary spans only + Still tol(0.1 유닛 · 0.5°) · Min span 2 · Anchor Touchdown/Middle/Lift-off · Blend By travel/Ease/Linear · `Preview Spans`. 기본 이름 `<layer>_plant`.
+- 알고리즘: 뮤트 스트리밍 정지 구간 → 앵커 포즈(구간 목표) + 구간 시작/끝 델타 → 허공은 OFF 이동량 비례 보간(위치 더하기 · 회전 월드 후곱 slerp, **원점 기준 행렬 보간 금지**) → **Start·End 델타 0**(걸친 구간은 앵커 경계 강제, 전구간 정지는 제외 경고) → 기존 청크 쓰기(스냅샷 뮤트 = 보정 레이어만).
+- 실측: 구간 오차 1.7e-6(쿼터니언 왕복) · 범위 밖 0 · 최종 0 · 프레임 간 이동량 보정 전후 동일 · Middle 앵커 흡수 절반 · 1000f×2 발 10.5 s / 0.4 MB · **프레임마다 뮤트 토글 16 ms/f** → 청크 유지. 함정: 경계 0 을 `end+1` 에 두면 마지막 프레임 잔여 0.44 + 계단 → `end` 에서 0. 커브 찾기는 긴 이름(`translateX`)으로.
+- 재현 `tests/exp_plant_hold_zihan.py`(씬 경로 상수, 저장 안 함) — 구현 때 회귀로 흡수·삭제. Step 은 이 모드에서 무시.
 
 관련: [[wip-a00110-fill-keys]] [[animated-attr-setkeyframe-plus-setattr]] [[animlayer-no-global-selected-query]] [[wip-a00110-tab-taxonomy]] [[mayapy-headless-verify]] [[qapplication-before-maya-standalone]]
