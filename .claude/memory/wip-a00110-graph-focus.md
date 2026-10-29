@@ -1,6 +1,6 @@
 ---
 name: wip-a00110-graph-focus
-description: A00110 Graph Focus tab — frame Graph Editor to current±margin frames on selection instead of whole keyed range
+description: A00110 Graph Focus tab — frame Graph Editor to current±margin frames on selection instead of whole keyed range; V02 v02.25 Layer curves = GE animLayerFilterOptions + 레이어별 값 범위 (keyframe -q -name 은 활성 레이어 커브만 준다)
 metadata: 
   node_type: memory
   type: project
@@ -8,6 +8,14 @@ metadata:
 ---
 
 DONE (Maya-verified + pushed Dnable/dev, latest commit 835ce8f, v01.30): A00110_animTool **Graph Focus** tab (7th tab).
+
+**V02 v02.25 (2026-10-29) — `Layer curves` 콤보 (View > Graph Focus).** 애니메이션 레이어가 있을 때 "Layer1 선택 → 베이스 ±400 과 겹쳐 너무 확대" 보고.
+★ 원인: `cmds.keyframe(obj, q=True, name=True)` 는 **활성(preferred) 레이어의 커브만** 돌려준다(실측: Base 활성 → 베이스 커브, Layer1 활성 → Layer1 커브).
+세로 맞춤은 그걸로 ±200 에 맞추는데 GE 는 기본 필터(모든 레이어)라 ±400 도 그린다. 해법: GE 아웃라이너 `outlinerEditor <panel>OutlineEd
+-animLayerFilterOptions selected|active|activeAndSelected|allAffecting|animLayerEditor`(= GE View > Animation Layer Filter, 'Active' 는 `preferred`,
+`animLayerEditor` 는 optionVar `animLayerFilterOptions` 1~4)를 콤보 값으로 걸고, 커브는 `listHistory(pdo)` 의 animCurveT* 를 `animLayer -q -animCurves`
+로 레이어별 분류(어디에도 없으면 베이스)해 같은 집합만 잰다. 선택 없음 → 활성 → 전부 되돌림(빈 GE 방지). 시험 `tests/test_graph_focus_layers.py` 37.
+시험 씬 함정: `setKeyframe(animLayer=L, v=V)` 는 최종값 역산이라 레이어를 번갈아 찍으면 값이 엉킨다 — 레이어마다 따로 키. **GE 필터 동작은 마야 GUI 확인 아직.**
 
 v01.30: Auto-Focus now fires ONLY on a real scene-object selection change. Maya's `SelectionChanged` also fires on Graph Editor key select/deselect and undo(z), so auto-frame triggered spuriously; v01.27's "skip if keys selected" guard missed the moment keys are *deselected* (0 keys selected). Fix (`graph_focus_manager.py` only): cache the last framed object selection (`_last_selection`); `_apply_silent` only frames when `cmds.ls(sl=True, long=True)` actually differs (skips empty selection too, keeps the key-selected guard). `apply_now` also syncs the cache to avoid re-trigger.
 

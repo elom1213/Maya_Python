@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-19
+# last Update date : 2026-10-29
 # A00110_animTool_V02 - Qt UI
 
 from Framework.qt.qt import *
@@ -2418,6 +2418,15 @@ class MainWindow(QWidget):
 
         return page
 
+    # Graph Focus > Layer curves 콤보 (표시 라벨, graph_view_manager.LAYER_FILTER_MODES 값). 첫 줄이 기본.
+    GRAPH_LAYER_FILTERS = (
+        ("Selected layers", "selected"),
+        ("Active layer", "active"),
+        ("Active + selected layers", "activeAndSelected"),
+        ("All affecting layers", "allAffecting"),
+        ("Keep Graph Editor setting", "keep"),
+    )
+
     def _build_graph_focus_tab(self):
         """선택한 컨트롤러의 전체 키 구간을 다 보여주는 대신, 현재 프레임 기준
         ± margin 프레임만 그래프 에디터에 확대해서 보여주는 탭.
@@ -2491,6 +2500,34 @@ class MainWindow(QWidget):
         grp_layout.addLayout(pad_row)
 
         # -------------------------
+        # 애니메이션 레이어가 있을 때 어느 레이어의 커브를 보이고 잴지 (v02.25).
+        # 예전엔 세로 맞춤이 **활성 레이어 커브만** 재서(keyframe -name 의 동작), Layer1 을 선택하면
+        # ±200 에 맞추는데 그래프 에디터엔 베이스 ±400 커브도 겹쳐 보여 "너무 확대"돼 보였다.
+        # 이제 그래프 에디터의 View > Animation Layer Filter 를 여기서 고른 값으로 바꾸고,
+        # 세로 맞춤도 그 필터로 보이는 커브만 잰다. 'Keep' 은 GE 설정을 건드리지 않고 그대로 따른다.
+        # -------------------------
+
+        layer_row = QHBoxLayout()
+        layer_row.addWidget(QLabel("Layer curves"))
+        self.cmb_graph_layer_filter = QComboBox()
+        for label, mode in self.GRAPH_LAYER_FILTERS:
+            self.cmb_graph_layer_filter.addItem(label, mode)
+        self.cmb_graph_layer_filter.setCurrentIndex(0)
+        self.cmb_graph_layer_filter.setToolTip(
+            "Which animation layers' curves the Graph Editor shows (and the value\n"
+            "axis fits to) when the scene has animation layers.\n"
+            "  Selected layers : only the layers selected in the Animation Layer Editor\n"
+            "                    (falls back to the active layer, then to all, if none is selected)\n"
+            "  Active layer    : only the active (preferred) layer\n"
+            "  Active + selected, All affecting layers : as named\n"
+            "  Keep Graph Editor setting : do not change the Graph Editor's\n"
+            "                    View > Animation Layer Filter, just fit to what it shows.\n"
+            "Scenes without animation layers are not affected.")
+        layer_row.addWidget(self.cmb_graph_layer_filter)
+        layer_row.addStretch(1)
+        grp_layout.addLayout(layer_row)
+
+        # -------------------------
         # 토글과 무관하게 지금 한 번만 프레이밍
         # -------------------------
 
@@ -2513,6 +2550,7 @@ class MainWindow(QWidget):
         self.sb_graph_margin.valueChanged.connect(self._graph_focus_reapply)
         self.cb_graph_fit_value.toggled.connect(self._graph_focus_reapply)
         self.sb_graph_value_pad.valueChanged.connect(self._graph_focus_reapply)
+        self.cmb_graph_layer_filter.currentIndexChanged.connect(self._graph_focus_reapply)
 
         return tab
 
@@ -4466,6 +4504,14 @@ class MainWindow(QWidget):
         """세로(값) 위/아래 여백 퍼센트."""
         return self.sb_graph_value_pad.value()
 
+    def _graph_layer_filter(self):
+        """Layer curves 콤보의 모드 문자열(LAYER_FILTER_MODES). 콤보가 없으면 'selected'."""
+        cmb = getattr(self, "cmb_graph_layer_filter", None)
+        if cmb is None:
+            return "selected"
+        mode = cmb.currentData()
+        return mode if mode else "selected"
+
     def on_toggle_graph_focus(self, checked):
         """Auto-Focus 토글 ON/OFF. ON 이면 SelectionChanged 감시 시작 + 즉시 1회 적용."""
         self.btn_graph_focus.setText(
@@ -4473,7 +4519,8 @@ class MainWindow(QWidget):
 
         if checked:
             ok, msg = self.graph_focus_mgr.install(
-                self._graph_margin, self._graph_fit_value, self._graph_value_pad)
+                self._graph_margin, self._graph_fit_value, self._graph_value_pad,
+                self._graph_layer_filter)
             self.log(msg)
         else:
             self.graph_focus_mgr.uninstall()
@@ -4483,7 +4530,7 @@ class MainWindow(QWidget):
         """토글과 무관하게 지금 한 번만 현재 프레임 ± margin 으로 프레이밍."""
         count, msg = GraphViewManager.frame_around_current(
             self._graph_margin(), fit_value=self._graph_fit_value(),
-            value_pad_pct=self._graph_value_pad())
+            value_pad_pct=self._graph_value_pad(), layer_filter=self._graph_layer_filter())
         self.log(msg)
 
     def _graph_focus_reapply(self, *args):
@@ -4491,7 +4538,7 @@ class MainWindow(QWidget):
         if self.graph_focus_mgr.is_active():
             GraphViewManager.frame_around_current(
                 self._graph_margin(), fit_value=self._graph_fit_value(),
-                value_pad_pct=self._graph_value_pad())
+                value_pad_pct=self._graph_value_pad(), layer_filter=self._graph_layer_filter())
 
     # --------------------------------------------------
     # Teardown

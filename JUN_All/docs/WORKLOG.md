@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-29 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.25 — Graph Focus `Layer curves`**: 애니메이션 레이어가 있으면 선택한 레이어의 커브만 보이고 그 범위에 맞춤 `#A00110_animTool`
+- 요청: "베이스 ±400 · Layer1 ±200 일 때 Layer1 을 선택하고 컨트롤러를 고르면 두 커브가 겹쳐 보이고 너무 확대된다. Layer1 커브만 보이고 적절히 확대되게 진단 · 가능하면 수정".
+- 진단(mayapy 실측): 세로 범위를 모으던 `cmds.keyframe(obj, q=True, name=True)` 가 **활성(preferred) 레이어의 커브만** 돌려준다 → Layer1 활성이면 ±200 에 맞추는데, 그래프 에디터는 기본 필터(`animLayerFilterOptions` = 모든 레이어)라 베이스 ±400 도 겹쳐 그려 잘려 보였다. GE 의 `View > Animation Layer Filter` 는 `outlinerEditor <panel>OutlineEd -animLayerFilterOptions selected|active|activeAndSelected|allAffecting|animLayerEditor` 이고 'Active' = `preferred`.
+- 구현: `Layer curves` 콤보(기본 Selected · Active · Active+Selected · All · Keep) — GE 필터를 그 값으로 걸고, 커브는 `listHistory` 로 전부 모아 `animLayer -q -animCurves` 로 레이어별로 걸러 같은 집합만 잰다. 선택 레이어가 없으면 활성 → 전부로 되돌리고 로그에 적는다(빈 GE 방지). 레이어 없는 씬은 영향 없음.
+- 검증: `tests/test_graph_focus_layers.py` 37/37 (레이어 없음 · 둘 · 레이어별 범위 ±400/±200/±100 · 되돌림 · 옛 질의가 활성 레이어만 주는 것 재현 · 창 콤보). **GE 필터가 실제로 커브를 가리는 것과 확대 모양은 마야 GUI 확인 아직.** ★ setKeyframe(animLayer=L, v) 를 레이어 번갈아 찍으면 역산이 섞여 커브 값이 엉킨다 — 시험 씬은 레이어마다 따로.
+
 > [!summary] **탭마다 창 높이 자동 맞춤을 PySide 툴 30곳에 롤아웃** — A00275 마야 확인 뒤 "모든 툴에" 요청, 공용 `JUN_mod_tabFit_qt_v01` 한 줄씩 `#Framework`
 - 단순 24곳은 `addWidget(self.tabs)` 다음 한 줄. 자체 `fit_to_content` 가 있는 5곳(A00210 · A00240 · A00480 · A00550 · A00560)은 `enabled=False` 로 만들고 그 끝에서 켜서 처음 여는 폭 계산은 예전대로. A00110 V01 은 `_fit_window` 를 위임(이제 탭 전환도 줄어든다). A00110_V02 는 다른 세션 작업 중이라 제외, 탭 없는 창 20곳은 대상 아님.
 - 헬퍼 보강: 루트 탭을 감싼 바깥 `tabs_scroll` 도 QScrollArea sizeHint 24h 잘림 보정 · `self.layout` 속성이 메서드를 가린 툴(A00080) 때문에 `QWidget.layout(window)` 로. ★ 한 창에 인스턴스 둘이면 두 번째 fit 이 창을 최소 높이로 줄인다(A00010 이중 적용으로 발견).

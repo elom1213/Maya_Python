@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-07
+# last Update date : 2026-10-29
 # A00110_animTool_V02 - 선택 변경 시 그래프 에디터 자동 프레이밍 라이프사이클
 #                   (maya.cmds, UI 비의존)
 #
@@ -30,6 +30,7 @@ class GraphFocusManager:
         self._margin_getter = None
         self._fit_getter = None
         self._pad_getter = None
+        self._layer_getter = None
         # 마지막으로 프레이밍을 적용한 시점의 씬 오브젝트 선택 목록(long name).
         # SelectionChanged 가 와도 이 목록과 같으면(키 선택/해제·undo 등) 무시한다.
         self._last_selection = None
@@ -46,17 +47,19 @@ class GraphFocusManager:
     # install / uninstall
     # --------------------------------------------------
 
-    def install(self, margin_getter, fit_getter=None, pad_getter=None):
+    def install(self, margin_getter, fit_getter=None, pad_getter=None, layer_getter=None):
         """SelectionChanged 감시를 시작한다.
 
         margin_getter : 호출 시 현재 margin(정수) 를 반환하는 콜러블.
         fit_getter    : 호출 시 세로 값 맞춤 여부(bool) 를 반환하는 콜러블(선택).
         pad_getter    : 호출 시 세로 여백 퍼센트(float) 를 반환하는 콜러블(선택).
+        layer_getter  : 호출 시 레이어 필터 모드(LAYER_FILTER_MODES 문자열)를 반환하는 콜러블(선택).
         반환: (성공여부, 메시지)
         """
         self._margin_getter = margin_getter
         self._fit_getter = fit_getter
         self._pad_getter = pad_getter
+        self._layer_getter = layer_getter
 
         if self._job is not None and cmds.scriptJob(exists=self._job):
             return (True, "Graph focus already active.")
@@ -98,6 +101,12 @@ class GraphFocusManager:
         except (TypeError, ValueError):
             return 10.0
 
+    def _layer_filter(self):
+        try:
+            return str(self._layer_getter()) if self._layer_getter else "selected"
+        except (TypeError, ValueError):
+            return "selected"
+
     def _on_selection_changed(self):
         # 마야 자체 프레이밍(Auto Frame 등) 뒤에 우리가 마지막으로 덮어쓰도록 defer.
         cmds.evalDeferred(self._apply_silent, lowestPriority=True)
@@ -123,7 +132,8 @@ class GraphFocusManager:
             if cmds.keyframe(q=True, selected=True, name=True):
                 return
             GraphViewManager.frame_around_current(
-                self._margin(), fit_value=self._fit_value(), value_pad_pct=self._pad_pct())
+                self._margin(), fit_value=self._fit_value(), value_pad_pct=self._pad_pct(),
+                layer_filter=self._layer_filter())
         except RuntimeError:
             pass
 
@@ -133,6 +143,7 @@ class GraphFocusManager:
         # 않게 한다.
         self._last_selection = self._current_selection()
         count, msg = GraphViewManager.frame_around_current(
-            self._margin(), fit_value=self._fit_value(), value_pad_pct=self._pad_pct()
+            self._margin(), fit_value=self._fit_value(), value_pad_pct=self._pad_pct(),
+            layer_filter=self._layer_filter(),
         )
         return (count > 0, msg)
