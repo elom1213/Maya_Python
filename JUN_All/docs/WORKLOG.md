@@ -32,7 +32,10 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-29 (오늘)
 
-> [!summary] A00110_animTool_V02 **`Bake > Counter Layer` 계획서** — 글로벌 컨트롤만 든 레이어(`lyr_glo`)가 바꾼 자식(발)의 **월드 위치·회전을 되돌리는 보정 레이어** 생성 `#A00110_animTool` `#plan`
+> [!summary] A00110_animTool_V02 **v02.26 `Bake > Counter Layer`** — 글로벌 컨트롤만 든 레이어(`lyr_glo`)가 바꾼 자식(발)의 **월드 위치·회전을 되돌리는 보정 레이어** 생성. 계획서 → 같은 날 구현 `#A00110_animTool` `#plan`
+- 구현(v02.26): `app/core/counter_layer_manager.py`(`CounterLayerManager.create/validate`) + `Bake > Counter Layer` 하위 탭(TSL · 체크 레이어 목록 · Range · Channels T/R · Step · 이름 · Zero outside / Skip unchanged / Select new · 진행 팝업). 회귀 `tests/test_counter_layer.py` **51/51**(정확도 · by-component · 조인트 · 큰 회전 · 가중치 · **청크 7/1 프레임** · zero_outside · skip_unchanged · step · 두 레이어 · undo · 거부 7종 · lock · 컨스트레인트 · 이름 충돌 · 스케일 노트 · progress). exp 스크립트는 회귀로 흡수해 삭제.
+- **메모리 설계(사용자 요청: 1000+ 프레임)**: 스냅샷을 구간 전체로 들지 않고 **200 프레임 청크**로 "뮤트 → 스냅샷(`array('d')`) → 뮤트 해제 → 키 → 버림" 반복. 상한 = 청크 × 오브젝트 × 16 double 로 구간 길이와 무관. 청크 2 부터는 보정 레이어 자신도 함께 뮤트해야 앞 청크 키의 외삽이 스냅샷을 오염시키지 않는다(테스트 T7 로 확인).
+- GUI(실기) 확인 아직 — Auto Keyframe ON 상태 · 진행 팝업 · 탭 높이 맞춤.
 - 요청: "`global_ctl > foot_l/r_ctl`, 발은 additive `lyr_01..n` 에 키. `global_ctl` 만 든 `lyr_glo` 에 키를 찍으면 발의 월드가 바뀐다. `lyr_glo` 는 그대로 두고, 발의 월드 위치·회전이 `lyr_glo` 가 있기 전과 같아지는 추가 레이어를 만드는 기능. A00110_V02 에. `_SmartLayer` 의 Smart Layer 탭 참고 가능. 계획서를 작성."
 - 분석: `bakeResults -resolveWithoutLayer` 는 어트리뷰트 단위라 **부모가 바뀐** 이 문제엔 안 맞는다. 설계 = ① 되돌릴 레이어를 뮤트해 발의 `worldMatrix` 를 매 프레임 스냅샷 → ② 뮤트 풀고 `xform -ws -m <스냅샷>` 으로 로컬 T/R 을 얻어 새 additive 레이어에 **`setKeyframe -animLayer -value`**(마야가 누적 모드 · 가중치 · 아래 override 를 역산). 회전 동치해는 `alternateSolution + setToClosestCut`(기준 = 지금 로컬 회전).
 - 실측(mayapy 2024, `tests/exp_counter_layer.py` + 추가 6): **21/21** — 발 worldMatrix **정수 프레임 전부 1e-14 동일**(by-layer/by-component, 조인트 JO+zxy, 270° 회전, 발이 `lyr_glo` 에도 키, 가중치 0.5 + 애니메이션 weight, 아래 override, 정적 발). 프레임 사이 1.15e-3(보간). **드라이버 키에만 찍는 희소 모드는 0.95 유닛 틀림** → 매 프레임 기본. **잠긴 채널은 `xform`·`setKeyframe` 이 조용히 지나감**(반환 0) → 사전 검사. 비용 0.9 ms/(오브젝트·프레임) → 50 ctl × 1000 f ≈ 44 s(진행 팝업).

@@ -10,6 +10,7 @@ from Framework.qt import JUN_mod_timeRange_qt
 from Framework.qt import JUN_mod_filter_qt
 from Framework.qt import JUN_mod_expand_qt
 from Framework.qt import JUN_mod_checkList_qt
+from Framework.qt import JUN_mod_progress_qt
 from Framework.qt.maya_window import maya_main_window
 from Framework.core.maya_refresh import force_refresh
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
@@ -39,6 +40,7 @@ from tools.A00110_animTool_V02.app.core import GraphFocusManager
 from tools.A00110_animTool_V02.app.core import FillKeyManager
 from tools.A00110_animTool_V02.app.core import CURRENT_LAYER
 from tools.A00110_animTool_V02.app.core import LayerKeyManager
+from tools.A00110_animTool_V02.app.core import CounterLayerManager
 from tools.A00110_animTool_V02.app.core import CurveFilterSession
 from tools.A00110_animTool_V02.app.core import (
     CF_EASE_IN, CF_EASE_OUT, CF_LINEAR, CF_EASE_IN_OUT,
@@ -359,6 +361,10 @@ class MainWindow(QWidget):
     BAKE_PAGES = (
         ("Bake", "Bake - bake the listed objects down to dense keys over a "
          "frame range", "_build_bake_tab"),
+        ("Counter Layer", "Counter Layer - add an animation layer that keeps the "
+         "listed objects' world position / rotation as they were without the "
+         "checked layers (e.g. feet under an animated global control)",
+         "_build_counter_layer_tab"),
     )
 
     VIEW_PAGES = (
@@ -2036,6 +2042,171 @@ class MainWindow(QWidget):
         self.rb_bake_custom.toggled.connect(self._bake_update_range_mode)
         self.cb_bake_smart.toggled.connect(self._bake_update_smart_mode)
         self.btn_bake.clicked.connect(self.on_bake)
+
+        return tab
+
+    def _build_counter_layer_tab(self):
+        """상위 레이어가 바꾼 자식의 **월드** 위치·회전을 되돌리는 보정 레이어 탭 (Bake > Counter Layer).
+
+        `global_ctl > foot_l_ctl, foot_r_ctl` 에서 global_ctl 만 든 레이어(lyr_glo)에 키를 찍으면 발의
+        월드가 바뀐다. 여기서 lyr_glo 를 체크하고 발을 리스트업해 실행하면, 발의 월드가 **lyr_glo 를
+        뮤트한 상태**와 같아지도록 키를 찍은 새 additive 레이어가 맨 위에 생긴다(lyr_glo 는 그대로).
+
+        로직은 CounterLayerManager(계획서 docs/plans/A00110_animTool_V02_counter_layer_plan.md).
+        구성은 Bake 탭과 같은 재료(TSL · Range 라디오 · timeRange · Channels)로 맞췄다.
+        """
+        tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
+        tab_layout = QVBoxLayout(tab)
+
+        # -------------------------
+        # 월드를 유지시킬 오브젝트 (발)
+        # -------------------------
+
+        self.cl_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Counter List", select_label="Select Objects",
+            list_min_height=110, log_callback=self.log)
+        self.cl_tsl.setToolTip(
+            "The objects whose WORLD position / rotation must stay as it was "
+            "(e.g. the feet).\nThey get the keys; the checked layers are left alone.")
+        tab_layout.addWidget(self.cl_tsl)
+
+        # -------------------------
+        # 되돌릴 레이어 (체크 목록). 기본 체크 = 에디터에서 선택된 레이어.
+        # -------------------------
+
+        layer_grp = QGroupBox("Counter These Layers")
+        layer_box = QVBoxLayout(layer_grp)
+
+        self.lw_cl_layers = QListWidget()
+        self.lw_cl_layers.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lw_cl_layers.setMinimumHeight(70)
+        self.lw_cl_layers.setMaximumHeight(110)
+        self.lw_cl_layers.setToolTip(
+            "Check the layer(s) whose effect on the listed objects' world should be "
+            "undone\n(the layer that moves the parent, e.g. lyr_glo). They are not "
+            "modified.\n'Before' = the scene with these layers muted. BaseAnimation "
+            "is not listed.\nShift / Ctrl click to select several rows - the check "
+            "box of a selected row\n(or Space) checks or unchecks every selected row.")
+        # 다중 선택 + 다중 체크 공용 동작 (Framework checkList).
+        self.chk_cl_layers = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(self.lw_cl_layers)
+        self.lw_cl_layers.itemChanged.connect(self._cl_layers_changed)
+        layer_box.addWidget(self.lw_cl_layers)
+
+        refresh_row = QHBoxLayout()
+        self.lbl_cl_layers = QLabel("")
+        refresh_row.addWidget(self.lbl_cl_layers, 1)
+        self.btn_cl_layers = QPushButton("Refresh")
+        self.btn_cl_layers.setToolTip("Re-scan the scene for animation layers "
+                                      "(keeps your checks).")
+        self.btn_cl_layers.clicked.connect(self.on_cl_refresh_layers)
+        refresh_row.addWidget(self.btn_cl_layers)
+        layer_box.addLayout(refresh_row)
+
+        tab_layout.addWidget(layer_grp)
+
+        # -------------------------
+        # Range : Current timeline / Custom range (Bake 탭과 동일)
+        # -------------------------
+
+        range_mode_row = QHBoxLayout()
+        range_mode_row.addWidget(QLabel("Range"))
+        self.cl_range_grp = QButtonGroup(self)
+        self.rb_cl_timeline = QRadioButton("Current timeline")
+        self.rb_cl_custom = QRadioButton("Custom range")
+        self.rb_cl_timeline.setChecked(True)
+        self.cl_range_grp.addButton(self.rb_cl_timeline)
+        self.cl_range_grp.addButton(self.rb_cl_custom)
+        range_mode_row.addWidget(self.rb_cl_timeline)
+        range_mode_row.addWidget(self.rb_cl_custom)
+        range_mode_row.addStretch(1)
+        tab_layout.addLayout(range_mode_row)
+
+        time_str = int(cmds.playbackOptions(query=True, minTime=True))
+        time_end = int(cmds.playbackOptions(query=True, maxTime=True))
+        self.cl_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_value=time_str, end_value=time_end, log_callback=self.log)
+        tab_layout.addWidget(self.cl_range)
+
+        # -------------------------
+        # Channels + Step
+        # -------------------------
+
+        ch_row = QHBoxLayout()
+        ch_row.addWidget(QLabel("Channels"))
+        self.cb_cl_t = QCheckBox("Translate")
+        self.cb_cl_r = QCheckBox("Rotate")
+        self.cb_cl_t.setChecked(True)
+        self.cb_cl_r.setChecked(True)
+        ch_row.addWidget(self.cb_cl_t)
+        ch_row.addWidget(self.cb_cl_r)
+        ch_row.addStretch(1)
+        ch_row.addWidget(QLabel("Step"))
+        self.sb_cl_step = QSpinBox()
+        self.sb_cl_step.setRange(1, 1000)
+        self.sb_cl_step.setValue(1)
+        self.sb_cl_step.setToolTip(
+            "Key every N frames. 1 (default) is exact on every integer frame.\n"
+            "Anything else is only exact on the keyed frames - the frames between "
+            "them\ninterpolate and the world drifts there (measured: every 2nd frame "
+            "~2.5e-3,\nkeys only where the driver has keys ~0.95 units).")
+        ch_row.addWidget(self.sb_cl_step)
+        tab_layout.addLayout(ch_row)
+
+        # -------------------------
+        # New layer name + options
+        # -------------------------
+
+        name_row = QHBoxLayout()
+        name_row.addWidget(QLabel("New layer"))
+        self.le_cl_name = QLineEdit()
+        self.le_cl_name.setPlaceholderText(CounterLayerManager.default_layer_name([]))
+        self.le_cl_name.setToolTip(
+            "Name of the new (additive) layer. Empty = '<layer>_counter'.\n"
+            "If the name exists Maya makes it unique; the log tells which name was used.")
+        name_row.addWidget(self.le_cl_name, 1)
+        tab_layout.addLayout(name_row)
+
+        opt_row = QHBoxLayout()
+        self.cb_cl_zero = QCheckBox("Zero outside range")
+        self.cb_cl_zero.setChecked(True)
+        self.cb_cl_zero.setToolTip(
+            "Put a 0 key one frame before Start and one frame after End so the new "
+            "layer\nhas no effect outside the range. Off: the curves hold their end "
+            "values and\nthe objects drift outside the range.")
+        opt_row.addWidget(self.cb_cl_zero)
+        self.cb_cl_skip = QCheckBox("Skip unchanged objects")
+        self.cb_cl_skip.setChecked(True)
+        self.cb_cl_skip.setToolTip(
+            "Objects whose world did not change at any frame (not under the moved "
+            "parent)\nget no keys and are removed from the new layer.")
+        opt_row.addWidget(self.cb_cl_skip)
+        self.cb_cl_select = QCheckBox("Select new layer")
+        self.cb_cl_select.setChecked(True)
+        self.cb_cl_select.setToolTip("Select the new layer in the Anim Layer editor "
+                                     "when done (like Maya's Merge Layers).")
+        opt_row.addWidget(self.cb_cl_select)
+        opt_row.addStretch(1)
+        tab_layout.addLayout(opt_row)
+
+        # -------------------------
+        # 실행
+        # -------------------------
+
+        self.btn_cl_create = QPushButton("Create Counter Layer")
+        self.btn_cl_create.setToolTip(
+            "Sample the listed objects' world matrix with the checked layers muted, "
+            "then key a new\nadditive layer so they land there again with the layers "
+            "on. One undo step.\nLong ranges are sampled in chunks of {0} frames, so "
+            "memory stays flat.".format(CounterLayerManager.CHUNK_FRAMES))
+        tab_layout.addWidget(self.btn_cl_create)
+
+        tab_layout.addStretch(1)
+
+        self._cl_update_range_mode()
+        self.rb_cl_custom.toggled.connect(self._cl_update_range_mode)
+        self.btn_cl_create.clicked.connect(self.on_counter_layer)
+
+        self.on_cl_refresh_layers(quiet=True)
 
         return tab
 
@@ -3890,6 +4061,127 @@ class MainWindow(QWidget):
             smart_tolerance=smart_tol,
         )
         self.log(msg)
+
+    # --------------------------------------------------
+    # Handlers : Bake > Counter Layer
+    # --------------------------------------------------
+
+    def _cl_update_range_mode(self, *args):
+        """Current timeline 이면 Start/End 입력을 비활성."""
+        self.cl_range.set_inputs_enabled(self.rb_cl_custom.isChecked())
+
+    def _cl_resolve_range(self):
+        """라디오에 따라 (start, end). 실패 시 None (Bake 탭과 같은 규칙)."""
+        if self.rb_cl_timeline.isChecked():
+            return (int(cmds.playbackOptions(q=True, minTime=True)),
+                    int(cmds.playbackOptions(q=True, maxTime=True)))
+        values = self.cl_range.values()
+        if values is None:
+            self.log("[Warning] Enter Start / End.")
+            return None
+        start, end = values
+        if start > end:
+            self.log("[Warning] Start ({0}) is greater than End ({1}).".format(start, end))
+            return None
+        return (start, end)
+
+    def _cl_checked_layers(self):
+        return [self.lw_cl_layers.item(i).text()
+                for i in range(self.lw_cl_layers.count())
+                if self.lw_cl_layers.item(i).checkState() == Qt.Checked]
+
+    def _cl_layers_changed(self, *args):
+        """체크가 바뀌면 새 레이어 기본 이름(placeholder)을 따라 바꾼다."""
+        self.le_cl_name.setPlaceholderText(
+            CounterLayerManager.default_layer_name(self._cl_checked_layers()))
+
+    def on_cl_refresh_layers(self, quiet=False):
+        """씬의 레이어(BaseAnimation 제외)로 체크 목록을 다시 채운다.
+
+        이미 있던 체크는 유지한다. 처음(체크가 하나도 없을 때)엔 **에디터에서 선택된 레이어**를
+        체크해 둔다 - 보통 방금 키를 찍은 글로벌 레이어가 선택돼 있다.
+        """
+        keep = set(self._cl_checked_layers())
+        layers, selected = CounterLayerManager.list_counter_candidates()
+
+        self.lw_cl_layers.blockSignals(True)
+        self.lw_cl_layers.clear()
+        for name in layers:
+            item = QListWidgetItem(name)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            on = (name in keep) if keep else (name in selected)
+            item.setCheckState(Qt.Checked if on else Qt.Unchecked)
+            self.lw_cl_layers.addItem(item)
+        self.lw_cl_layers.blockSignals(False)
+        self._cl_layers_changed()
+
+        self.lbl_cl_layers.setText("{0} layer(s)".format(len(layers)) if layers
+                                   else "No animation layer in the scene")
+        if quiet:
+            return
+        if not layers:
+            self.log("[Warning] No animation layer (other than BaseAnimation) in the "
+                     "scene. Key the parent control on a layer first.")
+        else:
+            self.log("Anim layers: {0}  (checked: {1})".format(
+                ", ".join(layers), ", ".join(self._cl_checked_layers()) or "none"))
+
+    def on_counter_layer(self):
+        objs = self.cl_tsl.get_all_items()
+        if not objs:
+            self.log("[Warning] Add objects to the Counter List first (the feet, not "
+                     "the global control).")
+            return
+
+        layers = self._cl_checked_layers()
+        if not layers:
+            self.log("[Warning] Check at least one layer to counter (press Refresh if "
+                     "the list is stale).")
+            return
+
+        rng = self._cl_resolve_range()
+        if rng is None:
+            return
+        start, end = rng
+
+        translate = self.cb_cl_t.isChecked()
+        rotate = self.cb_cl_r.isChecked()
+        if not (translate or rotate):
+            self.log("[Warning] Enable Translate and/or Rotate.")
+            return
+
+        step = self.sb_cl_step.value()
+        frames = len(range(start, end + 1, step)) + (1 if (end - start) % step else 0)
+
+        # 오브젝트 x 프레임이 크면 진행 팝업 (실측 0.9 ms / 단위 -> 2000 이면 약 2 초).
+        dlg = None
+        if len(objs) * frames > CounterLayerManager.PROGRESS_THRESHOLD:
+            dlg = JUN_mod_progress_qt.JUN_mod_progress_qt_v01(
+                self, title="Counter Layer", phases=[("Sampling + keying", 1)])
+            dlg.start()
+            dlg.begin_phase()
+
+        elapsed = None
+        try:
+            count, msg = CounterLayerManager.create(
+                objs, layers, start, end, translate=translate, rotate=rotate,
+                step=step, layer_name=self.le_cl_name.text(),
+                zero_outside=self.cb_cl_zero.isChecked(),
+                skip_unchanged=self.cb_cl_skip.isChecked(),
+                select_new=self.cb_cl_select.isChecked(),
+                progress=dlg.callback() if dlg else None)
+        finally:
+            if dlg:
+                elapsed = dlg.elapsed()
+                dlg.finish()
+
+        if elapsed is not None:
+            msg += "  ({0:.1f}s)".format(elapsed)
+        self.log(msg)
+
+        if count:
+            # 새 레이어가 목록에 보이게(체크는 그대로).
+            self.on_cl_refresh_layers(quiet=True)
 
     # --------------------------------------------------
     # Follow (target match bake)

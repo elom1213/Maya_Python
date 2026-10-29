@@ -74,6 +74,11 @@
    **Bake**(v01.05~): **리스트업한 컨트롤러/오브젝트**의 키를 구간 전체에 **정수 프레임 단위로**
    굽는다. 구간은 **현재 타임라인(플레이백)** 또는 **직접 입력(Custom)** 중 선택. Maya 네이티브
    `bakeResults`(C++)를 써서 **6000+프레임 × 50~100 컨트롤러** 같은 대규모도 빠르다.
+   **Counter Layer**(v02.26~): `global_ctl > foot_l/r_ctl` 에서 **`global_ctl` 만 든 레이어**(예: `lyr_glo`)에
+   키를 찍어 발의 **월드** 위치·회전이 바뀌었을 때, 그 레이어는 그대로 두고 발의 월드가 **그 레이어가 없을 때와
+   같아지도록** 키를 찍은 **보정 additive 레이어**를 새로 만든다. 레이어를 뮤트해 `worldMatrix` 를 재고
+   `setKeyframe -animLayer` 의 역산에 맡기므로 누적 모드·가중치·override·`jointOrient`·회전 순서를 다 존중한다.
+   긴 구간(1000+ 프레임)은 **200 프레임 청크**로 재서 메모리가 구간 길이와 무관하다.
 7. **View** — **보기**를 돕는다(씬을 바꾸지 않는 유일한 카테고리).
    **Graph Focus**(v01.25~): 컨트롤러를 선택하면 그 컨트롤러의 **전체 키 구간**(예: 0~6000f)을
    다 보여주는 대신, **현재 프레임 기준 ± margin 프레임**만 그래프 에디터에 확대해서 보여준다
@@ -724,7 +729,7 @@ A00110_animTool_V02.run(True)   # True = reload
 | **Timing** | 키의 **시점** | Move · Offset · Stagger |
 | **Curve** | 커브의 **값·형태** | Euler · Filters(Smooth · Intensity · Interp) |
 | **Transfer** | **다른 오브젝트로** 옮기기 | Copy Key · Mirror Key · Follow |
-| **Bake** | 결과를 **키로 굽기** | Bake |
+| **Bake** | 결과를 **키로 굽기** | Bake · Counter Layer(v02.26~) |
 | **View** | **보기**(씬 불변) | Graph Focus |
 | **Hot Key** (v02.19~) | 툴이 열린 동안의 **단축키** | Main(Hold · Manipulator Space) |
 
@@ -1571,6 +1576,64 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   의존 리그에 안전). 순수 FK 라면 꺼서 가속할 수 있다.
 - **Bake List**: 베이크 실행. 결과(개수 / 구간 / 프레임 수 / 컨스트레인트 kept·baked down)가 로그에 출력.
 
+#### Counter Layer — 상위 레이어가 바꾼 월드 위치·회전 되돌리기 (v02.26~)
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ [Counter List]                                           │  ← JUN_mod_tsl_qt_v01 — 월드를 유지시킬 오브젝트(발)
+│ Select Objects                                           │
+│ ┌ Counter These Layers ──────────────── [Refresh] ┐      │  ← 체크 목록(JUN_mod_checkList_qt_v01, 다중 체크)
+│ │ [ ] lyr_01  [ ] lyr_02  [v] lyr_glo              │      │     기본 체크 = 에디터에서 선택된 레이어. Base 제외
+│ └──────────────────────────────────────────────────┘      │
+│ Range (•) Current timeline  ( ) Custom range             │
+│ Start [ 0 ]  End [ 200 ]                                  │  ← Custom 일 때만 활성
+│ Channels [v] Translate [v] Rotate          Step [ 1 ]    │
+│ New layer [ lyr_glo_counter               ]              │  ← 비우면 `<layer>_counter`(여럿이면 `counter`)
+│ [v] Zero outside range [v] Skip unchanged objects [v] Select new layer │
+│ [ Create Counter Layer ]                                 │
+└──────────────────────────────────────────────────────────┘
+```
+
+**상황**: `global_ctl > foot_l_ctl, foot_r_ctl`. 발은 additive 레이어 `lyr_01…n` 에 키가 있고, 나중에
+`global_ctl` 만 든 `lyr_glo` 에 위치·회전 키를 찍었다 → 발의 **월드**가 `lyr_glo` 이전과 달라진다.
+**하는 일**: `lyr_glo` 는 그대로 두고, 발의 월드 위치·회전이 **`lyr_glo` 를 뮤트한 상태와 같아지도록**
+발에 키를 찍은 **새 additive 레이어 하나**를 스택 맨 위에 만든다. 마야 `bakeResults -resolveWithoutLayer` 는
+**어트리뷰트 단위**라 부모가 바뀐 이 문제엔 쓸 수 없다(발의 로컬 값은 전후가 같다).
+
+- **Counter List**: 월드를 유지시킬 오브젝트(발). **글로벌 컨트롤이 아니다.**
+- **Counter These Layers**: 되돌릴 레이어들(부모를 움직인 레이어). 처음엔 **에디터에서 선택된 레이어**가 체크된다.
+  여러 개를 체크하면 그 레이어들을 전부 뮤트한 상태가 "이전" 이다. BaseAnimation 은 목록에 없다(뮤트 불가).
+  `Refresh` 는 체크를 유지한다.
+- **Range**: Bake 와 같다. **구간은 애니메이션 전체를 덮는 것이 보통**이다(아래 Zero outside range).
+- **Channels**: Translate / Rotate(기본 둘 다). 스케일은 v1 미지원 — 글로벌이 스케일을 바꾸면 로그에
+  `the world SCALE also changed` 를 적는다(위치·회전만 복원).
+- **Step**(기본 1): N 프레임마다 키. **1 이 아니면 키 사이 프레임이 어긋난다**(실측: 2 프레임마다 2.5e-3,
+  드라이버 키에만 찍으면 0.95 유닛). 가속 수단이 아니라 "의도적으로 거친 키" 옵션이다.
+- **New layer**: 새 레이어 이름. 이미 있으면 마야가 번호를 붙이고 로그가 실제 이름을 알려 준다.
+- **Zero outside range**(기본 ON): Start−1 / End+1 에 **0 키**를 둬 구간 밖에 영향이 없게 한다.
+  끄면 보정 커브가 끝값을 유지해 구간 밖에서 발이 어긋난다.
+- **Skip unchanged objects**(기본 ON): 글로벌이 월드를 바꾸지 않은 오브젝트(움직인 부모 아래가 아닌 것)는
+  키를 남기지 않고 레이어 멤버에서도 뺀다.
+- **Select new layer**(기본 ON): 끝나면 새 레이어만 선택(마야 Merge Layers 관례).
+- **Create Counter Layer**: 실행. **오브젝트 × 프레임 > 2000** 이면 진행 팝업이 뜬다(실측 0.9 ms/단위 → 50 컨트롤 ×
+  1000 프레임 ≈ 44 s). **단일 Undo.** 실행 중 Auto Keyframe 을 잠깐 끈다(`xform` 이 setAttr 라 자체 키가 생기는 것을 막음).
+
+**정확도**: 정수 프레임은 **모든 프레임에서 월드가 완전히 같다**(mayapy 실측 1e-14). 프레임 사이는 보간이라 1e-3
+정도 다르다(베이크와 같은 성질). 회전은 `xform` 이 돌려준 오일러의 **동치해 중 지금 로컬 회전에 가까운 것**을 골라
+커브가 연속이다(270° 회전 드라이버에서 프레임 사이 점프 23°). 발이 되돌릴 레이어의 멤버이기도 하면 그 기여까지
+되돌아간다(로그에 노트).
+
+**건너뛰는 것 · 거부**: 잠긴 채널 / 컨스트레인트·익스프레션으로 구동되는 채널은 **건너뛰고 경고**(키가 결과에 안 나타난다).
+되돌릴 레이어가 **뮤트** 상태(되돌릴 게 없다) · **solo** 레이어 존재 · BaseAnimation 체크는 거부.
+
+**메모리**: 스냅샷을 구간 전체로 들고 있지 않고 **200 프레임 청크**로 "뮤트 → 스냅샷 → 뮤트 해제 → 키 → 버림" 을
+반복한다. 메모리 상한 = 청크 × 오브젝트 × 16 double 로 **구간 길이와 무관**하다(청크마다 보정 레이어도 함께 뮤트해
+앞 청크 키의 외삽이 스냅샷을 오염시키지 않게 한다).
+
+> 계획서: [`plans/A00110_animTool_V02_counter_layer_plan.md`](plans/A00110_animTool_V02_counter_layer_plan.md) ·
+> 회귀 시험 `tests/test_counter_layer.py`(mayapy, 51 항목). `_SmartLayer` 는 코어가 컴파일 `.pyc` 라 디컴파일 없이
+> 사용자 노출 설명문만 참고했다 — "레이어 켜고/끄고 비교" 원리와 World Space 개념.
+
 ### 5.8 View 탭 — 보기 보조 (씬을 바꾸지 않는다)
 
 **씬을 전혀 바꾸지 않는** 유일한 카테고리다. 그래서 다른 탭과 섞지 않았다.
@@ -1739,6 +1802,14 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 2. **Range** 선택: **Current timeline**(기본, 현재 재생 구간) 또는 **Custom range**(Start/End 직접 입력).
 3. **Channels**(기본 T·R) / **Keep constraints**(기본 ON=유지) / **Simulation**(기본 ON) 확인.
 4. **Bake List** → 리스트의 노드만 해당 구간에 정수 프레임 키로 구워진다(단일 Undo).
+
+### Bake > Counter Layer (v02.26~)
+1. 글로벌 컨트롤만 든 레이어(예: `lyr_glo`)에 키를 찍은 뒤, 월드를 유지시킬 컨트롤(발 IK 등)을 선택 →
+   **Select Objects** 로 **Counter List** 에 채운다(글로벌 컨트롤은 넣지 않는다).
+2. **Counter These Layers** 에서 되돌릴 레이어를 체크한다(처음엔 에디터에서 선택된 레이어가 체크돼 있다).
+3. **Range**(기본 현재 타임라인 — 보통 애니메이션 전체) / **Channels**(기본 T·R) / 옵션 확인.
+4. **Create Counter Layer** → 맨 위에 `lyr_glo_counter` 가 생기고 발의 월드가 `lyr_glo` 이전과 같아진다(단일 Undo).
+   로그에 개수·구간·건너뛴 채널·노트가 출력된다. 결과가 마음에 안 들면 Ctrl+Z 한 번.
 
 ### Transfer > Follow
 1. 따라갈 대상(**target**)들을 선택 → Target 의 **Select Targets**.
@@ -1923,6 +1994,26 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   `pairBlend` 가 삽입되어 **컨스트레인트가 남고 키와 공존**한다(`blendParent1` 로 전환). OFF → `True`:
   구동을 끊고 키만 남기는 **bake down**. (이 툴은 컨스트레인트를 만들거나 `delete` 하지 않는다.)
 - **Channels**: 체크한 그룹만(T=tx/ty/tz, R=rx/ry/rz, S=sx/sy/sz). 모두 끄면 경고.
+
+### Bake > Counter Layer
+- **엔진**(`counter_layer_manager.CounterLayerManager.create`): 두 번 훑기. ① 체크한 레이어(+ 새 보정 레이어)를
+  `mute` 하고 `currentTime` 루프로 `worldMatrix[0]` 스냅샷(`getAttr(time=)` 은 값은 같지만 3 배 느리다) → 뮤트 복원.
+  ② 프레임마다 `xform -ws -m <스냅샷>` → `xform -q -t` · `getAttr rotate` 로 로컬 목표값 →
+  `setKeyframe(obj, at=a, t=f, v=val, animLayer=L)` — 이 명령이 **"최종 평가값이 val 이 되도록"** 레이어 기여를 역산한다
+  (누적 모드 by-layer/by-component · weight · 아래 override · `jointOrient` · 회전 순서 · 피벗을 우리가 계산하지 않는다).
+- **회전 동치해**: `MEulerRotation.alternateSolution` + `setToClosestCut(지금 로컬 회전)` + `asMatrix().isEquivalent`
+  확인. `setToClosestSolution` 은 짐벌 근처에서 다른 회전을 돌려줘 쓰지 않는다.
+- **청크**: `CHUNK_FRAMES = 200`. 청크마다 뮤트 토글 2회(싸다). 쓰기 비용 0.9 ms/(오브젝트·프레임) 이 지배적.
+- **검사**(`validate`): 레이어 존재·뮤트 아님·Base 아님·solo 없음 → 거부. 채널 `lock` / 입력이 `animCurve*`·`animBlendNode*`
+  가 아닌 것(부모 compound 포함) → 건너뛰고 경고. 잠긴 채널은 `animLayer -at`·`xform`·`setKeyframe`(반환 0) 이
+  **전부 조용히 지나가므로** 반드시 사전 검사.
+- **Zero outside**: 보정 레이어의 **커브 노드에 직접** `setKeyframe(curve, t=s-1 / e+1, v=0)`. `animLayer` 경로로 0 을
+  찍으면 "최종값 0" 으로 역산되어 identity 가 아니다.
+- **Skip unchanged**: 쓰기 루프에서 글로벌 켜진 월드와 스냅샷을 비교해 **어느 프레임에서도** 안 바뀐 오브젝트는 끝에서
+  커브 삭제 + `removeAttribute`.
+- **Auto Keyframe**: 실행 중 `autoKeyframe -state false` → 복원. 현재 프레임도 복원. `undo_chunk` + `suspend_refresh`.
+- **새 레이어 위치**: 마야가 `children[-1]`(맨 위)에 만든다. 사용자가 뒤에 다른 레이어 아래로 옮기면 by-layer 회전 누적에서는
+  결과가 달라질 수 있다.
 - **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
 
 ### Transfer > Follow (`follow_match_manager.FollowMatchManager.match_follow`)
