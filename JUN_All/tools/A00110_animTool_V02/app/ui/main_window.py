@@ -1721,6 +1721,7 @@ class MainWindow(QWidget):
         self.btn_lk_copy.clicked.connect(lambda *_: self.on_lk_transfer(cut=False))
         tab_layout.addWidget(self.btn_lk_copy)
 
+        cut_row = QHBoxLayout()
         self.btn_lk_cut = QPushButton("Cut Keys to Layer (Move)")
         self.btn_lk_cut.setMinimumHeight(32)
         self.btn_lk_cut.setToolTip(
@@ -1729,7 +1730,22 @@ class MainWindow(QWidget):
             "Keys are removed only from channels that pasted successfully.\n"
             "Runs as a single undo step.")
         self.btn_lk_cut.clicked.connect(lambda *_: self.on_lk_transfer(cut=True))
-        tab_layout.addWidget(self.btn_lk_cut)
+        cut_row.addWidget(self.btn_lk_cut, 1)
+
+        # v02.28 - Move 는 기본으로 최종 평가값(월드 위치·회전)을 보존한다. 끄면 예전처럼 커브 값만 옮긴다.
+        self.cb_lk_keep = QCheckBox("Keep Result")
+        self.cb_lk_keep.setChecked(True)
+        self.cb_lk_keep.setToolTip(
+            "Move only. Keep the evaluated result (world position / rotation) the\n"
+            "same after the move: the value the source leaves behind in its blend\n"
+            "node is reset to identity, and a static value the destination held is\n"
+            "folded into the pasted keys. Off = move the raw curve values like Maya's\n"
+            "cut / paste (Base -> additive layer then changes the pose).\n"
+            "Not exact when the destination already has keys on that channel\n"
+            "(use Bake > Merge Layers), a layer weight is not 1, or a by-layer\n"
+            "rotation has to fold in a non-zero rotation - the log says which.")
+        cut_row.addWidget(self.cb_lk_keep)
+        tab_layout.addLayout(cut_row)
 
         tab_layout.addStretch(1)
 
@@ -3981,7 +3997,8 @@ class MainWindow(QWidget):
         count, msg = LayerKeyManager.transfer_keys(
             objs, src, dst, attr_flags=attr_flags, custom_attrs=custom_attrs,
             all_keyed=all_keyed, start=start, end=end,
-            paste_option=self.cmb_lk_paste.currentText(), cut=cut)
+            paste_option=self.cmb_lk_paste.currentText(), cut=cut,
+            keep_result=self.cb_lk_keep.isChecked())
         self.log(msg)
 
         # 옮긴 뒤 소스 레이어의 채널 구성이 달라졌을 수 있다(Cut 이면 커브가 사라진다).

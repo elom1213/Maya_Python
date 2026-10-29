@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-31
+# last Update date : 2026-10-29
 # A00110_animTool_V02 - 애니메이션 레이어 사이 키 복사 / 잘라내기 (maya.cmds, UI 비의존)
 #
 # "리스트업한 오브젝트들의 키를 **레이어 A 에서 레이어 B 로** 한 번에 옮긴다."
@@ -27,11 +27,32 @@
 #
 # ## 값 의미(중요)
 #
-# 이 기능은 **커브 값을 그대로** 옮긴다 - 레이어 기여분을 다시 계산하지 않는다.
-# 그래서 Base(절대값) -> additive 레이어처럼 성격이 다른 레이어로 옮기면 **최종 결과는
-# 달라진다**(그 레이어에 그 값의 커브가 생기는 것뿐이다). 마야의 복사/붙여넣기와 같은
-# 규칙이며, "이 레이어의 커브를 저 레이어로" 라는 요청에 맞는 동작이다.
-# 최종 포즈를 유지한 채 레이어를 바꾸고 싶으면 Bake 탭을 쓴다.
+# **Copy** 는 **커브 값을 그대로** 옮긴다 - 레이어 기여분을 다시 계산하지 않는다(마야의
+# 복사/붙여넣기와 같은 규칙). Base(절대값) -> additive 레이어로 복사하면 두 번 더해진다.
+#
+# **Cut(Move) 는 기본으로 최종 결과를 보존한다(keep_result=True, v02.28).** 커브를 그대로 옮기고
+# 잘라내기만 하면 월드 위치·회전이 달라지는데, 원인은 두 가지다(mayapy 2024 실측, 2026-10-29):
+#
+# 6. **커브를 다 지우면 blend 노드 입력에 마지막 값이 정적으로 남는다.** Base 커브를 지우면
+#    맨 아래 `animBlendNode*.inputA` 에, 레이어 커브를 지우면 그 레이어 노드의 `inputB` 에
+#    지우던 순간의 값이 그대로 남아 계속 더해진다(마야 자체 `animLayer -extractAnimation` 도
+#    같은 상태를 만든다). `setAttr` 로 plug 에 직접 쓰면 활성 레이어 쪽에 들어가 소용없고,
+#    **그 입력 plug 에 identity(0 · multiply 스케일은 1)를 써야** 정확히 원래 결과로 돌아간다.
+#    override 레이어에는 identity 가 없으므로 `animLayer -e -removeAttribute` 로 멤버에서 뺀다.
+# 7. **대상이 커브 없이 정적 값을 갖고 있었으면 붙여넣기가 그 값을 덮는다.** Base 로 옮길 때 base
+#    정적값 c, additive 로 옮길 때 그 레이어 멤버의 정적값 d 가 사라지므로 붙여넣은 키에
+#    합성한다(`keyframe -r -vc` / multiply 스케일은 `scaleKey -vs`). by-component 는 정확,
+#    **by-layer 회전에 0 아닌 회전을 합성하는 경우만 근사**(회전 합성은 축별 덧셈이 아니다)
+#    -> 로그에 경고.
+#
+# 구간(Limit to Time Range) 이동은 Merge Layers 와 같은 경계 규칙을 쓴다 - 소스에 `s-1`·`s`·`e`·`e+1`
+# 키를 `setKeyframe -insert` + `keyTangent fixed` 로 박아 모양을 고정하고, 잘라낸 자리는 identity
+# 키(`s` step · `e`), 대상에는 바깥 값 키(`s-1` · `e+1`). 정수 프레임은 전부 같고 `(s-1, s)` ·
+# `(e, e+1)` 사이만 보간이 다르다.
+#
+# 보존이 안 되는 경우(그대로 옮기고 로그에 적는다): 대상에 이미 키가 있는 채널(`replace` 로
+# 덮인다 - 합치려면 Bake > Merge Layers), 레이어 weight ≠ 1, override 소스를 구간으로 자르기,
+# visibility 같은 비수치(Boolean/Enum) 채널, 아래 레이어가 애니메이션된 override 소스.
 
 import maya.cmds as cmds
 
@@ -181,7 +202,7 @@ class LayerKeyManager:
     @staticmethod
     def transfer_keys(objects, src_layer, dst_layer, attr_flags=None,
                       custom_attrs=None, all_keyed=False, start=None, end=None,
-                      paste_option=None, cut=False):
+                      paste_option=None, cut=False, keep_result=True):
         """`src_layer` 의 키를 `dst_layer` 로 복사(cut=False) 하거나 옮긴다(cut=True).
 
         Args:
@@ -195,6 +216,8 @@ class LayerKeyManager:
             start, end   : 시간 구간(양 끝 포함). None 이면 **그 커브의 모든 키**.
             paste_option : cmds.pasteKey option (기본 "replace").
             cut          : True 면 붙여넣기에 성공한 뒤 **소스 레이어의 그 키들을 지운다**.
+            keep_result  : cut 일 때 **최종 평가값(월드 위치·회전)을 보존**한다(맨 위 §6·§7).
+                           False 면 예전처럼 커브 값만 그대로 옮긴다. Copy 에는 영향 없다.
 
         Returns:
             (옮긴 채널 수, 메시지)
@@ -226,14 +249,35 @@ class LayerKeyManager:
             time_kwargs = {}
 
         root = LayerKeyManager.root_layer()
+        keep = bool(cut and keep_result)
 
         moved = 0          # 실제로 붙여넣은 채널 수
         cut_count = 0      # 소스에서 지운 채널 수
+        kept = 0           # 최종값을 보존한(정확한) 채널 수
         objs_done = set()
         missing_obj = []   # 씬에 없는 오브젝트
         missing = []       # plug 가 없는 채널
         no_key = []        # 소스 레이어에 (구간 안) 키가 없는 채널
         failed = []        # 붙여넣기 실패
+        notes = []         # keep_result 가 정확히 안 되는 이유 [text, set(attr)] (중복 제거, 순서 유지)
+
+        def note(text, attr=None):
+            """같은 이유는 한 번만, 채널은 뒤에 묶어 적는다(9축이면 이름 아홉 개가 아홉 줄이 된다)."""
+            for item in notes:
+                if item[0] == text:
+                    if attr:
+                        item[1].add(attr)
+                    return
+            notes.append([text, set([attr]) if attr else set()])
+
+        if keep:
+            for layer in (src_layer, dst_layer):
+                w = LayerKeyManager._layer_weight(layer, root)
+                if w is None:
+                    note("'{0}' weight is animated - result not exact".format(layer))
+                elif abs(w - 1.0) > 1e-9:
+                    note("'{0}' weight is {1:g} (not 1) - result not exact".format(
+                        layer, w))
 
         with undo_chunk():
             for obj in objects:
@@ -252,6 +296,20 @@ class LayerKeyManager:
                     if not cmds.objExists(plug):
                         missing.append(attr)
                         continue
+
+                    # ---- 0) (Move + keep) 구간 이동이면 소스 커브의 경계 모양을 먼저 고정한다
+                    src_curve = None
+                    edges = (False, False)
+                    dst_member = True
+                    if keep:
+                        src_curve = LayerKeyManager.layer_curve(plug, src_layer, root)
+                        if src_curve and start is not None:
+                            edges = LayerKeyManager._prep_source_range(
+                                src_curve, start, end)
+                        if src_curve and dst_layer != root:
+                            dst_nodes = LayerKeyManager._layer_nodes(dst_layer)
+                            dst_member = any(n in dst_nodes for n, _ in
+                                             LayerKeyManager._blend_chain(plug))
 
                     # ---- 1) 소스 레이어에서 복사
                     try:
@@ -273,6 +331,13 @@ class LayerKeyManager:
                         except Exception:
                             pass
 
+                    # ---- 2.5) (Move + keep) 붙여넣기 전에 대상의 정적값 · blend 노드를 읽어 둔다
+                    info = None
+                    if keep and src_curve:
+                        info = LayerKeyManager._move_info(
+                            plug, attr, src_layer, dst_layer, root, src_curve,
+                            start, end, edges, dst_member, note)
+
                     # ---- 3) 붙여넣기
                     try:
                         cmds.pasteKey(plug, animLayer=dst_layer,
@@ -285,10 +350,17 @@ class LayerKeyManager:
                     moved += 1
                     objs_done.add(obj)
 
+                    # ---- 3.5) (Move + keep) 대상이 들고 있던 정적값을 붙여넣은 키에 합성
+                    if info:
+                        LayerKeyManager._compose_destination(info)
+
                     # ---- 4) 잘라내기 : 붙여넣기가 성공한 뒤에만 소스를 지운다
                     if cut and LayerKeyManager._cut_source(plug, src_layer, root,
                                                            start, end):
                         cut_count += 1
+                        # ---- 5) (Move + keep) 소스에 남은 정적값 · 구간 기여를 중화
+                        if info and LayerKeyManager._neutralize_source(info):
+                            kept += 1
 
         mode = "Cut" if cut else "Copy"
         scope = ("all keyed channels" if all_keyed
@@ -300,6 +372,15 @@ class LayerKeyManager:
                    paste_option, scope))
         if cut:
             msg += " Removed from {0}: {1} channel(s).".format(src_layer, cut_count)
+        if keep:
+            msg += " Result kept on {0} channel(s).".format(kept)
+            if notes:
+                parts = []
+                for text, attrs_ in notes:
+                    if attrs_:
+                        text = "{0} ({1})".format(text, LayerKeyManager._brief(attrs_))
+                    parts.append(text)
+                msg += " Not exact: " + "; ".join(parts) + "."
         if missing_obj:
             msg += " Not found: {0}.".format(LayerKeyManager._brief(missing_obj))
         # 키가 없던 채널 보고는 두 갈래다. 9축은 **기본이 전부 켜짐**이라, 회전만 키가 있는
@@ -345,6 +426,321 @@ class LayerKeyManager:
         except Exception:
             return False
         return True
+
+    # --------------------------------------------------
+    # Move + keep_result : 최종값 보존 (맨 위 §6 · §7)
+    # --------------------------------------------------
+
+    # enum (실측) : scaleAccumulationMode Additive(0):Multiply(1), rotationAccumulationMode By Component(0):By Layer(1)
+    SCALE_MULTIPLY = 1
+    ROT_BY_LAYER = 1
+
+    @staticmethod
+    def _blend_chain(plug):
+        """plug 앞단의 animBlendNode 사슬 [(node, suffix), ...] - **맨 위 레이어부터 맨 아래로**.
+
+        plug <- bnTop.output[X] <- bnTop.inputA[X] <- bnNext.output[X] ... 를 따라 내려간다.
+        레이어에 안 든 plug 는 빈 리스트. suffix 는 회전(`outputX`)처럼 compound 자식일 때의 꼬리.
+        """
+        chain = []
+        cur = plug
+        for _ in range(128):
+            srcs = cmds.listConnections(cur, source=True, destination=False, plugs=True,
+                                        skipConversionNodes=True) or []
+            if not srcs:
+                break
+            node, attr = srcs[0].split(".", 1)
+            if (not cmds.nodeType(node).startswith("animBlendNode")
+                    or not attr.startswith("output")):
+                break
+            suffix = attr[len("output"):]
+            chain.append((node, suffix))
+            cur = node + ".inputA" + suffix
+        return chain
+
+    @staticmethod
+    def _layer_nodes(layer):
+        try:
+            return set(cmds.animLayer(layer, q=True, blendNodes=True) or [])
+        except Exception:
+            return set()
+
+    @staticmethod
+    def _layer_kind(layer, root):
+        if layer == root:
+            return "base"
+        try:
+            return "override" if cmds.getAttr(layer + ".override") else "additive"
+        except Exception:
+            return "additive"
+
+    @staticmethod
+    def _layer_weight(layer, root):
+        """레이어 weight. Base 는 1. 애니메이션돼 있으면 None."""
+        if layer == root:
+            return 1.0
+        try:
+            if cmds.listConnections(layer + ".weight", source=True, destination=False):
+                return None
+            return float(cmds.getAttr(layer + ".weight"))
+        except Exception:
+            return 1.0
+
+    @staticmethod
+    def _static(input_plug):
+        """blend 노드 입력이 커브 없이 들고 있는 정적 값. 연결돼 있으면(= 애니메이션) None."""
+        try:
+            if cmds.listConnections(input_plug, source=True, destination=False):
+                return None
+            return float(cmds.getAttr(input_plug))
+        except Exception:
+            return None
+
+    @staticmethod
+    def _insert_fixed(curve, t):
+        """모양 보존 키(`setKeyframe -insert`) + 탄젠트 고정. 이미 키가 있으면 값은 그대로, 탄젠트만 고정된다."""
+        cmds.setKeyframe(curve, insert=True, time=(t, t))
+        cmds.keyTangent(curve, e=True, time=(t, t), itt="fixed", ott="fixed")
+
+    @staticmethod
+    def _prep_source_range(curve, start, end):
+        """구간 이동 전에 소스 커브의 경계 모양을 고정한다. (구간 앞에 키가 있나, 뒤에 키가 있나) 를 돌려준다.
+
+        앞에 키가 있으면 `s-1`(남는 쪽) · `s`(옮겨지는 쪽) 에, 뒤에 키가 있으면 `e` · `e+1` 에 모양 보존 키를
+        박고 탄젠트를 고정한다. 바로 바깥 이웃 키(auto 탄젠트는 이웃이 바뀌면 다시 계산된다)도 고정해
+        구간 밖 커브가 잘라낸 뒤에도 그대로이게 한다.
+        """
+        try:
+            times = cmds.keyframe(curve, q=True, timeChange=True) or []
+        except Exception:
+            times = []
+        before = [t for t in times if t < start]
+        after = [t for t in times if t > end]
+        has_before, has_after = bool(before), bool(after)
+        try:
+            if has_before:
+                p = max(before)
+                cmds.keyTangent(curve, e=True, time=(p, p), itt="fixed", ott="fixed")
+                LayerKeyManager._insert_fixed(curve, start - 1)
+                LayerKeyManager._insert_fixed(curve, start)
+            if has_after:
+                n = min(after)
+                cmds.keyTangent(curve, e=True, time=(n, n), itt="fixed", ott="fixed")
+                LayerKeyManager._insert_fixed(curve, end)
+                LayerKeyManager._insert_fixed(curve, end + 1)
+        except Exception:
+            pass
+        return (has_before, has_after)
+
+    @staticmethod
+    def _move_info(plug, attr, src, dst, root, src_curve, start, end, edges,
+                   dst_member, note):
+        """붙여넣기 **전에** 읽어야 하는 것들을 모은다. 보존이 불가능한 채널이면 None(이유는 note 로).
+
+        dst_member : 이 plug 가 (멤버 추가 전에) 이미 대상 레이어 멤버였나. override 대상이 새 멤버면
+                     구간 이동 때 구간 밖까지 덮어 버리므로 경고만 한다.
+
+        돌려주는 사전:
+            src_kind / dst_kind : "base" | "additive" | "override"
+            src_input           : 잘라낸 뒤 identity 를 써 넣을 소스 blend 입력 plug (override 소스는 None - 멤버에서 뺀다)
+            src_identity        : 그 identity 값 (0, multiply 스케일은 1)
+            compose             : 붙여넣은 키에 합성할 대상의 정적값 ("add"|"mul", 값) 또는 None
+            outside             : 구간 이동일 때 대상 커브의 `s-1` · `e+1` 키 값(대상이 밖에서 내던 정적값) 또는 None
+        """
+        chain = LayerKeyManager._blend_chain(plug)
+        if not chain:
+            note("channel is not driven by an anim layer - not kept", attr)
+            return None
+        for node, _ in chain:
+            if not cmds.nodeType(node).startswith("animBlendNodeAdditive"):
+                note("non-numeric channel (boolean/enum) - not kept", attr)
+                return None
+
+        src_kind = LayerKeyManager._layer_kind(src, root)
+        dst_kind = LayerKeyManager._layer_kind(dst, root)
+
+        def find(layer):
+            nodes = LayerKeyManager._layer_nodes(layer)
+            for node, suffix in chain:
+                if node in nodes:
+                    return node, suffix
+            return None, None
+
+        bottom_node, bottom_suf = chain[-1]
+        base_input = bottom_node + ".inputA" + bottom_suf
+
+        src_node = src_suf = None
+        if src_kind != "base":
+            src_node, src_suf = find(src)
+            if not src_node:
+                note("no blend node on '{0}' - not kept".format(src), attr)
+                return None
+        dst_node = dst_suf = None
+        if dst_kind != "base":
+            dst_node, dst_suf = find(dst)
+            if not dst_node:
+                note("could not be added to '{0}' - not kept".format(dst), attr)
+                return None
+
+        # 채널 성격은 blend 노드 타입으로 (attr 이름은 "sx" 든 "scaleX" 든 상관없이)
+        ntype = cmds.nodeType(bottom_node)
+        is_scale = (ntype == "animBlendNodeAdditiveScale")
+        is_rot = (ntype == "animBlendNodeAdditiveRotation")
+
+        def multiply(layer):
+            if not is_scale or layer == root:
+                return False
+            try:
+                return int(cmds.getAttr(layer + ".scaleAccumulationMode")) == LayerKeyManager.SCALE_MULTIPLY
+            except Exception:
+                return False
+
+        def by_layer(layer):
+            if not is_rot or layer == root:
+                return False
+            try:
+                return int(cmds.getAttr(layer + ".rotationAccumulationMode")) == LayerKeyManager.ROT_BY_LAYER
+            except Exception:
+                return False
+
+        def ident(layer):
+            return 1.0 if multiply(layer) else 0.0
+
+        # 대상이 커브 없이 들고 있던 정적값 d (커브가 있으면 None = replace 로 덮인다)
+        dst_input = base_input if dst_kind == "base" else dst_node + ".inputB" + dst_suf
+        d = None
+        if LayerKeyManager.layer_curve(plug, dst, root):
+            note("destination already has keys - replaced, not merged "
+                 "(use Bake > Merge Layers)", attr)
+        else:
+            d = LayerKeyManager._static(dst_input)
+            if dst_kind == "override" and dst_member:
+                # 키 없는 override 멤버는 정적값으로 이미 아래를 전부 덮고 있다 - "이동 전" 이 그 상수였다.
+                note("'{0}' already overrides with a static value - the pasted keys "
+                     "replace it".format(dst), attr)
+
+        compose = None
+        src_input = None
+        src_identity = 0.0
+        mode_layer = dst if dst_kind != "base" else src   # 합성 규칙을 정하는 레이어
+
+        if src_kind == "base":
+            src_input = base_input
+            src_identity = ident(dst)
+            if dst_kind == "additive" and d is not None:
+                compose = ("mul" if multiply(dst) else "add", d)
+
+        elif src_kind == "additive":
+            src_input = src_node + ".inputB" + src_suf
+            src_identity = ident(src)
+            if dst_kind == "additive":
+                if is_scale and multiply(src) != multiply(dst):
+                    note("scale accumulation mode differs between '{0}' and '{1}' - "
+                         "scale not exact".format(src, dst))
+                if d is not None:
+                    compose = ("mul" if multiply(dst) else "add", d)
+            elif dst_kind == "base":
+                if d is not None:
+                    compose = ("mul" if multiply(src) else "add", d)
+            else:   # override 대상 : 소스 아래의 값까지 절대값으로 담아야 한다
+                below = LayerKeyManager._static(src_node + ".inputA" + src_suf)
+                if below is None:
+                    note("layers below '{0}' are animated - override destination "
+                         "not exact".format(src), attr)
+                else:
+                    compose = ("mul" if multiply(src) else "add", below)
+
+        else:   # override 소스 : identity 가 없다 -> 커브를 다 옮긴 뒤 멤버에서 뺀다
+            if start is not None and (edges[0] or edges[1]):
+                note("'{0}' is an override layer with keys outside the range - "
+                     "cannot neutralize the range only".format(src))
+                return None
+            if dst_kind == "additive":
+                below = LayerKeyManager._static(src_node + ".inputA" + src_suf)
+                if below is None:
+                    note("layers below '{0}' are animated - not exact".format(src), attr)
+                elif multiply(dst):
+                    if d is not None and abs(below) > 1e-12:
+                        compose = ("mul", d / below)
+                elif d is not None:
+                    compose = ("add", d - below)
+
+        if (is_rot and compose and abs(compose[1]) > 1e-9 and by_layer(mode_layer)):
+            note("'{0}' rotates by layer and a non-zero rotation had to be folded in - "
+                 "rotation not exact".format(mode_layer))
+
+        outside = None
+        if start is not None and d is not None:
+            outside = d
+            if dst_kind == "override" and not dst_member:
+                note("'{0}' is an override layer the channel was not in - it now overrides "
+                     "outside the range too".format(dst), attr)
+
+        return {
+            "plug": plug, "attr": attr, "src": src, "dst": dst, "root": root,
+            "src_curve": src_curve, "start": start, "end": end, "edges": edges,
+            "src_kind": src_kind, "dst_kind": dst_kind,
+            "src_input": src_input, "src_identity": src_identity,
+            "compose": compose, "outside": outside,
+        }
+
+    @staticmethod
+    def _compose_destination(info):
+        """붙여넣은 키에 대상의 정적값을 합성하고, 구간 이동이면 대상 커브 바깥(`s-1` · `e+1`)에 그 정적값 키를 둔다."""
+        curve = LayerKeyManager.layer_curve(info["plug"], info["dst"], info["root"])
+        if not curve:
+            return
+        start, end = info["start"], info["end"]
+        tk = {} if start is None else {"time": (start, end)}
+        compose = info["compose"]
+        try:
+            if compose:
+                op, v = compose
+                if op == "add":
+                    if abs(v) > 1e-12:
+                        cmds.keyframe(curve, e=True, relative=True, valueChange=v, **tk)
+                elif abs(v - 1.0) > 1e-12:
+                    cmds.scaleKey(curve, valueScale=v, valuePivot=0.0, **tk)
+            if info["outside"] is not None:
+                has_before, has_after = info["edges"]
+                if has_before:
+                    cmds.setKeyframe(curve, time=(start - 1, start - 1), value=info["outside"])
+                if has_after:
+                    cmds.setKeyframe(curve, time=(end + 1, end + 1), value=info["outside"])
+        except Exception:
+            pass
+
+    @staticmethod
+    def _neutralize_source(info):
+        """잘라낸 뒤 소스가 더 이상 기여하지 않게 한다. 했으면 True.
+
+        커브가 통째로 사라졌으면 blend 입력에 남은 정적값을 identity 로(override 소스는 멤버에서 뺀다),
+        구간만 잘라 커브가 남아 있으면 `s`(step) · `e` 에 identity 키를 둔다.
+        """
+        plug = info["plug"]
+        curve = info["src_curve"]
+        alive = False
+        try:
+            alive = bool(cmds.objExists(curve)
+                         and (cmds.keyframe(curve, q=True, keyframeCount=True) or 0))
+        except Exception:
+            alive = False
+        try:
+            if info["src_kind"] == "override":
+                cmds.animLayer(info["src"], e=True, removeAttribute=plug)
+                return True
+            v = info["src_identity"]
+            if alive:
+                s, e = info["start"], info["end"]
+                cmds.setKeyframe(curve, time=(s, s), value=v, outTangentType="step")
+                cmds.setKeyframe(curve, time=(e, e), value=v)
+                return True
+            if info["src_input"]:
+                cmds.setAttr(info["src_input"], v)
+                return True
+        except Exception:
+            return False
+        return False
 
     @staticmethod
     def _scope_text(attrs):

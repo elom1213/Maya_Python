@@ -1,6 +1,6 @@
 ---
 name: animlayer-copy-cut-traps
-description: "애님 레이어 사이 키 이동 - copyKey/pasteKey 는 animLayer 를 받지만 cutKey 는 안 받고, 비멤버 plug 는 paste 실패 + findCurveForPlug 가 None"
+description: "애님 레이어 사이 키 이동 - copyKey/pasteKey 는 animLayer 를 받지만 cutKey 는 안 받고, 비멤버 plug 는 paste 실패 + findCurveForPlug 가 None · 커브를 다 지우면 blend 입력에 마지막 값이 정적으로 남는다(월드가 틀어지는 원인)"
 metadata: 
   node_type: memory
   type: reference
@@ -26,8 +26,22 @@ metadata:
    `animCurve`(`listConnections(type="animCurve", skipConversionNodes=True)`)가 base 커브다.
    레이어에 든 plug 는 앞단이 `animBlendNode*` 라 이 조회에 안 걸리므로 두 판정이 겹치지 않는다.
 
+5. **커브를 다 지우면 blend 노드 입력에 지우던 순간의 값이 정적으로 남는다**(2026-10-29 실측). Base 커브
+   → 맨 아래 `animBlendNode*.inputA`, 레이어 커브 → 그 레이어 노드의 `inputB`. 그래서 커브를 다른 레이어로
+   옮기고 잘라내면 **남은 정적값 + 옮긴 커브**가 돼 월드가 틀어진다(Base → a 6.0, a → b 8.0, a → Base 14.1).
+   마야 자체 `animLayer -e -extractAnimation` 도 같은 상태를 만든다. **`setAttr` 로 plug 에 쓰면 활성
+   레이어의 `inputB` 로 가서 소용없다** — 그 입력 plug 에 직접 identity(0 · Multiply 스케일은 1)를 써야
+   정확히 돌아온다(0.0). override 레이어는 identity 가 없으니 `animLayer -e -removeAttribute` 로 뺀다
+   (additive 도 removeAttribute 면 0.0 이지만 멤버십이 사라진다). 사슬은 `plug <- bn.output[X] <- bn.inputA[X]
+   <- ...` 로 내려가고 어느 레이어 노드인지는 `animLayer -q -blendNodes` 로 가른다.
+6. **대상이 커브 없이 들고 있던 정적값은 붙여넣기가 덮는다.** Base 정적값 c, additive 멤버 정적값 d 는
+   `pasteKey` 뒤에 `inputB` 가 커브에 연결돼 읽을 수 없다 — **붙여넣기 전에 읽어** 붙여넣은 키에 합성한다
+   (`keyframe -e -r -vc c`, Multiply 스케일은 `scaleKey -vs c -vp 0`). by-component 는 8.9e-16 으로 정확,
+   **by-layer 회전에 0 아닌 회전을 합성하면 0.30 근사**(회전 합성은 축별 덧셈이 아니다). 기본 레이어
+   `rotationAccumulationMode` 는 standalone 에서 0(by-component).
+
 **값 의미**: `copyKey`/`pasteKey` 는 **커브 값을 그대로** 옮긴다 — 레이어 기여분을 다시
 계산하지 않는다. `setKeyframe(animLayer=L, value=V)` 가 **최종 평가값이 V 가 되도록 역산**하는
 것과 **다르다**([[wip-a00110-fill-keys]]). Base(절대값) → additive 로 옮기면 최종 결과가 달라진다.
 
-쓰는 곳: [[wip-a00110-layer-key-copy]]. 레이어 목록 조회 함정은 [[animlayer-no-global-selected-query]].
+쓰는 곳: [[wip-a00110-layer-key-copy]](v02.28 `Keep Result` 가 §5·§6 처방을 구현). 레이어 목록 조회 함정은 [[animlayer-no-global-selected-query]].

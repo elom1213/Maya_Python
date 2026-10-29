@@ -1,6 +1,6 @@
 ---
 name: wip-a00110-layer-key-copy
-description: A00110_animTool_V02 Transfer > Layer 탭 - 애님 레이어 사이 키 복사/잘라내기 (v02.13)
+description: A00110_animTool_V02 Transfer > Layer 탭 - 애님 레이어 사이 키 복사/잘라내기 (v02.13) · v02.28 Move 는 월드 결과 보존(Keep Result)
 metadata: 
   node_type: memory
   type: project
@@ -33,3 +33,19 @@ metadata:
   전부 켜져 있어 이름을 다 적으면 한 줄이 안 읽힌다 — Copy Key 의 `_brief` 와 같은 취지).
 - 검증은 mayapy headless 로 Qt 창을 실제 빌드해서 했다([[qapplication-before-maya-standalone]]) —
   비멤버 오브젝트 · DAG 긴 이름 · 네임스페이스까지 포함.
+
+**v02.28 (2026-10-29) — Move(Cut) 는 최종 평가값(월드 위치·회전)을 보존한다(`Keep Result`, 기본 ON).**
+사용자 관찰("Base 에만 키가 있는 ctl 을 Base → a 로 옮기면 월드가 달라진다")이 사실이었고, 실측으로는
+a → b · a → Base 도 같은 이유로 어긋난다. 원인·처방은 [[animlayer-copy-cut-traps]] §5·§6.
+- 구현: `transfer_keys(keep_result=True)` → `_blend_chain` · `_move_info`(붙여넣기 **전에** 대상 정적값과
+  소스 blend 입력을 읽는다 — 붙여넣으면 `inputB` 가 커브에 연결돼 정적값을 잃는다) · `_compose_destination`
+  (대상 정적값을 붙여넣은 키에 합성) · `_neutralize_source`(커브 사라짐 → 입력에 identity, 남음 → `s` step ·
+  `e` identity 키, override 소스 → `removeAttribute`).
+- 구간 이동은 Merge Layers 의 경계 규칙을 그대로(소스 `s-1`·`s`·`e`·`e+1` insert fixed + **바로 바깥 이웃 키도
+  fixed**(auto 는 이웃이 바뀌면 재계산), 대상 `s-1`·`e+1` 에 대상의 옛 정적값 키). 정수 프레임 · 구간 안팎
+  반 프레임 1e-15.
+- 정확히 안 되는 경우는 로그 `Not exact:` 로만(거부하지 않는다): 대상에 이미 키(replace) · weight≠1 ·
+  by-layer 회전에 0 아닌 회전 합성(0.30 근사) · override 소스 구간 · 키 없는 override 멤버 대상 · 비수치 채널.
+- Copy 는 예전처럼 값 그대로. 회귀 `tests/test_layer_key_move.py` 68/68(UI 스모크 포함). **GUI 실기 확인 아직.**
+- 테스트 씬 함정: **키 없는 override 멤버는 정적값으로 아래를 전부 덮는다** — override 대상 시험은 멤버로
+  넣지 않은 채널로 해야 뜻이 있다.

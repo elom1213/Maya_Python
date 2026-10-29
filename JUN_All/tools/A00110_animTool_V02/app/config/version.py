@@ -30,5 +30,15 @@
 #        없던 채널은 거부. Verify(병합 전후 채널 값 비교) · Smart bake(근사, 경고) · Selected objects only · 진행 팝업.
 #        계획서 docs/plans/A00110_animTool_V02_layer_range_merge_plan.md, 회귀 tests/test_layer_range_merge.py.
 
-VERSION = "02.27"
+# 02.28  Transfer > Layer `Cut Keys to Layer (Move)` 가 **최종 평가값(월드 위치·회전)을 보존**한다(`Keep Result` 체크, 기본 ON).
+#        사용자 관찰대로 Base 에만 키가 있는 ctl 을 Base -> a 로 옮기면 월드가 달라졌다(a -> b 도 실측으로는 어긋남).
+#        원인 ① 커브를 다 지우면 blend 노드 입력(Base 는 맨 아래 `inputA`, 레이어는 그 노드 `inputB`)에 지우던 순간의
+#        값이 정적으로 남아 계속 더해진다 -> identity(0 · multiply 스케일 1) 로 되돌린다(override 소스는 멤버에서 뺌).
+#        ② 대상이 커브 없이 들고 있던 정적값(Base 정적값 · additive 멤버 정적값)을 붙여넣기가 덮는다 -> 붙여넣은 키에
+#        합성(`keyframe -r -vc` / `scaleKey -vs`). 구간 이동은 Merge Layers 와 같은 경계 규칙(소스 `s-1`·`s`·`e`·`e+1`
+#        insert fixed + identity step 키, 대상 바깥 정적값 키) - 정수 프레임 전부 동일, 구간 안팎 반 프레임 동일.
+#        정확히 안 되는 경우는 로그 `Not exact:` 에 이유(대상에 이미 키 · weight≠1 · by-layer 회전에 0 아닌 회전 합성 ·
+#        override 소스 구간 · 비수치 채널). Copy 는 예전처럼 값 그대로. 회귀 tests/test_layer_key_move.py 68/68.
+
+VERSION = "02.28"
 LAST_UPDATE = "2026-10-29"
