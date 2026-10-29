@@ -2107,6 +2107,8 @@ class MainWindow(QWidget):
         opt_row = QHBoxLayout()
         opt_row.addWidget(QLabel("Options"))
         self.cb_follow_offset = QCheckBox("Maintain Offset")
+        # v02.24 : 기본 켜짐(예전엔 꺼짐). 실제 작업에서 거의 항상 켜고 쓴다.
+        self.cb_follow_offset.setChecked(True)
         self.cb_follow_point = QCheckBox("Point")
         self.cb_follow_point.setToolTip(
             "Off: the offset works like a parent constraint - when the target rotates,\n"

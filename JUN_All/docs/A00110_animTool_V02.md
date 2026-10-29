@@ -1496,7 +1496,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 │ Add|Del|Up|Down|Sort      Add|Del|Up|Down|Sort    │
 │ Start [ 1 ] [Get Current]  End [ 24 ] [Get Current]│  ← 기본값 = 현재 playback 범위
 │ Channels [v] Translate [v] Rotate [ ] Scale       │  ← 기본 T·R (Scale off)
-│ Options [ ] Maintain Offset [ ] Point [ ] 1 <- n  │  ← 기본 모두 off (Point 는 Offset+Translate 일 때만)
+│ Options [v] Maintain Offset [ ] Point [ ] 1 <- n  │  ← 기본 Offset on(v02.24~), 나머지 off (Point 는 Offset+Translate 일 때만)
 │ Blend (0..1) [ 1.0 ]  [====슬라이더 0..100====]   │  ← LineEdit ↔ Slider 동기화, 기본 1.0
 │ [ Match Follow ]                                  │
 └───────────────────────────────────────────────────┘
@@ -1510,8 +1510,8 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   **Get Current** 버튼을 누르면 **현재 Maya 프레임**(`currentTime`)으로 해당 입력란을 갱신한다.
 - **Channels**: 매치/블렌드할 채널 그룹(**Translate / Rotate / Scale**). 기본 **T·R on, Scale off**.
 - **Maintain Offset**: 체크 시 **start 프레임에서 측정한 target↔follower 상대 거리·회전을 매 프레임
-  유지**한다(`parentConstraint maintainOffset=True` 와 동등, 컨스트레인트 노드 없는 행렬 연산). 끄면
-  offset 0 으로 target 과 정확히 일치한다(기본).
+  유지**한다(`parentConstraint maintainOffset=True` 와 동등, 컨스트레인트 노드 없는 행렬 연산). **기본 켜짐**
+  (v02.24~, 그 전엔 꺼짐). 끄면 offset 0 으로 target 과 정확히 일치한다.
 - **Point**(v02.23~): Maintain Offset 의 **위치**를 `pointConstraint maintainOffset=True` 처럼 맞춘다.
   끄면(기본, 예전 동작) offset 이 `parentConstraint` 처럼 target 회전을 따라 돌아서, Translate 만 켜도
   follower 가 **target 둘레를 공전**한다. 켜면 start 프레임의 위치 차이를 follower 부모 공간에서 그대로
@@ -1724,7 +1724,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
    - **1<-n**: **1 <- n** 체크. Target 에는 **1개만** 두고 Follower 에 여럿을 넣으면 모두 그 하나를 추종.
 3. **Start / End**(기본 = 현재 playback 범위, 옆 **Get Current** 로 현재 프레임 채움) /
    **Channels**(기본 T·R) / **Blend**(기본 1.0) 확인.
-4. (선택) **Maintain Offset** 체크 → start 프레임의 target↔follower 거리·회전을 유지한 채 따라간다
+4. **Maintain Offset**(기본 켜짐) → start 프레임의 target↔follower 거리·회전을 유지한 채 따라간다
    (끄면 target 과 정확히 겹친다).
 5. (선택) 키를 특정 **애니 레이어**에 굽고 싶으면 Channel Box / Anim Layer 에디터에서 **그 레이어를
    선택**해 둔다.
@@ -2163,7 +2163,7 @@ Euler filter: 3 object(s), 27 key(s) changed in [20-40f].  Anchored to the key b
   원하면 **Keep constraints 를 끄고**(bake down) 다시 굽는다.
 - **(Follow) follower 가 target 과 정확히 안 겹침** → ① Channels 에 필요한 그룹(보통 T·R)이 켜져
   있는지 확인. ② **Blend 가 1.0** 인지 확인(1 미만이면 원본과 섞여 덜 따라간다). ③ **Maintain Offset
-  이 켜져 있으면** 정확히 겹치지 않고 start 프레임의 거리·회전을 유지하는 것이 정상(정확히 겹치려면
+  이 켜져 있으면**(v02.24~ 기본 켜짐) 정확히 겹치지 않고 start 프레임의 거리·회전을 유지하는 것이 정상(정확히 겹치려면
   끈다). ④ follower 채널이 잠겨/연결돼 있으면 그 채널은 skip 된다(로그의 `skipped` 확인).
 - **(Follow, 1<-n) 실행이 막힘** → `1 <- n` 을 켰는데 Target 이 1개가 아니다(로그 `needs exactly 1
   target`). Target 리스트에 정확히 1개만 남기거나, 인덱스 1:1 로 쓰려면 `1 <- n` 을 끈다.

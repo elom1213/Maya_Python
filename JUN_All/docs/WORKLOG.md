@@ -32,6 +32,10 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-29 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.24 — Follow 탭 `Maintain Offset` 기본 켜짐** `#A00110_animTool`
+- 요청 그대로 `setChecked(True)`. 따라서 Point 체크박스도 처음부터 켤 수 있는 상태(체크는 꺼짐).
+- 검증: `tests/test_follow_point.py` 14/14 (기본값 항목 갱신 + Offset 끄면 Point 비활성 항목 추가). 문서 UI 그림 · 옵션 설명 · 사용 순서 · 문제 해결 갱신.
+
 > [!summary] **공용 메뉴 `Help > Copy Tool Name + Tabs`** - 툴 이름 뒤에 지금 보고 있는 탭 경로(`A00110_animTool_V02 / Transfer / Follow`)를 클립보드로 `#Framework`
 - 요청: "Help 의 툴 이름 복사 연장선으로, 툴 이름과 지금 보고 있는 탭 이름을 클립보드에 복사하는 공용 기능".
 - `Framework/core/tool_menu.py` 레지스트리에 항목 한 줄 + `MenuContext.tab_path`(누를 때 부르는 함수) → 메뉴 바를 쓰는 PySide 툴 52곳 · cmds 툴 7곳에 자동으로 생김. 툴 파일은 손대지 않음(A00110 은 다른 세션이 작업 중).

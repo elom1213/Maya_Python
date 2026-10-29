@@ -123,7 +123,10 @@ check("log says point translate", "point translate" in msg, msg)
 from tools.A00110_animTool_V02.app.ui import main_window as MW   # noqa: E402
 w = MW.MainWindow()
 cb = w.cb_follow_point
-check("ui : disabled by default (no offset)", not cb.isEnabled() and not cb.isChecked())
+check("ui : Maintain Offset on by default (v02.24), Point enabled but off",
+      w.cb_follow_offset.isChecked() and cb.isEnabled() and not cb.isChecked())
+w.cb_follow_offset.setChecked(False)
+check("ui : disabled without Maintain Offset", not cb.isEnabled())
 w.cb_follow_offset.setChecked(True)
 check("ui : enabled with Maintain Offset + Translate", cb.isEnabled())
 w.cb_follow_t.setChecked(False)
