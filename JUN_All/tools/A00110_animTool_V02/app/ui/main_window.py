@@ -41,6 +41,7 @@ from tools.A00110_animTool_V02.app.core import FillKeyManager
 from tools.A00110_animTool_V02.app.core import CURRENT_LAYER
 from tools.A00110_animTool_V02.app.core import LayerKeyManager
 from tools.A00110_animTool_V02.app.core import CounterLayerManager
+from tools.A00110_animTool_V02.app.core import LayerMergeManager
 from tools.A00110_animTool_V02.app.core import CurveFilterSession
 from tools.A00110_animTool_V02.app.core import (
     CF_EASE_IN, CF_EASE_OUT, CF_LINEAR, CF_EASE_IN_OUT,
@@ -365,6 +366,10 @@ class MainWindow(QWidget):
          "listed objects' world position / rotation as they were without the "
          "checked layers (e.g. feet under an animated global control)",
          "_build_counter_layer_tab"),
+        ("Merge Layers", "Merge Layers - Maya's Merge Layers limited to a frame range: "
+         "bake the checked animation layers into one of them (or a new layer) "
+         "between Start and End only, keeping the motion identical",
+         "_build_merge_layers_tab"),
     )
 
     VIEW_PAGES = (
@@ -2207,6 +2212,186 @@ class MainWindow(QWidget):
         self.btn_cl_create.clicked.connect(self.on_counter_layer)
 
         self.on_cl_refresh_layers(quiet=True)
+
+        return tab
+
+    def _build_merge_layers_tab(self):
+        """애니메이션 레이어를 **프레임 구간 안에서만** 병합하는 탭 (Bake > Merge Layers).
+
+        마야 Merge Layers 의 본체(`bakeResults -destinationLayer X -resolveWithoutLayer a b`)를 구간
+        `[Start, End]` 에만 적용한다. 소스 레이어는 구간 밖에 그대로 남고, 구간 안에서는 기여가 중화된다
+        (additive = identity 키, override = weight 0). 전후 월드 움직임은 정수 프레임에서 완전히 같다.
+        로직은 LayerMergeManager(계획서 docs/plans/A00110_animTool_V02_layer_range_merge_plan.md).
+        구성은 Counter Layer 탭과 같은 재료(체크 레이어 목록 · timeRange)로 맞췄다.
+        """
+        tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
+        tab_layout = QVBoxLayout(tab)
+
+        # -------------------------
+        # 병합할 레이어 (체크 목록, 스택 순서 = 맨 위부터). 기본 체크 = 에디터에서 선택된 레이어.
+        # -------------------------
+
+        layer_grp = QGroupBox("Layers to Merge (stack order, top first)")
+        layer_box = QVBoxLayout(layer_grp)
+
+        self.lw_ml_layers = QListWidget()
+        self.lw_ml_layers.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lw_ml_layers.setMinimumHeight(80)
+        self.lw_ml_layers.setMaximumHeight(130)
+        self.lw_ml_layers.setToolTip(
+            "Check the layers to merge, exactly as you would select them for Maya's "
+            "Merge Layers.\nTop of the list = top of the stack. Mode, weight and "
+            "locked / muted / solo tags are shown.\nBaseAnimation can only be merged "
+            "into itself (Result = Into existing layer = BaseAnimation).\nShift / Ctrl "
+            "click to select several rows - the check box of a selected row\n(or Space) "
+            "checks or unchecks every selected row.")
+        self.chk_ml_layers = JUN_mod_checkList_qt.JUN_mod_checkList_qt_v01(self.lw_ml_layers)
+        self.lw_ml_layers.itemChanged.connect(self._ml_layers_changed)
+        layer_box.addWidget(self.lw_ml_layers)
+
+        refresh_row = QHBoxLayout()
+        self.lbl_ml_layers = QLabel("")
+        refresh_row.addWidget(self.lbl_ml_layers, 1)
+        self.btn_ml_layers = QPushButton("Refresh")
+        self.btn_ml_layers.setToolTip("Re-scan the scene for animation layers (keeps your checks).")
+        self.btn_ml_layers.clicked.connect(self.on_ml_refresh_layers)
+        refresh_row.addWidget(self.btn_ml_layers)
+        layer_box.addLayout(refresh_row)
+
+        tab_layout.addWidget(layer_grp)
+
+        # -------------------------
+        # Result : 기존 레이어(체크한 것 중 하나) / 새 레이어
+        # -------------------------
+
+        res_grp = QGroupBox("Result")
+        res_box = QVBoxLayout(res_grp)
+        self.ml_result_grp = QButtonGroup(self)
+
+        row = QHBoxLayout()
+        self.rb_ml_existing = QRadioButton("Into existing layer")
+        self.rb_ml_existing.setChecked(True)
+        self.rb_ml_existing.setToolTip(
+            "a + b => b : bake into one of the checked layers. Its own keys outside the "
+            "range stay.\nThe target must have weight 1.0 and no weight animation "
+            "(otherwise merge into a new layer).")
+        self.ml_result_grp.addButton(self.rb_ml_existing)
+        row.addWidget(self.rb_ml_existing)
+        self.cmb_ml_target = QComboBox()
+        self.cmb_ml_target.setToolTip("Target layer - one of the checked layers. Default = the lowest checked one.")
+        row.addWidget(self.cmb_ml_target, 1)
+        res_box.addLayout(row)
+
+        row = QHBoxLayout()
+        self.rb_ml_new = QRadioButton("New layer")
+        self.rb_ml_new.setToolTip(
+            "a + b => c : bake into a new layer placed just above the topmost checked "
+            "layer.\nMode follows Maya's Auto rule: override if any source is override, "
+            "else additive;\naccumulation modes by majority.")
+        self.ml_result_grp.addButton(self.rb_ml_new)
+        row.addWidget(self.rb_ml_new)
+        self.le_ml_name = QLineEdit()
+        self.le_ml_name.setPlaceholderText(LayerMergeManager.DEFAULT_NEW_NAME)
+        self.le_ml_name.setToolTip("Name of the new layer. Empty = 'Merged_Layer' (Maya's default). "
+                                   "If it exists Maya makes it unique; the log tells which.")
+        row.addWidget(self.le_ml_name, 1)
+        self.lbl_ml_mode = QLabel("mode: -")
+        self.lbl_ml_mode.setToolTip("Mode the result layer will have.")
+        row.addWidget(self.lbl_ml_mode)
+        res_box.addLayout(row)
+
+        tab_layout.addWidget(res_grp)
+
+        # -------------------------
+        # Range : 비우면 소스 커브의 전체 키 범위(= 마야 전체 병합과 같은 동작)
+        # -------------------------
+
+        range_row = QHBoxLayout()
+        range_row.addWidget(QLabel("Range"))
+        self.ml_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_placeholder="source start", end_placeholder="source end",
+            log_callback=self.log)
+        self.ml_range.setToolTip(
+            "Only frames Start..End are merged (integers, inclusive). Outside the range "
+            "nothing changes.\nLeave both empty to use the whole key range of the "
+            "sources (= Maya's full merge, the sources keep identity keys).\nInteger "
+            "frames are preserved exactly; between frames inside the range the result "
+            "is baked per sample,\nexactly like Maya's Merge Layers.")
+        range_row.addWidget(self.ml_range, 1)
+        tab_layout.addLayout(range_row)
+
+        # -------------------------
+        # Options
+        # -------------------------
+
+        opt_row = QHBoxLayout()
+        opt_row.addWidget(QLabel("Sample by"))
+        self.sb_ml_sample = QDoubleSpinBox()
+        self.sb_ml_sample.setRange(0.01, 100.0)
+        self.sb_ml_sample.setDecimals(2)
+        self.sb_ml_sample.setSingleStep(0.5)
+        self.sb_ml_sample.setValue(1.0)
+        self.sb_ml_sample.setToolTip("bakeResults -sampleBy. 1.0 = a key on every integer frame "
+                                     "(Maya's default). Smaller = denser.")
+        opt_row.addWidget(self.sb_ml_sample)
+        self.cb_ml_smart = QCheckBox("Smart bake (approximate)")
+        self.cb_ml_smart.setChecked(False)
+        self.cb_ml_smart.setToolTip(
+            "bakeResults -smart : drop keys the curve can do without. The result then "
+            "matches the original\nonly within the tolerance (measured: up to several "
+            "units on integer frames). Off = exact.")
+        opt_row.addWidget(self.cb_ml_smart)
+        opt_row.addWidget(QLabel("Tolerance"))
+        self.le_ml_smart_tol = QLineEdit(str(LayerMergeManager.DEFAULT_SMART_TOLERANCE))
+        self.le_ml_smart_tol.setValidator(QDoubleValidator(0.0, 1000.0, 3, self))
+        self.le_ml_smart_tol.setMaximumWidth(60)
+        opt_row.addWidget(self.le_ml_smart_tol)
+        opt_row.addStretch(1)
+        tab_layout.addLayout(opt_row)
+
+        opt_row = QHBoxLayout()
+        self.cb_ml_verify = QCheckBox("Verify result")
+        self.cb_ml_verify.setChecked(True)
+        self.cb_ml_verify.setToolTip(
+            "Compare every merged channel on the integer frames Start-5..End+5 before "
+            "and after.\nThe log shows the max deviation; above 1e-4 it is a warning "
+            "(nothing is undone - Ctrl+Z if needed).")
+        opt_row.addWidget(self.cb_ml_verify)
+        self.cb_ml_selected = QCheckBox("Selected objects only")
+        self.cb_ml_selected.setChecked(False)
+        self.cb_ml_selected.setToolTip(
+            "Merge only the channels of the objects selected in the scene.\nNot "
+            "available with an override source (its weight gates the whole layer).")
+        opt_row.addWidget(self.cb_ml_selected)
+        self.cb_ml_select = QCheckBox("Select result layer")
+        self.cb_ml_select.setChecked(True)
+        self.cb_ml_select.setToolTip("Select the result layer in the Anim Layer editor "
+                                     "when done (like Maya's Merge Layers).")
+        opt_row.addWidget(self.cb_ml_select)
+        opt_row.addStretch(1)
+        tab_layout.addLayout(opt_row)
+
+        # -------------------------
+        # 실행
+        # -------------------------
+
+        self.btn_ml_merge = QPushButton("Merge Range")
+        self.btn_ml_merge.setToolTip(
+            "Bake the checked layers into the target between Start and End "
+            "(bakeResults -resolveWithoutLayer, exactly what Maya's Merge Layers runs),\n"
+            "then neutralise the sources inside the range so nothing is counted twice. "
+            "One undo step.\nA progress popup appears for large jobs (about 0.2 ms per key).")
+        tab_layout.addWidget(self.btn_ml_merge)
+
+        tab_layout.addStretch(1)
+
+        self._ml_update_smart_mode()
+        self.cb_ml_smart.toggled.connect(self._ml_update_smart_mode)
+        self.rb_ml_new.toggled.connect(self._ml_result_changed)
+        self.cmb_ml_target.currentIndexChanged.connect(self._ml_result_changed)
+        self.btn_ml_merge.clicked.connect(self.on_merge_layers)
+
+        self.on_ml_refresh_layers(quiet=True)
 
         return tab
 
@@ -4182,6 +4367,177 @@ class MainWindow(QWidget):
         if count:
             # 새 레이어가 목록에 보이게(체크는 그대로).
             self.on_cl_refresh_layers(quiet=True)
+
+    # --------------------------------------------------
+    # Handlers : Bake > Merge Layers
+    # --------------------------------------------------
+
+    def _ml_checked_layers(self):
+        """체크한 레이어 이름들 (목록 순서 = 맨 위부터)."""
+        out = []
+        for i in range(self.lw_ml_layers.count()):
+            item = self.lw_ml_layers.item(i)
+            if item.checkState() == Qt.Checked:
+                out.append(item.data(Qt.UserRole))
+        return out
+
+    def on_ml_refresh_layers(self, quiet=False):
+        """씬의 레이어(스택 순서, BaseAnimation 마지막)로 체크 목록을 다시 채운다.
+
+        이미 있던 체크는 유지한다. 처음(체크가 없을 때)엔 **에디터에서 선택된 레이어**를 체크해 둔다 -
+        마야의 Merge Layers 도 선택한 레이어를 합친다.
+        """
+        keep = set(self._ml_checked_layers())
+        rows, selected = LayerMergeManager.list_layers_stack()
+
+        self.lw_ml_layers.blockSignals(True)
+        self.lw_ml_layers.clear()
+        for info in rows:
+            item = QListWidgetItem(LayerMergeManager.row_label(info))
+            item.setData(Qt.UserRole, info["name"])
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            on = (info["name"] in keep) if keep else (info["name"] in selected)
+            item.setCheckState(Qt.Checked if on else Qt.Unchecked)
+            self.lw_ml_layers.addItem(item)
+        self.lw_ml_layers.blockSignals(False)
+        self._ml_layers_changed()
+
+        n = max(0, len(rows) - 1)
+        self.lbl_ml_layers.setText("{0} layer(s) + BaseAnimation".format(n) if rows
+                                   else "No animation layer in the scene")
+        if quiet:
+            return
+        if not rows:
+            self.log("[Warning] No animation layer in the scene.")
+        else:
+            self.log("Anim layers (top first): {0}  (checked: {1})".format(
+                ", ".join(r["name"] for r in rows), ", ".join(self._ml_checked_layers()) or "none"))
+
+    def _ml_layers_changed(self, *args):
+        """체크가 바뀌면 대상 콤보(체크한 것 중)와 Base 규칙 · 결과 모드 표시를 따라 바꾼다."""
+        checked = self._ml_checked_layers()
+        root = LayerMergeManager.root_layer()
+        base_checked = bool(root) and root in checked
+
+        prev = self.cmb_ml_target.currentText()
+        self.cmb_ml_target.blockSignals(True)
+        self.cmb_ml_target.clear()
+        self.cmb_ml_target.addItems(checked)
+        if base_checked:
+            self.cmb_ml_target.setCurrentIndex(checked.index(root))
+        elif prev in checked:
+            self.cmb_ml_target.setCurrentIndex(checked.index(prev))
+        elif checked:
+            self.cmb_ml_target.setCurrentIndex(len(checked) - 1)   # 가장 아래 = 마야처럼 아래로 합친다
+        self.cmb_ml_target.blockSignals(False)
+
+        # Base 를 체크하면 결과는 Base 뿐 (Base -> 새 레이어는 v2).
+        self.rb_ml_new.setEnabled(not base_checked)
+        if base_checked and self.rb_ml_new.isChecked():
+            self.rb_ml_existing.setChecked(True)
+        self._ml_result_changed()
+
+    def _ml_result_changed(self, *args):
+        new = self.rb_ml_new.isChecked()
+        checked = self._ml_checked_layers()
+        self.le_ml_name.setEnabled(new)
+        self.cmb_ml_target.setEnabled((not new) and bool(checked)
+                                      and self.cmb_ml_target.count() > 1)
+        if not checked:
+            self.lbl_ml_mode.setText("mode: -")
+            return
+        if new:
+            override, _s, _r = LayerMergeManager.auto_result(checked)
+            self.lbl_ml_mode.setText("mode: {0}".format("override" if override else "additive"))
+        else:
+            target = self.cmb_ml_target.currentText()
+            mode = LayerMergeManager.layer_info(target)["mode"] if target and cmds.objExists(target) else "-"
+            self.lbl_ml_mode.setText("mode: {0}".format(mode))
+
+    def _ml_update_smart_mode(self, *args):
+        self.le_ml_smart_tol.setEnabled(self.cb_ml_smart.isChecked())
+
+    def _ml_resolve_range(self, sources):
+        """Start/End. 둘 다 비었으면 소스 커브 전체 키 범위(칸에도 채운다). 실패 시 None."""
+        values = self.ml_range.values()
+        if values is not None:
+            start, end = values
+            if start > end:
+                self.log("[Warning] Start ({0}) is greater than End ({1}).".format(start, end))
+                return None
+            return (start, end)
+        if self.ml_range.start_text() == "" and self.ml_range.end_text() == "":
+            rng = LayerMergeManager.source_key_range(sources)
+            if rng is None:
+                self.log("[Warning] The checked layers have no keys - enter Start / End.")
+                return None
+            self.ml_range.set_range(rng[0], rng[1])
+            self.log("Range left empty - using the sources' whole key range {0}-{1}.".format(*rng))
+            return rng
+        self.log("[Warning] Enter both Start and End (or leave both empty for the whole key range).")
+        return None
+
+    def on_merge_layers(self):
+        checked = self._ml_checked_layers()
+        if not checked:
+            self.log("[Warning] Check at least one layer to merge (press Refresh if the list is stale).")
+            return
+
+        if self.rb_ml_new.isChecked():
+            target = None
+        else:
+            target = self.cmb_ml_target.currentText()
+            if not target:
+                self.log("[Warning] Pick the target layer.")
+                return
+
+        sources = [l for l in checked if l != target]
+        rng = self._ml_resolve_range(sources)
+        if rng is None:
+            return
+        start, end = rng
+
+        objects = None
+        if self.cb_ml_selected.isChecked():
+            objects = cmds.ls(selection=True, long=True) or []
+            if not objects:
+                self.log("[Warning] 'Selected objects only' is on but nothing is selected.")
+                return
+
+        smart = self.cb_ml_smart.isChecked()
+        smart_tol = LayerMergeManager.DEFAULT_SMART_TOLERANCE
+        if smart:
+            try:
+                smart_tol = float(self.le_ml_smart_tol.text().strip())
+            except ValueError:
+                self.log("[Warning] Invalid Tolerance, using {0}.".format(smart_tol))
+        sample_by = float(self.sb_ml_sample.value())
+
+        # plug x 샘플이 크면 진행 팝업 (실측 0.22 ms / 키 -> 4000 이면 약 1 초).
+        plugs = LayerMergeManager.merge_plugs(sources, objects)[0]
+        samples = int(round((end - start) / sample_by)) + 1
+        dlg = None
+        if len(plugs) * samples > LayerMergeManager.PROGRESS_THRESHOLD:
+            dlg = JUN_mod_progress_qt.JUN_mod_progress_qt_v01(
+                self, title="Merge Layers", phases=[("Baking", 1)])
+            dlg.start()
+            dlg.begin_phase()
+
+        try:
+            count, msg = LayerMergeManager.merge_range(
+                checked, target, start, end, sample_by=sample_by, smart=smart,
+                smart_tolerance=smart_tol, objects=objects,
+                new_name=self.le_ml_name.text(), verify=self.cb_ml_verify.isChecked(),
+                select_result=self.cb_ml_select.isChecked(),
+                progress=dlg.callback() if dlg else None)
+        finally:
+            if dlg:
+                dlg.finish()
+
+        self.log(msg)
+        if count:
+            # 새 레이어가 목록에 보이게(체크는 그대로).
+            self.on_ml_refresh_layers(quiet=True)
 
     # --------------------------------------------------
     # Follow (target match bake)

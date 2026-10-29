@@ -13,13 +13,24 @@ updated: 2026-10-29
 > 하며, "합친다"는 **마야 Merge Layers 와 같은 의미**다 — 레이어 모드 · 누적 모드 · 가중치 · 다른 레이어와의 관계를
 > 그대로 존중한 결과를 **키로 굽는다.**
 
-> [!note] **상태: 계획 (2026-10-29). 구현 전.**
-> 이 문서의 수치는 전부 **mayapy(Maya 2024) 실측**이다(§4). 핵심 가정 **13 항목 전수 통과**(월드 매트릭스
-> 정수 프레임 전부 동일 · 구간 밖 반 프레임까지 동일). 실측 스크립트는
-> `tools/A00110_animTool_V02/tests/exp_layer_range_merge.py` (부록 A) — 구현 때 그대로 회귀 시험의 뼈대가 된다.
+> [!done] **상태: 구현 완료 — v02.27 (2026-10-29, 계획과 같은 날).** 코어 `app/core/layer_merge_manager.py`
+> (`LayerMergeManager.merge_range`), UI `Bake > Merge Layers`, 회귀 `tests/test_layer_range_merge.py` **111 / 111**
+> (mayapy 2024). 이 문서의 수치는 전부 **mayapy 실측**이다(§4). 사전 실험 `exp_layer_range_merge.py` 는 회귀 시험으로 흡수해 지웠다.
 >
-> ⚠️ 2026-10-29 시점에 **다른 세션이 `A00110_animTool_V02` 를 작업 중일 수 있다**(탭 높이 자동 맞춤 롤아웃이 그래서
-> 이 툴만 건너뛰었다). 구현 시작 전에 `git status` · `git log -3 -- tools/A00110_animTool_V02` 로 충돌을 확인한다.
+> **구현하며 달라진 것** (계획 → 실제)
+> - 버전은 02.26 이 아니라 **02.27** — 다른 세션이 같은 날 v02.26 `Bake > Counter Layer` 를 넣었다(그래서 `BAKE_PAGES` 세 번째 탭).
+>   이 툴은 `CHANGELOG.md` 가 없고 `app/config/version.py` 주석이 이력이다.
+> - **override 기존 레이어가 대상**(계획엔 없던 경우, 구현 중 실측): 멤버인데 키 없는 채널은 bake 뒤 정적 값(blend 노드
+>   `inputB`)을 `s-1`/`e+1` 키로 되돌려야 하고, **멤버가 아니던 채널은 구간 밖에 identity 가 없어 거부**(새 레이어 권유).
+> - **additive 대상의 정적 멤버**도 같다 — 대상에 커브는 없지만 멤버로서 0 이 아닌 값을 들고 있으면(예: 스케일 Additive 모드의 1)
+>   경계 키는 identity 가 아니라 **그 값**이어야 한다(회귀 T6 가 잡았다: scaleY 가 1 틀림).
+> - **additive 소스의 키 없는 정적 멤버**(레이어 활성 상태에서 setAttr 로 넣은 값)도 기여다 — blend 노드 `inputB` 를 읽어 identity 가
+>   아니면 plug 집합에 넣고, 중화 때 커브를 만들어 밖은 그 값 · 안은 identity. visibility 같은 Boolean/Enum 블렌드는 제외.
+> - **by-layer(쿼터니언) 회전**이 소스나 결과에 끼면 그 노드의 `rotateX/Y/Z` 를 **셋 다** plug 집합에 넣는다 — 하나가 빠지면
+>   새 by-layer 레이어에서 2.0 틀렸다(회귀 T6).
+> - `Listed objects only` 는 이 툴에 공용 리스트가 없어 **`Selected objects only`**(씬 선택)로 바꿨다.
+> - bake 를 32 채널씩 나눠 호출해도 시간이 같다(50 ctl × 200 plug × 251 f: 나눔 15.8 s · 한 번 15.1 s · 나눔 + Verify 17.7 s).
+> - 마야 GUI 확인(§11-2)은 아직이다.
 
 ---
 

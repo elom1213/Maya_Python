@@ -16,6 +16,7 @@ from .graph_focus_manager import GraphFocusManager
 from .fill_key_manager import FillKeyManager, CURRENT_LAYER
 from .layer_key_manager import LayerKeyManager
 from .counter_layer_manager import CounterLayerManager
+from .layer_merge_manager import LayerMergeManager
 from .noise_node_manager import NoiseNodeManager, NoiseSession
 from . import noise_generator
 from .curve_filter_manager import (
@@ -30,7 +31,7 @@ __all__ = [
     "MirrorKeyManager", "MirrorTokenStore", "BakeManager", "FollowMatchManager",
     "OffsetHoldManager", "StaggerOffsetSession", "EulerFilterManager",
     "GraphViewManager", "GraphFocusManager", "FillKeyManager", "CURRENT_LAYER",
-    "LayerKeyManager", "CounterLayerManager",
+    "LayerKeyManager", "CounterLayerManager", "LayerMergeManager",
     "CurveFilterSession", "CF_EASE_IN", "CF_EASE_OUT", "CF_LINEAR",
     "CF_EASE_IN_OUT", "cf_selected_channel_attrs",
     "NoiseNodeManager", "NoiseSession", "noise_generator",

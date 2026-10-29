@@ -79,6 +79,11 @@
    같아지도록** 키를 찍은 **보정 additive 레이어**를 새로 만든다. 레이어를 뮤트해 `worldMatrix` 를 재고
    `setKeyframe -animLayer` 의 역산에 맡기므로 누적 모드·가중치·override·`jointOrient`·회전 순서를 다 존중한다.
    긴 구간(1000+ 프레임)은 **200 프레임 청크**로 재서 메모리가 구간 길이와 무관하다.
+   **Merge Layers**(v02.27~): 마야 **Merge Layers 를 프레임 구간 `[Start, End]` 안에서만** 수행한다 — 레이어
+   `a`, `b` 가 `[0, 1000]` 에 키를 갖고 있어도 `[50, 300]` 만 `a + b => b`(기존 레이어) / `=> 새 레이어` /
+   `a + Base => Base` 로 합치고 **구간 밖은 손대지 않는다.** 마야 병합의 본체인 `bakeResults -resolveWithoutLayer`
+   를 그대로 쓰므로 모드·누적 모드·가중치·다른 레이어의 가림을 마야가 풀고, 소스의 구간 안 기여는 이 툴이 중화한다.
+   정수 프레임의 월드 움직임은 **전후가 완전히 같다**(1e-15).
 7. **View** — **보기**를 돕는다(씬을 바꾸지 않는 유일한 카테고리).
    **Graph Focus**(v01.25~): 컨트롤러를 선택하면 그 컨트롤러의 **전체 키 구간**(예: 0~6000f)을
    다 보여주는 대신, **현재 프레임 기준 ± margin 프레임**만 그래프 에디터에 확대해서 보여준다
@@ -672,6 +677,8 @@ A00110_animTool_V02/
     │   ├── mirror_key_manager.py # 컨트롤 키 좌우 미러 (Mirror Key 탭, OpenMaya)
     │   ├── mirror_token_store.py # Framework.core.mirror_tokens 재노출(경로 호환용)
     │   ├── bake_manager.py       # 리스트 노드 구간 bake (Bake 탭, native bakeResults)
+    │   ├── counter_layer_manager.py # 상위 레이어가 바꾼 자식의 월드 T/R 을 되돌리는 보정 레이어 (Bake > Counter Layer)
+    │   ├── layer_merge_manager.py # 애님 레이어 구간 한정 병합 = bakeResults -rwl + 소스 중화 (Bake > Merge Layers)
     │   ├── follow_match_manager.py # follower→target 월드 매치 베이크 (Follow 탭, OpenMaya + blend, maintain offset, 1<-n)
     │   ├── offset_hold_manager.py # 키를 hold+offset 구조로 재배치 (Timing > Offset)
     │   ├── stagger_offset_manager.py # 리스트 순서대로 구간 키를 계단식 오프셋 (Timing > Stagger)
@@ -729,7 +736,7 @@ A00110_animTool_V02.run(True)   # True = reload
 | **Timing** | 키의 **시점** | Move · Offset · Stagger |
 | **Curve** | 커브의 **값·형태** | Euler · Filters(Smooth · Intensity · Interp) |
 | **Transfer** | **다른 오브젝트로** 옮기기 | Copy Key · Mirror Key · Follow |
-| **Bake** | 결과를 **키로 굽기** | Bake · Counter Layer(v02.26~) |
+| **Bake** | 결과를 **키로 굽기** | Bake · Counter Layer(v02.26~) · Merge Layers(v02.27~) |
 | **View** | **보기**(씬 불변) | Graph Focus |
 | **Hot Key** (v02.19~) | 툴이 열린 동안의 **단축키** | Main(Hold · Manipulator Space) |
 
@@ -1417,7 +1424,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 > **값은 커브 그대로 간다.** 레이어 기여분을 다시 계산하지 않으므로, `BaseAnimation`(절대값)
 > → additive 레이어처럼 성격이 다른 레이어로 옮기면 **최종 결과가 달라진다**(그 값의 커브가
 > 그 레이어에 생기는 것뿐이다). 마야의 복사/붙여넣기와 같은 규칙이다. 최종 포즈를 유지한 채
-> 레이어를 정리하고 싶으면 `Bake` 탭을 쓴다.
+> 레이어를 정리하고 싶으면 `Bake` 탭을 쓴다 — 레이어끼리 **결과를 보존하며 합치는** 것은 `Bake > Merge Layers`(v02.27~).
 
 #### Mirror Key
 
@@ -1634,6 +1641,65 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 > 회귀 시험 `tests/test_counter_layer.py`(mayapy, 51 항목). `_SmartLayer` 는 코어가 컴파일 `.pyc` 라 디컴파일 없이
 > 사용자 노출 설명문만 참고했다 — "레이어 켜고/끄고 비교" 원리와 World Space 개념.
 
+#### Merge Layers — 마야 Merge Layers 를 프레임 구간 안에서만 (v02.27~)
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ ┌ Layers to Merge (stack order, top first) ──── [Refresh] ┐  │  ← 체크 목록(JUN_mod_checkList_qt_v01)
+│ │ [ ] lyrTop     additive  w 0.70                          │  │     모드 · weight · [locked] [muted] [solo] 태그
+│ │ [v] a          override  w 1.00                          │  │     기본 체크 = 에디터에서 선택된 레이어
+│ │ [v] b          additive  w 1.00                          │  │
+│ │ [ ] BaseAnimation    base                                │  │
+│ └──────────────────────────────────────────────────────────┘  │
+│ ┌ Result ────────────────────────────────────────────────┐    │
+│ │ (•) Into existing layer  [ b              ▼ ]           │    │  ← 체크한 레이어 중에서(기본 = 가장 아래)
+│ │ ( ) New layer            [ Merged_Layer     ] mode: auto│    │  ← 마야 Auto 규칙 결과를 미리 표시
+│ └────────────────────────────────────────────────────────┘    │
+│ Range  Start [ 50 ][Get Current]  End [ 300 ][Get Current] [Get Sel Range]   ← 둘 다 비우면 소스 전체 키 범위
+│ Sample by [ 1.00 ]  [ ] Smart bake (approximate)  Tolerance [0.5]            │
+│ [v] Verify result  [ ] Selected objects only  [v] Select result layer        │
+│ [ Merge Range ]                                                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**상황**: 레이어 `a`, `b` 에 `[0, 1000]` 키가 있는데 **`[50, 300]` 만** 합치고 싶다. 마야의 Merge Layers 는 전 구간을
+굽고 소스를 지운다. **하는 일**: 마야 병합의 본체인
+`bakeResults -destinationLayer X -resolveWithoutLayer a -resolveWithoutLayer b` 를 **`-time 50:300 -preserveOutsideKeys`**
+로 돌려 "a, b 를 뺀 스택에서 같은 결과가 나오는 값" 을 대상에 굽고, 마야가 소스를 지우던 자리에서 **소스의 구간 안
+기여만 없앤다**(additive = 구간 키 삭제 + identity 키 step, override = `weight` 를 구간에서 0 으로 계단 키).
+경계 `Start-1` / `End+1` 에는 모양 보존 키(`setKeyframe -insert` + `keyTangent fixed`)를 먼저 박는다.
+
+- **Layers to Merge**: 마야에서 Merge Layers 하려고 고르듯 체크한다(스택 순서, 맨 위가 위). 모드·weight·태그가 보인다.
+- **Result**: **Into existing layer** = `a + b => b`(체크한 것 중 하나, 기본 가장 아래. 대상은 weight 1 · 애니메이션 없음).
+  **New layer** = `a + b => c` — 마야 Auto 규칙(소스에 override 가 하나라도 있으면 override, 누적 모드는 과반)으로
+  **가장 위 소스 바로 위**에 만든다. `mode:` 라벨이 결과 모드를 미리 보여 준다. BaseAnimation 을 체크하면 결과는
+  BaseAnimation 뿐이다(임시 additive 레이어를 맨 아래에 굽고 base 커브에 접는다 — `-destinationLayer BaseAnimation`
+  은 소스 커브를 통째로 지운다).
+- **Range**: 정수 프레임, 양 끝 포함. **둘 다 비우면 소스 커브의 전체 키 범위**(= 마야 전체 병합과 같은 동작, 소스엔
+  identity 키만 남는다). `Get Sel Range` 는 그래프 에디터 선택 키의 앞/뒤.
+- **Sample by**(기본 1.0): `bakeResults -sampleBy`. **Smart bake**(기본 OFF): 키를 솎는 대신 **근사**(실측 정수 프레임
+  0.05~7.9 차이) — 켜면 로그에 경고. **Verify result**(기본 ON): 병합 전후 채널 값을 `Start-5..End+5` 정수 프레임에서
+  비교해 최대 편차를 로그에(1e-4 넘으면 경고, 되돌리진 않는다). **Selected objects only**: 씬 선택 오브젝트의 채널만
+  (override 소스와는 불가 — weight 는 레이어 전체). **Select result layer**: 끝나면 결과 레이어만 선택(마야 관례).
+- **Merge Range**: 실행. **채널 × 샘플 > 4000** 이면 진행 팝업(실측 0.22 ms/키). **단일 Undo.**
+
+**정확도 계약**: 정수 프레임은 **구간 안팎 전부** 월드가 완전히 같다(mayapy 실측 1e-15). 구간 밖은 반 프레임까지 같다.
+구간 안의 **프레임 사이**(0.5 등)는 매 프레임 키의 보간이라 달라진다 — **마야 Merge Layers 도 같은 씬에서 반 프레임이
+7.9e-4 다르다**(전 구간을 `Sample by 1` 로 굽기 때문). `Start-1 ~ Start`, `End ~ End+1` 의 프레임 사이도 전이 구간이다.
+
+**거부(로그 `[Merge Layers] Skipped : ...`)**: 소스/대상 lock(편집이 조용히 무시됨) · mute · 씬에 solo · 레퍼런스 ·
+자식 레이어 / 자식을 가진 레이어 · 대상 기존 레이어의 **weight ≠ 1 또는 애니메이션**(bakeResults 가 되돌려 나누지
+않는다 — 새 레이어로) · BaseAnimation → 새 레이어 / 다른 레이어 · `Selected objects only` + override 소스 · **override
+기존 대상에 없던 채널**(override 는 구간 밖에 identity 가 없다 — 새 레이어로). **경고(진행은 함)**: 결과 위에서 같은 채널을
+덮는 비병합 override 레이어(bake 해가 임의 — 마야도 같은 빈틈), Smart bake, override 소스의 키 없는 멤버(정적 값으로
+굽는다, 마야와 같음), additive 소스의 **키 없이 0 이 아닌 정적 값**(레이어가 활성일 때 setAttr 로 넣은 값 — 함께 병합하고
+구간 밖은 커브로 그 값을 유지), 잠긴 채널(bakeResults 가 조용히 건너뛴다 → 제외).
+
+> 계획서: [`plans/A00110_animTool_V02_layer_range_merge_plan.md`](plans/A00110_animTool_V02_layer_range_merge_plan.md)
+> (마야 `performAnimLayerMerge.mel` 분석 · 사전 실측 13/13 · 깨진 가정 11개) · 회귀 시험 `tests/test_layer_range_merge.py`
+> (mayapy, 111 항목: additive/override × 기존/새/Base · by-layer 회전 · 가중치 · 경계 밖 구간 · 소스 3개 · 거부 15종 ·
+> smart · 연속 병합 · 마야 자체 병합 대조 · undo · 정적 멤버 · UI 스모크).
+
 ### 5.8 View 탭 — 보기 보조 (씬을 바꾸지 않는다)
 
 **씬을 전혀 바꾸지 않는** 유일한 카테고리다. 그래서 다른 탭과 섞지 않았다.
@@ -1810,6 +1876,13 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 3. **Range**(기본 현재 타임라인 — 보통 애니메이션 전체) / **Channels**(기본 T·R) / 옵션 확인.
 4. **Create Counter Layer** → 맨 위에 `lyr_glo_counter` 가 생기고 발의 월드가 `lyr_glo` 이전과 같아진다(단일 Undo).
    로그에 개수·구간·건너뛴 채널·노트가 출력된다. 결과가 마음에 안 들면 Ctrl+Z 한 번.
+
+### Bake > Merge Layers (v02.27~)
+1. 레이어 에디터에서 합칠 레이어를 선택(또는 탭에서 체크)하고 **Refresh** — 선택된 레이어가 체크돼 있다.
+2. **Result**: 기존 레이어로(`a + b => b`)면 콤보에서 대상을, 새 레이어면 이름을. Base 가 섞이면 결과는 Base.
+3. **Start / End** 를 넣는다(비우면 소스 전체 키 범위). 그래프 에디터에서 키를 골랐다면 **Get Sel Range**.
+4. **Merge Range** → 구간 안만 대상에 구워지고 소스는 구간 안에서 기여가 0 이 된다. 로그의 `Verified: max deviation`
+   이 1e-10 수준이면 정수 프레임에서 전후가 같다. 아니면 경고와 원인 후보(위 override · smart)가 적힌다. Ctrl+Z 한 번.
 
 ### Transfer > Follow
 1. 따라갈 대상(**target**)들을 선택 → Target 의 **Select Targets**.
@@ -2016,6 +2089,30 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   결과가 달라질 수 있다.
 - **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
 
+### Bake > Merge Layers (`layer_merge_manager.LayerMergeManager.merge_range`)
+- **엔진 = 마야 그대로**: `bakeResults(plugs, time=(s, e), sampleBy, simulation=False, disableImplicitControl=False,
+  preserveOutsideKeys=True, destinationLayer=X, resolveWithoutLayer=[소스들 (+ 기존 대상 자신)])`. 마야 `animLayerMerge`
+  와 다른 점은 `-time`, `-preserveOutsideKeys`, 기존 레이어가 대상이면 **mute 하지 않는 것**, `-removeBakedAttributeFromLayer`
+  를 쓰지 않는 것뿐이다. 32 채널씩 나눠 호출해 진행률을 낸다(채널은 독립 — 한 번에 부르는 것과 시간이 같다, 실측 15.8s vs 15.1s).
+- **plug 집합** = 중화되는 소스들의 합집합(대상 자신의 채널은 다시 굽지 않는다). additive 소스는 커브 있는 멤버 +
+  **정적 값이 identity 가 아닌 멤버**(blend 노드 `inputB`), override 소스는 **모든 멤버**(키 없이도 정적 값으로 덮는다).
+  by-layer(쿼터니언) 회전이 끼면 그 노드의 `rotateX/Y/Z` 를 **셋 다** 넣는다(하나가 빠지면 bake 가 맞출 수 없다 — 실측 2.0 차이).
+- **세 경로**: 기존 레이어(대상 커브에 경계 키 → bake → 대상에 없던 채널은 경계에 identity / 정적 값 키) · 새 레이어(모드 ·
+  누적 모드 = 마야 Auto 규칙, `moveLayerAfter <가장 위 소스>`, `addRelatedKG false` 로 멤버 추가, **mute 한 채** bake,
+  additive 면 경계 identity 키 / override 면 weight 를 밖 0 안 1) · BaseAnimation(임시 additive · by-component · additive
+  scale 레이어를 `children[0]` 앞 = 맨 아래에 굽고 `base'(f) = base(f) + c(f)` 로 접은 뒤 삭제. base 에 커브가 없던 plug 는
+  `setKeyframe(plug, animLayer=root)` 로 커브만 만들고 값은 **커브 노드에** 쓴다 — `animLayer` 경로는 역산한다).
+- **소스 중화**: additive = 커브마다 `s-1` / `e+1` insert + `keyTangent fixed` → `cutKey (s, e)` → `s` identity `-ott step`,
+  `e` identity(identity = 0, 스케일이고 `scaleAccumulationMode` 가 Multiply(1) 면 1). 커브 없는 정적 멤버는 커브를 만들어
+  밖은 그 값, 안은 identity. override = `weight` 계단(`s-1` 현재 step · `s` 0 step · `e` 0 step · `e+1` 현재; weight 가
+  애니메이션이면 insert + fixed 뒤 구간을 지우고 0 키).
+- **왜 step 인가**: `s` 와 `e` 사이에 identity 두 키만 남으면 auto 탄젠트가 이웃(`s-1`) 값 때문에 기울어 구간 안이 0 이
+  아니게 된다. `s` 의 out-tangent 가 step 이면 `[s, e)` 가 정확히 identity 다.
+- **검사**(`validate`): 위 거부 조건 전부 → `(0, "[Merge Layers] Skipped : ...")`, 씬 불변. 잠긴 plug 는 제외 + 경고.
+- **Verify**: `currentTime` 루프로 `Start-5..End+5` 정수 프레임의 채널 값을 전후 비교(월드가 아니라 채널 — 채널이 같으면
+  월드도 같다). 허용치 1e-4.
+- `undo_chunk` + `suspend_refresh`, 현재 프레임 복원, 결과 레이어만 `selected` + `preferred`.
+
 ### Transfer > Follow (`follow_match_manager.FollowMatchManager.match_follow`)
 - **매칭 모드**:
   - **n<-n**(`one_to_many=False`, 기본): `Target[i] → Follower[i]`. 개수가 다르면 **경고 후 중단**
@@ -2175,6 +2272,13 @@ Shift+A bound to Hold Selected Range.  (set: MyHotkeys)
 # Bake
 60 object(s) baked over [1-6000] (6000 frames, constraints kept).
 60 object(s) baked over [1-6000] (6000 frames, constraints baked down).
+
+# Merge Layers
+[Merge Layers] a -> 'b' (additive) : 4 channel(s) on 1 object(s), frames 50-300 (251 samples), 0.1s. Verified: max deviation 3.6e-15 @ f46 (ctl.rotateY). One undo step.
+[Merge Layers] b + a -> new layer 'Merged_Layer' (override) : 10 channel(s) on 1 object(s), frames 50-300 (251 samples), 0.2s. Placed just above 'a'. Verified: max deviation 0.0e+00 @ f45 (ctl.translateX). 'a' (override) : 7 member channel(s) without keys baked as static override values (same as Maya): ctl.rotateX, ... One undo step.
+[Merge Layers] a -> BaseAnimation : 4 channel(s) on 1 object(s), frames 50-300 (251 samples), 0.1s. Verified: max deviation 7.1e-15 @ f47 (ctl.rotateY). One undo step.
+[Merge Layers] Skipped : target layer 'b' weight is 0.6 - it must be 1.0 and not animated (bakeResults does not divide the weight back out; Maya always bakes into a fresh weight-1 layer). Merge into a new layer instead.
+[Merge Layers] b + a -> new layer 'Merged_Layer' (additive) : 6 channel(s) ... [Warning] Verified: max deviation 0.0545 @ f53 (ctl.scaleX) - the result does NOT match the original on integer frames (masked by an override above? smart bake?). Undo if that is not what you want. Warning : Smart bake is on (tol 0.5) - the result matches the original only within that tolerance.
 
 # Follow
 4 follower(s) matched over [1-24] (24 frames, blend 1.0, n<-n, no-offset). No anim layer selected; keys on base curves.

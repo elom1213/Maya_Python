@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-29 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.27 `Bake > Merge Layers`** — 마야 Merge Layers 를 **프레임 구간 안에서만**(`a + b => b` / `=> 새 레이어` / `a + Base => Base`), 월드 움직임 보존. 오전 계획서 → 같은 날 구현 `#A00110_animTool`
+- 구현: `app/core/layer_merge_manager.py`(`LayerMergeManager.merge_range/validate/merge_plugs/list_layers_stack`) + `Bake > Merge Layers` 하위 탭(스택 순서 체크 목록 + 모드/weight 태그 · Result 기존/새 · Range(비우면 소스 전체 키 범위) · Sample by · Smart bake · Verify · Selected objects only · 진행 팝업). 회귀 `tests/test_layer_range_merge.py` **111/111**(additive/override × 기존/새/Base · by-layer 회전 + additive 스케일 · 가중치 정적/애니 · 경계 밖 구간 · 소스 3개 · 거부 15종 · smart · 연속 병합 · 마야 자체 병합 대조 · 성능 · undo 3경로 · override 기존 대상 · 정적 멤버 · 선택 오브젝트 · 진행 · UI 스모크). exp 스크립트는 회귀로 흡수해 삭제.
+- 구현 중 실측으로 추가된 규칙: **override 기존 대상**은 키 없는 멤버의 정적 값을 경계에 되돌리고 멤버 아니던 채널은 거부 · **additive 대상의 정적 멤버**(Additive 스케일 모드의 1 등)도 identity 가 아니라 그 값으로 경계 키(T6 가 잡음) · **additive 소스의 키 없는 정적 값**(blend 노드 `inputB`)도 병합 + 커브로 밖 유지 · **by-layer 회전**은 `rotateX/Y/Z` 세트(하나 빠지면 2.0 틀림) · visibility(Boolean 블렌드)는 정적 감지 제외 · 테스트 레이어 이름 `top` 은 카메라와 겹쳐 `top1` 이 된다.
+- 성능: 50 ctl × 200 plug × 251 f — 32 채널씩 나눠 bake 15.8 s, 한 번에 15.1 s(같다), Verify 포함 17.7 s. 마야 자체 병합은 같은 씬 139 s(오전 실측).
+- 다른 세션의 v02.26 Counter Layer 와 같은 파일(`main_window.py` · `core/__init__.py` · `version.py`)을 이어서 수정 — 시작 전 `git status` 깨끗함 확인, `BAKE_PAGES` 세 번째 탭으로 추가. GUI(실기) 확인 아직.
+- 계획서 상태 `[!done]` + "구현하며 달라진 것". 가이드 `docs/A00110_animTool_V02.md` §1 · 표 · §2 · §5.7 · §6 · §7 · §8, Transfer > Layer 교차 참조.
+
 > [!summary] A00110_animTool_V02 **v02.26 `Bake > Counter Layer`** — 글로벌 컨트롤만 든 레이어(`lyr_glo`)가 바꾼 자식(발)의 **월드 위치·회전을 되돌리는 보정 레이어** 생성. 계획서 → 같은 날 구현 `#A00110_animTool` `#plan`
 - 구현(v02.26): `app/core/counter_layer_manager.py`(`CounterLayerManager.create/validate`) + `Bake > Counter Layer` 하위 탭(TSL · 체크 레이어 목록 · Range · Channels T/R · Step · 이름 · Zero outside / Skip unchanged / Select new · 진행 팝업). 회귀 `tests/test_counter_layer.py` **51/51**(정확도 · by-component · 조인트 · 큰 회전 · 가중치 · **청크 7/1 프레임** · zero_outside · skip_unchanged · step · 두 레이어 · undo · 거부 7종 · lock · 컨스트레인트 · 이름 충돌 · 스케일 노트 · progress). exp 스크립트는 회귀로 흡수해 삭제.
 - **메모리 설계(사용자 요청: 1000+ 프레임)**: 스냅샷을 구간 전체로 들지 않고 **200 프레임 청크**로 "뮤트 → 스냅샷(`array('d')`) → 뮤트 해제 → 키 → 버림" 반복. 상한 = 청크 × 오브젝트 × 16 double 로 구간 길이와 무관. 청크 2 부터는 보정 레이어 자신도 함께 뮤트해야 앞 청크 키의 외삽이 스냅샷을 오염시키지 않는다(테스트 T7 로 확인).
