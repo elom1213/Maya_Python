@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-26
+# last Update date : 2026-10-29
 # A00560_JaliBatch - main window (Qt, standalone)
 #
 # VisemeNet Converter 출력 폴더(22열 txt + json + wav, N 개) -> JALI 컨트롤러를 레퍼런스하고 키를 베이크한 클립 .mb N 개.
@@ -19,6 +19,7 @@ from Framework.qt.qt import (
 )
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 from Framework.qt import MOD_mayapyProcess_qt_v01 as mayapy_process
 from Framework.qt.pin_style import apply_pin_style
 from Framework.core import shell_integration, mayapy_runner, file_opener
@@ -129,6 +130,9 @@ class MainWindow(QWidget):
         self.tabs.setTabToolTip(1, "Open every clip in mayapy and check controller path, failed edits, baked keys, stamp")
         self.batch_tab.generated.connect(self.validate_tab.set_folder)
         root.addWidget(self.tabs, stretch=1)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v01.02, 공용 위젯). 처음 여는 크기(폭 계산)는 fit_to_content 가
+        # 예전대로 정하고, 그 끝에서 set_enabled(True) 로 켠다 - 그 뒤로 높이는 현재 탭을 따른다.
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs, enabled=False)
         root.addWidget(self.log_widget)
 
     @staticmethod
@@ -279,6 +283,9 @@ class MainWindow(QWidget):
         width = min(full_w, avail.width() - max(frame_w, 0))
         height = min(full_h, avail.height() - max(frame_h, 0))
         self.resize(width, height)
+
+        # 처음 여는 크기를 정한 뒤 tabFit 을 켠다 - 이 뒤로는 탭을 바꿀 때마다 높이를 현재 페이지에 맞춘다 (v01.02)
+        self.tab_fit.set_enabled(True)
 
     # ============================================================== Help
 

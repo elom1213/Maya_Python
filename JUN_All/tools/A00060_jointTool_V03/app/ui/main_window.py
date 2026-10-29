@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-16
+# last Update date : 2026-10-29
 # A00060_jointTool_V03 - Qt UI
 #
 # v03.15 (2026-10-16) Orient > Orient / Rotate : rotate 와 jointOrient 가 둘 다 값이 있어도
@@ -45,6 +45,7 @@ import maya.cmds as cmds
 from Framework.core.maya_undo import undo_chunk
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 from tools.A00060_jointTool_V03.app.config.version import VERSION, LAST_UPDATE
 from tools.A00060_jointTool_V03.app.core import curve_joint_manager as crv_mgr
 from tools.A00060_jointTool_V03.app.core import obj_joint_manager as obj_mgr
@@ -234,6 +235,8 @@ class MainWindow(QWidget):
         self.chain_tabs.currentChanged.connect(self._on_tab_changed)
 
         main_layout.addWidget(self.tabs)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v03.16, 공용 위젯 - 중첩 탭 · 스크롤 페이지 모두 따라간다)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
 
         main_layout.addWidget(self.te_log)
 

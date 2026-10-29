@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-23
+# last Update date : 2026-10-29
 # A00330_NamingTool - Qt UI
 #
 # 레거시 maya.cmds 네이밍 툴(JUN_PY_NamingTool_V03_04)을 PySide + QTabWidget 으로 이식.
@@ -28,6 +28,7 @@ from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_filter_qt
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 from Framework.qt.MOD_devMode_qt_v01 import JUN_mod_devMode_qt_v01
 from Framework.core import log_levels
 from Framework.themes.theme_manager import ThemeManager
@@ -114,6 +115,8 @@ class MainWindow(QWidget):
             "Token - name objects from token rules.\n"
             "Set Rename - search and replace inside set names.")
         main_layout.addWidget(self.tabs, stretch=1)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v01.28, 공용 위젯 - 중첩 탭 · 스크롤 페이지 모두 따라간다)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
 
         # v01.17 : 배포 화면에서는 Rename > Token 탭만 쓴다. Dev Mode 토글(개발자 모드에서만)에도 따른다.
         self.token_tab.token_widget.rulesEditableChanged.connect(self.apply_release_tabs)

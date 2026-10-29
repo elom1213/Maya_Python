@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-17
+# last Update date : 2026-10-29
 # A00170_driverTool - Qt UI
 #
 # A00150_remapVal (Remap Value) + A00160_sphericalEye (Spherical Eye) 를
@@ -18,6 +18,7 @@ from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_filter_qt
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 
 from tools.A00170_driverTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00170_driverTool.app.core import (
@@ -103,6 +104,8 @@ class MainWindow(QWidget):
             "Lip zip: close the lips from a corner toward the centre, with the "
             "two directions driven independently.")
         main_layout.addWidget(self.tabs)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v01.34, 공용 위젯 - 중첩 탭 · 스크롤 페이지 모두 따라간다)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
 
         # 로그창을 탭 아래에 배치
         log_group = QGroupBox("Log")

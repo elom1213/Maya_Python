@@ -2,7 +2,7 @@
 title: A00470_MaterialTool 사용법
 aliases: [Material Tool, MaterialTool, A00470, Material Name Check]
 tags: [maya-python, tool-guide, material, naming, convention, qc, json-profile]
-updated: 2026-10-12
+updated: 2026-10-29
 ---
 
 # A00470_MaterialTool 사용법
@@ -508,3 +508,9 @@ Expand 의 이동/복귀/미아 방지, 그리고 **이 툴이 실제로 그 위
 죽지 않고 이유를 로그에 적는지.
 
 > 실제 Maya GUI 에서의 사용 확인은 아직이다(헤드리스 검증만 마쳤다).
+
+## 창 높이 자동 맞춤 (v01.15~)
+
+탭(중첩 포함)을 바꾸면 창 높이가 **지금 보이는 페이지**에 맞게 늘거나 줄어 스크롤 없이 다 보인다. 페이지가 모니터 작업 영역보다
+길면 화면 높이에서 멈추고(스크롤 영역이 있는 페이지는 그 페이지만 스크롤), 창 아래가 화면 밖이면 위로 올린다. 폭은 건드리지 않는다.
+공용 [`JUN_mod_tabFit_qt_v01`](Framework_MOD_tabFit_qt.md) — A00275 v01.38 과 같은 방식. **마야 GUI 확인 아직.**

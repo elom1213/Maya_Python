@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-29
+# last Update date : 2026-10-29
 # A00270_skinMigrate - Qt UI
 #
 # 두 개의 탭:
@@ -15,6 +15,7 @@ from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -74,6 +75,8 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_classic_tab(), "Classic")
         self.tabs.addTab(self._build_migrate_tab(), "Migrate A -> B")
         main_layout.addWidget(self.tabs)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v01.06, 공용 위젯 - 중첩 탭 · 스크롤 페이지 모두 따라간다)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
 
         # 공유 로그
         main_layout.addWidget(self.te_log)

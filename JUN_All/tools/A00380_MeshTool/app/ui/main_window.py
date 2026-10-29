@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-23
+# last Update date : 2026-10-29
 # A00380_MeshTool - Qt UI
 #
 # Peak 탭: 선택한 메시/버텍스를 자기 노말 방향으로 팽창(+)·수축(-) 시킨다.
@@ -36,6 +36,7 @@ import maya.cmds as cmds
 from Framework.core.maya_undo import undo_chunk
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 from tools.A00380_MeshTool.app.config.version import VERSION, LAST_UPDATE
 from tools.A00380_MeshTool.app.core import peak_manager as peak_mgr
 from tools.A00380_MeshTool.app.core import match_manager as match_mgr
@@ -158,6 +159,8 @@ class MainWindow(QWidget):
         self.tabs.addTab(self.build_match_tab(), "Match")
         self.tabs.currentChanged.connect(self.on_tab_changed)
         root.addWidget(self.tabs, 1)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v01.18, 공용 위젯 - 중첩 탭 · 스크롤 페이지 모두 따라간다)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
 
         self.te_log = JUN_mod_log_qt_v01(
             window_title="Mesh Tool - Log",

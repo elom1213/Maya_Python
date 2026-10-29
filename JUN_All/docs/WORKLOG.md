@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-29 (오늘)
 
+> [!summary] **탭마다 창 높이 자동 맞춤을 PySide 툴 30곳에 롤아웃** — A00275 마야 확인 뒤 "모든 툴에" 요청, 공용 `JUN_mod_tabFit_qt_v01` 한 줄씩 `#Framework`
+- 단순 24곳은 `addWidget(self.tabs)` 다음 한 줄. 자체 `fit_to_content` 가 있는 5곳(A00210 · A00240 · A00480 · A00550 · A00560)은 `enabled=False` 로 만들고 그 끝에서 켜서 처음 여는 폭 계산은 예전대로. A00110 V01 은 `_fit_window` 를 위임(이제 탭 전환도 줄어든다). A00110_V02 는 다른 세션 작업 중이라 제외, 탭 없는 창 20곳은 대상 아님.
+- 헬퍼 보강: 루트 탭을 감싼 바깥 `tabs_scroll` 도 QScrollArea sizeHint 24h 잘림 보정 · `self.layout` 속성이 메서드를 가린 툴(A00080) 때문에 `QWidget.layout(window)` 로. ★ 한 창에 인스턴스 둘이면 두 번째 fit 이 창을 최소 높이로 줄인다(A00010 이중 적용으로 발견).
+- 툴마다 버전 +0.01 · version.py 이력 · CHANGELOG(있는 17곳) · 사용법 문서 끝 절. 검증: `Framework/tests/test_tab_fit_rollout.py` 31 툴 131 검사 0 실패(테마 적용, 중첩 탭까지 순회), A00275 34/34. **A00275 외 마야 GUI 확인 아직.**
+
 > [!summary] A00275_skinTool_V01 **v01.38 — 탭마다 창 높이 자동 맞춤** + 공용 `Framework/qt/MOD_tabFit_qt_v01` 신규(첫 적용 툴) `#A00275_skinTool_V01` `#Framework`
 - 요청: "세로가 길면 스크롤로 보는 대신, 탭마다 세로 길이에 맞춰 창 길이가 자동으로 조절되어 스크롤 없이 다 보이게. A00275 에 먼저, 잘 되면 모든 툴".
 - 원리: 안 보이는 탭 페이지의 세로 size policy 를 `Ignored` 로 → `QStackedLayout` 이 그 페이지를 0 으로 쳐서 탭 sizeHint 가 현재 페이지만 따른다(중첩 탭 포함). 탭 전환 다음 이벤트 루프에 `resize`(폭 유지), 모니터 작업 영역 − 타이틀 바로 자르고 화면 밖이면 위로.

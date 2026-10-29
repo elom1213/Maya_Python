@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-17
+# last Update date : 2026-10-29
 # A00145_RigConnect - Qt UI
 #
 # MEL ConnectionTool V04.02 의 3탭(Constrain / Connect / List Connected)을 PySide 로
@@ -30,6 +30,7 @@ from Framework.core.maya_undo import undo_chunk
 from Framework.core.mirror_tokens import MirrorTokenStore
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 from tools.A00145_RigConnect.app.config.version import VERSION, LAST_UPDATE
 from tools.A00145_RigConnect.app.core import match_manager as mch_mgr
 from tools.A00145_RigConnect.app.core import constrain_manager as con_mgr
@@ -142,6 +143,8 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_attribute_tab(), "Attribute")
         self.tabs.addTab(self._scrolled(self._build_mirror_tab()), "Mirror")
         main_layout.addWidget(self.tabs)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v01.68, 공용 위젯 - 중첩 탭 · 스크롤 페이지 모두 따라간다)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
 
         main_layout.addWidget(self.te_log)
 

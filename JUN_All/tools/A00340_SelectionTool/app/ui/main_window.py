@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-28
+# last Update date : 2026-10-29
 # A00340_SelectionTool - Qt UI (in-Maya)
 #
 # 마야에서 선택된 오브젝트들을 버튼 하나로 빠르게 다시 선택하는 툴.
@@ -40,6 +40,7 @@ from Framework.qt.maya_window import maya_main_window
 from Framework.qt.pin_style import apply_pin_style
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 from Framework.core import file_opener
 
 from tools.A00340_SelectionTool.app.config.version import VERSION, LAST_UPDATE
@@ -161,6 +162,8 @@ class MainWindow(QWidget):
         self.tabs.setTabToolTip(0, "Buttons grouped in categories, one profile json per set.")
         self.tabs.setTabToolTip(1, "Named object lists, one json file per rule - select them in any scene.")
         main_layout.addWidget(self.tabs, stretch=1)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v01.19, 공용 위젯 - 중첩 탭 · 스크롤 페이지 모두 따라간다)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
 
         # 마지막에 보던 탭으로 연다. 바뀌면 저장.
         last_tab = prefs_mod.get_setting(ACTIVE_TAB_KEY, 0)

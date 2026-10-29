@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# last Update date : 2026-06-24
+# last Update date : 2026-10-29
 # Python Script by Ji Hun Park
 
 # KWI creator V03 - Maya in-DCC (PySide) version
@@ -28,6 +28,7 @@ from Framework.qt.qt import (
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 
 from tools.A00080_KWI_creator_V03.app.config.version import VERSION
 from tools.A00080_KWI_creator_V03.app.core.KWI_creator import KWI_creator
@@ -203,6 +204,8 @@ class MainWindow(QWidget):
 
         # 탭 아래에 로그를 공유로 둔다 (두 탭이 같은 로그를 쓴다)
         self.layout.addWidget(self.tabs)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v01.08, 공용 위젯 - 중첩 탭 · 스크롤 페이지 모두 따라간다)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
         self.layout.addWidget(self.log_widget)
 
         # 초기 개수 표시 (예: "Target bones (Root bones) : 0")

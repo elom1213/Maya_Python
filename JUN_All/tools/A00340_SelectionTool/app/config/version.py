@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-26
+# last Update date : 2026-10-29
 # A00340_SelectionTool - version info
 
 # 01.07  View > Show Controls : Controls pane 을 통째로 숨기고 보인다(접기와 달리 영역이
@@ -46,6 +46,9 @@
 #        프로파일 json 은 그대로, 선택할 때만 {원래 ns: 대상 ns} 로 바꿔 끼운다. 후보 = 씬에서 이 프로파일 컨트롤러가
 #        있는 네임스페이스(찾은 수/전체). 프로파일마다 · PC 마다 기억(active.json), 캡처는 원래 ns 로 되돌려 저장.
 #        계획서 docs/plans/A00340_SelectionTool_namespace_remap_plan.md.
+# 01.19  창 높이 자동 맞춤 - 탭(중첩 포함)을 바꿀 때마다 창 높이를 지금 보이는 페이지에 맞춘다.
+#        스크롤 없이 다 보이고 짧은 페이지로 가면 줄어든다. 페이지가 화면보다 길면 화면 높이에서 멈춤.
+#        공용 Framework/qt/MOD_tabFit_qt_v01 (A00275 v01.38 과 같은 방식)
 
-VERSION = "01.18"
-LAST_UPDATE = "2026-10-28"
+VERSION = "01.19"
+LAST_UPDATE = "2026-10-29"

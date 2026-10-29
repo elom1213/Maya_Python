@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-19
+# last Update date : 2026-10-29
 # A00550_PoseMapper - Qt UI (in-Maya). 탭 2개 + 공용 로그.
 #   Pose Map      : 음소 어트리뷰트 -> 블렌드셰이프 포즈 (app/ui/pose_map_tab.py)
 #   Blend Weights : blendWeighted input / weight 편집 (app/ui/blend_weights_tab.py)
@@ -12,6 +12,7 @@ from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 from Framework.core import file_opener
 
 from tools.A00550_PoseMapper.app.config.version import VERSION, LAST_UPDATE
@@ -69,6 +70,9 @@ class MainWindow(QWidget):
         self.tabs_scroll.setFrameShape(QFrame.NoFrame)
         self.tabs_scroll.setWidget(self.tabs)
         layout.addWidget(self.tabs_scroll, 1)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v01.07, 공용 위젯). 처음 여는 크기(폭 계산)는 fit_to_content 가
+        # 예전대로 정하고, 그 끝에서 set_enabled(True) 로 켠다 - 그 뒤로 높이는 현재 탭을 따른다.
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs, enabled=False)
 
         log_box = QGroupBox("Log")
         log_layout = QVBoxLayout(log_box)
@@ -103,6 +107,9 @@ class MainWindow(QWidget):
             width = min(width, avail.width())
             height = min(height, avail.height() - frame_h)
         self.resize(width, height)
+
+        # 처음 여는 크기를 정한 뒤 tabFit 을 켠다 - 이 뒤로는 탭을 바꿀 때마다 높이를 현재 페이지에 맞춘다 (v01.07)
+        self.tab_fit.set_enabled(True)
 
     def closeEvent(self, event):
         if hasattr(self.pose_tab, "stop_preview"):

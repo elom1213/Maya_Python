@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-27
+# last Update date : 2026-10-29
 # A00390_WindTool_V03 - Qt UI
 #
 # TSL 에 본 체인을 리스트업하고, 회전(또는 이동) 축에 싸인 주기함수 키프레임을 찍어
@@ -19,6 +19,7 @@ import maya.cmds as cmds
 from Framework.core.maya_undo import undo_chunk
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 from tools.A00390_WindTool_V03.app.config.version import VERSION, LAST_UPDATE
 from tools.A00390_WindTool_V03.app.core import wind_manager as wind_mgr
 from tools.A00390_WindTool_V03.app.core import wave_manager as wave_mgr
@@ -253,6 +254,8 @@ class MainWindow(QWidget):
                 "Works on every tab's drivers."
                 .replace("@", chr(10)))
         root.addWidget(self.tabs)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v03.03, 공용 위젯 - 중첩 탭 · 스크롤 페이지 모두 따라간다)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
 
 
         # 로그

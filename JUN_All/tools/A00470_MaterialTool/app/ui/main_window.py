@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-17
+# last Update date : 2026-10-29
 # A00470_MaterialTool - Qt UI (in-Maya)
 #
 #   Name Check    : 리스트업한 메시의 머티리얼 이름이 프로파일(JSON) 규칙에 맞는지 진단
@@ -21,6 +21,7 @@ from Framework.qt.qt import (
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 from Framework.qt.pin_style import apply_pin_style
 
 from tools.A00470_MaterialTool.app.config.version import VERSION, LAST_UPDATE
@@ -83,6 +84,8 @@ class MainWindow(QWidget):
         self.tabs.addTab(self.copy_material_tab, "Copy Material")
 
         main_layout.addWidget(self.tabs, stretch=1)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v01.15, 공용 위젯 - 중첩 탭 · 스크롤 페이지 모두 따라간다)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
         main_layout.addWidget(self.log_view)
 
     # ==================================================================

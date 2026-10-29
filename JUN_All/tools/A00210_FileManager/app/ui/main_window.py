@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-23
+# last Update date : 2026-10-29
 # A00210_FileManager - main window (Qt, standalone)
 #
 # Maya 씬 파일(.mb/.ma)의 작업 기록을 관리한다.
@@ -52,6 +52,7 @@ from Framework.qt.qt import (
 )
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 from Framework.qt.pin_style import apply_pin_style
 from Framework.core import shell_integration
 
@@ -360,6 +361,9 @@ class MainWindow(QWidget):
         self.tabs_scroll.setFrameShape(QFrame.NoFrame)
         self.tabs_scroll.setWidget(self.tabs)
         root.addWidget(self.tabs_scroll, stretch=1)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v01.42, 공용 위젯). 처음 여는 크기(폭 계산)는 fit_to_content 가
+        # 예전대로 정하고, 그 끝에서 set_enabled(True) 로 켠다 - 그 뒤로 높이는 현재 탭을 따른다.
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs, enabled=False)
         root.addWidget(self.log_widget)
         self._fitted = False
 
@@ -490,6 +494,9 @@ class MainWindow(QWidget):
         y = min(max(frame.top(), avail.top()), max(avail.top(), avail.bottom() - frame.height() + 1))
         if (x, y) != (frame.left(), frame.top()):
             self.move(x, y)
+
+        # 처음 여는 크기를 정한 뒤 tabFit 을 켠다 - 이 뒤로는 탭을 바꿀 때마다 높이를 현재 페이지에 맞춘다 (v01.42)
+        self.tab_fit.set_enabled(True)
 
     def _build_file_manager_tab(self):
         page = QWidget()

@@ -1,6 +1,9 @@
 # Search Tool
 # Merge of legacy JUN_PY_SelectionTool_V02_01 (Selection) +
 # JUN_PY_SearchTool_V01_02 (Search) into one tabbed PySide tool.
+# 01.06  창 높이 자동 맞춤 - 탭(중첩 포함)을 바꿀 때마다 창 높이를 지금 보이는 페이지에 맞춘다.
+#        스크롤 없이 다 보이고 짧은 페이지로 가면 줄어든다. 페이지가 화면보다 길면 화면 높이에서 멈춤.
+#        공용 Framework/qt/MOD_tabFit_qt_v01 (A00275 v01.38 과 같은 방식)
 
-VERSION = "01.05"
-LAST_UPDATE = "2026-09-17"
+VERSION = "01.06"
+LAST_UPDATE = "2026-10-29"

@@ -29,7 +29,7 @@
 
 - [mayapy headless verify](mayapy-headless-verify.md) — maya.cmds 동작은 mayapy + standalone 으로 실측
 - [offscreen size needs theme](offscreen-size-needs-theme.md) — 테마 입히고 재라, 오프스크린 px > 마야 px (잰 값을 박지 말 것)
-- [tabFit: 탭마다 창 높이 자동](framework-tabfit-widget.md) — `JUN_mod_tabFit_qt_v01(window, tabs)` 한 줄, 숨은 페이지 세로 Ignored, **QScrollArea.sizeHint 는 24h 로 잘림**, A00275 v01.38 첫 적용 → GUI 확인 뒤 전 툴
+- [tabFit: 탭마다 창 높이 자동](framework-tabfit-widget.md) — `JUN_mod_tabFit_qt_v01(window, tabs)` 한 줄, 숨은 페이지 세로 Ignored, **QScrollArea.sizeHint 는 24h 로 잘림**, 탭 있는 PySide 31툴 전부 적용(A00110_V02 만 미적용) · 한 창에 하나만 · 새 툴도 이 한 줄
 - [QTabWidget min size = all pages](qtabwidget-min-size-hidden-pages.md) — 숨은 페이지까지 최소의 최댓값 → 창이 못 줄어듦, 탭을 QScrollArea 에 + fit_to_content
 - [window taller than screen](window-taller-than-screen-ghost.md) — 화면 밖 잘림 = "로그창 2개", 탭 스크롤 + 작업 영역 높이
 - [QApplication before standalone](qapplication-before-maya-standalone.md) · [standalone app package collision](standalone-app-package-collision.md)(`tools.<tool>.app.*`)

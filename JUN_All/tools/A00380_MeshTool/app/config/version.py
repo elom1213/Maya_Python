@@ -15,9 +15,12 @@
 #        Catch / Delete / Rename + UV Sets 표(Object / UV Sets / Rule), 로그의 [wrong_name] 빨강.
 #        코어 uv_set_manager.py · 표 uv_set_table.py 는 A00050 파일 그대로, 탭은 app/ui/uv_tab.py.
 #        Help > UV Sets Rule. 원본 A00050_uvTool_V02 는 남긴다
+# 01.18  창 높이 자동 맞춤 - 탭(중첩 포함)을 바꿀 때마다 창 높이를 지금 보이는 페이지에 맞춘다.
+#        스크롤 없이 다 보이고 짧은 페이지로 가면 줄어든다. 페이지가 화면보다 길면 화면 높이에서 멈춤.
+#        공용 Framework/qt/MOD_tabFit_qt_v01 (A00275 v01.38 과 같은 방식)
 
-VERSION = "01.17"
-LAST_UPDATE = "2026-09-23"
+VERSION = "01.18"
+LAST_UPDATE = "2026-10-29"
 
 # 01.06  Match 탭 From 리스트의 List From Mesh / Add / Del 버튼 글자가 잘리던 문제.
 #        TSL 위젯 전체에 걸려 있던 setMaximumHeight 를 치우고 리스트에만 높이를 제한한다.

@@ -142,3 +142,9 @@ A00210 Maya 탭과 같다. 얼린 exe 는 `launch.spec` datas 로 `app/maya` 와
 **확인 기록 (2026-10-26, mayapy 2024 · Windows 11)**: M0 실측 8항목(계획서 §11) → 코어 33 · 워커 32(5 클립 생성 · 재열기 키 수 = 프레임 + 1 ·
 failedEdits 0 · DUMMY_IN 0 · Skip/Overwrite/backup · 3번째에서 취소 · 깨진 txt 하나만 failed · Validate 5 ok · 이름 바꾼 컨트롤러 Repath → failedEdits 2 ·
 되돌리면 0) · UI 30(가짜 워커 + 실제 mayapy QProcess 1회). **실제 화면에서 창을 열어 본 것은 아직**(오프스크린만) · exe 빌드 미실행.
+
+## 창 높이 자동 맞춤 (v01.02~)
+
+탭(중첩 포함)을 바꾸면 창 높이가 **지금 보이는 페이지**에 맞게 늘거나 줄어 스크롤 없이 다 보인다. 페이지가 모니터 작업 영역보다
+길면 화면 높이에서 멈추고(스크롤 영역이 있는 페이지는 그 페이지만 스크롤), 창 아래가 화면 밖이면 위로 올린다. 폭은 건드리지 않는다(처음 여는 크기는 예전 `fit_to_content` 그대로, 그 뒤 높이만 따라간다).
+공용 [`JUN_mod_tabFit_qt_v01`](Framework_MOD_tabFit_qt.md) — A00275 v01.38 과 같은 방식. **마야 GUI 확인 아직.**

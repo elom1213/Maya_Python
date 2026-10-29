@@ -3,6 +3,12 @@
 `A00130_ControlRig`(V01)의 **템플릿 조인트 패러다임 재작성판**이다.
 계획서: `JUN_All/docs/plans/A00130_ControlRig_V02_plan.md`
 
+## v02.29 (2026-10-29)
+
+- **[UI] 탭마다 창 높이가 자동으로 맞춰진다.** 탭(중첩 포함)을 바꾸면 창 높이가 지금 보이는 페이지에 맞게 늘거나 줄어
+  스크롤 없이 다 보인다. 페이지가 모니터 작업 영역보다 길면 화면 높이에서 멈춘다. 폭은 그대로.
+  공용 `JUN_mod_tabFit_qt_v01` — A00275 v01.38 과 같은 방식 (`docs/Framework_MOD_tabFit_qt.md`). **마야 GUI 확인 아직.**
+
 ## v02.28 (2026-09-28)
 **[Change] Match 의 IK 세션이 폴 벡터 offset 을 지킨다 (기본) — 체인을 폴 평면에 맞추고 바뀐 길이를 쓴다.**
 계획서: `JUN_All/docs/plans/A00060_A00130_ik_edit_keep_pv_offset_plan.md`

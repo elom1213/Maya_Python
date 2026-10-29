@@ -2,6 +2,12 @@
 
 All notable changes to this tool are documented here.
 
+## [01.31] - 2026-10-29
+
+- **[UI] 탭마다 창 높이가 자동으로 맞춰진다.** 탭(중첩 포함)을 바꾸면 창 높이가 지금 보이는 페이지에 맞게 늘거나 줄어
+  스크롤 없이 다 보인다. 페이지가 모니터 작업 영역보다 길면 화면 높이에서 멈춘다. 폭은 그대로(처음 여는 크기는 예전 `fit_to_content` 그대로, 그 뒤 높이만 따라간다).
+  공용 `JUN_mod_tabFit_qt_v01` — A00275 v01.38 과 같은 방식 (`docs/Framework_MOD_tabFit_qt.md`). **마야 GUI 확인 아직.**
+
 ## [01.30] - 2026-10-23
 ### Changed
 - **Buttons follow the window width.** Narrowing the window now narrows the ShortCut buttons with it;

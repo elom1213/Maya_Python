@@ -11,7 +11,19 @@ updated: 2026-10-29
 |------|------|
 | `JUN_All/Framework/qt/MOD_tabFit_qt_v01.py` | 창 + 루트 `QTabWidget` 에 붙는 `QObject`. 중첩 탭 · `QScrollArea` 페이지를 모두 따라간다 |
 
-**첫 적용: `A00275_skinTool_V01` v01.38 (2026-10-29).** 잘 되면 같은 한 줄로 모든 PySide 툴에 적용한다.
+**첫 적용: `A00275_skinTool_V01` v01.38 (2026-10-29).** 사용자가 마야에서 확인한 뒤 같은 날 **탭이 있는 PySide 툴 30곳 전부**에 적용했다(아래 사용처).
+
+## 사용처 (2026-10-29 롤아웃, 31 툴)
+
+| 방식 | 툴 |
+|------|----|
+| **한 줄 추가** — `addWidget(self.tabs)` 다음에 `self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)` | A00010_V02 · A00060_V02 · A00060_V03 · A00080_V03 · A00130_V02 · A00145 · A00170 · A00180 · A00190 · A00270 · A00275 · A00290 · A00290_V02 · A00310 · A00330 · A00340 · A00380 · A00390 · A00390_V02 · A00390_V03 · A00400 · A00430 · A00440 · A00460 · A00470 |
+| **`enabled=False` 로 만들고 자체 `fit_to_content` 끝에서 `set_enabled(True)`** — 처음 여는 크기(폭 계산 · 화면 제한)는 예전 코드가, 그 뒤 높이는 tabFit 이 | A00210_FileManager · A00240_PathTool · A00480_FileTool · A00550_PoseMapper · A00560_JaliBatch |
+| **자체 `_fit_window` 를 tabFit 에 위임** — 페이지는 그대로 `JUN_mod_fit_tab_page_v01`, 탭 전환도 이제 줄어든다(grow_only 인자는 무시) | A00110_animTool (V01) |
+
+적용하지 않은 곳: **`A00110_animTool_V02`** — 같은 구조지만 다른 세션이 작업 중이라 손대지 않았다(자체 grow-only fit 은 있다).
+탭이 없는 창(A00030_V02 · A00040_V02 · A00050_V02 · A00120 · A00140 · A00150 · A00160 · A00220 · A00260 · A00280 · A00300 · A00350 · A00360 · A00370 · A00410 · A00420 · A00450 · A00490 · A00540 · A00570 · 템플릿)은 맞출 탭이 없다.
+Shrink 가 있는 툴(A00210 · A00240 · A00560)은 줄인 동안 탭이 숨어 있어 tabFit 이 끼어들지 않고, 되돌리면 예전 크기로 돌아간다.
 
 ## 왜
 
@@ -57,11 +69,22 @@ self.tab_fit.set_enabled(False)       # 끄기 - 정책을 되돌리고 더는 �
 
 ## 조심할 것
 
+- **한 창에 인스턴스 하나만.** 같은 창에 두 번 만들면(롤아웃 스크립트가 A00010 에 두 번 적용됐었다) 두 번째 `fit()` 이 창을
+  **최소 높이로 줄여 버린다**(오프스크린 실측 1060 → 793). 한 인스턴스로 `fit()` 을 연달아 불러도 안정적이다.
+- `self.layout = QVBoxLayout(self)` 처럼 **`layout()` 메서드를 속성으로 가린 툴**(A00080 등)이 있다. 위젯 안에서는
+  `QWidget.layout(window)` 로 부른다 — `window.layout()` 은 `'QVBoxLayout' object is not callable`.
 - **오프스크린 px 은 실제 마야보다 크다**([[offscreen-size-needs-theme]]). 시험의 1295px(Expand Bind) 같은 절대값을 믿지 말고
   "창 높이 = 내용 높이, 뷰포트 ≥ 내용" 같은 **상대 조건**으로 본다. 1080 모니터에선 긴 페이지가 화면 제한에 걸려 스크롤될 수 있다.
 - `fit()` 은 창이 보인 뒤에 불러야 뷰포트 보정이 맞는다. 생성자에서 직접 부르지 말고 `fit_later()`.
 - 페이지가 `QScrollArea` 가 아니면(내용 위젯을 바로 페이지로) 규칙 1 만으로 맞는다 — A00110 의 `JUN_mod_fit_tab_page_v01` 과 같은 결과.
 - 버튼 + `QStackedWidget` 식 페이지 전환은 `QTabWidget` 이 아니라 따라가지 않는다. 그 툴은 `fit_later()` 를 직접 부른다.
+
+## 검증 — 롤아웃 전수 (2026-10-29, 31 툴 · 131 검사 · 0 실패)
+
+`JUN_All/Framework/tests/test_tab_fit_rollout.py`. tabFit 을 단 모든 툴의 `MainWindow` 를 실제로 만들어(각 `launch.py` 의 테마) 보이고,
+루트 탭과 그 안의 중첩 탭을 전부 돌며 **창 높이 = `content_height()`(+16 이내) · `shortfall() <= 0`(스크롤 불필요) · 폭 불변
+(페이지 최소 폭이 더 넓어 Qt 가 넓힌 경우만 예외)** 을 본다. 화면보다 긴 페이지(A00210 File Manager 등)는 작업 영역에서 멈춘 것으로 통과.
+A00275 전용 시험 34/34 도 그대로. **마야 GUI 는 A00275 만 확인했고 나머지 30곳은 아직.**
 
 ## 검증 (2026-10-29, A00275 v01.38, mayapy 2024 + 오프스크린 Qt + green_dark 테마) — 34/34
 

@@ -104,6 +104,9 @@
 #        connection is broken and replaced (connectAttr -force, the previous behaviour).
 #        Applies to both Source -> Destination and Destination -> Source. Only the driven
 #        side is checked - a driver already feeding other attributes still connects.
+# 01.68  창 높이 자동 맞춤 - 탭(중첩 포함)을 바꿀 때마다 창 높이를 지금 보이는 페이지에 맞춘다.
+#        스크롤 없이 다 보이고 짧은 페이지로 가면 줄어든다. 페이지가 화면보다 길면 화면 높이에서 멈춤.
+#        공용 Framework/qt/MOD_tabFit_qt_v01 (A00275 v01.38 과 같은 방식)
 
-VERSION = "01.67"
-LAST_UPDATE = "2026-10-26"
+VERSION = "01.68"
+LAST_UPDATE = "2026-10-29"

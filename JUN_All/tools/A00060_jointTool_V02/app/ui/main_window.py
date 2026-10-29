@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-07-30
+# last Update date : 2026-10-29
 # A00060_jointTool_V02 - Qt UI
 #
 # MEL JointTool V05.03 의 3탭(Curve / Divide / Aim)을 PySide 로 포팅하고,
@@ -25,6 +25,7 @@ import maya.cmds as cmds
 from Framework.core.maya_undo import undo_chunk
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 from tools.A00060_jointTool_V02.app.config.version import VERSION, LAST_UPDATE
 from tools.A00060_jointTool_V02.app.core import curve_joint_manager as crv_mgr
 from tools.A00060_jointTool_V02.app.core import obj_joint_manager as obj_mgr
@@ -114,6 +115,8 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_hair_tab(), "Hair")
         self.tabs.addTab(self._build_ik_edit_tab(), "IK Edit")
         main_layout.addWidget(self.tabs)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v01.08, 공용 위젯 - 중첩 탭 · 스크롤 페이지 모두 따라간다)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
 
         main_layout.addWidget(self.te_log)
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-06
+# last Update date : 2026-10-29
 # A00110_animTool - Qt UI
 
 from Framework.qt.qt import *
@@ -12,6 +12,7 @@ from Framework.qt.maya_window import maya_main_window
 from Framework.core.maya_refresh import force_refresh
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 
 print("QT version  :  " + str(QT_VERSION))
 
@@ -180,6 +181,8 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._build_follow_tab(), "Follow")
         self.tabs.addTab(self._build_graph_focus_tab(), "Graph Focus")
         main_layout.addWidget(self.tabs)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v01.45, 공용 위젯 - 중첩 탭 · 스크롤 페이지 모두 따라간다)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
 
         # 탭 전환 시에는 '현재 탭' 콘텐츠에 맞추되 줄이지 않고 필요할 때만 늘린다(grow_only).
         # 사용자가 리스트업 후 창을 키워 둔 상태에서 탭을 눌렀다고 창이 갑자기 작아지지 않게 한다.
@@ -220,23 +223,11 @@ class MainWindow(QWidget):
         QTimer.singleShot(0, lambda: self._fit_window(grow_only=grow_only))
 
     def _fit_window(self, grow_only=False):
-        """현재 탭 콘텐츠 높이에 맞춰 창 높이를 조정(너비는 유지).
-        탭 페이지는 JUN_mod_fit_tab_page_v01 라 숨은 탭은 sizeHint 0 → 창이 현재 탭에만 맞춰진다.
-        page.adjustSize() 만으로는 QTabWidget 내부 QStackedLayout 의 캐시된 sizeHint 가
-        갱신되지 않으므로(섹션 접을 때 창이 안 줄어듦), tabs.adjustSize() 로 강제 재계산한다.
-
-        grow_only=True 면 콘텐츠가 현재 창보다 클 때만 늘리고 줄이지는 않는다. 섹션 토글(접기)
-        때는 grow_only=False 로 호출해 빈 공간을 회수한다(접으면 창이 줄어드는 동작 유지)."""
-        page = self.tabs.currentWidget()
-        if page is not None:
-            page.adjustSize()
-        self.tabs.adjustSize()
-        self.tabs.updateGeometry()
-        self.layout().activate()
-        target_h = self.sizeHint().height()
-        if grow_only:
-            target_h = max(self.height(), target_h)
-        self.resize(self.width(), target_h)
+        """v01.45 : 공용 JUN_mod_tabFit_qt_v01 에 위임 - 탭 전환 · 섹션 접기 모두 **현재 페이지 높이**로 맞춘다
+        (줄어들기도 한다). grow_only 는 호환용 인자로 남겨 두고 무시한다 - 사용자 요청(2026-10-29)은 탭마다
+        창 높이가 늘고 줄며 따라오는 것. 페이지는 여전히 JUN_mod_fit_tab_page_v01 이라 숨으면 sizeHint 0 이고,
+        tabFit 은 거기에 세로 Ignored 정책 · 화면 높이 제한 · 화면 밖 이동을 더한다."""
+        return self.tab_fit.fit()
 
     # --------------------------------------------------
     # Tab builders

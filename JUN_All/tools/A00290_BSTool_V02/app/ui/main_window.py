@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-03
+# last Update date : 2026-10-29
 # A00290_BSTool_V02 - Qt UI (V01 의 탭을 카테고리 3 / 기능 7 의 2단으로 재편)
 #
 # 탭 구성 — 상위 = 카테고리("무엇을 바꾸는가"), 하위 = 기능
@@ -45,6 +45,7 @@ import maya.cmds as cmds
 from Framework.core.maya_undo import undo_chunk
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 from tools.A00290_BSTool_V02.app.config.version import VERSION, LAST_UPDATE
 from tools.A00290_BSTool_V02.app.core import (EditBSManager, BaseShapeManager,
                                           MixManager, ShapeEditorManager,
@@ -365,6 +366,8 @@ class MainWindow(QWidget):
         self.tabs.currentChanged.connect(lambda *_a: self._update_se_timer())
         self.shape_tabs.currentChanged.connect(lambda *_a: self._update_se_timer())
         main_layout.addWidget(self.tabs)
+        # 탭마다 창 높이를 현재 페이지에 맞춘다 (v02.04, 공용 위젯 - 중첩 탭 · 스크롤 페이지 모두 따라간다)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
 
         # 공용 로그
         self.te_log = JUN_mod_log_qt_v01(

@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-26
+# last Update date : 2026-10-29
 # A00560_JaliBatch - version info
 
 # 01.00  Standalone (PySide, outside Maya). Batch tab: a VisemeNet Converter output folder (22-column txt + .visemenet.json
@@ -20,6 +20,9 @@
 #        The environment lives in %USERPROFILE%\.jun_jalibatch\venv (JUN_JALIBATCH_HOME overrides) - the PySide6 wheel
 #        has a 151-character path, so a venv inside this (86-character) tool folder breaks the Windows 260 limit.
 #        requirements.txt = PySide6_Essentials (pyinstaller just for build_exe.bat). Verified on Python 3.14.9 + PySide6 6.12.
+# 01.02  창 높이 자동 맞춤 - 탭(중첩 포함)을 바꿀 때마다 창 높이를 지금 보이는 페이지에 맞춘다.
+#        스크롤 없이 다 보이고 짧은 페이지로 가면 줄어든다. 페이지가 화면보다 길면 화면 높이에서 멈춤.
+#        공용 Framework/qt/MOD_tabFit_qt_v01 (A00275 v01.38 과 같은 방식) · 처음 여는 폭은 예전 fit_to_content 그대로
 
-VERSION = "01.01"
-LAST_UPDATE = "2026-10-26"
+VERSION = "01.02"
+LAST_UPDATE = "2026-10-29"

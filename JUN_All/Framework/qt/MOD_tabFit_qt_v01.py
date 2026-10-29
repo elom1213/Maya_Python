@@ -20,7 +20,8 @@ JUN_mod_tabFit_qt_v01 - 탭을 바꿀 때마다 창 높이를 **지금 보이는
 2. 페이지가 `QScrollArea` 면 그 sizeHint 는 믿지 않는다 - **`QScrollArea.sizeHint()` 는 글자 높이의
    24배(12px 글꼴이면 약 350px)로 잘려 있다**(Qt 소스 `boundedTo(36h, 24h)`, sizeAdjustPolicy 와 무관).
    그래서 창 sizeHint 에 **(안 내용 sizeHint + 테두리) - 스크롤 영역 sizeHint** 만큼을 더한다.
-   보이는 사슬(바깥 탭의 현재 페이지 안에 든 것)의 스크롤 페이지마다 더한다. minimumSizeHint 는 그대로
+   보이는 사슬(바깥 탭의 현재 페이지 안에 든 것)의 스크롤 페이지마다, 그리고 **루트 탭 위젯을 통째로 감싼
+   바깥 스크롤 칸**(`tabs_scroll` 패턴)에도 같은 보정을 한다. minimumSizeHint 는 그대로
    작아서, 창을 손으로 줄이면 예전처럼 스크롤이 생긴다 - 스크롤 영역은 **화면보다 긴 페이지의 안전망**으로 남는다.
 3. 탭이 바뀌면(모든 QTabWidget 의 `currentChanged`) 다음 이벤트 루프에서 창을 `sizeHint` 높이로
    `resize` 한다. 폭은 건드리지 않는다. 높이는 창이 있는 모니터의 **작업 영역 - 타이틀 바**를
@@ -42,6 +43,8 @@ JUN_mod_tabFit_qt_v01 - 탭을 바꿀 때마다 창 높이를 **지금 보이는
 
 - `tabs` 아래의 QTabWidget 은 전부(중첩 포함) 자동으로 따라간다. 나중에 생긴 탭 위젯도 다음 fit 때 잡는다.
 - `enabled=False` 로 만들거나 `set_enabled(False)` 로 끄면 정책만 되돌리고 아무것도 하지 않는다.
+  자체 `fit_to_content`(처음 열 때 폭까지 계산)가 있는 툴은 **`enabled=False` 로 만들고 그 끝에서
+  `set_enabled(True)`** — 폭은 예전 계산대로, 높이는 그 뒤 현재 탭에 맞춘다(A00210 · A00240 · A00480 · A00550 · A00560).
 - 창 밖 다른 위젯(로그창 등)은 레이아웃의 sizeHint 그대로 더해진다. 로그창처럼 늘어나는 위젯은
   `setMaximumHeight` 가 있어야 창이 그만큼만 커진다.
 
@@ -53,6 +56,15 @@ from Framework.qt.qt import *
 
 # 페이지의 원래 세로 정책을 기억해 두는 property 이름
 _ORIG_VPOLICY = "_jun_tabFit_vpolicy"
+
+
+def _window_layout(window):
+    """창의 레이아웃. ★ 툴 중에 `self.layout = QVBoxLayout(self)` 처럼 **메서드를 속성으로 가린** 곳이 있어
+    (A00080 등) `window.layout()` 을 부르면 'QVBoxLayout object is not callable' 로 죽는다 - 기반 클래스 메서드로 부른다."""
+    try:
+        return QWidget.layout(window)
+    except Exception:
+        return None
 
 
 class JUN_mod_tabFit_qt_v01(QObject):
@@ -143,11 +155,11 @@ class JUN_mod_tabFit_qt_v01(QObject):
 
     def shortfall(self):
         """보이는 스크롤 페이지의 내용이 뷰포트보다 긴 만큼(px). 0 이하면 스크롤 없이 다 보인다."""
-        layout = self._window.layout()
+        layout = _window_layout(self._window)
         if layout is not None:
             layout.activate()
         short = 0
-        for scroll in self.visible_scroll_pages():
+        for scroll in self.scroll_areas():
             need = scroll.widget().sizeHint().height()
             short = max(short, need - scroll.viewport().height())
         return short
@@ -157,9 +169,22 @@ class JUN_mod_tabFit_qt_v01(QObject):
         self._apply_policies()
         self._invalidate_layouts()
         height = self._window.sizeHint().height()
-        for scroll in self.visible_scroll_pages():
+        for scroll in self.scroll_areas():
             height += max(0, self._scroll_wanted_height(scroll) - scroll.sizeHint().height())
         return height
+
+    def scroll_areas(self):
+        """높이 보정이 필요한 `QScrollArea`(widgetResizable) 전부 =
+        **루트 탭을 감싼 바깥 스크롤 칸들**(A00210 · A00480 · A00550 의 `tabs_scroll`) + 보이는 스크롤 페이지."""
+        found = []
+        parent = self._tabs.parentWidget() if self._tabs is not None else None
+        while parent is not None and parent is not self._window:
+            if isinstance(parent, QScrollArea) and parent.widget() is not None and parent.widgetResizable():
+                found.append(parent)
+            parent = parent.parentWidget()
+        found.reverse()
+        found.extend(self.visible_scroll_pages())
+        return found
 
     def visible_pages(self):
         """지금 보이는 사슬의 현재 페이지들(바깥 → 안쪽)."""
@@ -265,7 +290,7 @@ class JUN_mod_tabFit_qt_v01(QObject):
                     inner.updateGeometry()
                 page.updateGeometry()
             tab_widget.updateGeometry()
-        layout = self._window.layout()
+        layout = _window_layout(self._window)
         if layout is not None:
             layout.invalidate()
             layout.activate()
