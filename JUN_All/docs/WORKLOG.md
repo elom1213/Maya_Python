@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-29 (오늘)
 
+> [!summary] A00110_animTool_V02 **`Bake > Merge Layers` 계획서** — 애니메이션 레이어를 **프레임 구간 안에서만** 병합(`a + b => b` / `=> 새 레이어`), 월드 움직임 보존 `#A00110_animTool` `#plan`
+- 요청: "마야 Merge Layers 처럼 레이어를 합치되 `[50, 300]` 같은 임의 구간만 합치고, 병합 전후 컨트롤러의 월드 기준 움직임은 같아야 한다. 계획서를 작성."
+- 분석: 마야 `performAnimLayerMerge.mel` 의 `animLayerMerge` 는 `bakeResults -destinationLayer Merged_Layer -resolveWithoutLayer a -resolveWithoutLayer b -time ":"` 한 줄 + 소스 삭제. 구간 병합 = 같은 bake 에 `-time "s:e" -preserveOutsideKeys` + **소스의 구간 안 기여 중화**(additive 는 identity 키 step, override 는 weight 계단 0) + 경계 `s-1`/`e+1` insert 키 fixed.
+- 실측(mayapy 2024, `tests/exp_layer_range_merge.py`): **13/13** — additive/override, 기존/새 레이어, Base 대상(임시 additive 레이어를 base 위에 굽고 값을 접기), 쿼터니언 누적까지 worldMatrix **정수 프레임 전부 1e-15 동일 · 구간 밖 반 프레임 동일**. 마야 자체 병합도 반 프레임은 7.9e-4 다르다(bake 보간). 깨진 가정 11개와 교정을 계획서 §4.2 에 기록: `-destinationLayer BaseAnimation` 은 소스 커브를 지움, 대상 weight≠1 이면 틀림, 대상에 없던 채널은 끝값이 샘, override 멤버는 키 없이도 덮음, `scaleAccumulationMode` 는 Additive(0):Multiply(1), smart bake 는 근사, lock 레이어 편집은 조용히 무시, `setKeyframe(plug, animLayer=root)` 는 역산.
+- 비용: `bakeResults -rwl` 키 하나 0.22 ms → 50 ctl × 300 채널 × 251 프레임 16.5 s(같은 씬 마야 Merge Layers 139 s).
+- 계획서: [`docs/plans/A00110_animTool_V02_layer_range_merge_plan.md`](plans/A00110_animTool_V02_layer_range_merge_plan.md). 구현은 다음 턴(다른 세션의 A00110_V02 작업 여부 확인 뒤).
+
 > [!summary] A00110_animTool_V02 **v02.25 — Graph Focus `Layer curves`**: 애니메이션 레이어가 있으면 선택한 레이어의 커브만 보이고 그 범위에 맞춤 `#A00110_animTool`
 - 요청: "베이스 ±400 · Layer1 ±200 일 때 Layer1 을 선택하고 컨트롤러를 고르면 두 커브가 겹쳐 보이고 너무 확대된다. Layer1 커브만 보이고 적절히 확대되게 진단 · 가능하면 수정".
 - 진단(mayapy 실측): 세로 범위를 모으던 `cmds.keyframe(obj, q=True, name=True)` 가 **활성(preferred) 레이어의 커브만** 돌려준다 → Layer1 활성이면 ±200 에 맞추는데, 그래프 에디터는 기본 필터(`animLayerFilterOptions` = 모든 레이어)라 베이스 ±400 도 겹쳐 그려 잘려 보였다. GE 의 `View > Animation Layer Filter` 는 `outlinerEditor <panel>OutlineEd -animLayerFilterOptions selected|active|activeAndSelected|allAffecting|animLayerEditor` 이고 'Active' = `preferred`.
