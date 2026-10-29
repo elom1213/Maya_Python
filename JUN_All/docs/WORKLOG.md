@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-10-27
+updated: 2026-10-29
 ---
 
 # 작업 일지 (WORKLOG)
@@ -31,6 +31,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 ---
 
 ## 2026-10-29 (오늘)
+
+> [!summary] **공용 메뉴 `Help > Copy Tool Name + Tabs`** - 툴 이름 뒤에 지금 보고 있는 탭 경로(`A00110_animTool_V02 / Transfer / Follow`)를 클립보드로 `#Framework`
+- 요청: "Help 의 툴 이름 복사 연장선으로, 툴 이름과 지금 보고 있는 탭 이름을 클립보드에 복사하는 공용 기능".
+- `Framework/core/tool_menu.py` 레지스트리에 항목 한 줄 + `MenuContext.tab_path`(누를 때 부르는 함수) → 메뉴 바를 쓰는 PySide 툴 52곳 · cmds 툴 7곳에 자동으로 생김. 툴 파일은 손대지 않음(A00110 은 다른 세션이 작업 중).
+- PySide: `MOD_menuBar_qt_v01.visible_tab_path(window)` - 창 안 `QTabWidget` 중 조상 탭의 `currentWidget()` 안에 있고 `isVisibleTo` 인 사슬만, 라벨은 `&` 뗀 `tabText`. cmds: `MOD_menu_v01.visible_tab_path(window)` - 창 아래 `tabLayout` 의 `selectTab` 사슬, 창 이름은 만든 `menuItem` 경로 첫 마디(툴 쪽 호출 불변).
+- 검증: mayapy 오프스크린 27/27 - 합성 3단 중첩 창 · 실제 A00110 창 `Transfer / Follow` · 메뉴 바 쓰는 툴 52/52 스모크 · 가짜 cmds 로 tabLayout 사슬. **마야 GUI 확인 아직**(특히 cmds 메뉴). 문서 `Framework_MOD_menuBar_qt.md`.
 
 > [!summary] A00110_animTool_V02 **v02.23 — Follow 탭 `Point` 체크박스**: Maintain Offset 의 위치를 pointConstraint 처럼 `#A00110_animTool`
 - 요청: "Translate 만 켜고 Match Follow 하면 parent constraint 처럼 따라간다 - 그대로 두고 point constraint 처럼 되는 옵션도".

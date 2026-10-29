@@ -35,6 +35,14 @@ JUN_mod_menuBar_qt_v01 - 모든 툴이 공통 메뉴 항목을 갖는 PySide 메
 `tool_file=__file__` 을 주면 그 경로에서 **툴 폴더 이름**(`A00060_jointTool_V03`)을 찾는다
 (부모가 `tools` 인 폴더, 없으면 `app` 폴더를 담은 폴더). 직접 주려면 `tool_name=`.
 
+지금 보이는 탭 경로 (2026-10-29)
+-----------------------------
+`Help > Copy Tool Name + Tabs` 는 **지금 보고 있는 탭의 라벨**을 툴 이름 뒤에 붙인다 —
+`A00110_animTool_V02 / Transfer / Follow`. 창 안의 `QTabWidget` 들 중 **보이는 사슬**만 고른다:
+바깥 탭 위젯의 `currentWidget()` 안에 들어 있는 탭 위젯만 다음 단계로 인정하고(다른 탭 페이지 속
+탭 위젯은 제외), 숨긴 위젯(접힌 그룹 · Shrink 등)도 제외한다. 모듈 함수 `visible_tab_path(window)`.
+메뉴 바는 탭보다 먼저 만들어지므로 **누를 때** 센다.
+
 결과 알림
 ---------
 `Copy Tool Name` 같은 항목의 결과는 **창 안의 공용 로그창(`JUN_mod_log_qt_v01`)** 에 한 줄 남긴다.
@@ -60,6 +68,75 @@ from Framework.core import tool_menu
 def _plain_title(title):
     """`&Help` 같은 니모닉 표시를 떼고 비교한다."""
     return (title or "").replace("&", "")
+
+
+def _ancestor_tabs(tab_widget, window):
+    """창까지 올라가며 만나는 **조상 QTabWidget 들**(바깥 → 안쪽 순)."""
+    found = []
+    parent = tab_widget.parentWidget()
+    while parent is not None and parent is not window:
+        if isinstance(parent, QTabWidget):
+            found.append(parent)
+        parent = parent.parentWidget()
+    found.reverse()
+    return found
+
+
+def _is_on_visible_chain(tab_widget, window):
+    """조상 탭 위젯마다 이 위젯이 **현재 페이지** 안에 있는지 - 하나라도 아니면 안 보이는 탭 속."""
+    parent = tab_widget.parentWidget()
+    while parent is not None and parent is not window:
+        if isinstance(parent, QTabWidget):
+            # 탭 위젯의 직접 자식은 QStackedWidget 이므로 **처음 위젯**이 현재 페이지 안에 있는지 본다
+            current = parent.currentWidget()
+            if current is None or not current.isAncestorOf(tab_widget):
+                return False
+        parent = parent.parentWidget()
+    return True
+
+
+def visible_tab_path(window):
+    """창에서 **지금 보이는 탭 라벨**들을 바깥 → 안쪽 순으로.
+
+    - 바깥 `QTabWidget` 의 현재 탭 라벨, 그 페이지 안의 `QTabWidget` 의 현재 탭 라벨, ... 순.
+    - 다른(안 보이는) 탭 페이지 속 탭 위젯 · 숨긴 위젯(`isVisibleTo(window)` 가 False)은 제외.
+    - 같은 페이지에 보이는 탭 위젯이 둘이면 둘 다 - 사슬 단위로 묶어서(바깥 탭의 안쪽 탭들을 다 적은
+      뒤 다음 형제), 순서는 findChildren(생성) 순서.
+    - 탭이 없거나 `window` 가 None 이면 빈 리스트. `&File` 의 니모닉 표시는 뗀다.
+    """
+    if window is None:
+        return []
+
+    try:
+        tab_widgets = window.findChildren(QTabWidget)
+    except Exception:
+        return []
+
+    order = {}
+    for index, tab_widget in enumerate(tab_widgets):
+        order[id(tab_widget)] = index
+
+    rows = []
+    for tab_widget in tab_widgets:
+        try:
+            if tab_widget.count() == 0 or tab_widget.currentIndex() < 0:
+                continue
+            if not tab_widget.isVisibleTo(window):
+                continue
+            if not _is_on_visible_chain(tab_widget, window):
+                continue
+            label = _plain_title(tab_widget.tabText(tab_widget.currentIndex())).strip()
+            # 정렬 키 = 조상 탭 위젯들의 순번 + 자기 순번 → 한 사슬(바깥 → 안쪽)이 붙어서 나온다
+            chain = _ancestor_tabs(tab_widget, window) + [tab_widget]
+            key = tuple(order.get(id(t), len(order)) for t in chain)
+        except Exception:
+            continue
+        if not label:
+            continue
+        rows.append((key, label))
+
+    rows.sort(key=lambda row: row[0])
+    return [label for _key, label in rows]
 
 
 class JUN_mod_menuBar_qt_v01(QMenuBar):
@@ -198,11 +275,17 @@ class JUN_mod_menuBar_qt_v01(QMenuBar):
     # ------------------------------------------------------------------
 
     def context(self):
+        window = self.window()
         return tool_menu.MenuContext(
             tool_name=self.tool_name,
             tool_dir=self.tool_dir,
-            window=self.window(),
-            log=self.log)
+            window=window,
+            log=self.log,
+            tab_path=lambda: visible_tab_path(window))
+
+    def tab_path(self):
+        """지금 창에서 보이는 탭 라벨들(바깥 → 안쪽). `Copy Tool Name + Tabs` 가 쓰는 값."""
+        return visible_tab_path(self.window())
 
     def run_item(self, spec):
         """공통 항목 실행. 콜백이 던진 예외는 로그로 알리고 삼킨다(메뉴가 툴을 죽이지 않게)."""

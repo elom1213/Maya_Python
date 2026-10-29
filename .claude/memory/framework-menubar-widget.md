@@ -1,6 +1,6 @@
 ---
 name: framework-menubar-widget
-description: 공용 메뉴 바 JUN_mod_menuBar_qt_v01 + 공통 항목 레지스트리 Framework/core/tool_menu.py (2026-09-17). 모든 툴 공통 메뉴 항목은 여기 한 줄로. PySide2 에서 QAction.menu() 를 부르면 QMenu 가 지워진다
+description: 공용 메뉴 바 JUN_mod_menuBar_qt_v01 + 공통 항목 레지스트리 Framework/core/tool_menu.py (2026-09-17). 모든 툴 공통 메뉴 항목은 여기 한 줄로. Help = Copy Tool Name · Copy Tool Name + Tabs(2026-10-29, 보이는 탭 사슬). PySide2 에서 QAction.menu() 를 부르면 QMenu 가 지워진다
 metadata: 
   node_type: memory
   type: project
@@ -12,6 +12,12 @@ metadata:
 PySide 툴은 `Framework/qt/MOD_menuBar_qt_v01.py` 의 `JUN_mod_menuBar_qt_v01(tool_file=__file__)`(QMenuBar 대체),
 maya.cmds 툴은 `JUN_mod_menu.add_common_items('Help', tool_file=__file__)` 가 같은 목록을 읽는다.
 첫 항목 `Help > Copy Tool Name`(툴 폴더명을 클립보드로). 문서 `JUN_All/docs/Framework_MOD_menuBar_qt.md`.
+둘째 항목 `Help > Copy Tool Name + Tabs`(2026-10-29) = 툴 폴더명 + **지금 보이는 탭 라벨** 사슬을 ` / ` 로 —
+`A00110_animTool_V02 / Transfer / Follow`. `MenuContext.tab_path` 는 **누를 때 부르는 함수**(메뉴 바가 탭보다 먼저 생김).
+PySide 는 `visible_tab_path(window)` = QTabWidget 중 조상 탭의 `currentWidget().isAncestorOf(자기)` 이고 `isVisibleTo` 인 것만
+(★ QTabWidget 의 직접 자식은 QStackedWidget 이라 "바로 아래 자식" 으로 비교하면 전부 빠진다), 사슬 단위 정렬.
+cmds 는 `lsUI -controlLayouts -long` 의 tabLayout 사슬, 창 이름은 만든 menuItem 경로 첫 마디 → 툴 쪽 호출 불변.
+버튼 + QStackedWidget 식 페이지(A00370 카테고리)는 라벨이 없어 안 센다. cmds 쪽 마야 GUI 확인 아직.
 
 - 사용처: PySide 툴 **42곳 전부**(QMenuBar 쓰던 곳) + cmds 툴 7곳(A00000/10/20/30/40/50/60 V01).
   **새 툴이 메뉴 바를 만들면 `QMenuBar()` 대신 이 위젯을 쓸 것.** 메뉴 바 없는 창 15곳은 미적용 → 2026-09-18 A00220 · A00240 에 달아 13곳(`setMenuBar` 라 레이아웃 인덱스 불변).

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-17
+# last Update date : 2026-10-29
 # Framework - 모든 툴 창의 메뉴에 공통으로 들어가는 항목(레지스트리) + 툴 이름 판정.
 #
 # 툴 창 위의 메뉴(`Help` 등)에 **모든 툴이 똑같이 가져야 하는 항목**을 한 곳에 적는다.
@@ -90,13 +90,29 @@ class MenuContext(object):
     tool_dir  : 툴 폴더 경로 (못 찾았으면 None)
     window    : 메뉴가 달린 창(QWidget). maya.cmds 툴은 None
     log       : 결과를 알리는 함수 log(message) - 툴 로그창이 있으면 거기로, 없으면 print
+    tab_path  : **지금 보이는 탭 라벨들**(바깥 → 안쪽). 탭이 없거나 모르면 빈 리스트.
+                예: A00110 의 Transfer 탭 안 Follow 탭을 보고 있으면 ["Transfer", "Follow"].
+                UI 계열마다 수집 방법이 다르므로(QTabWidget / cmds.tabLayout) 메뉴 쪽이 채운다.
+                함수를 주면 **누를 때** 부른다(메뉴 바가 탭보다 먼저 만들어지므로 미리 셀 수 없다).
     """
 
-    def __init__(self, tool_name=None, tool_dir=None, window=None, log=None):
+    def __init__(self, tool_name=None, tool_dir=None, window=None, log=None, tab_path=None):
         self.tool_name = tool_name
         self.tool_dir = tool_dir
         self.window = window
         self.log = log or _print_log
+        self._tab_path = tab_path
+
+    @property
+    def tab_path(self):
+        """지금 보이는 탭 라벨 리스트. 수집 함수가 실패하면 빈 리스트(메뉴가 툴을 죽이지 않게)."""
+        source = self._tab_path
+        if callable(source):
+            try:
+                source = source()
+            except Exception:
+                source = None
+        return [str(label) for label in (source or []) if label]
 
 
 class MenuItemSpec(object):
@@ -149,6 +165,40 @@ def copy_tool_name(ctx):
     return True
 
 
+# 툴 이름과 탭 라벨 사이의 구분자 - `A00110_animTool_V02 / Transfer / Follow`
+TAB_PATH_SEPARATOR = " / "
+
+
+def tool_tab_path_text(tool_name, tab_path):
+    """`툴 이름 / 바깥 탭 / 안쪽 탭` 문자열. 탭이 없으면 툴 이름만."""
+    parts = [tool_name] + [label for label in (tab_path or []) if label]
+    return TAB_PATH_SEPARATOR.join(parts)
+
+
+def copy_tool_name_with_tabs(ctx):
+    """툴 폴더 이름 + 지금 보고 있는 탭 경로를 클립보드로 - `A00110_animTool_V02 / Transfer / Follow`.
+
+    탭이 하나도 없는 창이면 툴 이름만 복사하고 로그에 그렇게 적는다.
+    """
+    label = "Copy Tool Name + Tabs"
+    if not ctx.tool_name:
+        ctx.log("[{0}] Could not find the tool folder name.".format(label))
+        return False
+
+    tab_path = ctx.tab_path
+    text = tool_tab_path_text(ctx.tool_name, tab_path)
+
+    if not copy_text_to_clipboard(text):
+        ctx.log("[{0}] Could not access the clipboard.".format(label))
+        return False
+
+    if tab_path:
+        ctx.log("[{0}] Copied to clipboard : {1}".format(label, text))
+    else:
+        ctx.log("[{0}] Copied to clipboard : {1} (no visible tabs)".format(label, text))
+    return True
+
+
 # ======================================================================
 # 레지스트리
 # ======================================================================
@@ -160,6 +210,11 @@ COMMON_MENUS = [
             "Copy Tool Name",
             copy_tool_name,
             "Copy this tool's folder name (e.g. A00060_jointTool_V03) to the clipboard"),
+        MenuItemSpec(
+            "Copy Tool Name + Tabs",
+            copy_tool_name_with_tabs,
+            "Copy the tool name and the tabs you are looking at "
+            "(e.g. A00110_animTool_V02 / Transfer / Follow) to the clipboard"),
     ]),
 ]
 
