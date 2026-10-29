@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-29 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.23 — Follow 탭 `Point` 체크박스**: Maintain Offset 의 위치를 pointConstraint 처럼 `#A00110_animTool`
+- 요청: "Translate 만 켜고 Match Follow 하면 parent constraint 처럼 따라간다 - 그대로 두고 point constraint 처럼 되는 옵션도".
+- 원인: Maintain Offset 은 `offset · worldMatrix(tgt)` 라 offset 이 target 회전을 따라 돈다(= parentConstraint). Translate 만 골라도 그 위치가 공전한다.
+- 구현: `point_translate` - start 프레임의 위치 차이를 follower 부모 공간 벡터로 재서 매 프레임 target 위치에 더한다(pointConstraint offset 과 같은 정의). Offset + Translate 일 때만 켜짐, 기본 꺼짐(예전 동작).
+- 검증: `tests/test_follow_point.py` 13/13 - 실제 point / parent / orient 컨스트레인트 값과 1e-15. **마야 GUI 확인 아직.**
+
 > [!summary] **Pin 켜짐 = 연한 빨강** - Pin 버튼이 있는 툴 9개에 공용 `Framework/qt/pin_style` 적용 (A00240_PathTool 과 같은 색) `#Framework`
 - 대상 · 버전: A00030_quickTool_V02 02.08 · A00050_uvTool_V02 02.04 · A00110_animTool 01.44 · A00110_animTool_V02 02.22 · A00440_SetTool 01.06 · A00450_manipulatorTool 01.03 · A00470_MaterialTool 01.14 · A00480_FileTool 01.14 · A00490_KeyboardTool 01.03.
 - 이미 쓰던 툴: A00210 · A00220 · A00240 · A00340 · A00370 · A00560. A00030_quickTool(v01, cmds 체크박스)은 Qt 버튼이 아니라 제외.

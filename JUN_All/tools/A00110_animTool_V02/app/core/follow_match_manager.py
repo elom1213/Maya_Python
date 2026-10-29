@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-19
+# last Update date : 2026-10-29
 # A00110_animTool_V02 - 여러 follower 를 매칭된 target 의 월드 transform 에 맞춰 구간 키 베이크
 #                   (maya.cmds + OpenMaya 2.0, UI 비의존)
 #
@@ -159,7 +159,7 @@ class FollowMatchManager:
     @staticmethod
     def match_follow(targets, followers, start, end, blend,
                      do_translate=True, do_rotate=True, do_scale=False,
-                     maintain_offset=False, one_to_many=False):
+                     maintain_offset=False, one_to_many=False, point_translate=False):
         """
         target 의 월드 transform 에 follower 를 맞춰 [start, end] 구간 키를 굽는다.
 
@@ -173,6 +173,11 @@ class FollowMatchManager:
         maintain_offset    : True 면 start 프레임의 target↔follower 상대 행렬을 유지
                              (parentConstraint maintainOffset=True 와 동등, 행렬 연산).
         one_to_many        : True 면 1<-n 매칭(위 참고).
+        point_translate    : (v02.23) True 면 **위치만 pointConstraint 처럼** 맞춘다 - target 이 돌아도
+                             follower 는 target 둘레를 공전하지 않고, start 프레임의 위치 차이를
+                             follower 부모 공간에서 그대로 더한다. Maintain Offset 이 꺼져 있으면
+                             어느 쪽이든 target 위치와 같으므로 차이가 없다. 회전 · 스케일은 그대로
+                             (회전을 켜면 orientConstraint maintainOffset 과 같다).
         반환               : (matched_count, msg)
         """
         if not targets or not followers:
@@ -219,7 +224,7 @@ class FollowMatchManager:
                 for tgt, flw in pairs:
                     ok = FollowMatchManager._match_one(
                         tgt, flw, times, blend, do_translate, do_rotate, do_scale,
-                        layer, is_override, maintain_offset, ref_time)
+                        layer, is_override, maintain_offset, ref_time, point_translate)
                     if ok:
                         done += 1
                     else:
@@ -232,6 +237,8 @@ class FollowMatchManager:
         frames = len(times)
         mode = "1<-n" if one_to_many else "n<-n"
         off = "offset" if maintain_offset else "no-offset"
+        if point_translate and do_translate:
+            off += ", point translate"
         msg = "{0} follower(s) matched over [{1}-{2}] ({3} frames, blend {4}, {5}, {6}). {7}".format(
             done, start, end, frames, blend, mode, off, layer_msg)
         if skipped:
@@ -244,7 +251,7 @@ class FollowMatchManager:
 
     @staticmethod
     def _match_one(tgt, flw, times, blend, do_t, do_r, do_s, layer, is_override,
-                   maintain_offset=False, ref_time=None):
+                   maintain_offset=False, ref_time=None, point_translate=False):
         """단일 (tgt, flw) 페어를 굽는다. 키를 하나라도 기록했으면 True.
 
         핵심: setKeyframe(animLayer=L, value=V) 는 레이어 커브에 V 를 그대로 쓰는 게 아니라
@@ -271,9 +278,12 @@ class FollowMatchManager:
 
         # maintain_offset: ref_time(구간 시작)에서 target↔follower 상대 행렬을 1회 측정.
         offset = None
+        point_offset = None
         if maintain_offset:
             try:
                 offset = FollowMatchManager._offset_matrix(tgt, flw, ref_time)
+                if point_translate and do_t:
+                    point_offset = FollowMatchManager._point_offset(tgt, flw, ref_time)
             except Exception:
                 # 타겟을 못 읽으면 이 페어만 건너뛴다(다른 페어는 계속 굽는다).
                 return False
@@ -314,7 +324,7 @@ class FollowMatchManager:
         for t in times:
             try:
                 m_state = FollowMatchManager._matched_state(
-                    tgt, flw, t, do_t, do_r, do_s, offset)
+                    tgt, flw, t, do_t, do_r, do_s, offset, point_offset)
             except Exception:
                 # 프레임 중간에 타겟이 사라지는 등 예외 -> 이 페어만 포기.
                 return any_set
@@ -446,14 +456,31 @@ class FollowMatchManager:
         return mf * ms_inv
 
     @staticmethod
-    def _matched_state(tgt, flw, t, do_t, do_r, do_s, offset=None):
+    def _point_offset(tgt, flw, t):
+        """(v02.23 Point) ref 프레임 t 에서 follower 위치 - target 위치, **follower 부모 공간** 벡터.
+
+        pointConstraint maintainOffset=True 의 offset 과 같은 정의다 - 부모 공간에서 더하므로 target 이
+        돌아도 이 벡터는 돌지 않는다(parent 방식은 offset 행렬이 target 회전을 따라 돌아 공전한다).
+        """
+        mpi = om.MMatrix(cmds.getAttr(flw + ".parentInverseMatrix[0]", time=t))
+        mf = om.MMatrix(cmds.getAttr(flw + ".worldMatrix[0]", time=t))
+        ms = FollowMatchManager._target_matrix(tgt, t)
+        f = om.MTransformationMatrix(mf * mpi).translation(om.MSpace.kTransform)
+        s = om.MTransformationMatrix(ms * mpi).translation(om.MSpace.kTransform)
+        return (f.x - s.x, f.y - s.y, f.z - s.z)
+
+    @staticmethod
+    def _matched_state(tgt, flw, t, do_t, do_r, do_s, offset=None, point_offset=None):
         """target 의 월드 transform 을 follower 로컬로 변환한 state. rotateOrder 무관.
 
         offset=None : local = worldMatrix(tgt) * parentInverseMatrix(flw).  정확히 일치.
         offset 지정 : local = offset * worldMatrix(tgt) * parentInverseMatrix(flw).
                       start 프레임의 상대 거리/회전을 매 프레임 유지(maintain offset).
+        point_offset 지정(v02.23) : 위치만 target 위치(부모 공간) + point_offset - pointConstraint 와 같다.
+                      회전 · 스케일은 위 offset 규칙 그대로.
         """
-        ms = FollowMatchManager._target_matrix(tgt, t)
+        ms_raw = FollowMatchManager._target_matrix(tgt, t)
+        ms = ms_raw
         if offset is not None:
             ms = offset * ms
         mpi = om.MMatrix(cmds.getAttr(flw + ".parentInverseMatrix[0]", time=t))
@@ -461,8 +488,12 @@ class FollowMatchManager:
 
         st = {}
         if do_t:
-            tr = tm.translation(om.MSpace.kTransform)
-            st["t"] = (tr.x, tr.y, tr.z)
+            if point_offset is not None:
+                tr = om.MTransformationMatrix(ms_raw * mpi).translation(om.MSpace.kTransform)
+                st["t"] = (tr.x + point_offset[0], tr.y + point_offset[1], tr.z + point_offset[2])
+            else:
+                tr = tm.translation(om.MSpace.kTransform)
+                st["t"] = (tr.x, tr.y, tr.z)
         if do_r:
             st["q"] = tm.rotation(asQuaternion=True)
         if do_s:

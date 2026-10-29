@@ -2099,18 +2099,31 @@ class MainWindow(QWidget):
         # Options
         #   Maintain Offset : start 프레임의 target↔follower 상대 거리/회전을 유지
         #                     (parentConstraint maintainOffset=True, 행렬 연산 구현).
+        #   Point           : (v02.23) 위치만 pointConstraint 처럼 - target 이 돌아도 공전하지 않는다.
+        #                     Maintain Offset + Translate 일 때만 의미가 있어 그때만 켤 수 있다.
         #   1<-n            : target 1개를 모든 follower 가 따름. off 면 n<-n(인덱스 1:1).
         # -------------------------
 
         opt_row = QHBoxLayout()
         opt_row.addWidget(QLabel("Options"))
         self.cb_follow_offset = QCheckBox("Maintain Offset")
+        self.cb_follow_point = QCheckBox("Point")
+        self.cb_follow_point.setToolTip(
+            "Off: the offset works like a parent constraint - when the target rotates,\n"
+            "the follower swings around it.\n"
+            "On: the position works like a point constraint - the start-frame distance is\n"
+            "kept as is and never swings with the target's rotation.\n"
+            "Only matters with Maintain Offset and Translate on. Rotate / Scale are unchanged.")
         self.cb_follow_one_to_many = QCheckBox("1 <- n")
         self.cb_follow_one_to_many.setToolTip(
             "On: every follower follows the single target (1<-n).\n"
             "Off: index-matched, Target[i] -> Follower[i] (n<-n).")
         opt_row.addWidget(self.cb_follow_offset)
+        opt_row.addWidget(self.cb_follow_point)
         opt_row.addWidget(self.cb_follow_one_to_many)
+        for cb in (self.cb_follow_offset, self.cb_follow_t):
+            cb.toggled.connect(self._sync_follow_point)
+        self._sync_follow_point()
         opt_row.addStretch(1)
         tab_layout.addLayout(opt_row)
 
@@ -3857,6 +3870,11 @@ class MainWindow(QWidget):
         self.sld_follow_blend.setValue(int(round(v * 100)))
         self.sld_follow_blend.blockSignals(False)
 
+    def _sync_follow_point(self, *_args):
+        """Point 는 Maintain Offset + Translate 일 때만 결과가 달라진다 - 그때만 켤 수 있게."""
+        self.cb_follow_point.setEnabled(
+            self.cb_follow_offset.isChecked() and self.cb_follow_t.isChecked())
+
     def on_follow_bake(self):
 
         targets = self.follow_tgt_tsl.get_all_items()
@@ -3906,7 +3924,8 @@ class MainWindow(QWidget):
         count, msg = FollowMatchManager.match_follow(
             targets, followers, start, end, blend,
             do_translate=do_t, do_rotate=do_r, do_scale=do_s,
-            maintain_offset=maintain_offset, one_to_many=one_to_many)
+            maintain_offset=maintain_offset, one_to_many=one_to_many,
+            point_translate=self.cb_follow_point.isEnabled() and self.cb_follow_point.isChecked())
         self.log(msg)
 
     # --------------------------------------------------

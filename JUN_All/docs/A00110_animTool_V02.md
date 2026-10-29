@@ -65,7 +65,8 @@
    **Follow**(v01.11~): 좌(**Target**)/우(**Follower**) 리스트로, follower 가 target 의 **월드
    위치·회전(·스케일)** 에 맞도록 구간 키를 굽는다(컨스트레인트 노드 없이 `parentConstraint` 와
    동등한 행렬 연산, **rotateOrder 무관**). **Maintain Offset**(v01.15) 으로 start 프레임의
-   상대 거리·회전 유지, **1<-n**(v01.15) 으로 target 1개를 **모든 follower 가 추종**, **blend(0~1)**
+   상대 거리·회전 유지(**Point**(v02.23) 를 켜면 위치는 `pointConstraint` 처럼 — target 이 돌아도 공전하지 않는다),
+   **1<-n**(v01.15) 으로 target 1개를 **모든 follower 가 추종**, **blend(0~1)**
    로 원본과 매치 결과를 섞으며(0=원본, 1=덮어쓰기) 선택된 **애니메이션 레이어**에 키가 들어간다.
    **Target 에는 메시 버텍스(`mesh.vtx[i]`) 같은 컴포넌트도 넣을 수 있다**(v01.41~) — 디폼되는
    메시의 정점도 프레임마다 따라간다(아래 §Follow: 컴포넌트 타겟).
@@ -1495,7 +1496,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 │ Add|Del|Up|Down|Sort      Add|Del|Up|Down|Sort    │
 │ Start [ 1 ] [Get Current]  End [ 24 ] [Get Current]│  ← 기본값 = 현재 playback 범위
 │ Channels [v] Translate [v] Rotate [ ] Scale       │  ← 기본 T·R (Scale off)
-│ Options [ ] Maintain Offset  [ ] 1 <- n           │  ← 기본 둘 다 off
+│ Options [ ] Maintain Offset [ ] Point [ ] 1 <- n  │  ← 기본 모두 off (Point 는 Offset+Translate 일 때만)
 │ Blend (0..1) [ 1.0 ]  [====슬라이더 0..100====]   │  ← LineEdit ↔ Slider 동기화, 기본 1.0
 │ [ Match Follow ]                                  │
 └───────────────────────────────────────────────────┘
@@ -1511,6 +1512,15 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 - **Maintain Offset**: 체크 시 **start 프레임에서 측정한 target↔follower 상대 거리·회전을 매 프레임
   유지**한다(`parentConstraint maintainOffset=True` 와 동등, 컨스트레인트 노드 없는 행렬 연산). 끄면
   offset 0 으로 target 과 정확히 일치한다(기본).
+- **Point**(v02.23~): Maintain Offset 의 **위치**를 `pointConstraint maintainOffset=True` 처럼 맞춘다.
+  끄면(기본, 예전 동작) offset 이 `parentConstraint` 처럼 target 회전을 따라 돌아서, Translate 만 켜도
+  follower 가 **target 둘레를 공전**한다. 켜면 start 프레임의 위치 차이를 follower 부모 공간에서 그대로
+  더하므로 target 이 돌아도 거리 방향이 바뀌지 않는다.
+  - **Maintain Offset + Translate** 가 켜져 있을 때만 켤 수 있다(그 밖에는 결과가 같다 — offset 이 없으면
+    둘 다 target 위치 그대로).
+  - Rotate 를 같이 켜면 회전은 예전과 같다 = `orientConstraint maintainOffset=True`. 즉 Point + Rotate =
+    point + orient 컨스트레인트 두 개를 건 것과 같다.
+  - 로그에 `offset, point translate` 로 표기된다.
 - **1 <- n**: 체크 시 **target 1개를 모든 follower 가 추종**한다(target 이 정확히 1개가 아니면 경고 후
   중단). 끄면 **n<-n**(인덱스 1:1, 기본). 체크하면 두 리스트 개수가 달라도 된다.
 - **Blend (0..1)**: 원본 follower 애니메이션과 매치 결과의 혼합 비율. **0 = 원본 유지(아무것도 안 함)**,
@@ -1909,6 +1919,12 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   `local = offset · worldMatrix(tgt) · parentInverseMatrix(flw)` 로 분해한다. `parentConstraint
   maintainOffset=True` 와 동등하되 노드/사이클/평가순서 오류가 없다(레거시 `JUN_PY_MatrixCon_01_01`
   의 offsetMat 로직과 동일).
+- **Point**(`point_translate`, v02.23): Maintain Offset 과 함께일 때 위치만 바꾼다. start 프레임에서
+  `point_offset = (worldMatrix(flw) · parentInverse(flw)).t − (worldMatrix(tgt) · parentInverse(flw)).t`
+  (follower 부모 공간 벡터)를 재고, 매 프레임 `t = (worldMatrix(tgt) · parentInverse(flw)).t + point_offset`.
+  pointConstraint 의 offset 정의와 같다. 회전 · 스케일은 위 offset 행렬 그대로.
+  검증 `tests/test_follow_point.py` 13항목: 실제 `pointConstraint` / `parentConstraint(skipRotate)` /
+  `orientConstraint` (모두 maintainOffset) 로 구운 값과 오차 1e-15 (부모가 돌아간 follower 포함).
 - **blend(0~1) 는 키 값에 베이크**(레이어 weight=1 유지): 원본 평가값 `O` 와 매치값 `M` 을 섞어 최종
   `F` 를 만든다 — 위치/스케일 선형 lerp `F = O + (M−O)·b`, 회전 쿼터니언 **slerp**(최단호). `blend==0`
   이면 아무것도 안 쓰고 반환(원본 유지), `blend==1` 이고 override(/베이스)면 `F=M` 단축 경로.
