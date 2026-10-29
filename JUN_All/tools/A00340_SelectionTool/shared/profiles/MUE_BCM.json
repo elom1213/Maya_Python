@@ -10,6 +10,20 @@
           ]
         },
         {
+          "name": "HandIK_All",
+          "objects": [
+            "test:ZIHAN:Cage:CH_r_ArmIK_xx_ctl",
+            "test:ZIHAN:Cage:CH_l_ArmIK_xx_ctl"
+          ]
+        },
+        {
+          "name": "Wrist_Inner_All",
+          "objects": [
+            "test:ZIHAN:Cage:CH_l_Wrist_xx_ctl",
+            "test:ZIHAN:Cage:CH_r_Wrist_xx_ctl"
+          ]
+        },
+        {
           "name": "Fingers_R",
           "objects": [
             "test:ZIHAN:Cage:CH_Ring_proximal_r_xx_ctl",
