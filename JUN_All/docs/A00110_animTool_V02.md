@@ -79,7 +79,9 @@
    키를 찍어 발의 **월드** 위치·회전이 바뀌었을 때, 그 레이어는 그대로 두고 발의 월드가 **그 레이어가 없을 때와
    같아지도록** 키를 찍은 **보정 additive 레이어**를 새로 만든다. 레이어를 뮤트해 `worldMatrix` 를 재고
    `setKeyframe -animLayer` 의 역산에 맡기므로 누적 모드·가중치·override·`jointOrient`·회전 순서를 다 존중한다.
-   긴 구간(1000+ 프레임)은 **200 프레임 청크**로 재서 메모리가 구간 길이와 무관하다.
+   긴 구간(1000+ 프레임)은 **200 프레임 청크**로 재서 메모리가 구간 길이와 무관하다. **Hold = Stationary spans only**
+   (v02.29~)는 글로벌 이동은 살리고 **발이 땅을 짚어 정지하던 구간만** 월드 고정 — 움직이는 구간이 차이를 흡수해
+   최종 위치는 레이어 결과대로(발 미끄럼 제거).
    **Merge Layers**(v02.27~): 마야 **Merge Layers 를 프레임 구간 `[Start, End]` 안에서만** 수행한다 — 레이어
    `a`, `b` 가 `[0, 1000]` 에 키를 갖고 있어도 `[50, 300]` 만 `a + b => b`(기존 레이어) / `=> 새 레이어` /
    `a + Base => Base` 로 합치고 **구간 밖은 손대지 않는다.** 마야 병합의 본체인 `bakeResults -resolveWithoutLayer`
@@ -737,7 +739,7 @@ A00110_animTool_V02.run(True)   # True = reload
 | **Timing** | 키의 **시점** | Move · Offset · Stagger |
 | **Curve** | 커브의 **값·형태** | Euler · Filters(Smooth · Intensity · Interp) |
 | **Transfer** | **다른 오브젝트로** 옮기기 | Copy Key · Mirror Key · Follow |
-| **Bake** | 결과를 **키로 굽기** | Bake · Counter Layer(v02.26~) · Merge Layers(v02.27~) |
+| **Bake** | 결과를 **키로 굽기** | Bake · Counter Layer(v02.26~, Stationary 모드 v02.29~) · Merge Layers(v02.27~) |
 | **View** | **보기**(씬 불변) | Graph Focus |
 | **Hot Key** (v02.19~) | 툴이 열린 동안의 **단축키** | Main(Hold · Manipulator Space) |
 
@@ -1616,8 +1618,11 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 │ └──────────────────────────────────────────────────┘      │
 │ Range (•) Current timeline  ( ) Custom range             │
 │ Start [ 0 ]  End [ 200 ]                                  │  ← Custom 일 때만 활성
-│ Channels [v] Translate [v] Rotate          Step [ 1 ]    │
-│ New layer [ lyr_glo_counter               ]              │  ← 비우면 `<layer>_counter`(여럿이면 `counter`)
+│ Channels [v] Translate [v] Rotate          Step [ 1 ]    │  ← Stationary 모드에선 Step 비활성(매 프레임)
+│ Hold (•) Everywhere  ( ) Stationary spans only           │  ← v02.29~ 모드 라디오
+│   Still tolerance [0.100] units [0.50] deg  Min span [2] f│  ← Stationary 일 때만 활성
+│   Anchor [Touchdown ▾]  Blend [By travel ▾] [Preview Spans]│
+│ New layer [ lyr_glo_counter               ]              │  ← 비우면 `<layer>_counter`(Stationary 는 `_plant`)
 │ [v] Zero outside range [v] Skip unchanged objects [v] Select new layer │
 │ [ Create Counter Layer ]                                 │
 └──────────────────────────────────────────────────────────┘
@@ -1644,13 +1649,33 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 - **Skip unchanged objects**(기본 ON): 글로벌이 월드를 바꾸지 않은 오브젝트(움직인 부모 아래가 아닌 것)는
   키를 남기지 않고 레이어 멤버에서도 뺀다.
 - **Select new layer**(기본 ON): 끝나면 새 레이어만 선택(마야 Merge Layers 관례).
+- **Hold**(v02.29~): **Everywhere**(기본) = 모든 프레임에서 월드를 "레이어 없을 때" 로 되돌린다(발이 처음 자리로).
+  **Stationary spans only** = 체크한 레이어를 뮤트했을 때 오브젝트가 **정지하던 구간(땅을 짚은 발)에서만** 월드를 한
+  포즈로 고정하고, 움직이는 구간이 그 차이를 흡수한다 — 발은 사이사이 글로벌을 따라가고 **End 에서는 레이어 결과와
+  정확히 같다**(최종 위치 유지, 미끄럼만 제거). Step 은 이 모드에서 무시(매 프레임 키). 기본 이름 `<layer>_plant`.
+  - **Still tolerance**(0.1 유닛 / 0.5°): 이전 프레임 대비 월드 위치·회전 변화가 둘 다 이보다 작으면 "정지". 체크한
+    채널만 본다(Rotate 끄면 회전 무시). **Min span**(2f): 이보다 짧은 정지는 이동으로 친다.
+  - **Anchor**: 정지 구간 안에서 발이 서 있을 자리 = 레이어 켠 상태의 **Touchdown**(첫 프레임, 기본 — 닿은 자리에
+    그대로) / **Middle**(가운데 — 앞뒤가 반씩 흡수, 변형 최소) / **Lift-off**(끝 프레임) 월드 포즈. 구간이 Start/End 에
+    걸치면 앵커는 그 경계로 강제된다(경계에서 델타 0 이어야 범위 밖과 이어진다).
+  - **Blend**: 정지 구간 사이(그리고 Start → 첫 구간, 마지막 구간 → End)의 델타 분배. **By travel**(기본) = 레이어
+    없을 때 오브젝트 자신의 이동량 비례 — 원래 멈춰 있던 프레임은 보정도 멈춘다 / **Ease**(smoothstep) / **Linear**.
+  - **Preview Spans**: 레이어를 만들지 않고 지금 톨러런스로 찾은 구간을 로그에(`foot_l_ctl: 4277-4282 (6f), …`).
+    톨러런스 조정은 이걸 보고 한다.
+  - 정지 구간이 없는 오브젝트(`No stationary span`) · 범위 전체가 정지인 오브젝트(`Stationary for the whole range`)는
+    경고와 함께 건너뛴다(멤버에서 제외).
 - **Create Counter Layer**: 실행. **오브젝트 × 프레임 > 2000** 이면 진행 팝업이 뜬다(실측 0.9 ms/단위 → 50 컨트롤 ×
   1000 프레임 ≈ 44 s). **단일 Undo.** 실행 중 Auto Keyframe 을 잠깐 끈다(`xform` 이 setAttr 라 자체 키가 생기는 것을 막음).
 
-**정확도**: 정수 프레임은 **모든 프레임에서 월드가 완전히 같다**(mayapy 실측 1e-14). 프레임 사이는 보간이라 1e-3
+**정확도(Everywhere)**: 정수 프레임은 **모든 프레임에서 월드가 완전히 같다**(mayapy 실측 1e-14). 프레임 사이는 보간이라 1e-3
 정도 다르다(베이크와 같은 성질). 회전은 `xform` 이 돌려준 오일러의 **동치해 중 지금 로컬 회전에 가까운 것**을 골라
 커브가 연속이다(270° 회전 드라이버에서 프레임 사이 점프 23°). 발이 되돌릴 레이어의 멤버이기도 하면 그 기여까지
 되돌아간다(로그에 노트).
+
+**정확도(Stationary)**: 정지 구간 안은 앵커 포즈와 **≤ 2e-6**(쿼터니언 왕복), **Start · End · 범위 밖은 레이어 결과와
+완전히 같다(0)**. 움직이는 구간은 레이어 결과에서 최대 \|델타\|(앵커 Touchdown/Lift-off 는 구간 미끄럼량, Middle 은 그
+절반)만큼 벗어나되 프레임 간 이동량 분포는 보정 전과 같다(실제 씬 두 발: 스파이크 없음). 글로벌이 **회전**해도 같다
+(회전 델타는 발 자신의 위치 기준으로 적용).
 
 **건너뛰는 것 · 거부**: 잠긴 채널 / 컨스트레인트·익스프레션으로 구동되는 채널은 **건너뛰고 경고**(키가 결과에 안 나타난다).
 되돌릴 레이어가 **뮤트** 상태(되돌릴 게 없다) · **solo** 레이어 존재 · BaseAnimation 체크는 거부.
@@ -1660,7 +1685,8 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 앞 청크 키의 외삽이 스냅샷을 오염시키지 않게 한다).
 
 > 계획서: [`plans/A00110_animTool_V02_counter_layer_plan.md`](plans/A00110_animTool_V02_counter_layer_plan.md) ·
-> 회귀 시험 `tests/test_counter_layer.py`(mayapy, 51 항목). `_SmartLayer` 는 코어가 컴파일 `.pyc` 라 디컴파일 없이
+> Stationary 모드 [`plans/A00110_animTool_V02_counter_layer_stationary_plan.md`](plans/A00110_animTool_V02_counter_layer_stationary_plan.md)
+> (실제 씬 실측) · 회귀 시험 `tests/test_counter_layer.py`(mayapy, 92 항목). `_SmartLayer` 는 코어가 컴파일 `.pyc` 라 디컴파일 없이
 > 사용자 노출 설명문만 참고했다 — "레이어 켜고/끄고 비교" 원리와 World Space 개념.
 
 #### Merge Layers — 마야 Merge Layers 를 프레임 구간 안에서만 (v02.27~)
@@ -1898,6 +1924,9 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 3. **Range**(기본 현재 타임라인 — 보통 애니메이션 전체) / **Channels**(기본 T·R) / 옵션 확인.
 4. **Create Counter Layer** → 맨 위에 `lyr_glo_counter` 가 생기고 발의 월드가 `lyr_glo` 이전과 같아진다(단일 Undo).
    로그에 개수·구간·건너뛴 채널·노트가 출력된다. 결과가 마음에 안 들면 Ctrl+Z 한 번.
+5. **발 미끄럼만 없애고 글로벌 이동은 살리려면**(v02.29~): **Hold → Stationary spans only**. `Preview Spans` 로 정지
+   구간이 뜻대로 잡혔는지 보고(안 잡히면 Still tolerance 를 키운다) → **Create Counter Layer** → `lyr_glo_plant`.
+   정지 구간에서는 발이 서 있고, 사이에서 글로벌을 따라가며, End 에서는 글로벌 결과와 같다.
 
 ### Bake > Merge Layers (v02.27~)
 1. 레이어 에디터에서 합칠 레이어를 선택(또는 탭에서 체크)하고 **Refresh** — 선택된 레이어가 체크돼 있다.
@@ -2110,6 +2139,19 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 - **새 레이어 위치**: 마야가 `children[-1]`(맨 위)에 만든다. 사용자가 뒤에 다른 레이어 아래로 옮기면 by-layer 회전 누적에서는
   결과가 달라질 수 있다.
 - **단일 Undo 청크** — Ctrl+Z 한 번으로 전체 취소.
+- **Hold = Stationary**(`hold=HOLD_STATIONARY`, v02.29~): ① `detect_spans` — 체크한 레이어를 뮤트하고 `start-1..end`
+  를 `currentTime` 루프로 돌며 이전 프레임 대비 월드 위치/쿼터니언 변화를 재서 정지 프레임(bytearray)과 누적 이동량
+  (`array('d')` 거리·각도)만 남긴다 → 연속 정지 프레임 묶음 = 구간(`min_span` 미만 버림). ② `_stationary_plan` — 레이어
+  켠 채 구간마다 앵커 프레임 포즈(위치 + 쿼터니언)와 구간 시작/끝 델타(앵커 − 그 프레임), 사이 구간 표
+  `(g0, g1, D0, D1)`. 첫 구간 앞은 `g0 = start, D0 = 0`, 마지막 구간 뒤는 `g1 = end, D1 = 0`(`zero_outside=False` 면
+  경계 델타 유지). 구간이 Start/End 에 걸치면 앵커 = 경계, 전구간 정지 · 구간 없음은 제외 + 경고. ③ 쓰기는 같은 청크
+  루프인데 스냅샷 뮤트 목록이 **보정 레이어만**이고, 목표 = `_stationary_target`(구간 안 = 앵커 포즈, 사이 = 스냅샷
+  위치 + 보간 델타 · 스냅샷 회전 × slerp 델타 — 월드 원점 기준 행렬 보간은 금지, 회전 델타가 큰 호를 그린다).
+  분배 비율 `_frac`: By travel = 누적 이동량 차 / 구간 총 이동량(0 이면 각도, 그것도 0 이면 선형).
+- **채널 일부만 키를 찍을 때**(Translate only 등, `len(usable) < 6`): `xform -m` 이 건드린 나머지 채널을
+  `xform -m <현재 월드>` 로 되돌린 뒤 키를 찍는다 — 키 없는 정적 채널이면 setAttr 가 그대로 남기 때문(회귀 T28b).
+- **프레임마다 뮤트 토글 금지**: 실제 씬에서 16 ms/프레임(청크 스냅샷 5배). 정지 판정은 반드시 레이어 뮤트 상태에서
+  (켜진 채로는 어떤 프레임도 정지가 아니다).
 
 ### Bake > Merge Layers (`layer_merge_manager.LayerMergeManager.merge_range`)
 - **엔진 = 마야 그대로**: `bakeResults(plugs, time=(s, e), sampleBy, simulation=False, disableImplicitControl=False,

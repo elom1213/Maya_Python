@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# A00110_animTool_V02 v02.26 - Bake > Counter Layer 회귀 시험 (mayapy, 헤드리스)
+# A00110_animTool_V02 v02.26 / v02.29 - Bake > Counter Layer 회귀 시험 (mayapy, 헤드리스) - Everywhere + Stationary spans only
 #   "C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe" test_counter_layer.py     (약 1분)
 #
 # 계획서 docs/plans/A00110_animTool_V02_counter_layer_plan.md 의 사전 실험(exp_counter_layer.py, 21/21)을
@@ -390,6 +390,300 @@ check("T21 progress callback called, ends at total", calls and calls[-1][0] == c
 
 # autokey state untouched (mayapy: query only)
 check("T22 autoKeyframe state unchanged after run", cmds.autoKeyframe(q=True, state=True) in (True, False))
+
+# ================================================================ v02.29 Hold = Stationary spans only (T23~)
+# 씬 : global_ctl > foot_l_ctl, foot_r_ctl (+ hand_ctl 정적, wave_ctl 계속 이동). 발은 Base + additive lyr_01 에
+#      "정지(hold) - 이동 - 정지" 키 (hold 양끝 키 값 같음 + linear 탄젠트 -> hold 안 월드 완전 정지).
+#      ※ 레이어를 먼저 만들면 그 레이어가 preferred 라 animLayer 없는 setKeyframe 이 거기로 간다 -> Base 키를 먼저.
+#      ※ `setKeyframe -animLayer -value` 는 최종값 역산이라 by-layer 회전에선 아직 안 찍은 채널이 섞여 hold 양끝이 달라진다
+#        -> 레이어 커브 값은 커브 노드에 직접 쓴다 (by-component 회전).
+#      lyr_glo 가 global_ctl 을 0..200 에서 tx 0 -> -20 (옵션: ry 0 -> 40, tz 0 -> 8) 이동.
+# 판정 : hold 안 월드 == 레이어 켠 상태의 앵커 프레임 월드, Start/End/밖 == 레이어 켠 월드, 다른 커브 불변.
+HL = [(20, 30), (70, 85), (140, 150)]              # foot_l 의 정지 구간
+HR = [(0, 10), (45, 60), (105, 120), (185, 200)]   # foot_r (Start · End 에 걸침)
+STATIC_ROT = (5.0, 10.0, 15.0)
+
+
+def build_plant_scene(global_rotates=False, static_rotate=False, extras=False):
+    cmds.file(new=True, force=True)
+    cmds.playbackOptions(min=S, max=E, ast=S, aet=E)
+    glo = cmds.createNode("transform", n="global_ctl")
+    feet = [cmds.createNode("transform", n="foot_%s_ctl" % s, p=glo) for s in ("l", "r")]
+
+    def hold_values(side, k):
+        base = {"tx": 10.0 * k + (3.0 if side == 0 else -3.0), "ty": 2.0 * k, "tz": -5.0 * k,
+                "rx": 15.0 * k, "ry": -20.0 * k + 5.0, "rz": 8.0 * k}
+        lyr = {"tx": 1.0 * (k % 2), "ty": 0.5 * k, "tz": -0.7 * (k % 3),
+               "rx": 4.0 * (k % 2), "ry": 3.0 * k, "rz": -2.0 * (k % 2)}
+        return base, lyr
+
+    # 1) Base 키 먼저 (레이어가 아직 없어 setKeyframe 이 Base 로 간다). hold 양끝은 같은 값 + linear 탄젠트.
+    plan = {}
+    for side, (f, holds) in enumerate(zip(feet, (HL, HR))):
+        rot_attrs = [] if (static_rotate and side == 0) else ["rx", "ry", "rz"]
+        attrs = ["tx", "ty", "tz"] + rot_attrs
+        plan[f] = attrs
+        if not rot_attrs:
+            cmds.setAttr(f + ".rotate", *STATIC_ROT)
+        keyed = []
+        for k, (s_, e_) in enumerate(holds):
+            base, _ = hold_values(side, k)
+            for a in attrs:
+                for t in (s_, e_):
+                    cmds.setKeyframe(f, at=a, t=t, v=base[a], itt="linear", ott="linear")
+            keyed += [s_, e_]
+        for t, mult in ((S, -1.0), (E, 2.5)):          # hold 가 없는 양끝엔 다른 값 -> 계속 움직임
+            if t not in keyed:
+                for a in attrs:
+                    cmds.setKeyframe(f, at=a, t=t, v=mult * 6.0, itt="linear", ott="linear")
+    # 2) additive lyr_01 (by-component 회전) - 커브 값은 **커브 노드에 직접** 써서 역산에 의존하지 않는다.
+    lyr1 = cmds.animLayer("lyr_01")
+    cmds.setAttr(lyr1 + ".rotationAccumulationMode", 1)
+    for side, (f, holds) in enumerate(zip(feet, (HL, HR))):
+        for a in plan[f]:
+            cmds.animLayer(lyr1, e=True, at=f + "." + a)
+            cmds.setKeyframe(f, at=a, t=S, animLayer=lyr1)          # 커브 생성
+            curve = cmds.animLayer(lyr1, q=True, findCurveForPlug=f + "." + a)[0]
+            keyed = []
+            for k, (s_, e_) in enumerate(holds):
+                _, lyr = hold_values(side, k)
+                for t in (s_, e_):
+                    cmds.setKeyframe(curve, t=t, v=lyr[a], itt="linear", ott="linear")
+                keyed += [s_, e_]
+            for t, mult in ((S, -1.0), (E, 2.5)):
+                if t not in keyed:
+                    cmds.setKeyframe(curve, t=t, v=mult * 0.5, itt="linear", ott="linear")
+    extra = []
+    if extras:
+        hand = cmds.createNode("transform", n="hand_ctl", p=glo)      # 키 없음 -> 전구간 정지
+        cmds.setAttr(hand + ".translate", 4, 12, 1)
+        wave = cmds.createNode("transform", n="wave_ctl", p=glo)      # 계속 이동
+        for a in TR:
+            cmds.setKeyframe(wave, at=a, t=S, v=0.0, itt="linear", ott="linear", animLayer="BaseAnimation")
+            cmds.setKeyframe(wave, at=a, t=E, v=30.0, itt="linear", ott="linear", animLayer="BaseAnimation")
+        extra = [hand, wave]
+    # 3) lyr_glo : 글로벌만. 0..200 에서 tx 0 -> -20 (옵션 ry 0 -> 40, tz 0 -> 8)
+    lyr_glo = cmds.animLayer("lyr_glo")
+    for a in TR:
+        cmds.animLayer(lyr_glo, e=True, at=glo + "." + a)
+    cmds.setKeyframe(glo, at="tx", t=S, v=0.0, animLayer=lyr_glo)
+    cmds.setKeyframe(glo, at="tx", t=E, v=-20.0, animLayer=lyr_glo)
+    if global_rotates:
+        cmds.setKeyframe(glo, at="ry", t=S, v=0.0, animLayer=lyr_glo)
+        cmds.setKeyframe(glo, at="ry", t=E, v=40.0, animLayer=lyr_glo)
+        cmds.setKeyframe(glo, at="tz", t=S, v=0.0, animLayer=lyr_glo)
+        cmds.setKeyframe(glo, at="tz", t=E, v=8.0, animLayer=lyr_glo)
+    return glo, feet, lyr_glo, extra
+
+
+def anchor_frame(s, e, anchor):
+    if s <= S:
+        return S
+    if e >= E:
+        return E
+    return {"start": s, "end": e, "middle": (s + e) // 2}[anchor]
+
+
+def span_err(on, new, feet, anchor="start"):
+    """hold 안 모든 프레임의 월드 행렬 vs 앵커 프레임의 (레이어 켠) 월드 행렬 최대 차."""
+    worst = 0.0
+    for f, holds in zip(feet, (HL, HR)):
+        for s, e in holds:
+            ref = on[(f, anchor_frame(s, e, anchor))]
+            for t in range(s, e + 1):
+                worst = max(worst, max(abs(x - y) for x, y in zip(new[(f, t)], ref)))
+    return worst
+
+
+def edge_err(on, new, feet, frames=(S, E)):
+    return max(max(abs(x - y) for x, y in zip(new[(f, t)], on[(f, t)])) for f in feet for t in frames)
+
+
+def max_frame_jump(w, feet):
+    worst = 0.0
+    for f in feet:
+        for t in range(S + 1, E + 1):
+            a, b = w[(f, t)], w[(f, t - 1)]
+            worst = max(worst, math.sqrt(sum((a[i] - b[i]) ** 2 for i in (12, 13, 14))))
+    return worst
+
+
+# ---------------------------------------------------------------- T23 정지 구간 탐지
+glo, feet, lyr_glo, _ = build_plant_scene()
+cmds.currentTime(77)
+spans, cum_d, cum_a = CLM.detect_spans(feet, [lyr_glo], S, E)
+check("T23 detect_spans finds the designed holds", spans[feet[0]] == [list(h) for h in HL]
+      and spans[feet[1]] == [list(h) for h in HR], spans)
+check("T23 detect leaves lyr_glo unmuted and restores current time",
+      not cmds.getAttr(lyr_glo + ".mute") and cmds.currentTime(q=True) == 77)
+check("T23 cumulative travel grows and is flat inside holds",
+      cum_d[feet[0]][30] == cum_d[feet[0]][20] and cum_d[feet[0]][E - S] > cum_d[feet[0]][69] > 0,
+      (cum_d[feet[0]][20], cum_d[feet[0]][30], cum_d[feet[0]][69]))
+spans2 = CLM.detect_spans(feet, [lyr_glo], S, E, min_span=12)[0]
+check("T23b min_span=12 keeps only the 16-frame hold", spans2[feet[0]] == [[70, 85]], spans2[feet[0]])
+spans3 = CLM.detect_spans(feet, [lyr_glo], S, E, tol_t=1e9, tol_r=1e9)[0]
+check("T23c huge tolerance -> the whole range is one span", spans3[feet[0]] == [[S, E]], spans3[feet[0]])
+spans4 = CLM.detect_spans(feet, [lyr_glo], 25, 75)[0]
+check("T23d spans clipped to the range", spans4[feet[0]] == [[25, 30], [70, 75]], spans4[feet[0]])
+
+# ---------------------------------------------------------------- T24 Stationary 기본 (touchdown · by travel)
+layers_all = ["BaseAnimation", "lyr_01", "lyr_glo"]
+plugs_all = [f + "." + a for f in feet for a in TR] + [glo + "." + a for a in TR]
+keep = all_curve_values(layers_all, plugs_all)
+on = world_at(feet, TIMES)
+count, msg = CLM.create(feet, [lyr_glo], S, E, hold=CLM.HOLD_STATIONARY)
+new = world_at(feet, TIMES)
+print("  [T24] " + msg)
+check("T24 count 2, layer lyr_glo_plant, log head", count == 2 and cmds.objExists("lyr_glo_plant")
+      and msg.startswith("Counter Layer (stationary): lyr_glo_plant"), msg[:80])
+check("T24 log reports spans / anchor / blend", "spans [foot_l_ctl 3, foot_r_ctl 4]" in msg
+      and "anchor touchdown" in msg and "blend by travel" in msg)
+e_span = span_err(on, new, feet, "start")
+check("T24 inside holds: world == layered world at touchdown (1e-5)", e_span < 1e-5, e_span)
+e_edge = edge_err(on, new, feet)
+check("T24 Start and End frames == layered world (1e-9)", e_edge < 1e-9, e_edge)
+c = curve_of("lyr_glo_plant", feet[0] + ".tx")
+times = cmds.keyframe(c, q=True, tc=True)
+check("T24 zero keys at -1 and 201, every frame keyed", times[0] == S - 1 and times[-1] == E + 1
+      and len(times) == E - S + 3, (times[0], times[-1], len(times)))
+check("T24 other curves untouched", keep == all_curve_values(layers_all, plugs_all))
+dev = max(max(abs(x - y) for x, y in zip(new[k], on[k])) for k in on)
+check("T24 moving frames deviate from the layered world by less than the global shift (20)", 1e-3 < dev < 20.0, dev)
+j_on, j_new = max_frame_jump(on, feet), max_frame_jump(new, feet)
+check("T24 by travel: no speed spike (max frame jump <= 1.5 x original)", j_new <= 1.5 * j_on + 1e-6, (j_on, j_new))
+cmds.animLayer("lyr_glo_plant", e=True, mute=True)
+muted = world_at(feet, TIMES)
+cmds.animLayer("lyr_glo_plant", e=True, mute=False)
+check("T24 muting the plant layer gives the layered world back", max_diff(muted, on) < 1e-9)
+check("T24 plant layer on top and selected", (cmds.animLayer("BaseAnimation", q=True, children=True) or [])[-1]
+      == "lyr_glo_plant" and cmds.animLayer("lyr_glo_plant", q=True, selected=True))
+
+# ---------------------------------------------------------------- T25 앵커 · T26 분배
+for anchor in ("end", "middle"):
+    cmds.delete("lyr_glo_plant")
+    count, msg = CLM.create(feet, [lyr_glo], S, E, hold=CLM.HOLD_STATIONARY, anchor=anchor)
+    new = world_at(feet, TIMES)
+    check("T25 anchor %s: holds == layered world at that frame, edges exact" % anchor,
+          span_err(on, new, feet, anchor) < 1e-5 and edge_err(on, new, feet) < 1e-9
+          and ("anchor lift-off" in msg if anchor == "end" else "anchor middle" in msg),
+          (span_err(on, new, feet, anchor), edge_err(on, new, feet)))
+for blend in ("ease", "linear"):
+    cmds.delete("lyr_glo_plant")
+    count, msg = CLM.create(feet, [lyr_glo], S, E, hold=CLM.HOLD_STATIONARY, blend=blend)
+    new = world_at(feet, TIMES)
+    check("T26 blend %s: holds exact, edges exact, no spike" % blend,
+          span_err(on, new, feet) < 1e-5 and edge_err(on, new, feet) < 1e-9
+          and max_frame_jump(new, feet) <= 1.5 * j_on + 1e-6 and "blend %s" % blend in msg,
+          (span_err(on, new, feet), max_frame_jump(new, feet)))
+check("T26 unknown anchor / blend rejected", CLM.create(feet, [lyr_glo], S, E, hold="stationary", anchor="x")[0] == 0
+      and "Unknown blend" in CLM.create(feet, [lyr_glo], S, E, hold="stationary", blend="x")[1])
+
+# ---------------------------------------------------------------- T27 글로벌이 회전도 할 때 (쿼터니언 델타 경로)
+glo, feet, lyr_glo, _ = build_plant_scene(global_rotates=True)
+on = world_at(feet, TIMES)
+count, msg = CLM.create(feet, [lyr_glo], S, E, hold=CLM.HOLD_STATIONARY)
+new = world_at(feet, TIMES)
+check("T27 rotating global: holds exact incl. rotation (1e-5), edges exact", span_err(on, new, feet) < 1e-5
+      and edge_err(on, new, feet) < 1e-9, (span_err(on, new, feet), edge_err(on, new, feet)))
+check("T27 rotating global: no speed spike", max_frame_jump(new, feet) <= 1.5 * max_frame_jump(on, feet) + 1e-6,
+      (max_frame_jump(on, feet), max_frame_jump(new, feet)))
+# 부분 구간 : 왼발 hold 70-85 / 140-150 가 Start/End 에 걸치게 [75, 145]
+cmds.delete("lyr_glo_plant")
+count, msg = CLM.create(feet, [lyr_glo], 75, 145, hold=CLM.HOLD_STATIONARY)
+new = world_at(feet, TIMES)
+ok_in = max(max(abs(x - y) for x, y in zip(new[(feet[0], t)], on[(feet[0], 75)])) for t in range(75, 86))
+ok_in2 = max(max(abs(x - y) for x, y in zip(new[(feet[0], t)], on[(feet[0], 145)])) for t in range(140, 146))
+out = max(max(abs(x - y) for x, y in zip(new[k], on[k])) for k in on if k[1] < 75 or k[1] > 145)
+check("T27b span crossing Start/End: anchor forced to the boundary, outside untouched",
+      ok_in < 1e-5 and ok_in2 < 1e-5 and out < 1e-9, (ok_in, ok_in2, out))
+
+# ---------------------------------------------------------------- T28 translate only (+ 정적 회전 복원)
+glo, feet, lyr_glo, _ = build_plant_scene(global_rotates=True, static_rotate=True)
+on = world_at(feet, TIMES)
+count, msg = CLM.create(feet, [lyr_glo], S, E, hold=CLM.HOLD_STATIONARY, rotate=False)
+new = world_at(feet, TIMES)
+pos = 0.0
+for f, holds in zip(feet, (HL, HR)):
+    for s, e in holds:
+        ref = on[(f, anchor_frame(s, e, "start"))]
+        for t in range(s, e + 1):
+            pos = max(pos, max(abs(new[(f, t)][i] - ref[i]) for i in (12, 13, 14)))
+check("T28 translate only: hold positions exact, rotate not in layer", pos < 1e-5
+      and curve_of("lyr_glo_plant", feet[0] + ".rx") is None, pos)
+cmds.currentTime(S)
+rot_now = cmds.getAttr(feet[0] + ".rotate")[0]
+check("T28b translate only: static (unkeyed) rotate of foot_l restored after xform",
+      max(abs(a - b) for a, b in zip(rot_now, STATIC_ROT)) < 1e-9, rot_now)
+
+# ---------------------------------------------------------------- T29 전구간 정지 · 구간 없음
+glo, feet, lyr_glo, extra = build_plant_scene(extras=True)
+hand, wave = extra
+on = world_at(feet, TIMES)
+count, msg = CLM.create(feet + extra, [lyr_glo], S, E, hold=CLM.HOLD_STATIONARY)
+members = set(a.split(".")[0] for a in (cmds.animLayer("lyr_glo_plant", q=True, attribute=True) or []))
+check("T29 whole-range still object reported and dropped", "Stationary for the whole range: hand_ctl" in msg
+      and hand not in members, msg[-200:])
+check("T29 always-moving object reported and dropped", "No stationary span: wave_ctl" in msg and wave not in members)
+check("T29 feet still keyed and exact", count == 2 and span_err(on, world_at(feet, TIMES), feet) < 1e-5)
+cmds.delete("lyr_glo_plant")
+count, msg = CLM.create([hand, wave], [lyr_glo], S, E, hold=CLM.HOLD_STATIONARY)
+check("T29b nothing to hold -> 0, warning, no layer", count == 0 and "Nothing to hold" in msg
+      and not cmds.objExists("lyr_glo_plant"), msg[:120])
+
+# ---------------------------------------------------------------- T30 zero_outside=False
+glo, feet, lyr_glo, _ = build_plant_scene()
+on = world_at(feet, TIMES)
+count, msg = CLM.create(feet, [lyr_glo], S, E, hold=CLM.HOLD_STATIONARY, zero_outside=False)
+new = world_at(feet, TIMES)
+c = curve_of("lyr_glo_plant", feet[0] + ".tx")
+times = cmds.keyframe(c, q=True, tc=True)
+leak = max(abs(x - y) for x, y in zip(new[(feet[0], E)], on[(feet[0], E)]))
+check("T30 zero_outside=False: last-span delta held to End (documented), no keys outside",
+      leak > 1e-3 and times[0] == S and times[-1] == E and span_err(on, new, feet) < 1e-5, (leak, times[0], times[-1]))
+
+# ---------------------------------------------------------------- T31 청크 · T32 undo
+glo, feet, lyr_glo, _ = build_plant_scene()
+count, msg = CLM.create(feet, [lyr_glo], S, E, hold=CLM.HOLD_STATIONARY)
+ref = world_at(feet, TIMES)
+cmds.delete("lyr_glo_plant")
+count, msg = CLM.create(feet, [lyr_glo], S, E, hold=CLM.HOLD_STATIONARY, chunk_frames=7)
+check("T31 chunk of 7 frames gives the same result (1e-9)", max_diff(ref, world_at(feet, TIMES)) < 1e-9)
+check("T31 lyr_glo not left muted", not cmds.getAttr(lyr_glo + ".mute"))
+cmds.delete("lyr_glo_plant")
+keep = all_curve_values(layers_all, plugs_all)
+cmds.flushUndo()
+count, msg = CLM.create(feet, [lyr_glo], S, E, hold=CLM.HOLD_STATIONARY)
+cmds.undo()
+check("T32 one undo removes the plant layer, curves identical, lyr_glo unmuted",
+      not cmds.objExists("lyr_glo_plant") and keep == all_curve_values(layers_all, plugs_all)
+      and not cmds.getAttr(lyr_glo + ".mute"))
+
+# ---------------------------------------------------------------- T33 preview · T34 names · T35 step 무시 · T36 progress
+found, msg = CLM.preview_spans(feet, [lyr_glo], S, E)
+print("  [T33] " + msg)
+check("T33 preview_spans lists spans per object without creating a layer", found == 2
+      and "foot_l_ctl: 20-30 (11f), 70-85 (16f), 140-150 (11f)" in msg and "foot_r_ctl: 0-10 (11f)" in msg
+      and msg.startswith("Stationary spans 0-200f without [lyr_glo]") and not cmds.objExists("lyr_glo_plant"), msg)
+found, msg = CLM.preview_spans(feet, [lyr_glo], S, E, tol_t=1e9, tol_r=1e9)
+check("T33b preview with huge tolerance shows the whole range", "foot_l_ctl: 0-200 (201f)" in msg, msg)
+check("T33c preview rejects a muted layer like create", (cmds.animLayer(lyr_glo, e=True, mute=True) or True)
+      and "is muted" in CLM.preview_spans(feet, [lyr_glo], S, E)[1])
+cmds.animLayer(lyr_glo, e=True, mute=False)
+check("T34 default names: _plant / plant in stationary mode, _counter otherwise",
+      CLM.default_layer_name(["lyr_glo"], CLM.HOLD_STATIONARY) == "lyr_glo_plant"
+      and CLM.default_layer_name(["a", "b"], CLM.HOLD_STATIONARY) == "plant"
+      and CLM.default_layer_name(["lyr_glo"]) == "lyr_glo_counter")
+count, msg = CLM.create(feet, [lyr_glo], S, E, hold=CLM.HOLD_STATIONARY, step=5)
+c = curve_of("lyr_glo_plant", feet[0] + ".tx")
+check("T35 step ignored in stationary mode (every frame keyed, no NOT exact note)",
+      cmds.keyframe(c, q=True, kc=True) == E - S + 3 and "NOT exact" not in msg)
+cmds.delete("lyr_glo_plant")
+calls = []
+CLM.create(feet, [lyr_glo], S, E, hold=CLM.HOLD_STATIONARY, progress=lambda d, t, m=None: calls.append((d, t, m)))
+check("T36 progress ends at total = detect 202 + sample 201 + key 201", calls and calls[-1][0] == calls[-1][1] == 604,
+      (len(calls), calls[-1]))
+check("T36 everywhere-mode message unchanged (regression)",
+      CLM.create(feet, [lyr_glo], S, E, layer_name="chk")[1].startswith("Counter Layer: chk - 2 object(s)"))
 
 print("\n%d / %d passed" % (sum(R), len(R)))
 maya.standalone.uninitialize()

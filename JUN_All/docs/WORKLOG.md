@@ -32,13 +32,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-29 (오늘)
 
-> [!summary] A00110_animTool_V02 **`Bake > Counter Layer` Stationary spans only 모드 계획서** — 글로벌 이동은 살리고 **발이 땅을 짚어 정지하던 구간만 월드 고정**, 허공 구간이 차이를 흡수(실제 ZIHAN 씬 실측) `#A00110_animTool`
+> [!summary] A00110_animTool_V02 **v02.29 `Bake > Counter Layer` Hold = Stationary spans only** — 글로벌 이동은 살리고 **발이 땅을 짚어 정지하던 구간만 월드 고정**, 허공 구간이 차이를 흡수. 오전 계획서(실제 ZIHAN 씬 실측) → 같은 날 구현 `#A00110_animTool`
 - 요청: `CH_n_Global_xx_ctl` 이 `global_lyr` 로 이동하면 IK 발 `CH_l/r_foot_xx_ctl` 의 정지 구간이 월드에서 미끄러진다. **최종 위치는 글로벌 결과대로**, 정지 구간은 정지. 새 탭 vs 기존 확장 판단 · 다른 방법 제시 · SmartLayer 참고 가능.
 - 관찰(mayapy, `00010_cleanup_ZIHAN_00120_tmp.mb` 저장 없음): 글로벌 `tx` 0 → −21.72(4271→4312 ease), 발 로컬은 뮤트 전후 동일(부모만 바뀜). 정지 구간 L `4277-4282 · 4297-4304`, R `4262-4271 · 4287-4290 · 4303-4305`, 그 안에서 2.6 / 4.4 / 1.6 / 1.0 유닛 미끄럼. 두 발이 동시에 떠 있는 프레임이 짧아 "글로벌을 허공에서만 움직이기" 대안은 불가.
 - 판단: **새 탭 아님 — v02.26 Counter Layer 탭에 `Hold: Everywhere / Stationary spans only` 라디오** + 톨러런스 · 최소 길이 · Anchor(Touchdown/Middle/Lift-off) · Blend(By travel/Ease/Linear) · `Preview Spans`. 입력 · 엔진(뮤트 스냅샷 · 청크 · `xform -m` · `setKeyframe -animLayer` 역산) 전부 재사용, 새 코드는 구간 탐지 · 앵커 · 델타 분배만. additive 레이어가 맞고 로케이터 핀/override/글로벌 수정은 거부(계획서 §2).
 - 알고리즘: ① 레이어 뮤트 스트리밍으로 정지 구간(포즈 변화 < tol) ② 앵커 프레임 월드 포즈 = 구간 목표, 구간 시작/끝 델타 ③ 허공은 발 이동량 비례로 델타 보간(위치 더하기 · 회전 월드 후곱 slerp) ④ **Start·End 에서 델타 0**(경계에 걸친 구간은 앵커 강제) ⑤ 쓰기는 기존 청크 루프. 메모리 = 프레임당 double 2 + 구간당 포즈 3 + 200f 청크.
 - 실측: 정지 구간 월드 오차 1.7e-6 · 범위 밖 변화 0 · 4313 최종 위치 차 0 · 프레임 간 최대 이동량 보정 전후 동일(스파이크 없음) · `global_lyr` 불변 · 뮤트/삭제 시 원상 · Middle 앵커는 흡수 델타 절반(2.33) · 1000f × 2 발 10.5 s, 파이썬 피크 0.4 MB · 프레임마다 뮤트 토글은 16 ms/f(5배)라 청크 유지. 함정: 경계 0 을 `end+1` 에 두면 마지막 프레임에 0.44 잔여 + 한 프레임 계단 → `end`.
-- 산출: `docs/plans/A00110_animTool_V02_counter_layer_stationary_plan.md`, 재현 `tests/exp_plant_hold_zihan.py`(씬 경로 상수, 구현 때 흡수·삭제). 구현은 다음 턴(v02.29).
+- 계획서 `docs/plans/A00110_animTool_V02_counter_layer_stationary_plan.md`(커밋 `8c2ed04`, 푸시됨).
+- 구현: `CounterLayerManager.create(hold="stationary", tol_t, tol_r, min_span, anchor, blend)` + `detect_spans`(뮤트 스트리밍, bytearray + `array('d')` 누적 이동량) · `preview_spans` · `_stationary_plan`(앵커 포즈 · 경계 델타 · 사이 구간 표) · `_stationary_target`(구간 안 = 앵커, 사이 = 스냅샷 + lerp/slerp 델타) · `_frac`. 스냅샷 뮤트 = 보정 레이어만. 기본 이름 `<layer>_plant`. 채널 일부만 키를 찍을 때 `xform` 이 건드린 나머지 채널을 `xform -m <현재>` 로 되돌림(정적 채널 보호 — v02.26 에도 있던 구멍). UI: `Hold` 라디오 + Still tolerance/Min span + Anchor/Blend 콤보 + `Preview Spans`(Stationary 일 때만 활성, Step 은 비활성), 진행 팝업 단계명.
+- 회귀 `tests/test_counter_layer.py` **92**(기존 51 + Stationary T23~T36: 구간 탐지·min_span·톨러런스·범위 잘림 · touchdown/middle/lift-off · travel/ease/linear · 회전하는 글로벌 · Start/End 걸친 구간 앵커 강제 · translate only + 정적 회전 복원 · 전구간 정지/구간 없음 경고 · zero_outside off · 청크 7 · undo · preview 문장 · 기본 이름 · step 무시 · progress 604). 오프스크린 UI 스모크 **23**. `exp_plant_hold_zihan.py` 삭제(흡수). GUI(실기) 확인 아직.
 
 > [!summary] A00110_animTool_V02 **v02.28 Transfer > Layer `Cut Keys to Layer (Move)` 월드 결과 보존** — Base 에만 키가 있는 ctl 을 Base → a 로 옮기면 월드가 달라지던 것 수정(`Keep Result`, 기본 ON) `#A00110_animTool`
 - 요청: "Base 와 a 에 키가 있을 때 a → b Move 는 월드가 안 변하는데, Base 에만 키가 있을 때 Base → a/b Move 는 월드 위치·회전이 달라지는 것 같다. 사실인지 확인하고 사실이면 같도록 수정."

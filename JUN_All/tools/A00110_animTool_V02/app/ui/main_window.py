@@ -364,7 +364,9 @@ class MainWindow(QWidget):
          "frame range", "_build_bake_tab"),
         ("Counter Layer", "Counter Layer - add an animation layer that keeps the "
          "listed objects' world position / rotation as they were without the "
-         "checked layers (e.g. feet under an animated global control)",
+         "checked layers (e.g. feet under an animated global control) - on every "
+         "frame, or only while they stood still (planted feet) with the moving "
+         "frames absorbing the difference",
          "_build_counter_layer_tab"),
         ("Merge Layers", "Merge Layers - Maya's Merge Layers limited to a frame range: "
          "bake the checked animation layers into one of them (or a new layer) "
@@ -2174,6 +2176,104 @@ class MainWindow(QWidget):
         tab_layout.addLayout(ch_row)
 
         # -------------------------
+        # Hold : Everywhere (v02.26) / Stationary spans only (v02.29)
+        # -------------------------
+
+        hold_row = QHBoxLayout()
+        hold_row.addWidget(QLabel("Hold"))
+        self.cl_hold_grp = QButtonGroup(self)
+        self.rb_cl_hold_all = QRadioButton("Everywhere")
+        self.rb_cl_hold_still = QRadioButton("Stationary spans only")
+        self.rb_cl_hold_all.setChecked(True)
+        self.cl_hold_grp.addButton(self.rb_cl_hold_all)
+        self.cl_hold_grp.addButton(self.rb_cl_hold_still)
+        self.rb_cl_hold_all.setToolTip(
+            "Restore the world pose on EVERY frame - undo what the checked layers did "
+            "to these objects\ncompletely (they end up where they were without the "
+            "layers).")
+        self.rb_cl_hold_still.setToolTip(
+            "Keep the objects where they stood only while they were NOT moving without "
+            "the checked\nlayers (planted feet). The moving frames absorb the "
+            "difference, so the objects still follow\nthe checked layers between "
+            "spans and the final position (End) is the layered result.\nStep is "
+            "ignored (every frame is keyed).")
+        hold_row.addWidget(self.rb_cl_hold_all)
+        hold_row.addWidget(self.rb_cl_hold_still)
+        hold_row.addStretch(1)
+        tab_layout.addLayout(hold_row)
+
+        self.cl_still_box = QWidget()
+        still_col = QVBoxLayout(self.cl_still_box)
+        still_col.setContentsMargins(16, 0, 0, 0)
+
+        tol_row = QHBoxLayout()
+        tol_row.addWidget(QLabel("Still tolerance"))
+        self.dsb_cl_tol_t = QDoubleSpinBox()
+        self.dsb_cl_tol_t.setRange(0.0001, 10000.0)
+        self.dsb_cl_tol_t.setDecimals(3)
+        self.dsb_cl_tol_t.setSingleStep(0.05)
+        self.dsb_cl_tol_t.setValue(CounterLayerManager.STILL_TOL_T)
+        self.dsb_cl_tol_t.setKeyboardTracking(False)
+        self.dsb_cl_tol_t.setToolTip(
+            "A frame counts as 'still' when the world position moved less than this "
+            "(scene units)\nAND the world rotation turned less than the degrees "
+            "value, compared with the previous\nframe - measured with the checked "
+            "layers muted. Use Preview Spans to check.")
+        tol_row.addWidget(self.dsb_cl_tol_t)
+        tol_row.addWidget(QLabel("units"))
+        self.dsb_cl_tol_r = QDoubleSpinBox()
+        self.dsb_cl_tol_r.setRange(0.001, 180.0)
+        self.dsb_cl_tol_r.setDecimals(2)
+        self.dsb_cl_tol_r.setSingleStep(0.1)
+        self.dsb_cl_tol_r.setValue(CounterLayerManager.STILL_TOL_R)
+        self.dsb_cl_tol_r.setKeyboardTracking(False)
+        self.dsb_cl_tol_r.setToolTip(self.dsb_cl_tol_t.toolTip())
+        tol_row.addWidget(self.dsb_cl_tol_r)
+        tol_row.addWidget(QLabel("deg"))
+        tol_row.addSpacing(12)
+        tol_row.addWidget(QLabel("Min span"))
+        self.sb_cl_min_span = QSpinBox()
+        self.sb_cl_min_span.setRange(2, 100000)
+        self.sb_cl_min_span.setValue(CounterLayerManager.MIN_SPAN)
+        self.sb_cl_min_span.setToolTip(
+            "Shortest run of still frames that counts as a stationary span. "
+            "Shorter runs are treated as moving.")
+        tol_row.addWidget(self.sb_cl_min_span)
+        tol_row.addWidget(QLabel("f"))
+        tol_row.addStretch(1)
+        still_col.addLayout(tol_row)
+
+        ab_row = QHBoxLayout()
+        ab_row.addWidget(QLabel("Anchor"))
+        self.cb_cl_anchor = QComboBox()
+        self.cb_cl_anchor.addItems(["Touchdown", "Middle", "Lift-off"])
+        self.cb_cl_anchor.setToolTip(
+            "Which frame of a stationary span the object stays at (where the checked "
+            "layers put it\non that frame): Touchdown = first frame of the span, "
+            "Lift-off = last frame,\nMiddle = halfway (smallest detour for the moving "
+            "frames).")
+        ab_row.addWidget(self.cb_cl_anchor)
+        ab_row.addSpacing(12)
+        ab_row.addWidget(QLabel("Blend"))
+        self.cb_cl_blend = QComboBox()
+        self.cb_cl_blend.addItems(["By travel", "Ease", "Linear"])
+        self.cb_cl_blend.setToolTip(
+            "How the offset fades between two spans (and from Start / to End):\n"
+            "By travel = proportional to the object's own motion without the layers "
+            "(frames that\nwere still stay still), Ease = smooth in / out over time, "
+            "Linear = constant rate.")
+        ab_row.addWidget(self.cb_cl_blend)
+        ab_row.addStretch(1)
+        self.btn_cl_preview = QPushButton("Preview Spans")
+        self.btn_cl_preview.setToolTip(
+            "List the stationary spans the current tolerance finds (per object) in "
+            "the log,\nwithout creating a layer.")
+        ab_row.addWidget(self.btn_cl_preview)
+        still_col.addLayout(ab_row)
+
+        tab_layout.addWidget(self.cl_still_box)
+
+        # -------------------------
         # New layer name + options
         # -------------------------
 
@@ -2182,7 +2282,8 @@ class MainWindow(QWidget):
         self.le_cl_name = QLineEdit()
         self.le_cl_name.setPlaceholderText(CounterLayerManager.default_layer_name([]))
         self.le_cl_name.setToolTip(
-            "Name of the new (additive) layer. Empty = '<layer>_counter'.\n"
+            "Name of the new (additive) layer. Empty = '<layer>_counter' "
+            "('<layer>_plant' in Stationary mode).\n"
             "If the name exists Maya makes it unique; the log tells which name was used.")
         name_row.addWidget(self.le_cl_name, 1)
         tab_layout.addLayout(name_row)
@@ -2224,7 +2325,10 @@ class MainWindow(QWidget):
         tab_layout.addStretch(1)
 
         self._cl_update_range_mode()
+        self._cl_update_hold_mode()
         self.rb_cl_custom.toggled.connect(self._cl_update_range_mode)
+        self.rb_cl_hold_still.toggled.connect(self._cl_update_hold_mode)
+        self.btn_cl_preview.clicked.connect(self.on_cl_preview_spans)
         self.btn_cl_create.clicked.connect(self.on_counter_layer)
 
         self.on_cl_refresh_layers(quiet=True)
@@ -4293,9 +4397,60 @@ class MainWindow(QWidget):
                 if self.lw_cl_layers.item(i).checkState() == Qt.Checked]
 
     def _cl_layers_changed(self, *args):
-        """체크가 바뀌면 새 레이어 기본 이름(placeholder)을 따라 바꾼다."""
+        """체크(또는 Hold 모드)가 바뀌면 새 레이어 기본 이름(placeholder)을 따라 바꾼다."""
         self.le_cl_name.setPlaceholderText(
-            CounterLayerManager.default_layer_name(self._cl_checked_layers()))
+            CounterLayerManager.default_layer_name(self._cl_checked_layers(), self._cl_hold()))
+
+    def _cl_hold(self):
+        return (CounterLayerManager.HOLD_STATIONARY if self.rb_cl_hold_still.isChecked()
+                else CounterLayerManager.HOLD_ALL)
+
+    def _cl_anchor(self):
+        return CounterLayerManager.ANCHORS[self.cb_cl_anchor.currentIndex()]
+
+    def _cl_blend(self):
+        return CounterLayerManager.BLENDS[self.cb_cl_blend.currentIndex()]
+
+    def _cl_update_hold_mode(self, *args):
+        """Stationary 면 톨러런스·앵커·분배 줄을 켜고 Step 을 끈다 (매 프레임 키)."""
+        still = self.rb_cl_hold_still.isChecked()
+        self.cl_still_box.setEnabled(still)
+        self.sb_cl_step.setEnabled(not still)
+        self._cl_layers_changed()
+
+    def _cl_inputs(self):
+        """(objs, layers, start, end, translate, rotate) 또는 None (경고는 로그에)."""
+        objs = self.cl_tsl.get_all_items()
+        if not objs:
+            self.log("[Warning] Add objects to the Counter List first (the feet, not "
+                     "the global control).")
+            return None
+        layers = self._cl_checked_layers()
+        if not layers:
+            self.log("[Warning] Check at least one layer to counter (press Refresh if "
+                     "the list is stale).")
+            return None
+        rng = self._cl_resolve_range()
+        if rng is None:
+            return None
+        translate = self.cb_cl_t.isChecked()
+        rotate = self.cb_cl_r.isChecked()
+        if not (translate or rotate):
+            self.log("[Warning] Enable Translate and/or Rotate.")
+            return None
+        return (objs, layers, rng[0], rng[1], translate, rotate)
+
+    def on_cl_preview_spans(self):
+        """레이어를 만들지 않고 지금 톨러런스로 찾은 정지 구간을 로그에."""
+        inputs = self._cl_inputs()
+        if inputs is None:
+            return
+        objs, layers, start, end, translate, rotate = inputs
+        _found, msg = CounterLayerManager.preview_spans(
+            objs, layers, start, end, translate=translate, rotate=rotate,
+            tol_t=self.dsb_cl_tol_t.value(), tol_r=self.dsb_cl_tol_r.value(),
+            min_span=self.sb_cl_min_span.value())
+        self.log(msg)
 
     def on_cl_refresh_layers(self, quiet=False):
         """씬의 레이어(BaseAnimation 제외)로 체크 목록을 다시 채운다.
@@ -4329,37 +4484,23 @@ class MainWindow(QWidget):
                 ", ".join(layers), ", ".join(self._cl_checked_layers()) or "none"))
 
     def on_counter_layer(self):
-        objs = self.cl_tsl.get_all_items()
-        if not objs:
-            self.log("[Warning] Add objects to the Counter List first (the feet, not "
-                     "the global control).")
+        inputs = self._cl_inputs()
+        if inputs is None:
             return
+        objs, layers, start, end, translate, rotate = inputs
 
-        layers = self._cl_checked_layers()
-        if not layers:
-            self.log("[Warning] Check at least one layer to counter (press Refresh if "
-                     "the list is stale).")
-            return
-
-        rng = self._cl_resolve_range()
-        if rng is None:
-            return
-        start, end = rng
-
-        translate = self.cb_cl_t.isChecked()
-        rotate = self.cb_cl_r.isChecked()
-        if not (translate or rotate):
-            self.log("[Warning] Enable Translate and/or Rotate.")
-            return
-
-        step = self.sb_cl_step.value()
+        hold = self._cl_hold()
+        stationary = (hold == CounterLayerManager.HOLD_STATIONARY)
+        step = 1 if stationary else self.sb_cl_step.value()
         frames = len(range(start, end + 1, step)) + (1 if (end - start) % step else 0)
 
         # 오브젝트 x 프레임이 크면 진행 팝업 (실측 0.9 ms / 단위 -> 2000 이면 약 2 초).
         dlg = None
         if len(objs) * frames > CounterLayerManager.PROGRESS_THRESHOLD:
             dlg = JUN_mod_progress_qt.JUN_mod_progress_qt_v01(
-                self, title="Counter Layer", phases=[("Sampling + keying", 1)])
+                self, title="Counter Layer",
+                phases=[("Detecting + sampling + keying" if stationary
+                         else "Sampling + keying", 1)])
             dlg.start()
             dlg.begin_phase()
 
@@ -4371,7 +4512,11 @@ class MainWindow(QWidget):
                 zero_outside=self.cb_cl_zero.isChecked(),
                 skip_unchanged=self.cb_cl_skip.isChecked(),
                 select_new=self.cb_cl_select.isChecked(),
-                progress=dlg.callback() if dlg else None)
+                progress=dlg.callback() if dlg else None,
+                hold=hold, tol_t=self.dsb_cl_tol_t.value(),
+                tol_r=self.dsb_cl_tol_r.value(),
+                min_span=self.sb_cl_min_span.value(),
+                anchor=self._cl_anchor(), blend=self._cl_blend())
         finally:
             if dlg:
                 elapsed = dlg.elapsed()

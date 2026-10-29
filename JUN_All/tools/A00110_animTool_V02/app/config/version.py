@@ -40,5 +40,14 @@
 #        정확히 안 되는 경우는 로그 `Not exact:` 에 이유(대상에 이미 키 · weight≠1 · by-layer 회전에 0 아닌 회전 합성 ·
 #        override 소스 구간 · 비수치 채널). Copy 는 예전처럼 값 그대로. 회귀 tests/test_layer_key_move.py 68/68.
 
-VERSION = "02.28"
+# 02.29  Bake > Counter Layer `Hold` 모드 - Everywhere(기존) / **Stationary spans only**. 글로벌 레이어가 이동할 때
+#        발이 **땅을 짚어 정지하던 구간만** 월드 고정하고, 움직이는 구간이 그 차이를 흡수해 최종 위치(End)는 레이어 결과대로.
+#        레이어 뮤트 스트리밍으로 정지 구간(포즈 변화 < Still tolerance, Min span) -> 앵커(Touchdown/Middle/Lift-off) 포즈를
+#        구간 목표로 -> 사이는 By travel(이동량 비례)/Ease/Linear 로 델타 보간(위치 더하기 · 회전 월드 후곱 slerp) ->
+#        Start·End 델타 0(걸친 구간은 앵커 경계 강제, 전구간 정지는 제외 경고) -> 기존 청크 쓰기(보정 레이어만 뮤트).
+#        `Preview Spans` 는 레이어 없이 구간만 로그. Step 은 이 모드에서 무시. 채널 일부만 키를 찍을 때 xform 이 건드린
+#        나머지 채널을 되돌림(정적 채널 보호). 실제 씬(ZIHAN 두 발) 구간 오차 1.7e-6 · 범위 밖 0 · 1000f 10.5 s.
+#        계획서 docs/plans/A00110_animTool_V02_counter_layer_stationary_plan.md, 회귀 tests/test_counter_layer.py.
+
+VERSION = "02.29"
 LAST_UPDATE = "2026-10-29"
