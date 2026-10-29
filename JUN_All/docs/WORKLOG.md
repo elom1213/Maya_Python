@@ -32,6 +32,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-29 (오늘)
 
+> [!summary] A00110_animTool_V02 **`Bake > Counter Layer` 계획서** — 글로벌 컨트롤만 든 레이어(`lyr_glo`)가 바꾼 자식(발)의 **월드 위치·회전을 되돌리는 보정 레이어** 생성 `#A00110_animTool` `#plan`
+- 요청: "`global_ctl > foot_l/r_ctl`, 발은 additive `lyr_01..n` 에 키. `global_ctl` 만 든 `lyr_glo` 에 키를 찍으면 발의 월드가 바뀐다. `lyr_glo` 는 그대로 두고, 발의 월드 위치·회전이 `lyr_glo` 가 있기 전과 같아지는 추가 레이어를 만드는 기능. A00110_V02 에. `_SmartLayer` 의 Smart Layer 탭 참고 가능. 계획서를 작성."
+- 분석: `bakeResults -resolveWithoutLayer` 는 어트리뷰트 단위라 **부모가 바뀐** 이 문제엔 안 맞는다. 설계 = ① 되돌릴 레이어를 뮤트해 발의 `worldMatrix` 를 매 프레임 스냅샷 → ② 뮤트 풀고 `xform -ws -m <스냅샷>` 으로 로컬 T/R 을 얻어 새 additive 레이어에 **`setKeyframe -animLayer -value`**(마야가 누적 모드 · 가중치 · 아래 override 를 역산). 회전 동치해는 `alternateSolution + setToClosestCut`(기준 = 지금 로컬 회전).
+- 실측(mayapy 2024, `tests/exp_counter_layer.py` + 추가 6): **21/21** — 발 worldMatrix **정수 프레임 전부 1e-14 동일**(by-layer/by-component, 조인트 JO+zxy, 270° 회전, 발이 `lyr_glo` 에도 키, 가중치 0.5 + 애니메이션 weight, 아래 override, 정적 발). 프레임 사이 1.15e-3(보간). **드라이버 키에만 찍는 희소 모드는 0.95 유닛 틀림** → 매 프레임 기본. **잠긴 채널은 `xform`·`setKeyframe` 이 조용히 지나감**(반환 0) → 사전 검사. 비용 0.9 ms/(오브젝트·프레임) → 50 ctl × 1000 f ≈ 44 s(진행 팝업).
+- SmartLayer 는 코어가 `.pyc` 라 **디컴파일 없이** 툴팁 · Starter Guide 텍스트만 참고(2026-08 Curve Filters 와 같은 결정). 가져온 건 "레이어 켜고/끄고 비교" 원리와 World Space 개념, 속도 비례 분배는 v2 후보로 제외.
+- 계획서: [`docs/plans/A00110_animTool_V02_counter_layer_plan.md`](plans/A00110_animTool_V02_counter_layer_plan.md). UI 는 `Bake > Counter Layer`(Merge Layers 와 같은 카테고리 — 같은 파일을 건드리므로 구현 순서 확인 필요).
+
 > [!summary] A00110_animTool_V02 **`Bake > Merge Layers` 계획서** — 애니메이션 레이어를 **프레임 구간 안에서만** 병합(`a + b => b` / `=> 새 레이어`), 월드 움직임 보존 `#A00110_animTool` `#plan`
 - 요청: "마야 Merge Layers 처럼 레이어를 합치되 `[50, 300]` 같은 임의 구간만 합치고, 병합 전후 컨트롤러의 월드 기준 움직임은 같아야 한다. 계획서를 작성."
 - 분석: 마야 `performAnimLayerMerge.mel` 의 `animLayerMerge` 는 `bakeResults -destinationLayer Merged_Layer -resolveWithoutLayer a -resolveWithoutLayer b -time ":"` 한 줄 + 소스 삭제. 구간 병합 = 같은 bake 에 `-time "s:e" -preserveOutsideKeys` + **소스의 구간 안 기여 중화**(additive 는 identity 키 step, override 는 weight 계단 0) + 경계 `s-1`/`e+1` insert 키 fixed.
