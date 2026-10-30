@@ -200,6 +200,12 @@ check("P6 set_stay_on_top(False) on a live window clears the flag and keeps it v
 win.cf_panel.collapse()
 pump()
 
+# Graph Focus 토글 ON = 연한 빨강 (v02.34, 공용 pin_style)
+from Framework.qt import pin_style   # noqa: E402
+check("G1 Graph Focus toggle carries the pin style (checked = light red)",
+      pin_style.PINNED_BG in win.btn_graph_focus.styleSheet() and "QPushButton:checked" in win.btn_graph_focus.styleSheet()
+      and win.btn_graph_focus.isCheckable())
+
 win.close()
 pump()
 print("\n%d / %d passed" % (sum(R), len(R)))

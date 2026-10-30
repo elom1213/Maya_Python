@@ -1795,7 +1795,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 
 ```
 ┌ Focus Graph Editor around Current Frame ──────────┐
-│ [ Auto-Focus on Selection : OFF ]                 │  ← 체크형 토글 버튼
+│ [ Auto-Focus on Selection : OFF ]                 │  ← 체크형 토글 버튼 (ON 이면 연한 빨강, v02.34)
 │ Frame margin (±) [ 30 f ]                         │  ← 스핀박스 (기본 30, v02.30~)
 │ [x] Fit value (vertical) axis too                 │
 │ Value margin (%) [ 10 % ]                         │  ← 세로 위/아래 여백 (v01.29~)

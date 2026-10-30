@@ -5,6 +5,8 @@ metadata:
   type: project
 ---
 
+**2026-10-30**: A00110_V02 View > Graph Focus 의 `Auto-Focus on Selection` 체크형 토글에도 `apply_pin_style` (ON = 연한 빨강, v02.34). Pin 이 아닌 켜짐/꺼짐 토글에도 쓸 수 있다.
+
 **Pin(Always on Top) 토글 버튼의 "켜짐" 표시는 `Framework/qt/pin_style.py` 의 `apply_pin_style(button)` 한 줄.**
 켜진 동안(`:checked`) 연한 빨강 바탕 `#f2a0a0` + 어두운 글자, hover/pressed 도 같은 계열. 사용자 요청(2026-10-23):
 "Pinned 모드일 때 버튼이 연한 빨강으로 변해 pin 되었다는 표현". 적용: A00240 v01.26 · A00220 v01.21 · A00370 v01.13 · A00210 v01.39.

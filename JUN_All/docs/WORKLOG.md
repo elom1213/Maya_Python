@@ -32,6 +32,9 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-30 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.34 View > Graph Focus `Auto-Focus on Selection` ON 이면 연한 빨강**(공용 `pin_style`) `#A00110_animTool_V02`
+- 요청: "Auto Focus 버튼이 On 일 때 색이 연한 빨강으로." → `apply_pin_style(self.btn_graph_focus)` 한 줄(Pin 과 같은 `:checked` 색). `test_anim_layers.py` G1 추가(40/40).
+
 > [!summary] A00110_animTool_V02 **v02.33 Expand 창(View > Layers · Curve > Filters)은 Pin 과 무관하게 늘 다른 창 위에** `#A00110_animTool_V02` `#Framework`
 - 보고: "아직도 Layers 창이 다른 창 밑으로 간다 — 그래프 에디터를 선택하면 그 위로 간다. 앞으로 가도록."
 - 수정: 공용 Expand 위젯에 생성 인자 `stay_on_top`(창을 **만들 때** `WindowStaysOnTopHint`), A00110 두 패널에 `True`. v02.32 의 Pin 핸들러 전달은 뺐다(Pin 이 꺼져 있어도 위에). 헤드리스로는 Z-order 를 못 재현해 플래그 유무만 시험(38/38, P1~P6).

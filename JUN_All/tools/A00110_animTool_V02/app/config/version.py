@@ -64,5 +64,7 @@
 # 02.33  Expand 창(View > Layers · Curve > Filters)은 **Pin 과 무관하게 늘 다른 창 위에**(생성 때 WindowStaysOnTopHint).
 #        v02.32 의 "Pin 을 따라가기" 는 그래프 에디터를 클릭하면 뒤로 숨는다는 보고 → 창을 만들 때 플래그를 준다.
 
-VERSION = "02.33"
+# 02.34  View > Graph Focus `Auto-Focus on Selection` 토글이 ON 이면 연한 빨강(공용 pin_style, Pin 과 같은 색). 사용자 요청.
+
+VERSION = "02.34"
 LAST_UPDATE = "2026-10-30"

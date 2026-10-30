@@ -2934,6 +2934,8 @@ class MainWindow(QWidget):
 
         self.btn_graph_focus = QPushButton("Auto-Focus on Selection : OFF")
         self.btn_graph_focus.setCheckable(True)
+        # 켜진 동안 연한 빨강 - Pin 과 같은 공용 pin_style (v02.34, 사용자 요청)
+        apply_pin_style(self.btn_graph_focus)
         self.btn_graph_focus.setToolTip(
             "When ON, selecting a controller frames the Graph Editor to\n"
             "[current frame - margin, current frame + margin] instead of its\n"
