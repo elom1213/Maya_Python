@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-30 (오늘)
 
+> [!summary] A00480_FileTool **v01.16 Reference > Default `Show` 콤보 — File 열을 Full Path / File Name 으로** `#A00480_FileTool`
+- 요청: "지금은 각 레퍼런스 파일의 경로를 모두 보여준다. 이 모드와 다른 보기 모드(파일 이름만) 를 추가."
+- 구현: 헤더 줄 `Show [Full Path | File Name]` 콤보. `core.reference_ops.file_text(path, view)` 로 File 열 글자만 바꾸고(씬 재독 없음) 헤더도 `File Name` 으로. 저장된 경로(ROLE_PATH) · 열기 · 더블클릭 · Copy Path · 툴팁은 그대로 전체 경로. 모드는 `optionVar JUN_A00480_FileTool_reference_file_view` 에 기억(`load_file_view` / `save_file_view`, 마야 밖이면 기본 Full Path).
+- 시험 `tests/test_reference.py` **46/46**(V1~V11 추가). CHANGELOG v01.16 · 가이드 §5 · About. **마야 GUI 확인 아직.**
+
 > [!summary] Framework **tabFit 보정 + A00170_driverTool v01.35** — Remap Value · Spherical Eye · AttachCrv > Default 가 **가장 긴 Seal 페이지 높이**로 열려 리스트가 650px 까지 늘어나던 것 수정(사용자: "세로가 너무 길다, 특히 리스트 — 절반으로"). `#Framework` `#A00170_driverTool`
 - 원인(mayapy 오프스크린 실측): **Qt 5.15 `QTabWidget.sizeHint()` 는 숨은 페이지의 `Ignored` 정책을 보지 않고 모든 페이지 sizeHint 의 최댓값을 센다**(Ignored 줘도 951 그대로, minimumSizeHint 만 501 → 201). 10-29 tabFit 은 그 정책에 의존했는데, 페이지가 전부 `QScrollArea`(sizeHint 24h 로 잘려 다 비슷)인 A00275 로 확인해서 몰랐다. 페이지가 맨 위젯인 툴은 모든 탭이 가장 긴 페이지 높이(A00170 1354 ×5). 현재 페이지에 글줄 바꿈 라벨이 있으면 `heightForWidth` 경로(hfw 가진 페이지들의 최댓값)로 바뀌어 Edge Loop 만 913 이었다.
 - 수정: 공용 `MOD_tabFit_qt_v01.tab_correction(within=None)` — 보이는 사슬의 탭 위젯마다 (현재 페이지 − 페이지들 최댓값) 을 Qt 와 같은 규칙(sizeHint / hfw)으로 재서 `content_height` 에 더하고, `shortfall()` 의 스크롤 내용 sizeHint 에도 더한다(없으면 `tabs_scroll` 툴 A00240 · A00480 · A00550 이 늘 가장 긴 페이지로 되돌아갔다 — 1차 전수 시험이 잡음). 공용 TSL 에 `list_hint_height`(QListWidget 기본 sizeHint 192px 대신) — A00170 세 탭 `LIST_HINT = 100`, 창을 늘리면 리스트는 따라 늘어난다.

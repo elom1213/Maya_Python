@@ -62,5 +62,9 @@
 #        스크롤 없이 다 보이고 짧은 페이지로 가면 줄어든다. 페이지가 화면보다 길면 화면 높이에서 멈춤.
 #        공용 Framework/qt/MOD_tabFit_qt_v01 (A00275 v01.38 과 같은 방식) · 처음 여는 폭은 예전 fit_to_content 그대로
 
-VERSION = "01.15"
-LAST_UPDATE = "2026-10-29"
+# 01.16  Reference > Default : `Show` 콤보 - File 열을 **Full Path / File Name** 으로 바꿔 본다(사용자 요청).
+#        글자만 바뀌고 Open in Explorer · Copy Path 는 그대로 전체 경로. 고른 모드는 optionVar 에 기억.
+#        core.reference_ops.file_text / load_file_view / save_file_view. tests/test_reference.py 46 항목.
+
+VERSION = "01.16"
+LAST_UPDATE = "2026-10-30"

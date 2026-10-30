@@ -2,7 +2,7 @@
 title: A00480_FileTool 사용법
 aliases: [File Tool, FileTool, A00480]
 tags: [maya-python, tool-guide, file, fbx, export, import, path, reference, mocap, pyside]
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # A00480_FileTool 사용법
@@ -322,7 +322,7 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
 ```
 ┌ Reference ─────────────────────────────────────────────────┐
 │ ┌ Default ┐                                                 │
-│ │ References : 6 (nested 2, missing 1)          [Refresh]  │
+│ │ References : 6 (nested 2, missing 1)  Show [Full Path ▾] [Refresh] │
 │ │ Reference        File                          Status     │
 │ │ ▾ MID_A          D:\...\mid.ma                  Loaded     │
 │ │     MID_A:LEAF   D:\...\leaf.ma                 Loaded     │
@@ -338,6 +338,9 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
   `Reference` 열은 네임스페이스(같은 파일을 여러 번 레퍼런스하면 마야가 붙이는 `{1}` `{2}` 복사 번호를 뒤에), `File` 은 실제 경로
   (복사 번호 뺀 것, 윈도우 모양), `Status` 는 `Loaded` / `Unloaded`(회색) / `Missing`(빨강). 툴팁에 레퍼런스 노드 이름 · 씬에 적힌 원래 경로(환경 변수 · 상대 경로면 다를 수 있다).
   최상위 순서는 Reference Editor 와 같다.
+- **`Show` 콤보 (v01.16)** — File 열을 **`Full Path`**(기본, 전체 경로) / **`File Name`**(파일 이름만) 으로 바꿔 본다. 모든 레퍼런스가
+  같은 긴 폴더에 있을 때 이름만 보는 쪽이 읽기 쉽다. **글자만 바뀐다** — 열기 · 더블클릭 · 복사는 그대로 전체 경로, 툴팁에도 전체 경로.
+  `File Name` 이면 헤더도 `File Name`. 고른 모드는 마야 optionVar 에 기억돼 다음에 툴을 열 때도 같다. 바꿀 때 씬은 다시 읽지 않는다.
 - **탭을 열 때마다 씬을 다시 읽는다.** 다른 씬을 열고 와도 `Refresh` 를 안 눌러도 된다(눌러도 된다). 레퍼런스가 없으면 `[Info] No references in the current scene.`
 - **`Open in Explorer`** — 고른 행들의 파일을 탐색기에서 연다. **파일마다 창 하나**, 그 파일이 선택된 채로. 더블클릭은 그 행 하나, 우클릭 메뉴 `Reveal in File Explorer (n files)` 는 고른 것 전부.
   같은 파일을 여러 행이 가리키면(복사 번호 · 중첩) **한 번만** 연다. 파일이 없으면(`Missing`) **그 폴더**를 열고 `[WARN] File is missing - opening its folder instead`, 폴더도 없으면 경고만.
@@ -408,12 +411,14 @@ A00480_FileTool/
 
 ## 7. 검증 (mayapy 2024 + 오프스크린 Qt)
 
-**v01.12 Reference** — `tests/test_reference.py` **35항목 통과** (`mayapy tests/test_reference.py`). 합성 씬 `leaf.ma ← mid.ma ← top`
+**v01.12 Reference (v01.16 에 `Show` 콤보 11항목 추가 → 46항목)** — `tests/test_reference.py` 통과 (`mayapy tests/test_reference.py`). 합성 씬 `leaf.ma ← mid.ma ← top`
 (mid 를 두 번 = 복사 번호, leaf 를 최상위에도, 없는 파일로 바꾼 레퍼런스 하나):
 - core — 6행(중첩 2) · 최상위 순서 = Reference Editor · 자식은 부모 바로 아래 depth 1 · 경로에 복사 번호 없음(`{1}` 따로) · 네임스페이스 앞 `:` 없음 ·
   Loaded / Missing · 요약 로그 · **부모 언로드 → 중첩 행 사라짐 + `nested_hidden`** · 열기(중복 한 번 · 없는 파일은 폴더 · 폴더도 없으면 경고 · 탐색기 실패는 경고) · 복사 문자열(한 줄 하나 · 중복 제거)
 - UI — 탭을 보이면 채움(4 최상위 + 중첩 2, 펼침) · 글자(`MID_B{1}` · 윈도우 경로 · 상태) · Missing 빨강 / Unloaded 회색 · 툴팁에 노드 · 선택 순서 · Copy Path → 클립보드 두 줄 ·
   Open in Explorer → 파일마다 한 번 · 더블클릭 한 파일 · 빈 선택 경고 · Refresh 뒤 언로드 반영 · 우클릭 메뉴 항목 · 빈 씬 안내 · 메인 창 탭 4개 + Default · About
+- `Show` 콤보(v01.16) — 기본 Full Path · File Name 이면 중첩 · Missing 포함 전 행이 이름만 + 헤더 `File Name` · 저장된 경로와 `selected_paths` 는 전체 경로 그대로 ·
+  이름 모드에서 Copy Path 도 전체 경로 · Refresh 뒤 모드 유지 · optionVar 에 기억(새 페이지가 이름 모드로 열림) · 되돌리기 · 모르는 값은 무시
 
 **54항목 통과.** 창 크기는 원본과 나란히 띄워 **둘 다 960 x 853** 인 것을 확인(v01.01).
 

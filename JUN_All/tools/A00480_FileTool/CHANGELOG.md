@@ -1,5 +1,16 @@
 # Changelog — A00480_FileTool
 
+## v01.16 (2026-10-30)
+
+- **[Feature] Reference > Default — `Show` 콤보 : File 열을 `Full Path` / `File Name` 으로.** 지금까지는 레퍼런스마다
+  전체 경로만 보였다(사용자: "파일 이름만 보이는 모드가 필요하다"). `File Name` 을 고르면 모든 행(중첩 · Missing 포함)이
+  파일 이름만 보이고 헤더가 `File Name` 으로 바뀐다. **글자만 바뀐다** — Open in Explorer · 더블클릭 · Copy Path 는 그대로
+  전체 경로를 쓰고, 툴팁에도 전체 경로가 남는다. 고른 모드는 마야 optionVar(`JUN_A00480_FileTool_reference_file_view`)에
+  기억돼 다음에 열 때도 같다. 바꿀 때 씬을 다시 읽지 않는다(글자만 갱신).
+- 검증 `tests/test_reference.py` **46 항목**(V1~V11 추가: 글자 변환 · 기본 Full Path · 이름 모드 전 행 · 헤더 · 저장된 경로와
+  선택 경로 불변 · 이름 모드에서 Copy Path 는 전체 경로 · Refresh 뒤 유지 · optionVar 기억 + 새 페이지 · 되돌리기 · 모르는 값 무시).
+  **마야 GUI 확인 아직.**
+
 ## v01.15 (2026-10-29)
 
 - **[UI] 탭마다 창 높이가 자동으로 맞춰진다.** 탭(중첩 포함)을 바꾸면 창 높이가 지금 보이는 페이지에 맞게 늘거나 줄어

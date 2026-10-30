@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-26
+# last Update date : 2026-10-30
 # A00480_FileTool - Reference 탭 로직 (maya.cmds, UI 비의존)
 """
 reference_ops - 현재 씬의 레퍼런스(중첩 포함)를 모으고, 파일을 탐색기로 열고, 경로 문자열을 만든다.
@@ -144,6 +144,49 @@ def summary(rows):
 # ==========================================================================
 # Open / copy
 # ==========================================================================
+
+# File 열 보기 모드 (v01.16) - 전체 경로 / 파일 이름만. 마야 optionVar 에 기억해 다음에 열 때도 같다.
+FILE_VIEW_PATH = "path"
+FILE_VIEW_NAME = "name"
+FILE_VIEWS = (FILE_VIEW_PATH, FILE_VIEW_NAME)
+FILE_VIEW_OPTION = "JUN_A00480_FileTool_reference_file_view"
+
+
+def file_text(path, view=FILE_VIEW_PATH):
+    """File 열에 보일 글자. `path` 모드는 윈도우 모양 전체 경로, `name` 모드는 파일 이름만."""
+    if not path:
+        return ""
+    if view == FILE_VIEW_NAME:
+        return os.path.basename(os.path.normpath(path))
+    return os.path.normpath(path)
+
+
+def load_file_view():
+    """기억해 둔 보기 모드. 없거나 마야 밖이면 전체 경로."""
+    cmds = _cmds()
+    if cmds is None:
+        return FILE_VIEW_PATH
+    try:
+        if cmds.optionVar(exists=FILE_VIEW_OPTION):
+            value = cmds.optionVar(q=FILE_VIEW_OPTION)
+            if value in FILE_VIEWS:
+                return value
+    except Exception:                                      # noqa: BLE001
+        pass
+    return FILE_VIEW_PATH
+
+
+def save_file_view(view):
+    """보기 모드를 마야 optionVar 에 기억한다(마야 밖이면 아무것도 안 한다)."""
+    cmds = _cmds()
+    if cmds is None or view not in FILE_VIEWS:
+        return False
+    try:
+        cmds.optionVar(sv=(FILE_VIEW_OPTION, view))
+        return True
+    except Exception:                                      # noqa: BLE001
+        return False
+
 
 def unique_paths(paths):
     """순서를 지키며 같은 파일(대소문자 · 슬래시 무시)을 하나로."""

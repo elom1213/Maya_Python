@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-26
+# last Update date : 2026-10-30
 # A00480_FileTool - Reference 탭 (in-Maya)
 #
 # 하위 탭 `Default` : 현재 씬의 레퍼런스를 **중첩(이중 · 삼중)까지 트리**로 보여 주고,
 # 고른 파일들을 탐색기에서 열거나(Open in Explorer / 더블클릭) 경로를 복사한다(Copy Path).
 # 여러 행을 골라 한 번에 - 열기는 파일마다 탐색기 창, 복사는 한 줄에 하나.
 # 레퍼런스를 읽는 것 · 열기 · 복사 문자열은 core.reference_ops, 클립보드 · 메뉴는 여기(Qt).
+# `Show` 콤보(v01.16) : File 열을 **전체 경로 / 파일 이름만** 으로 바꿔 본다. 긴 경로가 같은 폴더를 반복하면
+# 이름만 보는 쪽이 읽기 쉽다. 글자만 바뀌고 열기 · 복사는 그대로 전체 경로. 고른 모드는 optionVar 에 기억.
 # 새 하위 탭(예: 경로 바꾸기)은 `ReferenceTab.build_ui` 에 addTab 한 줄.
 
 import os
@@ -18,6 +20,7 @@ from Framework.qt.qt import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QComboBox,
     QTabWidget,
     QTreeWidget,
     QTreeWidgetItem,
@@ -38,6 +41,9 @@ UNLOADED_COLOR = "#9a9a9a"
 
 COL_NAME, COL_FILE, COL_STATUS = 0, 1, 2
 
+# `Show` 콤보의 항목 (라벨, core 의 보기 모드)
+VIEW_CHOICES = (("Full Path", ops.FILE_VIEW_PATH), ("File Name", ops.FILE_VIEW_NAME))
+
 
 class ReferenceDefaultPage(QWidget):
     """Reference > Default : 씬 레퍼런스 트리 + Open in Explorer / Copy Path."""
@@ -49,6 +55,7 @@ class ReferenceDefaultPage(QWidget):
         self.buttons = {}
         self._brush_missing = QBrush(QColor(null_item_color()))
         self._brush_unloaded = QBrush(QColor(UNLOADED_COLOR))
+        self.file_view = ops.load_file_view()
         self.build_ui()
 
     # ------------------------------------------------------------------ UI
@@ -59,6 +66,20 @@ class ReferenceDefaultPage(QWidget):
         head = QHBoxLayout()
         self.count_label = QLabel("Scene references (nested included)")
         head.addWidget(self.count_label, stretch=1)
+        # File 열 보기 모드 - 전체 경로 / 파일 이름만 (v01.16)
+        head.addWidget(QLabel("Show"))
+        self.view_combo = QComboBox()
+        for label, _view in VIEW_CHOICES:
+            self.view_combo.addItem(label)
+        self.view_combo.setCurrentIndex(self._view_index(self.file_view))
+        self.view_combo.setToolTip(
+            "What the File column shows.\n"
+            "Full Path : the whole path of each reference file (Windows style).\n"
+            "File Name : only the file name - easier to read when every reference "
+            "sits in the same long folder.\n"
+            "Open in Explorer / Copy Path always use the full path. The choice is remembered.")
+        self.view_combo.currentIndexChanged.connect(self._on_view_changed)
+        head.addWidget(self.view_combo)
         self.refresh_button = QPushButton("Refresh")
         self.refresh_button.setToolTip("Read the references of the current scene again.")
         self.refresh_button.clicked.connect(self.refresh)
@@ -68,7 +89,7 @@ class ReferenceDefaultPage(QWidget):
 
         self.tree = QTreeWidget()
         self.tree.setColumnCount(3)
-        self.tree.setHeaderLabels(["Reference", "File", "Status"])
+        self.tree.setHeaderLabels(["Reference", self._file_header(), "Status"])
         header = self.tree.header()
         header.setSectionResizeMode(COL_NAME, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(COL_FILE, QHeaderView.Stretch)
@@ -128,9 +149,37 @@ class ReferenceDefaultPage(QWidget):
         super(ReferenceDefaultPage, self).showEvent(event)
         self.refresh()
 
+    # ------------------------------------------------------------------ file column view
+
+    @staticmethod
+    def _view_index(view):
+        for i, (_label, v) in enumerate(VIEW_CHOICES):
+            if v == view:
+                return i
+        return 0
+
+    def _file_header(self):
+        return "File Name" if self.file_view == ops.FILE_VIEW_NAME else "File"
+
+    def set_file_view(self, view):
+        """File 열을 `path`(전체 경로) / `name`(파일 이름만) 으로 바꾼다. 씬은 다시 읽지 않는다."""
+        if view not in ops.FILE_VIEWS:
+            return
+        self.file_view = view
+        if self.view_combo.currentIndex() != self._view_index(view):
+            self.view_combo.setCurrentIndex(self._view_index(view))      # -> _on_view_changed 가 다시 들어온다
+            return
+        for item in self._all_items():
+            item.setText(COL_FILE, ops.file_text(item.data(COL_NAME, ROLE_PATH) or "", view))
+        self.tree.headerItem().setText(COL_FILE, self._file_header())
+        ops.save_file_view(view)
+
+    def _on_view_changed(self, index):
+        self.set_file_view(VIEW_CHOICES[index][1] if 0 <= index < len(VIEW_CHOICES) else ops.FILE_VIEW_PATH)
+
     def _make_item(self, row):
         name = row["namespace"] + (row["copy"] or "")
-        item = QTreeWidgetItem([name, os.path.normpath(row["path"]) if row["path"] else "", row["status"]])
+        item = QTreeWidgetItem([name, ops.file_text(row["path"], self.file_view), row["status"]])
         item.setData(COL_NAME, ROLE_PATH, row["path"])
         tip = "Node : {0}\nPath : {1}".format(row["node"], row["path"])
         if row["stored"] and row["stored"] != row["path"]:
@@ -239,11 +288,13 @@ class ReferenceTab(QWidget):
         self.default_page = ReferenceDefaultPage(log=self._log_callback)
         self.tabs.addTab(self.default_page, "Default")
         self.tabs.setTabToolTip(0, "List the references of the current scene (nested included), "
-                                   "open them in File Explorer, copy their paths.")
+                                   "open them in File Explorer, copy their paths. The File column "
+                                   "can show the full path or just the file name.")
         layout.addWidget(self.tabs)
 
         self.tree = self.default_page.tree
         self.buttons = self.default_page.buttons
+        self.view_combo = self.default_page.view_combo
 
     def refresh(self):
         self.default_page.refresh()

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-29
+# last Update date : 2026-10-30
 # A00480_FileTool - Qt UI (in-Maya)
 #
 # 파일을 들여오고 · 내보내고 · 경로를 다루는 툴.
@@ -214,7 +214,8 @@ class MainWindow(QWidget):
             "[Path] Copy Scene Folder / Open Scene Folder.\n"
             "[Reference > Default] Every reference of the current scene as a tree (nested\n"
             "  references under their parent). Open the selected files in File Explorer or\n"
-            "  copy their paths.\n"
+            "  copy their paths. 'Show' switches the File column between the full path\n"
+            "  and the file name only.\n"
             "\n"
             "Merged from A00040_file_exporter_V02 and the File / Import option\n"
             "buttons of A00030_quickTool_V02 (both tools are still available).\n"

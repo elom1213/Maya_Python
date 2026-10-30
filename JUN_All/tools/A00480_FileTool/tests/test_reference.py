@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # A00480_FileTool - Reference 탭 시험 (mayapy 오프스크린, 합성 씬: leaf.ma <- mid.ma <- top, 복사 번호 · 언로드 · 없는 파일)
+#   v01.16 : `Show` 콤보(File 열 = Full Path / File Name) - 글자만 바뀌고 열기 · 복사는 전체 경로, optionVar 에 기억 (V1 ~ V11)
 #   "C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe" test_reference.py
 # QApplication 은 maya.standalone.initialize() 보다 먼저 만든다 (메모리 qapplication-before-maya-standalone).
 import os
@@ -146,6 +147,51 @@ check("U5 missing row is red, loaded row is not",
       tree.topLevelItem(3).foreground(0).color().name() != tree.topLevelItem(0).foreground(0).color().name())
 check("U6 tooltip names the node", "MID_ARN" in tree.topLevelItem(0).toolTip(0))
 
+# ---------------------------------------------------------------- File column view (v01.16)
+check("V1 core file_text: path / name / empty",
+      ops.file_text(MID) == os.path.normpath(MID) and ops.file_text(MID, ops.FILE_VIEW_NAME) == "mid.ma"
+      and ops.file_text("", ops.FILE_VIEW_NAME) == "" and ops.file_text(GONE, "name") == "gone.ma")
+if cmds.optionVar(exists=ops.FILE_VIEW_OPTION):
+    cmds.optionVar(remove=ops.FILE_VIEW_OPTION)
+check("V2 core load_file_view: no optionVar -> full path", ops.load_file_view() == ops.FILE_VIEW_PATH)
+check("V3 combo starts at Full Path, header 'File', rows show full paths",
+      page.view_combo.currentText() == "Full Path" and tree.headerItem().text(1) == "File"
+      and tree.topLevelItem(0).child(0).text(1) == os.path.normpath(LEAF),
+      (page.view_combo.currentText(), tree.headerItem().text(1)))
+page.view_combo.setCurrentIndex(1)
+pump()
+names_now = [tree.topLevelItem(i).text(1) for i in range(4)] + [tree.topLevelItem(0).child(0).text(1)]
+check("V4 File Name mode: every row (nested, missing too) shows only the file name",
+      names_now == ["mid.ma", "mid.ma", "leaf.ma", "gone.ma", "leaf.ma"] and page.file_view == ops.FILE_VIEW_NAME, names_now)
+check("V5 header reads 'File Name'", tree.headerItem().text(1) == "File Name", tree.headerItem().text(1))
+tree.clearSelection()
+tree.topLevelItem(1).setSelected(True)
+check("V6 stored path and selected_paths are still the full path",
+      tree.topLevelItem(1).data(0, rt.ROLE_PATH) == MID and page.selected_paths() == [MID], page.selected_paths())
+LOG[:] = []
+page.buttons["Copy Path"].click()
+pump()
+check("V7 Copy Path in name mode still copies the full path",
+      QApplication.clipboard().text() == os.path.normpath(MID) and LOG == ["Copied to clipboard : " + os.path.normpath(MID)],
+      QApplication.clipboard().text())
+page.buttons["Refresh"].click()
+pump()
+check("V8 Refresh keeps the name mode", tree.topLevelItem(0).text(1) == "mid.ma" and page.view_combo.currentIndex() == 1,
+      tree.topLevelItem(0).text(1))
+page2 = rt.ReferenceDefaultPage()                 # 변수에 잡아 둔다 - 임시 객체면 Qt 쪽이 바로 지워진다
+check("V9 choice remembered in optionVar, a new page opens in name mode",
+      cmds.optionVar(q=ops.FILE_VIEW_OPTION) == ops.FILE_VIEW_NAME and ops.load_file_view() == ops.FILE_VIEW_NAME
+      and page2.view_combo.currentText() == "File Name", cmds.optionVar(q=ops.FILE_VIEW_OPTION))
+page2.deleteLater()
+page.set_file_view(ops.FILE_VIEW_PATH)
+pump()
+check("V10 set_file_view('path') -> combo back to Full Path, full paths, header 'File', optionVar updated",
+      page.view_combo.currentIndex() == 0 and tree.topLevelItem(0).text(1) == os.path.normpath(MID)
+      and tree.headerItem().text(1) == "File" and cmds.optionVar(q=ops.FILE_VIEW_OPTION) == ops.FILE_VIEW_PATH)
+page.set_file_view("bogus")
+check("V11 unknown view ignored", page.file_view == ops.FILE_VIEW_PATH and page.view_combo.currentIndex() == 0)
+cmds.optionVar(remove=ops.FILE_VIEW_OPTION)
+
 tree.clearSelection()
 tree.topLevelItem(0).setSelected(True)           # MID_A  (mid.ma)
 tree.topLevelItem(1).setSelected(True)           # MID_B  (mid.ma{1}) - same file
@@ -217,7 +263,8 @@ pump()
 labels = [win.tabs.tabText(i) for i in range(win.tabs.count())]
 check("U15 main window tabs", labels == ["Export", "Import", "Path", "Reference"], labels)
 check("U16 Reference sub tab Default", win.reference_tab.tabs.tabText(0) == "Default"
-      and set(win.reference_tab.buttons) == {"Open in Explorer", "Copy Path", "Refresh"})
+      and set(win.reference_tab.buttons) == {"Open in Explorer", "Copy Path", "Refresh"}
+      and win.reference_tab.view_combo.count() == 2)
 import inspect   # noqa: E402
 check("U17 About mentions the tab", "[Reference > Default]" in inspect.getsource(type(win).show_about))
 win.close()
