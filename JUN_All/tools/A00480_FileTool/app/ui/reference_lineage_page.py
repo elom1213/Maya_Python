@@ -20,6 +20,8 @@
 # 이 페이지는 절대 경로를 알고 있으므로 project root 없이도 Reveal in File Explorer / Copy Path 가 된다.
 #
 # `Show` 콤보(v01.18) : 노드 글자를 **File Name**(기본) / **Full Path** 로. Default 탭과 같은 optionVar 를 쓴다.
+# 선택(v01.19) : 빈 곳 드래그 = 러버밴드 다중 선택(A00210 과 같은 IntersectsItemShape), Shift/Ctrl 클릭도 된다.
+# 고른 노드의 **전체 경로**는 캔버스 아래 `Selected` 칸(읽기 전용, 복사 가능)에 보인다 - 여러 개면 수와 이름.
 # 노드 글자는 A00210 NodeItem 이 `node.file_name` 을 그리므로 그 값을 보기 모드에 맞춰 바꾼다 - Export 때는
 # A00210 규약(파일 이름)으로 되돌려 쓴다. 이름 없는 씬은 "(untitled scene)" 그대로.
 
@@ -36,6 +38,8 @@ from Framework.qt.qt import (
     QPushButton,
     QComboBox,
     QGraphicsScene,
+    QGraphicsView,
+    QPainter,
     QMenu,
     QMessageBox,
     QApplication,
@@ -161,15 +165,32 @@ class ReferenceLineagePage(QWidget):
             return
 
         self.scene = QGraphicsScene()
+        self.scene.selectionChanged.connect(self._on_selection_changed)
         self.view = lt.LineageView(self.scene)
+        self.view.setRenderHint(QPainter.Antialiasing, True)
+        # 빈 곳 드래그 = 러버밴드 다중 선택(범위에 일부라도 걸친 노드 · 엣지). 중간 버튼 팬 · 휠 줌은 view 가 처리. (v01.19)
+        self.view.setDragMode(QGraphicsView.RubberBandDrag)
+        self.view.setRubberBandSelectionMode(Qt.IntersectsItemShape)
         self.view.setMinimumHeight(360)
         self.view.setToolTip(
             "Every file the current scene references, as a graph. Node = one file (the scene\n"
             "itself is the root). Dashed grey arrow = 'referenced file -> file that references it'\n"
             "(same drawing as A00210_FileManager > Lineage).\n"
-            "Mouse wheel: zoom. Middle drag: pan. Drag a node to move it. Right-click a node:\n"
-            "Reveal in File Explorer / Copy Path.")
+            "Mouse wheel: zoom. Middle drag: pan. Drag a node to move it. Drag on empty space:\n"
+            "rubber-band select several nodes (Shift / Ctrl click also work). Right-click a node:\n"
+            "Reveal in File Explorer / Copy Path. The full path of the selection shows below.")
         layout.addWidget(self.view, stretch=1)
+
+        sel_row = QHBoxLayout()
+        sel_row.addWidget(QLabel("Selected"))
+        self.selected_edit = QLineEdit()
+        self.selected_edit.setReadOnly(True)
+        self.selected_edit.setPlaceholderText("Click a node to see its full file path here")
+        self.selected_edit.setToolTip(
+            "Full path of the selected node (select the text to copy it).\n"
+            "With several nodes selected: how many, and their file names - the tooltip of this box lists every path.")
+        sel_row.addWidget(self.selected_edit, stretch=1)
+        layout.addLayout(sel_row)
 
         row = QHBoxLayout()
         row.addWidget(QLabel("Graph name"))
@@ -352,6 +373,40 @@ class ReferenceLineagePage(QWidget):
 
         self._reroute_edges()
         self._update_scene_rect()
+        self._on_selection_changed()
+
+    # ------------------------------------------------------------------ selection -> full path (v01.19)
+
+    def selected_nodes(self):
+        """지금 선택된 노드(모델)들 - 씬 아이템 순서."""
+        if self.scene is None:
+            return []
+        return [item.node for item in self.scene.selectedItems() if isinstance(item, lt.NodeItem)]
+
+    def selection_text(self):
+        """`Selected` 칸 글자. 하나면 전체 경로, 여럿이면 수 + 파일 이름들, 없으면 ""."""
+        nodes = self.selected_nodes()
+        if not nodes:
+            return ""
+        if len(nodes) == 1:
+            path = self.node_abs_path(nodes[0])
+            return os.path.normpath(path) if path else "(untitled scene - not saved yet)"
+        names = []
+        for node in nodes:
+            path = self.node_abs_path(node)
+            names.append(os.path.basename(os.path.normpath(path)) if path else "(untitled scene)")
+        return "{0} nodes selected : {1}".format(len(nodes), ", ".join(names))
+
+    def _on_selection_changed(self, *_args):
+        if self.view is None:
+            return
+        self.selected_edit.setText(self.selection_text())
+        self.selected_edit.setCursorPosition(0)
+        paths = [os.path.normpath(p) for p in (self.node_abs_path(n) for n in self.selected_nodes()) if p]
+        self.selected_edit.setToolTip(
+            "\n".join(paths) if paths else
+            "Full path of the selected node (select the text to copy it).\n"
+            "With several nodes selected: how many, and their file names - this tooltip lists every path.")
 
     def _reroute_edges(self):
         """노드가 움직이면 엣지를 다시 긋는다(NodeItem.itemChange 가 부른다). 같은 노드쌍 엣지는 가로로 벌린다."""

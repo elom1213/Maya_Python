@@ -18,7 +18,7 @@ import maya.cmds as cmds   # noqa: E402
 
 JUN_ALL = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, JUN_ALL)
-from Framework.qt.qt import QPointF   # noqa: E402
+from Framework.qt.qt import QPointF, QGraphicsView, Qt   # noqa: E402
 from tools.A00480_FileTool.app.core import reference_ops as ops   # noqa: E402
 from tools.A00480_FileTool.app.ui import reference_lineage_page as rlp   # noqa: E402
 from tools.A00480_FileTool.app.ui import reference_tab as rt   # noqa: E402
@@ -160,6 +160,38 @@ check("L16 Fit View keeps zoom <= 1 and shows every node", page.view.transform()
               for it in page._node_items.values()), page.view.transform().m11())
 
 # ---------------------------------------------------------------- export
+# ---------------------------------------------------------------- selection -> full path (v01.19)
+check("S1 canvas drag = rubber-band multi select (intersect), like A00210",
+      page.view.dragMode() == QGraphicsView.RubberBandDrag and page.view.rubberBandSelectionMode() == Qt.IntersectsItemShape)
+check("S2 nothing selected: Selected box empty with a hint", page.selected_edit.text() == "" and page.selected_edit.isReadOnly()
+      and "full file path" in page.selected_edit.placeholderText())
+page.scene.clearSelection()
+page._node_items[nodes["mid.ma"].id].setSelected(True)
+pump()
+check("S3 one node selected: its FULL path shows", page.selected_edit.text() == os.path.normpath(MID), page.selected_edit.text())
+page._node_items[nodes["leaf.ma"].id].setSelected(True)
+pump()
+check("S4 two nodes: count + file names, tooltip lists both full paths",
+      page.selected_edit.text().startswith("2 nodes selected : ") and "mid.ma" in page.selected_edit.text() and "leaf.ma" in page.selected_edit.text()
+      and page.selected_edit.toolTip() in (os.path.normpath(MID) + "\n" + os.path.normpath(LEAF), os.path.normpath(LEAF) + "\n" + os.path.normpath(MID)),
+      (page.selected_edit.text(), page.selected_edit.toolTip()))
+# 러버밴드로 깊이 1 줄(mid · gone) 전부 담기 - 뷰 좌표 사각형으로 scene 선택을 흉내 낸다 (오프스크린엔 마우스가 없다)
+page.scene.clearSelection()
+band = page.scene.itemsBoundingRect()
+band.setTop(140.0)            # gone 은 y 150, mid 는 L12 에서 190 으로 끌어 놓았다 - 둘에 걸치고 leaf(0) · top(300) 은 비켜 가는 띠
+band.setBottom(200.0)
+from Framework.qt.qt import QPainterPath   # noqa: E402
+band_path = QPainterPath()
+band_path.addRect(band)
+page.scene.setSelectionArea(band_path, Qt.IntersectsItemShape)
+pump()
+check("S5 band across row 150 selects mid + gone (not leaf above, not the scene below)",
+      sorted(n.file_name for n in page.selected_nodes()) == ["gone.ma", "mid.ma"] and page.selected_edit.text().startswith("2 nodes selected"),
+      sorted(n.file_name for n in page.selected_nodes()))
+page.scene.clearSelection()
+pump()
+check("S6 clear selection -> box empty again", page.selected_edit.text() == "")
+
 # ---------------------------------------------------------------- node text view (v01.18)
 check("N1 default view = File Name: combo + node texts are file names",
       page.view_combo.currentText() == "File Name" and page.file_view == ops.FILE_VIEW_NAME

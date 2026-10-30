@@ -1,5 +1,14 @@
 # Changelog — A00480_FileTool
 
+## v01.19 (2026-10-30)
+
+- **[Feature] Reference > Lineage — 러버밴드 다중 선택 + 선택 노드의 전체 경로 표시.** 빈 곳을 드래그하면 사각형에 **일부라도 걸친**
+  노드 · 화살표가 모두 선택된다(A00210 Lineage 탭과 같은 `RubberBandDrag` / `IntersectsItemShape`, Shift / Ctrl 클릭도 그대로).
+  캔버스 아래 **`Selected`** 칸(읽기 전용, 글자를 긁어 복사 가능)에 고른 노드의 **전체 경로**가 보인다 — 노드 글자가 파일 이름만일 때
+  전체 경로를 보는 자리. 여럿이면 `N nodes selected : a.ma, b.ma` 와 함께 툴팁에 경로 전부, 저장 전 씬은 `(untitled scene - not saved yet)`.
+- 검증 `tests/test_reference_lineage.py` **44 항목**(S1~S6: 드래그 모드 · 빈 선택 · 하나 = 전체 경로 · 둘 = 수 + 이름 + 툴팁 ·
+  러버밴드 영역으로 한 줄 전부 선택 · 해제). **마야 GUI 확인 아직.**
+
 ## v01.18 (2026-10-30)
 
 - **[Feature] Reference > Lineage 에도 `Show` 콤보 — 노드 글자를 `File Name` / `Full Path` 로.** Default 탭과 **같은 optionVar**

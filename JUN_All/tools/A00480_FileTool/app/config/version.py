@@ -77,5 +77,9 @@
 #        Lineage 배치는 **깊은 노드가 위, 씬이 맨 아래**(A00211 v01.03 _layout - 화살표가 아래로 흐른다).
 #        tests/test_reference_lineage.py 38 · test_reference.py 47.
 
-VERSION = "01.18"
+# 01.19  Reference > Lineage : 빈 곳 드래그로 **러버밴드 다중 선택**(A00210 과 같은 IntersectsItemShape) + 고른 노드의
+#        **전체 경로**가 캔버스 아래 `Selected` 칸(읽기 전용 · 복사 가능)에 보인다(여럿이면 수 + 파일 이름, 툴팁에 경로 전부).
+#        tests/test_reference_lineage.py 44.
+
+VERSION = "01.19"
 LAST_UPDATE = "2026-10-30"
