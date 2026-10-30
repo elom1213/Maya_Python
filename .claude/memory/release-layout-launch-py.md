@@ -35,5 +35,9 @@ A00470 v01.08 이 이 형태다 (`JUN_All/tools/A00470_MaterialTool/launch.py`).
 `sys.modules` 의 `Framework`/`tools`/`config` 를 지운 뒤 import 해야 의미가 있다 —
 안 그러면 dev 트리의 Framework 가 잡혀 통과한 것처럼 보인다.
 
+**툴 간 import 예외(2026-10-30, 사용자 지시)**: `A00480_FileTool` Reference > Lineage 가 `A00211_RefLineage`(스캔) 와
+`A00210_FileManager`(노드 그림 · lineage 모델)를 import 한다(A00211 자체도 A00210 을 쓴다). 모듈 수준 try/except 로 없으면
+안내문만 보이게 했으니 릴리즈본은 셋을 함께 담거나 그 페이지 없이 쓴다. 새 교차 import 는 사용자 지시가 있을 때만.
+
 > 곁가지: 툴마다 Framework 사본이라 한 세션에서 여러 툴을 열면 **먼저 열린 툴의 사본**이
 > `sys.modules` 를 차지한다. 오래 묵은 툴이 있으면 옛 Framework 가 쓰인다.

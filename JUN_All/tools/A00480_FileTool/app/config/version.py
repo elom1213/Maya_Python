@@ -66,5 +66,11 @@
 #        글자만 바뀌고 Open in Explorer · Copy Path 는 그대로 전체 경로. 고른 모드는 optionVar 에 기억.
 #        core.reference_ops.file_text / load_file_view / save_file_view. tests/test_reference.py 46 항목.
 
-VERSION = "01.16"
+# 01.17  Reference > **Lineage** 하위 탭 - 현재 씬의 레퍼런스 관계를 **노드 그래프**로. 데이터는 A00211_RefLineage
+#        (ref_scanner: 씬 → A00210 LineageGraph), 노드 · 화살표는 A00210 Lineage 탭의 NodeItem / EdgeItem / LineageView
+#        그대로(참조 대상 → 참조하는 파일 회색 점선, 레인 자동색). 휠 줌 · 중간 버튼 팬 · 드래그 · 우클릭 Reveal / Copy Path.
+#        `Export to Lineage` = A00211 과 같은 lineage JSON 을 A00210 Store Repo 에(덮어쓰기 확인). 두 툴이 없으면 안내문만.
+#        ★ 툴 간 import 예외(사용자 지시). tests/test_reference_lineage.py 31 항목.
+
+VERSION = "01.17"
 LAST_UPDATE = "2026-10-30"

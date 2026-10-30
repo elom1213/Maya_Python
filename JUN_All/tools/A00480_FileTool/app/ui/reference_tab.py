@@ -9,7 +9,9 @@
 # 레퍼런스를 읽는 것 · 열기 · 복사 문자열은 core.reference_ops, 클립보드 · 메뉴는 여기(Qt).
 # `Show` 콤보(v01.16) : File 열을 **전체 경로 / 파일 이름만** 으로 바꿔 본다. 긴 경로가 같은 폴더를 반복하면
 # 이름만 보는 쪽이 읽기 쉽다. 글자만 바뀌고 열기 · 복사는 그대로 전체 경로. 고른 모드는 optionVar 에 기억.
-# 새 하위 탭(예: 경로 바꾸기)은 `ReferenceTab.build_ui` 에 addTab 한 줄.
+# 하위 탭 `Lineage`(v01.17) : 같은 레퍼런스 관계를 **노드 그래프**로 - `reference_lineage_page.py`
+# (A00211_RefLineage 로 데이터, A00210 Lineage 탭의 노드 · 화살표 그대로, Export 로 A00210 에 보낸다).
+# 새 하위 탭은 `ReferenceTab.build_ui` 에 addTab 한 줄.
 
 import os
 
@@ -35,6 +37,7 @@ from Framework.qt import path_context
 from Framework.qt.MOD_tsl_qt_v01 import null_item_color
 
 from tools.A00480_FileTool.app.core import reference_ops as ops
+from tools.A00480_FileTool.app.ui.reference_lineage_page import ReferenceLineagePage
 
 ROLE_PATH = Qt.UserRole + 1
 UNLOADED_COLOR = "#9a9a9a"
@@ -273,7 +276,7 @@ class ReferenceDefaultPage(QWidget):
 
 
 class ReferenceTab(QWidget):
-    """Reference 탭 = 하위 탭 Default (앞으로 늘어난다)."""
+    """Reference 탭 = 하위 탭 Default(트리) + Lineage(노드 그래프, v01.17)."""
 
     def __init__(self, log=None, parent=None):
         super(ReferenceTab, self).__init__(parent)
@@ -290,6 +293,12 @@ class ReferenceTab(QWidget):
         self.tabs.setTabToolTip(0, "List the references of the current scene (nested included), "
                                    "open them in File Explorer, copy their paths. The File column "
                                    "can show the full path or just the file name.")
+        self.lineage_page = ReferenceLineagePage(log=self._log_callback)
+        index = self.tabs.addTab(self.lineage_page, "Lineage")
+        self.tabs.setTabToolTip(index, "The same references as a node graph - one node per file, "
+                                       "dashed arrow from the referenced file to the file that "
+                                       "references it (drawn like A00210_FileManager > Lineage). "
+                                       "Export writes it as an A00210 lineage graph.")
         layout.addWidget(self.tabs)
 
         self.tree = self.default_page.tree

@@ -1,5 +1,24 @@
 # Changelog — A00480_FileTool
 
+## v01.17 (2026-10-30)
+
+- **[Feature] Reference > `Lineage` 하위 탭 — 현재 씬의 레퍼런스 관계를 노드 그래프로.** 노드 1개 = 파일 1개(씬 자신이 루트,
+  같은 파일을 여러 번 레퍼런스해도 노드 하나), 화살표 = **참조 대상 → 참조하는 파일**(회색 점선 + 채운 삼각 화살촉), 깊이별 자동 배치.
+  데이터는 **A00211_RefLineage** 의 `ref_scanner`(씬 스캔 → A00210 `LineageGraph`)가 만들고, 그림은 **A00210_FileManager Lineage 탭의
+  `NodeItem` / `EdgeItem` / `LineageView` 를 그대로** 쓴다 — A00210 에서 보는 노드와 같은 모양(레인 자동색, 파일명 + `current scene` /
+  `unloaded` 보조 라벨, 휠 줌 · 중간 버튼 팬 · 드래그 이동 · 러버밴드 선택). 탭을 열 때마다 씬을 다시 읽는다(`Refresh` · `Fit View`).
+- **노드 우클릭** `Reveal in File Explorer` / `Copy Path` — 이 페이지는 절대 경로를 알고 있어 A00210 과 달리 project root 없이도 된다
+  (Default 탭과 같은 `reference_ops` 경로: 없는 파일은 폴더를 연다).
+- **`Export to Lineage`** — 지금 그래프(끌어 놓은 위치 포함)를 A00211 과 똑같은 lineage JSON 으로 **A00210 Store Repo**
+  (`<store_dir>/lineage/<name>.json`)에 쓴다. 이름 칸이 비면 씬 파일 이름. 같은 이름이 있으면 덮어쓸지 묻는다. Store Repo 미설정 ·
+  저장 전 씬이면 경고. A00210 Lineage 탭에서 Refresh 로 열린다(Push 로 동기화).
+- **★ 툴 간 import 예외.** 이 저장소는 릴리즈본(툴 하나 + Framework)을 위해 툴 간 import 를 피하지만, 이 탭은 사용자 지시
+  (2026-10-30: "A00211 로 데이터, A00210 과 같은 노드")로 두 툴을 import 한다. 둘이 없으면 페이지는 안내문만 보이고 나머지 탭은 그대로.
+  A00211 자체도 같은 식으로 A00210 을 쓴다.
+- 검증 `tests/test_reference_lineage.py` mayapy 2024 **31 항목**(노드 4 · 엣지 방향 4 · A00210 NodeItem / 점선 회색 · 라벨 · 키 · 깊이 배치 ·
+  레인색 · 드래그 → 모델 + 재배선 · Reveal / Copy · Fit · Export 쓰기 · A00210 으로 다시 로드 · 덮어쓰기 확인 · 이름 지정 · Store 미설정 ·
+  저장 전 씬 · 하위 탭 2개 · 백엔드 없을 때 안내문). `test_reference.py` 46/46 그대로. **마야 GUI 확인 아직.**
+
 ## v01.16 (2026-10-30)
 
 - **[Feature] Reference > Default — `Show` 콤보 : File 열을 `Full Path` / `File Name` 으로.** 지금까지는 레퍼런스마다

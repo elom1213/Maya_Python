@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-30 (오늘)
 
+> [!summary] A00480_FileTool **v01.17 Reference > `Lineage` 하위 탭 — 현재 씬의 레퍼런스 관계를 노드 그래프로** (A00211 데이터 + A00210 Lineage 노드 그대로, Export 로 A00210 에) `#A00480_FileTool`
+- 요청: "Reference 에 탭을 하나 추가. 현재 씬의 레퍼런스 관계를 노드로. A00211_RefLineage 로 데이터를 만들고 A00210 Lineage 와 같은 모양의 노드."
+- 구현: `ui/reference_lineage_page.py` — `rs.collect_scene_references` → `rs.build_graph`(A00210 `LineageGraph`), 그림은 A00210 `lineage_tab` 의 `NodeItem`(서브클래스로 우클릭만 교체 — A00210 의 `QMenu.exec` 는 PySide2 에 없고 key 없으면 비활성이라) · `EdgeItem(kind="ref")` · `LineageView`, `_render_graph / _reroute_edges / _update_scene_rect / fit_view` 는 A00210 과 같은 규칙. 노드 id → 절대 경로는 build_graph 의 seq 순서([씬] + 정렬)로 되찾아 Reveal / Copy Path 가 project root 없이도 된다. `Export to Lineage` = `lin.save` (덮어쓰기 확인 `confirm` 은 바꿔 끼울 수 있게). 백엔드 import 실패면 안내문 + 버튼 비활성.
+- ★ 툴 간 import 예외(사용자 지시) — 릴리즈본엔 셋을 함께 담아야 한다. CHANGELOG · 가이드 §5-1 · `Release_Layout.md` 에 적음. 마야 2024 PySide2 에는 `QMenu.exec` 가 없다(`exec_` 만) — A00210 Lineage 노드 우클릭은 마야 안에서 깨질 수 있음(A00210 은 standalone PySide6 라 무관).
+- 시험 `tests/test_reference_lineage.py` **31/31**(A00210 설정은 임시 store 로 바꿔 끼움), `test_reference.py` 46/46. **마야 GUI 확인 아직.**
+
 > [!summary] A00480_FileTool **v01.16 Reference > Default `Show` 콤보 — File 열을 Full Path / File Name 으로** `#A00480_FileTool`
 - 요청: "지금은 각 레퍼런스 파일의 경로를 모두 보여준다. 이 모드와 다른 보기 모드(파일 이름만) 를 추가."
 - 구현: 헤더 줄 `Show [Full Path | File Name]` 콤보. `core.reference_ops.file_text(path, view)` 로 File 열 글자만 바꾸고(씬 재독 없음) 헤더도 `File Name` 으로. 저장된 경로(ROLE_PATH) · 열기 · 더블클릭 · Copy Path · 툴팁은 그대로 전체 경로. 모드는 `optionVar JUN_A00480_FileTool_reference_file_view` 에 기억(`load_file_view` / `save_file_view`, 마야 밖이면 기본 Full Path).

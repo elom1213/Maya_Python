@@ -2,7 +2,7 @@
 title: 릴리즈 배치 — dev 트리와 릴리즈본은 폴더 모양이 다르다
 aliases: [Release Layout, 릴리즈 배치, IS_RELEASE, 릴리즈본, Maya_Tool_Release, dragDrop, userSetup]
 tags: [maya-python, release, packaging, sys-path, framework]
-updated: 2026-09-22
+updated: 2026-10-30
 ---
 
 # 릴리즈 배치 — dev 트리와 릴리즈본은 폴더 모양이 다르다
@@ -121,6 +121,18 @@ Qt 툴은 `run(True)` 까지 불러 **창이 뜨는지 + `Framework` 가 동봉�
 피하려면 릴리즈를 툴 단위가 아니라 **한 번에 전부** 내보내는 편이 안전하다.
 (`Framework` 를 저장소 루트에 하나만 두는 배치로 바꾸면 사라지는 문제지만,
 그러려면 릴리즈 저장소의 폴더 구조와 `install.bat` 의 경로 등록을 함께 바꿔야 한다.)
+
+### 4.1 툴 간 import — 원칙은 금지, 예외 셋 (2026-10-30)
+
+릴리즈본은 툴 하나 + `Framework` 만 담으므로 **다른 툴의 모듈을 import 하면 그 툴이 없는 릴리즈본에서 죽는다.**
+그래서 공용 코드는 `Framework` 로 올리는 것이 원칙이다. 예외는 사용자 지시로 둔 다음 셋뿐이다.
+
+| import 하는 쪽 | import 되는 쪽 | 왜 | 없을 때 |
+|---|---|---|---|
+| `A00211_RefLineage` | `A00210_FileManager` (`core.lineage` · `store` · `prefs`) | lineage JSON 포맷의 단일 소스 | 툴이 뜨지 않는다 |
+| `A00480_FileTool` Reference > Lineage | `A00211_RefLineage` (`ref_scanner`) · `A00210_FileManager` (`core.lineage` · `ui.lineage_tab` 의 노드 그림) | 씬 레퍼런스 그래프를 A00210 과 같은 노드로 보이게(사용자 지시) | 모듈 수준 try/except — 그 페이지만 안내문, 다른 탭은 정상 |
+
+이 셋을 릴리즈할 때는 **함께** 담는다(A00210 은 standalone PySide6 툴이지만 `core.lineage` 와 `ui.lineage_tab` 은 `Framework.qt.qt` 로 PySide2 에서도 import 된다 — 단 `QMenu.exec` 는 PySide2 에 없어 A00480 은 우클릭 메뉴를 제 것으로 바꿨다).
 
 ---
 

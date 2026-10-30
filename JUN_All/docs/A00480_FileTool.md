@@ -317,7 +317,7 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
 
 ## 5. Reference 탭 (v01.12)
 
-하위 탭 **`Default`** 하나다(앞으로 경로 바꾸기 등이 하위 탭으로 는다).
+하위 탭 **`Default`**(트리) 와 **`Lineage`**(노드 그래프, v01.17 — §5-1) 둘이다.
 
 ```
 ┌ Reference ─────────────────────────────────────────────────┐
@@ -356,6 +356,53 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
 
 > 마야 밖에서 **디스크의 파일들**이 부르는 레퍼런스를 모으고 임포트하는 것은 [`A00210_FileManager`](A00210_FileManager.md) Maya > Reference 다. 이 탭은 **열려 있는 씬**이다.
 
+### 5-1. Lineage 하위 탭 — 레퍼런스 관계를 노드 그래프로 (v01.17)
+
+Default 와 같은 레퍼런스를 **노드 그래프**로 본다. 데이터는 [`A00211_RefLineage`](A00211_RefLineage.md) 의 스캐너가 만들고,
+노드 · 화살표는 [`A00210_FileManager`](A00210_FileManager.md) **Lineage 탭의 그림 그대로**다 — 그래서 Export 한 그래프를 A00210 에서
+열어도 똑같이 보인다.
+
+```
+┌ Reference ──────────────────────────────────────────────────┐
+│ ┌ Default ┐┌ Lineage ┐                                       │
+│ │ Reference graph : 4 file(s), 4 reference link(s)  [Refresh] [Fit View] │
+│ │                 ┌────────────┐                               │
+│ │                 │ top.ma     │  ← 씬 자신(루트, 'current scene')        │
+│ │                 │current scene│                               │
+│ │                 └─────▲──────┘                               │
+│ │        ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄  회색 점선 = 참조 대상 → 참조하는 파일 │
+│ │  ┌──────────┐  ┌──────────┐  ┌──────────┐                     │
+│ │  │ gone.ma  │  │ leaf.ma  │  │ mid.ma   │  ← 깊이 1 (같은 파일을 두 번 레퍼런스해도 노드 하나) │
+│ │  │ unloaded │  │          │  │          │                     │
+│ │  └──────────┘  └────▲─────┘  └──────────┘                     │
+│ │                     └┄┄┄┄┄┄┄┄┄┄┄┘  mid.ma 안의 중첩 레퍼런스     │
+│ │ Graph name [ top            ]            [ Export to Lineage ] │
+│ │ Export : D:\store\lineage\top.json  /  Project root : D:\proj   │
+└─┴───────────────────────────────────────────────────────────────┘
+```
+
+- **노드** = 파일 1개. 씬 자신이 루트(라벨 `current scene`), 로드 안 된 레퍼런스는 `unloaded`, project root 밖이면 `(out of project root)`.
+  색은 A00210 레인 팔레트 자동색. **같은 파일을 여러 번 레퍼런스해도 노드는 하나**(Default 탭은 행 둘).
+- **화살표** = `참조 대상 → 참조하는 파일` 회색 점선(채운 삼각 화살촉). 중첩 레퍼런스는 깊이별 행으로 자동 배치된다.
+- **조작** — 휠 줌(커서 기준) · 중간 버튼 드래그 팬 · 노드 드래그 이동 · 빈 곳 드래그로 러버밴드 선택. `Refresh` 는 씬을 다시 읽고
+  (탭을 열 때마다 자동), `Fit View` 는 전체가 보이게 맞춘다(노드가 하나뿐이면 1:1).
+- **노드 우클릭** — `Reveal in File Explorer`(없는 파일은 그 폴더) / `Copy Path`. Default 탭과 같은 동작이고, 이 페이지는 절대 경로를
+  알고 있어 **project root 없이도** 된다.
+- **`Export to Lineage`** — 지금 그래프(끌어 놓은 위치 포함)를 **A00211 과 같은 lineage JSON** 으로 A00210 **Store Repo**
+  (`<store_dir>/lineage/<name>.json`)에 쓴다. `Graph name` 이 비면 씬 파일 이름. 같은 이름이 있으면 덮어쓸지 묻는다.
+  아래 줄에 저장될 경로와 project root 가 보인다. 그 뒤 A00210 Lineage 탭에서 **Refresh**(동기화는 Push).
+
+| 상황 | 결과 |
+|------|------|
+| A00210 Store Repo 미설정 | 그래프는 보인다. Export 는 `[WARN] Store Repo is not set - set it in A00210_FileManager ...` |
+| Project root 미설정 / 루트 밖 | 노드 key 가 비어 `(out of project root)` — record · 썸네일 링크만 없다 |
+| 저장 전(untitled) 씬 | 루트 노드 `(untitled scene)`, Export 는 이름을 쳐야 한다 |
+| A00211 · A00210 이 tools 폴더에 없음(릴리즈본) | 이 페이지는 안내문만, 버튼 비활성. Default 탭과 다른 탭은 그대로 |
+
+> **툴 간 import 예외.** 이 저장소는 릴리즈본(툴 하나 + Framework 동봉)을 위해 툴 간 import 를 피하지만([`Release_Layout.md`](Release_Layout.md)),
+> 이 탭은 사용자 지시(2026-10-30)로 `A00211_RefLineage` 와 `A00210_FileManager` 를 import 한다(A00211 자체도 A00210 을 쓴다).
+> 릴리즈본에 셋을 함께 담거나, 이 페이지 없이 쓴다.
+
 ---
 
 ## 6. 구조
@@ -367,7 +414,8 @@ A00480_FileTool/
 ├── __dragDrop_A00480.py        # 셸프 설치 (TOOL_LABEL = "FileTool")
 ├── icon/                       # A00480_FileTool.svg / .png (폴더 + 들어오고 나가는 화살표)
 ├── CHANGELOG.md
-├── tests/test_reference.py     # Reference 탭 시험 (mayapy 오프스크린, v01.12)
+├── tests/test_reference.py     # Reference > Default 시험 (mayapy 오프스크린, v01.12 · v01.16 Show 콤보)
+├── tests/test_reference_lineage.py  # Reference > Lineage 시험 (mayapy 오프스크린, v01.17)
 ├── tests/test_fbx_core.py      # FBX 리더 · 오일러 수학 시험 (순수 파이썬, 작은 FBX 를 직접 씀, v01.13)
 ├── tests/test_fbx_exact.py     # Mocap FBX Import (Exact Rotation) 시험 (mayapy 오프스크린, v01.13)
 └── app/
@@ -388,7 +436,8 @@ A00480_FileTool/
         ├── import_csv_page.py  # Import > CSV 화면 (v01.10)
         ├── import_fbx_exact.py # Import > FBX 의 Mocap FBX Import (Exact Rotation) 섹션 (v01.13)
         ├── path_tab.py         # SECTIONS 표
-        ├── reference_tab.py    # Reference 탭 = 하위 탭 Default (트리 · Open in Explorer · Copy Path · 우클릭) (v01.12)
+        ├── reference_tab.py    # Reference 탭 = 하위 탭 Default (트리 · Open in Explorer · Copy Path · 우클릭 · Show 콤보) + Lineage (v01.12 · 16 · 17)
+        ├── reference_lineage_page.py  # Reference > Lineage : A00211 ref_scanner 데이터 + A00210 NodeItem/EdgeItem/LineageView 그림 + Export (v01.17)
         ├── button_section.py   # SECTIONS 표 → 두 칸 버튼 그리드 (quickTool 방식)
         ├── type_filter_button.py
         └── rules_button.py     # Rules (n/m) 드롭다운 - EXPORT_RULES 에서 항목을 만든다 (v01.03)
@@ -402,14 +451,21 @@ A00480_FileTool/
   `addTab` 한 줄 (CSV 가 본보기).
 - **섹션이 3~4개를 넘으면** 접이식으로 쌓지 말고 하위 탭으로 나눈다.
 - **새 탭** — `app/ui/<name>_tab.py` 에 `QWidget(log=...)` 를 만들고 `main_window.build_ui` 에서 `addTab`.
-- **Reference 에 새 하위 탭** — `ui/reference_tab.py` 에 페이지 `QWidget(log=...)` 를 만들고 `ReferenceTab.build_ui` 에 `addTab` 한 줄.
-  씬을 읽는 것은 `core/reference_ops.scene_references()`(행 dict 목록)를 같이 쓴다.
+- **Reference 에 새 하위 탭** — `ui/<name>_page.py` 에 페이지 `QWidget(log=...)` 를 만들고 `ReferenceTab.build_ui` 에 `addTab` 한 줄
+  (Lineage 가 본보기). 씬을 읽는 것은 `core/reference_ops.scene_references()`(행 dict 목록)를 같이 쓴다.
 - **Export 의 타입 필터 타입** — `export_ops.FILTER_TYPES` + `_TYPE_MATCHERS` 두 곳(원본과 같다).
 - **Export 규칙** — `export_rules.EXPORT_RULES` 에 한 줄 + 검사 함수(§2-2).
 
 ---
 
 ## 7. 검증 (mayapy 2024 + 오프스크린 Qt)
+
+**v01.17 Reference > Lineage** — `tests/test_reference_lineage.py` **31항목 통과**. 같은 합성 씬, A00210 설정은 임시 폴더로 바꿔 끼움:
+노드 4(같은 파일 두 번 → 하나) · A00210 `NodeItem` 그대로 · 엣지 4 방향(참조 대상 → 참조하는 파일) · 점선 회색 · 라벨 `current scene` / `unloaded` ·
+project-relative key · 깊이별 행 · 레인 팔레트 색 · 드래그 → 모델 위치 + 엣지 재배선 · Reveal(없는 파일은 폴더) · Copy Path · Fit View ·
+Export → `<store>/lineage/top.json` 을 A00210 `lineage.load` 로 다시 읽어 노드 · references · 끌어 놓은 위치 유지 · 덮어쓰기 확인(거절 시 유지) ·
+이름 지정 · Store 미설정 경고 · root 없으면 key 빈 채 그림 · 저장 전 씬(`(untitled scene)`, Export 경고) · 하위 탭 `Default` + `Lineage` ·
+백엔드 없을 때 안내문 + 버튼 비활성.
 
 **v01.12 Reference (v01.16 에 `Show` 콤보 11항목 추가 → 46항목)** — `tests/test_reference.py` 통과 (`mayapy tests/test_reference.py`). 합성 씬 `leaf.ma ← mid.ma ← top`
 (mid 를 두 번 = 복사 번호, leaf 를 최상위에도, 없는 파일로 바꾼 레퍼런스 하나):

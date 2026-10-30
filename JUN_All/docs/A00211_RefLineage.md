@@ -2,7 +2,7 @@
 title: A00211_RefLineage — 씬 reference → Lineage 내보내기
 aliases: [A00211, RefLineage, Ref Lineage]
 tags: [tool, maya, lineage, A00211_RefLineage]
-updated: 2026-09-16
+updated: 2026-10-30
 ---
 
 # A00211_RefLineage
@@ -32,6 +32,10 @@ A00210 에서 손으로 그리던 reference 관계를 **씬에서 자동으로**
   보이지만 record/썸네일 링크는 없음).
 
 저장 경로: `<store_dir>/lineage/<name>.json` — A00210 의 Lineage 그래프와 같은 폴더.
+
+> **A00480_FileTool 의 Reference > Lineage 탭(v01.17, 2026-10-30)** 이 이 스캐너(`ref_scanner.collect_scene_references` ·
+> `build_graph`)로 같은 그래프를 만들어 **툴 안에서 바로 노드로 보여 주고** `Export to Lineage` 로 같은 JSON 을 쓴다
+> ([`A00480_FileTool.md`](A00480_FileTool.md) §5-1). 이 툴은 그대로 남는다.
 
 ---
 
