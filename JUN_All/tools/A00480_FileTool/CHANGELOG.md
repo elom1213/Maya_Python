@@ -1,5 +1,16 @@
 # Changelog — A00480_FileTool
 
+## v01.18 (2026-10-30)
+
+- **[Feature] Reference > Lineage 에도 `Show` 콤보 — 노드 글자를 `File Name` / `Full Path` 로.** Default 탭과 **같은 optionVar**
+  를 써서 한쪽에서 바꾸면 다른 쪽도 다음에 열 때 따라간다. **기본이 `File Name`** 이 됐다(Default 탭도 — 사용자 요청).
+  Full Path 는 노드 폭에 맞게 가운데를 줄여 보이고, Reveal / Copy Path / Export 는 늘 전체 경로 · 파일 이름 규약을 쓴다
+  (Export 로 쓰는 A00210 그래프의 노드 글자는 모드와 무관하게 파일 이름).
+- **[Change] Lineage 배치 — 깊은 노드가 위, 씬(depth 0)이 맨 아래.** 예전엔 씬이 위라 "참조 대상 → 참조하는 파일" 화살표가
+  거꾸로 올라갔다(사용자: "지금은 반대로 보여"). A00211_RefLineage v01.03 의 `_layout` 에서 고쳐 A00210 으로 Export 한 그래프도 같다.
+- 검증 `tests/test_reference_lineage.py` **38 항목**(N1~N6 보기 모드 · 공유 · Refresh 유지 · Export 는 파일 이름, L7/L7b 배치 방향),
+  `tests/test_reference.py` **47 항목**(기본 File Name · Full Path 전환 · 공유 optionVar 따라가기). **마야 GUI 확인 아직.**
+
 ## v01.17 (2026-10-30)
 
 - **[Feature] Reference > `Lineage` 하위 탭 — 현재 씬의 레퍼런스 관계를 노드 그래프로.** 노드 1개 = 파일 1개(씬 자신이 루트,

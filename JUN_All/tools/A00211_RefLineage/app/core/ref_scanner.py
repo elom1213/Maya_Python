@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-22
+# last Update date : 2026-10-30
 # A00211_RefLineage - Maya 씬의 reference 관계를 읽어 A00210 Lineage 그래프로 변환.
 #
 # 현재 열린 Maya 씬과 그 씬이 (중첩 포함) 불러오는 모든 reference 파일을 노드로 만들고,
@@ -139,19 +139,30 @@ def collect_scene_references():
 
 
 def _compute_depth(scene_norm, edges, all_norms):
-    """씬(루트)으로부터 owner->source 방향 BFS 로 각 파일의 깊이를 구한다."""
+    """씬(루트)으로부터 owner->source 방향으로 각 파일의 깊이 = **가장 긴 경로**(v01.03).
+
+    같은 파일을 씬이 직접 불러오고(깊이 1) 어떤 레퍼런스 안에서도 불러오면(깊이 2) 깊이 2 로 둔다 -
+    그래야 배치(깊은 것이 위)에서 참조 대상이 **자기를 참조하는 모든 파일보다 위**에 놓여 화살표가
+    전부 아래로 흐른다. 예전 BFS(최단 경로 1)는 둘을 같은 줄에 놓아 화살표가 옆으로 누웠다.
+    마야 레퍼런스는 순환이 없지만, 만약 있어도 끝나도록 반복 횟수를 노드 수로 막는다.
+    """
     children = {}
     for owner, source in edges:
         children.setdefault(owner, []).append(source)
 
     depth = {scene_norm: 0}
-    queue = [scene_norm]
-    while queue:
-        cur = queue.pop(0)
-        for nxt in children.get(cur, []):
-            if nxt not in depth:
-                depth[nxt] = depth[cur] + 1
-                queue.append(nxt)
+    for _ in range(len(all_norms) + 1):          # 완화 반복: 더 긴 경로가 나오면 갱신
+        changed = False
+        for owner, sources in children.items():
+            if owner not in depth:
+                continue
+            for source in sources:
+                want = depth[owner] + 1
+                if depth.get(source, -1) < want:
+                    depth[source] = want
+                    changed = True
+        if not changed:
+            break
 
     # 씬에 닿지 않은(이론상 없음) 파일은 1로.
     for n in all_norms:
@@ -185,10 +196,16 @@ def _make_node(abs_path, store, seq, is_scene, is_loaded):
 
 def _layout(nodes_by_norm, depth):
     """depth 별로 가로로 균등(중앙 정렬) 배치. references 는 Auto Layout 에 안 잡히므로
-    내보낼 때 보기 좋은 초기 위치를 직접 준다."""
+    내보낼 때 보기 좋은 초기 위치를 직접 준다.
+
+    세로는 **깊은 노드가 위, 씬(depth 0)이 맨 아래** (v01.03, 사용자 요청 2026-10-30). A00210 의 reference
+    화살표는 "참조 대상 → 참조하는 파일" 이고 EdgeItem 은 위 노드의 아래 가운데에서 아래 노드의 위 가운데로
+    긋으므로, 참조 대상(더 깊은 것)이 위에 있어야 화살표가 아래로 흘러 씬에 모인다. 예전(씬이 위)은 반대였다.
+    """
     by_depth = {}
     for norm, node in nodes_by_norm.items():
         by_depth.setdefault(depth.get(norm, 1), []).append(norm)
+    deepest = max(by_depth) if by_depth else 0
 
     for d, norms in by_depth.items():
         norms.sort(key=lambda n: nodes_by_norm[n].seq)   # 결정적 순서
@@ -196,7 +213,7 @@ def _layout(nodes_by_norm, depth):
         for col, norm in enumerate(norms):
             node = nodes_by_norm[norm]
             node.x = (col - (count - 1) / 2.0) * _COL_SPACING
-            node.y = d * _ROW_SPACING
+            node.y = (deepest - d) * _ROW_SPACING
 
 
 def build_graph(collected, store, name, author=""):

@@ -145,10 +145,13 @@ def summary(rows):
 # Open / copy
 # ==========================================================================
 
-# File 열 보기 모드 (v01.16) - 전체 경로 / 파일 이름만. 마야 optionVar 에 기억해 다음에 열 때도 같다.
+# File 열 / Lineage 노드 보기 모드 (v01.16, v01.18 기본 = 파일 이름) - 전체 경로 / 파일 이름만.
+# Default 와 Lineage 두 하위 탭이 **같은** 마야 optionVar 를 쓴다 - 한쪽에서 바꾸면 다른 쪽도 다음에 열 때 따라간다.
 FILE_VIEW_PATH = "path"
 FILE_VIEW_NAME = "name"
 FILE_VIEWS = (FILE_VIEW_PATH, FILE_VIEW_NAME)
+FILE_VIEW_DEFAULT = FILE_VIEW_NAME
+FILE_VIEW_CHOICES = (("Full Path", FILE_VIEW_PATH), ("File Name", FILE_VIEW_NAME))   # `Show` 콤보 항목 (라벨, 모드)
 FILE_VIEW_OPTION = "JUN_A00480_FileTool_reference_file_view"
 
 
@@ -162,10 +165,10 @@ def file_text(path, view=FILE_VIEW_PATH):
 
 
 def load_file_view():
-    """기억해 둔 보기 모드. 없거나 마야 밖이면 전체 경로."""
+    """기억해 둔 보기 모드. 없거나 마야 밖이면 기본(파일 이름)."""
     cmds = _cmds()
     if cmds is None:
-        return FILE_VIEW_PATH
+        return FILE_VIEW_DEFAULT
     try:
         if cmds.optionVar(exists=FILE_VIEW_OPTION):
             value = cmds.optionVar(q=FILE_VIEW_OPTION)
@@ -173,7 +176,7 @@ def load_file_view():
                 return value
     except Exception:                                      # noqa: BLE001
         pass
-    return FILE_VIEW_PATH
+    return FILE_VIEW_DEFAULT
 
 
 def save_file_view(view):

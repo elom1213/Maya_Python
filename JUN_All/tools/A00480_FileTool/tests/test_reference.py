@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # A00480_FileTool - Reference 탭 시험 (mayapy 오프스크린, 합성 씬: leaf.ma <- mid.ma <- top, 복사 번호 · 언로드 · 없는 파일)
 #   v01.16 : `Show` 콤보(File 열 = Full Path / File Name) - 글자만 바뀌고 열기 · 복사는 전체 경로, optionVar 에 기억 (V1 ~ V11)
+#   v01.18 : 기본이 File Name. 시작 때 optionVar 를 지우고 U 검사는 이름 모드 기준, V 검사는 Full Path 로 바꿔 보는 순서.
 #   "C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe" test_reference.py
 # QApplication 은 maya.standalone.initialize() 보다 먼저 만든다 (메모리 qapplication-before-maya-standalone).
 import os
@@ -128,6 +129,8 @@ check("C16 clipboard single", text1 == os.path.normpath(LEAF) and logs8 == ["Cop
 check("C17 clipboard empty", ops.clipboard_text([]) == ("", ["[WARN] No reference selected."]))
 
 # ---------------------------------------------------------------- UI
+if cmds.optionVar(exists=ops.FILE_VIEW_OPTION):
+    cmds.optionVar(remove=ops.FILE_VIEW_OPTION)          # 기억된 모드 없이 시작 -> 기본(File Name)
 LOG = []
 page = rt.ReferenceDefaultPage(log=LOG.append)
 page.show()
@@ -136,8 +139,8 @@ tree = page.tree
 check("U1 showEvent fills the tree: 4 top-level, 2 nested", tree.topLevelItemCount() == 4
       and tree.topLevelItem(0).childCount() == 1 and tree.topLevelItem(1).childCount() == 1
       and tree.topLevelItem(2).childCount() == 0)
-check("U2 texts: namespace + copy, native path, status",
-      tree.topLevelItem(1).text(0) == "MID_B{1}" and tree.topLevelItem(1).text(1) == os.path.normpath(MID)
+check("U2 texts: namespace + copy, file name (default view), status",
+      tree.topLevelItem(1).text(0) == "MID_B{1}" and tree.topLevelItem(1).text(1) == "mid.ma"
       and tree.topLevelItem(1).text(2) == "Loaded" and tree.topLevelItem(3).text(2) == "Missing"
       and tree.topLevelItem(0).child(0).text(0) == "MID_A:LEAF",
       [tree.topLevelItem(i).text(0) for i in range(4)])
@@ -151,19 +154,20 @@ check("U6 tooltip names the node", "MID_ARN" in tree.topLevelItem(0).toolTip(0))
 check("V1 core file_text: path / name / empty",
       ops.file_text(MID) == os.path.normpath(MID) and ops.file_text(MID, ops.FILE_VIEW_NAME) == "mid.ma"
       and ops.file_text("", ops.FILE_VIEW_NAME) == "" and ops.file_text(GONE, "name") == "gone.ma")
-if cmds.optionVar(exists=ops.FILE_VIEW_OPTION):
-    cmds.optionVar(remove=ops.FILE_VIEW_OPTION)
-check("V2 core load_file_view: no optionVar -> full path", ops.load_file_view() == ops.FILE_VIEW_PATH)
-check("V3 combo starts at Full Path, header 'File', rows show full paths",
-      page.view_combo.currentText() == "Full Path" and tree.headerItem().text(1) == "File"
-      and tree.topLevelItem(0).child(0).text(1) == os.path.normpath(LEAF),
-      (page.view_combo.currentText(), tree.headerItem().text(1)))
+check("V2 core load_file_view: no optionVar -> File Name (default since v01.18)",
+      ops.load_file_view() == ops.FILE_VIEW_NAME and ops.FILE_VIEW_DEFAULT == ops.FILE_VIEW_NAME)
+names_now = [tree.topLevelItem(i).text(1) for i in range(4)] + [tree.topLevelItem(0).child(0).text(1)]
+check("V3 combo starts at File Name, header 'File Name', every row (nested, missing too) shows only the file name",
+      page.view_combo.currentText() == "File Name" and tree.headerItem().text(1) == "File Name"
+      and names_now == ["mid.ma", "mid.ma", "leaf.ma", "gone.ma", "leaf.ma"], (page.view_combo.currentText(), names_now))
+page.view_combo.setCurrentIndex(0)
+pump()
+check("V4 Full Path mode: rows show full paths, header 'File'",
+      tree.topLevelItem(0).child(0).text(1) == os.path.normpath(LEAF) and tree.topLevelItem(3).text(1) == os.path.normpath(GONE)
+      and tree.headerItem().text(1) == "File" and page.file_view == ops.FILE_VIEW_PATH, tree.topLevelItem(3).text(1))
 page.view_combo.setCurrentIndex(1)
 pump()
-names_now = [tree.topLevelItem(i).text(1) for i in range(4)] + [tree.topLevelItem(0).child(0).text(1)]
-check("V4 File Name mode: every row (nested, missing too) shows only the file name",
-      names_now == ["mid.ma", "mid.ma", "leaf.ma", "gone.ma", "leaf.ma"] and page.file_view == ops.FILE_VIEW_NAME, names_now)
-check("V5 header reads 'File Name'", tree.headerItem().text(1) == "File Name", tree.headerItem().text(1))
+check("V5 back to File Name", tree.headerItem().text(1) == "File Name" and tree.topLevelItem(0).text(1) == "mid.ma")
 tree.clearSelection()
 tree.topLevelItem(1).setSelected(True)
 check("V6 stored path and selected_paths are still the full path",
@@ -178,18 +182,28 @@ page.buttons["Refresh"].click()
 pump()
 check("V8 Refresh keeps the name mode", tree.topLevelItem(0).text(1) == "mid.ma" and page.view_combo.currentIndex() == 1,
       tree.topLevelItem(0).text(1))
-page2 = rt.ReferenceDefaultPage()                 # 변수에 잡아 둔다 - 임시 객체면 Qt 쪽이 바로 지워진다
-check("V9 choice remembered in optionVar, a new page opens in name mode",
-      cmds.optionVar(q=ops.FILE_VIEW_OPTION) == ops.FILE_VIEW_NAME and ops.load_file_view() == ops.FILE_VIEW_NAME
-      and page2.view_combo.currentText() == "File Name", cmds.optionVar(q=ops.FILE_VIEW_OPTION))
-page2.deleteLater()
 page.set_file_view(ops.FILE_VIEW_PATH)
 pump()
-check("V10 set_file_view('path') -> combo back to Full Path, full paths, header 'File', optionVar updated",
-      page.view_combo.currentIndex() == 0 and tree.topLevelItem(0).text(1) == os.path.normpath(MID)
-      and tree.headerItem().text(1) == "File" and cmds.optionVar(q=ops.FILE_VIEW_OPTION) == ops.FILE_VIEW_PATH)
+page2 = rt.ReferenceDefaultPage()                 # 변수에 잡아 둔다 - 임시 객체면 Qt 쪽이 바로 지워진다
+check("V9 choice remembered in optionVar, a new page opens in the remembered (Full Path) mode",
+      cmds.optionVar(q=ops.FILE_VIEW_OPTION) == ops.FILE_VIEW_PATH and ops.load_file_view() == ops.FILE_VIEW_PATH
+      and page2.view_combo.currentText() == "Full Path", cmds.optionVar(q=ops.FILE_VIEW_OPTION))
+page2.deleteLater()
+page.set_file_view(ops.FILE_VIEW_NAME)
+pump()
+check("V10 set_file_view('name') -> combo File Name, names, header 'File Name', optionVar updated",
+      page.view_combo.currentIndex() == 1 and tree.topLevelItem(0).text(1) == "mid.ma"
+      and tree.headerItem().text(1) == "File Name" and cmds.optionVar(q=ops.FILE_VIEW_OPTION) == ops.FILE_VIEW_NAME)
 page.set_file_view("bogus")
-check("V11 unknown view ignored", page.file_view == ops.FILE_VIEW_PATH and page.view_combo.currentIndex() == 0)
+check("V11 unknown view ignored", page.file_view == ops.FILE_VIEW_NAME and page.view_combo.currentIndex() == 1)
+cmds.optionVar(sv=(ops.FILE_VIEW_OPTION, ops.FILE_VIEW_PATH))
+page.hide()
+page.show()
+pump()
+check("V12 showEvent follows the shared optionVar (changed from the Lineage tab)", page.file_view == ops.FILE_VIEW_PATH
+      and page.view_combo.currentText() == "Full Path" and tree.topLevelItem(0).text(1) == os.path.normpath(MID))
+cmds.optionVar(remove=ops.FILE_VIEW_OPTION)
+page.set_file_view(ops.FILE_VIEW_NAME)
 cmds.optionVar(remove=ops.FILE_VIEW_OPTION)
 
 tree.clearSelection()

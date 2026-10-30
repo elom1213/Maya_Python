@@ -2,6 +2,17 @@
 
 All notable changes to this tool are documented here.
 
+## [01.03] - 2026-10-30
+### Changed
+- **Layout flipped: deeper references sit higher, the scene (depth 0) is at the bottom.** A00210 draws a
+  reference edge from the bottom of the referenced node to the top of the referencing node, so the
+  referenced (deeper) files must be above for the arrows to flow down into the scene. Before, the scene
+  was on top and the arrows ran upward. Same scanner is used by **A00480_FileTool > Reference > Lineage**
+  (which shows the graph in-tool); existing exported graphs keep their saved positions.
+- **Depth = longest path, not shortest.** A file referenced both by the scene and inside another
+  reference now sits one row above that reference, so every arrow points downward (before, both shared
+  a row and the arrow ran sideways).
+
 ## [01.00] - 2026-06-22
 ### Added
 - **Initial release.** Scans the current Maya scene's **reference relationships**

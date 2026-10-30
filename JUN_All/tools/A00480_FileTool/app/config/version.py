@@ -72,5 +72,10 @@
 #        `Export to Lineage` = A00211 과 같은 lineage JSON 을 A00210 Store Repo 에(덮어쓰기 확인). 두 툴이 없으면 안내문만.
 #        ★ 툴 간 import 예외(사용자 지시). tests/test_reference_lineage.py 31 항목.
 
-VERSION = "01.17"
+# 01.18  Reference > Lineage 에도 `Show` 콤보 - 노드 글자를 **File Name(기본) / Full Path** 로. Default 탭과 같은
+#        optionVar 를 써서 한쪽에서 바꾸면 다른 쪽도 따라간다. **기본이 File Name**(Default 탭도). Export 는 늘 파일 이름.
+#        Lineage 배치는 **깊은 노드가 위, 씬이 맨 아래**(A00211 v01.03 _layout - 화살표가 아래로 흐른다).
+#        tests/test_reference_lineage.py 38 · test_reference.py 47.
+
+VERSION = "01.18"
 LAST_UPDATE = "2026-10-30"

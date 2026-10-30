@@ -44,8 +44,8 @@ UNLOADED_COLOR = "#9a9a9a"
 
 COL_NAME, COL_FILE, COL_STATUS = 0, 1, 2
 
-# `Show` 콤보의 항목 (라벨, core 의 보기 모드)
-VIEW_CHOICES = (("Full Path", ops.FILE_VIEW_PATH), ("File Name", ops.FILE_VIEW_NAME))
+# `Show` 콤보의 항목 (라벨, core 의 보기 모드) - Lineage 페이지와 같은 목록 · 같은 optionVar
+VIEW_CHOICES = ops.FILE_VIEW_CHOICES
 
 
 class ReferenceDefaultPage(QWidget):
@@ -150,6 +150,10 @@ class ReferenceDefaultPage(QWidget):
     def showEvent(self, event):
         # 탭을 열 때마다 현재 씬 기준으로 - 다른 씬을 열고 와도 Refresh 를 안 눌러도 된다.
         super(ReferenceDefaultPage, self).showEvent(event)
+        # Lineage 페이지에서 보기 모드를 바꿨으면 따라간다(같은 optionVar).
+        view = ops.load_file_view()
+        if view != self.file_view:
+            self.set_file_view(view)
         self.refresh()
 
     # ------------------------------------------------------------------ file column view

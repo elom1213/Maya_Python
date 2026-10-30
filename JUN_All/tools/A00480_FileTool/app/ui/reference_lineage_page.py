@@ -18,6 +18,10 @@
 #
 # 노드 우클릭은 A00210 의 메뉴(`QMenu.exec` — PySide2 에는 없다, key 없으면 비활성) 대신 여기서 다시 만든다 :
 # 이 페이지는 절대 경로를 알고 있으므로 project root 없이도 Reveal in File Explorer / Copy Path 가 된다.
+#
+# `Show` 콤보(v01.18) : 노드 글자를 **File Name**(기본) / **Full Path** 로. Default 탭과 같은 optionVar 를 쓴다.
+# 노드 글자는 A00210 NodeItem 이 `node.file_name` 을 그리므로 그 값을 보기 모드에 맞춰 바꾼다 - Export 때는
+# A00210 규약(파일 이름)으로 되돌려 쓴다. 이름 없는 씬은 "(untitled scene)" 그대로.
 
 import os
 
@@ -30,6 +34,7 @@ from Framework.qt.qt import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QComboBox,
     QGraphicsScene,
     QMenu,
     QMessageBox,
@@ -97,6 +102,7 @@ class ReferenceLineagePage(QWidget):
         super(ReferenceLineagePage, self).__init__(parent)
         self._log_callback = log
         self.available = backends_available()
+        self.file_view = ops.load_file_view()
         self.collected = None
         self.graph = None
         self.store = None
@@ -120,6 +126,18 @@ class ReferenceLineagePage(QWidget):
         head = QHBoxLayout()
         self.count_label = QLabel("Reference graph of the current scene")
         head.addWidget(self.count_label, stretch=1)
+        head.addWidget(QLabel("Show"))
+        self.view_combo = QComboBox()
+        for label, _view in ops.FILE_VIEW_CHOICES:
+            self.view_combo.addItem(label)
+        self.view_combo.setCurrentIndex(self._view_index(self.file_view))
+        self.view_combo.setToolTip(
+            "What each node shows.\n"
+            "File Name : only the file name (default).\n"
+            "Full Path : the whole path of the file (middle-elided to fit the node).\n"
+            "Reveal / Copy Path / Export always use the full path. Shared with the Default tab and remembered.")
+        self.view_combo.currentIndexChanged.connect(self._on_view_changed)
+        head.addWidget(self.view_combo)
         for label, handler, tip in (
                 ("Refresh", self.refresh, "Read the references of the current scene again and redraw the graph."),
                 ("Fit View", self.fit_view, "Zoom the canvas so every node is visible.")):
@@ -176,10 +194,54 @@ class ReferenceLineagePage(QWidget):
     # ------------------------------------------------------------------ data
 
     def showEvent(self, event):
-        # 탭을 열 때마다 현재 씬 기준으로(Default 페이지와 같은 규칙).
+        # 탭을 열 때마다 현재 씬 기준으로(Default 페이지와 같은 규칙). 보기 모드도 optionVar 에서 따라간다.
         super(ReferenceLineagePage, self).showEvent(event)
+        view = ops.load_file_view()
+        if view != self.file_view:
+            self.set_file_view(view)
         if self.available:
             self.refresh()
+
+    # ------------------------------------------------------------------ node text view (Default 탭과 같은 모드)
+
+    @staticmethod
+    def _view_index(view):
+        for i, (_label, v) in enumerate(ops.FILE_VIEW_CHOICES):
+            if v == view:
+                return i
+        return 0
+
+    def node_text(self, node, view=None):
+        """노드에 보일 글자 - 보기 모드(기본 = 지금 모드)에 따라 파일 이름 / 전체 경로. 저장 전 씬은 그대로."""
+        path = self.node_abs_path(node)
+        if not path:
+            return node.file_name
+        return ops.file_text(path, self.file_view if view is None else view)
+
+    def _apply_file_view(self):
+        """그래프의 모든 노드 글자를 지금 보기 모드로. 아이템은 다시 그린다."""
+        if self.graph is None:
+            return
+        for node in self.graph.nodes:
+            node.file_name = self.node_text(node)
+            item = self._node_items.get(node.id)
+            if item is not None:
+                item.update()
+
+    def set_file_view(self, view):
+        """노드 글자를 `path`(전체 경로) / `name`(파일 이름) 으로. 씬은 다시 읽지 않는다."""
+        if view not in ops.FILE_VIEWS:
+            return
+        self.file_view = view
+        if self.view_combo.currentIndex() != self._view_index(view):
+            self.view_combo.setCurrentIndex(self._view_index(view))      # -> _on_view_changed 가 다시 들어온다
+            return
+        self._apply_file_view()
+        ops.save_file_view(view)
+
+    def _on_view_changed(self, index):
+        choices = ops.FILE_VIEW_CHOICES
+        self.set_file_view(choices[index][1] if 0 <= index < len(choices) else ops.FILE_VIEW_DEFAULT)
 
     def graph_name(self):
         """Export 이름 - 칸이 비면 씬 파일 이름(확장자 없이). 저장 전 씬이면 ""."""
@@ -207,6 +269,7 @@ class ReferenceLineagePage(QWidget):
         self.graph = rs.build_graph(self.collected, self.store, self.graph_name() or "scene_references",
                                     (self.prefs or {}).get("author", ""))
         self._path_by_id = self._map_paths(self.collected, self.graph)
+        self._apply_file_view()
         self._render_graph()
         QTimer.singleShot(0, self.fit_view)
 
@@ -378,11 +441,16 @@ class ReferenceLineagePage(QWidget):
             self._log("Export cancelled - '{0}' was kept as it is.".format(name))
             return
         self.graph.name = name
+        # A00210 규약대로 노드 글자는 파일 이름으로 저장한다(Full Path 모드여도).
+        for node in self.graph.nodes:
+            node.file_name = self.node_text(node, ops.FILE_VIEW_NAME)
         try:
             path = lin.save(store.store_dir, self.graph)
         except Exception as exc:                            # noqa: BLE001
             self._log("[WARN] Export failed : {0}".format(exc))
             return
+        finally:
+            self._apply_file_view()
         self._log("Exported lineage graph '{0}' : {1}".format(name, os.path.normpath(path)))
         self._log("Open A00210_FileManager > Lineage and press Refresh to see it (Push there to sync).")
         self._refresh_store_label()

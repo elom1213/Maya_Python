@@ -34,7 +34,7 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 > [!summary] A00480_FileTool **v01.18 Reference > Lineage `Show`(File Name 기본 · Default 와 공유) + 배치 뒤집기(깊은 노드가 위)** · A00211_RefLineage v01.03 `#A00480_FileTool` `#A00211_RefLineage`
 - 요청: "Lineage 노드 글자도 Default 처럼 파일 이름만 보이는 모드를 추가하고 기본으로. Default 도 기본은 파일 이름." 이어서 "깊은 노드가 위, 얕은 노드가 아래 — 지금은 반대."
-- 구현: `reference_ops.FILE_VIEW_DEFAULT = name` · `FILE_VIEW_CHOICES`(두 페이지 공용), Lineage 페이지 `Show` 콤보 + `node_text / _apply_file_view / set_file_view`(A00210 NodeItem 이 `node.file_name` 을 그리므로 그 값을 모드에 맞춰 바꾸고 Export 직전엔 파일 이름으로 되돌림). 두 페이지가 같은 optionVar 를 쓰고 `showEvent` 에서 다시 읽어 따라간다. 배치는 A00211 `_layout` 에서 `y = (deepest − depth) · 150` — A00210 EdgeItem 이 위 노드 아래에서 아래 노드 위로 긋으므로 참조 대상이 위에 있어야 화살표가 아래로 흐른다(예전엔 거꾸로).
+- 구현: `reference_ops.FILE_VIEW_DEFAULT = name` · `FILE_VIEW_CHOICES`(두 페이지 공용), Lineage 페이지 `Show` 콤보 + `node_text / _apply_file_view / set_file_view`(A00210 NodeItem 이 `node.file_name` 을 그리므로 그 값을 모드에 맞춰 바꾸고 Export 직전엔 파일 이름으로 되돌림). 두 페이지가 같은 optionVar 를 쓰고 `showEvent` 에서 다시 읽어 따라간다. 배치는 A00211 `_layout` 에서 `y = (deepest − depth) · 150`, 깊이는 BFS 최단이 아니라 **가장 긴 경로**(씬이 직접 불러오면서 다른 레퍼런스 안에서도 불러오는 파일은 그 레퍼런스보다 위) — A00210 EdgeItem 이 위 노드 아래에서 아래 노드 위로 긋으므로 참조 대상이 위에 있어야 화살표가 전부 아래로 흐른다(예전엔 거꾸로 · 옆으로).
 - 시험 `test_reference_lineage.py` **38/38**(N1~N6 · L7/L7b), `test_reference.py` **47/47**(기본 File Name · 공유 따라가기). A00211 CHANGELOG 01.03 · 두 가이드. **마야 GUI 확인 아직.**
 
 > [!summary] A00110_animTool_V02 **v02.30 View > Graph Focus `Frame margin (±)` 기본 80 → 30** `#A00110_animTool_V02`

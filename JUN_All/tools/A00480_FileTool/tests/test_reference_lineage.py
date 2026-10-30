@@ -76,6 +76,8 @@ TOP = save_as("top.ma")
 
 # A00210 설정은 임시 store + 이 폴더를 project root 로 (사용자 설정을 건드리지 않는다)
 rs.load_store = lambda: (MetaStore(STORE, TMP), {"author": "test"})
+if cmds.optionVar(exists=ops.FILE_VIEW_OPTION):
+    cmds.optionVar(remove=ops.FILE_VIEW_OPTION)          # 기억된 보기 모드 없이 시작 -> 기본(File Name)
 
 # ---------------------------------------------------------------- page
 LOG = []
@@ -101,9 +103,11 @@ check("L5 labels: scene node 'current scene', missing/unloaded file 'unloaded'",
       (nodes["top.ma"].label, nodes["gone.ma"].label))
 check("L6 keys are project-root relative (A00210 record links)", nodes["mid.ma"].key == "mid.ma" and nodes["top.ma"].key == "top.ma",
       (nodes["mid.ma"].key, nodes["top.ma"].key))
-check("L7 layout by depth: scene row 0, referenced files row 150",
-      nodes["top.ma"].y == 0.0 and all(nodes[n].y == 150.0 for n in ("mid.ma", "leaf.ma", "gone.ma")),
+check("L7 layout by depth (longest path): leaf (inside mid) top row 0, mid / gone row 150, the scene bottom row 300",
+      nodes["leaf.ma"].y == 0.0 and nodes["mid.ma"].y == 150.0 and nodes["gone.ma"].y == 150.0 and nodes["top.ma"].y == 300.0,
       [(n, nodes[n].x, nodes[n].y) for n in sorted(nodes)])
+check("L7b edges run downward: referenced node above the node that references it",
+      all(page._node_items[e.parent_id].pos().y() < page._node_items[e.child_id].pos().y() for e in page._edge_items))
 check("L8 node colours come from the lane palette", all(it._color.name().upper() in [c.upper() for c in lin.LANE_PALETTE]
                                                         for it in page._node_items.values()))
 check("L9 header + log summary", page.count_label.text() == "Reference graph : 4 file(s), 4 reference link(s)"
@@ -123,7 +127,7 @@ mid_item.setPos(mid_item.pos() + QPointF(100.0, 40.0))
 pump()
 start_after = edge_mid_top.path().pointAtPercent(0.0)
 check("L12 dragging a node updates the model and re-routes its edge",
-      nodes["mid.ma"].x == 310.0 and nodes["mid.ma"].y == 190.0
+      nodes["mid.ma"].x == 205.0 and nodes["mid.ma"].y == 190.0
       and abs(start_after.x() - start_before.x() - 100.0) < 1e-6 and abs(start_after.y() - start_before.y() - 40.0) < 1e-6,
       (nodes["mid.ma"].x, nodes["mid.ma"].y))
 
@@ -156,6 +160,37 @@ check("L16 Fit View keeps zoom <= 1 and shows every node", page.view.transform()
               for it in page._node_items.values()), page.view.transform().m11())
 
 # ---------------------------------------------------------------- export
+# ---------------------------------------------------------------- node text view (v01.18)
+check("N1 default view = File Name: combo + node texts are file names",
+      page.view_combo.currentText() == "File Name" and page.file_view == ops.FILE_VIEW_NAME
+      and sorted(n.file_name for n in page.graph.nodes) == ["gone.ma", "leaf.ma", "mid.ma", "top.ma"])
+page.view_combo.setCurrentIndex(0)
+pump()
+check("N2 Full Path mode: node texts are the full native paths",
+      sorted(n.file_name for n in page.graph.nodes) == sorted(os.path.normpath(p) for p in (GONE, LEAF, MID, TOP))
+      and cmds.optionVar(q=ops.FILE_VIEW_OPTION) == ops.FILE_VIEW_PATH, [n.file_name for n in page.graph.nodes])
+check("N3 Full Path mode: same node items kept (texts only, no re-read)", len(page._node_items) == 4
+      and page._node_items[nodes["mid.ma"].id] is mid_item)
+page.buttons["Refresh"].click()
+pump()
+check("N4 Refresh keeps the Full Path mode", all(os.path.isabs(n.file_name) for n in page.graph.nodes), [n.file_name for n in page.graph.nodes][:1])
+default_page = rt.ReferenceDefaultPage(log=LOG.append)
+default_page.show()
+pump()
+check("N5 Default tab follows the shared choice (opens in Full Path)", default_page.view_combo.currentText() == "Full Path"
+      and default_page.tree.topLevelItem(0).text(1) == os.path.normpath(MID))
+default_page.view_combo.setCurrentIndex(1)
+pump()
+page.hide()
+page.show()
+pump()
+check("N6 Lineage follows a change made in the Default tab (showEvent -> File Name)", page.view_combo.currentText() == "File Name"
+      and sorted(n.file_name for n in page.graph.nodes) == ["gone.ma", "leaf.ma", "mid.ma", "top.ma"])
+default_page.close()
+nodes = {n.file_name: n for n in page.graph.nodes}          # Refresh 로 그래프가 새로 만들어졌다
+page.set_file_view(ops.FILE_VIEW_PATH)
+pump()
+
 check("L17 default graph name = scene file name", page.graph_name() == "top")
 LOG[:] = []
 page.buttons["Export to Lineage"].click()
@@ -165,9 +200,12 @@ check("L18 Export writes <store>/lineage/top.json + log", os.path.isfile(out)
       and LOG[0] == "Exported lineage graph 'top' : " + os.path.normpath(out), LOG)
 loaded = lin.load(STORE, "top")
 by_name = {n.file_name: n for n in loaded.nodes}
-check("L19 exported graph loads with A00210: 4 nodes, references kept, dragged position kept",
-      sorted(by_name) == sorted(nodes) and len(by_name["top.ma"].references) == 3
-      and by_name["mid.ma"].references == [by_name["leaf.ma"].id] and by_name["mid.ma"].x == 310.0, by_name["mid.ma"].x)
+check("L19 exported graph loads with A00210: 4 nodes named by FILE NAME even in Full Path mode, references kept, node texts restored",
+      sorted(by_name) == ["gone.ma", "leaf.ma", "mid.ma", "top.ma"] and len(by_name["top.ma"].references) == 3
+      and by_name["mid.ma"].references == [by_name["leaf.ma"].id] and by_name["leaf.ma"].y < by_name["mid.ma"].y < by_name["top.ma"].y
+      and all(os.path.isabs(n.file_name) for n in page.graph.nodes), sorted(by_name))
+page.set_file_view(ops.FILE_VIEW_NAME)
+pump()
 check("L20 A00210 lists it", lin.list_names(STORE) == ["top"], lin.list_names(STORE))
 
 asked = []
@@ -213,6 +251,7 @@ check("L27 node_abs_path of the untitled scene is empty", page.node_abs_path(pag
 tab = rt.ReferenceTab(log=LOG.append)
 check("L28 Reference sub tabs: Default + Lineage", [tab.tabs.tabText(i) for i in range(tab.tabs.count())] == ["Default", "Lineage"]
       and isinstance(tab.lineage_page, rlp.ReferenceLineagePage))
+cmds.optionVar(remove=ops.FILE_VIEW_OPTION)
 saved_rs = rlp.rs
 rlp.rs = None
 fallback = rlp.ReferenceLineagePage(log=LOG.append)

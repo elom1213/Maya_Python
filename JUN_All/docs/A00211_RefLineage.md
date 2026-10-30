@@ -23,7 +23,9 @@ A00210 에서 손으로 그리던 reference 관계를 **씬에서 자동으로**
 - **엣지 = reference 관계**. `cmds.referenceQuery` 로 각 reference 노드의 파일과 부모(자기를
   불러온 파일/씬)를 따라가며, A00210 의 **reference 엣지 규약**(`owner.references` 에 source id,
   화살표 **참조 대상(source) → 참조하는 파일(owner)**)으로 기록한다.
-- **중첩 reference** 도 재귀로 따라가 깊이(depth)별로 자동 배치한다(계보 parents 가 아니라
+- **중첩 reference** 도 재귀로 따라가 깊이(depth)별로 자동 배치한다 — **깊은 것이 위, 씬이 맨 아래**(v01.03,
+  화살표 "참조 대상 → 참조하는 파일" 이 아래로 흘러 씬에 모이게; 그전엔 씬이 위라 화살표가 거꾸로 올라갔다. 깊이는 **가장 긴 경로**라
+  씬이 직접 불러오면서 다른 레퍼런스 안에서도 불러오는 파일은 그 레퍼런스보다 한 줄 위)(계보 parents 가 아니라
   references 라 A00210 의 Auto Layout 에는 안 잡히므로 보기 좋은 초기 위치를 직접 준다).
 - **포맷/설정 단일 소스**: A00210 의 `app/core/lineage.py`(`LineageGraph`) · `store.py` ·
   `prefs.py` 를 **그대로 재사용**한다. 따라서 JSON 포맷이 100% 동일하고, 출력 위치(`store_dir`)와
