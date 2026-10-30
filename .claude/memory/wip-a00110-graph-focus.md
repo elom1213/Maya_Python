@@ -25,7 +25,7 @@ v01.26/01.27 follow-up fixes (pushed): (1) Fit value vertical axis was computed 
 
 **What:** Selecting a controller normally shows its whole keyed range (e.g. 0–6000f) in the Graph Editor. This tab instead frames the Graph Editor to `[currentFrame - margin, currentFrame + margin]` (e.g. current 500f, margin 80 → 420f–580f).
 
-**UI:** checkable "Auto-Focus on Selection" toggle button + "Frame margin (±)" QSpinBox (default 80, user-set) + "Fit value (vertical) axis too" checkbox (default on) + "Focus Now" one-shot button.
+**UI:** checkable "Auto-Focus on Selection" toggle button + "Frame margin (±)" QSpinBox (default **30** since V02 v02.30 2026-10-30, was 80 — one constant `graph_view_manager.DEFAULT_FRAME_MARGIN` feeds the spinbox and the manager fallback; user-set) + "Fit value (vertical) axis too" checkbox (default on) + "Focus Now" one-shot button.
 
 **How:** toggle ON installs a `SelectionChanged` scriptJob; callback uses `cmds.evalDeferred(..., lowestPriority=True)` so our `animView` framing runs AFTER Maya's own Auto-Frame. Framing = `cmds.animView(<panel>GraphEd, startTime, endTime, minValue, maxValue)` over `cmds.getPanel(scriptType="graphEditor")`. Value axis fit from `cmds.keyframe(sel, time=(s,e), valueChange=True)` min/max. closeEvent kills the scriptJob.
 
