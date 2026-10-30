@@ -1,5 +1,28 @@
 # Changelog — A00400_CurveTool
 
+## v01.29 (2026-10-30)
+**[Feature] `Create > Ribbon` — 커브를 따라 납작한 NURBS 서피스(리본)를 만든다.**
+
+- **무엇을 하나**: 리스트에 담은 커브마다 리본 하나. 커브의 **CV · 차수 · 노트를 U 로 그대로** 쓰고,
+  `Width` 만큼 양옆으로 벌린 줄이 V 가 된다 — 커브 복제 두 개를 ±폭/2 옮겨 `loft` 한 것과 CV 가 하나도
+  다르지 않다(샘플 `sfcTest/sample_001.mb` 의 `loftedSurface` 를 그대로 재현, mayapy 대조).
+  리깅에서 리본에 조인트나 오브젝트를 붙이려는 용도 — 만든 뒤에는 `Edit > Joints`(바인드) 나
+  `A00170_driverTool > AttachCrv`(서피스 위에 어태치) 로 이어진다.
+- **옵션**: `Width`(기본 2) · `Direction` **Auto**(커브가 놓인 평면의 노멀 — 사이드 뷰 커브면 X) /
+  World X·Y·Z · `Across` Cubic(4 CV 줄, 마야 loft 와 같음) / Linear(2 줄) · `Normalize U parameter to 0..1`
+  (기본 켬, 모양 불변) · `Reverse U` · `Name`(비우면 `<curve>_ribbon`).
+- **커브의 트랜스폼이 있어도** 월드 CV 로 만들므로 부모 그룹이 돌아 있어도 결과는 월드에서 맞다.
+  주기(닫힌) 커브는 주기 서피스. 직선 커브는 평면이 없어 선과 가장 수직인 월드 축을 쓰고 로그에 남긴다.
+  비평면 커브는 최적 평면 노멀 + 로그.
+- **[Why not `cmds.surface`]** 서피스를 한 번에 정의하는 `cmds.surface` 는 **undo 가 안 된다**
+  (mayapy 실측 — 큐에 오르지 않아 Ctrl+Z 가 이름 바꾸기만 되돌리고 서피스는 남는다). 그래서 벌린
+  **임시 커브 두 개**(`cmds.curve` 에 CV + 노트 직접 지정) → `loft`(히스토리 없음) → 임시 삭제로 만든다.
+  전부 undo 되는 명령이라 **Ctrl+Z 한 번에 리본만 사라진다.** 정규화 · 뒤집기는 임시 커브의 노트 · CV
+  순서에 미리 반영해 rebuild 가 없다(Linear 만 `loft -d 1` 의 V 범위 `0..2` 를 `0..1` 로 다시 매김).
+- 검증: `tests/test_ribbon.py` mayapy 2024 **75 항목** — 샘플 재현 · 열린/주기/차수 1·2 커브 vs 마야 loft ·
+  정규화 · 뒤집기 · Auto 방향(XZ · 회전 그룹 · 직선 · 나선) · 거부 · 네임스페이스 · undo/redo · UI 스모크.
+  **마야 GUI 확인 아직.**
+
 ## v01.28 (2026-10-29)
 
 - **[UI] 탭마다 창 높이가 자동으로 맞춰진다.** 탭(중첩 포함)을 바꾸면 창 높이가 지금 보이는 페이지에 맞게 늘거나 줄어

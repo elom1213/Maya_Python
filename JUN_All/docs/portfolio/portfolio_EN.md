@@ -643,6 +643,14 @@ Default Distance attribute (driver signal x)
 - **`A00400_CurveTool`** — **curve work across three categories of tabs** (Create / Edit / Display). Builds a
   curve along the **selected mesh edges** (one curve per connected run of edges, direction unified across them)
   and adjusts curve **line width** live (one undo step per drag). Several tabs were added on top.
+  - **Ribbon** — builds the flat NURBS surface riggers call a ribbon along each listed curve: the curve's own
+    CVs, degree and knots become U, and rows offset by ±width/2 become V, so the result is **CV-for-CV identical
+    to lofting two offset copies** (checked against a hand-made sample). `Auto` direction takes the normal of
+    the curve's best-fit plane (a pure-Python 3x3 Jacobi, since Maya 2023's mayapy has no numpy), with a
+    documented fallback for straight lines. One measured trap shaped the implementation: `cmds.surface` is
+    **not undoable**, so the ribbon is built from two temporary curves and a history-free `loft` — all undoable,
+    one Ctrl+Z removes just the ribbon. 75 headless checks against Maya's own loft on open, periodic and
+    degree-1/2 curves.
   - **Wrap** — makes one curve take the shape of another **even when the two have different CV counts**. Maya's
     stock `wrap` deformer is too unstable between curves to be usable in production, so instead of a deformer
     this wires up **`rebuildCurve` + `blendShape`**: rebuilding the driver at the driven curve's span/degree

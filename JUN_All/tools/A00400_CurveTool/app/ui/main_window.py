@@ -35,6 +35,7 @@ from tools.A00400_CurveTool.app.core import points_manager as points_mgr
 from tools.A00400_CurveTool.app.core import smooth_manager as smooth_mgr
 from tools.A00400_CurveTool.app.core import joint_curve_manager as jnt_mgr
 from tools.A00400_CurveTool.app.core import combine_manager as combine_mgr
+from tools.A00400_CurveTool.app.core import ribbon_manager as ribbon_mgr
 from tools.A00400_CurveTool.app.ui.controls_tab import ControlsTab
 from tools.A00400_CurveTool.app.ui.replace_tab import ReplaceTab
 from tools.A00400_CurveTool.app.ui.shape_edit_tab import ShapeEditTab
@@ -58,7 +59,8 @@ class MainWindow(QWidget):
     # 탭 분류표 — 상위 탭 = 카테고리, 하위 탭 = 기능
     #
     # A00110_animTool_V02 와 같은 규칙이다. 기준은 "씬에 무엇을 하는가" 다.
-    #   Create  : 씬에 **새 커브를 만든다**
+    #   Create  : 씬에 **새 커브를 만든다** (Ribbon 은 커브에서 뜨는 **NURBS 서피스**지만,
+    #             커브로 새 지오메트리를 만드는 일이라 여기 둔다 — v01.29)
     #   Edit    : **기존 커브의 형상(CV 위치)** 을 바꾼다
     #   Display : **어떻게 보이는지**를 바꾼다 — 컨트롤이 **어떤 모양으로 보일지**
     #             (Replace · Shape Edit)
@@ -104,6 +106,11 @@ class MainWindow(QWidget):
          "From Points - draw one curve through the world positions of the "
          "listed objects, joints or components, in list order.",
          "_build_points_tab"),
+        ("Ribbon",
+         "Ribbon - build a flat NURBS surface along each listed curve (the curve "
+         "widened to both sides, like lofting two offset copies). Made for rigging: "
+         "attach joints or objects to it, or bind it with Edit > Joints.",
+         "_build_ribbon_tab"),
         ("Controls",
          "Controls - build control curves from a shape library and colour them "
          "(ported from bs_controls).",
@@ -143,7 +150,7 @@ class MainWindow(QWidget):
     )
 
     CATEGORIES = (
-        ("Create", "Create - build new curves in the scene",
+        ("Create", "Create - build new curves (and ribbon surfaces) in the scene",
          CREATE_PAGES, "create_tabs"),
         ("Edit", "Edit - change the shape of existing curves",
          EDIT_PAGES, "edit_tabs"),
@@ -629,6 +636,97 @@ class MainWindow(QWidget):
         return tab
 
     # --------------------------------------------------------------
+    # Create > Ribbon  (커브 -> 납작한 NURBS 서피스)
+    # --------------------------------------------------------------
+
+    def _build_ribbon_tab(self):
+        """리스트의 커브마다 **리본 서피스** 하나.
+
+        커브의 CV · 차수 · 노트를 그대로 U 로 쓰고, Width 만큼 양옆으로 벌린 줄을 V 로 둔다 —
+        커브 복제 두 개를 옮겨 loft 한 것과 CV 가 같다(샘플 `sfcTest/sample_001.mb` 재현).
+        자세한 근거는 core/ribbon_manager.py.
+        """
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+
+        desc = QLabel(
+            "Build a flat NURBS surface (ribbon) along each listed curve.\n"
+            "Attach joints or objects to it, or bind it with Edit > Joints.")
+        desc.setAlignment(Qt.AlignCenter)
+        root.addWidget(desc)
+
+        self.tsl_ribbon = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Curves", select_label="List Selected Curves",
+            show_sort=False, list_min_height=150, log_callback=self.log)
+        root.addWidget(self.tsl_ribbon, 1)
+
+        opt_box = QGroupBox("Ribbon")
+        opt_lay = QGridLayout(opt_box)
+        opt_lay.setColumnStretch(1, 1)
+
+        opt_lay.addWidget(QLabel("Width"), 0, 0)
+        self.dsb_ribbon_width = QDoubleSpinBox()
+        self.dsb_ribbon_width.setDecimals(3)
+        self.dsb_ribbon_width.setRange(0.001, 100000.0)
+        self.dsb_ribbon_width.setSingleStep(0.5)
+        self.dsb_ribbon_width.setValue(ribbon_mgr.DEFAULT_WIDTH)
+        self.dsb_ribbon_width.setKeyboardTracking(False)
+        self.dsb_ribbon_width.setToolTip(
+            "Total width of the ribbon, in scene units. The curve runs down the middle,\n"
+            "so each side is half of this.")
+        opt_lay.addWidget(self.dsb_ribbon_width, 0, 1)
+
+        opt_lay.addWidget(QLabel("Direction"), 1, 0)
+        self.cmb_ribbon_dir = QComboBox()
+        for key in ribbon_mgr.DIRECTIONS:
+            self.cmb_ribbon_dir.addItem(ribbon_mgr.DIRECTION_LABELS[key], key)
+        self.cmb_ribbon_dir.setToolTip(
+            "Which way the ribbon is widened.\n"
+            "Auto uses the normal of the plane the curve lies in (a curve drawn in the\n"
+            "side view is widened along X). A straight line has no plane, so the world\n"
+            "axis most perpendicular to it is used and the log says so.")
+        opt_lay.addWidget(self.cmb_ribbon_dir, 1, 1)
+
+        opt_lay.addWidget(QLabel("Across"), 2, 0)
+        self.cmb_ribbon_across = QComboBox()
+        self.cmb_ribbon_across.addItem("Cubic - 4 CV rows (same as Maya's loft)", 3)
+        self.cmb_ribbon_across.addItem("Linear - 2 CV rows", 1)
+        self.cmb_ribbon_across.setToolTip(
+            "Degree across the width. Both give the same flat strip; cubic can bend\n"
+            "across the width when the surface is deformed, linear is the lightest.\n"
+            "Along the curve the surface always keeps the curve's own CVs and degree.")
+        opt_lay.addWidget(self.cmb_ribbon_across, 2, 1)
+
+        self.cb_ribbon_norm = QCheckBox("Normalize U parameter to 0..1")
+        self.cb_ribbon_norm.setChecked(True)
+        self.cb_ribbon_norm.setToolTip(
+            "The shape does not change; only the parameter range along the curve becomes\n"
+            "0..1 (a fresh CV curve has 0..spans). Convenient for follicles and pointOnSurface\n"
+            "values. Off keeps the curve's own range.")
+        opt_lay.addWidget(self.cb_ribbon_norm, 3, 0, 1, 2)
+
+        self.cb_ribbon_rev = QCheckBox("Reverse U (surface starts at the curve's end)")
+        self.cb_ribbon_rev.setToolTip(
+            "By default U runs the same way as the curve (u = 0 at the curve's start).")
+        opt_lay.addWidget(self.cb_ribbon_rev, 4, 0, 1, 2)
+
+        opt_lay.addWidget(QLabel("Name"), 5, 0)
+        self.le_ribbon_name = QLineEdit()
+        self.le_ribbon_name.setPlaceholderText("leave empty for <curve>{0}".format(ribbon_mgr.NAME_SUFFIX))
+        self.le_ribbon_name.setToolTip(
+            "Name of the new surface. With several curves Maya numbers the rest.")
+        opt_lay.addWidget(self.le_ribbon_name, 5, 1)
+
+        root.addWidget(opt_box)
+
+        self.btn_ribbon_create = QPushButton("Create Ribbons")
+        self.btn_ribbon_create.setMinimumHeight(30)
+        self.btn_ribbon_create.clicked.connect(self.on_ribbon_create)
+        root.addWidget(self.btn_ribbon_create)
+
+        return tab
+
+    # --------------------------------------------------------------
     # Edit > Smooth
     # --------------------------------------------------------------
 
@@ -961,6 +1059,42 @@ class MainWindow(QWidget):
             return
 
         self.log(result["message"])
+
+    # ==============================================================
+    # actions : Ribbon
+    # ==============================================================
+
+    def on_ribbon_create(self):
+        curves = self.tsl_ribbon.get_all_nodes() or self.tsl_ribbon.get_all_items()
+        if not curves:
+            self.log("The list is empty. Select curves and click 'List Selected Curves'.",
+                     warn=True)
+            return
+
+        # 생성 + 선택을 한 청크로 (From Points 와 같은 이유 — 선택이 별도 undo 항목이 되지 않게).
+        with undo_chunk():
+            result = ribbon_mgr.create_ribbons(
+                curves,
+                width=self.dsb_ribbon_width.value(),
+                direction=self.cmb_ribbon_dir.currentData(),
+                across_degree=self.cmb_ribbon_across.currentData(),
+                normalize_u=self.cb_ribbon_norm.isChecked(),
+                reverse_u=self.cb_ribbon_rev.isChecked(),
+                name=self.le_ribbon_name.text().strip() or None,
+                select=True)
+
+        for curve, why in result.get("skipped") or []:
+            self.log("Skipped {0} ({1}).".format(curve.split("|")[-1], why), warn=True)
+        for surface, note in result.get("notes") or []:
+            self.log("{0}: {1}.".format(surface.split("|")[-1], note), warn=True)
+
+        if not result["ok"]:
+            self.log(result["message"], warn=True)
+            return
+
+        self.log(result["message"])
+        self.log("Next: Edit > Joints binds the ribbon to joints; "
+                 "A00170 driverTool > AttachCrv places objects on it.")
 
     # ==============================================================
     # actions : Wrap

@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # 작업 일지 (WORKLOG)
@@ -30,7 +30,18 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-10-29 (오늘)
+## 2026-10-30 (오늘)
+
+> [!summary] A00400_CurveTool **v01.29 `Create > Ribbon`** — 커브를 따라 **납작한 NURBS 서피스(리본)** 를 만든다. 리깅에서 리본에 조인트 · 오브젝트를 붙이려는 용도 `#A00400_CurveTool`
+- 요청: `sfcTest/sample_001.mb` 의 `curve` → `loftedSurface` 같은 서피스를 만드는 기능. 리본에 본/오브젝트를 어태치하는 리깅용. 어느 툴에 넣을지 판단 후 구현.
+- 관찰(mayapy): 커브는 차수 3 · CV 6 · YZ 평면 · 노트 `0..1`. 서피스는 **U = 커브 CV · 차수 · 노트 그대로**, **V = CV 를 X 로 `-1, -⅓, +⅓, +1` 옮긴 네 줄**(차수 3) — 복제 둘을 `loft -d 3` 한 것과 CV 동일. 히스토리 없음. 샘플은 U 가 커브와 반대(u0 = 커브 끝).
+- 판단: **`A00400_CurveTool` 의 `Create` 카테고리**(From Points 다음). 커브 중심 툴이고 만든 서피스를 받는 곳(`Edit > Joints` 바인드 · A00170 `AttachCrv` 어태치)이 이미 있어 "커브 → 리본 → 붙이기" 흐름이 닫힌다. 어태치 기능은 중복하지 않고 로그로 안내.
+- 구현: `app/core/ribbon_manager.py`(`create_ribbons / build_ribbon / offset_direction / plane_normal / curve_data`) + `_build_ribbon_tab` · `on_ribbon_create`. 옵션 Width · Direction Auto(커브 평면 노멀, 순수 파이썬 야코비 PCA)/X/Y/Z · Across cubic/linear · U 0..1 정규화 · Reverse U · Name.
+- 함정: **`cmds.surface` 는 undo 가 안 된다**(큐에 안 오름 → Ctrl+Z 가 이름 바꾸기만 되돌려 반쪽 상태). → 월드 CV 로 **임시 커브 둘**(`cmds.curve` CV+노트 직접, 주기는 `per=True`) → `loft`(ch 없음, autoReverse 끔) → 삭제. 정규화 · 뒤집기는 임시 커브 노트 · CV 순서에 반영. `loft -d 1` 은 V 범위 `0..2` → V 만 `rebuildSurface kcp kr0`. 복제 대신 월드 CV 를 쓰는 이유: 회전한 부모 아래 커브는 로컬 이동이 월드와 어긋난다(테스트 T5 가 잡음).
+- 회귀 `tests/test_ribbon.py` **75/75** — 샘플 CV 재현(Reverse U) · 열린/주기/차수 1·2 vs 마야 loft · 정규화 · 뒤집기 · Auto 방향(YZ → X, XZ → Y, 회전 그룹, 직선 폴백 + 노트, 나선 비평면 노트, 한 점) · 거부 · 네임스페이스 이름 · undo/redo 임시 커브 없음 · UI 스모크. GUI 확인 아직.
+- 가이드 `docs/A00400_CurveTool.md` 표 · §4 · `Create > Ribbon` 절, CHANGELOG v01.29, 포트폴리오 EN/KR, README.
+
+## 2026-10-29
 
 > [!summary] A00110_animTool_V02 **v02.29 `Bake > Counter Layer` Hold = Stationary spans only** — 글로벌 이동은 살리고 **발이 땅을 짚어 정지하던 구간만 월드 고정**, 허공 구간이 차이를 흡수. 오전 계획서(실제 ZIHAN 씬 실측) → 같은 날 구현 `#A00110_animTool`
 - 요청: `CH_n_Global_xx_ctl` 이 `global_lyr` 로 이동하면 IK 발 `CH_l/r_foot_xx_ctl` 의 정지 구간이 월드에서 미끄러진다. **최종 위치는 글로벌 결과대로**, 정지 구간은 정지. 새 탭 vs 기존 확장 판단 · 다른 방법 제시 · SmartLayer 참고 가능.

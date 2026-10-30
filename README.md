@@ -4,7 +4,7 @@
 독립 실행(standalone) Qt 앱을 직접 설계·개발한 포트폴리오 저장소입니다.
 
 > 작성자: **Ji Hun Park (Junny)** · Technical Artist / Rigging & Pipeline Tools Developer
-> 최근 갱신: 2026-10-29 · 툴 폴더 **72개**(템플릿·구버전 포함, **현행 57종**) · 공용 프레임워크 1개
+> 최근 갱신: 2026-10-30 · 툴 폴더 **72개**(템플릿·구버전 포함, **현행 57종**) · 공용 프레임워크 1개
 
 ---
 
@@ -181,7 +181,7 @@ A narrative work summary lives in
 
 | 시기 | 내용 |
 |------|------|
-| 2026-10 하순 | **`A00110_V02` Bake > Merge Layers** — 마야 Merge Layers 를 프레임 구간 안에서만(`a + b => b` / 새 레이어 / Base), `bakeResults -resolveWithoutLayer` 그대로 + 소스 중화, 정수 프레임 월드 1e-15 동일 · **탭마다 창 높이 자동 맞춤**(공용 `JUN_mod_tabFit_qt_v01`) — 탭을 바꾸면 창 높이가 지금 보이는 페이지에 맞춰 스크롤 없이 다 보인다, 탭 있는 PySide 툴 31곳에 툴당 한 줄 · **`A00110_V02` Graph Focus `Layer curves`** — 애니메이션 레이어가 있으면 선택한 레이어의 커브만 보이고 그 범위에 맞춤 · **공용 메뉴 `Help > Copy Tool Name + Tabs`** — 툴 이름 + 지금 보고 있는 탭 경로(`A00110_animTool_V02 / Transfer / Follow`)를 클립보드로, 메뉴 바를 쓰는 PySide 52곳 · cmds 7곳에 자동 반영 · **Pin 켜짐 = 연한 빨강** 공용 `pin_style` 을 Pin 버튼이 있는 9툴에 · **`A00340_SelectionTool` 네임스페이스 교체**(`Namespace` 콤보 · `Map...` 으로 다른 아바타 선택, 버튼 드래그 정렬) · **`A00470`** Copy Material 좌/우 리스트(1 → n · n 쌍) · **`A00275`** Weights > Move(조인트 n → k, Kangaroo 이식) · **`A00480`** Mocap FBX Import (Exact Rotation) · **`A00110_V02`** Follow `Point` 체크박스 |
+| 2026-10 하순 | **`A00400_CurveTool` Create > Ribbon** — 커브를 따라 납작한 NURBS 서피스(리본), 커브 CV·노트를 U 로 그대로 + `Width` 만큼 벌린 줄이 V(마야 loft 와 CV 동일), Direction Auto(커브 평면 노멀)/X/Y/Z · U 0..1 · Reverse U, 리깅용(Edit > Joints · A00170 AttachCrv 로 이어짐) · **`A00110_V02` Bake > Merge Layers** — 마야 Merge Layers 를 프레임 구간 안에서만(`a + b => b` / 새 레이어 / Base), `bakeResults -resolveWithoutLayer` 그대로 + 소스 중화, 정수 프레임 월드 1e-15 동일 · **탭마다 창 높이 자동 맞춤**(공용 `JUN_mod_tabFit_qt_v01`) — 탭을 바꾸면 창 높이가 지금 보이는 페이지에 맞춰 스크롤 없이 다 보인다, 탭 있는 PySide 툴 31곳에 툴당 한 줄 · **`A00110_V02` Graph Focus `Layer curves`** — 애니메이션 레이어가 있으면 선택한 레이어의 커브만 보이고 그 범위에 맞춤 · **공용 메뉴 `Help > Copy Tool Name + Tabs`** — 툴 이름 + 지금 보고 있는 탭 경로(`A00110_animTool_V02 / Transfer / Follow`)를 클립보드로, 메뉴 바를 쓰는 PySide 52곳 · cmds 7곳에 자동 반영 · **Pin 켜짐 = 연한 빨강** 공용 `pin_style` 을 Pin 버튼이 있는 9툴에 · **`A00340_SelectionTool` 네임스페이스 교체**(`Namespace` 콤보 · `Map...` 으로 다른 아바타 선택, 버튼 드래그 정렬) · **`A00470`** Copy Material 좌/우 리스트(1 → n · n 쌍) · **`A00275`** Weights > Move(조인트 n → k, Kangaroo 이식) · **`A00480`** Mocap FBX Import (Exact Rotation) · **`A00110_V02`** Follow `Point` 체크박스 |
 | 2026-10 하순 | **`A00210_FileManager` Maya > Export 하위탭** — 마야 파일 N 개에서 세트 규칙(`Bake`, json 하나 = 규칙 하나)에 맞는 파일을 솎아 재생 범위 · fps · 버전을 보이고 `bakeResults` → **FBX**(최상위 본은 월드로, 레퍼런스 임포트 · 네임스페이스 제거, 이름 Find/Replace + Insert, Overwrite 팝업) / FBX 만 · **`Framework/core/maya_fbx`** 승격(A00480 재노출) · **`A00490_KeyboardTool`** 더블클릭 실행 `Run_KeyboardTool.bat`(PySide6 있는 파이썬이면 바로, 없으면 전용 venv 한 번) |
 | 2026-10 하순 | **`A00560_JaliBatch` · `A00570_JaliReview` 신규** — 변환 결과 폴더 → JALI 클립 `.mb` N 개(mayapy 워커) → 레퍼런스 검수(Swap · Save Clip Edits · ARKIT_OUT 연결), **`Framework/jali`** · mayapy 러너 승격(A00540 v01.03 · A00210 v01.40 재노출) |
 | 2026-10 하순 | **`A00370_ToolLauncher` Shrink + 로켓 발사 애니메이션**(줄였을 때 272 x 155, `A00220` · `A00240` 도 같은 모양으로) · **`A00210_FileManager` Shrink · Pin + 폴더 · 기록 카드 애니메이션** · **`A00240` · `A00220` · `A00210`** `File > Add to Start Menu` + Pinned 동안 Pin 버튼 연한 빨강 · **`A00240`** Path 버튼 드래그 정렬 + 창 자유 크기 · **`A00360`** Sort By > Selection · **`A00540`** 클립 여러 개를 순서대로 한 씬에 · **`A00145`** Connect by Rule 겹치는 이름 보호 + `JALI 22 Viseme` 규칙 |

@@ -1,8 +1,8 @@
 ---
 title: A00400_CurveTool 사용법
 aliases: [Curve Tool, CurveTool, A00400]
-tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve, lineWidth, wrap, blendShape, editPoint, laplacian, smoothCurve, softSelect, joint, skinCluster, controller, shape-transform]
-updated: 2026-10-29
+tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve, lineWidth, wrap, blendShape, editPoint, laplacian, smoothCurve, softSelect, joint, skinCluster, controller, shape-transform, ribbon, loft, nurbsSurface]
+updated: 2026-10-30
 ---
 
 # A00400_CurveTool 사용법
@@ -13,9 +13,10 @@ Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya).
 
 | 상위 탭 | 하위 탭 | 내용 |
 |---------|---------|------|
-| **Create**<br>씬에 **새 커브를 만든다** | **From Edges** | ① 선택한 메시 엣지에 부착된 커브 생성(엣지 덩어리마다 커브 하나) ② Reverse Direction(방향 통일) |
+| **Create**<br>씬에 **새 커브(와 리본 서피스)를 만든다** | **From Edges** | ① 선택한 메시 엣지에 부착된 커브 생성(엣지 덩어리마다 커브 하나) ② Reverse Direction(방향 통일) |
 | | **Controls** (v01.15~) | 컨트롤러 커브 **34종**을 만들고(Parent / Child / World / Origin) **색**을 입힌다(인덱스 32색 + **팔레트 팝업의 임의 색**, v01.17~). `bs_controls` 이식 |
 | | **From Points** (v01.04~) | 리스트에 담은 오브젝트·조인트·컴포넌트의 **월드 위치**를 **순서대로** 잇는 커브 하나. 정확히 통과 / 완화 선택 |
+| | **Ribbon** (v01.29~) | 리스트의 커브마다 **납작한 NURBS 서피스(리본)** — 커브의 CV·차수·노트를 U 로 그대로, `Width` 만큼 양옆으로 벌린 줄이 V(커브 복제 둘을 loft 한 것과 같다). Direction Auto(커브 평면 노멀)/X/Y/Z · Across cubic/linear · U 0..1 · Reverse U. **리깅용** — 만든 리본에 조인트·오브젝트를 붙인다 |
 | **Edit**<br>기존 커브의 **형상(CV)** 을 바꾼다 | **Smooth** (v01.05~) | 씬에서 고른 **CV** 를 슬라이더로 실시간 Smooth / Rough. **소프트 셀렉션 폴오프**를 그대로 쓴다. **닫힌 커브도 이음매를 넘어** 고른다 (v01.08~) |
 | | **Wrap** (v01.03~) | **CV 개수가 달라도** 한 커브가 다른 커브의 모양을 따르게 한다. 0~1 envelope 어트리뷰트로 라이브 블렌드 |
 | | **Joints** (v01.07~) | 커브 위에 조인트를 **균일 배치** → 그 조인트로 **커브를 바인드** → 조인트마다 `zro/con/ctl/tgt` 컨트롤러. 컨트롤러가 조인트를, 조인트가 커브를 움직인다. **v01.14~ NURBS 서피스도** — U 또는 V 방향 한 줄로 |
@@ -53,7 +54,7 @@ Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya).
 
 > 분류표는 코드에서 `MainWindow.CATEGORIES` 한 곳이 정한다. 탭을 추가·이동하려면 그 표만 고치면 된다.
 
-- **버전**: `app/config/version.py` (v01.26 — `Display > Replace` 가 교체본의 **선 굵기도 복사**)
+- **버전**: `app/config/version.py` (v01.29 — `Create > Ribbon`)
 - **설치**: `__dragDrop_A00400.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **CurveTool** → `tools.A00400_CurveTool.run(True)`
 - **참고**: 엣지→커브 생성은 `ref/ref_01.mel`(`duplicateCurve`+`attachCurve`)의 아이디어를, 축 비교 방식은 `A00360_SortTool` 을 이식/응용.
 
@@ -145,6 +146,7 @@ tools/A00400_CurveTool/
     ├── config/version.py
     ├── core/curve_manager.py        # 엣지 그룹핑 + polyToCurve + reverseCurve (maya.cmds, UI 비의존)
     ├── core/points_manager.py       # 월드 위치 목록 -> 커브
+    ├── core/ribbon_manager.py       # 커브 -> 납작한 NURBS 서피스(리본) : 임시 커브 둘 + loft (v01.29)
     ├── core/smooth_manager.py       # CV 라플라시안 스무딩
     ├── core/wrap_manager.py         # rebuildCurve + blendShape 래핑
     ├── core/joint_curve_manager.py  # 커브 위 균일 조인트 + skinCluster 바인드 + 컨트롤러 스택
@@ -161,7 +163,9 @@ tools/A00400_CurveTool/
 
 ```python
 CREATE_PAGES  = (("From Edges", tip, "_build_create_tab"),
-                 ("From Points", tip, "_build_points_tab"))
+                 ("From Points", tip, "_build_points_tab"),
+                 ("Ribbon", tip, "_build_ribbon_tab"),
+                 ("Controls", tip, "_build_controls_tab"))
 EDIT_PAGES    = (("Smooth", tip, "_build_smooth_tab"),
                  ("Wrap",   tip, "_build_wrap_tab"),
                  ("Joints", tip, "_build_joints_tab"))
@@ -344,6 +348,84 @@ Create 직후 **얼마나 잘 맞았는지 로그에 찍는다** — 최대 편�
 - 만든 커브는 씬에서 선택된 상태가 되고, **생성 + 선택이 undo 한 스텝**이다.
   > 선택을 청크 밖에서 하면 `Ctrl+Z` 한 번이 커브가 아니라 선택만 되돌린다(개발 중 실제로 겪음).
 - 리스트는 UUID 로 현재 경로를 되찾으므로 **리네임·리페어런트 후에도** 같은 대상을 잡는다.
+
+---
+
+## Create > Ribbon (v01.29~) — 커브를 따라 납작한 NURBS 서피스(리본)
+
+리스트에 담은 **커브마다 리본 하나**. 리깅에서 쓰는 "리본" — 커브를 `Width` 만큼 양옆으로 벌려
+loft 한 것과 같은 서피스다. 만든 뒤에는 리본에 조인트 · 오브젝트를 붙인다:
+`Edit > Joints`(조인트 배치 + 서피스 바인드 + 컨트롤러) 또는 `A00170_driverTool > AttachCrv`
+(서피스 위 최근접점 / 균일 분배 어태치).
+
+```
+ 커브 (U 방향, CV 6개 차수 3)            리본  Width 2, Direction X
+        ●                                 ┌──┬──┬──┐ u5   ← 커브 CV 그대로
+       ╱                                  │  │  │  │
+      ●                                   ├──┼──┼──┤ u4
+      │                 ──────▶           │  │  │  │
+      ●                                   ├──┼──┼──┤ u3
+       ╲                                  ...
+        ●                                 └──┴──┴──┘ u0
+                                       v0 v1 v2 v3  ← X 로 -1, -⅓, +⅓, +1 (cubic 4줄)
+```
+
+### 사용법
+
+1. 커브를 고르고 **List Selected Curves** (여러 개면 리본도 여러 개)
+2. 옵션을 정하고 **Create Ribbons** — 결과 서피스가 선택된다. **생성 + 선택이 undo 한 스텝.**
+
+| 옵션 | 뜻 | 기본 |
+|------|----|------|
+| **Width** | 리본 전체 폭(씬 단위). 커브가 가운데를 지나므로 한쪽은 절반 | 2 |
+| **Direction** | 벌리는 방향. **Auto** = 커브가 놓인 **평면의 노멀**(사이드 뷰에서 그린 커브 → X). World X / Y / Z 는 그대로 | Auto |
+| **Across** | 폭 방향 차수. **Cubic** = CV 4 줄(마야 loft 기본과 같다, 변형 때 폭 방향도 휜다) · **Linear** = 2 줄(가장 가볍다). 어느 쪽이든 만든 직후의 면은 같은 평면 띠 | Cubic |
+| **Normalize U parameter to 0..1** | 모양은 그대로 두고 **커브 방향 파라미터 범위만 0..1** 로(갓 만든 CV 커브는 `0..스팬수`). 폴리클 · pointOnSurface 값을 적기 편하다 | 켬 |
+| **Reverse U** | 기본은 커브와 같은 방향(u=0 이 커브 시작). 켜면 커브 끝에서 시작 | 끔 |
+| **Name** | 비우면 `<curve>_ribbon`(네임스페이스는 뗀다). 여러 개면 마야가 번호를 붙인다 | |
+
+### 어떻게 만드나 ★
+
+샘플(`sfcTest/sample_001.mb` 의 `loftedSurface`)을 뜯어 보면 **U 는 커브의 CV · 차수 · 노트 그대로**,
+**V 는 CV 를 X 로 `-1, -⅓, +⅓, +1` 옮긴 네 줄**(차수 3, 노트 `0 0 0 1 1 1`)이고 히스토리는 없다 —
+두 복제 커브를 `loft -d 3` 한 결과와 CV 가 하나도 다르지 않다(mayapy 대조).
+
+이 툴은 원본 커브를 **복제하지 않는다.** 커브의 **월드 CV** 와 노트를 읽어 양쪽으로 벌린
+**임시 커브 두 개**를 `cmds.curve`(CV + 노트 직접 지정, 주기 커브는 `per=True`)로 월드에 만들고
+`loft`(히스토리 없음) 한 뒤 임시 커브를 지운다.
+
+- 복제는 부모 · 자식 · 다른 셰이프까지 딸려 오고, **부모가 돌아 있으면 로컬 이동이 월드 방향과 어긋난다.**
+  월드 CV 로 새로 만들면 어떤 계층 아래 커브든 결과가 월드에서 맞다(회전 그룹 아래 커브 실측).
+- **0..1 정규화와 Reverse U 는 임시 커브의 노트 · CV 순서에 미리 반영**한다. loft 는 커브의 노트를 U 로
+  그대로 쓰므로 `rebuildSurface` / `reverseSurface` 를 돌릴 일이 없다. Linear 만 `loft -d 1` 이 V 범위를
+  `0..2` 로 두길래 V 만 `0..1` 로 다시 매긴다(두 줄 직선이라 모양 불변).
+- **`cmds.surface` 로 서피스를 한 번에 정의하는 길은 버렸다 — 그 명령은 undo 가 안 된다.** mayapy 실측:
+  undo 큐에 오르지 않아 Ctrl+Z 가 뒤따른 이름 바꾸기만 되돌리고 **서피스는 남는다**(반쪽 상태).
+  위 조합은 전부 undo 되는 명령이라 한 청크로 묶으면 Ctrl+Z 한 번에 리본만 사라진다.
+
+### Direction Auto — 커브 평면의 노멀
+
+CV 들의 공분산 행렬에서 **가장 작은 고유벡터**(순수 파이썬 3x3 야코비 — Maya 2023 mayapy 에는 numpy 가 없다).
+부호는 가장 큰 성분이 양수가 되게 맞춰 같은 커브에서 늘 같은 쪽이 나온다.
+
+| 커브 | Auto 결과 |
+|------|-----------|
+| YZ 평면(사이드 뷰에서 그림) | X |
+| XZ 평면(탑 뷰) · XZ 원 | Y |
+| 회전한 그룹 아래 평면 커브 | **월드에서 본** 그 평면의 노멀 |
+| **직선** | 평면이 없다 → 선과 가장 수직인 월드 축(동률이면 X, Y, Z 순) + 로그 `the curve is a straight line ...` |
+| 나선처럼 **비평면** | 최적 평면의 노멀 + 로그 `the curve is not planar ...` (만들기는 한다) |
+| CV 가 전부 한 점 | 만들지 않는다 |
+
+### 알아둘 것 (mayapy 2024 로 확인, `tests/test_ribbon.py` 75 항목)
+
+- 샘플 서피스는 **U 가 커브와 반대**(u0 가 커브 끝)였다 — 만든 사람이 뒤집었거나 커브를 나중에 뒤집은 것.
+  기본은 커브와 같은 방향이고 `Reverse U` 를 켜면 샘플과 CV 까지 같다.
+- 열린 커브(노트 `0..3`) · 주기 원(CV 11, 노트 `-2..10`) · 차수 1 · 차수 2 커브 모두 마야 방식(복제 + 월드 이동 + loft)과
+  CV · 노트 · 차수 · 폼이 같다. 정규화 · 뒤집기 뒤에도 서피스 위 샘플 점이 같다(1e-6).
+- 커브가 아닌 것(메시 · 로케이터 · 없는 이름)은 **사유와 함께 건너뛰고** 나머지로 만든다. `Width` 0 이하는 거부.
+- 결과 서피스는 `initialShadingGroup` 에 붙고 트랜스폼은 identity(월드 좌표 그대로) — 샘플과 같다.
+- **마야 GUI 확인 아직** — 탭 높이, 뷰포트에서 리본 두께 표시.
 
 ---
 

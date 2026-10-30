@@ -73,5 +73,12 @@
 #        스크롤 없이 다 보이고 짧은 페이지로 가면 줄어든다. 페이지가 화면보다 길면 화면 높이에서 멈춤.
 #        공용 Framework/qt/MOD_tabFit_qt_v01 (A00275 v01.38 과 같은 방식)
 
-VERSION = "01.28"
-LAST_UPDATE = "2026-10-29"
+# 01.29  Create > Ribbon    - 리스트의 커브마다 **납작한 NURBS 서피스(리본)** 를 만든다. 커브의
+#        CV · 차수 · 노트를 U 로 그대로 쓰고 Width 만큼 양옆으로 벌린 줄이 V — 커브 복제 두 개를
+#        옮겨 loft 한 것과 CV 가 같다(샘플 sfcTest/sample_001.mb 재현). Direction Auto(커브 평면의
+#        노멀) / World X·Y·Z, Across cubic(4줄) / linear(2줄), U 0..1 정규화, Reverse U, 이름.
+#        리깅용 — 만든 리본에 조인트 · 오브젝트를 붙인다(Edit > Joints · A00170 AttachCrv).
+#        `cmds.surface` 는 undo 가 안 돼 임시 커브 두 개 + loft(히스토리 없음) 로 만든다.
+
+VERSION = "01.29"
+LAST_UPDATE = "2026-10-30"
