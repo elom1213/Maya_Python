@@ -52,5 +52,11 @@
 # 02.30  View > Graph Focus `Frame margin (±)` 기본값 80 -> **30**(사용자 요청). 코어 상수
 #        graph_view_manager.DEFAULT_FRAME_MARGIN 하나로 스핀박스 초기값 · GraphFocusManager 폴백을 맞춤. 범위 · 동작은 그대로.
 
-VERSION = "02.30"
+# 02.31  View > **Layers** - 씬의 애니메이션 레이어 목록(에디터 순서 · 자식은 부모 아래 · BaseAnimation 맨 아래).
+#        행을 고르면 그 레이어가 선택(하나면 활성)되어 그래프 에디터(필터 Selected)가 그 커브를 보인다.
+#        Mute / Solo / Lock 체크, `Graph Editor: Selected Only / All Layers` 버튼, 보이는 동안 1.5 s 마다 마야 쪽
+#        변화 따라가기(레이어 변경 이벤트가 없어 QTimer 비교). Curve > Filters 처럼 **Expand** 로 별도 창.
+#        core/anim_layer_manager.py (LayerMergeManager.layer_info 재사용), tests/test_anim_layers.py.
+
+VERSION = "02.31"
 LAST_UPDATE = "2026-10-30"

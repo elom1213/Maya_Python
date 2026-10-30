@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-29
+# last Update date : 2026-10-30
 # A00110_animTool_V02 - Qt UI
 
 from Framework.qt.qt import *
@@ -43,6 +43,7 @@ from tools.A00110_animTool_V02.app.core import CURRENT_LAYER
 from tools.A00110_animTool_V02.app.core import LayerKeyManager
 from tools.A00110_animTool_V02.app.core import CounterLayerManager
 from tools.A00110_animTool_V02.app.core import LayerMergeManager
+from tools.A00110_animTool_V02.app.core import AnimLayerManager
 from tools.A00110_animTool_V02.app.core import CurveFilterSession
 from tools.A00110_animTool_V02.app.core import (
     CF_EASE_IN, CF_EASE_OUT, CF_LINEAR, CF_EASE_IN_OUT,
@@ -58,6 +59,10 @@ WINDOW_OBJECT_NAME = "JUN_A00110_animTool_V02_window"
 # Curve > Filters 를 따로 띄우는 창(Expand)의 objectName.
 # 창 자체는 공용 위젯(Framework.qt JUN_mod_expand_qt)이 만든다.
 CURVE_FILTERS_WINDOW_OBJECT_NAME = "JUN_A00110_animTool_V02_curveFilters_window"
+# View > Layers 를 따로 띄우는 창(Expand)의 objectName (v02.31).
+LAYERS_WINDOW_OBJECT_NAME = "JUN_A00110_animTool_V02_layers_window"
+# View > Layers 자동 새로고침 주기(ms) - 레이어 에디터에서 바꾼 것을 따라간다(마야에 레이어 변경 이벤트가 없다).
+LAYERS_POLL_MS = 1500
 
 
 # Stagger Offset 슬라이더가 담당하는 프레임 범위(±). 더 큰 값은 옆 스핀박스로 넣는다.
@@ -379,6 +384,10 @@ class MainWindow(QWidget):
         ("Graph Focus", "Graph Focus - frame the Graph Editor around the current "
          "frame (+ auto-focus when the selection changes)",
          "_build_graph_focus_tab"),
+        ("Layers", "Layers - the animation layers of the scene: click a row to make it the "
+         "selected / active layer (what the Graph Editor shows), tick Mute / Solo / Lock. "
+         "Expand puts the list in its own window.",
+         "_build_layers_page"),
     )
 
     # v02.19 - 툴이 열려 있는 동안 거는 **키보드 단축키**를 모은다. Timing > Hold 를 여기로 옮겼다
@@ -3030,6 +3039,232 @@ class MainWindow(QWidget):
         self.cmb_graph_layer_filter.currentIndexChanged.connect(self._graph_focus_reapply)
 
         return tab
+
+    # --------------------------------------------------
+    # View > Layers (v02.31)
+    # --------------------------------------------------
+
+    AL_FLAG_COLUMNS = ((1, "mute", "muted"), (2, "solo", "solo"), (3, "lock", "locked"))
+
+    def _build_layers_page(self):
+        """씬의 애니메이션 레이어 목록 - 어느 레이어를 볼지(선택 · 활성) 고르고 Mute / Solo / Lock 을 켜고 끈다.
+
+        마야 Animation Layer Editor 와 같은 순서(맨 위부터, 자식은 부모 아래 들여쓰기, BaseAnimation 맨 아래).
+        본문은 Curve > Filters 와 같은 공용 Expand 패널에 담아 **별도 창**으로 뺄 수 있다(그래프 에디터 옆에 두는 배치).
+        마야에는 레이어 변경 이벤트가 없어 보이는 동안 QTimer 로 상태를 비교해 따라간다(`_al_poll`).
+        """
+        tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
+        tab_layout = QVBoxLayout(tab)
+
+        self.al_panel = JUN_mod_expand_qt.JUN_mod_expand_qt_v01(
+            title="Animation Layers",
+            placeholder="Animation Layers are shown in the expanded window.",
+            object_name=LAYERS_WINDOW_OBJECT_NAME,
+            size=(380, 460))
+        self.al_panel.expanded_changed.connect(lambda *_: self._fit_window_later())
+        tab_layout.addWidget(self.al_panel)
+        layout = self.al_panel.body
+
+        hint = QLabel(
+            "Animation layers of the current scene, top first like the Animation Layer Editor.\n"
+            "Click a row to make it the selected layer (one row = also the active layer) - the Graph\n"
+            "Editor then shows that layer's curves when its filter is 'Selected'. Tick Mute / Solo / Lock.")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        self.tw_al_layers = QTreeWidget()
+        self.tw_al_layers.setColumnCount(4)
+        self.tw_al_layers.setHeaderLabels(["Layer", "Mute", "Solo", "Lock"])
+        header = self.tw_al_layers.header()
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        for col in (1, 2, 3):
+            header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+        self.tw_al_layers.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.tw_al_layers.setRootIsDecorated(True)
+        self.tw_al_layers.setAlternatingRowColors(True)
+        self.tw_al_layers.setMinimumHeight(170)
+        self.tw_al_layers.setToolTip(
+            "Top row = topmost layer (evaluated last). Child layers sit under their parent.\n"
+            "Bold = active (preferred) layer, highlighted = selected in the Animation Layer Editor.\n"
+            "Shift / Ctrl click selects several layers. BaseAnimation can only be locked.")
+        self.tw_al_layers.itemSelectionChanged.connect(self.on_al_selection)
+        self.tw_al_layers.itemChanged.connect(self.on_al_item_changed)
+        layout.addWidget(self.tw_al_layers)
+
+        row = QHBoxLayout()
+        self.btn_al_refresh = QPushButton("Refresh")
+        self.btn_al_refresh.setToolTip("Read the animation layers of the scene again.")
+        self.btn_al_refresh.clicked.connect(lambda *_: self.on_al_refresh())
+        row.addWidget(self.btn_al_refresh)
+        self.btn_al_ge_selected = QPushButton("Graph Editor: Selected Only")
+        self.btn_al_ge_selected.setToolTip(
+            "Set every open Graph Editor's View > Animation Layer Filter to 'Selected layers',\n"
+            "so only the curves of the layers selected here are shown.")
+        self.btn_al_ge_selected.clicked.connect(lambda *_: self.on_al_graph_filter(True))
+        row.addWidget(self.btn_al_ge_selected)
+        self.btn_al_ge_all = QPushButton("Graph Editor: All Layers")
+        self.btn_al_ge_all.setToolTip(
+            "Set every open Graph Editor's View > Animation Layer Filter back to 'All affecting layers'.")
+        self.btn_al_ge_all.clicked.connect(lambda *_: self.on_al_graph_filter(False))
+        row.addWidget(self.btn_al_ge_all)
+        layout.addLayout(row)
+
+        self.cb_al_auto = QCheckBox("Auto refresh while visible")
+        self.cb_al_auto.setChecked(True)
+        self.cb_al_auto.setToolTip(
+            "Follow changes made in Maya's Animation Layer Editor (new / deleted layers, selection,\n"
+            "Mute / Solo / Lock) while this list is visible - checked every {0:.1f} s.".format(LAYERS_POLL_MS / 1000.0))
+        layout.addWidget(self.cb_al_auto)
+
+        self._al_updating = False
+        self._al_snapshot = None
+        self._al_timer = QTimer(self)
+        self._al_timer.setInterval(LAYERS_POLL_MS)
+        self._al_timer.timeout.connect(self._al_poll)
+        self._al_timer.start()
+
+        self.on_al_refresh(quiet=True)
+        return tab
+
+    def al_selected_names(self):
+        """트리에서 고른 레이어 이름들(트리 순서)."""
+        return [item.data(0, Qt.UserRole) for item in self.tw_al_layers.selectedItems()]
+
+    def al_item(self, name):
+        """이름으로 트리 항목 찾기(없으면 None)."""
+        stack = [self.tw_al_layers.topLevelItem(i) for i in range(self.tw_al_layers.topLevelItemCount())]
+        while stack:
+            item = stack.pop(0)
+            if item.data(0, Qt.UserRole) == name:
+                return item
+            stack.extend(item.child(i) for i in range(item.childCount()))
+        return None
+
+    def on_al_refresh(self, *_args, quiet=False):
+        """씬을 다시 읽어 트리를 채운다. 선택 · 활성 · 플래그 상태를 마야에서 가져온다."""
+        tree = self.tw_al_layers
+        self._al_updating = True
+        try:
+            tree.clear()
+            nodes = AnimLayerManager.tree()
+            rows = AnimLayerManager.rows(nodes)
+            to_select = []
+
+            def add(node, parent_item):
+                info = node["info"]
+                item = QTreeWidgetItem([info["name"], "", "", ""])
+                item.setData(0, Qt.UserRole, info["name"])
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                for col, flag, key in self.AL_FLAG_COLUMNS:
+                    if info["base"] and flag != "lock":
+                        continue                                   # BaseAnimation 은 Lock 만
+                    item.setCheckState(col, Qt.Checked if info[key] else Qt.Unchecked)
+                if info["preferred"]:
+                    font = item.font(0)
+                    font.setBold(True)
+                    item.setFont(0, font)
+                tags = []
+                if info["base"]:
+                    tags.append("BaseAnimation")
+                else:
+                    tags.append("override" if info["override"] else "additive")
+                    tags.append("weight {0:.2f}".format(info["weight"]))
+                if info["preferred"]:
+                    tags.append("active")
+                if info["selected"]:
+                    tags.append("selected")
+                tip = "{0} - {1}".format(info["name"], ", ".join(tags))
+                for col in range(4):
+                    item.setToolTip(col, tip)
+                if parent_item is None:
+                    tree.addTopLevelItem(item)
+                else:
+                    parent_item.addChild(item)
+                if info["selected"]:
+                    to_select.append(item)
+                for child in node["children"]:
+                    add(child, item)
+
+            for node in nodes:
+                add(node, None)
+            tree.expandAll()
+            for item in to_select:
+                item.setSelected(True)
+            self._al_snapshot = AnimLayerManager.snapshot(rows)
+        finally:
+            self._al_updating = False
+        if not quiet:
+            if not rows:
+                self.log("[Info] No animation layers in the current scene.")
+            else:
+                selected = [r["name"] for r in rows if r["selected"]]
+                self.log("Animation layers : {0} (selected : {1}).".format(
+                    len(rows), ", ".join(selected) if selected else "none"))
+
+    def on_al_selection(self):
+        """트리에서 고른 레이어를 마야에서 선택(하나면 활성도)한다 - 그래프 에디터가 그 레이어를 보인다."""
+        if self._al_updating:
+            return
+        names = self.al_selected_names()
+        if not names:
+            return                                             # 전부 해제는 마야에 반영하지 않는다(에디터도 늘 하나는 선택)
+        chosen = AnimLayerManager.set_selected(names)
+        self._al_updating = True
+        try:
+            # 활성(굵게) 표시를 다시 맞춘다 - 트리를 다시 만들지 않고 글꼴만.
+            for row in AnimLayerManager.rows():
+                item = self.al_item(row["name"])
+                if item is not None:
+                    font = item.font(0)
+                    font.setBold(bool(row["preferred"]))
+                    item.setFont(0, font)
+        finally:
+            self._al_updating = False
+        self._al_snapshot = AnimLayerManager.snapshot()
+        self.log("Layer selected : {0}{1}".format(", ".join(chosen), " (active)" if len(chosen) == 1 else ""))
+        # Graph Focus 가 켜져 있으면 바뀐 레이어로 다시 프레이밍한다.
+        try:
+            self._graph_focus_reapply()
+        except Exception:                                      # noqa: BLE001
+            pass
+
+    def on_al_item_changed(self, item, column):
+        """Mute / Solo / Lock 체크를 마야에 쓴다."""
+        if self._al_updating:
+            return
+        for col, flag, _key in self.AL_FLAG_COLUMNS:
+            if col == column:
+                break
+        else:
+            return
+        name = item.data(0, Qt.UserRole)
+        value = item.checkState(column) == Qt.Checked
+        if AnimLayerManager.set_flag(name, flag, value):
+            self.log("{0} : {1} {2}".format(name, flag, "on" if value else "off"))
+            self._al_snapshot = AnimLayerManager.snapshot()
+        else:
+            self.log("[WARN] Could not set {0} on {1}.".format(flag, name))
+            self.on_al_refresh(quiet=True)
+
+    def on_al_graph_filter(self, selected_only):
+        """열린 그래프 에디터의 레이어 필터를 선택 레이어만 / 전부로."""
+        count, _layer_filter = AnimLayerManager.graph_editor_filter(selected_only)
+        if count == 0:
+            self.log("[WARN] No Graph Editor is open.")
+            return
+        self.log("Graph Editor filter : {0} ({1} editor(s)).".format(
+            "selected layers only" if selected_only else "all affecting layers", count))
+
+    def _al_poll(self):
+        """보이는 동안 마야 쪽 변화를 따라간다(새 레이어 · 삭제 · 선택 · 플래그)."""
+        if not self.cb_al_auto.isChecked() or not self.tw_al_layers.isVisible() or self._al_updating:
+            return
+        try:
+            snap = AnimLayerManager.snapshot()
+        except Exception:                                      # noqa: BLE001
+            return
+        if snap != self._al_snapshot:
+            self.on_al_refresh(quiet=True)
 
     # --------------------------------------------------
     # Helper

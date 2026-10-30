@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-30 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.31 View > `Layers` — 씬의 애니메이션 레이어 목록 · 어느 레이어를 볼지 선택 · Mute/Solo/Lock · Expand 별도 창** `#A00110_animTool_V02`
+- 요청: "현재 씬의 애니메이션 레이어가 리스트업되고 어떤 레이어를 볼지 선택. Curve > Filters 처럼 Expand 로 따로 창."
+- 구현: `core/anim_layer_manager.py` — `tree()`(에디터 순서: root 직계 `stack()` 뒤집어 맨 위부터, 자식은 부모 아래, Base 마지막, `LayerMergeManager.layer_info` + preferred) · `set_selected`(에디터 선택, 하나면 활성 — **마야의 `preferred=True` 는 다른 레이어의 것을 끄지 않아** 툴이 하나로 맞춤) · `set_flag`(Base 는 lock 만) · `graph_editor_filter`(열린 GE 의 `animLayerFilterOptions` selected/allAffecting) · `snapshot`. UI `_build_layers_page`: 공용 Expand 패널 안 QTreeWidget(Mute/Solo/Lock 체크 열, 굵게 = 활성) + Refresh · `Graph Editor: Selected Only / All Layers` · Auto refresh. 마야에 레이어 변경 이벤트가 없어(`scriptJob listEvents` 에 없음) 보이는 동안 1.5 s QTimer 로 스냅샷 비교.
+- 시험 `tests/test_anim_layers.py` **33/33**(오프스크린, MainWindow 포함). **마야 GUI 확인 아직.**
+
 > [!summary] A00480_FileTool **v01.19 Reference > Lineage 러버밴드 다중 선택 + 선택 노드 전체 경로 `Selected` 칸** `#A00480_FileTool`
 - 요청: "드래그로 여러 노드를 다중 선택. 노드를 선택하면 파일 전체 이름이 어딘가에 보이게."
 - 구현: `view.setDragMode(RubberBandDrag)` + `setRubberBandSelectionMode(IntersectsItemShape)`(A00210 `_build_canvas` 와 같음 — 내 페이지는 맨 `QGraphicsScene` 이라 기본이 NoDrag 였다). `scene.selectionChanged` → `selection_text()`: 하나면 전체 경로, 여럿이면 `N nodes selected : 이름들`(툴팁에 경로 전부), 캔버스 아래 읽기 전용 `QLineEdit`. 재렌더 뒤에도 갱신.

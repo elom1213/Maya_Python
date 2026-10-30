@@ -88,6 +88,8 @@
    를 그대로 쓰므로 모드·누적 모드·가중치·다른 레이어의 가림을 마야가 풀고, 소스의 구간 안 기여는 이 툴이 중화한다.
    정수 프레임의 월드 움직임은 **전후가 완전히 같다**(1e-15).
 7. **View** — **보기**를 돕는다(씬을 바꾸지 않는 유일한 카테고리).
+   **Layers**(v02.31~): 씬의 애니메이션 레이어 목록. 행을 고르면 그 레이어가 **선택 / 활성**되어 그래프 에디터가
+   그 레이어의 커브를 보이고, Mute / Solo / Lock 을 체크로 켜고 끈다. Curve > Filters 처럼 **Expand** 로 별도 창.
    **Graph Focus**(v01.25~): 컨트롤러를 선택하면 그 컨트롤러의 **전체 키 구간**(예: 0~6000f)을
    다 보여주는 대신, **현재 프레임 기준 ± margin 프레임**만 그래프 에디터에 확대해서 보여준다
    (예: 현재 500f, margin 30 → `470f~530f`). **Auto-Focus 토글**을 켜면 **컨트롤러(오브젝트)를
@@ -740,7 +742,7 @@ A00110_animTool_V02.run(True)   # True = reload
 | **Curve** | 커브의 **값·형태** | Euler · Filters(Smooth · Intensity · Interp) |
 | **Transfer** | **다른 오브젝트로** 옮기기 | Copy Key · Mirror Key · Follow |
 | **Bake** | 결과를 **키로 굽기** | Bake · Counter Layer(v02.26~, Stationary 모드 v02.29~) · Merge Layers(v02.27~) |
-| **View** | **보기**(씬 불변) | Graph Focus |
+| **View** | **보기**(씬 불변) | Graph Focus · **Layers**(v02.31~, Expand 가능) |
 | **Hot Key** (v02.19~) | 툴이 열린 동안의 **단축키** | Main(Hold · Manipulator Space) |
 
 - **Help > About**: 작성자·업데이트 날짜 팝업.
@@ -1751,6 +1753,41 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 ### 5.8 View 탭 — 보기 보조 (씬을 바꾸지 않는다)
 
 **씬을 전혀 바꾸지 않는** 유일한 카테고리다. 그래서 다른 탭과 섞지 않았다.
+
+#### Layers (v02.31~) — 씬의 애니메이션 레이어, 어느 레이어를 볼지
+
+```
+┌ Animation Layers ──────────────────────────── [Expand] ┐
+│ Animation layers of the current scene, top first ...    │
+│ Layer            Mute  Solo  Lock                       │
+│ L2               [ ]   [ ]   [ ]                        │  ← 맨 위 = 가장 위 레이어(마지막에 만든 것)
+│ ▾ L1             [ ]   [ ]   [ ]        (굵게 = 활성)    │
+│     L3           [x]   [ ]   [ ]                        │  ← 자식 레이어는 부모 아래 들여쓰기
+│ BaseAnimation                [ ]                        │  ← Lock 만
+│ [Refresh] [Graph Editor: Selected Only] [Graph Editor: All Layers] │
+│ [x] Auto refresh while visible                          │
+└─────────────────────────────────────────────────────────┘
+```
+
+마야 **Animation Layer Editor 와 같은 목록**을 툴 안에서 다룬다 — 레이어 에디터를 따로 열지 않고, 또 **Expand** 로 이 목록만
+작은 창으로 빼서 그래프 에디터 옆에 둘 수 있다(Curve > Filters 와 같은 공용 Expand 패널, 복제가 아니라 이동이라 한 벌).
+
+- **목록** — 에디터 순서(맨 위부터, 마지막에 만든 레이어가 위), 자식 레이어는 부모 아래 들여쓰기, `BaseAnimation` 은 맨 아래.
+  **굵게** = 활성(preferred) 레이어, **하이라이트** = 에디터에서 선택된 레이어. 툴팁에 additive/override · weight · active · selected.
+- **행 클릭 = 어느 레이어를 볼지** — 그 레이어를 에디터에서 **선택**하고, 하나만 고르면 **활성** 레이어로도 만든다(에디터의 클릭과
+  같다; 마야의 `preferred` 는 다른 레이어의 것을 끄지 않아 툴이 직접 하나로 맞춘다). Shift / Ctrl 로 여러 개. Graph Focus 가 켜져
+  있으면 바뀐 레이어로 즉시 다시 프레이밍된다. 그래프 에디터가 그 레이어의 커브만 보이게 하려면 필터가 `Selected` 여야 한다 →
+  **`Graph Editor: Selected Only`** 가 열린 그래프 에디터 전부의 `View > Animation Layer Filter` 를 그렇게 바꾼다,
+  **`Graph Editor: All Layers`** 는 되돌린다(그래프 에디터가 없으면 `[WARN] No Graph Editor is open.`).
+- **Mute / Solo / Lock** 체크 = `animLayer -e -mute/-solo/-lock`. `BaseAnimation` 은 Lock 만(체크박스가 Lock 열에만 있다).
+- **Auto refresh while visible**(기본 ON) — 마야에는 레이어 변경 이벤트가 없어, 목록이 보이는 동안 1.5 초마다 상태를 비교해
+  레이어 에디터에서 바꾼 것(새 레이어 · 삭제 · 선택 · Mute 등)을 따라간다. `Refresh` 는 지금 바로.
+- 로그: `Animation layers : 4 (selected : L2).` · `Layer selected : L1 (active)` · `L2 : mute on` · `Graph Editor filter : selected layers only (1 editor(s)).`
+
+> 구현: `app/core/anim_layer_manager.py` (`AnimLayerManager.tree / rows / set_selected / set_flag / graph_editor_filter / snapshot`),
+> 상태는 Merge Layers 의 `LayerMergeManager.layer_info` 를 재사용. 선택 질의는 전역 플래그가 없어 레이어마다 묻는다.
+> 시험 `tests/test_anim_layers.py` **33 항목**(순서 · 트리 · 선택/활성 하나만 · 플래그 · Base 제한 · 스냅샷 · UI 트리 · 행 클릭 →
+> 마야 선택 · 체크 → 플래그 · 폴링 따라가기 · Auto off · Expand 창 이동 / 복귀). **마야 GUI 확인 아직.**
 
 #### Graph Focus (v01.25~)
 
