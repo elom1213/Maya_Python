@@ -2,7 +2,7 @@
 title: 공용 리스트 위젯 (JUN_mod_tsl_qt) 사용법
 aliases: [MOD_tsl_qt, JUN_mod_tsl_qt, TSL 위젯, 공용 TSL, (Null), 자리표시]
 tags: [maya-python, framework, widget, tsl, selection-order]
-updated: 2026-09-22
+updated: 2026-10-30
 ---
 
 # 공용 리스트 위젯 `JUN_mod_tsl_qt_v01`
@@ -59,12 +59,20 @@ tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
     order_default=False,         # 열자마자 Order ON (기본 꺼짐)
     multi_select=True,
     list_min_height=None,        # 지정 없으면 바닥값 100px
+    list_hint_height=None,       # 처음 열릴 때 리스트 높이(sizeHint). 없으면 Qt 기본 192px (2.2)
     list_limit=0,                # 이 수 **이상**이면 펼치지 않고 요약 (0 = 언제나 펼침, 5장)
     select_label="Select Objects",
     select_no_expand=False,      # 항목이 **세트**인 리스트에서 켠다 (2.1)
     log_callback=self.log,       # 없으면 print
 )
 ```
+
+### 2.2 `list_hint_height` — 처음 열릴 때의 리스트 높이 (2026-10-30~)
+
+`QListWidget.sizeHint()` 는 내용과 무관하게 **256 x 192** 다. 창 높이를 현재 탭에 맞추는 툴([`Framework_MOD_tabFit_qt.md`](Framework_MOD_tabFit_qt.md))
+에서는 이 192px 이 **처음 열리는 리스트 높이**가 된다. 짧게 열고 싶으면 `list_hint_height=100` 처럼 준다 — 리스트의 sizeHint 만 바뀌고
+정책(Expanding)은 그대로라 **창을 늘리면 예전처럼 따라 늘어난다.** `list_min_height` 보다 작으면 최소가 이긴다.
+첫 사용처 A00170 v01.35 (Remap Value · Spherical Eye · AttachCrv > Default, `LIST_HINT = 100`) — 사용자 요청 "리스트 세로가 너무 길다, 절반으로".
 
 ### 2.1 `select_no_expand` — 세트를 담은 리스트
 

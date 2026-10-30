@@ -48,5 +48,11 @@
 #        스크롤 없이 다 보이고 짧은 페이지로 가면 줄어든다. 페이지가 화면보다 길면 화면 높이에서 멈춤.
 #        공용 Framework/qt/MOD_tabFit_qt_v01 (A00275 v01.38 과 같은 방식)
 
-VERSION = "01.34"
-LAST_UPDATE = "2026-10-29"
+# 01.35  Remap Value · Spherical Eye · AttachCrv > Default 가 너무 길게 열리던 것 수정 (사용자: "세로가 절반이 되게").
+#        원인 1 - Qt 5.15 QTabWidget.sizeHint 는 숨은 페이지의 Ignored 정책을 안 봐 모든 탭이 가장 긴 Seal 높이로
+#        열렸다 → 공용 tabFit 에 tab_correction(현재 페이지 - 가장 긴 페이지) 보정. 원인 2 - QListWidget 기본
+#        sizeHint 192px 이 리스트의 처음 높이가 됨 → 세 탭의 TSL 에 list_hint_height=LIST_HINT(100).
+#        창을 늘리면 리스트는 예전처럼 따라 늘어난다. tests/test_tab_fit_ui.py 45/45.
+
+VERSION = "01.35"
+LAST_UPDATE = "2026-10-30"

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-29
+# last Update date : 2026-10-30
 # A00170_driverTool - Qt UI
 #
 # A00150_remapVal (Remap Value) + A00160_sphericalEye (Spherical Eye) 를
@@ -43,6 +43,11 @@ from tools.A00170_driverTool.app.core import (
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
 WINDOW_OBJECT_NAME = "JUN_A00170_driverTool_window"
+
+# Remap Value · Spherical Eye · AttachCrv > Default 의 오브젝트 리스트가 **처음 열릴 때** 차지하는 높이(px).
+# QListWidget 기본 sizeHint 는 192 라 창 높이를 탭에 맞추면(v01.34) 리스트가 그만큼 길게 열렸다 -
+# 사용자 요청(2026-10-30)으로 절반 수준. 창을 늘리면 리스트는 예전처럼 따라 늘어난다. (v01.35)
+LIST_HINT = 100
 
 
 class MainWindow(QWidget):
@@ -205,9 +210,11 @@ class MainWindow(QWidget):
         # Set Up : Joints(oColl) + Attributes(twistAttrs)
         group = QGroupBox("Set Up")
         group_layout = QHBoxLayout(group)
-        self.rmp_joints_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(title="Joints")
+        # v01.35 : 리스트는 짧게 열린다(LIST_HINT) - 창을 늘리면 따라 늘어난다.
+        self.rmp_joints_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Joints", list_hint_height=LIST_HINT)
         self.rmp_attr_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Attributes", show_select=False)
+            title="Attributes", show_select=False, list_hint_height=LIST_HINT)
         # numberTool 의 'List attributes' 버튼을 편집 버튼 행 맨 앞에 추가.
         self.rmp_attr_tsl.add_button("List Attributes", self.on_rmp_list_attributes, index=0)
         group_layout.addWidget(self.rmp_joints_tsl)
@@ -500,7 +507,8 @@ class MainWindow(QWidget):
         # Joints (front -> center order)
         group = QGroupBox("Joints (front -> center order)")
         group_layout = QVBoxLayout(group)
-        self.sph_joints_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(title="Joints")
+        self.sph_joints_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Joints", list_hint_height=LIST_HINT)          # v01.35 짧게 열림
         group_layout.addWidget(self.sph_joints_tsl)
         root.addWidget(group, stretch=1)
 
@@ -719,7 +727,8 @@ class MainWindow(QWidget):
         # Objects (커브에 붙일 기존 오브젝트들 / Follower 모드에서는 팔로워를 만들 기준 오브젝트들)
         group = QGroupBox("Objects (attach to closest point)")
         group_layout = QVBoxLayout(group)
-        self.atc_objs_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(title="Objects")
+        self.atc_objs_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Objects", list_hint_height=LIST_HINT)         # v01.35 짧게 열림
         group_layout.addWidget(self.atc_objs_tsl)
         root.addWidget(group, stretch=1)
         self.atc_objs_group = group

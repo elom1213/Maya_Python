@@ -7,6 +7,9 @@
 #   - 창 높이 = tabFit.content_height() (+ 보정 16px 이내)  ← 현재 페이지에 맞춰졌다
 #   - shortfall() <= 0                                     ← 보이는 스크롤 페이지/칸에 세로 스크롤이 필요 없다
 #   - 폭은 탭을 바꿔도 그대로
+#   - 보이는 현재 페이지(스크롤 영역이 아닌 것)의 높이 >= 그 sizeHint   ← 페이지가 잘리지 않았다 (2026-10-30 추가)
+#   - 현재 페이지들 sizeHint 의 합 기준으로 창이 맞춰졌다 — 가장 긴 숨은 페이지에 끌려가지 않았다 (2026-10-30 추가,
+#     Qt 5.15 QTabWidget.sizeHint 는 Ignored 정책을 보지 않는다 → tabFit.tab_correction 이 보정)
 # 모니터 작업 영역은 2560 x 1392 로 바꿔 끼운다(오프스크린 화면은 800 x 600 이라 전부 잘린다).
 # QApplication 은 maya.standalone.initialize() 보다 먼저 만든다.
 import os
@@ -30,6 +33,14 @@ from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01   # noqa: E402
 
 BIG = QRect(0, 0, 2560, 1392)
 TOL = 16
+
+# 페이지 잘림이 tabFit 탓이 아닌 곳 - 창은 내용 높이에 맞는데 **툴의 창 레이아웃**이 그 공간을 탭 밖 위젯에 준다.
+# A00310 : 탭 위의 TSL 과 탭이 둘 다 stretch=1 이라 QBoxLayout 이 여분을 최소 크기 기준으로 나눠 탭 안 TSL 이 최소(198)로 눌린다.
+#          10-29 롤아웃 전(고정 창)에도 같은 모양 - 손보려면 그 툴의 stretch 를 고친다. 여기서는 KNOWN 으로 세고 실패로 치지 않는다.
+KNOWN_CLIP = {
+    "A00310_SearchTool Type": "window layout: TSL above the tabs and the tabs both stretch=1 (pre-existing)",
+}
+known = []
 
 
 def pump(n=8):
@@ -99,6 +110,34 @@ for tool in tools:
                 ok = ((c <= h <= c + TOL and short <= 0) or clamped) and width_ok
                 if not ok:
                     failed.append("%s %s : h=%d content=%d short=%d w=%d (start %d, min %d)" % (tool, " > ".join(label), h, c, short, win.width(), width0, win.minimumWidth()))
+                # 보이는 현재 페이지(스크롤 영역 제외)가 잘리지 않았다 + 가장 긴 숨은 페이지에 끌려가지 않았다
+                if not clamped:
+                    for page_ in fit.visible_pages():
+                        if isinstance(page_, QScrollArea):
+                            continue
+                        # 글줄 바꿈 라벨이 있는 페이지는 레이아웃이 실제 폭의 heightForWidth 를 쓴다(sizeHint 는 좁은 폭 기준이라 더 크다)
+                        if page_.hasHeightForWidth():
+                            need_ = page_.heightForWidth(page_.width())
+                        else:
+                            need_ = page_.sizeHint().height()
+                        # 페이지 안에 중첩 탭이 있으면 그 sizeHint 는 "가장 긴 하위 페이지" 기준 - 현재 하위 페이지로 고친다
+                        need_ += fit.tab_correction(page_)
+                        if page_.height() < need_ - 1:
+                            key_ = "%s %s" % (tool, " > ".join(label))
+                            msg_ = "%s : page clipped h=%d < need %d" % (key_, page_.height(), need_)
+                            if key_ in KNOWN_CLIP:
+                                known.append(msg_ + "  (" + KNOWN_CLIP[key_] + ")")
+                            else:
+                                failed.append(msg_)
+                    if fit.tab_correction() == 0:
+                        # 현재 페이지가 가장 긴 페이지일 때만 0 이어야 한다 - 더 긴 숨은 페이지가 있으면 보정이 빠진 것
+                        for tw_ in fit.tab_widgets():
+                            if not fit._on_visible_chain(tw_) or tw_.currentWidget() is None or tw_.hasHeightForWidth():
+                                continue
+                            cur_ = tw_.currentWidget().sizeHint().height()
+                            tallest_ = max(tw_.widget(k).sizeHint().height() for k in range(tw_.count()))
+                            if tallest_ > cur_ + 1:
+                                failed.append("%s %s : no correction although a hidden page is taller (%d > %d)" % (tool, " > ".join(label), tallest_, cur_))
                 page = tab_widget.widget(i)
                 for inner in page.findChildren(QTabWidget):
                     # 바로 위 조상 탭이 이 탭 위젯인 것만(한 단계씩 내려간다)
@@ -117,7 +156,9 @@ for tool in tools:
 
 for line in summary:
     print(line)
-print("\ntools %d, checks %d, failed %d" % (len(tools), total_checks, len(failed)))
+print("\ntools %d, checks %d, failed %d, known %d" % (len(tools), total_checks, len(failed), len(known)))
+for k in known:
+    print("  KNOWN", k)
 for f in failed:
     print("  FAIL", f)
 maya.standalone.uninitialize()

@@ -2,7 +2,7 @@
 title: Framework 공용 위젯 — MOD_tabFit_qt (탭마다 창 높이 자동 맞춤)
 aliases: [JUN_mod_tabFit_qt, tabFit, 창 높이 자동, 탭 높이 맞춤, fit window to tab]
 tags: [framework, qt, widget, maya-python, window-size]
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # `JUN_mod_tabFit_qt_v01` — 탭을 바꿀 때마다 창 높이를 지금 보이는 페이지에 맞춘다
@@ -54,9 +54,19 @@ self.tab_fit.set_enabled(False)       # 끄기 - 정책을 되돌리고 더는 �
 ## 동작 규칙
 
 1. **안 보이는 페이지의 세로 size policy 를 `Ignored`** 로 둔다. `QStackedLayout` 은 `Ignored` 방향의
-   sizeHint 를 0 으로 치므로 탭 위젯의 sizeHint 가 **현재 페이지만** 따른다. 현재 페이지는 원래 정책으로
-   되돌린다(원래 값은 위젯 property 에 기억). 중첩 탭도 같은 규칙 → 바깥 → 안쪽 사슬의 현재 페이지만 남는다.
-   덤으로 **창 최소 높이도 현재 페이지 기준**이 되어 [[qtabwidget-min-size-hidden-pages]] 증상(가장자리를 끌어도 안 줄어듦)도 사라진다.
+   최소 크기를 0 으로 치므로 탭 위젯의 **minimumSizeHint 가 현재 페이지만** 따른다 — **창 최소 높이가 현재 페이지 기준**이
+   되어 [[qtabwidget-min-size-hidden-pages]] 증상(가장자리를 끌어도 안 줄어듦)이 사라진다. 현재 페이지는 원래 정책으로
+   되돌린다(원래 값은 위젯 property 에 기억). 중첩 탭도 같은 규칙.
+1-b. **`QTabWidget.sizeHint()` 는 그 정책을 보지 않는다 (2026-10-30 발견).** Qt 5.15 의 `QTabWidget::sizeHint` 는 스택
+   레이아웃을 거치지 않고 **보이는 탭의 모든 페이지 `sizeHint` 최댓값**을 직접 구한다(실측: `Ignored` 를 줘도 951 그대로,
+   minimumSizeHint 만 501 → 201). 현재 페이지에 글줄 바꿈 라벨(height-for-width)이 있으면 `heightForWidth` 경로로 바뀌는데,
+   그것도 **hfw 를 가진 페이지들(숨은 것 포함)의 최댓값**이다. 그래서 `tab_correction()` 이 보이는 사슬의 탭 위젯마다
+   **(현재 페이지 높이 − 페이지들 높이 최댓값)** 을 Qt 와 같은 규칙으로 재서 창 sizeHint 에 더한다. 스크롤 칸 안 내용의
+   sizeHint 를 쓰는 `shortfall()` 도 같은 보정을 받는다(`tab_correction(within=내용)`) — 없으면 `tabs_scroll` 툴은 늘 가장 긴
+   페이지 높이로 되돌아간다.
+   10-29 롤아웃 때는 페이지가 전부 `QScrollArea` 인 A00275 로 확인해서 몰랐다 — 스크롤 페이지는 sizeHint 가 24h 로 잘려 다 비슷해서
+   최댓값이 해를 안 끼쳤고, 규칙 2 의 보정이 보이는 페이지에만 붙어 결과가 맞았다. **페이지가 맨 위젯인 툴(A00170 등)은
+   모든 탭이 가장 긴 페이지 높이로 열렸다** — A00170 은 Seal(1080px) 에 맞춰져 Remap Value 의 리스트가 650px 로 늘어났다.
 2. **`QScrollArea.sizeHint()` 는 믿지 않는다** — Qt 가 글자 높이의 24배(12px 글꼴이면 약 350px)로 잘라 돌려준다
    (`QScrollArea::sizeHint` 의 `boundedTo(36h, 24h)`, `sizeAdjustPolicy` 와 무관). 보이는 사슬의 스크롤 페이지마다
    **(안 내용 `sizeHint` + 테두리) − 스크롤 영역 `sizeHint`** 를 창 sizeHint 에 더한다. 내용이 작으면 0.
@@ -76,8 +86,21 @@ self.tab_fit.set_enabled(False)       # 끄기 - 정책을 되돌리고 더는 �
 - **오프스크린 px 은 실제 마야보다 크다**([[offscreen-size-needs-theme]]). 시험의 1295px(Expand Bind) 같은 절대값을 믿지 말고
   "창 높이 = 내용 높이, 뷰포트 ≥ 내용" 같은 **상대 조건**으로 본다. 1080 모니터에선 긴 페이지가 화면 제한에 걸려 스크롤될 수 있다.
 - `fit()` 은 창이 보인 뒤에 불러야 뷰포트 보정이 맞는다. 생성자에서 직접 부르지 말고 `fit_later()`.
-- 페이지가 `QScrollArea` 가 아니면(내용 위젯을 바로 페이지로) 규칙 1 만으로 맞는다 — A00110 의 `JUN_mod_fit_tab_page_v01` 과 같은 결과.
+- 페이지가 `QScrollArea` 가 아니면(내용 위젯을 바로 페이지로) 규칙 1 + 1-b 로 맞는다 — A00110 의 `JUN_mod_fit_tab_page_v01` 과 같은 결과.
+  **규칙 1 만으로는 안 된다**(10-29 ~ 10-30 사이의 상태) — `QTabWidget.sizeHint` 가 숨은 페이지를 그대로 센다.
+- 리스트(`QListWidget`)의 기본 sizeHint 는 내용과 무관한 **192px** 이다. 창이 페이지에 맞춰지면 그 값이 곧 처음 열리는 리스트 높이가
+  되므로, 짧게 열고 싶은 리스트는 공용 TSL 의 `list_hint_height` 로 준다([`Framework_MOD_tsl_qt.md`](Framework_MOD_tsl_qt.md) 2장, A00170 v01.35 = 100).
 - 버튼 + `QStackedWidget` 식 페이지 전환은 `QTabWidget` 이 아니라 따라가지 않는다. 그 툴은 `fit_later()` 를 직접 부른다.
+
+## 검증 — 보정 뒤 전수 (2026-10-30, 31 툴 · 132 검사 · 0 실패)
+
+규칙 1-b 를 넣고 같은 `test_tab_fit_rollout.py` 를 다시 돌렸다. 검사 두 개를 더했다 — **보이는 현재 페이지(스크롤 영역 제외) 높이 ≥ 그 sizeHint
+(+ 중첩 탭 보정)** = 페이지가 잘리지 않았다, 그리고 **현재 페이지보다 긴 숨은 페이지가 있으면 `tab_correction` 이 0 이 아니다** = 가장 긴 페이지에
+끌려가지 않았다. 보정 전엔 A00240 `Junction > Remove` · A00480 네 탭 · A00550 `Blend Weights` 가 창 높이 > 내용(가장 긴 페이지로 되돌아감)이었고,
+보정 뒤 전부 맞는다. 탭마다 창 높이가 달라진 툴(일부): A00170 `[1354 ×5] → [802, 734, 807, 1274, 1354]`, A00400 `[1125 ×3] → [885, 845, 1125]`
+(하위 탭은 438 ~ 1125), A00480 `[1062 ×4] → [1062, 634, 333, 556]`, A00210 `[1388 ×4] → [1388, 1121, 1148, 1388]` (오프스크린 px).
+A00170 전용 시험 `tools/A00170_driverTool/tests/test_tab_fit_ui.py` 45/45 (Qt 전제 두 개 · 탭 6개 · 모드 3개 · 리스트 100px · 창 늘리면 리스트도).
+**마야 GUI 확인 아직.**
 
 ## 검증 — 롤아웃 전수 (2026-10-29, 31 툴 · 131 검사 · 0 실패)
 

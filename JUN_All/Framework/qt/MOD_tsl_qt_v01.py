@@ -94,6 +94,26 @@ from Framework.qt.qt import *
 # 안 주면 이 바닥값을 적용한다. (공간이 충분하면 위젯은 이보다 크게 늘어난다)
 DEFAULT_LIST_MIN_HEIGHT = 100
 
+
+class _ListWidget(QListWidget):
+    """sizeHint 높이를 호출부가 정할 수 있는 QListWidget.
+
+    `QListWidget.sizeHint()` 는 내용과 무관하게 **256 x 192** 다(QAbstractScrollArea 기본값). 창 높이를
+    현재 탭 내용에 맞추는 툴([[framework-tabfit-widget]])에서는 이 192px 이 **처음 열릴 때의 리스트 높이**가
+    되므로, 짧게 열고 싶은 리스트는 `list_hint_height` 로 더 작은 값을 준다(최소 높이보다 작으면 최소가 이긴다).
+    창을 늘리면 예전처럼 따라 늘어난다(정책은 그대로 Expanding).
+    """
+
+    def __init__(self, hint_height=None, parent=None):
+        super().__init__(parent)
+        self._hint_height = hint_height
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        if self._hint_height:
+            hint.setHeight(int(self._hint_height))
+        return hint
+
 # 항목에 (uuid, component) 를 보관하는 Qt 역할. 호출부가 Qt.UserRole 을 쓰는 경우와
 # 겹치지 않도록 +1 을 쓴다.
 UUID_ROLE = Qt.UserRole + 1
@@ -280,6 +300,7 @@ class JUN_mod_tsl_qt_v01(QWidget):
                  show_up=True, show_down=True, show_sort=True,
                  show_reverse=False, show_order=True, order_default=False,
                  multi_select=True, list_min_height=None, list_limit=0,
+                 list_hint_height=None,
                  select_label="Select Objects", attach_uuids=True,
                  select_no_expand=False,
                  log_callback=None, parent=None):
@@ -310,6 +331,9 @@ class JUN_mod_tsl_qt_v01(QWidget):
         # 세트가 아닌 항목에는 아무 차이가 없으므로 세트 리스트에서만 켜면 된다.
         self.select_no_expand = select_no_expand
         self.list_min_height = list_min_height
+        # 처음 열릴 때 리스트가 차지할 높이(sizeHint). None 이면 Qt 기본 192px. 창 높이를 탭 내용에
+        # 맞추는 툴에서 리스트가 너무 길게 열리면 더 작은 값을 준다(최소 높이가 더 크면 최소가 이긴다).
+        self.list_hint_height = list_hint_height
         # 항목이 이 수 **이상**이면 리스트에 펼치지 않고 요약만 보여준다(0 = 언제나 펼침).
         self.list_limit = int(list_limit or 0)
         # 중복 안내 등 메시지를 출력할 콜백. None 이면 print 사용(툴 로그창에 연결 가능).
@@ -374,7 +398,7 @@ class JUN_mod_tsl_qt_v01(QWidget):
         layout.addLayout(header)
 
         # 리스트 위젯
-        self.list_widget = QListWidget()
+        self.list_widget = _ListWidget(self.list_hint_height)
         mode = (QAbstractItemView.ExtendedSelection
                 if self.multi_select else QAbstractItemView.SingleSelection)
         self.list_widget.setSelectionMode(mode)

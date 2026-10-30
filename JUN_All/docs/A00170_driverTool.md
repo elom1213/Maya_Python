@@ -661,8 +661,15 @@ Filter 에 적은 문구로 **첫 오브젝트를 다시 질의**(`listAttr(obj.
 
 자세한 것은 [`Framework_MOD_log_qt.md`](Framework_MOD_log_qt.md).
 
-## 창 높이 자동 맞춤 (v01.34~)
+## 창 높이 자동 맞춤 (v01.34~) · 리스트는 짧게 (v01.35~)
 
 탭(중첩 포함)을 바꾸면 창 높이가 **지금 보이는 페이지**에 맞게 늘거나 줄어 스크롤 없이 다 보인다. 페이지가 모니터 작업 영역보다
 길면 화면 높이에서 멈추고(스크롤 영역이 있는 페이지는 그 페이지만 스크롤), 창 아래가 화면 밖이면 위로 올린다. 폭은 건드리지 않는다.
-공용 [`JUN_mod_tabFit_qt_v01`](Framework_MOD_tabFit_qt.md) — A00275 v01.38 과 같은 방식. **마야 GUI 확인 아직.**
+공용 [`JUN_mod_tabFit_qt_v01`](Framework_MOD_tabFit_qt.md) — A00275 v01.38 과 같은 방식.
+
+**v01.35 (2026-10-30)** — v01.34 에서는 Remap Value · Spherical Eye · AttachCrv > Default 가 **가장 긴 Seal 페이지 높이**로 열려 오브젝트
+리스트가 650px 까지 늘어났다(사용자: "세로가 너무 길다, 특히 리스트 — 절반으로"). 원인은 Qt 5.15 `QTabWidget.sizeHint()` 가 숨은 페이지를
+그대로 세는 것 — 공용 tabFit 이 보정하도록 고쳤고(위 문서 규칙 1-b), 세 탭의 리스트는 `list_hint_height=100`(`LIST_HINT`) 으로 **처음엔 100px
+로 열린다.** 창을 늘리면 리스트가 따라 늘어나는 것은 그대로. 오프스크린 실측(마야보다 큰 px) 창 높이: Remap Value 1354 → 802, Spherical Eye
+1354 → 734, AttachCrv > Default 1354 → 807(Distribute 모드 663 · Follower 889), Edge Loop 913, Stretch 1274, Seal 1354(변화 없음 — 가장 긴 페이지).
+시험 `tests/test_tab_fit_ui.py` 45/45. **마야 GUI 확인 아직.**

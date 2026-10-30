@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-29
+# last Update date : 2026-10-30
 """
 JUN_mod_tabFit_qt_v01 - 탭을 바꿀 때마다 창 높이를 **지금 보이는 탭 내용**에 맞춘다.
 
@@ -14,9 +14,16 @@ JUN_mod_tabFit_qt_v01 - 탭을 바꿀 때마다 창 높이를 **지금 보이는
 원리
 ----
 1. 안 보이는 탭 페이지의 **세로 size policy 를 `Ignored`** 로 둔다. `QStackedLayout` 은 `Ignored`
-   정책인 위젯의 그 방향 sizeHint 를 0 으로 치므로, 탭 위젯의 sizeHint 가 **현재 페이지만** 따른다.
-   현재 페이지는 원래 정책으로 되돌린다. 중첩 탭(카테고리 > 기능)도 같은 규칙을 모든 QTabWidget 에
-   적용하면 바깥 → 안쪽 사슬의 현재 페이지만 남는다.
+   정책인 위젯의 그 방향 최소 크기를 0 으로 치므로, 탭 위젯의 **minimumSizeHint 가 현재 페이지만** 따른다
+   (창을 손으로 줄일 수 있다). 현재 페이지는 원래 정책으로 되돌린다. 중첩 탭(카테고리 > 기능)도 같은
+   규칙을 모든 QTabWidget 에 적용하면 바깥 → 안쪽 사슬의 현재 페이지만 남는다.
+   ★ 그러나 **`QTabWidget.sizeHint()` 는 정책을 보지 않는다** (Qt 5.15 `QTabWidget::sizeHint` 는 스택
+   레이아웃을 거치지 않고 **보이는 탭의 모든 페이지 `sizeHint` 의 최댓값**을 직접 구한다 - 2026-10-30 실측,
+   `Ignored` 를 줘도 951 그대로 · minimumSizeHint 만 501 → 201). 현재 페이지에 글줄 바꿈 라벨이 있으면
+   height-for-width 경로(`heightForWidth` = hfw 가진 페이지들의 최댓값)로 바뀐다. 그래서 창 sizeHint 에
+   보이는 사슬의 탭 위젯마다 **(현재 페이지 높이 − 페이지들 높이 최댓값)** 을 같은 규칙으로 재서
+   더한다(`tab_correction`). 페이지가 `QScrollArea` 가 아닌 툴(A00170 등)은 이 보정이 없으면 모든 탭이
+   **가장 긴 페이지 높이**로 열린다 (A00170 은 Seal 1080px 에 맞춰져 리스트가 650px 로 늘어났었다).
 2. 페이지가 `QScrollArea` 면 그 sizeHint 는 믿지 않는다 - **`QScrollArea.sizeHint()` 는 글자 높이의
    24배(12px 글꼴이면 약 350px)로 잘려 있다**(Qt 소스 `boundedTo(36h, 24h)`, sizeAdjustPolicy 와 무관).
    그래서 창 sizeHint 에 **(안 내용 sizeHint + 테두리) - 스크롤 영역 sizeHint** 만큼을 더한다.
@@ -160,18 +167,74 @@ class JUN_mod_tabFit_qt_v01(QObject):
             layout.activate()
         short = 0
         for scroll in self.scroll_areas():
-            need = scroll.widget().sizeHint().height()
+            inner = scroll.widget()
+            # 안 내용의 sizeHint 에도 그 안 탭 위젯의 "가장 긴 페이지" 가 들어 있다 - 현재 페이지 기준으로 고친다
+            # (루트 탭을 감싼 tabs_scroll 은 이 보정이 없으면 늘 가장 긴 페이지 높이로 되돌아간다 - A00480 · A00550).
+            need = inner.sizeHint().height() + self.tab_correction(inner)
             short = max(short, need - scroll.viewport().height())
         return short
 
     def content_height(self):
-        """맞출 때 창이 가질 높이(화면 제한 전) = 창 sizeHint + 보이는 스크롤 페이지의 잘린 몫."""
+        """맞출 때 창이 가질 높이(화면 제한 전)
+        = 창 sizeHint + 탭 위젯마다 (현재 페이지 − 가장 긴 페이지) + 보이는 스크롤 페이지의 잘린 몫."""
         self._apply_policies()
         self._invalidate_layouts()
         height = self._window.sizeHint().height()
+        height += self.tab_correction()
         for scroll in self.scroll_areas():
             height += max(0, self._scroll_wanted_height(scroll) - scroll.sizeHint().height())
         return height
+
+    def tab_correction(self, within=None):
+        """보이는 사슬의 QTabWidget 마다 **현재 페이지 높이 − 페이지들 높이 최댓값**(0 이하)의 합.
+        `within` 을 주면 그 위젯(자신 포함) 아래의 탭 위젯만 센다 - 스크롤 칸 안 내용의 sizeHint 를 고칠 때.
+
+        `QTabWidget` 이 부모 레이아웃에 내는 높이는 두 경로다(Qt 5.15 실측, 둘 다 size policy 를 보지 않는다).
+        - 보통  : `sizeHint()` = 숨긴 탭(`setTabVisible(False)`)만 빼고 **모든 페이지 sizeHint 의 최댓값**.
+        - 현재 페이지에 글줄 바꿈 라벨 같은 height-for-width 항목이 있으면 `hasHeightForWidth()` 가 참이 되어
+          `heightForWidth(w)` = **hfw 를 가진 페이지들**(숨은 것 포함)의 `heightForWidth` 최댓값, 없는 페이지는 −1 로 빠진다.
+        같은 규칙으로 페이지마다 "유효 높이"를 재서 (현재 − 최댓값) 을 더하면 "현재 페이지들만 쌓은 높이"가 된다.
+        바깥 페이지의 높이에는 그 안 중첩 탭의 최댓값이 들어 있으므로 사슬의 탭 위젯마다 더한다.
+        """
+        total = 0
+        for tab_widget in self.tab_widgets():
+            if within is not None and within is not tab_widget and not within.isAncestorOf(tab_widget):
+                continue
+            current = tab_widget.currentWidget()
+            if current is None or not self._on_visible_chain(tab_widget):
+                continue
+            use_hfw = bool(tab_widget.hasHeightForWidth())
+            width = current.width()
+            stack = tab_widget.findChild(QStackedWidget)
+            if stack is not None and stack.width() > 0:
+                width = stack.width()
+            bar = tab_widget.tabBar()
+
+            def effective(page):
+                if use_hfw:
+                    h = page.heightForWidth(width)
+                    return h if h >= 0 else None            # hfw 없는 페이지는 Qt 도 세지 않는다
+                return page.sizeHint().height()
+
+            tallest = None
+            for i in range(tab_widget.count()):
+                page = tab_widget.widget(i)
+                if page is None:
+                    continue
+                try:
+                    if not bar.isTabVisible(i):        # Qt 5.15+ 만 있는 조회 - 없으면 전부 보이는 것으로
+                        continue
+                except AttributeError:
+                    pass
+                h = effective(page)
+                if h is not None and (tallest is None or h > tallest):
+                    tallest = h
+            now = effective(current)
+            if now is None:
+                now = current.sizeHint().height()
+            if tallest is not None:
+                total += min(0, now - tallest)
+        return total
 
     def scroll_areas(self):
         """높이 보정이 필요한 `QScrollArea`(widgetResizable) 전부 =
