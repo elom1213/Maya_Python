@@ -8,6 +8,8 @@ metadata:
   modified: 2026-09-21T02:38:54.502Z
 ---
 
+**v01.30 (2026-10-30) Always Draw On Top** — 같은 커브 목록 아래 `On / Off / Toggle` 버튼 한 줄, `curve_manager.set_always_draw_on_top(curves, state)`(None = 셰이프마다 반대로, 이미 그 값이면 쓰지 않고 `already on/off` 로 셈). 사용자가 A00145 `Attribute > Set Value` 로 매번 하던 일. `alwaysDrawOnTop` 은 nurbsCurve · mesh 에만(nurbsSurface 없음). `undo_chunk()` 는 **인자 없음**. GUI 확인 아직. [[wip-a00400-curvetool]]
+
 `A00400_CurveTool` **Display > Transform** 탭 (v01.17 -> 01.18, 2026-09-21, 사용자 요청).
 리스트업한 커브마다 **그 커브의 피벗** 기준으로 셰이프(CV 전체)를 스케일 · 이동 · 회전한다.
 코어 `app/core/shape_xform_manager.py`, 화면 `app/ui/shape_xform_tab.py`.

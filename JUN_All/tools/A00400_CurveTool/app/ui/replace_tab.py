@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-22
+# last Update date : 2026-10-30
 # A00400_CurveTool - Display > Replace 탭 (컨트롤 커브의 셰이프를 다른 커브 모양으로 교체)
 #
 # v01.15 에서는 `Create > Controls` 탭 안의 한 섹션이었고 대상/교체본을 **텍스트 칸**에
@@ -47,12 +47,13 @@ class ReplaceTab(QWidget):
         note.setAlignment(Qt.AlignCenter)
         root.addWidget(note)
 
+        # 리스트는 최소 높이로 열린다(list_hint_height) - 창을 늘리면 따라 늘어난다. (사용자 요청 2026-10-30)
         self.tsl_targets = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Shapes to replace", select_label="List Selected",
-            show_sort=False, list_min_height=150, log_callback=self._log)
+            show_sort=False, list_min_height=150, list_hint_height=150, log_callback=self._log)
         self.tsl_replacements = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Replacement", select_label="List Selected",
-            show_sort=False, list_min_height=150, log_callback=self._log)
+            show_sort=False, list_min_height=150, list_hint_height=150, log_callback=self._log)
 
         lists = QHBoxLayout()
         lists.addWidget(self.tsl_targets)

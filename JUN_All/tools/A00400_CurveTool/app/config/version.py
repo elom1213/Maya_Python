@@ -80,5 +80,11 @@
 #        리깅용 — 만든 리본에 조인트 · 오브젝트를 붙인다(Edit > Joints · A00170 AttachCrv).
 #        `cmds.surface` 는 undo 가 안 돼 임시 커브 두 개 + loft(히스토리 없음) 로 만든다.
 
-VERSION = "01.29"
+# 01.30  Display > Shape Edit - **Always Draw On Top** On / Off / Toggle (nurbsCurve.alwaysDrawOnTop).
+#        같은 커브 목록으로 메시에 묻힌 컨트롤러를 늘 위에 그리게 한다 — A00145 Attribute > Set Value 로
+#        매번 하던 일을 버튼으로. 한 번 = undo 한 스텝, 이미 그 값인 셰이프는 건너뛰고 셈만 한다.
+#        + Create(From Edges · From Points · Ribbon) · Edit(Joints · Combine) · Display(Replace) 의 리스트가
+#        **최소 높이로 열린다**(list_hint_height) — tabFit 보정(Framework 10-30)과 함께 탭 세로를 줄인다.
+
+VERSION = "01.30"
 LAST_UPDATE = "2026-10-30"

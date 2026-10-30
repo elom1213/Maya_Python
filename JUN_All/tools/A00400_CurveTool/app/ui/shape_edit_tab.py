@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-21
+# last Update date : 2026-10-30
 # A00400_CurveTool - Display > Shape Edit 탭
 #   (커브 **셰이프 노드**를 다룬다 - CV 를 피벗 기준으로 크게/작게 · 이동 · 회전 + 선 굵기)
 #
@@ -55,6 +55,11 @@
 #
 # ── Line Width (v01.21 에 옛 Display > Line Width 탭에서 이주) ────────────
 # `nurbsCurve.lineWidth` 는 **그려지는 두께**일 뿐이라 커브 데이터를 건드리지 않는다.
+#
+# ── Always Draw On Top (v01.30) ──────────────────────────────────────────
+# 같은 커브 목록으로 `nurbsCurve.alwaysDrawOnTop` 을 On / Off / Toggle 한다. 켜진 커브는 메시에
+# 묻혀도 **늘 위에 그려져** 잡기 쉽다. 사용자가 A00145 `Attribute > Set Value` 로 매번 하던 일이라
+# (너무 잦아서) 버튼 하나로 옮겼다. 표시 전용 — 형상 · 트랜스폼 · 렌더 무관. 한 번 누름 = undo 한 스텝.
 # 굵게 해 두면 씬에서 커브가 눈에 띄고 클릭으로 집기 쉬워진다. 위의 Scale/Move/Rotate 와
 # 달리 **Apply 가 없다** — 슬라이더에서 손을 떼는 순간이 곧 적용이고, 드래그 한 번이
 # undo 한 스텝이다. `-1` 은 마야 전역 설정을 따른다는 뜻이다.
@@ -310,8 +315,8 @@ class ShapeEditTab(QWidget):
 
         self.tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Curves", select_label="List Selected Curves",
-            show_sort=False, list_min_height=150, log_callback=self._log)
-        root.addWidget(self.tsl, 1)
+            show_sort=False, list_min_height=150, list_hint_height=150, log_callback=self._log)
+        root.addWidget(self.tsl, 1)      # 리스트는 최소 높이로 열린다(list_hint_height), 창을 늘리면 따라 늘어남
 
         # 리스트가 바뀌면 라이브 세션을 확정하고 닫는다(세션은 시작 시점의 CV 를 들고 있다).
         model = self.tsl.list_widget.model()
@@ -362,8 +367,39 @@ class ShapeEditTab(QWidget):
         # 선 굵기는 위의 변환과 **따로 논다** — Apply 도 Live 도 거치지 않고 슬라이더에서
         # 손을 떼는 순간 적용된다. 그래서 버튼 줄 아래에 제 상자로 둔다.
         root.addWidget(self._build_width_group())
+        # 늘 위에 그리기(alwaysDrawOnTop) — 역시 같은 목록. 버튼 한 줄. (v01.30)
+        root.addWidget(self._build_draw_on_top_group())
 
         return self
+
+    def _build_draw_on_top_group(self):
+        """`nurbsCurve.alwaysDrawOnTop` On / Off / Toggle — 위 커브 목록을 그대로 쓴다."""
+
+        box = QGroupBox("Always Draw On Top (curve drawn over everything)")
+        row = QHBoxLayout(box)
+
+        self.btn_top_on = QPushButton("On")
+        self.btn_top_on.setToolTip(
+            "Set alwaysDrawOnTop ON for every listed curve shape.\n"
+            "The curve is then drawn over all other geometry in the viewport, so a\n"
+            "controller buried inside a mesh stays visible and easy to pick.\n"
+            "Display only - shape, transform and render are not touched. One undo step.")
+        self.btn_top_on.clicked.connect(lambda *_a: self.on_draw_on_top(True))
+        row.addWidget(self.btn_top_on)
+
+        self.btn_top_off = QPushButton("Off")
+        self.btn_top_off.setToolTip(
+            "Set alwaysDrawOnTop OFF for every listed curve shape (normal depth-sorted drawing).")
+        self.btn_top_off.clicked.connect(lambda *_a: self.on_draw_on_top(False))
+        row.addWidget(self.btn_top_off)
+
+        self.btn_top_toggle = QPushButton("Toggle")
+        self.btn_top_toggle.setToolTip(
+            "Flip alwaysDrawOnTop on every listed curve shape - ON ones go OFF and OFF ones go ON.")
+        self.btn_top_toggle.clicked.connect(lambda *_a: self.on_draw_on_top(None))
+        row.addWidget(self.btn_top_toggle)
+
+        return box
 
     def _build_width_group(self):
         """선 굵기(`nurbsCurve.lineWidth`) — 위 커브 목록을 그대로 쓴다."""
@@ -506,6 +542,34 @@ class ShapeEditTab(QWidget):
     def _nodes(self):
         """TSL 에 담긴 노드들. UUID 로 지금 이름을 되찾는다(리네임·리페어런트 안전)."""
         return self.tsl.get_all_nodes() or self.tsl.get_all_items()
+
+    # ==================================================================
+    # Always Draw On Top (v01.30)
+    # ==================================================================
+
+    def on_draw_on_top(self, state):
+        """리스트의 커브 셰이프마다 alwaysDrawOnTop 을 state(True/False/None=toggle) 로. 한 번 = undo 한 스텝."""
+        curves = self._nodes()
+        if not curves:
+            self._log("[WARN] Curve list is empty. List some curves first.")
+            return 0, []
+        label = "toggled" if state is None else ("ON" if state else "OFF")
+        with undo_chunk():
+            changed, skipped = curve_mgr.set_always_draw_on_top(curves, state)
+        if state is None and changed:
+            on_n = sum(1 for _s, v in changed if v)
+            self._log("Always Draw On Top toggled on {0} curve shape(s): {1} now on, {2} now off.".format(
+                len(changed), on_n, len(changed) - on_n))
+        else:
+            self._log("Always Draw On Top {0} -> {1} curve shape(s).".format(label, len(changed)))
+        same = [n for n, why in skipped if why.startswith("already")]
+        others = [(n, why) for n, why in skipped if not why.startswith("already")]
+        if same:
+            self._log("{0} shape(s) were already {1}.".format(len(same), label))
+        if others:
+            details = ", ".join("{0} ({1})".format(n.split("|")[-1], why) for n, why in others)
+            self._log("[WARN] Skipped {0}: {1}".format(len(others), details))
+        return len(changed), skipped
 
     # ==================================================================
     # 선 굵기 (v01.21 - 옛 Line Width 탭)

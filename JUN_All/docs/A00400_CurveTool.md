@@ -224,6 +224,35 @@ CATEGORIES = (("Create",  tip, CREATE_PAGES,  "create_tabs"),
 - 리스트는 UUID 로 현재 경로를 되찾으므로 **리네임·리페어런트 후에도** 같은 커브를 잡는다.
 - 커브 하나에 셰이프가 여럿이면 **모든 nurbsCurve 셰이프**에 적용한다.
 
+## Display > Shape Edit — Always Draw On Top (v01.30~) — 메시에 묻힌 컨트롤러를 늘 위에 그리기
+
+같은 커브 목록으로 `nurbsCurve.alwaysDrawOnTop` 을 켜고 끈다. 켜진 커브는 뷰포트에서 **다른 지오메트리에 가려지지 않고 늘 위에
+그려진다** — 몸 안에 들어간 컨트롤러도 보이고 클릭으로 잡힌다. 원래 `A00145_RigConnect > Attribute > Set Value` 로 셰이프를 골라
+매번 값을 넣던 일인데 너무 자주 하는 작업이라 여기 버튼으로 두었다(사용자 요청 2026-10-30).
+
+> **표시 전용이다.** 형상 · 트랜스폼 채널 · 렌더에 영향이 없다. Maya 2019+ 의 `nurbsCurve` / `mesh` 셰이프에 있는 어트리뷰트다
+> (`nurbsSurface` 에는 없다 — 이 탭은 커브만 다룬다).
+
+### 사용법
+
+1. 씬에서 커브(트랜스폼이든 셰이프든)를 고르고 **List Selected Curves** 로 담는다 — 셰이프 변환 · 선 굵기와 같은 리스트.
+2. **On** / **Off** / **Toggle** 중 하나를 누른다. 끝. 한 번 누름이 undo 한 스텝이다.
+
+| 버튼 | 뜻 |
+|------|-----|
+| **On** | 목록의 모든 커브 셰이프 `alwaysDrawOnTop = on` |
+| **Off** | 전부 `off` (보통의 깊이 정렬 그리기) |
+| **Toggle** | **셰이프마다 반대로** — 켜진 건 끄고 꺼진 건 켠다. 로그에 `N now on, M now off` |
+
+### 알아둘 것
+
+- 커브 하나에 셰이프가 여럿이면(Combine 결과 등) **모든 nurbsCurve 셰이프**에 쓴다.
+- **이미 그 값인 셰이프는 쓰지 않는다** — 로그에 `N shape(s) were already ON.` 으로만 센다(undo 큐도 더럽히지 않는다).
+- 커브가 아닌 항목(`not a curve`) · 어트리뷰트가 없는 구버전 · 잠기거나 연결된 어트리뷰트(`locked or connected`) 는 사유와 함께
+  건너뛰고 나머지는 계속 처리한다. 리스트는 UUID 로 되찾으므로 리네임 뒤에도 같은 커브를 잡는다.
+- 코어 `curve_manager.set_always_draw_on_top(curves, state)` — `state` True / False / None(toggle), 반환 `(changed, skipped)`.
+  검증 `tests/test_draw_on_top.py` 30 항목(mayapy 2024). **마야 GUI 확인 아직.**
+
 ---
 
 ## Edit > Wrap (v01.03~)

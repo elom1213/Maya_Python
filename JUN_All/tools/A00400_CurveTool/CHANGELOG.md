@@ -1,5 +1,22 @@
 # Changelog — A00400_CurveTool
 
+## v01.30 (2026-10-30)
+**[Feature] `Display > Shape Edit` — Always Draw On Top (On / Off / Toggle).**
+
+- 리스트에 담은 커브(트랜스폼이든 셰이프든)의 **모든 `nurbsCurve` 셰이프**에 `alwaysDrawOnTop` 을 쓴다. 켜진 커브는
+  뷰포트에서 다른 지오메트리에 가려지지 않고 **늘 위에 그려져** 메시 안에 묻힌 컨트롤러도 보이고 잡힌다. 표시 전용 —
+  형상 · 트랜스폼 · 렌더 무관. 원래 `A00145_RigConnect > Attribute > Set Value` 로 매번 하던 일을(너무 잦아서) 버튼으로 옮겼다.
+- **Toggle** 은 셰이프마다 반대로(켜진 건 끄고 꺼진 건 켠다). 이미 그 값인 셰이프는 쓰지 않고 로그에 "N shape(s) were already ON"
+  으로만 센다. 커브가 아닌 항목 · 잠기거나 연결된 어트리뷰트는 사유와 함께 건너뛰고 나머지는 계속. **한 번 누름 = undo 한 스텝.**
+- 셰이프 변환 · 선 굵기와 **같은 커브 목록**을 쓴다(v01.21 의 판단 그대로 — 같은 커브를 두 번 담지 않는다).
+- **[UI] 리스트가 최소 높이로 열린다.** From Edges · From Points · Ribbon · Joints · Combine · Replace · Shape Edit 의 목록이
+  `QListWidget` 기본 sizeHint(192px) 대신 각자의 최소 높이(140 ~ 170)로 열린다(공용 TSL `list_hint_height`). 창을 늘리면 예전처럼
+  따라 늘어난다. 같은 날 Framework tabFit 보정(숨은 가장 긴 페이지에 끌려가던 것)과 함께 — 사용자가 지적한 8개 탭의 세로가
+  전부 자기 페이지 높이가 됐다(오프스크린 실측 `[1125 ×3]` → From Edges 807 · From Points 829 · Ribbon 777 · Smooth 438 ·
+  Wrap 625 · Joints 917 · Combine 793 · Replace 703).
+- 검증: `tests/test_draw_on_top.py` mayapy 2024 **30 항목**(트랜스폼/셰이프 입력 · 셰이프 둘 · toggle · 커브 아님 · 잠김 · 이미 그 값 ·
+  UI 버튼 · 로그 · undo/redo 한 스텝 · 리네임 뒤 UUID), `tests/test_ribbon.py` 75/75 그대로. **마야 GUI 확인 아직.**
+
 ## v01.29 (2026-10-30)
 **[Feature] `Create > Ribbon` — 커브를 따라 납작한 NURBS 서피스(리본)를 만든다.**
 

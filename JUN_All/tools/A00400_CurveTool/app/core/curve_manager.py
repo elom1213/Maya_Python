@@ -190,6 +190,61 @@ def set_line_width(curves, width):
     return changed, skipped
 
 
+def get_always_draw_on_top(node):
+    """첫 nurbsCurve shape 의 alwaysDrawOnTop (True/False). 커브가 아니거나 못 읽으면 None."""
+    for shape in curve_shapes(node):
+        try:
+            return bool(cmds.getAttr(shape + ".alwaysDrawOnTop"))
+        except Exception:                                  # noqa: BLE001
+            return None
+    return None
+
+
+def set_always_draw_on_top(curves, state):
+    """리스트업된 커브(트랜스폼이든 셰이프든)의 **nurbsCurve 셰이프**마다 `alwaysDrawOnTop` 을 쓴다.
+
+    켜면 그 커브는 뷰포트에서 **다른 지오메트리에 가려지지 않고 늘 위에 그려진다** — 메시 안에 묻힌
+    컨트롤러를 잡기 쉽게 하는 데 쓴다. 형상 · 히스토리 · 렌더와는 무관한 **표시 전용** 어트리뷰트다
+    (Maya 2019+, nurbsCurve 와 mesh 셰이프에 있고 nurbsSurface 에는 없다).
+
+    state : True(켬) / False(끔) / None(**셰이프마다 반대로** 뒤집기)
+
+    Returns (changed, skipped)
+      changed : (shape, 새 값) 리스트 — 이미 그 값이던 셰이프는 쓰지 않고 `unchanged` 로 건너뛴다
+      skipped : (이름, 사유) 리스트 — 커브가 아님 / 어트리뷰트 없음(구버전) / 잠기거나 연결됨 / 이미 그 값
+    """
+    changed = []
+    skipped = []
+    for name in curves or []:
+        shapes = curve_shapes(name)
+        if not shapes:
+            skipped.append((name, "not a curve"))
+            continue
+        for shape in shapes:
+            if not cmds.attributeQuery("alwaysDrawOnTop", node=shape, exists=True):
+                skipped.append((shape, "no alwaysDrawOnTop attribute (Maya 2019+)"))
+                continue
+            plug = shape + ".alwaysDrawOnTop"
+            try:
+                now = bool(cmds.getAttr(plug))
+            except Exception as exc:                       # noqa: BLE001
+                skipped.append((shape, str(exc)))
+                continue
+            want = (not now) if state is None else bool(state)
+            if want == now:
+                skipped.append((shape, "already %s" % ("on" if now else "off")))
+                continue
+            if not cmds.getAttr(plug, settable=True):
+                skipped.append((shape, "locked or connected"))
+                continue
+            try:
+                cmds.setAttr(plug, want)
+                changed.append((shape, want))
+            except Exception as exc:                       # noqa: BLE001
+                skipped.append((shape, str(exc)))
+    return changed, skipped
+
+
 def reverse_curves_by_axis(curves, mode, cv0_at_max=True):
     """커브들의 방향을 지정 축 기준으로 통일한다.
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-29
+# last Update date : 2026-10-30
 # A00400_CurveTool - Qt UI
 #
 # 1) 선택한 메시 엣지에 부착된 커브를 만든다. 떨어져 있는 엣지 덩어리(연결 성분)마다
@@ -144,8 +144,9 @@ class MainWindow(QWidget):
          "_build_replace_tab"),
         ("Shape Edit",
          "Shape Edit - work on the curve shape itself: resize, move and rotate it "
-         "around each curve's own pivot, and set how thick it is drawn. The "
-         "transform channels are never touched.",
+         "around each curve's own pivot, set how thick it is drawn, and whether it "
+         "is always drawn on top of other geometry. The transform channels are "
+         "never touched.",
          "_build_shape_edit_tab"),
     )
 
@@ -276,7 +277,7 @@ class MainWindow(QWidget):
         # 손으로 씬에서 커브를 골라 'List Selected Curves' 로 담을 수도 있다.
         self.tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Curves", select_label="List Selected Curves",
-            show_sort=False, list_min_height=170, log_callback=self.log)
+            show_sort=False, list_min_height=170, list_hint_height=170, log_callback=self.log)
         root.addWidget(self.tsl, 1)
 
         # ---------------- 2) 방향 정렬 ----------------
@@ -557,7 +558,7 @@ class MainWindow(QWidget):
         self.tsl_points = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Objects / Components", select_label="List Selected",
             show_sort=False, show_reverse=True, show_order=True, order_default=True,
-            list_min_height=170, log_callback=self.log)
+            list_min_height=170, list_hint_height=170, log_callback=self.log)
         root.addWidget(self.tsl_points, 1)
 
         opt_box = QGroupBox("Curve")
@@ -657,7 +658,7 @@ class MainWindow(QWidget):
 
         self.tsl_ribbon = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Curves", select_label="List Selected Curves",
-            show_sort=False, list_min_height=150, log_callback=self.log)
+            show_sort=False, list_min_height=150, list_hint_height=150, log_callback=self.log)
         root.addWidget(self.tsl_ribbon, 1)
 
         opt_box = QGroupBox("Ribbon")
@@ -1261,7 +1262,7 @@ class MainWindow(QWidget):
 
         self.tsl_joints = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Curves / Surfaces", select_label="List Selected",
-            show_sort=False, list_min_height=140, log_callback=self.log)
+            show_sort=False, list_min_height=140, list_hint_height=140, log_callback=self.log)
         root.addWidget(self.tsl_joints, 1)
 
         # ---------------- 조인트 ----------------
@@ -1537,10 +1538,10 @@ class MainWindow(QWidget):
 
         self.tsl_combine_src = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Source", select_label="Select Source",
-            show_sort=False, list_min_height=140, log_callback=self.log)
+            show_sort=False, list_min_height=140, list_hint_height=140, log_callback=self.log)
         self.tsl_combine_tgt = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Target", select_label="Select Target",
-            show_sort=False, list_min_height=140, log_callback=self.log)
+            show_sort=False, list_min_height=140, list_hint_height=140, log_callback=self.log)
         list_row = QHBoxLayout()
         list_row.addWidget(self.tsl_combine_src)
         list_row.addWidget(self.tsl_combine_tgt)

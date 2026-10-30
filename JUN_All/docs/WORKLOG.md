@@ -32,6 +32,19 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-30 (오늘)
 
+> [!summary] Framework **tabFit 보정 + A00170_driverTool v01.35** — Remap Value · Spherical Eye · AttachCrv > Default 가 **가장 긴 Seal 페이지 높이**로 열려 리스트가 650px 까지 늘어나던 것 수정(사용자: "세로가 너무 길다, 특히 리스트 — 절반으로"). `#Framework` `#A00170_driverTool`
+- 원인(mayapy 오프스크린 실측): **Qt 5.15 `QTabWidget.sizeHint()` 는 숨은 페이지의 `Ignored` 정책을 보지 않고 모든 페이지 sizeHint 의 최댓값을 센다**(Ignored 줘도 951 그대로, minimumSizeHint 만 501 → 201). 10-29 tabFit 은 그 정책에 의존했는데, 페이지가 전부 `QScrollArea`(sizeHint 24h 로 잘려 다 비슷)인 A00275 로 확인해서 몰랐다. 페이지가 맨 위젯인 툴은 모든 탭이 가장 긴 페이지 높이(A00170 1354 ×5). 현재 페이지에 글줄 바꿈 라벨이 있으면 `heightForWidth` 경로(hfw 가진 페이지들의 최댓값)로 바뀌어 Edge Loop 만 913 이었다.
+- 수정: 공용 `MOD_tabFit_qt_v01.tab_correction(within=None)` — 보이는 사슬의 탭 위젯마다 (현재 페이지 − 페이지들 최댓값) 을 Qt 와 같은 규칙(sizeHint / hfw)으로 재서 `content_height` 에 더하고, `shortfall()` 의 스크롤 내용 sizeHint 에도 더한다(없으면 `tabs_scroll` 툴 A00240 · A00480 · A00550 이 늘 가장 긴 페이지로 되돌아갔다 — 1차 전수 시험이 잡음). 공용 TSL 에 `list_hint_height`(QListWidget 기본 sizeHint 192px 대신) — A00170 세 탭 `LIST_HINT = 100`, 창을 늘리면 리스트는 따라 늘어난다.
+- 실측(오프스크린 px): A00170 Remap 1354 → 802 · Spherical 1354 → 734 · AttachCrv Default 1354 → 807(Distribute 663 · Follower 889) · Edge Loop 913 · Stretch 1274 · Seal 1354. A00400 `[1125 ×3] → [885, 845, 1125]`(하위 탭 438 ~ 1125 — 사용자가 이어서 지적한 8개 탭이 이 보정만으로 자기 높이로 열린다; 리스트는 아래 v01.30 에서 최소 높이로) · A00480 `[1062 ×4] → [1062, 634, 333, 556]` · A00210 `[1388 ×4] → [1388, 1121, 1148, 1388]`.
+- 시험: `Framework/tests/test_tab_fit_rollout.py` 31 툴 132 검사(페이지 잘림 · 보정 누락 검사 추가) 0 실패, `tools/A00170_driverTool/tests/test_tab_fit_ui.py` 45/45, A00275 34/34. 문서 `Framework_MOD_tabFit_qt.md`(규칙 1-b) · `Framework_MOD_tsl_qt.md` 2.2 · `A00170_driverTool.md`. **마야 GUI 확인 아직.**
+
+> [!summary] A00400_CurveTool **v01.30 `Display > Shape Edit` Always Draw On Top (On / Off / Toggle)** — 메시에 묻힌 컨트롤러를 늘 위에 그리기. A00145 `Attribute > Set Value` 로 매번 하던 일을 버튼으로 `#A00400_CurveTool`
+- 요청: "선택한 커브 · 커브 셰이프를 리스트업한 뒤 `alwaysDrawOnTop` 을 on/off. 너무 자주 하는 작업이라 더 편하게. A00400_CurveTool 에 추가."
+- 판단: 새 탭이 아니라 **Display > Shape Edit 의 커브 목록 아래 버튼 한 줄**(v01.21 Line Width 흡수와 같은 이유 — 같은 커브를 두 번 담지 않는다). mayapy 2024 확인: 어트리뷰트는 `nurbsCurve` · `mesh` 에 있고 `nurbsSurface` 에 없음, bool, setAttr 는 undo 됨.
+- 구현: `curve_manager.set_always_draw_on_top(curves, state)`(True/False/None=셰이프마다 반대로, `(changed, skipped)`, 이미 그 값이면 쓰지 않고 셈) · `get_always_draw_on_top` · `ShapeEditTab._build_draw_on_top_group` + `on_draw_on_top`(한 번 = undo 한 스텝, `undo_chunk()` 는 인자 없음). 로그 `Always Draw On Top ON -> N curve shape(s).` / `toggled on N ...: a now on, b now off.` / `N shape(s) were already ON.` / `[WARN] Skipped`.
+- 같은 판에서 From Edges · From Points · Ribbon · Joints · Combine · Replace · Shape Edit 의 TSL 에 `list_hint_height = list_min_height`(140 ~ 170) — 리스트가 최소 높이로 열린다(사용자 2차 요청 "A00400 8개 탭도 같은 이유로 길다"). 실측 `[1125 ×3]` → From Edges 807 · From Points 829 · Ribbon 777 · Smooth 438 · Wrap 625 · Joints 917 · Combine 793 · Replace 703 · Shape Edit 1159(새 그룹 +76, 리스트 −42).
+- 시험 `tests/test_draw_on_top.py` **30/30**, `test_ribbon.py` 75/75. CHANGELOG v01.30 · 가이드 절 추가. **마야 GUI 확인 아직.**(다른 세션의 v01.29 Ribbon 커밋 `ab5992b` 위에 얹음)
+
 > [!summary] A00400_CurveTool **v01.29 `Create > Ribbon`** — 커브를 따라 **납작한 NURBS 서피스(리본)** 를 만든다. 리깅에서 리본에 조인트 · 오브젝트를 붙이려는 용도 `#A00400_CurveTool`
 - 요청: `sfcTest/sample_001.mb` 의 `curve` → `loftedSurface` 같은 서피스를 만드는 기능. 리본에 본/오브젝트를 어태치하는 리깅용. 어느 툴에 넣을지 판단 후 구현.
 - 관찰(mayapy): 커브는 차수 3 · CV 6 · YZ 평면 · 노트 `0..1`. 서피스는 **U = 커브 CV · 차수 · 노트 그대로**, **V = CV 를 X 로 `-1, -⅓, +⅓, +1` 옮긴 네 줄**(차수 3) — 복제 둘을 `loft -d 3` 한 것과 CV 동일. 히스토리 없음. 샘플은 U 가 커브와 반대(u0 = 커브 끝).
