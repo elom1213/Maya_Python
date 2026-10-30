@@ -61,5 +61,8 @@
 # 02.32  Pin(Always on Top)이 켜져 있으면 Expand 로 뺀 창(View > Layers · Curve > Filters)도 다른 창 위에 머문다
 #        (공용 MOD_expand_qt_v01.set_stay_on_top - 떠 있는 창에 바로, 다음에 띄우는 창에도). 사용자 요청.
 
-VERSION = "02.32"
+# 02.33  Expand 창(View > Layers · Curve > Filters)은 **Pin 과 무관하게 늘 다른 창 위에**(생성 때 WindowStaysOnTopHint).
+#        v02.32 의 "Pin 을 따라가기" 는 그래프 에디터를 클릭하면 뒤로 숨는다는 보고 → 창을 만들 때 플래그를 준다.
+
+VERSION = "02.33"
 LAST_UPDATE = "2026-10-30"

@@ -89,6 +89,7 @@ self.panel.expanded_changed.connect(lambda *_: self._fit_window_later())
 | `object_name` | 자동 | 확장 창의 `objectName`. **툴마다 유일하게 줄 것** — 재실행 시 옛 창을 찾아 닫는 데 쓴다 |
 | `size` | `(420, 460)` | 확장 창 초기 크기. `None` 이면 Qt 기본값 |
 | `button_on_top` | `True` | 버튼 줄을 본문 위/아래 중 어디에 둘지 |
+| `stay_on_top` | `False` | `True` 면 확장 창을 **늘 다른 창 위에**(`WindowStaysOnTopHint`, 창을 만들 때 준다). 그래프 에디터 옆에 두는 작은 팔레트용 (2026-10-30, A00110_V02 두 패널) |
 
 ---
 
@@ -99,9 +100,10 @@ self.panel.expanded_changed.connect(lambda *_: self._fit_window_later())
 - **닫기는 창의 X** 로 한다 → 자동으로 제자리 복귀.
 - 패널 여러 개를 한 툴에 둬도 **서로 간섭하지 않는다**(각자 창을 가진다).
 - `maya` 의존이 없다 — 마야 밖에서도 import·생성된다.
-- **툴이 Pin(Always on Top) 이면 확장 창도 위에** — 확장 창은 툴 창의 자식 `Qt.Window` 라 툴 창 위에는 있지만, 툴 창에만
-  `WindowStaysOnTopHint` 를 주면 확장 창은 뷰포트 클릭에 뒤로 숨는다. 툴의 Pin 핸들러에서 `panel.set_stay_on_top(enabled)` 를
-  패널마다 부른다(A00110_V02 v02.32: `toggle_always_on_top` 이 `al_panel` · `cf_panel` 둘에).
+- **확장 창은 기본으로는 다른 마야 창 뒤로 숨을 수 있다** — 툴 창의 자식 `Qt.Window` 라 툴 창 위에는 있지만, 그래프 에디터 같은
+  다른 창을 클릭하면 그 뒤로 간다. 늘 위에 두려면 **생성 인자 `stay_on_top=True`**(A00110_V02 v02.33 의 Layers · Curve Filters).
+  보인 뒤에 바꾸는 `set_stay_on_top(bool)` 도 있지만(창을 다시 show 한다), 처음부터 플래그를 주는 쪽이 확실하다 —
+  v02.32 에서 Pin 토글을 따라가게만 했을 때 사용자 보고로 그래프 에디터를 클릭하면 뒤로 숨었다.
 
 ---
 

@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-30 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.33 Expand 창(View > Layers · Curve > Filters)은 Pin 과 무관하게 늘 다른 창 위에** `#A00110_animTool_V02` `#Framework`
+- 보고: "아직도 Layers 창이 다른 창 밑으로 간다 — 그래프 에디터를 선택하면 그 위로 간다. 앞으로 가도록."
+- 수정: 공용 Expand 위젯에 생성 인자 `stay_on_top`(창을 **만들 때** `WindowStaysOnTopHint`), A00110 두 패널에 `True`. v02.32 의 Pin 핸들러 전달은 뺐다(Pin 이 꺼져 있어도 위에). 헤드리스로는 Z-order 를 못 재현해 플래그 유무만 시험(38/38, P1~P6).
+- **마야 GUI 확인 필요** — 그래프 에디터를 클릭해도 Expand 창이 위에 남는지.
+
 > [!summary] A00110_animTool_V02 **v02.32 Pin 이 켜져 있으면 Expand 창(View > Layers · Curve > Filters)도 다른 창 위에** + 공용 Expand 위젯 `set_stay_on_top` `#A00110_animTool_V02` `#Framework`
 - 요청: "Layers 가 expand 되었고 Pin 이 활성화되어 있으면 이 창 또한 다른 창 위에."
 - 구현: `MOD_expand_qt_v01` 에 `set_stay_on_top(bool)` / `stay_on_top()` — 떠 있는 `_ExpandedWindow` 에 `WindowStaysOnTopHint` 를 바로(플래그 변경 뒤 재 show), 다음에 띄우는 창도 그 값으로 만든다. A00110 `toggle_always_on_top` 이 `al_panel` · `cf_panel` 에 전달. 확장 창은 툴 창의 자식 `Qt.Window` 라 툴 창 위에는 있지만 뷰포트 클릭엔 뒤로 숨어 플래그가 따로 필요했다.

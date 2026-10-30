@@ -2807,7 +2807,8 @@ class MainWindow(QWidget):
             title="Curve Filters",
             placeholder="Curve Filters are shown in the expanded window.",
             object_name=CURVE_FILTERS_WINDOW_OBJECT_NAME,
-            size=(420, 460))
+            size=(420, 460),
+            stay_on_top=True)       # v02.33 : 그래프 에디터를 클릭해도 뒤로 숨지 않게 늘 위에
         self.cf_panel.expanded_changed.connect(
             lambda *_: self._fit_window_later())
         page_layout.addWidget(self.cf_panel)
@@ -3060,7 +3061,8 @@ class MainWindow(QWidget):
             title="Animation Layers",
             placeholder="Animation Layers are shown in the expanded window.",
             object_name=LAYERS_WINDOW_OBJECT_NAME,
-            size=(380, 460))
+            size=(380, 460),
+            stay_on_top=True)       # v02.33 : 그래프 에디터를 클릭해도 뒤로 숨지 않게 늘 위에(Pin 과 무관)
         self.al_panel.expanded_changed.connect(lambda *_: self._fit_window_later())
         tab_layout.addWidget(self.al_panel)
         layout = self.al_panel.body
@@ -5347,10 +5349,8 @@ class MainWindow(QWidget):
         self.setWindowFlag(Qt.WindowStaysOnTopHint, enabled)
         self.pin_button.setText("Pinned" if enabled else "Pin")
         self.show()
-        # Expand 로 뺀 창(View > Layers · Curve > Filters)도 Pin 을 따라 위에 둔다 (v02.32).
-        for panel in (getattr(self, "al_panel", None), getattr(self, "cf_panel", None)):
-            if panel is not None:
-                panel.set_stay_on_top(enabled)
+        # Expand 로 뺀 창(View > Layers · Curve > Filters)은 v02.33 부터 Pin 과 무관하게 늘 위에 둔다
+        # (v02.32 의 "Pin 을 따라가기" 는 그래프 에디터를 클릭하면 뒤로 숨는다는 보고로 바꿈).
         self.log("Always on Top: " + ("ON" if enabled else "OFF"))
 
     def show_about(self, *args):

@@ -48,8 +48,9 @@ class _ExpandedWindow(QWidget):
         self.setObjectName(object_name)
         self.setWindowTitle(title)
         if stay_on_top:
-            # 툴 창이 Pin(WindowStaysOnTopHint) 상태면 확장 창도 같이 위에 - 안 그러면 뷰포트 클릭에 뒤로 숨는다.
-            self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
+            # 다른 창 위에 - 창을 만들 때 플래그를 주어야 확실하다(보인 뒤 바꾸면 창을 다시 만들어야 한다).
+            # 안 그러면 마야의 그래프 에디터 등 다른 창을 클릭할 때 그 뒤로 숨는다.
+            self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
         if size:
             self.resize(size[0], size[1])
 
@@ -89,13 +90,16 @@ class JUN_mod_expand_qt_v01(QWidget):
                      있다. None 이면 제목에서 만든다.
         size: 확장 창의 초기 크기 (w, h). None 이면 Qt 기본값.
         button_on_top: True(기본)면 버튼 줄을 본문 위에, False 면 아래에 둔다.
+        stay_on_top: True 면 확장 창을 **늘 다른 창 위에**(WindowStaysOnTopHint) 둔다 - 그래프 에디터 옆에
+                     두는 작은 팔레트용. 확장 창은 툴 창의 자식이라 툴 창 위에는 있지만, 마야의 다른 창
+                     (그래프 에디터 등)을 클릭하면 그 뒤로 숨는다. 기본 False. `set_stay_on_top` 으로도 바꾼다.
     """
 
     expanded_changed = Signal(bool)
 
     def __init__(self, title="Panel", button_label="Expand", placeholder=None,
                  object_name=None, size=(420, 460), button_on_top=True,
-                 parent=None):
+                 stay_on_top=False, parent=None):
         super().__init__(parent)
 
         self._title = title
@@ -104,7 +108,7 @@ class JUN_mod_expand_qt_v01(QWidget):
         self._size = size
         self._window = None
         self._filtered = None          # Close 를 감시 중인 툴 창
-        self._stay_on_top = False      # 확장 창을 다른 창 위에 둘지(툴의 Pin 을 따라간다)
+        self._stay_on_top = bool(stay_on_top)   # 확장 창을 다른 창 위에 둘지
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
