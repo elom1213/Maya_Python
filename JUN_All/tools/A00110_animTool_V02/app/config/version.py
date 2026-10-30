@@ -49,5 +49,8 @@
 #        나머지 채널을 되돌림(정적 채널 보호). 실제 씬(ZIHAN 두 발) 구간 오차 1.7e-6 · 범위 밖 0 · 1000f 10.5 s.
 #        계획서 docs/plans/A00110_animTool_V02_counter_layer_stationary_plan.md, 회귀 tests/test_counter_layer.py.
 
-VERSION = "02.29"
-LAST_UPDATE = "2026-10-29"
+# 02.30  View > Graph Focus `Frame margin (±)` 기본값 80 -> **30**(사용자 요청). 코어 상수
+#        graph_view_manager.DEFAULT_FRAME_MARGIN 하나로 스핀박스 초기값 · GraphFocusManager 폴백을 맞춤. 범위 · 동작은 그대로.
+
+VERSION = "02.30"
+LAST_UPDATE = "2026-10-30"

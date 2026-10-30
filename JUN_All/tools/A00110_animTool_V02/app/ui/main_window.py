@@ -37,6 +37,7 @@ from tools.A00110_animTool_V02.app.core import StaggerOffsetSession
 from tools.A00110_animTool_V02.app.core import EulerFilterManager
 from tools.A00110_animTool_V02.app.core import GraphViewManager
 from tools.A00110_animTool_V02.app.core import GraphFocusManager
+from tools.A00110_animTool_V02.app.core.graph_view_manager import DEFAULT_FRAME_MARGIN
 from tools.A00110_animTool_V02.app.core import FillKeyManager
 from tools.A00110_animTool_V02.app.core import CURRENT_LAYER
 from tools.A00110_animTool_V02.app.core import LayerKeyManager
@@ -2909,7 +2910,7 @@ class MainWindow(QWidget):
 
         토글이 켜져 있으면 SelectionChanged 를 감시하다가 선택이 바뀔 때마다
         그래프 에디터를 [현재프레임-margin, 현재프레임+margin] 구간으로 프레이밍한다.
-        margin(예: 80) 은 아래 스핀박스로 사용자가 지정한다."""
+        margin(기본 30, v02.30 전에는 80) 은 아래 스핀박스로 사용자가 지정한다."""
 
         tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
         tab_layout = QVBoxLayout(tab)
@@ -2930,18 +2931,18 @@ class MainWindow(QWidget):
         grp_layout.addWidget(self.btn_graph_focus)
 
         # -------------------------
-        # margin(± 프레임) 입력. 사용자가 '80' 같은 값을 여기서 정한다.
+        # margin(± 프레임) 입력. 기본 30(graph_view_manager.DEFAULT_FRAME_MARGIN), 사용자가 여기서 바꾼다.
         # -------------------------
 
         margin_row = QHBoxLayout()
         margin_row.addWidget(QLabel("Frame margin (±)"))
         self.sb_graph_margin = QSpinBox()
         self.sb_graph_margin.setRange(1, 100000)
-        self.sb_graph_margin.setValue(80)
+        self.sb_graph_margin.setValue(DEFAULT_FRAME_MARGIN)
         self.sb_graph_margin.setSuffix(" f")
         self.sb_graph_margin.setToolTip(
             "Frames to show before and after the current frame.\n"
-            "e.g. current 500f, margin 80  ->  shows 420f ~ 580f")
+            "e.g. current 500f, margin 30  ->  shows 470f ~ 530f")
         margin_row.addWidget(self.sb_graph_margin)
         margin_row.addStretch(1)
         grp_layout.addLayout(margin_row)

@@ -32,6 +32,16 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-30 (오늘)
 
+> [!summary] A00480_FileTool **v01.18 Reference > Lineage `Show`(File Name 기본 · Default 와 공유) + 배치 뒤집기(깊은 노드가 위)** · A00211_RefLineage v01.03 `#A00480_FileTool` `#A00211_RefLineage`
+- 요청: "Lineage 노드 글자도 Default 처럼 파일 이름만 보이는 모드를 추가하고 기본으로. Default 도 기본은 파일 이름." 이어서 "깊은 노드가 위, 얕은 노드가 아래 — 지금은 반대."
+- 구현: `reference_ops.FILE_VIEW_DEFAULT = name` · `FILE_VIEW_CHOICES`(두 페이지 공용), Lineage 페이지 `Show` 콤보 + `node_text / _apply_file_view / set_file_view`(A00210 NodeItem 이 `node.file_name` 을 그리므로 그 값을 모드에 맞춰 바꾸고 Export 직전엔 파일 이름으로 되돌림). 두 페이지가 같은 optionVar 를 쓰고 `showEvent` 에서 다시 읽어 따라간다. 배치는 A00211 `_layout` 에서 `y = (deepest − depth) · 150` — A00210 EdgeItem 이 위 노드 아래에서 아래 노드 위로 긋으므로 참조 대상이 위에 있어야 화살표가 아래로 흐른다(예전엔 거꾸로).
+- 시험 `test_reference_lineage.py` **38/38**(N1~N6 · L7/L7b), `test_reference.py` **47/47**(기본 File Name · 공유 따라가기). A00211 CHANGELOG 01.03 · 두 가이드. **마야 GUI 확인 아직.**
+
+> [!summary] A00110_animTool_V02 **v02.30 View > Graph Focus `Frame margin (±)` 기본 80 → 30** `#A00110_animTool_V02`
+- 요청: "View / Graph Focus 에서 frame margin 값이 기본으로 30 이도록 해."
+- 구현: 코어 상수 `graph_view_manager.DEFAULT_FRAME_MARGIN = 30` 하나로 스핀박스 초기값 · `GraphFocusManager` 의 getter 없을 때 폴백을 맞춤(예전엔 80 이 두 파일에 따로 박혀 있었다). 툴팁 예시 `500f ±30 → 470~530f`. 범위(1~100000) · 즉시 재프레이밍 동작은 그대로. 가이드 §Graph Focus 갱신.
+- 확인: mayapy 2024 오프스크린 `MainWindow().sb_graph_margin.value() == 30`, `tests/test_graph_focus_layers.py` 회귀. **마야 GUI 확인 아직.**
+
 > [!summary] A00480_FileTool **v01.17 Reference > `Lineage` 하위 탭 — 현재 씬의 레퍼런스 관계를 노드 그래프로** (A00211 데이터 + A00210 Lineage 노드 그대로, Export 로 A00210 에) `#A00480_FileTool`
 - 요청: "Reference 에 탭을 하나 추가. 현재 씬의 레퍼런스 관계를 노드로. A00211_RefLineage 로 데이터를 만들고 A00210 Lineage 와 같은 모양의 노드."
 - 구현: `ui/reference_lineage_page.py` — `rs.collect_scene_references` → `rs.build_graph`(A00210 `LineageGraph`), 그림은 A00210 `lineage_tab` 의 `NodeItem`(서브클래스로 우클릭만 교체 — A00210 의 `QMenu.exec` 는 PySide2 에 없고 key 없으면 비활성이라) · `EdgeItem(kind="ref")` · `LineageView`, `_render_graph / _reroute_edges / _update_scene_rect / fit_view` 는 A00210 과 같은 규칙. 노드 id → 절대 경로는 build_graph 의 seq 순서([씬] + 정렬)로 되찾아 Reveal / Copy Path 가 project root 없이도 된다. `Export to Lineage` = `lin.save` (덮어쓰기 확인 `confirm` 은 바꿔 끼울 수 있게). 백엔드 import 실패면 안내문 + 버튼 비활성.

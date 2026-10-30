@@ -19,7 +19,7 @@
 
 import maya.cmds as cmds
 
-from .graph_view_manager import GraphViewManager
+from .graph_view_manager import GraphViewManager, DEFAULT_FRAME_MARGIN
 
 
 class GraphFocusManager:
@@ -88,9 +88,9 @@ class GraphFocusManager:
 
     def _margin(self):
         try:
-            return int(self._margin_getter()) if self._margin_getter else 80
+            return int(self._margin_getter()) if self._margin_getter else DEFAULT_FRAME_MARGIN
         except (TypeError, ValueError):
-            return 80
+            return DEFAULT_FRAME_MARGIN
 
     def _fit_value(self):
         return bool(self._fit_getter()) if self._fit_getter else True

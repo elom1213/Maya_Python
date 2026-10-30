@@ -90,7 +90,7 @@
 7. **View** — **보기**를 돕는다(씬을 바꾸지 않는 유일한 카테고리).
    **Graph Focus**(v01.25~): 컨트롤러를 선택하면 그 컨트롤러의 **전체 키 구간**(예: 0~6000f)을
    다 보여주는 대신, **현재 프레임 기준 ± margin 프레임**만 그래프 에디터에 확대해서 보여준다
-   (예: 현재 500f, margin 80 → `420f~580f`). **Auto-Focus 토글**을 켜면 **컨트롤러(오브젝트)를
+   (예: 현재 500f, margin 30 → `470f~530f`). **Auto-Focus 토글**을 켜면 **컨트롤러(오브젝트)를
    새로 선택할 때만** 자동으로 프레이밍하고(v01.30~), margin 값은 **스핀박스로 사용자가 지정**한다.
    애니메이션 레이어가 있으면 **`Layer curves`**(v02.25~)로 선택/활성 레이어의 커브만 보이고 그 범위에 맞춘다.
 8. **Hot Key** (v02.19~) — 툴이 **열려 있는 동안만** 거는 키보드 단축키. 창을 닫으면 원래 바인딩으로 돌아간다.
@@ -521,7 +521,7 @@
 > **v01.25 — Graph Focus 탭 신설**: 선택 시 그래프 에디터를 현재 프레임 ± margin 구간으로 프레이밍하는
 > 탭을 추가했다. **Auto-Focus 토글**(체크형 버튼)이 켜지면 `SelectionChanged` scriptJob 으로 선택 변경을
 > 감시하다가, 마야 자체 프레이밍 뒤(`evalDeferred`)에 `animView` 로 `[현재-margin, 현재+margin]` 을
-> 덮어쓴다. **Frame margin(±)** 스핀박스로 프레임 수를 정하고(기본 80), **Fit value** 체크 시 세로(값)
+> 덮어쓴다. **Frame margin(±)** 스핀박스로 프레임 수를 정하고(기본 80 → v02.30 부터 30), **Fit value** 체크 시 세로(값)
 > 축도 구간 내 키 값 범위에 맞춘다. **Focus Now** 버튼은 토글과 무관하게 즉시 1회 프레이밍. 창을 닫으면
 > `closeEvent` 에서 scriptJob 을 정리한다. 새 매니저 `graph_view_manager.py`(프레이밍 로직) +
 > `graph_focus_manager.py`(scriptJob 라이프사이클), `app/ui/main_window.py` 변경.
@@ -1757,7 +1757,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 ```
 ┌ Focus Graph Editor around Current Frame ──────────┐
 │ [ Auto-Focus on Selection : OFF ]                 │  ← 체크형 토글 버튼
-│ Frame margin (±) [ 80 f ]                         │  ← 스핀박스 (사용자 지정)
+│ Frame margin (±) [ 30 f ]                         │  ← 스핀박스 (기본 30, v02.30~)
 │ [x] Fit value (vertical) axis too                 │
 │ Value margin (%) [ 10 % ]                         │  ← 세로 위/아래 여백 (v01.29~)
 │ Layer curves [ Selected layers        v ]         │  ← 애니메이션 레이어 필터 (v02.25~)
@@ -1773,8 +1773,8 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   프레이밍한다. 켠 순간의 현재 선택에도 즉시 1회 적용된다. 끄면 감시(scriptJob)를 중단한다. 창을
   닫으면 자동 정리된다. (v01.30~) 그래프 에디터의 **키프레임 선택/해제나 undo(`z`)** 로도
   `SelectionChanged` 가 발생하지만, 이때는 씬 오브젝트 선택이 그대로라 **자동 확대되지 않는다**.
-- **Frame margin (±)**: 현재 프레임 앞/뒤로 몇 프레임을 보여줄지. 예) 현재 500f, margin 80 →
-  `420f ~ 580f`. 토글이 켜진 상태에서 값을 바꾸면 **즉시 다시 프레이밍**된다.
+- **Frame margin (±)**: 현재 프레임 앞/뒤로 몇 프레임을 보여줄지. 기본 **30**(v02.30~, 그 전엔 80).
+  예) 현재 500f, margin 30 → `470f ~ 530f`. 토글이 켜진 상태에서 값을 바꾸면 **즉시 다시 프레이밍**된다.
 - **Fit value (vertical) axis too**(기본 ON): 가로(시간) 구간에서 선택 오브젝트의 애니메이션 커브를
   실제로 평가한 값 범위에 맞춰 **세로(값) 축**도 자동으로 프레이밍한다(v01.26~ 구간에 키가 없어도
   맞는다). 끄면 세로 줌은 건드리지 않고 가로만 바꾼다.

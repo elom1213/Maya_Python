@@ -5,10 +5,14 @@
 #
 # 선택 컨트롤러의 전체 키 구간(예: 0~6000f)을 다 보여주는 대신, 현재 프레임을
 # 기준으로 앞/뒤 margin 프레임만 그래프 에디터에 확대해서 보여준다.
-#   예) 현재 500f, margin 80  ->  [420f ~ 580f] 만 표시.
+#   예) 현재 500f, margin 30  ->  [470f ~ 530f] 만 표시.
 
 import maya.cmds as cmds
 
+
+# Frame margin(±) 기본값. v02.30 에서 80 -> 30 (사용자 요청 - 보통 한 동작 안팎만 보면 된다).
+# UI 스핀박스 초기값과 GraphFocusManager 의 getter 없을 때 폴백이 같은 값을 쓴다.
+DEFAULT_FRAME_MARGIN = 30
 
 # 그래프 에디터 아웃라이너의 애니메이션 레이어 필터(outlinerEditor -animLayerFilterOptions) 값.
 # 마야 GE 의 View > Animation Layer Filter 메뉴가 바로 이 값을 바꾼다(createOutlinerPanelMenu.mel).
