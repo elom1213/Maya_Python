@@ -13,7 +13,7 @@
 A portfolio of **production-grade Python tooling for Autodesk Maya and game pipelines**, written and
 maintained by **Ji Hun Park (Junny)**, a Technical Artist focused on rigging, facial, and pipeline automation.
 
-It contains **69 tool folders (54 actively maintained)** spanning two architectures — **in-Maya
+It contains **72 tool folders (57 actively maintained)** spanning two architectures — **in-Maya
 `maya.cmds` / PySide UIs** and **standalone PySide (Qt) desktop apps** — built on a **shared framework**
 (reusable widgets, theming, path management, undo handling, drag-&-drop installers).
 
@@ -130,22 +130,28 @@ A narrative work summary lives in
   **키 애니메이션으로 굽는다**. 마야 시뮬레이션 솔버(nucleus/nHair)를 쓰지 않아 게임 에셋에 그대로 사용.
 
 ### 애니메이션 · 모델링 · 메시
-- **`A00110_animTool_V02`** — 애니메이션 키 통합 툴(카테고리 8 × 기능 14). 키 복사/미러/베이크 ·
+- **`A00110_animTool_V02`** — 애니메이션 키 통합 툴(카테고리 8 × 기능 14+). 키 복사/미러/베이크 ·
   Follow · Fill Keys · 구간 한정 Euler Filter · **Stagger Offset**(팔로우스루) ·
   **Curve Filters**(Smooth / Intensity / Interp, 쿼터니언 처리로 짐벌 점프 방지) ·
-  **Noise**(결정론적 · 심리스 노이즈를 내보내는 노드) · Graph Focus.
+  **Noise**(결정론적 · 심리스 노이즈를 내보내는 노드) · Graph Focus ·
+  애니메이션 레이어 작업 — **Merge Layers**(프레임 구간 안에서만 병합, 월드 보존) ·
+  **Counter Layer**(글로벌 레이어가 바꾼 자식의 월드 위치·회전을 되돌리는 보정 레이어,
+  **Stationary spans only** = 발이 땅을 짚어 정지하던 구간만 고정) · Cut Keys to Layer 의 **Keep Result**.
 - **`A00180_abSymMesh`** — 메쉬 대칭/블렌드셰이프(OpenMaya 재구현).
 - **`A00300_meshDoctor`** — 메시 **읽기전용 진단 + 안전 원클릭 수정**(배치 진단 요약 테이블, JSON/TXT 로그).
 - **`A00380_MeshTool`** — **MeshDoctor**(A00300 이식) · **Peak**(노말 방향 팽창/수축, 후디니 peak 노드 개념) ·
   **Match**(좌 Source / 우 Targets · **By Weight** 스킨 웨이트 마스크) 탭.
 - **`A00400_CurveTool`** — 커브 생성·편집·표시(**Create / Edit / Display**). 엣지 덩어리마다 커브 ·
-  월드 위치를 순서대로 잇는 **From Points** · CV 수가 달라도 모양을 따라가는 **Wrap** ·
-  고른 CV 실시간 **Smooth** · **Line Width**.
+  월드 위치를 순서대로 잇는 **From Points** · 커브를 따라 납작한 NURBS 서피스를 만드는 **Ribbon** ·
+  CV 수가 달라도 모양을 따라가는 **Wrap** · 고른 CV 실시간 **Smooth** · 컨트롤 셰이프 편집(피벗 기준
+  Scale/Move/Rotate · **Line Width** · 메시에 묻힌 컨트롤러를 늘 위에 그리는 **Always Draw On Top**).
 - **`A00390_WindTool_V03`** — 본 체인에 위상이 어긋난 싸인 파형을 넣어 **바람에 일렁이는** 애니메이션 생성
   (Sine · Chain Wave · Chain Wave Lite). V03 은 드라이버마다 붙던 표현식 적분을 걷어내
   **재생이 V02 대비 144~202배**(결과 회전값은 실측 동일).
-- **`A00480_FileTool`** — 파일 입출력 · 경로 툴(**Export / Import / Path** 탭). `A00040_file_exporter_V02` 화면과
-  quickTool 의 File · Import option 버튼을 한 창에 모으고, 씬 폴더를 Export Path 에 바로 채우는 `Scene` 버튼을 더했다.
+- **`A00480_FileTool`** — 파일 입출력 · 경로 · 레퍼런스 툴(**Export / Import / Path / Reference** 탭). `A00040_file_exporter_V02` 화면과
+  quickTool 의 File · Import option 버튼을 한 창에 모으고, 씬 폴더를 Export Path 에 바로 채우는 `Scene` 버튼, ARKit **CSV** ·
+  모캡 FBX **Exact Rotation** 임포트, 현재 씬의 레퍼런스를 **중첩 트리**(파일 이름 / 전체 경로 보기)와 **노드 그래프**(A00211 데이터 ·
+  A00210 Lineage 노드 그대로, Export 로 A00210 에)로 보는 **Reference** 탭을 더했다.
 - **`A00040_file_exporter_V02`** — 타입 필터 기반 익스포트 자동화. · **`A00050_uvTool_V02`**(PySide 이식, 규칙 위반을 사유와 함께 로그), **`A00030_quickTool_V02`**(레거시 퀵툴의 PySide 재작성), **`A00200_CSV_tool`**.
 
 ### 씬 / 선택 · 네이밍 유틸
@@ -160,7 +166,7 @@ A narrative work summary lives in
 - **`A00250_SceneMemo`** — 오브젝트별 메모를 씬에 저장.
 
 ### 독립 실행(Standalone) / in-Maya PySide 앱
-- **`A00210_FileManager`** — 파일/버전 매니저(파일 참조관계 **Lineage 그래프 시각화**, Remote Git ↔ Local/NAS Source Mode, 폴더 구조 캡처·재생성, **Maya > Reference**(레퍼런스 일괄 임포트) · **Maya > Export**(세트 규칙으로 솎아 **베이크 → FBX**, mayapy 워커)). · **`A00211_RefLineage`** — 씬 reference → Lineage 내보내기.
+- **`A00210_FileManager`** — 파일/버전 매니저(파일 참조관계 **Lineage 그래프 시각화**, Remote Git ↔ Local/NAS Source Mode, 폴더 구조 캡처·재생성, **Maya > Reference**(레퍼런스 일괄 임포트) · **Maya > Export**(세트 규칙으로 솎아 **베이크 → FBX**, mayapy 워커)). · **`A00211_RefLineage`** — 씬 reference → Lineage 내보내기(같은 스캐너로 `A00480` Reference > Lineage 가 그래프를 툴 안에서 바로 보여 준다).
 - **`A00220_BackupTool`** — 지정 파일 **주기적/저장 시점 자동 백업**(크래시 대비). · **`A00240_PathTool`** — 자주 쓰는 폴더를 버튼/프로파일로 빠르게 열기 + **경로 트리**(이름·경로 필터, Shift 로 한꺼번에 펼치기, 경로 복사).
 - **`A00370_ToolLauncher`** — 툴 폴더 경로를 버튼에 담아 JUN 툴을 즉시 실행(PC가 바뀌어도 경로 자동 재매핑).
 - **`A00230_StartupTool`** — Windows 로그인 시 폴더 팝업 + standalone 툴 자동 실행.
@@ -181,6 +187,8 @@ A narrative work summary lives in
 
 | 시기 | 내용 |
 |------|------|
+| 2026-10-30 | **`A00480_FileTool` Reference 탭** — `Default` 트리에 **`Show` 콤보**(File Name 기본 / Full Path) · 새 하위 탭 **`Lineage`** = 현재 씬의 레퍼런스 관계를 **노드 그래프**로(`A00211_RefLineage` 데이터 + `A00210` Lineage 탭의 노드 · 화살표 그대로, 깊은 레퍼런스가 위 · 씬이 맨 아래, `Export to Lineage` 로 A00210 에) · **`A00400` Shape Edit `Always Draw On Top`**(On / Off / Toggle — 메시에 묻힌 컨트롤러를 늘 위에 그리기, A00145 Set Value 로 매번 하던 일) · **Framework tabFit 보정** — Qt 5.15 `QTabWidget.sizeHint` 가 숨은 페이지의 Ignored 정책을 안 봐 페이지가 맨 위젯인 툴은 모든 탭이 가장 긴 페이지 높이로 열렸다 → 현재 페이지 기준 보정(31툴 전수 시험) · 공용 TSL `list_hint_height`(리스트가 짧게 열림: `A00170` 세 탭 · `A00400` 8 탭) · **`A00110_V02`** Graph Focus Frame margin 기본 30 |
+| 2026-10-29 | **`A00110_V02` Bake > Counter Layer** — 글로벌 컨트롤만 든 레이어가 바꾼 자식(발)의 **월드 위치·회전을 되돌리는 보정 레이어**(뮤트 스냅샷 → `xform -m` → `setKeyframe -animLayer` 역산, 200 프레임 청크), 같은 날 **Hold = Stationary spans only** — 글로벌 이동은 살리고 **발이 땅을 짚어 정지하던 구간만 월드 고정**, 허공 구간이 이동량 비례로 차이를 흡수(실제 ZIHAN 씬 실측 계획서 → 구현, 회귀 92) · **Transfer > Layer `Cut Keys to Layer (Move)` Keep Result** — Base 에만 키가 있는 컨트롤을 레이어로 옮겨도 월드 결과 보존(blend 입력 identity + 정적값 합성) · Follow `Maintain Offset` 기본 ON |
 | 2026-10 하순 | **`A00400_CurveTool` Create > Ribbon** — 커브를 따라 납작한 NURBS 서피스(리본), 커브 CV·노트를 U 로 그대로 + `Width` 만큼 벌린 줄이 V(마야 loft 와 CV 동일), Direction Auto(커브 평면 노멀)/X/Y/Z · U 0..1 · Reverse U, 리깅용(Edit > Joints · A00170 AttachCrv 로 이어짐) · **`A00110_V02` Bake > Merge Layers** — 마야 Merge Layers 를 프레임 구간 안에서만(`a + b => b` / 새 레이어 / Base), `bakeResults -resolveWithoutLayer` 그대로 + 소스 중화, 정수 프레임 월드 1e-15 동일 · **탭마다 창 높이 자동 맞춤**(공용 `JUN_mod_tabFit_qt_v01`) — 탭을 바꾸면 창 높이가 지금 보이는 페이지에 맞춰 스크롤 없이 다 보인다, 탭 있는 PySide 툴 31곳에 툴당 한 줄 · **`A00110_V02` Graph Focus `Layer curves`** — 애니메이션 레이어가 있으면 선택한 레이어의 커브만 보이고 그 범위에 맞춤 · **공용 메뉴 `Help > Copy Tool Name + Tabs`** — 툴 이름 + 지금 보고 있는 탭 경로(`A00110_animTool_V02 / Transfer / Follow`)를 클립보드로, 메뉴 바를 쓰는 PySide 52곳 · cmds 7곳에 자동 반영 · **Pin 켜짐 = 연한 빨강** 공용 `pin_style` 을 Pin 버튼이 있는 9툴에 · **`A00340_SelectionTool` 네임스페이스 교체**(`Namespace` 콤보 · `Map...` 으로 다른 아바타 선택, 버튼 드래그 정렬) · **`A00470`** Copy Material 좌/우 리스트(1 → n · n 쌍) · **`A00275`** Weights > Move(조인트 n → k, Kangaroo 이식) · **`A00480`** Mocap FBX Import (Exact Rotation) · **`A00110_V02`** Follow `Point` 체크박스 |
 | 2026-10 하순 | **`A00210_FileManager` Maya > Export 하위탭** — 마야 파일 N 개에서 세트 규칙(`Bake`, json 하나 = 규칙 하나)에 맞는 파일을 솎아 재생 범위 · fps · 버전을 보이고 `bakeResults` → **FBX**(최상위 본은 월드로, 레퍼런스 임포트 · 네임스페이스 제거, 이름 Find/Replace + Insert, Overwrite 팝업) / FBX 만 · **`Framework/core/maya_fbx`** 승격(A00480 재노출) · **`A00490_KeyboardTool`** 더블클릭 실행 `Run_KeyboardTool.bat`(PySide6 있는 파이썬이면 바로, 없으면 전용 venv 한 번) |
 | 2026-10 하순 | **`A00560_JaliBatch` · `A00570_JaliReview` 신규** — 변환 결과 폴더 → JALI 클립 `.mb` N 개(mayapy 워커) → 레퍼런스 검수(Swap · Save Clip Edits · ARKIT_OUT 연결), **`Framework/jali`** · mayapy 러너 승격(A00540 v01.03 · A00210 v01.40 재노출) |
