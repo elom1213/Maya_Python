@@ -42,11 +42,14 @@ from Framework.qt.qt import *
 class _ExpandedWindow(QWidget):
     """본문을 넘겨받아 띄우는 독립 창. 닫히면 패널에게 알린다."""
 
-    def __init__(self, panel, title, object_name, size):
+    def __init__(self, panel, title, object_name, size, stay_on_top=False):
         super().__init__(panel.window(), Qt.Window)
         self._panel = panel
         self.setObjectName(object_name)
         self.setWindowTitle(title)
+        if stay_on_top:
+            # 툴 창이 Pin(WindowStaysOnTopHint) 상태면 확장 창도 같이 위에 - 안 그러면 뷰포트 클릭에 뒤로 숨는다.
+            self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
         if size:
             self.resize(size[0], size[1])
 
@@ -54,6 +57,16 @@ class _ExpandedWindow(QWidget):
         # 패널에서 넘겨받은 본문이 들어갈 자리
         self.body = QVBoxLayout()
         layout.addLayout(self.body, 1)
+
+    def set_stay_on_top(self, enabled):
+        """떠 있는 채로 WindowStaysOnTopHint 를 켜고 끈다(플래그를 바꾸면 창이 숨어 다시 show 한다)."""
+        enabled = bool(enabled)
+        if bool(self.windowFlags() & Qt.WindowStaysOnTopHint) == enabled:
+            return
+        was_visible = self.isVisible()
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, enabled)
+        if was_visible:
+            self.show()
 
     def closeEvent(self, event):
         self._panel.collapse()
@@ -91,6 +104,7 @@ class JUN_mod_expand_qt_v01(QWidget):
         self._size = size
         self._window = None
         self._filtered = None          # Close 를 감시 중인 툴 창
+        self._stay_on_top = False      # 확장 창을 다른 창 위에 둘지(툴의 Pin 을 따라간다)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -151,6 +165,18 @@ class JUN_mod_expand_qt_v01(QWidget):
     def is_expanded(self):
         return self._window is not None
 
+    def stay_on_top(self):
+        return self._stay_on_top
+
+    def set_stay_on_top(self, enabled):
+        """확장 창을 다른 창 위에 둘지(WindowStaysOnTopHint). 툴의 Pin 토글에서 부른다.
+
+        지금 떠 있는 창에 바로 적용하고, 다음에 띄우는 창도 이 값으로 만든다. 접힌 상태에서 불러도 기억만 한다.
+        """
+        self._stay_on_top = bool(enabled)
+        if self._window is not None:
+            self._window.set_stay_on_top(self._stay_on_top)
+
     def toggle(self):
         """버튼 동작 — 떠 있으면 앞으로 가져오고, 없으면 띄운다.
 
@@ -168,7 +194,7 @@ class JUN_mod_expand_qt_v01(QWidget):
         if self._window is not None:
             return
 
-        window = _ExpandedWindow(self, self._title, self._object_name, self._size)
+        window = _ExpandedWindow(self, self._title, self._object_name, self._size, self._stay_on_top)
         # addWidget 이 본문을 이 패널에서 떼어 창으로 옮긴다(복제가 아니다).
         window.body.addWidget(self._content)
         self._window = window

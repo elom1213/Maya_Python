@@ -1782,6 +1782,8 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 - **Mute / Solo / Lock** 체크 = `animLayer -e -mute/-solo/-lock`. `BaseAnimation` 은 Lock 만(체크박스가 Lock 열에만 있다).
 - **Auto refresh while visible**(기본 ON) — 마야에는 레이어 변경 이벤트가 없어, 목록이 보이는 동안 1.5 초마다 상태를 비교해
   레이어 에디터에서 바꾼 것(새 레이어 · 삭제 · 선택 · Mute 등)을 따라간다. `Refresh` 는 지금 바로.
+- **Pin 을 따라간다**(v02.32) — 툴의 `Pin`(Always on Top) 이 켜져 있으면 Expand 로 뺀 이 창도 다른 창 위에 머문다(Curve > Filters 의
+  Expand 창도 같다). Pin 을 끄면 같이 풀린다.
 - 로그: `Animation layers : 4 (selected : L2).` · `Layer selected : L1 (active)` · `L2 : mute on` · `Graph Editor filter : selected layers only (1 editor(s)).`
 
 > 구현: `app/core/anim_layer_manager.py` (`AnimLayerManager.tree / rows / set_selected / set_flag / graph_editor_filter / snapshot`),

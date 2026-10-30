@@ -58,5 +58,8 @@
 #        변화 따라가기(레이어 변경 이벤트가 없어 QTimer 비교). Curve > Filters 처럼 **Expand** 로 별도 창.
 #        core/anim_layer_manager.py (LayerMergeManager.layer_info 재사용), tests/test_anim_layers.py.
 
-VERSION = "02.31"
+# 02.32  Pin(Always on Top)이 켜져 있으면 Expand 로 뺀 창(View > Layers · Curve > Filters)도 다른 창 위에 머문다
+#        (공용 MOD_expand_qt_v01.set_stay_on_top - 떠 있는 창에 바로, 다음에 띄우는 창에도). 사용자 요청.
+
+VERSION = "02.32"
 LAST_UPDATE = "2026-10-30"

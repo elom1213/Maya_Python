@@ -5347,6 +5347,10 @@ class MainWindow(QWidget):
         self.setWindowFlag(Qt.WindowStaysOnTopHint, enabled)
         self.pin_button.setText("Pinned" if enabled else "Pin")
         self.show()
+        # Expand 로 뺀 창(View > Layers · Curve > Filters)도 Pin 을 따라 위에 둔다 (v02.32).
+        for panel in (getattr(self, "al_panel", None), getattr(self, "cf_panel", None)):
+            if panel is not None:
+                panel.set_stay_on_top(enabled)
         self.log("Always on Top: " + ("ON" if enabled else "OFF"))
 
     def show_about(self, *args):

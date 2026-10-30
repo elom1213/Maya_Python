@@ -2,7 +2,7 @@
 title: Framework 공용 위젯 — MOD_expand_qt (Expand / 별도 창)
 aliases: [JUN_mod_expand_qt, Expand 패널, 별도 창]
 tags: [framework, qt, widget, maya-python]
-updated: 2026-08-14
+updated: 2026-10-30
 ---
 
 # `JUN_mod_expand_qt_v01` — 본문을 별도 창으로 빼서 보는 패널
@@ -76,6 +76,7 @@ self.panel.expanded_changed.connect(lambda *_: self._fit_window_later())
 | `placeholder` | 본문이 나가 있는 동안 자리를 지키는 `QLabel` |
 | `expand()` / `collapse()` / `toggle()` | 프로그램에서 직접 제어 |
 | `is_expanded()` | 지금 별도 창에 나가 있나 |
+| `set_stay_on_top(bool)` / `stay_on_top()` | 확장 창을 **다른 창 위에**(`WindowStaysOnTopHint`) 둘지 (2026-10-30). 툴의 Pin 토글에서 부른다 — 떠 있는 창엔 바로, 다음에 띄우는 창도 그 값으로. 접힌 상태에서 불러도 기억만 한다 |
 | `expanded_changed(bool)` | 상태가 바뀔 때 방출(창 크기 재조정 등에 연결) |
 
 ### 생성 인자
@@ -98,6 +99,9 @@ self.panel.expanded_changed.connect(lambda *_: self._fit_window_later())
 - **닫기는 창의 X** 로 한다 → 자동으로 제자리 복귀.
 - 패널 여러 개를 한 툴에 둬도 **서로 간섭하지 않는다**(각자 창을 가진다).
 - `maya` 의존이 없다 — 마야 밖에서도 import·생성된다.
+- **툴이 Pin(Always on Top) 이면 확장 창도 위에** — 확장 창은 툴 창의 자식 `Qt.Window` 라 툴 창 위에는 있지만, 툴 창에만
+  `WindowStaysOnTopHint` 를 주면 확장 창은 뷰포트 클릭에 뒤로 숨는다. 툴의 Pin 핸들러에서 `panel.set_stay_on_top(enabled)` 를
+  패널마다 부른다(A00110_V02 v02.32: `toggle_always_on_top` 이 `al_panel` · `cf_panel` 둘에).
 
 ---
 

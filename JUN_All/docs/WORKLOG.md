@@ -32,6 +32,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-10-30 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.32 Pin 이 켜져 있으면 Expand 창(View > Layers · Curve > Filters)도 다른 창 위에** + 공용 Expand 위젯 `set_stay_on_top` `#A00110_animTool_V02` `#Framework`
+- 요청: "Layers 가 expand 되었고 Pin 이 활성화되어 있으면 이 창 또한 다른 창 위에."
+- 구현: `MOD_expand_qt_v01` 에 `set_stay_on_top(bool)` / `stay_on_top()` — 떠 있는 `_ExpandedWindow` 에 `WindowStaysOnTopHint` 를 바로(플래그 변경 뒤 재 show), 다음에 띄우는 창도 그 값으로 만든다. A00110 `toggle_always_on_top` 이 `al_panel` · `cf_panel` 에 전달. 확장 창은 툴 창의 자식 `Qt.Window` 라 툴 창 위에는 있지만 뷰포트 클릭엔 뒤로 숨어 플래그가 따로 필요했다.
+- 시험 `tests/test_anim_layers.py` **38/38**(P1~P5: 접힌 채 Pin → 기억, 핀 상태에서 expand → 위, Pin off/on 이 떠 있는 창에 즉시, Filters 도). **마야 GUI 확인 아직.**
+
 > [!summary] A00110_animTool_V02 **v02.31 View > `Layers` — 씬의 애니메이션 레이어 목록 · 어느 레이어를 볼지 선택 · Mute/Solo/Lock · Expand 별도 창** `#A00110_animTool_V02`
 - 요청: "현재 씬의 애니메이션 레이어가 리스트업되고 어떤 레이어를 볼지 선택. Curve > Filters 처럼 Expand 로 따로 창."
 - 구현: `core/anim_layer_manager.py` — `tree()`(에디터 순서: root 직계 `stack()` 뒤집어 맨 위부터, 자식은 부모 아래, Base 마지막, `LayerMergeManager.layer_info` + preferred) · `set_selected`(에디터 선택, 하나면 활성 — **마야의 `preferred=True` 는 다른 레이어의 것을 끄지 않아** 툴이 하나로 맞춤) · `set_flag`(Base 는 lock 만) · `graph_editor_filter`(열린 GE 의 `animLayerFilterOptions` selected/allAffecting) · `snapshot`. UI `_build_layers_page`: 공용 Expand 패널 안 QTreeWidget(Mute/Solo/Lock 체크 열, 굵게 = 활성) + Refresh · `Graph Editor: Selected Only / All Layers` · Auto refresh. 마야에 레이어 변경 이벤트가 없어(`scriptJob listEvents` 에 없음) 보이는 동안 1.5 s QTimer 로 스냅샷 비교.

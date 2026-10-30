@@ -31,8 +31,11 @@ panel.expanded_changed.connect(lambda *_: self._fit_window_later())
 - 버튼 재클릭 = 새 창 생성이 아니라 **떠 있는 창을 앞으로**. 닫기는 창의 X 로 한다
   (버튼이 '닫기'로 변하면 창을 찾다 누른 사용자가 창을 잃는다).
 - `object_name` 은 **툴마다 유일하게** — 재실행 시 옛 창을 찾아 닫는 데 쓴다.
+- **툴이 Pin(Always on Top) 이면 `panel.set_stay_on_top(enabled)` 를 Pin 핸들러에서 부른다**(2026-10-30). 확장 창은 툴 창의
+  자식 Qt.Window 라 툴 창 위엔 있지만 뷰포트 클릭에 뒤로 숨는다 - 플래그를 따로 줘야 한다. 떠 있는 창엔 바로, 다음 창도 그 값.
+  (A00110_V02 v02.32 `toggle_always_on_top` → `al_panel` · `cf_panel`)
 - maya 무의존 → 마야 밖에서도 import·검증 가능(단독 28항목).
 
-쓰는 곳: `A00110_animTool_V02` Curve > Filters (v02.04~).
+쓰는 곳: `A00110_animTool_V02` Curve > Filters (v02.04~) · View > Layers (v02.31~).
 `A00290_BSTool` Shape Editor 는 **아직 자체 구현**(이 위젯의 원형) — 옮길 수 있다.
 관련: [[wip-a00110-tab-taxonomy]], [[prefer-subtabs-over-stacked-collapsibles]]
