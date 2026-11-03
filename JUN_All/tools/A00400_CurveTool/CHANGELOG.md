@@ -1,5 +1,11 @@
 # Changelog — A00400_CurveTool
 
+## v01.31 (2026-11-03)
+**[UI] `Display > Replace` — 두 리스트에 `Sort` 버튼.**
+
+- `Shapes to replace` · `Replacement` 각각 이름순 정렬(공용 TSL 의 Sort, UUID 유지). 짝은 리스트 **순서대로**라
+  양쪽을 정렬하면 `arm_l_ctl` ↔ `arm_r_ctl` 처럼 이름 순서로 짝지어진다. 한쪽만 정렬하면 짝이 바뀌니 주의.
+
 ## v01.30 (2026-10-30)
 **[Feature] `Display > Shape Edit` — Always Draw On Top (On / Off / Toggle).**
 

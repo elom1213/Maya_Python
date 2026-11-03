@@ -86,5 +86,8 @@
 #        + Create(From Edges · From Points · Ribbon) · Edit(Joints · Combine) · Display(Replace) 의 리스트가
 #        **최소 높이로 열린다**(list_hint_height) — tabFit 보정(Framework 10-30)과 함께 탭 세로를 줄인다.
 
-VERSION = "01.30"
-LAST_UPDATE = "2026-10-30"
+# 01.31  Display > Replace - 두 리스트(Shapes to replace · Replacement)에 Sort 버튼(이름순, 공용 TSL).
+#        짝은 리스트 순서대로라 양쪽을 정렬하면 이름순으로 짝지어진다.
+
+VERSION = "01.31"
+LAST_UPDATE = "2026-11-03"
