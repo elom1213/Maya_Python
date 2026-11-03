@@ -24,5 +24,9 @@
 
 # 02.08  Pin 켜짐(Pinned) = 연한 빨강 - 공용 Framework/qt/pin_style (A00240_PathTool 과 같은 색).
 
-VERSION = "02.08"
-LAST_UPDATE = "2026-10-29"
+# 02.09  Animation > Delete BaseAnimation 추가 : MEL `delete BaseAnimation;` 과 같은 결과.
+#        루트 레이어(animLayer -q -root)를 지워 레이어 전부 삭제, Base 커브는 다시 직접 연결.
+#        undo 로 레이어가 안 돌아와서(mayapy 실측) 확인 팝업을 먼저 띄운다.
+
+VERSION = "02.09"
+LAST_UPDATE = "2026-11-03"

@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-10-30
+updated: 2026-11-03
 ---
 
 # 작업 일지 (WORKLOG)
@@ -31,3 +31,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
+## 2026-11-03 (오늘)
+
+> [!summary] A00030_quickTool_V02 **v02.09 Animation > `Delete BaseAnimation` — MEL `delete BaseAnimation;` 과 같은 결과** `#A00030_quickTool_V02`
+- 요청: "delete BaseAnimation 이 mel 명령이 친 것과 같은 결과가 되도록 버튼을 추가."
+- 구현: core `delete_base_animation()` — 루트를 `animLayer -q -root` 로 찾아(이름을 박지 않음) `cmds.delete`. 마야가 자식 레이어 · blend 노드 · 레이어 커브를 지우고 Base 커브를 다시 직접 연결한다. UI 는 새 `Animation` 섹션(Create 와 Shelf 사이) + 확인 팝업(기본 No).
+- mayapy 실측: 레이어 3단(Base · Layer1 · 자식 Layer2)에서 mel 과 **남은 노드 · 프레임 1/5/10 값 · tx 입력 연결이 같다**. 이 삭제는 **undo 로 레이어가 돌아오지 않아서**(standalone, undo 켠 상태) 팝업을 둔다. 레이어 없는 씬은 경고 한 줄. **마야 GUI 확인 아직** — 팝업 · GUI 에서의 undo.
+
+---

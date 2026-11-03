@@ -2,7 +2,7 @@
 title: A00030_quickTool_V02 사용법
 aliases: [Quick Tool V02, QuickToolV2, 퀵툴 V02]
 tags: [maya-python, tool-guide, quicktool, pyside, qt]
-updated: 2026-10-13
+updated: 2026-11-03
 ---
 
 # A00030_quickTool_V02 — Quick Tool (PySide 재작성)
@@ -11,7 +11,7 @@ updated: 2026-10-13
 다시 쓴 버전이다. **버튼도 동작도 그대로**고 달라진 것은 그릇이다.
 
 - **아키텍처**: (B) Standalone/Qt — PySide, Maya 내 실행 (`slate_dark` 테마)
-- **버전**: `app/config/version.py` (v02.07)
+- **버전**: `app/config/version.py` (v02.09)
 - **설치**: `__dragDrop_A00030_V02.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **QuickToolV2**
   → `tools.A00030_quickTool_V02.run(True)`
 - **V01 과 동시에 띄울 수 있다** — 창과 로그 확장창의 `objectName` 이 갈렸다.
@@ -43,7 +43,7 @@ updated: 2026-10-13
 ## 2. 화면 구성
 
 ```
-┌ Quick Tool v02.07 ──────────────────┐
+┌ Quick Tool v02.09 ──────────────────┐
 │ Help                        [ Pin ] │   ← 메뉴 + 항상 위 토글
 │ ┌ Update window ────────────────┐   │
 │ │ [ Selected ] [ All Windows ]  │   │
@@ -57,6 +57,8 @@ updated: 2026-10-13
 │ │ [ Import FBX normal ]         │   │   ← 버튼 하나면 가로를 다 쓴다
 │ ├ Create ──────────────────────┤    │
 │ │ [ Create texture file ] [ Cl… ]│  │
+│ ├ Animation ───────────────────┤    │
+│ │ [ Delete BaseAnimation ]      │   │   ← MEL `delete BaseAnimation;` 과 같은 결과 (확인 팝업)
 │ ├ Shelf ──────────────────────┤    │
 │ │ [ Update Shelves ]            │   │
 │ ├ Display ─────────────────────┤    │
@@ -180,6 +182,21 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
 - 저장하지 않은 씬이거나 폴더 자체가 없으면(드라이브 분리 등) 탐색기를 띄우지 않고 **경고만** 남긴다.
 - 여는 일은 공용 `Framework.core.file_opener.open_path` 에 맡긴다(`A00210` · `A00220` 과 같은 구현).
 
+### Animation — `Delete BaseAnimation` (v02.09~, 레거시에 없던 것)
+
+**MEL `delete BaseAnimation;` 을 친 것과 같은 결과**를 버튼 하나로 낸다 — 씬의 애니메이션 레이어가 **전부** 없어진다.
+
+- 루트 레이어를 `animLayer -q -root` 로 찾아 `cmds.delete` 한다. 이름 `BaseAnimation` 을 박지 않는다.
+- 마야가 알아서 **자식 레이어 · blend 노드 · 레이어 커브를 함께 지우고**, Base 레이어 커브는 어트리뷰트에
+  **직접 다시 연결**한다. 레이어에만 키가 있던 채널은 커브 없이 정적 값만 남는다(그 값도 mel 과 같다).
+- **누르면 먼저 묻는다** (`Yes` / `No`, 기본 `No`). mayapy 실측에서 이 삭제는 **undo 로 레이어가 돌아오지
+  않았다** — 레이어 키가 사라지는 작업이라 한 번 확인한다. 레이어가 없으면 묻지 않고 경고 한 줄.
+
+```
+Deleted BaseAnimation : 3 animation layer(s) removed, base curves reconnected.
+Layers : ['Layer1', 'Layer2']
+```
+
 ### Shelf — `Update Shelves` (v02.01~, 레거시에 없던 것)
 
 **지금 셸프 상태를 `prefs/shelves` 에 즉시 쓴다.**
@@ -233,7 +250,7 @@ A00030_quickTool_V02/
 ├── __dragDrop_A00030_V02.py    # 셸프 설치 (TOOL_LABEL = "QuickToolV2")
 ├── icon/                       # A00030_quickTool_V02.svg / .png
 └── app/
-    ├── config/version.py       # VERSION = "02.07"
+    ├── config/version.py       # VERSION = "02.09"
     ├── core/quick_ops.py       # ★ 버튼이 하는 일 전부 (maya.cmds/mel, UI 비의존)
     └── ui/main_window.py       # 창 · 섹션 · 버튼 · 로그
 ```
@@ -284,6 +301,9 @@ A00030_quickTool_V02/
 - `Update Shelves`(12항목) — UI 가 없으면 **트레이스백 없이 경고만** · 파일이 하나도
   안 바뀌면 **성공이라고 하지 않음** · 쓰인 개수를 정확히 보고 · 일부만 쓰이면 어느 것이
   안 쓰였는지 · MEL 실패는 경고 한 줄로
+- `Delete BaseAnimation`(v02.09) — 레이어 3단(Base · Layer1 · 그 자식 Layer2)에서 **MEL `delete BaseAnimation` 과
+  결과가 같다**(남은 노드 목록 · 프레임 1/5/10 의 tx/ty/tz · tx 입력 연결 대조) · 레이어가 없으면 경고 · 오프스크린 창에
+  버튼이 있고 레이어 없는 씬에서 누르면 경고 로그. **확인 팝업과 GUI 의 undo 동작은 마야 GUI 확인 아직.**
 - `run()` 진입점이 창을 띄우고, 다시 불러도 **보이는 창은 하나**
 
 > 실제 Maya GUI 육안 확인은 아직이다.

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-13
+# last Update date : 2026-11-03
 # A00030_quickTool_V02 - Qt UI (in-Maya)
 #
 # 레거시 maya.cmds 툴 `A00030_quickTool`(V01.16) 을 PySide 로 재작성했다.
@@ -19,6 +19,7 @@
 #   Create        : Create texture file · Cluster Each
 #   File          : Copy Scene Folder · Open Scene Folder  (v02.03~ Open 신규,
 #                   v02.07~ UI 에서 숨김 - HIDDEN_SECTIONS. 코어 · 핸들러는 그대로)
+#   Animation     : Delete BaseAnimation  (v02.09~ 신규 - MEL `delete BaseAnimation;` 과 같은 결과)
 #   Shelf         : Update Shelves  (v02.01~ 신규 - 레거시에 없던 것)
 #   Display       : Local Axis ON · Local Axis OFF
 #
@@ -101,6 +102,13 @@ class MainWindow(QWidget):
             ("Open Scene Folder", "on_open_scene_folder",
              "Open the folder of the current scene in the file explorer\n"
              "(the scene file is selected)."),
+        )),
+        ("Animation", (
+            ("Delete BaseAnimation", "on_delete_base_animation",
+             "Same as the MEL command 'delete BaseAnimation;'.\n"
+             "Deletes the root animation layer, so every animation layer goes with it.\n"
+             "Base layer curves are reconnected, layer-only channels keep a static value.\n"
+             "Asks first - undo does not bring the layers back."),
         )),
         ("Shelf", (
             ("Update Shelves", "on_update_shelves",
@@ -275,6 +283,25 @@ class MainWindow(QWidget):
     def on_open_scene_folder(self):
         self._log_all(core.open_scene_folder())
 
+    def on_delete_base_animation(self):
+        """루트 레이어 삭제 - undo 로 안 돌아오므로(실측) 레이어 목록을 보여 주고 묻는다."""
+        root = core.anim_layer_root()
+        if not root:
+            self._log("[WARN] No animation layers in the scene - nothing to delete.")
+            return
+
+        answer = QMessageBox.question(
+            self, "Delete BaseAnimation",
+            "Delete '{0}' and every animation layer under it?\n"
+            "Animation on the layers (not the base) is lost.\n"
+            "Undo does not bring the layers back.".format(root),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            self._log("Delete BaseAnimation : cancelled.")
+            return
+
+        self._log_all(core.delete_base_animation())
+
     def on_update_shelves(self):
         self._log_all(core.save_all_shelves())
 
@@ -321,6 +348,8 @@ class MainWindow(QWidget):
             "  attributes on the selected objects (all locked -> unlock, else lock).\n"
             "[Import option] Import FBX normal - use the normals in the file.\n"
             "[Create] Create texture file / Cluster Each.\n"
+            "[Animation] Delete BaseAnimation - same as MEL 'delete BaseAnimation;'\n"
+            "  (removes every animation layer, base curves stay).\n"
             "[Shelf] Update Shelves - write the shelves to disk now, so a Maya\n"
             "  started later sees them (Maya only saves them on exit).\n"
             "[Display] Local Axis ON / OFF - batch show or hide local axes.\n"
