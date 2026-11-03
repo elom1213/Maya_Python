@@ -42,6 +42,7 @@ from tools.A00110_animTool_V02.app.core import FillKeyManager
 from tools.A00110_animTool_V02.app.core import CURRENT_LAYER
 from tools.A00110_animTool_V02.app.core import LayerKeyManager
 from tools.A00110_animTool_V02.app.core import CounterLayerManager
+from tools.A00110_animTool_V02.app.core import LocatorBakeManager
 from tools.A00110_animTool_V02.app.core import LayerMergeManager
 from tools.A00110_animTool_V02.app.core import AnimLayerManager
 from tools.A00110_animTool_V02.app.core import CurveFilterSession
@@ -368,6 +369,9 @@ class MainWindow(QWidget):
     BAKE_PAGES = (
         ("Bake", "Bake - bake the listed objects down to dense keys over a "
          "frame range", "_build_bake_tab"),
+        ("Locator", "Locator - LOC + Anim: make a locator for each listed object and "
+         "bake its world motion onto it between Start and End (progress popup)",
+         "_build_locator_bake_tab"),
         ("Counter Layer", "Counter Layer - add an animation layer that keeps the "
          "listed objects' world position / rotation as they were without the "
          "checked layers (e.g. feet under an animated global control) - on every "
@@ -2091,6 +2095,91 @@ class MainWindow(QWidget):
         self.cb_bake_smart.toggled.connect(self._bake_update_smart_mode)
         self.btn_bake.clicked.connect(self.on_bake)
 
+        return tab
+
+    def _build_locator_bake_tab(self):
+        """리스트의 오브젝트마다 로케이터를 만들어 월드 움직임을 구간 베이크하는 탭 (Bake > Locator, v02.36).
+
+        마야에서 쓰던 `_SmartLayer` 의 `LOC + Anim` 버튼을 새로 만든 것 - 대상은 씬 선택이 아니라 리스트,
+        구간은 Start / End(Get Current · Get Sel Range · Get Timeline), 베이크 중 진행 팝업.
+        로직은 LocatorBakeManager (bakeResults 한 번 + 시간 변경 콜백으로 게이지).
+        """
+        tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
+        tab_layout = QVBoxLayout(tab)
+
+        # -------------------------
+        # 로케이터를 붙일 오브젝트
+        # -------------------------
+
+        self.lb_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Locator List", select_label="Select Objects",
+            list_min_height=110, log_callback=self.log)
+        self.lb_tsl.setToolTip(
+            "Objects to follow. Each one gets its own locator (<name>_LOC, at the world root)\n"
+            "that is baked to the object's world position / rotation between Start and End.")
+        tab_layout.addWidget(self.lb_tsl)
+
+        # -------------------------
+        # Frame range : Start / End (+ Get Current / Get Sel Range 내장) + Get Timeline
+        # -------------------------
+
+        range_grp = QGroupBox("Frame Range")
+        range_box = QVBoxLayout(range_grp)
+        self.lb_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_value=int(cmds.playbackOptions(query=True, minTime=True)),
+            end_value=int(cmds.playbackOptions(query=True, maxTime=True)),
+            log_callback=self.log)
+        range_box.addWidget(self.lb_range)
+        timeline_row = QHBoxLayout()
+        self.btn_lb_timeline = QPushButton("Get Timeline")
+        self.btn_lb_timeline.setToolTip("Fill Start / End with the current timeline (playback) range.")
+        self.btn_lb_timeline.clicked.connect(self.on_lb_get_timeline)
+        timeline_row.addWidget(self.btn_lb_timeline)
+        timeline_row.addStretch(1)
+        range_box.addLayout(timeline_row)
+        tab_layout.addWidget(range_grp)
+
+        # -------------------------
+        # Channels / Options
+        # -------------------------
+
+        ch_row = QHBoxLayout()
+        ch_row.addWidget(QLabel("Channels"))
+        self.cb_lb_t = QCheckBox("Translate")
+        self.cb_lb_r = QCheckBox("Rotate")
+        self.cb_lb_s = QCheckBox("Scale")
+        self.cb_lb_t.setChecked(True)
+        self.cb_lb_r.setChecked(True)
+        self.cb_lb_s.setToolTip("Also follow the world scale (scaleConstraint while baking).")
+        for cb in (self.cb_lb_t, self.cb_lb_r, self.cb_lb_s):
+            ch_row.addWidget(cb)
+        ch_row.addStretch(1)
+        tab_layout.addLayout(ch_row)
+
+        opt_row = QHBoxLayout()
+        self.cb_lb_euler = QCheckBox("Euler Filter")
+        self.cb_lb_euler.setChecked(True)
+        self.cb_lb_euler.setToolTip("Run the Euler filter on the baked rotate curves (removes 360 flips).")
+        self.cb_lb_select = QCheckBox("Select Locators")
+        self.cb_lb_select.setChecked(True)
+        self.cb_lb_select.setToolTip("Select the new locators when done.")
+        opt_row.addWidget(self.cb_lb_euler)
+        opt_row.addWidget(self.cb_lb_select)
+        opt_row.addStretch(1)
+        tab_layout.addLayout(opt_row)
+
+        # -------------------------
+        # 실행
+        # -------------------------
+
+        self.btn_lb_bake = QPushButton("LOC + Anim")
+        self.btn_lb_bake.setToolTip(
+            "Create a locator for every listed object and bake its world motion onto it\n"
+            "between Start and End. A progress popup shows the bake. One undo step.")
+        self.btn_lb_bake.clicked.connect(self.on_locator_bake)
+        tab_layout.addWidget(self.btn_lb_bake)
+
+        tab_layout.addStretch(1)
         return tab
 
     def _build_counter_layer_tab(self):
@@ -4621,6 +4710,68 @@ class MainWindow(QWidget):
             smart=smart,
             smart_tolerance=smart_tol,
         )
+        self.log(msg)
+
+    # --------------------------------------------------
+    # Handlers : Bake > Locator (LOC + Anim, v02.36)
+    # --------------------------------------------------
+
+    def on_lb_get_timeline(self, *_args):
+        start = int(cmds.playbackOptions(q=True, minTime=True))
+        end = int(cmds.playbackOptions(q=True, maxTime=True))
+        self.lb_range.set_range(start, end)
+        self.log("Range = timeline {0} - {1}".format(start, end))
+
+    def on_locator_bake(self, *_args):
+        items = self.lb_tsl.get_all_items()
+        if not items:
+            self.log("[Warning] Add objects to the Locator List first.")
+            return
+        # UUID 로 현재 이름을 되찾는다 (담은 뒤 리네임돼도 맞는 노드). 씬에서 사라진 항목은 빠진다.
+        nodes = self.lb_tsl.get_all_nodes() or items
+        if len(nodes) < len(items):
+            self.log("[Warning] {0} listed item(s) no longer exist in the scene - skipped.".format(
+                len(items) - len(nodes)))
+
+        values = self.lb_range.values()
+        if values is None:
+            self.log("[Warning] Enter Start / End.")
+            return
+        start, end = values
+        if start > end:
+            self.log("[Warning] Start ({0}) is greater than End ({1}).".format(start, end))
+            return
+        translate, rotate, scale = (self.cb_lb_t.isChecked(), self.cb_lb_r.isChecked(),
+                                    self.cb_lb_s.isChecked())
+        if not (translate or rotate or scale):
+            self.log("[Warning] Enable at least one channel group.")
+            return
+
+        dlg = JUN_mod_progress_qt.JUN_mod_progress_qt_v01(
+            self, title="LOC + Anim",
+            phases=[(LocatorBakeManager.PHASE_CREATE, 5),
+                    (LocatorBakeManager.PHASE_BAKE, 90),
+                    (LocatorBakeManager.PHASE_CLEANUP, 5)])
+        step = dlg.callback()
+
+        def progress(done, total, message=None):
+            step(done, total, message)
+
+        progress.phase = lambda name: dlg.begin_phase(name)
+
+        dlg.start()
+        elapsed = None
+        try:
+            locators, msg = LocatorBakeManager.bake(
+                nodes, start, end, translate=translate, rotate=rotate, scale=scale,
+                euler_filter=self.cb_lb_euler.isChecked(),
+                select_result=self.cb_lb_select.isChecked(),
+                progress=progress)
+        finally:
+            elapsed = dlg.elapsed()
+            dlg.finish()
+        if locators and elapsed is not None:
+            msg += "  ({0:.1f}s)".format(elapsed)
         self.log(msg)
 
     # --------------------------------------------------

@@ -71,5 +71,10 @@
 #        AnimLayerManager.delete_root() : 루트(animLayer -q -root)를 cmds.delete - 자식 레이어 · blend 노드 ·
 #        레이어 커브 삭제, Base 커브 재연결. undo 로 레이어가 안 돌아와서(mayapy 실측) 확인 팝업, 지운 뒤 View > Layers 갱신.
 
-VERSION = "02.35"
+# 02.36  Bake > Locator (새 하위 탭) - `LOC + Anim`: 리스트(TSL)의 오브젝트마다 로케이터 `<이름>_LOC` 를 월드에 만들고
+#        Start ~ End 동안 월드 위치 · 회전(+ 선택 Scale)을 베이크. 마야에서 쓰던 `_SmartLayer` 의 LOC + Anim 을 새로 만든 것.
+#        구간 = 공용 timeRange(Get Current · Get Sel Range) + Get Timeline. 진행 팝업(공용 progress) - bakeResults 한 번 +
+#        MDGMessage 시간 변경 콜백으로 프레임마다 게이지. 임시 컨스트레인트 삭제 · 오일러 필터 · 실패 시 정리 · undo 한 번.
+
+VERSION = "02.36"
 LAST_UPDATE = "2026-11-03"

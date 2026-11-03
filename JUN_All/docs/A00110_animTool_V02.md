@@ -75,6 +75,9 @@
    **Bake**(v01.05~): **리스트업한 컨트롤러/오브젝트**의 키를 구간 전체에 **정수 프레임 단위로**
    굽는다. 구간은 **현재 타임라인(플레이백)** 또는 **직접 입력(Custom)** 중 선택. Maya 네이티브
    `bakeResults`(C++)를 써서 **6000+프레임 × 50~100 컨트롤러** 같은 대규모도 빠르다.
+   **Locator**(v02.36~, `LOC + Anim`): 리스트의 오브젝트마다 **로케이터 `<이름>_LOC`** 를 월드에 만들어 Start ~ End
+   동안 그 오브젝트의 **월드 위치 · 회전**(선택 Scale)을 굽는다. 마야에서 쓰던 `_SmartLayer` 의 같은 버튼을 새로 만든 것 —
+   대상은 리스트, 구간은 Start / End(`Get Current` · `Get Sel Range` · `Get Timeline`), 베이크 중 **진행 팝업(게이지)**.
    **Counter Layer**(v02.26~): `global_ctl > foot_l/r_ctl` 에서 **`global_ctl` 만 든 레이어**(예: `lyr_glo`)에
    키를 찍어 발의 **월드** 위치·회전이 바뀌었을 때, 그 레이어는 그대로 두고 발의 월드가 **그 레이어가 없을 때와
    같아지도록** 키를 찍은 **보정 additive 레이어**를 새로 만든다. 레이어를 뮤트해 `worldMatrix` 를 재고
@@ -684,6 +687,7 @@ A00110_animTool_V02/
     │   ├── mirror_token_store.py # Framework.core.mirror_tokens 재노출(경로 호환용)
     │   ├── bake_manager.py       # 리스트 노드 구간 bake (Bake 탭, native bakeResults)
     │   ├── counter_layer_manager.py # 상위 레이어가 바꾼 자식의 월드 T/R 을 되돌리는 보정 레이어 (Bake > Counter Layer)
+    │   ├── locator_bake_manager.py  # 오브젝트마다 로케이터를 만들어 구간 월드 베이크 (Bake > Locator, v02.36)
     │   ├── layer_merge_manager.py # 애님 레이어 구간 한정 병합 = bakeResults -rwl + 소스 중화 (Bake > Merge Layers)
     │   ├── follow_match_manager.py # follower→target 월드 매치 베이크 (Follow 탭, OpenMaya + blend, maintain offset, 1<-n)
     │   ├── offset_hold_manager.py # 키를 hold+offset 구조로 재배치 (Timing > Offset)
@@ -742,7 +746,7 @@ A00110_animTool_V02.run(True)   # True = reload
 | **Timing** | 키의 **시점** | Move · Offset · Stagger |
 | **Curve** | 커브의 **값·형태** | Euler · Filters(Smooth · Intensity · Interp) |
 | **Transfer** | **다른 오브젝트로** 옮기기 | Copy Key · Mirror Key · Follow |
-| **Bake** | 결과를 **키로 굽기** | Bake · Counter Layer(v02.26~, Stationary 모드 v02.29~) · Merge Layers(v02.27~) |
+| **Bake** | 결과를 **키로 굽기** | Bake · **Locator**(v02.36~, LOC + Anim) · Counter Layer(v02.26~, Stationary 모드 v02.29~) · Merge Layers(v02.27~) |
 | **View** | **보기**(씬 불변) | Graph Focus · **Layers**(v02.31~, Expand 가능) |
 | **Hot Key** (v02.19~) | 툴이 열린 동안의 **단축키** | Main(Hold · Manipulator Space · Animation Layers v02.35~) |
 
@@ -1610,6 +1614,33 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   의존 리그에 안전). 순수 FK 라면 꺼서 가속할 수 있다.
 - **Bake List**: 베이크 실행. 결과(개수 / 구간 / 프레임 수 / 컨스트레인트 kept·baked down)가 로그에 출력.
 
+#### Locator — LOC + Anim, 오브젝트를 따라가는 로케이터 베이크 (v02.36~)
+
+마야에서 `_SmartLayer` 패키지로 쓰던 **`LOC + Anim`** 버튼(선택한 오브젝트마다 로케이터를 만들어 현재 타임라인 구간을
+베이크)을 새로 만든 것이다. 원래 버튼이 가끔 답답하거나 오류가 나서 다시 만들었다(사용자 요청 2026-11-03).
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ [Locator List]  Select Objects / Add / Del / Up / Down / Sort │  ← 공용 TSL. 대상은 이 리스트(씬 선택 아님)
+│ ┌ Frame Range ──────────────────────────────────────────┐│
+│ │ Start [ 1 ][Get Current]  End [ 120 ][Get Current] [Get Sel Range] ││  ← 공용 timeRange, 처음 값 = 타임라인
+│ │ [Get Timeline]                                        ││  ← Start / End = 재생 구간
+│ └───────────────────────────────────────────────────────┘│
+│ Channels [v] Translate [v] Rotate [ ] Scale               │
+│ [v] Euler Filter  [v] Select Locators                     │
+│ [ LOC + Anim ]                                            │
+└──────────────────────────────────────────────────────────┘
+```
+
+- **Locator List**: `Select Objects` 로 씬 선택을 담는다. 셰이프가 담겨 있으면 그 부모 트랜스폼, 같은 노드는 한 번만,
+  씬에 없는 항목은 건너뛰고 로그에 적는다. 담은 뒤 리네임돼도 UUID 로 맞는 노드를 찾는다.
+- **Frame Range**: `Get Current` = 그 칸에 현재 프레임, `Get Sel Range` = 그래프 에디터 등에서 **고른 키의 첫 · 마지막 프레임**을
+  두 칸에, `Get Timeline` = 재생 구간. 처음 열 때 값은 타임라인.
+- **Channels**: Translate · Rotate(기본) · Scale. Scale 은 월드 스케일을 따라간다(부모 스케일 포함).
+- **LOC + Anim**: 오브젝트마다 로케이터 **`<이름>_LOC`**(네임스페이스 · 경로를 뺀 이름, 이미 있으면 마야가 끝 숫자) 를
+  **월드 최상위**에 만들고 회전 순서를 원본과 맞춘 뒤 구간을 굽는다. 베이크 동안 **진행 팝업** — `Creating locators` →
+  `Baking`(프레임마다 `Frame n / End`) → `Cleaning up`. 끝나면 로그에 개수 · 구간 · 걸린 시간. **Undo 한 번**에 전부 사라진다.
+
 #### Counter Layer — 상위 레이어가 바꾼 월드 위치·회전 되돌리기 (v02.26~)
 
 ```
@@ -1970,6 +2001,11 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 3. **Channels**(기본 T·R) / **Keep constraints**(기본 ON=유지) / **Simulation**(기본 ON) 확인.
 4. **Bake List** → 리스트의 노드만 해당 구간에 정수 프레임 키로 구워진다(단일 Undo).
 
+### Bake > Locator (v02.36~)
+1. 따라갈 오브젝트(컨트롤러 · 조인트 등)를 씬에서 선택 → **Select Objects** 로 **Locator List** 에 채운다.
+2. **Frame Range**: 기본은 타임라인. 키 구간만 굽고 싶으면 그래프 에디터에서 키를 고르고 **Get Sel Range**.
+3. **LOC + Anim** → 진행 팝업이 끝나면 `<이름>_LOC` 로케이터들이 선택된 채로 남는다.
+
 ### Bake > Counter Layer (v02.26~)
 1. 글로벌 컨트롤만 든 레이어(예: `lyr_glo`)에 키를 찍은 뒤, 월드를 유지시킬 컨트롤(발 IK 등)을 선택 →
    **Select Objects** 로 **Counter List** 에 채운다(글로벌 컨트롤은 넣지 않는다).
@@ -2171,6 +2207,19 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   `pairBlend` 가 삽입되어 **컨스트레인트가 남고 키와 공존**한다(`blendParent1` 로 전환). OFF → `True`:
   구동을 끊고 키만 남기는 **bake down**. (이 툴은 컨스트레인트를 만들거나 `delete` 하지 않는다.)
 - **Channels**: 체크한 그룹만(T=tx/ty/tz, R=rx/ry/rz, S=sx/sy/sz). 모두 끄면 경고.
+
+### Bake > Locator (`locator_bake_manager.LocatorBakeManager.bake`)
+- **방식**: 로케이터 + 임시 `parentConstraint`(오프셋 없음, 끈 채널은 skip) (+ Scale 이면 `scaleConstraint`) →
+  **`bakeResults` 한 번**(`simulation=True`, 전 로케이터 · 전 구간, `disableImplicitControl=True`) → 임시 컨스트레인트 삭제 →
+  (옵션) 회전 커브 `filterCurve -f euler`. 리프레시 정지 · undo 한 덩어리 · 현재 시간 복원.
+- **게이지**: `bakeResults` 한 번은 진행률을 알려 주지 않는다. `simulation` 베이크가 프레임마다 시간을 옮길 때
+  `MDGMessage.addTimeChangeCallback` 이 불리는 것을 쓴다(mayapy 2024 실측: 1 ~ 200 → 201 회).
+  ★ 구간을 쪼개 여러 번 부르지 않는 이유: 첫 호출의 `disableImplicitControl` 이 컨스트레인트를 끊어 다음 구간이 안 따라온다.
+  그래서 **Cancel 은 없다**(C++ 베이크 한 번을 중간에 끊을 수 없다).
+- **실패 정리**: 중간에 예외가 나면 이번에 만든 로케이터 · 컨스트레인트를 지우고 `[Error]` 를 로그에 — 반쯤 만든 결과를 남기지 않는다.
+- **정확도**(시험 `tests/test_locator_bake.py` 25/25): 네임스페이스 + 키 있는 부모(회전 · 이동 · 스케일 2) 아래 zxy 컨트롤,
+  jointOrient 있는 조인트 모두 **월드 T/R 오차 1e-13**, Scale 켜면 월드 행렬 전체 1e-13. UI 시험 `tests/test_locator_bake_ui.py` 20/20
+  (탭 · Get Current / Get Sel Range / Get Timeline · 진행 팝업 3단계 · 게이지 100% · 리네임 뒤 UUID).
 
 ### Bake > Counter Layer
 - **엔진**(`counter_layer_manager.CounterLayerManager.create`): 두 번 훑기. ① 체크한 레이어(+ 새 보정 레이어)를
