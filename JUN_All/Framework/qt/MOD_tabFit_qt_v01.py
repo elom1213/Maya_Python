@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-30
+# last Update date : 2026-11-03
 """
 JUN_mod_tabFit_qt_v01 - 탭을 바꿀 때마다 창 높이를 **지금 보이는 탭 내용**에 맞춘다.
 
@@ -72,6 +72,13 @@ def _window_layout(window):
         return QWidget.layout(window)
     except Exception:
         return None
+
+
+def _enum_int(value):
+    """Qt enum -> int. ★ PySide6 (6.4+) 의 enum 은 파이썬 Enum 이라 `int(QSizePolicy.Expanding)` 가
+    TypeError 로 죽는다(PySide2 는 int 로 바뀐다). 이 때문에 PySide6 로 도는 standalone 툴(A00210 등)에서
+    fit 이 매번 'fit skipped' 로 끝나 탭 높이가 맞춰지지 않고 스크롤이 생겼다(2026-11-03). `.value` 를 먼저 본다."""
+    return int(getattr(value, "value", value))
 
 
 class JUN_mod_tabFit_qt_v01(QObject):
@@ -203,7 +210,11 @@ class JUN_mod_tabFit_qt_v01(QObject):
             current = tab_widget.currentWidget()
             if current is None or not self._on_visible_chain(tab_widget):
                 continue
-            use_hfw = bool(tab_widget.hasHeightForWidth())
+            # ★ 스크롤 칸(widgetResizable) 안의 탭은 hfw 경로를 타지 않는다 - 그 높이는 스크롤 내용의 `sizeHint()`
+            #   (= 페이지 sizeHint 최댓값, 정책 · hfw 무시)로 들어온다(`_scroll_wanted_height` · `shortfall`).
+            #   여기서 hfw 로 재면 hfw 없는 긴 페이지(A00210 File Manager)가 최댓값에서 빠져, 글줄 바꿈 라벨이 있는
+            #   페이지(A00210 Maya > Export)에서 창이 그 긴 페이지 높이로 열렸다 (2026-11-03).
+            use_hfw = bool(tab_widget.hasHeightForWidth()) and not self._inside_scroll(tab_widget)
             width = current.width()
             stack = tab_widget.findChild(QStackedWidget)
             if stack is not None and stack.width() > 0:
@@ -235,6 +246,15 @@ class JUN_mod_tabFit_qt_v01(QObject):
             if tallest is not None:
                 total += min(0, now - tallest)
         return total
+
+    def _inside_scroll(self, widget):
+        """창과 이 위젯 사이에 내용 크기를 따르는 QScrollArea(widgetResizable) 가 있는가."""
+        parent = widget.parentWidget()
+        while parent is not None and parent is not self._window:
+            if isinstance(parent, QScrollArea) and parent.widgetResizable():
+                return True
+            parent = parent.parentWidget()
+        return False
 
     def scroll_areas(self):
         """높이 보정이 필요한 `QScrollArea`(widgetResizable) 전부 =
@@ -322,7 +342,7 @@ class JUN_mod_tabFit_qt_v01(QObject):
         if policy.verticalPolicy() == QSizePolicy.Ignored:
             return
         if page.property(_ORIG_VPOLICY) is None:
-            page.setProperty(_ORIG_VPOLICY, int(policy.verticalPolicy()))
+            page.setProperty(_ORIG_VPOLICY, _enum_int(policy.verticalPolicy()))
         policy.setVerticalPolicy(QSizePolicy.Ignored)
         page.setSizePolicy(policy)
 

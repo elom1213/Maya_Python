@@ -7,7 +7,8 @@
 #
 # job.json:
 #   {"job": "scan",   "files": [...]}                                                          Reference 하위탭
-#   {"job": "import", "scan": <scan 결과 dict>, "checked": [norm...], "remove_namespaces": bool, "make_backup": bool}
+#   {"job": "import", "scan": <scan 결과 dict>, "checked": [norm...], "remove_namespaces": bool, "make_backup": bool,
+#                     "delete_display_layers": bool, "delete_anim_layers": bool}   (v01.43, 없으면 True)
 #   {"job": "probe",  "files": [...], "rule": {"set_name", "match", "ignore_namespace"}}      Export 하위탭 (v01.41, 계획서 §3.2)
 #   {"job": "export", "rule": {...}, "bake": bool, "channels": [...], "joints_only": bool, "euler_filter": bool,
 #                     "import_references": bool, "report": path, "items": [{"file", "start", "end", "out_fbx"}]}   (§3.3)
@@ -90,6 +91,8 @@ def main(argv):
                 job["scan"], set(job.get("checked", [])),
                 remove_namespaces=bool(job.get("remove_namespaces", True)),
                 make_backup=bool(job.get("make_backup", True)),
+                delete_display_layers_=bool(job.get("delete_display_layers", True)),
+                delete_anim_layers=bool(job.get("delete_anim_layers", True)),
                 log=log, progress=progress, should_cancel=should_cancel)
         elif kind == "probe":
             import scene_probe

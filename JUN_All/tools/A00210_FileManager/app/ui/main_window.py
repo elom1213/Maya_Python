@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-29
+# last Update date : 2026-11-03
 # A00210_FileManager - main window (Qt, standalone)
 #
 # Maya 씬 파일(.mb/.ma)의 작업 기록을 관리한다.
@@ -212,6 +212,19 @@ class LogEditDialog(QDialog):
             )
             for r in self._rows
         ]
+
+
+class _ShortPlainTextEdit(QPlainTextEdit):
+    """sizeHint 높이만 짧게 바꾼 QPlainTextEdit (v01.43). 늘어나는 것은 그대로."""
+
+    def __init__(self, hint_height, parent=None):
+        super().__init__(parent)
+        self._hint_height = hint_height
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        hint.setHeight(self._hint_height)
+        return hint
 
 
 class MainWindow(QWidget):
@@ -606,11 +619,14 @@ class MainWindow(QWidget):
         self.ipf_scan_dir = QLineEdit()
         btn_scan_browse = QPushButton("Browse...")
         btn_scan_browse.clicked.connect(lambda: self._browse_dir(self.ipf_scan_dir))
+        # v01.43 : Scan 옵션 행을 Scan Dir 행 오른쪽으로 올린다(세로 한 줄 절약). Browse... 까지 한 칸에.
+        scan_dir_row = QHBoxLayout()
+        scan_dir_row.addWidget(self.ipf_scan_dir, stretch=1)
+        scan_dir_row.addWidget(btn_scan_browse)
         grid.addWidget(QLabel("Scan Dir"), 3, 0)
-        grid.addWidget(self.ipf_scan_dir, 3, 1)
-        grid.addWidget(btn_scan_browse, 3, 2)
+        grid.addLayout(scan_dir_row, 3, 1, 1, 2)
 
-        scan_row = QHBoxLayout()
+        scan_row = scan_dir_row
         self.chk_recursive = QCheckBox("Recursive")
         # 이 툴로 기록(Save Record)한 파일만 목록에 남긴다. Recursive 스캔에서 수많은
         # 파일이 잡힐 때 '관리 중인 파일'만 추리는 용도. 재스캔 없이 즉시 재필터.
@@ -629,12 +645,11 @@ class MainWindow(QWidget):
         self.btn_file_types.setMenu(self._types_menu)
         btn_scan = QPushButton("Scan")
         btn_scan.clicked.connect(self.on_scan)
+        scan_row.addSpacing(8)
         scan_row.addWidget(self.chk_recursive)
         scan_row.addWidget(self.chk_recorded_only)
         scan_row.addWidget(self.btn_file_types)
-        scan_row.addStretch(1)
         scan_row.addWidget(btn_scan)
-        grid.addLayout(scan_row, 4, 1, 1, 2)
 
         # Remote / Branch / Author / Save settings
         meta_row = QHBoxLayout()
@@ -653,14 +668,14 @@ class MainWindow(QWidget):
         meta_row.addWidget(QLabel("Author"))
         meta_row.addWidget(self.ipf_author)
         meta_row.addWidget(btn_save_settings)
-        grid.addLayout(meta_row, 5, 0, 1, 3)
+        grid.addLayout(meta_row, 4, 0, 1, 3)
 
         # Remote URL (중앙 데이터 리포 git URL). 보통 번들 기본값 그대로 — 첫 Pull 시
         # Store Repo 가 비어 있으면 이 URL 을 기본 경로로 자동 clone 한다.
         self.ipf_remote_url = QLineEdit()
         self.ipf_remote_url.setPlaceholderText("data repo git URL (auto-clone on first Pull)")
-        grid.addWidget(QLabel("Remote URL"), 6, 0)
-        grid.addWidget(self.ipf_remote_url, 6, 1, 1, 2)
+        grid.addWidget(QLabel("Remote URL"), 5, 0)
+        grid.addWidget(self.ipf_remote_url, 5, 1, 1, 2)
 
         return group
 
@@ -706,7 +721,8 @@ class MainWindow(QWidget):
         log_header.addWidget(self.btn_expand_log)
         layout.addLayout(log_header)
 
-        self.txt_log_history = QPlainTextEdit()
+        # v01.43 : sizeHint 를 줄여 File Manager 탭을 짧게 연다(Qt 기본 192px). 창을 키우면 늘어난다.
+        self.txt_log_history = _ShortPlainTextEdit(100)
         self.txt_log_history.setReadOnly(True)
         layout.addWidget(self.txt_log_history, stretch=1)
 

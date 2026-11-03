@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-12
+# last Update date : 2026-11-03
 # A00210_FileManager / Maya 탭 - Reference 트리 위젯 (QTreeWidget)
 #
 # 스캔 결과(ref_scanner.scan)를 보여 준다.
@@ -32,8 +32,16 @@ NESTED_COLOR = "#9a9a9a"
 
 class ReferenceTree(QTreeWidget):
 
+    #: sizeHint 높이 (v01.43) - Qt 기본 192px 은 Reference 하위탭을 화면보다 길게 만든다. 창을 키우면 늘어난다.
+    HINT_HEIGHT = 100
+
     #: 체크된 최상위 레퍼런스 키 목록이 바뀌었다
     checksChanged = Signal(list)
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        hint.setHeight(self.HINT_HEIGHT)
+        return hint
 
     def __init__(self, parent=None):
         super().__init__(parent)

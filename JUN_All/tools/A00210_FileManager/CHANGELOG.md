@@ -2,6 +2,20 @@
 
 All notable changes to this tool are documented here.
 
+## [01.43] - 2026-11-03
+
+- **[Maya > Reference] `Delete Display Layers` · `Delete Anim Layers` 체크박스 (기본 둘 다 ON).** `Import Reference` 가 임포트 ·
+  네임스페이스 정리 **뒤, 저장 전에** 씬의 디스플레이 레이어(`defaultLayer` 제외)와 애니메이션 레이어를 지운다. 임포트된 레퍼런스의 레이어도
+  함께 지워지고, 레퍼런스로 남은 것(체크 안 한 레퍼런스)의 레이어는 지울 수 없어 남긴다(로그에 개수). 애니메이션 레이어는 MEL
+  `delete BaseAnimation;` 과 같은 결과 — Base 커브만 남고 다른 레이어에만 있던 키는 사라진다. 확인 팝업에 두 옵션 상태 표시.
+  mayapy 2024 실측: 레이어 3 + 애니 레이어 4 삭제, 남는 레퍼런스 레이어 유지, 오브젝트 · Base 커브 유지.
+- **[UI] 탭 스크롤 제거.** v01.42 의 탭 높이 자동 맞춤이 **PySide6 에서는 한 번도 돌지 않았다** — 공용 tabFit 이
+  `int(QSizePolicy.Policy)` 에서 TypeError(PySide6 enum)로 매번 `fit skipped` → 창이 처음 크기에 머물러 긴 탭은 스크롤. Framework 에서 고침.
+  또 루트 탭이 `tabs_scroll` 안에 있어 Maya > Export(글줄 바꿈 라벨) 에서 창이 File Manager 높이로 열리던 보정 오차도 고침.
+- **[UI] 탭 세로 길이 축소.** 리스트 · 트리의 Qt 기본 sizeHint(192px) 대신 짧게 연다(창을 키우면 늘어난다) — Maya 하위탭 폴더 트리 110 ·
+  Maya File 90 · Reference 트리 100 · Export 표 120 · File Manager `Log history` 100. File Manager Settings 는 Scan 옵션을 Scan Dir 줄로 올려 한 줄 절약.
+  실화면(2560x1552 작업 영역) 실측 창 높이: File Manager 1480 → 1348 · Maya > Reference 987 · Export 1363, **모든 탭 스크롤바 없음.**
+
 ## [01.42] - 2026-10-29
 
 - **[UI] 탭마다 창 높이가 자동으로 맞춰진다.** 탭(중첩 포함)을 바꾸면 창 높이가 지금 보이는 페이지에 맞게 늘거나 줄어

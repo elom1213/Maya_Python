@@ -423,7 +423,7 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 │                        │  │ [ ] Ref_fbx_01.fbx              File_03.ma          │
 └────────────────────────┘  │ [Check All] [Uncheck All]        Checked: 2 / 3     │
 Scanned: File_01.mb, File_03.ma (2)
-[x] Remove All Namespace  [x] Backup
+[x] Remove All Namespace  [x] Delete Display Layers  [x] Delete Anim Layers  [x] Backup     <- 레이어 둘은 v01.43
 [Get Reference]                                   [Import Reference]
 mayapy [C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe] [Browse...] [Detect]      <- v01.41 부터 Maya 탭 아래에 하나 (하위탭 공용)
 ```
@@ -442,14 +442,16 @@ mayapy [C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe] [Browse...] [Detect] 
    - `.ma` 는 파일 머리글만 **이 앱에서 바로** 읽는다. **`.mb` 가 하나라도 끼면(중첩 포함) mayapy 가 읽는다** — 마야 기동에
      몇 초가 걸리고 진행률 팝업이 `Starting mayapy...` 를 보인다.
 3. **체크** — 임포트할 레퍼런스를 체크한다. `Check All` / `Uncheck All`. 다시 Get Reference 해도 같은 파일은 체크가 남는다.
-4. **`Import Reference`** — 확인 팝업(파일 ← 레퍼런스 목록, Backup · Remove All Namespace 상태) 뒤, mayapy 가 **스캔한 마야
+4. **`Import Reference`** — 확인 팝업(파일 ← 레퍼런스 목록, Backup · Remove All Namespace · 레이어 옵션 상태) 뒤, mayapy 가 **스캔한 마야
    파일마다**: 백업 → 열기 → 그 파일이 부르는 **체크된** 레퍼런스를 임포트(언로드면 먼저 로드) → 올라온 중첩 레퍼런스도 임포트 →
-   네임스페이스 병합 → **원래 타입(.ma / .mb)으로 제자리 저장**. 진행률 팝업(파일 단위). Cancel 은 **지금 파일을 끝내고** 멈춘다
+   네임스페이스 병합 → 레이어 삭제(v01.43) → **원래 타입(.ma / .mb)으로 제자리 저장**. 진행률 팝업(파일 단위). Cancel 은 **지금 파일을 끝내고** 멈춘다
    (2분 안에 안 끝나면 프로세스를 끊는다). 체크한 레퍼런스를 안 부르는 파일은 건너뛴다. 실패한 파일은 **저장하지 않는다.**
 
 | 옵션 (기본 ON) | 뜻 |
 |---|---|
 | `Remove All Namespace` | 임포트 뒤 **씬의 모든 네임스페이스**를 루트로 병합한다. 레퍼런스로 남는 것의 네임스페이스는 지울 수 없으니 건너뛰고 개수만 로그. 이름이 겹치면 마야가 끝 숫자를 올린다(`cube02` → `cube03`, 로그는 없다) |
+| `Delete Display Layers` (v01.43) | 임포트 · 네임스페이스 정리 뒤 **씬의 디스플레이 레이어를 전부** 지운다(`defaultLayer` 는 마야 내부라 남는다). 오브젝트는 그대로, 레이어 소속만 풀린다. 임포트된 레퍼런스의 레이어도 지워지고, **레퍼런스로 남은 것의 레이어는 지울 수 없어** 남긴다(로그에 개수) |
+| `Delete Anim Layers` (v01.43) | **애니메이션 레이어를 전부** 지운다 — MEL `delete BaseAnimation;` 과 같은 결과(A00110 v02.35 `Delete BaseAnimation` 과 같은 방식). **Base 레이어 커브만 남고 다른 레이어에만 있던 키는 사라진다.** 남은 레퍼런스의 레이어가 있으면 루트를 못 지우니 지울 수 있는 레이어만 하나씩 지운다 |
 | `Backup` | 저장 전에 원본을 **그 파일 폴더의 `backup/`** 에 복사한다 — [`A00220_BackupTool`](A00220_BackupTool.md) 과 **같은 폴더**. A00220 은 `<이름>_BU.mb` / `_BU_NN`, 이 툴은 **`<이름>_REF_NN.mb`**(빈 다음 번호, 지우지 않음). `log.txt` 에 한 줄 |
 
 ### mayapy
@@ -707,3 +709,9 @@ A00210_FileManager/
 탭(중첩 포함)을 바꾸면 창 높이가 **지금 보이는 페이지**에 맞게 늘거나 줄어 스크롤 없이 다 보인다. 페이지가 모니터 작업 영역보다
 길면 화면 높이에서 멈추고(스크롤 영역이 있는 페이지는 그 페이지만 스크롤), 창 아래가 화면 밖이면 위로 올린다. 폭은 건드리지 않는다(처음 여는 크기는 예전 `fit_to_content` 그대로, 그 뒤 높이만 따라간다).
 공용 [`JUN_mod_tabFit_qt_v01`](Framework_MOD_tabFit_qt.md) — A00275 v01.38 과 같은 방식. **마야 GUI 확인 아직.**
+
+**v01.43 — 실제로 동작하게 고침 + 탭 축소.** A00210 은 PySide6 로 도는데, v01.42 의 tabFit 은 PySide6 enum 을 `int()` 로 바꾸다 매번
+`fit skipped` 로 끝나 **한 번도 높이를 맞추지 않았다**(창이 처음 크기에 머물러 긴 탭이 스크롤됐다). Framework 에서 고쳤고, 리스트 · 트리의
+기본 sizeHint(192px)를 짧게(트리 110 · Maya File 90 · Reference 100 · Export 표 120 · Log history 100) 바꿔 탭을 짧게 연다 — 창을 키우면 늘어난다.
+실화면(작업 영역 2560x1552) 실측 창 높이: File Manager 1348 · Path Structure 1160 · Lineage 1157 · Maya > Reference 987 · Export 1363, **전부 스크롤바 없음.**
+모니터가 이보다 낮으면 화면 높이에서 멈추고 그 탭만 스크롤된다.

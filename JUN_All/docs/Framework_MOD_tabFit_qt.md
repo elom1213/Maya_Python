@@ -92,6 +92,17 @@ self.tab_fit.set_enabled(False)       # 끄기 - 정책을 되돌리고 더는 �
   되므로, 짧게 열고 싶은 리스트는 공용 TSL 의 `list_hint_height` 로 준다([`Framework_MOD_tsl_qt.md`](Framework_MOD_tsl_qt.md) 2장, A00170 v01.35 = 100).
 - 버튼 + `QStackedWidget` 식 페이지 전환은 `QTabWidget` 이 아니라 따라가지 않는다. 그 툴은 `fit_later()` 를 직접 부른다.
 
+## PySide6 수정 (2026-11-03)
+
+- ★ **PySide6(6.4+)에서는 한 번도 돌지 않았다.** 숨은 페이지의 원래 세로 정책을 `int(policy.verticalPolicy())` 로 property 에 적는데,
+  PySide6 enum 은 파이썬 `Enum` 이라 `int()` 가 **TypeError** → `_fit_now` 가 삼키고 `fit skipped : int() argument must be ... not 'Policy'` 만 찍었다.
+  PySide2(마야 2024 이하)는 enum 이 int 로 바뀌어 문제가 없었고, 시험(`test_tab_fit_rollout.py`)도 mayapy(PySide2)라 못 잡았다.
+  standalone 으로 PySide6 에서 도는 툴(A00210 등)은 창이 처음 크기에 머물러 긴 탭이 스크롤됐다(사용자 보고). → `_enum_int()` = `.value` 를 먼저 본다.
+- ★ **스크롤 칸 안 탭은 hfw 경로로 재지 않는다.** 루트 탭이 `tabs_scroll` 안에 있으면 그 높이는 스크롤 내용의 `sizeHint()`(페이지 sizeHint 최댓값,
+  hfw 무시)로 들어온다. 그런데 `tab_correction` 이 현재 페이지에 글줄 바꿈 라벨이 있으면 hfw 경로(hfw 없는 페이지는 최댓값에서 빠짐)로 재서,
+  hfw 없는 긴 페이지만큼이 빠지지 않았다 — A00210 Maya > Export 에서 창이 File Manager 높이로 열렸다(오프스크린 1396 → 1279). `_inside_scroll()` 이면 hfw 끔.
+- 같은 날 롤아웃 시험 다시: **31 툴 · 134 검사 · 0 실패**(mayapy 2024, PySide2). A00210 은 PySide6 실화면(Windows 플랫폼)으로도 확인 — 모든 탭 스크롤바 없음.
+
 ## 검증 — 보정 뒤 전수 (2026-10-30, 31 툴 · 132 검사 · 0 실패)
 
 규칙 1-b 를 넣고 같은 `test_tab_fit_rollout.py` 를 다시 돌렸다. 검사 두 개를 더했다 — **보이는 현재 페이지(스크롤 영역 제외) 높이 ≥ 그 sizeHint

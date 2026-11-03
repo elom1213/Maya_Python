@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-12
+# last Update date : 2026-11-03
 # Framework - 폴더 트리 공용 위젯 `JUN_mod_fileTree_qt_v01` (Qt)
 #
 # A00240_PathTool 의 "Tree" 탭(app/ui/tree_tab.py, v01.19) 을 **그대로** Framework 로 승격했다
@@ -115,6 +115,21 @@ class _CheckableMenu(QMenu):
         super().mouseReleaseEvent(event)
 
 
+class _HintTreeWidget(QTreeWidget):
+    """sizeHint 높이만 바꾼 QTreeWidget - 기본 192px 은 창을 처음 열 때(tabFit) 페이지를 길게 만든다.
+    늘어나는 건 그대로라 창을 키우면 따라 커진다. hint_height=None 이면 QTreeWidget 그대로."""
+
+    def __init__(self, hint_height=None, parent=None):
+        super().__init__(parent)
+        self._hint_height = hint_height
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        if self._hint_height:
+            hint.setHeight(int(self._hint_height))
+        return hint
+
+
 class JUN_mod_fileTree_qt_v01(QWidget):
     """폴더 트리 위젯 - A00240 Tree 탭 본체. 생성 후 `on_build()` 전까지는 빈 트리다.
 
@@ -122,14 +137,16 @@ class JUN_mod_fileTree_qt_v01(QWidget):
     checkable_folders : 폴더 행(루트 포함)에 체크박스. 기본 False. 둘을 함께 켤 수도 있다.
                         (2026-10-13, A00240 Junction 의 "Tree..." 폴더 고르기용. `...` 생략 행은 없다.)
     default_types     : 처음 발견된 확장자 중 체크해 둘 것(점 없는 소문자 모음). None = 전부.
+    tree_hint_height  : 트리의 sizeHint 높이(px). None = Qt 기본(192). 짧게 열고 싶은 툴이 준다 (2026-11-03, A00210 Maya 탭).
     """
 
     #: 체크 상태가 바뀌었다 - 지금 체크된 절대경로 목록 (checkable_files / checkable_folders 일 때만)
     checksChanged = Signal(list)
 
     def __init__(self, parent=None, checkable_files=False, default_types=None,
-                 checkable_folders=False):
+                 checkable_folders=False, tree_hint_height=None):
         super().__init__(parent)
+        self._tree_hint_height = tree_hint_height
 
         self.checkable_files = bool(checkable_files)
         self.checkable_folders = bool(checkable_folders)
@@ -174,6 +191,8 @@ class JUN_mod_fileTree_qt_v01(QWidget):
         root.addWidget(self._build_controls())
 
         self.tree = self._make_tree_widget()
+        if self._tree_hint_height:
+            self.tree._hint_height = self._tree_hint_height
         root.addWidget(self.tree, stretch=1)
 
     def _build_controls(self):
@@ -322,7 +341,7 @@ class JUN_mod_fileTree_qt_v01(QWidget):
 
     def _make_tree_widget(self):
         """우클릭 Reveal 컨텍스트 메뉴가 붙은 QTreeWidget 을 만든다(메인/Expand 공용)."""
-        tree = QTreeWidget()
+        tree = _HintTreeWidget()
         tree.setHeaderLabels(["Name"])
         # 우클릭 Reveal / Copy file path + 더블클릭 = Reveal (v01.16) - 공용 헬퍼.
         # Qt 기본인 "더블클릭으로 펼치기/접기" 는 헬퍼가 끈다 - 열 때마다 트리까지 같이 펼쳐졌다 접힌다

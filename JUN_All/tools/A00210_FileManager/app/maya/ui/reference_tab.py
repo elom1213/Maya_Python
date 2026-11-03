@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-26
+# last Update date : 2026-11-03
 # A00210_FileManager / Maya 탭 > Reference 하위탭 (PySide, standalone)
 #
 # 여러 마야 파일이 부르는 레퍼런스를 보고, 체크한 레퍼런스를 각 파일 안으로 임포트해 제자리 저장한다.
@@ -11,7 +11,7 @@
 #   [Add Checked] [Browse...]
 #   ┌ Maya File (공용 TSL) ┐  ┌ Reference (트리, 체크박스, 중첩은 접힘) ┐
 #   Scanned: ...
-#   [x] Remove All Namespace  [x] Backup
+#   [x] Remove All Namespace  [x] Delete Display Layers  [x] Delete Anim Layers  [x] Backup   (레이어 둘은 v01.43)
 #   [Get Reference]                         [Import Reference]
 #   (mayapy 칸은 v01.41 부터 Maya 탭 아래에 하나 - mayapy_bar.py, 하위탭 공용)
 #
@@ -84,7 +84,7 @@ class ReferenceTab(QWidget):
         ref_box = QGroupBox("Reference")
         ref_layout = QVBoxLayout(ref_box)
         self.ref_tree = ReferenceTree()
-        self.ref_tree.setMinimumHeight(120)
+        self.ref_tree.setMinimumHeight(80)
         self.ref_tree.checksChanged.connect(self._update_counts)
         ref_layout.addWidget(self.ref_tree, stretch=1)
         ref_btns = QHBoxLayout()
@@ -122,6 +122,23 @@ class ReferenceTab(QWidget):
             "(namespaces of references that stay referenced cannot be removed and are kept).")
         opt_row.addWidget(self.chk_remove_ns)
 
+        # v01.43 : 임포트한 뒤 씬의 레이어를 지운다 (기본 둘 다 ON). 남은 레퍼런스의 레이어는 못 지워 남는다.
+        self.chk_del_display = QCheckBox("Delete Display Layers")
+        self.chk_del_display.setChecked(True)
+        self.chk_del_display.setToolTip(
+            "After importing, delete every display layer in the scene (defaultLayer stays).\n"
+            "The objects are kept - only their layer membership goes.\n"
+            "Layers of references that stay referenced cannot be deleted and are kept.")
+        opt_row.addWidget(self.chk_del_display)
+
+        self.chk_del_anim = QCheckBox("Delete Anim Layers")
+        self.chk_del_anim.setChecked(True)
+        self.chk_del_anim.setToolTip(
+            "After importing, delete every animation layer (same as MEL 'delete BaseAnimation;').\n"
+            "The BaseAnimation curves stay on the attributes; keys that live only on other layers are lost.\n"
+            "Layers of references that stay referenced cannot be deleted and are kept.")
+        opt_row.addWidget(self.chk_del_anim)
+
         self.chk_backup = QCheckBox("Backup")
         self.chk_backup.setChecked(True)
         self.chk_backup.setToolTip(
@@ -143,7 +160,8 @@ class ReferenceTab(QWidget):
         self.btn_import = QPushButton("Import Reference")
         self.btn_import.setToolTip(
             "For every scanned Maya file: open it in mayapy, import the checked references it uses\n"
-            "(nested references come along), remove namespaces, and save it in place.")
+            "(nested references come along), remove namespaces, delete layers (options above)\n"
+            "and save it in place.")
         self.btn_import.clicked.connect(self.on_import_reference)
         act_row.addWidget(self.btn_import, stretch=1)
         root.addLayout(act_row)
@@ -259,10 +277,13 @@ class ReferenceTab(QWidget):
         answer = QMessageBox.question(
             self, "Import Reference",
             "{0} Maya file(s) will be opened in mayapy, modified and saved in place:\n\n{1}\n\n"
-            "Backup : {2}\nRemove All Namespace : {3}\n\nContinue?".format(
+            "Backup : {2}\nRemove All Namespace : {3}\nDelete Display Layers : {4}\n"
+            "Delete Anim Layers : {5}\n\nContinue?".format(
                 len(jobs), "\n".join(lines),
                 "ON" if self.chk_backup.isChecked() else "OFF",
-                "ON" if self.chk_remove_ns.isChecked() else "OFF"),
+                "ON" if self.chk_remove_ns.isChecked() else "OFF",
+                "ON" if self.chk_del_display.isChecked() else "OFF",
+                "ON" if self.chk_del_anim.isChecked() else "OFF"),
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if answer != QMessageBox.Yes:
             self._log("Import Reference cancelled.")
@@ -272,7 +293,9 @@ class ReferenceTab(QWidget):
             self, mayapy,
             {"job": "import", "scan": self._scan, "checked": list(checked),
              "remove_namespaces": self.chk_remove_ns.isChecked(),
-             "make_backup": self.chk_backup.isChecked()},
+             "make_backup": self.chk_backup.isChecked(),
+             "delete_display_layers": self.chk_del_display.isChecked(),
+             "delete_anim_layers": self.chk_del_anim.isChecked()},
             title="File Manager - Import Reference", message="Starting mayapy...", log=self._log)
 
         summary = outcome.result

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-26
+# last Update date : 2026-11-03
 # A00210_FileManager / Maya 탭 - 마야 파일 고르기 (하위탭 공용, v01.41). reference_tab.py 의 트리 + Add Checked / Browse + Maya File TSL 을 뽑았다.
 #
 # 세 조각을 만들어 두고 **배치는 하위탭이** 한다 (Reference 는 트리 | (Maya File | Reference 트리), Export 는 트리 / Maya File | Rule):
@@ -42,8 +42,10 @@ class MayaFilePicker(QObject):
         self._log_callback = log
 
         # ---- 폴더 트리 -------------------------------------------------
-        self.tree = JUN_mod_fileTree_qt_v01(checkable_files=True, default_types=DEFAULT_TYPES)
-        self.tree.tree.setMinimumHeight(140)
+        # 높이 (v01.43) : 리스트 · 트리의 Qt 기본 sizeHint(192px)가 하위탭을 화면보다 길게 만들어 스크롤이 생겼다 ->
+        # 짧은 sizeHint 로 열고, 창을 키우면 늘어난다.
+        self.tree = JUN_mod_fileTree_qt_v01(checkable_files=True, default_types=DEFAULT_TYPES, tree_hint_height=110)
+        self.tree.tree.setMinimumHeight(80)
         self.tree.checksChanged.connect(self._on_tree_checks_changed)
 
         # ---- Add Checked / Browse 행 -------------------------------------
@@ -66,7 +68,7 @@ class MayaFilePicker(QObject):
         self.maya_list = JUN_mod_tsl_qt_v01(
             title="Maya File", show_select=False, show_add=False, show_del=True,
             show_up=False, show_down=False, show_sort=False, show_order=False,
-            attach_uuids=False, list_min_height=120, log_callback=self._log)
+            attach_uuids=False, list_min_height=70, list_hint_height=90, log_callback=self._log)
         self.maya_list.list_widget.setToolTip(
             list_tooltip or "Maya files to work on.\nDouble-click: open in File Explorer.")
         try:

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-12
+# last Update date : 2026-11-03
 # A00210_FileManager / Maya 탭 - 체크한 레퍼런스를 마야 파일마다 임포트하고 같은 파일에 저장 (maya.cmds)
 # (A00210 은 standalone 이라 이 모듈은 mayapy 워커(maya_worker.py) 안에서 돈다.)
 #
@@ -8,7 +8,8 @@
 #   1. 백업 (backup.py, 옵션)           5. 중첩이 올라오면 그것도 load -> import (요청: 중첩까지)
 #   2. file -o (저장된 로드 상태 그대로)  6. Remove All Namespace (옵션) - 씬의 모든 네임스페이스를 루트로 병합
 #   3. 체크된 직접 레퍼런스가 언로드면 load   (남는 레퍼런스의 네임스페이스는 지울 수 없으니 건너뛴다)
-#   4. importReference                   7. 원래 타입(mayaAscii / mayaBinary)으로 제자리 저장
+#   4. importReference                   7. Delete Display Layers / Delete Animation Layers (옵션, v01.43)
+#                                        8. 원래 타입(mayaAscii / mayaBinary)으로 제자리 저장
 #
 # 실측(2026-10-12, mayapy 2024)에 기댄 것:
 #   - 언로드 레퍼런스는 importReference 가 에러 -> 먼저 loadReference.
@@ -132,6 +133,85 @@ def remove_all_namespaces(log=None):
     return removed, failed
 
 
+# ------------------------------------------------------------------ layers (v01.43)
+
+def _is_referenced(node):
+    cmds = _cmds()
+    try:
+        return bool(cmds.referenceQuery(node, isNodeReferenced=True))
+    except (RuntimeError, ValueError):
+        return False
+
+
+def delete_display_layers(log=None):
+    """씬의 디스플레이 레이어를 전부 지운다(`defaultLayer` 는 마야 내부라 남는다). 반환: (지운 개수, 못 지운 이름들).
+
+    임포트 **뒤에** 부르므로 임포트된 레퍼런스의 레이어도 지워진다. 남아 있는 레퍼런스(체크 안 한 것)의 레이어는
+    지울 수 없어 건너뛴다(개수만 로그). 레이어를 지워도 멤버 노드는 그대로다(레이어 소속만 풀린다).
+    """
+    cmds = _cmds()
+    removed = 0
+    failed = []
+    skipped = 0
+    for layer in cmds.ls(type="displayLayer") or []:
+        if layer.split(":")[-1] == "defaultLayer":
+            continue
+        if _is_referenced(layer):
+            skipped += 1
+            continue
+        try:
+            if cmds.lockNode(layer, q=True, lock=True)[0]:
+                cmds.lockNode(layer, lock=False)
+            cmds.delete(layer)
+            removed += 1
+        except (RuntimeError, ValueError) as exc:
+            failed.append(layer)
+            if log:
+                log("    [WARN] Could not delete display layer {0} : {1}".format(layer, str(exc).strip()))
+    if skipped and log:
+        log("    kept {0} display layer(s) of references that stay referenced".format(skipped))
+    return removed, failed
+
+
+def delete_animation_layers(log=None):
+    """애니메이션 레이어를 전부 지운다 - MEL `delete BaseAnimation;` 과 같은 결과(A00110 v02.35 와 같은 방식).
+
+    루트 레이어를 지우면 마야가 자식 레이어 · blend 노드 · 레이어 커브를 함께 지우고 Base 커브를 어트리뷰트에 다시
+    연결한다 → **Base 레이어의 애니메이션만 남고 다른 레이어의 키는 사라진다**. 이름 `BaseAnimation` 을 박지 않고
+    루트를 질의한다. 남은 레퍼런스의 레이어가 루트 아래 있으면 루트를 못 지운다 → 지울 수 있는 레이어만 하나씩.
+    반환: (지운 레이어 개수, 못 지운 이름들).
+    """
+    cmds = _cmds()
+    layers = cmds.ls(type="animLayer") or []
+    if not layers:
+        return 0, []
+    try:
+        root = cmds.animLayer(q=True, root=True) or ""
+    except RuntimeError:
+        root = ""
+    if root and not any(_is_referenced(layer) for layer in layers):
+        try:
+            cmds.delete(root)
+            return len(layers), []
+        except (RuntimeError, ValueError) as exc:
+            if log:
+                log("    [WARN] Could not delete {0} : {1} - deleting layer by layer".format(root, str(exc).strip()))
+    # 하나씩 (레퍼런스 레이어 · 루트는 남긴다)
+    removed = 0
+    failed = []
+    for layer in layers:
+        if layer == root or _is_referenced(layer) or not cmds.objExists(layer):
+            continue
+        try:
+            cmds.delete(layer)
+            removed += 1
+        except (RuntimeError, ValueError) as exc:
+            failed.append(layer)
+            if log:
+                log("    [WARN] Could not delete animation layer {0} : {1}".format(layer, str(exc).strip()))
+    return removed, failed
+
+
 # ------------------------------------------------------------------ import every loaded reference (Export 하위탭, v01.41)
 
 def import_loaded_references(log=None):
@@ -165,16 +245,17 @@ def import_loaded_references(log=None):
 # ------------------------------------------------------------------ import one file
 
 def import_into_file(maya_file, checked_keys, remove_namespaces=True, make_backup=True,
-                     log=None, progress=None):
+                     delete_display_layers_=True, delete_anim_layers=True, log=None, progress=None):
     """마야 파일 하나에 체크된 레퍼런스(+ 그 중첩)를 임포트하고 제자리 저장한다.
 
     반환 dict: {"file", "status": "saved" | "skipped" | "failed", "imported": [파일명...],
-                "backup": 경로 또는 "", "namespaces_removed": int, "error": str}
+                "backup": 경로 또는 "", "namespaces_removed": int, "display_layers_removed": int,
+                "anim_layers_removed": int, "error": str}
     """
     cmds = _cmds()
     name = os.path.basename(maya_file)
     result = {"file": maya_file, "status": "failed", "imported": [], "backup": "",
-              "namespaces_removed": 0, "error": ""}
+              "namespaces_removed": 0, "display_layers_removed": 0, "anim_layers_removed": 0, "error": ""}
     checked = set(checked_keys or ())
 
     def _log(message):
@@ -187,7 +268,7 @@ def import_into_file(maya_file, checked_keys, remove_namespaces=True, make_backu
 
     # 1. 백업
     if make_backup:
-        _step(0, 4, "{0} : backup".format(name))
+        _step(0, 5, "{0} : backup".format(name))
         try:
             result["backup"] = backup_mod.backup_file(maya_file)
             _log("  backup -> {0}".format(result["backup"]))
@@ -197,7 +278,7 @@ def import_into_file(maya_file, checked_keys, remove_namespaces=True, make_backu
             return result
 
     # 2. 열기 - 저장된 로드 상태 그대로(none 으로 열면 체크 안 한 레퍼런스가 언로드로 저장된다)
-    _step(1, 4, "{0} : open".format(name))
+    _step(1, 5, "{0} : open".format(name))
     _ensure_fbx_plugin()
     try:
         ref_scanner.open_scene(maya_file)
@@ -220,7 +301,7 @@ def import_into_file(maya_file, checked_keys, remove_namespaces=True, make_backu
         return result
 
     # 4~5. load -> import, 올라온 중첩도 같은 길
-    _step(2, 4, "{0} : import".format(name))
+    _step(2, 5, "{0} : import".format(name))
     try:
         while queue:
             node = queue.pop(0)
@@ -244,14 +325,28 @@ def import_into_file(maya_file, checked_keys, remove_namespaces=True, make_backu
 
     # 6. 네임스페이스
     if remove_namespaces:
-        _step(3, 4, "{0} : namespaces".format(name))
+        _step(3, 5, "{0} : namespaces".format(name))
         removed, failed = remove_all_namespaces(log=_log)
         result["namespaces_removed"] = removed
         _log("  namespaces removed : {0}{1}".format(
             removed, "" if not failed else " ({0} kept)".format(len(failed))))
 
-    # 7. 저장 (원래 타입)
-    _step(4, 4, "{0} : save".format(name))
+    # 7. 레이어 (v01.43) - 임포트 뒤라 임포트된 레퍼런스의 레이어도 지워진다
+    if delete_display_layers_ or delete_anim_layers:
+        _step(4, 5, "{0} : layers".format(name))
+    if delete_display_layers_:
+        removed, failed = delete_display_layers(log=_log)
+        result["display_layers_removed"] = removed
+        _log("  display layers deleted : {0}{1}".format(
+            removed, "" if not failed else " ({0} failed)".format(len(failed))))
+    if delete_anim_layers:
+        removed, failed = delete_animation_layers(log=_log)
+        result["anim_layers_removed"] = removed
+        _log("  animation layers deleted : {0}{1}".format(
+            removed, "" if not failed else " ({0} failed)".format(len(failed))))
+
+    # 8. 저장 (원래 타입)
+    _step(5, 5, "{0} : save".format(name))
     try:
         if scene_type:
             cmds.file(save=True, force=True, type=scene_type)
@@ -270,6 +365,7 @@ def import_into_file(maya_file, checked_keys, remove_namespaces=True, make_backu
 # ------------------------------------------------------------------ batch
 
 def import_references(scan_result, checked_keys, remove_namespaces=True, make_backup=True,
+                      delete_display_layers_=True, delete_anim_layers=True,
                       log=None, progress=None, should_cancel=None):
     """plan() 의 파일마다 import_into_file. progress 는 파일 단위(done, total, message).
 
@@ -294,12 +390,13 @@ def import_references(scan_result, checked_keys, remove_namespaces=True, make_ba
         _log("{0} : {1} checked reference(s)".format(os.path.basename(maya_file), len(keys)))
 
         def _sub(k, n, message, _i=i):
-            # 파일 안의 4 단계를 파일 단위 진행률 안에 끼워 넣는다
+            # 파일 안의 5 단계를 파일 단위 진행률 안에 끼워 넣는다
             if progress:
                 progress(_i + (float(k) / n if n else 1.0), total, message)
 
         res = import_into_file(maya_file, keys, remove_namespaces=remove_namespaces,
-                               make_backup=make_backup, log=_log, progress=_sub)
+                               make_backup=make_backup, delete_display_layers_=delete_display_layers_,
+                               delete_anim_layers=delete_anim_layers, log=_log, progress=_sub)
         summary["results"].append(res)
         summary[res["status"]] += 1
 

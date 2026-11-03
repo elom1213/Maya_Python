@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-26
+# last Update date : 2026-11-03
 # A00210_FileManager / Maya 탭 > Export - 파일 표 (QTableWidget)  (v01.41)
 #
 #   ☑ │ File │ Set │ Start │ End │ FPS │ Ver │ Output │ Status
@@ -48,6 +48,14 @@ class ExportTable(QTableWidget):
 
     rangeEdited = Signal()
 
+    #: sizeHint 높이 (v01.43) - Qt 기본 192px 은 Export 하위탭을 화면보다 길게 만든다. 창을 키우면 늘어난다.
+    HINT_HEIGHT = 120
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        hint.setHeight(self.HINT_HEIGHT)
+        return hint
+
     def __init__(self, parent=None):
         super().__init__(0, len(COLUMNS), parent)
         self.setHorizontalHeaderLabels(COLUMNS)
@@ -60,7 +68,7 @@ class ExportTable(QTableWidget):
         header.setSectionResizeMode(COL_FILE, QHeaderView.Stretch)
         header.setSectionResizeMode(COL_OUT, QHeaderView.Stretch)
         header.setSectionResizeMode(COL_SET, QHeaderView.Interactive)
-        self.setMinimumHeight(110)
+        self.setMinimumHeight(80)
         self.setToolTip(
             "One row per Maya file. Check Sets fills Set / Start / End / FPS / Ver.\n"
             "Start and End can be edited. Output is the FBX name from the Naming rule.\n"

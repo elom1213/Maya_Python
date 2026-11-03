@@ -20,6 +20,10 @@ A00110_V02 만 미적용(다른 세션 작업 중이었음, 자체 grow-only fit
   (현재 페이지 − 최댓값) 을 같은 규칙으로 재서 `content_height` 에 더하고, `shortfall()` 의 스크롤 내용 sizeHint 에도 `tab_correction(within=내용)` 을 더한다
   (없으면 `tabs_scroll` 툴 A00480 · A00550 · A00240 이 늘 가장 긴 페이지로 되돌아간다). 10-29 에는 페이지가 전부 QScrollArea(sizeHint 24h 로 잘려 다 비슷)인
   A00275 로만 확인해 몰랐다 — **페이지가 맨 위젯인 툴은 모든 탭이 가장 긴 페이지 높이로 열렸다**(A00170 Seal 1080 → Remap 리스트 650px, 사용자 보고).
+- ★★ **PySide6 enum 은 `int()` 가 안 된다**(2026-11-03) — `int(policy.verticalPolicy())` 가 TypeError → `fit skipped` 로 **PySide6 standalone 툴(A00210 등)에서 tabFit 이 한 번도 안 돌았다**
+  (사용자: "아직 스크롤로 본다"). 롤아웃 시험은 mayapy(PySide2)라 못 잡았다 → `_enum_int()`(`.value` 먼저). **PySide6 툴은 PySide6 로(실화면 `QT_QPA_PLATFORM` 기본) 따로 재 볼 것.**
+  Qt enum 을 int 로 저장하는 새 코드는 다 같은 함정.
+- ★ `tabs_scroll` 안 탭은 hfw 경로로 재면 안 된다(스크롤 내용은 `sizeHint()` 경로) → `_inside_scroll()` 이면 hfw 끔. 안 그러면 글줄 바꿈 라벨 있는 페이지에서 hfw 없는 긴 페이지 높이로 열림(A00210 Export).
 - 리스트가 길게 열리면 `QListWidget` 기본 sizeHint **192px** 탓 — 공용 TSL `list_hint_height`(A00170 v01.35 = 100, 창 늘리면 따라 늘어남). [[framework-tsl-list-limit]]
 - ★ **`QScrollArea.sizeHint()` 는 글자 높이 24배(12px 글꼴 ≈ 350px)로 잘려 있다**(`QScrollArea::sizeHint` 의 `boundedTo(36h, 24h)`,
   `sizeAdjustPolicy` 를 AdjustToContents 로 해도 소용없다 - QScrollArea 가 override). 그래서 보이는 사슬의 스크롤 페이지마다

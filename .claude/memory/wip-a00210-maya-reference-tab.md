@@ -36,3 +36,8 @@ metadata:
 
 마야 동작 함정은 [[maya-reference-import-traps]]. 관련: [[release-layout-launch-py]](툴 간 import 금지의 이유),
 [[qtreewidgetitem-checkable-default-flag]], [[wip-a00480-filetool]].
+
+**v01.43 (2026-11-03)** — `Delete Display Layers` · `Delete Anim Layers` 체크박스(기본 ON, 사용자 요청). `ref_importer` 가 임포트 · 네임스페이스 **뒤, 저장 전** 실행.
+디스플레이 = `defaultLayer`(잎 이름) 빼고 전부, 레퍼런스로 남는 것의 레이어는 건너뜀. 애니 = `animLayer -q -root` 삭제(`delete BaseAnimation;` 과 같음, Base 커브만 남음),
+남는 레퍼런스 애니 레이어가 있으면 하나씩. ★ 레퍼런스 파일 안의 애니 레이어는 씬에 `R:BaseAnimation` 루트로 하나 더 들어온다(임포트 뒤 둘 다 지워짐, mayapy 실측).
+같은 버전에 탭 축소(트리 110 · Maya File 90 · Reference 100 · Export 표 120) — [[framework-tabfit-widget]] 의 PySide6 수정과 함께.
