@@ -111,3 +111,9 @@ V01 은 `Targets` 리스트에 **손으로 순서대로** 담아야 했고 그�
 - **행 더블클릭 → Cage set 선택 (v02.23)** — `item.setData(0, UserRole, row["set_wanted"])` 로 담고 누를 때 `su.resolve` 후
   `cmds.select(set, noExpand=True)`([[maya-set-rename-traps]]). 오프스크린 테스트에서 `QTest.mouseDClick` 만 보내면
   **itemDoubleClicked 가 안 온다**(press 가 먼저 와야 한다) — `mouseClick` 다음 `mouseDClick`.
+
+**Match 표 체크박스 (v02.30, 2026-11-03)** — 행 0열 체크, `on_match` 가 체크된 행만 `apply` 에 넘긴다(코어 불변).
+기본 전부 체크 + `Check All`/`Uncheck All`. 해제 기억 = `self._plan_unchecked` 의 `(joint, set_wanted)` 키 —
+`_refresh_plan` 은 `tree.clear()` 로 다시 그리므로 **itemChanged 를 blockSignals 로 막고** 다시 그려야 기억이 안 지워진다.
+다중 전파는 공용 `JUN_mod_checkTree_qt_v01`(checksChanged). **IK 세션은 체크 무관(D01 전체)** — 해제 세트도 IK 체인이면
+Keep 모드 평면 맞춤으로 움직일 수 있음, 문서 §4.1e. GUI 확인 아직.

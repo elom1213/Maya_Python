@@ -3,6 +3,18 @@
 `A00130_ControlRig`(V01)의 **템플릿 조인트 패러다임 재작성판**이다.
 계획서: `JUN_All/docs/plans/A00130_ControlRig_V02_plan.md`
 
+## v02.30 (2026-11-03)
+
+- **[Feature] `Match` 표의 행마다 체크박스.** `Match` 는 **체크된 행만** 맞추고, 체크 안 된 행의 케이지 세트는 손대지 않는다.
+  기본은 전부 체크, 표 위에 `Check All` · `Uncheck All` 버튼과 `n / m checked` 표시.
+  체크 상태는 (템플릿 조인트, 세트) 로 기억해 `Check` · `Match` · 네임스페이스 변경으로 표를 다시 그려도 유지된다.
+  여러 행을 골라 체크박스 하나를 누르면 고른 행 전부가 바뀐다(Space 로 뒤집기) — 공용 `JUN_mod_checkTree_qt_v01`.
+  하나도 체크 안 됐으면 `[WARN] No row is checked`, 일부만이면 `Matching a of b row(s) - c unchecked row(s) left alone.`
+- IK 세션(`D01_IK_handle`)은 그대로 세트 전체 핸들로 연다 — 체크 안 된 세트도 IK 체인이면 세션을 닫을 때 체인이
+  폴 평면에 맞춰질 수 있다(§4.4c).
+- 검증(mayapy 2024 오프스크린): 기본 전부 체크 · 해제 행은 Match 뒤에도 원점 그대로 · 체크 행만 이동 · 다시 그려도 유지 ·
+  Uncheck All 이면 아무것도 안 움직임 · Check All 로 둘 다 이동 · 다중 선택 전파 기억 — **13/13**. **마야 GUI 확인 아직.**
+
 ## v02.29 (2026-10-29)
 
 - **[UI] 탭마다 창 높이가 자동으로 맞춰진다.** 탭(중첩 포함)을 바꾸면 창 높이가 지금 보이는 페이지에 맞게 늘거나 줄어

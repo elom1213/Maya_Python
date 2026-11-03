@@ -4,7 +4,10 @@
 Manager* · AdvancedSkeleton 의 *FitSkeleton* 처럼 — **씬에 템플릿 조인트를 놓고 눈으로 맞춘 뒤,
 버튼으로 컨트롤러(cage)를 그 자리에 굽는다.**
 
-- 버전: `v02.28` (`app/config/version.py`) — Match 의 IK 세션이 **폴 벡터 offset 을 지키고** 체인을 폴 평면에
+- 버전: `v02.30` (`app/config/version.py`) — `Match` 표의 행마다 **체크박스**. `Match` 는 **체크된 행만**
+  맞추고 나머지 세트는 손대지 않는다. 기본 전부 체크, `Check All` · `Uncheck All` (§4.1e)
+  · v02.29 는 탭을 바꿀 때마다 **창 높이가 보이는 페이지에 맞춰진다**
+- `v02.28` — Match 의 IK 세션이 **폴 벡터 offset 을 지키고** 체인을 폴 평면에
   맞춘다(기본). 바뀐 IK 체인 길이를 IK 를 켜기 **전에** 옵션 컨트롤러에 쓴다 (§4.4d)
 - `v02.27` — `Orient & Place` 에서 **오른팔 전체가 왼팔의 Behavior 미러**가 된다
   (왼팔이 다 정렬된 **뒤에** 통째로 미러). 표는 **한 조인트에 한 행** (§7.2 · §7.5)
@@ -171,6 +174,23 @@ obj_01
 - **세트 노드 자체**를 고른다 — `cmds.select(set)` 은 세트를 **멤버로 펼쳐** 안의 오브젝트를 고르므로 `noExpand=True` 로 고른다.
 - 이름은 **누르는 순간** 네임스페이스 콤보로 다시 찾는다(`CAGE:sB` → `sB`). 템플릿 조인트가 없는 행도 세트만 있으면 선택된다.
 - 세트가 없으면 선택을 건드리지 않고 로그에 `[WARN] Cage set not found - looked for ...`. 선택하면 `Selected set: <이름>`.
+
+### 4.1e 체크한 행만 Match (v02.30)
+
+`Match` 표의 행마다 **체크박스**가 있다. **`Match` 는 체크된 행만** 맞추고, 체크 안 된 행의 케이지 세트는 **그대로 둔다.**
+
+- **기본은 전부 체크** — 아무것도 안 건드리면 예전처럼 표 전체를 맞춘다.
+- 표 위 **`Check All`** · **`Uncheck All`** 버튼, 옆에 `n / m checked`. 몇 개만 맞추려면 `Uncheck All` 뒤 필요한 행만 체크.
+- 여러 행을 Shift / Ctrl 로 고른 뒤 **그중 하나의 체크박스를 누르면 고른 행 전부**가 같은 상태가 된다. `Space` 는 고른 행 뒤집기.
+  (공용 `JUN_mod_checkTree_qt_v01`)
+- 체크 상태는 **(템플릿 조인트, 세트) 이름**으로 기억한다 — `Check` · `Match` · 네임스페이스 변경으로 표를 다시 그려도 유지된다.
+  매핑을 다시 읽어도 같은 이름의 행은 유지되고, 새로 생긴 행은 체크된 채로 나온다.
+- 로그: 일부만 체크면 `Matching a of b row(s) - c unchecked row(s) left alone.`, 하나도 없으면 `[WARN] No row is checked - nothing to match.`
+- `Check` · `Check Position` 은 체크와 상관없이 **표 전체**를 본다(진단이라).
+
+> **IK 세션은 체크와 무관하다.** `Turn IK off while matching` 이 켜져 있으면 `D01_IK_handle` 의 핸들 전부로 세션을 연다(§4.4c).
+> 체크 안 된 세트의 멤버가 그 IK 체인에 있으면, 세션을 닫을 때(`Keep pole vector offset`) 체인이 폴 평면에 맞춰지면서
+> 조금 움직일 수 있다. 완전히 그대로 두려면 IK 체크박스를 끄고 Match 한다.
 
 ### 4.3 없어도 멈추지 않는다
 

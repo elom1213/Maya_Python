@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-29
+# last Update date : 2026-11-03
 # A00130_ControlRig_V02 - Qt UI
 #
 # 계획서: docs/plans/A00130_ControlRig_V02_plan.md
@@ -16,6 +16,9 @@
 #   Pair           : 세트 A 의 하나뿐인 원소로 세트 B 의 하나뿐인 원소를 맞춘다 (Match 뒤)
 #   Constrain      : 포즈 오브젝트를 `Con` 이 가리키는 노드에 parentConstraint (Pair 뒤)
 #
+# v02.30 : Match 표 행마다 **체크박스** — Match 는 체크된 행만 맞추고, 체크 안 된 행의 세트는
+#          손대지 않는다. 체크 상태는 (조인트, 세트) 로 기억해 표를 다시 그려도 유지된다.
+#          다중 선택 + 체크 전파는 공용 JUN_mod_checkTree_qt_v01.
 # v02.23 : Match 표 행 더블클릭 -> 그 Cage set 노드를 마야에서 선택(noExpand).
 # v02.22 : Length 탭 Total 기본값을 **sum** 으로, 콤보 맨 위로.
 # v02.21 : Match 탭 **Check Position** — 세트마다 멤버들이 월드 위치 · 회전이 같은지
@@ -45,6 +48,7 @@ from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
+from Framework.qt.MOD_checkTree_qt_v01 import JUN_mod_checkTree_qt_v01
 from Framework.qt import JUN_mod_filter_qt
 
 print("QT version  :  " + str(QT_VERSION))
@@ -332,6 +336,23 @@ class MainWindow(QWidget):
         layout.addWidget(grp_ik)
 
         # ---- 미리보기 ----
+        # v02.30 - 행마다 체크박스. Match 는 체크된 행만 맞춘다.
+        # 체크를 끈 (조인트, 세트) 키를 기억한다 - 표를 다시 그려도(Check · Match 뒤) 그대로 남는다.
+        self._plan_unchecked = set()
+
+        check_row = QHBoxLayout()
+        btn_check_all = QPushButton("Check All")
+        btn_check_all.setToolTip("Check every row - Match will move all of them.")
+        btn_check_all.clicked.connect(lambda: self._set_all_plan_checks(True))
+        check_row.addWidget(btn_check_all)
+        btn_uncheck_all = QPushButton("Uncheck All")
+        btn_uncheck_all.setToolTip("Uncheck every row - then check only the ones to match.")
+        btn_uncheck_all.clicked.connect(lambda: self._set_all_plan_checks(False))
+        check_row.addWidget(btn_uncheck_all)
+        self.lbl_plan_checked = QLabel("")
+        check_row.addWidget(self.lbl_plan_checked, 1)
+        layout.addLayout(check_row)
+
         self.tree_plan = QTreeWidget()
         self.tree_plan.setColumnCount(5)
         self.tree_plan.setHeaderLabels(
@@ -339,8 +360,15 @@ class MainWindow(QWidget):
         self.tree_plan.setRootIsDecorated(False)
         self.tree_plan.setAlternatingRowColors(True)
         self.tree_plan.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.tree_plan.setToolTip("Double-click a row to select its cage set in Maya.")
+        self.tree_plan.setToolTip(
+            "Only checked rows are matched - unchecked cage sets are left as they are.\n"
+            "Select several rows and click one checkbox to set them all (Space toggles).\n"
+            "Double-click a row to select its cage set in Maya.")
         self.tree_plan.itemDoubleClicked.connect(self.on_plan_double_clicked)
+        self.tree_plan.itemChanged.connect(self._on_plan_item_changed)
+        # 다중 선택 + 체크 전파 (공용). 여러 행을 바꾸면 checksChanged 로 한 번에 온다.
+        self.chk_tree_plan = JUN_mod_checkTree_qt_v01(self.tree_plan)
+        self.chk_tree_plan.checksChanged.connect(self._on_plan_checks_changed)
         layout.addWidget(self.tree_plan, 1)
 
         match_row = QHBoxLayout()
@@ -367,7 +395,8 @@ class MainWindow(QWidget):
         self.btn_match = QPushButton("Match")
         self.btn_match.setMinimumHeight(34)
         self.btn_match.setToolTip(
-            "Move the members of every listed cage set onto its template joint.\n"
+            "Move the members of every checked cage set onto its template joint.\n"
+            "Unchecked rows are left alone.\n"
             "Sub-sets inside a set are ignored. Locked or driven objects are skipped\n"
             "and reported rather than half-moved.\n"
             "Everything is one undo step.")
@@ -782,6 +811,8 @@ class MainWindow(QWidget):
         if not hasattr(self, "tree_plan"):
             return
         rows = self._current_plan()
+        # 다시 그리는 동안 itemChanged 가 체크 기억을 지우지 않게 막는다
+        self.tree_plan.blockSignals(True)
         self.tree_plan.clear()
         for row in rows:
             item = QTreeWidgetItem([
@@ -795,11 +826,66 @@ class MainWindow(QWidget):
             # 더블클릭 선택용 - 매핑 표의 이름(네임스페이스 없음)을 담아 두고 누를 때 다시 푼다.
             # 조인트가 없는 행은 plan() 이 세트를 안 풀어 두므로 row["set"] 을 믿을 수 없다.
             item.setData(0, Qt.UserRole, row["set_wanted"])
+            # v02.30 - 기본은 체크. 사용자가 끈 (조인트, 세트) 만 꺼진 채로 다시 그린다.
+            item.setCheckState(
+                0, Qt.Unchecked if self._plan_key(row) in self._plan_unchecked else Qt.Checked)
             self.tree_plan.addTopLevelItem(item)
+        self.tree_plan.blockSignals(False)
         for col in range(5):
             self.tree_plan.resizeColumnToContents(col)
+        self._update_plan_checked_label()
         self._refresh_ik_label()
         return rows
+
+    # ---- v02.30 체크박스 ----
+
+    @staticmethod
+    def _plan_key(row):
+        """체크 기억의 키 - 매핑 표의 이름(네임스페이스 없음)이라 네임스페이스를 바꿔도 유지된다."""
+        return (row["joint"], row["set_wanted"])
+
+    @staticmethod
+    def _plan_item_key(item):
+        return (item.text(0), item.data(0, Qt.UserRole))
+
+    def _remember_plan_check(self, item):
+        key = self._plan_item_key(item)
+        if item.checkState(0) == Qt.Checked:
+            self._plan_unchecked.discard(key)
+        else:
+            self._plan_unchecked.add(key)
+
+    def _on_plan_item_changed(self, item, column=0):
+        if column != 0:
+            return
+        self._remember_plan_check(item)
+        self._update_plan_checked_label()
+
+    def _on_plan_checks_changed(self, items):
+        for item in items:
+            self._remember_plan_check(item)
+        self._update_plan_checked_label()
+
+    def _set_all_plan_checks(self, checked):
+        state = Qt.Checked if checked else Qt.Unchecked
+        self.tree_plan.blockSignals(True)
+        for index in range(self.tree_plan.topLevelItemCount()):
+            item = self.tree_plan.topLevelItem(index)
+            item.setCheckState(0, state)
+            self._remember_plan_check(item)
+        self.tree_plan.blockSignals(False)
+        self._update_plan_checked_label()
+
+    def _plan_checked_flags(self):
+        """표의 행 순서대로 체크 여부 목록 (rows 와 같은 순서)."""
+        return [self.tree_plan.topLevelItem(i).checkState(0) == Qt.Checked
+                for i in range(self.tree_plan.topLevelItemCount())]
+
+    def _update_plan_checked_label(self):
+        if not hasattr(self, "lbl_plan_checked"):
+            return
+        flags = self._plan_checked_flags()
+        self.lbl_plan_checked.setText("{0} / {1} checked".format(sum(flags), len(flags)))
 
     def on_plan_double_clicked(self, item, _column=0):
         """더블클릭한 행의 Cage set **노드 자체**를 마야에서 선택한다(씬 불변, 선택만).
@@ -905,6 +991,17 @@ class MainWindow(QWidget):
         if not rows:
             self.log("[WARN] Nothing to match.")
             return
+
+        # v02.30 - 체크된 행만 맞춘다. 체크 안 된 행의 세트는 손대지 않는다.
+        flags = self._plan_checked_flags()
+        all_count = len(rows)
+        rows = [row for row, on in zip(rows, flags) if on]
+        if not rows:
+            self.log("[WARN] No row is checked - nothing to match.")
+            return
+        if len(rows) < all_count:
+            self.log("Matching {0} of {1} row(s) - {2} unchecked row(s) left alone.".format(
+                len(rows), all_count, all_count - len(rows)))
 
         # 체크박스는 "매칭 중 IK 를 다룬다" 는 뜻이다 - 세트에서 온 것도,
         # 툴이 찾아낸 것도 함께 끈다/안 끈다.
