@@ -609,7 +609,11 @@ class MainWindow(QWidget):
         # (self._path_values). 그래서 모드를 오가도 상대 모드의 경로가 지워지지 않는다.
         self.lbl_store = QLabel("Store Repo")
         self.ipf_store_dir = QLineEdit()
+        # v01.44 : 붙여넣기 · 타이핑으로 바뀌지 않게 읽기 전용 - 경로는 Browse... 로만 바꾼다(실수 방지).
+        # 선택 · 복사는 된다. 코드의 setText(모드 전환 · 기본 경로 · Browse)는 그대로 동작한다.
+        self.ipf_store_dir.setReadOnly(True)
         self.btn_store = QPushButton("Browse...")
+        self.btn_store.setToolTip("Change the data folder (the only way to edit this path).")
         self.btn_store.clicked.connect(lambda: self._browse_dir(self.ipf_store_dir))
         grid.addWidget(self.lbl_store, 2, 0)
         grid.addWidget(self.ipf_store_dir, 2, 1)
@@ -966,14 +970,16 @@ class MainWindow(QWidget):
                 "local clone of the central data repo (git)")
             self.ipf_store_dir.setToolTip(
                 "Remote (Git) mode: local clone of the central data-repo.\n"
-                "Pull / Push sync records & thumbnails here.")
+                "Pull / Push sync records & thumbnails here.\n"
+                "Read-only - use Browse... to change it.")
         else:
             self.lbl_store.setText("Shared Folder")
             self.ipf_store_dir.setPlaceholderText(
                 "local / NAS folder used directly (no git)")
             self.ipf_store_dir.setToolTip(
                 "Local (Shared / NAS) mode: shared folder used directly.\n"
-                "No git — the NAS keeps it in sync across the team.")
+                "No git — the NAS keeps it in sync across the team.\n"
+                "Read-only - use Browse... to change it.")
 
         # git 전용 입력/버튼만 토글(데이터 폴더 입력은 위처럼 항상 활성).
         for w in (

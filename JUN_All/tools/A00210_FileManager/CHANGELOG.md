@@ -2,6 +2,11 @@
 
 All notable changes to this tool are documented here.
 
+## [01.44] - 2026-11-03
+
+- **[File Manager > Settings] `Store Repo` / `Shared Folder` 칸 읽기 전용.** 붙여넣기 · 타이핑으로 데이터 폴더 경로가 실수로 바뀌지 않게,
+  경로는 옆의 **`Browse...`** 로만 바꾼다. 칸의 경로를 선택해 복사하는 것은 된다. 모드 전환 · 프로파일 · 기본 경로 채우기는 그대로.
+
 ## [01.43] - 2026-11-03
 
 - **[Maya > Reference] `Delete Display Layers` · `Delete Anim Layers` 체크박스 (기본 둘 다 ON).** `Import Reference` 가 임포트 ·

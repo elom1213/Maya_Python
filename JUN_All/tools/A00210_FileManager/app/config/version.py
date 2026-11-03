@@ -16,5 +16,8 @@
 #        탭 높이: PySide6 에서 tabFit 이 enum int() 로 매번 'fit skipped' 였던 것 수정(Framework) + 스크롤 칸 안 탭의 hfw 경로 보정,
 #        리스트 · 트리 sizeHint 축소(picker 트리 110 · Maya File 90 · Reference 100 · Export 표 120 · Log history 100), Settings 줄 합침.
 
-VERSION = "01.43"
+# 01.44  File Manager > Settings: Store Repo / Shared Folder 칸 읽기 전용 - 붙여넣기 · 타이핑으로 경로가 바뀌지 않게,
+#        Browse... 로만 바꾼다(실수 방지). 선택 · 복사는 된다.
+
+VERSION = "01.44"
 LAST_UPDATE = "2026-11-03"

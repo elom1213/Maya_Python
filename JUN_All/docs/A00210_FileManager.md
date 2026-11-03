@@ -20,7 +20,7 @@ Maya 씬 파일(`.mb` / `.ma`)의 **버전·작업 기록 추적** 파이프라�
 |------|------|
 | **Project Root** | Maya 파일들이 모여 있는 작업 루트. 기록 키(key)를 이 기준 **상대경로**로 만든다. |
 | **Source Mode** | 기록·썸네일을 어디서 읽고 쓸지: **Remote (Git)** = 중앙 git 데이터 리포(Pull/Push), **Local (Shared / NAS)** = 공유 폴더 직접 사용(git 미사용). 프로파일별로 저장(v01.23). |
-| **Store Repo / Shared Folder** | 데이터 스토어 폴더 입력 **한 칸**(v01.26). Source Mode 에 따라 라벨/설명이 바뀐다 — Remote 면 **Store Repo**(중앙 git 데이터 리포의 로컬 clone, 예: `JUN_FileManager_data`), Local 이면 **Shared Folder**(git 없이 직접 쓰는 공유/NAS 폴더). 두 모드의 경로는 프로파일에 각각(`store_dir`/`local_dir`) 저장돼, 모드를 오가도 상대 경로가 지워지지 않는다. |
+| **Store Repo / Shared Folder** | 데이터 스토어 폴더 입력 **한 칸**(v01.26). Source Mode 에 따라 라벨/설명이 바뀐다 — Remote 면 **Store Repo**(중앙 git 데이터 리포의 로컬 clone, 예: `JUN_FileManager_data`), Local 이면 **Shared Folder**(git 없이 직접 쓰는 공유/NAS 폴더). 두 모드의 경로는 프로파일에 각각(`store_dir`/`local_dir`) 저장돼, 모드를 오가도 상대 경로가 지워지지 않는다. **v01.44~ 칸은 읽기 전용** — 붙여넣기 · 타이핑으로 바뀌지 않고 `Browse...` 로만 바꾼다(실수 방지, 선택 · 복사는 됨). |
 | **key** | `Project Root` 기준 상대경로(예: `chars/charA_rig.mb`). PC 가 달라도(예: `P:/proj` vs `D:/work`) **같은 파일이 같은 기록**에 매핑된다. |
 | **원본 제외** | 원본 mb/ma 는 데이터 스토어에 애초에 들어가지 않는다(git 모드는 `.gitignore` 로 `*.mb`/`*.ma` 이중 차단). |
 
