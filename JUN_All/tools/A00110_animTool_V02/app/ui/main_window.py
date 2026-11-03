@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-30
+# last Update date : 2026-11-03
 # A00110_animTool_V02 - Qt UI
 
 from Framework.qt.qt import *
@@ -394,7 +394,8 @@ class MainWindow(QWidget):
     # (Hold 는 버튼보다 Shift+A 로 쓰는 기능이고, 같은 성격의 Tab 토글이 생겨서).
     HOTKEY_PAGES = (
         ("Main", "Main - Shift+A holds the Graph Editor key range, Tab toggles "
-         "the manipulator space Object / World", "_build_hotkey_main_page"),
+         "the manipulator space Object / World, Delete BaseAnimation removes every "
+         "animation layer", "_build_hotkey_main_page"),
     )
 
     # (상위 탭 라벨, 툴팁, 하위 페이지 표, 하위 QTabWidget 을 담을 속성 이름)
@@ -668,12 +669,26 @@ class MainWindow(QWidget):
         space_layout.addLayout(space_row)
         layout.addWidget(space_box)
 
+        # ---- Animation Layers (v02.35, A00030_quickTool_V02 에서 이식) ----
+        layers_box = QGroupBox("Animation Layers")
+        layers_layout = QVBoxLayout(layers_box)
+
+        self.btn_delete_base_animation = QPushButton("Delete BaseAnimation")
+        self.btn_delete_base_animation.setToolTip(
+            "Same as the MEL command 'delete BaseAnimation;'.\n"
+            "Deletes the root animation layer, so every animation layer goes with it.\n"
+            "Base layer curves are reconnected, layer-only channels keep a static value.\n"
+            "Asks first - undo does not bring the layers back.")
+        layers_layout.addWidget(self.btn_delete_base_animation)
+        layout.addWidget(layers_box)
+
         layout.addStretch(1)
 
         self.btn_hold.clicked.connect(self.on_hold)
         self.cb_hotkey.toggled.connect(self.on_toggle_hotkey)
         self.btn_toggle_space.clicked.connect(self.on_toggle_space)
         self.cb_space_hotkey.toggled.connect(self._enable_space_hotkey)
+        self.btn_delete_base_animation.clicked.connect(self.on_delete_base_animation)
 
         return page
 
@@ -5512,6 +5527,35 @@ class MainWindow(QWidget):
                 slider.blockSignals(False)
         finally:
             self._cf_updating = False
+
+    def on_delete_base_animation(self, *_args):
+        """Hot Key > Main > Delete BaseAnimation - 루트 레이어 삭제. undo 로 안 돌아오므로(실측) 먼저 묻는다."""
+        root = AnimLayerManager.root_layer()
+        if not root:
+            self.log("[Warning] No animation layers in the scene - nothing to delete.")
+            return
+
+        answer = QMessageBox.question(
+            self,
+            "Delete BaseAnimation",
+            "Delete '{0}' and every animation layer under it?\n"
+            "Animation on the layers (not the base) is lost.\n"
+            "Undo does not bring the layers back.".format(root),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            self.log("Delete BaseAnimation : cancelled.")
+            return
+
+        root, children = AnimLayerManager.delete_root()
+        self.log("Deleted {0} : {1} animation layer(s) removed, base curves reconnected.".format(
+            root, len(children) + 1))
+        if children:
+            self.log("Layers : {0}".format(", ".join(children)))
+        # View > Layers 목록도 바로 비운다(폴링을 기다리지 않게).
+        if getattr(self, "tw_al_layers", None) is not None:
+            self.on_al_refresh(quiet=True)
 
     def on_toggle_hotkey(self, checked):
         self._enable_hotkey(checked)

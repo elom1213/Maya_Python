@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-03
+# last Update date : 2026-10-12
 # A00030_quickTool_V02 - 핵심 로직 (maya.cmds / mel, UI 비의존)
 """
 quick_ops - Quick Tool 의 버튼 하나하나가 실제로 하는 일.
@@ -601,40 +601,6 @@ def set_local_axis(state):
     if failed:
         logs.append("[WARN] Could not change {0} object(s) (locked or connected) : "
                     "{1}".format(len(failed), failed))
-    return logs
-
-
-# ==========================================================================
-# Animation
-# ==========================================================================
-
-def anim_layer_root():
-    """루트 애니메이션 레이어 이름(보통 `BaseAnimation`). 레이어가 없으면 빈 문자열."""
-    return cmds.animLayer(query=True, root=True) or ""
-
-
-def delete_base_animation():
-    """MEL `delete BaseAnimation;` 과 같은 결과 - 루트 레이어를 지워 **레이어를 전부 없앤다.**
-
-    루트를 지우면 마야가 자식 레이어 · blend 노드 · 레이어 커브를 함께 지우고, Base 레이어
-    커브는 어트리뷰트에 **직접 다시 연결**한다(mayapy 실측: mel 과 `cmds.delete(root)` 결과 동일).
-    레이어에만 키가 있던 채널은 커브 없이 **정적 값만 남는다**(그 값도 mel 과 같다).
-
-    ★ 이름 `BaseAnimation` 을 박지 않고 `animLayer -q -root` 로 루트를 찾는다(이름이 바뀐 씬).
-    ★ standalone 실측에서 이 삭제는 **undo 로 레이어가 돌아오지 않았다** - UI 가 먼저 묻는다.
-    """
-    root = anim_layer_root()
-    if not root:
-        return ["[WARN] No animation layers in the scene - nothing to delete."]
-
-    layers = cmds.ls(type="animLayer") or []
-    children = [layer for layer in layers if layer != root]
-    cmds.delete(root)
-
-    logs = ["Deleted {0} : {1} animation layer(s) removed, base curves reconnected.".format(
-        root, len(layers))]
-    if children:
-        logs.append("Layers : {0}".format(children))
     return logs
 
 

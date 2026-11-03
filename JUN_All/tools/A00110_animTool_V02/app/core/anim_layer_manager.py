@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-30
+# last Update date : 2026-11-03
 # A00110_animTool_V02 - View > Layers : 씬의 애니메이션 레이어 목록 + 어느 레이어를 볼지(선택 · mute · solo · lock) (v02.31)
 #
 # 마야의 Animation Layer Editor 와 같은 것을 툴 안에서(그리고 Expand 로 띄운 작은 창에서) 다룬다.
@@ -126,6 +126,23 @@ class AnimLayerManager:
             if GraphViewManager.apply_editor_layer_filter(outliner, layer_filter):
                 count += 1
         return count, layer_filter
+
+    @staticmethod
+    def delete_root():
+        """MEL `delete BaseAnimation;` 과 같은 결과 - 루트 레이어를 지워 **레이어를 전부 없앤다** (v02.35, A00030 에서 이식).
+
+        마야가 자식 레이어 · blend 노드 · 레이어 커브를 함께 지우고 Base 커브를 어트리뷰트에 **직접 다시 연결**한다
+        (mayapy 실측: mel 과 결과 동일). 레이어에만 키가 있던 채널은 커브 없이 정적 값만 남는다(그 값도 mel 과 같다).
+        이름 `BaseAnimation` 을 박지 않고 루트를 질의한다. ★ standalone 실측에서 undo 로 레이어가 돌아오지 않았다 - UI 가 먼저 묻는다.
+
+        반환 (지운 루트 이름, 함께 사라진 자식 레이어 목록). 레이어가 없으면 ("", []).
+        """
+        root = LayerMergeManager.root_layer()
+        if not root:
+            return "", []
+        children = [layer for layer in (cmds.ls(type="animLayer") or []) if layer != root]
+        cmds.delete(root)
+        return root, children
 
     @staticmethod
     def snapshot(rows=None):

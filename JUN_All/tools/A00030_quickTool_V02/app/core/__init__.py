@@ -16,8 +16,6 @@ from .quick_ops import (
     scene_folder,
     open_scene_folder,
     set_local_axis,
-    anim_layer_root,
-    delete_base_animation,
     save_all_shelves,
 )
 
@@ -36,7 +34,5 @@ __all__ = [
     "scene_folder",
     "open_scene_folder",
     "set_local_axis",
-    "anim_layer_root",
-    "delete_base_animation",
     "save_all_shelves",
 ]

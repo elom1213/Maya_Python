@@ -206,6 +206,65 @@ check("G1 Graph Focus toggle carries the pin style (checked = light red)",
       pin_style.PINNED_BG in win.btn_graph_focus.styleSheet() and "QPushButton:checked" in win.btn_graph_focus.styleSheet()
       and win.btn_graph_focus.isCheckable())
 
+# Hot Key > Main > Delete BaseAnimation (v02.35, A00030 에서 이식) - MEL `delete BaseAnimation` 과 같은 결과
+from Framework.qt.qt import QMessageBox   # noqa: E402
+import maya.mel as mel   # noqa: E402
+
+
+def layered_scene():
+    cmds.file(new=True, force=True)
+    c = cmds.polyCube(n="cube")[0]
+    cmds.setKeyframe(c, at="tx", t=1, v=0)
+    cmds.setKeyframe(c, at="tx", t=10, v=5)
+    cmds.select(c)
+    a = cmds.animLayer("LA", addSelectedObjects=True)
+    cmds.setKeyframe(c, at="tx", t=5, v=20, animLayer=a)
+    b = cmds.animLayer("LB", addSelectedObjects=True, parent=a)
+    cmds.setKeyframe(c, at="ty", t=5, v=3, animLayer=b)
+    cmds.currentTime(5)
+
+
+def scene_state():
+    out = [sorted(cmds.ls(type=["animLayer", "animBlendNodeBase", "animCurve"]) or [])]
+    for t in (1, 5, 10):
+        cmds.currentTime(t)
+        out.append([round(cmds.getAttr("cube." + ch), 6) for ch in ("tx", "ty", "tz")])
+    out.append(cmds.listConnections("cube.tx", s=True, d=False))
+    return out
+
+
+layered_scene()
+mel.eval("delete BaseAnimation")
+mel_state = scene_state()
+layered_scene()
+root, kids = ALM.delete_root()
+check("D1 delete_root == MEL 'delete BaseAnimation' (nodes, values at 1/5/10, tx input)",
+      scene_state() == mel_state and root == "BaseAnimation" and sorted(kids) == ["LA", "LB"], (root, kids))
+check("D2 delete_root with no layers : ('', [])", ALM.delete_root() == ("", []))
+
+check("D3 Hot Key > Main has the Delete BaseAnimation button",
+      win.btn_delete_base_animation.text() == "Delete BaseAnimation" and win.btn_delete_base_animation.toolTip())
+
+_real_question = QMessageBox.question
+layered_scene()
+win.on_al_refresh(quiet=True)
+QMessageBox.question = staticmethod(lambda *a, **k: QMessageBox.No)
+win.btn_delete_base_animation.click()
+pump()
+check("D4 answer No : layers stay", sorted(cmds.ls(type="animLayer")) == ["BaseAnimation", "LA", "LB"])
+QMessageBox.question = staticmethod(lambda *a, **k: QMessageBox.Yes)
+win.btn_delete_base_animation.click()
+pump()
+check("D5 answer Yes : every layer gone + View > Layers list emptied",
+      not cmds.ls(type="animLayer") and win.tw_al_layers.topLevelItemCount() == 0,
+      win.tw_al_layers.topLevelItemCount())
+asked = []
+QMessageBox.question = staticmethod(lambda *a, **k: asked.append(1) or QMessageBox.Yes)
+win.btn_delete_base_animation.click()
+pump()
+check("D6 no layers : no question asked", not asked)
+QMessageBox.question = _real_question
+
 win.close()
 pump()
 print("\n%d / %d passed" % (sum(R), len(R)))

@@ -49,4 +49,4 @@ metadata:
 **루트 삭제(`delete BaseAnimation`)**: 루트 레이어를 지우면 자식 레이어 · blend 노드 · 레이어 커브가 전부
 지워지고 Base 커브가 어트리뷰트에 직접 다시 붙는다. mel 과 `cmds.delete(animLayer -q -root)` 결과 동일.
 **standalone 에서 undo(청크 · undoInfo 켬)로 레이어가 안 돌아왔다** — GUI 는 미확인. A00030_quickTool_V02
-v02.09 `Delete BaseAnimation` 이 그래서 확인 팝업을 띄운다(2026-11-03 mayapy 실측).
+v02.09 에 넣었다가 A00110_animTool_V02 v02.35 Hot Key > Main `Delete BaseAnimation`(`AnimLayerManager.delete_root`)으로 옮겼고, 그래서 확인 팝업을 띄운다(2026-11-03 mayapy 실측).

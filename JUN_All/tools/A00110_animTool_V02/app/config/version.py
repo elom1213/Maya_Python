@@ -66,5 +66,10 @@
 
 # 02.34  View > Graph Focus `Auto-Focus on Selection` 토글이 ON 이면 연한 빨강(공용 pin_style, Pin 과 같은 색). 사용자 요청.
 
-VERSION = "02.34"
-LAST_UPDATE = "2026-10-30"
+# 02.35  Hot Key > Main 에 `Animation Layers > Delete BaseAnimation` - MEL `delete BaseAnimation;` 과 같은 결과.
+#        A00030_quickTool_V02 v02.09 에 넣었던 것을 사용자 요청으로 옮겼다(A00030 에서는 v02.10 에 뺐다).
+#        AnimLayerManager.delete_root() : 루트(animLayer -q -root)를 cmds.delete - 자식 레이어 · blend 노드 ·
+#        레이어 커브 삭제, Base 커브 재연결. undo 로 레이어가 안 돌아와서(mayapy 실측) 확인 팝업, 지운 뒤 View > Layers 갱신.
+
+VERSION = "02.35"
+LAST_UPDATE = "2026-11-03"

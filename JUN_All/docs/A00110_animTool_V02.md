@@ -97,7 +97,8 @@
    애니메이션 레이어가 있으면 **`Layer curves`**(v02.25~)로 선택/활성 레이어의 커브만 보이고 그 범위에 맞춘다.
 8. **Hot Key** (v02.19~) — 툴이 **열려 있는 동안만** 거는 키보드 단축키. 창을 닫으면 원래 바인딩으로 돌아간다.
    **Main**: **Hold**(옛 Timing > Hold — 그래프 에디터에서 고른 키 구간을 평평하게, `Shift+A`) +
-   **Manipulator Space**(`Tab` 또는 버튼으로 Move / Rotate / Scale 매니퓰레이터 공간을 **Object ↔ World** 토글).
+   **Manipulator Space**(`Tab` 또는 버튼으로 Move / Rotate / Scale 매니퓰레이터 공간을 **Object ↔ World** 토글) +
+   **Animation Layers**(v02.35~, `Delete BaseAnimation` — MEL `delete BaseAnimation;` 과 같은 결과, 단축키 없이 버튼만).
 
 하위 탭이나 상위 탭을 바꾸면 **창 크기가 지금 보이는 페이지에 맞춰 자동 조정**된다.
 
@@ -743,7 +744,7 @@ A00110_animTool_V02.run(True)   # True = reload
 | **Transfer** | **다른 오브젝트로** 옮기기 | Copy Key · Mirror Key · Follow |
 | **Bake** | 결과를 **키로 굽기** | Bake · Counter Layer(v02.26~, Stationary 모드 v02.29~) · Merge Layers(v02.27~) |
 | **View** | **보기**(씬 불변) | Graph Focus · **Layers**(v02.31~, Expand 가능) |
-| **Hot Key** (v02.19~) | 툴이 열린 동안의 **단축키** | Main(Hold · Manipulator Space) |
+| **Hot Key** (v02.19~) | 툴이 열린 동안의 **단축키** | Main(Hold · Manipulator Space · Animation Layers v02.35~) |
 
 - **Help > About**: 작성자·업데이트 날짜 팝업.
 - 하단 **로그창**과 저작권 라벨은 **모든 탭이 공유**한다(모든 결과/경고가 여기 출력).
@@ -1875,6 +1876,19 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   (`nexOpt -e` 는 메모리 값이라 마야가 죽어도 다음 세션은 원래 Tab). Modeling Toolkit 이 로드되지 않았으면 일반 핫키로 건다.
   툴이 켜져 있는 동안 **Tab 페인트 선택은 쓸 수 없다** — 필요하면 체크를 끈다.
 - 마야 mode 값: Move / Scale 은 Object `0` · World `2`, **Rotate 는 Object `0` · World `1`**(`2` 는 Gimbal) — 번호가 다르다.
+
+#### Main > Animation Layers — Delete BaseAnimation (v02.35~, A00030_quickTool_V02 에서 이식)
+
+- **Delete BaseAnimation**: MEL `delete BaseAnimation;` 을 친 것과 **같은 결과** — 씬의 애니메이션 레이어가 **전부** 없어진다.
+  루트를 `animLayer -q -root` 로 찾아(이름을 박지 않는다) `cmds.delete` 한다(`AnimLayerManager.delete_root`).
+- 마야가 자식 레이어 · blend 노드 · 레이어 커브를 함께 지우고, Base 레이어 커브는 어트리뷰트에 **직접 다시 연결**한다.
+  레이어에만 키가 있던 채널은 커브 없이 정적 값만 남는다(그 값도 mel 과 같다).
+- **누르면 먼저 묻는다**(`Yes` / `No`, 기본 `No`). mayapy 실측에서 이 삭제는 **undo 로 레이어가 돌아오지 않았다.**
+  레이어가 없으면 묻지 않고 경고 한 줄. 지운 뒤 **View > Layers** 목록도 바로 갱신한다.
+- 되돌릴 수 없는 작업이라 **단축키는 걸지 않았다** — 이 페이지의 다른 두 기능과 달리 버튼만 있다.
+- 시험 `tests/test_anim_layers.py` D1~D6: 레이어 3단(Base · LA · 자식 LB)에서 **mel 과 남은 노드 · 프레임 1/5/10 값 · tx 입력이
+  같다** · 레이어 없으면 `("", [])` · 버튼 존재 · 팝업 No → 그대로 · Yes → 전부 삭제 + Layers 목록 비움 · 레이어 없으면 묻지 않음.
+  **마야 GUI 확인 아직** — 팝업 · GUI 에서의 undo.
 
 ---
 

@@ -28,5 +28,8 @@
 #        루트 레이어(animLayer -q -root)를 지워 레이어 전부 삭제, Base 커브는 다시 직접 연결.
 #        undo 로 레이어가 안 돌아와서(mayapy 실측) 확인 팝업을 먼저 띄운다.
 
-VERSION = "02.09"
+# 02.10  Animation > Delete BaseAnimation 제거 - A00110_animTool_V02 v02.35 Hot Key > Main 으로 옮겼다(사용자 요청).
+#        코드는 v02.08 과 같다.
+
+VERSION = "02.10"
 LAST_UPDATE = "2026-11-03"
