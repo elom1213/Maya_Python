@@ -64,3 +64,7 @@ JUN_FileManager_data/
 **/.python/
 **/.python_dl/
 **/setup_env.log
+
+# A00510_release_builder 바로가기(.lnk) 는 절대 경로를 담아 PC 마다 Run_ReleaseBuilder.bat 이 만든다 — 추적 안 함.
+**/A00510_release_builder/*.lnk
+**/A00510_release_builder/.shortcut_stamp

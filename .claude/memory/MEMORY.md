@@ -15,7 +15,7 @@
 - [Docs go in JUN_All/docs](docs-go-in-jun-all-docs.md) — 툴 안내 = docs/, 계획 = docs/plans/, 학습 = JUN_Study
 - [A00500_reloader](wip-a00500-reloader.md) — dev 리로더는 `dev/A00500_reloader` 셸프 툴, `dev/reloader_v02` 는 재노출(launch.py 들이 쓴다) · 전부 리로드는 다른 툴 창을 닫을 수 있다
 - [A00520 icon_builder · A00530 dependency_check](wip-a00500-reloader.md) — dev 툴 4개 전부 같은 모양(launch.run · __dragDrop · icon · docs), 옛 `dev/build_icons.py` · `check_dependencies.py`(재노출 유지) 자리, 새 tools 는 A00540 부터
-- [A00510_release_builder](wip-release-builder-qt.md) — 릴리즈 복사 개발툴(dev/, 옛 release_builder_QT, v01.03 부터 A 번호 + __dragDrop_A00510)
+- [A00510_release_builder](wip-release-builder-qt.md) — 릴리즈 복사 개발툴(dev/, v01.03 A 번호 + __dragDrop_A00510, **v01.04 마야 안에선 qss 를 창에만 — 앱에 걸면 마야 UI 가 바뀐다** · Run_ReleaseBuilder.bat + 아이콘 .lnk)
 - [Release layout & launch.py](release-layout-launch-py.md) — 릴리즈본은 Framework 동봉 · config/dev 없음, launch.py 가 두 배치 구분. **툴 간 import 금지**
 - [Release install scripts](release-install-scripts.md) — userSetup 이름 고정, git 출력 UTF-8 vs 콘솔 cp949
 - [Update portfolio on tool work](update-portfolio-on-tool-work.md) — portfolio EN/KR 동기, 커밋 통계 건드리지 않기

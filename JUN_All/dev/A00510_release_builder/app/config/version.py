@@ -12,5 +12,10 @@
 #        아이콘 파일 이름 · ICON_STEM · 로그창 objectName 도 같이. __dragDrop_A00510.py 로 셸프 설치,
 #        패키지 __init__ 의 run() 은 launch 를 늦게 import (import 만으로 AUMID 가 바뀌지 않게).
 
-VERSION = "01.03"
-LAST_UPDATE = "2026-10-12"
+# 01.04  ★ 마야 셸프로 띄우면 **마야 UI 전체가 이 툴 테마로 바뀌던 것** 수정 - qss 를 QApplication(=마야)
+#        이 아니라 이 창에만 입힌다. AppUserModelID · 앱 아이콘도 이 프로세스가 앱을 만들 때만
+#        (예전엔 launch import 만으로 마야 프로세스의 작업 표시줄 ID 가 바뀌었다). 다시 누르면 이전 창을 닫는다.
+#        Run_ReleaseBuilder.bat (더블클릭 실행) + make_shortcut.py - 툴 아이콘이 박힌 `Release Builder.lnk`.
+
+VERSION = "01.04"
+LAST_UPDATE = "2026-11-03"

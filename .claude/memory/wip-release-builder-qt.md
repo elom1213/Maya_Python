@@ -42,3 +42,11 @@ tools 와 같은 `A00XXX_` 번호). 아이콘 파일명 · `ICON_STEM` · 로그
 릴리즈 커밋 전에 `git status` 로 **data/ 변경을 따로 보고**, `git add -u` 로 통째 담지 말 것 — 실제로 활성 프로파일이
 배포되지 않는 `Dnable_Basic_v001` 로 바뀐 채 커밋됐다가 되돌렸다. 툴의 `ref/` 도 같은 이유로 복사된다(ref_02.png).
 배포에 넣을 프로파일은 사용자에게 묻는다.
+
+**v01.04 (2026-11-03)** — ★ 마야 셸프로 띄우면 **마야 UI 전체가 dark.qss 로 바뀌었다**: launch 가 마야 안에서도
+`ThemeManager.load_theme_dev(app)` = `QApplication(=마야).setStyleSheet`. 게다가 launch import 만으로 AUMID 를 지정해
+마야 프로세스 작업 표시줄 ID 도 바꿨다. → 앱 전역(qss · 앱 아이콘 · AUMID)은 **내가 QApplication 을 만들 때만**,
+마야 안에서는 `load_theme_to_widget(win)`. **다른 in-Maya PySide 툴 launch 를 고칠 때도 같은 점검**(load_theme_dev 를 앱에 거는지).
+`Run_ReleaseBuilder.bat` + `make_shortcut.py` — `.bat` 은 아이콘을 못 바꾸므로 툴 아이콘 + AUMID 박은 `Release Builder.lnk`
+를 툴 폴더에 만든다(절대 경로 → gitignore, `.shortcut_stamp` 로 바뀔 때만 재생성). 시험 PC 에서 cmd 는 `.\` 없이
+현재 폴더 bat 을 못 찾는다(PowerShell 툴에서 `cmd /c ".\x.bat"`). 마야 GUI 확인 아직.
