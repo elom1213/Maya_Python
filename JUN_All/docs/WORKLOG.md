@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-04 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.44 Pose Key `Current` 축마다** `#A00110_animTool`
+- 요구: `Use current values` 는 어트리뷰트마다 필요한 체크 → 전역 체크박스 대신 Pose Key 행마다 `Current`.
+- 구현: `PoseKeyManager.set_pose_keys(current_axes=)`, `HoldLayerManager` 설정 `use_current` → `current_axes`(optionVar JSON, 옛 값은 체크 축 전부로 옮김),
+  capture · apply 모두 축마다. 켠 행만 값 칸 비활성, Layer Blend 메시지 `current: tx`.
+- 시험: 69/69(축마다 Pose Key · Layer Blend additive/override · 옛 설정 옮기기) · UI 19/19. **GUI 확인 아직.**
+
 > [!summary] A00110_animTool_V02 **v02.43 Layer Blend Key 보기 게이트** `#A00110_animTool`
 - 요구: AnimLayer1 을 보며 그 구간 키를 골라 Shift+A 하면 Layer Blend 가 돌면 안 됨 → 고른 레이어(기본 BaseAnimation)를 볼 때만 동작.
 - 구현: `HoldLayerManager.viewed_layers()`(에디터 선택 → preferred → 루트) · `view_gate()` — 보는 레이어가 정확히 그 하나일 때만,

@@ -988,6 +988,8 @@ class MainWindow(QWidget):
 
         # attr -> (checkbox, lineedit)
         self.pose_rows = {}
+        # v02.44 attr -> `Current` 체크박스 (그 축은 입력 값 대신 지금 값으로 키, Layer Blend Key 도 따른다)
+        self.pose_current = {}
 
         for attr, label in PoseKeyManager.AXES:
 
@@ -1005,17 +1007,17 @@ class MainWindow(QWidget):
             le.setValidator(QDoubleValidator(-1000000.0, 1000000.0, 4, self))
             row.addWidget(le)
 
+            cur = QCheckBox("Current")
+            cur.setToolTip(
+                "Key this axis with its current value at the current frame\n"
+                "instead of the number typed here (unkeyed changes are keyed as they are).\n"
+                "Hot Key > Main > Layer Blend Key also keys this axis this way.")
+            row.addWidget(cur)
+
             grp_layout.addLayout(row)
 
             self.pose_rows[attr] = (cb, le)
-
-        # v02.41 체크된 축에 입력 값 대신 지금 프레임의 현재 값으로 키 (Shift+A Layer Blend Key 도 따른다)
-        self.cb_pose_current = QCheckBox("Use current values")
-        self.cb_pose_current.setToolTip(
-            "Key the checked axes with their current values at the current frame\n"
-            "instead of the numbers typed above (unkeyed changes are keyed as they are).\n"
-            "Hot Key > Main > Layer Blend Key also keys the current frame this way.")
-        grp_layout.addWidget(self.cb_pose_current)
+            self.pose_current[attr] = cur
 
         tab_layout.addWidget(grp)
 
@@ -3779,7 +3781,7 @@ class MainWindow(QWidget):
             return
 
         count, msg = PoseKeyManager.set_pose_keys(
-            axis_values, use_current=self.cb_pose_current.isChecked())
+            axis_values, current_axes=self._pose_current_axes())
         self.log(msg)
 
     # --------------------------------------------------
@@ -5869,7 +5871,8 @@ class MainWindow(QWidget):
         try:
             self.cb_hold_layer.setChecked(bool(saved["enabled"]))
             self.sp_hold_layer_offset.setValue(int(saved["offset"]))
-            self.cb_pose_current.setChecked(bool(saved["use_current"]))
+            for attr, cur in self.pose_current.items():
+                cur.setChecked(attr in saved["current_axes"])
             self._pose_current_changed()
             self._hold_layer_refresh(prefer=saved["layer"])
             self._hold_view_layer_refresh(prefer=saved["view_layer"])
@@ -5884,8 +5887,9 @@ class MainWindow(QWidget):
         for cb, le in self.pose_rows.values():
             cb.toggled.connect(self._push_hold_layer_settings)
             le.textChanged.connect(self._push_hold_layer_settings)
-        self.cb_pose_current.toggled.connect(self._pose_current_changed)
-        self.cb_pose_current.toggled.connect(self._push_hold_layer_settings)
+        for cur in self.pose_current.values():
+            cur.toggled.connect(self._pose_current_changed)
+            cur.toggled.connect(self._push_hold_layer_settings)
 
         self._push_hold_layer_settings()
 
@@ -5917,11 +5921,14 @@ class MainWindow(QWidget):
             if not quiet:
                 self.log("Layer Blend: {0} layer(s) listed.".format(len(layers)))
 
+    def _pose_current_axes(self):
+        """`Current` 가 켜진 축 목록 (축 체크와 무관하게 - 상태 기억용. 실제로는 체크된 축과 겹치는 것만 쓰인다)."""
+        return [attr for attr, cur in self.pose_current.items() if cur.isChecked()]
+
     def _pose_current_changed(self, *_args):
-        """Use current values 가 켜지면 값 칸은 쓰이지 않으므로 비활성 (축 체크박스는 그대로)."""
-        on = self.cb_pose_current.isChecked()
-        for _cb, le in self.pose_rows.values():
-            le.setEnabled(not on)
+        """`Current` 가 켜진 행은 값 칸이 쓰이지 않으므로 비활성 (축 체크박스는 그대로)."""
+        for attr, (_cb, le) in self.pose_rows.items():
+            le.setEnabled(not self.pose_current[attr].isChecked())
 
     def _hold_view_layer_name(self):
         """보기 게이트 콤보 값. "" = 루트(BaseAnimation)."""
@@ -5955,9 +5962,9 @@ class MainWindow(QWidget):
     def _collect_pose_axis_values(self, warn=True):
         """Pose Key 탭에서 체크된 축 {attr: float}. 빈 칸 · 숫자 아님은 warn 이면 None(중단), 아니면 그 축만 뺀다.
 
-        Use current values 가 켜져 있으면 값 칸은 안 쓰이므로 비어 있어도 그 축을 넣는다(값 0.0 자리표시).
+        `Current` 가 켜진 축은 값 칸을 안 쓰므로 비어 있어도 넣는다(값 0.0 자리표시).
         """
-        use_current = getattr(self, "cb_pose_current", None) is not None and self.cb_pose_current.isChecked()
+        current = set(self._pose_current_axes()) if getattr(self, "pose_current", None) else set()
         axis_values = {}
         for attr, (cb, le) in self.pose_rows.items():
             if not cb.isChecked():
@@ -5966,7 +5973,7 @@ class MainWindow(QWidget):
             try:
                 axis_values[attr] = float(txt)
             except ValueError:
-                if use_current:
+                if attr in current:
                     axis_values[attr] = 0.0
                     continue
                 if warn:
@@ -5985,7 +5992,7 @@ class MainWindow(QWidget):
         # optionVar 에 저장된다(원본) - 핫키는 그걸 읽는다
         HoldLayerManager.update(enabled=on, layer=layer, offset=offset,
                                 axis_values=self._collect_pose_axis_values(warn=False),
-                                use_current=self.cb_pose_current.isChecked(),
+                                current_axes=self._pose_current_axes(),
                                 view_layer=self._hold_view_layer_name())
 
     def on_toggle_hotkey(self, checked):

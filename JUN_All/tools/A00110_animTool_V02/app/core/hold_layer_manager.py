@@ -36,6 +36,10 @@
 #   없으면 활성(preferred) 레이어 -> 그것도 없으면 루트(BaseAnimation). 여러 개를 같이 보고 있으면 통과 못 한다.
 #   view_layer 저장값 "" = 루트 레이어(이름이 BaseAnimation 이 아니어도). 씬에 레이어가 하나도 없으면 게이트는 통과(루트 취급).
 #
+# v02.44 - `Use current values` 를 **축마다** (사용자 요구). 전역 use_current(bool) -> `current_axes`(축 목록, optionVar JSON).
+#   Pose Key 행마다 `Current` 체크박스 - 켠 축만 현재 값, 나머지 축은 입력 값. capture_current 도 그 축만 읽는다.
+#   옛 optionVar use_current=1 이 남아 있고 current_axes 가 없으면 체크된 축 전부를 current 로 옮겨 읽는다.
+#
 # 결정 사항 (2026-11-04 사용자):
 #   1. -N 키 값 = 그 시점의 레이어 값 유지 (레이어 커브 평가값, 커브가 없으면 그 레이어 blend 입력(inputB)의 정적값)
 #   2. 레이어가 없거나 오브젝트가 멤버가 아니면 경고하고 건너뜀 (레이어를 만들거나 멤버로 넣지 않는다)
@@ -66,7 +70,7 @@ class HoldLayerManager:
         "layer": "",           # 대상 animLayer 이름
         "offset": 10,          # N (프레임, int >= 1)
         "axis_values": {},     # Pose Key 탭에서 체크된 축 {"rx": 0.0, ...}
-        "use_current": False,  # v02.41 현재 프레임 키 = 현재 값 (Pose Key `Use current values`)
+        "current_axes": [],    # v02.44 현재 값으로 찍을 축 (Pose Key 행마다 `Current`). v02.41 전역 use_current 대체
         "view_layer": "",      # v02.43 이 레이어를 보고 있을 때만 동작. "" = 루트(BaseAnimation)
     }
 
@@ -83,8 +87,10 @@ class HoldLayerManager:
             cmds.optionVar(intValue=(pre + "offset", int(kw["offset"])))
         if "axis_values" in kw:
             cmds.optionVar(stringValue=(pre + "axis_values", json.dumps(dict(kw["axis_values"] or {}))))
-        if "use_current" in kw:
-            cmds.optionVar(intValue=(pre + "use_current", int(bool(kw["use_current"]))))
+        if "current_axes" in kw:
+            cmds.optionVar(stringValue=(pre + "current_axes", json.dumps(list(kw["current_axes"] or []))))
+            if cmds.optionVar(exists=pre + "use_current"):      # v02.41 전역 플래그는 더 안 쓴다
+                cmds.optionVar(remove=pre + "use_current")
         if "view_layer" in kw:
             cmds.optionVar(stringValue=(pre + "view_layer", str(kw["view_layer"] or "")))
 
@@ -92,8 +98,9 @@ class HoldLayerManager:
     def load_settings(cls):
         """optionVar 에서 설정을 읽는다. 없는 키는 기본값."""
         pre = OPTVAR_PREFIX
-        out = {"enabled": False, "layer": "", "offset": 10, "axis_values": {}, "use_current": False,
+        out = {"enabled": False, "layer": "", "offset": 10, "axis_values": {}, "current_axes": [],
                "view_layer": ""}
+        old_use_current = False
         try:
             if cmds.optionVar(exists=pre + "enabled"):
                 out["enabled"] = bool(cmds.optionVar(q=pre + "enabled"))
@@ -103,13 +110,18 @@ class HoldLayerManager:
                 out["offset"] = int(cmds.optionVar(q=pre + "offset"))
             if cmds.optionVar(exists=pre + "view_layer"):
                 out["view_layer"] = str(cmds.optionVar(q=pre + "view_layer") or "")
-            if cmds.optionVar(exists=pre + "use_current"):
-                out["use_current"] = bool(cmds.optionVar(q=pre + "use_current"))
+            if cmds.optionVar(exists=pre + "current_axes"):
+                out["current_axes"] = [str(a) for a in json.loads(cmds.optionVar(q=pre + "current_axes") or "[]")]
+            elif cmds.optionVar(exists=pre + "use_current"):
+                old_use_current = bool(cmds.optionVar(q=pre + "use_current"))
             if cmds.optionVar(exists=pre + "axis_values"):
                 raw = json.loads(cmds.optionVar(q=pre + "axis_values") or "{}")
                 out["axis_values"] = {str(k): float(v) for k, v in raw.items()}
         except (TypeError, ValueError):
             pass
+        if old_use_current:
+            # v02.41 전역 Use current values 를 쓰던 설정 -> 체크된 축 전부 current
+            out["current_axes"] = list(out["axis_values"])
         return out
 
     # --------------------------------------------------
@@ -238,19 +250,20 @@ class HoldLayerManager:
 
     @classmethod
     def capture_current(cls, objects=None):
-        """use_current 가 켜져 있으면 선택 오브젝트 x Pose 축의 **지금 값** {(obj, 축): float}. 꺼져 있으면 None.
+        """current 축이 있으면 선택 오브젝트 x (체크된 축 ∩ current 축) 의 **지금 값** {(obj, 축): float}. 없으면 None.
 
         run_hold 가 Hold **전에** 부른다. 읽을 수 없는 채널은 빠진다(apply 가 그때 다시 읽는다).
         """
         s = cls.load_settings()
-        if not (s.get("enabled") and s.get("use_current")):
+        axes = [a for a in (s.get("axis_values") or {}) if a in set(s.get("current_axes") or [])]
+        if not (s.get("enabled") and axes):
             return None
         if not cls.view_gate(s.get("view_layer", ""))[0]:
             return None
         sel = cls.selected_objects(objects)
         out = {}
         for obj in sel:
-            for short in (s.get("axis_values") or {}):
+            for short in axes:
                 try:
                     out[(obj, short)] = float(cmds.getAttr("{0}.{1}".format(obj, short)))
                 except Exception:                           # noqa: BLE001
@@ -261,7 +274,7 @@ class HoldLayerManager:
     def apply(cls, objects=None, frame=None, current_values=None):
         """현재 프레임-N 에 '그 시점 레이어 값' 키, 현재 프레임에 Pose 값 키.
 
-        use_current 가 켜져 있으면 현재 프레임 키는 Pose 값 대신 **지금 값**
+        current 축(v02.44 축마다)은 현재 프레임 키를 Pose 값 대신 **지금 값**으로
         (current_values {(obj, 축): 값} 이 있으면 그것, 없으면 여기서 읽는다).
 
         undo 묶기는 호출부(HotkeyManager.run_hold)가 Hold 와 함께 한다.
@@ -307,7 +320,7 @@ class HoldLayerManager:
         now = float(cmds.currentTime(q=True))
         t1 = now if frame is None else float(frame)
         t0 = t1 - n
-        use_current = bool(s.get("use_current"))
+        current_axes = set(s.get("current_axes") or []) & set(axis_values)
         current_values = current_values or {}
 
         def current_of(obj, short):
@@ -350,7 +363,7 @@ class HoldLayerManager:
             for short, val in axis_values.items():
                 long_name = cls._long_name(obj, short)
                 if long_name in members:
-                    pose.append((long_name, current_of(obj, short) if use_current else float(val)))
+                    pose.append((long_name, current_of(obj, short) if short in current_axes else float(val)))
                 else:
                     not_member_axes.add(short)
 
@@ -371,7 +384,8 @@ class HoldLayerManager:
             return "{0:g}".format(t)
 
         msg = "Layer Blend: {0} object(s) keyed on '{1}' (f{2} -> f{3}{4}){5}.".format(
-            len(keyed), layer, fmt(t0), fmt(t1), ", current values" if use_current else "",
+            len(keyed), layer, fmt(t0), fmt(t1),
+            ", current: " + ", ".join(a for a in axis_values if a in current_axes) if current_axes else "",
             ": " + LayerKeyManager._brief(keyed, limit=5) if keyed else "")
         try:
             if cmds.animLayer(layer, q=True, mute=True):

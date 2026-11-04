@@ -25,7 +25,7 @@ def check(name, cond, extra=""):
 
 
 PRE = "JUN_A00110_holdLayer_"
-for k in ("enabled", "offset", "layer", "axis_values", "use_current", "view_layer"):
+for k in ("enabled", "offset", "layer", "axis_values", "use_current", "view_layer", "current_axes"):
     if cmds.optionVar(exists=PRE + k):
         cmds.optionVar(remove=PRE + k)
 
@@ -76,23 +76,28 @@ check("U17 'Run only when viewing' defaults to BaseAnimation (data ''), lists ot
 win.cmb_hold_view_layer.setCurrentIndex(win.cmb_hold_view_layer.findData("Layer_01"))
 check("U18 choosing Layer_01 pushes view_layer", HLM.load_settings()["view_layer"] == "Layer_01", HLM.load_settings())
 
-# v02.41 Use current values
-check("U13 Pose Key has 'Use current values' (off), value fields enabled",
-      win.cb_pose_current.text() == "Use current values" and not win.cb_pose_current.isChecked()
-      and all(le.isEnabled() for _c, le in win.pose_rows.values()))
-win.cb_pose_current.setChecked(True)
-check("U14 on: value fields disabled, use_current pushed, empty rz now included",
-      not any(le.isEnabled() for _c, le in win.pose_rows.values())
-      and HLM.load_settings()["use_current"] is True and "rz" in HLM.load_settings()["axis_values"],
+# v02.44 축마다 `Current`
+check("U13 every Pose Key row has its own 'Current' (off), value fields enabled",
+      sorted(win.pose_current) == sorted(win.pose_rows)
+      and all(c.text() == "Current" and not c.isChecked() for c in win.pose_current.values())
+      and all(le.isEnabled() for _c, le in win.pose_rows.values()) and not hasattr(win, "cb_pose_current"))
+win.pose_current["ty"].setChecked(True)
+win.pose_current["rz"].setChecked(True)
+check("U14 per-axis: only ty / rz fields disabled, current_axes pushed, empty rz still included",
+      not win.pose_rows["ty"][1].isEnabled() and not win.pose_rows["rz"][1].isEnabled()
+      and win.pose_rows["rx"][1].isEnabled() and win.pose_rows["tx"][1].isEnabled()
+      and sorted(HLM.load_settings()["current_axes"]) == ["rz", "ty"] and "rz" in HLM.load_settings()["axis_values"],
       HLM.load_settings())
 cmds.currentTime(5)
 cmds.setAttr(cube + ".ty", 4.5)
+cmds.setAttr(cube + ".tx", 9.0)
 cmds.select(cube)
-win.pose_rows["rz"][1].setText("")
+win.pose_rows["tx"][1].setText("3.5")
 win.btn_set_pose.click()
 k_ty = cmds.keyframe(cube + ".ty", q=True, valueChange=True, time=(5, 5)) or []
-check("U15 Set Pose Key button keys the current value (ty 4.5), empty field no warning stop",
-      k_ty == [4.5], k_ty)
+k_tx = cmds.keyframe(cube + ".tx", q=True, valueChange=True, time=(5, 5)) or []
+check("U15 Set Pose Key: ty = current 4.5, tx = typed 3.5, empty rz field no warning stop",
+      k_ty == [4.5] and k_tx == [3.5], (k_ty, k_tx))
 
 win.close()
 APP.processEvents()
@@ -110,8 +115,9 @@ check("U9 missing layer shown as '(missing)' and kept",
 check("U10 settings re-pushed on reopen", HLM.settings["enabled"] and HLM.settings["offset"] == 7)
 check("U19 reopen restores view layer Layer_01", win2.cmb_hold_view_layer.currentText() == "Layer_01",
       win2.cmb_hold_view_layer.currentText())
-check("U16 reopen restores 'Use current values' + disabled fields",
-      win2.cb_pose_current.isChecked() and not any(le.isEnabled() for _c, le in win2.pose_rows.values()))
+check("U16 reopen restores per-axis 'Current' (ty, rz) + their disabled fields",
+      sorted(a for a, c in win2.pose_current.items() if c.isChecked()) == ["rz", "ty"]
+      and not win2.pose_rows["ty"][1].isEnabled() and win2.pose_rows["rx"][1].isEnabled())
 
 cmds.animLayer("Layer_03")
 win2.cmb_hold_layer.showPopup()      # v02.40 : 펼치면 새 레이어가 바로 보인다
@@ -125,7 +131,7 @@ check("U11 Refresh picks up new layer, keeps missing selection",
       "Layer_04" in items and win2.cmb_hold_layer.currentText() == "Layer_02 (missing)", items)
 win2.close()
 
-for k in ("enabled", "offset", "layer", "axis_values", "use_current", "view_layer"):
+for k in ("enabled", "offset", "layer", "axis_values", "use_current", "view_layer", "current_axes"):
     if cmds.optionVar(exists=PRE + k):
         cmds.optionVar(remove=PRE + k)
 

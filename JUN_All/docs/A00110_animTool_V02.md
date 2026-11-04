@@ -806,13 +806,12 @@ A00110_animTool_V02.run(True)   # True = reload
 
 ```
 ┌ Set Pose Key (current frame) ─────────────────────┐
-│ [v] rotate X     [ 0 ]                            │
-│ [ ] rotate Y     [ 0 ]                            │
-│ [v] rotate Z     [ 0 ]                            │
-│ [ ] translate X  [ 0 ]                            │
-│ [v] translate Y  [ 0 ]                            │
-│ [ ] translate Z  [ 0 ]                            │
-│ [ ] Use current values                            │  ← v02.41
+│ [v] rotate X     [ 0 ]  [ ] Current               │
+│ [ ] rotate Y     [ 0 ]  [ ] Current               │
+│ [v] rotate Z     [ 0 ]  [ ] Current               │  ← Current : v02.44 축마다
+│ [ ] translate X  [ 0 ]  [ ] Current               │
+│ [v] translate Y  [ 0 ]  [ ] Current               │
+│ [ ] translate Z  [ 0 ]  [ ] Current               │
 └───────────────────────────────────────────────────┘
 [ Set Pose Key ]
 ```
@@ -821,10 +820,11 @@ A00110_animTool_V02.run(True)   # True = reload
 - **기본 체크 축**: rotate X / rotate Z / translate Y (원본 A00030 의 3축).
 - **Set Pose Key**: 선택 오브젝트(들)의 **현재 타임라인 프레임**에 **체크된 축만** 입력값으로
   `setKeyframe`. 체크됐는데 값이 비어 있으면 경고 후 중단.
-- **Use current values**(v02.41~, 기본 끔): 켜면 **체크된 축**에 입력 값 대신 **지금 프레임의 현재 값**으로 키를 찍는다
-  (키 없이 움직여 둔 값도 그대로 키가 된다). 켜져 있는 동안 값 칸은 비활성이고 비어 있어도 된다. 활성 애니메이션 레이어에서는
-  최종 값이 지금 값 그대로 남는다. 켜져 있으면 **Hot Key > Main > Layer Blend Key** 의 현재 프레임 키도 같은 방식이다.
-  체크 상태는 창을 다시 열어도 기억된다.
+- **Current**(축마다, v02.44~ · v02.41~43 은 전역 `Use current values` 하나, 기본 끔): 그 행을 켜면 **그 축만** 입력 값 대신
+  **지금 프레임의 현재 값**으로 키를 찍는다(키 없이 움직여 둔 값도 그대로 키). 켠 행의 값 칸은 비활성이고 비어 있어도 된다.
+  나머지 축은 입력 값 그대로. 활성 애니메이션 레이어에서는 최종 값이 지금 값 그대로 남는다.
+  **Hot Key > Main > Layer Blend Key** 의 현재 프레임 키도 축마다 같은 방식이다. 체크 상태는 창을 다시 열어도 기억된다
+  (v02.41 의 전역 설정을 쓰던 경우 처음 열 때 체크된 축 전부가 Current 로 옮겨진다).
 
 #### Fill Keys — 구간의 모든 프레임에 키 채우기 (v01.40~)
 
@@ -1946,8 +1946,8 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
   (레이어 커브 평가값, 커브가 없으면 그 레이어 blend 입력의 정적값 — additive 는 보통 0). 이미 키가 있으면 덮어쓴다.
 - **(현재 프레임)**: Key > **Pose Key** 탭에서 체크된 축에 그 값으로 키. Pose Key 버튼과 **같은 호출**이라 그 프레임의
   **최종 값이 Pose 값**이 된다(additive 레이어면 마야가 레이어 값을 역산). Pose 축이 아닌 채널은 현재 프레임에 키를 찍지 않는다.
-  v02.41~ Pose Key 의 **Use current values** 가 켜져 있으면 Pose 값 대신 **지금 값**(최종 값이 그대로 남는다). 값은 **Hold 전에** 읽으므로
-  Hold 가 커브를 바꿔도 Shift+A 를 누르던 순간의 값이 키가 된다. 메시지에 `current values` 가 붙는다.
+  Pose Key 행의 **Current** 가 켜진 축(v02.44~ 축마다)은 Pose 값 대신 **지금 값**(최종 값이 그대로 남는다). 값은 **Hold 전에** 읽으므로
+  Hold 가 커브를 바꿔도 Shift+A 를 누르던 순간의 값이 키가 된다. 메시지에 `current: tx, ...` 처럼 그 축이 붙는다.
 - **레이어를 만들거나 멤버로 넣지 않는다** — 레이어가 없거나 잠겼으면 경고 후 건너뜀, 멤버 채널이 없는 오브젝트는
   `Skipped: ...`, 멤버가 아닌 Pose 축은 `Pose axes not in layer: ...`. 뮤트된 레이어는 키는 찍고 `(layer muted)` 를 붙인다.
 - Hold 와 **독립**(Hold 할 키 선택이 없어도 레이어 키는 찍는다). 뷰포트 메시지는 두 줄, **Ctrl+Z 한 번에 둘 다** 되돌아간다.
@@ -1955,8 +1955,8 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
   v02.39 는 클래스 변수에 두어, DEV 리로드 순서에 따라 핫키가 옛 클래스(꺼짐)를 읽고 **레이어 키를 조용히 건너뛰는** 버그가 있었다.
   Layer Blend 에서 에러가 나면 Hold 메시지 아래에 `[Error] Layer Blend: ...` 한 줄.
 - **Hold Selected Range 버튼**은 예전처럼 Hold 만 한다 — Layer Blend 는 Shift+A 전용.
-- 시험 `tests/test_hold_layer_blend.py` 63/63(v02.43 보기 게이트 VG0~11, v02.42 SEL: 멤버 셋 중 하나만 선택 · 레이어/세트/캐릭터 섞임, v02.41 Use current values UC1~5, v02.40 optionVar · 리로드 순서 회귀 RL1 포함, Additive · Override, 덮어쓰기, 최종값 = Pose, Base 불변, 비멤버 · 없는 레이어 · 잠김 · 뮤트,
-  run_hold 한 번 undo), `tests/test_hold_layer_blend_ui.py` 19/19(보기 게이트 콤보 기본 · push · 복원, Use current values 체크 · 값 칸 비활성 · 복원, 콤보 · 펼칠 때 갱신 · push · Pose 행 · optionVar 복원 · missing). **마야 GUI 확인 아직.**
+- 시험 `tests/test_hold_layer_blend.py` 69/69(v02.44 축마다 Current UC1b · UC-ADD/OVR 3 · 옛 설정 옮기기 UC7~8, v02.43 보기 게이트 VG0~11, v02.42 SEL: 멤버 셋 중 하나만 선택 · 레이어/세트/캐릭터 섞임, v02.41 Use current values UC1~5, v02.40 optionVar · 리로드 순서 회귀 RL1 포함, Additive · Override, 덮어쓰기, 최종값 = Pose, Base 불변, 비멤버 · 없는 레이어 · 잠김 · 뮤트,
+  run_hold 한 번 undo), `tests/test_hold_layer_blend_ui.py` 19/19(보기 게이트 콤보 기본 · push · 복원, 행마다 Current · 그 행 값 칸만 비활성 · 축마다 키 · 복원, 콤보 · 펼칠 때 갱신 · push · Pose 행 · optionVar 복원 · missing). **마야 GUI 확인 아직.**
   계획서 [a00110_hold_layer_blend_plan.md](plans/a00110_hold_layer_blend_plan.md).
 
 #### Main > Manipulator Space
@@ -2012,7 +2012,7 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
 ### Key > Pose Key
 1. 대상 오브젝트(들) 선택 → 타임라인을 키를 찍을 프레임으로 이동.
 2. 적용할 축 체크 + 값 입력 → **Set Pose Key**.
-   (지금 값 그대로 키를 찍으려면 **Use current values** 를 켜고 축만 체크 → **Set Pose Key**.)
+   (어떤 축을 지금 값 그대로 찍으려면 그 행의 **Current** 를 켠다 — 축마다 따로. → **Set Pose Key**.)
 
 ### Transfer > Copy Key
 1. 복사 **원본** 오브젝트들을 선택 → Base 의 **Select Base**.

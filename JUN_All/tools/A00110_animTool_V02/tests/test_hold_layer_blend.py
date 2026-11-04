@@ -21,7 +21,7 @@ PRE = "JUN_A00110_holdLayer_"
 
 
 def clear_optvars():
-    for k in ("enabled", "offset", "layer", "axis_values", "use_current", "view_layer"):
+    for k in ("enabled", "offset", "layer", "axis_values", "use_current", "view_layer", "current_axes"):
         if cmds.optionVar(exists=PRE + k):
             cmds.optionVar(remove=PRE + k)
 
@@ -215,8 +215,18 @@ cmds.setAttr(plain + ".ry", 33.0)          # 키 없던 채널
 n, msg = PoseKeyManager.set_pose_keys({"tx": 0.0, "ry": 0.0}, use_current=True)
 k_tx = keys(cmds.listConnections(plain + ".tx", type="animCurve")[0])
 k_ry = keys((cmds.listConnections(plain + ".ry", type="animCurve") or [None])[0])
-check("UC1 Pose Key use_current: keys the current (unkeyed) values, not the typed 0",
-      k_tx.get(10.0) == 7.25 and k_ry.get(10.0) == 33.0 and "current values" in msg, (k_tx, k_ry, msg))
+check("UC1 Pose Key use_current=True (all axes): keys the current (unkeyed) values, not the typed 0",
+      k_tx.get(10.0) == 7.25 and k_ry.get(10.0) == 33.0 and "tx=current" in msg, (k_tx, k_ry, msg))
+
+# v02.44 축마다 : ry 만 current, tx 는 입력 값 1.5
+cmds.currentTime(12)
+cmds.setAttr(plain + ".tx", 8.0)
+cmds.setAttr(plain + ".ry", 44.0)
+n, msg = PoseKeyManager.set_pose_keys({"tx": 1.5, "ry": 0.0}, current_axes=["ry"])
+k_tx = keys(cmds.listConnections(plain + ".tx", type="animCurve")[0])
+k_ry = keys(cmds.listConnections(plain + ".ry", type="animCurve")[0])
+check("UC1b per-axis: ry = current 44.0, tx = typed 1.5", k_tx.get(12.0) == 1.5 and k_ry.get(12.0) == 44.0,
+      (k_tx, k_ry, msg))
 
 
 def final_at(obj, attr, t):
@@ -230,20 +240,31 @@ for override in (False, True):
     clear_optvars()
     cube, other, layer = scene(override)
     before = {a: final_at(cube, a, 100) for a in ("tx", "rx")}
-    HLM.update(use_current=True, **SETTINGS)
+    HLM.update(current_axes=["rx", "tx"], **SETTINGS)
     cmds.select(cube)
     n, msg = HLM.apply()
     after = {a: final_at(cube, a, 100) for a in ("tx", "rx")}
     lay = keys(crv(cube, "translateX", layer))
-    check(tag + " 1 Layer Blend use_current: f100 keyed, final value unchanged (not Pose 5.0 / 0.0)",
-          n == 1 and 100.0 in lay and after == before and "current values" in msg, (before, after, msg))
+    check(tag + " 1 Layer Blend all axes current: f100 keyed, final value unchanged (not Pose 5.0 / 0.0)",
+          n == 1 and 100.0 in lay and after == before and "current: rx, tx" in msg, (before, after, msg))
     check(tag + " 2 f90 still keeps layer value 2.0", lay.get(90.0) == 2.0, lay)
+
+    # v02.44 축마다 : tx 만 current -> tx 는 지금 값 유지, rx 는 Pose 0.0
+    clear_optvars()
+    cube, other, layer = scene(override)
+    before_tx = final_at(cube, "tx", 100)
+    HLM.update(current_axes=["tx"], **SETTINGS)
+    cmds.select(cube)
+    n, msg = HLM.apply()
+    check(tag + " 3 per-axis: tx current (unchanged), rx = Pose 0.0",
+          final_at(cube, "tx", 100) == before_tx and final_at(cube, "rx", 100) == 0.0 and msg.count("current: tx") == 1,
+          (before_tx, final_at(cube, "tx", 100), final_at(cube, "rx", 100), msg))
 
 # Shift+A : Hold 가 base tx 를 평평하게 바꿔도, Hold **전** 값이 레이어 f100 키로 남는다
 clear_optvars()
 cube, other, layer = scene(False)
 want = final_at(cube, "tx", 100)
-HLM.update(use_current=True, **SETTINGS)
+HLM.update(current_axes=["rx", "tx"], **SETTINGS)
 cmds.select(cube)
 cmds.selectKey(LKM.layer_curve("ctl.translateX", LKM.root_layer()), time=(1, 100), replace=True)
 hk.HotkeyManager.run_hold()
@@ -255,8 +276,20 @@ cmds.redo()
 check("UC3 run_hold: values captured before Hold (final f100 = pre-Hold value)",
       final_at(cube, "tx", 100) == want and keys(LKM.layer_curve("ctl.translateX", LKM.root_layer())).get(100.0) == 0.0,
       (want, final_at(cube, "tx", 100)))
-HLM.update(use_current=False)
-check("UC5 use_current off -> capture_current() is None", HLM.capture_current() is None)
+HLM.update(current_axes=[])
+check("UC5 no current axis -> capture_current() is None", HLM.capture_current() is None)
+HLM.update(current_axes=["rz"])     # 체크된 축(rx, tx)과 안 겹치면 읽을 것 없음
+check("UC6 current axis not checked -> capture_current() is None", HLM.capture_current() is None)
+
+# v02.41 전역 use_current 를 쓰던 optionVar -> 체크된 축 전부 current 로 읽힌다
+clear_optvars()
+cmds.optionVar(intValue=(PRE + "use_current", 1))
+cmds.optionVar(stringValue=(PRE + "axis_values", '{"rx": 0.0, "ty": 1.0}'))
+check("UC7 old use_current=1 migrates to current_axes = checked axes",
+      sorted(HLM.load_settings()["current_axes"]) == ["rx", "ty"], HLM.load_settings())
+HLM.update(current_axes=["ty"])
+check("UC8 writing current_axes removes the old flag",
+      not cmds.optionVar(exists=PRE + "use_current") and HLM.load_settings()["current_axes"] == ["ty"])
 clear_optvars()
 for k in ("use_current",):
     if cmds.optionVar(exists=PRE + k):
@@ -299,7 +332,8 @@ for use_current in (False, True):
             cmds.sets(objs, n="ctlSet")
         if extra == "character":
             cmds.character(objs, n="charSet")
-        HLM.update(enabled=True, layer=lay, offset=10, axis_values={"rx": 0.0, "tx": 5.0}, use_current=use_current)
+        HLM.update(enabled=True, layer=lay, offset=10, axis_values={"rx": 0.0, "tx": 5.0},
+                   current_axes=["rx", "tx"] if use_current else [])
         before = layer_snap(objs, lay)
         cmds.select(["A"] + {"layer": [lay], "set": ["ctlSet"], "character": ["charSet"]}.get(extra, []), r=True, ne=True)
         hk.HotkeyManager.run_hold()
@@ -372,7 +406,7 @@ for l in cmds.ls(type="animLayer"):
 check("VG9 nothing selected/preferred -> viewing root", HLM.viewed_layers() == [root], HLM.viewed_layers())
 cmds.animLayer(lay, e=True, preferred=True)
 check("VG10 nothing selected, AnimLayer1 preferred -> viewing AnimLayer1", HLM.viewed_layers() == [lay], HLM.viewed_layers())
-HLM.update(use_current=True)
+HLM.update(current_axes=["tx"])
 check("VG11 gate closed -> capture_current() is None", HLM.capture_current(["A"]) is None)
 clear_optvars()
 if cmds.optionVar(exists=PRE + "view_layer"):

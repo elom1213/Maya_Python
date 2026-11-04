@@ -117,5 +117,10 @@
 #        Hold 는 그대로, Layer Blend 는 `skipped - viewing '...'` 한 줄. 저장값 "" = 루트, optionVar view_layer.
 #        회귀 test_hold_layer_blend 63/63(VG) · _ui 19/19.
 
-VERSION = "02.43"
+# 02.44  Pose Key `Use current values` 를 **축마다** (사용자 요구) - 전역 체크박스 대신 행마다 `Current` 체크박스.
+#        켠 축만 지금 값, 나머지 축은 입력 값(켠 행은 값 칸 비활성). Layer Blend Key 도 축마다 따른다(capture 도 그 축만).
+#        설정 use_current(bool) -> current_axes(축 목록, optionVar JSON). 옛 use_current=1 은 체크된 축 전부 current 로 옮겨 읽음.
+#        회귀 test_hold_layer_blend 69/69(UC1b · UC-ADD/OVR 3 · UC6~8) · _ui 19/19.
+
+VERSION = "02.44"
 LAST_UPDATE = "2026-11-04"
