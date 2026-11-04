@@ -695,7 +695,7 @@ class MainWindow(QWidget):
         self.sp_hold_layer_offset.setValue(10)
         self.sp_hold_layer_offset.setToolTip("N : the layer value is keyed at (current frame - N).")
         hl_form.addWidget(self.sp_hold_layer_offset, 1, 1)
-        hl_note = QLabel("Uses Key > Pose Key axes/values.")
+        hl_note = QLabel("Uses Key > Pose Key axes/values (or current values).")
         hl_note.setEnabled(False)
         hl_form.addWidget(hl_note, 2, 0, 1, 3)
         hl_form.setColumnStretch(1, 1)
@@ -991,6 +991,14 @@ class MainWindow(QWidget):
             grp_layout.addLayout(row)
 
             self.pose_rows[attr] = (cb, le)
+
+        # v02.41 체크된 축에 입력 값 대신 지금 프레임의 현재 값으로 키 (Shift+A Layer Blend Key 도 따른다)
+        self.cb_pose_current = QCheckBox("Use current values")
+        self.cb_pose_current.setToolTip(
+            "Key the checked axes with their current values at the current frame\n"
+            "instead of the numbers typed above (unkeyed changes are keyed as they are).\n"
+            "Hot Key > Main > Layer Blend Key also keys the current frame this way.")
+        grp_layout.addWidget(self.cb_pose_current)
 
         tab_layout.addWidget(grp)
 
@@ -3753,7 +3761,8 @@ class MainWindow(QWidget):
             self.log("[Warning] No axis checked.")
             return
 
-        count, msg = PoseKeyManager.set_pose_keys(axis_values)
+        count, msg = PoseKeyManager.set_pose_keys(
+            axis_values, use_current=self.cb_pose_current.isChecked())
         self.log(msg)
 
     # --------------------------------------------------
@@ -5843,6 +5852,8 @@ class MainWindow(QWidget):
         try:
             self.cb_hold_layer.setChecked(bool(saved["enabled"]))
             self.sp_hold_layer_offset.setValue(int(saved["offset"]))
+            self.cb_pose_current.setChecked(bool(saved["use_current"]))
+            self._pose_current_changed()
             self._hold_layer_refresh(prefer=saved["layer"])
         finally:
             self._hold_layer_loading = False
@@ -5854,6 +5865,8 @@ class MainWindow(QWidget):
         for cb, le in self.pose_rows.values():
             cb.toggled.connect(self._push_hold_layer_settings)
             le.textChanged.connect(self._push_hold_layer_settings)
+        self.cb_pose_current.toggled.connect(self._pose_current_changed)
+        self.cb_pose_current.toggled.connect(self._push_hold_layer_settings)
 
         self._push_hold_layer_settings()
 
@@ -5885,8 +5898,18 @@ class MainWindow(QWidget):
             if not quiet:
                 self.log("Layer Blend: {0} layer(s) listed.".format(len(layers)))
 
+    def _pose_current_changed(self, *_args):
+        """Use current values 가 켜지면 값 칸은 쓰이지 않으므로 비활성 (축 체크박스는 그대로)."""
+        on = self.cb_pose_current.isChecked()
+        for _cb, le in self.pose_rows.values():
+            le.setEnabled(not on)
+
     def _collect_pose_axis_values(self, warn=True):
-        """Pose Key 탭에서 체크된 축 {attr: float}. 빈 칸 · 숫자 아님은 warn 이면 None(중단), 아니면 그 축만 뺀다."""
+        """Pose Key 탭에서 체크된 축 {attr: float}. 빈 칸 · 숫자 아님은 warn 이면 None(중단), 아니면 그 축만 뺀다.
+
+        Use current values 가 켜져 있으면 값 칸은 안 쓰이므로 비어 있어도 그 축을 넣는다(값 0.0 자리표시).
+        """
+        use_current = getattr(self, "cb_pose_current", None) is not None and self.cb_pose_current.isChecked()
         axis_values = {}
         for attr, (cb, le) in self.pose_rows.items():
             if not cb.isChecked():
@@ -5895,6 +5918,9 @@ class MainWindow(QWidget):
             try:
                 axis_values[attr] = float(txt)
             except ValueError:
+                if use_current:
+                    axis_values[attr] = 0.0
+                    continue
                 if warn:
                     self.log(f"[Warning] {attr} is checked but empty." if txt == ""
                              else f"[Warning] {attr} is not a number: {txt}")
@@ -5910,7 +5936,8 @@ class MainWindow(QWidget):
         offset = int(self.sp_hold_layer_offset.value())
         # optionVar 에 저장된다(원본) - 핫키는 그걸 읽는다
         HoldLayerManager.update(enabled=on, layer=layer, offset=offset,
-                                axis_values=self._collect_pose_axis_values(warn=False))
+                                axis_values=self._collect_pose_axis_values(warn=False),
+                                use_current=self.cb_pose_current.isChecked())
 
     def on_toggle_hotkey(self, checked):
         self._enable_hotkey(checked)

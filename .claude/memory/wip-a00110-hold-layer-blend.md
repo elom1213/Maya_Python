@@ -18,6 +18,9 @@ metadata:
 - 멤버 판정은 `LayerKeyManager._blend_chain(plug)` 노드 ∩ `animLayer -q -blendNodes` (이름 비교 안 함).
 - `getAttr plug -time t` 는 레이어 blend 를 거치면 옛 값이 나올 때가 있다 → 시험은 currentTime 을 옮겨 잰다.
 - Hold 와 독립 수행, 바깥 undo_chunk 로 중첩(마야 허용) → Ctrl+Z 한 번. Hold 버튼은 Hold 만.
+- v02.41 Pose Key `Use current values`(optionVar `use_current`): Pose Key 버튼 · Layer Blend 현재 프레임 키 모두 **지금 값**으로.
+  Shift+A 는 `capture_current()` 를 **Hold 전에** 불러 값을 잡는다 — Hold 가 커브를 바꾸면 키 없이 움직여 둔 값이 재평가로 사라진다.
+- 시험 함정: `currentTime` 이동도 undo 큐에 들어간다 → undo 확인을 먼저, 값 재기는 redo 뒤에.
 
 **Why:** 사용자 결정 2026-11-04 — −N 은 레이어 값 유지 · 레이어 없음/비멤버는 경고 후 건너뜀 · −N 기존 키 덮어쓰기.
 **How to apply:** 레이어 키를 값으로 찍는 다른 기능도 additive 역산을 의식할 것([[wip-a00110-counter-layer]] 은 역산을 일부러 이용). 남은 것: 마야 GUI 확인.

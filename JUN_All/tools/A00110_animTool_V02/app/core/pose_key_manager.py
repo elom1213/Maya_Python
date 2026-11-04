@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-12
+# last Update date : 2026-11-04
 # A00110_animTool_V02 - 선택 오브젝트의 현재 프레임에 pose 키를 설정하는 핵심 로직 (maya.cmds, UI 비의존)
 # A00030_quickTool 의 JUN_cmd_anim_rot_x_z_to_zero 기능을 6축 + 축별 토글로 일반화한 것
+# v02.41 - use_current=True : 입력 값 대신 **지금 프레임의 현재 값**으로 키 (체크된 축만, UI `Use current values`).
+#          키 없이 움직여 둔 값도 그대로 키가 된다. 활성 애니메이션 레이어에서는 최종 값이 그대로 남는다.
 
 import maya.cmds as cmds
 
@@ -29,13 +31,14 @@ class PoseKeyManager:
     ]
 
     @staticmethod
-    def set_pose_keys(axis_values, objects=None):
+    def set_pose_keys(axis_values, objects=None, use_current=False):
         """
         선택 오브젝트(들)의 현재 프레임에 각 축 값으로 setKeyframe.
 
         axis_values: {"rx": float, "rz": float, "ty": float, ...}
                      (체크된 축만 포함된 dict)
         objects    : 명시하지 않으면 현재 선택을 사용.
+        use_current: True 면 axis_values 의 값은 무시하고(축 선택만 쓴다) 각 채널의 현재 값으로 키.
         반환       : (처리한 오브젝트 수, 메시지)
         """
         sel = objects if objects else (cmds.ls(sl=True) or [])
@@ -46,13 +49,24 @@ class PoseKeyManager:
         if not axis_values:
             return (0, "No axis checked.")
 
+        # 현재 값은 키를 찍기 전에 전부 읽는다 (앞 키가 다른 채널 평가를 바꿀 수 있다)
+        plan = []
+        for obj in sel:
+            for attr, val in axis_values.items():
+                if use_current:
+                    try:
+                        val = cmds.getAttr(f"{obj}.{attr}")
+                    except Exception:                       # noqa: BLE001
+                        continue
+                plan.append((obj, attr, float(val)))
+
         with undo_chunk():
-            for obj in sel:
-                for attr, val in axis_values.items():
-                    cmds.setKeyframe(obj, at=attr, v=val)
+            for obj, attr, val in plan:
+                cmds.setKeyframe(obj, at=attr, v=val)
 
         axes = ", ".join(axis_values.keys())
+        what = "current values" if use_current else "pose key"
         return (
             len(sel),
-            f"{len(sel)} objects : pose key set on current frame  ({axes})"
+            f"{len(sel)} objects : {what} set on current frame  ({axes})"
         )

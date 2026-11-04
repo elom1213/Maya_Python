@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-04 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.41 Pose Key `Use current values`** `#A00110_animTool`
+- 요청: Pose Key 에 "선택 컨트롤러의 체크 축에 지금 프레임 값으로 키" 체크박스, 켜져 있으면 Layer Blend Key 의 레이어 키도 같은 방식.
+- 구현: `PoseKeyManager.set_pose_keys(use_current=)`(키 찍기 전에 전부 읽기), `HoldLayerManager` `use_current` 설정(optionVar) +
+  `capture_current()` — `run_hold` 가 **Hold 전에** 값을 읽어 apply 에 넘김(Hold 가 커브를 바꾸면 움직여 둔 값이 사라지므로). 켜면 값 칸 비활성.
+- 시험: 41/41(키 없이 바꾼 값 키 · additive/override 최종값 유지 · Hold 전 값 · undo 한 번) · UI 16/16. **마야 GUI 확인 아직.**
+
 > [!summary] A00110_animTool_V02 **v02.40 Layer Blend Key 버그 수정** `#A00110_animTool`
 - 보고: 컨트롤러가 AnimLayer1 에 있는데 Shift+A 가 Hold 만 하고 레이어의 현재 / −N 프레임 키를 안 찍음.
 - 원인(mayapy 재현): DEV 리로드가 같은 깊이 모듈을 `sys.modules` 등록 순서로 reload → v02.38 세션에서 다시 열면 `hotkey_manager` 가 먼저 reload 돼

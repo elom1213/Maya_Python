@@ -99,5 +99,11 @@
 #        레이어 미선택은 'no layer chosen' 경고, 레이어 콤보는 펼칠 때 목록 새로 읽기(창을 연 뒤 만든 레이어).
 #        회귀 test_hold_layer_blend 33/33(RL1 리로드 순서) · _ui 12/12.
 
-VERSION = "02.40"
+# 02.41  Key > Pose Key `Use current values` 체크박스(기본 끔) - 체크된 축에 입력 값 대신 **지금 프레임의 현재 값**으로 키
+#        (키 없이 움직여 둔 값도 그대로 키, 켜면 값 칸 비활성). 켜져 있으면 Shift+A Layer Blend Key 의 현재 프레임 키도
+#        Pose 값 대신 현재 값(최종 값이 그대로 남게 setKeyframe -animLayer). 값은 run_hold 가 **Hold 전에** 읽는다
+#        (Hold 가 커브를 바꾸면 움직여 둔 값이 사라지므로). 설정은 optionVar use_current 로 기억.
+#        회귀 test_hold_layer_blend 41/41 · _ui 16/16.
+
+VERSION = "02.41"
 LAST_UPDATE = "2026-11-04"

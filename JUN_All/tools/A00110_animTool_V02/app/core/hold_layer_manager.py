@@ -19,6 +19,11 @@
 #   **조용히** 건너뛰었다(v02.38 세션에서 툴을 다시 연 경우 재현). optionVar 는 클래스가 몇 벌이든 하나다.
 #   settings 클래스 변수는 마지막 값을 보여 주는 거울로만 남긴다.
 #
+# v02.41 - `use_current` (Key > Pose Key 의 `Use current values` 체크박스): 켜져 있으면 현재 프레임 키를 Pose 값 대신
+#   **지금 그 채널의 현재 값**으로 찍는다(축 선택은 그대로 Pose Key 체크 축). 값은 run_hold 가 **Hold 전에** capture_current()
+#   로 읽어 넘긴다 - Hold 가 커브를 바꾸면 키 없이 움직여 둔 값이 다시 평가돼 사라지기 때문이다.
+#   찍는 방식은 Pose 키와 같은 obj 경로(`setKeyframe -animLayer -v`) -> 그 프레임의 최종 값이 지금 값 그대로 남는다.
+#
 # 결정 사항 (2026-11-04 사용자):
 #   1. -N 키 값 = 그 시점의 레이어 값 유지 (레이어 커브 평가값, 커브가 없으면 그 레이어 blend 입력(inputB)의 정적값)
 #   2. 레이어가 없거나 오브젝트가 멤버가 아니면 경고하고 건너뜀 (레이어를 만들거나 멤버로 넣지 않는다)
@@ -49,6 +54,7 @@ class HoldLayerManager:
         "layer": "",           # 대상 animLayer 이름
         "offset": 10,          # N (프레임, int >= 1)
         "axis_values": {},     # Pose Key 탭에서 체크된 축 {"rx": 0.0, ...}
+        "use_current": False,  # v02.41 현재 프레임 키 = 현재 값 (Pose Key `Use current values`)
     }
 
     @classmethod
@@ -64,12 +70,14 @@ class HoldLayerManager:
             cmds.optionVar(intValue=(pre + "offset", int(kw["offset"])))
         if "axis_values" in kw:
             cmds.optionVar(stringValue=(pre + "axis_values", json.dumps(dict(kw["axis_values"] or {}))))
+        if "use_current" in kw:
+            cmds.optionVar(intValue=(pre + "use_current", int(bool(kw["use_current"]))))
 
     @classmethod
     def load_settings(cls):
         """optionVar 에서 설정을 읽는다. 없는 키는 기본값."""
         pre = OPTVAR_PREFIX
-        out = {"enabled": False, "layer": "", "offset": 10, "axis_values": {}}
+        out = {"enabled": False, "layer": "", "offset": 10, "axis_values": {}, "use_current": False}
         try:
             if cmds.optionVar(exists=pre + "enabled"):
                 out["enabled"] = bool(cmds.optionVar(q=pre + "enabled"))
@@ -77,6 +85,8 @@ class HoldLayerManager:
                 out["layer"] = str(cmds.optionVar(q=pre + "layer") or "")
             if cmds.optionVar(exists=pre + "offset"):
                 out["offset"] = int(cmds.optionVar(q=pre + "offset"))
+            if cmds.optionVar(exists=pre + "use_current"):
+                out["use_current"] = bool(cmds.optionVar(q=pre + "use_current"))
             if cmds.optionVar(exists=pre + "axis_values"):
                 raw = json.loads(cmds.optionVar(q=pre + "axis_values") or "{}")
                 out["axis_values"] = {str(k): float(v) for k, v in raw.items()}
@@ -155,8 +165,30 @@ class HoldLayerManager:
     # --------------------------------------------------
 
     @classmethod
-    def apply(cls, objects=None, frame=None):
+    def capture_current(cls, objects=None):
+        """use_current 가 켜져 있으면 선택 오브젝트 x Pose 축의 **지금 값** {(obj, 축): float}. 꺼져 있으면 None.
+
+        run_hold 가 Hold **전에** 부른다. 읽을 수 없는 채널은 빠진다(apply 가 그때 다시 읽는다).
+        """
+        s = cls.load_settings()
+        if not (s.get("enabled") and s.get("use_current")):
+            return None
+        sel = list(objects) if objects else (cmds.ls(sl=True) or [])
+        out = {}
+        for obj in sel:
+            for short in (s.get("axis_values") or {}):
+                try:
+                    out[(obj, short)] = float(cmds.getAttr("{0}.{1}".format(obj, short)))
+                except Exception:                           # noqa: BLE001
+                    pass
+        return out
+
+    @classmethod
+    def apply(cls, objects=None, frame=None, current_values=None):
         """현재 프레임-N 에 '그 시점 레이어 값' 키, 현재 프레임에 Pose 값 키.
+
+        use_current 가 켜져 있으면 현재 프레임 키는 Pose 값 대신 **지금 값**
+        (current_values {(obj, 축): 값} 이 있으면 그것, 없으면 여기서 읽는다).
 
         undo 묶기는 호출부(HotkeyManager.run_hold)가 Hold 와 함께 한다.
         반환 (처리한 오브젝트 수, 메시지). 옵션이 꺼져 있으면 (0, "").
@@ -194,8 +226,19 @@ class HoldLayerManager:
             n = max(1, int(s.get("offset", 10)))
         except (TypeError, ValueError):
             n = 10
-        t1 = float(cmds.currentTime(q=True) if frame is None else frame)
+        now = float(cmds.currentTime(q=True))
+        t1 = now if frame is None else float(frame)
         t0 = t1 - n
+        use_current = bool(s.get("use_current"))
+        current_values = current_values or {}
+
+        def current_of(obj, short):
+            if (obj, short) in current_values:
+                return current_values[(obj, short)]
+            plug = "{0}.{1}".format(obj, short)
+            if t1 == now:
+                return float(cmds.getAttr(plug))
+            return float(cmds.getAttr(plug, time=t1))
 
         layer_nodes = LayerKeyManager._layer_nodes(layer)
         kind = LayerKeyManager._layer_kind(layer, root)
@@ -229,7 +272,7 @@ class HoldLayerManager:
             for short, val in axis_values.items():
                 long_name = cls._long_name(obj, short)
                 if long_name in members:
-                    pose.append((long_name, float(val)))
+                    pose.append((long_name, current_of(obj, short) if use_current else float(val)))
                 else:
                     not_member_axes.add(short)
 
@@ -249,8 +292,8 @@ class HoldLayerManager:
         def fmt(t):
             return "{0:g}".format(t)
 
-        msg = "Layer Blend: {0} object(s) keyed on '{1}' (f{2} -> f{3}).".format(
-            len(keyed), layer, fmt(t0), fmt(t1))
+        msg = "Layer Blend: {0} object(s) keyed on '{1}' (f{2} -> f{3}{4}).".format(
+            len(keyed), layer, fmt(t0), fmt(t1), ", current values" if use_current else "")
         try:
             if cmds.animLayer(layer, q=True, mute=True):
                 msg += " (layer muted)"

@@ -21,7 +21,7 @@ PRE = "JUN_A00110_holdLayer_"
 
 
 def clear_optvars():
-    for k in ("enabled", "offset", "layer", "axis_values"):
+    for k in ("enabled", "offset", "layer", "axis_values", "use_current"):
         if cmds.optionVar(exists=PRE + k):
             cmds.optionVar(remove=PRE + k)
 
@@ -201,6 +201,66 @@ lay = keys(crv(cube, "translateX", layer))
 check("RL1 after reload (old module order) run_hold still keys the layer",
       lay.get(90.0) == 2.0 and 100.0 in lay and 90.0 in keys(crv(cube, "rotateY", layer)), lay)
 clear_optvars()
+
+# ---------------- v02.41 : Use current values ----------------
+from tools.A00110_animTool_V02.app.core import PoseKeyManager   # noqa: E402
+
+cmds.file(new=True, force=True)
+plain = cmds.polyCube(n="plain")[0]
+cmds.setKeyframe(plain, at="tx", t=1, v=0.0)
+cmds.setKeyframe(plain, at="tx", t=20, v=10.0)
+cmds.currentTime(10)
+cmds.setAttr(plain + ".tx", 7.25)          # 키 없이 바꾼 값
+cmds.setAttr(plain + ".ry", 33.0)          # 키 없던 채널
+n, msg = PoseKeyManager.set_pose_keys({"tx": 0.0, "ry": 0.0}, use_current=True)
+k_tx = keys(cmds.listConnections(plain + ".tx", type="animCurve")[0])
+k_ry = keys((cmds.listConnections(plain + ".ry", type="animCurve") or [None])[0])
+check("UC1 Pose Key use_current: keys the current (unkeyed) values, not the typed 0",
+      k_tx.get(10.0) == 7.25 and k_ry.get(10.0) == 33.0 and "current values" in msg, (k_tx, k_ry, msg))
+
+
+def final_at(obj, attr, t):
+    cmds.currentTime(t - 1)
+    cmds.currentTime(t)
+    return round(cmds.getAttr("{0}.{1}".format(obj, attr)), 6)
+
+
+for override in (False, True):
+    tag = "UC-OVR" if override else "UC-ADD"
+    clear_optvars()
+    cube, other, layer = scene(override)
+    before = {a: final_at(cube, a, 100) for a in ("tx", "rx")}
+    HLM.update(use_current=True, **SETTINGS)
+    cmds.select(cube)
+    n, msg = HLM.apply()
+    after = {a: final_at(cube, a, 100) for a in ("tx", "rx")}
+    lay = keys(crv(cube, "translateX", layer))
+    check(tag + " 1 Layer Blend use_current: f100 keyed, final value unchanged (not Pose 5.0 / 0.0)",
+          n == 1 and 100.0 in lay and after == before and "current values" in msg, (before, after, msg))
+    check(tag + " 2 f90 still keeps layer value 2.0", lay.get(90.0) == 2.0, lay)
+
+# Shift+A : Hold 가 base tx 를 평평하게 바꿔도, Hold **전** 값이 레이어 f100 키로 남는다
+clear_optvars()
+cube, other, layer = scene(False)
+want = final_at(cube, "tx", 100)
+HLM.update(use_current=True, **SETTINGS)
+cmds.select(cube)
+cmds.selectKey(LKM.layer_curve("ctl.translateX", LKM.root_layer()), time=(1, 100), replace=True)
+hk.HotkeyManager.run_hold()
+# 시간 이동(final_at)도 undo 큐에 들어가므로 undo 확인을 먼저 하고 redo 뒤에 값을 잰다
+cmds.undo()
+check("UC4 one undo reverts", keys(LKM.layer_curve("ctl.translateX", LKM.root_layer())).get(100.0) == 10.0
+      and 100.0 not in keys(crv(cube, "translateX", layer)))
+cmds.redo()
+check("UC3 run_hold: values captured before Hold (final f100 = pre-Hold value)",
+      final_at(cube, "tx", 100) == want and keys(LKM.layer_curve("ctl.translateX", LKM.root_layer())).get(100.0) == 0.0,
+      (want, final_at(cube, "tx", 100)))
+HLM.update(use_current=False)
+check("UC5 use_current off -> capture_current() is None", HLM.capture_current() is None)
+clear_optvars()
+for k in ("use_current",):
+    if cmds.optionVar(exists=PRE + k):
+        cmds.optionVar(remove=PRE + k)
 
 print("\n{0}/{1} passed".format(sum(R), len(R)))
 maya.standalone.uninitialize()

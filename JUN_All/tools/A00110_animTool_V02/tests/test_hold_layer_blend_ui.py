@@ -25,7 +25,7 @@ def check(name, cond, extra=""):
 
 
 PRE = "JUN_A00110_holdLayer_"
-for k in ("enabled", "offset", "layer", "axis_values"):
+for k in ("enabled", "offset", "layer", "axis_values", "use_current"):
     if cmds.optionVar(exists=PRE + k):
         cmds.optionVar(remove=PRE + k)
 
@@ -68,6 +68,24 @@ check("U7 optionVars saved",
       cmds.optionVar(q=PRE + "enabled") == 1 and cmds.optionVar(q=PRE + "offset") == 7
       and cmds.optionVar(q=PRE + "layer") == "Layer_02")
 
+# v02.41 Use current values
+check("U13 Pose Key has 'Use current values' (off), value fields enabled",
+      win.cb_pose_current.text() == "Use current values" and not win.cb_pose_current.isChecked()
+      and all(le.isEnabled() for _c, le in win.pose_rows.values()))
+win.cb_pose_current.setChecked(True)
+check("U14 on: value fields disabled, use_current pushed, empty rz now included",
+      not any(le.isEnabled() for _c, le in win.pose_rows.values())
+      and HLM.load_settings()["use_current"] is True and "rz" in HLM.load_settings()["axis_values"],
+      HLM.load_settings())
+cmds.currentTime(5)
+cmds.setAttr(cube + ".ty", 4.5)
+cmds.select(cube)
+win.pose_rows["rz"][1].setText("")
+win.btn_set_pose.click()
+k_ty = cmds.keyframe(cube + ".ty", q=True, valueChange=True, time=(5, 5)) or []
+check("U15 Set Pose Key button keys the current value (ty 4.5), empty field no warning stop",
+      k_ty == [4.5], k_ty)
+
 win.close()
 APP.processEvents()
 
@@ -82,6 +100,8 @@ check("U9 missing layer shown as '(missing)' and kept",
       win2.cmb_hold_layer.currentText() == "Layer_02 (missing)" and HLM.settings["layer"] == "Layer_02",
       (win2.cmb_hold_layer.currentText(), HLM.settings["layer"]))
 check("U10 settings re-pushed on reopen", HLM.settings["enabled"] and HLM.settings["offset"] == 7)
+check("U16 reopen restores 'Use current values' + disabled fields",
+      win2.cb_pose_current.isChecked() and not any(le.isEnabled() for _c, le in win2.pose_rows.values()))
 
 cmds.animLayer("Layer_03")
 win2.cmb_hold_layer.showPopup()      # v02.40 : 펼치면 새 레이어가 바로 보인다
@@ -95,7 +115,7 @@ check("U11 Refresh picks up new layer, keeps missing selection",
       "Layer_04" in items and win2.cmb_hold_layer.currentText() == "Layer_02 (missing)", items)
 win2.close()
 
-for k in ("enabled", "offset", "layer", "axis_values"):
+for k in ("enabled", "offset", "layer", "axis_values", "use_current"):
     if cmds.optionVar(exists=PRE + k):
         cmds.optionVar(remove=PRE + k)
 

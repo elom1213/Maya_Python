@@ -23,6 +23,7 @@
 # v02.40 - HoldLayerManager 는 **호출할 때 모듈 속성으로** 찾는다(`_hold_layer.HoldLayerManager`). 이름을 import 해 두면
 #   DEV 리로드 순서에 따라 옛 클래스를 붙잡는다. 설정 자체도 optionVar 가 원본(hold_layer_manager 머리말).
 #   Layer Blend 에서 예외가 나도 Hold 결과와 함께 뷰포트에 에러 한 줄을 띄운다.
+# v02.41 - Pose Key `Use current values` 가 켜져 있으면 Hold 전에 capture_current() 로 지금 값을 읽어 apply 에 넘긴다.
 #
 # 주의:
 #  - keyShortcut 은 소문자 'a' + shiftModifier=True 로 지정한다 (.mhk 의 "s" -sht 관례).
@@ -175,10 +176,15 @@ class HotkeyManager:
         Hold 와 Layer Blend 는 서로 독립이고, undo 한 번에 함께 되돌아가도록 한 청크로 묶는다
         (hold_selected_keys 안의 청크는 중첩 - 마야 openChunk 는 중첩을 허용한다).
         """
+        # v02.41 Use current values : Hold 가 커브를 바꾸기 전에 지금 값을 읽어 둔다
+        try:
+            current = _hold_layer.HoldLayerManager.capture_current()
+        except Exception:                                   # noqa: BLE001
+            current = None
         with undo_chunk():
             count, msg = KeyframeManager.hold_selected_keys()
             try:
-                _lcount, lmsg = _hold_layer.HoldLayerManager.apply()
+                _lcount, lmsg = _hold_layer.HoldLayerManager.apply(current_values=current)
             except Exception as exc:                        # noqa: BLE001
                 lmsg = "[Error] Layer Blend: {0}".format(exc)
                 cmds.warning(lmsg)
