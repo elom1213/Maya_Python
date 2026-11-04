@@ -39,6 +39,8 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   **soundAliance 프로파일 branch=Dnable 인데 클론은 SA**(어긋남), master 는 06-19 이후 멈춤.
 - 계획: `main` 하나 + `profiles/<data_folder>/`, 비공개는 저장소로 분리. 코드(prefs `data_folder` · `data_dir_of` · GitSync 내 폴더만 add + rebase 재시도 · check_branch · A00211)
   → 리허설 → (푸시 턴) 반영 → PC 전환 → 정리. **리허설 실측: 265=265 · 11=11 · 7=7 blob 차이 0, 기록 보존, 최장 경로 128자.**
+- 개정: 비공개 저장소 폐지 요청 → MUE 도 `JUN_FileManager_data/profiles/MUE`. ★ 그 저장소가 **공개**(API 200)라 MUE 가 공개됨 →
+  §0-A 결정(A Private 전환 후 기록째 권장 / B 공개 + 스냅숏 / C 공개 + 기록째). 리허설 MUE 128=128 blob 0, 기록째면 비공개 커밋 15 공개. 비공개 저장소는 Archive.
 
 > [!summary] **A00220_BackupTool Save Cache 계획서** (`docs/plans/A00220_BackupTool_save_cache_plan.md`) `#A00220_BackupTool`
 - 요청: 마야 저장을 SSD 캐시에 먼저 → 몇 초 뒤 원래 HDD 경로로 복사(덮어쓰기), n 개 파일, 체감 저장 속도 개선 + 저장 보장.

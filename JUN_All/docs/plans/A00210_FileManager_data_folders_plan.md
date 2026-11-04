@@ -2,7 +2,9 @@
 
 > **작성** 2026-11-04 · 상태: **계획 (구현 전)** · 대상 A00210 v01.44 → **v01.45**, 함께 바뀌는 곳 A00211_RefLineage
 > 이 문서만 보고 작업할 수 있게 쓴다. 순서대로 하고, 각 단계 끝의 **확인** 을 통과해야 다음으로 간다.
-> 원격을 바꾸는 단계(§5 · §7)는 **그 턴에 사용자 푸시 요청이 있을 때만** 실행한다(전역 규칙 2장).
+> 원격을 바꾸는 단계(§5 · §6 · §7-7)는 **그 턴에 사용자 푸시 요청이 있을 때만** 실행한다(전역 규칙 2장).
+> **개정 2026-11-04 (사용자 요청)**: 비공개 저장소 `JUN_FileManager_data_Private` 는 더 쓰지 않는다 — MUE 데이터도 전부
+> `JUN_FileManager_data` 의 `profiles/MUE/` 로 옮겨 **저장소 하나**로 쓴다. ★ 그 저장소가 **공개**라서 §0-A 결정이 먼저다.
 
 ---
 
@@ -17,27 +19,46 @@
 
 문제: ① 브랜치마다 클론 폴더가 하나씩 늘어난다 ② `Dnable` 한 브랜치에 7개 프로파일 데이터가 이미 섞여 있다(브랜치가 프로파일을
 나누지 못함) ③ GitHub 기본 화면 = `master`(06-19 이후 멈춤)라 전체가 안 보이고, 브랜치들이 master 에서 갈라져 정리 커밋이 섞인다
-④ 프로파일 branch 값과 클론의 실제 브랜치가 어긋나도 아무도 모른다.
+④ 프로파일 branch 값과 클론의 실제 브랜치가 어긋나도 아무도 모른다 ⑤ 저장소도 두 개(공개 · 비공개)라 관리할 곳이 둘이다.
+
+## 0-A. 먼저 정할 것 — 공개 저장소로 옮기면 MUE 데이터가 공개된다
+
+2026-11-04 확인: `api.github.com/repos/elom1213/JUN_FileManager_data` → **HTTP 200, `visibility: public`** (누구나 읽기 가능),
+`JUN_FileManager_data_Private` → 404(비공개). MUE 데이터(`origin/MUE` 128 파일, 커밋 15개 — 레코드 메모 · 파일 경로 · 썸네일 ·
+lineage · path_structures, 예: `records/00_04_01_ANI_00_Src_204_GN_cleanup_01/`, `Content/`)를 그대로 옮기면 **누구나 볼 수 있다.**
+**공개 저장소에 한 번 올라간 것은 되돌릴 수 없다**(히스토리 재작성 금지 규칙 + 이미 받아 간 클론 · 캐시 · 포크). 셋 중 하나를 고른다:
+
+| 안 | 방법 | 결과 |
+|----|------|------|
+| **A (권장)** | **`JUN_FileManager_data` 를 먼저 Private 으로 바꾼 뒤** MUE 를 **기록째** 합친다 | 아무것도 새로 공개되지 않는다. 저장소 하나 · 기록 보존. 대신 툴 사용자(다른 PC · 배포본)는 GitHub 접근 권한 + git 자격증명이 필요(`data_repo.py` 주석에 이미 적힌 조건). 지금까지 공개였던 Dnable · SA · src_rig 데이터는 이미 공개됐던 것이라 되돌려지지 않는다 |
+| B | 공개 유지, MUE 는 **현재 파일만**(스냅숏 커밋 1개) | 128 파일은 공개, 비공개 커밋 15개의 옛 내용은 공개 안 됨. MUE 옛 기록은 보관용 미러(§6)에만 |
+| C | 공개 유지, MUE 를 **기록째** | 128 파일 + 커밋 15개 옛 내용 전부 공개. **비권장** |
+
+- 안 A 의 전환: GitHub `Settings > General > Danger Zone > Change repository visibility > Make private`
+  (또는 `gh auth login` 뒤 `gh repo edit elom1213/JUN_FileManager_data --visibility private --accept-visibility-change-consequences`).
+  확인: `curl -s -o /dev/null -w "%{http_code}" https://api.github.com/repos/elom1213/JUN_FileManager_data` → **404** 면 비공개.
+- **§4 이후 명령은 고른 안에 따라 갈린다** — 각 단계에 `[A·C]` / `[B]` 로 표시했다. **결정 전에는 §5 · §6 을 실행하지 않는다.**
 
 ## 1. 목표 구조
 
 ```
-JUN_FileManager_data            (공개, 브랜치 main 하나, PC 당 클론 하나)
+JUN_FileManager_data            (저장소 하나 — 안 A 면 Private, 브랜치 main 하나, PC 당 클론 하나)
 └─ profiles/
-   ├─ Dnable/   lineage/ path_structures/ records/ thumbs/     ← 지금 Dnable 브랜치 전체
+   ├─ Dnable/   lineage/ path_structures/ records/ thumbs/     ← 지금 공개 저장소 Dnable 브랜치 전체
+   ├─ MUE/      lineage/ path_structures/ records/ thumbs/     ← 지금 비공개 저장소 MUE 브랜치 전체
    ├─ SA/       path_structures/ records/ thumbs/              ← 지금 SA
    └─ src_rig/  records/ thumbs/                               ← 지금 src_rig
-JUN_FileManager_data_Private    (비공개, 브랜치 main 하나)
-└─ profiles/
-   └─ MUE/      lineage/ path_structures/ records/ thumbs/     ← 지금 MUE
+JUN_FileManager_data_Private    → 더 쓰지 않는다. 보관(Archive, 읽기 전용) — 삭제는 사용자 결정 (§6)
 ```
 
 - **프로파일 설정에 `data_folder` 를 둔다** = `profiles/` 아래 폴더 이름. 여러 프로파일이 같은 폴더를 써도 된다(지금 7개가 Dnable 공유 — 그대로).
 - 실제 데이터 폴더 = `<store_dir>/profiles/<data_folder>` (이하 **data_dir**). records · thumbs · lineage · path_structures 는 전부 data_dir 아래.
-- 브랜치는 `main` 하나. 비공개가 필요한 데이터만 **저장소를 나눈다**(GitHub 읽기 권한은 저장소 단위 — 브랜치로는 못 막는다).
+- 브랜치는 `main` 하나, **저장소도 하나**(사용자 요청). GitHub 읽기 권한은 저장소 단위라 브랜치 · 폴더로는 일부만 숨길 수 없다 —
+  접근을 막아야 하면 저장소 전체를 Private 으로(§0-A 안 A).
 - 폴더 이름은 **지금 브랜치 이름 그대로**(Dnable · SA · src_rig · MUE) — 옮기기와 프로파일 변환이 1:1 이 된다. 이름을 바꾸고 싶으면 마지막에 `git mv` 한 번.
 - `master` 는 폴더로 옮기지 않는다: master 의 데이터는 Dnable 에 다 있고, 없는 4개(`lineage/LUN_Test.json` · `Test_02` · `Test_03` · `path_structures/Test.json`)는
-  Dnable 에서 일부러 지운 시험 파일이다 → `archive/master` 태그로만 보존. 비공개 저장소의 `master` · `private` 는 `MUE` 의 조상이라 역시 태그로만.
+  Dnable 에서 일부러 지운 시험 파일이다 → `archive/master` 태그로만 보존. 비공개 저장소의 `master` · `private` 는 `MUE` 의 조상이라
+  (안 A·C) MUE 를 기록째 합치면 함께 들어오고, (안 B) 보관 미러에만 남는다.
 
 ## 2. 사전 상태 (2026-11-04 11:30 기준 — 옮기기 직전 다시 확인)
 
@@ -48,7 +69,7 @@ JUN_FileManager_data_Private    (비공개, 브랜치 main 하나)
 | 공개 `origin/SA` | `47bda85` | **11** |
 | 공개 `origin/src_rig` | `e8d7bba` | **7** |
 | 비공개 `origin/master` · `origin/private` | `fe5aabd` · `49a50bf` | 23 · — (둘 다 MUE 의 조상) |
-| 비공개 `origin/MUE` | `51f4b2a` | **128** |
+| 비공개 `origin/MUE` | `51f4b2a` | **128** (커밋 15, 공개 저장소에 없는 커밋 15) |
 
 모든 클론이 깨끗하고 원격과 같다(2026-11-04 Dnable 미반영 82건을 `4690a34` 로 푸시함). 옮기기 전에 **다른 PC 에서도 Push 를 끝내 둔다**.
 
@@ -78,6 +99,8 @@ DEFAULT_DATA_FOLDER = "Dnable"     # 새 상수: data_folder 가 비었을 때
    ```
    - `_LEGACY_FOLDER_BY_STORE` = **저장 폴더 이름 → 데이터 폴더** 표. 프로파일의 branch 값이 틀린 경우(soundAliance)를 바로잡는 근거:
      `{"A0020_SA": "SA", "A0030_Src_Rig": "src_rig", "A0010_MEU": "MUE"}` (키 = `os.path.basename(store_dir)`). 나머지는 branch 값 → 폴더.
+   - **store_dir 은 자동으로 바꾸지 않는다**(클론 위치는 PC 마다 다르고, 옛 클론에 미반영 데이터가 있을 수 있다) — §7-3 에서 사람이 바꾼다.
+   - `remote_url` 이 `JUN_FileManager_data_Private` 이면 `JUN_FileManager_data` 로 바꾼다(비공개 저장소 폐지). 이 PC 의 MUE 프로파일은 이미 공개 URL 이 적혀 있다.
 3. 새 공용 함수(A00211 도 쓴다):
    ```python
    def data_dir_of(prefs):
@@ -95,7 +118,7 @@ DEFAULT_DATA_FOLDER = "Dnable"     # 새 상수: data_folder 가 비었을 때
    | Default · HDN · Local_CH_C · Local_CH_D · Local_PJ_root · NAS_Character · Template | Dnable | main |
    | Rig_Src | src_rig | main |
    | soundAliance | **SA** (저장 폴더 표로 교정) | main |
-   | MUE | MUE | main |
+   | MUE | MUE | main (store_dir 은 §7-3 에서 `JUN_FileManager_data` 로) |
 
 ### 3-3. `app/core/git_sync.py` — 받기 · 올리기 순서
 
@@ -148,7 +171,7 @@ DEFAULT_DATA_FOLDER = "Dnable"     # 새 상수: data_folder 가 비었을 때
 
 ---
 
-## 4. 옮기기 리허설 (원격 변경 없음) — 공개 저장소
+## 4. 옮기기 리허설 (원격 변경 없음) — 두 저장소를 `JUN_FileManager_data` 의 main 하나로
 
 작업 폴더는 **새 임시 폴더**(기존 클론은 손대지 않는다). 예: `C:/Users/USER/Desktop/JP/0030_maya_python_JUN/_migrate`.
 
@@ -157,7 +180,10 @@ cd C:/Users/USER/Desktop/JP/0030_maya_python_JUN/_migrate
 git clone --mirror https://github.com/elom1213/JUN_FileManager_data.git backup_public.git   # 통째 백업(지우지 말 것)
 git clone https://github.com/elom1213/JUN_FileManager_data.git public && cd public
 git remote set-url --push origin DISABLED_NO_PUSH        # 리허설 중 실수 푸시 방지 (§5 에서 되돌림)
-git fetch origin
+git clone --mirror https://github.com/elom1213/JUN_FileManager_data_Private.git ../backup_private.git   # 비공개 저장소 통째 백업(지우지 말 것)
+git remote add private https://github.com/elom1213/JUN_FileManager_data_Private.git
+git remote set-url --push private DISABLED_NO_PUSH       # 비공개 저장소엔 이 클론에서 절대 푸시하지 않는다
+git fetch origin && git fetch private
 
 # (1) main = Dnable 의 기록을 이어받고, 최상위 4폴더를 profiles/Dnable 로 이동
 git checkout -b main origin/Dnable
@@ -171,61 +197,79 @@ for B in SA src_rig; do
   git read-tree --prefix=profiles/$B/ -u origin/$B
   git commit -m "Restructure: merge branch $B into profiles/$B"
 done
+
+# (3) MUE (비공개 저장소) — §0-A 에서 고른 안대로 하나만
+# [A·C] 기록째 (A 는 §5-0 에서 저장소를 Private 으로 바꾼 뒤에만 푸시)
+git merge -s ours --no-commit --allow-unrelated-histories private/MUE
+git read-tree --prefix=profiles/MUE/ -u private/MUE
+git commit -m "Restructure: merge JUN_FileManager_data_Private MUE into profiles/MUE"
+# [B] 현재 파일만 (비공개 커밋은 main 에 들어오지 않는다)
+mkdir -p profiles/MUE
+git --work-tree=profiles/MUE checkout private/MUE -- .
+git add profiles/MUE
+git commit -m "Import MUE data (snapshot of JUN_FileManager_data_Private MUE 51f4b2a)"
 ```
 
 **확인 (리허설 결과 — 하나라도 틀리면 멈춘다)**
 ```bash
 git ls-tree --name-only main                 # profiles  (최상위에 records/thumbs 가 없어야)
-git ls-tree --name-only main:profiles        # Dnable SA src_rig
-for B in Dnable SA src_rig; do echo $B $(git ls-tree -r --name-only main:profiles/$B | wc -l) $(git ls-tree -r --name-only origin/$B | wc -l); done
-#   두 숫자가 같아야 한다 (265 · 11 · 7)
-git log --oneline main | head -5                               # merge 커밋 2개 + restructure 1개
+git ls-tree --name-only main:profiles        # Dnable MUE SA src_rig
+for R in origin/Dnable origin/SA origin/src_rig private/MUE; do B=${R#*/}; echo $B $(git ls-tree -r --name-only main:profiles/$B | wc -l) $(git ls-tree -r --name-only $R | wc -l); done
+#   두 숫자가 같아야 한다 (265 · 11 · 7 · 128)
+git log --oneline main | head -5                               # MUE 커밋 1 + merge 2 + restructure 1
 git merge-base --is-ancestor origin/SA main && echo SA-history-kept
 git merge-base --is-ancestor origin/src_rig main && echo src_rig-history-kept
+git merge-base --is-ancestor private/MUE main && echo MUE-history-IN-main   # [A·C] 나와야 / [B] 나오면 안 된다
+git rev-list --count private/MUE --not origin/master origin/Dnable origin/SA origin/src_rig   # 15 = 공개 저장소에 새로 들어갈 비공개 커밋 수([A·C])
 ```
 > 파일 비교는 `git diff <브랜치> main:profiles/<B>` 대신 다음이 확실하다:
 > `diff <(git ls-tree -r origin/$B | awk '{print $3, $4}' | sort) <(git ls-tree -r main:profiles/$B | awk '{print $3, $4}' | sort)` — **blob 해시 · 경로가 전부 같아야** 한다(출력 0줄).
 
-**2026-11-04 리허설 실측**(scratchpad 임시 클론, push URL 막아 둠 — 원격 변경 없음): 위 명령 그대로 실행 →
-최상위 `profiles` 하나, `profiles` = `Dnable SA src_rig`, 파일 수 **265=265 · 11=11 · 7=7, blob 차이 0줄**, 세 브랜치 모두 `main` 의 조상(기록 보존),
-`git log --follow profiles/Dnable/records/...` 가 옛 기록까지 3커밋 추적, 가장 긴 경로 **128자**. 커밋 3개(restructure 1 + merge 2).
+**2026-11-04 리허설 실측**(scratchpad 임시 클론, origin · private 둘 다 push URL 막아 둠 — 원격 변경 없음): 위 명령 그대로 실행 →
+최상위 `profiles` 하나, `profiles` = `Dnable MUE SA src_rig`, 파일 수 **265=265 · 11=11 · 7=7 · 128=128, blob 차이 0줄**,
+[A·C] 네 브랜치 모두 `main` 의 조상(기록 보존) · 새로 들어가는 비공개 커밋 **15**, [B] MUE 128=128 blob 0줄 · `private/MUE` 는 조상 아님(비공개 기록 안 들어감),
+`git log --follow profiles/Dnable/records/...` 가 옛 기록까지 추적, 가장 긴 경로 **128자**.
 > 리허설 클론에서는 실수 푸시를 막으려고 `git remote set-url --push origin DISABLED_NO_PUSH` 를 먼저 해 둔다. §5 에서 실제 반영할 때는
 > 새로 클론하거나 `git remote set-url --push origin https://github.com/elom1213/JUN_FileManager_data.git` 로 되돌린다.
 
 **리허설 확인 2 — 툴로 읽기**: v01.45 툴의 프로파일 하나(예: Rig_Src)를 복사해 store_dir = `_migrate/public`, data_folder = `src_rig` 로 두고 Scan →
 레코드 · 썸네일이 예전과 같이 보이는지(Push 는 누르지 않는다 — 리허설 클론의 원격은 실제 원격이다).
 
-## 5. 공개 저장소 반영 (원격 변경 — 사용자 푸시 요청이 있는 턴에만)
+## 5. `JUN_FileManager_data` 반영 (원격 변경 — 사용자 푸시 요청이 있는 턴에만)
 
+**5-0. 공개 여부 확인 (안 A 는 필수)**
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://api.github.com/repos/elom1213/JUN_FileManager_data
+#   [A] 404 여야 한다 (Private 으로 바꾼 뒤). 200 이면 멈춘다 — 아직 공개.
+#   [B·C] 200 (공개 유지를 사용자가 고른 경우만)
+```
+
+**5-1. 반영**
 ```bash
 cd C:/Users/USER/Desktop/JP/0030_maya_python_JUN/_migrate/public
-git fetch origin
-for B in Dnable SA src_rig; do echo "$B new since rehearsal: $(git rev-list --count main..origin/$B)"; done   # 전부 0 이어야(아니면 §4 다시)
+git fetch origin && git fetch private
+for R in origin/Dnable origin/SA origin/src_rig private/MUE; do echo "$R new since rehearsal: $(git rev-list --count main..$R)"; done
+#   [A·C] 전부 0 이어야 / [B] private/MUE 는 기록이 안 들어가 늘 15 이상 — 대신 `git diff --stat private/MUE main:profiles/MUE` 가 비어야(아니면 §4 다시)
 git remote set-url --push origin https://github.com/elom1213/JUN_FileManager_data.git
 for B in master Dnable SA src_rig; do git tag archive/$B origin/$B; done
+git tag archive/private-MUE private/MUE              # [A·C] 만. [B] 에서는 이 태그를 만들거나 푸시하지 않는다(비공개 기록이 공개된다)
 git push origin main
-git push origin --tags                                    # archive/* 태그 4개
-gh repo edit elom1213/JUN_FileManager_data --default-branch main
+git push origin --tags                               # archive/* ([A·C] 5개, [B] 4개)
+gh repo edit elom1213/JUN_FileManager_data --default-branch main   # 또는 GitHub Settings > General > Default branch
 ```
 - **옛 브랜치(master · Dnable · SA · src_rig)는 아직 지우지 않는다.** 다른 PC · 옛 버전 툴이 계속 Push 할 수 있다 → §7 정리 단계에서.
 - 반영 뒤 옛 브랜치에 새 커밋이 생기면(옛 툴이 Push) `git log archive/<B>..origin/<B>` 로 찾아 §4 (2) 처럼 그 차이만 다시 합친다
   (`git checkout <commit> -- ` 로 해당 파일을 `profiles/<B>/` 에 가져와 커밋).
 
-## 6. 비공개 저장소 — §4 · §5 와 같은 순서
+## 6. 비공개 저장소 `JUN_FileManager_data_Private` 폐지
 
-```bash
-cd C:/Users/USER/Desktop/JP/0030_maya_python_JUN/_migrate
-git clone --mirror https://github.com/elom1213/JUN_FileManager_data_Private.git backup_private.git
-git clone https://github.com/elom1213/JUN_FileManager_data_Private.git private && cd private
-git checkout -b main origin/MUE
-mkdir -p profiles/MUE && git mv lineage path_structures records thumbs profiles/MUE/
-git commit -m "Restructure: move MUE data into profiles/MUE"
-# 확인: profiles/MUE 파일 수 == origin/MUE 파일 수(128, .gitignore 제외 차이만), blob 비교 같음
-# --- 사용자 푸시 요청 턴에만 ---
-for B in master private MUE; do git tag archive/$B origin/$B; done
-git push origin main && git push origin --tags
-gh repo edit elom1213/JUN_FileManager_data_Private --default-branch main
-```
+옮기기(§5)와 이 PC 전환(§7-1 ~ 5) 확인이 끝난 뒤.
+1. **보관 미러 확인**: `_migrate/backup_private.git` 이 있고 `git -C _migrate/backup_private.git log --oneline -1 MUE` = 마지막 커밋(지금 `51f4b2a`, 그 뒤 새 커밋이 있으면 §5-1 처럼 다시 합친 뒤).
+2. **새 데이터가 더 쌓이지 않게**: 이 PC 의 MUE 프로파일이 §7-3 대로 `JUN_FileManager_data` 를 쓰는지 확인. 다른 PC 도 같은 확인.
+3. (원격 변경 — 사용자 요청 턴에만) GitHub 에서 **Archive**(읽기 전용, 되돌릴 수 있음):
+   `Settings > General > Danger Zone > Archive this repository` 또는 `gh repo archive elom1213/JUN_FileManager_data_Private --yes`.
+   **삭제는 하지 않는다** — 지우려면 사용자가 따로 정할 때만(미러 백업이 있어도).
+4. 로컬 클론 `JUN_FileManager_data_all/A0010_MEU` 는 이름만 `_old_A0010_MEU` 로 바꿔 1~2주 두고, 사용자 확인 뒤 지운다.
 
 ## 7. 이 PC 전환 · 정리
 
@@ -233,20 +277,22 @@ gh repo edit elom1213/JUN_FileManager_data_Private --default-branch main
 2. **클론 하나로 합친다**: `JUN_FileManager_data` 에서 툴의 `Switch to main` (또는 `git fetch && git checkout -b main --track origin/main`).
    이 클론에 이제 `profiles/Dnable · SA · src_rig` 가 다 있다.
 3. 프로파일 store_dir 바꾸기: **Rig_Src · soundAliance → `JUN_FileManager_data`** (data_folder 는 각각 src_rig · SA 그대로).
-   MUE 는 비공개 클론 `A0010_MEU` 에서 `Switch to main`, store_dir 그대로.
+   **MUE 도 `JUN_FileManager_data`** (data_folder = MUE, remote_url = `https://github.com/elom1213/JUN_FileManager_data.git`). 이제 모든 프로파일이 클론 하나를 쓴다.
 4. 각 프로파일로 Pull → Scan → 레코드 · 썸네일 · Lineage · Path Structure 가 예전과 같은지. 한 프로파일에서 메모 하나 수정 → Push → GitHub 에서
    `profiles/<folder>/records/...` 한 파일만 바뀐 커밋인지.
 5. A00211 RefLineage(+ A00480 Reference > Lineage)에서 저장 · 읽기 확인.
-6. 옛 클론 `JUN_FileManager_data_all/A0020_SA` · `A0030_Src_Rig` 는 **1~2주 사용해 본 뒤** 사용자 확인을 받아 지운다(그전엔 이름만 `_old_` 접두).
-7. 원격 옛 브랜치 삭제(`git push origin --delete Dnable SA src_rig master` / 비공개 `MUE private master`) — **다른 PC 도 v01.45 로 바꾼 뒤, 사용자가 정할 때만.**
-   태그 `archive/*` 와 `_migrate/backup_*.git` 미러는 남긴다.
+6. 옛 클론 `JUN_FileManager_data_all/A0020_SA` · `A0030_Src_Rig` · `A0010_MEU` 는 **1~2주 사용해 본 뒤** 사용자 확인을 받아 지운다(그전엔 이름만 `_old_` 접두).
+   `JUN_FileManager_data_all` 폴더 자체가 비면 함께 정리.
+7. 원격 옛 브랜치 삭제(`git push origin --delete Dnable SA src_rig master`) — **다른 PC 도 v01.45 로 바꾼 뒤, 사용자가 정할 때만.**
+   비공개 저장소는 브랜치를 지우지 않고 §6-3 Archive. 태그 `archive/*` 와 `_migrate/backup_*.git` 미러는 남긴다.
 
 ## 8. 되돌리기
 
 | 시점 | 방법 |
 |------|------|
 | §3 (코드만) | Maya_Python 커밋 되돌리기(revert). 데이터 무관 |
-| §5 · §6 직후 | 옛 브랜치를 안 지웠으므로 옛 툴(v01.44)로 그대로 계속 쓸 수 있다. GitHub 기본 브랜치를 원래대로(`gh repo edit --default-branch master`), `main` 은 그대로 두거나 사용자 확인 뒤 삭제 |
+| §5 · §6 직후 | 옛 브랜치를 안 지웠으므로 옛 툴(v01.44)로 그대로 계속 쓸 수 있다. GitHub 기본 브랜치를 원래대로(`gh repo edit --default-branch master`), `main` 은 그대로 두거나 사용자 확인 뒤 삭제. 비공개 저장소는 `gh repo unarchive` 로 다시 쓸 수 있다 |
+| **공개로 올라간 MUE** ([B·C]) | **되돌릴 수 없다.** 저장소를 나중에 Private 으로 바꿔도 이미 받아 간 사본은 남는다 — 그래서 §0-A 결정과 §5-0 확인이 먼저다 |
 | §7-7 이후 | `archive/<B>` 태그에서 브랜치 복구: `git push origin archive/<B>:refs/heads/<B>` (미러 백업도 있음) |
 
 ## 9. 위험 · 주의
@@ -255,13 +301,17 @@ gh repo edit elom1213/JUN_FileManager_data_Private --default-branch main
 - **배포 사용자**: 번들 기본 브랜치가 `master` → `main` 으로 바뀐다. 첫 Pull 에서 `check_branch` 가 어긋남을 알리고 `Switch to main` 을 안내 — 자동 변환이 아니라 버튼으로(미커밋 데이터 보호).
 - **경로 길이**: `profiles/<folder>/` 가 붙어 경로가 약 16자 길어진다. 리허설 실측 최장 **128자** + 클론 위치(`C:/Users/USER/Desktop/JP/0030_maya_python_JUN/JUN_FileManager_data/` 69자) = 197자 < 260 — OK. 새 PC 에서 클론 위치가 깊으면 다시 확인.
 - `git mv` 는 기록상 이름 변경이라 `git log --follow profiles/Dnable/records/...` 로 옛 기록을 따라갈 수 있다. SA · src_rig 는 merge 부모로 기록이 남는다(`git log archive/SA`).
-- **히스토리 재작성 금지** — 이 계획은 커밋 추가 · 태그 · 기본 브랜치 변경만 한다. force push 없음.
+- **히스토리 재작성 금지** — 이 계획은 커밋 추가 · 태그 · 기본 브랜치 변경 · 저장소 공개 설정 · Archive 만 한다. force push 없음.
+- **공개 노출** — 비공개였던 MUE 를 공개 저장소에 올리는 순간 공개된다(§0-A). 안 A 에서 Private 전환은 반영(§5-1) **전에**, 확인(§5-0)과 함께.
+- **Private 전환의 영향**(안 A) — 저장소를 받는 모든 PC · 배포본이 GitHub 로그인(자격증명)과 저장소 접근 권한을 가져야 Pull 된다. 다른 사람이 쓰면 GitHub 에서 Collaborator 로 초대.
 
 ## 10. 체크리스트 (요약)
 
+- [ ] **§0-A 결정 (A 권장 / B / C)** — 사용자
 - [ ] §3 코드 + 시험 1~7 통과, 로컬 커밋
-- [ ] §4 리허설: 폴더 3개, 파일 수 · blob 일치, 기록 보존, 툴로 읽기
-- [ ] (푸시 요청 턴) §5 공개 저장소 main · archive 태그 · 기본 브랜치
-- [ ] §6 비공개 저장소 리허설 → (푸시 요청 턴) 반영
-- [ ] §7-1 ~ 5 이 PC 전환 확인
-- [ ] (나중, 사용자 결정) 옛 클론 · 옛 원격 브랜치 정리
+- [ ] §4 리허설: 폴더 4개(Dnable · MUE · SA · src_rig), 파일 수 · blob 일치, 고른 안대로 MUE 기록 포함 여부, 툴로 읽기
+- [ ] (안 A) 저장소 Private 전환 → §5-0 이 404
+- [ ] (푸시 요청 턴) §5-1 main · archive 태그 · 기본 브랜치
+- [ ] §7-1 ~ 5 이 PC 전환 확인 — 모든 프로파일이 `JUN_FileManager_data` 클론 하나
+- [ ] (요청 턴) §6 비공개 저장소 Archive
+- [ ] (나중, 사용자 결정) 옛 클론 3개 · 옛 원격 브랜치 정리, 비공개 저장소 삭제 여부

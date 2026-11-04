@@ -1,6 +1,6 @@
 ---
 name: wip-a00210-data-folders
-description: A00210 데이터 저장소를 프로파일별 브랜치 → main 하나 + profiles/<data_folder>/ 로 바꾸는 계획(리허설 검증됨, 구현 전) · soundAliance 프로파일 branch 어긋남
+description: A00210 데이터 저장소를 프로파일별 브랜치 → main 하나 + profiles/<data_folder>/ 로, 비공개 저장소도 폐지해 저장소 하나로(공개 노출 결정 대기 · 리허설 검증 · 구현 전)
 metadata:
   type: project
 ---
@@ -13,5 +13,8 @@ metadata:
 - 리허설(merge -s ours + read-tree --prefix, Dnable 은 git mv): 파일 수 · blob 일치, 기록 보존, 최장 경로 128자 — 계획서 §4 명령 그대로 동작.
 - 2026-11-04 Dnable 미반영 82건 푸시(`4690a34`).
 
+- **개정 2026-11-04**: 사용자 요청으로 비공개 저장소 `JUN_FileManager_data_Private` 폐지 → MUE 도 `JUN_FileManager_data/profiles/MUE`(저장소 하나).
+  ★ `JUN_FileManager_data` 는 **공개**(API 200) — 옮기면 MUE 공개. 계획서 §0-A: A 저장소 Private 전환 후 기록째(권장) / B 공개 + 스냅숏 / C 공개 + 기록째(비권장). **사용자 결정 대기.**
+  리허설: MUE 128=128 blob 0, 기록째면 비공개 커밋 15 개가 들어간다. 비공개 저장소는 삭제 말고 Archive.
 **Why:** 사용자가 브랜치보다 간결한 버전 관리 방식을 요청. GitHub 읽기 권한은 저장소 단위라 비공개 데이터만 저장소로 나눈다.
 **How to apply:** 구현은 계획서 §3 부터 순서대로. 원격 변경(§5 · §6 · §7-7)은 푸시 요청 턴에만, 옛 브랜치 삭제는 사용자 결정.
