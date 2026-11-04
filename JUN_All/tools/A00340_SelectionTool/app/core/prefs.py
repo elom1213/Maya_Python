@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-28
+# last Update date : 2026-11-04
 # A00340_SelectionTool - selection-button config persistence (UI/DCC 비의존)
 #
 # 사용자가 만든 카테고리/선택 버튼을 "프로파일" 단위로 저장한다.
@@ -19,6 +19,9 @@
 #     └── rules/<rule>.json
 #   공유 루트는 PC 별로 바꿀 수 있다(active.json 의 shared_dir - NAS · 별도 데이터 저장소).
 #   git 은 무시된 폴더 안을 `!` 로 다시 포함시키지 못하므로 공유 폴더는 data/ **밖**이다.
+#
+# v01.20 - Share 덮어쓰기: share_profile(name, overwrite=True) 면 공유에 같은 이름이 있어도 로컬 것으로 교체한다
+#   (UI 가 먼저 묻는다). 네임스페이스 매핑은 로컬에 있으면 그걸로 바꾸고, 없으면 공유 쪽 매핑을 그대로 둔다.
 #
 # 프로파일의 정체는 (scope, 이름) - 같은 이름이 로컬과 공유에 함께 있어도 따로 다룬다.
 # 함수들은 scope 인자의 기본값이 "local" 이라 v01.16 이하의 호출은 그대로 동작한다.
@@ -205,17 +208,30 @@ def rename_profile(old, new, scope=SCOPE_LOCAL):
         set_active(new, scope)
 
 
-def share_profile(name):
-    """로컬 프로파일을 공유 폴더로 **옮긴다**. 공유에 같은 이름이 있으면 ValueError. 반환: 새 경로."""
+def profile_exists(name, scope=SCOPE_LOCAL):
+    """그 scope 에 그 이름의 프로파일 파일이 있나."""
+    return os.path.isfile(_profile_path(name, scope))
+
+
+def share_profile(name, overwrite=False):
+    """로컬 프로파일을 공유 폴더로 **옮긴다**. 반환: 새 경로.
+
+    공유에 같은 이름이 있으면 overwrite=False 는 ValueError, True 면 공유 파일을 로컬 것으로 **교체**한다(v01.20).
+    """
     src = _profile_path(name, SCOPE_LOCAL)
     dst = _profile_path(name, SCOPE_SHARED)
     if not os.path.isfile(src):
         raise ValueError("local profile '{0}' not found".format(name))
-    if os.path.exists(dst):
+    if os.path.exists(dst) and not overwrite:
         raise ValueError("a shared profile named '{0}' already exists".format(name))
     was_active = (_read_active_raw() == (SCOPE_LOCAL, name))
     os.makedirs(os.path.dirname(dst), exist_ok=True)
-    shutil.move(src, dst)
+    # os.replace 는 같은 드라이브에서 대상이 있어도 원자적으로 바꾼다. 다른 드라이브(NAS 공유 루트)면 복사 후 지운다.
+    try:
+        os.replace(src, dst)
+    except OSError:
+        shutil.copy2(src, dst)
+        os.remove(src)
     _move_namespace_map((SCOPE_LOCAL, name), (SCOPE_SHARED, name))
     if was_active:
         set_active(name, SCOPE_SHARED)

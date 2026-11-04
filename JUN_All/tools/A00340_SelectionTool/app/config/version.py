@@ -50,5 +50,9 @@
 #        스크롤 없이 다 보이고 짧은 페이지로 가면 줄어든다. 페이지가 화면보다 길면 화면 높이에서 멈춤.
 #        공용 Framework/qt/MOD_tabFit_qt_v01 (A00275 v01.38 과 같은 방식)
 
-VERSION = "01.19"
-LAST_UPDATE = "2026-10-29"
+# 01.20  Buttons `Share` 덮어쓰기 - 공유 폴더에 같은 이름의 프로파일이 있으면 막기만 하던 것을, 덮어쓸지 묻는다(기본 No).
+#        Yes 면 공유 파일을 로컬 것으로 교체하고 그쪽으로 전환. 네임스페이스 매핑은 로컬에 있으면 그걸로, 없으면 공유 것 유지.
+#        prefs.share_profile(name, overwrite=True) · profile_exists. 회귀 test_shared_profiles 51/51 · test_namespace_remap 30/30.
+
+VERSION = "01.20"
+LAST_UPDATE = "2026-11-04"

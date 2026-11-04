@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-27
+# last Update date : 2026-11-04
 # A00340_SelectionTool - "Buttons" tab (Qt, in-Maya)
 #
 # 사용자가 카테고리와 선택 버튼을 직접 만들고, 버튼을 누르면 그 버튼에 저장된
@@ -893,19 +893,40 @@ class SelectionTab(QWidget):
         self._render_categories()
 
     def on_share_profile(self):
-        """로컬 프로파일을 공유 폴더로 옮긴다 (v01.17)."""
+        """로컬 프로파일을 공유 폴더로 옮긴다 (v01.17).
+
+        v01.20 - 공유에 같은 이름이 있으면 덮어쓸지 묻는다(기본 No). Yes 면 공유 파일을 로컬 것으로 교체.
+        """
         if self._is_shared():
             return
         name = self._profile
+        overwrite = False
+        if prefs_mod.profile_exists(name, prefs_mod.SCOPE_SHARED):
+            answer = QMessageBox.question(
+                self, TITLE,
+                "A shared profile named '{0}' already exists.\n\n"
+                "Overwrite it with this local profile?\n"
+                "The shared file is replaced for everyone who pulls it,\n"
+                "and the local copy moves to the shared folder.".format(name),
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if answer != QMessageBox.Yes:
+                self._log("Share '{0}' cancelled - shared profile kept.".format(name))
+                return
+            overwrite = True
         try:
-            path = prefs_mod.share_profile(name)
+            path = prefs_mod.share_profile(name, overwrite=overwrite)
         except (ValueError, OSError) as exc:
             QMessageBox.warning(self, TITLE, "Cannot share '{0}':\n{1}".format(name, exc))
             return
         self._scope = prefs_mod.SCOPE_SHARED
         prefs_mod.set_active(name, self._scope)
+        # 덮어쓰기면 로컬에 매핑이 없을 때 공유 쪽 매핑이 남아 있다 - 화면도 그걸로
+        self._data = prefs_mod.load_profile(name, self._scope)
+        self._ns_map = prefs_mod.get_namespace_map(self._scope, name)
         self._refresh_profiles()
-        self._log("[OK] Shared profile '{0}' -> {1}".format(name, path))
+        self.refresh_namespace_choices()
+        self._log("[OK] {0} profile '{1}' -> {2}".format(
+            "Overwrote shared" if overwrite else "Shared", name, path))
         self._log("    Commit and push that file to share it through git.")
 
     def on_copy_profile_to_local(self):

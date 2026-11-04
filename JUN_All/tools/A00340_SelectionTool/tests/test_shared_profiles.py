@@ -76,6 +76,21 @@ try:
     check("prefs : share blocked when shared has the name", False)
 except ValueError:
     check("prefs : share blocked when shared has the name", True)
+# v01.20 덮어쓰기 : 로컬 A -> 공유 A 교체, 로컬 매핑이 없으면 공유 매핑 유지
+P.set_namespace_map("shared", "A", {"old": "new"})
+P.set_active("A", "local")
+P.share_profile("A", overwrite=True)
+check("prefs : share overwrite replaces the shared file with the local one (v01.20)",
+      P.load_profile("A", "shared")["categories"] == [1] and not P.profile_exists("A", "local")
+      and P.get_active_ref() == ("shared", "A"), P.list_all_profiles())
+check("prefs : overwrite keeps the shared namespace map when local has none",
+      P.get_namespace_map("shared", "A") == {"old": "new"})
+P.save_profile("A", {"categories": [3]})
+P.set_namespace_map("local", "A", {"x": "y"})
+P.share_profile("A", overwrite=True)
+check("prefs : overwrite takes the local namespace map when it has one",
+      P.get_namespace_map("shared", "A") == {"x": "y"} and P.load_profile("A", "shared")["categories"] == [3])
+P.save_profile("A", {"categories": [1]})
 P.set_active("Default")
 P.share_profile("Default")
 check("prefs : share moves the file and active follows",
@@ -145,6 +160,31 @@ app.processEvents()
 tab.on_share_profile()
 check("buttons : Share moves B and stays on it", P.get_active_ref() == ("shared", "B")
       and tab.cmb_profile.currentText() == "B  [Shared]")
+# v01.20 Share 덮어쓰기 : 공유에 같은 이름(C)이 있으면 묻는다 - No 면 그대로, Yes 면 교체
+P.save_profile("C", {"categories": [{"name": "LocalC", "buttons": []}]})
+P.save_profile("C", {"categories": [{"name": "SharedC", "buttons": []}]}, "shared")
+tab._refresh_profiles()
+tab.cmb_profile.setCurrentIndex([tab.cmb_profile.itemText(i) for i in range(tab.cmb_profile.count())].index("C"))
+app.processEvents()
+del WARNED[:]
+ST.QMessageBox.question = staticmethod(lambda *a, **k: ASKED.append(a[2]) or QMessageBox.No)
+n = len(ASKED)
+tab.on_share_profile()
+check("buttons : Share with an existing shared name asks; No keeps both, no warning",
+      len(ASKED) - n == 1 and "already exists" in ASKED[-1] and not WARNED
+      and [c["name"] for c in P.load_profile("C", "shared")["categories"]] == ["SharedC"]
+      and P.profile_exists("C", "local") and P.get_active_ref() == ("local", "C"), ASKED[-1:])
+ST.QMessageBox.question = staticmethod(lambda *a, **k: ASKED.append(a[2]) or QMessageBox.Yes)
+tab.on_share_profile()
+check("buttons : Yes overwrites the shared profile and switches to it",
+      [c["name"] for c in P.load_profile("C", "shared")["categories"]] == ["LocalC"]
+      and not P.profile_exists("C", "local") and P.get_active_ref() == ("shared", "C")
+      and tab.cmb_profile.currentText() == "C  [Shared]" and [c["name"] for c in tab._data["categories"]] == ["LocalC"]
+      and not WARNED, (tab.cmb_profile.currentText(), WARNED))
+ST.QMessageBox.question = RT.QMessageBox.question = staticmethod(
+    lambda *a, **k: ASKED.append(a[2]) or QMessageBox.Yes)
+tab.cmb_profile.setCurrentIndex([tab.cmb_profile.itemText(i) for i in range(tab.cmb_profile.count())].index("B  [Shared]"))
+app.processEvents()
 n = len(ASKED)
 tab.on_delete_profile()
 check("buttons : deleting a shared profile asks twice", len(ASKED) - n == 2 and ("shared", "B") not in P.list_all_profiles())

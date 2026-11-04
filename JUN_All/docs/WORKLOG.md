@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-04 (오늘)
 
+> [!summary] A00340_SelectionTool **v01.20 Share 덮어쓰기** `#A00340_SelectionTool`
+- 보고: Buttons 의 `MUE_BCM` 을 Share 로 공유 쪽에 덮어쓰려 하면 "already exists" 팝업만 뜨고 막힘.
+- 원인: `prefs.share_profile()` 이 공유에 같은 이름이 있으면 무조건 ValueError.
+- 수정: Share 때 같은 이름이 있으면 **덮어쓸지 묻는다**(기본 No) → Yes 면 `share_profile(name, overwrite=True)` 로 교체 후 공유 것으로 전환.
+  네임스페이스 매핑은 로컬에 있으면 그것, 없으면 공유 것 유지. 같은 드라이브는 `os.replace`, 다른 드라이브(NAS)는 복사 후 삭제.
+- 시험: `test_shared_profiles.py` 51/51(prefs 덮어쓰기 · 매핑 두 경우 · UI No/Yes), `test_namespace_remap.py` 30/30. **마야 GUI 확인 아직.**
+
 > [!summary] A00110_animTool_V02 **v02.44 Pose Key `Current` 축마다** `#A00110_animTool`
 - 요구: `Use current values` 는 어트리뷰트마다 필요한 체크 → 전역 체크박스 대신 Pose Key 행마다 `Current`.
 - 구현: `PoseKeyManager.set_pose_keys(current_axes=)`, `HoldLayerManager` 설정 `use_current` → `current_axes`(optionVar JSON, 옛 값은 체크 축 전부로 옮김),

@@ -39,3 +39,7 @@ buttons select Maya objects instead of opening paths.
   A00310-style tile; PNG rendered via PIL supersample since no SVG rasterizer avail).
 - Follows [[prefer-pyside-for-new-tools]], [[ui-text-english-only]],
   [[standalone-app-package-collision]] (imports via tools.A00340_SelectionTool.app.*).
+
+**v01.20 (2026-11-04) Share 덮어쓰기** — 사용자가 `MUE_BCM` 을 Share 로 공유에 덮어쓰려다 "already exists" 로 막힘 → 같은 이름이 있으면
+덮어쓸지 묻고(기본 No) `prefs.share_profile(name, overwrite=True)`. 네임스페이스 매핑은 로컬 것 우선, 없으면 공유 것 유지.
+Rules 탭의 규칙 Share 는 아직 막기만 한다(요청 범위 밖).
