@@ -22,6 +22,7 @@ Maya 씬 파일(`.mb` / `.ma`)의 **버전·작업 기록 추적** 파이프라�
 | **Source Mode** | 기록·썸네일을 어디서 읽고 쓸지: **Remote (Git)** = 중앙 git 데이터 리포(Pull/Push), **Local (Shared / NAS)** = 공유 폴더 직접 사용(git 미사용). 프로파일별로 저장(v01.23). |
 | **Store Repo / Shared Folder** | 데이터 스토어 폴더 입력 **한 칸**(v01.26). Source Mode 에 따라 라벨/설명이 바뀐다 — Remote 면 **Store Repo**(중앙 git 데이터 리포의 로컬 clone, 예: `JUN_FileManager_data`), Local 이면 **Shared Folder**(git 없이 직접 쓰는 공유/NAS 폴더). 두 모드의 경로는 프로파일에 각각(`store_dir`/`local_dir`) 저장돼, 모드를 오가도 상대 경로가 지워지지 않는다. **v01.44~ 칸은 읽기 전용** — 붙여넣기 · 타이핑으로 바뀌지 않고 `Browse...` 로만 바꾼다(실수 방지, 선택 · 복사는 됨). |
 | **Data Folder** (v01.45~) | 저장소 안 **`profiles/<이름>/`** — 이 프로파일의 records · thumbs · lineage · path_structures 가 있는 폴더. 편집 가능한 드롭다운(= `profiles/` 하위 폴더, 새 이름 = 새 폴더). 여러 프로파일이 같은 폴더를 써도 된다(예: 7개 프로파일이 `Dnable`). 예전에는 프로파일마다 **git 브랜치**로 나눴다 — 브랜치는 이제 `main` 하나 |
+| **경로 표기** (v01.46~) | 화면의 경로는 전부 **슬래시(`/`)** 하나로 보인다 — `C:/Users/...`, NAS 는 `//172.30.1.93/...`. 프로파일 · 입력 칸 · Browse · 로그 · 툴팁 모두(`app/core/paths.py`). 역슬래시로 붙여 넣어도 입력을 마치면 바뀐다 |
 | **key** | `Project Root` 기준 상대경로(예: `chars/charA_rig.mb`). PC 가 달라도(예: `P:/proj` vs `D:/work`) **같은 파일이 같은 기록**에 매핑된다. |
 | **원본 제외** | 원본 mb/ma 는 데이터 스토어에 애초에 들어가지 않는다(git 모드는 `.gitignore` 로 `*.mb`/`*.ma` 이중 차단). |
 

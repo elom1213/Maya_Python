@@ -28,6 +28,7 @@ from Framework.qt.MOD_fileTree_qt_v01 import JUN_mod_fileTree_qt_v01
 from Framework.qt.MOD_tsl_qt_v01 import JUN_mod_tsl_qt_v01, null_item_color
 
 from ..core import ref_scanner
+from ...core.paths import ui_path
 
 DEFAULT_TYPES = ("ma", "mb", "fbx")        # Reference 계획 결정 ⑧
 FILE_FILTER = "Maya Files (*.ma *.mb);;All Files (*)"
@@ -116,10 +117,10 @@ class MayaFilePicker(QObject):
                 name = "{0}  ({1})".format(name, os.path.basename(os.path.dirname(path)))
             item = self.maya_list._add_item(name)
             item.setData(Qt.UserRole, path)
-            item.setToolTip(path)
+            item.setToolTip(ui_path(path))
             if not os.path.isfile(path):
                 item.setForeground(QBrush(QColor(null_item_color())))
-                item.setToolTip(path + "\nFile not found")
+                item.setToolTip(ui_path(path) + "\nFile not found")
             existing.add(key)
             names.add(name)
             added += 1

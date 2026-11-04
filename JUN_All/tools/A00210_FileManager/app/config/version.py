@@ -24,5 +24,9 @@
 #        Push = 내 폴더만 add -> pull --rebase --autostash -> push(거절되면 한 번 더). 클론 브랜치가 설정과 다르면 Pull/Push 거부 + `Switch to main`.
 #        옛 프로파일 자동 변환(branch -> data_folder, 저장 폴더 이름으로 soundAliance=SA 교정, 비공개 URL -> 공개 URL). 기본 브랜치 master -> main.
 
-VERSION = "01.45"
+# 01.46  화면 경로 표기 통일 - 같은 경로가 C:\... 와 C:/... 로 섞여 보이던 것을 슬래시(/) 하나로(NAS = //서버/...).
+#        새 app/core/paths.py(ui_path · ui_text): 프로파일 읽기(경로 키 8개) · 입력 칸(입력 마침 · Browse) · 로그(모든 탭) · 툴팁 · 안내창,
+#        Maya 탭(mayapy · Export Folder 는 예전엔 normpath 로 \ 였다).
+
+VERSION = "01.46"
 LAST_UPDATE = "2026-11-03"

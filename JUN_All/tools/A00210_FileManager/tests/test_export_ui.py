@@ -30,6 +30,11 @@ def check(name, cond, extra=""):
 work = tempfile.mkdtemp(prefix="a00210_ui_")
 rules_dir = os.path.join(work, "rules")
 out_dir = os.path.join(work, "out")
+
+
+def same_path(a, b):
+    """표기(\ vs /, 대소문자)와 무관하게 같은 경로인지 - v01.46 부터 칸은 / 표기."""
+    return os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))
 os.makedirs(out_dir)
 files = []
 for n in ("anim_01.mb", "anim_02.ma", "anim_03.mb"):
@@ -149,7 +154,7 @@ ex.on_export(bake=True); app.processEvents()
 job, grace = calls["run"][-1]
 check("export job from UI", job["job"] == "export" and job["bake"] is True and job["channels"] == ["translate", "rotate"] and job["euler_filter"] is True
       and job["joints_only"] is True and job["import_references"] is True and job["items"][0]["start"] == 100 and job["items"][0]["end"] == 6000
-      and os.path.dirname(job["report"]).lower() == out_dir.lower(), job)
+      and same_path(os.path.dirname(job["report"]), out_dir), job)
 check("export cancel grace 1800", grace == et.EXPORT_CANCEL_GRACE_SEC)
 check("result -> status exported", ex.table.item(0, xt.COL_STATUS).text() == "exported" and any("Bake & Export done - 1 exported" in l for l in logs))
 ex.on_export(bake=False); app.processEvents()
@@ -167,7 +172,7 @@ check("rule summary for Face", 'set "FaceCtl"' in ex.lbl_rule.text() and "contai
 # prefs round trip into a new tab
 tab2 = mt.MayaTab(log=logs.append, prefs={"load": load, "save": save})
 ex2 = tab2.export_tab
-check("prefs reload : rule, folder, euler, channels", ex2.cmb_rule.currentText() == "Face" and ex2.le_folder.text() == out_dir and ex2.chk_euler.isChecked()
+check("prefs reload : rule, folder, euler, channels", ex2.cmb_rule.currentText() == "Face" and same_path(ex2.le_folder.text(), out_dir) and ex2.chk_euler.isChecked()
       and not ex2.chk_channels["scale"].isChecked())
 
 # reference tab still works with picker

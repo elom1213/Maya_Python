@@ -61,6 +61,7 @@ from ..config.app_meta import (
     icon_path, APP_NAME, APP_USER_MODEL_ID, APP_DESCRIPTION, start_menu_launch_spec)
 from ..config import data_repo
 from ..core import scanner, prefs as prefs_mod
+from ..core.paths import ui_path, ui_text
 from ..core.store import MetaStore, OutsideProjectRootError
 from ..core.git_sync import GitSync
 from ..core.models import FileRecord, LogEntry
@@ -598,6 +599,7 @@ class MainWindow(QWidget):
         self.ipf_project_root = QLineEdit()
         btn_root = QPushButton("Browse...")
         btn_root.clicked.connect(lambda: self._browse_dir(self.ipf_project_root))
+        self.ipf_project_root.editingFinished.connect(lambda: self._tidy_path_edit(self.ipf_project_root))
         grid.addWidget(QLabel("Project Root"), 1, 0)
         grid.addWidget(self.ipf_project_root, 1, 1)
         grid.addWidget(btn_root, 1, 2)
@@ -638,6 +640,7 @@ class MainWindow(QWidget):
         btn_scan_browse = QPushButton("Browse...")
         btn_scan_browse.clicked.connect(lambda: self._browse_dir(self.ipf_scan_dir))
         # v01.43 : Scan 옵션 행을 Scan Dir 행 오른쪽으로 올린다(세로 한 줄 절약). Browse... 까지 한 칸에.
+        self.ipf_scan_dir.editingFinished.connect(lambda: self._tidy_path_edit(self.ipf_scan_dir))
         scan_dir_row = QHBoxLayout()
         scan_dir_row.addWidget(self.ipf_scan_dir, stretch=1)
         scan_dir_row.addWidget(btn_scan_browse)
@@ -791,8 +794,8 @@ class MainWindow(QWidget):
     # ============================================================== prefs
 
     def _load_prefs_to_ui(self):
-        self.ipf_project_root.setText(self._prefs.get("project_root", ""))
-        self.ipf_scan_dir.setText(self._prefs.get("scan_dir", ""))
+        self.ipf_project_root.setText(ui_path(self._prefs.get("project_root", "")))
+        self.ipf_scan_dir.setText(ui_path(self._prefs.get("scan_dir", "")))
         self.ipf_remote.setText(self._prefs.get("remote", data_repo.DATA_REPO_REMOTE))
         self.ipf_branch.setCurrentText(self._prefs.get("branch", data_repo.DATA_REPO_BRANCH))
         self.ipf_remote_url.setText(self._prefs.get("remote_url", data_repo.DATA_REPO_URL))
@@ -809,8 +812,8 @@ class MainWindow(QWidget):
         self.path_structure_tab.set_recreate_to(self._prefs.get("recreate_to", ""))
 
         # Source Mode 별 경로를 슬롯에 채우고, 활성 모드 경로를 공유 입력 칸에 로드한다.
-        self._path_values["git"] = self._prefs.get("store_dir", "")
-        self._path_values["local"] = self._prefs.get("local_dir", "")
+        self._path_values["git"] = ui_path(self._prefs.get("store_dir", ""))
+        self._path_values["local"] = ui_path(self._prefs.get("local_dir", ""))
 
         # Source Mode: 콤보 값 복원 후 git-전용 위젯 활성 상태·라벨을 갱신한다.
         mode = self._prefs.get("source_mode", "git")
@@ -826,13 +829,13 @@ class MainWindow(QWidget):
 
     def _collect_prefs(self):
         # 현재 입력 칸의 값을 활성 모드 슬롯에 먼저 반영(두 모드 경로를 모두 보존).
-        self._path_values[self._active_mode] = self.ipf_store_dir.text().strip()
+        self._path_values[self._active_mode] = ui_path(self.ipf_store_dir.text())
         return {
-            "project_root": self.ipf_project_root.text().strip(),
+            "project_root": ui_path(self.ipf_project_root.text()),
             "source_mode": self.cmb_source_mode.currentData() or "git",
             "store_dir": self._path_values["git"],
             "local_dir": self._path_values["local"],
-            "scan_dir": self.ipf_scan_dir.text().strip(),
+            "scan_dir": ui_path(self.ipf_scan_dir.text()),
             "remote": self.ipf_remote.text().strip() or data_repo.DATA_REPO_REMOTE,
             "branch": self.ipf_branch.currentText().strip() or data_repo.DATA_REPO_BRANCH,
             "remote_url": self.ipf_remote_url.text().strip(),
@@ -1098,11 +1101,18 @@ class MainWindow(QWidget):
         if not self.ipf_store_dir.text().strip():
             self.ipf_store_dir.setText(data_repo.DEFAULT_STORE_DIR)
 
+    @staticmethod
+    def _tidy_path_edit(line_edit):
+        """직접 입력한 경로 칸의 표기를 맞춘다(v01.46). 바뀔 때만 setText - 커서 · 편집 흐름을 건드리지 않게."""
+        tidy = ui_path(line_edit.text())
+        if tidy != line_edit.text():
+            line_edit.setText(tidy)
+
     def _browse_dir(self, line_edit):
         start = line_edit.text().strip() or os.path.expanduser("~")
         path = QFileDialog.getExistingDirectory(self, "Select Directory", start)
         if path:
-            line_edit.setText(path)
+            line_edit.setText(ui_path(path))
 
     def _set_detail_enabled(self, enabled):
         for w in (
@@ -1118,7 +1128,8 @@ class MainWindow(QWidget):
             w.setEnabled(enabled)
 
     def log(self, message):
-        self.log_widget.appendPlainText(str(message))
+        # v01.46 : 모든 탭의 로그가 여기로 온다 - 안의 Windows 경로 표기를 슬래시로 통일.
+        self.log_widget.appendPlainText(ui_text(str(message)))
 
     @staticmethod
     def _now_iso():

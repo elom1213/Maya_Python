@@ -2,6 +2,16 @@
 
 All notable changes to this tool are documented here.
 
+## [01.46] - 2026-11-04
+
+- **[UI] 경로 표기 하나로.** 같은 경로가 `C:\Users\...\JUN_FileManager_data` 와 `C:/Users/.../JUN_FileManager_data` 처럼 섞여 보이던 것을
+  **슬래시(`/`)** 로 통일(NAS 는 `//172.30.1.93/...`). Qt 파일 대화상자 · 기존 프로파일 대부분이 쓰던 표기.
+  - 프로파일을 읽을 때 경로 칸 8개(Project Root · Store Repo · Shared Folder · Scan Dir · Recreate To · mayapy · Export Rules / Folder)의 표기를 맞추고, 저장도 그 표기로.
+  - 직접 입력한 Project Root · Scan Dir 는 입력을 마치면, Browse 결과는 바로 맞춘다. Maya 탭의 mayapy · Export Folder 는 예전엔 일부러 `\` 로 바꿨다 → `/`.
+  - **로그**(모든 탭) 안의 Windows 경로, 파일 목록 · Export 표 툴팁, Lineage 경로 안내창도 같은 표기.
+  - 끝 구분자 · `..` 정리, 대소문자 · 공백은 그대로. 파일 · git · mayapy 동작은 바뀌지 않는다(Windows 는 `/` 도 받는다).
+- 새 `app/core/paths.py`(`ui_path` · `ui_text`). 시험 `tests/test_ui_paths.py` 28/28, 기존 43/43 · 50/50 · 32/32(경로 비교를 표기와 무관하게) · 31/31, A00480 44/44.
+
 ## [01.45] - 2026-11-04
 
 - **[데이터 저장소] 프로파일마다 브랜치 → 브랜치 `main` 하나 + 프로파일 폴더.** 데이터는 저장소 안 **`profiles/<Data Folder>/`**

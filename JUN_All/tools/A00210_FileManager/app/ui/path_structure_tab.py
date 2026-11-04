@@ -49,6 +49,7 @@ from Framework.qt.qt import (
 )
 
 from ..core import path_structure as ps_mod
+from ..core.paths import ui_path
 
 
 class PathStructureTab(QWidget):
@@ -294,17 +295,17 @@ class PathStructureTab(QWidget):
 
     def recreate_to(self):
         """'Recreate To' 칸 값. MainWindow 가 프로파일에 저장할 때 읽는다."""
-        return self.ipf_recreate_to.text().strip()
+        return ui_path(self.ipf_recreate_to.text())
 
     def set_recreate_to(self, path):
         """프로파일에서 복원한 'Recreate To' 값을 칸에 넣는다."""
-        self.ipf_recreate_to.setText(path or "")
+        self.ipf_recreate_to.setText(ui_path(path))
 
     def _browse_dir(self, line_edit):
         start = line_edit.text().strip() or os.path.expanduser("~")
         path = QFileDialog.getExistingDirectory(self, "Select Directory", start)
         if path:
-            line_edit.setText(path)
+            line_edit.setText(ui_path(path))
 
     def _on_browse_base(self):
         self._browse_dir(self.ipf_base)

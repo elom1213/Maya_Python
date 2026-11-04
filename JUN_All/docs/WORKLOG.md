@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-04 (오늘)
 
+> [!summary] A00210_FileManager **v01.46 화면 경로 표기 통일** `#A00210_FileManager`
+- 요청: Store Repo 등에서 같은 경로가 `C:\...` 와 `C:/...` 로 다르게 보임 → 하나로.
+- 구현: 슬래시(`/`)로 통일(NAS `//서버/...`). `app/core/paths.py` `ui_path`(normpath + /, UNC 유지) · `ui_text`(로그 안 Windows 경로만).
+  프로파일 읽기(경로 키 8개) · 입력 마침 · Browse · `MainWindow.log`(모든 탭) · 툴팁 · 안내창 · Maya 탭(예전 normpath `\`) · `data_dir_of` 결과.
+- 시험: 새 28/28(`\` 프로파일과 `/` 프로파일이 같은 글자, 로그, mayapy Browse), 기존 43/43 · 50/50 · 32/32(비교를 표기 무관으로 고침) · 31/31, A00480 44/44.
+
 > [!summary] A00210_FileManager **v01.45 데이터 폴더 구조 (안 A) — 코드 · 리허설 완료, 원격 반영 대기** `#A00210_FileManager`
 - 사용자: 안 A 확정 + `JUN_FileManager_data` Private 전환 → 확인(익명 API 404, 자격증명 없는 git 거부, 이 PC 자격증명 OK).
 - 코드: Settings `Data Folder`(profiles/ 하위), 데이터 폴더 = `<Store Repo>/profiles/<folder>`(`prefs.data_dir_of`, A00211 공유), Push = 내 폴더만 → rebase → push(거절 재시도),

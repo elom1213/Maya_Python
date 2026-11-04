@@ -53,6 +53,7 @@ from . import mayapy_process
 from .maya_file_picker import MayaFilePicker
 from .export_table import ExportTable
 from .set_rule_dialog import SetRuleDialog
+from ...core.paths import ui_path
 
 # 베이크 한 호출이 수 분이라 Cancel 뒤 프로세스를 끊기까지 넉넉히 (설계 §7)
 EXPORT_CANCEL_GRACE_SEC = 1800
@@ -325,7 +326,7 @@ class ExportTab(QWidget):
         self._loading = True
         try:
             self._rules_dir = set_rules.rules_dir(data.get("export_rules_dir", ""))
-            self.le_folder.setText(data.get("export_fbx_dir", "") or "")
+            self.le_folder.setText(ui_path(data.get("export_fbx_dir", "") or ""))
             spec = export_naming.NamingSpec.from_dict(data.get("export_naming") or {})
             self.le_find.setText(spec.find)
             self.le_replace.setText(spec.replace)
@@ -393,7 +394,7 @@ class ExportTab(QWidget):
     def _on_rule_changed(self, *_args):
         rule = self.current_rule()
         self.lbl_rule.setText(rule.summary() + ("  -  " + rule.description if rule.description else "") if rule else "-")
-        self.lbl_rule.setToolTip(rule.path if rule else "")
+        self.lbl_rule.setToolTip(ui_path(rule.path) if rule else "")
         self.table.reset_probe()
         self.save_prefs()
 
@@ -511,7 +512,7 @@ class ExportTab(QWidget):
     def on_browse_folder(self, *_args):
         folder = QFileDialog.getExistingDirectory(self, "Export Folder", self.le_folder.text().strip())
         if folder:
-            self.le_folder.setText(os.path.normpath(folder))
+            self.le_folder.setText(ui_path(folder))
 
     def on_open_folder(self, *_args):
         folder = self.le_folder.text().strip()

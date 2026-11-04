@@ -29,6 +29,7 @@ from Framework.core import log_levels
 
 from ..core import export_jobs
 from ..core import export_naming
+from ...core.paths import ui_path
 
 COLUMNS = ("", "File", "Set", "Start", "End", "FPS", "Ver", "Output", "Status")
 COL_CHECK, COL_FILE, COL_SET, COL_START, COL_END, COL_FPS, COL_VER, COL_OUT, COL_STATUS = range(len(COLUMNS))
@@ -115,7 +116,7 @@ class ExportTable(QTableWidget):
                 self.setItem(r, COL_CHECK, chk)
                 f = QTableWidgetItem(os.path.basename(path))
                 f.setData(Qt.UserRole, path)
-                f.setToolTip(path)
+                f.setToolTip(ui_path(path))
                 self.setItem(r, COL_FILE, f)
                 for c in (COL_SET, COL_FPS, COL_VER, COL_OUT, COL_STATUS):
                     self.setItem(r, c, self._ro("-"))
@@ -215,7 +216,7 @@ class ExportTable(QTableWidget):
                     continue
                 it = self.item(r, COL_OUT)
                 it.setText(row.out_name)
-                it.setToolTip(row.out_path + ("\n" + "\n".join(row.notes) if row.notes else ""))
+                it.setToolTip(ui_path(row.out_path) + ("\n" + "\n".join(row.notes) if row.notes else ""))
                 self._paint(r, COL_OUT, "ERROR" if not row.ok else None)
         finally:
             self._block = False

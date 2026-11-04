@@ -17,6 +17,11 @@ import os
 import json
 
 from ..config import data_repo
+from .paths import ui_path
+
+# v01.46 : 이 키들은 경로 - 읽을 때 표기를 하나(슬래시)로 맞춘다(같은 경로가 \ 와 / 로 섞여 보이던 문제).
+PATH_KEYS = ("project_root", "store_dir", "local_dir", "scan_dir", "recreate_to",
+             "mayapy_path", "export_rules_dir", "export_fbx_dir")
 
 PREFS_DIR = os.path.join(
     os.path.expanduser("~"),
@@ -142,6 +147,9 @@ def _apply_defaults(data):
     retired = data_repo.RETIRED_REPO_URLS.get((prefs.get("remote_url") or "").strip())
     if retired:
         prefs["remote_url"] = retired
+    for key in PATH_KEYS:
+        if isinstance(prefs.get(key), str):
+            prefs[key] = ui_path(prefs[key])
     return prefs
 
 
@@ -151,12 +159,12 @@ def data_dir_of(prefs):
     git 모드 = <store_dir>/profiles/<data_folder>, local 모드 = Shared Folder 그대로(폴더 규칙 없음).
     A00211_RefLineage 도 이 함수로 경로를 만든다(단일 소스)."""
     if (prefs or {}).get("source_mode") == "local":
-        return prefs.get("local_dir", "") or ""
+        return ui_path(prefs.get("local_dir", "") or "")
     store = (prefs or {}).get("store_dir", "") or ""
     if not store:
         return ""
     folder = (prefs.get("data_folder") or data_repo.DEFAULT_DATA_FOLDER).strip()
-    return os.path.join(store, data_repo.DATA_PROFILES_DIR, folder)
+    return ui_path(os.path.join(store, data_repo.DATA_PROFILES_DIR, folder))
 
 
 # ----------------------------------------------------------------- profiles

@@ -20,6 +20,7 @@ from Framework.qt.qt import (
 )
 
 from ..core import mayapy_runner
+from ...core.paths import ui_path
 
 MAYAPY_FILTER = "mayapy (mayapy.exe);;All Files (*)"
 
@@ -73,7 +74,7 @@ class MayapyBar(QWidget):
         start = os.path.dirname(self.ipf_mayapy.text().strip()) or r"C:\Program Files\Autodesk"
         path, _flt = QFileDialog.getOpenFileName(self, "Select mayapy.exe", start, MAYAPY_FILTER)
         if path:
-            self.ipf_mayapy.setText(os.path.normpath(path))
+            self.ipf_mayapy.setText(ui_path(path))
             self._save_pref()
 
     def on_detect(self, *_args):
@@ -81,7 +82,7 @@ class MayapyBar(QWidget):
         if not found:
             self._log("[WARN] No mayapy.exe found under Program Files\\Autodesk. Use Browse...")
             return
-        self.ipf_mayapy.setText(found[0])
+        self.ipf_mayapy.setText(ui_path(found[0]))
         self._save_pref()
         self._log("mayapy : {0}{1}".format(
             found[0], "" if len(found) == 1 else "  (+{0} more)".format(len(found) - 1)))
@@ -94,7 +95,7 @@ class MayapyBar(QWidget):
             path = (self._prefs["load"]() or {}).get("mayapy_path", "") or ""
         except Exception:  # noqa: BLE001
             path = ""
-        self.ipf_mayapy.setText(path)
+        self.ipf_mayapy.setText(ui_path(path))
 
     def _save_pref(self):
         if not self._prefs:

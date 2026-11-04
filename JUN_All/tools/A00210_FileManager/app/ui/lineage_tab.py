@@ -61,6 +61,7 @@ from Framework.qt.qt import (
 from ..core import lineage as lin
 from ..core import scanner
 from ..core.store import OutsideProjectRootError
+from ..core.paths import ui_path
 
 
 NODE_W = 150
@@ -1050,7 +1051,7 @@ class LineageTab(QWidget):
         box = QMessageBox(self)
         box.setWindowTitle("File Path")
         box.setIcon(QMessageBox.Information)
-        box.setText(path)            # 경로를 본문으로(마우스로 선택/복사 가능)
+        box.setText(ui_path(path))   # 경로를 본문으로(마우스로 선택/복사 가능) - 표기 통일(v01.46)
         box.setInformativeText("File not found on this machine — path shown only.")
         box.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
         box.exec()
