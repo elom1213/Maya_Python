@@ -189,8 +189,10 @@ class MainWindow(QWidget):
         # Pose Key 행은 다른 페이지라 두 페이지가 다 만들어진 여기서 시그널을 잇는다.
         self._init_hold_layer()
 
-        # 선택 시 그래프 에디터 자동 프레이밍 (기본 OFF, 창 종료 시 scriptJob 정리)
+        # 선택 시 그래프 에디터 자동 프레이밍 (창 종료 시 scriptJob 정리)
         self.graph_focus_mgr = GraphFocusManager()
+        # v02.46 툴을 열면 Auto-Focus on Selection 기본 ON (사용자 요청) - 토글 시그널이 install 까지 한다
+        self.btn_graph_focus.setChecked(True)
 
     # --------------------------------------------------
     # UI
@@ -5966,11 +5968,12 @@ class MainWindow(QWidget):
         """Pose Key 탭에서 체크된 축 {attr: float}. 빈 칸 · 숫자 아님은 warn 이면 None(중단), 아니면 그 축만 뺀다.
 
         `Current` 가 켜진 축은 값 칸을 안 쓰므로 비어 있어도 넣는다(값 0.0 자리표시).
+        v02.46 - `Current` 가 켜진 축은 축 체크가 꺼져 있어도 넣는다(키 축 = 체크 ∪ Current).
         """
         current = set(self._pose_current_axes()) if getattr(self, "pose_current", None) else set()
         axis_values = {}
         for attr, (cb, le) in self.pose_rows.items():
-            if not cb.isChecked():
+            if not cb.isChecked() and attr not in current:
                 continue
             txt = le.text().strip()
             try:

@@ -6,6 +6,7 @@
 # v02.41 - use_current=True : 입력 값 대신 **지금 프레임의 현재 값**으로 키 (체크된 축만, UI `Use current values`).
 #          키 없이 움직여 둔 값도 그대로 키가 된다. 활성 애니메이션 레이어에서는 최종 값이 그대로 남는다.
 # v02.44 - current_axes : **축마다** 현재 값 여부 (UI 행마다 `Current`). use_current=True 는 전부 current.
+# v02.46 - current_axes 의 축은 axis_values 에 없어도(축 체크가 꺼져 있어도) 키를 찍는다.
 
 import maya.cmds as cmds
 
@@ -48,10 +49,14 @@ class PoseKeyManager:
         if not sel:
             return (0, "No objects selected.")
 
+        axis_values = dict(axis_values or {})
+        for a in (current_axes or []):
+            axis_values.setdefault(a, 0.0)      # v02.46 current 축은 체크와 무관하게 키
+
         if not axis_values:
             return (0, "No axis checked.")
 
-        current = set(axis_values) if use_current else set(current_axes or []) & set(axis_values)
+        current = set(axis_values) if use_current else set(current_axes or [])
 
         # 현재 값은 키를 찍기 전에 전부 읽는다 (앞 키가 다른 채널 평가를 바꿀 수 있다)
         plan = []

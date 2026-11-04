@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-04 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.46 Current 축 키 누락 수정 + Auto-Focus 기본 ON** `#A00110_animTool`
+- 보고: Layer Blend Key 로 AnimLayer1 에 찍힌 키를 보면 Pose Key `Current` 를 켠 축에 키가 없다.
+- 원인: 키 축 = 축 체크만, Current 는 그 안에서 값만 바꿈(체크 ∩ Current) → 기본값(체크 rx rz ty / Current ry tx tz)이 안 겹쳐 Current 축이 통째로 빠짐.
+- 수정: 키 축 = 체크 ∪ Current (`HoldLayerManager.effective_axes`, `set_pose_keys`, UI 수집, capture). + View > Graph Focus `Auto-Focus on Selection` 을 툴 열 때 ON.
+- 시험: 73/73 · UI 21/21, 창 띄우는 기존 시험 5개(46 · 31 · 14 · 68 · 111) 통과. mayapy 는 scriptJob 이 None 이라 Auto-Focus 는 토글 · 설치 호출로 확인. **GUI 확인 아직.**
+
 > [!summary] A00340_SelectionTool **v01.20 Share 덮어쓰기** `#A00340_SelectionTool`
 - 보고: Buttons 의 `MUE_BCM` 을 Share 로 공유 쪽에 덮어쓰려 하면 "already exists" 팝업만 뜨고 막힘.
 - 원인: `prefs.share_profile()` 이 공유에 같은 이름이 있으면 무조건 ValueError.

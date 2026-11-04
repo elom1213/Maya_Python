@@ -125,5 +125,11 @@
 # 02.45  Pose Key `Current` 기본 켜짐 = rotate Y · translate X · translate Z (사용자 요구, 저장값이 없을 때).
 #        hold_layer_manager.DEFAULT_CURRENT_AXES 하나로 UI 초기값 · load_settings 기본을 맞춤. 회귀 70/70 · _ui 19/19.
 
-VERSION = "02.45"
+# 02.46  ① Pose Key `Current` 를 켠 축은 **축 체크가 꺼져 있어도 키를 찍는다**(키 축 = 체크 ∪ Current). 사용자 보고:
+#        Layer Blend Key 로 AnimLayer1 에 찍힌 키를 보면 Current 축에 키가 없다 - v02.44~45 는 체크 ∩ Current 만 current 로
+#        다뤄 기본값(체크 rx rz ty / Current ry tx tz)에서 Current 축이 대상에서 빠졌다. Pose Key 버튼 · capture · apply 모두.
+#        ② 툴을 열면 View > Graph Focus `Auto-Focus on Selection` 기본 ON(사용자 요청).
+#        회귀 test_hold_layer_blend 73/73(UC6 · UC10~12) · _ui 21/21(U20 · U21), 창 띄우는 기존 시험 5개 통과.
+
+VERSION = "02.46"
 LAST_UPDATE = "2026-11-04"

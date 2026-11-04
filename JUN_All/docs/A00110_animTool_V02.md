@@ -823,6 +823,8 @@ A00110_animTool_V02.run(True)   # True = reload
 - **Current**(축마다, v02.44~ · v02.41~43 은 전역 `Use current values` 하나. **기본 켜짐 = rotate Y · translate X · translate Z**(v02.45~), 나머지 끔): 그 행을 켜면 **그 축만** 입력 값 대신
   **지금 프레임의 현재 값**으로 키를 찍는다(키 없이 움직여 둔 값도 그대로 키). 켠 행의 값 칸은 비활성이고 비어 있어도 된다.
   나머지 축은 입력 값 그대로. 활성 애니메이션 레이어에서는 최종 값이 지금 값 그대로 남는다.
+  v02.46~ **Current 를 켠 축은 앞쪽 축 체크가 꺼져 있어도 키를 찍는다** — 키를 찍는 축 = 축 체크 ∪ Current
+  (기본값이면 rx · rz · ty 는 입력 값, ry · tx · tz 는 현재 값 = 6축 전부).
   **Hot Key > Main > Layer Blend Key** 의 현재 프레임 키도 축마다 같은 방식이다. 체크 상태는 창을 다시 열어도 기억된다
   (v02.41 의 전역 설정을 쓰던 경우 처음 열 때 체크된 축 전부가 Current 로 옮겨진다).
 
@@ -1849,7 +1851,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 
 ```
 ┌ Focus Graph Editor around Current Frame ──────────┐
-│ [ Auto-Focus on Selection : OFF ]                 │  ← 체크형 토글 버튼 (ON 이면 연한 빨강, v02.34)
+│ [ Auto-Focus on Selection : ON ]                  │  ← 체크형 토글 버튼 (ON 이면 연한 빨강, v02.34 · 툴을 열면 ON, v02.46)
 │ Frame margin (±) [ 30 f ]                         │  ← 스핀박스 (기본 30, v02.30~)
 │ [x] Fit value (vertical) axis too                 │
 │ Value margin (%) [ 10 % ]                         │  ← 세로 위/아래 여백 (v01.29~)
@@ -1861,7 +1863,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 컨트롤러를 선택했을 때, 그 컨트롤러에 걸린 **전체 키 구간**(예: 0~6000f)을 다 보여주는 마야 기본
 동작 대신 **현재 프레임 ± margin 프레임**만 그래프 에디터에 확대해서 보여준다.
 
-- **Auto-Focus on Selection**(토글): 켜면 `SelectionChanged` 를 감시하다가 **컨트롤러(오브젝트)
+- **Auto-Focus on Selection**(토글, v02.46~ **툴을 열면 기본 ON**): 켜면 `SelectionChanged` 를 감시하다가 **컨트롤러(오브젝트)
   선택이 실제로 바뀔 때마다** 그래프 에디터를 `[현재프레임 - margin, 현재프레임 + margin]` 구간으로
   프레이밍한다. 켠 순간의 현재 선택에도 즉시 1회 적용된다. 끄면 감시(scriptJob)를 중단한다. 창을
   닫으면 자동 정리된다. (v01.30~) 그래프 에디터의 **키프레임 선택/해제나 undo(`z`)** 로도

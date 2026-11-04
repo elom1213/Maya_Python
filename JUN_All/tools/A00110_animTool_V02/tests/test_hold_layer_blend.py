@@ -279,8 +279,32 @@ check("UC3 run_hold: values captured before Hold (final f100 = pre-Hold value)",
       (want, final_at(cube, "tx", 100)))
 HLM.update(current_axes=[])
 check("UC5 no current axis -> capture_current() is None", HLM.capture_current() is None)
-HLM.update(current_axes=["rz"])     # 체크된 축(rx, tx)과 안 겹치면 읽을 것 없음
-check("UC6 current axis not checked -> capture_current() is None", HLM.capture_current() is None)
+HLM.update(current_axes=["rz"])     # v02.46 체크된 축(rx, tx)에 없어도 current 축은 읽는다
+cap = HLM.capture_current(["ctl"])
+check("UC6 current axis not checked is still captured (v02.46)", cap is not None and ("ctl", "rz") in cap, cap)
+
+# v02.46 사용자 보고 : 축 체크는 꺼져 있고 Current 만 켠 축(기본 ry tx tz)이 레이어에 안 찍혔다
+clear_optvars()
+cube, other, layer = scene(False)
+cmds.currentTime(100)
+before_ry = final_at(cube, "ry", 100)
+HLM.update(**dict(SETTINGS, axis_values={"rx": 0.0}, current_axes=["ry", "tz"]))
+cmds.select(cube)
+n, msg = HLM.apply()
+ry = keys(crv(cube, "rotateY", layer))
+check("UC10 Layer Blend: Current-only axis ry (axis unchecked) keyed at f100 with its current value",
+      n == 1 and 100.0 in ry and final_at(cube, "ry", 100) == before_ry and "current: ry" in msg
+      and "Pose axes not in layer: tz" in msg, (ry, msg))
+rx = keys(crv(cube, "rotateX", layer))
+check("UC11 checked axis rx still keyed with the typed Pose value", final_at(cube, "rx", 100) == 0.0 and 100.0 in rx, rx)
+cmds.file(new=True, force=True)
+pk = cmds.polyCube(n="pk")[0]
+cmds.currentTime(3)
+cmds.setAttr(pk + ".ry", 21.0)
+n, msg = PoseKeyManager.set_pose_keys({"tx": 1.0}, current_axes=["ry"])
+k_ry = cmds.keyframe(pk + ".ry", q=True, valueChange=True, time=(3, 3)) or []
+check("UC12 Pose Key: Current-only axis ry keyed (21.0) alongside checked tx", k_ry == [21.0]
+      and (cmds.keyframe(pk + ".tx", q=True, valueChange=True, time=(3, 3)) or []) == [1.0], (k_ry, msg))
 
 # v02.41 전역 use_current 를 쓰던 optionVar -> 체크된 축 전부 current 로 읽힌다
 clear_optvars()

@@ -42,6 +42,13 @@ win = MainWindow()
 win.show()
 APP.processEvents()
 
+check("U20 View > Graph Focus Auto-Focus is ON when the tool opens (v02.46)",
+      win.btn_graph_focus.isChecked() and win.btn_graph_focus.text().endswith(": ON")
+      # mayapy(헤드리스)에서는 cmds.scriptJob 이 None 을 돌려줘 is_active() 가 False - 설치 호출 여부(게터)로 본다
+      and win.graph_focus_mgr._margin_getter is not None, win.btn_graph_focus.text())
+check("U21 Current-only axes (ry tx tz, axis unchecked) are pushed as key axes (v02.46)",
+      all(a in HLM.load_settings()["axis_values"] for a in ("ry", "tx", "tz")), HLM.load_settings())
+
 items = [win.cmb_hold_layer.itemText(i) for i in range(win.cmb_hold_layer.count())]
 check("U1 combo lists layers without BaseAnimation", sorted(items) == ["Layer_01", "Layer_02"], items)
 check("U2 default off, sub widgets disabled", not win.cb_hold_layer.isChecked() and not win.w_hold_layer.isEnabled())

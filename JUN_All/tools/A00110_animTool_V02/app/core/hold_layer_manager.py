@@ -40,6 +40,9 @@
 #   Pose Key 행마다 `Current` 체크박스 - 켠 축만 현재 값, 나머지 축은 입력 값. capture_current 도 그 축만 읽는다.
 #   옛 optionVar use_current=1 이 남아 있고 current_axes 가 없으면 체크된 축 전부를 current 로 옮겨 읽는다.
 # v02.45 - 저장된 current_axes 가 없을 때의 기본 = DEFAULT_CURRENT_AXES (rotate Y · translate X · translate Z, 사용자 요구).
+# v02.46 - **`Current` 를 켠 축은 축 체크가 꺼져 있어도 키를 찍는다** (키 축 = 체크 축 ∪ current 축, effective_axes).
+#   v02.44~45 는 체크 축 ∩ current 만 current 로 다뤄, 기본값(체크 rx rz ty / current ry tx tz)에서 current 축이
+#   하나도 안 찍혔다(사용자 보고: AnimLayer1 에 current 축 키가 없다).
 #
 # 결정 사항 (2026-11-04 사용자):
 #   1. -N 키 값 = 그 시점의 레이어 값 유지 (레이어 커브 평가값, 커브가 없으면 그 레이어 blend 입력(inputB)의 정적값)
@@ -253,14 +256,22 @@ class HoldLayerManager:
             out.append(obj)
         return out
 
+    @staticmethod
+    def effective_axes(s):
+        """키를 찍을 축 {축: 값} = 체크 축(axis_values) ∪ current 축(값 0.0 자리표시 - 지금 값으로 바뀐다), 순서 유지."""
+        out = dict(s.get("axis_values") or {})
+        for a in (s.get("current_axes") or []):
+            out.setdefault(a, 0.0)
+        return out
+
     @classmethod
     def capture_current(cls, objects=None):
-        """current 축이 있으면 선택 오브젝트 x (체크된 축 ∩ current 축) 의 **지금 값** {(obj, 축): float}. 없으면 None.
+        """current 축이 있으면 선택 오브젝트 x current 축의 **지금 값** {(obj, 축): float}. 없으면 None (v02.46 체크와 무관).
 
         run_hold 가 Hold **전에** 부른다. 읽을 수 없는 채널은 빠진다(apply 가 그때 다시 읽는다).
         """
         s = cls.load_settings()
-        axes = [a for a in (s.get("axis_values") or {}) if a in set(s.get("current_axes") or [])]
+        axes = list(dict.fromkeys(s.get("current_axes") or []))
         if not (s.get("enabled") and axes):
             return None
         if not cls.view_gate(s.get("view_layer", ""))[0]:
@@ -314,7 +325,7 @@ class HoldLayerManager:
         if locked:
             return (0, "[Warning] Layer Blend: layer '{0}' is locked. Skipped.".format(layer))
 
-        axis_values = dict(s.get("axis_values") or {})
+        axis_values = cls.effective_axes(s)    # v02.46 체크 축 ∪ current 축
         if not axis_values:
             return (0, "[Warning] Layer Blend: no Pose Key axis checked. Skipped.")
 
