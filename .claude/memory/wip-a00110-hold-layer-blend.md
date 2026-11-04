@@ -21,6 +21,8 @@ metadata:
 - v02.41 Pose Key `Use current values`(optionVar `use_current`): Pose Key 버튼 · Layer Blend 현재 프레임 키 모두 **지금 값**으로.
   Shift+A 는 `capture_current()` 를 **Hold 전에** 불러 값을 잡는다 — Hold 가 커브를 바꾸면 키 없이 움직여 둔 값이 재평가로 사라진다.
 - 시험 함정: `currentTime` 이동도 undo 큐에 들어간다 → undo 확인을 먼저, 값 재기는 redo 뒤에.
+- v02.43 보기 게이트 `view_layer`(UI `Run only when viewing`, 기본 "" = 루트): 보는 레이어 = 에디터 **selected** → 없으면 preferred →
+  없으면 루트, **정확히 그 하나**일 때만 Layer Blend. 사용자 이유: 다른 레이어 커브를 Hold 할 때 끼어들면 위험. mayapy 에선 새 레이어가 선택되지 않지만 GUI 는 만들면 선택된다.
 - v02.42 사용자 요구: **선택한 오브젝트에만** 레이어 키(레이어의 다른 멤버 금지). `selected_objects()` 가 animLayer · objectSet · character 를
   뺀다(세트에 setKeyframe = 멤버 전체). mayapy 에선 v02.41 도 새지 않았다(재현 안 됨) — GUI 에서 다시 보이면 메시지 끝 오브젝트 이름으로 확인.
 

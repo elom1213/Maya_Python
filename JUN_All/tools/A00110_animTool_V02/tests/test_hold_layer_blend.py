@@ -21,7 +21,7 @@ PRE = "JUN_A00110_holdLayer_"
 
 
 def clear_optvars():
-    for k in ("enabled", "offset", "layer", "axis_values", "use_current"):
+    for k in ("enabled", "offset", "layer", "axis_values", "use_current", "view_layer"):
         if cmds.optionVar(exists=PRE + k):
             cmds.optionVar(remove=PRE + k)
 
@@ -316,6 +316,67 @@ check("SEL selected_objects drops the layer node, keeps order", HLM.selected_obj
 n, msg = HLM.apply()
 check("SEL message names the keyed objects", n == 2 and msg.endswith(": A, B."), msg)
 clear_optvars()
+
+# ---------------- v02.43 : 보기 게이트 (Run only when viewing, 기본 BaseAnimation) ----------------
+from tools.A00110_animTool_V02.app.core import AnimLayerManager as ALM   # noqa: E402
+
+clear_optvars()
+if cmds.optionVar(exists=PRE + "view_layer"):
+    cmds.optionVar(remove=PRE + "view_layer")
+check("VG0 default view_layer = '' (root)", HLM.load_settings()["view_layer"] == "")
+
+objs, lay = three_scene()
+root = LKM.root_layer()
+HLM.update(enabled=True, layer=lay, offset=10, axis_values={"tx": 5.0})
+
+# AnimLayer1 을 보면서 그 레이어 커브의 구간 키를 골라 Shift+A  ->  Hold 만, Layer Blend 는 건너뜀
+HLM._key_raw("A", "translateX", lay, 80, 4.0)
+ALM.set_selected([lay])
+cmds.select("A", r=True)
+a_curve = LKM.layer_curve("A.translateX", lay)
+cmds.selectKey(a_curve, time=(50, 80), replace=True)
+check("VG1 viewed_layers = [AnimLayer1]", HLM.viewed_layers() == [lay], HLM.viewed_layers())
+msgs = []
+cmds.inViewMessage = lambda **kw: msgs.append(kw.get("amg", ""))
+hk.HotkeyManager.run_hold()
+k = keys(a_curve)
+check("VG2 viewing AnimLayer1: Hold ran on the layer curve (f80 = f50 value 1.0)", k.get(80.0) == 1.0, k)
+check("VG3 viewing AnimLayer1: Layer Blend skipped (no f90/f100 keys) + reason in message",
+      90.0 not in k and 100.0 not in k and "skipped - viewing 'AnimLayer1'" in msgs[-1], (k, msgs[-1]))
+
+# BaseAnimation 을 보면 동작
+ALM.set_selected([root])
+cmds.select("A", r=True)
+check("VG4 viewed_layers = [BaseAnimation]", HLM.viewed_layers() == [root], HLM.viewed_layers())
+n, msg = HLM.apply()
+check("VG5 viewing BaseAnimation: Layer Blend runs", n == 1 and 100.0 in keys(a_curve), msg)
+
+# 둘 다 보고 있으면 건너뜀
+ALM.set_selected([root, lay])
+n, msg = HLM.apply(frame=60)
+check("VG6 viewing two layers: skipped", n == 0 and "skipped - viewing" in msg and 60.0 not in keys(a_curve), msg)
+
+# 게이트를 AnimLayer1 로 바꾸면 반대
+HLM.update(view_layer=lay)
+ALM.set_selected([root])
+n, msg = HLM.apply(frame=60)
+check("VG7 gate=AnimLayer1, viewing Base: skipped", n == 0 and "runs only when viewing 'AnimLayer1'" in msg, msg)
+ALM.set_selected([lay])
+n, msg = HLM.apply(frame=60)
+check("VG8 gate=AnimLayer1, viewing AnimLayer1: runs", n == 1 and 60.0 in keys(a_curve), msg)
+
+# 아무 레이어도 선택 안 됨 -> preferred, 그것도 없으면 루트
+HLM.update(view_layer="")
+for l in cmds.ls(type="animLayer"):
+    cmds.animLayer(l, e=True, selected=False, preferred=False)
+check("VG9 nothing selected/preferred -> viewing root", HLM.viewed_layers() == [root], HLM.viewed_layers())
+cmds.animLayer(lay, e=True, preferred=True)
+check("VG10 nothing selected, AnimLayer1 preferred -> viewing AnimLayer1", HLM.viewed_layers() == [lay], HLM.viewed_layers())
+HLM.update(use_current=True)
+check("VG11 gate closed -> capture_current() is None", HLM.capture_current(["A"]) is None)
+clear_optvars()
+if cmds.optionVar(exists=PRE + "view_layer"):
+    cmds.optionVar(remove=PRE + "view_layer")
 
 print("\n{0}/{1} passed".format(sum(R), len(R)))
 maya.standalone.uninitialize()

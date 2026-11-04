@@ -29,6 +29,13 @@
 #   뺀 노드만. run_hold 는 누른 순간의 선택을 한 번 읽어 capture_current / apply 에 같은 목록을 넘긴다.
 #   키는 그 오브젝트의 plug(obj.attr)와 그 plug 를 구동하는 레이어 커브에만 쓴다. 메시지에 키를 찍은 오브젝트 이름을 보인다.
 #
+# v02.43 - **보기 게이트** `view_layer` (UI `Run only when viewing`, 기본 BaseAnimation): 지금 **보고 있는 레이어**가
+#   정확히 그 레이어 하나일 때만 Layer Blend 가 돈다. AnimLayer1 을 보며 그 커브 키를 골라 Shift+A(= AnimLayer1 Hold)할 때
+#   Layer Blend 가 끼어들지 않게 하려는 안전장치(사용자 요구). Hold 는 게이트와 무관하게 그대로 돈다.
+#   보고 있는 레이어 = Animation Layer Editor 에서 **선택된** 레이어들(그래프 에디터 필터 Selected 가 보이는 것) ->
+#   없으면 활성(preferred) 레이어 -> 그것도 없으면 루트(BaseAnimation). 여러 개를 같이 보고 있으면 통과 못 한다.
+#   view_layer 저장값 "" = 루트 레이어(이름이 BaseAnimation 이 아니어도). 씬에 레이어가 하나도 없으면 게이트는 통과(루트 취급).
+#
 # 결정 사항 (2026-11-04 사용자):
 #   1. -N 키 값 = 그 시점의 레이어 값 유지 (레이어 커브 평가값, 커브가 없으면 그 레이어 blend 입력(inputB)의 정적값)
 #   2. 레이어가 없거나 오브젝트가 멤버가 아니면 경고하고 건너뜀 (레이어를 만들거나 멤버로 넣지 않는다)
@@ -60,6 +67,7 @@ class HoldLayerManager:
         "offset": 10,          # N (프레임, int >= 1)
         "axis_values": {},     # Pose Key 탭에서 체크된 축 {"rx": 0.0, ...}
         "use_current": False,  # v02.41 현재 프레임 키 = 현재 값 (Pose Key `Use current values`)
+        "view_layer": "",      # v02.43 이 레이어를 보고 있을 때만 동작. "" = 루트(BaseAnimation)
     }
 
     @classmethod
@@ -77,12 +85,15 @@ class HoldLayerManager:
             cmds.optionVar(stringValue=(pre + "axis_values", json.dumps(dict(kw["axis_values"] or {}))))
         if "use_current" in kw:
             cmds.optionVar(intValue=(pre + "use_current", int(bool(kw["use_current"]))))
+        if "view_layer" in kw:
+            cmds.optionVar(stringValue=(pre + "view_layer", str(kw["view_layer"] or "")))
 
     @classmethod
     def load_settings(cls):
         """optionVar 에서 설정을 읽는다. 없는 키는 기본값."""
         pre = OPTVAR_PREFIX
-        out = {"enabled": False, "layer": "", "offset": 10, "axis_values": {}, "use_current": False}
+        out = {"enabled": False, "layer": "", "offset": 10, "axis_values": {}, "use_current": False,
+               "view_layer": ""}
         try:
             if cmds.optionVar(exists=pre + "enabled"):
                 out["enabled"] = bool(cmds.optionVar(q=pre + "enabled"))
@@ -90,6 +101,8 @@ class HoldLayerManager:
                 out["layer"] = str(cmds.optionVar(q=pre + "layer") or "")
             if cmds.optionVar(exists=pre + "offset"):
                 out["offset"] = int(cmds.optionVar(q=pre + "offset"))
+            if cmds.optionVar(exists=pre + "view_layer"):
+                out["view_layer"] = str(cmds.optionVar(q=pre + "view_layer") or "")
             if cmds.optionVar(exists=pre + "use_current"):
                 out["use_current"] = bool(cmds.optionVar(q=pre + "use_current"))
             if cmds.optionVar(exists=pre + "axis_values"):
@@ -108,6 +121,41 @@ class HoldLayerManager:
         """BaseAnimation 을 뺀 animLayer 이름 목록 (씬 순서)."""
         root = LayerKeyManager.root_layer()
         return [l for l in (cmds.ls(type="animLayer") or []) if l != root]
+
+    @staticmethod
+    def viewed_layers():
+        """지금 보고 있는 레이어 목록 : 에디터 선택 -> 없으면 활성(preferred) -> 없으면 [루트]. 레이어가 없으면 []."""
+        layers = cmds.ls(type="animLayer") or []
+        if not layers:
+            return []
+
+        def flagged(flag):
+            out = []
+            for layer in layers:
+                try:
+                    if cmds.animLayer(layer, q=True, **{flag: True}):
+                        out.append(layer)
+                except Exception:                           # noqa: BLE001
+                    pass
+            return out
+
+        root = LayerKeyManager.root_layer()
+        return flagged("selected") or flagged("preferred") or ([root] if root else [])
+
+    @classmethod
+    def view_gate(cls, view_layer=None):
+        """(통과 여부, 메시지). view_layer "" / None = 루트. 레이어가 없는 씬은 통과."""
+        if view_layer is None:
+            view_layer = cls.load_settings().get("view_layer", "")
+        viewed = cls.viewed_layers()
+        if not viewed:
+            return (True, "")
+        root = LayerKeyManager.root_layer()
+        want = view_layer or root
+        if viewed == [want]:
+            return (True, "")
+        return (False, "Layer Blend: skipped - viewing {0} (runs only when viewing '{1}').".format(
+            ", ".join("'{0}'".format(v) for v in viewed), want))
 
     @staticmethod
     def _layer_node_for(plug, layer_nodes):
@@ -197,6 +245,8 @@ class HoldLayerManager:
         s = cls.load_settings()
         if not (s.get("enabled") and s.get("use_current")):
             return None
+        if not cls.view_gate(s.get("view_layer", ""))[0]:
+            return None
         sel = cls.selected_objects(objects)
         out = {}
         for obj in sel:
@@ -221,6 +271,11 @@ class HoldLayerManager:
         cls.settings.update(s)
         if not s.get("enabled"):
             return (0, "")
+
+        # v02.43 보기 게이트 - 정한 레이어(기본 BaseAnimation)를 보고 있을 때만
+        ok, gate_msg = cls.view_gate(s.get("view_layer", ""))
+        if not ok:
+            return (0, gate_msg)
 
         sel = cls.selected_objects(objects)
         if not sel:

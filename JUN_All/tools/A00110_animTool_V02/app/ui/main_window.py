@@ -120,6 +120,14 @@ STAGGER_SLIDER_STYLE = (
 )
 
 
+def _root_layer_name():
+    """보기 게이트 콤보의 첫 항목 글자 : 씬의 루트 레이어 이름(없으면 'BaseAnimation')."""
+    try:
+        return cmds.animLayer(q=True, root=True) or "BaseAnimation"
+    except Exception:                                       # noqa: BLE001
+        return "BaseAnimation"
+
+
 class _PopupRefreshCombo(QComboBox):
     """펼치기 직전에 on_popup() 을 부르는 콤보 (v02.40 Layer Blend 레이어 목록 - 창을 연 뒤 만든 레이어도 보이게)."""
 
@@ -695,9 +703,18 @@ class MainWindow(QWidget):
         self.sp_hold_layer_offset.setValue(10)
         self.sp_hold_layer_offset.setToolTip("N : the layer value is keyed at (current frame - N).")
         hl_form.addWidget(self.sp_hold_layer_offset, 1, 1)
+        # v02.43 보기 게이트 : 이 레이어를 보고 있을 때만 Layer Blend (기본 BaseAnimation)
+        hl_form.addWidget(QLabel("Run only when viewing"), 2, 0)
+        self.cmb_hold_view_layer = _PopupRefreshCombo(on_popup=lambda: self._hold_view_layer_refresh())
+        self.cmb_hold_view_layer.setToolTip(
+            "Layer Blend Key runs only while this layer is the one you are viewing\n"
+            "(the only layer selected in the Animation Layer Editor).\n"
+            "Viewing another layer - e.g. holding keys on AnimLayer1 - runs Hold only.\n"
+            "Default: BaseAnimation.")
+        hl_form.addWidget(self.cmb_hold_view_layer, 2, 1, 1, 2)
         hl_note = QLabel("Uses Key > Pose Key axes/values (or current values).")
         hl_note.setEnabled(False)
-        hl_form.addWidget(hl_note, 2, 0, 1, 3)
+        hl_form.addWidget(hl_note, 3, 0, 1, 3)
         hl_form.setColumnStretch(1, 1)
         self.w_hold_layer.setToolTip(tip)
         hold_layout.addWidget(self.w_hold_layer)
@@ -5855,11 +5872,13 @@ class MainWindow(QWidget):
             self.cb_pose_current.setChecked(bool(saved["use_current"]))
             self._pose_current_changed()
             self._hold_layer_refresh(prefer=saved["layer"])
+            self._hold_view_layer_refresh(prefer=saved["view_layer"])
         finally:
             self._hold_layer_loading = False
 
         self.cb_hold_layer.toggled.connect(self._push_hold_layer_settings)
         self.cmb_hold_layer.currentIndexChanged.connect(self._push_hold_layer_settings)
+        self.cmb_hold_view_layer.currentIndexChanged.connect(self._push_hold_layer_settings)
         self.sp_hold_layer_offset.valueChanged.connect(self._push_hold_layer_settings)
         self.btn_hold_layer_refresh.clicked.connect(lambda: self._hold_layer_refresh())
         for cb, le in self.pose_rows.values():
@@ -5904,6 +5923,35 @@ class MainWindow(QWidget):
         for _cb, le in self.pose_rows.values():
             le.setEnabled(not on)
 
+    def _hold_view_layer_name(self):
+        """보기 게이트 콤보 값. "" = 루트(BaseAnimation)."""
+        data = self.cmb_hold_view_layer.currentData()
+        return str(data) if data else ""
+
+    def _hold_view_layer_refresh(self, prefer=None):
+        """보기 게이트 콤보 = 루트(데이터 "") + 다른 레이어. 저장 이름이 없으면 '(missing)'.
+
+        prefer=None 이면 지금 값을 유지하고 핫키 쪽에 push 한다(콤보 펼치기).
+        """
+        want = self._hold_view_layer_name() if prefer is None else (prefer or "")
+        root = _root_layer_name()
+        layers = HoldLayerManager.list_layers()
+        cmb = self.cmb_hold_view_layer
+        cmb.blockSignals(True)
+        try:
+            cmb.clear()
+            cmb.addItem(root, "")
+            for name in layers:
+                cmb.addItem(name, name)
+            if want and want not in layers:
+                cmb.addItem("{0} (missing)".format(want), want)
+            idx = cmb.findData(want) if want else 0
+            cmb.setCurrentIndex(idx if idx >= 0 else 0)
+        finally:
+            cmb.blockSignals(False)
+        if prefer is None:
+            self._push_hold_layer_settings()
+
     def _collect_pose_axis_values(self, warn=True):
         """Pose Key 탭에서 체크된 축 {attr: float}. 빈 칸 · 숫자 아님은 warn 이면 None(중단), 아니면 그 축만 뺀다.
 
@@ -5937,7 +5985,8 @@ class MainWindow(QWidget):
         # optionVar 에 저장된다(원본) - 핫키는 그걸 읽는다
         HoldLayerManager.update(enabled=on, layer=layer, offset=offset,
                                 axis_values=self._collect_pose_axis_values(warn=False),
-                                use_current=self.cb_pose_current.isChecked())
+                                use_current=self.cb_pose_current.isChecked(),
+                                view_layer=self._hold_view_layer_name())
 
     def on_toggle_hotkey(self, checked):
         self._enable_hotkey(checked)

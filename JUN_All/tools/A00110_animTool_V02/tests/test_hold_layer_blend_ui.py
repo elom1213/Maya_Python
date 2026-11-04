@@ -25,7 +25,7 @@ def check(name, cond, extra=""):
 
 
 PRE = "JUN_A00110_holdLayer_"
-for k in ("enabled", "offset", "layer", "axis_values", "use_current"):
+for k in ("enabled", "offset", "layer", "axis_values", "use_current", "view_layer"):
     if cmds.optionVar(exists=PRE + k):
         cmds.optionVar(remove=PRE + k)
 
@@ -68,6 +68,14 @@ check("U7 optionVars saved",
       cmds.optionVar(q=PRE + "enabled") == 1 and cmds.optionVar(q=PRE + "offset") == 7
       and cmds.optionVar(q=PRE + "layer") == "Layer_02")
 
+# v02.43 보기 게이트 콤보
+vitems = [win.cmb_hold_view_layer.itemText(i) for i in range(win.cmb_hold_view_layer.count())]
+check("U17 'Run only when viewing' defaults to BaseAnimation (data ''), lists other layers",
+      win.cmb_hold_view_layer.currentText() == "BaseAnimation" and win.cmb_hold_view_layer.currentData() in ("", None)
+      and vitems[0] == "BaseAnimation" and "Layer_01" in vitems, vitems)
+win.cmb_hold_view_layer.setCurrentIndex(win.cmb_hold_view_layer.findData("Layer_01"))
+check("U18 choosing Layer_01 pushes view_layer", HLM.load_settings()["view_layer"] == "Layer_01", HLM.load_settings())
+
 # v02.41 Use current values
 check("U13 Pose Key has 'Use current values' (off), value fields enabled",
       win.cb_pose_current.text() == "Use current values" and not win.cb_pose_current.isChecked()
@@ -100,6 +108,8 @@ check("U9 missing layer shown as '(missing)' and kept",
       win2.cmb_hold_layer.currentText() == "Layer_02 (missing)" and HLM.settings["layer"] == "Layer_02",
       (win2.cmb_hold_layer.currentText(), HLM.settings["layer"]))
 check("U10 settings re-pushed on reopen", HLM.settings["enabled"] and HLM.settings["offset"] == 7)
+check("U19 reopen restores view layer Layer_01", win2.cmb_hold_view_layer.currentText() == "Layer_01",
+      win2.cmb_hold_view_layer.currentText())
 check("U16 reopen restores 'Use current values' + disabled fields",
       win2.cb_pose_current.isChecked() and not any(le.isEnabled() for _c, le in win2.pose_rows.values()))
 
@@ -115,7 +125,7 @@ check("U11 Refresh picks up new layer, keeps missing selection",
       "Layer_04" in items and win2.cmb_hold_layer.currentText() == "Layer_02 (missing)", items)
 win2.close()
 
-for k in ("enabled", "offset", "layer", "axis_values", "use_current"):
+for k in ("enabled", "offset", "layer", "axis_values", "use_current", "view_layer"):
     if cmds.optionVar(exists=PRE + k):
         cmds.optionVar(remove=PRE + k)
 

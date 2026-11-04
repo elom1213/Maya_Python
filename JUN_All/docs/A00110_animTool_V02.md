@@ -1925,7 +1925,8 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
 [x] Layer Blend Key
     Layer          [Layer_01        v] [Refresh]
     Frames before  [ 10 ]
-    Uses Key > Pose Key axes/values.
+    Run only when viewing [BaseAnimation  v]      ← v02.43
+    Uses Key > Pose Key axes/values (or current values).
 ```
 
 - **Layer Blend Key** 체크(기본 끔)로 켜고 끈다. 끄면 아래 칸이 비활성, Shift+A 는 예전처럼 Hold 만.
@@ -1933,6 +1934,11 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
   고르지 않았으면 Shift+A 때 `no layer chosen` 경고. 저장된 레이어가 씬에 없으면 `<이름> (missing)` 으로 남고,
   실행 때 경고 후 건너뛴다.
 - **Frames before** = N (1~1000).
+- **Run only when viewing**(v02.43~, 기본 **BaseAnimation**): 지금 **보고 있는 레이어**가 정확히 이 레이어 하나일 때만 Layer Blend 가 돈다.
+  예: AnimLayer1 을 보면서 그 커브의 구간 키를 골라 Shift+A 를 누르면 **AnimLayer1 Hold 만** 되고 Layer Blend 는
+  `Layer Blend: skipped - viewing 'AnimLayer1' (runs only when viewing 'BaseAnimation').` 한 줄과 함께 건너뛴다.
+  보고 있는 레이어 = Animation Layer Editor 에서 **선택된** 레이어 → 선택이 없으면 활성(preferred) 레이어 → 그것도 없으면 BaseAnimation.
+  여러 레이어를 같이 고르고 있으면 건너뛴다. 콤보는 펼칠 때 목록을 다시 읽고, 첫 항목은 씬의 루트 레이어(이름이 달라도 루트를 뜻한다).
 - 대상 = **마야에서 지금 선택한 오브젝트만**(Pose Key 와 같다. 그래프 에디터 키 선택과 무관). 레이어에 다른 오브젝트가 들어 있어도
   그 오브젝트들에는 키를 찍지 않는다. v02.42~ 선택에 섞인 animLayer · 세트 · 캐릭터 세트 노드는 대상에서 뺀다(세트에 키를 찍으면
   멤버 전체로 퍼지므로). 뷰포트 메시지 끝에 키를 찍은 오브젝트 이름이 나온다(`... (f90 -> f100): ctl_A.`).
@@ -1949,8 +1955,8 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
   v02.39 는 클래스 변수에 두어, DEV 리로드 순서에 따라 핫키가 옛 클래스(꺼짐)를 읽고 **레이어 키를 조용히 건너뛰는** 버그가 있었다.
   Layer Blend 에서 에러가 나면 Hold 메시지 아래에 `[Error] Layer Blend: ...` 한 줄.
 - **Hold Selected Range 버튼**은 예전처럼 Hold 만 한다 — Layer Blend 는 Shift+A 전용.
-- 시험 `tests/test_hold_layer_blend.py` 51/51(v02.42 SEL: 멤버 셋 중 하나만 선택 · 레이어/세트/캐릭터 섞임, v02.41 Use current values UC1~5, v02.40 optionVar · 리로드 순서 회귀 RL1 포함, Additive · Override, 덮어쓰기, 최종값 = Pose, Base 불변, 비멤버 · 없는 레이어 · 잠김 · 뮤트,
-  run_hold 한 번 undo), `tests/test_hold_layer_blend_ui.py` 16/16(Use current values 체크 · 값 칸 비활성 · 복원, 콤보 · 펼칠 때 갱신 · push · Pose 행 · optionVar 복원 · missing). **마야 GUI 확인 아직.**
+- 시험 `tests/test_hold_layer_blend.py` 63/63(v02.43 보기 게이트 VG0~11, v02.42 SEL: 멤버 셋 중 하나만 선택 · 레이어/세트/캐릭터 섞임, v02.41 Use current values UC1~5, v02.40 optionVar · 리로드 순서 회귀 RL1 포함, Additive · Override, 덮어쓰기, 최종값 = Pose, Base 불변, 비멤버 · 없는 레이어 · 잠김 · 뮤트,
+  run_hold 한 번 undo), `tests/test_hold_layer_blend_ui.py` 19/19(보기 게이트 콤보 기본 · push · 복원, Use current values 체크 · 값 칸 비활성 · 복원, 콤보 · 펼칠 때 갱신 · push · Pose 행 · optionVar 복원 · missing). **마야 GUI 확인 아직.**
   계획서 [a00110_hold_layer_blend_plan.md](plans/a00110_hold_layer_blend_plan.md).
 
 #### Main > Manipulator Space

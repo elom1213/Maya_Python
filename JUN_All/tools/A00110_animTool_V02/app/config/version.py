@@ -111,5 +111,11 @@
 #        뷰포트 메시지에 키를 찍은 오브젝트 이름. mayapy 에서는 v02.41 도 선택 오브젝트에만 찍혔다(재현 안 됨) - 방어 + 확인용.
 #        회귀 test_hold_layer_blend 51/51(SEL: 멤버 3개 중 A 만 선택 x 레이어 · 세트 · 캐릭터 섞임) · _ui 16/16.
 
-VERSION = "02.42"
+# 02.43  Layer Blend Key 보기 게이트 `Run only when viewing`(기본 BaseAnimation) - 지금 보고 있는 레이어가 정확히 그 레이어
+#        하나일 때만 Layer Blend 가 돈다. AnimLayer1 을 보며 그 커브 구간 키를 골라 Shift+A(= AnimLayer1 Hold) 할 때 끼어들지
+#        않게(사용자 요구). 보고 있는 레이어 = 레이어 에디터 선택 -> 없으면 preferred -> 없으면 루트. 여럿 보면 건너뜀.
+#        Hold 는 그대로, Layer Blend 는 `skipped - viewing '...'` 한 줄. 저장값 "" = 루트, optionVar view_layer.
+#        회귀 test_hold_layer_blend 63/63(VG) · _ui 19/19.
+
+VERSION = "02.43"
 LAST_UPDATE = "2026-11-04"

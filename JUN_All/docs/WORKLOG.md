@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-04 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.43 Layer Blend Key 보기 게이트** `#A00110_animTool`
+- 요구: AnimLayer1 을 보며 그 구간 키를 골라 Shift+A 하면 Layer Blend 가 돌면 안 됨 → 고른 레이어(기본 BaseAnimation)를 볼 때만 동작.
+- 구현: `HoldLayerManager.viewed_layers()`(에디터 선택 → preferred → 루트) · `view_gate()` — 보는 레이어가 정확히 그 하나일 때만,
+  아니면 Hold 만 하고 `skipped - viewing '...'`. UI `Run only when viewing` 콤보(첫 항목 = 루트, 펼칠 때 갱신, optionVar `view_layer`, "" = 루트).
+- 시험: 63/63(AnimLayer1 보며 그 커브 Hold → Layer Blend 건너뜀 · Base 에서 동작 · 둘 보기 · 게이트 반대 · preferred 폴백) · UI 19/19. **GUI 확인 아직.**
+
 > [!summary] A00110_animTool_V02 **v02.42 Layer Blend Key = 선택한 오브젝트만** `#A00110_animTool`
 - 요구: Layer 에 AnimLayer1 이 설정돼 있어도 AnimLayer1 의 모든 오브젝트가 아니라 **마야에서 선택한 오브젝트에만** 레이어 키.
 - 조사(mayapy): v02.41 도 선택 오브젝트에만 찍힘 — 선택만 / 레이어 노드 · 세트 · 캐릭터 세트 섞임 / Use current values 켬끔 전부 A 만.
