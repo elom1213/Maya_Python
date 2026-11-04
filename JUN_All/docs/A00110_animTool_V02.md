@@ -1806,6 +1806,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 │ ▾ L1             [ ]   [ ]   [ ]        (굵게 = 활성)    │
 │     L3           [x]   [ ]   [ ]                        │  ← 자식 레이어는 부모 아래 들여쓰기
 │ BaseAnimation                [ ]                        │  ← Lock 만
+│                                    Zoom [-] 150% [+]    │  ← v02.38 확대 / 축소 (Ctrl + 휠)
 │ [Refresh] [Graph Editor: Selected Only] [Graph Editor: All Layers] │
 │ [x] Auto refresh while visible                          │
 └─────────────────────────────────────────────────────────┘
@@ -1822,6 +1823,10 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   **`Graph Editor: Selected Only`** 가 열린 그래프 에디터 전부의 `View > Animation Layer Filter` 를 그렇게 바꾼다,
   **`Graph Editor: All Layers`** 는 되돌린다(그래프 에디터가 없으면 `[WARN] No Graph Editor is open.`).
 - **Mute / Solo / Lock** 체크 = `animLayer -e -mute/-solo/-lock`. `BaseAnimation` 은 Lock 만(체크박스가 Lock 열에만 있다).
+  v02.38~ **칸 어디를 눌러도** 체크가 바뀐다(체크박스를 정확히 노리지 않아도 됨), 이 누름은 행 선택(= 활성 레이어)을 바꾸지 않는다.
+- **확대 / 축소**(v02.38~) — 목록 아래 **`Zoom [-] 150% [+]`**, 또는 목록 위에서 **Ctrl + 마우스 휠**. 글자 · 행 높이 · 체크박스 ·
+  들여쓰기가 함께 커진다. 기본 **150%**(예전 크기 = 100%), 퍼센트 글자를 누르면 150% 로. 고른 배율은 다음 실행 때도 그대로.
+  공용 위젯 [`MOD_viewZoom_qt`](Framework_MOD_viewZoom_qt.md) — 다른 툴의 리스트에도 같은 한 줄로 붙는다.
 - **Auto refresh while visible**(기본 ON) — 마야에는 레이어 변경 이벤트가 없어, 목록이 보이는 동안 1.5 초마다 상태를 비교해
   레이어 에디터에서 바꾼 것(새 레이어 · 삭제 · 선택 · Mute 등)을 따라간다. `Refresh` 는 지금 바로.
 - **Expand 창은 늘 다른 창 위에**(v02.33) — Expand 로 뺀 이 창(과 Curve > Filters 의 Expand 창)은 툴의 `Pin` 과 무관하게 항상 다른

@@ -80,5 +80,8 @@
 #        Parent(기본) · Point · Orient · Scale, Parent 와 Point/Orient 는 서로 배타. 오프셋 없음(구간 안 월드 그대로, 실측 1e-15).
 #        잠긴 축 · 키 아닌 구동 축은 그 축만 skip, scale 은 pairBlend 가 없어 키 있는 축도 skip(마야 Constrain > Scale 과 같음).
 
-VERSION = "02.37"
+# 02.38  View > Layers - 공용 확대 / 축소(Framework MOD_viewZoom_qt_v01) 적용: 기본 150%, 글자 · 행 높이 · 체크박스가 함께 커진다.
+#        `Zoom [-] 150% [+]` + Ctrl + 휠, 배율 기억. Mute / Solo / Lock 은 칸 어디를 눌러도 토글(행 선택은 안 바뀜). Expand 창 440x600.
+
+VERSION = "02.38"
 LAST_UPDATE = "2026-11-04"

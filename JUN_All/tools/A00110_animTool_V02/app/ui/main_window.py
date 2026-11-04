@@ -9,6 +9,7 @@ from Framework.qt import JUN_mod_collapsible_qt
 from Framework.qt import JUN_mod_timeRange_qt
 from Framework.qt import JUN_mod_filter_qt
 from Framework.qt import JUN_mod_expand_qt
+from Framework.qt import JUN_mod_viewZoom_qt
 from Framework.qt import JUN_mod_checkList_qt
 from Framework.qt import JUN_mod_progress_qt
 from Framework.qt.maya_window import maya_main_window
@@ -3197,7 +3198,7 @@ class MainWindow(QWidget):
             title="Animation Layers",
             placeholder="Animation Layers are shown in the expanded window.",
             object_name=LAYERS_WINDOW_OBJECT_NAME,
-            size=(380, 460),
+            size=(440, 600),         # v02.38 : 행이 커져서(기본 150%) 창도 키운다
             stay_on_top=True)       # v02.33 : 그래프 에디터를 클릭해도 뒤로 숨지 않게 늘 위에(Pin 과 무관)
         self.al_panel.expanded_changed.connect(lambda *_: self._fit_window_later())
         tab_layout.addWidget(self.al_panel)
@@ -3220,14 +3221,24 @@ class MainWindow(QWidget):
         self.tw_al_layers.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tw_al_layers.setRootIsDecorated(True)
         self.tw_al_layers.setAlternatingRowColors(True)
-        self.tw_al_layers.setMinimumHeight(170)
+        self.tw_al_layers.setMinimumHeight(240)
         self.tw_al_layers.setToolTip(
             "Top row = topmost layer (evaluated last). Child layers sit under their parent.\n"
             "Bold = active (preferred) layer, highlighted = selected in the Animation Layer Editor.\n"
-            "Shift / Ctrl click selects several layers. BaseAnimation can only be locked.")
+            "Shift / Ctrl click selects several layers. BaseAnimation can only be locked.\n"
+            "Click anywhere in a Mute / Solo / Lock cell to toggle it. Ctrl + Mouse Wheel = zoom.")
         self.tw_al_layers.itemSelectionChanged.connect(self.on_al_selection)
         self.tw_al_layers.itemChanged.connect(self.on_al_item_changed)
+        # v02.38 : 공용 확대 / 축소 - 행 높이 · 글자 · 체크박스를 함께 키운다(기본 150%, 배율은 기억).
+        #          Mute / Solo / Lock 칸은 칸 어디를 눌러도 체크가 바뀐다(행 선택은 바뀌지 않음).
+        self.al_zoom = JUN_mod_viewZoom_qt.JUN_mod_viewZoom_qt_v01(
+            self.tw_al_layers, key="A00110_animTool_V02/layers", default=1.5, minimum=0.8, maximum=3.0)
         layout.addWidget(self.tw_al_layers)
+
+        zoom_row = QHBoxLayout()
+        zoom_row.addStretch(1)
+        zoom_row.addWidget(self.al_zoom.controls())
+        layout.addLayout(zoom_row)
 
         row = QHBoxLayout()
         self.btn_al_refresh = QPushButton("Refresh")
