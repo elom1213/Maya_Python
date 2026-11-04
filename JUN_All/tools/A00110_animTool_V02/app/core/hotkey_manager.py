@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-16
+# last Update date : 2026-11-04
 # A00110_animTool_V02 - 툴 전용 핫키 라이프사이클 (maya.cmds, UI 비의존)
 #
 # 툴이 열려 있는 동안 키 하나를 툴 명령에 바인딩하고,
@@ -18,6 +18,9 @@
 #      MTK 가 없으면(플러그인 미로드) 가로채는 쪽도 없으므로 예전처럼 핫키로 건다.
 #   nexOpt -e 는 메모리 값만 바꾼다(-save 해야 저장) - 마야가 죽어도 다음 세션은 원래 Tab 이다.
 #
+# v02.39 - run_hold() 가 Hold 뒤에 HoldLayerManager.apply()(Layer Blend Key, 옵션)도 수행한다.
+#   둘은 독립(Hold 키 선택이 없어도 레이어 키는 찍는다)이고 undo 한 번으로 함께 되돌아간다.
+#
 # 주의:
 #  - keyShortcut 은 소문자 'a' + shiftModifier=True 로 지정한다 (.mhk 의 "s" -sht 관례).
 #  - 현재 핫키 세트만(메모리) 수정하며 .mhk 원본 파일은 건드리지 않는다.
@@ -30,6 +33,9 @@ import maya.mel as mel
 
 from .keyframe_manager import KeyframeManager
 from .manip_space_manager import ManipSpaceManager
+from .hold_layer_manager import HoldLayerManager
+
+from Framework.core.maya_undo import undo_chunk
 
 
 # nameCommand 는 핫키 실행 시 MEL 로 돌기 때문에, python 코드를 MEL 의 python("...") 으로
@@ -161,8 +167,16 @@ class HotkeyManager:
 
     @staticmethod
     def run_hold():
-        """nameCommand 가 호출. hold 실행 후 결과를 뷰포트 메시지로 표시."""
-        count, msg = KeyframeManager.hold_selected_keys()
+        """nameCommand 가 호출. hold 실행 (+ 옵션이면 Layer Blend Key) 후 결과를 뷰포트 메시지로 표시.
+
+        Hold 와 Layer Blend 는 서로 독립이고, undo 한 번에 함께 되돌아가도록 한 청크로 묶는다
+        (hold_selected_keys 안의 청크는 중첩 - 마야 openChunk 는 중첩을 허용한다).
+        """
+        with undo_chunk():
+            count, msg = KeyframeManager.hold_selected_keys()
+            _lcount, lmsg = HoldLayerManager.apply()
+        if lmsg:
+            msg = "{0}<br>{1}".format(msg, lmsg)
         cmds.inViewMessage(amg=msg, pos="topCenter", fade=True)
         return count
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-03
+# last Update date : 2026-11-04
 # A00110_animTool_V02 - Qt UI
 
 from Framework.qt.qt import *
@@ -25,6 +25,8 @@ from Framework.qt.pin_style import apply_pin_style
 from tools.A00110_animTool_V02.app.config.version import VERSION, LAST_UPDATE
 from tools.A00110_animTool_V02.app.core import KeyframeManager
 from tools.A00110_animTool_V02.app.core import HotkeyManager
+from tools.A00110_animTool_V02.app.core import HoldLayerManager
+from tools.A00110_animTool_V02.app.core.hold_layer_manager import OPTVAR_PREFIX as HOLD_LAYER_OPTVAR
 from tools.A00110_animTool_V02.app.core import ManipSpaceManager
 from tools.A00110_animTool_V02.app.core import PoseKeyManager
 from tools.A00110_animTool_V02.app.core import AttrKeyManager
@@ -158,6 +160,10 @@ class MainWindow(QWidget):
 
         self._enable_hotkey(self.cb_hotkey.isChecked())
         self._enable_space_hotkey(self.cb_space_hotkey.isChecked())
+
+        # Shift+A Layer Blend Key (v02.39) - 저장값 복원 + 코어로 한 번 push.
+        # Pose Key 행은 다른 페이지라 두 페이지가 다 만들어진 여기서 시그널을 잇는다.
+        self._init_hold_layer()
 
         # 선택 시 그래프 에디터 자동 프레이밍 (기본 OFF, 창 종료 시 scriptJob 정리)
         self.graph_focus_mgr = GraphFocusManager()
@@ -649,6 +655,38 @@ class MainWindow(QWidget):
         self.lbl_hotkey = QLabel("")
         hold_row.addWidget(self.lbl_hotkey, 1)
         hold_layout.addLayout(hold_row)
+
+        # ---- Layer Blend Key (v02.39) : Shift+A 가 고른 레이어에 (현재-N) 레이어 값 키 + 현재 프레임 Pose 키 ----
+        tip = ("Shift+A also keys the chosen layer: all layer attributes at (current - N) with their\n"
+               "layer value, and Pose Key axes at the current frame.\n"
+               "Objects / attributes that are not in the layer are skipped (nothing is added to the layer).")
+        self.cb_hold_layer = QCheckBox("Layer Blend Key")
+        self.cb_hold_layer.setToolTip(tip)
+        hold_layout.addWidget(self.cb_hold_layer)
+
+        self.w_hold_layer = QWidget()
+        hl_form = QGridLayout(self.w_hold_layer)
+        hl_form.setContentsMargins(20, 0, 0, 0)
+        hl_form.addWidget(QLabel("Layer"), 0, 0)
+        self.cmb_hold_layer = QComboBox()
+        self.cmb_hold_layer.setToolTip("Animation layer to key (BaseAnimation is not listed).")
+        hl_form.addWidget(self.cmb_hold_layer, 0, 1)
+        self.btn_hold_layer_refresh = QPushButton("Refresh")
+        self.btn_hold_layer_refresh.setToolTip("Reload the animation layer list from the scene.")
+        hl_form.addWidget(self.btn_hold_layer_refresh, 0, 2)
+        hl_form.addWidget(QLabel("Frames before"), 1, 0)
+        self.sp_hold_layer_offset = QSpinBox()
+        self.sp_hold_layer_offset.setRange(1, 1000)
+        self.sp_hold_layer_offset.setValue(10)
+        self.sp_hold_layer_offset.setToolTip("N : the layer value is keyed at (current frame - N).")
+        hl_form.addWidget(self.sp_hold_layer_offset, 1, 1)
+        hl_note = QLabel("Uses Key > Pose Key axes/values.")
+        hl_note.setEnabled(False)
+        hl_form.addWidget(hl_note, 2, 0, 1, 3)
+        hl_form.setColumnStretch(1, 1)
+        self.w_hold_layer.setToolTip(tip)
+        hold_layout.addWidget(self.w_hold_layer)
+
         layout.addWidget(hold_box)
 
         # ---- Manipulator Space (v02.19) ----
@@ -3692,15 +3730,9 @@ class MainWindow(QWidget):
     def on_set_pose(self):
 
         # 체크된 축만 모은다. 체크됐는데 값이 비어 있으면 경고 후 중단.
-        axis_values = {}
-        for attr, (cb, le) in self.pose_rows.items():
-            if not cb.isChecked():
-                continue
-            txt = le.text().strip()
-            if txt == "":
-                self.log(f"[Warning] {attr} is checked but empty.")
-                return
-            axis_values[attr] = float(txt)
+        axis_values = self._collect_pose_axis_values(warn=True)
+        if axis_values is None:
+            return
 
         if not axis_values:
             self.log("[Warning] No axis checked.")
@@ -5785,6 +5817,87 @@ class MainWindow(QWidget):
         # View > Layers 목록도 바로 비운다(폴링을 기다리지 않게).
         if getattr(self, "tw_al_layers", None) is not None:
             self.on_al_refresh(quiet=True)
+
+    # ---------------- Shift+A Layer Blend Key (v02.39) ----------------
+    # 핫키(run_hold)는 UI 를 못 읽으므로 값이 바뀔 때마다 HoldLayerManager.settings 로 밀어 넣는다.
+    # 창을 다시 열 때를 위해 optionVar(HOLD_LAYER_OPTVAR) 에도 저장한다.
+
+    def _init_hold_layer(self):
+        pre = HOLD_LAYER_OPTVAR
+        self._hold_layer_loading = True
+        try:
+            if cmds.optionVar(exists=pre + "enabled"):
+                self.cb_hold_layer.setChecked(bool(cmds.optionVar(q=pre + "enabled")))
+            if cmds.optionVar(exists=pre + "offset"):
+                self.sp_hold_layer_offset.setValue(int(cmds.optionVar(q=pre + "offset")))
+            saved = cmds.optionVar(q=pre + "layer") if cmds.optionVar(exists=pre + "layer") else ""
+            self._hold_layer_refresh(prefer=str(saved or ""))
+        finally:
+            self._hold_layer_loading = False
+
+        self.cb_hold_layer.toggled.connect(self._push_hold_layer_settings)
+        self.cmb_hold_layer.currentIndexChanged.connect(self._push_hold_layer_settings)
+        self.sp_hold_layer_offset.valueChanged.connect(self._push_hold_layer_settings)
+        self.btn_hold_layer_refresh.clicked.connect(lambda: self._hold_layer_refresh())
+        for cb, le in self.pose_rows.values():
+            cb.toggled.connect(self._push_hold_layer_settings)
+            le.textChanged.connect(self._push_hold_layer_settings)
+
+        self._push_hold_layer_settings()
+
+    def _hold_layer_name(self):
+        """콤보에서 고른 레이어 이름 ('(missing)' 꼬리 제외)."""
+        data = self.cmb_hold_layer.currentData()
+        return str(data) if data else ""
+
+    def _hold_layer_refresh(self, prefer=None):
+        """씬의 레이어(BaseAnimation 제외)로 콤보를 다시 채운다. 고르던 이름이 없으면 '(missing)' 으로 남긴다."""
+        want = self._hold_layer_name() if prefer is None else prefer
+        layers = HoldLayerManager.list_layers()
+        self.cmb_hold_layer.blockSignals(True)
+        try:
+            self.cmb_hold_layer.clear()
+            for name in layers:
+                self.cmb_hold_layer.addItem(name, name)
+            if want and want not in layers:
+                self.cmb_hold_layer.addItem("{0} (missing)".format(want), want)
+            idx = self.cmb_hold_layer.findData(want) if want else -1
+            self.cmb_hold_layer.setCurrentIndex(idx if idx >= 0 else (0 if self.cmb_hold_layer.count() else -1))
+        finally:
+            self.cmb_hold_layer.blockSignals(False)
+        if prefer is None:
+            self._push_hold_layer_settings()
+            self.log("Layer Blend: {0} layer(s) listed.".format(len(layers)))
+
+    def _collect_pose_axis_values(self, warn=True):
+        """Pose Key 탭에서 체크된 축 {attr: float}. 빈 칸 · 숫자 아님은 warn 이면 None(중단), 아니면 그 축만 뺀다."""
+        axis_values = {}
+        for attr, (cb, le) in self.pose_rows.items():
+            if not cb.isChecked():
+                continue
+            txt = le.text().strip()
+            try:
+                axis_values[attr] = float(txt)
+            except ValueError:
+                if warn:
+                    self.log(f"[Warning] {attr} is checked but empty." if txt == ""
+                             else f"[Warning] {attr} is not a number: {txt}")
+                    return None
+        return axis_values
+
+    def _push_hold_layer_settings(self, *_args):
+        on = self.cb_hold_layer.isChecked()
+        self.w_hold_layer.setEnabled(on)
+        if getattr(self, "_hold_layer_loading", False):
+            return
+        layer = self._hold_layer_name()
+        offset = int(self.sp_hold_layer_offset.value())
+        HoldLayerManager.update(enabled=on, layer=layer, offset=offset,
+                                axis_values=self._collect_pose_axis_values(warn=False))
+        pre = HOLD_LAYER_OPTVAR
+        cmds.optionVar(intValue=(pre + "enabled", int(on)))
+        cmds.optionVar(intValue=(pre + "offset", offset))
+        cmds.optionVar(stringValue=(pre + "layer", layer))
 
     def on_toggle_hotkey(self, checked):
         self._enable_hotkey(checked)

@@ -99,7 +99,8 @@
    새로 선택할 때만** 자동으로 프레이밍하고(v01.30~), margin 값은 **스핀박스로 사용자가 지정**한다.
    애니메이션 레이어가 있으면 **`Layer curves`**(v02.25~)로 선택/활성 레이어의 커브만 보이고 그 범위에 맞춘다.
 8. **Hot Key** (v02.19~) — 툴이 **열려 있는 동안만** 거는 키보드 단축키. 창을 닫으면 원래 바인딩으로 돌아간다.
-   **Main**: **Hold**(옛 Timing > Hold — 그래프 에디터에서 고른 키 구간을 평평하게, `Shift+A`) +
+   **Main**: **Hold**(옛 Timing > Hold — 그래프 에디터에서 고른 키 구간을 평평하게, `Shift+A`.
+   v02.39~ 옵션 **Layer Blend Key** — Shift+A 가 고른 레이어에 (현재 − N) 레이어 값 키 + 현재 프레임 Pose Key 키도 찍는다) +
    **Manipulator Space**(`Tab` 또는 버튼으로 Move / Rotate / Scale 매니퓰레이터 공간을 **Object ↔ World** 토글) +
    **Animation Layers**(v02.35~, `Delete BaseAnimation` — MEL `delete BaseAnimation;` 과 같은 결과, 단축키 없이 버튼만).
 
@@ -679,6 +680,7 @@ A00110_animTool_V02/
     ├── core/              # 로직 (UI 비의존, maya.cmds)
     │   ├── keyframe_manager.py   # 키 이동 / 구간삭제 / 전체삭제 / Hold (Timing · Key 탭)
     │   ├── hotkey_manager.py     # 툴 전용 핫키 설치 / 복원 (Shift+A → Hold, Tab → 공간 토글)
+    │   ├── hold_layer_manager.py # Shift+A Layer Blend Key (레이어에 현재-N 레이어 값 + 현재 Pose 키, v02.39)
     │   ├── manip_space_manager.py # 매니퓰레이터 공간 Object ↔ World 토글 (Hot Key > Main)
     │   ├── pose_key_manager.py   # 현재 프레임 6축 pose 키 (Pose Key 탭)
     │   ├── copykey_manager.py    # Base→Target 키 복사 + 축 Reverse (Copy Key 탭)
@@ -1909,6 +1911,36 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 - **Shift+A hotkey** 체크박스(기본 켬): 켜면 Shift+A 를 Hold 에 바인딩, 끄면 원래 바인딩으로 복원.
   옆 라벨에 `Shift+A : ON / OFF / unavailable` 상태를 표시한다.
 
+#### Main > Hold > Layer Blend Key (v02.39~)
+
+Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에서 N 프레임 동안 원래 값 → Pose 값으로 바뀌게** 키 두 줄을 찍는다.
+
+```
+[x] Shift+A hotkey   Shift+A : ON
+[x] Layer Blend Key
+    Layer          [Layer_01        v] [Refresh]
+    Frames before  [ 10 ]
+    Uses Key > Pose Key axes/values.
+```
+
+- **Layer Blend Key** 체크(기본 끔)로 켜고 끈다. 끄면 아래 칸이 비활성, Shift+A 는 예전처럼 Hold 만.
+- **Layer**: BaseAnimation 을 뺀 씬의 레이어. `Refresh` 로 다시 읽는다. 저장된 레이어가 씬에 없으면 `<이름> (missing)` 으로 남고,
+  실행 때 경고 후 건너뛴다.
+- **Frames before** = N (1~1000).
+- 대상 = **씬에서 선택한 오브젝트**(Pose Key 와 같다. 그래프 에디터 키 선택과 무관).
+- **(현재 − N)**: 오브젝트의 keyable 채널 중 **그 레이어 멤버인 것 전부**에, 그 시점의 **레이어 값 그대로** 키
+  (레이어 커브 평가값, 커브가 없으면 그 레이어 blend 입력의 정적값 — additive 는 보통 0). 이미 키가 있으면 덮어쓴다.
+- **(현재 프레임)**: Key > **Pose Key** 탭에서 체크된 축에 그 값으로 키. Pose Key 버튼과 **같은 호출**이라 그 프레임의
+  **최종 값이 Pose 값**이 된다(additive 레이어면 마야가 레이어 값을 역산). Pose 축이 아닌 채널은 현재 프레임에 키를 찍지 않는다.
+- **레이어를 만들거나 멤버로 넣지 않는다** — 레이어가 없거나 잠겼으면 경고 후 건너뜀, 멤버 채널이 없는 오브젝트는
+  `Skipped: ...`, 멤버가 아닌 Pose 축은 `Pose axes not in layer: ...`. 뮤트된 레이어는 키는 찍고 `(layer muted)` 를 붙인다.
+- Hold 와 **독립**(Hold 할 키 선택이 없어도 레이어 키는 찍는다). 뷰포트 메시지는 두 줄, **Ctrl+Z 한 번에 둘 다** 되돌아간다.
+- 값은 바뀔 때마다 핫키 쪽(`HoldLayerManager.settings`)에 바로 반영되고, 창을 다시 열면 `optionVar`(`JUN_A00110_holdLayer_*`)에서 복원된다.
+- **Hold Selected Range 버튼**은 예전처럼 Hold 만 한다 — Layer Blend 는 Shift+A 전용.
+- 시험 `tests/test_hold_layer_blend.py` 29/29(Additive · Override, 덮어쓰기, 최종값 = Pose, Base 불변, 비멤버 · 없는 레이어 · 잠김 · 뮤트,
+  run_hold 한 번 undo), `tests/test_hold_layer_blend_ui.py` 11/11(콤보 · push · Pose 행 · optionVar 복원 · missing). **마야 GUI 확인 아직.**
+  계획서 [a00110_hold_layer_blend_plan.md](plans/a00110_hold_layer_blend_plan.md).
+
 #### Main > Manipulator Space
 
 - **Toggle Manipulator Space (Object / World)**: Move / Rotate / Scale 매니퓰레이터의 공간을 토글한다.
@@ -1951,6 +1983,8 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 ### Hot Key > Main — Hold
 1. 그래프 에디터에서 평평하게 만들 **키 구간을 선택**(커브마다 2개 이상).
 2. **Hold Selected Range** 클릭(또는 Shift+A) → 각 커브가 시작 값으로 평평하게 유지된다.
+3. (v02.39~, 선택) **Layer Blend Key** 를 켜고 레이어 · N 을 고른 뒤, 오브젝트를 선택하고 Shift+A →
+   그 레이어에 (현재 − N) 레이어 값 키 + 현재 프레임 Pose Key 키.
 
 ### Key > Delete All — 모든 키 삭제
 1. **Delete All Keys** 섹션을 펼친다(기본 접힘).

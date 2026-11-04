@@ -1,5 +1,6 @@
 from .keyframe_manager import KeyframeManager
 from .hotkey_manager import HotkeyManager
+from .hold_layer_manager import HoldLayerManager
 from .manip_space_manager import ManipSpaceManager
 from .pose_key_manager import PoseKeyManager
 from .attr_key_manager import AttrKeyManager
@@ -29,7 +30,7 @@ from .curve_filter_manager import (
 )
 
 __all__ = [
-    "KeyframeManager", "HotkeyManager", "ManipSpaceManager", "PoseKeyManager", "AttrKeyManager", "CopyKeyManager",
+    "KeyframeManager", "HotkeyManager", "HoldLayerManager", "ManipSpaceManager", "PoseKeyManager", "AttrKeyManager", "CopyKeyManager",
     "MirrorKeyManager", "MirrorTokenStore", "BakeManager", "FollowMatchManager",
     "OffsetHoldManager", "StaggerOffsetSession", "EulerFilterManager",
     "GraphViewManager", "GraphFocusManager", "FillKeyManager", "CURRENT_LAYER",

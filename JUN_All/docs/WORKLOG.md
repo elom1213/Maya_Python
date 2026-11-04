@@ -33,6 +33,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-04 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.39 Shift+A Layer Blend Key** `#A00110_animTool`
+- 요청: 계획서 `docs/plans/a00110_hold_layer_blend_plan.md` 대로 — Shift+A 가 Hold 에 더해 고른 레이어에 (현재 − N) 레이어 값 키 + 현재 프레임 Pose Key 키.
+- 구현: `core/hold_layer_manager.py`(settings 저장소 + apply), `run_hold` 가 Hold + apply 를 한 undo 청크로, Hot Key > Main 에 `Layer Blend Key` 체크 · Layer 콤보(Refresh, missing) · Frames before,
+  Pose Key 행 변경까지 push, optionVar 복원. 멤버 판정 = blend 사슬에 그 레이어 노드가 있는지.
+- ★ 실측: additive 레이어에서 `setKeyframe -animLayer -value` 는 **최종값 역산** → −N 키는 커브에 직접(레이어 값 보존), Pose 키는 같은 호출로 **최종값 = Pose**.
+  `getAttr -time` 은 레이어 blend 뒤 옛 값이 나올 때가 있다.
+- 시험: 새 29/29(Additive · Override · 비멤버 · 없음 · 잠김 · 뮤트 · run_hold undo 한 번) + UI 11/11. **마야 GUI 확인 아직.**
+
 > [!summary] A00210_FileManager **v01.46 화면 경로 표기 통일** `#A00210_FileManager`
 - 요청: Store Repo 등에서 같은 경로가 `C:\...` 와 `C:/...` 로 다르게 보임 → 하나로.
 - 구현: 슬래시(`/`)로 통일(NAS `//서버/...`). `app/core/paths.py` `ui_path`(normpath + /, UNC 유지) · `ui_text`(로그 안 Windows 경로만).

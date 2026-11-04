@@ -1,7 +1,12 @@
 # A00110_animTool_V02 — Shift+A 추가 기능: Layer Blend Key 계획서
 
 - 작성: 2026-11-04 (현재 V02 = v02.38) → 구현 버전 **v02.39**
-- 상태: 계획만. 구현 전.
+- 상태: **v02.39 구현 완료 (2026-11-04)** — 시험 29/29 · UI 11/11, 마야 GUI 확인 아직.
+  - 구현 중 바뀐 것: additive 레이어에서 `setKeyframe -animLayer -value` 는 값을 **최종(합성) 값**으로 받아 레이어 값을 역산한다(mayapy 실측).
+    그래서 −N 키는 레이어 커브 노드에 직접 쓰고(`_key_raw`), 현재 프레임 Pose 키는 Pose Key 와 같은 호출 → **최종 값 = Pose 값**.
+    5장 3번의 "레이어 tx 커브 f100 = 5.0" 은 additive 에선 "f100 최종 tx = 5.0" 으로 확인한다(override 는 둘이 같다).
+  - 멤버 판정은 이름 비교 대신 plug 앞단 blend 사슬에 그 레이어 blend 노드가 있는지로(`LayerKeyManager._blend_chain`).
+  - `getAttr -time` 은 레이어 blend 를 거치면 옛 값이 나올 때가 있어, 시험은 시간을 실제로 옮겨 잰다.
 - 이 문서만 보고 구현할 수 있도록 결정 사항 · 파일 위치 · 로직 · 검증을 모두 적는다.
 
 ---

@@ -83,5 +83,13 @@
 # 02.38  View > Layers - 공용 확대 / 축소(Framework MOD_viewZoom_qt_v01) 적용: 기본 150%, 글자 · 행 높이 · 체크박스가 함께 커진다.
 #        `Zoom [-] 150% [+]` + Ctrl + 휠, 배율 기억. Mute / Solo / Lock 은 칸 어디를 눌러도 토글(행 선택은 안 바뀜). Expand 창 440x600.
 
-VERSION = "02.38"
+# 02.39  Hot Key > Main > Hold 에 `Layer Blend Key` 옵션(기본 끔) - Shift+A 가 Hold 에 더해 고른 레이어에
+#        (현재 - N) 레이어 멤버 keyable 채널 전부 = 그 시점 레이어 값(커브 평가 / blend inputB 정적값, 커브에 직접 써서 덮어쓰기),
+#        현재 프레임 = Pose Key 탭 체크 축(Pose Key 와 같은 setKeyframe -animLayer -> 최종 값이 Pose 값) 키.
+#        레이어를 만들거나 멤버로 넣지 않는다(없음 · 잠김 · 비멤버는 경고 후 건너뜀). Hold 와 독립, undo 한 번.
+#        UI 값은 HoldLayerManager.settings 로 push(핫키는 UI 를 못 읽는다) + optionVar 복원.
+#        core/hold_layer_manager.py, 계획서 docs/plans/a00110_hold_layer_blend_plan.md,
+#        회귀 tests/test_hold_layer_blend.py 29/29 · test_hold_layer_blend_ui.py 11/11.
+
+VERSION = "02.39"
 LAST_UPDATE = "2026-11-04"

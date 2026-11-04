@@ -1,0 +1,20 @@
+---
+name: wip-a00110-hold-layer-blend
+description: A00110_V02 v02.39 Shift+A Layer Blend Key — 핫키가 고른 레이어에 (현재-N) 레이어 값 + 현재 Pose 키; additive 의 setKeyframe -animLayer -v 는 최종값 역산
+metadata:
+  type: project
+---
+
+2026-11-04 v02.39 구현. `core/hold_layer_manager.py` `HoldLayerManager`, UI = Hot Key > Main > Hold 의 `Layer Blend Key`.
+계획서 `JUN_All/docs/plans/a00110_hold_layer_blend_plan.md`, 시험 `tests/test_hold_layer_blend.py` 29/29 · `_ui.py` 11/11.
+
+- 핫키(`run_hold`, nameCommand)는 UI 를 못 읽는다 → UI 가 값 바뀔 때마다 `HoldLayerManager.settings` 로 push, optionVar `JUN_A00110_holdLayer_*` 로 복원.
+- **★ additive 레이어에서 `setKeyframe obj -at a -v val -animLayer L` 의 val 은 최종(합성) 값** — 마야가 레이어 값을 역산한다.
+  레이어 값 그대로 쓰려면 레이어 커브 노드에 `setKeyframe curve -t -v` + `keyframe -e -vc -absolute`(`_key_raw`). override 는 둘이 같다.
+- Pose 키는 일부러 obj 경로(최종값 = Pose 값) — Pose Key 탭과 같은 의미.
+- 멤버 판정은 `LayerKeyManager._blend_chain(plug)` 노드 ∩ `animLayer -q -blendNodes` (이름 비교 안 함).
+- `getAttr plug -time t` 는 레이어 blend 를 거치면 옛 값이 나올 때가 있다 → 시험은 currentTime 을 옮겨 잰다.
+- Hold 와 독립 수행, 바깥 undo_chunk 로 중첩(마야 허용) → Ctrl+Z 한 번. Hold 버튼은 Hold 만.
+
+**Why:** 사용자 결정 2026-11-04 — −N 은 레이어 값 유지 · 레이어 없음/비멤버는 경고 후 건너뜀 · −N 기존 키 덮어쓰기.
+**How to apply:** 레이어 키를 값으로 찍는 다른 기능도 additive 역산을 의식할 것([[wip-a00110-counter-layer]] 은 역산을 일부러 이용). 남은 것: 마야 GUI 확인.
