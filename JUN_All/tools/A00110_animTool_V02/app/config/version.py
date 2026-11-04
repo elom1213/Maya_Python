@@ -76,5 +76,9 @@
 #        구간 = 공용 timeRange(Get Current · Get Sel Range) + Get Timeline. 진행 팝업(공용 progress) - bakeResults 한 번 +
 #        MDGMessage 시간 변경 콜백으로 프레임마다 게이지. 임시 컨스트레인트 삭제 · 오일러 필터 · 실패 시 정리 · undo 한 번.
 
-VERSION = "02.36"
-LAST_UPDATE = "2026-11-03"
+# 02.37  Bake > Locator - `Constrain Objects to Locators` 그룹(기본 끔): 베이크 뒤 각 로케이터 -> 원본 오브젝트 컨스트레인트.
+#        Parent(기본) · Point · Orient · Scale, Parent 와 Point/Orient 는 서로 배타. 오프셋 없음(구간 안 월드 그대로, 실측 1e-15).
+#        잠긴 축 · 키 아닌 구동 축은 그 축만 skip, scale 은 pairBlend 가 없어 키 있는 축도 skip(마야 Constrain > Scale 과 같음).
+
+VERSION = "02.37"
+LAST_UPDATE = "2026-11-04"

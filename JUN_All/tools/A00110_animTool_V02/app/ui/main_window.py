@@ -2169,6 +2169,36 @@ class MainWindow(QWidget):
         tab_layout.addLayout(opt_row)
 
         # -------------------------
+        # (v02.37) 베이크 뒤 로케이터 -> 오브젝트 컨스트레인트. 그룹 체크 = 켜기(기본 끔), 종류 기본 Parent.
+        # Parent 와 Point / Orient 는 같은 채널을 다투므로 하나를 켜면 다른 쪽이 꺼진다. Scale 은 함께 쓸 수 있다.
+        # -------------------------
+
+        self.grp_lb_constrain = QGroupBox("Constrain Objects to Locators")
+        self.grp_lb_constrain.setCheckable(True)
+        self.grp_lb_constrain.setChecked(False)
+        self.grp_lb_constrain.setToolTip(
+            "After the bake, constrain every listed object to its locator\n"
+            "(the locator drives the object). No offset - the locator already matches the object.\n"
+            "Locked channels and channels driven by something other than keys are skipped per axis.")
+        con_row = QHBoxLayout(self.grp_lb_constrain)
+        self.cb_lb_con_parent = QCheckBox("Parent")
+        self.cb_lb_con_point = QCheckBox("Point")
+        self.cb_lb_con_orient = QCheckBox("Orient")
+        self.cb_lb_con_scale = QCheckBox("Scale")
+        self.cb_lb_con_parent.setChecked(True)
+        self.cb_lb_con_parent.setToolTip("parentConstraint (translate + rotate). Cannot be combined with Point / Orient.")
+        self.cb_lb_con_point.setToolTip("pointConstraint (translate). Needs Translate baked.")
+        self.cb_lb_con_orient.setToolTip("orientConstraint (rotate). Needs Rotate baked.")
+        self.cb_lb_con_scale.setToolTip("scaleConstraint. Needs Scale baked (Channels > Scale).")
+        for cb in (self.cb_lb_con_parent, self.cb_lb_con_point, self.cb_lb_con_orient, self.cb_lb_con_scale):
+            con_row.addWidget(cb)
+        con_row.addStretch(1)
+        self.cb_lb_con_parent.toggled.connect(self._on_lb_con_parent_toggled)
+        self.cb_lb_con_point.toggled.connect(self._on_lb_con_part_toggled)
+        self.cb_lb_con_orient.toggled.connect(self._on_lb_con_part_toggled)
+        tab_layout.addWidget(self.grp_lb_constrain)
+
+        # -------------------------
         # 실행
         # -------------------------
 
@@ -4722,6 +4752,29 @@ class MainWindow(QWidget):
         self.lb_range.set_range(start, end)
         self.log("Range = timeline {0} - {1}".format(start, end))
 
+    def _on_lb_con_parent_toggled(self, checked):
+        """Parent 를 켜면 Point / Orient 를 끈다(같은 채널을 다툰다)."""
+        if checked:
+            for cb in (self.cb_lb_con_point, self.cb_lb_con_orient):
+                cb.blockSignals(True)
+                cb.setChecked(False)
+                cb.blockSignals(False)
+
+    def _on_lb_con_part_toggled(self, checked):
+        """Point / Orient 를 켜면 Parent 를 끈다."""
+        if checked:
+            self.cb_lb_con_parent.blockSignals(True)
+            self.cb_lb_con_parent.setChecked(False)
+            self.cb_lb_con_parent.blockSignals(False)
+
+    def lb_constrain_types(self):
+        """Constrain Objects 그룹에서 고른 종류 (그룹이 꺼져 있으면 빈 목록)."""
+        if not self.grp_lb_constrain.isChecked():
+            return []
+        return [name for name, cb in (("parent", self.cb_lb_con_parent), ("point", self.cb_lb_con_point),
+                                      ("orient", self.cb_lb_con_orient), ("scale", self.cb_lb_con_scale))
+                if cb.isChecked()]
+
     def on_locator_bake(self, *_args):
         items = self.lb_tsl.get_all_items()
         if not items:
@@ -4746,12 +4799,26 @@ class MainWindow(QWidget):
         if not (translate or rotate or scale):
             self.log("[Warning] Enable at least one channel group.")
             return
+        constrain = self.lb_constrain_types()
+        if self.grp_lb_constrain.isChecked() and not constrain:
+            self.log("[Warning] Constrain Objects is on - pick at least one constraint type.")
+            return
+        # 굽지 않은 채널의 컨스트레인트는 걸 수 없다 - 반쯤 걸린 결과 대신 미리 막는다.
+        need = {"parent": translate or rotate, "point": translate, "orient": rotate, "scale": scale}
+        missing = [c for c in constrain if not need[c]]
+        if missing:
+            self.log("[Warning] Constraint {0} needs its channel baked - enable {1} under Channels.".format(
+                " / ".join(c.capitalize() for c in missing),
+                " / ".join({"parent": "Translate or Rotate", "point": "Translate", "orient": "Rotate",
+                            "scale": "Scale"}[c] for c in missing)))
+            return
 
-        dlg = JUN_mod_progress_qt.JUN_mod_progress_qt_v01(
-            self, title="LOC + Anim",
-            phases=[(LocatorBakeManager.PHASE_CREATE, 5),
-                    (LocatorBakeManager.PHASE_BAKE, 90),
-                    (LocatorBakeManager.PHASE_CLEANUP, 5)])
+        phases = [(LocatorBakeManager.PHASE_CREATE, 5),
+                  (LocatorBakeManager.PHASE_BAKE, 85 if constrain else 90),
+                  (LocatorBakeManager.PHASE_CLEANUP, 5)]
+        if constrain:
+            phases.append((LocatorBakeManager.PHASE_CONSTRAIN, 5))
+        dlg = JUN_mod_progress_qt.JUN_mod_progress_qt_v01(self, title="LOC + Anim", phases=phases)
         step = dlg.callback()
 
         def progress(done, total, message=None):
@@ -4766,7 +4833,7 @@ class MainWindow(QWidget):
                 nodes, start, end, translate=translate, rotate=rotate, scale=scale,
                 euler_filter=self.cb_lb_euler.isChecked(),
                 select_result=self.cb_lb_select.isChecked(),
-                progress=progress)
+                progress=progress, constrain=constrain)
         finally:
             elapsed = dlg.elapsed()
             dlg.finish()

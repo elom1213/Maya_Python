@@ -1628,6 +1628,9 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 │ └───────────────────────────────────────────────────────┘│
 │ Channels [v] Translate [v] Rotate [ ] Scale               │
 │ [v] Euler Filter  [v] Select Locators                     │
+│ [ ] Constrain Objects to Locators ────────────────────────┐│  ← v02.37, 그룹 체크 = 켜기(기본 끔)
+│ │ [v] Parent  [ ] Point  [ ] Orient  [ ] Scale            ││
+│ └─────────────────────────────────────────────────────────┘│
 │ [ LOC + Anim ]                                            │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -1640,6 +1643,13 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 - **LOC + Anim**: 오브젝트마다 로케이터 **`<이름>_LOC`**(네임스페이스 · 경로를 뺀 이름, 이미 있으면 마야가 끝 숫자) 를
   **월드 최상위**에 만들고 회전 순서를 원본과 맞춘 뒤 구간을 굽는다. 베이크 동안 **진행 팝업** — `Creating locators` →
   `Baking`(프레임마다 `Frame n / End`) → `Cleaning up`. 끝나면 로그에 개수 · 구간 · 걸린 시간. **Undo 한 번**에 전부 사라진다.
+- **Constrain Objects to Locators**(v02.37~, 기본 끔): 베이크가 끝나면 거꾸로 **각 로케이터가 자기 오브젝트를 구동**하도록
+  컨스트레인트를 건다(`Constraining` 단계가 팝업에 추가). 로케이터를 움직여 원본을 조종하는 용도.
+  - 종류: **Parent**(기본) · Point · Orient · Scale. Parent 와 Point / Orient 는 같은 채널을 다투므로 하나를 켜면 다른 쪽이 꺼진다. Scale 은 함께 쓸 수 있다.
+  - **오프셋 없음** — 로케이터 월드 = 오브젝트 월드라 구간 안에서 오브젝트 자세가 그대로다. 오브젝트의 원래 키는 지우지 않는다(translate · rotate 는 pairBlend 를 거쳐 컨스트레인트가 덮는다).
+  - 굽지 않은 채널의 종류는 실행 전에 막는다(Point = Translate, Orient = Rotate, Scale = Scale 을 Channels 에서 켜야 한다).
+  - **축 단위 건너뛰기**: 잠긴 축, 키가 아닌 것(다른 컨스트레인트 · 연결)이 구동하는 축은 그 축만 빼고 걸고 로그에 `[Warning]`.
+    ★ **Scale 은 키가 있는 축도 건너뛴다** — scale 에는 pairBlend 가 없어 키 있는 채널에 scaleConstraint 가 실패한다(마야 Constrain > Scale 도 같다).
 
 #### Counter Layer — 상위 레이어가 바꾼 월드 위치·회전 되돌리기 (v02.26~)
 
@@ -2005,6 +2015,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 1. 따라갈 오브젝트(컨트롤러 · 조인트 등)를 씬에서 선택 → **Select Objects** 로 **Locator List** 에 채운다.
 2. **Frame Range**: 기본은 타임라인. 키 구간만 굽고 싶으면 그래프 에디터에서 키를 고르고 **Get Sel Range**.
 3. **LOC + Anim** → 진행 팝업이 끝나면 `<이름>_LOC` 로케이터들이 선택된 채로 남는다.
+4. (v02.37~) 로케이터로 원본을 조종하려면 굽기 전에 **Constrain Objects to Locators** 를 켜고 종류(기본 Parent)를 고른다.
 
 ### Bake > Counter Layer (v02.26~)
 1. 글로벌 컨트롤만 든 레이어(예: `lyr_glo`)에 키를 찍은 뒤, 월드를 유지시킬 컨트롤(발 IK 등)을 선택 →
@@ -2220,6 +2231,11 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 - **정확도**(시험 `tests/test_locator_bake.py` 25/25): 네임스페이스 + 키 있는 부모(회전 · 이동 · 스케일 2) 아래 zxy 컨트롤,
   jointOrient 있는 조인트 모두 **월드 T/R 오차 1e-13**, Scale 켜면 월드 행렬 전체 1e-13. UI 시험 `tests/test_locator_bake_ui.py` 20/20
   (탭 · Get Current / Get Sel Range / Get Timeline · 진행 팝업 3단계 · 게이지 100% · 리네임 뒤 UUID).
+- **Constrain Objects**(v02.37, `LocatorBakeManager.constrain_objects`): 베이크 · 정리 뒤 같은 undo 덩어리 안에서 `mo=False` 로
+  로케이터 -> 오브젝트. 막힌 축 판정 `_blocked_axes` = 잠김 · 부모 compound 연결 · animCurve 아닌 소스(scale 은 animCurve 도).
+  종류 하나가 실패해도 경고만 남기고 나머지는 계속. 시험 `tests/test_locator_bake_constrain.py` **34/34**: Parent · Point+Orient ·
+  Parent+Scale(스케일 2 부모) 모두 **오브젝트 월드 오차 1e-15**, 로케이터 이동 → 오브젝트 따라옴, 잠김 tz · multiplyDivide 가 구동하는 ry 축 skip,
+  키 있는 sx skip, undo, 부분 실패. UI 시험 31/31(기본 끔 · Parent 기본 · 배타 · 굽지 않은 채널 거부 · 4단계 팝업).
 
 ### Bake > Counter Layer
 - **엔진**(`counter_layer_manager.CounterLayerManager.create`): 두 번 훑기. ① 체크한 레이어(+ 새 보정 레이어)를

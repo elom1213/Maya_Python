@@ -18,5 +18,9 @@ metadata:
 - 진행 팝업 단계 넘기기: core 의 `progress` 콜백에 `progress.phase = lambda name: dlg.begin_phase(name)` 속성을 붙여 넘긴다.
 - 시험 `tests/test_locator_bake.py` 25/25(월드 T/R 1e-13), `tests/test_locator_bake_ui.py` 20/20(오프스크린). **마야 GUI 확인 아직.**
 - 시험 장면 함정: `setAttr grp.s 2` 를 **parent 전에** 하면 `cmds.parent` 가 자식에 0.5 를 넣어 월드 스케일이 1 이 된다.
+- **v02.37 Constrain Objects to Locators**(2026-11-04, 기본 끔): 베이크 뒤 로케이터 -> 오브젝트, Parent(기본) · Point · Orient · Scale,
+  Parent ↔ Point/Orient 배타, `mo=False`. 막힌 축 skip. ★ **scaleConstraint 는 키 있는 scale 축에 실패**("Destination attribute must be writable" —
+  translate/rotate 와 달리 pairBlend 가 안 생긴다) → 키 있는 scale 축도 skip. 시험 `test_locator_bake_constrain.py` 34/34, UI 31/31.
+- 시험 함정: 키 있는 오브젝트의 컨스트레인트는 pairBlend 를 거쳐 연결 → `listConnections(node, type=...)` 로 못 찾는다, `listRelatives(type=...)` 로.
 
 관련: [[framework-progress-widget]], [[framework-timerange-widget]], [[wip-a00110-get-sel-range]], [[wip-a00110-counter-layer]]

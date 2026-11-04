@@ -132,6 +132,39 @@ win.lb_range.set_range(30, 10)
 win.btn_lb_bake.click()
 check("start > end: no popup", SEEN["created"] == before)
 
+# ---- v02.37 Constrain Objects to Locators ----
+check("constrain group off by default", not win.grp_lb_constrain.isChecked())
+check("constrain: Parent default", win.cb_lb_con_parent.isChecked()
+      and not (win.cb_lb_con_point.isChecked() or win.cb_lb_con_orient.isChecked() or win.cb_lb_con_scale.isChecked()))
+check("constrain off -> no types", win.lb_constrain_types() == [])
+win.grp_lb_constrain.setChecked(True)
+check("constrain on -> parent", win.lb_constrain_types() == ["parent"])
+win.cb_lb_con_point.setChecked(True)
+check("point turns parent off", not win.cb_lb_con_parent.isChecked() and win.lb_constrain_types() == ["point"])
+win.cb_lb_con_orient.setChecked(True)
+win.cb_lb_con_scale.setChecked(True)
+check("point + orient + scale", win.lb_constrain_types() == ["point", "orient", "scale"])
+win.cb_lb_con_parent.setChecked(True)
+check("parent turns point / orient off", win.lb_constrain_types() == ["parent", "scale"])
+# Scale 컨스트레인트인데 Scale 을 굽지 않음 -> 경고, 팝업 없음
+win.lb_range.set_range(5, 35)
+before = SEEN["created"]
+win.btn_lb_bake.click()
+check("scale constraint without Scale bake: no popup", SEEN["created"] == before)
+# 종류 없음 -> 경고
+for cb in (win.cb_lb_con_parent, win.cb_lb_con_scale):
+    cb.setChecked(False)
+win.btn_lb_bake.click()
+check("constrain on with no type: no popup", SEEN["created"] == before)
+# Parent 로 실행 -> 4 단계 팝업, 오브젝트에 parentConstraint
+win.cb_lb_con_parent.setChecked(True)
+SEEN["phases"] = []
+win.btn_lb_bake.click()
+check("constrain run: four phases", SEEN["phases"] == ["Creating locators", "Baking", "Cleaning up", "Constraining"],
+      SEEN["phases"])
+check("constrain run: objects constrained",
+      all(cmds.listRelatives(n, children=True, type="parentConstraint") for n in ("cube_renamed", b)))
+
 print("RESULT {0}/{1}".format(sum(R), len(R)))
 win.close()
 maya.standalone.uninitialize()
