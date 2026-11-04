@@ -1,6 +1,6 @@
 # A00210_FileManager — 데이터 저장소: "프로파일마다 브랜치" → "브랜치 하나 + 프로파일 폴더" 작업 계획서
 
-> **작성** 2026-11-04 · 상태: **§3 · §4 · §5-1 · §7-2 · §7-3 완료 — 남은 것: 기본 브랜치 변경(사용자), §6 비공개 저장소 Archive, §7-6 · 7 정리** · 대상 A00210 v01.44 → **v01.45**, 함께 바뀌는 곳 A00211_RefLineage
+> **작성** 2026-11-04 · 상태: **§3 · §4 · §5 · §7-2 · §7-3 완료 — 남은 것: 1~2주 뒤 §6 비공개 저장소 Archive, §7-6 · 7 정리(사용자 결정)** · 대상 A00210 v01.44 → **v01.45**, 함께 바뀌는 곳 A00211_RefLineage
 > 이 문서만 보고 작업할 수 있게 쓴다. 순서대로 하고, 각 단계 끝의 **확인** 을 통과해야 다음으로 간다.
 > 원격을 바꾸는 단계(§5 · §6 · §7-7)는 **그 턴에 사용자 푸시 요청이 있을 때만** 실행한다(전역 규칙 2장).
 > **개정 2026-11-04 (사용자 요청)**: 비공개 저장소 `JUN_FileManager_data_Private` 는 더 쓰지 않는다 — MUE 데이터도 전부
@@ -29,7 +29,8 @@
 | 2026-11-04 | §3 | 코드 완료(아래 §3 그대로). 시험 `test_data_folders.py` **43/43**, 기존 50/50 · 32/32 · 31/31, A00480 Lineage 44/44. 실제 프로파일 10개 변환 = §3-2 표 그대로(파일은 안 바뀜) |
 | 2026-11-04 | §4 | `0030_maya_python_JUN/_migrate/` 에 **백업 미러 2개**(`backup_public.git` · `backup_private.git`) + 리허설 클론 `public`(main, push 막힘). profiles = Dnable · MUE · SA · src_rig, **265 · 128 · 11 · 7 일치 · blob 차이 0 · 기록 보존**. 리허설 확인 2: 실제 프로파일 10개의 store_dir 을 리허설 클론으로 바꿔 읽으면 records · thumbs · lineage · path_structures 수가 **옛 클론과 전부 같음(불일치 0)** |
 | 2026-11-04 | §5-1 | 사용자 "푸시해". 리허설 뒤 새 커밋 0 확인 → `main` **`8bc1d5b`** 푸시(`-u`) + 태그 `archive/master · Dnable · SA · src_rig · private-MUE` 푸시. 옛 브랜치 4개는 그대로 |
-| — | §5-1 기본 브랜치 | **사용자 할 일** — `gh` 로그인 안 됨. GitHub `Settings > General > Default branch` 를 `main` 으로 |
+| 2026-11-04 | §5-1 기본 브랜치 | 사용자가 GitHub 에서 직접 `main` 으로 변경 → `git ls-remote --symref origin HEAD` = `refs/heads/main` 확인, 이 PC 클론 `origin/HEAD` 도 main |
+| 2026-11-04 | 클론 위치 | **옮기지 않는다**(사용자 결정) — `0030_maya_python_JUN/JUN_FileManager_data` 그대로. 정리 때 `JUN_FileManager_data_all/` 의 옛 클론 3개만 지운다 |
 | 2026-11-04 | §7-2 | `JUN_FileManager_data` 클론을 툴 코드(`GitSync.switch_branch`)로 `main` 전환 → `check_branch` OK, `profiles` = Dnable · MUE · SA · src_rig, Pull OK, 옛 파일 안 남음 |
 | 2026-11-04 | §7-3 | 프로파일 백업 `~/.jun_filemanager/profiles_backup_20261104_v0145` → Rig_Src · soundAliance · MUE 의 store_dir = `JUN_FileManager_data`. **10개 프로파일 모두 브랜치 OK · 레코드 / 썸네일 / lineage / path_structures 수가 옛 클론과 같음** |
 | — | §6 · §7-6 · 7 | 대기 — 1~2주 사용 뒤: 비공개 저장소 Archive, 옛 클론 `JUN_FileManager_data_all/A00x0_*` 정리, 옛 원격 브랜치 삭제(사용자 결정) |
