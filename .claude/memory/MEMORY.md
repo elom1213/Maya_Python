@@ -11,7 +11,7 @@
 
 ## 작업 방식 · 사용자 선호
 
-- [진행 상황 문장도 한국어](feedback-korean-progress-notes.md) — 도구 사이 중간 설명까지 한국어(두 번 지적: 11-03, 11-04)
+- [진행 상황 문장도 한국어](feedback-korean-progress-notes.md) — 도구 사이 중간 설명 · 짧은 답까지 한국어(세 번 지적: 11-03, 11-04 두 번 — 사용자 중간 메시지 · 영어 도구 결과 직후가 위험)
 - [Push target Dnable/dev](push-target-dnable-dev.md) — push 대상은 Dnable_repo 의 dev
 - [No history rewrite / master on request](no-history-rewrite-master-on-request.md) — 재작성 금지, master 최신화는 그 턴 요청 시만
 - [Push includes tool guide docs](push-includes-tool-guide-docs.md) — 툴 push 에 docs 가이드 · version · WORKLOG 함께
