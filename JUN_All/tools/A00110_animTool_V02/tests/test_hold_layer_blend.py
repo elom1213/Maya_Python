@@ -262,6 +262,61 @@ for k in ("use_current",):
     if cmds.optionVar(exists=PRE + k):
         cmds.optionVar(remove=PRE + k)
 
+# ---------------- v02.42 : 선택한 오브젝트에만 레이어 키 ----------------
+# AnimLayer1 에 A · B · C 가 모두 들어 있어도 A 만 선택하면 A 에만 키. 선택에 레이어 · 세트 · 캐릭터 노드가 섞여도 마찬가지.
+
+
+def layer_snap(objs, lay):
+    out = {}
+    for o in objs:
+        for a in ("translateX", "translateY", "translateZ", "rotateX", "rotateY", "rotateZ", "scaleX", "visibility"):
+            c = LKM.layer_curve(o + "." + a, lay)
+            out[(o, a)] = tuple(zip(cmds.keyframe(c, q=True, timeChange=True) or [],
+                                    cmds.keyframe(c, q=True, valueChange=True) or [])) if c else None
+    return out
+
+
+def three_scene():
+    cmds.file(new=True, force=True)
+    objs = [cmds.polyCube(n=n)[0] for n in ("A", "B", "C")]
+    for o in objs:
+        cmds.setKeyframe(o, at="tx", t=1, v=0)
+        cmds.setKeyframe(o, at="tx", t=100, v=10)
+    lay = cmds.animLayer("AnimLayer1")
+    cmds.select(objs)
+    cmds.animLayer(lay, e=True, addSelectedObjects=True)
+    for o in objs:
+        HLM._key_raw(o, "translateX", lay, 50, 1.0)
+    cmds.currentTime(100)
+    return objs, lay
+
+
+for use_current in (False, True):
+    for extra in ("none", "layer", "set", "character"):
+        clear_optvars()
+        objs, lay = three_scene()
+        if extra == "set":
+            cmds.sets(objs, n="ctlSet")
+        if extra == "character":
+            cmds.character(objs, n="charSet")
+        HLM.update(enabled=True, layer=lay, offset=10, axis_values={"rx": 0.0, "tx": 5.0}, use_current=use_current)
+        before = layer_snap(objs, lay)
+        cmds.select(["A"] + {"layer": [lay], "set": ["ctlSet"], "character": ["charSet"]}.get(extra, []), r=True, ne=True)
+        hk.HotkeyManager.run_hold()
+        after = layer_snap(objs, lay)
+        changed = sorted({o for k, o in [(k, k[0]) for k in after] if after[k] != before[k]})
+        check("SEL {0} +{1}: only the selected object A gets layer keys".format(
+            "current" if use_current else "pose", extra), changed == ["A"], changed)
+
+clear_optvars()
+objs, lay = three_scene()
+HLM.update(enabled=True, layer=lay, offset=10, axis_values={"tx": 5.0})
+cmds.select(["A", lay, "B"], r=True, ne=True)
+check("SEL selected_objects drops the layer node, keeps order", HLM.selected_objects() == ["A", "B"], HLM.selected_objects())
+n, msg = HLM.apply()
+check("SEL message names the keyed objects", n == 2 and msg.endswith(": A, B."), msg)
+clear_optvars()
+
 print("\n{0}/{1} passed".format(sum(R), len(R)))
 maya.standalone.uninitialize()
 os._exit(0 if all(R) else 1)

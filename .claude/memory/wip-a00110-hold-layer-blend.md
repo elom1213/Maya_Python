@@ -21,6 +21,8 @@ metadata:
 - v02.41 Pose Key `Use current values`(optionVar `use_current`): Pose Key 버튼 · Layer Blend 현재 프레임 키 모두 **지금 값**으로.
   Shift+A 는 `capture_current()` 를 **Hold 전에** 불러 값을 잡는다 — Hold 가 커브를 바꾸면 키 없이 움직여 둔 값이 재평가로 사라진다.
 - 시험 함정: `currentTime` 이동도 undo 큐에 들어간다 → undo 확인을 먼저, 값 재기는 redo 뒤에.
+- v02.42 사용자 요구: **선택한 오브젝트에만** 레이어 키(레이어의 다른 멤버 금지). `selected_objects()` 가 animLayer · objectSet · character 를
+  뺀다(세트에 setKeyframe = 멤버 전체). mayapy 에선 v02.41 도 새지 않았다(재현 안 됨) — GUI 에서 다시 보이면 메시지 끝 오브젝트 이름으로 확인.
 
 **Why:** 사용자 결정 2026-11-04 — −N 은 레이어 값 유지 · 레이어 없음/비멤버는 경고 후 건너뜀 · −N 기존 키 덮어쓰기.
 **How to apply:** 레이어 키를 값으로 찍는 다른 기능도 additive 역산을 의식할 것([[wip-a00110-counter-layer]] 은 역산을 일부러 이용). 남은 것: 마야 GUI 확인.

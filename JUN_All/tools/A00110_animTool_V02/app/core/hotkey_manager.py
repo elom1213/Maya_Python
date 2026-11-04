@@ -177,14 +177,17 @@ class HotkeyManager:
         (hold_selected_keys 안의 청크는 중첩 - 마야 openChunk 는 중첩을 허용한다).
         """
         # v02.41 Use current values : Hold 가 커브를 바꾸기 전에 지금 값을 읽어 둔다
+        # v02.42 누른 순간의 선택을 한 번만 읽어 둘 다 같은 목록을 쓴다 (선택한 오브젝트에만 레이어 키)
         try:
-            current = _hold_layer.HoldLayerManager.capture_current()
+            targets = _hold_layer.HoldLayerManager.selected_objects()
+            current = _hold_layer.HoldLayerManager.capture_current(targets)
         except Exception:                                   # noqa: BLE001
-            current = None
+            targets, current = None, None
         with undo_chunk():
             count, msg = KeyframeManager.hold_selected_keys()
             try:
-                _lcount, lmsg = _hold_layer.HoldLayerManager.apply(current_values=current)
+                # targets 가 비면 apply 가 선택을 다시 읽어도 비어 있다 -> 'no objects selected' 경고
+                _lcount, lmsg = _hold_layer.HoldLayerManager.apply(objects=targets or None, current_values=current)
             except Exception as exc:                        # noqa: BLE001
                 lmsg = "[Error] Layer Blend: {0}".format(exc)
                 cmds.warning(lmsg)

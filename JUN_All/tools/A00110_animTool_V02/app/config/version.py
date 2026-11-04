@@ -105,5 +105,11 @@
 #        (Hold 가 커브를 바꾸면 움직여 둔 값이 사라지므로). 설정은 optionVar use_current 로 기억.
 #        회귀 test_hold_layer_blend 41/41 · _ui 16/16.
 
-VERSION = "02.41"
+# 02.42  Layer Blend Key 대상 = **마야에서 지금 선택한 오브젝트만** 명시(사용자 요구 - 레이어에 든 다른 오브젝트엔 키 금지).
+#        HoldLayerManager.selected_objects(): ls -sl -objectsOnly 에서 animLayer · objectSet · character 노드 제외
+#        (세트 · 캐릭터에 setKeyframe 하면 멤버 전체로 퍼진다). run_hold 는 누른 순간 선택을 한 번 읽어 capture / apply 에 같은 목록.
+#        뷰포트 메시지에 키를 찍은 오브젝트 이름. mayapy 에서는 v02.41 도 선택 오브젝트에만 찍혔다(재현 안 됨) - 방어 + 확인용.
+#        회귀 test_hold_layer_blend 51/51(SEL: 멤버 3개 중 A 만 선택 x 레이어 · 세트 · 캐릭터 섞임) · _ui 16/16.
+
+VERSION = "02.42"
 LAST_UPDATE = "2026-11-04"

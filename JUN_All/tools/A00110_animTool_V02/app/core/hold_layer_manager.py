@@ -24,6 +24,11 @@
 #   로 읽어 넘긴다 - Hold 가 커브를 바꾸면 키 없이 움직여 둔 값이 다시 평가돼 사라지기 때문이다.
 #   찍는 방식은 Pose 키와 같은 obj 경로(`setKeyframe -animLayer -v`) -> 그 프레임의 최종 값이 지금 값 그대로 남는다.
 #
+# v02.42 - 대상은 **마야에서 지금 선택한 오브젝트만** (사용자 요구: 레이어에 든 다른 오브젝트에는 키가 가면 안 된다).
+#   selected_objects() : `ls -sl -objectsOnly` 에서 animLayer · objectSet · character(세트에 setKeyframe 하면 멤버 전체에 키)를
+#   뺀 노드만. run_hold 는 누른 순간의 선택을 한 번 읽어 capture_current / apply 에 같은 목록을 넘긴다.
+#   키는 그 오브젝트의 plug(obj.attr)와 그 plug 를 구동하는 레이어 커브에만 쓴다. 메시지에 키를 찍은 오브젝트 이름을 보인다.
+#
 # 결정 사항 (2026-11-04 사용자):
 #   1. -N 키 값 = 그 시점의 레이어 값 유지 (레이어 커브 평가값, 커브가 없으면 그 레이어 blend 입력(inputB)의 정적값)
 #   2. 레이어가 없거나 오브젝트가 멤버가 아니면 경고하고 건너뜀 (레이어를 만들거나 멤버로 넣지 않는다)
@@ -164,6 +169,25 @@ class HoldLayerManager:
     # 실행
     # --------------------------------------------------
 
+    # 선택에 섞여도 대상이 아닌 노드 타입 (세트 · 캐릭터는 setKeyframe 이 멤버 전체로 퍼진다)
+    NON_TARGET_TYPES = ("animLayer", "objectSet", "character")
+
+    @classmethod
+    def selected_objects(cls, objects=None):
+        """키를 찍을 오브젝트 = objects(명시) 또는 **지금 마야 선택**, 레이어 · 세트 · 캐릭터 노드 제외, 순서 유지 중복 제거."""
+        src = list(objects) if objects else (cmds.ls(sl=True, objectsOnly=True) or [])
+        out = []
+        for obj in src:
+            if not cmds.objExists(obj) or obj in out:
+                continue
+            try:
+                if cmds.nodeType(obj) in cls.NON_TARGET_TYPES:
+                    continue
+            except Exception:                               # noqa: BLE001
+                continue
+            out.append(obj)
+        return out
+
     @classmethod
     def capture_current(cls, objects=None):
         """use_current 가 켜져 있으면 선택 오브젝트 x Pose 축의 **지금 값** {(obj, 축): float}. 꺼져 있으면 None.
@@ -173,7 +197,7 @@ class HoldLayerManager:
         s = cls.load_settings()
         if not (s.get("enabled") and s.get("use_current")):
             return None
-        sel = list(objects) if objects else (cmds.ls(sl=True) or [])
+        sel = cls.selected_objects(objects)
         out = {}
         for obj in sel:
             for short in (s.get("axis_values") or {}):
@@ -198,8 +222,7 @@ class HoldLayerManager:
         if not s.get("enabled"):
             return (0, "")
 
-        sel = list(objects) if objects else (cmds.ls(sl=True) or [])
-        sel = [o for o in sel if cmds.objExists(o)]
+        sel = cls.selected_objects(objects)
         if not sel:
             return (0, "[Warning] Layer Blend: no objects selected.")
 
@@ -292,8 +315,9 @@ class HoldLayerManager:
         def fmt(t):
             return "{0:g}".format(t)
 
-        msg = "Layer Blend: {0} object(s) keyed on '{1}' (f{2} -> f{3}{4}).".format(
-            len(keyed), layer, fmt(t0), fmt(t1), ", current values" if use_current else "")
+        msg = "Layer Blend: {0} object(s) keyed on '{1}' (f{2} -> f{3}{4}){5}.".format(
+            len(keyed), layer, fmt(t0), fmt(t1), ", current values" if use_current else "",
+            ": " + LayerKeyManager._brief(keyed, limit=5) if keyed else "")
         try:
             if cmds.animLayer(layer, q=True, mute=True):
                 msg += " (layer muted)"
