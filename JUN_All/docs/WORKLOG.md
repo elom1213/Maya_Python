@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-04 (오늘)
 
+> [!summary] **A00220_BackupTool Save Cache 계획서** (`docs/plans/A00220_BackupTool_save_cache_plan.md`) `#A00220_BackupTool`
+- 요청: 마야 저장을 SSD 캐시에 먼저 → 몇 초 뒤 원래 HDD 경로로 복사(덮어쓰기), n 개 파일, 체감 저장 속도 개선 + 저장 보장.
+- 실측(이 PC C: NVMe · D: SATA HDD): python 쓰기 300MB 는 HDD 도 0.07s(OS 쓰기 캐시), 1.5GB 부터 1.7s(fsync 10s).
+  **마야 실제 저장 426MB .mb · 904MB .ma 는 SSD = HDD (4~6s, 직렬화가 전부)** → 로컬 HDD 는 이득 거의 없음, NAS · 초대형 파일이 후보.
+- 계획: 1단계 = 실제 씬 · NAS 실측 게이트(차이 없으면 중단). 진행 시 마야 저장 훅(rename → save → rename) + 파일 큐 + A00220 지연 복사기
+  (최신만 · `os.replace` 원자 교체 · 충돌 사본 · 재시도 · 재시작 재개 · 종료/열기 훅). 구현은 사용자 확인 뒤.
+
 > [!summary] **Framework `MOD_viewZoom_qt_v01` (리스트 · 트리 확대 / 축소 공용)** + A00110_animTool_V02 **v02.38 View > Layers 확대** `#Framework` `#A00110_animTool_V02`
 - 요청: Layers 목록 행이 낮아 고르기 · Mute 체크가 불편 → 행을 키우거나, 확대 / 축소를 공용 기능으로 만들어 툴마다 공유.
 - 공용: 뷰 하나에 붙이면 배율 하나로 글자 · 헤더 · 행 높이 · 체크박스 · 들여쓰기. Ctrl + 휠 · `Zoom [-] 150% [+]` · QSettings 기억 · 체크 칸 전체 클릭(행 선택 안 바뀜).
