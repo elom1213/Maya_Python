@@ -25,7 +25,7 @@ def check(name, cond, extra=""):
 
 
 PRE = "JUN_A00110_holdLayer_"
-for k in ("enabled", "offset", "layer"):
+for k in ("enabled", "offset", "layer", "axis_values"):
     if cmds.optionVar(exists=PRE + k):
         cmds.optionVar(remove=PRE + k)
 
@@ -84,14 +84,20 @@ check("U9 missing layer shown as '(missing)' and kept",
 check("U10 settings re-pushed on reopen", HLM.settings["enabled"] and HLM.settings["offset"] == 7)
 
 cmds.animLayer("Layer_03")
+win2.cmb_hold_layer.showPopup()      # v02.40 : 펼치면 새 레이어가 바로 보인다
+items = [win2.cmb_hold_layer.itemText(i) for i in range(win2.cmb_hold_layer.count())]
+check("U12 popup refreshes the layer list", "Layer_03" in items, items)
+win2.cmb_hold_layer.hidePopup()
+cmds.animLayer("Layer_04")
 win2.btn_hold_layer_refresh.click()
 items = [win2.cmb_hold_layer.itemText(i) for i in range(win2.cmb_hold_layer.count())]
 check("U11 Refresh picks up new layer, keeps missing selection",
-      "Layer_03" in items and win2.cmb_hold_layer.currentText() == "Layer_02 (missing)", items)
+      "Layer_04" in items and win2.cmb_hold_layer.currentText() == "Layer_02 (missing)", items)
 win2.close()
 
-for k in ("enabled", "offset", "layer"):
-    cmds.optionVar(remove=PRE + k)
+for k in ("enabled", "offset", "layer", "axis_values"):
+    if cmds.optionVar(exists=PRE + k):
+        cmds.optionVar(remove=PRE + k)
 
 print("\n{0}/{1} passed".format(sum(R), len(R)))
 maya.standalone.uninitialize()

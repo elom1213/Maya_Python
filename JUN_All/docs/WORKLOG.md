@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-04 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.40 Layer Blend Key 버그 수정** `#A00110_animTool`
+- 보고: 컨트롤러가 AnimLayer1 에 있는데 Shift+A 가 Hold 만 하고 레이어의 현재 / −N 프레임 키를 안 찍음.
+- 원인(mayapy 재현): DEV 리로드가 같은 깊이 모듈을 `sys.modules` 등록 순서로 reload → v02.38 세션에서 다시 열면 `hotkey_manager` 가 먼저 reload 돼
+  **옛 `HoldLayerManager`** 를 잡음. UI 는 새 클래스에 설정, 핫키는 옛 클래스(enabled=False) → 메시지 없이 건너뜀.
+- 수정: 설정 원본 = optionVar(update 쓰기 · apply 읽기), `run_hold` 는 호출 때 모듈 속성 조회, 예외는 뷰포트 에러 한 줄, `no layer chosen` 경고, 콤보 펼칠 때 레이어 갱신.
+- 시험: 33/33(RL1 = 그 리로드 순서 재현 후 run_hold 가 키) · UI 12/12. **마야 GUI 확인 아직.**
+
 > [!summary] A00110_animTool_V02 **v02.39 Shift+A Layer Blend Key** `#A00110_animTool`
 - 요청: 계획서 `docs/plans/a00110_hold_layer_blend_plan.md` 대로 — Shift+A 가 Hold 에 더해 고른 레이어에 (현재 − N) 레이어 값 키 + 현재 프레임 Pose Key 키.
 - 구현: `core/hold_layer_manager.py`(settings 저장소 + apply), `run_hold` 가 Hold + apply 를 한 undo 청크로, Hot Key > Main 에 `Layer Blend Key` 체크 · Layer 콤보(Refresh, missing) · Frames before,

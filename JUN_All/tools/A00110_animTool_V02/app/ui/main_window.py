@@ -26,7 +26,6 @@ from tools.A00110_animTool_V02.app.config.version import VERSION, LAST_UPDATE
 from tools.A00110_animTool_V02.app.core import KeyframeManager
 from tools.A00110_animTool_V02.app.core import HotkeyManager
 from tools.A00110_animTool_V02.app.core import HoldLayerManager
-from tools.A00110_animTool_V02.app.core.hold_layer_manager import OPTVAR_PREFIX as HOLD_LAYER_OPTVAR
 from tools.A00110_animTool_V02.app.core import ManipSpaceManager
 from tools.A00110_animTool_V02.app.core import PoseKeyManager
 from tools.A00110_animTool_V02.app.core import AttrKeyManager
@@ -119,6 +118,22 @@ STAGGER_SLIDER_STYLE = (
     "QSlider::handle:horizontal:disabled {"
     " background: #5a5a5a; border: 1px solid #454545; }"
 )
+
+
+class _PopupRefreshCombo(QComboBox):
+    """펼치기 직전에 on_popup() 을 부르는 콤보 (v02.40 Layer Blend 레이어 목록 - 창을 연 뒤 만든 레이어도 보이게)."""
+
+    def __init__(self, on_popup=None, parent=None):
+        super().__init__(parent)
+        self._on_popup = on_popup
+
+    def showPopup(self):
+        if self._on_popup is not None:
+            try:
+                self._on_popup()
+            except Exception:                               # noqa: BLE001
+                pass
+        super().showPopup()
 
 
 class MainWindow(QWidget):
@@ -668,7 +683,7 @@ class MainWindow(QWidget):
         hl_form = QGridLayout(self.w_hold_layer)
         hl_form.setContentsMargins(20, 0, 0, 0)
         hl_form.addWidget(QLabel("Layer"), 0, 0)
-        self.cmb_hold_layer = QComboBox()
+        self.cmb_hold_layer = _PopupRefreshCombo(on_popup=lambda: self._hold_layer_refresh(quiet=True))
         self.cmb_hold_layer.setToolTip("Animation layer to key (BaseAnimation is not listed).")
         hl_form.addWidget(self.cmb_hold_layer, 0, 1)
         self.btn_hold_layer_refresh = QPushButton("Refresh")
@@ -5819,19 +5834,16 @@ class MainWindow(QWidget):
             self.on_al_refresh(quiet=True)
 
     # ---------------- Shift+A Layer Blend Key (v02.39) ----------------
-    # 핫키(run_hold)는 UI 를 못 읽으므로 값이 바뀔 때마다 HoldLayerManager.settings 로 밀어 넣는다.
-    # 창을 다시 열 때를 위해 optionVar(HOLD_LAYER_OPTVAR) 에도 저장한다.
+    # 핫키(run_hold)는 UI 를 못 읽으므로 값이 바뀔 때마다 HoldLayerManager.update 로 밀어 넣는다.
+    # 설정의 원본은 optionVar(JUN_A00110_holdLayer_*) - update 가 쓰고 핫키가 읽는다(v02.40, 리로드에 안전).
 
     def _init_hold_layer(self):
-        pre = HOLD_LAYER_OPTVAR
+        saved = HoldLayerManager.load_settings()
         self._hold_layer_loading = True
         try:
-            if cmds.optionVar(exists=pre + "enabled"):
-                self.cb_hold_layer.setChecked(bool(cmds.optionVar(q=pre + "enabled")))
-            if cmds.optionVar(exists=pre + "offset"):
-                self.sp_hold_layer_offset.setValue(int(cmds.optionVar(q=pre + "offset")))
-            saved = cmds.optionVar(q=pre + "layer") if cmds.optionVar(exists=pre + "layer") else ""
-            self._hold_layer_refresh(prefer=str(saved or ""))
+            self.cb_hold_layer.setChecked(bool(saved["enabled"]))
+            self.sp_hold_layer_offset.setValue(int(saved["offset"]))
+            self._hold_layer_refresh(prefer=saved["layer"])
         finally:
             self._hold_layer_loading = False
 
@@ -5850,8 +5862,11 @@ class MainWindow(QWidget):
         data = self.cmb_hold_layer.currentData()
         return str(data) if data else ""
 
-    def _hold_layer_refresh(self, prefer=None):
-        """씬의 레이어(BaseAnimation 제외)로 콤보를 다시 채운다. 고르던 이름이 없으면 '(missing)' 으로 남긴다."""
+    def _hold_layer_refresh(self, prefer=None, quiet=False):
+        """씬의 레이어(BaseAnimation 제외)로 콤보를 다시 채운다. 고르던 이름이 없으면 '(missing)' 으로 남긴다.
+
+        prefer=None 이면 지금 고른 이름을 유지하고, 바뀐 결과를 핫키 쪽에 push 한다(Refresh 버튼 · 콤보 펼치기).
+        """
         want = self._hold_layer_name() if prefer is None else prefer
         layers = HoldLayerManager.list_layers()
         self.cmb_hold_layer.blockSignals(True)
@@ -5867,7 +5882,8 @@ class MainWindow(QWidget):
             self.cmb_hold_layer.blockSignals(False)
         if prefer is None:
             self._push_hold_layer_settings()
-            self.log("Layer Blend: {0} layer(s) listed.".format(len(layers)))
+            if not quiet:
+                self.log("Layer Blend: {0} layer(s) listed.".format(len(layers)))
 
     def _collect_pose_axis_values(self, warn=True):
         """Pose Key 탭에서 체크된 축 {attr: float}. 빈 칸 · 숫자 아님은 warn 이면 None(중단), 아니면 그 축만 뺀다."""
@@ -5892,12 +5908,9 @@ class MainWindow(QWidget):
             return
         layer = self._hold_layer_name()
         offset = int(self.sp_hold_layer_offset.value())
+        # optionVar 에 저장된다(원본) - 핫키는 그걸 읽는다
         HoldLayerManager.update(enabled=on, layer=layer, offset=offset,
                                 axis_values=self._collect_pose_axis_values(warn=False))
-        pre = HOLD_LAYER_OPTVAR
-        cmds.optionVar(intValue=(pre + "enabled", int(on)))
-        cmds.optionVar(intValue=(pre + "offset", offset))
-        cmds.optionVar(stringValue=(pre + "layer", layer))
 
     def on_toggle_hotkey(self, checked):
         self._enable_hotkey(checked)

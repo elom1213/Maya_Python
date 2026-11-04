@@ -10,8 +10,14 @@
 # 계획서 docs/plans/a00110_hold_layer_blend_plan.md
 #
 # 핫키(run_hold)는 nameCommand 에서 정적으로 불려 UI 위젯을 못 읽는다
-#   -> UI 가 바뀔 때마다 `HoldLayerManager.update(...)` 로 클래스 변수 settings 에 밀어 넣고, apply() 는 그걸 읽는다.
-#   창을 다시 열 때 값은 UI 가 optionVar(OPTVAR_PREFIX) 로 기억한다.
+#   -> UI 가 바뀔 때마다 `HoldLayerManager.update(...)` 로 밀어 넣고, apply() 는 그걸 읽는다.
+#
+# v02.40 - **설정의 원본은 optionVar(OPTVAR_PREFIX)** 다. update() 가 optionVar 에 쓰고 apply() 는 optionVar 에서 읽는다.
+#   v02.39 는 클래스 변수 settings 를 원본으로 썼는데, DEV 리로드(같은 깊이 모듈을 sys.modules 등록 순서대로 reload)에서
+#   hotkey_manager 가 hold_layer_manager 보다 먼저 reload 되면 `from .hold_layer_manager import HoldLayerManager` 가
+#   **리로드 전 옛 클래스**를 잡는다 -> UI 는 새 클래스에, 핫키는 옛 클래스(enabled=False)를 읽어 Shift+A 가 레이어 키를
+#   **조용히** 건너뛰었다(v02.38 세션에서 툴을 다시 연 경우 재현). optionVar 는 클래스가 몇 벌이든 하나다.
+#   settings 클래스 변수는 마지막 값을 보여 주는 거울로만 남긴다.
 #
 # 결정 사항 (2026-11-04 사용자):
 #   1. -N 키 값 = 그 시점의 레이어 값 유지 (레이어 커브 평가값, 커브가 없으면 그 레이어 blend 입력(inputB)의 정적값)
@@ -26,6 +32,8 @@
 #
 # 멤버 판정은 이름 비교가 아니라 plug 앞단 blend 사슬에 그 레이어의 blend 노드가 있는지로 한다
 # (네임스페이스 · DAG 경로 · 짧은/긴 어트리뷰트 이름과 무관). 사슬 헬퍼는 LayerKeyManager 것을 그대로 쓴다.
+
+import json
 
 import maya.cmds as cmds
 
@@ -45,7 +53,36 @@ class HoldLayerManager:
 
     @classmethod
     def update(cls, **kw):
+        """설정을 optionVar 에 쓴다(원본). settings 클래스 변수도 같이 맞춘다."""
         cls.settings.update(kw)
+        pre = OPTVAR_PREFIX
+        if "enabled" in kw:
+            cmds.optionVar(intValue=(pre + "enabled", int(bool(kw["enabled"]))))
+        if "layer" in kw:
+            cmds.optionVar(stringValue=(pre + "layer", str(kw["layer"] or "")))
+        if "offset" in kw:
+            cmds.optionVar(intValue=(pre + "offset", int(kw["offset"])))
+        if "axis_values" in kw:
+            cmds.optionVar(stringValue=(pre + "axis_values", json.dumps(dict(kw["axis_values"] or {}))))
+
+    @classmethod
+    def load_settings(cls):
+        """optionVar 에서 설정을 읽는다. 없는 키는 기본값."""
+        pre = OPTVAR_PREFIX
+        out = {"enabled": False, "layer": "", "offset": 10, "axis_values": {}}
+        try:
+            if cmds.optionVar(exists=pre + "enabled"):
+                out["enabled"] = bool(cmds.optionVar(q=pre + "enabled"))
+            if cmds.optionVar(exists=pre + "layer"):
+                out["layer"] = str(cmds.optionVar(q=pre + "layer") or "")
+            if cmds.optionVar(exists=pre + "offset"):
+                out["offset"] = int(cmds.optionVar(q=pre + "offset"))
+            if cmds.optionVar(exists=pre + "axis_values"):
+                raw = json.loads(cmds.optionVar(q=pre + "axis_values") or "{}")
+                out["axis_values"] = {str(k): float(v) for k, v in raw.items()}
+        except (TypeError, ValueError):
+            pass
+        return out
 
     # --------------------------------------------------
     # 조회
@@ -124,7 +161,8 @@ class HoldLayerManager:
         undo 묶기는 호출부(HotkeyManager.run_hold)가 Hold 와 함께 한다.
         반환 (처리한 오브젝트 수, 메시지). 옵션이 꺼져 있으면 (0, "").
         """
-        s = cls.settings
+        s = cls.load_settings()
+        cls.settings.update(s)
         if not s.get("enabled"):
             return (0, "")
 
@@ -135,7 +173,9 @@ class HoldLayerManager:
 
         layer = (s.get("layer") or "").strip()
         root = LayerKeyManager.root_layer()
-        if (not layer or not cmds.objExists(layer)
+        if not layer:
+            return (0, "[Warning] Layer Blend: no layer chosen (Hot Key > Main > Layer). Skipped.")
+        if (not cmds.objExists(layer)
                 or cmds.nodeType(layer) != "animLayer" or layer == root):
             return (0, "[Warning] Layer Blend: layer '{0}' not found. Skipped.".format(layer))
 

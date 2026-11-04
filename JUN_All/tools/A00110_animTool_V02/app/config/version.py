@@ -91,5 +91,13 @@
 #        core/hold_layer_manager.py, 계획서 docs/plans/a00110_hold_layer_blend_plan.md,
 #        회귀 tests/test_hold_layer_blend.py 29/29 · test_hold_layer_blend_ui.py 11/11.
 
-VERSION = "02.39"
+# 02.40  Layer Blend Key 버그 수정 - 컨트롤러가 레이어에 있어도 Shift+A 가 레이어 키를 **조용히** 안 찍던 문제.
+#        원인: DEV 리로드는 같은 깊이 모듈을 sys.modules 등록 순서로 reload 한다. v02.38 이 로드된 세션에서 툴을 다시 열면
+#        hotkey_manager 가 hold_layer_manager 보다 먼저 reload 되어 옛 HoldLayerManager 를 붙잡음 -> UI 는 새 클래스에 설정,
+#        핫키는 옛 클래스(enabled=False)를 읽어 아무 메시지 없이 건너뜀(mayapy 재현). 수정: 설정 원본을 optionVar 로
+#        (update 가 쓰고 apply 가 읽음), run_hold 는 호출 때 모듈 속성으로 클래스 조회, Layer Blend 예외는 뷰포트에 에러 한 줄,
+#        레이어 미선택은 'no layer chosen' 경고, 레이어 콤보는 펼칠 때 목록 새로 읽기(창을 연 뒤 만든 레이어).
+#        회귀 test_hold_layer_blend 33/33(RL1 리로드 순서) · _ui 12/12.
+
+VERSION = "02.40"
 LAST_UPDATE = "2026-11-04"

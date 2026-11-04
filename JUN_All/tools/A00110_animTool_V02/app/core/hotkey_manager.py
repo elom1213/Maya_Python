@@ -20,6 +20,9 @@
 #
 # v02.39 - run_hold() 가 Hold 뒤에 HoldLayerManager.apply()(Layer Blend Key, 옵션)도 수행한다.
 #   둘은 독립(Hold 키 선택이 없어도 레이어 키는 찍는다)이고 undo 한 번으로 함께 되돌아간다.
+# v02.40 - HoldLayerManager 는 **호출할 때 모듈 속성으로** 찾는다(`_hold_layer.HoldLayerManager`). 이름을 import 해 두면
+#   DEV 리로드 순서에 따라 옛 클래스를 붙잡는다. 설정 자체도 optionVar 가 원본(hold_layer_manager 머리말).
+#   Layer Blend 에서 예외가 나도 Hold 결과와 함께 뷰포트에 에러 한 줄을 띄운다.
 #
 # 주의:
 #  - keyShortcut 은 소문자 'a' + shiftModifier=True 로 지정한다 (.mhk 의 "s" -sht 관례).
@@ -33,7 +36,7 @@ import maya.mel as mel
 
 from .keyframe_manager import KeyframeManager
 from .manip_space_manager import ManipSpaceManager
-from .hold_layer_manager import HoldLayerManager
+from . import hold_layer_manager as _hold_layer
 
 from Framework.core.maya_undo import undo_chunk
 
@@ -174,7 +177,11 @@ class HotkeyManager:
         """
         with undo_chunk():
             count, msg = KeyframeManager.hold_selected_keys()
-            _lcount, lmsg = HoldLayerManager.apply()
+            try:
+                _lcount, lmsg = _hold_layer.HoldLayerManager.apply()
+            except Exception as exc:                        # noqa: BLE001
+                lmsg = "[Error] Layer Blend: {0}".format(exc)
+                cmds.warning(lmsg)
         if lmsg:
             msg = "{0}<br>{1}".format(msg, lmsg)
         cmds.inViewMessage(amg=msg, pos="topCenter", fade=True)

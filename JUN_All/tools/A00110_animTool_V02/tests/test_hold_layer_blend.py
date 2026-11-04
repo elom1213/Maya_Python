@@ -17,6 +17,17 @@ from tools.A00110_animTool_V02.app.core import LayerKeyManager as LKM   # noqa: 
 
 R = []
 
+PRE = "JUN_A00110_holdLayer_"
+
+
+def clear_optvars():
+    for k in ("enabled", "offset", "layer", "axis_values"):
+        if cmds.optionVar(exists=PRE + k):
+            cmds.optionVar(remove=PRE + k)
+
+
+clear_optvars()
+
 
 def check(name, cond, extra=""):
     R.append(bool(cond))
@@ -147,6 +158,49 @@ check("RH3 one undo reverts both Hold and Layer Blend",
       keys(base_tx) == base0["translateX"] and keys(crv(cube, "translateX", layer)) == lay0,
       (keys(base_tx), keys(crv(cube, "translateX", layer))))
 check("RH4 layer ry curve gone after undo", not keys(crv(cube, "rotateY", layer)))
+
+# ---------------- v02.40 : 설정 원본 = optionVar ----------------
+HLM.update(**SETTINGS)
+check("OV1 update writes optionVars",
+      cmds.optionVar(q=PRE + "enabled") == 1 and cmds.optionVar(q=PRE + "layer") == "Layer_01"
+      and cmds.optionVar(q=PRE + "offset") == 10 and HLM.load_settings()["axis_values"] == {"rx": 0.0, "tx": 5.0},
+      HLM.load_settings())
+HLM.settings["enabled"] = False      # 클래스 변수만 꺼도 apply 는 optionVar 를 본다
+cube, other, layer = scene(False)
+cmds.select(cube)
+n, msg = HLM.apply()
+check("OV2 apply reads optionVar, not the class dict", n == 1, msg)
+HLM.update(layer="")
+n, msg = HLM.apply()
+check("OV3 empty layer -> 'no layer chosen'", n == 0 and "no layer chosen" in msg, msg)
+
+# ---------------- v02.40 : DEV 리로드 순서 회귀 ----------------
+# v02.38 이 로드된 세션에서 업데이트하면 hotkey_manager 가 hold_layer_manager 보다 sys.modules 앞에 있다
+# -> reload 때 hotkey_manager 가 옛 HoldLayerManager 를 잡았다(v02.39 버그: Shift+A 가 레이어 키를 조용히 건너뜀).
+import importlib   # noqa: E402
+import config   # noqa: E402
+KEY = "tools.A00110_animTool_V02.app.core.hold_layer_manager"
+mod = sys.modules.pop(KEY)
+sys.modules[KEY] = mod
+if config.DEV_MODE:
+    from dev.reloader_v02 import reload_for_tool   # noqa: E402
+    reload_for_tool("tools.A00110_animTool_V02")
+else:
+    importlib.reload(sys.modules["tools.A00110_animTool_V02.app.core.hotkey_manager"])
+    importlib.reload(mod)
+    importlib.reload(sys.modules["tools.A00110_animTool_V02.app.core"])
+from tools.A00110_animTool_V02.app.core import HoldLayerManager as UI_HLM   # noqa: E402  (UI 가 잡는 클래스)
+hk = sys.modules["tools.A00110_animTool_V02.app.core.hotkey_manager"]
+clear_optvars()
+cube, other, layer = scene(False)
+UI_HLM.update(**SETTINGS)
+cmds.select(cube)
+cmds.inViewMessage = lambda **kw: None
+hk.HotkeyManager.run_hold()
+lay = keys(crv(cube, "translateX", layer))
+check("RL1 after reload (old module order) run_hold still keys the layer",
+      lay.get(90.0) == 2.0 and 100.0 in lay and 90.0 in keys(crv(cube, "rotateY", layer)), lay)
+clear_optvars()
 
 print("\n{0}/{1} passed".format(sum(R), len(R)))
 maya.standalone.uninitialize()

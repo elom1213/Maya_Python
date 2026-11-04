@@ -8,7 +8,10 @@ metadata:
 2026-11-04 v02.39 구현. `core/hold_layer_manager.py` `HoldLayerManager`, UI = Hot Key > Main > Hold 의 `Layer Blend Key`.
 계획서 `JUN_All/docs/plans/a00110_hold_layer_blend_plan.md`, 시험 `tests/test_hold_layer_blend.py` 29/29 · `_ui.py` 11/11.
 
-- 핫키(`run_hold`, nameCommand)는 UI 를 못 읽는다 → UI 가 값 바뀔 때마다 `HoldLayerManager.settings` 로 push, optionVar `JUN_A00110_holdLayer_*` 로 복원.
+- 핫키(`run_hold`, nameCommand)는 UI 를 못 읽는다 → UI 가 `HoldLayerManager.update` → **optionVar `JUN_A00110_holdLayer_*` 가 원본**, apply 가 그걸 읽는다(v02.40).
+- **★ v02.39 버그: 클래스 변수에 설정을 두면 DEV 리로드 뒤 핫키가 옛 클래스를 읽는다.** reloader 는 같은 깊이 모듈을 sys.modules 등록 순서로 reload →
+  `from .x import Cls` 하는 모듈이 x 보다 먼저 reload 되면 옛 Cls 를 잡는다(새 모듈을 기존 세션에 추가했을 때 특히). 핫키 · 콜백 진입점은
+  호출 때 `module.Cls` 로 찾고, 상태는 optionVar 처럼 모듈 밖에 둘 것. 증상은 "조용히 아무것도 안 함".
 - **★ additive 레이어에서 `setKeyframe obj -at a -v val -animLayer L` 의 val 은 최종(합성) 값** — 마야가 레이어 값을 역산한다.
   레이어 값 그대로 쓰려면 레이어 커브 노드에 `setKeyframe curve -t -v` + `keyframe -e -vc -absolute`(`_key_raw`). override 는 둘이 같다.
 - Pose 키는 일부러 obj 경로(최종값 = Pose 값) — Pose Key 탭과 같은 의미.

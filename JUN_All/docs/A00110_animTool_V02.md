@@ -1924,7 +1924,8 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
 ```
 
 - **Layer Blend Key** 체크(기본 끔)로 켜고 끈다. 끄면 아래 칸이 비활성, Shift+A 는 예전처럼 Hold 만.
-- **Layer**: BaseAnimation 을 뺀 씬의 레이어. `Refresh` 로 다시 읽는다. 저장된 레이어가 씬에 없으면 `<이름> (missing)` 으로 남고,
+- **Layer**: BaseAnimation 을 뺀 씬의 레이어. `Refresh` 로 다시 읽고, v02.40~ **콤보를 펼칠 때도** 다시 읽는다(창을 연 뒤 만든 레이어).
+  고르지 않았으면 Shift+A 때 `no layer chosen` 경고. 저장된 레이어가 씬에 없으면 `<이름> (missing)` 으로 남고,
   실행 때 경고 후 건너뛴다.
 - **Frames before** = N (1~1000).
 - 대상 = **씬에서 선택한 오브젝트**(Pose Key 와 같다. 그래프 에디터 키 선택과 무관).
@@ -1935,10 +1936,12 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
 - **레이어를 만들거나 멤버로 넣지 않는다** — 레이어가 없거나 잠겼으면 경고 후 건너뜀, 멤버 채널이 없는 오브젝트는
   `Skipped: ...`, 멤버가 아닌 Pose 축은 `Pose axes not in layer: ...`. 뮤트된 레이어는 키는 찍고 `(layer muted)` 를 붙인다.
 - Hold 와 **독립**(Hold 할 키 선택이 없어도 레이어 키는 찍는다). 뷰포트 메시지는 두 줄, **Ctrl+Z 한 번에 둘 다** 되돌아간다.
-- 값은 바뀔 때마다 핫키 쪽(`HoldLayerManager.settings`)에 바로 반영되고, 창을 다시 열면 `optionVar`(`JUN_A00110_holdLayer_*`)에서 복원된다.
+- 값은 바뀔 때마다 `optionVar`(`JUN_A00110_holdLayer_*`)에 저장되고 핫키는 **그 optionVar 를 읽는다**(v02.40~). 창을 다시 열어도 복원된다.
+  v02.39 는 클래스 변수에 두어, DEV 리로드 순서에 따라 핫키가 옛 클래스(꺼짐)를 읽고 **레이어 키를 조용히 건너뛰는** 버그가 있었다.
+  Layer Blend 에서 에러가 나면 Hold 메시지 아래에 `[Error] Layer Blend: ...` 한 줄.
 - **Hold Selected Range 버튼**은 예전처럼 Hold 만 한다 — Layer Blend 는 Shift+A 전용.
-- 시험 `tests/test_hold_layer_blend.py` 29/29(Additive · Override, 덮어쓰기, 최종값 = Pose, Base 불변, 비멤버 · 없는 레이어 · 잠김 · 뮤트,
-  run_hold 한 번 undo), `tests/test_hold_layer_blend_ui.py` 11/11(콤보 · push · Pose 행 · optionVar 복원 · missing). **마야 GUI 확인 아직.**
+- 시험 `tests/test_hold_layer_blend.py` 33/33(v02.40 optionVar · 리로드 순서 회귀 RL1 포함, Additive · Override, 덮어쓰기, 최종값 = Pose, Base 불변, 비멤버 · 없는 레이어 · 잠김 · 뮤트,
+  run_hold 한 번 undo), `tests/test_hold_layer_blend_ui.py` 12/12(콤보 · 펼칠 때 갱신 · push · Pose 행 · optionVar 복원 · missing). **마야 GUI 확인 아직.**
   계획서 [a00110_hold_layer_blend_plan.md](plans/a00110_hold_layer_blend_plan.md).
 
 #### Main > Manipulator Space
