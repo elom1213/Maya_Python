@@ -10,18 +10,33 @@
           ]
         },
         {
-          "name": "HandIK_All",
+          "name": "Smooth_Body",
           "objects": [
-            "test:ZIHAN:Cage:CH_r_ArmIK_xx_ctl",
-            "test:ZIHAN:Cage:CH_l_ArmIK_xx_ctl"
-          ]
+            "test:ZIHAN:Cage:CH_n_Neck_xx_ctl",
+            "test:ZIHAN:Cage:CH_n_Neck_02_ctl",
+            "test:ZIHAN:Cage:CH_n_Head_xx_ctl",
+            "test:ZIHAN:Cage:CH_n_Head_02_ctl",
+            "test:ZIHAN:Cage:CH_n_MainRoot_xx_ctl",
+            "test:ZIHAN:Cage:CH_n_Root_xx_ctl",
+            "test:ZIHAN:Cage:CH_n_Spine_02_ctl",
+            "test:ZIHAN:Cage:CH_n_Spine_03_ctl",
+            "test:ZIHAN:Cage:CH_n_Spine_04_ctl"
+          ],
+          "color": "#ffff00"
         },
         {
-          "name": "Wrist_Inner_All",
+          "name": "Foot_R",
           "objects": [
-            "test:ZIHAN:Cage:CH_l_Wrist_xx_ctl",
-            "test:ZIHAN:Cage:CH_r_Wrist_xx_ctl"
-          ]
+            "test:ZIHAN:Cage:CH_r_foot_xx_ctl"
+          ],
+          "color": "#55aaff"
+        },
+        {
+          "name": "Foot_L",
+          "objects": [
+            "test:ZIHAN:Cage:CH_l_foot_xx_ctl"
+          ],
+          "color": "#aa0000"
         },
         {
           "name": "Fingers_R",
@@ -66,15 +81,17 @@
           "color": "#aa0000"
         },
         {
-          "name": "Foot_R",
+          "name": "HandIK_All",
           "objects": [
-            "test:ZIHAN:Cage:CH_r_foot_xx_ctl"
+            "test:ZIHAN:Cage:CH_r_ArmIK_xx_ctl",
+            "test:ZIHAN:Cage:CH_l_ArmIK_xx_ctl"
           ]
         },
         {
-          "name": "Foot_L",
+          "name": "Wrist_Inner_All",
           "objects": [
-            "test:ZIHAN:Cage:CH_l_foot_xx_ctl"
+            "test:ZIHAN:Cage:CH_l_Wrist_xx_ctl",
+            "test:ZIHAN:Cage:CH_r_Wrist_xx_ctl"
           ]
         }
       ]
