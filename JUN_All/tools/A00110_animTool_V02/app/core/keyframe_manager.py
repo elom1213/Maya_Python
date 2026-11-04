@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-09-23
+# last Update date : 2026-11-04
 # A00110_animTool_V02 - 키프레임 이동/삭제/hold 핵심 로직 (maya.cmds, UI 비의존)
+# v02.48 - Hold 를 커브 단위(_hold_curve)로 쪼갰다. hold_selected_keys 는 동작 그대로, Bake > Fix Sliding 은
+#          hold_range(curves, a, b) 로 "[a, b] 안 키를 고르고 Shift+A" 와 같은 Hold 를 한다.
 
 import maya.cmds as cmds
 
@@ -235,9 +237,6 @@ class KeyframeManager:
         오브젝트 선택이 아니라 '선택된 키' 기준이므로 어떤 어트리뷰트든 동일하게 동작.
         반환: (처리한 커브 수, 메시지)
         """
-        # 미세 오차로 start 키는 보존하고 end 키까지 삭제 (정수/실수 프레임 모두 대응)
-        EPS = 1e-4
-
         # 선택된 키를 가진 애니메이션 커브 노드 목록 (중복 제거됨)
         curves = cmds.keyframe(q=True, name=True, selected=True) or []
 
@@ -249,40 +248,63 @@ class KeyframeManager:
 
         with undo_chunk():
             for crv in curves:
-
                 times = cmds.keyframe(
                     crv, q=True, selected=True, timeChange=True
                 ) or []
-
-                if len(times) < 2:
+                if KeyframeManager._hold_curve(crv, times):
+                    done += 1
+                else:
                     skipped += 1
-                    continue
-
-                start = min(times)
-                end = max(times)
-
-                vals = cmds.keyframe(
-                    crv, q=True, time=(start, start), valueChange=True
-                ) or []
-
-                if not vals:
-                    skipped += 1
-                    continue
-
-                start_val = vals[0]
-
-                # (start, end] 구간 삭제 -> end 에 start 값 재삽입
-                cmds.cutKey(crv, time=(start + EPS, end), clear=True)
-                cmds.setKeyframe(crv, time=end, value=start_val)
-
-                # 구간을 평평하게: start out / end in 탄젠트 flat
-                cmds.keyTangent(crv, edit=True, time=(start, start), outTangentType="flat")
-                cmds.keyTangent(crv, edit=True, time=(end, end), inTangentType="flat")
-
-                done += 1
 
         msg = f"{done} curve(s) held flat at start value."
         if skipped:
             msg += f"  ({skipped} skipped: <2 keys / no value)"
 
         return (done, msg)
+
+    # 미세 오차로 start 키는 보존하고 end 키까지 삭제 (정수/실수 프레임 모두 대응)
+    HOLD_EPS = 1e-4
+
+    @staticmethod
+    def _hold_curve(crv, times):
+        """커브 하나를 Hold. times = 그 커브에서 '선택된' 키 시간들. 반환 True(처리) / False(skip: 키 < 2 · 값 없음).
+
+        start(최소) 값을 읽어 (start, end] 키를 지우고 end 에 start 값, start out / end in 탄젠트 flat.
+        """
+        if len(times) < 2:
+            return False
+        start = min(times)
+        end = max(times)
+        vals = cmds.keyframe(crv, q=True, time=(start, start), valueChange=True) or []
+        if not vals:
+            return False
+        start_val = vals[0]
+
+        # (start, end] 구간 삭제 -> end 에 start 값 재삽입
+        cmds.cutKey(crv, time=(start + KeyframeManager.HOLD_EPS, end), clear=True)
+        cmds.setKeyframe(crv, time=end, value=start_val)
+
+        # 구간을 평평하게: start out / end in 탄젠트 flat
+        cmds.keyTangent(crv, edit=True, time=(start, start), outTangentType="flat")
+        cmds.keyTangent(crv, edit=True, time=(end, end), inTangentType="flat")
+        return True
+
+    @staticmethod
+    def hold_range(curves, a, b):
+        """커브들에서 [a, b] 안의 키를 **선택한 것처럼** Hold (Shift+A 의 Hold 와 같은 결과, v02.48 Fix Sliding).
+
+        반환 (처리한 커브 수, skip 한 커브 수, 기준 시간 = 그 '선택' 키들의 최소 시간 or None).
+        키 선택은 건드리지 않는다. undo 묶기는 호출부.
+        """
+        done = skipped = 0
+        first = None
+        for crv in curves or []:
+            times = cmds.keyframe(crv, q=True, time=(a, b), timeChange=True) or []
+            if times:
+                t = min(times)
+                first = t if first is None else min(first, t)
+            if KeyframeManager._hold_curve(crv, times):
+                done += 1
+            else:
+                skipped += 1
+        return (done, skipped, first)

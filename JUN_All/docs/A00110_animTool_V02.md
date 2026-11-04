@@ -689,6 +689,7 @@ A00110_animTool_V02/
     │   ├── mirror_token_store.py # Framework.core.mirror_tokens 재노출(경로 호환용)
     │   ├── bake_manager.py       # 리스트 노드 구간 bake (Bake 탭, native bakeResults)
     │   ├── counter_layer_manager.py # 상위 레이어가 바꾼 자식의 월드 T/R 을 되돌리는 보정 레이어 (Bake > Counter Layer)
+    │   ├── fix_sliding_manager.py # 정지 구간마다 Hold + Layer Blend Key, _debug_speed (Bake > Fix Sliding, v02.48)
     │   ├── locator_bake_manager.py  # 오브젝트마다 로케이터를 만들어 구간 월드 베이크 (Bake > Locator, v02.36)
     │   ├── layer_merge_manager.py # 애님 레이어 구간 한정 병합 = bakeResults -rwl + 소스 중화 (Bake > Merge Layers)
     │   ├── follow_match_manager.py # follower→target 월드 매치 베이크 (Follow 탭, OpenMaya + blend, maintain offset, 1<-n)
@@ -748,7 +749,7 @@ A00110_animTool_V02.run(True)   # True = reload
 | **Timing** | 키의 **시점** | Move · Offset · Stagger |
 | **Curve** | 커브의 **값·형태** | Euler · Filters(Smooth · Intensity · Interp) |
 | **Transfer** | **다른 오브젝트로** 옮기기 | Copy Key · Mirror Key · Follow |
-| **Bake** | 결과를 **키로 굽기** | Bake · **Locator**(v02.36~, LOC + Anim) · Counter Layer(v02.26~, Stationary 모드 v02.29~) · Merge Layers(v02.27~) |
+| **Bake** | 결과를 **키로 굽기** | Bake · **Locator**(v02.36~, LOC + Anim) · Counter Layer(v02.26~, Stationary 모드 v02.29~) · **Fix Sliding**(v02.48~) · Merge Layers(v02.27~) |
 | **View** | **보기**(씬 불변) | Graph Focus · **Layers**(v02.31~, Expand 가능) |
 | **Hot Key** (v02.19~) | 툴이 열린 동안의 **단축키** | Main(Hold · Manipulator Space · Animation Layers v02.35~) |
 
@@ -1742,6 +1743,48 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 > (실제 씬 실측) · 회귀 시험 `tests/test_counter_layer.py`(mayapy, 92 항목). `_SmartLayer` 는 코어가 컴파일 `.pyc` 라 디컴파일 없이
 > 사용자 노출 설명문만 참고했다 — "레이어 켜고/끄고 비교" 원리와 World Space 개념.
 
+#### Fix Sliding — 정지 구간마다 Shift+A (Hold + Layer Blend Key) (v02.48~)
+
+발 IK 처럼 모캡이 구워진 컨트롤에서 **땅을 짚는 동안의 미끄러짐**을 없앤다. 구간을 손으로 고르고 Shift+A 를 누르던 일을
+정지 구간마다 자동으로 한다. 계획서 [a00110_fix_sliding_plan.md](plans/a00110_fix_sliding_plan.md).
+
+```
+[Fix Sliding List  (TSL)                    ]
+Frame Range  [Start][End]  Get Current · Get Sel Range · [Get Timeline]
+Speed   Components [x]X [x]Y [x]Z   Smooth interval [5 f]   Threshold [2.00 % of max speed]
+Spans   Merge gap (G) [4 f]   Min span (M) [3 f]
+Keys    [x]Translate [x]Rotate
+        [x] Layer Blend Key       Hot Key > Main: layer 'AnimLayer1', N = 5
+            [x] Clamp blend start to the previous span
+            [x] Lock the layer through each span (key at b)
+        [x] Debug speed curves (_debug_speed)
+[ Preview Spans ]  [ Fix Sliding ]
+```
+
+1. **속도** — 오브젝트마다 [Start, End] 의 **월드 위치** 프레임당 이동 거리(체크한 축만, 세로축을 끄면 수평 속도). 시간을 실제로 옮기며 잰다
+   (레이어가 있으면 `getAttr -time` 은 Base 값만 준다).
+2. **스무딩** — Smooth interval 프레임 중심 이동 평균(1 = 안 함).
+3. **정지** — 스무딩 속도 < **Threshold % × 그 오브젝트의 최대 스무딩 속도** 인 연속 프레임 = 구간 [a, b]. 좋은 모캡 1~2 %, 나쁜 데이터 15 %+.
+4. **Merge gap (G)** — 이웃 구간 사이 움직인 프레임이 G 이하면 한 구간(노이즈로 접지가 잠깐 끊긴 경우). 0 = 안 합침.
+5. **Min span (M)** — 길이 `b − a + 1` 이 **M 보다 긴** 구간만 고친다. 짧은 건 노이즈로 보고 둔다.
+6. **구간마다 (시간순)** — "그 구간의 translate / rotate 키를 고르고 Layer Blend Key 를 켠 채 Shift+A" 와 같다:
+   - **Hold**: Hot Key > Main `Run only when viewing` 레이어(기본 BaseAnimation)의 T/R 커브에서 [a, b] 안 키를 첫 키 값으로 평평하게.
+   - **Layer Blend Key**: Hot Key > Main 의 **레이어 · Frames before(N) · Pose Key 축 / Current** 그대로, 기준 a = 구간 안 첫 키.
+     Hot Key > Main 의 `Layer Blend Key` 체크와 보기 조건은 **필요 없다**(이 탭의 체크가 정한다).
+   - **Clamp**(대안 A): 블렌드 시작(a − N)을 **앞 구간 끝보다 앞으로 가지 않게** — 고정된 앞 구간 안에서 레이어가 움직이기 시작하지 않는다.
+   - **Lock**(대안 D): 구간 끝 b 에도 a 와 **같은 레이어 값** + flat 탄젠트 — 구간 내내 레이어 값이 상수. 구간 안에 원래 레이어 키가 있으면
+     지우지 않고 메시지로 알린다.
+   - G=0 · Clamp 끔 · Lock 끔이면 **순수 Shift+A** 결과와 같다(시험으로 키 값 1e-9 대조).
+7. **Debug** — `_debug_speed` 노드를 새로 만들어 오브젝트마다 `<이름>_speed` · `_smooth` · `_threshold` · `_result` 커브(그래프 에디터로 본다).
+   `_result` 는 Fix Sliding 뒤 **다시 잰 실제 속도**(Preview 는 예측). 노드는 undo 에 안 들어간다(Ctrl+Z 뒤에도 비교용으로 남음).
+- **Preview Spans** 는 키를 바꾸지 않고 오브젝트마다 최대 속도 · Threshold · 합친 구간 · 고칠 구간 · 건너뛸 짧은 구간을 로그에 쓴다.
+- **Fix Sliding** 은 진행 팝업(Sampling → Applying → Debug), **Ctrl+Z 한 번**에 전부 되돌아간다.
+- 설정은 창을 다시 열어도 기억된다.
+- **주의**: 오브젝트 **자기 채널**의 키를 고정한다. 부모(글로벌 컨트롤)가 그 구간에 움직이면 월드는 여전히 움직인다 → 그 경우는 Counter Layer(Stationary).
+- 실측: KANA 씬(6830 f) 발 IK 두 개, 기본값으로 191 구간 · 34 초, 고친 구간 안 월드 속도 0(전: 최대 0.69 / 0.82 per frame).
+  기본 M=3 은 4~5 프레임짜리 접지도 잡는다 — 너무 많으면 M 을 키운다.
+- 시험 `tests/test_fix_sliding.py` 30/30 · `tests/test_fix_sliding_ui.py` 11/11. **마야 GUI 확인 아직.**
+
 #### Merge Layers — 마야 Merge Layers 를 프레임 구간 안에서만 (v02.27~)
 
 ```
@@ -2091,6 +2134,12 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
 5. **발 미끄럼만 없애고 글로벌 이동은 살리려면**(v02.29~): **Hold → Stationary spans only**. `Preview Spans` 로 정지
    구간이 뜻대로 잡혔는지 보고(안 잡히면 Still tolerance 를 키운다) → **Create Counter Layer** → `lyr_glo_plant`.
    정지 구간에서는 발이 서 있고, 사이에서 글로벌을 따라가며, End 에서는 글로벌 결과와 같다.
+
+### Bake > Fix Sliding (v02.48~)
+1. Hot Key > Main 에서 **Layer** · **Frames before (N)** 를 정하고, Key > Pose Key 에서 축 / Current 를 정한다(Shift+A 와 같은 설정).
+2. 발 IK 등을 선택 → **Select Objects** 로 Fix Sliding List 에 채우고 Frame Range 를 정한다.
+3. **Preview Spans** 로 구간을 본다(`_debug_speed` 커브도). 구간이 너무 많으면 Threshold ↓ 또는 M ↑, 끊기면 G ↑.
+4. **Fix Sliding** → 구간마다 Hold + Layer Blend Key. `_debug_speed` 의 `_result` 가 구간에서 0 인지 본다. 마음에 안 들면 Ctrl+Z 한 번.
 
 ### Bake > Merge Layers (v02.27~)
 1. 레이어 에디터에서 합칠 레이어를 선택(또는 탭에서 체크)하고 **Refresh** — 선택된 레이어가 체크돼 있다.

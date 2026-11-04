@@ -137,5 +137,14 @@
 #        mayapy 실측 - 레이어가 있으면 getAttr -time · MDGContext 는 Base 값만, currentTime -update false 는 옛 값.
 #        setKeyframe -animLayer -v 의 additive 역산은 키 시간 기준이라 그대로 a 에 찍는다. 회귀 81/81(RA0~7) · _ui 21/21.
 
-VERSION = "02.47"
+# 02.48  Bake > Fix Sliding 탭 신설 - 리스트 오브젝트마다 월드 속도(선택 축) -> 스무딩 -> Threshold(최대 속도의 %) 아래 연속 프레임 =
+#        정지 구간 [a, b]. 이웃 구간 틈 <= G(기본 4) 면 합치고(대안 B), 길이 > M 인 구간만, 구간마다 시간순으로 "그 구간 T/R 키를 고르고
+#        Layer Blend Key 켠 채 Shift+A" 를 한다(Hold = 보기 레이어 커브, Layer Blend = Hot Key > Main 설정, force). 블렌드 시작은 앞 구간 끝에서
+#        자르고(대안 A), 구간 끝 b 에도 같은 레이어 값 + flat(대안 D). 셋 다 끄면 순수 Shift+A 재현(시험으로 1e-9 대조).
+#        `_debug_speed` 노드에 speed / smooth / threshold / result(적용 뒤 재샘플) 커브, undo 밖. Preview Spans, 진행 팝업, optionVar 기억.
+#        KeyframeManager._hold_curve / hold_range, HoldLayerManager.apply(force, ramp_start, hold_end). _SmartLayer 는 툴팁만 참고.
+#        실측: KANA 씬(6830 f) 발 IK 둘, 191 구간, 34 s, 구간 안 월드 속도 0. 계획서 docs/plans/a00110_fix_sliding_plan.md,
+#        회귀 tests/test_fix_sliding.py 30/30 · test_fix_sliding_ui.py 11/11.
+
+VERSION = "02.48"
 LAST_UPDATE = "2026-11-04"

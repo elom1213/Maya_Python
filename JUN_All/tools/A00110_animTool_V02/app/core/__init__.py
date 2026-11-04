@@ -17,6 +17,7 @@ from .graph_focus_manager import GraphFocusManager
 from .fill_key_manager import FillKeyManager, CURRENT_LAYER
 from .layer_key_manager import LayerKeyManager
 from .counter_layer_manager import CounterLayerManager
+from .fix_sliding_manager import FixSlidingManager
 from .locator_bake_manager import LocatorBakeManager
 from .layer_merge_manager import LayerMergeManager
 from .anim_layer_manager import AnimLayerManager
@@ -34,7 +35,7 @@ __all__ = [
     "MirrorKeyManager", "MirrorTokenStore", "BakeManager", "FollowMatchManager",
     "OffsetHoldManager", "StaggerOffsetSession", "EulerFilterManager",
     "GraphViewManager", "GraphFocusManager", "FillKeyManager", "CURRENT_LAYER",
-    "LayerKeyManager", "CounterLayerManager", "LocatorBakeManager", "LayerMergeManager", "AnimLayerManager",
+    "LayerKeyManager", "CounterLayerManager", "FixSlidingManager", "LocatorBakeManager", "LayerMergeManager", "AnimLayerManager",
     "CurveFilterSession", "CF_EASE_IN", "CF_EASE_OUT", "CF_LINEAR",
     "CF_EASE_IN_OUT", "cf_selected_channel_attrs",
     "NoiseNodeManager", "NoiseSession", "noise_generator",

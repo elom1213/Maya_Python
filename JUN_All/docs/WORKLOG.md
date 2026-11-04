@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-04 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.48 Bake > Fix Sliding** `#A00110_animTool`
+- 계획서대로 구현: `core/fix_sliding_manager.py`(순수 함수 speeds · smooth · still_spans · merge_gaps · split_spans · blend_start + currentTime 샘플링 · preview · run · `_debug_speed`),
+  `KeyframeManager._hold_curve / hold_range`(Shift+A 동작 불변), `HoldLayerManager.apply(force, ramp_start, hold_end)`, Bake > Fix Sliding 탭(TSL · 구간 · Speed · Spans · Keys · Preview / Fix Sliding · 진행 팝업 · optionVar).
+- 정지 구간 [a, b] 마다 Hold + Layer Blend Key, B(Merge gap 4) → A(블렌드 시작 클램프) → D(b 에도 같은 레이어 값). 셋 끄면 순수 Shift+A.
+- 시험: `test_fix_sliding.py` 30/30(핵심: 손으로 selectKey + run_hold 한 결과와 1e-9 일치 · 사용자 예시 [0,10]·[12,20] 에 f7 키 없음), UI 11/11,
+  회귀 81 · 21 · 46 · 31 · 92 통과. **실측 KANA 씬**(사용자 제공, 저장 안 함): 6830 f 발 IK 둘, 191 구간, 34 s, 구간 안 월드 속도 0.69/0.82 → 0. **GUI 확인 아직.**
+
 > [!summary] A00110_animTool_V02 **Bake > Fix Sliding 계획서** (`docs/plans/a00110_fix_sliding_plan.md`) `#A00110_animTool`
 - 요구: `_SmartLayer` Fix Sliding 처럼 속도(원래 · 스무딩 · Threshold)로 정지 구간 [a, b] 를 찾되, 결과는 **그 구간 T/R 키를 고르고 Layer Blend Key 켠 채 Shift+A** 한 것과 같게.
   길이 > M 인 구간만(사용자 확정), Threshold = 최대 속도의 %, TSL 로 대상 리스트업, `_debug_speed` 4 커브.

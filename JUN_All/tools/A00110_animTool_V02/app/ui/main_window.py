@@ -45,6 +45,7 @@ from tools.A00110_animTool_V02.app.core import FillKeyManager
 from tools.A00110_animTool_V02.app.core import CURRENT_LAYER
 from tools.A00110_animTool_V02.app.core import LayerKeyManager
 from tools.A00110_animTool_V02.app.core import CounterLayerManager
+from tools.A00110_animTool_V02.app.core import FixSlidingManager
 from tools.A00110_animTool_V02.app.core import LocatorBakeManager
 from tools.A00110_animTool_V02.app.core import LayerMergeManager
 from tools.A00110_animTool_V02.app.core import AnimLayerManager
@@ -411,6 +412,10 @@ class MainWindow(QWidget):
          "frame, or only while they stood still (planted feet) with the moving "
          "frames absorbing the difference",
          "_build_counter_layer_tab"),
+        ("Fix Sliding", "Fix Sliding - find the frames where each listed object stands still (smoothed "
+         "world speed below a % of its max speed) and, for every still span longer than Min span, do "
+         "what Shift+A does on that span: Hold its translate / rotate keys and Layer Blend Key",
+         "_build_fix_sliding_tab"),
         ("Merge Layers", "Merge Layers - Maya's Merge Layers limited to a frame range: "
          "bake the checked animation layers into one of them (or a new layer) "
          "between Start and End only, keeping the motion identical",
@@ -2299,6 +2304,174 @@ class MainWindow(QWidget):
         tab_layout.addWidget(self.btn_lb_bake)
 
         tab_layout.addStretch(1)
+        return tab
+
+    # ---------------- Bake > Fix Sliding (v02.48) ----------------
+
+    FS_OPTVAR = "JUN_A00110_fixSliding_"
+
+    def _build_fix_sliding_tab(self):
+        """리스트 오브젝트의 정지 구간마다 Shift+A(Hold + Layer Blend Key)를 하는 탭 (Bake > Fix Sliding, v02.48).
+
+        로직은 FixSlidingManager. 계획서 docs/plans/a00110_fix_sliding_plan.md.
+        """
+        tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
+        tab_layout = QVBoxLayout(tab)
+
+        self.fs_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
+            title="Fix Sliding List", select_label="Select Objects",
+            list_min_height=110, log_callback=self.log)
+        self.fs_tsl.setToolTip(
+            "Objects to fix (e.g. IK feet). Each one is measured on its own: its still spans are found\n"
+            "from its world speed. Their translate / rotate keys must be on their own channels\n"
+            "(a moving parent is not compensated - use Counter Layer for that).")
+        tab_layout.addWidget(self.fs_tsl)
+
+        range_grp = QGroupBox("Frame Range")
+        range_box = QVBoxLayout(range_grp)
+        self.fs_range = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_value=int(cmds.playbackOptions(query=True, minTime=True)),
+            end_value=int(cmds.playbackOptions(query=True, maxTime=True)),
+            log_callback=self.log)
+        range_box.addWidget(self.fs_range)
+        timeline_row = QHBoxLayout()
+        self.btn_fs_timeline = QPushButton("Get Timeline")
+        self.btn_fs_timeline.setToolTip("Fill Start / End with the current timeline (playback) range.")
+        self.btn_fs_timeline.clicked.connect(self.on_fs_get_timeline)
+        timeline_row.addWidget(self.btn_fs_timeline)
+        timeline_row.addStretch(1)
+        range_box.addLayout(timeline_row)
+        tab_layout.addWidget(range_grp)
+
+        # ---- Speed ----
+        speed_grp = QGroupBox("Speed")
+        speed_form = QGridLayout(speed_grp)
+        speed_form.addWidget(QLabel("Components"), 0, 0)
+        comp_row = QHBoxLayout()
+        self.cb_fs_x, self.cb_fs_y, self.cb_fs_z = QCheckBox("X"), QCheckBox("Y"), QCheckBox("Z")
+        for cb in (self.cb_fs_x, self.cb_fs_y, self.cb_fs_z):
+            cb.setChecked(True)
+            cb.setToolTip("World axes used for the speed. Turn the vertical axis off to use the horizontal speed only.")
+            comp_row.addWidget(cb)
+        comp_row.addStretch(1)
+        speed_form.addLayout(comp_row, 0, 1)
+        speed_form.addWidget(QLabel("Smooth interval"), 1, 0)
+        self.sp_fs_smooth = QSpinBox()
+        self.sp_fs_smooth.setRange(1, 200)
+        self.sp_fs_smooth.setValue(FixSlidingManager.DEFAULT_SMOOTH)
+        self.sp_fs_smooth.setSuffix(" f")
+        self.sp_fs_smooth.setToolTip(
+            "Moving average over this many frames before the threshold test (1 = no smoothing).\n"
+            "Noisy mocap gives false steps without it.")
+        speed_form.addWidget(self.sp_fs_smooth, 1, 1)
+        speed_form.addWidget(QLabel("Threshold"), 2, 0)
+        self.sp_fs_threshold = QDoubleSpinBox()
+        self.sp_fs_threshold.setRange(0.01, 100.0)
+        self.sp_fs_threshold.setDecimals(2)
+        self.sp_fs_threshold.setValue(FixSlidingManager.DEFAULT_THRESHOLD_PCT)
+        self.sp_fs_threshold.setSuffix(" % of max speed")
+        self.sp_fs_threshold.setToolTip(
+            "A frame is 'still' when the smoothed speed is below this % of the object's max smoothed speed.\n"
+            "Good mocap: 1-2 %, noisy data: 15 % or more.")
+        speed_form.addWidget(self.sp_fs_threshold, 2, 1)
+        speed_form.setColumnStretch(1, 1)
+        tab_layout.addWidget(speed_grp)
+
+        # ---- Spans ----
+        span_grp = QGroupBox("Spans")
+        span_form = QGridLayout(span_grp)
+        span_form.addWidget(QLabel("Merge gap (G)"), 0, 0)
+        self.sp_fs_merge_gap = QSpinBox()
+        self.sp_fs_merge_gap.setRange(0, 1000)
+        self.sp_fs_merge_gap.setValue(FixSlidingManager.DEFAULT_MERGE_GAP)
+        self.sp_fs_merge_gap.setSuffix(" f")
+        self.sp_fs_merge_gap.setToolTip(
+            "Two still spans with at most this many moving frames between them are treated as one span\n"
+            "(checked before Min span). 0 = never merge.")
+        span_form.addWidget(self.sp_fs_merge_gap, 0, 1)
+        span_form.addWidget(QLabel("Min span (M)"), 1, 0)
+        self.sp_fs_min_span = QSpinBox()
+        self.sp_fs_min_span.setRange(1, 10000)
+        self.sp_fs_min_span.setValue(FixSlidingManager.DEFAULT_MIN_SPAN)
+        self.sp_fs_min_span.setSuffix(" f")
+        self.sp_fs_min_span.setToolTip(
+            "Only still spans longer than this many frames are fixed.\n"
+            "Shorter ones are treated as noise and left alone.")
+        span_form.addWidget(self.sp_fs_min_span, 1, 1)
+        span_form.setColumnStretch(1, 1)
+        tab_layout.addWidget(span_grp)
+
+        # ---- Keys ----
+        keys_grp = QGroupBox("Keys")
+        keys_box = QVBoxLayout(keys_grp)
+        tr_row = QHBoxLayout()
+        self.cb_fs_t, self.cb_fs_r = QCheckBox("Translate"), QCheckBox("Rotate")
+        for cb in (self.cb_fs_t, self.cb_fs_r):
+            cb.setChecked(True)
+            cb.setToolTip("Channels whose keys are held inside each still span (like selecting them before Shift+A).")
+            tr_row.addWidget(cb)
+        tr_row.addStretch(1)
+        keys_box.addLayout(tr_row)
+        self.cb_fs_layer_blend = QCheckBox("Layer Blend Key")
+        self.cb_fs_layer_blend.setChecked(True)
+        self.cb_fs_layer_blend.setToolTip(
+            "For each fixed span [a, b] also key the layer chosen in Hot Key > Main at a and a - N\n"
+            "(Pose Key axes / Current), exactly like Shift+A with Layer Blend Key on.\n"
+            "Hot Key > Main's own Layer Blend Key checkbox and 'Run only when viewing' are not needed here.")
+        keys_box.addWidget(self.cb_fs_layer_blend)
+        self.lbl_fs_layer_blend = QLabel("")
+        self.lbl_fs_layer_blend.setContentsMargins(20, 0, 0, 0)
+        keys_box.addWidget(self.lbl_fs_layer_blend)
+        self.cb_fs_clamp = QCheckBox("Clamp blend start to the previous span")
+        self.cb_fs_clamp.setChecked(True)
+        self.cb_fs_clamp.setToolTip(
+            "Start each blend (a - N) no earlier than the end of the previous fixed span, so the layer never\n"
+            "starts moving inside a span that is already fixed.")
+        self.cb_fs_lock = QCheckBox("Lock the layer through each span (key at b)")
+        self.cb_fs_lock.setChecked(True)
+        self.cb_fs_lock.setToolTip(
+            "Also key the layer at the span end b with the same value as at a (flat tangents), so the layer\n"
+            "stays constant through the whole span.")
+        for cb in (self.cb_fs_clamp, self.cb_fs_lock):
+            cb.setContentsMargins(20, 0, 0, 0)
+            row = QHBoxLayout()
+            row.addSpacing(20)
+            row.addWidget(cb)
+            row.addStretch(1)
+            keys_box.addLayout(row)
+        self.cb_fs_debug = QCheckBox("Debug speed curves ({0})".format(FixSlidingManager.DEBUG_NODE))
+        self.cb_fs_debug.setChecked(True)
+        self.cb_fs_debug.setToolTip(
+            "Rebuild the '{0}' node with 4 curves per object: speed, smoothed speed, threshold and result\n"
+            "(measured again after Fix Sliding, predicted for Preview). Not part of the undo.".format(
+                FixSlidingManager.DEBUG_NODE))
+        keys_box.addWidget(self.cb_fs_debug)
+        tab_layout.addWidget(keys_grp)
+
+        # ---- Buttons ----
+        btn_row = QHBoxLayout()
+        self.btn_fs_preview = QPushButton("Preview Spans")
+        self.btn_fs_preview.setToolTip("Find and log the still spans without changing any key.")
+        self.btn_fs_run = QPushButton("Fix Sliding")
+        self.btn_fs_run.setToolTip(
+            "For each still span longer than Min span: Hold the translate / rotate keys inside it\n"
+            "(the curves of the Hot Key > Main 'Run only when viewing' layer) and Layer Blend Key. One undo.")
+        btn_row.addWidget(self.btn_fs_preview)
+        btn_row.addWidget(self.btn_fs_run)
+        tab_layout.addLayout(btn_row)
+        tab_layout.addStretch(1)
+
+        self.btn_fs_preview.clicked.connect(self.on_fs_preview)
+        self.btn_fs_run.clicked.connect(self.on_fs_run)
+        self.cb_fs_layer_blend.toggled.connect(self._fs_layer_blend_toggled)
+
+        self._fs_load_settings()
+        for w in (self.cb_fs_x, self.cb_fs_y, self.cb_fs_z, self.cb_fs_t, self.cb_fs_r,
+                  self.cb_fs_layer_blend, self.cb_fs_clamp, self.cb_fs_lock, self.cb_fs_debug):
+            w.toggled.connect(self._fs_save_settings)
+        for w in (self.sp_fs_smooth, self.sp_fs_threshold, self.sp_fs_merge_gap, self.sp_fs_min_span):
+            w.valueChanged.connect(self._fs_save_settings)
+        self._fs_layer_blend_toggled()
         return tab
 
     def _build_counter_layer_tab(self):
@@ -4936,6 +5109,155 @@ class MainWindow(QWidget):
         self.log(msg)
 
     # --------------------------------------------------
+    # Handlers : Bake > Fix Sliding (v02.48)
+    # --------------------------------------------------
+
+    FS_SETTINGS = (
+        # (optionVar 키, 위젯 속성 이름, 종류)
+        ("x", "cb_fs_x", "bool"), ("y", "cb_fs_y", "bool"), ("z", "cb_fs_z", "bool"),
+        ("smooth", "sp_fs_smooth", "int"), ("threshold", "sp_fs_threshold", "float"),
+        ("merge_gap", "sp_fs_merge_gap", "int"), ("min_span", "sp_fs_min_span", "int"),
+        ("t", "cb_fs_t", "bool"), ("r", "cb_fs_r", "bool"), ("layer_blend", "cb_fs_layer_blend", "bool"),
+        ("clamp", "cb_fs_clamp", "bool"), ("lock", "cb_fs_lock", "bool"), ("debug", "cb_fs_debug", "bool"),
+    )
+
+    def _fs_load_settings(self):
+        for key, name, kind in self.FS_SETTINGS:
+            ov = self.FS_OPTVAR + key
+            if not cmds.optionVar(exists=ov):
+                continue
+            w = getattr(self, name)
+            v = cmds.optionVar(q=ov)
+            try:
+                if kind == "bool":
+                    w.setChecked(bool(v))
+                elif kind == "int":
+                    w.setValue(int(v))
+                else:
+                    w.setValue(float(v))
+            except (TypeError, ValueError):
+                pass
+
+    def _fs_save_settings(self, *_args):
+        for key, name, kind in self.FS_SETTINGS:
+            w = getattr(self, name)
+            ov = self.FS_OPTVAR + key
+            if kind == "bool":
+                cmds.optionVar(intValue=(ov, int(w.isChecked())))
+            elif kind == "int":
+                cmds.optionVar(intValue=(ov, int(w.value())))
+            else:
+                cmds.optionVar(floatValue=(ov, float(w.value())))
+
+    def _fs_layer_blend_toggled(self, *_args):
+        on = self.cb_fs_layer_blend.isChecked()
+        self.cb_fs_clamp.setEnabled(on)
+        self.cb_fs_lock.setEnabled(on)
+        self._fs_update_layer_label()
+
+    def _fs_update_layer_label(self):
+        """Layer Blend 줄 아래 : Hot Key > Main 의 레이어 · N (못 쓰면 경고 문구)."""
+        if getattr(self, "lbl_fs_layer_blend", None) is None:
+            return
+        ok, layer, n, msg = FixSlidingManager.layer_blend_status()
+        if ok:
+            text = "Hot Key > Main: layer '{0}', N = {1}".format(layer, n)
+        else:
+            text = msg.replace("[Warning] Fix Sliding: ", "[Warning] ")
+        self.lbl_fs_layer_blend.setText(text)
+        self.lbl_fs_layer_blend.setEnabled(self.cb_fs_layer_blend.isChecked())
+
+    def on_fs_get_timeline(self, *_args):
+        start = int(cmds.playbackOptions(q=True, minTime=True))
+        end = int(cmds.playbackOptions(q=True, maxTime=True))
+        self.fs_range.set_range(start, end)
+        self.log("Range = timeline {0} - {1}".format(start, end))
+
+    def _fs_inputs(self):
+        """(nodes, start, end, opts) 또는 None (경고는 로그에)."""
+        items = self.fs_tsl.get_all_items()
+        if not items:
+            self.log("[Warning] Add objects to the Fix Sliding List first.")
+            return None
+        nodes = self.fs_tsl.get_all_nodes() or items
+        if len(nodes) < len(items):
+            self.log("[Warning] {0} listed item(s) no longer exist in the scene - skipped.".format(
+                len(items) - len(nodes)))
+        values = self.fs_range.values()
+        if values is None:
+            self.log("[Warning] Enter Start / End.")
+            return None
+        start, end = values
+        if start >= end:
+            self.log("[Warning] Start ({0}) must be before End ({1}).".format(start, end))
+            return None
+        opts = dict(axes=(self.cb_fs_x.isChecked(), self.cb_fs_y.isChecked(), self.cb_fs_z.isChecked()),
+                    smooth=self.sp_fs_smooth.value(), threshold_pct=self.sp_fs_threshold.value(),
+                    merge_gap=self.sp_fs_merge_gap.value(), min_span=self.sp_fs_min_span.value())
+        return nodes, start, end, opts
+
+    def _fs_progress(self, title, phases):
+        dlg = JUN_mod_progress_qt.JUN_mod_progress_qt_v01(self, title=title, phases=phases)
+        step = dlg.callback()
+
+        def progress(done, total, message=None):
+            step(done, total, message)
+
+        progress.phase = lambda name: dlg.begin_phase(name)
+        return dlg, progress
+
+    def _fs_log_lines(self, lines, elapsed=None):
+        for line in lines:
+            if line:
+                self.log(line)
+        if elapsed is not None:
+            self.log("  ({0:.1f}s)".format(elapsed))
+
+    def on_fs_preview(self, *_args):
+        got = self._fs_inputs()
+        if not got:
+            return
+        nodes, start, end, opts = got
+        debug = self.cb_fs_debug.isChecked()
+        phases = [("Sampling", 90 if debug else 100)] + ([("Debug", 10)] if debug else [])
+        dlg, progress = self._fs_progress("Fix Sliding - Preview", phases)
+        dlg.start()
+        try:
+            _res, lines = FixSlidingManager.preview(nodes, start, end, debug=debug, progress=progress, **opts)
+        finally:
+            elapsed = dlg.elapsed()
+            dlg.finish()
+        self._fs_log_lines(lines, elapsed)
+
+    def on_fs_run(self, *_args):
+        got = self._fs_inputs()
+        if not got:
+            return
+        nodes, start, end, opts = got
+        translate, rotate = self.cb_fs_t.isChecked(), self.cb_fs_r.isChecked()
+        if not (translate or rotate):
+            self.log("[Warning] Check Translate and/or Rotate.")
+            return
+        layer_blend = self.cb_fs_layer_blend.isChecked()
+        self._fs_update_layer_label()
+        debug = self.cb_fs_debug.isChecked()
+        phases = [("Sampling", 45 if debug else 60), ("Applying", 40)] + ([("Debug", 15)] if debug else [])
+        dlg, progress = self._fs_progress("Fix Sliding", phases)
+        dlg.start()
+        try:
+            _count, lines = FixSlidingManager.run(
+                nodes, start, end, translate=translate, rotate=rotate, layer_blend=layer_blend,
+                clamp_blend=self.cb_fs_clamp.isChecked(), lock_end=self.cb_fs_lock.isChecked(),
+                debug=debug, progress=progress, **opts)
+        finally:
+            elapsed = dlg.elapsed()
+            dlg.finish()
+        self._fs_log_lines(lines, elapsed)
+        # View > Layers 목록도 바로 (레이어 커브가 생겼을 수 있다)
+        if getattr(self, "tw_al_layers", None) is not None:
+            self.on_al_refresh(quiet=True)
+
+    # --------------------------------------------------
     # Handlers : Bake > Counter Layer
     # --------------------------------------------------
 
@@ -6003,6 +6325,9 @@ class MainWindow(QWidget):
                                 axis_values=self._collect_pose_axis_values(warn=False),
                                 current_axes=self._pose_current_axes(),
                                 view_layer=self._hold_view_layer_name())
+        # v02.48 Bake > Fix Sliding 의 'Hot Key > Main: layer ..., N = ...' 라벨도 따라간다
+        if hasattr(self, "_fs_update_layer_label"):
+            self._fs_update_layer_label()
 
     def on_toggle_hotkey(self, checked):
         self._enable_hotkey(checked)

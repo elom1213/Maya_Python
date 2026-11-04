@@ -48,6 +48,11 @@
 #   Current 값 = a 프레임의 값. 현재 시간이 a 가 아니면 values_at() 이 **undo 기록을 끈 채 시간을 a 로 옮겨 읽고 되돌린다** -
 #   mayapy 실측: 레이어가 있으면 `getAttr -time` · API MDGContext 는 Base 값만, `currentTime -update false` 는 옛 값을 준다.
 #   additive 의 `setKeyframe -animLayer -v` 역산은 **키 시간 기준**이라(실측) 현재 시간과 무관하게 a 에 찍으면 된다.
+# v02.48 - Bake > Fix Sliding 용 인자 (Shift+A 는 안 쓴다, 계획서 docs/plans/a00110_fix_sliding_plan.md §4.2):
+#   force=True      : enabled 검사와 보기 게이트를 건너뛴다 (일괄 처리는 보는 레이어와 무관).
+#   ramp_start=t0   : 블렌드 시작(레이어 값 키) 프레임을 직접 준다 - 대안 A (앞 구간 끝에서 자르기). 없으면 frame - N.
+#   hold_end=b      : 대안 D - 이번에 키를 찍은 레이어 채널마다 a 와 b 에 같은 레이어 값 + a out / b in 탄젠트 flat
+#                     -> [a, b] 동안 레이어 값이 상수. 구간 안에 원래 레이어 키가 있으면 지우지 않고 메시지로 알린다.
 #
 # 결정 사항 (2026-11-04 사용자):
 #   1. -N 키 값 = 그 시점의 레이어 값 유지 (레이어 커브 평가값, 커브가 없으면 그 레이어 blend 입력(inputB)의 정적값)
@@ -146,6 +151,9 @@ class HoldLayerManager:
         """BaseAnimation 을 뺀 animLayer 이름 목록 (씬 순서)."""
         root = LayerKeyManager.root_layer()
         return [l for l in (cmds.ls(type="animLayer") or []) if l != root]
+
+    # 대안 D 에서 '구간 안 원래 키' 를 찾을 때 양 끝을 뺄 여유
+    LOCK_EPS = 1e-3
 
     @staticmethod
     def viewed_layers():
@@ -311,16 +319,16 @@ class HoldLayerManager:
         return out
 
     @classmethod
-    def capture_current(cls, objects=None, frame=None):
+    def capture_current(cls, objects=None, frame=None, force=False):
         """current 축이 있으면 선택 오브젝트 x current 축의 **frame(기본 현재) 시점 값** {(obj, 축): float}. 없으면 None.
 
         run_hold 가 Hold **전에** 부른다(v02.47 frame = 고른 구간의 a). 읽을 수 없는 채널은 빠진다(apply 가 그때 다시 읽는다).
         """
         s = cls.load_settings()
         axes = list(dict.fromkeys(s.get("current_axes") or []))
-        if not (s.get("enabled") and axes):
+        if not axes or not (force or s.get("enabled")):
             return None
-        if not cls.view_gate(s.get("view_layer", ""))[0]:
+        if not force and not cls.view_gate(s.get("view_layer", ""))[0]:
             return None
         sel = cls.selected_objects(objects)
         t = float(cmds.currentTime(q=True)) if frame is None else float(frame)
@@ -329,7 +337,7 @@ class HoldLayerManager:
         return {(o, a): vals["{0}.{1}".format(o, a)] for o, a in pairs if "{0}.{1}".format(o, a) in vals}
 
     @classmethod
-    def apply(cls, objects=None, frame=None, current_values=None):
+    def apply(cls, objects=None, frame=None, current_values=None, force=False, ramp_start=None, hold_end=None):
         """(frame - N) 에 '그 시점 레이어 값' 키, frame 에 Pose 값 키. frame 기본 = 현재 프레임 (v02.47 run_hold 는 고른 구간의 a).
 
         current 축(v02.44 축마다)은 현재 프레임 키를 Pose 값 대신 **지금 값**으로
@@ -340,13 +348,14 @@ class HoldLayerManager:
         """
         s = cls.load_settings()
         cls.settings.update(s)
-        if not s.get("enabled"):
-            return (0, "")
+        if not force:
+            if not s.get("enabled"):
+                return (0, "")
 
-        # v02.43 보기 게이트 - 정한 레이어(기본 BaseAnimation)를 보고 있을 때만
-        ok, gate_msg = cls.view_gate(s.get("view_layer", ""))
-        if not ok:
-            return (0, gate_msg)
+            # v02.43 보기 게이트 - 정한 레이어(기본 BaseAnimation)를 보고 있을 때만
+            ok, gate_msg = cls.view_gate(s.get("view_layer", ""))
+            if not ok:
+                return (0, gate_msg)
 
         sel = cls.selected_objects(objects)
         if not sel:
@@ -377,7 +386,11 @@ class HoldLayerManager:
             n = 10
         now = float(cmds.currentTime(q=True))
         t1 = now if frame is None else float(frame)
-        t0 = t1 - n
+        t0 = t1 - n if ramp_start is None else float(ramp_start)
+        if t0 >= t1:
+            return (0, "[Warning] Layer Blend: blend start f{0:g} is not before f{1:g}. Skipped.".format(t0, t1))
+        t2 = float(hold_end) if hold_end is not None and float(hold_end) > t1 else None
+        not_flat = []
         current_axes = set(s.get("current_axes") or []) & set(axis_values)
         current_values = current_values or {}
 
@@ -434,13 +447,33 @@ class HoldLayerManager:
             for attr, val in pose:
                 cmds.setKeyframe(obj, attribute=attr, time=t1, value=val, animLayer=layer)
 
+            if t2 is not None:
+                # v02.48 대안 D : [t1, t2] 동안 레이어 값 상수 (모든 키 찍은 채널 - 멤버 전부)
+                pose_attrs = set(a for a, _v in pose)
+                for attr in members:
+                    plug = "{0}.{1}".format(obj, attr)
+                    curve = LayerKeyManager.layer_curve(plug, layer)
+                    if not curve:
+                        continue
+                    v1 = cmds.keyframe(curve, q=True, eval=True, time=(t1, t1), valueChange=True)[0]
+                    inside = cmds.keyframe(curve, q=True, time=(t1 + cls.LOCK_EPS, t2 - cls.LOCK_EPS),
+                                           timeChange=True) or []
+                    if inside:
+                        not_flat.append(plug)
+                        continue
+                    if attr not in pose_attrs:
+                        cls._key_raw(obj, attr, layer, t1, v1)
+                    cls._key_raw(obj, attr, layer, t2, v1)
+                    cmds.keyTangent(curve, edit=True, time=(t1, t1), outTangentType="flat")
+                    cmds.keyTangent(curve, edit=True, time=(t2, t2), inTangentType="flat")
+
             keyed.append(obj)
 
         def fmt(t):
             return "{0:g}".format(t)
 
         msg = "Layer Blend: {0} object(s) keyed on '{1}' (f{2} -> f{3}{4}){5}.".format(
-            len(keyed), layer, fmt(t0), fmt(t1),
+            len(keyed), layer, fmt(t0), fmt(t1) + (" -> f" + fmt(t2) if t2 is not None else ""),
             ", current: " + ", ".join(a for a in axis_values if a in current_axes) if current_axes else "",
             ": " + LayerKeyManager._brief(keyed, limit=5) if keyed else "")
         try:
@@ -450,6 +483,9 @@ class HoldLayerManager:
             pass
         if skipped:
             msg += " Skipped: {0} (not in layer).".format(LayerKeyManager._brief(skipped))
+        if not_flat:
+            msg += " Layer already has keys inside [f{0:g}-f{1:g}] - not locked flat: {2}.".format(
+                t1, t2, LayerKeyManager._brief(not_flat, limit=5))
         if not_member_axes and keyed:
             msg += " Pose axes not in layer: {0}.".format(", ".join(sorted(not_member_axes)))
         if not keyed:
