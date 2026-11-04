@@ -26,6 +26,7 @@ from tools.A00110_animTool_V02.app.config.version import VERSION, LAST_UPDATE
 from tools.A00110_animTool_V02.app.core import KeyframeManager
 from tools.A00110_animTool_V02.app.core import HotkeyManager
 from tools.A00110_animTool_V02.app.core import HoldLayerManager
+from tools.A00110_animTool_V02.app.core.hold_layer_manager import DEFAULT_CURRENT_AXES
 from tools.A00110_animTool_V02.app.core import ManipSpaceManager
 from tools.A00110_animTool_V02.app.core import PoseKeyManager
 from tools.A00110_animTool_V02.app.core import AttrKeyManager
@@ -1008,6 +1009,8 @@ class MainWindow(QWidget):
             row.addWidget(le)
 
             cur = QCheckBox("Current")
+            # v02.45 기본 켜짐 : rotate Y · translate X · translate Z (저장값이 있으면 _init_hold_layer 가 덮는다)
+            cur.setChecked(attr in DEFAULT_CURRENT_AXES)
             cur.setToolTip(
                 "Key this axis with its current value at the current frame\n"
                 "instead of the number typed here (unkeyed changes are keyed as they are).\n"

@@ -68,7 +68,8 @@ def scene(override=False):
     return cube, other, layer
 
 
-SETTINGS = {"enabled": True, "layer": "Layer_01", "offset": 10, "axis_values": {"rx": 0.0, "tx": 5.0}}
+# current_axes=[] : Pose 값 경로를 보는 시험 (v02.45 기본 current 축 ry · tx · tz 를 끈다)
+SETTINGS = {"enabled": True, "layer": "Layer_01", "offset": 10, "axis_values": {"rx": 0.0, "tx": 5.0}, "current_axes": []}
 
 for override in (False, True):
     tag = "OVR" if override else "ADD"
@@ -240,7 +241,7 @@ for override in (False, True):
     clear_optvars()
     cube, other, layer = scene(override)
     before = {a: final_at(cube, a, 100) for a in ("tx", "rx")}
-    HLM.update(current_axes=["rx", "tx"], **SETTINGS)
+    HLM.update(**dict(SETTINGS, current_axes=["rx", "tx"]))
     cmds.select(cube)
     n, msg = HLM.apply()
     after = {a: final_at(cube, a, 100) for a in ("tx", "rx")}
@@ -253,7 +254,7 @@ for override in (False, True):
     clear_optvars()
     cube, other, layer = scene(override)
     before_tx = final_at(cube, "tx", 100)
-    HLM.update(current_axes=["tx"], **SETTINGS)
+    HLM.update(**dict(SETTINGS, current_axes=["tx"]))
     cmds.select(cube)
     n, msg = HLM.apply()
     check(tag + " 3 per-axis: tx current (unchanged), rx = Pose 0.0",
@@ -264,7 +265,7 @@ for override in (False, True):
 clear_optvars()
 cube, other, layer = scene(False)
 want = final_at(cube, "tx", 100)
-HLM.update(current_axes=["rx", "tx"], **SETTINGS)
+HLM.update(**dict(SETTINGS, current_axes=["rx", "tx"]))
 cmds.select(cube)
 cmds.selectKey(LKM.layer_curve("ctl.translateX", LKM.root_layer()), time=(1, 100), replace=True)
 hk.HotkeyManager.run_hold()
@@ -290,6 +291,9 @@ check("UC7 old use_current=1 migrates to current_axes = checked axes",
 HLM.update(current_axes=["ty"])
 check("UC8 writing current_axes removes the old flag",
       not cmds.optionVar(exists=PRE + "use_current") and HLM.load_settings()["current_axes"] == ["ty"])
+clear_optvars()
+check("UC9 no saved current_axes -> default ry, tx, tz (v02.45)",
+      HLM.load_settings()["current_axes"] == ["ry", "tx", "tz"], HLM.load_settings())
 clear_optvars()
 for k in ("use_current",):
     if cmds.optionVar(exists=PRE + k):
@@ -344,7 +348,7 @@ for use_current in (False, True):
 
 clear_optvars()
 objs, lay = three_scene()
-HLM.update(enabled=True, layer=lay, offset=10, axis_values={"tx": 5.0})
+HLM.update(enabled=True, layer=lay, offset=10, axis_values={"tx": 5.0}, current_axes=[])
 cmds.select(["A", lay, "B"], r=True, ne=True)
 check("SEL selected_objects drops the layer node, keeps order", HLM.selected_objects() == ["A", "B"], HLM.selected_objects())
 n, msg = HLM.apply()
@@ -361,7 +365,7 @@ check("VG0 default view_layer = '' (root)", HLM.load_settings()["view_layer"] ==
 
 objs, lay = three_scene()
 root = LKM.root_layer()
-HLM.update(enabled=True, layer=lay, offset=10, axis_values={"tx": 5.0})
+HLM.update(enabled=True, layer=lay, offset=10, axis_values={"tx": 5.0}, current_axes=[])
 
 # AnimLayer1 을 보면서 그 레이어 커브의 구간 키를 골라 Shift+A  ->  Hold 만, Layer Blend 는 건너뜀
 HLM._key_raw("A", "translateX", lay, 80, 4.0)

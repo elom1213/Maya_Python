@@ -807,11 +807,11 @@ A00110_animTool_V02.run(True)   # True = reload
 ```
 ┌ Set Pose Key (current frame) ─────────────────────┐
 │ [v] rotate X     [ 0 ]  [ ] Current               │
-│ [ ] rotate Y     [ 0 ]  [ ] Current               │
-│ [v] rotate Z     [ 0 ]  [ ] Current               │  ← Current : v02.44 축마다
-│ [ ] translate X  [ 0 ]  [ ] Current               │
+│ [ ] rotate Y     [ 0 ]  [v] Current               │
+│ [v] rotate Z     [ 0 ]  [ ] Current               │  ← Current : v02.44 축마다, v02.45 기본 ry · tx · tz
+│ [ ] translate X  [ 0 ]  [v] Current               │
 │ [v] translate Y  [ 0 ]  [ ] Current               │
-│ [ ] translate Z  [ 0 ]  [ ] Current               │
+│ [ ] translate Z  [ 0 ]  [v] Current               │
 └───────────────────────────────────────────────────┘
 [ Set Pose Key ]
 ```
@@ -820,7 +820,7 @@ A00110_animTool_V02.run(True)   # True = reload
 - **기본 체크 축**: rotate X / rotate Z / translate Y (원본 A00030 의 3축).
 - **Set Pose Key**: 선택 오브젝트(들)의 **현재 타임라인 프레임**에 **체크된 축만** 입력값으로
   `setKeyframe`. 체크됐는데 값이 비어 있으면 경고 후 중단.
-- **Current**(축마다, v02.44~ · v02.41~43 은 전역 `Use current values` 하나, 기본 끔): 그 행을 켜면 **그 축만** 입력 값 대신
+- **Current**(축마다, v02.44~ · v02.41~43 은 전역 `Use current values` 하나. **기본 켜짐 = rotate Y · translate X · translate Z**(v02.45~), 나머지 끔): 그 행을 켜면 **그 축만** 입력 값 대신
   **지금 프레임의 현재 값**으로 키를 찍는다(키 없이 움직여 둔 값도 그대로 키). 켠 행의 값 칸은 비활성이고 비어 있어도 된다.
   나머지 축은 입력 값 그대로. 활성 애니메이션 레이어에서는 최종 값이 지금 값 그대로 남는다.
   **Hot Key > Main > Layer Blend Key** 의 현재 프레임 키도 축마다 같은 방식이다. 체크 상태는 창을 다시 열어도 기억된다
@@ -1955,7 +1955,7 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
   v02.39 는 클래스 변수에 두어, DEV 리로드 순서에 따라 핫키가 옛 클래스(꺼짐)를 읽고 **레이어 키를 조용히 건너뛰는** 버그가 있었다.
   Layer Blend 에서 에러가 나면 Hold 메시지 아래에 `[Error] Layer Blend: ...` 한 줄.
 - **Hold Selected Range 버튼**은 예전처럼 Hold 만 한다 — Layer Blend 는 Shift+A 전용.
-- 시험 `tests/test_hold_layer_blend.py` 69/69(v02.44 축마다 Current UC1b · UC-ADD/OVR 3 · 옛 설정 옮기기 UC7~8, v02.43 보기 게이트 VG0~11, v02.42 SEL: 멤버 셋 중 하나만 선택 · 레이어/세트/캐릭터 섞임, v02.41 Use current values UC1~5, v02.40 optionVar · 리로드 순서 회귀 RL1 포함, Additive · Override, 덮어쓰기, 최종값 = Pose, Base 불변, 비멤버 · 없는 레이어 · 잠김 · 뮤트,
+- 시험 `tests/test_hold_layer_blend.py` 70/70(v02.45 기본 Current UC9, v02.44 축마다 Current UC1b · UC-ADD/OVR 3 · 옛 설정 옮기기 UC7~8, v02.43 보기 게이트 VG0~11, v02.42 SEL: 멤버 셋 중 하나만 선택 · 레이어/세트/캐릭터 섞임, v02.41 Use current values UC1~5, v02.40 optionVar · 리로드 순서 회귀 RL1 포함, Additive · Override, 덮어쓰기, 최종값 = Pose, Base 불변, 비멤버 · 없는 레이어 · 잠김 · 뮤트,
   run_hold 한 번 undo), `tests/test_hold_layer_blend_ui.py` 19/19(보기 게이트 콤보 기본 · push · 복원, 행마다 Current · 그 행 값 칸만 비활성 · 축마다 키 · 복원, 콤보 · 펼칠 때 갱신 · push · Pose 행 · optionVar 복원 · missing). **마야 GUI 확인 아직.**
   계획서 [a00110_hold_layer_blend_plan.md](plans/a00110_hold_layer_blend_plan.md).
 

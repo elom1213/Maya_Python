@@ -122,5 +122,8 @@
 #        설정 use_current(bool) -> current_axes(축 목록, optionVar JSON). 옛 use_current=1 은 체크된 축 전부 current 로 옮겨 읽음.
 #        회귀 test_hold_layer_blend 69/69(UC1b · UC-ADD/OVR 3 · UC6~8) · _ui 19/19.
 
-VERSION = "02.44"
+# 02.45  Pose Key `Current` 기본 켜짐 = rotate Y · translate X · translate Z (사용자 요구, 저장값이 없을 때).
+#        hold_layer_manager.DEFAULT_CURRENT_AXES 하나로 UI 초기값 · load_settings 기본을 맞춤. 회귀 70/70 · _ui 19/19.
+
+VERSION = "02.45"
 LAST_UPDATE = "2026-11-04"

@@ -39,6 +39,7 @@
 # v02.44 - `Use current values` 를 **축마다** (사용자 요구). 전역 use_current(bool) -> `current_axes`(축 목록, optionVar JSON).
 #   Pose Key 행마다 `Current` 체크박스 - 켠 축만 현재 값, 나머지 축은 입력 값. capture_current 도 그 축만 읽는다.
 #   옛 optionVar use_current=1 이 남아 있고 current_axes 가 없으면 체크된 축 전부를 current 로 옮겨 읽는다.
+# v02.45 - 저장된 current_axes 가 없을 때의 기본 = DEFAULT_CURRENT_AXES (rotate Y · translate X · translate Z, 사용자 요구).
 #
 # 결정 사항 (2026-11-04 사용자):
 #   1. -N 키 값 = 그 시점의 레이어 값 유지 (레이어 커브 평가값, 커브가 없으면 그 레이어 blend 입력(inputB)의 정적값)
@@ -62,6 +63,9 @@ from .layer_key_manager import LayerKeyManager
 
 OPTVAR_PREFIX = "JUN_A00110_holdLayer_"
 
+# v02.45 Pose Key `Current` 기본으로 켜 둘 축 (저장값이 없을 때)
+DEFAULT_CURRENT_AXES = ("ry", "tx", "tz")
+
 
 class HoldLayerManager:
 
@@ -70,7 +74,7 @@ class HoldLayerManager:
         "layer": "",           # 대상 animLayer 이름
         "offset": 10,          # N (프레임, int >= 1)
         "axis_values": {},     # Pose Key 탭에서 체크된 축 {"rx": 0.0, ...}
-        "current_axes": [],    # v02.44 현재 값으로 찍을 축 (Pose Key 행마다 `Current`). v02.41 전역 use_current 대체
+        "current_axes": list(DEFAULT_CURRENT_AXES),    # v02.44 현재 값으로 찍을 축 (Pose Key 행마다 `Current`). v02.41 전역 use_current 대체
         "view_layer": "",      # v02.43 이 레이어를 보고 있을 때만 동작. "" = 루트(BaseAnimation)
     }
 
@@ -98,7 +102,8 @@ class HoldLayerManager:
     def load_settings(cls):
         """optionVar 에서 설정을 읽는다. 없는 키는 기본값."""
         pre = OPTVAR_PREFIX
-        out = {"enabled": False, "layer": "", "offset": 10, "axis_values": {}, "current_axes": [],
+        out = {"enabled": False, "layer": "", "offset": 10, "axis_values": {},
+               "current_axes": list(DEFAULT_CURRENT_AXES),
                "view_layer": ""}
         old_use_current = False
         try:

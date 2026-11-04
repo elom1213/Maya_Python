@@ -19,7 +19,8 @@ metadata:
 - `getAttr plug -time t` 는 레이어 blend 를 거치면 옛 값이 나올 때가 있다 → 시험은 currentTime 을 옮겨 잰다.
 - Hold 와 독립 수행, 바깥 undo_chunk 로 중첩(마야 허용) → Ctrl+Z 한 번. Hold 버튼은 Hold 만.
 - v02.41 Pose Key `Use current values` → **v02.44 축마다 `Current`**(사용자: "각 어트리뷰트마다 필요한 체크"), optionVar `current_axes`(JSON 목록,
-  옛 `use_current=1` 은 체크 축 전부로 옮겨 읽고 새로 쓰면 지움). Pose Key 버튼 · Layer Blend 현재 프레임 키 모두 그 축만 **지금 값**으로.
+  옛 `use_current=1` 은 체크 축 전부로 옮겨 읽고 새로 쓰면 지움). **v02.45 기본 켜짐 = ry · tx · tz**(`DEFAULT_CURRENT_AXES`, 사용자 요구) —
+  시험은 Pose 값 경로를 볼 때 `current_axes=[]` 를 명시해야 한다. Pose Key 버튼 · Layer Blend 현재 프레임 키 모두 그 축만 **지금 값**으로.
   Shift+A 는 `capture_current()` 를 **Hold 전에** 불러 값을 잡는다 — Hold 가 커브를 바꾸면 키 없이 움직여 둔 값이 재평가로 사라진다.
 - 시험 함정: `currentTime` 이동도 undo 큐에 들어간다 → undo 확인을 먼저, 값 재기는 redo 뒤에.
 - v02.43 보기 게이트 `view_layer`(UI `Run only when viewing`, 기본 "" = 루트): 보는 레이어 = 에디터 **selected** → 없으면 preferred →

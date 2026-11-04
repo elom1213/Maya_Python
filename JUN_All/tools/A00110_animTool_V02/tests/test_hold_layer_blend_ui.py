@@ -77,10 +77,15 @@ win.cmb_hold_view_layer.setCurrentIndex(win.cmb_hold_view_layer.findData("Layer_
 check("U18 choosing Layer_01 pushes view_layer", HLM.load_settings()["view_layer"] == "Layer_01", HLM.load_settings())
 
 # v02.44 축마다 `Current`
-check("U13 every Pose Key row has its own 'Current' (off), value fields enabled",
+check("U13 every Pose Key row has its own 'Current', default on = ry, tx, tz (v02.45), their fields disabled",
       sorted(win.pose_current) == sorted(win.pose_rows)
-      and all(c.text() == "Current" and not c.isChecked() for c in win.pose_current.values())
-      and all(le.isEnabled() for _c, le in win.pose_rows.values()) and not hasattr(win, "cb_pose_current"))
+      and all(c.text() == "Current" for c in win.pose_current.values())
+      and sorted(a for a, c in win.pose_current.items() if c.isChecked()) == ["ry", "tx", "tz"]
+      and [a for a, (_c, le) in win.pose_rows.items() if not le.isEnabled()] == ["ry", "tx", "tz"]
+      and sorted(HLM.load_settings()["current_axes"]) == ["ry", "tx", "tz"] and not hasattr(win, "cb_pose_current"),
+      HLM.load_settings())
+for a in ("ry", "tx", "tz"):
+    win.pose_current[a].setChecked(False)
 win.pose_current["ty"].setChecked(True)
 win.pose_current["rz"].setChecked(True)
 check("U14 per-axis: only ty / rz fields disabled, current_axes pushed, empty rz still included",
