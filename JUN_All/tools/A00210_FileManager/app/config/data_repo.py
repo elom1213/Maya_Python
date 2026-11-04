@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-18
+# last Update date : 2026-11-04
 # A00210_FileManager - bundled default data-repo config
 #
 # 이 파일은 '중앙 데이터 리포'(records/thumbs/lineage/path_structures)의 기본 위치를
@@ -13,8 +13,19 @@ import os
 
 # 중앙 데이터 리포(git). private 면 사용자에게 GitHub 접근 권한 + 캐시된 git 자격증명이 필요하다.
 DATA_REPO_URL = "https://github.com/elom1213/JUN_FileManager_data.git"
-DATA_REPO_BRANCH = "master"
+# v01.45 : 브랜치는 main 하나. 프로파일 데이터는 브랜치가 아니라 저장소 안 profiles/<data_folder>/ 폴더로 나눈다
+# (예전: 프로파일마다 브랜치 Dnable · SA · src_rig + 비공개 저장소 MUE). 계획 docs/plans/A00210_FileManager_data_folders_plan.md
+DATA_REPO_BRANCH = "main"
 DATA_REPO_REMOTE = "origin"
+
+# 저장소 안 프로파일 데이터 폴더들의 부모, 그리고 data_folder 가 비었을 때 쓰는 폴더.
+DATA_PROFILES_DIR = "profiles"
+DEFAULT_DATA_FOLDER = "Dnable"
+
+# 더 쓰지 않는 저장소 URL -> 대신 쓸 URL (v01.45, 비공개 저장소 폐지 · MUE 는 profiles/MUE).
+RETIRED_REPO_URLS = {
+    "https://github.com/elom1213/JUN_FileManager_data_Private.git": DATA_REPO_URL,
+}
 
 # 배포 PC 에서 중앙 리포를 clone 해 넣을 기본 로컬 폴더(= 툴의 Store Repo 경로).
 # prefs.json 과 같은 ~/.jun_filemanager 아래에 둬 PC 마다 일관되게 한다.

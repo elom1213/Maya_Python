@@ -21,19 +21,28 @@ Maya 씬 파일(`.mb` / `.ma`)의 **버전·작업 기록 추적** 파이프라�
 | **Project Root** | Maya 파일들이 모여 있는 작업 루트. 기록 키(key)를 이 기준 **상대경로**로 만든다. |
 | **Source Mode** | 기록·썸네일을 어디서 읽고 쓸지: **Remote (Git)** = 중앙 git 데이터 리포(Pull/Push), **Local (Shared / NAS)** = 공유 폴더 직접 사용(git 미사용). 프로파일별로 저장(v01.23). |
 | **Store Repo / Shared Folder** | 데이터 스토어 폴더 입력 **한 칸**(v01.26). Source Mode 에 따라 라벨/설명이 바뀐다 — Remote 면 **Store Repo**(중앙 git 데이터 리포의 로컬 clone, 예: `JUN_FileManager_data`), Local 이면 **Shared Folder**(git 없이 직접 쓰는 공유/NAS 폴더). 두 모드의 경로는 프로파일에 각각(`store_dir`/`local_dir`) 저장돼, 모드를 오가도 상대 경로가 지워지지 않는다. **v01.44~ 칸은 읽기 전용** — 붙여넣기 · 타이핑으로 바뀌지 않고 `Browse...` 로만 바꾼다(실수 방지, 선택 · 복사는 됨). |
+| **Data Folder** (v01.45~) | 저장소 안 **`profiles/<이름>/`** — 이 프로파일의 records · thumbs · lineage · path_structures 가 있는 폴더. 편집 가능한 드롭다운(= `profiles/` 하위 폴더, 새 이름 = 새 폴더). 여러 프로파일이 같은 폴더를 써도 된다(예: 7개 프로파일이 `Dnable`). 예전에는 프로파일마다 **git 브랜치**로 나눴다 — 브랜치는 이제 `main` 하나 |
 | **key** | `Project Root` 기준 상대경로(예: `chars/charA_rig.mb`). PC 가 달라도(예: `P:/proj` vs `D:/work`) **같은 파일이 같은 기록**에 매핑된다. |
 | **원본 제외** | 원본 mb/ma 는 데이터 스토어에 애초에 들어가지 않는다(git 모드는 `.gitignore` 로 `*.mb`/`*.ma` 이중 차단). |
 
 > **데이터 스토어 폴더**(records/thumbs/lineage/path_structures 의 부모)는 Source Mode 에 따라
 > Store Repo(git) 또는 Shared Folder(local) 가 된다. 모든 탭이 활성 모드의 폴더를 자동으로 따른다.
 
-스토어 레이아웃:
+스토어 레이아웃 (v01.45~, 브랜치 `main` 하나):
 ```
-JUN_FileManager_data/        # git repo
-├── .gitignore               # *.mb, *.ma, __pycache__/
-├── records/<key>.json       # records/chars/charA_rig.mb.json
-└── thumbs/<key>.png         # thumbs/chars/charA_rig.mb.png
+JUN_FileManager_data/                 # git repo (Private)
+└── profiles/
+    ├── Dnable/                       # Data Folder = Dnable 인 프로파일들
+    │   ├── records/<key>.json        # records/chars/charA_rig.mb.json
+    │   ├── thumbs/<key>.png
+    │   ├── lineage/<name>.json
+    │   └── path_structures/<name>.json
+    ├── MUE/  SA/  src_rig/ ...
 ```
+- **Push 는 자기 Data Folder 만** 커밋하고, 올리기 전에 받아서(`pull --rebase`) 이어 붙인다 — 프로파일 · PC 가 동시에 올려도 폴더가 달라 충돌하지 않는다.
+- 클론이 옛 프로파일 브랜치(Dnable · SA · src_rig · MUE)에 있으면 Pull / Push 대신 **`Switch to main`** 이 보인다(미커밋 변경이 있으면 거부 — 옛 브랜치에서 먼저 Push).
+- local 모드(Shared Folder)는 폴더 규칙 없이 Shared Folder 를 그대로 쓴다.
+- 바꾼 이유와 옮긴 절차: [`plans/A00210_FileManager_data_folders_plan.md`](plans/A00210_FileManager_data_folders_plan.md).
 
 PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **로컬 prefs** 에 저장한다.
 세팅은 **Profile(환경별 묶음)** 단위로 저장된다(v01.20): `%USERPROFILE%/.jun_filemanager/profiles/<name>.json`
@@ -152,7 +161,7 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 - **첫 Pull**: Store Repo 가 비어 있으면 번들된 **Remote URL** 을 기본 경로
   `~/.jun_filemanager/JUN_FileManager_data` 에 **자동 clone** 한 뒤 pull 한다. 사용자는 **Pull 한 번**이면 된다.
 - **Settings** 의 `Store Repo`/`Remote`/`Branch`/`Remote URL` 은 번들 기본값으로 **미리 채워진다**(리포를
-  포크/이전했다면 `Remote URL`/`Branch` 만 바꿔 Save). 데이터 리포 기본 브랜치는 **`master`**.
+  포크/이전했다면 `Remote URL`/`Branch` 만 바꿔 Save). 데이터 리포 기본 브랜치는 **`main`**(v01.45~, 예전 `master`).
 - **Branch** 입력은 **편집 가능한 드롭다운** — 펼치면 Store Repo 의 실제 git 브랜치(로컬 + 원격추적, 중복
   제거)를 보여줘 올바른 이름을 고를 수 있다(직접 타이핑도 가능). `main`/`master` 혼동 같은 브랜치명 불일치로
   생기는 `src refspec ... does not match any` push 오류를 줄인다.

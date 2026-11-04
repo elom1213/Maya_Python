@@ -19,5 +19,10 @@
 # 01.44  File Manager > Settings: Store Repo / Shared Folder 칸 읽기 전용 - 붙여넣기 · 타이핑으로 경로가 바뀌지 않게,
 #        Browse... 로만 바꾼다(실수 방지). 선택 · 복사는 된다.
 
-VERSION = "01.44"
+# 01.45  데이터 저장소: 프로파일마다 브랜치 -> 브랜치 main 하나 + 저장소 안 profiles/<Data Folder>/ (비공개 저장소 폐지, MUE 도 같은 저장소).
+#        Settings 에 Data Folder(편집 콤보 = profiles/ 하위 폴더). 데이터 폴더 = <Store Repo>/profiles/<folder> (prefs.data_dir_of, A00211 공유).
+#        Push = 내 폴더만 add -> pull --rebase --autostash -> push(거절되면 한 번 더). 클론 브랜치가 설정과 다르면 Pull/Push 거부 + `Switch to main`.
+#        옛 프로파일 자동 변환(branch -> data_folder, 저장 폴더 이름으로 soundAliance=SA 교정, 비공개 URL -> 공개 URL). 기본 브랜치 master -> main.
+
+VERSION = "01.45"
 LAST_UPDATE = "2026-11-03"

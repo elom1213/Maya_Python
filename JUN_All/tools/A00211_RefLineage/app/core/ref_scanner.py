@@ -35,9 +35,14 @@ _UNTITLED = "__UNTITLED_SCENE__"
 # ------------------------------------------------------------------ prefs/store
 
 def load_store():
-    """A00210 의 prefs.json 에서 store_dir/project_root 를 읽어 (MetaStore, prefs) 반환."""
+    """A00210 의 활성 프로파일에서 데이터 폴더/project_root 를 읽어 (MetaStore, prefs) 반환.
+
+    A00210 v01.45 부터 데이터 폴더 = <store_dir>/profiles/<data_folder> (local 모드는 Shared Folder) -
+    A00210 과 같은 규칙을 쓰도록 fm_prefs.data_dir_of 로 만든다(옛 A00210 이면 store_dir 그대로)."""
     prefs = fm_prefs.load()
-    store = MetaStore(prefs.get("store_dir", ""), prefs.get("project_root", ""))
+    data_dir_of = getattr(fm_prefs, "data_dir_of", None)
+    data_dir = data_dir_of(prefs) if data_dir_of else prefs.get("store_dir", "")
+    store = MetaStore(data_dir, prefs.get("project_root", ""))
     return store, prefs
 
 

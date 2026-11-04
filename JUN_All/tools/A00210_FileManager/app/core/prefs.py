@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-22
+# last Update date : 2026-11-04
 # A00210_FileManager - per-PC local preferences / profiles (UI/DCC 비의존)
 #
 # 절대 경로 / 사용자명 등 PC 마다 다른 설정을 로컬에 저장한다(데이터 리포 git 밖이라 push X).
@@ -46,6 +46,9 @@ DEFAULTS = {
     "remote": data_repo.DATA_REPO_REMOTE,
     "branch": data_repo.DATA_REPO_BRANCH,
     "remote_url": data_repo.DATA_REPO_URL,
+    # v01.45 : 저장소 안 profiles/<data_folder>/ - 이 프로파일의 records · thumbs · lineage · path_structures 가 사는 폴더.
+    # 여러 프로파일이 같은 폴더를 써도 된다. 비어 있으면 옛 branch 값에서 변환(_apply_defaults).
+    "data_folder": "",
     "author": "",
     "recursive": False,
     "show_recorded_only": False,
@@ -73,6 +76,20 @@ _SYNC_BACKFILL = {
     "branch": data_repo.DATA_REPO_BRANCH,
     "remote_url": data_repo.DATA_REPO_URL,
 }
+
+
+# v01.45 : 옛 "프로파일마다 브랜치" -> 데이터 폴더 변환.
+# 저장 폴더(클론) 이름이 맞는 폴더를 가장 확실하게 알려 준다 - 프로파일의 branch 값이 클론과 어긋난 경우
+# (예: soundAliance 프로파일 branch=Dnable 인데 클론 A0020_SA 는 SA 브랜치)를 바로잡는다.
+_LEGACY_FOLDER_BY_STORE = {
+    "a0020_sa": "SA",
+    "a0030_src_rig": "src_rig",
+    "a0010_meu": "MUE",
+}
+# 옛 branch 값 -> 데이터 폴더 (master 데이터는 Dnable 에 다 들어 있다).
+_LEGACY_FOLDER_BY_BRANCH = {"": "Dnable", "master": "Dnable", "main": "Dnable", "private": "MUE"}
+# 이 값들이면 옛 "프로파일 브랜치" 로 보고 main 으로 바꾼다.
+_LEGACY_BRANCHES = {"", "master", "Dnable", "SA", "src_rig", "MUE", "private"}
 
 
 # ------------------------------------------------------------------ helpers
@@ -111,7 +128,35 @@ def _apply_defaults(data):
     for key, default in _SYNC_BACKFILL.items():
         if not prefs.get(key):
             prefs[key] = default
+
+    # v01.45 : 프로파일 브랜치 -> 데이터 폴더 (data_folder 가 이미 있으면 손대지 않는다).
+    if not prefs.get("data_folder"):
+        store_name = os.path.basename(os.path.normpath(prefs.get("store_dir") or "")).lower()
+        old_branch = (data or {}).get("branch", "") if isinstance(data, dict) else ""
+        prefs["data_folder"] = (_LEGACY_FOLDER_BY_STORE.get(store_name)
+                                or _LEGACY_FOLDER_BY_BRANCH.get(old_branch, old_branch)
+                                or data_repo.DEFAULT_DATA_FOLDER)
+    if prefs.get("branch") in _LEGACY_BRANCHES:
+        prefs["branch"] = data_repo.DATA_REPO_BRANCH
+    # 더 쓰지 않는 저장소(비공개 저장소) -> 대체 저장소. store_dir 은 자동으로 바꾸지 않는다(PC 마다 다르다).
+    retired = data_repo.RETIRED_REPO_URLS.get((prefs.get("remote_url") or "").strip())
+    if retired:
+        prefs["remote_url"] = retired
     return prefs
+
+
+def data_dir_of(prefs):
+    """프로파일 세팅 -> 실제 데이터 폴더(records · thumbs · lineage · path_structures 의 부모).
+
+    git 모드 = <store_dir>/profiles/<data_folder>, local 모드 = Shared Folder 그대로(폴더 규칙 없음).
+    A00211_RefLineage 도 이 함수로 경로를 만든다(단일 소스)."""
+    if (prefs or {}).get("source_mode") == "local":
+        return prefs.get("local_dir", "") or ""
+    store = (prefs or {}).get("store_dir", "") or ""
+    if not store:
+        return ""
+    folder = (prefs.get("data_folder") or data_repo.DEFAULT_DATA_FOLDER).strip()
+    return os.path.join(store, data_repo.DATA_PROFILES_DIR, folder)
 
 
 # ----------------------------------------------------------------- profiles

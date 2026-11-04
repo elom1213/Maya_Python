@@ -33,6 +33,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-04 (오늘)
 
+> [!summary] A00210_FileManager **v01.45 데이터 폴더 구조 (안 A) — 코드 · 리허설 완료, 원격 반영 대기** `#A00210_FileManager`
+- 사용자: 안 A 확정 + `JUN_FileManager_data` Private 전환 → 확인(익명 API 404, 자격증명 없는 git 거부, 이 PC 자격증명 OK).
+- 코드: Settings `Data Folder`(profiles/ 하위), 데이터 폴더 = `<Store Repo>/profiles/<folder>`(`prefs.data_dir_of`, A00211 공유), Push = 내 폴더만 → rebase → push(거절 재시도),
+  클론 브랜치 확인 + `Switch to main`, 옛 프로파일 자동 변환(저장 폴더 이름 우선 → soundAliance=SA), 기본 브랜치 main, 비공개 URL → 공용.
+- 시험: 새 43/43, 기존 50/50 · 32/32 · 31/31, A00480 Lineage 44/44. 실제 프로파일 10개 변환 = 계획 표.
+- 리허설: `_migrate/`(백업 미러 2 + 클론, push 막힘) Dnable 265 · MUE 128 · SA 11 · src_rig 7 일치 · 기록 보존, 프로파일 10개 읽기 수 불일치 0.
+  **다음: 계획서 §5 원격 반영(푸시 요청 턴). 그 전엔 A00210 Pull/Push 쓰지 말 것.**
+
 > [!summary] **A00210 데이터 저장소 구조 변경 계획서** (`docs/plans/A00210_FileManager_data_folders_plan.md`) + FileManager 데이터 푸시 `#A00210_FileManager`
 - 데이터 푸시: `JUN_FileManager_data` Dnable 미반영 82건(08-24 이후)을 `4690a34` 로 커밋 · 푸시(툴 Push 와 같은 형식). SA · src_rig · MUE 는 이미 원격과 같음.
 - 관찰: 프로파일마다 브랜치(Dnable · SA · src_rig, 비공개 MUE) + 브랜치마다 클론, Dnable 한 브랜치에 프로파일 7개 데이터가 이미 섞임,

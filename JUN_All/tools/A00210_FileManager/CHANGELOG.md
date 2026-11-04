@@ -2,6 +2,23 @@
 
 All notable changes to this tool are documented here.
 
+## [01.45] - 2026-11-04
+
+- **[데이터 저장소] 프로파일마다 브랜치 → 브랜치 `main` 하나 + 프로파일 폴더.** 데이터는 저장소 안 **`profiles/<Data Folder>/`**
+  (records · thumbs · lineage · path_structures)에 있다. 저장소 · 클론은 하나, GitHub 에서 모든 프로파일을 폴더로 한 화면에 본다.
+  비공개 저장소 `JUN_FileManager_data_Private` 는 더 쓰지 않고 MUE 도 같은 저장소(`profiles/MUE`) — 저장소는 Private 으로 전환됨.
+- **[Settings] `Data Folder`** (Store Repo 아래, 편집 가능한 드롭다운 = `profiles/` 하위 폴더). 여러 프로파일이 같은 폴더를 써도 된다.
+  Git Sync 제목에 지금 올리는 폴더(`profiles/<folder>`)가 보인다.
+- **[Push] 내 폴더만 커밋** → `pull --rebase --autostash` → push, 그 사이 누가 올려 거절되면 한 번 더. 다른 폴더의 미커밋 변경은 섞이지 않는다.
+  커밋 메시지 끝에 `[profiles/<folder>]`. **Pull** 도 `--rebase --autostash`.
+- **[안전] 클론 브랜치 확인** — 클론이 옛 프로파일 브랜치(Dnable · SA …)에 있으면 Pull / Push 를 하지 않고 **`Switch to main`** 버튼을 보인다
+  (미커밋 변경이 있으면 전환 거부).
+- **[변환] 옛 프로파일 자동 변환**: branch 값 → Data Folder(`master` → Dnable), **저장 폴더 이름이 우선**(A0020_SA → SA, A0030_Src_Rig → src_rig,
+  A0010_MEU → MUE — branch 값이 클론과 어긋나 있던 soundAliance 교정), 옛 프로파일 브랜치 → `main`, 비공개 저장소 URL → 공용 URL. Store Repo 경로는 바꾸지 않는다.
+- **A00211_RefLineage**(+ A00480 Reference > Lineage)도 같은 데이터 폴더 규칙(`prefs.data_dir_of`).
+- 시험 `tests/test_data_folders.py` 43/43(변환 · 동시 Push · 내 폴더만 · 거절 재시도 · 브랜치 확인 · Switch · UI). 기존 50/50 · 32/32 · 31/31, A00480 44/44.
+- **원격 데이터 옮기기 전에는 이 버전으로 Pull / Push 하지 말 것** — 옛 클론은 `profiles/` 가 없어 목록이 비고 `Wrong branch` 가 뜬다. 절차는 계획서 §5 ~ §7.
+
 ## [01.44] - 2026-11-03
 
 - **[File Manager > Settings] `Store Repo` / `Shared Folder` 칸 읽기 전용.** 붙여넣기 · 타이핑으로 데이터 폴더 경로가 실수로 바뀌지 않게,

@@ -16,5 +16,9 @@ metadata:
 - **개정 2026-11-04**: 사용자 요청으로 비공개 저장소 `JUN_FileManager_data_Private` 폐지 → MUE 도 `JUN_FileManager_data/profiles/MUE`(저장소 하나).
   ★ `JUN_FileManager_data` 는 **공개**(API 200) — 옮기면 MUE 공개. 계획서 §0-A: A 저장소 Private 전환 후 기록째(권장) / B 공개 + 스냅숏 / C 공개 + 기록째(비권장). **사용자 결정 대기.**
   리허설: MUE 128=128 blob 0, 기록째면 비공개 커밋 15 개가 들어간다. 비공개 저장소는 삭제 말고 Archive.
+- **진행 2026-11-04**: 안 A 확정, 사용자가 저장소 Private 전환(익명 API 404 확인). v01.45 코드 완료(시험 43/43 + 기존 전부),
+  `0030_maya_python_JUN/_migrate/`(백업 미러 2 + 리허설 클론 public, push 막힘) 리허설 일치 · 실제 프로파일 10개 읽기 일치.
+  **다음 = 계획서 §5 (푸시 요청 턴)** — `_migrate/public` 에서 `git push -u origin main` + archive 태그 + 기본 브랜치. 그 전엔 A00210 을 쓰면 목록이 비고 Wrong branch.
+- 함정: 시험 출력에 `—` 가 있으면 cp949 콘솔에서 UnicodeEncodeError → `PYTHONIOENCODING=utf-8`.
 **Why:** 사용자가 브랜치보다 간결한 버전 관리 방식을 요청. GitHub 읽기 권한은 저장소 단위라 비공개 데이터만 저장소로 나눈다.
 **How to apply:** 구현은 계획서 §3 부터 순서대로. 원격 변경(§5 · §6 · §7-7)은 푸시 요청 턴에만, 옛 브랜치 삭제는 사용자 결정.

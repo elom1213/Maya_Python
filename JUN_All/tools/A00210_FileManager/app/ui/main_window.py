@@ -619,6 +619,20 @@ class MainWindow(QWidget):
         grid.addWidget(self.ipf_store_dir, 2, 1)
         grid.addWidget(self.btn_store, 2, 2)
 
+        # v01.45 : Data Folder - 저장소 안 profiles/<이름>/ (프로파일마다 브랜치 대신 폴더).
+        # 드롭다운 = 지금 저장소의 profiles/ 하위 폴더, 새 이름을 쳐 넣으면 새 폴더. 여러 프로파일이 같은 폴더를 써도 된다.
+        self.lbl_data_folder = QLabel("Data Folder")
+        self.cmb_data_folder = _BranchComboBox(self._data_folder_names)
+        self.cmb_data_folder.setToolTip(
+            "Folder under <Store Repo>/profiles/ that holds this profile's records,\n"
+            "thumbnails, lineage and path structures. Profiles may share a folder.\n"
+            "Push only commits this folder.")
+        self.cmb_data_folder.currentTextChanged.connect(lambda *_: self._update_git_title())
+        self.cmb_data_folder.lineEdit().editingFinished.connect(self._on_data_folder_committed)
+        self.cmb_data_folder.activated.connect(lambda *_: self._on_data_folder_committed())
+        grid.addWidget(self.lbl_data_folder, 3, 0)
+        grid.addWidget(self.cmb_data_folder, 3, 1, 1, 2)
+
         # Scan Dir + Scan
         self.ipf_scan_dir = QLineEdit()
         btn_scan_browse = QPushButton("Browse...")
@@ -627,8 +641,8 @@ class MainWindow(QWidget):
         scan_dir_row = QHBoxLayout()
         scan_dir_row.addWidget(self.ipf_scan_dir, stretch=1)
         scan_dir_row.addWidget(btn_scan_browse)
-        grid.addWidget(QLabel("Scan Dir"), 3, 0)
-        grid.addLayout(scan_dir_row, 3, 1, 1, 2)
+        grid.addWidget(QLabel("Scan Dir"), 4, 0)
+        grid.addLayout(scan_dir_row, 4, 1, 1, 2)
 
         scan_row = scan_dir_row
         self.chk_recursive = QCheckBox("Recursive")
@@ -672,14 +686,14 @@ class MainWindow(QWidget):
         meta_row.addWidget(QLabel("Author"))
         meta_row.addWidget(self.ipf_author)
         meta_row.addWidget(btn_save_settings)
-        grid.addLayout(meta_row, 4, 0, 1, 3)
+        grid.addLayout(meta_row, 5, 0, 1, 3)
 
         # Remote URL (중앙 데이터 리포 git URL). 보통 번들 기본값 그대로 — 첫 Pull 시
         # Store Repo 가 비어 있으면 이 URL 을 기본 경로로 자동 clone 한다.
         self.ipf_remote_url = QLineEdit()
         self.ipf_remote_url.setPlaceholderText("data repo git URL (auto-clone on first Pull)")
-        grid.addWidget(QLabel("Remote URL"), 5, 0)
-        grid.addWidget(self.ipf_remote_url, 5, 1, 1, 2)
+        grid.addWidget(QLabel("Remote URL"), 6, 0)
+        grid.addWidget(self.ipf_remote_url, 6, 1, 1, 2)
 
         return group
 
@@ -759,9 +773,17 @@ class MainWindow(QWidget):
         self.btn_push.clicked.connect(self.on_push)
 
         self.lbl_git_status = QLabel("")
+        # v01.45 : 클론이 옛 프로파일 브랜치(Dnable · SA ...)에 있으면 Pull / Push 대신 이 버튼이 보인다.
+        self.btn_switch_branch = QPushButton("Switch to main")
+        self.btn_switch_branch.setToolTip(
+            "This clone is still on an old per-profile branch. Switch it to the shared branch\n"
+            "(refused if there are uncommitted changes - push them on the old branch first).")
+        self.btn_switch_branch.clicked.connect(self.on_switch_branch)
+        self.btn_switch_branch.setVisible(False)
 
         row.addWidget(self.btn_pull)
         row.addWidget(self.btn_push)
+        row.addWidget(self.btn_switch_branch)
         row.addWidget(self.lbl_git_status, stretch=1)
 
         return self.git_group
@@ -774,6 +796,10 @@ class MainWindow(QWidget):
         self.ipf_remote.setText(self._prefs.get("remote", data_repo.DATA_REPO_REMOTE))
         self.ipf_branch.setCurrentText(self._prefs.get("branch", data_repo.DATA_REPO_BRANCH))
         self.ipf_remote_url.setText(self._prefs.get("remote_url", data_repo.DATA_REPO_URL))
+        self.cmb_data_folder.blockSignals(True)
+        self.cmb_data_folder.setCurrentText(self._prefs.get("data_folder") or data_repo.DEFAULT_DATA_FOLDER)
+        self.cmb_data_folder.blockSignals(False)
+        self._last_data_folder = self.cmb_data_folder.currentText().strip()
         self.ipf_author.setText(self._prefs.get("author", ""))
         self.chk_recursive.setChecked(bool(self._prefs.get("recursive", False)))
         self.chk_recorded_only.setChecked(
@@ -810,6 +836,7 @@ class MainWindow(QWidget):
             "remote": self.ipf_remote.text().strip() or data_repo.DATA_REPO_REMOTE,
             "branch": self.ipf_branch.currentText().strip() or data_repo.DATA_REPO_BRANCH,
             "remote_url": self.ipf_remote_url.text().strip(),
+            "data_folder": self.cmb_data_folder.currentText().strip() or data_repo.DEFAULT_DATA_FOLDER,
             "author": self.ipf_author.text().strip(),
             "recursive": self.chk_recursive.isChecked(),
             "show_recorded_only": self.chk_recorded_only.isChecked(),
@@ -930,13 +957,19 @@ class MainWindow(QWidget):
         return self.ipf_project_root.text().strip()
 
     def _effective_store_dir(self):
-        """현재 Source Mode 에 따른 실제 데이터 폴더(records/thumbs 의 부모).
+        """현재 Source Mode 에 따른 실제 데이터 폴더(records/thumbs/lineage/path_structures 의 부모).
 
-        입력 칸(ipf_store_dir)은 항상 활성 모드의 경로를 담으므로 그대로 쓴다.
-        (git 모드면 Store Repo, local 모드면 Shared Folder). store/탭이 모두 이
-        경로로 읽고 쓰므로 모드 전환이 자동으로 반영된다.
+        입력 칸(ipf_store_dir)은 항상 활성 모드의 경로를 담는다(git 모드면 Store Repo, local 모드면 Shared Folder).
+        v01.45 : git 모드는 그 아래 profiles/<Data Folder> 가 데이터 폴더다(prefs.data_dir_of - A00211 과 같은 규칙).
+        store/탭이 모두 이 경로로 읽고 쓰므로 모드 · 폴더 전환이 자동으로 반영된다. git 은 저장소 루트를 따로 쓴다(_make_git).
         """
-        return self.ipf_store_dir.text().strip()
+        path = self.ipf_store_dir.text().strip()
+        return prefs_mod.data_dir_of({
+            "source_mode": self.cmb_source_mode.currentData() or "git",
+            "store_dir": path,
+            "local_dir": path,
+            "data_folder": self.cmb_data_folder.currentText().strip(),
+        })
 
     def get_store_dir(self):
         return self._effective_store_dir()
@@ -984,13 +1017,12 @@ class MainWindow(QWidget):
         # git 전용 입력/버튼만 토글(데이터 폴더 입력은 위처럼 항상 활성).
         for w in (
             self.ipf_remote, self.ipf_branch, self.ipf_remote_url,
-            self.btn_pull, self.btn_push,
+            self.btn_pull, self.btn_push, self.cmb_data_folder, self.lbl_data_folder,
         ):
             w.setEnabled(is_git)
 
         if is_git:
-            self.git_group.setTitle(
-                "Git Sync  (records / thumbnails only — originals are never pushed)")
+            self._update_git_title()
             self.lbl_git_status.setText("")
         else:
             self.git_group.setTitle("Git Sync  (disabled in Local mode)")
@@ -1003,7 +1035,55 @@ class MainWindow(QWidget):
             self.ipf_store_dir.text().strip(),
             self.ipf_remote.text().strip() or data_repo.DATA_REPO_REMOTE,
             self.ipf_branch.currentText().strip() or data_repo.DATA_REPO_BRANCH,
+            data_folder=self.cmb_data_folder.currentText().strip() or data_repo.DEFAULT_DATA_FOLDER,
         )
+
+    def _data_folder_names(self):
+        """Store Repo 의 profiles/ 하위 폴더 이름(Data Folder 콤보용)."""
+        return self._make_git().list_data_folders()
+
+    def _on_data_folder_committed(self):
+        """Data Folder 를 고르거나 입력을 마치면 탭 목록 · 파일 목록을 새 폴더 기준으로."""
+        folder = self.cmb_data_folder.currentText().strip()
+        if folder == getattr(self, "_last_data_folder", None):
+            return
+        self._last_data_folder = folder
+        self._update_git_title()
+        self._refresh_other_tabs()
+        self.log("Data folder: {0}".format(self._effective_store_dir() or "(not set)"))
+
+    def _update_git_title(self):
+        """Git 그룹 제목에 지금 올리는 폴더(profiles/<folder>)를 보여 준다."""
+        if not hasattr(self, "git_group"):
+            return
+        if (self.cmb_source_mode.currentData() or "git") == "local":
+            return
+        folder = self.cmb_data_folder.currentText().strip() or data_repo.DEFAULT_DATA_FOLDER
+        self.git_group.setTitle(
+            "Git Sync  -  profiles/{0}  (records / thumbnails only — originals are never pushed)".format(folder))
+
+    def _branch_ok(self, git):
+        """클론 브랜치가 설정과 같은지. 다르면 Switch 버튼을 보이고 False."""
+        ok, msg = git.check_branch()
+        self.btn_switch_branch.setText("Switch to {0}".format(git.branch))
+        self.btn_switch_branch.setVisible(not ok)
+        if not ok:
+            self.log("[Warning] " + msg)
+            self.lbl_git_status.setText("Wrong branch")
+        return ok
+
+    def on_switch_branch(self):
+        git = self._make_git()
+        ok, out = git.switch_branch()
+        self.log(out)
+        if not ok:
+            self.lbl_git_status.setText("Switch failed")
+            QMessageBox.warning(self, "Git", out.splitlines()[0] if out else "Switch failed.")
+            return
+        self.btn_switch_branch.setVisible(False)
+        self.lbl_git_status.setText("Switched to {0}".format(git.branch))
+        self._refresh_other_tabs()
+        self.on_scan()
 
     def _branch_names(self):
         """현재 Store Repo 의 git 브랜치 이름 목록(없으면 빈 목록). Branch 콤보용."""
@@ -1445,6 +1525,8 @@ class MainWindow(QWidget):
                 self.lbl_git_status.setText("Clone failed")
                 return
 
+        if not self._branch_ok(git):
+            return
         ok, out = git.pull()
         self.log(out)
         self.lbl_git_status.setText("Pull OK" if ok else "Pull failed")
@@ -1468,8 +1550,10 @@ class MainWindow(QWidget):
                 self.lbl_git_status.setText("Clone failed")
                 return
 
+        if not self._branch_ok(git):
+            return
         author = self.ipf_author.text().strip() or "unknown"
-        message = f"Update records by {author} ({self._now_iso()})"
+        message = f"Update records by {author} ({self._now_iso()}) [{git.data_rel or 'all'}]"
 
         ok, out = git.push(message)
         self.log(out)
