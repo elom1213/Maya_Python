@@ -20,5 +20,8 @@ metadata:
   `0030_maya_python_JUN/_migrate/`(백업 미러 2 + 리허설 클론 public, push 막힘) 리허설 일치 · 실제 프로파일 10개 읽기 일치.
   **다음 = 계획서 §5 (푸시 요청 턴)** — `_migrate/public` 에서 `git push -u origin main` + archive 태그 + 기본 브랜치. 그 전엔 A00210 을 쓰면 목록이 비고 Wrong branch.
 - 함정: 시험 출력에 `—` 가 있으면 cp949 콘솔에서 UnicodeEncodeError → `PYTHONIOENCODING=utf-8`.
+- **반영 2026-11-04**: 원격 `main` `8bc1d5b` + `archive/*` 5개, 이 PC 클론 main 전환, 프로파일 3개 store_dir 변경(백업 `profiles_backup_20261104_v0145`), 10개 검증 OK.
+  ★ 첫 푸시 시도는 "4가지 작업을 진행해"(푸시 단어 없음)라 자동 권한 확인에서 거부 → "푸시해" 턴에 통과.
+  남은 것: 기본 브랜치 main(사용자, gh 미로그인), 1~2주 뒤 §6 Archive · 옛 클론 · 옛 브랜치(사용자 결정). 클론 위치 이동(`JUN_FileManager_data_all/` 아래) 논의 중.
 **Why:** 사용자가 브랜치보다 간결한 버전 관리 방식을 요청. GitHub 읽기 권한은 저장소 단위라 비공개 데이터만 저장소로 나눈다.
 **How to apply:** 구현은 계획서 §3 부터 순서대로. 원격 변경(§5 · §6 · §7-7)은 푸시 요청 턴에만, 옛 브랜치 삭제는 사용자 결정.

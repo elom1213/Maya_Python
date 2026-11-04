@@ -40,6 +40,9 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 시험: 새 43/43, 기존 50/50 · 32/32 · 31/31, A00480 Lineage 44/44. 실제 프로파일 10개 변환 = 계획 표.
 - 리허설: `_migrate/`(백업 미러 2 + 클론, push 막힘) Dnable 265 · MUE 128 · SA 11 · src_rig 7 일치 · 기록 보존, 프로파일 10개 읽기 수 불일치 0.
   **다음: 계획서 §5 원격 반영(푸시 요청 턴). 그 전엔 A00210 Pull/Push 쓰지 말 것.**
+- **반영(사용자 "푸시해")**: 데이터 저장소 `main` `8bc1d5b` + `archive/*` 태그 5개 푸시(옛 브랜치 유지), 이 PC 클론 `main` 전환(툴 `switch_branch`),
+  Rig_Src · soundAliance · MUE store_dir → `JUN_FileManager_data`(프로파일 백업 후). **10개 프로파일 브랜치 OK · 파일 수 옛 클론과 같음.**
+  남은 것: GitHub 기본 브랜치 `main`(사용자 — gh 미로그인), 1~2주 뒤 비공개 저장소 Archive · 옛 클론 · 옛 브랜치 정리.
 
 > [!summary] **A00210 데이터 저장소 구조 변경 계획서** (`docs/plans/A00210_FileManager_data_folders_plan.md`) + FileManager 데이터 푸시 `#A00210_FileManager`
 - 데이터 푸시: `JUN_FileManager_data` Dnable 미반영 82건(08-24 이후)을 `4690a34` 로 커밋 · 푸시(툴 Push 와 같은 형식). SA · src_rig · MUE 는 이미 원격과 같음.
