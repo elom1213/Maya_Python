@@ -152,5 +152,12 @@
 #        탭에서 고른다(처음 값 = Hot Key > Main, 펼칠 때 목록 갱신, Hot Key 설정은 안 바뀜) ④ 공용 Expand 로 별도 창(늘 위).
 #        FixSlidingManager.run(layer=, offset=), HoldLayerManager.apply(layer=, offset=). 회귀 test_fix_sliding 36/36 · _ui 15/15.
 
-VERSION = "02.49"
+# 02.50  Fix Sliding 크래시 수정 (MayaCrashLog261104.1716 / .1749 - 두 번째 이후 실행, 디버그 커브가 그래프 에디터에 떠 있음):
+#        AnimUISlice.dll TanimCurveCallbackManager::uiPainter ACCESS_VIOLATION. 진행 팝업의 processEvents 로 그래프 에디터가
+#        다시 그릴 때, undo 를 끈 채 지운 디버그 노드의 해제된 커브를 읽었다. ① 디버그 노드 · 커브를 지우지 않고 재사용(MFnAnimCurve.remove
+#        로 키만 비우고 addKeys - cutKey -clear 는 커브 노드까지 지워서 안 씀) · 옛 `_debug_speed` / 리스트에 없는 노드는 안내만
+#        ② 커브를 고치는 단계에선 게이지를 단계 끝에만(이벤트 루프 안 돌림) ③ 그 동안 그래프 에디터 setUpdatesEnabled(False)
+#        ④ 시작할 때 키 선택 비우기. 회귀 test_fix_sliding 40/40 · _ui 15/15, KANA 두 번 연속 실행 노드 · 커브 재사용 확인.
+
+VERSION = "02.50"
 LAST_UPDATE = "2026-11-04"

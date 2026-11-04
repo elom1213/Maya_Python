@@ -219,12 +219,30 @@ for at in ("speed", "smooth", "threshold", "result"):
 check("12e Graph Editor colors: white / light sky blue / red / green (v02.49)",
       colors == {"speed": (True, (1.0, 1.0, 1.0)), "smooth": (True, (0.53, 0.81, 0.98)),
                  "threshold": (True, (1.0, 0.0, 0.0)), "result": (True, (0.0, 1.0, 0.0))}, colors)
-check("12f the old single '_debug_speed' node is removed", not cmds.objExists("_debug_speed"))
+# v02.50 : 옛 단일 노드는 지우지 않는다(그래프 에디터에 떠 있으면 지우는 순간 위험) - 안내만
+check("12f old single '_debug_speed' is kept and reported, not deleted (v02.50)",
+      cmds.objExists("_debug_speed") and any("Old debug node '_debug_speed'" in l for l in lines),
+      [l for l in lines if "debug" in l.lower()][-3:])
 check("12b debug result (measured after the fix) lower than raw speed inside a fixed span",
       sum(resv[i] for i in inner) < sum(spd[i] for i in inner), (sum(resv[i] for i in inner), sum(spd[i] for i in inner)))
+def debug_curves(node):
+    return dict((at, (cmds.listConnections(node + "." + at, type="animCurve") or [None])[0])
+                for at in ("speed", "smooth", "threshold", "result"))
+
+
+crv_before = debug_curves(DN)
+node_uuid = cmds.ls(DN, uuid=True)[0]
 FS.run([foot], 1, 60, **dict(OPTS, debug=True, layer_blend=False))
-check("12c second run keeps one debug node per object", cmds.ls("*_debug_speed*", type="transform") == [DN],
-      cmds.ls("*_debug_speed*", type="transform"))
+check("12c second run keeps one debug node per object", sorted(cmds.ls("*_debug_speed", type="transform")) ==
+      sorted([DN, "_debug_speed"]), cmds.ls("*_debug_speed*", type="transform"))
+check("12g second run REUSES the same node and the same 4 curve nodes (v02.50 crash fix - nothing deleted)",
+      cmds.ls(DN, uuid=True)[0] == node_uuid and debug_curves(DN) == crv_before, (crv_before, debug_curves(DN)))
+FS.preview([foot], 11, 40, smooth=3, threshold_pct=5.0, merge_gap=0, min_span=5, debug=True)
+kc2 = cmds.keyframe(DN + ".speed", q=True, timeChange=True)
+check("12h reused curves get the new range's keys only (11..40 -> 30 keys), colors kept",
+      len(kc2) == 30 and kc2[0] == 11.0 and kc2[-1] == 40.0 and debug_curves(DN) == crv_before
+      and cmds.getAttr(crv_before["result"] + ".useCurveColor"), (len(kc2), kc2[:1], kc2[-1:]))
+cmds.delete("_debug_speed")
 # 오브젝트 둘 -> 노드 둘 (TSL 에 든 개수만큼)
 foot, lay = make_scene(walk_xs())
 other = cmds.duplicate(foot, name="ns_other")[0]
@@ -233,6 +251,14 @@ _r, lines = FS.preview([foot, other], 1, 60, smooth=3, threshold_pct=5.0, merge_
 dn = sorted(cmds.ls("*_debug_speed", type="transform"))
 check("12d two listed objects -> two debug nodes (one each)",
       dn == sorted([FS.debug_node_name(foot), FS.debug_node_name(other)]) and len(dn) == 2, dn)
+_r, lines = FS.preview([foot], 1, 60, smooth=3, threshold_pct=5.0, merge_gap=0, min_span=5, debug=True)
+check("12i a node of an object left out of the list is kept and reported",
+      cmds.objExists(FS.debug_node_name(other)) and any("not in this run are kept" in l for l in lines))
+cmds.selectKey(LKM.layer_curve(foot + ".translateX", LKM.root_layer()), time=(1, 60), replace=True)
+had = bool(cmds.keyframe(q=True, selected=True, name=True))
+FS.run([foot], 1, 60, **dict(OPTS, debug=False, layer_blend=False))
+check("12j run clears the Graph Editor key selection first (v02.50)",
+      had and not cmds.keyframe(q=True, selected=True, name=True))
 
 # ================================================================ 13 undo 한 번 · 시간 복원
 foot, lay = make_scene(walk_xs())

@@ -33,6 +33,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-04 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.50 Fix Sliding 크래시 수정** `#A00110_animTool`
+- 보고: Fix Sliding 실행 중 마야 크래시 2 회(MayaCrashLog261104.1716 / .1749). 사용자 확인 = 두 번째 이후 실행, 디버그 커브가 그래프 에디터에 떠 있던 경우 있음.
+- 분석: 버튼 → Python → `processEvents`(진행 팝업) → 그래프 에디터 paint → `AnimUISlice.dll TanimCurveCallbackManager::uiPainter` ACCESS_VIOLATION(0xFFFFFFFF).
+  v02.49 `write_debug` 가 **undo 를 끈 채** 디버그 노드를 지우고 다시 만들었다 → 지운 커브가 바로 해제 → 그래프 에디터가 해제된 커브를 그림.
+- 수정: ① 디버그 노드 · 커브 재사용(`MFnAnimCurve.remove` 7000 키 0.015 s, 노드 유지 — `cutKey -clear` 는 커브 노드까지 지워서 안 씀) · 옛 노드는 안내만
+  ② Applying · Debug 동안 게이지는 단계 끝에만 ③ 그래프 에디터 `setUpdatesEnabled(False)` ④ 키 선택 비우기(`selectKey(clear=True)` 는 대상 없이 실패 → 골라진 커브를 remove).
+- 시험: 40/40 · UI 15/15 · 회귀 81 · 21, KANA 두 번 연속 실행 — 노드 2 · 커브 8 재사용(UUID 동일), 33.4 s. 그래프 에디터 크래시 자체는 mayapy 에 GE 가 없어 재현 불가 → **GUI 확인 필요**.
+
 > [!summary] A00110_animTool_V02 **v02.49 Fix Sliding 업데이트** `#A00110_animTool`
 - 요청 4건: ① 디버그 노드를 TSL 오브젝트마다 `<이름>_debug_speed`(speed / smooth / threshold / result + source / info, 옛 단일 노드 정리)
   ② 그래프 에디터 커브 색 흰 · 밝은 하늘 · 빨강 · 초록(`animCurve.useCurveColor` + `curveColor`, mayapy 실측) ③ 탭에서 Layer 콤보 + Frames before (N)

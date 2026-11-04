@@ -16,6 +16,9 @@ metadata:
 - 디버그 노드는 **undo 를 끈 채**(밖에서 만들면 Ctrl+Z 한 번이 디버그만 되돌린다). 커브는 API `MFnAnimCurve.addKeys`.
 - **v02.49**: 디버그 노드 = 오브젝트마다 `<이름>_debug_speed`(speed 흰 · smooth 밝은 하늘 · threshold 빨강 · result 초록 —
   **animCurve 의 `useCurveColor` + `curveColor`(double3)** 로 그래프 에디터 색), Layer · N 을 탭에서 고름(`run(layer=, offset=)`), 공용 Expand.
+- **★ v02.50 크래시**: undo 를 끈 채(`undoInfo stateWithoutFlush=False`) 노드를 지우면 **바로 해제** → 그 커브가 그래프 에디터에 떠 있으면
+  다음 paint 에서 `AnimUISlice.dll uiPainter` ACCESS_VIOLATION(진행 팝업 processEvents 가 방아쇠). → 디버그 노드 · 커브는 **재사용**(MFnAnimCurve.remove,
+  `cutKey -clear` 는 커브 노드까지 지움), 커브 고치는 동안 이벤트 루프 금지 · GE `setUpdatesEnabled(False)`. `selectKey(clear=True)` 는 대상 없이 부르면 헤드리스에서 실패.
 - `_SmartLayer` 는 .pyc — 디컴파일 안 함, 툴팁 문구만 참고([[wip-a00110-counter-layer]] 와 같은 결정).
 
 **실측 씬(사용자 제공, 테스트용으로 써도 됨, 저장하지 말 것)**:

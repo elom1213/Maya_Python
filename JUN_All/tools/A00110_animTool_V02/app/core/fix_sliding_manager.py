@@ -23,6 +23,16 @@
 # v02.49 - 디버그 노드를 **오브젝트마다 하나** `<이름>_debug_speed` (어트리뷰트 speed / smooth / threshold / result + info · source),
 #   그래프 에디터 커브 색 = 흰 / 밝은 하늘 / 빨강 / 초록 (animCurve.useCurveColor + curveColor). v02.48 의 단일 `_debug_speed` 는 지운다.
 #   Layer Blend 레이어 · N 을 탭에서 고른다 - run(layer=, offset=) 가 Hot Key > Main 값을 덮는다(Pose / Current 축은 그대로 Pose Key).
+#
+# v02.50 - **그래프 에디터 크래시 수정** (MayaCrashLog261104.1716 / .1749 - 두 번째 이후 실행, 디버그 커브가 그래프 에디터에 떠 있음):
+#   AnimUISlice.dll TanimCurveCallbackManager::uiPainter 에서 ACCESS_VIOLATION (0xFFFFFFFF 읽기). 진행 팝업의 processEvents 가
+#   그래프 에디터를 다시 그리게 했는데, 그 커브는 write_debug 가 **undo 기록을 끈 채 지운** 디버그 노드의 것이었다
+#   (undo 가 켜져 있으면 지운 노드가 undo 큐에 살아 있지만, 꺼 두면 바로 해제 -> 그래프 에디터가 해제된 커브를 가리킨다).
+#   1) 디버그 노드 · 어트리뷰트 · 커브를 **지우지 않고 재사용** - 키만 MFnAnimCurve.remove 로 비우고 addKeys.
+#      옛 단일 `_debug_speed` · 리스트에서 빠진 오브젝트의 노드는 자동으로 지우지 않는다(로그로 알림).
+#   2) 커브를 고치는 단계(Applying · Debug)에서는 게이지를 단계 끝에만 갱신 - 고치는 도중에 이벤트 루프를 돌리지 않는다.
+#   3) 그 동안 그래프 에디터 다시 그리기를 멈춘다(_freeze_graph_editors, finally 에서 복원) - 이중 안전장치.
+#   4) 시작할 때 키 선택을 비운다(Hold 가 선택된 키를 지워 그래프 에디터 선택 캐시가 어긋나지 않게).
 
 import contextlib
 import math
@@ -39,6 +49,39 @@ from .layer_key_manager import LayerKeyManager
 
 T_ATTRS = ("translateX", "translateY", "translateZ")
 R_ATTRS = ("rotateX", "rotateY", "rotateZ")
+
+
+@contextlib.contextmanager
+def _freeze_graph_editors():
+    """열린 그래프 에디터의 다시 그리기를 블록 동안 멈춘다(v02.50 크래시 안전장치). GUI 가 없거나 실패하면 아무것도 안 한다."""
+    widgets = []
+    try:
+        import maya.OpenMayaUI as omui
+        try:
+            from shiboken2 import wrapInstance
+            from PySide2.QtWidgets import QWidget
+        except ImportError:                                 # PySide6 마야
+            from shiboken6 import wrapInstance
+            from PySide6.QtWidgets import QWidget
+        for panel in cmds.getPanel(scriptType="graphEditor") or []:
+            ptr = omui.MQtUtil.findControl(panel + "GraphEd")
+            if not ptr:
+                continue
+            w = wrapInstance(int(ptr), QWidget)
+            if w.updatesEnabled():
+                w.setUpdatesEnabled(False)
+                widgets.append(w)
+    except Exception:                                       # noqa: BLE001
+        pass
+    try:
+        yield len(widgets)
+    finally:
+        for w in widgets:
+            try:
+                w.setUpdatesEnabled(True)
+                w.update()
+            except Exception:                               # noqa: BLE001
+                pass
 
 
 @contextlib.contextmanager
@@ -301,9 +344,11 @@ class FixSlidingManager:
                     for f in range(int(a), int(b) + 1):
                         sp[f - int(start)] = 0.0
                 predicted[o] = sp
-            nodes = cls.write_debug(results, predicted, start, cls._info(start, end, smooth, threshold_pct,
-                                                                          merge_gap, min_span, axes))
+            with _freeze_graph_editors():
+                nodes = cls.write_debug(results, predicted, start, cls._info(start, end, smooth, threshold_pct,
+                                                                              merge_gap, min_span, axes))
             lines.append("Debug curves: {0} (result = predicted)".format(LayerKeyManager._brief(nodes, limit=5)))
+            lines += cls._stale_debug_lines(objs)
         n_apply = sum(len(results[o]["apply"]) for o in objs)
         lines.append("Fix Sliding preview: {0} object(s), {1} span(s) to fix (G={2}, M={3}).".format(
             len(objs), n_apply, int(merge_gap), int(min_span)))
@@ -336,7 +381,12 @@ class FixSlidingManager:
         done_spans = 0
         merges = 0
         short = 0
-        with undo_chunk():
+        # v02.50 : 커브를 고치는 동안 이벤트 루프를 돌리지 않고(게이지는 끝에 한 번), 그래프 에디터 다시 그리기도 멈춘다
+        with _freeze_graph_editors(), undo_chunk():
+            # 그래프 에디터 키 선택 비우기 - selectKey(clear=True) 는 대상 없이 부르면 실패할 수 있어 골라진 커브를 직접 뺀다
+            picked = cmds.keyframe(q=True, selected=True, name=True) or []
+            if picked:
+                cmds.selectKey(picked, remove=True)
             for o in objs:
                 r = results[o]
                 lines += cls._span_lines(o, r, min_span, merge_gap)
@@ -369,17 +419,19 @@ class FixSlidingManager:
                     lines.append(text)
                     prev_end = b
                     done_spans += 1
-                    if progress:
-                        progress(done_spans, total)
+        if progress:
+            progress(total, total)
 
         if debug:
             cls._phase(progress, "Debug")
-            pos = cls.sample_positions(objs, start, end)
-            measured = dict((o, cls.speeds(pos[o], axes)) for o in objs)
-            nodes = cls.write_debug(results, measured, start, cls._info(start, end, smooth, threshold_pct,
-                                                                         merge_gap, min_span, axes))
+            with _freeze_graph_editors():
+                pos = cls.sample_positions(objs, start, end)
+                measured = dict((o, cls.speeds(pos[o], axes)) for o in objs)
+                nodes = cls.write_debug(results, measured, start, cls._info(start, end, smooth, threshold_pct,
+                                                                             merge_gap, min_span, axes))
             lines.append("Debug curves: {0} (result = measured after the fix)".format(
                 LayerKeyManager._brief(nodes, limit=5)))
+            lines += cls._stale_debug_lines(objs)
 
         lines.append("Fix Sliding: {0} object(s), {1} span(s) fixed, {2} merge(s) (G={3}), "
                      "{4} short span(s) skipped (M={5}).".format(
@@ -420,9 +472,11 @@ class FixSlidingManager:
 
     @classmethod
     def write_debug(cls, results, result_speeds, start, info=""):
-        """오브젝트마다 `<이름>_debug_speed` 를 새로 만들고 speed / smooth / threshold / result 커브(색 지정).
+        """오브젝트마다 `<이름>_debug_speed` 에 speed / smooth / threshold / result 커브(색 지정).
 
-        undo 기록 안 남김. 반환 = 만든 노드 이름 목록(results 순서).
+        v02.50 - **지우지 않고 재사용**한다: 노드 · 어트리뷰트 · 커브가 있으면 그대로 두고 키만 갈아 끼운다
+        (undo 를 끈 채 지우면 그래프 에디터가 해제된 커브를 가리켜 마야가 죽었다). 없을 때만 만든다.
+        undo 기록 안 남김. 반환 = 노드 이름 목록(results 순서).
         """
         import maya.api.OpenMaya as om
         import maya.api.OpenMayaAnim as oma
@@ -430,17 +484,17 @@ class FixSlidingManager:
         objs = list(results)
         nodes = []
         with _undo_off():
-            if cmds.objExists(cls.LEGACY_DEBUG_NODE):
-                cmds.delete(cls.LEGACY_DEBUG_NODE)
             unit = om.MTime.uiUnit()
             for o, pre in cls._prefixes(objs).items():
                 name = pre + cls.DEBUG_SUFFIX
-                if cmds.objExists(name):
-                    cmds.delete(name)
-                node = cmds.createNode("transform", name=name)
+                if cmds.objExists(name) and cmds.nodeType(name) == "transform":
+                    node = name
+                else:
+                    node = cmds.createNode("transform", name=name)
                 nodes.append(node)
                 for key, text in (("source", o), ("info", info)):
-                    cmds.addAttr(node, longName=key, dataType="string")
+                    if not cmds.attributeQuery(key, node=node, exists=True):
+                        cmds.addAttr(node, longName=key, dataType="string")
                     cmds.setAttr(node + "." + key, text, type="string")
                 r = results[o]
                 n = len(r["speed"])
@@ -448,20 +502,46 @@ class FixSlidingManager:
                 series = (("speed", r["speed"]), ("smooth", r["smooth"]),
                           ("threshold", [r["threshold"]] * n), ("result", result_speeds.get(o, [])))
                 for attr, values in series:
-                    cmds.addAttr(node, longName=attr, attributeType="double", keyable=True)
-                    if not values:
+                    if not cmds.attributeQuery(attr, node=node, exists=True):
+                        cmds.addAttr(node, longName=attr, attributeType="double", keyable=True)
+                    plug_name = "{0}.{1}".format(node, attr)
+                    existing = cmds.listConnections(plug_name, source=True, destination=False,
+                                                    type="animCurve") or []
+                    if not values and not existing:
                         continue
                     sel = om.MSelectionList()
-                    sel.add("{0}.{1}".format(node, attr))
-                    fn = oma.MFnAnimCurve()
-                    fn.create(sel.getPlug(0), oma.MFnAnimCurve.kAnimCurveTU)
-                    fn.addKeys(times, [float(v) for v in values],
-                               oma.MFnAnimCurve.kTangentLinear, oma.MFnAnimCurve.kTangentLinear)
+                    if existing:
+                        sel.add(existing[0])
+                        fn = oma.MFnAnimCurve(sel.getDependNode(0))
+                        for i in range(fn.numKeys - 1, -1, -1):      # 뒤에서부터 - 커브 노드는 남는다
+                            fn.remove(i)
+                    else:
+                        sel.add(plug_name)
+                        fn = oma.MFnAnimCurve()
+                        fn.create(sel.getPlug(0), oma.MFnAnimCurve.kAnimCurveTU)
+                    if values:
+                        fn.addKeys(times, [float(v) for v in values],
+                                   oma.MFnAnimCurve.kTangentLinear, oma.MFnAnimCurve.kTangentLinear)
                     # 그래프 에디터 커브 색
                     crv = fn.name()
                     cmds.setAttr(crv + ".useCurveColor", 1)
                     cmds.setAttr(crv + ".curveColor", *cls.DEBUG_COLORS[attr], type="double3")
         return nodes
+
+    @classmethod
+    def _stale_debug_lines(cls, objs):
+        """자동으로 지우지 않는 옛 디버그 노드 안내 (v02.48 단일 노드 · 리스트에 없는 오브젝트의 노드)."""
+        lines = []
+        if cmds.objExists(cls.LEGACY_DEBUG_NODE):
+            lines.append("[Info] Old debug node '{0}' (v02.48) is left in the scene - delete it by hand "
+                         "when it is not shown in the Graph Editor.".format(cls.LEGACY_DEBUG_NODE))
+        mine = set(cls._prefixes(objs)[o] + cls.DEBUG_SUFFIX for o in objs)
+        others = [n for n in (cmds.ls("*" + cls.DEBUG_SUFFIX, type="transform") or [])
+                  if n not in mine and n != cls.LEGACY_DEBUG_NODE]
+        if others:
+            lines.append("[Info] Debug nodes of objects not in this run are kept: {0}".format(
+                LayerKeyManager._brief(others, limit=5)))
+        return lines
 
     @staticmethod
     def _phase(progress, name):
