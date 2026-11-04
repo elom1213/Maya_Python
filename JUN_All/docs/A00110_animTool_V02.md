@@ -1936,6 +1936,10 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
   고르지 않았으면 Shift+A 때 `no layer chosen` 경고. 저장된 레이어가 씬에 없으면 `<이름> (missing)` 으로 남고,
   실행 때 경고 후 건너뛴다.
 - **Frames before** = N (1~1000).
+- **기준 프레임 a**(v02.47~): 그래프 에디터에서 고른 키 구간 **[a, b] 의 a**(고른 키의 최소 시간). Shift+A 는 Hold 와 함께
+  **a**(Pose / Current)와 **a − N**(레이어 값)에 키를 찍는다 — 시간 슬라이더가 어디 있든 상관없다. 고른 키가 없으면 예전처럼 현재 프레임.
+  a 는 Hold 가 (a, b] 키를 지우기 **전에** 읽는다. `Current` 값도 a 시점의 값이며, 현재 시간이 a 가 아니면 잠깐 a 로 옮겨 읽고
+  되돌린다(undo 에 남지 않음). 이때 지금 프레임에서 키 없이 움직여 둔 값은 시간 이동으로 사라진다.
 - **Run only when viewing**(v02.43~, 기본 **BaseAnimation**): 지금 **보고 있는 레이어**가 정확히 이 레이어 하나일 때만 Layer Blend 가 돈다.
   예: AnimLayer1 을 보면서 그 커브의 구간 키를 골라 Shift+A 를 누르면 **AnimLayer1 Hold 만** 되고 Layer Blend 는
   `Layer Blend: skipped - viewing 'AnimLayer1' (runs only when viewing 'BaseAnimation').` 한 줄과 함께 건너뛴다.

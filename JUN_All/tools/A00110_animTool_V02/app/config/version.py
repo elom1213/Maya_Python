@@ -131,5 +131,11 @@
 #        ② 툴을 열면 View > Graph Focus `Auto-Focus on Selection` 기본 ON(사용자 요청).
 #        회귀 test_hold_layer_blend 73/73(UC6 · UC10~12) · _ui 21/21(U20 · U21), 창 띄우는 기존 시험 5개 통과.
 
-VERSION = "02.46"
+# 02.47  Layer Blend Key 기준 프레임 = **그래프 에디터에서 고른 키 구간 [a, b] 의 a** (사용자 요구). 키는 a(Pose / Current) 와
+#        a - N(레이어 값). a 는 Hold 전에 읽는다(range_start - Hold 가 (a, b] 를 지우므로), 고른 키가 없으면 현재 프레임.
+#        Current 값 = a 시점 값: 현재 시간이 a 가 아니면 undo 기록을 끈 채 시간을 a 로 옮겨 읽고 되돌린다(values_at).
+#        mayapy 실측 - 레이어가 있으면 getAttr -time · MDGContext 는 Base 값만, currentTime -update false 는 옛 값.
+#        setKeyframe -animLayer -v 의 additive 역산은 키 시간 기준이라 그대로 a 에 찍는다. 회귀 81/81(RA0~7) · _ui 21/21.
+
+VERSION = "02.47"
 LAST_UPDATE = "2026-11-04"

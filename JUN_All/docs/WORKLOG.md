@@ -33,6 +33,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-04 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.47 Layer Blend 기준 = 고른 구간의 a** `#A00110_animTool`
+- 요구: 현재 프레임 / −N 이 아니라, 그래프 에디터에서 [a, b] 를 고르고 Shift+A 하면 **a 와 a − N** 에 레이어 키.
+- 구현: `HoldLayerManager.range_start()`(고른 키 최소 시간, Hold 전에), `run_hold` 가 frame=a 로 capture · apply, 없으면 현재 프레임.
+  `values_at()` — a ≠ 현재 시간이면 undo 끈 채 시간 이동해 읽고 복귀.
+- ★ 실측: 레이어가 있으면 `getAttr -time` · `MDGContext` 는 Base 값만, `currentTime -update false` 는 옛 값 → 실제 시간 이동만 맞다.
+  `setKeyframe -animLayer -v` additive 역산은 키 시간 기준.
+- 시험: 81/81(RA: [60,90] 선택 · 현재 100 → f60 · f50, 시간 복귀, undo 한 번, Current = f60 값, 키 없으면 현재 프레임) · UI 21/21. **GUI 확인 아직.**
+
 > [!summary] A00110_animTool_V02 **v02.46 Current 축 키 누락 수정 + Auto-Focus 기본 ON** `#A00110_animTool`
 - 보고: Layer Blend Key 로 AnimLayer1 에 찍힌 키를 보면 Pose Key `Current` 를 켠 축에 키가 없다.
 - 원인: 키 축 = 축 체크만, Current 는 그 안에서 값만 바꿈(체크 ∩ Current) → 기본값(체크 rx rz ty / Current ry tx tz)이 안 겹쳐 Current 축이 통째로 빠짐.

@@ -683,8 +683,9 @@ class MainWindow(QWidget):
         hold_layout.addLayout(hold_row)
 
         # ---- Layer Blend Key (v02.39) : Shift+A 가 고른 레이어에 (현재-N) 레이어 값 키 + 현재 프레임 Pose 키 ----
-        tip = ("Shift+A also keys the chosen layer: all layer attributes at (current - N) with their\n"
-               "layer value, and Pose Key axes at the current frame.\n"
+        tip = ("Shift+A also keys the chosen layer at the start 'a' of the key range [a, b] selected\n"
+               "in the Graph Editor (no keys selected: the current frame):\n"
+               "all layer attributes at (a - N) with their layer value, and Pose Key axes at a.\n"
                "Objects / attributes that are not in the layer are skipped (nothing is added to the layer).")
         self.cb_hold_layer = QCheckBox("Layer Blend Key")
         self.cb_hold_layer.setToolTip(tip)
@@ -704,7 +705,9 @@ class MainWindow(QWidget):
         self.sp_hold_layer_offset = QSpinBox()
         self.sp_hold_layer_offset.setRange(1, 1000)
         self.sp_hold_layer_offset.setValue(10)
-        self.sp_hold_layer_offset.setToolTip("N : the layer value is keyed at (current frame - N).")
+        self.sp_hold_layer_offset.setToolTip(
+            "N : the layer value is keyed at (a - N), a = start of the selected key range\n"
+            "(the current frame when no keys are selected).")
         hl_form.addWidget(self.sp_hold_layer_offset, 1, 1)
         # v02.43 보기 게이트 : 이 레이어를 보고 있을 때만 Layer Blend (기본 BaseAnimation)
         hl_form.addWidget(QLabel("Run only when viewing"), 2, 0)

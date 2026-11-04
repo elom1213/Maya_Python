@@ -43,6 +43,11 @@
 # v02.46 - **`Current` 를 켠 축은 축 체크가 꺼져 있어도 키를 찍는다** (키 축 = 체크 축 ∪ current 축, effective_axes).
 #   v02.44~45 는 체크 축 ∩ current 만 current 로 다뤄, 기본값(체크 rx rz ty / current ry tx tz)에서 current 축이
 #   하나도 안 찍혔다(사용자 보고: AnimLayer1 에 current 축 키가 없다).
+# v02.47 - **기준 프레임 = 그래프 에디터에서 고른 키 구간 [a, b] 의 a** (사용자 요구). 키는 a(Pose / Current) 와 a - N(레이어 값).
+#   run_hold 가 Hold **전에** range_start() 로 a 를 읽는다(Hold 가 (a, b] 키를 지우므로). 고른 키가 없으면 예전처럼 현재 프레임.
+#   Current 값 = a 프레임의 값. 현재 시간이 a 가 아니면 values_at() 이 **undo 기록을 끈 채 시간을 a 로 옮겨 읽고 되돌린다** -
+#   mayapy 실측: 레이어가 있으면 `getAttr -time` · API MDGContext 는 Base 값만, `currentTime -update false` 는 옛 값을 준다.
+#   additive 의 `setKeyframe -animLayer -v` 역산은 **키 시간 기준**이라(실측) 현재 시간과 무관하게 a 에 찍으면 된다.
 #
 # 결정 사항 (2026-11-04 사용자):
 #   1. -N 키 값 = 그 시점의 레이어 값 유지 (레이어 커브 평가값, 커브가 없으면 그 레이어 blend 입력(inputB)의 정적값)
@@ -264,11 +269,52 @@ class HoldLayerManager:
             out.setdefault(a, 0.0)
         return out
 
-    @classmethod
-    def capture_current(cls, objects=None):
-        """current 축이 있으면 선택 오브젝트 x current 축의 **지금 값** {(obj, 축): float}. 없으면 None (v02.46 체크와 무관).
+    @staticmethod
+    def range_start():
+        """그래프 에디터(키 선택)에서 고른 키들의 최소 시간 = 구간 [a, b] 의 a. 고른 키가 없으면 None."""
+        try:
+            times = cmds.keyframe(q=True, selected=True, timeChange=True) or []
+        except Exception:                                   # noqa: BLE001
+            times = []
+        return float(min(times)) if times else None
 
-        run_hold 가 Hold **전에** 부른다. 읽을 수 없는 채널은 빠진다(apply 가 그때 다시 읽는다).
+    @staticmethod
+    def values_at(plugs, t):
+        """plug 들의 t 시점 **최종(레이어 합성) 값** {plug: float}. 읽을 수 없는 plug 는 빠진다.
+
+        현재 시간이 t 면 그대로 읽는다(키 없이 움직여 둔 값 포함). 아니면 undo 기록을 잠시 끄고 시간을 t 로 옮겨 읽은 뒤
+        되돌린다 - 레이어가 있으면 getAttr -time / MDGContext 는 Base 값만 준다(mayapy 실측).
+        """
+        out = {}
+        now = float(cmds.currentTime(q=True))
+
+        def read():
+            for plug in plugs:
+                try:
+                    out[plug] = float(cmds.getAttr(plug))
+                except Exception:                           # noqa: BLE001
+                    pass
+
+        if abs(now - float(t)) < 1e-6:
+            read()
+            return out
+        undo_on = cmds.undoInfo(q=True, state=True)
+        if undo_on:
+            cmds.undoInfo(stateWithoutFlush=False)
+        try:
+            cmds.currentTime(t, update=True)
+            read()
+        finally:
+            cmds.currentTime(now, update=True)
+            if undo_on:
+                cmds.undoInfo(stateWithoutFlush=True)
+        return out
+
+    @classmethod
+    def capture_current(cls, objects=None, frame=None):
+        """current 축이 있으면 선택 오브젝트 x current 축의 **frame(기본 현재) 시점 값** {(obj, 축): float}. 없으면 None.
+
+        run_hold 가 Hold **전에** 부른다(v02.47 frame = 고른 구간의 a). 읽을 수 없는 채널은 빠진다(apply 가 그때 다시 읽는다).
         """
         s = cls.load_settings()
         axes = list(dict.fromkeys(s.get("current_axes") or []))
@@ -277,18 +323,14 @@ class HoldLayerManager:
         if not cls.view_gate(s.get("view_layer", ""))[0]:
             return None
         sel = cls.selected_objects(objects)
-        out = {}
-        for obj in sel:
-            for short in axes:
-                try:
-                    out[(obj, short)] = float(cmds.getAttr("{0}.{1}".format(obj, short)))
-                except Exception:                           # noqa: BLE001
-                    pass
-        return out
+        t = float(cmds.currentTime(q=True)) if frame is None else float(frame)
+        pairs = [(obj, short) for obj in sel for short in axes]
+        vals = cls.values_at(["{0}.{1}".format(o, a) for o, a in pairs], t)
+        return {(o, a): vals["{0}.{1}".format(o, a)] for o, a in pairs if "{0}.{1}".format(o, a) in vals}
 
     @classmethod
     def apply(cls, objects=None, frame=None, current_values=None):
-        """현재 프레임-N 에 '그 시점 레이어 값' 키, 현재 프레임에 Pose 값 키.
+        """(frame - N) 에 '그 시점 레이어 값' 키, frame 에 Pose 값 키. frame 기본 = 현재 프레임 (v02.47 run_hold 는 고른 구간의 a).
 
         current 축(v02.44 축마다)은 현재 프레임 키를 Pose 값 대신 **지금 값**으로
         (current_values {(obj, 축): 값} 이 있으면 그것, 없으면 여기서 읽는다).
@@ -343,9 +385,7 @@ class HoldLayerManager:
             if (obj, short) in current_values:
                 return current_values[(obj, short)]
             plug = "{0}.{1}".format(obj, short)
-            if t1 == now:
-                return float(cmds.getAttr(plug))
-            return float(cmds.getAttr(plug, time=t1))
+            return cls.values_at([plug], t1)[plug]
 
         layer_nodes = LayerKeyManager._layer_nodes(layer)
         kind = LayerKeyManager._layer_kind(layer, root)

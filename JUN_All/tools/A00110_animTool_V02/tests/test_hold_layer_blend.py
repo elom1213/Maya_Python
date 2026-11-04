@@ -153,7 +153,9 @@ finally:
 after_lay = keys(crv(cube, "translateX", layer))
 after_base = keys(base_tx)
 check("RH1 run_hold: hold flattened base tx (f100 = f1 value 0)", after_base.get(100.0) == 0.0, after_base)
-check("RH2 run_hold: layer tx f90 = 2.0 kept + f100 keyed", after_lay.get(90.0) == 2.0 and 100.0 in after_lay, after_lay)
+# v02.47 기준 프레임 = 고른 구간 [1, 100] 의 a=1 -> 레이어 키는 f1 (Pose) 와 f-9 (레이어 값), f100 에는 없다
+check("RH2 run_hold: layer keys at range start a=1 and a-N=-9, none at f100 (v02.47)",
+      1.0 in after_lay and -9.0 in after_lay and 100.0 not in after_lay and after_lay.get(90.0) == 2.0, after_lay)
 cmds.undo()
 check("RH3 one undo reverts both Hold and Layer Blend",
       keys(base_tx) == base0["translateX"] and keys(crv(cube, "translateX", layer)) == lay0,
@@ -264,19 +266,69 @@ for override in (False, True):
 # Shift+A : Hold 가 base tx 를 평평하게 바꿔도, Hold **전** 값이 레이어 f100 키로 남는다
 clear_optvars()
 cube, other, layer = scene(False)
-want = final_at(cube, "tx", 100)
+want = final_at(cube, "tx", 1)        # v02.47 Current 값 = 고른 구간 a=1 의 값
+cmds.currentTime(100)
 HLM.update(**dict(SETTINGS, current_axes=["rx", "tx"]))
 cmds.select(cube)
 cmds.selectKey(LKM.layer_curve("ctl.translateX", LKM.root_layer()), time=(1, 100), replace=True)
 hk.HotkeyManager.run_hold()
 # 시간 이동(final_at)도 undo 큐에 들어가므로 undo 확인을 먼저 하고 redo 뒤에 값을 잰다
 cmds.undo()
-check("UC4 one undo reverts", keys(LKM.layer_curve("ctl.translateX", LKM.root_layer())).get(100.0) == 10.0
-      and 100.0 not in keys(crv(cube, "translateX", layer)))
+check("UC4 one undo reverts (time moves for reading a are not in the undo queue)",
+      keys(LKM.layer_curve("ctl.translateX", LKM.root_layer())).get(100.0) == 10.0
+      and 1.0 not in keys(crv(cube, "translateX", layer)))
 cmds.redo()
-check("UC3 run_hold: values captured before Hold (final f100 = pre-Hold value)",
-      final_at(cube, "tx", 100) == want and keys(LKM.layer_curve("ctl.translateX", LKM.root_layer())).get(100.0) == 0.0,
-      (want, final_at(cube, "tx", 100)))
+check("UC3 run_hold: Current = value at range start a=1 read before Hold (final f1 unchanged), base held",
+      final_at(cube, "tx", 1) == want and keys(LKM.layer_curve("ctl.translateX", LKM.root_layer())).get(100.0) == 0.0,
+      (want, final_at(cube, "tx", 1)))
+# ---------------- v02.47 : 기준 프레임 = 고른 키 구간 [a, b] 의 a ----------------
+clear_optvars()
+cube, other, layer = scene(False)
+base_tx = LKM.layer_curve("ctl.translateX", LKM.root_layer())
+base_rx = LKM.layer_curve("ctl.rotateX", LKM.root_layer())
+for c, v60, v90 in ((base_tx, 6.0, 9.0), (base_rx, 18.0, 27.0)):
+    cmds.setKeyframe(c, time=60, value=v60)
+    cmds.setKeyframe(c, time=90, value=v90)
+HLM._key_raw(cube, "translateX", layer, 50, 1.5)
+want_rx60 = final_at(cube, "rx", 60)
+cmds.currentTime(100)
+HLM.update(**dict(SETTINGS, current_axes=["rx"]))          # tx = Pose 5.0, rx = Current (f60 값)
+cmds.select(cube)
+cmds.selectKey(base_tx, time=(60, 90), replace=True)
+cmds.selectKey(base_rx, time=(60, 90), add=True)
+check("RA0 range_start() = 60", HLM.range_start() == 60.0, HLM.range_start())
+msgs = []
+cmds.inViewMessage = lambda **kw: msgs.append(kw.get("amg", ""))
+cmds.flushUndo()
+hk.HotkeyManager.run_hold()
+lay_tx = keys(crv(cube, "translateX", layer))
+check("RA1 layer keys at a=60 and a-N=50, none at f100 (current time 100), scene's own f80 / f90 untouched",
+      60.0 in lay_tx and lay_tx.get(50.0) == 1.5 and 100.0 not in lay_tx
+      and lay_tx.get(80.0) == 7.0 and lay_tx.get(90.0) == 2.0
+      and "(f50 -> f60" in msgs[-1], (lay_tx, msgs[-1]))
+check("RA2 current time restored to 100", cmds.currentTime(q=True) == 100.0)
+check("RA3 Hold still ran on the selected range (base tx f90 = f60 value 6.0)", keys(base_tx).get(90.0) == 6.0, keys(base_tx))
+cmds.undo()
+check("RA4 one undo reverts Hold + Layer Blend", keys(base_tx).get(90.0) == 9.0 and 60.0 not in keys(crv(cube, "translateX", layer)))
+cmds.redo()
+check("RA5 final at a=60: tx = Pose 5.0, rx = its pre-Hold value (Current)",
+      final_at(cube, "tx", 60) == 5.0 and final_at(cube, "rx", 60) == want_rx60,
+      (final_at(cube, "tx", 60), final_at(cube, "rx", 60), want_rx60))
+# 고른 키가 없으면 예전처럼 현재 프레임
+clear_optvars()
+cube, other, layer = scene(False)
+cmds.currentTime(100)
+HLM.update(**SETTINGS)
+cmds.select(cube)
+cmds.selectKey(clear=True)
+check("RA6 no keys selected -> range_start() None", HLM.range_start() is None)
+hk.HotkeyManager.run_hold()
+check("RA7 no keys selected -> layer keys at current frame 100 and 90", 100.0 in keys(crv(cube, "translateX", layer)))
+clear_optvars()
+HLM.update(**SETTINGS)
+cube, other, layer = scene(False)
+cmds.select(cube)
+
 HLM.update(current_axes=[])
 check("UC5 no current axis -> capture_current() is None", HLM.capture_current() is None)
 HLM.update(current_axes=["rz"])     # v02.46 체크된 축(rx, tx)에 없어도 current 축은 읽는다

@@ -22,7 +22,10 @@ metadata:
   옛 `use_current=1` 은 체크 축 전부로 옮겨 읽고 새로 쓰면 지움). **v02.45 기본 켜짐 = ry · tx · tz**(`DEFAULT_CURRENT_AXES`, 사용자 요구) —
   시험은 Pose 값 경로를 볼 때 `current_axes=[]` 를 명시해야 한다.
 - **v02.46 키 축 = 축 체크 ∪ Current** (사용자 보고: Current 축에 레이어 키가 없다). v02.44~45 는 체크 ∩ Current 라 기본값끼리 안 겹쳐 Current 축이 빠졌다.
-  `effective_axes()`. 같은 버전에 Graph Focus Auto-Focus 기본 ON. mayapy 에서는 `cmds.scriptJob` 이 None → `is_active()` False(기능 문제 아님). Pose Key 버튼 · Layer Blend 현재 프레임 키 모두 그 축만 **지금 값**으로.
+  `effective_axes()`. 같은 버전에 Graph Focus Auto-Focus 기본 ON.
+- **v02.47 기준 프레임 = 그래프 에디터 고른 키 구간 [a, b] 의 a**(사용자 요구) — 키는 a 와 a−N. `range_start()` 를 Hold **전에**(Hold 가 (a,b] 를 지운다).
+  **★ 레이어가 있으면 `getAttr -time` 과 API `MDGContext` 는 Base 값만, `currentTime -update false` 는 옛 값** → 다른 시간의 합성값은
+  undo 끈 채(`undoInfo stateWithoutFlush`) 실제로 시간을 옮겨 읽는다(`values_at`). `setKeyframe -animLayer -v` 역산은 키 시간 기준. mayapy 에서는 `cmds.scriptJob` 이 None → `is_active()` False(기능 문제 아님). Pose Key 버튼 · Layer Blend 현재 프레임 키 모두 그 축만 **지금 값**으로.
   Shift+A 는 `capture_current()` 를 **Hold 전에** 불러 값을 잡는다 — Hold 가 커브를 바꾸면 키 없이 움직여 둔 값이 재평가로 사라진다.
 - 시험 함정: `currentTime` 이동도 undo 큐에 들어간다 → undo 확인을 먼저, 값 재기는 redo 뒤에.
 - v02.43 보기 게이트 `view_layer`(UI `Run only when viewing`, 기본 "" = 루트): 보는 레이어 = 에디터 **selected** → 없으면 preferred →
