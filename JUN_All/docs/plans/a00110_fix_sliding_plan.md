@@ -4,6 +4,7 @@
 - 상태: **계획만. 구현 전.**
 - 이 문서만 보고 구현할 수 있도록 결정 사항 · 파일 위치 · 알고리즘 · UI · 검증을 모두 적는다.
 - 관련 계획서: [a00110_hold_layer_blend_plan.md](a00110_hold_layer_blend_plan.md) (Shift+A Layer Blend Key, v02.39~47)
+- 개정: 2026-11-04 — 이웃 구간 블렌드 침범 문제(§9)에 대해 **B → A → D 순서 적용, G 기본 4 프레임** 결정 반영. 대안 A~E 를 §9 에 기록.
 
 ---
 
@@ -40,6 +41,7 @@
 | 1 | 구간 길이 조건 방향 ("M 이 길이보다 클 때" 의 글자 뜻은 짧은 구간만) | **길이 > M 일 때만 적용** (짧은 정지는 노이즈로 보고 건너뜀 = Min span) |
 | 2 | Hold 할 채널 ("위치, 이동") | **translate + rotate** (UI 에 T / R 체크, 기본 둘 다) |
 | 3 | Threshold 단위 | **최대 속도의 %** (오브젝트마다 스무딩된 속도의 최댓값 기준, 기본 2 %) |
+| 4 | 이웃 구간의 블렌드 [a−N, a] 가 앞 구간 안으로 들어올 때 (예: [0, 10] · [12, 20], N=5 → f7 키 → f7~f10 이 다시 움직임) | **B → A → D 순서로 적용**, Merge gap **G 기본 4 프레임** (§3.3a, §3.4, 대안 비교는 §9) |
 
 ### 1.4 구현자가 정한 해석 (이 문서에서 확정 — 바꾸려면 사용자 확인)
 
@@ -52,6 +54,7 @@
 | "Shift+A 결과" 재현 | Hold 대상 커브 = 각 채널의 **보기 레이어 커브**(Hot Key > Main `Run only when viewing`, 기본 BaseAnimation) 위 [a, b] 안의 키를 "선택" 한 것으로 보고 Hold. Layer Blend = Hot Key > Main 의 레이어 · N · Pose/Current 설정 그대로, 기준 프레임 = 선택 키의 최소 시간(v02.47 규칙) | Shift+A 를 누를 때 사용자는 기본적으로 BaseAnimation 을 보며 그 커브 키를 고른다(v02.43 게이트) |
 | Layer Blend 켜짐 여부 | 이 탭의 `Layer Blend Key` 체크(기본 ON)가 정한다. Hot Key > Main 의 `Layer Blend Key` 체크 · 보기 게이트는 **무시**(일괄 처리는 보는 레이어와 무관) | 요구 "Layer Blend Key 가 체크된 상태로" |
 | 처리 순서 | 오브젝트마다, 구간을 **시간순**으로 하나씩 "Shift+A" 한다(앞 구간의 레이어 키가 뒤 구간의 Current 값에 반영되게) | 사람이 구간마다 Shift+A 를 차례로 누른 결과와 같게 |
+| "Shift+A 결과" 와의 관계 | 결정 #4 의 B · A · D 는 Shift+A 를 **보정**한다. UI 에서 셋을 끄면(G=0, Clamp 끔, Lock 끔) 순수 Shift+A 재현이 된다 — 핵심 대조 시험은 그 상태로 한다(§6-6) | 요구의 정의를 시험으로 지키면서 보정을 얹기 위해 |
 | 디버그 | `_debug_speed` 노드에 4 커브(원래 · 스무딩 · Threshold · 결과) — 옵션, 기본 ON | 사용자가 결과를 눈으로 검증 |
 
 ---
@@ -80,7 +83,8 @@
 ## 3. 알고리즘
 
 오브젝트 목록 `objs`(TSL), 구간 `[S, E]`(정수 프레임), 옵션:
-`axes=(x, y, z)` · `smooth=W` · `threshold_pct=P` · `min_span=M` · `translate` · `rotate` · `layer_blend` · `debug`.
+`axes=(x, y, z)` · `smooth=W` · `threshold_pct=P` · `merge_gap=G`(기본 4) · `min_span=M` · `translate` · `rotate` · `layer_blend` ·
+`clamp_blend`(대안 A, 기본 ON) · `lock_end`(대안 D, 기본 ON) · `debug`.
 
 ### 3.1 샘플링 (한 번의 시간 루프로 모든 오브젝트)
 
@@ -119,11 +123,26 @@ threshold = P / 100 * max(smoothed)
 def still_spans(smoothed, start, threshold):
     # smoothed[i] < threshold 인 연속 구간 -> [(a, b)] (프레임 번호, a = start + i0, b = start + i1)
 
+spans = merge_gaps(spans, G)                                   # §3.3a 대안 B — 반드시 M 판정 **전에**
 apply_spans = [(a, b) for (a, b) in spans if (b - a + 1) > M]
 short_spans = 나머지 (로그에만)
 ```
 
 - 구간이 `S` 나 `E` 에 닿아도 그대로 쓴다(잘림은 [S, E] 로 자연히).
+
+### 3.3a 짧은 틈 합치기 — 대안 B (Merge gap G, 기본 4)
+
+```python
+def merge_gaps(spans, G):
+    # spans 는 시간순. 이웃 (a1, b1), (a2, b2) 사이의 '움직인 프레임 수' gap = a2 - b1 - 1.
+    # gap <= G 면 하나로 합친다 -> (a1, b2). 합친 결과에 대해 다시 다음 이웃과 비교(연쇄 합치기).
+    # G = 0 이면 합치지 않는다(이웃 구간은 정의상 gap >= 1).
+```
+
+- 예: [0, 10] · [12, 20] → gap 1 ≤ 4 → **[0, 20] 한 구간**. [0, 10] · [16, 25] → gap 5 > 4 → 그대로 둘.
+- 합친 구간의 길이로 M 을 판정한다(짧은 두 조각이 합쳐져 M 을 넘으면 적용).
+- 로그: `"<o>: merged [0-10] + [12-20] -> [0-20] (gap 1 <= G 4)"`.
+- 디버그 `n_result` 예측(Preview)은 합친 구간 기준으로 0.
 
 ### 3.4 구간마다 "Shift+A" 재현 (시간순)
 
@@ -136,10 +155,23 @@ short_spans = 나머지 (로그에만)
    (Shift+A 와 같다 — 모캡처럼 매 프레임 키면 항상 2 개 이상).
 4. **기준 프레임** `a'` = 모든 대상 커브의 "선택된 키" 최소 시간(`range_start` 와 같은 규칙). 키가 하나도 없으면 `a' = a`.
 5. **Current 값** — `layer_blend` 면 `HoldLayerManager.capture_current([o], frame=a', force=True)` 를 **Hold 전에**.
-6. undo 청크 안에서:
+6. **블렌드 시작 t0** — 대안 A (`clamp_blend`, 기본 ON):
+   `t0 = max(a' - N, b_prev)` — `b_prev` = **같은 오브젝트에서 바로 앞에 적용한 구간의 끝**(없으면 클램프 없음).
+   §3.3a 뒤에는 이웃 구간 gap ≥ G+1 ≥ 1 이므로 항상 `b_prev < a'` → `t0 < a'` 가 보장된다.
+   예: [0, 10] · [16, 25], N=8 → 두 번째 구간 t0 = max(8, 10) = **f10** (f8 이면 f8~f10 이 다시 움직였다).
+   `clamp_blend` 끔이면 `t0 = a' - N`(Shift+A 그대로).
+7. undo 청크 안에서:
    - `KeyframeManager.hold_range(curves, a, b)` (§4.1 — `hold_selected_keys` 의 커브 처리를 그대로)
-   - `layer_blend` 면 `HoldLayerManager.apply(objects=[o], frame=a', current_values=cur, force=True)`
-7. 결과 줄 수집: `"<o>: [a-b] (L f) held <k> curve(s), layer keys f<a'-N> / f<a'>"` 또는 Layer Blend 메시지(경고 포함) 그대로.
+   - `layer_blend` 면 `HoldLayerManager.apply(objects=[o], frame=a', current_values=cur, force=True,
+     ramp_start=t0, hold_end=(b if lock_end else None))` (§4.2)
+   - **대안 D** (`lock_end`, 기본 ON) — `apply` 안에서: 이번에 키를 찍은 모든 레이어 채널(t0 의 멤버 채널 + a' 의 Pose 축)에
+     **b 에도 키**를 찍는다. 값 = **a' 에서의 레이어 값**(a' 키를 찍은 뒤 레이어 커브를 a' 에서 평가한 raw 값, `_key_raw`).
+     그리고 그 커브의 `a'` out 탄젠트 · `b` in 탄젠트를 **flat** 으로 — 값이 같아도 auto/spline 탄젠트는 이웃 키 때문에 부풀 수 있다.
+     결과: [a', b] 안에서 레이어 값이 상수 → 다음 구간의 키가 들어와도 고정 구간 내부는 안 움직인다.
+     `b == a'` 면 생략. b 에 이미 키가 있으면 덮어쓴다(결정 1 과 같은 규칙).
+   - A 와 D 를 같이 쓰면: 다음 구간의 t0 ≥ 이 구간의 b → 다음 블렌드는 이동 프레임 (b, a₂') 에서만 일어난다.
+8. 결과 줄 수집: `"<o>: [a-b] (L f) held <k> curve(s), layer keys f<t0> / f<a'>[ / f<b>]"` (+ `"(blend start clamped from f<a'-N>)"`)
+   또는 Layer Blend 메시지(경고 포함) 그대로.
 
 > 전체 실행은 **바깥 undo_chunk 하나** — Ctrl+Z 한 번에 모든 오브젝트 · 구간이 되돌아간다.
 
@@ -182,11 +214,15 @@ def hold_range(curves, a, b):
 
 - **회귀**: `tests/test_hold_layer_blend.py` 의 RH · VG2 · RA 가 그대로 통과해야 한다(Shift+A 동작 불변).
 
-### 4.2 `core/hold_layer_manager.py` — `force` 인자
+### 4.2 `core/hold_layer_manager.py` — `force` · `ramp_start` · `hold_end` 인자
 
 - `capture_current(objects=None, frame=None, force=False)` · `apply(objects=None, frame=None, current_values=None, force=False)`.
 - `force=True` 면 `enabled` 검사와 `view_gate` 를 건너뛴다. 나머지(레이어 존재 · 잠김 · 멤버 · 축 · 메시지)는 그대로.
 - `run_hold` 는 바꾸지 않는다(force=False).
+- `apply(..., ramp_start=None, hold_end=None)` 추가 (Fix Sliding 전용, Shift+A 는 안 씀):
+  - `ramp_start` 가 있으면 `t0 = ramp_start` (없으면 예전처럼 `t1 - N`). `ramp_start >= t1` 이면 경고하고 레이어 키 생략.
+  - `hold_end` 가 있고 `> t1` 이면 대안 D(§3.4-7): 이번에 키를 찍은 채널마다 b 에 a' 레이어 값 키 + a' out / b in 탄젠트 flat.
+  - 메시지 프레임 표기: `(f<t0> -> f<t1>[ -> f<b>])`.
 
 ### 4.3 새 파일 `core/fix_sliding_manager.py` (maya.cmds, UI 비의존)
 
@@ -195,6 +231,7 @@ class FixSlidingManager:
     DEFAULT_SMOOTH = 5
     DEFAULT_THRESHOLD_PCT = 2.0
     DEFAULT_MIN_SPAN = 3
+    DEFAULT_MERGE_GAP = 4          # 대안 B, 0 = 합치지 않음
     DEBUG_NODE = "_debug_speed"
     PHASES = ("Sampling", "Applying", "Debug")
 
@@ -206,7 +243,11 @@ class FixSlidingManager:
     @staticmethod
     def still_spans(smoothed, start, threshold) -> list[(a, b)]
     @staticmethod
+    def merge_gaps(spans, gap) -> (merged, merges)           # 대안 B, merges = [((a1,b1),(a2,b2))] 로그용
+    @staticmethod
     def split_spans(spans, min_span) -> (apply, short)       # L = b - a + 1 > M
+    @staticmethod
+    def blend_starts(spans, n, clamp=True) -> [t0, ...]       # 대안 A 의 t0 계산 (순수 함수, a' 는 호출부가 넘김)
 
     # ---- 마야 ----
     @staticmethod
@@ -217,8 +258,9 @@ class FixSlidingManager:
     @classmethod
     def preview(cls, objs, start, end, ..., debug=True, progress=None) -> (results, lines)
     @classmethod
-    def run(cls, objs, start, end, axes, smooth, threshold_pct, min_span,
-            translate=True, rotate=True, layer_blend=True, debug=True, progress=None) -> (count, lines)
+    def run(cls, objs, start, end, axes, smooth, threshold_pct, min_span, merge_gap=4,
+            translate=True, rotate=True, layer_blend=True, clamp_blend=True, lock_end=True,
+            debug=True, progress=None) -> (count, lines)
     @staticmethod
     def write_debug(results, start, end, info) -> node
 ```
@@ -226,7 +268,7 @@ class FixSlidingManager:
 - 검증 먼저(아무것도 안 바꾸고 반환): 오브젝트 없음 · 씬에 없음 · `end <= start` · T/R 둘 다 꺼짐 · 축 셋 다 꺼짐 ·
   `layer_blend` 인데 Hot Key > Main 레이어 미선택 / 없음 / 잠김 → 그 이유 한 줄(영어, `[Warning]`).
 - `run` 순서: 검증 → 분석(Sampling) → undo_chunk { 오브젝트마다 · 구간 시간순 §3.4 } (Applying) → 디버그(재샘플 포함, Debug).
-- 반환 `lines` 마지막에 요약: `"Fix Sliding: <k> object(s), <s> span(s) fixed, <t> short span(s) skipped (M=<M>)."`
+- 반환 `lines` 마지막에 요약: `"Fix Sliding: <k> object(s), <s> span(s) fixed, <m> merge(s) (G=<G>), <t> short span(s) skipped (M=<M>)."`
 
 ### 4.4 `core/__init__.py`
 
@@ -252,10 +294,13 @@ Speed
   Smooth interval  [ 5 ] frames                         self.sp_fs_smooth   (QSpinBox 1~200)
   Threshold        [ 2.00 ] % of max speed              self.sp_fs_threshold (QDoubleSpinBox 0.01~100, 2 자리)
 Spans
+  Merge gap (G)    [ 4 ] frames  - join spans whose gap is this short   self.sp_fs_merge_gap (0~1000, 0 = off)
   Min span (M)     [ 3 ] frames  - fix only spans longer than this   self.sp_fs_min_span (1~10000)
 Keys
   [x] Translate  [x] Rotate                             self.cb_fs_t / _r
   [x] Layer Blend Key  (Hot Key > Main: <layer>, N=<N>)  self.cb_fs_layer_blend + self.lbl_fs_layer_blend
+      [x] Clamp blend start to the previous span        self.cb_fs_clamp   (대안 A, Layer Blend 끄면 비활성)
+      [x] Lock the layer through each span (key at b)   self.cb_fs_lock    (대안 D, Layer Blend 끄면 비활성)
   [x] Debug speed curves (_debug_speed)                 self.cb_fs_debug
 [ Preview Spans ]  [ Fix Sliding ]                      self.btn_fs_preview / self.btn_fs_run
 ```
@@ -263,11 +308,14 @@ Keys
 - 툴팁(요지):
   - Threshold: `"A frame is 'still' when the smoothed speed is below this % of the object's max smoothed speed.\nGood mocap: 1-2 %, noisy data: 15 % or more."`
   - Min span: `"Only still spans longer than this many frames are fixed. Shorter ones are treated as noise and left alone."`
+  - Merge gap: `"Two still spans with at most this many moving frames between them are treated as one span\n(checked before Min span). 0 = never merge."`
+  - Clamp: `"Start each blend (a - N) no earlier than the end of the previous fixed span, so the layer never\nstarts moving inside a span that is already fixed."`
+  - Lock: `"Also key the layer at the span end b with the same value as at a (flat tangents), so the layer\nstays constant through the whole span."`
   - Layer Blend Key: `"For each fixed span [a, b] also key the layer chosen in Hot Key > Main at a and a - N\n(Pose Key axes / Current), exactly like Shift+A with Layer Blend Key on."`
   - Fix Sliding: `"For each still span longer than Min span: Hold the translate / rotate keys inside it\n(the curves of the Hot Key > Main 'Run only when viewing' layer) and Layer Blend Key. One undo."`
 - `lbl_fs_layer_blend` 는 탭이 보일 때 · 버튼 누를 때 `HoldLayerManager.load_settings()` 로 갱신(`<layer>` 없으면 `(no layer chosen)` 빨강 대신 `[Warning]` 문구).
 - 실행 = 진행 팝업(`phases=FixSlidingManager.PHASES`), 결과 `lines` 를 로그에 그대로. 끝나면 View > Layers 갱신(`on_al_refresh(quiet=True)`, 있을 때).
-- 설정 기억: optionVar `JUN_A00110_fixSliding_<key>`(smooth · threshold · min_span · x/y/z · t/r · layer_blend · debug). 창을 열 때 복원.
+- 설정 기억: optionVar `JUN_A00110_fixSliding_<key>`(smooth · threshold · merge_gap · min_span · x/y/z · t/r · layer_blend · clamp · lock · debug). 창을 열 때 복원.
 - 창 높이: 공용 tabFit 이 이미 걸려 있다(새 하위 탭도 자동). 확인만.
 
 ---
@@ -277,9 +325,10 @@ Keys
 1. **레이어가 있으면 `getAttr -time` / `MDGContext` 는 Base 값만** — 샘플링 · 재샘플은 반드시 `currentTime` 루프([[wip-a00110-hold-layer-blend]] v02.47).
 2. **로컬 채널 Hold ≠ 월드 정지** — 부모(글로벌 컨트롤 등)가 그 구간에 움직이면 로컬 T/R 을 고정해도 월드는 움직인다.
    대상은 월드에 있는 IK 발 · 컨트롤러 전제. 부모가 움직이는 경우는 Counter Layer(Stationary) 쪽 기능이다 → 툴팁 · 가이드에 적는다.
-3. **Layer Blend 레이어 키는 a', a'−N 두 개뿐** — 구간 안 (a', b] 에서 레이어 커브는 다음 레이어 키 쪽으로 보간된다.
-   레이어에 다른 키가 있으면 구간 안에서 레이어 값이 변해 완전한 정지가 안 될 수 있다. **요구가 "Shift+A 를 누른 결과" 이므로 그대로 재현**하고,
-   디버그 `n_result`(재샘플 실제 속도)로 드러나게 한다. 사용자가 원하면 다음 버전에 "b 에도 레이어 키" 옵션(지금은 범위 밖).
+3. **Layer Blend 레이어 키가 a', a'−N 두 개뿐이면** 구간 안 (a', b] 에서 레이어 커브가 다음 레이어 키 쪽으로 보간되고,
+   다음 구간의 블렌드 [a₂'−N, a₂'] 가 앞 구간 안으로 들어올 수 있다(사용자 확인: [0, 10] · [12, 20], N=5 → f7 키).
+   → **결정 #4: B → A → D** 로 해결(§3.3a · §3.4-6/7). 남는 경우: 레이어에 원래 있던 키가 구간 안에 있으면 D 의 a'~b 사이에서
+   그 키가 지워지지는 않는다 — 덮어쓰지 않고 로그 `"(layer already has keys inside [a-b] - not locked flat)"` 로 알린다.
 4. **Hold 대상 레이어 = 보기 레이어**: 기본 BaseAnimation. 사용자가 `Run only when viewing` 을 다른 레이어로 바꿔 두면 그 레이어 커브를 Hold 한다
    (Shift+A 와 같은 정신). Layer Blend 레이어와 같으면 같은 커브에 Hold + 레이어 키가 겹친다 → 경고 한 줄만.
 5. **키가 듬성한 커브**: [a, b] 안 키가 2 개 미만이면 Hold skip(Shift+A 와 같음). 로그 `"(k curve(s) skipped: <2 keys in span)"`.
@@ -307,8 +356,9 @@ Keys
 
 5. Preview: 정지 구간 두 개 ≈ [11, 30](L=20) · [41, 60](L=20) — 정확한 경계는 스무딩 창 때문에 1~2 f 밀릴 수 있으니
    순수 함수로 같은 데이터에서 계산한 값과 비교한다. M=5 면 둘 다 apply, M=20 이면 둘 다 short(L == M), M=19 면 둘 다 apply. 키 변경 없음.
-6. Run(M=5, P=5 %, W=3): **같은 장면을 복제해 손으로 `selectKey`(구간 안 T/R Base 커브) + `HotkeyManager.run_hold()`(보기 = Base) 를 구간마다 한 결과와
-   Base 커브 · 레이어 커브의 키 시간 · 값이 1e-9 까지 같다** — "Shift+A 결과" 의 정의 그대로 대조(핵심 시험).
+6. Run(M=5, P=5 %, W=3, **G=0 · Clamp 끔 · Lock 끔**): **같은 장면을 복제해 손으로 `selectKey`(구간 안 T/R Base 커브) +
+   `HotkeyManager.run_hold()`(보기 = Base) 를 구간마다 한 결과와 Base 커브 · 레이어 커브의 키 시간 · 값이 1e-9 까지 같다**
+   — "Shift+A 결과" 의 정의 그대로 대조(핵심 시험). 보정(B · A · D)을 끈 상태가 순수 Shift+A 다.
 7. 짧은 구간(L ≤ M) 의 커브는 그대로.
 8. 레이어 멤버가 아닌 오브젝트: Hold 는 되고 Layer Blend 는 `Skipped` 메시지.
 9. 안 움직이는 오브젝트: 건너뜀 + 경고, 키 변경 없음.
@@ -317,10 +367,16 @@ Keys
 12. 디버그: `_debug_speed` 존재, 오브젝트당 어트리뷰트 4 개, 키 수 = 프레임 수, threshold 상수, 적용 구간에서 `n_result` 평균 < `n_speed` 평균. 두 번 실행해도 노드 하나.
 13. undo 한 번에 Base · 레이어 커브 원상복구(디버그 노드는 남음), `currentTime` 원래대로.
 14. Hot Key > Main 의 `Layer Blend Key` 가 꺼져 있고 보기 레이어가 AnimLayer1 이어도 이 탭 실행은 동작(force).
+14a. **대안 B** `merge_gaps` 순수: gap = G 는 합침, G+1 은 안 합침, 연쇄 합치기, G=0 은 그대로. 장면: 정지 [0, 10] · [12, 20](gap 1) → G=4 로 한 구간
+     [0, 20], 레이어 키는 f(0−N) · f0 (· f20) 뿐이고 **f7 같은 중간 키가 없다**(사용자 예시 그대로).
+14b. **대안 A** 장면: 정지 [0, 10] · [16, 25](gap 5 > G 4), N=8 → 두 번째 구간 레이어 키 t0 = **f10**(f8 아님), 로그에 `clamped`. Clamp 끔이면 f8.
+14c. **대안 D**: 각 구간 b 에 레이어 키, 값 = a' 의 레이어 값(1e-9), a' out / b in 탄젠트 flat, [a', b] 의 정수 · 반 프레임에서 레이어 값 상수.
+14d. B · A · D 를 다 켠 Run 뒤 재샘플 월드 속도: 적용 구간 내부(양 끝 제외) 프레임 속도 < 1e-6 (레이어에 원래 키가 없을 때).
 15. 회귀: `test_hold_layer_blend.py` 81/81 · `test_hold_layer_blend_ui.py` 21/21 (Shift+A 불변).
 
 **UI** (`tests/test_fix_sliding_ui.py`)
-16. Bake 하위 탭 `Fix Sliding` 존재, 기본값(W 5 · 2 % · M 3 · XYZ · T R · Layer Blend ON · Debug ON).
+16. Bake 하위 탭 `Fix Sliding` 존재, 기본값(W 5 · 2 % · **G 4** · M 3 · XYZ · T R · Layer Blend ON · **Clamp ON · Lock ON** · Debug ON),
+    Layer Blend 를 끄면 Clamp · Lock 비활성.
 17. 버튼 → 코어에 옵션이 그대로 넘어간다(코어를 가짜로 바꿔 인자 기록).
 18. optionVar 저장 → 창 다시 열면 복원.
 19. `lbl_fs_layer_blend` 가 Hot Key > Main 레이어 · N 을 보인다, 레이어 미선택이면 경고 문구.
@@ -333,9 +389,10 @@ GUI 확인(사용자): 실제 모캡(ZIHAN 등)에서 발 IK 두 개 — Preview
 
 1. §4.1 Hold 리팩터 → `test_hold_layer_blend.py` 통과 확인(동작 불변).
 2. §4.2 `force` → 같은 회귀.
-3. §4.3 순수 함수 + 시험 1~4.
+3. §4.3 순수 함수(speeds · smooth · still_spans · merge_gaps · split_spans · blend_starts) + 시험 1~4 · 14a 순수 부분.
 4. 샘플링 · analyze · preview + 시험 5.
-5. run(§3.4) + 대조 시험 6 → 7~11, 13~14.
+5. run(§3.4, 먼저 B · A · D 끈 상태) + 대조 시험 6 → 7~11, 13~14.
+5a. `apply(ramp_start, hold_end)`(§4.2) + B · A · D 켜기 → 시험 14a~14d.
 6. 디버그 노드(§3.5) + 시험 12.
 7. UI(§4.5) + UI 시험 16~19.
 8. 마무리 체크리스트.
@@ -349,3 +406,40 @@ GUI 확인(사용자): 실제 모캡(ZIHAN 등)에서 발 IK 두 개 — Preview
 - [ ] 메모리 `wip-a00110-fix-sliding.md` 새로 + `MEMORY.md` A00110 줄
 - [ ] 이 계획서 상태 → 구현 완료 + 바뀐 점
 - [ ] 로컬 커밋(경로 명시 스테이징). **푸시는 그 턴에 요청이 있을 때만.**
+
+---
+
+## 9. 이웃 구간 블렌드 침범 — 대안 A~E 기록 (2026-11-04)
+
+### 9.1 문제
+
+Shift+A(= Fix Sliding 의 기본 재현)를 구간마다 차례로 하면 블렌드 구간 **[a−N, a]** 가 앞 구간 안으로 들어올 수 있다.
+
+| 순서 | 구간 | 레이어 키 |
+|---|---|---|
+| 1 | [0, 10] | f-5 (레이어 값), f0 (Pose / Current) |
+| 2 | [12, 20] | **f7** (레이어 값), f12 (Pose / Current) |
+
+f7 키 자체는 그 시점 값을 보존하지만, **f7 → f12 사이에서 레이어가 두 번째 포즈 쪽으로 보간**되므로 고정돼야 할 첫 구간의 f7~f10 이
+다시 움직인다(사용자 확인: "7 프레임에 원하지 않는 키가 찍힌다"). 첫 구간 안 (0, 10] 도 레이어가 다음 키 쪽으로 보간될 수 있다.
+
+### 9.2 대안
+
+| | 방법 | 장점 | 단점 |
+|---|---|---|---|
+| **A** | **블렌드 시작을 앞 구간 끝에서 자른다** — `t0 = max(a − N, b_prev)`. 예: max(7, 10) = f10, 블렌드는 이동 프레임 [10, 12] 에서만 | 고정 구간 안은 절대 안 움직인다. 구현 몇 줄 | 틈이 짧으면 블렌드가 1~2 프레임 → 툭 튈 수 있다 |
+| **B** | **틈이 짧은 구간을 하나로 합친다**(Merge gap G) — 이동 프레임 수 ≤ G 면 한 구간. 예: 틈 f11 한 프레임 → [0, 20] | 모캡 노이즈로 접지가 잠깐 끊긴 경우를 깔끔히 처리, 키도 준다 | 진짜 짧은 스텝까지 합칠 수 있어 G 를 사용자가 정해야 한다 |
+| **C** | **겹치면 그 구간의 블렌드를 생략하고 경고** | 가장 보수적 | 그 구간은 레이어 보정이 빠진다 |
+| **D** | **구간 끝 b 에도 레이어 키** — a 와 같은 값 + flat 탄젠트로 구간 내부를 잠근다 | A 와 함께면 고정 구간을 완전히 보장 | 단독으로는 다음 블렌드가 안으로 들어오는 걸 못 막는다 |
+| **E** | **이동 거리 비례 블렌드**(SmartLayer 방식) — 틈 안에서 실제 이동 거리 비율로 레이어 값을 매 프레임 분배. 정지 프레임은 이동량 0 이라 자동으로 안 움직인다. Counter Layer v02.29 "By travel" 과 같은 원리 | 품질이 가장 좋다 | 틈 구간에 매 프레임 키, 작업량 큼, "Shift+A 결과" 와 달라진다 |
+
+### 9.3 결정
+
+- **Fix Sliding: B → A → D 순서로 적용, G 기본 4 프레임**(사용자, 2026-11-04). 셋 다 UI 에서 끌 수 있고(G=0 · Clamp 끔 · Lock 끔) 끄면 순수 Shift+A 재현.
+  - B 먼저: 노이즈로 끊긴 접지를 하나로 → 그 뒤 M 판정.
+  - A: 남은 이웃 구간 사이에서 블렌드가 이동 프레임에서만 일어나게.
+  - D: 각 고정 구간 내부의 레이어 값을 상수로 잠금.
+- **C**: 채택 안 함(A 가 같은 상황을 보정까지 해서 처리).
+- **E**: 이번 범위 밖 — Fix Sliding 결과(`_debug_speed` 의 `n_result`)를 본 뒤 다음 버전 옵션 후보.
+- **손으로 누르는 Shift+A** 는 앞 구간을 모르므로 이번 범위에서 바꾸지 않는다. 후보(미정): 세션 동안 오브젝트마다 Shift+A 로 Hold 한 구간을 기억해
+  다음 Shift+A 의 t0 를 직전 구간 끝으로 자르기 — 시간순으로 누르면 정확, 거꾸로 누르면 못 막아 경고만 가능.
