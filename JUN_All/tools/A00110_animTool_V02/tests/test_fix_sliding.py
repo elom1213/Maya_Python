@@ -199,21 +199,40 @@ check("11 translate off: only rotate curves held",
 # ================================================================ 12 디버그 노드
 foot, lay = make_scene(walk_xs())
 hotkey_settings()
+cmds.createNode("transform", name="_debug_speed")      # v02.48 단일 노드가 남아 있던 씬
 cnt, lines = FS.run([foot], 1, 60, **dict(OPTS, debug=True))
-attrs = [a for a in (cmds.listAttr(FS.DEBUG_NODE, userDefined=True) or [])]
-kc = cmds.keyframe(FS.DEBUG_NODE + ".foot_speed", q=True, keyframeCount=True)
-thr = set(round(v, 9) for v in cmds.keyframe(FS.DEBUG_NODE + ".foot_threshold", q=True, valueChange=True))
-spd = cmds.keyframe(FS.DEBUG_NODE + ".foot_speed", q=True, valueChange=True)
-resv = cmds.keyframe(FS.DEBUG_NODE + ".foot_result", q=True, valueChange=True)
+DN = FS.debug_node_name(foot)
+attrs = [a for a in (cmds.listAttr(DN, userDefined=True) or [])]
+kc = cmds.keyframe(DN + ".speed", q=True, keyframeCount=True)
+thr = set(round(v, 9) for v in cmds.keyframe(DN + ".threshold", q=True, valueChange=True))
+spd = cmds.keyframe(DN + ".speed", q=True, valueChange=True)
+resv = cmds.keyframe(DN + ".result", q=True, valueChange=True)
 a, b = r["apply"][0]               # 5 Preview 에서 같은 데이터로 찾은 첫 적용 구간
 inner = range(a, b)                # 구간 안쪽 프레임 a+1..b 의 인덱스 (인덱스 = f - 1)
-check("12 debug node: 4 attrs per object + info, keys = frames, threshold constant",
-      sorted(attrs) == sorted(["info", "foot_speed", "foot_smooth", "foot_threshold", "foot_result"])
-      and kc == 60 and len(thr) == 1, (attrs, kc, thr))
+check("12 debug node 'foot_debug_speed': speed / smooth / threshold / result + source / info, keys = frames",
+      DN == "foot_debug_speed" and sorted(attrs) == sorted(["source", "info", "speed", "smooth", "threshold", "result"])
+      and cmds.getAttr(DN + ".source") == foot and kc == 60 and len(thr) == 1, (DN, attrs, kc, thr))
+colors = {}
+for at in ("speed", "smooth", "threshold", "result"):
+    crv = cmds.listConnections(DN + "." + at, type="animCurve")[0]
+    colors[at] = (cmds.getAttr(crv + ".useCurveColor"), tuple(round(c, 2) for c in cmds.getAttr(crv + ".curveColor")[0]))
+check("12e Graph Editor colors: white / light sky blue / red / green (v02.49)",
+      colors == {"speed": (True, (1.0, 1.0, 1.0)), "smooth": (True, (0.53, 0.81, 0.98)),
+                 "threshold": (True, (1.0, 0.0, 0.0)), "result": (True, (0.0, 1.0, 0.0))}, colors)
+check("12f the old single '_debug_speed' node is removed", not cmds.objExists("_debug_speed"))
 check("12b debug result (measured after the fix) lower than raw speed inside a fixed span",
       sum(resv[i] for i in inner) < sum(spd[i] for i in inner), (sum(resv[i] for i in inner), sum(spd[i] for i in inner)))
 FS.run([foot], 1, 60, **dict(OPTS, debug=True, layer_blend=False))
-check("12c second run keeps a single _debug_speed", len(cmds.ls(FS.DEBUG_NODE + "*", type="transform")) == 1)
+check("12c second run keeps one debug node per object", cmds.ls("*_debug_speed*", type="transform") == [DN],
+      cmds.ls("*_debug_speed*", type="transform"))
+# 오브젝트 둘 -> 노드 둘 (TSL 에 든 개수만큼)
+foot, lay = make_scene(walk_xs())
+other = cmds.duplicate(foot, name="ns_other")[0]
+hotkey_settings()
+_r, lines = FS.preview([foot, other], 1, 60, smooth=3, threshold_pct=5.0, merge_gap=0, min_span=5, debug=True)
+dn = sorted(cmds.ls("*_debug_speed", type="transform"))
+check("12d two listed objects -> two debug nodes (one each)",
+      dn == sorted([FS.debug_node_name(foot), FS.debug_node_name(other)]) and len(dn) == 2, dn)
 
 # ================================================================ 13 undo 한 번 · 시간 복원
 foot, lay = make_scene(walk_xs())
@@ -227,7 +246,7 @@ changed = curves_of(foot, LKM.root_layer()) != b0
 cmds.undo()
 check("13 one undo reverts base + layer curves (debug node stays), time restored",
       changed and curves_of(foot, LKM.root_layer()) == b0 and curves_of(foot, lay) == l0
-      and cmds.objExists(FS.DEBUG_NODE) and cmds.currentTime(q=True) == 33.0)
+      and cmds.objExists(FS.debug_node_name(foot)) and cmds.currentTime(q=True) == 33.0)
 
 # ================================================================ 14 force : Hot Key > Main 꺼짐 + 다른 레이어 보기
 foot, lay = make_scene(walk_xs())
@@ -292,6 +311,23 @@ pos = FS.sample_positions([foot2], 1, 60)[foot2]
 sp = FS.speeds(pos)
 inner_max = max(sp[f - 1] for a_, b_ in ap for f in range(a_ + 1, b_ + 1))
 check("14d B+A+D: world speed inside every fixed span < 1e-6", inner_max < 1e-6, inner_max)
+
+# ================================================================ 15 탭에서 고른 레이어 · N (v02.49)
+foot, lay = make_scene(walk_xs())
+lay2 = cmds.animLayer("AnimLayer2")
+cmds.select(foot)
+cmds.animLayer(lay2, e=True, attribute=[foot + "." + a for a in TR])
+cmds.select(clear=True)
+hotkey_settings(offset=5)
+HLM.update(layer="")                       # Hot Key > Main 에는 레이어가 없다
+ok, _l, _n, msg = FS.layer_blend_status()
+check("15a Hot Key layer empty -> status warns", not ok and "choose one" in msg, msg)
+cnt, lines = FS.run([foot], 1, 60, **dict(OPTS, layer="AnimLayer2", offset=7))
+k2 = sorted(keys(LKM.layer_curve(foot + ".translateX", lay2)))
+k1 = keys(LKM.layer_curve(foot + ".translateX", lay))
+check("15b run(layer=AnimLayer2, offset=7): keys on AnimLayer2 at a-7, nothing on AnimLayer1",
+      cnt == 2 and k2 and (k2[0] == r["apply"][0][0] - 7) and not k1, (k2, k1, lines[-1]))
+check("15c Hot Key > Main settings untouched", HLM.load_settings()["layer"] == "" and HLM.load_settings()["offset"] == 5)
 
 clear_optvars()
 print("\n{0}/{1} passed".format(sum(R), len(R)))

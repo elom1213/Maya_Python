@@ -1749,15 +1749,19 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 정지 구간마다 자동으로 한다. 계획서 [a00110_fix_sliding_plan.md](plans/a00110_fix_sliding_plan.md).
 
 ```
+                                                  [ Expand ]   ← v02.49 별도 창 (늘 위)
 [Fix Sliding List  (TSL)                    ]
 Frame Range  [Start][End]  Get Current · Get Sel Range · [Get Timeline]
 Speed   Components [x]X [x]Y [x]Z   Smooth interval [5 f]   Threshold [2.00 % of max speed]
 Spans   Merge gap (G) [4 f]   Min span (M) [3 f]
 Keys    [x]Translate [x]Rotate
-        [x] Layer Blend Key       Hot Key > Main: layer 'AnimLayer1', N = 5
+        [x] Layer Blend Key
+            Layer [AnimLayer1  v] [Refresh]            ← v02.49 이 탭에서 고른다
+            Frames before (N) [5 f]
+            Axes / values: Key > Pose Key (incl. Current).
             [x] Clamp blend start to the previous span
             [x] Lock the layer through each span (key at b)
-        [x] Debug speed curves (_debug_speed)
+        [x] Debug speed curves (<object>_debug_speed)
 [ Preview Spans ]  [ Fix Sliding ]
 ```
 
@@ -1769,21 +1773,26 @@ Keys    [x]Translate [x]Rotate
 5. **Min span (M)** — 길이 `b − a + 1` 이 **M 보다 긴** 구간만 고친다. 짧은 건 노이즈로 보고 둔다.
 6. **구간마다 (시간순)** — "그 구간의 translate / rotate 키를 고르고 Layer Blend Key 를 켠 채 Shift+A" 와 같다:
    - **Hold**: Hot Key > Main `Run only when viewing` 레이어(기본 BaseAnimation)의 T/R 커브에서 [a, b] 안 키를 첫 키 값으로 평평하게.
-   - **Layer Blend Key**: Hot Key > Main 의 **레이어 · Frames before(N) · Pose Key 축 / Current** 그대로, 기준 a = 구간 안 첫 키.
+   - **Layer Blend Key**: 이 탭의 **Layer · Frames before (N)**(v02.49~, 처음 값 = Hot Key > Main, 콤보를 펼치면 목록 갱신 —
+     여기서 바꿔도 Hot Key > Main 설정은 그대로), 축 · 값은 **Key > Pose Key(Current 포함)**, 기준 a = 구간 안 첫 키.
      Hot Key > Main 의 `Layer Blend Key` 체크와 보기 조건은 **필요 없다**(이 탭의 체크가 정한다).
    - **Clamp**(대안 A): 블렌드 시작(a − N)을 **앞 구간 끝보다 앞으로 가지 않게** — 고정된 앞 구간 안에서 레이어가 움직이기 시작하지 않는다.
    - **Lock**(대안 D): 구간 끝 b 에도 a 와 **같은 레이어 값** + flat 탄젠트 — 구간 내내 레이어 값이 상수. 구간 안에 원래 레이어 키가 있으면
      지우지 않고 메시지로 알린다.
    - G=0 · Clamp 끔 · Lock 끔이면 **순수 Shift+A** 결과와 같다(시험으로 키 값 1e-9 대조).
-7. **Debug** — `_debug_speed` 노드를 새로 만들어 오브젝트마다 `<이름>_speed` · `_smooth` · `_threshold` · `_result` 커브(그래프 에디터로 본다).
-   `_result` 는 Fix Sliding 뒤 **다시 잰 실제 속도**(Preview 는 예측). 노드는 undo 에 안 들어간다(Ctrl+Z 뒤에도 비교용으로 남음).
+7. **Debug** — v02.49~ **리스트의 오브젝트마다 노드 하나** `<이름>_debug_speed`(이름의 `:` 등은 `_`, 예: `origin_KANA_Cage_CH_l_foot_xx_ctl_debug_speed`)를
+   새로 만들고 커브 넷: `speed`(원래, **흰색**) · `smooth`(스무딩, **밝은 하늘색**) · `threshold`(**빨간색**) · `result`(결과, **초록색**).
+   노드를 선택하면 그래프 에디터에 그 색으로 보인다(`source` 어트리뷰트 = 원본 오브젝트, `info` = 설정).
+   `result` 는 Fix Sliding 뒤 **다시 잰 실제 속도**(Preview 는 예측). 노드는 undo 에 안 들어간다(Ctrl+Z 뒤에도 비교용으로 남음).
+   v02.48 의 단일 `_debug_speed` 노드는 다음 실행 때 지운다.
+8. **Expand**(v02.49~) — 탭 오른쪽 위 `Expand` 로 본문 전체를 별도 창으로 뺀다(View > Layers 와 같은 공용 위젯, 늘 위). 창을 닫으면 탭으로 돌아온다.
 - **Preview Spans** 는 키를 바꾸지 않고 오브젝트마다 최대 속도 · Threshold · 합친 구간 · 고칠 구간 · 건너뛸 짧은 구간을 로그에 쓴다.
 - **Fix Sliding** 은 진행 팝업(Sampling → Applying → Debug), **Ctrl+Z 한 번**에 전부 되돌아간다.
 - 설정은 창을 다시 열어도 기억된다.
 - **주의**: 오브젝트 **자기 채널**의 키를 고정한다. 부모(글로벌 컨트롤)가 그 구간에 움직이면 월드는 여전히 움직인다 → 그 경우는 Counter Layer(Stationary).
 - 실측: KANA 씬(6830 f) 발 IK 두 개, 기본값으로 191 구간 · 34 초, 고친 구간 안 월드 속도 0(전: 최대 0.69 / 0.82 per frame).
   기본 M=3 은 4~5 프레임짜리 접지도 잡는다 — 너무 많으면 M 을 키운다.
-- 시험 `tests/test_fix_sliding.py` 30/30 · `tests/test_fix_sliding_ui.py` 11/11. **마야 GUI 확인 아직.**
+- 시험 `tests/test_fix_sliding.py` 36/36 · `tests/test_fix_sliding_ui.py` 15/15(v02.49 노드 개수 · 색 · 레이어 콤보 · Expand). **마야 GUI 확인 아직.**
 
 #### Merge Layers — 마야 Merge Layers 를 프레임 구간 안에서만 (v02.27~)
 
@@ -2136,9 +2145,10 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
    정지 구간에서는 발이 서 있고, 사이에서 글로벌을 따라가며, End 에서는 글로벌 결과와 같다.
 
 ### Bake > Fix Sliding (v02.48~)
-1. Hot Key > Main 에서 **Layer** · **Frames before (N)** 를 정하고, Key > Pose Key 에서 축 / Current 를 정한다(Shift+A 와 같은 설정).
+1. 탭의 **Layer** · **Frames before (N)** 를 고르고(v02.49~), Key > Pose Key 에서 축 / Current 를 정한다.
 2. 발 IK 등을 선택 → **Select Objects** 로 Fix Sliding List 에 채우고 Frame Range 를 정한다.
-3. **Preview Spans** 로 구간을 본다(`_debug_speed` 커브도). 구간이 너무 많으면 Threshold ↓ 또는 M ↑, 끊기면 G ↑.
+3. **Preview Spans** 로 구간을 본다(`<오브젝트>_debug_speed` 노드를 선택하면 그래프 에디터에 색 커브).
+   그래프 에디터를 크게 쓰려면 **Expand** 로 탭을 별도 창으로. 구간이 너무 많으면 Threshold ↓ 또는 M ↑, 끊기면 G ↑.
 4. **Fix Sliding** → 구간마다 Hold + Layer Blend Key. `_debug_speed` 의 `_result` 가 구간에서 0 인지 본다. 마음에 안 들면 Ctrl+Z 한 번.
 
 ### Bake > Merge Layers (v02.27~)

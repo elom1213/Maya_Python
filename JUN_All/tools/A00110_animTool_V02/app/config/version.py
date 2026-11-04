@@ -146,5 +146,11 @@
 #        실측: KANA 씬(6830 f) 발 IK 둘, 191 구간, 34 s, 구간 안 월드 속도 0. 계획서 docs/plans/a00110_fix_sliding_plan.md,
 #        회귀 tests/test_fix_sliding.py 30/30 · test_fix_sliding_ui.py 11/11.
 
-VERSION = "02.48"
+# 02.49  Bake > Fix Sliding 업데이트(사용자 요청 4건) - ① 디버그 노드를 TSL 오브젝트마다 하나 `<이름>_debug_speed`
+#        (어트리뷰트 speed / smooth / threshold / result + source / info, v02.48 단일 `_debug_speed` 는 지움) ② 그래프 에디터 커브 색
+#        흰 / 밝은 하늘 / 빨강 / 초록 (animCurve.useCurveColor + curveColor) ③ [a-N, a] 키를 찍을 Layer 콤보 + Frames before (N) 를
+#        탭에서 고른다(처음 값 = Hot Key > Main, 펼칠 때 목록 갱신, Hot Key 설정은 안 바뀜) ④ 공용 Expand 로 별도 창(늘 위).
+#        FixSlidingManager.run(layer=, offset=), HoldLayerManager.apply(layer=, offset=). 회귀 test_fix_sliding 36/36 · _ui 15/15.
+
+VERSION = "02.49"
 LAST_UPDATE = "2026-11-04"

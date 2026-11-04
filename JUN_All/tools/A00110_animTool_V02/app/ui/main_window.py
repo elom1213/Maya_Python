@@ -66,6 +66,8 @@ WINDOW_OBJECT_NAME = "JUN_A00110_animTool_V02_window"
 CURVE_FILTERS_WINDOW_OBJECT_NAME = "JUN_A00110_animTool_V02_curveFilters_window"
 # View > Layers 를 따로 띄우는 창(Expand)의 objectName (v02.31).
 LAYERS_WINDOW_OBJECT_NAME = "JUN_A00110_animTool_V02_layers_window"
+# Bake > Fix Sliding 을 Expand 로 띄운 창 (v02.49)
+FIX_SLIDING_WINDOW_OBJECT_NAME = "JUN_A00110_animTool_V02_fixSliding_window"
 # View > Layers 자동 새로고침 주기(ms) - 레이어 에디터에서 바꾼 것을 따라간다(마야에 레이어 변경 이벤트가 없다).
 LAYERS_POLL_MS = 1500
 
@@ -2314,9 +2316,19 @@ class MainWindow(QWidget):
         """리스트 오브젝트의 정지 구간마다 Shift+A(Hold + Layer Blend Key)를 하는 탭 (Bake > Fix Sliding, v02.48).
 
         로직은 FixSlidingManager. 계획서 docs/plans/a00110_fix_sliding_plan.md.
+        v02.49 - 본문 전체를 공용 Expand 패널에 담아 **별도 창**으로 뺄 수 있다(View > Layers 와 같은 방식, 늘 위).
         """
         tab = JUN_mod_collapsible_qt.JUN_mod_fit_tab_page_v01()
-        tab_layout = QVBoxLayout(tab)
+        outer = QVBoxLayout(tab)
+        self.fs_panel = JUN_mod_expand_qt.JUN_mod_expand_qt_v01(
+            title="Fix Sliding",
+            placeholder="Fix Sliding is shown in the expanded window.",
+            object_name=FIX_SLIDING_WINDOW_OBJECT_NAME,
+            size=(460, 900),
+            stay_on_top=True)
+        self.fs_panel.expanded_changed.connect(lambda *_: self._fit_window_later())
+        outer.addWidget(self.fs_panel)
+        tab_layout = self.fs_panel.body
 
         self.fs_tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Fix Sliding List", select_label="Select Objects",
@@ -2415,13 +2427,32 @@ class MainWindow(QWidget):
         self.cb_fs_layer_blend = QCheckBox("Layer Blend Key")
         self.cb_fs_layer_blend.setChecked(True)
         self.cb_fs_layer_blend.setToolTip(
-            "For each fixed span [a, b] also key the layer chosen in Hot Key > Main at a and a - N\n"
-            "(Pose Key axes / Current), exactly like Shift+A with Layer Blend Key on.\n"
+            "For each fixed span [a, b] also key the layer below at a and a - N\n"
+            "(Key > Pose Key axes / Current), exactly like Shift+A with Layer Blend Key on.\n"
             "Hot Key > Main's own Layer Blend Key checkbox and 'Run only when viewing' are not needed here.")
         keys_box.addWidget(self.cb_fs_layer_blend)
-        self.lbl_fs_layer_blend = QLabel("")
-        self.lbl_fs_layer_blend.setContentsMargins(20, 0, 0, 0)
-        keys_box.addWidget(self.lbl_fs_layer_blend)
+        # v02.49 : 레이어 · N 을 이 탭에서 고른다 (처음엔 Hot Key > Main 값)
+        self.w_fs_layer = QWidget()
+        lay_form = QGridLayout(self.w_fs_layer)
+        lay_form.setContentsMargins(20, 0, 0, 0)
+        lay_form.addWidget(QLabel("Layer"), 0, 0)
+        self.cmb_fs_layer = _PopupRefreshCombo(on_popup=lambda: self._fs_layer_refresh())
+        self.cmb_fs_layer.setToolTip("Animation layer that gets the keys at a - N and a (BaseAnimation is not listed).")
+        lay_form.addWidget(self.cmb_fs_layer, 0, 1)
+        self.btn_fs_layer_refresh = QPushButton("Refresh")
+        self.btn_fs_layer_refresh.setToolTip("Reload the animation layer list from the scene.")
+        lay_form.addWidget(self.btn_fs_layer_refresh, 0, 2)
+        lay_form.addWidget(QLabel("Frames before (N)"), 1, 0)
+        self.sp_fs_offset = QSpinBox()
+        self.sp_fs_offset.setRange(1, 1000)
+        self.sp_fs_offset.setSuffix(" f")
+        self.sp_fs_offset.setToolTip("N : the layer value is keyed at (a - N) - the blend into the span starts there.")
+        lay_form.addWidget(self.sp_fs_offset, 1, 1)
+        note = QLabel("Axes / values: Key > Pose Key (incl. Current).")
+        note.setEnabled(False)
+        lay_form.addWidget(note, 2, 0, 1, 3)
+        lay_form.setColumnStretch(1, 1)
+        keys_box.addWidget(self.w_fs_layer)
         self.cb_fs_clamp = QCheckBox("Clamp blend start to the previous span")
         self.cb_fs_clamp.setChecked(True)
         self.cb_fs_clamp.setToolTip(
@@ -2439,12 +2470,13 @@ class MainWindow(QWidget):
             row.addWidget(cb)
             row.addStretch(1)
             keys_box.addLayout(row)
-        self.cb_fs_debug = QCheckBox("Debug speed curves ({0})".format(FixSlidingManager.DEBUG_NODE))
+        self.cb_fs_debug = QCheckBox("Debug speed curves (<object>{0})".format(FixSlidingManager.DEBUG_SUFFIX))
         self.cb_fs_debug.setChecked(True)
         self.cb_fs_debug.setToolTip(
-            "Rebuild the '{0}' node with 4 curves per object: speed, smoothed speed, threshold and result\n"
-            "(measured again after Fix Sliding, predicted for Preview). Not part of the undo.".format(
-                FixSlidingManager.DEBUG_NODE))
+            "Rebuild one '<object>{0}' node per listed object with 4 curves: speed (white),\n"
+            "smoothed speed (light blue), threshold (red) and result (green - measured again after\n"
+            "Fix Sliding, predicted for Preview). Select it to see the curves in the Graph Editor.\n"
+            "Not part of the undo.".format(FixSlidingManager.DEBUG_SUFFIX))
         keys_box.addWidget(self.cb_fs_debug)
         tab_layout.addWidget(keys_grp)
 
@@ -2460,17 +2492,27 @@ class MainWindow(QWidget):
         btn_row.addWidget(self.btn_fs_run)
         tab_layout.addLayout(btn_row)
         tab_layout.addStretch(1)
+        outer.addStretch(1)
 
         self.btn_fs_preview.clicked.connect(self.on_fs_preview)
         self.btn_fs_run.clicked.connect(self.on_fs_run)
         self.cb_fs_layer_blend.toggled.connect(self._fs_layer_blend_toggled)
+        self.btn_fs_layer_refresh.clicked.connect(lambda: self._fs_layer_refresh(log=True))
 
+        # 레이어 · N 첫 값 = 저장값 -> 없으면 Hot Key > Main 값
+        hk = HoldLayerManager.load_settings()
+        self.sp_fs_offset.setValue(int(hk.get("offset", 10)))
+        saved_layer = (cmds.optionVar(q=self.FS_OPTVAR + "layer")
+                       if cmds.optionVar(exists=self.FS_OPTVAR + "layer") else hk.get("layer", ""))
+        self._fs_layer_refresh(prefer=str(saved_layer or ""))
         self._fs_load_settings()
         for w in (self.cb_fs_x, self.cb_fs_y, self.cb_fs_z, self.cb_fs_t, self.cb_fs_r,
                   self.cb_fs_layer_blend, self.cb_fs_clamp, self.cb_fs_lock, self.cb_fs_debug):
             w.toggled.connect(self._fs_save_settings)
-        for w in (self.sp_fs_smooth, self.sp_fs_threshold, self.sp_fs_merge_gap, self.sp_fs_min_span):
+        for w in (self.sp_fs_smooth, self.sp_fs_threshold, self.sp_fs_merge_gap, self.sp_fs_min_span,
+                  self.sp_fs_offset):
             w.valueChanged.connect(self._fs_save_settings)
+        self.cmb_fs_layer.currentIndexChanged.connect(self._fs_save_settings)
         self._fs_layer_blend_toggled()
         return tab
 
@@ -5119,6 +5161,7 @@ class MainWindow(QWidget):
         ("merge_gap", "sp_fs_merge_gap", "int"), ("min_span", "sp_fs_min_span", "int"),
         ("t", "cb_fs_t", "bool"), ("r", "cb_fs_r", "bool"), ("layer_blend", "cb_fs_layer_blend", "bool"),
         ("clamp", "cb_fs_clamp", "bool"), ("lock", "cb_fs_lock", "bool"), ("debug", "cb_fs_debug", "bool"),
+        ("offset", "sp_fs_offset", "int"),                  # v02.49 (레이어 이름은 _fs_save_settings 가 따로)
     )
 
     def _fs_load_settings(self):
@@ -5148,24 +5191,36 @@ class MainWindow(QWidget):
                 cmds.optionVar(intValue=(ov, int(w.value())))
             else:
                 cmds.optionVar(floatValue=(ov, float(w.value())))
+        cmds.optionVar(stringValue=(self.FS_OPTVAR + "layer", self._fs_layer_name()))
 
     def _fs_layer_blend_toggled(self, *_args):
         on = self.cb_fs_layer_blend.isChecked()
-        self.cb_fs_clamp.setEnabled(on)
-        self.cb_fs_lock.setEnabled(on)
-        self._fs_update_layer_label()
+        for w in (self.cb_fs_clamp, self.cb_fs_lock, self.w_fs_layer):
+            w.setEnabled(on)
 
-    def _fs_update_layer_label(self):
-        """Layer Blend 줄 아래 : Hot Key > Main 의 레이어 · N (못 쓰면 경고 문구)."""
-        if getattr(self, "lbl_fs_layer_blend", None) is None:
-            return
-        ok, layer, n, msg = FixSlidingManager.layer_blend_status()
-        if ok:
-            text = "Hot Key > Main: layer '{0}', N = {1}".format(layer, n)
-        else:
-            text = msg.replace("[Warning] Fix Sliding: ", "[Warning] ")
-        self.lbl_fs_layer_blend.setText(text)
-        self.lbl_fs_layer_blend.setEnabled(self.cb_fs_layer_blend.isChecked())
+    def _fs_layer_name(self):
+        """Fix Sliding 레이어 콤보 값 ('(missing)' 꼬리 제외)."""
+        data = self.cmb_fs_layer.currentData()
+        return str(data) if data else ""
+
+    def _fs_layer_refresh(self, prefer=None, log=False):
+        """레이어 콤보를 씬의 레이어(BaseAnimation 제외)로 다시 채운다. 고르던 이름이 없으면 '(missing)'."""
+        want = self._fs_layer_name() if prefer is None else prefer
+        layers = HoldLayerManager.list_layers()
+        cmb = self.cmb_fs_layer
+        cmb.blockSignals(True)
+        try:
+            cmb.clear()
+            for name in layers:
+                cmb.addItem(name, name)
+            if want and want not in layers:
+                cmb.addItem("{0} (missing)".format(want), want)
+            idx = cmb.findData(want) if want else -1
+            cmb.setCurrentIndex(idx if idx >= 0 else (0 if cmb.count() else -1))
+        finally:
+            cmb.blockSignals(False)
+        if log:
+            self.log("Fix Sliding: {0} layer(s) listed.".format(len(layers)))
 
     def on_fs_get_timeline(self, *_args):
         start = int(cmds.playbackOptions(q=True, minTime=True))
@@ -5239,7 +5294,9 @@ class MainWindow(QWidget):
             self.log("[Warning] Check Translate and/or Rotate.")
             return
         layer_blend = self.cb_fs_layer_blend.isChecked()
-        self._fs_update_layer_label()
+        if layer_blend and not self._fs_layer_name():
+            self.log("[Warning] Fix Sliding: choose a Layer for Layer Blend Key (or turn it off).")
+            return
         debug = self.cb_fs_debug.isChecked()
         phases = [("Sampling", 45 if debug else 60), ("Applying", 40)] + ([("Debug", 15)] if debug else [])
         dlg, progress = self._fs_progress("Fix Sliding", phases)
@@ -5248,7 +5305,8 @@ class MainWindow(QWidget):
             _count, lines = FixSlidingManager.run(
                 nodes, start, end, translate=translate, rotate=rotate, layer_blend=layer_blend,
                 clamp_blend=self.cb_fs_clamp.isChecked(), lock_end=self.cb_fs_lock.isChecked(),
-                debug=debug, progress=progress, **opts)
+                debug=debug, progress=progress, layer=self._fs_layer_name(),
+                offset=self.sp_fs_offset.value(), **opts)
         finally:
             elapsed = dlg.elapsed()
             dlg.finish()
@@ -6325,9 +6383,6 @@ class MainWindow(QWidget):
                                 axis_values=self._collect_pose_axis_values(warn=False),
                                 current_axes=self._pose_current_axes(),
                                 view_layer=self._hold_view_layer_name())
-        # v02.48 Bake > Fix Sliding 의 'Hot Key > Main: layer ..., N = ...' 라벨도 따라간다
-        if hasattr(self, "_fs_update_layer_label"):
-            self._fs_update_layer_label()
 
     def on_toggle_hotkey(self, checked):
         self._enable_hotkey(checked)

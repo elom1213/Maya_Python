@@ -41,6 +41,7 @@ for f in range(1, 41):
     x = min(f, 10) * 1.0 if f <= 20 else 10.0 + min(f - 20, 10)
     cmds.setKeyframe(foot, at="tx", t=f, v=x)
 lay = cmds.animLayer("AnimLayer1")
+cmds.animLayer("AnimLayer2")
 cmds.select(foot)
 cmds.animLayer(lay, e=True, attribute=[foot + ".translateX"])
 cmds.select(clear=True)
@@ -73,17 +74,25 @@ check("16c Layer Blend off disables Clamp / Lock", not win.cb_fs_clamp.isEnabled
 win.cb_fs_layer_blend.setChecked(True)
 check("16d Layer Blend on enables them again", win.cb_fs_clamp.isEnabled() and win.cb_fs_lock.isEnabled())
 
-# ---------------- 19 레이어 라벨
-# 씬에 레이어가 하나면 Hot Key > Main 콤보가 그것을 고른다 -> 설정을 비워 경고 문구를 본다
-HLM.update(layer="")
-win._fs_update_layer_label()
-check("19 label warns when Hot Key > Main has no layer", "[Warning]" in win.lbl_fs_layer_blend.text(),
-      win.lbl_fs_layer_blend.text())
-win.cmb_hold_layer.setCurrentIndex(win.cmb_hold_layer.findData("AnimLayer1"))
-win.sp_hold_layer_offset.setValue(6)
-APP.processEvents()
-check("19b label follows Hot Key > Main (layer, N)",
-      win.lbl_fs_layer_blend.text() == "Hot Key > Main: layer 'AnimLayer1', N = 6", win.lbl_fs_layer_blend.text())
+# ---------------- 19 레이어 · N 을 이 탭에서 고른다 (v02.49)
+items = [win.cmb_fs_layer.itemText(i) for i in range(win.cmb_fs_layer.count())]
+check("19 own Layer combo (no BaseAnimation) + Frames before N (default = Hot Key 10)",
+      sorted(items) == ["AnimLayer1", "AnimLayer2"] and win.sp_fs_offset.value() == 10 and not hasattr(win, "lbl_fs_layer_blend"),
+      (items, win.sp_fs_offset.value()))
+win.cmb_fs_layer.setCurrentIndex(win.cmb_fs_layer.findData("AnimLayer2"))
+win.sp_fs_offset.setValue(7)
+check("19b choosing here does not change Hot Key > Main", HLM.load_settings()["layer"] != "AnimLayer2"
+      and HLM.load_settings()["offset"] == 10, HLM.load_settings())
+win.cb_fs_layer_blend.setChecked(False)
+off = not win.w_fs_layer.isEnabled()
+win.cb_fs_layer_blend.setChecked(True)
+check("19c Layer Blend off disables the layer row", off and win.w_fs_layer.isEnabled())
+cmds.animLayer("AnimLayer3")
+win.cmb_fs_layer.showPopup()
+items = [win.cmb_fs_layer.itemText(i) for i in range(win.cmb_fs_layer.count())]
+win.cmb_fs_layer.hidePopup()
+check("19d opening the combo picks up a new layer, keeps the choice",
+      "AnimLayer3" in items and win.cmb_fs_layer.currentText() == "AnimLayer2", items)
 
 # ---------------- 17 버튼 -> 코어 인자
 win.fs_tsl.set_items([foot])
@@ -122,12 +131,14 @@ check("17b Fix Sliding passes the options",
       and kw.get("axes") == (True, False, True) and kw.get("smooth") == 3 and kw.get("threshold_pct") == 5.0
       and kw.get("merge_gap") == 2 and kw.get("min_span") == 4 and kw.get("translate") is True
       and kw.get("rotate") is False and kw.get("layer_blend") is True and kw.get("clamp_blend") is True
-      and kw.get("lock_end") is False and kw.get("debug") is True and kw.get("progress") is not None, kw)
+      and kw.get("lock_end") is False and kw.get("debug") is True and kw.get("progress") is not None
+      and kw.get("layer") == "AnimLayer2" and kw.get("offset") == 7, kw)
 check("17c Preview passes the options (no key options)",
       seen.get("preview", [None])[0] == cmds.ls(foot, long=True) and seen["preview"][3].get("min_span") == 4
       and "translate" not in seen["preview"][3], seen.get("preview"))
 
-# 실제 실행 한 번 (진행 팝업 포함)
+# 실제 실행 한 번 (진행 팝업 포함) - foot 은 AnimLayer1 멤버
+win.cmb_fs_layer.setCurrentIndex(win.cmb_fs_layer.findData("AnimLayer1"))
 win.cb_fs_r.setChecked(True)
 win.cb_fs_lock.setChecked(True)
 win.btn_fs_run.click()
@@ -136,7 +147,18 @@ base_tx = LKM.layer_curve(foot + ".translateX", LKM.root_layer())
 lay_tx = LKM.layer_curve(foot + ".translateX", lay)
 check("17d real run: base tx held (fewer keys) + layer keys + debug node",
       cmds.keyframe(base_tx, q=True, keyframeCount=True) < 40 and lay_tx is not None
-      and cmds.objExists(FS.DEBUG_NODE), (cmds.keyframe(base_tx, q=True, keyframeCount=True), lay_tx))
+      and cmds.objExists(FS.debug_node_name(foot)), (cmds.keyframe(base_tx, q=True, keyframeCount=True), lay_tx))
+
+# ---------------- 20 Expand : 별도 창으로 (v02.49)
+win.fs_panel.expand()
+APP.processEvents()
+ext = [w for w in APP.topLevelWidgets() if w.objectName() == MWmod.FIX_SLIDING_WINDOW_OBJECT_NAME]
+check("20 Expand moves the Fix Sliding body into its own window",
+      win.fs_panel.is_expanded() and ext and ext[0].isVisible() and ext[0].isAncestorOf(win.fs_tsl)
+      and ext[0].isAncestorOf(win.btn_fs_run), [w.objectName() for w in APP.topLevelWidgets()][:8])
+win.fs_panel.collapse()
+APP.processEvents()
+check("20b collapse puts it back in the tab", not win.fs_panel.is_expanded() and win.fs_panel.isAncestorOf(win.fs_tsl))
 
 # ---------------- 18 optionVar 저장 -> 다시 열면 복원
 win.close()
@@ -147,7 +169,9 @@ APP.processEvents()
 check("18 reopen restores Fix Sliding settings",
       win2.sp_fs_smooth.value() == 3 and abs(win2.sp_fs_threshold.value() - 5.0) < 1e-9
       and win2.sp_fs_merge_gap.value() == 2 and win2.sp_fs_min_span.value() == 4
-      and not win2.cb_fs_y.isChecked() and win2.cb_fs_r.isChecked() and win2.cb_fs_lock.isChecked())
+      and not win2.cb_fs_y.isChecked() and win2.cb_fs_r.isChecked() and win2.cb_fs_lock.isChecked()
+      and win2.cmb_fs_layer.currentText() == "AnimLayer1" and win2.sp_fs_offset.value() == 7,
+      (win2.cmb_fs_layer.currentText(), win2.sp_fs_offset.value()))
 win2.close()
 
 clear_optvars()

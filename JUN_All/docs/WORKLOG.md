@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-04 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.49 Fix Sliding 업데이트** `#A00110_animTool`
+- 요청 4건: ① 디버그 노드를 TSL 오브젝트마다 `<이름>_debug_speed`(speed / smooth / threshold / result + source / info, 옛 단일 노드 정리)
+  ② 그래프 에디터 커브 색 흰 · 밝은 하늘 · 빨강 · 초록(`animCurve.useCurveColor` + `curveColor`, mayapy 실측) ③ 탭에서 Layer 콤보 + Frames before (N)
+  (처음 값 = Hot Key > Main, 펼칠 때 갱신, Hot Key 설정은 안 바뀜 — `run(layer=, offset=)` · `apply(layer=, offset=)`) ④ 공용 Expand 로 별도 창.
+- 시험: `test_fix_sliding.py` 36/36 · `_ui` 15/15, 회귀 81 · 21 · 46. **GUI 확인 아직.**
+
 > [!summary] A00110_animTool_V02 **v02.48 Bake > Fix Sliding** `#A00110_animTool`
 - 계획서대로 구현: `core/fix_sliding_manager.py`(순수 함수 speeds · smooth · still_spans · merge_gaps · split_spans · blend_start + currentTime 샘플링 · preview · run · `_debug_speed`),
   `KeyframeManager._hold_curve / hold_range`(Shift+A 동작 불변), `HoldLayerManager.apply(force, ramp_start, hold_end)`, Bake > Fix Sliding 탭(TSL · 구간 · Speed · Spans · Keys · Preview / Fix Sliding · 진행 팝업 · optionVar).

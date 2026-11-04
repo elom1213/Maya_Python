@@ -53,6 +53,7 @@
 #   ramp_start=t0   : 블렌드 시작(레이어 값 키) 프레임을 직접 준다 - 대안 A (앞 구간 끝에서 자르기). 없으면 frame - N.
 #   hold_end=b      : 대안 D - 이번에 키를 찍은 레이어 채널마다 a 와 b 에 같은 레이어 값 + a out / b in 탄젠트 flat
 #                     -> [a, b] 동안 레이어 값이 상수. 구간 안에 원래 레이어 키가 있으면 지우지 않고 메시지로 알린다.
+# v02.49 - layer= / offset= : Fix Sliding 탭에서 고른 레이어 · N 으로 설정값을 덮는다(Shift+A 는 안 씀).
 #
 # 결정 사항 (2026-11-04 사용자):
 #   1. -N 키 값 = 그 시점의 레이어 값 유지 (레이어 커브 평가값, 커브가 없으면 그 레이어 blend 입력(inputB)의 정적값)
@@ -337,7 +338,8 @@ class HoldLayerManager:
         return {(o, a): vals["{0}.{1}".format(o, a)] for o, a in pairs if "{0}.{1}".format(o, a) in vals}
 
     @classmethod
-    def apply(cls, objects=None, frame=None, current_values=None, force=False, ramp_start=None, hold_end=None):
+    def apply(cls, objects=None, frame=None, current_values=None, force=False, ramp_start=None, hold_end=None,
+              layer=None, offset=None):
         """(frame - N) 에 '그 시점 레이어 값' 키, frame 에 Pose 값 키. frame 기본 = 현재 프레임 (v02.47 run_hold 는 고른 구간의 a).
 
         current 축(v02.44 축마다)은 현재 프레임 키를 Pose 값 대신 **지금 값**으로
@@ -361,7 +363,7 @@ class HoldLayerManager:
         if not sel:
             return (0, "[Warning] Layer Blend: no objects selected.")
 
-        layer = (s.get("layer") or "").strip()
+        layer = ((s.get("layer") if layer is None else layer) or "").strip()
         root = LayerKeyManager.root_layer()
         if not layer:
             return (0, "[Warning] Layer Blend: no layer chosen (Hot Key > Main > Layer). Skipped.")
@@ -381,7 +383,7 @@ class HoldLayerManager:
             return (0, "[Warning] Layer Blend: no Pose Key axis checked. Skipped.")
 
         try:
-            n = max(1, int(s.get("offset", 10)))
+            n = max(1, int(s.get("offset", 10) if offset is None else offset))
         except (TypeError, ValueError):
             n = 10
         now = float(cmds.currentTime(q=True))

@@ -14,6 +14,8 @@ metadata:
   f7 키가 앞 구간을 다시 움직였다. 셋 끄면 순수 Shift+A → 핵심 시험은 손으로 selectKey + run_hold 한 결과와 1e-9 대조.
 - Hold 대상 = Hot Key > Main `view_layer` 커브, Layer Blend = Hot Key > Main 설정 + `force=True`(enabled · 보기 게이트 무시).
 - 디버그 노드는 **undo 를 끈 채**(밖에서 만들면 Ctrl+Z 한 번이 디버그만 되돌린다). 커브는 API `MFnAnimCurve.addKeys`.
+- **v02.49**: 디버그 노드 = 오브젝트마다 `<이름>_debug_speed`(speed 흰 · smooth 밝은 하늘 · threshold 빨강 · result 초록 —
+  **animCurve 의 `useCurveColor` + `curveColor`(double3)** 로 그래프 에디터 색), Layer · N 을 탭에서 고름(`run(layer=, offset=)`), 공용 Expand.
 - `_SmartLayer` 는 .pyc — 디컴파일 안 함, 툴팁 문구만 참고([[wip-a00110-counter-layer]] 와 같은 결정).
 
 **실측 씬(사용자 제공, 테스트용으로 써도 됨, 저장하지 말 것)**:

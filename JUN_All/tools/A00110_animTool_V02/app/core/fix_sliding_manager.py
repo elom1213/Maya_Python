@@ -19,6 +19,10 @@
 # 샘플링은 반드시 currentTime 루프 - 레이어가 있으면 getAttr -time / MDGContext 는 Base 값만 준다(v02.47 실측).
 # 시간 이동 · 디버그 노드는 undo 기록을 끈 채로 해서, Ctrl+Z 한 번이 Fix Sliding 결과만 되돌린다.
 # _SmartLayer 의 Fix Sliding 은 참고만(툴팁 문구). 디컴파일하지 않는다.
+#
+# v02.49 - 디버그 노드를 **오브젝트마다 하나** `<이름>_debug_speed` (어트리뷰트 speed / smooth / threshold / result + info · source),
+#   그래프 에디터 커브 색 = 흰 / 밝은 하늘 / 빨강 / 초록 (animCurve.useCurveColor + curveColor). v02.48 의 단일 `_debug_speed` 는 지운다.
+#   Layer Blend 레이어 · N 을 탭에서 고른다 - run(layer=, offset=) 가 Hot Key > Main 값을 덮는다(Pose / Current 축은 그대로 Pose Key).
 
 import contextlib
 import math
@@ -56,7 +60,15 @@ class FixSlidingManager:
     DEFAULT_THRESHOLD_PCT = 2.0
     DEFAULT_MERGE_GAP = 4          # 대안 B, 0 = 합치지 않음
     DEFAULT_MIN_SPAN = 3
-    DEBUG_NODE = "_debug_speed"
+    DEBUG_SUFFIX = "_debug_speed"
+    LEGACY_DEBUG_NODE = "_debug_speed"      # v02.48 단일 노드 - 다시 만들 때 지운다
+    # 그래프 에디터 커브 색 (RGB 0~1)
+    DEBUG_COLORS = {
+        "speed": (1.0, 1.0, 1.0),           # 원래 속도 : 흰색
+        "smooth": (0.53, 0.81, 0.98),       # 스무딩 : 밝은 하늘색
+        "threshold": (1.0, 0.0, 0.0),       # Threshold : 빨간색
+        "result": (0.0, 1.0, 0.0),          # 결과 속도 : 초록색
+    }
     PHASES = ("Sampling", "Applying", "Debug")
 
     # ==================================================
@@ -204,16 +216,19 @@ class FixSlidingManager:
         return objs, note
 
     @staticmethod
-    def layer_blend_status():
-        """(ok, 레이어, N, 메시지) - Hot Key > Main 의 Layer Blend 설정이 쓸 수 있는가."""
+    def layer_blend_status(layer=None, offset=None):
+        """(ok, 레이어, N, 메시지) - Layer Blend 에 쓸 레이어가 쓸 수 있는가.
+
+        layer / offset 을 주면 그것(v02.49 탭에서 고른 값), 없으면 Hot Key > Main 설정.
+        """
         s = HoldLayerManager.load_settings()
-        layer = (s.get("layer") or "").strip()
-        n = int(s.get("offset", 10))
+        layer = ((s.get("layer") if layer is None else layer) or "").strip()
+        n = int(s.get("offset", 10) if offset is None else offset)
         root = LayerKeyManager.root_layer()
         if not layer:
-            return (False, "", n, "[Warning] Fix Sliding: Layer Blend Key needs a layer - choose one in Hot Key > Main.")
+            return (False, "", n, "[Warning] Fix Sliding: Layer Blend Key needs a layer - choose one.")
         if not cmds.objExists(layer) or cmds.nodeType(layer) != "animLayer" or layer == root:
-            return (False, layer, n, "[Warning] Fix Sliding: layer '{0}' (Hot Key > Main) not found.".format(layer))
+            return (False, layer, n, "[Warning] Fix Sliding: layer '{0}' not found.".format(layer))
         try:
             if cmds.animLayer(layer, q=True, lock=True):
                 return (False, layer, n, "[Warning] Fix Sliding: layer '{0}' is locked.".format(layer))
@@ -286,9 +301,9 @@ class FixSlidingManager:
                     for f in range(int(a), int(b) + 1):
                         sp[f - int(start)] = 0.0
                 predicted[o] = sp
-            node = cls.write_debug(results, predicted, start, cls._info(start, end, smooth, threshold_pct,
-                                                                         merge_gap, min_span, axes))
-            lines.append("Debug curves: {0} (result = predicted)".format(node))
+            nodes = cls.write_debug(results, predicted, start, cls._info(start, end, smooth, threshold_pct,
+                                                                          merge_gap, min_span, axes))
+            lines.append("Debug curves: {0} (result = predicted)".format(LayerKeyManager._brief(nodes, limit=5)))
         n_apply = sum(len(results[o]["apply"]) for o in objs)
         lines.append("Fix Sliding preview: {0} object(s), {1} span(s) to fix (G={2}, M={3}).".format(
             len(objs), n_apply, int(merge_gap), int(min_span)))
@@ -298,15 +313,18 @@ class FixSlidingManager:
     def run(cls, objs, start, end, axes=(True, True, True), smooth=DEFAULT_SMOOTH,
             threshold_pct=DEFAULT_THRESHOLD_PCT, min_span=DEFAULT_MIN_SPAN, merge_gap=DEFAULT_MERGE_GAP,
             translate=True, rotate=True, layer_blend=True, clamp_blend=True, lock_end=True,
-            debug=True, progress=None):
-        """정지 구간마다 Hold (+ Layer Blend Key). 한 번의 undo. 반환 (고친 구간 수, 로그 줄)."""
+            debug=True, progress=None, layer=None, offset=None):
+        """정지 구간마다 Hold (+ Layer Blend Key). 한 번의 undo. 반환 (고친 구간 수, 로그 줄).
+
+        layer / offset : Layer Blend 레이어 · N (v02.49 탭에서 고른 값). None 이면 Hot Key > Main 설정.
+        """
         objs, note = cls._validate(objs, start, end, axes, translate, rotate)
         if not objs:
             return 0, [note]
         lines = [note] if note else []
         n = 0
         if layer_blend:
-            ok, layer, n, msg = cls.layer_blend_status()
+            ok, layer, n, msg = cls.layer_blend_status(layer, offset)
             if not ok:
                 return 0, lines + [msg]
 
@@ -344,7 +362,7 @@ class FixSlidingManager:
                         t0 = cls.blend_start(a_p, n, prev_end, clamp_blend)
                         _cnt, lmsg = HoldLayerManager.apply(
                             objects=[o], frame=a_p, current_values=cur, force=True,
-                            ramp_start=t0, hold_end=(b if lock_end else None))
+                            ramp_start=t0, hold_end=(b if lock_end else None), layer=layer, offset=n)
                         text += " | " + lmsg
                         if clamp_blend and t0 > a_p - n:
                             text += " (blend start clamped from f{0:g})".format(a_p - n)
@@ -358,9 +376,10 @@ class FixSlidingManager:
             cls._phase(progress, "Debug")
             pos = cls.sample_positions(objs, start, end)
             measured = dict((o, cls.speeds(pos[o], axes)) for o in objs)
-            node = cls.write_debug(results, measured, start, cls._info(start, end, smooth, threshold_pct,
-                                                                        merge_gap, min_span, axes))
-            lines.append("Debug curves: {0} (result = measured after the fix)".format(node))
+            nodes = cls.write_debug(results, measured, start, cls._info(start, end, smooth, threshold_pct,
+                                                                         merge_gap, min_span, axes))
+            lines.append("Debug curves: {0} (result = measured after the fix)".format(
+                LayerKeyManager._brief(nodes, limit=5)))
 
         lines.append("Fix Sliding: {0} object(s), {1} span(s) fixed, {2} merge(s) (G={3}), "
                      "{4} short span(s) skipped (M={5}).".format(
@@ -377,9 +396,14 @@ class FixSlidingManager:
             int(start), int(end), int(smooth), threshold_pct, int(merge_gap), int(min_span),
             "".join(c for c, on in zip("XYZ", axes) if on))
 
+    @classmethod
+    def debug_node_name(cls, obj):
+        """오브젝트 하나의 디버그 노드 이름 (짧은 이름의 `:` `|` 등 -> `_`) + `_debug_speed`."""
+        return cls._prefixes([obj])[obj] + cls.DEBUG_SUFFIX
+
     @staticmethod
     def _prefixes(objs):
-        """오브젝트마다 어트리뷰트 접두사 (짧은 이름, `:` `|` -> `_`, 겹치면 _2 ...)."""
+        """오브젝트마다 이름 접두사 (짧은 이름, `:` `|` -> `_`, 겹치면 _2 ...)."""
         out = {}
         used = set()
         for o in objs:
@@ -396,26 +420,34 @@ class FixSlidingManager:
 
     @classmethod
     def write_debug(cls, results, result_speeds, start, info=""):
-        """_debug_speed 를 새로 만들고 오브젝트마다 speed / smooth / threshold / result 커브. undo 기록 안 남김."""
+        """오브젝트마다 `<이름>_debug_speed` 를 새로 만들고 speed / smooth / threshold / result 커브(색 지정).
+
+        undo 기록 안 남김. 반환 = 만든 노드 이름 목록(results 순서).
+        """
         import maya.api.OpenMaya as om
         import maya.api.OpenMayaAnim as oma
 
         objs = list(results)
+        nodes = []
         with _undo_off():
-            if cmds.objExists(cls.DEBUG_NODE):
-                cmds.delete(cls.DEBUG_NODE)
-            node = cmds.createNode("transform", name=cls.DEBUG_NODE)
-            cmds.addAttr(node, longName="info", dataType="string")
-            cmds.setAttr(node + ".info", info, type="string")
+            if cmds.objExists(cls.LEGACY_DEBUG_NODE):
+                cmds.delete(cls.LEGACY_DEBUG_NODE)
             unit = om.MTime.uiUnit()
             for o, pre in cls._prefixes(objs).items():
+                name = pre + cls.DEBUG_SUFFIX
+                if cmds.objExists(name):
+                    cmds.delete(name)
+                node = cmds.createNode("transform", name=name)
+                nodes.append(node)
+                for key, text in (("source", o), ("info", info)):
+                    cmds.addAttr(node, longName=key, dataType="string")
+                    cmds.setAttr(node + "." + key, text, type="string")
                 r = results[o]
                 n = len(r["speed"])
                 times = [om.MTime(float(start) + i, unit) for i in range(n)]
                 series = (("speed", r["speed"]), ("smooth", r["smooth"]),
                           ("threshold", [r["threshold"]] * n), ("result", result_speeds.get(o, [])))
-                for suffix, values in series:
-                    attr = "{0}_{1}".format(pre, suffix)
+                for attr, values in series:
                     cmds.addAttr(node, longName=attr, attributeType="double", keyable=True)
                     if not values:
                         continue
@@ -425,7 +457,11 @@ class FixSlidingManager:
                     fn.create(sel.getPlug(0), oma.MFnAnimCurve.kAnimCurveTU)
                     fn.addKeys(times, [float(v) for v in values],
                                oma.MFnAnimCurve.kTangentLinear, oma.MFnAnimCurve.kTangentLinear)
-        return node
+                    # 그래프 에디터 커브 색
+                    crv = fn.name()
+                    cmds.setAttr(crv + ".useCurveColor", 1)
+                    cmds.setAttr(crv + ".curveColor", *cls.DEBUG_COLORS[attr], type="double3")
+        return nodes
 
     @staticmethod
     def _phase(progress, name):
