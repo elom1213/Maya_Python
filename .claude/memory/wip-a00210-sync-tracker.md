@@ -21,3 +21,6 @@ metadata:
 - 함정: Windows `os.path.normcase` 는 `/` 를 `\` 로 바꾼다 → glob 패턴 비교 전에 다시 `/` 로. 2대에서 한쪽만 가진 파일 = `Only here`(Ahead 아님).
 - 오프스크린 시험에서 MainWindow 를 만들되 close 하지 않는다(closeEvent 가 실제 프로파일을 저장).
 **How to apply:** 2차(지운 파일 · 자동 스캔 · 별명) · 3차는 사용자가 요청할 때. GUI 실사용(두 PC) 확인 전. 관련 [[wip-a00210-data-folders]].
+- v01.48~49 (2026-11-05): Status 열 = 경로 옆, 폴더 줄 = 아래 **모든** 파일 상태(`Missing (1) · Ahead (2)` / `OK`), 처음 접힘(펼침 유지),
+  색 Missing #ff8a8a · Outdated #f2d64b · Conflict #7fd8ff · OK #6fcf6f(사용자 지정), Show 기본 전부 체크(키 `sync_show_filters` — 예전 `sync_show` 무시),
+  Status 트리 힌트 1075 = 창 2.2 배(717 → 1600), Excluded 왼쪽 게으른 체크 트리 → Exclude Checked. GUI 확인 아직.

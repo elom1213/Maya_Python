@@ -77,7 +77,8 @@ DEFAULTS = {
     "sync_local_excluded": {},      # {root_id: [이 PC 만 제외할 상대 경로]}
     "sync_root": "",
     "sync_compare": "this",
-    "sync_show": ["Missing", "Outdated", "Conflict", "Ahead"],
+    "sync_show_filters": ["Missing", "Outdated", "Conflict", "Ahead", "OK"],   # v01.49 전부 켬(예전 키 sync_show 는 안 읽는다)
+    "sync_show_excluded": True,
 }
 
 # 비어 있으면 번들 기본값으로 보정할 동기화 키들(예전 파일에 없던 키 대비).

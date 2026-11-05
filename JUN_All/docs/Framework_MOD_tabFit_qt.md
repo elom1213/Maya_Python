@@ -132,3 +132,14 @@ A00275 전용 시험 34/34 도 그대로. **마야 GUI 는 A00275 만 확인했�
 - 끄면 숨은 페이지 11개의 `Ignored` 정책이 전부 원래대로, 켜면 다시 맞춤.
 - 기존 회귀: 하위 페이지는 전부 `QScrollArea`, 상위는 `QTabWidget`(이중 스크롤 없음), `test_move_ui.py` 15/15.
 - **마야 GUI 확인 아직.**
+
+## 중첩 탭 hfw 보정 (2026-11-05, A00210 v01.49)
+
+- 증상: A00210 Sync > Status 트리를 길게(세로 힌트 1075) 하자, 중첩 탭에서 Roots · Excluded 로 가면 창이 **246px** 로 쪼그라들었다
+  (`content_height` 가 −114 · 58). PySide6 · PySide2 똑같다.
+- 원인: `tab_correction` 은 "스크롤 칸(`tabs_scroll`) 안의 탭은 hfw 경로가 아니다" 라고 보고 모든 페이지 `sizeHint` 최댓값(Status 1271)을 뺐다.
+  그런데 **중첩 탭**은 부모 페이지(SyncTab)의 `sizeHint()` = `QLayout.totalSizeHint()` 로 들어오고, 레이아웃에 hfw 가 있으면 높이를
+  `heightForWidth` 로 잰다 — hfw 없는 Status 페이지는 처음부터 안 세졌다. 보정이 그것을 한 번 더 빼서 두 번 빠졌다.
+- 수정: `_hfw_reaches_parent(tab)` — 부모 위젯이 레이아웃으로 크기를 내면 그 레이아웃의 hfw 여부를 따른다. 탭 위젯이 **스크롤 칸의 내용 위젯이거나
+  QTabWidget 의 페이지(QStackedWidget 바로 아래)** 일 때만 예전 규칙(스크롤 칸 안이면 sizeHint). 11-03 의 A00210 Maya > Export 수정(바깥 탭)은 그대로.
+- 검증: 롤아웃 31툴 138 검사 0 실패(mayapy), Sync = Status 1600 · Roots 629 · Excluded 829.

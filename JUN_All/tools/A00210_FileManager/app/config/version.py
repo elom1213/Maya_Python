@@ -37,5 +37,10 @@
 #        공용 Framework/qt/MOD_treeExpand_qt_v01
 #        Sync: PCs 줄을 한 줄로 - 줄바꿈 라벨 때문에 탭 높이 맞춤이 Status 페이지를 16px 잘랐다.
 
-VERSION = "01.48"
+# 01.49  Sync > Status: Show 기본 전부 체크(OK · Excluded, 키 sync_show_filters / sync_show_excluded) · 처음엔 전부 접힘(펼친 상태는 다시 그려도 유지) · Status 열을 경로 바로 옆으로 · 폴더 줄 = 아래 모든 파일의 상태
+#        (Missing (1) · Ahead (2), 다 같으면 OK) · 색 Missing 연한 빨강 / Outdated 노랑 / Conflict 하늘 / OK 초록 · 창 세로 2.2 배(트리 힌트 1075).
+#        Sync > Excluded: 왼쪽에 이 PC 루트 폴더 트리(체크박스, 게으른 읽기) - Exclude Checked (All PCs / This PC).
+#        Framework tabFit: 스크롤 칸 안의 중첩 탭도 hfw 경로 - 긴 Status 페이지를 두 번 빼 창이 246px 로 쪼그라들던 것.
+
+VERSION = "01.49"
 LAST_UPDATE = "2026-11-05"

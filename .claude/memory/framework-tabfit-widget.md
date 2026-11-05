@@ -41,3 +41,6 @@ A00110_V02 만 미적용(다른 세션 작업 중이었음, 자체 grow-only fit
 - A00110_V02 의 `JUN_mod_fit_tab_page_v01` + `_fit_window(grow_only)` 는 같은 목적의 툴별 구현(페이지 위젯 교체 필요). 이 위젯은 **기존 페이지를 바꾸지 않고** 붙는다.
 
 관련: [[qtabwidget-min-size-hidden-pages]], [[window-taller-than-screen-ghost]], [[framework-log-widget]]
+
+- **2026-11-05 중첩 탭 hfw**: 스크롤 칸 안이라도 중첩 탭은 부모 레이아웃 `totalSizeHint` → hfw 경로. 예전 `_inside_scroll` 규칙이 긴 hfw 없는 페이지를
+  두 번 빼서 창 246px(A00210 Sync). `_hfw_reaches_parent` 로 수정 — 스크롤 내용 위젯 · QStackedWidget 페이지일 때만 예전 규칙. 롤아웃 0 fail.

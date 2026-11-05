@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-03
+# last Update date : 2026-11-05
 """
 JUN_mod_tabFit_qt_v01 - 탭을 바꿀 때마다 창 높이를 **지금 보이는 탭 내용**에 맞춘다.
 
@@ -214,7 +214,11 @@ class JUN_mod_tabFit_qt_v01(QObject):
             #   (= 페이지 sizeHint 최댓값, 정책 · hfw 무시)로 들어온다(`_scroll_wanted_height` · `shortfall`).
             #   여기서 hfw 로 재면 hfw 없는 긴 페이지(A00210 File Manager)가 최댓값에서 빠져, 글줄 바꿈 라벨이 있는
             #   페이지(A00210 Maya > Export)에서 창이 그 긴 페이지 높이로 열렸다 (2026-11-03).
-            use_hfw = bool(tab_widget.hasHeightForWidth()) and not self._inside_scroll(tab_widget)
+            # ★ (2026-11-05) 단, 스크롤 칸 안이라도 **중첩 탭**(부모 페이지의 레이아웃 안)은 hfw 경로를 탄다 - 부모의
+            #   `sizeHint()` 가 `QLayout.totalSizeHint()` 이고 레이아웃에 hfw 가 있으면 높이를 `heightForWidth` 로 잰다.
+            #   예전 규칙(스크롤 칸 안이면 무조건 sizeHint)은 A00210 Sync > Status(hfw 없음, 1271)처럼 형제보다 훨씬 긴
+            #   중첩 페이지를 **두 번** 뺐다 - 부모는 이미 hfw 로 그 페이지를 안 셌는데 보정이 또 빼서 창이 246px 로 쪼그라들었다.
+            use_hfw = bool(tab_widget.hasHeightForWidth()) and self._hfw_reaches_parent(tab_widget)
             width = current.width()
             stack = tab_widget.findChild(QStackedWidget)
             if stack is not None and stack.width() > 0:
@@ -246,6 +250,21 @@ class JUN_mod_tabFit_qt_v01(QObject):
             if tallest is not None:
                 total += min(0, now - tallest)
         return total
+
+    def _hfw_reaches_parent(self, tab_widget):
+        """이 탭 위젯의 높이가 부모에게 heightForWidth 로 전해지는가.
+
+        - 부모 위젯이 레이아웃으로 크기를 내면(중첩 탭 · 창 레이아웃) `totalSizeHint()` → 레이아웃에 hfw 가 있으면 hfw.
+        - 탭 위젯이 스크롤 칸의 내용 위젯이거나 다른 QTabWidget 의 페이지(QStackedWidget 바로 아래)면 예전 규칙 -
+          스크롤 칸 안이면 `sizeHint()`(hfw 아님), 아니면 hfw."""
+        parent = tab_widget.parentWidget()
+        if parent is None:
+            return False
+        grand = parent.parentWidget()
+        if isinstance(parent, QStackedWidget) or isinstance(grand, QScrollArea):
+            return not self._inside_scroll(tab_widget)
+        layout = parent.layout()
+        return layout is not None and bool(layout.hasHeightForWidth())
 
     def _inside_scroll(self, widget):
         """창과 이 위젯 사이에 내용 크기를 따르는 QScrollArea(widgetResizable) 가 있는가."""

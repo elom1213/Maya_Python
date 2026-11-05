@@ -2,6 +2,24 @@
 
 All notable changes to this tool are documented here.
 
+## [01.49] - 2026-11-05
+
+- **[Sync > Status] `Show` 기본 = 전부 체크(OK · Excluded 포함, 사용자 지정).** 설정 키를 `sync_show` → `sync_show_filters` · `sync_show_excluded` 로 바꿔
+  예전 프로파일에 저장된 'OK 꺼짐' 대신 새 기본으로 시작한다(그 뒤 바꾼 체크는 다시 기억).
+- **[Sync > Status] 처음엔 전부 접힌 트리.** 다시 그려도(필터 · Show · Compare 를 바꿔도) 사용자가 펼쳐 둔 폴더는 그대로, 필터 글자가 있으면 맞는 곳까지 펼친다.
+- **[Sync > Status] 폴더 줄에 아래 파일들의 상태.** `Status` 열을 **경로 바로 옆(2번째 열)** 으로 옮기고, 폴더 줄은 그 아래 **모든** 파일의 상태를
+  가장 급한 것부터 `Missing (1) · Ahead (2)` 처럼, 다 같으면 `OK` 로 — 위로 재귀(`00_04_02_ANI_00_PJ_010` → `scenes` → `5040_cleanup_BCM_KANA`).
+  `Show` 로 OK 행을 숨겨도 폴더 줄은 실제 상태로 센다. 툴팁에 상태별 개수. `All PCs` 비교에서는 행마다 PC 들 중 가장 급한 상태로 센다.
+- **[Sync] 상태 색(사용자 지정).** Missing 연한 빨강 `#ff8a8a` · Outdated 노랑 `#f2d64b` · Conflict 밝은 하늘색 `#7fd8ff` · OK 초록 `#6fcf6f`
+  (Ahead / Only here 는 지정이 없어 보라 `#c39bf0`).
+- **[Sync > Status] 창 세로 2.2 배.** 트리 세로 힌트 1075(오프스크린 · `slate_mid` 실측: 창 717 → 1600, 2.23 배). 모니터보다 길면 화면 높이에서 멈춘다.
+- **[Sync > Excluded] 왼쪽에 폴더 트리 + 체크박스.** 이 PC 루트 아래 폴더 · 파일을 펼쳐 가며(한 겹씩 읽음) 체크하고 `Exclude Checked (All PCs)` /
+  `Exclude Checked (This PC)`. 체크한 폴더 아래의 체크는 폴더 하나로 합친다. 이미 제외 · 무시 패턴에 걸린 항목은 회색 기울임 + 툴팁.
+  여러 행을 골라 체크 하나로 전부(공용 `checkTree`), 펼치기 규칙은 공용 `treeExpand`. `Add Folder...` / `Add File...` 도 그대로 있다.
+- **[Framework tabFit] 중첩 탭 높이 보정 수정** — 스크롤 칸 안이라도 중첩 탭은 부모 레이아웃의 heightForWidth 경로로 높이가 정해지는데 보정은 아니라고 봐서,
+  형제보다 훨씬 긴 Status 페이지를 **두 번** 빼 Roots · Excluded 로 가면 창이 246px 로 쪼그라들었다. 롤아웃 시험 31툴 0 fail.
+- 시험 `test_sync_ui.py` 78/78(기본 체크 · 폴더 상태 재귀 · 색 · 처음 접힘 · 펼침 유지 · 2.2 배 · Excluded 트리 체크 → 제외), core 53 · 기존 43 · 32 · 28. **GUI 확인 아직.**
+
 ## [01.48] - 2026-11-05
 
 - **[UI] 트리 펼치기 규칙.** 화살표(더블클릭 · `→` 키)로 펼치면 **한 단계만** 보인다 — 접었다 다시 펼쳐도

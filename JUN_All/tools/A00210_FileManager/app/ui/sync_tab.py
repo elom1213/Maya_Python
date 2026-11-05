@@ -18,6 +18,7 @@ import time
 from Framework.core.file_opener import open_path
 from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.MOD_viewZoom_qt_v01 import JUN_mod_viewZoom_qt_v01
+from Framework.qt.MOD_checkTree_qt_v01 import JUN_mod_checkTree_qt_v01
 from Framework.qt.qt import (
     Qt,
     QThread,
@@ -58,14 +59,22 @@ from ..core import sync_compare as sc
 from ..core.paths import ui_path
 
 # 상태 글자색(어두운 · 밝은 테마 모두에서 읽히는 중간 톤)
+# v01.49 사용자 지정: Missing 연한 빨강 · Outdated 노랑 · Conflict 밝은 하늘색 · OK 초록. (Ahead / Only here 는 지정 없음 - 보라)
 STATUS_COLORS = {
-    sc.MISSING: "#e05555",
-    sc.OUTDATED: "#e0904a",
-    sc.CONFLICT: "#b07ee0",
-    sc.AHEAD: "#4a9be0",
-    sc.ONLY_HERE: "#4a9be0",
-    sc.OK: "#8a8a8a",
+    sc.MISSING: "#ff8a8a",
+    sc.OUTDATED: "#f2d64b",
+    sc.CONFLICT: "#7fd8ff",
+    sc.AHEAD: "#c39bf0",
+    sc.ONLY_HERE: "#c39bf0",
+    sc.OK: "#6fcf6f",
 }
+# 폴더 상태 = 하위 파일 중 가장 급한 것(이 순서). 글자도 이 순서로 나열한다.
+STATUS_PRIORITY = (sc.MISSING, sc.OUTDATED, sc.CONFLICT, sc.AHEAD, sc.ONLY_HERE, sc.OK)
+# Status 트리 세로 크기 힌트 (v01.49 사용자 요청: Status 를 볼 때 창 세로 2.2 배).
+# 오프스크린 실측(slate_mid 테마) - 창 731 = 트리 힌트 192 + 나머지 533 → 2.2 배 1608 = 533 + 1075.
+# 모니터 작업 영역보다 길면 tabFit 이 화면 높이에서 멈춘다.
+STATUS_TREE_HINT = 1075
+EXCL_TREE_HINT = 260
 EXCLUDED_COLOR = "#707070"
 STALE_HOURS = 24
 SUMMARY_PC_LIMIT = 4            # PC 가 이보다 많으면 요약 열(Latest on / Missing on / Outdated on)
@@ -73,6 +82,7 @@ SUMMARY_PC_LIMIT = 4            # PC 가 이보다 많으면 요약 열(Latest o
 ROLE_REL = Qt.UserRole
 ROLE_KIND = Qt.UserRole + 1     # "file" | "dir" | "excluded"
 ROLE_EXCL_SCOPE = Qt.UserRole + 2   # "shared" | "local"
+ROLE_LOADED = Qt.UserRole + 4       # Excluded 트리: 폴더 자식을 읽었는가
 
 SHOW_KEYS = (sc.MISSING, sc.OUTDATED, sc.CONFLICT, sc.AHEAD, sc.OK)
 
@@ -131,6 +141,7 @@ class SyncTab(QWidget):
         self._rows = []
         self._thread = None
         self._push_after_scan = False
+        self._populated_once = False
 
         self._build_ui()
 
@@ -222,12 +233,13 @@ class SyncTab(QWidget):
                   sc.AHEAD: "Ahead / Only here", sc.OK: "OK"}
         for key in SHOW_KEYS:
             cb = QCheckBox(labels[key])
-            cb.setChecked(key != sc.OK)
+            cb.setChecked(True)          # v01.49 사용자 지정: OK 까지 전부 기본 체크
             cb.toggled.connect(self._populate_tree)
             self.chk_show[key] = cb
             opts.addWidget(cb)
         self.chk_show_excluded = QCheckBox("Excluded")
         self.chk_show_excluded.setToolTip("Show excluded paths (grey) - right-click > Include Again.")
+        self.chk_show_excluded.setChecked(True)     # v01.49 사용자 지정: 기본 체크
         self.chk_show_excluded.toggled.connect(self._populate_tree)
         opts.addWidget(self.chk_show_excluded)
         opts.addStretch(1)
@@ -245,7 +257,7 @@ class SyncTab(QWidget):
         frow.addWidget(btn_clear)
         lay.addLayout(frow)
 
-        self.tree = QTreeWidget()
+        self.tree = _HintTree(STATUS_TREE_HINT)
         JUN_mod_treeExpand_qt_v01(self.tree)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -341,6 +353,8 @@ class SyncTab(QWidget):
         lay.addWidget(info)
 
         lists = QHBoxLayout()
+        # v01.49 : 왼쪽에 이 PC 의 루트 폴더 트리(체크박스) - 체크한 폴더 · 파일을 제외 목록에 넣는다.
+        lists.addLayout(self._build_excl_tree_box(), 2)
         self.lst_shared, box_shared = self._excluded_box(
             "All PCs (shared)", "shared",
             "Shared through the data folder - push to apply on the other PCs.")
@@ -364,6 +378,146 @@ class SyncTab(QWidget):
         row.addStretch(1)
         lay.addLayout(row)
         return page
+
+    def _build_excl_tree_box(self):
+        box = QVBoxLayout()
+        lbl = QLabel("Browse (this PC) - check folders / files to exclude")
+        lbl.setToolTip(
+            "Folders and files under the root on this PC.\n"
+            "Check them (Shift / Ctrl to select several, then one check box checks them all)\n"
+            "and press Exclude Checked. A checked folder excludes everything below it.\n"
+            "Grey = already excluded or ignored.")
+        box.addWidget(lbl)
+        self.excl_tree = _HintTree(EXCL_TREE_HINT)
+        self.excl_tree.setHeaderHidden(True)
+        self.excl_tree.setUniformRowHeights(True)
+        self.excl_tree.setMinimumHeight(120)
+        self.excl_tree.itemExpanded.connect(self._on_excl_expanded)
+        JUN_mod_treeExpand_qt_v01(self.excl_tree)        # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
+        self._excl_check = JUN_mod_checkTree_qt_v01(self.excl_tree)   # 여러 행 골라 체크 하나로 전부 (공용)
+        box.addWidget(self.excl_tree, 1)
+        row = QHBoxLayout()
+        b_all = QPushButton("Exclude Checked (All PCs)")
+        b_all.setToolTip("Add the checked folders / files to 'All PCs (shared)' - push to share.")
+        b_all.clicked.connect(lambda: self.on_exclude_checked("shared"))
+        b_local = QPushButton("Exclude Checked (This PC)")
+        b_local.setToolTip("Add the checked folders / files to 'This PC only'.")
+        b_local.clicked.connect(lambda: self.on_exclude_checked("local"))
+        b_clear = QPushButton("Uncheck All")
+        b_clear.clicked.connect(self.on_uncheck_excl_tree)
+        b_reload = QPushButton("Reload")
+        b_reload.setToolTip("Read the root folder again.")
+        b_reload.clicked.connect(self._reload_excl_tree)
+        row.addWidget(b_all)
+        row.addWidget(b_local)
+        row.addWidget(b_clear)
+        row.addWidget(b_reload)
+        box.addLayout(row)
+        return box
+
+    # ---------------------------------------------------------------- Excluded 트리 (게으른 읽기)
+
+    def _reload_excl_tree(self):
+        """루트의 맨 위 한 겹만 읽는다 - 폴더는 펼칠 때 그 한 겹씩."""
+        self.excl_tree.clear()
+        base = self._root_abs()
+        if not self._current_root() or not base or not os.path.isdir(base):
+            it = QTreeWidgetItem(["(root folder not available on this PC)"])
+            it.setFlags(Qt.NoItemFlags)
+            self.excl_tree.addTopLevelItem(it)
+            return
+        self._fill_excl_children(None, base, "")
+
+    def _fill_excl_children(self, parent, abs_dir, rel_dir):
+        try:
+            entries = sorted(os.scandir(abs_dir), key=lambda e: (not _safe_is_dir(e), e.name.lower()))
+        except OSError as exc:
+            self._log("Sync: cannot read {0}: {1}".format(ui_path(abs_dir), exc))
+            return
+        for e in entries:
+            is_dir = _safe_is_dir(e)
+            rel = (rel_dir + e.name) + ("/" if is_dir else "")
+            it = QTreeWidgetItem([e.name])
+            it.setIcon(0, self._icon_dir if is_dir else self._icon_file)
+            it.setData(0, ROLE_REL, rel)
+            it.setData(0, ROLE_KIND, "dir" if is_dir else "file")
+            it.setData(0, Qt.UserRole + 5, e.path)
+            it.setFlags(it.flags() | Qt.ItemIsUserCheckable)
+            it.setCheckState(0, Qt.Unchecked)
+            if is_dir:
+                it.setChildIndicatorPolicy(QTreeWidgetItem.ShowIndicator)
+                it.setData(0, ROLE_LOADED, False)
+            self._mark_excl_item(it)
+            (parent.addChild(it) if parent is not None else self.excl_tree.addTopLevelItem(it))
+
+    def _on_excl_expanded(self, item):
+        if item.data(0, ROLE_KIND) != "dir" or item.data(0, ROLE_LOADED):
+            return
+        item.setData(0, ROLE_LOADED, True)
+        self._fill_excl_children(item, item.data(0, Qt.UserRole + 5), item.data(0, ROLE_REL))
+        if item.childCount() == 0:
+            item.setChildIndicatorPolicy(QTreeWidgetItem.DontShowIndicator)
+
+    def _mark_excl_item(self, it):
+        """이미 제외(공유 / 이 PC) 또는 무시 패턴에 걸린 항목은 회색 + 툴팁."""
+        root = self._current_root()
+        rel = it.data(0, ROLE_REL) or ""
+        why = ""
+        if root:
+            if ss.is_excluded(rel, root.get("excluded_paths") or []):
+                why = "Excluded on all PCs"
+            elif ss.is_excluded(rel, self._local_excluded.get(root["id"], [])):
+                why = "Excluded on this PC"
+            elif ss.is_ignored(rel, self._settings.get("ignore_patterns") or []):
+                why = "Ignored by pattern"
+        font = it.font(0)
+        font.setItalic(bool(why))
+        it.setFont(0, font)
+        if why:
+            it.setForeground(0, QBrush(QColor(EXCLUDED_COLOR)))
+            it.setToolTip(0, "{0}\n{1}".format(rel, why))
+        else:
+            it.setData(0, Qt.ForegroundRole, None)
+            it.setToolTip(0, rel)
+
+    def _excl_items(self):
+        out = []
+        stack = [self.excl_tree.topLevelItem(i) for i in range(self.excl_tree.topLevelItemCount())]
+        while stack:
+            it = stack.pop()
+            out.append(it)
+            stack.extend(it.child(i) for i in range(it.childCount()))
+        return out
+
+    def _refresh_excl_marks(self):
+        for it in self._excl_items():
+            if it.data(0, ROLE_REL):
+                self._mark_excl_item(it)
+
+    def checked_excl_rels(self):
+        """체크된 경로 - 체크된 폴더 아래의 체크는 뺀다(폴더가 이미 다 덮는다)."""
+        rels = [it.data(0, ROLE_REL) for it in self._excl_items()
+                if it.data(0, ROLE_REL) and it.checkState(0) == Qt.Checked]
+        dirs = [r for r in rels if r.endswith("/")]
+        out = []
+        for r in sorted(rels, key=lambda x: (x.count("/"), x.lower())):
+            if any(r != d and r.lower().startswith(d.lower()) for d in dirs):
+                continue
+            out.append(r)
+        return out
+
+    def on_exclude_checked(self, scope):
+        rels = self.checked_excl_rels()
+        if not rels:
+            self._log("Sync: nothing checked in the tree.")
+            return
+        self._exclude(rels, scope)
+        self.on_uncheck_excl_tree()
+
+    def on_uncheck_excl_tree(self):
+        for it in self._excl_items():
+            if it.data(0, ROLE_REL):
+                it.setCheckState(0, Qt.Unchecked)
 
     def _excluded_box(self, title, scope, tip):
         box = QVBoxLayout()
@@ -399,12 +553,16 @@ class SyncTab(QWidget):
         self.cmb_compare.blockSignals(True)
         self.cmb_compare.setCurrentIndex(max(idx, 0))
         self.cmb_compare.blockSignals(False)
-        show = prefs.get("sync_show")
+        # v01.49 : 키 이름을 바꿨다(sync_show -> sync_show_filters) - 예전 프로파일에 저장된 'OK 꺼짐' 대신 새 기본(전부 켬)으로 시작.
+        show = prefs.get("sync_show_filters")
         if isinstance(show, list):
             for key, cb in self.chk_show.items():
                 cb.blockSignals(True)
                 cb.setChecked(key in show)
                 cb.blockSignals(False)
+        self.chk_show_excluded.blockSignals(True)
+        self.chk_show_excluded.setChecked(bool(prefs.get("sync_show_excluded", True)))
+        self.chk_show_excluded.blockSignals(False)
         self.on_refresh(quiet=True)
 
     def prefs_values(self):
@@ -413,7 +571,8 @@ class SyncTab(QWidget):
             "sync_local_excluded": copy.deepcopy(self._local_excluded),
             "sync_root": self._root_id,
             "sync_compare": self.cmb_compare.currentData() or "this",
-            "sync_show": [k for k, cb in self.chk_show.items() if cb.isChecked()],
+            "sync_show_filters": [k for k, cb in self.chk_show.items() if cb.isChecked()],
+            "sync_show_excluded": self.chk_show_excluded.isChecked(),
         }
 
     # ============================================================== settings / roots
@@ -488,6 +647,7 @@ class SyncTab(QWidget):
         self._update_root_label()
         self._load_manifests()
         self._refresh_excluded_lists()
+        self._reload_excl_tree()
         self._select_root_row()
         self._compare()
 
@@ -499,6 +659,7 @@ class SyncTab(QWidget):
         self._refresh_root_combo()
         self._refresh_roots_table()
         self._refresh_excluded_lists()
+        self._reload_excl_tree()
         self.txt_ignore.setPlainText("\n".join(self._settings.get("ignore_patterns") or []))
         self._load_manifests()
         self._compare()
@@ -576,20 +737,54 @@ class SyncTab(QWidget):
     def _summary_mode(self):
         return len(self._pcs()) > SUMMARY_PC_LIMIT
 
+    def _row_key(self, row, mode):
+        """행 하나의 대표 상태 - This PC 면 이 PC 상태, All PCs 면 PC 들 중 가장 급한 것."""
+        if mode == "all":
+            vals = set(row.pc_status.values())
+            return next((s for s in STATUS_PRIORITY if s in vals), sc.OK)
+        return row.status
+
+    def _expanded_rels(self):
+        out = set()
+
+        def walk(it):
+            if it.isExpanded():
+                out.add((it.data(0, ROLE_REL) or "").lower())
+            for i in range(it.childCount()):
+                walk(it.child(i))
+
+        for i in range(self.tree.topLevelItemCount()):
+            walk(self.tree.topLevelItem(i))
+        return out
+
     def _populate_tree(self, *_args):
         pcs = self._pcs()
         summary = self._summary_mode()
+        # v01.49 : Status 를 경로 바로 옆(1 열)에 - 폴더 줄의 하위 상태가 경로 옆에 보인다.
         if summary:
-            headers = ["Path", "This PC", "Latest on", "Missing on", "Outdated on", "Status"]
+            headers = ["Path", "Status", "This PC", "Latest on", "Missing on", "Outdated on"]
         else:
-            headers = ["Path"] + ["{0} (this PC)".format(p) if p == self._pc else p for p in pcs] + ["Status"]
+            headers = ["Path", "Status"] + ["{0} (this PC)".format(p) if p == self._pc else p for p in pcs]
+        status_col = 1
+        # 다시 그려도 사용자가 펼쳐 둔 폴더는 그대로(처음엔 전부 접힘). 필터 글자가 있으면 맞는 것까지 펼친다.
+        keep = self._expanded_rels() if self._populated_once else set()
         self.tree.clear()
         self.tree.setColumnCount(len(headers))
         self.tree.setHeaderLabels(headers)
-        status_col = len(headers) - 1
 
+        mode = self.cmb_compare.currentData() or "this"
         rows = self._visible_rows()
         folders = {}
+
+        # 폴더 상태는 보이는 행이 아니라 **그 아래 모든 파일**로 센다 - Show 로 OK 를 숨겨도 폴더 줄은 실제 상태.
+        folder_counts = {}
+        for r in self._rows:
+            key = self._row_key(r, mode)
+            path = r.rel.rpartition("/")[0]
+            while path:
+                c = folder_counts.setdefault(path.lower(), {})
+                c[key] = c.get(key, 0) + 1
+                path = path.rpartition("/")[0]
 
         def folder_item(path):
             if not path:
@@ -603,12 +798,10 @@ class SyncTab(QWidget):
             it.setIcon(0, self._icon_dir)
             it.setData(0, ROLE_REL, path + "/")
             it.setData(0, ROLE_KIND, "dir")
-            it.setData(0, Qt.UserRole + 3, {})       # 하위 상태 개수
             (parent.addChild(it) if parent else self.tree.addTopLevelItem(it))
             folders[path.lower()] = it
             return it
 
-        mode = self.cmb_compare.currentData() or "this"
         for r in rows:
             parent_path, _, name = r.rel.rpartition("/")
             parent = folder_item(parent_path)
@@ -620,37 +813,29 @@ class SyncTab(QWidget):
             if summary:
                 self._fill_summary_cells(it, r)
             else:
-                for col, pc in enumerate(pcs, start=1):
+                for col, pc in enumerate(pcs, start=2):
                     self._fill_pc_cell(it, col, r, pc)
             text, color = self._status_text(r, mode)
             it.setText(status_col, text)
             it.setForeground(status_col, QBrush(QColor(color)))
             (parent.addChild(it) if parent else self.tree.addTopLevelItem(it))
-            # 폴더 뱃지용 개수
-            key = r.status if mode == "this" else ("Out of sync" if r.is_problem() else sc.OK)
-            p = parent
-            while p is not None:
-                counts = p.data(0, Qt.UserRole + 3) or {}
-                counts[key] = counts.get(key, 0) + 1
-                p.setData(0, Qt.UserRole + 3, counts)
-                p = p.parent()
 
-        for it in folders.values():
-            counts = it.data(0, Qt.UserRole + 3) or {}
-            order = [sc.MISSING, sc.OUTDATED, sc.CONFLICT, "Out of sync", sc.AHEAD, sc.ONLY_HERE]
-            parts = ["{0} {1}".format(counts[k], k) for k in order if counts.get(k)]
-            it.setText(status_col, " · ".join(parts))
-            worst = next((k for k in order if counts.get(k)), sc.OK)
-            it.setForeground(status_col, QBrush(QColor(STATUS_COLORS.get(worst, STATUS_COLORS[sc.MISSING]))))
+        for low, it in folders.items():
+            text, color, tip = _folder_status(folder_counts.get(low, {}))
+            it.setText(status_col, text)
+            it.setToolTip(status_col, tip)
+            it.setForeground(status_col, QBrush(QColor(color)))
 
         if self.chk_show_excluded.isChecked():
             self._add_excluded_items(folder_item)
 
-        if len(rows) <= 500:
+        if self.le_filter.text().strip():
             self.tree.expandAll()
-        else:
-            for i in range(self.tree.topLevelItemCount()):
-                self.tree.topLevelItem(i).setExpanded(True)
+        elif keep:
+            for low, it in folders.items():
+                if (low + "/") in keep:
+                    it.setExpanded(True)
+        self._populated_once = True
         self.tree.header().setSectionResizeMode(0, QHeaderView.Interactive)
         for c in range(len(headers)):
             self.tree.resizeColumnToContents(c)
@@ -695,12 +880,12 @@ class SyncTab(QWidget):
 
     def _fill_summary_cells(self, it, row):
         e = row.entries.get(self._pc)
-        it.setText(1, (e.get("mtime") or "")[5:16] if e else "—")
-        it.setText(2, ", ".join(row.latest_on()))
-        it.setText(3, ", ".join(row.pcs_with(sc.MISSING)))
-        it.setText(4, ", ".join(row.pcs_with(sc.OUTDATED)))
-        it.setForeground(3, QBrush(QColor(STATUS_COLORS[sc.MISSING])))
-        it.setForeground(4, QBrush(QColor(STATUS_COLORS[sc.OUTDATED])))
+        it.setText(2, (e.get("mtime") or "")[5:16] if e else "—")
+        it.setText(3, ", ".join(row.latest_on()))
+        it.setText(4, ", ".join(row.pcs_with(sc.MISSING)))
+        it.setText(5, ", ".join(row.pcs_with(sc.OUTDATED)))
+        it.setForeground(4, QBrush(QColor(STATUS_COLORS[sc.MISSING])))
+        it.setForeground(5, QBrush(QColor(STATUS_COLORS[sc.OUTDATED])))
 
     def _status_text(self, row, mode):
         if mode == "all" and row.is_problem():
@@ -981,6 +1166,8 @@ class SyncTab(QWidget):
 
     def _refresh_excluded_lists(self):
         root = self._current_root()
+        if hasattr(self, "excl_tree"):
+            self._refresh_excl_marks()
         self.lst_shared.clear()
         self.lst_local.clear()
         if not root:
@@ -1018,6 +1205,7 @@ class SyncTab(QWidget):
         self._settings["ignore_patterns"] = pats
         if self._save_settings():
             self._log("Sync: saved {0} ignore pattern(s) - push to share.".format(len(pats)))
+            self._refresh_excl_marks()
             self._compare()
 
     def on_reset_patterns(self):
@@ -1191,3 +1379,37 @@ def _age_text(seconds):
     if seconds < 86400:
         return "{0} h ago".format(seconds // 3600)
     return "{0} days ago".format(seconds // 86400)
+
+
+def _folder_status(counts):
+    """폴더 아래 파일 상태 개수 -> (글자, 색, 툴팁). 예: 'Missing (1) · Ahead (2)', 전부 OK 면 'OK'."""
+    if not counts:
+        return "", STATUS_COLORS[sc.OK], ""
+    problems = [st for st in STATUS_PRIORITY if st != sc.OK and counts.get(st)]
+    worst = problems[0] if problems else sc.OK
+    if problems:
+        text = " · ".join("{0} ({1})".format(st, counts[st]) for st in problems)
+    else:
+        text = sc.OK
+    tip = "\n".join("{0}: {1}".format(st, counts[st]) for st in STATUS_PRIORITY if counts.get(st))
+    return text, STATUS_COLORS[worst], tip
+
+
+class _HintTree(QTreeWidget):
+    """세로 sizeHint 를 정해 둔 트리 - 탭 높이 맞춤(tabFit)이 이 높이로 창을 맞춘다."""
+
+    def __init__(self, hint_height, parent=None):
+        super().__init__(parent)
+        self._hint_height = int(hint_height)
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        hint.setHeight(self._hint_height)
+        return hint
+
+
+def _safe_is_dir(entry):
+    try:
+        return entry.is_dir()
+    except OSError:
+        return False

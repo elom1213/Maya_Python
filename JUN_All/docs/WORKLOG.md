@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-05 (오늘)
 
+> [!summary] A00210_FileManager **v01.49 Sync 트리 다듬기** + Framework **tabFit 중첩 탭 보정 수정** `#A00210_FileManager` `#Framework`
+- 요청: Status 트리 처음엔 접힘 · `Show` 의 OK · Excluded 기본 체크 · 상위 폴더에서 하위 파일 상태(재귀) · 색(Missing 연한 빨강 / Outdated 노랑 / Conflict 하늘 / OK 초록) · Excluded 에 체크 트리 · Status 창 세로 2.2 배.
+- 구현: Status 열을 경로 옆으로, 폴더 줄 = 아래 **모든** 파일 상태(`Missing (1) · Ahead (2)` / `OK`), 펼침 상태 유지 · 필터면 펼침, 트리 힌트 1075(717 → 1600, 2.23 배).
+  Excluded 왼쪽에 게으른 체크 트리(공용 checkTree · treeExpand) → `Exclude Checked (All PCs / This PC)`, 폴더 아래 체크는 합침, 제외 · 무시는 회색.
+- 덤: tabFit 이 스크롤 칸 안의 **중첩 탭**도 hfw 가 아니라고 봐서 긴 Status 페이지를 두 번 빼 Roots / Excluded 에서 창이 246px — `_hfw_reaches_parent` 로 수정(부모 레이아웃 hfw 면 hfw).
+- 시험: sync UI 78/78 · core 53, tabFit 롤아웃 31툴 0 fail(mayapy), A00275 34, treeExpand 19, viewZoom 32, A00210 기존 43 · 32 · 28. **GUI 확인 아직.**
+
 > [!summary] **Framework `MOD_treeExpand_qt_v01` (트리 펼치기 = 한 단계, Shift = 아래 전부)** + 툴 16개 적용 · A00210 **v01.48** `#Framework`
 - 요청: A00210 Sync 트리를 접었다 펼치면 아래가 전부 열린다 → 화살표는 한 단계만, Shift + 펼치기/접기 = 아래 전부. 다른 트리도, 앞으로 만들 툴도 공용 코드로.
 - 구현: `JUN_mod_treeExpand_qt_v01(tree)` 한 줄 — 사용자 입력 중의 펼침만(코드 expandAll 그대로), Shift 는 이벤트 modifiers, `*` 키 = 전부, 게으른 트리는 너비 우선 + 2000 한도.

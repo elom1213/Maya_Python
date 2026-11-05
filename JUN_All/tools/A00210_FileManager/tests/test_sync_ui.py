@@ -11,7 +11,7 @@ import time
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 JUN_ALL = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, JUN_ALL)
-from Framework.qt.qt import QApplication, QMessageBox, QFileDialog, QInputDialog  # noqa: E402
+from Framework.qt.qt import QApplication, QMessageBox, QFileDialog, QInputDialog, Qt  # noqa: E402
 app = QApplication.instance() or QApplication([])
 from tools.A00210_FileManager.app.core import sync_settings as ss  # noqa: E402
 from tools.A00210_FileManager.app.core import sync_manifest as sm  # noqa: E402
@@ -100,7 +100,12 @@ def tree_rows(tab):
 KANA = "00_04_02_ANI_00_PJ_010/scenes/5040_cleanup_BCM_KANA/"
 try:
     tab = make_tab()
-    tab.load_prefs({})
+    tab.load_prefs({"sync_show": ["Missing"]})        # 예전 키는 무시 - 새 기본(전부 켬)
+    check("Show defaults: all checked incl. OK + Excluded", all(cb.isChecked() for cb in tab.chk_show.values())
+          and tab.chk_show_excluded.isChecked())
+    # 아래 시험들은 예전 화면(OK · Excluded 숨김) 기준
+    tab.chk_show[sc.OK].setChecked(False)
+    tab.chk_show_excluded.setChecked(False)
     tab.resize(1000, 700)
     tab.show()
     app.processEvents()
@@ -131,14 +136,53 @@ try:
     check("pull called", PULLED == [1])
     rows = tree_rows(tab)
     k80 = KANA + "00010_cleanup_KANA_00080.mb"
-    check("00080 shown as Missing on this PC", k80 in rows and rows[k80][1][-1].startswith("Missing")
-          and "get from PCB" in rows[k80][1][-1], rows.get(k80))
-    check("PC columns: this PC first", tab.tree.headerItem().text(1) == "PCA (this PC)" and tab.tree.headerItem().text(2) == "PCB")
-    check("missing cell shows dash", rows[k80][1][1] == "—")
+    check("00080 shown as Missing on this PC", k80 in rows and rows[k80][1][1].startswith("Missing")
+          and "get from PCB" in rows[k80][1][1], rows.get(k80))
+    check("Status column right after Path", tab.tree.headerItem().text(1) == "Status")
+    check("PC columns: this PC first", tab.tree.headerItem().text(2) == "PCA (this PC)" and tab.tree.headerItem().text(3) == "PCB")
+    check("missing cell shows dash", rows[k80][1][2] == "—")
     k70 = KANA + "00010_cleanup_KANA_00070.mb"
     check("OK hidden by default", k70 not in rows)
-    check("only-here shown as Only here", rows.get("only_a/new.mb", (0, [""]))[1][-1].startswith("Only here"))
-    check("folder badge counts", "1 Missing" in rows[KANA][1][-1], rows.get(KANA))
+    check("only-here shown as Only here", rows.get("only_a/new.mb", (0, ["", ""]))[1][1].startswith("Only here"))
+    check("folder status next to path", rows[KANA][1][1] == "Missing (1)", rows.get(KANA))
+    # 위로 재귀: 00_04_02_ANI_00_PJ_010 · scenes 도 Missing
+    check("folder status recursive up", rows["00_04_02_ANI_00_PJ_010/"][1][1] == "Missing (1)"
+          and rows["00_04_02_ANI_00_PJ_010/scenes/"][1][1] == "Missing (1)", rows.get("00_04_02_ANI_00_PJ_010/"))
+    check("all-OK folder shows OK (even with OK rows hidden)", rows.get("00_00_02_doc/") is None
+          or rows["00_00_02_doc/"][1][1] == "OK")
+
+    def item_of(rel):
+        found = []
+
+        def walk(it):
+            if it.data(0, st.ROLE_REL) == rel:
+                found.append(it)
+            for i in range(it.childCount()):
+                walk(it.child(i))
+        for i in range(tab.tree.topLevelItemCount()):
+            walk(tab.tree.topLevelItem(i))
+        return found[0] if found else None
+
+    def color_of(rel, col=1):
+        return item_of(rel).foreground(col).color().name().lower()
+
+    check("colors: Missing light red", color_of(KANA) == st.STATUS_COLORS[sc.MISSING] == "#ff8a8a")
+    check("colors: Only here", color_of("only_a/new.mb") == st.STATUS_COLORS[sc.ONLY_HERE])
+    check("colors: Outdated yellow / Conflict sky / OK green",
+          st.STATUS_COLORS[sc.OUTDATED] == "#f2d64b" and st.STATUS_COLORS[sc.CONFLICT] == "#7fd8ff"
+          and st.STATUS_COLORS[sc.OK] == "#6fcf6f")
+    check("folder status helper mixes", st._folder_status({sc.MISSING: 1, sc.AHEAD: 2, sc.OK: 5})[0] == "Missing (1) · Ahead (2)"
+          and st._folder_status({sc.OK: 3})[:2] == ("OK", st.STATUS_COLORS[sc.OK])
+          and st._folder_status({sc.OUTDATED: 2, sc.CONFLICT: 1})[1] == st.STATUS_COLORS[sc.OUTDATED])
+
+    # 처음엔 전부 접힘, 펼친 상태는 다시 그려도 유지, 필터 글자가 있으면 전부 펼침
+    top = item_of("00_04_02_ANI_00_PJ_010/")
+    check("initially all collapsed", not top.isExpanded() and not item_of(KANA).isExpanded())
+    top.setExpanded(True)
+    tab._populate_tree()
+    check("expanded state kept on repopulate", item_of("00_04_02_ANI_00_PJ_010/").isExpanded()
+          and not item_of("00_04_02_ANI_00_PJ_010/scenes/").isExpanded())
+    check("status tree size hint (2.2x window)", tab.tree.sizeHint().height() == st.STATUS_TREE_HINT == 1075)
     check("summary label", "Missing 1" in tab.lbl_summary.text() and "Only here 1" in tab.lbl_summary.text(), tab.lbl_summary.text())
 
     tab.chk_show[sc.OK].setChecked(True)
@@ -148,12 +192,14 @@ try:
     tab.le_filter.setText("kana 0080")
     rows = tree_rows(tab)
     check("filter words", k80 in rows and "only_a/new.mb" not in rows)
+    check("filter expands matches", item_of(KANA).isExpanded())
     tab.le_filter.clear()
 
     tab.cmb_compare.setCurrentIndex(tab.cmb_compare.findData("all"))
     rows = tree_rows(tab)
-    check("All PCs mode: per-PC text", rows["only_a/new.mb"][1][-1] == "Missing: PCB" and rows[k80][1][-1] == "Missing: PCA",
-          (rows["only_a/new.mb"][1][-1], rows[k80][1][-1]))
+    check("All PCs mode: per-PC text", rows["only_a/new.mb"][1][1] == "Missing: PCB" and rows[k80][1][1] == "Missing: PCA",
+          (rows["only_a/new.mb"][1][1], rows[k80][1][1]))
+    check("All PCs mode: folder = worst over PCs", rows["only_a/"][1][1] == "Missing (1)", rows.get("only_a/"))
     tab.cmb_compare.setCurrentIndex(tab.cmb_compare.findData("this"))
 
     # ---------------------------------------------------------- 제외 (공유 / 이 PC)
@@ -188,6 +234,49 @@ try:
     check("ignore pattern applies at compare", "00_00_02_doc/a.pdf" not in tree_rows(tab) and
           json.load(open(ss.settings_path(data_dir), encoding="utf-8"))["ignore_patterns"] == ["**/backup/**", "**/*.pdf"])
     tab.on_reset_patterns()
+
+    # ---------------------------------------------------------- Excluded 트리 (체크해서 제외)
+    def excl_item(rel):
+        for it in tab._excl_items():
+            if it.data(0, st.ROLE_REL) == rel:
+                return it
+        return None
+
+    tab._reload_excl_tree()
+    tops = [tab.excl_tree.topLevelItem(i).data(0, st.ROLE_REL) for i in range(tab.excl_tree.topLevelItemCount())]
+    check("excl tree: top level lazily (folders first)", tops[:3] == ["00_00_02_doc/", "00_04_02_ANI_00_PJ_010/", "only_a/"]
+          and excl_item("00_04_02_ANI_00_PJ_010/scenes/") is None, tops)
+    check("excl tree: local-excluded folder grey + italic", excl_item("only_a/").font(0).italic()
+          and "this PC" in excl_item("only_a/").toolTip(0))
+    excl_item("00_04_02_ANI_00_PJ_010/").setExpanded(True)
+    check("excl tree: expand loads one level", excl_item("00_04_02_ANI_00_PJ_010/scenes/") is not None)
+    excl_item("00_04_02_ANI_00_PJ_010/scenes/").setExpanded(True)
+    excl_item(KANA).setExpanded(True)
+    check("excl tree: backup folder marked ignored", "Ignored" in excl_item(KANA + "backup/").toolTip(0))
+    check("excl tree: tree size hint", tab.excl_tree.sizeHint().height() == st.EXCL_TREE_HINT)
+    excl_item(KANA).setCheckState(0, Qt.Checked)
+    excl_item(KANA + "00010_cleanup_KANA_00070.mb").setCheckState(0, Qt.Checked)
+    excl_item("00_00_02_doc/").setExpanded(True)
+    excl_item("00_00_02_doc/a.pdf").setCheckState(0, Qt.Checked)
+    check("checked rels drop children of checked folder", tab.checked_excl_rels() == ["00_00_02_doc/a.pdf", KANA],
+          tab.checked_excl_rels())
+    tab.on_exclude_checked("shared")
+    sset = json.load(open(ss.settings_path(data_dir), encoding="utf-8"))
+    check("exclude checked -> shared list saved", sset["roots"][0]["excluded_paths"] == ["00_00_02_doc/a.pdf", KANA],
+          sset["roots"][0]["excluded_paths"])
+    check("checks cleared + marks grey", not tab.checked_excl_rels() and excl_item(KANA).font(0).italic()
+          and "all PCs" in excl_item(KANA).toolTip(0))
+    check("status tree drops excluded", k80 not in tree_rows(tab))
+    tab._include_again([("00_00_02_doc/a.pdf", "shared"), (KANA, "shared")])
+    check("include again un-greys tree", not excl_item(KANA).font(0).italic())
+    excl_item("00_00_02_doc/").setCheckState(0, Qt.Checked)
+    tab.on_exclude_checked("local")
+    check("exclude checked -> this PC", tab.prefs_values()["sync_local_excluded"][rid] == ["only_a/", "00_00_02_doc/"],
+          tab.prefs_values()["sync_local_excluded"])
+    tab._include_again([("00_00_02_doc/", "local")])
+    n_log = len(LOG)
+    tab.on_exclude_checked("shared")
+    check("exclude checked with nothing checked = log only", len(LOG) == n_log + 1 and "nothing checked" in LOG[-1])
 
     # ---------------------------------------------------------- 루트 추가 · PC 별 경로
     other = os.path.join(work, "Mocap")
@@ -238,9 +327,9 @@ try:
         sm.save_manifest(data_dir, m)
     tab.on_refresh()
     heads = [tab.tree.headerItem().text(c) for c in range(tab.tree.columnCount())]
-    check("5 PCs -> summary columns", heads == ["Path", "This PC", "Latest on", "Missing on", "Outdated on", "Status"], heads)
+    check("5 PCs -> summary columns", heads == ["Path", "Status", "This PC", "Latest on", "Missing on", "Outdated on"], heads)
     rows = tree_rows(tab)
-    check("summary cells", rows[k80][1][2] == "PCB, PCC, PCD, PCE" and rows[k80][1][3] == "PCA", rows.get(k80))
+    check("summary cells", rows[k80][1][3] == "PCB, PCC, PCD, PCE" and rows[k80][1][4] == "PCA", rows.get(k80))
 
     # 오래된 매니페스트 경고
     m = json.load(open(sm.manifest_path(data_dir, rid, "PCE"), encoding="utf-8"))
@@ -289,10 +378,27 @@ try:
 
     # ---------------------------------------------------------- MainWindow 에 탭이 붙는다 (닫지 않음 - 실제 프로파일 저장 안 함)
     from tools.A00210_FileManager.app.ui import main_window as mw
+    from Framework.themes.theme_manager import ThemeManager
+    ThemeManager.load_theme_dev(app, "slate_mid")      # launch.py 와 같은 테마 - 높이는 테마 글자 크기로 정해진다
     win = mw.MainWindow()
     titles = [win.tabs.tabText(i) for i in range(win.tabs.count())]
     check("MainWindow has Sync tab", titles[-1] == "Sync", titles)
     check("MainWindow collect prefs has sync keys", "sync_root_paths" in win._collect_prefs())
+    win.show()
+    for _ in range(5):
+        app.processEvents()
+    win.fit_to_content()
+    win.tabs.setCurrentIndex(0)
+    for _ in range(5):
+        app.processEvents()
+    h_fm = win.height()
+    win.tabs.setCurrentIndex(titles.index("Sync"))
+    win.sync_tab.sub_tabs.setCurrentIndex(0)
+    for _ in range(5):
+        app.processEvents()
+    ch = win.tab_fit.content_height()
+    old = ch - (st.STATUS_TREE_HINT - 192)       # 예전 트리 힌트(QTreeWidget 기본 192) 였다면
+    check("Sync > Status content height ~2.2x of before", 2.1 <= float(ch) / old <= 2.3, (old, ch, round(float(ch) / old, 2)))
     win.deleteLater()
 
 finally:

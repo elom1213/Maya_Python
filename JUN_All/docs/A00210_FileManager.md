@@ -607,10 +607,14 @@ mayapy [C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe] [Browse...] [Detect] 
 ### Status
 
 - `Compare`: **This PC**(이 PC 사본 기준) / **All PCs**(어느 PC 에서든 어긋난 파일 전부, 상태 칸에 `Missing: PCB` 처럼).
-- `Show`: Missing · Outdated · Conflict · Ahead / Only here · OK · Excluded. `Filter`: 경로 단어(공백 = 모두 포함).
+- `Show`: Missing · Outdated · Conflict · Ahead / Only here · OK · Excluded — **기본은 전부 체크**(v01.49). `Filter`: 경로 단어(공백 = 모두 포함).
 - PC 열은 매니페스트 수만큼(이 PC 먼저, 셀 = 수정 시각, 툴팁 = 크기 · 해시). **PC 가 5대 이상이면 요약 열** `This PC · Latest on · Missing on · Outdated on`.
-- 트리: 화살표로 펼치면 한 단계만, **Shift + 펼치기 / 접기 = 아래 전부**(공용 `JUN_mod_treeExpand_qt_v01`, v01.48 — 모든 트리 공통).
-- 폴더 줄에 하위 개수(`1 Missing · 2 Ahead`). `Copy Paths` · `Export List...`(txt) · `Reveal in Explorer`(이 PC 에 없으면 가장 가까운 폴더).
+- 트리: **처음엔 전부 접힘**(v01.49). 화살표로 펼치면 한 단계만, **Shift + 펼치기 / 접기 = 아래 전부**(공용 `JUN_mod_treeExpand_qt_v01`, v01.48 — 모든 트리 공통).
+  펼쳐 둔 폴더는 필터 · Show 를 바꿔도 그대로, 필터 글자가 있으면 맞는 곳까지 펼친다.
+- `Status` 열은 경로 바로 옆. **폴더 줄 = 그 아래 모든 파일의 상태**(가장 급한 것부터 `Missing (1) · Ahead (2)`, 다 같으면 `OK`) — 위로 재귀라
+  맨 위 폴더만 봐도 아래에 빠진 파일이 있는지 보인다. OK 행을 숨겨도 폴더 줄은 실제 상태로 센다.
+- 색: Missing 연한 빨강 · Outdated 노랑 · Conflict 밝은 하늘색 · OK 초록 · Ahead / Only here 보라.
+- Status 를 볼 때 창 세로가 길다(다른 탭의 약 2.2 배, 모니터 높이까지). `Copy Paths` · `Export List...`(txt) · `Reveal in Explorer`(이 PC 에 없으면 가장 가까운 폴더).
 - 우클릭: `Exclude from Sync (All PCs)` · `Exclude on This PC Only` · (제외 항목) `Include Again`.
 
 ### Roots — 추적 루트 여러 개
@@ -624,6 +628,9 @@ mayapy [C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe] [Browse...] [Detect] 
 
 ### Excluded — 제외 경로 · 무시 패턴
 
+- **왼쪽 트리(v01.49)**: 이 PC 의 루트 폴더 · 파일을 펼쳐 가며 체크 → `Exclude Checked (All PCs)` / `Exclude Checked (This PC)`.
+  여러 행을 Shift / Ctrl 로 골라 체크 하나로 전부. 체크한 폴더 아래의 체크는 폴더 하나로 합친다. 이미 제외 · 무시된 항목은 회색 기울임.
+  탐색기로 고르는 `Add Folder...` / `Add File...` 도 그대로 있다.
 - 루트별. 폴더를 넣으면 **그 아래 전부**, 파일은 그 파일만. 경계는 `/` 까지 본다(`0010_test/` 가 `0010_test_02/` 를 빼지 않음).
 - `All PCs (shared)` = `_sync_settings.json`(푸시해야 다른 PC 에 전해진다), `This PC only` = 이 PC 프로파일.
 - **스캔과 비교 둘 다** 적용 — 다른 PC 가 아직 다시 스캔하지 않았어도 결과에서 빠진다. 제외를 풀면 다음 스캔부터 다시 추적.
