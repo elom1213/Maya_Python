@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-03
+# last Update date : 2026-11-05
 # A00210_FileManager - version info
 
 # 01.41  Maya > Export sub tab: set rule (json) -> Check Sets (set · playback range · fps · version per file) -> Bake & Export / Export Only
@@ -28,5 +28,10 @@
 #        새 app/core/paths.py(ui_path · ui_text): 프로파일 읽기(경로 키 8개) · 입력 칸(입력 마침 · Browse) · 로그(모든 탭) · 툴팁 · 안내창,
 #        Maya 탭(mayapy · Export Folder 는 예전엔 normpath 로 \ 였다).
 
-VERSION = "01.46"
-LAST_UPDATE = "2026-11-03"
+# 01.47  Sync 탭 (Sync Tracker) - PC 간 작업 파일 동기화 추적. PC 마다 가진 파일 목록(매니페스트: 경로 · 크기 · 시각 · SHA-256 · 해시 이력)을
+#        <데이터 폴더>/manifests/<root>/<PC>.json 으로 주고받아 Missing / Outdated / Ahead / Only here / Conflict 판정.
+#        하위 탭 Status · Roots(추적 루트 여러 개, PC 별 경로) · Excluded(루트별 제외 경로 - 공유 / 이 PC 만, 무시 패턴).
+#        새 app/core/sync_settings · sync_manifest · sync_compare, app/ui/sync_tab. 계획 docs/plans/A00210_FileManager_sync_tracker_plan.md
+
+VERSION = "01.47"
+LAST_UPDATE = "2026-11-05"

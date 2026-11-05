@@ -2,6 +2,30 @@
 
 All notable changes to this tool are documented here.
 
+## [01.47] - 2026-11-05
+
+- **[Sync] 새 탭 — PC 간 작업 파일 동기화 추적(Sync Tracker).** 여러 PC 가 같은 경로(예: 정션 `C:\JUN\JUN_MUE`)로 작업할 때
+  **어느 PC 의 파일이 최신이고 어느 PC 에 없거나 옛것인지** 를 파일마다 보여 준다. 파일 자체는 옮기지 않는다(전송은 지금처럼 구글 드라이브 등).
+  - PC 마다 **매니페스트**(경로 · 크기 · 수정 시각 · SHA-256 · 해시 이력)를 `<데이터 폴더>/manifests/<root>/<PC 이름>.json` 에 쓰고
+    기존 Git Sync 로 주고받는다. PC 마다 자기 파일만 써서 git 충돌이 없다. Local(Shared) 모드는 공유 폴더에 바로 쓴다.
+  - 상태: `Missing`(다른 PC 에만 있음) · `Outdated`(내 해시가 다른 PC 이력 안에 있음) · `Ahead` / `Only here`(내 것이 최신 — 보내야 함) ·
+    `Conflict`(양쪽이 따로 고침) · `OK`. **판정은 해시 + 이력** — 구글 드라이브에서 받은 파일은 수정 시각이 바뀌기 때문.
+    처음 보는 파일인데 내용이 다르면 시각으로 '아마' 를 정하고 `?` 를 붙인다.
+  - **Status**: `Scan & Push` · `Scan Only` · `Pull & Compare` · `Refresh`, 해시는 백그라운드(진행 막대 · `Cancel`) — 크기 · 시각이 같은 파일은 다시 해시하지 않는다.
+    PC 열은 매니페스트 수만큼(이 PC 먼저), **5대 이상이면 요약 열**(Latest on / Missing on / Outdated on). `Compare: This PC / All PCs`,
+    `Show` 필터, 경로 필터, 폴더 뱃지(`1 Missing · 2 Ahead`), PC 별 마지막 스캔 시각(24시간 넘으면 `stale`).
+    `Copy Paths` · `Export List...` · `Reveal in Explorer`, 우클릭 `Exclude from Sync (All PCs)` / `Exclude on This PC Only` / `Include Again`.
+  - **Roots**: 추적 루트 여러 개. 루트 = 이름(id) + 공유 기본 경로, **PC 마다 다른 경로**는 `Set Path on This PC...`(프로파일에 저장).
+    겹치는 루트는 안쪽을 바깥 루트의 제외 경로로 넣을지 묻는다. 루트 안의 정션은 기본으로 따라가지 않는다(`Follow junctions` 옵션).
+    처음엔 File Manager 의 Project Root 를 첫 루트로 제안한다.
+  - **Excluded**: 루트별 제외 경로(폴더 = 그 아래 전부) — `All PCs (shared)` / `This PC only`. 스캔과 비교 둘 다 적용.
+    무시 패턴(glob, 기본 `**/backup/**` · `.mayaSwatches` · `Thumbs.db` …).
+- 새 `app/core/sync_settings.py` · `sync_manifest.py` · `sync_compare.py`(UI 비의존), `app/ui/sync_tab.py`.
+  계획 `JUN_All/docs/plans/A00210_FileManager_sync_tracker_plan.md` 의 1차 범위. 지운 파일 추적 · 시작 시 자동 스캔 · 전송 보조는 다음 단계.
+- 시험 `tests/test_sync_core.py` 53/53(제외 경계 · 해시 캐시 · 저장 중 파일 · 되돌림 · 루트 안 정션 · PC 2/3/5대 판정),
+  `tests/test_sync_ui.py` 52/52(오프스크린, 가짜 PC · 가짜 git). 기존 43/43 · 28/28 · 50/50 · 32/32.
+  실제 `C:/JUN/JUN_MUE`: 320 파일 · 13.9 GB 첫 스캔 10.9 s(디스크 캐시 상태), 재스캔 0.03 s, 매니페스트 106 KB. **GUI 확인 아직.**
+
 ## [01.46] - 2026-11-04
 
 - **[UI] 경로 표기 하나로.** 같은 경로가 `C:\Users\...\JUN_FileManager_data` 와 `C:/Users/.../JUN_FileManager_data` 처럼 섞여 보이던 것을

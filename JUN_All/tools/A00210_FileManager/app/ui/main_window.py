@@ -69,6 +69,7 @@ from .file_table import FileTable
 from .region_capture import RegionCapture
 from .path_structure_tab import PathStructureTab
 from .lineage_tab import LineageTab
+from .sync_tab import SyncTab
 from .folder_anim import FolderAnimWidget
 from ..maya.ui.maya_tab import MayaTab
 
@@ -364,6 +365,18 @@ class MainWindow(QWidget):
         # Maya 탭 (v01.35) - 마야 파일 자체를 다룬다. 마야 일은 mayapy 하위 프로세스로.
         self.maya_tab = MayaTab(log=self.log)
         self.tabs.addTab(self.maya_tab, "Maya")
+
+        # Sync 탭 (v01.47) - PC 간 작업 파일 동기화 추적. PC 마다 파일 목록(매니페스트)을 데이터 폴더로 주고받아 비교.
+        self.sync_tab = SyncTab(
+            get_data_dir=self._effective_store_dir,
+            get_project_root=self.get_project_root,
+            is_git_mode=lambda: (self.cmb_source_mode.currentData() or "git") != "local",
+            git_pull=self._sync_git_pull,
+            git_push=self._sync_git_push,
+            get_author=lambda: self.ipf_author.text().strip(),
+            log=self.log,
+        )
+        self.tabs.addTab(self.sync_tab, "Sync")
 
         # v01.36 : 탭을 스크롤 칸에 담는다. QTabWidget 의 최소 크기는 **안 보이는 페이지까지 포함한** 모든
         # 페이지 최소 크기의 최댓값이라(File Manager 탭의 세로, Lineage 탭의 가로), 창이 그 크기에 붙어
@@ -827,6 +840,9 @@ class MainWindow(QWidget):
         self.ipf_store_dir.setText(self._path_values[mode])
         self._apply_source_mode(mode)
 
+        # Sync 탭의 PC 별 값(루트 실제 경로 · 이 PC 만 제외 · 화면 상태) - 데이터 폴더가 정해진 뒤에 (v01.47)
+        self.sync_tab.load_prefs(self._prefs)
+
     def _collect_prefs(self):
         # 현재 입력 칸의 값을 활성 모드 슬롯에 먼저 반영(두 모드 경로를 모두 보존).
         self._path_values[self._active_mode] = ui_path(self.ipf_store_dir.text())
@@ -844,6 +860,7 @@ class MainWindow(QWidget):
             "recursive": self.chk_recursive.isChecked(),
             "show_recorded_only": self.chk_recorded_only.isChecked(),
             "recreate_to": self.path_structure_tab.recreate_to(),
+            **self.sync_tab.prefs_values(),
         }
 
     def on_save_settings(self):
@@ -943,11 +960,16 @@ class MainWindow(QWidget):
         try:
             self.lineage_tab.on_refresh()
             self.path_structure_tab.on_refresh()
+            self.sync_tab.on_refresh(quiet=True)
         except Exception as exc:  # noqa: BLE001 - 갱신 실패가 전환을 막지 않게
             self.log(f"Tab refresh skipped: {exc}")
 
     def closeEvent(self, event):
         # 창을 닫을 때 현재 UI 값을 활성 프로파일에 저장(다음 실행에 복원).
+        try:
+            self.sync_tab.shutdown()
+        except Exception:  # noqa: BLE001
+            pass
         try:
             self._save_current_to_active()
         except Exception:  # noqa: BLE001
@@ -1543,6 +1565,46 @@ class MainWindow(QWidget):
         self.lbl_git_status.setText("Pull OK" if ok else "Pull failed")
         if ok:
             self.on_scan()
+
+    # ------------------------------------------------------------ Sync 탭용 git (v01.47)
+
+    def _ready_git(self):
+        """Pull / Push 전 검사(Store Repo · 클론 · 브랜치) - 통과하면 GitSync, 아니면 None."""
+        if self.cmb_source_mode.currentData() == "local":
+            return None
+        self._ensure_default_store_dir()
+        git = self._make_git()
+        if not git.store_dir:
+            QMessageBox.warning(self, "Git", "Set Store Repo first.")
+            return None
+        if not git.is_repo():
+            ok, out = git.ensure_repo(self.ipf_remote_url.text().strip())
+            self.log(out)
+            if not ok:
+                self.lbl_git_status.setText("Clone failed")
+                return None
+        if not self._branch_ok(git):
+            return None
+        return git
+
+    def _sync_git_pull(self):
+        git = self._ready_git()
+        if git is None:
+            return False
+        ok, out = git.pull()
+        self.log(out)
+        self.lbl_git_status.setText("Pull OK" if ok else "Pull failed")
+        return ok
+
+    def _sync_git_push(self, message):
+        """이 프로파일 데이터 폴더(profiles/<folder>)째 커밋 · 푸시 - 매니페스트 · 공유 설정이 그 안에 있다."""
+        git = self._ready_git()
+        if git is None:
+            return False
+        ok, out = git.push(message)
+        self.log(out)
+        self.lbl_git_status.setText("Push OK" if ok else "Push failed")
+        return ok
 
     def on_push(self):
         if self.cmb_source_mode.currentData() == "local":

@@ -33,6 +33,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-05 (오늘)
 
+> [!summary] A00210_FileManager **v01.47 Sync 탭 (Sync Tracker 1차)** `#A00210_FileManager`
+- 요청: 계획서대로 진행 — PC 간 작업 파일(정션 `C:\JUN\JUN_MUE`)의 최신본 · 빠진 PC 추적.
+- 구현: PC 별 매니페스트(경로 · 크기 · 시각 · SHA-256 · 해시 이력 10개) → `<데이터 폴더>/manifests/<root>/<PC>.json`, 공유 설정 `_sync_settings.json`.
+  비교 = 해시 + 이력(Missing · Outdated · Ahead · Only here · Conflict, 처음 보는 다른 내용은 시각으로 `?`). 하위 탭 Status · Roots(여러 루트 · PC 별 경로) · Excluded(공유 / 이 PC 만 · 무시 패턴).
+  스캔은 QThread(크기 · 시각 같으면 해시 재사용, 저장 중 파일 건너뜀, 루트 안 정션 안 따라감). Push/Pull 은 MainWindow `_ready_git` 검사 재사용.
+- 시험: `test_sync_core.py` 53/53 · `test_sync_ui.py` 52/52, 기존 43 · 28 · 50 · 32. 실측 `C:/JUN/JUN_MUE` 320 파일 · 13.9 GB 첫 스캔 10.9 s · 재스캔 0.03 s. **GUI 확인 아직.**
+- 문서: 안내 4-F, 계획서 8장, 포트폴리오 EN/KR.
+
 > [!summary] A00210_FileManager **Sync Tracker 계획서** (구현 보류) `#A00210_FileManager`
 - 요청: 여러 PC 가 정션 `C:\JUN\JUN_MUE` 로 같은 경로를 쓰는데, 어느 PC 가 최신본이고 어느 PC 에 파일이 없거나 옛것인지 감지하고 싶다(현재 전송 = 구글 드라이브 수동).
 - 안: PC 별 매니페스트 json(경로 · 크기 · 시각 · SHA-256 · 해시 이력)을 기존 데이터 저장소 `profiles/MUE/manifests/<루트>/<PC>.json` 으로 주고받아 Missing / Outdated / Ahead / Only here / Conflict 판정. 드라이브 다운로드는 시각을 바꾸므로 판정은 해시.

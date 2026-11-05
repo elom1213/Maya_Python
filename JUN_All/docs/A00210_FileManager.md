@@ -571,6 +571,72 @@ mayapy [C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe] [Browse...] [Detect] 
 
 ---
 
+## 4-F. Sync 탭 — PC 간 작업 파일 동기화 추적 (v01.47)
+
+여러 PC 가 같은 경로(예: 정션 `C:\JUN\JUN_MUE`)로 작업할 때 **어느 PC 의 파일이 최신이고, 어느 PC 에 파일이 없거나 옛것인지** 를
+파일마다 보여 준다. 파일 자체는 옮기지 않는다 — 각 PC 가 **가진 파일 목록(매니페스트)** 만 데이터 폴더로 주고받는다.
+계획서: [`plans/A00210_FileManager_sync_tracker_plan.md`](plans/A00210_FileManager_sync_tracker_plan.md)
+
+```
+<데이터 폴더>/manifests/                 (Git 모드 = <Store Repo>/profiles/<Data Folder>/manifests)
+    _sync_settings.json                  모든 PC 공유: 루트 · 루트별 제외 경로 · 무시 패턴
+    <root id>/<PC 이름>.json             PC 마다 하나 - 자기 것만 쓴다(git 충돌 없음)
+```
+
+### 흐름
+
+1. 작업한 PC: **Status > `Scan & Push`** — 루트 아래 파일을 훑어 바뀐 파일만 SHA-256, 이 PC 매니페스트를 저장하고 푸시.
+2. 다른 PC: **`Pull & Compare`** — 다른 PC 매니페스트를 받아 비교. 예: 저 PC 가 `00010_cleanup_KANA_00080.mb` 를 만들었으면
+   여기서 `Missing (get from <PC>)` 로 뜬다. 구글 드라이브 등으로 받아 같은 경로에 넣고 다시 `Scan & Push`.
+3. 받은 쪽이 스캔해 올리면 보낸 쪽에서도 `OK` 가 된다.
+
+| 상태 | 뜻 | 할 일 |
+|------|----|-------|
+| `Missing` | 다른 PC 에 있고 이 PC 에 없다 | 받아 온다 |
+| `Outdated` | 이 PC 버전이 다른 PC 의 이력에 있다(저쪽이 그 뒤에 또 고침) | 받아 온다 |
+| `Ahead` | 이 PC 것이 최신, 다른 PC 가 없거나 옛것 | 보낸다 |
+| `Only here` | 이 PC 에만 있다 | 보낸다 |
+| `Conflict` | 양쪽이 따로 고쳤다 | 사람이 고른다 |
+| `OK` | 모든 PC 가 같다 | — |
+
+- **판정은 해시 + 이력**(PC 마다 경로별 최근 해시 10개). 구글 드라이브 웹 다운로드는 수정 시각을 받은 시각으로 바꾸므로 시각은 표시용이다.
+  처음 보는 파일인데 내용이 다르면 수정 시각으로 '아마' 를 정하고 상태 끝에 `?` 를 붙인다.
+- 크기 · 수정 시각이 지난 스캔과 같은 파일은 다시 해시하지 않는다(재스캔은 거의 즉시). 해시 중 크기가 바뀐 파일(마야 저장 중)은 건너뛰고 다음 스캔에.
+- 위쪽 `PCs:` 줄에 PC 마다 마지막 스캔 시각 — 24시간 넘으면 `stale`(그 PC 결과는 믿지 말 것). 스캔을 안 하면 매니페스트가 낡는다.
+
+### Status
+
+- `Compare`: **This PC**(이 PC 사본 기준) / **All PCs**(어느 PC 에서든 어긋난 파일 전부, 상태 칸에 `Missing: PCB` 처럼).
+- `Show`: Missing · Outdated · Conflict · Ahead / Only here · OK · Excluded. `Filter`: 경로 단어(공백 = 모두 포함).
+- PC 열은 매니페스트 수만큼(이 PC 먼저, 셀 = 수정 시각, 툴팁 = 크기 · 해시). **PC 가 5대 이상이면 요약 열** `This PC · Latest on · Missing on · Outdated on`.
+- 폴더 줄에 하위 개수(`1 Missing · 2 Ahead`). `Copy Paths` · `Export List...`(txt) · `Reveal in Explorer`(이 PC 에 없으면 가장 가까운 폴더).
+- 우클릭: `Exclude from Sync (All PCs)` · `Exclude on This PC Only` · (제외 항목) `Include Again`.
+
+### Roots — 추적 루트 여러 개
+
+- 루트 = 이름 + 공유 기본 경로. **PC 마다 경로가 다르면 `Set Path on This PC...`**(이 PC 프로파일에만 저장), 되돌리기는 `Use Shared Default`.
+  경로가 없는 PC 는 그 루트를 스캔하지 않는다.
+- 처음 열면 File Manager 의 **Project Root 를 첫 루트로 제안**한다(첫 스캔 · 편집 때 저장).
+- 한 루트가 다른 루트 안이면 추가할 때 안쪽을 바깥 루트의 제외 경로로 넣을지 묻는다(이중 추적 방지). 같은 경로는 거부.
+- 루트 **안의** 정션 · 심볼릭 링크 폴더는 기본으로 따라가지 않는다(`Follow junctions inside this root`). 루트 자체가 정션인 건 상관없다.
+- `Rename` 은 이름만(폴더 id 는 그대로), `Remove` 는 추적만 멈춘다(파일 · 저장된 매니페스트는 그대로).
+
+### Excluded — 제외 경로 · 무시 패턴
+
+- 루트별. 폴더를 넣으면 **그 아래 전부**, 파일은 그 파일만. 경계는 `/` 까지 본다(`0010_test/` 가 `0010_test_02/` 를 빼지 않음).
+- `All PCs (shared)` = `_sync_settings.json`(푸시해야 다른 PC 에 전해진다), `This PC only` = 이 PC 프로파일.
+- **스캔과 비교 둘 다** 적용 — 다른 PC 가 아직 다시 스캔하지 않았어도 결과에서 빠진다. 제외를 풀면 다음 스캔부터 다시 추적.
+- 무시 패턴(모든 루트, 공유): 기본 `**/backup/**` · `**/incrementalSave/**` · `**/.mayaSwatches/**` · `**/*.swatches` · `**/Thumbs.db` · `**/desktop.ini` · `**/~$*`.
+
+### 알아 둘 것
+
+- `Scan & Push` 의 푸시는 기존 Git Sync 와 같다 — 이 프로파일 데이터 폴더(`profiles/<folder>`)째 커밋한다(records 변경도 함께).
+- 실측(이 PC, `C:/JUN/JUN_MUE`): 320 파일 · 13.9 GB 첫 스캔 10.9 s(디스크 캐시 상태 — 콜드 디스크는 더 걸림), 재스캔 0.03 s, 매니페스트 106 KB.
+- 다음 단계(계획서 5장): 지운 파일 추적(`Deleted elsewhere`) · 툴 시작 시 자동 스캔 · PC 별명 · 마야 열 때 경고 · 드라이브 업로드 / 다운로드 보조.
+- 검증: 코어 53 · 오프스크린 UI 52 항목. **GUI 실사용 확인 아직.**
+
+---
+
 ## 5. 구조 (개발자용)
 
 ```
@@ -591,13 +657,17 @@ A00210_FileManager/
     │   ├── prefs.py         # PC 로컬 설정 저장/로드
     │   ├── git_sync.py      # GitSync: ensure/clone, pull, push (subprocess git)
     │   ├── path_structure.py# 폴더 구조 템플릿 캡처/재생성
+    │   ├── sync_settings.py # Sync: 공유 설정(루트 · 제외 경로 · 무시 패턴), is_excluded / is_ignored (v01.47)
+    │   ├── sync_manifest.py # Sync: PC 매니페스트 스캔(해시 캐시 · 저장 중 건너뜀 · 정션) · 저장 / 읽기
+    │   ├── sync_compare.py  # Sync: 매니페스트 비교 -> 파일마다 PC 별 상태 (순수 함수)
     │   └── lineage.py       # 브랜치/병합 DAG 모델 + 레인/색상 계산 (compute_lanes)
     ├── ui/
     │   ├── main_window.py   # MainWindow(QWidget) 조립 + 핸들러
     │   ├── file_table.py    # 파일 목록 위젯
     │   ├── region_capture.py# 화면 영역 캡쳐 오버레이
     │   ├── path_structure_tab.py # Path Structure 탭
-    │   └── lineage_tab.py   # Lineage 탭 (QGraphicsView 캔버스 + 노드/엣지 아이템)
+    │   ├── lineage_tab.py   # Lineage 탭 (QGraphicsView 캔버스 + 노드/엣지 아이템)
+    │   └── sync_tab.py      # Sync 탭 (Status · Roots · Excluded, 스캔은 QThread) (v01.47)
     └── maya/                # Maya 탭 (v01.35, Export v01.41) - 이 폴더가 통째로 분리 단위 (밖은 Framework · prefs 만 본다)
         ├── core/            # Qt 없음. maya.cmds 를 쓰는 모듈은 mayapy 워커 안에서 돈다
         │   ├── ma_parser.py     # .ma 머리글의 file -r / -rdi 문장 파싱 (여러 줄)

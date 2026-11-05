@@ -72,6 +72,12 @@ DEFAULTS = {
     "export_joints_only": True,
     "export_euler_filter": False,
     "export_import_references": True,
+    # Sync 탭 (v01.47) - PC 마다 다른 값만. 공유 값(루트 · 제외 경로 · 패턴)은 <데이터 폴더>/manifests/_sync_settings.json.
+    "sync_root_paths": {},          # {root_id: 이 PC 의 실제 경로} - 없으면 공유 default_path
+    "sync_local_excluded": {},      # {root_id: [이 PC 만 제외할 상대 경로]}
+    "sync_root": "",
+    "sync_compare": "this",
+    "sync_show": ["Missing", "Outdated", "Conflict", "Ahead"],
 }
 
 # 비어 있으면 번들 기본값으로 보정할 동기화 키들(예전 파일에 없던 키 대비).
