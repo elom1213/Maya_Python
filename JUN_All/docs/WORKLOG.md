@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-05 (오늘)
 
+> [!summary] A00390_WindTool **Waves Gen(블렌더) 이식 계획서** (구현 전) `#A00390_WindTool`
+- 요청: 무료 블렌더 애드온 Waves Gen(GPL-3.0) 분석 → 장점 · 보완점을 A00390 V02 에 이식, 바람 프리셋 3개를 그대로 옮길 수 있는지, 진폭 · 속도를 실시간으로 바꿀 수 있는지.
+- 결론: 숫자만 옮기면 다른 그림(진폭 · 파장 · 속도의 뜻이 다름, 끝 따라가기 Damped Track 이 결과를 깎는 구조). Waves Gen 운동 모델(누적 두 축 회전 + 기울기 + 끝 따라가기)을 새 `Flow` 모드로 노드 구현하면 프리셋을 같은 뜻으로 이식 가능.
+  실시간은 노드라 전부 키 가능 — Mix 까지 키로(원본은 UI 콜백). 속도 키 · Mix 키는 위상 적분 필요 → V03 위상 엔진(V02 는 느린 표현식) → V03 권장. 코드 복사 금지(GPL), 수식 독립 구현 + 출처 표기.
+- 블렌더 4.0.2 헤드리스 기준 데이터 추출은 외부 코드 실행이라 자동 권한 검사에서 막힘 → 승인 대기(측정 스크립트는 계획서 옆).
+- 문서: [`plans/A00390_WindTool_wavesgen_port_plan.md`](plans/A00390_WindTool_wavesgen_port_plan.md)
+
 > [!summary] A00210_FileManager **v01.49 Sync 트리 다듬기** + Framework **tabFit 중첩 탭 보정 수정** `#A00210_FileManager` `#Framework`
 - 요청: Status 트리 처음엔 접힘 · `Show` 의 OK · Excluded 기본 체크 · 상위 폴더에서 하위 파일 상태(재귀) · 색(Missing 연한 빨강 / Outdated 노랑 / Conflict 하늘 / OK 초록) · Excluded 에 체크 트리 · Status 창 세로 2.2 배.
 - 구현: Status 열을 경로 옆으로, 폴더 줄 = 아래 **모든** 파일 상태(`Missing (1) · Ahead (2)` / `OK`), 펼침 상태 유지 · 필터면 펼침, 트리 힌트 1075(717 → 1600, 2.23 배).
