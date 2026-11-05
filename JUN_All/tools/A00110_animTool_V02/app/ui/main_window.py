@@ -2165,6 +2165,10 @@ class MainWindow(QWidget):
 
         self.cb_bake_smart = QCheckBox("Smart bake (reduce keys)")
         self.cb_bake_smart.setChecked(False)
+        self.cb_bake_smart.setToolTip(
+            "Bake every frame, then remove the keys inside the range that a straight line can replace\n"
+            "within Tolerance (channel units: scene units for translate, degrees for rotate).\n"
+            "Keys outside the range are never touched.")
         tab_layout.addWidget(self.cb_bake_smart)
 
         smart_row = QHBoxLayout()

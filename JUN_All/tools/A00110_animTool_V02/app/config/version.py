@@ -159,5 +159,15 @@
 #        ② 커브를 고치는 단계에선 게이지를 단계 끝에만(이벤트 루프 안 돌림) ③ 그 동안 그래프 에디터 setUpdatesEnabled(False)
 #        ④ 시작할 때 키 선택 비우기. 회귀 test_fix_sliding 40/40 · _ui 15/15, KANA 두 번 연속 실행 노드 · 커브 재사용 확인.
 
-VERSION = "02.50"
+# 02.51  Bake > Bake 를 구간 [s, e] 만 구울 때 **구간 밖 기존 키 보존** (사용자 보고: 컨스트레인트를 걸고 [10, 50] 만 구우면 그 밖의 키가 지워짐,
+#        오브젝트는 BaseAnimation + 다른 레이어에 키). 실측 - 레이어 멤버 채널에서 bakeResults -time -preserveOutsideKeys 는 Base 커브를
+#        [s, e] 키만 남기고 바꾸고(구간 밖 소실) 합성값을 Base 에 써 위 레이어를 이중 계산. -> 레이어 오브젝트는 bake_layered:
+#        컨스트레인트 켠 채 매 프레임 샘플 -> 채널마다 대상 레이어(덮는 맨 위 override, 없으면 Base) 커브의 [s, e] 안 키만 지우고
+#        (s-1 / e+1 모양 보존 키 + 이웃 탄젠트 fixed) setKeyframe -animLayer 대상 -value (마야 역산). 다른 레이어 커브 그대로.
+#        또 bakeResults -smart 는 레이어 없이도 구간 밖 값을 바꿨다 -> smart = dense bake + 구간 안만 Douglas-Peucker 로 키 줄이기
+#        (Tolerance = 채널 단위 절댓값, linear 탄젠트). filterCurve -simplify 는 허용오차를 안 지켜 안 씀. 키가 없던 채널은 마야 기본대로
+#        구간 밖에서 구운 끝값을 잇는다(컨스트레인트를 거는 순간 pairBlend 입력이 0 이라 원래 값을 되살릴 수 없음).
+#        회귀 tests/test_bake_layers.py 19/19.
+
+VERSION = "02.51"
 LAST_UPDATE = "2026-11-04"

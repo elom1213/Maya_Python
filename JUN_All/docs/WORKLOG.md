@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-11-03
+updated: 2026-11-05
 ---
 
 # 작업 일지 (WORKLOG)
@@ -31,7 +31,19 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-11-04 (오늘)
+## 2026-11-05 (오늘)
+
+> [!summary] A00110_animTool_V02 **v02.51 Bake > Bake 구간 밖 키 보존** `#A00110_animTool`
+- 보고: 컨스트레인트를 걸고 Bake List 로 [10, 50] 만 구우면 그 밖의 기존 키가 지워진다(오브젝트는 Base + 다른 레이어에 키).
+- 실측(mayapy): 레이어 없으면 정상. **레이어 멤버 채널**에서 `bakeResults -time -preserveOutsideKeys` 는 Base 커브를 [s, e] 의 41 키만 남기고 바꾸고
+  (구간 밖 f70 tx 8.0 → 1.0), 합성값을 Base 에 써서 구간 안에서 위 레이어를 이중 계산. keep / bake down 둘 다 컨스트레인트는 남김.
+- 수정 `BakeManager.bake_layered`: 컨스트레인트 켠 채 샘플 → 채널마다 대상 레이어(덮는 맨 위 override · 없으면 Base) 커브의 [s, e] 만 지우고
+  (s-1 / e+1 fixed 모양 보존 — 듬성한 커브 보간 보호) `setKeyframe -animLayer 대상 -value` 역산. additive · override · 뮤트 · 잠김 처리.
+- 덤으로 찾은 버그: `bakeResults -smart` 가 레이어 없이도 구간 밖 60 f 값을 바꿈 → dense + 구간 안만 Douglas-Peucker. `filterCurve -simplify` 는 허용오차 무시(실측).
+- 한계: 키가 없던 채널은 원래 값이 컨스트레인트 순간 pairBlend 입력 0 → 마야 기본대로.
+- 시험: `test_bake_layers.py` 19/19, 회귀 40 · 81 · 111 · 31. **GUI 확인 아직.**
+
+## 2026-11-04
 
 > [!summary] A00110_animTool_V02 **v02.50 Fix Sliding 크래시 수정** `#A00110_animTool`
 - 보고: Fix Sliding 실행 중 마야 크래시 2 회(MayaCrashLog261104.1716 / .1749). 사용자 확인 = 두 번째 이후 실행, 디버그 커브가 그래프 에디터에 떠 있던 경우 있음.
