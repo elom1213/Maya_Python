@@ -1,7 +1,42 @@
 # CHANGELOG - A00390_WindTool_V03
 
 > V03 는 `A00390_WindTool_V02` 를 복제해 시작했다. 아래 v02.x 기록은 V02 에서 이어받은
-> 것이고, V03 에서 실제로 바뀐 것은 **v03.00** 항목뿐이다.
+> 것이고, V03 에서 실제로 바뀐 것은 **v03.00** 이후 항목이다.
+
+## v03.04 (2026-11-05) - Flow 탭: 블렌더 Waves Gen 식 바람 (프리셋 3 x 2 + Mix + 끝 따라가기)
+
+블렌더 애드온 **Waves Gen**(Guillaume Bissieres, GPL-3.0, 무료)의 바람을 마야 노드망으로 옮겼다.
+코드를 복사하지 않고 움직임의 수학을 다시 썼다 — 개인 작업용(배포 안 함). 계획 `docs/plans/A00390_WindTool_wavesgen_port_plan.md`.
+
+### Added — `Flow` 탭
+
+- **움직임**: 뼈마다 두 축 로컬 회전이 쌓인다 — 바람에 눕기(`Lean`, 끝으로 갈수록 큼) + 뿌리에서 끝으로 흐르는 파동(`Flutter`)
+  + 옆 흔들림(`Cross Sway`, 끝이 고리를 그림) + 불규칙 · 돌풍(`Randomness`) + 뿌리 고정(`Stiffness`), 방향(`Direction`)으로 두 축에 나눔.
+  뼈 개수가 달라도 같은 모양(뼈 12개 기준 정규화).
+- **끝 따라가기(`Tip Follow`)**: 체인 끝 너머의 `*_flowTip` 로케이터를 향해 뼈마다 최소 회전(블렌더 Damped Track 과 같음)을
+  영향력(뿌리 1 → 끝 0.55)으로 섞는다. Tip 을 움직이면 2차 애니메이션. 끌 수 있다(바람만, 더 가벼움).
+- **프리셋** `Slow Flow` · `Breeze` · `Fast Flutter` — 각각 옵션 2개를 드라이버의 `*A` / `*B` 에, **`flowMix` 0 → 1 로 섞는다**.
+  지금 값과 맞는 프리셋 버튼이 파랗게 눌려 보인다. `Option 1` / `Option 2` 버튼, Mix 슬라이더, `Key Mix`(현재 프레임에 키).
+- **전부 라이브 · 키 가능**: 드라이버 한 개(`<root>_flowDriver`)에 옵션 A/B 8개씩 · Mix · Direction · `windEnvelope` · `flowTimeScale` ·
+  `flowChainOffset`(체인 사이 지연) · `flowVariation`(체인마다 리듬 · 파장 · 크기 차이). 탭의 칸을 바꾸면 대상 드라이버에 바로 쓴다
+  (`Live Edit`, 대상 = 선택한 드라이버 · 그 체인 · Tip, 없으면 씬 전체). 키가 걸린 값은 현재 프레임에 키(linear).
+- **위상 엔진 `flowPhaseEngine`**(씬에 표현식 하나): 위상 = `∫ timeScale × speed(Mix) dt`. speed A/B · Mix · timeScale 에 키가 있으면
+  키 시각마다 구간을 나눠 **Simpson 으로 정확히** 적분한다(키 사이 직선 가정에서 3차 이하). **역행 없음**, 키를 고치면 Rebuild 없이 즉시.
+  fps 와 무관하게 같은 초당 리듬(24 fps 기준 `flowFpsScale`).
+- 사인은 `eulerToQuat`(quatX = sin θ/2)로 **정확히** 계산(V03 다른 탭의 16샘플 LUT 근사가 아니다).
+
+### 검증
+
+- **블렌더 기준 데이터와 12/12 일치**(Blender 4.0.2 헤드리스로 애드온을 실행해 측정 — 뼈 12, 60 프레임, 프리셋 3 × Mix 0/50/100 +
+  끝 따라가기 0 · 불규칙 · 옆 흔들림 · 강성 · 방향): 머리 위치 오차 최대 체인 길이의 **0.013%**, 축 **0.09도**
+  (Waves Gen 식의 소수점 3자리 반올림 수준). `tests/test_flow_golden.py`(순수 모델) · `tests/test_flow_maya.py`(마야 노드망).
+- 일반 마야 체인(X 진행 · jointOrient · rotateOrder 6종 · rest 회전, 체인 2개 · Mix 0.37 · 변주 · 지연) = 순수 모델 **4.8e-7**.
+- 키 걸린 speed + Mix + timeScale 위상 = 수치 적분 2.5e-7, 역행 0, 키 수정 즉시 반영, 30 fps, 제거 시 rest 복원,
+  rotate 에 키 · 연결이 있는 체인은 거부. UI 16/16(`tests/test_flow_ui.py`). tabFit 롤아웃 31툴 0 fail.
+- 재생(mayapy, 뼈 12 체인, Tip Follow 켬): 1체인 0.85 ms · 10체인 1.88 ms · 30체인 4.77 ms/프레임(노드 2.4만). `tests/perf_flow.py`.
+- 함정(고친 것): 뼈 축을 연결 루프 **안에서** 구하면 앞 뼈가 이미 돌아간 월드 회전을 읽어 뒤 뼈의 진행축이 기운다 — 연결 전에 전부 구한다
+  (블렌더 대조에서 잡힘). `blendTwoAttr` 출력은 float 정밀도(1e-8).
+- **마야 GUI 손 확인 아직.** Flow 페이지가 길어 작은 모니터에서는 화면 높이에서 멈춘다.
 
 ## v03.03 (2026-10-29)
 

@@ -31,5 +31,9 @@
 #        스크롤 없이 다 보이고 짧은 페이지로 가면 줄어든다. 페이지가 화면보다 길면 화면 높이에서 멈춤.
 #        공용 Framework/qt/MOD_tabFit_qt_v01 (A00275 v01.38 과 같은 방식)
 
-VERSION = "03.03"
-LAST_UPDATE = "2026-10-29"
+# 03.04  Flow 탭 - 블렌더 애드온 Waves Gen 식 바람(기울기 + 두 축 진행파 + 불규칙 · 돌풍 + 끝 따라가기)을 마야 노드망으로.
+#        프리셋 Slow Flow / Breeze / Fast Flutter (옵션 2개) + flowMix (라이브 · 키 가능), 위상 엔진 flowPhaseEngine
+#        (speed · Mix · timeScale 키를 Simpson 으로 정확 적분). 블렌더 기준 데이터와 12/12 일치. 계획 docs/plans/A00390_WindTool_wavesgen_port_plan.md
+
+VERSION = "03.04"
+LAST_UPDATE = "2026-11-05"

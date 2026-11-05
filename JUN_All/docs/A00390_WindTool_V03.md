@@ -231,3 +231,46 @@ V02 는 **프레임 단위** 사다리꼴, V03 의 라이브 경로는 **키 구
 탭(중첩 포함)을 바꾸면 창 높이가 **지금 보이는 페이지**에 맞게 늘거나 줄어 스크롤 없이 다 보인다. 페이지가 모니터 작업 영역보다
 길면 화면 높이에서 멈추고(스크롤 영역이 있는 페이지는 그 페이지만 스크롤), 창 아래가 화면 밖이면 위로 올린다. 폭은 건드리지 않는다.
 공용 [`JUN_mod_tabFit_qt_v01`](Framework_MOD_tabFit_qt.md) — A00275 v01.38 과 같은 방식. **마야 GUI 확인 아직.**
+
+## 9. Flow 탭 — Waves Gen(블렌더) 식 바람 (v03.04)
+
+블렌더 애드온 Waves Gen(Guillaume Bissieres, GPL-3.0)의 움직임을 마야 노드로 다시 만든 탭. 블렌더 기준 데이터와 12/12 일치(CHANGELOG v03.04).
+
+### 쓰는 법
+
+1. 위쪽 `Joints` 목록에 체인을 넣고 `Bone Chain`(목록 = 한 체인) / `Bone Root`(목록 = 루트들)를 고른다.
+2. 프리셋 버튼(`Slow Flow` · `Breeze` · `Fast Flutter`)을 누르면 Option 1 / 2 칸이 채워진다. 칸을 직접 고쳐도 된다.
+3. `Build Flow`. 드라이버 `<root>_flowDriver` 하나와 체인마다 `<root>_flowTip`(Tip Follow 켬)이 생긴다.
+4. 재생. 이후 탭의 칸 · Mix 슬라이더를 바꾸면 **선택한 드라이버(또는 그 체인 · Tip 선택)** 에 바로 들어간다. 아무것도 안 고르면 씬의 모든 Flow 드라이버.
+5. 지우기 `Remove Flow`(rest 회전으로 되돌린다).
+
+### 값
+
+| 칸 / 어트리뷰트 | 뜻 |
+|----------------|----|
+| `Lean` (`flowLeanA/B`) | 바람에 눕는 정도(도, 뼈 12개 기준). 끝으로 갈수록 크다 |
+| `Flutter` | 뿌리 → 끝으로 흐르는 파동 크기(도/뼈) |
+| `Cross Sway` | 옆 흔들림 0~1 — 끝이 고리를 그린다 |
+| `Speed` | 파동 속도(24 fps 기준 값, 어떤 fps 에서도 같은 초당 리듬). Breeze 옵션 1 = 2.58 ≈ 1.28 Hz |
+| `Wavelength` | 파장(뼈 12개 기준) — 체인 위 파동 수 = 12 / 값 |
+| `Stiffness` | 뿌리 고정 지수 — 크면 끝만 움직인다 |
+| `Randomness` | 불규칙 리듬 · 돌풍 0~1 |
+| `Tip Follow` | 뼈가 Tip 을 향하는 정도 0~0.99 (Tip Follow 를 끄고 빌드하면 쓰이지 않는다) |
+| `flowMix` | 0 = Option 1, 1 = Option 2. **키 가능** — `Key Mix` 로 "잔잔 → 돌풍" 전환 |
+| `Direction` (`flowDirection`) | 바람 방향(도). 0 = Wind Axis 기준 |
+| `Envelope` (`windEnvelope`) | 전체 세기 0~1 (0 = rest 자세) |
+| `Time Scale` (`flowTimeScale`) | 바람 재생 속도 배수. 키를 걸어도 위상이 거꾸로 가지 않는다 |
+| `Chain Offset` (`flowChainOffset`) | Bone Root 모드에서 체인 사이 지연(프레임) — 같이 흔들리지 않게 |
+| `Variation` (`flowVariation`) | 체인마다 리듬 · 파장 · 크기 차이 0~1 |
+
+- 빌드 옵션: `Wind Axis`(Auto = 월드 X, 체인이 X 방향이면 Y) · `Tip Follow`(프리셋을 Waves Gen 처럼 보이게 하려면 켬) · `Live Edit`.
+- `Load From Driver` 는 고른 드라이버 값을 탭으로 가져온다. 값이 프리셋과 같으면 그 버튼이 파랗다.
+
+### 알아 둘 것
+
+- 회전하는 뼈 = **자식이 있는 노드**. 끝 노드는 rest 그대로(블렌더 뼈의 꼬리 자리).
+- rotate 에 키 · 연결이 이미 있는 체인은 빌드하지 않는다(로그에 사유).
+- 위상 엔진 `flowPhaseEngine` 은 씬에 하나, Flow 드라이버 전부를 맡는다. speed · Mix · Time Scale 의 키는 **키 사이를 직선**으로 보고 적분한다 —
+  툴이 찍는 키는 linear 탄젠트. spline 키를 직접 넣으면 그림(실제 곡선)과 속도가 조금 다를 수 있다.
+- Playback 탭의 Rebuild Phase · Mute / Solo 는 다른 탭 드라이버용이다(Flow 는 엔진이 늘 라이브라 Rebuild 가 필요 없다).
+- 노드 수: 뼈당 약 65(Tip Follow 켬) / 50(끔). 30 체인 × 뼈 12 ≈ 2.4만 노드, mayapy 재생 4.8 ms/프레임.

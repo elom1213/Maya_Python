@@ -13,6 +13,7 @@
 
 - [진행 상황 문장도 한국어](feedback-korean-progress-notes.md) — 도구 사이 중간 설명 · 짧은 답까지 한국어(세 번 지적: 11-03, 11-04 두 번 — 사용자 중간 메시지 · 영어 도구 결과 직후가 위험)
 - [Push target Dnable/dev](push-target-dnable-dev.md) — push 대상은 Dnable_repo 의 dev
+- [Push: 나가는 커밋을 따로 보고 push](push-check-outgoing-separately.md) — `git log ..HEAD` 와 `git push` 를 한 줄로 묶지 말 것(11-05 다른 세션 A00600 커밋이 함께 나감)
 - [No history rewrite / master on request](no-history-rewrite-master-on-request.md) — 재작성 금지, master 최신화는 그 턴 요청 시만
 - [Push includes tool guide docs](push-includes-tool-guide-docs.md) — 툴 push 에 docs 가이드 · version · WORKLOG 함께
 - [Push refreshes README date](push-refresh-readme-date.md) — 푸시 때 루트 README 의 `최근 갱신` 날짜 진단 · 최신화해 함께 담기
@@ -104,7 +105,7 @@
 - A00340 — [SelectionTool](wip-a00340-selectiontool.md)(v01.11 `Rules` 탭 = 규칙당 json 하나, 동명은 `cmds.ls` 로 펼쳐 선택 · v01.20 Share 덮어쓰기 확인) · [button colors](wip-a00340-button-colors.md) · [split layout](wip-a00340-split-layout.md)
 - A00350 — [ArrayCreator](wip-a00350-arraycreator.md) · A00360 — [SortTool](wip-a00360-sorttool.md)(v01.03 Selection = 선택 순서, Ari Selects) · A00370 — [ToolLauncher](wip-a00370-toollauncher.md)(v01.08 Filter = 공용 rows_provider, 빈 카테고리는 filtered 시그널로 숨김) · [Shrink + 로켓](wip-a00370-shrink-rocket.md)(v01.12, 272x155 · Pin 은 Shrunk 아래, 로켓 발사 무한 반복)
 - A00380 — [MeshTool Peak](wip-a00380-meshtool-peak.md) · [Match tab](wip-a00380-match-tab.md) · [Match > By Weight](wip-a00380-match-by-weight.md) · [MeshDoctor tab](wip-a00380-meshdoctor-tab.md) · UV Sets 탭([[wip-a00050-uvtool-v02]])
-- A00390 — [WindTool](wip-a00390-windtool.md) · [Chain Wave](wip-a00390-chain-wave.md) · [V02 axis & driver](wip-a00390-v02-axis-driver.md) · [V02 Envelope](wip-a00390-v02-envelope.md) · [Lite debug curve](wip-a00390-lite-debug-curve.md) · [Waves Gen 이식 계획](wip-a00390-wavesgen-port.md)(블렌더 GPL, Flow 모드 · 프리셋 3x2 · V03 권장, 구현 전)
+- A00390 — [WindTool](wip-a00390-windtool.md) · [Chain Wave](wip-a00390-chain-wave.md) · [V02 axis & driver](wip-a00390-v02-axis-driver.md) · [V02 Envelope](wip-a00390-v02-envelope.md) · [Lite debug curve](wip-a00390-lite-debug-curve.md) · [V03 Flow = Waves Gen 이식](wip-a00390-wavesgen-port.md)(v03.04, 블렌더 골든 12/12, sin=eulerToQuat, 축은 연결 전에, GUI 확인 아직)
 - A00400 — [CurveTool](wip-a00400-curvetool.md) · [Smooth](wip-a00400-smooth-tab.md) · [Points to Curve](wip-a00400-points-to-curve.md) · [Ribbon v01.29](wip-a00400-ribbon.md)(커브 → 리본 서피스, 마야 loft 와 CV 동일, 임시 커브 둘 + loft, GUI 확인 아직) · [Wrap](wip-a00400-curve-wrap.md) · [Joints](wip-a00400-curve-joints.md) · [Controls](wip-a00400-controls-tab.md) · Combine([instance trap](parent-shape-add-is-instance.md)) · [Shape Edit](wip-a00400-shape-transform.md)(레퍼런스 커브는 xform, Line Width 흡수, **v01.30 Always Draw On Top On/Off/Toggle** 같은 목록, Replace > Resolve Pair)
 - A00410 — [SecondaryMotion](wip-a00410-secondarymotion.md)(Virtual Child) · A00420 — [Wrapper](wip-a00420-wrapper.md) · A00430 — [DemBone](wip-a00430-dembone.md)
 - A00440 — [SetTool](wip-a00440-settool.md) · [Sets x Objects](wip-a00440-sets-x-objects.md) · [Find tab](wip-a00440-find-tab.md) · A00450 — [ManipulatorTool](wip-a00450-manipulatortool.md) · A00460 — [FK & IK](wip-a00460-fk-ik.md)

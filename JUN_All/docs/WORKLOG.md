@@ -33,6 +33,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-05 (오늘)
 
+> [!summary] A00390_WindTool_V03 **v03.04 Flow 탭 — Waves Gen(블렌더) 바람 이식** `#A00390_WindTool`
+- 요청: 계획서대로 V03 에, 끝 따라가기까지, Mix 포함(개인용, 블렌더 애드온 실행 허가).
+- 블렌더 4.0.2 헤드리스로 애드온을 돌려 기준 데이터(12 경우 × 뼈 12 × 60 f) → 순수 모델 `flow_model` 12/12 → 마야 노드망 12/12(0.013% · 0.09도).
+  노드망: sin 은 eulerToQuat(정확), 바람 = 두 축 쿼터니언, 끝 따라가기 = angleBetween 최소 회전 + quatSlerp. 위상 엔진 표현식 1개(키 걸린 speed · Mix · timeScale 을 Simpson 정확 적분, 역행 0).
+  프리셋 3 × 옵션 2 → 드라이버 A/B + flowMix(blendTwoAttr, 키 가능), Live Edit, Key Mix, Load From Driver.
+- 함정: 뼈 축을 연결 루프 안에서 구하면 앞 뼈 회전이 섞인다(블렌더 대조로 잡음) → 연결 전에 전부.
+- 시험: golden 12 · maya 28 · UI 16, tabFit 31툴 0 fail, 재생 30체인 4.8 ms. **GUI 확인 아직.**
+- ⚠️ 이 턴 첫 푸시에 다른 세션 커밋 `6aa97fb5`(A00600_SceneCleanup v01.00)가 함께 나갔다(확인 · 푸시를 한 줄로 실행) — 사용자 보고, 메모리 `push-check-outgoing-separately`.
+
 > [!summary] **A00600_SceneCleanup v01.00 새 툴** — 체크한 항목대로 열린 씬 정리 `#A00600_SceneCleanup`
 - 요청: 레이어 · 애니메이션 레이어 · 안 쓰는 머티리얼 제거를 체크박스(기본 모두 체크)로, 항목은 계속 늘어남. 기존 툴 대신 새 툴로 판단(A00480 = 파일 입출력, A00470 = 머티리얼만, A00210 = 마야 밖 일괄).
 - 결정: 머티리얼 = **Hypershade Delete Unused Nodes 와 같게** → MEL `MLdeleteUnused` 그대로. 애니메이션 레이어 = **BaseAnimation 도 안 보이게** → 루트 삭제(홀로 남은 BaseAnimation 도).

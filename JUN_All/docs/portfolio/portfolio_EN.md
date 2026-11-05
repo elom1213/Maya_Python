@@ -615,6 +615,17 @@ Default Distance attribute (driver signal x)
   fixed this feature only bought 1.3x, so it is **positioned as a workflow convenience -
   "let only the chain I am looking at move" - rather than as a performance fix**.
 
+- **Porting a Blender wind add-on into Maya nodes, verified against Blender itself** (`A00390_WindTool_V03` Flow tab).
+  The free Blender add-on Waves Gen (GPL) gives chains a lean, a travelling wave, sideways loops and gusts, plus "Tip Follow"
+  (every bone turns toward a tip control) and three presets with a live Option 1 -> 2 Mix. Copying the preset numbers alone
+  would not reproduce it - its amplitude accumulates bone by bone and a tracking constraint then pulls most of it back - so the
+  motion was rewritten from its maths (no code copied) as a pure Python model, then **checked against data captured by running
+  the add-on headless in Blender**: 12/12 cases, worst error 0.013% of the chain length. The Maya version is a live node network
+  (exact sines via `eulerToQuat`, quaternion wind on two axes, Damped-Track-style minimal rotation with `angleBetween` +
+  `quatSlerp`) that matches Blender to the same 12/12, and it goes beyond the original: **Mix, speed and time scale are
+  keyable** because one scene expression integrates the keyed curves exactly (Simpson per key interval), so the wind can
+  ramp from calm to gusty during playback without ever running backward. 30 chains of 12 bones play at 4.8 ms per frame.
+
 
 ---
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-29
+# last Update date : 2026-11-05
 # A00390_WindTool_V03 - Qt UI
 #
 # TSL 에 본 체인을 리스트업하고, 회전(또는 이동) 축에 싸인 주기함수 키프레임을 찍어
@@ -24,6 +24,7 @@ from tools.A00390_WindTool_V03.app.config.version import VERSION, LAST_UPDATE
 from tools.A00390_WindTool_V03.app.core import wind_manager as wind_mgr
 from tools.A00390_WindTool_V03.app.core import wave_manager as wave_mgr
 from tools.A00390_WindTool_V03.app.core import wave_lite_manager as lite_mgr
+from tools.A00390_WindTool_V03.app.ui.flow_tab import FlowTab
 
 
 WINDOW_OBJECT_NAME = "JUN_A00390_WindTool_V03_window"
@@ -246,6 +247,14 @@ class MainWindow(QWidget):
         self.tabs.setTabToolTip(
             1, "Chain Wave - the chain follows a travelling sine wave using "
                "ROTATION ONLY (bone lengths kept, each joint aims at its child).")
+
+        # Flow (v03.04) - Waves Gen(블렌더) 식 바람: 기울기 + 두 축 진행파 + 돌풍 + 끝 따라가기, 프리셋 3 x 2 + Mix (라이브 · 키)
+        self.flow_tab = FlowTab(get_nodes=self.tsl.get_all_nodes, is_root_mode=self.rb_root.isChecked, log=self.log)
+        fi = self.tabs.addTab(self.flow_tab, "Flow")
+        self.tabs.setTabToolTip(
+            fi, "Waves Gen style wind: lean + travelling wave + sideways sway + gusts + Tip Follow.@"
+                "Presets Slow Flow / Breeze / Fast Flutter with Option 1 / 2 and a live, keyable Mix."
+                .replace("@", chr(10)))
 
         pb = self.tabs.addTab(self._build_playback_tab(), "Playback")
         self.tabs.setTabToolTip(
@@ -1023,4 +1032,7 @@ class MainWindow(QWidget):
             "Every driver also carries windEnvelope [0-1] - 0 = the node has no\n"
             "effect, 0.5 = half, 1 = full. Set or key it to fade the wind in/out.\n"
             "Bone Chain -> 1 driver; Bone Root -> one driver per root.\n"
+            "\nFlow tab: wind after the Blender add-on Waves Gen (Guillaume Bissieres,\n"
+            "GPL-3.0) - presets Slow Flow / Breeze / Fast Flutter, Option 1 / 2 + Mix,\n"
+            "Tip Follow. Re-implemented as Maya nodes, for personal use.\n"
             "by Ji Hun Park".format(VERSION, LAST_UPDATE))
