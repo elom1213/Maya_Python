@@ -12,7 +12,7 @@ metadata:
 
 - `C:\JUN\JUN_MUE` = 정션 → 이 PC `Desktop/JP/0001_PJ/0023_MUE_original` (git 아님, 381 파일 · 18.6 GB). 정션은 경로만 맞춘다.
 - 현행 전송 = **구글 드라이브 수동 업/다운**(사용자 설명). 웹 다운로드는 수정 시각을 안 지킨다 → 판정은 해시 + history.
-- 안: `JUN_FileManager_data/profiles/MUE/manifests/<COMPUTERNAME>.json`(PC 당 파일 하나 → git 충돌 없음), A00210 `Sync` 탭.
+- 안: `JUN_FileManager_data/profiles/MUE/manifests/<루트>/<COMPUTERNAME>.json`(PC 당 루트당 파일 하나 → git 충돌 없음), A00210 `Sync` 탭.
 - 결정(§7): A00210 `Sync` 탭 · **추적 루트 여러 개**(공유 id + PC 별 경로, 루트별 manifests 폴더) · 루트별 Excluded Paths(하위 전부, 공유 + 이 PC 만) · PC 열 동적(현재 2대, 늘어남).
 - `.mb` 를 git/LFS 로 올리는 안은 비권장(용량 · LFS 한도).
 
