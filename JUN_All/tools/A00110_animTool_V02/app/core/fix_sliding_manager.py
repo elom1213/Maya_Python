@@ -14,7 +14,7 @@
 #   Layer    : HoldLayerManager.apply(force=True) - Hot Key > Main 의 레이어 · N · Pose/Current 설정 그대로, 기준 a' = 그 키들의 최소 시간
 #   대안 A   : 블렌드 시작 t0 = max(a' - N, 바로 앞 적용 구간의 끝)
 #   대안 D   : 구간 끝 b 에도 a' 와 같은 레이어 값 + flat 탄젠트 (구간 안 레이어 값 상수)
-# B · A · D 를 끄면(G=0, clamp/lock 끔) 순수 Shift+A 재현이다.
+# G=0 · clamp 끔 · lock 켬 이면 순수 Shift+A 재현이다 (v02.52 부터 Shift+A 도 b 에 레이어 키 = 대안 D).
 #
 # 샘플링은 반드시 currentTime 루프 - 레이어가 있으면 getAttr -time / MDGContext 는 Base 값만 준다(v02.47 실측).
 # 시간 이동 · 디버그 노드는 undo 기록을 끈 채로 해서, Ctrl+Z 한 번이 Fix Sliding 결과만 되돌린다.

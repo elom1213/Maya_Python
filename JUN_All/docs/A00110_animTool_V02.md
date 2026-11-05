@@ -1790,7 +1790,7 @@ Keys    [x]Translate [x]Rotate
    - **Clamp**(대안 A): 블렌드 시작(a − N)을 **앞 구간 끝보다 앞으로 가지 않게** — 고정된 앞 구간 안에서 레이어가 움직이기 시작하지 않는다.
    - **Lock**(대안 D): 구간 끝 b 에도 a 와 **같은 레이어 값** + flat 탄젠트 — 구간 내내 레이어 값이 상수. 구간 안에 원래 레이어 키가 있으면
      지우지 않고 메시지로 알린다.
-   - G=0 · Clamp 끔 · Lock 끔이면 **순수 Shift+A** 결과와 같다(시험으로 키 값 1e-9 대조).
+   - G=0 · Clamp 끔 · **Lock 켬**이면 **순수 Shift+A** 결과와 같다(시험으로 키 값 1e-9 대조). v02.52 부터 Shift+A 도 b 에 키를 찍으므로(= Lock).
 7. **Debug** — v02.49~ **리스트의 오브젝트마다 노드 하나** `<이름>_debug_speed`(이름의 `:` 등은 `_`, 예: `origin_KANA_Cage_CH_l_foot_xx_ctl_debug_speed`)를
    새로 만들고 커브 넷: `speed`(원래, **흰색**) · `smooth`(스무딩, **밝은 하늘색**) · `threshold`(**빨간색**) · `result`(결과, **초록색**).
    노드를 선택하면 그래프 에디터에 그 색으로 보인다(`source` 어트리뷰트 = 원본 오브젝트, `info` = 설정).
@@ -2008,6 +2008,10 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
   **a**(Pose / Current)와 **a − N**(레이어 값)에 키를 찍는다 — 시간 슬라이더가 어디 있든 상관없다. 고른 키가 없으면 예전처럼 현재 프레임.
   a 는 Hold 가 (a, b] 키를 지우기 **전에** 읽는다. `Current` 값도 a 시점의 값이며, 현재 시간이 a 가 아니면 잠깐 a 로 옮겨 읽고
   되돌린다(undo 에 남지 않음). 이때 지금 프레임에서 키 없이 움직여 둔 값은 시간 이동으로 사라진다.
+- **구간 끝 b 에도 키**(v02.52~): 고른 구간의 **b**(고른 키의 최대 시간)에도 레이어 키를 찍는다. 값은 a − N · a 를 찍은 **뒤** 정해진
+  **a 의 레이어 값과 같다**(키를 찍은 모든 레이어 채널), a 의 out · b 의 in 탄젠트는 flat → [a, b] 동안 레이어 값이 일정하다.
+  메시지 `(f<a−N> -> f<a> -> f<b>)`. 구간 안에 레이어 키가 원래 있던 채널은 지우지 않고 `not locked flat` 으로 알린다.
+  고른 키가 없으면(현재 프레임 기준) b 키는 없다.
 - **Run only when viewing**(v02.43~, 기본 **BaseAnimation**): 지금 **보고 있는 레이어**가 정확히 이 레이어 하나일 때만 Layer Blend 가 돈다.
   예: AnimLayer1 을 보면서 그 커브의 구간 키를 골라 Shift+A 를 누르면 **AnimLayer1 Hold 만** 되고 Layer Blend 는
   `Layer Blend: skipped - viewing 'AnimLayer1' (runs only when viewing 'BaseAnimation').` 한 줄과 함께 건너뛴다.

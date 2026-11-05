@@ -133,11 +133,11 @@ L1 = r["apply"][0][1] - r["apply"][0][0] + 1
 _r2, _l = FS.preview([foot], 1, 60, smooth=3, threshold_pct=5.0, merge_gap=0, min_span=L1, debug=False)
 check("5c Preview: M = span length -> that span is short", r["apply"][0] in _r2[foot]["short"], _r2[foot]["short"])
 
-# ================================================================ 6 순수 Shift+A 대조 (G=0, Clamp/Lock 끔)
+# ================================================================ 6 순수 Shift+A 대조 (G=0, Clamp 끔, Lock 켬 - v02.52 Shift+A 가 b 에도 키)
 OPTS = dict(smooth=3, threshold_pct=5.0, min_span=5, merge_gap=0, clamp_blend=False, lock_end=False, debug=False)
 foot, lay = make_scene(walk_xs())
 hotkey_settings()
-cnt, lines = FS.run([foot], 1, 60, **OPTS)
+cnt, lines = FS.run([foot], 1, 60, **dict(OPTS, lock_end=True))
 got_base, got_lay = curves_of(foot, LKM.root_layer()), curves_of(foot, lay)
 # 손으로 : 같은 장면, 구간마다 selectKey (T/R Base 커브, [a,b]) + run_hold (보기 = Base)
 foot2, lay2 = make_scene(walk_xs())
@@ -154,7 +154,7 @@ for a, b in pre["apply"]:
     HotkeyManager.run_hold()
 cmds.selectKey(clear=True)
 man_base, man_lay = curves_of(foot2, root), curves_of(foot2, lay2)
-check("6 Run == manual selectKey + Shift+A per span (base + layer curves, 1e-9)",
+check("6 Run (G=0, Clamp off, Lock on) == manual selectKey + Shift+A per span (base + layer curves, 1e-9)",
       cnt == 2 and same(got_base, man_base) and same(got_lay, man_lay),
       (cnt, lines[-1]))
 

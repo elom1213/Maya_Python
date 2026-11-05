@@ -56,7 +56,7 @@
 | "Shift+A 결과" 재현 | Hold 대상 커브 = 각 채널의 **보기 레이어 커브**(Hot Key > Main `Run only when viewing`, 기본 BaseAnimation) 위 [a, b] 안의 키를 "선택" 한 것으로 보고 Hold. Layer Blend = Hot Key > Main 의 레이어 · N · Pose/Current 설정 그대로, 기준 프레임 = 선택 키의 최소 시간(v02.47 규칙) | Shift+A 를 누를 때 사용자는 기본적으로 BaseAnimation 을 보며 그 커브 키를 고른다(v02.43 게이트) |
 | Layer Blend 켜짐 여부 | 이 탭의 `Layer Blend Key` 체크(기본 ON)가 정한다. Hot Key > Main 의 `Layer Blend Key` 체크 · 보기 게이트는 **무시**(일괄 처리는 보는 레이어와 무관) | 요구 "Layer Blend Key 가 체크된 상태로" |
 | 처리 순서 | 오브젝트마다, 구간을 **시간순**으로 하나씩 "Shift+A" 한다(앞 구간의 레이어 키가 뒤 구간의 Current 값에 반영되게) | 사람이 구간마다 Shift+A 를 차례로 누른 결과와 같게 |
-| "Shift+A 결과" 와의 관계 | 결정 #4 의 B · A · D 는 Shift+A 를 **보정**한다. UI 에서 셋을 끄면(G=0, Clamp 끔, Lock 끔) 순수 Shift+A 재현이 된다 — 핵심 대조 시험은 그 상태로 한다(§6-6) | 요구의 정의를 시험으로 지키면서 보정을 얹기 위해 |
+| "Shift+A 결과" 와의 관계 | 결정 #4 의 B · A · D 는 Shift+A 를 **보정**한다. UI 에서 셋을 끄면(G=0, Clamp 끔, Lock 끔) 순수 Shift+A 재현이 된다 — 핵심 대조 시험은 그 상태로 한다(§6-6). **v02.52 개정**: Shift+A 자체가 b 에 레이어 키를 찍게 되어(= D) 순수 Shift+A = G=0 · Clamp 끔 · **Lock 켬** | 요구의 정의를 시험으로 지키면서 보정을 얹기 위해 |
 | 디버그 | `_debug_speed` 노드에 4 커브(원래 · 스무딩 · Threshold · 결과) — 옵션, 기본 ON | 사용자가 결과를 눈으로 검증 |
 
 ---

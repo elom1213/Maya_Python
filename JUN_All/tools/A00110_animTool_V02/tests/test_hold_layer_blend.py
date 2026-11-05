@@ -492,6 +492,57 @@ clear_optvars()
 if cmds.optionVar(exists=PRE + "view_layer"):
     cmds.optionVar(remove=PRE + "view_layer")
 
+# ---------------- v02.52 : Shift+A 가 구간 끝 b 에도 레이어 키 (값 = a-N, a 를 찍은 뒤의 a 레이어 값) ----------------
+cmds.file(new=True, force=True)
+ctl = cmds.polyCube(n="ctl")[0]
+for f in range(1, 101):
+    cmds.setKeyframe(ctl, at="tx", t=f, v=f * 0.1)
+    cmds.setKeyframe(ctl, at="rx", t=f, v=f * 0.5)
+    cmds.setKeyframe(ctl, at="ry", t=f, v=-f * 0.2)
+lay = cmds.animLayer("Layer_01")
+cmds.select(ctl)
+cmds.animLayer(lay, e=True, attribute=[ctl + "." + a for a in ("tx", "rx", "ry")])
+cmds.currentTime(100)
+HLM.update(**dict(SETTINGS, current_axes=["ry"]))           # tx = Pose 5.0, rx = Pose 0.0, ry = Current
+root = LKM.root_layer()
+base = dict((a, LKM.layer_curve(ctl + "." + a, root)) for a in ("translateX", "rotateX", "rotateY"))
+cmds.select(ctl, r=True)
+cmds.selectKey(base["translateX"], time=(60, 90), replace=True)
+check("RB0 range_end() = 90", HLM.range_end() == 90.0, HLM.range_end())
+cmds.flushUndo()
+msgs = []
+cmds.inViewMessage = lambda **kw: msgs.append(kw.get("amg", ""))
+lay0 = dict((a, keys(crv(ctl, a, lay))) for a in ("translateX", "rotateX", "rotateY"))
+hk.HotkeyManager.run_hold()
+ok = True
+info = []
+for a in ("translateX", "rotateX", "rotateY"):
+    c = crv(ctl, a, lay)
+    k = keys(c)
+    v60 = cmds.keyframe(c, q=True, eval=True, time=(60, 60), valueChange=True)[0]
+    v90 = k.get(90.0)
+    span = [cmds.keyframe(c, q=True, eval=True, time=(t, t), valueChange=True)[0] for t in [60 + 0.5 * i for i in range(61)]]
+    flat = (cmds.keyTangent(c, q=True, time=(60, 60), outTangentType=True) == ["flat"]
+            and cmds.keyTangent(c, q=True, time=(90, 90), inTangentType=True) == ["flat"])
+    if not (50.0 in k and 60.0 in k and v90 is not None and abs(v90 - v60) < 1e-9
+            and max(span) - min(span) < 1e-9 and flat):
+        ok = False
+        info.append((a, sorted(k), v60, v90, max(span) - min(span), flat))
+check("RB1 Shift+A keys a-N=50, a=60 AND b=90 on every layer channel, b value = a value, constant on [a, b], flat",
+      ok and "f50 -> f60 -> f90" in msgs[-1], (info, msgs[-1:]))
+cmds.undo()
+check("RB2 one undo removes the b key too",
+      dict((a, keys(crv(ctl, a, lay))) for a in ("translateX", "rotateX", "rotateY")) == lay0)
+# 고른 키가 없으면 b 없음 (현재 프레임 기준, 예전 그대로)
+picked = cmds.keyframe(q=True, selected=True, name=True) or []
+if picked:
+    cmds.selectKey(picked, remove=True)
+check("RB3 no keys selected -> range_end() None", HLM.range_end() is None)
+hk.HotkeyManager.run_hold()
+k = sorted(keys(crv(ctl, "translateX", lay)))
+check("RB4 no selection -> keys only at current-N and current (no extra b key)", k == [90.0, 100.0], k)
+clear_optvars()
+
 print("\n{0}/{1} passed".format(sum(R), len(R)))
 maya.standalone.uninitialize()
 os._exit(0 if all(R) else 1)

@@ -693,6 +693,7 @@ class MainWindow(QWidget):
         tip = ("Shift+A also keys the chosen layer at the start 'a' of the key range [a, b] selected\n"
                "in the Graph Editor (no keys selected: the current frame):\n"
                "all layer attributes at (a - N) with their layer value, and Pose Key axes at a.\n"
+               "With a key range, the end 'b' gets the same layer value as a (flat), so the layer holds on [a, b].\n"
                "Objects / attributes that are not in the layer are skipped (nothing is added to the layer).")
         self.cb_hold_layer = QCheckBox("Layer Blend Key")
         self.cb_hold_layer.setToolTip(tip)

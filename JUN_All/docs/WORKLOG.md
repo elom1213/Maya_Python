@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-05 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.52 Shift+A 가 구간 끝 b 에도 레이어 키** `#A00110_animTool`
+- 요청: [a, b] 를 고르고 Shift+A 하면 Layer 에 b 에도 키, 값은 a−N · a 를 찍은 뒤 정해진 a 와 같게.
+- 구현: `HoldLayerManager.range_end()`(Hold 전에), `run_hold` → `apply(hold_end=b)` — Fix Sliding 대안 D 와 같은 경로(모든 키 찍은 레이어 채널, a out / b in flat).
+- 시험: `test_hold_layer_blend.py` 86/86(RB: f50 · f60 · f90, b 값 = a 값 1e-9, [a, b] 상수, undo 한 번, 선택 없으면 b 없음), UI 21/21.
+  Fix Sliding 시험 6 의 "순수 Shift+A" 기준을 Lock 켬으로 바꿈(40/40). **GUI 확인 아직.**
+
 > [!summary] A00110_animTool_V02 **v02.51 Bake > Bake 구간 밖 키 보존** `#A00110_animTool`
 - 보고: 컨스트레인트를 걸고 Bake List 로 [10, 50] 만 구우면 그 밖의 기존 키가 지워진다(오브젝트는 Base + 다른 레이어에 키).
 - 실측(mayapy): 레이어 없으면 정상. **레이어 멤버 채널**에서 `bakeResults -time -preserveOutsideKeys` 는 Base 커브를 [s, e] 의 41 키만 남기고 바꾸고

@@ -28,6 +28,8 @@ metadata:
   undo 끈 채(`undoInfo stateWithoutFlush`) 실제로 시간을 옮겨 읽는다(`values_at`). `setKeyframe -animLayer -v` 역산은 키 시간 기준. mayapy 에서는 `cmds.scriptJob` 이 None → `is_active()` False(기능 문제 아님). Pose Key 버튼 · Layer Blend 현재 프레임 키 모두 그 축만 **지금 값**으로.
   Shift+A 는 `capture_current()` 를 **Hold 전에** 불러 값을 잡는다 — Hold 가 커브를 바꾸면 키 없이 움직여 둔 값이 재평가로 사라진다.
 - 시험 함정: `currentTime` 이동도 undo 큐에 들어간다 → undo 확인을 먼저, 값 재기는 redo 뒤에.
+- **v02.52 Shift+A 도 b 에 키**: `range_end()`(Hold 전) → `apply(hold_end=b)`, 값 = a−N · a 를 찍은 뒤의 a 레이어 값(모든 키 찍은 채널), flat.
+  그래서 Fix Sliding 의 "순수 Shift+A" 대조 기준 = G 0 · Clamp 끔 · **Lock 켬**.
 - v02.43 보기 게이트 `view_layer`(UI `Run only when viewing`, 기본 "" = 루트): 보는 레이어 = 에디터 **selected** → 없으면 preferred →
   없으면 루트, **정확히 그 하나**일 때만 Layer Blend. 사용자 이유: 다른 레이어 커브를 Hold 할 때 끼어들면 위험. mayapy 에선 새 레이어가 선택되지 않지만 GUI 는 만들면 선택된다.
 - v02.42 사용자 요구: **선택한 오브젝트에만** 레이어 키(레이어의 다른 멤버 금지). `selected_objects()` 가 animLayer · objectSet · character 를

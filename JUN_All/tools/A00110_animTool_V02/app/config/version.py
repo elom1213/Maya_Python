@@ -169,5 +169,10 @@
 #        구간 밖에서 구운 끝값을 잇는다(컨스트레인트를 거는 순간 pairBlend 입력이 0 이라 원래 값을 되살릴 수 없음).
 #        회귀 tests/test_bake_layers.py 19/19.
 
-VERSION = "02.51"
+# 02.52  Hot Key > Main Layer Blend Key - [a, b] 를 고르고 Shift+A 하면 고른 레이어의 **b 에도 키** (사용자 요청). 값 = a - N, a 를 찍은 뒤
+#        정해진 a 의 레이어 값(모든 키 찍은 레이어 채널), a out / b in flat -> [a, b] 동안 레이어 값 상수. b 는 Hold 전에 range_end
+#        (고른 키의 최대 시간), 고른 키가 없으면 b 키 없음. 구간 안에 원래 레이어 키가 있는 채널은 지우지 않고 메시지로 알림(Fix Sliding D 와 같은
+#        apply(hold_end=b)). 그래서 Fix Sliding 의 "순수 Shift+A" = G 0 · Clamp 끔 · Lock 켬. 회귀 test_hold_layer_blend 86/86 · fix_sliding 40/40.
+
+VERSION = "02.52"
 LAST_UPDATE = "2026-11-04"

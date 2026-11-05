@@ -25,6 +25,7 @@
 #   Layer Blend 에서 예외가 나도 Hold 결과와 함께 뷰포트에 에러 한 줄을 띄운다.
 # v02.41 - Pose Key `Use current values` 가 켜져 있으면 Hold 전에 capture_current() 로 지금 값을 읽어 apply 에 넘긴다.
 # v02.47 - Layer Blend 기준 프레임 = 그래프 에디터에서 고른 키 구간의 a (Hold 전에 range_start). 없으면 현재 프레임.
+# v02.52 - 구간 끝 b 도 Hold 전에 읽어(range_end) b 에 a 와 같은 레이어 값 키 (apply hold_end=b).
 #
 # 주의:
 #  - keyShortcut 은 소문자 'a' + shiftModifier=True 로 지정한다 (.mhk 의 "s" -sht 관례).
@@ -183,15 +184,16 @@ class HotkeyManager:
             targets = _hold_layer.HoldLayerManager.selected_objects()
             # v02.47 고른 키 구간 [a, b] 의 a - Hold 가 (a, b] 를 지우기 전에 읽는다
             frame = _hold_layer.HoldLayerManager.range_start()
+            end = _hold_layer.HoldLayerManager.range_end()           # v02.52 b
             current = _hold_layer.HoldLayerManager.capture_current(targets, frame=frame)
         except Exception:                                   # noqa: BLE001
-            targets, current, frame = None, None, None
+            targets, current, frame, end = None, None, None, None
         with undo_chunk():
             count, msg = KeyframeManager.hold_selected_keys()
             try:
                 # targets 가 비면 apply 가 선택을 다시 읽어도 비어 있다 -> 'no objects selected' 경고
                 _lcount, lmsg = _hold_layer.HoldLayerManager.apply(
-                    objects=targets or None, frame=frame, current_values=current)
+                    objects=targets or None, frame=frame, current_values=current, hold_end=end)
             except Exception as exc:                        # noqa: BLE001
                 lmsg = "[Error] Layer Blend: {0}".format(exc)
                 cmds.warning(lmsg)

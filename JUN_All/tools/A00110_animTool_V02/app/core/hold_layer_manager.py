@@ -54,6 +54,8 @@
 #   hold_end=b      : 대안 D - 이번에 키를 찍은 레이어 채널마다 a 와 b 에 같은 레이어 값 + a out / b in 탄젠트 flat
 #                     -> [a, b] 동안 레이어 값이 상수. 구간 안에 원래 레이어 키가 있으면 지우지 않고 메시지로 알린다.
 # v02.49 - layer= / offset= : Fix Sliding 탭에서 고른 레이어 · N 으로 설정값을 덮는다(Shift+A 는 안 씀).
+# v02.52 - Shift+A 도 구간 끝 b 에 키 (사용자 요청): run_hold 가 range_end() 를 Hold 전에 읽어 hold_end=b 로 넘긴다
+#   -> a - N, a 키를 찍은 뒤 정해진 a 의 레이어 값을 b 에도 (모든 키 찍은 레이어 채널, a out / b in flat). 고른 키가 없으면 b 없음.
 #
 # 결정 사항 (2026-11-04 사용자):
 #   1. -N 키 값 = 그 시점의 레이어 값 유지 (레이어 커브 평가값, 커브가 없으면 그 레이어 blend 입력(inputB)의 정적값)
@@ -277,6 +279,15 @@ class HoldLayerManager:
         for a in (s.get("current_axes") or []):
             out.setdefault(a, 0.0)
         return out
+
+    @staticmethod
+    def range_end():
+        """그래프 에디터에서 고른 키들의 최대 시간 = 구간 [a, b] 의 b (v02.52). 고른 키가 없으면 None."""
+        try:
+            times = cmds.keyframe(q=True, selected=True, timeChange=True) or []
+        except Exception:                                   # noqa: BLE001
+            times = []
+        return float(max(times)) if times else None
 
     @staticmethod
     def range_start():
