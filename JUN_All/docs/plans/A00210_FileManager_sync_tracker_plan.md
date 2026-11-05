@@ -1,6 +1,6 @@
 # A00210_FileManager — PC 간 작업 파일 동기화 추적 계획서 (Sync Tracker)
 
-> **작성** 2026-11-05 · 상태: **계획 (구현 전)** · 대상: `C:\JUN\JUN_MUE` (정션) 아래 작업 파일 전부
+> **작성** 2026-11-05 · 상태: **계획 확정 · 구현 보류** (결정 4개 반영 — 7장) · 대상: `C:\JUN\JUN_MUE` (정션) 아래 작업 파일 전부
 > 요청: 여러 PC 가 같은 경로(`C:\JUN\JUN_MUE`)로 작업한다. 형상관리처럼 **어느 PC 의 파일이 최신본인지**,
 > **어느 PC 가 최신본과 어긋나 있는지**(없음 · 옛것) 추적 · 감지하고 싶다.
 > 예: 이 PC 에서 `5040_cleanup_BCM_KANA/00010_cleanup_KANA_00080.mb` 를 만들면, 다른 PC 에서는
@@ -16,7 +16,7 @@
 파일마다 "누가 최신본을 가졌고, 누가 없고, 누가 옛것인지" 가 표로 나온다.
 
 - 저장 위치는 **이미 있는 A00210 데이터 저장소** `JUN_FileManager_data`(비공개 GitHub, `main`)의
-  `profiles/MUE/manifests/<PC>.json`. 새 서버 · 새 저장소 · 새 계정이 필요 없다.
+  `profiles/MUE/manifests/<루트>/<PC>.json`(추적 루트는 여러 개 — 4-1A). 새 서버 · 새 저장소 · 새 계정이 필요 없다.
   A00210 의 `GitSync` 가 이미 이 폴더 단위로 pull/push 한다(v01.45).
 - PC 마다 **자기 파일 하나만 쓰므로 git 충돌이 원리상 나지 않는다.**
 - 화면은 A00210 에 **`Sync` 탭**을 붙인다 — "이 PC 에 없는 파일 · 옛 파일 · 이 PC 만 가진 파일" 목록.
@@ -85,14 +85,51 @@ JUN_FileManager_data/                  (비공개 GitHub, main — A00210 기존
 └── profiles/MUE/
     ├── records/ thumbs/ lineage/ path_structures/     (기존)
     └── manifests/                     (신규)
-        ├── DESKTOP-ABC123.json        ← 이 PC 만 쓴다
-        ├── LAPTOP-XYZ789.json         ← 저 PC 만 쓴다
+        ├── mue/DESKTOP-ABC123.json    ← 이 PC 만 쓴다 (루트별 폴더 — 4-1A)
+        ├── mue/LAPTOP-XYZ789.json     ← 저 PC 만 쓴다
         └── _pcs.json                  ← PC 별명 (선택, 사람이 편집)
 ```
 
 - 파일 이름 = `COMPUTERNAME`(환경 변수). 별명(`Office`, `Home`)은 `_pcs.json` 에서 화면 표시용으로만.
 - `GitSync` 는 이미 `profiles/<data_folder>/` 만 스테이징 → 매니페스트도 같이 올라간다. 코드 변경 최소.
 - `.gitignore` 의 `*.mb` 안전망은 그대로 — 매니페스트는 `.json` 이라 영향 없음.
+
+### 4-1A. 추적 루트 여러 개 — Tracked Roots (사용자 추가 요청 2026-11-05)
+
+`C:\JUN\JUN_MUE` 하나가 아니라 **사용자가 원하는 경로를 몇 개든 추적 루트로 등록**한다.
+
+```
+[Sync] > Tracked Roots
+ ┌ Name ──────── Path (this PC) ─────────────────────────── Files ─ Last scan ─┐
+ │ MUE           C:/JUN/JUN_MUE                              381    11-05 08:10 │
+ │ Mocap         D:/Mocap/2026_MUE                           1204   11-05 08:11 │
+ │ RigLib        (not set on this PC)  ⚠                     —      —           │
+ └─────────────────────────────────────────────────────────────────────────────┘
+ [Add Root...] [Set Path on This PC...] [Rename] [Remove]     Root: [MUE ▼]  ← Sync 표가 보여 줄 루트
+```
+
+- **루트 = 이름(id) + PC 마다의 실제 경로.** `C:\JUN\JUN_MUE` 는 정션 덕분에 모든 PC 에서 같은 경로지만,
+  새로 고르는 경로는 PC 마다 다를 수 있다(`D:\Mocap` vs `E:\Mocap`). 그래서
+  - 공유(`_sync_settings.json`): `roots: [{"id": "mocap", "name": "Mocap", "default_path": "D:/Mocap/2026_MUE", "excluded_paths": [...]}]`
+  - PC 별(그 PC 의 A00210 prefs, 공유 안 함): `sync_root_paths: {"mocap": "E:/Mocap/2026_MUE"}` — 없으면 `default_path`.
+  - 경로가 없는 PC 는 `(not set on this PC)` — 이 경우 그 PC 를 그 루트 비교에서 "참여 안 함" 으로 두고, `Missing` 을 쏟아내지 않는다.
+- 파일 열쇠는 **루트 기준 상대 경로**. 비교는 같은 루트 id 끼리만 한다.
+- **제외 경로(4-6)는 루트마다** 따로 가진다.
+- 루트끼리 겹치면(한 루트가 다른 루트 안) 등록 시 경고하고, 안쪽 루트를 바깥 루트의 제외 경로로 자동 추가할지 묻는다(이중 추적 방지).
+- 정션 · 심볼릭 링크를 루트로 골라도 된다(경로 그대로 따라감). 루트 **안의** 정션은 따라 들어가지 않는 것이 기본(무한 루프 · 이중 추적 방지), 루트별 옵션.
+
+저장 위치는 루트마다 폴더 하나 — PC 매니페스트도 루트마다 따로(루트 하나 스캔이 다른 루트 파일을 건드리지 않음):
+
+```
+profiles/MUE/manifests/
+    _sync_settings.json          (roots · 루트별 excluded_paths · ignore_patterns)
+    _pcs.json
+    mue/    DESKTOP-ABC123.json  LAPTOP-XYZ789.json
+    mocap/  DESKTOP-ABC123.json  LAPTOP-XYZ789.json
+```
+
+> 첫 루트는 `mue` = `C:/JUN/JUN_MUE` 로 미리 등록해 둔다. 루트들은 지금 A00210 프로파일(MUE)에 속한다 —
+> 다른 프로젝트 프로파일로 바꾸면 그 프로파일의 `manifests/` 를 쓴다.
 
 ### 4-2. 매니페스트 형식
 
@@ -101,6 +138,7 @@ JUN_FileManager_data/                  (비공개 GitHub, main — A00210 기존
   "schema": 1,
   "pc": "DESKTOP-ABC123",
   "user": "Dnable_JunnyPark",
+  "root_id": "mue",
   "root": "C:/JUN/JUN_MUE",
   "scanned_at": "2026-11-05 08:10:00",
   "files": {
@@ -171,33 +209,65 @@ JUN_FileManager_data/                  (비공개 GitHub, main — A00210 기존
  [Copy Paths]  [Export Missing List...]  [Reveal in Explorer]
 ```
 
+- **PC 수는 늘어난다(현재 2대)** → PC 열은 매니페스트 개수만큼 **동적으로** 만든다(고정 2열 금지).
+  - PC 가 4대를 넘으면 기본 표시를 **요약 모드**로: `Path · This PC · Latest on · Missing on · Outdated on · Status`
+    (예: `Latest on: OFFICE` · `Missing on: HOME, LAPTOP`). `PCs...` 버튼으로 보일 PC 열을 고른다(optionVar 대신 prefs 기억).
+  - 비교는 "이 PC 기준" 이 기본이고, `Compare: [All PCs ▼]` 로 "어느 PC 에서든 어긋난 파일 전부" 를 볼 수도 있다.
 - 트리는 공용 `MOD_fileTree_qt_v01` / 필터 위젯, 탭 높이는 `tabFit`, 확대는 `viewZoom` — 기존 Framework 재사용.
 - 폴더 노드에 하위 상태 개수 뱃지(`5040_cleanup_BCM_KANA  ● 1 Missing`).
 - 기존 File Manager 탭의 파일 목록에도 상태 아이콘을 작게 표시(2차).
 
-### 4-6. 무시 규칙
+### 4-6. 추적 범위 · 제외 경로 (사용자 결정 2)
 
-프로파일 설정(`sync_ignore`, glob 목록), 기본값:
+**기본은 `C:\JUN\JUN_MUE` 아래 모든 파일 · 폴더를 추적하고, 사용자가 고른 경로는 그 하위 전부를 추적에서 뺀다.**
+
+**(a) Excluded Paths — 사용자가 고르는 제외 경로**
+
+```
+[Sync] > Excluded Paths
+ ┌───────────────────────────────────────────────┐
+ │ 00_00_02_자료/                                │   ← 폴더 = 그 아래 모든 파일 · 하위 폴더 제외
+ │ 99_00_01_Fin_movie/                           │
+ │ 00_04_02_ANI_00_PJ_010/scenes/0010_test/      │
+ │ 00_04_02_ANI_00_PJ_010/sound/bgm_tmp.wav      │   ← 파일 하나도 가능
+ └───────────────────────────────────────────────┘
+ [Add Folder...] [Add File...] [Remove]      (트리 우클릭: Exclude from Sync / Include Again)
+```
+
+- 저장: `profiles/MUE/manifests/_sync_settings.json` 의 **루트별** `excluded_paths` (루트 기준 상대 경로, `/` 구분, 폴더는 끝에 `/`).
+  **모든 PC 가 같은 목록을 공유**한다 — 한 PC 에서 빼면 다른 PC 에서도 빠진다(pull 로 전달).
+  PC 마다 따로 빼고 싶은 경우를 위해 `local_excluded_paths`(그 PC 의 prefs, 공유 안 함)도 둔다.
+- 판정: 경로 `p` 는 목록의 폴더 `e/` 에 대해 `normcase(p).startswith(normcase(e))` 이면 제외(경계는 `/` 까지 포함해 비교 —
+  `scenes/0010_test/` 가 `scenes/0010_test_02/` 를 빼지 않게).
+- **스캔과 비교 둘 다에 적용한다.** 스캔은 제외 폴더 안으로 들어가지 않고(빠름), 비교는 다른 PC 의 옛 매니페스트에
+  그 경로가 남아 있어도 걸러낸다 — 제외 목록을 고친 직후 다른 PC 가 다시 스캔하기 전에도 결과가 맞다.
+- 제외를 풀면(`Include Again`) 다음 스캔부터 다시 추적. 그동안의 `history` 는 없으므로 앞뒤 판정은 시각 기준 `?` 로 시작한다.
+- 화면: 제외된 폴더는 트리에서 회색 + `(excluded)` 로 보이고, `Show: [ ] Excluded` 로 숨길 수 있다.
+
+**(b) 기본 무시 패턴 — 도구가 만드는 잡파일** (`_sync_settings.json` 의 `ignore_patterns`, glob), 기본값:
 
 ```
 **/backup/**        (저장 툴 백업 — 53개, PC 마다 달라도 정상)
 **/incrementalSave/**
 **/.mayaSwatches/**  **/*.swatches
 **/Thumbs.db  **/desktop.ini  **/~$*
-cache/**  images/**  (옵션 — 결과물이라 다시 만들 수 있음, 기본은 추적)
 ```
+
+`cache/` · `images/` 처럼 다시 만들 수 있는 결과물 폴더는 패턴이 아니라 (a) Excluded Paths 로 사용자가 직접 뺀다(기본은 추적).
 
 ### 4-7. 코어 / UI 분리 (CLAUDE.md 9장)
 
 ```
 tools/A00210_FileManager/app/core/
     sync_manifest.py   # scan(root, ignore, prev) -> manifest dict · save/load · 해시 캐시   (UI · DCC 비의존)
-    sync_compare.py    # compare(manifests, this_pc) -> [FileStatus]                     (순수 함수, 시험 쉬움)
+    sync_compare.py    # compare(manifests, this_pc, excluded) -> [FileStatus]           (순수 함수, 시험 쉬움)
+    sync_settings.py   # _sync_settings.json 읽기/쓰기 · is_excluded(rel, excluded)       (경계 매칭)
 tools/A00210_FileManager/app/ui/
     sync_tab.py        # Sync 탭
 ```
 
-`sync_compare` 는 순수 함수라 매니페스트 json 몇 개로 상태 표 전부를 단위 시험한다(가짜 PC 2~3대 시나리오).
+`sync_compare` 는 순수 함수라 매니페스트 json 몇 개로 상태 표 전부를 단위 시험한다 —
+가짜 PC **2대 · 3대 · 5대** 시나리오(늘어날 PC 대비), 제외 경로 경계(`0010_test/` vs `0010_test_02/`) · 제외 해제 포함.
 
 ---
 
@@ -205,7 +275,7 @@ tools/A00210_FileManager/app/ui/
 
 | 단계 | 내용 | 산출 |
 |------|------|------|
-| **1차 (MVP)** | `sync_manifest` 스캔 + 해시 캐시 · `sync_compare` (OK/Missing/Outdated/Only here/Ahead/Conflict) · `Sync` 탭 · `Scan & Push` / `Pull & Compare` · 무시 규칙 · 단위 시험 | A00210 v01.47 |
+| **1차 (MVP)** | `sync_manifest` 스캔 + 해시 캐시 · `sync_compare` (OK/Missing/Outdated/Only here/Ahead/Conflict) · `Sync` 탭(PC 열 동적) · **Tracked Roots**(여러 루트 · PC 별 경로) · `Scan & Push` / `Pull & Compare` · **Excluded Paths**(공유 + 이 PC 만) · 무시 패턴 · 단위 시험 | A00210 v01.47 |
 | 2차 | 지운 파일(`deleted`) · `Deleted elsewhere` · A00210 시작 시 자동 pull + 스캔, 요약 한 줄 알림 · File Manager 탭 상태 아이콘 · `_pcs.json` 별명 | v01.48 |
 | 3차 (마야 연동) | 씬을 열 때 "이 파일보다 새 버전이 다른 PC 에 있다"(`_00080` 이 있는데 `_00070` 을 엶 · 같은 이름 Outdated) 경고 — 저장 툴(A00220) 저장 직후 해당 파일만 매니페스트 갱신 | A00220 / userSetup 훅 |
 | 3차 (전송 보조 · 구글 드라이브 흐름) | 보내는 PC: `Only here` / `Ahead` 목록 → **`Collect for Upload`** = 상대 경로를 유지한 채 임시 폴더(또는 zip)에 모음 → 드라이브에 그 폴더째 올림. 받는 PC: 받은 zip/폴더를 **`Place Downloaded...`** 로 지정 → 해시로 매니페스트와 대조해 맞는 상대 경로에 넣고(시각도 원본 `mtime` 으로 복원) 다시 스캔. 손으로 경로를 찾아 넣는 실수 · 엉뚱한 버전 덮어쓰기를 막는다 | 선택 |
@@ -228,9 +298,12 @@ tools/A00210_FileManager/app/ui/
 
 ---
 
-## 7. 결정이 필요한 것
+## 7. 결정 (2026-11-05 사용자 답)
 
-1. **위치** — A00210 의 탭으로 넣을지(권장: 저장소 · git 설정 · 프로파일을 그대로 씀), 별도 툴(A00600)로 뺄지.
-2. **추적 범위** — 프로젝트 전체 vs `scenes/` 만. `cache/` · `images/` · `.MP4` 를 추적할지.
-3. **PC 수** — 지금 2대인지, 더 늘어날지(화면 열 개수 · 표 형태가 달라진다).
-4. **전송** — 1차는 감지만 하고 구글 드라이브 수동 업/다운을 그대로 둘지, 3차의 `Collect for Upload` / `Place Downloaded` 보조까지 원하는지.
+| # | 질문 | 결정 | 반영 |
+|---|------|------|------|
+| 1 | 위치 | **A00210 의 탭** (`Sync`) | 4-5 · 4-7 |
+| 2 | 추적 범위 | **`C:\JUN\JUN_MUE` 전체 추적 + 사용자가 고른 경로(하위 전부)는 제외하는 기능** | 4-6 (a) Excluded Paths |
+| 3 | PC 수 | **현재 2대, 늘어날 계획** | 4-5 PC 열 동적 · 4대 넘으면 요약 모드, 시험 2·3·5대 |
+| + | 추적 경로 (추가 요청) | **`C:\JUN\JUN_MUE` 외에도 원하는 경로를 마음대로 정해 추적** | 4-1A Tracked Roots (루트별 PC 경로 · 제외 경로) |
+| 4 | 진행 | **계획서만, 구현은 보류** | 착수는 사용자가 따로 요청할 때 — 그때 1차(5장)부터 |

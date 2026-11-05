@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-05 (오늘)
 
+> [!summary] A00210_FileManager **Sync Tracker 계획서** (구현 보류) `#A00210_FileManager`
+- 요청: 여러 PC 가 정션 `C:\JUN\JUN_MUE` 로 같은 경로를 쓰는데, 어느 PC 가 최신본이고 어느 PC 에 파일이 없거나 옛것인지 감지하고 싶다(현재 전송 = 구글 드라이브 수동).
+- 안: PC 별 매니페스트 json(경로 · 크기 · 시각 · SHA-256 · 해시 이력)을 기존 데이터 저장소 `profiles/MUE/manifests/<루트>/<PC>.json` 으로 주고받아 Missing / Outdated / Ahead / Only here / Conflict 판정. 드라이브 다운로드는 시각을 바꾸므로 판정은 해시.
+- 결정: A00210 `Sync` 탭 · 추적 루트 여러 개(PC 별 경로) · 루트별 제외 경로(하위 전부) · PC 열 동적(현재 2대, 늘어남) · **구현 보류**.
+- 문서: [`plans/A00210_FileManager_sync_tracker_plan.md`](plans/A00210_FileManager_sync_tracker_plan.md)
+
 > [!summary] A00110_animTool_V02 **v02.52 Shift+A 가 구간 끝 b 에도 레이어 키** `#A00110_animTool`
 - 요청: [a, b] 를 고르고 Shift+A 하면 Layer 에 b 에도 키, 값은 a−N · a 를 찍은 뒤 정해진 a 와 같게.
 - 구현: `HoldLayerManager.range_end()`(Hold 전에), `run_hold` → `apply(hold_end=b)` — Fix Sliding 대안 D 와 같은 경로(모든 키 찍은 레이어 채널, a out / b in flat).
