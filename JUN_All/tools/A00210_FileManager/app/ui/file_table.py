@@ -7,6 +7,7 @@
 
 import time
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import (
     QWidget,
     QVBoxLayout,
@@ -32,6 +33,7 @@ class FileTable(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         self.tree = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree.setColumnCount(len(self.HEADERS))
         self.tree.setHeaderLabels(self.HEADERS)
         self.tree.setRootIsDecorated(False)

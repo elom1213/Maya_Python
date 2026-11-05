@@ -40,5 +40,8 @@
 #        스크롤 없이 페이지 전체가 보이고, 짧은 페이지로 가면 창이 줄어든다. 페이지가 화면보다 길면
 #        화면 높이에서 멈추고 스크롤. 공용 Framework/qt/MOD_tabFit_qt_v01 (첫 적용 툴, 잘 되면 전 툴로).
 
-VERSION = "01.38"
-LAST_UPDATE = "2026-10-29"
+# 01.39  트리 펼치기 - 화살표로 펼치면 한 단계만, Shift + 펼치기/접기 = 아래 전부 (Layer 탭 트리 · Lock 트리).
+#        공용 Framework/qt/MOD_treeExpand_qt_v01
+
+VERSION = "01.39"
+LAST_UPDATE = "2026-11-05"

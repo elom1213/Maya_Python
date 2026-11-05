@@ -13,6 +13,7 @@
 
 import os
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import (
     Qt,
     QTreeWidget,
@@ -45,6 +46,7 @@ class ReferenceTree(QTreeWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        JUN_mod_treeExpand_qt_v01(self)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.setColumnCount(2)
         self.setHeaderLabels(["Reference", "Used by"])
         self.header().setSectionResizeMode(0, QHeaderView.Stretch)

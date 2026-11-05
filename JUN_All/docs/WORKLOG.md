@@ -33,6 +33,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-05 (오늘)
 
+> [!summary] **Framework `MOD_treeExpand_qt_v01` (트리 펼치기 = 한 단계, Shift = 아래 전부)** + 툴 16개 적용 · A00210 **v01.48** `#Framework`
+- 요청: A00210 Sync 트리를 접었다 펼치면 아래가 전부 열린다 → 화살표는 한 단계만, Shift + 펼치기/접기 = 아래 전부. 다른 트리도, 앞으로 만들 툴도 공용 코드로.
+- 구현: `JUN_mod_treeExpand_qt_v01(tree)` 한 줄 — 사용자 입력 중의 펼침만(코드 expandAll 그대로), Shift 는 이벤트 modifiers, `*` 키 = 전부, 게으른 트리는 너비 우선 + 2000 한도.
+  적용: A00010 · A00050 · A00110 · A00130 · A00145 · A00210 · A00211 · A00275 · A00290 / V02 · A00330 · A00340 · A00380 · A00420 · A00470 · A00480(트리 26개, 각 버전 +1). `MOD_fileTree` 는 같은 규칙을 자체로 가져서 제외.
+- A00210 v01.48: 덤으로 Sync > Status 가 16px 잘리던 것(줄바꿈 `PCs:` 라벨) 수정 — tabFit 롤아웃 시험에서 발견.
+- 시험: `test_tree_expand.py` 19/19(PySide6 · mayapy PySide2), tabFit 롤아웃 31툴 0 fail, A00110 Layers 46 · A00275 34 · 15 · A00480 47 · A00340 51 · A00210 52 · 32. **GUI 손 확인 아직.**
+- 문서: `docs/Framework_MOD_treeExpand_qt.md`.
+
 > [!summary] A00210_FileManager **v01.47 Sync 탭 (Sync Tracker 1차)** `#A00210_FileManager`
 - 요청: 계획서대로 진행 — PC 간 작업 파일(정션 `C:\JUN\JUN_MUE`)의 최신본 · 빠진 PC 추적.
 - 구현: PC 별 매니페스트(경로 · 크기 · 시각 · SHA-256 · 해시 이력 10개) → `<데이터 폴더>/manifests/<root>/<PC>.json`, 공유 설정 `_sync_settings.json`.

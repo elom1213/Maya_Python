@@ -174,5 +174,8 @@
 #        (고른 키의 최대 시간), 고른 키가 없으면 b 키 없음. 구간 안에 원래 레이어 키가 있는 채널은 지우지 않고 메시지로 알림(Fix Sliding D 와 같은
 #        apply(hold_end=b)). 그래서 Fix Sliding 의 "순수 Shift+A" = G 0 · Clamp 끔 · Lock 켬. 회귀 test_hold_layer_blend 86/86 · fix_sliding 40/40.
 
-VERSION = "02.52"
-LAST_UPDATE = "2026-11-04"
+# 02.53  트리 펼치기 - 화살표로 펼치면 한 단계만, Shift + 펼치기/접기 = 아래 전부 (View > Layers 레이어 트리).
+#        공용 Framework/qt/MOD_treeExpand_qt_v01
+
+VERSION = "02.53"
+LAST_UPDATE = "2026-11-05"

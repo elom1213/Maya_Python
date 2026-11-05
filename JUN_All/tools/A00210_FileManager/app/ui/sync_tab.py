@@ -16,6 +16,7 @@ import os
 import time
 
 from Framework.core.file_opener import open_path
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.MOD_viewZoom_qt_v01 import JUN_mod_viewZoom_qt_v01
 from Framework.qt.qt import (
     Qt,
@@ -48,6 +49,7 @@ from Framework.qt.qt import (
     QBrush,
     QColor,
     QStyle,
+    QSizePolicy,
 )
 
 from ..core import sync_settings as ss
@@ -162,8 +164,10 @@ class SyncTab(QWidget):
         lay = QVBoxLayout(page)
 
         self.lbl_pcs = QLabel("No manifests yet.")
-        self.lbl_pcs.setWordWrap(True)
+        # 줄바꿈 라벨은 heightForWidth 경로라 탭 높이 맞춤(tabFit)이 16px 모자랐다(v01.48) - 한 줄 + 가로 Ignored
+        # (PC 가 많아 길어져도 창 폭을 밀지 않는다, 전체는 툴팁).
         self.lbl_pcs.setTextFormat(Qt.RichText)
+        self.lbl_pcs.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         lay.addWidget(self.lbl_pcs)
 
         act = QHBoxLayout()
@@ -242,6 +246,7 @@ class SyncTab(QWidget):
         lay.addLayout(frow)
 
         self.tree = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self._on_tree_menu)
@@ -542,6 +547,7 @@ class SyncTab(QWidget):
             parts.append("<span style='color:{0}'>● {1}: scanned {2} ({3}){4}</span>".format(
                 color, name, (m.get("scanned_at") or "")[5:16], age, " ⚠ stale" if stale else ""))
         self.lbl_pcs.setText("PCs: " + " &nbsp; ".join(parts))
+        self.lbl_pcs.setToolTip("<br>".join(parts))
 
     # ============================================================== tree
 

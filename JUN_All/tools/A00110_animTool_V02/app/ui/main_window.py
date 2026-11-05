@@ -3,6 +3,7 @@
 # last Update date : 2026-11-04
 # A00110_animTool_V02 - Qt UI
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_collapsible_qt
@@ -3520,6 +3521,7 @@ class MainWindow(QWidget):
         layout.addWidget(hint)
 
         self.tw_al_layers = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tw_al_layers)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tw_al_layers.setColumnCount(4)
         self.tw_al_layers.setHeaderLabels(["Layer", "Mute", "Solo", "Lock"])
         header = self.tw_al_layers.header()

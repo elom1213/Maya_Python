@@ -25,6 +25,7 @@
 # v01.18 : Rename 왼쪽 **Hierarchy** 체크 - 켜면 자손까지(예전 동작), 끄면 리스트 오브젝트만.
 # v01.19 : Hierarchy 기본은 **꺼짐** (사용자 요청) - 리스트에 담은 것만 바뀌는 쪽이 안전하다.
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.core import log_levels
@@ -106,6 +107,7 @@ class TokenTab(QWidget):
 
         # Preview 표 (v01.15) - Quick Rename > Insert 의 Preview 와 같은 모양
         self.preview_tree = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.preview_tree)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.preview_tree.setColumnCount(3)
         self.preview_tree.setHeaderLabels(["Current", "New name", "Status"])
         self.preview_tree.setAlternatingRowColors(True)

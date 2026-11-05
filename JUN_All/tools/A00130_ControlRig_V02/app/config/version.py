@@ -38,5 +38,8 @@
 # 02.30  Match 표 체크박스 - 행마다 체크, Match 는 체크된 행만 맞추고 나머지 세트는 손대지 않는다.
 #        기본은 전부 체크, Check All / Uncheck All 버튼. 체크 상태는 표를 다시 그려도 유지된다.
 
-VERSION = "02.30"
-LAST_UPDATE = "2026-11-03"
+# 02.31  트리 펼치기 - 화살표로 펼치면 한 단계만, Shift + 펼치기/접기 = 아래 전부 (Plan · Length · Orient · Pair · Constrain 트리).
+#        공용 Framework/qt/MOD_treeExpand_qt_v01
+
+VERSION = "02.31"
+LAST_UPDATE = "2026-11-05"

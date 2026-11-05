@@ -30,6 +30,7 @@
 
 import os
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import (
     QWidget,
     QVBoxLayout,
@@ -115,6 +116,7 @@ class RulesTab(QWidget):
         rules_box = QGroupBox("Rules")
         rules_lay = QVBoxLayout(rules_box)
         self.tree = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree.setColumnCount(4)
         self.tree.setHeaderLabels(["Name", "Scope", "Objects", "File"])
         self.tree.setRootIsDecorated(False)

@@ -20,6 +20,7 @@
 #                     전체에 반영 - 중립 셰이프와 모든 타겟 메시도 같이 줄이고 히스토리를
 #                     blendShape -> skinCluster 로 되돌린다
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_filter_qt
@@ -1053,6 +1054,7 @@ class MainWindow(QWidget):
 
         # ---- 미리보기
         self.tree_nm_preview = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree_nm_preview)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree_nm_preview.setHeaderLabels(["Current", "New", "Note"])
         self.tree_nm_preview.setRootIsDecorated(False)
         self.tree_nm_preview.setUniformRowHeights(True)

@@ -32,6 +32,7 @@
 # 잡아 두었으므로(win_width/height) 평소에는 스크롤이 나타나지 않고, 창을 줄이면 그때
 # 스크롤이 받는다. 계획서: docs/plans/A00290_BSTool_tab_reorg_plan.md
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_filter_qt
@@ -1177,6 +1178,7 @@ class MainWindow(QWidget):
 
         # ---- 미리보기
         self.tree_nm_preview = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree_nm_preview)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree_nm_preview.setHeaderLabels(["Current", "New", "Note"])
         self.tree_nm_preview.setRootIsDecorated(False)
         self.tree_nm_preview.setUniformRowHeights(True)

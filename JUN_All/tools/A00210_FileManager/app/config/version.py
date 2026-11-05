@@ -33,5 +33,9 @@
 #        하위 탭 Status · Roots(추적 루트 여러 개, PC 별 경로) · Excluded(루트별 제외 경로 - 공유 / 이 PC 만, 무시 패턴).
 #        새 app/core/sync_settings · sync_manifest · sync_compare, app/ui/sync_tab. 계획 docs/plans/A00210_FileManager_sync_tracker_plan.md
 
-VERSION = "01.47"
+# 01.48  트리 펼치기 - 화살표로 펼치면 한 단계만, Shift + 펼치기/접기 = 아래 전부 (Sync > Status · File Manager 파일 목록 · Path Structure 미리보기 · Maya > Reference 트리).
+#        공용 Framework/qt/MOD_treeExpand_qt_v01
+#        Sync: PCs 줄을 한 줄로 - 줄바꿈 라벨 때문에 탭 높이 맞춤이 Status 페이지를 16px 잘랐다.
+
+VERSION = "01.48"
 LAST_UPDATE = "2026-11-05"

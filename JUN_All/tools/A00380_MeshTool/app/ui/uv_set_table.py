@@ -11,6 +11,7 @@
 # 행 데이터는 코어 `uv_set_manager.inspect()` 가 만든 dict 목록을 그대로 받는다.
 # A00050_uvTool_V02 의 같은 파일과 **내용이 같다** - 한쪽을 고치면 다른 쪽도 맞출 것.
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import (
     QAbstractItemView,
     QBrush,
@@ -75,6 +76,7 @@ class UvSetTable(QWidget):
         layout.addWidget(self.lbl_title)
 
         self.tree = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree.setColumnCount(3)
         self.tree.setHeaderLabels(["Object", "UV Sets", "Rule"])
         self.tree.setRootIsDecorated(False)

@@ -2,6 +2,13 @@
 
 All notable changes to this tool are documented here.
 
+## [01.04] - 2026-11-05
+
+- **[UI] 트리 펼치기 규칙.** 화살표(더블클릭 · `→` 키)로 펼치면 **한 단계만** 보인다 — 접었다 다시 펼쳐도
+  예전에 열어 둔 아래 단계가 한꺼번에 열리지 않는다. **Shift + 펼치기 = 아래 전부 펼침, Shift + 접기 = 아래 전부 접음**
+  (`*` 키 = 아래 전부). 툴이 처음 펼쳐 보여 주는 동작은 그대로. 적용: 레퍼런스 트리.
+  공용 `JUN_mod_treeExpand_qt_v01` (`docs/Framework_MOD_treeExpand_qt.md`). **마야 GUI 확인 아직.**
+
 ## [01.03] - 2026-10-30
 ### Changed
 - **Layout flipped: deeper references sit higher, the scene (depth 0) is at the bottom.** A00210 draws a

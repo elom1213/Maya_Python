@@ -2,6 +2,15 @@
 
 All notable changes to this tool are documented here.
 
+## [01.48] - 2026-11-05
+
+- **[UI] 트리 펼치기 규칙.** 화살표(더블클릭 · `→` 키)로 펼치면 **한 단계만** 보인다 — 접었다 다시 펼쳐도
+  예전에 열어 둔 아래 단계가 한꺼번에 열리지 않는다. **Shift + 펼치기 = 아래 전부 펼침, Shift + 접기 = 아래 전부 접음**
+  (`*` 키 = 아래 전부). 툴이 처음 펼쳐 보여 주는 동작은 그대로. 적용: Sync > Status · File Manager 파일 목록 · Path Structure 미리보기 · Maya > Reference 트리.
+  공용 `JUN_mod_treeExpand_qt_v01` (`docs/Framework_MOD_treeExpand_qt.md`). **GUI 확인 아직.**
+- **[Sync] 탭 높이 16px 모자람 수정.** `PCs:` 줄이 줄바꿈 라벨이라 탭 높이 맞춤(tabFit)이 Status 페이지를 368 < 384 로 잘랐다
+  (Framework tabFit 롤아웃 시험에서 발견). 한 줄 + 가로 크기 무시(PC 가 많아도 창 폭을 밀지 않음), 전체 내용은 툴팁.
+
 ## [01.47] - 2026-11-05
 
 - **[Sync] 새 탭 — PC 간 작업 파일 동기화 추적(Sync Tracker).** 여러 PC 가 같은 경로(예: 정션 `C:\JUN\JUN_MUE`)로 작업할 때

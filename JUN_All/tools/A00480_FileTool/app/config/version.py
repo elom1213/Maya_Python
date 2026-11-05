@@ -81,5 +81,8 @@
 #        **전체 경로**가 캔버스 아래 `Selected` 칸(읽기 전용 · 복사 가능)에 보인다(여럿이면 수 + 파일 이름, 툴팁에 경로 전부).
 #        tests/test_reference_lineage.py 44.
 
-VERSION = "01.19"
-LAST_UPDATE = "2026-10-30"
+# 01.20  트리 펼치기 - 화살표로 펼치면 한 단계만, Shift + 펼치기/접기 = 아래 전부 (Reference 트리).
+#        공용 Framework/qt/MOD_treeExpand_qt_v01
+
+VERSION = "01.20"
+LAST_UPDATE = "2026-11-05"

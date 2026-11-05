@@ -10,6 +10,7 @@
 # v02.01 : 상위 탭 2개(Assign / Mirror). HIK 캐릭터 노드 선택은 두 탭이 공유하므로
 #          탭 밖 상단에 그대로 둔다.
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt.maya_window import maya_main_window
@@ -312,6 +313,7 @@ class MainWindow(QWidget):
         res_layout = QVBoxLayout(grp_res)
 
         self.tree_result = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree_result)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree_result.setHeaderLabels(["HIK Slot", "Source", "Target", "Status", "Detail"])
         self.tree_result.setRootIsDecorated(False)
         self.tree_result.setAlternatingRowColors(True)

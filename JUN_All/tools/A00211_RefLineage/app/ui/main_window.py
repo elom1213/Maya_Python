@@ -8,6 +8,7 @@
 
 import os
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import (
     QWidget,
     QVBoxLayout,
@@ -86,6 +87,7 @@ class MainWindow(QWidget):
 
         # 미리보기 트리(씬 -> 중첩 reference)
         self.tree = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree.setHeaderLabels(["File", "Note"])
         self.tree.setColumnWidth(0, 320)
         root.addWidget(self.tree, stretch=1)

@@ -16,6 +16,7 @@
 # 로직은 app/core 에 위임하고 이 모듈은 위젯 구성/시그널 연결/로그 출력만 담당한다.
 # 모든 UI 문자열(버튼/라벨/로그)은 영어. (한국어는 주석/독스트링만)
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
@@ -2201,6 +2202,7 @@ class MainWindow(QWidget):
 
         # 미리보기: 오브젝트마다 현재 값 -> 새 값. 건너뛸 것은 이유를 적는다.
         self.tw_aval_preview = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tw_aval_preview)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tw_aval_preview.setHeaderLabels(["Object", "Current", "New", "Note"])
         self.tw_aval_preview.setRootIsDecorated(False)
         self.tw_aval_preview.setMinimumHeight(150)

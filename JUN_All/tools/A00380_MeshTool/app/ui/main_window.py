@@ -23,6 +23,7 @@
 import os
 import time
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_tsl_qt_v01 import JUN_mod_tsl_qt_v01
@@ -397,6 +398,7 @@ class MainWindow(QWidget):
         self.lb_match_mode.setWordWrap(True)
         lay.addWidget(self.lb_match_mode)
         self.tw_match_pairs = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tw_match_pairs)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tw_match_pairs.setHeaderLabels(["Source", "Target (modified)"])
         self.tw_match_pairs.setRootIsDecorated(False)
         self.tw_match_pairs.setMinimumHeight(60)
@@ -592,6 +594,7 @@ class MainWindow(QWidget):
         vp.addWidget(self.rb_wm_sum)
 
         self.tw_wm_pairs = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tw_wm_pairs)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tw_wm_pairs.setHeaderLabels(["Mesh", "Joint weights"])
         self.tw_wm_pairs.setRootIsDecorated(False)
         self.tw_wm_pairs.setMinimumHeight(70)

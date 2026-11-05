@@ -17,6 +17,7 @@ main_window.py 가 이미 길어서 이 탭은 위젯 하나로 따로 둔다. �
 모든 UI 문자열은 영어. (한국어는 주석/독스트링만)
 """
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_filter_qt
 
@@ -54,6 +55,7 @@ class LockTree(QTreeWidget):
 
     def __init__(self, parent=None):
         super(LockTree, self).__init__(parent)
+        JUN_mod_treeExpand_qt_v01(self)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.setColumnCount(2)
         self.setHeaderLabels(["Lock", "Joint"])
         self.setRootIsDecorated(False)
@@ -151,6 +153,7 @@ class LayerTab(QWidget):
         layers_layout = QVBoxLayout(layers_grp)
 
         self.tw_layers = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tw_layers)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tw_layers.setColumnCount(4)
         self.tw_layers.setHeaderLabels(["#", "Mesh", "Locked", "Blend"])
         self.tw_layers.setRootIsDecorated(False)

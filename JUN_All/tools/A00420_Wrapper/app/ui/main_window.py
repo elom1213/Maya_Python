@@ -9,6 +9,7 @@
 #
 # 화면 흐름: Meshes(소스/타깃) -> Guide Pairs(커브 쌍 목록) -> 설정 -> Wrap.
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_collapsible_qt
@@ -160,6 +161,7 @@ class MainWindow(QWidget):
         lay = QVBoxLayout(box)
 
         self.tree = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree.setColumnCount(5)
         self.tree.setHeaderLabels(["On", "Source", "Target", "Flip", "Info"])
         self.tree.setRootIsDecorated(False)

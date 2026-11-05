@@ -609,6 +609,7 @@ mayapy [C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe] [Browse...] [Detect] 
 - `Compare`: **This PC**(이 PC 사본 기준) / **All PCs**(어느 PC 에서든 어긋난 파일 전부, 상태 칸에 `Missing: PCB` 처럼).
 - `Show`: Missing · Outdated · Conflict · Ahead / Only here · OK · Excluded. `Filter`: 경로 단어(공백 = 모두 포함).
 - PC 열은 매니페스트 수만큼(이 PC 먼저, 셀 = 수정 시각, 툴팁 = 크기 · 해시). **PC 가 5대 이상이면 요약 열** `This PC · Latest on · Missing on · Outdated on`.
+- 트리: 화살표로 펼치면 한 단계만, **Shift + 펼치기 / 접기 = 아래 전부**(공용 `JUN_mod_treeExpand_qt_v01`, v01.48 — 모든 트리 공통).
 - 폴더 줄에 하위 개수(`1 Missing · 2 Ahead`). `Copy Paths` · `Export List...`(txt) · `Reveal in Explorer`(이 PC 에 없으면 가장 가까운 폴더).
 - 우클릭: `Exclude from Sync (All PCs)` · `Exclude on This PC Only` · (제외 항목) `Include Again`.
 

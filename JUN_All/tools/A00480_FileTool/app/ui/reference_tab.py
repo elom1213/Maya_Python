@@ -15,6 +15,7 @@
 
 import os
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import (
     Qt,
     QWidget,
@@ -91,6 +92,7 @@ class ReferenceDefaultPage(QWidget):
         layout.addLayout(head)
 
         self.tree = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree.setColumnCount(3)
         self.tree.setHeaderLabels(["Reference", self._file_header(), "Status"])
         header = self.tree.header()

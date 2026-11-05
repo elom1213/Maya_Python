@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-29
+# last Update date : 2026-11-05
 # A00340_SelectionTool - version info
 
 # 01.07  View > Show Controls : Controls pane 을 통째로 숨기고 보인다(접기와 달리 영역이
@@ -54,5 +54,8 @@
 #        Yes 면 공유 파일을 로컬 것으로 교체하고 그쪽으로 전환. 네임스페이스 매핑은 로컬에 있으면 그걸로, 없으면 공유 것 유지.
 #        prefs.share_profile(name, overwrite=True) · profile_exists. 회귀 test_shared_profiles 51/51 · test_namespace_remap 30/30.
 
-VERSION = "01.20"
-LAST_UPDATE = "2026-11-04"
+# 01.21  트리 펼치기 - 화살표로 펼치면 한 단계만, Shift + 펼치기/접기 = 아래 전부 (Rules 트리).
+#        공용 Framework/qt/MOD_treeExpand_qt_v01
+
+VERSION = "01.21"
+LAST_UPDATE = "2026-11-05"

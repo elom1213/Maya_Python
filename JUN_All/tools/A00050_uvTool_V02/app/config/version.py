@@ -22,5 +22,8 @@
 
 # 02.04  Pin 켜짐(Pinned) = 연한 빨강 - 공용 Framework/qt/pin_style (A00240_PathTool 과 같은 색).
 
-VERSION = "02.04"
-LAST_UPDATE = "2026-10-29"
+# 02.05  트리 펼치기 - 화살표로 펼치면 한 단계만, Shift + 펼치기/접기 = 아래 전부 (UV Set 표).
+#        공용 Framework/qt/MOD_treeExpand_qt_v01
+
+VERSION = "02.05"
+LAST_UPDATE = "2026-11-05"

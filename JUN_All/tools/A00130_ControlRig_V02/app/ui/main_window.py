@@ -43,6 +43,7 @@
 #          **orient 규칙은 아직 안 정해졌다** — 매핑 json 의 `orient` 필드는 자리만
 #          잡아 두고 아무도 읽지 않는다. 규칙이 오면 `Orient` 단계를 STEPS 에 더한다.
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
@@ -354,6 +355,7 @@ class MainWindow(QWidget):
         layout.addLayout(check_row)
 
         self.tree_plan = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree_plan)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree_plan.setColumnCount(5)
         self.tree_plan.setHeaderLabels(
             ["Template joint", "Cage set", "Match", "Members", "Status"])
@@ -482,6 +484,7 @@ class MainWindow(QWidget):
 
         # ---- 미리보기 ----
         self.tree_length = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree_length)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree_length.setColumnCount(6)
         self.tree_length.setHeaderLabels(
             ["Part", "Total", "Upper", "Lower", "Attributes", "Status"])
@@ -560,6 +563,7 @@ class MainWindow(QWidget):
         layout.addWidget(grp)
 
         self.tree_orient = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree_orient)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree_orient.setColumnCount(5)
         self.tree_orient.setHeaderLabels(
             ["Joint", "Rule", "Up dev", "Status", "Note"])
@@ -635,6 +639,7 @@ class MainWindow(QWidget):
         layout.addWidget(note)
 
         self.tree_pair = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree_pair)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree_pair.setColumnCount(5)
         self.tree_pair.setHeaderLabels(
             ["From (set)", "To (set)", "Source", "Target", "Status"])
@@ -686,6 +691,7 @@ class MainWindow(QWidget):
         layout.addWidget(self.lbl_constrain_src)
 
         self.tree_constrain = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree_constrain)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree_constrain.setColumnCount(4)
         self.tree_constrain.setHeaderLabels(
             ["Pose object", "Driver(s)", "Status", "Note"])

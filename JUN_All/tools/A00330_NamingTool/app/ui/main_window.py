@@ -22,6 +22,7 @@
 
 import html
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt import JUN_mod_tsl_qt
@@ -488,6 +489,7 @@ class MainWindow(QWidget):
             log_callback=self._log)
 
         self.ins_tree = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.ins_tree)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.ins_tree.setColumnCount(3)
         self.ins_tree.setHeaderLabels(["Current", "New name", "Status"])
         self.ins_tree.setRootIsDecorated(False)
@@ -789,6 +791,7 @@ class MainWindow(QWidget):
         # ---- 필터 ----
         self.sr_lbl_number = QLabel("Number: 0")
         self.sr_tree = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.sr_tree)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.sr_tree.setColumnCount(5)
         self.sr_tree.setHeaderLabels(["Set", "Type", "Members", "New name", "Status"])
         self.sr_tree.setRootIsDecorated(False)

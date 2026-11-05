@@ -19,6 +19,7 @@
 # 붙은 **페이스**를 씬에서 선택한다. 페이스는 기본으로 **리스트에 담은 메시로 범위를 좁힌다**
 # (`Listed meshes only`) — 끄면 레거시처럼 씬 전체. 수집은 core/maya_materials.faces_of().
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.qt import (
     QWidget,
     QVBoxLayout,
@@ -134,6 +135,7 @@ class NameCheckTab(QWidget):
 
         # ---- 머티리얼 트리 -------------------------------------------
         self.tree = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(self.tree)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         self.tree.setColumnCount(3)
         self.tree.setHeaderLabels(["Material", "Status", "Meshes"])
         self.tree.setRootIsDecorated(False)

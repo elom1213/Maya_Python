@@ -19,8 +19,11 @@
 #        스크롤 없이 다 보이고 짧은 페이지로 가면 줄어든다. 페이지가 화면보다 길면 화면 높이에서 멈춤.
 #        공용 Framework/qt/MOD_tabFit_qt_v01 (A00275 v01.38 과 같은 방식)
 
-VERSION = "01.18"
-LAST_UPDATE = "2026-10-29"
+# 01.19  트리 펼치기 - 화살표로 펼치면 한 단계만, Shift + 펼치기/접기 = 아래 전부 (Match · By Weight 짝 트리 · UV Set 표).
+#        공용 Framework/qt/MOD_treeExpand_qt_v01
+
+VERSION = "01.19"
+LAST_UPDATE = "2026-11-05"
 
 # 01.06  Match 탭 From 리스트의 List From Mesh / Add / Del 버튼 글자가 잘리던 문제.
 #        TSL 위젯 전체에 걸려 있던 setMaximumHeight 를 치우고 리스트에만 높이를 제한한다.

@@ -19,6 +19,7 @@
 import os
 import time
 
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt import JUN_mod_checkList_qt
 from Framework.qt.qt import (
     Qt,
@@ -273,6 +274,7 @@ class PathStructureTab(QWidget):
 
     def _make_preview_widget(self):
         tree = QTreeWidget()
+        JUN_mod_treeExpand_qt_v01(tree)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
         tree.setHeaderLabels(["Name"])
         # Shift/Ctrl 로 여러 항목을 동시에 선택할 수 있게 한다(체크박스 일괄 토글용).
         tree.setSelectionMode(QAbstractItemView.ExtendedSelection)

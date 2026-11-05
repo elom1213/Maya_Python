@@ -19,6 +19,7 @@ from Framework.qt import MOD_fileTree_qt_v01 as JUN_mod_fileTree_qt
 from Framework.qt import MOD_checkTree_qt_v01 as JUN_mod_checkTree_qt
 from Framework.qt import MOD_tabFit_qt_v01 as JUN_mod_tabFit_qt
 from Framework.qt import MOD_viewZoom_qt_v01 as JUN_mod_viewZoom_qt
+from Framework.qt import MOD_treeExpand_qt_v01 as JUN_mod_treeExpand_qt
 
 
 __all__ = [
@@ -38,4 +39,5 @@ __all__ = [
     "JUN_mod_checkTree_qt",
     "JUN_mod_tabFit_qt",
     "JUN_mod_viewZoom_qt",
+    "JUN_mod_treeExpand_qt",
 ]
