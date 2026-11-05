@@ -274,3 +274,13 @@ V02 는 **프레임 단위** 사다리꼴, V03 의 라이브 경로는 **키 구
   툴이 찍는 키는 linear 탄젠트. spline 키를 직접 넣으면 그림(실제 곡선)과 속도가 조금 다를 수 있다.
 - Playback 탭의 Rebuild Phase · Mute / Solo 는 다른 탭 드라이버용이다(Flow 는 엔진이 늘 라이브라 Rebuild 가 필요 없다).
 - 노드 수: 뼈당 약 65(Tip Follow 켬) / 50(끔). 30 체인 × 뼈 12 ≈ 2.4만 노드, mayapy 재생 4.8 ms/프레임.
+
+## 10. Chain Wave Lite — Flutter (v03.05)
+
+Flow 탭(Waves Gen)의 **Flutter** 를 Lite 에 더한 것. `Swing Angle` 아래 `Flutter` 줄(체크 + 값 + `Stiffness`).
+
+- Lite 의 Swing 은 "뼈의 **월드** 각도가 사인을 그린다" — 차분으로 누적을 상쇄해 체인이 파형을 따라간다.
+- Flutter 는 같은 위상의 사인을 각 노드의 **로컬** 회전에 그대로 더한다 → 끝으로 갈수록 **쌓여** 끝이 펄럭인다.
+- 값: `windFlutter`(도 / 뼈, 뼈 12개 기준 — 뼈 수가 달라도 같은 모양) · `windFlutterStiffness`(0 = 모든 노드 같은 크기, 크면 끝만). 드라이버에서 라이브 · 키.
+- **0 이면 예전 Lite 와 완전히 같다.** 체크를 끄고 빌드하면 어트리뷰트 · 노드가 아예 없다(체인 수백 개면 끄는 게 가볍다, 켜면 노드당 4개 추가).
+- `windEnvelope` 가 함께 곱해진다. Rotate Axis (object) · Curve(굽기) 출력에서도 같다.

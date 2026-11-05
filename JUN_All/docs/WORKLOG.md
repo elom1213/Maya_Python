@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-05 (오늘)
 
+> [!summary] A00390_WindTool_V03 **v03.05 Chain Wave Lite 에 Flutter** `#A00390_WindTool`
+- 요청: Flow(Waves Gen)의 Flutter 기능을 Lite 탭으로 이식.
+- 구현: Lite 의 월드 각도 파형(차분) 위에, 같은 위상의 사인(노드별 LUT 재사용)을 로컬 회전에 그대로 더해 끝으로 누적 — `windFlutter`(도/뼈, 12뼈 기준) · `windFlutterStiffness`, 노드당 4개.
+  기본 0 = 예전 Lite 와 diff 0, 체크 끄면 노드 없음.
+- 시험: `test_lite_flutter.py` 14/14, Flow UI 16/16, tabFit 31툴 0 fail.
+
 > [!summary] A00390_WindTool_V03 **v03.04 Flow 탭 — Waves Gen(블렌더) 바람 이식** `#A00390_WindTool`
 - 요청: 계획서대로 V03 에, 끝 따라가기까지, Mix 포함(개인용, 블렌더 애드온 실행 허가).
 - 블렌더 4.0.2 헤드리스로 애드온을 돌려 기준 데이터(12 경우 × 뼈 12 × 60 f) → 순수 모델 `flow_model` 12/12 → 마야 노드망 12/12(0.013% · 0.09도).

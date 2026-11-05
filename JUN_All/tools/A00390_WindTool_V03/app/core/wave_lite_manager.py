@@ -114,6 +114,22 @@ from .wave_manager import (
 # Lite 전용 드라이버 어트리뷰트. 진폭이 **각도(도)** 라는 점만 기존과 다르다.
 LITE_SWING = "windSwingAngle"
 
+# ## Flutter (v03.05) — Flow 탭(Waves Gen)의 Flutter 를 Lite 에 더한다
+#
+# Lite 의 파동은 "뼈의 **월드** 각도가 사인을 그린다" 라 차분(theta_k - theta_(k-1))으로 누적을 상쇄한다.
+# Waves Gen 의 Flutter 는 반대로 **로컬 회전에 그대로 더해 누적**된다 — 끝으로 갈수록 휘어짐이 쌓여 펄럭인다.
+# 그래서 같은 위상의 사인(노드마다 이미 있는 LUT 출력)으로 로컬 회전에 항 하나를 **더한다**:
+#
+#     local_k = (theta_k - theta_(k-1)) + windFlutter * windEnvelope * (12/n) * (s_k/total)^windFlutterStiffness * sin(2pi u_k)
+#
+# - windFlutter : 도 / 뼈, **뼈 12개 기준**(Flow 탭 Flutter 와 같은 뜻 - 뼈가 n 개면 12/n 을 곱해 같은 모양).
+# - windFlutterStiffness : 뿌리 고정 지수(0 = 모든 노드 같은 크기 - Waves Gen 프리셋 값, 크면 끝만).
+# - 기본 windFlutter = 0 -> 예전 Lite 와 **완전히 같은 회전**(항이 0). 빌드 옵션으로 끄면 어트리뷰트 · 노드도 안 만든다.
+# - 노드당 4개(pow · 곱 2 · 합), 체인당 2개. 같은 축(_apply_angle)으로 들어가므로 Rotate Axis (object) 와도 그대로 맞는다.
+LITE_FLUTTER = "windFlutter"
+LITE_FLUTTER_STIFF = "windFlutterStiffness"
+FLUTTER_REF_NODES = 12.0
+
 # windEnvelope([0,1], wind_manager 의 DRIVER_ENVELOPE)은 **실효 스윙 각도**에 곱해진다:
 #     effSwing = windSwingAngle * windEnvelope
 # theta_k 가 스윙 각도에 정비례하고 로컬 회전이 theta 의 차분이므로, 스윙에 한 번만 곱하면
@@ -203,7 +219,7 @@ def _rotate_order(node):
 # --------------------------------------------------------------- 드라이버
 
 def _make_lite_driver(name, swing, wavelength, period, speed, ramp, phase_offset=0.0,
-                      envelope=1.0, place_at=None):
+                      envelope=1.0, place_at=None, flutter=None, flutter_stiffness=0.0):
     """Lite 드라이버 로케이터. 진폭만 **각도(도)** 이고 나머지는 기존과 같다.
 
     place_at : 월드 좌표 (x, y, z). 주면 로케이터를 그 자리로 옮긴다(체인 최상단 위에 두기).
@@ -237,6 +253,13 @@ def _make_lite_driver(name, swing, wavelength, period, speed, ramp, phase_offset
     cmds.addAttr(drv, longName=DRIVER_ENVELOPE, attributeType="double",
                  defaultValue=1.0, minValue=0.0, maxValue=1.0, keyable=True)
     cmds.setAttr(drv + "." + DRIVER_ENVELOPE, max(0.0, min(1.0, envelope)))
+
+    # Flutter (v03.05) - None 이면 만들지 않는다(예전 드라이버와 같다).
+    if flutter is not None:
+        for attr, val in ((LITE_FLUTTER, flutter), (LITE_FLUTTER_STIFF, flutter_stiffness)):
+            cmds.addAttr(drv, longName=attr, attributeType="double", defaultValue=float(val),
+                         minValue=0.0, keyable=True)
+            cmds.setAttr(drv + "." + attr, float(val))
 
     # 위상 시계 배선은 호출부가 wire_phase() 로 한다(V03). 상수 속도면 노드 3개,
     # windSpeed 에 키가 걸려 있으면 씬에 하나뿐인 통합 표현식이 맡는다.
@@ -379,8 +402,11 @@ def _group_nodes(nodes, name):
 def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
                       phase_offset, envelope=1.0, local_axis=None,
                       driver_at_root=True, debug_curve=True, follow_root=True,
-                      auto_period=False):
+                      auto_period=False, flutter=None, flutter_stiffness=0.0):
     """체인 하나에 각도 노드망을 만든다. (드라이버, 만든 노드들, rest 회전, 정보, 커브)
+
+    flutter    : None 이면 Flutter 없음(예전과 같다). 숫자면 windFlutter 초기값 - 노드마다 누적되는 파동 항을 더한다
+                 (모듈 머리의 'Flutter' 참고).
 
     local_axis : "X"/"Y"/"Z" 를 주면 각 노드의 **오브젝트 공간** 축으로만 돌린다.
                  이때 `axis`(Sway Axis) 는 **전혀 쓰이지 않는다**.
@@ -433,7 +459,8 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
 
     drv = _make_lite_driver(name + "_liteDriver#", swing, wavelength, period,
                             speed, ramp, phase_offset, envelope,
-                            place_at=(points[0] if driver_at_root else None))
+                            place_at=(points[0] if driver_at_root else None),
+                            flutter=flutter, flutter_stiffness=flutter_stiffness)
     made = [drv]
 
     # 놓기만 하는 게 아니라 **따라다니게** 한다 - 루트 뼈/컨트롤러가 움직이면(리그 전체
@@ -448,6 +475,17 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
     cmds.connectAttr(drv + "." + LITE_SWING, swing_env + ".input1")
     cmds.connectAttr(drv + "." + DRIVER_ENVELOPE, swing_env + ".input2")
     made.append(swing_env)
+
+    # Flutter 이득 = windFlutter * windEnvelope * (12 / n)   (체인 공유, 노드 2개)
+    flut_gain = None
+    if flutter is not None:
+        flut_env = cmds.createNode("multDoubleLinear", name=name + "_liteFlutEnv#")
+        cmds.connectAttr(drv + "." + LITE_FLUTTER, flut_env + ".input1")
+        cmds.connectAttr(drv + "." + DRIVER_ENVELOPE, flut_env + ".input2")
+        flut_gain = cmds.createNode("multDoubleLinear", name=name + "_liteFlutGain#")
+        cmds.connectAttr(flut_env + ".output", flut_gain + ".input1")
+        cmds.setAttr(flut_gain + ".input2", FLUTTER_REF_NODES / float(len(chain)))
+        made += [flut_env, flut_gain]
 
     # ---- 체인 전체가 공유하는 시간 위상 : (windPhaseTime - windPhaseOffset) / windPeriod
     phase_sub = cmds.createNode("plusMinusAverage", name=name + "_litePhase#")
@@ -515,6 +553,24 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
 
         thetas.append(theta)
 
+        # ---- Flutter : 로컬 회전에 **누적되는** 항을 더한다 (같은 위상의 sin = 이 노드의 LUT)
+        if flut_gain is not None:
+            env = cmds.createNode("multiplyDivide", name=tag + "_flutEnv")
+            cmds.setAttr(env + ".operation", 3)                     # (s_k/total) ^ stiffness
+            cmds.setAttr(env + ".input1X", arcs[k] / total)
+            cmds.connectAttr(drv + "." + LITE_FLUTTER_STIFF, env + ".input2X")
+            amp = cmds.createNode("multDoubleLinear", name=tag + "_flutAmp")
+            cmds.connectAttr(flut_gain + ".output", amp + ".input1")
+            cmds.connectAttr(env + ".outputX", amp + ".input2")
+            term = cmds.createNode("multDoubleLinear", name=tag + "_flut")
+            cmds.connectAttr(amp + ".output", term + ".input1")
+            cmds.connectAttr(lut + ".output", term + ".input2")
+            total_local = cmds.createNode("plusMinusAverage", name=tag + "_localFlut")
+            cmds.connectAttr(local_plug, total_local + ".input1D[0]")
+            cmds.connectAttr(term + ".output", total_local + ".input1D[1]")
+            made += [env, amp, term, total_local]
+            local_plug = total_local + ".output1D"
+
         if local_index is not None or _cardinal(_local_axis(node, world_axis)) is not None:
             cardinal_count += 1
         made += _apply_angle(node, local_plug, world_axis, rest_rotate[node], tag,
@@ -539,7 +595,7 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
                     period=24.0, speed=1.0, ramp=1.0, node_offset=0.0,
                     output=OUTPUT_NODE, start=0.0, end=100.0, prefix=None,
                     envelope=1.0, local_axis=None, driver_at_root=True,
-                    debug_curve=True, auto_period=True):
+                    debug_curve=True, auto_period=True, flutter=None, flutter_stiffness=0.0):
     """커브·ikHandle 없이 체인이 파형을 따라가게 한다.
 
     swing : **뼈가 흔들리는 각도(도)**. 기존 Chain Wave 의 windAmplitude(거리)와 뜻이 다르다.
@@ -560,6 +616,9 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
     debug_curve : True(기본)면 체인마다 **흔들림을 보여 주는 커브**를 하나 만든다.
                   Chain Wave 탭의 커브와 같은 방식(노드 위치 = CV, degree 3)이지만 구동
                   방향이 반대라 **실제 결과**를 그린다. Remove 로 함께 지워진다.
+    flutter : None 이면 Flutter 없음(예전 Lite 와 같다). 숫자면 드라이버에 windFlutter(그 값) · windFlutterStiffness 를 두고
+              노드마다 **누적되는** 파동 항을 더한다 - Flow 탭(Waves Gen)의 Flutter 와 같은 뜻(도 / 뼈, 뼈 12개 기준).
+              0 이면 회전은 예전과 같고, 빌드 뒤 라이브로 올리면 된다.
     나머지 인자는 기존 build_wave 와 같다.
 
     Returns: (체인 수, 드라이버 수, 메시지)
@@ -590,7 +649,7 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
             chain, axis, swing, wavelength, period, speed, ramp, k * node_offset,
             envelope, local_axis=local_axis, driver_at_root=driver_at_root,
             debug_curve=debug_curve, follow_root=follow_root,
-            auto_period=auto_period)
+            auto_period=auto_period, flutter=flutter, flutter_stiffness=flutter_stiffness)
 
         if drv is None:
             failed.append("{0} ({1})".format(_leaf(chain[0]), info))

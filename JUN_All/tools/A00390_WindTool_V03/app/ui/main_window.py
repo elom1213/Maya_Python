@@ -644,7 +644,33 @@ class MainWindow(QWidget):
             "Set or key windEnvelope afterwards to fade the wind in and out\n"
             "without touching the swing angle.")
 
+        # Flutter (v03.05) - Flow 탭(Waves Gen)의 Flutter: 노드마다 **쌓이는** 펄럭임. 0 = 예전 Lite 그대로.
+        flut_row = QHBoxLayout()
+        self.chk_lite_flutter = QCheckBox()
+        self.chk_lite_flutter.setChecked(True)
+        self.chk_lite_flutter.setToolTip(
+            "On (default): the driver gets windFlutter / windFlutterStiffness (live, keyable)\n"
+            "and 4 extra nodes per chain node. Off: no Flutter nodes at all (lightest).")
+        self.sb_lite_flutter = self._wave_spin(0.0, 0.0, 120.0, 0.5)
+        self.sb_lite_flutter.setToolTip(
+            "Flutter - the Flow tab's (Waves Gen) Flutter: a wave added to every node's LOCAL\n"
+            "rotation, so it ADDS UP toward the tip and the end flaps (degrees per bone, for a\n"
+            "12-bone chain - other bone counts get the same shape).\n"
+            "Swing Angle bends the chain by WORLD angle; Flutter piles up on top of it.\n"
+            "0 = exactly the old Lite motion. Same wavelength / period / speed as the swing.")
+        self.sb_lite_flutter_stiff = self._wave_spin(0.0, 0.0, 4.0, 0.1)
+        self.sb_lite_flutter_stiff.setToolTip(
+            "windFlutterStiffness: 0 = every node flutters the same (Waves Gen presets),\n"
+            "high = only the end flutters.")
+        self.chk_lite_flutter.toggled.connect(self.sb_lite_flutter.setEnabled)
+        self.chk_lite_flutter.toggled.connect(self.sb_lite_flutter_stiff.setEnabled)
+        flut_row.addWidget(self.chk_lite_flutter)
+        flut_row.addWidget(self.sb_lite_flutter, 1)
+        flut_row.addWidget(QLabel("Stiffness"))
+        flut_row.addWidget(self.sb_lite_flutter_stiff, 1)
+
         rows = (("Swing Angle", self.sb_lite_swing),
+                ("Flutter", flut_row),
                 ("Wavelength", len_row),
                 ("Period", self.sb_lite_period),
                 ("Speed", self.sb_lite_speed),
@@ -653,7 +679,10 @@ class MainWindow(QWidget):
                 ("Chain Offset", self.sb_lite_node_offset))
         for r, (label, widget) in enumerate(rows):
             grid.addWidget(QLabel(label), r, 0)
-            grid.addWidget(widget, r, 1)
+            if isinstance(widget, QHBoxLayout):
+                grid.addLayout(widget, r, 1)
+            else:
+                grid.addWidget(widget, r, 1)
         lite.addLayout(grid)
 
         # 흔들림을 눈으로 확인하는 커브. Chain Wave 탭이 만드는 커브와 같은 방식이지만
@@ -917,6 +946,8 @@ class MainWindow(QWidget):
                     driver_at_root=self.chk_lite_driver_root.isChecked(),
                     debug_curve=self.chk_lite_debug.isChecked(),
                     auto_period=self.chk_lite_auto_period.isChecked(),
+                    flutter=(self.sb_lite_flutter.value() if self.chk_lite_flutter.isChecked() else None),
+                    flutter_stiffness=self.sb_lite_flutter_stiff.value(),
                     output=(wind_mgr.OUTPUT_NODE if node
                             else wind_mgr.OUTPUT_CURVE),
                     start=start, end=end)

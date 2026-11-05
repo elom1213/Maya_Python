@@ -35,5 +35,9 @@
 #        프리셋 Slow Flow / Breeze / Fast Flutter (옵션 2개) + flowMix (라이브 · 키 가능), 위상 엔진 flowPhaseEngine
 #        (speed · Mix · timeScale 키를 Simpson 으로 정확 적분). 블렌더 기준 데이터와 12/12 일치. 계획 docs/plans/A00390_WindTool_wavesgen_port_plan.md
 
-VERSION = "03.04"
+# 03.05  Chain Wave Lite 에 Flutter - Flow 탭(Waves Gen)의 Flutter 를 이식: 노드마다 로컬 회전에 **누적되는** 파동 항
+#        (windFlutter 도/뼈, 뼈 12개 기준 + windFlutterStiffness). Lite 의 사인(같은 위상)을 재사용, 노드당 4개.
+#        기본 0 = 예전 Lite 와 완전히 같은 회전. 빌드 옵션으로 끄면 어트리뷰트 · 노드도 없다.
+
+VERSION = "03.05"
 LAST_UPDATE = "2026-11-05"

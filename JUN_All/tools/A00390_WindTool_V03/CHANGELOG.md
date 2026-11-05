@@ -3,6 +3,24 @@
 > V03 는 `A00390_WindTool_V02` 를 복제해 시작했다. 아래 v02.x 기록은 V02 에서 이어받은
 > 것이고, V03 에서 실제로 바뀐 것은 **v03.00** 이후 항목이다.
 
+## v03.05 (2026-11-05) - Chain Wave Lite: Flutter (Flow 탭의 Flutter 이식)
+
+### Added
+- **`Flutter` (Chain Wave Lite 탭, Swing Angle 아래)** — Flow 탭(Waves Gen)의 Flutter 를 Lite 에 넣었다.
+  드라이버에 **`windFlutter`**(도 / 뼈, **뼈 12개 기준** — Flow 의 Flutter 와 같은 뜻) · **`windFlutterStiffness`**(뿌리 고정 지수). 둘 다 라이브 · 키 가능.
+
+  ```
+  local_k = (theta_k - theta_(k-1))                                  <- 기존 Lite: 월드 각도 파형(차분으로 누적 상쇄)
+          + windFlutter * windEnvelope * (12/n) * (s_k/total)^stiffness * sin(2pi u_k)   <- Flutter: 로컬에 그대로 더해 **끝으로 누적**
+  ```
+
+  - Swing Angle 은 체인을 **월드 각도**로 굽히고, Flutter 는 그 위에 **노드마다 쌓여** 끝이 펄럭인다(Waves Gen 의 느낌).
+  - 사인은 Lite 가 노드마다 이미 가진 LUT 출력(같은 파장 · 주기 · 속도 · 위상)을 재사용 — 노드당 4개, 체인당 2개 추가.
+  - **기본 0 → 예전 Lite 와 완전히 같은 회전**(실측 차이 0). 체크를 끄면 어트리뷰트 · 노드도 만들지 않는다(가장 가볍게).
+  - `windEnvelope` 가 Flutter 에도 곱해진다(0 이면 rest). Rotate Axis (object) · Curve 출력(굽기)에서도 그대로.
+- 시험 `tests/test_lite_flutter.py` 14/14 — 0 이면 예전과 diff 0, 항 = 수식(float 정밀도 1.1e-6), 강성 > 0 이면 뿌리 0, 누적(모든 노드 같은 로컬 각),
+  envelope 0 = rest, 제거, 굽기, UI. Flow 16/16, tabFit 롤아웃 31툴 0 fail.
+
 ## v03.04 (2026-11-05) - Flow 탭: 블렌더 Waves Gen 식 바람 (프리셋 3 x 2 + Mix + 끝 따라가기)
 
 블렌더 애드온 **Waves Gen**(Guillaume Bissieres, GPL-3.0, 무료)의 바람을 마야 노드망으로 옮겼다.

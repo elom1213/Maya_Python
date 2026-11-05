@@ -21,3 +21,5 @@ metadata:
   - sin = `eulerToQuat(rotateX=2θ).outputQuatX`(정확), 각도 입력은 unitConversion π/180 을 직접 만든다. quatProd(a,b) = a 다음 b. angleBetween→axisAngleToQuat = v1→v2.
   - ★ 뼈 축은 **연결 전에** 전부 구할 것(루프 안에서 구하면 앞 뼈 회전이 섞인다). blendTwoAttr 는 float 정밀도.
   - 위상 엔진 `flowPhaseEngine` 상시(키 사이 직선 → W·(SA+(SB−SA)M) 3차 → Simpson 정확), 어트리뷰트 직접 참조라 멈춘 상태에서도 갱신. 툴이 찍는 키는 linear.
+- **v03.05 (2026-11-05)**: Lite 에 Flutter — `windFlutter` · `windFlutterStiffness`, local_k = 차분 + Flutter·env·(12/n)·(s/total)^p·LUT(같은 위상), 노드당 4개.
+  0 이면 예전 Lite diff 0, 체크 끄면 어트리뷰트 · 노드 없음. 시험 `tests/test_lite_flutter.py` 14/14.
