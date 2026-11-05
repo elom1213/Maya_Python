@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+  <!-- broom handle -->
+  <line x1="23" y1="6" x2="14.5" y2="16.5" stroke="#c8a165" stroke-width="2.6" stroke-linecap="round"/>
+  <!-- broom head -->
+  <path d="M11 14.5 L17.5 19.5 L13 26 L5.5 22 Z" fill="#4fc3c7" stroke="#2a8f93" stroke-width="1" stroke-linejoin="round"/>
+  <line x1="9.5" y1="21.5" x2="7.5" y2="24" stroke="#2a8f93" stroke-width="1.2"/>
+  <line x1="12.5" y1="23" x2="10.8" y2="25.6" stroke="#2a8f93" stroke-width="1.2"/>
+  <!-- sparkle -->
+  <path d="M24 19 L25 21.5 L27.5 22.5 L25 23.5 L24 26 L23 23.5 L20.5 22.5 L23 21.5 Z" fill="#ffe082"/>
+</svg>

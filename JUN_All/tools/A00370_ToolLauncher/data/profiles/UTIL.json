@@ -52,6 +52,11 @@
           "name": "quickTool_V02",
           "path": "tools/A00030_quickTool_V02",
           "color": "#6b7280"
+        },
+        {
+          "name": "SceneCleanup",
+          "path": "tools/A00600_SceneCleanup",
+          "color": "#6b7280"
         }
       ]
     },

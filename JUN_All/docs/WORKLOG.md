@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-05 (오늘)
 
+> [!summary] **A00600_SceneCleanup v01.00 새 툴** — 체크한 항목대로 열린 씬 정리 `#A00600_SceneCleanup`
+- 요청: 레이어 · 애니메이션 레이어 · 안 쓰는 머티리얼 제거를 체크박스(기본 모두 체크)로, 항목은 계속 늘어남. 기존 툴 대신 새 툴로 판단(A00480 = 파일 입출력, A00470 = 머티리얼만, A00210 = 마야 밖 일괄).
+- 결정: 머티리얼 = **Hypershade Delete Unused Nodes 와 같게** → MEL `MLdeleteUnused` 그대로. 애니메이션 레이어 = **BaseAnimation 도 안 보이게** → 루트 삭제(홀로 남은 BaseAnimation 도).
+- 구조: 공용 `Framework/core/maya_cleanup.py` + `cleanup_items.ITEMS`(항목 = 클래스 하나) + runner(undo 청크 하나, 항목 실패 격리, Layer Editor 갱신). 계획서 `plans/A00600_SceneCleanup_plan.md`.
+- 실측: `MLdeleteUnused` 는 mayapy 에서 source 필요 · undo 한 번 복원 · 레퍼런스 애니메이션 레이어가 있으면 루트를 못 지움(경고).
+- 시험 `test_scene_cleanup.py` 33/33(Hypershade 직접 호출과 지운 목록 대조 포함). ToolLauncher UTIL > Scene 에 버튼. **GUI 확인 아직.**
+
 > [!summary] A00390_WindTool **Waves Gen(블렌더) 이식 계획서** (구현 전) `#A00390_WindTool`
 - 요청: 무료 블렌더 애드온 Waves Gen(GPL-3.0) 분석 → 장점 · 보완점을 A00390 V02 에 이식, 바람 프리셋 3개를 그대로 옮길 수 있는지, 진폭 · 속도를 실시간으로 바꿀 수 있는지.
 - 결론: 숫자만 옮기면 다른 그림(진폭 · 파장 · 속도의 뜻이 다름, 끝 따라가기 Damped Track 이 결과를 깎는 구조). Waves Gen 운동 모델(누적 두 축 회전 + 기울기 + 끝 따라가기)을 새 `Flow` 모드로 노드 구현하면 프리셋을 같은 뜻으로 이식 가능.

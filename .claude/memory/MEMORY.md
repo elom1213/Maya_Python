@@ -115,6 +115,7 @@
 - A00560 · A00570 — [JaliBatch · JaliReview](wip-a00560-jalibatch.md)(2026-10-26 v01.01 `Run_JaliBatch.bat` 더블클릭 · Python 3.14 OK(abi3) · **환경은 ~/.jun_jalibatch/venv — PySide6 휠 151자 경로 × 260 한도** · 코어는 Framework/jali · Swap 은 편집 0 일 때만 · 실기 눈 확인 · exe · P4 아직)
 - STT Converter — [wav → 대본 변환기 계획](wip-stt-converter.md)(JUN_JALI docs/0130, 2026-10-23 계획만 · faster-whisper turbo 1차 · Qwen3-ASR 2차 · 기준 PC Ryzen 9 3900X + RTX A2000 12GB · Win10 · Python 3.14 전용 PC 지원 조건)
 - A00550 — [PoseMapper](wip-a00550-posemapper.md)(음소 → BS 포즈 json · Connect, blendWeighted 의 weight 원소 없는 input = 안 보이고 1.0 · getAttr 가 원소를 만든다)
+- A00600 — [SceneCleanup](wip-a00600-scenecleanup.md)(항목 레지스트리 · 애니 레이어는 루트까지 · Unused = MLdeleteUnused · GUI 확인 아직)
 - A00590 — [SwingTwistNative 계획](wip-a00590-swingtwist-native.md)(MetaHuman `SwingTwistEvaluatorNode` → quatNodes 망, 실측 1e-13 완벽 재현 · X 축 · XYZ 고정 · blend 0=상쇄 · DNA export 는 원본 노드 필요 → Restore · 구현 전 확인 대기)
 - A00580 — [FacialBoardBuilder · Ctl_Only_V05](wip-facial-arkit52-ctl-v05.md)(ARKit 52 보드를 json 명세에서 빌드 · CSV 베이크 · verify 1722 · 더미 `BS_Face_CSV` 는 숨긴 평면에 · 컨트롤 트랜스폼은 override normal · GUI 확인 아직 · UE 빌더는 다음)
 - JALI 슬라이더 리그 — [A0020_jali_slider_ctl](wip-jali-slider-ctl.md)(angela 1:1 슬라이더 22 + JaLi 박스, remapValue 리맵, DUMMY_IN/OUT 3쌍, global_scale · 생성/검증은 JUN_JALI examples · GUI 확인 아직)
