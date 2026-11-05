@@ -25,6 +25,20 @@
           "color": "#ffff00"
         },
         {
+          "name": "HandIK_R",
+          "objects": [
+            "test:ZIHAN:Cage:CH_r_ArmIK_xx_ctl"
+          ],
+          "color": "#55aaff"
+        },
+        {
+          "name": "HandIK_L",
+          "objects": [
+            "test:ZIHAN:Cage:CH_l_ArmIK_xx_ctl"
+          ],
+          "color": "#aa0000"
+        },
+        {
           "name": "Foot_R",
           "objects": [
             "test:ZIHAN:Cage:CH_r_foot_xx_ctl"
