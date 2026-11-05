@@ -1,11 +1,11 @@
 ---
 name: wip-a00390-wavesgen-port
-description: A00390 V03 v03.04 Flow 탭 = 블렌더 Waves Gen 바람(프리셋 3x2 · Mix · 끝 따라가기) 마야 노드 이식, 블렌더 골든 12/12 (2026-11-05, GUI 확인 아직)
+description: A00390 V03 v03.04 Flow 탭 = 블렌더 Waves Gen 바람(프리셋 3x2 · Mix · 끝 따라가기) 마야 노드 이식, 블렌더 골든 12/12 (2026-11-05, 사용자 GUI 확인 OK)
 metadata:
   type: project
 ---
 
-2026-11-05 계획서 `JUN_All/docs/plans/A00390_WindTool_wavesgen_port_plan.md` (**V03 v03.04 구현 완료 2026-11-05, GUI 확인 아직** — 결정: V03 · 끝 따라가기까지 · Mix · 개인용 · 블렌더 실행 허가).
+2026-11-05 계획서 `JUN_All/docs/plans/A00390_WindTool_wavesgen_port_plan.md` (**V03 v03.04 구현 완료 2026-11-05, 사용자 GUI 확인 OK "잘 된다"** — 결정: V03 · 끝 따라가기까지 · Mix · 개인용 · 블렌더 실행 허가).
 
 - 원본 `C:\Users\USER\Desktop\JP\0120_blender_plugin\0010_waveGen\__init__.py` (1,052줄), **GPL-3.0** → 코드 · 드라이버 식 복사 금지, 수식을 독립 구현 + 프리셋 출처 표기.
 - 원본 모델: 뼈마다 **로컬 회전 누적**(차분 아님) 두 축 = Strength·(0.3+0.7u) + Flutter·u^Stiff·진행파, Cross 옆 파, Randomness 위상 흔들기, k0=12/n 정규화, 1/(1-0.7q) 보정, **Damped Track 끝 따라가기**가 결과를 깎는다 → 숫자만 옮기면 다른 그림(누적 280~430도).
