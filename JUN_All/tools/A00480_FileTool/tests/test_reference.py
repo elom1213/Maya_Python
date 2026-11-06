@@ -255,15 +255,16 @@ tree.topLevelItem(0).child(0).setSelected(True)    # leaf.ma
 menu, handlers = page.build_context_menu()
 names = [a.text() for a in menu.actions() if not a.isSeparator()]
 check("U13 context menu: Reveal / Copy (2 files) / Refresh, handlers wired",
-      names == ["Reveal in File Explorer (2 files)", "Copy file path (2 files)", "Refresh"]
-      and [handlers[a] for a in menu.actions() if not a.isSeparator()] == [page.on_open, page.on_copy, page.refresh],
+      names == ["Reveal in File Explorer (2 files)", "Copy file path (2 files)", "Replace Reference... (2)", "Refresh"]
+      and [handlers[a] for a in menu.actions() if not a.isSeparator()]
+      == [page.on_open, page.on_copy, page.on_replace, page.refresh],
       names)
 tree.clearSelection()
 menu, handlers = page.build_context_menu()
 acts = [a for a in menu.actions() if not a.isSeparator()]
 check("U13b context menu with nothing selected: Reveal / Copy disabled, Refresh enabled",
-      [a.text() for a in acts] == ["Reveal in File Explorer", "Copy file path", "Refresh"]
-      and [a.isEnabled() for a in acts] == [False, False, True])
+      [a.text() for a in acts] == ["Reveal in File Explorer", "Copy file path", "Replace Reference...", "Refresh"]
+      and [a.isEnabled() for a in acts] == [False, False, False, True])
 
 cmds.file(new=True, force=True)
 LOG[:] = []
@@ -277,7 +278,7 @@ pump()
 labels = [win.tabs.tabText(i) for i in range(win.tabs.count())]
 check("U15 main window tabs", labels == ["Export", "Import", "Path", "Reference"], labels)
 check("U16 Reference sub tab Default", win.reference_tab.tabs.tabText(0) == "Default"
-      and set(win.reference_tab.buttons) == {"Open in Explorer", "Copy Path", "Refresh"}
+      and set(win.reference_tab.buttons) == {"Open in Explorer", "Copy Path", "Replace...", "Refresh"}
       and win.reference_tab.view_combo.count() == 2)
 import inspect   # noqa: E402
 check("U17 About mentions the tab", "[Reference > Default]" in inspect.getsource(type(win).show_about))

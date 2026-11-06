@@ -65,3 +65,6 @@ UI 가 Check 와 규칙에 막힌 Export 뒤에 `select(replace)`. 통과면 선
 - UI 는 `ReferenceTab`(QTabWidget) 안 `ReferenceDefaultPage`; **showEvent 마다 refresh**; 우클릭 메뉴는 `build_context_menu()`(만들기) 와 `_on_context_menu`(exec_) 분리 —
   **오프스크린 시험에서 `QMenu.exec_` 는 영원히 멈추고, PySide2 는 클래스 속성 패치로도 못 막는다.** 새 하위 탭은 `ReferenceTab.build_ui` 에 addTab.
 - `tests/test_reference.py` 35항목. 마야 GUI 눈 확인 아직. 마야 밖 디스크 파일 스캔은 A00210 Maya > Reference([[wip-a00210-maya-reference-tab]]).
+- **v01.21 (2026-11-06) `Replace...`** — 고른 레퍼런스를 다른 .ma/.mb 로(`file new -loadReference rn`). mayapy 실측: 네임스페이스 · 씬 쪽 컨스트레인트 유지,
+  **언로드 레퍼런스를 그냥 부르면 로드돼 버린다 → `loadReferenceDepth="none"` 이면 언로드 그대로**, **중첩 레퍼런스 교체는 임시(저장해도 안 남음, 마야 경고)**,
+  undo 안 됨(확인 창). 부모 + 중첩 같이 고르면 부모만. 파일 창 · 확인 창은 `_ask_file` / `_confirm` 메서드로 시험에서 교체. `test_reference_replace.py` 20.

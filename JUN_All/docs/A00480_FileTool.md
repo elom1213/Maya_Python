@@ -330,7 +330,7 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
 │ │     MID_B:LEAF   D:\...\leaf.ma                 Loaded     │
 │ │   LEAF_TOP{2}    D:\...\leaf.ma                 Unloaded   │  (회색 — 안의 중첩은 로드돼야 보인다)
 │ │   GONE{3}        D:\...\gone.ma                 Missing    │  (빨강 — 파일이 디스크에 없다)
-│ │ [ Open in Explorer ]            [ Copy Path ]             │
+│ │ [ Open in Explorer ]   [ Copy Path ]   [ Replace... ]     │
 └─┴───────────────────────────────────────────────────────────┘
 ```
 
@@ -346,6 +346,17 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
 - **`Open in Explorer`** — 고른 행들의 파일을 탐색기에서 연다. **파일마다 창 하나**, 그 파일이 선택된 채로. 더블클릭은 그 행 하나, 우클릭 메뉴 `Reveal in File Explorer (n files)` 는 고른 것 전부.
   같은 파일을 여러 행이 가리키면(복사 번호 · 중첩) **한 번만** 연다. 파일이 없으면(`Missing`) **그 폴더**를 열고 `[WARN] File is missing - opening its folder instead`, 폴더도 없으면 경고만.
 - **`Copy Path`** — 고른 행들의 경로를 클립보드에, **한 줄에 하나**(윈도우 모양 `\`, 같은 파일은 한 번). 우클릭 `Copy file path (n files)` 도 같다. 로그 `Copied to clipboard : 2 paths`.
+- **`Replace...` (v01.21)** — 고른 레퍼런스를 **다른 마야 파일(.ma / .mb)로 교체**한다. Reference Editor 의 `Replace Reference` 와 같다.
+  우클릭 `Replace Reference... (n)` 도 같다.
+  1. 파일 창이 첫 행 파일의 폴더에서 열린다 → 새 파일을 고른다.
+  2. 확인 창(바꿀 레퍼런스 목록 · **undo 안 됨**) → `Yes`.
+  3. 교체 뒤 트리를 다시 읽는다. 로그 `Replaced TOPLRN : leaf.ma -> leaf2.ma`.
+  - **여러 행을 고르면 전부 같은 파일**로 바뀐다. 이미 그 파일이면 건너뛴다.
+  - 네임스페이스 · 노드 이름 · 씬 쪽 연결(컨스트레인트 · 키)은 그대로 남는다(새 파일에 같은 이름의 노드가 있으면 다시 붙는다).
+  - **로드 상태를 지킨다** — 로드돼 있던 것은 로드, 언로드였던 것은 파일만 바뀌고 언로드 그대로(`(kept unloaded)`). `Missing` 이던 것은 로드한다.
+  - 부모와 그 안의 중첩 레퍼런스를 같이 고르면 **부모만** 바꾼다(중첩은 새 파일 것으로 다시 생긴다).
+  - **중첩 레퍼런스**(다른 레퍼런스 안의 행)도 바꿀 수 있지만 마야 규칙상 **이번 세션만**이다 — 씬을 저장해도 남지 않는다.
+    확인 창과 로그에 경고가 나온다. 영구히 바꾸려면 부모 파일을 열고 거기서 바꾼다.
 - 여러 행은 Shift / Ctrl 로 고른다. 아무것도 안 고르고 누르면 `[WARN] No reference selected.`
 
 | 상황 | 결과 |

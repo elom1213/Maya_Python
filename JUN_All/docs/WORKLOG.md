@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-06 (오늘)
 
+> [!summary] A00480_FileTool **v01.21 Reference > Default `Replace...`** `#A00480_FileTool`
+- 요청: Reference > Default 트리에서 고른 레퍼런스를 다른 파일로 교체.
+- `Replace...` 버튼 + 우클릭 `Replace Reference...` — 파일 고르기 → 확인(undo 안 됨) → `file -loadReference` → 트리 다시 읽기. 여러 행 = 같은 파일.
+- mayapy 실측: 네임스페이스 · 컨스트레인트 유지, 언로드는 `loadReferenceDepth none` 이면 언로드 그대로, **중첩 레퍼런스 교체는 저장 안 됨**(마야 경고) → 막지 않고 확인 창 · 로그로 알림. 부모 + 중첩을 같이 고르면 부모만.
+- 시험 `test_reference_replace.py` 20/20, `test_reference.py` 47/47, `test_reference_lineage.py` 44/44. **GUI 확인 아직.**
+
 > [!summary] A00110_animTool_V02 **v02.54 Match Follow 진행 팝업** `#A00110_animTool`
 - 요청: Transfer > Follow 의 Match Follow 를 누르면 팝업으로 진행도를 보여 줄 것.
 - 공용 `JUN_mod_progress_qt_v01` 사용. core `FollowMatchManager.match_follow(progress=None)` 콜백 — 단위 = 페어 × 프레임(Blend < 1 이면 원본 읽기까지 ×2), 세부 줄 `Follower k/N : 이름`, 로그에 경과 시간.

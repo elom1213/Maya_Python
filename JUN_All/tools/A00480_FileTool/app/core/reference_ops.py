@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-30
+# last Update date : 2026-11-06
 # A00480_FileTool - Reference 탭 로직 (maya.cmds, UI 비의존)
 """
 reference_ops - 현재 씬의 레퍼런스(중첩 포함)를 모으고, 파일을 탐색기로 열고, 경로 문자열을 만든다.
@@ -242,3 +242,121 @@ def clipboard_text(paths):
     lines = [os.path.normpath(p) for p in targets]
     return "\n".join(lines), ["Copied to clipboard : {0}".format(
         lines[0] if len(lines) == 1 else "{0} paths".format(len(lines)))]
+
+
+# ==========================================================================
+# Replace (v01.21)
+# ==========================================================================
+# mayapy 2024 실측 (2026-11-06):
+# - `file(new, loadReference=rn)` = Reference Editor 의 Replace Reference. 네임스페이스 · 노드 이름 · 씬 쪽 연결
+#   (컨스트레인트 · 애니 커브)은 그대로 남는다(같은 이름의 노드가 새 파일에 있으면 다시 붙는다).
+# - 언로드 레퍼런스도 그냥 부르면 **로드돼 버린다** → `loadReferenceDepth="none"` 이면 파일만 바뀌고 언로드 그대로.
+# - **중첩 레퍼런스**(다른 레퍼런스 안의 것)도 바뀌지만 마야 경고대로 **임시**다 - 씬을 저장해도 남지 않는다
+#   (다시 열면 원래 파일). 영구히 바꾸려면 부모 파일을 열고 거기서 바꿔야 한다 → 막지 않고 로그로 알린다.
+# - 같은 파일을 이미 다른 레퍼런스가 쓰면 마야가 `{1}` 복사 번호를 붙인다(정상).
+# - **undo 안 된다**(undoInfo 에 남지 않는다) → UI 가 실행 전에 확인을 받는다.
+
+REPLACE_EXTENSIONS = (".ma", ".mb")
+REPLACE_FILTER = "Maya Files (*.ma *.mb);;All Files (*)"
+
+
+def _is_nested(cmds, node):
+    return bool(_query(cmds, node, referenceNode=True, parent=True))
+
+
+def replace_plan(nodes):
+    """교체할 노드를 정리한다. 반환 (targets, skipped_logs).
+
+    - 씬에 없는 노드 · 레퍼런스가 아닌 노드는 뺀다.
+    - 부모와 그 안의 중첩 레퍼런스를 같이 고르면 **부모만** 바꾼다(부모를 바꾸면 중첩 노드는 새 파일 것으로 다시 생긴다).
+    """
+    cmds = _cmds()
+    if cmds is None:
+        return [], ["[WARN] maya.cmds is not available - no scene to change."]
+    picked = []
+    for node in nodes or []:
+        if node and node not in picked:
+            picked.append(node)
+    logs = []
+    valid = []
+    for node in picked:
+        if not cmds.objExists(node) or cmds.nodeType(node) != "reference":
+            logs.append("[WARN] Not a reference node in the scene - skipped : {0}".format(node))
+            continue
+        valid.append(node)
+    targets = []
+    for node in valid:
+        parent = _query(cmds, node, referenceNode=True, parent=True)
+        covered = False
+        while parent:
+            if parent in valid:
+                covered = True
+                break
+            parent = _query(cmds, parent, referenceNode=True, parent=True)
+        if covered:
+            logs.append("[Info] {0} is inside another selected reference - replacing the parent only.".format(node))
+        else:
+            targets.append(node)
+    return targets, logs
+
+
+def nested_targets(nodes):
+    """그중 중첩 레퍼런스(바꿔도 저장되지 않는 것) 노드 목록 - 확인 창 문구용."""
+    cmds = _cmds()
+    if cmds is None:
+        return []
+    return [n for n in nodes or [] if cmds.objExists(n) and _is_nested(cmds, n)]
+
+
+def replace_references(nodes, new_path):
+    """고른 레퍼런스 노드들을 `new_path` 파일로 바꾼다(Reference Editor 의 Replace Reference). 반환 (count, logs).
+
+    로드 상태는 지킨다 - 로드돼 있던 것은 로드, 언로드였던 것은 언로드 그대로(Missing 이던 것은 로드해 본다).
+    중첩 레퍼런스는 바뀌지만 저장되지 않는다는 경고를 남긴다. undo 는 안 된다(호출 전에 확인 받을 것).
+    """
+    cmds = _cmds()
+    if cmds is None:
+        return 0, ["[WARN] maya.cmds is not available - no scene to change."]
+    path = (new_path or "").replace("\\", "/")
+    if not path:
+        return 0, ["[WARN] No replacement file chosen."]
+    if not os.path.isfile(path):
+        return 0, ["[WARN] File does not exist : {0}".format(os.path.normpath(path))]
+    if os.path.splitext(path)[1].lower() not in REPLACE_EXTENSIONS:
+        return 0, ["[WARN] Not a Maya file (.ma / .mb) : {0}".format(os.path.normpath(path))]
+
+    targets, logs = replace_plan(nodes)
+    if not targets:
+        return 0, logs or ["[WARN] No reference selected."]
+
+    count = 0
+    nested = 0
+    for node in targets:
+        old = _query(cmds, node, filename=True, withoutCopyNumber=True) or ""
+        if old and norm_key(old) == norm_key(path):
+            logs.append("[Info] Already uses that file - skipped : {0}".format(node))
+            continue
+        was_nested = _is_nested(cmds, node)
+        loaded = bool(_query(cmds, node, isLoaded=True))
+        keep_unloaded = (not loaded) and bool(old) and os.path.isfile(old)
+        try:
+            if keep_unloaded:
+                cmds.file(path, loadReference=node, loadReferenceDepth="none")
+            else:
+                cmds.file(path, loadReference=node)
+        except Exception as exc:                            # noqa: BLE001
+            logs.append("[ERROR] Could not replace {0} : {1}".format(node, exc))
+            continue
+        count += 1
+        line = "Replaced {0} : {1} -> {2}".format(
+            node, os.path.basename(old) or "(none)", os.path.basename(path))
+        if keep_unloaded:
+            line += " (kept unloaded)"
+        logs.append(line)
+        if was_nested:
+            nested += 1
+    if nested:
+        logs.append("[WARN] {0} nested reference(s) replaced - this is temporary and is NOT saved with the scene. "
+                    "Open the parent file and replace it there to make it permanent.".format(nested))
+    logs.append("Replace done : {0} reference(s) -> {1}".format(count, os.path.normpath(path)))
+    return count, logs

@@ -84,5 +84,11 @@
 # 01.20  트리 펼치기 - 화살표로 펼치면 한 단계만, Shift + 펼치기/접기 = 아래 전부 (Reference 트리).
 #        공용 Framework/qt/MOD_treeExpand_qt_v01
 
-VERSION = "01.20"
-LAST_UPDATE = "2026-11-05"
+# 01.21  Reference > Default `Replace...` (버튼 + 우클릭 `Replace Reference...`) - 고른 레퍼런스를 다른 .ma / .mb 로 교체
+#        (Reference Editor 의 Replace Reference, 사용자 요청). 파일 고르기(첫 행의 폴더에서) -> 확인(undo 안 됨) -> 교체 -> 트리 다시 읽기.
+#        여러 행 = 같은 파일로 전부. 네임스페이스 · 씬 쪽 연결(컨스트레인트 · 키) 유지, 로드 상태 유지(언로드는 loadReferenceDepth none).
+#        부모 + 그 안의 중첩을 같이 고르면 부모만. 중첩 레퍼런스도 바뀌지만 마야 규칙상 **임시**(씬에 저장 안 됨) - 확인 창 · 로그에 경고.
+#        core.reference_ops.replace_plan / nested_targets / replace_references. tests/test_reference_replace.py 20 · test_reference.py 47.
+
+VERSION = "01.21"
+LAST_UPDATE = "2026-11-06"

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-30
+# last Update date : 2026-11-06
 # A00480_FileTool - Reference 탭 (in-Maya)
 #
 # 하위 탭 `Default` : 현재 씬의 레퍼런스를 **중첩(이중 · 삼중)까지 트리**로 보여 주고,
@@ -12,6 +12,9 @@
 # 하위 탭 `Lineage`(v01.17) : 같은 레퍼런스 관계를 **노드 그래프**로 - `reference_lineage_page.py`
 # (A00211_RefLineage 로 데이터, A00210 Lineage 탭의 노드 · 화살표 그대로, Export 로 A00210 에 보낸다).
 # 새 하위 탭은 `ReferenceTab.build_ui` 에 addTab 한 줄.
+# `Replace...`(v01.21) : 고른 레퍼런스를 다른 .ma / .mb 로 교체(Reference Editor 의 Replace Reference). 파일 고르기 →
+# 확인(undo 안 됨 · 중첩은 저장 안 됨 안내) → core.reference_ops.replace_references → 트리 다시 읽기.
+# 파일 창 / 확인 창은 `_ask_file` / `_confirm` 메서드 - 시험에서 바꿔 끼운다.
 
 import os
 
@@ -31,6 +34,8 @@ from Framework.qt.qt import (
     QAbstractItemView,
     QApplication,
     QMenu,
+    QFileDialog,
+    QMessageBox,
     QBrush,
     QColor,
 )
@@ -41,6 +46,7 @@ from tools.A00480_FileTool.app.core import reference_ops as ops
 from tools.A00480_FileTool.app.ui.reference_lineage_page import ReferenceLineagePage
 
 ROLE_PATH = Qt.UserRole + 1
+ROLE_NODE = Qt.UserRole + 2
 UNLOADED_COLOR = "#9a9a9a"
 
 COL_NAME, COL_FILE, COL_STATUS = 0, 1, 2
@@ -121,6 +127,13 @@ class ReferenceDefaultPage(QWidget):
              "the file is selected). A missing file opens its folder instead."),
             ("Copy Path", self.on_copy,
              "Copy the paths of the selected references to the clipboard, one per line."),
+            ("Replace...", self.on_replace,
+             "Replace the selected references with another Maya file (.ma / .mb) -\n"
+             "the same as Reference Editor > Replace Reference. Namespaces and the scene's\n"
+             "connections (constraints, keys) stay. Loaded stays loaded, unloaded stays unloaded.\n"
+             "Several rows: all of them get the same file.\n"
+             "Nested references can be replaced too, but only for this session -\n"
+             "Maya does not save that change with the scene. Cannot be undone."),
         )
         for label, handler, tip in specs:
             button = QPushButton(label)
@@ -190,6 +203,7 @@ class ReferenceDefaultPage(QWidget):
         name = row["namespace"] + (row["copy"] or "")
         item = QTreeWidgetItem([name, ops.file_text(row["path"], self.file_view), row["status"]])
         item.setData(COL_NAME, ROLE_PATH, row["path"])
+        item.setData(COL_NAME, ROLE_NODE, row["node"])
         tip = "Node : {0}\nPath : {1}".format(row["node"], row["path"])
         if row["stored"] and row["stored"] != row["path"]:
             tip += "\nStored as : {0}".format(row["stored"])
@@ -215,6 +229,12 @@ class ReferenceDefaultPage(QWidget):
             if item in selected:
                 paths.append(item.data(COL_NAME, ROLE_PATH) or "")
         return [p for p in paths if p]
+
+    def selected_nodes(self):
+        """고른 행들의 레퍼런스 노드(트리 순서)."""
+        selected = self.tree.selectedItems()
+        nodes = [item.data(COL_NAME, ROLE_NODE) for item in self._all_items() if item in selected]
+        return [n for n in nodes if n]
 
     def _all_items(self):
         out = []
@@ -243,6 +263,48 @@ class ReferenceDefaultPage(QWidget):
                 clipboard.setText(text)
         self._log_all(logs)
 
+    def on_replace(self, *_args):
+        """고른 레퍼런스를 다른 파일로 교체 (v01.21). 파일 고르기 -> 확인 -> 교체 -> 다시 읽기."""
+        nodes = self.selected_nodes()
+        if not nodes:
+            self._log_all(["[WARN] No reference selected."])
+            return False
+        targets, plan_logs = ops.replace_plan(nodes)
+        if not targets:
+            self._log_all(plan_logs or ["[WARN] No reference selected."])
+            return False
+        paths = self.selected_paths()
+        start = os.path.dirname(os.path.normpath(paths[0])) if paths else ""
+        new_path = self._ask_file(start)
+        if not new_path:
+            return False
+        nested = ops.nested_targets(targets)
+        text = "Replace {0} reference(s) with\n{1} ?\n\n{2}".format(
+            len(targets), os.path.normpath(new_path),
+            "\n".join("  " + n for n in targets[:10]) + ("\n  ..." if len(targets) > 10 else ""))
+        if nested:
+            text += ("\n\n{0} of them are nested references - the change is temporary and is NOT saved "
+                     "with the scene (Maya rule).".format(len(nested)))
+        text += "\n\nThis cannot be undone."
+        if not self._confirm(text):
+            self._log_all(["[Info] Replace cancelled."])
+            return False
+        _count, logs = ops.replace_references(targets, new_path)
+        self._log_all(plan_logs + logs)
+        self.refresh()
+        return True
+
+    def _ask_file(self, start):
+        """교체할 파일 고르기 창. 시험에서 바꿔 끼운다."""
+        path, _filter = QFileDialog.getOpenFileName(self, "Replace Reference With", start, ops.REPLACE_FILTER)
+        return path
+
+    def _confirm(self, text):
+        """실행 확인 창(undo 안 됨). 시험에서 바꿔 끼운다."""
+        answer = QMessageBox.question(self, "Replace Reference", text,
+                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        return answer == QMessageBox.Yes
+
     def _on_double_click(self, item, *_args):
         path = item.data(COL_NAME, ROLE_PATH) or ""
         if path:
@@ -260,6 +322,10 @@ class ReferenceDefaultPage(QWidget):
         act = menu.addAction(path_context.MENU_COPY + suffix)
         act.setEnabled(count > 0)
         handlers[act] = self.on_copy
+        nodes = self.selected_nodes()
+        act = menu.addAction("Replace Reference..." + (" ({0})".format(len(nodes)) if len(nodes) > 1 else ""))
+        act.setEnabled(bool(nodes))
+        handlers[act] = self.on_replace
         menu.addSeparator()
         handlers[menu.addAction("Refresh")] = self.refresh
         return menu, handlers
@@ -297,7 +363,7 @@ class ReferenceTab(QWidget):
         self.default_page = ReferenceDefaultPage(log=self._log_callback)
         self.tabs.addTab(self.default_page, "Default")
         self.tabs.setTabToolTip(0, "List the references of the current scene (nested included), "
-                                   "open them in File Explorer, copy their paths. The File column "
+                                   "open them in File Explorer, copy their paths, replace them with another file. The File column "
                                    "can show the full path or just the file name.")
         self.lineage_page = ReferenceLineagePage(log=self._log_callback)
         index = self.tabs.addTab(self.lineage_page, "Lineage")
