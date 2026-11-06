@@ -251,6 +251,17 @@ try:
     cnt = sc.summarize(sc.compare(man, "D"))
     check("summarize", cnt[sc.MISSING] == 1, cnt)
 
+    # ---- v01.50 PC 표시 이름
+    check("clean_pc_names: trims, drops empty, case-dup",
+          ss.clean_pc_names({"P4T7MBN": "  Office   PC ", "X": "", "p4t7mbn": "dup", "": "n"}) == {"P4T7MBN": "Office PC"})
+    cfg = {"pc_names": {"P4T7MBN": "Office"}}
+    check("pc_label: name / case-insensitive / fallback id",
+          ss.pc_label(cfg, "P4T7MBN") == "Office" and ss.pc_label(cfg, "p4t7mbn") == "Office"
+          and ss.pc_label(cfg, "HOME01") == "HOME01" and ss.pc_label(None, "A") == "A")
+    check("default settings have empty pc_names", ss.default_settings()["pc_names"] == {})
+    ss.save_settings(work, {"roots": [], "pc_names": {"A": "Desk", "B": " "}})
+    check("pc_names round trip through settings file", ss.load_settings(work)["pc_names"] == {"A": "Desk"})
+
 finally:
     shutil.rmtree(work, ignore_errors=True)
 

@@ -138,6 +138,47 @@ try:
     k80 = KANA + "00010_cleanup_KANA_00080.mb"
     check("00080 shown as Missing on this PC", k80 in rows and rows[k80][1][1].startswith("Missing")
           and "get from PCB" in rows[k80][1][1], rows.get(k80))
+    # ---------------------------------------------------------- v01.50 PC 이름
+    from Framework.qt.qt import QDialog  # noqa: E402
+    check("PC Names: known_pcs lists both PCs", sorted(sm.known_pcs(data_dir)) == ["PCA", "PCB"], sm.known_pcs(data_dir))
+    tab._update_this_pc_label()
+    check("PC Names: no name -> computer name", "<b>PCA</b>" in tab.lbl_this_pc.text())
+    ok = tab.apply_pc_names({"PCA": "  Office  ", "PCB": "Home"})
+    saved = json.load(open(ss.settings_path(data_dir), encoding="utf-8"))
+    check("PC Names: saved in shared settings", ok and saved.get("pc_names") == {"PCA": "Office", "PCB": "Home"},
+          saved.get("pc_names"))
+    check("PC Names: This PC label", "<b>Office</b>" in tab.lbl_this_pc.text() and "PCA" in tab.lbl_this_pc.toolTip())
+    heads = [tab.tree.headerItem().text(c) for c in range(tab.tree.columnCount())]
+    check("PC Names: column headers use names", "Office (this PC)" in heads and "Home" in heads and "PCB" not in heads, heads)
+    rows = tree_rows(tab)
+    check("PC Names: status says get from Home", "get from Home" in rows[k80][1][1], rows[k80][1][1])
+    check("PC Names: PCs line uses names", "Office (this PC)" in tab.lbl_pcs.text() and "Home:" in tab.lbl_pcs.text())
+    check("PC Names: manifest files keep the computer name", os.path.isfile(sm.manifest_path(data_dir, rid, "PCB")))
+    tab.on_refresh(quiet=True)
+    check("PC Names: kept after refresh (read from data folder)", "<b>Office</b>" in tab.lbl_this_pc.text())
+
+    def fake_exec(dlg):
+        t = tab._pc_names_table
+        names = {t.item(r, 0).data(Qt.UserRole): t.item(r, 1) for r in range(t.rowCount())}
+        FAKE["first"] = t.item(0, 0).data(Qt.UserRole)
+        FAKE["prefill"] = names["PCB"].text()
+        names["PCB"].setText("")            # 비우면 이름 지움
+        names["PCA"].setText("Desk 1")
+        return QDialog.Accepted
+
+    FAKE = {}
+    st.QDialog.exec_ = fake_exec
+    tab.on_pc_names()
+    check("PC Names dialog: this PC first, prefilled", FAKE.get("first") == "PCA" and FAKE.get("prefill") == "Home", FAKE)
+    heads = [tab.tree.headerItem().text(c) for c in range(tab.tree.columnCount())]
+    check("PC Names dialog: rename + clear applied", "Desk 1 (this PC)" in heads and "PCB" in heads
+          and tab._settings["pc_names"] == {"PCA": "Desk 1"}, (heads, tab._settings["pc_names"]))
+    st.QDialog.exec_ = lambda dlg: QDialog.Rejected
+    tab.on_pc_names()
+    check("PC Names dialog: cancel changes nothing", tab._settings["pc_names"] == {"PCA": "Desk 1"})
+    tab.apply_pc_names({"PCA": ""})
+    check("PC Names: all cleared", tab._settings["pc_names"] == {} and "<b>PCA</b>" in tab.lbl_this_pc.text())
+
     check("Status column right after Path", tab.tree.headerItem().text(1) == "Status")
     check("PC columns: this PC first", tab.tree.headerItem().text(2) == "PCA (this PC)" and tab.tree.headerItem().text(3) == "PCB")
     check("missing cell shows dash", rows[k80][1][2] == "—")

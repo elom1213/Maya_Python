@@ -74,6 +74,21 @@ def load_root_manifests(data_dir, root_id):
     return out
 
 
+def known_pcs(data_dir):
+    """모든 루트 폴더의 매니페스트에 나온 PC id -> {pc: [root_id, ...]} (PC 이름 붙이기 창용)."""
+    d = ss.manifests_dir(data_dir)
+    out = {}
+    if not d or not os.path.isdir(d):
+        return out
+    for rid in sorted(os.listdir(d), key=str.lower):
+        sub = os.path.join(d, rid)
+        if rid.startswith("_") or not os.path.isdir(sub):
+            continue
+        for pc in load_root_manifests(data_dir, rid):
+            out.setdefault(pc, []).append(rid)
+    return out
+
+
 def save_manifest(data_dir, manifest):
     path = manifest_path(data_dir, manifest.get("root_id"), manifest.get("pc"))
     if not path:

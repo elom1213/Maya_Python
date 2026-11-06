@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-11-05
+updated: 2026-11-06
 ---
 
 # 작업 일지 (WORKLOG)
@@ -31,7 +31,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-11-05 (오늘)
+## 2026-11-06 (오늘)
+
+> [!summary] A00210_FileManager **v01.50 Sync PC 이름** `#A00210_FileManager`
+- 요청: Sync / Status 에 `P4T7MBN` 같은 컴퓨터 이름 대신 직관적인 PC 이름을 붙이고 싶다(기존 기능 없음 → 새로).
+- 구현: `PC Names...` 창(PC · 이름 · 스캔한 루트) → `_sync_settings.json` 의 `pc_names`(모든 PC 공유). 화면의 모든 PC 표기가 이름으로, 매니페스트 파일은 컴퓨터 이름 그대로.
+- 시험: `test_sync_ui.py` 91/91, `test_sync_core.py` 57/57, 나머지 A00210 시험 통과.
+
+## 2026-11-05
 
 > [!summary] A00390_WindTool_V03 **v03.05 Chain Wave Lite 에 Flutter** `#A00390_WindTool`
 - 요청: Flow(Waves Gen)의 Flutter 기능을 Lite 탭으로 이식.

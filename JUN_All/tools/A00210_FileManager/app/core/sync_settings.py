@@ -12,7 +12,8 @@
 #   {"schema": 1,
 #    "roots": [{"id": "jun_mue", "name": "JUN_MUE", "default_path": "C:/JUN/JUN_MUE",
 #               "excluded_paths": ["00_00_02_자료/", "x/y.mb"], "follow_junctions": false}],
-#    "ignore_patterns": ["**/backup/**", ...]}
+#    "ignore_patterns": ["**/backup/**", ...],
+#    "pc_names": {"P4T7MBN": "Office"}}      ← v01.50 PC 표시 이름(툴 안에서만). 매니페스트 파일 이름은 그대로 PC id.
 #
 # PC 마다 다른 값(루트의 실제 경로, 이 PC 만의 제외 경로)은 공유하지 않는다 - A00210 프로파일(prefs)에 둔다.
 #
@@ -48,6 +49,33 @@ def this_pc():
     """이 PC 이름(매니페스트 파일 이름). Windows 는 COMPUTERNAME."""
     name = os.environ.get("COMPUTERNAME") or socket.gethostname() or "PC"
     return safe_file_name(name)
+
+
+def clean_pc_names(data):
+    """{pc_id: 표시 이름} 정리 - 빈 이름은 뺀다(= id 로 보인다). 키 비교는 대소문자 무시."""
+    out = {}
+    seen = set()
+    if isinstance(data, dict):
+        for pc, name in data.items():
+            pc = str(pc or "").strip()
+            name = " ".join(str(name or "").split())
+            if not pc or not name or pc.lower() in seen:
+                continue
+            seen.add(pc.lower())
+            out[pc] = name
+    return out
+
+
+def pc_label(settings, pc):
+    """화면에 보일 PC 이름 - 붙인 이름이 있으면 그것, 없으면 PC id(COMPUTERNAME)."""
+    names = (settings or {}).get("pc_names") or {}
+    if pc in names:
+        return names[pc]
+    low = str(pc or "").lower()
+    for k, v in names.items():
+        if k.lower() == low:
+            return v
+    return pc
 
 
 def safe_file_name(name):
@@ -192,7 +220,7 @@ def overlap(path_a, path_b):
 # ---------------------------------------------------------------- load / save
 
 def default_settings():
-    return {"schema": SCHEMA, "roots": [], "ignore_patterns": list(DEFAULT_IGNORE)}
+    return {"schema": SCHEMA, "roots": [], "ignore_patterns": list(DEFAULT_IGNORE), "pc_names": {}}
 
 
 def _clean(data):
@@ -222,6 +250,7 @@ def _clean(data):
         out["roots"] = roots
         if isinstance(data.get("ignore_patterns"), list):
             out["ignore_patterns"] = [str(p) for p in data["ignore_patterns"] if str(p).strip()]
+        out["pc_names"] = clean_pc_names(data.get("pc_names"))
     return out
 
 

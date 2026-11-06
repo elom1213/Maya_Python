@@ -42,5 +42,9 @@
 #        Sync > Excluded: 왼쪽에 이 PC 루트 폴더 트리(체크박스, 게으른 읽기) - Exclude Checked (All PCs / This PC).
 #        Framework tabFit: 스크롤 칸 안의 중첩 탭도 hfw 경로 - 긴 Status 페이지를 두 번 빼 창이 246px 로 쪼그라들던 것.
 
-VERSION = "01.49"
-LAST_UPDATE = "2026-11-05"
+# 01.50  Sync: PC 표시 이름 - 위쪽 `PC Names...` 창에서 PC 마다 툴 안 이름(예: Office / Home)을 붙인다. 빈 칸 = 컴퓨터 이름(COMPUTERNAME).
+#        _sync_settings.json 의 pc_names 로 모든 PC 공유(푸시하면 다른 PC 에도). This PC 라벨 · PCs 줄 · PC 열 머리 · 상태 글자(get from / send to) ·
+#        요약 열 · 툴팁 · Export List 에 이름. 매니페스트 파일 이름은 컴퓨터 이름 그대로(이름을 바꿔도 이력이 끊기지 않는다).
+
+VERSION = "01.50"
+LAST_UPDATE = "2026-11-06"

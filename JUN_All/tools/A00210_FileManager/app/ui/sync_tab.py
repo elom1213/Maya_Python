@@ -7,6 +7,7 @@
 #   - 하위 탭: Status(비교 표) · Roots(추적 루트 여러 개, PC 별 경로) · Excluded(루트별 제외 경로 · 무시 패턴).
 #   - 공유 값(루트 · 제외 경로 · 패턴)은 <데이터 폴더>/manifests/_sync_settings.json,
 #     PC 별 값(루트 실제 경로 · 이 PC 만 제외 · 화면 상태)은 A00210 프로파일(prefs).
+#   - v01.50 : PC 표시 이름(_sync_settings.json 의 pc_names, 모든 PC 공유) - 화면에는 붙인 이름, 매니페스트 파일은 PC id 그대로.
 #   - 스캔(해시)은 QThread. git Pull / Push 는 MainWindow 가 주는 콜러블로(검사 · 클론은 MainWindow 쪽).
 #
 # UI 문자열은 영어, 주석은 한국어.
@@ -51,6 +52,8 @@ from Framework.qt.qt import (
     QColor,
     QStyle,
     QSizePolicy,
+    QDialog,
+    QDialogButtonBox,
 )
 
 from ..core import sync_settings as ss
@@ -160,8 +163,16 @@ class SyncTab(QWidget):
         self.lbl_root_path = QLabel("")
         self.lbl_root_path.setTextInteractionFlags(Qt.TextSelectableByMouse)
         top.addWidget(self.lbl_root_path, 1)
-        top.addWidget(QLabel("This PC: <b>{0}</b>".format(self._pc)))
+        self.lbl_this_pc = QLabel("")
+        top.addWidget(self.lbl_this_pc)
+        self.btn_pc_names = QPushButton("PC Names...")
+        self.btn_pc_names.setToolTip(
+            "Give each PC a name shown in this tool (e.g. Office / Home) instead of its computer name.\n"
+            "Names are shared with the other PCs through the data folder - push to apply there.")
+        self.btn_pc_names.clicked.connect(self.on_pc_names)
+        top.addWidget(self.btn_pc_names)
         root.addLayout(top)
+        self._update_this_pc_label()
 
         self.sub_tabs = QTabWidget()
         self.sub_tabs.addTab(self._build_status_page(), "Status")
@@ -607,6 +618,93 @@ class SyncTab(QWidget):
     def _current_root(self):
         return ss.find_root(self._settings, self._root_id)
 
+    # ---------------------------------------------------------------- PC names (v01.50)
+    def _pc_name(self, pc):
+        """화면용 PC 이름 - 붙인 이름, 없으면 PC id."""
+        return ss.pc_label(self._settings, pc)
+
+    def _pc_names(self, pcs):
+        return ", ".join(self._pc_name(p) for p in pcs)
+
+    def _update_this_pc_label(self):
+        name = self._pc_name(self._pc)
+        self.lbl_this_pc.setText("This PC: <b>{0}</b>".format(name))
+        tip = "Computer name: {0}".format(self._pc)
+        if name == self._pc:
+            tip += "\nGive it a friendlier name with PC Names..."
+        self.lbl_this_pc.setToolTip(tip)
+
+    def on_pc_names(self):
+        """PC 이름 붙이기 창 - 매니페스트에 나온 모든 PC + 이 PC + 이미 이름 붙인 PC."""
+        data_dir = self._data_dir()
+        if not data_dir:
+            QMessageBox.warning(self, "Sync", "Set the data folder first (File Manager > Settings).")
+            return
+        seen = sm.known_pcs(data_dir)
+        names = dict(self._settings.get("pc_names") or {})
+        pcs = {}
+        for p in list(seen) + list(names) + [self._pc]:
+            pcs.setdefault(p.lower(), p)
+        order = sorted(pcs.values(), key=lambda p: (p.lower() != self._pc.lower(), p.lower()))
+        root_names = {r["id"]: r["name"] for r in self._settings.get("roots", [])}
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("PC Names")
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(QLabel("Name shown in this tool for each PC. Empty = computer name.\n"
+                             "Shared with all PCs through the data folder (push to apply on the others)."))
+        tbl = QTableWidget(len(order), 3)
+        tbl.setHorizontalHeaderLabels(["Computer", "Name", "Scanned roots"])
+        tbl.verticalHeader().setVisible(False)
+        for row, pc in enumerate(order):
+            it = QTableWidgetItem(pc + ("  (this PC)" if pc.lower() == self._pc.lower() else ""))
+            it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+            it.setData(Qt.UserRole, pc)
+            tbl.setItem(row, 0, it)
+            cur = ss.pc_label(self._settings, pc)
+            tbl.setItem(row, 1, QTableWidgetItem("" if cur == pc else cur))
+            rids = next((v for k, v in seen.items() if k.lower() == pc.lower()), [])
+            it = QTableWidgetItem(", ".join(root_names.get(r, r) for r in rids) or "-")
+            it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+            tbl.setItem(row, 2, it)
+        tbl.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        tbl.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        tbl.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        tbl.setMinimumWidth(460)
+        lay.addWidget(tbl)
+        if order:
+            tbl.setCurrentCell(0, 1)
+        bb = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        bb.accepted.connect(dlg.accept)
+        bb.rejected.connect(dlg.reject)
+        lay.addWidget(bb)
+        self._pc_names_table = tbl           # 시험에서 접근
+        if dlg.exec_() != QDialog.Accepted:
+            return
+        tbl.setCurrentItem(None)             # 편집 중인 칸을 확정
+        self.apply_pc_names({tbl.item(r, 0).data(Qt.UserRole): (tbl.item(r, 1).text() if tbl.item(r, 1) else "")
+                             for r in range(tbl.rowCount())})
+
+    def apply_pc_names(self, mapping):
+        """{pc_id: 이름} 을 공유 설정에 저장하고 화면을 다시 그린다. 빈 이름 = 이름 지움(PC id 로 보인다)."""
+        old = dict(self._settings.get("pc_names") or {})
+        given = {str(k).lower() for k in mapping}
+        new = {k: v for k, v in old.items() if k.lower() not in given}
+        new.update(ss.clean_pc_names(mapping))
+        if new == old:
+            return False
+        self._settings["pc_names"] = new
+        if not self._save_settings():
+            self._settings["pc_names"] = old
+            return False
+        keys = sorted({k for k, _ in set(old.items()) ^ set(new.items())}, key=str.lower)
+        self._log("Sync: PC names saved ({0}) - push to share with the other PCs.".format(
+            ", ".join("{0} = {1}".format(k, new.get(k, "(computer name)")) for k in keys)))
+        self._update_this_pc_label()
+        self._update_pcs_label()
+        self._populate_tree()
+        return True
+
     def _root_abs(self, root=None):
         root = root or self._current_root()
         return ss.root_path(root, self._local_paths)
@@ -661,6 +759,7 @@ class SyncTab(QWidget):
         self._refresh_excluded_lists()
         self._reload_excl_tree()
         self.txt_ignore.setPlainText("\n".join(self._settings.get("ignore_patterns") or []))
+        self._update_this_pc_label()
         self._load_manifests()
         self._compare()
         if not quiet:
@@ -697,7 +796,7 @@ class SyncTab(QWidget):
         now = time.time()
         for pc in self._pcs():
             m = self._manifests.get(pc)
-            name = "{0} (this PC)".format(pc) if pc == self._pc else pc
+            name = "{0} (this PC)".format(self._pc_name(pc)) if pc == self._pc else self._pc_name(pc)
             if not m:
                 parts.append("<span style='color:{0}'>● {1}: not scanned</span>".format(STATUS_COLORS[sc.MISSING], name))
                 continue
@@ -764,7 +863,8 @@ class SyncTab(QWidget):
         if summary:
             headers = ["Path", "Status", "This PC", "Latest on", "Missing on", "Outdated on"]
         else:
-            headers = ["Path", "Status"] + ["{0} (this PC)".format(p) if p == self._pc else p for p in pcs]
+            headers = ["Path", "Status"] + ["{0} (this PC)".format(self._pc_name(p)) if p == self._pc else self._pc_name(p)
+                                            for p in pcs]
         status_col = 1
         # 다시 그려도 사용자가 펼쳐 둔 폴더는 그대로(처음엔 전부 접힘). 필터 글자가 있으면 맞는 것까지 펼친다.
         keep = self._expanded_rels() if self._populated_once else set()
@@ -867,10 +967,10 @@ class SyncTab(QWidget):
         if e:
             text = (e.get("mtime") or "")[5:16] or "?"
             tip = "{0}\nsize {1:,} bytes\nsha256 {2}\nmodified {3}".format(
-                pc, e.get("size") or 0, (e.get("sha256") or "")[:16], e.get("mtime") or "?")
+                self._pc_name(pc), e.get("size") or 0, (e.get("sha256") or "")[:16], e.get("mtime") or "?")
         else:
             text = "—"
-            tip = "{0}: no file".format(pc) if pc in self._manifests else "{0}: not scanned".format(pc)
+            tip = "{0}: {1}".format(self._pc_name(pc), "no file" if pc in self._manifests else "not scanned")
         if st:
             mark = "?" if row.uncertain.get(pc) else ""
             tip += "\nstatus: {0}{1}".format(st, mark)
@@ -881,9 +981,9 @@ class SyncTab(QWidget):
     def _fill_summary_cells(self, it, row):
         e = row.entries.get(self._pc)
         it.setText(2, (e.get("mtime") or "")[5:16] if e else "—")
-        it.setText(3, ", ".join(row.latest_on()))
-        it.setText(4, ", ".join(row.pcs_with(sc.MISSING)))
-        it.setText(5, ", ".join(row.pcs_with(sc.OUTDATED)))
+        it.setText(3, self._pc_names(row.latest_on()))
+        it.setText(4, self._pc_names(row.pcs_with(sc.MISSING)))
+        it.setText(5, self._pc_names(row.pcs_with(sc.OUTDATED)))
         it.setForeground(4, QBrush(QColor(STATUS_COLORS[sc.MISSING])))
         it.setForeground(5, QBrush(QColor(STATUS_COLORS[sc.OUTDATED])))
 
@@ -893,9 +993,9 @@ class SyncTab(QWidget):
             for st in (sc.MISSING, sc.OUTDATED, sc.CONFLICT):
                 pcs = row.pcs_with(st)
                 if pcs:
-                    parts.append("{0}: {1}".format(st, ", ".join(pcs)))
+                    parts.append("{0}: {1}".format(st, self._pc_names(pcs)))
             if not parts:
-                parts.append("Send from: " + ", ".join(row.latest_on()))
+                parts.append("Send from: " + self._pc_names(row.latest_on()))
             worst = next((s for s in (sc.MISSING, sc.OUTDATED, sc.CONFLICT) if row.pcs_with(s)), sc.AHEAD)
             return " · ".join(parts), STATUS_COLORS[worst]
         st = row.status
@@ -903,11 +1003,11 @@ class SyncTab(QWidget):
         if st in (sc.MISSING, sc.OUTDATED):
             src = row.latest_on() or [p for p in row.entries if p != self._pc]
             if src:
-                text += "  (get from {0})".format(", ".join(src))
+                text += "  (get from {0})".format(self._pc_names(src))
         elif st == sc.AHEAD:
             need = [p for p in row.pc_status if p != self._pc and row.pc_status[p] in (sc.MISSING, sc.OUTDATED)]
             if need:
-                text += "  (send to {0})".format(", ".join(need))
+                text += "  (send to {0})".format(self._pc_names(need))
         return text, STATUS_COLORS.get(st, "#888")
 
     def _update_summary(self, visible):
@@ -1066,7 +1166,8 @@ class SyncTab(QWidget):
             return
         rows = self._row_by_rel()
         lines = ["# root: {0} ({1})  this PC: {2}  {3}".format(
-            self._root_name(), self._root_abs(), self._pc, time.strftime("%Y-%m-%d %H:%M:%S")),
+            self._root_name(), self._root_abs(),
+            self._pc if self._pc_name(self._pc) == self._pc else "{0} ({1})".format(self._pc_name(self._pc), self._pc), time.strftime("%Y-%m-%d %H:%M:%S")),
             "# status\tpath\tdetails"]
         mode = self.cmb_compare.currentData() or "this"
         for it in items:

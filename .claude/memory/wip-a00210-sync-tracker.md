@@ -24,3 +24,5 @@ metadata:
 - v01.48~49 (2026-11-05): Status 열 = 경로 옆, 폴더 줄 = 아래 **모든** 파일 상태(`Missing (1) · Ahead (2)` / `OK`), 처음 접힘(펼침 유지),
   색 Missing #ff8a8a · Outdated #f2d64b · Conflict #7fd8ff · OK #6fcf6f(사용자 지정), Show 기본 전부 체크(키 `sync_show_filters` — 예전 `sync_show` 무시),
   Status 트리 힌트 1075 = 창 2.2 배(717 → 1600), Excluded 왼쪽 게으른 체크 트리 → Exclude Checked. GUI 확인 아직.
+- v01.50 (2026-11-06): PC 표시 이름 — `PC Names...` 창, `_sync_settings.json` 의 `pc_names`(공유), `ss.pc_label` 로 화면만 바꾼다.
+  매니페스트 파일 · 판정 키는 컴퓨터 이름(COMPUTERNAME) 그대로. 옛 버전 툴이 설정을 저장하면 `_clean` 이 pc_names 를 버리므로 다른 PC 도 v01.50 이상이어야 한다. GUI 확인 아직.

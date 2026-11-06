@@ -2,6 +2,15 @@
 
 All notable changes to this tool are documented here.
 
+## [01.50] - 2026-11-06
+
+- **[Sync] PC 표시 이름.** 위쪽 `This PC:` 옆 **`PC Names...`** 창에서 PC 마다 툴 안에서 부를 이름(예: `P4T7MBN` → `Office`)을 붙인다.
+  표에는 매니페스트에 나온 모든 PC(이 PC 먼저) · 스캔한 루트가 보이고, 이름 칸을 비우면 컴퓨터 이름으로 돌아간다.
+  - 화면 전부 이름으로: `This PC:` 라벨(툴팁 = 컴퓨터 이름) · `PCs:` 줄 · PC 열 머리 · 상태 글자(`get from Home` · `send to Home` · `Missing: Home`) · 요약 열 · 셀 툴팁 · Export List 머리.
+  - 이름은 `_sync_settings.json` 의 `pc_names` — **모든 PC 가 공유**(Scan && Push 등으로 푸시하면 다른 PC 에도 같은 이름).
+  - 매니페스트 파일 이름 · 판정 키는 **컴퓨터 이름 그대로** — 이름을 바꿔도 이력이 끊기지 않는다.
+- 시험 `test_sync_ui.py` 91/91(+13: 저장 · 라벨 · 열 머리 · 상태 글자 · 새로 읽어도 유지 · 창 미리 채움 · 비우기 · 취소), core 57/57. **GUI 확인 아직.**
+
 ## [01.49] - 2026-11-05
 
 - **[Sync > Status] `Show` 기본 = 전부 체크(OK · Excluded 포함, 사용자 지정).** 설정 키를 `sync_show` → `sync_show_filters` · `sync_show_excluded` 로 바꿔
