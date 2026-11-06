@@ -49,5 +49,8 @@
 # 01.51  Sync > Status: 빈 폴더도 트리에(예: scenes/1999_=== - 복사본). 스캔이 가장 안쪽 빈 폴더를 매니페스트 empty_dirs 에 적고,
 #        PC 마다 있음 / 없음으로 Empty folder(OK) · Missing · Only here. 위 폴더 줄 상태에도 센다. 옛 매니페스트(키 없음)는 판정에서 뺀다 - 다시 스캔하면 들어간다.
 
-VERSION = "01.51"
+# 01.52  Sync > Status: File Types - File Manager 탭과 같은 확장자 체크 메뉴(눌러도 닫히지 않음, All, 확장자별 개수). 끈 확장자는 prefs sync_types_off
+#        (새 확장자는 켜진 채). 고르는 중엔 빈 폴더 숨김, 폴더 줄 상태는 아래 모든 파일로. 메뉴 클래스는 app/ui/checkable_menu.py 로 옮겨 두 탭이 같이 쓴다.
+
+VERSION = "01.52"
 LAST_UPDATE = "2026-11-06"

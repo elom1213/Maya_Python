@@ -28,3 +28,4 @@ metadata:
   매니페스트 파일 · 판정 키는 컴퓨터 이름(COMPUTERNAME) 그대로. 옛 버전 툴이 설정을 저장하면 `_clean` 이 pc_names 를 버리므로 다른 PC 도 v01.50 이상이어야 한다. GUI 확인 아직.
 - v01.51 (2026-11-06): 빈 폴더 — 스캔이 가장 안쪽 빈 폴더만 `empty_dirs` 에, `sc.empty_dirs` 가 DirStatus(present / lacking). 키 없는 옛 매니페스트 = 모름(Missing 아님).
   트리에서 빈 폴더 줄은 폴더 상태 계산 **전에** 만들어야 그 위 폴더 줄도 센다.
+- v01.52 (2026-11-06): Status `File Types` — 확장자 체크 메뉴(File Manager 와 같은 `CheckableMenu`, `app/ui/checkable_menu.py`), 끈 것 prefs `sync_types_off`. GUI 확인 아직.

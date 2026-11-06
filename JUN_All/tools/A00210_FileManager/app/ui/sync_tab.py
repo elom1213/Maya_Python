@@ -9,6 +9,7 @@
 #     PC 별 값(루트 실제 경로 · 이 PC 만 제외 · 화면 상태)은 A00210 프로파일(prefs).
 #   - v01.50 : PC 표시 이름(_sync_settings.json 의 pc_names, 모든 PC 공유) - 화면에는 붙인 이름, 매니페스트 파일은 PC id 그대로.
 #   - v01.51 : 빈 폴더도 Status 트리에(매니페스트 empty_dirs). 있는 PC / 없는 PC 로 Missing · Only here · OK.
+#   - v01.52 : Status 에 File Types(확장자 체크 메뉴) - File Manager 탭과 같은 모양. 끈 확장자는 prefs sync_types_off.
 #   - 스캔(해시)은 QThread. git Pull / Push 는 MainWindow 가 주는 콜러블로(검사 · 클론은 MainWindow 쪽).
 #
 # UI 문자열은 영어, 주석은 한국어.
@@ -55,12 +56,14 @@ from Framework.qt.qt import (
     QSizePolicy,
     QDialog,
     QDialogButtonBox,
+    QToolButton,
 )
 
 from ..core import sync_settings as ss
 from ..core import sync_manifest as sm
 from ..core import sync_compare as sc
 from ..core.paths import ui_path
+from .checkable_menu import CheckableMenu
 
 # 상태 글자색(어두운 · 밝은 테마 모두에서 읽히는 중간 톤)
 # v01.49 사용자 지정: Missing 연한 빨강 · Outdated 노랑 · Conflict 밝은 하늘색 · OK 초록. (Ahead / Only here 는 지정 없음 - 보라)
@@ -144,6 +147,8 @@ class SyncTab(QWidget):
         self._manifests = {}
         self._rows = []
         self._dirs = []                            # 빈 폴더 (sc.DirStatus)
+        self._types_off = set()                    # File Types 에서 끈 확장자(점 없음 · 소문자, "" = 확장자 없음)
+        self._type_actions = {}
         self._thread = None
         self._push_after_scan = False
         self._populated_once = False
@@ -268,6 +273,16 @@ class SyncTab(QWidget):
         btn_clear = QPushButton("Clear")
         btn_clear.clicked.connect(self.le_filter.clear)
         frow.addWidget(btn_clear)
+        # v01.52 File Types - File Manager 탭과 같은 확장자 체크 메뉴(눌러도 닫히지 않는다)
+        self.btn_file_types = QToolButton()
+        self.btn_file_types.setText("File Types")
+        self.btn_file_types.setToolTip(
+            "Choose which file extensions to show (from the compared manifests).\n"
+            "Folder status still counts every file below.")
+        self.btn_file_types.setPopupMode(QToolButton.InstantPopup)
+        self._types_menu = CheckableMenu(self.btn_file_types)
+        self.btn_file_types.setMenu(self._types_menu)
+        frow.addWidget(self.btn_file_types)
         lay.addLayout(frow)
 
         self.tree = _HintTree(STATUS_TREE_HINT)
@@ -575,6 +590,7 @@ class SyncTab(QWidget):
                 cb.blockSignals(False)
         self.chk_show_excluded.blockSignals(True)
         self.chk_show_excluded.setChecked(bool(prefs.get("sync_show_excluded", True)))
+        self._types_off = {str(x).lower() for x in (prefs.get("sync_types_off") or [])}
         self.chk_show_excluded.blockSignals(False)
         self.on_refresh(quiet=True)
 
@@ -586,6 +602,7 @@ class SyncTab(QWidget):
             "sync_compare": self.cmb_compare.currentData() or "this",
             "sync_show_filters": [k for k, cb in self.chk_show.items() if cb.isChecked()],
             "sync_show_excluded": self.chk_show_excluded.isChecked(),
+            "sync_types_off": sorted(self._types_off),
         }
 
     # ============================================================== settings / roots
@@ -782,7 +799,71 @@ class SyncTab(QWidget):
         self._rows = sc.compare(self._manifests, self._pc, self._excluded_for(root), ignore) if root else []
         self._dirs = sc.empty_dirs(self._manifests, self._pc, self._excluded_for(root), ignore, self._rows) if root else []
         self._update_pcs_label()
+        self._rebuild_type_menu()
         self._populate_tree()
+
+    # ---------------------------------------------------------------- File Types (v01.52)
+    def _rebuild_type_menu(self):
+        """비교한 파일들의 확장자로 메뉴를 다시 만든다. 끈 확장자(_types_off)는 이름으로 기억 - 새 확장자는 켜진 채."""
+        exts = sorted({_ext_of(r.rel) for r in self._rows})
+        self._types_menu.clear()
+        self._type_actions = {}
+        self.act_all_types = self._types_menu.addAction("All")
+        self.act_all_types.setCheckable(True)
+        self.act_all_types.triggered.connect(self._on_all_types_toggled)
+        self._types_menu.addSeparator()
+        counts = {}
+        for r in self._rows:
+            x = _ext_of(r.rel)
+            counts[x] = counts.get(x, 0) + 1
+        for x in exts:
+            act = self._types_menu.addAction("{0}  ({1})".format(("." + x) if x else "(no ext)", counts[x]))
+            act.setCheckable(True)
+            act.setChecked(x not in self._types_off)
+            act.triggered.connect(lambda checked, ex=x: self._on_type_toggled(ex, checked))
+            self._type_actions[x] = act
+        self._sync_type_menu()
+
+    def _on_type_toggled(self, ext, checked):
+        (self._types_off.discard if checked else self._types_off.add)(ext)
+        self._sync_type_menu()
+        self._populate_tree()
+
+    def _on_all_types_toggled(self, checked):
+        for ext, act in self._type_actions.items():
+            act.setChecked(checked)
+            (self._types_off.discard if checked else self._types_off.add)(ext)
+        self._sync_type_menu()
+        self._populate_tree()
+
+    def set_types_shown(self, exts):
+        """보일 확장자를 정한다(시험 · 코드용). exts = None 이면 전부."""
+        for ext, act in self._type_actions.items():
+            on = exts is None or ext in exts
+            act.setChecked(on)
+            (self._types_off.discard if on else self._types_off.add)(ext)
+        self._sync_type_menu()
+        self._populate_tree()
+
+    def _types_filtering(self):
+        """일부 확장자만 켜져 있는가(전부 켜졌으면 거르지 않는다)."""
+        return any(x in self._types_off for x in self._type_actions)
+
+    def _sync_type_menu(self):
+        """All 체크 · 버튼 글자(File Types: mb, ma +2)."""
+        if not self._type_actions:
+            self.act_all_types.setChecked(True)
+            self.btn_file_types.setText("File Types")
+            return
+        shown = [x for x in self._type_actions if x not in self._types_off]
+        self.act_all_types.setChecked(len(shown) == len(self._type_actions))
+        if len(shown) == len(self._type_actions):
+            self.btn_file_types.setText("File Types: All")
+        elif not shown:
+            self.btn_file_types.setText("File Types: none")
+        else:
+            more = "" if len(shown) <= 3 else " +{0}".format(len(shown) - 3)
+            self.btn_file_types.setText("File Types: " + ", ".join((x or "(no ext)") for x in shown[:3]) + more)
 
     def _pcs(self):
         """열 순서: 이 PC 먼저, 나머지 이름순. 이 PC 매니페스트가 없어도 열은 만든다."""
@@ -820,10 +901,13 @@ class SyncTab(QWidget):
         if sc.AHEAD in show:
             show.add(sc.ONLY_HERE)
         words = [w for w in self.le_filter.text().lower().split() if w]
+        types_on = self._types_filtering()
         out = []
         for r in self._rows:
             low = r.rel.lower()
             if words and not all(w in low for w in words):
+                continue
+            if types_on and _ext_of(r.rel) in self._types_off:
                 continue
             if mode == "all":
                 if r.is_problem():
@@ -956,6 +1040,8 @@ class SyncTab(QWidget):
         if sc.AHEAD in show:
             show.add(sc.ONLY_HERE)
         words = [w for w in self.le_filter.text().lower().split() if w]
+        if self._types_filtering():
+            return []          # 확장자를 골라 보는 중엔 빈 폴더(파일 없음)는 숨긴다
         out = []
         for d in self._dirs:
             if words and not all(w in d.rel.lower() for w in words):
@@ -1537,6 +1623,12 @@ def _age_text(seconds):
     if seconds < 86400:
         return "{0} h ago".format(seconds // 3600)
     return "{0} days ago".format(seconds // 86400)
+
+
+def _ext_of(rel):
+    """확장자(점 없음 · 소문자). 없으면 "" - File Manager 의 File Types 와 같은 표기."""
+    name = rel.rpartition("/")[2]
+    return os.path.splitext(name)[1].lstrip(".").lower()
 
 
 def _folder_status(counts):

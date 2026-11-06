@@ -2,6 +2,15 @@
 
 All notable changes to this tool are documented here.
 
+## [01.52] - 2026-11-06
+
+- **[Sync > Status] `File Types` 확장자 필터.** `Filter` 줄 오른쪽에 File Manager 탭과 같은 `File Types` 버튼 — 비교한 파일들의 확장자를
+  `.mb (120)` 처럼 개수와 함께 체크 메뉴로(눌러도 닫히지 않음, `All` 로 한 번에). 버튼 글자 `File Types: mb, ma +2`.
+  - 끈 확장자는 이 PC 프로파일(`sync_types_off`)에 기억 — 나중에 생긴 확장자는 켜진 채로 보인다.
+  - 고르는 중에는 빈 폴더 줄(파일 없음)을 숨긴다. 폴더 줄 상태는 그대로 **아래 모든 파일**로 센다(`Show` 와 같은 규칙).
+  - 메뉴 클래스 `_CheckableMenu` 를 `app/ui/checkable_menu.py`(`CheckableMenu`)로 옮겨 두 탭이 같이 쓴다(main_window 에는 별칭).
+- 시험 UI 106/106(+10), File Manager 쪽 시험 그대로 통과.
+
 ## [01.51] - 2026-11-06
 
 - **[Sync > Status] 빈 폴더도 트리에.** 파일이 하나도 없는 폴더(예: `scenes/1999_=================================== - 복사본`)는 파일 목록으로는 안 생겨 보이지 않았다.

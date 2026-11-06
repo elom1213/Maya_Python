@@ -38,7 +38,6 @@ from Framework.qt.qt import (
     QDialogButtonBox,
     QScrollArea,
     QToolButton,
-    QMenu,
     QPixmap,
     QIcon,
     QFrame,
@@ -62,6 +61,7 @@ from ..config.app_meta import (
 from ..config import data_repo
 from ..core import scanner, prefs as prefs_mod
 from ..core.paths import ui_path, ui_text
+from .checkable_menu import CheckableMenu
 from ..core.store import MetaStore, OutsideProjectRootError
 from ..core.git_sync import GitSync
 from ..core.models import FileRecord, LogEntry
@@ -116,19 +116,8 @@ class _BranchComboBox(QComboBox):
         super().showPopup()
 
 
-class _CheckableMenu(QMenu):
-    """체크 가능한 항목을 토글해도 닫히지 않는 메뉴.
-
-    기본 QMenu 는 항목 클릭 시 닫히므로 여러 확장자를 연속으로 체크/해제하기 불편하다.
-    체크 가능한 항목 위에서 마우스를 떼면 닫지 않고 그 항목만 토글(trigger)한다.
-    """
-
-    def mouseReleaseEvent(self, event):
-        action = self.activeAction()
-        if action is not None and action.isEnabled() and action.isCheckable():
-            action.trigger()   # 체크 토글 + triggered(bool) 방출, 메뉴는 유지
-            return
-        super().mouseReleaseEvent(event)
+# v01.52 : Sync > Status 의 File Types 와 같이 쓰려고 app/ui/checkable_menu.py 로 옮겼다.
+_CheckableMenu = CheckableMenu
 
 
 class LogEditDialog(QDialog):

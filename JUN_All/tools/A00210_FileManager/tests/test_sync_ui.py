@@ -163,10 +163,46 @@ try:
     rows = tree_rows(tab)
     check("Filter applies to empty folders", e2 not in rows)
     tab.le_filter.setText("")
+    tab.chk_show[sc.OK].setChecked(True)
+    e1_saved = e1
     shutil.rmtree(os.path.join(root_b, "empty_b_only"))
     mb, _ = sm.scan(root_b, rid, "PCB", "other", [], ss.DEFAULT_IGNORE)
     sm.save_manifest(data_dir, mb)
     tab.on_refresh(quiet=True)
+
+    # ---------------------------------------------------------- v01.52 File Types
+    tab.chk_show[sc.OK].setChecked(True)
+    labels = [a.text() for a in tab._types_menu.actions() if a.text()]
+    check("File Types menu: All + extensions with counts", labels[0] == "All" and any(l.startswith(".mb") for l in labels)
+          and any(l.startswith(".pdf") for l in labels) and tab.btn_file_types.text() == "File Types: All", labels)
+    tab.set_types_shown({"pdf"})
+    rows = tree_rows(tab)
+    files = [r for r, v in rows.items() if v[0] == "file"]
+    check("File Types: only .pdf files shown", files and all(f.endswith(".pdf") for f in files), files)
+    check("File Types: folder status still counts all files below",
+          rows.get("00_00_02_doc/", ("", ["", ""]))[1][1] != "", rows.get("00_00_02_doc/"))
+    check("File Types: button text + prefs", tab.btn_file_types.text() == "File Types: pdf"
+          and "mb" in tab.prefs_values()["sync_types_off"] and "pdf" not in tab.prefs_values()["sync_types_off"],
+          (tab.btn_file_types.text(), tab.prefs_values()["sync_types_off"]))
+    check("File Types: empty folders hidden while filtering", e1 not in rows)
+    act_mb = tab._type_actions["mb"]
+    act_mb.trigger()                         # 메뉴에서 .mb 체크
+    rows = tree_rows(tab)
+    check("File Types: menu toggle adds .mb", any(r.endswith(".mb") for r, v in rows.items() if v[0] == "file")
+          and act_mb.isChecked())
+    check("File Types: All checked again when every type is on", tab.act_all_types.isChecked())
+    tab.act_all_types.trigger()              # All 끔 -> 아무 파일도 없음
+    check("File Types: All off = none", tab.btn_file_types.text() == "File Types: none"
+          and not any(v[0] == "file" for v in tree_rows(tab).values()))
+    tab.act_all_types.trigger()              # All 켬
+    check("File Types: All restores everything", not tab._types_off and tab.btn_file_types.text() == "File Types: All"
+          and e1 in tree_rows(tab), (tab._types_off, tab.btn_file_types.text(), e1 in tree_rows(tab)))
+    tab.load_prefs({"sync_types_off": ["MB"]})
+    tab.on_refresh(quiet=True)
+    check("File Types: prefs restore (case-insensitive), new ext stays on",
+          not tab._type_actions["mb"].isChecked() and tab._type_actions["pdf"].isChecked())
+    tab.set_types_shown(None)
+    tab.chk_show[sc.OK].setChecked(False)
 
     # ---------------------------------------------------------- v01.50 PC 이름
     from Framework.qt.qt import QDialog  # noqa: E402

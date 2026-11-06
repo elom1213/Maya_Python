@@ -33,6 +33,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-06 (오늘)
 
+> [!summary] A00210_FileManager **v01.52 Sync Status File Types** `#A00210_FileManager`
+- 요청: Sync / Status 에도 File Manager 처럼 확장자별로 파일을 보는 기능.
+- 구현: `Filter` 줄에 `File Types` 버튼(확장자 · 개수 체크 메뉴, All, 닫히지 않는 메뉴 공용화 `checkable_menu.py`), 끈 확장자 prefs `sync_types_off`.
+- 시험: UI 106/106, File Manager 쪽 시험 통과.
+
 > [!summary] A00210_FileManager **v01.51 Sync Status 빈 폴더 표시** `#A00210_FileManager`
 - 요청: `1999_=== - 복사본` 같은 빈 폴더가 실제로 있는데 Status 트리에 안 보인다.
 - 원인: 매니페스트가 파일만 적어 파일 없는 폴더는 트리에 생기지 않았다.
