@@ -33,6 +33,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-06 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.54 Match Follow 진행 팝업** `#A00110_animTool`
+- 요청: Transfer > Follow 의 Match Follow 를 누르면 팝업으로 진행도를 보여 줄 것.
+- 공용 `JUN_mod_progress_qt_v01` 사용. core `FollowMatchManager.match_follow(progress=None)` 콜백 — 단위 = 페어 × 프레임(Blend < 1 이면 원본 읽기까지 ×2), 세부 줄 `Follower k/N : 이름`, 로그에 경과 시간.
+- 시험 `test_follow_progress.py` 13/13(총량 · 단조 증가 · 콜백 없이도 같음 · UI 팝업 열림/닫힘), `test_follow_point.py` 14/14. **GUI 확인 아직.**
+
 > [!summary] A00390_WindTool_V03 **v03.06 Chain Wave Lite 에 Tip Follow** `#A00390_WindTool`
 - 요청: Flow 의 Tip Follow(체인이 Tip 을 쫓는 기능)를 Chain Wave Lite 에서도 쓸 수 있게 이식.
 - Flow 의 Tip 생성 · 따라가기 · 이득 블록을 `flow_manager.make_tip / tip_follow_quat / follow_gain` 으로 떼어 Flow · Lite 가 같은 코드를 쓴다(Flow 회귀 56/56 불변).

@@ -1583,8 +1583,9 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 - **애니메이션 레이어**: 현재 **선택된 애니 레이어**가 있으면 그 레이어에 키가 들어간다(override/additive
   자동 판별). 선택된 레이어가 없거나 BaseAnimation 이면 베이스 커브에 키를 굽는다. blend 는 항상 **키
   값에 베이크**되며(레이어 weight 는 1 유지), follower/프레임마다 독립적이다.
-- **Match Follow**: 실행. 결과(매치한 follower 수 / 구간 / 프레임 수 / blend / 사용 레이어 / skip)가
-  로그에 출력.
+- **Match Follow**: 실행. 도는 동안 **진행 팝업**(v02.54)이 뜬다 — 게이지(follower × 프레임) + 세부 줄
+  `Follower k/N : 이름` + 경과 시간. 닫기 버튼이 없고 끝나면 저절로 닫힌다. 결과(매치한 follower 수 / 구간 /
+  프레임 수 / blend / 사용 레이어 / skip)와 걸린 시간 `(3.4s)` 가 로그에 출력.
 
 ### 5.7 Bake 탭 — 결과를 키로 굽는다
 

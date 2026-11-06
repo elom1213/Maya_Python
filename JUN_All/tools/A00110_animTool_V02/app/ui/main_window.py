@@ -3081,6 +3081,8 @@ class MainWindow(QWidget):
         # -------------------------
 
         self.btn_follow = QPushButton("Match Follow")
+        self.btn_follow.setToolTip("Bake each follower onto its target between Start and End.\n"
+                                   "A progress popup shows the bake (follower k/N). One undo step.")
         tab_layout.addWidget(self.btn_follow)
 
         tab_layout.addStretch(1)
@@ -5725,11 +5727,22 @@ class MainWindow(QWidget):
             self.log("[Warning] Invalid Blend value.")
             return
 
-        count, msg = FollowMatchManager.match_follow(
-            targets, followers, start, end, blend,
-            do_translate=do_t, do_rotate=do_r, do_scale=do_s,
-            maintain_offset=maintain_offset, one_to_many=one_to_many,
-            point_translate=self.cb_follow_point.isEnabled() and self.cb_follow_point.isChecked())
+        # v02.54 진행 팝업(공용 progress) - 페어 x 프레임 단위로 게이지 + "Follower k/N : 이름".
+        dlg = JUN_mod_progress_qt.JUN_mod_progress_qt_v01(self, title="Match Follow", message="Matching followers")
+        dlg.start()
+        elapsed = None
+        try:
+            count, msg = FollowMatchManager.match_follow(
+                targets, followers, start, end, blend,
+                do_translate=do_t, do_rotate=do_r, do_scale=do_s,
+                maintain_offset=maintain_offset, one_to_many=one_to_many,
+                point_translate=self.cb_follow_point.isEnabled() and self.cb_follow_point.isChecked(),
+                progress=dlg.callback())
+        finally:
+            elapsed = dlg.elapsed()
+            dlg.finish()
+        if count and elapsed is not None:
+            msg += "  ({0:.1f}s)".format(elapsed)
         self.log(msg)
 
     # --------------------------------------------------

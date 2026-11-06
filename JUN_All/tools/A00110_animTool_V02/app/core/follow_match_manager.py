@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-29
+# last Update date : 2026-11-06
 # A00110_animTool_V02 - 여러 follower 를 매칭된 target 의 월드 transform 에 맞춰 구간 키 베이크
 #                   (maya.cmds + OpenMaya 2.0, UI 비의존)
 #
@@ -159,7 +159,8 @@ class FollowMatchManager:
     @staticmethod
     def match_follow(targets, followers, start, end, blend,
                      do_translate=True, do_rotate=True, do_scale=False,
-                     maintain_offset=False, one_to_many=False, point_translate=False):
+                     maintain_offset=False, one_to_many=False, point_translate=False,
+                     progress=None):
         """
         target 의 월드 transform 에 follower 를 맞춰 [start, end] 구간 키를 굽는다.
 
@@ -178,6 +179,8 @@ class FollowMatchManager:
                              follower 부모 공간에서 그대로 더한다. Maintain Offset 이 꺼져 있으면
                              어느 쪽이든 target 위치와 같으므로 차이가 없다. 회전 · 스케일은 그대로
                              (회전을 켜면 orientConstraint maintainOffset 과 같다).
+        progress           : (v02.54) progress(done, total, message=None) 콜백. None 이면 조용히.
+                             단위 = 페어 x 프레임(blend < 1 이면 원본 읽기 패스까지 x2). UI 가 진행 팝업을 넘긴다.
         반환               : (matched_count, msg)
         """
         if not targets or not followers:
@@ -216,19 +219,33 @@ class FollowMatchManager:
         done = 0
         skipped = 0
 
+        # 진행 보고: 페어마다 프레임 수(원본 읽기 패스가 있으면 2배)만큼 단위를 쓴다.
+        passes = 2 if blend < 1.0 else 1
+        total_units = len(pairs) * len(times) * passes
+        report = None
+        if progress:
+            def report(pair_index, unit, flw):
+                progress(pair_index * len(times) * passes + unit, total_units,
+                         "Follower {0}/{1} : {2}".format(pair_index + 1, len(pairs), flw.split("|")[-1]))
+
         cur = cmds.currentTime(q=True)
         cmds.undoInfo(openChunk=True)
         try:
             # suspend_refresh: 블록 종료 시 refresh 복원이 항상 먼저/무조건 실행된다.
             with suspend_refresh():
-                for tgt, flw in pairs:
+                for k, (tgt, flw) in enumerate(pairs):
+                    tick = (lambda unit, _k=k, _f=flw: report(_k, unit, _f)) if report else None
+                    if tick:
+                        tick(0)
                     ok = FollowMatchManager._match_one(
                         tgt, flw, times, blend, do_translate, do_rotate, do_scale,
-                        layer, is_override, maintain_offset, ref_time, point_translate)
+                        layer, is_override, maintain_offset, ref_time, point_translate, tick)
                     if ok:
                         done += 1
                     else:
                         skipped += 1
+                if progress:
+                    progress(total_units, total_units, "Done")
         finally:
             # 예외가 나도 프레임 복원 / undo 청크 닫기를 반드시 수행(refresh 는 위에서 복원됨).
             cmds.currentTime(cur, edit=True)
@@ -251,8 +268,10 @@ class FollowMatchManager:
 
     @staticmethod
     def _match_one(tgt, flw, times, blend, do_t, do_r, do_s, layer, is_override,
-                   maintain_offset=False, ref_time=None, point_translate=False):
+                   maintain_offset=False, ref_time=None, point_translate=False, tick=None):
         """단일 (tgt, flw) 페어를 굽는다. 키를 하나라도 기록했으면 True.
+
+        tick : (v02.54) tick(unit) - 이 페어 안에서 끝낸 단위 수(프레임, 원본 읽기 패스가 있으면 그것부터).
 
         핵심: setKeyframe(animLayer=L, value=V) 는 레이어 커브에 V 를 그대로 쓰는 게 아니라
         '평가 결과(= 아래 레이어 + 이 레이어)가 V 가 되도록' 레이어 기여를 역산해 기록한다.
@@ -316,12 +335,17 @@ class FollowMatchManager:
         need_orig = blend < 1.0
         orig = {}
         if need_orig:
-            for t in times:
+            for i, t in enumerate(times):
                 orig[t] = FollowMatchManager._read_state(flw, t, do_t, do_r, do_s, order)
+                if tick:
+                    tick(i + 1)
+        unit0 = len(times) if need_orig else 0
 
         # ---- 매치 M(절대) -> (blend) -> 절대값 F 기록 ----
         any_set = False
-        for t in times:
+        for i, t in enumerate(times):
+            if tick:
+                tick(unit0 + i)
             try:
                 m_state = FollowMatchManager._matched_state(
                     tgt, flw, t, do_t, do_r, do_s, offset, point_offset)

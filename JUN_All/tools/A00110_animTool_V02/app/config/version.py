@@ -177,5 +177,9 @@
 # 02.53  트리 펼치기 - 화살표로 펼치면 한 단계만, Shift + 펼치기/접기 = 아래 전부 (View > Layers 레이어 트리).
 #        공용 Framework/qt/MOD_treeExpand_qt_v01
 
-VERSION = "02.53"
-LAST_UPDATE = "2026-11-05"
+# 02.54  Transfer > Follow `Match Follow` 진행 팝업 - 공용 Framework/qt/MOD_progress_qt_v01. 게이지 단위 = 페어 x 프레임
+#        (Blend < 1 이면 원본 읽기 패스까지 x2), 세부 줄 "Follower k/N : 이름", 끝나면 로그에 경과 시간 "(3.4s)".
+#        core FollowMatchManager.match_follow(progress=None) 콜백만 받는다(없으면 예전 그대로). 시험 tests/test_follow_progress.py 13/13.
+
+VERSION = "02.54"
+LAST_UPDATE = "2026-11-06"
