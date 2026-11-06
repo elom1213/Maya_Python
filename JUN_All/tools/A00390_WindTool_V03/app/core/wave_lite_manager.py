@@ -109,6 +109,7 @@ from .wave_manager import (
     WAVE_WAVELENGTH, WAVE_PERIOD, WAVE_ROOT_RAMP, UP_AXES,
     is_joint, resolve_chains, _chain_positions, _arc_positions,
 )
+from .flow_manager import _Net, _local_vec, make_tip, tip_follow_quat, follow_gain
 
 
 # Lite 전용 드라이버 어트리뷰트. 진폭이 **각도(도)** 라는 점만 기존과 다르다.
@@ -129,6 +130,23 @@ LITE_SWING = "windSwingAngle"
 LITE_FLUTTER = "windFlutter"
 LITE_FLUTTER_STIFF = "windFlutterStiffness"
 FLUTTER_REF_NODES = 12.0
+
+# ## Tip Follow (v03.06) — Flow 탭(Waves Gen)의 끝 따라가기를 Lite 에 더한다
+#
+# 체인 끝 너머에 Tip 로케이터(<root>_liteTip, 루트의 부모 아래)를 두고, 노드마다 Lite 회전을 Tip 쪽으로 섞는다.
+# **Flow 와 같은 함수**(flow_manager.make_tip / tip_follow_quat / follow_gain)를 그대로 쓴다:
+#
+#     q_lite = Lite 가 만든 이 노드의 회전(쿼터니언)
+#     q_aim  = q_lite 에 "로컬 진행축이 Tip 을 향하는 최소 회전" 을 더한 것 (블렌더 Damped Track)
+#     out    = slerp(q_lite, q_aim, w_k),  w_k = 1 - (1 - min(0.999, windTipFollow * k_k))^(12/n)
+#     실효 envelope = windEnvelope / (1 - 0.7 * windTipFollow)   (섞여 줄어드는 흔들림 보정 - Flow 와 같다)
+#
+# - Lite 는 **끝 노드까지** 회전하므로(Flow 는 끝 노드 rest) 끝 노드의 진행축 = 마지막 뼈 방향(Tip 을 향한다).
+# - windTipFollow 0 이면 w = 0, 이득 1 -> 예전 Lite 와 같은 회전(쿼터니언 -> 오일러를 거칠 뿐).
+# - 회전이 쿼터니언을 거치므로 **세 rotate 채널이 모두 연결된다** - Rotate Axis (object) 도 다른 두 채널을 비워 두지 않는다.
+# - 빌드 옵션으로 끄면(tip_follow=None) 어트리뷰트 · 로케이터 · 노드가 없다(예전과 같다).
+LITE_TIP_FOLLOW = "windTipFollow"
+LITE_TIP_SUFFIX = "_liteTip"
 
 # windEnvelope([0,1], wind_manager 의 DRIVER_ENVELOPE)은 **실효 스윙 각도**에 곱해진다:
 #     effSwing = windSwingAngle * windEnvelope
@@ -219,7 +237,8 @@ def _rotate_order(node):
 # --------------------------------------------------------------- 드라이버
 
 def _make_lite_driver(name, swing, wavelength, period, speed, ramp, phase_offset=0.0,
-                      envelope=1.0, place_at=None, flutter=None, flutter_stiffness=0.0):
+                      envelope=1.0, place_at=None, flutter=None, flutter_stiffness=0.0,
+                      tip_follow=None):
     """Lite 드라이버 로케이터. 진폭만 **각도(도)** 이고 나머지는 기존과 같다.
 
     place_at : 월드 좌표 (x, y, z). 주면 로케이터를 그 자리로 옮긴다(체인 최상단 위에 두기).
@@ -261,6 +280,13 @@ def _make_lite_driver(name, swing, wavelength, period, speed, ramp, phase_offset
                          minValue=0.0, keyable=True)
             cmds.setAttr(drv + "." + attr, float(val))
 
+    # Tip Follow (v03.06) - None 이면 만들지 않는다. [0, 0.99] (Flow 의 follow 와 같은 범위).
+    if tip_follow is not None:
+        value = max(0.0, min(0.99, float(tip_follow)))
+        cmds.addAttr(drv, longName=LITE_TIP_FOLLOW, attributeType="double", defaultValue=value,
+                     minValue=0.0, maxValue=0.99, keyable=True)
+        cmds.setAttr(drv + "." + LITE_TIP_FOLLOW, value)
+
     # 위상 시계 배선은 호출부가 wire_phase() 로 한다(V03). 상수 속도면 노드 3개,
     # windSpeed 에 키가 걸려 있으면 씬에 하나뿐인 통합 표현식이 맡는다.
     cmds.addAttr(drv, longName=DRIVER_PHASE, attributeType="double", keyable=True)
@@ -269,11 +295,13 @@ def _make_lite_driver(name, swing, wavelength, period, speed, ramp, phase_offset
 
 # --------------------------------------------------------------- 각도 적용
 
-def _apply_angle(node, angle_plug, world_axis, rest, tag, local_index=None):
+def _apply_angle(node, angle_plug, world_axis, rest, tag, local_index=None, quat_out=False):
     """각도를 노드의 rotate 로 넣는다. 축이 기본축이면 채널 직결, 아니면 쿼터니언 경로.
 
     local_index : 0/1/2 를 주면 **오브젝트 공간** 축으로 보고 그 rotate 채널에 바로 넣는다
                   (world_axis 는 쓰지 않는다). None 이면 월드 축을 노드 공간으로 옮겨 쓴다.
+    quat_out    : True 면 rotate 에 연결하지 않고 (만든 노드, outputQuat 를 가진 노드) 를 돌려준다(Tip Follow, v03.06).
+                  채널 직결 경로는 eulerToQuat(rest + 그 채널 값), 임의 축 경로는 quatProd 를 그대로 준다.
     """
     if local_index is not None:
         axis, card = None, (local_index, 1.0)
@@ -288,6 +316,19 @@ def _apply_angle(node, angle_plug, world_axis, rest, tag, local_index=None):
         scale = cmds.createNode("multDoubleLinear", name=tag + "_sign")
         cmds.connectAttr(angle_plug, scale + ".input1")
         cmds.setAttr(scale + ".input2", sign)
+
+        if quat_out:
+            # rest 세 채널 + 이 채널만 (rest + 각도) -> 쿼터니언. rotate 채널에 넣는 것과 같은 단위 변환을 거친다.
+            _ensure_quat_nodes()
+            e2q = cmds.createNode("eulerToQuat", name=tag + "_e2q")
+            cmds.setAttr(e2q + ".inputRotateOrder", cmds.getAttr(node + ".rotateOrder"))
+            for i in range(3):
+                cmds.setAttr(e2q + ".inputRotate" + "XYZ"[i], rest[i])
+            add = cmds.createNode("addDoubleLinear", name=tag + "_rest")
+            cmds.connectAttr(scale + ".output", add + ".input1")
+            cmds.setAttr(add + ".input2", rest[index])
+            cmds.connectAttr(add + ".output", e2q + ".inputRotate" + "XYZ"[index], force=True)
+            return [scale, add, e2q], e2q
 
         if abs(rest[index]) > 1e-9:
             add = cmds.createNode("addDoubleLinear", name=tag + "_rest")
@@ -316,6 +357,9 @@ def _apply_angle(node, angle_plug, world_axis, rest, tag, local_index=None):
     for i, value in enumerate((rest_quat.x, rest_quat.y, rest_quat.z, rest_quat.w)):
         cmds.setAttr(prod + ".input1Quat" + "XYZW"[i], value)
     cmds.connectAttr(a2q + ".outputQuat", prod + ".input2Quat")
+
+    if quat_out:
+        return [a2q, prod], prod
 
     q2e = cmds.createNode("quatToEuler", name=tag + "_q2e")
     cmds.setAttr(q2e + ".inputRotateOrder", cmds.getAttr(node + ".rotateOrder"))
@@ -402,12 +446,14 @@ def _group_nodes(nodes, name):
 def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
                       phase_offset, envelope=1.0, local_axis=None,
                       driver_at_root=True, debug_curve=True, follow_root=True,
-                      auto_period=False, flutter=None, flutter_stiffness=0.0):
+                      auto_period=False, flutter=None, flutter_stiffness=0.0, tip_follow=None):
     """체인 하나에 각도 노드망을 만든다. (드라이버, 만든 노드들, rest 회전, 정보, 커브)
 
     flutter    : None 이면 Flutter 없음(예전과 같다). 숫자면 windFlutter 초기값 - 노드마다 누적되는 파동 항을 더한다
                  (모듈 머리의 'Flutter' 참고).
 
+    tip_follow : None 이면 끝 따라가기 없음(예전과 같다). 숫자면 windTipFollow 초기값 - Tip 로케이터를 만들고
+                 노드마다 회전을 Tip 쪽으로 섞는다(모듈 머리의 'Tip Follow' 참고). 정보 끝에 tip 이 붙는다.
     local_axis : "X"/"Y"/"Z" 를 주면 각 노드의 **오브젝트 공간** 축으로만 돌린다.
                  이때 `axis`(Sway Axis) 는 **전혀 쓰이지 않는다**.
     debug_curve: True 면 흔들림을 보여 주는 커브를 하나 만든다(`_make_debug_curve`).
@@ -457,11 +503,30 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
 
     rest_rotate = {node: list(cmds.getAttr(node + ".rotate")[0]) for node in chain}
 
+    # ---- Tip Follow 준비 : 로컬 진행축은 **연결하기 전에 전부** 구한다(Flow 와 같은 이유 - 앞 노드가 돌아간 뒤
+    #      읽으면 뒤 노드 축이 기운다). 끝 노드는 마지막 뼈 방향(그 너머의 Tip 을 향한다).
+    tip_aims = None
+    if tip_follow is not None:
+        vecs = [om.MVector(*pt) for pt in points]
+        tip_aims = []
+        for k, node in enumerate(chain):
+            seg = (vecs[k + 1] - vecs[k]) if k + 1 < len(chain) else (vecs[-1] - vecs[-2])
+            tip_aims.append(_local_vec(node, seg).normal())
+
     drv = _make_lite_driver(name + "_liteDriver#", swing, wavelength, period,
                             speed, ramp, phase_offset, envelope,
                             place_at=(points[0] if driver_at_root else None),
-                            flutter=flutter, flutter_stiffness=flutter_stiffness)
+                            flutter=flutter, flutter_stiffness=flutter_stiffness,
+                            tip_follow=tip_follow)
     made = [drv]
+
+    tip, tip_net, env_plug = None, None, drv + "." + DRIVER_ENVELOPE
+    if tip_follow is not None:
+        tip = make_tip(chain, [om.MVector(*pt) for pt in points], LITE_TIP_SUFFIX)
+        made.append(tip)
+        tip_net = _Net(name + "_liteTip")
+        # 실효 envelope = windEnvelope / (1 - 0.7 * windTipFollow) - 스윙 · Flutter 둘 다 (Flow 의 이득과 같다)
+        env_plug = follow_gain(tip_net, drv + "." + LITE_TIP_FOLLOW, drv + "." + DRIVER_ENVELOPE)
 
     # 놓기만 하는 게 아니라 **따라다니게** 한다 - 루트 뼈/컨트롤러가 움직이면(리그 전체
     # 이동 포함) 드라이버도 같이 간다. 위치만이고 constraint 는 쓰지 않는다.
@@ -473,7 +538,7 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
     # 실효 스윙 = windSwingAngle * windEnvelope (체인 전체가 공유, 노드 1개).
     swing_env = cmds.createNode("multDoubleLinear", name=name + "_liteSwingEnv#")
     cmds.connectAttr(drv + "." + LITE_SWING, swing_env + ".input1")
-    cmds.connectAttr(drv + "." + DRIVER_ENVELOPE, swing_env + ".input2")
+    cmds.connectAttr(env_plug, swing_env + ".input2")
     made.append(swing_env)
 
     # Flutter 이득 = windFlutter * windEnvelope * (12 / n)   (체인 공유, 노드 2개)
@@ -481,7 +546,7 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
     if flutter is not None:
         flut_env = cmds.createNode("multDoubleLinear", name=name + "_liteFlutEnv#")
         cmds.connectAttr(drv + "." + LITE_FLUTTER, flut_env + ".input1")
-        cmds.connectAttr(drv + "." + DRIVER_ENVELOPE, flut_env + ".input2")
+        cmds.connectAttr(env_plug, flut_env + ".input2")
         flut_gain = cmds.createNode("multDoubleLinear", name=name + "_liteFlutGain#")
         cmds.connectAttr(flut_env + ".output", flut_gain + ".input1")
         cmds.setAttr(flut_gain + ".input2", FLUTTER_REF_NODES / float(len(chain)))
@@ -573,10 +638,25 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
 
         if local_index is not None or _cardinal(_local_axis(node, world_axis)) is not None:
             cardinal_count += 1
-        made += _apply_angle(node, local_plug, world_axis, rest_rotate[node], tag,
-                             local_index=local_index)
+        if tip is None:
+            made += _apply_angle(node, local_plug, world_axis, rest_rotate[node], tag,
+                                 local_index=local_index)
+        else:
+            # Lite 회전(쿼터니언) -> Tip 쪽으로 섞기(Flow 와 같은 함수) -> 오일러 -> rotate
+            a_made, q_lite = _apply_angle(node, local_plug, world_axis, rest_rotate[node], tag,
+                                          local_index=local_index, quat_out=True)
+            made += a_made
+            tip_net.tag = tag + "_tip"
+            q_out = tip_follow_quat(tip_net, node, q_lite, tip_aims[k], tip,
+                                    drv + "." + LITE_TIP_FOLLOW, k, len(chain))
+            qe = tip_net.node("quatToEuler", "euler")
+            cmds.setAttr(qe + ".inputRotateOrder", cmds.getAttr(node + ".rotateOrder"))
+            cmds.connectAttr(q_out + ".outputQuat", qe + ".inputQuat")
+            cmds.connectAttr(qe + ".outputRotate", node + ".rotate", force=True)
 
     cmds.delete(template)
+    if tip_net is not None:
+        made += tip_net.made
 
     # 디버그 커브는 각도 노드망을 다 건 뒤에 붙인다 — CV 가 노드의 월드 위치를 읽으므로
     # 순서가 결과를 바꾸지는 않지만, 커브가 만들어지지 않아도 파형은 그대로여야 한다.
@@ -586,7 +666,7 @@ def _build_chain_lite(chain, axis, swing, wavelength, period, speed, ramp,
         made += crv_made
 
     return (drv, made, rest_rotate,
-            (cardinal_count, len(chain), follow_skip, wavelength), crv)
+            (cardinal_count, len(chain), follow_skip, wavelength, tip), crv)
 
 
 # --------------------------------------------------------------- 공개 API
@@ -595,7 +675,8 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
                     period=24.0, speed=1.0, ramp=1.0, node_offset=0.0,
                     output=OUTPUT_NODE, start=0.0, end=100.0, prefix=None,
                     envelope=1.0, local_axis=None, driver_at_root=True,
-                    debug_curve=True, auto_period=True, flutter=None, flutter_stiffness=0.0):
+                    debug_curve=True, auto_period=True, flutter=None, flutter_stiffness=0.0,
+                    tip_follow=None):
     """커브·ikHandle 없이 체인이 파형을 따라가게 한다.
 
     swing : **뼈가 흔들리는 각도(도)**. 기존 Chain Wave 의 windAmplitude(거리)와 뜻이 다르다.
@@ -619,6 +700,9 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
     flutter : None 이면 Flutter 없음(예전 Lite 와 같다). 숫자면 드라이버에 windFlutter(그 값) · windFlutterStiffness 를 두고
               노드마다 **누적되는** 파동 항을 더한다 - Flow 탭(Waves Gen)의 Flutter 와 같은 뜻(도 / 뼈, 뼈 12개 기준).
               0 이면 회전은 예전과 같고, 빌드 뒤 라이브로 올리면 된다.
+    tip_follow : None 이면 끝 따라가기 없음(예전과 같다). 숫자 [0, 0.99] 면 체인마다 Tip 로케이터(*_liteTip)를 만들고
+                 드라이버 windTipFollow(그 값, 라이브 · 키 가능)만큼 노드들이 Tip 을 쫓는다 - Flow 탭의 Tip Follow 와
+                 같은 노드망. Tip 을 움직이면 체인이 따라온다(2차 애니). 세 rotate 채널이 모두 연결된다.
     나머지 인자는 기존 build_wave 와 같다.
 
     Returns: (체인 수, 드라이버 수, 메시지)
@@ -641,6 +725,7 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
     cardinal_total, node_total = 0, 0
     no_follow = []
     used_lengths = []       # Auto Period 로 체인마다 실제로 쓴 파장(= 체인 길이)
+    tips = []               # Tip Follow 로케이터 (v03.06)
     # 루트 추종은 라이브 노드망일 때만 뜻이 있다 - curve 출력은 구운 뒤 셋업을 지운다.
     follow_root = driver_at_root and output != OUTPUT_CURVE
 
@@ -649,7 +734,8 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
             chain, axis, swing, wavelength, period, speed, ramp, k * node_offset,
             envelope, local_axis=local_axis, driver_at_root=driver_at_root,
             debug_curve=debug_curve, follow_root=follow_root,
-            auto_period=auto_period, flutter=flutter, flutter_stiffness=flutter_stiffness)
+            auto_period=auto_period, flutter=flutter, flutter_stiffness=flutter_stiffness,
+            tip_follow=tip_follow)
 
         if drv is None:
             failed.append("{0} ({1})".format(_leaf(chain[0]), info))
@@ -665,6 +751,8 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
         if info[2]:
             no_follow.append("{0} ({1})".format(_leaf(chain[0]), info[2]))
         used_lengths.append(info[3])
+        if info[4]:
+            tips.append(info[4])
 
     if not drivers:
         return 0, 0, "[Warning] Nothing built. {0}".format("; ".join(failed))
@@ -753,6 +841,10 @@ def build_wave_lite(joints, mode=MODE_ROOT, axis="Y", swing=20.0, wavelength=10.
         if no_follow:
             msg += " Root-follow skipped (would cycle): {0}.".format(
                 ", ".join(no_follow[:5]))
+        if tips:
+            msg += (" Tip Follow on (windTipFollow {0:g}): move the {1} '*{2}' locator(s) and the chain "
+                    "follows; all three rotate channels are driven.".format(
+                        max(0.0, min(0.99, float(tip_follow))), len(tips), LITE_TIP_SUFFIX))
 
     msg += " {0}.".format(length_note)
     msg += " Phase: {0} constant (node path){1}.".format(

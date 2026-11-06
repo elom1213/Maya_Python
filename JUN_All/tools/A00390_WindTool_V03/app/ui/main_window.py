@@ -669,8 +669,30 @@ class MainWindow(QWidget):
         flut_row.addWidget(QLabel("Stiffness"))
         flut_row.addWidget(self.sb_lite_flutter_stiff, 1)
 
+        # Tip Follow (v03.06) - Flow 탭(Waves Gen)의 끝 따라가기: 체인이 Tip 로케이터를 쫓는다. 기본 꺼짐(노드가 늘어난다).
+        tip_row = QHBoxLayout()
+        self.chk_lite_tip = QCheckBox()
+        self.chk_lite_tip.setChecked(False)
+        self.chk_lite_tip.setToolTip(
+            "On: build a Tip locator past each chain end ('*_liteTip', under the root's parent)\n"
+            "and make every node turn toward it - the Flow tab's Tip Follow, same node network.\n"
+            "Move or key the Tip and the chain follows (secondary motion); the wind keeps waving on top.\n"
+            "All three rotate channels get driven (also with Rotate Axis (object)).\n"
+            "Off (default): no Tip, no extra nodes - the old Lite.")
+        self.sb_lite_tip = self._wave_spin(0.6, 0.0, 0.99, 0.05, decimals=3)
+        self.sb_lite_tip.setToolTip(
+            "windTipFollow on the driver [0 - 0.99] (live, keyable): how strongly the chain turns\n"
+            "toward the Tip - more at the root, a little less toward the end (Flow tab rule).\n"
+            "The swing is boosted by 1 / (1 - 0.7 * value) so the wave does not die out.\n"
+            "0 = exactly the Lite motion without Tip Follow.")
+        self.sb_lite_tip.setEnabled(False)
+        self.chk_lite_tip.toggled.connect(self.sb_lite_tip.setEnabled)
+        tip_row.addWidget(self.chk_lite_tip)
+        tip_row.addWidget(self.sb_lite_tip, 1)
+
         rows = (("Swing Angle", self.sb_lite_swing),
                 ("Flutter", flut_row),
+                ("Tip Follow", tip_row),
                 ("Wavelength", len_row),
                 ("Period", self.sb_lite_period),
                 ("Speed", self.sb_lite_speed),
@@ -948,6 +970,7 @@ class MainWindow(QWidget):
                     auto_period=self.chk_lite_auto_period.isChecked(),
                     flutter=(self.sb_lite_flutter.value() if self.chk_lite_flutter.isChecked() else None),
                     flutter_stiffness=self.sb_lite_flutter_stiff.value(),
+                    tip_follow=(self.sb_lite_tip.value() if self.chk_lite_tip.isChecked() else None),
                     output=(wind_mgr.OUTPUT_NODE if node
                             else wind_mgr.OUTPUT_CURVE),
                     start=start, end=end)

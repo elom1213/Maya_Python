@@ -39,5 +39,12 @@
 #        (windFlutter 도/뼈, 뼈 12개 기준 + windFlutterStiffness). Lite 의 사인(같은 위상)을 재사용, 노드당 4개.
 #        기본 0 = 예전 Lite 와 완전히 같은 회전. 빌드 옵션으로 끄면 어트리뷰트 · 노드도 없다.
 
-VERSION = "03.05"
-LAST_UPDATE = "2026-11-05"
+# 03.06  Chain Wave Lite 에 Tip Follow - Flow 탭(Waves Gen)의 끝 따라가기를 이식: 체인 끝 너머 Tip 로케이터(*_liteTip, 루트의 부모 아래)를
+#        노드들이 쫓는다(Tip 을 움직이면 체인이 따라온다 = 2차 애니). Flow 와 **같은 함수**(flow_manager.make_tip / tip_follow_quat /
+#        follow_gain 으로 떼어 냄 - Flow 결과 불변, 회귀 56/56). Lite 회전을 쿼터니언으로 받아 slerp(q_lite, q_aim, w_k) -> rotate,
+#        드라이버 windTipFollow [0, 0.99] 라이브 · 키, 실효 envelope = windEnvelope / (1 - 0.7 follow). 0 이면 예전 Lite 와 같다(위치 3e-14).
+#        Lite 는 끝 노드도 돌린다 - 끝 노드 진행축 = 마지막 뼈 방향. 세 rotate 채널이 모두 연결된다. 빌드 옵션 기본 꺼짐(노드당 약 +19).
+#        시험 tests/test_lite_tip_follow.py 24/24.
+
+VERSION = "03.06"
+LAST_UPDATE = "2026-11-06"

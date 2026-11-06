@@ -339,6 +339,82 @@ def wire_flow_phase():
     return len(drivers)
 
 
+# ---------------------------------------------------------------- 끝 따라가기 (Tip Follow) - Chain Wave Lite 도 쓴다 (v03.06)
+
+def make_tip(chain, pos, suffix):
+    """끝 따라가기 목표 로케이터. 끝 노드에서 마지막 뼈 방향으로 반 뼈 더, **루트의 부모 아래**(리그와 같이 움직인다).
+
+    pos = 체인 노드 월드 위치(MVector) 목록. 반환: 로케이터 풀패스."""
+    last = pos[-1] - pos[-2]
+    tip_pos = pos[-1] + last * 0.5
+    tip = cmds.spaceLocator(name=_safe(_leaf(chain[0])) + suffix + "#")[0]
+    cmds.xform(tip, worldSpace=True, translation=list(tip_pos))
+    size = max(last.length() * 0.6, 1e-3)
+    for c in "XYZ":
+        cmds.setAttr(tip + ".localScale" + c, size)
+    parent = cmds.listRelatives(chain[0], parent=True, fullPath=True)
+    if parent:
+        tip = cmds.parent(tip, parent[0])[0]
+    return cmds.ls(tip, long=True)[0]
+
+
+def tip_follow_quat(net, node, q_rot, aim, tip, follow_plug, i, n):
+    """노드 하나의 회전 q_rot(rotate 채널 공간, outputQuat 를 가진 노드)를 Tip 쪽으로 섞는다. 반환: quatSlerp 노드.
+
+        q_par = q_rot 다음 q_JO                  (부모 공간 방향)
+        a_par = aim x matrix(q_par),  t_par = (Tip 의 부모 공간 위치) - translate
+        q_dt  = angleBetween(a_par, t_par)       (블렌더 Damped Track = 최소 회전)
+        q_aim = q_par 다음 q_dt 다음 q_JO^-1
+        out   = slerp(q_rot, q_aim, w),  w = 1 - (1 - min(0.999, follow * k_i))^(12/n),  k_i = 1 - 0.45 * i/(n-1)
+
+    aim = 노드 **로컬** 진행축(rest 에서 미리 구한 것). i / n = 이 노드의 순번 / 회전하는 노드 수."""
+    jo = (cmds.getAttr(node + ".jointOrient")[0] if cmds.objExists(node + ".jointOrient") else (0, 0, 0))
+    q_jo = om.MEulerRotation([math.radians(v) for v in jo]).asQuaternion()
+    q_par = _quat_prod(net, q_rot, q_jo, "qPar")
+    cm = net.node("composeMatrix", "parMtx")
+    cmds.setAttr(cm + ".useEulerRotation", 0)
+    cmds.connectAttr(q_par + ".outputQuat", cm + ".inputQuat")
+    vp = net.node("vectorProduct", "aimPar")
+    cmds.setAttr(vp + ".operation", 3)
+    cmds.setAttr(vp + ".input1", aim.x, aim.y, aim.z)
+    cmds.connectAttr(cm + ".outputMatrix", vp + ".matrix")
+    mm = net.node("multMatrix", "tipMmx")
+    cmds.connectAttr(tip + ".worldMatrix[0]", mm + ".matrixIn[0]")
+    cmds.connectAttr(node + ".parentInverseMatrix[0]", mm + ".matrixIn[1]")
+    dm = net.node("decomposeMatrix", "tipDcm")
+    cmds.connectAttr(mm + ".matrixSum", dm + ".inputMatrix")
+    tv = net.node("plusMinusAverage", "tipVec")
+    cmds.setAttr(tv + ".operation", 2)
+    cmds.connectAttr(dm + ".outputTranslate", tv + ".input3D[0]")
+    cmds.connectAttr(node + ".translate", tv + ".input3D[1]")
+    ab = net.node("angleBetween", "track")
+    cmds.connectAttr(vp + ".output", ab + ".vector1")
+    cmds.connectAttr(tv + ".output3D", ab + ".vector2")
+    qdt = net.node("axisAngleToQuat", "qTrack")
+    cmds.connectAttr(ab + ".axis", qdt + ".inputAxis")
+    cmds.connectAttr(ab + ".angle", qdt + ".inputAngle")
+    q_aim = _quat_prod(net, _quat_prod(net, q_par, qdt, "qParTrack"), q_jo.inverse(), "qAim")
+    # 영향력 w = 1 - (1 - min(0.999, follow * k))^(12/n)
+    k = 1.0 - fm.FOLLOW_TIP_DROP * (i / float(max(1, n - 1)))
+    cl = net.node("clamp", "folClamp")
+    cmds.setAttr(cl + ".maxR", fm.FOLLOW_CAP)
+    cmds.setAttr(cl + ".minR", -1e9)
+    cmds.connectAttr(net.mdl(follow_plug, k, "folK"), cl + ".inputR")
+    w = net.pma([1.0, net.pow(net.pma([1.0, cl + ".outputR"], "folInv", op=2), fm.REF_BONES / n, "folPow")],
+                "folW", op=2)
+    sl = net.node("quatSlerp", "qBlend")
+    cmds.connectAttr(q_rot + ".outputQuat", sl + ".input1Quat")
+    cmds.connectAttr(q_aim + ".outputQuat", sl + ".input2Quat")
+    cmds.connectAttr(w, sl + ".inputT")
+    return sl
+
+
+def follow_gain(net, follow_plug, base_plug):
+    """base / (1 - 0.7 * follow) - Tip 쪽으로 섞어 줄어드는 흔들림을 보정하는 이득(Waves Gen 과 같다)."""
+    den = net.pma([1.0, net.mdl(follow_plug, fm.FOLLOW_GAIN, "folGain")], "gainDen", op=2)
+    return net.div(base_plug, den, "gain")
+
+
 # ---------------------------------------------------------------- 체인
 
 def _world_rot(node):
@@ -402,16 +478,7 @@ def _build_chain(drv, chain, chain_index, tip_follow, wind_axis, net_tag):
     # ---- Tip (끝 따라가기 목표): 끝 노드에서 마지막 뼈 방향으로 반 뼈 더. 루트의 부모 아래.
     tip = None
     if tip_follow:
-        last = pos[-1] - pos[-2]
-        tip_pos = pos[-1] + last * 0.5
-        tip = cmds.spaceLocator(name=_safe(_leaf(chain[0])) + FLOW_TIP_SUFFIX + "#")[0]
-        cmds.xform(tip, worldSpace=True, translation=list(tip_pos))
-        size = max(last.length() * 0.6, 1e-3)
-        for c in "XYZ":
-            cmds.setAttr(tip + ".localScale" + c, size)
-        parent = cmds.listRelatives(chain[0], parent=True, fullPath=True)
-        if parent:
-            tip = cmds.parent(tip, parent[0])[0]
+        tip = make_tip(chain, pos, FLOW_TIP_SUFFIX)
         net.made.append(tip)
 
     # ---- 체인 공유: 위상 · 변주 · 이득 · 방향
@@ -445,8 +512,7 @@ def _build_chain(drv, chain, chain_index, tip_follow, wind_axis, net_tag):
     # 이득 = k0 * envelope / (1 - 0.7 * follow * F)
     env_k0 = net.mdl(drv + "." + DRIVER_ENVELOPE, k0, "envK0")
     if tip_follow:
-        den = net.pma([1.0, net.mdl(drv + "." + eff_attr("follow"), fm.FOLLOW_GAIN, "folGain")], "gainDen", op=2)
-        gain = net.div(env_k0, den, "gain")
+        gain = follow_gain(net, drv + "." + eff_attr("follow"), env_k0)
     else:
         gain = env_k0
     dir_q = net.sin2(net.mdl(drv + "." + FLOW_DIR, 2.0, "dir2"), "dirSin")    # X = sin d, W = cos d
@@ -505,45 +571,7 @@ def _build_chain(drv, chain, chain_index, tip_follow, wind_axis, net_tag):
         q_rot = _quat_prod(net, q_wind, q_rest, "qRot")
 
         if tip_follow:
-            jo = (cmds.getAttr(node + ".jointOrient")[0] if cmds.objExists(node + ".jointOrient") else (0, 0, 0))
-            q_jo = om.MEulerRotation([math.radians(v) for v in jo]).asQuaternion()
-            q_par = _quat_prod(net, q_rot, q_jo, "qPar")
-            cm = net.node("composeMatrix", "parMtx")
-            cmds.setAttr(cm + ".useEulerRotation", 0)
-            cmds.connectAttr(q_par + ".outputQuat", cm + ".inputQuat")
-            vp = net.node("vectorProduct", "aimPar")
-            cmds.setAttr(vp + ".operation", 3)
-            cmds.setAttr(vp + ".input1", aim.x, aim.y, aim.z)
-            cmds.connectAttr(cm + ".outputMatrix", vp + ".matrix")
-            mm = net.node("multMatrix", "tipMmx")
-            cmds.connectAttr(tip + ".worldMatrix[0]", mm + ".matrixIn[0]")
-            cmds.connectAttr(node + ".parentInverseMatrix[0]", mm + ".matrixIn[1]")
-            dm = net.node("decomposeMatrix", "tipDcm")
-            cmds.connectAttr(mm + ".matrixSum", dm + ".inputMatrix")
-            tv = net.node("plusMinusAverage", "tipVec")
-            cmds.setAttr(tv + ".operation", 2)
-            cmds.connectAttr(dm + ".outputTranslate", tv + ".input3D[0]")
-            cmds.connectAttr(node + ".translate", tv + ".input3D[1]")
-            ab = net.node("angleBetween", "track")
-            cmds.connectAttr(vp + ".output", ab + ".vector1")
-            cmds.connectAttr(tv + ".output3D", ab + ".vector2")
-            qdt = net.node("axisAngleToQuat", "qTrack")
-            cmds.connectAttr(ab + ".axis", qdt + ".inputAxis")
-            cmds.connectAttr(ab + ".angle", qdt + ".inputAngle")
-            q_aim = _quat_prod(net, _quat_prod(net, q_par, qdt, "qParTrack"), q_jo.inverse(), "qAim")
-            # 영향력 w = 1 - (1 - min(0.999, follow * k))^(12/n)
-            k = 1.0 - fm.FOLLOW_TIP_DROP * (i / float(max(1, n - 1)))
-            cl = net.node("clamp", "folClamp")
-            cmds.setAttr(cl + ".maxR", fm.FOLLOW_CAP)
-            cmds.setAttr(cl + ".minR", -1e9)
-            cmds.connectAttr(net.mdl(drv + "." + eff_attr("follow"), k, "folK"), cl + ".inputR")
-            w = net.pma([1.0, net.pow(net.pma([1.0, cl + ".outputR"], "folInv", op=2), fm.REF_BONES / n, "folPow")],
-                        "folW", op=2)
-            sl = net.node("quatSlerp", "qBlend")
-            cmds.connectAttr(q_rot + ".outputQuat", sl + ".input1Quat")
-            cmds.connectAttr(q_aim + ".outputQuat", sl + ".input2Quat")
-            cmds.connectAttr(w, sl + ".inputT")
-            q_out = sl
+            q_out = tip_follow_quat(net, node, q_rot, aim, tip, drv + "." + eff_attr("follow"), i, n)
         else:
             q_out = q_rot
 

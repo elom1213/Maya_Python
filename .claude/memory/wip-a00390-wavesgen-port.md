@@ -23,3 +23,7 @@ metadata:
   - 위상 엔진 `flowPhaseEngine` 상시(키 사이 직선 → W·(SA+(SB−SA)M) 3차 → Simpson 정확), 어트리뷰트 직접 참조라 멈춘 상태에서도 갱신. 툴이 찍는 키는 linear.
 - **v03.05 (2026-11-05)**: Lite 에 Flutter — `windFlutter` · `windFlutterStiffness`, local_k = 차분 + Flutter·env·(12/n)·(s/total)^p·LUT(같은 위상), 노드당 4개.
   0 이면 예전 Lite diff 0, 체크 끄면 어트리뷰트 · 노드 없음. 시험 `tests/test_lite_flutter.py` 14/14.
+- **v03.06 (2026-11-06)**: Lite 에 Tip Follow — Flow 블록을 `flow_manager.make_tip / tip_follow_quat / follow_gain` 공용으로 떼고
+  Lite 는 `_apply_angle(quat_out=True)`(채널 직결이면 eulerToQuat(rest + 값)) → slerp → quatToEuler. `windTipFollow`, `*_liteTip`.
+  Lite 는 끝 노드도 돌림 → 끝 노드 aim = 마지막 뼈 방향. 세 rotate 채널 모두 연결. multiplyDivide 이득은 float 정밀도(시험 1e-6).
+  `resolve_chains` Root 모드는 셰이프 없는 맨 트랜스폼 체인을 못 찾는다(FK 시험은 Chain 모드). 시험 24/24, GUI 확인 아직.

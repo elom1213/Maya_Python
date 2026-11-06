@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-06 (오늘)
 
+> [!summary] A00390_WindTool_V03 **v03.06 Chain Wave Lite 에 Tip Follow** `#A00390_WindTool`
+- 요청: Flow 의 Tip Follow(체인이 Tip 을 쫓는 기능)를 Chain Wave Lite 에서도 쓸 수 있게 이식.
+- Flow 의 Tip 생성 · 따라가기 · 이득 블록을 `flow_manager.make_tip / tip_follow_quat / follow_gain` 으로 떼어 Flow · Lite 가 같은 코드를 쓴다(Flow 회귀 56/56 불변).
+- Lite: `_apply_angle(quat_out=True)` 로 노드 회전을 쿼터니언으로 받아 slerp → quatToEuler → rotate. 드라이버 `windTipFollow`, Tip `*_liteTip`(루트의 부모 아래). UI `Tip Follow` 줄(기본 꺼짐).
+- 시험 `test_lite_tip_follow.py` 24/24(follow 0 = 예전 Lite 위치 3e-14 · Tip 을 옮기면 끝이 따라감 · 리그 이동 · FK 체인 · 제거 · 굽기 · UI), Flutter 14/14. **GUI 확인 아직.**
+
 > [!summary] A00210_FileManager **v01.52 Sync Status File Types** `#A00210_FileManager`
 - 요청: Sync / Status 에도 File Manager 처럼 확장자별로 파일을 보는 기능.
 - 구현: `Filter` 줄에 `File Types` 버튼(확장자 · 개수 체크 메뉴, All, 닫히지 않는 메뉴 공용화 `checkable_menu.py`), 끈 확장자 prefs `sync_types_off`.

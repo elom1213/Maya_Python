@@ -284,3 +284,18 @@ Flow 탭(Waves Gen)의 **Flutter** 를 Lite 에 더한 것. `Swing Angle` 아래
 - 값: `windFlutter`(도 / 뼈, 뼈 12개 기준 — 뼈 수가 달라도 같은 모양) · `windFlutterStiffness`(0 = 모든 노드 같은 크기, 크면 끝만). 드라이버에서 라이브 · 키.
 - **0 이면 예전 Lite 와 완전히 같다.** 체크를 끄고 빌드하면 어트리뷰트 · 노드가 아예 없다(체인 수백 개면 끄는 게 가볍다, 켜면 노드당 4개 추가).
 - `windEnvelope` 가 함께 곱해진다. Rotate Axis (object) · Curve(굽기) 출력에서도 같다.
+
+## 11. Chain Wave Lite — Tip Follow (v03.06)
+
+Flow 탭의 **Tip Follow(끝 따라가기)** 를 Lite 에서도 쓴다. `Flutter` 아래 `Tip Follow` 줄(체크 + 값). **기본 꺼짐.**
+
+- 켜고 빌드하면 체인마다 끝 너머(끝 노드에서 마지막 뼈 방향으로 반 뼈 더)에 **Tip 로케이터 `<루트>_liteTip`** 이 생긴다.
+  로케이터는 **루트의 부모 아래**라 리그와 같이 움직인다.
+- **Tip 을 옮기거나 키를 찍으면 체인이 그쪽을 쫓는다**(2차 애니). 바람(Swing · Flutter)은 그 위에서 계속 흔든다.
+- 값 `windTipFollow` [0 – 0.99] — 드라이버에서 라이브 · 키. 루트 쪽이 더 세고 끝으로 갈수록 조금 약하다(Flow 와 같은 규칙).
+  섞이면서 줄어드는 흔들림은 `1 / (1 − 0.7 × 값)` 만큼 키워 보정한다(Flow 와 같다). **0 이면 Tip Follow 없는 Lite 와 같다.**
+- 노드망은 Flow 와 **같은 함수**를 쓴다(`flow_manager.make_tip` · `tip_follow_quat` · `follow_gain`). Lite 의 회전을 쿼터니언으로 받아
+  "진행축이 Tip 을 향하는 회전" 과 slerp 한다. Lite 는 끝 노드도 돌리므로 끝 노드는 마지막 뼈 방향이 Tip 을 향한다.
+- 주의: 회전이 쿼터니언을 거치므로 **세 rotate 채널이 모두 연결된다**. `Rotate Axis (object)` 를 켜도 다른 두 채널이 비지 않는다.
+- 노드: 노드당 약 19 개 + 체인당 4 개(Tip 포함). 체인 수백 개면 꺼 두는 게 가볍다. Remove 로 Tip 까지 지워지고, Curve(굽기) 출력도 된다.
+- 조인트 체인 · FK 컨트롤러 체인 둘 다 된다. 시험 `tests/test_lite_tip_follow.py` 24/24. **GUI 확인 아직.**
