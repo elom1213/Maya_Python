@@ -142,6 +142,80 @@ def compare(manifests, this_pc, excluded=(), ignore=()):
     return out
 
 
+class DirStatus(object):
+    """빈 폴더 하나(v01.51). 어떤 PC 에서든 파일이 없는 폴더 - 파일 비교(compare)로는 안 보이는 것."""
+    __slots__ = ("rel", "present", "lacking", "pc_status", "status")
+
+    def __init__(self, rel):
+        self.rel = rel              # 끝 '/' 없음
+        self.present = []           # 이 폴더가 있는 PC
+        self.lacking = []           # 스캔했는데 이 폴더가 없는 PC
+        self.pc_status = {}
+        self.status = OK
+
+    def is_problem(self):
+        return bool(self.lacking)
+
+
+def empty_dirs(manifests, this_pc, excluded=(), ignore=(), rows=None):
+    """빈 폴더 비교 -> [DirStatus] (경로순).
+
+    - 어느 PC 의 manifest['empty_dirs'](가장 안쪽 빈 폴더) 에든 있는 폴더 중, **어느 PC 에도 그 아래 파일이 없고**
+      다른 빈 폴더의 위 폴더도 아닌 것만(그런 폴더는 경로로 따라 나온다).
+    - 그 폴더가 있다 = 그 PC 의 empty_dirs 에 그것 또는 그 아래 폴더가 있다(빈 폴더 경로의 위 폴더는 당연히 있다). 'empty_dirs' 키가 없는 옛 매니페스트(v01.50 이전 스캔)는 모른다 - 판정에서 뺀다.
+    - 있는 PC 는 OK(빠진 PC 가 있으면 Only here), 없는 PC 는 Missing.
+    rows : compare() 결과(주면 그 파일 경로로 '아래 파일 있음' 을 판단, 없으면 매니페스트에서 다시 모음)."""
+    known = [pc for pc in manifests if isinstance((manifests[pc] or {}).get("empty_dirs"), list)]
+    if not known:
+        return []
+    has_files = set()
+    rels = [r.rel for r in rows] if rows is not None else [
+        rel for m in manifests.values() for rel in ((m or {}).get("files") or {})
+        if not (ss.is_excluded(rel, excluded) or ss.is_ignored(rel, ignore))]
+    for rel in rels:
+        d = rel.rpartition("/")[0]
+        while d and d.lower() not in has_files:
+            has_files.add(d.lower())
+            d = d.rpartition("/")[0]
+    found = {}
+    have = {}                        # {pc: 그 PC 에 있는 폴더(빈 폴더와 그 위 폴더 전부, 소문자)}
+    for pc in known:
+        own = have.setdefault(pc, set())
+        for d in manifests[pc]["empty_dirs"]:
+            d = ss.norm_rel(d).rstrip("/")
+            if not d:
+                continue
+            p = d
+            while p:
+                own.add(p.lower())
+                p = p.rpartition("/")[0]
+            if d.lower() in has_files:
+                continue
+            if ss.is_excluded(d + "/", excluded) or ss.is_ignored(d + "/", ignore):
+                continue
+            found.setdefault(d.lower(), DirStatus(d))
+    # 다른 빈 폴더의 위 폴더는 줄로 만들지 않는다(그 아래 줄이 있다)
+    parents = set()
+    for low in found:
+        p = low.rpartition("/")[0]
+        while p:
+            parents.add(p)
+            p = p.rpartition("/")[0]
+    order = sorted(known, key=lambda p: (p != this_pc, p.lower()))
+    out = []
+    for low in sorted(found):
+        if low in parents:
+            continue
+        row = found[low]
+        row.present = [p for p in order if low in have[p]]
+        row.lacking = [p for p in order if p not in row.present]
+        for p in order:
+            row.pc_status[p] = MISSING if p in row.lacking else (ONLY_HERE if row.lacking else OK)
+        row.status = row.pc_status.get(this_pc, MISSING)
+        out.append(row)
+    return out
+
+
 def summarize(rows, pc=None):
     """{status: count} - pc 를 주면 그 PC 기준, 아니면 각 행의 status."""
     counts = dict((s, 0) for s in ALL_STATUSES)

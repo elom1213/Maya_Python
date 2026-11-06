@@ -251,6 +251,34 @@ try:
     cnt = sc.summarize(sc.compare(man, "D"))
     check("summarize", cnt[sc.MISSING] == 1, cnt)
 
+    # ---- v01.51 빈 폴더
+    ew = os.path.join(work, "empty_dirs")
+    for pc, dirs in (("A", ["1999_=== - 복사본", "x/y/z", "x/w", "only_a", "backup", "skip/me", "f"]), ("B", ["x/y", "f", "1999_=== - 복사본"])):
+        for d in dirs:
+            os.makedirs(os.path.join(ew, pc, *d.split("/")))
+    for rel in ("A/f/g.txt", "A/top.txt", "A/skip/me/keep_out.txt"):
+        with open(os.path.join(ew, *rel.split("/")), "w") as f:
+            f.write("x")
+    ma, ra = sm.scan(os.path.join(ew, "A"), "r", "A", excluded=["skip/"], ignore=ss.DEFAULT_IGNORE)
+    mb, rb = sm.scan(os.path.join(ew, "B"), "r", "B", ignore=ss.DEFAULT_IGNORE)
+    check("scan records innermost empty folders only (not ignored / excluded / with files)",
+          ma["empty_dirs"] == ["1999_=== - 복사본", "only_a", "x/w", "x/y/z"] and ra["empty_dirs"] == 4, ma["empty_dirs"])
+    check("scan B empty dirs", mb["empty_dirs"] == ["1999_=== - 복사본", "f", "x/y"], mb["empty_dirs"])
+    mans = {"A": ma, "B": mb}
+    ed = {d.rel: d for d in sc.empty_dirs(mans, "A", rows=sc.compare(mans, "A"))}
+    check("empty_dirs: folder with files on another PC is not an empty row ('f')", "f" not in ed and "x/y" not in ed, sorted(ed))
+    check("empty_dirs: on both = OK", ed["1999_=== - 복사본"].status == sc.OK and not ed["1999_=== - 복사본"].is_problem())
+    check("empty_dirs: only on A -> A Only here, B Missing",
+          ed["x/y/z"].pc_status == {"A": sc.ONLY_HERE, "B": sc.MISSING} and ed["only_a"].lacking == ["B"], ed["x/y/z"].pc_status)
+    edb = {d.rel: d for d in sc.empty_dirs(mans, "B")}
+    check("empty_dirs from B's view: Missing", edb["x/w"].status == sc.MISSING and edb["x/w"].present == ["A"])
+    check("empty_dirs: excluded at compare time", "only_a" not in {d.rel for d in sc.empty_dirs(mans, "A", excluded=["only_a/"])})
+    old_b = dict(mb)
+    old_b.pop("empty_dirs")
+    edo = {d.rel: d for d in sc.empty_dirs({"A": ma, "B": old_b}, "A")}
+    check("empty_dirs: old manifest without the key is unknown, not Missing",
+          edo["only_a"].status == sc.OK and edo["only_a"].lacking == [] and "B" not in edo["only_a"].pc_status, edo["only_a"].pc_status)
+
     # ---- v01.50 PC 표시 이름
     check("clean_pc_names: trims, drops empty, case-dup",
           ss.clean_pc_names({"P4T7MBN": "  Office   PC ", "X": "", "p4t7mbn": "dup", "": "n"}) == {"P4T7MBN": "Office PC"})

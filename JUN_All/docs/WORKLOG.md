@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-06 (오늘)
 
+> [!summary] A00210_FileManager **v01.51 Sync Status 빈 폴더 표시** `#A00210_FileManager`
+- 요청: `1999_=== - 복사본` 같은 빈 폴더가 실제로 있는데 Status 트리에 안 보인다.
+- 원인: 매니페스트가 파일만 적어 파일 없는 폴더는 트리에 생기지 않았다.
+- 구현: 스캔이 가장 안쪽 빈 폴더를 `empty_dirs` 에 기록 → `sync_compare.empty_dirs` 로 PC 별 있음 / 없음(Empty folder · Missing · Only here), 위 폴더 상태에도 반영. 옛 매니페스트는 모름 처리.
+- 실측: JUN_MUE 빈 폴더 181개(복사본 구분 폴더 5개 포함). 시험 core 65/65 · UI 96/96.
+
 > [!summary] A00210_FileManager **v01.50 Sync PC 이름** `#A00210_FileManager`
 - 요청: Sync / Status 에 `P4T7MBN` 같은 컴퓨터 이름 대신 직관적인 PC 이름을 붙이고 싶다(기존 기능 없음 → 새로).
 - 구현: `PC Names...` 창(PC · 이름 · 스캔한 루트) → `_sync_settings.json` 의 `pc_names`(모든 PC 공유). 화면의 모든 PC 표기가 이름으로, 매니페스트 파일은 컴퓨터 이름 그대로.

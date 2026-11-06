@@ -612,6 +612,8 @@ mayapy [C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe] [Browse...] [Detect] 
 - `Compare`: **This PC**(이 PC 사본 기준) / **All PCs**(어느 PC 에서든 어긋난 파일 전부, 상태 칸에 `Missing: PCB` 처럼).
 - `Show`: Missing · Outdated · Conflict · Ahead / Only here · OK · Excluded — **기본은 전부 체크**(v01.49). `Filter`: 경로 단어(공백 = 모두 포함).
 - PC 열은 매니페스트 수만큼(이 PC 먼저, 셀 = 수정 시각, 툴팁 = 크기 · 해시). **PC 가 5대 이상이면 요약 열** `This PC · Latest on · Missing on · Outdated on`.
+- **빈 폴더(v01.51)**: 파일이 없는 폴더도 트리에 — 모든 PC 에 있으면 `Empty folder`, 이 PC 에 없으면 `Missing`, 다른 PC 에 없으면 `Only here`.
+  매니페스트 `empty_dirs`(가장 안쪽 빈 폴더만)로 판정하므로 **업데이트 뒤 각 PC 에서 한 번 다시 스캔**해야 그 PC 의 빈 폴더가 비교에 들어간다.
 - 트리: **처음엔 전부 접힘**(v01.49). 화살표로 펼치면 한 단계만, **Shift + 펼치기 / 접기 = 아래 전부**(공용 `JUN_mod_treeExpand_qt_v01`, v01.48 — 모든 트리 공통).
   펼쳐 둔 폴더는 필터 · Show 를 바꿔도 그대로, 필터 글자가 있으면 맞는 곳까지 펼친다.
 - `Status` 열은 경로 바로 옆. **폴더 줄 = 그 아래 모든 파일의 상태**(가장 급한 것부터 `Missing (1) · Ahead (2)`, 다 같으면 `OK`) — 위로 재귀라

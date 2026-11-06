@@ -8,6 +8,7 @@
 #   - 공유 값(루트 · 제외 경로 · 패턴)은 <데이터 폴더>/manifests/_sync_settings.json,
 #     PC 별 값(루트 실제 경로 · 이 PC 만 제외 · 화면 상태)은 A00210 프로파일(prefs).
 #   - v01.50 : PC 표시 이름(_sync_settings.json 의 pc_names, 모든 PC 공유) - 화면에는 붙인 이름, 매니페스트 파일은 PC id 그대로.
+#   - v01.51 : 빈 폴더도 Status 트리에(매니페스트 empty_dirs). 있는 PC / 없는 PC 로 Missing · Only here · OK.
 #   - 스캔(해시)은 QThread. git Pull / Push 는 MainWindow 가 주는 콜러블로(검사 · 클론은 MainWindow 쪽).
 #
 # UI 문자열은 영어, 주석은 한국어.
@@ -142,6 +143,7 @@ class SyncTab(QWidget):
         self._root_id = ""
         self._manifests = {}
         self._rows = []
+        self._dirs = []                            # 빈 폴더 (sc.DirStatus)
         self._thread = None
         self._push_after_scan = False
         self._populated_once = False
@@ -778,6 +780,7 @@ class SyncTab(QWidget):
         root = self._current_root()
         ignore = self._settings.get("ignore_patterns") or []
         self._rows = sc.compare(self._manifests, self._pc, self._excluded_for(root), ignore) if root else []
+        self._dirs = sc.empty_dirs(self._manifests, self._pc, self._excluded_for(root), ignore, self._rows) if root else []
         self._update_pcs_label()
         self._populate_tree()
 
@@ -877,8 +880,9 @@ class SyncTab(QWidget):
         folders = {}
 
         # 폴더 상태는 보이는 행이 아니라 **그 아래 모든 파일**로 센다 - Show 로 OK 를 숨겨도 폴더 줄은 실제 상태.
+        # 빈 폴더(v01.51)도 하나로 센다 - 다른 PC 에 빠진 빈 폴더가 위 폴더 줄에도 보인다.
         folder_counts = {}
-        for r in self._rows:
+        for r in list(self._rows) + list(self._dirs):
             key = self._row_key(r, mode)
             path = r.rel.rpartition("/")[0]
             while path:
@@ -920,7 +924,12 @@ class SyncTab(QWidget):
             it.setForeground(status_col, QBrush(QColor(color)))
             (parent.addChild(it) if parent else self.tree.addTopLevelItem(it))
 
+        # 빈 폴더 줄을 먼저 만든다 - 그 위 폴더 줄도 아래 상태 계산에 들어가야 한다.
+        empty_lows = self._add_empty_dirs(folder_item, folders, mode, summary, pcs, status_col)
+
         for low, it in folders.items():
+            if low in empty_lows:
+                continue
             text, color, tip = _folder_status(folder_counts.get(low, {}))
             it.setText(status_col, text)
             it.setToolTip(status_col, tip)
@@ -940,6 +949,54 @@ class SyncTab(QWidget):
         for c in range(len(headers)):
             self.tree.resizeColumnToContents(c)
         self._update_summary(rows)
+
+    def _visible_dirs(self, mode):
+        """보이는 빈 폴더 - Show(상태) · Filter(경로 단어)는 파일 줄과 같은 규칙."""
+        show = set(k for k, cb in self.chk_show.items() if cb.isChecked())
+        if sc.AHEAD in show:
+            show.add(sc.ONLY_HERE)
+        words = [w for w in self.le_filter.text().lower().split() if w]
+        out = []
+        for d in self._dirs:
+            if words and not all(w in d.rel.lower() for w in words):
+                continue
+            if self._row_key(d, mode) in show:
+                out.append(d)
+        return out
+
+    def _add_empty_dirs(self, folder_item, folders, mode, summary, pcs, status_col):
+        """빈 폴더 줄(v01.51) - 파일이 없어 파일 줄로는 안 생기는 폴더. 만든 폴더 키(소문자) 집합을 돌려준다."""
+        made = set()
+        for d in self._visible_dirs(mode):
+            made.add(d.rel.lower())
+            it = folder_item(d.rel)
+            it.setData(0, ROLE_KIND, "dir")
+            it.setToolTip(0, "{0}/  (empty folder)".format(d.rel))
+            if mode == "all" and d.lacking:
+                text = "Missing: {0}  (empty folder)".format(self._pc_names(d.lacking))
+            elif d.status == sc.MISSING:
+                text = "Missing  (empty folder - create it; on {0})".format(self._pc_names(d.present))
+            elif d.status == sc.ONLY_HERE:
+                text = "Only here  (empty folder - missing on {0})".format(self._pc_names(d.lacking))
+            else:
+                text = "Empty folder"
+            key = self._row_key(d, mode)
+            it.setText(status_col, text)
+            it.setToolTip(status_col, "Empty folder (no tracked files below).\nOn: {0}\nMissing on: {1}".format(
+                self._pc_names(d.present) or "-", self._pc_names(d.lacking) or "-"))
+            it.setForeground(status_col, QBrush(QColor(STATUS_COLORS.get(key, "#888"))))
+            if summary:
+                it.setText(2, "folder" if self._pc in d.present else "—")
+                it.setText(4, self._pc_names(d.lacking))
+                it.setForeground(4, QBrush(QColor(STATUS_COLORS[sc.MISSING])))
+            else:
+                for col, pc in enumerate(pcs, start=2):
+                    if pc not in d.pc_status:
+                        continue
+                    it.setText(col, "folder" if pc in d.present else "—")
+                    it.setForeground(col, QBrush(QColor(STATUS_COLORS.get(d.pc_status[pc], "#888"))))
+                    it.setToolTip(col, "{0}: {1}".format(self._pc_name(pc), "empty folder" if pc in d.present else "no folder"))
+        return made
 
     def _add_excluded_items(self, folder_item):
         root = self._current_root()

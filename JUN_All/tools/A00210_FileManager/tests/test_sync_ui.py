@@ -138,6 +138,36 @@ try:
     k80 = KANA + "00010_cleanup_KANA_00080.mb"
     check("00080 shown as Missing on this PC", k80 in rows and rows[k80][1][1].startswith("Missing")
           and "get from PCB" in rows[k80][1][1], rows.get(k80))
+    # ---------------------------------------------------------- v01.51 빈 폴더
+    os.makedirs(os.path.join(root_a, "00_04_02_ANI_00_PJ_010", "scenes", "1999_====== - copy"))
+    os.makedirs(os.path.join(root_b, "00_04_02_ANI_00_PJ_010", "scenes", "1999_====== - copy"))
+    os.makedirs(os.path.join(root_b, "empty_b_only", "inner"))
+    tab.on_scan(push=False)
+    wait_scan(tab)
+    mb, _ = sm.scan(root_b, rid, "PCB", "other", [], ss.DEFAULT_IGNORE)
+    sm.save_manifest(data_dir, mb)
+    tab.chk_show[sc.OK].setChecked(True)
+    tab.on_refresh(quiet=True)
+    rows = tree_rows(tab)
+    e1 = "00_04_02_ANI_00_PJ_010/scenes/1999_====== - copy/"
+    check("empty folder on both PCs shown in tree", e1 in rows and rows[e1][0] == "dir" and rows[e1][1][1] == "Empty folder",
+          rows.get(e1))
+    e2 = "empty_b_only/inner/"
+    check("empty folder only on PCB -> Missing here (with parent)", e2 in rows and rows[e2][1][1].startswith("Missing")
+          and "empty_b_only/" in rows and rows["empty_b_only/"][1][1].startswith("Missing (1)"), (rows.get(e2), rows.get("empty_b_only/")))
+    check("empty folder PC cells", rows[e2][1][2:4] == ["—", "folder"], rows[e2][1])
+    tab.chk_show[sc.OK].setChecked(False)
+    rows = tree_rows(tab)
+    check("Show OK off hides the OK empty folder, keeps the Missing one", e1 not in rows and e2 in rows)
+    tab.le_filter.setText("1999")
+    rows = tree_rows(tab)
+    check("Filter applies to empty folders", e2 not in rows)
+    tab.le_filter.setText("")
+    shutil.rmtree(os.path.join(root_b, "empty_b_only"))
+    mb, _ = sm.scan(root_b, rid, "PCB", "other", [], ss.DEFAULT_IGNORE)
+    sm.save_manifest(data_dir, mb)
+    tab.on_refresh(quiet=True)
+
     # ---------------------------------------------------------- v01.50 PC 이름
     from Framework.qt.qt import QDialog  # noqa: E402
     check("PC Names: known_pcs lists both PCs", sorted(sm.known_pcs(data_dir)) == ["PCA", "PCB"], sm.known_pcs(data_dir))

@@ -2,6 +2,17 @@
 
 All notable changes to this tool are documented here.
 
+## [01.51] - 2026-11-06
+
+- **[Sync > Status] 빈 폴더도 트리에.** 파일이 하나도 없는 폴더(예: `scenes/1999_=================================== - 복사본`)는 파일 목록으로는 안 생겨 보이지 않았다.
+  - 스캔이 **가장 안쪽 빈 폴더**를 매니페스트 `empty_dirs` 에 적는다(`a/` 와 `a/b/` 가 다 비면 `a/b` 만 — 위 폴더는 경로로 따라 나온다).
+    제외 · 무시된 파일만 있는 폴더도 빈 폴더. 실측 JUN_MUE: 폴더 277 중 빈 폴더 181(복사본 구분 폴더 5개 포함).
+  - 상태: 모든 PC 에 있으면 `Empty folder`(OK 색), 이 PC 에 없으면 `Missing (empty folder - create it; on …)`, 다른 PC 에 없으면 `Only here (…)`.
+    `All PCs` 비교에서는 `Missing: <PC> (empty folder)`. PC 열 = `folder` / `—`. 위 폴더 줄의 상태 개수에도 들어간다.
+  - `Show` · `Filter` 는 파일 줄과 같은 규칙. 다른 PC 에 파일이 있는 폴더는 빈 폴더 줄로 만들지 않는다.
+  - v01.50 이전에 스캔한 매니페스트(`empty_dirs` 없음)는 '모름' — Missing 으로 치지 않는다. **각 PC 에서 한 번 다시 스캔하면** 들어간다.
+- 시험 core 65/65(+8) · UI 96/96(+5).
+
 ## [01.50] - 2026-11-06
 
 - **[Sync] PC 표시 이름.** 위쪽 `This PC:` 옆 **`PC Names...`** 창에서 PC 마다 툴 안에서 부를 이름(예: `P4T7MBN` → `Office`)을 붙인다.

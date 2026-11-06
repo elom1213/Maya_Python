@@ -46,5 +46,8 @@
 #        _sync_settings.json 의 pc_names 로 모든 PC 공유(푸시하면 다른 PC 에도). This PC 라벨 · PCs 줄 · PC 열 머리 · 상태 글자(get from / send to) ·
 #        요약 열 · 툴팁 · Export List 에 이름. 매니페스트 파일 이름은 컴퓨터 이름 그대로(이름을 바꿔도 이력이 끊기지 않는다).
 
-VERSION = "01.50"
+# 01.51  Sync > Status: 빈 폴더도 트리에(예: scenes/1999_=== - 복사본). 스캔이 가장 안쪽 빈 폴더를 매니페스트 empty_dirs 에 적고,
+#        PC 마다 있음 / 없음으로 Empty folder(OK) · Missing · Only here. 위 폴더 줄 상태에도 센다. 옛 매니페스트(키 없음)는 판정에서 뺀다 - 다시 스캔하면 들어간다.
+
+VERSION = "01.51"
 LAST_UPDATE = "2026-11-06"

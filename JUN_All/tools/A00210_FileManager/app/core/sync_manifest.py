@@ -120,8 +120,10 @@ def _is_link_dir(entry):
     return bool(getattr(st, "st_file_attributes", 0) & _REPARSE)
 
 
-def list_files(root_abs, excluded=(), ignore=(), follow_junctions=False, cancel=None):
-    """(rel, abs_path, os.stat_result) 목록. 제외 폴더 안으로는 들어가지 않는다."""
+def list_files(root_abs, excluded=(), ignore=(), follow_junctions=False, cancel=None, dirs_out=None):
+    """(rel, abs_path, os.stat_result) 목록. 제외 폴더 안으로는 들어가지 않는다.
+
+    dirs_out : 리스트를 주면 들어간 폴더의 상대 경로(끝 '/' 없음)를 담는다(v01.51 빈 폴더 기록용)."""
     out = []
     errors = []
     stack = [("", root_abs)]
@@ -146,6 +148,8 @@ def list_files(root_abs, excluded=(), ignore=(), follow_junctions=False, cancel=
                 if not follow_junctions and _is_link_dir(entry):
                     continue
                 stack.append((rel, entry.path))
+                if dirs_out is not None:
+                    dirs_out.append(rel)
                 continue
             if ss.is_excluded(rel, excluded) or ss.is_ignored(rel, ignore):
                 continue
@@ -193,7 +197,17 @@ def scan(root_abs, root_id, pc, user="", excluded=(), ignore=(), prev=None,
     if not root_abs or not os.path.isdir(root_abs):
         raise OSError("Root folder not found: {0}".format(root_abs))
 
-    files, errors = list_files(root_abs, excluded, ignore, follow_junctions, cancel)
+    all_dirs = []
+    files, errors = list_files(root_abs, excluded, ignore, follow_junctions, cancel, dirs_out=all_dirs)
+    # v01.51 빈 폴더 = 아래에 추적하는 파일이 하나도 없는 폴더(제외 · 무시된 파일만 있어도 빈 폴더). 파일이 없으니 files 로는 안 보인다.
+    # **가장 안쪽 것만** 적는다(a/ 와 a/b/ 가 둘 다 비었으면 a/b 만) - 위 폴더는 경로로 따라 나온다.
+    full = set()                     # 파일이 있거나 하위 폴더가 있는 폴더
+    for rel in [f[0] for f in files] + all_dirs:
+        d = rel.rpartition("/")[0]
+        while d and d.lower() not in full:
+            full.add(d.lower())
+            d = d.rpartition("/")[0]
+    empty_dirs = sorted((d for d in all_dirs if d.lower() not in full), key=str.lower)
     prev_idx = _prev_index(prev)
 
     todo = []                        # 해시가 필요한 것
@@ -262,9 +276,11 @@ def scan(root_abs, root_id, pc, user="", excluded=(), ignore=(), prev=None,
         "scanned_at": _fmt_time(now),
         "scanned_epoch": now,
         "files": result,
+        "empty_dirs": empty_dirs,
     }
     report = {
         "files": len(result),
+        "empty_dirs": len(empty_dirs),
         "hashed": hashed,
         "reused": reused,
         "busy": busy,
