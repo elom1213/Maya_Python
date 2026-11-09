@@ -23,6 +23,8 @@ import struct
 import sys
 import zlib
 
+from Framework.core import fbx_name
+
 MAGIC = b"Kaydara FBX Binary  \x00"
 
 #: FBX 시간 단위 - 1초 = 46186158000 tick
@@ -195,15 +197,9 @@ def strip_namespace(name):
 
 
 def maya_node_name(name):
-    """마야 FBX 임포터가 만드는 노드 이름 - [A-Za-z0-9_] 밖의 바이트는 FBXASC%03d."""
-    out = []
-    for byte in name.encode("utf-8"):
-        ch = chr(byte)
-        if ch.isalnum() and byte < 128 or ch == "_":
-            out.append(ch)
-        else:
-            out.append("FBXASC{0:03d}".format(byte))
-    return "".join(out)
+    """마야 FBX 임포터가 만드는 노드 이름 - [A-Za-z0-9_] 밖의 바이트와 맨 앞 숫자는 FBXASC%03d.
+    본체는 공용 Framework.core.fbx_name.encode (2026-11-09 A00620 - 맨 앞 숫자 규칙 추가, 실측)."""
+    return fbx_name.encode(name)
 
 
 # ================================================================

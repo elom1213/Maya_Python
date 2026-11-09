@@ -57,6 +57,11 @@
           "name": "SceneCleanup",
           "path": "tools/A00600_SceneCleanup",
           "color": "#6b7280"
+        },
+        {
+          "name": "NameDecoder",
+          "path": "tools/A00620_NameDecoder",
+          "color": "#6b7280"
         }
       ]
     },

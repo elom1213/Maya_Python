@@ -1,10 +1,10 @@
 ---
-title: A00610_NameDecoder 계획서
+title: A00620_NameDecoder 계획서
 tags: [maya-python, plan, fbx, fbxasc, unicode, blendshape, naming]
 updated: 2026-11-09
 ---
 
-# A00610_NameDecoder 계획서
+# A00620_NameDecoder 계획서
 
 마야 FBX 임포터가 `FBXASC227FBXASC129FBXASC130` 처럼 바꿔 놓은 이름(일본어 · 중국어 · 띄어쓰기 · 맨 앞 숫자 등)을
 **원래 글자로 풀어서 보여 주는** in-Maya PySide 툴(arch B).
@@ -16,7 +16,7 @@ updated: 2026-11-09
 |---|------|------|
 | 1 | 마야가 표현 못 하는 글자(일본어 · 중국어 · 띄어쓰기)가 `FBXASC###` 로 바뀐 이름을 원래 글자로 읽고 싶다 | 디코드해서 표로 보여 준다(§3) |
 | 2 | 대상 = 임의 노드 이름 + 블렌드셰이프 타겟 이름 | 노드 이름(DAG · DG 전부) + **블렌드셰이프 웨이트 alias** 를 함께 다룬다 |
-| 3 | 새 툴 / 기존 툴 이식 판단 | **새 툴 A00610 + 디코더는 Framework 공용**(§4) |
+| 3 | 새 툴 / 기존 툴 이식 판단 | **새 툴 A00620 + 디코더는 Framework 공용**(§4) |
 
 ## 2. 실측 (mayapy 2024, 2026-11-09, 예시 `0010_Miyabi_base_02.mb`)
 
@@ -122,7 +122,7 @@ Shape Editor 가 `FBXASC…` 로만 보여 주는 문제를 직접 해결한다.
 | A00480 FileTool | FBX 임포트를 다룬다 | 파일 입출력 툴. 임포트가 끝난 씬을 읽는 일과 다르다 |
 | A00310 SearchTool | 검색 | 규칙 기반 타입/토큰 검색. 디코드 표 · BS 슬라이더와 결이 다르다 |
 
-**결정: 새 툴 `A00610_NameDecoder` + 디코더는 `Framework` 공용.**
+**결정: 새 툴 `A00620_NameDecoder` + 디코더는 `Framework` 공용.**
 
 - 일이 **노드 타입을 가로지르는 "읽기 전용 뷰어"** 라서 어느 기존 툴 도메인에도 온전히 속하지 않는다.
 - 작은 툴이라 애니메이터 · 모델러에게 그대로 배포하기 쉽다(A00330 의 Release view 규칙과 엮이지 않는다).
@@ -144,8 +144,8 @@ Framework/core/maya_fbx_names.py        # 공용 - maya.cmds
     scan(scope, include_attrs=False) -> [NameEntry]   # node / bs_target / attr
     select_entry(entry)
 
-tools/A00610_NameDecoder/
-├─ __init__.py · launch.py · __dragDrop_A00610.py · icon/A00610_NameDecoder.svg(+png)
+tools/A00620_NameDecoder/
+├─ __init__.py · launch.py · __dragDrop_A00620.py · icon/A00620_NameDecoder.svg(+png)
 ├─ app/config/version.py
 ├─ app/core/name_table.py      # NameEntry 묶기 · 필터 · export(csv/json)
 ├─ app/core/ascii_rename.py    # 2 단계: 번역표 → 미리보기 → apply / restore
@@ -180,11 +180,11 @@ tools/A00610_NameDecoder/
 
 | 단계 | 내용 |
 |------|------|
-| 1 | `Framework/core/fbx_name.py` + `maya_fbx_names.py` + A00610 Scan 탭(표 · 검색 · 선택 · Sync · Copy · Export) |
+| 1 | `Framework/core/fbx_name.py` + `maya_fbx_names.py` + A00620 Scan 탭(표 · 검색 · 선택 · Sync · Copy · Export) |
 | 2 | BlendShape 타겟 패널(디코드 이름 + 슬라이더) · Rename to ASCII / Restore |
 | 3 | 기존 툴에 디코드 표시 한 줄씩(A00290 V02 · A00330) — 따로 요청 시 |
 
 ## 8. 문서 · 기록
 
-- `docs/A00610_NameDecoder.md` 사용 안내(인코딩 규칙 · 마야 한계 · **FBX 왕복은 FBXASC 그대로가 안전** · 번역표 형식)
+- `docs/A00620_NameDecoder.md` 사용 안내(인코딩 규칙 · 마야 한계 · **FBX 왕복은 FBXASC 그대로가 안전** · 번역표 형식)
 - `docs/WORKLOG.md`, 메모리 `wip-a00610-namedecoder.md`, 아이콘 32x32 svg + png, A00370 런처 버튼

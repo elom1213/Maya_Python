@@ -33,6 +33,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-09 (오늘)
 
+> [!summary] **A00620_NameDecoder v01.00 신규** - FBXASC 이름을 원래 글자로 읽는 툴 (`docs/A00620_NameDecoder.md`) `#A00620_NameDecoder`
+- 요청: FBX 로 들어온 일본어 · 중국어 · 띄어쓰기 이름이 `FBXASC227FBXASC129FBXASC130` 처럼 보인다 - 노드 · 블렌드셰이프 타겟 이름을 읽고 싶다. 새 툴 vs 기존 툴 판단 → 새 툴(계획서 §4).
+- 실측: 마야는 유니코드 이름을 못 받는다(rename · aliasAttr 에러, OpenMaya setName 은 조용히 무시). **FBX 익스포터는 FBXASC 를 원래 글자로 되돌려 쓴다** → 기본은 읽기 전용, ASCII 이름 바꾸기는 숨긴 선택 기능 + Restore.
+- Names(스캔 · 풀린 글자 검색 · 선택 · Sync · 복사 · csv/json) · Blend Shapes(풀린 이름 + 슬라이더) · Rename to ASCII(번역표 → Preview → Apply, 원래 이름은 network 노드에).
+- 공용 `Framework/core/fbx_name.py`(인코딩 · 디코딩) · `maya_fbx_names.py`(씬 스캔). **임포터는 맨 앞 숫자도 FBXASC 로 바꾼다**(`1abc` → `FBXASC049abc`, 실측) → `fbx_binary.maya_node_name` 을 공용 인코더로 바꿔 바로잡음(A00480 test_fbx_core 40/40 · test_fbx_exact 25/25).
+- 번호: 처음 A00610 으로 계획했으나 다른 세션 `A00610_PmxImporter` 와 겹쳐(드롭 파일 `__dragDrop_A00610.py` 이름 충돌) A00620 으로 옮김.
+- 시험 61/61 (예시 `0010_Miyabi_base_02.mb` 노드 149 · 타겟 52 포함). 마야 GUI 확인 아직(일본어 글꼴).
+
 > [!summary] **A00610_PmxImporter 계획서** (`docs/plans/A00610_PmxImporter_plan.md`) `#A00610_PmxImporter`
 - 요청: PMX(MMD)를 마야에 바로 임포트 - 스킨 메시 · 본 · 블렌드셰이프 · 머티리얼 · 텍스처까지. 지금은 CATS(블렌더) → FBX → 마야 손질로 하는 중.
 - 실측: Miyabi.pmx(정점 27,086 · 재질 23 · 본 436 · 버텍스 모프 52 · 추가 UV 2) 를 기준 mb(`0010_Miyabi_base_02.mb`)와 대조 -
