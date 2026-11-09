@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-05
+# last Update date : 2026-11-09
 # A00210_FileManager - version info
 
 # 01.41  Maya > Export sub tab: set rule (json) -> Check Sets (set · playback range · fps · version per file) -> Bake & Export / Export Only
@@ -52,5 +52,8 @@
 # 01.52  Sync > Status: File Types - File Manager 탭과 같은 확장자 체크 메뉴(눌러도 닫히지 않음, All, 확장자별 개수). 끈 확장자는 prefs sync_types_off
 #        (새 확장자는 켜진 채). 고르는 중엔 빈 폴더 숨김, 폴더 줄 상태는 아래 모든 파일로. 메뉴 클래스는 app/ui/checkable_menu.py 로 옮겨 두 탭이 같이 쓴다.
 
-VERSION = "01.52"
-LAST_UPDATE = "2026-11-06"
+# 01.53  Sync > Status: 트리 이름 순 - 단계마다 추적 폴더 -> 추적 파일 -> 제외 폴더 -> 제외 파일, 각 무리 안은 이름(대소문자 무시) 순.
+#        예전엔 비교 결과 순서 · 폴더가 처음 생긴 순서라 섞여 보였다. 제외 항목(흐린 색)은 그대로 추적 항목 아래.
+
+VERSION = "01.53"
+LAST_UPDATE = "2026-11-09"

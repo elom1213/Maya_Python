@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-11-06
+updated: 2026-11-09
 ---
 
 # 작업 일지 (WORKLOG)
@@ -31,7 +31,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-11-06 (오늘)
+## 2026-11-09 (오늘)
+
+> [!summary] A00210_FileManager **v01.53 Sync Status 이름 순** `#A00210_FileManager`
+- 요청: Sync / Status 의 경로 · 파일을 이름 순으로. 추적 제외(흐린 색)는 지금처럼 아래에 두되 그 안도 이름 순.
+- 원인: 파일 줄은 비교 결과 순서, 폴더 줄은 처음 나온 파일 때 생긴 순서로 붙었다.
+- 구현: 다 그린 뒤 `_sort_tree_items` 로 단계마다 정렬 — 추적 폴더 → 추적 파일 → 제외 폴더 → 제외 파일, 이름(대소문자 무시).
+- 시험 UI 108/108(+2), core 65/65. **GUI 확인 아직.**
+
+## 2026-11-06
 
 > [!summary] A00480_FileTool **v01.21 Reference > Default `Replace...`** `#A00480_FileTool`
 - 요청: Reference > Default 트리에서 고른 레퍼런스를 다른 파일로 교체.

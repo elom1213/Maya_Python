@@ -483,6 +483,35 @@ try:
     tab.shutdown()
     tab2.shutdown()
 
+    # ---------------------------------------------------------- v01.53 이름 순 (추적 폴더 -> 추적 파일 -> 제외 폴더 -> 제외 파일)
+    from Framework.qt.qt import QTreeWidgetItem
+
+    def mk(parent, rel, kind):
+        it = QTreeWidgetItem([rel.rstrip("/").rpartition("/")[2]])
+        it.setData(0, st.ROLE_REL, rel)
+        it.setData(0, st.ROLE_KIND, kind)
+        (parent.addChild(it) if parent else tab.tree.addTopLevelItem(it))
+        return it
+
+    tab.tree.clear()
+    top_z = mk(None, "zz/", "dir")
+    mk(None, "b.mb", "file")
+    mk(None, "x_ex/", "excluded")
+    mk(None, "A.mb", "file")
+    mk(None, "c_ex.mb", "excluded")
+    mk(None, "aa/", "dir")
+    mk(None, "a_ex.mb", "excluded")
+    for rel, kind in [("zz/y.mb", "file"), ("zz/b_ex.mb", "excluded"), ("zz/Sub/", "dir"), ("zz/a.mb", "file"), ("zz/a_ex/", "excluded")]:
+        mk(top_z, rel, kind)
+    tab._sort_tree_items()
+    names = [tab.tree.topLevelItem(i).data(0, st.ROLE_REL) for i in range(tab.tree.topLevelItemCount())]
+    check("sort: top level by name, excluded below",
+          names == ["aa/", "zz/", "A.mb", "b.mb", "x_ex/", "a_ex.mb", "c_ex.mb"], names)
+    top_z = tab.tree.topLevelItem(1)
+    names = [top_z.child(i).data(0, st.ROLE_REL) for i in range(top_z.childCount())]
+    check("sort: children sorted too", names == ["zz/Sub/", "zz/a.mb", "zz/y.mb", "zz/a_ex/", "zz/b_ex.mb"], names)
+    tab._populate_tree()
+
     # ---------------------------------------------------------- MainWindow 에 탭이 붙는다 (닫지 않음 - 실제 프로파일 저장 안 함)
     from tools.A00210_FileManager.app.ui import main_window as mw
     from Framework.themes.theme_manager import ThemeManager

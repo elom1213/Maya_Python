@@ -1022,6 +1022,9 @@ class SyncTab(QWidget):
         if self.chk_show_excluded.isChecked():
             self._add_excluded_items(folder_item)
 
+        # v01.53 : 단계마다 이름 순 - 추적 대상(폴더 -> 파일) 먼저, 제외 항목(흐린 색)은 그 아래에 다시 이름 순.
+        self._sort_tree_items()
+
         if self.le_filter.text().strip():
             self.tree.expandAll()
         elif keep:
@@ -1083,6 +1086,30 @@ class SyncTab(QWidget):
                     it.setForeground(col, QBrush(QColor(STATUS_COLORS.get(d.pc_status[pc], "#888"))))
                     it.setToolTip(col, "{0}: {1}".format(self._pc_name(pc), "empty folder" if pc in d.present else "no folder"))
         return made
+
+    def _sort_tree_items(self):
+        """트리의 모든 단계를 이름 순으로 다시 놓는다(v01.53).
+
+        순서: 추적 폴더 -> 추적 파일 -> 제외 폴더 -> 제외 파일, 각 무리 안은 이름(대소문자 무시) 순.
+        파일 줄은 비교 결과 순서대로 붙고 폴더 줄은 처음 나온 파일 때 생겨서 이름 순이 아니었다.
+        """
+        def key(it):
+            excluded = it.data(0, ROLE_KIND) == "excluded"
+            rel = it.data(0, ROLE_REL) or ""
+            is_dir = rel.endswith("/")
+            name = rel.rstrip("/").rpartition("/")[2] or it.text(0)
+            return (excluded, not is_dir, name.lower(), name)
+
+        def sort_children(take, add):
+            kids = take()
+            kids.sort(key=key)
+            add(kids)
+            for k in kids:
+                if k.childCount():
+                    sort_children(k.takeChildren, k.addChildren)
+
+        tops = [self.tree.takeTopLevelItem(0) for _ in range(self.tree.topLevelItemCount())]
+        sort_children(lambda: tops, self.tree.addTopLevelItems)
 
     def _add_excluded_items(self, folder_item):
         root = self._current_root()
