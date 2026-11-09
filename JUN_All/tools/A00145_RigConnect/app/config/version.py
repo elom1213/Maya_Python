@@ -111,5 +111,10 @@
 # 01.69  트리 펼치기 - 화살표로 펼치면 한 단계만, Shift + 펼치기/접기 = 아래 전부 (All Targets 미리보기 트리).
 #        공용 Framework/qt/MOD_treeExpand_qt_v01
 
-VERSION = "01.69"
-LAST_UPDATE = "2026-11-05"
+# 01.70  Constrain > Constraint - Swap 버튼(Match 탭과 같은 Targets <-> Followers 교환) +
+#        Targets / Followers 에 Rules 버튼 : 규칙대로 리스트업(세트가 간직한 오브젝트, 네임스페이스 무관).
+#        공용 TSL 기능(show_rules) + Framework/core/list_rules + Framework/rules/list_rules/<Category>/*.json.
+#        첫 규칙 Cage_v02 (A01_FingersMC_O_tgt_L ... B06_Twist_tgt, 10개)
+
+VERSION = "01.70"
+LAST_UPDATE = "2026-11-09"

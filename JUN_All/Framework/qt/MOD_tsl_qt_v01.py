@@ -16,6 +16,15 @@ Maya 접근(현재 선택 가져오기 / 씬에서 선택)은 위젯이 직접 m
 Maya 밖에서도 import / 위젯 생성이 가능하도록 cmds 는 메서드 내부에서 lazy import 하고,
 실패하면 조용히 무시한다.
 
+Rules 버튼 (show_rules, 2026-11-09~)
+-----------------------------------
+`show_rules=True` 면 Select 버튼 옆에 **Rules** 버튼(메뉴)이 생긴다. 메뉴에서 규칙을 고르면 규칙대로 모은
+오브젝트로 리스트를 교체한다(Shift 를 누른 채 고르면 추가). 지금 규칙은 **세트가 간직한 오브젝트**이고,
+세트 이름에 네임스페이스가 붙어 있어도 찾는다. 규칙은 json 파일 하나씩 `Framework/rules/list_rules/<Category>/`
+에 둔다 — 코어 `Framework/core/list_rules.py`(형식 · 순서 · 네임스페이스 규칙은 그 모듈 독스트링).
+메뉴는 열 때마다 폴더를 다시 읽으므로 새 파일을 넣으면 바로 보인다. 같은 세트가 여러 네임스페이스에
+있으면 어느 쪽인지 묻는다(`choose_namespace`). 기본은 꺼짐 — 켜는 툴의 화면만 바뀐다.
+
 UUID 보관 (v01.01~)
 -------------------
 항목의 표시 텍스트는 예전처럼 노드 이름이지만, 씬 노드인 항목은 **UUID 도 함께** 보관한다
@@ -303,6 +312,7 @@ class JUN_mod_tsl_qt_v01(QWidget):
                  list_hint_height=None,
                  select_label="Select Objects", attach_uuids=True,
                  select_no_expand=False,
+                 show_rules=False, rules_dir=None,
                  log_callback=None, parent=None):
         super().__init__(parent)
 
@@ -330,6 +340,10 @@ class JUN_mod_tsl_qt_v01(QWidget):
         # 켜 두면 행 클릭의 씬 선택에 `noExpand=True` 를 붙여 **세트 노드 자체**를 고른다.
         # 세트가 아닌 항목에는 아무 차이가 없으므로 세트 리스트에서만 켜면 된다.
         self.select_no_expand = select_no_expand
+        # Rules 버튼(규칙대로 리스트업). 기본 꺼짐 — 원하는 툴만 켠다. rules_dir=None 이면 공용 폴더.
+        self.show_rules = show_rules
+        self.rules_dir = rules_dir
+        self.btn_rules = None
         self.list_min_height = list_min_height
         # 처음 열릴 때 리스트가 차지할 높이(sizeHint). None 이면 Qt 기본 192px. 창 높이를 탭 내용에
         # 맞추는 툴에서 리스트가 너무 길게 열리면 더 작은 값을 준다(최소 높이가 더 크면 최소가 이긴다).
@@ -369,10 +383,17 @@ class JUN_mod_tsl_qt_v01(QWidget):
         layout.setContentsMargins(2, 2, 2, 2)
 
         # Select 버튼 (현재 선택으로 리스트 교체). 라벨은 select_label 로 커스텀 가능.
+        # show_rules 면 같은 줄 오른쪽에 Rules 버튼 (세로 공간을 더 먹지 않게).
+        top_row = QHBoxLayout()
         if self.show_select:
             self.btn_select = QPushButton(self.select_label)
             self.btn_select.clicked.connect(self._on_select)
-            layout.addWidget(self.btn_select)
+            top_row.addWidget(self.btn_select, 1)
+        if self.show_rules:
+            self._build_rules_button()
+            top_row.addWidget(self.btn_rules)
+        if top_row.count():
+            layout.addLayout(top_row)
 
         # 헤더 행: 타이틀(bold) + (선택) Order 체크박스 + Number 라벨
         header = QHBoxLayout()
@@ -609,6 +630,163 @@ class JUN_mod_tsl_qt_v01(QWidget):
         된다. Order 가 꺼져 있으면 `ls(sl=True)` 와 같다(컴포넌트는 인덱스 순서).
         """
         return self._maya_selection()
+
+    # ================================================================
+    # Rules (show_rules)
+    # ================================================================
+
+    def _build_rules_button(self):
+        self.btn_rules = QPushButton("Rules")
+        self.btn_rules.setToolTip(
+            "List objects by a rule - e.g. every object kept in a set.\n"
+            "Pick a rule to replace the list; hold Shift while picking to add to it.\n"
+            "Sets are found in any namespace.\n"
+            "Rules are json files in Framework/rules/list_rules/<Category>/ -\n"
+            "the menu re-reads the folder every time it opens.")
+        self._rules_menu = QMenu(self.btn_rules)
+        self._rules_menu.setToolTipsVisible(True)
+        self._rules_menu.aboutToShow.connect(self._fill_rules_menu)
+        self.btn_rules.setMenu(self._rules_menu)
+
+    def _list_rules_module(self):
+        from Framework.core import list_rules
+        return list_rules
+
+    def load_rules(self):
+        """규칙 폴더를 읽는다. 깨진 파일은 로그로만 알린다. 반환 rules."""
+        lr = self._list_rules_module()
+        rules, errors = lr.load_rules(self.rules_dir)
+        for path, why in errors:
+            self._log("[WARN] Rule file skipped ({0}): {1}".format(why, path))
+        return rules
+
+    def _fill_rules_menu(self):
+        """메뉴를 열 때마다 규칙 폴더를 다시 읽어 채운다(카테고리 = 하위 메뉴)."""
+        lr = self._list_rules_module()
+        menu = self._rules_menu
+        menu.clear()
+        rules = self.load_rules()
+        if not rules:
+            act = menu.addAction("(no rules)")
+            act.setEnabled(False)
+        for category, items in lr.categories(rules):
+            target = menu.addMenu(category) if category else menu
+            target.setToolTipsVisible(True)
+            for rule in items:
+                act = target.addAction(rule.name)
+                act.setToolTip(rule.tooltip())
+                act.triggered.connect(lambda _c=False, r=rule: self._on_rule_picked(r))
+        menu.addSeparator()
+        act = menu.addAction("New Rules from Selected Sets...")
+        act.setToolTip("Make one rule per objectSet selected in Maya (name = set name\n"
+                       "without namespace). Asks for the category (sub-menu).")
+        act.triggered.connect(lambda _c=False: self.new_rules_from_selected_sets())
+        act = menu.addAction("Open Rules Folder")
+        act.triggered.connect(lambda _c=False: self.open_rules_folder())
+
+    def _on_rule_picked(self, rule):
+        append = bool(QApplication.keyboardModifiers() & Qt.ShiftModifier)
+        self.apply_rule(rule, append=append)
+
+    def choose_namespace(self, rule, namespaces):
+        """같은 세트가 여러 네임스페이스에 있을 때 하나를 고른다. None = 취소.
+
+        팝업 메뉴로 묻는다. 시험에서는 이 메서드를 바꿔 끼운다(오프스크린 QMenu.exec_ 는 멈춘다).
+        """
+        menu = QMenu(self)
+        menu.addSection("Namespace for '{0}'".format(rule.name))
+        acts = {}
+        for ns in namespaces:
+            acts[menu.addAction(ns if ns else "(root)")] = ns
+        picked = menu.exec_(QCursor.pos())
+        return acts.get(picked)
+
+    def apply_rule(self, rule, append=False, namespace=None):
+        """규칙대로 모은 오브젝트로 리스트를 교체(append=True 면 추가). 반환 RuleResult 또는 None(취소).
+
+        세트가 여러 네임스페이스에 있으면 choose_namespace 로 묻는다.
+        모은 게 하나도 없으면 리스트를 건드리지 않는다(교체로 비워 버리지 않게).
+        """
+        lr = self._list_rules_module()
+        result = lr.resolve_rule(rule, namespace)
+        if result.ambiguous:
+            spaces = sorted(set(lr.namespace_of(n) for found in result.ambiguous.values()
+                                for n in found))
+            ns = self.choose_namespace(rule, spaces)
+            if ns is None:
+                self._log("Rule '{0}': cancelled (several namespaces).".format(rule.name))
+                return None
+            result = lr.resolve_rule(rule, ns)
+
+        for name in result.missing:
+            self._log("[WARN] Rule '{0}': no set named '{1}' in the scene (any namespace)."
+                      .format(rule.name, name))
+        for node in result.empty_sets:
+            self._log("[WARN] Rule '{0}': set '{1}' is empty.".format(rule.name, node))
+        if not result.items:
+            self._log("[WARN] Rule '{0}': nothing to list - the list is unchanged."
+                      .format(rule.name))
+            return result
+
+        if append:
+            self.append_unique(result.items)
+        else:
+            self.set_items(result.items)
+        self._log("Rule '{0}': {1} {2} object(s) from {3}.".format(
+            rule.name, "added" if append else "listed", len(result.items),
+            ", ".join(result.used_sets)))
+        return result
+
+    def ask_category(self, default=""):
+        """새 규칙의 카테고리(하위 메뉴) 이름을 묻는다. None = 취소. 시험에서 바꿔 끼운다."""
+        text, ok = QInputDialog.getText(
+            self, "New Rules", "Category (sub-menu, empty = top level):", text=default)
+        return text.strip() if ok else None
+
+    def confirm_overwrite(self, names):
+        """이미 있는 규칙을 덮어쓸지. 시험에서 바꿔 끼운다."""
+        answer = QMessageBox.question(
+            self, "New Rules",
+            "These rules already exist:\n  " + "\n  ".join(names) + "\n\nOverwrite them?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        return answer == QMessageBox.Yes
+
+    def new_rules_from_selected_sets(self):
+        """Maya 에서 고른 세트마다 규칙 하나를 만든다. 반환 저장한 경로 목록."""
+        import os
+        lr = self._list_rules_module()
+        sets = lr.selected_sets()
+        if not sets:
+            self._log("[WARN] Select one or more sets (objectSet) in the Outliner first.")
+            return []
+        category = self.ask_category()
+        if category is None:
+            return []
+        category = lr.safe_folder_name(category)
+        rules = lr.rules_from_sets(sets, category=category)
+        root = self.rules_dir or lr.RULES_DIR
+        folder = os.path.join(root, category) if category else root
+        exists = [r.name for r in rules
+                  if os.path.exists(os.path.join(folder, lr.rule_file_name(r.name)))]
+        overwrite = bool(exists) and self.confirm_overwrite(exists)
+        saved = []
+        for rule in rules:
+            try:
+                saved.append(lr.save_rule(rule, self.rules_dir, overwrite=overwrite))
+            except FileExistsError:
+                self._log("Rule '{0}' already exists - kept.".format(rule.name))
+        self._log("Saved {0} rule(s){1}: {2}".format(
+            len(saved), " in '{0}'".format(category) if category else "",
+            ", ".join(os.path.splitext(os.path.basename(p))[0] for p in saved)))
+        return saved
+
+    def open_rules_folder(self):
+        import os
+        lr = self._list_rules_module()
+        root = self.rules_dir or lr.RULES_DIR
+        if not os.path.isdir(root):
+            os.makedirs(root)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(root))
 
     def add_button(self, label, callback, index=None):
         """편집 버튼 행에 커스텀 버튼을 추가한다. index=None 이면 맨 뒤에 붙인다."""

@@ -1,0 +1,9 @@
+{
+  "name": "A02_FingersMC_X_tgt_L",
+  "description": "Cage_v002 rig - objects in the set 'A02_FingersMC_X_tgt_L' (any namespace).",
+  "sets": [
+    "A02_FingersMC_X_tgt_L"
+  ],
+  "order": "name",
+  "expand_nested": true
+}

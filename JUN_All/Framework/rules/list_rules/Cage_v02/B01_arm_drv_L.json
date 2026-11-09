@@ -1,0 +1,9 @@
+{
+  "name": "B01_arm_drv_L",
+  "description": "Cage_v002 rig - objects in the set 'B01_arm_drv_L' (any namespace).",
+  "sets": [
+    "B01_arm_drv_L"
+  ],
+  "order": "name",
+  "expand_nested": true
+}

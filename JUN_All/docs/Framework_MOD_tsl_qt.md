@@ -2,7 +2,7 @@
 title: 공용 리스트 위젯 (JUN_mod_tsl_qt) 사용법
 aliases: [MOD_tsl_qt, JUN_mod_tsl_qt, TSL 위젯, 공용 TSL, (Null), 자리표시]
 tags: [maya-python, framework, widget, tsl, selection-order]
-updated: 2026-10-30
+updated: 2026-11-09
 ---
 
 # 공용 리스트 위젯 `JUN_mod_tsl_qt_v01`
@@ -63,6 +63,8 @@ tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
     list_limit=0,                # 이 수 **이상**이면 펼치지 않고 요약 (0 = 언제나 펼침, 5장)
     select_label="Select Objects",
     select_no_expand=False,      # 항목이 **세트**인 리스트에서 켠다 (2.1)
+    show_rules=False,            # Select 옆 `Rules` 버튼 - 규칙대로 리스트업 (2.3, 2026-11-09~)
+    rules_dir=None,              # 규칙 폴더. 없으면 공용 Framework/rules/list_rules
     log_callback=self.log,       # 없으면 print
 )
 ```
@@ -296,6 +298,40 @@ They are used exactly as if they were listed.
 > 요약 라벨로 대신하는 발상 자체는 `A00170_driverTool` 의 AttachCrv > Edge Loop **Stored selection**
 > (엣지/버텍스를 리스트에 펼치지 않고 `Edge loops: 132 edge(s) in 2 loop(s)` 로 요약)에서 가져왔다.
 > 그쪽은 리스트 위젯을 아예 쓰지 않고, 이쪽은 **같은 TSL 위젯이 상황에 따라 전환**한다.
+
+---
+
+## 2.3 `show_rules` — 규칙대로 리스트업 (2026-11-09~)
+
+`show_rules=True` 면 Select 버튼 **같은 줄 오른쪽**에 `Rules` 버튼(메뉴)이 생긴다. 기본은 꺼짐 — 켜는 툴의 화면만 바뀐다.
+처음 쓰는 곳: `A00145_RigConnect > Constrain > Constraint` 의 Targets / Followers.
+
+| 메뉴 | 동작 |
+|------|------|
+| 규칙 이름 (카테고리 = 하위 메뉴) | 규칙대로 모은 오브젝트로 리스트를 **교체**. **Shift** 를 누른 채 고르면 **추가**(중복 제외) |
+| `New Rules from Selected Sets...` | 아웃라이너에서 고른 **세트마다 규칙 하나**(이름 = 네임스페이스를 뺀 세트 이름). 카테고리를 묻고, 이미 있으면 덮어쓸지 묻는다 |
+| `Open Rules Folder` | 규칙 폴더를 탐색기로 |
+
+- **규칙 = json 파일 하나**: `Framework/rules/list_rules/<Category>/<rule>.json`. 메뉴를 열 때마다 폴더를 다시 읽으므로
+  파일만 넣으면 바로 보인다. 깨진 파일은 `[WARN]` 로그로만 알리고 나머지는 그대로 쓴다.
+  ```json
+  { "name": "A01_FingersMC_O_tgt_L", "description": "...",
+    "sets": ["A01_FingersMC_O_tgt_L"], "order": "name", "expand_nested": true }
+  ```
+- **지금 규칙 = 세트가 간직한 오브젝트.** `sets` 가 여럿이면 합집합. 멤버 중 세트는 펼친다(`expand_nested`).
+- **네임스페이스**: 세트 이름은 네임스페이스 없이 적고, 씬에서는 **어느 네임스페이스에 있든** 찾는다(`ns:A01_...`, `a:b:A01_...`).
+  같은 세트가 **두 네임스페이스 이상**에 있으면(같은 리그를 두 번 레퍼런스) 팝업으로 **어느 쪽인지 묻는다.**
+  잎 이름이 정확히 같은 것만 잡는다(`RIG_set2` 는 `RIG_set` 규칙에 안 걸린다).
+- **순서 (`order`)**: `cmds.sets -q` 의 멤버 순서는 **임의**라(넣은 순서도 이름 순서도 아님 — Cage_v002_0130 실측),
+  기본은 **네임스페이스를 뺀 이름순**(`name`). Targets[i] ← Followers[i] 처럼 자리로 짝짓는 리스트에서 양쪽 이름이 대응하면
+  이름순끼리 짝이 맞는다. 세트가 주는 순서 그대로는 `"set"`.
+- 모은 게 하나도 없으면(세트 없음 · 빈 세트) 리스트를 **건드리지 않는다**(교체로 비워 버리지 않게) + `[WARN]`.
+- 코어 `Framework/core/list_rules.py` — `load_rules` · `save_rule` · `resolve_rule(rule, namespace)` · `rule_namespaces` ·
+  `rules_from_sets`. 툴이 메뉴 없이 쓰려면 `tsl.apply_rule(rule, append=False, namespace=None)`.
+- 첫 규칙: `Cage_v02` 카테고리 10개(`A01_FingersMC_O_tgt_L` … `B06_Twist_tgt`, 세트 이름 = 규칙 이름).
+- 검증: `Framework/tests/test_list_rules.py` mayapy 2024 **39 항목**(로더 · 깨진 json · 네임스페이스 · 중첩 · 순서 · 빈 세트 ·
+  컴포넌트 · 메뉴 · Shift 추가 · 네임스페이스 묻기/취소 · 세트로 규칙 만들기 · Cage_v002_0130 을 `cage:` 로 레퍼런스해 10개 개수 ·
+  A00145 Rules + Swap). **마야 GUI 확인 아직.**
 
 ---
 

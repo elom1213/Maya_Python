@@ -1,0 +1,9 @@
+{
+  "name": "B05_spineToHead_tgt",
+  "description": "Cage_v002 rig - objects in the set 'B05_spineToHead_tgt' (any namespace).",
+  "sets": [
+    "B05_spineToHead_tgt"
+  ],
+  "order": "name",
+  "expand_nested": true
+}

@@ -4,7 +4,7 @@ MEL `ConnectionTool V04.02`(탭: Constrain / Connect / List Connected) · `Match
 `A00140_ConnectClosest`(최근접 1:1 constraint)를 하나로 합친 툴이다.
 **UI 는 PySide(Qt)**, 로직은 `maya.cmds`(일부 `maya.api.OpenMaya`) 로 작성되었다.
 
-- 버전: `v01.67` (`app/config/version.py`) — Connect > Connect 에 **`Force (replace existing connections)`** 체크박스(기본 OFF): 이미 입력 연결이 있는 대상 어트리뷰트는 **끊지 않고 그대로 두고** 로그로 알린다, 켜면 예전처럼 끊고 교체(§연결 방향). v01.66 — Connect by Rule 규칙 `JALI 22 Viseme` 에 **A0020 `DUMMY_OUT_COARTIC` 의 `MMM WA_PEDAL YA_PEDAL` 추가**(36개, §Connect by Rule). v01.65 — 같은 규칙에 **`DUMMY_OUT_PHONEMES` 16개 이름 추가**(33개). v01.64 — Connect by Rule **겹치는 이름 보호 + 스킵 사유 로그**(§Connect by Rule). v01.63 — Connect by Rule 두 번째 규칙 **`JALI 22 Viseme`**(§Connect by Rule). v01.62 — Constrain > Constraint 에 **`All Targets -> Each Follower`** 옵션(follower 마다 Targets **전부**를 타깃으로 갖는 constraint 하나, §Constraint)
+- 버전: `v01.70` (`app/config/version.py`) — Constrain > Constraint 에 **`Swap`**(Targets ↔ Followers) + 두 리스트에 **`Rules`** 버튼 — 규칙대로 리스트업(세트가 간직한 오브젝트, 네임스페이스 무관, §Constraint). v01.67 — Connect > Connect 에 **`Force (replace existing connections)`** 체크박스(기본 OFF): 이미 입력 연결이 있는 대상 어트리뷰트는 **끊지 않고 그대로 두고** 로그로 알린다, 켜면 예전처럼 끊고 교체(§연결 방향). v01.66 — Connect by Rule 규칙 `JALI 22 Viseme` 에 **A0020 `DUMMY_OUT_COARTIC` 의 `MMM WA_PEDAL YA_PEDAL` 추가**(36개, §Connect by Rule). v01.65 — 같은 규칙에 **`DUMMY_OUT_PHONEMES` 16개 이름 추가**(33개). v01.64 — Connect by Rule **겹치는 이름 보호 + 스킵 사유 로그**(§Connect by Rule). v01.63 — Connect by Rule 두 번째 규칙 **`JALI 22 Viseme`**(§Connect by Rule). v01.62 — Constrain > Constraint 에 **`All Targets -> Each Follower`** 옵션(follower 마다 Targets **전부**를 타깃으로 갖는 constraint 하나, §Constraint)
   · v01.57 은 Constrain 의 **Constraint · Skin Weight 하위 탭을 하나로**(모드 `Default` / `Skin Weight`), Transfer 에 모드 **`Copy`** — constraint 의 성질을 읽어 다른 오브젝트에 똑같이 건다, 원본 유지(§Transfer) · v01.56 은 Attribute > Set Value 에 **`Include Non-Common`**: 일부 오브젝트만 가진 어트리뷰트도 나열, 행마다 **`[k/n]`**(§Set Value) · v01.55 는 창 기본 높이 900 → **980**(Match 탭이 스크롤 없이 다 보이게) · v01.54 는 리스트의 **`(Null)` 자리표시를 빨간 글씨로**(공용 TSL, 아래 메모) · v01.53 은 Match 에 **`Keep Children in Place`**(기본 OFF):
   팔로워만 움직이고 **그 아래 오브젝트는 있던 월드 자리에 그대로** 둔다. Mirror 탭의 같은 이름
   체크박스와 **같은 코어**(`app/core/keep_children.py`)를 쓴다 (§Match)
@@ -347,6 +347,13 @@ Targets                       Number: 4212
 타겟(드라이버) → 팔로워로 constraint 를 건다.
 
 - `Targets` / `Followers` 리스트에 오브젝트 추가(Select/Add/Del/Up/Down).
+- **`Rules` 버튼 (v01.70)** — Select 옆. 메뉴에서 규칙을 고르면 **규칙대로 모은 오브젝트**로 리스트를 교체(Shift = 추가).
+  지금 규칙은 **세트가 간직한 오브젝트**이고, 세트에 **네임스페이스가 붙어 있어도** 찾는다(두 군데 이상이면 어느 쪽인지 묻는다).
+  `Cage_v02` 하위 메뉴에 `A01_FingersMC_O_tgt_L` … `B06_Twist_tgt` 10개. 순서는 **네임스페이스를 뺀 이름순**(세트의 멤버 순서는 임의라
+  Targets[i] ← Followers[i] 짝이 틀어지지 않게). 새 규칙은 아웃라이너에서 세트를 고르고 `New Rules from Selected Sets...`, 또는
+  json 을 `Framework/rules/list_rules/<Category>/` 에. 공용 TSL 기능이라 다른 툴도 `show_rules=True` 한 줄로 쓴다
+  → [Framework_MOD_tsl_qt](Framework_MOD_tsl_qt.md) §2.3.
+- **`Swap` (v01.70)** — `Constrain` 옆. Targets ↔ Followers 목록 교환(Match 탭 Swap 과 같은 동작).
 - Options: `Maintain Offset` 체크(**기본 ON**, v01.28) + constraint 종류 **체크박스**(v01.47, 예전엔 라디오)
   (`Parent` / `Scale` / `Point` / `Orient` / `Point On Poly`, 기본은 `Parent` 하나).
 - `Constrain` 클릭.

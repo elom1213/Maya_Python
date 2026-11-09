@@ -53,7 +53,7 @@
 
 | 모듈 | 내용 | 문서 |
 |------|------|------|
-| `Framework/qt/MOD_tsl_qt_v01.py` | 공용 리스트(TSL) 위젯 — Select/Add/Del/Up/Down/Sort, **Order(선택 순서 유지)**, UUID 보관, **요약 모드(`list_limit`)** | [Framework_MOD_tsl_qt](Framework_MOD_tsl_qt.md) |
+| `Framework/qt/MOD_tsl_qt_v01.py` | 공용 리스트(TSL) 위젯 — Select/Add/Del/Up/Down/Sort, **Order(선택 순서 유지)**, UUID 보관, **요약 모드(`list_limit`)**, **Rules(규칙대로 리스트업 — 세트 멤버, `Framework/core/list_rules.py`)** | [Framework_MOD_tsl_qt](Framework_MOD_tsl_qt.md) |
 | `Framework/qt/MOD_filter_qt_v01.py` | 공용 **검색/필터** 위젯 — 입력 즉시 일치 항목만 표시, "보이는 것이 작업 대상" 헬퍼 | [Framework_MOD_filter_qt](Framework_MOD_filter_qt.md) |
 | `Framework/qt/MOD_fileTree_qt_v01.py` + `Framework/core/tree_scanner.py` · `prefetcher.py` | 공용 **폴더 트리** 위젯 — A00240 Tree 탭을 그대로 승격(Adaptive · File Types · Omit · Refresh · Expand · Reveal/Copy · 정션). `checkable_files` 로 파일 행 체크박스(Shift 다중 체크, 경로로 기억), `default_types`. A00240 · A00210 Maya 탭이 쓴다 | [Framework_MOD_fileTree_qt](Framework_MOD_fileTree_qt.md) |
 | `Framework/qt/MOD_checkTree_qt_v01.py` | 체크박스 `QTreeWidget` 에 붙이는 **다중 선택 + 다중 체크** 동작 — checkList 의 트리 판. 체크박스 유무는 `CheckStateRole` 데이터로 가른다(QTreeWidgetItem 은 기본 플래그가 checkable) | [Framework_MOD_checkTree_qt](Framework_MOD_checkTree_qt.md) |

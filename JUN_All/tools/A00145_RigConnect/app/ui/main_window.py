@@ -690,11 +690,12 @@ class MainWindow(QWidget):
         page = QWidget()
         layout = QVBoxLayout(page)
 
+        # Rules (v01.70) - 규칙(세트 멤버 등)대로 리스트업. 공용 TSL 의 show_rules, 규칙은 Framework/rules/list_rules.
         self.tsl_targets = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Targets", select_label="Select",
+            title="Targets", select_label="Select", show_rules=True,
             list_min_height=200, log_callback=self.log)
         self.tsl_followers = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Followers", select_label="Select",
+            title="Followers", select_label="Select", show_rules=True,
             list_min_height=200, log_callback=self.log)
 
         list_row = QHBoxLayout()
@@ -757,10 +758,17 @@ class MainWindow(QWidget):
 
         layout.addWidget(opt_box)
 
+        # Constrain / Swap (v01.70 - Match 탭과 같은 Swap)
+        btn_row = QHBoxLayout()
         btn = QPushButton("Constrain")
         btn.setMinimumHeight(32)
         btn.clicked.connect(self.on_constrain)
-        layout.addWidget(btn)
+        btn_swap = QPushButton("Swap")
+        btn_swap.setToolTip("Swap the two lists: Targets <-> Followers.")
+        btn_swap.clicked.connect(self.on_constraint_swap)
+        btn_row.addWidget(btn)
+        btn_row.addWidget(btn_swap)
+        layout.addLayout(btn_row)
 
         return page
 
@@ -3286,6 +3294,14 @@ class MainWindow(QWidget):
                 len(created), ctl_type))
 
         self._run("Create {0}".format(ctl_type), _do)
+
+    def on_constraint_swap(self):
+        """Targets <-> Followers 교환 (Constrain > Constraint, v01.70). Match 탭 Swap 과 같은 동작."""
+        targets = self.tsl_targets.get_all_items()
+        followers = self.tsl_followers.get_all_items()
+        self.tsl_targets.set_items(followers)
+        self.tsl_followers.set_items(targets)
+        self.log("[OK] Swap : targets <-> followers")
 
     def on_match_swap(self):
         targets = self.tsl_match_tgt.get_all_items()

@@ -76,6 +76,7 @@
 - [shell_integration: Add to Start Menu](framework-shell-integration.md) — standalone 툴 시작 메뉴 .lnk + AUMID (PowerShell C#), Win10/11, A00240 · A00220 `File` 메뉴 · PS 출력 cp949 폴백
 - [Menu bar + common items](framework-menubar-widget.md)(`tool_menu.COMMON_MENUS` 한 줄, Help = Copy Tool Name · `+ Tabs` 보이는 탭 사슬) · [Dev Mode menu widget](framework-devmode-widget.md) · [Sub-tabs over collapsibles](prefer-subtabs-over-stacked-collapsibles.md)
 - [viewZoom: 리스트 · 트리 확대 / 축소](framework-viewzoom-widget.md) — `JUN_mod_viewZoom_qt_v01(view, key, default)` 한 줄, 체크박스는 직접 그려야 커짐(스타일 13px 고정), 글자는 테마 qss 때문에 뷰 시트 px · 기준 = 부모 글꼴 · Show 때 재적용, 오프스크린 QFontInfo = -1
+- [TSL Rules: 규칙대로 리스트업](framework-list-rules.md) — `show_rules=True`, 세트 멤버 · 네임스페이스 무관 · 기본 이름순(sets -q 순서 임의), A00145 Constraint 첫 적용
 - [checkList behavior](framework-checklist-behavior.md) — QListWidget 다중 체크는 `JUN_mod_checkList_qt_v01(lw)` 한 줄. 트리 판은 `MOD_checkTree_qt_v01`, 폴더 트리는 `MOD_fileTree_qt_v01`(A00240 Tree 승격) — [[wip-a00210-maya-reference-tab]]
 - [treeExpand: 트리 펼치기](framework-treeexpand-widget.md) — 모든 트리에 `JUN_mod_treeExpand_qt_v01(tree)` 한 줄(화살표 = 한 단계, Shift = 아래 전부) · 새 툴도 · fileTree 엔 붙이지 말 것
 - widgets — [log level colors](framework-log-level-colors.md) · [log](framework-log-widget.md)(47툴 교체 완료) · [expand](framework-expand-widget.md)(이동) · [filter](framework-filter-widget.md)(트리 모드) · [falloff curve](framework-falloff-curve-widget.md) · [progress popup](framework-progress-widget.md)(마지막 값 스로틀 금지) · [timeRange](framework-timerange-widget.md)
