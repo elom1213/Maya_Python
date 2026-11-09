@@ -20,7 +20,7 @@ json 모양
       "name": "A01_FingersMC_O_tgt_L",          # 메뉴에 보이는 이름
       "description": "...",                     # 툴팁 (선택)
       "sets": ["A01_FingersMC_O_tgt_L"],        # 멤버를 모을 세트 이름들(네임스페이스 없이). 여럿이면 합집합
-      "order": "name",                          # "name"(기본) | "set"
+      "order": "set",                           # "set"(기본, 세트 안 원본 순서) | "name"
       "expand_nested": true                     # 멤버 중 세트는 펼쳐 그 멤버를 담는다(기본 true)
     }
 
@@ -32,9 +32,12 @@ json 모양
 
 순서 (`order`)
 -------------
-`cmds.sets -q` 의 멤버 순서는 **임의**다(넣은 순서도 이름 순서도 아님 - Cage_v002_0130 실측). Targets[i] <- Followers[i]
-처럼 **자리로 짝짓는 리스트**에 쓰면 짝이 틀어지므로 기본은 **네임스페이스를 뺀 이름순**(`name`)이다. 양쪽 세트의
-이름이 대응하면 이름순끼리 짝이 맞는다. 마야가 주는 순서 그대로가 필요하면 `"set"`.
+기본 `"set"` = **세트 안 원본 순서** — 세트의 `dagSetMembers[0], [1], …`(DAG 멤버) 다음 `dnSetMembers[…]`(DG 멤버)
+**배열 인덱스 순서**다. 세트를 만들 때 · 멤버를 더할 때의 순서가 여기 남는다(파일에 저장되는 순서).
+**`cmds.sets -q` 의 순서는 이것이 아니다** — 넣은 순서도 이름 순서도 아니고 **같은 파일을 열 때마다 달라진다**
+(Cage_v002_0130 실측: `B03_leg_drv_L` 배열 = leg, knee, ankle, foot, toe / `sets -q` = leg, ankle, foot, knee, toe,
+다른 실행에선 또 다름). 그래서 멤버 이름은 `sets -q` 로 받되 **자리는 배열 인덱스로** 정한다(`set_members`).
+`"name"` = 네임스페이스를 뺀 이름순.
 """
 
 import io
@@ -60,12 +63,12 @@ _BAD_FILE_CHARS = re.compile(r'[^0-9A-Za-z_.\-]+')
 class ListRule(object):
     """규칙 하나."""
 
-    def __init__(self, name, sets, description="", order=ORDER_NAME,
+    def __init__(self, name, sets, description="", order=ORDER_SET,
                  expand_nested=True, category="", path=None):
         self.name = name
         self.sets = list(sets)
         self.description = description or ""
-        self.order = order if order in ORDERS else ORDER_NAME
+        self.order = order if order in ORDERS else ORDER_SET
         self.expand_nested = bool(expand_nested)
         self.category = category or ""
         self.path = path
@@ -79,7 +82,7 @@ class ListRule(object):
         if self.description:
             lines.append(self.description)
         lines.append("Sets: " + ", ".join(self.sets))
-        lines.append("Order: " + ("by name" if self.order == ORDER_NAME else "as stored in the set"))
+        lines.append("Order: " + ("by name" if self.order == ORDER_NAME else "as stored in the set (original order)"))
         if self.path:
             lines.append(self.path)
         return "\n".join(lines)
@@ -99,7 +102,7 @@ def _rule_from_dict(data, category, path):
         raise ValueError("'sets' must be a non-empty list of set names")
     return ListRule(name=name, sets=[s.strip() for s in sets],
                     description=data.get("description", ""),
-                    order=data.get("order", ORDER_NAME),
+                    order=data.get("order", ORDER_SET),
                     expand_nested=data.get("expand_nested", True),
                     category=category, path=path)
 
@@ -235,15 +238,59 @@ def rule_namespaces(rule):
     return sorted(spaces)
 
 
+def _member_array(set_node):
+    """세트 멤버 배열의 원본 순서 = [연결된 노드 long name] (dagSetMembers 인덱스 순 -> dnSetMembers 인덱스 순).
+
+    컴포넌트 멤버는 셰이프의 objectGroups 가 연결되므로 셰이프가 나온다.
+    """
+    cmds = _cmds()
+    out = []
+    for attr in ("dagSetMembers", "dnSetMembers"):
+        if not cmds.attributeQuery(attr, node=set_node, exists=True):
+            continue
+        for i in cmds.getAttr("{0}.{1}".format(set_node, attr), multiIndices=True) or []:
+            src = cmds.listConnections("{0}.{1}[{2}]".format(set_node, attr, i),
+                                       source=True, destination=False, shapes=True) or []
+            for node in src:
+                long = cmds.ls(node, long=True) or [node]
+                out.append(long[0])
+    return out
+
+
+def ordered_members(set_node):
+    """세트의 직속 멤버를 **원본 순서**(멤버 배열 인덱스)로.
+
+    이름 · 컴포넌트 표기는 `cmds.sets -q` 그대로 쓰고, 자리만 배열에서 찾는다. 배열에서 못 찾은 멤버는
+    (있을 일은 드물다) `sets -q` 순서대로 뒤에 붙인다.
+    """
+    cmds = _cmds()
+    members = cmds.sets(set_node, q=True) or []
+    rank = {}
+    for pos, node in enumerate(_member_array(set_node)):
+        rank.setdefault(node, pos)
+        # 컴포넌트는 셰이프가 연결되지만 sets -q 는 트랜스폼 이름으로 적는다
+        if cmds.objectType(node, isAType="shape"):
+            parent = cmds.listRelatives(node, parent=True, fullPath=True) or []
+            if parent:
+                rank.setdefault(parent[0], pos)
+
+    def key(item):
+        node = item.split(".")[0]
+        long = cmds.ls(node, long=True) or [node]
+        return rank.get(long[0], len(rank) + members.index(item))
+
+    return sorted(members, key=key)
+
+
 def set_members(set_node, expand_nested=True, _seen=None):
-    """세트 멤버(이름). expand_nested 면 멤버 세트를 펼친다(순환 안전)."""
+    """세트 멤버(이름, 원본 순서). expand_nested 면 멤버 세트를 **그 자리에서** 펼친다(순환 안전)."""
     cmds = _cmds()
     seen = _seen if _seen is not None else set()
     if set_node in seen:
         return []
     seen.add(set_node)
     out = []
-    for member in cmds.sets(set_node, q=True) or []:
+    for member in ordered_members(set_node):
         if expand_nested and "." not in member and cmds.objExists(member) \
                 and cmds.nodeType(member) == "objectSet":
             out.extend(set_members(member, True, seen))
@@ -294,7 +341,7 @@ def selected_sets():
     return cmds.ls(selection=True, type="objectSet") or []
 
 
-def rules_from_sets(set_nodes, category="", order=ORDER_NAME):
+def rules_from_sets(set_nodes, category="", order=ORDER_SET):
     """세트 노드들 -> 규칙(세트 하나 = 규칙 하나, 이름 = 네임스페이스를 뺀 세트 이름)."""
     out = []
     for node in set_nodes:

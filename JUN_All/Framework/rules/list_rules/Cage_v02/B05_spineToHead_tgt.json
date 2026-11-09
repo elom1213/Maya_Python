@@ -4,6 +4,6 @@
   "sets": [
     "B05_spineToHead_tgt"
   ],
-  "order": "name",
+  "order": "set",
   "expand_nested": true
 }

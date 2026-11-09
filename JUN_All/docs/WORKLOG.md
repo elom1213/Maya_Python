@@ -41,8 +41,8 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 > [!summary] A00145_RigConnect **v01.70 Constraint Swap + Rules** · Framework **TSL Rules(공용)** `#A00145_RigConnect` `#Framework`
 - 요청: Constrain > Constraint 에 Match 의 Swap, Targets / Followers 를 정해진 규칙대로 리스트업(공용 TSL 기능으로). 첫 규칙 = Cage_v002_0130 의 세트 10개, 네임스페이스가 붙어도 대응.
 - 공용: TSL `show_rules=True` → `Rules` 메뉴(교체 / Shift 추가 · 세트로 규칙 만들기 · 폴더 열기). 코어 `Framework/core/list_rules.py`, 규칙 json `Framework/rules/list_rules/<Category>/`.
-- 세트는 어느 네임스페이스든 찾고 두 군데 이상이면 묻는다. `sets -q` 멤버 순서가 임의(실측)라 기본은 네임스페이스 뺀 이름순 — Targets[i] <- Followers[i] 짝 보호.
-- 시험 `Framework/tests/test_list_rules.py` 39/39(Cage 를 `cage:` 로 레퍼런스해 10개 개수 확인). tabFit 롤아웃 시험의 A00620 실패는 원래 TSL 로도 같음(무관). **GUI 확인 아직.**
+- 세트는 어느 네임스페이스든 찾고 두 군데 이상이면 묻는다. 순서는 **세트 안 원본 순서**(멤버 배열 `dagSetMembers` 인덱스) — `sets -q` 는 열 때마다 순서가 달라진다(실측). 처음엔 이름순으로 했다가 사용자 요청("원본 Cage 세트 안 순서와 똑같이")으로 바꿈, `B03_leg_drv_L` = leg → knee → ankle → foot → toe.
+- 시험 `Framework/tests/test_list_rules.py` 47/47(Cage 를 `cage:` 로 레퍼런스해 10개 개수 + 배열 순서 그대로 · 반복 호출에도 같은 순서). tabFit 롤아웃 시험의 A00620 실패는 원래 TSL 로도 같음(무관). **GUI 확인 아직.**
 
 > [!summary] **A00610_PmxImporter v01.00 신규** - PMX(MMD)를 마야에 바로 임포트 (`docs/A00610_PmxImporter.md`) `#A00610_PmxImporter`
 - 요청: 계획서대로 구현. 사용자 결정 — 이름은 PMX 고유 이름(못 쓰는 글자는 FBXASC) · 머티리얼 lambert · IK 본 기본 생성 · PMX 의 다른 데이터(물리 등)를 계획서에 정리.

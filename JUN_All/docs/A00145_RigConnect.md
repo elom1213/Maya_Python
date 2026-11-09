@@ -349,8 +349,8 @@ Targets                       Number: 4212
 - `Targets` / `Followers` 리스트에 오브젝트 추가(Select/Add/Del/Up/Down).
 - **`Rules` 버튼 (v01.70)** — Select 옆. 메뉴에서 규칙을 고르면 **규칙대로 모은 오브젝트**로 리스트를 교체(Shift = 추가).
   지금 규칙은 **세트가 간직한 오브젝트**이고, 세트에 **네임스페이스가 붙어 있어도** 찾는다(두 군데 이상이면 어느 쪽인지 묻는다).
-  `Cage_v02` 하위 메뉴에 `A01_FingersMC_O_tgt_L` … `B06_Twist_tgt` 10개. 순서는 **네임스페이스를 뺀 이름순**(세트의 멤버 순서는 임의라
-  Targets[i] ← Followers[i] 짝이 틀어지지 않게). 새 규칙은 아웃라이너에서 세트를 고르고 `New Rules from Selected Sets...`, 또는
+  `Cage_v02` 하위 메뉴에 `A01_FingersMC_O_tgt_L` … `B06_Twist_tgt` 10개. 순서는 **세트 안 원본 순서**(멤버 배열 `dagSetMembers` 인덱스 —
+  `cmds.sets -q` 는 열 때마다 순서가 달라 쓰지 않는다). Targets[i] ← Followers[i] 짝이 세트를 만든 순서대로 선다. 새 규칙은 아웃라이너에서 세트를 고르고 `New Rules from Selected Sets...`, 또는
   json 을 `Framework/rules/list_rules/<Category>/` 에. 공용 TSL 기능이라 다른 툴도 `show_rules=True` 한 줄로 쓴다
   → [Framework_MOD_tsl_qt](Framework_MOD_tsl_qt.md) §2.3.
 - **`Swap` (v01.70)** — `Constrain` 옆. Targets ↔ Followers 목록 교환(Match 탭 Swap 과 같은 동작).

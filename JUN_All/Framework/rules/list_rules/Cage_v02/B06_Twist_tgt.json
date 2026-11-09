@@ -4,6 +4,6 @@
   "sets": [
     "B06_Twist_tgt"
   ],
-  "order": "name",
+  "order": "set",
   "expand_nested": true
 }

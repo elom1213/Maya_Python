@@ -4,6 +4,6 @@
   "sets": [
     "B01_arm_drv_L"
   ],
-  "order": "name",
+  "order": "set",
   "expand_nested": true
 }

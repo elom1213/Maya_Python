@@ -322,14 +322,18 @@ They are used exactly as if they were listed.
 - **네임스페이스**: 세트 이름은 네임스페이스 없이 적고, 씬에서는 **어느 네임스페이스에 있든** 찾는다(`ns:A01_...`, `a:b:A01_...`).
   같은 세트가 **두 네임스페이스 이상**에 있으면(같은 리그를 두 번 레퍼런스) 팝업으로 **어느 쪽인지 묻는다.**
   잎 이름이 정확히 같은 것만 잡는다(`RIG_set2` 는 `RIG_set` 규칙에 안 걸린다).
-- **순서 (`order`)**: `cmds.sets -q` 의 멤버 순서는 **임의**라(넣은 순서도 이름 순서도 아님 — Cage_v002_0130 실측),
-  기본은 **네임스페이스를 뺀 이름순**(`name`). Targets[i] ← Followers[i] 처럼 자리로 짝짓는 리스트에서 양쪽 이름이 대응하면
-  이름순끼리 짝이 맞는다. 세트가 주는 순서 그대로는 `"set"`.
+- **순서 (`order`)**: 기본 `"set"` = **세트 안 원본 순서** — 세트의 멤버 배열 `dagSetMembers[0], [1], …`(그 뒤 DG 멤버
+  `dnSetMembers[…]`)의 **인덱스 순서**. 세트를 만들고 멤버를 더한 순서가 파일에 이 배열로 남는다.
+  **`cmds.sets -q` 의 순서는 이것이 아니다** — 넣은 순서도 이름 순서도 아니고 **같은 파일을 열 때마다 달라진다**(Cage_v002_0130 실측:
+  `B03_leg_drv_L` 배열 = leg, knee, ankle, foot, toe / `sets -q` = leg, ankle, foot, knee, toe, 다른 실행에선 또 다름).
+  그래서 이름은 `sets -q` 로 받고 **자리는 배열 인덱스로** 정한다(컴포넌트 멤버는 셰이프가 연결되므로 부모 트랜스폼으로 맞춘다).
+  한 번에 여러 개를 `sets -add` 하면 배열 자리는 마야가 매긴다(넘긴 순서와 다를 수 있음) — 그 경우에도 결과는 배열과 같다.
+  `"name"` = 네임스페이스를 뺀 이름순(규칙 json 에서 고른다).
 - 모은 게 하나도 없으면(세트 없음 · 빈 세트) 리스트를 **건드리지 않는다**(교체로 비워 버리지 않게) + `[WARN]`.
 - 코어 `Framework/core/list_rules.py` — `load_rules` · `save_rule` · `resolve_rule(rule, namespace)` · `rule_namespaces` ·
   `rules_from_sets`. 툴이 메뉴 없이 쓰려면 `tsl.apply_rule(rule, append=False, namespace=None)`.
 - 첫 규칙: `Cage_v02` 카테고리 10개(`A01_FingersMC_O_tgt_L` … `B06_Twist_tgt`, 세트 이름 = 규칙 이름).
-- 검증: `Framework/tests/test_list_rules.py` mayapy 2024 **39 항목**(로더 · 깨진 json · 네임스페이스 · 중첩 · 순서 · 빈 세트 ·
+- 검증: `Framework/tests/test_list_rules.py` mayapy 2024 **47 항목**(원본 순서 · 반복 호출 안정 · 로더 · 깨진 json · 네임스페이스 · 중첩 · 순서 · 빈 세트 ·
   컴포넌트 · 메뉴 · Shift 추가 · 네임스페이스 묻기/취소 · 세트로 규칙 만들기 · Cage_v002_0130 을 `cage:` 로 레퍼런스해 10개 개수 ·
   A00145 Rules + Swap). **마야 GUI 확인 아직.**
 

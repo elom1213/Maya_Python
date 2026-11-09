@@ -4,6 +4,6 @@
   "sets": [
     "A01_FingersMC_O_tgt_L"
   ],
-  "order": "name",
+  "order": "set",
   "expand_nested": true
 }

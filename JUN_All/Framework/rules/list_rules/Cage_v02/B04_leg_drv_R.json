@@ -4,6 +4,6 @@
   "sets": [
     "B04_leg_drv_R"
   ],
-  "order": "name",
+  "order": "set",
   "expand_nested": true
 }

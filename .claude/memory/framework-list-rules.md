@@ -1,6 +1,6 @@
 ---
 name: framework-list-rules
-description: 공용 TSL `Rules` 버튼(show_rules=True) — 규칙 json(Framework/rules/list_rules/<Category>/)대로 리스트업, 지금은 세트 멤버(네임스페이스 무관), 기본 이름순. A00145 Constraint 첫 적용 + Swap
+description: 공용 TSL `Rules` 버튼(show_rules=True) — 규칙 json(Framework/rules/list_rules/<Category>/)대로 리스트업, 지금은 세트 멤버(네임스페이스 무관), 순서 = 세트 원본 순서(dagSetMembers 인덱스). A00145 Constraint 첫 적용 + Swap
 metadata:
   type: project
 ---
@@ -15,10 +15,13 @@ metadata:
   규칙 = `Framework/rules/list_rules/<Category>/<name>.json` {name, description, sets[], order, expand_nested}. git 추적(릴리즈에 동봉).
 - **세트 찾기 = `cmds.ls(name, recursive=True, type="objectSet")` + 잎 이름 정확히 같은 것만.** 여러 네임스페이스면 `ambiguous` →
   TSL 이 `choose_namespace` 팝업으로 묻는다(시험은 메서드 바꿔 끼움 — 오프스크린 QMenu.exec_ 는 멈춘다).
-- **`cmds.sets -q` 멤버 순서는 임의**(Cage 실측) → 기본 `order: "name"`(네임스페이스 뺀 이름순). Constraint 는 자리로 짝짓기 때문.
+- **순서 = 세트 원본 순서 = `dagSetMembers[i]`(→ `dnSetMembers[i]`) 인덱스 순** (사용자 요구: "원본 Cage 세트 안 순서와 똑같이").
+  **`cmds.sets -q` 순서는 원본이 아니고 같은 파일을 열 때마다 달라진다**(Cage 실측: B03 배열 leg,knee,ankle,foot,toe / sets -q 는 실행마다 다름).
+  이름은 sets -q 로, 자리는 배열 인덱스로(컴포넌트는 셰이프가 연결 → 부모 트랜스폼으로 매칭). `sets -add` 로 여러 개를 한 번에 넣으면
+  배열 자리는 마야가 매긴다(넘긴 순서와 다름). 처음엔 이름순 기본이었다가 바꿈 — `"name"` 은 옵션으로 남김.
 - 모은 게 0 이면 리스트를 안 건드린다(교체로 비우지 않게). 멤버 세트는 펼침(순환 안전), 컴포넌트 멤버 그대로.
 - A00145 v01.70: Constraint 페이지 `tsl_targets/tsl_followers` 에 show_rules, `on_constraint_swap`.
-- 시험 `Framework/tests/test_list_rules.py` 39/39 (Cage 를 `cage:` 로 레퍼런스: **loadReferenceDepth="none" 으로 걸면 언로드라 노드 없음**
+- 시험 `Framework/tests/test_list_rules.py` 47/47 (Cage 를 `cage:` 로 레퍼런스: **loadReferenceDepth="none" 으로 걸면 언로드라 노드 없음**
   — 시험에서 실제로 걸림, `topOnly` 로). GUI 확인 아직.
 
 관련: [[wip-a00145-connect-rules]], [[wip-a00340-selectiontool]], [[maya-reference-import-traps]]
