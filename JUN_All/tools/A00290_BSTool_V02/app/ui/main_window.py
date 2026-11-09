@@ -44,6 +44,7 @@ print("QT version  :  " + str(QT_VERSION))
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.core import fbx_name
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
@@ -104,6 +105,14 @@ SLIDER_STYLE = (
 #   나중에 카테고리 순서를 바꾸면 반대로 영영 거짓이 되어 슬라이더가 씬을 안 따라갔을 것이다.
 #   **둘 다 에러가 나지 않는다.** 지금은 `_shape_editor_visible()` 이 위젯 동일성으로 본다.
 SE_SUB_INDEX = 0        # Shape 카테고리 안에서 Shape Editor 하위 탭의 자리
+
+# 타겟 이름 표시 모드 (v02.06). FBX 로 들어온 일본어 · 중국어 · 띄어쓰기 타겟은 마야 안에서
+# `FBXASC227FBXASC129FBXASC130` 처럼 보인다(마야 이름 규칙 - docs/plans/A00620_NameDecoder_plan.md).
+#   Decoded : 원래 글자로 풀어서 보여 준다(기본) - あ
+#   Raw     : 마야 이름(alias) 그대로 - FBXASC227FBXASC129FBXASC130
+# **표시만 바꾼다** - 행 동작은 전부 웨이트 인덱스 기준이라 모드와 무관. 필터는 어느 모드든 두 이름 다 찾는다.
+SE_NAMES_DECODED = "Decoded"
+SE_NAMES_RAW = "Raw (FBXASC)"
 
 # 씬에서 weight 가 바뀌어도(채널박스, 어트리뷰트 에디터, 애니메이션 재생, 다른 스크립트 등)
 # Maya 는 Qt 에 알려 주지 않는다. 그래서 주기적으로 다시 읽어 스핀박스에 반영한다.
@@ -286,8 +295,12 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
 
         # Shape Editor 탭의 타겟 행 정보:
-        # [{node, index, name, row, btn, spin, slider, selected}, ...]
+        # [{node, index, name, row, btn, spin, slider, selected, label, filter_text}, ...]
         self._se_rows = []
+        # 블렌드셰이프 노드 헤더 라벨 [(QLabel, 노드 이름)] - 이름 표시 모드가 바뀌면 글자만 다시 쓴다
+        self._se_node_headers = []
+        # 타겟 이름 표시 모드 - 창을 열 때마다 Decoded(요청: 기본은 해독)
+        self._se_name_mode = SE_NAMES_DECODED
         self._se_rebuild_pending = False
         # 다중 편집 중 위젯 setValue 가 다시 on_se_weight_changed 를 부르는 재귀를 막는다.
         self._se_applying = False
@@ -408,7 +421,7 @@ class MainWindow(QWidget):
         # Edit 버튼·슬라이더·스핀박스) 공용 Filter 를 rows_provider 모드로 쓴다.
         tool_row = QHBoxLayout()
         self.flt_se = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
-            rows_provider=lambda: [(r["name"], r["row"]) for r in self._se_rows],
+            rows_provider=lambda: [(r["filter_text"], r["row"]) for r in self._se_rows],
             placeholder="Type any part of a target name (e.g. Inner)")
         self.flt_se.filtered.connect(self._on_se_filtered)
         tool_row.addWidget(self.flt_se, 1)
@@ -440,6 +453,19 @@ class MainWindow(QWidget):
         btn_clear_sel.setToolTip("Clear the target selection.")
         btn_clear_sel.clicked.connect(lambda: self._se_select_all(False))
         header.addWidget(btn_clear_sel)
+
+        # 타겟 이름 표시 모드 (v02.06)
+        header.addSpacing(8)
+        header.addWidget(QLabel("Names"))
+        self.cb_se_names = QComboBox()
+        self.cb_se_names.addItems([SE_NAMES_DECODED, SE_NAMES_RAW])
+        self.cb_se_names.setToolTip(
+            "How target names are shown.\n"
+            "Decoded: FBX names in Japanese / Chinese / with spaces are shown as the original text.\n"
+            "Raw (FBXASC): the Maya name as it is (e.g. FBXASC227FBXASC129FBXASC130).\n"
+            "Only the text changes - the filter finds either name.")
+        self.cb_se_names.currentTextChanged.connect(self.on_se_name_mode_changed)
+        header.addWidget(self.cb_se_names)
 
         header.addStretch(1)
         self.lbl_se_number = QLabel("Number: 0")
@@ -539,6 +565,7 @@ class MainWindow(QWidget):
             self._se_undo_open = False
         self._se_dragging = False
         self._se_rows = []
+        self._se_node_headers = []
         self._se_anchor = None
         # 마지막 stretch 를 제외한 모든 위젯 제거
         while self.se_body_layout.count() > 1:
@@ -548,8 +575,33 @@ class MainWindow(QWidget):
                 w.setParent(None)
                 w.deleteLater()
 
+    # --------------------------------------------------
+    # 타겟 이름 표시 모드 (v02.06)
+    # --------------------------------------------------
+
+    def _se_display_name(self, raw):
+        """이름 표시 모드에 맞는 글자 - Decoded 면 FBXASC 를 풀고, Raw 면 그대로."""
+        return fbx_name.decode(raw) if self._se_name_mode == SE_NAMES_DECODED else raw
+
+    @staticmethod
+    def _se_name_tooltip(raw, idx):
+        decoded = fbx_name.decode(raw)
+        if decoded == raw:
+            return "weight[{0}]".format(idx)
+        return "weight[{0}]\nDecoded: {1}\nMaya name: {2}".format(idx, decoded, raw)
+
+    def on_se_name_mode_changed(self, mode):
+        """행을 다시 만들지 않고 이름 글자만 바꾼다(선택 · Edit · 드래그 상태 유지)."""
+        self._se_name_mode = mode
+        for row in self._se_rows:
+            row["label"].setText(self._se_display_name(row["name"]))
+        for lbl, node in self._se_node_headers:
+            lbl.setText(self._se_display_name(node))
+
     def _add_se_node_header(self, bs_node):
-        lbl = QLabel(bs_node)
+        lbl = QLabel(self._se_display_name(bs_node))
+        lbl.setToolTip(bs_node)
+        self._se_node_headers.append((lbl, bs_node))
         f = lbl.font()
         f.setBold(True)
         lbl.setFont(f)
@@ -577,8 +629,8 @@ class MainWindow(QWidget):
             lambda *_a, n=bs_node, i=idx, b=btn: self.on_se_edit_toggled(n, i, b.isChecked()))
         row_layout.addWidget(btn)
 
-        lbl = QLabel(target["name"])
-        lbl.setToolTip("weight[{0}]".format(idx))
+        lbl = QLabel(self._se_display_name(target["name"]))
+        lbl.setToolTip(self._se_name_tooltip(target["name"], idx))
         row_layout.addWidget(lbl, 1)
 
         # 편집 가능(free/keyed) 하고 sculpt 편집 중이 아니면 조절 가능.
@@ -608,6 +660,9 @@ class MainWindow(QWidget):
         self.se_body_layout.insertWidget(self.se_body_layout.count() - 1, row)
         row_info = {
             "node": bs_node, "index": idx, "name": target["name"],
+            # 표시 글자 라벨 · 필터 글자(풀린 이름 + 마야 이름 - 어느 모드든 둘 다 찾는다)
+            "label": lbl,
+            "filter_text": "\n".join(dict.fromkeys([fbx_name.decode(target["name"]), target["name"]])),
             "row": row, "btn": btn, "spin": spin, "slider": slider,
             "selected": False,
         }

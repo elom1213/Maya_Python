@@ -33,6 +33,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-09 (오늘)
 
+> [!summary] **A00290_BSTool_V02 v02.06 · A00620_NameDecoder v01.01** - 타겟 이름 해독 표시 · 게이지 `#A00290_BSTool_V02` `#A00620_NameDecoder`
+- A00290 Shape Editor: `Names: Decoded(기본) / Raw (FBXASC)` - FBXASC 타겟을 원래 글자로. 표시만(인덱스 기준), 필터는 두 이름 다. 공용 `fbx_name`. 오프스크린 시험 10/10.
+- A00620 Blend Shapes: 게이지를 직접 그림(A00290 WeightSlider 방식) - 채운 길이 = 웨이트 · 줄 배경 번갈아 · 켜진 타겟 이름 굵게. 시험 61/61.
+- 마야 GUI 확인 아직.
+
 > [!summary] A00145_RigConnect **v01.70 Constraint Swap + Rules** · Framework **TSL Rules(공용)** `#A00145_RigConnect` `#Framework`
 - 요청: Constrain > Constraint 에 Match 의 Swap, Targets / Followers 를 정해진 규칙대로 리스트업(공용 TSL 기능으로). 첫 규칙 = Cage_v002_0130 의 세트 10개, 네임스페이스가 붙어도 대응.
 - 공용: TSL `show_rules=True` → `Rules` 메뉴(교체 / Shift 추가 · 세트로 규칙 만들기 · 폴더 열기). 코어 `Framework/core/list_rules.py`, 규칙 json `Framework/rules/list_rules/<Category>/`.

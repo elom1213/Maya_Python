@@ -19,5 +19,8 @@ metadata:
 번호는 원래 A00610 이었으나 다른 세션 `A00610_PmxImporter` 와 충돌(드롭 파일 이름 같음) → A00620.
 PmxImporter 에도 같은 규칙의 `encode_name/decode_name` 이 따로 있다 - 공용 `fbx_name` 으로 합치는 건 그쪽 작업 끝난 뒤 요청 시.
 
+사용처: A00290_BSTool_V02 v02.06 Shape Editor `Names: Decoded(기본) / Raw (FBXASC)` - 표시만, 필터는 두 이름 다 (2026-11-09).
+A00620 v01.01 Blend Shapes 게이지는 A00290 WeightSlider 방식(테마가 QSlider 를 안 꾸밈 → 슬라이더 전용 qss), 0~1 이라 채움 = 웨이트.
+
 **How to apply:** FBXASC 관련 작업은 `fbx_name` 을 쓴다(새로 짜지 말 것). 마야 GUI 확인 아직 - 마야 Qt 창의 일본어 · 중국어 글꼴(□ 로 깨지면 Yu Gothic / Microsoft YaHei 폴백).
 관련: [[mayapy-headless-verify]] · [[wip-a00480-filetool]] · [[maya-fbx-import-nonxyz-flip]]
