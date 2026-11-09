@@ -24,13 +24,19 @@ from . import texture_resolver as tr
 from ..config.version import VERSION
 
 PHASES = [("Reading PMX", 5), ("Mesh", 15), ("Materials", 10), ("Skeleton", 15), ("Morphs", 15),
-          ("Skin", 35), ("Finish", 5)]
+          ("Skin", 30), ("Rig (append / IK)", 5), ("Finish", 5)]
 
 
 class ImportOptions(object):
     def __init__(self, scale=cv.DEFAULT_SCALE, mesh=True, materials=True, skeleton=True, skin=True,
                  morphs=True, import_normals=True, hide_invisible_bones=True, dq_for_sdef=True,
-                 copy_unsafe_textures=True, uv_set_name="map1", namespace=""):
+                 copy_unsafe_textures=True, uv_set_name="map1", namespace="",
+                 local_axes=True, build_append=True, build_ik=True, display_frames=True):
+        # v01.01 (사용자 결정 2026-11-09): 로컬축 · IK(근사) 기본 켬. 부여 · 표시 프레임도 기본 켬.
+        self.local_axes = local_axes
+        self.build_append = build_append
+        self.build_ik = build_ik
+        self.display_frames = display_frames
         self.scale = float(scale)
         self.mesh = mesh
         self.materials = materials
@@ -208,12 +214,22 @@ def _build(model, pmx_path, pmx_dir, options, log, progress, phase, result, ns="
     phase("Skeleton")
     if options.skeleton and model.bones:
         bone_names = [book.item_name(b.name, b.name_e, "bone_{0:03d}".format(i)) for i, b in enumerate(model.bones)]
-        result.joints = mb.build_skeleton(model, bone_names, skel_grp, S, options.hide_invisible_bones,
-                                          progress=progress)
-        log("Skeleton: {0} joints".format(len(result.joints)))
+        result.joints, frames = mb.build_skeleton(model, bone_names, skel_grp, S, options.hide_invisible_bones,
+                                                  progress=progress, use_local_axes=options.local_axes)
+        oriented = sum(1 for f in frames if not f.isEquivalent(mb._IDENTITY, 1e-12))
+        log("Skeleton: {0} joints ({1} oriented by MMD local / fixed axes)".format(len(result.joints), oriented))
+        rep["oriented_joints"] = oriented
+        # 부여 - 스킨 전에(조인트 translate 가 offsetParentMatrix 로 옮겨간 최종 구성으로 바인드)
+        if options.build_append:
+            arep = mb.build_append(model, result.joints, frames, log)
+            rep["append"] = arep
+            rep["not_imported"]["append_bones"] -= len(arep["built"])
+            if arep["built"]:
+                log("Append (fuyo): {0} bones follow their append parent (quatNodes).".format(len(arep["built"])))
 
     # -- 모프 (스킨보다 먼저 - 디포머 순서 blendShape -> skinCluster) --------------------
     phase("Morphs")
+    aliases = {}
     if options.mesh and options.morphs:
         morph_names = [book_name for book_name in _morph_names(model)]
         bs, aliases = mb.build_morphs(model, shape, book.unique(model_base + "_morphs"), morph_names, S, progress)
@@ -243,6 +259,29 @@ def _build(model, pmx_path, pmx_dir, options, log, progress, phase, result, ns="
         if srep["sdef"] or srep["qdef"]:
             log("SDEF {0} / QDEF {1} vertices -> {2}.".format(
                 srep["sdef"], srep["qdef"], "dual quaternion blend" if options.dq_for_sdef else "linear"))
+
+    # -- IK (스킨 뒤 - 레스트에서 자세가 바뀌지 않는지 시험이 확인한다) -------------------------
+    phase("Rig (append / IK)")
+    if options.skeleton and options.build_ik and result.joints:
+        irep = mb.build_ik(model, result.joints, log)
+        rep["ik"] = irep
+        rep["not_imported"]["ik_bones"] -= len(irep["built"])
+        if irep["built"]:
+            log("IK: {0} ikHandles (approximation of MMD CCD IK - limits are not applied).".format(len(irep["built"])))
+
+    # -- 표시 프레임 -------------------------------------------------------------
+    if options.display_frames:
+        sets = []
+        if options.skeleton and result.joints:
+            set_names = [book.unique("{0}_frame_{1}".format(model_base, cv.encode_name(fr.name) or fi))
+                         for fi, fr in enumerate(model.display_frames)]
+            sets = mb.build_display_frames(model, result.joints, set_names, book.unique(model_base + "_frames"))
+        groups = mb.build_morph_groups(model, result.blendshape, aliases) if result.blendshape else {}
+        rep["display_frames"] = {"sets": len(sets) - 1 if sets else 0, "morph_groups": groups}
+        rep["not_imported"]["display_frames"] = 0
+        if sets or groups:
+            log("Display frames: {0} bone sets, Shape Editor groups {1}".format(
+                max(0, len(sets) - 1), ", ".join("{0} ({1})".format(k, v) for k, v in groups.items()) or "-"))
 
     # -- 마무리 ---------------------------------------------------------------
     phase("Finish")

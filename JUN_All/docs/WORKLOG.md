@@ -33,6 +33,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-09 (오늘)
 
+> [!summary] **A00610_PmxImporter v01.01 - 2차 1단계: 부여 본 · IK · 로컬축 · 표시 프레임** `#A00610_PmxImporter`
+- 요청: 2차 항목 중 물리를 뺀 13개 진단 → 결정(IK 근사 기본 켬 · 로컬축 기본 켬 · 외곽선/툰/스피어 보류) → 1단계 진행.
+- 진단 근거: Miyabi 다리 웨이트가 전부 D 본(`左足D` 등) → v01.00 은 다리를 돌려도 메시가 안 움직였다. UV 모프 · SDEF 정확 디포머 · 재질별 분리는 안 함.
+- 구현: 부여 = quatNodes 망 → **rotateAxis**(부여 먼저 · 자기 rotate 나중 = three.js GrantSolver 원문 확인, rotate 는 자유) · IK = ikHandle(RP/SC, IK 본 아래) · 로컬축/고정축 → jointOrient(42개) · 표시 프레임 → 셋 13 + Shape Editor 그룹(eyebrow/eye/mouth) · 엣지 배율 → 컬러 셋.
+- 검증: **Blender 2.93 + mmd_tools(CATS zip) headless 를 정답 기준**으로 포즈 메시 대조 — 다리 D 체인 · 허리/어깨 캔슬 ≤ 6.7e-4 cm, IK 평균 0.03 cm. mmd_tools 는 부여를 오일러로 근사(비틀기 0.34 cm)해 그 경우는 MMD 규칙을 직접 검사(같은 축 × 0.25/0.5/0.75 정확).
+- 실측 함정: 블렌더에서 IK 만 끄면 무릎 LIMIT_ROTATION 이 남아 레스트가 71 cm 어긋남 · `pose_bone.matrix` 대입은 부여를 두 번 넣음.
+- 시험: core 61/61 · mayapy 80/80(+20). **GUI 확인 아직.** 계획서 §15.
+
 > [!summary] **A00290_BSTool_V02 v02.06 · A00620_NameDecoder v01.01** - 타겟 이름 해독 표시 · 게이지 `#A00290_BSTool_V02` `#A00620_NameDecoder`
 - A00290 Shape Editor: `Names: Decoded(기본) / Raw (FBXASC)` - FBXASC 타겟을 원래 글자로. 표시만(인덱스 기준), 필터는 두 이름 다. 공용 `fbx_name`. 오프스크린 시험 10/10.
 - A00620 Blend Shapes: 게이지를 직접 그림(A00290 WeightSlider 방식) - 채운 길이 = 웨이트 · 줄 배경 번갈아 · 켜진 타겟 이름 굵게. 시험 61/61.

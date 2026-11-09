@@ -2,6 +2,21 @@
 
 All notable changes to this tool are documented here.
 
+## [01.01] - 2026-11-09
+
+- **2차 1단계** — 결정: IK 근사 생성(기본 켬) · 로컬축 반영(기본 켬) · 외곽선 / 툰 / 스피어 보류.
+- **부여(付与) 본이 움직인다.** Miyabi 의 다리 웨이트는 전부 `足D` · `ひざD` · `足首D` 에 있어 v01.00 에서는 다리를 돌려도 메시가 안 움직였다.
+  - quatNodes 망: 부여 부모의 MMD 로컬 회전을 `slerp(I, q, 비율)`(음수 비율은 역회전) → 조인트 **`rotateAxis`** 로.
+    마야 조인트 행렬에서 rotateAxis 가 rotate 보다 먼저라 **부여 먼저, 자기 회전 나중**(three.js MMD GrantSolver 와 같은 순서) — `rotate` 는 비어 있어 직접 조작 가능.
+  - 사슬(`足補助 ← 足D ← 足`)은 부모의 총 회전, IK 가 돌린 본은 IK 결과까지 따라간다. 이동 부여 · 로컬 부여는 아직(경고).
+- **IK** — IK 본마다 ikHandle(링크 2개 이상 RP, 1개 SC), 핸들은 IK 본 아래(숨김). MMD 의 CCD 반복 · 각도 제한은 적용하지 않는 근사.
+- **로컬축** — 로컬축(팔 · 손가락) · 고정축(비틀기 본)이 있는 본 42개를 그 축으로 jointOrient, 나머지는 월드 정렬. 월드 위치 · 스킨은 그대로.
+- **표시 프레임** — 본 프레임 → 조인트 셋(`<모델>_frames` 아래), 모프 패널 → Shape Editor 그룹(eyebrow / eye / mouth / other).
+- **엣지 배율** → 컬러 셋 `mmdEdgeScale`(1 이 아닌 정점이 있을 때만).
+- UI 체크 4개 추가(`Local axes` · `Append bones` · `IK` · `Display frames`, 전부 기본 켬).
+- 시험 core 61/61 · mayapy 80/80(+20): MMD 규칙 직접 검사(비틀기 = 같은 축 ×0.25/0.5/0.75 · 허리 캔슬) ·
+  **Blender + mmd_tools 와 포즈 메시 대조**(다리 D 체인 · 허리 / 어깨 캔슬 < 1e-3 cm, IK 평균 0.03 cm). **GUI 확인 아직.**
+
 ## [01.00] - 2026-11-09
 
 - **첫 버전.** MMD 모델(PMX 2.0 / 2.1)을 마야에 바로 임포트 — 계획서 `docs/plans/A00610_PmxImporter_plan.md`.

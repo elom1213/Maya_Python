@@ -123,4 +123,4 @@
 - A00580 — [FacialBoardBuilder · Ctl_Only_V05](wip-facial-arkit52-ctl-v05.md)(ARKit 52 보드를 json 명세에서 빌드 · CSV 베이크 · verify 1722 · 더미 `BS_Face_CSV` 는 숨긴 평면에 · 컨트롤 트랜스폼은 override normal · GUI 확인 아직 · UE 빌더는 다음)
 - JALI 슬라이더 리그 — [A0020_jali_slider_ctl](wip-jali-slider-ctl.md)(angela 1:1 슬라이더 22 + JaLi 박스, remapValue 리맵, DUMMY_IN/OUT 3쌍, global_scale · 생성/검증은 JUN_JALI examples · GUI 확인 아직)
 - A00620 — [NameDecoder](wip-a00620-namedecoder.md)(FBXASC 이름 디코드 · 마야는 유니코드 이름 불가(setName 조용히 무시) · FBX 익스포터가 원래 글자로 복원 → 기본 읽기 전용 · 공용 `fbx_name`)
-- A00610 — [PmxImporter](wip-a00610-pmximporter.md)(PMX 직접 임포트 · 이름 FBXASC · lambert · IK 본 생성 · 기준 mb 골든 · 2차 = 부여 본)
+- A00610 — [PmxImporter](wip-a00610-pmximporter.md)(v01.01 부여 = rotateAxis(부여 먼저) · IK 근사 · 로컬축 · 기준 mb + Blender mmd_tools 골든, mmd_tools 부여는 오일러 근사)

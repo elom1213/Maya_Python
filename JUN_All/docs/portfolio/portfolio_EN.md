@@ -810,6 +810,10 @@ Default Distance attribute (driver signal x)
   Measuring also exposed two Maya traps that the tool works around: **textures whose path has characters outside the system code page (cp949) do not load** (copied under reversible FBXASC names), and
   **`.ma` files turn those characters into `?`** (original names and data are stored as ASCII). Node names are the PMX's own names, encoded with the same rule as FBX so they decode back to the original text,
   and the whole import is undone with **one Ctrl+Z**.
+  It then rebuilds **MMD append (fuyo) bones** (leg D bones, twist bones, waist cancel - 30 bones; this model carries all its leg weights on them, so without them the legs do not deform) as a quatNodes network.
+  The "append first, own rotation second" order was confirmed in the three.js MMD source, and the append goes into the joint's `rotateAxis`, so **the `rotate` channels stay free for animators**.
+  As ground truth, **Blender + mmd_tools runs headless and the same MMD pose is compared vertex by vertex** (legs and waist cancel match to 6.7e-4 cm);
+  this also showed that mmd_tools itself approximates append with Euler channels (0.3 cm off when axes mix), so those cases are checked against the MMD rule directly. IK (approximate), MMD local-axis joint orientation and display-frame sets come with it.
 
 ---
 

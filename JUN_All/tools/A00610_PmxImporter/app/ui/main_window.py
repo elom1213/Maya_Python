@@ -42,6 +42,17 @@ _CHECKS = [
     ("chk_skeleton", "skeleton", "Skeleton", True, "One joint per PMX bone (including IK bones), world aligned."),
     ("chk_skin", "skin", "Skin", True, "skinCluster with the PMX weights (BDEF1/2/4, SDEF/QDEF)."),
     ("chk_morphs", "morphs", "Morphs", True, "Vertex morphs -> blendShape targets (named after the PMX morphs)."),
+    ("chk_local_axes", "local_axes", "Local axes", True,
+     "Orient joints that have MMD local axes (arms, fingers) or a fixed axis (twist bones).\n"
+     "Off = every joint world aligned (jointOrient 0)."),
+    ("chk_append", "build_append", "Append bones", True,
+     "MMD append (fuyo) rotation: e.g. leg D bones follow the leg, twist bones share the arm twist.\n"
+     "Built with quatNodes into rotateAxis - the bones' own rotate stays free."),
+    ("chk_ik", "build_ik", "IK", True,
+     "ikHandles for the MMD IK bones (approximation: RP solver for 2+ links, SC for 1 link;\n"
+     "MMD CCD loop count and angle limits are not applied)."),
+    ("chk_frames", "display_frames", "Display frames", True,
+     "MMD display frames -> object sets of joints; morph panels -> Shape Editor groups."),
     ("chk_normals", "import_normals", "Import normals", True, "Lock the PMX vertex normals on the mesh."),
     ("chk_hide_bones", "hide_invisible_bones", "Hide invisible bones", True,
      "Bones that are hidden in MMD get drawStyle None."),
@@ -130,10 +141,12 @@ class MainWindow(QWidget):
             cb.setToolTip(tip)
             setattr(self, attr, cb)
             if n < 5:
-                grid.addWidget(cb, 0, n)
+                grid.addWidget(cb, 0, n)                       # Mesh · Materials · Skeleton · Skin · Morphs
+            elif n < 9:
+                grid.addWidget(cb, 1, n - 5)                   # Local axes · Append · IK · Display frames
             else:
-                grid.addWidget(cb, 1 + (n - 5) // 2, (n - 5) % 2 * 2, 1, 2)
-        row = 1 + (len(_CHECKS) - 5 + 1) // 2
+                grid.addWidget(cb, 2 + (n - 9) // 2, (n - 9) % 2 * 2, 1, 2)
+        row = 2 + (len(_CHECKS) - 9 + 1) // 2
         grid.addWidget(QLabel("Scale"), row, 0)
         self.sp_scale = QDoubleSpinBox()
         self.sp_scale.setDecimals(3)
@@ -298,8 +311,9 @@ class MainWindow(QWidget):
             "Import an MMD model (PMX 2.0 / 2.1) into Maya: one skinned mesh, joints,\n"
             "blendShape morphs, lambert materials and textures.\n\n"
             "Names are the PMX names. Characters Maya cannot use become FBXASC### (like FBX).\n"
-            "Size: x8 (1 MMD unit = 8 cm). Rigid bodies, physics joints, IK and append bones\n"
-            "are kept as data (attributes) only.".format(VERSION, LAST_UPDATE))
+            "Size: x8 (1 MMD unit = 8 cm). Append (fuyo) bones follow their parent, IK bones get\n"
+            "ikHandles (approximation), joints use the MMD local axes, display frames become sets.\n"
+            "Rigid bodies and physics joints are kept as data only.".format(VERSION, LAST_UPDATE))
 
 
 def summary_text(m):

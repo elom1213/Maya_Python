@@ -6,6 +6,7 @@
 # 2) 실제 모델이 있으면(A00610_SAMPLE_DIR) 기준 mb(CATS -> FBX 결과)와 숫자로 대조 - 계획서 §11-2 G1 ~ G12
 import io
 import json
+import math
 import os
 import re
 import shutil
@@ -32,6 +33,7 @@ sys.path.insert(0, HERE)
 from tools.A00610_PmxImporter.app.core import import_runner as IR  # noqa: E402
 from tools.A00610_PmxImporter.app.core import pmx_reader as pr  # noqa: E402
 from tools.A00610_PmxImporter.app.core import pmx_convert as cv  # noqa: E402
+from tools.A00610_PmxImporter.app.core import maya_build as mb  # noqa: E402
 import pmx_writer as pw  # noqa: E402
 
 SAMPLE = os.environ.get("A00610_SAMPLE_DIR", "C:/Users/USER/Desktop/JP/0090_Avatar/0010_ZZZ/021_Miyabi")
@@ -97,6 +99,8 @@ def write_synthetic(folder):
             v = {"pos": (x, y * 2, 0.5 * x), "normal": (0, 0, -1), "uv": (x, y / 2.0), "add_uvs": [(x, y, 0, 0)]}
             if y == 0:
                 v.update(type=0, bones=(1,))
+                if x == 0:
+                    v["edge"] = 0.5          # 엣지 배율 -> 컬러 셋
             elif y == 1:
                 v.update(type=3, bones=(1, 2), weights=(0.5,), sdef=(0.0,) * 9)
             else:
@@ -116,6 +120,7 @@ def write_synthetic(folder):
         [{"name": u"まばたき", "type": 1, "panel": 2, "offsets": [(5, (0, 0, 1)), (4, (0, -1, 0)), (5, (0, 0, 1))]},
          {"name": u"あ", "type": 1, "panel": 3, "offsets": [(0, (1, 0, 0))]},
          {"name": "grp", "type": 0, "offsets": [(0, 1.0)]}],
+        frames=[("Root", [(0, 0)]), (u"表情", [(1, 0), (1, 1)]), (u"足", [(0, 1), (0, 2)])],
         rigids=[u"頭"], joints=[u"j"], name=u"テスト", name_e="test")
     path = os.path.join(folder, u"テスト.pmx")
     with open(path, "wb") as f:
@@ -213,6 +218,53 @@ try:
     rep = json.loads(cmds.getAttr(res.group + ".mmdImportReport"))
     check("syn: report", rep["not_imported"]["rigid_bodies"] == 1 and rep["skin"]["sdef"] == 2
           and rep["counts"]["morphs"] == 3, rep.get("not_imported"))
+
+    # ---- v01.01 부여 · IK · 표시 프레임 · 엣지 배율
+    def world_rot(j):
+        return om.MTransformationMatrix(om.MMatrix(cmds.xform(j, q=True, ws=True, m=True))).rotation(asQuaternion=True)
+    check("syn: append built (rotateAxis driven, rotate free)",
+          cmds.listConnections(res.joints[1] + ".rotateAxis", source=True) is not None
+          and not cmds.listConnections(res.joints[1] + ".rotate", source=True, destination=False)
+          and rep["append"]["built"] == [u"左足", u"1"], rep.get("append"))
+    handles = cmds.ls(type="ikHandle")
+    for h in handles:
+        cmds.setAttr(h + ".ikBlend", 0)
+    cmds.setAttr(res.joints[0] + ".rotate", 0, 40, 0)
+    # 左足 = 親(40) 의 0.5 -> 부모 40 + 부여 20 = 60 / 「1」 = 左足 총(20) 의 0.3 -> 60 + 6 = 66
+    a1 = world_rot(res.joints[1])
+    a2 = world_rot(res.joints[2])
+    check("syn: append ratio 0.5 (world 60 deg about Y)", a1.isEquivalent(om.MEulerRotation(0, math.radians(60), 0).asQuaternion(), 1e-6), a1.asEulerRotation())
+    check("syn: append chain uses parent's total (66 deg)",
+          a2.isEquivalent(om.MEulerRotation(0, math.radians(66), 0).asQuaternion(), 1e-6), a2.asEulerRotation())
+    cmds.setAttr(res.joints[1] + ".rotate", 10, 0, 0)
+    # 左足 = 부여(20 Y) 먼저, 자기(10 X) 나중 (three.js GrantSolver: q = own * grant)
+    exp = om.MEulerRotation(math.radians(10), 0, 0).asQuaternion()
+    exp = om.MEulerRotation(0, math.radians(20), 0).asQuaternion() * exp * om.MEulerRotation(0, math.radians(40), 0).asQuaternion()
+    check("syn: append first, own rotation second", world_rot(res.joints[1]).isEquivalent(exp, 1e-6))
+    cmds.setAttr(res.joints[0] + ".rotate", 0, 0, 0)
+    cmds.setAttr(res.joints[1] + ".rotate", 0, 0, 0)
+    check("syn: IK handle (1 link -> SC) under the IK bone", len(handles) == 1
+          and cmds.ikHandle(handles[0], q=True, solver=True) == "ikSCsolver"
+          and cmds.listRelatives(handles[0], parent=True, fullPath=True)[0] == res.joints[3]
+          and rep["ik"]["built"] == [u"左足ＩＫ"], handles)
+    for h in handles:
+        cmds.setAttr(h + ".ikBlend", 1)
+    sets = [s for s in cmds.ls(type="objectSet") if cmds.attributeQuery("mmdName", node=s, exists=True)]
+    by_frame = dict((cv.decode_name(cmds.getAttr(s + ".mmdName")), s) for s in sets)
+    check("syn: display frames -> sets (bone frames only)", sorted(by_frame) == sorted(["Root", u"足"])
+          and len(cmds.sets(by_frame[u"足"], q=True)) == 2, sorted(by_frame))
+    check("syn: morph panels -> Shape Editor groups", cmds.getAttr(bs + ".targetDirectory[1].directoryName") == "eye"
+          and cmds.getAttr(bs + ".targetDirectory[2].directoryName") == "mouth"
+          and list(cmds.getAttr(bs + ".targetDirectory[0].childIndices")) == [-1, -2]
+          and cmds.getAttr(bs + ".parentDirectory[1]") == 2, rep.get("display_frames"))
+    check("syn: edge scale -> color set", "mmdEdgeScale" in (cmds.polyColorSet(shp, q=True, allColorSets=True) or [])
+          and abs(cmds.polyColorPerVertex(shp + ".vtx[0]", q=True, r=True)[0] - 0.5) < 1e-6)
+    res_w = IR.run_import(syn, IR.ImportOptions(local_axes=False, build_append=False, build_ik=False,
+                                                display_frames=False), log=log)
+    check("syn: rig options off -> no rotateAxis link / IK / sets",
+          not cmds.listConnections(res_w.joints[1] + ".rotateAxis", source=True)
+          and len(cmds.ls(type="ikHandle")) == 1 and "append" not in json.loads(cmds.getAttr(res_w.group + ".mmdImportReport")))
+    cmds.delete(res_w.group)
     # 문자열 어트리뷰트 = ASCII 만 (.ma 는 cp949 로 저장되어 '颜' 이 '?' 가 된다)
     strings = []
     for node in [res.group] + res.joints + res.materials + [res.blendshape]:
@@ -376,9 +428,9 @@ try:
         check("G8 bind pose deformation == input", d < 1e-4, d)
         # G9 포즈: 왼팔꿈치 회전 -> 직접 계산한 LBS
         elbow = [j for j, b in zip(res.joints, model.bones) if b.name == u"左ひじ"][0]
+        # 바인드 = 레스트 월드 행렬의 역 (로컬축 조인트는 회전이 들어 있다)
+        bind_inv = [om.MMatrix(cmds.xform(j, q=True, ws=True, m=True)).inverse() for j in res.joints]
         cmds.setAttr(elbow + ".rotate", 30, 60, 90, type="double3")
-        bind_inv = [om.MMatrix([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0] + [-c for c in cv.to_maya_point(b.position)] + [1])
-                    for b in model.bones]
         cur = [om.MMatrix(cmds.xform(j, q=True, ws=True, m=True)) for j in res.joints]
         skinned = world_points(shp)
         worst = 0.0
@@ -395,6 +447,138 @@ try:
         cmds.setAttr(elbow + ".rotate", 0, 0, 0, type="double3")
         check("G9 posed skin == linear blend skinning from PMX weights", worst < 1e-3 and moved > 100,
               (worst, moved))
+
+        # G15 로컬축 · 표시 프레임
+        by_jp = dict((b.name, j) for j, b in zip(res.joints, model.bones))
+        jo = cmds.getAttr(by_jp[u"左ひじ"] + ".jointOrient")[0]
+        check("G15 local axes: 42 joints oriented (arms / fingers / twist), legs world aligned",
+              json.loads(cmds.getAttr(res.group + ".mmdImportReport"))["oriented_joints"] == 42
+              and max(abs(a) for a in jo) > 1.0 and cmds.getAttr(by_jp[u"左ひざ"] + ".jointOrient")[0] == (0.0, 0.0, 0.0), jo)
+        rep = json.loads(cmds.getAttr(res.group + ".mmdImportReport"))
+        check("G15 display frames: 13 bone sets, morph groups eyebrow 6 / eye 15 / mouth 31",
+              rep["display_frames"]["sets"] == 13
+              and rep["display_frames"]["morph_groups"] == {"eyebrow": 6, "eye": 15, "mouth": 31}, rep["display_frames"])
+        check("G15 append 30 + IK 4 built", len(rep["append"]["built"]) == 30 and len(rep["ik"]["built"]) == 4
+              and rep["not_imported"]["append_bones"] == 0 and rep["not_imported"]["ik_bones"] == 0)
+
+        # 포즈 도우미: MMD 로컬 회전(VMD 키와 같은 뜻, PMX 축) -> 조인트 rotate = W * q * W^-1
+        frames_rest = mb.bone_rest_frames(model, True)
+        handles = cmds.ls("imp:*", type="ikHandle")
+        orig_t = dict((j, cmds.getAttr(j + ".t")[0]) for j in res.joints)
+
+        def reset_pose(ik_on):
+            for j in res.joints:
+                cmds.setAttr(j + ".r", 0, 0, 0)
+                cmds.setAttr(j + ".t", *orig_t[j])
+            for h in handles:
+                cmds.setAttr(h + ".ikBlend", 1 if ik_on else 0)
+
+        def mmd_rotate(jp, axis, deg):
+            i = [b.name for b in model.bones].index(jp)
+            ax = om.MVector(axis[0], axis[1], -axis[2]).normal()
+            q = om.MQuaternion(math.radians(deg), -ax)               # z 거울: 축 -(x, y, -z), 같은 각
+            e = om.MTransformationMatrix(frames_rest[i] * q.asMatrix() * frames_rest[i].inverse()).rotation()
+            cmds.setAttr(res.joints[i] + ".r", *[math.degrees(a) for a in (e.x, e.y, e.z)])
+
+        def delta_q(jp):
+            j = by_jp[jp]
+            i = res.joints.index(j)
+            g = om.MTransformationMatrix(om.MMatrix(cmds.xform(j, q=True, ws=True, m=True))).rotation(asQuaternion=True)
+            return frames_rest_q[i].inverse() * g     # 레스트 대비 월드 회전 (행벡터: 레스트 다음 변화)
+
+        frames_rest_q = [om.MTransformationMatrix(om.MMatrix(cmds.xform(j, q=True, ws=True, m=True))).rotation(asQuaternion=True)
+                         for j in res.joints]
+        # G13a MMD 규칙 그 자체(외부 기준 없이): 비틀기 본 = 부모 회전을 같은 축으로 0.25 / 0.5 / 0.75
+        reset_pose(False)
+        mmd_rotate(u"左腕捩", (0.823, -0.568, 0.025), 60)
+        par = delta_q(u"左腕捩")
+        pax, pang = par.asAxisAngle()
+        ok = True
+        info = []
+        for k, ratio in ((1, 0.25), (2, 0.5), (3, 0.75)):
+            ax, ang = delta_q(u"左腕捩{0}".format(k)).asAxisAngle()
+            info.append((round(math.degrees(ang), 4), round(ax * pax, 6)))
+            ok = ok and abs(ang - pang * ratio) < 1e-6 and abs(ax * pax - 1.0) < 1e-6
+        check("G13a twist bones = slerp of the parent rotation (same axis, x0.25/0.5/0.75)", ok, info)
+        reset_pose(False)
+        mmd_rotate(u"腰", (0, 1, 0), 30)
+        d = delta_q(u"左足")
+        check("G13a waist cancel (-1): leg keeps its world rotation", d.isEquivalent(om.MQuaternion(), 1e-6), d)
+        reset_pose(True)
+
+        # G13b / G14 Blender + mmd_tools(CATS zip) 대조 - 있을 때만
+        blender = os.environ.get("A00610_BLENDER", "C:/Program Files/Blender Foundation/Blender 2.93/blender.exe")
+        cats_zip = os.environ.get("A00610_CATS_ZIP", "C:/Users/USER/Desktop/JP/0070_blender_plugins/cats-blender-plugin-master.zip")
+        if os.path.isfile(blender) and os.path.isfile(cats_zip):
+            import subprocess
+            import zipfile
+            ext = os.path.join(TMP, "mmdx")
+            with zipfile.ZipFile(cats_zip) as zf:
+                for nm in zf.namelist():
+                    if "/extern_tools/mmd_tools_local/" in nm and not nm.endswith("/"):
+                        dst = os.path.join(ext, nm.split("/extern_tools/", 1)[1])
+                        if not os.path.isdir(os.path.dirname(dst)):
+                            os.makedirs(os.path.dirname(dst))
+                        with open(dst, "wb") as f:
+                            f.write(zf.read(nm))
+            scen = [
+                {"name": "rest", "ik": False, "ops": []},
+                {"name": "hip", "ik": False, "ops": [["mmdrot", u"左足", [1, 0, 0], 40]]},
+                {"name": "knee", "ik": False, "ops": [["mmdrot", u"左ひざ", [1, 0, 0], -60]]},
+                {"name": "waist", "ik": False, "ops": [["mmdrot", u"腰", [0, 1, 0], 30]]},
+                {"name": "shoulder", "ik": False, "ops": [["mmdrot", u"左肩P", [0, 0, 1], 20]]},
+                {"name": "leg_chain", "ik": False, "ops": [["mmdrot", u"左足", [1, 0, 0], 30], ["mmdrot", u"左ひざ", [1, 0, 0], -50],
+                                                          ["mmdrot", u"左足首", [1, 0, 0], 20]]},
+                {"name": "twist", "ik": False, "ops": [["mmdrot", u"左腕捩", [0.823, -0.568, 0.025], 60]]},
+                {"name": "eyes", "ik": False, "ops": [["mmdrot", u"両目", [0, 1, 0], 20], ["mmdrot", u"左目", [1, 0, 0], 10]]},
+                {"name": "ik", "ik": True, "ops": [["move", u"左足ＩＫ", [0, 15, 10]]]},
+            ]
+            sp = os.path.join(TMP, "scen.json")
+            rp = os.path.join(TMP, "ref.json")
+            with io.open(sp, "w", encoding="utf-8") as f:
+                json.dump(scen, f, ensure_ascii=False)
+            subprocess.call([blender, "-b", "--factory-startup", "--python", os.path.join(HERE, "blender_mmd_reference.py"),
+                             "--", ext, real, sp, rp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            ref = json.load(io.open(rp, encoding="utf-8")) if os.path.isfile(rp) else {}
+            check("G13b Blender reference ran (same vertex count)", ref.get("_info", {}).get("vertices") == len(model.vertices))
+            dist = {}
+            for sc in scen:
+                if sc["name"] not in ref:
+                    continue
+                reset_pose(sc["ik"])
+                for op in sc["ops"]:
+                    if op[0] == "mmdrot":
+                        mmd_rotate(op[1], op[2], op[3])
+                    else:
+                        cmds.move(op[2][0], op[2][1], op[2][2], by_jp[op[1]], relative=True, worldSpace=True)
+                mp = world_points(shp)
+                rb = ref[sc["name"]]
+                ds = [math.sqrt(sum((mp[i][k] - rb[i][k]) ** 2 for k in range(3))) for i in range(len(rb))]
+                dist[sc["name"]] = (max(ds), sum(ds) / len(ds))
+            reset_pose(True)
+            exact = ("rest", "hip", "knee", "waist", "shoulder", "leg_chain")
+            check("G13b append == mmd_tools (legs D chain, waist / shoulder cancel): max < 1e-3 cm",
+                  all(dist.get(n, (9, 9))[0] < 1e-3 for n in exact), dict((n, round(dist[n][0], 6)) for n in exact if n in dist))
+            # mmd_tools 는 부여를 오일러 TRANSFORM 컨스트레인트로 근사한다 -> 축이 섞이는 경우는 MMD 규칙(G13a)이 정답
+            check("G13b twist / eyes within mmd_tools euler approximation (< 0.5 cm, mean < 0.01)",
+                  all(dist.get(n, (9, 9))[0] < 0.5 and dist[n][1] < 0.01 for n in ("twist", "eyes")),
+                  dict((n, [round(x, 4) for x in dist[n]]) for n in ("twist", "eyes") if n in dist))
+            check("G14 IK vs mmd_tools IK (different solvers): mean < 0.1 cm, max < 3 cm",
+                  "ik" in dist and dist["ik"][1] < 0.1 and dist["ik"][0] < 3.0, dist.get("ik"))
+        else:
+            OUT.write("SKIP G13b/G14 Blender reference (no {0} or {1})\n".format(blender, cats_zip))
+        # G14 IK 자체: 발목이 IK 본을 따라간다, 무릎은 앞으로
+        reset_pose(True)
+        ankle = by_jp[u"左足首"]
+        cmds.move(0, 15, 10, by_jp[u"左足ＩＫ"], relative=True, worldSpace=True)
+        a = om.MVector(*cmds.xform(ankle, q=True, ws=True, t=True))
+        t = om.MVector(*cmds.xform(by_jp[u"左足ＩＫ"], q=True, ws=True, t=True))
+        k = om.MVector(*cmds.xform(by_jp[u"左ひざ"], q=True, ws=True, t=True))
+        check("G14 IK: ankle reaches the IK bone, knee bends forward (+Z)", (a - t).length() < 1e-3 and k.z > a.z,
+              ((a - t).length(), k.z, a.z))
+        reset_pose(True)
+        d = max(x.distanceTo(y) for x, y in zip(world_points(shp), mine))
+        check("G14 IK at rest keeps the bind pose", d < 1e-3, d)
         # G10 다른 모델
         for f, n_files in ((u"武器.pmx", 1), (u"幽灵.pmx", 0)):
             r = IR.run_import(os.path.join(SAMPLE, f), IR.ImportOptions(namespace="imp2"), log=log)

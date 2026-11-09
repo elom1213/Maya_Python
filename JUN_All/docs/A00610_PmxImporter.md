@@ -10,7 +10,7 @@ updated: 2026-11-09
 MMD 모델(**PMX 2.0 / 2.1**)을 블렌더 · CATS · FBX 를 거치지 않고 **마야에 바로** 임포트하는 in-Maya PySide 툴(arch B).
 결과 = **스킨된 메시 하나 + 조인트 + 블렌드셰이프(모프) + lambert 머티리얼 · 텍스처**. **Ctrl+Z 한 번**에 임포트 전체가 되돌아간다.
 
-- **버전**: `app/config/version.py` (v01.00)
+- **버전**: `app/config/version.py` (v01.01 — 부여 본 · IK · 로컬축 · 표시 프레임)
 - **설치**: `__dragDrop_A00610.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **PMX** → `tools.A00610_PmxImporter.run(True)`
   (ToolLauncher `UTIL` 프로파일 `File` 칸에도 있다)
 - **계획서**: [`plans/A00610_PmxImporter_plan.md`](plans/A00610_PmxImporter_plan.md) — 실측 근거 · PMX 규격 · PMX 안의 다른 데이터(§14)
@@ -31,6 +31,10 @@ MMD 모델(**PMX 2.0 / 2.1**)을 블렌더 · CATS · FBX 를 거치지 않고 *
 | `Skeleton` | 켬 | PMX 본마다 조인트(**IK 본 포함**), 월드 정렬(jointOrient 0) |
 | `Skin` | 켬 | skinCluster + PMX 웨이트(웨이트가 있는 본만 인플루언스) |
 | `Morphs` | 켬 | 버텍스 모프 → blendShape 타깃 |
+| `Local axes` | 켬 | 로컬축(팔 · 손가락) · 고정축(비틀기 본)이 있는 본을 그 축으로 jointOrient(Miyabi 42개). 끄면 전부 월드 정렬 |
+| `Append bones` | 켬 | 부여(付与) 본이 부여 부모를 따라간다(아래 5-1) |
+| `IK` | 켬 | IK 본마다 ikHandle — **근사**(아래 5-2) |
+| `Display frames` | 켬 | 본 표시 프레임 → 조인트 셋, 모프 패널 → Shape Editor 그룹 |
 | `Import normals` | 켬 | PMX 노멀을 잠가 넣는다 |
 | `Hide invisible bones` | 켬 | MMD 에서 숨김인 본은 `drawStyle = None` |
 | `SDEF/QDEF as dual quaternion` | 켬 | SDEF · QDEF 정점만 듀얼 쿼터니언(weight blended). 끄면 선형 |
@@ -82,20 +86,44 @@ tex\髮.png  ->  (cp949 에 있는 글자라 원본 그대로)
     └── PMX 본 계층 그대로(全ての親 · 操作中心 · IK 친 본 …)
 ```
 
-`<모델>` = PMX 안의 모델 이름(Miyabi.pmx → `Unagi`).
+`<모델>` = PMX 안의 모델 이름(Miyabi.pmx → `Unagi`). 그 밖에 `<모델>_frames`(표시 프레임 셋), IK 본 아래 숨긴 `*_ikHandle`,
+부여 노드 `mmd_<본>_*`(eulerToQuat · quatProd · quatSlerp · quatToEuler).
 
-## 6. 한계 (v01.00)
+### 5-1. 부여(付与) 본
 
-- **부여(付与) 본이 움직이지 않는다** — `左足D` 처럼 MMD 가 자동으로 돌리는 본(웨이트가 실려 있다)이 바인드 포즈에서만 맞다.
-  `左足` 을 돌려도 `左足D` 는 그대로. 애니메이션에 쓰려면 2차 작업(계획서 §14-1).
-- **IK 는 조인트만**(ikHandle 없음), **물리(강체 · 조인트) · 표시 프레임 · 버텍스 외 모프**는 만들지 않고 리포트에 개수만.
-- 툰 · 스피어 · 외곽선 셰이딩 없음(lambert 색 + 알파만).
+MMD 가 자동으로 돌리는 본. Miyabi 는 30개이고 **다리 웨이트가 전부 여기**(`足D` · `ひざD` · `足首D`)에 있다 — 이게 없으면 다리를 돌려도 메시가 안 움직인다.
+
+| 종류 | 예 | 동작 |
+|------|----|------|
+| 다리 D 본 | `左足D` ← `左足` ×1 | 다리를 그대로 따라감 |
+| 보조 | `左ひざ補助` ← `左ひざD` ×0.5 | 사슬 - 부모의 부여까지 포함 |
+| 비틀기 | `左腕捩1/2/3` ← `左腕捩` ×0.25/0.5/0.75 | 같은 축으로 비율만큼 |
+| 캔슬 | `腰キャンセル左` ← `腰` ×-1 | 허리를 돌려도 다리는 그대로 |
+| 눈 | `左目` ← `両目` ×0.9 | 두 눈 함께 + 각자 회전 |
+
+- 부여 회전은 조인트의 **`rotateAxis`** 에 들어간다 → **`rotate` 는 비어 있어 키를 그대로 찍을 수 있다**(부여 먼저, 자기 회전 나중 — MMD 와 같은 순서).
+- IK 가 돌린 본(`足`)의 결과도 따라간다. 이동 부여 · 로컬 부여 플래그는 아직(경고 로그).
+
+### 5-2. IK (근사)
+
+- IK 본(`左足ＩＫ` · `左つま先ＩＫ` …)을 움직이면 다리가 따라온다. 링크 2개 이상 = RP 솔버, 1개 = SC 솔버. 핸들은 IK 본 아래에 숨겨져 있다.
+- MMD 의 IK 는 반복형(CCD) + 무릎 각도 제한이라 **완전히 같지는 않다** — Blender mmd_tools 대비 평균 0.03 cm, 최대 2 cm(발을 15 cm 들고 10 cm 앞으로).
+- IK 를 켠 상태에서는 `足` · `ひざ` 를 손으로 돌려도 IK 가 덮어쓴다(마야 IK 와 같음). FK 로 쓰려면 핸들의 `ikBlend` 를 0 으로.
+
+## 6. 한계 (v01.01)
+
+- **물리(강체 · 조인트)**, **버텍스 외 모프**(그룹 · 본 · UV · 재질)는 만들지 않고 리포트에 개수만.
+- IK 는 근사(위 5-2), 이동 부여 · 로컬 부여는 아직.
+- 툰 · 스피어 · 외곽선 셰이딩 없음(보류 - lambert 색 + 알파만).
 - redo(Ctrl+Y)는 보장하지 않는다.
 
 ## 7. 검증
 
 - `tests/test_pmx_core.py` — 파서 · 변환 · 이름 · 텍스처(마야 없이) 61/61.
-- `tests/test_import_maya.py` — mayapy: 합성 PMX + 실제 모델을 CATS → FBX 로 만든 기준 mb 와 숫자 대조 60/60
+- `tests/test_import_maya.py` — mayapy: 합성 PMX + 실제 모델을 CATS → FBX 로 만든 기준 mb 와 숫자 대조 80/80
   (위치 2.8e-5 cm · UV 0 · 면 33,528 전부 같음 · 모프 51개 1.1e-4 · 웨이트 = PMX · 팔꿈치 포즈 변형 7.6e-6 · 저장 왕복).
+  v01.01: **Blender + mmd_tools 로 같은 MMD 포즈를 준 메시와 대조**(`tests/blender_mmd_reference.py`, 블렌더 · CATS zip 이 있을 때만) —
+  다리 D 체인 · 허리 / 어깨 캔슬 1e-3 cm 이하, IK 평균 0.03 cm. 비틀기 · 눈은 mmd_tools 가 오일러로 근사해 0.3 cm 차이가 나므로
+  MMD 규칙(같은 축 × 비율)을 직접 검사한다.
   모델 파일은 저장소에 없다(재배포 금지) — `A00610_SAMPLE_DIR` 이 있을 때만 실제 모델 시험을 한다.
 - GUI 실기 확인(뷰포트 텍스처 · 투명 · Shape Editor · FBX → UE)은 아직.
