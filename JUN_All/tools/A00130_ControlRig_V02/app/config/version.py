@@ -45,5 +45,9 @@
 #        사용자가 놓은 회전값을 그대로 두고 오른팔만 그 Behavior 미러로. json keep_options.left_arm + 규칙의 keep_option 태그.
 #        원인: A2 가 거의 일자인 팔(팔꿈치가 선보다 0.15 cm 뒤)에서 폴 쪽을 뒤로 잡아 왼팔 롤을 180 도 뒤집고, 오른팔은 그 미러를 물려받았다.
 
-VERSION = "02.32"
+# 02.33  Orient & Place: 팔 A2 = -Z 가 폴 타깃을 향한다(팔 폴 타깃은 늘 팔 뒤 = 월드 -Z, 사용자 전제). 다리는 +Z 그대로(무릎 폴은 앞, 사용자 확인).
+#        v02.32 에서 '거의 일자인 팔' 탓으로 본 180 도 롤의 진짜 원인 = +Z 를 뒤쪽 폴로 겨눈 것. 손으로 맞춘 왼팔을 0.006 도 이내로 재현.
+#        Keep the left arm 기본값은 다시 끔(json keep_options.left_arm.default, UI 가 로드 때 맞춘다).
+
+VERSION = "02.33"
 LAST_UPDATE = "2026-11-09"

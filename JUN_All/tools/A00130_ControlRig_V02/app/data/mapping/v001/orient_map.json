@@ -30,17 +30,15 @@
   "keep_options": {
     "left_arm": {
       "label": "Keep the left arm as it is",
-      "default": true,
+      "default": false,
       "comment": [
-        "v02.32 (2026-11-09, user request): Orient & Place leaves the LEFT arm",
-        "(clavicle_l, arm_l + hand, fingers_l) exactly as the user set it and only",
-        "mirrors it onto the right. Every rule tagged keep_option 'left_arm' is",
-        "skipped while this is on - the table shows those joints as 'preserved'.",
-        "Why: A2 re-aimed the left arm at its pole target, and on a nearly straight",
-        "arm the pole side is decided by a tiny bend (0.15 cm behind the line in",
-        "1010_IVI_ctl_AGF_0030) - the roll flipped 180 deg and the right arm, being",
-        "its mirror, inherited the flip.",
-        "Turn it off to get the old behaviour (aim the left arm, then mirror)."
+        "v02.32 (2026-11-09): Orient & Place leaves the LEFT arm (clavicle_l, arm_l + hand,",
+        "fingers_l) exactly as the user set it and only mirrors it onto the right. Every rule",
+        "tagged keep_option 'left_arm' is skipped while this is on - the table shows those",
+        "joints as 'preserved'.",
+        "v02.33: default OFF again. The real cause of the flipped left arm was A2 aiming +Z at a",
+        "pole target that sits BEHIND the arm; arm_l now aims -Z at it and reproduces the",
+        "hand-set arm (0.00 deg on 1010_IVI_ctl_AGF_0030). Turn this on to keep a hand-tuned arm."
       ]
     }
   },
@@ -83,6 +81,12 @@
   "pole_chains": [
     {
       "name": "arm_l",
+      "comment": [
+        "v02.33 (2026-11-09): -Z (not +Z) aims at the pole target. The elbow bends BACK,",
+        "so the arm pole target always sits behind the arm (world -Z) - with +Z at the pole",
+        "the arm came out rolled 180 deg (+Z -> world -Z, logged as 'deviates 179.96 deg').",
+        "-Z at the pole leaves +Z facing world +Z (front). The legs keep +Z: knees bend forward."
+      ],
       "joints": [
         "helper_upperarm_l",
         "helper_lowerarm_l",
@@ -90,8 +94,8 @@
       ],
       "pole": "helper_polTgt_arm_l",
       "forward": "+X",
-      "up": "+Z",
-      "expect_up_world": "+Z",
+      "up": "-Z",
+      "expect_up_world": "-Z",
       "tail": "parent",
       "keep_option": "left_arm"
     },

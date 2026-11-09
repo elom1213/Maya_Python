@@ -562,13 +562,13 @@ class MainWindow(QWidget):
 
         # v02.32 - 왼팔을 사용자가 놓은 대로 두고 오른팔만 그 미러로 (json keep_options.left_arm)
         self.chk_keep_left_arm = QCheckBox("Keep the left arm as it is (only mirror it onto the right)")
-        self.chk_keep_left_arm.setChecked(True)
+        self.chk_keep_left_arm.setChecked(False)      # 실제 기본값은 json keep_options (로드 때 맞춘다)
         self.chk_keep_left_arm.setToolTip(
             "On  : the left clavicle, arm, hand and fingers keep the rotation values you set -\n"
             "      their aim rules (A1 clavicle_l, A2 arm_l, fingers_l) are skipped, and the\n"
             "      right arm becomes the behaviour mirror of the left one as it is.\n"
-            "Off : the left arm is aimed first (A2 aims +Z at the pole target - on a nearly\n"
-            "      straight arm that can flip the roll 180 deg), then mirrored.")
+            "Off : the left arm is aimed first (A2: forward +X down the chain, -Z at the pole\n"
+            "      target behind the arm, so +Z faces the front), then mirrored onto the right.")
         self.chk_keep_left_arm.stateChanged.connect(lambda *_: self._refresh_orient())
         opt.addWidget(self.chk_keep_left_arm)
 
@@ -767,6 +767,11 @@ class MainWindow(QWidget):
         self.orient_doc, orient_messages = mapping_data.load_orient(
             None if version == "(none)" else version, joints=self.joints)
         self._log_all(orient_messages)
+        if hasattr(self, "chk_keep_left_arm"):
+            # 기본값 = json keep_options.left_arm.default (v02.33 부터 끔)
+            self.chk_keep_left_arm.blockSignals(True)
+            self.chk_keep_left_arm.setChecked("left_arm" in orient_manager.keep_set(self.orient_doc))
+            self.chk_keep_left_arm.blockSignals(False)
 
         self.pair_doc, pair_messages = mapping_data.load_pairs(
             None if version == "(none)" else version)
