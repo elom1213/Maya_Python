@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-09 (오늘)
 
+> [!summary] **A00610_PmxImporter 계획서** (`docs/plans/A00610_PmxImporter_plan.md`) `#A00610_PmxImporter`
+- 요청: PMX(MMD)를 마야에 바로 임포트 - 스킨 메시 · 본 · 블렌드셰이프 · 머티리얼 · 텍스처까지. 지금은 CATS(블렌더) → FBX → 마야 손질로 하는 중.
+- 실측: Miyabi.pmx(정점 27,086 · 재질 23 · 본 436 · 버텍스 모프 52 · 추가 UV 2) 를 기준 mb(`0010_Miyabi_base_02.mb`)와 대조 -
+  위치 `(x, y, -z) × 8` 오차 2.8e-5 · UV `(u, 1-v)` 0 · 면 감기 `(c, b, a)` · 모프 델타 6.2e-5. 텍스처 `颜` · `髮` · `内` 는 RGBA(기준 mb 는 투명도 연결 없음).
+- 계획: PMX 규격 요약 · 이름 규칙(CATS 호환 본 이름 + 모델별 이름 맵 JSON) · 재질/알파 · 스킨(물리 인덱스 한 번에) · 지오메트리 없는 blendShape 입력 · 골든 대조 G1~G12 · M0~M9.
+  IK · 부여(付与) · 물리는 데이터만 보존하고 2차. 프로브 스크립트 3개를 계획서 옆에 둠.
+
 > [!summary] A00400_CurveTool **v01.32 Create > From Hair** `#A00400_CurveTool`
 - 요청: Houdini `0010_hairShrink_LUN_01.hip` 의 foreach 루프(헤어 메시 가닥마다 커브)를 마야에서 — A00400 에 추가, 작은 메시 · 짧은 커브 거르기, Houdini 보다 빠르게.
 - 분석: hip(ASCII cpio)을 풀고 hython 으로 쿡 — Labs `straight_skeleton_3d`(VDB 수축) 149 가닥 71.5 초, 커브 없음 3 · 조각 2. 입력은 전부 "뿌리 열린 쿼드 튜브 + 끝 팬". 계획서 `plans/A00400_CurveTool_hair_centerline_plan.md`.
