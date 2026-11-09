@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+  <!-- file -->
+  <path d="M6 5 H15 L19 9 V19 H6 Z" fill="#e8eaf0" stroke="#9aa3b5" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M15 5 V9 H19" fill="none" stroke="#9aa3b5" stroke-width="1" stroke-linejoin="round"/>
+  <text x="12.5" y="16.6" font-family="Arial, Helvetica, sans-serif" font-size="5.6" font-weight="bold"
+        fill="#c2185b" text-anchor="middle">PMX</text>
+  <!-- arrow into Maya -->
+  <path d="M17 21 L22 21 L22 18.5 L26.5 23 L22 27.5 L22 25 L17 25 Z" fill="#4fc3c7"/>
+  <!-- joint chain -->
+  <circle cx="8" cy="24" r="1.8" fill="#ffe082"/>
+  <circle cx="13" cy="27" r="1.4" fill="#ffe082"/>
+  <line x1="8" y1="24" x2="13" y2="27" stroke="#ffe082" stroke-width="1.2"/>
+</svg>

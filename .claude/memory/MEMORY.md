@@ -61,6 +61,7 @@
 - blendShape — [geo-less blendShape dies on connected delete](maya-delete-cascades-geoless-blendshape.md)(숨긴 평면에 붙일 것 · pma 는 입력 떼고 delete · aliasAttr 순서는 plug 문자열 순 · 리밋은 연결값도 자름) · [delta space = origin](blendshape-delta-space-origin.md) · [target name vs alias](blendshape-target-name-vs-alias.md) · [live target deltas](blendshape-live-target-inputpointstarget.md) · [sculpt target: pnts redirect](sculpt-target-pnts-redirect.md) · [shape.pnts is post-deformation](shape-pnts-is-post-deformation.md)
 - shapes/curves — [parent -s -add = instance](parent-shape-add-is-instance.md) · [extendToShape picks wrong shape](extendtoshape-picks-wrong-shape.md)(공용 `maya_shape`) · [pointPosition: points only](pointposition-points-only.md) · [cmds -pivot is world](cmds-scale-rotate-pivot-is-world.md) · [referenced curve CV write](referenced-curve-cv-write.md)(xform 으로만)
 - [Reference parent → click selects shape](maya-reference-parent-selects-shape.md) — 틀이 Reference 면 컨트롤 트랜스폼에도 override normal 을 줄 것
+- [cp949 non-ASCII traps](maya-codepage-nonascii-traps.md) — cp949 밖 글자 경로는 텍스처 못 읽음 · .ma 문자열 `?` · getVertexNormal 은 잠긴 노멀 무시
 - [viewport Tab is MTK](maya-viewport-tab-is-mtk.md) — 뷰포트 Tab 은 hotkey 무시, `nexOpt mayaTabPressCmd` 를 바꿔 끼울 것 (GUI 전용)
 - [Euler closestSolution not equivalent](euler-closest-solution-not-equivalent.md) — 짐벌 근처 다른 회전, closestCut + alternate 로 · 오일러는 축별로 안 더해진다
 - API lifetime — [MPlug.asMObject](mplug-asmobject-lifetime.md) · [MFn cvPositions](mfn-cvpositions-lifetime.md)(읽는 즉시 tuple 로)
@@ -121,3 +122,4 @@
 - A00580 — [FacialBoardBuilder · Ctl_Only_V05](wip-facial-arkit52-ctl-v05.md)(ARKit 52 보드를 json 명세에서 빌드 · CSV 베이크 · verify 1722 · 더미 `BS_Face_CSV` 는 숨긴 평면에 · 컨트롤 트랜스폼은 override normal · GUI 확인 아직 · UE 빌더는 다음)
 - JALI 슬라이더 리그 — [A0020_jali_slider_ctl](wip-jali-slider-ctl.md)(angela 1:1 슬라이더 22 + JaLi 박스, remapValue 리맵, DUMMY_IN/OUT 3쌍, global_scale · 생성/검증은 JUN_JALI examples · GUI 확인 아직)
 - A00620 — [NameDecoder](wip-a00620-namedecoder.md)(FBXASC 이름 디코드 · 마야는 유니코드 이름 불가(setName 조용히 무시) · FBX 익스포터가 원래 글자로 복원 → 기본 읽기 전용 · 공용 `fbx_name`)
+- A00610 — [PmxImporter](wip-a00610-pmximporter.md)(PMX 직접 임포트 · 이름 FBXASC · lambert · IK 본 생성 · 기준 mb 골든 · 2차 = 부여 본)

@@ -72,6 +72,11 @@
           "name": "FileTool",
           "path": "tools/A00480_FileTool",
           "color": "#6b7280"
+        },
+        {
+          "name": "PmxImporter",
+          "path": "tools/A00610_PmxImporter",
+          "color": "#6b7280"
         }
       ]
     }

@@ -33,6 +33,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-09 (오늘)
 
+> [!summary] **A00610_PmxImporter v01.00 신규** - PMX(MMD)를 마야에 바로 임포트 (`docs/A00610_PmxImporter.md`) `#A00610_PmxImporter`
+- 요청: 계획서대로 구현. 사용자 결정 — 이름은 PMX 고유 이름(못 쓰는 글자는 FBXASC) · 머티리얼 lambert · IK 본 기본 생성 · PMX 의 다른 데이터(물리 등)를 계획서에 정리.
+- 구현: 파서(2.0/2.1, 강체 · 조인트까지) · 메시 하나(정점 순서 = PMX, 노멀 잠금, 추가 UV) · lambert + 텍스처(알파 → 투명도) · 조인트 436 · 스킨(SDEF/QDEF → DQ) · 지오메트리 없는 blendShape 52 · 리포트. Miyabi 1.4초.
+- 실측으로 바뀐 것: 마야가 cp949 밖 글자 경로(`颜.png`)의 이미지를 못 읽음 → `maya_textures/` 에 FBXASC 이름으로 복사 · `.ma` 저장이 cp949 밖 글자를 `?` 로 깨뜨림 → 문자열 어트리뷰트는 ASCII(FBXASC / JSON 이스케이프) · undo 청크 하나로 임포트 전체가 되돌아감 → `Remove Last Import` 없음 · `getVertexNormal` 은 잠긴 노멀을 무시(시험은 face-vertex 로).
+- 시험: core 61/61 · mayapy 60/60 — 기준 mb(CATS → FBX) 대비 위치 2.8e-5 cm · UV 0 · 면 전부 같음 · 모프 51개 1.1e-4 · 웨이트 = PMX · 포즈 변형 7.6e-6 · 저장 왕복. **GUI 확인 아직.**
+- 계획서 갱신: §13 결정 기록, **§14 PMX 안의 데이터 전체**(강체 318 · 조인트 442 · 표시 프레임 14 · IK 4 · 부여 30 …), 부여 본 2차 방법.
+- 번호: 다른 세션이 같은 A00610 으로 NameDecoder 계획을 먼저 커밋 → 그쪽이 A00620 으로 옮김. ToolLauncher `UTIL` > `File` 에 버튼.
+
 > [!summary] **A00620_NameDecoder v01.00 신규** - FBXASC 이름을 원래 글자로 읽는 툴 (`docs/A00620_NameDecoder.md`) `#A00620_NameDecoder`
 - 요청: FBX 로 들어온 일본어 · 중국어 · 띄어쓰기 이름이 `FBXASC227FBXASC129FBXASC130` 처럼 보인다 - 노드 · 블렌드셰이프 타겟 이름을 읽고 싶다. 새 툴 vs 기존 툴 판단 → 새 툴(계획서 §4).
 - 실측: 마야는 유니코드 이름을 못 받는다(rename · aliasAttr 에러, OpenMaya setName 은 조용히 무시). **FBX 익스포터는 FBXASC 를 원래 글자로 되돌려 쓴다** → 기본은 읽기 전용, ASCII 이름 바꾸기는 숨긴 선택 기능 + Restore.

@@ -804,6 +804,12 @@ Default Distance attribute (driver signal x)
   exception**, so the tool had been reporting those as assigned — it now blocks up front and **reads the
   connection back** to judge every assignment.
 - **`A00050_uvTool`**, **`A00030_quickTool_V02`** (PySide rewrite of the legacy `maya.cmds` quick tool - same buttons and behaviour, but results go to a log panel inside the window instead of the script editor, and the logic moved into `core`), **`A00330_NamingTool`** (legacy naming tool port + Quick Rename. **Insert** puts text at the **n-th position** of every listed name (negative counts from the end); a **preview table** that never touches the scene shows the inserted text in green, and nothing is renamed until Apply. Names Maya would silently alter (leading digit, spaces) and clashes under the same parent are flagged up front, and parents and children can be listed together - the **deepest node is renamed first**, so no stored path goes stale), **`A00310_SearchTool`** (select by **type, name or state in the scene** - the state rules live in a registry as data, so a new rule is **one function plus one line of registration** and the UI is untouched), **`A00360_SortTool`** (sort by world X/Y/Z, name, type or **selection order** and reorder the Outliner).
+- **`A00610_PmxImporter`** — imports MMD models (**PMX**) **straight into Maya**, with no Blender / CATS / FBX round trip — skinned mesh, 436 joints, 52 blendShape targets, materials and textures in 1.4 s.
+  The PMX binary is parsed directly (2.0/2.1, physics sections included), and the coordinate, UV and winding conversions were **not guessed but matched numerically against the existing pipeline's output (CATS → FBX)**
+  (positions within 2.8e-5 cm, UVs and all 33,528 faces identical, morph deltas within 1e-4, and a posed elbow matches deformation computed directly from the PMX weights to 7.6e-6).
+  Measuring also exposed two Maya traps that the tool works around: **textures whose path has characters outside the system code page (cp949) do not load** (copied under reversible FBXASC names), and
+  **`.ma` files turn those characters into `?`** (original names and data are stored as ASCII). Node names are the PMX's own names, encoded with the same rule as FBX so they decode back to the original text,
+  and the whole import is undone with **one Ctrl+Z**.
 
 ---
 
