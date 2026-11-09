@@ -392,7 +392,24 @@ def restore_positions(snap):
 # 계획 (씬을 바꾸지 않는다)
 # =========================
 
-def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True):
+def keep_set(doc, keep=None):
+    """켜진 keep 옵션 키 집합. `keep` 가 None 이면 json `keep_options` 의 `default` 를 쓴다 (v02.32).
+
+    `keep_option` 이 붙은 규칙(왼팔: clavicle_l A1 · arm_l A2 · fingers_l)은 옵션이 켜져 있으면
+    **돌지 않는다** - 사용자가 놓은 로컬 회전값이 그대로 남고, 오른팔은 늦은 미러로 그걸 따른다.
+    """
+    if keep is None:
+        return frozenset(k for k, v in (doc.get("keep_options") or {}).items()
+                         if isinstance(v, dict) and v.get("default"))
+    return frozenset(keep)
+
+
+def _keep_label(doc, key):
+    opt = (doc.get("keep_options") or {}).get(key) or {}
+    return opt.get("label") or key
+
+
+def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True, keep=None):
     """어느 조인트에 어떤 규칙이 걸리는지 계산한다. `(rows, messages)`.
 
     **씬은 바꾸지 않는다.** 각 행:
@@ -448,6 +465,17 @@ def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True):
         return row
 
     mirror = doc.get("mirror") or {}
+    keep = keep_set(doc, keep)
+
+    def kept(rule):
+        return rule.get("keep_option") in keep
+
+    def add_kept(name, rule_doc):
+        row = add(name, "Keep " + rule_doc["name"], ST_PRESERVED,
+                  "kept as you set it ({0}) - the right side mirrors it".format(
+                      _keep_label(doc, rule_doc["keep_option"])))
+        row["status"] = ST_PRESERVED
+        return row
 
     # ---- 1. 미러 ----
     if mirror_enabled:
@@ -477,6 +505,10 @@ def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True):
 
     # ---- 2. A1 ----
     for group in (doc.get("aim_groups") or []):
+        if kept(group):
+            for name in group["joints"]:
+                add_kept(name, group)
+            continue
         use_zero = world_zero_spine and group.get("world_zero_option")
         rule = "A1 world zero" if use_zero else "A1 aim"
         expect = None if use_zero else (group.get("up"), group.get("up_world"))
@@ -488,6 +520,12 @@ def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True):
     # ---- 3. A2 ----
     for chain in (doc.get("pole_chains") or []):
         joints = chain["joints"]
+        if kept(chain):
+            tail = chain.get("tail")
+            extra = tail["joints"] if isinstance(tail, dict) else []
+            for name in joints + [n for n in extra if n not in joints]:
+                add_kept(name, chain)
+            continue
         expect = (chain.get("up"), chain.get("expect_up_world"))
         for name in joints[:-1]:
             add(name, "A2 " + chain["name"], up_expect=expect)
@@ -528,6 +566,9 @@ def plan(doc, namespace, world_zero_spine=None, mirror_enabled=True):
         root = _resolve(group["root"], namespace)
         if not root:
             add(group["root"], "aim subtree", ST_MISSING)
+        elif kept(group):
+            for node in descendants(root):
+                add_kept(su.short_name(node), dict(group, name=group.get("name", "subtree")))
         else:
             for node in descendants(root):
                 add(su.short_name(node), "Aim " + group.get("name", "subtree"),
@@ -585,7 +626,7 @@ def summarize(rows):
 # 적용
 # =========================
 
-def apply(doc, namespace, world_zero_spine=None, mirror_enabled=True):
+def apply(doc, namespace, world_zero_spine=None, mirror_enabled=True, keep=None):
     """규칙대로 실제로 방향을 잡는다. `(results, messages)`. **undo 한 스텝.**
 
     순서가 강제된다 (계획서 4-6):
@@ -603,6 +644,10 @@ def apply(doc, namespace, world_zero_spine=None, mirror_enabled=True):
 
     mirror = doc.get("mirror") or {}
     plane = mirror.get("plane", "YZ")
+    keep = keep_set(doc, keep)
+    for key in sorted(keep):
+        messages.append("[Info] {0}: its rules are skipped - the rotation values you set stay, "
+                        "and the right side is mirrored from them.".format(_keep_label(doc, key)))
 
     with undo_chunk():
         # ---- 1. 미러 (A2 가 폴 타깃 위치를 읽으므로 반드시 먼저) ----
@@ -629,10 +674,10 @@ def apply(doc, namespace, world_zero_spine=None, mirror_enabled=True):
 
         # ---- 2. A1 ----
         results["aimed"] += _do_aim_groups(doc, world_zero_spine, namespace,
-                                           results, messages)
+                                           results, messages, keep)
 
         # ---- 3. A2 ----
-        results["aimed"] += _do_pole_chains(doc, namespace, results, messages)
+        results["aimed"] += _do_pole_chains(doc, namespace, results, messages, keep)
 
         # ---- 끌려간 위치를 되돌린다 (부모부터) ----
         moved = restore_positions(snap)
@@ -642,7 +687,7 @@ def apply(doc, namespace, world_zero_spine=None, mirror_enabled=True):
                 "rotated - put back where they were.".format(moved))
 
         # ---- 3b. 하위 계층 정렬 (손가락) ----
-        results["aimed"] += _do_aim_subtrees(doc, namespace, results, messages)
+        results["aimed"] += _do_aim_subtrees(doc, namespace, results, messages, keep)
 
         # ---- 3c. 늦은 미러 (오른팔 전체 - 왼쪽이 다 정렬된 뒤라야 진짜 미러다) ----
         if mirror_enabled:
@@ -761,9 +806,21 @@ def _do_position_pairs(mirror, plane, namespace, messages):
     return done
 
 
-def _do_aim_groups(doc, world_zero_spine, namespace, results, messages):
+def _keep_skip(rule, keep, count, results, messages, doc):
+    """keep 옵션이 켜진 규칙이면 건너뛰고 True (v02.32)."""
+    if rule.get("keep_option") not in keep:
+        return False
+    results["preserved"] += count
+    messages.append("[OK] {0} : kept as it is ({1} joint(s), {2}).".format(
+        rule.get("name", rule.get("root", "?")), count, _keep_label(doc, rule["keep_option"])))
+    return True
+
+
+def _do_aim_groups(doc, world_zero_spine, namespace, results, messages, keep=frozenset()):
     done = 0
     for group in (doc.get("aim_groups") or []):
+        if _keep_skip(group, keep, len(group["joints"]), results, messages, doc):
+            continue
         use_zero = world_zero_spine and group.get("world_zero_option")
         names = group["joints"]
         nodes = [_resolve(n, namespace) for n in names]
@@ -820,7 +877,7 @@ def _do_aim_groups(doc, world_zero_spine, namespace, results, messages):
     return done
 
 
-def _do_aim_subtrees(doc, namespace, results, messages):
+def _do_aim_subtrees(doc, namespace, results, messages, keep=frozenset()):
     """어느 조인트 아래 **전부**를, 각자 제 자식을 보도록 정렬한다.
 
     손가락처럼 **마디 수가 제각각이고 갈래가 많은** 계층에 쓴다 — 조인트 이름을 하나하나
@@ -835,6 +892,8 @@ def _do_aim_subtrees(doc, namespace, results, messages):
         if not root:
             messages.append("[Warning] {0}: not in the scene - subtree skipped.".format(
                 group["root"]))
+            continue
+        if _keep_skip(group, keep, len(descendants(root)), results, messages, doc):
             continue
 
         hint = axis_vector(group["up_world"])
@@ -878,9 +937,14 @@ def _do_aim_subtrees(doc, namespace, results, messages):
     return done
 
 
-def _do_pole_chains(doc, namespace, results, messages):
+def _do_pole_chains(doc, namespace, results, messages, keep=frozenset()):
     done = 0
     for chain in (doc.get("pole_chains") or []):
+        tail = chain.get("tail")
+        n_keep = len(chain["joints"]) + (len([n for n in tail["joints"] if n not in chain["joints"]])
+                                         if isinstance(tail, dict) else 0)
+        if _keep_skip(chain, keep, n_keep, results, messages, doc):
+            continue
         names = chain["joints"]
         nodes = [_resolve(n, namespace) for n in names]
         pole = _resolve(chain.get("pole"), namespace) if chain.get("pole") else None

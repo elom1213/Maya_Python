@@ -560,6 +560,18 @@ class MainWindow(QWidget):
         self.chk_mirror.stateChanged.connect(lambda *_: self._refresh_orient())
         opt.addWidget(self.chk_mirror)
 
+        # v02.32 - 왼팔을 사용자가 놓은 대로 두고 오른팔만 그 미러로 (json keep_options.left_arm)
+        self.chk_keep_left_arm = QCheckBox("Keep the left arm as it is (only mirror it onto the right)")
+        self.chk_keep_left_arm.setChecked(True)
+        self.chk_keep_left_arm.setToolTip(
+            "On  : the left clavicle, arm, hand and fingers keep the rotation values you set -\n"
+            "      their aim rules (A1 clavicle_l, A2 arm_l, fingers_l) are skipped, and the\n"
+            "      right arm becomes the behaviour mirror of the left one as it is.\n"
+            "Off : the left arm is aimed first (A2 aims +Z at the pole target - on a nearly\n"
+            "      straight arm that can flip the roll 180 deg), then mirrored.")
+        self.chk_keep_left_arm.stateChanged.connect(lambda *_: self._refresh_orient())
+        opt.addWidget(self.chk_keep_left_arm)
+
         layout.addWidget(grp)
 
         self.tree_orient = QTreeWidget()
@@ -1140,7 +1152,8 @@ class MainWindow(QWidget):
         rows, messages = orient_manager.plan(
             self.orient_doc, self._namespace(),
             world_zero_spine=self.chk_spine_zero.isChecked(),
-            mirror_enabled=self.chk_mirror.isChecked())
+            mirror_enabled=self.chk_mirror.isChecked(),
+            keep=self._orient_keep())
         if log_messages:
             self._log_all(messages)
 
@@ -1185,9 +1198,17 @@ class MainWindow(QWidget):
         _results, messages = orient_manager.apply(
             self.orient_doc, self._namespace(),
             world_zero_spine=self.chk_spine_zero.isChecked(),
-            mirror_enabled=self.chk_mirror.isChecked())
+            mirror_enabled=self.chk_mirror.isChecked(),
+            keep=self._orient_keep())
         self._log_all(messages)
         self._refresh_orient()
+
+    def _orient_keep(self):
+        """켜진 keep 옵션 (v02.32). 체크박스가 없으면(옛 화면) json 기본값."""
+        chk = getattr(self, "chk_keep_left_arm", None)
+        if chk is None:
+            return None
+        return {"left_arm"} if chk.isChecked() else set()
 
     # --------------------------------------------------------------
     # Pair

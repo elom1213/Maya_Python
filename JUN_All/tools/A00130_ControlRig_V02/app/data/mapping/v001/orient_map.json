@@ -27,6 +27,23 @@
     "  The right hand is not listed at all - the late mirror above covers it."
   ],
   "world_zero_default": true,
+  "keep_options": {
+    "left_arm": {
+      "label": "Keep the left arm as it is",
+      "default": true,
+      "comment": [
+        "v02.32 (2026-11-09, user request): Orient & Place leaves the LEFT arm",
+        "(clavicle_l, arm_l + hand, fingers_l) exactly as the user set it and only",
+        "mirrors it onto the right. Every rule tagged keep_option 'left_arm' is",
+        "skipped while this is on - the table shows those joints as 'preserved'.",
+        "Why: A2 re-aimed the left arm at its pole target, and on a nearly straight",
+        "arm the pole side is decided by a tiny bend (0.15 cm behind the line in",
+        "1010_IVI_ctl_AGF_0030) - the roll flipped 180 deg and the right arm, being",
+        "its mirror, inherited the flip.",
+        "Turn it off to get the old behaviour (aim the left arm, then mirror)."
+      ]
+    }
+  },
   "aim_groups": [
     {
       "name": "spine",
@@ -59,7 +76,8 @@
       "aim_at": "helper_upperarm_l",
       "forward": "+X",
       "up": "+Y",
-      "up_world": "+Y"
+      "up_world": "+Y",
+      "keep_option": "left_arm"
     }
   ],
   "pole_chains": [
@@ -74,7 +92,8 @@
       "forward": "+X",
       "up": "+Z",
       "expect_up_world": "+Z",
-      "tail": "parent"
+      "tail": "parent",
+      "keep_option": "left_arm"
     },
     {
       "name": "leg_l",
@@ -133,7 +152,8 @@
       "root": "helper_hand_l",
       "forward": "+X",
       "up": "+Y",
-      "up_world": "+Y"
+      "up_world": "+Y",
+      "keep_option": "left_arm"
     }
   ],
   "pole_targets": {

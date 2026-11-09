@@ -129,3 +129,14 @@ jointOrient/rotate 0), `arm_r` = **`mirror`**(A2 는 안 건드림 - 늦은 미�
 **★ 오른팔 A2 는 왼팔의 Behavior 미러가 아니다** — arm_r 은 `+Z`→월드 `+Z`, Behavior 미러면 `-Z` 쪽. 그래서 왼손을
 미러한 `hand_r` 은 `lowerarm_r` 에 대해 **X 180도**(실측 jointOrient X=-180). 사용자 요청("hand_l 의 미러")대로 두고 보고했다.
 오른손을 lowerarm_r 과 맞추고 싶어지면 `arm_r` tail 을 `parent` 로 바꾸면 된다(단 그러면 미러가 아니다).
+
+**★ 왼팔은 그대로, 오른팔만 미러 — `Keep the left arm as it is` (v02.32, 2026-11-09, 기본 켬)**
+
+사용자 기대: Orient & Place 를 누르면 **왼팔 회전값은 가만히, 오른팔 = 왼팔의 Behavior 미러**. 실제로는 A2 `arm_l` 이 왼팔을
+폴 타깃 쪽으로 다시 겨누어 바꿨다. **팔이 거의 일자면 폴 쪽이 아주 작은 굽힘으로 정해진다** — `1010_IVI_ctl_AGF_0030_tmp.mb`
+는 팔꿈치가 어깨-손목 선보다 0.15 cm 뒤라 폴이 뒤로 잡혀 롤 180° 뒤집힘(`upperarm_l` jo X 0.09 → -179.9). 늦은 미러가 그걸 복사한
+결과가 원래 오른팔과 같아 "오른팔은 그대로"로 보였다.
+사용자가 말한 "오른팔 forward 가 +X" 는 실측으로 아니었다 — 로컬 X · 자식 방향 = -1.000(뷰포트 X 화살표가 몸 쪽 월드 +X 를 본다 =
+그게 -X forward). 틀린 건 **롤**(미러면 +Y→월드 -Y · +Z→-Z). **사용자 표현을 그대로 믿지 말고 축 · 자식 방향 내적으로 잴 것.**
+구현: json `keep_options.left_arm` + 규칙 태그 `keep_option` → 그 규칙 skip, 표 `preserved`. 끄면 예전 동작.
+시험 `tests/test_orient_keep_left_arm.py`(그 씬이 있을 때만) 8/8. 이 툴에 저장소 시험 파일이 처음 생겼다.

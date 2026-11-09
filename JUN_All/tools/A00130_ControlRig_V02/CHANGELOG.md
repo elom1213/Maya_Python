@@ -3,6 +3,20 @@
 `A00130_ControlRig`(V01)의 **템플릿 조인트 패러다임 재작성판**이다.
 계획서: `JUN_All/docs/plans/A00130_ControlRig_V02_plan.md`
 
+## v02.32 (2026-11-09)
+
+- **[Orient & Place] `Keep the left arm as it is` (기본 켬).** 왼팔(쇄골 · 팔 · 손 · 손가락 23개)은 **사용자가 놓은 회전값 그대로** 두고,
+  오른팔만 그 **Behavior 미러**로 만든다(사용자 기대: "왼팔은 가만히, 오른팔 = 왼팔의 미러").
+  - 진단(`1010_IVI_ctl_AGF_0030_tmp.mb`): A2 `arm_l` 이 `+Z` 를 폴 타깃 쪽으로 다시 겨누는데, 팔이 거의 일자라(팔꿈치가 어깨-손목 선보다
+    **0.15 cm 뒤**) 폴이 뒤로 잡혀 **왼팔 롤이 180° 뒤집혔다**(`upperarm_l` jointOrient X 0.09 → -179.9). 늦은 미러는 그 뒤집힌 왼팔을 복사하는데
+    결과가 원래 오른팔과 같아 **오른팔은 그대로**처럼 보였다.
+  - **오른팔 forward 는 원래 로컬 `-X` 였다**(4개 조인트 모두 로컬 X · 자식 방향 = -1.000, 뷰포트의 X 화살표가 몸 쪽 월드 +X 를 본다).
+    틀린 것은 롤(Y · Z)이었다: 미러라면 `+Y`→월드 `-Y` · `+Z`→월드 `-Z` 인데 `+Y` · `+Z` 였다. 이제 `-Y` · `-Z`.
+  - json `keep_options.left_arm`(label · default) + 규칙(`clavicle_l` · `arm_l` · `fingers_l`)의 `keep_option` 태그. 켜져 있으면 그 규칙은 돌지 않고
+    표에 `preserved`(`kept as you set it`), 로그에 `kept as it is`. 끄면 예전 동작(왼팔을 겨눈 뒤 미러).
+  - 시험 `tests/test_orient_keep_left_arm.py` 8/8 (그 씬이 있을 때만): 왼팔 로컬 값 불변 · 오른팔 23개 = 왼팔 미러(구동되는 폴 타깃 제외) ·
+    켬/끔 차이는 양팔 upperarm · lowerarm · hand 6개뿐. **마야 GUI 확인 아직.**
+
 ## v02.31 (2026-11-05)
 
 - **[UI] 트리 펼치기 규칙.** 화살표(더블클릭 · `→` 키)로 펼치면 **한 단계만** 보인다 — 접었다 다시 펼쳐도

@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-09 (오늘)
 
+> [!summary] A00130_ControlRig_V02 **v02.32 Orient & Place `Keep the left arm as it is`** `#A00130_ControlRig`
+- 요청: Orient & Place 를 누르면 왼팔은 가만히, 오른팔은 왼팔의 미러가 되길 기대했는데 왼팔이 바뀌고 오른팔은 그대로(`1010_IVI_ctl_AGF_0030_tmp.mb`).
+- 진단: A2 `arm_l` 이 왼팔을 폴 타깃 쪽으로 다시 겨누는데 팔이 거의 일자(팔꿈치가 선보다 0.15 cm 뒤)라 **롤이 180° 뒤집힘** → 늦은 미러가 그걸 복사해 오른팔이 원래 값 그대로.
+  오른팔 forward 는 원래 로컬 `-X`(X · 자식 방향 = -1.000) - 틀린 건 롤(`+Y` · `+Z` 가 월드 +로, 미러면 -).
+- 구현: json `keep_options.left_arm`(기본 켬) + 규칙 태그 `keep_option`(clavicle_l · arm_l · fingers_l) → 켜져 있으면 그 규칙을 건너뛰고 표에 `preserved`. UI 체크박스.
+- 시험 `tests/test_orient_keep_left_arm.py` 8/8: 왼팔 로컬 값 불변 · 오른팔 = 왼팔 미러 · 켬/끔 차이는 양팔 6개뿐. **GUI 확인 아직.**
+
 > [!summary] **A00610_PmxImporter v01.01 - 2차 1단계: 부여 본 · IK · 로컬축 · 표시 프레임** `#A00610_PmxImporter`
 - 요청: 2차 항목 중 물리를 뺀 13개 진단 → 결정(IK 근사 기본 켬 · 로컬축 기본 켬 · 외곽선/툰/스피어 보류) → 1단계 진행.
 - 진단 근거: Miyabi 다리 웨이트가 전부 D 본(`左足D` 등) → v01.00 은 다리를 돌려도 메시가 안 움직였다. UV 모프 · SDEF 정확 디포머 · 재질별 분리는 안 함.

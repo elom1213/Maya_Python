@@ -41,5 +41,9 @@
 # 02.31  트리 펼치기 - 화살표로 펼치면 한 단계만, Shift + 펼치기/접기 = 아래 전부 (Plan · Length · Orient · Pair · Constrain 트리).
 #        공용 Framework/qt/MOD_treeExpand_qt_v01
 
-VERSION = "02.31"
-LAST_UPDATE = "2026-11-05"
+# 02.32  Orient & Place: 'Keep the left arm as it is' (기본 켬, 사용자 요청) - 왼팔(clavicle_l A1 · arm_l A2 · fingers_l) 규칙을 건너뛰어
+#        사용자가 놓은 회전값을 그대로 두고 오른팔만 그 Behavior 미러로. json keep_options.left_arm + 규칙의 keep_option 태그.
+#        원인: A2 가 거의 일자인 팔(팔꿈치가 선보다 0.15 cm 뒤)에서 폴 쪽을 뒤로 잡아 왼팔 롤을 180 도 뒤집고, 오른팔은 그 미러를 물려받았다.
+
+VERSION = "02.32"
+LAST_UPDATE = "2026-11-09"
