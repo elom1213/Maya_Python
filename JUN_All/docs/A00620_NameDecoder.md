@@ -10,7 +10,7 @@ updated: 2026-11-09
 마야 FBX 임포터가 `FBXASC227FBXASC129FBXASC130` 처럼 바꿔 놓은 이름(일본어 · 중국어 · 띄어쓰기 · 맨 앞 숫자)을
 **원래 글자로 풀어 보여 주는** in-Maya PySide 툴(arch B). 기본 동작은 **읽기만** 하고 씬을 바꾸지 않는다.
 
-- **버전**: `app/config/version.py` (v01.00)
+- **버전**: `app/config/version.py` (v01.01)
 - **설치**: `__dragDrop_A00620.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **Decode** → `tools.A00620_NameDecoder.run(True)`
   (ToolLauncher `UTIL` 프로파일 `Scene` 칸에도 있다)
 - **계획서**: [`plans/A00620_NameDecoder_plan.md`](plans/A00620_NameDecoder_plan.md) (실측 근거 §2)
@@ -59,6 +59,7 @@ Shape Editor 가 FBXASC 로만 보여 주는 타겟을 **풀린 이름 + 웨이�
 
 - `blendShape` 콤보 / `From Selection`(고른 메시의 blendShape) / `Refresh`.
 - 슬라이더 0~1, 숫자 칸 -10~10. **setAttr 만 한다 - 키는 찍지 않는다.** 슬라이더 한 번 끌기 = undo 한 번.
+- 게이지는 **채운 길이 = 웨이트**(0~1). 줄마다 배경이 번갈아 칠해지고, 웨이트가 0 이 아닌 타겟 이름은 밝게 · 굵게 (v01.01, A00290 Shape Editor 슬라이더 방식).
 - 연결이 들어온 웨이트 · 잠긴 웨이트는 회색(툴팁에 연결 소스).
 - `Reset All` = 바꿀 수 있는 웨이트 전부 0 (undo 한 번).
 

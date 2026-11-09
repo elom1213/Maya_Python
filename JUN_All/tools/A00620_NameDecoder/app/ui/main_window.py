@@ -25,6 +25,7 @@ from Framework.qt.qt import (
     QCheckBox,
     QPushButton,
     QSlider,
+    QFrame,
     QDoubleSpinBox,
     QScrollArea,
     QMenu,
@@ -75,6 +76,68 @@ _STATUS_COLORS = {
 _STATUS_WARN = QColor(230, 160, 90)
 
 SLIDER_STEPS = 1000
+
+# ------------------------------------------------------------------ Blend Shapes 게이지
+# A00290_BSTool_V02 Shape Editor 의 WeightSlider 와 같은 이유로 슬라이더를 직접 그린다:
+# 어떤 테마 qss 도 QSlider 를 꾸미지 않아 어두운 배경에선 마야 기본 홈(groove)이 묻혀 핸들만 보인다.
+# 다른 점: A00290 은 -1~1 양방향이라 채움(sub-page)을 빼고 중앙 눈금으로 0 을 보였지만,
+# 여기는 0~1 한 방향이라 **채운 길이 = 웨이트** 인 게이지로 그린다. 색은 purple_dark 테마(#9582b5)에 맞춘다.
+WEIGHT_GAUGE_STYLE = (
+    "QSlider:horizontal { min-height: 22px; }"
+    # 홈: 빈 부분은 어둡게 + accent 테두리
+    "QSlider::groove:horizontal {"
+    " height: 10px; margin: 0 6px;"
+    " background: #24222b; border: 1px solid #6f6385; border-radius: 5px; }"
+    # 채운 부분(0 ~ 핸들) = 웨이트
+    "QSlider::sub-page:horizontal {"
+    " margin: 0 0 0 6px;"
+    " background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6f5f96, stop:1 #b39ddb);"
+    " border: 1px solid #9582b5; border-radius: 5px; }"
+    "QSlider::add-page:horizontal {"
+    " margin: 0 6px 0 0;"
+    " background: #24222b; border: 1px solid #6f6385; border-radius: 5px; }"
+    # 핸들: 홈 위아래로 튀어나오게
+    "QSlider::handle:horizontal {"
+    " width: 12px; margin: -5px -6px;"
+    " background: #e4dbf2; border: 1px solid #9582b5; border-radius: 4px; }"
+    "QSlider::handle:horizontal:hover { background: #ffffff; border: 1px solid #c0addf; }"
+    # 비활성(구동 · 잠긴 웨이트): 전체를 회색으로
+    "QSlider::groove:horizontal:disabled, QSlider::add-page:horizontal:disabled {"
+    " background: #2f2f2f; border: 1px solid #454545; }"
+    "QSlider::sub-page:horizontal:disabled { background: #555555; border: 1px solid #454545; }"
+    "QSlider::handle:horizontal:disabled { background: #5a5a5a; border: 1px solid #454545; }"
+)
+
+BS_ROW_OBJECT_NAME = "bsWeightRow"
+BS_LABEL_OBJECT_NAME = "bsWeightLabel"
+BS_ROW_BG = "#2b2b2b"          # 테마 기본 배경
+BS_ROW_BG_ALT = "#32303a"      # 번갈아 칠하는 줄 - purple 기운
+BS_LABEL_IDLE = "#b8b8b8"      # 웨이트 0 인 타겟 이름
+BS_LABEL_ACTIVE = "#e8dcff"    # 웨이트가 0 이 아닌 타겟 이름(굵게)
+BS_ACTIVE_EPS = 0.0005         # 숫자 칸(소수 3자리)에 0.000 으로 보이는 값은 꺼진 것으로
+BS_ROW_STYLE = (
+    "QFrame#{name} {{ background-color: {bg}; border-radius: 3px; }}"
+    "QLabel#{label} {{ color: {fg}; font-weight: {weight}; background: transparent; }}"
+)
+
+
+class WeightGauge(QSlider):
+    """0 ~ 1 웨이트 게이지 - 채운 길이가 웨이트. 정수 슬라이더라 SLIDER_STEPS 배로 담는다(0.001 해상도).
+    범위 밖 웨이트(-10 ~ 10 은 숫자 칸)는 게이지 끝에 붙는다."""
+
+    def __init__(self, parent=None):
+        super().__init__(Qt.Horizontal, parent)
+        self.setRange(0, SLIDER_STEPS)
+        self.setSingleStep(SLIDER_STEPS // 100)   # 방향키 0.01
+        self.setPageStep(SLIDER_STEPS // 10)      # PageUp/Down 0.1
+        self.setMinimumWidth(120)
+        self.setStyleSheet(WEIGHT_GAUGE_STYLE)
+
+    def weight(self):
+        return self.value() / float(SLIDER_STEPS)
+
+    def set_weight(self, value):
+        self.setValue(int(round(min(max(value, 0.0), 1.0) * SLIDER_STEPS)))
 
 
 class MainWindow(QWidget):
@@ -262,7 +325,7 @@ class MainWindow(QWidget):
         self.bs_container = QWidget()
         self.bs_rows_layout = QVBoxLayout(self.bs_container)
         self.bs_rows_layout.setContentsMargins(2, 2, 2, 2)
-        self.bs_rows_layout.setSpacing(2)
+        self.bs_rows_layout.setSpacing(1)
         self.bs_rows_layout.addStretch(1)
         self.bs_scroll = QScrollArea()
         self.bs_scroll.setWidgetResizable(True)
@@ -573,50 +636,72 @@ class MainWindow(QWidget):
         self.flt_bs.refresh()
 
     def _make_bs_row(self, target):
-        w = QWidget()
+        # 행 = QFrame(objectName 으로 스타일 대상 한정). 줄마다 배경을 번갈아 칠해 이름 ↔ 게이지 줄을 눈으로 따라가기 쉽게.
+        w = QFrame()
+        w.setObjectName(BS_ROW_OBJECT_NAME)
+        alt = len(self.bs_rows) % 2 == 1
         row = QHBoxLayout(w)
-        row.setContentsMargins(0, 0, 0, 0)
+        row.setContentsMargins(4, 2, 4, 2)
+        row.setSpacing(8)
         lbl = QLabel(target.decoded)
+        lbl.setObjectName(BS_LABEL_OBJECT_NAME)
         lbl.setMinimumWidth(170)
         lbl.setToolTip("[{0}] {1}".format(target.index, target.alias))
         row.addWidget(lbl)
-        slider = QSlider(Qt.Horizontal)
-        slider.setRange(0, SLIDER_STEPS)
+        slider = WeightGauge()
         spin = QDoubleSpinBox()
         spin.setRange(-10.0, 10.0)
         spin.setDecimals(3)
         spin.setSingleStep(0.05)
+        # 칠 때마다 확정하면 "0.1" 에서 setValue 가 "0.100" 으로 다시 써서 뒷자리를 못 친다 - Enter / 포커스 아웃에서 확정
         spin.setKeyboardTracking(False)
-        spin.setFixedWidth(80)
+        spin.setFixedWidth(72)
         value = bs_weights.get_weight(target.plug)
-        slider.setValue(int(round(min(max(value, 0.0), 1.0) * SLIDER_STEPS)))
+        slider.set_weight(value)
         spin.setValue(value)
         row.addWidget(slider, stretch=1)
         row.addWidget(spin)
+        info = {"name": "{0}\n{1}".format(target.decoded, target.alias), "widget": w, "label": lbl,
+                "plug": target.plug, "slider": slider, "spin": spin, "alt": alt, "editable": target.editable}
         if not target.editable:
             slider.setEnabled(False)
             spin.setEnabled(False)
             w.setToolTip("Driven by {0}".format(target.source) if target.source else "Locked")
         else:
+            slider.setToolTip("Drag to set the weight (0 left, 1 right). The filled part is the weight.\n"
+                              "Values outside 0-1 are in the number box.")
             slider.sliderPressed.connect(lambda: cmds.undoInfo(openChunk=True, chunkName="A00620_weight"))
             slider.sliderReleased.connect(lambda: cmds.undoInfo(closeChunk=True))
-            slider.valueChanged.connect(lambda v, p=target.plug, s=spin: self._on_slider(p, v, s))
-            spin.valueChanged.connect(lambda v, p=target.plug, s=slider: self._on_spin(p, v, s))
-        return {"name": "{0}\n{1}".format(target.decoded, target.alias), "widget": w,
-                "plug": target.plug, "slider": slider, "spin": spin}
+            slider.valueChanged.connect(lambda _v, r=info: self._on_slider(r))
+            spin.valueChanged.connect(lambda _v, r=info: self._on_spin(r))
+        self._style_bs_row(info, value)
+        return info
 
-    def _on_slider(self, plug, value, spin):
-        weight = value / float(SLIDER_STEPS)
-        bs_weights.set_weight(plug, weight)
-        spin.blockSignals(True)
-        spin.setValue(weight)
-        spin.blockSignals(False)
+    @staticmethod
+    def _style_bs_row(info, weight):
+        """행 배경(번갈아) + 웨이트가 0 이 아니면 이름을 밝게 · 굵게 - 켜진 타겟이 한눈에 보이게."""
+        active = abs(weight) > BS_ACTIVE_EPS
+        info["widget"].setStyleSheet(BS_ROW_STYLE.format(
+            name=BS_ROW_OBJECT_NAME, label=BS_LABEL_OBJECT_NAME,
+            bg=BS_ROW_BG_ALT if info["alt"] else BS_ROW_BG,
+            fg=BS_LABEL_ACTIVE if active else BS_LABEL_IDLE,
+            weight="bold" if active else "normal"))
 
-    def _on_spin(self, plug, value, slider):
-        bs_weights.set_weight(plug, value)
-        slider.blockSignals(True)
-        slider.setValue(int(round(min(max(value, 0.0), 1.0) * SLIDER_STEPS)))
-        slider.blockSignals(False)
+    def _on_slider(self, info):
+        weight = info["slider"].weight()
+        bs_weights.set_weight(info["plug"], weight)
+        info["spin"].blockSignals(True)
+        info["spin"].setValue(weight)
+        info["spin"].blockSignals(False)
+        self._style_bs_row(info, weight)
+
+    def _on_spin(self, info):
+        value = info["spin"].value()
+        bs_weights.set_weight(info["plug"], value)
+        info["slider"].blockSignals(True)
+        info["slider"].set_weight(value)
+        info["slider"].blockSignals(False)
+        self._style_bs_row(info, value)
 
     def reset_all_weights(self):
         bs = self.cb_bs.currentData()

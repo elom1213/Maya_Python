@@ -10,5 +10,9 @@
 #          network 노드에 기억해 Restore Original Names. FBX 로 내보낼 때 원래 이름이 사라지므로 경고 후 실행.
 #        디코더는 공용 Framework/core/fbx_name.py, 씬 스캔은 Framework/core/maya_fbx_names.py.
 
-VERSION = "01.00"
+# 01.01  Blend Shapes 게이지를 잘 보이게 (A00290_BSTool_V02 Shape Editor WeightSlider 참고) - 슬라이더를 직접 그린다:
+#        어두운 홈 + 채운 길이 = 웨이트(0~1 한 방향이라 채움, purple_dark 그라데이션) · 튀어나온 핸들 · 구동/잠긴 웨이트는 회색.
+#        줄마다 배경을 번갈아 칠하고, 웨이트가 0 이 아닌 타겟 이름은 밝게 · 굵게.
+
+VERSION = "01.01"
 LAST_UPDATE = "2026-11-09"
