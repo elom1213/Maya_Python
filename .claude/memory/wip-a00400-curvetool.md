@@ -29,7 +29,9 @@ A00400_CurveTool — 신규 in-Maya PySide 툴 (v01.00, 코어 mayapy-verified, 
 - v01.02: **Apply 버튼 없이 슬라이더를 놓는 순간 자동 적용**. 이때 **확정 적용을 청크 안에서**
   해야 한다 — 닫은 뒤에 쓰면 드래그 하나가 undo 두 스텝으로 갈라져 Ctrl+Z 를 두 번 눌러야 한다.
 
-**From Hair 계획** (2026-11-09, 미구현): Houdini `hairShrink` hip(Labs straight_skeleton_3d, 149 가닥 71.5초)을
-`Create > From Hair` 로 대체 — 열린 끝(경계 루프)에서 링 BFS → 링 중심점(시제작 0.47초, Houdini 와 편차 0.15cm),
-cv[0]=뿌리, 크기 · 길이 필터, Joints 탭 연동은 Spacing `Param` 이어야 조인트 = CV 정확. 계획서
-`docs/plans/A00400_CurveTool_hair_centerline_plan.md`, 목표 v01.32.
+**From Hair v01.32** (2026-11-09 구현, mayapy 66/66, **GUI 확인 아직**): Houdini `hairShrink` hip(Labs
+straight_skeleton_3d, 149 가닥 71.5초)을 `Create > From Hair` 로 대체 — 열린 끝(경계 루프)에서 링 BFS → 링 중심점,
+cv[0]=뿌리, 불규칙 · 닫힌 메시는 측지 구간. LUN 1.1초 · Houdini 와 편차 0.11cm. 함정: 끝 정점 2개가 거짓 가지 →
+최소 가지 길이 `max(3, 10%)` · 쿼드 격자 엣지 거리는 둘레 경로 과대평가 → 측지 거리는 **면 대각선 이웃**으로.
+조인트 = CV 는 Joints **By parameter**(By length 는 현 길이 차로 어긋남). 계획서
+`docs/plans/A00400_CurveTool_hair_centerline_plan.md` §12 에 계획 대비 변경.

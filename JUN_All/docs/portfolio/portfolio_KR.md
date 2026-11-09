@@ -2,13 +2,13 @@
 title: 포트폴리오 작업 내역 (2026-05-06 ~ 2026-10-12)
 aliases: [Portfolio KR, 포트폴리오 국문]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-11-05
+updated: 2026-11-09
 ---
 
 # Technical Artist / Pipeline TD 작업 내역 — 국문
 
 > **작성자**: 박지훈 (Ji Hun Park / Junny)
-> **기간**: 2026-05-06 ~ 2026-11-05 (약 26주)
+> **기간**: 2026-05-06 ~ 2026-11-09 (약 27주)
 > **범위**: Autodesk Maya 툴 개발 · 언리얼 엔진 연동 자동화 · MetaHuman 페이셜 · 파이프라인 인프라
 > **규모**: 사내 툴 50여 종(툴 폴더 64개) · 전 툴 공용 프레임워크 1식 · 커밋 299건(2026-07-15 기준 집계)
 > **스택**: Python 3, `maya.cmds` / OpenMaya, PySide2·PySide6(Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF), Houdini Alembic 캐시 연동
@@ -601,6 +601,16 @@ Default Distance 어트리뷰트 (driver 신호 x)
 - **`A00400_CurveTool`** — **커브 작업 툴**(상위 탭 Create / Edit / Display + 기능별 하위 탭). 선택한
   **메시 엣지에 부착된 커브**를 생성하고(이어진 엣지 덩어리마다 커브 하나, 방향 통일 포함), 커브
   **선 두께(line width)** 를 실시간 조절합니다(드래그 한 번이 undo 한 스텝). 여기에 여러 기능을 더했습니다.
+  - **From Hair** — **헤어 리깅 파이프라인의 Houdini 단계를 대체했습니다.** 가닥 커브는 Houdini 그래프(SideFX Labs
+    `straight_skeleton_3d` — 가닥을 VDB 로 수축)에서 만들어 Alembic 으로 넘겨 왔습니다. .hip 을 분석하고(cpio 를 풀고,
+    잠긴 HDA 를 hython 으로 열고, 실제로 쿡: 149 가닥 **71.5 초**, 3 가닥은 커브 없음, 2 가닥은 잡음 조각으로 쪼개짐)
+    대신 입력을 쟀습니다 — 모든 가닥이 뿌리가 열리고 끝이 팬으로 닫힌 쿼드 튜브였습니다. 그래서 중심선은
+    **열린 경계에서 센 엣지 링마다의 중심**이면 되고, 뿌리가 정해져 있으니 `cv[0] = 뿌리` 도 저절로 따라옵니다.
+    불규칙 · 닫힌 메시는 표면 거리(Dijkstra) 구간으로 같은 일을 합니다. 같은 149 가닥 결과: **약 1 초, 커브 148 +
+    퇴화 조각 1 필터, Houdini 커브와 평균 거리 0.11 cm**, 크기 · 길이 필터, 조인트를 CV 에 정확히 놓는 연동.
+    실측 함정 둘 — 정점 두 개짜리 끝이 거짓 가지로 잡힘(최소 가지 길이로 해결), 쿼드 격자에서 엣지만 따라 잰
+    거리는 둘레 경로를 과대평가해 닫힌 가닥의 "끝" 이 극점 대신 링 정점에 잡힘(면 대각선까지 이웃으로 재서 해결).
+    Houdini 결과와의 골든 대조를 포함한 mayapy 시험 66 항목.
   - **Ribbon** — 리거가 "리본" 이라 부르는 납작한 NURBS 서피스를 커브마다 만듭니다. 커브의 CV · 차수 · 노트가
     그대로 U 가 되고 ±폭/2 로 벌린 줄이 V 가 되어, **복제 두 개를 loft 한 것과 CV 단위로 같습니다**(손으로 만든
     샘플과 대조). `Auto` 방향은 커브 최적 평면의 노멀(Maya 2023 mayapy 에 numpy 가 없어 순수 파이썬 3x3

@@ -2,13 +2,13 @@
 title: Portfolio — Work Summary (2026-05-06 ~ 2026-10-12)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-11-05
+updated: 2026-11-09
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
 
 > **Author**: Ji Hun Park (Junny)
-> **Period**: 2026-05-06 – 2026-11-05 (~26 weeks)
+> **Period**: 2026-05-06 – 2026-11-09 (~27 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
 > **Volume**: 50+ in-house tools (64 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
@@ -654,6 +654,18 @@ Default Distance attribute (driver signal x)
 - **`A00400_CurveTool`** — **curve work across three categories of tabs** (Create / Edit / Display). Builds a
   curve along the **selected mesh edges** (one curve per connected run of edges, direction unified across them)
   and adjusts curve **line width** live (one undo step per drag). Several tabs were added on top.
+  - **From Hair** — **replaced a Houdini step in the hair-rigging pipeline.** Strand curves used to come from a
+    Houdini graph (SideFX Labs `straight_skeleton_3d`, which shrinks each strand through a VDB) and travel to Maya
+    as Alembic. I analysed the .hip (unpacked the cpio, opened the locked HDA in hython, cooked it: **71.5 s** for
+    149 strands, 3 strands with no curve, 2 split into noise fragments) and measured the input instead: every
+    strand is a quad tube open at the root and fan-closed at the tip. So the centerline is just the centroid of
+    each **edge ring counted from the open border** — the root is known, so `cv[0] = root` for free. A
+    surface-distance (Dijkstra) slicing fallback covers irregular or closed meshes. Result on the same 149 strands:
+    **~1 s, 148 curves + 1 degenerate piece filtered, mean distance to the Houdini curves 0.11 cm**, size / length
+    filters, and a hand-off that puts each joint exactly on a CV. Two measured traps: a two-vertex tip read as a
+    false branch (fixed with a minimum branch length), and edge-only distances on a quad grid over-estimate the
+    path around the tube, so the far "end" of a closed strand landed on a ring vertex instead of the pole (fixed
+    by measuring across face diagonals). 66 mayapy checks including a golden comparison against the Houdini output.
   - **Ribbon** — builds the flat NURBS surface riggers call a ribbon along each listed curve: the curve's own
     CVs, degree and knots become U, and rows offset by ±width/2 become V, so the result is **CV-for-CV identical
     to lofting two offset copies** (checked against a hand-made sample). `Auto` direction takes the normal of

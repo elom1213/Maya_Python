@@ -1,5 +1,33 @@
 # Changelog — A00400_CurveTool
 
+## v01.32 (2026-11-09)
+**[Feature] `Create > From Hair` — 헤어 메시 가닥마다 가닥을 관통하는 중심선 커브.**
+
+- **무엇을 대체하나**: Houdini `0010_hairShrink_LUN_01.hip` 의 foreach 루프(Labs `straight_skeleton_3d` — VDB 로 메시를
+  수축해 스켈레톤). 그 결과를 abc 로 마야에 넘기던 단계를 없앤다. 분석 · 설계: `docs/plans/A00400_CurveTool_hair_centerline_plan.md`.
+- **방식**: 가닥의 **열린 끝(경계 루프)** 에서 엣지 단계로 BFS → 단계(링)마다 정점 평균 = 단면 중심 → 이으면 중심선.
+  첫 링이 뿌리라 **cv[0] = 뿌리**로 방향이 정해진다. 위상이 고르지 않으면(쿼드 < 80 % 등) **측지 거리 구간**(Geodesic)으로
+  같은 일을 한다. 끝점 고정 스무딩(Houdini `smooth1` 과 같은 뜻), Trim Root / Tip.
+- **옵션**: Method Auto / Rings / Geodesic(Slices) · Root `Open end`(열린 끝이 없거나 여럿이면 Highest Y 로 대체 + 경고) /
+  축 ± · Points **Count**(기본 10) / Spacing / Per Ring · Degree **1**(CV = 계산한 점) / 3(그 점을 지나는 큐빅) ·
+  Name `{mesh}_crv`(shell 여럿이면 `_s01`…) · Group `hairCurves_grp` · 원본 메시 이름 어트리뷰트 `hairSourceMesh` ·
+  `Include child meshes`(그룹 하나만 담아도 된다).
+- **필터(요구)**: `Skip meshes smaller than`(바운딩 박스 대각선) · `Skip curves shorter than`(중심선 길이), 둘 다 기본 1.0.
+  씬 길이 단위로 받는다. 걸러진 메시는 `Select Skipped`(UUID — 리네임 뒤에도).
+- **Analyze**: 씬을 안 바꾸고 계산만 → 요약(만들 수 · 건너뜀 이유별 · 엔진별 · 길이 · 경고).
+  **Create Curves = undo 한 스텝.** 20 메시 이상이면 공용 진행 팝업.
+- **Send to Joints**: 만든 커브를 `Edit > Joints` 리스트로 넘기고 Count 를 맞추고 **By parameter** 로 둔다 —
+  1차 커브(노트 0..N-1)에서 파라미터 균등 = CV 자리라 **조인트가 CV 에 정확히** 놓인다(By length 는 현 길이 차만큼 어긋남).
+- **가지**: 두 번째로 긴 덩어리가 `max(3, 단계의 10 %)` 이상일 때만 가지로 보고 가장 긴 가지를 탄다 + 경고.
+  (LUN 한 가닥은 끝에 이웃하지 않은 정점 2개가 남아 처음에 거짓 경고가 났다 → 길이 기준)
+- **닫힌 메시**: 측지 2단계 스윕으로 양끝. 거리는 **면 대각선까지 이웃**으로 잰다 — 엣지만 따라 재면 쿼드 격자에서
+  둘레를 도는 경로가 과대평가되어 극점 대신 맞은편 링 정점이 "가장 먼 끝" 으로 잡혔다.
+- **실데이터 (LUN hair_01.fbx, 149 가닥 · 71,599 정점)**: 커브 **148** + 퇴화 조각 1 건너뜀, Analyze 0.49 초 + Create 0.60 초
+  (Houdini 루프 71.5 초), Houdini `hair_02.abc` 와 평균 편차 중앙값 **0.11 cm** · p95 0.15 cm, 뿌리가 위인 가닥 146.
+- 검증: `tests/test_hair_curve.py` mayapy 2024 **66 항목**(합성 튜브 직선 · 호 · 양끝 열림 · 닫힘 · 한 메시 두 가닥 · 필터 · 다듬기 ·
+  Count/Spacing/큐빅 · 그룹/자식 · 부모 변환 · 삼각화 → Geodesic · 가지 그래프 · undo/redo · 조인트 = CV · UI · 골든),
+  `test_ribbon.py` 75/75(Create 탭 목록에 From Hair 반영), `test_draw_on_top.py` 그대로. **마야 GUI 확인 아직.**
+
 ## v01.31 (2026-11-03)
 **[UI] `Display > Replace` — 두 리스트에 `Sort` 버튼.**
 

@@ -9,7 +9,7 @@
 #    (Reverse Direction). 축 비교 방식은 A00360_SortTool 을 참고했다.
 #
 # 탭은 상위 = 카테고리, 하위 = 기능으로 두 단계다 (A00110_animTool_V02 과 같은 규칙).
-#   Create  > From Edges / From Points   - 씬에 새 커브를 만든다
+#   Create  > From Edges / From Points / From Hair - 씬에 새 커브를 만든다
 #   Edit    > Smooth / Wrap / Joints / Combine - 기존 커브의 형상(CV)을 바꾼다
 #   Display > Replace / Shape Edit
 #                                        - 어떻게 보이는지 (굵기 · 셰이프 교체 ·
@@ -39,6 +39,7 @@ from tools.A00400_CurveTool.app.core import ribbon_manager as ribbon_mgr
 from tools.A00400_CurveTool.app.ui.controls_tab import ControlsTab
 from tools.A00400_CurveTool.app.ui.replace_tab import ReplaceTab
 from tools.A00400_CurveTool.app.ui.shape_edit_tab import ShapeEditTab
+from tools.A00400_CurveTool.app.ui.hair_tab import HairTab
 
 
 WINDOW_OBJECT_NAME = "JUN_A00400_CurveTool_window"
@@ -106,6 +107,10 @@ class MainWindow(QWidget):
          "From Points - draw one curve through the world positions of the "
          "listed objects, joints or components, in list order.",
          "_build_points_tab"),
+        ("From Hair",
+         "From Hair - one centerline curve through each hair strand mesh, "
+         "starting at the strand's open end (root -> tip).",
+         "_build_hair_tab"),
         ("Ribbon",
          "Ribbon - build a flat NURBS surface along each listed curve (the curve "
          "widened to both sides, like lofting two offset copies). Made for rigging: "
@@ -538,6 +543,30 @@ class MainWindow(QWidget):
         """
         self.shape_edit_tab = ShapeEditTab(log_callback=self.log)
         return self.shape_edit_tab
+
+    def _build_hair_tab(self):
+        """헤어 가닥 중심선 탭 (v01.32) — 화면은 `app/ui/hair_tab.py`, 계산은 core/hair_curve_manager.py.
+
+        Houdini hairShrink hip 을 대체한다. 만든 커브는 `Send to Joints` 로 Edit > Joints 에 넘긴다
+        (이 창의 Joints 리스트를 채우는 콜백을 넘겨 준다 - HairTab 은 main_window 를 직접 만지지 않는다).
+        """
+        self.hair_tab = HairTab(log_callback=self.log, send_to_joints=self._hair_to_joints)
+        return self.hair_tab
+
+    def _hair_to_joints(self, curves, count=None):
+        """From Hair 커브를 Edit > Joints 리스트에 채우고 그 탭을 연다.
+
+        Count 모드 + Degree 1 이면 Count 를 맞추고 **By parameter** 로 둔다 — 노트가 0..N-1 인 1차 커브에서
+        파라미터 균등 = CV 위치라 조인트가 CV 에 정확히 놓인다(By length 는 현 길이 차만큼 미세하게 어긋난다).
+        """
+        self.tsl_joints.set_items(curves)
+        if count:
+            self.sb_jnt_count.setValue(int(count))
+            self.rb_jnt_param.setChecked(True)
+        self.tabs.setCurrentIndex([c[0] for c in self.CATEGORIES].index("Edit"))
+        self.edit_tabs.setCurrentIndex([p[0] for p in self.EDIT_PAGES].index("Joints"))
+        self.log("Sent {0} curve(s) to Edit > Joints{1}.".format(
+            len(curves), " (Count {0}, By parameter)".format(count) if count else ""))
 
     def _build_points_tab(self):
         """리스트에 담은 오브젝트/조인트/컴포넌트의 **월드 위치**를 순서대로 잇는 커브.
@@ -1647,4 +1676,5 @@ class MainWindow(QWidget):
             "Curve Tool\nv{0}  ({1})\n\n"
             "Create one attached curve per connected group of selected mesh edges,\n"
             "then align curve direction by comparing cv[0]/cv[n] on a world axis.\n"
+            "From Hair: one centerline curve per hair strand mesh (root -> tip).\n"
             "by Ji Hun Park".format(VERSION, LAST_UPDATE))

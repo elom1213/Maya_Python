@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-09 (오늘)
 
+> [!summary] A00400_CurveTool **v01.32 Create > From Hair** `#A00400_CurveTool`
+- 요청: Houdini `0010_hairShrink_LUN_01.hip` 의 foreach 루프(헤어 메시 가닥마다 커브)를 마야에서 — A00400 에 추가, 작은 메시 · 짧은 커브 거르기, Houdini 보다 빠르게.
+- 분석: hip(ASCII cpio)을 풀고 hython 으로 쿡 — Labs `straight_skeleton_3d`(VDB 수축) 149 가닥 71.5 초, 커브 없음 3 · 조각 2. 입력은 전부 "뿌리 열린 쿼드 튜브 + 끝 팬". 계획서 `plans/A00400_CurveTool_hair_centerline_plan.md`.
+- 구현: 열린 끝에서 링 BFS → 링 중심점(cv[0] = 뿌리), 불규칙 · 닫힌 메시는 측지 거리 구간. 필터 2종, Count / Spacing / Per Ring, Degree 1/3, Analyze, Select Skipped, Send to Joints(By parameter = 조인트가 CV 위).
+- 실측 함정: 끝에 이웃 아닌 정점 2개 → 거짓 가지(최소 가지 길이로), 엣지만 따라 잰 거리는 둘레 경로를 과대평가 → 닫힌 튜브 끝이 극점 대신 링 정점(면 대각선 이웃으로).
+- LUN 149 가닥: 커브 148 + 퇴화 1, 약 1.1 초, Houdini 결과와 편차 중앙값 0.11 cm. 시험 `test_hair_curve.py` 66/66, `test_ribbon.py` 75/75. **GUI 확인 아직.**
+
 > [!summary] A00210_FileManager **v01.53 Sync Status 이름 순** `#A00210_FileManager`
 - 요청: Sync / Status 의 경로 · 파일을 이름 순으로. 추적 제외(흐린 색)는 지금처럼 아래에 두되 그 안도 이름 순.
 - 원인: 파일 줄은 비교 결과 순서, 폴더 줄은 처음 나온 파일 때 생긴 순서로 붙었다.

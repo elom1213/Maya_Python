@@ -89,5 +89,10 @@
 # 01.31  Display > Replace - 두 리스트(Shapes to replace · Replacement)에 Sort 버튼(이름순, 공용 TSL).
 #        짝은 리스트 순서대로라 양쪽을 정렬하면 이름순으로 짝지어진다.
 
-VERSION = "01.31"
-LAST_UPDATE = "2026-11-03"
+# 01.32  Create > From Hair - 헤어 메시 가닥마다 중심선 커브 하나(cv[0] = 뿌리 = 열린 끝).
+#        Houdini hairShrink hip(Labs straight_skeleton_3d, 149 가닥 71.5 초)을 대체 - 열린 끝에서 링 BFS ->
+#        링 중심점(위상 고르지 않으면 측지 거리 구간). 크기 · 길이 필터, Count / Spacing / Per Ring,
+#        Degree 1/3, Analyze, Select Skipped, Send to Joints(By parameter 로 조인트 = CV). LUN 149 가닥 1.1 초.
+
+VERSION = "01.32"
+LAST_UPDATE = "2026-11-09"

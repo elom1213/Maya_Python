@@ -1,8 +1,8 @@
 ---
 title: A00400_CurveTool 사용법
 aliases: [Curve Tool, CurveTool, A00400]
-tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve, lineWidth, wrap, blendShape, editPoint, laplacian, smoothCurve, softSelect, joint, skinCluster, controller, shape-transform, ribbon, loft, nurbsSurface]
-updated: 2026-10-30
+tags: [maya-python, tool-guide, curve, mesh-edge, polyToCurve, lineWidth, wrap, blendShape, editPoint, laplacian, smoothCurve, softSelect, joint, skinCluster, controller, shape-transform, ribbon, loft, nurbsSurface, hair, centerline]
+updated: 2026-11-09
 ---
 
 # A00400_CurveTool 사용법
@@ -16,6 +16,7 @@ Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya).
 | **Create**<br>씬에 **새 커브(와 리본 서피스)를 만든다** | **From Edges** | ① 선택한 메시 엣지에 부착된 커브 생성(엣지 덩어리마다 커브 하나) ② Reverse Direction(방향 통일) |
 | | **Controls** (v01.15~) | 컨트롤러 커브 **34종**을 만들고(Parent / Child / World / Origin) **색**을 입힌다(인덱스 32색 + **팔레트 팝업의 임의 색**, v01.17~). `bs_controls` 이식 |
 | | **From Points** (v01.04~) | 리스트에 담은 오브젝트·조인트·컴포넌트의 **월드 위치**를 **순서대로** 잇는 커브 하나. 정확히 통과 / 완화 선택 |
+| | **From Hair** (v01.32~) | 헤어 메시 **가닥마다 중심선 커브** 하나(cv[0] = 뿌리). Houdini hairShrink 단계를 대체. 크기 · 길이 필터, CV 개수 지정, `Send to Joints` |
 | | **Ribbon** (v01.29~) | 리스트의 커브마다 **납작한 NURBS 서피스(리본)** — 커브의 CV·차수·노트를 U 로 그대로, `Width` 만큼 양옆으로 벌린 줄이 V(커브 복제 둘을 loft 한 것과 같다). Direction Auto(커브 평면 노멀)/X/Y/Z · Across cubic/linear · U 0..1 · Reverse U. **리깅용** — 만든 리본에 조인트·오브젝트를 붙인다 |
 | **Edit**<br>기존 커브의 **형상(CV)** 을 바꾼다 | **Smooth** (v01.05~) | 씬에서 고른 **CV** 를 슬라이더로 실시간 Smooth / Rough. **소프트 셀렉션 폴오프**를 그대로 쓴다. **닫힌 커브도 이음매를 넘어** 고른다 (v01.08~) |
 | | **Wrap** (v01.03~) | **CV 개수가 달라도** 한 커브가 다른 커브의 모양을 따르게 한다. 0~1 envelope 어트리뷰트로 라이브 블렌드 |
@@ -54,7 +55,7 @@ Maya 안에서 도는 **커브** PySide 툴이다(arch B, in-Maya).
 
 > 분류표는 코드에서 `MainWindow.CATEGORIES` 한 곳이 정한다. 탭을 추가·이동하려면 그 표만 고치면 된다.
 
-- **버전**: `app/config/version.py` (v01.29 — `Create > Ribbon`)
+- **버전**: `app/config/version.py` (v01.32 — `Create > From Hair`)
 - **설치**: `__dragDrop_A00400.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **CurveTool** → `tools.A00400_CurveTool.run(True)`
 - **참고**: 엣지→커브 생성은 `ref/ref_01.mel`(`duplicateCurve`+`attachCurve`)의 아이디어를, 축 비교 방식은 `A00360_SortTool` 을 이식/응용.
 
@@ -377,6 +378,49 @@ Create 직후 **얼마나 잘 맞았는지 로그에 찍는다** — 최대 편�
 - 만든 커브는 씬에서 선택된 상태가 되고, **생성 + 선택이 undo 한 스텝**이다.
   > 선택을 청크 밖에서 하면 `Ctrl+Z` 한 번이 커브가 아니라 선택만 되돌린다(개발 중 실제로 겪음).
 - 리스트는 UUID 로 현재 경로를 되찾으므로 **리네임·리페어런트 후에도** 같은 대상을 잡는다.
+
+---
+
+## Create > From Hair (v01.32~) — 헤어 가닥마다 중심선 커브
+
+헤어 메시 가닥(연결 성분 하나)마다 **가닥 가운데를 관통하는 커브**를 하나씩 만든다. 그 커브에 조인트를 놓고
+리깅하는 흐름의 첫 단계 — 예전엔 Houdini(`0010_hairShrink_LUN_01.hip`)에서 뽑아 abc 로 넘기던 것이다.
+설계 · Houdini 분석: [`plans/A00400_CurveTool_hair_centerline_plan.md`](plans/A00400_CurveTool_hair_centerline_plan.md).
+
+### 사용법
+
+1. 헤어 메시(또는 **그 그룹 하나**)를 고르고 `Hair meshes` 의 **List Selected**. `Include child meshes`(기본 켬)면
+   아래 계층의 메시를 전부 쓴다. 메시 하나에 가닥이 여러 개 붙어 있어도 가닥마다 커브 하나.
+2. **Analyze** — 씬은 그대로, 몇 개가 만들어지고 무엇이 왜 걸러지는지 로그로 본다.
+3. **Create Curves** — 커브 생성(**undo 한 스텝**). 기본은 `hairCurves_grp` 아래, 이름 `<메시>_crv`.
+4. **Send to Joints** — 만든 커브가 `Edit > Joints` 리스트로 가고 Count · **By parameter** 가 맞춰진다 → 거기서 Create.
+   Degree 1 + Count N 이면 **조인트 i 가 정확히 cv[i] 위**.
+
+### 옵션
+
+| 옵션 | 기본 | 뜻 |
+|------|------|----|
+| Method | Auto | **Rings** = 뿌리에서 엣지 단계(링)마다 중심(쿼드 튜브에 정확) · **Geodesic** = 뿌리에서 표면 거리를 `Slices` 구간으로(삼각화 · 불규칙 메시) · Auto = 쿼드 80 % 이상 + 열린 끝 1~2 개면 Rings |
+| Root | Open end | 튜브의 **열린 끝**(두피 쪽)이 cv[0]. 열린 끝이 없거나 여럿이면 Highest Y 로 대체 + 경고. 축 규칙(Highest/Lowest X·Y·Z)도 있지만 **위로 뻗은 가닥이 뒤집히므로** 헤어엔 Open end |
+| Smooth / Strength | 10 / 0.5 | 중심선 스무딩(양끝 고정). 0 = 끔 |
+| Trim Root / Tip | 0 / 0 | 양끝에서 그 길이만큼 잘라낸다 |
+| Points | Count 10 | **Count** = 균등 N 점 · **Spacing** = 그 길이에 가장 가까운 균등 간격 · **Per Ring** = 링 중심 그대로 |
+| Degree | 1 Linear | 1 = CV 가 계산한 점 그 자체 · 3 = 그 점들을 지나는 큐빅 |
+| Name / Group | `{mesh}_crv` / `hairCurves_grp` | 가닥 여럿인 메시는 `_s01`, `_s02` … |
+| Add source attribute | 켬 | 커브에 문자열 `hairSourceMesh` = 원본 메시 경로 |
+| Skip meshes smaller than | 켬, 1.0 | 가닥 바운딩 박스 **대각선**이 이보다 작으면 건너뜀 |
+| Skip curves shorter than | 켬, 1.0 | 스무딩 · 다듬기 뒤 중심선 **길이**가 이보다 짧으면 건너뜀 |
+
+길이 칸은 모두 **씬 단위**(Preferences 의 Linear 단위).
+
+### 알아둘 것
+
+- 커브는 **정적**이다(히스토리 없음) — 메시를 움직여도 따라가지 않는다. 리깅 셋업 단계용.
+- 점 위치는 **월드** — 부모 그룹이 움직여 있어도 맞다.
+- 갈라진 가닥은 **가장 긴 가지 하나**만 따라가고 로그에 경고(가지별 커브는 아직 없음).
+- LUN 헤어(149 가닥) 실측: 148 개 + 퇴화 조각 1 건너뜀, 약 1 초(Houdini 71.5 초), Houdini 결과와 평균 편차 0.11 cm.
+  Houdini 커브는 양끝이 안쪽으로 줄어 있고(약 0.9 cm), 이 툴은 **뿌리 열린 끝 ~ 가닥 끝 극점**까지 닿는다.
+- 결과 방향을 바꾸고 싶으면 같은 창의 `Create > From Edges` 의 Reverse Direction.
 
 ---
 

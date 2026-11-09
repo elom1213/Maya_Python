@@ -312,7 +312,7 @@ from tools.A00400_CurveTool.app.ui.main_window import MainWindow   # noqa: E402
 
 win = MainWindow()
 labels = [win.create_tabs.tabText(i) for i in range(win.create_tabs.count())]
-check("T8 Create tabs", labels == ["From Edges", "From Points", "Ribbon", "Controls"], labels)
+check("T8 Create tabs", labels == ["From Edges", "From Points", "From Hair", "Ribbon", "Controls"], labels)
 check("T8 defaults", win.dsb_ribbon_width.value() == 2.0 and win.cmb_ribbon_dir.currentData() == rm.DIRECTION_AUTO
       and win.cmb_ribbon_across.currentData() == 3 and win.cb_ribbon_norm.isChecked()
       and not win.cb_ribbon_rev.isChecked() and win.le_ribbon_name.text() == "")
