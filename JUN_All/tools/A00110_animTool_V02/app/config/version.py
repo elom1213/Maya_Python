@@ -181,5 +181,9 @@
 #        (Blend < 1 이면 원본 읽기 패스까지 x2), 세부 줄 "Follower k/N : 이름", 끝나면 로그에 경과 시간 "(3.4s)".
 #        core FollowMatchManager.match_follow(progress=None) 콜백만 받는다(없으면 예전 그대로). 시험 tests/test_follow_progress.py 13/13.
 
-VERSION = "02.54"
-LAST_UPDATE = "2026-11-06"
+# 02.55  Transfer > Copy Key - 복사할 짝의 rotate order 가 다르면 경고 팝업 (사용자 요청). 짝마다 Base (xyz) -> Target (zyx),
+#        Continue / Cancel(기본). 회전 채널을 복사할 때만 묻는다. core build_pairs · rotate_order_mismatches · copies_rotation.
+#        시험 tests/test_copykey_rotate_order.py 15/15.
+
+VERSION = "02.55"
+LAST_UPDATE = "2026-11-09"

@@ -4605,11 +4605,43 @@ class MainWindow(QWidget):
 
         one_to_many = self.cb_copy_one_to_many.isChecked()
 
+        # rotate order 가 다른 짝이 있으면 묻는다(회전 채널을 복사할 때만 - 오일러 값이
+        # 같아도 rotate order 가 다르면 다른 자세가 된다).
+        if CopyKeyManager.copies_rotation(
+                CopyKeyManager.resolve_attrs(attr_flags, custom_attrs)):
+            mismatches = CopyKeyManager.rotate_order_mismatches(base, tgt, one_to_many)
+            if mismatches and not self._confirm_rotate_order_mismatch(mismatches):
+                self.log("[Info] Copy Key cancelled (rotate order mismatch).")
+                return
+
         count, msg = CopyKeyManager.copy_keys(
             base, tgt, start, end, reverse_flags, paste_option,
             one_to_many=one_to_many, attr_flags=attr_flags,
             custom_attrs=custom_attrs)
         self.log(msg)
+
+    def _confirm_rotate_order_mismatch(self, mismatches, limit=10):
+        """rotate order 가 다른 짝을 팝업으로 알리고 Continue 면 True, Cancel 이면 False."""
+        lines = ["{0} ({1})  ->  {2} ({3})".format(b, bo, t, to)
+                 for b, t, bo, to in mismatches[:limit]]
+        if len(mismatches) > limit:
+            lines.append("... and {0} more".format(len(mismatches) - limit))
+        for line in lines:
+            self.log("[Warning] Rotate order differs: " + line)
+
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Warning)
+        box.setWindowTitle("Rotate Order Mismatch")
+        box.setText("{0} pair(s) have a different rotate order.\n"
+                    "Copied rotation keys may give a different pose.".format(
+                        len(mismatches)))
+        box.setInformativeText("\n".join(lines))
+        btn_continue = box.addButton("Continue", QMessageBox.AcceptRole)
+        btn_cancel = box.addButton("Cancel", QMessageBox.RejectRole)
+        box.setDefaultButton(btn_cancel)
+        box.setEscapeButton(btn_cancel)
+        box.exec_()
+        return box.clickedButton() is btn_continue
 
     # --------------------------------------------------
     # Handlers : Transfer > Layer (레이어 사이 키 복사 / 이동)

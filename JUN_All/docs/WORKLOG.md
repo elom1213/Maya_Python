@@ -33,6 +33,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-09 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.55 Copy Key rotate order 경고** `#A00110_animTool`
+- 요청: Copy Key 의 Base / Target 끼리 rotate order 가 다르면 팝업으로 알리고 Continue / Cancel 로 고르게.
+- 구현: core `build_pairs`(copy_keys 와 같은 짝) · `rotate_order_mismatches` · `copies_rotation`, UI `_confirm_rotate_order_mismatch`(Cancel 기본 · 로그에도 목록). 회전 채널을 복사할 때만 묻는다.
+- 시험 `tests/test_copykey_rotate_order.py` 15/15(mayapy). **GUI 확인 아직.**
+
 > [!summary] A00130_ControlRig_V02 **v02.33 팔 A2 = `-Z` 가 폴 타깃을 향한다** `#A00130_ControlRig`
 - 요청: Keep 대신 A2 를 `-Z` → 폴로 바꾸는 안 검토. 사용자 전제: **팔 폴 타깃은 늘 팔 뒤(월드 -Z)**, **다리는 +Z → 폴이 맞다**.
 - 실측: 팔 폴이 팔꿈치보다 27 cm 뒤 → 예전 `+Z` → 폴 규칙이 팔을 매번 180° 굴린 게 진짜 원인(v02.32 의 '거의 일자인 팔' 설명 정정). `-Z` → 폴이면 손으로 맞춘 왼팔과 0.006° 이내.

@@ -1358,6 +1358,10 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   Base 가 하나면 순서를 맞출 필요가 없다.
 - **Start / End**: 복사할 시간 범위(`cmds.copyKey time=(start,end)`). 빌드 시 현재 playback
   범위(`minTime`/`maxTime`)로 채워진다.
+- **Rotate order 경고**(v02.55~): 복사할 짝 중 **rotate order 가 서로 다른** 것이 있으면 `Copy Key` 를
+  누를 때 경고 팝업(`Rotate Order Mismatch`)에 짝마다 `Base (xyz) -> Target (zyx)` 를 보여 주고
+  **Continue**(그대로 복사) / **Cancel**(중단, 기본 버튼 · Esc) 중에서 고른다. 같은 목록이 로그에도 남는다.
+  회전 채널을 복사할 때만 묻는다(Attributes 에서 Rotate 를 다 끄면 묻지 않음).
 - **Paste Option**: `cmds.pasteKey` 의 `option` 인자. **기본 `insert`**. 선택 가능값(10개):
   `insert`, `replace`, `replaceCompletely`, `merge`, `scaleInsert`, `scaleReplace`,
   `scaleMerge`, `fitInsert`, `fitReplace`, `fitMerge`.
@@ -2279,6 +2283,12 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
   **Attributes 에서 빠진 축도 건너뛴다** — 복사하지도 않은 타깃의 기존 키를 뒤집지 않도록.
 - 키가 없거나 붙여넣기에 실패한 쌍은 **건너뛰고**(skip) 집계해 로그에 표시한다 → 일부 실패해도 중단되지 않는다.
 - **Paste Option** 이 유효값 목록 밖이면 `insert` 로 폴백(방어).
+- **Rotate order 확인**(v02.55~): 복사 전에 UI 가 `CopyKeyManager.rotate_order_mismatches(base, tgt, one_to_many)`
+  로 짝(`build_pairs` = `copy_keys` 와 같은 1→n / n→n 규칙)마다 `rotateOrder` 를 비교한다. 다르면 팝업 →
+  Cancel 이면 아무것도 바꾸지 않는다. `rotateOrder` 가 없는 노드 · 없는 노드는 비교하지 않는다.
+  `copies_rotation(resolve_attrs(...))` 가 False(회전 채널을 복사하지 않음)면 확인을 건너뛴다.
+  오일러 회전 값은 rotate order 에 따라 다른 자세가 되므로, 다르면 값은 그대로 복사돼도 자세는 달라진다.
+  시험 `tests/test_copykey_rotate_order.py` 15/15.
 
 ### Transfer > Layer (`layer_key_manager.LayerKeyManager.transfer_keys`)
 - **채널(plug) 하나씩** `cmds.copyKey(plug, animLayer=<From>)` → `cmds.pasteKey(plug,

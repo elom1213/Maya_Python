@@ -155,6 +155,66 @@ class CopyKeyManager:
                 merged.append(attr)
         return merged
 
+    # rotateOrder enum 순서(마야 transform.rotateOrder).
+    ROTATE_ORDERS = ("xyz", "yzx", "zxy", "xzy", "yxz", "zyx")
+
+    @staticmethod
+    def build_pairs(base_list, tgt_list, one_to_many=True):
+        """copy_keys 와 같은 규칙으로 (Base, Target) 짝을 만든다. 반환 (fan_out, pairs).
+
+        1->n 은 Base 가 정확히 1개일 때만 성립한다. 옵션이 켜져 있어도 Base 가 여러 개면
+        평소대로 n->n(같은 인덱스, 짧은 쪽 기준)으로 간다.
+        """
+        base_list = list(base_list or [])
+        tgt_list = list(tgt_list or [])
+        fan_out = bool(one_to_many) and len(base_list) == 1
+        if fan_out:
+            pairs = [(base_list[0], tgt) for tgt in tgt_list]
+        else:
+            pair_count = min(len(base_list), len(tgt_list))
+            pairs = list(zip(base_list[:pair_count], tgt_list[:pair_count]))
+        return fan_out, pairs
+
+    @staticmethod
+    def _rotate_order(node):
+        """노드의 rotateOrder 이름("xyz" ...). 어트리뷰트가 없으면 None."""
+        try:
+            if not cmds.objExists(node) or not cmds.attributeQuery(
+                    "rotateOrder", node=node, exists=True):
+                return None
+            idx = cmds.getAttr(node + ".rotateOrder")
+        except Exception:
+            return None
+        if 0 <= idx < len(CopyKeyManager.ROTATE_ORDERS):
+            return CopyKeyManager.ROTATE_ORDERS[idx]
+        return str(idx)
+
+    @staticmethod
+    def copies_rotation(attrs):
+        """resolve_attrs 결과에 회전 채널이 들어가는가. None(필터 없음)은 전부라 True."""
+        if attrs is None:
+            return True
+        return any(a in ("rotateX", "rotateY", "rotateZ", "rotate", "rx", "ry", "rz", "r")
+                   for a in attrs)
+
+    @staticmethod
+    def rotate_order_mismatches(base_list, tgt_list, one_to_many=True):
+        """복사할 짝 중 rotate order 가 서로 다른 것을 찾는다.
+
+        회전 커브 값은 오일러 각이라 rotate order 가 다르면 같은 값이라도 다른 자세가 된다.
+        반환: [(base, tgt, base_order, tgt_order), ...]. 어느 한쪽에 rotateOrder 가 없으면
+        (트랜스폼이 아님) 비교하지 않는다.
+        """
+        _, pairs = CopyKeyManager.build_pairs(base_list, tgt_list, one_to_many)
+        result = []
+        for base, tgt in pairs:
+            b = CopyKeyManager._rotate_order(base)
+            t = CopyKeyManager._rotate_order(tgt)
+            if b is None or t is None or b == t:
+                continue
+            result.append((base, tgt, b, t))
+        return result
+
     @staticmethod
     def copy_keys(base_list, tgt_list, start, end, reverse_flags, paste_option="insert",
                   one_to_many=True, attr_flags=None, custom_attrs=None):
@@ -193,14 +253,7 @@ class CopyKeyManager:
             return (0, "[Warning] No attribute checked (Translate / Rotate / Scale / Custom).")
 
         # ---- 매칭 구성 ----
-        # 1->n 은 Base 가 정확히 1개일 때만 성립한다. 옵션이 켜져 있어도 Base 가 여러 개면
-        # 평소대로 n->n(같은 인덱스, 짧은 쪽 기준)으로 간다.
-        fan_out = bool(one_to_many) and len(base_list) == 1
-        if fan_out:
-            pairs = [(base_list[0], tgt) for tgt in tgt_list]
-        else:
-            pair_count = min(len(base_list), len(tgt_list))
-            pairs = list(zip(base_list[:pair_count], tgt_list[:pair_count]))
+        fan_out, pairs = CopyKeyManager.build_pairs(base_list, tgt_list, one_to_many)
 
         done = 0
         skipped = 0
