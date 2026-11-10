@@ -23,4 +23,14 @@ metadata:
   translate/rotate 와 달리 pairBlend 가 안 생긴다) → 키 있는 scale 축도 skip. 시험 `test_locator_bake_constrain.py` 34/34, UI 31/31.
 - 시험 함정: 키 있는 오브젝트의 컨스트레인트는 pairBlend 를 거쳐 연결 → `listConnections(node, type=...)` 로 못 찾는다, `listRelatives(type=...)` 로.
 
+- **v02.56 `Fast - parents don't move`**(2026-11-10, 기본 끔): 부모 쪽 행렬 `inverse(matrix)*worldMatrix` 를 Start 에서 한 번, 프레임마다
+  자기 `matrix` 만 `getAttr -time` → 분해 → 임시 커브(createNode) + API addKeys → `copyKey`/`pasteKey replaceCompletely` → 임시 삭제.
+  ★ `animCurve.ktv` 는 setAttr 불가 — copy/paste 경로가 undo · redo 모두 정확(1000 키 0.006 s).
+  ★ **부모 정지 여부는 사용자가 고른다**(사용자 지시: 연결이 있어도 안 움직이는 그룹이 있다) — 툴이 연결로 판단하지 말 것.
+  ★ 움직이는 부모를 `worldMatrix -time` 으로 프레임마다 읽기는 깊은 계층에서 일반 베이크보다 느렸다(0.91 vs 0.17 s) → 넣지 않음.
+  ★ mayapy 기본 평가는 DG(off) 라 시간 변경이 거의 공짜 — 병렬(GUI 기본)로 바꿔야 "프레임마다 장면 전체 평가" 비용이 재현된다.
+- ★ **v02.56 버그 수정**: `parentConstraint` 는 원본 **rotateAxis 를 무시** → 로케이터가 일정 각(23.26°) 어긋났다. 원본 자세로 놓고(`_snap_to`)
+  `maintainOffset=True`. 시험 씬에 rotateAxis 를 넣지 않으면 못 잡는다.
+- 시험 `tests/test_locator_bake_fast.py` 18/18, UI 36/36.
+
 관련: [[framework-progress-widget]], [[framework-timerange-widget]], [[wip-a00110-get-sel-range]], [[wip-a00110-counter-layer]]

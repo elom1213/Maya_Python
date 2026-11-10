@@ -2270,6 +2270,18 @@ class MainWindow(QWidget):
         opt_row.addStretch(1)
         tab_layout.addLayout(opt_row)
 
+        # (v02.56) 빠른 경로 - 부모가 움직이지 않는다는 것은 사용자가 정한다(연결만 보고 툴이 판단하지 않는다).
+        self.cb_lb_fast = QCheckBox("Fast - parents don't move")
+        self.cb_lb_fast.setChecked(False)
+        self.cb_lb_fast.setToolTip(
+            "Bake without playing the scene: the parent side of each object is read ONCE at Start,\n"
+            "then only the object's own matrix is read per frame - the rest of the scene is not\n"
+            "evaluated, so heavy scenes bake much faster. Still a key on every frame.\n"
+            "Turn it on only when the object's parents (all groups above it) do not move in the\n"
+            "range - even if they have constraints or other connections. If a parent does move,\n"
+            "the result is only right on the Start frame; leave this off then.")
+        tab_layout.addWidget(self.cb_lb_fast)
+
         # -------------------------
         # (v02.37) 베이크 뒤 로케이터 -> 오브젝트 컨스트레인트. 그룹 체크 = 켜기(기본 끔), 종류 기본 Parent.
         # Parent 와 Point / Orient 는 같은 채널을 다투므로 하나를 켜면 다른 쪽이 꺼진다. Scale 은 함께 쓸 수 있다.
@@ -5183,7 +5195,7 @@ class MainWindow(QWidget):
                 nodes, start, end, translate=translate, rotate=rotate, scale=scale,
                 euler_filter=self.cb_lb_euler.isChecked(),
                 select_result=self.cb_lb_select.isChecked(),
-                progress=progress, constrain=constrain)
+                progress=progress, constrain=constrain, fast=self.cb_lb_fast.isChecked())
         finally:
             elapsed = dlg.elapsed()
             dlg.finish()

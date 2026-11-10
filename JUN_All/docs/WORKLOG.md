@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-10 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.56 Bake > Locator `Fast - parents don't move`** `#A00110_animTool`
+- 요청: 그룹 아래 ctl_01 의 월드 움직임을 월드의 로케이터에 옮길 때 O(n) 베이크 대신 키 변환으로 빠르게. 논의 결과: 매 프레임 키면 정수 프레임은 정확(검증 샘플링 불필요), **부모가 안 움직인다는 조건은 사용자가 고른다**(연결이 있어도 안 움직이는 그룹이 있다).
+- 구현: 부모 쪽 행렬은 Start 에서 한 번, 프레임마다 자기 `matrix` 만 `getAttr -time` → 분해(closestCut) → 임시 커브 + `copyKey`/`pasteKey`(undo · redo 됨, `ktv` 는 setAttr 불가). 씬 시간을 옮기지 않는다. 움직이는 부모를 프레임마다 읽는 방식은 깊은 계층에서 더 느려 뺐다(0.91 s vs 0.17 s).
+- 발견 · 수정: 일반 경로가 원본 **rotateAxis 를 무시**해 로케이터가 매 프레임 23.26° 어긋났다 → 원본 자세에 놓고 `maintainOffset`.
+- 측정: 변형 메시 4개 씬 · 컨트롤 5 × 300f 일반 0.87 s / Fast 0.14 s. 시험 fast 18/18 · 기존 25 · 34 · UI 36. **GUI 확인 아직.**
+
 > [!summary] A00410_SecondaryMotion **v01.12 Solver: Physics Asset** `#A00410_SecondaryMotion`
 - 요청: KawaiiPhysics(원래 회전값 유지)와 달리 **원래 회전값을 지키지 않는** 언리얼 Physics Asset 움직임 재현 — 계획서 → 추천대로 + 충돌 None / Ground 선택.
 - 계획서 `docs/plans/A00410_PhysicsAsset_plan.md`. 구현: 순수 파이썬 `physics_solver`(점 + 노드 월드 회전, 기준 포즈 상대 회전 × 최소 스윙, Swing1/2 타원 콘, 중력 cm/s², 감쇠 1/s, Settled, Ground), 월드 회전 → 로컬 키 `build_rotations_from_world`, UI `Solver` 라디오 + Physics Asset 박스(Kawaii 전용 값은 숨김). 첫 노드 Kinematic 옵션 기본 켬.

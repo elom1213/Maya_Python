@@ -185,5 +185,11 @@
 #        Continue / Cancel(기본). 회전 채널을 복사할 때만 묻는다. core build_pairs · rotate_order_mismatches · copies_rotation.
 #        시험 tests/test_copykey_rotate_order.py 15/15.
 
-VERSION = "02.55"
-LAST_UPDATE = "2026-11-09"
+# 02.56  Bake > Locator `Fast - parents don't move` (기본 끔, 사용자 요청) - 씬을 재생하지 않고 굽는다: 부모 쪽 행렬은 Start 에서 한 번,
+#        프레임마다 오브젝트 자기 matrix 만 getAttr -time -> 매 프레임 키를 임시 커브 + copyKey/pasteKey 로(undo 됨). 부모가 안 움직인다는
+#        것은 사용자가 고른다(연결이 있어도 안 움직이는 그룹이 있다). 무거운 씬 0.87 s -> 0.14 s.
+#        수정: 일반 경로가 원본 rotateAxis 를 무시해 로케이터가 일정 각도 어긋났다(23.26 도) -> 원본 자세로 놓고 maintainOffset.
+#        시험 test_locator_bake_fast 18/18 · 기존 25/25 · 34/34 · UI 36/36.
+
+VERSION = "02.56"
+LAST_UPDATE = "2026-11-10"

@@ -165,6 +165,21 @@ check("constrain run: four phases", SEEN["phases"] == ["Creating locators", "Bak
 check("constrain run: objects constrained",
       all(cmds.listRelatives(n, children=True, type="parentConstraint") for n in ("cube_renamed", b)))
 
+# (v02.56) Fast - parents don't move : 기본 끔, 켜면 시간을 옮기지 않고 같은 결과
+check("fast: default off", not win.cb_lb_fast.isChecked())
+win.grp_lb_constrain.setChecked(False)
+win.cb_lb_fast.setChecked(True)
+cmds.currentTime(7)
+SEEN["phases"] = []
+before_locs = set(cmds.ls("*_LOC*", type="transform"))
+win.btn_lb_bake.click()
+new_locs = sorted(set(cmds.ls("*_LOC*", type="transform")) - before_locs)
+check("fast: popup phases", SEEN["phases"] == ["Creating locators", "Baking", "Cleaning up"], SEEN["phases"])
+check("fast: two locators, a key per frame", len(new_locs) == 2 and all(
+    cmds.keyframe(l + ".tx", q=True, kc=True) == 31 for l in new_locs), new_locs)
+check("fast: time untouched", cmds.currentTime(q=True) == 7)
+check("fast: log says fast", "Fast mode" in win.te_log.toPlainText())
+
 print("RESULT {0}/{1}".format(sum(R), len(R)))
 win.close()
 maya.standalone.uninitialize()

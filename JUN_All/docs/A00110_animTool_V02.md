@@ -1654,6 +1654,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 │ └───────────────────────────────────────────────────────┘│
 │ Channels [v] Translate [v] Rotate [ ] Scale               │
 │ [v] Euler Filter  [v] Select Locators                     │
+│ [ ] Fast - parents don't move                             │  ← v02.56, 기본 끔
 │ [ ] Constrain Objects to Locators ────────────────────────┐│  ← v02.37, 그룹 체크 = 켜기(기본 끔)
 │ │ [v] Parent  [ ] Point  [ ] Orient  [ ] Scale            ││
 │ └─────────────────────────────────────────────────────────┘│
@@ -1669,6 +1670,14 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 - **LOC + Anim**: 오브젝트마다 로케이터 **`<이름>_LOC`**(네임스페이스 · 경로를 뺀 이름, 이미 있으면 마야가 끝 숫자) 를
   **월드 최상위**에 만들고 회전 순서를 원본과 맞춘 뒤 구간을 굽는다. 베이크 동안 **진행 팝업** — `Creating locators` →
   `Baking`(프레임마다 `Frame n / End`) → `Cleaning up`. 끝나면 로그에 개수 · 구간 · 걸린 시간. **Undo 한 번**에 전부 사라진다.
+- **Fast - parents don't move**(v02.56~, 기본 끔): **씬을 재생하지 않고** 굽는다. 오브젝트의 부모 쪽 행렬은 Start 에서
+  **한 번만** 읽고, 프레임마다는 오브젝트 **자기 행렬만** 읽어 곱한다 — 장면의 나머지(다른 캐릭터 · 디포머 등)는 평가하지 않는다.
+  키는 여전히 **매 프레임** 찍으므로 정수 프레임 값은 일반 베이크와 같다.
+  - **부모가 움직이지 않는다는 것은 사용자가 정한다.** 그룹에 컨스트레인트나 다른 노드가 연결돼 있어도 실제로는 안 움직이는
+    경우가 있어서, 툴은 연결을 보고 막지 않는다. 부모가 구간 안에서 움직이면 결과는 **Start 프레임에서만** 맞다 — 그때는 끈다.
+  - 무거운 씬일수록 차이가 크다(마야는 기본 병렬 평가라 일반 베이크가 프레임마다 장면 전체를 평가한다).
+    헤드리스 측정: 변형 메시 4개 씬, 컨트롤 5개 × 300f — 일반 0.87 s / Fast 0.14 s. Fast 는 장면 무게와 무관하다.
+  - 씬 시간을 옮기지 않는다(시간 변경 콜백 0 회). Undo · Redo 한 번.
 - **Constrain Objects to Locators**(v02.37~, 기본 끔): 베이크가 끝나면 거꾸로 **각 로케이터가 자기 오브젝트를 구동**하도록
   컨스트레인트를 건다(`Constraining` 단계가 팝업에 추가). 로케이터를 움직여 원본을 조종하는 용도.
   - 종류: **Parent**(기본) · Point · Orient · Scale. Parent 와 Point / Orient 는 같은 채널을 다투므로 하나를 켜면 다른 쪽이 꺼진다. Scale 은 함께 쓸 수 있다.
@@ -2156,6 +2165,7 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
 1. 따라갈 오브젝트(컨트롤러 · 조인트 등)를 씬에서 선택 → **Select Objects** 로 **Locator List** 에 채운다.
 2. **Frame Range**: 기본은 타임라인. 키 구간만 굽고 싶으면 그래프 에디터에서 키를 고르고 **Get Sel Range**.
 3. **LOC + Anim** → 진행 팝업이 끝나면 `<이름>_LOC` 로케이터들이 선택된 채로 남는다.
+   (v02.56~) 오브젝트 위의 그룹들이 구간 안에서 **움직이지 않는다면** `Fast - parents don't move` 를 켜고 굽는다 — 훨씬 빠르다.
 4. (v02.37~) 로케이터로 원본을 조종하려면 굽기 전에 **Constrain Objects to Locators** 를 켜고 종류(기본 Parent)를 고른다.
 
 ### Bake > Counter Layer (v02.26~)
@@ -2374,13 +2384,29 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
 - **Channels**: 체크한 그룹만(T=tx/ty/tz, R=rx/ry/rz, S=sx/sy/sz). 모두 끄면 경고.
 
 ### Bake > Locator (`locator_bake_manager.LocatorBakeManager.bake`)
-- **방식**: 로케이터 + 임시 `parentConstraint`(오프셋 없음, 끈 채널은 skip) (+ Scale 이면 `scaleConstraint`) →
+- **방식**: 로케이터 + 임시 `parentConstraint`(끈 채널은 skip) (+ Scale 이면 `scaleConstraint`) →
   **`bakeResults` 한 번**(`simulation=True`, 전 로케이터 · 전 구간, `disableImplicitControl=True`) → 임시 컨스트레인트 삭제 →
   (옵션) 회전 커브 `filterCurve -f euler`. 리프레시 정지 · undo 한 덩어리 · 현재 시간 복원.
 - **게이지**: `bakeResults` 한 번은 진행률을 알려 주지 않는다. `simulation` 베이크가 프레임마다 시간을 옮길 때
   `MDGMessage.addTimeChangeCallback` 이 불리는 것을 쓴다(mayapy 2024 실측: 1 ~ 200 → 201 회).
   ★ 구간을 쪼개 여러 번 부르지 않는 이유: 첫 호출의 `disableImplicitControl` 이 컨스트레인트를 끊어 다음 구간이 안 따라온다.
   그래서 **Cancel 은 없다**(C++ 베이크 한 번을 중간에 끊을 수 없다).
+- ★ **rotateAxis 수정**(v02.56): `parentConstraint` 는 원본의 **rotateAxis 를 반영하지 않는다** — rotateAxis (10, -20, 5) 인
+  원본에서 로케이터가 **매 프레임 23.26° 어긋났다**(예전 시험 씬엔 rotateAxis 가 없어 드러나지 않았다). 이제 로케이터를 원본의
+  현재 월드 자세에 먼저 놓고(`_snap_to`, 스케일은 1) **`maintainOffset=True`** 로 건다 — 일정한 rotateAxis 차이가 오프셋으로 흡수된다.
+  수정 뒤 원본과 7e-15.
+- **Fast**(v02.56, `fast=True`): 로케이터만 만들고 컨스트레인트 · `bakeResults` 없이 `sample_world` → `decompose` → `write_curves`.
+  - `sample_world`: `Pm = inverse(matrix) * worldMatrix` 를 Start 에서 한 번, 프레임마다 `getAttr node.matrix -time f`
+    (DG 컨텍스트 평가 — 그 노드의 상류만) 로 `W = matrix * Pm`.
+  - `decompose`: 로케이터 회전 순서로 오일러, 직전 프레임에 `closestCut`(같은 회전, ±360 만 이음). 이동은 내부 단위(cm) 그대로 커브에.
+  - `write_curves`: ★ `animCurve.ktv` 는 `setAttr` 로 못 쓴다("should be set with the keyframe or setKeyframe command").
+    임시 커브를 `createNode`(undo 됨) → API `addKeys` → `copyKey` / `pasteKey -option replaceCompletely`(undo 됨) → 임시 커브 삭제.
+    undo · redo 모두 정확, 1000 키 0.006 s.
+  - 부모가 움직이는 경우를 프레임마다 `worldMatrix -time` 으로 읽는 방식도 재 봤지만, 깊은 계층(30 단계 × 5 × 300f)에서
+    호출마다 부모 체인을 다시 평가해 **0.91 s**(일반 0.17 s)라 넣지 않았다 — 부모가 움직이면 일반 경로.
+  - 시험 `tests/test_locator_bake_fast.py` **18/18**: 정지 부모 · 컨스트레인트가 걸렸지만 안 움직이는 부모 · 조인트(jointOrient) ·
+    씬 단위 m 모두 원본과 1e-6 이내(실측 7e-15), 움직이는 부모는 Start 프레임만 맞음(의도), 매 프레임 키 · 회전 커브 연속 ·
+    임시 커브 없음 · undo / redo · 시간 변경 0 회 · 무거운 씬 속도. UI 시험 36/36.
 - **실패 정리**: 중간에 예외가 나면 이번에 만든 로케이터 · 컨스트레인트를 지우고 `[Error]` 를 로그에 — 반쯤 만든 결과를 남기지 않는다.
 - **정확도**(시험 `tests/test_locator_bake.py` 25/25): 네임스페이스 + 키 있는 부모(회전 · 이동 · 스케일 2) 아래 zxy 컨트롤,
   jointOrient 있는 조인트 모두 **월드 T/R 오차 1e-13**, Scale 켜면 월드 행렬 전체 1e-13. UI 시험 `tests/test_locator_bake_ui.py` 20/20

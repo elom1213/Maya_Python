@@ -23,6 +23,7 @@
 
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
+import maya.api.OpenMayaAnim as oma
 
 from Framework.core.maya_refresh import suspend_refresh
 from Framework.core.maya_undo import undo_chunk
@@ -152,11 +153,102 @@ class LocatorBakeManager:
                     warnings.append("{0}: {1} failed - {2}".format(short, ctype, str(exc).strip()))
         return made, warnings
 
+    # ------------------------------------------------------------------ 빠른 경로 (v02.56)
+    #
+    # 일반 경로는 bakeResults(simulation) 라 **프레임마다 씬 시간을 옮겨** 평가한다 - 무거운 리그가 있으면
+    # 그 프레임마다 장면 전체가 다시 돈다. 빠른 경로는 시간을 옮기지 않는다:
+    #   - 부모 쪽 행렬 Pm = inverse(matrix) * worldMatrix 를 **Start 프레임에서 한 번만** 읽고,
+    #     프레임마다는 오브젝트의 로컬 `matrix` 만 `getAttr -time`(DG 컨텍스트 평가 - 그 노드의 상류만)으로 읽어
+    #     W = matrix * Pm. 부모 체인도 장면의 나머지도 평가하지 않는다.
+    #   - **"부모가 움직이지 않는다" 는 사용자가 정한다**(UI 체크). 그룹에 컨스트레인트 등이 연결돼 있어도 실제로는
+    #     안 움직이는 경우가 있어서, 툴이 연결만 보고 판단하지 않는다. 틀리게 고르면 결과도 틀린다(Start 프레임만 맞다).
+    #   - 부모가 움직이는 경우는 일반 경로(bakeResults)를 쓴다. 프레임마다 worldMatrix 를 컨텍스트로 읽는 방식도 재 봤지만
+    #     깊은 계층에서는 호출마다 부모 체인을 다시 평가해 일반 베이크보다 느렸다(30 단계 x 5 개 x 300f: 0.91 s vs 0.17 s).
+    # 키는 매 프레임 찍으므로 정수 프레임에서는 일반 경로와 같은 값이다(검증 샘플링 불필요).
+    # 쓰기: 임시 커브를 createNode(undo 됨) -> API 로 값 채움 -> copyKey / pasteKey(undo 됨) -> 임시 커브 삭제.
+    #   ★ animCurve 의 `ktv` 는 setAttr 로 못 쓴다("should be set with the keyframe or setKeyframe command").
+    #   이 방식은 undo / redo 모두 그대로(mayapy 2024 확인), 1000 키 0.006 s.
+
+    _CURVE_TYPE = {"t": "animCurveTL", "r": "animCurveTA", "s": "animCurveTU"}
+
+    @staticmethod
+    def _snap_to(loc, src):
+        """로케이터(월드 루트)의 이동 · 회전을 src 의 현재 월드 자세로. 스케일은 1 그대로."""
+        m = om.MMatrix(cmds.getAttr(src + ".worldMatrix[0]"))
+        vals = LocatorBakeManager.decompose([m], cmds.getAttr(loc + ".rotateOrder"))
+        cmds.setAttr(loc + ".translate", *[om.MDistance(vals[k][0]).asUnits(om.MDistance.uiUnit())
+                                           for k in ("tx", "ty", "tz")])
+        cmds.setAttr(loc + ".rotate", *[om.MAngle(vals[k][0]).asUnits(om.MAngle.uiUnit())
+                                        for k in ("rx", "ry", "rz")])
+
+    @staticmethod
+    def _matrix_at(node, attr, frame):
+        return om.MMatrix(cmds.getAttr("{0}.{1}".format(node, attr), time=frame))
+
+    @staticmethod
+    def sample_world(node, start, end, step=None):
+        """[start, end] 프레임마다 node 의 월드 행렬(MMatrix 목록) - **부모가 움직이지 않는다는 가정**.
+
+        씬 시간은 옮기지 않는다. 부모 쪽 행렬은 start 에서 한 번, 프레임마다는 로컬 matrix 만 읽는다."""
+        local0 = LocatorBakeManager._matrix_at(node, "matrix", start)
+        world0 = LocatorBakeManager._matrix_at(node, "worldMatrix[0]", start)
+        pm = local0.inverse() * world0          # world = local * Pm (행벡터 규약)
+        out = []
+        for i, f in enumerate(range(int(start), int(end) + 1)):
+            out.append(LocatorBakeManager._matrix_at(node, "matrix", f) * pm)
+            if step:
+                step(i + 1)
+        return out
+
+    @staticmethod
+    def decompose(worlds, rotate_order=0):
+        """월드 행렬 목록 -> {'tx': [...], ..., 'sz': [...]} (이동 cm 내부 단위, 회전 rad, 연속화)."""
+        order = (om.MEulerRotation.kXYZ, om.MEulerRotation.kYZX, om.MEulerRotation.kZXY,
+                 om.MEulerRotation.kXZY, om.MEulerRotation.kYXZ, om.MEulerRotation.kZYX)[int(rotate_order)]
+        vals = dict((k, []) for k in ("tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz"))
+        prev = None
+        for m in worlds:
+            tm = om.MTransformationMatrix(m)
+            t = tm.translation(om.MSpace.kWorld)
+            e = tm.rotation().reorder(order)
+            if prev is not None:
+                e = e.closestCut(prev)              # 같은 회전 그대로, ±360 만 이어 붙인다
+            prev = e
+            s = tm.scale(om.MSpace.kWorld)
+            for k, v in zip(("tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz"),
+                            (t.x, t.y, t.z, e.x, e.y, e.z, s[0], s[1], s[2])):
+                vals[k].append(v)
+        return vals
+
+    @staticmethod
+    def write_curves(node, start, values, attrs):
+        """values[attr] (프레임마다) 를 node.attr 커브로 통째 기록. undo 되는 경로(임시 커브 + copy / paste)."""
+        times = om.MTimeArray()
+        n = len(values[attrs[0]]) if attrs else 0
+        for i in range(n):
+            times.append(om.MTime(int(start) + i, om.MTime.uiUnit()))
+        for attr in attrs:
+            tmp = cmds.createNode(LocatorBakeManager._CURVE_TYPE[attr[0]], name="LOC_fast_tmp")
+            try:
+                sel = om.MSelectionList()
+                sel.add(tmp)
+                fn = oma.MFnAnimCurve(sel.getDependNode(0))
+                va = om.MDoubleArray()
+                for v in values[attr]:
+                    va.append(v)
+                fn.addKeys(times, va)
+                cmds.copyKey(tmp)
+                cmds.pasteKey(node, attribute=attr, option="replaceCompletely")
+            finally:
+                if cmds.objExists(tmp):
+                    cmds.delete(tmp)
+
     # ------------------------------------------------------------------ 베이크
 
     @staticmethod
     def bake(objects, start, end, translate=True, rotate=True, scale=False,
-             euler_filter=True, select_result=True, progress=None, constrain=None):
+             euler_filter=True, select_result=True, progress=None, constrain=None,
+             fast=False):
         """objects 마다 로케이터를 만들어 [start, end] 를 월드 베이크한다.
 
         progress : progress(done, total, message=None) - 단계마다 0 -> total. None 이면 조용히.
@@ -164,6 +256,8 @@ class LocatorBakeManager:
                    `progress.phase(name)` 이 있으면 먼저 부른다(UI 가 진행 팝업 단계를 넘긴다).
                    constrain 이 있으면 마지막에 PHASE_CONSTRAIN 단계가 하나 더 온다.
         constrain: 베이크 뒤 로케이터 -> 오브젝트 컨스트레인트 종류(CONSTRAINT_TYPES 의 부분집합). None / 빈 것 = 안 건다.
+        fast     : True 면 **부모가 움직이지 않는다고 보고** 씬 시간을 옮기지 않는 빠른 경로(위 `빠른 경로` 설명).
+                   임시 컨스트레인트도 만들지 않는다. 부모가 움직이면 결과가 틀린다 - 사용자가 고른다.
         반환     : (만든 로케이터 이름 목록, msg)
         """
         if start is None or end is None:
@@ -216,11 +310,18 @@ class LocatorBakeManager:
                             cmds.setAttr(loc + ".rotateOrder", cmds.getAttr(src + ".rotateOrder"))
                         except (RuntimeError, ValueError):
                             pass
+                        if fast:
+                            _step(i + 1, n, loc)
+                            continue
                         if translate or rotate:
                             skip_t = [] if translate else ["x", "y", "z"]
                             skip_r = [] if rotate else ["x", "y", "z"]
+                            # ★ parentConstraint 는 원본의 rotateAxis 를 반영하지 않는다(v02.56 발견 - rotateAxis
+                            #   (10,-20,5) 원본에서 로케이터가 매 프레임 23.26 도 어긋났다). 로케이터를 원본 월드 자세에
+                            #   먼저 놓고 maintainOffset 으로 걸면 그 일정한 차이가 오프셋으로 흡수된다.
+                            LocatorBakeManager._snap_to(loc, src)
                             constraints += cmds.parentConstraint(
-                                src, loc, maintainOffset=False, skipTranslate=skip_t, skipRotate=skip_r)
+                                src, loc, maintainOffset=True, skipTranslate=skip_t, skipRotate=skip_r)
                         if scale:
                             constraints += cmds.scaleConstraint(src, loc, maintainOffset=False)
                         _step(i + 1, n, loc)
@@ -228,6 +329,23 @@ class LocatorBakeManager:
                     # 3. 베이크 한 번 - 진행률은 시간 변경 콜백으로
                     _phase(LocatorBakeManager.PHASE_BAKE)
                     frames = end - start + 1
+
+                    if fast:
+                        # 3'. 빠른 경로 - 시간을 옮기지 않고 행렬을 읽어 커브를 통째 쓴다.
+                        total = frames * n
+                        for i, (src, loc) in enumerate(zip(targets, locators)):
+                            base = i * frames
+
+                            def _fstep(done, _base=base, _name=src.split("|")[-1]):
+                                if done % 25 == 0 or done == frames:
+                                    _step(_base + done, total, "{0}  frame {1} / {2}".format(
+                                        _name, start + done - 1, end))
+
+                            worlds = LocatorBakeManager.sample_world(src, start, end, step=_fstep)
+                            values = LocatorBakeManager.decompose(
+                                worlds, cmds.getAttr(loc + ".rotateOrder"))
+                            LocatorBakeManager.write_curves(loc, start, values, attrs)
+                        _step(total, total)
 
                     def _on_time(mtime, *_args):
                         try:
@@ -237,16 +355,17 @@ class LocatorBakeManager:
                         except Exception:  # noqa: BLE001 - 콜백 예외가 베이크를 깨지 않게
                             pass
 
-                    callback_id = om.MDGMessage.addTimeChangeCallback(_on_time) if progress else None
-                    try:
-                        cmds.bakeResults(
-                            locators, simulation=True, time=(start, end), sampleBy=1,
-                            attribute=attrs, disableImplicitControl=True,
-                            preserveOutsideKeys=True, sparseAnimCurveBake=False)
-                    finally:
-                        if callback_id is not None:
-                            om.MMessage.removeCallback(callback_id)
-                    _step(frames, frames)
+                    if not fast:
+                        callback_id = om.MDGMessage.addTimeChangeCallback(_on_time) if progress else None
+                        try:
+                            cmds.bakeResults(
+                                locators, simulation=True, time=(start, end), sampleBy=1,
+                                attribute=attrs, disableImplicitControl=True,
+                                preserveOutsideKeys=True, sparseAnimCurveBake=False)
+                        finally:
+                            if callback_id is not None:
+                                om.MMessage.removeCallback(callback_id)
+                        _step(frames, frames)
 
                     # 4. 정리
                     _phase(LocatorBakeManager.PHASE_CLEANUP)
@@ -278,13 +397,16 @@ class LocatorBakeManager:
                 cmds.currentTime(current, edit=True)
                 return [], "[Error] Locator bake failed : {0}".format(str(exc).strip())
 
-            cmds.currentTime(current, edit=True)
+            if not fast:      # 빠른 경로는 시간을 건드리지 않았다(되돌리는 것도 시간 변경이다)
+                cmds.currentTime(current, edit=True)
             if select_result:
                 cmds.select(locators, replace=True)
 
         msg = "LOC + Anim : {0} locator(s), frames {1} - {2} ({3}).".format(
             len(locators), start, end, " ".join(
                 g for g, on in (("T", translate), ("R", rotate), ("S", scale)) if on))
+        if fast:
+            msg += "  Fast mode (parents treated as still - read once at frame {0}).".format(start)
         if constrain:
             msg += "  Constrained objects ({0}): {1} constraint(s).".format(
                 " + ".join(c.capitalize() for c in constrain), len(made_constraints))
