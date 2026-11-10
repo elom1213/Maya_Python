@@ -2,7 +2,7 @@
 title: A00410_SecondaryMotion 사용법
 aliases: [Secondary Motion, SecondaryMotion, A00410, 찰랑이, 관성 툴]
 tags: [maya-python, tool-guide, animation, secondary-motion, physics, kawaiiphysics]
-updated: 2026-10-12
+updated: 2026-11-10
 ---
 
 # A00410_SecondaryMotion 사용법
@@ -265,6 +265,42 @@ v01.11 부터는 자식이 없는 노드에 **가상 자식**을 붙여 2점 체
   없다** — 2노드 이상 체인은 예전과 완전히 같다. `Rotate last node` 체크와도 무관하게 붙는다.
 - `Axis` / `Length` 를 바꾸면 **다시 샘플링**한다(가상 자식의 위치가 샘플에 들어가므로).
 - 로그: `No children under: ctl_a - solved with a virtual child (+X, 10 units).`
+
+### 4.5 Solver — Kawaii / Physics Asset (v01.12)
+
+창 위쪽 `Solver` 에서 고른다(마지막 선택을 기억한다).
+
+| | `Kawaii (keep animation)` | `Physics Asset (simulate)` |
+|---|---|---|
+| 노드를 끄는 힘 | 애니메이션 자리로 당기는 스프링(`Stiffness`) | **없다** |
+| 체인 노드의 회전 키 | 결과의 바탕(원본 + 흔들림) | **무시된다** |
+| 정지 애니메이션 | 원본 그대로 | **중력으로 늘어진다** |
+| 각도 제한 기준 | 그 프레임의 애니메이션 방향 | 기준 포즈의 부모 대비 방향 |
+| 단위 | 프레임 | 초(중력 cm/s², 감쇠 1/s) — fps 와 무관 |
+
+Physics Asset 은 언리얼 Physics Asset 의 시뮬레이트 바디처럼 **체인 루트만 애니메이션을 따르고** 나머지는
+중력 · 관성 · 감쇠 · 조인트 한계로만 움직인다. 그래서 **자식 노드에 키를 넣어도 결과가 바뀌지 않는다**(시험으로 1e-13 확인).
+Physics Asset 을 고르면 Kawaii 전용 값(`Stiffness` `Damping` `Falloff` `World Damp` `Limit Angle` `Gravity` `Substeps`)은 숨는다.
+`Blend` · `Rotate Axis` · `Rotate last node` · `Virtual Child` · `Loop` · 출력은 공용이다.
+
+| 값 | 기본 | 뜻 |
+|----|------|----|
+| `Root node follows the animation` | 켬 | 체인 첫 노드는 애니메이션 회전 그대로(Kinematic 바디), 그 아래부터 시뮬레이션. 끄면 첫 노드도 시뮬레이션되고 그 **부모**와 루트 위치만 체인을 끈다 |
+| `Gravity` | 업 축 -980 | cm/s², 월드. 씬 단위와 무관(샘플 위치가 내부 단위 cm 라서) |
+| `Linear Damp` / `Angular Damp` | 0.5 / 1.0 | 1/s. 각 감쇠는 부모 점 대비 뼈 수직 속도(= 흔들림)만 줄인다 |
+| `Swing 1` / `Swing 2` | Limited 45° | 부모 프레임 기준 타원 콘. `Locked` = 그 축 스윙 0, `Free` = 제한 없음. 라벨의 축 이름은 샘플링 뒤 뼈 축으로 바뀐다(뼈가 X 면 Swing 1 = Z 둘레, Swing 2 = Y 둘레 — UE 와 같다) |
+| `Twist` | (표시만) | 이 버전은 트위스트가 **부모를 따른다**(UE Twist Locked). 애니메이션의 롤은 남지 않는다 |
+| `Start` | From animation | 첫 프레임 애니메이션 포즈에서 정지 출발 → 떨어지며 흔들린다. `Settled` = 첫 프레임 루트로 `Settle` 초 동안 미리 매달아 둔 뒤 출발 |
+| `Reference pose` | Start frame | 한계 · 뼈 길이를 재는 포즈(UE 의 컨스트레인트 프레임). `Current frame` 이 구간 밖이면 시작 프레임 |
+| `Substeps` / `Iterations` | 4 / 1 | 반복은 바닥 충돌을 켰을 때만 의미가 있다(파고들면 4) |
+| `Collision` | None | `None` = 충돌 없음, `Ground` = 업 축 `Height`(씬 단위) 바닥 평면 |
+
+- 뼈 길이는 기준 포즈 길이로 고정된다(강체). 애니메이션의 이동 · 스트레치는 따라가지 않는다.
+- 체인 노드 사이 **오프셋 그룹**의 회전은 남는다(정적 오프셋). 오프셋 그룹 자체에 키가 있으면 그 키도 남는다.
+- 솔버를 바꾸면 프리뷰 레이어를 다시 만든다(샘플링은 다시 하지 않는다).
+- 성능(20본 × 300f): 서브스텝 1 = 0.03 s, 서브스텝 4 + 한계 = 0.12 s. 프리뷰와 Apply 는 같은 계산이다.
+- 화면 비교 데모: `tests/demo_physics_asset.py` — 같은 꼬리 두 개(왼쪽 KAWAII / 오른쪽 PHYSICS).
+- 계획서: [`plans/A00410_PhysicsAsset_plan.md`](plans/A00410_PhysicsAsset_plan.md).
 
 ---
 

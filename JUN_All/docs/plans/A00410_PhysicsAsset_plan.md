@@ -3,7 +3,7 @@ title: A00410_SecondaryMotion — Physics Asset 모드 작업 계획서
 aliases: [PhysicsAsset mode, A00410 Physics Asset, 래그돌 체인]
 tags: [maya-python, plan, animation, secondary-motion, physics, physics-asset, unreal]
 updated: 2026-11-10
-status: 계획 (구현 전)
+status: 1단계 구현 완료 (v01.12) — 마야 GUI 확인 대기
 ---
 
 # A00410_SecondaryMotion — Physics Asset 모드 작업 계획서
@@ -318,3 +318,20 @@ mayapy 2024 헤드리스. 시험 씬은 컨트롤러 체인(오프셋 그룹 포
 3. **1단계 트위스트를 부모에 묶는 것** 괜찮은가. (추천: 괜찮다 — 헤어 · 꼬리 PhAT 기본과 같음, 동역학 트위스트는 2단계)
 4. **충돌 범위** — 1단계는 바닥 평면만. (추천: 그렇다. 씬 콜라이더는 2단계)
 5. **Animation Drive**(애니메이션 쪽으로 끄는 힘) — 넣지 않음 vs 2단계 옵션. (추천: 1단계 제외. 넣는 순간 Kawaii 와 경계가 흐려진다)
+
+---
+
+## 12. 결정 기록 · 구현 메모 (2026-11-10)
+
+사용자 결정: 1 · 2 · 3 · 5 는 추천대로. **4 는 "바닥 또는 충돌 없음을 고를 수 있게"** → `Collision: None / Ground`(기본 None).
+
+구현하면서 정한 것:
+- **`Root node follows the animation`(기본 켬)** — 체인 첫 노드는 애니메이션 회전 그대로(UE 의 Kinematic 바디), 시뮬레이션은
+  그 아래부터. 기존 Kawaii 사용법(첫 컨트롤러를 돌려 체인을 끈다)이 그대로 통하게 하려는 것. 끄면 계획서 4장 그대로(첫 노드도 시뮬레이션,
+  부모 · 루트 위치만 구동). 어느 쪽이든 **노드 1 아래의 회전 키는 쓰이지 않는다.**
+- **Blend 는 공용 슬라이더** 하나(Physics Asset 에서는 UE Physics Blend Weight).
+- **0단계 측정**(20본 × 300f): 서브스텝 1 = 0.031 s, 서브스텝 4 + 한계 = 0.121 s, 4 + Free = 0.081 s. 게이트(60 ms)는 넘었지만
+  보통 체인(5~10본, 100~200f)은 수십 ms 라 **프리뷰와 Apply 를 같은 계산으로** 두었다(프리뷰만 품질을 낮추면 보이는 것과 구워지는 것이 달라진다).
+- `getAttr worldMatrix` 는 씬 단위와 무관하게 cm → 중력은 cm/s² 그대로, 바닥 높이만 `cm_per_scene_unit()` 으로 환산.
+- `Settled` 는 정착 동안 감쇠를 최소 4 / 8 (1/s) 로 올린다(정지 자세는 감쇠와 무관 — 시간만 줄인다).
+- V9(fps 독립)는 **서브스텝 dt 가 같을 때**(24×8 vs 48×4) 판정한다. dt 가 다르면 혼돈 진자는 갈라진다(시간 해상도 차이).

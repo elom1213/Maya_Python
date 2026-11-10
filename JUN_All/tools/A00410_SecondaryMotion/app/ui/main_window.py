@@ -24,12 +24,16 @@ from tools.A00410_SecondaryMotion.app.config.version import VERSION, LAST_UPDATE
 from tools.A00410_SecondaryMotion.app.core import bake_manager as bake_mgr
 from tools.A00410_SecondaryMotion.app.core import chain_solver
 from tools.A00410_SecondaryMotion.app.core import outputs
+from tools.A00410_SecondaryMotion.app.core import physics_solver
 from tools.A00410_SecondaryMotion.app.core import scene_sampler
 
 
 WINDOW_OBJECT_NAME = "JUN_A00410_SecondaryMotion_window"
 
 _WARN_COLOR = "#ffb454"
+
+# 마지막으로 고른 솔버(kawaii / physics)를 기억한다.
+_OV_SOLVER = "JUN_A00410_solver"
 
 # 프리뷰 재계산 디바운스(ms). 슬라이더를 드래그하는 동안 계산을 묶는다.
 _DEBOUNCE_MS = 40
@@ -251,9 +255,42 @@ class MainWindow(QWidget):
         self.range.changed.connect(self._invalidate)
         root.addWidget(self.range)
 
+        # ---- 솔버 선택 — KawaiiPhysics(원래 회전값을 지킨다) / Physics Asset(지키지 않는다)
+        solver_box = QGroupBox("Solver")
+        solver_lay = QHBoxLayout(solver_box)
+        self.rb_kawaii = QRadioButton("Kawaii (keep animation)")
+        self.rb_kawaii.setToolTip(
+            "KawaiiPhysics-style: every node is pulled back to its ANIMATED place.\n"
+            "The result is the original animation plus follow-through - the\n"
+            "rotation keys of the chain stay the base of the result.")
+        self.rb_physics = QRadioButton("Physics Asset (simulate)")
+        self.rb_physics.setToolTip(
+            "Unreal Physics Asset-style: only the chain root follows the animation.\n"
+            "The other nodes are moved by gravity, inertia, damping and joint\n"
+            "limits only - their rotation keys are IGNORED, so even a still pose\n"
+            "hangs down under gravity.")
+        use_physics = False
+        try:
+            use_physics = bool(cmds.optionVar(exists=_OV_SOLVER)
+                               and cmds.optionVar(q=_OV_SOLVER) == "physics")
+        except Exception:
+            pass
+        (self.rb_physics if use_physics else self.rb_kawaii).setChecked(True)
+        solver_lay.addWidget(self.rb_kawaii)
+        solver_lay.addWidget(self.rb_physics)
+        solver_lay.addStretch(1)
+        root.addWidget(solver_box)
+
         # ---- 물리 파라미터
         phys = QGroupBox("Physics")
         pl = QVBoxLayout(phys)
+
+        # Kawaii 전용 — Physics Asset 일 때는 숨긴다(비활성으로 두면 "Stiffness 0 이면
+        # 같은 것" 이라는 오해가 생긴다. 회전 기준과 단위가 다르다).
+        self.kawaii_w = QWidget()
+        kl = QVBoxLayout(self.kawaii_w)
+        kl.setContentsMargins(0, 0, 0, 0)
+        pl.addWidget(self.kawaii_w)
 
         self.sr_stiff = _SliderRow(
             "Stiffness", 0.0, 1.0, 0.35, graph=True,
@@ -273,13 +310,9 @@ class MainWindow(QWidget):
             "World Damp", 0.0, 1.0, 0.0, graph=True,
             tooltip="Pulls the result back toward the original pose in world space.\n"
                     "'Graph' shapes this value along the chain (root -> tip).")
-        self.sr_blend = _SliderRow(
-            "Blend", 0.0, 1.0, 1.0,
-            tooltip="Overall amount. 0 = identical to the original animation.")
-        for w in (self.sr_stiff, self.sr_damp, self.sr_falloff,
-                  self.sr_world, self.sr_blend):
+        for w in (self.sr_stiff, self.sr_damp, self.sr_falloff, self.sr_world):
             w.valueChanged.connect(self._schedule)
-            pl.addWidget(w)
+            kl.addWidget(w)
 
         # Graph 버튼 -> 파라미터별 커브 팝업(비모달, 한 번 만들면 값이 남는다).
         for key, attr, title, info in CURVE_PARAMS:
@@ -320,6 +353,21 @@ class MainWindow(QWidget):
             "Sub-steps per frame. Raise it if fast motion makes the chain unstable.")
         self.sb_sub.valueChanged.connect(self._schedule)
         form.addRow("Substeps", self.sb_sub)
+        kl.addLayout(form)
+
+        # Physics Asset 전용
+        self.pa_w = QWidget()
+        self._build_physics_asset(QVBoxLayout(self.pa_w))
+        pl.addWidget(self.pa_w)
+
+        # ---- 두 솔버 공용
+        self.sr_blend = _SliderRow(
+            "Blend", 0.0, 1.0, 1.0,
+            tooltip="Overall amount. 0 = identical to the original animation.\n"
+                    "Physics Asset: same as Unreal's Physics Blend Weight.")
+        self.sr_blend.valueChanged.connect(self._schedule)
+        pl.addWidget(self.sr_blend)
+        form = QFormLayout()
 
         # 결과를 쓸 회전 축. 체크가 빠진 축에는 커브도 키도 만들지 않으므로
         # 그 축은 원본 애니메이션 그대로 남는다.
@@ -408,6 +456,9 @@ class MainWindow(QWidget):
 
         root.addWidget(phys)
 
+        self.rb_kawaii.toggled.connect(self._on_solver_toggled)
+        self._show_solver_widgets()
+
         # ---- 프리뷰
         prev_row = QHBoxLayout()
         self.chk_preview = QCheckBox("Live Preview")
@@ -454,6 +505,227 @@ class MainWindow(QWidget):
 
         self.log("Secondary Motion v{0} ({1}) ready. List a chain (root first), "
                  "set the range, then turn on Live Preview.".format(VERSION, LAST_UPDATE))
+
+    def _build_physics_asset(self, lay):
+        """Physics Asset 파라미터(언리얼 PhAT 바디 / 컨스트레인트 어휘)."""
+        lay.setContentsMargins(0, 0, 0, 0)
+        form = QFormLayout()
+
+        self.chk_pa_kin = QCheckBox("Root node follows the animation")
+        self.chk_pa_kin.setChecked(True)
+        self.chk_pa_kin.setToolTip(
+            "On (default): the FIRST node of the chain keeps its animated rotation\n"
+            "(a Kinematic body) and everything below it is simulated - rotate it to\n"
+            "drive the chain.\n"
+            "Off: the first node is simulated too; only its parent (and the root\n"
+            "position) drive the chain.")
+        self.chk_pa_kin.toggled.connect(self._schedule)
+        lay.addWidget(self.chk_pa_kin)
+
+        up = scene_sampler.up_axis_index()
+        grav_row = QHBoxLayout()
+        self.sb_pa_grav = []
+        for k, axis in enumerate(("X", "Y", "Z")):
+            sb = QDoubleSpinBox()
+            sb.setDecimals(1)
+            sb.setRange(-100000.0, 100000.0)
+            sb.setSingleStep(10.0)
+            sb.setValue(-980.0 if k == up else 0.0)
+            sb.setToolTip("Gravity in cm/s^2 (Unreal default -980), world space.")
+            sb.valueChanged.connect(self._schedule)
+            grav_row.addWidget(QLabel(axis))
+            grav_row.addWidget(sb)
+            self.sb_pa_grav.append(sb)
+        form.addRow("Gravity", grav_row)
+        lay.addLayout(form)
+
+        self.sr_pa_lin = _SliderRow(
+            "Linear Damp", 0.0, 10.0, 0.5, step=0.1,
+            tooltip="Linear damping (1/s). Higher = moves through thicker air.")
+        self.sr_pa_ang = _SliderRow(
+            "Angular Damp", 0.0, 20.0, 1.0, step=0.1,
+            tooltip="Angular damping (1/s). Higher = the swing dies out sooner.")
+        for w in (self.sr_pa_lin, self.sr_pa_ang):
+            w.valueChanged.connect(self._schedule)
+            lay.addWidget(w)
+
+        form = QFormLayout()
+        # Swing 1 / Swing 2 — 축 이름은 샘플링 뒤 체인의 뼈 축으로 갱신한다.
+        self.lbl_pa_sw = []
+        self.cb_pa_sw = []
+        self.sb_pa_sw = []
+        for name in ("Swing 1", "Swing 2"):
+            row = QHBoxLayout()
+            cb = QComboBox()
+            cb.addItems(["Limited", "Locked", "Free"])
+            cb.setToolTip(
+                "Limited: the bone may swing this many degrees away from its\n"
+                "reference direction (measured in the PARENT's frame).\n"
+                "Locked: no swing around this axis. Free: no limit.")
+            sb = QDoubleSpinBox()
+            sb.setRange(0.0, 180.0)
+            sb.setValue(45.0)
+            sb.setSuffix(" deg")
+            cb.currentIndexChanged.connect(self._schedule)
+            cb.currentIndexChanged.connect(
+                lambda _i, c=cb, b=sb: b.setEnabled(c.currentText() == "Limited"))
+            sb.valueChanged.connect(self._schedule)
+            row.addWidget(cb)
+            row.addWidget(sb, 1)
+            lbl = QLabel(name)
+            form.addRow(lbl, row)
+            self.lbl_pa_sw.append(lbl)
+            self.cb_pa_sw.append(cb)
+            self.sb_pa_sw.append(sb)
+        self.lbl_pa_twist = QLabel("Locked - follows the parent")
+        self.lbl_pa_twist.setToolTip(
+            "Twist (roll around the bone) follows the parent body in this version\n"
+            "- like a Locked twist limit. The animated roll is NOT kept.")
+        form.addRow("Twist", self.lbl_pa_twist)
+
+        start_row = QHBoxLayout()
+        self.cb_pa_start = QComboBox()
+        self.cb_pa_start.addItems(["From animation", "Settled"])
+        self.cb_pa_start.setToolTip(
+            "From animation: start from the animated pose at the first frame, at\n"
+            "rest - the chain then falls and swings (shows the difference best).\n"
+            "Settled: let the chain hang still before the first frame (Settle\n"
+            "seconds, root held at its first-frame pose), then start.")
+        self.sb_pa_settle = QDoubleSpinBox()
+        self.sb_pa_settle.setRange(0.0, 60.0)
+        self.sb_pa_settle.setValue(3.0)
+        self.sb_pa_settle.setSuffix(" s")
+        self.sb_pa_settle.setToolTip("Seconds to settle before the first frame.")
+        self.sb_pa_settle.setEnabled(False)
+        self.cb_pa_start.currentIndexChanged.connect(
+            lambda i: self.sb_pa_settle.setEnabled(i == 1))
+        self.cb_pa_start.currentIndexChanged.connect(self._schedule)
+        self.sb_pa_settle.valueChanged.connect(self._schedule)
+        start_row.addWidget(self.cb_pa_start)
+        start_row.addWidget(self.sb_pa_settle, 1)
+        form.addRow("Start", start_row)
+
+        self.cb_pa_ref = QComboBox()
+        self.cb_pa_ref.addItems(["Start frame", "Current frame"])
+        self.cb_pa_ref.setToolTip(
+            "Reference pose = where the joint limits and bone lengths are measured\n"
+            "from (Unreal: the constraint frames). Current frame falls back to the\n"
+            "start frame when it is outside the range.")
+        self.cb_pa_ref.currentIndexChanged.connect(self._schedule)
+        form.addRow("Reference pose", self.cb_pa_ref)
+
+        step_row = QHBoxLayout()
+        self.sb_pa_sub = QSpinBox()
+        self.sb_pa_sub.setRange(1, 32)
+        self.sb_pa_sub.setValue(4)
+        self.sb_pa_sub.setToolTip("Sub-steps per frame. Raise for fast motion.")
+        self.sb_pa_iter = QSpinBox()
+        self.sb_pa_iter.setRange(1, 16)
+        self.sb_pa_iter.setValue(1)
+        self.sb_pa_iter.setToolTip(
+            "Constraint passes per sub-step. Only matters with Ground collision\n"
+            "(raise to 4 if the chain sinks into the ground).")
+        for sb in (self.sb_pa_sub, self.sb_pa_iter):
+            sb.valueChanged.connect(self._schedule)
+        step_row.addWidget(self.sb_pa_sub)
+        step_row.addSpacing(8)
+        step_row.addWidget(QLabel("Iterations"))
+        step_row.addWidget(self.sb_pa_iter)
+        step_row.addStretch(1)
+        form.addRow("Substeps", step_row)
+
+        col_row = QHBoxLayout()
+        self.cb_pa_col = QComboBox()
+        self.cb_pa_col.addItems(["None", "Ground"])
+        self.cb_pa_col.setToolTip(
+            "None: no collision at all.\n"
+            "Ground: a flat floor at Height (scene units, along the scene up axis).")
+        self.sb_pa_ground = QDoubleSpinBox()
+        self.sb_pa_ground.setRange(-100000.0, 100000.0)
+        self.sb_pa_ground.setDecimals(3)
+        self.sb_pa_ground.setToolTip("Floor height in scene units.")
+        self.sb_pa_ground.setEnabled(False)
+        self.cb_pa_col.currentIndexChanged.connect(
+            lambda i: self.sb_pa_ground.setEnabled(i == 1))
+        self.cb_pa_col.currentIndexChanged.connect(self._schedule)
+        self.sb_pa_ground.valueChanged.connect(self._schedule)
+        col_row.addWidget(self.cb_pa_col)
+        col_row.addWidget(QLabel("Height"))
+        col_row.addWidget(self.sb_pa_ground, 1)
+        form.addRow("Collision", col_row)
+
+        lay.addLayout(form)
+
+    def _is_physics(self):
+        return self.rb_physics.isChecked()
+
+    def _show_solver_widgets(self):
+        physics = self._is_physics()
+        self.kawaii_w.setVisible(not physics)
+        self.pa_w.setVisible(physics)
+
+    def _on_solver_toggled(self, *args):
+        self._show_solver_widgets()
+        try:
+            cmds.optionVar(sv=(_OV_SOLVER, "physics" if self._is_physics() else "kawaii"))
+        except Exception:
+            pass
+        # 살아 있는 프리뷰 레이어는 앞 솔버의 결과다 — 지우고 새로 만든다(캐시는 그대로).
+        self.session.clear_preview()
+        if self._is_physics():
+            self.log("Solver: Physics Asset - only the chain root follows the animation; "
+                     "the other nodes' rotation keys are ignored.")
+            self._update_swing_labels()
+        else:
+            self.log("Solver: Kawaii - follow-through on top of the original animation.")
+        self._schedule()
+
+    def _update_swing_labels(self):
+        """Swing 1 / Swing 2 라벨에 실제 회전 축을 적는다(샘플이 있을 때만)."""
+        names = self.session.swing_axis_names() if self.session.has_cache() else None
+        if not names:
+            return
+        twist, s1, s2, mixed = names
+        self.lbl_pa_sw[0].setText("Swing 1 (around {0})".format(s1))
+        self.lbl_pa_sw[1].setText("Swing 2 (around {0})".format(s2))
+        self.lbl_pa_twist.setText("Locked - follows the parent ({0})".format(twist))
+        if mixed:
+            self.log("Physics Asset: the bones in the chain point along different local "
+                     "axes - Swing 1 / 2 are named after the first simulated node.",
+                     warn=True)
+
+    @staticmethod
+    def _limit_mode(text):
+        return {"Limited": physics_solver.LIMIT_LIMITED,
+                "Locked": physics_solver.LIMIT_LOCKED,
+                "Free": physics_solver.LIMIT_FREE}[text]
+
+    def _physics_params(self):
+        ref = None
+        if self.cb_pa_ref.currentIndex() == 1:
+            ref = cmds.currentTime(query=True)
+        return physics_solver.PhysicsParams(
+            gravity=tuple(sb.value() for sb in self.sb_pa_grav),
+            linear_damping=self.sr_pa_lin.value(),
+            angular_damping=self.sr_pa_ang.value(),
+            swing1_mode=self._limit_mode(self.cb_pa_sw[0].currentText()),
+            swing1=self.sb_pa_sw[0].value(),
+            swing2_mode=self._limit_mode(self.cb_pa_sw[1].currentText()),
+            swing2=self.sb_pa_sw[1].value(),
+            start=(physics_solver.START_SETTLED if self.cb_pa_start.currentIndex() == 1
+                   else physics_solver.START_ANIMATION),
+            settle_seconds=self.sb_pa_settle.value(),
+            substeps=self.sb_pa_sub.value(),
+            iterations=self.sb_pa_iter.value(),
+            collision=(physics_solver.COLLISION_GROUND if self.cb_pa_col.currentIndex() == 1
+                       else physics_solver.COLLISION_NONE),
+            # 샘플 위치는 내부 단위(cm)라 바닥 높이도 cm 로.
+            ground_height=self.sb_pa_ground.value() * scene_sampler.cm_per_scene_unit(),
+            up_axis=scene_sampler.up_axis_index(),
+            blend=self.sr_blend.value(),
+            loop=self.chk_loop.isChecked(),
+            kinematic_root=self.chk_pa_kin.isChecked(),
+            reference=ref)
 
     # ==============================================================
     # state
@@ -514,6 +786,8 @@ class MainWindow(QWidget):
         return (dlg.points(), dlg.interpolation(), dlg.tangents())
 
     def _params(self):
+        if self._is_physics():
+            return self._physics_params()
         return chain_solver.SolverParams(
             stiffness=self.sr_stiff.value(),
             damping=self.sr_damp.value(),
@@ -616,6 +890,8 @@ class MainWindow(QWidget):
                          ", ".join(self.session.branched)), warn=True)
         self.log("Sampled {0} chain(s), {1} nodes, {2} frames.".format(
             chains, count, frames))
+        if self._is_physics():
+            self._update_swing_labels()
         return True
 
     # ==============================================================
@@ -772,7 +1048,9 @@ class MainWindow(QWidget):
             self, "About",
             "Secondary Motion\nv{0}  ({1})\n\n"
             "Adds KawaiiPhysics-style inertia (follow-through) to an FK chain\n"
-            "and bakes it as keyframes.\n\n"
+            "and bakes it as keyframes.\n"
+            "Physics Asset solver: only the chain root follows the animation,\n"
+            "the rest is simulated (gravity, inertia, joint limits).\n\n"
             "The whole range is re-solved on every parameter change and written\n"
             "into an override anim layer, so playback stays real-time.\n"
             "Falloff is the inertia dial: nodes further from the parent lag more.\n"

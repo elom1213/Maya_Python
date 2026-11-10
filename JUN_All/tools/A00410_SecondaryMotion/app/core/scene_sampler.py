@@ -372,6 +372,51 @@ def sample_chain(chain, frames, target_type=TARGET_CTRL, dummy_tip=True,
     return s
 
 
+def _qt(q):
+    """MQuaternion -> (x, y, z, w) 튜플(physics_solver 는 maya 를 모른다)."""
+    return (q.x, q.y, q.z, q.w)
+
+
+def physics_input(sample, ref_index=0, kinematic_root=True):
+    """ChainSample -> physics_solver.PhysicsChainInput (+ 애니메이션 월드 회전).
+
+    기준 포즈(ref_index 프레임)에서 노드 사이의 상대 회전과 뼈 벡터를 잰다. 그 뒤로는
+    **루트 위치 · 루트의 DAG 부모 회전**(+ kinematic_root 면 노드 0 의 회전)만 프레임마다 쓴다.
+    반환: (PhysicsChainInput, anim_world[f][i]) — anim_world 는 Physics Blend 용.
+    """
+    from tools.A00410_SecondaryMotion.app.core import physics_solver as ps
+
+    n_pts = sample.point_count()
+    n_rot = min(n_pts - 1, sample.count())
+    if n_rot < 1:
+        raise RuntimeError("Chain has no bone to simulate.")
+    nf = len(sample.frames)
+    r = max(0, min(nf - 1, int(ref_index)))
+
+    T = sample.positions[r]
+    Wr = sample.world_quats[r]
+    ref_rel = []
+    bone_local = []
+    for i in range(n_rot):
+        par = sample.parent_quats[r][0] if i == 0 else Wr[i - 1]
+        ref_rel.append(_qt(Wr[i] * par.inverse()))
+        v = om.MVector(T[i + 1][0] - T[i][0], T[i + 1][1] - T[i][1],
+                       T[i + 1][2] - T[i][2]).rotateBy(Wr[i].inverse())
+        bone_local.append((v.x, v.y, v.z))
+
+    root_pos = [tuple(sample.positions[f][0]) for f in range(nf)]
+    root_parent_q = [_qt(sample.parent_quats[f][0]) for f in range(nf)]
+    root_node_q = None
+    if kinematic_root:
+        root_node_q = [_qt(sample.world_quats[f][0]) for f in range(nf)]
+    init_points = [tuple(p) for p in sample.positions[0][:n_rot + 1]]
+    anim_world = [[_qt(sample.world_quats[f][i]) for i in range(n_rot)]
+                  for f in range(nf)]
+    chain = ps.PhysicsChainInput(root_pos, root_parent_q, ref_rel, bone_local,
+                                 init_points, root_node_q)
+    return chain, anim_world
+
+
 def scene_fps():
     """현재 씬의 프레임레이트(fps). 알 수 없으면 24."""
     unit = cmds.currentUnit(query=True, time=True)
@@ -386,3 +431,20 @@ def scene_fps():
         except ValueError:
             pass
     return 24.0
+
+
+def cm_per_scene_unit():
+    """씬 리니어 단위 1 이 몇 cm 인가.
+
+    `getAttr worldMatrix` 는 씬 단위와 관계없이 **내부 단위(cm)** 로 돌려준다(mayapy 확인 —
+    단위 m 에서 translateX 1 -> worldMatrix 100). 그래서 샘플 위치 · 중력(cm/s²)은 그대로 쓰고,
+    사용자가 씬 단위로 입력하는 값(바닥 높이)만 이 배수로 cm 로 바꾼다.
+    """
+    unit = cmds.currentUnit(query=True, linear=True)
+    return {"mm": 0.1, "cm": 1.0, "m": 100.0, "km": 100000.0,
+            "in": 2.54, "ft": 30.48, "yd": 91.44, "mi": 160934.4}.get(unit, 1.0)
+
+
+def up_axis_index():
+    """씬 업 축(Y = 1, Z = 2)."""
+    return 2 if cmds.upAxis(query=True, axis=True).lower() == "z" else 1

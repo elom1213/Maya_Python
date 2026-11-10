@@ -1,6 +1,6 @@
 ---
 name: wip-a00410-secondarymotion
-description: "A00410_SecondaryMotion — FK 체인 관성(2차 모션)을 키로 굽는 신규 툴, 설계 근거와 마야 변환 규칙"
+description: "A00410_SecondaryMotion — FK 체인 관성(2차 모션)을 키로 굽는 툴, 설계 근거와 마야 변환 규칙 · v01.12 Physics Asset 솔버"
 metadata: 
   node_type: memory
   type: project
@@ -105,7 +105,17 @@ Jiggle 은 메시 포인트 전용(조인트에 못 씀), spring 컨스트레인
   - Axis/Length 는 샘플에 들어가므로 바꾸면 **재샘플링**(`_invalidate`), 슬라이더처럼 `_schedule` 로 두면 안 된다.
   - `Rotate last node` 와 독립 — 노드 하나면 끌 이유가 없다. Length 0 = 예전 동작(에러 메시지가 Length 를 안내).
   - 검증 관용구 그대로: 구운 회전으로 계산한 `offset * worldMatrix` == 솔버의 점[1] (5e-14 / 조인트 9e-15).
-- 문서: `JUN_All/docs/A00410_SecondaryMotion.md`, 계획서 `docs/plans/A00410_ChainPhysics_plan.md`.
+- **v01.12 `Solver: Physics Asset`(2026-11-10)** — 원래 회전값을 **지키지 않는** 두 번째 솔버(사용자의 가장 큰 기대).
+  새 모듈 `physics_solver`(순수 파이썬)라 Kawaii 경로는 한 줄도 안 바뀜. 애니메이션이 들어오는 곳은 루트 위치 · 루트 DAG 부모
+  회전(+ `kinematic_root` 기본 켬이면 노드 0 회전)뿐. 노드 월드 회전 = `qm(ref_rel[i], W_parent) * 최소스윙`, 키 변환은
+  `build_rotations_from_world`(다음 부모에 `W_orig⁻¹·W_new` 를 얹어 오프셋 그룹은 남고 자식 애니는 빠짐).
+  - ★ `getAttr worldMatrix` 는 씬 단위와 무관하게 **cm** → 중력 cm/s² 그대로, 바닥 높이만 환산.
+  - ★ 시험 씬에서 `cmds.parent(ctl, grp)` 는 월드 위치 유지 → 원점에 겹친 체인으로 "통과" 하거나 엉뚱하게 실패. `relative=True`.
+  - ★ fps 독립 시험은 서브스텝 dt 가 같을 때만(24×8 vs 48×4) — dt 가 다르면 혼돈 진자는 갈라진다.
+  - Settled 는 정착 동안 감쇠를 올려 시간만 줄인다. 1단계 트위스트 = 부모를 따름(Locked). Collision None/Ground(사용자 지정).
+  - 성능 20본×300f 서브스텝4+한계 0.12s — 프리뷰도 같은 계산(품질 낮춘 프리뷰는 보이는 것과 구운 것이 달라져서 안 함).
+  - 시험 `tests/test_physics_core.py` 18 · `test_physics_maya.py` 15 · `test_physics_ui.py` 18, 데모 `demo_physics_asset.py`. GUI 확인 아직.
+- 문서: `JUN_All/docs/A00410_SecondaryMotion.md`, 계획서 `docs/plans/A00410_ChainPhysics_plan.md` · `A00410_PhysicsAsset_plan.md`.
 - 미해결: 빠른 구동 + Substeps=3 에서 왕복 오차 4.7e-05(~3ppm), 원인 미특정. 콜라이더/키 감축 없음(v01.03~04 예정).
 
 관련: [[framework-progress-widget]], [[mayapy-headless-verify]], [[tsl-selection-order]], [[undo-chunk-by-default]], [[maya-2023-compat]]

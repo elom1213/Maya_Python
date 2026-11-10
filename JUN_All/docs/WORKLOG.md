@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-11-09
+updated: 2026-11-10
 ---
 
 # 작업 일지 (WORKLOG)
@@ -31,7 +31,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-11-09 (오늘)
+## 2026-11-10 (오늘)
+
+> [!summary] A00410_SecondaryMotion **v01.12 Solver: Physics Asset** `#A00410_SecondaryMotion`
+- 요청: KawaiiPhysics(원래 회전값 유지)와 달리 **원래 회전값을 지키지 않는** 언리얼 Physics Asset 움직임 재현 — 계획서 → 추천대로 + 충돌 None / Ground 선택.
+- 계획서 `docs/plans/A00410_PhysicsAsset_plan.md`. 구현: 순수 파이썬 `physics_solver`(점 + 노드 월드 회전, 기준 포즈 상대 회전 × 최소 스윙, Swing1/2 타원 콘, 중력 cm/s², 감쇠 1/s, Settled, Ground), 월드 회전 → 로컬 키 `build_rotations_from_world`, UI `Solver` 라디오 + Physics Asset 박스(Kawaii 전용 값은 숨김). 첫 노드 Kinematic 옵션 기본 켬.
+- 핵심 판정: 자식 회전 키 유무와 결과 차 **7e-14°**(Kawaii 대조 43°), 정지 체인 매달림. 시험 core 18 · maya 15 · UI 18. 0단계 측정 20본×300f 서브스텝 4 = 0.12 s. **GUI 확인 아직.**
+
+## 2026-11-09
 
 > [!summary] A00110_animTool_V02 **v02.55 Copy Key rotate order 경고** `#A00110_animTool`
 - 요청: Copy Key 의 Base / Target 끼리 rotate order 가 다르면 팝업으로 알리고 Continue / Cancel 로 고르게.

@@ -495,6 +495,11 @@ Default Distance attribute (driver signal x)
   **keys**. Live Preview computes the whole range into a preview layer so it can be scrubbed immediately;
   Apply promotes that same layer to the final **override animation layer**, leaving the original animation
   intact and letting the **layer weight dial the strength** (0 = original, 1 = full) — or be deleted outright.
+- **A second solver — Unreal's Physics Asset**: KawaiiPhysics wobbles on top of the original rotations; a Physics
+  Asset does not keep them — only the root follows the animation and the rest moves by gravity, inertia and joint
+  limits (Swing 1/2 elliptical cones). The pure-Python solver carries each node's world rotation as **its parent's
+  rotation times the reference-pose relative rotation times a minimal swing**, so animated rotations have no way in,
+  and a test pins that down: with or without keys on the child nodes the result differs by 7e-14° (KawaiiPhysics: 43°).
 - **Where the maths had to be exact**: a joint's local rotation is `R × jointOrient` while a plain
   transform's is `rotateAxis × R` — composing them the same way breaks one of the two. Assuming a chain
   node's parent is the previous chain node also breaks on rigs with offset groups in between, so the real

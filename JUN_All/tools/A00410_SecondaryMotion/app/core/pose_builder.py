@@ -119,3 +119,45 @@ def build_rotations(sample, sim_positions):
             prev_delta = q_swing
 
     return out
+
+
+def build_rotations_from_world(sample, world, count=None):
+    """Physics Asset 솔버의 노드 월드 회전 -> 노드별 로컬 회전(도) 프레임열.
+
+    world[f][i] = (x, y, z, w) 튜플(마야 MQuaternion 과 같은 성분 순서).
+    `build_rotations` 와 다른 점: 애니메이션 회전(`W_orig`) 위에 스윙을 얹지 않고, 솔버가 준
+    월드 회전을 **그대로** 쓴다. 다음 노드의 부모에는 변화량 `W_orig^-1 * W_new` 를 얹는다 —
+    그래야 사이에 낀 오프셋 그룹(정적)은 남고 **자식의 애니메이션 회전은 결과에서 빠진다**.
+
+        parent_new = parent_orig * delta_prev
+        local      = W_new * parent_new^-1
+        R          = RA^-1 * local * JO^-1
+    """
+    n_rot = len(world[0]) if world else 0
+    if count is not None:
+        n_rot = min(n_rot, count)
+    out = [[] for _ in range(n_rot)]
+    prev_vals = [None] * n_rot
+
+    for f in range(len(sample.frames)):
+        W = sample.world_quats[f]
+        parents = sample.parent_quats[f]
+        prev_delta = None
+        for i in range(n_rot):
+            x, y, z, w = world[f][i]
+            w_new = om.MQuaternion(x, y, z, w)
+            parent_q = parents[i]
+            if prev_delta is not None:
+                parent_q = parent_q * prev_delta
+            local = w_new * parent_q.inverse()
+            r = sample.ra_inv[i] * local * sample.jo_inv[i]
+            e = r.asEulerRotation().reorder(sample.orders[i])
+            vals = (math.degrees(e.x), math.degrees(e.y), math.degrees(e.z))
+            if prev_vals[i] is not None:
+                vals = (_unwrap(vals[0], prev_vals[i][0]),
+                        _unwrap(vals[1], prev_vals[i][1]),
+                        _unwrap(vals[2], prev_vals[i][2]))
+            out[i].append(vals)
+            prev_vals[i] = vals
+            prev_delta = W[i].inverse() * w_new
+    return out

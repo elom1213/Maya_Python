@@ -1,5 +1,37 @@
 # Changelog — A00410_SecondaryMotion
 
+## v01.12 (2026-11-10)
+
+- **[Add] `Solver` — `Kawaii (keep animation)` / `Physics Asset (simulate)`** (창 위쪽, 마지막 선택 기억).
+  Physics Asset 은 언리얼 Physics Asset 의 시뮬레이트 바디를 흉내 낸다 — **체인 루트만 애니메이션을 따르고**,
+  나머지 노드는 중력 · 관성 · 감쇠 · 조인트 한계로만 움직인다. **체인 노드의 회전 키는 결과에 쓰이지 않는다**
+  (KawaiiPhysics 는 원래 회전값을 바탕으로 흔들림을 얹는다 — 그 차이가 이 모드의 목적).
+  - 값: `Root node follows the animation`(기본 켬 — 첫 노드는 Kinematic) · `Gravity`(cm/s², 업 축 -980) ·
+    `Linear Damp` / `Angular Damp`(1/s) · `Swing 1` / `Swing 2`(Limited / Locked / Free, 기본 Limited 45°,
+    축 이름은 뼈 축에서) · `Twist`(1단계: 부모를 따른다 = Locked) · `Start`(From animation / Settled + 초) ·
+    `Reference pose`(Start frame / Current frame) · `Substeps` / `Iterations` · `Collision`(None / Ground + Height).
+  - Kawaii 전용 값은 Physics Asset 일 때 숨는다. Blend · Rotate Axis · Rotate last node · Virtual Child · Loop · 출력은 공용.
+  - 솔버를 바꾸면 프리뷰 레이어를 다시 만든다(샘플 캐시 재사용).
+- core: `physics_solver.py`(신규, 순수 파이썬 — `PhysicsParams` · `PhysicsChainInput` · `solve_physics` ·
+  `solve_physics_loop` · `clamp_swing`), `scene_sampler.physics_input()` · `cm_per_scene_unit()` · `up_axis_index()`,
+  `pose_builder.build_rotations_from_world()`, `SecondaryMotionSession.solve()` 가 params 종류로 갈라진다 ·
+  `reference_index()` · `swing_axis_names()`. Kawaii 경로(`chain_solver` · `build_rotations`)는 한 줄도 바뀌지 않았다.
+- 실측: `getAttr worldMatrix` 는 씬 단위와 관계없이 **cm**(단위 m 에서 translateX 1 -> 100) → 중력은 cm/s² 그대로,
+  바닥 높이만 환산.
+
+### 검증
+
+- `tests/test_physics_core.py` 18/18(순수 파이썬): 정지 체인이 중력 방향으로 1.3° 안 · 길이 8e-15 ·
+  타원 콘 안(최대 1.000000) + Free 대조군은 넘음 · Locked = 부모에 고정 · 감쇠 0 이면 계속 흔들림 / 감쇠면 잦아듦 ·
+  24fps×8 와 48fps×4 같은 초 시점 0.10(체인 30 의 0.3%) · Settled 첫 프레임 = 마지막 · 바닥 · 루프 이음매.
+- `tests/test_physics_maya.py` 15/15(mayapy, 오프셋 그룹 · RA · RO · JO 섞음): **자식 키 유무와 결과 차 7e-14°**
+  (Kawaii 대조군 43°) · 구운 키의 월드 위치 = 솔버 4e-14, 회전 3e-6° · 루트 위치 불변 · 정지 체인 매달림(원본 대비 87°,
+  Kawaii 대조군 9e-15) · 조인트 체인 왕복 3e-14 · Blend 0 = 원본 · Override Layer · 단위 헬퍼.
+- `tests/test_physics_ui.py` 18/18(오프스크린): 솔버 전환 · 숨김 · optionVar · 기본값 · Collision None/Ground ·
+  Swing 라벨(Z / Y) · 전환 시 프리뷰 재생성 · Bake Keys.
+- 데모 `tests/demo_physics_asset.py`: 루트 대비 팁 높이 Kawaii +25(말린 키 유지) / Physics Asset -30(매달림).
+- **마야 GUI 확인 아직.**
+
 ## v01.11 (2026-10-12)
 
 - **[Fix/Add] 자식이 없는 노드도 혼자 찰랑인다 — `Virtual Child` 박스** (Physics 박스,

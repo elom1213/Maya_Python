@@ -32,6 +32,7 @@ from maya.api import OpenMaya as om, OpenMayaAnim as oma
 
 from tools.A00410_SecondaryMotion.app.core import chain_solver
 from tools.A00410_SecondaryMotion.app.core import outputs
+from tools.A00410_SecondaryMotion.app.core import physics_solver
 from tools.A00410_SecondaryMotion.app.core import pose_builder
 from tools.A00410_SecondaryMotion.app.core import scene_sampler
 
@@ -153,6 +154,34 @@ class SecondaryMotionSession(object):
             self.clear_preview()
         return self.axes
 
+    def reference_index(self, frame=None):
+        """기준 포즈 프레임 -> 샘플 인덱스. None 이거나 구간 밖이면 0(시작 프레임)."""
+        if frame is None or not self.frames:
+            return 0
+        if frame < self.frames[0] - 1e-6 or frame > self.frames[-1] + 1e-6:
+            return 0
+        return min(range(len(self.frames)), key=lambda k: abs(self.frames[k] - frame))
+
+    def swing_axis_names(self):
+        """Physics Asset 의 (Twist, Swing1, Swing2, 체인 안에서 축이 섞였는가) - 첫 체인 기준.
+
+        Twist 축 = 뼈 방향에 가장 가까운 노드 로컬 축(UE: Twist X -> Swing1 Z, Swing2 Y).
+        첫 시뮬레이션 노드(키네마틱 루트면 노드 1)의 축으로 이름을 붙인다.
+        """
+        if not self.samples:
+            return None
+        try:
+            chain, _ = scene_sampler.physics_input(self.samples[0], 0, False)
+        except Exception:
+            return None
+        axes = chain.twist_axis
+        if not axes:
+            return None
+        k = axes[1] if len(axes) > 1 else axes[0]
+        names = "XYZ"
+        mixed = len(set(axes[1:] or axes)) > 1
+        return names[k], names[(k + 2) % 3], names[(k + 1) % 3], mixed
+
     def node_count(self):
         return len(self._last_writes) or sum(s.count() for s in self.samples)
 
@@ -255,7 +284,27 @@ class SecondaryMotionSession(object):
         loop = bool(getattr(params, "loop", False))
         self.loop_infos = []
         total = len(self.samples)
+        physics = isinstance(params, physics_solver.PhysicsParams)
+        ref_index = self.reference_index(getattr(params, "reference", None))
         for ci, (sample, own) in enumerate(zip(self.samples, self.owners)):
+            if physics:
+                # Physics Asset — 루트(와 그 부모)만 애니메이션, 나머지는 시뮬레이션.
+                chain, anim_world = scene_sampler.physics_input(
+                    sample, ref_index, params.kinematic_root)
+                if loop:
+                    _pts, world, info = physics_solver.solve_physics_loop(
+                        chain, params, anim_world)
+                    self.loop_infos.append(info)
+                else:
+                    _pts, world = physics_solver.solve_physics(
+                        chain, params, anim_world)
+                rots = pose_builder.build_rotations_from_world(sample, world)
+                for i, values in enumerate(rots):
+                    if own[i]:
+                        writes[sample.nodes[i]] = values
+                if progress:
+                    progress(ci + 1, total, "chain {0}/{1}".format(ci + 1, total))
+                continue
             if loop:
                 # 사이클 정상상태 — 첫/마지막 프레임의 흔들림이 같아진다.
                 sim, info = chain_solver.solve_loop(sample.positions, params)
