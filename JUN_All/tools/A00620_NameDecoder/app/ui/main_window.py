@@ -40,6 +40,7 @@ from Framework.qt.qt import (
     QColor,
     QIcon,
     QSize,
+    QTimer,
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
@@ -252,7 +253,14 @@ class MainWindow(QWidget):
         self.tabs.addTab(self.bs_page, "Blend Shapes")
         self.rename_page = self._build_rename_tab()
         self.tabs.addTab(self.rename_page, "Rename to ASCII")
-        main_layout.addWidget(self.tabs, stretch=3)
+        # 탭을 스크롤 칸에 담는다 (v01.04). QTabWidget 의 최소 폭은 안 보이는 탭까지 포함한 가장 넓은 줄이라
+        # (Outliner 윗줄) 창을 그보다 좁힐 수 없었다. 스크롤 칸은 최소가 작아 창을 자유롭게 줄이고 늘린다(좁으면 가로 스크롤바).
+        # 스크롤 칸에 최소 폭을 걸지 않는다 - 걸면 다시 그 폭 아래로 못 줄인다. 여는 크기는 fit_to_content 가 내용에 맞춘다.
+        self.tabs_scroll = QScrollArea()
+        self.tabs_scroll.setWidgetResizable(True)
+        self.tabs_scroll.setFrameShape(QFrame.NoFrame)
+        self.tabs_scroll.setWidget(self.tabs)
+        main_layout.addWidget(self.tabs_scroll, stretch=3)
         self.set_rename_tab_visible(False)
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
@@ -263,7 +271,8 @@ class MainWindow(QWidget):
         self.log_view.setMinimumHeight(110)
         main_layout.addWidget(self.log_view, stretch=1)
 
-        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
+        # 처음 여는 크기는 fit_to_content 가 정하고, 그 끝에서 켠다 - 그 뒤로 높이는 현재 탭을 따른다(tabs_scroll 패턴)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs, enabled=False)
 
     # ------------------------------------------------------------------ Outliner
 
@@ -274,6 +283,9 @@ class MainWindow(QWidget):
         row = QHBoxLayout()
         row.addWidget(QLabel("Scope"))
         self.cb_out_scope = QComboBox()
+        # 가장 긴 항목('Selected + Hierarchy') 폭을 최소로 요구하지 않게 - 창을 좁힐 수 있도록 (v01.04)
+        self.cb_out_scope.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.cb_out_scope.setMinimumContentsLength(8)
         for label, key in SCOPES:
             self.cb_out_scope.addItem(label, key)
         self.cb_out_scope.setToolTip("Scene: every DAG node.\n"
@@ -354,6 +366,8 @@ class MainWindow(QWidget):
         row = QHBoxLayout()
         row.addWidget(QLabel("Scope"))
         self.cb_scope = QComboBox()
+        self.cb_scope.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)   # v01.04, 위와 같다
+        self.cb_scope.setMinimumContentsLength(8)
         for label, key in SCOPES:
             self.cb_scope.addItem(label, key)
         self.cb_scope.setToolTip("Scene: every node.\n"
@@ -1286,6 +1300,28 @@ class MainWindow(QWidget):
     # ==================================================================
     # 창 동작
     # ==================================================================
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not getattr(self, "_fitted", False):
+            self._fitted = True
+            # 테마 qss 가 입은 뒤(다음 이벤트 루프) 글자 크기로 재야 여는 크기가 맞다
+            QTimer.singleShot(0, self.fit_to_content)
+
+    def fit_to_content(self):
+        """처음 열 때만 창을 내용 폭에 맞춘다(화면 작업 영역까지) - 스크롤 칸에 담기 전과 같은 크기로 열린다.
+        그 뒤로 폭은 건드리지 않는다(사용자가 자유롭게 줄이고 늘린다)."""
+        extra_w = max(self.minimumSizeHint().width() - self.tabs_scroll.minimumSizeHint().width(), 0)
+        width = max(self.tabs.minimumSizeHint().width() + extra_w, self.width())
+        height = self.height()
+        screen = self.screen() if hasattr(self, "screen") else None
+        if screen is not None:
+            avail = screen.availableGeometry()
+            frame_h = max(self.frameGeometry().height() - self.geometry().height(), 0)
+            width = min(width, avail.width())
+            height = min(height, avail.height() - frame_h)
+        self.resize(width, height)
+        self.tab_fit.set_enabled(True)
 
     def closeEvent(self, event):
         self._kill_sync_job()

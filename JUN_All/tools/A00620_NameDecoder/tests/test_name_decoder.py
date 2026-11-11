@@ -447,6 +447,27 @@ w.restore_names()
 check("8 restore refreshes the outliner", any(n.decoded == u"顔" for n in w.out_nodes))
 w.close()
 
+# 8-7 창 가로 크기 자유 (v01.04) - 탭을 스크롤 칸에, 콤보는 가장 긴 항목 폭을 요구하지 않는다
+w = MW.MainWindow()
+w.show()
+for _ in range(3):
+    APP.processEvents()
+check("8 resize: window minimum width no longer follows the widest tab row",
+      w.minimumSizeHint().width() < 400 < w.tabs.minimumSizeHint().width(),
+      (w.minimumSizeHint().width(), w.tabs.minimumSizeHint().width()))
+w.resize(360, w.height())
+APP.processEvents()
+narrow_bar = w.tabs_scroll.horizontalScrollBar().isVisible()
+check("8 resize: narrows to 360 with a horizontal scroll bar", w.width() == 360 and narrow_bar, (w.width(), narrow_bar))
+w.resize(w.tabs.minimumSizeHint().width() + 200, w.height())
+APP.processEvents()
+check("8 resize: wide again, no scroll bar", not w.tabs_scroll.horizontalScrollBar().isVisible())
+check("8 resize: scope combos do not ask for the longest item",
+      w.cb_out_scope.minimumSizeHint().width() < w.cb_out_scope.sizeHint().width() or
+      w.cb_out_scope.sizeAdjustPolicy() == MW.QComboBox.AdjustToMinimumContentsLengthWithIcon)
+check("8 resize: tabFit turned on after the first fit", w.tab_fit.is_enabled())
+w.close()
+
 # 8-5 속도 - 합성 1 만 노드(10 단 체인 1000 개)
 cmds.file(new=True, force=True)
 for c in range(1000):
