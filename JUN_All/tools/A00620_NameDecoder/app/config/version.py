@@ -31,5 +31,7 @@
 # 01.04  창 가로 크기 자유 조절 - 탭을 스크롤 칸(tabs_scroll)에 담아 창 최소 폭이 가장 넓은 탭 줄(Outliner 윗줄)을
 #        따르지 않게(좁으면 가로 스크롤바). 여는 크기는 fit_to_content 로 내용 폭에 맞춤, Scope 콤보 2 개는 가장 긴 항목 폭을 요구하지 않음.
 
-VERSION = "01.04"
+# 01.05  Outliner: Raw Column 체크박스(아래 줄) - Raw (Maya name) 칸을 접었다 편다. 헤더 우클릭 메뉴와 같은 상태, optionVar 기억.
+
+VERSION = "01.05"
 LAST_UPDATE = "2026-11-11"

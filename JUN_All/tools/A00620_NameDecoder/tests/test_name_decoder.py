@@ -426,6 +426,23 @@ check("8 ui: select hierarchy", FN.encode(u"顔Shape") in cmds.ls(selection=True
 w.set_out_raw_column(False, save=False)
 check("8 ui: raw column hidden", w.tree_out.isColumnHidden(MW.OUT_COL_RAW))
 w.set_out_raw_column(True, save=False)
+# v01.05 Raw Column 체크박스 - 헤더 메뉴(set_out_raw_column)와 같은 상태
+check("8 raw toggle: checkbox follows the column", w.chk_out_raw.isChecked() and not w.tree_out.isColumnHidden(MW.OUT_COL_RAW))
+_raw_saved = MW.cmds.optionVar(query=MW.OPTVAR_OUT_RAW) if MW.cmds.optionVar(exists=MW.OPTVAR_OUT_RAW) else None
+w.chk_out_raw.setChecked(False)
+APP.processEvents()
+check("8 raw toggle: unchecking hides the Raw column, Name fills the width",
+      w.tree_out.isColumnHidden(MW.OUT_COL_RAW)
+      and w.tree_out.header().sectionSize(MW.OUT_COL_NAME) >= w.tree_out.viewport().width() - 2,
+      (w.tree_out.header().sectionSize(MW.OUT_COL_NAME), w.tree_out.viewport().width()))
+check("8 raw toggle: remembered in the optionVar", MW.cmds.optionVar(query=MW.OPTVAR_OUT_RAW) == 0)
+w.set_out_raw_column(True, save=False)
+check("8 raw toggle: header menu path updates the checkbox", w.chk_out_raw.isChecked()
+      and not w.tree_out.isColumnHidden(MW.OUT_COL_RAW))
+if _raw_saved is None:
+    MW.cmds.optionVar(remove=MW.OPTVAR_OUT_RAW)
+else:
+    MW.cmds.optionVar(intValue=(MW.OPTVAR_OUT_RAW, _raw_saved))
 w.zoom_outliner.set_scale(2.0, save=False)
 check("8 ui: zoom grows the icons", w.tree_out.iconSize().width() == 32)
 w.zoom_outliner.set_scale(1.0, save=False)

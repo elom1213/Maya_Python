@@ -33,6 +33,10 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-11 (오늘)
 
+> [!summary] A00620_NameDecoder **v01.05 Outliner Raw Column 토글** `#A00620_NameDecoder`
+- 요청: Outliner 의 Raw 칸을 접었다 펴서 안 보이게. 헤더 우클릭 메뉴에만 있던 기능을 아래 줄 `Raw Column` 체크박스로 꺼냄(두 경로 같은 상태, optionVar 기억, 숨기면 Name 칸이 폭을 다 씀).
+- 시험 122/122. **GUI 확인 아직.**
+
 > [!summary] A00620_NameDecoder **v01.04 창 가로 크기 자유 조절** `#A00620_NameDecoder`
 - 제보: 창 가로를 일정 길이보다 줄일 수 없다. 실측(오프스크린, 테마 적용): 창 최소 폭 1029 = **Outliner 윗줄 985**(v01.02 에서 Names 752 보다 넓어짐) — QTabWidget 최소 폭은 숨은 탭까지 가장 넓은 줄, `Scope` 콤보도 가장 긴 항목 폭 268 을 요구.
 - 수정: 탭을 `tabs_scroll`(QScrollArea, NoFrame, 최소 폭 안 걸기)에 담음 → 창 최소 폭 266, 좁히면 가로 스크롤바. 여는 크기는 `fit_to_content` 로 내용 폭(화면까지), tabFit 은 그 뒤에 켬. Scope 콤보 2 개 `AdjustToMinimumContentsLengthWithIcon`.

@@ -344,7 +344,6 @@ class MainWindow(QWidget):
         self.zoom_outliner = JUN_mod_viewZoom_qt_v01(self.tree_out, key="A00620/outliner", default=1.0)
         self.zoom_outliner.scale_changed.connect(self._apply_out_icon_size)
         self._apply_out_icon_size(self.zoom_outliner.scale())
-        self.set_out_raw_column(self._load_out_raw_column(), save=False)
 
         row2 = QHBoxLayout()
         row2.addWidget(self.lbl_out_number)
@@ -352,9 +351,16 @@ class MainWindow(QWidget):
         self.chk_out_sync.setToolTip("Select, expand to and scroll to the nodes selected in Maya.")
         self.chk_out_sync.toggled.connect(lambda _on: self._update_sync_job())
         row2.addWidget(self.chk_out_sync)
+        # Raw 칸 접기 / 펴기 (v01.05) - 헤더 우클릭 메뉴와 같은 상태, optionVar 기억
+        self.chk_out_raw = QCheckBox("Raw Column")
+        self.chk_out_raw.setToolTip("Show or hide the Raw (Maya name) column.\n"
+                                    "Also in the header right-click menu.")
+        self.chk_out_raw.toggled.connect(self.set_out_raw_column)
+        row2.addWidget(self.chk_out_raw)
         row2.addStretch(1)
         row2.addWidget(self.zoom_outliner.controls())
         lay.addLayout(row2)
+        self.set_out_raw_column(self._load_out_raw_column(), save=False)
         return page
 
     # ------------------------------------------------------------------ Names
@@ -775,7 +781,13 @@ class MainWindow(QWidget):
         return True
 
     def set_out_raw_column(self, visible, save=True):
+        """Raw (Maya name) 칸 보이기 / 숨기기. 체크박스 · 헤더 메뉴 어느 쪽에서 바꿔도 둘이 같은 상태."""
+        visible = bool(visible)
         self.tree_out.setColumnHidden(OUT_COL_RAW, not visible)
+        if self.chk_out_raw.isChecked() != visible:
+            self.chk_out_raw.blockSignals(True)
+            self.chk_out_raw.setChecked(visible)
+            self.chk_out_raw.blockSignals(False)
         if save:
             cmds.optionVar(intValue=(OPTVAR_OUT_RAW, int(bool(visible))))
 
