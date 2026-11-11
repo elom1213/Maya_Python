@@ -10,7 +10,7 @@ updated: 2026-11-11
 마야 FBX 임포터가 `FBXASC227FBXASC129FBXASC130` 처럼 바꿔 놓은 이름(일본어 · 중국어 · 띄어쓰기 · 맨 앞 숫자)을
 **원래 글자로 풀어 보여 주는** in-Maya PySide 툴(arch B). 기본 동작은 **읽기만** 하고 씬을 바꾸지 않는다.
 
-- **버전**: `app/config/version.py` (v01.05)
+- **버전**: `app/config/version.py` (v01.06)
 - **설치**: `__dragDrop_A00620.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **Decode** → `tools.A00620_NameDecoder.run(True)`
   (ToolLauncher `UTIL` 프로파일 `Scene` 칸에도 있다)
 - **계획서**: [`plans/A00620_NameDecoder_plan.md`](plans/A00620_NameDecoder_plan.md) (실측 근거 §2) ·
@@ -53,15 +53,17 @@ updated: 2026-11-11
 | `Refresh` | 다시 읽는다. **펼침 · 선택은 UUID 로 유지**(이름이 바뀌어도) |
 | Filter | 풀린 글자 · raw 로 찾는다. **맞는 행 + 그 조상만** 보이고 조상은 펼친다. 비우면 필터가 펼친 것만 다시 접는다 |
 | 행 클릭 | 마야에서 선택(인스턴스는 경로로 구분, 타겟 행 = blendShape 노드) |
-| `Sync with Selection` | 마야 선택 → 그 행을 고르고 조상을 펼쳐 스크롤. scriptJob 은 Names 탭 Sync 와 하나를 같이 쓴다 |
+| `Sync with Selection` | 마야 선택 → 그 행을 고른다. **접힌 조상은 펼치지 않고**(v01.06) 보이는 행으로 스크롤. scriptJob 은 Names 탭 Sync 와 하나를 같이 쓴다 |
 | 더블클릭(blendShape · 타겟) | Blend Shapes 탭으로 가서 그 blendShape 를 고르고 타겟 행으로 스크롤 |
 | 우클릭 | `Copy Decoded` · `Copy Raw` · `Copy Decoded Path` · `Select Hierarchy` · `Expand All Below` · `Collapse All` |
-| `Raw Column` (아래 줄) | `Raw (Maya name)` 칸을 접었다 편다(v01.05). 숨기면 `Name` 칸이 폭을 다 쓴다. optionVar 기억 |
+| `Raw Column` (아래 줄) | `Raw (Maya name)` 칸을 접었다 편다(v01.05). **기본 끔**(v01.06). 숨기면 `Name` 칸이 폭을 다 쓴다. optionVar 기억 |
 | 헤더 우클릭 | `Raw (Maya name)` 열 숨김 - `Raw Column` 체크박스와 같은 상태 |
 | **Alt + 가운데 버튼 드래그** | 뷰를 위아래로 끌어 옮긴다(마야 아웃라이너와 같은 조작, v01.03). 선택은 바뀌지 않는다. 공용 `Framework/qt/MOD_altPan_qt_v01.py` |
 
 - 아이콘 = 마야 리소스 `:/out_<type>.png`. 없는 타입은 상속 타입 → `out_dagNode` → `out_default`.
   blendShape · 타겟은 마야 리소스가 없어 툴 `icon/outliner_blendShape.svg` · `outliner_bsTarget.svg`.
+- **고른 행의 조상 행 = 옅은 선택색**(v01.06, 마야 아웃라이너처럼) - 접혀 있어도 그 안에 선택이 있음을 보인다. 트리에서 고를 때도 같다.
+- 로그는 **접힌 채 시작**한다(v01.06) - 로그 줄의 `Show` 로 편다.
 - 글자 색: 깨진 FBXASC = 노랑, FBXASC 없는 이름 = 회색, **숨은 노드(visibility 끔 · 조상 숨김 · 중간 셰이프) = 흐린 기울임**.
 - 화살표 = 한 단계 펼치기, Shift + 화살표 = 아래 전부. Ctrl + 휠 또는 `- 100% +` 로 확대(아이콘도 커진다).
 - `Apply ASCII Names` · `Restore Original Names` 뒤에는 Names 와 Outliner 둘 다 다시 읽는다.
@@ -145,9 +147,9 @@ tools/A00620_NameDecoder/
 "C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe" tools/A00620_NameDecoder/tests/test_name_decoder.py
 ```
 
-122 개 - 실제 이름 디코드 · **마야 FBX 임포터 실측 표와 인코더 일치** · 왕복 · 깨진 바이트 · 스캔 범위 · 내보내기 ·
+128 개 - 실제 이름 디코드 · **마야 FBX 임포터 실측 표와 인코더 일치** · 왕복 · 깨진 바이트 · 스캔 범위 · 내보내기 ·
 웨이트 · Rename/undo/Restore · UI(오프스크린) · **Outliner**(아이콘 대체 · 계층 · 인스턴스 · 숨김 · Scope · 필터 계층 모드 ·
-Sync · Refresh 유지 · Alt 드래그 이동 · 창 가로 크기 자유 · 합성 1 만 노드 Refresh 0.4 초) · 예시 씬 `0010_Miyabi_base_02.mb`(노드 149 · 타겟 52 · DAG 637, 열기만).
+Sync(조상 안 펼침 · 조상 색) · Refresh 유지 · Alt 드래그 이동 · 창 가로 크기 자유 · 합성 1 만 노드 Refresh 0.4 초) · 예시 씬 `0010_Miyabi_base_02.mb`(노드 149 · 타겟 52 · DAG 637, 열기만).
 
 마야 GUI 확인 아직 - 특히 마야 Qt 창에서 일본어 · 중국어 글꼴이 □ 로 깨지지 않는지, Outliner 아이콘이 테마 위에서 보이는지,
 깊은 체인 들여쓰기 · 확대 시 아이콘 크기.

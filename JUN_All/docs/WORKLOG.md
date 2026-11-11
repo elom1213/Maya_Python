@@ -33,6 +33,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-11 (오늘)
 
+> [!summary] A00620_NameDecoder **v01.06 Sync 는 조상을 펼치지 않고 옅게 칠함** · 로그 · Raw 칸 기본 접힘 `#A00620_NameDecoder`
+- 요청: Sync with Selection 으로 자식을 고르면 최상위 부모부터 전부 펼쳐지던 것 → 마야 아웃라이너처럼 펼치지 않고 조상 행 색만 약하게. 로그 기본 접힘, Raw Column 기본 해제.
+- `_reveal_items(expand=False)` + `_mark_out_ancestors`(선택 바뀔 때마다, 트리 클릭 포함) - 팔레트 선택색 알파 60. **★ `scrollToItem` 은 접힌 조상을 펼친다(QTreeView.scrollTo)** → 가장 바깥 접힌 조상으로 스크롤. Raw 기본 끔은 optionVar 키를 바꿔 옛 '켬' 이 덮지 않게. 로그는 공용 `set_shrunk(True)`.
+- 시험 128/128, 테마(purple_dark) 오프스크린 렌더에서 조상 행 색 확인(43,43,43 → 44,66,80). **GUI 확인 아직.**
+
 > [!summary] A00620_NameDecoder **v01.05 Outliner Raw Column 토글** `#A00620_NameDecoder`
 - 요청: Outliner 의 Raw 칸을 접었다 펴서 안 보이게. 헤더 우클릭 메뉴에만 있던 기능을 아래 줄 `Raw Column` 체크박스로 꺼냄(두 경로 같은 상태, optionVar 기억, 숨기면 Name 칸이 폭을 다 씀).
 - 시험 122/122. **GUI 확인 아직.**

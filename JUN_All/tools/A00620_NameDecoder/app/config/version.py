@@ -33,5 +33,8 @@
 
 # 01.05  Outliner: Raw Column 체크박스(아래 줄) - Raw (Maya name) 칸을 접었다 편다. 헤더 우클릭 메뉴와 같은 상태, optionVar 기억.
 
-VERSION = "01.05"
+# 01.06  Outliner Sync with Selection: 접힌 조상을 펼치지 않는다 - 고른 행의 조상 행을 옅은 선택색으로 칠한다(마야 아웃라이너처럼,
+#        트리에서 고를 때도). 스크롤은 보이는 행(가장 바깥 접힌 조상)으로. 로그는 접힌 채 시작, Raw 칸 기본 숨김(optionVar 키 변경).
+
+VERSION = "01.06"
 LAST_UPDATE = "2026-11-11"

@@ -334,6 +334,11 @@ w.show()
 APP.processEvents()
 check("8 ui: Outliner is the first tab and filled on open",
       w.tabs.indexOf(w.outliner_page) == 0 and w.tree_out.topLevelItemCount() == len(cmds.ls(assemblies=True)))
+# v01.06 기본값 - 로그 접힘, Raw 칸 숨김(optionVar 없을 때)
+check("8 ui: log starts shrunk", w.log_view.is_shrunk() and w.log_view.btn_shrink.isChecked())
+check("8 ui: Raw column hidden by default",
+      MW.cmds.optionVar(exists=MW.OPTVAR_OUT_RAW)
+      or (w.tree_out.isColumnHidden(MW.OUT_COL_RAW) and not w.chk_out_raw.isChecked()))
 face_item = w.out_items[face]
 check("8 ui: decoded name + icon + parent", face_item.text(0) == u"顔" and not face_item.icon(0).isNull()
       and face_item.parent() is w.out_items["|rig_grp"])
@@ -367,10 +372,28 @@ cmds.select(FN.encode(u"Left ankle"))
 APP.processEvents()
 w.sync_outliner_from_maya()
 check("8 ui: sync selects the maya selection", [n.decoded for n in w.selected_out_nodes()] == [u"Left ankle"])
+w.out_items["|rig_grp"].setExpanded(False)
 cmds.select(face)
 w.sync_outliner_from_maya()
-check("8 ui: sync expands to the row", [n.path for n in w.selected_out_nodes()] == [face]
-      and w.out_items["|rig_grp"].isExpanded())
+APP.processEvents()
+_rig = w.out_items["|rig_grp"]
+check("8 ui: sync selects a child without expanding its parent (v01.06)",
+      [n.path for n in w.selected_out_nodes()] == [face] and not _rig.isExpanded())
+check("8 ui: the collapsed parent row is tinted, the selected row is not",
+      _rig.background(0).style() != MW.Qt.NoBrush and _rig.background(0).color().alpha() == MW._ANCESTOR_ALPHA
+      and w.out_items[face].background(0).style() == MW.Qt.NoBrush and w._out_marked == [_rig])
+check("8 ui: scroll goes to the visible row", w._visible_row(w.out_items[face]) is _rig)
+cmds.select(FN.encode(u"Left ankle"))
+w.sync_outliner_from_maya()
+check("8 ui: tint cleared when the child is no longer selected",
+      _rig.background(0).style() == MW.Qt.NoBrush and not w._out_marked)
+_rig.setExpanded(True)
+w.out_items[face].setSelected(True)
+check("8 ui: tree clicks tint the parent too (expanded)", _rig.background(0).style() != MW.Qt.NoBrush)
+w.tree_out.clearSelection()
+_rig.setExpanded(False)
+cmds.select(face)
+w.sync_outliner_from_maya()
 tgt_item = [it for k, it in w.out_items.items() if k.endswith("|1") and k.startswith("bs|")][0]
 w.tree_out.clearSelection()
 tgt_item.setSelected(True)

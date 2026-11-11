@@ -26,6 +26,8 @@ v01.02 (2026-11-11) Outliner 탭 = 풀린 이름 + 아이콘 + DAG 계층(첫 �
 
 v01.03 Outliner Alt + 가운데 버튼 드래그 = 공용 `Framework/qt/MOD_altPan_qt_v01(view)` 한 줄(다른 리스트 · 트리에도 붙일 수 있다, 항목 단위 스크롤 OK).
 
+v01.06 Sync 는 조상을 펼치지 않고 조상 행을 옅게(마야처럼). **`QTreeWidget.scrollToItem` 은 접힌 조상을 펼친다** → 펼치지 않을 땐 가장 바깥 접힌 조상으로 스크롤. 로그 기본 접힘 · Raw 칸 기본 끔(optionVar 키 변경).
+
 v01.04 창 가로 자유 = `tabs_scroll` 패턴([[qtabwidget-min-size-hidden-pages]]) - 새 줄을 넣어 탭이 넓어지면 창 최소 폭이 따라 커지던 문제.
 
 **How to apply:** FBXASC 관련 작업은 `fbx_name` 을 쓴다(새로 짜지 말 것). 마야 GUI 확인 아직 - 마야 Qt 창의 일본어 · 중국어 글꼴(□ 로 깨지면 Yu Gothic / Microsoft YaHei 폴백).

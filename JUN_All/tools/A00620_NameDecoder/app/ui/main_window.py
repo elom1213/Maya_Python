@@ -90,7 +90,9 @@ _HIDDEN_COLOR = QColor(115, 115, 115)      # 숨은 노드(visibility 끔 · 중
 # Outliner 탭
 OUT_ICON_PX = 16                           # 배율 1.0 의 아이콘 크기 - 확대하면 함께 커진다
 OUT_INDENT = 14                            # 깊이 25 조인트 체인(예시 씬) 대비 좁은 들여쓰기
-OPTVAR_OUT_RAW = "A00620_outlinerRawColumn"
+# v01.06 기본 끔으로 바꾸며 키도 바꿨다 - 옛 키에 남은 '켬' 이 새 기본을 덮지 않게
+OPTVAR_OUT_RAW = "A00620_outlinerShowRawColumn"
+_ANCESTOR_ALPHA = 60                       # 고른 행의 조상 행 - 선택색을 옅게(마야 아웃라이너처럼)
 # 마야 리소스에 blendShape 아이콘이 없다(실측) → 툴 로컬 svg
 ICON_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "icon"))
 _LOCAL_ICONS = {}
@@ -208,6 +210,7 @@ class MainWindow(QWidget):
         self._sync_job = None
         self._out_selecting = False   # Outliner 행 클릭 → 마야 선택 중
         self._out_pushed = None       # Outliner 가 마지막으로 마야에 건 선택 (paths, uuids)
+        self._out_marked = []         # 옅게 칠한 조상 행 (v01.06)
 
         self.build_ui()
         # Outliner 는 첫 탭이라 열자마자 채운다(Names 는 Scan 버튼으로)
@@ -270,6 +273,8 @@ class MainWindow(QWidget):
             object_name="JUN_A00620_NameDecoder_log_window")
         self.log_view.setMinimumHeight(110)
         main_layout.addWidget(self.log_view, stretch=1)
+        # 로그는 접힌 채(Shrink 켜짐) 시작한다 - 버튼 줄만 보이고 Show 로 편다 (v01.06)
+        self.log_view.set_shrunk(True)
 
         # 처음 여는 크기는 fit_to_content 가 정하고, 그 끝에서 켠다 - 그 뒤로 높이는 현재 탭을 따른다(tabs_scroll 패턴)
         self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs, enabled=False)
@@ -323,6 +328,7 @@ class MainWindow(QWidget):
         self.tree_out.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree_out.customContextMenuRequested.connect(self._outliner_menu)
         self.tree_out.itemSelectionChanged.connect(self._on_outliner_selection)
+        self.tree_out.itemSelectionChanged.connect(self._mark_out_ancestors)
         self.tree_out.itemDoubleClicked.connect(self._on_outliner_double_click)
         header = self.tree_out.header()
         header.setStretchLastSection(True)
@@ -348,7 +354,8 @@ class MainWindow(QWidget):
         row2 = QHBoxLayout()
         row2.addWidget(self.lbl_out_number)
         self.chk_out_sync = QCheckBox("Sync with Selection")
-        self.chk_out_sync.setToolTip("Select, expand to and scroll to the nodes selected in Maya.")
+        self.chk_out_sync.setToolTip("Select the nodes selected in Maya.\n"
+                                     "Collapsed parents are not expanded - they are tinted instead.")
         self.chk_out_sync.toggled.connect(lambda _on: self._update_sync_job())
         row2.addWidget(self.chk_out_sync)
         # Raw 칸 접기 / 펴기 (v01.05) - 헤더 우클릭 메뉴와 같은 상태, optionVar 기억
@@ -778,7 +785,7 @@ class MainWindow(QWidget):
                 return bool(cmds.optionVar(query=OPTVAR_OUT_RAW))
         except RuntimeError:
             pass
-        return True
+        return False                 # 기본 숨김 (v01.06)
 
     def set_out_raw_column(self, visible, save=True):
         """Raw (Maya name) 칸 보이기 / 숨기기. 체크박스 · 헤더 메뉴 어느 쪽에서 바꿔도 둘이 같은 상태."""
@@ -851,6 +858,7 @@ class MainWindow(QWidget):
     def fill_outliner(self, expanded=(), selected=()):
         self.tree_out.clear()
         self.out_items = {}
+        self._out_marked = []        # 지워진 항목 - 되돌릴 것 없다
         # 1) 만들기 - 인스턴스 셰이프는 조상보다 먼저 나올 수 있다(실측) → 붙이기는 다음 단계에서
         for i, n in enumerate(self.out_nodes):
             label = n.decoded
@@ -923,21 +931,66 @@ class MainWindow(QWidget):
         finally:
             self._out_selecting = False
 
-    def _reveal_items(self, items):
-        """항목들을 고르고, 조상을 펼치고, 첫 항목으로 스크롤(마야 선택은 바꾸지 않는다)."""
+    def _reveal_items(self, items, expand=True):
+        """항목들을 고르고 첫 항목으로 스크롤(마야 선택은 바꾸지 않는다).
+
+        expand=True  : 조상을 펼쳐 항목을 보인다 (Names 탭의 Show in Outliner).
+        expand=False : 펼침은 그대로 - 접힌 조상 안의 항목은 그 조상 행이 옅게 칠해진다 (Sync, v01.06).
+        """
         self._syncing = True
         try:
             self.tree_out.clearSelection()
             for item in items:
                 item.setSelected(True)
-                parent = item.parent()
-                while parent is not None:
-                    parent.setExpanded(True)
-                    parent = parent.parent()
+                if expand:
+                    parent = item.parent()
+                    while parent is not None:
+                        parent.setExpanded(True)
+                        parent = parent.parent()
             if items:
-                self.tree_out.scrollToItem(items[0])
+                # ★ scrollToItem 은 접힌 조상을 펼친다(QTreeView.scrollTo) → 펼치지 않을 땐 보이는 행으로
+                target = items[0] if expand else self._visible_row(items[0])
+                self.tree_out.scrollToItem(target)
         finally:
             self._syncing = False
+        self._mark_out_ancestors()
+
+    @staticmethod
+    def _visible_row(item):
+        """접힌 조상 때문에 안 보이면 그 가장 바깥 접힌 조상, 보이면 item 그대로."""
+        chain = []
+        parent = item.parent()
+        while parent is not None:
+            chain.append(parent)
+            parent = parent.parent()
+        for anc in reversed(chain):          # 최상위부터
+            if not anc.isExpanded():
+                return anc
+        return item
+
+    def _mark_out_ancestors(self):
+        """고른 행의 조상 행을 옅은 선택색으로 칠한다 - 접혀 있어도 어디에 선택이 있는지 보인다(마야 아웃라이너처럼)."""
+        for item in self._out_marked:
+            try:
+                for col in (OUT_COL_NAME, OUT_COL_RAW):
+                    item.setData(col, Qt.BackgroundRole, None)
+            except RuntimeError:     # 이미 지워진 항목
+                pass
+        marked, seen = [], set()
+        for item in self.tree_out.selectedItems():
+            parent = item.parent()
+            while parent is not None and id(parent) not in seen:
+                seen.add(id(parent))
+                marked.append(parent)
+                parent = parent.parent()
+        if marked:
+            color = QColor(self.tree_out.palette().highlight().color())
+            color.setAlpha(_ANCESTOR_ALPHA)
+            brush = QBrush(color)
+            for item in marked:
+                for col in (OUT_COL_NAME, OUT_COL_RAW):
+                    item.setBackground(col, brush)
+        self._out_marked = marked
 
     def sync_outliner_from_maya(self):
         """마야에서 고른 노드의 행을 고르고 펼쳐 보인다. DAG 는 경로(인스턴스 구분), blendShape 는 UUID."""
@@ -952,7 +1005,7 @@ class MainWindow(QWidget):
         self._out_pushed = None
         items = [self.out_items[n.key] for n in self.out_nodes
                  if (n.kind == OL.KIND_DAG and n.path in paths) or (n.kind == OL.KIND_BS and n.uuid in uuids)]
-        self._reveal_items(items)
+        self._reveal_items(items, expand=False)     # 펼치지 않는다 - 조상 행이 옅게 칠해진다 (v01.06)
         return items
 
     def show_in_outliner(self, entries):
