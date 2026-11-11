@@ -25,6 +25,8 @@ from tools.A00620_NameDecoder.app.core import name_table as NT   # noqa: E402
 from tools.A00620_NameDecoder.app.core import bs_weights as BW   # noqa: E402
 from tools.A00620_NameDecoder.app.core import ascii_rename as AR   # noqa: E402
 from tools.A00620_NameDecoder.app.ui import main_window as MW   # noqa: E402
+from tools.A00620_NameDecoder.app.core import outline as OL   # noqa: E402
+from Framework.qt import maya_icons as MI   # noqa: E402
 
 MIYABI = r"C:\Users\USER\Desktop\JP\0090_Avatar\0010_ZZZ\021_Miyabi\00_01_03_RIG_01_PJ\scenes\0010_Miyabi_base_02.mb"
 
@@ -212,7 +214,7 @@ w.sync_from_maya()
 check("6 sync highlights maya selection", [e.decoded for e in w.selected_entries()] == [u"Left ankle"])
 w.chk_sync.setChecked(False)
 check("6 sync job killed", w._sync_job is None)
-w.tabs.setCurrentIndex(1)
+w.tabs.setCurrentWidget(w.bs_page)
 APP.processEvents()
 check("6 bs tab rows decoded", [r["name"].split("\n")[0] for r in w.bs_rows] == [u"まばたき", u"あ", "plainTarget"])
 w.bs_rows[1]["slider"].setValue(500)
@@ -235,6 +237,237 @@ check("6 restore via UI", cmds.objExists(FN.encode(u"顔")) and w.lbl_stored.tex
 check("6 ui strings ascii", all(t.isascii() for t in (w.windowTitle(), w.btn_scan.text(), w.btn_apply.text())))
 w.close()
 
+# ---------------------------------------------------------------- 8. Outliner (v01.02)
+import time   # noqa: E402
+
+# 8-1 아이콘
+def _pix_ok(icon):
+    return icon is not None and not icon.pixmap(16, 16).isNull()
+
+
+check("8 icons: maya resources for common DAG types",
+      all(_pix_ok(MI.node_icon(t)) for t in ("transform", "mesh", "joint", "camera", "locator", "nurbsCurve")))
+check("8 icons: own name when the resource exists", MI.icon_name("joint") == "out_joint.png")
+check("8 icons: fallback for types without a resource",
+      MI.icon_name("blendShape") == MI.DEFAULT_ICON and MI.icon_name("network") == MI.DEFAULT_ICON
+      and MI.icon_name("noSuchType_A00620") == MI.DEFAULT_ICON,
+      (MI.icon_name("blendShape"), MI.icon_name("network")))
+check("8 icons: cached", MI.node_icon("joint") is MI.node_icon("joint"))
+check("8 icons: tool svg for blendShape + target",
+      _pix_ok(MW.local_icon("outliner_blendShape")) and _pix_ok(MW.local_icon("outliner_bsTarget")))
+
+# 8-2 build_rows (마야 없이) - 인스턴스 셰이프가 조상보다 먼저 나오는 실측 순서
+rows = OL.build_rows([
+    ("|g", "transform", "u1", False),
+    ("|g|" + FN.encode(u"顔"), "transform", "u2", False),
+    ("|h|inst|shape", "mesh", "u5", False),          # 조상 |h 보다 먼저
+    ("|h", "transform", "u3", True),
+    ("|h|inst", "transform", "u4", True),
+    ("|plain", "transform", "u6", False),
+], bs_rows=[("|g|" + FN.encode(u"顔"), "bs1", "u7", [(0, FN.encode(u"あ")), (1, "smile")]),
+            ("|missing", "bs2", "u8", [(0, "x")])])
+pk = dict((r.key, r.parent) for r in rows)
+check("8 build_rows: parent by path even when the child comes first", pk["|h|inst|shape"] == "|h|inst"
+      and pk["|h"] is None and pk["|g|" + FN.encode(u"顔")] == "|g")
+check("8 build_rows: blendShape + targets under the mesh, unknown attach dropped",
+      [r.decoded for r in rows if r.kind != OL.KIND_DAG] == ["bs1", u"あ", "smile"]
+      and [r for r in rows if r.kind == OL.KIND_BS][0].parent == "|g|" + FN.encode(u"顔"))
+pruned = OL.prune_to_encoded(rows)
+check("8 prune: encoded rows + their parents only",
+      [r.key for r in pruned] == ["|g", "|g|" + FN.encode(u"顔"), "bs|{0}|bs1".format("|g|" + FN.encode(u"顔")),
+                                  "bs|{0}|bs1|0".format("|g|" + FN.encode(u"顔"))], [r.key for r in pruned])
+
+# 8-3 collect (씬)
+base, bs, joint = build()
+face = cmds.ls(base, long=True)[0]
+nodes = OL.collect(MFN.SCOPE_SCENE)
+by_path = dict((n.path, n) for n in nodes if n.kind == OL.KIND_DAG)
+check("8 collect: every DAG transform, no shapes by default",
+      set(by_path) == set(p for p in cmds.ls(dag=True, long=True) if not cmds.objectType(p, isAType="shape")),
+      sorted(set(by_path) ^ set(p for p in cmds.ls(dag=True, long=True) if not cmds.objectType(p, isAType="shape"))))
+check("8 collect: parent = listRelatives parent",
+      all((n.parent or None) == ((cmds.listRelatives(n.path, parent=True, fullPath=True) or [None])[0])
+          for n in nodes if n.kind == OL.KIND_DAG))
+check("8 collect: order = ls -dag order", [n.path for n in nodes if n.kind == OL.KIND_DAG]
+      == [p for p in cmds.ls(dag=True, long=True) if p in by_path])
+bsn = [n for n in nodes if n.kind == OL.KIND_BS]
+tg = [n for n in nodes if n.kind == OL.KIND_BS_TARGET]
+check("8 collect: blendShape under the face transform with decoded targets",
+      len(bsn) == 1 and bsn[0].parent == face and [t.decoded for t in tg] == [u"まばたき", u"あ", "plainTarget"])
+check("8 collect: default cameras are hidden", by_path["|persp"].hidden and not by_path[face].hidden)
+cmds.setAttr("rig_grp.visibility", 0)
+check("8 collect: hidden parent hides children", [n for n in OL.collect() if n.path == face][0].hidden)
+cmds.setAttr("rig_grp.visibility", 1)
+with_shapes = OL.collect(shapes=True)
+shape_rows = dict((n.path, n) for n in with_shapes if n.kind == OL.KIND_DAG)
+orig = [p for p in shape_rows if p.endswith("ShapeOrig")]
+check("8 collect: Shapes on - shapes, intermediate shape hidden, blendShape under the shape",
+      face + "|" + FN.encode(u"顔Shape") in shape_rows and orig and shape_rows[orig[0]].hidden
+      and [n for n in with_shapes if n.kind == OL.KIND_BS][0].parent == face + "|" + FN.encode(u"顔Shape"))
+check("8 collect: Blend Shapes off", not any(n.kind != OL.KIND_DAG for n in OL.collect(blend_shapes=False)))
+enc = OL.collect(encoded_branches_only=True)
+check("8 collect: encoded branches only keeps the plain parent",
+      set(n.path for n in enc if n.kind == OL.KIND_DAG) == {"|rig_grp", face, "|" + FN.encode(u"Left ankle")}
+      and "plainTarget" not in [n.decoded for n in enc], [n.decoded for n in enc])
+cmds.select(base)
+sel_rows = OL.collect(MFN.SCOPE_SELECTED)
+check("8 collect: Selected = node + the path above it",
+      [n.path for n in sel_rows if n.kind == OL.KIND_DAG] == ["|rig_grp", face])
+cmds.select("rig_grp")
+check("8 collect: Selected + Hierarchy reaches children",
+      face in [n.path for n in OL.collect(MFN.SCOPE_HIERARCHY)])
+cmds.select(bs)
+check("8 collect: selecting the blendShape shows its mesh",
+      face in [n.path for n in OL.collect(MFN.SCOPE_SELECTED)])
+inst = cmds.instance(base)[0]
+inst_rows = OL.collect(shapes=True)
+shape_paths = [n.path for n in inst_rows if n.kind == OL.KIND_DAG and n.node_type == "mesh"
+               and n.raw == FN.encode(u"顔Shape")]
+check("8 collect: instanced shape = one row per parent", len(shape_paths) == 2, shape_paths)
+cmds.delete(inst)
+cmds.select(clear=True)
+
+# 8-4 UI
+w = MW.MainWindow()
+w.confirm_before_apply = False
+w.show()
+APP.processEvents()
+check("8 ui: Outliner is the first tab and filled on open",
+      w.tabs.indexOf(w.outliner_page) == 0 and w.tree_out.topLevelItemCount() == len(cmds.ls(assemblies=True)))
+face_item = w.out_items[face]
+check("8 ui: decoded name + icon + parent", face_item.text(0) == u"顔" and not face_item.icon(0).isNull()
+      and face_item.parent() is w.out_items["|rig_grp"])
+check("8 ui: hidden camera is italic", w.out_items["|persp"].font(0).italic())
+tgt_item = [it for k, it in w.out_items.items() if k.endswith("|1") and k.startswith("bs|")][0]
+check("8 ui: target row label", tgt_item.text(0) == u"あ  [1]" and tgt_item.parent().parent() is face_item)
+w.flt_out.set_text(u"まば")
+vis = [it.text(0) for it in w.flt_out.visible_items()]
+check("8 ui: recursive filter shows the hit + its parents, expanded",
+      vis == ["rig_grp", u"顔", "bsFace  (blendShape)", u"まばたき  [0]"]
+      and w.out_items["|rig_grp"].isExpanded() and face_item.isExpanded() and w.lbl_out_number.text() == "Number: 1 / {0}".format(len(w.out_nodes)), (vis, w.lbl_out_number.text()))
+w.flt_out.set_text("")
+check("8 ui: clearing the filter collapses what it expanded",
+      not w.out_items["|rig_grp"].isExpanded() and len(w.flt_out.visible_items()) == len(w.out_nodes))
+w.flt_out.set_text(u"まば")
+w.refresh_outliner()
+w.flt_out.set_text("")
+check("8 ui: refresh under a filter does not keep the filter's expansion",
+      not w.out_items["|rig_grp"].isExpanded() and not w.out_items[face].isExpanded())
+face_item = w.out_items[face]
+face_item.setSelected(True)
+APP.processEvents()
+check("8 ui: row click selects in maya", cmds.ls(selection=True, long=True) == [face])
+w.out_items["|rig_grp"].setExpanded(True)
+w.refresh_outliner()
+check("8 ui: refresh keeps expanded + selected rows",
+      w.out_items["|rig_grp"].isExpanded() and w.out_items[face].isSelected())
+w.tree_out.clearSelection()
+w.chk_out_sync.setChecked(True)
+cmds.select(FN.encode(u"Left ankle"))
+APP.processEvents()
+w.sync_outliner_from_maya()
+check("8 ui: sync selects the maya selection", [n.decoded for n in w.selected_out_nodes()] == [u"Left ankle"])
+cmds.select(face)
+w.sync_outliner_from_maya()
+check("8 ui: sync expands to the row", [n.path for n in w.selected_out_nodes()] == [face]
+      and w.out_items["|rig_grp"].isExpanded())
+tgt_item = [it for k, it in w.out_items.items() if k.endswith("|1") and k.startswith("bs|")][0]
+w.tree_out.clearSelection()
+tgt_item.setSelected(True)
+w.sync_outliner_from_maya()      # 마야 GUI 에선 scriptJob 이 부른다
+check("8 ui: clicking a target row with Sync on keeps the target row selected",
+      [n.decoded for n in w.selected_out_nodes()] == [u"あ"] and cmds.ls(selection=True) == [bs],
+      [n.decoded for n in w.selected_out_nodes()])
+cmds.select(face)
+w.sync_outliner_from_maya()
+check("8 ui: a new maya selection still syncs after a tree click", [n.path for n in w.selected_out_nodes()] == [face])
+w.chk_out_sync.setChecked(False)
+# mayapy standalone 의 scriptJob 은 에러 없이 None 을 돌려준다(실측 2026-11-11) → 공유 · 정리는 가짜 scriptJob 으로 센다
+_real_job = MW.cmds.scriptJob
+_jobs = {"next": 100, "live": set(), "made": 0}
+
+
+def _fake_job(*args, **kwargs):
+    if "event" in kwargs:
+        _jobs["next"] += 1
+        _jobs["made"] += 1
+        _jobs["live"].add(_jobs["next"])
+        return _jobs["next"]
+    if "exists" in kwargs:
+        return kwargs["exists"] in _jobs["live"]
+    if "kill" in kwargs:
+        _jobs["live"].discard(kwargs["kill"])
+    return None
+
+
+MW.cmds.scriptJob = _fake_job
+try:
+    w.chk_sync.setChecked(True)
+    w.chk_out_sync.setChecked(True)
+    job = w._sync_job
+    w.chk_sync.setChecked(False)
+    check("8 ui: one job while either sync is on",
+          job is not None and w._sync_job == job and _jobs["made"] == 1 and _jobs["live"] == {job}, _jobs)
+    w.chk_out_sync.setChecked(False)
+    check("8 ui: sync job killed when both are off", w._sync_job is None and not _jobs["live"], _jobs)
+finally:
+    MW.cmds.scriptJob = _real_job
+row = w.open_bs_target(bs, 1)
+check("8 ui: double-click target opens the Blend Shapes row",
+      w.tabs.currentWidget() is w.bs_page and row is not None and row["plug"].endswith(".weight[1]"))
+w.tabs.setCurrentWidget(w.outliner_page)
+w.tree_out.clearSelection()
+cmds.select(clear=True)
+face_item = w.out_items[face]
+face_item.setSelected(True)
+check("8 ui: copy decoded path", w.copy_out_rows("path") == u"|rig_grp|顔")
+w.select_out_hierarchy()
+check("8 ui: select hierarchy", FN.encode(u"顔Shape") in cmds.ls(selection=True))
+w.set_out_raw_column(False, save=False)
+check("8 ui: raw column hidden", w.tree_out.isColumnHidden(MW.OUT_COL_RAW))
+w.set_out_raw_column(True, save=False)
+w.zoom_outliner.set_scale(2.0, save=False)
+check("8 ui: zoom grows the icons", w.tree_out.iconSize().width() == 32)
+w.zoom_outliner.set_scale(1.0, save=False)
+w.scan()
+names_items = [w.tree_names.topLevelItem(i) for i in range(w.tree_names.topLevelItemCount())]
+check("8 names: icons on node + target rows", all(not it.icon(0).isNull() for it in names_items))
+shape_entry = [e for e in w.entries if e.decoded == u"顔Shape"]
+tgt_entry = [e for e in w.entries if e.decoded == u"あ"]
+found = w.show_in_outliner(shape_entry + tgt_entry)
+check("8 names: Show in Outliner (shape -> transform row, target row)",
+      w.tabs.currentWidget() is w.outliner_page and [n.decoded for n in found] == [u"顔", u"あ"]
+      and sorted(n.decoded for n in w.selected_out_nodes()) == sorted([u"顔", u"あ"]), [n.decoded for n in found])
+w.act_rename_tab.setChecked(True)
+w.set_map({u"顔": "face", u"まばたき": "blink", u"あ": "A", u" ": "_"})
+w.preview_rename()
+w.apply_rename()
+check("8 rename refreshes the outliner", any(n.decoded == "face" for n in w.out_nodes))
+w.restore_names()
+check("8 restore refreshes the outliner", any(n.decoded == u"顔" for n in w.out_nodes))
+w.close()
+
+# 8-5 속도 - 합성 1 만 노드(10 단 체인 1000 개)
+cmds.file(new=True, force=True)
+for c in range(1000):
+    parent = None
+    for d in range(10):
+        parent = cmds.createNode("transform", name=FN.encode(u"節{0}_{1}".format(c, d)), parent=parent,
+                                 skipSelect=True)
+t0 = time.time()
+big = OL.collect()
+t_collect = time.time() - t0
+w = MW.MainWindow()
+t0 = time.time()
+w.refresh_outliner()
+t_ui = time.time() - t0
+w.flt_out.set_text(u"節999_9")
+t_flt = time.time() - t0 - t_ui
+w.close()
+print("    timing 10k: collect {0:.2f}s, refresh+fill {1:.2f}s, filter {2:.2f}s".format(t_collect, t_ui, t_flt))
+check("8 speed: 10k nodes collected", len([n for n in big if n.kind == OL.KIND_DAG]) == 10004, len(big))
+check("8 speed: 10k refresh under 5s (target 1s, see timing)", t_ui < 5.0, round(t_ui, 2))
+
 # ---------------------------------------------------------------- 7. 예시 씬 (있을 때만, 저장하지 않는다)
 if os.path.exists(MIYABI):
     cmds.file(MIYABI, open=True, force=True, loadReferenceDepth="none")
@@ -244,6 +477,16 @@ if os.path.exists(MIYABI):
     check("7 Miyabi: 149 nodes, 52 targets, none broken", (len(nodes), len(targets)) == (149, 52)
           and all(e.ok for e in m), (len(nodes), len(targets)))
     check("7 Miyabi: まばたき among targets", any(e.decoded == u"まばたき" for e in targets))
+    t0 = time.time()
+    mo = OL.collect(shapes=True)
+    print("    timing Miyabi collect (shapes): {0:.2f}s".format(time.time() - t0))
+    dag_rows = [n for n in mo if n.kind == OL.KIND_DAG]
+    check("7 Miyabi outliner: every DAG node (637), 52 targets under a mesh",
+          len(dag_rows) == len(cmds.ls(dag=True, long=True, allPaths=True))
+          and len([n for n in mo if n.kind == OL.KIND_BS_TARGET]) == 52, (len(dag_rows), len(mo)))
+    check("7 Miyabi outliner: no DAG type falls back to the default icon",
+          all(MI.icon_name(t) != MI.DEFAULT_ICON for t in set(n.node_type for n in dag_rows)),
+          sorted(t for t in set(n.node_type for n in dag_rows) if MI.icon_name(t) == MI.DEFAULT_ICON))
     cmds.file(new=True, force=True)
 else:
     print("SKIP 7 Miyabi scene not found")

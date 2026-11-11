@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-09
+# last Update date : 2026-11-11
 # A00620_NameDecoder - Qt UI (in-Maya)
 #
-# 탭: Names(찾은 이름 표) · Blend Shapes(풀린 타겟 이름 + 웨이트) · Rename to ASCII(View 메뉴로 켬, 기본 숨김).
+# 탭: Outliner(풀린 이름 + 아이콘 + DAG 계층, v01.02) · Names(찾은 이름 표) · Blend Shapes(풀린 타겟 이름 + 웨이트) ·
+#     Rename to ASCII(View 메뉴로 켬, 기본 숨김).
 # 마야 UI(아웃라이너 · 채널 박스 · Shape Editor)의 글자는 바꿀 수 없어서 이 창에서 풀어 보여 준다 - Qt 는 유니코드를 그린다.
 # 모든 UI 문자열/로그는 영어.
+
+import os
 
 import maya.cmds as cmds
 
@@ -35,6 +38,8 @@ from Framework.qt.qt import (
     QAction,
     QBrush,
     QColor,
+    QIcon,
+    QSize,
     Qt,
 )
 from Framework.qt.maya_window import maya_main_window
@@ -43,6 +48,8 @@ from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 from Framework.qt.MOD_filter_qt_v01 import JUN_mod_filter_qt_v01
 from Framework.qt.MOD_viewZoom_qt_v01 import JUN_mod_viewZoom_qt_v01
 from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
+from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
+from Framework.qt.maya_icons import node_icon
 from Framework.qt.pin_style import apply_pin_style
 from Framework.core import fbx_name
 from Framework.core import maya_fbx_names as MFN
@@ -51,6 +58,7 @@ from tools.A00620_NameDecoder.app.config.version import VERSION, LAST_UPDATE
 from tools.A00620_NameDecoder.app.core import name_table
 from tools.A00620_NameDecoder.app.core import bs_weights
 from tools.A00620_NameDecoder.app.core import ascii_rename as AR
+from tools.A00620_NameDecoder.app.core import outline as OL
 
 
 # 리로드/재실행 시 기존 창을 찾아 닫기 위한 고유 objectName
@@ -65,6 +73,7 @@ SCOPES = (
 )
 
 COL_DECODED, COL_RAW, COL_TYPE, COL_OWNER = range(4)
+OUT_COL_NAME, OUT_COL_RAW = range(2)
 
 _BROKEN_COLOR = QColor(230, 200, 90)       # 깨진 FBXASC - 노랑
 _PLAIN_COLOR = QColor(150, 150, 150)       # FBXASC 없는 이름(Encoded only 끔) - 회색
@@ -74,6 +83,41 @@ _STATUS_COLORS = {
     AR.ST_NO_CHANGE: QColor(150, 150, 150),
 }
 _STATUS_WARN = QColor(230, 160, 90)
+_HIDDEN_COLOR = QColor(115, 115, 115)      # 숨은 노드(visibility 끔 · 중간 셰이프) - 마야 아웃라이너처럼 흐리게
+
+# Outliner 탭
+OUT_ICON_PX = 16                           # 배율 1.0 의 아이콘 크기 - 확대하면 함께 커진다
+OUT_INDENT = 14                            # 깊이 25 조인트 체인(예시 씬) 대비 좁은 들여쓰기
+OPTVAR_OUT_RAW = "A00620_outlinerRawColumn"
+# 마야 리소스에 blendShape 아이콘이 없다(실측) → 툴 로컬 svg
+ICON_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "icon"))
+_LOCAL_ICONS = {}
+
+
+def local_icon(name):
+    """툴 icon/ 폴더의 svg(캐시). 'outliner_blendShape' · 'outliner_bsTarget'."""
+    icon = _LOCAL_ICONS.get(name)
+    if icon is None:
+        icon = QIcon(os.path.join(ICON_DIR, name + ".svg"))
+        _LOCAL_ICONS[name] = icon
+    return icon
+
+
+def outline_icon(node):
+    if node.kind == OL.KIND_BS:
+        return local_icon("outliner_blendShape")
+    if node.kind == OL.KIND_BS_TARGET:
+        return local_icon("outliner_bsTarget")
+    return node_icon(node.node_type)
+
+
+def entry_icon(entry):
+    """Names 탭 행 아이콘 - 노드 = 타입 아이콘, 타겟 = 타겟 svg, 어트리뷰트 · enum = 없음."""
+    if entry.kind == MFN.KIND_NODE:
+        return node_icon(entry.node_type)
+    if entry.kind == MFN.KIND_BS_TARGET:
+        return local_icon("outliner_bsTarget")
+    return None
 
 SLIDER_STEPS = 1000
 
@@ -156,10 +200,16 @@ class MainWindow(QWidget):
         self.entries = []          # Names 탭의 마지막 Scan 결과 [NameEntry]
         self.plans = []            # Rename 탭의 마지막 Preview [RenamePlan]
         self.bs_rows = []          # Blend Shapes 탭의 행 [dict]
+        self.out_nodes = []        # Outliner 탭의 마지막 Refresh [OutlineNode]
+        self.out_items = {}        # OutlineNode.key -> QTreeWidgetItem
         self._syncing = False
         self._sync_job = None
+        self._out_selecting = False   # Outliner 행 클릭 → 마야 선택 중
+        self._out_pushed = None       # Outliner 가 마지막으로 마야에 건 선택 (paths, uuids)
 
         self.build_ui()
+        # Outliner 는 첫 탭이라 열자마자 채운다(Names 는 Scan 버튼으로)
+        self.refresh_outliner()
 
     # ==================================================================
     # UI
@@ -193,8 +243,12 @@ class MainWindow(QWidget):
         main_layout.addLayout(header_row)
 
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._build_names_tab(), "Names")
-        self.tabs.addTab(self._build_bs_tab(), "Blend Shapes")
+        self.outliner_page = self._build_outliner_tab()
+        self.tabs.addTab(self.outliner_page, "Outliner")
+        self.names_page = self._build_names_tab()
+        self.tabs.addTab(self.names_page, "Names")
+        self.bs_page = self._build_bs_tab()
+        self.tabs.addTab(self.bs_page, "Blend Shapes")
         self.rename_page = self._build_rename_tab()
         self.tabs.addTab(self.rename_page, "Rename to ASCII")
         main_layout.addWidget(self.tabs, stretch=3)
@@ -209,6 +263,84 @@ class MainWindow(QWidget):
         main_layout.addWidget(self.log_view, stretch=1)
 
         self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
+
+    # ------------------------------------------------------------------ Outliner
+
+    def _build_outliner_tab(self):
+        page = QWidget()
+        lay = QVBoxLayout(page)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Scope"))
+        self.cb_out_scope = QComboBox()
+        for label, key in SCOPES:
+            self.cb_out_scope.addItem(label, key)
+        self.cb_out_scope.setToolTip("Scene: every DAG node.\n"
+                                     "Selected: the selected nodes and the path above them.\n"
+                                     "Selected + Hierarchy: also everything below the selected nodes.")
+        self.cb_out_scope.currentIndexChanged.connect(lambda _i: self.refresh_outliner())
+        row.addWidget(self.cb_out_scope)
+        self.chk_out_shapes = QCheckBox("Shapes")
+        self.chk_out_shapes.setToolTip("Show shape nodes (off like the Maya Outliner default).")
+        self.chk_out_shapes.toggled.connect(lambda _on: self.refresh_outliner())
+        row.addWidget(self.chk_out_shapes)
+        self.chk_out_bs = QCheckBox("Blend Shapes")
+        self.chk_out_bs.setChecked(True)
+        self.chk_out_bs.setToolTip("Show the blendShape and its decoded targets under the mesh.")
+        self.chk_out_bs.toggled.connect(lambda _on: self.refresh_outliner())
+        row.addWidget(self.chk_out_bs)
+        self.chk_out_encoded = QCheckBox("Encoded branches only")
+        self.chk_out_encoded.setToolTip("Show only the branches with an FBXASC name in them.\n"
+                                        "Parents stay so the hierarchy is kept.")
+        self.chk_out_encoded.toggled.connect(lambda _on: self.refresh_outliner())
+        row.addWidget(self.chk_out_encoded)
+        row.addStretch(1)
+        self.btn_out_refresh = QPushButton("Refresh")
+        self.btn_out_refresh.setMinimumWidth(90)
+        self.btn_out_refresh.setToolTip("Read the scene again. Expanded and selected rows are kept.")
+        self.btn_out_refresh.clicked.connect(self.refresh_outliner)
+        row.addWidget(self.btn_out_refresh)
+        lay.addLayout(row)
+
+        self.tree_out = QTreeWidget()
+        self.tree_out.setHeaderLabels(["Name", "Raw (Maya name)"])
+        self.tree_out.setUniformRowHeights(True)
+        self.tree_out.setIndentation(OUT_INDENT)
+        self.tree_out.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.tree_out.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree_out.customContextMenuRequested.connect(self._outliner_menu)
+        self.tree_out.itemSelectionChanged.connect(self._on_outliner_selection)
+        self.tree_out.itemDoubleClicked.connect(self._on_outliner_double_click)
+        header = self.tree_out.header()
+        header.setStretchLastSection(True)
+        header.resizeSection(OUT_COL_NAME, 300)
+        header.setContextMenuPolicy(Qt.CustomContextMenu)
+        header.customContextMenuRequested.connect(self._outliner_header_menu)
+        JUN_mod_treeExpand_qt_v01(self.tree_out)
+
+        self.lbl_out_number = QLabel("Number: 0")
+        self.flt_out = JUN_mod_filter_qt_v01(
+            tree_widget=self.tree_out, tree_column=OUT_COL_NAME,
+            tree_columns=(OUT_COL_NAME, OUT_COL_RAW), tree_recursive=True,
+            number_label=self.lbl_out_number,
+            placeholder="Type decoded text (e.g. まば) or any part of the Maya name")
+        lay.addWidget(self.flt_out)
+        lay.addWidget(self.tree_out, stretch=1)
+        self.zoom_outliner = JUN_mod_viewZoom_qt_v01(self.tree_out, key="A00620/outliner", default=1.0)
+        self.zoom_outliner.scale_changed.connect(self._apply_out_icon_size)
+        self._apply_out_icon_size(self.zoom_outliner.scale())
+        self.set_out_raw_column(self._load_out_raw_column(), save=False)
+
+        row2 = QHBoxLayout()
+        row2.addWidget(self.lbl_out_number)
+        self.chk_out_sync = QCheckBox("Sync with Selection")
+        self.chk_out_sync.setToolTip("Select, expand to and scroll to the nodes selected in Maya.")
+        self.chk_out_sync.toggled.connect(lambda _on: self._update_sync_job())
+        row2.addWidget(self.chk_out_sync)
+        row2.addStretch(1)
+        row2.addWidget(self.zoom_outliner.controls())
+        lay.addLayout(row2)
+        return page
 
     # ------------------------------------------------------------------ Names
 
@@ -270,7 +402,7 @@ class MainWindow(QWidget):
         row2.addWidget(self.lbl_names_number)
         self.chk_sync = QCheckBox("Sync with Selection")
         self.chk_sync.setToolTip("Highlight the rows of the nodes selected in Maya.")
-        self.chk_sync.toggled.connect(self.set_sync)
+        self.chk_sync.toggled.connect(lambda _on: self._update_sync_job())
         row2.addWidget(self.chk_sync)
         row2.addStretch(1)
         row2.addWidget(self.zoom_names.controls())
@@ -423,7 +555,7 @@ class MainWindow(QWidget):
         page = self.tabs.widget(index)
         if page is self.rename_page:
             self._update_stored_label()
-        elif index == 1 and self.cb_bs.count() == 0:
+        elif page is self.bs_page and self.cb_bs.count() == 0:
             self.refresh_bs_list()
 
     # ==================================================================
@@ -461,6 +593,9 @@ class MainWindow(QWidget):
             item.setData(COL_DECODED, _ENTRY_ROLE, i)
             item.setToolTip(COL_DECODED, e.decoded)
             item.setToolTip(COL_RAW, e.raw)
+            icon = entry_icon(e)
+            if icon is not None:
+                item.setIcon(COL_DECODED, icon)
             if not e.ok:
                 item.setForeground(COL_DECODED, QBrush(_BROKEN_COLOR))
             elif not e.encoded:
@@ -503,6 +638,7 @@ class MainWindow(QWidget):
         menu.addAction("Copy Both (tab)").triggered.connect(lambda: self.copy_rows("both"))
         menu.addSeparator()
         menu.addAction("Select in Maya").triggered.connect(lambda: MFN.select_entries(self.selected_entries()))
+        menu.addAction("Show in Outliner").triggered.connect(lambda: self.show_in_outliner(self.selected_entries()))
         menu.exec_(self.tree_names.viewport().mapToGlobal(pos))
 
     def copy_rows(self, what="decoded"):
@@ -552,14 +688,28 @@ class MainWindow(QWidget):
     # ------------------------------------------------------------------ Sync
 
     def set_sync(self, on):
-        self._kill_sync_job()
-        if on:
+        """Names 탭 Sync (예전 진입점 - 체크박스와 같다)."""
+        self.chk_sync.setChecked(bool(on))
+
+    def _update_sync_job(self):
+        """Names · Outliner 의 Sync 중 하나라도 켜져 있으면 SelectionChanged scriptJob 하나를 둔다."""
+        want = self.chk_sync.isChecked() or self.chk_out_sync.isChecked()
+        if not want:
+            self._kill_sync_job()
+            return
+        if self._sync_job is None:
             try:
-                self._sync_job = cmds.scriptJob(event=["SelectionChanged", self.sync_from_maya])
+                self._sync_job = cmds.scriptJob(event=["SelectionChanged", self._on_maya_selection])
             except RuntimeError as exc:
                 self.log("[ERROR] Sync: {0}".format(str(exc).strip()))
                 return
+        self._on_maya_selection()
+
+    def _on_maya_selection(self):
+        if self.chk_sync.isChecked():
             self.sync_from_maya()
+        if self.chk_out_sync.isChecked():
+            self.sync_outliner_from_maya()
 
     def _kill_sync_job(self):
         if self._sync_job is not None:
@@ -590,6 +740,303 @@ class MainWindow(QWidget):
                 self.tree_names.scrollToItem(first)
         finally:
             self._syncing = False
+
+    # ==================================================================
+    # Outliner
+    # ==================================================================
+
+    def _apply_out_icon_size(self, scale):
+        px = max(12, int(round(OUT_ICON_PX * float(scale))))
+        self.tree_out.setIconSize(QSize(px, px))
+
+    def _load_out_raw_column(self):
+        try:
+            if cmds.optionVar(exists=OPTVAR_OUT_RAW):
+                return bool(cmds.optionVar(query=OPTVAR_OUT_RAW))
+        except RuntimeError:
+            pass
+        return True
+
+    def set_out_raw_column(self, visible, save=True):
+        self.tree_out.setColumnHidden(OUT_COL_RAW, not visible)
+        if save:
+            cmds.optionVar(intValue=(OPTVAR_OUT_RAW, int(bool(visible))))
+
+    def _outliner_header_menu(self, pos):
+        menu = QMenu(self.tree_out)
+        act = menu.addAction("Raw (Maya name) Column")
+        act.setCheckable(True)
+        act.setChecked(not self.tree_out.isColumnHidden(OUT_COL_RAW))
+        act.toggled.connect(self.set_out_raw_column)
+        menu.exec_(self.tree_out.header().mapToGlobal(pos))
+
+    def _out_node_of(self, item):
+        index = item.data(OUT_COL_NAME, _ENTRY_ROLE)
+        return self.out_nodes[index] if index is not None and 0 <= index < len(self.out_nodes) else None
+
+    def selected_out_nodes(self):
+        return [n for n in (self._out_node_of(it) for it in self.tree_out.selectedItems()) if n]
+
+    def _out_state(self):
+        """(펼친 state_key 집합, 고른 state_key 집합) - Refresh 뒤에 되살린다."""
+        expanded, selected = set(), set()
+        for node in self.out_nodes:
+            item = self.out_items.get(node.key)
+            if item is None:
+                continue
+            try:
+                # 필터가 펼친 것은 빼고 저장 - 넣으면 Refresh 뒤 필터를 비워도 펼친 채로 남는다
+                if item.isExpanded() and not self.flt_out.is_auto_expanded(item):
+                    expanded.add(node.state_key())
+                if item.isSelected():
+                    selected.add(node.state_key())
+            except RuntimeError:     # 이미 지워진 항목
+                pass
+        return expanded, selected
+
+    def refresh_outliner(self):
+        """범위의 DAG 계층을 다시 읽어 트리를 채운다. 펼침 · 선택은 UUID 로 유지."""
+        expanded, selected = self._out_state()
+        scope = self.cb_out_scope.currentData()
+        try:
+            nodes = OL.collect(scope,
+                               shapes=self.chk_out_shapes.isChecked(),
+                               blend_shapes=self.chk_out_bs.isChecked(),
+                               encoded_branches_only=self.chk_out_encoded.isChecked())
+        except RuntimeError as exc:
+            self.log("[ERROR] Outliner: {0}".format(str(exc).strip()))
+            return []
+        self._syncing = True
+        try:
+            self.out_nodes = nodes
+            self.fill_outliner(expanded, selected)
+            # Selected 범위는 결과가 작고, 고른 노드가 보여야 의미가 있다 → 전부 펼친다
+            if scope != MFN.SCOPE_SCENE:
+                self.tree_out.expandAll()
+        finally:
+            self._syncing = False
+        if self.chk_out_sync.isChecked():
+            self.sync_outliner_from_maya()
+        return self.out_nodes
+
+    def fill_outliner(self, expanded=(), selected=()):
+        self.tree_out.clear()
+        self.out_items = {}
+        # 1) 만들기 - 인스턴스 셰이프는 조상보다 먼저 나올 수 있다(실측) → 붙이기는 다음 단계에서
+        for i, n in enumerate(self.out_nodes):
+            label = n.decoded
+            if n.kind == OL.KIND_BS:
+                label = "{0}  (blendShape)".format(n.decoded)
+            elif n.kind == OL.KIND_BS_TARGET:
+                label = "{0}  [{1}]".format(n.decoded, n.index)
+            item = QTreeWidgetItem([label, n.raw])
+            item.setData(OUT_COL_NAME, _ENTRY_ROLE, i)
+            item.setIcon(OUT_COL_NAME, outline_icon(n))
+            tip = n.decoded_path()
+            if n.kind == OL.KIND_DAG:
+                tip = "{0}\n{1}  ({2})".format(tip, n.path, n.node_type)
+                if n.hidden:
+                    tip += "\nHidden"
+            elif n.kind == OL.KIND_BS_TARGET:
+                tip = "{0}\n{1}.{2}  [weight {3}]\nDouble-click: open in the Blend Shapes tab".format(
+                    tip, n.path, n.raw, n.index)
+            else:
+                tip += "\nDouble-click: open in the Blend Shapes tab"
+            item.setToolTip(OUT_COL_NAME, tip)
+            item.setToolTip(OUT_COL_RAW, n.raw)
+            if not n.ok:
+                item.setForeground(OUT_COL_NAME, QBrush(_BROKEN_COLOR))
+            elif n.hidden:
+                item.setForeground(OUT_COL_NAME, QBrush(_HIDDEN_COLOR))
+                item.setForeground(OUT_COL_RAW, QBrush(_HIDDEN_COLOR))
+            elif not n.encoded:
+                item.setForeground(OUT_COL_NAME, QBrush(_PLAIN_COLOR))
+            if n.hidden:
+                font = item.font(OUT_COL_NAME)
+                font.setItalic(True)
+                item.setFont(OUT_COL_NAME, font)
+            self.out_items[n.key] = item
+        # 2) 붙이기 - 형제 순서 = 씬 순서
+        tops = []
+        for n in self.out_nodes:
+            item = self.out_items[n.key]
+            parent = self.out_items.get(n.parent) if n.parent else None
+            if parent is not None:
+                parent.addChild(item)
+            else:
+                tops.append(item)
+        self.tree_out.addTopLevelItems(tops)
+        # 3) 펼침 · 선택 되살리기
+        if expanded or selected:
+            for n in self.out_nodes:
+                key = n.state_key()
+                item = self.out_items[n.key]
+                if key in expanded:
+                    item.setExpanded(True)
+                if key in selected:
+                    item.setSelected(True)
+        self.flt_out.refresh()
+
+    def _on_outliner_selection(self):
+        if self._syncing:
+            return
+        nodes = self.selected_out_nodes()
+        if not nodes:
+            return
+        # 트리에서 고른 선택이 Sync 로 되돌아와 트리를 다시 고르지 않게 - 타겟 행을 누르면 마야엔
+        # blendShape 노드가 선택되므로, 되돌아오면 선택이 부모 blendShape 행으로 튄다.
+        self._out_selecting = True
+        try:
+            OL.select_nodes(nodes)
+            self._out_pushed = OL.selected_paths()
+        except RuntimeError as exc:
+            self.log("[ERROR] Select: {0}".format(str(exc).strip()))
+        finally:
+            self._out_selecting = False
+
+    def _reveal_items(self, items):
+        """항목들을 고르고, 조상을 펼치고, 첫 항목으로 스크롤(마야 선택은 바꾸지 않는다)."""
+        self._syncing = True
+        try:
+            self.tree_out.clearSelection()
+            for item in items:
+                item.setSelected(True)
+                parent = item.parent()
+                while parent is not None:
+                    parent.setExpanded(True)
+                    parent = parent.parent()
+            if items:
+                self.tree_out.scrollToItem(items[0])
+        finally:
+            self._syncing = False
+
+    def sync_outliner_from_maya(self):
+        """마야에서 고른 노드의 행을 고르고 펼쳐 보인다. DAG 는 경로(인스턴스 구분), blendShape 는 UUID."""
+        if self._out_selecting:
+            return self.tree_out.selectedItems()
+        try:
+            paths, uuids = OL.selected_paths()
+        except Exception:  # noqa: BLE001 - 창이 닫히는 중 등
+            return []
+        if self._out_pushed is not None and (paths, uuids) == self._out_pushed:
+            return self.tree_out.selectedItems()      # 트리에서 고른 그대로 - 건드리지 않는다
+        self._out_pushed = None
+        items = [self.out_items[n.key] for n in self.out_nodes
+                 if (n.kind == OL.KIND_DAG and n.path in paths) or (n.kind == OL.KIND_BS and n.uuid in uuids)]
+        self._reveal_items(items)
+        return items
+
+    def show_in_outliner(self, entries):
+        """Names 탭 항목을 Outliner 탭에서 보인다. 셰이프를 안 보이고 있으면 부모 트랜스폼 행으로."""
+        if not entries:
+            self.log("[WARN] Pick rows in the Names tab first.")
+            return []
+        self.tabs.setCurrentWidget(self.outliner_page)
+        if not self.out_nodes:
+            self.refresh_outliner()
+        self.flt_out.clear()
+        by_uuid = {}
+        by_path = {}
+        by_target = {}
+        for n in self.out_nodes:
+            if n.kind == OL.KIND_DAG:
+                by_uuid.setdefault(n.uuid, []).append(n)
+                by_path[n.path] = n
+            elif n.kind == OL.KIND_BS_TARGET:
+                by_target.setdefault((n.uuid, n.index), []).append(n)
+        found, missing = [], []
+        for e in entries:
+            hit = []
+            if e.kind == MFN.KIND_NODE:
+                hit = by_uuid.get(e.uuid, [])
+                if not hit:
+                    node = MFN.node_of(e)
+                    if node and cmds.objectType(node, isAType="shape"):
+                        parent = node.rsplit("|", 1)[0]
+                        hit = [by_path[parent]] if parent in by_path else []
+            elif e.kind == MFN.KIND_BS_TARGET:
+                hit = by_target.get((e.uuid, e.index), [])
+            if hit:
+                found.extend(n for n in hit if n not in found)
+            else:
+                missing.append(e)
+        self._reveal_items([self.out_items[n.key] for n in found])
+        if missing:
+            self.log("[WARN] {0} name(s) are not in the Outliner (not DAG nodes or out of the scope): {1}".format(
+                len(missing), ", ".join(e.decoded for e in missing[:5]) + (" ..." if len(missing) > 5 else "")))
+        return found
+
+    def _on_outliner_double_click(self, item, _column):
+        node = self._out_node_of(item)
+        if node is not None and node.kind in (OL.KIND_BS, OL.KIND_BS_TARGET):
+            self.open_bs_target(node.path, node.index)
+
+    def open_bs_target(self, bs, index=None):
+        """Blend Shapes 탭으로 가서 그 blendShape 를 고르고 타겟 행으로 스크롤. 그 행(dict) 또는 None."""
+        self.tabs.setCurrentWidget(self.bs_page)
+        if self.cb_bs.findData(bs) < 0:
+            self.refresh_bs_list()
+        pos = self.cb_bs.findData(bs)
+        if pos < 0:
+            self.log("[WARN] blendShape not found: {0}".format(bs))
+            return None
+        self.flt_bs.clear()
+        if self.cb_bs.currentIndex() != pos:
+            self.cb_bs.setCurrentIndex(pos)      # load_bs_rows 가 따라 돈다
+        if index is None:
+            return None
+        plug_tail = ".weight[{0}]".format(index)
+        for r in self.bs_rows:
+            if r["plug"].endswith(plug_tail):
+                self.bs_scroll.ensureWidgetVisible(r["widget"])
+                r["slider"].setFocus()
+                return r
+        return None
+
+    def _outliner_menu(self, pos):
+        menu = QMenu(self.tree_out)
+        menu.addAction("Copy Decoded").triggered.connect(lambda: self.copy_out_rows("decoded"))
+        menu.addAction("Copy Raw").triggered.connect(lambda: self.copy_out_rows("raw"))
+        menu.addAction("Copy Decoded Path").triggered.connect(lambda: self.copy_out_rows("path"))
+        menu.addSeparator()
+        menu.addAction("Select Hierarchy").triggered.connect(self.select_out_hierarchy)
+        menu.addAction("Expand All Below").triggered.connect(self.expand_out_below)
+        menu.addAction("Collapse All").triggered.connect(self.tree_out.collapseAll)
+        menu.exec_(self.tree_out.viewport().mapToGlobal(pos))
+
+    def copy_out_rows(self, what="decoded"):
+        """고른 행을 클립보드로. decoded / raw / path(풀린 전체 경로). 복사한 글."""
+        nodes = self.selected_out_nodes()
+        if not nodes:
+            self.log("[WARN] Nothing to copy - pick rows in the Outliner.")
+            return ""
+        if what == "raw":
+            lines = [n.raw for n in nodes]
+        elif what == "path":
+            lines = [n.decoded_path() for n in nodes]
+        else:
+            lines = [n.decoded for n in nodes]
+        text = "\n".join(lines)
+        QApplication.clipboard().setText(text)
+        self.log("Copied {0} name(s) ({1}).".format(len(lines), what))
+        return text
+
+    def select_out_hierarchy(self):
+        try:
+            names = OL.select_hierarchy(self.selected_out_nodes())
+        except RuntimeError as exc:
+            self.log("[ERROR] Select Hierarchy: {0}".format(str(exc).strip()))
+            return []
+        if not names:
+            self.log("[WARN] Pick DAG rows in the Outliner.")
+        return names
+
+    def expand_out_below(self):
+        stack = list(self.tree_out.selectedItems())
+        while stack:
+            it = stack.pop()
+            it.setExpanded(True)
+            stack.extend(it.child(i) for i in range(it.childCount()))
 
     # ==================================================================
     # Blend Shapes
@@ -811,6 +1258,7 @@ class MainWindow(QWidget):
         self.log("Renamed {0} of {1} name(s).".format(done, len(ready)))
         self._update_stored_label()
         self.scan()
+        self.refresh_outliner()
         self.plans = []
         self.tree_preview.clear()
         return results
@@ -823,6 +1271,7 @@ class MainWindow(QWidget):
         self.log("Restored {0} name(s){1}.".format(done, ", {0} failed".format(failed) if failed else ""))
         self._update_stored_label()
         self.scan()
+        self.refresh_outliner()
         return done, failed
 
     def _update_stored_label(self):

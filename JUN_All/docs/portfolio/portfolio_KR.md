@@ -2,13 +2,13 @@
 title: 포트폴리오 작업 내역 (2026-05-06 ~ 2026-10-12)
 aliases: [Portfolio KR, 포트폴리오 국문]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-11-09
+updated: 2026-11-11
 ---
 
 # Technical Artist / Pipeline TD 작업 내역 — 국문
 
 > **작성자**: 박지훈 (Ji Hun Park / Junny)
-> **기간**: 2026-05-06 ~ 2026-11-09 (약 27주)
+> **기간**: 2026-05-06 ~ 2026-11-11 (약 27주)
 > **범위**: Autodesk Maya 툴 개발 · 언리얼 엔진 연동 자동화 · MetaHuman 페이셜 · 파이프라인 인프라
 > **규모**: 사내 툴 50여 종(툴 폴더 64개) · 전 툴 공용 프레임워크 1식 · 커밋 299건(2026-07-15 기준 집계)
 > **스택**: Python 3, `maya.cmds` / OpenMaya, PySide2·PySide6(Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF), Houdini Alembic 캐시 연동
@@ -748,6 +748,12 @@ Default Distance 어트리뷰트 (driver 신호 x)
   three.js MMD 구현 원문에서 "부여 먼저, 자기 회전 나중" 순서를 확인하고 조인트 `rotateAxis` 에 넣어 **`rotate` 채널은 애니메이터에게 그대로** 남겼습니다.
   정답 기준으로 **Blender + mmd_tools 를 headless 로 돌려 같은 MMD 포즈의 메시를 대조**했고(다리 · 허리 캔슬 6.7e-4 cm 일치),
   그 과정에서 mmd_tools 자체가 부여를 오일러로 근사한다는 것(축이 섞이면 0.3 cm)을 찾아 그 경우는 MMD 규칙을 직접 검사합니다. IK(근사) · MMD 로컬축 조인트 방향 · 표시 프레임 셋도 함께.
+- **`A00620_NameDecoder`** — FBX 로 들어온 일본어 · 중국어 이름이 마야에서 `FBXASC227FBXASC129…` 로 바뀌어 아웃라이너 · Shape Editor 에서
+  읽을 수 없는 문제를 풉니다. 마야는 노드 이름에 유니코드를 쓸 수 없고(OpenMaya `setName` 은 **에러 없이 무시**), 반대로 FBX 익스포터는 FBXASC 를
+  원래 글자로 되돌려 쓴다는 것을 실측해 **이름은 그대로 두고 툴 창에서 풀어 보여 주는** 읽기 전용 설계로 정했습니다.
+  풀린 이름 표 · 블렌드셰이프 타겟 웨이트 슬라이더(`まばたき`) 에 이어, **노드 타입 아이콘 + DAG 계층의 "읽을 수 있는 아웃라이너"** 탭을 붙였습니다 —
+  마야 내장 아이콘 리소스를 실측해 없는 타입은 상속 타입으로 대체하고, 깊이 25 조인트 체인에서도 쓸 수 있게 공용 필터에 **계층 모드**(맞는 행 + 조상만)를 추가했습니다.
+  큰 씬 대비 마야 질의를 묶어 합성 1 만 노드도 0.4 초에 채웁니다. 시험 110 개(mayapy 오프스크린).
 
 ---
 

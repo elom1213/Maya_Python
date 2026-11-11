@@ -69,6 +69,17 @@ Rule 열의 `A2` 를 함께 가진 행. 처음 쓰인 곳: A00130_ControlRig_V02
 대신 항목을 직접 훑어 `isSelected()` 로 판정한다. 안 그러면 "가려진 선택 수" 가 늘 0 이 되어
 경고가 사라진다.
 
+계층 트리 (tree_recursive, 2026-11-11)
+------------------------------------
+기본 트리 모드는 **최상위 항목만** 거른다(표처럼 쓰는 QTreeWidget). 아웃라이너처럼 깊은 트리는
+`tree_recursive=True` 를 준다 — **모든 깊이**의 항목을 보고, **맞는 항목 + 그 조상**만 남기고,
+맞는 항목이 보이도록 조상을 펼친다. 필터를 비우면 전부 보이고 **필터가 펼친 것만** 다시 접는다
+(사용자가 펼쳐 둔 것은 그대로). `Number` 는 맞는 항목 수 / 전체 항목 수.
+처음 쓰인 곳: A00620_NameDecoder 의 Outliner 탭(깊이 25 의 조인트 체인).
+
+    self.flt = JUN_mod_filter_qt.JUN_mod_filter_qt_v01(
+        tree_widget=self.tree, tree_columns=(0, 1), tree_recursive=True)
+
 QListWidget 이 아닌 목록 (rows_provider)
 ----------------------------------------
 탭에 따라 목록이 `QListWidget` 이 아니라 **행 위젯을 쌓아 만든 것**일 때가 있다
@@ -97,7 +108,8 @@ class JUN_mod_filter_qt_v01(QWidget):
     def __init__(self, list_widget=None, label="Filter",
                  placeholder="Type any part of a name (e.g. Inner)",
                  show_clear=True, number_label=None, rows_provider=None,
-                 tree_widget=None, tree_column=0, tree_columns=None, parent=None):
+                 tree_widget=None, tree_column=0, tree_columns=None, tree_recursive=False,
+                 parent=None):
         super().__init__(parent)
 
         self.list_widget = None
@@ -106,6 +118,9 @@ class JUN_mod_filter_qt_v01(QWidget):
         self.tree_column = int(tree_column or 0)
         # 찾을 열들. 없으면 tree_column 하나(예전과 같다).
         self.tree_columns = tuple(tree_columns) if tree_columns else None
+        # 계층 트리 - 모든 깊이를 거르고 맞는 항목의 조상을 남긴다 / 필터가 펼친 항목(다시 접을 것)
+        self.tree_recursive = bool(tree_recursive)
+        self._auto_expanded = {}
         # QListWidget 도 QTreeWidget 도 아닌 목록용 — () -> [(name, widget), ...]
         self.rows_provider = rows_provider
         self.number_label = number_label
@@ -203,6 +218,9 @@ class JUN_mod_filter_qt_v01(QWidget):
                 if hit:
                     shown += 1
 
+        elif self.tree_widget is not None and self.tree_recursive:
+            shown, total = self._refresh_tree_recursive(tokens)
+
         elif self.tree_widget is not None:
             total = self.tree_widget.topLevelItemCount()
             for i in range(total):
@@ -227,6 +245,54 @@ class JUN_mod_filter_qt_v01(QWidget):
         self._update_number(shown, total)
         self.filtered.emit(shown, total)
         return shown, total
+
+    def _iter_tree(self):
+        """트리의 모든 항목(깊이 우선, 부모가 먼저)."""
+        stack = [self.tree_widget.topLevelItem(i)
+                 for i in reversed(range(self.tree_widget.topLevelItemCount()))]
+        while stack:
+            item = stack.pop()
+            yield item
+            stack.extend(item.child(i) for i in reversed(range(item.childCount())))
+
+    def _refresh_tree_recursive(self, tokens):
+        """계층 트리 거르기. (맞는 수, 전체 수)."""
+        items = list(self._iter_tree())
+        visible = {}                       # id(item) -> 보이는가
+        hits = 0
+        for item in reversed(items):       # 자식이 먼저 - 부모는 자식 결과를 본다
+            hit = True if not tokens else self._matches(self._tree_haystack(item), tokens)
+            if hit:
+                hits += 1
+            child_visible = any(visible.get(id(item.child(i))) for i in range(item.childCount()))
+            visible[id(item)] = hit or child_visible
+            item.setHidden(not (hit or child_visible))
+
+        # 펼치기: 보이는 자식이 있는 항목. 필터를 비우면 필터가 펼친 것만 접는다.
+        need = {}
+        if tokens:
+            for item in items:
+                if item.childCount() and any(visible.get(id(item.child(i))) for i in range(item.childCount())):
+                    need[id(item)] = item
+        previous, self._auto_expanded = self._auto_expanded, {}
+        for key, item in previous.items():
+            if key in need:
+                self._auto_expanded[key] = item
+                continue
+            try:
+                item.setExpanded(False)
+            except RuntimeError:          # 트리를 다시 채워 지워진 항목
+                pass
+        for key, item in need.items():
+            if key not in self._auto_expanded and not item.isExpanded():
+                item.setExpanded(True)
+                self._auto_expanded[key] = item
+        return hits, len(items)
+
+    def is_auto_expanded(self, item):
+        """필터(tree_recursive)가 펼친 항목인가. 트리를 다시 채우는 쪽이 펼침 상태를 저장할 때
+        **사용자가 펼친 것만** 남기려고 쓴다 - 안 그러면 필터를 비워도 그 항목이 펼친 채로 남는다."""
+        return self._auto_expanded.get(id(item)) is item
 
     def _on_text_changed(self, _text):
         self.refresh()
@@ -257,6 +323,8 @@ class JUN_mod_filter_qt_v01(QWidget):
 
     def visible_items(self):
         """지금 보이는 항목들."""
+        if self.tree_widget is not None and self.tree_recursive:
+            return [it for it in self._iter_tree() if not it.isHidden()]
         if self.tree_widget is not None:
             return [self.tree_widget.topLevelItem(i)
                     for i in range(self.tree_widget.topLevelItemCount())
@@ -281,8 +349,12 @@ class JUN_mod_filter_qt_v01(QWidget):
             # **QTreeWidget.selectedItems() 는 숨긴 항목을 빼고 준다**(실측) —
             # QListWidget 과 다르다. 그대로 쓰면 "가려진 선택" 이 늘 0 으로 보여
             # 이 함수의 존재 이유가 사라진다. 항목을 직접 훑어 isSelected() 로 본다.
-            for i in range(self.tree_widget.topLevelItemCount()):
-                item = self.tree_widget.topLevelItem(i)
+            if self.tree_recursive:
+                tree_items = list(self._iter_tree())
+            else:
+                tree_items = [self.tree_widget.topLevelItem(i)
+                              for i in range(self.tree_widget.topLevelItemCount())]
+            for item in tree_items:
                 if not item.isSelected():
                     continue
                 if item.isHidden():

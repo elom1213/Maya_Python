@@ -2,13 +2,13 @@
 title: Portfolio — Work Summary (2026-05-06 ~ 2026-10-12)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-11-09
+updated: 2026-11-11
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
 
 > **Author**: Ji Hun Park (Junny)
-> **Period**: 2026-05-06 – 2026-11-09 (~27 weeks)
+> **Period**: 2026-05-06 – 2026-11-11 (~27 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
 > **Volume**: 50+ in-house tools (64 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
@@ -819,6 +819,12 @@ Default Distance attribute (driver signal x)
   The "append first, own rotation second" order was confirmed in the three.js MMD source, and the append goes into the joint's `rotateAxis`, so **the `rotate` channels stay free for animators**.
   As ground truth, **Blender + mmd_tools runs headless and the same MMD pose is compared vertex by vertex** (legs and waist cancel match to 6.7e-4 cm);
   this also showed that mmd_tools itself approximates append with Euler channels (0.3 cm off when axes mix), so those cases are checked against the MMD rule directly. IK (approximate), MMD local-axis joint orientation and display-frame sets come with it.
+- **`A00620_NameDecoder`** — Japanese and Chinese names that come in through FBX become `FBXASC227FBXASC129…` in Maya and cannot be read in the Outliner or Shape Editor.
+  Measuring showed that Maya cannot hold Unicode node names (OpenMaya `setName` **silently ignores them**) while the FBX exporter turns FBXASC back into the original text,
+  so the tool is read-only by design: **names stay as they are and are decoded in the tool window**.
+  After a decoded name table and blendShape target weight sliders (`まばたき`), it gained a **"readable Outliner" tab with node-type icons and the DAG hierarchy** —
+  Maya's built-in icon resources were measured and missing types fall back to an inherited type, and the shared filter widget gained a **hierarchy mode** (hits + their parents) that works on 25-deep joint chains.
+  Maya queries are batched for large scenes: a synthetic 10k-node scene fills in 0.4 s. 110 tests (mayapy offscreen).
 
 ---
 

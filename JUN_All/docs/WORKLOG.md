@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-11 (오늘)
 
+> [!summary] A00620_NameDecoder **v01.02 Outliner 탭** · Framework `maya_icons` · `MOD_filter` **tree_recursive** `#A00620_NameDecoder`
+- 요청: 풀린 이름을 마야 아웃라이너처럼 아이콘 + 계층으로. 새 탭 vs Names 탭 업데이트 판단 → **새 탭 `Outliner`**(첫 탭) + Names 엔 아이콘 · `Show in Outliner` 만(계획서 `plans/A00620_NameDecoder_outliner_plan.md`).
+- 실측: 마야 리소스 `:/out_<type>.png` 는 transform · mesh · joint 등 있음, blendShape · network 없음 → 공용 `Framework/qt/maya_icons.py`(상속 타입 → out_dagNode → out_default 대체, 캐시) + 툴 svg 2 개. `ls -dag -allPaths` 는 인스턴스 셰이프가 조상보다 먼저 나온다 → 경로로 부모 찾기.
+- 구현: `app/core/outline.py`(Scope 3 종 · Shapes · Blend Shapes 자식 행 · Encoded branches only · 숨김 상속 · 인스턴스 경로별 행), Refresh 는 UUID 로 펼침 · 선택 유지, Sync scriptJob 은 Names 와 하나 공유, 공용 필터 계층 모드(맞는 행 + 조상, 비우면 필터가 펼친 것만 접기).
+- 작업 중 PC 가 꺼져 재개 · 점검: 시험 1 실패는 **mayapy standalone 의 `scriptJob` 이 에러 없이 None** 이라서(시험을 가짜 scriptJob 으로 교체). 점검에서 찾은 결함 2 개 수정 — 필터가 펼친 채 Refresh 하면 비워도 펼침이 남음(`is_auto_expanded`), Sync 켠 채 타겟 행 클릭 시 선택이 부모 blendShape 행으로 튐.
+- 시험 110/110(기존 61 포함), 합성 1 만 노드 Refresh 0.41 s. **GUI 확인 아직**(일본어 글꼴 · 아이콘 · 들여쓰기).
+
 > [!summary] A00110_animTool_V02 **v02.57 Copy Key 잠긴 채널** · A00500_reloader **v01.01 옛 클래스 다시 잡기** `#A00110_animTool` `#A00500_reloader`
 - 제보: `Transfer > Copy Key` 에서 `AttributeError: type object 'CopyKeyManager' has no attribute 'copies_rotation'`, 잠긴 채널이 있을 때 나는 것 같다.
 - 원인 조사: 메서드는 코드에 있다(v02.55). 잠금과 무관 — DEV 리로드가 깊은 모듈부터 돌면서 `app/ui/main_window` 가 `app/core` 패키지보다 먼저 리로드돼 **패키지가 재노출한 옛 클래스**를 잡았다. 마야를 켠 채 코드를 받고 셸프를 처음 누를 때만 나고, 두 번째엔 풀린다. 일반 python 으로 재현.

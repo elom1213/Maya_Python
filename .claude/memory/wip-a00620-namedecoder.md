@@ -22,5 +22,7 @@ PmxImporter 에도 같은 규칙의 `encode_name/decode_name` 이 따로 있다 
 사용처: A00290_BSTool_V02 v02.06 Shape Editor `Names: Decoded(기본) / Raw (FBXASC)` - 표시만, 필터는 두 이름 다 (2026-11-09).
 A00620 v01.01 Blend Shapes 게이지는 A00290 WeightSlider 방식(테마가 QSlider 를 안 꾸밈 → 슬라이더 전용 qss), 0~1 이라 채움 = 웨이트.
 
+v01.02 (2026-11-11) Outliner 탭 = 풀린 이름 + 아이콘 + DAG 계층(첫 탭). 실측: 마야 `:/out_<type>.png` 에 blendShape · skinCluster · network 아이콘 없음(svg 판도 없음) → 공용 `Framework/qt/maya_icons.node_icon`(다른 트리 툴도 쓸 것) · `ls -dag -allPaths` 는 인스턴스 셰이프를 조상보다 먼저 준다 · `ls -invisible` 은 자식을 안 준다(숨김은 조상에서 상속) · **mayapy standalone 의 `cmds.scriptJob` 은 에러 없이 None**(Sync 시험은 가짜로). 공용 `MOD_filter` 에 `tree_recursive=True`(깊은 트리) + `is_auto_expanded(item)` — 트리를 다시 채우는 쪽은 필터가 펼친 것을 저장하지 말 것.
+
 **How to apply:** FBXASC 관련 작업은 `fbx_name` 을 쓴다(새로 짜지 말 것). 마야 GUI 확인 아직 - 마야 Qt 창의 일본어 · 중국어 글꼴(□ 로 깨지면 Yu Gothic / Microsoft YaHei 폴백).
 관련: [[mayapy-headless-verify]] · [[wip-a00480-filetool]] · [[maya-fbx-import-nonxyz-flip]]

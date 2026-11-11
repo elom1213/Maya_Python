@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">
+  <!-- blendShape target: weight gauge -->
+  <rect x="3" y="8" width="14" height="4" rx="2" fill="#24222b" stroke="#6f6385" stroke-width="1"/>
+  <rect x="3" y="8" width="8" height="4" rx="2" fill="#b39ddb"/>
+  <circle cx="11" cy="10" r="2.6" fill="#e4dbf2" stroke="#9582b5" stroke-width="1"/>
+</svg>
