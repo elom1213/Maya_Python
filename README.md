@@ -4,7 +4,7 @@
 독립 실행(standalone) Qt 앱을 직접 설계·개발한 포트폴리오 저장소입니다.
 
 > 작성자: **Ji Hun Park (Junny)** · Technical Artist / Rigging & Pipeline Tools Developer
-> 최근 갱신: 2026-11-10 · 툴 폴더 **75개**(템플릿·구버전 포함, **현행 60종**) · 공용 프레임워크 1개
+> 최근 갱신: 2026-11-11 · 툴 폴더 **75개**(템플릿·구버전 포함, **현행 60종**) · 공용 프레임워크 1개
 
 ---
 
@@ -187,6 +187,7 @@ A narrative work summary lives in
 
 | 시기 | 내용 |
 |------|------|
+| 2026-11-11 | **`A00620_NameDecoder` v01.02~03 Outliner 탭** — 마야 아웃라이너가 못 그리는 일본어 · 중국어(FBXASC) 이름을 노드 타입 아이콘 + DAG 계층으로, Scope · Shapes · blendShape 타겟 자식 행 · 계층 필터(맞는 행 + 조상) · Sync, Alt + 가운데 버튼 드래그로 위아래 이동(공용 `maya_icons` · `MOD_altPan`) · `A00110_animTool_V02` v02.57 Copy Key — Target 잠긴 채널은 건너뛰기 · `A00500_reloader` v01.01 패키지 재노출 옛 클래스 다시 잡기(첫 셸프 클릭 AttributeError) |
 | 2026-11-10 | **`A00410_SecondaryMotion` v01.12 Solver: Physics Asset** — 언리얼 Physics Asset 흉내: 체인 루트만 애니메이션을 따르고 나머지는 중력 · 관성 · Swing 1/2 한계로만 움직인다(자식 회전 키 무시 — KawaiiPhysics 와 반대), Start From animation / Settled · Collision None / Ground · `A00110_animTool_V02` v02.56 Bake > Locator `Fast - parents don't move` — 씬 재생 없이 굽기(무거운 씬 0.87 s → 0.14 s), 일반 경로 rotateAxis 어긋남 수정 |
 | 2026-11-09 | **`A00400_CurveTool` v01.32 Create > From Hair** — 헤어 메시 가닥마다 중심선 커브(열린 끝에서 링 BFS → 링 중심점, cv[0] = 뿌리), Houdini hairShrink(Labs 스켈레톤, 149 가닥 71.5 초)를 **약 1 초**로 대체 · 크기 · 길이 필터 · `Send to Joints` 로 조인트 = CV · **`A00145_RigConnect` v01.70** — Constraint `Swap` + Targets / Followers **`Rules`**(세트 멤버를 네임스페이스와 무관하게, 세트 안 원본 순서로) = **Framework 공용 TSL `show_rules`** · **`A00610_PmxImporter` 신규 → v01.01** — PMX(MMD) 직접 임포트(스킨 메시 · 조인트 · blendShape · 텍스처), v01.01 부여(付与) 본 · IK(근사) · 로컬축 · 표시 프레임(Blender mmd_tools 대조) · **`A00620_NameDecoder` 신규** — FBXASC 이름을 원래 글자로 읽기(v01.01 Blend Shapes 게이지) · `A00290_BSTool_V02` v02.06 타겟 이름 Decoded / Raw · `A00210_FileManager` v01.53 Sync Status 이름 순 · **`A00130_ControlRig_V02` v02.33 Orient & Place** — 팔 A2 는 `-Z` 가 폴 타깃(늘 팔 뒤)을 향한다(다리는 `+Z`) - 팔이 180° 구르던 것 수정, v02.32 `Keep the left arm as it is` 옵션 · `A00110_animTool_V02` v02.55 Copy Key — Base / Target rotate order 가 다르면 경고 팝업(Continue / Cancel) |
 | 2026-11-06 | **`A00600_SceneCleanup` 신규**(11-05) — 체크박스로 씬 정리: Display Layer 전부 · Animation Layer 전부(BaseAnimation 까지 안 보이게) · Hypershade `Delete Unused Nodes` 와 같은 안 쓰는 노드, undo 한 번 · 항목은 계속 늘릴 수 있는 목록 구조 · **`A00390_WindTool_V03` v03.06 Chain Wave Lite `Tip Follow`** — Flow 탭의 끝 따라가기를 같은 함수로 이식, Tip 로케이터를 옮기면 체인이 쫓아오고 바람은 그 위에서 계속 흔든다 · **`A00110_animTool_V02` v02.54 Match Follow 진행 팝업** — follower × 프레임 게이지 · `Follower k/N` · 걸린 시간 · **`A00480_FileTool` v01.21 Reference > Default `Replace...`** — 고른 레퍼런스를 다른 .ma / .mb 로 교체(Reference Editor 의 Replace Reference, 로드 상태 유지 · 중첩은 임시라 경고) |
