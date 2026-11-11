@@ -33,8 +33,39 @@ def modules_of(package_name):
     return modules
 
 
-def reload_package(package_name, quiet=False):
-    """package_name 트리를 리로드한다. 반환 (ok 목록, (이름, 에러) 목록)."""
+def stale_refs(module, reloaded):
+    """module 전역 중 **리로드로 바뀌기 전의 옛 클래스/함수**를 가리키는 이름들.
+
+    `from pkg.app.core import Mgr` 처럼 **패키지 __init__ 이 재노출한 이름**을 가져다 쓰는
+    모듈은, 깊이 순서상 패키지(`pkg.app.core`)보다 먼저 리로드된다(`pkg.app.ui.main_window` 가
+    더 깊다). 그 순간 패키지 속성은 아직 옛 클래스라 main_window 가 옛 것을 붙잡는다.
+    마야를 켠 채 코드를 받고 셸프 버튼을 처음 누르면 새로 만든 메서드가
+    `AttributeError: type object 'CopyKeyManager' has no attribute 'copies_rotation'` 로 터진
+    것이 이것이다(A00110 v02.55, 2026-11-11). 두 번째 누르면 풀린다.
+
+    판정: 전역 값이 리로드한 모듈에서 온 클래스/함수인데, 그 모듈의 지금 같은 이름이
+    다른 객체를 가리키면 옛 것이다.
+    """
+    stale = []
+    for name, value in list(vars(module).items()):
+        if not isinstance(value, type) and not callable(value):
+            continue
+        owner = getattr(value, "__module__", None)
+        qual = getattr(value, "__qualname__", None)
+        if owner not in reloaded or not qual or "." in qual:
+            continue
+        current = getattr(sys.modules.get(owner), qual, None)
+        if current is not None and current is not value:
+            stale.append(name)
+    return stale
+
+
+def reload_package(package_name, quiet=False, max_passes=4):
+    """package_name 트리를 리로드한다. 반환 (ok 목록, (이름, 에러) 목록).
+
+    첫 패스는 깊은 모듈부터. 그 뒤 옛 클래스/함수를 붙잡은 모듈만 골라 다시 리로드한다
+    (`stale_refs`) - 없어질 때까지, 최대 max_passes 번.
+    """
     ok = []
     failed = []
 
@@ -42,19 +73,37 @@ def reload_package(package_name, quiet=False):
         print("[Reload] DEV_MODE is OFF")
         return ok, failed
 
-    for mod_name in modules_of(package_name):
+    def _reload(mod_name):
         module = sys.modules.get(mod_name)
         if module is None:
-            continue
+            return False
         try:
             importlib.reload(module)
-            ok.append(mod_name)
             if not quiet:
                 print("[Reload] OK : {0}".format(mod_name))
+            return True
         except Exception as e:
             failed.append((mod_name, str(e)))
             print("[Reload] FAILED : {0}".format(mod_name))
             print(e)
+            return False
+
+    order = modules_of(package_name)
+    for mod_name in order:
+        if _reload(mod_name):
+            ok.append(mod_name)
+
+    reloaded = set(ok)
+    for _ in range(max_passes):
+        again = [n for n in order
+                 if n in sys.modules and stale_refs(sys.modules[n], reloaded)]
+        if not again:
+            break
+        for mod_name in again:
+            if not quiet:
+                print("[Reload] stale refs : {0} ({1})".format(
+                    mod_name, ", ".join(stale_refs(sys.modules[mod_name], reloaded))))
+            _reload(mod_name)
 
     return ok, failed
 

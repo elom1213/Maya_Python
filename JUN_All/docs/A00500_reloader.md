@@ -4,7 +4,7 @@
 예전에는 `dev/reloader_mayaScript_v02.py` 의 네 줄을 스크립트 에디터에 붙여 넣어 썼는데,
 다른 툴처럼 `__dragDrop_A00500.py` 로 셸프에 설치해 쓴다.
 
-- 버전: `v01.00` (`app/config/version.py`)
+- 버전: `v01.01` (`app/config/version.py`)
 - 위치: `JUN_All/dev/A00500_reloader` — 배포 대상이 아니라 **개발 도구**라 `tools/` 가 아닌 `dev/` 에 있다
   (`A00510_release_builder` 와 같은 자리). 릴리즈본에는 `dev/` 가 실리지 않는다 — [Release_Layout](Release_Layout.md)
 - 창이 없다. 누르면 리로드하고 결과를 뷰포트 메시지와 스크립트 에디터에 적는다.
@@ -70,4 +70,12 @@ dev/
 ```
 
 - `reload_package(name)` 은 `(ok 목록, (모듈, 에러) 목록)` 을 돌려준다. 예전에는 print 만 하고 아무것도 돌려주지 않았다.
+- **옛 클래스 다시 잡기**(v01.01~): 깊은 모듈부터 리로드하면 `app/ui/main_window.py` 가 `app/core` 패키지보다
+  먼저 리로드되는데, `from tools.X.app.core import Mgr` 처럼 **패키지가 재노출한 이름**을 쓰면 그 순간 패키지 속성은
+  아직 옛 클래스라 main_window 가 옛 것을 붙잡는다. 마야를 켠 채 코드를 받고 셸프 버튼을 **처음** 누르면 새 메서드가
+  `AttributeError: type object 'CopyKeyManager' has no attribute 'copies_rotation'` 로 터지고, 두 번째 누르면 풀렸다.
+  이제 첫 패스 뒤 `stale_refs(module, reloaded)` 로 **교체된 클래스/함수를 아직 가리키는 모듈만** 골라 다시 리로드한다
+  (최대 4번). 시험 `tests/test_stale_refs.py`(일반 python) 5/5 — v01.00 에서는 2개 실패.
+  - 리로더 자신은 각 툴의 셸프 버튼이 다시 읽지 않는다. 마야를 켠 채 이 수정을 받았으면 **마야를 다시 켜거나
+    `Reload` 셸프 버튼을 한 번** 눌러야 새 리로더가 쓰인다.
 - 검증: mayapy 2024 — `run(True)` 로 Framework · tools 모듈 리로드와 개수, 재노출 import, `DEV_MODE` 꺼짐 경로, 드롭 파일의 셸프 명령 실행. 마야 GUI 에서 드롭 설치는 아직 확인 전.

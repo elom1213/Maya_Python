@@ -28,3 +28,10 @@ metadata:
   `build_release.py` → A00510/legacy, `__userSetup.py` · `__memo.py` → `_archive/study_notes/100_Memo/`.
 
 관련: [[wip-release-builder-qt]], [[new-tool-needs-icon]], [[shelf-childarray-has-separators]]
+
+**v01.01 (2026-11-11) 옛 클래스 함정**: 깊이 순 리로드에서 `app/ui/main_window`(깊이 4)가 `app/core`(깊이 3)보다
+먼저 리로드돼 `from tools.X.app.core import Mgr` 가 **패키지의 옛 클래스**를 잡았다 → 마야를 켠 채 코드를 받고
+셸프 첫 클릭에 새 메서드 AttributeError, 두 번째엔 풀림(A00110 `copies_rotation` 제보). 수정: 첫 패스 뒤
+`stale_refs` 로 교체된 클래스/함수를 가리키는 모듈만 재리로드. 리로더 자체는 툴 셸프가 안 다시 읽으므로
+받은 뒤엔 마야 재시작 또는 A00500 Reload 한 번. 사용자가 "X 할 때 AttributeError" 를 보고하면 **조건이 아니라
+리로드 순서부터** 의심. 시험 `dev/A00500_reloader/tests/test_stale_refs.py`.
