@@ -33,6 +33,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-11 (오늘)
 
+> [!summary] A00620_NameDecoder **v01.03 Outliner Alt + 가운데 버튼 드래그** · Framework `MOD_altPan_qt_v01` `#A00620_NameDecoder`
+- 요청: 마야 아웃라이너처럼 Alt + 휠 클릭 드래그로 뷰를 위아래로 이동.
+- 구현: 공용 `MOD_altPan_qt_v01(view)` 한 줄 - 뷰포트 이벤트 필터, 잡아 끄는 방향(내용이 마우스를 따라감), 항목 단위 스크롤이면 픽셀을 행 높이로 나눔(뷰의 스크롤 모드 · 휠 동작은 그대로), 그 클릭은 뷰에 안 넘겨 선택이 안 바뀜, 드래그 중 Alt 를 떼도 계속.
+- 시험 113/113(Alt 드래그 3 개 추가). **GUI 확인 아직**, PySide6(마야 2025+) 경로는 시험 안 함.
+
 > [!summary] A00620_NameDecoder **v01.02 Outliner 탭** · Framework `maya_icons` · `MOD_filter` **tree_recursive** `#A00620_NameDecoder`
 - 요청: 풀린 이름을 마야 아웃라이너처럼 아이콘 + 계층으로. 새 탭 vs Names 탭 업데이트 판단 → **새 탭 `Outliner`**(첫 탭) + Names 엔 아이콘 · `Show in Outliner` 만(계획서 `plans/A00620_NameDecoder_outliner_plan.md`).
 - 실측: 마야 리소스 `:/out_<type>.png` 는 transform · mesh · joint 등 있음, blendShape · network 없음 → 공용 `Framework/qt/maya_icons.py`(상속 타입 → out_dagNode → out_default 대체, 캐시) + 툴 svg 2 개. `ls -dag -allPaths` 는 인스턴스 셰이프가 조상보다 먼저 나온다 → 경로로 부모 찾기.

@@ -10,7 +10,7 @@ updated: 2026-11-11
 마야 FBX 임포터가 `FBXASC227FBXASC129FBXASC130` 처럼 바꿔 놓은 이름(일본어 · 중국어 · 띄어쓰기 · 맨 앞 숫자)을
 **원래 글자로 풀어 보여 주는** in-Maya PySide 툴(arch B). 기본 동작은 **읽기만** 하고 씬을 바꾸지 않는다.
 
-- **버전**: `app/config/version.py` (v01.02)
+- **버전**: `app/config/version.py` (v01.03)
 - **설치**: `__dragDrop_A00620.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **Decode** → `tools.A00620_NameDecoder.run(True)`
   (ToolLauncher `UTIL` 프로파일 `Scene` 칸에도 있다)
 - **계획서**: [`plans/A00620_NameDecoder_plan.md`](plans/A00620_NameDecoder_plan.md) (실측 근거 §2) ·
@@ -55,6 +55,7 @@ updated: 2026-11-11
 | 더블클릭(blendShape · 타겟) | Blend Shapes 탭으로 가서 그 blendShape 를 고르고 타겟 행으로 스크롤 |
 | 우클릭 | `Copy Decoded` · `Copy Raw` · `Copy Decoded Path` · `Select Hierarchy` · `Expand All Below` · `Collapse All` |
 | 헤더 우클릭 | `Raw (Maya name)` 열 숨김(optionVar 기억) |
+| **Alt + 가운데 버튼 드래그** | 뷰를 위아래로 끌어 옮긴다(마야 아웃라이너와 같은 조작, v01.03). 선택은 바뀌지 않는다. 공용 `Framework/qt/MOD_altPan_qt_v01.py` |
 
 - 아이콘 = 마야 리소스 `:/out_<type>.png`. 없는 타입은 상속 타입 → `out_dagNode` → `out_default`.
   blendShape · 타겟은 마야 리소스가 없어 툴 `icon/outliner_blendShape.svg` · `outliner_bsTarget.svg`.
@@ -141,9 +142,9 @@ tools/A00620_NameDecoder/
 "C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe" tools/A00620_NameDecoder/tests/test_name_decoder.py
 ```
 
-110 개 - 실제 이름 디코드 · **마야 FBX 임포터 실측 표와 인코더 일치** · 왕복 · 깨진 바이트 · 스캔 범위 · 내보내기 ·
+113 개 - 실제 이름 디코드 · **마야 FBX 임포터 실측 표와 인코더 일치** · 왕복 · 깨진 바이트 · 스캔 범위 · 내보내기 ·
 웨이트 · Rename/undo/Restore · UI(오프스크린) · **Outliner**(아이콘 대체 · 계층 · 인스턴스 · 숨김 · Scope · 필터 계층 모드 ·
-Sync · Refresh 유지 · 합성 1 만 노드 Refresh 0.4 초) · 예시 씬 `0010_Miyabi_base_02.mb`(노드 149 · 타겟 52 · DAG 637, 열기만).
+Sync · Refresh 유지 · Alt 드래그 이동 · 합성 1 만 노드 Refresh 0.4 초) · 예시 씬 `0010_Miyabi_base_02.mb`(노드 149 · 타겟 52 · DAG 637, 열기만).
 
 마야 GUI 확인 아직 - 특히 마야 Qt 창에서 일본어 · 중국어 글꼴이 □ 로 깨지지 않는지, Outliner 아이콘이 테마 위에서 보이는지,
 깊은 체인 들여쓰기 · 확대 시 아이콘 크기.

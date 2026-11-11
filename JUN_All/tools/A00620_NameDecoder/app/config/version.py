@@ -25,5 +25,8 @@
 #        - 필터 = 공용 MOD_filter 의 새 tree_recursive 모드(맞는 행 + 조상, 조상 펼침)
 #        - Names 탭: Decoded 열에도 같은 아이콘, 우클릭 Show in Outliner
 
-VERSION = "01.02"
+# 01.03  Outliner 탭: Alt + 가운데 버튼 드래그 = 위아래로 끌어 옮기기(마야 아웃라이너와 같은 조작).
+#        공용 Framework/qt/MOD_altPan_qt_v01.py - 항목 단위 스크롤이어도 행 높이로 나눠 옮긴다, 그 클릭은 선택을 바꾸지 않는다.
+
+VERSION = "01.03"
 LAST_UPDATE = "2026-11-11"

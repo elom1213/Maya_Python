@@ -463,6 +463,41 @@ w.refresh_outliner()
 t_ui = time.time() - t0
 w.flt_out.set_text(u"節999_9")
 t_flt = time.time() - t0 - t_ui
+# 8-6 Alt + 가운데 버튼 드래그 (v01.03)
+from PySide2.QtCore import QEvent, QPointF   # noqa: E402
+from PySide2.QtGui import QMouseEvent   # noqa: E402
+from PySide2.QtCore import Qt as _Qt   # noqa: E402
+
+
+def _mouse(kind, x, y, buttons, mods, button=_Qt.MiddleButton):
+    ev = QMouseEvent(kind, QPointF(x, y), button, buttons, mods)
+    APP.sendEvent(w.tree_out.viewport(), ev)
+
+
+w.flt_out.set_text("")
+w.resize(600, 400)
+w.tabs.setCurrentWidget(w.outliner_page)
+w.show()
+APP.processEvents()
+bar = w.tree_out.verticalScrollBar()
+w.tree_out.clearSelection()
+bar.setValue(50)
+_mouse(QEvent.MouseButtonPress, 50, 200, _Qt.MiddleButton, _Qt.AltModifier)
+panning = w.pan_out.is_panning()
+_mouse(QEvent.MouseMove, 50, 100, _Qt.MiddleButton, _Qt.NoModifier, _Qt.NoButton)   # 드래그 중 Alt 를 떼도 계속
+up = bar.value()
+_mouse(QEvent.MouseMove, 50, 300, _Qt.MiddleButton, _Qt.NoModifier, _Qt.NoButton)
+down = bar.value()
+_mouse(QEvent.MouseButtonRelease, 50, 300, _Qt.NoButton, _Qt.NoModifier)
+check("8 alt pan: drag up scrolls down, drag down scrolls up (grab direction)",
+      panning and up > 50 and down < 50 and not w.pan_out.is_panning(), (bar.maximum(), up, down))
+check("8 alt pan: no selection change, cursor restored",
+      not w.tree_out.selectedItems() and w.tree_out.viewport().cursor().shape() != _Qt.ClosedHandCursor)
+bar.setValue(50)
+_mouse(QEvent.MouseButtonPress, 50, 200, _Qt.MiddleButton, _Qt.NoModifier)
+_mouse(QEvent.MouseMove, 50, 100, _Qt.MiddleButton, _Qt.NoModifier, _Qt.NoButton)
+_mouse(QEvent.MouseButtonRelease, 50, 100, _Qt.NoButton, _Qt.NoModifier)
+check("8 alt pan: middle drag without Alt does not pan", bar.value() == 50 and not w.pan_out.is_panning(), bar.value())
 w.close()
 print("    timing 10k: collect {0:.2f}s, refresh+fill {1:.2f}s, filter {2:.2f}s".format(t_collect, t_ui, t_flt))
 check("8 speed: 10k nodes collected", len([n for n in big if n.kind == OL.KIND_DAG]) == 10004, len(big))

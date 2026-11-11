@@ -49,6 +49,7 @@ from Framework.qt.MOD_filter_qt_v01 import JUN_mod_filter_qt_v01
 from Framework.qt.MOD_viewZoom_qt_v01 import JUN_mod_viewZoom_qt_v01
 from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
+from Framework.qt.MOD_altPan_qt_v01 import JUN_mod_altPan_qt_v01
 from Framework.qt.maya_icons import node_icon
 from Framework.qt.pin_style import apply_pin_style
 from Framework.core import fbx_name
@@ -317,6 +318,8 @@ class MainWindow(QWidget):
         header.setContextMenuPolicy(Qt.CustomContextMenu)
         header.customContextMenuRequested.connect(self._outliner_header_menu)
         JUN_mod_treeExpand_qt_v01(self.tree_out)
+        # Alt + 가운데 버튼 드래그 = 위아래로 끌어 옮기기 (마야 아웃라이너와 같은 조작, v01.03)
+        self.pan_out = JUN_mod_altPan_qt_v01(self.tree_out)
 
         self.lbl_out_number = QLabel("Number: 0")
         self.flt_out = JUN_mod_filter_qt_v01(
