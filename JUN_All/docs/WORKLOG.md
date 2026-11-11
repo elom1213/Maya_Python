@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 # 작업 일지 (WORKLOG)
@@ -31,7 +31,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-11-10 (오늘)
+## 2026-11-11 (오늘)
+
+> [!summary] A00110_animTool_V02 **v02.57 Copy Key 잠긴 채널** · A00500_reloader **v01.01 옛 클래스 다시 잡기** `#A00110_animTool` `#A00500_reloader`
+- 제보: `Transfer > Copy Key` 에서 `AttributeError: type object 'CopyKeyManager' has no attribute 'copies_rotation'`, 잠긴 채널이 있을 때 나는 것 같다.
+- 원인 조사: 메서드는 코드에 있다(v02.55). 잠금과 무관 — DEV 리로드가 깊은 모듈부터 돌면서 `app/ui/main_window` 가 `app/core` 패키지보다 먼저 리로드돼 **패키지가 재노출한 옛 클래스**를 잡았다. 마야를 켠 채 코드를 받고 셸프를 처음 누를 때만 나고, 두 번째엔 풀린다. 일반 python 으로 재현.
+- 수정 1 (A00500 v01.01): 첫 패스 뒤 교체된 클래스/함수를 가리키는 모듈만 다시 리로드(`stale_refs`, 최대 4번). 시험 5/5(v01.00 은 2 실패), 실제 A00110 패키지로도 mayapy 확인.
+- 수정 2 (A00110 v02.57): 잠금 동작을 mayapy 로 재 보니 노드 단위 `pasteKey` 는 **잠긴 채널에 커브가 이미 있으면 잠금을 무시하고 붙여넣고**, 전부 잠겨도 "성공". → Target 에 잠긴 채널이 있으면 채널 단위 경로, 명시 경로도 잠긴 채널 사전 제외, 로그 `Locked on Target (skipped)`, 회전 전부 잠긴 짝은 rotate order 경고 제외. 시험 23/23 · 기존 15/15. **GUI 확인 아직.**
+
+## 2026-11-10
 
 > [!summary] A00110_animTool_V02 **v02.56 Bake > Locator `Fast - parents don't move`** `#A00110_animTool`
 - 요청: 그룹 아래 ctl_01 의 월드 움직임을 월드의 로케이터에 옮길 때 O(n) 베이크 대신 키 변환으로 빠르게. 논의 결과: 매 프레임 키면 정수 프레임은 정확(검증 샘플링 불필요), **부모가 안 움직인다는 조건은 사용자가 고른다**(연결이 있어도 안 움직이는 그룹이 있다).

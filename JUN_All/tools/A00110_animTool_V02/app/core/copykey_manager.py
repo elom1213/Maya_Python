@@ -208,6 +208,10 @@ class CopyKeyManager:
         _, pairs = CopyKeyManager.build_pairs(base_list, tgt_list, one_to_many)
         result = []
         for base, tgt in pairs:
+            # Target 회전이 전부 잠겨 있으면 회전 키가 들어가지 않으므로 물을 필요가 없다.
+            if all(CopyKeyManager._is_locked(tgt + "." + a)
+                   for a in ("rotateX", "rotateY", "rotateZ")):
+                continue
             b = CopyKeyManager._rotate_order(base)
             t = CopyKeyManager._rotate_order(tgt)
             if b is None or t is None or b == t:
@@ -259,15 +263,17 @@ class CopyKeyManager:
         skipped = 0
         missing = []      # Base 나 Target 한쪽에 없는(또는 붙여넣기 실패한) 채널
         no_key = []       # 채널은 있는데 구간에 Base 키가 없는 것
+        locked = []       # Target 에서 잠겨 있어 건너뛴 채널(나머지 채널은 그대로 복사)
 
         with undo_chunk():
             for base, tgt in pairs:
                 if attrs is None:
                     copied = CopyKeyManager._copy_pair_all(
-                        base, tgt, start, end, paste_option)
+                        base, tgt, start, end, paste_option, locked, missing, no_key)
                 else:
                     copied = CopyKeyManager._copy_pair_attrs(
-                        base, tgt, start, end, paste_option, attrs, missing, no_key)
+                        base, tgt, start, end, paste_option, attrs, missing, no_key,
+                        locked)
 
                 if not copied:
                     skipped += 1
@@ -284,8 +290,11 @@ class CopyKeyManager:
             msg += " {0} skipped (no keys / paste failed).".format(skipped)
         if no_key:
             msg += " No key in range: {0}.".format(CopyKeyManager._brief(no_key))
+        if locked:
+            msg += " Locked on Target (skipped): {0}.".format(
+                CopyKeyManager._brief(locked))
         if missing:
-            msg += " Channel missing or locked: {0}.".format(
+            msg += " Channel missing or paste failed: {0}.".format(
                 CopyKeyManager._brief(missing))
         # 개수 불일치 경고는 n->n 에서만 뜻이 있다(1->n 은 개수가 달라도 정상).
         if not fan_out and len(base_list) != len(tgt_list):
@@ -313,11 +322,51 @@ class CopyKeyManager:
         return "{0} (+{1} more)".format(", ".join(uniq[:limit]), len(uniq) - limit)
 
     @staticmethod
-    def _copy_pair_all(base, tgt, start, end, paste_option):
+    def _is_locked(plug):
+        """plug 가 잠겨 있는가. 부모 compound(translate 등)가 잠겨도 자식 질의가 True 다
+        (mayapy 2024 확인). 없는 plug 는 False - 그쪽은 objExists 가 따로 거른다."""
+        try:
+            return bool(cmds.getAttr(plug, lock=True))
+        except Exception:
+            return False
+
+    @staticmethod
+    def _keyed_attrs(node):
+        """노드에서 애니메이션 커브(또는 레이어 blend)가 들어오는 어트리뷰트 이름들.
+
+        잠긴 채널은 `keyframe -q` 가 None 을 주므로 연결로 본다.
+        """
+        try:
+            conns = cmds.listConnections(node, source=True, destination=False,
+                                         connections=True, plugs=False) or []
+        except Exception:
+            return []
+        names = []
+        for plug, src in zip(conns[0::2], conns[1::2]):
+            try:
+                if not cmds.nodeType(src).startswith(("animCurve", "animBlendNode")):
+                    continue
+            except Exception:
+                continue
+            attr = plug.split(".", 1)[-1]
+            if attr not in names:
+                names.append(attr)
+        return names
+
+    @staticmethod
+    def _copy_pair_all(base, tgt, start, end, paste_option, locked=None,
+                       missing=None, no_key=None):
         """필터 없는 경로: 노드 단위로 통째 copy/paste.
 
         반환은 붙여넣은 채널 목록 대신 ["*"](= 전부)이다. 노드 단위 pasteKey 는 어떤
         채널이 들어갔는지 알려 주지 않으므로 Reverse 는 6축 전부를 대상으로 본다.
+
+        **Target 에 잠긴 채널이 하나라도 있으면 채널 단위 경로로 바꾼다** (v02.57).
+        노드 단위 pasteKey 는 잠금을 일관되게 지키지 않는다(mayapy 2024 확인):
+          - 잠긴 채널에 커브가 없으면 건너뛴다(에러도 없다 - 전부 잠겨도 "성공").
+          - 잠긴 채널에 **이미 커브가 있으면 그 커브에 그대로 붙여넣는다** - 잠금을 무시한다.
+        채널 단위로 돌면 잠긴 채널만 빼고(locked 에 기록) 나머지는 붙고, 반환도 실제로 붙인
+        채널 목록이라 Reverse 가 정확하다.
         """
         try:
             curves = cmds.copyKey(base, time=(start, end))
@@ -326,6 +375,12 @@ class CopyKeyManager:
         # 클립보드가 비면 pasteKey 가 실패한다. 예외로 흘리지 말고 건너뛴다.
         if not curves:
             return []
+        keyed = CopyKeyManager._keyed_attrs(base)
+        if any(CopyKeyManager._is_locked("{0}.{1}".format(tgt, attr)) for attr in keyed):
+            return CopyKeyManager._copy_pair_attrs(
+                base, tgt, start, end, paste_option, keyed,
+                missing if missing is not None else [],
+                no_key if no_key is not None else [], locked)
         try:
             cmds.pasteKey(tgt, option=paste_option)
         except Exception:
@@ -333,14 +388,22 @@ class CopyKeyManager:
         return ["*"]
 
     @staticmethod
-    def _copy_pair_attrs(base, tgt, start, end, paste_option, attrs, missing, no_key):
-        """명시 필터 경로: 채널 하나씩 copy/paste. 반환은 실제로 붙여넣은 채널 목록."""
+    def _copy_pair_attrs(base, tgt, start, end, paste_option, attrs, missing, no_key,
+                         locked=None):
+        """명시 필터 경로: 채널 하나씩 copy/paste. 반환은 실제로 붙여넣은 채널 목록.
+
+        Target 채널이 잠겨 있으면 그 채널만 건너뛰고(locked 에 기록) 나머지는 계속 간다.
+        Base 채널이 잠긴 것은 문제없다 - 잠금은 값 쓰기만 막고 커브 복사는 된다.
+        """
         copied = []
         for attr in attrs:
             src = "{0}.{1}".format(base, attr)
             dst = "{0}.{1}".format(tgt, attr)
             if not cmds.objExists(src) or not cmds.objExists(dst):
                 missing.append(attr)
+                continue
+            if CopyKeyManager._is_locked(dst):
+                (locked if locked is not None else missing).append(attr)
                 continue
             try:
                 if not cmds.copyKey(src, time=(start, end)):

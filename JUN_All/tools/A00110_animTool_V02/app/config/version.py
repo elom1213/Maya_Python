@@ -191,5 +191,13 @@
 #        수정: 일반 경로가 원본 rotateAxis 를 무시해 로케이터가 일정 각도 어긋났다(23.26 도) -> 원본 자세로 놓고 maintainOffset.
 #        시험 test_locator_bake_fast 18/18 · 기존 25/25 · 34/34 · UI 36/36.
 
-VERSION = "02.56"
-LAST_UPDATE = "2026-11-10"
+# 02.57  Transfer > Copy Key - Target 에 잠긴(Lock) 채널이 있어도 안 잠긴 채널끼리는 복사 (사용자 제보).
+#        mayapy 확인: 노드 단위 pasteKey 는 잠긴 채널에 커브가 없으면 건너뛰지만 **이미 커브가 있으면 잠금을 무시하고
+#        붙여넣는다**, 전부 잠겨도 에러 없이 "성공". -> Target 에 잠긴 채널이 있으면 채널 단위 경로로 돌린다.
+#        명시 경로도 잠긴 Target 채널을 미리 거른다. 로그 "Locked on Target (skipped): ...". Target 회전이 전부 잠긴
+#        짝은 rotate order 경고에서 뺀다. 제보된 AttributeError(copies_rotation) 는 잠금과 무관 - DEV 리로드 순서로
+#        main_window 가 옛 CopyKeyManager 를 잡은 것(A00500_reloader v01.01 에서 수정).
+#        시험 tests/test_copykey_locked.py 23/23 · test_copykey_rotate_order 15/15.
+
+VERSION = "02.57"
+LAST_UPDATE = "2026-11-11"

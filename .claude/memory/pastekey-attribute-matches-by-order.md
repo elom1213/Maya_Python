@@ -22,3 +22,10 @@ mayapy 2024 확인: `src.myFloat` 에만 키가 있는 상태에서
 (없는 plug 는 `objExists` 로 미리 거르고, 잠긴 타깃은 `RuntimeError: Nothing to paste to`).
 
 관련: [[wip-a00110-copykey-custom-attrs]], [[list-attrs-multi-detection]]
+
+**잠금(2026-11-11, mayapy 2024, A00110 v02.57)**: 노드 단위 `pasteKey(node)` 는 잠금을 일관되게 안 지킨다 —
+잠긴 채널에 커브가 없으면 조용히 건너뛰지만 **이미 커브가 있으면 잠금을 무시하고 그 커브에 붙여넣는다**.
+Target 채널이 전부 잠겨도 에러 없이 "성공". 채널 단위 `pasteKey(plug)` 는 잠긴 plug 에 `Nothing to paste to`.
+→ 잠긴 채널을 지키려면 `getAttr(plug, lock=True)`(부모 compound 잠금도 자식 질의에 반영됨)로 미리 거르고
+채널 단위로. 잠긴 plug 는 `keyframe -q` 가 None 을 준다(커브는 있음 → listConnections 로 볼 것).
+`scaleKey` 는 잠긴 plug 커브를 안 바꾼다.
