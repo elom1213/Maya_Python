@@ -207,5 +207,15 @@
 #        밖은 원래 움직임. 켜면 레이어 없는 오브젝트도 같은 레이어 경로. 끄면 레이어 오브젝트만 레이어(weight 1), 나머지는 pairBlend.
 #        시험 tests/test_locator_bake_layers.py 26/26 · 기존 25/25 · 34/34 · 18/18 · UI 38/38.
 
-VERSION = "02.58"
+# 02.59  Bake > Locator > `Bake to Keys` 버튼(+ Delete Locators 기본 켬) - 로케이터 컨스트레인트 결과를 오브젝트 자기 키로 굽고
+#        컨스트레인트 · LOC_Constraint 레이어(· 로케이터)를 지운다(사용자: 레이어 없이 키로만 움직이게, Bake 탭으로는 안 됨).
+#        ★ Bake 탭이 안 되는 이유: 레이어 오브젝트는 "채널을 덮는 맨 위 override 레이어" 에 키를 찍는데 그게 LOC_Constraint 자신
+#        -> 레이어를 지우면 구운 키도 사라진다. 해법: 값을 먼저 읽고 -> 정리 -> 그 아래 레이어에 역산 키
+#        (BakeManager.bake_layered 에 before_write · unwrap_rotation · edge_keys 옵션, 기본값이면 Bake 탭 동작 그대로).
+#        ★ addSelectedObjects 로 만든 override 레이어는 모든 채널이 멤버인데 커브가 없다 -> 구간 안만 키를 찍으면 구간 밖이
+#        끝 키 값으로 늘어난다(실측) -> edge_keys = 바깥 키가 없는 쪽 Start-1 / End+1 에 원래 값 키.
+#        구간 = LOC_Constraint weight 키(값 > 0) 첫 ~ 끝, 없으면 Start / End. 회전은 Start-1 부터 ±360 이어 붙임.
+#        시험 tests/test_locator_bake_to_keys.py 18/18 · UI 41/41 · bake_layers 19/19 · 기존 Locator 시험 전부.
+
+VERSION = "02.59"
 LAST_UPDATE = "2026-11-12"

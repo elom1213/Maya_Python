@@ -24,6 +24,10 @@
 #      레이어 weight 를 Start ~ End 만 1, 밖은 0(step 키)으로 두면 구간 안은 로케이터, 밖은 원래 움직임(아래 레이어들).
 #      ★ 옛 경로는 레이어 채널(animBlendNode 구동)을 "다른 것이 구동" 으로 보고 전 축을 건너뛰었다 - 컨스트레인트 0 개.
 #      ★ 레이어 경로에선 키 있는 scale 축에도 scaleConstraint 가 걸린다(레이어 블렌드 노드 입력으로 들어간다, mayapy 2024 실측).
+#   7. (v02.59) **Bake to Keys** - 위 컨스트레인트 결과를 오브젝트 자기 키로 굽고 컨스트레인트 · `LOC_Constraint` 를 지운다.
+#      ★ Bake 탭으로는 안 된다: 레이어 오브젝트는 "채널을 덮는 맨 위 override 레이어" 에 키를 찍는데 그게 LOC_Constraint
+#      자신이라, 레이어를 지우면 구운 키도 같이 사라진다. 그래서 값을 먼저 읽고 -> 컨스트레인트 · 레이어를 지운 뒤 ->
+#      그 아래에서 채널을 정하는 레이어(Base 또는 다른 override)에 역산 키(BakeManager.bake_layered 의 before_write).
 # 중간에 실패하면 이번에 만든 로케이터 · 컨스트레인트를 지우고 끝낸다(반쯤 만든 결과를 남기지 않는다).
 
 import maya.cmds as cmds
@@ -32,6 +36,8 @@ import maya.api.OpenMayaAnim as oma
 
 from Framework.core.maya_refresh import suspend_refresh
 from Framework.core.maya_undo import undo_chunk
+
+from .bake_manager import BakeManager
 
 
 class LocatorBakeManager:
@@ -215,6 +221,145 @@ class LocatorBakeManager:
                 except RuntimeError as exc:
                     warnings.append("{0}: {1} failed - {2}".format(short, ctype, str(exc).strip()))
         return made, warnings
+
+    # ------------------------------------------------------------------ Bake to Keys (v02.59)
+
+    @staticmethod
+    def _is_locator(node):
+        shapes = cmds.listRelatives(node, shapes=True, fullPath=True) or []
+        return any(cmds.nodeType(x) == "locator" for x in shapes)
+
+    @staticmethod
+    def locator_constraints(obj):
+        """obj 에 걸린 컨스트레인트 중 **로케이터만** 타깃인 것 -> [(컨스트레인트, [로케이터])]."""
+        out = []
+        for con in cmds.listRelatives(obj, children=True, type="constraint", fullPath=True) or []:
+            fn = getattr(cmds, cmds.nodeType(con), None)
+            try:
+                targets = fn(con, q=True, targetList=True) or [] if fn else []
+            except RuntimeError:
+                targets = []
+            if targets and all(LocatorBakeManager._is_locator(t) for t in targets):
+                out.append((con, targets))
+        return out
+
+    @staticmethod
+    def constraint_layers(obj=None):
+        """LOC_Constraint 레이어들(이름이 CONSTRAINT_LAYER 로 시작). obj 가 있으면 그 오브젝트에 영향 주는 것만."""
+        layers = [l for l in (cmds.ls(type="animLayer") or []) if l.startswith(LocatorBakeManager.CONSTRAINT_LAYER)]
+        if obj is None:
+            return layers
+        try:
+            affected = set(cmds.animLayer([obj], q=True, affectedLayers=True) or [])
+        except RuntimeError:
+            affected = set()
+        return [l for l in layers if l in affected]
+
+    @staticmethod
+    def layer_range(layer):
+        """레이어 weight 키 중 0 보다 큰 키의 (첫, 끝) 프레임. 키가 없으면 None (= 전 구간 weight 고정)."""
+        times = cmds.keyframe(layer + ".weight", q=True, timeChange=True) or []
+        vals = cmds.keyframe(layer + ".weight", q=True, valueChange=True) or []
+        on = [t for t, v in zip(times, vals) if v > 1e-6]
+        if not on:
+            return None
+        return int(round(min(on))), int(round(max(on)))
+
+    @staticmethod
+    def _remove_from_layer(layer, obj):
+        plugs = [p for p in (cmds.animLayer(layer, q=True, attribute=True) or [])
+                 if cmds.ls(p.split(".")[0], long=True) == cmds.ls(obj, long=True)]
+        if plugs:
+            cmds.animLayer(layer, edit=True, removeAttribute=plugs)
+
+    @staticmethod
+    def bake_to_keys(objects, start=None, end=None, translate=True, rotate=True, scale=False,
+                     delete_locators=True):
+        """로케이터 컨스트레인트 결과를 오브젝트 키로 굽고 컨스트레인트 · LOC_Constraint 레이어를 지운다.
+
+        구간 : 오브젝트가 든 LOC_Constraint 레이어의 weight 키(값 > 0 인 첫 ~ 끝). 키가 없거나 레이어가 없으면 start / end.
+        키   : 구간 안만, 구간 밖 키 · 다른 레이어는 그대로(BakeManager.bake_layered). 회전은 Start-1 부터 ±360 이어 붙임.
+        정리 : 컨스트레인트 삭제 -> 그 오브젝트 채널을 LOC_Constraint 에서 빼고, 비면 레이어 삭제 -> (옵션) 쓰지 않는 로케이터 삭제.
+        반환 : (구운 오브젝트 목록, msg). undo 한 번.
+        """
+        attrs = (["tx", "ty", "tz"] if translate else []) + (["rx", "ry", "rz"] if rotate else []) \
+            + (["sx", "sy", "sz"] if scale else [])
+        if not attrs:
+            return [], "[Warning] Enable at least one channel group."
+        targets, skipped = LocatorBakeManager.resolve_targets(objects)
+        # 로케이터 컨스트레인트가 걸린 것만
+        jobs = []
+        for obj in targets:
+            cons = LocatorBakeManager.locator_constraints(obj)
+            if cons:
+                jobs.append((obj, cons, LocatorBakeManager.constraint_layers(obj)))
+            else:
+                skipped.append((obj, "no locator constraint"))
+        if not jobs:
+            return [], "[Warning] No listed object is constrained to a locator - run LOC + Anim with Constrain first."
+
+        # 구간마다 묶는다 (보통 한 번 실행 = 레이어 하나 = 구간 하나)
+        groups = {}
+        for obj, cons, layers in jobs:
+            rng = None
+            for layer in layers:
+                r = LocatorBakeManager.layer_range(layer)
+                if r:
+                    rng = r if rng is None else (min(rng[0], r[0]), max(rng[1], r[1]))
+            if rng is None:
+                if start is None or end is None:
+                    skipped.append((obj, "no range - enter Start / End"))
+                    continue
+                rng = (int(start), int(end))
+            groups.setdefault(rng, []).append((obj, cons, layers))
+        if not groups:
+            return [], "[Warning] Nothing to bake. " + ", ".join("{0} ({1})".format(o, w) for o, w in skipped)
+
+        current = cmds.currentTime(q=True)
+        baked, notes, removed_layers, removed_locs = [], [], [], []
+        with undo_chunk():
+            try:
+                with suspend_refresh():
+                    for (s, e), items in sorted(groups.items()):
+                        def _cleanup(_items=items):
+                            for obj, cons, layers in _items:
+                                cmds.delete([c for c, _t in cons if cmds.objExists(c)])
+                                for layer in layers:
+                                    if cmds.objExists(layer):
+                                        LocatorBakeManager._remove_from_layer(layer, obj)
+                            for layer in set(l for _o, _c, ls in _items for l in ls):
+                                if cmds.objExists(layer) and not (cmds.animLayer(layer, q=True, attribute=True) or []):
+                                    cmds.delete(layer)
+                                    removed_layers.append(layer)
+
+                        objs = [o for o, _c, _l in items]
+                        lines, _curves = BakeManager.bake_layered(objs, s, e, attrs, before_write=_cleanup,
+                                                                  unwrap_rotation=True, edge_keys=True)
+                        notes += lines
+                        baked += ["{0} [{1}-{2}]".format(o.split("|")[-1], s, e) for o in objs]
+                    if delete_locators:
+                        locs = set(t for _o, cons, _l in jobs for _c, ts in cons for t in ts)
+                        for loc in sorted(locs):
+                            if not cmds.objExists(loc):
+                                continue
+                            still = cmds.listConnections(loc, source=False, destination=True, type="constraint")
+                            if not still:
+                                cmds.delete(loc)
+                                removed_locs.append(loc.split("|")[-1])
+            finally:
+                cmds.currentTime(current, edit=True)
+
+        msg = "Bake to Keys : {0} object(s) - {1}.".format(len(baked), ", ".join(baked))
+        if removed_layers:
+            msg += "  Removed layer(s): {0}.".format(", ".join(removed_layers))
+        if removed_locs:
+            msg += "  Deleted {0} locator(s).".format(len(removed_locs))
+        if skipped:
+            msg += "  Skipped {0}: {1}".format(len(skipped), ", ".join(
+                "{0} ({1})".format(o.split("|")[-1] if o else o, why) for o, why in skipped))
+        for line in notes:
+            msg += "\n  " + line
+        return [o for o, _c, _l in jobs], msg
 
     # ------------------------------------------------------------------ 빠른 경로 (v02.56)
     #

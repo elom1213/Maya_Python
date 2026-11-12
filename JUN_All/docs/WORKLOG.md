@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-12 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.59 Locator > Bake to Keys** `#A00110_animTool_V02`
+- 요청: LOC_Constraint 로 로케이터에 맞춘 움직임을 레이어 없이 컨트롤러 키로만 간직하게. Bake 탭으로 구워도 의도대로 안 됨.
+- 원인: Bake 탭은 레이어 오브젝트 키를 "채널을 덮는 맨 위 override 레이어" 에 찍는다 = LOC_Constraint 자신 → 레이어 삭제 시 키도 사라짐(mayapy 재현).
+- 해법: `Bake to Keys` 버튼 — 값 샘플 → 컨스트레인트 · LOC_Constraint 정리 → 그 아래 레이어에 역산 키(`bake_layered` 의 before_write). 구간 = 레이어 weight 키. `Delete Locators` 기본 켬.
+- ★ addSelectedObjects override 레이어는 커브 없는 채널이 많다 → 구간 안만 키를 찍으면 구간 밖이 바뀜 → edge_keys(Start-1 / End+1 원래 값). Bake 탭엔 끔(컨스트레인트가 남아 경계 값이 섞인다 - 켜면 bake_layers 6개 실패).
+- 시험 test_locator_bake_to_keys 18/18 · UI 41/41 · bake_layers 19/19 · counter 92 · merge 111 · Locator 시험 전부. **GUI 확인 아직.**
+
 > [!summary] A00110_animTool_V02 **v02.58 Locator > Constrain: 애니메이션 레이어 컨트롤러 · Blend only in Frame Range** `#A00110_animTool_V02`
 - 요청: Constrain Objects to Locators 를 켜도 BaseAnimation + 다른 레이어에 키가 있는 컨트롤러엔 안 걸림 → 걸리게. 그리고 Start ~ End 만 blend 1(로케이터에 매칭), 나머지는 원래 움직임이 되는 체크박스(기본 켬).
 - 원인: 레이어 채널은 animBlendNode 가 구동 → `_blocked_axes` 가 "키가 아닌 구동" 으로 전 축 skip(mayapy 재현: 컨스트레인트 0 개).

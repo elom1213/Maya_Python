@@ -239,28 +239,38 @@ class BakeManager:
         return root
 
     @staticmethod
-    def bake_layered(objects, start, end, attrs):
+    def _unwrap(prev, values):
+        """회전 값 목록을 앞 값과 ±360 단위로 이어 붙인다(같은 회전, 커브 튐 없음)."""
+        out = []
+        for v in values:
+            if prev is not None:
+                v += 360.0 * round((prev - v) / 360.0)
+            out.append(v)
+            prev = v
+        return out
+
+    @staticmethod
+    def bake_layered(objects, start, end, attrs, before_write=None, unwrap_rotation=False, edge_keys=False):
         """레이어 오브젝트를 [start, end] 만 굽는다 - 구간 밖 키 · 다른 레이어 커브 보존. 반환 (로그 줄(경고), 키를 찍은 커브).
 
         1) 컨스트레인트 등이 켜진 채 매 프레임 채널 값 샘플링 (currentTime 루프 = simulation)
         2) 채널마다 대상 레이어(target_layer) 커브의 [start, end] 안 키만 지움
         3) 매 프레임 setKeyframe -animLayer 대상 -value 값 (마야가 위 레이어를 빼서 역산)
         undo 묶기 · 시간 복원은 호출부(bake).
+
+        before_write    : (v02.59) 샘플링 뒤 · 키 찍기 전에 부르는 함수. 대상 레이어는 **그 뒤에** 정한다 -
+                          예) Locator 의 `LOC_Constraint` 레이어 · 컨스트레인트를 지운 뒤 그 아래 레이어에 굽기.
+                          레이어가 하나도 안 남으면 오브젝트 직결 커브에 찍는다.
+        unwrap_rotation : (v02.59) 회전 샘플을 Start-1 값부터 ±360 으로 이어 붙인다(컨스트레인트 출력은 -180~180 이라
+                          원래 커브가 그 밖이면 경계에서 튄다).
+        edge_keys       : (v02.59) 구간 바깥에 기존 키가 없는 쪽은 Start-1 / End+1 에 그때 값으로 키(아래). 컨스트레인트를
+                          지운 뒤(before_write) 굽는 경우만 - 컨스트레인트를 남기는 Bake 탭은 끈다(경계 값에 컨스트레인트가 섞인다).
         """
-        root = LayerKeyManager.root_layer()
-        layers = BakeManager._layer_order()
-        members = dict((layer, BakeManager._members(layer)) for layer, _i in layers)
-        locked = set(layer for layer, info in layers if info.get("locked"))
-        try:
-            if root and cmds.animLayer(root, q=True, lock=True):
-                locked.add(root)
-        except Exception:                                   # noqa: BLE001
-            pass
         frames = list(range(int(start), int(end) + 1))
         notes = []
 
         # 채널 목록 (잠긴 채널 · 없는 어트리뷰트 제외)
-        plan = []
+        plugs = []
         for obj in objects:
             for attr in attrs:
                 plug = "{0}.{1}".format(obj, attr)
@@ -270,24 +280,71 @@ class BakeManager:
                         continue
                 except Exception:                           # noqa: BLE001
                     continue
-                target = BakeManager.target_layer(obj, attr, layers, members, root)
-                if target in locked:
-                    notes.append("[Warning] {0}: layer '{1}' is locked - skipped.".format(plug, target))
-                    continue
-                plan.append((obj, attr, plug, target))
+                plugs.append((obj, attr, plug))
 
         # 1) 샘플링
-        values = dict((p[2], []) for p in plan)
+        values = dict((p[2], []) for p in plugs)
+        prev = {}
+        if unwrap_rotation:
+            cmds.currentTime(int(start) - 1)
+            for _o, attr, plug in plugs:
+                if BakeManager._long_attr(_o, attr).startswith("rotate"):
+                    prev[plug] = float(cmds.getAttr(plug))
         for f in frames:
             cmds.currentTime(f)
-            for _o, _a, plug, _t in plan:
+            for _o, _a, plug in plugs:
                 values[plug].append(float(cmds.getAttr(plug)))
+        for plug, first in prev.items():
+            values[plug] = BakeManager._unwrap(first, values[plug])
+
+        if before_write:
+            before_write()
+
+        # 대상 레이어 - before_write 가 레이어를 바꿨을 수 있어 샘플링 뒤에 정한다
+        root = LayerKeyManager.root_layer()
+        layers = BakeManager._layer_order()
+        members = dict((layer, BakeManager._members(layer)) for layer, _i in layers)
+        locked = set(layer for layer, info in layers if info.get("locked"))
+        try:
+            if root and cmds.animLayer(root, q=True, lock=True):
+                locked.add(root)
+        except Exception:                                   # noqa: BLE001
+            pass
+        plan = []
+        for obj, attr, plug in plugs:
+            target = BakeManager.target_layer(obj, attr, layers, members, root) if root else None
+            if target and target in locked:
+                notes.append("[Warning] {0}: layer '{1}' is locked - skipped.".format(plug, target))
+                continue
+            plan.append((obj, attr, plug, target))
+
+        # v02.59 경계 키 - 구간 바깥에 기존 키가 없는 쪽(커브가 아예 없는 채널 포함)은 Start-1 / End+1 에 지금 값을 역산 키로.
+        #   안 하면 새 키가 구간 안에만 생겨 구간 밖이 끝 키 값으로 늘어난다. 예) addSelectedObjects 로 만든 override 레이어는
+        #   모든 채널이 멤버인데 대부분 커브가 없다(레이어 값 = 정적) -> 구간 안만 키를 찍으면 구간 밖이 바뀌었다(실측).
+        curves = {}
+        edges = {}
+        for obj, attr, plug, target in plan:
+            curve = LayerKeyManager.layer_curve(plug, target, root) if target else LayerKeyManager.plain_curve(plug)
+            curves[plug] = curve
+            times = (cmds.keyframe(curve, q=True, timeChange=True) or []) if curve else []
+            need = []
+            if not [t for t in times if t < start]:
+                need.append(int(start) - 1)
+            if not [t for t in times if t > end]:
+                need.append(int(end) + 1)
+            if need and edge_keys:
+                edges[plug] = dict((f, None) for f in need)
+        for f in sorted(set(f for d in edges.values() for f in d)):
+            cmds.currentTime(f)
+            for plug, d in edges.items():
+                if f in d:
+                    d[f] = float(cmds.getAttr(plug))
 
         # 2) 3) 대상 레이어 커브의 구간 안 키만 지우고 매 프레임 역산 키
         overridden = set()
         keyed_curves = []
         for obj, attr, plug, target in plan:
-            curve = LayerKeyManager.layer_curve(plug, target, root) if target else None
+            curve = curves[plug]
             if curve:
                 # 듬성한 커브는 구간 안 키를 지우면 구간 밖 보간 모양까지 바뀐다 -> Merge Layers 와 같은 경계 처리:
                 # 바로 바깥 이웃 키 탄젠트 고정 + s-1 / e+1 에 모양 보존 키(fixed). auto 탄젠트는 이웃이 바뀌면 다시 계산된다.
@@ -303,7 +360,8 @@ class BakeManager:
                     cmds.keyTangent(curve, e=True, time=(q, q), itt="fixed", ott="fixed")
                     LayerKeyManager._insert_fixed(curve, end + 1)
                 cmds.cutKey(curve, time=(start, end), clear=True)
-            for f, v in zip(frames, values[plug]):
+            keys = list(zip(frames, values[plug])) + sorted((edges.get(plug) or {}).items())
+            for f, v in keys:
                 if target:
                     cmds.setKeyframe(obj, attribute=attr, time=f, value=v, animLayer=target)
                 else:

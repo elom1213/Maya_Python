@@ -39,4 +39,11 @@ metadata:
   켜면 모든 오브젝트 레이어 경로, 끄면 레이어 오브젝트만. ★ mayapy 에선 `currentTime` 도 undo 대기열에 쌓인다 → 시험은 시간 이동 전에 undo.
   시험 `test_locator_bake_layers.py` 26/26, UI 38/38. **GUI 확인 아직.**
 
+- **v02.59 `Bake to Keys`**(2026-11-12): 컨스트레인트 결과 → 오브젝트 키, 컨스트레인트 · LOC_Constraint · 로케이터 정리.
+  ★ **Bake 탭은 레이어 오브젝트 키를 맨 위 override 레이어에 찍는다 → LOC_Constraint 자신에 들어가 레이어 삭제 시 사라진다.**
+  해법 = `bake_layered(before_write=정리)` — 샘플 뒤 정리, **대상 레이어는 정리 뒤에** 정한다.
+  ★ `addSelectedObjects` override 레이어는 전 채널 멤버 + 커브 없음 → 구간 안만 `setKeyframe -animLayer` 하면 구간 밖이 끝 값으로 늘어난다 →
+  `edge_keys`(Start-1 / End+1 원래 값). Bake 탭엔 끔(컨스트레인트가 남아 있어 경계 값이 섞임).
+  시험 `test_locator_bake_to_keys.py` 18/18. **GUI 확인 아직.**
+
 관련: [[framework-progress-widget]], [[framework-timerange-widget]], [[wip-a00110-get-sel-range]], [[wip-a00110-counter-layer]]

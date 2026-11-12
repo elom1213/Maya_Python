@@ -1667,6 +1667,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 │ │ [v] Blend only in Frame Range                           ││  ← v02.58, 기본 켬
 │ └─────────────────────────────────────────────────────────┘│
 │ [ LOC + Anim ]                                            │
+│ [ Bake to Keys                    ] [v] Delete Locators   │  ← v02.59
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -1700,6 +1701,14 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   - **Blend only in Frame Range**(v02.58~, **기본 켬**): 컨스트레인트가 **Start ~ End 에만** 영향(blend 1), 밖은 **원래 움직임**.
     `LOC_Constraint` 레이어 weight 에 step 키 `Start-1 = 0 · Start = 1 · End = 1 · End+1 = 0`. 켜면 레이어 없는 오브젝트도 같은 레이어에
     들어간다(실행 한 번 = 레이어 하나). 끄면 전 프레임에서 컨스트레인트(레이어 오브젝트는 weight 1 레이어, 나머지는 예전 pairBlend).
+- **Bake to Keys**(v02.59~): 리스트 오브젝트 중 **로케이터에 컨스트레인트된 것**의 움직임을 **오브젝트 자기 키**로 굽고 컨스트레인트 ·
+  `LOC_Constraint` 레이어를 지운다 — 그 뒤엔 레이어 · 로케이터 없이 키만으로 같은 움직임. `Delete Locators`(기본 켬)면 더 이상
+  아무것도 구동하지 않는 로케이터도 지운다. Undo 한 번.
+  - 구간 = `LOC_Constraint` 레이어 weight 가 켜진 프레임(키 값 > 0 인 첫 ~ 끝). weight 키가 없거나(구간 블렌드 끔) 레이어가 없으면 Start / End.
+  - 키는 **그 아래에서 채널을 정하는 레이어**(BaseAnimation 또는 다른 override)에 찍는다 — 다른 레이어 · 구간 밖 키는 그대로.
+    레이어에 목록 밖 오브젝트가 남아 있으면 그 레이어는 지우지 않는다(이 오브젝트의 채널만 뺀다).
+  - ★ **Bake 탭으로는 안 된다**: 레이어 오브젝트는 Bake 탭이 "채널을 덮는 맨 위 override 레이어" 에 키를 찍는데 그게 `LOC_Constraint` 자신이라,
+    레이어를 지우면 구운 키도 같이 사라진다.
 
 #### Counter Layer — 상위 레이어가 바꾼 월드 위치·회전 되돌리기 (v02.26~)
 
@@ -2437,6 +2446,12 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
   레이어 컨트롤 → 걸림, 로케이터를 옮기면 구간 안은 따라오고 밖은 원래 월드(오차 1e-3), weight 0/1/1/0 step, 구간 끔 = 전 프레임,
   레이어 없는 오브젝트(구간 끔 = pairBlend · 켬 = 레이어), 두 오브젝트 = 레이어 하나, point + orient + 키 있는 scale, 잠긴 축 skip, undo 한 번.
   ★ mayapy 에선 `currentTime` 도 undo 대기열에 쌓인다 — 시험에서 시간을 옮긴 뒤 undo 하면 그것만 되돌아간다.
+- **Bake to Keys**(v02.59, `LocatorBakeManager.bake_to_keys`): `locator_constraints`(타깃이 전부 로케이터인 컨스트레인트) · `layer_range`(weight 키) →
+  `BakeManager.bake_layered(before_write=정리, unwrap_rotation=True, edge_keys=True)` — 값 샘플 → 컨스트레인트 삭제 · 레이어에서 채널 빼기 · 빈 레이어 삭제 →
+  **그 뒤에** 대상 레이어를 정해 역산 키. edge_keys = 구간 바깥에 키가 없는 쪽은 Start-1 / End+1 에 원래 값(커브 없는 override 레이어 채널이
+  구간 밖에서 끝 값으로 늘어나던 것, 실측). 시험 `tests/test_locator_bake_to_keys.py` **18/18**: Bake 탭 방식 실패 재현 · Base + additive + override
+  레이어 컨트롤 전 프레임 월드 행렬 1e-3 · 다른 레이어 유지 · undo · 레이어 없는 오브젝트(레이어 · pairBlend 경로) · 큰 회전 경계 · 두 오브젝트 ·
+  다른 오브젝트가 남은 레이어 유지 · Keep locators.
 
 ### Bake > Counter Layer
 - **엔진**(`counter_layer_manager.CounterLayerManager.create`): 두 번 훑기. ① 체크한 레이어(+ 새 보정 레이어)를
