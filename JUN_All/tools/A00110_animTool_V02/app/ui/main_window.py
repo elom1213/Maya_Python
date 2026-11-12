@@ -2337,7 +2337,7 @@ class MainWindow(QWidget):
             "After the bake, constrain every listed object to its locator\n"
             "(the locator drives the object). No offset - the locator already matches the object.\n"
             "Locked channels and channels driven by something other than keys are skipped per axis.\n"
-            "Objects in animation layers are constrained in a new override layer 'LOC_Constraint'.")
+            "Objects with keys in animation layers are constrained too (no new layer).")
         con_box = QVBoxLayout(self.grp_lb_constrain)
         con_row = QHBoxLayout()
         con_box.addLayout(con_row)
@@ -2356,14 +2356,15 @@ class MainWindow(QWidget):
         self.cb_lb_con_parent.toggled.connect(self._on_lb_con_parent_toggled)
         self.cb_lb_con_point.toggled.connect(self._on_lb_con_part_toggled)
         self.cb_lb_con_orient.toggled.connect(self._on_lb_con_part_toggled)
-        # (v02.58) 구간 블렌드 - 기본 켬. 컨스트레인트를 override 레이어에 넣고 레이어 weight 를 Start ~ End 만 1(밖 0).
+        # (v02.58 -> v02.61) 구간 블렌드 - 기본 켬. pairBlend 웨이트(blendParent1 등)를 Start ~ End 만 1(밖 0), 레이어 없음.
         self.cb_lb_con_range = QCheckBox("Blend only in Frame Range")
         self.cb_lb_con_range.setChecked(True)
         self.cb_lb_con_range.setToolTip(
             "The constraint drives the object only from Start to End (blend 1 there).\n"
             "Outside the range the object keeps its own motion (blend 0).\n"
-            "Done with a new override animation layer 'LOC_Constraint' whose weight is keyed\n"
-            "1 from Start to End and 0 outside (stepped). Delete the layer to remove the constraint effect.\n"
+            "The blend attribute (blendParent1 / blendPoint1 / blendOrient1) is keyed 1 from Start to End\n"
+            "and 0 outside (stepped). Bake > Bake then keeps it: delete the constraints / locators after it.\n"
+            "Scale constraints have no blend attribute - they drive every frame.\n"
             "Off: the constraint drives every frame.")
         con_box.addWidget(self.cb_lb_con_range)
         tab_layout.addWidget(self.grp_lb_constrain)
@@ -2378,23 +2379,6 @@ class MainWindow(QWidget):
             "between Start and End. A progress popup shows the bake. One undo step.")
         self.btn_lb_bake.clicked.connect(self.on_locator_bake)
         tab_layout.addWidget(self.btn_lb_bake)
-
-        # (v02.59) 컨스트레인트 결과를 오브젝트 키로 굽고 컨스트레인트 · LOC_Constraint 레이어를 지운다.
-        #   Bake 탭은 레이어 오브젝트의 키를 맨 위 override 레이어(= LOC_Constraint 자신)에 찍어, 레이어를 지우면 사라진다.
-        btk_row = QHBoxLayout()
-        self.btn_lb_bake_keys = QPushButton("Bake to Keys")
-        self.btn_lb_bake_keys.setToolTip(
-            "For listed objects constrained to their locators: bake the constrained motion onto the\n"
-            "objects' own keys, then delete the constraints and the 'LOC_Constraint' layer.\n"
-            "Range = the frames where the LOC_Constraint layer weight is on (Start / End if it has no keys).\n"
-            "Keys outside the range and the other animation layers are kept. One undo step.")
-        self.btn_lb_bake_keys.clicked.connect(self.on_locator_bake_to_keys)
-        btk_row.addWidget(self.btn_lb_bake_keys, stretch=1)
-        self.cb_lb_del_locs = QCheckBox("Delete Locators")
-        self.cb_lb_del_locs.setChecked(True)
-        self.cb_lb_del_locs.setToolTip("Also delete the locators that no longer drive anything.")
-        btk_row.addWidget(self.cb_lb_del_locs)
-        tab_layout.addLayout(btk_row)
 
         tab_layout.addStretch(1)
         return tab
@@ -5340,22 +5324,6 @@ class MainWindow(QWidget):
             dlg.finish()
         if locators and elapsed is not None:
             msg += "  ({0:.1f}s)".format(elapsed)
-        self.log(msg)
-
-    def on_locator_bake_to_keys(self, *_args):
-        """(v02.59) 로케이터 컨스트레인트 결과 -> 오브젝트 키, 컨스트레인트 · LOC_Constraint 정리."""
-        items = self.lb_tsl.get_all_items()
-        if not items:
-            self.log("[Warning] Add objects to the Locator List first.")
-            return
-        nodes = self.lb_tsl.get_all_nodes() or items
-        values = self.lb_range.values()
-        start, end = values if values is not None else (None, None)
-        translate, rotate, scale = (self.cb_lb_t.isChecked(), self.cb_lb_r.isChecked(),
-                                    self.cb_lb_s.isChecked())
-        _done, msg = LocatorBakeManager.bake_to_keys(
-            nodes, start, end, translate=translate, rotate=rotate, scale=scale,
-            delete_locators=self.cb_lb_del_locs.isChecked())
         self.log(msg)
 
     # --------------------------------------------------

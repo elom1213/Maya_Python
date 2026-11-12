@@ -223,5 +223,15 @@
 #        표시 칸 = 논리 열 4 를 화면에서 Layer 옆으로(moveSection) - Mute / Solo / Lock 열 번호 그대로, 크기는 viewZoom 배율을 따름.
 #        시험 tests/test_anim_layers.py 57/57(M0~M10, 실제 렌더 픽셀 색 확인).
 
-VERSION = "02.60"
+# 02.61  Locator > Constrain 을 **레이어 없이** (사용자 제안): v02.58 의 LOC_Constraint override 레이어 · v02.59 Bake to Keys 를 뺐다.
+#        - 레이어 채널(animBlendNode 구동)에도 그냥 건다 - 마야가 레이어 결과 뒤에 pairBlend 를 끼운다(실측, v02.57 판정이 틀렸다).
+#        - Blend only in Frame Range = 컨스트레인트가 만든 blendParent1 / blendPoint1 / blendOrient1 에 step 키 0/1/1/0.
+#          ★ 컨스트레인트 타깃 웨이트 0 은 원래 움직임이 아니라 rest 자세 -> 웨이트가 아니라 pairBlend 블렌드 attr.
+#          키 없는 오브젝트는 지금 값 키 먼저(pairBlend 가 안 생긴다). scale 은 블렌드 attr 이 없어 전 프레임 + 경고.
+#        - Bake > Bake: 블렌드 attr 에 키가 있는 오브젝트는 레이어가 없어도 bake_layered(edge_keys · unwrap) 경로 -> 구운 뒤
+#          로케이터를 지워도 키만으로 같은 움직임. bakeResults 는 듬성한 auto 탄젠트 커브의 구간 밖 모양을 바꿨다(2~7 f, 실측).
+#          pairBlend 뒤 원래 커브는 `pairblend_curve` 로 찾는다(직결 커브가 없다).
+#        시험 test_locator_bake_layers 28/28 · UI 39/39 · bake_layers 19/19 · 기존 Locator 시험 전부 · counter 92 · merge 111.
+
+VERSION = "02.61"
 LAST_UPDATE = "2026-11-12"

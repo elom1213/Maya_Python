@@ -1664,10 +1664,9 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 │ [ ] Fast - parents don't move                             │  ← v02.56, 기본 끔
 │ [ ] Constrain Objects to Locators ────────────────────────┐│  ← v02.37, 그룹 체크 = 켜기(기본 끔)
 │ │ [v] Parent  [ ] Point  [ ] Orient  [ ] Scale            ││
-│ │ [v] Blend only in Frame Range                           ││  ← v02.58, 기본 켬
+│ │ [v] Blend only in Frame Range                           ││  ← v02.58 · v02.61, 기본 켬
 │ └─────────────────────────────────────────────────────────┘│
 │ [ LOC + Anim ]                                            │
-│ [ Bake to Keys                    ] [v] Delete Locators   │  ← v02.59
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -1694,21 +1693,19 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   - 굽지 않은 채널의 종류는 실행 전에 막는다(Point = Translate, Orient = Rotate, Scale = Scale 을 Channels 에서 켜야 한다).
   - **축 단위 건너뛰기**: 잠긴 축, 키가 아닌 것(다른 컨스트레인트 · 연결)이 구동하는 축은 그 축만 빼고 걸고 로그에 `[Warning]`.
     ★ **Scale 은 키가 있는 축도 건너뛴다** — scale 에는 pairBlend 가 없어 키 있는 채널에 scaleConstraint 가 실패한다(마야 Constrain > Scale 도 같다).
-    (레이어 경로에서는 키 있는 scale 도 걸린다 - 아래)
-  - **애니메이션 레이어**(v02.58~): BaseAnimation 말고 다른 레이어에도 키가 있는 컨트롤러도 걸린다(예전엔 레이어 채널을
-    "키가 아닌 구동" 으로 보고 전 축을 건너뛰어 컨스트레인트가 0 개였다). 이런 오브젝트는 컨스트레인트를 새 **override 레이어
-    `LOC_Constraint`** 안에 건다 — 레이어를 지우면 컨스트레인트 효과가 사라진다.
+  - **애니메이션 레이어**(v02.58~ · v02.61): BaseAnimation 말고 다른 레이어에도 키가 있는 컨트롤러도 걸린다 — 마야가 레이어 결과 뒤에
+    pairBlend 를 끼운다. v02.57 까지는 레이어 채널을 "키가 아닌 구동" 으로 보고 전 축을 건너뛰어 컨스트레인트가 0 개였다. **새 레이어는 만들지 않는다.**
   - **Blend only in Frame Range**(v02.58~, **기본 켬**): 컨스트레인트가 **Start ~ End 에만** 영향(blend 1), 밖은 **원래 움직임**.
-    `LOC_Constraint` 레이어 weight 에 step 키 `Start-1 = 0 · Start = 1 · End = 1 · End+1 = 0`. 켜면 레이어 없는 오브젝트도 같은 레이어에
-    들어간다(실행 한 번 = 레이어 하나). 끄면 전 프레임에서 컨스트레인트(레이어 오브젝트는 weight 1 레이어, 나머지는 예전 pairBlend).
-- **Bake to Keys**(v02.59~): 리스트 오브젝트 중 **로케이터에 컨스트레인트된 것**의 움직임을 **오브젝트 자기 키**로 굽고 컨스트레인트 ·
-  `LOC_Constraint` 레이어를 지운다 — 그 뒤엔 레이어 · 로케이터 없이 키만으로 같은 움직임. `Delete Locators`(기본 켬)면 더 이상
-  아무것도 구동하지 않는 로케이터도 지운다. Undo 한 번.
-  - 구간 = `LOC_Constraint` 레이어 weight 가 켜진 프레임(키 값 > 0 인 첫 ~ 끝). weight 키가 없거나(구간 블렌드 끔) 레이어가 없으면 Start / End.
-  - 키는 **그 아래에서 채널을 정하는 레이어**(BaseAnimation 또는 다른 override)에 찍는다 — 다른 레이어 · 구간 밖 키는 그대로.
-    레이어에 목록 밖 오브젝트가 남아 있으면 그 레이어는 지우지 않는다(이 오브젝트의 채널만 뺀다).
-  - ★ **Bake 탭으로는 안 된다**: 레이어 오브젝트는 Bake 탭이 "채널을 덮는 맨 위 override 레이어" 에 키를 찍는데 그게 `LOC_Constraint` 자신이라,
-    레이어를 지우면 구운 키도 같이 사라진다.
+    컨스트레인트가 오브젝트에 만든 블렌드 attr(`blendParent1` · Point 는 `blendPoint1` · Orient 는 `blendOrient1`)에 step 키
+    `Start-1 = 0 · Start = 1 · End = 1 · End+1 = 0`.
+    - 컨스트레인트 **타깃 웨이트**가 아니라 이 attr 이다 — 타깃 웨이트 0 은 원래 움직임이 아니라 rest 자세로 간다(실측).
+    - 키가 하나도 없는 오브젝트는 pairBlend 가 안 생기므로, 먼저 **지금 값으로 키를 하나** 넣는다(움직임은 그대로).
+    - **Scale** 은 블렌드 attr 이 없어 구간을 못 나눈다 — 전 프레임 + `[Warning]`.
+    - 끄면 전 프레임에서 컨스트레인트(블렌드 키 없음).
+  - **로케이터 움직임을 키로 남기기**: 구간 블렌드 상태로 **Bake > Bake** 에서 같은 Start / End 를 굽고 → **로케이터를 지운다**(컨스트레인트도 같이 지워진다).
+    키만으로 같은 움직임이 남고, 구간 밖 키 · 다른 애니메이션 레이어는 그대로다(v02.61, 아래 Bake 의 "구간 블렌드 오브젝트").
+    (v02.58 의 `LOC_Constraint` override 레이어 방식과 v02.59 `Bake to Keys` 버튼은 이 방식으로 바꾸며 뺐다 — 레이어 오브젝트는
+    Bake 탭이 맨 위 override 레이어 = `LOC_Constraint` 에 키를 찍어, 레이어를 지우면 키도 사라졌다.)
 
 #### Counter Layer — 상위 레이어가 바꾼 월드 위치·회전 되돌리기 (v02.26~)
 
@@ -2446,18 +2443,14 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
   종류 하나가 실패해도 경고만 남기고 나머지는 계속. 시험 `tests/test_locator_bake_constrain.py` **34/34**: Parent · Point+Orient ·
   Parent+Scale(스케일 2 부모) 모두 **오브젝트 월드 오차 1e-15**, 로케이터 이동 → 오브젝트 따라옴, 잠김 tz · multiplyDivide 가 구동하는 ry 축 skip,
   키 있는 sx skip, undo, 부분 실패. UI 시험 31/31(기본 끔 · Parent 기본 · 배타 · 굽지 않은 채널 거부 · 4단계 팝업).
-- **레이어 경로**(v02.58): `constrain_range` 이거나 `in_anim_layers(obj)`(`animLayer -q -affectedLayers`) 면 실행마다 override 레이어 하나
-  (`create_constraint_layer`) → 거는 축을 `animLayer -e -attribute` 로 넣고 `parentConstraint ... -layer`. `_blocked_axes(layered=True)` 는
-  animBlendNode(`animBlendNodeBase`) 구동을 키로 본다. 시험 `tests/test_locator_bake_layers.py` **26/26**: Base + additive + override(weight 0.5)
-  레이어 컨트롤 → 걸림, 로케이터를 옮기면 구간 안은 따라오고 밖은 원래 월드(오차 1e-3), weight 0/1/1/0 step, 구간 끔 = 전 프레임,
-  레이어 없는 오브젝트(구간 끔 = pairBlend · 켬 = 레이어), 두 오브젝트 = 레이어 하나, point + orient + 키 있는 scale, 잠긴 축 skip, undo 한 번.
+- **구간 블렌드**(v02.61, `constrain_objects(blend_range=)`): `_blocked_axes` 는 animBlendNode(`animBlendNodeBase`) 구동도 키로 본다(scale 은 여전히 막힘).
+  컨스트레인트 뒤 `blend_plugs(con)` = 그 컨스트레인트가 끼운 pairBlend 의 `weight` 를 구동하는 plug(`obj.blendParent1` 등) → `key_blend_range` step 키.
+  키 없는 채널 묶음은 `_ensure_keyed` 로 지금 값 키 먼저. Bake 탭은 `BakeManager.range_blended_objects`(pairBlend 웨이트에 키) 오브젝트를
+  `bake_layered(unwrap_rotation=True, edge_keys=True)` 로 굽는다(레이어가 없어도). 대상 커브는 `pairblend_curve`(pairBlend 입력 1) 로도 찾는다.
+  시험 `tests/test_locator_bake_layers.py` **28/28**: 레이어 채널 판정 · Base + additive + override(weight 0.5) 컨트롤 → 걸림 · 새 레이어 없음 ·
+  blendParent1 0/1/1/0 step · 로케이터를 옮기면 구간 안 따라옴 / 밖 원래 월드 · **Bake 탭 → 로케이터 삭제 = 전 프레임 같은 움직임(1e-3)** · 레이어 그대로 ·
+  레이어 없는 / 키 없는 오브젝트 · 구간 끔 · Point + Orient(blendPoint1 / blendOrient1) · Scale 경고 · 큰 회전 경계 · 잠긴 축 · undo.
   ★ mayapy 에선 `currentTime` 도 undo 대기열에 쌓인다 — 시험에서 시간을 옮긴 뒤 undo 하면 그것만 되돌아간다.
-- **Bake to Keys**(v02.59, `LocatorBakeManager.bake_to_keys`): `locator_constraints`(타깃이 전부 로케이터인 컨스트레인트) · `layer_range`(weight 키) →
-  `BakeManager.bake_layered(before_write=정리, unwrap_rotation=True, edge_keys=True)` — 값 샘플 → 컨스트레인트 삭제 · 레이어에서 채널 빼기 · 빈 레이어 삭제 →
-  **그 뒤에** 대상 레이어를 정해 역산 키. edge_keys = 구간 바깥에 키가 없는 쪽은 Start-1 / End+1 에 원래 값(커브 없는 override 레이어 채널이
-  구간 밖에서 끝 값으로 늘어나던 것, 실측). 시험 `tests/test_locator_bake_to_keys.py` **18/18**: Bake 탭 방식 실패 재현 · Base + additive + override
-  레이어 컨트롤 전 프레임 월드 행렬 1e-3 · 다른 레이어 유지 · undo · 레이어 없는 오브젝트(레이어 · pairBlend 경로) · 큰 회전 경계 · 두 오브젝트 ·
-  다른 오브젝트가 남은 레이어 유지 · Keep locators.
 
 ### Bake > Counter Layer
 - **엔진**(`counter_layer_manager.CounterLayerManager.create`): 두 번 훑기. ① 체크한 레이어(+ 새 보정 레이어)를

@@ -72,8 +72,10 @@ class BakeManager:
         attrs = list(channels) if channels else list(BakeManager.DEFAULT_CHANNELS)
 
         # v02.51 : 레이어에 든 오브젝트는 따로 (bakeResults 가 구간 밖 키를 지운다)
-        layered = BakeManager.layered_objects(objects, attrs)
-        plain = [o for o in objects if o not in layered]
+        # v02.61 : 구간 블렌드(pairBlend 웨이트에 키)가 걸린 오브젝트도 따로 - 레이어가 없어도 경계 키 처리 경로로.
+        blended = BakeManager.range_blended_objects(objects)
+        layered = [o for o in BakeManager.layered_objects(objects, attrs) if o not in blended]
+        plain = [o for o in objects if o not in layered and o not in blended]
 
         # v02.51 : 언제나 dense 로 굽는다 (bakeResults -smart 는 구간 밖 키를 망가뜨린다). smart 는 뒤에서 구간 안만 simplify.
         bake_kwargs = dict(
@@ -103,6 +105,11 @@ class BakeManager:
                 if layered:
                     notes, curves = BakeManager.bake_layered(layered, start, end, attrs)
                     baked_curves += curves
+                if blended:
+                    lines, curves = BakeManager.bake_layered(blended, start, end, attrs,
+                                                             unwrap_rotation=True, edge_keys=True)
+                    notes += lines
+                    baked_curves += curves
                 if smart and baked_curves:
                     used_smart = BakeManager.simplify_range(baked_curves, start, end, smart_tolerance)
         finally:
@@ -124,6 +131,9 @@ class BakeManager:
         if layered:
             msg += (" {0} in animation layers: baked through the layers, keys outside [{1}-{2}] kept.".format(
                 len(layered), start, end))
+        if blended:
+            msg += (" {0} with a range blend (keyed blendParent): keys outside [{1}-{2}] kept -"
+                    " delete the constraints / locators to keep only the keys.".format(len(blended), start, end))
         for line in notes:
             msg += "\n  " + line
         return (n, msg)
@@ -238,6 +248,46 @@ class BakeManager:
                 return layer
         return root
 
+    # pairBlend 출력 attr -> 그 채널의 입력 1(원래 키 쪽) attr
+    _PAIRBLEND_IN1 = {"translateX": "inTranslateX1", "translateY": "inTranslateY1", "translateZ": "inTranslateZ1",
+                      "rotateX": "inRotateX1", "rotateY": "inRotateY1", "rotateZ": "inRotateZ1"}
+
+    @staticmethod
+    def pairblend_curve(plug):
+        """plug 앞에 pairBlend 가 끼어 있으면(컨스트레인트 + 키) 그 원래 키 커브(입력 1). 없으면 None. (v02.61)"""
+        node, _sep, attr = plug.partition(".")
+        in1 = BakeManager._PAIRBLEND_IN1.get(BakeManager._long_attr(node, attr))
+        if not in1:
+            return None
+        for pb in cmds.listConnections(plug, source=True, destination=False, type="pairBlend") or []:
+            found = cmds.listConnections(pb + "." + in1, source=True, destination=False, type="animCurve") or []
+            if found:
+                return found[0]
+        return None
+
+    @staticmethod
+    def range_blended_objects(objects):
+        """translate / rotate 앞 pairBlend 의 웨이트에 키가 있는 오브젝트 (Locator 의 Blend only in Frame Range, v02.61).
+
+        구간 밖은 웨이트 0 = 원래 움직임이라, 굽는 동안 그대로여야 한다 -> bake_layered(edge_keys) 로 굽는다."""
+        out = []
+        for obj in objects:
+            pbs = set()
+            for ch in ("translate", "rotate", "tx", "ty", "tz", "rx", "ry", "rz"):
+                try:
+                    pbs |= set(cmds.listConnections("{0}.{1}".format(obj, ch), source=True, destination=False,
+                                                    type="pairBlend") or [])
+                except Exception:                           # noqa: BLE001
+                    continue
+            for pb in pbs:
+                src = cmds.listConnections(pb + ".weight", source=True, destination=False, plugs=True) or []
+                keyed = cmds.listConnections(src[0] if src else pb + ".weight", source=True, destination=False,
+                                             type="animCurve") or []
+                if keyed:
+                    out.append(obj)
+                    break
+        return out
+
     @staticmethod
     def _unwrap(prev, values):
         """회전 값 목록을 앞 값과 ±360 단위로 이어 붙인다(같은 회전, 커브 튐 없음)."""
@@ -258,13 +308,13 @@ class BakeManager:
         3) 매 프레임 setKeyframe -animLayer 대상 -value 값 (마야가 위 레이어를 빼서 역산)
         undo 묶기 · 시간 복원은 호출부(bake).
 
-        before_write    : (v02.59) 샘플링 뒤 · 키 찍기 전에 부르는 함수. 대상 레이어는 **그 뒤에** 정한다 -
-                          예) Locator 의 `LOC_Constraint` 레이어 · 컨스트레인트를 지운 뒤 그 아래 레이어에 굽기.
-                          레이어가 하나도 안 남으면 오브젝트 직결 커브에 찍는다.
+        before_write    : (v02.59) 샘플링 뒤 · 키 찍기 전에 부르는 함수. 대상 레이어는 **그 뒤에** 정한다.
+                          레이어가 하나도 없으면 오브젝트 직결 커브(pairBlend 가 끼어 있으면 그 입력 1 커브)에 찍는다.
         unwrap_rotation : (v02.59) 회전 샘플을 Start-1 값부터 ±360 으로 이어 붙인다(컨스트레인트 출력은 -180~180 이라
                           원래 커브가 그 밖이면 경계에서 튄다).
-        edge_keys       : (v02.59) 구간 바깥에 기존 키가 없는 쪽은 Start-1 / End+1 에 그때 값으로 키(아래). 컨스트레인트를
-                          지운 뒤(before_write) 굽는 경우만 - 컨스트레인트를 남기는 Bake 탭은 끈다(경계 값에 컨스트레인트가 섞인다).
+        edge_keys       : (v02.59) 구간 바깥에 기존 키가 없는 쪽은 Start-1 / End+1 에 그때 값으로 키(아래). 경계 프레임이
+                          컨스트레인트 영향 밖일 때만 - 구간 블렌드 오브젝트(v02.61). 컨스트레인트가 전 프레임을 구동하는
+                          보통 Bake 탭 경로는 끈다(경계 값에 컨스트레인트가 섞인다).
         """
         frames = list(range(int(start), int(end) + 1))
         notes = []
@@ -324,7 +374,13 @@ class BakeManager:
         curves = {}
         edges = {}
         for obj, attr, plug, target in plan:
-            curve = LayerKeyManager.layer_curve(plug, target, root) if target else LayerKeyManager.plain_curve(plug)
+            if target:
+                curve = LayerKeyManager.layer_curve(plug, target, root)
+                if not curve and target == root:
+                    # 레이어에 안 든 오브젝트(BaseAnimation 으로 잡힘) + pairBlend - 직결 커브가 없다
+                    curve = BakeManager.pairblend_curve(plug)
+            else:
+                curve = LayerKeyManager.plain_curve(plug) or BakeManager.pairblend_curve(plug)
             curves[plug] = curve
             times = (cmds.keyframe(curve, q=True, timeChange=True) or []) if curve else []
             need = []
@@ -368,7 +424,12 @@ class BakeManager:
                     cmds.setKeyframe(obj, attribute=attr, time=f, value=v)
             if target and target != root:
                 overridden.add("{0} -> {1}".format(plug, target))
-            done = LayerKeyManager.layer_curve(plug, target, root) if target else LayerKeyManager.plain_curve(plug)
+            if target:
+                done = LayerKeyManager.layer_curve(plug, target, root)
+                if not done and target == root:
+                    done = BakeManager.pairblend_curve(plug)
+            else:
+                done = LayerKeyManager.plain_curve(plug) or BakeManager.pairblend_curve(plug)
             if done:
                 keyed_curves.append(done)
         if overridden:

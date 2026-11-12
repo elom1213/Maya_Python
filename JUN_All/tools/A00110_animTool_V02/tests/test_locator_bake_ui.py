@@ -164,24 +164,11 @@ check("constrain run: four phases", SEEN["phases"] == ["Creating locators", "Bak
       SEEN["phases"])
 check("constrain run: objects constrained",
       all(cmds.listRelatives(n, children=True, type="parentConstraint") for n in ("cube_renamed", b)))
-# (v02.58) Blend only in Frame Range - 기본 켬, 켜면 LOC_Constraint 레이어 weight 가 구간에만 1
+# (v02.61) Blend only in Frame Range - 기본 켬, pairBlend 웨이트(blendParent1)를 구간(5 - 35)에만 1, 레이어 없음
 check("range blend: default on", win.cb_lb_con_range.isChecked())
-_lay = [l for l in cmds.ls(type="animLayer") if l.startswith("LOC_Constraint")]
-check("range blend: layer weight keyed 0 / 1 / 1 / 0 around 5 - 35",
-      len(_lay) == 1 and [round(cmds.getAttr(_lay[0] + ".weight", time=f)) for f in (4, 5, 35, 36)] == [0, 1, 1, 0], _lay)
-# (v02.59) Bake to Keys - 컨스트레인트 결과를 키로, 컨스트레인트 · 레이어 · 로케이터 정리
-check("bake to keys: Delete Locators default on", win.cb_lb_del_locs.isChecked())
-_pose = {}
-for _n in ("cube_renamed", b):
-    cmds.currentTime(20)
-    _pose[_n] = cmds.xform(_n, q=True, ws=True, matrix=True)
-win.btn_lb_bake_keys.click()
-check("bake to keys: constraints and LOC_Constraint gone",
-      not [l for l in cmds.ls(type="animLayer") if l.startswith("LOC_Constraint")]
-      and not any(cmds.listRelatives(n, children=True, type="parentConstraint") for n in ("cube_renamed", b)))
-cmds.currentTime(20)
-check("bake to keys: pose kept by keys", all(
-    max(abs(x - y) for x, y in zip(cmds.xform(n, q=True, ws=True, matrix=True), _pose[n])) < 1e-3
+check("range blend: no animation layer created", not cmds.ls(type="animLayer"))
+check("range blend: blendParent1 keyed 0 / 1 / 1 / 0 around 5 - 35", all(
+    [round(cmds.getAttr(n + ".blendParent1", time=f)) for f in (4, 5, 35, 36)] == [0, 1, 1, 0]
     for n in ("cube_renamed", b)))
 
 # (v02.56) Fast - parents don't move : 기본 끔, 켜면 시간을 옮기지 않고 같은 결과

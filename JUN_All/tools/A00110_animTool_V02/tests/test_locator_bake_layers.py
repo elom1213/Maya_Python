@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-# A00110_animTool_V02 v02.58 - Bake > Locator 의 Constrain Objects : 애니메이션 레이어 오브젝트 · 구간 블렌드 시험 (mayapy, 헤드리스)
+# A00110_animTool_V02 v02.61 - Bake > Locator 의 Constrain Objects : 애니메이션 레이어 컨트롤러 · 구간 블렌드(blendParent) ·
+# Bake 탭으로 굽기 시험 (mayapy, 헤드리스)
 #   "C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe" test_locator_bake_layers.py
 #
-# 판정 : BaseAnimation + 다른 레이어에 키가 있는 컨트롤러에도 컨스트레인트가 걸린다(예전엔 0 개).
-#        Blend only in Frame Range = 구간 안은 로케이터 월드, 밖은 원래 월드(베이크 전과 같다).
-#        끄면 전 프레임 로케이터. 레이어 없는 오브젝트 + 구간 끔 = 예전 pairBlend 경로 그대로. undo 한 번.
+# 판정 : BaseAnimation + 다른 레이어에 키가 있는 컨트롤러에도 컨스트레인트가 걸린다(v02.57 까지 0 개). 새 레이어는 안 생긴다.
+#        Blend only in Frame Range = pairBlend 웨이트(blendParent1 ...) step 키 -> 구간 안은 로케이터, 밖은 원래 월드.
+#        그 상태로 Bake 탭(BakeManager.bake) -> 로케이터 · 컨스트레인트를 지워도 전 프레임 같은 움직임(키만으로).
 import os
 import sys
 
@@ -15,6 +16,7 @@ import maya.cmds as cmds   # noqa: E402
 JUN_ALL = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, JUN_ALL)
 from tools.A00110_animTool_V02.app.core.locator_bake_manager import LocatorBakeManager as LBM   # noqa: E402
+from tools.A00110_animTool_V02.app.core.bake_manager import BakeManager   # noqa: E402
 
 R = []
 FRAMES = list(range(1, 41))
@@ -27,8 +29,8 @@ def check(name, cond, extra=""):
     print(("PASS " if cond else "FAIL ") + name + ("  | " + str(extra) if extra else ""))
 
 
-def build():
-    """grp(키) > ctl(BaseAnimation 키 + Layer1(additive) 키 + Layer2(override, weight 0.5) 키, scale 키) / plain(레이어 없음)."""
+def build(big_rotation=False):
+    """grp(키) > arm_ctl(Base 키 + Layer1 additive + Layer2 override 0.5) / plain_ctl(레이어 없음) / bare_ctl(키 없음)."""
     cmds.file(new=True, force=True)
     cmds.playbackOptions(min=1, max=40, ast=1, aet=40)
     grp = cmds.group(empty=True, name="grp")
@@ -38,8 +40,9 @@ def build():
     ctl = cmds.circle(name="arm_ctl")[0]
     cmds.parent(ctl, grp)
     cmds.setAttr(ctl + ".rotateOrder", 2)
+    base_y = 250 if big_rotation else 0
     for t, (x, y, z) in ((1, (0, 0, 0)), (20, (60, 40, -30)), (40, (120, 90, 80))):
-        for a, v in (("rx", x), ("ry", y), ("rz", z), ("ty", t * 0.2), ("sx", 1 + t * 0.01)):
+        for a, v in (("rx", x), ("ry", y + base_y), ("rz", z), ("ty", t * 0.2), ("sx", 1 + t * 0.01)):
             cmds.setKeyframe(ctl, at=a, t=t, v=v)
     cmds.select(ctl)
     l1 = cmds.animLayer("Layer1", addSelectedObjects=True)
@@ -51,142 +54,160 @@ def build():
     for t, v in ((1, 1), (30, 6)):
         cmds.setKeyframe(ctl, at="tx", t=t, v=v, animLayer=l2)
     plain = cmds.circle(name="plain_ctl")[0]
-    for t, v in ((1, 0), (40, 12)):
-        cmds.setKeyframe(plain, at="tx", t=t, v=v)
+    for t, v in ((1, 0), (20, 7), (40, 12)):
+        cmds.setKeyframe(plain, at="ty", t=t, v=v)
         cmds.setKeyframe(plain, at="rz", t=t, v=v * 5)
+    bare = cmds.circle(name="bare_ctl")[0]
+    cmds.setAttr(bare + ".t", 3, 4, 5)
+    cmds.setAttr(bare + ".r", 10, 20, 30)
     cmds.select(clear=True)
-    return "|grp|arm_ctl", "|plain_ctl"
+    return "|grp|arm_ctl", "|plain_ctl", "|bare_ctl"
 
 
 def world(node, f):
     cmds.currentTime(f)
-    return (cmds.xform(node, q=True, ws=True, t=True) + cmds.xform(node, q=True, ws=True, ro=True))
+    return cmds.xform(node, q=True, ws=True, matrix=True)
 
 
 def same(a, b):
+    return all(abs(x - y) <= TOL for x, y in zip(a, b))
+
+
+def same_tr(a, b):
+    """이동 · 회전만 비교 (축 길이 = 스케일은 뺀다 - 로케이터 scale 은 1, 오브젝트는 scale 키가 있다)."""
     import math
-    for x, y in zip(a, b):
-        d = abs(x - y) % 360.0
-        if min(d, 360.0 - d) > TOL and abs(x - y) > TOL:
-            return False
-    return True
+
+    def unit(m):
+        out = []
+        for r in range(3):
+            row = m[r * 4:r * 4 + 3]
+            n = math.sqrt(sum(v * v for v in row)) or 1.0
+            out += [v / n for v in row]
+        return out + list(m[12:15])
+    return same(unit(a), unit(b))
 
 
-def snapshot(node):
-    return dict((f, world(node, f)) for f in FRAMES)
+def snapshot(nodes):
+    return dict(((n, f), world(n, f)) for n in nodes for f in FRAMES)
 
 
-def shift_locator(loc, dy=50.0):
+def move_locators(locs):
     """로케이터 커브를 옮겨 '로케이터를 따른다' 와 '원래 움직임' 을 구분한다."""
-    cmds.keyframe(loc + ".ty", edit=True, relative=True, valueChange=dy)
+    for loc in locs:
+        cmds.keyframe(loc + ".ty", edit=True, relative=True, valueChange=50)
+        cmds.keyframe(loc + ".rz", edit=True, relative=True, valueChange=30)
 
 
-# ---------------------------------------------------------------- 1. 옛 버그 재현 조건
-ctl, plain = build()
-check("scene: ctl is in anim layers", LBM.in_anim_layers(ctl) and not LBM.in_anim_layers(plain))
-check("old check blocked every axis (the bug)", LBM._blocked_axes(ctl, "translate") == ["x", "y", "z"]
-      and LBM._blocked_axes(ctl, "rotate") == ["x", "y", "z"])
-check("layer check frees them", LBM._blocked_axes(ctl, "translate", True) == []
-      and LBM._blocked_axes(ctl, "rotate", True) == [])
+def layers():
+    return sorted(cmds.ls(type="animLayer") or [])
 
-# ---------------------------------------------------------------- 2. 구간 블렌드 (기본)
-orig = snapshot(ctl)
-locs, msg = LBM.bake([ctl], 1, 40, constrain=["parent"], constrain_range=False)
-cmds.undo()
-locs, msg = LBM.bake([ctl], 1, 40, constrain=["parent"], constrain_range=True)
-print(msg)
-loc = locs[0]
-cons = cmds.ls(type="parentConstraint")
-check("layered ctl gets a parentConstraint", len(cons) == 1, msg)
-layer = [l for l in cmds.ls(type="animLayer") if l.startswith(LBM.CONSTRAINT_LAYER)]
-check("override layer LOC_Constraint created", len(layer) == 1 and cmds.animLayer(layer[0], q=True, override=True), layer)
-check("message names the layer and the range", "LOC_Constraint" in msg and "1 - 40" in msg, msg)
-# ★ undo 는 시간 이동보다 먼저 - mayapy 에선 currentTime 도 undo 대기열에 쌓여 undo 한 번이 그것만 되돌린다
-cmds.undo()
-check("undo removes locator, constraint, layer",
-      not cmds.ls("arm_ctl_LOC*") and not cmds.ls(type="parentConstraint")
-      and not [l for l in cmds.ls(type="animLayer") if l.startswith(LBM.CONSTRAINT_LAYER)])
-cmds.redo()
-check("no change right after constraining (locator = object)",
-      all(same(world(ctl, f), orig[f]) for f in FRAMES))
-ctl, plain = build()
-orig = snapshot(ctl)
-locs, msg = LBM.bake([ctl], 1, 40, constrain=["parent"], constrain_range=True)
-cmds.undo()
-check("undo removes locator, constraint, layer",
-      not cmds.ls("arm_ctl_LOC*") and not cmds.ls(type="parentConstraint")
-      and not [l for l in cmds.ls(type="animLayer") if l.startswith(LBM.CONSTRAINT_LAYER)])
-check("undo keeps the original motion", all(same(world(ctl, f), orig[f]) for f in FRAMES))
 
+def bad_frames(node, expect, frames=FRAMES):
+    return [f for f in frames if not same(world(node, f), expect[(node, f)])]
+
+
+# ---------------------------------------------------------------- 1. 레이어 채널 판정
+ctl, plain, bare = build()
+check("layered channels are free now (v02.57 blocked them all)",
+      LBM._blocked_axes(ctl, "translate") == [] and LBM._blocked_axes(ctl, "rotate") == [])
+check("keyed / layered scale is still blocked (no pairBlend for scale)",
+      LBM._blocked_axes(ctl, "scale") == ["x", "y", "z"])
+
+# ---------------------------------------------------------------- 2. 구간 블렌드 - 레이어 컨트롤러
+orig = snapshot([ctl])
+before_layers = layers()
 locs, msg = LBM.bake([ctl], START, END, constrain=["parent"], constrain_range=True)
-loc = locs[0]
-shift_locator(loc)
-bad_in = [f for f in range(START, END + 1) if not same(world(ctl, f), world(loc, f))]
-bad_out = [f for f in FRAMES if (f < START or f > END) and not same(world(ctl, f), orig[f])]
-check("range: inside Start-End the object matches the moved locator", not bad_in, bad_in[:5])
-check("range: outside the object keeps its own motion", not bad_out, bad_out[:5])
-lay = [l for l in cmds.ls(type="animLayer") if l.startswith(LBM.CONSTRAINT_LAYER)][0]
-w = [(f, round(cmds.getAttr(lay + ".weight", time=f), 3)) for f in (START - 1, START, END, END + 1)]
-check("range: layer weight 0 / 1 / 1 / 0 (stepped)", [v for _f, v in w] == [0, 1, 1, 0], w)
-mid = (START + END) / 2.0 + 0.5
-check("range: stepped - no ramp between keys (holds the previous key)",
-      round(cmds.getAttr(lay + ".weight", time=START - 0.5), 3) == 0
-      and round(cmds.getAttr(lay + ".weight", time=END + 0.5), 3) == 1
-      and round(cmds.getAttr(lay + ".weight", time=mid), 3) == 1)
-
-# ---------------------------------------------------------------- 3. 구간 끔 = 전 프레임
-ctl, plain = build()
-orig = snapshot(ctl)
-locs, msg = LBM.bake([ctl], START, END, constrain=["parent"], constrain_range=False)
-loc = locs[0]
-check("range off: layered ctl still constrained (layer path)", len(cmds.ls(type="parentConstraint")) == 1, msg)
-lay = [l for l in cmds.ls(type="animLayer") if l.startswith(LBM.CONSTRAINT_LAYER)]
-check("range off: layer weight 1, no keys", lay and cmds.getAttr(lay[0] + ".weight") == 1
-      and not cmds.listConnections(lay[0] + ".weight", s=True, d=False))
-shift_locator(loc)
-check("range off: every frame follows the locator",
-      all(same(world(ctl, f), world(loc, f)) for f in FRAMES))
-
-# ---------------------------------------------------------------- 4. 레이어 없는 오브젝트
-ctl, plain = build()
-orig_p = snapshot(plain)
-locs, msg = LBM.bake([plain], START, END, constrain=["parent"], constrain_range=False)
-check("plain + range off: old pairBlend path (no new layer)",
-      len(cmds.ls(type="parentConstraint")) == 1
-      and not [l for l in cmds.ls(type="animLayer") if l.startswith(LBM.CONSTRAINT_LAYER)]
-      and cmds.ls(type="pairBlend"), msg)
+print(msg)
+# ★ undo 는 시간 이동보다 먼저 - mayapy 에선 currentTime 도 undo 대기열에 쌓인다
 cmds.undo()
-locs, msg = LBM.bake([plain], START, END, constrain=["parent"], constrain_range=True)
+check("undo: locator and constraint gone, no blend keys left",
+      not cmds.ls("arm_ctl_LOC*") and not cmds.ls(type="parentConstraint")
+      and not cmds.keyframe(ctl + ".blendParent1", q=True) if cmds.attributeQuery("blendParent1", node=ctl, exists=True)
+      else not cmds.ls("arm_ctl_LOC*") and not cmds.ls(type="parentConstraint"))
+cmds.redo()
+check("layered ctl gets a parentConstraint", len(cmds.ls(type="parentConstraint")) == 1, msg)
+check("no new animation layer", layers() == before_layers, layers())
+check("message names the blend range", "Blend 1 only in 10 - 25" in msg, msg)
+w = [(f, round(cmds.getAttr(ctl + ".blendParent1", time=f), 3)) for f in (START - 1, START, END, END + 1)]
+check("blendParent1 keyed 0 / 1 / 1 / 0", [v for _f, v in w] == [0, 1, 1, 0], w)
+check("stepped: holds between keys", round(cmds.getAttr(ctl + ".blendParent1", time=START - 0.5), 3) == 0
+      and round(cmds.getAttr(ctl + ".blendParent1", time=END + 0.5), 3) == 1)
+check("right after: object unchanged (locator = object)", not bad_frames(ctl, orig))
 loc = locs[0]
-shift_locator(loc)
-check("plain + range on: inside follows the locator",
-      all(same(world(plain, f), world(loc, f)) for f in range(START, END + 1)))
-check("plain + range on: outside keeps its own motion",
-      all(same(world(plain, f), orig_p[f]) for f in FRAMES if f < START or f > END))
+move_locators(locs)
+inside = [f for f in range(START, END + 1) if not same_tr(world(ctl, f), world(loc, f))]
+outside = [f for f in FRAMES if (f < START or f > END) and not same(world(ctl, f), orig[(ctl, f)])]
+check("inside Start-End: object matches the moved locator", not inside, inside[:5])
+check("outside: object keeps its own motion", not outside, outside[:5])
 
-# ---------------------------------------------------------------- 5. 두 오브젝트 함께 · 레이어 하나 · 다른 종류
-ctl, plain = build()
-orig = snapshot(ctl)
-locs, msg = LBM.bake([ctl, plain], START, END, scale=True, constrain=["point", "orient", "scale"],
-                     constrain_range=True)
-check("two objects share one LOC_Constraint layer",
-      len([l for l in cmds.ls(type="animLayer") if l.startswith(LBM.CONSTRAINT_LAYER)]) == 1, msg)
-check("point + orient + scale on the layered ctl (keyed scale too)",
-      all(cmds.listRelatives(ctl, children=True, type=t)
-          for t in ("pointConstraint", "orientConstraint", "scaleConstraint")), msg)
-check("no warnings for the layered ctl", "arm_ctl:" not in msg, msg)
-shift_locator(locs[0])
+# ---------------------------------------------------------------- 3. 그 상태로 Bake 탭 -> 로케이터 삭제 = 키만으로 같은 움직임
+goal = snapshot([ctl])
+n, bmsg = BakeManager.bake([ctl], START, END)
+print(bmsg)
+check("Bake tab: routed as a range blend object", "range blend" in bmsg, bmsg)
+check("Bake tab: nothing changes while the constraint is still there", not bad_frames(ctl, goal))
+cmds.delete(loc)
+check("deleting the locator removes the constraint", not cmds.ls(type="parentConstraint"))
+bad = bad_frames(ctl, goal)
+check("after deleting the locator: every frame = the constrained motion (keys only)", not bad, bad[:6])
+check("the animation layers are as before", layers() == before_layers, layers())
+
+# ---------------------------------------------------------------- 4. 레이어 없는 오브젝트 · 키 없는 오브젝트
+ctl, plain, bare = build()
+locs, msg = LBM.bake([plain, bare], START, END, constrain=["parent"], constrain_range=True)
+check("bare object got blendParent1 (static key first)", cmds.attributeQuery("blendParent1", node=bare, exists=True)
+      and cmds.keyframe(bare + ".blendParent1", q=True), msg)
+move_locators(locs)
+goal = snapshot([plain, bare])
+BakeManager.bake([plain, bare], START, END)
+cmds.delete(locs)
+for node in (plain, bare):
+    bad = bad_frames(node, goal)
+    check("plain / bare {0}: keys only = the constrained motion".format(node), not bad, bad[:6])
+
+# ---------------------------------------------------------------- 5. 구간 끔 - 전 프레임 컨스트레인트, 블렌드 키 없음
+ctl, plain, bare = build()
+locs, msg = LBM.bake([ctl], START, END, constrain=["parent"], constrain_range=False)
+move_locators(locs)
+check("range off: no blend keys", not cmds.keyframe(ctl + ".blendParent1", q=True))
+check("range off: every frame follows the locator",
+      all(same_tr(world(ctl, f), world(locs[0], f)) for f in FRAMES))
+
+# ---------------------------------------------------------------- 6. Point + Orient + Scale
+ctl, plain, bare = build()
+orig = snapshot([ctl])
+locs, msg = LBM.bake([ctl], START, END, scale=True, constrain=["point", "orient", "scale"], constrain_range=True)
+check("point + orient: blendPoint1 / blendOrient1 keyed",
+      all(cmds.keyframe(ctl + "." + a, q=True) for a in ("blendPoint1", "blendOrient1")), msg)
+check("scale on a keyed / layered object: skipped with a warning", "scale skipped" in msg, msg)
+move_locators(locs)
 check("point / orient: inside follows, outside original",
       all(same(world(ctl, f), world(locs[0], f)) for f in range(START, END + 1))
-      and all(same(world(ctl, f), orig[f]) for f in FRAMES if f < START or f > END))
+      and all(same(world(ctl, f), orig[(ctl, f)]) for f in FRAMES if f < START or f > END))
+ctl2, plain2, bare2 = build()
+locs, msg = LBM.bake([bare2], START, END, scale=True, constrain=["parent", "scale"], constrain_range=True)
+check("scale on an unkeyed object: constrained every frame with a warning",
+      cmds.ls(type="scaleConstraint") and "scale constraint drives every frame" in msg, msg)
 
-# ---------------------------------------------------------------- 6. 잠긴 축은 레이어 경로에서도 skip
-ctl, plain = build()
-cmds.setAttr(ctl + ".tz", lock=True)
-check("layer path: locked axis blocked", LBM._blocked_axes(ctl, "translate", True) == ["z"])
+# ---------------------------------------------------------------- 7. 큰 회전 - Bake 탭 뒤 경계에서 360 안 튐
+ctl, plain, bare = build(big_rotation=True)
 locs, msg = LBM.bake([ctl], START, END, constrain=["parent"], constrain_range=True)
-check("layer path: constrained with the locked axis skipped",
-      len(cmds.ls(type="parentConstraint")) == 1 and "T[z]" in msg, msg)
+move_locators(locs)
+goal = snapshot([ctl])
+BakeManager.bake([ctl], START, END)
+cmds.delete(locs)
+check("big rotation: keys only = the constrained motion", not bad_frames(ctl, goal))
+cmds.currentTime(START - 1)
+a = cmds.getAttr(ctl + ".ry")
+cmds.currentTime(START)
+b = cmds.getAttr(ctl + ".ry")
+check("big rotation: no 360 jump at Start", abs(a - b) < 90, (a, b))
+
+# ---------------------------------------------------------------- 8. 잠긴 축
+ctl, plain, bare = build()
+cmds.setAttr(ctl + ".tz", lock=True)
+locs, msg = LBM.bake([ctl], START, END, constrain=["parent"], constrain_range=True)
+check("locked axis skipped, rest constrained", len(cmds.ls(type="parentConstraint")) == 1 and "T[z]" in msg, msg)
 
 print("RESULT {0}/{1}".format(sum(R), len(R)))
 maya.standalone.uninitialize()

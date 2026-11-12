@@ -33,6 +33,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-12 (오늘)
 
+> [!summary] A00110_animTool_V02 **v02.61 Locator > Constrain 을 레이어 없이 · Bake 탭으로 굽기** `#A00110_animTool_V02`
+- 요청: LOC_Constraint 레이어를 만들지 말고, 컨스트레인트 웨이트를 구간만 1 · 밖 0 으로 → Bake 탭으로 구우면 되지 않나. 검증 후 "그대로 구현".
+- 검증(mayapy): ① 타깃 웨이트 0 은 rest 자세로 감 ✗ ② pairBlend `blendParent1` 0/1 키 ✓(레이어 유무 무관) ③ 그대로 Bake 탭 → 구간 밖 1~7 f 어긋남 ✗
+  (레이어: 커브 없는 override 채널 / 레이어 없음: bakeResults 가 듬성한 auto 탄젠트 커브 모양을 바꿈) ④ edge_keys + pairBlend 뒤 커브 찾기 → 0 f ✓.
+- 구현: 레이어 채널도 걸 수 있는 축, blendParent1 / blendPoint1 / blendOrient1 step 키, 키 없는 오브젝트는 지금 값 키 먼저, scale 은 경고.
+  Bake 탭은 블렌드 키 있는 오브젝트를 경계 처리 경로로. v02.58 레이어 · v02.59 Bake to Keys 제거.
+- 시험 test_locator_bake_layers 28/28(컨스트레인트 → Bake 탭 → 로케이터 삭제 = 전 프레임 같은 움직임) · UI 39 · bake_layers 19 · counter 92 · merge 111. **GUI 확인 아직.**
+
 > [!summary] A00110_animTool_V02 **v02.60 View > Layers: 고른 오브젝트가 든 레이어 표시** `#A00110_animTool_V02`
 - 요청: 씬에서 오브젝트를 고르면 그 오브젝트가 있는 레이어에 라이브로 표시 — 마야 레이어 에디터처럼 주황 타원, 레이어를 선택하면 초록.
 - 판정 = `animLayer -q -affectedLayers`(mayapy 실측: **현재 선택 기준만, 오브젝트 인자 불가**, 멤버면 BaseAnimation 도 함께, 셰이프 · 컴포넌트 선택은 None).

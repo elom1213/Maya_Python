@@ -33,17 +33,13 @@ metadata:
   `maintainOffset=True`. 시험 씬에 rotateAxis 를 넣지 않으면 못 잡는다.
 - 시험 `tests/test_locator_bake_fast.py` 18/18, UI 36/36.
 
-- **v02.58 애니메이션 레이어 컨트롤러 + `Blend only in Frame Range`**(2026-11-12, 기본 켬): 레이어 채널은 animBlendNode 구동이라
-  옛 `_blocked_axes` 가 전 축 skip(컨스트레인트 0 개, 사용자 제보). ★ **컨스트레인트 명령의 `-layer` 플래그** = 새 override 레이어
-  `LOC_Constraint` 에 축을 넣고(`animLayer -e -attribute`) 건다 — 키 있는 scale 도 된다. 구간 = 레이어 weight step 키 0/1/1/0.
-  켜면 모든 오브젝트 레이어 경로, 끄면 레이어 오브젝트만. ★ mayapy 에선 `currentTime` 도 undo 대기열에 쌓인다 → 시험은 시간 이동 전에 undo.
-  시험 `test_locator_bake_layers.py` 26/26, UI 38/38. **GUI 확인 아직.**
-
-- **v02.59 `Bake to Keys`**(2026-11-12): 컨스트레인트 결과 → 오브젝트 키, 컨스트레인트 · LOC_Constraint · 로케이터 정리.
-  ★ **Bake 탭은 레이어 오브젝트 키를 맨 위 override 레이어에 찍는다 → LOC_Constraint 자신에 들어가 레이어 삭제 시 사라진다.**
-  해법 = `bake_layered(before_write=정리)` — 샘플 뒤 정리, **대상 레이어는 정리 뒤에** 정한다.
-  ★ `addSelectedObjects` override 레이어는 전 채널 멤버 + 커브 없음 → 구간 안만 `setKeyframe -animLayer` 하면 구간 밖이 끝 값으로 늘어난다 →
-  `edge_keys`(Start-1 / End+1 원래 값). Bake 탭엔 끔(컨스트레인트가 남아 있어 경계 값이 섞임).
-  시험 `test_locator_bake_to_keys.py` 18/18. **GUI 확인 아직.**
+- **v02.61 구간 블렌드 = pairBlend 블렌드 attr, 레이어 없음**(2026-11-12, v02.58 `LOC_Constraint` 레이어 · v02.59 Bake to Keys 를 대체 — 사용자 제안).
+  ★ **레이어 채널(animBlendNode 구동)에도 컨스트레인트가 그냥 걸린다** — 마야가 레이어 결과 뒤에 pairBlend 를 끼운다(v02.57 의 전 축 skip 은 틀린 판정).
+  ★ **컨스트레인트 타깃 웨이트 0 = rest 자세**(원래 움직임 아님) → 구간은 `blendParent1`/`blendPoint1`/`blendOrient1` step 키.
+  ★ 키 없는 채널 묶음엔 pairBlend 가 안 생긴다 → 지금 값 키 먼저. scale 은 블렌드 attr 없음 → 전 프레임 + 경고.
+  ★ 그대로 Bake 탭이면 구간 밖이 바뀐다 — `bakeResults` 는 듬성한 auto 탄젠트 커브의 구간 밖 모양을 바꾸고(2~7 f), 커브 없는 override 레이어 채널은
+  구간 밖이 끝 값으로 늘어난다 → Bake 탭이 블렌드 키 있는 오브젝트를 `bake_layered(edge_keys, unwrap)` 로, pairBlend 뒤 원래 커브는 `pairblend_curve`.
+  ★ Bake 탭 `layered` 판정에서 레이어에 안 든 오브젝트도 장면에 레이어가 있으면 대상 = BaseAnimation → `layer_curve` 가 pairBlend 를 못 지나 None.
+  사용 흐름: LOC + Anim(Constrain · 구간 블렌드) → 로케이터 조정 → Bake > Bake 같은 구간 → 로케이터 삭제. 시험 `test_locator_bake_layers.py` 28/28. **GUI 확인 아직.**
 
 관련: [[framework-progress-widget]], [[framework-timerange-widget]], [[wip-a00110-get-sel-range]], [[wip-a00110-counter-layer]]
