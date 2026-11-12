@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # A00110_animTool_V02 v02.31 - View > Layers (애니메이션 레이어 목록 · 선택 · Mute/Solo/Lock · Expand) 시험 (mayapy 오프스크린)
+# v02.60 - 선택 오브젝트가 든 레이어 표시(주황 타원, 선택된 레이어면 초록) M 시험 추가.
 #   "C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe" test_anim_layers.py
 # 씬 : cube 키 + L1, L2, L3(L1 의 자식). 그래프 에디터는 mayapy 에 없어 필터는 (0, filter) 만 본다.
 # QApplication 은 maya.standalone.initialize() 보다 먼저 (qapplication-before-maya-standalone).
@@ -171,6 +172,70 @@ win.al_panel.collapse()
 pump()
 check("U18 Collapse : tree back in the tool window", not win.al_panel.is_expanded() and tw.window() is win)
 
+# ---------------------------------------------------------------- v02.60 선택 오브젝트가 든 레이어 표시
+from tools.A00110_animTool_V02.app.ui.main_window import AL_MARK_COLUMN, AL_MARK_ORANGE, AL_MARK_GREEN   # noqa: E402
+
+
+def marks():
+    out = []
+    stack = [tw.topLevelItem(i) for i in range(tw.topLevelItemCount())]
+    while stack:
+        it = stack.pop(0)
+        if it.data(AL_MARK_COLUMN, Qt.UserRole):
+            out.append(it.text(0))
+        stack.extend(it.child(i) for i in range(it.childCount()))
+    return sorted(out)
+
+
+def cell_has_color(name, rgb, tol=40):
+    """표시 칸을 실제로 그려 그 색 픽셀이 있는지."""
+    item = win.al_item(name)
+    rect = tw.visualItemRect(item)
+    x0 = tw.header().sectionViewportPosition(AL_MARK_COLUMN)
+    w = tw.header().sectionSize(AL_MARK_COLUMN)
+    img = tw.viewport().grab().toImage()
+    for x in range(max(0, x0), x0 + w):
+        for y in range(rect.top(), rect.bottom()):
+            c = img.pixelColor(x, y)
+            if abs(c.red() - rgb[0]) < tol and abs(c.green() - rgb[1]) < tol and abs(c.blue() - rgb[2]) < tol:
+                return True
+    return False
+
+
+hdr = tw.header()
+check("M0 mark column shown right after Layer (visual 1), Mute/Solo/Lock keep 1..3",
+      hdr.visualIndex(AL_MARK_COLUMN) == 1 and tw.headerItem().text(1) == "Mute", hdr.visualIndex(AL_MARK_COLUMN))
+cmds.select(cube)
+check("M1 core : object in no layer -> nothing marked", ALM.affected_layers() == set(), ALM.affected_layers())
+cmds.animLayer("L3", e=True, attribute=[cube + ".translateY"])
+cmds.select(clear=True)
+cmds.select(cube)
+pump()
+win._al_on_maya_selection()     # scriptJob 와 같은 경로(standalone 에서는 이벤트가 안 올 수 있어 직접)
+check("M2 core : member of L3 -> {L3, BaseAnimation}", ALM.affected_layers() == {"L3", "BaseAnimation"}, ALM.affected_layers())
+check("M3 UI : L3 + BaseAnimation marked", marks() == ["BaseAnimation", "L3"], marks())
+# standalone(batch) 의 scriptJob 은 None 을 돌려준다(mayapy 실측) - GUI 마야에서만 잡이 있다.
+check("M4 SelectionChanged scriptJob installed (None in standalone)",
+      (win._al_sel_job is None) if cmds.about(batch=True) else cmds.scriptJob(exists=win._al_sel_job), win._al_sel_job)
+cmds.animLayer("L2", e=True, attribute=[cube + ".translateZ"])
+win._al_poll()                  # 멤버 변경은 폴링이 따라간다
+check("M5 poll : added to L2 -> L2 marked too", marks() == ["BaseAnimation", "L2", "L3"], marks())
+tw.clearSelection()
+win.al_item("L2").setSelected(True)
+pump()
+check("M6 paint : unselected marked layer = orange, selected marked layer = green",
+      cell_has_color("L3", AL_MARK_ORANGE) and not cell_has_color("L3", AL_MARK_GREEN)
+      and cell_has_color("L2", AL_MARK_GREEN) and not cell_has_color("L2", AL_MARK_ORANGE))
+check("M7 paint : unmarked layer has no dot", not cell_has_color("L1", AL_MARK_ORANGE) and not cell_has_color("L1", AL_MARK_GREEN))
+cmds.select(clear=True)
+win._al_on_maya_selection()
+check("M8 nothing selected -> no marks", marks() == [], marks())
+cmds.select(cube)
+win.on_al_refresh(quiet=True)
+check("M9 refresh rebuild keeps marks", marks() == ["BaseAnimation", "L2", "L3"], marks())
+cmds.select(clear=True)
+win._al_on_maya_selection()
+
 # Pin(Always on Top) 이 Expand 창에도 걸린다 (v02.32)
 def on_top(widget):
     return bool(widget.windowFlags() & Qt.WindowStaysOnTopHint)
@@ -265,8 +330,10 @@ pump()
 check("D6 no layers : no question asked", not asked)
 QMessageBox.question = _real_question
 
+job = win._al_sel_job
 win.close()
 pump()
+check("M10 close kills the SelectionChanged scriptJob", job is None or not cmds.scriptJob(exists=job))
 print("\n%d / %d passed" % (sum(R), len(R)))
 maya.standalone.uninitialize()
 os._exit(0 if sum(R) == len(R) else 1)

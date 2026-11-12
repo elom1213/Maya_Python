@@ -18,3 +18,8 @@ Curve > Filters 처럼 Expand 로 따로 창". `app/core/anim_layer_manager.py` 
   1.5 s `QTimer` 로 `snapshot()`(이름 · depth · 플래그 · 선택 · 활성) 비교해 새로고침. `isVisible()` 아니면 건너뛴다(탭이 숨으면 비용 0).
 - Expand = 공용 `JUN_mod_expand_qt_v01`(이동이라 트리 한 벌, `tw.window()` 가 확장 창으로 바뀌고 collapse 로 복귀) — [[framework-expand-widget]].
 - GUI 확인 아직. 관련: [[wip-a00110-layer-range-merge]] [[wip-a00110-graph-focus]] [[animlayer-no-global-selected-query]]
+
+**v02.60 (2026-11-12) 고른 오브젝트가 든 레이어 표시** — 사용자: 마야 레이어 에디터처럼 주황 타원(레이어 선택 시 초록), 라이브.
+- 판정 `animLayer -q -affectedLayers` — ★ **현재 선택 기준만**(오브젝트 인자는 "No valid query flags"), 멤버면 BaseAnimation 도 함께, 셰이프 · 컴포넌트 선택은 None.
+- SelectionChanged scriptJob(보일 때만, closeEvent kill — ★ standalone 에선 None 이라 시험은 핸들러 직접 호출) + 폴링에 표시 비교.
+- 표시 칸 = 논리 열 4 를 `header.moveSection` 으로 Layer 옆 → Mute/Solo/Lock 열 번호(시험이 쓰는 1~3) 그대로. `setItemDelegateForColumn` 으로 viewZoom 델리게이트 대신. GUI 확인 아직.

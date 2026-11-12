@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-04
+# last Update date : 2026-11-12
 # A00110_animTool_V02 - Qt UI
 
 from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
@@ -71,6 +71,49 @@ LAYERS_WINDOW_OBJECT_NAME = "JUN_A00110_animTool_V02_layers_window"
 FIX_SLIDING_WINDOW_OBJECT_NAME = "JUN_A00110_animTool_V02_fixSliding_window"
 # View > Layers 자동 새로고침 주기(ms) - 레이어 에디터에서 바꾼 것을 따라간다(마야에 레이어 변경 이벤트가 없다).
 LAYERS_POLL_MS = 1500
+# View > Layers 의 '선택 오브젝트가 이 레이어에 있다' 표시 칸 (v02.60). 논리 열은 맨 끝(4)이고 화면에서는 Layer 바로 옆으로 옮긴다
+# (moveSection) - Mute / Solo / Lock 의 열 번호(1~3)는 그대로.
+AL_MARK_COLUMN = 4
+# 마야 Animation Layer Editor 의 타원 색 - 레이어에 있으면 주황, 그 레이어가 선택돼 있으면 초록.
+AL_MARK_ORANGE = (236, 146, 40)
+AL_MARK_GREEN = (92, 200, 84)
+
+
+class _LayerMarkDelegate(QStyledItemDelegate):
+    """View > Layers 표시 칸 - 씬에서 고른 오브젝트가 그 레이어에 있으면 타원을 그린다 (v02.60).
+
+    마야 레이어 에디터처럼 주황 타원, 그 행(레이어)이 선택돼 있으면 초록. 값은 항목의 Qt.UserRole(bool).
+    크기는 행 높이를 따라가므로 공용 viewZoom 배율과 함께 커진다(행 높이는 다른 칸의 zoom 델리게이트가 정한다).
+    """
+
+    def __init__(self, zoom=None, parent=None):
+        super().__init__(parent)
+        self._zoom = zoom
+
+    def sizeHint(self, option, index):
+        scale = self._zoom.scale() if self._zoom is not None else 1.0
+        return QSize(int(round(28 * scale)), int(round(14 * scale)))
+
+    def paint(self, painter, option, index):
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        opt.text = ""
+        style = opt.widget.style() if opt.widget else QApplication.style()
+        style.drawControl(QStyle.CE_ItemViewItem, opt, painter, opt.widget)   # 배경 · 선택 하이라이트
+        if not index.data(Qt.UserRole):
+            return
+        selected = bool(option.state & QStyle.State_Selected)
+        color = QColor(*(AL_MARK_GREEN if selected else AL_MARK_ORANGE))
+        r = option.rect
+        h = max(5.0, r.height() * 0.40)
+        w = min(r.width() - 4.0, h * 1.75)
+        ellipse = QRectF(r.center().x() - w / 2.0 + 0.5, r.center().y() - h / 2.0 + 0.5, w, h)
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setPen(QPen(color.darker(150), max(1.0, h / 9.0)))
+        painter.setBrush(color)
+        painter.drawEllipse(ellipse)
+        painter.restore()
 
 
 # Stagger Offset 슬라이더가 담당하는 프레임 범위(±). 더 큰 값은 옆 스핀박스로 넣는다.
@@ -3560,18 +3603,24 @@ class MainWindow(QWidget):
         hint = QLabel(
             "Animation layers of the current scene, top first like the Animation Layer Editor.\n"
             "Click a row to make it the selected layer (one row = also the active layer) - the Graph\n"
-            "Editor then shows that layer's curves when its filter is 'Selected'. Tick Mute / Solo / Lock.")
+            "Editor then shows that layer's curves when its filter is 'Selected'. Tick Mute / Solo / Lock.\n"
+            "A dot next to a layer = the objects selected in the scene are in that layer\n"
+            "(orange, green when the layer is selected) - like Maya's Animation Layer Editor.")
         hint.setWordWrap(True)
         layout.addWidget(hint)
 
         self.tw_al_layers = QTreeWidget()
         JUN_mod_treeExpand_qt_v01(self.tw_al_layers)  # 펼치기 = 한 단계, Shift = 아래 전부 (공용)
-        self.tw_al_layers.setColumnCount(4)
-        self.tw_al_layers.setHeaderLabels(["Layer", "Mute", "Solo", "Lock"])
+        self.tw_al_layers.setColumnCount(5)
+        self.tw_al_layers.setHeaderLabels(["Layer", "Mute", "Solo", "Lock", ""])
         header = self.tw_al_layers.header()
         header.setSectionResizeMode(0, QHeaderView.Stretch)
-        for col in (1, 2, 3):
+        for col in (1, 2, 3, AL_MARK_COLUMN):
             header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+        # v02.60 : 표시 칸(논리 4)을 화면에서 Layer 바로 옆으로 - 마야 레이어 에디터처럼 이름 오른쪽.
+        header.moveSection(header.visualIndex(AL_MARK_COLUMN), 1)
+        self.tw_al_layers.headerItem().setToolTip(
+            AL_MARK_COLUMN, "Selected objects are in this layer (green = the layer is selected).")
         self.tw_al_layers.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tw_al_layers.setRootIsDecorated(True)
         self.tw_al_layers.setAlternatingRowColors(True)
@@ -3580,13 +3629,17 @@ class MainWindow(QWidget):
             "Top row = topmost layer (evaluated last). Child layers sit under their parent.\n"
             "Bold = active (preferred) layer, highlighted = selected in the Animation Layer Editor.\n"
             "Shift / Ctrl click selects several layers. BaseAnimation can only be locked.\n"
-            "Click anywhere in a Mute / Solo / Lock cell to toggle it. Ctrl + Mouse Wheel = zoom.")
+            "Click anywhere in a Mute / Solo / Lock cell to toggle it. Ctrl + Mouse Wheel = zoom.\n"
+            "Orange dot = the objects selected in the scene are in that layer (green when the layer is selected).")
         self.tw_al_layers.itemSelectionChanged.connect(self.on_al_selection)
         self.tw_al_layers.itemChanged.connect(self.on_al_item_changed)
         # v02.38 : 공용 확대 / 축소 - 행 높이 · 글자 · 체크박스를 함께 키운다(기본 150%, 배율은 기억).
         #          Mute / Solo / Lock 칸은 칸 어디를 눌러도 체크가 바뀐다(행 선택은 바뀌지 않음).
         self.al_zoom = JUN_mod_viewZoom_qt.JUN_mod_viewZoom_qt_v01(
             self.tw_al_layers, key="A00110_animTool_V02/layers", default=1.5, minimum=0.8, maximum=3.0)
+        # v02.60 : 표시 칸은 체크박스가 없으므로 zoom 델리게이트 대신 타원 델리게이트(크기는 같은 배율).
+        self._al_mark_delegate = _LayerMarkDelegate(self.al_zoom, self.tw_al_layers)
+        self.tw_al_layers.setItemDelegateForColumn(AL_MARK_COLUMN, self._al_mark_delegate)
         layout.addWidget(self.tw_al_layers)
 
         zoom_row = QHBoxLayout()
@@ -3621,13 +3674,65 @@ class MainWindow(QWidget):
 
         self._al_updating = False
         self._al_snapshot = None
+        self._al_marks = None          # v02.60 : 마지막으로 그린 표시(선택 오브젝트가 든 레이어 집합)
+        self._al_sel_job = None
         self._al_timer = QTimer(self)
         self._al_timer.setInterval(LAYERS_POLL_MS)
         self._al_timer.timeout.connect(self._al_poll)
         self._al_timer.start()
 
+        # v02.60 : 씬 선택이 바뀌면 바로 표시를 갱신(라이브). 레이어 멤버 변경은 위 폴링이 따라간다.
+        try:
+            self._al_sel_job = cmds.scriptJob(
+                event=["SelectionChanged", self._al_on_maya_selection], killWithScene=False)
+        except Exception:                                      # noqa: BLE001
+            self._al_sel_job = None
+
         self.on_al_refresh(quiet=True)
         return tab
+
+    def _al_update_marks(self, force=False):
+        """씬에서 고른 오브젝트가 든 레이어에 표시(타원)를 켠다 (v02.60). 바뀐 게 없으면 아무것도 안 한다."""
+        marks = AnimLayerManager.affected_layers()
+        if not force and marks == self._al_marks:
+            return
+        self._al_marks = marks
+        tree = self.tw_al_layers
+        self._al_updating = True
+        try:
+            stack = [tree.topLevelItem(i) for i in range(tree.topLevelItemCount())]
+            while stack:
+                item = stack.pop(0)
+                on = item.data(0, Qt.UserRole) in marks
+                item.setData(AL_MARK_COLUMN, Qt.UserRole, on)
+                item.setToolTip(AL_MARK_COLUMN, "Selected objects are in this layer." if on else "")
+                stack.extend(item.child(i) for i in range(item.childCount()))
+        finally:
+            self._al_updating = False
+        tree.viewport().update()
+
+    def _al_on_maya_selection(self):
+        """SelectionChanged scriptJob - 목록이 보일 때만 표시를 갱신(숨어 있으면 다음 폴링이 맞춘다)."""
+        try:
+            if self.tw_al_layers.isVisible():
+                self._al_update_marks()
+        except RuntimeError:
+            # 창의 C++ 객체가 이미 지워졌다(닫힘 없이 삭제) - 잡을 스스로 정리한다(콜백 안에서 바로 kill 하지 않음).
+            job, self._al_sel_job = self._al_sel_job, None
+            if job is not None:
+                cmds.evalDeferred(lambda j=job: cmds.scriptJob(kill=j, force=True)
+                                  if cmds.scriptJob(exists=j) else None)
+
+    def _al_kill_selection_job(self):
+        """View > Layers 표시용 SelectionChanged scriptJob 정리(멱등)."""
+        job, self._al_sel_job = getattr(self, "_al_sel_job", None), None
+        if job is None:
+            return
+        try:
+            if cmds.scriptJob(exists=job):
+                cmds.scriptJob(kill=job, force=True)
+        except Exception:                                      # noqa: BLE001
+            pass
 
     def al_selected_names(self):
         """트리에서 고른 레이어 이름들(트리 순서)."""
@@ -3655,7 +3760,7 @@ class MainWindow(QWidget):
 
             def add(node, parent_item):
                 info = node["info"]
-                item = QTreeWidgetItem([info["name"], "", "", ""])
+                item = QTreeWidgetItem([info["name"], "", "", "", ""])
                 item.setData(0, Qt.UserRole, info["name"])
                 item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
                 for col, flag, key in self.AL_FLAG_COLUMNS:
@@ -3677,7 +3782,7 @@ class MainWindow(QWidget):
                 if info["selected"]:
                     tags.append("selected")
                 tip = "{0} - {1}".format(info["name"], ", ".join(tags))
-                for col in range(4):
+                for col in range(4):                              # 표시 칸(4) 툴팁은 _al_update_marks
                     item.setToolTip(col, tip)
                 if parent_item is None:
                     tree.addTopLevelItem(item)
@@ -3696,6 +3801,7 @@ class MainWindow(QWidget):
             self._al_snapshot = AnimLayerManager.snapshot(rows)
         finally:
             self._al_updating = False
+        self._al_update_marks(force=True)                      # 새 항목에 표시 다시 (v02.60)
         if not quiet:
             if not rows:
                 self.log("[Info] No animation layers in the current scene.")
@@ -3768,6 +3874,8 @@ class MainWindow(QWidget):
             return
         if snap != self._al_snapshot:
             self.on_al_refresh(quiet=True)
+        else:
+            self._al_update_marks()        # v02.60 : 레이어에 넣고 뺀 것 · 숨어 있던 동안 바뀐 선택
 
     # --------------------------------------------------
     # Helper
@@ -6595,6 +6703,8 @@ class MainWindow(QWidget):
                 self.space_hotkey_mgr.restore()
             if getattr(self, "graph_focus_mgr", None):
                 self.graph_focus_mgr.uninstall()
+            # View > Layers 표시용 SelectionChanged scriptJob (v02.60)
+            self._al_kill_selection_job()
             # 아직 기록되지 않은 Stagger 미리보기가 남아 있으면 마지막으로 기록해 둔다.
             # (미리보기는 undo 큐에 없어서, 그냥 두면 Ctrl+Z 로도 못 되돌린다.)
             session = getattr(self, "_stagger_session", None)

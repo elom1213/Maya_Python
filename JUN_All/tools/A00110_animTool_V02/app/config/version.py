@@ -217,5 +217,11 @@
 #        구간 = LOC_Constraint weight 키(값 > 0) 첫 ~ 끝, 없으면 Start / End. 회전은 Start-1 부터 ±360 이어 붙임.
 #        시험 tests/test_locator_bake_to_keys.py 18/18 · UI 41/41 · bake_layers 19/19 · 기존 Locator 시험 전부.
 
-VERSION = "02.59"
+# 02.60  View > Layers - 씬에서 고른 오브젝트가 들어 있는 레이어 옆에 타원 표시(주황, 그 레이어가 선택돼 있으면 초록) - 마야
+#        Animation Layer Editor 와 같은 모양 (사용자 요청). 판정 = `animLayer -q -affectedLayers`(현재 선택 기준, BaseAnimation 포함).
+#        라이브: SelectionChanged scriptJob(목록이 보일 때만, 창 닫을 때 정리) + 1.5 s 폴링이 레이어 멤버 변경 · 숨어 있던 동안의 선택을 따라감.
+#        표시 칸 = 논리 열 4 를 화면에서 Layer 옆으로(moveSection) - Mute / Solo / Lock 열 번호 그대로, 크기는 viewZoom 배율을 따름.
+#        시험 tests/test_anim_layers.py 57/57(M0~M10, 실제 렌더 픽셀 색 확인).
+
+VERSION = "02.60"
 LAST_UPDATE = "2026-11-12"

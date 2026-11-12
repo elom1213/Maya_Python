@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 # 작업 일지 (WORKLOG)
@@ -32,6 +32,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 ---
 
 ## 2026-11-12 (오늘)
+
+> [!summary] A00110_animTool_V02 **v02.60 View > Layers: 고른 오브젝트가 든 레이어 표시** `#A00110_animTool_V02`
+- 요청: 씬에서 오브젝트를 고르면 그 오브젝트가 있는 레이어에 라이브로 표시 — 마야 레이어 에디터처럼 주황 타원, 레이어를 선택하면 초록.
+- 판정 = `animLayer -q -affectedLayers`(mayapy 실측: **현재 선택 기준만, 오브젝트 인자 불가**, 멤버면 BaseAnimation 도 함께, 셰이프 · 컴포넌트 선택은 None).
+- 라이브: SelectionChanged scriptJob(보일 때만, closeEvent 에서 kill) + 기존 1.5 s 폴링에 표시 비교(멤버 변경). 표시 칸 = 논리 열 4 를 `moveSection` 으로 Layer 옆 — Mute/Solo/Lock 열 번호 그대로. 델리게이트가 행 높이 비례로 그려 viewZoom 배율을 따름.
+- 시험 test_anim_layers 57/57(렌더 픽셀로 주황 / 초록 확인) · graph_focus_layers 37 · locator_bake_ui 41 · hold_layer_blend_ui 21. **GUI 확인 아직.**
 
 > [!summary] A00110_animTool_V02 **v02.59 Locator > Bake to Keys** `#A00110_animTool_V02`
 - 요청: LOC_Constraint 로 로케이터에 맞춘 움직임을 레이어 없이 컨트롤러 키로만 간직하게. Bake 탭으로 구워도 의도대로 안 됨.

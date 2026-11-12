@@ -1916,11 +1916,11 @@ Keys    [x]Translate [x]Rotate
 ```
 ┌ Animation Layers ──────────────────────────── [Expand] ┐
 │ Animation layers of the current scene, top first ...    │
-│ Layer            Mute  Solo  Lock                       │
-│ L2               [ ]   [ ]   [ ]                        │  ← 맨 위 = 가장 위 레이어(마지막에 만든 것)
-│ ▾ L1             [ ]   [ ]   [ ]        (굵게 = 활성)    │
-│     L3           [x]   [ ]   [ ]                        │  ← 자식 레이어는 부모 아래 들여쓰기
-│ BaseAnimation                [ ]                        │  ← Lock 만
+│ Layer               Mute  Solo  Lock                    │
+│ L2                  [ ]   [ ]   [ ]                     │  ← 맨 위 = 가장 위 레이어(마지막에 만든 것)
+│ ▾ L1           (●)  [ ]   [ ]   [ ]     (굵게 = 활성)    │  ← (●) 고른 오브젝트가 이 레이어에 있다(주황 / 선택 레이어면 초록, v02.60)
+│     L3              [x]   [ ]   [ ]                     │  ← 자식 레이어는 부모 아래 들여쓰기
+│ BaseAnimation  (●)              [ ]                     │  ← Lock 만
 │                                    Zoom [-] 150% [+]    │  ← v02.38 확대 / 축소 (Ctrl + 휠)
 │ [Refresh] [Graph Editor: Selected Only] [Graph Editor: All Layers] │
 │ [x] Auto refresh while visible                          │
@@ -1937,6 +1937,10 @@ Keys    [x]Translate [x]Rotate
   있으면 바뀐 레이어로 즉시 다시 프레이밍된다. 그래프 에디터가 그 레이어의 커브만 보이게 하려면 필터가 `Selected` 여야 한다 →
   **`Graph Editor: Selected Only`** 가 열린 그래프 에디터 전부의 `View > Animation Layer Filter` 를 그렇게 바꾼다,
   **`Graph Editor: All Layers`** 는 되돌린다(그래프 에디터가 없으면 `[WARN] No Graph Editor is open.`).
+- **고른 오브젝트가 든 레이어 표시**(v02.60~) — 씬에서 오브젝트를 고르면 그 오브젝트가 멤버인 레이어 이름 옆에 **주황 타원**,
+  그 레이어가 선택(하이라이트)돼 있으면 **초록** — 마야 Animation Layer Editor 와 같은 모양. 레이어 멤버면 `BaseAnimation` 에도 붙는다
+  (마야와 같다). 셰이프 · 컴포넌트만 고르면 표시 없음(마야 질의 `animLayer -q -affectedLayers` 그대로). **라이브** — 씬 선택이 바뀌면
+  바로(SelectionChanged scriptJob, 목록이 보일 때만), 레이어에 넣고 빼는 것은 아래 Auto refresh 주기(1.5 초)로 따라간다.
 - **Mute / Solo / Lock** 체크 = `animLayer -e -mute/-solo/-lock`. `BaseAnimation` 은 Lock 만(체크박스가 Lock 열에만 있다).
   v02.38~ **칸 어디를 눌러도** 체크가 바뀐다(체크박스를 정확히 노리지 않아도 됨), 이 누름은 행 선택(= 활성 레이어)을 바꾸지 않는다.
 - **확대 / 축소**(v02.38~) — 목록 아래 **`Zoom [-] 150% [+]`**, 또는 목록 위에서 **Ctrl + 마우스 휠**. 글자 · 행 높이 · 체크박스 ·
@@ -1948,10 +1952,12 @@ Keys    [x]Translate [x]Rotate
   마야 창 위에 머문다. 그래프 에디터를 클릭해도 그 뒤로 숨지 않는다(v02.32 에서 Pin 을 따라가게 했을 때 뒤로 숨는다는 보고로 바꿈).
 - 로그: `Animation layers : 4 (selected : L2).` · `Layer selected : L1 (active)` · `L2 : mute on` · `Graph Editor filter : selected layers only (1 editor(s)).`
 
-> 구현: `app/core/anim_layer_manager.py` (`AnimLayerManager.tree / rows / set_selected / set_flag / graph_editor_filter / snapshot`),
+> 구현: `app/core/anim_layer_manager.py` (`AnimLayerManager.tree / rows / set_selected / set_flag / graph_editor_filter / snapshot /
+> affected_layers`(v02.60)), 표시 칸은 `main_window._LayerMarkDelegate`(논리 열 4 를 `moveSection` 으로 Layer 옆에),
 > 상태는 Merge Layers 의 `LayerMergeManager.layer_info` 를 재사용. 선택 질의는 전역 플래그가 없어 레이어마다 묻는다.
 > 시험 `tests/test_anim_layers.py` **33 항목**(순서 · 트리 · 선택/활성 하나만 · 플래그 · Base 제한 · 스냅샷 · UI 트리 · 행 클릭 →
-> 마야 선택 · 체크 → 플래그 · 폴링 따라가기 · Auto off · Expand 창 이동 / 복귀). **마야 GUI 확인 아직.**
+> 마야 선택 · 체크 → 플래그 · 폴링 따라가기 · Auto off · Expand 창 이동 / 복귀) → v02.60 **57 항목**(표시 M0~M10: 열 위치 · 멤버 판정 ·
+> 폴링 · 실제 렌더 주황 / 초록 픽셀 · 닫을 때 scriptJob 정리). **마야 GUI 확인 아직.**
 
 #### Graph Focus (v01.25~)
 

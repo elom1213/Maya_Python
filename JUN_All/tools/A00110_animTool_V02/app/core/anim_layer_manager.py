@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-03
+# last Update date : 2026-11-12
 # A00110_animTool_V02 - View > Layers : 씬의 애니메이션 레이어 목록 + 어느 레이어를 볼지(선택 · mute · solo · lock) (v02.31)
 #
 # 마야의 Animation Layer Editor 와 같은 것을 툴 안에서(그리고 Expand 로 띄운 작은 창에서) 다룬다.
@@ -10,6 +10,8 @@
 #              그래프 에디터의 레이어 필터가 'Selected' 면 그 레이어의 커브만 보인다 → 아래 graph_editor_filter.
 #   - 토글   : Mute / Solo / Lock 체크. BaseAnimation 은 Lock 만.
 #   - 선택 질의는 전역 플래그가 없어 레이어마다 묻는다([[animlayer-no-global-selected-query]]).
+#   - 표시   : 씬에서 고른 오브젝트가 들어 있는 레이어 = `animLayer -q -affectedLayers` (v02.60).
+#              마야 레이어 에디터의 주황 타원(선택하면 초록)과 같은 결과 - BaseAnimation 도 포함된다.
 #
 # 로직만 있고 UI 는 main_window `_build_layers_page`. 결과 메시지는 UI 가 영어로 만든다.
 
@@ -100,6 +102,19 @@ class AnimLayerManager:
                 except Exception:                           # noqa: BLE001
                     pass
         return wanted
+
+    @staticmethod
+    def affected_layers():
+        """씬에서 지금 고른 오브젝트가 멤버인 레이어 이름 집합 (v02.60).
+
+        `animLayer -q -affectedLayers` 는 **현재 선택** 기준이다(오브젝트 인자는 받지 않는다, mayapy 실측).
+        레이어 멤버 오브젝트를 고르면 그 레이어와 BaseAnimation 이 함께 온다 - 마야 레이어 에디터의 표시와 같다.
+        셰이프 · 컴포넌트만 고르거나 선택이 없으면 빈 집합.
+        """
+        try:
+            return set(cmds.animLayer(q=True, affectedLayers=True) or [])
+        except Exception:                                   # noqa: BLE001
+            return set()
 
     @staticmethod
     def set_flag(layer, flag, value):
