@@ -33,4 +33,10 @@ metadata:
   `maintainOffset=True`. 시험 씬에 rotateAxis 를 넣지 않으면 못 잡는다.
 - 시험 `tests/test_locator_bake_fast.py` 18/18, UI 36/36.
 
+- **v02.58 애니메이션 레이어 컨트롤러 + `Blend only in Frame Range`**(2026-11-12, 기본 켬): 레이어 채널은 animBlendNode 구동이라
+  옛 `_blocked_axes` 가 전 축 skip(컨스트레인트 0 개, 사용자 제보). ★ **컨스트레인트 명령의 `-layer` 플래그** = 새 override 레이어
+  `LOC_Constraint` 에 축을 넣고(`animLayer -e -attribute`) 건다 — 키 있는 scale 도 된다. 구간 = 레이어 weight step 키 0/1/1/0.
+  켜면 모든 오브젝트 레이어 경로, 끄면 레이어 오브젝트만. ★ mayapy 에선 `currentTime` 도 undo 대기열에 쌓인다 → 시험은 시간 이동 전에 undo.
+  시험 `test_locator_bake_layers.py` 26/26, UI 38/38. **GUI 확인 아직.**
+
 관련: [[framework-progress-widget]], [[framework-timerange-widget]], [[wip-a00110-get-sel-range]], [[wip-a00110-counter-layer]]

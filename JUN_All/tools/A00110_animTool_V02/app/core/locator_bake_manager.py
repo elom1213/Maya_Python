@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-03
+# last Update date : 2026-11-12
 # A00110_animTool_V02 - Bake > Locator : 리스트의 오브젝트마다 로케이터를 만들어 그 월드 움직임을 구간 베이크 (maya.cmds, UI 비의존)
 #
 # 사용자가 마야에서 쓰던 `_SmartLayer` 패키지의 `LOC + Anim` 버튼을 새로 만든 것 (v02.36, 2026-11-03).
@@ -19,6 +19,11 @@
 #   5. (옵션, v02.37) 거꾸로 **로케이터 -> 원본 오브젝트** 컨스트레인트(parent 기본 · point · orient · scale).
 #      로케이터를 움직여 원본을 조종하는 용도. 오프셋 없음(로케이터 월드 = 원본 월드라 구간 안에서 원본이 그대로).
 #      잠긴 채널 · 키 말고 다른 것이 구동하는 채널은 그 축만 건너뛴다. 굽지 않은 채널 묶음의 컨스트레인트는 걸지 않는다.
+#   6. (v02.58) **애니메이션 레이어** 경로 - 오브젝트가 레이어에 들어 있거나(채널을 animBlendNode 가 구동) `Blend only in
+#      Frame Range` 가 켜져 있으면, 컨스트레인트를 새 **override 레이어 `LOC_Constraint`** 에 넣는다(`-layer`).
+#      레이어 weight 를 Start ~ End 만 1, 밖은 0(step 키)으로 두면 구간 안은 로케이터, 밖은 원래 움직임(아래 레이어들).
+#      ★ 옛 경로는 레이어 채널(animBlendNode 구동)을 "다른 것이 구동" 으로 보고 전 축을 건너뛰었다 - 컨스트레인트 0 개.
+#      ★ 레이어 경로에선 키 있는 scale 축에도 scaleConstraint 가 걸린다(레이어 블렌드 노드 입력으로 들어간다, mayapy 2024 실측).
 # 중간에 실패하면 이번에 만든 로케이터 · 컨스트레인트를 지우고 끝낸다(반쯤 만든 결과를 남기지 않는다).
 
 import maya.cmds as cmds
@@ -42,6 +47,9 @@ class LocatorBakeManager:
 
     # 로케이터 -> 오브젝트 컨스트레인트 종류 (UI 체크박스와 같은 키). parent 는 point / orient 와 함께 쓸 수 없다.
     CONSTRAINT_TYPES = ("parent", "point", "orient", "scale")
+
+    # 레이어 경로의 컨스트레인트를 담는 override 레이어 이름 (v02.58, 같은 이름이 있으면 마야가 끝 숫자를 붙인다)
+    CONSTRAINT_LAYER = "LOC_Constraint"
 
     # ------------------------------------------------------------------ 대상
 
@@ -79,35 +87,83 @@ class LocatorBakeManager:
     # ------------------------------------------------------------------ 컨스트레인트 (로케이터 -> 오브젝트)
 
     @staticmethod
-    def _blocked_axes(node, channel):
+    def _is_key_source(node, layered):
+        """키에서 오는 연결인가 - animCurve, 레이어 경로면 animBlendNode(애니메이션 레이어 블렌드)도."""
+        types = cmds.nodeType(node, inherited=True) or []
+        if "animCurve" in types:
+            return True
+        return layered and "animBlendNodeBase" in types
+
+    @staticmethod
+    def _blocked_axes(node, channel, layered=False):
         """node 의 channel('translate' / 'rotate' / 'scale') 축 중 컨스트레인트를 걸 수 없는 축 ['x', ...].
 
         잠긴 축, 그리고 키(animCurve) 가 아닌 무언가가 이미 구동하는 축(다른 컨스트레인트 · 익스프레션 · 연결).
         translate / rotate 는 키가 있어도 걸 수 있다 - 마야가 pairBlend 를 끼워 컨스트레인트가 이긴다(blendParent = 1).
         ★ scale 은 pairBlend 가 없어 키 있는 축에 scaleConstraint 가 실패한다("Destination attribute must be writable",
-        마야 Constrain > Scale 도 같다) -> scale 은 키 있는 축도 막힌 축으로 센다."""
+        마야 Constrain > Scale 도 같다) -> scale 은 키 있는 축도 막힌 축으로 센다.
+        layered=True (v02.58, 레이어 경로): 애니메이션 레이어 블렌드 노드 구동도 키로 보고, 키 있는 scale 도 걸 수 있다
+        (컨스트레인트가 레이어 블렌드 노드로 들어간다)."""
         short = {"translate": "t", "rotate": "r", "scale": "s"}[channel]
         parent_src = cmds.listConnections(node + "." + channel, source=True, destination=False,
                                           skipConversionNodes=True) or []
+        if layered:
+            parent_blocked = any(not LocatorBakeManager._is_key_source(x, True) for x in parent_src)
+        else:
+            parent_blocked = bool(parent_src)
         blocked = []
         for ax in "xyz":
             plug = node + "." + short + ax
-            if cmds.getAttr(plug, lock=True) or parent_src:
+            if cmds.getAttr(plug, lock=True) or parent_blocked:
                 blocked.append(ax)
                 continue
             srcs = cmds.listConnections(plug, source=True, destination=False, skipConversionNodes=True) or []
-            if srcs and channel == "scale":
+            if srcs and channel == "scale" and not layered:
                 blocked.append(ax)
-            elif any("animCurve" not in (cmds.nodeType(x, inherited=True) or []) for x in srcs):
+            elif any(not LocatorBakeManager._is_key_source(x, layered) for x in srcs):
                 blocked.append(ax)
         return blocked
 
+    # ------------------------------------------------------------------ 레이어 경로 (v02.58)
+
     @staticmethod
-    def constrain_objects(pairs, types, translate=True, rotate=True, scale=False):
+    def in_anim_layers(node):
+        """node 가 애니메이션 레이어에 들어 있나."""
+        try:
+            layers = cmds.animLayer([node], query=True, affectedLayers=True) or []
+        except RuntimeError:
+            return False
+        return bool(layers)
+
+    @staticmethod
+    def create_constraint_layer(start=None, end=None):
+        """컨스트레인트용 override 레이어를 만든다. start / end 가 있으면 weight = 구간 안 1, 밖 0 (step 키).
+
+        start / end 가 None 이면 weight 1 그대로(키 없음 = 전 구간에서 컨스트레인트)."""
+        layer = cmds.animLayer(LocatorBakeManager.CONSTRAINT_LAYER, override=True)
+        if start is not None and end is not None:
+            start, end = int(start), int(end)
+            for frame, value in ((start - 1, 0.0), (start, 1.0), (end, 1.0), (end + 1, 0.0)):
+                cmds.setKeyframe(layer, attribute="weight", time=frame, value=value, outTangentType="step")
+        return layer
+
+    @staticmethod
+    def constrain_objects(pairs, types, translate=True, rotate=True, scale=False, layer=None):
         """pairs = [(로케이터, 오브젝트)] 마다 로케이터 -> 오브젝트 컨스트레인트. 반환 (만든 컨스트레인트, 경고 목록).
 
         types : CONSTRAINT_TYPES 중 고른 것. 굽지 않은 채널 묶음은 건너뛴다(translate=False 면 point 없음 ·
-        parent 는 이동 축 skip). 축 단위로 잠김 / 다른 구동을 건너뛰고, 오브젝트 하나가 실패해도 나머지는 계속한다."""
+        parent 는 이동 축 skip). 축 단위로 잠김 / 다른 구동을 건너뛰고, 오브젝트 하나가 실패해도 나머지는 계속한다.
+        layer : 애니메이션 레이어 이름이면 레이어 경로(v02.58) - 거는 축을 그 레이어에 넣고 `-layer` 로 건다."""
+        layered = bool(layer)
+        short_of = {"translate": "t", "rotate": "r", "scale": "s"}
+
+        def _add_to_layer(obj, channel, blocked):
+            if layered:
+                plugs = [obj + "." + short_of[channel] + ax for ax in "xyz" if ax not in blocked]
+                if plugs:
+                    cmds.animLayer(layer, edit=True, attribute=plugs)
+
+        extra = {"layer": layer} if layered else {}
         chosen = set(types or ())
         types = [t for t in LocatorBakeManager.CONSTRAINT_TYPES if t in chosen]
         baked = {"translate": translate, "rotate": rotate, "scale": scale}
@@ -121,15 +177,20 @@ class LocatorBakeManager:
                         if not (translate or rotate):
                             warnings.append("{0}: parent skipped (Translate / Rotate not baked)".format(short))
                             continue
-                        blk_t = LocatorBakeManager._blocked_axes(obj, "translate") if translate else []
-                        blk_r = LocatorBakeManager._blocked_axes(obj, "rotate") if rotate else []
+                        blk_t = LocatorBakeManager._blocked_axes(obj, "translate", layered) if translate else []
+                        blk_r = LocatorBakeManager._blocked_axes(obj, "rotate", layered) if rotate else []
                         skip_t = blk_t if translate else ["x", "y", "z"]
                         skip_r = blk_r if rotate else ["x", "y", "z"]
                         if len(skip_t) == 3 and len(skip_r) == 3:
                             warnings.append("{0}: parent skipped (no free translate / rotate channel)".format(short))
                             continue
+                        if translate:
+                            _add_to_layer(obj, "translate", skip_t)
+                        if rotate:
+                            _add_to_layer(obj, "rotate", skip_r)
                         made += cmds.parentConstraint(loc, obj, maintainOffset=False,
-                                                      skipTranslate=skip_t or "none", skipRotate=skip_r or "none")
+                                                      skipTranslate=skip_t or "none", skipRotate=skip_r or "none",
+                                                      **extra)
                         if blk_t or blk_r:
                             warnings.append("{0}: parent skipped axes T[{1}] R[{2}] (locked / driven)".format(
                                 short, "".join(blk_t), "".join(blk_r)))
@@ -138,17 +199,19 @@ class LocatorBakeManager:
                     if not baked[need]:
                         warnings.append("{0}: {1} skipped ({2} not baked)".format(short, ctype, need.capitalize()))
                         continue
-                    skip = LocatorBakeManager._blocked_axes(obj, need)
+                    skip = LocatorBakeManager._blocked_axes(obj, need, layered)
+                    keyed_note = " / keyed" if need == "scale" and not layered else ""
                     if len(skip) == 3:
-                        warnings.append("{0}: {1} skipped (all {2} channels locked / driven{3})".format(short, ctype, need,
-                                                                                       " / keyed" if need == "scale" else ""))
+                        warnings.append("{0}: {1} skipped (all {2} channels locked / driven{3})".format(
+                            short, ctype, need, keyed_note))
                         continue
                     fn = {"point": cmds.pointConstraint, "orient": cmds.orientConstraint,
                           "scale": cmds.scaleConstraint}[ctype]
-                    made += fn(loc, obj, maintainOffset=False, skip=skip or "none")
+                    _add_to_layer(obj, need, skip)
+                    made += fn(loc, obj, maintainOffset=False, skip=skip or "none", **extra)
                     if skip:
                         warnings.append("{0}: {1} skipped axes [{2}] (locked / driven{3})".format(
-                            short, ctype, "".join(skip), " / keyed" if need == "scale" else ""))
+                            short, ctype, "".join(skip), keyed_note))
                 except RuntimeError as exc:
                     warnings.append("{0}: {1} failed - {2}".format(short, ctype, str(exc).strip()))
         return made, warnings
@@ -248,7 +311,7 @@ class LocatorBakeManager:
     @staticmethod
     def bake(objects, start, end, translate=True, rotate=True, scale=False,
              euler_filter=True, select_result=True, progress=None, constrain=None,
-             fast=False):
+             fast=False, constrain_range=False):
         """objects 마다 로케이터를 만들어 [start, end] 를 월드 베이크한다.
 
         progress : progress(done, total, message=None) - 단계마다 0 -> total. None 이면 조용히.
@@ -256,6 +319,9 @@ class LocatorBakeManager:
                    `progress.phase(name)` 이 있으면 먼저 부른다(UI 가 진행 팝업 단계를 넘긴다).
                    constrain 이 있으면 마지막에 PHASE_CONSTRAIN 단계가 하나 더 온다.
         constrain: 베이크 뒤 로케이터 -> 오브젝트 컨스트레인트 종류(CONSTRAINT_TYPES 의 부분집합). None / 빈 것 = 안 건다.
+        constrain_range : True 면 컨스트레인트가 Start ~ End 에만 영향(밖은 원래 움직임) - 모든 오브젝트를 레이어 경로로,
+                   `LOC_Constraint` 레이어 weight 를 구간에만 1 (v02.58). False 면 레이어에 든 오브젝트만 레이어 경로
+                   (weight 1, 전 구간), 나머지는 예전처럼 pairBlend.
         fast     : True 면 **부모가 움직이지 않는다고 보고** 씬 시간을 옮기지 않는 빠른 경로(위 `빠른 경로` 설명).
                    임시 컨스트레인트도 만들지 않는다. 부모가 움직이면 결과가 틀린다 - 사용자가 고른다.
         반환     : (만든 로케이터 이름 목록, msg)
@@ -296,6 +362,7 @@ class LocatorBakeManager:
         current = cmds.currentTime(q=True)
         locators, constraints = [], []
         made_constraints, constrain_warnings = [], []
+        con_layer = None
         n = len(targets)
 
         with undo_chunk():
@@ -382,16 +449,23 @@ class LocatorBakeManager:
                     _step(1, 1)
 
                     # 5. (옵션) 로케이터 -> 오브젝트 컨스트레인트. 원본 키는 그대로 두고 pairBlend 로 컨스트레인트가 덮는다.
+                    #    v02.58 레이어 경로: 레이어에 든 오브젝트 · 구간 블렌드면 override 레이어에 건다.
                     if constrain:
                         _phase(LocatorBakeManager.PHASE_CONSTRAIN)
                         for i, pair in enumerate(zip(locators, targets)):
+                            use_layer = constrain_range or LocatorBakeManager.in_anim_layers(pair[1])
+                            if use_layer and con_layer is None:
+                                con_layer = LocatorBakeManager.create_constraint_layer(
+                                    *((start, end) if constrain_range else (None, None)))
                             made, warns = LocatorBakeManager.constrain_objects(
-                                [pair], constrain, translate=translate, rotate=rotate, scale=scale)
+                                [pair], constrain, translate=translate, rotate=rotate, scale=scale,
+                                layer=con_layer if use_layer else None)
                             made_constraints += made
                             constrain_warnings += warns
                             _step(i + 1, n, pair[1].split("|")[-1])
             except Exception as exc:  # noqa: BLE001 - 반쯤 만든 결과를 남기지 않는다
-                leftovers = [x for x in constraints + made_constraints + locators if cmds.objExists(x)]
+                leftovers = [x for x in constraints + made_constraints + locators + [con_layer]
+                             if x and cmds.objExists(x)]
                 if leftovers:
                     cmds.delete(leftovers)
                 cmds.currentTime(current, edit=True)
@@ -410,6 +484,9 @@ class LocatorBakeManager:
         if constrain:
             msg += "  Constrained objects ({0}): {1} constraint(s).".format(
                 " + ".join(c.capitalize() for c in constrain), len(made_constraints))
+            if con_layer:
+                msg += "  Layer '{0}'{1}.".format(con_layer, " (weight 1 only in {0} - {1})".format(
+                    start, end) if constrain_range else "")
             if constrain_warnings:
                 msg += "  [Warning] " + "; ".join(constrain_warnings)
         if skipped:

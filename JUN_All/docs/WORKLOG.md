@@ -31,7 +31,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-11-11 (오늘)
+## 2026-11-12 (오늘)
+
+> [!summary] A00110_animTool_V02 **v02.58 Locator > Constrain: 애니메이션 레이어 컨트롤러 · Blend only in Frame Range** `#A00110_animTool_V02`
+- 요청: Constrain Objects to Locators 를 켜도 BaseAnimation + 다른 레이어에 키가 있는 컨트롤러엔 안 걸림 → 걸리게. 그리고 Start ~ End 만 blend 1(로케이터에 매칭), 나머지는 원래 움직임이 되는 체크박스(기본 켬).
+- 원인: 레이어 채널은 animBlendNode 가 구동 → `_blocked_axes` 가 "키가 아닌 구동" 으로 전 축 skip(mayapy 재현: 컨스트레인트 0 개).
+- 해법: override 레이어 `LOC_Constraint` 에 축을 넣고 `-layer` 로 건다, weight = 구간만 1(step). 켜면 모든 오브젝트가 레이어 경로, 끄면 레이어 오브젝트만(weight 1) · 나머지 pairBlend 그대로. 레이어 경로에선 키 있는 scale 도 걸린다.
+- 시험 test_locator_bake_layers 26/26 · 기존 25 · 34 · 18 · UI 38/38. ★ mayapy 에선 currentTime 도 undo 대기열에 쌓인다(시험 함정). **GUI 확인 아직.**
+
+## 2026-11-11
 
 > [!summary] A00620_NameDecoder **v01.06 Sync 는 조상을 펼치지 않고 옅게 칠함** · 로그 · Raw 칸 기본 접힘 `#A00620_NameDecoder`
 - 요청: Sync with Selection 으로 자식을 고르면 최상위 부모부터 전부 펼쳐지던 것 → 마야 아웃라이너처럼 펼치지 않고 조상 행 색만 약하게. 로그 기본 접힘, Raw Column 기본 해제.

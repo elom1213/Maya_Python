@@ -199,5 +199,13 @@
 #        main_window 가 옛 CopyKeyManager 를 잡은 것(A00500_reloader v01.01 에서 수정).
 #        시험 tests/test_copykey_locked.py 23/23 · test_copykey_rotate_order 15/15.
 
-VERSION = "02.57"
-LAST_UPDATE = "2026-11-11"
+# 02.58  Bake > Locator > Constrain Objects to Locators - 애니메이션 레이어(BaseAnimation + 다른 레이어)에 키가 있는
+#        컨트롤러에도 컨스트레인트가 걸린다(사용자 제보: 체크해도 안 걸림). 원인: 레이어 채널은 animBlendNode 가 구동하는데
+#        `_blocked_axes` 가 "키가 아닌 구동" 으로 보고 전 축을 건너뜀(컨스트레인트 0 개). 해법: 새 override 레이어
+#        `LOC_Constraint` 에 축을 넣고 `-layer` 로 건다(키 있는 scale 도 된다).
+#        신규 `Blend only in Frame Range`(기본 켬) - 레이어 weight 를 Start ~ End 만 1, 밖 0(step 키) -> 구간 안은 로케이터,
+#        밖은 원래 움직임. 켜면 레이어 없는 오브젝트도 같은 레이어 경로. 끄면 레이어 오브젝트만 레이어(weight 1), 나머지는 pairBlend.
+#        시험 tests/test_locator_bake_layers.py 26/26 · 기존 25/25 · 34/34 · 18/18 · UI 38/38.
+
+VERSION = "02.58"
+LAST_UPDATE = "2026-11-12"

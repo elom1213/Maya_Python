@@ -1664,6 +1664,7 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
 │ [ ] Fast - parents don't move                             │  ← v02.56, 기본 끔
 │ [ ] Constrain Objects to Locators ────────────────────────┐│  ← v02.37, 그룹 체크 = 켜기(기본 끔)
 │ │ [v] Parent  [ ] Point  [ ] Orient  [ ] Scale            ││
+│ │ [v] Blend only in Frame Range                           ││  ← v02.58, 기본 켬
 │ └─────────────────────────────────────────────────────────┘│
 │ [ LOC + Anim ]                                            │
 └──────────────────────────────────────────────────────────┘
@@ -1692,6 +1693,13 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   - 굽지 않은 채널의 종류는 실행 전에 막는다(Point = Translate, Orient = Rotate, Scale = Scale 을 Channels 에서 켜야 한다).
   - **축 단위 건너뛰기**: 잠긴 축, 키가 아닌 것(다른 컨스트레인트 · 연결)이 구동하는 축은 그 축만 빼고 걸고 로그에 `[Warning]`.
     ★ **Scale 은 키가 있는 축도 건너뛴다** — scale 에는 pairBlend 가 없어 키 있는 채널에 scaleConstraint 가 실패한다(마야 Constrain > Scale 도 같다).
+    (레이어 경로에서는 키 있는 scale 도 걸린다 - 아래)
+  - **애니메이션 레이어**(v02.58~): BaseAnimation 말고 다른 레이어에도 키가 있는 컨트롤러도 걸린다(예전엔 레이어 채널을
+    "키가 아닌 구동" 으로 보고 전 축을 건너뛰어 컨스트레인트가 0 개였다). 이런 오브젝트는 컨스트레인트를 새 **override 레이어
+    `LOC_Constraint`** 안에 건다 — 레이어를 지우면 컨스트레인트 효과가 사라진다.
+  - **Blend only in Frame Range**(v02.58~, **기본 켬**): 컨스트레인트가 **Start ~ End 에만** 영향(blend 1), 밖은 **원래 움직임**.
+    `LOC_Constraint` 레이어 weight 에 step 키 `Start-1 = 0 · Start = 1 · End = 1 · End+1 = 0`. 켜면 레이어 없는 오브젝트도 같은 레이어에
+    들어간다(실행 한 번 = 레이어 하나). 끄면 전 프레임에서 컨스트레인트(레이어 오브젝트는 weight 1 레이어, 나머지는 예전 pairBlend).
 
 #### Counter Layer — 상위 레이어가 바꾼 월드 위치·회전 되돌리기 (v02.26~)
 
@@ -2423,6 +2431,12 @@ Shift+A 를 누르면 Hold 에 더해, **고른 애니메이션 레이어 안에
   종류 하나가 실패해도 경고만 남기고 나머지는 계속. 시험 `tests/test_locator_bake_constrain.py` **34/34**: Parent · Point+Orient ·
   Parent+Scale(스케일 2 부모) 모두 **오브젝트 월드 오차 1e-15**, 로케이터 이동 → 오브젝트 따라옴, 잠김 tz · multiplyDivide 가 구동하는 ry 축 skip,
   키 있는 sx skip, undo, 부분 실패. UI 시험 31/31(기본 끔 · Parent 기본 · 배타 · 굽지 않은 채널 거부 · 4단계 팝업).
+- **레이어 경로**(v02.58): `constrain_range` 이거나 `in_anim_layers(obj)`(`animLayer -q -affectedLayers`) 면 실행마다 override 레이어 하나
+  (`create_constraint_layer`) → 거는 축을 `animLayer -e -attribute` 로 넣고 `parentConstraint ... -layer`. `_blocked_axes(layered=True)` 는
+  animBlendNode(`animBlendNodeBase`) 구동을 키로 본다. 시험 `tests/test_locator_bake_layers.py` **26/26**: Base + additive + override(weight 0.5)
+  레이어 컨트롤 → 걸림, 로케이터를 옮기면 구간 안은 따라오고 밖은 원래 월드(오차 1e-3), weight 0/1/1/0 step, 구간 끔 = 전 프레임,
+  레이어 없는 오브젝트(구간 끔 = pairBlend · 켬 = 레이어), 두 오브젝트 = 레이어 하나, point + orient + 키 있는 scale, 잠긴 축 skip, undo 한 번.
+  ★ mayapy 에선 `currentTime` 도 undo 대기열에 쌓인다 — 시험에서 시간을 옮긴 뒤 undo 하면 그것만 되돌아간다.
 
 ### Bake > Counter Layer
 - **엔진**(`counter_layer_manager.CounterLayerManager.create`): 두 번 훑기. ① 체크한 레이어(+ 새 보정 레이어)를

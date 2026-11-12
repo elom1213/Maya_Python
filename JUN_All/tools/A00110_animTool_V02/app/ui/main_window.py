@@ -2293,8 +2293,11 @@ class MainWindow(QWidget):
         self.grp_lb_constrain.setToolTip(
             "After the bake, constrain every listed object to its locator\n"
             "(the locator drives the object). No offset - the locator already matches the object.\n"
-            "Locked channels and channels driven by something other than keys are skipped per axis.")
-        con_row = QHBoxLayout(self.grp_lb_constrain)
+            "Locked channels and channels driven by something other than keys are skipped per axis.\n"
+            "Objects in animation layers are constrained in a new override layer 'LOC_Constraint'.")
+        con_box = QVBoxLayout(self.grp_lb_constrain)
+        con_row = QHBoxLayout()
+        con_box.addLayout(con_row)
         self.cb_lb_con_parent = QCheckBox("Parent")
         self.cb_lb_con_point = QCheckBox("Point")
         self.cb_lb_con_orient = QCheckBox("Orient")
@@ -2310,6 +2313,16 @@ class MainWindow(QWidget):
         self.cb_lb_con_parent.toggled.connect(self._on_lb_con_parent_toggled)
         self.cb_lb_con_point.toggled.connect(self._on_lb_con_part_toggled)
         self.cb_lb_con_orient.toggled.connect(self._on_lb_con_part_toggled)
+        # (v02.58) 구간 블렌드 - 기본 켬. 컨스트레인트를 override 레이어에 넣고 레이어 weight 를 Start ~ End 만 1(밖 0).
+        self.cb_lb_con_range = QCheckBox("Blend only in Frame Range")
+        self.cb_lb_con_range.setChecked(True)
+        self.cb_lb_con_range.setToolTip(
+            "The constraint drives the object only from Start to End (blend 1 there).\n"
+            "Outside the range the object keeps its own motion (blend 0).\n"
+            "Done with a new override animation layer 'LOC_Constraint' whose weight is keyed\n"
+            "1 from Start to End and 0 outside (stepped). Delete the layer to remove the constraint effect.\n"
+            "Off: the constraint drives every frame.")
+        con_box.addWidget(self.cb_lb_con_range)
         tab_layout.addWidget(self.grp_lb_constrain)
 
         # -------------------------
@@ -5195,7 +5208,8 @@ class MainWindow(QWidget):
                 nodes, start, end, translate=translate, rotate=rotate, scale=scale,
                 euler_filter=self.cb_lb_euler.isChecked(),
                 select_result=self.cb_lb_select.isChecked(),
-                progress=progress, constrain=constrain, fast=self.cb_lb_fast.isChecked())
+                progress=progress, constrain=constrain, fast=self.cb_lb_fast.isChecked(),
+                constrain_range=bool(constrain) and self.cb_lb_con_range.isChecked())
         finally:
             elapsed = dlg.elapsed()
             dlg.finish()

@@ -164,6 +164,11 @@ check("constrain run: four phases", SEEN["phases"] == ["Creating locators", "Bak
       SEEN["phases"])
 check("constrain run: objects constrained",
       all(cmds.listRelatives(n, children=True, type="parentConstraint") for n in ("cube_renamed", b)))
+# (v02.58) Blend only in Frame Range - 기본 켬, 켜면 LOC_Constraint 레이어 weight 가 구간에만 1
+check("range blend: default on", win.cb_lb_con_range.isChecked())
+_lay = [l for l in cmds.ls(type="animLayer") if l.startswith("LOC_Constraint")]
+check("range blend: layer weight keyed 0 / 1 / 1 / 0 around 5 - 35",
+      len(_lay) == 1 and [round(cmds.getAttr(_lay[0] + ".weight", time=f)) for f in (4, 5, 35, 36)] == [0, 1, 1, 0], _lay)
 
 # (v02.56) Fast - parents don't move : 기본 끔, 켜면 시간을 옮기지 않고 같은 결과
 check("fast: default off", not win.cb_lb_fast.isChecked())
