@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-13 (오늘)
 
+> [!summary] **`A00590_SwingTwistNative` v01.01 — Convert(원본 노드 → 망) · Restore · Container** `#A00590_SwingTwistNative`
+- 요청: 계획서 다음 단계 §9 · §10 진행(작업 중 PC 가 꺼져 다른 세션에서 재개 — 코드 · 시험은 미커밋으로 남아 있었고, 시험 재실행 후 문서 · 커밋).
+- 코어 `maya_swing_twist.py`: `read_original` · `convert`(망을 출력 미연결로 만들어 원본과 무작위 포즈 대조 → 1e-6° 넘으면 원래대로) · `restore`(MetaHuman 방식으로 원본 재생성) · `wrap_container` / `unwrap_container` / `set_black_box` · `load/unload_original_plugin`. 전부 undo 한 번.
+- 툴: **Convert 탭**(원본 목록 · Convert Selected/All · Verify · Load/Unload Plugin) · Rigs 탭에 Wrap · Unwrap · Black Box · Restore Original · `Container` · `Source` 칸. Build · Convert 의 `Wrap in Container` 기본 켬.
+- ★ 실측 함정: 원본에만 연결된 블렌드 animCurve 는 원본 삭제 때 같이 지워진다(→ 삭제 전에 홀더로 이동) · 출력 연결만 끊으면 unitConversion 이 남는다(→ 원본째 삭제) · 지운 원본이 undo 큐에 남아 `unloadPlugin` 거부(→ flushUndo + 확인 창) · 원본은 affects 가 비어 MetaHuman 식 `twists[i]` 0 setAttr 뒤 0 이 남는다(→ Restore 끝 dgdirty).
+- 시험: convert 50/50(변환 41 포즈 2e-13° · undo/redo · Restore 왕복 · container · 플러그인 내리고 저장 · 재열기 `requires` 확인 · 레퍼런스 거부) · tool 59/59 · golden 16/16. **GUI · 실제 MetaHuman 씬 · Maya 2023 · 레퍼런스 container 는 아직.**
+
 > [!summary] **`A00590_SwingTwistNative` 신규 v01.00 — MetaHuman `SwingTwistEvaluatorNode` 를 quatNodes 망으로 만들기** `#A00590_SwingTwistNative`
 - 요청: 계획서(11-03) 대로 툴 제작. 기존 노드 변환(Convert) · container 로 한 노드처럼 다루기는 "급하지 않음" → 계획서 §9 · §10 에 기록, v1 = 대체 노드망 생성만.
 - 번호: `tools/` 에 A00580 다음이 A00600 → 590 은 계획서가 잡아 둔 빈 번호 그대로.

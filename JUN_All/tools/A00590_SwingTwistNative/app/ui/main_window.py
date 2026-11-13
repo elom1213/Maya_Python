@@ -5,8 +5,10 @@
 #
 # Build 탭: MetaHuman `create_swing_twist_evaluator` 와 같은 입력(Start / End / Swing 조인트, Twist 조인트 + 블렌드,
 #           From End) 을 받아 quatNodes 노드망을 만든다 - 코어 Framework/core/maya_swing_twist.build().
-# Rigs 탭:  씬에 만든 노드망(홀더 network 노드) 목록 · 선택 · Build 탭으로 불러오기 · 삭제.
-# 블렌드는 홀더의 swingBlend / twistBlend[i] 어트리뷰트 - 홀더를 고르면 Channel Box 에서 바로 고친다.
+# Convert 탭: 씬의 원본 SwingTwistEvaluatorNode 목록 → 노드망으로 변환(수치 대조 후 원본 삭제) · 다 바꾸면 플러그인 내리기.
+# Rigs 탭:  씬에 만든 노드망(홀더 network 노드) 목록 · 선택 · Build 탭으로 불러오기 · 삭제 ·
+#           Container 로 묶기/풀기 · 안 숨기기(Black Box) · 원본 노드로 되돌리기(Restore - DNA export 용).
+# 블렌드는 홀더의 swingBlend / twistBlend[i] 어트리뷰트 - 홀더(묶였으면 container)를 고르면 Channel Box 에서 바로 고친다.
 # 모든 UI 문자열/로그는 영어.
 
 import maya.cmds as cmds
@@ -33,6 +35,7 @@ from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
+from Framework.qt.MOD_progress_qt_v01 import JUN_mod_progress_qt_v01
 from Framework.qt.pin_style import apply_pin_style
 from Framework.core import maya_swing_twist as ST
 
@@ -49,7 +52,14 @@ BLEND_TIP = ("Each blend slides its output from the full counter rotation (0) to
              "  Swing: 0 = cancel the whole start rotation, 1 = cancel the start twist only.\n"
              "Same as the original SwingTwistEvaluatorNode. Values outside 0-1 extrapolate.")
 
-RIG_COLUMNS = ["Holder", "Start", "Swing", "Twists", "From End", "Nodes"]
+RIG_COLUMNS = ["Holder", "Start", "Swing", "Twists", "From End", "Nodes", "Container", "Source"]
+ORIG_COLUMNS = ["Node", "Start", "Swing", "Twists", "From End", "Note"]
+
+VERIFY_SAMPLES = 20
+
+CONTAINER_TIP = ("Put the network and its holder in one Maya container, shown as a single node.\n"
+                 "Blends and inputs/outputs are published with the original attribute names;\n"
+                 "Black Box hides the inside in the Outliner and Node Editor.")
 
 
 def _short(node):
@@ -81,6 +91,7 @@ class MainWindow(QWidget):
         self.confirm_delete = True
 
         self.build_ui()
+        self.refresh_originals()
         self.refresh_rigs()
 
     # ==================================================================
@@ -110,6 +121,7 @@ class MainWindow(QWidget):
 
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_tab(), "Build")
+        self.tabs.addTab(self._convert_tab(), "Convert")
         self.tabs.addTab(self._rigs_tab(), "Rigs")
         self.tabs.currentChanged.connect(self._on_tab_changed)
         main_layout.addWidget(self.tabs, stretch=1)
@@ -195,6 +207,11 @@ class MainWindow(QWidget):
         note.setToolTip(BLEND_TIP)
         lay.addWidget(note)
 
+        self.chk_wrap = QCheckBox("Wrap in Container")
+        self.chk_wrap.setChecked(True)
+        self.chk_wrap.setToolTip(CONTAINER_TIP)
+        lay.addWidget(self.chk_wrap)
+
         self.btn_build = QPushButton("Build")
         self.btn_build.setMinimumHeight(34)
         self.btn_build.setToolTip("Create the quatNodes network that replaces SwingTwistEvaluatorNode.\n"
@@ -219,21 +236,87 @@ class MainWindow(QWidget):
         self.tbl_rigs.itemSelectionChanged.connect(self._on_rig_selection)
         lay.addWidget(self.tbl_rigs, stretch=1)
 
-        row1 = QHBoxLayout()
-        row2 = QHBoxLayout()
+        rows = [QHBoxLayout() for _ in range(4)]
+        for r, label, slot, tip in (
+                (0, "Refresh", self.refresh_rigs, "Re-read the networks in the scene"),
+                (0, "Select Holder", self.select_holders,
+                 "Select the holder (or its container) - edit swingBlend / twistBlend in the Channel Box"),
+                (0, "Select Nodes", self.select_nodes, "Select every node of the network"),
+                (1, "Select Joints", self.select_joints, "Select the input and output joints"),
+                (1, "Load to Build", self.load_to_build, "Copy this network's settings into the Build tab"),
+                (1, "Delete", self.delete_rigs,
+                 "Delete the network (and its container). Output joints keep their last rotate values."),
+                (2, "Wrap", self.wrap_rigs, "Put each selected network in its own container.\n" + CONTAINER_TIP),
+                (2, "Unwrap", self.unwrap_rigs, "Take the network out of its container and delete the container"),
+                (2, "Black Box", self.toggle_black_box,
+                 "Toggle the container's Black Box (hide / show the nodes inside)"),
+                (3, "Restore Original", self.restore_rigs,
+                 "Replace the network with an original SwingTwistEvaluatorNode (needs the Epic plugin).\n"
+                 "Use this before MetaHuman DNA export - it only finds SwingTwistEvaluatorNode.")):
+            btn = QPushButton(label)
+            btn.setToolTip(tip)
+            btn.clicked.connect(slot)
+            rows[r].addWidget(btn)
+        for row in rows:
+            lay.addLayout(row)
+        return page
+
+    # ---------------------------------------------------------------- Convert
+    def _convert_tab(self):
+        page = QWidget()
+        lay = QVBoxLayout(page)
+
+        status_row = QHBoxLayout()
+        self.lbl_plugin = QLabel()
+        status_row.addWidget(self.lbl_plugin, stretch=1)
+        self.btn_load_plugin = QPushButton("Load Plugin")
+        self.btn_load_plugin.setToolTip("Load Epic's SwingTwistEvaluatorPlugin (MetaHuman for Maya)")
+        self.btn_load_plugin.clicked.connect(self.load_plugin)
+        status_row.addWidget(self.btn_load_plugin)
+        lay.addLayout(status_row)
+
+        self.tbl_orig = QTableWidget(0, len(ORIG_COLUMNS))
+        self.tbl_orig.setHorizontalHeaderLabels(ORIG_COLUMNS)
+        self.tbl_orig.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.tbl_orig.horizontalHeader().setStretchLastSection(True)
+        self.tbl_orig.verticalHeader().setVisible(False)
+        self.tbl_orig.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tbl_orig.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tbl_orig.setMinimumHeight(140)
+        self.tbl_orig.itemSelectionChanged.connect(self._on_orig_selection)
+        lay.addWidget(self.tbl_orig, stretch=1)
+
+        self.chk_verify = QCheckBox("Verify ({0} random poses)".format(VERIFY_SAMPLES))
+        self.chk_verify.setChecked(True)
+        self.chk_verify.setToolTip("Compare the network with the original at the current pose and random poses\n"
+                                   "before deleting the original. A node that differs is left unchanged.\n"
+                                   "Off: compare at the current pose only.")
+        self.chk_wrap_convert = QCheckBox("Wrap in Container")
+        self.chk_wrap_convert.setChecked(True)
+        self.chk_wrap_convert.setToolTip(CONTAINER_TIP)
+        opt_row = QHBoxLayout()
+        opt_row.addWidget(self.chk_verify)
+        opt_row.addWidget(self.chk_wrap_convert)
+        opt_row.addStretch(1)
+        lay.addLayout(opt_row)
+
+        row1, row2 = QHBoxLayout(), QHBoxLayout()
         for target, label, slot, tip in (
-                (row1, "Refresh", self.refresh_rigs, "Re-read the networks in the scene"),
-                (row1, "Select Holder", self.select_holders,
-                 "Select the holder node - edit swingBlend / twistBlend in the Channel Box"),
-                (row1, "Select Nodes", self.select_nodes, "Select every node of the network"),
-                (row2, "Select Joints", self.select_joints, "Select the input and output joints"),
-                (row2, "Load to Build", self.load_to_build, "Copy this network's settings into the Build tab"),
-                (row2, "Delete", self.delete_rigs,
-                 "Delete the network. Output joints keep their last rotate values.")):
+                (row1, "Refresh", self.refresh_originals, "Re-read SwingTwistEvaluatorNode in the scene"),
+                (row1, "Select", self.select_originals, "Select the selected nodes in Maya"),
+                (row2, "Convert Selected", lambda: self.convert_nodes(self.selected_originals()),
+                 "Replace the selected nodes with quatNodes networks. One Ctrl+Z per node."),
+                (row2, "Convert All", lambda: self.convert_nodes(self.convertible_originals()),
+                 "Replace every non-referenced node in the scene.")):
             btn = QPushButton(label)
             btn.setToolTip(tip)
             btn.clicked.connect(slot)
             target.addWidget(btn)
+        self.btn_unload = QPushButton("Unload Plugin")
+        self.btn_unload.setToolTip("Unload SwingTwistEvaluatorPlugin - only when no original node is left,\n"
+                                   "so saved scenes no longer require it.")
+        self.btn_unload.clicked.connect(self.unload_plugin)
+        row1.addWidget(self.btn_unload)
         lay.addLayout(row1)
         lay.addLayout(row2)
         return page
@@ -259,8 +342,11 @@ class MainWindow(QWidget):
             self.le_name.setText(_short(sel[0]))
 
     def _on_tab_changed(self, index):
-        if self.tabs.widget(index) is self.tbl_rigs.parent():
+        page = self.tabs.widget(index)
+        if page is self.tbl_rigs.parent():
             self.refresh_rigs()
+        elif page is self.tbl_orig.parent():
+            self.refresh_originals()
 
     # ==================================================================
     # Twist 표
@@ -340,7 +426,7 @@ class MainWindow(QWidget):
         args = self.build_args()
         self.log("--- Build {0} ---".format(args["name"]))
         try:
-            holder = ST.build(log=self.log, **args)
+            holder = ST.build(log=self.log, wrap=self.chk_wrap.isChecked(), **args)
         except ST.SwingTwistError as exc:
             self.log("[ERROR] " + str(exc))
             return None
@@ -360,8 +446,14 @@ class MainWindow(QWidget):
         for h in holders:
             spec = ST.read_holder(h)
             twists = [j for j in spec["twist_joints"] if j]
+            container = ST.container_of(h)
+            if container:
+                container_text = container + (" (black box)" if cmds.getAttr(container + ".blackBox") else "")
+            else:
+                container_text = "-"
             values = [h, _short(spec["start_joint"]), _short(spec["swing_joint"]) or "-",
-                      str(len(twists)), "Yes" if spec["from_end"] else "-", str(len(ST.members(h)))]
+                      str(len(twists)), "Yes" if spec["from_end"] else "-", str(len(ST.members(h))),
+                      container_text, spec["source_name"] or "Built"]
             r = self.tbl_rigs.rowCount()
             self.tbl_rigs.insertRow(r)
             for c, v in enumerate(values):
@@ -392,16 +484,180 @@ class MainWindow(QWidget):
             self.log("[WARN] Select a network in the list first.")
         return holders
 
+    @staticmethod
+    def _face_nodes(holders):
+        """채널박스에 보일 노드 - container 로 묶였으면 container(공개 블렌드), 아니면 홀더."""
+        return [ST.container_of(h) or h for h in holders]
+
     def _on_rig_selection(self):
         holders = self.selected_holders()
         if holders:
-            cmds.select(holders, replace=True)
+            cmds.select(self._face_nodes(holders), replace=True)
 
     def select_holders(self):
         holders = self._need_holders()
         if holders:
-            cmds.select(holders, replace=True)
+            cmds.select(self._face_nodes(holders), replace=True)
             self.log("Selected {0} holder(s) - edit blends in the Channel Box.".format(len(holders)))
+
+    def wrap_rigs(self):
+        for h in self._need_holders():
+            had = ST.container_of(h)
+            container = ST.wrap_container(h)
+            self.log("{0} is already in {1}.".format(h, had) if had else "Wrapped {0} in {1}.".format(h, container))
+        self.refresh_rigs()
+
+    def unwrap_rigs(self):
+        for h in self._need_holders():
+            if ST.unwrap_container(h):
+                self.log("Unwrapped {0}.".format(h))
+            else:
+                self.log("[WARN] {0} is not in a container.".format(h))
+        self.refresh_rigs()
+
+    def toggle_black_box(self):
+        for h in self._need_holders():
+            container = ST.container_of(h)
+            if not container:
+                self.log("[WARN] {0} is not in a container.".format(h))
+                continue
+            on = not cmds.getAttr(container + ".blackBox")
+            ST.set_black_box(h, on)
+            self.log("{0} Black Box {1}.".format(container, "on" if on else "off"))
+        self.refresh_rigs()
+
+    def restore_rigs(self):
+        holders = self._need_holders()
+        if not holders:
+            return
+        if self.confirm_delete:
+            answer = QMessageBox.question(
+                self, "Restore Original",
+                "Replace these networks with original SwingTwistEvaluatorNode nodes?\n\n  - {0}\n\n"
+                "Needs Epic's SwingTwistEvaluatorPlugin. One Ctrl+Z per network.".format("\n  - ".join(holders)),
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if answer != QMessageBox.Yes:
+                self.log("Cancelled.")
+                return
+        for h in holders:
+            try:
+                ST.restore(h, log=self.log)
+            except (ST.SwingTwistError, RuntimeError) as exc:
+                self.log("[ERROR] {0}: {1}".format(h, str(exc).strip()))
+        self.refresh_rigs()
+        self.refresh_originals()
+
+    # ==================================================================
+    # Convert
+    # ==================================================================
+
+    def refresh_originals(self):
+        known = ST.original_type_known()
+        nodes = ST.list_original_nodes()
+        if known:
+            self.lbl_plugin.setText("Original plugin: loaded - {0} node(s) in the scene".format(len(nodes)))
+        else:
+            self.lbl_plugin.setText("Original plugin: not loaded")
+        self.btn_load_plugin.setEnabled(not known)
+        self.btn_unload.setEnabled(known and not nodes)
+
+        self.tbl_orig.setRowCount(0)
+        for n in nodes:
+            note = ""
+            try:
+                spec = ST.read_original(n)
+                values = [_short(spec["start_joint"]), _short(spec["swing_joint"]) or "-",
+                          str(len([j for j in spec["twist_joints"] if j])), "Yes" if spec["from_end"] else "-"]
+            except ST.SwingTwistError as exc:
+                values = ["?", "?", "?", "?"]
+                note = str(exc)
+            if cmds.referenceQuery(n, isNodeReferenced=True):
+                note = "Referenced - convert in the source file"
+            r = self.tbl_orig.rowCount()
+            self.tbl_orig.insertRow(r)
+            for c, v in enumerate([n] + values + [note]):
+                item = QTableWidgetItem(v)
+                if c == 0:
+                    item.setData(Qt.UserRole, n)
+                if note:
+                    item.setToolTip(note)
+                self.tbl_orig.setItem(r, c, item)
+        return nodes
+
+    def selected_originals(self):
+        rows = sorted({i.row() for i in self.tbl_orig.selectedIndexes()})
+        nodes = [self.tbl_orig.item(r, 0).data(Qt.UserRole) for r in rows]
+        return [n for n in nodes if cmds.objExists(n)]
+
+    def convertible_originals(self):
+        return [n for n in ST.list_original_nodes() if not cmds.referenceQuery(n, isNodeReferenced=True)]
+
+    def _on_orig_selection(self):
+        nodes = self.selected_originals()
+        if nodes:
+            cmds.select(nodes, replace=True)
+
+    def select_originals(self):
+        nodes = self.selected_originals()
+        if nodes:
+            cmds.select(nodes, replace=True)
+        else:
+            self.log("[WARN] Select a node in the list first.")
+
+    def load_plugin(self):
+        if ST.load_original_plugin():
+            self.log("Loaded {0}.".format(ST.ORIGINAL_PLUGIN))
+        else:
+            self.log("[ERROR] {0} not found - install MetaHuman for Maya or load it from the Plug-in Manager.".format(
+                ST.ORIGINAL_PLUGIN))
+        self.refresh_originals()
+
+    def unload_plugin(self):
+        if self.confirm_delete:
+            answer = QMessageBox.question(
+                self, "Unload Plugin",
+                "Unload {0}?\n\nMaya keeps the converted original nodes in the undo queue,\n"
+                "so the undo queue is cleared first - you cannot undo past this point.".format(ST.ORIGINAL_PLUGIN),
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if answer != QMessageBox.Yes:
+                self.log("Cancelled.")
+                return
+        if ST.unload_original_plugin(flush_undo=True):
+            self.log("Unloaded {0} - saved scenes no longer require it.".format(ST.ORIGINAL_PLUGIN))
+        else:
+            self.log("[WARN] Cannot unload - original nodes are still in the scene (or the plugin is not loaded).")
+        self.refresh_originals()
+
+    def convert_nodes(self, nodes):
+        """원본 노드들을 하나씩 변환한다(노드마다 undo 한 번). 변환한 홀더 목록."""
+        if not nodes:
+            self.log("[WARN] Nothing to convert.")
+            return []
+        samples = VERIFY_SAMPLES if self.chk_verify.isChecked() else 0
+        wrap = self.chk_wrap_convert.isChecked()
+        self.log("--- Convert {0} node(s) ---".format(len(nodes)))
+        done, failed = [], 0
+        dlg = JUN_mod_progress_qt_v01(self, title="Convert", phases=[("Converting", 100)])
+        dlg.start()
+        try:
+            dlg.begin_phase()
+            for k, n in enumerate(nodes):
+                dlg.step(k, len(nodes), n)
+                try:
+                    done.append(ST.convert(n, verify_samples=samples, wrap=wrap, log=self.log))
+                except (ST.SwingTwistError, RuntimeError) as exc:
+                    failed += 1
+                    self.log("[ERROR] {0}: {1}".format(n, str(exc).strip()))
+            dlg.step(len(nodes), len(nodes))
+        finally:
+            dlg.finish()
+        self.log("Converted {0}, failed {1}.".format(len(done), failed))
+        left = ST.list_original_nodes()
+        if not left and ST.original_type_known():
+            self.log("No original node left - Unload Plugin removes the plugin requirement from saved scenes.")
+        self.refresh_originals()
+        self.refresh_rigs()
+        return done
 
     def select_nodes(self):
         holders = self._need_holders()
@@ -476,5 +732,8 @@ class MainWindow(QWidget):
             "  (rotate order and joint orient are ignored, like the original).\n"
             "- Twist blend: 0 = cancel the start twist, 1 = zero rotation.\n"
             "- Swing blend: 0 = cancel the whole start rotation, 1 = cancel the twist only.\n"
-            "- Blends live on the holder node (<name>_SwingTwist).".format(VERSION, LAST_UPDATE),
+            "- Blends live on the holder node (<name>_SwingTwist), or on its container.\n\n"
+            "Build: create a new network.  Convert: replace existing SwingTwistEvaluatorNode nodes.\n"
+            "Rigs: select, wrap in a container, or restore the original node (for MetaHuman DNA export).".format(
+                VERSION, LAST_UPDATE),
         )

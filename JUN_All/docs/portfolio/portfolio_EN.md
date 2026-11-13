@@ -213,6 +213,8 @@ updated: 2026-11-13
   (eulerToQuat · quatNormalize · quatInvert · quatProd · quatSlerp · quatToEuler). It takes the same arguments as MetaHuman's `create_swing_twist_evaluator()`, so it drops into that slot, and the blends are edited from one holder node in the Channel Box.
 - **Result**: In a golden test that runs the original plugin side by side (9,000 random poses plus singular inputs such as 180° about Y/Z) the outputs match **down to the Euler values, max 2e-13°** — not just the same rotation but the same Euler branch.
   The test also caught that my first assumption, "blend 1 = no effect", is wrong for the swing output (at 1 it cancels the twist only), and the docs were corrected.
+- **Convert · Restore · Container (v01.01)**: existing plugin nodes in a scene are converted in place — the network is first built unconnected and compared with the original's outputs over random poses, and only then does the original get deleted (blend keys and driver connections are moved over *before* the delete, because an animCurve connected only to the deleted node dies with it).
+  A Restore button rebuilds the original node for MetaHuman's DNA export, and each network can be wrapped in a black-boxed Maya container that publishes the original attribute names, so it again behaves like a single node.
 - **Keywords**: MetaHuman, swing-twist decomposition, quaternion slerp, RigLogic, quatNodes, removing a plugin dependency, golden test (mayapy)
 
 ---

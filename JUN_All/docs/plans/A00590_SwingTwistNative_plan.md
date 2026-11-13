@@ -1,6 +1,6 @@
 # A00590_SwingTwistNative — 검토 + 계획서 (`SwingTwistEvaluatorNode` 를 마야 기본 노드로 대체)
 
-> **작성** 2026-11-03 · **갱신** 2026-11-13 · 상태: **v1 구현 중 — Build(새 노드망 생성)만**, Convert · Container 는 §9 · §10 계획 · 대상 Maya 2023 ~ 2026 (실측은 2024)
+> **작성** 2026-11-03 · **갱신** 2026-11-13 · 상태: **v01.00 Build · Rigs, v01.01 Convert(§9) · Container(§10) 구현** — 남은 것: GUI 확인 · 실제 MetaHuman 씬(§5-5) · Maya 2023 · 레퍼런스 container · 대상 Maya 2023 ~ 2026 (실측은 2024)
 > 요청: Epic MetaHuman for Maya 의 `SwingTwistEvaluatorNode` 의존성을 없애고 싶다 — 마야에 있는 노드만으로
 > 기능을 **완벽하게** 재현할 수 있는지 검토하고, 가능하면 제작 계획서를 만든다.
 > 원본: `~/Documents/maya/modules/MetaHumanForMaya/lib/SwingTwistEvaluatorPlugin/1.3.2/.../SwingTwistEvaluatorPlugin.mll`
@@ -173,7 +173,7 @@ fromEnd: end.rotate ─▶ eulerToQuat ─▶ quatNormalize(X/W) = twistEnd
 
 ---
 
-## 9. (다음 단계) Convert — 기존 `SwingTwistEvaluatorNode` 를 노드망으로
+## 9. Convert — 기존 `SwingTwistEvaluatorNode` 를 노드망으로 (v01.01 구현)
 
 §4-1 `read_plugin_node` · `convert` · `restore` 와 §4-2 Convert / Restore 탭을 그대로 구현한다. 순서와 세부:
 
@@ -191,7 +191,19 @@ fromEnd: end.rotate ─▶ eulerToQuat ─▶ quatNormalize(X/W) = twistEnd
 
 시험: §5-2 · 5-3 · 5-4. UI: Convert 탭(원본 목록 TSL + Convert Selected/All + Verify 옵션), Restore 는 Rigs 탭의 버튼으로.
 
-## 10. (다음 단계) Container — 노드망을 한 노드처럼
+**구현 결과 (2026-11-13, v01.01)** — `tests/test_swing_twist_convert.py` 50/50 · `test_swing_twist_tool.py` 59/59
+
+- 함수 이름은 `read_original(node)`(계획의 `read_plugin_node`). 검증은 `verify()` 를 따로 두지 않고 `convert` 안에서 —
+  망을 **출력 미연결**로 먼저 만들어 원본 출력 plug 와 망 quatToEuler 를 지금 포즈 + 무작위 N 포즈로 직접 비교(`VERIFY_TOLERANCE` 1e-6°).
+  넘으면 망을 지우고 원본은 그대로. 실측 2e-13°.
+- 실측 함정
+  - **원본에만 연결된 animCurve(블렌드 키)는 원본을 지우면 함께 지워진다** → 블렌드 입력을 원본 삭제 **전에** 홀더로 옮긴다.
+  - 원본 **출력 연결만 끊으면 unitConversion 이 남는다** → 원본을 지우면 함께 사라진다(지운 뒤 망 출력 연결).
+  - 변환으로 지운 원본 노드가 **undo 큐에 남아 `unloadPlugin` 이 "still in use" 로 거부** → `unload_original_plugin(flush_undo=True)`, UI 는 확인 창.
+  - 원본 노드는 attributeAffects 가 비어, MetaHuman 처럼 `twists[i]` 를 0 으로 setAttr 하면 입력이 바뀔 때까지 0 이 남는다 → Restore 끝에 `dgdirty`.
+- 실제 MetaHuman 씬(§5-5) · 성능은 아직 — 씬 경로 · DNA export 사용 여부를 사용자에게 받아야 한다.
+
+## 10. Container — 노드망을 한 노드처럼 (v01.01 구현)
 
 노드망은 평가기 하나당 10~20 개라, 바디 전체를 바꾸면 Outliner/Node Editor 에 수백 개가 흩어진다.
 마야 **`container`** 로 망 하나를 묶어 **원본 노드 하나를 다루던 감각**을 되살린다.
@@ -214,6 +226,14 @@ fromEnd: end.rotate ─▶ eulerToQuat ─▶ quatNormalize(X/W) = twistEnd
 - undo 한 번으로 Wrap/Unwrap 이 되돌아가는지([[undo-chunk-by-default]]).
 - Maya 2023 에서 같은 동작인지.
 - 대안 `assets`(Asset Editor) · `dagContainer` 는 쓰지 않는다 — DAG 아닌 DG 노드망이라 `container` 로 충분.
+
+**구현 결과 (2026-11-13, v01.01)**
+
+- `Wrap in Container` 는 Build · Convert 모두 **기본 켬**으로 넣었다(바꾸려면 체크 한 번 — 사용자 확인 대상).
+- 확인됨: container 안에서 결과 그대로(변환 대조 · 저장 · 다시 열기 후), container 블렌드 → 홀더 구동 · 키 가능, 조인트는 안 들어감,
+  Unwrap 후 망 그대로 · Unwrap undo 한 번, container 삭제 = 멤버 · 홀더까지 삭제, container 상태에서 Restore.
+- multi 는 `twistBlend[i]` 그대로 공개하지 않고 **`twistBlend<i>` · `twists<i>`** 로 원소마다 공개. double3 입출력은 마야가 X/Y/Z 자식도 함께 공개한다(`startJointX` …).
+- 아직: **레퍼런스로 불러온 container** 의 편집, Maya 2023. `container.iconName` 은 넣지 않았다(필요하면 다음).
 
 ---
 

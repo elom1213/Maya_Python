@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# A00590_SwingTwistNative v01.00 - 코어(검사 · 홀더 · undo · 저장) + UI 시험 (mayapy 오프스크린)
+# A00590_SwingTwistNative v01.01 - 코어(검사 · 홀더 · undo · 저장) + UI 시험(Convert 탭 · container 포함) (mayapy 오프스크린)
 #   "C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe" test_swing_twist_tool.py
 # 원본 플러그인과의 수치 비교는 test_swing_twist_golden.py.
 import os
@@ -141,7 +141,7 @@ win.confirm_delete = False
 win.show()
 APP.processEvents()
 check("6 window title", win.windowTitle().startswith("Swing Twist Native v"))
-check("6 tabs", [win.tabs.tabText(i) for i in range(win.tabs.count())] == ["Build", "Rigs"])
+check("6 tabs", [win.tabs.tabText(i) for i in range(win.tabs.count())] == ["Build", "Convert", "Rigs"])
 cmds.select(start)
 win._set_from_selection(win.le_start)
 check("6 Set fills start + name", win.le_start.text() == start and win.le_name.text() == start)
@@ -176,8 +176,62 @@ win.select_nodes()
 check("6 select nodes", len(cmds.ls(selection=True)) == len(ST.members(holder)))
 win.select_joints()
 check("6 select joints", set(cmds.ls(selection=True)) == {start, sw, t0, t1})
+check("6 Wrap in Container default -> container", ST.container_of(holder) == holder + ST.CONTAINER_SUFFIX
+      and win.tbl_rigs.item(0, 6).text().startswith(holder + ST.CONTAINER_SUFFIX))
+win.tbl_rigs.clearSelection()
+cmds.select(clear=True)
+win.tbl_rigs.selectRow(0)
+check("6 row click selects the container", cmds.ls(selection=True) == [holder + ST.CONTAINER_SUFFIX])
+win.toggle_black_box()
+check("6 black box toggle", not cmds.getAttr(holder + ST.CONTAINER_SUFFIX + ".blackBox"))
+win.tbl_rigs.selectRow(0)
+win.unwrap_rigs()
+check("6 unwrap from UI", ST.container_of(holder) is None and win.tbl_rigs.item(0, 6).text() == "-")
+win.tbl_rigs.selectRow(0)
+win.wrap_rigs()
+check("6 wrap from UI", ST.container_of(holder) is not None)
+win.tbl_rigs.selectRow(0)
 win.delete_rigs()
-check("6 delete from UI", ST.list_holders() == [] and win.tbl_rigs.rowCount() == 0)
+check("6 delete from UI", ST.list_holders() == [] and win.tbl_rigs.rowCount() == 0 and not cmds.ls(type="container"))
+# ---------------------------------------------------------------- 7. Convert 탭 (원본 플러그인 필요)
+if ST.load_original_plugin():
+    cmds.file(new=True, force=True)
+    win.refresh_originals()
+    j = {n: joint(n) for n in ("a_s", "a_sw", "a_t0", "b_s", "b_t0")}
+    origs = []
+    for tag, sw_j, tw in (("a", "a_sw", "a_t0"), ("b", None, "b_t0")):
+        n = cmds.createNode(ST.ORIGINAL_TYPE, name=tag + ST.ORIGINAL_SUFFIX)
+        cmds.connectAttr(tag + "_s.rotate", n + ".startJoint")
+        if sw_j:
+            cmds.connectAttr(n + ".swing", sw_j + ".rotate")
+        cmds.setAttr(n + ".twists[0]", 0, 0, 0)
+        cmds.setAttr(n + ".twistBlend[0]", 0.3)
+        cmds.connectAttr(n + ".twists[0]", tw + ".rotate")
+        origs.append(n)
+    win.tabs.setCurrentIndex(1)
+    APP.processEvents()
+    check("7 convert tab lists originals", win.tbl_orig.rowCount() == 2 and "loaded - 2" in win.lbl_plugin.text(),
+          win.lbl_plugin.text())
+    check("7 unload disabled while nodes remain", not win.btn_unload.isEnabled())
+    win.tbl_orig.selectRow(0)
+    done = win.convert_nodes(win.selected_originals())
+    check("7 convert selected", done == ["a_SwingTwist"] and win.tbl_orig.rowCount() == 1 and ST.container_of("a_SwingTwist"), done)
+    win.chk_wrap_convert.setChecked(False)
+    done = win.convert_nodes(win.convertible_originals())
+    check("7 convert all (no wrap)", done == ["b_SwingTwist"] and ST.container_of("b_SwingTwist") is None, done)
+    check("7 unload enabled when none left", win.btn_unload.isEnabled() and win.tbl_orig.rowCount() == 0)
+    win.tbl_rigs.clearSelection()
+    rows = {win.tbl_rigs.item(r, 0).text(): r for r in range(win.tbl_rigs.rowCount())}
+    check("7 rigs show source", win.tbl_rigs.item(rows["a_SwingTwist"], 7).text() == "a" + ST.ORIGINAL_SUFFIX)
+    win.tbl_rigs.selectRow(rows["b_SwingTwist"])
+    win.restore_rigs()
+    check("7 restore from UI", ST.list_original_nodes() == ["b" + ST.ORIGINAL_SUFFIX] and win.tbl_orig.rowCount() == 1)
+    win.convert_nodes(win.convertible_originals())
+    win.unload_plugin()
+    check("7 unload plugin from UI", not ST.original_type_known() and "not loaded" in win.lbl_plugin.text())
+else:
+    print("SKIP 7 - original plugin not available")
+
 ascii_ok = all(s.isascii() for s in (win.windowTitle(), MW.BLEND_TIP, win.btn_build.toolTip(), win.log_view.toPlainText()))
 check("6 UI strings are English ascii", ascii_ok)
 win.close()
