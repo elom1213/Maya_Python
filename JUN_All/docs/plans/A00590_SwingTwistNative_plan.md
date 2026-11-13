@@ -1,6 +1,6 @@
 # A00590_SwingTwistNative — 검토 + 계획서 (`SwingTwistEvaluatorNode` 를 마야 기본 노드로 대체)
 
-> **작성** 2026-11-03 · 상태: **검토 완료 · 계획 (구현 전)** · 대상 Maya 2023 ~ 2026 (실측은 2024)
+> **작성** 2026-11-03 · **갱신** 2026-11-13 · 상태: **v1 구현 중 — Build(새 노드망 생성)만**, Convert · Container 는 §9 · §10 계획 · 대상 Maya 2023 ~ 2026 (실측은 2024)
 > 요청: Epic MetaHuman for Maya 의 `SwingTwistEvaluatorNode` 의존성을 없애고 싶다 — 마야에 있는 노드만으로
 > 기능을 **완벽하게** 재현할 수 있는지 검토하고, 가능하면 제작 계획서를 만든다.
 > 원본: `~/Documents/maya/modules/MetaHumanForMaya/lib/SwingTwistEvaluatorPlugin/1.3.2/.../SwingTwistEvaluatorPlugin.mll`
@@ -62,7 +62,10 @@ twistOut_i = slerp(base, identity, twistBlend_i)
 출력 오일러 = quat → euler(XYZ)
 ```
 
-- `blend = 0` → 입력 회전을 **완전히 상쇄**, `blend = 1` → 0 (영향 없음). 직관과 반대이므로 UI · 문서에 적는다.
+- 블렌드는 출력을 "완전한 역회전(0)" → identity(1) 로 민다. 직관과 반대이므로 UI · 문서에 적는다.
+  - twist: `0` → 시작 트위스트 **상쇄**(fromEnd 면 end 트위스트 복사), `1` → 회전 0.
+  - swing: `0` → 시작 회전 **전체 상쇄**(= inverse(q)), `1` → **시작 트위스트만 상쇄**(= invTwist, 0 이 아니다).
+    (2026-11-13 정정 — 처음 "1 = 영향 없음" 이라 적었는데 그건 twist 만 맞다. v1 시험에서 확인)
 - 블렌드는 0~1 밖도 허용된다(외삽) — 프로토타입도 같은 값.
 
 ## 3. 마야 노드 대응 (프로토타입 그대로)
@@ -148,6 +151,69 @@ fromEnd: end.rotate ─▶ eulerToQuat ─▶ quatNormalize(X/W) = twistEnd
 2. **실제 MetaHuman 테스트 씬** 경로.
 3. **DNA 내보내기를 계속 쓰는지** — 쓴다면 `Restore` 가 필수, 안 쓰면 3단계를 뒤로 미룬다.
 4. `quatNodes`(Autodesk 동봉) 사용 허용 여부 — 허용 안 하면 완벽 재현은 불가(§0).
+
+**2026-11-13 사용자 답 · 범위 결정**
+
+- 툴은 새 툴 **`A00590_SwingTwistNative`**. 번호 확인: `tools/` 에 A00580 다음이 A00600 이라 590 은 비어 있다(이 계획서가 잡아 둔 번호).
+- 계획서대로 진행 → quatNodes 사용(허용으로 본다).
+- **v1 = `SwingTwistEvaluatorNode` 를 대체하는 마야 노드망 생성(Build) 만.** 아래 두 기능은 "급하지 않음" — 계획만 적고 다음 단계로 미룬다.
+  1. 기존 `SwingTwistEvaluatorNode` → 마야 노드망 **변환(Convert)** — §9
+  2. 노드망을 **container 로 묶어 한 노드처럼** 다루기 — §10
+- 실제 MetaHuman 씬 · DNA export 사용 여부는 아직 미정 → Convert 단계(§9) 에서 다시 묻는다.
+
+**v1 범위 (§7 1단계 + 4단계 중 Build 탭)**
+
+| 산출물 | 내용 |
+|--------|------|
+| `Framework/core/maya_swing_twist.py` | `build()` · 홀더 · `list_holders()` · `members()` · `delete_rig()` · `set_blends()` |
+| `tests/test_swing_twist_golden.py` | 원본 플러그인 vs `build()` 골든 시험(§5-1) — 플러그인이 없는 PC 에선 수식 모델로 대조 |
+| `tools/A00590_SwingTwistNative` | **Build** 탭(조인트 · 블렌드 · fromEnd → Build) + **Rigs** 탭(만든 홀더 목록 · Select · Delete · 블렌드 편집) |
+
+홀더는 v1 부터 **멤버 노드 목록**(`nodes[]` message)을 갖는다 — §9 Restore 와 §10 Container 가 이 목록으로 망 전체를 찾는다.
+
+---
+
+## 9. (다음 단계) Convert — 기존 `SwingTwistEvaluatorNode` 를 노드망으로
+
+§4-1 `read_plugin_node` · `convert` · `restore` 와 §4-2 Convert / Restore 탭을 그대로 구현한다. 순서와 세부:
+
+1. **읽기** `read_plugin_node(node)` → `SwingTwistSpec`(v1 `build()` 인자와 같은 모양):
+   - `startJoint`/`endJoint` 입력의 소스 조인트 = `listConnections(plug, s=True, d=False, skipConversionNodes=True)`.
+   - `swing` 출력 · `twists[i]` 출력의 목적지 조인트(unitConversion 건너뜀). `twists` 는 **논리 인덱스 순서**로, 빈 인덱스는 `None` 으로 자리 유지.
+   - 블렌드 = 값 + **입력 연결 소스 plug**(있으면). fromEnd 값(연결돼 있으면 경고 — v1 구조는 빌드 시 고정, §6).
+   - start 가 조인트가 아니라 다른 노드 plug 면(예: 다른 평가기 출력) 그 plug 를 그대로 소스로 기억.
+2. **생성** `build(spec)` — 이름은 원본 노드 이름 기준(`<name>_SwingTwistEvalNode` → `<name>`).
+3. **옮기기** — 원본 출력 연결 끊기 → 새 망 출력을 같은 조인트 `.rotate` 에 연결 · 블렌드 소스 plug 는 홀더로 재연결.
+4. **원본 삭제** + 홀더 `sourceNodeType = "SwingTwistEvaluatorNode"`, `sourceName` 기록. 전부 `undo_chunk` 한 덩어리.
+5. **검증** `verify()` — 변환 전에 무작위 포즈 N 개의 출력 조인트 월드 행렬을 저장 → 변환 후 같은 포즈 재생 → 1e-9 비교. 실패면 undo 하고 로그.
+6. **Restore** — 홀더 메타데이터로 원본 노드를 다시 만들고 노드망 삭제(플러그인이 로드돼 있을 때만). DNA export 용.
+7. 레퍼런스 노드는 건너뜀 + 로그. 다 바꾸고 남은 원본이 0 이면 `Unload Plugin` 버튼 활성.
+
+시험: §5-2 · 5-3 · 5-4. UI: Convert 탭(원본 목록 TSL + Convert Selected/All + Verify 옵션), Restore 는 Rigs 탭의 버튼으로.
+
+## 10. (다음 단계) Container — 노드망을 한 노드처럼
+
+노드망은 평가기 하나당 10~20 개라, 바디 전체를 바꾸면 Outliner/Node Editor 에 수백 개가 흩어진다.
+마야 **`container`** 로 망 하나를 묶어 **원본 노드 하나를 다루던 감각**을 되살린다.
+
+| 항목 | 설계 |
+|------|------|
+| 묶는 단위 | 평가기(홀더) 하나 = container 하나 `<name>_SwingTwist_CTN`. 멤버 = 홀더 `nodes[]` 전부 + 홀더 자신 |
+| 만들기 | `cmds.container(name=..., addNode=members, includeNetwork=False, includeHierarchyBelow=False)` — 조인트는 **절대 넣지 않는다**(includeNetwork 를 켜면 연결된 조인트까지 빨려 들어간다) |
+| 공개 어트리뷰트 | 홀더의 `swingBlend`, `twistBlend[i]` 를 `container -e -publishAndBind` 로 공개 → Channel Box · Attribute Editor 에서 container 하나만 고르고 블렌드 편집. 입력/출력도 원본 이름(`startJoint` · `endJoint` · `swing` · `twists[i]`)으로 공개해 Node Editor 에서 원본 노드와 같은 모양 |
+| 숨기기 | `blackBox = True` — Outliner/Node Editor 에서 안이 보이지 않고 한 노드로 보인다. 툴에 `Black Box` 토글(디버그 때 펼치기) |
+| 옵션 | Build · Convert 에 `Wrap in Container` 체크(기본 켬 예정 — 단계에서 사용자 확인). 기존 망에는 Rigs 탭 `Wrap` / `Unwrap` 버튼 |
+| 지우기 | container 삭제 = 멤버까지 삭제(마야 기본). `delete_rig()` 는 container 가 있으면 그것 하나만 지운다 |
+| 아이콘 | `container.iconName` 에 툴 아이콘 — Outliner 에서 구분 |
+
+**확인할 함정(실측 후 확정)**
+
+- container 에 넣은 노드의 **연결 · 평가 · 결과가 그대로**인지(골든 시험을 container 버전으로 한 번 더).
+- `publishAndBind` 한 이름이 원본 어트리뷰트 이름과 겹칠 때 동작, multi(`twistBlend[i]`) 공개 방식.
+- **레퍼런스로 불러온 container** 의 blackBox · 공개 어트리뷰트 편집이 레퍼런스 편집으로 남는지.
+- undo 한 번으로 Wrap/Unwrap 이 되돌아가는지([[undo-chunk-by-default]]).
+- Maya 2023 에서 같은 동작인지.
+- 대안 `assets`(Asset Editor) · `dagContainer` 는 쓰지 않는다 — DAG 아닌 DG 노드망이라 `container` 로 충분.
 
 ---
 

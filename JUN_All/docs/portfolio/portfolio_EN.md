@@ -2,13 +2,13 @@
 title: Portfolio — Work Summary (2026-05-06 ~ 2026-10-12)
 aliases: [Portfolio EN]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-11-11
+updated: 2026-11-13
 ---
 
 # Technical Artist / Pipeline TD — Work Summary (EN)
 
 > **Author**: Ji Hun Park (Junny)
-> **Period**: 2026-05-06 – 2026-11-11 (~27 weeks)
+> **Period**: 2026-05-06 – 2026-11-13 (~27 weeks)
 > **Scope**: Autodesk Maya tool development · Unreal Engine bridging · MetaHuman facial · pipeline infrastructure
 > **Volume**: 50+ in-house tools (64 tool folders) · one shared framework powering all of them · 299 commits counted through 2026-07-15
 > **Stack**: Python 3, `maya.cmds` / OpenMaya, PySide2 & PySide6 (Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF Pose Driver), Houdini Alembic caches
@@ -203,6 +203,17 @@ updated: 2026-11-11
   inference, Montreal Forced Aligner (forced alignment), IPA phoneme mapping, faster-whisper / CTranslate2 local STT, text
   normalization (numerals · kanji numerals), multilingual dubbing (EN · KO · JA), PySide standalone + QThread, ARKit 52
   mapping, MetaHuman facial, dummy hub-node rig, `remapValue`, Maya reference edits, fork · lock file · installer bats
+
+### 1-8. MetaHuman `SwingTwistEvaluatorNode` without Epic's plugin — an exact rebuild from Maya's own quaternion nodes
+`A00590_SwingTwistNative` · shared `Framework/core/maya_swing_twist.py`
+
+- **Problem**: MetaHuman for Maya's body twist/swing rig depends on Epic's C++ plugin node (`SwingTwistEvaluatorNode`); without the plugin the scene will not evaluate the rig.
+- **What I did**: Inspected the plugin's attributes through the API and matched them against UE RigLogic's `TwistSwingJointsEvaluator` source to pin down the math
+  (X-axis twist extraction, shortest-path slerp, the asymmetric `fromEnd` rule), then built a tool that recreates the same network from Maya's bundled `quatNodes` only
+  (eulerToQuat · quatNormalize · quatInvert · quatProd · quatSlerp · quatToEuler). It takes the same arguments as MetaHuman's `create_swing_twist_evaluator()`, so it drops into that slot, and the blends are edited from one holder node in the Channel Box.
+- **Result**: In a golden test that runs the original plugin side by side (9,000 random poses plus singular inputs such as 180° about Y/Z) the outputs match **down to the Euler values, max 2e-13°** — not just the same rotation but the same Euler branch.
+  The test also caught that my first assumption, "blend 1 = no effect", is wrong for the swing output (at 1 it cancels the twist only), and the docs were corrected.
+- **Keywords**: MetaHuman, swing-twist decomposition, quaternion slerp, RigLogic, quatNodes, removing a plugin dependency, golden test (mayapy)
 
 ---
 

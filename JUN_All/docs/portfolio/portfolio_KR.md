@@ -2,13 +2,13 @@
 title: 포트폴리오 작업 내역 (2026-05-06 ~ 2026-10-12)
 aliases: [Portfolio KR, 포트폴리오 국문]
 tags: [portfolio, technical-artist, pipeline, unreal, metahuman]
-updated: 2026-11-11
+updated: 2026-11-13
 ---
 
 # Technical Artist / Pipeline TD 작업 내역 — 국문
 
 > **작성자**: 박지훈 (Ji Hun Park / Junny)
-> **기간**: 2026-05-06 ~ 2026-11-11 (약 27주)
+> **기간**: 2026-05-06 ~ 2026-11-13 (약 27주)
 > **범위**: Autodesk Maya 툴 개발 · 언리얼 엔진 연동 자동화 · MetaHuman 페이셜 · 파이프라인 인프라
 > **규모**: 사내 툴 50여 종(툴 폴더 64개) · 전 툴 공용 프레임워크 1식 · 커밋 299건(2026-07-15 기준 집계)
 > **스택**: Python 3, `maya.cmds` / OpenMaya, PySide2·PySide6(Qt), PyInstaller, Unreal Engine (Control Rig / KawaiiPhysics / RBF), Houdini Alembic 캐시 연동
@@ -176,6 +176,17 @@ updated: 2026-11-11
 - **키워드**: VisemeNet, JALI (Jaw/Lip viseme field), 오디오 구동 립싱크, TensorFlow frozen graph 패치, dropout 추론, Montreal Forced Aligner(강제 정렬),
   IPA 음소 매핑, faster-whisper / CTranslate2 로컬 STT, 텍스트 정규화(수사 · 漢数字), 다국어 더빙(영 · 한 · 일), PySide 스탠드얼론 + QThread,
   ARKit 52 매핑, MetaHuman 페이셜, 더미 허브 노드 리그, `remapValue`, 마야 레퍼런스 편집, 포크 · 잠금 파일 · 설치 bat
+
+### 1-8. MetaHuman `SwingTwistEvaluatorNode` 를 에픽 플러그인 없이 — 마야 기본 쿼터니언 노드망으로 완벽 재현
+`A00590_SwingTwistNative` · 공용 `Framework/core/maya_swing_twist.py`
+
+- **문제**: MetaHuman for Maya 의 바디 트위스트 · 스윙 리그는 Epic 의 C++ 플러그인 노드(`SwingTwistEvaluatorNode`)에 의존해, 플러그인이 없는 환경에서는 씬이 열리지 않거나 리그가 멈춥니다.
+- **한 일**: 플러그인의 어트리뷰트를 API 로 조사하고 UE RigLogic `TwistSwingJointsEvaluator` 소스와 대조해 계산식(X 축 트위스트 추출 · 최단 경로 slerp · `fromEnd` 의 비대칭 규칙)을 확정한 뒤,
+  마야에 동봉된 `quatNodes`(eulerToQuat · quatNormalize · quatInvert · quatProd · quatSlerp · quatToEuler)만으로 같은 망을 세우는 툴을 만들었습니다.
+  MetaHuman `create_swing_twist_evaluator()` 와 같은 인자를 받아 그 자리에 바로 쓸 수 있고, 블렌드는 홀더 노드 하나에서 Channel Box 로 고칩니다.
+- **결과**: 원본 플러그인과 나란히 놓은 골든 시험(무작위 9,000 포즈 + Y/Z 180° 같은 특이 입력)에서 **오일러 값까지 최대 2e-13° 차이** — 같은 회전일 뿐 아니라 같은 오일러 가지를 냅니다.
+  시험 중 "blend 1 = 영향 없음" 이라는 처음 가정이 스윙 출력에는 틀린다는 것(1 이면 트위스트만 상쇄)을 찾아 문서를 바로잡았습니다.
+- **키워드**: MetaHuman, Swing-Twist 분해, 쿼터니언 slerp, RigLogic, quatNodes, 플러그인 의존 제거, 골든 테스트(mayapy)
 
 ---
 

@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # 작업 일지 (WORKLOG)
@@ -31,7 +31,17 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-11-12 (오늘)
+## 2026-11-13 (오늘)
+
+> [!summary] **`A00590_SwingTwistNative` 신규 v01.00 — MetaHuman `SwingTwistEvaluatorNode` 를 quatNodes 망으로 만들기** `#A00590_SwingTwistNative`
+- 요청: 계획서(11-03) 대로 툴 제작. 기존 노드 변환(Convert) · container 로 한 노드처럼 다루기는 "급하지 않음" → 계획서 §9 · §10 에 기록, v1 = 대체 노드망 생성만.
+- 번호: `tools/` 에 A00580 다음이 A00600 → 590 은 계획서가 잡아 둔 빈 번호 그대로.
+- 코어 공용 `Framework/core/maya_swing_twist.py` — `build()`(MetaHuman `create_swing_twist_evaluator` 와 같은 인자) · 홀더 network(`swingBlend` · `twistBlend[]` · 조인트 message · 멤버 `nodes[]`) · `read_holder` · `delete_rig`, 입력 검사(이미 구동 중 · 잠김 · 순환 · 중복), undo 한 번.
+- 툴: Build 탭(Start/End/Swing + Twist 표 + From End) · Rigs 탭(목록 · Select Holder/Nodes/Joints · Load to Build · Delete), 아이콘 · `__dragDrop_A00590` · 문서 `A00590_SwingTwistNative.md`.
+- ★ 정정: 계획서 §2 의 "blend 1 = 영향 없음" 은 **twist 만** 맞다 — swing 은 1 에서 **트위스트만 상쇄**(invTwist). UI · 문서 · 계획서 고침.
+- 시험: 골든(원본 플러그인과 나란히, 1500 × 6 구성 + 특이 44) 16/16, 최대 오일러 2.1e-13° · 행렬 3.8e-15 · 툴(검사 · 홀더 · undo/redo · 저장 · 재열기 · UI 오프스크린) 46/46. **GUI 확인 아직.**
+
+## 2026-11-12
 
 > [!summary] A00110_animTool_V02 **v02.61 Locator > Constrain 을 레이어 없이 · Bake 탭으로 굽기** `#A00110_animTool_V02`
 - 요청: LOC_Constraint 레이어를 만들지 말고, 컨스트레인트 웨이트를 구간만 1 · 밖 0 으로 → Bake 탭으로 구우면 되지 않나. 검증 후 "그대로 구현".

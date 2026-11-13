@@ -43,6 +43,7 @@
 | `A00560_JaliBatch` | 페이셜 / 립싱크 **대량** (standalone) — VisemeNet 변환 결과 폴더 → 대사마다 JALI 컨트롤러를 레퍼런스하고 키를 베이크한 **클립 `.mb`**(mayapy 워커 한 프로세스, 도장 + 매니페스트) · Validate / Repath | [A00560_JaliBatch](A00560_JaliBatch.md) |
 | `A00570_JaliReview` | 페이셜 / 립싱크 **검수** (in-Maya) — 아바타 + 클립 레퍼런스(ns CLIP), Prev/Next/Swap, 레퍼런스 커브 편집 → Save Clip Edits(`saveReference`), ARKIT_OUT → 블렌드셰이프 연결 | [A00570_JaliReview](A00570_JaliReview.md) |
 | `A00580_FacialBoardBuilder` | 페이셜 — ARKit 52 컨트롤 보드(`Ctl_Only_V05`)를 명세 json 에서 생성 · CSV 베이크 · 검증 (헤드리스, UE Control Rig 는 2단계) | [A00580_FacialBoardBuilder](A00580_FacialBoardBuilder.md) |
+| `A00590_SwingTwistNative` | 리깅 / MetaHuman — Epic `SwingTwistEvaluatorNode` 를 마야 동봉 `quatNodes` 망으로 대체(원본과 오일러 값까지 같음, 에픽 플러그인 불필요) · Build + Rigs. Convert · Container 는 다음 단계 | [A00590_SwingTwistNative](A00590_SwingTwistNative.md) |
 | `A00380_MeshTool` | 모델링 / 메시 진단 · 편집 (MeshDoctor · Peak · Match) | [A00380_MeshTool](A00380_MeshTool.md) |
 | `A00300_meshDoctor` | 〃 (A00380 의 MeshDoctor 탭으로 이식됨 · 보존) | [A00300_meshDoctor](A00300_meshDoctor.md) |
 

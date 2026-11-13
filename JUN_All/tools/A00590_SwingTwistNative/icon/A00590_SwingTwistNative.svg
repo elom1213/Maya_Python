@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+  <!-- swing: 뼈대가 호를 그리며 흔들림 -->
+  <path d="M7 24 A15 15 0 0 1 22 9" fill="none" stroke="#b48cff" stroke-width="1.6" stroke-dasharray="2.2 2"/>
+  <line x1="8" y1="25" x2="22" y2="11" stroke="#e8e8ec" stroke-width="2.6" stroke-linecap="round"/>
+  <circle cx="8" cy="25" r="2.6" fill="#b48cff"/>
+  <!-- twist: 뼈 축을 감는 화살표 -->
+  <ellipse cx="17" cy="16" rx="6" ry="2.6" transform="rotate(-45 17 16)" fill="none" stroke="#ffb347" stroke-width="1.7"/>
+  <path d="M22.2 14.2 l2.6 -0.4 l-0.9 2.5 z" fill="#ffb347"/>
+</svg>
