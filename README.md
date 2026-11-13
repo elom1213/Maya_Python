@@ -4,7 +4,7 @@
 독립 실행(standalone) Qt 앱을 직접 설계·개발한 포트폴리오 저장소입니다.
 
 > 작성자: **Ji Hun Park (Junny)** · Technical Artist / Rigging & Pipeline Tools Developer
-> 최근 갱신: 2026-11-12 · 툴 폴더 **75개**(템플릿·구버전 포함, **현행 60종**) · 공용 프레임워크 1개
+> 최근 갱신: 2026-11-13 · 툴 폴더 **76개**(템플릿·구버전 포함, **현행 61종**) · 공용 프레임워크 1개
 
 ---
 
@@ -187,6 +187,7 @@ A narrative work summary lives in
 
 | 시기 | 내용 |
 |------|------|
+| 2026-11-13 | **`A00590_SwingTwistNative` 신규 v01.00** — MetaHuman `SwingTwistEvaluatorNode`(Epic 플러그인)를 마야 동봉 `quatNodes` 망으로 생성(공용 `Framework/core/maya_swing_twist.py`, `create_swing_twist_evaluator` 와 같은 인자), 원본과 나란히 놓은 골든 시험에서 오일러 값까지 최대 2e-13° · Build / Rigs 탭 · 기존 노드 Convert · Container 는 다음 단계 |
 | 2026-11-12 | **`A00110_animTool_V02` v02.58~61 Bake > Locator > Constrain** — 애니메이션 레이어(BaseAnimation + 다른 레이어)에 키가 있는 컨트롤러에도 컨스트레인트, **Blend only in Frame Range**(기본 켬) — `blendParent1` step 키로 Start ~ End 만 로케이터 · 밖은 원래 움직임, 레이어 없이 → Bake > Bake 로 굽고 로케이터를 지우면 키만으로 같은 움직임(Bake 탭이 구간 밖 키 모양 보존) · v02.60 View > Layers — 고른 오브젝트가 든 레이어에 타원 표시 |
 | 2026-11-11 | **`A00620_NameDecoder` v01.02~06 Outliner 탭** — 마야 아웃라이너가 못 그리는 일본어 · 중국어(FBXASC) 이름을 노드 타입 아이콘 + DAG 계층으로, Scope · Shapes · blendShape 타겟 자식 행 · 계층 필터(맞는 행 + 조상) · Sync, Alt + 가운데 버튼 드래그로 위아래 이동(공용 `maya_icons` · `MOD_altPan`), Raw 칸 접기 · 창 가로 크기 자유 조절 · Sync 는 부모를 펼치지 않고 부모 행을 옅게(마야처럼) · `A00110_animTool_V02` v02.57 Copy Key — Target 잠긴 채널은 건너뛰기 · `A00500_reloader` v01.01 패키지 재노출 옛 클래스 다시 잡기(첫 셸프 클릭 AttributeError) |
 | 2026-11-10 | **`A00410_SecondaryMotion` v01.12 Solver: Physics Asset** — 언리얼 Physics Asset 흉내: 체인 루트만 애니메이션을 따르고 나머지는 중력 · 관성 · Swing 1/2 한계로만 움직인다(자식 회전 키 무시 — KawaiiPhysics 와 반대), Start From animation / Settled · Collision None / Ground · `A00110_animTool_V02` v02.56 Bake > Locator `Fast - parents don't move` — 씬 재생 없이 굽기(무거운 씬 0.87 s → 0.14 s), 일반 경로 rotateAxis 어긋남 수정 |
