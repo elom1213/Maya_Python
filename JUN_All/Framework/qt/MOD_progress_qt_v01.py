@@ -50,9 +50,31 @@ DemBone(A00430)은 메인 창에 붙은 QProgressBar, Wrapper(A00420)는 로그 
 
 취소
 ----
-`cancellable=True` 면 Cancel 버튼이 생기고 `was_cancelled()` 가 True 가 된다. **중단
-지점이 안전한 작업에만** 켤 것 — 씬을 반쯤 고쳐 놓고 멈추면 안 되는 작업은 기본값(False)
-그대로 두고 창을 닫지도 못하게 둔다(닫기 버튼 없음, Esc 무시).
+`cancellable=True` 면 Cancel 버튼이 생기고(Esc 도 같다) `was_cancelled()` 가 True 가 된다.
+기본값(False)은 버튼이 없고 창을 닫지도 못한다(닫기 버튼 없음, Esc 무시).
+
+**Cancel = 실행 전으로 자동 되돌리기** (2026-11-16, 사용자 요청) — 작업을 `run_undoable` 로 돌린다:
+
+    dlg = JUN_mod_progress_qt_v01(self, title="Bake", phases=[...], cancellable=True)
+    dlg.start()
+    try:
+        result, cancelled = dlg.run_undoable(core.bake, nodes, start, end, progress=dlg.callback())
+    finally:
+        dlg.finish()
+    if cancelled:
+        self.log("[Warning] Cancelled - the scene is back to before the run.")
+
+  1. Cancel 을 누르면 **다음 진행 보고**(`step` / `set_fraction` / `begin_phase`)가 `ProgressCancelled` 를 던진다.
+     core 는 이 위젯을 몰라도 된다 — 콜백이 던지는 예외로 루프가 끊긴다.
+     `ProgressCancelled` 는 **BaseException** 이다: core 의 `except Exception:` 정리 코드가 삼키지 않고 통과한다
+     (그래도 삼키는 core 가 있으면 `was_cancelled()` 로 다시 본다).
+  2. `run_undoable` 은 작업 전체를 **undo 덩어리 하나**로 감싸고, 취소면 그 덩어리를 `cmds.undo()` 한 번으로 되돌린다
+     + 현재 시간 복원. 덩어리 맨 앞에 **표식 노드를 만들었다 지운다** — ★ 마야는 아무 변경 없는 빈 덩어리를 큐에
+     남기지 않아서(mayapy 실측), 첫 변경 전에 취소하면 `undo` 가 사용자가 **그 전에 한 작업**을 되돌린다.
+  3. ★ C++ 한 번 호출(`bakeResults` 등)은 중간에 못 끊는다 — 그 안에서 부르는 시간 변경 콜백이 예외를 던져도 마야가
+     삼키고 끝까지 돈다(실측). 그런 작업은 그 호출이 끝난 직후의 첫 진행 보고에서 멈추고 되돌린다.
+     마야 콜백 안에서 진행을 보고하는 core 는 그 콜백에서 `BaseException` 까지 잡을 것(안 그러면 프레임마다 에러 출력).
+  4. undo 가 꺼져 있으면(`undoInfo -state off`) 되돌릴 수 없다 — 작업은 그대로 멈추고 `reverted` 가 False.
 """
 
 import time
@@ -62,6 +84,10 @@ from Framework.qt.qt import *
 
 # 다시 그리는 최소 간격(초). 이보다 자주 오는 갱신은 값만 반영하고 그리지 않는다.
 _MIN_INTERVAL = 0.03
+
+
+class ProgressCancelled(BaseException):
+    """Cancel 뒤 다음 진행 보고에서 던진다. BaseException - core 의 `except Exception` 이 삼키지 않게."""
 
 # 게이지 색은 툴 테마(qss)를 타지만, 홈이 배경에 묻히는 coral_dark 대비용으로 직접 그린다.
 PROGRESS_STYLE = """
@@ -84,6 +110,7 @@ class JUN_mod_progress_qt_v01(QDialog):
 
         self._cancellable = bool(cancellable)
         self._cancelled = False
+        self.reverted = False  # run_undoable 이 취소된 작업을 되돌렸는가
 
         self._phases = []      # [(label, weight), ...]
         self._bounds = []      # [(base, span), ...] 0~1 로 정규화된 단계 구간
@@ -220,9 +247,10 @@ class JUN_mod_progress_qt_v01(QDialog):
     def set_fraction(self, fraction, message=None, force=False):
         """전체 진행(0.0~1.0)을 직접 지정한다."""
         self._fraction = max(0.0, min(1.0, float(fraction)))
-        if message is not None:
+        if message is not None and not self._cancelled:
             self.lbl_detail.setText(str(message))
         self._draw(force=force)
+        self.check_cancel()
 
     def set_message(self, text):
         self.lbl_detail.setText(str(text))
@@ -290,7 +318,53 @@ class JUN_mod_progress_qt_v01(QDialog):
     def was_cancelled(self):
         return self._cancelled
 
+    def check_cancel(self):
+        """Cancel 을 눌렀으면 ProgressCancelled 를 던진다(진행 보고마다 부른다 - core 가 직접 불러도 된다)."""
+        if self._cancellable and self._cancelled:
+            raise ProgressCancelled()
+
+    def run_undoable(self, fn, *args, **kwargs):
+        """fn(*args, **kwargs) 를 undo 덩어리 하나로 돌린다. Cancel 이면 그 덩어리를 되돌린다. 반환 (결과, cancelled).
+
+        되돌렸으면 `self.reverted` = True. maya.cmds 는 여기서만 import (위젯 자체는 마야 밖에서도 쓴다)."""
+        import maya.cmds as cmds
+
+        self.reverted = False
+        can_undo = bool(cmds.undoInfo(q=True, state=True))
+        cur = cmds.currentTime(q=True)
+        result, cancelled = None, False
+        if can_undo:
+            cmds.undoInfo(openChunk=True, chunkName="JUN_progress_run")
+        try:
+            if can_undo:
+                # 표식: 빈 덩어리는 큐에 안 남는다 -> 아무것도 안 바뀐 채 취소해도 undo 가 이 덩어리를 가리키게
+                marker = cmds.createNode("network", name="JUN_progress_marker", skipSelect=True)
+                cmds.delete(marker)
+            result = fn(*args, **kwargs)
+        except ProgressCancelled:
+            cancelled = True
+        finally:
+            if can_undo:
+                cmds.undoInfo(closeChunk=True)
+        if self._cancelled:            # core 가 예외를 삼켰어도 취소는 취소
+            cancelled = True
+        if cancelled:
+            result = None
+            if can_undo:
+                self.lbl_detail.setText("Reverting...")
+                QApplication.processEvents()
+                cmds.undo()
+                self.reverted = True
+            try:
+                if cmds.currentTime(q=True) != cur:    # 같으면 건드리지 않는다(mayapy 에선 시간 변경도 undo 큐에 쌓인다)
+                    cmds.currentTime(cur, edit=True)
+            except Exception:
+                pass
+        return result, cancelled
+
     def _on_cancel(self):
+        if not self._cancellable:
+            return
         self._cancelled = True
         self.btn_cancel.setEnabled(False)
         self.lbl_detail.setText("Cancelling...")

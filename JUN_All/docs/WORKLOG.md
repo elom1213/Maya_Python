@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-16 (오늘)
 
+> [!summary] **공용 진행 팝업 Cancel = 실행 전으로 자동 되돌리기 · `A00120_FKIK` v01.13** `#Framework` `#A00120_FKIK`
+- 요청: 공용 게이지(A00120_FKIK 등)에 Cancel 을 만들어 진행 중인 작업을 멈추고 실행 전으로(Ctrl+Z 또는 자동으로) 되돌릴 수 없나.
+- `MOD_progress_qt_v01`: Cancel 뒤 다음 진행 보고가 `ProgressCancelled`(BaseException) 를 던지고, 새 `run_undoable(fn)` 이 작업을 undo 덩어리 하나로 감싸 취소면 `cmds.undo()` + 시간 복원. 빈 덩어리는 마야가 기록하지 않아(실측) 표식 노드를 만들었다 지운다. `bakeResults` 같은 C++ 한 번 호출은 중간에 못 끊는다(콜백 예외를 마야가 삼킴) → 끝난 직후 멈추고 되돌림.
+- A00120_FKIK v01.13: Bake IK / Bake FK 팝업에 Cancel. A00110 Bake / Locator 의 시간 콜백이 취소 예외를 마야로 흘리지 않게.
+- 시험 `Framework/tests/test_progress_cancel.py` 21/21 · A00110 bake progress 12 · locator UI 39 · locator 25. GUI 확인 아직.
+
 > [!summary] **`A00110_animTool_V02` v02.63 — Bake > Bake 진행 팝업** `#A00110_animTool_V02`
 - 요청: Bake 탭의 Bake List 를 누르면 팝업 게이지로 베이크 진행도를 보여 줄 것.
 - `BakeManager.bake(progress=)` — 실제로 도는 단계만 `set_phases` 로 넘김(Baking = bakeResults 의 시간 변경 콜백, 레이어 · 구간 블렌드 = 프레임 샘플링 + 키 쓰기, Smart = Simplifying). UI 는 Locator 탭과 같은 공용 progress 팝업, 로그에 걸린 시간.

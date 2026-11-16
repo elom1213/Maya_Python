@@ -456,7 +456,7 @@ class LocatorBakeManager:
                             done = int(round(mtime.value)) - start + 1
                             if 0 < done <= frames:
                                 _step(done, frames, "Frame {0} / {1}".format(int(round(mtime.value)), end))
-                        except Exception:  # noqa: BLE001 - 콜백 예외가 베이크를 깨지 않게
+                        except BaseException:  # noqa: BLE001 - 콜백 예외(취소 포함)가 베이크를 깨지 않게
                             pass
 
                     if not fast:

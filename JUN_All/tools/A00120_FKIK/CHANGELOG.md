@@ -2,6 +2,13 @@
 
 All notable changes to this tool are documented here.
 
+## [01.13] - 2026-11-16
+### Added
+- **Cancel on the Bake IK / Bake FK progress popup** (Esc does the same). The bake stops at the next
+  frame and the scene goes back to how it was before the bake (keys, pose, current time) - the whole
+  bake runs inside one undo chunk (`run_undoable` of the shared `JUN_mod_progress_qt_v01`) and a
+  cancel undoes that chunk. Actions done before the bake are kept.
+
 ## [01.12] - 2026-10-12
 ### Fixed
 - **Setup box is back to its v01.10 height.** v01.11 put the Manual / Auto radios on their own

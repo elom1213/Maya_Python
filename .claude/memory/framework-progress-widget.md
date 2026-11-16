@@ -48,3 +48,10 @@ finally:
 
 관련: [[wip-a00410-secondarymotion]], [[framework-timerange-widget]], [[framework-expand-widget]],
 [[prefer-pyside-for-new-tools]], [[mayapy-headless-verify]]
+
+- **2026-11-16 Cancel = 실행 전으로 자동 되돌리기**(사용자 요청): `cancellable=True` + `dlg.run_undoable(fn, ...)` → `(결과, cancelled)`, `dlg.reverted`.
+  취소 뒤 다음 진행 보고가 `ProgressCancelled`(**BaseException** — core 의 `except Exception` 통과)를 던지고, run_undoable 이 덩어리를 undo.
+  ★ 마야는 **빈 undo 덩어리를 큐에 안 남긴다** → 첫 변경 전 취소 시 `undo` 가 사용자의 이전 작업을 되돌림 → 덩어리 맨 앞에 표식 노드 생성 · 삭제.
+  ★ `bakeResults` 등 C++ 한 번 호출은 못 끊는다(시간 콜백 예외를 마야가 삼킴) → 끝난 뒤 멈춤. 마야 콜백 안 progress 는 `BaseException` 까지 잡을 것.
+  ★ mayapy 에선 currentTime 도 undo 큐에 쌓인다 → 시간 복원은 다를 때만. 적용: A00120 Bake IK/FK(v01.13). 나머지 툴은 아직(한 줄씩 붙이면 됨).
+  시험 `Framework/tests/test_progress_cancel.py` 21/21.

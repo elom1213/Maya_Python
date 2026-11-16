@@ -145,7 +145,7 @@ class BakeManager:
                             f = int(round(mtime.value))
                             if start <= f <= end:
                                 _step(f - start + 1, frames_n, "Frame {0} / {1}".format(f, end))
-                        except Exception:                   # noqa: BLE001
+                        except BaseException:               # noqa: BLE001 - 취소(ProgressCancelled)도 마야 콜백 밖으로 내보내지 않는다
                             pass
 
                     callback_id = om.MDGMessage.addTimeChangeCallback(_on_time) if progress else None

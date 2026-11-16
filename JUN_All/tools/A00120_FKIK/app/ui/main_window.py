@@ -611,16 +611,25 @@ class MainWindow(QWidget):
         mode = "IK" if ik_to_fk else "FK"
 
         # v01.11 : 공용 진행률 팝업 - core 의 bake 가 프레임마다 콜백을 부른다.
+        # v01.13 : Cancel(또는 Esc) = 멈추고 실행 전으로 자동 되돌림 (공용 위젯 run_undoable).
         dlg = JUN_mod_progress_qt.JUN_mod_progress_qt_v01(
             self, title="FKIK Tool - Bake %s" % mode,
-            message="Starting...", phases=[("Baking frames", 1)])
+            message="Starting...", phases=[("Baking frames", 1)], cancellable=True)
         dlg.start()
         try:
             dlg.begin_phase()
-            frames = FKIKMatcher.bake(tgt, flw, start, end, progress=dlg.callback())
+            frames, cancelled = dlg.run_undoable(
+                FKIKMatcher.bake, tgt, flw, start, end, progress=dlg.callback())
+            reverted = dlg.reverted
         finally:
             dlg.finish()
 
+        if cancelled:
+            if reverted:
+                self.log(f"[Warning] Bake {mode} cancelled - the scene is back to before the bake.")
+            else:
+                self.log(f"[Warning] Bake {mode} cancelled - undo is off, keys baked so far are kept.")
+            return
         self.log(f"Bake {mode} : {frames} frames baked [{start}-{end}]")
 
     def on_bake_constraint(self):

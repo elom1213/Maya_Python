@@ -107,9 +107,37 @@ phases.append(("Baking keys", 65))
 
 - 기본은 **닫기 버튼 없음 · Esc 무시**다. 창만 닫히고 작업은 계속 도는 상태를 만들지 않기 위해서다.
 - 모달(`ApplicationModal`)이라 도는 동안 툴 버튼을 다시 누를 수 없다.
-- `cancellable=True` 면 Cancel 버튼이 생기고 `was_cancelled()` 가 True 가 된다.
-  **중단 지점이 안전한 작업에만** 켤 것 — 씬을 반쯤 고쳐 놓고 멈추면 안 되는 작업(A00410 의 Apply 등)은
-  기본값 그대로 둔다.
+- `cancellable=True` 면 Cancel 버튼이 생기고(Esc 도 같다) `was_cancelled()` 가 True 가 된다.
+  **Cancel 로 실행 전으로 되돌리려면 `run_undoable` 로 돌린다**(2026-11-16, 아래). 그렇게 감싸지 않은 작업에는
+  켜지 말 것 — 씬을 반쯤 고쳐 놓고 멈춘다.
+
+### 5-1. Cancel = 실행 전으로 자동 되돌리기 (`run_undoable`)
+
+```python
+dlg = JUN_mod_progress_qt.JUN_mod_progress_qt_v01(self, title="Bake", phases=[...], cancellable=True)
+dlg.start()
+try:
+    dlg.begin_phase()
+    result, cancelled = dlg.run_undoable(core.bake, nodes, start, end, progress=dlg.callback())
+finally:
+    dlg.finish()
+if cancelled:
+    self.log("[Warning] Cancelled - the scene is back to before the run.")   # dlg.reverted 가 False 면 undo 꺼짐
+```
+
+- Cancel 을 누르면 **다음 진행 보고**(`step` · `set_fraction` · `begin_phase`)가 `ProgressCancelled` 를 던져 core 루프가 끊긴다.
+  core 는 위젯을 몰라도 된다. `ProgressCancelled` 는 **BaseException** 이라 core 의 `except Exception:` 이 삼키지 않는다
+  (그래도 삼키면 `was_cancelled()` 로 다시 본다).
+- `run_undoable` 은 작업 전체를 **undo 덩어리 하나**로 감싸고, 취소면 `cmds.undo()` 한 번 + 현재 시간 복원. 취소하지 않았으면
+  결과를 그대로 돌려주고, Ctrl+Z 한 번에 작업 전체가 되돌아간다.
+- ★ 덩어리 맨 앞에 **표식 노드를 만들었다 지운다** — 마야는 아무 변경 없는 빈 덩어리를 큐에 남기지 않아서(mayapy 실측),
+  첫 변경 전에 취소하면 `undo` 가 사용자가 **그 전에 한 작업**을 되돌려 버린다.
+- ★ **C++ 한 번 호출(`bakeResults` 등)은 중간에 못 끊는다** — 그 안에서 부르는 시간 변경 콜백이 예외를 던져도 마야가 삼키고 끝까지
+  돈다(실측). 그런 작업은 그 호출이 끝난 뒤 첫 진행 보고에서 멈추고 되돌린다. 마야 콜백 안에서 진행을 보고하는 core 는
+  그 콜백에서 `BaseException` 까지 잡을 것(안 그러면 남은 프레임마다 에러 출력).
+- undo 가 꺼져 있으면(`undoInfo -state off`) 멈추기만 하고 `reverted = False`.
+- 시험 `Framework/tests/test_progress_cancel.py` 21/21 (FKIK 베이크 중간 취소 · 첫 변경 전 취소 · 예외를 삼키는 core ·
+  취소 안 함 · 취소 못 하는 팝업 · bakeResults 경로 · undo 꺼짐).
 
 ---
 
@@ -127,6 +155,8 @@ phases.append(("Baking keys", 65))
 | `start()` / `finish()` | 팝업 띄우기 / 닫기 |
 | `elapsed()` | 시작 후 경과 초 (로그에 "(3.4s)" 로 붙이기 좋다) |
 | `was_cancelled()` | Cancel 눌렸는가 (`cancellable=True` 일 때만) |
+| `check_cancel()` | 취소됐으면 `ProgressCancelled` 를 던진다(진행 보고가 알아서 부른다) |
+| `run_undoable(fn, *a, **k)` | fn 을 undo 덩어리 하나로 실행, 취소면 되돌림. 반환 `(결과, cancelled)`, `reverted` 속성 |
 
 ---
 
