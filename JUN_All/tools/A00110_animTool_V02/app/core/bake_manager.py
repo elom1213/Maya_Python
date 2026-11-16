@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-05
+# last Update date : 2026-11-16
 # A00110_animTool_V02 - 리스트업한 컨트롤러를 구간 dense 키로 굽는 핵심 로직 (maya.cmds, UI 비의존)
 #
 # A00120_FKIK 의 native bakeResults 베이크(Python 프레임 루프 대체)를 범용 bake 로 이식.
@@ -21,8 +21,14 @@
 #   **Smart bake 도 구간 밖을 망가뜨렸다**(레이어 없이도: `bakeResults -smart` 는 preserveOutsideKeys 를 안 지켜 구간 밖 60 f 값이 바뀜).
 #   -> smart 는 dense 로 정확히 구운 뒤 구운 커브의 [s, e] 안만 `filterCurve -filter simplify -tolerance tol -startTime s -endTime e`
 #   (구간 밖 변화 0 실측). 레이어 오브젝트에도 같은 방식으로 적용된다.
+#
+# v02.63 - **진행 보고**(progress): Bake List 를 누르면 공용 진행 팝업 게이지. 단계는 실제로 도는 것만
+#   (Baking = bakeResults, 진행률은 Locator 탭과 같은 MDGMessage 시간 변경 콜백 · Baking layered objects /
+#   Baking range blend objects = 프레임 샘플링 + 키 쓰기 · Simplifying = smart). 단계 목록은 core 가 정해
+#   `progress.set_phases(phases)` 로 넘기고, 단계마다 `progress.phase(name)` 을 부른다(둘 다 있을 때만).
 
 import maya.cmds as cmds
+import maya.api.OpenMaya as om
 
 from Framework.core.maya_refresh import suspend_refresh
 
@@ -43,10 +49,16 @@ class BakeManager:
     # native smart bake 의 기본 허용오차(도). 값이 클수록 키를 더 많이 제거(거칠게)한다.
     DEFAULT_SMART_TOLERANCE = 0.5
 
+    # 진행 팝업 단계 이름 (v02.63). 실제로 도는 단계만 progress.set_phases 로 넘긴다.
+    PHASE_BAKE = "Baking"
+    PHASE_LAYERED = "Baking layered objects"
+    PHASE_BLENDED = "Baking range blend objects"
+    PHASE_SMART = "Simplifying"
+
     @staticmethod
     def bake(objects, start, end, channels=None, simulation=True,
              disable_implicit=False, smart=False,
-             smart_tolerance=DEFAULT_SMART_TOLERANCE):
+             smart_tolerance=DEFAULT_SMART_TOLERANCE, progress=None):
         """
         objects 의 [start, end] 구간을 native bakeResults 로 굽는다.
 
@@ -61,6 +73,8 @@ class BakeManager:
                            중간 키를 C++ 내부에서 제거해 키 수를 줄인다(bakeResults -smart).
                            Maya 2020+ 에서 동작(2023 확인). 미지원 버전은 dense 로 폴백.
         smart_tolerance  : smart 허용오차(도). 클수록 더 적은 키(거친 결과).
+        progress         : (v02.63) progress(done, total, message=None) - 단계 안 진행. 속성 `set_phases(phases)` 가 있으면
+                           실제로 도는 단계 [(이름, 가중치)] 를 먼저 넘기고, `phase(name)` 이 있으면 단계마다 부른다.
         반환             : (baked_count, msg)
         """
         if not objects:
@@ -88,6 +102,31 @@ class BakeManager:
             sparseAnimCurveBake=False,
         )
 
+        # v02.63 진행 단계 - 실제로 도는 것만. 가중치 = 대략의 시간(파이썬 프레임 루프는 bakeResults 보다 느리다).
+        frames_n = end - start + 1
+
+        def _step(done, total, message=None):
+            if progress:
+                progress(done, total, message)
+
+        def _phase(name):
+            hook = getattr(progress, "phase", None)
+            if hook:
+                hook(name)
+
+        phases = []
+        if plain:
+            phases.append((BakeManager.PHASE_BAKE, frames_n * len(plain)))
+        if layered:
+            phases.append((BakeManager.PHASE_LAYERED, 3 * frames_n * len(layered)))
+        if blended:
+            phases.append((BakeManager.PHASE_BLENDED, 3 * frames_n * len(blended)))
+        if smart:
+            phases.append((BakeManager.PHASE_SMART, max(1, sum(w for _n, w in phases) // 10)))
+        set_phases = getattr(progress, "set_phases", None)
+        if set_phases and phases:
+            set_phases(phases)
+
         cur = cmds.currentTime(q=True)
         used_smart = False
         notes = []
@@ -98,20 +137,41 @@ class BakeManager:
             # suspend_refresh: 블록 종료 시 refresh 복원이 항상 먼저/무조건 실행된다.
             with suspend_refresh():
                 if plain:
-                    cmds.bakeResults(plain, **bake_kwargs)
+                    _phase(BakeManager.PHASE_BAKE)
+
+                    def _on_time(mtime, *_args):
+                        # simulation 베이크는 프레임마다 시간을 옮긴다(Locator 탭과 같은 방식). 콜백 예외는 삼킨다.
+                        try:
+                            f = int(round(mtime.value))
+                            if start <= f <= end:
+                                _step(f - start + 1, frames_n, "Frame {0} / {1}".format(f, end))
+                        except Exception:                   # noqa: BLE001
+                            pass
+
+                    callback_id = om.MDGMessage.addTimeChangeCallback(_on_time) if progress else None
+                    try:
+                        cmds.bakeResults(plain, **bake_kwargs)
+                    finally:
+                        if callback_id is not None:
+                            om.MMessage.removeCallback(callback_id)
+                    _step(frames_n, frames_n)
                     for obj in plain:
                         for attr in attrs:
                             baked_curves += cmds.keyframe("{0}.{1}".format(obj, attr), q=True, name=True) or []
                 if layered:
-                    notes, curves = BakeManager.bake_layered(layered, start, end, attrs)
+                    _phase(BakeManager.PHASE_LAYERED)
+                    notes, curves = BakeManager.bake_layered(layered, start, end, attrs, progress=progress)
                     baked_curves += curves
                 if blended:
+                    _phase(BakeManager.PHASE_BLENDED)
                     lines, curves = BakeManager.bake_layered(blended, start, end, attrs,
-                                                             unwrap_rotation=True, edge_keys=True)
+                                                             unwrap_rotation=True, edge_keys=True, progress=progress)
                     notes += lines
                     baked_curves += curves
+                if smart:
+                    _phase(BakeManager.PHASE_SMART)
                 if smart and baked_curves:
-                    used_smart = BakeManager.simplify_range(baked_curves, start, end, smart_tolerance)
+                    used_smart = BakeManager.simplify_range(baked_curves, start, end, smart_tolerance, progress=progress)
         finally:
             # 예외가 나도 프레임 복원 / undo 청크 닫기를 반드시 수행(refresh 는 위에서 복원됨).
             cmds.currentTime(cur, edit=True)
@@ -168,7 +228,7 @@ class BakeManager:
         return sorted(keep)
 
     @staticmethod
-    def simplify_range(curves, start, end, tolerance):
+    def simplify_range(curves, start, end, tolerance, progress=None):
         """구운 커브들의 [start, end] 안 키만 줄인다 (v02.51 smart). 구간 밖 키는 건드리지 않는다. 반환 성공 여부.
 
         `bakeResults -smart` 는 구간 밖을 망가뜨리고 `filterCurve -simplify` 는 허용오차를 안 지켰다(실측) ->
@@ -180,7 +240,9 @@ class BakeManager:
             return False
         try:
             tol = max(0.0, float(tolerance))
-            for crv in curves:
+            for i, crv in enumerate(curves):
+                if progress:
+                    progress(i + 1, len(curves), crv)
                 times = cmds.keyframe(crv, q=True, time=(start, end), timeChange=True) or []
                 if len(times) <= 2:
                     continue
@@ -300,7 +362,8 @@ class BakeManager:
         return out
 
     @staticmethod
-    def bake_layered(objects, start, end, attrs, before_write=None, unwrap_rotation=False, edge_keys=False):
+    def bake_layered(objects, start, end, attrs, before_write=None, unwrap_rotation=False, edge_keys=False,
+                     progress=None):
         """레이어 오브젝트를 [start, end] 만 굽는다 - 구간 밖 키 · 다른 레이어 커브 보존. 반환 (로그 줄(경고), 키를 찍은 커브).
 
         1) 컨스트레인트 등이 켜진 채 매 프레임 채널 값 샘플링 (currentTime 루프 = simulation)
@@ -315,6 +378,7 @@ class BakeManager:
         edge_keys       : (v02.59) 구간 바깥에 기존 키가 없는 쪽은 Start-1 / End+1 에 그때 값으로 키(아래). 경계 프레임이
                           컨스트레인트 영향 밖일 때만 - 구간 블렌드 오브젝트(v02.61). 컨스트레인트가 전 프레임을 구동하는
                           보통 Bake 탭 경로는 끈다(경계 값에 컨스트레인트가 섞인다).
+        progress        : (v02.63) progress(done, total, message) - 샘플링 프레임 수 + 키를 쓸 채널 수.
         """
         frames = list(range(int(start), int(end) + 1))
         notes = []
@@ -340,10 +404,13 @@ class BakeManager:
             for _o, attr, plug in plugs:
                 if BakeManager._long_attr(_o, attr).startswith("rotate"):
                     prev[plug] = float(cmds.getAttr(plug))
-        for f in frames:
+        total = len(frames) + len(plugs)
+        for i, f in enumerate(frames):
             cmds.currentTime(f)
             for _o, _a, plug in plugs:
                 values[plug].append(float(cmds.getAttr(plug)))
+            if progress:
+                progress(i + 1, total, "Frame {0} / {1}".format(f, frames[-1]))
         for plug, first in prev.items():
             values[plug] = BakeManager._unwrap(first, values[plug])
 
@@ -399,7 +466,9 @@ class BakeManager:
         # 2) 3) 대상 레이어 커브의 구간 안 키만 지우고 매 프레임 역산 키
         overridden = set()
         keyed_curves = []
-        for obj, attr, plug, target in plan:
+        for k, (obj, attr, plug, target) in enumerate(plan):
+            if progress:
+                progress(len(frames) + k + 1, total, "Writing keys {0}".format(plug.split("|")[-1]))
             curve = curves[plug]
             if curve:
                 # 듬성한 커브는 구간 안 키를 지우면 구간 밖 보간 모양까지 바뀐다 -> Merge Layers 와 같은 경계 처리:

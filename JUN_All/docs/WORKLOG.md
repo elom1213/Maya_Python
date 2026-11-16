@@ -33,6 +33,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-16 (오늘)
 
+> [!summary] **`A00110_animTool_V02` v02.63 — Bake > Bake 진행 팝업** `#A00110_animTool_V02`
+- 요청: Bake 탭의 Bake List 를 누르면 팝업 게이지로 베이크 진행도를 보여 줄 것.
+- `BakeManager.bake(progress=)` — 실제로 도는 단계만 `set_phases` 로 넘김(Baking = bakeResults 의 시간 변경 콜백, 레이어 · 구간 블렌드 = 프레임 샘플링 + 키 쓰기, Smart = Simplifying). UI 는 Locator 탭과 같은 공용 progress 팝업, 로그에 걸린 시간.
+- 시험 `tests/test_bake_progress_ui.py` 12/12(팝업 1회 · 단계 · 게이지 100% · 결과 동일) · 기존 Bake / Locator 시험 통과. GUI 확인 아직.
+
 > [!summary] **`A00110_animTool_V02` v02.62 — Locator > Constrain 어긋남 수정** `#A00110_animTool_V02`
 - 제보: Bake > Locator 에서 Constrain Objects to Locators(Parent) + Blend only in Frame Range 로 구우면, 다른 레이어에도 키가 있고 부모 그룹도 움직이는 컨트롤러가 어떤 경우엔 구간 안에서 원래 월드 위치 · 회전과 달라진다.
 - 원인 실측(mayapy, 변형별): 레이어 · 움직이는 부모만으론 0. **Freeze 한 컨트롤러 6.06 · 옮긴 피벗 5.20 · rotateAxis 0.36 · 부모 비균일 스케일 0.47** — 로케이터 -> 오브젝트 컨스트레인트가 `mo=False` 라 회전 피벗을 로케이터에 붙이고 rotateAxis 를 무시했다.

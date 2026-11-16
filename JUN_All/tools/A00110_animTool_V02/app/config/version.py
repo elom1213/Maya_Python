@@ -244,5 +244,11 @@
 #        시험 test_locator_bake_layers 43/43(+15: frozen · pivot · rotaxis · joint · all × 2단 부모 키 + 레이어 2개 + 구간 밖 실행) ·
 #        locator_bake 25 · constrain 34 · fast 18 · UI 39 · bake_layers 19.
 
-VERSION = "02.62"
+# 02.63  Bake > Bake 의 `Bake List` 에 **진행 팝업**(사용자 요청) - Locator 탭과 같은 공용 progress 게이지.
+#        단계는 실제로 도는 것만 core 가 정한다(progress.set_phases): Baking(레이어 없는 오브젝트, bakeResults 의 프레임마다
+#        시간 변경 콜백) · Baking layered objects · Baking range blend objects(프레임 샘플링 + 채널별 키 쓰기) · Simplifying(Smart).
+#        로그 끝에 걸린 시간. 굽는 결과는 그대로(팝업 없이 core 로 구운 것과 1e-6 동일). 시험 tests/test_bake_progress_ui.py 12/12 ·
+#        bake_layers 19 · locator_bake_layers 43 · locator UI 39.
+
+VERSION = "02.63"
 LAST_UPDATE = "2026-11-16"

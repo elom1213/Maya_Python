@@ -2229,6 +2229,8 @@ class MainWindow(QWidget):
         # -------------------------
 
         self.btn_bake = QPushButton("Bake List")
+        self.btn_bake.setToolTip("Bake the listed objects between Start and End.\n"
+                                 "A progress popup shows the bake. One undo step.")
         tab_layout.addWidget(self.btn_bake)
 
         tab_layout.addStretch(1)
@@ -5218,13 +5220,32 @@ class MainWindow(QWidget):
             except ValueError:
                 self.log("[Warning] Invalid Tolerance, using {0}.".format(smart_tol))
 
-        count, msg = BakeManager.bake(
-            objs, start, end, channels=channels,
-            simulation=self.cb_bake_sim.isChecked(),
-            disable_implicit=not self.cb_bake_keep_con.isChecked(),  # 체크=유지 -> False
-            smart=smart,
-            smart_tolerance=smart_tol,
-        )
+        # v02.63 진행 팝업 - 단계(Baking / Baking layered objects / ... / Simplifying)는 core 가 실제로 도는 것만 정한다.
+        dlg = JUN_mod_progress_qt.JUN_mod_progress_qt_v01(self, title="Bake List", message="Baking")
+        step = dlg.callback()
+
+        def progress(done, total, message=None):
+            step(done, total, message)
+
+        progress.set_phases = dlg.set_phases
+        progress.phase = lambda name: dlg.begin_phase(name)
+
+        dlg.start()
+        elapsed = None
+        try:
+            count, msg = BakeManager.bake(
+                objs, start, end, channels=channels,
+                simulation=self.cb_bake_sim.isChecked(),
+                disable_implicit=not self.cb_bake_keep_con.isChecked(),  # 체크=유지 -> False
+                smart=smart,
+                smart_tolerance=smart_tol,
+                progress=progress,
+            )
+        finally:
+            elapsed = dlg.elapsed()
+            dlg.finish()
+        if count and elapsed is not None:
+            msg += "  ({0:.1f}s)".format(elapsed)
         self.log(msg)
 
     # --------------------------------------------------

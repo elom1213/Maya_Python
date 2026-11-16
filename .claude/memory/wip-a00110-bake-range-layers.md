@@ -19,3 +19,7 @@ metadata:
 
 **Why:** 사용자는 구간만 구워도 나머지 애니메이션(레이어 포함)이 그대로이길 원한다. **How to apply:** 레이어 오브젝트를 구간 굽기 하는 다른 기능도
 bakeResults 대신 이 경로를 쓸 것. 관련 [[wip-a00110-layer-range-merge]](같은 경계 처리), [[wip-a00110-hold-layer-blend]](setKeyframe -animLayer 역산).
+
+- **v02.63 진행 팝업**(2026-11-16, 사용자 요청): `BakeManager.bake(progress=)` — 도는 단계만 core 가 `progress.set_phases` 로 넘기고
+  `progress.phase(name)` 으로 넘긴다(Baking = bakeResults + `MDGMessage.addTimeChangeCallback`, 레이어 · 구간 블렌드 = 샘플링 + 키 쓰기, Simplifying).
+  UI 는 `progress.set_phases = dlg.set_phases` 를 붙여 넘긴다. 시험 `test_bake_progress_ui.py` 12/12. GUI 확인 아직.

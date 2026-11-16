@@ -1634,7 +1634,10 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
   `disableImplicitControl` 에 반대로 매핑된다(ON → `False`).
 - **Simulation** (기본 ON): `bakeResults(simulation=True)` — 프레임 순차 평가(컨스트레인트/익스프레션
   의존 리그에 안전). 순수 FK 라면 꺼서 가속할 수 있다.
-- **Bake List**: 베이크 실행. 결과(개수 / 구간 / 프레임 수 / 컨스트레인트 kept·baked down)가 로그에 출력.
+- **Bake List**: 베이크 실행. 결과(개수 / 구간 / 프레임 수 / 컨스트레인트 kept·baked down · 걸린 시간)가 로그에 출력.
+  - **진행 팝업**(v02.63~): 굽는 동안 게이지가 프레임마다 움직인다. 단계는 실제로 도는 것만 보인다 —
+    `Baking`(레이어 없는 오브젝트) · `Baking layered objects`(애니메이션 레이어 오브젝트) · `Baking range blend objects`
+    (Locator 구간 블렌드 오브젝트) · `Simplifying`(Smart bake).
 - **구간 밖 키 보존**(v02.51~): [Start, End] 만 구워도 **그 밖의 기존 키는 그대로**다 — 애니메이션 레이어에 든 오브젝트도.
   - 레이어에 든 오브젝트는 `bakeResults` 를 쓰지 않는다(마야가 Base 커브를 구간 키만 남기고 바꾸고, 합성값을 Base 에 써서 위 레이어를
     이중 계산했다). 대신 컨스트레인트가 켜진 채 매 프레임 값을 재고, 채널마다 **그 채널을 정하는 레이어**(덮는 맨 위 override 레이어,
