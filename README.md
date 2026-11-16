@@ -4,7 +4,7 @@
 독립 실행(standalone) Qt 앱을 직접 설계·개발한 포트폴리오 저장소입니다.
 
 > 작성자: **Ji Hun Park (Junny)** · Technical Artist / Rigging & Pipeline Tools Developer
-> 최근 갱신: 2026-11-13 · 툴 폴더 **76개**(템플릿·구버전 포함, **현행 61종**) · 공용 프레임워크 1개
+> 최근 갱신: 2026-11-16 · 툴 폴더 **76개**(템플릿·구버전 포함, **현행 61종**) · 공용 프레임워크 1개
 
 ---
 
@@ -140,7 +140,7 @@ A narrative work summary lives in
 - **`A00180_abSymMesh`** — 메쉬 대칭/블렌드셰이프(OpenMaya 재구현).
 - **`A00300_meshDoctor`** — 메시 **읽기전용 진단 + 안전 원클릭 수정**(배치 진단 요약 테이블, JSON/TXT 로그).
 - **`A00380_MeshTool`** — **MeshDoctor**(A00300 이식) · **Peak**(노말 방향 팽창/수축, 후디니 peak 노드 개념) ·
-  **Match**(좌 Source / 우 Targets · **By Weight** 스킨 웨이트 마스크) 탭.
+  **Match**(좌 Source / 우 Targets · **By Weight** 스킨 웨이트 마스크) · **LOD**(재생용 저폴리 프록시, polyReduce 대비 ~12배) 탭.
 - **`A00400_CurveTool`** — 커브 생성·편집·표시(**Create / Edit / Display**). 엣지 덩어리마다 커브 ·
   월드 위치를 순서대로 잇는 **From Points** · 커브를 따라 납작한 NURBS 서피스를 만드는 **Ribbon** ·
   CV 수가 달라도 모양을 따라가는 **Wrap** · 고른 CV 실시간 **Smooth** · 컨트롤 셰이프 편집(피벗 기준
@@ -187,6 +187,7 @@ A narrative work summary lives in
 
 | 시기 | 내용 |
 |------|------|
+| 2026-11-16 | **`A00380_MeshTool` v01.20 LOD 탭** — 모캡 클린업 재생 끊김 대응용 저폴리 프록시(LOD1~5)를 한 번에, numpy 그리드 클러스터링 + QEM 대표점으로 실제 아바타(27.6만 삼각형) LOD 3개 1.6초(`polyReduce` 18.9초), 스킨 메시는 바인드 포즈에서 · 원본 재질 · 대략 UV · 원본 UUID 기록 |
 | 2026-11-13 | **`A00590_SwingTwistNative` 신규 v01.00 → v01.01** — MetaHuman `SwingTwistEvaluatorNode`(Epic 플러그인)를 마야 동봉 `quatNodes` 망으로 생성(공용 `Framework/core/maya_swing_twist.py`, `create_swing_twist_evaluator` 와 같은 인자), 원본과 나란히 놓은 골든 시험에서 오일러 값까지 최대 2e-13° · Build / Rigs 탭 · **v01.01** 기존 원본 노드 Convert(무작위 포즈 대조 후 교체, 블렌드 키 이동) · Restore(DNA export 용) · 원본 이름으로 공개한 black box container |
 | 2026-11-12 | **`A00110_animTool_V02` v02.58~61 Bake > Locator > Constrain** — 애니메이션 레이어(BaseAnimation + 다른 레이어)에 키가 있는 컨트롤러에도 컨스트레인트, **Blend only in Frame Range**(기본 켬) — `blendParent1` step 키로 Start ~ End 만 로케이터 · 밖은 원래 움직임, 레이어 없이 → Bake > Bake 로 굽고 로케이터를 지우면 키만으로 같은 움직임(Bake 탭이 구간 밖 키 모양 보존) · v02.60 View > Layers — 고른 오브젝트가 든 레이어에 타원 표시 |
 | 2026-11-11 | **`A00620_NameDecoder` v01.02~06 Outliner 탭** — 마야 아웃라이너가 못 그리는 일본어 · 중국어(FBXASC) 이름을 노드 타입 아이콘 + DAG 계층으로, Scope · Shapes · blendShape 타겟 자식 행 · 계층 필터(맞는 행 + 조상) · Sync, Alt + 가운데 버튼 드래그로 위아래 이동(공용 `maya_icons` · `MOD_altPan`), Raw 칸 접기 · 창 가로 크기 자유 조절 · Sync 는 부모를 펼치지 않고 부모 행을 옅게(마야처럼) · `A00110_animTool_V02` v02.57 Copy Key — Target 잠긴 채널은 건너뛰기 · `A00500_reloader` v01.01 패키지 재노출 옛 클래스 다시 잡기(첫 셸프 클릭 AttributeError) |

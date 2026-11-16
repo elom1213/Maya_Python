@@ -46,6 +46,7 @@ from tools.A00380_MeshTool.app.core.mesh_scan import MeshScanner
 from tools.A00380_MeshTool.app.core.mesh_fix import MeshFixer
 from tools.A00380_MeshTool.app.core.report import ReportWriter
 from tools.A00380_MeshTool.app.ui.uv_tab import UvSetsTab, RULE_TEXT as UV_RULE_TEXT
+from tools.A00380_MeshTool.app.ui.lod_tab import LodTab, NOTES_TEXT as LOD_NOTES_TEXT
 
 
 WINDOW_OBJECT_NAME = "JUN_A00380_MeshTool_window"
@@ -146,6 +147,7 @@ class MainWindow(QWidget):
         help_menu = self.menu_bar.addMenu("Help")
         help_menu.addAction("About").triggered.connect(self.show_about)
         help_menu.addAction("UV Sets Rule").triggered.connect(self.show_uv_rule)
+        help_menu.addAction("LOD Notes").triggered.connect(self.show_lod_notes)
         root.setMenuBar(self.menu_bar)
 
         self.tabs = QTabWidget()
@@ -158,6 +160,9 @@ class MainWindow(QWidget):
         self.tabs.addTab(self.uv_tab, "UV Sets")
         self.tabs.addTab(self.build_peak_tab(), "Peak")
         self.tabs.addTab(self.build_match_tab(), "Match")
+        # LOD (v01.20) - 재생용 저폴리 프록시 메시. 맨 오른쪽 (모양을 다 고친 다음 만드는 것)
+        self.lod_tab = LodTab(log=lambda text, warn=False, ok=False: self.log(text, warn=warn, ok=ok))
+        self.tabs.addTab(self.lod_tab, "LOD")
         self.tabs.currentChanged.connect(self.on_tab_changed)
         root.addWidget(self.tabs, 1)
         # 탭마다 창 높이를 현재 페이지에 맞춘다 (v01.18, 공용 위젯 - 중첩 탭 · 스크롤 페이지 모두 따라간다)
@@ -1648,6 +1653,9 @@ class MainWindow(QWidget):
     def show_uv_rule(self):
         QMessageBox.information(self, "UV Sets Rule", UV_RULE_TEXT)
 
+    def show_lod_notes(self):
+        QMessageBox.information(self, "LOD Notes", LOD_NOTES_TEXT)
+
     def show_about(self):
         QMessageBox.information(
             self, "About",
@@ -1666,6 +1674,8 @@ class MainWindow(QWidget):
             "UV Sets: one UV set per mesh (default 'map1') - catch the meshes\n"
             "that break it, delete the other sets, rename the first one.\n"
             "Ported from A00050_uvTool_V02. See Help > UV Sets Rule.\n\n"
+            "LOD: build low-poly copies (LOD1 - LOD5) of meshes for fast\n"
+            "playback, in bind pose, not bound. See Help > LOD Notes.\n\n"
             "Peak has no Apply button: dragging the slider applies the\n"
             "result as you go (each change is one Ctrl+Z).\n"
             "by Ji Hun Park".format(VERSION, LAST_UPDATE))

@@ -1,14 +1,14 @@
 ---
 title: A00380_MeshTool 사용법
-aliases: [Mesh Tool, MeshTool, A00380, Peak, Match, By Weight, MeshDoctor, meshDoctor, UV Sets, uvTool]
+aliases: [Mesh Tool, MeshTool, A00380, Peak, Match, By Weight, MeshDoctor, meshDoctor, UV Sets, uvTool, LOD]
 tags: [maya-python, tool-guide, mesh, modeling, peak, normal, match, kangaroo, layout, skin-weight, corrective, diagnostics, cleanup]
-updated: 2026-10-29
+updated: 2026-11-16
 ---
 
 # A00380_MeshTool 사용법
 
 Maya 안에서 도는 **메시 진단 · 편집** PySide 툴이다(arch B, in-Maya).
-**MeshDoctor / UV Sets / Peak / Match** 네 탭으로 구성된다 — **무엇이 잘못됐는지 먼저 보고, 그다음 고치는** 순서다.
+**MeshDoctor / UV Sets / Peak / Match / LOD** 다섯 탭으로 구성된다 — **무엇이 잘못됐는지 먼저 보고, 그다음 고치는** 순서다.
 
 - **MeshDoctor** (v01.14~) = 메시를 **읽기만 해서** 진단한다. 리스트업한 메시들을 한 번에 검사해
   **메시당 한 줄 요약 표**를 만들고, 행을 누르면 **그 메시의 상세 리포트**가 아래에 펼쳐진다.
@@ -26,8 +26,11 @@ Maya 안에서 도는 **메시 진단 · 편집** PySide 툴이다(arch B, in-Ma
     좌 1개면 `1 <= n`, 여러 개면 `n <= n`(리스트 순서대로 짝, 개수가 다르면 작은 쪽만큼).
   - **By Weight** (v01.09~) — 스킨 메시의 **조인트 웨이트를 마스크로** 써서, 메시들을 타깃 모양 쪽으로
     `웨이트 × 델타` 만큼 옮긴다. 블렌드셰이프 타깃에 웨이트 맵(마스크)을 칠한 것과 결과가 같다.
+- **LOD** (v01.20~) = 재생용 **저폴리 프록시(LOD1 ~ LOD5)** 메시를 빠르게 만든다. 바인딩은 하지 않는다 —
+  `A00275_skinTool_V01` 로 다시 바인딩한다. 기본(Fast)은 마야 `polyReduce` 보다 실제 아바타에서 약 12배 빠르다(§3-6).
 
-- **버전**: `app/config/version.py` (v01.17 — **UV Sets 탭**(A00050_uvTool_V02 이식, MeshDoctor 오른쪽)
+- **버전**: `app/config/version.py` (v01.20 — **LOD 탭**(맨 오른쪽, 재생용 저폴리 프록시)
+  · v01.17 — **UV Sets 탭**(A00050_uvTool_V02 이식, MeshDoctor 오른쪽)
   · v01.16 — 창 가로를 `A00400_CurveTool` 과 같게(360 요청)
   · v01.14 — **MeshDoctor 탭** 이식 + 새 아이콘
   · v01.13 — `Match > Default` 좌/우 리스트에 **Sort** 버튼)
@@ -413,6 +416,83 @@ mask[v] = M_j 에 짝지은 조인트들의 M_w 웨이트 합 (1 로 자름)
 - 원본 `A00050_uvTool_V02` 는 **지우지 않고 남긴다**(A00300 → MeshDoctor 때와 같은 관례).
 - 창 최소 크기는 이식 전후 **748 x 805 그대로**(오프스크린, yellow_dark) — 폭은 여전히 Match 탭이 정한다.
 - 검증: mayapy 2024 오프스크린 15항목 — 탭 순서 · Help 메뉴 · 버튼 위치 · 표 · 빨간 로그 · Catch/Delete/Rename · undo · 다른 탭 전환.
+
+---
+
+## 3-6. LOD 탭 (v01.20~)
+
+모션캡처 클린업 중 고폴리 아바타 재생이 가끔 끊기는 문제 → **폴리곤을 줄인 같은 아바타**로 재생하기 위한 탭이다.
+게임 엔진의 LOD 처럼 LOD1 ~ LOD5 를 한 번에 만든다. 계획서 · 설계 근거는
+[`plans/A00380_MeshTool_LOD_plan.md`](plans/A00380_MeshTool_LOD_plan.md).
+
+```
+┌ LOD ─────────────────────────────────────────────────────┐
+│ [ List Selected ]                                        │
+│ Sources                                     Number: 1    │
+│ ┌──────────────────────────────────────────────────────┐ │  ← 메시 또는 그룹(아래 메시 전부)
+│ │ geo_grp                                              │ │
+│ └──────────────────────────────────────────────────────┘ │
+│ [Add] [Del] [Up] [Down] / [Sort]                         │
+│ ┌ Levels ──────────────────────────────────────────────┐ │
+│ │ LOD count [3]               (•) Ratio %  ( ) Triangles │
+│ │ LOD1 [50 %]    LOD2 [25 %]    LOD3 [12.5 %]          │ │
+│ └──────────────────────────────────────────────────────┘ │
+│ ┌ Options ─────────────────────────────────────────────┐ │
+│ │ Method      (•) Fast (Cluster)  ( ) Quality (polyReduce) │
+│ │ Source pose (•) Bind            ( ) Current          │ │
+│ │ [x] Approx UVs  [x] Copy materials  [x] Keep thin parts │
+│ │ [ ] Combine per LOD  [x] Overwrite  Min triangles [100] │
+│ └──────────────────────────────────────────────────────┘ │
+│ [                    Build LODs                    ]     │
+│ [LOD1] [LOD2] [LOD3]                 [Delete LODs]       │  ← 마지막 결과의 n 단계 선택 / 그룹 삭제
+│ Mesh | Source | LOD1 | LOD2 | LOD3 | Time                │  ← 결과 표 (행 클릭 = 그 메시의 LOD 선택)
+└──────────────────────────────────────────────────────────┘
+```
+
+### 쓰는 법
+
+1. 아바타의 지오메트리 그룹(예: `geo_grp`)이나 메시들을 선택하고 **List Selected**. 그룹은 아래 메시를 전부 쓴다.
+2. LOD 수와 비율(또는 삼각형 수)을 정하고 **Build LODs** — `<최상위 그룹>_LOD_grp / <..>_LOD1_grp / <메시>_LOD1` 이 생긴다.
+   **Ctrl+Z 한 번**에 전부 사라진다.
+3. 원하는 단계 메시를 A00275 로 같은 조인트에 바인딩하고 원본에서 웨이트를 복사한다.
+
+### 옵션
+
+| 옵션 | 기본 | 뜻 |
+|------|------|----|
+| Method = Fast | ● | numpy **그리드 클러스터링 + 셀마다 QEM 대표점**. 삼각형만, UV 대충, 아주 낮은 비율에서 얇은 부위가 붙을 수 있다 |
+| Method = Quality | | 원본 복사본에 마야 `polyReduce`. 느리지만 깨끗하다(UV 유지) |
+| Source pose = Bind | ● | 스킨 · 블렌드셰이프 아래의 **orig 셰이프(바인드 포즈)** 를 읽는다 → 조인트와 맞아 바로 재바인딩 가능 |
+| Source pose = Current | | 지금 프레임의 변형된 모양 |
+| Approx UVs | ● | (Fast) 버텍스당 UV 하나 — 이음매에서 텍스처가 늘어난다. 끄면 UV 없음 |
+| Copy materials | ● | 원본 셰이딩 그룹을 면마다 그대로 |
+| Keep thin parts | ● | (Fast) 반대쪽을 보는 면(옷 겉/안, 손가락 사이)은 같은 칸이어도 합치지 않는다. 작은 틈이 생길 수 있다 |
+| Combine per LOD | | 단계마다 모든 소스를 메시 하나로 (스킨클러스터 수 ↓, 대신 웨이트를 여러 원본에서 가져와야 한다) |
+| Overwrite | ● | 같은 이름의 `_LOD_grp` 가 있으면 지우고 다시 |
+| Min triangles | 100 | 이 이하 메시는 줄이지 않고 복사(눈 · 치아), 어떤 LOD 도 이보다 작게 줄이지 않는다 |
+
+LOD 메시마다 기록 어트리뷰트가 붙는다 — `junLodSource`(원본 **UUID**) · `junLodLevel` · `junLodTarget` · `junLodMethod`.
+이름이 아니라 UUID 라서 이름을 바꿔도 원본 짝을 찾을 수 있다. UV 세트 이름은 이 툴의 규칙대로 `map1`.
+
+### 속도 (mayapy 2024, 2026-11-16)
+
+| 입력 | Fast | Quality (`polyReduce`) |
+|------|-----:|-----:|
+| 실제 아바타(메시 5개 · 27.6만 삼각형, LOD 3개) | **1.6 s** | 18.9 s |
+| 구 31.9만 삼각형, LOD 5개 | **2.1 s** | 34.4 s |
+
+Fast 는 메시를 한 번 읽고 면 쿼드릭을 한 번 계산해 모든 LOD 가 나눠 쓴다. 그래서 LOD 수가 늘어도 시간이 크게 늘지 않는다.
+
+### 구현 메모
+
+- 코어 `app/core/lod_manager.py`(Qt 비의존), 탭 `app/ui/lod_tab.py`. 설정은 optionVar `JUN_A00380_lod_*`.
+- 목표 삼각형 수에 맞는 격자 해상도를 이분 탐색한다. 개수는 **중복 삼각형을 뺀 뒤** 센다 — 양면 헤어 카드는
+  절반이 중복으로 사라져, 빼기 전으로 세면 목표의 36% 까지 떨어졌다(CHOEUN 헤어 LOD3 실측).
+- 트랜스폼은 `cmds.createNode`, 셰이프는 `MFnMesh.create(parent=)` → 같은 undo 청크로 사라진다.
+- 면을 셰이딩 그룹 순서로 재배열해 만들어서 재질 할당은 그룹당 `sets -forceElement f[a:b]` 한 번.
+- numpy 가 필요하다(Maya 2022+ 내장). 없으면 Build 버튼이 꺼진다.
+- 시험: `docs/plans/A00380_MeshTool_LOD_probe_test.py`(mayapy, 19항목 — 목표 수 · 속도 · 얇은 판 · UV · 재질 · undo/redo ·
+  바인드/현재 포즈 · 월드 위치 · 덮어쓰기 · Combine · Quality).
 
 ---
 

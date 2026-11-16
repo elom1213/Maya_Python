@@ -22,8 +22,14 @@
 # 01.19  트리 펼치기 - 화살표로 펼치면 한 단계만, Shift + 펼치기/접기 = 아래 전부 (Match · By Weight 짝 트리 · UV Set 표).
 #        공용 Framework/qt/MOD_treeExpand_qt_v01
 
-VERSION = "01.19"
-LAST_UPDATE = "2026-11-05"
+# 01.20  **LOD 탭**(맨 오른쪽) - 재생용 저폴리 프록시(LOD1 ~ LOD5) 메시를 빠르게 만든다. 바인딩 안 함.
+#        Fast = numpy 그리드 클러스터링 + 셀마다 QEM 대표점 (polyReduce 대비 실제 아바타 12배, 구 17배),
+#        Quality = polyReduce. 스킨 메시는 orig 셰이프(바인드 포즈)에서 줄인다. 노멀 버킷으로 얇은 부위 보호,
+#        버텍스당 UV · 원본 재질, Combine per LOD, 기록 어트리뷰트 junLodSource(UUID) 등. Ctrl+Z 한 번.
+#        코어 app/core/lod_manager.py, 탭 app/ui/lod_tab.py. 계획서 docs/plans/A00380_MeshTool_LOD_plan.md
+
+VERSION = "01.20"
+LAST_UPDATE = "2026-11-16"
 
 # 01.06  Match 탭 From 리스트의 List From Mesh / Add / Del 버튼 글자가 잘리던 문제.
 #        TSL 위젯 전체에 걸려 있던 setMaximumHeight 를 치우고 리스트에만 높이를 제한한다.

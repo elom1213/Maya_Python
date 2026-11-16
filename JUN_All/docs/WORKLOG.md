@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-11-13
+updated: 2026-11-16
 ---
 
 # 작업 일지 (WORKLOG)
@@ -31,7 +31,17 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-11-13 (오늘)
+## 2026-11-16 (오늘)
+
+> [!summary] **`A00380_MeshTool` v01.20 — LOD 탭 (재생용 저폴리 프록시 메시)** `#A00380_MeshTool`
+- 요청: 모션캡처 클린업 중 고폴리 아바타 재생이 가끔 끊기고 저폴리 바인딩 아바타는 안 끊긴다 → LOD 메시(1~5개)를 마야 기본 기능보다 빠르게 만드는 기능. UV 는 대충이어도 되고 바인딩은 필요 없음. 계획서 작성 → 푸시 → 계획서대로 구현.
+- 계획서 `docs/plans/A00380_MeshTool_LOD_plan.md` + 실측 스크립트(bench · test).
+- 코어 `lod_manager.py`: Fast = numpy 그리드 클러스터링 + 셀마다 QEM 대표점(노멀 6 버킷으로 얇은 부위 보호, 버텍스당 UV, 셰이딩 그룹 순 재배열), Quality = `polyReduce`. 스킨 · 블렌드셰이프 메시는 orig 셰이프(바인드 포즈) 에서. Combine per LOD · Overwrite · Min triangles · 기록 어트리뷰트 `junLodSource`(UUID). 전체 undo 한 번.
+- 탭 `lod_tab.py`: Sources(공용 TSL) · Levels · Options · Build · LOD 선택 · Delete · 결과 표, optionVar 기억, 진행률 팝업, Help > LOD Notes.
+- 실측: 실제 아바타(CHOEUN, 메시 5개 27.6만 삼각형) LOD 3개 Fast **1.6 s** vs Quality 18.9 s · 구 32만 LOD 5개 2.1 s vs 34.4 s. ★ 해상도 탐색은 중복 삼각형을 뺀 뒤 세야 한다(양면 헤어 카드 LOD3 이 목표의 36% → 93%).
+- 시험: mayapy 19/19 · 오프스크린 UI(빌드 · 선택 · 모드 전환 · 삭제, 창 폭 그대로 748). **마야 GUI 실기 · 재바인딩 후 재생 끊김 확인은 아직.**
+
+## 2026-11-13
 
 > [!summary] **`A00590_SwingTwistNative` v01.01 — Convert(원본 노드 → 망) · Restore · Container** `#A00590_SwingTwistNative`
 - 요청: 계획서 다음 단계 §9 · §10 진행(작업 중 PC 가 꺼져 다른 세션에서 재개 — 코드 · 시험은 미커밋으로 남아 있었고, 시험 재실행 후 문서 · 커밋).
