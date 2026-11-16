@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-12
+# last Update date : 2026-11-16
 # A00110_animTool_V02 - Bake > Locator : 리스트의 오브젝트마다 로케이터를 만들어 그 월드 움직임을 구간 베이크 (maya.cmds, UI 비의존)
 #
 # 사용자가 마야에서 쓰던 `_SmartLayer` 패키지의 `LOC + Anim` 버튼을 새로 만든 것 (v02.36, 2026-11-03).
@@ -10,14 +10,16 @@
 #
 # 흐름 (오브젝트 N 개, 한 번의 undo):
 #   1. 로케이터 `<이름>_LOC` 를 월드에 만들고 회전 순서를 원본과 맞춘다(네임스페이스 · 경로는 뺀 잎 이름).
-#   2. 임시 parentConstraint(원본 -> 로케이터, 오프셋 없음) (+ Scale 이면 scaleConstraint).
+#   2. 로케이터를 원본의 **회전 피벗** · 월드 회전에 놓고(v02.62) 임시 parentConstraint(원본 -> 로케이터, 오프셋 유지)
+#      (+ Scale 이면 scaleConstraint).
 #   3. **bakeResults 한 번**(simulation, 전 로케이터 · 전 구간) - C++ 베이커라 빠르다.
 #      진행률은 `MDGMessage.addTimeChangeCallback` 으로 받는다: simulation 베이크는 프레임마다 시간을 옮기며
 #      콜백을 부른다(mayapy 2024 실측: 1~200 -> 201 회). 구간을 쪼개 여러 번 부르면 첫 호출이 컨스트레인트를
 #      끊어(disableImplicitControl) 다음 구간이 안 따라오므로 쪼개지 않는다.
 #   4. 임시 컨스트레인트 삭제 -> (옵션) 회전 커브 오일러 필터 -> 현재 시간 복원 -> 로케이터 선택.
 #   5. (옵션, v02.37) 거꾸로 **로케이터 -> 원본 오브젝트** 컨스트레인트(parent 기본 · point · orient · scale).
-#      로케이터를 움직여 원본을 조종하는 용도. 오프셋 없음(로케이터 월드 = 원본 월드라 구간 안에서 원본이 그대로).
+#      로케이터를 움직여 원본을 조종하는 용도. v02.62 부터 Start 에서 오프셋 유지(mo=True) - 피벗 · rotateAxis ·
+#      부모 비균일 스케일 차이를 흡수해 구간 안에서 원본 월드가 그대로다(v02.61 까지 mo=False 라 Freeze 한 컨트롤러가 어긋났다).
 #      잠긴 채널 · 키 말고 다른 것이 구동하는 채널은 그 축만 건너뛴다. 굽지 않은 채널 묶음의 컨스트레인트는 걸지 않는다.
 #   6. (v02.61) **구간 블렌드** `Blend only in Frame Range`(기본 켬) - 컨스트레인트가 끼운 pairBlend 의 웨이트 attr
 #      (`blendParent1` · `blendPoint1` · `blendOrient1`) 를 Start ~ End 만 1, 밖은 0(step 키) -> 구간 안은 로케이터, 밖은 원래 움직임.
@@ -167,7 +169,11 @@ class LocatorBakeManager:
 
         types : CONSTRAINT_TYPES 중 고른 것. 굽지 않은 채널 묶음은 건너뛴다(translate=False 면 point 없음 ·
         parent 는 이동 축 skip). 축 단위로 잠김 / 다른 구동을 건너뛰고, 오브젝트 하나가 실패해도 나머지는 계속한다.
-        blend_range : (start, end) 면 구간 블렌드(v02.61) - pairBlend 웨이트를 구간에만 1. scale 은 못 한다(경고)."""
+        blend_range : (start, end) 면 구간 블렌드(v02.61) - pairBlend 웨이트를 구간에만 1. scale 은 못 한다(경고).
+
+        ★ v02.62 `maintainOffset=True` - **현재 시간에 로케이터 = 오브젝트 월드** 여야 한다(bake 는 Start 로 옮겨서 부른다).
+        mo=False 는 오브젝트의 회전 피벗을 로케이터에 붙이고 rotateAxis · 부모의 비균일 스케일을 무시해서, Freeze 한
+        컨트롤러(피벗 ≠ 원점) 는 구간 안에서 수 cm 어긋났다(사용자 제보). 그 차이는 오브젝트 공간에서 일정해 오프셋이 흡수한다."""
         chosen = set(types or ())
         types = [t for t in LocatorBakeManager.CONSTRAINT_TYPES if t in chosen]
         baked = {"translate": translate, "rotate": rotate, "scale": scale}
@@ -193,7 +199,7 @@ class LocatorBakeManager:
                                 LocatorBakeManager._ensure_keyed(obj, "translate", [a for a in "xyz" if a not in skip_t])
                             if len(skip_r) < 3:
                                 LocatorBakeManager._ensure_keyed(obj, "rotate", [a for a in "xyz" if a not in skip_r])
-                        con = cmds.parentConstraint(loc, obj, maintainOffset=False,
+                        con = cmds.parentConstraint(loc, obj, maintainOffset=True,
                                                     skipTranslate=skip_t or "none", skipRotate=skip_r or "none")
                         made += con
                         if blend_range:
@@ -215,7 +221,7 @@ class LocatorBakeManager:
                           "scale": cmds.scaleConstraint}[ctype]
                     if blend_range and need != "scale":
                         LocatorBakeManager._ensure_keyed(obj, need, [a for a in "xyz" if a not in skip])
-                    con = fn(loc, obj, maintainOffset=False, skip=skip or "none")
+                    con = fn(loc, obj, maintainOffset=True, skip=skip or "none")
                     made += con
                     if blend_range:
                         if need == "scale":
@@ -249,9 +255,27 @@ class LocatorBakeManager:
     _CURVE_TYPE = {"t": "animCurveTL", "r": "animCurveTA", "s": "animCurveTU"}
 
     @staticmethod
-    def _snap_to(loc, src):
-        """로케이터(월드 루트)의 이동 · 회전을 src 의 현재 월드 자세로. 스케일은 1 그대로."""
+    def pivot_local(src):
+        """src 의 회전 피벗(rotatePivot) 위치를 src 오브젝트 공간 점으로 (MPoint) - v02.62.
+
+        ★ worldMatrix 의 원점은 Freeze Transformations 한 컨트롤러에선 컨트롤러가 아니라 얼린 자리(보통 월드 원점)다.
+        로케이터는 컨트롤러가 실제로 도는 자리 = 회전 피벗에 둔다. 피벗이 오브젝트 공간에서 고정이면 프레임마다
+        `pivot_local * worldMatrix` 가 그 프레임의 피벗 월드 위치다."""
+        ws = cmds.xform(src, q=True, worldSpace=True, rotatePivot=True)       # UI 단위
+        ws = [om.MDistance(v, om.MDistance.uiUnit()).asCentimeters() for v in ws]   # 행렬은 내부 단위(cm)
         m = om.MMatrix(cmds.getAttr(src + ".worldMatrix[0]"))
+        return om.MPoint(ws[0], ws[1], ws[2]) * m.inverse()
+
+    @staticmethod
+    def pivot_matrix(src):
+        """worldMatrix 앞에 곱하면 원점이 회전 피벗으로 가는 이동 행렬 (회전 · 스케일은 그대로)."""
+        p = LocatorBakeManager.pivot_local(src)
+        return om.MMatrix([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, p.x, p.y, p.z, 1])
+
+    @staticmethod
+    def _snap_to(loc, src):
+        """로케이터(월드 루트)를 src 의 현재 월드 자세로 - 위치 = 회전 피벗(v02.62), 회전 = 월드 회전. 스케일은 1 그대로."""
+        m = LocatorBakeManager.pivot_matrix(src) * om.MMatrix(cmds.getAttr(src + ".worldMatrix[0]"))
         vals = LocatorBakeManager.decompose([m], cmds.getAttr(loc + ".rotateOrder"))
         cmds.setAttr(loc + ".translate", *[om.MDistance(vals[k][0]).asUnits(om.MDistance.uiUnit())
                                            for k in ("tx", "ty", "tz")])
@@ -263,16 +287,18 @@ class LocatorBakeManager:
         return om.MMatrix(cmds.getAttr("{0}.{1}".format(node, attr), time=frame))
 
     @staticmethod
-    def sample_world(node, start, end, step=None):
+    def sample_world(node, start, end, step=None, pivot=False):
         """[start, end] 프레임마다 node 의 월드 행렬(MMatrix 목록) - **부모가 움직이지 않는다는 가정**.
 
-        씬 시간은 옮기지 않는다. 부모 쪽 행렬은 start 에서 한 번, 프레임마다는 로컬 matrix 만 읽는다."""
+        씬 시간은 옮기지 않는다. 부모 쪽 행렬은 start 에서 한 번, 프레임마다는 로컬 matrix 만 읽는다.
+        pivot=True 면 행렬 원점을 회전 피벗으로 옮긴다(v02.62 - 일반 경로의 로케이터 위치와 같게)."""
         local0 = LocatorBakeManager._matrix_at(node, "matrix", start)
         world0 = LocatorBakeManager._matrix_at(node, "worldMatrix[0]", start)
         pm = local0.inverse() * world0          # world = local * Pm (행벡터 규약)
+        pv = LocatorBakeManager.pivot_matrix(node) if pivot else om.MMatrix()
         out = []
         for i, f in enumerate(range(int(start), int(end) + 1)):
-            out.append(LocatorBakeManager._matrix_at(node, "matrix", f) * pm)
+            out.append(pv * LocatorBakeManager._matrix_at(node, "matrix", f) * pm)
             if step:
                 step(i + 1)
         return out
@@ -419,7 +445,7 @@ class LocatorBakeManager:
                                     _step(_base + done, total, "{0}  frame {1} / {2}".format(
                                         _name, start + done - 1, end))
 
-                            worlds = LocatorBakeManager.sample_world(src, start, end, step=_fstep)
+                            worlds = LocatorBakeManager.sample_world(src, start, end, step=_fstep, pivot=True)
                             values = LocatorBakeManager.decompose(
                                 worlds, cmds.getAttr(loc + ".rotateOrder"))
                             LocatorBakeManager.write_curves(loc, start, values, attrs)
@@ -462,6 +488,8 @@ class LocatorBakeManager:
                     # 5. (옵션) 로케이터 -> 오브젝트 컨스트레인트. 원본 키는 그대로 두고 pairBlend 로 컨스트레인트가 덮는다.
                     if constrain:
                         _phase(LocatorBakeManager.PHASE_CONSTRAIN)
+                        # ★ 오프셋을 재는 시각 = Start (구간 안이라 로케이터 = 오브젝트 월드. 구간 밖이면 로케이터가 끝 값에 멈춰 있다)
+                        cmds.currentTime(start, edit=True)
                         for i, pair in enumerate(zip(locators, targets)):
                             made, warns = LocatorBakeManager.constrain_objects(
                                 [pair], constrain, translate=translate, rotate=rotate, scale=scale,
@@ -476,7 +504,7 @@ class LocatorBakeManager:
                 cmds.currentTime(current, edit=True)
                 return [], "[Error] Locator bake failed : {0}".format(str(exc).strip())
 
-            if not fast:      # 빠른 경로는 시간을 건드리지 않았다(되돌리는 것도 시간 변경이다)
+            if not fast or constrain:   # 빠른 경로 + 컨스트레인트 없음은 시간을 건드리지 않았다(되돌리는 것도 시간 변경이다)
                 cmds.currentTime(current, edit=True)
             if select_result:
                 cmds.select(locators, replace=True)

@@ -1,6 +1,6 @@
 ---
 name: wip-a00110-locator-bake
-description: A00110_animTool_V02 v02.36 Bake > Locator (LOC + Anim) - _SmartLayer 의 같은 버튼을 새로, bakeResults 한 번 + MDGMessage 시간 변경 콜백으로 게이지, 구간을 쪼개면 컨스트레인트가 끊긴다
+description: A00110_animTool_V02 v02.36~62 Bake > Locator (LOC + Anim) - _SmartLayer 의 같은 버튼을 새로, bakeResults 한 번 + MDGMessage 시간 변경 콜백으로 게이지, 구간을 쪼개면 컨스트레인트가 끊긴다
 metadata:
   type: project
 ---
@@ -41,5 +41,11 @@ metadata:
   구간 밖이 끝 값으로 늘어난다 → Bake 탭이 블렌드 키 있는 오브젝트를 `bake_layered(edge_keys, unwrap)` 로, pairBlend 뒤 원래 커브는 `pairblend_curve`.
   ★ Bake 탭 `layered` 판정에서 레이어에 안 든 오브젝트도 장면에 레이어가 있으면 대상 = BaseAnimation → `layer_curve` 가 pairBlend 를 못 지나 None.
   사용 흐름: LOC + Anim(Constrain · 구간 블렌드) → 로케이터 조정 → Bake > Bake 같은 구간 → 로케이터 삭제. 시험 `test_locator_bake_layers.py` 28/28. **GUI 확인 아직.**
+
+- **v02.62 어긋남 수정**(2026-11-16, 사용자 제보 "레이어 + 움직이는 부모에서 가끔 안 맞는다"): 실제 원인은 레이어 · 부모가 아니라
+  로케이터 -> 오브젝트 컨스트레인트 `mo=False`. ★ **parentConstraint(mo=False) 는 대상의 회전 피벗을 타깃에 붙이고 rotateAxis 를 무시** →
+  Freeze 한 컨트롤러(피벗 ≠ 원점) 6.06 · 옮긴 피벗 5.20 · rotateAxis 0.36 어긋남. 해법 = Start 로 시간 옮겨 `mo=True`,
+  로케이터는 worldMatrix 원점이 아니라 **회전 피벗**(`pivot_local`, xform -ws -rp 는 UI 단위 → cm 환산). 부모 비균일 스케일(shear)은 한계로 남김.
+  ★ 시험 씬엔 **Freeze 한 컨트롤러 · 피벗 · rotateAxis** 를 꼭 넣을 것 — 원점 피벗 원 컨트롤러로는 통과해서 놓쳤다. 시험 43/43. **GUI 확인 아직.**
 
 관련: [[framework-progress-widget]], [[framework-timerange-widget]], [[wip-a00110-get-sel-range]], [[wip-a00110-counter-layer]]

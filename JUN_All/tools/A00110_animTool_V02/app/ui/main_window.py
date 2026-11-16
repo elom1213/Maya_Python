@@ -2335,7 +2335,8 @@ class MainWindow(QWidget):
         self.grp_lb_constrain.setChecked(False)
         self.grp_lb_constrain.setToolTip(
             "After the bake, constrain every listed object to its locator\n"
-            "(the locator drives the object). No offset - the locator already matches the object.\n"
+            "(the locator drives the object). Offset kept at Start, so the object stays exactly\n"
+            "where it was (frozen controllers, moved pivots, rotate axis).\n"
             "Locked channels and channels driven by something other than keys are skipped per axis.\n"
             "Objects with keys in animation layers are constrained too (no new layer).")
         con_box = QVBoxLayout(self.grp_lb_constrain)

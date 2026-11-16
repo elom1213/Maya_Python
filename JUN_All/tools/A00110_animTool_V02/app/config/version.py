@@ -233,5 +233,16 @@
 #          pairBlend 뒤 원래 커브는 `pairblend_curve` 로 찾는다(직결 커브가 없다).
 #        시험 test_locator_bake_layers 28/28 · UI 39/39 · bake_layers 19/19 · 기존 Locator 시험 전부 · counter 92 · merge 111.
 
-VERSION = "02.61"
-LAST_UPDATE = "2026-11-12"
+# 02.62  Locator > Constrain 버그 수정 (사용자 제보): Parent + Blend only in Frame Range 로 구우면 어떤 컨트롤러는 구간 안에서
+#        원래 월드 위치 · 회전에서 어긋났다. 원인 = 로케이터 -> 오브젝트 컨스트레인트가 mo=False 였다 - parentConstraint 는
+#        오브젝트의 **회전 피벗**을 로케이터에 붙이고 **rotateAxis** 를 무시한다. Freeze Transformations 한 컨트롤러(피벗 ≠ 원점)는
+#        6.06, 옮긴 피벗 5.20, rotateAxis 0.36 어긋났다(레이어 · 움직이는 부모는 원인이 아니었다 - 그것만으론 0).
+#        - 컨스트레인트를 **Start 프레임에서 maintainOffset=True** 로 (Start 에선 로케이터 = 오브젝트 월드). 구간 밖에서 실행해도 같다.
+#        - 로케이터 위치 = 컨트롤러의 **회전 피벗**(예전엔 worldMatrix 원점 = Freeze 한 자리, 보통 월드 원점). 회전은 그대로 월드 회전.
+#          Fast 경로도 같은 자리(피벗을 오브젝트 공간 점으로 한 번 읽어 프레임마다 행렬 앞에 곱함, 씬 단위 m 에서도 cm 로 환산).
+#        - 남는 한계: 부모 그룹이 **비균일 스케일**(예 1, 2, 0.5)이면 월드 행렬에 shear 가 생겨 로케이터(직교)로 다 못 옮긴다(0.3 정도).
+#        시험 test_locator_bake_layers 43/43(+15: frozen · pivot · rotaxis · joint · all × 2단 부모 키 + 레이어 2개 + 구간 밖 실행) ·
+#        locator_bake 25 · constrain 34 · fast 18 · UI 39 · bake_layers 19.
+
+VERSION = "02.62"
+LAST_UPDATE = "2026-11-16"

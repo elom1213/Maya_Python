@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-16 (오늘)
 
+> [!summary] **`A00110_animTool_V02` v02.62 — Locator > Constrain 어긋남 수정** `#A00110_animTool_V02`
+- 제보: Bake > Locator 에서 Constrain Objects to Locators(Parent) + Blend only in Frame Range 로 구우면, 다른 레이어에도 키가 있고 부모 그룹도 움직이는 컨트롤러가 어떤 경우엔 구간 안에서 원래 월드 위치 · 회전과 달라진다.
+- 원인 실측(mayapy, 변형별): 레이어 · 움직이는 부모만으론 0. **Freeze 한 컨트롤러 6.06 · 옮긴 피벗 5.20 · rotateAxis 0.36 · 부모 비균일 스케일 0.47** — 로케이터 -> 오브젝트 컨스트레인트가 `mo=False` 라 회전 피벗을 로케이터에 붙이고 rotateAxis 를 무시했다.
+- 수정: Start 로 시간을 옮겨 `maintainOffset=True`(구간 밖에서 실행해도 같음) · 로케이터 위치를 worldMatrix 원점 대신 **회전 피벗**에(Fast 경로 포함, 씬 단위 m 환산). 비균일 스케일 부모는 shear 라 한계로 남김.
+- 시험 `test_locator_bake_layers.py` 43/43(+15) · 기존 Locator · Bake 시험 전부 통과. GUI 확인 아직.
+
 > [!summary] **`A00380_MeshTool` v01.20 — LOD 탭 (재생용 저폴리 프록시 메시)** `#A00380_MeshTool`
 - 요청: 모션캡처 클린업 중 고폴리 아바타 재생이 가끔 끊기고 저폴리 바인딩 아바타는 안 끊긴다 → LOD 메시(1~5개)를 마야 기본 기능보다 빠르게 만드는 기능. UV 는 대충이어도 되고 바인딩은 필요 없음. 계획서 작성 → 푸시 → 계획서대로 구현.
 - 계획서 `docs/plans/A00380_MeshTool_LOD_plan.md` + 실측 스크립트(bench · test).

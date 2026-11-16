@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-# A00110_animTool_V02 v02.61 - Bake > Locator 의 Constrain Objects : 애니메이션 레이어 컨트롤러 · 구간 블렌드(blendParent) ·
+# A00110_animTool_V02 v02.61 ~ 02.62 - Bake > Locator 의 Constrain Objects : 애니메이션 레이어 컨트롤러 · 구간 블렌드(blendParent) ·
 # Bake 탭으로 굽기 시험 (mayapy, 헤드리스)
 #   "C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe" test_locator_bake_layers.py
 #
 # 판정 : BaseAnimation + 다른 레이어에 키가 있는 컨트롤러에도 컨스트레인트가 걸린다(v02.57 까지 0 개). 새 레이어는 안 생긴다.
 #        Blend only in Frame Range = pairBlend 웨이트(blendParent1 ...) step 키 -> 구간 안은 로케이터, 밖은 원래 월드.
 #        그 상태로 Bake 탭(BakeManager.bake) -> 로케이터 · 컨스트레인트를 지워도 전 프레임 같은 움직임(키만으로).
+#        v02.62 : Freeze 한(피벗 ≠ 원점) · rotateAxis · 조인트 컨트롤러 + 움직이는 2단 부모 + 레이어에서도 구간 안 월드 그대로.
 import os
 import sys
 
@@ -208,6 +209,73 @@ ctl, plain, bare = build()
 cmds.setAttr(ctl + ".tz", lock=True)
 locs, msg = LBM.bake([ctl], START, END, constrain=["parent"], constrain_range=True)
 check("locked axis skipped, rest constrained", len(cmds.ls(type="parentConstraint")) == 1 and "T[z]" in msg, msg)
+
+# ---------------------------------------------------------------- 9. v02.62 Freeze 한 컨트롤러 · 피벗 · rotateAxis · 조인트 + 움직이는 2단 부모 + 레이어
+def build_rig(kind):
+    """top(키) > grp(키) > arm_ctl (Base 키 + Layer1 additive + Layer2 override 0.5). kind 마다 피벗 / 축이 원점과 다르다."""
+    cmds.file(new=True, force=True)
+    cmds.playbackOptions(min=1, max=40, ast=1, aet=40)
+    top = cmds.group(empty=True, name="top")
+    grp = cmds.group(empty=True, name="grp", parent=top)
+    for t, v in ((1, 0), (40, 30)):
+        cmds.setKeyframe(grp, at="tx", t=t, v=v)
+        cmds.setKeyframe(grp, at="ry", t=t, v=v * 2)
+        cmds.setKeyframe(top, at="rz", t=t, v=v)
+        cmds.setKeyframe(top, at="ty", t=t, v=-v)
+    if kind == "joint":
+        cmds.select(clear=True)
+        ctl = cmds.joint(name="arm_ctl")
+        cmds.parent(ctl, grp)
+        cmds.setAttr(ctl + ".jointOrient", 30, -40, 15)
+    else:
+        ctl = cmds.circle(name="arm_ctl")[0]
+        cmds.parent(ctl, grp)
+    if kind in ("frozen", "all"):
+        cmds.setAttr(ctl + ".t", 5, 3, -2)
+        cmds.setAttr(ctl + ".r", 20, 10, 5)
+        cmds.makeIdentity(ctl, apply=True, t=True, r=True, s=True)
+    if kind in ("pivot", "all"):
+        cmds.xform(ctl, piv=(3, -2, 4), os=True)
+    if kind in ("rotaxis", "all"):
+        cmds.setAttr(ctl + ".rotateAxis", 10, -20, 5)
+    cmds.setAttr(ctl + ".rotateOrder", 2)
+    for t, (x, y, z) in ((1, (0, 0, 0)), (20, (60, 40, -30)), (40, (120, 90, 80))):
+        for a, v in (("rx", x), ("ry", y), ("rz", z), ("ty", t * 0.2)):
+            cmds.setKeyframe(ctl, at=a, t=t, v=v)
+    cmds.select(ctl)
+    l1 = cmds.animLayer("Layer1", addSelectedObjects=True)
+    l2 = cmds.animLayer("Layer2", addSelectedObjects=True, override=True)
+    cmds.setAttr(l2 + ".weight", 0.5)
+    for t, v in ((1, 0), (15, 4), (40, -2)):
+        cmds.setKeyframe(ctl, at="tz", t=t, v=v, animLayer=l1)
+        cmds.setKeyframe(ctl, at="rx", t=t, v=v * 10, animLayer=l1)
+    for t, v in ((1, 1), (30, 6)):
+        cmds.setKeyframe(ctl, at="tx", t=t, v=v, animLayer=l2)
+        cmds.setKeyframe(ctl, at="rz", t=t, v=v * 9, animLayer=l2)
+    cmds.select(clear=True)
+    return cmds.ls(ctl, long=True)[0]
+
+
+for kind in ("frozen", "pivot", "rotaxis", "joint", "all"):
+    ctl = build_rig(kind)
+    orig = snapshot([ctl])
+    piv = {}
+    for f in range(START, END + 1):
+        cmds.currentTime(f)
+        piv[f] = cmds.xform(ctl, q=True, ws=True, rotatePivot=True)
+    cmds.currentTime(35)        # 구간 밖에서 실행해도 같아야 한다
+    locs, msg = LBM.bake([ctl], START, END, constrain=["parent"], constrain_range=True)
+    loc = locs[0]
+    off = [f for f in range(START, END + 1) if not same(world(loc, f)[12:15], piv[f])]
+    check("{0}: locator sits on the controller's rotate pivot every frame".format(kind), not off, off[:5])
+    bad = bad_frames(ctl, orig)
+    check("{0}: right after - controller world unchanged inside and outside the range".format(kind), not bad, bad[:5])
+    move_locators(locs)
+    goal = snapshot([ctl])
+    BakeManager.bake([ctl], START, END)
+    cmds.delete(loc)
+    bad = bad_frames(ctl, goal)
+    check("{0}: Bake tab + delete locator = the constrained motion".format(kind), not bad, bad[:5])
 
 print("RESULT {0}/{1}".format(sum(R), len(R)))
 maya.standalone.uninitialize()
