@@ -4,7 +4,7 @@
 독립 실행(standalone) Qt 앱을 직접 설계·개발한 포트폴리오 저장소입니다.
 
 > 작성자: **Ji Hun Park (Junny)** · Technical Artist / Rigging & Pipeline Tools Developer
-> 최근 갱신: 2026-11-16 · 툴 폴더 **76개**(템플릿·구버전 포함, **현행 61종**) · 공용 프레임워크 1개
+> 최근 갱신: 2026-11-17 · 툴 폴더 **76개**(템플릿·구버전 포함, **현행 61종**) · 공용 프레임워크 1개
 
 ---
 
@@ -187,6 +187,7 @@ A narrative work summary lives in
 
 | 시기 | 내용 |
 |------|------|
+| 2026-11-17 | **`A00110_animTool_V02` v02.64** Bake > Counter Layer — Create Counter Layer 를 누르면 작업 크기와 상관없이 늘 진행 팝업(게이지 + 지금 단계, 로그에 걸린 시간) |
 | 2026-11-16 | **`A00380_MeshTool` v01.20 LOD 탭** — 모캡 클린업 재생 끊김 대응용 저폴리 프록시(LOD1~5)를 한 번에, numpy 그리드 클러스터링 + QEM 대표점으로 실제 아바타(27.6만 삼각형) LOD 3개 1.6초(`polyReduce` 18.9초), 스킨 메시는 바인드 포즈에서 · 원본 재질 · 대략 UV · 원본 UUID 기록 · **`A00110_animTool_V02` v02.62** Bake > Locator > Constrain 이 Freeze 한 컨트롤러 · 옮긴 피벗 · rotateAxis 에서 구간 안 월드가 어긋나던 문제 수정(Start 에서 오프셋 유지, 로케이터는 회전 피벗에) · **v02.63** Bake > Bake 의 Bake List 에 진행 팝업(실제로 도는 단계만, 프레임마다 게이지) · **공용 진행 팝업 Cancel** = 실행 전으로 자동 되돌리기(`run_undoable`), `A00120_FKIK` v01.13 Bake IK / FK 에 적용 |
 | 2026-11-13 | **`A00590_SwingTwistNative` 신규 v01.00 → v01.01** — MetaHuman `SwingTwistEvaluatorNode`(Epic 플러그인)를 마야 동봉 `quatNodes` 망으로 생성(공용 `Framework/core/maya_swing_twist.py`, `create_swing_twist_evaluator` 와 같은 인자), 원본과 나란히 놓은 골든 시험에서 오일러 값까지 최대 2e-13° · Build / Rigs 탭 · **v01.01** 기존 원본 노드 Convert(무작위 포즈 대조 후 교체, 블렌드 키 이동) · Restore(DNA export 용) · 원본 이름으로 공개한 black box container |
 | 2026-11-12 | **`A00110_animTool_V02` v02.58~61 Bake > Locator > Constrain** — 애니메이션 레이어(BaseAnimation + 다른 레이어)에 키가 있는 컨트롤러에도 컨스트레인트, **Blend only in Frame Range**(기본 켬) — `blendParent1` step 키로 Start ~ End 만 로케이터 · 밖은 원래 움직임, 레이어 없이 → Bake > Bake 로 굽고 로케이터를 지우면 키만으로 같은 움직임(Bake 탭이 구간 밖 키 모양 보존) · v02.60 View > Layers — 고른 오브젝트가 든 레이어에 타원 표시 |
