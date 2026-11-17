@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-11-16
+updated: 2026-11-17
 ---
 
 # 작업 일지 (WORKLOG)
@@ -31,7 +31,16 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-11-16 (오늘)
+## 2026-11-17 (오늘)
+
+> [!summary] **`A00110_animTool_V02` v02.64 — Counter Layer 진행 팝업 항상** `#A00110_animTool_V02`
+- 요청: Bake > Counter Layer 에서 Create Counter Layer 를 누르면 팝업창의 게이지로 진행도를 알려 줄 것.
+- 팝업은 있었지만 오브젝트 × 프레임 > 2000 일 때만 떴다 → 임계(`PROGRESS_THRESHOLD`) 제거, 늘 공용 progress 팝업. 메시지는 core 그대로(Detecting still spans · Sampling · Keying frame), 로그에 걸린 시간.
+- 시험 `tests/test_counter_layer_progress_ui.py` 11/11(작은 작업 2 × 40 프레임에서 Everywhere · Stationary 팝업 1회 · 게이지 100% · 결과 동일 · 빈 목록이면 팝업 없음) · `test_counter_layer.py` 92/92. GUI 확인 아직.
+
+---
+
+## 2026-11-16
 
 > [!summary] **공용 진행 팝업 Cancel = 실행 전으로 자동 되돌리기 · `A00120_FKIK` v01.13** `#Framework` `#A00120_FKIK`
 - 요청: 공용 게이지(A00120_FKIK 등)에 Cancel 을 만들어 진행 중인 작업을 멈추고 실행 전으로(Ctrl+Z 또는 자동으로) 되돌릴 수 없나.

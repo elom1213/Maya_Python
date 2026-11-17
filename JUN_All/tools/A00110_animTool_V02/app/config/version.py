@@ -250,5 +250,11 @@
 #        로그 끝에 걸린 시간. 굽는 결과는 그대로(팝업 없이 core 로 구운 것과 1e-6 동일). 시험 tests/test_bake_progress_ui.py 12/12 ·
 #        bake_layers 19 · locator_bake_layers 43 · locator UI 39.
 
-VERSION = "02.63"
-LAST_UPDATE = "2026-11-16"
+# 02.64  Bake > Counter Layer 의 `Create Counter Layer` 를 누르면 **늘 진행 팝업**(사용자 요청). 예전엔 오브젝트 x 프레임 > 2000
+#        일 때만 떠서 작은 작업은 표시 없이 멈춘 듯 보였다(`CounterLayerManager.PROGRESS_THRESHOLD` 제거). 게이지 + core 메시지
+#        (Detecting still spans / Sampling / Keying frame) + 로그에 걸린 시간. 결과는 그대로.
+#        시험 tests/test_counter_layer_progress_ui.py 11/11(Everywhere · Stationary 팝업 1회 · 100% · 결과 동일 · 입력 오류면 팝업 없음) ·
+#        test_counter_layer 92/92.
+
+VERSION = "02.64"
+LAST_UPDATE = "2026-11-17"

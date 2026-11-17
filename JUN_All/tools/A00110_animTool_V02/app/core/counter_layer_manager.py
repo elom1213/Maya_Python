@@ -80,9 +80,6 @@ class CounterLayerManager:
     # 월드 스케일이 바뀌었는지(T/R 만으로는 못 돌린다) 판정 허용오차.
     SCALE_TOL = 1e-4
 
-    # UI 가 진행 팝업을 띄울 기준 (오브젝트 x 프레임). 실측 0.9 ms 단위 -> 약 2 초.
-    PROGRESS_THRESHOLD = 2000
-
     # Hold 모드. Everywhere = 모든 프레임에서 되돌림, Stationary = 정지 구간만 고정(사이는 분배).
     HOLD_ALL = "all"
     HOLD_STATIONARY = "stationary"

@@ -25,7 +25,7 @@ metadata:
 - 새 레이어는 `children[-1]`(맨 위), 이름 충돌은 마야가 `name1` 로 — 로그가 실제 이름을 전한다. `_select_only` 로 새 레이어만 selected+preferred.
 - GUI 함정: `xform` = setAttr 라 **autoKeyframe ON 이면 활성 레이어에 자체 키** → 실행 중 끄고 복원(mayapy 로는 확인 불가 — 실기 1순위).
 - 거부: 레이어 뮤트 상태 · solo 존재 · Base 체크 · T/R 둘 다 꺼짐. 스케일 v1 제외(월드 스케일 바뀌면 로그 노트).
-- UI = `Bake > Counter Layer`(위젯 접두 `cl_`: `cl_tsl` · `lw_cl_layers`+`chk_cl_layers` · `rb_cl_timeline/custom` · `cl_range` · `cb_cl_t/r` · `sb_cl_step` · `le_cl_name` · `cb_cl_zero/skip/select` · `btn_cl_create`). 오브젝트 × 프레임 > `PROGRESS_THRESHOLD`(2000) 이면 `JUN_mod_progress_qt` 팝업 한 단계.
+- UI = `Bake > Counter Layer`(위젯 접두 `cl_`: `cl_tsl` · `lw_cl_layers`+`chk_cl_layers` · `rb_cl_timeline/custom` · `cl_range` · `cb_cl_t/r` · `sb_cl_step` · `le_cl_name` · `cb_cl_zero/skip/select` · `btn_cl_create`). `JUN_mod_progress_qt` 팝업 한 단계 — **v02.64(2026-11-17, 사용자 요청)부터 늘 띄운다**(`PROGRESS_THRESHOLD` 제거, 작은 작업도). 시험 `test_counter_layer_progress_ui.py` 11/11.
 - `_SmartLayer` 는 `.pyc` — **디컴파일 금지**, 툴팁·Starter Guide 텍스트만 참고. 속도 비례 분배(Linear Offset 등)는 v2 후보.
 - 같은 날 [[wip-a00110-layer-range-merge]] 도 `Bake` 하위 탭 계획 — 그쪽 구현 때 `BAKE_PAGES` 튜플 · `version.py` 에 이 탭이 이미 있음을 전제로.
 

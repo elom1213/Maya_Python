@@ -2844,8 +2844,8 @@ class MainWindow(QWidget):
         self.btn_cl_create.setToolTip(
             "Sample the listed objects' world matrix with the checked layers muted, "
             "then key a new\nadditive layer so they land there again with the layers "
-            "on. One undo step.\nLong ranges are sampled in chunks of {0} frames, so "
-            "memory stays flat.".format(CounterLayerManager.CHUNK_FRAMES))
+            "on. One undo step.\nA progress popup shows the work. Long ranges are sampled "
+            "in chunks of {0} frames, so memory stays flat.".format(CounterLayerManager.CHUNK_FRAMES))
         tab_layout.addWidget(self.btn_cl_create)
 
         tab_layout.addStretch(1)
@@ -5637,17 +5637,15 @@ class MainWindow(QWidget):
         hold = self._cl_hold()
         stationary = (hold == CounterLayerManager.HOLD_STATIONARY)
         step = 1 if stationary else self.sb_cl_step.value()
-        frames = len(range(start, end + 1, step)) + (1 if (end - start) % step else 0)
 
-        # 오브젝트 x 프레임이 크면 진행 팝업 (실측 0.9 ms / 단위 -> 2000 이면 약 2 초).
-        dlg = None
-        if len(objs) * frames > CounterLayerManager.PROGRESS_THRESHOLD:
-            dlg = JUN_mod_progress_qt.JUN_mod_progress_qt_v01(
-                self, title="Counter Layer",
-                phases=[("Detecting + sampling + keying" if stationary
-                         else "Sampling + keying", 1)])
-            dlg.start()
-            dlg.begin_phase()
+        # v02.64 진행 팝업은 늘 띄운다(예전엔 오브젝트 x 프레임 > 2000 일 때만 - 작은 작업은 아무 표시 없이 멈춘 듯 보였다).
+        # 단계 하나 + core 의 메시지(Detecting still spans / Sampling / Keying frame)로 지금 하는 일을 보여 준다.
+        dlg = JUN_mod_progress_qt.JUN_mod_progress_qt_v01(
+            self, title="Counter Layer",
+            phases=[("Detecting + sampling + keying" if stationary
+                     else "Sampling + keying", 1)])
+        dlg.start()
+        dlg.begin_phase()
 
         elapsed = None
         try:
@@ -5657,15 +5655,14 @@ class MainWindow(QWidget):
                 zero_outside=self.cb_cl_zero.isChecked(),
                 skip_unchanged=self.cb_cl_skip.isChecked(),
                 select_new=self.cb_cl_select.isChecked(),
-                progress=dlg.callback() if dlg else None,
+                progress=dlg.callback(),
                 hold=hold, tol_t=self.dsb_cl_tol_t.value(),
                 tol_r=self.dsb_cl_tol_r.value(),
                 min_span=self.sb_cl_min_span.value(),
                 anchor=self._cl_anchor(), blend=self._cl_blend())
         finally:
-            if dlg:
-                elapsed = dlg.elapsed()
-                dlg.finish()
+            elapsed = dlg.elapsed()
+            dlg.finish()
 
         if elapsed is not None:
             msg += "  ({0:.1f}s)".format(elapsed)

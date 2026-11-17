@@ -1771,7 +1771,8 @@ v02.04~ 이 동작은 **공용 위젯** `Framework.qt` 의 `JUN_mod_expand_qt_v0
     톨러런스 조정은 이걸 보고 한다.
   - 정지 구간이 없는 오브젝트(`No stationary span`) · 범위 전체가 정지인 오브젝트(`Stationary for the whole range`)는
     경고와 함께 건너뛴다(멤버에서 제외).
-- **Create Counter Layer**: 실행. **오브젝트 × 프레임 > 2000** 이면 진행 팝업이 뜬다(실측 0.9 ms/단위 → 50 컨트롤 ×
+- **Create Counter Layer**: 실행. **진행 팝업**이 늘 뜬다(v02.64~, 예전엔 오브젝트 × 프레임 > 2000 일 때만) — 게이지와
+  지금 하는 일(`Detecting still spans` · `Sampling` · `Keying frame`), 끝나면 로그에 걸린 시간(실측 0.9 ms/단위 → 50 컨트롤 ×
   1000 프레임 ≈ 44 s). **단일 Undo.** 실행 중 Auto Keyframe 을 잠깐 끈다(`xform` 이 setAttr 라 자체 키가 생기는 것을 막음).
 
 **정확도(Everywhere)**: 정수 프레임은 **모든 프레임에서 월드가 완전히 같다**(mayapy 실측 1e-14). 프레임 사이는 보간이라 1e-3
