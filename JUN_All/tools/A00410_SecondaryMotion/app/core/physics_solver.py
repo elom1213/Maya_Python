@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-10
+# last Update date : 2026-11-19
+# v01.13 DFTL 속도 보정 - FTL 구속이 에너지를 만들어 처음에 크게 튀던 것 수정(_substep).
 # A00410_SecondaryMotion core - Physics Asset 솔버 (언리얼 Physics Asset 의 시뮬레이트 바디 흉내).
 #
 # **DCC 비의존 순수 파이썬** — chain_solver 와 같은 성질(maya 를 import 하지 않는다).
@@ -65,6 +66,13 @@ COLLISION_MODES = (COLLISION_NONE, COLLISION_GROUND)
 # Settled 시작 상태를 만들 때 쓰는 최소 감쇠(1/s).
 SETTLE_LINEAR_DAMPING = 4.0
 SETTLE_ANGULAR_DAMPING = 8.0
+
+# DFTL 속도 보정 계수 s (_substep 참고). 1.0 에 가까울수록 안정 · 감쇠가 크다.
+# 실측(20본 · 31도에서 놓기 · 감쇠 0, Substeps 1~32): 0.0 = 에너지 5배로 폭주,
+# 0.9 = Substeps 4 이하는 안전하지만 8 이상에서 다시 주입, 0.95 = 16 이상에서 주입,
+# 1.0 = Substeps 1~32 전부 에너지가 놓은 순간을 넘지 않음. Substeps 를 올리면 수치 감쇠가 줄어
+# 더 오래 찰랑인다(수렴하는 방향 — 예전엔 Substeps 를 올리면 더 튀었다).
+DFTL_VELOCITY_CORRECTION = 1.0
 
 # 루프 프리롤 (chain_solver 와 같은 값)
 LOOP_MAX_CYCLES = 16
@@ -438,11 +446,32 @@ def _substep(state, chain, root_p, par_q, params, dt, lims, node_q=None):
 
     state.p_prev = list(p)
     state.p = new
+    pred = list(new)      # 구속 전 예측 위치(_constrain 은 state.p 를 제자리에서 고친다)
     ground = params.collision == COLLISION_GROUND
     for _ in range(params.iterations):
         if ground:
             _ground(state, params)
         _constrain(state, chain, root_p, par_q, lims, node_q)
+
+    # DFTL 속도 보정 (v01.13). _constrain 은 Follow-The-Leader — 자식 점만 움직이고 부모는
+    # 그대로라 **루트 쪽 질량이 무한대**인 셈이다. 구속이 끌어 놓은 변위가 그대로 다음 속도가
+    # 되면 운동량이 팁으로 몰려 **에너지가 생긴다**(채찍). 실측: 20본 체인을 31도에서 놓으면
+    # 감쇠 0 에서도 에너지가 놓은 순간의 5배 · 팁이 루트 위로 튀어 오름, Substeps 를 올리면 더 심함.
+    # Müller 2012 "Fast Simulation of Inextensible Hair and Fur" 의 보정:
+    #     v_i -= s * d_{i+1} / dt     (d_{i+1} = 자식 점이 구속으로 옮겨진 양)
+    # 속도는 (p - p_prev)/dt 로 다시 재므로 p_prev_i 에 s * d_{i+1} 을 더하면 같다.
+    # 키네마틱 점(0, kinematic_root 면 1)은 속도가 애니메이션이라 건드리지 않는다.
+    s = DFTL_VELOCITY_CORRECTION
+    if s > 0.0:
+        cur = state.p
+        prev = state.p_prev
+        first = 2 if node_q is not None else 1
+        for i in range(first, m - 1):
+            c = cur[i + 1]
+            n = pred[i + 1]
+            q = prev[i]
+            prev[i] = (q[0] + s * (c[0] - n[0]), q[1] + s * (c[1] - n[1]),
+                       q[2] + s * (c[2] - n[2]))
 
 
 def _init_state(chain, params, lims):

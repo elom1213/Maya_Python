@@ -95,30 +95,38 @@ p4 = ps.PhysicsParams(swing1=30.0, swing2=10.0, kinematic_root=False)
 ch4 = chain_input(nf4, parent_q=par)
 pts4, W4 = ps.solve_physics(ch4, p4)
 lim1, lim2 = math.radians(30.0), math.radians(10.0)
-worst = 0.0
-for f in range(nf4):
-    for i in range(N):
-        wp = par[f] if i == 0 else W4[f][i - 1]
-        R_ref = ps.qm(ch4.ref_rel[i], wp)
-        d = ps.rot(ps.rot(ch4.bone_dir[i], W4[f][i]), ps.qinv(R_ref))
-        b = ch4.bone_dir[i]
-        c = ps._cross(b, d)
-        sn = ps._length(c)
-        ang = math.atan2(sn, ps._dot(b, d))
-        if sn < 1e-12:
-            continue
-        ax = ps._scale(c, 1.0 / sn)
-        s1, s2 = ch4.swing_frames[i]
-        e = (ang * ps._dot(ax, s1) / lim1) ** 2 + (ang * ps._dot(ax, s2) / lim2) ** 2
-        worst = max(worst, e)
+
+
+def worst_ellipse(W_):
+    """노드마다 (Swing1/한계1)^2 + (Swing2/한계2)^2 의 최댓값. 1 이하 = 콘 안."""
+    worst_ = 0.0
+    for f in range(nf4):
+        for i in range(N):
+            wp = par[f] if i == 0 else W_[f][i - 1]
+            R_ref = ps.qm(ch4.ref_rel[i], wp)
+            d = ps.rot(ps.rot(ch4.bone_dir[i], W_[f][i]), ps.qinv(R_ref))
+            b = ch4.bone_dir[i]
+            c = ps._cross(b, d)
+            sn = ps._length(c)
+            ang = math.atan2(sn, ps._dot(b, d))
+            if sn < 1e-12:
+                continue
+            ax = ps._scale(c, 1.0 / sn)
+            s1, s2 = ch4.swing_frames[i]
+            e = (ang * ps._dot(ax, s1) / lim1) ** 2 + (ang * ps._dot(ax, s2) / lim2) ** 2
+            worst_ = max(worst_, e)
+    return worst_
+
+
+worst = worst_ellipse(W4)
 check("V4 swing inside ellipse cone", worst <= 1.0 + 1e-6, "max %.6f" % worst)
-# 같은 입력을 Free 로 풀면 한계를 넘는다(시험이 비어 있지 않음을 확인)
+# 같은 입력을 Free 로 풀면 한계를 넘는다(시험이 비어 있지 않음을 확인).
+# v01.13 DFTL 이후 Free 체인은 채찍질이 없어 31도를 넘지 않는다 -> 같은 타원 지표로 잰다.
 p4f = p4.copy()
 p4f.swing1_mode = p4f.swing2_mode = ps.LIMIT_FREE
 _, W4f = ps.solve_physics(ch4, p4f)
-check("V4 control: free exceeds the cone", any(
-    angle(ps.rot((1, 0, 0), W4f[f][1]), ps.rot((1, 0, 0), W4f[f][0])) > 31
-    for f in range(nf4)))
+worst_f = worst_ellipse(W4f)
+check("V4 control: free exceeds the cone", worst_f > 1.5, "max %.3f" % worst_f)
 
 # Locked 두 축 = 부모에 고정
 p4l = p4.copy()
@@ -129,28 +137,61 @@ worst = max(1 - abs(sum(W4l[f][i][k] * ps.qm(ch4.ref_rel[i], par[f] if i == 0 el
             for f in range(nf4) for i in range(N))
 check("locked swing = rigid to parent", worst < 1e-9, "%.2e" % worst)
 
-# ---- V3 진자: 감쇠 0 이면 진폭 유지, 감쇠 > 0 이면 줄어든다
-nf3 = 24 * 12
+# ---- V3 진자: 에너지가 늘지 않는다 · 감쇠가 듣는다 · Substeps 를 올리면 수렴(덜 감쇠)
+# 예전 판정(팁 X 진폭 late > 0.5 * early)은 v01.12 가 **에너지를 주입**해서 통과했던 것이다.
+# v01.13 DFTL 보정은 수치 감쇠가 있어(감쇠 0 이어도 줄어든다) 진폭 유지 대신 아래를 본다.
+nf3 = 24 * 4
+G = 980.0
+REST3 = G * sum(100.0 - BONE * j for j in range(1, N + 1))   # 곧게 매달린 위치 에너지
 
 
-def tip_amplitude(pts_, a, b):
-    xs = [row[-1][0] for row in pts_[a:b]]
-    return max(xs) - min(xs)
+def swing_energy(pts_, rest, fps_=24.0):
+    """프레임마다 (운동 + 위치) 에너지 - 정지해 매달린 에너지 (점 질량 1)."""
+    out = []
+    for f in range(1, len(pts_)):
+        ke = 0.5 * fps_ * fps_ * sum(
+            ps._dot(ps._sub(pts_[f][j], pts_[f - 1][j]), ps._sub(pts_[f][j], pts_[f - 1][j]))
+            for j in range(1, len(pts_[f])))
+        pe = G * sum(pts_[f][j][1] for j in range(1, len(pts_[f])))
+        out.append(ke + pe - rest)
+    return out
 
 
-p3 = ps.PhysicsParams(swing1_mode=ps.LIMIT_FREE, swing2_mode=ps.LIMIT_FREE,
-                      linear_damping=0.0, angular_damping=0.0, kinematic_root=False,
-                      substeps=8)
-pts3, _ = ps.solve_physics(chain_input(nf3), p3)
-early = tip_amplitude(pts3, 24, 24 * 4)
-late = tip_amplitude(pts3, 24 * 8, 24 * 12)
-check("V3 no damping keeps swinging", late > 0.5 * early, "early %.2f late %.2f" % (early, late))
-p3d = p3.copy()
-p3d.linear_damping = 1.0
-p3d.angular_damping = 2.0
-pts3d, _ = ps.solve_physics(chain_input(nf3), p3d)
-late_d = tip_amplitude(pts3d, 24 * 8, 24 * 12)
-check("V3 damping settles", late_d < 0.2 * late, "late %.2f -> %.2f" % (late, late_d))
+def v3_energy(substeps, lin, ang):
+    pp = ps.PhysicsParams(swing1_mode=ps.LIMIT_FREE, swing2_mode=ps.LIMIT_FREE,
+                          linear_damping=lin, angular_damping=ang, kinematic_root=False,
+                          substeps=substeps)
+    return swing_energy(ps.solve_physics(chain_input(nf3), pp)[0], REST3)
+
+
+E3 = v3_energy(8, 0.0, 0.0)
+check("V3 no damping never gains energy", max(E3) <= E3[0] * 1.001,
+      "max %.0f start %.0f" % (max(E3), E3[0]))
+E3d = v3_energy(8, 1.0, 2.0)
+check("V3 damping settles faster", E3d[23] < 0.7 * E3[23],
+      "1s %.0f%% -> %.0f%%" % (100.0 * E3[23] / E3[0], 100.0 * E3d[23] / E3d[0]))
+E3s = v3_energy(32, 0.0, 0.0)
+check("V3 more substeps = less numerical damping", E3s[23] > E3[23],
+      "1s sub8 %.0f%% sub32 %.0f%%" % (100.0 * E3[23] / E3[0], 100.0 * E3s[23] / E3s[0]))
+
+# ---- V11 (v01.13 회귀) 긴 체인을 기울여 놓기 — 처음에 튀던 것(SecondaryToolEx/test_01.mb 모양)
+# 20본 x 1.13cm, 키네마틱 루트 31도, 30fps, 감쇠 0. v01.12: 흔들림 에너지가 놓은 순간의
+# 52~139배, 팁이 루트 위로 튀어 오름, Substeps 를 올릴수록 더 심함.
+n11 = 20
+b11 = 1.1293
+tilt = ps.qaxis_angle((0, 0, 1), math.radians(-90 + 31.22))
+d11 = ps.rot((1.0, 0.0, 0.0), tilt)
+init11 = [ps._scale(d11, b11 * j) for j in range(n11 + 1)]
+nf11 = 65
+ch11 = ps.PhysicsChainInput([(0.0, 0.0, 0.0)] * nf11, [I] * nf11, [tilt] + [I] * (n11 - 1),
+                            [(b11, 0.0, 0.0)] * n11, init11, [tilt] * nf11)
+for sub11 in (1, 4, 16, 32):
+    p11 = ps.PhysicsParams(fps=30.0, substeps=sub11, linear_damping=0.0, angular_damping=0.0)
+    E11 = swing_energy(ps.solve_physics(ch11, p11)[0], 0.0, 30.0)
+    # 기준(0)을 원점으로 두었으니 놓은 순간 대비 증가량만 본다. 허용 = 놓은 에너지 크기의 0.1%.
+    gain = max(E11) - E11[0]
+    check("V11 tilted long chain: no energy gain (substeps %d)" % sub11,
+          gain <= 1e-3 * abs(E11[0]), "gain %.2f" % gain)
 
 # ---- V9 fps 독립: 24 fps x 8 서브스텝 / 48 fps x 4 서브스텝(같은 dt)에서 같은 초 시점 팁 위치.
 # 파라미터가 초 단위라 프레임레이트가 바뀌어도 같은 움직임이어야 한다. (서브스텝 dt 자체가 다르면

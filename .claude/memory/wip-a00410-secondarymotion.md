@@ -1,6 +1,6 @@
 ---
 name: wip-a00410-secondarymotion
-description: "A00410_SecondaryMotion — FK 체인 관성(2차 모션)을 키로 굽는 툴, 설계 근거와 마야 변환 규칙 · v01.12 Physics Asset 솔버"
+description: "A00410_SecondaryMotion — FK 체인 관성(2차 모션)을 키로 굽는 툴, 설계 근거와 마야 변환 규칙 · v01.12 Physics Asset 솔버 · v01.13 DFTL(처음 튐 수정)"
 metadata: 
   node_type: memory
   type: project
@@ -115,6 +115,14 @@ Jiggle 은 메시 포인트 전용(조인트에 못 씀), spring 컨스트레인
   - Settled 는 정착 동안 감쇠를 올려 시간만 줄인다. 1단계 트위스트 = 부모를 따름(Locked). Collision None/Ground(사용자 지정).
   - 성능 20본×300f 서브스텝4+한계 0.12s — 프리뷰도 같은 계산(품질 낮춘 프리뷰는 보이는 것과 구운 것이 달라져서 안 함).
   - 시험 `tests/test_physics_core.py` 18 · `test_physics_maya.py` 15 · `test_physics_ui.py` 18, 데모 `demo_physics_asset.py`. GUI 확인 아직.
+- **v01.13 (2026-11-19) Physics Asset 처음에 튐 = 솔버가 에너지를 만들었다.** `_constrain` 이 FTL(자식만 끌기 = 루트 쪽 질량 무한대)
+  + 속도를 위치 차로 재서 구속 변위가 자식 속도가 됨 → 놓은 체인 흔들림 에너지 52~139배, Substeps 를 올리면 더 심함, Iterations 무효.
+  고침 = DFTL 속도 보정 `p_prev[i] += s*(구속 뒤 - 구속 전)[i+1]`, **s=1.0**(0.9/0.95 는 Substeps 8+/16+ 에서 여전히 주입), 키네마틱 점 제외.
+  ★ 대가 = 수치 감쇠(감쇠 0 이어도 줄어듦), **Substeps 가 생기 조절**(1초 뒤 4 → 3%, 32 → 61%). PBD 앞붙이기는 비용 대비 효과 작아 버림.
+  ★ 시험 지표 함정: 팁 X 진폭은 에너지가 다른 모드로 가면 줄어 보인다 → **에너지(운동+위치 - 매달린 정지값)** 로 잴 것, 정지 위치 에너지 부호 실수 주의(한 번 틀려 "91% 유지" 오판).
+  ★ 옛 V3 "감쇠 0 이면 진폭 유지" 는 에너지 주입 덕에 통과했던 것. 재현 씬 `0001_tmp_01/SecondaryToolEx/test_01.mb`, 결과 `test_01_v0113.mb`.
+  ★ 레이어 삭제(수동 · `clear_preview` 둘 다) 시 레이어에만 커브가 있던 자식 조인트는 그 프레임 값을 정적으로 남김 → 재샘플이 휜 자세에서 출발할 수 있음(조건 따라 다름, 미수정).
+  ★ mayapy 스크립트 이름을 `inspect.py` 로 두면 표준 inspect 를 가려 initialize 가 크래시(스택만 출력).
 - 문서: `JUN_All/docs/A00410_SecondaryMotion.md`, 계획서 `docs/plans/A00410_ChainPhysics_plan.md` · `A00410_PhysicsAsset_plan.md`.
 - 미해결: 빠른 구동 + Substeps=3 에서 왕복 오차 4.7e-05(~3ppm), 원인 미특정. 콜라이더/키 감축 없음(v01.03~04 예정).
 

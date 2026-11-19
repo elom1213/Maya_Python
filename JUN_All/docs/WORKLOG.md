@@ -33,6 +33,18 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-19 (오늘)
 
+> [!summary] **`A00410_SecondaryMotion` v01.13 — Physics Asset 이 처음에 크게 튀던 것 수정 (DFTL 속도 보정)** `#A00410_SecondaryMotion`
+- 요청: `0001_tmp_01/SecondaryToolEx/test_01.mb`(option.png 설정 = Physics Asset 기본값, 조인트 20본 × 1.13cm, 루트 31° 기울임, 30fps)가 처음에 엄청 튄다 → 원인 분석 · 수정 또는 안내.
+- mayapy 로 씬을 열고 툴 코어로 같은 결과를 재현(파일 값과 일치) → 체인 입력을 덤프해 솔버만 반복 실험.
+- 원인: 길이 구속이 **Follow-The-Leader**(자식 점만 끌고 부모는 그대로 = 루트 쪽 질량 무한대) + 속도를 위치 차로 다시 재서 구속 변위가 자식 속도가 됨 → 운동량이 팁에 쌓여 **에너지 생성**.
+  루트가 가만히 있는데 흔들림 에너지가 놓은 순간의 **52배(Substeps 4) ~ 139배(32)**, 팁이 루트 위 +9.5cm. 감쇠 0 · 한계 Free 에서도 같음, **Substeps 를 올리면 더 심함**, Iterations 는 결과 동일.
+- 수정: Müller 2012 **DFTL 속도 보정** `v_i -= s·d_(i+1)/dt`, `s = 1.0`(0.9 는 Substeps 8+, 0.95 는 16+ 에서 여전히 주입 — 실측으로 고름). 대가 = 수치 감쇠, **Substeps 로 조절**(감쇠 0 · 1초 뒤 남는 흔들림: 4 → 3%, 16 → 36%, 32 → 61%).
+  질량 가중 PBD 를 앞에 붙이는 안도 쟀지만 비용 대비 개선이 작아 버림.
+- 같은 씬 다시 굽기: 팁 최고 -19.3(시작 높이), joint2 프레임 간 최대 변화 51.7° → 11.3°. 결과 `SecondaryToolEx/test_01_v0113.mb`(원본은 그대로).
+- 시험: core 23(V3 진자를 **에너지 기준**으로 고침 — 옛 판정은 에너지 주입으로 통과했던 것, V11 = 이 씬 모양 회귀 Substeps 1/4/16/32, 옛 솔버로 6항목 실패 확인) · maya 15 · UI 18.
+- 함정: 레이어를 지우면 레이어에만 커브가 있던 자식 조인트가 **지운 프레임의 값을 정적으로 들고 남는다**(툴의 `clear_preview` 도). 154 프레임에서 지우고 다시 구우면 휜 자세에서 출발 → 가이드 4.6 에 안내.
+- 가이드 `docs/A00410_SecondaryMotion.md` 4.6 신설(원인 · 전후 비교 · Substeps 표 · 설정 안내). **GUI 확인 아직.**
+
 > [!summary] **`A00630_MotionPathEditor` v01.00 신규 — 모션 경로를 그리고 키를 끌어 애니메이션 수정 (블렌더 Editable Motion Paths 독자 구현)** `#A00630_MotionPathEditor`
 - 요청: `D:\D__1020_Blender_PlugIn\0010_Editable_Motion_Paths`(블렌더 애드온) 분석 → 마야 새 툴 계획서 → 계획서대로 제작. 조건: 마야 Editable Motion Trail 보다 훨씬 빠를 것, 우선순위 = 프레임별 위치 경로 + 그것으로 애니메이션 수정.
 - 원본은 **GPL-3.0-or-later** → 사용자 결정으로 **독자 구현**(코드 미사용). 계획서 `docs/plans/A00630_MotionPathEditor_plan.md`, 결정 Q1~Q5 추천대로.
