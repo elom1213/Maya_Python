@@ -66,5 +66,8 @@
 #        전체 경로 툴팁. 리스트 우클릭 `Show Names` 로 Outliner Name / Full Path (전역, 기억). 툴이 쓰는 이름은 그대로.
 #        공용 TSL 의 `name_display` 옵션을 이 툴의 리스트 11개에 켰다(첫 적용, 계획서 Framework_MOD_tsl_qt_name_display_plan).
 
-VERSION = "01.44"
+# 01.45  Weights > Flood - Options 슬라이더(Value · Smooth Steps · Blend)가 보이게. 테마 qss 에 QSlider 규칙이 없어 어두운
+#        배경에서 홈이 묻히고 손잡이만 보였다 -> 공용 JUN_mod_sliderStyle_qt_v01 이 보일 때 테마 색(green_dark)으로 칠한다.
+
+VERSION = "01.45"
 LAST_UPDATE = "2026-11-19"

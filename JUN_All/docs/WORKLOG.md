@@ -60,6 +60,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - TSL 옵션 `name_display`(기본 False = 다른 툴 불변), 전역 모드 QSettings `JUN/tsl`, 우클릭 `Show Names`, Sort 보이는 이름 순. 공용 필터는 보이는 글자로(델리게이트 없는 리스트는 같은 결과).
 - 시험 `Framework/tests/test_tsl_name_display.py` 28/28(+ PySide6 확인) · A00275 `test_flood_ui` 33/33(리스트 11개 옵트인 · 같은 이름 표시 · Flood 풀패스) · 회귀 전부 통과. `test_tab_fit_rollout` 의 A00620 3건은 기존 실패(이번 변경 전에도 같음). GUI 확인 아직.
 
+> [!summary] **공용 슬라이더 색 위젯 + `A00275_skinTool_V01` v01.45 — Flood 슬라이더가 보이게** `#Framework` `#A00275_skinTool_V01`
+- 요청: Flood Options 슬라이더가 세로 막대(손잡이)밖에 안 보인다 + 앞으로 만드는 슬라이더도 색이 잘 보이게.
+- 원인: 테마 qss 25개 어디에도 `QSlider` 규칙이 없다 → 어두운 배경에 기본 홈이 묻힌다. 툴 7곳이 각자 비슷한 스타일을 복사해 쓰던 상태.
+- 새 공용 `Framework/qt/MOD_sliderStyle_qt_v01` : `JUN_mod_sliderStyle_qt_v01(self)` 한 줄, **보일 때** 테마 qss 에서 색(버튼 테두리 = 강조, 입력칸 = 홈 바탕)을 읽어 칠한다(launch.py 가 테마를 창 생성 뒤 입히므로). 가로 · 세로 · 비활성, `fill`, 자기 스타일 있는 슬라이더는 그대로, 무채색 `dark` 대응. 가이드 `docs/Framework_MOD_sliderStyle_qt.md`.
+- 시험 `Framework/tests/test_slider_style.py` 12/12(PySide6 · mayapy, 실제 픽셀로 홈이 배경과 구별) · A00275 `test_flood_ui` 35/35 · 회귀 통과. 렌더 이미지로 모양 확인. GUI 확인 아직.
+
 ---
 
 ## 2026-11-17

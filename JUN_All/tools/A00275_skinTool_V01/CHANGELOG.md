@@ -1,5 +1,12 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.45 (2026-11-19)
+
+- **[UI] Flood 의 Options 슬라이더가 보인다.** 테마 qss 에 `QSlider` 규칙이 없어 어두운 배경에서 홈(groove)이 묻히고
+  손잡이(세로 막대)만 보였다. 이제 값이 찬 쪽은 테마 초록, 나머지 홈은 초록 테두리, 손잡이는 밝게 그린다(비활성은 회색).
+  새 공용 위젯 `Framework/qt/MOD_sliderStyle_qt_v01` (`JUN_mod_sliderStyle_qt_v01(self)` 한 줄, 테마 qss 에서 색을 읽는다)의 첫 적용.
+  시험 `tests/test_flood_ui.py` 35 · `Framework/tests/test_slider_style.py` 12. **마야 GUI 확인 아직.**
+
 ## v01.44 (2026-11-19)
 
 - **[UI] 리스트 이름을 아웃라이너처럼.** 씬에 같은 이름 노드가 있어도 리스트에 `A|dup` 대신 **`dup`** 이 보인다.

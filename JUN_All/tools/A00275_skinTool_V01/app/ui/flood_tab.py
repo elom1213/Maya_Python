@@ -23,6 +23,7 @@ from Framework.core.maya_undo import undo_chunk
 from tools.A00275_skinTool_V01.app.core import weight_flood_manager as fl_mgr
 from tools.A00275_skinTool_V01.app.ui.move_tab import _LOCK_ITEMS
 from Framework.core import maya_skin
+from Framework.qt.MOD_sliderStyle_qt_v01 import JUN_mod_sliderStyle_qt_v01
 
 
 FLOAT_SLIDER_STEPS = 1000
@@ -88,6 +89,8 @@ class FloodTab(QWidget):
         self._syncing = False
         self._mesh_uuids = []          # v01.42 - Get Bound Joints 로 읽은 메시(UUID, 리네임 · 리페어런트 안전)
         self._build_ui()
+        # v01.45 - 테마 qss 에 QSlider 규칙이 없어 어두운 배경에서 홈이 묻히고 손잡이만 보였다 -> 공용 위젯이 테마 색으로 칠한다.
+        self.slider_style = JUN_mod_sliderStyle_qt_v01(self)
         self._sync_operation()
         self._update_button()
         self._sync_mesh_label()

@@ -174,6 +174,26 @@ else:
     _settings.setValue(T.NAME_SETTINGS_KEY, _saved_mode)
 T._NAME_STATE["mode"] = None
 
+# ---- v01.45 슬라이더가 테마 색으로 보인다 (공용 JUN_mod_sliderStyle_qt_v01)
+from PySide2.QtWidgets import QSlider   # noqa: E402
+from Framework.themes.theme_manager import ThemeManager   # noqa: E402
+ThemeManager.load_theme_to_widget(win, "green_dark")
+win.tabs.setCurrentIndex(0)
+_names = [win.weights_tabs.tabText(i) for i in range(win.weights_tabs.count())]
+win.weights_tabs.setCurrentIndex(_names.index("Flood"))
+win.show()
+for _ in range(5):
+    app.processEvents()
+fs = win.flood_tab.findChildren(QSlider)
+check("Flood sliders are painted with the theme accent when shown",
+      len(fs) == 3 and all("#6f9e80" in sl.styleSheet() for sl in fs), [len(sl.styleSheet()) for sl in fs])
+img = win.flood_tab.sl_blend.grab().toImage()
+row = img.height() // 2
+visible = sum(1 for x in range(img.width())
+              if sum(abs(p - q) for p, q in zip(img.pixelColor(x, row).getRgb()[:3], (0x2b, 0x2b, 0x2b))) > 30)
+check("Flood Blend slider groove is visible (middle row)", visible > img.width() * 0.8, (visible, img.width()))
+win.hide()
+
 print("\nRESULT: {0}/{1} passed".format(sum(R), len(R)))
 maya.standalone.uninitialize()
 os._exit(0 if all(R) else 1)
