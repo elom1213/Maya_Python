@@ -12,6 +12,11 @@
           "name": "FKIK",
           "path": "tools/A00120_FKIK",
           "color": "#c7762e"
+        },
+        {
+          "name": "MotionPath",
+          "path": "tools/A00630_MotionPathEditor",
+          "color": "#c7762e"
         }
       ]
     },

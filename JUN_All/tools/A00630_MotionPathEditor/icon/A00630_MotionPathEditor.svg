@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#2d2d30" stroke="#4a4a4f" stroke-width="1.5"/>
+  <!-- 모션 경로 (곡선) -->
+  <path d="M5 24 C 9 8, 15 6, 18 14 S 25 25, 27 9" fill="none" stroke="#4cc0ff" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- 프레임 점 -->
+  <circle cx="7.2" cy="17.5" r="1" fill="#4cc0ff"/>
+  <circle cx="10.5" cy="11.2" r="1" fill="#4cc0ff"/>
+  <circle cx="14.4" cy="9.6" r="1" fill="#4cc0ff"/>
+  <circle cx="20.6" cy="19.6" r="1" fill="#4cc0ff"/>
+  <circle cx="23.8" cy="20.2" r="1" fill="#4cc0ff"/>
+  <!-- 키 점 (선택 = 주황) + 끄는 화살표 -->
+  <circle cx="5" cy="24" r="2.2" fill="#f2f2f2"/>
+  <circle cx="18" cy="14" r="2.6" fill="#ffbf1a"/>
+  <circle cx="27" cy="9" r="2.2" fill="#f2f2f2"/>
+  <path d="M18 14 L 21.5 7.5" stroke="#ffbf1a" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M19.4 7.2 L 21.9 6.8 L 22.4 9.2" fill="none" stroke="#ffbf1a" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

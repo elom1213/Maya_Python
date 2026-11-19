@@ -33,6 +33,17 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-19 (오늘)
 
+> [!summary] **`A00630_MotionPathEditor` v01.00 신규 — 모션 경로를 그리고 키를 끌어 애니메이션 수정 (블렌더 Editable Motion Paths 독자 구현)** `#A00630_MotionPathEditor`
+- 요청: `D:\D__1020_Blender_PlugIn\0010_Editable_Motion_Paths`(블렌더 애드온) 분석 → 마야 새 툴 계획서 → 계획서대로 제작. 조건: 마야 Editable Motion Trail 보다 훨씬 빠를 것, 우선순위 = 프레임별 위치 경로 + 그것으로 애니메이션 수정.
+- 원본은 **GPL-3.0-or-later** → 사용자 결정으로 **독자 구현**(코드 미사용). 계획서 `docs/plans/A00630_MotionPathEditor_plan.md`, 결정 Q1~Q5 추천대로.
+- 원본 핵심 설계를 따름: 경로 = 부모 공간 × 자기 채널. **`parentMatrix[0]` plug 만 MDGContext.makeCurrent 로 한 번 굽고**, 자기 translate 는 `MFnAnimCurve.evaluate` → 끌 때 씬 재평가 없음.
+- 0단계 실측(1,000 프레임): 만들기 A 0.14~0.17초 ≈ Motion Trail 0.15~0.18초(기준 5배는 못 넘음 - 둘 다 리그 평가 필수), **편집 갱신 0.002초 대 Motion Trail 0.15초(70~90배)**. "시간만 옮겨 plug 읽기" 는 값이 틀려 버림(차이 20).
+- 1단계: 경로(선 · 프레임 점 · 키 · 현재 프레임, x-ray) VP2 draw override 플러그인, Edit Path(draggerContext: 클릭 · Shift/Ctrl · 박스 선택 · View/Ground/X/Y/Z 드래그 · 오른쪽 버튼 취소),
+  부분 키는 모양 유지하며 채움, **드래그 한 번 = undo 한 번**(누적 MAnimCurveChange 를 `junMotionPathSetKeys` 명령이 넘김 + 키 채움 cmds 를 같은 묶음), 잠금 이유(컨스트레인트 · 레이어 · lock), 감시(커브 편집 · undo · 시간 · 저장 · 새 씬).
+- 실측으로 고친 것: 피벗 항은 **상수 rp + rpt**(처음 rp·worldMatrix 는 스케일 ≠ 1 에서 0.43 어긋남) · 마야 `getAttr -time worldMatrix` 는 자기 커브가 바뀌어도 옛 값(시험 기준을 `xform -ws -rp` 로) ·
+  doNotWrite 노드도 있으면 파일에 플러그인 `requires` 가 써짐 → 저장 직전에 그리기 노드를 지우고 저장 뒤 다시.
+- 시험(mayapy) 106항목: path_math 19 · anim_channels 15 · edit_session 21(드래그 갱신 3.4 ms) · watcher 20 · ui 18 · picking 13. 아이콘 · 런처(ANIM) 버튼 · 가이드 `docs/A00630_MotionPathEditor.md` · 포트폴리오 EN/KR. **뷰포트 그리기 · 마우스 편집 GUI 확인 아직.**
+
 > [!summary] **`A00380_MeshTool` v01.21 — Quad Patch 탭 (구멍을 쿼드 그리드로)** `#A00380_MeshTool`
 - 요청: `.ref/quadPatcher_v1.0.py` 를 분석해 새 탭으로 이식. 원본 헤더가 **복사 · 수정 금지** 라이선스라 사용자 결정으로 **독자 구현**(코드 미사용, 아이디어만), Face · Extrude 모드까지.
 - 모드 3종: **Edge Border**(보더 엣지 하나만 골라도 그 구멍 전체) · **Faces**(고른 면을 지우고 원래 면 위에 그리드, UV 도 원래 면에서 읽어 꿰맴) · **Extrude**(보더 일부 사슬에서 `Rows` 줄).

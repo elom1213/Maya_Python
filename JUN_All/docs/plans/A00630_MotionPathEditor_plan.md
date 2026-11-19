@@ -7,7 +7,7 @@ updated: 2026-11-19
 
 # A00630_MotionPathEditor — 편집 가능한 모션 경로 (마야) 계획서
 
-> 작성 2026-11-19 · 상태: **계획 (구현 전)** · 아키텍처 (B) Maya 내 PySide 툴 + 파이썬 플러그인(뷰포트 그리기 노드 · undo 명령)
+> 작성 2026-11-19 · 상태: **0단계 실측 완료 · 1단계 구현 완료 (v01.00, 2026-11-19, mayapy 시험 106항목) · 마야 GUI 확인 전** · 결정 Q1~Q5 = 전부 추천대로(§9) · 아키텍처 (B) Maya 내 PySide 툴 + 파이썬 플러그인(뷰포트 그리기 노드 · undo 명령)
 >
 > 참고 원본 (읽기 전용, 저장소 밖): `D:\D__1020_Blender_PlugIn\0010_Editable_Motion_Paths` — 블렌더 애드온
 > *Editable Motion Paths* v2.0.7 (블렌더 4.4+, 파이썬 약 31,000줄). 아래 분석은 그 `README.md` · `DEV_GUIDE.md` · `docs/MANUAL.md` ·
@@ -162,8 +162,9 @@ JUN_All/tools/A00630_MotionPathEditor/
   ```
 
   - `PM(f)` = 그 프레임의 `parentMatrix` (굽는다).
-  - `c(f)` = 회전 · 스케일 · 피벗이 만드는 오프셋 = `rp` 를 T 앞 항들로 옮긴 점. **조인트는 늘 0**, 피벗이 원점인 transform(대부분의 컨트롤)도 0.
-    피벗이 있으면 굽는 순간 `c(f) = P_baked(f) · PM(f)⁻¹ − T(f)` 로 얻는다.
+  - `c` = **rotatePivot + rotatePivotTranslate — 상수**(구현 때 실측으로 확정, §10). 조인트는 0, 피벗이 원점인 transform 도 0.
+    회전 피벗은 회전 · 스케일 뒤에 `rp + rpt + T` 로 남기 때문에 회전 · 스케일과 무관하다 = 마야 `xform -q -ws -rp`.
+    (처음 적은 "`c(f)` 를 worldMatrix 로 굽는다" 는 틀렸다 - 스케일이 1 이 아니면 0.43 어긋났다.)
   - `T(f)` = translate 애님 커브 3개를 **직접 평가**한 값(`MFnAnimCurve.evaluate`, 키 없는 채널은 정적 값).
 - **solve (월드 W → translate)** — 정확한 역산:
 
@@ -172,8 +173,7 @@ JUN_All/tools/A00630_MotionPathEditor/
   ```
 
   잠긴 축(`translateX` lock 등)은 그 축 값을 원래대로 두고 나머지만 바꾼다(원본의 lock 처리와 같다).
-- `c(f)` 는 회전 · 스케일 · 피벗이 바뀌면 달라진다. 1단계는 **translate 만** 편집하므로 편집 중 `c` 는 고정이다.
-  그래프 에디터에서 rotate · scale 키가 바뀌면 `c` 를 다시 계산한다: 피벗이 0 이면 할 일 없음, 아니면 `MTransformationMatrix` 를 커브 값으로 조립해 다시 구한다(DG 평가 없음).
+- `c` 는 상수라 rotate · scale 키가 바뀌어도 다시 굽지 않는다(시험 `test_path_math`). 피벗 위치를 옮기면 `refresh()` 가 다시 읽는다.
 
 ### 4-3. 부모 공간 굽기 — 속도의 핵심
 
@@ -184,7 +184,7 @@ JUN_All/tools/A00630_MotionPathEditor/
   |------|------|------|
   | A | `MPlug.asMObject(MDGContext(MTime(f)))` 로 `parentMatrix` plug 만 평가 (마야 2022+ 는 `MDGContextGuard`) | 그 plug 의 상류만 계산 → 스킨 메시 · 다른 캐릭터는 계산 안 함. 유력 |
   | B | `cmds.getAttr(node + ".parentMatrix", time=f)` | A 와 같은 원리, 호출 비용만 더 큼(비교 기준) |
-  | C | `cmds.currentTime(f, update=False)` + plug 읽기 | 사용자 시간을 바꾼다 → 끝나고 되돌려야 함. 병렬 평가에서 동작 확인 필요 |
+  | C | `cmds.currentTime(f, update=False)` + plug 읽기 | **값이 틀려 버림**(다시 계산하지 않은 값, 차이 20 — §10) |
   | D | 마야 기본 Editable Motion Trail (`cmds.snapshot(motionTrail=True, ...)`) | **비교 대상(이겨야 할 기준)** |
 
 - 여러 대상을 굽을 때는 **프레임 하나에 대상 전부**를 읽는다(프레임 바깥 루프) — 같은 부모를 공유하면 상류 계산을 덜 반복할 가능성이 있다(0단계에서 A 의 두 루프 순서 비교).
@@ -221,8 +221,10 @@ JUN_All/tools/A00630_MotionPathEditor/
   - **명령 `junMotionPathSetKeys`** (`MPxCommand`) — §4-7.
 - 그리기 데이터는 **바뀔 때만** 만든다: 툴이 `MPointArray` 와 색 배열을 `draw_bridge` 에 넣고 노드의 `revision` 을 올린다 → 마야가 그 노드만 다시 그린다.
   매 그리기마다 numpy → `MPointArray` 변환을 하지 않는다.
-- 노드는 **씬에 저장되지 않는다**: 만들 때 `MFnDependencyNode.setDoNotWrite(True)`, 숨긴 그룹 `|JUN_motionPaths` 아래, 아웃라이너에서 숨김(`hiddenInOutliner`).
+- 노드는 **씬에 저장되지 않는다**: 만들 때 `MFnDependencyNode.setDoNotWrite(True)`, 아웃라이너에서 숨김(`hiddenInOutliner`).
   툴을 닫거나 씬을 새로 · 열기(`MSceneMessage`) 하면 지운다.
+  **저장 직전(`kBeforeSave`)에 지우고 저장 뒤 다시 만든다** — 노드가 씬에 있으면 doNotWrite 여도(그리고 `pluginInfo -writeRequires off` 여도)
+  파일에 `requires jun_motion_path` 줄이 써져, 툴 없는 PC 에서 경고가 난다(구현 때 실측).
 - 마야 셀렉션 대상이 아니다(`isTransparent`/선택 불가 설정 또는 `overrideEnabled + displayType=reference`) — 클릭은 우리 컨텍스트가 처리한다.
 - 0단계 확인: 파이썬 draw override 로 **경로 10개 × 2,000 점**을 그릴 때 뷰포트가 60fps 근처를 유지하는지. 느리면 점은 `MUIDrawManager.mesh(kPoints)` 한 번에.
 
@@ -238,7 +240,8 @@ JUN_All/tools/A00630_MotionPathEditor/
   마우스 광선과 평면의 교점 → 이동량 `Δ` → 선택 키마다 `W = 원래 월드 점 + Δ` → `solve` → `setValue`(누적 change) → 바뀐 키 사이 구간만 경로 다시 계산 → `draw_bridge` 갱신 → `M3dView.refresh(False, True)`.
   오브젝트 자체도 커브가 바뀌었으니 현재 프레임에서 따라 움직인다.
 - **놓기**: `junMotionPathSetKeys` 명령으로 누적된 change 를 undo 큐에 넣는다(한 번). 아무것도 안 움직였으면 아무것도 안 한다.
-- **취소**: Esc (컨텍스트의 `finalize` 또는 툴 창 단축키) → change `undoIt()` 로 되돌리고 경로를 원래대로.
+- **취소**: draggerContext 는 키 입력을 받지 않아 Esc 대신 **드래그 중 오른쪽 버튼** → change `undoIt()` 로 되돌리고 경로를 원래대로.
+  다른 툴로 바꾸면(`finalize`) 끄는 중인 드래그도 취소.
 - 마야 내비게이션(Alt + 드래그)은 컨텍스트와 무관하게 동작한다(0단계 확인).
 
 ### 4-7. undo — 한 동작 = 한 번
@@ -424,14 +427,39 @@ JUN_All/tools/A00630_MotionPathEditor/
 
 | # | 질문 | 추천 |
 |---|------|------|
-| Q1 | 원본이 GPL-3.0 — 코드 복사 없이 **독자 구현**으로 갈까? | **예** (§1) |
-| Q2 | 툴 이름 `A00630_MotionPathEditor` 괜찮은가? | 예 (A00630 은 비어 있음) |
-| Q3 | 1단계 대상: translate 가 **애님 커브 직결**인 transform · joint 만 (레이어 · 컨스트레인트 구동은 잠금 표시) | 예 — 레이어는 3단계 |
-| Q4 | 키 아닌 프레임을 끌 때 기본 동작: 1.5단계 `Insert key`(키 넣고 이동) — 원본의 기본(타이밍 이동)은 2단계 | 예 — 요청 우선순위가 "위치로 애니메이션 수정" 이므로 |
-| Q5 | 지원 마야 버전: 2024 기준 + 2023 확인(메모 [[maya-2023-compat]]), 2025+ PySide6 | 예 |
+| Q1 | 원본이 GPL-3.0 — 코드 복사 없이 **독자 구현**으로 갈까? | **예** (§1) — **결정 2026-11-19: 독자 구현** |
+| Q2 | 툴 이름 `A00630_MotionPathEditor` 괜찮은가? | 예 (A00630 은 비어 있음) — **결정: 그대로** |
+| Q3 | 1단계 대상: translate 가 **애님 커브 직결**인 transform · joint 만 (레이어 · 컨스트레인트 구동은 잠금 표시) | 예 — 레이어는 3단계 — **결정: 추천대로** |
+| Q4 | 키 아닌 프레임을 끌 때 기본 동작: 1.5단계 `Insert key`(키 넣고 이동) — 원본의 기본(타이밍 이동)은 2단계 | 예 — 요청 우선순위가 "위치로 애니메이션 수정" 이므로 — **결정: 추천대로** |
+| Q5 | 지원 마야 버전: 2024 기준 + 2023 확인(메모 [[maya-2023-compat]]), 2025+ PySide6 | 예 — **결정: 추천대로** |
 
 ---
 
 ## 10. 결과 기록 (단계가 끝날 때마다 채운다)
 
-- 0단계: (미실시)
+### 0단계 (2026-11-19, mayapy 2024, `tests/bench_motion_path.py`)
+
+| 씬 · 1,000 프레임 | A 문맥 평가 | B getAttr -time | C 시간 이동 | D Motion Trail 만들기 | 키 하나 바꾼 뒤: D | 키 하나 바꾼 뒤: 이 툴(커브 평가) |
+|---|---|---|---|---|---|---|
+| 단순 | 0.014 | 0.033 | 0.011 | 0.025 | 0.036 | **0.002** |
+| 계층 | 0.174 | 0.198 | (틀림) | 0.182 | 0.175 | **0.002** |
+| 무거운 리그 | 0.141 | 0.176 | (틀림) | 0.148 | 0.153 | **0.002** |
+
+- **방법 A 로 확정.** C 는 빠르지만 값이 틀렸다(다시 계산하지 않은 값, 최대 차이 20).
+- **0-1 기준(만들기 5배)은 못 넘었다**: 만들기는 A ≈ Motion Trail(둘 다 프레임마다 리그 평가 - 피할 수 없다).
+  대신 **편집 때 약 70 ~ 90배**(0.002 대 0.15초), 드래그 한 번 3.4 ms. 요청의 "훨씬 빨라야" 는 편집 쪽에서 충족 — 사용자에게 보고.
+  만들기를 더 줄이려면 상류가 FK 뿐일 때 행렬을 직접 계산(4단계 항목 8 을 앞당기기)이 다음 후보.
+- 0-2 · 0-8: 문맥 평가 parentMatrix 로 만든 경로 = 마야 `xform -ws -rp` (차이 < 1e-15). OPM 은 parentMatrix 에 들어 있다.
+- 0-3: 커브 3개 × 1,000 프레임 평가 2 ms.
+- 0-4: 드래그 동안 쌓은 MAnimCurveChange 를 명령이 받아 **undo 한 번 · redo** 정확(차이 0).
+- 0-5: `auto` 탄젠트는 키 하나를 바꾸면 이웃 키 탄젠트도 다시 계산 → 앞뒤 키 사이까지 바뀐다(그래프 에디터와 같음, 설계 변경 불필요).
+- 0-6 · 0-7 (GUI): 아직. 그리기 · 컨텍스트에 쓴 API 이름이 마야 2024 에 있는 것만 확인.
+- 실측으로 찾은 마야 함정: `getAttr -time worldMatrix` 는 시간 문맥 값을 캐시해 두고 **자기 커브가 바뀌어도 옛 값**을 준다(`dgdirty` 로도 안 지워짐).
+  이 툴의 굽기(parentMatrix plug + makeCurrent)는 부모를 바꾼 뒤 다시 구우면 새 값이 나왔다. 시험 기준값은 `xform -ws -rp` 실측으로 바꿨다.
+
+### 1단계 (2026-11-19, v01.00)
+
+- 완료: 툴 골격 · 채널 · 굽기 · 경로 캐시 · 플러그인(노드 + draw override + undo 명령) · 고르기 · 편집 컨텍스트 · 편집 세션 · 감시 · 툴 창 · 아이콘 · 런처 버튼.
+- 완료 기준: 놓은 위치 = 마야 피벗(차이 1e-16) · undo 한 번 · 그래프 에디터/undo 에 따라옴(감시 flush) · 창 닫으면 노드 · 콜백 없음 · 저장 파일에 노드 · requires 없음 ·
+  드래그 갱신 3.4 ms(< 16) — 모두 mayapy 로 확인. 시험 106항목(§7-2 + `test_picking.py`).
+- 남은 것: §7-3 GUI 확인. 1.5단계(키 아닌 프레임 끌기 = 키 넣고 이동 · 비례 편집 · 수치 입력)부터 다음 작업.

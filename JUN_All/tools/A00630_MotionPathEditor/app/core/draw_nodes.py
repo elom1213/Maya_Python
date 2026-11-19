@@ -1,0 +1,112 @@
+# -*- coding: utf-8 -*-
+# Python Script by Ji Hun Park
+# last Update date : 2026-11-19
+# A00630_MotionPathEditor - 플러그인 로드 · 그리기 노드 만들기 / 지우기 · 그리기 데이터 만들기 (계획서 §4-5)
+"""
+그리기 노드는 **API(MDagModifier)로** 만들고 지운다 → undo 큐에 들어가지 않는다(Ctrl+Z 는 키만 되돌린다).
+노드 · 그 트랜스폼은 `doNotWrite` 라 씬에 저장되지 않고, 아웃라이너에서 숨긴다 - 이 툴 없이도 파일이 그대로 열린다.
+"""
+
+import os
+
+import maya.api.OpenMaya as om
+import maya.cmds as cmds
+
+from . import draw_bridge
+
+PLUGIN_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "plugin",
+                           "jun_motion_path.py")
+NODE_TYPE = "junMotionPath"
+COMMAND = "junMotionPathSetKeys"
+TRANSFORM_PREFIX = "JUN_motionPath_"
+
+#: 경로마다 돌려 쓰는 색 (어두운 뷰포트 배경에서 잘 보이는 것)
+PALETTE = ((0.30, 0.75, 1.00), (0.55, 1.00, 0.45), (1.00, 0.55, 0.85), (1.00, 0.85, 0.35),
+           (0.60, 0.60, 1.00), (0.35, 1.00, 0.85))
+
+
+def ensure_plugin():
+    """플러그인을 읽는다(이미 읽혀 있으면 그대로). 실패하면 RuntimeError."""
+    name = os.path.splitext(os.path.basename(PLUGIN_FILE))[0]
+    if not cmds.pluginInfo(name, q=True, loaded=True):
+        cmds.loadPlugin(PLUGIN_FILE, quiet=True)
+    if not cmds.pluginInfo(name, q=True, loaded=True):
+        raise RuntimeError("Could not load the plugin {0}".format(PLUGIN_FILE))
+    return name
+
+
+def create_node(path_key, label):
+    """그리기 노드 하나 (트랜스폼 이름, 셰이프 이름). undo 큐 밖."""
+    mod = om.MDagModifier()
+    xform = mod.createNode(NODE_TYPE)
+    mod.renameNode(xform, TRANSFORM_PREFIX + _safe(label))
+    mod.doIt()
+    fn_x = om.MFnDagNode(xform)
+    shape = fn_x.child(0)
+    for obj in (xform, shape):
+        fn = om.MFnDependencyNode(obj)
+        fn.setDoNotWrite(True)
+    om.MFnDependencyNode(xform).findPlug("hiddenInOutliner", False).setBool(True)
+    om.MFnDependencyNode(shape).findPlug("pathKey", False).setString(path_key)
+    return fn_x.fullPathName(), om.MFnDagNode(shape).fullPathName()
+
+
+def delete_node(transform):
+    """그리기 노드를 지운다 (undo 큐 밖). 없으면 조용히."""
+    if not transform or not cmds.objExists(transform):
+        return
+    sel = om.MSelectionList()
+    sel.add(transform)
+    mod = om.MDagModifier()
+    mod.deleteNode(sel.getDependNode(0))
+    mod.doIt()
+
+
+def delete_all():
+    """이 툴이 만든 그리기 노드를 모두 지운다(이전 세션이 남긴 것 포함)."""
+    for shape in cmds.ls(type=NODE_TYPE, long=True) or []:
+        parents = cmds.listRelatives(shape, parent=True, fullPath=True) or [shape]
+        delete_node(parents[0])
+    draw_bridge.clear()
+
+
+def _safe(label):
+    return "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in label.split("|")[-1].split(":")[-1])
+
+
+def _points(rows):
+    arr = om.MPointArray()
+    for x, y, z in rows:
+        arr.append(om.MPoint(float(x), float(y), float(z)))
+    return arr
+
+
+def payload(cache, color, selected_times, current_frame, show_dots=True, show_keys=True, show_numbers=False,
+            line_width=2.0, dot_size=4.0, key_size=9.0):
+    """경로 하나의 그리기 데이터 (draw_bridge.DATA 형식)."""
+    pts = cache.points
+    sel = {round(t, 3) for t in selected_times}
+    keys, chosen, labels = [], [], []
+    if show_keys:
+        for k in cache.keys:
+            p = pts[k.row]
+            (chosen if round(k.t, 3) in sel else keys).append(p)
+            if show_numbers:
+                labels.append((om.MPoint(float(p[0]), float(p[1]), float(p[2])), " {0:g}".format(k.t)))
+    current = []
+    row = cache.row_of(current_frame)
+    if row is not None:
+        current.append(pts[row])
+    return {
+        "line": _points(pts),
+        "dots": _points(pts) if show_dots else om.MPointArray(),
+        "keys": _points(keys),
+        "selected": _points(chosen),
+        "current": _points(current),
+        "labels": labels,
+        "color": om.MColor((color[0], color[1], color[2], 1.0)),
+        "locked": cache.locked,
+        "line_width": float(line_width),
+        "dot_size": float(dot_size),
+        "key_size": float(key_size),
+    }

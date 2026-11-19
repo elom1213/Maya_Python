@@ -1,0 +1,54 @@
+# -*- coding: utf-8 -*-
+# Python Script by Ji Hun Park
+# last Update date : 2026-11-19
+# A00630_MotionPathEditor - 툴 <-> 플러그인 데이터 다리
+"""
+`cmds.loadPlugin` 으로 읽힌 플러그인 모듈은 툴이 `import` 한 모듈과 **다른 객체**다(그리고 `__file__` 이 없다 —
+메모 maya-loadplugin-no-file). 그래서 둘이 함께 보는 상태는 이 모듈 하나에 두고, 플러그인도 이 모듈을 **정식 경로**
+(`tools.A00630_MotionPathEditor.app.core.draw_bridge`)로 import 한다. A00180 의 undo_bridge 와 같은 방식.
+
+DATA    : {path_key: dict} — draw override 가 그릴 것 (툴이 바뀔 때만 만든다, 아래 키 설명)
+HUD     : 2D 로 그릴 것 (박스 선택 사각형 등) — {"box": (x0, y0, x1, y1)} 또는 {}
+PENDING : 다음 `junMotionPathSetKeys` 명령이 가져갈 undo 기록 (MAnimCurveChange)
+
+DATA[path_key] 키 (값은 OpenMaya 2.0 객체 - 그리기 때 변환하지 않게 미리 만든다):
+    "line"      : MPointArray  경로 선 (프레임 순서)
+    "dots"      : MPointArray  프레임 점
+    "keys"      : MPointArray  키 점 (선택 안 된 것)
+    "selected"  : MPointArray  선택된 키 점
+    "current"   : MPointArray  현재 프레임 점 (0 또는 1 개)
+    "labels"    : [(MPoint, str)]  키 옆 프레임 번호 (끄면 빈 목록)
+    "color"     : MColor  경로 색
+    "locked"    : bool  편집 불가 경로 (회색으로)
+    "line_width", "dot_size", "key_size" : float
+"""
+
+DATA = {}
+HUD = {}
+PENDING = None
+
+
+def put(path_key, payload):
+    DATA[path_key] = payload
+
+
+def drop(path_key):
+    DATA.pop(path_key, None)
+
+
+def clear():
+    DATA.clear()
+    HUD.clear()
+
+
+def stage(change):
+    """다음 undo 명령이 가져갈 기록을 둔다."""
+    global PENDING
+    PENDING = change
+
+
+def take():
+    """명령이 기록을 가져간다(한 번만)."""
+    global PENDING
+    change, PENDING = PENDING, None
+    return change
