@@ -54,5 +54,9 @@
 # 01.41  Weights > Flood - Joints 리스트에 `Get Bound Joints` 버튼. 메시를 고르면 그 skinCluster 의 조인트 전부,
 #        버텍스 · 엣지 · 페이스를 고르면 거기에 웨이트가 있는 조인트만으로 리스트를 교체(같은 이름도 구별).
 
-VERSION = "01.41"
+# 01.42  Weights > Flood - `Add Influence` 버튼. Get Bound Joints 로 읽은 메시를 기억해 두고(UUID, 리스트 위 `Mesh :`),
+#        씬에서 고른 조인트를 그 skinCluster 에 웨이트 0 으로 추가 + 리스트에 붙인다(마야 Skin > Add Influence 와 같다).
+#        이미 바인드된 것은 건너뛰고 알림, 같은 이름 조인트도 풀패스로, 한 번 = undo 한 스텝.
+
+VERSION = "01.42"
 LAST_UPDATE = "2026-11-19"

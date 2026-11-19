@@ -110,6 +110,46 @@ logs[:] = []
 tab.btn_flood.click()
 check("flood right after Get Bound Joints works", any(m.startswith("[OK]") for m in logs), logs)
 
+# ---- v01.42 Add Influence : Get Bound Joints 로 기억한 메시에 씬에서 고른 조인트를 웨이트 0 으로
+fresh = ft.FloodTab(log_callback=logs.append)
+check("Add Influence disabled before Get Bound Joints",
+      not fresh.btn_add_infl.isEnabled() and "none" in fresh.lbl_mesh.text(), fresh.lbl_mesh.text())
+cmds.undo()                              # 위 flood 되돌림 -> 다시 keep 100%
+cmds.select("m")
+tab.btn_bound.click()
+check("Get Bound Joints remembers the mesh", tab.btn_add_infl.isEnabled() and tab.lbl_mesh.text() == "Mesh : m",
+      tab.lbl_mesh.text())
+cmds.select(clear=True)
+cmds.group(empty=True, name="C")
+cmds.select(clear=True)
+new_j = cmds.joint(name="dup", position=(0, 2, 0))      # 세 번째 같은 이름 조인트
+cmds.parent(new_j, "C")
+new_path = cmds.ls("C|dup", long=True)[0]
+pos_before = cmds.xform("m.vtx[*]", q=True, ws=True, t=True)
+cmds.select([new_path, "keep"])          # 메시는 선택에 없어도 된다(기억한 메시에 붙는다)
+logs[:] = []
+tab.btn_add_infl.click()
+infl = [cmds.ls(n, long=True)[0] for n in cmds.skinCluster(skin, q=True, influence=True)]
+check("selected same-name joint is added to the skinCluster", new_path in infl, infl)
+check("already bound joint is reported, not added twice",
+      any("already bound" in m and "keep" in m for m in logs) and infl.count("|keep") == 1, logs)
+new_w = [cmds.skinPercent(skin, "m.vtx[{0}]".format(v), q=True, transform=new_path)
+         for v in range(cmds.polyEvaluate("m", vertex=True))]
+keep_w = [cmds.skinPercent(skin, "m.vtx[{0}]".format(v), q=True, transform="keep")
+          for v in range(cmds.polyEvaluate("m", vertex=True))]
+check("weight 0 on the new joint, old weights and shape unchanged",
+      max(new_w) == 0.0 and min(keep_w) > 0.99
+      and max(abs(a - b) for a, b in zip(pos_before, cmds.xform("m.vtx[*]", q=True, ws=True, t=True))) < 1e-9)
+check("new joint is put in the list as a unique partial name",
+      "C|dup" in tab.tsl_joints.get_all_items() and new_path in tab.joints(), tab.tsl_joints.get_all_items())
+cmds.undo()
+infl = [cmds.ls(n, long=True)[0] for n in cmds.skinCluster(skin, q=True, influence=True)]
+check("one undo removes the added influence", new_path not in infl, infl)
+cmds.select(clear=True)
+logs[:] = []
+tab.btn_add_infl.click()
+check("no joint selected -> warning", any("Select the joint" in m for m in logs), logs)
+
 print("\nRESULT: {0}/{1} passed".format(sum(R), len(R)))
 maya.standalone.uninitialize()
 os._exit(0 if all(R) else 1)

@@ -243,6 +243,59 @@ def bound_joints(targets=None, weight_eps=1e-8):
     return out, messages
 
 
+def skinned_meshes(targets):
+    """`parse_selection` 결과 중 skinCluster 가 있는 메시 풀패스 목록(순서 유지, 중복 제거)."""
+    out = []
+    for target in targets or []:
+        mesh = target["mesh"]
+        if mesh not in out and skin_clusters(mesh):
+            out.append(mesh)
+    return out
+
+
+def add_influences(meshes, joints):
+    """메시마다 첫 skinCluster 에 joints 를 **웨이트 0** 인플루언스로 더한다 (마야 Skin > Add Influence 와 같다).
+
+    `(더한 조인트 풀패스 목록, 메시지)`. 이미 인플루언스면 건너뛴다. 조인트 · 메시 모두 풀패스로 다뤄
+    같은 이름이 있어도 된다. 웨이트 0 이라 모양은 그대로이고, 바인드 행렬은 **지금 조인트 위치**로 잡힌다
+    (마야 Add Influence 와 같은 동작). 씬을 바꾸므로 호출부가 `undo_chunk()` 안에서 부른다.
+    """
+    messages = []
+    resolved = mv_mgr._resolve_joints(joints, "Add Influence", messages)
+    if not resolved:
+        return [], messages + ["[WARN] Select the joint(s) to add in the scene first."]
+    if not meshes:
+        return [], messages + ["[WARN] No mesh yet - select a skinned mesh and press Get Bound Joints first."]
+    added_any = []
+    for mesh in meshes:
+        if not cmds.objExists(mesh):
+            messages.append("[SKIP] {0} is no longer in the scene.".format(_leaf(mesh)))
+            continue
+        skins = skin_clusters(mesh)
+        if not skins:
+            messages.append("[SKIP] {0} has no skinCluster.".format(_leaf(mesh)))
+            continue
+        skin = skins[0]
+        current = set(maya_skin.influence_paths(maya_skin.skin_fn(skin)))
+        added, already = [], []
+        for joint in resolved:
+            if joint in current:
+                already.append(joint)
+                continue
+            cmds.skinCluster(skin, edit=True, addInfluence=joint, weight=0.0)
+            added.append(joint)
+            current.add(joint)
+            if joint not in added_any:
+                added_any.append(joint)
+        if added:
+            messages.append("[OK] {0} ({1}) : added {2} influence(s) with weight 0 : {3}.".format(
+                _leaf(mesh), skin, len(added), ", ".join(_leaf(j) for j in added)))
+        if already:
+            messages.append("[Info] {0} : already bound - {1}.".format(
+                _leaf(mesh), ", ".join(_leaf(j) for j in already)))
+    return added_any, messages
+
+
 # ==================================================================
 # 진입점
 # ==================================================================

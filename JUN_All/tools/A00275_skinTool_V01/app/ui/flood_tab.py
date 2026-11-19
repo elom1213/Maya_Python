@@ -22,6 +22,7 @@ from Framework.qt import JUN_mod_tsl_qt
 from Framework.core.maya_undo import undo_chunk
 from tools.A00275_skinTool_V01.app.core import weight_flood_manager as fl_mgr
 from tools.A00275_skinTool_V01.app.ui.move_tab import _LOCK_ITEMS
+from Framework.core import maya_skin
 
 
 FLOAT_SLIDER_STEPS = 1000
@@ -85,9 +86,11 @@ class FloodTab(QWidget):
         super(FloodTab, self).__init__(parent)
         self._log = log_callback or (lambda text: None)
         self._syncing = False
+        self._mesh_uuids = []          # v01.42 - Get Bound Joints 로 읽은 메시(UUID, 리네임 · 리페어런트 안전)
         self._build_ui()
         self._sync_operation()
         self._update_button()
+        self._sync_mesh_label()
 
     # ==============================================================
     # UI
@@ -112,12 +115,24 @@ class FloodTab(QWidget):
         self.btn_bound.setToolTip(
             "Fill the list with the joints bound to the selected mesh(es).\n"
             "Mesh selected: every bound joint. Vertices / edges / faces selected:\n"
-            "only the joints that have weight on them.")
+            "only the joints that have weight on them.\n"
+            "The mesh(es) are remembered for Add Influence.")
+        # v01.42 - 씬에서 고른 조인트를 기억한 메시의 skinCluster 에 인플루언스로 추가 (Skin > Add Influence 와 같다).
+        self.btn_add_infl = self.tsl_joints.add_button("Add Influence", self.on_add_influence, index=1)
+        self.btn_add_infl.setToolTip(
+            "Add the joints selected in the scene to the skinCluster of the mesh(es)\n"
+            "read by Get Bound Joints, with weight 0 (like Maya's Skin > Add Influence),\n"
+            "and put them in the list. The mesh shape does not change.")
         model = self.tsl_joints.list_widget.model()
         model.rowsInserted.connect(self._update_button)
         model.rowsRemoved.connect(self._update_button)
         model.modelReset.connect(self._update_button)
-        top.addWidget(self.tsl_joints, 1)
+        left = QVBoxLayout()
+        self.lbl_mesh = QLabel()
+        self.lbl_mesh.setToolTip("The skinned mesh(es) Add Influence works on (set by Get Bound Joints).")
+        left.addWidget(self.lbl_mesh)
+        left.addWidget(self.tsl_joints, 1)
+        top.addLayout(left, 1)
         top.addWidget(self._build_operation_group(), 1)
         root.addLayout(top)
 
@@ -377,21 +392,74 @@ class FloodTab(QWidget):
         리스트에는 짧고 유일한 이름(`cmds.ls(풀패스)`)으로 담는다 - 같은 이름이면 `A|dup` 처럼 부분 경로가 되고,
         담을 때 UUID 가 붙으므로 Flood 는 그대로 풀패스로 돈다.
         """
+        import maya.cmds as cmds
         try:
-            joints, messages = fl_mgr.bound_joints()
+            targets = fl_mgr.parse_selection(use_soft_selection=False)
+            joints, messages = fl_mgr.bound_joints(targets=targets) if targets else fl_mgr.bound_joints()
         except Exception as exc:                           # noqa: BLE001
             self._log("[FAIL] Get Bound Joints failed : {0}".format(exc))
             return
+        meshes = fl_mgr.skinned_meshes(targets)
+        if meshes:
+            self._mesh_uuids = [u for m in meshes for u in (cmds.ls(m, uuid=True) or [])[:1]]
+            self._sync_mesh_label()
         for message in messages:
             self._log(message)
         if not joints:
             if not any(m.startswith("[WARN]") for m in messages):
                 self._log("[WARN] No bound joint found.")
             return
-        import maya.cmds as cmds
         names = [(cmds.ls(j) or [j])[0] for j in joints]
         self.tsl_joints.set_items(names)
         self._log("[OK] Listed {0} bound joint(s).".format(len(names)))
+
+    # ---------------- Add Influence (v01.42) ----------------
+
+    def meshes(self):
+        """Get Bound Joints 로 기억한 메시의 **지금** 풀패스 (씬에서 사라진 것은 빠진다)."""
+        import maya.cmds as cmds
+        out = []
+        for uuid in self._mesh_uuids:
+            found = cmds.ls(uuid, long=True) or []
+            if found and found[0] not in out:
+                out.append(found[0])
+        return out
+
+    def _sync_mesh_label(self):
+        import maya.cmds as cmds
+        meshes = self.meshes() if self._mesh_uuids else []
+        if not meshes:
+            self.lbl_mesh.setText("Mesh : (none - select a skinned mesh, Get Bound Joints)")
+        else:
+            names = [(cmds.ls(m) or [m])[0] for m in meshes]
+            text = ", ".join(names[:3]) + (" +{0}".format(len(names) - 3) if len(names) > 3 else "")
+            self.lbl_mesh.setText("Mesh : " + text)
+        self.btn_add_infl.setEnabled(bool(meshes))
+
+    def on_add_influence(self, *args):
+        """씬에서 고른 조인트를 기억한 메시의 skinCluster 에 웨이트 0 으로 더하고 리스트에 붙인다(한 번 = undo 한 스텝)."""
+        import maya.cmds as cmds
+        selected = cmds.ls(sl=True, type="joint", long=True) or []
+        meshes = self.meshes()
+        try:
+            with undo_chunk():
+                added, messages = fl_mgr.add_influences(meshes, selected)
+        except Exception as exc:                           # noqa: BLE001
+            self._log("[FAIL] Add Influence failed : {0}".format(exc))
+            return
+        for message in messages:
+            self._log(message)
+        self._sync_mesh_label()
+        if not meshes:
+            return
+        # 이미 바인드돼 있던 것도 리스트에는 붙인다(고른 조인트로 바로 Flood 할 수 있게).
+        bound = set()
+        for mesh in meshes:
+            for skin in fl_mgr.skin_clusters(mesh)[:1]:
+                bound.update(maya_skin.influence_paths(maya_skin.skin_fn(skin)))
+        listed = [j for j in selected if j in bound]
+        if listed:
+            self.tsl_joints.append_unique([(cmds.ls(j) or [j])[0] for j in listed])
 
     def on_flood(self, *args):
         joints = self.joints()

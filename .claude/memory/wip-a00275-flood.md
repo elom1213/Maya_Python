@@ -23,4 +23,7 @@ option on this tab (it carries the bug). Subtract All not ported (dead branch in
 v01.41 : `Get Bound Joints` button on the Joints list (mesh = all bound joints, components = joints weighted there) -
 the user expected selecting a mesh to list its joints; plain `Select Joints` only copies the selection.
 
+v01.42 : `Add Influence` button - Get Bound Joints remembers the mesh(es) by UUID (`Mesh :` label); scene-selected joints
+are added to that skinCluster with weight 0 (`skinCluster -e -addInfluence -weight 0`) and appended to the list.
+
 Related: [[kangaroo-headless-golden-test]] · [[wip-a00275-move-joints]] · [[framework-tsl-attach-uuids]]

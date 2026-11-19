@@ -1,5 +1,12 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.42 (2026-11-19)
+
+- **[Flood] `Add Influence` 버튼** (Get Bound Joints 옆). Get Bound Joints 로 읽은 메시를 기억하고(리스트 위 `Mesh :` 에 표시),
+  씬에서 고른 조인트를 그 메시 skinCluster 에 **웨이트 0** 인플루언스로 추가한 뒤 리스트에 붙인다 — 마야 `Skin > Add Influence` 와 같다.
+  메시는 그때 선택돼 있지 않아도 된다. 이미 바인드된 조인트는 건너뛰고 `[Info]`. 같은 이름 조인트도 풀패스로. 한 번 = undo 한 스텝.
+  시험 `test_flood_ui.py` 29. **마야 GUI 확인 아직.**
+
 ## v01.41 (2026-11-19)
 
 - **[Flood] `Get Bound Joints` 버튼** (Joints 리스트 버튼 줄 맨 앞). 메시를 고르고 누르면 그 메시 skinCluster 에 바인드된

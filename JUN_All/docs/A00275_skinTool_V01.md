@@ -10,7 +10,7 @@ updated: 2026-11-19
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.41 — Flood 에 **`Get Bound Joints`**(선택 메시의 바인드 조인트로 리스트 채우기) · v01.40 — **`Weights > Flood`** 신규: 조인트(들)에 웨이트 채우기, Kangaroo `SkinCluster > Flood` 이식 + **같은 이름 조인트가 있어도 동작**(원본은 에러) · v01.37 — **`Weights > Move`** 신규: 조인트 n 개 → k 개 웨이트 이동, Kangaroo `SkinCluster > Move` 이식(플러그인 무의존 · Kangaroo 엔진 선택) + Respect selection · v01.36 — Classic Native 가 **선택 버텍스만** (Joints to Joints · Meshes to Meshes) · v01.35 — By Weight 조인트 리스트에 **이름 필터** · v01.32 — Transfer 에 **`Target mode`**(소스↔타겟 리스트 1:1) + **진행률 팝업** · v01.31 — **`Weights > Smooth`** 신규: Kangaroo `SkinCluster > Smooth` 이식(플러그인 무의존) · v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
+- **버전**: `app/config/version.py` (v01.42 — Flood 에 **`Add Influence`**(고른 조인트를 그 메시 skinCluster 에 웨이트 0 으로) · v01.41 — Flood 에 **`Get Bound Joints`**(선택 메시의 바인드 조인트로 리스트 채우기) · v01.40 — **`Weights > Flood`** 신규: 조인트(들)에 웨이트 채우기, Kangaroo `SkinCluster > Flood` 이식 + **같은 이름 조인트가 있어도 동작**(원본은 에러) · v01.37 — **`Weights > Move`** 신규: 조인트 n 개 → k 개 웨이트 이동, Kangaroo `SkinCluster > Move` 이식(플러그인 무의존 · Kangaroo 엔진 선택) + Respect selection · v01.36 — Classic Native 가 **선택 버텍스만** (Joints to Joints · Meshes to Meshes) · v01.35 — By Weight 조인트 리스트에 **이름 필터** · v01.32 — Transfer 에 **`Target mode`**(소스↔타겟 리스트 1:1) + **진행률 팝업** · v01.31 — **`Weights > Smooth`** 신규: Kangaroo `SkinCluster > Smooth` 이식(플러그인 무의존) · v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
   (v01.22 는 아래 레이어 lock 이 사라졌다) · v01.22 — **`Weights > Layer`** 신규: 버텍스 순서가 같은 메시 N 개의
   웨이트를 메시마다 lock + Blend 로 레이어처럼 합성해 새 메시로 만들거나 기존 메시를 갱신 · v01.15 — **탭 재분류**:
   평평한 탭 7개를 `카테고리 3 → 기능 7` 의 2단 구조로, 아래 표)
@@ -570,6 +570,7 @@ Kangaroo `SkinCluster > Flood` 를 **플러그인 없이** 옮긴 탭이고, 같
 │ A|dup               │ │ (o) Replace Closest ( ) Add Closest │
 │ B|dup               │ │ ( ) Replace All     ( ) Add All     │
 │ [Get Bound Joints]  │ │ ( ) Scale All       ( ) Distribute  │
+│ [Add Influence]     │ │                                     │
 │ [Select Joints] ... │ │                                     │
 └─────────────────────┘ └─────────────────────────────────────┘
 ┌ Options ─────────────────────────────────────────────────────┐
@@ -592,6 +593,11 @@ Kangaroo `SkinCluster > Flood` 를 **플러그인 없이** 옮긴 탭이고, 같
    - **`Get Bound Joints`** (v01.41~) — 메시를 고르고 누르면 그 메시 skinCluster 에 **바인드된 조인트 전부**로 리스트를 바꾼다.
      버텍스 · 엣지 · 페이스를 고르고 누르면 **그 버텍스에 웨이트가 있는 조인트만** 담긴다. 메시 여러 개면 합친다.
      같은 이름 조인트는 `A|dup` 처럼 부분 경로로 담겨 구별된다. 필요 없는 것은 `Del` 로 뺀다.
+   - **`Add Influence`** (v01.42~) — 아직 바인드되지 않은 조인트를 쓰려면: 메시를 고르고 `Get Bound Joints` 를 한 번 누른 뒤
+     (리스트 위 `Mesh : <메시>` 에 기억된다), 씬에서 **조인트를 고르고** `Add Influence`. 그 조인트가 메시 skinCluster 에
+     **웨이트 0** 으로 추가되고(모양 그대로, 마야 `Skin > Add Influence` 와 같다) 리스트에도 붙는다. 이때 메시는 선택돼 있지 않아도 된다.
+     이미 바인드된 조인트는 건너뛰고 로그로 알린다. 한 번 = undo 한 스텝. (Flood 자체도 미인플루언스 조인트는 자동으로 웨이트 0 추가한다 —
+     Add Influence 는 Flood 전에 미리 붙여 두고 싶을 때.)
    - 조인트를 직접 고르고 `Select Joints` / `Add` 해도 된다.
 2. 씬에서 **스킨된 메시**(여러 개 가능) 또는 그 **버텍스 · 엣지 · 페이스**를 고른다. 소프트 셀렉션을 켜 두면 falloff 만큼만 채운다.
 3. `Flood` — **한 번 = undo 한 스텝**. 로그에 메시마다 바뀐 버텍스 수가 적힌다.
