@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-19 (오늘)
 
+> [!summary] **`A00630_MotionPathEditor` — 속도 그래프 · Smooth 진단과 하위 계획서** `#A00630_MotionPathEditor`
+- 요청: 원본 블렌더 애드온의 "프레임 구간 [a, b] × 미분값/위치값 2D 그래프 + smooth" 를 그대로 · 더 낫게 만들 수 있는지 진단하고 계획서 작성.
+- 원본 MANUAL · API_GUIDE 확인: 그래프 = **Speed Graph**(세로축 = 프레임당 월드 이동 거리), 오른쪽 드래그 Smooth 는 **속도(타이밍)만** 고르게 — 경로 모양 · 키 프레임 유지, 정지 유지. 경로 모양 Smooth 는 별개 도구.
+- 판정: 구현 가능(경로 점 · solve · 레이어 β 재사용). 큰 일 = 목표 움직임 → 애님 커브 refit(Hermite 기울기 선형 최소제곱 + 필요한 곳만 키 추가).
+- 개선안: 툴 창 Qt 그래프 패널, Speed / Position / Acceleration 모드, Whole Pose 리타임(시간 왜곡을 회전에도), 획 중 미리보기, 범위 버튼 Smooth, refit 오차 보고. 단계 G0~G5(G5 = 경로 모양 Smooth).
+- 문서: [`plans/A00630_MotionPathEditor_speed_graph_plan.md`](plans/A00630_MotionPathEditor_speed_graph_plan.md), 상위 계획서 §5 에 링크. 코드 변경 없음.
+
 > [!summary] **`A00410_SecondaryMotion` v01.13 — Physics Asset 이 처음에 크게 튀던 것 수정 (DFTL 속도 보정)** `#A00410_SecondaryMotion`
 - 요청: `0001_tmp_01/SecondaryToolEx/test_01.mb`(option.png 설정 = Physics Asset 기본값, 조인트 20본 × 1.13cm, 루트 31° 기울임, 30fps)가 처음에 엄청 튄다 → 원인 분석 · 수정 또는 안내.
 - mayapy 로 씬을 열고 툴 코어로 같은 결과를 재현(파일 값과 일치) → 체인 입력을 덤프해 솔버만 반복 실험.
