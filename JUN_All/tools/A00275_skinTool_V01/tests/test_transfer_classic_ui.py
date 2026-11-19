@@ -38,7 +38,7 @@ def visible(w):
     return w.isVisibleTo(win)
 
 
-src_widgets = (win.lbl_transfer_desc, win.tsl_transfer_src, win.grp_transfer_opts,
+src_widgets = (win.tsl_transfer_src, win.grp_transfer_opts,
                win.lbl_transfer_hint, win.btn_transfer_run)
 
 check("default mode = Scene selection, Classic panel hidden",
@@ -63,6 +63,33 @@ win.rb_transfer_sel.click()
 app.processEvents()
 check("back to Scene selection", not visible(win.tsl_transfer_tgt) and not visible(win.transfer_classic_panel)
       and visible(win.btn_transfer_run))
+
+# ---- v01.46 모드를 바꿔도 라디오 버튼 줄이 움직이지 않는다 (설명은 위 한 자리, 글만 바뀜 · 높이 고정)
+from PySide2.QtCore import QPoint   # noqa: E402
+from Framework.themes.theme_manager import ThemeManager   # noqa: E402
+ThemeManager.load_theme_to_widget(win, "green_dark")     # 실제와 같은 글꼴 크기로
+
+
+def radio_y():
+    for _ in range(5):
+        app.processEvents()
+    return [rb.mapTo(win, QPoint(0, 0)).y() for rb in (win.rb_transfer_sel, win.rb_transfer_pairs,
+                                                       win.rb_transfer_classic)]
+
+
+ys = {}
+texts = {}
+for name, rb in (("selection", win.rb_transfer_sel), ("classic", win.rb_transfer_classic),
+                 ("pairs", win.rb_transfer_pairs), ("selection again", win.rb_transfer_sel)):
+    rb.click()
+    ys[name] = radio_y()
+    texts[name] = win.lbl_transfer_desc.text()
+check("radio buttons stay at the same place in every mode", len({tuple(v) for v in ys.values()}) == 1, ys)
+check("description stays above the radios and only its text changes",
+      visible(win.lbl_transfer_desc) and texts["classic"] == win.TRANSFER_DESC_CLASSIC
+      and texts["selection"] == texts["pairs"] == win.TRANSFER_DESC)
+check("both descriptions have the same number of lines",
+      win.TRANSFER_DESC.count("\n") == win.TRANSFER_DESC_CLASSIC.count("\n"))
 
 # ---- 모드를 바꾸면 창 높이를 다시 맞춘다 (tab_fit.fit_later)
 def settle():

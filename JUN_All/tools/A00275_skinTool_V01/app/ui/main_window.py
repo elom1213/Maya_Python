@@ -322,11 +322,8 @@ class MainWindow(QWidget):
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        desc = QLabel(
-            "Classic move tool. From[i] / To[i] are paired by row order.\n"
-            "Pick the engine: Kangaroo (plugin) or Native (no plugin).")
-        desc.setAlignment(Qt.AlignCenter)
-        layout.addWidget(desc)
+        # v01.46 - 패널 안의 설명 글은 없앴다. Transfer 탭 맨 위 설명(lbl_transfer_desc)이 모드에 따라
+        # TRANSFER_DESC_CLASSIC 으로 바뀐다 - 설명이 라디오 버튼 위 · 아래로 오가며 버튼 줄을 움직이지 않게.
 
         # Engine (Kangaroo / Native) + Transfer Mode
         eng_grp = QGroupBox("Engine")
@@ -397,11 +394,8 @@ class MainWindow(QWidget):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        desc = QLabel(
-            "Transfer skin weights from the SOURCE meshes (list below) to the\n"
-            "targets, by closest point. Target mode says how the targets are\n"
-            "picked - the scene selection (every source acts together on each\n"
-            "selected mesh), or a second list paired 1:1 with the sources.")
+        # 설명은 라디오 버튼 **위 한 자리**에 늘 보이고 글만 모드에 따라 바뀐다(_sync_transfer_mode, v01.46).
+        desc = QLabel(self.TRANSFER_DESC)
         desc.setAlignment(Qt.AlignCenter)
         layout.addWidget(desc)
         self.lbl_transfer_desc = desc
@@ -524,6 +518,18 @@ class MainWindow(QWidget):
     #: Target mode = Classic (UI 전용 값 - core 의 MODE_* 와 겹치지 않는다)
     TRANSFER_MODE_CLASSIC = "classic"
 
+    #: Transfer 탭 맨 위 설명 (v01.46). 두 글은 **같은 4줄**로 맞춘다 - 줄 수가 같아야 높이가 같다.
+    TRANSFER_DESC = (
+        "Transfer skin weights from the SOURCE meshes (list below) to the\n"
+        "targets, by closest point. Target mode says how the targets are\n"
+        "picked - the scene selection (every source acts together on each\n"
+        "selected mesh), or a second list paired 1:1 with the sources.")
+    TRANSFER_DESC_CLASSIC = (
+        "Classic move tool (was the Weights > Classic tab).\n"
+        "From[i] / To[i] are paired by row order - Joints to Joints moves\n"
+        "weights inside one mesh, Meshes to Meshes copies mesh to mesh.\n"
+        "Pick the engine: Kangaroo (plugin) or Native (no plugin).")
+
     def transfer_mode(self):
         """Transfer 탭이 대상을 고르는 방식 (core 의 MODE_* 값, 또는 TRANSFER_MODE_CLASSIC)."""
         if self.rb_transfer_classic.isChecked():
@@ -541,9 +547,18 @@ class MainWindow(QWidget):
         classic = self.transfer_mode() == self.TRANSFER_MODE_CLASSIC
         pairs = self.transfer_mode() == wt_mgr.MODE_PAIRS
 
+        # 맨 위 설명은 늘 보이고 글만 바꾼다. 높이는 두 글 중 큰 쪽으로 고정해, 모드를 바꿔도 아래 라디오 버튼 줄이
+        # 움직이지 않게 한다(v01.46 - 예전엔 Classic 에서 이 설명을 숨기고 패널 안 설명이 버튼 아래에 생겨 줄이 올라갔다).
+        desc = self.lbl_transfer_desc
+        desc.setText(self.TRANSFER_DESC_CLASSIC if classic else self.TRANSFER_DESC)
+        metrics = desc.fontMetrics()
+        desc.setMinimumHeight(max(
+            metrics.boundingRect(QRect(0, 0, 10000, 10000), int(Qt.AlignCenter), text).height()
+            for text in (self.TRANSFER_DESC, self.TRANSFER_DESC_CLASSIC)))
+
         # Classic 모드 = 예전 Classic 탭 패널만 보이고, 소스 전이 위젯은 숨긴다.
         self.transfer_classic_panel.setVisible(classic)
-        for widget in (self.lbl_transfer_desc, self.tsl_transfer_src, self.grp_transfer_opts,
+        for widget in (self.tsl_transfer_src, self.grp_transfer_opts,
                        self.lbl_transfer_hint, self.btn_transfer_run):
             widget.setVisible(not classic)
         self.tsl_transfer_tgt.setVisible(pairs)

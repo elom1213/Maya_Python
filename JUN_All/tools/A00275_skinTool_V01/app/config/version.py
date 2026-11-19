@@ -69,5 +69,8 @@
 # 01.45  Weights > Flood - Options 슬라이더(Value · Smooth Steps · Blend)가 보이게. 테마 qss 에 QSlider 규칙이 없어 어두운
 #        배경에서 홈이 묻히고 손잡이만 보였다 -> 공용 JUN_mod_sliderStyle_qt_v01 이 보일 때 테마 색(green_dark)으로 칠한다.
 
-VERSION = "01.45"
+# 01.46  Weights > Transfer - Target mode 를 바꿔도 라디오 버튼 줄이 움직이지 않는다. 예전엔 Classic 에서 위 설명을 숨기고
+#        Classic 패널 설명이 버튼 아래에 생겨 줄이 60px 올라갔다 -> 설명은 위 한 자리에서 글만 바뀌고(같은 4줄) 높이도 고정.
+
+VERSION = "01.46"
 LAST_UPDATE = "2026-11-19"
