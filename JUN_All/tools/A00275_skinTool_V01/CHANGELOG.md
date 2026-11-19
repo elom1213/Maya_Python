@@ -1,5 +1,13 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.43 (2026-11-19)
+
+- **[UI] `Weights > Classic` 하위 탭을 없애고 `Weights > Transfer` 로 옮겼다.** Transfer 의 `Target mode` 에 **`Classic`** 이 생겼고,
+  고르면 예전 Classic 탭(Engine Kangaroo/Native · Transfer Mode · From/To 리스트 · `Joints to Joints (single mesh)` / `Meshes to Meshes`)이
+  그 자리에 보이고 소스 전이 위젯(Source Meshes · Options · TRANSFER 버튼)은 숨는다. 위젯 · 핸들러 · 동작은 그대로.
+  모드를 바꾸면 창 높이를 다시 맞춘다(공용 tabFit). Weights 하위 탭은 8 -> 7, 첫 페이지는 Transfer.
+  시험 `tests/test_transfer_classic_ui.py` 9 (모드별 표시 · Native 두 버튼 실제 실행 · 창 높이). **마야 GUI 확인 아직.**
+
 ## v01.42 (2026-11-19)
 
 - **[Flood] `Add Influence` 버튼** (Get Bound Joints 옆). Get Bound Joints 로 읽은 메시를 기억하고(리스트 위 `Mesh :` 에 표시),

@@ -7,9 +7,10 @@
 # 분류는 아래 CATEGORIES 표 하나가 정한다 — 탭을 더할 때 그 표에만 줄을 넣는다.
 #
 #   Weights : 이미 있는 웨이트를 다른 곳으로 옮긴다
-#     - "Classic"        : 레거시 JUN_PY_move_skinWeightTool_v01_04 의 원본 2버튼 UI 이식.
-#                          From / To 리스트 + Engine(Kangaroo/Native) + Transfer Mode +
-#                          [Joints to Joints in single mesh] / [Meshes to Meshes].
+#     - (v01.43 에 Classic 하위 탭을 없애고 Transfer 의 Target mode = "Classic" 으로 옮겼다)
+#       Classic : 레거시 JUN_PY_move_skinWeightTool_v01_04 의 원본 2버튼 UI 이식.
+#                 From / To 리스트 + Engine(Kangaroo/Native) + Transfer Mode +
+#                 [Joints to Joints in single mesh] / [Meshes to Meshes].
 #     - "Transfer"       : 여러 소스 메시 → 현재 선택한 하나의 메시로 웨이트 전이(Kangaroo
 #                          무의존). 선택 버텍스에만/소프트 falloff 반영 (weight_transfer_manager).
 #     - "Migrate A -> B" : 토폴로지가 다른 두 메시 A,B 사이 Transfer + Move 를 한 번에 처리하는
@@ -204,11 +205,11 @@ class MainWindow(QWidget):
 
     # (하위 탭 라벨, 툴팁 = 전체 이름/설명, 빌더 메서드 이름)
     WEIGHTS_PAGES = (
-        ("Classic", "Classic - the legacy two-button transfer UI "
-         "(joints to joints in one mesh / meshes to meshes)", "_build_classic_tab"),
+        # v01.43 - Classic 하위 탭은 없앴다. 같은 UI 가 Transfer > Target mode = Classic 에 있다.
         ("Transfer", "Transfer - weights from several source meshes onto the "
-         "selected mesh (selected vertices and soft-selection falloff supported)",
-         "_build_transfer_tab"),
+         "selected mesh (selected vertices and soft-selection falloff supported). "
+         "Target mode = Classic : the legacy two-button UI (joints to joints in one "
+         "mesh / meshes to meshes)", "_build_transfer_tab"),
         ("Migrate A -> B", "Migrate A -> B - transfer + bone move in one step "
          "between two meshes with different topology", "_build_migrate_tab"),
         ("Copy Weights", "Copy Weights - copy the weights of a stored vertex "
@@ -310,13 +311,16 @@ class MainWindow(QWidget):
         return scroll
 
     # --------------------------------------------------
-    # Weights > Classic (레거시 원본 2버튼 이식)
+    # Weights > Transfer > Target mode = Classic (레거시 원본 2버튼 이식)
+    #   v01.42 까지는 Weights > Classic 하위 탭이었다. 위젯 · 속성 이름 · 핸들러는 그대로이고,
+    #   v01.43 부터 Transfer 탭이 이 패널을 담아 Classic 모드에서만 보인다.
     # --------------------------------------------------
 
     def _build_classic_tab(self):
 
         tab = QWidget()
         layout = QVBoxLayout(tab)
+        layout.setContentsMargins(0, 0, 0, 0)
 
         desc = QLabel(
             "Classic move tool. From[i] / To[i] are paired by row order.\n"
@@ -400,6 +404,7 @@ class MainWindow(QWidget):
             "selected mesh), or a second list paired 1:1 with the sources.")
         desc.setAlignment(Qt.AlignCenter)
         layout.addWidget(desc)
+        self.lbl_transfer_desc = desc
 
         # 대상을 고르는 방식 (v01.32~). Scene selection 이 원래 동작이고 기본값이다.
         mode_row = QHBoxLayout()
@@ -417,12 +422,24 @@ class MainWindow(QWidget):
             "by row order - one source per target, the whole mesh. When the two\n"
             "lists differ in length, only the first N pairs run (N = the shorter).\n"
             "The scene selection is not used in this mode.")
+        # v01.43 - 예전 Weights > Classic 탭이 이 모드로 들어왔다.
+        self.rb_transfer_classic = QRadioButton("Classic")
+        self.rb_transfer_classic.setToolTip(
+            "The legacy two-button UI (was the Weights > Classic tab):\n"
+            "From / To lists paired by row order - Joints to Joints (single mesh)\n"
+            "or Meshes to Meshes, Kangaroo or Native engine.")
         self.transfer_mode_grp.addButton(self.rb_transfer_sel)
         self.transfer_mode_grp.addButton(self.rb_transfer_pairs)
+        self.transfer_mode_grp.addButton(self.rb_transfer_classic)
         mode_row.addWidget(self.rb_transfer_sel)
         mode_row.addWidget(self.rb_transfer_pairs)
+        mode_row.addWidget(self.rb_transfer_classic)
         mode_row.addStretch(1)
         layout.addLayout(mode_row)
+
+        # Classic 모드 패널 - 예전 Classic 탭 그대로(속성 이름 · 핸들러 불변). Classic 모드에서만 보인다.
+        self.transfer_classic_panel = self._build_classic_tab()
+        layout.addWidget(self.transfer_classic_panel)
 
         # 소스 / 타겟 메시 리스트를 나란히 (타겟은 1:1 모드에서만 보인다)
         lists_row = QHBoxLayout()
@@ -445,6 +462,7 @@ class MainWindow(QWidget):
         # 옵션 (Engine + Mode + soft selection)
         opt_grp = QGroupBox("Options")
         opt_layout = QVBoxLayout(opt_grp)
+        self.grp_transfer_opts = opt_grp
 
         eng_row = QHBoxLayout()
         eng_row.addWidget(QLabel("Engine"))
@@ -503,8 +521,13 @@ class MainWindow(QWidget):
         layout.addStretch(1)
         return tab
 
+    #: Target mode = Classic (UI 전용 값 - core 의 MODE_* 와 겹치지 않는다)
+    TRANSFER_MODE_CLASSIC = "classic"
+
     def transfer_mode(self):
-        """Transfer 탭이 대상을 고르는 방식 (core 의 MODE_* 값)."""
+        """Transfer 탭이 대상을 고르는 방식 (core 의 MODE_* 값, 또는 TRANSFER_MODE_CLASSIC)."""
+        if self.rb_transfer_classic.isChecked():
+            return self.TRANSFER_MODE_CLASSIC
         if self.rb_transfer_pairs.isChecked():
             return wt_mgr.MODE_PAIRS
         return wt_mgr.MODE_SELECTION
@@ -515,9 +538,19 @@ class MainWindow(QWidget):
         소프트 falloff 체크는 **씬 선택 모드 + Native** 에서만 뜻이 있다 - 1:1 모드는
         메시 전체를 전이하므로(core `transfer_pairs` 주석) 함께 비활성한다.
         """
+        classic = self.transfer_mode() == self.TRANSFER_MODE_CLASSIC
         pairs = self.transfer_mode() == wt_mgr.MODE_PAIRS
 
+        # Classic 모드 = 예전 Classic 탭 패널만 보이고, 소스 전이 위젯은 숨긴다.
+        self.transfer_classic_panel.setVisible(classic)
+        for widget in (self.lbl_transfer_desc, self.tsl_transfer_src, self.grp_transfer_opts,
+                       self.lbl_transfer_hint, self.btn_transfer_run):
+            widget.setVisible(not classic)
         self.tsl_transfer_tgt.setVisible(pairs)
+        # 보이는 내용이 바뀌었으니 창 높이를 다시 맞춘다(창이 다 만들어진 뒤에만).
+        tab_fit = getattr(self, "tab_fit", None)
+        if tab_fit is not None:
+            tab_fit.fit_later()
         if pairs:
             self.lbl_transfer_hint.setText(
                 "Targets = the Target Meshes list, paired by row order "
@@ -2103,8 +2136,8 @@ class MainWindow(QWidget):
             self,
             "About",
             f"Skin Tool v{VERSION}\n\n"
-            "Classic : joint/mesh weight move (Kangaroo or Native engine).\n"
             "Transfer : many source meshes -> selected mesh/vertices (no plugin).\n"
+            "           Target mode Classic : joint/mesh weight move (Kangaroo or Native).\n"
             "Migrate A->B : cross-topology transfer + bone remap.\n"
             "Smooth : average the weights of the selected vertices with their neighbours.\n"
             "Move : move the weights of n joints to k joints (closest bone).\n"

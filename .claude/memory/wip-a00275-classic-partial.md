@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> **v01.43 (2026-11-19): Classic 하위 탭은 없어졌다 → `Weights > Transfer` 의 `Target mode = Classic`** (같은 위젯 · 핸들러,
+> `main_window._build_classic_tab()` 패널을 Transfer 탭이 담고 모드로 보이기/숨기기).
+
 2026-10-16 v01.36: `Weights > Classic` 의 **Native** 엔진이 선택 버텍스만 처리한다 (Kangaroo 는 손대지 않음).
 
 - 선택 파싱은 Transfer 탭 것(`weight_transfer_manager.parse_target_selections`) 재사용 - 엣지/페이스는 버텍스로, 소프트 셀렉션은 falloff.

@@ -58,5 +58,9 @@
 #        씬에서 고른 조인트를 그 skinCluster 에 웨이트 0 으로 추가 + 리스트에 붙인다(마야 Skin > Add Influence 와 같다).
 #        이미 바인드된 것은 건너뛰고 알림, 같은 이름 조인트도 풀패스로, 한 번 = undo 한 스텝.
 
-VERSION = "01.42"
+# 01.43  Weights > Classic 하위 탭 제거 -> Weights > Transfer 의 Target mode 에 `Classic` 추가. 고르면 예전 Classic 탭
+#        (Engine Kangaroo/Native · Transfer Mode · From/To · Joints to Joints / Meshes to Meshes) 이 그 자리에 보이고
+#        소스 전이 위젯은 숨는다. 위젯 · 핸들러 · 동작은 그대로, 모드를 바꾸면 창 높이를 다시 맞춘다.
+
+VERSION = "01.43"
 LAST_UPDATE = "2026-11-19"

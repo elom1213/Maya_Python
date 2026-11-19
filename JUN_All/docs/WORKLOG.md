@@ -51,6 +51,7 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 시험 `tests/test_weight_flood.py` 51/51(Kangaroo 대조 19 케이스 차이 0 ~ 1.1e-16, 같은 이름 씬에서 원본 실패 · 이식 성공) · `test_flood_ui.py` 16/16 · `test_tab_fit_ui.py` 기대 페이지 수 갱신 35/35. GUI 확인 아직.
 - **v01.41** — 요청: 메시를 고르면 바인드된 조인트가 Joints 리스트에 올라와야 한다. → 리스트 버튼 줄 맨 앞에 `Get Bound Joints` : 메시 = skinCluster 조인트 전부, 컴포넌트 = 그 버텍스에 웨이트 있는 조인트만, 같은 이름은 부분 경로로 구별. `test_flood_ui.py` 21/21.
 - **v01.42** — 요청: Get Bound Joints 뒤 다른 조인트를 골라 그 메시 skinCluster 에 추가하는 기능(마야 Add Influence). → `Add Influence` 버튼 : Get Bound Joints 가 메시를 UUID 로 기억(`Mesh :` 라벨), 고른 조인트를 웨이트 0 으로 추가 + 리스트에 붙임, 이미 바인드면 건너뜀, 같은 이름 풀패스, undo 한 스텝. `test_flood_ui.py` 29/29.
+- **v01.43** — 요청: Weights > Classic 탭을 없애고 Transfer 로 옮겨, Target mode 에 Classic 모드를 추가. → Classic 패널(예전 탭 위젯 · 핸들러 그대로)을 Transfer 안에 두고 Classic 모드에서만 보이게, 소스 전이 위젯은 숨김, 모드 전환 때 tabFit 재맞춤. Weights 하위 탭 8 → 7(첫 페이지 Transfer). 시험 `test_transfer_classic_ui.py` 9/9(모드별 표시 · Native Joints to Joints / Meshes to Meshes 실제 실행 · 창 높이) · `test_move_ui` 15 · `test_tab_fit_ui` 34(숨은 페이지 수 12 → 11) · `test_flood_ui` 29.
 
 ---
 
