@@ -28,8 +28,15 @@
 #        버텍스당 UV · 원본 재질, Combine per LOD, 기록 어트리뷰트 junLodSource(UUID) 등. Ctrl+Z 한 번.
 #        코어 app/core/lod_manager.py, 탭 app/ui/lod_tab.py. 계획서 docs/plans/A00380_MeshTool_LOD_plan.md
 
-VERSION = "01.20"
-LAST_UPDATE = "2026-11-16"
+# 01.21  **Quad Patch 탭**(Match 오른쪽) - 구멍을 쿼드 그리드로 메운다(블렌더 Grid Fill 류, 독자 구현).
+#        Edge Border(보더 엣지 하나만 골라도 그 구멍 전체) / Faces(고른 면을 지우고 원래 면 위에 그리드,
+#        UV 도 원래 면에서) / Extrude(보더 일부 사슬에서 Rows 줄). Coons 패치 + Relax, Rotation ·
+#        Proportion · Auto Corners · Inset 링 · Smooth Border. 초록 와이어 미리보기는 undo 큐 밖,
+#        Patch It = polyAppendVertex 로 원본 메시에 직접(트랜스폼 · 셰이프 · UUID 유지), Ctrl+Z 한 번.
+#        코어 app/core/quad_patch.py, 탭 app/ui/quad_patch_tab.py. Help > Quad Patch Notes
+
+VERSION = "01.21"
+LAST_UPDATE = "2026-11-19"
 
 # 01.06  Match 탭 From 리스트의 List From Mesh / Add / Del 버튼 글자가 잘리던 문제.
 #        TSL 위젯 전체에 걸려 있던 setMaximumHeight 를 치우고 리스트에만 높이를 제한한다.

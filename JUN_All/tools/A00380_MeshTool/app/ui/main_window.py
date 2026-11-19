@@ -47,6 +47,7 @@ from tools.A00380_MeshTool.app.core.mesh_fix import MeshFixer
 from tools.A00380_MeshTool.app.core.report import ReportWriter
 from tools.A00380_MeshTool.app.ui.uv_tab import UvSetsTab, RULE_TEXT as UV_RULE_TEXT
 from tools.A00380_MeshTool.app.ui.lod_tab import LodTab, NOTES_TEXT as LOD_NOTES_TEXT
+from tools.A00380_MeshTool.app.ui.quad_patch_tab import QuadPatchTab, NOTES_TEXT as QUAD_NOTES_TEXT
 
 
 WINDOW_OBJECT_NAME = "JUN_A00380_MeshTool_window"
@@ -148,6 +149,7 @@ class MainWindow(QWidget):
         help_menu.addAction("About").triggered.connect(self.show_about)
         help_menu.addAction("UV Sets Rule").triggered.connect(self.show_uv_rule)
         help_menu.addAction("LOD Notes").triggered.connect(self.show_lod_notes)
+        help_menu.addAction("Quad Patch Notes").triggered.connect(self.show_quad_notes)
         root.setMenuBar(self.menu_bar)
 
         self.tabs = QTabWidget()
@@ -160,6 +162,11 @@ class MainWindow(QWidget):
         self.tabs.addTab(self.uv_tab, "UV Sets")
         self.tabs.addTab(self.build_peak_tab(), "Peak")
         self.tabs.addTab(self.build_match_tab(), "Match")
+        # Quad Patch (v01.21) - 구멍을 쿼드 그리드로 메운다. 모양을 고치는 탭들 다음, LOD 앞
+        self.quad_tab = QuadPatchTab(
+            log=lambda text, warn=False, ok=False: self.log(text, warn=warn, ok=ok),
+            slider_style=SLIDER_STYLE)
+        self.tabs.addTab(self.quad_tab, "Quad Patch")
         # LOD (v01.20) - 재생용 저폴리 프록시 메시. 맨 오른쪽 (모양을 다 고친 다음 만드는 것)
         self.lod_tab = LodTab(log=lambda text, warn=False, ok=False: self.log(text, warn=warn, ok=ok))
         self.tabs.addTab(self.lod_tab, "LOD")
@@ -175,7 +182,8 @@ class MainWindow(QWidget):
         root.addWidget(self.te_log)
 
         self.log("Mesh Tool v{0} ({1}) ready.  Peak / Match reshape meshes, "
-                 "MeshDoctor diagnoses them, UV Sets checks the UV set rule.".format(
+                 "MeshDoctor diagnoses them, UV Sets checks the UV set rule, "
+                 "Quad Patch fills holes.".format(
                      VERSION, LAST_UPDATE))
 
     def build_peak_tab(self):
@@ -1624,6 +1632,7 @@ class MainWindow(QWidget):
         # 확정하지 않은 미리보기를 남긴 채 닫으면 씬이 어긋난 상태로 보인다.
         self.discard_preview()
         self.discard_match_preview()
+        self.quad_tab.discard()
         self.kill_script_job()
         super(MainWindow, self).closeEvent(event)
 
@@ -1656,6 +1665,9 @@ class MainWindow(QWidget):
     def show_lod_notes(self):
         QMessageBox.information(self, "LOD Notes", LOD_NOTES_TEXT)
 
+    def show_quad_notes(self):
+        QMessageBox.information(self, "Quad Patch Notes", QUAD_NOTES_TEXT)
+
     def show_about(self):
         QMessageBox.information(
             self, "About",
@@ -1676,6 +1688,9 @@ class MainWindow(QWidget):
             "Ported from A00050_uvTool_V02. See Help > UV Sets Rule.\n\n"
             "LOD: build low-poly copies (LOD1 - LOD5) of meshes for fast\n"
             "playback, in bind pose, not bound. See Help > LOD Notes.\n\n"
+            "Quad Patch: fill a hole with a grid of quads (Edge Border),\n"
+            "rebuild selected faces as a grid (Faces), or grow a grid from\n"
+            "part of a border (Extrude). See Help > Quad Patch Notes.\n\n"
             "Peak has no Apply button: dragging the slider applies the\n"
             "result as you go (each change is one Ctrl+Z).\n"
             "by Ji Hun Park".format(VERSION, LAST_UPDATE))

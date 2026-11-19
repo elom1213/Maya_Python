@@ -1,14 +1,14 @@
 ---
 title: A00380_MeshTool 사용법
-aliases: [Mesh Tool, MeshTool, A00380, Peak, Match, By Weight, MeshDoctor, meshDoctor, UV Sets, uvTool, LOD]
-tags: [maya-python, tool-guide, mesh, modeling, peak, normal, match, kangaroo, layout, skin-weight, corrective, diagnostics, cleanup]
-updated: 2026-11-16
+aliases: [Mesh Tool, MeshTool, A00380, Peak, Match, By Weight, MeshDoctor, meshDoctor, UV Sets, uvTool, LOD, Quad Patch, Grid Fill]
+tags: [maya-python, tool-guide, mesh, modeling, peak, normal, match, kangaroo, layout, skin-weight, corrective, diagnostics, cleanup, topology, grid-fill]
+updated: 2026-11-19
 ---
 
 # A00380_MeshTool 사용법
 
 Maya 안에서 도는 **메시 진단 · 편집** PySide 툴이다(arch B, in-Maya).
-**MeshDoctor / UV Sets / Peak / Match / LOD** 다섯 탭으로 구성된다 — **무엇이 잘못됐는지 먼저 보고, 그다음 고치는** 순서다.
+**MeshDoctor / UV Sets / Peak / Match / Quad Patch / LOD** 여섯 탭으로 구성된다 — **무엇이 잘못됐는지 먼저 보고, 그다음 고치는** 순서다.
 
 - **MeshDoctor** (v01.14~) = 메시를 **읽기만 해서** 진단한다. 리스트업한 메시들을 한 번에 검사해
   **메시당 한 줄 요약 표**를 만들고, 행을 누르면 **그 메시의 상세 리포트**가 아래에 펼쳐진다.
@@ -26,10 +26,13 @@ Maya 안에서 도는 **메시 진단 · 편집** PySide 툴이다(arch B, in-Ma
     좌 1개면 `1 <= n`, 여러 개면 `n <= n`(리스트 순서대로 짝, 개수가 다르면 작은 쪽만큼).
   - **By Weight** (v01.09~) — 스킨 메시의 **조인트 웨이트를 마스크로** 써서, 메시들을 타깃 모양 쪽으로
     `웨이트 × 델타` 만큼 옮긴다. 블렌드셰이프 타깃에 웨이트 맵(마스크)을 칠한 것과 결과가 같다.
+- **Quad Patch** (v01.21~) = 구멍을 **쿼드 그리드로 메운다**(블렌더 Grid Fill 류). 보더 엣지로 구멍 전체를 채우거나(Edge Border),
+  고른 면을 지우고 원래 면 위에 그리드로 다시 짜거나(Faces), 보더 일부에서 그리드를 뻗는다(Extrude). 독자 구현(§3-7).
 - **LOD** (v01.20~) = 재생용 **저폴리 프록시(LOD1 ~ LOD5)** 메시를 빠르게 만든다. 바인딩은 하지 않는다 —
   `A00275_skinTool_V01` 로 다시 바인딩한다. 기본(Fast)은 마야 `polyReduce` 보다 실제 아바타에서 약 12배 빠르다(§3-6).
 
-- **버전**: `app/config/version.py` (v01.20 — **LOD 탭**(맨 오른쪽, 재생용 저폴리 프록시)
+- **버전**: `app/config/version.py` (v01.21 — **Quad Patch 탭**(Match 오른쪽, 구멍을 쿼드 그리드로)
+  · v01.20 — **LOD 탭**(맨 오른쪽, 재생용 저폴리 프록시)
   · v01.17 — **UV Sets 탭**(A00050_uvTool_V02 이식, MeshDoctor 오른쪽)
   · v01.16 — 창 가로를 `A00400_CurveTool` 과 같게(360 요청)
   · v01.14 — **MeshDoctor 탭** 이식 + 새 아이콘
@@ -40,7 +43,7 @@ Maya 안에서 도는 **메시 진단 · 편집** PySide 툴이다(arch B, in-Ma
 
 ## 1. 화면 구성
 
-탭 순서는 **MeshDoctor → UV Sets → Peak → Match** 다. 진단이 앞에 오는 이유는 작업 순서가 그렇기 때문이다 —
+탭 순서는 **MeshDoctor → UV Sets → Peak → Match → Quad Patch → LOD** 다. 진단이 앞에 오는 이유는 작업 순서가 그렇기 때문이다 —
 무엇이 잘못됐는지 보고 나서 고친다. UV Sets 는 진단 바로 다음(규칙 검사 + 정리), 모양을 바꾸는 탭 앞이다.
 MeshDoctor 탭의 그림은 §3-4, UV Sets 탭은 §3-5 에 따로 있다.
 
@@ -493,6 +496,88 @@ Fast 는 메시를 한 번 읽고 면 쿼드릭을 한 번 계산해 모든 LOD 
 - numpy 가 필요하다(Maya 2022+ 내장). 없으면 Build 버튼이 꺼진다.
 - 시험: `docs/plans/A00380_MeshTool_LOD_probe_test.py`(mayapy, 19항목 — 목표 수 · 속도 · 얇은 판 · UV · 재질 · undo/redo ·
   바인드/현재 포즈 · 월드 위치 · 덮어쓰기 · Combine · Quality).
+
+---
+
+## 3-7. Quad Patch 탭 (v01.21~)
+
+구멍(짝수 개 보더 엣지)을 **쿼드 그리드로 메운다**. 블렌더의 Grid Fill 과 같은 일을 한다.
+외부 스크립트(`.ref/quadPatcher_v1.0.py`, 2021, Toshi Kosaka)를 보고 시작했지만, 그 파일은 **복사 · 수정 금지** 라이선스라
+**코드는 쓰지 않고 아이디어만 같은 독자 구현**이다(2026-11-19 사용자 결정). `.ref/` 는 gitignore 대상이다.
+
+```
+┌ Quad Patch ──────────────────────────────────────┐
+│ ┌ Start From Selection ────────────────────────┐ │
+│ │ [ Edge Border ]  [ Faces ]  [ Extrude ]      │ │
+│ └──────────────────────────────────────────────┘ │
+│ pPlane1: 16 border edges, grid 4 x 4 - 16 faces  │  ← 상태
+│ ┌ Grid ────────────────────────────────────────┐ │
+│ │ Rotation    ----[|]---------------  [ 0 ]    │ │  ← 모서리 위치
+│ │ Proportion  ----[|]---------------  [ 4 ]    │ │  ← 첫 변의 엣지 수
+│ │ Rows        ----[|]---------------  [ 1 ]    │ │  ← Extrude 만
+│ │ Inset       [|]-------------------  [ 0 ]    │ │  ← 둘레 링 수
+│ │ [               Auto Corners               ] │ │
+│ └──────────────────────────────────────────────┘ │
+│ ┌ Shape ───────────────────────────────────────┐ │
+│ │ Relax           ---[|]------------  [ 10 ]   │ │
+│ │ Smooth Border % [|]---------------  [ 0 ]    │ │
+│ └──────────────────────────────────────────────┘ │
+│ [x] Soft edges  [x] UVs                          │
+│ [        Patch It        ] [  Cancel  ]          │
+└──────────────────────────────────────────────────┘
+```
+
+### 쓰는 법
+
+1. 선택하고 Start 버튼을 누른다 → **초록 와이어 미리보기**가 뜬다.
+   - **Edge Border** — 구멍의 보더 엣지. **하나만 골라도** 그 구멍 전체를 쓴다.
+   - **Faces** — 서로 붙은 면 덩어리. 지우고 그 둘레를 그리드로 다시 채운다. 새 점은 **원래 면 위로 투영**하고
+     **UV 도 원래 면에서 읽어** 둘레 UV 와 꿰맨다(텍스처가 이어진다). 메시 테두리에 닿은 면은 거부한다.
+   - **Extrude** — 보더의 **일부 사슬**(열린 엣지 줄). 사슬에서 구멍 안쪽으로 `Rows` 줄만큼 그리드를 뻗는다.
+     양옆은 보더를 `Rows` 칸씩 따라가고, 위 줄은 새 점이다. 구멍은 작아진 채 남는다.
+2. 슬라이더로 모양을 고른다. Start 때 **Auto Corners** 가 한 번 돈다(모서리가 직각에 가깝고, 마주 보는 변 길이가 같고,
+   칸이 정사각형에 가까운 Rotation · Proportion).
+3. **Patch It** — 원본 메시에 면이 붙는다. **Ctrl+Z 한 번**에 전부 되돌아간다. **Cancel** 은 미리보기만 지운다.
+
+### 옵션
+
+| 옵션 | 뜻 |
+|------|----|
+| Rotation | 그리드 모서리가 보더를 따라 어디서 시작하는가 (0 ~ N-1) |
+| Proportion | 첫 변의 엣지 수 `a`. 옆 변은 `N/2 - a` |
+| Rows | Extrude 줄 수. 최대 `(N - 사슬 - 1) / 2` (남는 구멍이 엣지 1개 이상) |
+| Inset | 그리드 둘레 쿼드 링 수(0 ~ 5). 모서리 흐름이 부드러워진다 |
+| Relax | 새 점 라플라시안 반복 수(0 ~ 100). Faces 는 매 반복 원래 면 위로 다시 투영 |
+| Smooth Border % | 구멍 보더 **자체**를 둥글게(기존 정점이 움직인다). 미리보기엔 패치 가장자리로만 보인다. Extrude 에선 꺼진다 |
+| Soft edges | 새 엣지 · 보더 엣지를 부드럽게(`polySoftEdge 180`) |
+| UVs | Edge Border / Extrude = 새 면에 최적 평면 투영. Faces = 원래 면의 UV + 보더에서 꿰매기 |
+
+설정(Relax · Inset · Smooth · 옵션)은 optionVar `JUN_A00380_quad_*` 로 기억한다.
+
+### 원본 스크립트와 다른 점
+
+| | 원본 quadPatcher | 이 탭 |
+|---|---|---|
+| 그리드 | 복제 메시에 `polyBridgeEdge` 3개 + `polyAverageVertex` 10개 노드를 걸고 `inputComponents` 를 고쳐 쓴다 | 네 변 **Coons 패치**로 점을 계산 + numpy 라플라시안 |
+| 확정 | `polyUnite` → 이름 바꾸기 → `DeleteHistory` — **트랜스폼 · UUID · 스킨 히스토리가 날아간다** | `polyAppendVertex` 로 **원본 메시에 직접** — 노드 그대로, 히스토리 있으면 유지 |
+| undo | `undoInfo(swf=False)` 를 끄고 에러 나면 안 켠다 | 미리보기는 API(undo 큐 밖), 확정은 청크 하나, 실패하면 청크를 되돌린다 |
+| 정리 | `quadPatcher*_*Set` 와일드카드로 남의 세트까지 지울 수 있다 | 임시 노드는 미리보기 하나뿐 |
+| 선택 | 구멍 보더 전체를 직접 골라야 한다 | 보더 엣지 하나면 된다 |
+| Extrude | 끝내려면 RESET 이 필요 | 같은 Patch It / Cancel |
+
+### 구현 메모
+
+- 코어 `app/core/quad_patch.py`(Qt 비의존), 탭 `app/ui/quad_patch_tab.py`.
+- **방향**: 보더 루프를 바깥(남는) 면이 감는 방향의 반대로 세운다 → 새 면 노말이 이웃과 같다.
+- **확정은 면당 `polyAppendVertex` 한 번**(새 점은 만든 뒤 위치로 id 를 찾는다). 원래 히스토리가 없던 메시는 끝에 히스토리를 굽는다.
+  히스토리(스킨 등)가 있는 메시는 **면마다 노드 하나**가 남고 새 점은 스킨되지 않는다(로그 경고).
+  - 다른 길을 실측으로 버렸다: 임시 메시 `outMesh → inMesh` 를 잇고 끊는 방식은 **undo 해도 원래 형상이 안 돌아온다**(마야는 마지막 평가값을 쥔다).
+  - 속도(mayapy 2024): 9만 버텍스 구에 400면 패치 **5.7초**(면당 약 14ms). 60면이 넘으면 진행 팝업.
+- 확정 뒤 선택을 바꾸지 않는다 — `cmds.select` 도 undo 큐에 들어가 "Ctrl+Z 한 번" 이 깨진다(오프스크린 시험에서 발견).
+- Faces 의 지운 뒤 정점 번호 = `id - (그보다 작은 지워진 정점 수)`, 위치로 다시 확인한다.
+- 새 면 셰이딩: 면 단위 할당이면 이웃 면(Faces 는 지운 면)의 다수결 셰이딩 그룹.
+- 시험: `tools/A00380_MeshTool/tests/test_quad_patch.py`(mayapy, 40항목 — 4종 모드 · 방향 · 매니폴드 · 평면 유지 · 구 위 투영 ·
+  UV 셸 꿰매기 · undo · 스킨 히스토리 · 셰이딩 · 오류 메시지 · 탭 UI 스모크, `--speed` 큰 메시). GUI(실제 마야) 확인 아직.
 
 ---
 

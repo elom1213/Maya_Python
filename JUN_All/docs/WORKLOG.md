@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-11-17
+updated: 2026-11-19
 ---
 
 # 작업 일지 (WORKLOG)
@@ -31,7 +31,19 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-11-17 (오늘)
+## 2026-11-19 (오늘)
+
+> [!summary] **`A00380_MeshTool` v01.21 — Quad Patch 탭 (구멍을 쿼드 그리드로)** `#A00380_MeshTool`
+- 요청: `.ref/quadPatcher_v1.0.py` 를 분석해 새 탭으로 이식. 원본 헤더가 **복사 · 수정 금지** 라이선스라 사용자 결정으로 **독자 구현**(코드 미사용, 아이디어만), Face · Extrude 모드까지.
+- 모드 3종: **Edge Border**(보더 엣지 하나만 골라도 그 구멍 전체) · **Faces**(고른 면을 지우고 원래 면 위에 그리드, UV 도 원래 면에서 읽어 꿰맴) · **Extrude**(보더 일부 사슬에서 `Rows` 줄).
+- 방식: 보더 루프를 이웃 감김 반대로 세워 네 변 분할 → **Coons 패치** → numpy 라플라시안 Relax(Faces 는 매 반복 투영). Rotation · Proportion · **Auto Corners**(모서리 각 · 대변 길이 · 칸 비율 점수) · Inset 링 · Smooth Border.
+- 미리보기는 API 로 만든 초록 와이어(undo 큐 밖), **Patch It = `polyAppendVertex` 로 원본 메시에 직접** — 트랜스폼 · 셰이프 · UUID 유지, 히스토리 없던 메시는 끝에 굽기, Ctrl+Z 한 번. 원본 스크립트의 `polyUnite` + `DeleteHistory`(노드 · 스킨 소실) · undo 끄고 안 켜기 · 와일드카드 세트 삭제를 피했다.
+- 실측으로 버린 길: `outMesh → inMesh` 잇고 끊기는 undo 해도 원래 형상이 안 돌아온다. 확정 뒤 `cmds.select` 는 undo 큐에 들어가 Ctrl+Z 한 번을 깨서 뺐다.
+- 시험 `tools/A00380_MeshTool/tests/test_quad_patch.py` 40/40(mayapy · 오프스크린 탭 UI 포함). 9만 버텍스 구 400면 5.7초 → 60면 넘으면 진행 팝업. GUI 확인 아직. 가이드 §3-7, 포트폴리오 EN/KR.
+
+---
+
+## 2026-11-17
 
 > [!summary] **`A00110_animTool_V02` v02.64 — Counter Layer 진행 팝업 항상** `#A00110_animTool_V02`
 - 요청: Bake > Counter Layer 에서 Create Counter Layer 를 누르면 팝업창의 게이지로 진행도를 알려 줄 것.
