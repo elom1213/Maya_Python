@@ -23,4 +23,7 @@ metadata:
 **Why:** 사용자가 2026-11-04 "2주 뒤에 내가 물어보지 않아도 정리가 필요하다고 말해줄 수 있어?" 라고 요청. 세션 예약(CronCreate)은 세션이 닫히면 사라져 이 메모가 주 수단.
 **How to apply:** 오늘 날짜가 2026-11-18 이상이면 첫 답 맨 앞에 알린다. 정리가 끝나거나 사용자가 미루라고 하면 이 메모를 고치거나(새 날짜) 지운다 — 같은 알림을 매 세션 반복하지 않게, 한 번 알린 뒤엔 "알림 완료 YYYY-MM-DD, 사용자 답: …" 을 여기에 적는다.
 
-알림 완료 2026-11-19 (A00380 Quad Patch 세션 보고 끝에서 — 첫 답에서 놓쳤다), 사용자 답: 대기.
+알림 완료 2026-11-19 (A00380 Quad Patch 세션 보고 끝에서 — 첫 답에서 놓쳤다), 사용자 답: 세 건 모두 진행.
+- 2026-11-19 **2 · 3 완료**: 사전 점검(옛 브랜치 4개 = archive/* 태그와 같은 커밋 · 11-04 뒤 새 커밋 없음, 클론 3개 미커밋 · 미푸시 · stash 없음, A0010_MEU 로컬 master 4e02e3a 는 원격 MUE 에 포함) 뒤
+  `JUN_FileManager_data_all\` 클론 3개 + 폴더 삭제, `git push origin --delete master Dnable SA src_rig` → 원격엔 main 만, 태그 archive/* 5개 남음.
+- **1 남음**: 비공개 저장소 Archive — 이 PC 의 gh 가 로그인 안 됨(`gh auth login` 필요). 미러 backup_private.git 의 MUE · master · private = 원격과 같은 커밋(확인함). 끝나면 이 메모를 지운다.
