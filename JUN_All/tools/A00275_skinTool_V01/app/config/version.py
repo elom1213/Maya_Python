@@ -72,5 +72,7 @@
 # 01.46  Weights > Transfer - Target mode 를 바꿔도 라디오 버튼 줄이 움직이지 않는다. 예전엔 Classic 에서 위 설명을 숨기고
 #        Classic 패널 설명이 버튼 아래에 생겨 줄이 60px 올라갔다 -> 설명은 위 한 자리에서 글만 바뀌고(같은 4줄) 높이도 고정.
 
-VERSION = "01.46"
+# 01.47  Weights > Move · Smooth 슬라이더도 보이게 - Flood(v01.45)와 같은 공용 JUN_mod_sliderStyle_qt_v01 한 줄씩.
+
+VERSION = "01.47"
 LAST_UPDATE = "2026-11-19"

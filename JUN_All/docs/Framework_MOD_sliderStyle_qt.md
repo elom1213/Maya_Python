@@ -79,5 +79,6 @@ class MyTab(QWidget):
 | 툴 | 위치 | 비고 |
 |----|------|------|
 | `A00275_skinTool_V01` | Weights > Flood (v01.45) | 첫 적용 |
+| `A00275_skinTool_V01` | Weights > Move · Smooth (v01.47) | |
 
 기존 툴들의 자체 슬라이더 스타일(A00290 · A00380 등)은 그대로 둔다 — 옮길 때는 한 툴씩 화면을 비교하고 바꾼다.

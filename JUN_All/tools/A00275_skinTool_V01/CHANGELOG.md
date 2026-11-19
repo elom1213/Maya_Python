@@ -1,5 +1,11 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.47 (2026-11-19)
+
+- **[UI] Move · Smooth 탭 슬라이더도 보인다.** Flood(v01.45)와 같은 이유(테마에 `QSlider` 규칙이 없어 손잡이만 보임)로
+  같은 공용 위젯 `JUN_mod_sliderStyle_qt_v01` 을 한 줄씩 붙였다 — Move 의 Smooth Steps · Blend, Smooth 의 슬라이더 3개.
+  시험 `tests/test_flood_ui.py` 39 (테마를 입힌 창에서 탭마다 칠해짐 + 홈 픽셀). **마야 GUI 확인 아직.**
+
 ## v01.46 (2026-11-19)
 
 - **[UI] Transfer 의 Target mode 를 바꿔도 라디오 버튼이 제자리에 있다.** 예전엔 Classic 을 고르면 맨 위 설명이 숨고 Classic 패널의 설명이

@@ -192,6 +192,21 @@ row = img.height() // 2
 visible = sum(1 for x in range(img.width())
               if sum(abs(p - q) for p, q in zip(img.pixelColor(x, row).getRgb()[:3], (0x2b, 0x2b, 0x2b))) > 30)
 check("Flood Blend slider groove is visible (middle row)", visible > img.width() * 0.8, (visible, img.width()))
+
+# ---- v01.47 Move · Smooth 탭 슬라이더도 같은 방식
+for _label, _tab, _count in (("Move", win.move_tab, 2), ("Smooth", win.smooth_tab, None)):
+    win.weights_tabs.setCurrentIndex(_names.index(_label))
+    for _ in range(5):
+        app.processEvents()
+    _sl = _tab.findChildren(QSlider)
+    check("{0} sliders are painted with the theme accent when shown".format(_label),
+          _sl and (_count is None or len(_sl) == _count) and all("#6f9e80" in s.styleSheet() for s in _sl),
+          [(s.objectName(), len(s.styleSheet())) for s in _sl])
+    _img = _sl[-1].grab().toImage()
+    _row = _img.height() // 2
+    _vis = sum(1 for x in range(_img.width())
+               if sum(abs(p - q) for p, q in zip(_img.pixelColor(x, _row).getRgb()[:3], (0x2b, 0x2b, 0x2b))) > 30)
+    check("{0} slider groove is visible (middle row)".format(_label), _vis > _img.width() * 0.8, (_vis, _img.width()))
 win.hide()
 
 print("\nRESULT: {0}/{1} passed".format(sum(R), len(R)))

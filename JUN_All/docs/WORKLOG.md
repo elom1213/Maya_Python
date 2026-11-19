@@ -66,6 +66,8 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 새 공용 `Framework/qt/MOD_sliderStyle_qt_v01` : `JUN_mod_sliderStyle_qt_v01(self)` 한 줄, **보일 때** 테마 qss 에서 색(버튼 테두리 = 강조, 입력칸 = 홈 바탕)을 읽어 칠한다(launch.py 가 테마를 창 생성 뒤 입히므로). 가로 · 세로 · 비활성, `fill`, 자기 스타일 있는 슬라이더는 그대로, 무채색 `dark` 대응. 가이드 `docs/Framework_MOD_sliderStyle_qt.md`.
 - 시험 `Framework/tests/test_slider_style.py` 12/12(PySide6 · mayapy, 실제 픽셀로 홈이 배경과 구별) · A00275 `test_flood_ui` 35/35 · 회귀 통과. 렌더 이미지로 모양 확인. GUI 확인 아직.
 - **v01.46** — 요청: Transfer 에서 Classic 모드를 고르면 설명 글 때문에 라디오 버튼 위치가 바뀐다. 원인: Classic 에서 위 설명을 숨기고 패널 설명이 버튼 아래에 생김(버튼 줄 148 → 88px). → 설명을 위 한 자리에 두고 글만 바꿈(두 글 같은 4줄, 최소 높이 = 큰 쪽), 패널 안 설명 제거. `test_transfer_classic_ui` 12/12(세 모드 버튼 y 같음, 예전 코드로는 실패 확인) · 회귀 통과.
+- **Dnable 최신화** — `dev` → `Dnable` 병합 · 푸시(`48ed9038..64b518f3`, 11-12 이후 34커밋, 병합 뒤 두 브랜치 내용 동일).
+- **v01.47** — 요청: Move · Smooth 탭 슬라이더도 같은 방식으로. → 두 탭에 `JUN_mod_sliderStyle_qt_v01(self)` 한 줄씩(모두 0 부터 한쪽 방향이라 fill 켬). `test_flood_ui` 39/39(탭마다 칠해짐 + 홈 픽셀) · 회귀 통과.
 
 ---
 

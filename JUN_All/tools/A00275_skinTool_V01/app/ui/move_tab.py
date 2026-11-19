@@ -16,6 +16,7 @@ from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.qt.MOD_sliderStyle_qt_v01 import JUN_mod_sliderStyle_qt_v01
 from tools.A00275_skinTool_V01.app.core import weight_move_manager as mv_mgr
 
 
@@ -71,6 +72,8 @@ class MoveTab(QWidget):
         self._log = log_callback or (lambda text: None)
         self._syncing = False
         self._build_ui()
+        # v01.47 - 테마 qss 에 QSlider 규칙이 없어 어두운 배경에서 홈이 묻히고 손잡이만 보였다 -> 공용 위젯이 테마 색으로 칠한다(Flood 와 같다).
+        self.slider_style = JUN_mod_sliderStyle_qt_v01(self)
         self._update_button()
 
     # ==============================================================
