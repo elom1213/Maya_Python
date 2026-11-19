@@ -10,7 +10,7 @@ updated: 2026-11-19
 오브젝트 · 조인트가 **프레임마다 어디에 있는지를 뷰포트에 경로로 그리고**, 경로 위의 **키 점을 끌어 애니메이션을 고치는** in-Maya PySide 툴(arch B).
 그래프 에디터를 열지 않고 궤적 모양을 보면서 위치 애니메이션을 고친다.
 
-- **버전**: `app/config/version.py` (v01.02 — Edit Path 를 켜도 버튼이 연한 빨강이 안 되던 것 수정 · v01.01 — 키 드래그 에러 수정 · Custom 범위에 Get Current / Get Sel Range · Edit Path 켜짐 = 연한 빨강 · v01.00 — 첫 버전: 위치 경로 표시 + 키 드래그)
+- **버전**: `app/config/version.py` (v01.03 — **애니메이션 레이어**: 고른 레이어의 키만 끌어 고친다(경로는 합친 움직임) · v01.02 — Edit Path 를 켜도 버튼이 연한 빨강이 안 되던 것 수정 · v01.01 — 키 드래그 에러 수정 · Custom 범위에 Get Current / Get Sel Range · Edit Path 켜짐 = 연한 빨강 · v01.00 — 첫 버전: 위치 경로 표시 + 키 드래그)
 - **설치**: `__dragDrop_A00630.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **MPath** → `tools.A00630_MotionPathEditor.run(True)`.
   툴 런처(A00370) ANIM 프로파일에도 **MotionPath** 버튼이 있다.
 - **계획서**: [plans/A00630_MotionPathEditor_plan.md](plans/A00630_MotionPathEditor_plan.md) — 단계별 계획 · 0단계 실측 결과 · 다음 단계
@@ -81,6 +81,30 @@ updated: 2026-11-19
 
 ---
 
+## 2-1. 애니메이션 레이어 (v01.03~)
+
+툴 창 **Animation Layer** 목록에 Base 와 씬의 레이어가 레이어 에디터 순서로 나온다. 하나를 고르면:
+
+- 경로 위 **키 점 = 그 레이어의 키**. 끌면 **그 레이어의 커브만** 바뀐다(Base · 다른 레이어는 그대로).
+- **경로 자체는 늘 모든 레이어를 합친 실제 움직임**이다(무엇을 고르든 같다). 놓은 키는 합친 결과가 정확히 그 자리에 오도록 그 레이어 값이 정해진다.
+- 레이어를 만들거나 지웠으면 **Reload Layers**(또는 Refresh). 지워진 레이어를 고르고 있었으면 Base 로 돌아간다. 고른 레이어는 다음에도 기억한다.
+
+| 로그 (회색 경로) | 이유 |
+|---|---|
+| `Not in the animation layer <L>` | 그 오브젝트가 그 레이어에 없다 — 레이어 에디터에서 넣거나 다른 레이어를 고른다 |
+| `The animation layer <L> is locked` | 레이어 lock |
+| `... has no effect here (muted, weight 0, or covered by an override layer above)` | 그 레이어를 바꿔도 결과가 안 바뀐다 |
+
+어떻게 계산하나 (mayapy 실측): 레이어마다 translate 위에 `animBlendNodeAdditiveDL` 이 쌓이고 모두
+`output = weightA × 아래 결과 + weightB × 그 레이어 값` 이다(additive: 1 · 가중치, override: 1−가중치 · 가중치, 뮤트: 1 · 0).
+그래서 최종 translate 는 고른 레이어 값에 대한 1차식이고, 끈 위치로 정확히 역산된다. 레이어 가중치(뮤트 · 솔로 · 가중치 애니메이션)는
+경로를 만들 때 함께 굽는다 — 가중치를 바꿨으면 **Refresh**.
+
+- 그 레이어에 커브가 없던 축(예: override 레이어에 X 만 키가 있을 때의 Y)은 처음 움직일 때 그 레이어의 **원래 상수 값으로** 커브를 만든다 — 다른 프레임은 그대로.
+- undo 는 한 번에 커브 · 레이어 커브 생성 · 실제 움직임까지 돌아간다(마야가 레이어 커브 삭제 뒤 다시 계산하지 않는 문제를 툴이 막는다 — §5).
+
+---
+
 ## 3. 동작 (왜 빠른가)
 
 경로의 점은
@@ -130,6 +154,8 @@ P(f) = (c + T(f)) · parentMatrix(f)
 - **그리기 노드** `JUN_motionPath_*`: 아웃라이너에서 숨김, **씬에 저장되지 않고**(저장 직전에 잠깐 지워 플러그인 requires 줄도 남지 않는다) undo 큐에도 들어가지 않는다.
   창을 닫거나 새 씬 · 열기를 하면 지워진다. 툴 없이도 파일이 그대로 열린다.
 - **소수 프레임 키**도 경로에 들어간다.
+- **undo 뒤 다시 계산 (v01.03)**: 레이어에 새 커브를 만든 편집을 undo 하면 마야가 블렌드 체인 아래를 다시 계산하지 않아 오브젝트가 낡은 위치에 남았다
+  (데이터는 맞는데 표시만 낡음, 시간을 옮겨도). 그래서 드래그 묶음 맨 앞에 표시 명령 `junMotionPathDirty` 를 넣어 undo · redo 끝에 대상과 블렌드 노드를 `dgdirty` 한다.
 - 범위 밖 키는 그리지 않는다 — Range 를 Scene / Custom 으로.
 
 ---
@@ -162,7 +188,8 @@ mayapy 2024 (`tests/`, `-u` 로 실행):
 | `test_anim_channels.py` | 15 | 상태 판정 · 레이어 잠금 · 평가 = 마야 · m 단위 · 키 맞추기가 모양을 지킴 |
 | `test_edit_session.py` | 21 | 여러 번 움직여도 오차 없음 · 드래그 중 undo 큐 비어 있음 · **undo 한 번** · redo · 여러 키 · 여러 경로 · 부분 키 · 잠긴 축 · 취소 · 안 움직임 · auto 탄젠트 범위 · 속도(3.4 ms) |
 | `test_watcher.py` | 20 | 다른 곳의 커브 편집 · undo 뒤 경로 · 소수 키 → 다시 굽기 · 선택 · 저장 파일에 노드/requires 없음 · 그리기 노드가 undo 큐 밖 · 새 씬 정리 |
-| `test_ui.py` | 29 | 오프스크린 창: 경로 추가/빼기 · 표시 옵션 → 그리기 데이터 · optionVar · 범위(Custom · Get Current · Get Sel Range · 같은 범위면 안 굽기) · 슬라이더 색 · Edit Path 빨강 · 툴 바뀌면 버튼 끔 · Refresh · 닫으면 정리 |
+| `test_layers.py` | 27 | (v01.03) 경로 = 레이어 합친 실제 움직임(Base · additive 가중치 애니 · override 0.5 · 뮤트 · lock · 부모 애니), 키 = 고른 레이어, 레이어 바꿀 때 굽지 않음, 레이어별 끌기 정확 · **그 레이어 커브만** 바뀜 · undo 한 번에 커브와 **실제 움직임** 복원, override 의 커브 없던 축, 잠금 이유 3종, 관리자 레이어 바꾸기 · 지운 레이어 → Base |
+| `test_ui.py` | 35 | 오프스크린 창: 경로 추가/빼기 · 표시 옵션 → 그리기 데이터 · optionVar · 범위(Custom · Get Current · Get Sel Range · 같은 범위면 안 굽기) · 슬라이더 색 · Edit Path 빨강 · 툴 바뀌면 버튼 끔 · Refresh · 닫으면 정리 |
 | `test_picking.py` | 13 | 투영 · 고르기 · 박스 · 카메라 뒤 · 평면 / 축 드래그 |
 | `test_edit_context.py` | 19 | (v01.01) 편집 컨텍스트 전체 흐름 — 누름 → 끌기 → 놓기 · 축 고정 · 박스 선택 후 함께 끌기 · Shift / Ctrl · 빈 곳 클릭 해제 · 오른쪽 버튼 취소. 가짜 뷰의 `viewToWorld` 가 **마야 2024 와 같은 OUT 인자 모양**이라 v01.00 의 호출 실수를 잡는다 |
 

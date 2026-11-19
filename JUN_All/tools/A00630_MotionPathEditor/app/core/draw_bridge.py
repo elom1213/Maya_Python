@@ -9,7 +9,8 @@
 
 DATA    : {path_key: dict} — draw override 가 그릴 것 (툴이 바뀔 때만 만든다, 아래 키 설명)
 HUD     : 2D 로 그릴 것 (박스 선택 사각형 등) — {"box": (x0, y0, x1, y1)} 또는 {}
-PENDING : 다음 `junMotionPathSetKeys` 명령이 가져갈 undo 기록 (MAnimCurveChange)
+PENDING : 다음 `junMotionPathSetKeys` 명령이 가져갈 (undo 기록 MAnimCurveChange, 다시 계산을 표시할 노드들)
+DIRTY   : 다음 `junMotionPathDirty` 명령이 가져갈 노드들 (v01.03)
 
 DATA[path_key] 키 (값은 OpenMaya 2.0 객체 - 그리기 때 변환하지 않게 미리 만든다):
     "line"      : MPointArray  경로 선 (프레임 순서)
@@ -26,6 +27,7 @@ DATA[path_key] 키 (값은 OpenMaya 2.0 객체 - 그리기 때 변환하지 않�
 DATA = {}
 HUD = {}
 PENDING = None
+DIRTY = None
 
 
 def put(path_key, payload):
@@ -41,14 +43,25 @@ def clear():
     HUD.clear()
 
 
-def stage(change):
-    """다음 undo 명령이 가져갈 기록을 둔다."""
+def stage(change, nodes=()):
+    """다음 undo 명령이 가져갈 기록(과 undo · redo 뒤 다시 계산을 표시할 노드)을 둔다."""
     global PENDING
-    PENDING = change
+    PENDING = (change, list(nodes))
 
 
 def take():
-    """명령이 기록을 가져간다(한 번만)."""
+    """명령이 기록을 가져간다(한 번만). (change, nodes) 또는 (None, [])."""
     global PENDING
-    change, PENDING = PENDING, None
-    return change
+    payload, PENDING = PENDING, None
+    return payload if payload is not None else (None, [])
+
+
+def stage_dirty(nodes):
+    global DIRTY
+    DIRTY = list(nodes)
+
+
+def take_dirty():
+    global DIRTY
+    nodes, DIRTY = DIRTY, None
+    return nodes or []

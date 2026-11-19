@@ -20,4 +20,10 @@ Measured in mayapy 2024 while building [[wip-a00630-motion-path]]:
 4. Rotate pivot world position = `(rotatePivot + rotatePivotTranslate + translate) · parentMatrix` — not
    `rotatePivot · worldMatrix` (wrong once scale ≠ 1).
 
+5. **Anim layer blend:** each layer adds `animBlendNodeAdditiveDL`; `output = weightA*inputA + weightB*inputB`
+   (additive 1 / w, override 1-w / w, mute 1 / 0). `setKeyframe -animLayer` *without* value keeps the final value per key
+   (on override layers that bends a curve that should be constant).
+6. **Undo of a newly created layer curve leaves stale evaluation** downstream of the blend chain (even when stepping time);
+   data is correct. `cmds.dgdirty(target + blend nodes)` fixes it; a marker MPxCommand first in the undo chunk does it on undo.
+
 Related: [[mayapy-headless-verify]] · [[parentmatrix-includes-offsetparentmatrix]]

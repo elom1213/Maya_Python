@@ -43,7 +43,10 @@ cmds.select(names["plain"])
 layer = cmds.animLayer("layerA", addSelectedObjects=True)
 cmds.setKeyframe(names["plain"], attribute="translateX", time=10, value=3.0, animLayer=layer)
 reason = ch.Channels(names["plain"]).lock_reason()
-check("animation layer -> locked with a 'not supported yet' reason", "not supported yet" in reason, reason)
+check("animation layers are followed (v01.03) - Base stays editable", reason == "", reason)
+reason = ch.Channels(names["plain"], layer).lock_reason()
+check("the added layer is editable too", reason == "" and ch.Channels(names["plain"], layer).axes[0].state == "curve",
+      reason)
 
 # ---- 평가 = 마야 값 (내부 단위 cm, UI 단위 m 일 때도)
 names = scenes.simple(120)

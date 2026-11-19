@@ -57,10 +57,17 @@ def _matrix_rows(m):
     return [[m.getElement(r, c) for c in range(4)] for r in range(4)]
 
 
-def bake(nodes, frames, progress=None):
-    """{node: (N,4,4) parentMatrix}. nodes : 롱네임 목록, frames : 프레임 목록(소수 가능), progress : (done, total)."""
+def bake(nodes, frames, progress=None, layers=()):
+    """({node: (N,4,4) parentMatrix}, {레이어: (wA (N,), wB (N,))}).
+
+    nodes  : 롱네임 목록, frames : 프레임 목록(소수 가능), progress : (done, total)
+    layers : 가중치를 구울 애니메이션 레이어 (v01.03) - backgroundWeight / foregroundWeight 를 같은 시간 문맥에서 읽는다
+             (블렌드 노드의 weightA / weightB 가 이 둘에서 온다 - 뮤트 · 솔로 · 가중치 애니메이션 포함).
+    """
     pm_plugs = {n: _plug(n, "parentMatrix[0]") for n in nodes}
+    w_plugs = {L: (_plug(L, "backgroundWeight"), _plug(L, "foregroundWeight")) for L in layers}
     out = {n: [] for n in nodes}
+    weights = {L: ([], []) for L in layers}
     total = len(frames)
     for i, f in enumerate(frames):
         ctx = om.MDGContext(ui_time(f))
@@ -68,6 +75,9 @@ def bake(nodes, frames, progress=None):
         try:
             for n, plug in pm_plugs.items():
                 out[n].append(_matrix_rows(om.MFnMatrixData(plug.asMObject()).matrix()))
+            for L, (bg, fg) in w_plugs.items():
+                weights[L][0].append(bg.asDouble())
+                weights[L][1].append(fg.asDouble())
         finally:
             prev.makeCurrent()
         if progress is not None and (i % 50 == 0 or i == total - 1):
@@ -75,4 +85,5 @@ def bake(nodes, frames, progress=None):
     if np is not None:
         for n in nodes:
             out[n] = np.array(out[n], dtype="float64").reshape(-1, 4, 4)
-    return out
+        weights = {L: (np.array(a, dtype="float64"), np.array(b, dtype="float64")) for L, (a, b) in weights.items()}
+    return out, weights

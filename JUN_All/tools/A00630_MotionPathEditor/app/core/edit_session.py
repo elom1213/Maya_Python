@@ -13,6 +13,7 @@ DragSession : 누름 → 움직임(여러 번) → 놓기 / 취소.
 - 취소: 쌓인 변경을 되돌리고(`change.undoIt()`), ensure_keys 가 키를 넣었으면 그 묶음도 undo 한다.
 
 잠긴 축(lock · 편집 불가)은 원래 값을 그대로 둔다. 잠긴 경로(lock_reason)는 처음부터 세션에 넣지 않는다.
+애니메이션 레이어 (v01.03): 키 값은 **편집 레이어의 커브**에만 쓴다(path_cache.solve 가 그 레이어 값을 돌려준다).
 """
 
 import numpy as np
@@ -23,6 +24,7 @@ import maya.cmds as cmds
 from . import draw_bridge
 
 COMMAND = "junMotionPathSetKeys"
+DIRTY_COMMAND = "junMotionPathDirty"
 
 
 class DragSession(object):
@@ -54,8 +56,22 @@ class DragSession(object):
         cmds.undoInfo(openChunk=True, chunkName="MotionPathEdit")
         self.chunk_open = True
 
+    def _dirty_nodes(self):
+        out = []
+        for cache, _times in self.items:
+            for n in cache.channels.dirty_nodes():
+                if n not in out:
+                    out.append(n)
+        return out
+
     def _prepare(self):
-        """처음 실제로 움직일 때 한 번: 채널 키 맞추기 → 경로 다시 읽기."""
+        """처음 실제로 움직일 때 한 번: 표시 명령 → 채널 키 맞추기 → 경로 다시 읽기.
+
+        v01.03 - 표시 명령(junMotionPathDirty)을 묶음의 **맨 앞**에 넣는다: undo 때 가장 마지막에 되돌려지며
+        대상 · 블렌드 노드를 다시 계산하게 한다(레이어에 새로 만든 커브가 undo 로 지워진 뒤 마야가 낡은 위치를 남겼다).
+        """
+        draw_bridge.stage_dirty(self._dirty_nodes())
+        getattr(cmds, DIRTY_COMMAND)()
         for cache, times in self.items:
             if cache.channels.ensure_keys(times):
                 self.inserted = True
@@ -81,7 +97,8 @@ class DragSession(object):
                     continue
                 T = cache.solve(row, p0 + delta)
                 for axis, editable, value in zip(cache.channels.axes, mask, T):
-                    if not editable or axis.fn is None:
+                    # NaN = 그 축은 편집 레이어가 움직일 수 없다(β = 0 : 뮤트 · 가중치 0 · 위 override) - v01.03
+                    if not editable or axis.fn is None or not np.isfinite(value):
                         continue
                     idx = axis.key_index(t)
                     if idx >= 0:
@@ -95,7 +112,7 @@ class DragSession(object):
         self.finished = True
         try:
             if self.moved and self.change is not None:
-                draw_bridge.stage(self.change)
+                draw_bridge.stage(self.change, self._dirty_nodes())
                 getattr(cmds, COMMAND)()
                 return True
             return False
@@ -110,8 +127,8 @@ class DragSession(object):
         if self.change is not None:
             self.change.undoIt()
         self._close_chunk()
-        if self.inserted:
-            cmds.undo()             # 방금 닫은 묶음 = ensure_keys 로 넣은 키들
+        if self.moved:
+            cmds.undo()             # 방금 닫은 묶음 = 표시 명령 + ensure_keys 로 넣은 키들 (값은 위에서 되돌렸다)
         for cache, _times in self.items:
             cache.refresh()
 

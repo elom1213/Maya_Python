@@ -24,6 +24,7 @@ from Framework.qt.MOD_progress_qt_v01 import JUN_mod_progress_qt_v01
 from Framework.qt.MOD_sliderStyle_qt_v01 import JUN_mod_sliderStyle_qt_v01
 
 from tools.A00630_MotionPathEditor.app.config.version import VERSION, LAST_UPDATE
+from tools.A00630_MotionPathEditor.app.core import anim_channels as ch
 from tools.A00630_MotionPathEditor.app.core import draw_nodes
 from tools.A00630_MotionPathEditor.app.core import path_manager as pm
 from tools.A00630_MotionPathEditor.app.core import picking
@@ -95,6 +96,7 @@ class MainWindow(QWidget):
         root.addWidget(self.tsl_paths, 1)
 
         root.addWidget(self._build_range_group())
+        root.addWidget(self._build_layer_group())
         root.addWidget(self._build_display_group())
         root.addWidget(self._build_edit_group())
 
@@ -130,6 +132,72 @@ class MainWindow(QWidget):
         self.range_buttons.buttonClicked.connect(lambda *_: self._on_range_changed())
         self._sync_range_enabled()
         return box
+
+    def _build_layer_group(self):
+        """v01.03 - 편집할 애니메이션 레이어. 경로는 늘 모든 레이어를 합친 실제 움직임, 키 점 · 끌기는 고른 레이어만."""
+        box = QGroupBox("Animation Layer")
+        lay = QVBoxLayout(box)
+        self.layer_list = QListWidget()
+        self.layer_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.layer_list.setMaximumHeight(96)
+        self.layer_list.setToolTip(
+            "The layer whose keys are shown and dragged. Dragging changes only this layer's keys.\n"
+            "The path always shows the motion of every layer combined (what really moves).\n"
+            "A greyed path: the object is not in this layer, or the layer is locked / muted / weight 0.")
+        self.layer_list.itemSelectionChanged.connect(self._on_layer_picked)
+        lay.addWidget(self.layer_list)
+        row = QHBoxLayout()
+        self.lbl_layer = QLabel("")
+        row.addWidget(self.lbl_layer, 1)
+        btn = QPushButton("Reload Layers")
+        btn.setToolTip("Read the animation layers of the scene again (after adding / deleting / renaming one).")
+        btn.clicked.connect(self.reload_layers)
+        row.addWidget(btn)
+        lay.addLayout(row)
+        self._layer_syncing = False
+        self.reload_layers()
+        return box
+
+    def reload_layers(self, *args):
+        """씬의 레이어로 목록을 다시 채우고, 편집 레이어를 고른다(없으면 Base)."""
+        current = self.manager.edit_layer()
+        self._layer_syncing = True
+        try:
+            self.layer_list.clear()
+            for name in ch.scene_layers():
+                item = QListWidgetItem(name)
+                self.layer_list.addItem(item)
+                if name == current:
+                    item.setSelected(True)
+            if not self.layer_list.selectedItems() and self.layer_list.count():
+                self.layer_list.item(0).setSelected(True)
+        finally:
+            self._layer_syncing = False
+        self._show_layer()
+
+    def _show_layer(self):
+        self.lbl_layer.setText("Editing: {0}".format(self.manager.edit_layer()))
+
+    def _on_layer_picked(self):
+        if self._layer_syncing:
+            return
+        items = self.layer_list.selectedItems()
+        if not items:
+            return
+        name = items[0].text()
+        if name == self.manager.edit_layer():
+            return
+        try:
+            if self.context is not None:
+                self.context._finalize()                # 끄는 중인 드래그가 있으면 취소
+            self._with_progress(lambda prog: self.manager.set_edit_layer(name, progress=prog),
+                                len(self.manager.caches))
+            self._save("edit_layer")
+            self.log("[OK] Editing the animation layer {0} - the path stays the combined motion.".format(
+                self.manager.edit_layer()))
+        except Exception as exc:                           # noqa: BLE001
+            self.log("[FAIL] Layer change failed : {0}".format(exc))
+        self._show_layer()
 
     def _build_display_group(self):
         box = QGroupBox("Display")
@@ -299,7 +367,9 @@ class MainWindow(QWidget):
             self.log("[WARN] Add objects / joints to the Paths list first.")
             return
         try:
+            self.reload_layers()                        # 레이어를 만들거나 지웠을 수 있다
             self._with_progress(lambda prog: self.manager.rebake_all(progress=prog), len(self.manager.caches))
+            self.reload_layers()                        # 지워진 레이어였으면 Base 로 돌아왔다
             self.log("[OK] Re-baked {0} path(s), frames {1}-{2}.".format(len(self.manager.caches),
                                                                        *self.manager.frame_range()))
         except Exception as exc:                           # noqa: BLE001
@@ -382,11 +452,13 @@ class MainWindow(QWidget):
             self.context.deactivate()
         self.btn_edit.setChecked(False)
         self.manager.clear()
+        self.manager.settings["edit_layer"] = ""
         self._syncing = True
         try:
             self.tsl_paths.set_items([])
         finally:
             self._syncing = False
+        cmds.evalDeferred(self.reload_layers, lowestPriority=True)      # 새 씬이 열린 뒤 그 씬의 레이어로
 
     def closeEvent(self, event):
         try:

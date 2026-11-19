@@ -29,6 +29,13 @@ then move — user's Q4 choice, proportional editing, numeric input), then phase
 - v01.02: `MEventMessage("ToolChanged")` fires while `currentCtx()` still names the OLD tool — judging at once unchecked the
   just-pressed Edit Path button. Defer the check with `evalDeferred`. In mayapy `evalDeferred` runs immediately, so tests
   replace it with a queue to get the GUI order.
+- v01.03 anim layers: each layer stacks an `animBlendNodeAdditiveDL` on translate, `out = weightA*below + weightB*layer`
+  (weights from layer.backgroundWeight / foregroundWeight). Final T is linear in the picked layer's value → exact solve.
+  Path = combined motion, keys = picked layer. Baked layer weights with parentMatrix. Static layer axis → curve keyed at the
+  layer's constant (setKeyframe -animLayer w/o value gives per-key values on override layers → bent curve).
+- v01.03: undo of an edit that created a layer curve restores data but leaves stale evaluation down the blend chain →
+  `junMotionPathDirty` marker command first in the chunk dgdirties node + blends on undo/redo. Tests must compare world
+  motion after undo, not only curve keys (curve-only check missed it).
 - Run tests with `mayapy -u` (pipe buffering + os._exit lost output before `_common.finish` flushed).
 
 Related: [[maya-time-context-traps]] · [[wip-a00380-quad-patch]] · [[mayapy-headless-verify]] · [[feedback-sliders-use-shared-style]]

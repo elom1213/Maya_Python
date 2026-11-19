@@ -14,6 +14,7 @@ PathManager 하나가 툴의 상태를 다 가진다:
 
 import maya.cmds as cmds
 
+from . import anim_channels as ch
 from . import draw_bridge
 from . import draw_nodes
 from . import path_cache as pc
@@ -33,6 +34,7 @@ DEFAULT_SETTINGS = {
     "dot_size": 4.0,
     "key_size": 9.0,
     "plane": "view",
+    "edit_layer": "",              # v01.03 편집할 애니메이션 레이어 ("" = Base)
 }
 
 
@@ -82,7 +84,7 @@ class PathManager(object):
         for uuid in wanted:
             if uuid not in self.caches:
                 node = (cmds.ls(uuid, long=True) or [None])[0]
-                cache = pc.PathCache(node, start, end)
+                cache = pc.PathCache(node, start, end, layer=self.edit_layer())
                 self.caches[uuid] = cache
                 fresh.append(cache)
         self.order = wanted
@@ -106,6 +108,29 @@ class PathManager(object):
         self.order = []
         draw_nodes.delete_all()
 
+    # ---------------------------------------------------------------- 애니메이션 레이어 (v01.03)
+    def edit_layer(self):
+        """편집할 레이어 이름. 비었거나 씬에 없으면 Base."""
+        name = self.settings.get("edit_layer") or ""
+        if not name or ch.is_base(name) or not cmds.objExists(name):
+            return ch.root_layer()
+        return name
+
+    def set_edit_layer(self, layer, progress=None):
+        """편집 레이어를 바꾼다 - 경로(합친 움직임)는 그대로, 키 점 · 잠금 · 끌 때 쓰는 커브만 바뀐다. 키 선택은 비운다."""
+        self.settings["edit_layer"] = "" if ch.is_base(layer) else layer
+        need = []
+        for c in self.cache_list():
+            if not c.set_layer(self.edit_layer()):
+                need.append(c)
+        if need:
+            pc.bake_many(need, progress=progress)
+        self.selection = {}
+        for c in self.cache_list():
+            if c.locked:
+                self.log("[Info] {0} : {1}.".format(c.label, c.lock_reason))
+        self.redraw()
+
     # ---------------------------------------------------------------- 갱신
     def rebake_all(self, progress=None):
         """범위를 다시 읽고 전부 다시 굽는다 (부모 애니메이션이 바뀌었을 때 - Refresh)."""
@@ -113,6 +138,7 @@ class PathManager(object):
         caches = self.cache_list()
         for c in caches:
             c.start, c.end = start, end
+            c.layer = self.edit_layer()
             c.dirty_bake = True
         pc.bake_many(caches, progress=progress)
         self._prune_selection()

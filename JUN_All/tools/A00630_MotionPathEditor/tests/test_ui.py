@@ -160,6 +160,34 @@ check("Q / another tool turns the button off (and cancels a running drag)",
 win.context = None
 cmds.evalDeferred = _real_eval_deferred
 
+# ---- 애니메이션 레이어 목록 (v01.03)
+check("layer list starts with Base only (no layers yet)",
+      [win.layer_list.item(i).text() for i in range(win.layer_list.count())] == ["BaseAnimation"] and
+      "Editing: BaseAnimation" in win.lbl_layer.text())
+cmds.select(names["ctrl"])
+lay = cmds.animLayer("animLayer_01", addSelectedObjects=True)
+for f, v in ((1, 0.0), (45, 1.5), (120, 0.0)):
+    cmds.setKeyframe(names["ctrl"], attribute="translateY", time=f, value=v, animLayer=lay)
+cmds.select(clear=True)
+win.reload_layers()
+check("Reload Layers lists Base + animLayer_01",
+      [win.layer_list.item(i).text() for i in range(win.layer_list.count())] == ["BaseAnimation", "animLayer_01"])
+logs[:] = []
+win.layer_list.item(1).setSelected(True)
+cc = win.manager.caches[ctrl_key]
+check("picking animLayer_01 shows its keys and logs it", [k.t for k in cc.keys] == [1.0, 45.0, 120.0] and
+      any("Editing the animation layer animLayer_01" in m for m in logs) and "animLayer_01" in win.lbl_layer.text(),
+      ([k.t for k in cc.keys], logs))
+check("the edit layer is remembered", cmds.optionVar(q=mw.OPTVAR + "edit_layer") == "animLayer_01")
+j3 = [c for c in win.manager.cache_list() if c.node.endswith("|j3")][0]
+check("a path not in that layer turns grey (locked) with the reason", j3.locked and "Not in the animation layer" in
+      j3.lock_reason and draw_bridge.DATA[j3.key]["locked"])
+cmds.delete(lay)
+win.on_refresh()
+check("Refresh after deleting the layer falls back to Base",
+      win.manager.edit_layer() == "BaseAnimation" and win.layer_list.count() == 1 and
+      win.layer_list.item(0).isSelected())
+
 # ---- 대상 빼기
 win.tsl_paths.set_items([names["ctrl"]])
 app.processEvents()

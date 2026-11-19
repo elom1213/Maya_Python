@@ -67,6 +67,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   요청: Custom 범위에 A00110 의 Get Current · Get Sel Range → 공용 `JUN_mod_timeRange_qt_v01`(실제 범위가 바뀔 때만 다시 굽기). 요청: Edit Path 켜짐 = 연한 빨강 → 공용 `pin_style`, Q · 다른 툴로 나가면 버튼도 끔(`ToolChanged`). 시험 7종 126항목.
 - **v01.02** — 사용자: Edit Path 를 켜면 로그가 나오고 편집도 되는데 버튼이 연한 빨강이 안 된다. 원인: 켜는 순간의 `ToolChanged` 알림 때 `currentCtx()` 가 아직 이전 툴 → v01.01 의 즉시 판단이 방금 켠 버튼을 끔(GUI 순서).
   고침: 알림은 `evalDeferred` 로 미루기만, 컨텍스트 이름은 마야가 붙인 실제 이름으로. `test_ui` 29(GUI 순서 재현, 옛 코드로 실패 확인 · mayapy 의 evalDeferred 는 즉시 실행이라 시험에서 큐 대역).
+- **v01.03 애니메이션 레이어** — 요청: 컨트롤이 Base 말고 다른 레이어에도 키가 있을 때, 레이어 목록에서 고른 레이어(예: animLayer_01)의 키만 끌어 고치기. 계획 그대로 구현(더 나은 대안 없음 - 마야 레이어 에디터의 선택 레이어를 전역으로 묻는 명령이 없어 목록 선택이 맞다).
+  실측: 레이어마다 `animBlendNodeAdditiveDL`, `output = wA·아래 + wB·레이어`(additive 1/w · override 1−w/w · 뮤트 1/0) → 최종 translate 는 편집 레이어 값에 1차식 → 정확한 역산(오차 1e-16). 가중치는 parentMatrix 와 같이 굽기.
+  경로 = 합친 실제 움직임, 키 = 고른 레이어. 잠금: 레이어에 없음 · lock · 효과 없음. override 의 커브 없던 축 = 원래 상수로 커브(마야 기본은 키마다 다른 값 → 0.54 어긋남, 고침).
+  **발견한 마야 함정**: 레이어 커브를 만든 편집을 undo 하면 데이터는 정확히 돌아오는데 블렌드 체인 아래가 다시 계산되지 않아 낡은 위치(0.77)가 남음 → 표시 명령 `junMotionPathDirty` 를 묶음 맨 앞에(undo 끝 · redo 끝에 dgdirty). 시험이 커브만 비교해서 처음엔 못 잡음 → 이제 실제 움직임도 비교.
+  툴 창 Animation Layer 목록 + Reload Layers. 시험 8종 179항목(`test_layers` 27 · `test_ui` 35).
 
 > [!summary] **`A00380_MeshTool` v01.21 — Quad Patch 탭 (구멍을 쿼드 그리드로)** `#A00380_MeshTool`
 - 요청: `.ref/quadPatcher_v1.0.py` 를 분석해 새 탭으로 이식. 원본 헤더가 **복사 · 수정 금지** 라이선스라 사용자 결정으로 **독자 구현**(코드 미사용, 아이디어만), Face · Extrude 모드까지.

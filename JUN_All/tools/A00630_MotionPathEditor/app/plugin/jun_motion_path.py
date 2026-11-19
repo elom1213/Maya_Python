@@ -17,6 +17,7 @@ cmds.loadPlugin(<이 파일>) 로 읽는다 (툴의 plugin_loader 가 한다).
 
 import maya.api.OpenMaya as om
 import maya.api.OpenMayaRender as omr
+import maya.cmds as cmds
 import maya.api.OpenMayaUI as omui
 
 from tools.A00630_MotionPathEditor.app.core import draw_bridge
@@ -28,6 +29,15 @@ NODE_ID = om.MTypeId(0x0007F630)            # 마야가 로컬용으로 비워 �
 CLASSIFICATION = "drawdb/geometry/junMotionPath"
 REGISTRANT = "junMotionPathDrawOverride"
 COMMAND_NAME = "junMotionPathSetKeys"
+DIRTY_COMMAND_NAME = "junMotionPathDirty"
+
+
+def _dirty(nodes):
+    """다시 계산하라고 표시 (v01.03). 레이어에 새로 만든 커브가 undo 로 지워진 뒤 마야가 블렌드 체인 아래쪽을
+    다시 계산하지 않아 오브젝트가 낡은 위치에 남았다(시간을 옮겨도) - 대상 노드 + 블렌드 노드를 dgdirty 한다."""
+    alive = [n for n in nodes if cmds.objExists(n)]
+    if alive:
+        cmds.dgdirty(alive)
 
 _KEY_COLOR = om.MColor((0.95, 0.95, 0.95, 1.0))
 _SEL_COLOR = om.MColor((1.0, 0.75, 0.1, 1.0))
@@ -155,6 +165,7 @@ class JunMotionPathSetKeysCmd(om.MPxCommand):
     def __init__(self):
         om.MPxCommand.__init__(self)
         self._change = None
+        self._nodes = []
 
     @staticmethod
     def creator():
@@ -162,18 +173,44 @@ class JunMotionPathSetKeysCmd(om.MPxCommand):
 
     def doIt(self, args):
         # 변경은 드래그 동안 이미 적용됐다 - 기록만 받는다
-        self._change = draw_bridge.take()
+        self._change, self._nodes = draw_bridge.take()
 
     def redoIt(self):
         if self._change is not None:
             self._change.redoIt()
+            _dirty(self._nodes)
 
     def undoIt(self):
         if self._change is not None:
             self._change.undoIt()
+            _dirty(self._nodes)
 
     def isUndoable(self):
         return self._change is not None
+
+
+class JunMotionPathDirtyCmd(om.MPxCommand):
+    """드래그 undo 묶음의 **맨 앞**에 넣는 표시 명령 - undo 때 가장 마지막에 되돌려지며 대상 · 블렌드 노드를 다시 계산하게 한다."""
+
+    def __init__(self):
+        om.MPxCommand.__init__(self)
+        self._nodes = []
+
+    @staticmethod
+    def creator():
+        return JunMotionPathDirtyCmd()
+
+    def doIt(self, args):
+        self._nodes = draw_bridge.take_dirty()
+
+    def redoIt(self):
+        _dirty(self._nodes)
+
+    def undoIt(self):
+        _dirty(self._nodes)
+
+    def isUndoable(self):
+        return bool(self._nodes)
 
 
 def initializePlugin(obj):
@@ -182,10 +219,12 @@ def initializePlugin(obj):
                         om.MPxNode.kLocatorNode, CLASSIFICATION)
     omr.MDrawRegistry.registerDrawOverrideCreator(CLASSIFICATION, REGISTRANT, JunMotionPathDrawOverride.creator)
     plugin.registerCommand(COMMAND_NAME, JunMotionPathSetKeysCmd.creator)
+    plugin.registerCommand(DIRTY_COMMAND_NAME, JunMotionPathDirtyCmd.creator)
 
 
 def uninitializePlugin(obj):
     plugin = om.MFnPlugin(obj)
+    plugin.deregisterCommand(DIRTY_COMMAND_NAME)
     plugin.deregisterCommand(COMMAND_NAME)
     omr.MDrawRegistry.deregisterDrawOverrideCreator(CLASSIFICATION, REGISTRANT)
     plugin.deregisterNode(NODE_ID)
