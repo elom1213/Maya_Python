@@ -21,6 +21,11 @@ then move — user's Q4 choice, proportional editing, numeric input), then phase
   takes the `MAnimCurveChange` (draw_bridge.stage) → one Ctrl+Z; ensure_keys cmds sit in the same undoInfo chunk.
 - Draw nodes via MDagModifier (out of undo), doNotWrite, deleted before save (else file gets `requires` plugin line).
 - MAnimMessage curve-edited callbacks arrive on idle → never in mayapy; tests call `watcher.flush()`.
+- v01.01: API 2.0 `M3dView.viewToWorld(x, y, MPoint, MVector)` fills OUT args (returns self) — v01.00 called it with 2 args
+  and every drag failed in the GUI. `tests/test_edit_context.py` drives press/drag/release with a fake view of the same shape.
+  Before trusting a GUI-only API call, print its `__doc__` in mayapy (signatures differ from API 1.0 habits).
+- v01.01: Custom range = shared `JUN_mod_timeRange_qt_v01` (A00110's Get Current / Get Sel Range); Edit Path checked = `pin_style`
+  light red, kept in sync with the real tool via `MEventMessage("ToolChanged")`.
 - Run tests with `mayapy -u` (pipe buffering + os._exit lost output before `_common.finish` flushed).
 
 Related: [[maya-time-context-traps]] · [[wip-a00380-quad-patch]] · [[mayapy-headless-verify]] · [[feedback-sliders-use-shared-style]]

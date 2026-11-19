@@ -109,12 +109,24 @@ class ViewState(object):
         self.view_dir = np.array([vd.x, vd.y, vd.z])
 
     def ray(self, x, y):
-        """화면 (x, y) 의 월드 광선 (원점, 단위 방향). API 2.0 viewToWorld 는 (점, 방향) 을 돌려준다."""
-        point, vector = self.view.viewToWorld(int(x), int(y))
-        o = np.array([point.x, point.y, point.z])
-        d = np.array([vector.x, vector.y, vector.z])
-        n = np.linalg.norm(d)
-        return o, (d / n if n > 1e-12 else self.view_dir)
+        """화면 (x, y) 의 월드 광선 (원점, 단위 방향)."""
+        return view_ray(self.view, x, y, self.view_dir)
+
+
+def view_ray(view, x, y, fallback_dir):
+    """M3dView 의 화면 (x, y) → 월드 광선 (원점, 단위 방향).
+
+    v01.01 - 마야 2024 API 2.0 의 `viewToWorld(x, y, worldPt, worldVector)` 는 결과를 **돌려주지 않고 인자로 넘긴
+    MPoint / MVector 를 채운다**(OUT 인자). 처음에 결과를 돌려받는 줄 알고 인자 2개로 불러
+    "function takes exactly 4 arguments (2 given)" 로 드래그가 실패했다 - 시험 `test_picking.py` 가 이 모양을 고정한다.
+    """
+    import maya.api.OpenMaya as om
+    point, vector = om.MPoint(), om.MVector()
+    view.viewToWorld(int(x), int(y), point, vector)
+    o = np.array([point.x, point.y, point.z])
+    d = np.array([vector.x, vector.y, vector.z])
+    n = np.linalg.norm(d)
+    return o, (d / n if n > 1e-12 else np.asarray(fallback_dir, dtype="float64"))
 
     def refresh(self):
         self.view.refresh(False, True)

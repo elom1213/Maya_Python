@@ -10,7 +10,7 @@ updated: 2026-11-19
 오브젝트 · 조인트가 **프레임마다 어디에 있는지를 뷰포트에 경로로 그리고**, 경로 위의 **키 점을 끌어 애니메이션을 고치는** in-Maya PySide 툴(arch B).
 그래프 에디터를 열지 않고 궤적 모양을 보면서 위치 애니메이션을 고친다.
 
-- **버전**: `app/config/version.py` (v01.00 — 첫 버전: 위치 경로 표시 + 키 드래그)
+- **버전**: `app/config/version.py` (v01.01 — 키 드래그 에러 수정 · Custom 범위에 Get Current / Get Sel Range · Edit Path 켜짐 = 연한 빨강 · v01.00 — 첫 버전: 위치 경로 표시 + 키 드래그)
 - **설치**: `__dragDrop_A00630.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **MPath** → `tools.A00630_MotionPathEditor.run(True)`.
   툴 런처(A00370) ANIM 프로파일에도 **MotionPath** 버튼이 있다.
 - **계획서**: [plans/A00630_MotionPathEditor_plan.md](plans/A00630_MotionPathEditor_plan.md) — 단계별 계획 · 0단계 실측 결과 · 다음 단계
@@ -27,10 +27,11 @@ updated: 2026-11-19
 │ ctrl                                │   담으면 바로 경로가 생긴다
 │ j3                                  │
 └─────────────────────────────────────┘
-┌ Range ─ (o) Playback ( ) Scene ( ) Custom [ 1 ] [ 120 ] ┐
+┌ Range ─ ( ) Playback ( ) Scene (o) Custom                          ┐
+│  Start [ 1 ] [Get Current]  End [ 120 ] [Get Current] [Get Sel Range] │
 ┌ Display ─ [x] Frame dots [x] Keys [ ] Frame numbers     │
 │   Line width [==|-----] 2   Dot size [===|---] 4   Key size [====|--] 9
-┌ Edit ─ [   Edit Path   ] [Refresh]                      │
+┌ Edit ─ [   Edit Path   ] [Refresh]   (켜지면 Edit Path 가 연한 빨강) │
 │   Drag in (o) View ( ) Ground ( ) X ( ) Y ( ) Z         │
 │   2 key(s) selected                                     │
 [Log]
@@ -53,7 +54,12 @@ updated: 2026-11-19
 ## 2. 사용법
 
 1. 씬에서 애니메이션된 **오브젝트 · 조인트**를 고르고 `Paths` 의 **Set Selected**(또는 Add). 경로가 바로 그려진다.
-2. **Edit Path** 를 누르면 편집 툴이 된다(다시 누르거나 `Q` 로 나간다).
+2. **Edit Path** 를 누르면 편집 툴이 되고 버튼이 **연한 빨강**이 된다. 다시 누르거나 `Q` · 다른 마야 툴로 나가면 버튼도 꺼진다.
+
+   **두 단계로 한다 — 먼저 고르고, 그다음 고른 점을 잡고 끈다.**
+   - 고르기: 키 점을 클릭하거나, 빈 곳에서 눌러 사각형을 그려(박스 선택) 여러 키를 고른다 → 고른 점이 주황색.
+   - 끌기: **주황색 점 중 아무거나 하나 위에서**(반경 약 10 px) 왼쪽 버튼을 누른 채 움직인다 → 고른 키가 모두 함께 움직인다. 놓으면 확정.
+     점이 아닌 빈 곳에서 누르고 끌면 이동이 아니라 새 박스 선택이 된다.
 
    | 입력 | 동작 |
    |------|------|
@@ -67,6 +73,9 @@ updated: 2026-11-19
 
 3. **Drag in** 으로 움직이는 평면을 고른다: **View**(화면과 평행, 기본) · **Ground**(수평면) · **X / Y / Z**(그 월드 축으로만).
 4. 놓으면 **Ctrl+Z 한 번**에 그 드래그 전체가 되돌아간다.
+- **Range** : Playback(타임 슬라이더 재생 범위) · Scene(애니메이션 시작/끝) · **Custom**. Custom 은 아래 줄에 시작 · 끝을 넣는다 —
+  **Get Current** 는 그 칸을 현재 프레임으로, **Get Sel Range** 는 그래프 에디터 · 타임 슬라이더에서 고른 키의 처음 · 끝으로 두 칸을 함께 채운다
+  (A00110 animTool 과 같은 공용 위젯). 범위가 실제로 바뀔 때만 경로를 다시 굽는다.
 5. 그래프 에디터에서 키를 고치거나 undo 하면 경로가 따라 바뀐다.
    **부모 · 컨스트레인트 · 드라이버** 애니메이션을 바꿨으면 **Refresh** 를 누른다(§3).
 
@@ -153,8 +162,9 @@ mayapy 2024 (`tests/`, `-u` 로 실행):
 | `test_anim_channels.py` | 15 | 상태 판정 · 레이어 잠금 · 평가 = 마야 · m 단위 · 키 맞추기가 모양을 지킴 |
 | `test_edit_session.py` | 21 | 여러 번 움직여도 오차 없음 · 드래그 중 undo 큐 비어 있음 · **undo 한 번** · redo · 여러 키 · 여러 경로 · 부분 키 · 잠긴 축 · 취소 · 안 움직임 · auto 탄젠트 범위 · 속도(3.4 ms) |
 | `test_watcher.py` | 20 | 다른 곳의 커브 편집 · undo 뒤 경로 · 소수 키 → 다시 굽기 · 선택 · 저장 파일에 노드/requires 없음 · 그리기 노드가 undo 큐 밖 · 새 씬 정리 |
-| `test_ui.py` | 18 | 오프스크린 창: 경로 추가/빼기 · 표시 옵션 → 그리기 데이터 · optionVar · 범위 · 슬라이더 색 · Refresh · 닫으면 정리 |
+| `test_ui.py` | 26 | 오프스크린 창: 경로 추가/빼기 · 표시 옵션 → 그리기 데이터 · optionVar · 범위(Custom · Get Current · Get Sel Range · 같은 범위면 안 굽기) · 슬라이더 색 · Edit Path 빨강 · 툴 바뀌면 버튼 끔 · Refresh · 닫으면 정리 |
 | `test_picking.py` | 13 | 투영 · 고르기 · 박스 · 카메라 뒤 · 평면 / 축 드래그 |
+| `test_edit_context.py` | 19 | (v01.01) 편집 컨텍스트 전체 흐름 — 누름 → 끌기 → 놓기 · 축 고정 · 박스 선택 후 함께 끌기 · Shift / Ctrl · 빈 곳 클릭 해제 · 오른쪽 버튼 취소. 가짜 뷰의 `viewToWorld` 가 **마야 2024 와 같은 OUT 인자 모양**이라 v01.00 의 호출 실수를 잡는다 |
 
 **마야 GUI 확인 (아직)** — 헤드리스로는 확인할 수 없는 것:
 1. 경로 · 점 · 키가 보이고 메시에 가려지지 않는다 (x-ray 그리기).

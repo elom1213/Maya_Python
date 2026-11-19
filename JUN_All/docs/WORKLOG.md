@@ -43,6 +43,9 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 실측으로 고친 것: 피벗 항은 **상수 rp + rpt**(처음 rp·worldMatrix 는 스케일 ≠ 1 에서 0.43 어긋남) · 마야 `getAttr -time worldMatrix` 는 자기 커브가 바뀌어도 옛 값(시험 기준을 `xform -ws -rp` 로) ·
   doNotWrite 노드도 있으면 파일에 플러그인 `requires` 가 써짐 → 저장 직전에 그리기 노드를 지우고 저장 뒤 다시.
 - 시험(mayapy) 106항목: path_math 19 · anim_channels 15 · edit_session 21(드래그 갱신 3.4 ms) · watcher 20 · ui 18 · picking 13. 아이콘 · 런처(ANIM) 버튼 · 가이드 `docs/A00630_MotionPathEditor.md` · 포트폴리오 EN/KR. **뷰포트 그리기 · 마우스 편집 GUI 확인 아직.**
+- **v01.01** — GUI 에서 끌면 `[FAIL] Drag : function takes exactly 4 arguments (2 given)`: 마야 2024 API 2.0 `M3dView.viewToWorld(x, y, worldPt, worldVector)` 는 OUT 인자를 채운다 - 2개로 불렀다.
+  고침 + `test_edit_context.py` 19(가짜 뷰가 마야와 같은 함수 모양, 누름 → 끌기 → 놓기 · 박스 · Shift/Ctrl · 축 · 취소 전체 흐름). 사용법 질문("박스로 고르고 끈다") → 가이드에 "먼저 고르고, 고른 점 위에서 눌러 끈다" 두 단계로 적음.
+  요청: Custom 범위에 A00110 의 Get Current · Get Sel Range → 공용 `JUN_mod_timeRange_qt_v01`(실제 범위가 바뀔 때만 다시 굽기). 요청: Edit Path 켜짐 = 연한 빨강 → 공용 `pin_style`, Q · 다른 툴로 나가면 버튼도 끔(`ToolChanged`). 시험 7종 126항목.
 
 > [!summary] **`A00380_MeshTool` v01.21 — Quad Patch 탭 (구멍을 쿼드 그리드로)** `#A00380_MeshTool`
 - 요청: `.ref/quadPatcher_v1.0.py` 를 분석해 새 탭으로 이식. 원본 헤더가 **복사 · 수정 금지** 라이선스라 사용자 결정으로 **독자 구현**(코드 미사용, 아이디어만), Face · Extrude 모드까지.

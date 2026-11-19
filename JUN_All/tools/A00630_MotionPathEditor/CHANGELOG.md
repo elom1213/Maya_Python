@@ -1,5 +1,15 @@
 # Changelog — A00630_MotionPathEditor
 
+## v01.01 (2026-11-19)
+
+- **[Fix] 키를 끌면 에러** `[FAIL] Drag : function takes exactly 4 arguments (2 given)` 후 취소되던 것. 마야 2024 API 2.0 의
+  `M3dView.viewToWorld` 는 결과를 돌려주지 않고 **넘긴 `MPoint` / `MVector` 를 채운다** — 인자 2개로 불렀다(v01.00 은 이 경로를 헤드리스로 돌려 보지 못했다).
+  새 시험 `tests/test_edit_context.py` 19 : 누름 → 끌기 → 놓기 · 박스 선택 · Shift/Ctrl · Y 축 · 오른쪽 버튼 취소를 **마야와 같은 함수 모양의 가짜 뷰**로 끝까지 돌린다.
+- **[UI] Range > Custom 에 `Get Current` · `Get Sel Range`** — A00110 과 같은 공용 범위 위젯(`JUN_mod_timeRange_qt_v01`). Get Current = 그 칸을 현재 프레임으로,
+  Get Sel Range = 그래프 에디터 · 타임 슬라이더에서 고른 키의 처음 · 끝으로 두 칸을 함께. Custom 일 때만 켜지고, **실제 범위가 바뀔 때만** 다시 굽는다.
+- **[UI] Edit Path 가 켜져 있으면 버튼이 연한 빨강** (공용 `pin_style`). `Q` 나 다른 마야 툴로 바꿔 편집이 꺼지면 버튼도 꺼진다(`ToolChanged` 이벤트).
+- 시험 7종 126항목(`test_ui` 26). **마야 GUI 확인 아직.**
+
 ## v01.00 (2026-11-19)
 
 - **첫 버전** — 계획서 `docs/plans/A00630_MotionPathEditor_plan.md` 의 0단계(실측) + 1단계(위치 경로 표시 + 키 드래그).

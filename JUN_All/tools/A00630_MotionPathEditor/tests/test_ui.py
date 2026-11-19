@@ -6,7 +6,7 @@ import os
 import sys
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
-from PySide2.QtWidgets import QApplication, QSlider   # noqa: E402
+from PySide2.QtWidgets import QApplication, QSlider, QPushButton   # noqa: E402
 app = QApplication.instance() or QApplication(sys.argv)
 import maya.standalone   # noqa: E402
 maya.standalone.initialize(name="python")
@@ -31,6 +31,7 @@ ThemeManager.load_theme_to_widget(win, "blue_dark")
 logs = []
 win.log = lambda text: logs.append(text)
 win.manager.log = win.log
+win.range_edit.log_callback = win.log      # 위젯은 만들 때의 로그 함수를 들고 있다
 win.show()
 app.processEvents()
 
@@ -38,7 +39,12 @@ check("window title has the version", "Motion Path Editor v" in win.windowTitle(
 check("defaults: playback range, view plane, dots and keys on",
       win.manager.settings["range"] == pm.RANGE_PLAYBACK and win.manager.settings["plane"] == "view"
       and win.cb_dots.isChecked() and win.cb_keys.isChecked() and not win.cb_numbers.isChecked())
-check("custom range spin boxes are off unless Custom", not win.sb_start.isEnabled())
+check("custom range fields and Get buttons are off unless Custom",
+      not win.range_edit.start_edit.isEnabled() and not any(
+          b.isEnabled() for b in win.range_edit.findChildren(QPushButton)))
+check("range row has Get Current x2 + Get Sel Range (same widget as A00110)",
+      [b.text() for b in win.range_edit.findChildren(QPushButton)] == ["Get Current", "Get Current", "Get Sel Range"])
+check("Edit Path button turns light red when on (shared pin style)", "#f2a0a0" in win.btn_edit.styleSheet())
 
 # ---- 경로 추가 (TSL Set Selected 와 같은 효과: set_items)
 cmds.select([names["ctrl"], "j3", names["driven"]])
@@ -69,17 +75,45 @@ check("Drag plane option is stored", win.manager.settings["plane"] == "y" and
 
 # ---- 범위 : Custom 이면 다시 굽는다
 [b for b in win.range_buttons.buttons() if b.property("rangeMode") == pm.RANGE_CUSTOM][0].click()
-win.sb_start.setValue(10)
-win.sb_end.setValue(50)
+check("Custom turns the fields and buttons on", win.range_edit.start_edit.isEnabled() and all(
+    b.isEnabled() for b in win.range_edit.findChildren(QPushButton)))
+win.range_edit.set_range(10, 50)
 app.processEvents()
 c = win.manager.caches[ctrl_key]
 check("Custom range re-bakes the paths", c.start == 10 and c.end == 50 and c.times[0] == 10.0, (c.start, c.end))
+# Get Current : 현재 프레임으로 끝 칸
+cmds.currentTime(80)
+win.range_edit.get_current_end()
+check("Get Current fills End with the current frame and re-bakes", win.range_edit.end() == 80 and c.end == 80,
+      (win.range_edit.end(), c.end))
+# Get Sel Range : 고른 키의 처음 · 끝
+cmds.selectKey(clear=True)
+cmds.selectKey(names["ctrl"], time=(30, 70), attribute="translateY")
+win.range_edit.get_selected_range()
+check("Get Sel Range fills Start / End from the selected keys and re-bakes",
+      win.range_edit.values() == (30, 70) and (c.start, c.end) == (30, 70), (win.range_edit.values(), c.start, c.end))
+logs[:] = []
+cmds.selectKey(clear=True)
+win.range_edit.get_selected_range()
+check("Get Sel Range with no selected keys warns and keeps the range",
+      any("No keyframes selected" in m for m in logs) and (c.start, c.end) == (30, 70), logs)
+# 같은 범위로 다시 changed 가 와도 다시 굽지 않는다
+logs[:] = []
+win.range_edit.start_edit.editingFinished.emit()
+check("same range again does not re-bake", not any("Re-baked" in m for m in logs), logs)
 [b for b in win.range_buttons.buttons() if b.property("rangeMode") == pm.RANGE_PLAYBACK][0].click()
 
 # ---- 슬라이더가 테마 색으로 (메모 feedback-sliders-use-shared-style)
 sliders = win.findChildren(QSlider)
 check("sliders are painted by the shared slider style", sliders and all(s.styleSheet() for s in sliders),
       len(sliders))
+
+# ---- 마야 툴이 바뀌면(Q 등) Edit Path 버튼도 꺼진다 (편집 컨텍스트가 지금 툴이 아니면)
+win.btn_edit.blockSignals(True)
+win.btn_edit.setChecked(True)
+win.btn_edit.blockSignals(False)
+win._on_tool_changed()
+check("tool change turns the Edit Path button off when the edit tool is not current", not win.btn_edit.isChecked())
 
 # ---- 대상 빼기
 win.tsl_paths.set_items([names["ctrl"]])
@@ -97,7 +131,7 @@ win.close()
 app.processEvents()
 check("closing the window removes the draw nodes and the draw data",
       not cmds.ls(type="junMotionPath") and not draw_bridge.DATA)
-check("closing the window stops the callbacks", not win.watcher.ids)
+check("closing the window stops the callbacks", not win.watcher.ids and win._tool_cb is None)
 
 # 사용자 optionVar 되돌리기
 for k in pm.DEFAULT_SETTINGS:

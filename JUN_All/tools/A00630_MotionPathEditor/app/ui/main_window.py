@@ -10,10 +10,13 @@
 모든 UI 문자열은 영어. (한국어는 주석/독스트링만)
 """
 
+import maya.api.OpenMaya as om
 import maya.cmds as cmds
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
+from Framework.qt import JUN_mod_timeRange_qt
+from Framework.qt.pin_style import apply_pin_style
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
@@ -60,6 +63,8 @@ class MainWindow(QWidget):
         self.build_ui()
         self.manager.view_refresh = self._refresh_view
         self.watcher.start()
+        # v01.01 - Q 를 누르거나 다른 마야 툴로 바꾸면 편집 모드가 꺼진다 → 버튼(빨강)도 따라 끈다
+        self._tool_cb = om.MEventMessage.addEventCallback("ToolChanged", self._on_tool_changed)
         self.slider_style = JUN_mod_sliderStyle_qt_v01(self)
 
     # ==================================================================
@@ -100,27 +105,29 @@ class MainWindow(QWidget):
 
     def _build_range_group(self):
         box = QGroupBox("Range")
-        lay = QHBoxLayout(box)
+        outer = QVBoxLayout(box)
+        lay = QHBoxLayout()
         self.range_buttons = QButtonGroup(self)
         for label, value, tip in (("Playback", pm.RANGE_PLAYBACK, "The playback range of the time slider."),
                                   ("Scene", pm.RANGE_SCENE, "The animation start / end of the scene."),
-                                  ("Custom", pm.RANGE_CUSTOM, "The frames set on the right.")):
+                                  ("Custom", pm.RANGE_CUSTOM, "The frames set below.")):
             rb = QRadioButton(label)
             rb.setToolTip(tip)
             rb.setProperty("rangeMode", value)
             rb.setChecked(self.manager.settings["range"] == value)
             self.range_buttons.addButton(rb)
             lay.addWidget(rb)
-        self.sb_start = QSpinBox()
-        self.sb_end = QSpinBox()
-        for sb, key in ((self.sb_start, "custom_start"), (self.sb_end, "custom_end")):
-            sb.setRange(-100000, 100000)
-            sb.setValue(int(self.manager.settings[key]))
-            sb.setKeyboardTracking(False)
-            lay.addWidget(sb)
+        lay.addStretch(1)
+        outer.addLayout(lay)
+        # v01.01 - Custom 시작 · 끝 = A00110 과 같은 공용 위젯 (Get Current 칸마다 + Get Sel Range 두 칸 함께)
+        self.range_edit = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_value=int(self.manager.settings["custom_start"]),
+            end_value=int(self.manager.settings["custom_end"]), log_callback=self.log)
+        self.range_edit.setToolTip("Custom range. Get Current: the current frame. "
+                                   "Get Sel Range: the first and last selected keyframe.")
+        self.range_edit.changed.connect(self._on_range_changed)
+        outer.addWidget(self.range_edit)
         self.range_buttons.buttonClicked.connect(lambda *_: self._on_range_changed())
-        self.sb_start.valueChanged.connect(lambda *_: self._on_range_changed())
-        self.sb_end.valueChanged.connect(lambda *_: self._on_range_changed())
         self._sync_range_enabled()
         return box
 
@@ -175,6 +182,8 @@ class MainWindow(QWidget):
             "Drag a selected key: move it (and the other selected keys) - the animation follows.\n"
             "Right mouse while dragging: cancel. Alt + drag: Maya camera. Q: back to the select tool.")
         self.btn_edit.toggled.connect(self.set_edit_mode)
+        # v01.01 - 켜져 있으면 연한 빨강 (공용 pin_style : 체크형 토글 = 켜짐 연한 빨강)
+        apply_pin_style(self.btn_edit)
         row.addWidget(self.btn_edit, 2)
         self.btn_refresh = QPushButton("Refresh")
         self.btn_refresh.setMinimumHeight(34)
@@ -297,19 +306,27 @@ class MainWindow(QWidget):
             self.log("[FAIL] Refresh failed : {0}".format(exc))
 
     def _sync_range_enabled(self):
-        custom = self.manager.settings["range"] == pm.RANGE_CUSTOM
-        self.sb_start.setEnabled(custom)
-        self.sb_end.setEnabled(custom)
+        """시작 · 끝 칸과 Get Current · Get Sel Range 버튼은 Custom 일 때만."""
+        self.range_edit.set_inputs_enabled(self.manager.settings["range"] == pm.RANGE_CUSTOM)
 
-    def _on_range_changed(self):
+    def _on_range_changed(self, *args):
+        """범위 모드 · 시작 · 끝이 바뀌면 저장하고, **실제 범위가 바뀌었을 때만** 다시 굽는다.
+
+        공용 위젯은 칸에서 포커스만 빠져도 changed 를 보낸다 - 같은 범위로 다시 굽지 않게 비교한다.
+        칸이 비었거나 숫자가 아니면 이전 값을 그대로 둔다.
+        """
+        before = self.manager.frame_range()
         btn = self.range_buttons.checkedButton()
         self.manager.settings["range"] = btn.property("rangeMode") if btn else pm.RANGE_PLAYBACK
-        self.manager.settings["custom_start"] = self.sb_start.value()
-        self.manager.settings["custom_end"] = self.sb_end.value()
+        start, end = self.range_edit.start(), self.range_edit.end()
+        if start is not None:
+            self.manager.settings["custom_start"] = start
+        if end is not None:
+            self.manager.settings["custom_end"] = end
         for key in ("range", "custom_start", "custom_end"):
             self._save(key)
         self._sync_range_enabled()
-        if self.manager.caches:
+        if self.manager.caches and self.manager.frame_range() != before:
             self.on_refresh()
 
     def set_edit_mode(self, on):
@@ -331,6 +348,19 @@ class MainWindow(QWidget):
             self.btn_edit.setChecked(False)
             self.btn_edit.blockSignals(False)
 
+    def _on_tool_changed(self, *args):
+        """마야 툴이 바뀌었다 - Edit Path 버튼을 실제 상태(편집 컨텍스트가 지금 툴인가)에 맞춘다."""
+        try:
+            active = self.context is not None and self.context.is_active()
+        except Exception:                                  # noqa: BLE001
+            active = False
+        if self.btn_edit.isChecked() != active:
+            if not active and self.context is not None:
+                self.context._finalize()                    # 끄는 중인 드래그가 있으면 취소
+            self.btn_edit.blockSignals(True)
+            self.btn_edit.setChecked(active)
+            self.btn_edit.blockSignals(False)
+
     def _on_scene_change(self):
         """새 씬 · 열기 직전: 경로를 모두 정리한다."""
         if self.context is not None:
@@ -347,6 +377,9 @@ class MainWindow(QWidget):
         try:
             if self.context is not None:
                 self.context.deactivate()
+            if getattr(self, "_tool_cb", None) is not None:
+                om.MMessage.removeCallback(self._tool_cb)
+                self._tool_cb = None
             self.watcher.stop()
             self.manager.clear()
         finally:
