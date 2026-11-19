@@ -107,6 +107,12 @@ class FloodTab(QWidget):
         top = QHBoxLayout()
         self.tsl_joints = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
             title="Joints", select_label="Select Joints", log_callback=self._log)
+        # v01.41 - 메시를 고르고 누르면 그 메시에 바인드된 조인트로 리스트를 채운다.
+        self.btn_bound = self.tsl_joints.add_button("Get Bound Joints", self.on_get_bound_joints, index=0)
+        self.btn_bound.setToolTip(
+            "Fill the list with the joints bound to the selected mesh(es).\n"
+            "Mesh selected: every bound joint. Vertices / edges / faces selected:\n"
+            "only the joints that have weight on them.")
         model = self.tsl_joints.list_widget.model()
         model.rowsInserted.connect(self._update_button)
         model.rowsRemoved.connect(self._update_button)
@@ -364,6 +370,28 @@ class FloodTab(QWidget):
     def _confirm(self, question):
         answer = QMessageBox.question(self, "Flood weights", question, QMessageBox.Yes | QMessageBox.No)
         return answer == QMessageBox.Yes
+
+    def on_get_bound_joints(self, *args):
+        """선택 메시의 바인드 조인트로 리스트를 **교체**한다.
+
+        리스트에는 짧고 유일한 이름(`cmds.ls(풀패스)`)으로 담는다 - 같은 이름이면 `A|dup` 처럼 부분 경로가 되고,
+        담을 때 UUID 가 붙으므로 Flood 는 그대로 풀패스로 돈다.
+        """
+        try:
+            joints, messages = fl_mgr.bound_joints()
+        except Exception as exc:                           # noqa: BLE001
+            self._log("[FAIL] Get Bound Joints failed : {0}".format(exc))
+            return
+        for message in messages:
+            self._log(message)
+        if not joints:
+            if not any(m.startswith("[WARN]") for m in messages):
+                self._log("[WARN] No bound joint found.")
+            return
+        import maya.cmds as cmds
+        names = [(cmds.ls(j) or [j])[0] for j in joints]
+        self.tsl_joints.set_items(names)
+        self._log("[OK] Listed {0} bound joint(s).".format(len(names)))
 
     def on_flood(self, *args):
         joints = self.joints()

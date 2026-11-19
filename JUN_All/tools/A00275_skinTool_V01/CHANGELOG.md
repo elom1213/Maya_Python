@@ -1,5 +1,11 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.41 (2026-11-19)
+
+- **[Flood] `Get Bound Joints` 버튼** (Joints 리스트 버튼 줄 맨 앞). 메시를 고르고 누르면 그 메시 skinCluster 에 바인드된
+  조인트 전부로, 버텍스 · 엣지 · 페이스를 고르면 **그 버텍스에 웨이트가 있는 조인트만**으로 리스트를 교체한다.
+  메시 여러 개면 합친다. 같은 이름 조인트는 `A|dup` 처럼 부분 경로로 담겨 구별된다. 시험 `test_flood_ui.py` 21. **마야 GUI 확인 아직.**
+
 ## v01.40 (2026-11-19)
 
 - **[Feature] `Weights > Flood` 신규** — 리스트의 조인트(들)에 웨이트 채우기, Kangaroo `SkinCluster > Flood` 이식(플러그인 무의존).

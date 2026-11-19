@@ -193,6 +193,57 @@ def apply_row(row, cols, others, sets, value, operation):
 
 
 # ==================================================================
+# 바인드된 조인트 읽기 (Joints 리스트 채우기, v01.41)
+# ==================================================================
+
+def bound_joints(targets=None, weight_eps=1e-8):
+    """선택 메시의 skinCluster 에 바인드된 조인트 **풀패스** 목록과 메시지. `(joints, messages)`.
+
+    - 메시(오브젝트)를 고르면 그 skinCluster 의 조인트 **전부**.
+    - 버텍스 · 엣지 · 페이스를 고르면 **그 버텍스에 웨이트가 있는** 조인트만(웨이트 > weight_eps).
+    - 메시 여러 개면 합친다(처음 나온 순서, 중복 제거). 조인트가 아닌 인플루언스는 뺀다.
+    소프트 셀렉션은 보지 않는다(고른 버텍스 자체만). 같은 이름 조인트도 풀패스라 구별된다.
+    """
+    messages = []
+    if targets is None:
+        targets = parse_selection(use_soft_selection=False)
+    if not targets:
+        return [], ["[WARN] Select a skinned mesh (or some of its vertices) first."]
+    out = []
+    for target in targets:
+        mesh = target["mesh"]
+        skins = skin_clusters(mesh)
+        if not skins:
+            messages.append("[SKIP] {0} has no skinCluster.".format(_leaf(mesh)))
+            continue
+        skin = skins[0]
+        fn = maya_skin.skin_fn(skin)
+        influences = maya_skin.influence_paths(fn)
+        ids = target.get("ids")
+        if ids is None:
+            picked = list(influences)
+            scope = "all"
+        else:
+            dag = _shape_dag(mesh, skin)
+            total = _vertex_count(dag)
+            ids = sorted(i for i in set(ids) if 0 <= i < total)
+            weights, width = _read_weights(fn, dag, ids)
+            used = set()
+            for r in range(len(ids)):
+                for c in range(width):
+                    if weights[r * width + c] > weight_eps:
+                        used.add(c)
+            picked = [influences[c] for c in sorted(used)]
+            scope = "weighted on {0} vertices".format(len(ids))
+        joints = [p for p in picked if cmds.objectType(p) == "joint"]
+        new = [j for j in joints if j not in out]
+        out.extend(new)
+        messages.append("[OK] {0} ({1}) : {2} joint(s){3}.".format(
+            _leaf(mesh), skin, len(joints), ", " + scope if scope != "all" else ""))
+    return out, messages
+
+
+# ==================================================================
 # 진입점
 # ==================================================================
 

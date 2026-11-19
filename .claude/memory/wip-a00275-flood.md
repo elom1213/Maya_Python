@@ -20,4 +20,7 @@ except Distribute) · Scale All multiplies each joint by Value (original uses Va
 others). Rows with no other influence to take the rest keep sum < 1 like the original, with a `[WARN]`. No Kangaroo engine
 option on this tab (it carries the bug). Subtract All not ported (dead branch in the original).
 
+v01.41 : `Get Bound Joints` button on the Joints list (mesh = all bound joints, components = joints weighted there) -
+the user expected selecting a mesh to list its joints; plain `Select Joints` only copies the selection.
+
 Related: [[kangaroo-headless-golden-test]] · [[wip-a00275-move-joints]] · [[framework-tsl-attach-uuids]]

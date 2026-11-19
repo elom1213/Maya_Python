@@ -86,6 +86,30 @@ check("left corner -> A (renamed), right corner -> B|dup", w > 0.99 and w2 > 0.9
 cmds.undo()
 check("one undo restores", cmds.skinPercent(skin, "m.vtx[0]", q=True, transform="keep") > 0.99)
 
+# ---- v01.41 Get Bound Joints : 메시를 고르고 누르면 바인드된 조인트로 리스트 교체
+check("Get Bound Joints button is first in the list's button row",
+      tab.tsl_joints.edit_row.itemAt(0).widget() is tab.btn_bound)
+tab.tsl_joints.set_items([])
+cmds.select("m")
+tab.btn_bound.click()
+nodes = tab.joints()
+check("mesh selected -> every bound joint (same names kept apart)",
+      sorted(nodes) == sorted(["|A|renamed", "|B|dup", "|keep"]), (tab.tsl_joints.get_all_items(), nodes))
+cmds.select("m.vtx[0]")                  # undo 뒤라 keep 100%
+tab.btn_bound.click()
+check("vertex selected -> only joints with weight there", tab.joints() == ["|keep"], tab.joints())
+cmds.select(clear=True)
+before = tab.tsl_joints.get_all_items()
+tab.btn_bound.click()
+check("nothing selected -> list kept, warning logged",
+      tab.tsl_joints.get_all_items() == before and any("Select a skinned mesh" in m for m in logs))
+cmds.select("m")
+tab.btn_bound.click()
+cmds.select("m.vtx[0:5]")
+logs[:] = []
+tab.btn_flood.click()
+check("flood right after Get Bound Joints works", any(m.startswith("[OK]") for m in logs), logs)
+
 print("\nRESULT: {0}/{1} passed".format(sum(R), len(R)))
 maya.standalone.uninitialize()
 os._exit(0 if all(R) else 1)

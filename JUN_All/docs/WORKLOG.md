@@ -49,6 +49,7 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 원본 버그 둘도 찾아 고침: **Blend 무시**(`fBlend` 를 `setSkinClusterWeights` 에 안 넘김) · **Scale All 이 `Value / 조인트 수`**(조인트 2 개 Scale 1 = 둘 다 반 + 나머지 0). 남은 몫을 받을 인플루언스가 없는 버텍스의 합 < 1 은 원본과 같게 두고 경고.
 - Move 도 같은 이름 대비(`_resolve_joints` 애매 → 건너뜀, `skinParent` 풀패스). 회귀 45/45.
 - 시험 `tests/test_weight_flood.py` 51/51(Kangaroo 대조 19 케이스 차이 0 ~ 1.1e-16, 같은 이름 씬에서 원본 실패 · 이식 성공) · `test_flood_ui.py` 16/16 · `test_tab_fit_ui.py` 기대 페이지 수 갱신 35/35. GUI 확인 아직.
+- **v01.41** — 요청: 메시를 고르면 바인드된 조인트가 Joints 리스트에 올라와야 한다. → 리스트 버튼 줄 맨 앞에 `Get Bound Joints` : 메시 = skinCluster 조인트 전부, 컴포넌트 = 그 버텍스에 웨이트 있는 조인트만, 같은 이름은 부분 경로로 구별. `test_flood_ui.py` 21/21.
 
 ---
 

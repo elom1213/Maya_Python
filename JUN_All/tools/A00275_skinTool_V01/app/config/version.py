@@ -51,5 +51,8 @@
 #        Kangaroo 와 대조 시험 19 케이스 차이 0 ~ 1e-16 (tests/test_weight_flood.py).
 #        Move 도 같은 이름 대비 : 애매한 조인트 이름은 건너뛰고 알림, skinParent 는 풀패스로 풀릴 때만.
 
-VERSION = "01.40"
+# 01.41  Weights > Flood - Joints 리스트에 `Get Bound Joints` 버튼. 메시를 고르면 그 skinCluster 의 조인트 전부,
+#        버텍스 · 엣지 · 페이스를 고르면 거기에 웨이트가 있는 조인트만으로 리스트를 교체(같은 이름도 구별).
+
+VERSION = "01.41"
 LAST_UPDATE = "2026-11-19"
