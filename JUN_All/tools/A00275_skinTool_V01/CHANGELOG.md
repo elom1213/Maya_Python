@@ -1,5 +1,15 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.40 (2026-11-19)
+
+- **[Feature] `Weights > Flood` 신규** — 리스트의 조인트(들)에 웨이트 채우기, Kangaroo `SkinCluster > Flood` 이식(플러그인 무의존).
+  Replace/Add Closest · Replace/Add All · Scale All · Distribute, Value · Smooth Steps · Blend · Joint Lines · Joint Locks · Border Edges · 소프트 셀렉션.
+- **[Fix vs Kangaroo] 같은 이름 조인트.** 원본은 인플루언스를 짧은 이름으로 다뤄 `More than one object matches name` 으로 죽는다 →
+  조인트(UUID → 풀패스) · 인플루언스 열 · 최근접 계산 · 인플루언스 추가 · `skinParent` 를 전부 풀패스로.
+- **[Fix vs Kangaroo]** Blend 가 Distribute 외에는 무시되던 것 · Scale All 이 `Value / 조인트 수` 를 곱하던 것.
+- **[Move]** 같은 이름 대비 — 애매한 조인트 이름은 건너뛰고 알림, `skinParent` 는 풀패스 하나로 풀릴 때만. 결과 불변(회귀 45/45).
+- 시험 `tests/test_weight_flood.py` 51 · `tests/test_flood_ui.py` 16. (자세한 내용은 `docs/A00275_skinTool_V01.md` Weights > Flood 절) **마야 GUI 확인 아직.**
+
 ## v01.39 (2026-11-05)
 
 - **[UI] 트리 펼치기 규칙.** 화살표(더블클릭 · `→` 키)로 펼치면 **한 단계만** 보인다 — 접었다 다시 펼쳐도

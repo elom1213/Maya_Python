@@ -87,16 +87,28 @@ SQUASH_ATTR = "skinParent"      # bProjectSquashToMainJoints - Kangaroo 리그�
 # ==================================================================
 
 def _project_joints(joints, project_squash):
-    """`skinParent` 문자열 어트리뷰트가 가리키는 조인트로 바꾼다(원본 sProjectAttrs)."""
+    """`skinParent` 문자열 어트리뷰트가 가리키는 조인트로 바꾼다(원본 sProjectAttrs).
+
+    v01.40 - 같은 이름 조인트 대비. 원본은 짧은 이름 그대로 `xform` 해서, 씬에 같은 이름이 둘이면
+    "More than one object matches name" 으로 죽는다. 여기서는 **풀패스 하나로 풀릴 때만** 바꾸고
+    (애매하면 원래 조인트 위치를 쓴다), 목록과의 비교도 풀패스끼리 한다.
+    """
     out = list(joints)
     if not project_squash:
         return out
+    longs = set(cmds.ls(out, long=True) or [])
     for index, joint in enumerate(out):
         plug = "{0}.{1}".format(joint, SQUASH_ATTR)
         if cmds.objExists(plug):
             parent = cmds.getAttr(plug)
-            if parent and parent not in out and cmds.objExists(parent):
-                out[index] = parent
+            if not parent:
+                continue
+            try:
+                found = cmds.ls(parent, long=True) or []
+            except Exception:                              # noqa: BLE001
+                found = []
+            if len(found) == 1 and found[0] not in longs:
+                out[index] = found[0]
     return out
 
 
@@ -296,12 +308,23 @@ def count_islands(ids, neighbors):
 # ==================================================================
 
 def _resolve_joints(names, label, messages):
-    """존재하는 조인트만 풀패스로, 순서 유지 · 중복 제거."""
+    """존재하는 조인트만 풀패스로, 순서 유지 · 중복 제거.
+
+    v01.40 - 이름이 여러 조인트에 맞으면(같은 이름) 아무거나 고르지 않고 건너뛴다. UI 는 리스트의
+    UUID 로 푼 풀패스를 넘기므로 평소에는 일어나지 않는다(스크립트 호출 대비).
+    """
     out = []
     for name in names:
-        found = cmds.ls(name, long=True, type="joint") or []
+        try:
+            found = cmds.ls(name, long=True, type="joint") or []
+        except Exception:                                  # noqa: BLE001
+            found = []
         if not found:
             messages.append("[WARN] {0} : '{1}' is not a joint in the scene - ignored.".format(label, name))
+            continue
+        if len(found) > 1:
+            messages.append("[WARN] {0} : '{1}' matches {2} joints ({3}) - use the full path. Ignored.".format(
+                label, name, len(found), ", ".join(found)))
             continue
         if found[0] not in out:
             out.append(found[0])
@@ -311,11 +334,12 @@ def _resolve_joints(names, label, messages):
 def move_weights(joints_from, joints_to, smooth_steps=5, blend=1.0, joint_lines=JOINT_LINES_YES,
                  joint_locks=LOCKS_IGNORE, border_edges=BORDER_ALL, border_mask_steps=2,
                  respect_selection=True, use_soft_selection=True, project_squash=True,
-                 island_check=True, confirm=None, targets=None):
+                 island_check=True, confirm=None, targets=None, report_overlap=True):
     """선택 메시(들)에서 joints_from(n) 의 웨이트를 joints_to(k) 로 옮긴다. `(바뀐 메시 수, 메시지 목록)`.
 
     confirm : 섬이 여럿일 때 부를 콜백(질문 문자열 -> bool). None 이면 묻지 않고 진행한다.
     targets : 주면 선택 대신 그것을 쓴다(`[{"mesh", "ids", "softs"}]`, 테스트 · 스크립트용).
+    report_overlap : False 면 From/To 겹침 안내를 뺀다(Flood > Distribute 는 일부러 같은 목록을 넘긴다).
     씬을 바꾸는 부분은 호출부(UI)가 `undo_chunk()` 안에서 부른다.
     """
     messages = []
@@ -333,7 +357,7 @@ def move_weights(joints_from, joints_to, smooth_steps=5, blend=1.0, joint_lines=
     if not froms or not tos:
         return 0, messages + ["[WARN] Fill both the From and the To joint lists."]
     overlap = [j for j in froms if j in tos]
-    if overlap:
+    if overlap and report_overlap:
         messages.append("[Info] {0} joint(s) are in both lists ({1}) - their own weights are shared out among "
                         "the To joints as well (same as Kangaroo).".format(
                             len(overlap), ", ".join(_leaf(j) for j in overlap)))

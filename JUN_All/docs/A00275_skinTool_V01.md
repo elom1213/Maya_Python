@@ -1,8 +1,8 @@
 ---
 title: A00275_skinTool_V01 사용법
-aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose, Move Joints, Edit Mesh, Expand Bind, Smooth Weights, Move Weights n to k]
+aliases: [Skin Tool, SkinTool, A00275, Update Bind Pose, Move Joints, Edit Mesh, Expand Bind, Smooth Weights, Move Weights n to k, Flood Weights]
 tags: [maya-python, tool-guide, skin, skincluster, bind-pose, rigging]
-updated: 2026-10-29
+updated: 2026-11-19
 ---
 
 # A00275_skinTool_V01 사용법
@@ -10,7 +10,7 @@ updated: 2026-10-29
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.37 — **`Weights > Move`** 신규: 조인트 n 개 → k 개 웨이트 이동, Kangaroo `SkinCluster > Move` 이식(플러그인 무의존 · Kangaroo 엔진 선택) + Respect selection · v01.36 — Classic Native 가 **선택 버텍스만** (Joints to Joints · Meshes to Meshes) · v01.35 — By Weight 조인트 리스트에 **이름 필터** · v01.32 — Transfer 에 **`Target mode`**(소스↔타겟 리스트 1:1) + **진행률 팝업** · v01.31 — **`Weights > Smooth`** 신규: Kangaroo `SkinCluster > Smooth` 이식(플러그인 무의존) · v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
+- **버전**: `app/config/version.py` (v01.40 — **`Weights > Flood`** 신규: 조인트(들)에 웨이트 채우기, Kangaroo `SkinCluster > Flood` 이식 + **같은 이름 조인트가 있어도 동작**(원본은 에러) · v01.37 — **`Weights > Move`** 신규: 조인트 n 개 → k 개 웨이트 이동, Kangaroo `SkinCluster > Move` 이식(플러그인 무의존 · Kangaroo 엔진 선택) + Respect selection · v01.36 — Classic Native 가 **선택 버텍스만** (Joints to Joints · Meshes to Meshes) · v01.35 — By Weight 조인트 리스트에 **이름 필터** · v01.32 — Transfer 에 **`Target mode`**(소스↔타겟 리스트 1:1) + **진행률 팝업** · v01.31 — **`Weights > Smooth`** 신규: Kangaroo `SkinCluster > Smooth` 이식(플러그인 무의존) · v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
   (v01.22 는 아래 레이어 lock 이 사라졌다) · v01.22 — **`Weights > Layer`** 신규: 버텍스 순서가 같은 메시 N 개의
   웨이트를 메시마다 lock + Blend 로 레이어처럼 합성해 새 메시로 만들거나 기존 메시를 갱신 · v01.15 — **탭 재분류**:
   평평한 탭 7개를 `카테고리 3 → 기능 7` 의 2단 구조로, 아래 표)
@@ -27,6 +27,7 @@ updated: 2026-10-29
 | 〃 | 〃 | **Migrate A -> B** | 토폴로지가 다른 두 메시 사이 Transfer + Move 통합 마이그레이션 |
 | 〃 | 〃 | **Copy Weights** (v01.17~) | **같은 메시 안에서** 버텍스 → 버텍스로 웨이트 복사. 목표마다 가장 가까운 소스 버텍스의 웨이트 행을 베낀다. 최근접 기준은 **Surface / Topology / Volume**, 실리는 정도는 **`Blend` 0~1**(v01.18~) |
 | 〃 | 〃 | **Move** (v01.37~) | **조인트 n 개(From) → k 개(To)** 로 웨이트 이동. Kangaroo `SkinCluster > Move` 이식 — 버텍스마다 **최근접 To(뼈 선분)**, To 경계 `Smooth Steps` · `Blend` · `Joint Lines`(3) · `Joint Locks`(4) · `Border Edges`(3) · **`Respect selection`** · 소프트 셀렉션 · 섬 검사. Engine Native / Kangaroo |
+| 〃 | 〃 | **Flood** (v01.40~) | 리스트의 조인트(들)에 웨이트 **채우기**. Kangaroo `SkinCluster > Flood` 이식 — Replace/Add Closest · Replace/Add All · Scale All · Distribute, `Value` · `Smooth Steps` · `Blend` · Joint Lines · Locks · Border · 소프트 셀렉션. **같은 이름 조인트가 있어도 동작**(전부 풀패스) |
 | 〃 | 〃 | **Smooth** (v01.31~) | 선택 버텍스의 웨이트를 **이웃과 평균**해 매끄럽게. Kangaroo `SkinCluster > Smooth` 이식 — `Iterations` · `Blend` · `Rigid` · `Keep Value One` · `Joint Locks`(4) · `Border Edges`(3) + `Border Mask Steps` · `Loop Curve` · 소프트 셀렉션 falloff |
 | **Bind** | 바인드를 새로 만들거나 바인드 상태를 갱신한다 | **Bind Pose** | **조인트를 이동·회전한 현재 상태를 새 바인드 포즈로** |
 | 〃 | 〃 | **Expand Bind** (v01.09~) | 저장한 버텍스 집합 → 저장한 조인트들에 바인드. 조인트 사이가 **엣지 길이에 비례해 고르게** 분배 (Kangaroo `ClosestExpand` 대체). **엣지 루프 입력**(v01.10~)으로 밴드 전체가 루프와 같은 비율 유지, **Even distribution**(v01.16~)으로 간격·폭이 제각각이어도 같은 분배 + 조인트 버텍스 웨이트 1 |
@@ -552,6 +553,98 @@ Engine    (o) Native  ( ) Kangaroo
   Respect selection 끔 = 메시 전체 · From 웨이트 없는 버텍스 불변 · numpy = 순수 파이썬 · 섬 검사 · 방어. 45 항목.
 - `tests/test_move_ui.py` — 오프스크린: 탭 위치(기존 하위 탭 불변) · 기본값 · 버튼 글자 · 옵션 활성 규칙 · Reset · **실제 클릭 = 이동 + undo 한 스텝** · 섬 대화상자. 15 항목.
 - `tests/test_weight_smooth_regression.py` — Smooth 9 설정이 공용 모듈로 옮기기 전과 같음.
+
+## Weights > Flood — 조인트에 웨이트 채우기 (v01.40~)
+
+리스트에 담은 조인트(들)에 **선택 메시 / 버텍스의 웨이트를 채운다.** 마야 Paint Skin Weights 의 `Flood` 와 같지만
+**소프트 셀렉션이 반영**되고 **조인트 여러 개를 한 번에** 채울 수 있다(버텍스마다 가장 가까운 조인트에).
+Kangaroo `SkinCluster > Flood` 를 **플러그인 없이** 옮긴 탭이고, 같은 씬에서 Kangaroo 와 **숫자로 대조**했다(아래 검증).
+
+> **같은 이름 조인트가 있어도 된다.** 원본은 인플루언스를 **짧은 이름**(`fullPathName().split('|')[-1]`)으로 다뤄서,
+> 씬에 같은 이름 조인트가 둘이면 `More than one object matches name: dup` 으로 죽는다(인플루언스 표가 겹치고, `xform` ·
+> 인플루언스 추가도 짧은 이름이라 실패). 이 탭은 조인트 리스트를 **UUID 로 푼 풀패스**로 넘기고, 인플루언스 열 · 최근접 계산 ·
+> `skinParent` · 인플루언스 추가까지 **전부 풀패스**로 맞춘다. 담은 뒤 리네임 · 리페어런트해도 따라간다.
+
+```
+┌ Joints ─────────────┐ ┌ Operation ──────────────────────────┐
+│ A|dup               │ │ (o) Replace Closest ( ) Add Closest │
+│ B|dup               │ │ ( ) Replace All     ( ) Add All     │
+│ [Select Joints] ... │ │ ( ) Scale All       ( ) Distribute  │
+└─────────────────────┘ └─────────────────────────────────────┘
+┌ Options ─────────────────────────────────────────────────────┐
+│ Value        [==========] 1.000                              │
+│ Smooth Steps [===|      ] 4      Blend [==========] 1.000    │
+│ [x] Respect selection   [x] Use soft selection               │
+│ [x] Project squash joints (skinParent)  [x] Island check     │
+└──────────────────────────────────────────────────────────────┘
+┌ Joint Lines ───────┐┌ Joint Locks ──────────┐┌ Border Edges ─────────┐
+│ (o) All children   ││ (o) Ignore locks      ││ (o) Everything        │
+│ ( ) Children in .. ││ ( ) Keep locked ...   ││ ( ) Ignore border ... │
+│ ( ) Points only    ││ ( ) Only add / remove ││ ( ) Only border ...   │
+└────────────────────┘└───────────────────────┘│ Border Mask Steps [1] │
+[        Flood  2 joint(s)        ] [Reset Options]
+```
+
+### 사용법
+
+1. `Joints` 에 채울 조인트를 담는다(씬에서 고르고 `Select Joints`). 버튼 글자가 `Flood  2 joint(s)` 처럼 개수를 보여 준다.
+2. 씬에서 **스킨된 메시**(여러 개 가능) 또는 그 **버텍스 · 엣지 · 페이스**를 고른다. 소프트 셀렉션을 켜 두면 falloff 만큼만 채운다.
+3. `Flood` — **한 번 = undo 한 스텝**. 로그에 메시마다 바뀐 버텍스 수가 적힌다.
+
+### Operation (값까지 원본과 같다)
+
+| Operation | 뜻 |
+|-----------|----|
+| **Replace Closest** (기본) | 버텍스마다 **가장 가까운 조인트**(뼈 선분) 하나에 `Value`. 조인트가 하나면 전부 그 조인트 |
+| Add Closest | 위 값을 **남은 몫(1 - 고른 조인트 합)** 비율로 더한다 |
+| Replace All | 고른 조인트 전부에 `Value / 조인트 수` |
+| Add All | 위 값을 남은 몫 비율로 더한다 |
+| Scale All | 고른 조인트 값에 `Value` 를 곱한다(Value 는 10 까지) |
+| Distribute | 고른 조인트들끼리 웨이트를 **거리대로 나눠 갖는다** = Move(From = To = 고른 조인트). Value 는 안 쓴다 |
+
+- 조인트가 2 개 이상이면 조인트 사이 경계를 **선택 안 이웃만으로** `Smooth Steps` 번 평균한다(합 보존). Replace/Add Closest · Distribute 에서만 켜진다.
+- 고른 조인트 말고 나머지 인플루언스는 **Value = 1 이면 0**, 아니면 남은 몫에 비례해 줄어든다.
+- 섞기는 Move 와 같다 : `Blend` x 소프트 falloff → `Joint Locks` → `Border Edges` 마스크.
+- 조인트가 skinCluster 인플루언스가 아니면 **웨이트 0 으로 자동 추가**하고 로그에 적는다(원본의 "추가할까요" 대화 대신).
+
+### 옵션
+
+| 옵션 | 기본 | 원본 인자 | 뜻 |
+|------|------|-----------|----|
+| Value | 1.0 | `fValue` | 채울 값. Scale All 에서는 배율 |
+| Smooth Steps | 4 | `iSmoothSteps` | 조인트 경계 평균 횟수 |
+| Blend | 1.0 | `fBlend` | 결과를 원래 웨이트와 섞는 비율 (**원본은 Distribute 외에는 무시** — 아래) |
+| Joint Lines | All children | `iJointLines` | 뼈 선분의 자식: 목록 밖 자식도 / 목록 안 자식만 / 점만 |
+| Joint Locks | Ignore | `iJointLocks` | 잠긴(`liw`) 조인트: 무시 / 값 고정 / 늘기만 / 줄기만 |
+| Border Edges + Mask Steps | Everything, 1 | `iBorderEdges` · `iSmoothBorderMask` | 열린 경계를 빼고 / 경계만 |
+| Respect selection · Use soft selection · Project squash joints · Island check | ON | Move 와 같음 | Move 절 참고 |
+
+Engine 선택은 두지 않았다 — Kangaroo 엔진은 바로 그 같은 이름 문제를 안고 있다.
+원본에 있으나 옮기지 않은 것: `Subtract All`(원본에서 처리 분기가 주석이라 동작 안 함) · Distance Meshes · Sphere Masks · Closest To Curve(Move 와 같은 결정).
+
+### 원본과 다른 점 (원본 버그 — mayapy 에서 원본과 나란히 돌려 확인)
+
+| 원본 | 이 탭 |
+|------|-------|
+| 같은 이름 조인트가 있으면 `More than one object matches name` 으로 실패 | 풀패스로 동작. 이름으로 넘어와 여러 조인트에 맞으면 고르지 않고 `[WARN]` 후 건너뜀 |
+| `skinParent` 가 같은 이름을 가리키면 `xform` 에서 실패 | 풀패스 하나로 풀릴 때만 그 조인트로 잰다(애매하면 원래 조인트 위치). **Move 탭에도 적용** |
+| **Blend 무시** — `floodSkinCluster` 가 `fBlend` 를 `setSkinClusterWeights` 에 안 넘긴다(Distribute 만 먹음) | 모든 Operation 에 Blend 반영 |
+| **Scale All** 이 `Value / 조인트 수` 를 곱한다 — 조인트 2 개에 Scale 1 이면 둘 다 반이 되고 나머지 인플루언스는 0(합 < 1) | 조인트마다 `Value` 를 곱하고 나머지가 남은 몫을 채운다. Scale 1 = 변화 없음. 조인트 1 개면 원본과 같다 |
+
+- 고른 조인트 말고 다른 인플루언스가 없는 버텍스(예: 그 조인트 100%)에 `Value < 1` 을 주면 남은 몫을 받을 곳이 없어
+  **합이 1 보다 작게 남는다** — 원본과 같게 두고 `[WARN] ... add up to less than 1` 로 개수를 알린다.
+
+### 검증 (mayapy 2024)
+
+- `tests/test_weight_flood.py` — **Kangaroo 대조**(환경 변수 `JUN_KANGAROO_DIR`): Replace Closest(1 개 · Value 0.4 · 체인 3 · Smooth 0 ·
+  Joint Lines 3모드) · Add Closest 2 · Replace All · Add All · Scale All(1 개) · Distribute · 컴포넌트 선택 · 소프트 셀렉션 · Blend 0.5(원본 결과와
+  원래 웨이트를 섞은 기대값) · Joint Locks 2모드 · 미인플루언스 조인트 → **19 케이스 차이 0 ~ 1.1e-16**.
+  같은 이름 씬: **Kangaroo 는 `More than one object matches name: dup` 으로 실패, Native 는 왼쪽 → `A|dup` · 오른쪽 → `B|dup`** ·
+  애매한 `skinParent` · 애매한 짧은 이름은 건너뜀 · 부분 경로 OK · 같은 이름 인플루언스 풀패스 추가. 그 밖에 선택 밖 불변 · **undo 한 번에 복원** ·
+  Scale 1 = 변화 없음 · Scale 2 개 = 조인트마다 Value 배. 51 항목.
+- `tests/test_flood_ui.py` — 오프스크린: 탭 위치(Move 다음) · 기본값 · Operation 별 활성 규칙(Scale 은 Value > 1, Distribute 는 Value 끔) · Reset ·
+  리스트 → 풀패스 · **같은 이름 씬에서 리네임 후 실제 클릭 = 채움 + undo 한 스텝**. 16 항목.
+- 회귀: `test_weight_move.py` 45/45(Kangaroo 대조 포함) · `test_move_ui.py` 15/15 · `test_tab_fit_ui.py` 35/35 · `test_weight_smooth_regression.py` 통과.
 
 
 ## Select > By Weight — 웨이트로 버텍스 고르기 (v01.27~)

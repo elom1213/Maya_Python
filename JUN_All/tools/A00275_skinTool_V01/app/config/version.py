@@ -43,5 +43,13 @@
 # 01.39  트리 펼치기 - 화살표로 펼치면 한 단계만, Shift + 펼치기/접기 = 아래 전부 (Layer 탭 트리 · Lock 트리).
 #        공용 Framework/qt/MOD_treeExpand_qt_v01
 
-VERSION = "01.39"
-LAST_UPDATE = "2026-11-05"
+# 01.40  Weights > Flood 신규 - Kangaroo SkinCluster > Flood 이식(플러그인 무의존). 고른 조인트(들)에 웨이트 채우기 :
+#        Replace/Add Closest · Replace/Add All · Scale All · Distribute, Smooth Steps · Blend · 소프트 · Joint Lines ·
+#        Joint Locks · Border Edges. **씬에 같은 이름 조인트가 있어도 동작** - 원본은 인플루언스를 짧은 이름으로
+#        다뤄 "More than one object matches name" 으로 죽는다 -> 조인트 · 인플루언스 · skinParent 를 전부 풀패스로.
+#        원본 버그 둘 수정 : Blend 무시(Distribute 외) · Scale All 이 Value / 조인트 수로 곱함.
+#        Kangaroo 와 대조 시험 19 케이스 차이 0 ~ 1e-16 (tests/test_weight_flood.py).
+#        Move 도 같은 이름 대비 : 애매한 조인트 이름은 건너뛰고 알림, skinParent 는 풀패스로 풀릴 때만.
+
+VERSION = "01.40"
+LAST_UPDATE = "2026-11-19"

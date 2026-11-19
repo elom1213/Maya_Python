@@ -23,4 +23,6 @@ ktw.moveSkinClusterWeights(xJoints={"['fA','fB']": "['t1','t2']"}, bDisableIslan
 - 점 좌표는 원본처럼 `cmds.xform('shape.vtx[*]', q, ws, t)` 로 읽는다 - `MFnMesh.getPoints` 와 마지막 자리가 달라 동률 판정이 갈린다.
 - `moveSkinClusterWeights` 의 To 목록은 `list(set(...))` - **진짜 동률이면 Kangaroo 끼리도 실행마다 다르다**. 대조 씬은 동률을 피한다.
 - `iBorderEdges != 0` 이면 `getBorderMask -> smoothValues2d(bLockArray)` 가 numpy 2.x 에서 IndexError(불리언 길이가 패딩 행만큼 짧음) - 원본 버그. 그 케이스는 성질로 검증.
+- `floodSkinCluster` 는 기본 `xDistanceMeshes=['',0,0]` 이 헤드리스에서 TypeError → `xDistanceMeshes=None` 을 넘긴다.
+- Kangaroo 는 인플루언스를 **짧은 이름**으로 다뤄 같은 이름 조인트가 있으면 죽는다 — 이식할 땐 풀패스로([[wip-a00275-flood]]).
 - 테스트 스크립트는 환경 변수(`JUN_KANGAROO_DIR`)가 없으면 대조를 건너뛰게 만든다. 관련 [[maya-fbx-import-nonxyz-flip]]

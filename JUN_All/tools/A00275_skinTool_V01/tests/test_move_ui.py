@@ -29,8 +29,8 @@ def check(name, cond, extra=""):
 logs = []
 win = MainWindow()
 pages = [win.weights_tabs.tabText(i) for i in range(win.weights_tabs.count())]
-check("Weights sub tabs : Move is last, others unchanged",
-      pages == ["Classic", "Transfer", "Migrate A -> B", "Copy Weights", "Layer", "Smooth", "Move"], pages)
+check("Weights sub tabs : Move then Flood last, others unchanged",
+      pages == ["Classic", "Transfer", "Migrate A -> B", "Copy Weights", "Layer", "Smooth", "Move", "Flood"], pages)
 check("main window keeps a MoveTab", isinstance(win.move_tab, mt.MoveTab))
 
 tab = mt.MoveTab(log_callback=logs.append)

@@ -41,6 +41,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 실측으로 버린 길: `outMesh → inMesh` 잇고 끊기는 undo 해도 원래 형상이 안 돌아온다. 확정 뒤 `cmds.select` 는 undo 큐에 들어가 Ctrl+Z 한 번을 깨서 뺐다.
 - 시험 `tools/A00380_MeshTool/tests/test_quad_patch.py` 40/40(mayapy · 오프스크린 탭 UI 포함). 9만 버텍스 구 400면 5.7초 → 60면 넘으면 진행 팝업. GUI 확인 아직. 가이드 §3-7, 포트폴리오 EN/KR.
 
+> [!summary] **`A00275_skinTool_V01` v01.40 — Weights > Flood (Kangaroo SkinCluster > Flood 이식, 같은 이름 조인트 대응)** `#A00275_skinTool_V01`
+- 요청: Kangaroo 의 `SkinCluster > Flood` 를 그대로 이식하되, **씬에 같은 이름 조인트가 있으면 에러**나는 원본 문제를 고친 버전으로.
+- 원인: 원본은 인플루언스를 `fullPathName().split('|')[-1]` 짧은 이름으로 다룬다 → 인플루언스 dict 가 겹치고 `cmds.xform('dup')` 이 `More than one object matches name` (mayapy 에서 원본으로 재현). 인플루언스 검사 · 추가 · `skinParent` 도 짧은 이름.
+- 이식: 조인트 리스트는 **UUID 로 푼 풀패스**(`get_all_nodes`), 인플루언스 열 · 최근접 뼈 계산 · 인플루언스 추가 · `skinParent` 전부 풀패스. 이름으로 들어와 애매하면 고르지 않고 `[WARN]`. 리네임 · 리페어런트 후에도 따라간다.
+- Operation 6종(Replace/Add Closest · Replace/Add All · Scale All · Distribute) + Value · Smooth Steps · Blend · Joint Lines · Locks · Border · 소프트. Move 탭 공용 함수 재사용, Distribute = Move(From = To).
+- 원본 버그 둘도 찾아 고침: **Blend 무시**(`fBlend` 를 `setSkinClusterWeights` 에 안 넘김) · **Scale All 이 `Value / 조인트 수`**(조인트 2 개 Scale 1 = 둘 다 반 + 나머지 0). 남은 몫을 받을 인플루언스가 없는 버텍스의 합 < 1 은 원본과 같게 두고 경고.
+- Move 도 같은 이름 대비(`_resolve_joints` 애매 → 건너뜀, `skinParent` 풀패스). 회귀 45/45.
+- 시험 `tests/test_weight_flood.py` 51/51(Kangaroo 대조 19 케이스 차이 0 ~ 1.1e-16, 같은 이름 씬에서 원본 실패 · 이식 성공) · `test_flood_ui.py` 16/16 · `test_tab_fit_ui.py` 기대 페이지 수 갱신 35/35. GUI 확인 아직.
+
 ---
 
 ## 2026-11-17

@@ -159,8 +159,8 @@ def ignored_pages():
             if tw.widget(i).sizePolicy().verticalPolicy() == QSizePolicy.Ignored]
 
 
-# 상위 4 중 3 숨김 + 하위 12 중 (카테고리마다 현재 1 씩) 8 숨김 = 11
-check("enabled : hidden pages have vertical Ignored policy (11)", len(ignored_pages()) == 11, len(ignored_pages()))
+# 상위 4 중 3 숨김 + 하위 13 중 (카테고리마다 현재 1 씩) 9 숨김 = 12  (v01.40 Weights > Flood 추가)
+check("enabled : hidden pages have vertical Ignored policy (12)", len(ignored_pages()) == 12, len(ignored_pages()))
 fit.set_enabled(False)
 pump()
 check("disabled : every page policy restored (no Ignored)", not ignored_pages(), len(ignored_pages()))
