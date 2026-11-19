@@ -2,7 +2,7 @@
 title: 공용 리스트 위젯 (JUN_mod_tsl_qt) 사용법
 aliases: [MOD_tsl_qt, JUN_mod_tsl_qt, TSL 위젯, 공용 TSL, (Null), 자리표시]
 tags: [maya-python, framework, widget, tsl, selection-order]
-updated: 2026-11-09
+updated: 2026-11-19
 ---
 
 # 공용 리스트 위젯 `JUN_mod_tsl_qt_v01`
@@ -65,6 +65,7 @@ tsl = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
     select_no_expand=False,      # 항목이 **세트**인 리스트에서 켠다 (2.1)
     show_rules=False,            # Select 옆 `Rules` 버튼 - 규칙대로 리스트업 (2.3, 2026-11-09~)
     rules_dir=None,              # 규칙 폴더. 없으면 공용 Framework/rules/list_rules
+    name_display=False,          # 전역 이름 표시 모드(Outliner Name / Full Path)를 따른다 (5-1, 2026-11-19~, 지금은 A00275 만)
     log_callback=self.log,       # 없으면 print
 )
 ```
@@ -338,6 +339,29 @@ They are used exactly as if they were listed.
   A00145 Rules + Swap). **마야 GUI 확인 아직.**
 
 ---
+
+## 5-1. 이름 표시 모드 — `name_display` (2026-11-19~)
+
+씬에 같은 이름 노드가 있으면 `cmds.ls(sl=True)` 가 `A|dup` · `B|dup` 처럼 구별되는 경로를 주므로 리스트에 `|` 가 섞여 보인다.
+`name_display=True` 로 만든 리스트는 **전역 모드**를 따른다.
+
+| 모드 | 보이는 글자 | 툴팁 |
+|------|-------------|------|
+| **Outliner Name** (기본) | 마지막 이름만: `A|dup` → `dup`, `grp|ns:dup` → `ns:dup`, `A|pCube1.vtx[3]` → `pCube1.vtx[3]` | 노드 줄에 올리면 **지금 전체 경로**(`|A|dup`, UUID 로 찾음) |
+| Full Path | 항목 글자 그대로(`A|dup`, 예전 동작) | 없음 |
+
+- **항목 글자는 바꾸지 않는다.** `item.text()` · `get_all_items()` · `selected_items()` · UUID · 씬 선택 동기화는 그대로다 — 툴들이 이 글자를
+  노드 이름으로 쓰기 때문이다. 바뀌는 것은 델리게이트(`_NameDelegate`)가 **그리는 글자**와 툴팁뿐이다.
+- 노드 이름 모양이 아닌 글자(`(Null)`, 파일 이름 등)는 그대로. `(Null)` 의 빨간 글씨 · 안내 툴팁도 그대로다.
+- **모드 바꾸기**: 리스트 **우클릭 → `Show Names` → `Outliner Name` / `Full Path`**. 열려 있는 모든 옵트인 리스트가 바로 다시 그려지고,
+  QSettings `JUN/tsl` 의 `name_display` 에 기억된다(마야 안팎 공통).
+- **Sort** 는 Outliner Name 모드면 보이는 이름 순(같은 이름은 경로 순), 아니면 예전처럼 글자 순.
+- **공용 필터**([Framework_MOD_filter_qt.md](Framework_MOD_filter_qt.md))는 리스트의 **보이는 글자**로 거른다.
+- 공개 API: `get_name_display()` · `set_name_display(mode)` · `display_name(text)` (모듈 함수), `name_display_mode()` · `shown_text(row)` ·
+  `full_path_tooltip(row)` · `refresh_names()` (위젯 메서드). 상수 `NAME_OUTLINER` · `NAME_FULL`.
+- **적용 현황**: A00275_skinTool_V01 (v01.44, 리스트 11개)만. 모든 툴로 넓히는 2단계는
+  [plans/Framework_MOD_tsl_qt_name_display_plan.md](plans/Framework_MOD_tsl_qt_name_display_plan.md) §5.
+- 시험: `Framework/tests/test_tsl_name_display.py` (mayapy 오프스크린, 28 항목).
 
 ## 6. 로그 · 문제 해결
 

@@ -197,6 +197,21 @@ class JUN_mod_filter_qt_v01(QWidget):
         low = name.lower()
         return all(t in low for t in tokens)
 
+    def _shown(self, item):
+        """리스트에 **보이는** 글자 (2026-11-19~).
+
+        델리게이트가 그릴 때 글자를 바꾸는 리스트(공용 TSL 의 이름 표시 모드 - `A|dup` 을 `dup` 으로)에서는
+        화면 글자로 걸러야 한다. 기본 `QStyledItemDelegate.displayText` 는 문자열을 그대로 돌려주므로
+        그런 델리게이트가 없는 리스트는 예전과 결과가 같다.
+        """
+        delegate = self.list_widget.itemDelegate() if self.list_widget is not None else None
+        if isinstance(delegate, QStyledItemDelegate):
+            try:
+                return delegate.displayText(item.text(), QLocale())
+            except Exception:
+                pass
+        return item.text()
+
     def _tokens(self):
         return [t for t in self.le_filter.text().strip().lower().split() if t]
 
@@ -213,7 +228,7 @@ class JUN_mod_filter_qt_v01(QWidget):
             total = self.list_widget.count()
             for i in range(total):
                 item = self.list_widget.item(i)
-                hit = True if not tokens else self._matches(item.text(), tokens)
+                hit = True if not tokens else self._matches(self._shown(item), tokens)
                 item.setHidden(not hit)
                 if hit:
                     shown += 1

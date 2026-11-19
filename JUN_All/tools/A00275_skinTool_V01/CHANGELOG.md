@@ -1,5 +1,14 @@
 # Changelog — A00275_skinTool_V01
 
+## v01.44 (2026-11-19)
+
+- **[UI] 리스트 이름을 아웃라이너처럼.** 씬에 같은 이름 노드가 있어도 리스트에 `A|dup` 대신 **`dup`** 이 보인다.
+  같은 이름 줄은 **마우스를 올리면 전체 경로**(`|A|dup`) 툴팁으로 구별한다(리네임 · 리페어런트 뒤에도 지금 경로).
+  리스트 **우클릭 `Show Names` → Outliner Name / Full Path** 로 바꾸고, 모든 리스트에 함께 적용 · 다음 실행에도 기억한다(기본 Outliner Name).
+  Sort 는 보이는 이름 순, By Weight 의 이름 필터도 보이는 이름으로 거른다. **툴이 쓰는 이름(풀패스 · UUID)은 그대로**라 동작은 바뀌지 않는다.
+  공용 TSL 의 새 옵션 `name_display` 를 리스트 11개에 켰다 — 이 툴이 첫 적용(나중에 전 툴). 시험 `tests/test_flood_ui.py` 33 ·
+  `Framework/tests/test_tsl_name_display.py` 28. **마야 GUI 확인 아직.**
+
 ## v01.43 (2026-11-19)
 
 - **[UI] `Weights > Classic` 하위 탭을 없애고 `Weights > Transfer` 로 옮겼다.** Transfer 의 `Target mode` 에 **`Classic`** 이 생겼고,

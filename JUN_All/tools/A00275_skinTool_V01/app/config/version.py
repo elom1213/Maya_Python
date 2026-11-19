@@ -62,5 +62,9 @@
 #        (Engine Kangaroo/Native · Transfer Mode · From/To · Joints to Joints / Meshes to Meshes) 이 그 자리에 보이고
 #        소스 전이 위젯은 숨는다. 위젯 · 핸들러 · 동작은 그대로, 모드를 바꾸면 창 높이를 다시 맞춘다.
 
-VERSION = "01.43"
+# 01.44  리스트 이름이 아웃라이너처럼 - 같은 이름 노드가 있어도 `A|dup` 대신 `dup` 으로 보이고, 마우스를 올리면
+#        전체 경로 툴팁. 리스트 우클릭 `Show Names` 로 Outliner Name / Full Path (전역, 기억). 툴이 쓰는 이름은 그대로.
+#        공용 TSL 의 `name_display` 옵션을 이 툴의 리스트 11개에 켰다(첫 적용, 계획서 Framework_MOD_tsl_qt_name_display_plan).
+
+VERSION = "01.44"
 LAST_UPDATE = "2026-11-19"

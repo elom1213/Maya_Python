@@ -7,7 +7,7 @@ updated: 2026-11-19
 
 # 공용 TSL 이름 표시 모드 (Outliner Name / Full Path) 계획서
 
-> 작성 2026-11-19 · 상태: **계획 (구현 전)** · 1단계 대상: `A00275_skinTool_V01` 만 · 2단계: 모든 툴(나중)
+> 작성 2026-11-19 · 상태: **1단계 구현 완료 (2026-11-19, A00275 v01.44 · mayapy 오프스크린 시험) · 마야 GUI 확인 전** · 2단계: 모든 툴(나중)
 >
 > 사용자 결정 (2026-11-19):
 > - 같은 이름 줄은 **툴팁만으로** 구별한다(흐린 부모 이름 같은 덧붙임은 없음).
@@ -388,10 +388,10 @@ if self.name_display:
 ## 7. 작업 순서 (체크리스트)
 
 1. [x] `qt.py` 가 필요한 Qt 클래스를 다 내보내는지 확인 — 세 모듈 `*` import 라 추가 없음(작성 시 확인).
-2. [ ] `MOD_tsl_qt_v01.py` §3-1 (a)~(g).
-3. [ ] `MOD_filter_qt_v01.py` §3-2.
-4. [ ] `Framework/tests/test_tsl_name_display.py` §4-1 작성 · 통과.
-5. [ ] A00275 11곳 `name_display=True` §3-3.
-6. [ ] A00275 회귀 + 새 확인 §4-2, Framework 회귀 §4-3.
-7. [ ] 버전 01.44 · CHANGELOG · 문서 · WORKLOG · 메모 §3-4.
-8. [ ] 로컬 커밋(경로 명시). 푸시는 사용자가 그 턴에 요청할 때만.
+2. [x] `MOD_tsl_qt_v01.py` §3-1 (a)~(g).
+3. [x] `MOD_filter_qt_v01.py` §3-2.
+4. [x] `Framework/tests/test_tsl_name_display.py` §4-1 작성 · 통과.
+5. [x] A00275 11곳 `name_display=True` §3-3.
+6. [x] A00275 회귀 + 새 확인 §4-2, Framework 회귀 §4-3.
+7. [x] 버전 01.44 · CHANGELOG · 문서 · WORKLOG · 메모 §3-4.
+8. [x] 로컬 커밋(경로 명시). 푸시는 사용자가 그 턴에 요청할 때만.

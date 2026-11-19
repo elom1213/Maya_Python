@@ -105,9 +105,9 @@ class MoveTab(QWidget):
 
         lists = QHBoxLayout()
         self.tsl_from = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="From (n)", select_label="Select From", log_callback=self._log)
+            name_display=True, title="From (n)", select_label="Select From", log_callback=self._log)
         self.tsl_to = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="To (k)", select_label="Select To", log_callback=self._log)
+            name_display=True, title="To (k)", select_label="Select To", log_callback=self._log)
         for tsl in (self.tsl_from, self.tsl_to):
             model = tsl.list_widget.model()
             model.rowsInserted.connect(self._update_button)

@@ -53,6 +53,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - **v01.42** — 요청: Get Bound Joints 뒤 다른 조인트를 골라 그 메시 skinCluster 에 추가하는 기능(마야 Add Influence). → `Add Influence` 버튼 : Get Bound Joints 가 메시를 UUID 로 기억(`Mesh :` 라벨), 고른 조인트를 웨이트 0 으로 추가 + 리스트에 붙임, 이미 바인드면 건너뜀, 같은 이름 풀패스, undo 한 스텝. `test_flood_ui.py` 29/29.
 - **v01.43** — 요청: Weights > Classic 탭을 없애고 Transfer 로 옮겨, Target mode 에 Classic 모드를 추가. → Classic 패널(예전 탭 위젯 · 핸들러 그대로)을 Transfer 안에 두고 Classic 모드에서만 보이게, 소스 전이 위젯은 숨김, 모드 전환 때 tabFit 재맞춤. Weights 하위 탭 8 → 7(첫 페이지 Transfer). 시험 `test_transfer_classic_ui.py` 9/9(모드별 표시 · Native Joints to Joints / Meshes to Meshes 실제 실행 · 창 높이) · `test_move_ui` 15 · `test_tab_fit_ui` 34(숨은 페이지 수 12 → 11) · `test_flood_ui` 29.
 
+> [!summary] **공용 TSL 이름 표시 모드 + `A00275_skinTool_V01` v01.44 — 리스트 이름을 아웃라이너처럼** `#Framework` `#A00275_skinTool_V01`
+- 요청: 같은 이름 오브젝트가 리스트에서 `A|dup` 처럼 보인다 → Full Path / Outliner Name 모드. 진단 → 계획서(`docs/plans/Framework_MOD_tsl_qt_name_display_plan.md`) → 구현.
+  결정: 같은 이름은 **툴팁만**으로 구별, 1단계는 **A00275 만**, 기본 **Outliner Name**, 나중에 전 툴.
+- 핵심: 항목 글자는 그대로(툴들이 글자를 노드 이름으로 씀 - `get_all_items` 44개 파일), **그리는 글자만** 바꾸는 델리게이트(`displayText`) + 툴팁(`helpEvent`, UUID 로 지금 경로).
+- TSL 옵션 `name_display`(기본 False = 다른 툴 불변), 전역 모드 QSettings `JUN/tsl`, 우클릭 `Show Names`, Sort 보이는 이름 순. 공용 필터는 보이는 글자로(델리게이트 없는 리스트는 같은 결과).
+- 시험 `Framework/tests/test_tsl_name_display.py` 28/28(+ PySide6 확인) · A00275 `test_flood_ui` 33/33(리스트 11개 옵트인 · 같은 이름 표시 · Flood 풀패스) · 회귀 전부 통과. `test_tab_fit_rollout` 의 A00620 3건은 기존 실패(이번 변경 전에도 같음). GUI 확인 아직.
+
 ---
 
 ## 2026-11-17

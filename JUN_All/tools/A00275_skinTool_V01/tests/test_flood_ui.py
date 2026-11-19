@@ -150,6 +150,30 @@ logs[:] = []
 tab.btn_add_infl.click()
 check("no joint selected -> warning", any("Select the joint" in m for m in logs), logs)
 
+# ---- v01.44 이름 표시 모드 (공용 TSL name_display, 계획서 Framework_MOD_tsl_qt_name_display_plan §4-2)
+from Framework.qt import MOD_tsl_qt_v01 as T   # noqa: E402
+from PySide2.QtCore import QSettings   # noqa: E402
+_settings = QSettings(T.NAME_SETTINGS_ORG, T.NAME_SETTINGS_APP)
+_saved_mode = _settings.value(T.NAME_SETTINGS_KEY)
+T.set_name_display(T.NAME_OUTLINER)
+lists = win.findChildren(T.JUN_mod_tsl_qt_v01)
+check("all 11 A00275 lists follow the name display mode",
+      len(lists) == 11 and all(t.name_display for t in lists), [(t.title, t.name_display) for t in lists])
+fl2 = ft.FloodTab(log_callback=logs.append)
+cmds.select(["B|dup", "C|dup"])
+fl2.tsl_joints.set_items(cmds.ls(sl=True))
+t2 = fl2.tsl_joints
+check("same-name joints show as the Outliner name",
+      t2.get_all_items() == ["B|dup", "C|dup"] and [t2.shown_text(i) for i in range(2)] == ["dup", "dup"],
+      (t2.get_all_items(), [t2.shown_text(i) for i in range(2)]))
+check("tooltips give the full paths", [t2.full_path_tooltip(i) for i in range(2)] == ["|B|dup", "|C|dup"])
+check("Flood still gets full paths", fl2.joints() == ["|B|dup", "|C|dup"], fl2.joints())
+if _saved_mode is None:
+    _settings.remove(T.NAME_SETTINGS_KEY)
+else:
+    _settings.setValue(T.NAME_SETTINGS_KEY, _saved_mode)
+T._NAME_STATE["mode"] = None
+
 print("\nRESULT: {0}/{1} passed".format(sum(R), len(R)))
 maya.standalone.uninitialize()
 os._exit(0 if all(R) else 1)

@@ -59,6 +59,20 @@ UUID 는 보통 씬에서 유일하지만 **항상** 그렇진 않다. 같은 �
 (`_match_by_text`), 이름으로도 못 좁히면 첫 번째로 폴백한다. UUID 가 유일할 때의 동작
 (리네임/리페어런트 안전)은 그대로다.
 
+이름 표시 모드 — `name_display` (2026-11-19~)
+---------------------------------------------
+씬에 같은 이름 노드가 있으면 `cmds.ls(sl=True)` 가 `A|dup` 처럼 구별되는 경로를 주므로 리스트에 `|` 가 섞여 보인다.
+`name_display=True` 인 리스트는 **전역 모드**를 따른다:
+
+    - Outliner Name (기본) : 아웃라이너처럼 마지막 이름만(`dup`). 노드 줄에 마우스를 올리면 **현재 전체 경로** 툴팁.
+    - Full Path            : 항목 글자 그대로(`A|dup`, 예전 동작).
+
+**항목 글자(`item.text()`)는 바꾸지 않는다** — 그릴 때만 바꾸는 델리게이트(`_NameDelegate`)다. 툴들이 리스트 글자를
+그대로 노드 이름으로 쓰기 때문이다(`get_all_items()` 등). 모드는 QSettings `JUN/tsl` 의 `name_display` 에 하나만 있고,
+리스트 우클릭 `Show Names` 로 바꾸면 열려 있는 모든 옵트인 리스트가 다시 그려진다. Sort 는 이 모드에서 보이는 이름 순.
+기본은 꺼짐(`name_display=False`) — 2026-11-19 에는 A00275 만 켠다. 모든 툴 적용은 계획서
+`docs/plans/Framework_MOD_tsl_qt_name_display_plan.md` §5.
+
 요약 모드 (list_limit)
 ----------------------
 `list_limit` 을 주면 항목이 그 수 **이상**일 때 리스트에 펼치지 않고 **요약 라벨 + List All 버튼**만
@@ -94,6 +108,7 @@ pref 는 **켠 시점부터** 순서를 기록하므로, 체크한 뒤 **다시 
 """
 
 import re
+import weakref
 
 from Framework.qt.qt import *
 
@@ -123,9 +138,100 @@ class _ListWidget(QListWidget):
             hint.setHeight(int(self._hint_height))
         return hint
 
+
+class _NameDelegate(QStyledItemDelegate):
+    """이름 표시 모드 델리게이트 (name_display=True 인 리스트만).
+
+    항목 글자(DisplayRole)는 그대로 두고 **그리는 글자**와 **툴팁**만 바꾼다. 체크박스 · 색(`(Null)` 빨강) ·
+    선택 표시는 기본 그리기가 그대로 처리한다.
+    """
+
+    def __init__(self, owner):
+        super().__init__(owner.list_widget)
+        self._owner = weakref.ref(owner)
+
+    def displayText(self, value, locale):
+        text = super().displayText(value, locale)
+        if get_name_display() == NAME_OUTLINER:
+            return display_name(text)
+        return text
+
+    def helpEvent(self, event, view, option, index):
+        owner = self._owner()
+        if (owner is not None and event is not None and event.type() == QEvent.ToolTip
+                and get_name_display() == NAME_OUTLINER and not index.data(Qt.ToolTipRole)):
+            tip = owner.full_path_tooltip(index.row())
+            if tip:
+                QToolTip.showText(event.globalPos(), tip, view)
+                return True
+        return super().helpEvent(event, view, option, index)
+
 # 항목에 (uuid, component) 를 보관하는 Qt 역할. 호출부가 Qt.UserRole 을 쓰는 경우와
 # 겹치지 않도록 +1 을 쓴다.
 UUID_ROLE = Qt.UserRole + 1
+
+
+# ---- 이름 표시 모드 (2026-11-19~, 모듈 독스트링 "이름 표시 모드") -------------------
+# 항목 글자는 그대로 두고 **그릴 때만** 바꾼다 - 툴들이 글자를 노드 이름으로 쓰기 때문.
+NAME_OUTLINER = "outliner"      # 마지막 이름만 (아웃라이너처럼). 같은 이름은 툴팁으로 구별
+NAME_FULL = "full"              # 항목 글자 그대로 (A|dup)
+NAME_MODES = (NAME_OUTLINER, NAME_FULL)
+DEFAULT_NAME_DISPLAY = NAME_OUTLINER
+NAME_SETTINGS_ORG = "JUN"
+NAME_SETTINGS_APP = "tsl"
+NAME_SETTINGS_KEY = "name_display"
+
+# 그릴 때마다 QSettings 를 읽지 않도록 한 번 읽은 값을 둔다. set_name_display 가 갱신한다.
+_NAME_STATE = {"mode": None}
+# 옵트인 TSL 들 - 모드가 바뀌면 다시 그린다(파괴된 위젯은 저절로 빠진다).
+_NAME_WIDGETS = weakref.WeakSet()
+
+
+def _name_settings():
+    return QSettings(NAME_SETTINGS_ORG, NAME_SETTINGS_APP)
+
+
+def get_name_display():
+    """지금 이름 표시 모드. 저장값이 없거나 이상하면 DEFAULT_NAME_DISPLAY."""
+    if _NAME_STATE["mode"] is None:
+        mode = None
+        try:
+            mode = _name_settings().value(NAME_SETTINGS_KEY)
+        except Exception:
+            mode = None
+        _NAME_STATE["mode"] = mode if mode in NAME_MODES else DEFAULT_NAME_DISPLAY
+    return _NAME_STATE["mode"]
+
+
+def set_name_display(mode):
+    """모드를 저장하고 살아 있는 옵트인 TSL 을 모두 다시 그린다. 모르는 값은 ValueError."""
+    if mode not in NAME_MODES:
+        raise ValueError("Unknown name display mode: {0}".format(mode))
+    _NAME_STATE["mode"] = mode
+    try:
+        _name_settings().setValue(NAME_SETTINGS_KEY, mode)
+    except Exception:
+        pass
+    for widget in list(_NAME_WIDGETS):
+        try:
+            widget.refresh_names()
+        except RuntimeError:            # C++ 위젯이 이미 파괴됨
+            pass
+
+
+def display_name(text):
+    """Outliner Name 모드에서 보일 글자 (순수 함수, 마야 호출 없음).
+
+    'A|dup' -> 'dup', '|keep' -> 'keep', 'grp|ns:dup' -> 'ns:dup'(네임스페이스는 남긴다),
+    'A|pCube1.vtx[3]' -> 'pCube1.vtx[3]'. 노드 이름 모양이 아니면('(Null)' 등) 그대로.
+    """
+    if not _looks_like_node(text):
+        return text
+    node, comp = _split_component(text)
+    leaf = node.rsplit("|", 1)[-1]
+    if not leaf:
+        return text
+    return "{0}.{1}".format(leaf, comp) if comp else leaf
 
 
 def _cmds():
@@ -311,7 +417,7 @@ class JUN_mod_tsl_qt_v01(QWidget):
                  multi_select=True, list_min_height=None, list_limit=0,
                  list_hint_height=None,
                  select_label="Select Objects", attach_uuids=True,
-                 select_no_expand=False,
+                 select_no_expand=False, name_display=False,
                  show_rules=False, rules_dir=None,
                  log_callback=None, parent=None):
         super().__init__(parent)
@@ -340,6 +446,9 @@ class JUN_mod_tsl_qt_v01(QWidget):
         # 켜 두면 행 클릭의 씬 선택에 `noExpand=True` 를 붙여 **세트 노드 자체**를 고른다.
         # 세트가 아닌 항목에는 아무 차이가 없으므로 세트 리스트에서만 켜면 된다.
         self.select_no_expand = select_no_expand
+        # True 면 전역 이름 표시 모드(Outliner Name / Full Path)를 따른다 - 모듈 독스트링 "이름 표시 모드".
+        # 항목 글자는 바꾸지 않고 그릴 때만 바꾼다. 2026-11-19 은 A00275 만 켠다(계획서 §5 에서 전 툴로).
+        self.name_display = bool(name_display)
         # Rules 버튼(규칙대로 리스트업). 기본 꺼짐 — 원하는 툴만 켠다. rules_dir=None 이면 공용 폴더.
         self.show_rules = show_rules
         self.rules_dir = rules_dir
@@ -429,6 +538,15 @@ class JUN_mod_tsl_qt_v01(QWidget):
             self.list_min_height or DEFAULT_LIST_MIN_HEIGHT)
         self.list_widget.itemSelectionChanged.connect(self._on_selection_changed)
         layout.addWidget(self.list_widget)
+
+        # 이름 표시 모드 (옵트인). 델리게이트 + 우클릭 Show Names 메뉴.
+        self._name_delegate = None
+        if self.name_display:
+            self._name_delegate = _NameDelegate(self)
+            self.list_widget.setItemDelegate(self._name_delegate)
+            self.list_widget.setContextMenuPolicy(Qt.CustomContextMenu)
+            self.list_widget.customContextMenuRequested.connect(self._on_name_menu)
+            _NAME_WIDGETS.add(self)
 
         # 요약 모드용 위젯 — list_limit 을 준 툴에서만 만든다(다른 툴의 레이아웃은 그대로).
         # 리스트 대신 이 라벨이 보이고, List All 을 누르면 그때 실제로 리스트를 채운다.
@@ -803,6 +921,75 @@ class JUN_mod_tsl_qt_v01(QWidget):
             return len(self._deferred)
         return self.list_widget.count()
 
+    # ---- 이름 표시 모드 (name_display=True 인 리스트) --------------------------------
+
+    def name_display_mode(self):
+        """이 리스트가 지금 이름을 보이는 방식. 옵트인이 아니면 늘 NAME_FULL(글자 그대로)."""
+        return get_name_display() if self.name_display else NAME_FULL
+
+    def shown_text(self, row):
+        """그 행에 **보이는** 글자 (Outliner Name 모드면 마지막 이름)."""
+        item = self.list_widget.item(row)
+        if item is None:
+            return ""
+        text = item.text()
+        return display_name(text) if self.name_display_mode() == NAME_OUTLINER else text
+
+    def full_path_tooltip(self, row):
+        """그 행의 툴팁 = **지금** 전체 경로 (UUID 로 찾는다 - 리네임 · 리페어런트 뒤에도 맞다).
+
+        노드가 아닌 항목이면 None. UUID 는 있는데 씬에서 못 찾으면 '(not in the scene)'.
+        """
+        item = self.list_widget.item(row)
+        if item is None:
+            return None
+        node = self._node_of(item)
+        if node:
+            cmds = _cmds()
+            if cmds is not None and "|" not in node.split(".")[0]:
+                # UUID 없이 이름으로 찾은 항목은 짧은 이름이 올 수 있다 - 롱네임으로.
+                try:
+                    found = cmds.ls(node, long=True) or []
+                    if len(found) == 1:
+                        node = found[0]
+                except Exception:
+                    pass
+            return node
+        if self._uuid_of_item(item):
+            return "{0}  (not in the scene)".format(item.text())
+        return None
+
+    def refresh_names(self):
+        """모드가 바뀌었을 때 다시 그린다."""
+        self.list_widget.viewport().update()
+
+    def _build_name_menu(self):
+        """우클릭 메뉴 (띄우기와 분리 - 오프스크린 시험은 액션을 직접 trigger 한다)."""
+        menu = QMenu(self.list_widget)
+        menu.addSection("Show Names")
+        group = QActionGroup(menu)
+        group.setExclusive(True)
+        current = get_name_display()
+        for label, mode, tip in (
+                ("Outliner Name", NAME_OUTLINER,
+                 "Show only the last name, like the Outliner. Hover a row to see its full path."),
+                ("Full Path", NAME_FULL, "Show the name as listed (A|dup when names clash).")):
+            action = QAction(label, menu)
+            action.setCheckable(True)
+            action.setChecked(mode == current)
+            action.setToolTip(tip)
+            action.setData(mode)
+            action.triggered.connect(lambda _checked=False, m=mode: set_name_display(m))
+            group.addAction(action)
+            menu.addAction(action)
+        menu.setToolTipsVisible(True)
+        return menu
+
+    def _on_name_menu(self, pos):
+        menu = self._build_name_menu()
+        run = getattr(menu, "exec_", None) or menu.exec
+        run(self.list_widget.viewport().mapToGlobal(pos))
+
     def mark_null_rows(self):
         """자리표시 행을 빨갛게 칠한다. 채우는 경로에서 자동으로 불린다.
 
@@ -1114,13 +1301,20 @@ class JUN_mod_tsl_qt_v01(QWidget):
         self._set_records(items)
         self._reselect_rows(result_rows)
 
+    def _sort_text_key(self):
+        """Sort 의 글자 키. Outliner Name 모드면 보이는 이름 순(같은 이름은 경로 순), 아니면 글자 그대로(예전 동작)."""
+        if self.name_display_mode() == NAME_OUTLINER:
+            return lambda text: (display_name(text), text)
+        return lambda text: text
+
     def _on_sort(self):
+        key = self._sort_text_key()
         # 요약 모드에서는 위젯을 건드리지 않고 보관 목록만 정렬한다(항목 수와 무관하게 즉시).
         if self._deferred is not None:
-            self._deferred.sort()
+            self._deferred.sort(key=key)
             self._sync_summary()
             return
-        self._set_records(sorted(self._records(), key=lambda rec: rec[0]))
+        self._set_records(sorted(self._records(), key=lambda rec: key(rec[0])))
 
     def _on_reverse(self):
         """리스트 항목의 순서를 통째로 뒤집는다(레코드로 옮겨 UUID 유지)."""

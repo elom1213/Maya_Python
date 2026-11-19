@@ -103,7 +103,7 @@ class WeightSelectTab(QWidget):
 
         # --- 조인트 ---
         self.tsl_joints = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Bound Joints", show_select=False, show_add=False, show_del=False,
+            name_display=True, title="Bound Joints", show_select=False, show_add=False, show_del=False,
             show_up=False, show_down=False, show_sort=False, show_order=False,
             list_min_height=180, log_callback=self._log)
         self.tsl_joints.add_button("Check All", lambda *_: self._set_all_checked(True))

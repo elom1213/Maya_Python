@@ -71,6 +71,7 @@
 - [zero-arg super after reload](reload-stale-instance-super.md) — Framework 클래스는 `super()` 만
 - [token name widget](framework-token-name-widget.md) — Profile + 칸, A00330 · A00480 공유, 칸 편집은 `Save` 버튼으로만 저장
 - [control shapes](framework-control-shapes.md) · [mirror tokens](framework-mirror-tokens.md)(공용 json, 경계 매칭)
+- [TSL name_display](framework-tsl-name-display.md) — 같은 이름 `A|dup` 을 `dup` 으로 그리기만(글자 불변, 델리게이트), 툴팁 = 경로, 기본 Outliner Name, 지금은 A00275 만
 - TSL — [(Null) is red](framework-tsl-null-placeholder-red.md) · [UUID selection](wip-tsl-uuid-selection.md) · [attach_uuids](framework-tsl-attach-uuids.md)(씬 노드 아니면 False) · [list_limit summary](framework-tsl-list-limit.md) · [max-height squeezes buttons](tsl-widget-max-height-squeezes-buttons.md) · [selection order](tsl-selection-order.md) · [select_no_expand](wip-a00440-find-tab.md)(세트 리스트는 켤 것)
 - [pin_style: Pinned = 연한 빨강](framework-pin-style.md) — 체크형 Pin 버튼은 `apply_pin_style` 한 줄, `:checked` 색만(padding 금지), A00240 · A00220 · A00370
 - [shell_integration: Add to Start Menu](framework-shell-integration.md) — standalone 툴 시작 메뉴 .lnk + AUMID (PowerShell C#), Win10/11, A00240 · A00220 `File` 메뉴 · PS 출력 cp949 폴백

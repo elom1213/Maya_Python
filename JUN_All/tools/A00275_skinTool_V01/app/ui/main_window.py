@@ -356,9 +356,9 @@ class MainWindow(QWidget):
 
         # From / To 리스트 (joints 또는 meshes, 동작 버튼에 따라 의미가 달라진다)
         self.tsl_classic_from = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="From", select_label="Select From", log_callback=self.log)
+            name_display=True, title="From", select_label="Select From", log_callback=self.log)
         self.tsl_classic_to = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="To", select_label="Select To", log_callback=self.log)
+            name_display=True, title="To", select_label="Select To", log_callback=self.log)
 
         lists_row = QHBoxLayout()
         lists_row.addWidget(self.tsl_classic_from)
@@ -444,12 +444,12 @@ class MainWindow(QWidget):
         # 소스 / 타겟 메시 리스트를 나란히 (타겟은 1:1 모드에서만 보인다)
         lists_row = QHBoxLayout()
         self.tsl_transfer_src = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Source Meshes", select_label="Select Source Meshes",
+            name_display=True, title="Source Meshes", select_label="Select Source Meshes",
             log_callback=self.log)
         lists_row.addWidget(self.tsl_transfer_src, 1)
 
         self.tsl_transfer_tgt = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Target Meshes", select_label="Select Target Meshes",
+            name_display=True, title="Target Meshes", select_label="Select Target Meshes",
             log_callback=self.log)
         self.tsl_transfer_tgt.setToolTip(
             "Paired with Source Meshes by row order - the first source goes to\n"
@@ -900,10 +900,10 @@ class MainWindow(QWidget):
         # -------------------------
 
         self.tsl_joints_a = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Joints A (From)", select_label="Select From-Joints",
+            name_display=True, title="Joints A (From)", select_label="Select From-Joints",
             log_callback=self.log)
         self.tsl_joints_b = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Joints B (To)", select_label="Select To-Joints",
+            name_display=True, title="Joints B (To)", select_label="Select To-Joints",
             log_callback=self.log)
 
         joints_row = QHBoxLayout()
@@ -1673,7 +1673,7 @@ class MainWindow(QWidget):
 
         # ---------------- 조인트 집합 (개수가 적어 리스트로 보여도 가볍다)
         self.tsl_eb_joints = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Joints to bind to", select_label="Store Joints from Selection",
+            name_display=True, title="Joints to bind to", select_label="Store Joints from Selection",
             list_min_height=90, log_callback=self.log)
         self.tsl_eb_joints.setToolTip(
             "Influences for the bind, in any order. Usually the joints sitting "

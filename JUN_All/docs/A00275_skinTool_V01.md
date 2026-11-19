@@ -10,7 +10,7 @@ updated: 2026-11-19
 스킨 관련 **범용** in-Maya PySide 툴(arch B). `A00270_skinMigrate` 의 기능을 그대로 담고,
 **Transfer · Bind Pose 탭**을 추가했다. (`A00270_skinMigrate` 는 그대로 남아 있다.)
 
-- **버전**: `app/config/version.py` (v01.43 — **`Weights > Classic` 탭 제거 → `Transfer` 의 `Target mode = Classic`** 으로 이동 · v01.42 — Flood 에 **`Add Influence`**(고른 조인트를 그 메시 skinCluster 에 웨이트 0 으로) · v01.41 — Flood 에 **`Get Bound Joints`**(선택 메시의 바인드 조인트로 리스트 채우기) · v01.40 — **`Weights > Flood`** 신규: 조인트(들)에 웨이트 채우기, Kangaroo `SkinCluster > Flood` 이식 + **같은 이름 조인트가 있어도 동작**(원본은 에러) · v01.37 — **`Weights > Move`** 신규: 조인트 n 개 → k 개 웨이트 이동, Kangaroo `SkinCluster > Move` 이식(플러그인 무의존 · Kangaroo 엔진 선택) + Respect selection · v01.36 — Classic Native 가 **선택 버텍스만** (Joints to Joints · Meshes to Meshes) · v01.35 — By Weight 조인트 리스트에 **이름 필터** · v01.32 — Transfer 에 **`Target mode`**(소스↔타겟 리스트 1:1) + **진행률 팝업** · v01.31 — **`Weights > Smooth`** 신규: Kangaroo `SkinCluster > Smooth` 이식(플러그인 무의존) · v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
+- **버전**: `app/config/version.py` (v01.44 — **리스트 이름을 아웃라이너처럼**(같은 이름은 툴팁으로 전체 경로, 우클릭 `Show Names`) · v01.43 — **`Weights > Classic` 탭 제거 → `Transfer` 의 `Target mode = Classic`** 으로 이동 · v01.42 — Flood 에 **`Add Influence`**(고른 조인트를 그 메시 skinCluster 에 웨이트 0 으로) · v01.41 — Flood 에 **`Get Bound Joints`**(선택 메시의 바인드 조인트로 리스트 채우기) · v01.40 — **`Weights > Flood`** 신규: 조인트(들)에 웨이트 채우기, Kangaroo `SkinCluster > Flood` 이식 + **같은 이름 조인트가 있어도 동작**(원본은 에러) · v01.37 — **`Weights > Move`** 신규: 조인트 n 개 → k 개 웨이트 이동, Kangaroo `SkinCluster > Move` 이식(플러그인 무의존 · Kangaroo 엔진 선택) + Respect selection · v01.36 — Classic Native 가 **선택 버텍스만** (Joints to Joints · Meshes to Meshes) · v01.35 — By Weight 조인트 리스트에 **이름 필터** · v01.32 — Transfer 에 **`Target mode`**(소스↔타겟 리스트 1:1) + **진행률 팝업** · v01.31 — **`Weights > Smooth`** 신규: Kangaroo `SkinCluster > Smooth` 이식(플러그인 무의존) · v01.30 — Bind Pose 가 **마야를 내리던** 것 수정: 노멀 쓰기를 컴포넌트 명령에서 `MFnMesh` 로 (메모리 +1.2GB -> +114MB, 참조 리그 편집 131,698 -> 145) · v01.29 — Bind Pose 가 **잠긴 버텍스 노멀**을 바꿔 버리던 버그 수정 · v01.28 — By Weight 다중 체크를 Framework 공용 동작으로 · v01.27 — **`Select > By Weight`** 신규: 체크한 조인트의 웨이트가 기준값 이상/이하인 버텍스를 메시 전체 또는 저장한 버텍스 안에서 선택 · v01.23 — Layer 의 lock 이 넘칠 때 **위 레이어부터 잘리도록** 방향 수정
   (v01.22 는 아래 레이어 lock 이 사라졌다) · v01.22 — **`Weights > Layer`** 신규: 버텍스 순서가 같은 메시 N 개의
   웨이트를 메시마다 lock + Blend 로 레이어처럼 합성해 새 메시로 만들거나 기존 메시를 갱신 · v01.15 — **탭 재분류**:
   평평한 탭 7개를 `카테고리 3 → 기능 7` 의 2단 구조로, 아래 표)
@@ -35,6 +35,12 @@ updated: 2026-11-19
 | **Select** (v01.27~) | 스킨 웨이트로 버텍스를 고른다 (**선택 말고는 씬이 바뀌지 않는다**) | **By Weight** | 메시(전체) 또는 그 버텍스 일부를 불러오면 바인드된 조인트가 체크박스와 함께 리스트업된다. 체크한 조인트의 웨이트가 **Value(0~1) 이상 / 이하**인 버텍스를 그 범위 안에서 선택 |
 
 Migrate 탭 사용법은 [[A00270_skinMigrate]] 문서와 동일하다.
+
+> **리스트 이름 표시 (v01.44~)** — 이 툴의 리스트는 이름을 **아웃라이너처럼** 보여 준다. 씬에 같은 이름 노드가 있으면 마야가 `A|dup` · `B|dup`
+> 처럼 경로를 주지만, 리스트에는 둘 다 **`dup`** 으로 보이고 **마우스를 올리면 전체 경로**(`|A|dup`)가 툴팁으로 뜬다.
+> 리스트에서 **우클릭 → `Show Names` → `Full Path`** 를 고르면 예전처럼 `A|dup` 으로 보인다(모든 리스트에 함께, 다음 실행에도 기억).
+> 보이는 글자만 바뀌고 툴이 쓰는 이름(풀패스 · UUID)은 그대로다. Sort 는 보이는 이름 순, By Weight 의 이름 필터도 보이는 이름으로 거른다.
+> 공용 위젯 문서 [Framework_MOD_tsl_qt.md](Framework_MOD_tsl_qt.md) "이름 표시 모드".
 
 > **Bind Pose 와 Move Joints 의 차이**
 > 둘 다 "조인트를 옮기고 다시 바인드" 지만 **순서가 반대**다.

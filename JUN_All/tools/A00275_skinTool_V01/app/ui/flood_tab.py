@@ -109,7 +109,7 @@ class FloodTab(QWidget):
 
         top = QHBoxLayout()
         self.tsl_joints = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            title="Joints", select_label="Select Joints", log_callback=self._log)
+            name_display=True, title="Joints", select_label="Select Joints", log_callback=self._log)
         # v01.41 - 메시를 고르고 누르면 그 메시에 바인드된 조인트로 리스트를 채운다.
         self.btn_bound = self.tsl_joints.add_button("Get Bound Joints", self.on_get_bound_joints, index=0)
         self.btn_bound.setToolTip(
