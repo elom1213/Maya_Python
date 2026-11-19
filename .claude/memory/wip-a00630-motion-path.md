@@ -26,6 +26,9 @@ then move — user's Q4 choice, proportional editing, numeric input), then phase
   Before trusting a GUI-only API call, print its `__doc__` in mayapy (signatures differ from API 1.0 habits).
 - v01.01: Custom range = shared `JUN_mod_timeRange_qt_v01` (A00110's Get Current / Get Sel Range); Edit Path checked = `pin_style`
   light red, kept in sync with the real tool via `MEventMessage("ToolChanged")`.
+- v01.02: `MEventMessage("ToolChanged")` fires while `currentCtx()` still names the OLD tool — judging at once unchecked the
+  just-pressed Edit Path button. Defer the check with `evalDeferred`. In mayapy `evalDeferred` runs immediately, so tests
+  replace it with a queue to get the GUI order.
 - Run tests with `mayapy -u` (pipe buffering + os._exit lost output before `_common.finish` flushed).
 
 Related: [[maya-time-context-traps]] · [[wip-a00380-quad-patch]] · [[mayapy-headless-verify]] · [[feedback-sliders-use-shared-style]]

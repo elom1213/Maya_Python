@@ -349,17 +349,32 @@ class MainWindow(QWidget):
             self.btn_edit.blockSignals(False)
 
     def _on_tool_changed(self, *args):
-        """마야 툴이 바뀌었다 - Edit Path 버튼을 실제 상태(편집 컨텍스트가 지금 툴인가)에 맞춘다."""
+        """마야 툴이 바뀌었다 - 버튼 맞추기는 **마야가 툴 전환을 끝낸 뒤(idle)** 에 한다.
+
+        v01.02 - 알림을 받는 즉시 `currentCtx()` 를 물으면, Edit Path 를 켜는 그 순간에 아직 이전 툴 이름이 나와
+        "편집 툴 아님" 으로 보고 방금 켠 버튼을 다시 껐다(편집은 되는데 버튼이 빨갛지 않던 증상, GUI 에서만).
+        """
+        if getattr(self, "_tool_sync_pending", False):
+            return
+        self._tool_sync_pending = True
+        cmds.evalDeferred(self._sync_edit_button, lowestPriority=True)
+
+    def _sync_edit_button(self):
+        """Edit Path 버튼을 실제 상태(편집 컨텍스트가 지금 툴인가)에 맞춘다. 켜짐 = 연한 빨강."""
+        self._tool_sync_pending = False
         try:
             active = self.context is not None and self.context.is_active()
         except Exception:                                  # noqa: BLE001
             active = False
-        if self.btn_edit.isChecked() != active:
-            if not active and self.context is not None:
-                self.context._finalize()                    # 끄는 중인 드래그가 있으면 취소
-            self.btn_edit.blockSignals(True)
-            self.btn_edit.setChecked(active)
-            self.btn_edit.blockSignals(False)
+        try:
+            if self.btn_edit.isChecked() != active:
+                if not active and self.context is not None:
+                    self.context._finalize()                # 끄는 중인 드래그가 있으면 취소
+                self.btn_edit.blockSignals(True)
+                self.btn_edit.setChecked(active)
+                self.btn_edit.blockSignals(False)
+        except RuntimeError:
+            pass                                            # 미뤄 둔 사이 창이 닫혔다 (버튼이 이미 없음)
 
     def _on_scene_change(self):
         """새 씬 · 열기 직전: 경로를 모두 정리한다."""

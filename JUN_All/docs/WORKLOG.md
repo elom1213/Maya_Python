@@ -46,6 +46,8 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - **v01.01** — GUI 에서 끌면 `[FAIL] Drag : function takes exactly 4 arguments (2 given)`: 마야 2024 API 2.0 `M3dView.viewToWorld(x, y, worldPt, worldVector)` 는 OUT 인자를 채운다 - 2개로 불렀다.
   고침 + `test_edit_context.py` 19(가짜 뷰가 마야와 같은 함수 모양, 누름 → 끌기 → 놓기 · 박스 · Shift/Ctrl · 축 · 취소 전체 흐름). 사용법 질문("박스로 고르고 끈다") → 가이드에 "먼저 고르고, 고른 점 위에서 눌러 끈다" 두 단계로 적음.
   요청: Custom 범위에 A00110 의 Get Current · Get Sel Range → 공용 `JUN_mod_timeRange_qt_v01`(실제 범위가 바뀔 때만 다시 굽기). 요청: Edit Path 켜짐 = 연한 빨강 → 공용 `pin_style`, Q · 다른 툴로 나가면 버튼도 끔(`ToolChanged`). 시험 7종 126항목.
+- **v01.02** — 사용자: Edit Path 를 켜면 로그가 나오고 편집도 되는데 버튼이 연한 빨강이 안 된다. 원인: 켜는 순간의 `ToolChanged` 알림 때 `currentCtx()` 가 아직 이전 툴 → v01.01 의 즉시 판단이 방금 켠 버튼을 끔(GUI 순서).
+  고침: 알림은 `evalDeferred` 로 미루기만, 컨텍스트 이름은 마야가 붙인 실제 이름으로. `test_ui` 29(GUI 순서 재현, 옛 코드로 실패 확인 · mayapy 의 evalDeferred 는 즉시 실행이라 시험에서 큐 대역).
 
 > [!summary] **`A00380_MeshTool` v01.21 — Quad Patch 탭 (구멍을 쿼드 그리드로)** `#A00380_MeshTool`
 - 요청: `.ref/quadPatcher_v1.0.py` 를 분석해 새 탭으로 이식. 원본 헤더가 **복사 · 수정 금지** 라이선스라 사용자 결정으로 **독자 구현**(코드 미사용, 아이디어만), Face · Extrude 모드까지.

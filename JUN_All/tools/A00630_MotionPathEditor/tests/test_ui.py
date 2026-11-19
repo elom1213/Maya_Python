@@ -108,12 +108,57 @@ sliders = win.findChildren(QSlider)
 check("sliders are painted by the shared slider style", sliders and all(s.styleSheet() for s in sliders),
       len(sliders))
 
-# ---- 마야 툴이 바뀌면(Q 등) Edit Path 버튼도 꺼진다 (편집 컨텍스트가 지금 툴이 아니면)
+# ---- Edit Path 버튼 = 실제 편집 툴 상태 (v01.02). GUI 에서 생긴 순서를 그대로 재현한다:
+#      켜는 순간 "툴이 바뀌었다" 알림이 오는데 그때 currentCtx 는 아직 이전 툴 → 바로 판단하면 버튼을 껐다(빨강이 안 됨).
+#      이제 알림은 확인을 idle 로 미루기만 한다(헤드리스엔 idle 이 없어 _sync_edit_button 을 직접 부른다).
+class FakeCtx(object):
+    def __init__(self):
+        self.active = False
+        self.finalized = 0
+
+    def is_active(self):
+        return self.active
+
+    def _finalize(self):
+        self.finalized += 1
+
+    def deactivate(self):
+        self.active = False
+
+
+# mayapy(배치) 의 evalDeferred 는 미루지 않고 바로 실행한다 - GUI 처럼 idle 까지 미루도록 줄에 쌓는 대역으로 바꾼다
+DEFERRED = []
+_real_eval_deferred = cmds.evalDeferred
+cmds.evalDeferred = lambda fn, **kw: DEFERRED.append(fn)
+
+
+def idle():
+    while DEFERRED:
+        DEFERRED.pop(0)()
+
+
+fake = FakeCtx()
+win.context = fake
 win.btn_edit.blockSignals(True)
-win.btn_edit.setChecked(True)
+win.btn_edit.setChecked(True)                  # Edit Path 를 눌렀다
 win.btn_edit.blockSignals(False)
+win._tool_sync_pending = False
+win._on_tool_changed()                         # 툴 전환 알림 - 이 순간 마야는 아직 이전 툴
+check("tool-change notice does not judge at once (button stays on)", win.btn_edit.isChecked() and
+      win._tool_sync_pending)
+win._on_tool_changed()                         # 알림이 몰려도 확인은 한 번
+check("several notices queue only one check", len(DEFERRED) == 1, len(DEFERRED))
+fake.active = True                             # 마야가 전환을 끝냈다
+idle()
+check("after Maya finished switching, the button stays on = light red", win.btn_edit.isChecked() and
+      "#f2a0a0" in win.btn_edit.styleSheet() and not win._tool_sync_pending)
+fake.active = False                            # Q / 다른 툴
 win._on_tool_changed()
-check("tool change turns the Edit Path button off when the edit tool is not current", not win.btn_edit.isChecked())
+idle()
+check("Q / another tool turns the button off (and cancels a running drag)",
+      not win.btn_edit.isChecked() and fake.finalized == 1)
+win.context = None
+cmds.evalDeferred = _real_eval_deferred
 
 # ---- 대상 빼기
 win.tsl_paths.set_items([names["ctrl"]])

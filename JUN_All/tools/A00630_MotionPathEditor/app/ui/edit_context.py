@@ -39,34 +39,36 @@ class EditContext(object):
         self.view = None
         self.box = None
         self.previous_tool = None
+        self.name = CONTEXT_NAME        # 마야가 실제로 붙인 컨텍스트 이름 (v01.02 - 이름으로 켜짐을 판단한다)
 
     # ---------------------------------------------------------------- 켜기 / 끄기
     def activate(self):
         kwargs = dict(pressCommand=self._press, dragCommand=self._drag, releaseCommand=self._release,
                       finalize=self._finalize, space="screen", cursor="crossHair", undoMode="sequence",
                       projection="viewPlane")
-        if cmds.draggerContext(CONTEXT_NAME, exists=True):
-            cmds.draggerContext(CONTEXT_NAME, edit=True, **kwargs)
+        if cmds.draggerContext(self.name, exists=True):
+            cmds.draggerContext(self.name, edit=True, **kwargs)
         else:
-            cmds.draggerContext(CONTEXT_NAME, **kwargs)
+            # 만들 때 마야가 돌려준 이름을 쓴다 - 같은 이름이 다른 종류로 있으면 마야가 다른 이름을 붙일 수 있다
+            self.name = cmds.draggerContext(self.name, **kwargs) or self.name
         current = cmds.currentCtx()
-        if current != CONTEXT_NAME:
+        if current != self.name:
             self.previous_tool = current
-        cmds.setToolTo(CONTEXT_NAME)
+        cmds.setToolTo(self.name)
 
     def deactivate(self):
         self._finalize()
-        if cmds.currentCtx() == CONTEXT_NAME:
+        if cmds.currentCtx() == self.name:
             back = self.previous_tool if self.previous_tool and cmds.contextInfo(self.previous_tool, exists=True) \
                 else "selectSuperContext"
             cmds.setToolTo(back)
 
     def is_active(self):
-        return cmds.currentCtx() == CONTEXT_NAME
+        return cmds.currentCtx() == self.name
 
     # ---------------------------------------------------------------- 입력
     def _query(self, flag):
-        return cmds.draggerContext(CONTEXT_NAME, query=True, **{flag: True})
+        return cmds.draggerContext(self.name, query=True, **{flag: True})
 
     def _press(self):
         try:
