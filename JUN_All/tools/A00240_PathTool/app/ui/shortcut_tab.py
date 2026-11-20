@@ -28,7 +28,7 @@
 #     최소 폭을 만들지 않고, 창이 좁아지면 버튼도 함께 좁아지며 라벨은 말줄임(…)된다(전체 이름은 툴팁).
 #     Qt 는 setMinimumWidth 가 있으면 minimumSizeHint(글자 폭)를 쓰지 않는다. 프로파일 콤보도 가장 긴 항목
 #     폭을 요구하지 않는다. 그래야 창을 줄일 때 버튼 글자가 잘려 안 보이는 일이 없다.
-#   - Profile / Create / Color 세 그룹을 **하나의** 접이식 섹션에 담는다(v01.33, 공용 JUN_mod_collapsible_qt_v01).
+#   - Profile / Create / Color 세 그룹을 **하나의** 접이식 섹션 `Option` 에 담는다(v01.33, 공용 JUN_mod_collapsible_qt_v01).
 #     헤더를 누르면 셋이 함께 접히고, 접힘 상태는 data/ui_state.json 에 기억한다(프로파일과 무관).
 #     접거나 펴면 창 높이를 다시 맞춘다(창의 tab_fit). v01.32 는 셋을 따로 접었다.
 
@@ -368,7 +368,7 @@ class ShortcutTab(QWidget):
 
         # Profile · Create · Color 를 한 접이식 섹션에 (v01.33)
         self.settings_section = self._make_section(
-            "settings", "Profile / Create / Color",
+            "settings", "Option",
             (self._build_profile_group(), self._build_create_group(), self._build_color_group()))
         root.addWidget(self.settings_section)
 
