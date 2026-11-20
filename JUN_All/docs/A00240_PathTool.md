@@ -115,15 +115,11 @@
 ## 3. 화면 구성 (ShortCut 탭)
 
 ```
-┌ Profile ──────────────────────────────────┐
-│ [ Home ▼ ]   [New] [Rename] [Delete]       │
-└────────────────────────────────────────────┘
-┌ Create ───────────────────────────────────┐
-│ [Category]  [Path]                         │
-└────────────────────────────────────────────┘
-┌ Color ────────────────────────────────────┐   ← v01.15 (5-1 절)
-│ [ ] Color Select          [Apply...] [Clear]│
-└────────────────────────────────────────────┘
+▼ Profile                                       ← v01.32 접이식 (헤더 클릭 = 접기 / 펴기)
+   [ Home ▼ ]   [New] [Rename] [Delete]
+▼ Create
+   [Category]  [Path]
+▶ Color                                         ← 접힌 상태 (v01.15 기능, 5-1 절)
 ┌ Textures ─────────────────────────────────┐   ← 카테고리(QGroupBox)
 │ [ char_tex ]                               │   ← Path 버튼(클릭=탐색기 열기)
 │ [ env_tex  ]                               │
@@ -134,6 +130,15 @@
 ```
 
 > 탭은 앞으로 늘어날 예정이라 `QTabWidget` 으로 구성돼 있다(현재 **ShortCut** 1개).
+
+### 3-1. Profile · Create · Color 접기 (v01.32~)
+
+- 세 섹션은 **접이식**이다. 헤더(`▼ Profile` 등)를 누르면 접히고(`▶`), 다시 누르면 펴진다. 공용 `JUN_mod_collapsible_qt_v01`.
+- 프로파일을 자주 안 바꾸거나 버튼을 다 만든 뒤라면 접어 두고 **경로 버튼 칸을 넓게** 쓴다.
+- 접힘 상태는 `data/ui_state.json` 에 기억되어 다음에 열 때 그대로다(프로파일과 무관 — 어느 프로파일이든 같은 상태).
+- 접거나 펴면 창 높이를 지금 내용에 다시 맞춘다([창 높이 자동 맞춤](#창-높이-자동-맞춤-v0131)). 버튼이 많아 창이 화면 높이에
+  걸려 있으면 창 크기는 그대로이고 **접어서 생긴 자리가 버튼 목록으로** 간다. 버튼이 적으면 다른 탭(Tree · Junction)의 기본 높이
+  밑으로는 줄지 않는다(공용 창 높이 맞춤의 하한).
 
 ---
 
@@ -509,7 +514,8 @@ A00240_PathTool/data/
 ├── profiles/
 │   ├── Home.json      # {"categories": [{"name","buttons":[{"name","path"}]}]}
 │   └── Work.json
-└── active.json        # {"active": "Home"}
+├── active.json        # {"active": "Home"}
+└── ui_state.json      # 화면 상태(v01.32) - {"shortcut_profile_expanded": true, ...}
 ```
 
 - **onefile exe 주의**: PyInstaller `--onefile` 로 빌드하면 코드가 임시폴더(`_MEIPASS`)에

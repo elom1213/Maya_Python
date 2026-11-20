@@ -44,3 +44,5 @@ A00110_V02 만 미적용(다른 세션 작업 중이었음, 자체 grow-only fit
 
 - **2026-11-05 중첩 탭 hfw**: 스크롤 칸 안이라도 중첩 탭은 부모 레이아웃 `totalSizeHint` → hfw 경로. 예전 `_inside_scroll` 규칙이 긴 hfw 없는 페이지를
   두 번 빼서 창 246px(A00210 Sync). `_hfw_reaches_parent` 로 수정 — 스크롤 내용 위젯 · QStackedWidget 페이지일 때만 예전 규칙. 롤아웃 0 fail.
+
+- **하한 (2026-11-20 A00240 v01.32 실측)**: 페이지를 스크롤 칸에 담은 툴(`_wrap_page`)은 창이 **가장 높은 페이지 스크롤 칸의 sizeHint**(QScrollArea 기본, 예 288px) 밑으로 줄지 않는다 — `_scroll_wanted_height - scroll.sizeHint()` 가 max(0, …) 라서. 페이지 안 섹션을 접어 페이지 sizeHint 가 302→188 로 줄어도 창은 14px 만 줄었다. 화면 높이에 걸린 경우엔 접은 자리가 안쪽 스크롤로 가므로 실사용엔 문제없음.

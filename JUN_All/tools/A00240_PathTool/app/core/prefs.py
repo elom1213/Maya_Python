@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-06-19
+# last Update date : 2026-11-20
 # A00240_PathTool - shortcut config persistence (UI/DCC 비의존)
 #
 # 사용자가 만든 카테고리/경로 버튼을 "프로파일" 단위로 로컬에 저장한다.
@@ -42,6 +42,8 @@ PREFS_DIR = os.path.join(_base_dir(), "data")
 
 PROFILES_DIR = os.path.join(PREFS_DIR, "profiles")
 ACTIVE_PATH = os.path.join(PREFS_DIR, "active.json")
+# 화면 상태(프로파일과 무관) - 예: ShortCut 탭 접이식 섹션의 펼침 여부 (v01.32)
+UI_STATE_PATH = os.path.join(PREFS_DIR, "ui_state.json")
 
 # 구버전 데이터 — 있으면 Default 프로파일로 1회 마이그레이션한다.
 #   1) 같은 data/ 폴더의 단일 shortcuts.json
@@ -211,3 +213,24 @@ def set_active(name):
     os.makedirs(PREFS_DIR, exist_ok=True)
     with open(ACTIVE_PATH, "w", encoding="utf-8") as f:
         json.dump({"active": name}, f, ensure_ascii=False, indent=2)
+
+
+# ------------------------------------------------------------ UI state (v01.32)
+
+def get_ui_state(key, default=None):
+    """화면 상태 값 하나(ui_state.json). 없거나 못 읽으면 default."""
+    data = _read_json(UI_STATE_PATH, {})
+    if isinstance(data, dict) and key in data:
+        return data[key]
+    return default
+
+
+def set_ui_state(key, value):
+    """화면 상태 값 하나를 저장(다른 키는 그대로 둔다)."""
+    data = _read_json(UI_STATE_PATH, {})
+    if not isinstance(data, dict):
+        data = {}
+    data[key] = value
+    os.makedirs(PREFS_DIR, exist_ok=True)
+    with open(UI_STATE_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)

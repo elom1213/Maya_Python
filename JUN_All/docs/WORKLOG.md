@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-20 (오늘)
 
+> [!summary] **`A00240_PathTool` v01.32 — ShortCut 탭의 Profile · Create · Color 를 접이식으로** `#A00240_PathTool`
+- 요청: ShortCut 의 Profile, Create, Color 를 접을 수 있게. (하위 탭으로 옆에 나열하는 규칙과 달리, 이 셋은 경로 버튼과 **함께 보는** 보조 줄이라 접이식이 맞다.)
+- 세 QGroupBox → 공용 `JUN_mod_collapsible_qt_v01`. 접힘 상태 = `data/ui_state.json`(새 `prefs.get_ui_state / set_ui_state`, 프로파일과 무관), 접고 펼 때 `tab_fit.fit_later()`.
+- 오프스크린 확인 7항목(섹션 3 · 기본 펼침 · 접으면 본문 숨김 · 상태 저장 · 다시 열면 복원 · Color Select 동작). 사용자 ui_state 는 백업 후 복원, 프로파일은 임시 폴더로.
+- 측정: 페이지 높이는 302 → 188px 로 주는데, 버튼이 적으면 창은 거의 안 준다 — 공용 tabFit 이 다른 탭(Tree · Junction) 스크롤 칸 기본 높이(288) 밑으로 줄이지 않음.
+  버튼이 많아 화면 높이에 걸린 실제 프로파일에서는 접은 자리가 버튼 목록으로 간다(목적에 맞아 공용 위젯은 그대로). 가이드 3-1 절 · CHANGELOG. **GUI 확인 아직.**
+
 > [!summary] **`A00640_AttrSlider` v01.00 신규 — 고른 노드의 채널박스 어트리뷰트를 슬라이더로 (blendShape = 타겟 웨이트, FBXASC 이름 풀기)** `#A00640_AttrSlider`
 - 요청: A00390 V03 Chain Wave Lite 의 `*_liteDriver` 어트리뷰트(Wind Swing Angle · Wavelength …)를 슬라이더로. 처음엔 A00620 에 탭으로 넣을지 물음 →
   A00620 은 읽기 전용 이름 해독 툴이라 도메인이 다르고 A00145 는 무거워서 **새 툴**로 결정. 조건: 일반 노드 = 채널박스 어트리뷰트, blendShape = 타겟 웨이트, FBXASC(일본어 등) 풀기.
