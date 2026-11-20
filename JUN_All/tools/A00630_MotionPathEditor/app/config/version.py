@@ -38,5 +38,8 @@
 #        그대로). 같은 프레임이면 부르지 않는다. 획 · 곡선 끌기 · Smooth Range 자체는 원래 undo 하나씩이었다(진단 시험).
 #        그래프 키 선 끌기(키 시간 이동, 포즈 전체)를 없앴다 - 필요 없는 조작(사용자). 키 선 위 왼쪽 드래그도 스크럽.
 
-VERSION = "01.05"
+# 01.06  Speed 탭 Frames 에 Custom - 공용 Start / End / Get Current / Get Sel Range(Path 탭 Range 와 같은 위젯)로
+#        [Start, End] 구간만 그래프로 본다. 경로 범위로 자르고, 안 겹치면 그래프 자리에 안내. 값은 optionVar(graph_start · graph_end).
+
+VERSION = "01.06"
 LAST_UPDATE = "2026-11-20"

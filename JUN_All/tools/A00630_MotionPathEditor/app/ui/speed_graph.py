@@ -25,6 +25,7 @@ import maya.api.OpenMayaAnim as oma
 import maya.cmds as cmds
 
 from Framework.qt.qt import *
+from Framework.qt import JUN_mod_timeRange_qt
 
 from tools.A00630_MotionPathEditor.app.core import arc_length as al
 from tools.A00630_MotionPathEditor.app.core import draw_nodes
@@ -37,6 +38,7 @@ MODE_ACCEL = "accel"
 RANGE_PATH = "path"
 RANGE_SELECTED = "selected"
 RANGE_AROUND = "around"
+RANGE_CUSTOM = "custom"           # v01.06 [Start, End] 만
 BRUSH_SPEED = "speed"
 BRUSH_SHAPE = "shape"
 
@@ -383,16 +385,26 @@ class SpeedPanel(QWidget):
         for label, value, tip in (
                 ("Whole Path", RANGE_PATH, "The whole range of the path."),
                 ("Selected Keys", RANGE_SELECTED, "Between the selected keys (one key: the segments on both sides)."),
-                ("Around Current", RANGE_AROUND, "The keys before and after the current frame.")):
+                ("Around Current", RANGE_AROUND, "The keys before and after the current frame."),
+                ("Custom", RANGE_CUSTOM, "Only the frames from Start to End below.")):
             rb = QRadioButton(label)
             rb.setToolTip(tip)
             rb.setProperty("value", value)
             rb.setChecked(s["graph_range"] == value)
             self.range_buttons.addButton(rb)
             row.addWidget(rb)
-        self.range_buttons.buttonClicked.connect(lambda b: self._set("graph_range", b.property("value")))
+        self.range_buttons.buttonClicked.connect(lambda b: self._on_range_mode(b.property("value")))
         row.addStretch(1)
         lay.addLayout(row)
+
+        # v01.06 - Custom 범위: 공용 Start / End / Get Current / Get Sel Range (Path 탭 Range 와 같은 위젯)
+        self.range_edit = JUN_mod_timeRange_qt.JUN_mod_timeRange_qt_v01(
+            start_value=int(s["graph_start"]), end_value=int(s["graph_end"]), log_callback=self._log)
+        self.range_edit.setToolTip("Custom graph range. Get Current: the current frame. "
+                                   "Get Sel Range: the first and last selected keyframe (Graph Editor / Time Slider).")
+        self.range_edit.changed.connect(self._on_custom_range)
+        lay.addWidget(self.range_edit)
+        self.range_edit.set_inputs_enabled(s["graph_range"] == RANGE_CUSTOM)
 
         self.graph_holder = QWidget()
         hl = QVBoxLayout(self.graph_holder)
@@ -515,6 +527,26 @@ class SpeedPanel(QWidget):
         self.lbl_strength.setText("{0:.2f}".format(v))
         self._set("brush_strength", float(v), graph=False)
 
+    def _log(self, text):
+        self.log(text)
+
+    def _on_range_mode(self, value):
+        self.range_edit.set_inputs_enabled(value == RANGE_CUSTOM)
+        self._set("graph_range", value)
+
+    def _on_custom_range(self):
+        """Start · End 칸이 바뀌면 저장하고 그래프를 다시 (빈 칸 · 숫자 아님은 이전 값 유지). 값이 같으면 아무것도 안 한다."""
+        s = self.manager.settings
+        start, end = self.range_edit.start(), self.range_edit.end()
+        new = (start if start is not None else s["graph_start"], end if end is not None else s["graph_end"])
+        if new == (s["graph_start"], s["graph_end"]):
+            return
+        s["graph_start"], s["graph_end"] = int(new[0]), int(new[1])
+        self.save("graph_start")
+        self.save("graph_end")
+        if s["graph_range"] == RANGE_CUSTOM:
+            self.refresh_graph()
+
     # ---------------------------------------------------------------- 경로 · 범위
     def active_cache(self):
         key = self.cmb_path.currentData()
@@ -547,9 +579,13 @@ class SpeedPanel(QWidget):
             self.refresh_graph()
 
     def graph_range(self, cache):
-        """그래프에 보일 프레임 [x0, x1]."""
+        """그래프에 보일 프레임 [x0, x1]. Custom 이 경로와 1 프레임도 안 겹치면 None (v01.06)."""
         t0, t1 = float(cache.times[0]), float(cache.times[-1])
         mode = self.manager.settings["graph_range"]
+        if mode == RANGE_CUSTOM:
+            a, b = sorted((float(self.manager.settings["graph_start"]), float(self.manager.settings["graph_end"])))
+            a, b = max(a, t0), min(b, t1)          # 경로 밖 프레임은 그릴 것이 없다
+            return (a, b) if b - a >= 1.0 else None
         keys = [k.t for k in cache.keys]
         if mode == RANGE_SELECTED:
             sel = sorted(self.manager.selection.get(cache.key, ()))
@@ -606,7 +642,12 @@ class SpeedPanel(QWidget):
             return {"empty": "Add paths in the Paths list to see the graph."}
         mode = self.manager.settings["graph_mode"]
         self.graph.edit_curve = mode == MODE_SPEED and not active.locked
-        x0, x1 = self.graph_range(active)
+        rng = self.graph_range(active)
+        if rng is None:
+            s = self.manager.settings
+            return {"empty": "Start - End ({0} - {1}) is outside the path (frames {2:g} - {3:g}).".format(
+                s["graph_start"], s["graph_end"], active.times[0], active.times[-1])}
+        x0, x1 = rng
         per = "/s" if self.manager.settings["graph_per_second"] else "/frame"
         unit = self._unit_name()
         title = {MODE_SPEED: "Speed ({0}{1})".format(unit, per),
@@ -779,7 +820,11 @@ class SpeedPanel(QWidget):
         s = self._session(kind)
         if s is None:
             return
-        x0, x1 = self.graph_range(cache)
+        rng = self.graph_range(cache)
+        if rng is None:
+            self.log("[WARN] Start - End is outside the path - nothing to smooth.")
+            return
+        x0, x1 = rng
         r = self.graph.radius
         s.begin_stroke()
         for fc in np.arange(x0, x1 + 1e-6, max(r / 2.0, 1.0)):

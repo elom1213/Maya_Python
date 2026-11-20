@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-20 (오늘)
 
+> [!summary] **`A00630_MotionPathEditor` v01.06 — Speed 그래프를 [Start, End] 구간만 보기 (Frames > Custom)** `#A00630_MotionPathEditor`
+- 요청: Speed 에서 Start, End, Get Sel Range 버튼으로 [Start, End] 구간만 그래프로.
+- Frames 라디오에 `Custom` + 공용 `MOD_timeRange_qt_v01`(Path 탭 Range 와 같은 위젯, Custom 일 때만 켜짐). 경로 범위로 자르고, 안 겹치면 그래프 자리에 안내.
+  Smooth Range 도 이 구간. 값은 optionVar.
+- 시험 8항목(켜고 끔 · 30-80 만 · 기억 · 경로 끝 자르기 · 경로 밖 안내 · Get Sel Range 20-60 · Whole Path 로 복귀). A00630 전체 307항목 통과. **마야 GUI 확인 아직.**
+
 > [!summary] **`A00630_MotionPathEditor` v01.05 — 그래프 조작 뒤 Ctrl+Z 가 그래프를 되돌리지 못하던 것 (스크럽이 undo 큐를 채움)** `#A00630_MotionPathEditor`
 - 보고: 속도 그래프 계획서 §1-2 조작(획 · 끌기)을 하고 Ctrl+Z / Z 를 누르면 undo 는 되는데 그래프는 그대로.
 - 진단(mayapy 오프스크린): 획 · 곡선 끌기 · 키 선 끌기 · Smooth Range 는 각각 **undo 하나**이고 undo · redo 뒤 그래프도 돌아온다.

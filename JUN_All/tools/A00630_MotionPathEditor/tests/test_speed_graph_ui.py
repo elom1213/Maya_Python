@@ -111,7 +111,32 @@ win.manager.selection = {cache.key: {35.0}}
 [b for b in panel.range_buttons.buttons() if b.property("value") == sg.RANGE_SELECTED][0].click()
 check("Selected Keys with one key = its two segments (20 - 45)", (graph.data["x0"], graph.data["x1"]) == (20.0, 45.0))
 win.manager.selection = {}
+
+# v01.06 Custom = [Start, End] 만 (공용 Start / End / Get Sel Range)
+check("Custom off: Start / End inputs disabled", not panel.range_edit.start_edit.isEnabled())
+[b for b in panel.range_buttons.buttons() if b.property("value") == sg.RANGE_CUSTOM][0].click()
+check("Custom on: Start / End inputs enabled", panel.range_edit.start_edit.isEnabled())
+panel.range_edit.set_range(30, 80)
+check("Custom 30 - 80: the graph shows only those frames", (graph.data["x0"], graph.data["x1"]) == (30.0, 80.0) and
+      graph.data["series"][-1]["xs"][0] == 30.0 and graph.data["series"][-1]["xs"][-1] == 80.0,
+      (graph.data.get("x0"), graph.data.get("x1")))
+check("Custom range remembered", cmds.optionVar(q=mw.OPTVAR + "graph_start") == 30 and
+      cmds.optionVar(q=mw.OPTVAR + "graph_end") == 80 and cmds.optionVar(q=mw.OPTVAR + "graph_range") == "custom")
+panel.range_edit.set_range(90, 200)
+check("Custom past the path end is clipped to the path (90 - 120)", (graph.data["x0"], graph.data["x1"]) == (90.0, 120.0))
+panel.range_edit.set_range(300, 400)
+check("Custom outside the path: says so instead of drawing", not graph.data.get("series") and
+      "outside the path" in graph.data.get("empty", ""), graph.data.get("empty"))
+cmds.selectKey(clear=True)
+cmds.selectKey(node + ".translateX", time=(20, 20), add=True)
+cmds.selectKey(node + ".translateX", time=(60, 60), add=True)
+panel.range_edit.get_selected_range()
+check("Get Sel Range: first - last selected key (20 - 60)", (graph.data["x0"], graph.data["x1"]) == (20.0, 60.0),
+      (graph.data.get("x0"), graph.data.get("x1")))
+cmds.selectKey(clear=True)
 [b for b in panel.range_buttons.buttons() if b.property("value") == sg.RANGE_PATH][0].click()
+check("back to Whole Path: inputs disabled, whole range", not panel.range_edit.start_edit.isEnabled() and
+      (graph.data["x0"], graph.data["x1"]) == (1.0, 120.0))
 
 # ---- 휠: 반경 · 세기
 r0 = graph.radius

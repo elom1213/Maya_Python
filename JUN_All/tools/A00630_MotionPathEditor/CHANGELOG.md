@@ -1,5 +1,12 @@
 # Changelog — A00630_MotionPathEditor
 
+## v01.06 (2026-11-20)
+
+- **[New] Speed 탭 Frames 에 `Custom`** — 아래 줄의 **Start / End**(칸마다 Get Current) · **Get Sel Range**(고른 키의 첫 · 끝 프레임)로 정한
+  **[Start, End] 구간만** 그래프로 본다. Path 탭 Range 와 같은 공용 위젯(`MOD_timeRange_qt_v01`), Custom 일 때만 켜진다.
+  - 경로 범위를 넘는 부분은 잘라 보이고, 경로와 1 프레임도 안 겹치면 그래프 자리에 "outside the path" 안내. Smooth Range 는 이 구간에.
+  - 값 · 모드는 기억(optionVar `graph_start` · `graph_end` · `graph_range`). 시험 8항목.
+
 ## v01.05 (2026-11-20)
 
 - **[Fix] Speed 탭에서 획 · 끌기 뒤 Ctrl+Z / Z 를 눌러도 그래프(와 애니메이션)가 되돌아가지 않던 것.**

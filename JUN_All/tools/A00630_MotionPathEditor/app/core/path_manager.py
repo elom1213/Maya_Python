@@ -39,7 +39,9 @@ DEFAULT_SETTINGS = {
     "edit_layer": "",              # v01.03 편집할 애니메이션 레이어 ("" = Base)
     # v01.04 속도 그래프 (Speed 탭)
     "graph_mode": "speed",         # speed / position / accel
-    "graph_range": "path",         # path / selected / around
+    "graph_range": "path",         # path / selected / around / custom (v01.06)
+    "graph_start": 1,              # v01.06 그래프 Custom 범위 (프레임)
+    "graph_end": 120,
     "graph_per_second": False,
     "brush_mode": "speed",         # speed (타이밍만) / shape (모양)
     "brush_radius": 8.0,           # 프레임
