@@ -69,6 +69,10 @@ class MainWindow(QWidget):
         # v01.01 - Q 를 누르거나 다른 마야 툴로 바꾸면 편집 모드가 꺼진다 → 버튼(빨강)도 따라 끈다
         self._tool_cb = om.MEventMessage.addEventCallback("ToolChanged", self._on_tool_changed)
         self.slider_style = JUN_mod_sliderStyle_qt_v01(self)
+        if draw_nodes.replaced_plugin:              # v01.07 - 마야에 남아 있던 옛 플러그인을 새것으로 바꿨다
+            self.log("[Info] Replaced the old Motion Path plugin (v{0}) loaded in this Maya session. "
+                     "The undo queue was cleared once to do it.".format(draw_nodes.replaced_plugin))
+            draw_nodes.replaced_plugin = None
 
     # ==================================================================
     # UI

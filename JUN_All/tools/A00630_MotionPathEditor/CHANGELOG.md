@@ -1,5 +1,15 @@
 # Changelog — A00630_MotionPathEditor
 
+## v01.07 (2026-11-20)
+
+- **[Fix] 경로 키를 끌면 `[FAIL] Drag : module 'maya.cmds' has no attribute 'junMotionPathDirty'`.**
+  원인: 마야를 켠 채 툴만 새 버전이 되면(DEV 리로드 · 새 버전 복사) **처음 읽힌 옛 플러그인(v01.00~02, `1.0`)이 그대로 남는다** —
+  툴은 "이미 읽힘" 이면 다시 읽지 않았고, v01.03 에 더한 `junMotionPathDirty` 명령이 없었다. 씬 · 오브젝트와는 무관(마야를 다시 켜면 사라지는 종류).
+  - 플러그인에 `PLUGIN_VERSION`(지금 `1.4`) · `COMMANDS` 를 두고, 툴 창을 열 때 읽힌 버전과 명령을 비교해 **다르면 다시 읽는다**(그리기 노드를 먼저 지움).
+  - undo 큐에 옛 플러그인 명령이 남아 있으면 마야가 "still in use" 로 내려놓기를 거부한다(실측) → 그때만 **undo 큐를 한 번 비우고** 로그로 알린다.
+  - 시험 `test_plugin_reload.py` 10항목(옛 플러그인 = 버전 1.0 · Dirty 명령을 뺀 사본으로 같은 에러 재현 → 창 열기 = 교체 · 끌기 · undo 한 번).
+    사용자 씬(00010_cleanup_CHOEUN_00130, 6,830 프레임 · 키 397 개 LOC)에서도 끌기 · undo 확인.
+
 ## v01.06 (2026-11-20)
 
 - **[New] Speed 탭 Frames 에 `Custom`** — 아래 줄의 **Start / End**(칸마다 Get Current) · **Get Sel Range**(고른 키의 첫 · 끝 프레임)로 정한

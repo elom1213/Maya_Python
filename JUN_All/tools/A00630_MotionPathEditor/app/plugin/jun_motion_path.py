@@ -30,6 +30,11 @@ CLASSIFICATION = "drawdb/geometry/junMotionPath"
 REGISTRANT = "junMotionPathDrawOverride"
 COMMAND_NAME = "junMotionPathSetKeys"
 DIRTY_COMMAND_NAME = "junMotionPathDirty"
+COMMANDS = (COMMAND_NAME, DIRTY_COMMAND_NAME)
+
+#: 플러그인 버전 (v01.07). **이 파일을 고치면 올린다** - 마야는 이미 읽힌 플러그인을 다시 읽지 않으므로, 툴(draw_nodes.ensure_plugin)이
+#: 읽힌 버전과 이 값을 비교해 다르면 다시 읽는다. v01.00~02 의 플러그인은 "1.0" 이었다(junMotionPathDirty · ghost 그리기 없음).
+PLUGIN_VERSION = "1.4"
 
 
 def _dirty(nodes):
@@ -222,7 +227,7 @@ class JunMotionPathDirtyCmd(om.MPxCommand):
 
 
 def initializePlugin(obj):
-    plugin = om.MFnPlugin(obj, "Ji Hun Park", "1.0", "Any")
+    plugin = om.MFnPlugin(obj, "Ji Hun Park", PLUGIN_VERSION, "Any")
     plugin.registerNode(NODE_NAME, NODE_ID, JunMotionPathNode.creator, JunMotionPathNode.initialize,
                         om.MPxNode.kLocatorNode, CLASSIFICATION)
     omr.MDrawRegistry.registerDrawOverrideCreator(CLASSIFICATION, REGISTRANT, JunMotionPathDrawOverride.creator)

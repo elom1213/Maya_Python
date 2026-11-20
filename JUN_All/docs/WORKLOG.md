@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-20 (오늘)
 
+> [!summary] **`A00630_MotionPathEditor` v01.07 — 키 끌기가 `no attribute 'junMotionPathDirty'` 로 실패하던 것 (마야에 남은 옛 플러그인)** `#A00630_MotionPathEditor`
+- 보고: 00010_cleanup_CHOEUN_00130.mb 의 CH_r_knee_xx_ctl_LOC 경로를 고치면 `[FAIL] Drag : module 'maya.cmds' has no attribute 'junMotionPathDirty'`.
+- 원인: 씬과 무관. 마야를 켠 채 툴만 새 버전이 되면 처음 읽힌 **v01.00~02 플러그인(1.0)** 이 남는다 — `ensure_plugin` 이 "이미 읽힘" 이면 그대로 뒀고, 그 플러그인에는 v01.03 의 `junMotionPathDirty` 가 없다. 옛 플러그인 사본으로 같은 에러 재현.
+- 수정: 플러그인에 `PLUGIN_VERSION` · `COMMANDS`, 툴 창을 열 때 비교해 다르면 그리기 노드 삭제 → 다시 읽기. undo 큐에 옛 명령이 있으면 마야가 "still in use" 로 거부(실측) → 그때만 `flushUndo` 후 재시도, 로그로 알림.
+- 시험 `test_plugin_reload.py` 10항목 + 사용자 씬의 `CH_r_foot_xx_ctl_LOC`(knee LOC 는 저장 파일에 없음 — 세션에서 만든 것)로 끌기 · undo 확인. A00630 전체 317항목 통과.
+
 > [!summary] **`A00630_MotionPathEditor` v01.06 — Speed 그래프를 [Start, End] 구간만 보기 (Frames > Custom)** `#A00630_MotionPathEditor`
 - 요청: Speed 에서 Start, End, Get Sel Range 버튼으로 [Start, End] 구간만 그래프로.
 - Frames 라디오에 `Custom` + 공용 `MOD_timeRange_qt_v01`(Path 탭 Range 와 같은 위젯, Custom 일 때만 켜짐). 경로 범위로 자르고, 안 겹치면 그래프 자리에 안내.

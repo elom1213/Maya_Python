@@ -11,8 +11,10 @@ import os
 
 import maya.api.OpenMaya as om
 import maya.cmds as cmds
+import maya.mel as mel
 
 from . import draw_bridge
+from ..plugin import jun_motion_path as plugin_source     # 버전 · 명령 이름만 읽는다 (등록은 loadPlugin 이)
 
 PLUGIN_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "plugin",
                            "jun_motion_path.py")
@@ -25,12 +27,52 @@ PALETTE = ((0.30, 0.75, 1.00), (0.55, 1.00, 0.45), (1.00, 0.55, 0.85), (1.00, 0.
            (0.60, 0.60, 1.00), (0.35, 1.00, 0.85))
 
 
+#: 옛 플러그인을 바꿨으면 그 버전 (툴 창이 한 번 로그로 알린다) - v01.07
+replaced_plugin = None
+
+
+def command_exists(name):
+    """MEL 명령이 등록되어 있나 (Python cmds 에는 exists 가 없다 - hasattr 은 내려놓은 플러그인 명령도 남아 있을 수 있다)."""
+    return bool(mel.eval('exists "{0}"'.format(name)))
+
+
+def plugin_is_current(name):
+    """읽혀 있는 플러그인이 이 툴의 것과 같은가 (버전 + 명령이 다 있다)."""
+    try:
+        have = cmds.pluginInfo(name, q=True, version=True)
+    except RuntimeError:
+        return False
+    return have == plugin_source.PLUGIN_VERSION and all(command_exists(c) for c in plugin_source.COMMANDS)
+
+
 def ensure_plugin():
-    """플러그인을 읽는다(이미 읽혀 있으면 그대로). 실패하면 RuntimeError."""
+    """플러그인을 읽는다. 이미 읽혀 있어도 **옛 버전이면 다시 읽는다** (v01.07). 실패하면 RuntimeError.
+
+    v01.07 이전에는 읽혀 있으면 그대로 두었다 - 툴만 새로 고치고(DEV 리로드 · 새 버전 복사) 마야를 껐다 켜지 않으면
+    v01.00~02 의 플러그인이 남아 v01.03 의 `junMotionPathDirty` 가 없었다 → 키를 끌면
+    "[FAIL] Drag : module 'maya.cmds' has no attribute 'junMotionPathDirty'".
+    다시 읽기 전에 그리기 노드를 지운다(노드가 있으면 마야가 내려놓지 못한다). 툴 창이 다시 그린다.
+    """
     name = os.path.splitext(os.path.basename(PLUGIN_FILE))[0]
+    if cmds.pluginInfo(name, q=True, loaded=True) and not plugin_is_current(name):
+        old = cmds.pluginInfo(name, q=True, version=True)
+        delete_all()
+        try:
+            cmds.unloadPlugin(name)
+        except RuntimeError:
+            # undo 큐에 옛 플러그인 명령(키 끌기 기록)이 남아 있으면 "still in use" 로 거부된다(실측) → 큐를 비우고 한 번 더.
+            # 옛 플러그인을 처음 바꿀 때 한 번뿐이다. 툴 창이 로그로 알린다(replaced_plugin).
+            cmds.flushUndo()
+            try:
+                cmds.unloadPlugin(name)
+            except RuntimeError as exc:
+                raise RuntimeError("An old Motion Path plugin (v{0}) is loaded and could not be replaced ({1}). "
+                                   "Restart Maya.".format(old, exc))
+        global replaced_plugin
+        replaced_plugin = old
     if not cmds.pluginInfo(name, q=True, loaded=True):
         cmds.loadPlugin(PLUGIN_FILE, quiet=True)
-    if not cmds.pluginInfo(name, q=True, loaded=True):
+    if not cmds.pluginInfo(name, q=True, loaded=True) or not plugin_is_current(name):
         raise RuntimeError("Could not load the plugin {0}".format(PLUGIN_FILE))
     return name
 

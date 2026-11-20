@@ -58,6 +58,8 @@ then move — user's Q4 choice, proportional editing, numeric input), then phase
   Same version: **graph key-line drag (move key in time) removed** — user: not needed. Left-drag on a key line scrubs; do not re-add.
 - v01.06 (2026-11-20): Speed tab Frames `Custom` = shared `MOD_timeRange_qt_v01` (Start/End/Get Sel Range) → graph shows only
   [Start, End], clipped to the path; no overlap → message instead of a graph. Settings `graph_start` / `graph_end`.
+- v01.07 (2026-11-20): stale plugin from an older tool version caused "no attribute 'junMotionPathDirty'" → ensure_plugin
+  compares PLUGIN_VERSION (now "1.4") and reloads, see [[maya-loaded-plugin-stays-stale]]. **Bump PLUGIN_VERSION on any plugin edit.**
 - Next: Maya GUI check (viewport ghost line while painting, Esc/wheel focus, Pop Out), then plan phase 1.5 / 2.
 
 Related: [[maya-time-context-traps]] · [[wip-a00380-quad-patch]] · [[mayapy-headless-verify]] · [[feedback-sliders-use-shared-style]]

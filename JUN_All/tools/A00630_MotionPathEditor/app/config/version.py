@@ -41,5 +41,11 @@
 # 01.06  Speed 탭 Frames 에 Custom - 공용 Start / End / Get Current / Get Sel Range(Path 탭 Range 와 같은 위젯)로
 #        [Start, End] 구간만 그래프로 본다. 경로 범위로 자르고, 안 겹치면 그래프 자리에 안내. 값은 optionVar(graph_start · graph_end).
 
-VERSION = "01.06"
+# 01.07  키를 끌면 "[FAIL] Drag : module 'maya.cmds' has no attribute 'junMotionPathDirty'". 마야를 켠 채 툴만 새 버전이 되면
+#        (DEV 리로드 · 새 버전 복사) 처음 읽힌 v01.00~02 플러그인이 그대로 남는다 - ensure_plugin 이 "이미 읽힘" 이면 손대지 않았다.
+#        플러그인에 PLUGIN_VERSION("1.4") · COMMANDS 를 두고, 툴 창을 열 때 읽힌 버전 · 명령을 비교해 다르면 그리기 노드를 지우고 다시 읽는다.
+#        undo 큐에 옛 플러그인 명령이 있으면 마야가 내려놓기를 거부한다(실측 "still in use") → 그때만 undo 큐를 비우고 로그로 알린다.
+#        **플러그인 파일을 고치면 PLUGIN_VERSION 을 올릴 것.**
+
+VERSION = "01.07"
 LAST_UPDATE = "2026-11-20"
