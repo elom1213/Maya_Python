@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-19
+# last Update date : 2026-11-20
 # A00630_MotionPathEditor - 경로들 · 키 선택 · 그리기 (툴 창 · 편집 컨텍스트 · 감시가 함께 쓴다)
 """
 PathManager 하나가 툴의 상태를 다 가진다:
     caches     : {경로 키(UUID): PathCache}
     nodes      : {경로 키: 그리기 노드 트랜스폼}
-    selection  : {경로 키: {키 시간}}
+    selection  : {경로 키: {시간}} - 키 시간 또는 프레임 점 시간 (v01.09 - 프레임 점도 고른다)
     settings   : 범위 · 표시 · 드래그 평면
     preview    : {경로 키: (N,3)} 그래프 Smooth 를 칠하는 동안 보여 줄 새 점 (원래 선은 회색으로 함께) - v01.04
     listeners  : redraw 끝에 부르는 함수들 (속도 그래프가 따라 그린다) - v01.04
@@ -19,6 +19,7 @@ import maya.cmds as cmds
 from . import anim_channels as ch
 from . import draw_bridge
 from . import draw_nodes
+from . import falloff
 from . import path_cache as pc
 
 RANGE_PLAYBACK = "playback"
@@ -48,6 +49,10 @@ DEFAULT_SETTINGS = {
     "brush_strength": 0.5,
     "whole_pose": False,           # 속도 획이 rotate · scale 도 같은 시간 왜곡으로 (원본: 끔)
     "fit_tolerance": 0.1,          # % (경로 크기 대비) - refit 허용 오차
+    # v01.09 폴오프 (매니퓰레이터 · 폴오프 계획서 §3-2)
+    "falloff_on": False,
+    "falloff_radius": 8.0,         # 프레임 (경로를 따라 잰 거리)
+    "falloff_curve": "",           # json (falloff.curve_to_text), "" = Smooth 프리셋
 }
 
 
@@ -64,6 +69,8 @@ class PathManager(object):
         self.saving = False
         self.preview = {}
         self.listeners = []
+        self._lut_key = None
+        self._lut = None
 
     # ---------------------------------------------------------------- 범위
     def frame_range(self):
@@ -180,7 +187,7 @@ class PathManager(object):
             if cache is None:
                 self.selection.pop(key)
                 continue
-            have = {round(k.t, 3) for k in cache.keys}
+            have = {round(t, 3) for t in cache.times}          # v01.09 - 키든 프레임 점이든 경로 위에 있으면 남긴다
             self.selection[key] = {t for t in times if round(t, 3) in have}
 
     # ---------------------------------------------------------------- 그리기
@@ -200,7 +207,7 @@ class PathManager(object):
                 cache, color, self.selection.get(cache.key, ()), frame, show_dots=s["show_dots"],
                 show_keys=s["show_keys"], show_numbers=s["show_numbers"], line_width=s["line_width"],
                 dot_size=s["dot_size"], key_size=s["key_size"], points=preview,
-                ghost=cache.points if preview is not None else None))
+                ghost=cache.points if preview is not None else None, weights=self.weights_for(cache)))
         if self.view_refresh is not None:
             self.view_refresh()
         for fn in list(self.listeners):
@@ -230,6 +237,20 @@ class PathManager(object):
                 out.append((c, k))
         return out
 
+    def pickable_frames(self):
+        """[(cache, PathKey(partial=None))] - 키가 아닌 프레임 점 (v01.09). Frame dots 를 끄면 고르지 않는다(안 보이는 것)."""
+        out = []
+        if not self.settings["show_dots"]:
+            return out
+        for c in self.cache_list():
+            if c.locked or c.points is None:
+                continue
+            keyed = {k.row for k in c.keys}
+            for row, t in enumerate(c.times):
+                if row not in keyed:
+                    out.append((c, pc.PathKey(t, row, None)))
+        return out
+
     def select(self, picks, mode="replace"):
         """picks : [(cache, key)]. mode = replace / add / toggle / remove."""
         if mode == "replace":
@@ -254,3 +275,43 @@ class PathManager(object):
 
     def selected_count(self):
         return sum(len(v) for v in self.selection.values())
+
+    def selection_has_frames(self):
+        """고른 것 중 키가 아닌 프레임 점이 있나."""
+        for c in self.cache_list():
+            times = self.selection.get(c.key)
+            if times:
+                keyed = {round(k.t, 3) for k in c.keys}
+                if any(round(t, 3) not in keyed for t in times):
+                    return True
+        return False
+
+    # ---------------------------------------------------------------- 폴오프 (v01.09)
+    def falloff_radius(self):
+        """지금 쓰는 반경 (프레임). 꺼져 있으면 0."""
+        return float(self.settings["falloff_radius"]) if self.settings["falloff_on"] else 0.0
+
+    def falloff_table(self):
+        text = self.settings.get("falloff_curve") or ""
+        if self._lut is None or self._lut_key != text:
+            self._lut = falloff.lut(falloff.curve_from_text(text))
+            self._lut_key = text
+        return self._lut
+
+    def weights_for(self, cache):
+        """(N,) 그 경로의 폴오프 가중치 - 고른 것이 없거나 폴오프가 꺼져 있으면 None."""
+        times = self.selection.get(cache.key)
+        if not times or cache.points is None or self.falloff_radius() <= 0:
+            return None
+        return falloff.weights(cache.times, times, self.falloff_radius(), self.falloff_table())
+
+    def falloff_spans(self):
+        """[(cache, [(a, b)])] - 폴오프 범위 (폴오프가 꺼져 있으면 고른 점 자체의 구간)."""
+        out = []
+        for c in self.cache_list():
+            times = self.selection.get(c.key)
+            if not times or c.points is None:
+                continue
+            w = falloff.weights(c.times, times, self.falloff_radius(), self.falloff_table())
+            out.append((c, falloff.spans(c.times, w)))
+        return out

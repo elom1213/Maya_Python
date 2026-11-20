@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-19
+# last Update date : 2026-11-20
 # A00630_MotionPathEditor - 플러그인 (OpenMaya 2.0): 그리기 노드 + VP2 draw override + undo 명령
 """
 cmds.loadPlugin(<이 파일>) 로 읽는다 (툴의 plugin_loader 가 한다).
@@ -37,7 +37,7 @@ COMMANDS = (COMMAND_NAME, DIRTY_COMMAND_NAME, VERSION_COMMAND_NAME)
 #: 읽힌 코드의 버전과 이 값을 비교해 다르면 다시 읽는다. v01.00~02 의 플러그인은 "1.0" 이었다(junMotionPathDirty · ghost 그리기 없음).
 #: 읽힌 버전은 **명령 junMotionPathVersion 으로 묻는다** - `pluginInfo -q -version` 은 같은 경로에서 다시 읽어도 처음 읽은 값을 계속
 #: 돌려준다(실측: 새 코드인데 "1.0") → v01.07 첫 판이 교체 뒤에도 "옛것" 으로 보고 툴 창을 못 열었다.
-PLUGIN_VERSION = "1.5"
+PLUGIN_VERSION = "1.6"          # 1.6 = v01.09 폴오프 색 · 고른 프레임 점 · HUD 글자
 
 
 def _dirty(nodes):
@@ -53,6 +53,7 @@ _CUR_COLOR = om.MColor((1.0, 0.25, 0.25, 1.0))
 _LOCK_COLOR = om.MColor((0.45, 0.45, 0.45, 1.0))
 _HUD_COLOR = om.MColor((1.0, 1.0, 1.0, 0.8))
 _GHOST_COLOR = om.MColor((0.55, 0.55, 0.55, 0.9))
+_FALL_TEXT_COLOR = om.MColor((1.0, 0.85, 0.3, 1.0))
 
 
 class JunMotionPathNode(omui.MPxLocatorNode):
@@ -81,6 +82,7 @@ class _Data(om.MUserData):
         om.MUserData.__init__(self, False)
         self.payload = None
         self.hud = None
+        self.text = None
 
 
 class JunMotionPathDrawOverride(omr.MPxDrawOverride):
@@ -109,7 +111,9 @@ class JunMotionPathDrawOverride(omr.MPxDrawOverride):
         data = old_data if isinstance(old_data, _Data) else _Data()
         key = om.MFnDependencyNode(obj_path.node()).findPlug("pathKey", False).asString()
         data.payload = draw_bridge.DATA.get(key)
-        data.hud = draw_bridge.HUD.get("box") if draw_bridge.HUD.get("owner") == key else None
+        mine = draw_bridge.HUD.get("owner") == key
+        data.hud = draw_bridge.HUD.get("box") if mine else None
+        data.text = draw_bridge.HUD.get("text") if mine else None
         return data
 
     def addUIDrawables(self, obj_path, dm, frame_context, data):
@@ -126,6 +130,14 @@ class JunMotionPathDrawOverride(omr.MPxDrawOverride):
             corners = [om.MPoint(x0, y0), om.MPoint(x1, y0), om.MPoint(x1, y1), om.MPoint(x0, y1)]
             for a, b in zip(corners, corners[1:] + corners[:1]):
                 dm.line2d(a, b)
+            dm.endDrawable()
+        text = getattr(data, "text", None)
+        if text:                                            # v01.09 폴오프 반경 (커서 옆)
+            x, y, label = text
+            dm.beginDrawable(omr.MUIDrawManager.kNonSelectable)
+            dm.setColor(_FALL_TEXT_COLOR)
+            dm.setFontSize(omr.MUIDrawManager.kDefaultFontSize)
+            dm.text2d(om.MPoint(x + 14, y + 10), label, omr.MUIDrawManager.kLeft)
             dm.endDrawable()
 
     @staticmethod
@@ -148,10 +160,20 @@ class JunMotionPathDrawOverride(omr.MPxDrawOverride):
             dm.setColor(line_color)
             dm.setLineWidth(float(p.get("line_width", 2.0)))
             dm.lineStrip(p["line"], False)
+        # v01.09 폴오프 범위의 선 - 색 단계마다 lineStrip (G0-1: mesh(kLineStrip) 은 x-ray 가 안 먹어 메시에 가려진다)
+        for color, strip in p.get("fall_lines") or ():
+            if len(strip) > 1:
+                dm.setColor(color)
+                dm.setLineWidth(float(p.get("line_width", 2.0)) + 2.0)
+                dm.lineStrip(strip, False)
         if len(p.get("dots", ())):
             dm.setColor(line_color)
             dm.setPointSize(float(p.get("dot_size", 4.0)))
             dm.points(p["dots"], False)
+        fall = p.get("fall_dots")
+        if fall is not None and len(fall):                  # v01.09 폴오프 점 - 점마다 가중치 색 (mesh kPoints 는 x-ray 됨)
+            dm.setPointSize(float(p.get("dot_size", 4.0)) + 3.0)
+            dm.mesh(omr.MUIDrawManager.kPoints, fall, None, p["fall_colors"])
         key_size = float(p.get("key_size", 9.0))
         if len(p.get("keys", ())):
             dm.setColor(_LOCK_COLOR if locked else _KEY_COLOR)
@@ -161,6 +183,10 @@ class JunMotionPathDrawOverride(omr.MPxDrawOverride):
             dm.setColor(_SEL_COLOR)
             dm.setPointSize(key_size + 2.0)
             dm.points(p["selected"], False)
+        if len(p.get("selected_dots", ())):                # v01.09 고른 프레임 점
+            dm.setColor(_SEL_COLOR)
+            dm.setPointSize(float(p.get("dot_size", 4.0)) + 5.0)
+            dm.points(p["selected_dots"], False)
         if len(p.get("current", ())):
             dm.setColor(_CUR_COLOR)
             dm.setPointSize(key_size * 0.8)

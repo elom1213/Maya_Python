@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-19
+# last Update date : 2026-11-20
 # A00630_MotionPathEditor - 툴 창 (계획서 §4-9)
 """
 고른 오브젝트 · 조인트의 프레임별 월드 위치를 뷰포트에 경로로 그리고, 경로 위 키를 끌어 애니메이션을 고친다.
@@ -16,6 +16,7 @@ import maya.cmds as cmds
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_tsl_qt
 from Framework.qt import JUN_mod_timeRange_qt
+from Framework.qt import JUN_mod_falloffCurve_qt
 from Framework.qt.pin_style import apply_pin_style
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
@@ -27,6 +28,7 @@ from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 from tools.A00630_MotionPathEditor.app.config.version import VERSION, LAST_UPDATE
 from tools.A00630_MotionPathEditor.app.core import anim_channels as ch
 from tools.A00630_MotionPathEditor.app.core import draw_nodes
+from tools.A00630_MotionPathEditor.app.core import falloff
 from tools.A00630_MotionPathEditor.app.core import path_manager as pm
 from tools.A00630_MotionPathEditor.app.core import picking
 from tools.A00630_MotionPathEditor.app.core.watcher import Watcher
@@ -61,6 +63,7 @@ class MainWindow(QWidget):
         self._load_settings()
         self.watcher = Watcher(self.manager, on_scene_change=self._on_scene_change)
         self.context = None                     # 편집 컨텍스트 (Edit Path 를 처음 켤 때 만든다)
+        self.curve_dialog = None                # v01.09 폴오프 커브 팝업 (처음 열 때 만든다)
         self._syncing = False
 
         self.build_ui()
@@ -267,8 +270,9 @@ class MainWindow(QWidget):
         self.btn_edit.setMinimumHeight(34)
         self.btn_edit.setToolTip(
             "Turn the path edit tool on / off.\n"
-            "Click a key: select it (Shift: add / remove, Ctrl: remove). Drag on empty space: box select.\n"
+            "Click a key or a frame dot: select it (Shift: add / remove, Ctrl: remove). Drag on empty space: box select.\n"
             "Drag a selected key: move it (and the other selected keys) - the animation follows.\n"
+            "Tap b: falloff on / off. Hold b and drag left / right: falloff radius (Ctrl+Shift + drag works too).\n"
             "Right mouse while dragging: cancel. Alt + drag: Maya camera. Q: back to the select tool.")
         self.btn_edit.toggled.connect(self.set_edit_mode)
         # v01.01 - 켜져 있으면 연한 빨강 (공용 pin_style : 체크형 토글 = 켜짐 연한 빨강)
@@ -297,9 +301,68 @@ class MainWindow(QWidget):
         self.plane_buttons.buttonClicked.connect(
             lambda btn: self._set("plane", btn.property("plane"), redraw=False))
         lay.addLayout(plane)
+        lay.addLayout(self._build_falloff_row())
         self.lbl_selection = QLabel("")
         lay.addWidget(self.lbl_selection)
         return box
+
+    def _build_falloff_row(self):
+        """v01.09 폴오프 - 켜기 · 반경(프레임) · 커브. 뷰포트에서 b 톡 = 켜기 / 끄기, b + 끌기 = 반경."""
+        s = self.manager.settings
+        row = QHBoxLayout()
+        self.cb_falloff = QCheckBox("Falloff")
+        self.cb_falloff.setChecked(bool(s["falloff_on"]))
+        self.cb_falloff.setToolTip(
+            "Points around the selected ones follow too, less the farther they are (soft selection). "
+            "The distance is measured along the path in frames, so a loop never pulls in far frames. "
+            "In the viewport (Edit Path on): tap b = on / off, hold b + drag left / right = radius.")
+        self.cb_falloff.toggled.connect(lambda on: self._set("falloff_on", bool(on)))
+        row.addWidget(self.cb_falloff)
+        row.addWidget(QLabel("Radius"))
+        self.sp_falloff = QDoubleSpinBox()
+        self.sp_falloff.setRange(0.0, 2000.0)
+        self.sp_falloff.setDecimals(1)
+        self.sp_falloff.setSingleStep(1.0)
+        self.sp_falloff.setSuffix(" fr")
+        self.sp_falloff.setKeyboardTracking(False)
+        self.sp_falloff.setValue(float(s["falloff_radius"]))
+        self.sp_falloff.setToolTip("Falloff radius in frames along the path (b + drag in the viewport sets it too).")
+        self.sp_falloff.valueChanged.connect(lambda v: self._set("falloff_radius", float(v)))
+        row.addWidget(self.sp_falloff)
+        btn = QPushButton("Curve...")
+        btn.setToolTip("The shape of the falloff: left = the selected point, right = the end of the radius.")
+        btn.clicked.connect(self.show_falloff_curve)
+        row.addWidget(btn)
+        row.addStretch(1)
+        return row
+
+    def show_falloff_curve(self, *args):
+        if self.curve_dialog is None:
+            curve = falloff.curve_from_text(self.manager.settings["falloff_curve"])
+            base = falloff.default_curve()
+            self.curve_dialog = JUN_mod_falloffCurve_qt.JUN_mod_falloffCurveDialog_qt_v01(
+                self, title="Falloff curve", points=curve["points"], interp=curve["interp"],
+                tangents=curve.get("tangents"), reset_points=base["points"], reset_interp=base["interp"],
+                info="X = from the selected point (left) to the end of the radius (right). Y = how much a point follows.")
+            self.curve_dialog.changed.connect(self._on_falloff_curve)
+        self.curve_dialog.show()
+        self.curve_dialog.raise_()
+
+    def _on_falloff_curve(self):
+        dlg = self.curve_dialog
+        self._set("falloff_curve", falloff.curve_to_text(dlg.points(), dlg.interpolation(), dlg.tangents()))
+
+    def _on_context_setting(self, key):
+        """편집 컨텍스트가 설정을 바꿨다 (b 톡 · b 끌기) - 저장하고 칸을 맞춘다 (v01.09)."""
+        self._save(key)
+        s = self.manager.settings
+        self.cb_falloff.blockSignals(True)
+        self.cb_falloff.setChecked(bool(s["falloff_on"]))
+        self.cb_falloff.blockSignals(False)
+        self.sp_falloff.blockSignals(True)
+        self.sp_falloff.setValue(float(s["falloff_radius"]))
+        self.sp_falloff.blockSignals(False)
+        self._show_selection()
 
     # ==================================================================
     # 설정
@@ -352,7 +415,17 @@ class MainWindow(QWidget):
 
     def _show_selection(self):
         n = self.manager.selected_count()
-        self.lbl_selection.setText("{0} key(s) selected".format(n) if n else "No key selected")
+        if not n:
+            self.lbl_selection.setText("Nothing selected")
+            return
+        text = "{0} point(s) selected".format(n)
+        if self.manager.falloff_radius() > 0:
+            parts = []
+            for _cache, spans in self.manager.falloff_spans():
+                parts += ["[{0:g}, {1:g}]".format(a, b) for a, b in spans]
+            if parts:
+                text += " - falloff " + ", ".join(parts[:4]) + (" ..." if len(parts) > 4 else "")
+        self.lbl_selection.setText(text)
 
     def _with_progress(self, work, count):
         """굽기 - 크면 진행 팝업. work(progress) 를 부른다."""
@@ -425,7 +498,8 @@ class MainWindow(QWidget):
         try:
             if self.context is None:
                 from tools.A00630_MotionPathEditor.app.ui.edit_context import EditContext
-                self.context = EditContext(self.manager, self.watcher, log=self.log)
+                self.context = EditContext(self.manager, self.watcher, log=self.log,
+                                           on_setting=self._on_context_setting)
             if on:
                 if not self.manager.caches:
                     self.log("[WARN] Add objects / joints to the Paths list first.")
@@ -484,6 +558,8 @@ class MainWindow(QWidget):
     def closeEvent(self, event):
         # v01.07 - __init__ 가 중간에 실패한 창(예: 플러그인 로드 실패)도 닫힐 수 있다 - 없는 것은 건너뛴다
         try:
+            if getattr(self, "curve_dialog", None) is not None:
+                self.curve_dialog.close()
             if getattr(self, "speed_panel", None) is not None:
                 self.speed_panel.shutdown()
             if getattr(self, "context", None) is not None:

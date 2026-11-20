@@ -25,45 +25,8 @@ from tools.A00630_MotionPathEditor.app.ui import edit_context as ec   # noqa: E4
 draw_nodes.ensure_plugin()
 cmds.undoInfo(state=True, infinity=True)
 
-W, H = 1000, 800
-HALF = 20.0                      # 화면 가로 반폭이 월드 20 cm
-CX, CY = 0.0, 0.0
-
-
-class FakeM3dView(object):
-    """마야 2024 API 2.0 과 같은 시그니처 - viewToWorld 는 OUT 인자를 채운다(돌려주지 않는다)."""
-
-    def viewToWorld(self, x_pos, y_pos, worldPt, worldVector):
-        assert isinstance(worldPt, om.MPoint) and isinstance(worldVector, om.MVector)
-        worldPt.x = (x_pos / float(W) * 2.0 - 1.0) * HALF + CX
-        worldPt.y = (y_pos / float(H) * 2.0 - 1.0) * HALF * H / W + CY
-        worldPt.z = 100.0
-        worldVector.x, worldVector.y, worldVector.z = 0.0, 0.0, -1.0
-        return self
-
-
-class FakeViewState(object):
-    """정면(-Z 방향) 정사영 카메라."""
-
-    def __init__(self):
-        self.view = FakeM3dView()
-        sx, sy = 1.0 / HALF, 1.0 / (HALF * H / W)
-        self.view_proj = np.array([[sx, 0, 0, 0], [0, sy, 0, 0], [0, 0, 0.01, 0], [-CX * sx, -CY * sy, 0, 1.0]])
-        self.width, self.height = W, H
-        self.view_dir = np.array([0.0, 0.0, -1.0])
-
-    def ray(self, x, y):
-        return picking.view_ray(self.view, x, y, self.view_dir)
-
-
-def to_pixel(p):
-    px, _front = picking.project([p], FakeViewState().view_proj, W, H)
-    return float(px[0][0]), float(px[0][1])
-
-
-def to_world_xy(x, y, z):
-    o, d = FakeViewState().ray(x, y)
-    return np.array([o[0], o[1], z])
+from _fake_view import (CX, CY, FakeM3dView, FakeViewState, H, HALF, W,   # noqa: E402,F401
+                         to_pixel, to_world_xy)
 
 
 # ---- 장면 + 관리자 + 컨텍스트 (질의와 뷰만 가짜)
@@ -124,6 +87,8 @@ mgr.refresh_all()
 mgr.settings["plane"] = picking.PLANE_VIEW
 
 # ---- 박스 선택 → 고른 키 하나를 끌면 모두 함께
+# v01.09 - 박스는 프레임 점도 고른다. 여기서는 키만 끄는 기존 동작을 보므로 프레임 점 표시를 끈다(안 보이면 안 고른다)
+mgr.settings["show_dots"] = False
 pts = [cache.points[k.row] for k in cache.keys]
 pix = [to_pixel(p) for p in pts]
 xs = sorted(px for px, _py in pix)
@@ -153,6 +118,8 @@ check("all selected keys moved together by the same amount", same < 1e-6 and np.
       abs(moves[0][2]) < 1e-9, (same, moves[0]))
 cmds.undo()
 mgr.refresh_all()
+
+mgr.settings["show_dots"] = True
 
 # ---- Shift / Ctrl 클릭, 빈 곳 클릭 = 해제
 k1, k3 = cache.keys[1], cache.keys[3]

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-19
+# last Update date : 2026-11-20
 # A00630_MotionPathEditor - 플러그인 로드 · 그리기 노드 만들기 / 지우기 · 그리기 데이터 만들기 (계획서 §4-5)
 """
 그리기 노드는 **API(MDagModifier)로** 만들고 지운다 → undo 큐에 들어가지 않는다(Ctrl+Z 는 키만 되돌린다).
@@ -14,6 +14,7 @@ import maya.cmds as cmds
 import maya.mel as mel
 
 from . import draw_bridge
+from . import falloff
 from ..plugin import jun_motion_path as plugin_source     # 버전 · 명령 이름만 읽는다 (등록은 loadPlugin 이)
 
 PLUGIN_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "plugin",
@@ -147,14 +148,33 @@ def _points(rows):
     return arr
 
 
+def _colors(rows):
+    arr = om.MColorArray()
+    for r, g, b in rows:
+        arr.append(om.MColor((float(r), float(g), float(b), 1.0)))
+    return arr
+
+
 def payload(cache, color, selected_times, current_frame, show_dots=True, show_keys=True, show_numbers=False,
-            line_width=2.0, dot_size=4.0, key_size=9.0, points=None, ghost=None):
+            line_width=2.0, dot_size=4.0, key_size=9.0, points=None, ghost=None, weights=None):
     """경로 하나의 그리기 데이터 (draw_bridge.DATA 형식).
 
     points : cache.points 대신 그릴 점 (그래프 Smooth 미리보기, v01.04) · ghost : 함께 회색으로 그릴 원래 선
+    weights : (N,) 폴오프 가중치 (v01.09) - 범위의 점 · 선을 가중치 색으로. None = 폴오프 없음
     """
     pts = cache.points if points is None else points
     sel = {round(t, 3) for t in selected_times}
+    # v01.09 - 고른 프레임 점(키 아닌 것)
+    keyed = {k.row for k in cache.keys}
+    sel_dots = [pts[i] for i, t in enumerate(cache.times) if i not in keyed and round(t, 3) in sel]
+    fall_dots, fall_cols, fall_lines = [], [], []
+    if weights is not None:
+        inside = [i for i in range(len(pts)) if weights[i] > 1e-9]
+        fall_dots = [pts[i] for i in inside]
+        fall_cols = falloff.colors(weights[inside]) if inside else []
+        for level, rows in falloff.line_runs(weights):
+            r, g, b = falloff.level_color(level)
+            fall_lines.append((om.MColor((r, g, b, 1.0)), _points(pts[rows])))
     keys, chosen, labels = [], [], []
     if show_keys:
         for k in cache.keys:
@@ -174,6 +194,10 @@ def payload(cache, color, selected_times, current_frame, show_dots=True, show_ke
         "current": _points(current),
         "labels": labels,
         "ghost": _points(ghost) if ghost is not None else om.MPointArray(),
+        "selected_dots": _points(sel_dots),
+        "fall_dots": _points(fall_dots),
+        "fall_colors": _colors(fall_cols),
+        "fall_lines": fall_lines,
         "color": om.MColor((color[0], color[1], color[2], 1.0)),
         "locked": cache.locked,
         "line_width": float(line_width),

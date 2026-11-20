@@ -7,7 +7,7 @@ updated: 2026-11-20
 
 # A00630_MotionPathEditor — 매니퓰레이터 · 폴오프 편집 하위 계획서
 
-> 작성 2026-11-20 · 상태: **G0 끝(헤드리스 35/35 · GUI: 점 색 됨, mesh 선은 x-ray 안 됨 → 나눠 그리기, `b` 이벤트 필터로 됨)** · 상위 계획서 [`A00630_MotionPathEditor_plan.md`](A00630_MotionPathEditor_plan.md) §5 **1.5단계 "프레임 단위 편집 · 비례 편집"** 의 하위 계획
+> 작성 2026-11-20 · 상태: **G0 끝 · G1 구현 (v01.09, mayapy 390/390) · G2 다음** · 상위 계획서 [`A00630_MotionPathEditor_plan.md`](A00630_MotionPathEditor_plan.md) §5 **1.5단계 "프레임 단위 편집 · 비례 편집"** 의 하위 계획
 > · 형제 계획서 [`A00630_MotionPathEditor_speed_graph_plan.md`](A00630_MotionPathEditor_speed_graph_plan.md) (Speed 탭 · 획 세션 · refit — 이 계획이 그대로 재사용한다)
 >
 > 요청 (2026-11-20):
@@ -286,3 +286,14 @@ mayapy 에는 핫키 세트가 없어 `hotkey -q b` = None — 실제 값은 GUI
 
 - 키 반복(누르고 있는 동안 반복되는 KeyPress)은 `isAutoRepeat` 로 걸렀다 — 기록에 반복이 없다.
 - `W` · `E` 는 이번 기록에 없다(안 눌렀을 수 있다). B 와 같은 길이라 될 것으로 보지만 **G3 에서 확인**, 안 되면 창 라디오만.
+
+### G1 (2026-11-20, v01.09)
+
+- 구현: `core/falloff.py`(가중치 = 가장 가까운 고른 시간까지의 프레임 거리 → 커브 LUT 257, 고른 점 1 · 구간 · 색표 · 색 단계 16 의 선 조각 · 커브 json) ·
+  관리자(`pickable_frames` · 선택 정리 기준을 키 → 경로 시간 · `weights_for` · `falloff_spans` · 설정 `falloff_on/radius/curve`) ·
+  그리기 데이터(`selected_dots` · `fall_dots`+`fall_colors` → `mesh(kPoints)` · `fall_lines` → 색마다 `lineStrip`) · HUD 글자(`text2d`) · 플러그인 1.6 ·
+  컨텍스트(키 → 프레임 점 순서로 고르기 · 박스에 프레임 점 · `b` 필터 · `b` 톡 · `b`/Ctrl+Shift 끌기 반경, 1 px = 0.1 fr) · 창 Falloff 줄 + 공용 커브 팝업.
+- 프레임 점 · 폴오프로 **끄는 것은 G2** — 지금은 로그 안내(`... comes in the next update`).
+- 시험: `test_falloff.py` **59**. 기존 `test_edit_context.py` 의 "박스 → 키 함께 끌기" 는 박스가 프레임 점도 고르게 되어 그 부분만 `Frame dots` 끄고 시험(키만 끄는 기존 동작 확인).
+  가짜 뷰는 `tests/_fake_view.py` 로 빼 두 시험이 함께 쓴다. 전체 **390/390**.
+- `b` 필터는 Qt `QKeyEvent` 를 직접 넣어 시험했다(먹음 · ShortcutOverride accept · 반복 무시 · Ctrl+B 통과 · 다른 툴이면 통과). 마야 GUI 에서 실제로 막히는 것은 G0-2 로 확인됨.

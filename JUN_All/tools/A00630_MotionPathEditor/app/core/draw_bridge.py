@@ -8,7 +8,8 @@
 (`tools.A00630_MotionPathEditor.app.core.draw_bridge`)로 import 한다. A00180 의 undo_bridge 와 같은 방식.
 
 DATA    : {path_key: dict} — draw override 가 그릴 것 (툴이 바뀔 때만 만든다, 아래 키 설명)
-HUD     : 2D 로 그릴 것 (박스 선택 사각형 등) — {"box": (x0, y0, x1, y1)} 또는 {}
+HUD     : 2D 로 그릴 것 — {"box": (x0, y0, x1, y1), "text": (x, y, str), "owner": 경로 키} 또는 {}
+          (text = 폴오프 반경을 끄는 동안 커서 옆 글자, v01.09)
 PENDING : 다음 `junMotionPathSetKeys` 명령이 가져갈 (undo 기록 MAnimCurveChange, 다시 계산을 표시할 노드들)
 DIRTY   : 다음 `junMotionPathDirty` 명령이 가져갈 노드들 (v01.03)
 
@@ -20,6 +21,9 @@ DATA[path_key] 키 (값은 OpenMaya 2.0 객체 - 그리기 때 변환하지 않�
     "current"   : MPointArray  현재 프레임 점 (0 또는 1 개)
     "labels"    : [(MPoint, str)]  키 옆 프레임 번호 (끄면 빈 목록)
     "ghost"     : MPointArray  원래 경로 (그래프 Smooth 미리보기 중에만 - 회색 점선, v01.04)
+    "selected_dots" : MPointArray  고른 프레임 점 (키 아닌 것, v01.09)
+    "fall_dots" / "fall_colors" : MPointArray / MColorArray  폴오프 범위의 점과 가중치 색 (v01.09, mesh kPoints)
+    "fall_lines": [(MColor, MPointArray)]  폴오프 범위의 선 - 색 단계마다 한 조각 (v01.09, mesh 선은 x-ray 가 안 먹어 lineStrip)
     "color"     : MColor  경로 색
     "locked"    : bool  편집 불가 경로 (회색으로)
     "line_width", "dot_size", "key_size" : float

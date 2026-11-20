@@ -56,5 +56,13 @@
 #        그 전에는 Acceleration 그래프를 칠하면 Speed/Shape 브러시가 돌았다 - Smooth Speed 는 꺾인 곳을 빨리 지나가게 해 최대 가속도를
 #        0.057 → 0.197 로 키웠고, Smooth Shape 는 큰 호를 지켜 10% 밖에 못 줄였다.
 
-VERSION = "01.08"
+# 01.09  프레임 점 고르기 + 폴오프 (매니퓰레이터 · 폴오프 계획서 docs/plans/A00630_MotionPathEditor_manipulator_falloff_plan.md G1) -
+#        Edit Path 에서 키뿐 아니라 프레임 점도 클릭 · 박스로 고른다(같은 자리면 키 먼저, Frame dots 를 끄면 안 고른다).
+#        Edit 줄 `Falloff` · Radius(프레임, 경로를 따라 잰 거리) · Curve...(공용 falloff 커브 팝업, 기본 Smooth). 범위의 점 · 선이
+#        가중치 색(노랑 1 → 주황 → 빨강 0)으로 칠해진다. 뷰포트에서 b 톡 = 켜기 / 끄기, b + 좌우 끌기 = 반경(Ctrl+Shift + 끌기도 같다).
+#        b 는 마야 핫키(소프트 셀렉션 반경)로 가지 않게 편집 툴이 켜져 있을 때만 앱 이벤트 필터가 먹는다(G0-2 GUI 실측).
+#        폴오프 선은 색 단계마다 lineStrip (G0-1: mesh(kLineStrip) 은 x-ray 가 안 먹어 메시에 가려진다). 플러그인 1.6.
+#        고른 점을 폴오프로 끌기 · 프레임 점 끌기는 다음 버전(G2) - 지금은 로그로 안내만.
+
+VERSION = "01.09"
 LAST_UPDATE = "2026-11-20"

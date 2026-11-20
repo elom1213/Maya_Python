@@ -63,6 +63,13 @@ then move — user's Q4 choice, proportional editing, numeric input), then phase
 - v01.08 (2026-11-20): Acceleration graph smoothing = brush `Smooth Acceleration` (retime.AccelSmoother: pull toward a time-axis
   Gaussian average, no Taubin push-back; session MODE_ACCEL, refit tolerance x0.2 because position error's 2nd difference is accel
   noise). Auto-picked when Show = Acceleration. Lesson: Smooth Speed can *raise* acceleration at sharp corners (0.057 -> 0.197).
-- Next: Maya GUI check (viewport ghost line while painting, Esc/wheel focus, Pop Out), then plan phase 1.5 / 2.
+- Manipulator + falloff sub-plan (docs/plans/A00630_MotionPathEditor_manipulator_falloff_plan.md, 2026-11-20). User's requests:
+  move/rotate gizmo for selected path points, `b`+drag falloff with weight colors, Edit Path button on Speed tab with live graph,
+  graph [a,b] colors + Smooth Range = position smoothing. Decisions (user accepted): rotate = point positions around pivot (not rotate keys),
+  falloff distance = frames along the path, own-drawn gizmo, preview while dragging / write on release.
+  G0: deform = existing StrokeSession with target points (no new write code). GUI: `b` blocked via app event filter, mesh(kLineStrip) not x-ray
+  ([[maya-vp2-xray-and-hotkey-filter]]). **v01.09 = G1** (frame-point selection, falloff UI/colors, b tap/drag; plugin 1.6). Dragging frame
+  points / with falloff still only logs "next update" → **next = G2** (MODE_DEFORM + set_state, route in edit_context._press), then G3 gizmo, G4 Speed tab.
+- Next: G2; Maya GUI check of everything since v01.04.
 
 Related: [[maya-time-context-traps]] · [[wip-a00380-quad-patch]] · [[mayapy-headless-verify]] · [[feedback-sliders-use-shared-style]]
