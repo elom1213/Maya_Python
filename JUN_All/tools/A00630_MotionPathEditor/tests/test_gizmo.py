@@ -263,6 +263,33 @@ mgr.redraw()
 check("tool off -> no gizmo", not draw_bridge.GIZMO)
 mgr.gizmo_on = True
 mgr.redraw()
+
+# v01.14 호버 - 버튼 없이 축 위에 오면 그 부분이 굵어진다
+mgr.settings["manip_mode"] = "move"
+mgr.select([(cache, frame_pick(45.0))], "replace")
+mgr.redraw()
+geo, length = gizmo_px("x")
+hx, hy = gz.project([geo["x"][0] + (geo["x"][-1] - geo["x"][0]) * 0.7], VPF, W, 800)[0][0]
+redraws = []
+mgr.listeners.append(lambda: redraws.append(1))
+check("hover over the X arrow -> x is hovered (drawn thicker)", ctx.hover(hx, hy) and mgr.gizmo_hover == "x" and
+      draw_bridge.GIZMO.get("hover") == "x")
+n = len(redraws)
+check("moving along the same arrow does not redraw again", not ctx.hover(hx + 1, hy) and len(redraws) == n)
+check("moving off the gizmo clears the hover", ctx.hover(hx + 300, hy + 300) and mgr.gizmo_hover is None and
+      draw_bridge.GIZMO.get("hover") is None)
+ctx.hover(hx, hy)
+drag(hx, hy, 10.0, 0.0, release=False, steps=(1.0,))
+check("grabbing clears the hover (the grabbed part is yellow instead)", mgr.gizmo_hover is None and
+      draw_bridge.GIZMO.get("active") == "x")
+check("no hover while dragging", not ctx.hover(hx + 400, hy) and mgr.gizmo_hover is None)
+ctx._release()
+cmds.undo()
+mgr.refresh_all()
+mgr.gizmo_on = False
+check("no hover when the tool is off", ctx.hover(hx, hy) is False and mgr.gizmo_hover is None)
+mgr.gizmo_on = True
+mgr.listeners.pop()
 check("no error logged", not any(m.startswith("[FAIL]") for m in logs), [m for m in logs if m.startswith("[FAIL]")])
 
 # ====================================================================== 3. 키 필터 · 플러그인 · 창
@@ -285,8 +312,18 @@ check("w switches back to Move", flt.eventFilter(None, key_event("press", Qt.Key
       mgr.settings["manip_mode"] == "move")
 check("releases are eaten too", flt.eventFilter(None, key_event("release", Qt.Key_W)) is True)
 check("Shift+W passes (left to Maya)", flt.eventFilter(None, key_event("press", Qt.Key_W, Qt.ShiftModifier)) is False)
+# 호버: 마우스 움직임(버튼 없음)은 먹지 않고 hover_at_cursor 를 부른다
+from PySide2.QtCore import QPointF   # noqa: E402
+from PySide2.QtGui import QMouseEvent   # noqa: E402
+called = []
+ctx.hover_at_cursor = lambda: called.append(1)
+mv = QMouseEvent(QEvent.MouseMove, QPointF(5, 5), Qt.NoButton, Qt.NoButton, Qt.NoModifier)
+check("mouse move passes through the filter and updates the hover", flt.eventFilter(None, mv) is False and called == [1])
+mvb = QMouseEvent(QEvent.MouseMove, QPointF(5, 5), Qt.NoButton, Qt.LeftButton, Qt.NoModifier)
+check("mouse move with a button held does not hover (that is a drag)", flt.eventFilter(None, mvb) is False and called == [1])
 ctx.is_active = lambda: False
 check("w passes when another tool is current", flt.eventFilter(None, key_event("press", Qt.Key_W)) is False)
+check("no hover when another tool is current", flt.eventFilter(None, mv) is False and called == [1])
 
 
 class FakeDM(object):
@@ -294,10 +331,13 @@ class FakeDM(object):
 
     def __init__(self):
         self.calls = []
+        self.widths = []
 
     def __getattr__(self, name):
         def call(*a, **k):
             self.calls.append(name)
+            if name == "setLineWidth":
+                self.widths.append(a[0])
         return call
 
 
@@ -307,6 +347,13 @@ jp.JunMotionPathDrawOverride._draw_gizmo(dm, dict(draw_bridge.GIZMO), VPF, W, 80
 check("plugin draws the gizmo (2D lines + arrow heads, none for an arrow pointing at the camera)",
       dm.calls.count("mesh2d") >= 7 and dm.calls.count("line2d") == 4,
       (dm.calls.count("mesh2d"), dm.calls.count("line2d")))
+g = dict(draw_bridge.GIZMO)
+g.update({"hover": "y", "active": None})
+dm = FakeDM()
+jp.JunMotionPathDrawOverride._draw_gizmo(dm, g, VPF, W, 800)
+check("plugin draws the hovered part thicker (and the rest at the normal 1.5x width)",
+      dm.widths.count(gz.HOVER_WIDTH) == 1 and gz.HOVER_WIDTH > gz.LINE_WIDTH and
+      dm.widths.count(gz.LINE_WIDTH) == len(dm.widths) - 1, dm.widths)
 loaded = mel.eval("junMotionPathVersion")
 loaded = loaded[0] if isinstance(loaded, (list, tuple)) else loaded
 check("the loaded plugin is the current one", loaded == jp.PLUGIN_VERSION, loaded)

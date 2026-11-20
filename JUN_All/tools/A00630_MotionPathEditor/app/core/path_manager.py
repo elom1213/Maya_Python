@@ -79,6 +79,7 @@ class PathManager(object):
         self._lut = None
         self.gizmo_on = False           # v01.11 편집 컨텍스트가 켜져 있으면 고른 점에 매니퓰레이터를 그린다
         self.gizmo_active = None        # 끄는 중인 부분 (노랑)
+        self.gizmo_hover = None         # v01.14 마우스가 올라간 부분 (굵게)
         self.gizmo_pivot = None         # 끄는 중 피벗 (이동하면 따라간다) - None 이면 고른 점의 무게중심
         self.gizmo_axes = None          # 끄는 중 축 고정 (Path 축이 끄는 동안 돌지 않게)
 
@@ -339,7 +340,8 @@ class PathManager(object):
             axes = self.gizmo_axes
         draw_bridge.GIZMO.update({"owner": caches[0].key, "pivot": np.asarray(pivot, dtype="float64"),
                                   "axes": np.asarray(axes, dtype="float64"),
-                                  "mode": self.settings.get("manip_mode", gizmo.MODE_MOVE), "active": self.gizmo_active})
+                                  "mode": self.settings.get("manip_mode", gizmo.MODE_MOVE), "active": self.gizmo_active,
+                                  "hover": self.gizmo_hover})
 
     # ---------------------------------------------------------------- 폴오프 (v01.09)
     def falloff_radius(self):

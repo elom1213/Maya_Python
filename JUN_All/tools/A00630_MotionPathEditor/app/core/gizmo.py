@@ -24,6 +24,7 @@ CENTER = 0.09           # 가운데 사각형 반폭 (축 길이 비율)
 RING_SEGMENTS = 64
 LINE_WIDTH = 3.0        # v01.12 사용자 요청으로 1.5 배 (2.0 → 3.0)
 ACTIVE_WIDTH = 4.5      # 잡은 부분 (3.0 → 4.5)
+HOVER_WIDTH = 5.0       # v01.14 마우스가 올라간 부분 - 굵게 (색은 그대로, 잡으면 노랑)
 HEAD_LEN, HEAD_HALF = 18.0, 7.5     # 화살표 머리 (픽셀, 12 / 5 의 1.5 배)
 
 MODE_MOVE = "move"

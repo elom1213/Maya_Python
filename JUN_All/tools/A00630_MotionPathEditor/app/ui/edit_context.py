@@ -18,6 +18,8 @@ Edit Path 를 켜면 이 컨텍스트가 마야 툴이 된다.
     매니퓰레이터 (v01.11): 고른 점이 있으면 그 무게중심에 그린다. 화살표 · 평면 · 가운데 / 고리를 끌면 이동 / 회전
                         (고른 점 = 1, 폴오프 범위는 가중치만큼 - 회전은 각도가 가중치배). 점보다 먼저 잡힌다(Shift / Ctrl 클릭은 늘 점).
     w / e             : 매니퓰레이터 Move / Rotate (이 툴이 켜져 있을 때만 - 마야 툴 전환 핫키로 안 간다)
+    호버 (v01.14)     : 버튼 없이 마우스가 기즈모 부분 위에 오면 그 부분이 굵어진다. draggerContext 는 버튼 없는 움직임을
+                        알려 주지 않으므로 같은 앱 이벤트 필터가 MouseMove 를 보고(먹지 않는다) 활성 3D 뷰 픽셀로 바꿔 hover() 를 부른다.
     오른쪽 버튼       : 드래그 중이면 취소
     Alt + 드래그      : 마야 카메라 (컨텍스트로 오지 않는다)
 
@@ -89,6 +91,7 @@ class EditContext(object):
         self._finalize()
         self._remove_key_filter()
         self.manager.gizmo_on = False
+        self.manager.gizmo_hover = None
         self.manager.redraw()
         if cmds.currentCtx() == self.name:
             back = self.previous_tool if self.previous_tool and cmds.contextInfo(self.previous_tool, exists=True) \
@@ -149,6 +152,48 @@ class EditContext(object):
         self.manager.settings["manip_mode"] = mode
         self.on_setting("manip_mode")
         self.manager.redraw()
+
+    def hover(self, x, y):
+        """v01.14 - 화면 (x, y)(M3dView 픽셀, 왼쪽 아래 원점)에 있는 기즈모 부분을 굵게. 바뀔 때만 다시 그린다. 바뀌었으면 True."""
+        part = None
+        busy = self.gizmo_drag is not None or self.session is not None or self.deform is not None or \
+            self.box is not None or self.radius_drag is not None
+        if not busy and self.manager.gizmo_on:
+            frame = self.manager.gizmo_frame()
+            if frame is not None:
+                v = picking.ViewState()
+                part = gz.hit(frame[0], frame[1], self.manager.settings.get("manip_mode", gz.MODE_MOVE),
+                              v.view_proj, v.width, v.height, x, y)
+        if part == self.manager.gizmo_hover:
+            return False
+        self.manager.gizmo_hover = part
+        self.manager.redraw()
+        return True
+
+    def hover_at_cursor(self):
+        """마우스 커서 → 활성 3D 뷰 픽셀 → hover (GUI 전용). 뷰 밖이면 호버 없음."""
+        try:
+            import maya.api.OpenMayaUI as omui
+            from Framework.qt.qt import QCursor, QWidget
+            try:
+                from shiboken2 import wrapInstance
+            except ImportError:                            # pragma: no cover
+                from shiboken6 import wrapInstance
+            pos = QCursor.pos()
+            here = (pos.x(), pos.y())
+            if here == getattr(self, "_last_cursor", None):   # 한 움직임이 위젯마다 여러 번 온다 - 같은 자리는 한 번만
+                return False
+            self._last_cursor = here
+            view = omui.M3dView.active3dView()
+            widget = wrapInstance(int(view.widget()), QWidget)
+            local = widget.mapFromGlobal(pos)
+            if not widget.rect().contains(local):
+                return self.hover(-1e6, -1e6)
+            sx = view.portWidth() / float(max(widget.width(), 1))       # 고해상도 배율 (위젯 px → 뷰포트 px)
+            sy = view.portHeight() / float(max(widget.height(), 1))
+            return self.hover(local.x() * sx, (widget.height() - local.y()) * sy)
+        except Exception:                                  # noqa: BLE001 - 호버는 보조 기능, 실패해도 조용히
+            return False
 
     def _ctrl_shift(self):
         """Ctrl 과 Shift 를 함께 누르고 있나 (반경 끌기 안전망). draggerContext 의 modifier 는 하나만 알려 준다."""
@@ -388,6 +433,7 @@ class EditContext(object):
         elif not self._open_deform():
             return False
         self.gizmo_drag = drag
+        self.manager.gizmo_hover = None
         self.manager.gizmo_active = part
         self.manager.gizmo_axes = axes
         self.manager.redraw()
@@ -523,10 +569,18 @@ def _make_key_filter(context):
     from Framework.qt.qt import QEvent, QObject, Qt
 
     watched = (QEvent.ShortcutOverride, QEvent.KeyPress, QEvent.KeyRelease)
+    mouse_move = QEvent.MouseMove
 
     class _KeyFilter(QObject):
         def eventFilter(self, obj, event):
             et = event.type()
+            if et == mouse_move:                           # v01.14 호버 - 버튼 없이 움직일 때만, 이벤트는 먹지 않는다
+                try:
+                    if event.buttons() == Qt.NoButton and context.is_active():
+                        context.hover_at_cursor()
+                except Exception:                          # noqa: BLE001
+                    pass
+                return False
             if et not in watched:
                 return False
             try:
