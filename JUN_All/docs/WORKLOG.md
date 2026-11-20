@@ -33,6 +33,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-20 (오늘)
 
+> [!summary] **`A00210_FileManager` v01.54 — Maya > File Date: 체크한 .ma / .mb / .fbx 의 수정한 날짜만 바꾸기 (내용 그대로, 기본 오늘)** `#A00210_FileManager`
+- 요청: 경로를 탐색해 파일을 나열 · 체크하고(Maya > Reference 의 트리 재사용 가능), 체크한 파일의 저장 날짜만 바꾸기. 기본 오늘, 지금은 fbx · ma · mb.
+- 구현: Maya 탭 세 번째 하위탭 `File Date`. 위 = 공용 `JUN_mod_fileTree_qt_v01`(파일 체크, 기본 ma/mb/fbx) · 가운데 = 체크한 파일 표(지금 · 바뀔 날짜) ·
+  아래 = Date(기본 오늘, Today) · Time(각 파일 시각 유지 기본 / 지정) · Set Date(확인 창) · Undo Last.
+- 코어 `app/maya/core/file_dates.py`: `os.utime` 으로 수정 시각만(접근 시각 유지, 만든 날짜 안 건드림), 바뀐 값 재확인, 원래 시각 기록 → restore.
+- 시험 `tests/test_file_date.py` 24 항목(내용 해시 · 크기 불변, 대문자 `.FBX`, 읽기 전용, 미리보기, Undo, 메인 창 탭) + 기존 Export UI 32 · UI paths 28 · Sync UI 108 · Export core 50 통과.
+  `test_sync_ui` 는 cp949 콘솔에서 `—` 출력으로 죽는다(이번 변경 전에도 같음) → `PYTHONIOENCODING=utf-8` 로 돌린다. **GUI 확인 아직.**
+- 문서: 가이드 §4-G · CHANGELOG · version, 포트폴리오 EN/KR.
+
 > [!summary] **`A00630_MotionPathEditor` v01.04 — Speed 탭: 속도 그래프 + Smooth 브러시 (속도 그래프 계획서 G0 ~ G5)** `#A00630_MotionPathEditor`
 - 요청: 어제 쓴 [`plans/A00630_MotionPathEditor_speed_graph_plan.md`](plans/A00630_MotionPathEditor_speed_graph_plan.md) 대로 진행 (결정 Q1 ~ Q5 = 추천대로).
 - **G0 실측**: 마야 커브 = 핸들 (x·fps/3, y/3) Bezier · 비가중은 Hermite — 우리 평가가 `MFnAnimCurve.evaluate` 와 24/30/60 fps · cm/m · 가중/비가중 전부 1e-11 안.

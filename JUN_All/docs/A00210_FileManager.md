@@ -571,6 +571,51 @@ mayapy [C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe] [Browse...] [Detect] 
 
 ---
 
+## 4-G. Maya 탭 — File Date (v01.54)
+
+**체크한 `.ma` · `.mb` · `.fbx` 파일의 "수정한 날짜"만 바꾼다. 파일 내용 · 크기는 그대로다.** 기본은 **오늘**.
+마야를 쓰지 않는다(mayapy 없이 바로 끝난다).
+
+```
+Change only the modified date of the checked files - the contents stay as they are.
+┌ Path Tree (Reference · Export 와 같은 공용 폴더 트리 + 파일 체크, File Types 기본 .ma .mb .fbx) ┐
+│ Path [..........] [Browse...]  Adaptive  Depth  Show files  File Types  [Build Tree] [Expand] │
+│ ▸ 📁 Anim     [v] walk_01.ma   [ ] run_02.mb   [v] jump_03.fbx                               │
+└──────────────────────────────────────────────────────────────────────────────────────┘
+┌ Checked Files ─────────────────────────────────────────────────────────────────────┐
+│ File          Folder              Modified now          Will be                     │
+│ walk_01.ma    D:\...\Anim          2026-10-02 14:31:07   2026-11-20 14:31:07          │
+│ jump_03.fbx   D:\...\Anim          2026-09-28 09:12:44   2026-11-20 09:12:44          │
+│ 2 file(s)                                                       [Uncheck All]       │
+└────────────────────────────────────────────────────────────────────────────────────┘
+┌ New Modified Date ─────────────────────────────────────────────────────────────────┐
+│ Date [2026-11-20 ▾] [Today]                                                        │
+│ Time (•) Keep each file's time  ( ) Set time [14:00:00]                              │
+│ [        Set Date (2 file(s))        ] [ Undo Last ]                                │
+└────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 흐름
+
+1. 트리에 경로를 넣고 **Build Tree** → 바꿀 파일을 체크한다(Shift 로 여러 행을 고른 뒤 체크 하나로 전부).
+2. **Checked Files** 표에 지금 수정한 날짜와 **바뀔 날짜(Will be)** 가 바로 보인다. 날짜 · 시각을 바꾸면 미리보기도 바로 바뀐다.
+3. **Date** — 기본 오늘. 달력에서 고르거나 `Today` 로 오늘로 되돌린다.
+4. **Time** — `Keep each file's time`(기본) = 날짜만 바꾸고 파일마다 원래 시:분:초 유지 · `Set time` = 모든 파일을 같은 시각으로.
+5. **Set Date** → 확인 창 → 바꾼다. 로그에 `[OK]` · 실패는 `[FAIL]` · 대상 아닌 체크 파일은 `[SKIP]`.
+6. **Undo Last** — 마지막 Set Date 가 바꾼 파일을 원래 수정 시각으로 되돌린다.
+
+### 알아 둘 것
+
+- 바꾸는 것은 **수정한 날짜(mtime)** 하나다. 접근 시각은 원래대로 두고, **만든 날짜(Windows creation time)는 건드리지 않는다.**
+  파일을 열어 쓰지 않는다(`os.utime`) — 내용 해시 · 크기 그대로(시험으로 확인).
+- 대상 확장자는 지금 `.ma` · `.mb` · `.fbx`(대소문자 무관). 트리에서 다른 확장자를 켜고 체크해도 표에서 빠지고 `[SKIP]` 로 알린다.
+- 읽기 전용 파일도 바뀐다(Windows 의 읽기 전용은 내용 쓰기만 막는다).
+- **Sync 탭 주의**: Sync 는 수정 시각이 바뀌면 그 파일을 다시 해시한다(판정은 해시라 결과는 그대로, 다음 스캔만 조금 느려진다).
+- 표 우클릭 = Reveal in File Explorer / Copy file path, 더블클릭 = Reveal.
+- 코어 `app/maya/core/file_dates.py`(UI 비의존) · UI `app/maya/ui/file_date_tab.py` · 시험 `tests/test_file_date.py`(24 항목).
+
+---
+
 ## 4-F. Sync 탭 — PC 간 작업 파일 동기화 추적 (v01.47)
 
 여러 PC 가 같은 경로(예: 정션 `C:\JUN\JUN_MUE`)로 작업할 때 **어느 PC 의 파일이 최신이고, 어느 PC 에 파일이 없거나 옛것인지** 를

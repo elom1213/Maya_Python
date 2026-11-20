@@ -2,6 +2,15 @@
 
 All notable changes to this tool are documented here.
 
+## [01.54] - 2026-11-20
+
+- **[Maya > File Date] 새 하위탭 — 체크한 `.ma` · `.mb` · `.fbx` 의 수정한 날짜만 바꾼다(내용 그대로).**
+  - 위: Reference · Export 와 같은 공용 폴더 트리(파일 체크, 기본 타입 ma/mb/fbx). 가운데: 체크한 파일 표(지금 날짜 · 바뀔 날짜 미리보기).
+  - 날짜 기본 **오늘**(`Today` 버튼). 시각은 `Keep each file's time`(기본, 날짜만) / `Set time`(모두 같은 시각).
+  - `Set Date` = 확인 창 뒤 `os.utime` 으로 수정 시각만(접근 시각 유지, 만든 날짜 안 건드림). `Undo Last` = 마지막 변경 되돌리기.
+  - 대상 밖 확장자 · 없는 파일은 건너뛰고 `[SKIP]`. 읽기 전용 파일도 바뀐다.
+  - 코어 `app/maya/core/file_dates.py` · UI `app/maya/ui/file_date_tab.py` · 시험 `tests/test_file_date.py` 24 항목.
+
 ## [01.53] - 2026-11-09
 
 - **[Sync > Status] 트리 이름 순.** 경로 · 파일이 비교 결과 순서(폴더는 처음 나온 파일 때 생긴 순서)로 섞여 보이던 것을 단계마다 정렬한다.
