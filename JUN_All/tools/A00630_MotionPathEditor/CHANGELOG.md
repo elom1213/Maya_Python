@@ -1,5 +1,14 @@
 # Changelog — A00630_MotionPathEditor
 
+## v01.05 (2026-11-20)
+
+- **[Fix] Speed 탭에서 획 · 끌기 뒤 Ctrl+Z / Z 를 눌러도 그래프(와 애니메이션)가 되돌아가지 않던 것.**
+  원인: 그래프 빈 곳 **스크럽**이 `cmds.currentTime` 을 마우스 이동마다 불렀고, 스크립트에서 부른 `currentTime` 은 **부를 때마다 undo 하나**가 쌓인다
+  (mayapy 실측 - 마야 타임 슬라이더 드래그는 안 쌓인다). 그래서 획 뒤에 그래프를 조금만 훑어도 Ctrl+Z 가 획이 아니라 **시간만 한 프레임씩** 되돌렸다.
+  - 스크럽 = API `MAnimControl.setCurrentTime` (undo 큐 밖, `timeChanged` 는 그대로 → 그래프 · 뷰포트 현재 프레임은 따라온다). 같은 프레임이면 부르지 않는다.
+  - 나머지 조작(오른쪽 드래그 획 · 곡선 끌기 · 키 선 끌기 · Smooth Range)은 원래 **undo 하나씩**이고 undo · redo 뒤 그래프도 돌아온다 - 진단 시험으로 확인.
+  - 시험: 획 → 스크럽 10 프레임 → **undo 한 번에 획이 사라지고**, 시간은 그대로(큐에 안 쌓임), 그래프 = 원래 곡선, redo = 획 곡선 (6항목, 옛 코드에서는 3개 실패).
+
 ## v01.04 (2026-11-20)
 
 - **[New] Speed 탭 — 속도 그래프 + Smooth** (계획서 `docs/plans/A00630_MotionPathEditor_speed_graph_plan.md` G0~G5, 원본 애드온의 *Speed Graph* 를 독자 구현).

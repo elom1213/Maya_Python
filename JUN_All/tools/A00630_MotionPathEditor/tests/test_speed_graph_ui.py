@@ -157,6 +157,39 @@ cmds.undo()
 check("Ctrl+Z (one undo) = the stroke is gone", np.abs(track(node, FR) - before).max() < 1e-9)
 win.manager.refresh_all()
 
+# ---- v01.05 획 → 그래프 스크럽 → Ctrl+Z 한 번 = 획이 사라지고 그래프도 원래대로
+#      (v01.04 는 스크럽이 cmds.currentTime 을 마우스 이동마다 불러 undo 큐에 시간 변경이 쌓였다 - Ctrl+Z 가 시간만 되돌림)
+cmds.flushUndo()
+g_before = np.array(graph.data["series"][-1]["ys"]).copy()
+mouse(graph, "press", float(graph.frame_to_x(42)), ybot, Qt.RightButton, Qt.RightButton)
+for f in np.linspace(42, 62, 8):
+    mouse(graph, "move", float(graph.frame_to_x(f)), ybot, Qt.NoButton, Qt.RightButton)
+mouse(graph, "release", float(graph.frame_to_x(62)), ybot, Qt.RightButton, Qt.NoButton)
+g_stroke = np.array(graph.data["series"][-1]["ys"]).copy()
+check("v01.05: the graph shows the stroke", np.abs(g_stroke - g_before).max() > 1e-3)
+# 빈 곳 = 키 선도 곡선도 아닌 곳 (획이 키를 더했을 수 있다 / 곡선 위면 속도 끌기가 된다)
+f_scrub = [f for f in range(5, 110) if graph.key_at(float(graph.frame_to_x(f))) is None][0]
+x_s = float(graph.frame_to_x(f_scrub))
+ys_scrub = [y for y in range(int(ytop), int(ybot)) if not graph.on_curve(x_s, y)][0]
+mouse(graph, "press", x_s, ys_scrub, Qt.LeftButton, Qt.LeftButton)
+for f in range(f_scrub + 1, f_scrub + 11):
+    mouse(graph, "move", float(graph.frame_to_x(f)), ys_scrub, Qt.NoButton, Qt.LeftButton)
+mouse(graph, "release", float(graph.frame_to_x(f_scrub + 10)), ys_scrub, Qt.LeftButton, Qt.NoButton)
+check("v01.05: scrubbing moves the time", cmds.currentTime(q=True) == f_scrub + 10.0, (f_scrub, cmds.currentTime(q=True)))
+cmds.undo()
+check("v01.05: after scrubbing, ONE undo still removes the stroke", np.abs(track(node, FR) - before).max() < 1e-9)
+check("v01.05: scrubbing put nothing in the undo queue (time stays)", cmds.currentTime(q=True) == f_scrub + 10.0,
+      cmds.currentTime(q=True))
+win.watcher.flush()                     # 마야는 Undo 알림 뒤 idle 에 부른다
+check("v01.05: after undo the graph shows the original curve",
+      np.abs(np.array(graph.data["series"][-1]["ys"]) - g_before).max() < 1e-9)
+cmds.redo()
+win.watcher.flush()
+check("v01.05: redo brings the stroke back in the graph",
+      np.abs(np.array(graph.data["series"][-1]["ys"]) - g_stroke).max() < 1e-9)
+cmds.undo()
+win.watcher.flush()
+
 # 끄는 중 Esc = 취소
 mouse(graph, "press", float(graph.frame_to_x(42)), ybot, Qt.RightButton, Qt.RightButton)
 mouse(graph, "move", float(graph.frame_to_x(55)), ybot, Qt.NoButton, Qt.RightButton)

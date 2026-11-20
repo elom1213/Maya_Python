@@ -32,5 +32,10 @@
 #        Whole Pose = 같은 시간 왜곡을 rotate · scale 에도. 칠하는 동안 뷰포트에 원래 경로 회색 점선 + 새 프레임 점.
 #        툴 창을 Path / Speed 탭으로 (tabFit).
 
-VERSION = "01.04"
+# 01.05  그래프에서 획 · 끌기 뒤 Ctrl+Z / Z 를 눌러도 그래프가 되돌아가지 않던 것. 그래프 빈 곳 스크럽이 cmds.currentTime 을
+#        마우스 이동마다 불렀는데, 스크립트의 currentTime 은 **부를 때마다 undo 하나**가 쌓인다(실측) - 획 뒤에 그래프를 조금만 훑어도
+#        Ctrl+Z 가 획이 아니라 시간 변경만 한 프레임씩 되돌렸다. 스크럽을 API MAnimControl.setCurrentTime 으로(undo 큐 밖, timeChanged 는
+#        그대로). 같은 프레임이면 부르지 않는다. 획 · 곡선 끌기 · 키 선 끌기 · Smooth Range 자체는 원래 undo 하나씩이었다(진단 시험).
+
+VERSION = "01.05"
 LAST_UPDATE = "2026-11-20"

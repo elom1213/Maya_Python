@@ -1,6 +1,6 @@
 ---
 name: maya-time-context-traps
-description: Maya traps found 2026-11-19 - getAttr -time worldMatrix can return stale values after the node's own curve changes; currentTime(update=False)+plug read is stale; doNotWrite nodes still write the plugin requires line
+description: Maya traps found 2026-11-19 - getAttr -time worldMatrix can return stale values after the node's own curve changes; currentTime(update=False)+plug read is stale; doNotWrite nodes still write the plugin requires line; scripted cmds.currentTime adds an undo entry per call
 metadata:
   type: reference
 ---
@@ -25,5 +25,10 @@ Measured in mayapy 2024 while building [[wip-a00630-motion-path]]:
    (on override layers that bends a curve that should be constant).
 6. **Undo of a newly created layer curve leaves stale evaluation** downstream of the blend chain (even when stepping time);
    data is correct. `cmds.dgdirty(target + blend nodes)` fixes it; a marker MPxCommand first in the undo chunk does it on undo.
+7. **Scripted `cmds.currentTime(t)` puts one undo entry in the queue per call** (measured 2026-11-20: two calls = two
+   nameless entries, `cmds.undo()` moves time back; the Time Slider drag does not). A scrub that calls it on every mouse
+   move buries the user's last real edit — Ctrl+Z then only steps time back (A00630 v01.05 bug). For UI scrubbing use
+   `oma.MAnimControl.setCurrentTime(om.MTime(f, om.MTime.uiUnit()))`: no undo entry, still fires `timeChanged` and evaluates.
+   Skip the call when the frame is unchanged.
 
 Related: [[mayapy-headless-verify]] · [[parentmatrix-includes-offsetparentmatrix]]

@@ -33,6 +33,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-20 (오늘)
 
+> [!summary] **`A00630_MotionPathEditor` v01.05 — 그래프 조작 뒤 Ctrl+Z 가 그래프를 되돌리지 못하던 것 (스크럽이 undo 큐를 채움)** `#A00630_MotionPathEditor`
+- 보고: 속도 그래프 계획서 §1-2 조작(획 · 끌기)을 하고 Ctrl+Z / Z 를 누르면 undo 는 되는데 그래프는 그대로.
+- 진단(mayapy 오프스크린): 획 · 곡선 끌기 · 키 선 끌기 · Smooth Range 는 각각 **undo 하나**이고 undo · redo 뒤 그래프도 돌아온다.
+  범인은 **빈 곳 스크럽** — `cmds.currentTime` 을 마우스 이동마다 불렀는데 스크립트의 `currentTime` 은 **부를 때마다 undo 하나**가 쌓인다(실측).
+  획 뒤에 그래프를 조금만 훑어도 Ctrl+Z 가 시간만 한 프레임씩 되돌렸다(옛 코드 재현: 15 → 14, 획 그대로).
+- 수정: 스크럽 = API `MAnimControl.setCurrentTime`(undo 큐 밖, `timeChanged` 는 그대로), 같은 프레임이면 부르지 않음.
+- 시험 6항목 추가(획 → 스크럽 → undo 한 번 = 획 사라짐 · 시간 그대로 · 그래프 원래 곡선 · redo = 획 곡선, 옛 코드는 3개 실패). A00630 전체 304항목 통과. **마야 GUI 확인 아직.**
+
 > [!summary] **`A00240_PathTool` v01.32~33 — ShortCut 탭의 Profile · Create · Color 를 접이식으로 (v01.33 하나로 함께 접기)** `#A00240_PathTool`
 - 요청: ShortCut 의 Profile, Create, Color 를 접을 수 있게. (하위 탭으로 옆에 나열하는 규칙과 달리, 이 셋은 경로 버튼과 **함께 보는** 보조 줄이라 접이식이 맞다.)
 - 세 QGroupBox → 공용 `JUN_mod_collapsible_qt_v01`. 접힘 상태 = `data/ui_state.json`(새 `prefs.get_ui_state / set_ui_state`, 프로파일과 무관), 접고 펼 때 `tab_fit.fit_later()`.

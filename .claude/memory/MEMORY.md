@@ -63,7 +63,7 @@
 - shapes/curves — [parent -s -add = instance](parent-shape-add-is-instance.md) · [extendToShape picks wrong shape](extendtoshape-picks-wrong-shape.md)(공용 `maya_shape`) · [pointPosition: points only](pointposition-points-only.md) · [cmds -pivot is world](cmds-scale-rotate-pivot-is-world.md) · [referenced curve CV write](referenced-curve-cv-write.md)(xform 으로만)
 - [Reference parent → click selects shape](maya-reference-parent-selects-shape.md) — 틀이 Reference 면 컨트롤 트랜스폼에도 override normal 을 줄 것
 - [cp949 non-ASCII traps](maya-codepage-nonascii-traps.md) — cp949 밖 글자 경로는 텍스처 못 읽음 · .ma 문자열 `?` · getVertexNormal 은 잠긴 노멀 무시
-- [time-context traps](maya-time-context-traps.md) — `getAttr -time worldMatrix` 옛 값 · currentTime(update=False) 옛 값 · 플러그인 노드가 있으면 저장 파일이 requires
+- [time-context traps](maya-time-context-traps.md) — **스크립트 `currentTime` = 호출마다 undo 하나(스크럽은 MAnimControl)** · `getAttr -time worldMatrix` 옛 값 · currentTime(update=False) 옛 값 · 플러그인 노드가 있으면 저장 파일이 requires
 - [viewport Tab is MTK](maya-viewport-tab-is-mtk.md) — 뷰포트 Tab 은 hotkey 무시, `nexOpt mayaTabPressCmd` 를 바꿔 끼울 것 (GUI 전용)
 - [Euler closestSolution not equivalent](euler-closest-solution-not-equivalent.md) — 짐벌 근처 다른 회전, closestCut + alternate 로 · 오일러는 축별로 안 더해진다
 - API lifetime — [MPlug.asMObject](mplug-asmobject-lifetime.md) · [MFn cvPositions](mfn-cvpositions-lifetime.md)(읽는 즉시 tuple 로)
@@ -127,5 +127,5 @@
 - JALI 슬라이더 리그 — [A0020_jali_slider_ctl](wip-jali-slider-ctl.md)(angela 1:1 슬라이더 22 + JaLi 박스, remapValue 리맵, DUMMY_IN/OUT 3쌍, global_scale · 생성/검증은 JUN_JALI examples · GUI 확인 아직)
 - A00620 — [NameDecoder](wip-a00620-namedecoder.md)(FBXASC 이름 디코드 · 마야는 유니코드 이름 불가(setName 조용히 무시) · FBX 익스포터가 원래 글자로 복원 → 기본 읽기 전용 · 공용 `fbx_name` · v01.02 Outliner 탭 = 공용 `maya_icons` + 필터 `tree_recursive`)
 - A00610 — [PmxImporter](wip-a00610-pmximporter.md)(v01.01 부여 = rotateAxis(부여 먼저) · IK 근사 · 로컬축 · 기준 mb + Blender mmd_tools 골든, mmd_tools 부여는 오일러 근사)
-- A00630 — [MotionPathEditor v01.04](wip-a00630-motion-path.md)(GPL 애드온 독자 구현 · parentMatrix 만 굽기 · v01.04 Speed 탭: 마야 커브 = (x·fps/3, y/3) Bezier refit · 획 하나 = undo 하나 · GUI 확인 아직)
+- A00630 — [MotionPathEditor v01.05](wip-a00630-motion-path.md)(GPL 애드온 독자 구현 · parentMatrix 만 굽기 · v01.04 Speed 탭 refit · 획 하나 = undo 하나 · **v01.05 스크립트 currentTime 은 undo 가 쌓인다 → 스크럽은 MAnimControl** · GUI 확인 아직)
 - A00640 — [AttrSlider](wip-a00640-attrslider.md)(채널박스 어트리뷰트 · BS 타겟 슬라이더 · FBXASC 풀기, 범위 = 사용자 > 소프트 > 하드, 드리븐 키는 setAttr 가 조용히 덮어써짐)

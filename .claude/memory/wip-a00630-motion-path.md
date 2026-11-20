@@ -51,6 +51,10 @@ then move — user's Q4 choice, proportional editing, numeric input), then phase
   (new target = current curve + L(new) − L(prev)); session invalidated by curve signature (`StrokeSession.valid`).
   Speed smooth = time warp on the original path (shape kept), arc length conserved per run between holds → holds stay put.
 - Tolerance must be relative (0.1% of path size): fixed 0.01 cm needed 25 keys on a metre-unit scene.
+- v01.05 (2026-11-20): user report "after a graph stroke, Ctrl+Z / Z does not bring the graph back" = graph scrub used
+  `cmds.currentTime` (one undo entry per mouse move, see [[maya-time-context-traps]] 7) → `MAnimControl.setCurrentTime`.
+  Stroke / curve drag / key-line drag / Smooth Range were already one undo each and the graph followed undo/redo (diagnosed
+  headlessly). Regression test: stroke → scrub → one undo removes the stroke, graph = original, redo = stroke (old code fails 3).
 - Next: Maya GUI check (viewport ghost line while painting, Esc/wheel focus, Pop Out), then plan phase 1.5 / 2.
 
 Related: [[maya-time-context-traps]] · [[wip-a00380-quad-patch]] · [[mayapy-headless-verify]] · [[feedback-sliders-use-shared-style]]

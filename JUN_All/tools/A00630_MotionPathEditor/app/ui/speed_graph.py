@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
 # last Update date : 2026-11-20
-# A00630_MotionPathEditor - 속도 그래프 위젯 · 패널 (속도 그래프 계획서 §3 · §4-7, v01.04)
+# A00630_MotionPathEditor - 속도 그래프 위젯 · 패널 (속도 그래프 계획서 §3 · §4-7, v01.04 / v01.05 스크럽 undo 큐 밖)
 """
 SpeedGraphWidget — QPainter 로 그리는 그래프 (마야 비의존 - 데이터는 패널이 set_data 로 넣는다)
     가로 = 프레임, 세로 = 모드 값 (Speed: 경로 길이/프레임 · Position: X/Y/Z · Acceleration: 길이/프레임²)
@@ -22,6 +22,7 @@ UI 문자열은 영어.
 import numpy as np
 
 import maya.api.OpenMaya as om
+import maya.api.OpenMayaAnim as oma
 import maya.cmds as cmds
 
 from Framework.qt.qt import *
@@ -786,7 +787,17 @@ class SpeedPanel(QWidget):
             self.log("[Info] Stroke cancelled.")
 
     def _on_scrub(self, f):
-        cmds.currentTime(round(f), update=True)
+        """현재 프레임을 마우스로 (v01.05: undo 큐에 넣지 않는다).
+
+        `cmds.currentTime` 은 스크립트에서 부르면 **부를 때마다 undo 하나**가 쌓인다(실측 - 마야 타임 슬라이더는 안 쌓인다).
+        스크럽은 마우스 이동마다 부르므로 획 뒤에 그래프를 조금만 훑어도 Ctrl+Z 가 획이 아니라 시간 변경만 되돌렸다
+        (그래프가 그대로 = "undo 가 안 된다"). API `MAnimControl.setCurrentTime` 은 큐에 남지 않고 timeChanged 도 보낸다.
+        """
+        frame = float(round(f))
+        unit = om.MTime.uiUnit()
+        if abs(oma.MAnimControl.currentTime().asUnits(unit) - frame) < 1e-9:
+            return
+        oma.MAnimControl.setCurrentTime(om.MTime(frame, unit))
 
     def _on_key_moved(self, t_old, t_new):
         cache = self.active_cache()
