@@ -363,6 +363,7 @@ JUN_All/tools/A00630_MotionPathEditor/
 
 **하위 계획서**
 - 속도 그래프 · Smooth Speed (2단계 타이밍 + 4단계 3번 · 2번 일부) → [`A00630_MotionPathEditor_speed_graph_plan.md`](A00630_MotionPathEditor_speed_graph_plan.md) (2026-11-19 계획, **2026-11-20 v01.04 구현** · GUI 확인 전)
+- 매니퓰레이터 · 폴오프 편집(1.5단계 "비례 편집" + 프레임 점 고르기, Speed 탭 Edit Path · 라이브 그래프 · 폴오프 위치 Smooth) → [`A00630_MotionPathEditor_manipulator_falloff_plan.md`](A00630_MotionPathEditor_manipulator_falloff_plan.md) (2026-11-20 계획, 구현 전)
 
 ---
 

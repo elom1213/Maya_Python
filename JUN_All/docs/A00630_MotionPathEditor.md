@@ -15,6 +15,7 @@ updated: 2026-11-20
   툴 런처(A00370) ANIM 프로파일에도 **MotionPath** 버튼이 있다.
 - **계획서**: [plans/A00630_MotionPathEditor_plan.md](plans/A00630_MotionPathEditor_plan.md) — 단계별 계획 · 0단계 실측 결과 · 다음 단계
   · 속도 그래프: [plans/A00630_MotionPathEditor_speed_graph_plan.md](plans/A00630_MotionPathEditor_speed_graph_plan.md) — 진단 · G0 실측 · 설계
+  · 매니퓰레이터 · 폴오프 (계획, 구현 전): [plans/A00630_MotionPathEditor_manipulator_falloff_plan.md](plans/A00630_MotionPathEditor_manipulator_falloff_plan.md)
 - **원본 아이디어**: 블렌더 애드온 *Editable Motion Paths* (GPL-3.0-or-later). **코드는 쓰지 않은 독자 구현**이다(계획서 §1).
 
 ---

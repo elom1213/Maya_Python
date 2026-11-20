@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-20 (오늘)
 
+> [!summary] **`A00630_MotionPathEditor` 매니퓰레이터 · 폴오프 편집 계획서** `#A00630_MotionPathEditor`
+- 요청: Edit Path 에서 고른 점을 이동 · 회전하는 매니퓰레이터, `b`+끌기 폴오프(강도별 색), Speed 탭 Edit Path + 라이브 그래프, 그래프 [a, b] 색 + Smooth Range 위치 스무딩 — 작업 계획서.
+- 계획: 프레임 점도 고르기 · 폴오프 = 경로를 따라 잰 프레임 거리(월드 거리는 고리 경로에서 [a, b] 가 깨짐) · 쓰기는 기존 `StrokeSession` 에 `deform` 모드 하나(미리보기 · 차이만 쓰기 · refit · undo 하나 재사용) ·
+  기즈모는 플러그인이 직접 그림 · `b` 키는 마야 핫키와 겹쳐 G0 GUI 실측(Qt 이벤트 필터 / 핫키 교체) + 창 칸 · Ctrl+Shift 끌기 안전망 · G1~G4 = v01.09~v01.12.
+- 문서: `docs/plans/A00630_MotionPathEditor_manipulator_falloff_plan.md`(신규) · 상위 계획서 하위 계획 목록 · 가이드 링크.
+
 > [!summary] **`A00630_MotionPathEditor` v01.08 — Acceleration 그래프 스무딩 (브러시 Smooth Acceleration)** `#A00630_MotionPathEditor`
 - 요청: Speed 의 Acceleration 그래프도 스무딩할 수 있나, 안 되면 되게.
 - 진단: 칠하면 브러시는 돌지만 가속도용이 아니었다 — Smooth Speed 는 꺾인 곳을 더 빨리 지나가게 해 최대 가속도 0.057 → **0.197**(악화, 미리보기 단계에서 이미),
