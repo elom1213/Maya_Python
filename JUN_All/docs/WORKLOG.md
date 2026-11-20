@@ -33,6 +33,14 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-20 (오늘)
 
+> [!summary] **`A00630_MotionPathEditor` v01.08 — Acceleration 그래프 스무딩 (브러시 Smooth Acceleration)** `#A00630_MotionPathEditor`
+- 요청: Speed 의 Acceleration 그래프도 스무딩할 수 있나, 안 되면 되게.
+- 진단: 칠하면 브러시는 돌지만 가속도용이 아니었다 — Smooth Speed 는 꺾인 곳을 더 빨리 지나가게 해 최대 가속도 0.057 → **0.197**(악화, 미리보기 단계에서 이미),
+  Smooth Shape 는 큰 호를 지키는 Taubin 이라 10% 감소 + refit 위치 오차(0.013 cm)의 2차 차분이 가속도 잡음.
+- 수정: `retime.AccelSmoother`(시간 축 가우스 평균 쪽으로 당김, 되밀지 않음) · 세션 `MODE_ACCEL`(refit 허용 오차 1/5) · Brush 콤보 `Smooth Acceleration`,
+  Show = Acceleration 이면 저절로 고르고 나오면 그 전 브러시로. 칠한 구간 최대 0.057 → 0.017, 평균 −67%, 브러시 밖 불변.
+- 시험 12항목 추가, A00630 전체 331항목 통과. **마야 GUI 확인 아직.**
+
 > [!summary] **`A00630_MotionPathEditor` v01.07 — 키 끌기가 `no attribute 'junMotionPathDirty'` 로 실패하던 것 (마야에 남은 옛 플러그인)** `#A00630_MotionPathEditor`
 - 보고: 00010_cleanup_CHOEUN_00130.mb 의 CH_r_knee_xx_ctl_LOC 경로를 고치면 `[FAIL] Drag : module 'maya.cmds' has no attribute 'junMotionPathDirty'`.
 - 원인: 씬과 무관. 마야를 켠 채 툴만 새 버전이 되면 처음 읽힌 **v01.00~02 플러그인(1.0)** 이 남는다 — `ensure_plugin` 이 "이미 읽힘" 이면 그대로 뒀고, 그 플러그인에는 v01.03 의 `junMotionPathDirty` 가 없다. 옛 플러그인 사본으로 같은 에러 재현.

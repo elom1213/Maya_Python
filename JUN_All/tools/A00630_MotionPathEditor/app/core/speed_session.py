@@ -48,6 +48,8 @@ from . import retime
 COMMAND = "junMotionPathSetKeys"
 MODE_SPEED = "speed"
 MODE_SHAPE = "shape"
+MODE_ACCEL = "accel"          # v01.08 가속도 Smooth (retime.AccelSmoother)
+ACCEL_TOL_FACTOR = 0.2         # 가속도 브러시는 refit 을 더 엄격히 - 위치 오차의 2차 차분이 그대로 가속도 잡음이 된다
 POSE_ATTRS = ("rotateX", "rotateY", "rotateZ", "scaleX", "scaleY", "scaleZ")
 STEP = 0.25
 BETA_EPS = 1e-6
@@ -94,6 +96,8 @@ class StrokeSession(object):
         self.whole_pose = bool(whole_pose) and mode == MODE_SPEED
         self.tolerance_rel = float(tolerance_rel)
         self.tolerance = max(refit.TOL_LINEAR, float(tolerance_rel) * al.size(cache.points))   # 위치 (내부 단위)
+        if mode == MODE_ACCEL:
+            self.tolerance = max(refit.TOL_LINEAR, self.tolerance * ACCEL_TOL_FACTOR)
         self.times = np.asarray(cache.times, dtype="float64")
         self.points0 = cache.points.copy()
         self.T0 = cache.T.copy()
@@ -107,7 +111,8 @@ class StrokeSession(object):
             self.retimer = retime.SpeedRetimer(u, P)
             state0 = self.retimer.v0.copy()
         else:
-            self.shaper = retime.ShapeSmoother(self.times, self.points0)
+            smoother = retime.AccelSmoother if mode == MODE_ACCEL else retime.ShapeSmoother
+            self.shaper = smoother(self.times, self.points0)
             state0 = self.points0.copy()
         self.stack = [state0]
         self.current = state0

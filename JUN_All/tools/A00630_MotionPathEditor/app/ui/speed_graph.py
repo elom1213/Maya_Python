@@ -41,6 +41,8 @@ RANGE_AROUND = "around"
 RANGE_CUSTOM = "custom"           # v01.06 [Start, End] 만
 BRUSH_SPEED = "speed"
 BRUSH_SHAPE = "shape"
+BRUSH_ACCEL = "accel"            # v01.08 가속도 Smooth
+_BRUSH_KIND = {BRUSH_SPEED: ss.MODE_SPEED, BRUSH_SHAPE: ss.MODE_SHAPE, BRUSH_ACCEL: ss.MODE_ACCEL}
 
 _BG = QColor(38, 38, 38)
 _PLOT_BG = QColor(30, 30, 30)
@@ -369,7 +371,7 @@ class SpeedPanel(QWidget):
             rb.setChecked(s["graph_mode"] == value)
             self.mode_buttons.addButton(rb)
             row.addWidget(rb)
-        self.mode_buttons.buttonClicked.connect(lambda b: self._set("graph_mode", b.property("value")))
+        self.mode_buttons.buttonClicked.connect(lambda b: self._on_graph_mode(b.property("value")))
         row.addStretch(1)
         self.cmb_units = QComboBox()
         self.cmb_units.addItems(["per frame", "per second"])
@@ -436,11 +438,14 @@ class SpeedPanel(QWidget):
         self.cmb_brush = QComboBox()
         self.cmb_brush.addItem("Smooth Speed", BRUSH_SPEED)
         self.cmb_brush.addItem("Smooth Shape", BRUSH_SHAPE)
+        self.cmb_brush.addItem("Smooth Acceleration", BRUSH_ACCEL)
         self.cmb_brush.setToolTip(
             "Smooth Speed: evens out the timing - the path keeps its shape, the keys keep their frames,\n"
             "the poses slide along the path. A hold stays a hold.\n"
-            "Smooth Shape: removes bumps from the path itself (big arcs stay).")
-        self.cmb_brush.setCurrentIndex(1 if s["brush_mode"] == BRUSH_SHAPE else 0)
+            "Smooth Shape: removes bumps from the path itself (big arcs stay).\n"
+            "Smooth Acceleration: evens out the acceleration - pops, jitter and sharp turns get rounder\n"
+            "(shape and timing change together). Picked by itself when Show is Acceleration.")
+        self.cmb_brush.setCurrentIndex(max(self.cmb_brush.findData(s["brush_mode"]), 0))
         self.cmb_brush.currentIndexChanged.connect(lambda *_: self._set("brush_mode", self.cmb_brush.currentData()))
         row.addWidget(self.cmb_brush)
         row.addWidget(QLabel("Radius"))
@@ -529,6 +534,20 @@ class SpeedPanel(QWidget):
 
     def _log(self, text):
         self.log(text)
+
+    def _on_graph_mode(self, value):
+        """Show 바꾸기. v01.08 - Acceleration 을 보면 브러시도 Smooth Acceleration 으로(그 그래프를 칠하면 그 값이 고르게 되도록),
+        Acceleration 에서 나오면 그 전 브러시로 되돌린다(그동안 사용자가 브러시를 바꿨으면 그대로)."""
+        before = self.manager.settings["graph_mode"]
+        brush = self.manager.settings["brush_mode"]
+        if value == MODE_ACCEL and before != MODE_ACCEL and brush != BRUSH_ACCEL:
+            self._brush_before_accel = brush
+            self.cmb_brush.setCurrentIndex(self.cmb_brush.findData(BRUSH_ACCEL))
+        elif value != MODE_ACCEL and before == MODE_ACCEL and brush == BRUSH_ACCEL:
+            back = getattr(self, "_brush_before_accel", None)
+            if back:
+                self.cmb_brush.setCurrentIndex(self.cmb_brush.findData(back))
+        self._set("graph_mode", value)
 
     def _on_range_mode(self, value):
         self.range_edit.set_inputs_enabled(value == RANGE_CUSTOM)
@@ -727,7 +746,7 @@ class SpeedPanel(QWidget):
         self.manager.redraw()
 
     def _on_brush_started(self, f):
-        kind = ss.MODE_SHAPE if self.manager.settings["brush_mode"] == BRUSH_SHAPE else ss.MODE_SPEED
+        kind = _BRUSH_KIND.get(self.manager.settings["brush_mode"], ss.MODE_SPEED)
         s = self._session(kind)
         if s is not None:
             s.begin_stroke()
@@ -816,7 +835,7 @@ class SpeedPanel(QWidget):
         if cache is None:
             self.log("[WARN] Add a path first.")
             return
-        kind = ss.MODE_SHAPE if self.manager.settings["brush_mode"] == BRUSH_SHAPE else ss.MODE_SPEED
+        kind = _BRUSH_KIND.get(self.manager.settings["brush_mode"], ss.MODE_SPEED)
         s = self._session(kind)
         if s is None:
             return

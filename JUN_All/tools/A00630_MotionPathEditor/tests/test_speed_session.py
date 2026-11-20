@@ -256,6 +256,39 @@ check("change speed: outside the reach unchanged (< tol/10)",
       np.abs(a2[:40] - a0[:40]).max() < s.tolerance / 10 and np.abs(a2[80:] - a0[80:]).max() < s.tolerance / 10)
 cmds.undo()
 
+# ====================================================================== 6-2. 가속도 Smooth (v01.08)
+# 속도가 들쭉날쭉하고 키 35 에서 꺾이는 경로 - Smooth Speed 는 꺾인 곳 가속도를 키운다(실측), 가속도 브러시는 줄여야 한다
+scenes.new(120)
+node = cmds.polyCube(name="poppy")[0]
+for f in (1, 20, 35, 45, 60, 70, 90, 120):
+    cmds.setKeyframe(node, attribute="translateX", time=f, value=f * 0.2 + (1.5 if f in (35, 60) else 0.0))
+    cmds.setKeyframe(node, attribute="translateY", time=f, value=np.sin(f * 0.05) * 4)
+    cmds.setKeyframe(node, attribute="translateZ", time=f, value=0.0)
+cache = pc.PathCache(node, 1, 120)
+cache.rebake()
+a0 = track(node, FR)
+IN = FR[34:62]                                   # 칠한 곳 (35 ~ 62)
+acc0 = al.accel(FR, a0, IN)
+s = ss.StrokeSession(cache, mode=ss.MODE_ACCEL)
+check("accel: tighter refit tolerance than the other brushes",
+      abs(s.tolerance - max(0.01, ss.TOL_REL * al.size(cache.points) * ss.ACCEL_TOL_FACTOR)) < 1e-9 or s.tolerance == 0.01, s.tolerance)
+s.begin_stroke()
+for fc in np.linspace(35, 62, 10):
+    s.dab(fc, 12.0, 1.0)
+acc_prev = al.accel(cache.times, s.preview_points(), IN)
+s.end_stroke()
+a1 = track(node, FR)
+acc1 = al.accel(FR, a1, IN)
+check("accel: max acceleration in the stroke at least halved", acc1.max() < 0.5 * acc0.max(), (acc1.max(), acc0.max()))
+check("accel: mean acceleration in the stroke at least halved", acc1.mean() < 0.5 * acc0.mean(), (acc1.mean(), acc0.mean()))
+check("accel: what is written matches the preview (refit does not add pops)", np.abs(acc1 - acc_prev).max() < 0.25 * acc0.max(),
+      np.abs(acc1 - acc_prev).max())
+check("accel: outside the brush unchanged", np.abs(a1[:20] - a0[:20]).max() < 1e-3 and np.abs(a1[80:] - a0[80:]).max() < 1e-3,
+      (np.abs(a1[:20] - a0[:20]).max(), np.abs(a1[80:] - a0[80:]).max()))
+cmds.undo()
+cache.refresh()
+check("accel: one undo = back", np.abs(track(node, FR) - a0).max() < 1e-9)
+
 # ====================================================================== 7. 잠긴 경로
 names = scenes.hierarchy(120)
 cache = pc.PathCache(names["driven"], 1, 120)

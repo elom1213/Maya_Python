@@ -59,7 +59,10 @@ then move — user's Q4 choice, proportional editing, numeric input), then phase
 - v01.06 (2026-11-20): Speed tab Frames `Custom` = shared `MOD_timeRange_qt_v01` (Start/End/Get Sel Range) → graph shows only
   [Start, End], clipped to the path; no overlap → message instead of a graph. Settings `graph_start` / `graph_end`.
 - v01.07 (2026-11-20): stale plugin from an older tool version caused "no attribute 'junMotionPathDirty'" → ensure_plugin
-  compares PLUGIN_VERSION (now "1.4") and reloads, see [[maya-loaded-plugin-stays-stale]]. **Bump PLUGIN_VERSION on any plugin edit.**
+  compares PLUGIN_VERSION (now "1.5", asked via command junMotionPathVersion) and reloads, see [[maya-loaded-plugin-stays-stale]]. **Bump PLUGIN_VERSION on any plugin edit.**
+- v01.08 (2026-11-20): Acceleration graph smoothing = brush `Smooth Acceleration` (retime.AccelSmoother: pull toward a time-axis
+  Gaussian average, no Taubin push-back; session MODE_ACCEL, refit tolerance x0.2 because position error's 2nd difference is accel
+  noise). Auto-picked when Show = Acceleration. Lesson: Smooth Speed can *raise* acceleration at sharp corners (0.057 -> 0.197).
 - Next: Maya GUI check (viewport ghost line while painting, Esc/wheel focus, Pop Out), then plan phase 1.5 / 2.
 
 Related: [[maya-time-context-traps]] · [[wip-a00380-quad-patch]] · [[mayapy-headless-verify]] · [[feedback-sliders-use-shared-style]]

@@ -50,5 +50,11 @@
 #        `pluginInfo -version` 은 처음 값 "1.0" 을 계속 돌려준다(실측) → 교체 뒤에도 옛것으로 판정. 이제 읽힌 코드에 묻는 명령
 #        junMotionPathVersion 으로 비교한다(PLUGIN_VERSION "1.5"). 중간에 실패한 창을 닫을 때 'speed_panel' 없음 에러도 막았다.
 
-VERSION = "01.07"
+# 01.08  Acceleration 그래프도 스무딩 - 브러시 Smooth Acceleration (retime.AccelSmoother): 점들을 시간 축 가우스 평균 쪽으로 당긴다
+#        (가속도 = 위치의 2차 차분을 직접 줄인다, 되밀지 않음 - 모양 · 타이밍이 함께). refit 허용 오차 1/5(위치 오차의 2차 차분이 가속도 잡음).
+#        Show 를 Acceleration 으로 바꾸면 브러시도 저절로 이것, 나오면 그 전 브러시로. 실측(칠한 구간): 최대 0.057 → 0.017, 평균 −67%.
+#        그 전에는 Acceleration 그래프를 칠하면 Speed/Shape 브러시가 돌았다 - Smooth Speed 는 꺾인 곳을 빨리 지나가게 해 최대 가속도를
+#        0.057 → 0.197 로 키웠고, Smooth Shape 는 큰 호를 지켜 10% 밖에 못 줄였다.
+
+VERSION = "01.08"
 LAST_UPDATE = "2026-11-20"

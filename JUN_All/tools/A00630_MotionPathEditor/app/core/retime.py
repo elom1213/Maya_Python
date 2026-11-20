@@ -23,6 +23,13 @@ ShapeSmoother — 경로 **모양**을 부드럽게 (G5)
 ---------------------------------------------
 점들(시간 순서)에 Taubin 평활(λ = +w·0.5, μ = −w·0.53 한 쌍을 dab 마다 3 번): 울퉁불퉁한(짧은 파장) 것은 줄이고 큰 호(긴 파장)는
 거의 줄이지 않는다 - 단순 평균은 호를 안쪽으로 오그라뜨린다. 반경 밖 · 경로 양 끝 점은 그대로.
+
+AccelSmoother — **가속도**를 부드럽게 (v01.08)
+----------------------------------------------
+가속도 = 프레임 위치의 2차 차분 |P(f+1) − 2P(f) + P(f−1)| 이다. 그래서 점들을 **시간 축으로 가우스 평균**(σ = r/3)해 그 쪽으로 w 만큼 당긴다
+(Taubin 처럼 되밀지 않는다 - 되밀면 2차 차분이 남는다). 모양 · 타이밍이 함께 바뀌어 튐 · 떨림 · 꺾인 곳이 둥글어진다.
+브러시 지지 구간 양 끝 · 경로 양 끝은 그대로 → 브러시 밖 움직임 불변. Smooth Speed 는 꺾인 곳을 더 빨리 지나가게 해 가속도를 키울 수 있고
+(실측 최대 0.057 → 0.195), Smooth Shape 는 큰 호를 지켜서 가속도가 10% 밖에 안 줄었다 → 가속도 그래프에는 이 브러시.
 """
 
 import numpy as np
@@ -197,4 +204,24 @@ class ShapeSmoother(object):
             for factor in (0.5, TAUBIN_MU):
                 avg = self._average(out, rows, sigma)
                 out[rows] = out[rows] + (factor * w[rows])[:, None] * (avg - out[rows])
+        return out
+
+
+class AccelSmoother(ShapeSmoother):
+    """가속도 Smooth (v01.08) - 시간 축 가우스 평균 쪽으로 당긴다(되밀지 않는다)."""
+
+    ITER = 2
+
+    def dab(self, W, fc, radius, strength):
+        radius = max(float(radius), 1.0)
+        w = float(strength) * falloff(np.abs(self.t - float(fc)) / radius)
+        w[0] = w[-1] = 0.0
+        rows = np.nonzero(w > 1e-12)[0]
+        out = W.copy()
+        if not len(rows):
+            return out
+        sigma = max(radius / 3.0, 1.0)
+        for _ in range(self.ITER):
+            avg = self._average(out, rows, sigma)
+            out[rows] = out[rows] + (0.5 * w[rows])[:, None] * (avg - out[rows])
         return out

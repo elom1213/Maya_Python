@@ -269,6 +269,37 @@ mouse(graph, "release", float(graph.frame_to_x(52)), ybot, Qt.RightButton, Qt.No
 check("Smooth Shape stroke writes", np.abs(track(node, FR) - before).max() > 1e-4)
 cmds.undo()
 panel.cmb_brush.setCurrentIndex(0)
+win.manager.refresh_all()
+
+# ---- v01.08 Acceleration 그래프 = 가속도 Smooth 브러시가 저절로
+[b for b in panel.mode_buttons.buttons() if b.property("value") == sg.MODE_ACCEL][0].click()
+check("Show Acceleration picks the Smooth Acceleration brush", panel.cmb_brush.currentData() == sg.BRUSH_ACCEL and
+      win.manager.settings["brush_mode"] == "accel")
+from tools.A00630_MotionPathEditor.app.core import arc_length as al   # noqa: E402
+IN = np.arange(35, 63, dtype="float64")
+c = panel.active_cache()
+acc0 = al.accel(c.times, c.points, IN)
+graph.radius, graph.strength = 12.0, 1.0
+mouse(graph, "press", float(graph.frame_to_x(35)), ybot, Qt.RightButton, Qt.RightButton)
+for f in np.linspace(35, 62, 10):
+    mouse(graph, "move", float(graph.frame_to_x(f)), ybot, Qt.NoButton, Qt.RightButton)
+check("painting the acceleration graph previews a lower curve", graph.data.get("ghost") is not None and
+      np.nanmax(graph.data["series"][-1]["ys"][34:62]) < np.nanmax(graph.data["ghost"]["ys"][34:62]))
+mouse(graph, "release", float(graph.frame_to_x(62)), ybot, Qt.RightButton, Qt.NoButton)
+win.manager.refresh_all()
+c = panel.active_cache()
+acc1 = al.accel(c.times, c.points, IN)
+check("right-drag on the acceleration graph smooths the acceleration", acc1.max() < 0.5 * acc0.max(), (acc1.max(), acc0.max()))
+cmds.undo()
+win.manager.refresh_all()
+check("one undo = back", np.abs(track(node, FR) - before).max() < 1e-9)
+[b for b in panel.mode_buttons.buttons() if b.property("value") == sg.MODE_SPEED][0].click()
+check("back to Speed restores the brush used before", panel.cmb_brush.currentData() == sg.BRUSH_SPEED)
+panel.cmb_brush.setCurrentIndex(panel.cmb_brush.findData(sg.BRUSH_SHAPE))
+[b for b in panel.mode_buttons.buttons() if b.property("value") == sg.MODE_ACCEL][0].click()
+panel.cmb_brush.setCurrentIndex(panel.cmb_brush.findData(sg.BRUSH_SPEED))       # 사용자가 바꾸면
+[b for b in panel.mode_buttons.buttons() if b.property("value") == sg.MODE_SPEED][0].click()
+check("a brush picked by hand in Acceleration view is kept", panel.cmb_brush.currentData() == sg.BRUSH_SPEED)
 
 # ---- 잠긴 경로 / Pop Out
 panel.cmb_path.setCurrentIndex(1)

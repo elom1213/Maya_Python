@@ -1,5 +1,15 @@
 # Changelog — A00630_MotionPathEditor
 
+## v01.08 (2026-11-20)
+
+- **[New] Acceleration 그래프 스무딩 — 브러시 `Smooth Acceleration`.** 점들을 **시간 축 가우스 평균** 쪽으로 당겨 가속도(위치의 2차 차분)를 직접 줄인다.
+  튐 · 떨림 · 꺾인 곳이 둥글어진다(모양과 타이밍이 함께 바뀐다). 브러시 밖 · 경로 끝은 그대로, 획 하나 = undo 하나.
+  - Show 를 **Acceleration** 으로 바꾸면 브러시가 저절로 Smooth Acceleration, 다른 그래프로 나오면 그 전 브러시로(그동안 손으로 고른 브러시는 그대로).
+  - 키로 다시 맞출 때(refit) 허용 오차를 1/5 로 — 위치 오차의 2차 차분이 그대로 가속도 잡음이 된다. 그만큼 키가 더 들어갈 수 있다.
+  - 실측(속도가 들쭉날쭉하고 키에서 꺾이는 경로, 칠한 구간): 최대 가속도 0.057 → **0.017**, 평균 0.033 → 0.011. 그 전에는 Acceleration 그래프를 칠해도
+    Smooth Speed(꺾인 곳을 빨리 지나가 최대 **0.197 로 악화**) · Smooth Shape(큰 호를 지켜 10% 감소)만 돌았다.
+  - 시험 12항목(세션 6 · UI 6).
+
 ## v01.07 (2026-11-20)
 
 - **[Fix] 경로 키를 끌면 `[FAIL] Drag : module 'maya.cmds' has no attribute 'junMotionPathDirty'`.**
