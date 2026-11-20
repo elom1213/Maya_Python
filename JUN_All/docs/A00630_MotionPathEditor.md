@@ -10,7 +10,7 @@ updated: 2026-11-20
 오브젝트 · 조인트가 **프레임마다 어디에 있는지를 뷰포트에 경로로 그리고**, 경로 위의 **키 점을 끌어 애니메이션을 고치는** in-Maya PySide 툴(arch B).
 그래프 에디터를 열지 않고 궤적 모양을 보면서 위치 애니메이션을 고친다.
 
-- **버전**: `app/config/version.py` (v01.11 — **이동 · 회전 매니퓰레이터**(w / e) · 놓기 4배 빠름 · v01.10 — **프레임 점 · 폴오프 끌기** · 선이 메시에 안 가리게 화면 2D 로 · v01.09 — **프레임 점 고르기 + 폴오프**(b 톡 = 켜기/끄기, b + 끌기 = 반경, 가중치 색) · v01.08 — **Acceleration 그래프 스무딩**(브러시 Smooth Acceleration) · v01.07 — 마야에 남은 옛 플러그인 때문에 키 끌기가 `junMotionPathDirty` 에러로 실패하던 것 수정 · v01.06 — Speed 탭 Frames 에 **Custom**(Start / End / Get Sel Range 로 그 구간만 그래프) · v01.05 — 그래프 스크럽이 undo 큐에 쌓여 Ctrl+Z 가 획을 못 되돌리던 것 수정 · 그래프 키 선 끌기(키 시간 이동) 없앰 · v01.04 — **Speed 탭: 속도 그래프 + Smooth 브러시 · 속도 끌기**(§2-2) · v01.03 — **애니메이션 레이어**: 고른 레이어의 키만 끌어 고친다(경로는 합친 움직임) · v01.02 — Edit Path 를 켜도 버튼이 연한 빨강이 안 되던 것 수정 · v01.01 — 키 드래그 에러 수정 · Custom 범위에 Get Current / Get Sel Range · Edit Path 켜짐 = 연한 빨강 · v01.00 — 첫 버전: 위치 경로 표시 + 키 드래그)
+- **버전**: `app/config/version.py` (v01.12 — **Speed 탭 Edit Path · 그래프 폴오프 [a, b] 띠 · Frames > Falloff · 폴오프 범위 위치 Smooth** · 기즈모 1.5배 굵게 · v01.11 — **이동 · 회전 매니퓰레이터**(w / e) · 놓기 4배 빠름 · v01.10 — **프레임 점 · 폴오프 끌기** · 선이 메시에 안 가리게 화면 2D 로 · v01.09 — **프레임 점 고르기 + 폴오프**(b 톡 = 켜기/끄기, b + 끌기 = 반경, 가중치 색) · v01.08 — **Acceleration 그래프 스무딩**(브러시 Smooth Acceleration) · v01.07 — 마야에 남은 옛 플러그인 때문에 키 끌기가 `junMotionPathDirty` 에러로 실패하던 것 수정 · v01.06 — Speed 탭 Frames 에 **Custom**(Start / End / Get Sel Range 로 그 구간만 그래프) · v01.05 — 그래프 스크럽이 undo 큐에 쌓여 Ctrl+Z 가 획을 못 되돌리던 것 수정 · 그래프 키 선 끌기(키 시간 이동) 없앰 · v01.04 — **Speed 탭: 속도 그래프 + Smooth 브러시 · 속도 끌기**(§2-2) · v01.03 — **애니메이션 레이어**: 고른 레이어의 키만 끌어 고친다(경로는 합친 움직임) · v01.02 — Edit Path 를 켜도 버튼이 연한 빨강이 안 되던 것 수정 · v01.01 — 키 드래그 에러 수정 · Custom 범위에 Get Current / Get Sel Range · Edit Path 켜짐 = 연한 빨강 · v01.00 — 첫 버전: 위치 경로 표시 + 키 드래그)
 - **설치**: `__dragDrop_A00630.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **MPath** → `tools.A00630_MotionPathEditor.run(True)`.
   툴 런처(A00370) ANIM 프로파일에도 **MotionPath** 버튼이 있다.
 - **계획서**: [plans/A00630_MotionPathEditor_plan.md](plans/A00630_MotionPathEditor_plan.md) — 단계별 계획 · 0단계 실측 결과 · 다음 단계
@@ -128,9 +128,9 @@ updated: 2026-11-20
 ## 2-2. Speed 탭 — 속도 그래프 · Smooth (v01.04~)
 
 ```
-Path [ bumpy            ▾]                                   [Pop Out]
+Path [ bumpy            ▾]                     [ Edit Path ]  [Pop Out]   ← Edit Path v01.12 (Path 탭과 같은 툴)
 Show (o) Speed ( ) Position ( ) Acceleration                 [per frame ▾]
-Frames (o) Whole Path ( ) Selected Keys ( ) Around Current ( ) Custom
+Frames (o) Whole Path ( ) Selected Keys ( ) Around Current ( ) Custom ( ) Falloff   ← Falloff v01.12
 Start [  1 ][Get Current]  End [ 120 ][Get Current]  [Get Sel Range]     ← Custom 일 때만 (v01.06)
 ┌ Speed (cm/frame) ─────────────────────────── Radius 8  Strength 0.50 ┐
 │      |20        |35   |45          |60   |70         (키 선 + 번호) │
@@ -170,6 +170,10 @@ Smooth Range 도 이 구간에 칠한다(브러시 반경만큼 구간 끝 바�
 - **Tolerance %**: 키가 획을 얼마나 정확히 따라갈지(경로 크기 대비, 기본 0.1%). 작게 하면 정확하지만 키가 더 생긴다. 로그에 축마다 남은 오차와 넣은 키 수가 나온다.
   매 프레임 키(모캡)는 값만 바꾸므로 늘 정확하고 키도 늘지 않는다.
 - **Smooth Range**: 그래프에 보이는 구간 전체를 브러시 설정으로 한 번(undo 하나).
+  **(v01.12) Edit Path 에서 점을 골라 두었으면 그 폴오프 범위만, 가중치만큼 위치를 스무딩한다** — 그래프 배경의 색 띠가 그 범위 · 세기다(뷰포트 폴오프 색과 같다).
+  브러시 Smooth Shape / Smooth Acceleration 결과를 가중치로 섞는다(범위 밖은 그대로). Smooth Speed 면 위치가 아니라 타이밍 브러시라 Smooth Shape 로 대신한다.
+- **Edit Path (v01.12)**: Path 탭의 Edit Path 와 같은 편집 툴. Speed 탭에서 켜고 뷰포트에서 점 · 폴오프 · 매니퓰레이터로 끌면 그래프가 **끄는 동안 따라 바뀐다**.
+  고른 점의 폴오프 범위 [a, b] 는 그래프에 가중치 색 띠로, Frames > **Falloff** 는 그 범위만 보여 준다.
 - **Pop Out**: 그래프를 따로 띄워 넓게(두 번째 모니터). 다시 누르거나 닫으면 탭으로 돌아온다.
 
 키를 어떻게 고치나 (refit): 키의 **프레임은 그대로** 두고 값 = 목표, 탄젠트 = 목표에 가장 잘 맞는 기울기(최소제곱)로 바꾸고, 그래도 허용치를 넘는 곳에만 키를 넣는다.
@@ -279,6 +283,7 @@ mayapy 2024 (`tests/`, `-u` 로 실행):
 | `test_speed_session.py` | 49 | (v01.04) 칠하는 동안 커브 · undo 큐 불변 → 놓으면 쓰기 · **원래 경로 위**(< 0.2%) · 브러시 밖 불변 · 키 프레임 유지 · 속도 고르게 · 두 번째 획 / 여러 획 흘러가지 않음 · **획마다 undo 하나** · 바깥 undo 감지 · 취소 · 정지 유지 · 회전하는 부모 · 레이어(Base 불변) · Whole Pose(회전 = 옛 회전(τ)) · 모양 Smooth · 속도 바꾸기 · (v01.08) 가속도 Smooth(최대 · 평균 절반 이하 · 미리보기 = 쓴 결과 · 밖 불변 · undo) · 잠긴 경로 |
 | `test_speed_graph_ui.py` | 60 | (v01.04) 오프스크린 Speed 탭: 모드 · 단위 · 범위 3종 · (v01.06) Custom 범위(켜고 끔 · 구간만 · 기억 · 경로 끝 자르기 · 경로 밖 안내 · Get Sel Range) · 휠 반경/세기 · 스크럽 · **오른쪽 드래그 획**(미리보기 → 놓으면 쓰기 → undo 하나) · (v01.05) 획 → 스크럽 → **undo 한 번에 획 · 그래프 복귀**, 스크럽은 큐 밖, redo · Esc 취소 · Smooth Range · 곡선 끌기 = 빠르게 · 키 선 위 드래그 = 스크럽(키 불변) · Shape 브러시 · (v01.08) Acceleration 보기 = 가속도 브러시 저절로 · 칠하면 가속도 절반 이하 · 나오면 브러시 복귀 · Pop Out / Dock · 닫으면 정리 |
 | `bench_speed_graph.py` | 실측 | (v01.04) 조밀 경로 보간 vs 서브프레임 굽기(차이 0.03%, 80배 빠름) · dab 0.1~0.5 ms · 놓기(refit + 쓰기) 5~10 ms, 매 프레임 키 1,000 개 146 ms |
+| `test_speed_falloff.py` | 19 | (v01.12) 두 Edit Path 버튼 같은 상태 · 그래프 폴오프 띠(가중치 · 끄면 고른 프레임만 · 없으면 없음) · Frames > Falloff · 뷰포트 미리보기 → 그래프 라이브 · 폴오프 Smooth Range(범위 밖 그대로 · 가속도 감소 · 가중치 · undo 한 번 · Speed 브러시 → Shape · 선택 없으면 예전) |
 | `test_gizmo.py` | 46 | (v01.11) 원근 카메라: 시선 방향 · 화살표 / 가운데 / 평면 / 빈 곳 고르기 · 화면 크기 고정 · 축 / 평면 이동 · 고리 3개 각도 · 가중 회전 · Path 축, 컨텍스트(화살표 끌기 · 키만 = 예전 끌기 · 폴오프 회전 · 각도 글자 · 미리보기 · 취소 · Shift = 점 · 가운데 = Drag in · 툴 끄면 사라짐), w/e 필터, 플러그인 그리기, 창 라디오 |
 | `test_deform_drag.py` | 30 | (v01.10) deform 세션 · 프레임 점 끌기 · 폴오프 끌기(가중치대로 · 범위 밖 불변) · 키+폴오프 = deform · 키만 = 예전 끌기 · 끄는 동안 미리보기만 · 오른쪽 취소 · 안 움직인 클릭 = 안 씀 · 축 고정 · 경로 둘 undo 한 번 · 레이어 · 화면 2D 선 조각(카메라 뒤 끊기) |
 | `test_falloff.py` | 58 | (v01.09) 가중치(선형 반값 · 대칭 · 두 점 = 가까운 쪽 · 반경 0 · 소수) · 구간 · 색표 · 색 선 조각 · 커브 저장, 프레임 점 고르기 · 선택 정리 · 그리기 데이터 · 플러그인 1.6, 컨텍스트(프레임 점 클릭 · 키 우선 · 박스 · 끌면 안내 · b 톡 · b 끌기 반경 · Ctrl+Shift 끌기 · 나가면 정리), **진짜 Qt 키 이벤트로 b 필터**(ShortcutOverride 먹음 · 반복 무시 · Ctrl+B · 다른 툴이면 통과), 창(Falloff 줄 · 저장 · 범위 표시 · 커브 팝업) |
@@ -294,3 +299,4 @@ mayapy 2024 (`tests/`, `-u` 로 실행):
    그래프에 키보드 포커스가 있을 때 Esc 취소, 휠 · Shift+휠, Pop Out 창.
 7. (v01.09~10) 프레임 점 클릭 · 박스, 폴오프 색(점 · 굵은 선)과 **경로 선이 메시에 안 가린다**(v01.10 2D 선), 폴오프 끌기 미리보기 → 놓으면 오브젝트가 따라옴 · Ctrl+Z 한 번, `b` 톡 · `b` + 끌기 반경 · 커서 옆 숫자, 그동안 마야 소프트 셀렉션 그대로.
 8. (v01.11) 매니퓰레이터가 화면 크기로 보이고 메시에 안 가린다, 화살표 · 평면 · 가운데 · 고리 끌기, w / e 로 바뀌고 마야 툴로 안 나간다.
+9. (v01.12) Speed 탭 Edit Path 로 켜고 뷰포트에서 끌 때 그래프가 따라오는지, 그래프 폴오프 색 띠 · Frames Falloff · 폴오프 Smooth Range 결과, 기즈모 굵기.

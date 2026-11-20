@@ -26,9 +26,11 @@ import maya.cmds as cmds
 
 from Framework.qt.qt import *
 from Framework.qt import JUN_mod_timeRange_qt
+from Framework.qt.pin_style import apply_pin_style
 
 from tools.A00630_MotionPathEditor.app.core import arc_length as al
 from tools.A00630_MotionPathEditor.app.core import draw_nodes
+from tools.A00630_MotionPathEditor.app.core import falloff
 from tools.A00630_MotionPathEditor.app.core import refit
 from tools.A00630_MotionPathEditor.app.core import speed_session as ss
 
@@ -39,6 +41,7 @@ RANGE_PATH = "path"
 RANGE_SELECTED = "selected"
 RANGE_AROUND = "around"
 RANGE_CUSTOM = "custom"           # v01.06 [Start, End] 만
+RANGE_FALLOFF = "falloff"         # v01.12 Edit Path 에서 고른 점의 폴오프 범위 [a, b] (앞뒤로 반경만큼 여유)
 BRUSH_SPEED = "speed"
 BRUSH_SHAPE = "shape"
 BRUSH_ACCEL = "accel"            # v01.08 가속도 Smooth
@@ -174,6 +177,23 @@ class SpeedGraphWidget(QWidget):
             p.setPen(_TEXT)
             p.drawText(QRectF(0, y - 8, self.MARGIN_L - 4, 16), Qt.AlignRight | Qt.AlignVCenter, "{0:.3g}".format(v))
             p.setPen(QPen(_GRID, 1))
+        # v01.12 폴오프 [a, b] - 프레임마다 가중치 색 띠 (뷰포트 폴오프 색과 같은 색표), 고른 프레임은 진한 세로선
+        fall = d.get("falloff")
+        if fall is not None:
+            ft, fw, fsel = fall
+            half = max(float(self.frame_to_x(x0 + 0.5)) - float(self.frame_to_x(x0)), 0.5)
+            cols = falloff.colors(fw)
+            for t, w, rgb in zip(ft, fw, cols):
+                if w <= 1e-9 or t < x0 - 1e-6 or t > x1 + 1e-6:
+                    continue
+                band = _qcolor(rgb, int(40 + 120 * float(w)))
+                x = float(self.frame_to_x(t))
+                p.fillRect(QRectF(x - half, r.top(), 2 * half, r.height()), band)
+            p.setPen(QPen(_qcolor(falloff.colors([1.0])[0]), 1.5))
+            for t in fsel:
+                if x0 - 1e-6 <= t <= x1 + 1e-6:
+                    x = float(self.frame_to_x(t))
+                    p.drawLine(QPointF(x, r.top()), QPointF(x, r.bottom()))
         # 키 선 + 번호
         for t, selected in d.get("keys", ()):
             if t < x0 - 1e-6 or t > x1 + 1e-6:
@@ -352,6 +372,14 @@ class SpeedPanel(QWidget):
         self.cmb_path.setToolTip("The path the graph edits (strokes, curve and key drags). Other paths are drawn faint.")
         self.cmb_path.currentIndexChanged.connect(lambda *_: self._on_active_changed())
         row.addWidget(self.cmb_path, 1)
+        # v01.12 - Path 탭과 같은 Edit Path (한 편집 툴을 두 버튼이 함께 켜고 끈다 - 창이 연결한다)
+        self.btn_edit = QPushButton("Edit Path")
+        self.btn_edit.setCheckable(True)
+        self.btn_edit.setToolTip(
+            "Same as Edit Path on the Path tab: edit the path in the viewport (points, falloff, manipulator).\n"
+            "The graph follows live while you drag. With points selected, Smooth Range smooths their falloff range.")
+        apply_pin_style(self.btn_edit)
+        row.addWidget(self.btn_edit)
         self.btn_pop = QPushButton("Pop Out")
         self.btn_pop.setToolTip("Show the graph in its own window (wider, e.g. on a second monitor). Click again to dock it.")
         self.btn_pop.clicked.connect(self.toggle_float)
@@ -388,7 +416,8 @@ class SpeedPanel(QWidget):
                 ("Whole Path", RANGE_PATH, "The whole range of the path."),
                 ("Selected Keys", RANGE_SELECTED, "Between the selected keys (one key: the segments on both sides)."),
                 ("Around Current", RANGE_AROUND, "The keys before and after the current frame."),
-                ("Custom", RANGE_CUSTOM, "Only the frames from Start to End below.")):
+                ("Custom", RANGE_CUSTOM, "Only the frames from Start to End below."),
+                ("Falloff", RANGE_FALLOFF, "The falloff range of the points selected with Edit Path (a little around it).")):
             rb = QRadioButton(label)
             rb.setToolTip(tip)
             rb.setProperty("value", value)
@@ -492,7 +521,9 @@ class SpeedPanel(QWidget):
         row.addStretch(1)
         self.btn_smooth = QPushButton("Smooth Range")
         self.btn_smooth.setMinimumHeight(28)
-        self.btn_smooth.setToolTip("Smooth every frame shown in the graph once with the brush settings (one undo).")
+        self.btn_smooth.setToolTip(
+            "Smooth every frame shown in the graph once with the brush settings (one undo).\n"
+            "With points selected in Edit Path: smooth the position only in their falloff range, weighted like the colors.")
         self.btn_smooth.clicked.connect(self.smooth_range)
         row.addWidget(self.btn_smooth)
         lay.addLayout(row)
@@ -605,6 +636,12 @@ class SpeedPanel(QWidget):
             a, b = sorted((float(self.manager.settings["graph_start"]), float(self.manager.settings["graph_end"])))
             a, b = max(a, t0), min(b, t1)          # 경로 밖 프레임은 그릴 것이 없다
             return (a, b) if b - a >= 1.0 else None
+        if mode == RANGE_FALLOFF:
+            spans = self._falloff_spans(cache)
+            if spans:
+                pad = max(self.manager.falloff_radius(), 2.0)
+                return max(spans[0][0] - pad, t0), min(spans[-1][1] + pad, t1)
+            return t0, t1
         keys = [k.t for k in cache.keys]
         if mode == RANGE_SELECTED:
             sel = sorted(self.manager.selection.get(cache.key, ()))
@@ -624,6 +661,18 @@ class SpeedPanel(QWidget):
             if b - a >= 1.0:
                 return a, b
         return t0, t1
+
+    def falloff_weights(self, cache):
+        """(N,) Edit Path 에서 고른 점의 폴오프 가중치 (폴오프가 꺼져 있으면 고른 점만 1). 고른 것이 없으면 None."""
+        times = self.manager.selection.get(cache.key)
+        if not times or cache.points is None:
+            return None
+        w = self.manager.weights_for(cache)
+        return w if w is not None else falloff.weights(cache.times, times, 0.0)
+
+    def _falloff_spans(self, cache):
+        w = self.falloff_weights(cache)
+        return falloff.spans(cache.times, w) if w is not None else []
 
     # ---------------------------------------------------------------- 그래프 데이터
     @staticmethod
@@ -701,7 +750,11 @@ class SpeedPanel(QWidget):
             series.sort(key=lambda s: s["active"])         # 활성 경로를 맨 위에
         selected = self.manager.selection.get(active.key, set())
         keys = [(k.t, k.t in selected) for k in active.keys]
-        return {"x0": x0, "x1": x1, "series": series, "ghost": ghost, "keys": keys,
+        w = self.falloff_weights(active)
+        fall = None
+        if w is not None:
+            fall = (np.asarray(active.times, dtype="float64"), w, sorted(selected))
+        return {"x0": x0, "x1": x1, "series": series, "ghost": ghost, "keys": keys, "falloff": fall,
                 "current": float(cmds.currentTime(q=True)), "title": title}
 
     def _show_info(self):
@@ -830,10 +883,14 @@ class SpeedPanel(QWidget):
         oma.MAnimControl.setCurrentTime(om.MTime(frame, unit))
 
     def smooth_range(self):
-        """그래프에 보이는 프레임 전체를 브러시 설정으로 한 번 (undo 하나)."""
+        """그래프에 보이는 프레임 전체를 브러시 설정으로 한 번 (undo 하나).
+        v01.12 - Edit Path 에서 고른 점이 있으면 **그 폴오프 범위만, 가중치만큼 위치를** 스무딩한다(_smooth_falloff)."""
         cache = self.active_cache()
         if cache is None:
             self.log("[WARN] Add a path first.")
+            return
+        if self.falloff_weights(cache) is not None:
+            self._smooth_falloff(cache)
             return
         kind = _BRUSH_KIND.get(self.manager.settings["brush_mode"], ss.MODE_SPEED)
         s = self._session(kind)
@@ -849,6 +906,34 @@ class SpeedPanel(QWidget):
         for fc in np.arange(x0, x1 + 1e-6, max(r / 2.0, 1.0)):
             s.dab(fc, r, self.graph.strength)
         self._on_stroke_finished()
+
+    def _smooth_falloff(self, cache):
+        """폴오프 범위 [a, b] 의 위치 스무딩 (계획서 §3-7).
+
+            S = 브러시(Smooth Shape / Smooth Acceleration)를 [a − r, b + r] 에 한 번 칠한 결과
+            P = P0 + w · (S − P0)        w = 폴오프 가중치 (범위 밖 = 0 → 정확히 그대로)
+        Smooth Speed 는 위치가 아니라 타이밍이라 Smooth Shape 로 대신한다(로그로 알림).
+        """
+        w = self.falloff_weights(cache)
+        spans = falloff.spans(cache.times, w)
+        brush = self.manager.settings["brush_mode"]
+        kind = ss.MODE_ACCEL if brush == BRUSH_ACCEL else ss.MODE_SHAPE
+        if brush == BRUSH_SPEED:
+            self.log("[Info] Smoothing the falloff range smooths the position - used Smooth Shape (not Smooth Speed).")
+        s = self._session(kind)
+        if s is None:
+            return
+        r = self.graph.radius
+        s.begin_stroke()
+        P0 = s.current.copy()
+        for a, b in spans:
+            for fc in np.arange(a - r, b + r + 1e-6, max(r / 2.0, 1.0)):
+                s.dab(fc, r, self.graph.strength)
+        S = s.current
+        s.current = P0 + w[:, None] * (S - P0)
+        self._on_stroke_finished()
+        self.log("[OK] Smoothed the falloff range {0} (weighted).".format(
+            ", ".join("[{0:g}, {1:g}]".format(a, b) for a, b in spans)))
 
     # ---------------------------------------------------------------- 떼어 보기
     def toggle_float(self):

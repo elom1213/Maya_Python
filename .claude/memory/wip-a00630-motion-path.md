@@ -76,6 +76,9 @@ then move — user's Q4 choice, proportional editing, numeric input), then phase
 - v01.11 = G3 gizmo (core/gizmo.py shared by plugin draw + context pick; centre square follows "Drag in" because pressing a selected
   point always hits the centre; centre picked before axes; W/E eaten by the key filter). refit CurveSnap.evaluate vectorized
   (6,000-key curve release 986 -> 240 ms). User GUI-confirmed v01.10 ("잘 된다").
-- Next: G4 Speed tab Edit Path button / live graph from manager.preview / [a,b] weight colors / Smooth Range with falloff mask.
+- v01.12 = G4: Speed tab Edit Path (same context, buttons synced by main_window._set_edit_buttons), graph live came for free
+  (graph already reads manager.preview), falloff band in graph, Frames > Falloff, Smooth Range with a selection = weighted position
+  smoothing P0 + w(S-P0). Gizmo 1.5x thicker (user). User GUI OK for v01.10, v01.11. v01.08-v01.11 pushed 2026-11-20 (f66468f8).
+- Next: Maya GUI check of v01.12; later candidates: arc-length falloff, pivot options, numeric input, scale manipulator.
 
 Related: [[maya-time-context-traps]] · [[wip-a00380-quad-patch]] · [[mayapy-headless-verify]] · [[feedback-sliders-use-shared-style]]

@@ -7,7 +7,7 @@ updated: 2026-11-20
 
 # A00630_MotionPathEditor — 매니퓰레이터 · 폴오프 편집 하위 계획서
 
-> 작성 2026-11-20 · 상태: **G0 끝 · G1 (v01.09) · G2 (v01.10) · G3 (v01.11, mayapy 465/465) · G4 다음** · 상위 계획서 [`A00630_MotionPathEditor_plan.md`](A00630_MotionPathEditor_plan.md) §5 **1.5단계 "프레임 단위 편집 · 비례 편집"** 의 하위 계획
+> 작성 2026-11-20 · 상태: **G0 ~ G4 구현 끝 (v01.09 ~ v01.12, mayapy 484/484) · G5 정리(가이드) 함께 끝 · 마야 GUI 확인: v01.10 · v01.11 OK, v01.12 대기** · 상위 계획서 [`A00630_MotionPathEditor_plan.md`](A00630_MotionPathEditor_plan.md) §5 **1.5단계 "프레임 단위 편집 · 비례 편집"** 의 하위 계획
 > · 형제 계획서 [`A00630_MotionPathEditor_speed_graph_plan.md`](A00630_MotionPathEditor_speed_graph_plan.md) (Speed 탭 · 획 세션 · refit — 이 계획이 그대로 재사용한다)
 >
 > 요청 (2026-11-20):
@@ -342,3 +342,12 @@ mayapy 에는 핫키 세트가 없어 `hotkey -q b` = None — 실제 값은 GUI
 - **[Perf] refit `CurveSnap.evaluate` 벡터화** — 6,000 키 커브 놓기 986 → 240 ms(남은 것 = 마야에서 키 읽기 `read_curve` · 경로 다시 계산, 꼭 필요). 골든 시험 40/40 그대로.
 - 시험 `test_gizmo.py` **46**, 전체 **465/465**. 가짜 정사영 뷰의 깊이 축 부호를 실제와 맞춤(기즈모가 view_proj 에서 시선을 뽑는다).
 - 남은 GUI 확인: 기즈모 모양 · 크기 · 고르기 감각, w/e 가 실제로 마야 툴 전환을 막는지(B 와 같은 길이라 될 것으로 본다).
+
+### G4 (2026-11-20, v01.12)
+
+- 사용자 GUI 확인(v01.11): "다 좋다" — 기즈모 굵기만 1.5 배로(선 3 px · 잡은 부분 4.5 px · 화살표 머리 18 / 7.5 px, `gizmo.LINE_WIDTH` 등 상수로). 플러그인 1.9.
+- **라이브 그래프는 따로 만들 것이 없었다** — Speed 그래프는 이미 `manager.preview` 로 그리고(v01.04 획 미리보기), G2 · G3 의 끌기가 같은 미리보기를 쓴다 → 끄는 동안 그래프가 따라온다(시험으로 확인).
+- 구현: Speed 패널 `btn_edit`(pin_style) + 창이 두 버튼을 `_set_edit_buttons` 로 늘 같게 · 그래프 `falloff` 데이터(프레임 · 가중치 · 고른 프레임) → 배경 색 띠(`falloff.colors`, 알파 = 가중치) ·
+  `RANGE_FALLOFF`(spans ± 반경) · `_smooth_falloff`: 세션(Shape / Accel)에 [a − r, b + r] 칠한 결과 S → `P0 + w (S − P0)` → `end_stroke`(undo 하나).
+- 시험 `test_speed_falloff.py` **19**, 전체 **484/484**. 지터 경로(매 프레임 키 + 잡음)에서 범위 안 가속도 0.394 → 0.205, 범위 밖 그대로.
+- 계획서 §0 의 네 요청이 모두 들어갔다. 남은 것(다음 후보): 폴오프 `Arc length` 거리 · 피벗 옵션 · 수치 입력 · Scale 매니퓰레이터 · 그래프에서 직접 점 고르기.

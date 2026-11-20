@@ -33,6 +33,11 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-20 (오늘)
 
+> [!summary] **`A00630_MotionPathEditor` v01.12 — Speed 탭 Edit Path · 그래프 폴오프 띠 · 폴오프 범위 위치 Smooth (G4)** `#A00630_MotionPathEditor`
+- Speed 탭 Edit Path(Path 탭과 같은 툴, 두 버튼 늘 같은 상태), 끄는 동안 그래프 라이브(이미 manager.preview 로 그리고 있었다), 고른 점의 폴오프 [a, b] 를 그래프 배경 가중치 색 띠로,
+  Frames > Falloff, 고른 점이 있으면 Smooth Range = 폴오프 범위만 가중치만큼 위치 스무딩(Speed 브러시면 Shape 로 대신). 기즈모 굵기 1.5 배(사용자 요청).
+- 시험 `test_speed_falloff.py` 19, 전체 484/484. 이 앞 v01.08 ~ v01.11 은 이날 Dnable_repo dev 로 푸시함(`f66468f8`).
+
 > [!summary] **`A00630_MotionPathEditor` v01.11 — 이동 · 회전 매니퓰레이터 (G3) + 놓기 4배 빠름** `#A00630_MotionPathEditor`
 - 고른 점들의 무게중심에 기즈모(화면 크기 고정, 화면 2D 로 그려 메시에 안 가림): Move 화살표 · 평면 · 가운데(= Drag in), Rotate 축 고리 · 화면 고리,
   폴오프 가중치(회전은 각도 x 가중치), Axes World / Path, 뷰포트 `w` / `e`(이벤트 필터로 마야 툴 전환 막음), Shift/Ctrl 클릭은 점.

@@ -40,8 +40,8 @@ COMMANDS = (COMMAND_NAME, DIRTY_COMMAND_NAME, VERSION_COMMAND_NAME)
 #: 읽힌 코드의 버전과 이 값을 비교해 다르면 다시 읽는다. v01.00~02 의 플러그인은 "1.0" 이었다(junMotionPathDirty · ghost 그리기 없음).
 #: 읽힌 버전은 **명령 junMotionPathVersion 으로 묻는다** - `pluginInfo -q -version` 은 같은 경로에서 다시 읽어도 처음 읽은 값을 계속
 #: 돌려준다(실측: 새 코드인데 "1.0") → v01.07 첫 판이 교체 뒤에도 "옛것" 으로 보고 툴 창을 못 열었다.
-PLUGIN_VERSION = "1.8"          # 1.6 = v01.09 폴오프 색 · 고른 프레임 점 · HUD 글자 / 1.7 = v01.10 선을 화면 2D 로(메시에 안 가린다)
-                                # 1.8 = v01.11 매니퓰레이터 (draw_bridge.GIZMO, core/gizmo)
+PLUGIN_VERSION = "1.9"          # 1.6 = v01.09 폴오프 색 · 고른 프레임 점 · HUD 글자 / 1.7 = v01.10 선을 화면 2D 로(메시에 안 가린다)
+                                # 1.8 = v01.11 매니퓰레이터 (draw_bridge.GIZMO, core/gizmo) / 1.9 = v01.12 기즈모 굵기 1.5 배
 
 
 def _dirty(nodes):
@@ -293,7 +293,7 @@ class JunMotionPathDrawOverride(omr.MPxDrawOverride):
         for name, line in gz.geometry(pivot, axes, g.get("mode", gz.MODE_MOVE), length, vdir):
             rgb = gz.ACTIVE_COLOR if name == active else gz.COLORS.get(name, (1.0, 1.0, 1.0))
             dm.setColor(om.MColor(tuple(rgb) + (1.0,)))
-            dm.setLineWidth(3.0 if name == active else 2.0)
+            dm.setLineWidth(gz.ACTIVE_WIDTH if name == active else gz.LINE_WIDTH)
             for strip in screen_strips(line, view_proj, width, height):
                 _line2d(dm, strip)
             if name in ("x", "y", "z"):                     # 화살표 머리 (화면에서)
@@ -306,7 +306,7 @@ class JunMotionPathDrawOverride(omr.MPxDrawOverride):
                         side = np.array([-d[1], d[0]])
                         tip = px[1]
                         for s in (1.0, -1.0):
-                            q = tip - d * 12.0 + side * 5.0 * s
+                            q = tip - d * gz.HEAD_LEN + side * gz.HEAD_HALF * s
                             dm.line2d(om.MPoint(float(tip[0]), float(tip[1])), om.MPoint(float(q[0]), float(q[1])))
         dm.endDrawable()
 

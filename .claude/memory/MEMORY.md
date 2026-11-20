@@ -129,5 +129,5 @@
 - JALI 슬라이더 리그 — [A0020_jali_slider_ctl](wip-jali-slider-ctl.md)(angela 1:1 슬라이더 22 + JaLi 박스, remapValue 리맵, DUMMY_IN/OUT 3쌍, global_scale · 생성/검증은 JUN_JALI examples · GUI 확인 아직)
 - A00620 — [NameDecoder](wip-a00620-namedecoder.md)(FBXASC 이름 디코드 · 마야는 유니코드 이름 불가(setName 조용히 무시) · FBX 익스포터가 원래 글자로 복원 → 기본 읽기 전용 · 공용 `fbx_name` · v01.02 Outliner 탭 = 공용 `maya_icons` + 필터 `tree_recursive`)
 - A00610 — [PmxImporter](wip-a00610-pmximporter.md)(v01.01 부여 = rotateAxis(부여 먼저) · IK 근사 · 로컬축 · 기준 mb + Blender mmd_tools 골든, mmd_tools 부여는 오일러 근사)
-- A00630 — [MotionPathEditor v01.11](wip-a00630-motion-path.md)(**매니퓰레이터 · 폴오프 계획 G3 끝, 다음 G4 Speed 탭** · GPL 애드온 독자 구현 · parentMatrix 만 굽기 · v01.04 Speed 탭 refit · 획 하나 = undo 하나 · **v01.05 스크립트 currentTime 은 undo 가 쌓인다 → 스크럽은 MAnimControl** · GUI 확인 아직)
+- A00630 — [MotionPathEditor v01.12](wip-a00630-motion-path.md)(**매니퓰레이터 · 폴오프 계획 G0~G4 끝, v01.12 GUI 확인 대기** · GPL 애드온 독자 구현 · parentMatrix 만 굽기 · v01.04 Speed 탭 refit · 획 하나 = undo 하나 · **v01.05 스크립트 currentTime 은 undo 가 쌓인다 → 스크럽은 MAnimControl** · GUI 확인 아직)
 - A00640 — [AttrSlider](wip-a00640-attrslider.md)(채널박스 어트리뷰트 · BS 타겟 슬라이더 · FBXASC 풀기, 범위 = 사용자 > 소프트 > 하드, 드리븐 키는 setAttr 가 조용히 덮어써짐)

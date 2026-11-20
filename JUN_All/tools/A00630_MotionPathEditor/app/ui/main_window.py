@@ -119,6 +119,8 @@ class MainWindow(QWidget):
         self.tabs.addTab(page, "Path")
         self.tabs.setTabToolTip(0, "Range, animation layer, display and Edit Path (drag the keys in the viewport).")
         self.speed_panel = SpeedPanel(self.manager, self.watcher, self.log, self._save)
+        # v01.12 - Speed 탭에도 Edit Path. 두 버튼은 같은 편집 툴 하나를 켜고 끄며 늘 같은 상태다
+        self.speed_panel.btn_edit.toggled.connect(self.set_edit_mode)
         self.tabs.addTab(self.speed_panel, "Speed")
         self.tabs.setTabToolTip(1, "Speed graph: see the timing of a path and smooth it with a brush.")
         root.addWidget(self.tabs, 2)
@@ -527,8 +529,23 @@ class MainWindow(QWidget):
         if self.manager.caches and self.manager.frame_range() != before:
             self.on_refresh()
 
+    def _edit_buttons(self):
+        out = [self.btn_edit]
+        if getattr(self, "speed_panel", None) is not None:
+            out.append(self.speed_panel.btn_edit)
+        return out
+
+    def _set_edit_buttons(self, on):
+        """두 Edit Path 버튼을 신호 없이 같은 상태로 (v01.12)."""
+        for btn in self._edit_buttons():
+            if btn.isChecked() != on:
+                btn.blockSignals(True)
+                btn.setChecked(on)
+                btn.blockSignals(False)
+
     def set_edit_mode(self, on):
-        """Edit Path 토글 - 편집 컨텍스트를 켜고 끈다 (GUI 전용)."""
+        """Edit Path 토글 - 편집 컨텍스트를 켜고 끈다 (GUI 전용). 어느 탭의 버튼이든 둘 다 맞춘다(v01.12)."""
+        self._set_edit_buttons(bool(on))
         try:
             if self.context is None:
                 from tools.A00630_MotionPathEditor.app.ui.edit_context import EditContext
@@ -543,9 +560,7 @@ class MainWindow(QWidget):
                 self.context.deactivate()
         except Exception as exc:                           # noqa: BLE001
             self.log("[FAIL] Edit Path : {0}".format(exc))
-            self.btn_edit.blockSignals(True)
-            self.btn_edit.setChecked(False)
-            self.btn_edit.blockSignals(False)
+            self._set_edit_buttons(False)
 
     def _on_tool_changed(self, *args):
         """마야 툴이 바뀌었다 - 버튼 맞추기는 **마야가 툴 전환을 끝낸 뒤(idle)** 에 한다.
@@ -566,12 +581,10 @@ class MainWindow(QWidget):
         except Exception:                                  # noqa: BLE001
             active = False
         try:
-            if self.btn_edit.isChecked() != active:
+            if any(b.isChecked() != active for b in self._edit_buttons()):
                 if not active and self.context is not None:
                     self.context._finalize()                # 끄는 중인 드래그가 있으면 취소
-                self.btn_edit.blockSignals(True)
-                self.btn_edit.setChecked(active)
-                self.btn_edit.blockSignals(False)
+                self._set_edit_buttons(active)
         except RuntimeError:
             pass                                            # 미뤄 둔 사이 창이 닫혔다 (버튼이 이미 없음)
 
@@ -579,7 +592,7 @@ class MainWindow(QWidget):
         """새 씬 · 열기 직전: 경로를 모두 정리한다."""
         if self.context is not None:
             self.context.deactivate()
-        self.btn_edit.setChecked(False)
+        self._set_edit_buttons(False)
         self.manager.clear()
         self.manager.settings["edit_layer"] = ""
         self._syncing = True

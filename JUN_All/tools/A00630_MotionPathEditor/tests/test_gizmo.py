@@ -5,7 +5,7 @@
 # 1. gizmo 수학 (가짜 원근 카메라): 고르기 · 화면 크기 고정 · 축 / 평면 이동 · 고리 각도 · 가중 회전 · Path 축 · 시선 방향
 # 2. 편집 컨텍스트 흐름 (가짜 정사영 뷰, 25 px = 1 cm): 화살표 끌기 · 키만 = 예전 끌기 · 폴오프 회전 · Shift 클릭은 점 ·
 #    끄는 동안 기즈모가 따라감 · 각도 글자 · 취소 · undo 한 번 · 켜고 끌 때 그리기 데이터
-# 3. w / e 키 필터 · 창 라디오 · 플러그인 그리기(가짜 DM) · 플러그인 1.8
+# 3. w / e 키 필터 · 창 라디오 · 플러그인 그리기(가짜 DM) · 플러그인 버전
 # QApplication 은 maya.standalone 보다 먼저 (메모 qapplication-before-maya-standalone).
 import os
 import sys
@@ -309,7 +309,7 @@ check("plugin draws the gizmo (2D lines + arrow heads, none for an arrow pointin
       (dm.calls.count("mesh2d"), dm.calls.count("line2d")))
 loaded = mel.eval("junMotionPathVersion")
 loaded = loaded[0] if isinstance(loaded, (list, tuple)) else loaded
-check("plugin 1.8 loaded", jp.PLUGIN_VERSION == "1.8" and loaded == "1.8", loaded)
+check("the loaded plugin is the current one", loaded == jp.PLUGIN_VERSION, loaded)
 mgr.clear()
 
 from tools.A00630_MotionPathEditor.app.ui import main_window as mw   # noqa: E402
