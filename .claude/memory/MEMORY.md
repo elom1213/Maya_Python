@@ -27,6 +27,7 @@
 - [Update portfolio on tool work](update-portfolio-on-tool-work.md) — portfolio EN/KR 동기, 커밋 통계 건드리지 않기
 - [Launcher buttons follow current version](launcher-buttons-follow-current-version.md) — 새 버전 폴더면 A00370 버튼도 옮길 것
 - [Sliders use shared style](feedback-sliders-use-shared-style.md) — 새 QSlider 는 `JUN_mod_sliderStyle_qt_v01(self)` 한 줄(테마 qss 에 QSlider 규칙 없음 → 어두운 배경에 홈이 묻힌다)
+- [C:\JUN 정션 구조](project-c-jun-junction-layout.md) — PC 간 같은 논리 경로로 레퍼런스, 정션 경유 파일 아직 적음 → 이름 확정 적기, 확정 뒤엔 경로 불변
 - [Prefer PySide for new tools](prefer-pyside-for-new-tools.md) — 신규 툴은 PySide(arch B)
 - [No filename-dependent data](no-filename-dependent-data.md) — 파일 이름 규칙(예: `_f0105_0429`)에서 값을 읽어 데이터를 만들지 말 것, 이름은 출력 이름에만
 - [JUN_JALI repo](jun-jali-repo.md) — VisemeNet 포크, 푸시는 origin main, `.venv` 추론 · angela_JALI 리그 적용
