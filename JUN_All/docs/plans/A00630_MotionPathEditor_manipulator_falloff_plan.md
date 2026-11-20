@@ -7,7 +7,7 @@ updated: 2026-11-20
 
 # A00630_MotionPathEditor — 매니퓰레이터 · 폴오프 편집 하위 계획서
 
-> 작성 2026-11-20 · 상태: **G0 헤드리스 실측 완료(35/35) · GUI 실측 대기** · 상위 계획서 [`A00630_MotionPathEditor_plan.md`](A00630_MotionPathEditor_plan.md) §5 **1.5단계 "프레임 단위 편집 · 비례 편집"** 의 하위 계획
+> 작성 2026-11-20 · 상태: **G0 끝(헤드리스 35/35 · GUI: 점 색 됨, mesh 선은 x-ray 안 됨 → 나눠 그리기, `b` 이벤트 필터로 됨)** · 상위 계획서 [`A00630_MotionPathEditor_plan.md`](A00630_MotionPathEditor_plan.md) §5 **1.5단계 "프레임 단위 편집 · 비례 편집"** 의 하위 계획
 > · 형제 계획서 [`A00630_MotionPathEditor_speed_graph_plan.md`](A00630_MotionPathEditor_speed_graph_plan.md) (Speed 탭 · 획 세션 · refit — 이 계획이 그대로 재사용한다)
 >
 > 요청 (2026-11-20):
@@ -96,8 +96,8 @@ w(f) = curve( 1 − d(f) / R )   (d < R),  0 (그 밖),  고른 점은 1
 - 반경 `R` 은 프레임, 소수 허용, 0 = 폴오프 없음. 설정에 저장(`falloff_radius`, `falloff_on`, `falloff_curve`).
 - **색표**(마야 소프트 셀렉션과 같은 기대): 1 = 노랑 → 0.5 = 주황 → 0 에 가까울수록 빨강 → 어두운 빨강. 범위 밖은 경로 원래 색.
   `color_for(w)` 하나를 뷰포트 · 그래프가 함께 쓴다(같은 색이 두 곳에 보인다).
-- 그리기: 플러그인 `_draw_path` 가 **점마다 색**을 받는다 — `MUIDrawManager.mesh(kPoints / kLineStrip, 점, None, 색 배열)` (§4-2 실측).
-  선도 범위 구간만 색 선분으로 덧그려 범위가 한눈에 보이게 한다.
+- 그리기: 플러그인 `_draw_path` 가 **점마다 색**을 받는다 — 점 = `MUIDrawManager.mesh(kPoints, 점, None, 색 배열)` 한 번.
+  선은 범위 구간만 **색 단계(16)마다 `setColor` + `lineStrip`** 으로 덧그린다 — G0-1 실측: `mesh(kLineStrip)` 은 x-ray 가 안 먹어 메시에 가려진다.
 
 ### 3-3. 편집 쓰기 — 획 세션의 새 모드 `deform`
 
@@ -144,7 +144,7 @@ w(f) = curve( 1 − d(f) / R )   (d < R),  0 (그 밖),  고른 점은 1
 
 | 안 | 방법 | 판단 |
 |----|------|------|
-| A (추천) | 편집 컨텍스트가 켜져 있는 동안만 **Qt 이벤트 필터**(마야 메인 창 · 뷰포트 패널)가 `B / W / E` 누름 · 뗌을 받아 **먹는다**(핫키로 안 감). `b` 누름 상태를 기억하고, 그 상태의 왼쪽 끌기 = 반경 조절 | 마야 설정을 안 건드린다. **GUI 에서만 확인 가능** — 핫키가 Qt 이벤트보다 먼저 처리되면 실패 |
+| A (**채택** — G0-2 실측) | 편집 컨텍스트가 켜져 있는 동안만 **Qt 이벤트 필터**(마야 메인 창 · 뷰포트 패널)가 `B / W / E` 누름 · 뗌을 받아 **먹는다**(핫키로 안 감). `b` 누름 상태를 기억하고, 그 상태의 왼쪽 끌기 = 반경 조절 | 마야 설정을 안 건드린다. **GUI 에서만 확인 가능** — 핫키가 Qt 이벤트보다 먼저 처리되면 실패 |
 | B | 컨텍스트가 켜져 있는 동안 핫키 `b` 를 툴 명령으로 바꿔 끼우고 나갈 때 되돌린다 | 마야가 비정상 종료되면 사용자 핫키가 바뀐 채 남는다 → 원래 값을 optionVar 에 적어 두고 다음 실행 때 복구 |
 | C (안전망) | 창의 `Radius` 칸 · 슬라이더 + **Ctrl+Shift+왼쪽 끌기** = 반경 조절 | 키 감지 없이 늘 된다. A · B 가 다 막혀도 기능은 쓸 수 있다 |
 
@@ -188,7 +188,7 @@ w(f) = curve( 1 − d(f) / R )   (d < R),  0 (그 밖),  고른 점은 1
 
 | # | 무엇 | 어디서 | 통과 기준 |
 |---|------|--------|-----------|
-| 1 | `MUIDrawManager.mesh(kPoints / kLineStrip)` 에 **점마다 색** | 마야 GUI (VP2) | 색이 점마다 보이고 x-ray 안에서도 된다. 안 되면 색 단계별 `points()` 묶음 여러 번(8단계)으로 |
+| 1 | `MUIDrawManager.mesh(kPoints / kLineStrip)` 에 **점마다 색** | 마야 GUI (VP2) | 색이 점마다 보이고 x-ray 안에서도 된다. 안 되면 색 단계별 `points()` 묶음 여러 번(8단계)으로 → **결과 §7: 점 됨, 선은 나눠 그리기** |
 | 2 | 컨텍스트 켜진 동안 Qt 이벤트 필터가 `B` 누름 · 뗌을 **먼저** 받고 먹을 수 있나 (§3-5 A) | 마야 GUI | 필터가 받고, 마야 소프트 셀렉션 반경(`softSelect -q -ssd`)이 안 바뀐다 |
 | 3 | 2 가 안 되면 핫키 바꿔 끼우기(B) 가 되고 되돌려지나 | 마야 GUI | 나간 뒤 `hotkey -q` 가 원래 값 |
 | 4 | 기즈모 고르기 · 끌기 수학 (투영 · 축 · 평면 · 고리 각도) | mayapy (가짜 뷰, `test_edit_context` 방식) | 알려진 카메라에서 기대한 축 · 각도 |
@@ -274,9 +274,15 @@ X 축 끌기 = X 로만 · Y 고리 10° → 40° 끌기 = **30.000°** · 화�
 **G0-1 · G0-3 (헤드리스로 볼 수 있는 것)**: `MUIDrawManager.mesh(mode, position, normal=None, color=None, ...)` · `kPoints` · `kLineStrip` · `beginDrawInXray` 있음.
 mayapy 에는 핫키 세트가 없어 `hotkey -q b` = None — 실제 값은 GUI 에서.
 
-### G0 GUI (사용자 마야에서 — 대기)
+### G0 GUI (2026-11-20, 사용자 마야 2024 GUI — 끝)
 
-`tests/g0_gui_probe.py` + 임시 플러그인 `tests/g0_probe_plugin.py`(노드 ID 0x0007F631, 툴 플러그인과 별개). 결과 = `%TEMP%\a00630_g0_probe.txt`.
-- G0-1: 세 줄(mesh kPoints · mesh kLineStrip · 색마다 points())이 노랑 → 빨강으로 보이나, 앞의 큐브에 안 가리나.
-- G0-2: 프로브 컨텍스트에서 `B` 톡 · `B`+왼쪽 끌기 · `W` · `E` — 이벤트 필터가 받나, 먹었을 때 `softSelect` 켜짐(sse) · 반경(ssd)이 그대로인가, 컨텍스트 press 때 `b_held` 가 True 인가.
-- G0-3: `hotkey -q b/w/e` 의 실제 명령 이름(안 B 가 필요할 때 되돌릴 값).
+`tests/g0_gui_probe.py` + 임시 플러그인 `tests/g0_probe_plugin.py`(노드 ID 0x0007F631, 툴 플러그인과 별개), 기록 `%TEMP%00630_g0_probe.txt`.
+
+| # | 결과 | 결정 |
+|---|------|------|
+| G0-1 | 색표(가운데 노랑 → 끝 빨강)는 셋 다 맞게 보인다. **`mesh(kPoints)` · 색마다 `points()` 는 앞의 큐브를 뚫고 보이고, `mesh(kLineStrip)` 만 큐브에 가려졌다** — `beginDrawInXray` 가 mesh 선에는 안 먹는다 | 점 = `mesh(kPoints, 점, None, 색)` 한 번. **색 선 = 색 단계(16)마다 `setColor` + `lineStrip`/`line` 로 나눠 그린다**(지금 경로 선과 같은 호출) |
+| G0-2 | 앱 이벤트 필터가 `ShortcutOverride` · `KeyPress` · `KeyRelease` B 를 **`QWindow (MayaWindowWindow)` 에서** 받았다. 먹었더니 마야 `b` 핫키(`artisanModifyUpperRadius_press/_release`)가 **안 돌았다** — `softSelect` 켜짐 0 · 반경 3.0586 처음부터 끝까지 그대로(사용자: "b 를 눌러도 아무 반응이 없다" = 막힘). `B` 를 누른 채 끌면 컨텍스트 press 에서 `b_held=True`, 끈 거리 dx −90 · +82 px 받음 | **§3-5 안 A 채택**(이벤트 필터, 편집 컨텍스트가 지금 툴일 때만 먹는다). 안 B(핫키 교체)는 필요 없다. 안전망 C 는 계획대로 둔다 |
+| G0-3 | 사용자 핫키 세트 `JH_hotKey_V03_091`: b = `artisanModifyUpperRadius_press/_release`, w/e = 마야 기본 Translate/Rotate 마킹 메뉴 | 바꾸지 않으므로 되돌릴 일 없음 |
+
+- 키 반복(누르고 있는 동안 반복되는 KeyPress)은 `isAutoRepeat` 로 걸렀다 — 기록에 반복이 없다.
+- `W` · `E` 는 이번 기록에 없다(안 눌렀을 수 있다). B 와 같은 길이라 될 것으로 보지만 **G3 에서 확인**, 안 되면 창 라디오만.

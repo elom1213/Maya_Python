@@ -65,6 +65,7 @@
 - [Reference parent → click selects shape](maya-reference-parent-selects-shape.md) — 틀이 Reference 면 컨트롤 트랜스폼에도 override normal 을 줄 것
 - [cp949 non-ASCII traps](maya-codepage-nonascii-traps.md) — cp949 밖 글자 경로는 텍스처 못 읽음 · .ma 문자열 `?` · getVertexNormal 은 잠긴 노멀 무시
 - [time-context traps](maya-time-context-traps.md) — **스크립트 `currentTime` = 호출마다 undo 하나(스크럽은 MAnimControl)** · `getAttr -time worldMatrix` 옛 값 · currentTime(update=False) 옛 값 · 플러그인 노드가 있으면 저장 파일이 requires
+- [VP2 x-ray · hotkey filter](maya-vp2-xray-and-hotkey-filter.md) — `mesh(kLineStrip)` 은 x-ray 안 됨(점은 됨) · 컨텍스트 중 `b` 등 핫키는 앱 이벤트 필터로 먹어 막힘
 - [viewport Tab is MTK](maya-viewport-tab-is-mtk.md) — 뷰포트 Tab 은 hotkey 무시, `nexOpt mayaTabPressCmd` 를 바꿔 끼울 것 (GUI 전용)
 - [Euler closestSolution not equivalent](euler-closest-solution-not-equivalent.md) — 짐벌 근처 다른 회전, closestCut + alternate 로 · 오일러는 축별로 안 더해진다
 - API lifetime — [MPlug.asMObject](mplug-asmobject-lifetime.md) · [MFn cvPositions](mfn-cvpositions-lifetime.md)(읽는 즉시 tuple 로)
