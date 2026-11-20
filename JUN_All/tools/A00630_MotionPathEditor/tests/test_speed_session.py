@@ -141,21 +141,6 @@ check("dropped stroke: nothing written", not s.end_stroke() and same_state(curve
 s.begin_stroke()
 check("empty stroke: nothing written", not s.end_stroke())
 
-# 키 시간 끌기 (G4) - 포즈 전체, 이웃 키 사이로
-cmds.setKeyframe(node, attribute="rotateY", time=45, value=30.0)
-cmds.setKeyframe(node, attribute="rotateY", time=1, value=0.0)
-cache.refresh()
-moved_to = ss.move_key_time(cache, 45.0, 50.0)
-keys_x = cmds.keyframe(node + ".translateX", q=True, timeChange=True)
-keys_r = cmds.keyframe(node + ".rotateY", q=True, timeChange=True)
-check("move key time: translate and rotate keys move together", moved_to == 50.0 and 50.0 in keys_x and 50.0 in keys_r
-      and 45.0 not in keys_x, (moved_to, keys_x, keys_r))
-clamped = ss.move_key_time(cache, 50.0, 80.0)
-check("move key time: stops before the next key (60)", clamped is not None and 59.0 < clamped < 60.0, clamped)
-cmds.undo()
-cmds.undo()
-check("move key time: one undo each", 45.0 in cmds.keyframe(node + ".translateX", q=True, timeChange=True))
-
 # ====================================================================== 2. 정지 유지
 scenes.new(120)
 hn = cmds.polyCube(name="holder")[0]

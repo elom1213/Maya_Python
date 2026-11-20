@@ -10,7 +10,7 @@ updated: 2026-11-20
 오브젝트 · 조인트가 **프레임마다 어디에 있는지를 뷰포트에 경로로 그리고**, 경로 위의 **키 점을 끌어 애니메이션을 고치는** in-Maya PySide 툴(arch B).
 그래프 에디터를 열지 않고 궤적 모양을 보면서 위치 애니메이션을 고친다.
 
-- **버전**: `app/config/version.py` (v01.05 — 그래프 스크럽이 undo 큐에 쌓여 Ctrl+Z 가 획을 못 되돌리던 것 수정 · v01.04 — **Speed 탭: 속도 그래프 + Smooth 브러시 · 속도 끌기 · 키 시간 끌기**(§2-2) · v01.03 — **애니메이션 레이어**: 고른 레이어의 키만 끌어 고친다(경로는 합친 움직임) · v01.02 — Edit Path 를 켜도 버튼이 연한 빨강이 안 되던 것 수정 · v01.01 — 키 드래그 에러 수정 · Custom 범위에 Get Current / Get Sel Range · Edit Path 켜짐 = 연한 빨강 · v01.00 — 첫 버전: 위치 경로 표시 + 키 드래그)
+- **버전**: `app/config/version.py` (v01.05 — 그래프 스크럽이 undo 큐에 쌓여 Ctrl+Z 가 획을 못 되돌리던 것 수정 · 그래프 키 선 끌기(키 시간 이동) 없앰 · v01.04 — **Speed 탭: 속도 그래프 + Smooth 브러시 · 속도 끌기**(§2-2) · v01.03 — **애니메이션 레이어**: 고른 레이어의 키만 끌어 고친다(경로는 합친 움직임) · v01.02 — Edit Path 를 켜도 버튼이 연한 빨강이 안 되던 것 수정 · v01.01 — 키 드래그 에러 수정 · Custom 범위에 Get Current / Get Sel Range · Edit Path 켜짐 = 연한 빨강 · v01.00 — 첫 버전: 위치 경로 표시 + 키 드래그)
 - **설치**: `__dragDrop_A00630.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **MPath** → `tools.A00630_MotionPathEditor.run(True)`.
   툴 런처(A00370) ANIM 프로파일에도 **MotionPath** 버튼이 있다.
 - **계획서**: [plans/A00630_MotionPathEditor_plan.md](plans/A00630_MotionPathEditor_plan.md) — 단계별 계획 · 0단계 실측 결과 · 다음 단계
@@ -130,8 +130,7 @@ Frames: **Whole Path** · **Selected Keys**(선택 키 사이, 하나면 양쪽 
 |---|---|
 | **오른쪽 드래그** | **Smooth 브러시** — 지나간 곳을 부드럽게. 휠 = 반경, Shift+휠 = 세기 |
 | 왼쪽 · **곡선** 잡고 위 / 아래 | 그곳을 **빠르게 / 느리게** (끄는 중 휠 = Reach, 가장자리가 보상해 범위 밖은 그대로) — Speed 모드 |
-| 왼쪽 · **키 선** 잡고 좌 / 우 | 그 키를 **시간으로 이동** — translate · rotate · scale 키가 함께(포즈 전체), 이웃 키는 못 넘는다. Ctrl = 소수 프레임 — Speed 모드 |
-| 왼쪽 · 빈 곳 | 현재 프레임 스크럽 (undo 큐에 안 쌓인다 - v01.05) |
+| 왼쪽 · 곡선 밖 (키 선 위 포함) | 현재 프레임 스크럽 (undo 큐에 안 쌓인다 - v01.05). 키 시간 이동은 v01.05 에서 없앴다 — 그래프 에디터로 |
 | Esc / 끄는 중 반대 버튼 | 그 드래그 취소 |
 
 **Brush** 두 가지:
@@ -226,7 +225,7 @@ P(f) = (c + T(f)) · parentMatrix(f)
 | `app/core/arc_length.py` | (v01.04) 호 길이 · 속도 · 가속도 · 위치 (numpy, 마야 비의존) |
 | `app/core/retime.py` | (v01.04) 속도 Smooth · 속도 바꾸기(시간 왜곡, 모양 유지 · 보존 · 정지) · 모양 Smooth(Taubin) (마야 비의존) |
 | `app/core/refit.py` | (v01.04) 마야 커브 수학(골든) · 목표 → 키 값 · 기울기 최소제곱 · 키 추가 · 쓰기 |
-| `app/core/speed_session.py` | (v01.04) 획 세션(원래 경로 · 미리보기 · 차이만 쓰기 · undo 하나) · 키 시간 이동 |
+| `app/core/speed_session.py` | (v01.04) 획 세션(원래 경로 · 미리보기 · 차이만 쓰기 · undo 하나) |
 | `app/ui/speed_graph.py` | (v01.04) 그래프 위젯(QPainter) · Speed 탭 패널 |
 
 ---
@@ -246,8 +245,8 @@ mayapy 2024 (`tests/`, `-u` 로 실행):
 | `test_ui.py` | 35 | 오프스크린 창: 경로 추가/빼기 · 표시 옵션 → 그리기 데이터 · optionVar · 범위(Custom · Get Current · Get Sel Range · 같은 범위면 안 굽기) · 슬라이더 색 · Edit Path 빨강 · 툴 바뀌면 버튼 끔 · Refresh · 닫으면 정리 |
 | `test_picking.py` | 13 | 투영 · 고르기 · 박스 · 카메라 뒤 · 평면 / 축 드래그 |
 | `test_speed_engine.py` | 40 | (v01.04) 속도 · 가속도 · dab 보존 · τ 단조 · 모양 유지 · 정지 유지 · 속도 바꾸기 · Taubin, **마야 커브 골든**(24/30/60 fps · cm/m · 가중/비가중 < 1e-11) · refit(같은 목표 = 안 바꿈, 키 추가, 끝 밖 불변, 쓰기 = 마야, undo, 가중 커브, 매 프레임 키, 첫 키 앞 앵커) |
-| `test_speed_session.py` | 46 | (v01.04) 칠하는 동안 커브 · undo 큐 불변 → 놓으면 쓰기 · **원래 경로 위**(< 0.2%) · 브러시 밖 불변 · 키 프레임 유지 · 속도 고르게 · 두 번째 획 / 여러 획 흘러가지 않음 · **획마다 undo 하나** · 바깥 undo 감지 · 취소 · 키 시간 이동(포즈 전체 · 이웃에서 멈춤) · 정지 유지 · 회전하는 부모 · 레이어(Base 불변) · Whole Pose(회전 = 옛 회전(τ)) · 모양 Smooth · 속도 바꾸기 · 잠긴 경로 |
-| `test_speed_graph_ui.py` | 48 | (v01.04) 오프스크린 Speed 탭: 모드 · 단위 · 범위 3종 · 휠 반경/세기 · 스크럽 · **오른쪽 드래그 획**(미리보기 → 놓으면 쓰기 → undo 하나) · (v01.05) 획 → 스크럽 → **undo 한 번에 획 · 그래프 복귀**, 스크럽은 큐 밖, redo · Esc 취소 · Smooth Range · 곡선 끌기 = 빠르게 · 키 선 끌기 = 키 이동 · Shape 브러시 · Pop Out / Dock · 닫으면 정리 |
+| `test_speed_session.py` | 43 | (v01.04) 칠하는 동안 커브 · undo 큐 불변 → 놓으면 쓰기 · **원래 경로 위**(< 0.2%) · 브러시 밖 불변 · 키 프레임 유지 · 속도 고르게 · 두 번째 획 / 여러 획 흘러가지 않음 · **획마다 undo 하나** · 바깥 undo 감지 · 취소 · 정지 유지 · 회전하는 부모 · 레이어(Base 불변) · Whole Pose(회전 = 옛 회전(τ)) · 모양 Smooth · 속도 바꾸기 · 잠긴 경로 |
+| `test_speed_graph_ui.py` | 46 | (v01.04) 오프스크린 Speed 탭: 모드 · 단위 · 범위 3종 · 휠 반경/세기 · 스크럽 · **오른쪽 드래그 획**(미리보기 → 놓으면 쓰기 → undo 하나) · (v01.05) 획 → 스크럽 → **undo 한 번에 획 · 그래프 복귀**, 스크럽은 큐 밖, redo · Esc 취소 · Smooth Range · 곡선 끌기 = 빠르게 · 키 선 위 드래그 = 스크럽(키 불변) · Shape 브러시 · Pop Out / Dock · 닫으면 정리 |
 | `bench_speed_graph.py` | 실측 | (v01.04) 조밀 경로 보간 vs 서브프레임 굽기(차이 0.03%, 80배 빠름) · dab 0.1~0.5 ms · 놓기(refit + 쓰기) 5~10 ms, 매 프레임 키 1,000 개 146 ms |
 | `test_edit_context.py` | 19 | (v01.01) 편집 컨텍스트 전체 흐름 — 누름 → 끌기 → 놓기 · 축 고정 · 박스 선택 후 함께 끌기 · Shift / Ctrl · 빈 곳 클릭 해제 · 오른쪽 버튼 취소. 가짜 뷰의 `viewToWorld` 가 **마야 2024 와 같은 OUT 인자 모양**이라 v01.00 의 호출 실수를 잡는다 |
 

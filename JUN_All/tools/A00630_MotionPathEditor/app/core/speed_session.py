@@ -242,36 +242,3 @@ class StrokeSession(object):
         frames |= {float(t) for t in snap.t if start - 1e-6 <= t <= end + 1e-6}
         return np.array(sorted(frames), dtype="float64")
 
-
-def move_key_time(cache, t_old, t_new):
-    """그래프 키 선 끌기 (G4): 그 시간의 키를 **포즈 전체**(편집 레이어의 translate · rotate · scale 커브)로 t_new 로.
-
-    이웃 키를 넘거나 겹치지 않게 그 사이로 자른다(겹치면 마야가 밀어 넣는다 - 메모 keyframe-over-squeezes-on-collision).
-    cmds 로 하므로 undo 큐에 한 번(묶음). 실제로 옮긴 시간을 돌려준다(못 옮기면 None).
-    """
-    channels = ch.Channels(cache.node, cache.layer)
-    curves = []
-    for attr in ch.AXES + POSE_ATTRS:
-        try:
-            axis = ch.Axis(channels.obj, attr, channels.layer)
-        except Exception:                                  # noqa: BLE001
-            continue
-        if axis.state == "curve" and axis.edit is not None and axis.edit.curve_name:
-            curves.append(axis.edit.curve_name)
-    times = sorted({round(t, 6) for c in curves for t in (cmds.keyframe(c, q=True, timeChange=True) or [])})
-    if round(t_old, 6) not in times:
-        return None
-    i = times.index(round(t_old, 6))
-    lo = times[i - 1] + 0.01 if i > 0 else -1e9
-    hi = times[i + 1] - 0.01 if i + 1 < len(times) else 1e9
-    t_new = float(min(max(t_new, lo), hi))
-    if abs(t_new - t_old) < 1e-6:
-        return None
-    moving = [c for c in curves if cmds.keyframe(c, q=True, time=(t_old, t_old), keyframeCount=True)]
-    cmds.undoInfo(openChunk=True, chunkName="MotionPathKeyTime")
-    try:
-        for c in moving:
-            cmds.keyframe(c, edit=True, time=(t_old, t_old), timeChange=t_new, absolute=True)
-    finally:
-        cmds.undoInfo(closeChunk=True)
-    return t_new

@@ -55,6 +55,7 @@ then move — user's Q4 choice, proportional editing, numeric input), then phase
   `cmds.currentTime` (one undo entry per mouse move, see [[maya-time-context-traps]] 7) → `MAnimControl.setCurrentTime`.
   Stroke / curve drag / key-line drag / Smooth Range were already one undo each and the graph followed undo/redo (diagnosed
   headlessly). Regression test: stroke → scrub → one undo removes the stroke, graph = original, redo = stroke (old code fails 3).
+  Same version: **graph key-line drag (move key in time) removed** — user: not needed. Left-drag on a key line scrubs; do not re-add.
 - Next: Maya GUI check (viewport ghost line while painting, Esc/wheel focus, Pop Out), then plan phase 1.5 / 2.
 
 Related: [[maya-time-context-traps]] · [[wip-a00380-quad-patch]] · [[mayapy-headless-verify]] · [[feedback-sliders-use-shared-style]]

@@ -167,8 +167,8 @@ for f in np.linspace(42, 62, 8):
 mouse(graph, "release", float(graph.frame_to_x(62)), ybot, Qt.RightButton, Qt.NoButton)
 g_stroke = np.array(graph.data["series"][-1]["ys"]).copy()
 check("v01.05: the graph shows the stroke", np.abs(g_stroke - g_before).max() > 1e-3)
-# 빈 곳 = 키 선도 곡선도 아닌 곳 (획이 키를 더했을 수 있다 / 곡선 위면 속도 끌기가 된다)
-f_scrub = [f for f in range(5, 110) if graph.key_at(float(graph.frame_to_x(f))) is None][0]
+# 빈 곳 = 곡선 밖 (곡선 위면 속도 끌기가 된다)
+f_scrub = 5
 x_s = float(graph.frame_to_x(f_scrub))
 ys_scrub = [y for y in range(int(ytop), int(ybot)) if not graph.on_curve(x_s, y)][0]
 mouse(graph, "press", x_s, ys_scrub, Qt.LeftButton, Qt.LeftButton)
@@ -222,21 +222,18 @@ check("drag the curve up = faster there", v_after > v_before * 1.1, (v_after, v_
 cmds.undo()
 win.manager.refresh_all()
 
-# ---- 키 선 끌기 = 키 시간 이동 (포즈 전체)
+# ---- 키 선 위 왼쪽 드래그 = 스크럽 (v01.05: 키 시간 끌기는 없앴다 - 키는 그대로)
 app.processEvents()
 x70 = float(graph.frame_to_x(70))
-yk = graph.MARGIN_T + 3
-check("key line 70 is hit away from the curve", graph.key_at(x70) == 70.0 and not graph.on_curve(x70, yk))
+yk = [y for y in range(int(ytop), int(ybot)) if not graph.on_curve(x70, y)][0]
 mouse(graph, "press", x70, yk, Qt.LeftButton, Qt.LeftButton)
 mouse(graph, "move", float(graph.frame_to_x(74)), yk, Qt.NoButton, Qt.LeftButton)
 mouse(graph, "release", float(graph.frame_to_x(74)), yk, Qt.LeftButton, Qt.NoButton)
 kx = cmds.keyframe(node + ".translateX", q=True, timeChange=True)
-check("key 70 moved to 74 on every channel", 74.0 in kx and 70.0 not in kx and
-      74.0 in cmds.keyframe(node + ".translateY", q=True, timeChange=True), kx)
-check("the graph follows the new key", 74.0 in [t for t, _s in graph.data["keys"]])
-cmds.undo()
-win.manager.refresh_all()
-check("one undo puts the key back", 70.0 in cmds.keyframe(node + ".translateX", q=True, timeChange=True))
+check("left-drag on a key line scrubs and does not move the key", 70.0 in kx and 74.0 not in kx and
+      cmds.currentTime(q=True) == 74.0, (kx, cmds.currentTime(q=True)))
+check("no key-time drag left", not hasattr(sg.SpeedGraphWidget, "key_drag_finished") and
+      not hasattr(sg.SpeedPanel, "_on_key_moved"))
 
 # ---- 모양 브러시
 panel.cmb_brush.setCurrentIndex(1)

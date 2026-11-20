@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
 # last Update date : 2026-11-20
-# A00630_MotionPathEditor - 속도 그래프 위젯 · 패널 (속도 그래프 계획서 §3 · §4-7, v01.04 / v01.05 스크럽 undo 큐 밖)
+# A00630_MotionPathEditor - 속도 그래프 위젯 · 패널 (속도 그래프 계획서 §3 · §4-7, v01.04 / v01.05 스크럽 undo 큐 밖 · 키 선 끌기 없앰)
 """
 SpeedGraphWidget — QPainter 로 그리는 그래프 (마야 비의존 - 데이터는 패널이 set_data 로 넣는다)
     가로 = 프레임, 세로 = 모드 값 (Speed: 경로 길이/프레임 · Position: X/Y/Z · Acceleration: 길이/프레임²)
@@ -9,9 +9,8 @@ SpeedGraphWidget — QPainter 로 그리는 그래프 (마야 비의존 - 데이
 
     마우스                                 시그널
     오른쪽 드래그 : Smooth 브러시           brush_started(f) · brush_dab(f) · brush_finished()
-    왼쪽 · 빈 곳  : 현재 프레임 스크럽        scrubbed(f)
+    왼쪽 · 곡선 밖 : 현재 프레임 스크럽        scrubbed(f)   (키 선 위도 - v01.05 에서 키 시간 끌기는 없앴다)
     왼쪽 · 곡선   : 그곳을 빠르게 / 느리게      speed_started(f) · speed_dragging(f, amount) · speed_finished()   (Speed 모드)
-    왼쪽 · 키 선  : 키 시간 이동 (포즈 전체)    key_drag_finished(t_old, t_new)                                   (Speed 모드)
     휠 = 반경 · Shift+휠 = 세기 · 곡선 끄는 중 휠 = Reach      radius_changed · strength_changed · reach_changed
     Esc / 끄는 중 반대 버튼 = 그 드래그 취소   drag_cancelled()
 
@@ -52,7 +51,6 @@ _GHOST = QColor(130, 130, 130)
 _BRUSH = QColor(120, 180, 255)
 _AXIS_COLORS = (QColor(235, 90, 90), QColor(110, 220, 110), QColor(100, 150, 255))
 
-KEY_HIT_PX = 5
 CURVE_HIT_PX = 8
 
 
@@ -73,7 +71,6 @@ class SpeedGraphWidget(QWidget):
     speed_started = Signal(float)
     speed_dragging = Signal(float, float)
     speed_finished = Signal()
-    key_drag_finished = Signal(float, float)
     drag_cancelled = Signal()
     radius_changed = Signal(float)
     strength_changed = Signal(float)
@@ -94,9 +91,9 @@ class SpeedGraphWidget(QWidget):
         self.radius = 8.0
         self.strength = 0.5
         self.reach = 10.0
-        self.edit_curve = True           # 곡선 · 키 선 끌기 (Speed 모드만)
+        self.edit_curve = True           # 곡선 끌기 (Speed 모드만)
         self.hover = None                # 마우스 프레임 (브러시 띠)
-        self._drag = None                # ("scrub",) / ("brush",) / ("speed", f, y0, button) / ("key", t0, t_now)
+        self._drag = None                # ("scrub",) / ("brush",) / ("speed", f, y0)
         self.y_max = 1.0
 
     def sizeHint(self):
@@ -181,11 +178,6 @@ class SpeedGraphWidget(QWidget):
             p.setPen(QPen(_KEY_SEL if selected else _KEY, 1, Qt.SolidLine))
             p.drawLine(QPointF(x, r.top()), QPointF(x, r.bottom()))
             p.drawText(QRectF(x - 20, r.top() - 16, 40, 14), Qt.AlignCenter, "{0:g}".format(round(t, 2)))
-        # 키 시간 끄는 중
-        if self._drag and self._drag[0] == "key":
-            x = float(self.frame_to_x(self._drag[2]))
-            p.setPen(QPen(_KEY_SEL, 2, Qt.DashLine))
-            p.drawLine(QPointF(x, r.top()), QPointF(x, r.bottom()))
         # 현재 프레임
         cur = d.get("current")
         if cur is not None and x0 <= cur <= x1:
@@ -234,14 +226,6 @@ class SpeedGraphWidget(QWidget):
         p.drawPolyline(poly)
 
     # ---------------------------------------------------------------- 맞히기
-    def key_at(self, x):
-        best = None
-        for t, _sel in self.data.get("keys", ()):
-            dx = abs(float(self.frame_to_x(t)) - x)
-            if dx <= KEY_HIT_PX and (best is None or dx < best[0]):
-                best = (dx, t)
-        return None if best is None else best[1]
-
     def on_curve(self, x, y):
         for s in self.data.get("series", ()):
             if not s.get("active", True) or len(s["xs"]) < 2:
@@ -267,13 +251,7 @@ class SpeedGraphWidget(QWidget):
             self.brush_dab.emit(f)
         elif event.button() == Qt.LeftButton:
             if self.edit_curve:
-                key = self.key_at(pt.x())
-                near_curve = self.on_curve(pt.x(), pt.y())
-                if key is not None and not near_curve:
-                    self._drag = ("key", key, key)
-                    self.update()
-                    return
-                if near_curve:
+                if self.on_curve(pt.x(), pt.y()):
                     self._drag = ("speed", f, pt.y())
                     self.speed_started.emit(f)
                     self.update()
@@ -294,9 +272,6 @@ class SpeedGraphWidget(QWidget):
         elif kind == "speed":
             amount = (self._drag[2] - pt.y()) * self.value_per_px()
             self.speed_dragging.emit(self._drag[1], amount)
-        elif kind == "key":
-            t = f if (event.modifiers() & Qt.ControlModifier) else round(f)
-            self._drag = ("key", self._drag[1], float(t))
         self.update()
 
     def mouseReleaseEvent(self, event):
@@ -307,9 +282,6 @@ class SpeedGraphWidget(QWidget):
             self.brush_finished.emit()
         elif drag[0] == "speed" and event.button() == Qt.LeftButton:
             self.speed_finished.emit()
-        elif drag[0] == "key" and event.button() == Qt.LeftButton:
-            if abs(drag[2] - drag[1]) > 1e-6:
-                self.key_drag_finished.emit(drag[1], drag[2])
         self.update()
 
     def leaveEvent(self, event):
@@ -429,8 +401,7 @@ class SpeedPanel(QWidget):
         self.graph.setToolTip(
             "Right-drag: smooth (wheel: radius, Shift+wheel: strength).\n"
             "Left-drag on the curve: faster / slower there (wheel while dragging: reach).\n"
-            "Left-drag a key line: move that key in time (whole pose; Ctrl: sub-frames).\n"
-            "Left-drag elsewhere: scrub the current frame. Esc / the other button while dragging: cancel.\n"
+            "Left-drag elsewhere (key lines too): scrub the current frame. Esc / the other button while dragging: cancel.\n"
             "Every stroke is one undo (Ctrl+Z in Maya).")
         self.graph.radius = float(s["brush_radius"])
         self.graph.strength = float(s["brush_strength"])
@@ -444,7 +415,6 @@ class SpeedPanel(QWidget):
         g.speed_started.connect(self._on_speed_started)
         g.speed_dragging.connect(self._on_speed_dragging)
         g.speed_finished.connect(self._on_stroke_finished)
-        g.key_drag_finished.connect(self._on_key_moved)
         g.drag_cancelled.connect(self._on_cancelled)
         g.radius_changed.connect(self._on_radius_wheel)
         g.strength_changed.connect(self._on_strength_wheel)
@@ -798,26 +768,6 @@ class SpeedPanel(QWidget):
         if abs(oma.MAnimControl.currentTime().asUnits(unit) - frame) < 1e-9:
             return
         oma.MAnimControl.setCurrentTime(om.MTime(frame, unit))
-
-    def _on_key_moved(self, t_old, t_new):
-        cache = self.active_cache()
-        if cache is None or cache.locked:
-            return
-        try:
-            moved = ss.move_key_time(cache, t_old, t_new)
-        except Exception as exc:                           # noqa: BLE001
-            self.log("[FAIL] Could not move the key : {0}".format(exc))
-            return
-        if moved is None:
-            self.log("[Info] The key did not move (it cannot pass its neighbours).")
-            return
-        sel = self.manager.selection.get(cache.key)
-        if sel and t_old in sel:
-            sel.discard(t_old)
-            sel.add(moved)
-        self.session = None
-        self.manager.refresh_all()
-        self.log("[OK] {0} : key {1:g} moved to {2:g} (whole pose, one undo).".format(cache.label, t_old, round(moved, 3)))
 
     def smooth_range(self):
         """그래프에 보이는 프레임 전체를 브러시 설정으로 한 번 (undo 하나)."""
