@@ -68,7 +68,9 @@ check("Frame numbers adds a label per key", len(draw_bridge.DATA[ctrl_key]["labe
       len(win.manager.caches[ctrl_key].keys))
 win.cb_numbers.setChecked(False)
 
-# ---- 드래그 평면 옵션
+# ---- 드래그 평면 옵션 (v01.13 - 줄은 숨김, 숨긴 동안 View. 코드 · 저장은 그대로라 버튼을 누르면 예전처럼 저장된다)
+check("Drag in row is hidden and the drag plane is View", not win.plane_row.isVisible() and
+      win.manager.settings["plane"] == "view")
 [b for b in win.plane_buttons.buttons() if b.property("plane") == "y"][0].click()
 check("Drag plane option is stored", win.manager.settings["plane"] == "y" and
       cmds.optionVar(q=mw.OPTVAR + "plane") == "y")

@@ -39,6 +39,9 @@ OPTVAR = "JUN_A00630_"
 #: 진행 팝업을 띄울 굽기 크기 (대상 수 x 프레임 수)
 PROGRESS_THRESHOLD = 2000
 
+#: v01.13 Path 탭 `Drag in` 줄 보이기 (사용자 요청으로 숨김 - True 로 돌리면 다시 보인다)
+SHOW_DRAG_IN = False
+
 _PLANE_ITEMS = (
     ("View", picking.PLANE_VIEW, "Move in the plane facing the camera (default)."),
     ("Ground", picking.PLANE_GROUND, "Move on the horizontal plane (world XZ) through the key."),
@@ -290,7 +293,11 @@ class MainWindow(QWidget):
         row.addWidget(self.btn_refresh, 1)
         lay.addLayout(row)
 
-        plane = QHBoxLayout()
+        # v01.13 - Drag in 줄은 숨긴다(사용자: 필요 없다 - 매니퓰레이터 축 · 평면이 대신한다). 코드 · 설정은 남겨 두고,
+        # 숨긴 동안은 기본 View 로 움직인다(예전에 고른 Y · Ground 가 보이지 않게 계속 먹지 않도록 - 저장값은 그대로).
+        self.plane_row = QWidget()
+        plane = QHBoxLayout(self.plane_row)
+        plane.setContentsMargins(0, 0, 0, 0)
         plane.addWidget(QLabel("Drag in"))
         self.plane_buttons = QButtonGroup(self)
         for label, value, tip in _PLANE_ITEMS:
@@ -303,7 +310,10 @@ class MainWindow(QWidget):
         plane.addStretch(1)
         self.plane_buttons.buttonClicked.connect(
             lambda btn: self._set("plane", btn.property("plane"), redraw=False))
-        lay.addLayout(plane)
+        lay.addWidget(self.plane_row)
+        self.plane_row.setVisible(SHOW_DRAG_IN)
+        if not SHOW_DRAG_IN:
+            self.manager.settings["plane"] = picking.PLANE_VIEW
         lay.addLayout(self._build_manip_row())
         lay.addLayout(self._build_falloff_row())
         self.lbl_selection = QLabel("")

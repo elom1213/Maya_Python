@@ -82,5 +82,8 @@
 #        고른 점이 있으면 Smooth Range = 그 폴오프 범위만 가중치만큼 위치 스무딩(Smooth Shape / Acceleration 결과를 w 로 섞음, 범위 밖 그대로,
 #        Smooth Speed 브러시면 Shape 로 대신). 기즈모 굵기 1.5 배(사용자 요청). 플러그인 1.9.
 
-VERSION = "01.12"
+# 01.13  Path 탭 `Drag in` 줄을 숨김(사용자: 필요 없다 - 매니퓰레이터 축 · 평면이 대신). 코드 · 설정은 그대로(main_window.SHOW_DRAG_IN),
+#        숨긴 동안은 View 로 움직인다(예전에 고른 Y · Ground 가 안 보이게 계속 먹지 않도록, 저장값은 지우지 않음).
+
+VERSION = "01.13"
 LAST_UPDATE = "2026-11-20"

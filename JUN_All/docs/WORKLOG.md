@@ -33,6 +33,9 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-20 (오늘)
 
+> [!summary] **`A00630_MotionPathEditor` v01.13 — Path 탭 `Drag in` 줄 숨김** `#A00630_MotionPathEditor`
+- 사용자: 필요 없다 → UI 만 숨김(코드 · 설정 그대로, `SHOW_DRAG_IN`). 숨긴 동안 끌기 평면은 View(예전 저장값이 안 보이게 먹지 않도록). 전체 485/485.
+
 > [!summary] **`A00630_MotionPathEditor` v01.12 — Speed 탭 Edit Path · 그래프 폴오프 띠 · 폴오프 범위 위치 Smooth (G4)** `#A00630_MotionPathEditor`
 - Speed 탭 Edit Path(Path 탭과 같은 툴, 두 버튼 늘 같은 상태), 끄는 동안 그래프 라이브(이미 manager.preview 로 그리고 있었다), 고른 점의 폴오프 [a, b] 를 그래프 배경 가중치 색 띠로,
   Frames > Falloff, 고른 점이 있으면 Smooth Range = 폴오프 범위만 가중치만큼 위치 스무딩(Speed 브러시면 Shape 로 대신). 기즈모 굵기 1.5 배(사용자 요청).

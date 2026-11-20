@@ -79,6 +79,7 @@ then move — user's Q4 choice, proportional editing, numeric input), then phase
 - v01.12 = G4: Speed tab Edit Path (same context, buttons synced by main_window._set_edit_buttons), graph live came for free
   (graph already reads manager.preview), falloff band in graph, Frames > Falloff, Smooth Range with a selection = weighted position
   smoothing P0 + w(S-P0). Gizmo 1.5x thicker (user). User GUI OK for v01.10, v01.11. v01.08-v01.11 pushed 2026-11-20 (f66468f8).
+- v01.13: Path tab `Drag in` row hidden by user request (code kept, main_window.SHOW_DRAG_IN; plane forced to View while hidden).
 - Next: Maya GUI check of v01.12; later candidates: arc-length falloff, pivot options, numeric input, scale manipulator.
 
 Related: [[maya-time-context-traps]] · [[wip-a00380-quad-patch]] · [[mayapy-headless-verify]] · [[feedback-sliders-use-shared-style]]
