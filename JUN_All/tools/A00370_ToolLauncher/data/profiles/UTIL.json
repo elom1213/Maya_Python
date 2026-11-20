@@ -62,6 +62,11 @@
           "name": "NameDecoder",
           "path": "tools/A00620_NameDecoder",
           "color": "#6b7280"
+        },
+        {
+          "name": "AttrSlider",
+          "path": "tools/A00640_AttrSlider",
+          "color": "#6b7280"
         }
       ]
     },

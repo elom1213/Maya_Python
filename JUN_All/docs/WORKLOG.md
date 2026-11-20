@@ -42,7 +42,7 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
   blendShape weight(하드 -10~10 + 소프트 0~1)가 -10~10 슬라이더가 되는 걸 시험이 잡아 순서를 바꿈.
 - UI: 노드마다 섹션(+ 셰이프 · 히스토리 blendShape, View 메뉴), float/int 슬라이더 + 숫자 칸, bool 체크, enum 콤보(항목도 풀어서), 상태 색(분홍 · 노랑 · 회색),
   Auto Key, 드래그 한 번 = undo 한 번, 선택 · 시간 · undo 따라 갱신, Lock List(pin_style), Filter, 행 우클릭 Set Range / Reset Range / Set Key. 공용 sliderStyle · log · menuBar.
-- 시험 `tests/test_attr_slider.py` 75항목(liteDriver 와 같은 어트리뷰트 · 범위의 로케이터). 아이콘 · 런처(ANIM > Motion) 버튼 · 가이드 `docs/A00640_AttrSlider.md` · 포트폴리오 EN/KR 4-3. **마야 GUI 확인 아직.**
+- 시험 `tests/test_attr_slider.py` 75항목(liteDriver 와 같은 어트리뷰트 · 범위의 로케이터). 아이콘 · 런처(UTIL > Scene, 처음 ANIM 에 넣었다가 범용 툴이라 옮김) 버튼 · 가이드 `docs/A00640_AttrSlider.md` · 포트폴리오 EN/KR 4-3. **마야 GUI 확인 아직.**
 
 > [!summary] **`A00210_FileManager` v01.54 — Maya > File Date: 체크한 .ma / .mb / .fbx 의 수정한 날짜만 바꾸기 (내용 그대로, 기본 오늘)** `#A00210_FileManager`
 - 요청: 경로를 탐색해 파일을 나열 · 체크하고(Maya > Reference 의 트리 재사용 가능), 체크한 파일의 저장 날짜만 바꾸기. 기본 오늘, 지금은 fbx · ma · mb.

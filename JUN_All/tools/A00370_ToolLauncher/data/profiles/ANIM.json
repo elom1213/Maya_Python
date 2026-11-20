@@ -32,11 +32,6 @@
           "name": "WindTool_V03",
           "path": "tools/A00390_WindTool_V03",
           "color": "#c7762e"
-        },
-        {
-          "name": "AttrSlider",
-          "path": "tools/A00640_AttrSlider",
-          "color": "#c7762e"
         }
       ]
     }

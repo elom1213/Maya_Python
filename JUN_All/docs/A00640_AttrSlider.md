@@ -15,7 +15,7 @@ blendShape 노드는 **타겟 웨이트**를, FBX 에서 온 일본어 · 중국
 
 - **버전**: `app/config/version.py` (v01.00)
 - **설치**: `__dragDrop_A00640.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **Slider** → `tools.A00640_AttrSlider.run(True)`
-  (ToolLauncher `ANIM` 프로파일 `Motion` 칸에도 있다)
+  (ToolLauncher `UTIL` 프로파일 `Scene` 칸에도 있다 — 어떤 노드든 다루는 범용 툴이라 A00620 옆)
 - **계획서**: [`plans/A00640_AttrSlider_plan.md`](plans/A00640_AttrSlider_plan.md) (실측 근거 §1)
 
 ## 1. 화면
