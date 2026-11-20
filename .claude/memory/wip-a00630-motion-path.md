@@ -70,6 +70,9 @@ then move — user's Q4 choice, proportional editing, numeric input), then phase
   G0: deform = existing StrokeSession with target points (no new write code). GUI: `b` blocked via app event filter, mesh(kLineStrip) not x-ray
   ([[maya-vp2-xray-and-hotkey-filter]]). **v01.09 = G1** (frame-point selection, falloff UI/colors, b tap/drag; plugin 1.6). Dragging frame
   points / with falloff still only logs "next update" → **next = G2** (MODE_DEFORM + set_state, route in edit_context._press), then G3 gizmo, G4 Speed tab.
-- Next: G2; Maya GUI check of everything since v01.04.
+- v01.10 = G2: frame-point / falloff drag = StrokeSession MODE_DEFORM (preview while dragging, refit on release, one undo for many paths);
+  keys only + falloff off = old DragSession. Anchor = press-pixel ray ∩ drag plane (else a still click wrote keys). Lines drawn in screen 2D
+  (x-ray only works for points) — plugin 1.7. User GUI-confirmed (v01.09): points visible, radius text, softSelect untouched.
+- Next: G3 gizmo (core/gizmo.py from bench_g0 prototypes), then G4 Speed tab Edit Path / live graph / [a,b] colors / Smooth Range mask.
 
 Related: [[maya-time-context-traps]] · [[wip-a00380-quad-patch]] · [[mayapy-headless-verify]] · [[feedback-sliders-use-shared-style]]

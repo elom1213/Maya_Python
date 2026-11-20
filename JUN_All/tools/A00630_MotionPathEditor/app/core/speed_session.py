@@ -7,6 +7,7 @@ StrokeSession = 경로 하나에 대한 획들. **획 하나 = 마야 undo 하�
 
     mode "speed" : 속도 Smooth / 속도 바꾸기 - 모양 유지, 타이밍만 (retime.SpeedRetimer)
     mode "shape" : 모양 Smooth (retime.ShapeSmoother)
+    mode "deform": 목표 경로를 그대로 받는다 - set_state(P) (v01.10 Edit Path 의 프레임 점 · 폴오프 끌기, 매니퓰레이터 · 폴오프 계획서 §3-3)
 
 흐름
 ----
@@ -49,6 +50,7 @@ COMMAND = "junMotionPathSetKeys"
 MODE_SPEED = "speed"
 MODE_SHAPE = "shape"
 MODE_ACCEL = "accel"          # v01.08 가속도 Smooth (retime.AccelSmoother)
+MODE_DEFORM = "deform"        # v01.10 목표 경로를 직접 (set_state) - 상태 = cache.times 의 월드 점
 ACCEL_TOL_FACTOR = 0.2         # 가속도 브러시는 refit 을 더 엄격히 - 위치 오차의 2차 차분이 그대로 가속도 잡음이 된다
 POSE_ATTRS = ("rotateX", "rotateY", "rotateZ", "scaleX", "scaleY", "scaleZ")
 STEP = 0.25
@@ -110,6 +112,9 @@ class StrokeSession(object):
             u, P = dense_points(cache, step, exact)
             self.retimer = retime.SpeedRetimer(u, P)
             state0 = self.retimer.v0.copy()
+        elif mode == MODE_DEFORM:
+            self.shaper = None
+            state0 = self.points0.copy()
         else:
             smoother = retime.AccelSmoother if mode == MODE_ACCEL else retime.ShapeSmoother
             self.shaper = smoother(self.times, self.points0)
@@ -155,7 +160,14 @@ class StrokeSession(object):
         self.current = self.stack[-1]
         self.stroking = True
 
+    def set_state(self, points):
+        """deform 모드: 이번 획의 목표 경로 (N,3) - cache.times 의 새 월드 점. 놓을 때(end_stroke) 커브에 쓴다."""
+        P = np.asarray(points, dtype="float64").reshape(self.points0.shape)
+        self.current = P.copy()
+
     def dab(self, fc, radius, strength):
+        if self.mode == MODE_DEFORM:
+            return
         if self.mode == MODE_SPEED:
             self.current = self.retimer.dab(self.current, fc, radius, strength)
         else:

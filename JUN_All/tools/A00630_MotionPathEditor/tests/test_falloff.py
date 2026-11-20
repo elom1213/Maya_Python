@@ -114,7 +114,7 @@ check("falloff off -> no falloff drawing", len(draw_bridge.DATA[cache.key]["fall
       not draw_bridge.DATA[cache.key]["fall_lines"])
 loaded = mel.eval('junMotionPathVersion')
 loaded = loaded[0] if isinstance(loaded, (list, tuple)) else loaded
-check("plugin version bumped and loaded (1.6)", plugin_source.PLUGIN_VERSION == "1.6" and loaded == "1.6", loaded)
+check("the loaded plugin is the current one", loaded == plugin_source.PLUGIN_VERSION, loaded)
 # 박스 선택 · 드래그가 키와 프레임 점을 섞어 받는다
 key30 = [k for k in cache.keys if k.t == 30.0][0]
 mgr.select([(cache, key30), (cache, f45)], "replace")
@@ -153,16 +153,8 @@ ctx._drag()
 ctx._release()
 got = mgr.selection.get(cache.key, set())
 check("box selects frame dots too", set(np.arange(40.0, 51.0)) <= got, sorted(got))
-# 프레임 점을 끌면 (아직 deform 없음) 아무것도 안 바뀌고 안내만
-before = cache.points.copy()
 mgr.select([(cache, f45)], "replace")
-x, y = to_pixel(cache.points[cache.row_of(45.0)])
-STATE.update({"anchorPoint": [x, y, 0.0], "dragPoint": [x + 40, y, 0.0], "button": 1, "modifier": "none"})
-ctx._press()
-ctx._drag()
-ctx._release()
-check("dragging a frame point does not change anything yet (next update) and says so",
-      np.abs(cache.points - before).max() == 0.0 and any("next update" in m for m in logs))
+# (프레임 점 끌기 = deform 은 test_deform_drag.py)
 
 # b 톡 = 켜기 / 끄기
 mgr.settings.update({"falloff_on": False, "falloff_radius": 10.0})

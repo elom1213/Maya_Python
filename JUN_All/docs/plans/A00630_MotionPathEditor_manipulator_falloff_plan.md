@@ -7,7 +7,7 @@ updated: 2026-11-20
 
 # A00630_MotionPathEditor — 매니퓰레이터 · 폴오프 편집 하위 계획서
 
-> 작성 2026-11-20 · 상태: **G0 끝 · G1 구현 (v01.09, mayapy 390/390) · G2 다음** · 상위 계획서 [`A00630_MotionPathEditor_plan.md`](A00630_MotionPathEditor_plan.md) §5 **1.5단계 "프레임 단위 편집 · 비례 편집"** 의 하위 계획
+> 작성 2026-11-20 · 상태: **G0 끝 · G1 (v01.09) · G2 (v01.10, mayapy 419/419) · G3 다음** · 상위 계획서 [`A00630_MotionPathEditor_plan.md`](A00630_MotionPathEditor_plan.md) §5 **1.5단계 "프레임 단위 편집 · 비례 편집"** 의 하위 계획
 > · 형제 계획서 [`A00630_MotionPathEditor_speed_graph_plan.md`](A00630_MotionPathEditor_speed_graph_plan.md) (Speed 탭 · 획 세션 · refit — 이 계획이 그대로 재사용한다)
 >
 > 요청 (2026-11-20):
@@ -280,7 +280,7 @@ mayapy 에는 핫키 세트가 없어 `hotkey -q b` = None — 실제 값은 GUI
 
 | # | 결과 | 결정 |
 |---|------|------|
-| G0-1 | 색표(가운데 노랑 → 끝 빨강)는 셋 다 맞게 보인다. **`mesh(kPoints)` · 색마다 `points()` 는 앞의 큐브를 뚫고 보이고, `mesh(kLineStrip)` 만 큐브에 가려졌다** — `beginDrawInXray` 가 mesh 선에는 안 먹는다 | 점 = `mesh(kPoints, 점, None, 색)` 한 번. **색 선 = 색 단계(16)마다 `setColor` + `lineStrip`/`line` 로 나눠 그린다**(지금 경로 선과 같은 호출) |
+| G0-1 | **(v01.10 정정: 셋째 줄은 '색마다 points()' — 선이 아니었다. 사용자 확인으로 lineStrip 도 가려진다 → 선은 화면 2D, §7 G2)** 색표(가운데 노랑 → 끝 빨강)는 셋 다 맞게 보인다. **`mesh(kPoints)` · 색마다 `points()` 는 앞의 큐브를 뚫고 보이고, `mesh(kLineStrip)` 만 큐브에 가려졌다** — `beginDrawInXray` 가 mesh 선에는 안 먹는다 | 점 = `mesh(kPoints, 점, None, 색)` 한 번. **색 선 = 색 단계(16)마다 `setColor` + `lineStrip`/`line` 로 나눠 그린다**(지금 경로 선과 같은 호출) |
 | G0-2 | 앱 이벤트 필터가 `ShortcutOverride` · `KeyPress` · `KeyRelease` B 를 **`QWindow (MayaWindowWindow)` 에서** 받았다. 먹었더니 마야 `b` 핫키(`artisanModifyUpperRadius_press/_release`)가 **안 돌았다** — `softSelect` 켜짐 0 · 반경 3.0586 처음부터 끝까지 그대로(사용자: "b 를 눌러도 아무 반응이 없다" = 막힘). `B` 를 누른 채 끌면 컨텍스트 press 에서 `b_held=True`, 끈 거리 dx −90 · +82 px 받음 | **§3-5 안 A 채택**(이벤트 필터, 편집 컨텍스트가 지금 툴일 때만 먹는다). 안 B(핫키 교체)는 필요 없다. 안전망 C 는 계획대로 둔다 |
 | G0-3 | 사용자 핫키 세트 `JH_hotKey_V03_091`: b = `artisanModifyUpperRadius_press/_release`, w/e = 마야 기본 Translate/Rotate 마킹 메뉴 | 바꾸지 않으므로 되돌릴 일 없음 |
 
@@ -297,3 +297,15 @@ mayapy 에는 핫키 세트가 없어 `hotkey -q b` = None — 실제 값은 GUI
 - 시험: `test_falloff.py` **59**. 기존 `test_edit_context.py` 의 "박스 → 키 함께 끌기" 는 박스가 프레임 점도 고르게 되어 그 부분만 `Frame dots` 끄고 시험(키만 끄는 기존 동작 확인).
   가짜 뷰는 `tests/_fake_view.py` 로 빼 두 시험이 함께 쓴다. 전체 **390/390**.
 - `b` 필터는 Qt `QKeyEvent` 를 직접 넣어 시험했다(먹음 · ShortcutOverride accept · 반복 무시 · Ctrl+B 통과 · 다른 툴이면 통과). 마야 GUI 에서 실제로 막히는 것은 G0-2 로 확인됨.
+
+### G2 (2026-11-20, v01.10)
+
+- **[Fix 먼저] 선이 메시에 가려진다**(사용자 GUI, v01.09: 점은 보이고 선은 가림 · 반경 숫자 보임 · 소프트 셀렉션 그대로). G0 의 "색 선은 색마다 lineStrip 으로" 결정은
+  **근거가 잘못됐다** — 프로브 셋째 줄은 points() 였다. VP2 x-ray 는 점에만 먹는다 → 선 세 가지(경로 · 폴오프 · 원래 경로)를 그릴 때마다
+  `kViewProjMtx` 로 화면 픽셀에 투영해 `mesh2d(kLineStrip)`(안 되면 `line2d`)로 그린다. 카메라 뒤는 끊는다. 7,000 점 약 6 ms/그리기. 플러그인 1.7.
+  그리기 데이터의 선은 numpy (N,3) 로(그릴 때 투영). 2D 선은 3D 점보다 위에 그려진다(점이 선보다 커서 보인다).
+- G2: `StrokeSession` `MODE_DEFORM` + `set_state` · 컨텍스트 `_start_deform`(경로마다 세션, 가중치 = 폴오프 · 꺼져 있으면 고른 점만) →
+  끄는 동안 `manager.preview` 로 미리보기 → 놓을 때 `undoInfo` 묶음 안에서 경로마다 `end_stroke`(refit) → Ctrl+Z 한 번. 키만 + 폴오프 끔 = 기존 `DragSession`.
+- 구현 중 잡은 것: 끄는 기준을 점 자체로 두면 정수 픽셀 광선이 점을 비껴가 **안 움직인 클릭도 0.02 cm 튀어 키를 썼다** → 기준 = 누른 픽셀 광선과 끌기 평면의 교점.
+  (기존 키 끌기 `DragSession` 도 같은 모양이지만 그쪽은 첫 움직임에 키가 커서 밑으로 오는 것이라 그대로 둔다.)
+- 시험 `test_deform_drag.py` **30**, 전체 **419/419**. GUI 확인: 경로 · 폴오프 선이 메시 위에 보이는지, 끌기 미리보기 · 놓기 · Ctrl+Z.

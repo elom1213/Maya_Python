@@ -9,6 +9,8 @@
 
 import os
 
+import numpy as np
+
 import maya.api.OpenMaya as om
 import maya.cmds as cmds
 import maya.mel as mel
@@ -174,7 +176,7 @@ def payload(cache, color, selected_times, current_frame, show_dots=True, show_ke
         fall_cols = falloff.colors(weights[inside]) if inside else []
         for level, rows in falloff.line_runs(weights):
             r, g, b = falloff.level_color(level)
-            fall_lines.append((om.MColor((r, g, b, 1.0)), _points(pts[rows])))
+            fall_lines.append((om.MColor((r, g, b, 1.0)), np.asarray(pts[rows], dtype="float64")))
     keys, chosen, labels = [], [], []
     if show_keys:
         for k in cache.keys:
@@ -187,13 +189,13 @@ def payload(cache, color, selected_times, current_frame, show_dots=True, show_ke
     if row is not None:
         current.append(pts[row])
     return {
-        "line": _points(pts),
+        "line": np.asarray(pts, dtype="float64"),          # v01.10 선은 플러그인이 화면 2D 로 투영해 그린다
         "dots": _points(pts) if show_dots else om.MPointArray(),
         "keys": _points(keys),
         "selected": _points(chosen),
         "current": _points(current),
         "labels": labels,
-        "ghost": _points(ghost) if ghost is not None else om.MPointArray(),
+        "ghost": np.asarray(ghost, dtype="float64") if ghost is not None else np.zeros((0, 3)),
         "selected_dots": _points(sel_dots),
         "fall_dots": _points(fall_dots),
         "fall_colors": _colors(fall_cols),

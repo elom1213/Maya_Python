@@ -1,6 +1,6 @@
 ---
 name: maya-vp2-xray-and-hotkey-filter
-description: VP2 MUIDrawManager — mesh(kLineStrip) 는 beginDrawInXray 가 안 먹는다(점은 됨) · 컨텍스트 중 마야 핫키(b 등)는 앱 이벤트 필터로 먹어 막을 수 있다 (2026-11-20 GUI 실측)
+description: VP2 MUIDrawManager — beginDrawInXray 는 점에만 먹고 3D 선(lineStrip · mesh 선)은 메시에 가려진다 → 선은 화면 2D 로 · 컨텍스트 중 마야 핫키(b 등)는 앱 이벤트 필터로 먹어 막을 수 있다 (2026-11-20 GUI 실측)
 metadata:
   node_type: memory
   type: project
@@ -10,9 +10,12 @@ metadata:
 
 A00630 매니퓰레이터 · 폴오프 G0 GUI 실측 (마야 2024, 2026-11-20, `tools/A00630_MotionPathEditor/tests/g0_gui_probe.py`).
 
-1. **x-ray**: `beginDrawInXray` 안에서 `dm.mesh(kPoints, pts, None, colors)` · `dm.points()` 는 메시를 뚫고 보이는데
-   **`dm.mesh(kLineStrip, pts, None, colors)` 는 메시에 가려진다.** 점마다 색 자체는 셋 다 된다.
-   → 색 선은 색 단계마다 `setColor` + `lineStrip`/`line` 으로 나눠 그린다.
+1. **x-ray 는 점에만 먹는다**: `beginDrawInXray` 안에서 `dm.points()` · `dm.mesh(kPoints, ..., colors)` 는 메시를 뚫고 보이는데
+   **3D 선은 전부 메시에 가려진다** — `mesh(kLineStrip)`(G0 프로브) · `lineStrip`(v01.09 사용자 확인) 둘 다. 점마다 색 자체는 된다.
+   → **선은 그릴 때 화면 픽셀로 투영해 2D 로**(`mesh2d(kLineStrip)` · `line2d`, 박스 선택 사각형처럼 늘 위에 보인다).
+   `frame_context.getMatrix(kViewProjMtx)`(행 벡터) + `getViewportDimensions()`, 카메라 뒤(w<=0)에서 끊는다.
+   7,000 점 투영 + MPointArray(리스트 생성자) ≈ 6 ms/그리기. (A00630 v01.10 `screen_strips`. 첫 판은 G0 프로브의 "색마다 points()" 줄을 선으로 착각해
+   lineStrip 이면 된다고 적었다 — **프로브는 확인하려는 것 그대로를 그려야 한다**.)
 2. **핫키 막기**: `QApplication.instance().installEventFilter(f)` 가 `ShortcutOverride` · `KeyPress` · `KeyRelease` 를
    `QWindow (MayaWindowWindow)` 에서 받는다. 셋 다 `return True`(ShortcutOverride 는 `accept()` 도)로 먹으면 마야 핫키
    (`b` = `artisanModifyUpperRadius_press`)가 **안 돈다** — softSelect 설정 불변. draggerContext 는 키를 못 알려 주므로

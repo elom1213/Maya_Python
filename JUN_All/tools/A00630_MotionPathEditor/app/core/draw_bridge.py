@@ -14,16 +14,18 @@ PENDING : 다음 `junMotionPathSetKeys` 명령이 가져갈 (undo 기록 MAnimCu
 DIRTY   : 다음 `junMotionPathDirty` 명령이 가져갈 노드들 (v01.03)
 
 DATA[path_key] 키 (값은 OpenMaya 2.0 객체 - 그리기 때 변환하지 않게 미리 만든다):
-    "line"      : MPointArray  경로 선 (프레임 순서)
+    "line"      : numpy (N,3)  경로 선 (프레임 순서, v01.10 부터 numpy)
     "dots"      : MPointArray  프레임 점
     "keys"      : MPointArray  키 점 (선택 안 된 것)
     "selected"  : MPointArray  선택된 키 점
     "current"   : MPointArray  현재 프레임 점 (0 또는 1 개)
     "labels"    : [(MPoint, str)]  키 옆 프레임 번호 (끄면 빈 목록)
-    "ghost"     : MPointArray  원래 경로 (그래프 Smooth 미리보기 중에만 - 회색 점선, v01.04)
+    "ghost"     : numpy (M,3)  원래 경로 (그래프 Smooth 미리보기 중에만 - 회색 점선, v01.04)
     "selected_dots" : MPointArray  고른 프레임 점 (키 아닌 것, v01.09)
     "fall_dots" / "fall_colors" : MPointArray / MColorArray  폴오프 범위의 점과 가중치 색 (v01.09, mesh kPoints)
-    "fall_lines": [(MColor, MPointArray)]  폴오프 범위의 선 - 색 단계마다 한 조각 (v01.09, mesh 선은 x-ray 가 안 먹어 lineStrip)
+    "fall_lines": [(MColor, (k,3) numpy)]  폴오프 범위의 선 - 색 단계마다 한 조각 (v01.09)
+    ※ v01.10 "line" · "ghost" · "fall_lines" 의 점은 numpy (N,3) - 플러그인이 그릴 때 화면 2D 로 투영해 그린다
+      (3D 선은 x-ray 안에서도 메시에 가려진다, GUI 실측)
     "color"     : MColor  경로 색
     "locked"    : bool  편집 불가 경로 (회색으로)
     "line_width", "dot_size", "key_size" : float

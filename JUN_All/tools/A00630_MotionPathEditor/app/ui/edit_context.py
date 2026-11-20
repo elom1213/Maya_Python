@@ -11,6 +11,8 @@ Edit Path 를 켜면 이 컨텍스트가 마야 툴이 된다.
     Ctrl + 클릭       : 빼기
     빈 곳 드래그      : 박스 선택 (Shift = 더하기, Ctrl = 빼기) · 빈 곳 클릭 = 선택 해제
     선택 키 드래그    : 드래그 평면(View / Ground / X / Y / Z)에서 이동 → 놓으면 undo 한 번
+                        프레임 점을 골랐거나 폴오프가 켜져 있으면 deform (v01.10): 고른 점 = 1, 둘레는 가중치만큼 함께.
+                        끄는 동안은 미리보기(원래 경로 회색 점선 + 새 경로), 놓을 때 키에 쓴다(refit) - 경로 여럿이어도 undo 한 번
     b 톡              : 폴오프 켜기 / 끄기 (v01.09)
     b + 왼쪽 끌기     : 폴오프 반경 (좌우, v01.09) · Ctrl+Shift + 왼쪽 끌기 = 같은 일 (b 를 못 받을 때의 안전망)
     오른쪽 버튼       : 드래그 중이면 취소
@@ -28,7 +30,9 @@ import numpy as np
 import maya.cmds as cmds
 
 from tools.A00630_MotionPathEditor.app.core import draw_bridge
+from tools.A00630_MotionPathEditor.app.core import falloff
 from tools.A00630_MotionPathEditor.app.core import picking
+from tools.A00630_MotionPathEditor.app.core import speed_session as ss
 from tools.A00630_MotionPathEditor.app.core.edit_session import DragSession
 
 CONTEXT_NAME = "junMotionPathEditCtx"
@@ -45,7 +49,10 @@ class EditContext(object):
         self.log = log or (lambda text: None)
         self.on_setting = on_setting or (lambda key: None)     # 설정을 바꿨다 (창이 저장 · 칸을 맞춘다) - v01.09
         self.session = None
+        self.deform = None              # v01.10 [(cache, StrokeSession, 가중치)] - 프레임 점 · 폴오프 끌기
+        self.deform_moved = False
         self.anchor = None
+        self.anchor_point = None
         self.view = None
         self.box = None
         self.radius_drag = None         # (x0, 처음 반경) - b / Ctrl+Shift 끌기 중 (v01.09)
@@ -153,7 +160,7 @@ class EditContext(object):
             button = self._query("button")
             modifier = self._query("modifier")
             if button == 3:
-                if self.session is not None:
+                if self.session is not None or self.deform is not None:
                     self._cancel()
                 return
             if button == 1 and (self.b_held or self._ctrl_shift()):
@@ -185,9 +192,7 @@ class EditContext(object):
             if key.t not in self.manager.selection.get(cache.key, set()):
                 return                          # 방금 빼낸 점 - 끌지 않는다
             if self.manager.selection_has_frames() or self.manager.falloff_radius() > 0:
-                # 프레임 점 · 폴오프 끌기 = deform 세션 (계획서 G2 - 다음 단계)
-                self.log("[Info] Moving frame points or using the falloff comes in the next update - "
-                         "for now drag keys with the falloff off (tap b).")
+                self._start_deform(cache.points[key.row], x, y)
                 return
             self.anchor = cache.points[key.row].copy()
             self.session = DragSession(self.manager.selected_items())
@@ -208,6 +213,20 @@ class EditContext(object):
                 r = min(RADIUS_MAX, max(0.0, r0 + (x - x0) * RADIUS_PER_PX))
                 self.manager.settings["falloff_radius"] = round(r, 1)
                 self._show_radius(x, y)
+                self.manager.redraw()
+            elif self.deform is not None and self.anchor is not None:
+                origin, direction = self.view.ray(x, y)
+                target = picking.drag_target(self.manager.settings["plane"], origin, direction, self.anchor_point,
+                                             self.view.view_dir)
+                if target is None:
+                    return
+                delta = target - self.anchor
+                if np.any(np.abs(delta) > 1e-9):
+                    self.deform_moved = True
+                for cache, session, w in self.deform:
+                    P = session.stack[-1] + w[:, None] * delta
+                    session.set_state(P)
+                    self.manager.preview[cache.key] = P
                 self.manager.redraw()
             elif self.session is not None and self.anchor is not None:
                 origin, direction = self.view.ray(x, y)
@@ -234,6 +253,9 @@ class EditContext(object):
                 self.on_setting("falloff_radius")
                 self.manager.redraw()
                 self.log("[Info] Falloff radius {0:g} frame(s).".format(self.manager.settings["falloff_radius"]))
+                return
+            if self.deform is not None:
+                self._commit_deform()
                 return
             if self.session is not None:
                 session, self.session = self.session, None
@@ -267,6 +289,75 @@ class EditContext(object):
             self.log("[FAIL] Release : {0}".format(exc))
             self._cancel()
 
+    # ---------------------------------------------------------------- deform (v01.10)
+    def _start_deform(self, point, x, y):
+        """고른 점이 있는 경로마다 deform 세션 (가중치 = 폴오프, 꺼져 있으면 고른 점만 1).
+
+        끄는 기준(anchor)은 점 자체가 아니라 **누른 픽셀의 광선이 끌기 평면과 만나는 곳**이다 - 정수 픽셀 광선은 점을 정확히
+        지나지 않아, 점을 기준으로 하면 움직이지 않은 클릭도 조금 튀어 키를 썼다(시험이 잡음). 그 평면은 점을 지난다.
+        """
+        point = np.asarray(point, dtype="float64")
+        origin, direction = self.view.ray(x, y)
+        hit = picking.drag_target(self.manager.settings["plane"], origin, direction, point, self.view.view_dir)
+        anchor = point if hit is None else hit
+        tol = float(self.manager.settings.get("fit_tolerance", 0.1)) / 100.0
+        items = []
+        for cache in self.manager.cache_list():
+            times = self.manager.selection.get(cache.key)
+            if not times or cache.locked or cache.points is None:
+                continue
+            w = self.manager.weights_for(cache)
+            if w is None:
+                w = falloff.weights(cache.times, times, 0.0)
+            try:
+                session = ss.StrokeSession(cache, mode=ss.MODE_DEFORM, tolerance_rel=tol)
+            except RuntimeError as exc:
+                self.log("[SKIP] {0} : {1}".format(cache.label, exc))
+                continue
+            session.begin_stroke()
+            items.append((cache, session, w))
+        if not items:
+            return
+        self.deform = items
+        self.deform_moved = False
+        self.anchor = np.asarray(anchor, dtype="float64").copy()
+        self.anchor_point = point.copy()            # 끌기 평면 · 축이 지나는 점
+        self.watcher.busy = True
+
+    def _clear_preview(self, items):
+        for cache, _s, _w in items:
+            self.manager.preview.pop(cache.key, None)
+
+    def _commit_deform(self):
+        """놓기: 경로마다 refit 해 쓰고, undo 묶음 하나로 (Ctrl+Z 한 번)."""
+        items, self.deform = self.deform, None
+        self._clear_preview(items)
+        if not self.deform_moved:
+            for _c, session, _w in items:
+                session.drop_stroke()
+            self.watcher.busy = False
+            self.manager.redraw()
+            return
+        added, wrote, points = 0, 0, 0
+        cmds.undoInfo(openChunk=True, chunkName="MotionPathDeform")
+        try:
+            for cache, session, w in items:
+                if session.end_stroke():
+                    wrote += 1
+                added += sum(r[2] for r in session.report)
+                points += int(np.count_nonzero(w > 1e-9))
+                for name, _err, _n, msg in session.report:
+                    if msg:
+                        self.log("[WARN] {0}.{1} : {2}".format(cache.label, name, msg))
+        finally:
+            cmds.undoInfo(closeChunk=True)
+            self.watcher.busy = False
+        self.manager.refresh_all()
+        if wrote:
+            r = self.manager.falloff_radius()
+            self.log("[OK] Moved {0} path point(s){1} on {2} path(s), {3} key(s) added. Ctrl+Z undoes it in one step.".format(
+                points, " (falloff {0:g} fr)".format(r) if r > 0 else "", wrote, added))
+
     def _hud_owner(self):
         caches = self.manager.cache_list()
         return caches[0].key if caches else ""
@@ -277,6 +368,13 @@ class EditContext(object):
                                 "owner": self._hud_owner()})
 
     def _cancel(self):
+        if self.deform is not None:
+            items, self.deform = self.deform, None
+            for _c, session, _w in items:
+                session.drop_stroke()
+            self._clear_preview(items)
+            self.watcher.busy = False
+            self.log("[Info] Drag cancelled.")
         if self.session is not None:
             session, self.session = self.session, None
             try:
@@ -293,7 +391,7 @@ class EditContext(object):
 
     def _finalize(self):
         """컨텍스트에서 나갈 때 (다른 툴 · Q). 끄는 중인 드래그는 취소."""
-        if self.session is not None or self.box is not None or self.radius_drag is not None:
+        if self.session is not None or self.deform is not None or self.box is not None or self.radius_drag is not None:
             self._cancel()
 
 

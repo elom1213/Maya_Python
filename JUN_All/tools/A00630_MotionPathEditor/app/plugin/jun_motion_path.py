@@ -15,6 +15,8 @@ cmds.loadPlugin(<이 파일>) 로 읽는다 (툴의 plugin_loader 가 한다).
 `__file__` 이 없으므로(메모 maya-loadplugin-no-file) 경로 계산을 하지 않고, draw_bridge 는 정식 경로로 import 한다.
 """
 
+import numpy as np
+
 import maya.api.OpenMaya as om
 import maya.api.OpenMayaRender as omr
 import maya.cmds as cmds
@@ -37,7 +39,7 @@ COMMANDS = (COMMAND_NAME, DIRTY_COMMAND_NAME, VERSION_COMMAND_NAME)
 #: 읽힌 코드의 버전과 이 값을 비교해 다르면 다시 읽는다. v01.00~02 의 플러그인은 "1.0" 이었다(junMotionPathDirty · ghost 그리기 없음).
 #: 읽힌 버전은 **명령 junMotionPathVersion 으로 묻는다** - `pluginInfo -q -version` 은 같은 경로에서 다시 읽어도 처음 읽은 값을 계속
 #: 돌려준다(실측: 새 코드인데 "1.0") → v01.07 첫 판이 교체 뒤에도 "옛것" 으로 보고 툴 창을 못 열었다.
-PLUGIN_VERSION = "1.6"          # 1.6 = v01.09 폴오프 색 · 고른 프레임 점 · HUD 글자
+PLUGIN_VERSION = "1.7"          # 1.6 = v01.09 폴오프 색 · 고른 프레임 점 · HUD 글자 / 1.7 = v01.10 선을 화면 2D 로(메시에 안 가린다)
 
 
 def _dirty(nodes):
@@ -75,6 +77,56 @@ class JunMotionPathNode(omui.MPxLocatorNode):
 
     def isBounded(self):
         return False
+
+
+def screen_strips(points, view_proj, width, height):
+    """(N,3) 월드 점 → 화면 픽셀 선 조각들 [(k,2) 배열] (v01.10).
+
+    선은 **2D 로** 그린다: 마야 2024 VP2 는 beginDrawInXray 안에서도 3D 선(lineStrip · mesh 선)을 메시 뒤로 가린다
+    (GUI 실측 2회 - 점만 x-ray 가 된다). 화면 좌표 선(line2d · mesh2d)은 박스 선택 사각형처럼 늘 위에 보인다.
+    카메라 뒤(w <= 0)로 가는 점에서 선을 끊는다. view_proj = 행 벡터 4x4 (picking.project 와 같은 규약).
+    """
+    P = np.asarray(points, dtype="float64").reshape(-1, 3)
+    if len(P) < 2:
+        return []
+    clip = np.hstack([P, np.ones((len(P), 1))]) @ np.asarray(view_proj, dtype="float64")
+    w = clip[:, 3]
+    front = w > 1e-6
+    safe = np.where(front, w, 1.0)
+    px = np.empty((len(P), 2))
+    px[:, 0] = (clip[:, 0] / safe * 0.5 + 0.5) * width
+    px[:, 1] = (clip[:, 1] / safe * 0.5 + 0.5) * height
+    out = []
+    i, n = 0, len(P)
+    while i < n:
+        if not front[i]:
+            i += 1
+            continue
+        j = i
+        while j + 1 < n and front[j + 1]:
+            j += 1
+        if j > i:
+            out.append(px[i:j + 1])
+        i = j + 1
+    return out
+
+
+def _view_of(frame_context):
+    """(view_proj 4x4 numpy, 너비, 높이) - 지금 그리는 뷰."""
+    m = frame_context.getMatrix(omr.MFrameContext.kViewProjMtx)
+    vp = np.array([[m.getElement(r, c) for c in range(4)] for r in range(4)])
+    _x, _y, width, height = frame_context.getViewportDimensions()
+    return vp, width, height
+
+
+def _line2d(dm, strip):
+    """화면 선 조각 하나. mesh2d 한 번(빠름), 안 되면 line2d 로."""
+    arr = om.MPointArray([om.MPoint(x, y) for x, y in strip.tolist()])     # 7,000 점 약 6 ms (append 루프 9 ms)
+    try:
+        dm.mesh2d(omr.MUIDrawManager.kLineStrip, arr)
+    except Exception:                                      # noqa: BLE001
+        for a, b in zip(list(arr)[:-1], list(arr)[1:]):
+            dm.line2d(a, b)
 
 
 class _Data(om.MUserData):
@@ -120,6 +172,10 @@ class JunMotionPathDrawOverride(omr.MPxDrawOverride):
         p = getattr(data, "payload", None)
         if p:
             self._draw_path(dm, p)
+            try:
+                self._draw_lines(dm, p, *_view_of(frame_context))
+            except Exception:                              # noqa: BLE001 - 선이 실패해도 점은 그린다
+                pass
         box = getattr(data, "hud", None)
         if box:
             x0, y0, x1, y1 = box
@@ -149,23 +205,7 @@ class JunMotionPathDrawOverride(omr.MPxDrawOverride):
         dm.setDepthPriority(5)
         locked = p.get("locked", False)
         line_color = _LOCK_COLOR if locked else p.get("color", _KEY_COLOR)
-        ghost = p.get("ghost")
-        if ghost is not None and len(ghost) > 1:            # 그래프 Smooth 미리보기: 원래 경로 (v01.04)
-            dm.setColor(_GHOST_COLOR)
-            dm.setLineWidth(1.0)
-            dm.setLineStyle(omr.MUIDrawManager.kDashed)
-            dm.lineStrip(ghost, False)
-            dm.setLineStyle(omr.MUIDrawManager.kSolid)
-        if len(p.get("line", ())) > 1:
-            dm.setColor(line_color)
-            dm.setLineWidth(float(p.get("line_width", 2.0)))
-            dm.lineStrip(p["line"], False)
-        # v01.09 폴오프 범위의 선 - 색 단계마다 lineStrip (G0-1: mesh(kLineStrip) 은 x-ray 가 안 먹어 메시에 가려진다)
-        for color, strip in p.get("fall_lines") or ():
-            if len(strip) > 1:
-                dm.setColor(color)
-                dm.setLineWidth(float(p.get("line_width", 2.0)) + 2.0)
-                dm.lineStrip(strip, False)
+        # 선(경로 · 폴오프 · 미리보기 원래 경로)은 _draw_lines 가 화면 2D 로 그린다 (v01.10)
         if len(p.get("dots", ())):
             dm.setColor(line_color)
             dm.setPointSize(float(p.get("dot_size", 4.0)))
@@ -198,6 +238,35 @@ class JunMotionPathDrawOverride(omr.MPxDrawOverride):
                 dm.text(point, text, omr.MUIDrawManager.kLeft)
         if xray:
             dm.endDrawInXray()
+        dm.endDrawable()
+
+
+    @staticmethod
+    def _draw_lines(dm, p, view_proj, width, height):
+        """선 세 가지를 화면 2D 로 (v01.10 - 3D 선은 x-ray 안에서도 메시에 가려진다)."""
+        locked = p.get("locked", False)
+        line_color = _LOCK_COLOR if locked else p.get("color", _KEY_COLOR)
+        lw = float(p.get("line_width", 2.0))
+        dm.beginDrawable(omr.MUIDrawManager.kNonSelectable)
+        ghost = p.get("ghost")
+        if ghost is not None and len(ghost) > 1:            # 그래프 Smooth 미리보기 · 끄는 동안: 원래 경로 (v01.04)
+            dm.setColor(_GHOST_COLOR)
+            dm.setLineWidth(1.0)
+            dm.setLineStyle(omr.MUIDrawManager.kDashed)
+            for strip in screen_strips(ghost, view_proj, width, height):
+                _line2d(dm, strip)
+            dm.setLineStyle(omr.MUIDrawManager.kSolid)
+        line = p.get("line")
+        if line is not None and len(line) > 1:
+            dm.setColor(line_color)
+            dm.setLineWidth(lw)
+            for strip in screen_strips(line, view_proj, width, height):
+                _line2d(dm, strip)
+        for color, pts in p.get("fall_lines") or ():         # v01.09 폴오프 범위 - 색 단계마다
+            dm.setColor(color)
+            dm.setLineWidth(lw + 2.0)
+            for strip in screen_strips(pts, view_proj, width, height):
+                _line2d(dm, strip)
         dm.endDrawable()
 
 
