@@ -644,6 +644,13 @@ Default Distance attribute (driver signal x)
   keyable** because one scene expression integrates the keyed curves exactly (Simpson per key interval), so the wind can
   ramp from calm to gusty during playback without ever running backward. 30 chains of 12 bones play at 4.8 ms per frame.
 
+- **`A00640_AttrSlider` — tuning those wind drivers (or any node) with sliders.** The driver attributes mostly have only a
+  minimum or no range at all, so a plain slider has no ends. The tool lists the Channel Box attributes of the selection
+  (a blendShape shows its target weights) and picks each slider's range by a fixed order — a range the user saved **by
+  attribute name**, then soft, hard, min-only, automatic. Measuring first decided that order: a blendShape weight has a hard
+  -10..10 *and* a soft 0..1, and only soft-before-hard gives the expected 0..1 slider. Keyed / driven / locked rows take
+  the Channel Box colours (a driven key accepts `setAttr` silently and is overwritten - so it is disabled), one drag is one
+  undo, and FBX-imported Japanese names (`FBXASC…`) are shown decoded through the shared decoder. 75 headless checks.
 
 ---
 

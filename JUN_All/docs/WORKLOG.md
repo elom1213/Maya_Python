@@ -33,6 +33,17 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-20 (오늘)
 
+> [!summary] **`A00640_AttrSlider` v01.00 신규 — 고른 노드의 채널박스 어트리뷰트를 슬라이더로 (blendShape = 타겟 웨이트, FBXASC 이름 풀기)** `#A00640_AttrSlider`
+- 요청: A00390 V03 Chain Wave Lite 의 `*_liteDriver` 어트리뷰트(Wind Swing Angle · Wavelength …)를 슬라이더로. 처음엔 A00620 에 탭으로 넣을지 물음 →
+  A00620 은 읽기 전용 이름 해독 툴이라 도메인이 다르고 A00145 는 무거워서 **새 툴**로 결정. 조건: 일반 노드 = 채널박스 어트리뷰트, blendShape = 타겟 웨이트, FBXASC(일본어 등) 풀기.
+- 계획서 `docs/plans/A00640_AttrSlider_plan.md` 먼저 → 구현. mayapy 실측으로 설계: 시간 커브 · 애님 레이어 = setAttr 되지만 시간 이동 시 복귀(Keyed),
+  드리븐 키(`animCurveU*`) = setAttr 가 에러 없이 들어가고 곧 덮어씀(Driven · 비활성), 하드 최소 아래 = 에러(넣기 전 자르기), FBXASC 어트리뷰트는 niceName 도 FBXASC.
+- 범위 규칙(`ranges.py`, 마야 비의존): 사용자(어트리뷰트 이름 기준 optionVar) > **소프트** > 하드 > 최소만 > 자동(각도 ±180). 처음엔 하드를 먼저 봤다가
+  blendShape weight(하드 -10~10 + 소프트 0~1)가 -10~10 슬라이더가 되는 걸 시험이 잡아 순서를 바꿈.
+- UI: 노드마다 섹션(+ 셰이프 · 히스토리 blendShape, View 메뉴), float/int 슬라이더 + 숫자 칸, bool 체크, enum 콤보(항목도 풀어서), 상태 색(분홍 · 노랑 · 회색),
+  Auto Key, 드래그 한 번 = undo 한 번, 선택 · 시간 · undo 따라 갱신, Lock List(pin_style), Filter, 행 우클릭 Set Range / Reset Range / Set Key. 공용 sliderStyle · log · menuBar.
+- 시험 `tests/test_attr_slider.py` 75항목(liteDriver 와 같은 어트리뷰트 · 범위의 로케이터). 아이콘 · 런처(ANIM > Motion) 버튼 · 가이드 `docs/A00640_AttrSlider.md` · 포트폴리오 EN/KR 4-3. **마야 GUI 확인 아직.**
+
 > [!summary] **`A00210_FileManager` v01.54 — Maya > File Date: 체크한 .ma / .mb / .fbx 의 수정한 날짜만 바꾸기 (내용 그대로, 기본 오늘)** `#A00210_FileManager`
 - 요청: 경로를 탐색해 파일을 나열 · 체크하고(Maya > Reference 의 트리 재사용 가능), 체크한 파일의 저장 날짜만 바꾸기. 기본 오늘, 지금은 fbx · ma · mb.
 - 구현: Maya 탭 세 번째 하위탭 `File Date`. 위 = 공용 `JUN_mod_fileTree_qt_v01`(파일 체크, 기본 ma/mb/fbx) · 가운데 = 체크한 파일 표(지금 · 바뀔 날짜) ·
