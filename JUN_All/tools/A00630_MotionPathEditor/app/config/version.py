@@ -46,6 +46,9 @@
 #        플러그인에 PLUGIN_VERSION("1.4") · COMMANDS 를 두고, 툴 창을 열 때 읽힌 버전 · 명령을 비교해 다르면 그리기 노드를 지우고 다시 읽는다.
 #        undo 큐에 옛 플러그인 명령이 있으면 마야가 내려놓기를 거부한다(실측 "still in use") → 그때만 undo 큐를 비우고 로그로 알린다.
 #        **플러그인 파일을 고치면 PLUGIN_VERSION 을 올릴 것.**
+#        (같은 날 보충) 첫 판은 마야 GUI 에서 "Could not load the plugin" 으로 창이 안 열렸다: 같은 경로에서 다시 읽으면 새 코드가 도는데도
+#        `pluginInfo -version` 은 처음 값 "1.0" 을 계속 돌려준다(실측) → 교체 뒤에도 옛것으로 판정. 이제 읽힌 코드에 묻는 명령
+#        junMotionPathVersion 으로 비교한다(PLUGIN_VERSION "1.5"). 중간에 실패한 창을 닫을 때 'speed_panel' 없음 에러도 막았다.
 
 VERSION = "01.07"
 LAST_UPDATE = "2026-11-20"

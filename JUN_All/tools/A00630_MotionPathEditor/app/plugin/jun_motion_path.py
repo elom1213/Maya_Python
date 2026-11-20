@@ -30,11 +30,14 @@ CLASSIFICATION = "drawdb/geometry/junMotionPath"
 REGISTRANT = "junMotionPathDrawOverride"
 COMMAND_NAME = "junMotionPathSetKeys"
 DIRTY_COMMAND_NAME = "junMotionPathDirty"
-COMMANDS = (COMMAND_NAME, DIRTY_COMMAND_NAME)
+VERSION_COMMAND_NAME = "junMotionPathVersion"
+COMMANDS = (COMMAND_NAME, DIRTY_COMMAND_NAME, VERSION_COMMAND_NAME)
 
 #: 플러그인 버전 (v01.07). **이 파일을 고치면 올린다** - 마야는 이미 읽힌 플러그인을 다시 읽지 않으므로, 툴(draw_nodes.ensure_plugin)이
-#: 읽힌 버전과 이 값을 비교해 다르면 다시 읽는다. v01.00~02 의 플러그인은 "1.0" 이었다(junMotionPathDirty · ghost 그리기 없음).
-PLUGIN_VERSION = "1.4"
+#: 읽힌 코드의 버전과 이 값을 비교해 다르면 다시 읽는다. v01.00~02 의 플러그인은 "1.0" 이었다(junMotionPathDirty · ghost 그리기 없음).
+#: 읽힌 버전은 **명령 junMotionPathVersion 으로 묻는다** - `pluginInfo -q -version` 은 같은 경로에서 다시 읽어도 처음 읽은 값을 계속
+#: 돌려준다(실측: 새 코드인데 "1.0") → v01.07 첫 판이 교체 뒤에도 "옛것" 으로 보고 툴 창을 못 열었다.
+PLUGIN_VERSION = "1.5"
 
 
 def _dirty(nodes):
@@ -226,6 +229,23 @@ class JunMotionPathDirtyCmd(om.MPxCommand):
         return bool(self._nodes)
 
 
+class JunMotionPathVersionCmd(om.MPxCommand):
+    """읽혀 있는 플러그인 코드의 버전 (v01.07) - 툴이 옛 플러그인인지 판단한다. undo 큐에 남지 않는다."""
+
+    def __init__(self):
+        om.MPxCommand.__init__(self)
+
+    @staticmethod
+    def creator():
+        return JunMotionPathVersionCmd()
+
+    def doIt(self, args):
+        self.setResult(PLUGIN_VERSION)
+
+    def isUndoable(self):
+        return False
+
+
 def initializePlugin(obj):
     plugin = om.MFnPlugin(obj, "Ji Hun Park", PLUGIN_VERSION, "Any")
     plugin.registerNode(NODE_NAME, NODE_ID, JunMotionPathNode.creator, JunMotionPathNode.initialize,
@@ -233,10 +253,12 @@ def initializePlugin(obj):
     omr.MDrawRegistry.registerDrawOverrideCreator(CLASSIFICATION, REGISTRANT, JunMotionPathDrawOverride.creator)
     plugin.registerCommand(COMMAND_NAME, JunMotionPathSetKeysCmd.creator)
     plugin.registerCommand(DIRTY_COMMAND_NAME, JunMotionPathDirtyCmd.creator)
+    plugin.registerCommand(VERSION_COMMAND_NAME, JunMotionPathVersionCmd.creator)
 
 
 def uninitializePlugin(obj):
     plugin = om.MFnPlugin(obj)
+    plugin.deregisterCommand(VERSION_COMMAND_NAME)
     plugin.deregisterCommand(DIRTY_COMMAND_NAME)
     plugin.deregisterCommand(COMMAND_NAME)
     omr.MDrawRegistry.deregisterDrawOverrideCreator(CLASSIFICATION, REGISTRANT)

@@ -7,7 +7,11 @@
   툴은 "이미 읽힘" 이면 다시 읽지 않았고, v01.03 에 더한 `junMotionPathDirty` 명령이 없었다. 씬 · 오브젝트와는 무관(마야를 다시 켜면 사라지는 종류).
   - 플러그인에 `PLUGIN_VERSION`(지금 `1.4`) · `COMMANDS` 를 두고, 툴 창을 열 때 읽힌 버전과 명령을 비교해 **다르면 다시 읽는다**(그리기 노드를 먼저 지움).
   - undo 큐에 옛 플러그인 명령이 남아 있으면 마야가 "still in use" 로 내려놓기를 거부한다(실측) → 그때만 **undo 큐를 한 번 비우고** 로그로 알린다.
-  - 시험 `test_plugin_reload.py` 10항목(옛 플러그인 = 버전 1.0 · Dirty 명령을 뺀 사본으로 같은 에러 재현 → 창 열기 = 교체 · 끌기 · undo 한 번).
+  - **(보충) 첫 판은 마야 GUI 에서 창이 안 열렸다** — `RuntimeError: Could not load the plugin ...` + 닫을 때 `'MainWindow' object has no attribute 'speed_panel'`.
+    같은 경로에서 플러그인을 다시 읽으면 새 코드가 도는데도 **`pluginInfo -version` 은 처음 값 "1.0" 을 계속 돌려준다**(실측) → 교체해 놓고 "아직 옛것" 으로 판정.
+    이제 읽힌 코드에 직접 묻는 명령 `junMotionPathVersion` 으로 비교(PLUGIN_VERSION `1.5`, MEL 결과는 문자열 배열). 중간에 실패한 창도 에러 없이 닫힌다.
+    로그의 "undo 큐를 비웠다" 문구는 실제로 비웠을 때만.
+  - 시험 `test_plugin_reload.py` 12항목 — **같은 경로**의 파일을 옛 내용 → 새 내용으로 바꿔(실제 상황) 같은 에러 재현 → 창 열기 = 교체 · 다시 열면 재로드 없음 · 끌기 · undo 한 번 · 반쯤 만든 창 닫기.
     사용자 씬(00010_cleanup_CHOEUN_00130, 6,830 프레임 · 키 397 개 LOC)에서도 끌기 · undo 확인.
 
 ## v01.06 (2026-11-20)

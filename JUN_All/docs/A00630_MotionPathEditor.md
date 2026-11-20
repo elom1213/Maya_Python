@@ -210,7 +210,7 @@ P(f) = (c + T(f)) · parentMatrix(f)
   (데이터는 맞는데 표시만 낡음, 시간을 옮겨도). 그래서 드래그 묶음 맨 앞에 표시 명령 `junMotionPathDirty` 를 넣어 undo · redo 끝에 대상과 블렌드 노드를 `dgdirty` 한다.
 - 범위 밖 키는 그리지 않는다 — Range 를 Scene / Custom 으로.
 - **플러그인 교체 (v01.07)**: 마야는 한 번 읽은 플러그인(`jun_motion_path`)을 툴을 새로 고쳐도 다시 읽지 않는다. 툴 창을 열 때 플러그인 버전을 비교해
-  옛것이면 바꿔 읽는다(로그 `Replaced the old Motion Path plugin`). 이때 마야가 거부하면 **undo 큐를 한 번 비운다** — 그 전 작업은 Ctrl+Z 로 못 되돌린다.
+  옛것이면 바꿔 읽는다(로그 `Replaced the old Motion Path plugin`). 버전은 읽힌 코드에 명령 `junMotionPathVersion` 으로 묻는다 — `pluginInfo -version` 은 같은 경로에서 다시 읽어도 처음 값을 돌려준다. 이때 마야가 거부하면 **undo 큐를 한 번 비운다** — 그 전 작업은 Ctrl+Z 로 못 되돌린다.
   그래도 실패하면 마야를 다시 켠다. (v01.06 이전 툴로 열린 마야에서 키를 끌면 `no attribute 'junMotionPathDirty'` 에러가 났다.)
 
 ---
@@ -247,7 +247,7 @@ mayapy 2024 (`tests/`, `-u` 로 실행):
 | `test_path_math.py` | 19 | 경로 = 마야 `xform -ws -rp` (피벗 · OPM · 부분 키 · 컨스트레인트 아래 · 조인트 jointOrient/SSC/비균일 부모), solve 정확, 사용자 시간 · 선택 · 포즈 불변, 소수 프레임 키, 회전 · 스케일 편집 뒤 굽기 없이 맞음 |
 | `test_anim_channels.py` | 15 | 상태 판정 · 레이어 잠금 · 평가 = 마야 · m 단위 · 키 맞추기가 모양을 지킴 |
 | `test_edit_session.py` | 21 | 여러 번 움직여도 오차 없음 · 드래그 중 undo 큐 비어 있음 · **undo 한 번** · redo · 여러 키 · 여러 경로 · 부분 키 · 잠긴 축 · 취소 · 안 움직임 · auto 탄젠트 범위 · 속도(3.4 ms) |
-| `test_plugin_reload.py` | 10 | (v01.07) 옛 플러그인(1.0, Dirty 명령 없음)으로 사용자 에러 재현 → 툴 창 열기 = 교체(그리기 노드 · undo 큐에 옛 명령이 있어도) · 로그 한 번 · 두 번째는 그대로 · 끌기 · undo 한 번 |
+| `test_plugin_reload.py` | 12 | (v01.07) **같은 경로**의 옛 플러그인(1.0, Dirty · 버전 명령 없음)으로 사용자 에러 재현 → 새 내용으로 바꾸고 툴 창 열기 = 교체(그리기 노드 · undo 큐에 옛 명령이 있어도) · pluginInfo 버전 이름표는 낡은 채(그래서 버전 명령) · 로그 한 번 · 다시 열면 그대로 · 끌기 · undo 한 번 · 반쯤 만든 창 닫기 |
 | `test_watcher.py` | 20 | 다른 곳의 커브 편집 · undo 뒤 경로 · 소수 키 → 다시 굽기 · 선택 · 저장 파일에 노드/requires 없음 · 그리기 노드가 undo 큐 밖 · 새 씬 정리 |
 | `test_layers.py` | 27 | (v01.03) 경로 = 레이어 합친 실제 움직임(Base · additive 가중치 애니 · override 0.5 · 뮤트 · lock · 부모 애니), 키 = 고른 레이어, 레이어 바꿀 때 굽지 않음, 레이어별 끌기 정확 · **그 레이어 커브만** 바뀜 · undo 한 번에 커브와 **실제 움직임** 복원, override 의 커브 없던 축, 잠금 이유 3종, 관리자 레이어 바꾸기 · 지운 레이어 → Base |
 | `test_ui.py` | 35 | 오프스크린 창: 경로 추가/빼기 · 표시 옵션 → 그리기 데이터 · optionVar · 범위(Custom · Get Current · Get Sel Range · 같은 범위면 안 굽기) · 슬라이더 색 · Edit Path 빨강 · 툴 바뀌면 버튼 끔 · Refresh · 닫으면 정리 |

@@ -29,6 +29,7 @@ PALETTE = ((0.30, 0.75, 1.00), (0.55, 1.00, 0.45), (1.00, 0.55, 0.85), (1.00, 0.
 
 #: 옛 플러그인을 바꿨으면 그 버전 (툴 창이 한 번 로그로 알린다) - v01.07
 replaced_plugin = None
+replaced_flushed_undo = False     # 그때 undo 큐를 비웠나
 
 
 def command_exists(name):
@@ -36,13 +37,30 @@ def command_exists(name):
     return bool(mel.eval('exists "{0}"'.format(name)))
 
 
+def loaded_plugin_version():
+    """읽혀 있는 플러그인 **코드**의 버전. 버전 명령이 없는 옛 플러그인은 그 이름표(pluginInfo, 예 "1.0"), 안 읽혔으면 None.
+
+    pluginInfo -version 은 같은 경로에서 다시 읽어도 처음 값을 돌려주므로(실측) 판단에는 명령만 쓴다.
+    """
+    if command_exists(plugin_source.VERSION_COMMAND_NAME):
+        try:
+            result = mel.eval(plugin_source.VERSION_COMMAND_NAME)
+        except RuntimeError:
+            return None
+        if isinstance(result, (list, tuple)):          # MPxCommand.setResult(str) 가 MEL 에서는 문자열 배열로 온다(실측)
+            result = result[0] if result else ""
+        return str(result)
+    name = os.path.splitext(os.path.basename(PLUGIN_FILE))[0]
+    if cmds.pluginInfo(name, q=True, loaded=True):
+        return cmds.pluginInfo(name, q=True, version=True) or "?"
+    return None
+
+
 def plugin_is_current(name):
-    """읽혀 있는 플러그인이 이 툴의 것과 같은가 (버전 + 명령이 다 있다)."""
-    try:
-        have = cmds.pluginInfo(name, q=True, version=True)
-    except RuntimeError:
+    """읽혀 있는 플러그인이 이 툴의 것과 같은가 (코드 버전 + 명령이 다 있다)."""
+    if not cmds.pluginInfo(name, q=True, loaded=True):
         return False
-    return have == plugin_source.PLUGIN_VERSION and all(command_exists(c) for c in plugin_source.COMMANDS)
+    return loaded_plugin_version() == plugin_source.PLUGIN_VERSION and         all(command_exists(c) for c in plugin_source.COMMANDS)
 
 
 def ensure_plugin():
@@ -55,7 +73,9 @@ def ensure_plugin():
     """
     name = os.path.splitext(os.path.basename(PLUGIN_FILE))[0]
     if cmds.pluginInfo(name, q=True, loaded=True) and not plugin_is_current(name):
-        old = cmds.pluginInfo(name, q=True, version=True)
+        old = loaded_plugin_version()
+        global replaced_flushed_undo
+        replaced_flushed_undo = False
         delete_all()
         try:
             cmds.unloadPlugin(name)
@@ -63,6 +83,7 @@ def ensure_plugin():
             # undo 큐에 옛 플러그인 명령(키 끌기 기록)이 남아 있으면 "still in use" 로 거부된다(실측) → 큐를 비우고 한 번 더.
             # 옛 플러그인을 처음 바꿀 때 한 번뿐이다. 툴 창이 로그로 알린다(replaced_plugin).
             cmds.flushUndo()
+            replaced_flushed_undo = True
             try:
                 cmds.unloadPlugin(name)
             except RuntimeError as exc:
@@ -72,8 +93,11 @@ def ensure_plugin():
         replaced_plugin = old
     if not cmds.pluginInfo(name, q=True, loaded=True):
         cmds.loadPlugin(PLUGIN_FILE, quiet=True)
-    if not cmds.pluginInfo(name, q=True, loaded=True) or not plugin_is_current(name):
+    if not cmds.pluginInfo(name, q=True, loaded=True):
         raise RuntimeError("Could not load the plugin {0}".format(PLUGIN_FILE))
+    if not plugin_is_current(name):
+        raise RuntimeError("The Motion Path plugin loaded in Maya is v{0}, the tool needs v{1}. Restart Maya.".format(
+            loaded_plugin_version(), plugin_source.PLUGIN_VERSION))
     return name
 
 

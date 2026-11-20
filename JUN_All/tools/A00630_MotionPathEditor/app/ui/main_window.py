@@ -70,8 +70,9 @@ class MainWindow(QWidget):
         self._tool_cb = om.MEventMessage.addEventCallback("ToolChanged", self._on_tool_changed)
         self.slider_style = JUN_mod_sliderStyle_qt_v01(self)
         if draw_nodes.replaced_plugin:              # v01.07 - 마야에 남아 있던 옛 플러그인을 새것으로 바꿨다
-            self.log("[Info] Replaced the old Motion Path plugin (v{0}) loaded in this Maya session. "
-                     "The undo queue was cleared once to do it.".format(draw_nodes.replaced_plugin))
+            self.log("[Info] Replaced the old Motion Path plugin (v{0}) loaded in this Maya session.{1}".format(
+                draw_nodes.replaced_plugin,
+                " The undo queue was cleared once to do it." if draw_nodes.replaced_flushed_undo else ""))
             draw_nodes.replaced_plugin = None
 
     # ==================================================================
@@ -481,15 +482,19 @@ class MainWindow(QWidget):
         cmds.evalDeferred(self.reload_layers, lowestPriority=True)      # 새 씬이 열린 뒤 그 씬의 레이어로
 
     def closeEvent(self, event):
+        # v01.07 - __init__ 가 중간에 실패한 창(예: 플러그인 로드 실패)도 닫힐 수 있다 - 없는 것은 건너뛴다
         try:
-            self.speed_panel.shutdown()
-            if self.context is not None:
+            if getattr(self, "speed_panel", None) is not None:
+                self.speed_panel.shutdown()
+            if getattr(self, "context", None) is not None:
                 self.context.deactivate()
             if getattr(self, "_tool_cb", None) is not None:
                 om.MMessage.removeCallback(self._tool_cb)
                 self._tool_cb = None
-            self.watcher.stop()
-            self.manager.clear()
+            if getattr(self, "watcher", None) is not None:
+                self.watcher.stop()
+            if getattr(self, "manager", None) is not None:
+                self.manager.clear()
         finally:
             super().closeEvent(event)
 

@@ -37,7 +37,9 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - 보고: 00010_cleanup_CHOEUN_00130.mb 의 CH_r_knee_xx_ctl_LOC 경로를 고치면 `[FAIL] Drag : module 'maya.cmds' has no attribute 'junMotionPathDirty'`.
 - 원인: 씬과 무관. 마야를 켠 채 툴만 새 버전이 되면 처음 읽힌 **v01.00~02 플러그인(1.0)** 이 남는다 — `ensure_plugin` 이 "이미 읽힘" 이면 그대로 뒀고, 그 플러그인에는 v01.03 의 `junMotionPathDirty` 가 없다. 옛 플러그인 사본으로 같은 에러 재현.
 - 수정: 플러그인에 `PLUGIN_VERSION` · `COMMANDS`, 툴 창을 열 때 비교해 다르면 그리기 노드 삭제 → 다시 읽기. undo 큐에 옛 명령이 있으면 마야가 "still in use" 로 거부(실측) → 그때만 `flushUndo` 후 재시도, 로그로 알림.
-- 시험 `test_plugin_reload.py` 10항목 + 사용자 씬의 `CH_r_foot_xx_ctl_LOC`(knee LOC 는 저장 파일에 없음 — 세션에서 만든 것)로 끌기 · undo 확인. A00630 전체 317항목 통과.
+- 시험 `test_plugin_reload.py` + 사용자 씬의 `CH_r_foot_xx_ctl_LOC`(knee LOC 는 저장 파일에 없음 — 세션에서 만든 것)로 끌기 · undo 확인.
+- **보충**: 첫 판이 마야 GUI 에서 `Could not load the plugin` + 닫을 때 `'speed_panel'` 에러로 창을 못 열었다. 같은 경로에서 다시 읽으면 새 코드가 도는데도 `pluginInfo -version` 이 처음 값 "1.0" 을 돌려준다(실측 — 헤드리스 시험은 옛 플러그인을 다른 경로에서 읽어 못 잡았다).
+  → 읽힌 코드에 묻는 명령 `junMotionPathVersion`(PLUGIN_VERSION 1.5) · closeEvent 방어 · 시험을 같은 경로 시나리오로 바꿈(12항목). A00630 전체 319항목 통과.
 
 > [!summary] **`A00630_MotionPathEditor` v01.06 — Speed 그래프를 [Start, End] 구간만 보기 (Frames > Custom)** `#A00630_MotionPathEditor`
 - 요청: Speed 에서 Start, End, Get Sel Range 버튼으로 [Start, End] 구간만 그래프로.
