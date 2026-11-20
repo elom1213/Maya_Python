@@ -10,7 +10,7 @@ updated: 2026-11-20
 오브젝트 · 조인트가 **프레임마다 어디에 있는지를 뷰포트에 경로로 그리고**, 경로 위의 **키 점을 끌어 애니메이션을 고치는** in-Maya PySide 툴(arch B).
 그래프 에디터를 열지 않고 궤적 모양을 보면서 위치 애니메이션을 고친다.
 
-- **버전**: `app/config/version.py` (v01.14 — 매니퓰레이터 호버(마우스를 올린 부분이 굵어짐) · v01.13 — Path 탭 `Drag in` 줄 숨김(매니퓰레이터가 대신) · v01.12 — **Speed 탭 Edit Path · 그래프 폴오프 [a, b] 띠 · Frames > Falloff · 폴오프 범위 위치 Smooth** · 기즈모 1.5배 굵게 · v01.11 — **이동 · 회전 매니퓰레이터**(w / e) · 놓기 4배 빠름 · v01.10 — **프레임 점 · 폴오프 끌기** · 선이 메시에 안 가리게 화면 2D 로 · v01.09 — **프레임 점 고르기 + 폴오프**(b 톡 = 켜기/끄기, b + 끌기 = 반경, 가중치 색) · v01.08 — **Acceleration 그래프 스무딩**(브러시 Smooth Acceleration) · v01.07 — 마야에 남은 옛 플러그인 때문에 키 끌기가 `junMotionPathDirty` 에러로 실패하던 것 수정 · v01.06 — Speed 탭 Frames 에 **Custom**(Start / End / Get Sel Range 로 그 구간만 그래프) · v01.05 — 그래프 스크럽이 undo 큐에 쌓여 Ctrl+Z 가 획을 못 되돌리던 것 수정 · 그래프 키 선 끌기(키 시간 이동) 없앰 · v01.04 — **Speed 탭: 속도 그래프 + Smooth 브러시 · 속도 끌기**(§2-2) · v01.03 — **애니메이션 레이어**: 고른 레이어의 키만 끌어 고친다(경로는 합친 움직임) · v01.02 — Edit Path 를 켜도 버튼이 연한 빨강이 안 되던 것 수정 · v01.01 — 키 드래그 에러 수정 · Custom 범위에 Get Current / Get Sel Range · Edit Path 켜짐 = 연한 빨강 · v01.00 — 첫 버전: 위치 경로 표시 + 키 드래그)
+- **버전**: `app/config/version.py` (v01.15 — **Edit 묶음을 Speed 탭 맨 아래로**(Path 탭 = Range · Layer · Display) · v01.14 — 매니퓰레이터 호버(마우스를 올린 부분이 굵어짐) · v01.13 — Path 탭 `Drag in` 줄 숨김(매니퓰레이터가 대신) · v01.12 — **Speed 탭 Edit Path · 그래프 폴오프 [a, b] 띠 · Frames > Falloff · 폴오프 범위 위치 Smooth** · 기즈모 1.5배 굵게 · v01.11 — **이동 · 회전 매니퓰레이터**(w / e) · 놓기 4배 빠름 · v01.10 — **프레임 점 · 폴오프 끌기** · 선이 메시에 안 가리게 화면 2D 로 · v01.09 — **프레임 점 고르기 + 폴오프**(b 톡 = 켜기/끄기, b + 끌기 = 반경, 가중치 색) · v01.08 — **Acceleration 그래프 스무딩**(브러시 Smooth Acceleration) · v01.07 — 마야에 남은 옛 플러그인 때문에 키 끌기가 `junMotionPathDirty` 에러로 실패하던 것 수정 · v01.06 — Speed 탭 Frames 에 **Custom**(Start / End / Get Sel Range 로 그 구간만 그래프) · v01.05 — 그래프 스크럽이 undo 큐에 쌓여 Ctrl+Z 가 획을 못 되돌리던 것 수정 · 그래프 키 선 끌기(키 시간 이동) 없앰 · v01.04 — **Speed 탭: 속도 그래프 + Smooth 브러시 · 속도 끌기**(§2-2) · v01.03 — **애니메이션 레이어**: 고른 레이어의 키만 끌어 고친다(경로는 합친 움직임) · v01.02 — Edit Path 를 켜도 버튼이 연한 빨강이 안 되던 것 수정 · v01.01 — 키 드래그 에러 수정 · Custom 범위에 Get Current / Get Sel Range · Edit Path 켜짐 = 연한 빨강 · v01.00 — 첫 버전: 위치 경로 표시 + 키 드래그)
 - **설치**: `__dragDrop_A00630.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **MPath** → `tools.A00630_MotionPathEditor.run(True)`.
   툴 런처(A00370) ANIM 프로파일에도 **MotionPath** 버튼이 있다.
 - **계획서**: [plans/A00630_MotionPathEditor_plan.md](plans/A00630_MotionPathEditor_plan.md) — 단계별 계획 · 0단계 실측 결과 · 다음 단계
@@ -59,7 +59,7 @@ updated: 2026-11-20
 ## 2. 사용법
 
 1. 씬에서 애니메이션된 **오브젝트 · 조인트**를 고르고 `Paths` 의 **Set Selected**(또는 Add). 경로가 바로 그려진다.
-2. **Edit Path** 를 누르면 편집 툴이 되고 버튼이 **연한 빨강**이 된다. 다시 누르거나 `Q` · 다른 마야 툴로 나가면 버튼도 꺼진다.
+2. **Edit Path**(v01.15 부터 **Speed 탭 맨 아래** Edit 묶음 - Manipulator · Falloff 도 함께) 를 누르면 편집 툴이 되고 버튼이 **연한 빨강**이 된다. 다시 누르거나 `Q` · 다른 마야 툴로 나가면 버튼도 꺼진다.
 
    **두 단계로 한다 — 먼저 고르고, 그다음 고른 점을 잡고 끈다.**
    - 고르기: 키 점 · **프레임 점**(v01.09)을 클릭하거나, 빈 곳에서 눌러 사각형을 그려(박스 선택) 여러 점을 고른다 → 고른 점이 주황색.

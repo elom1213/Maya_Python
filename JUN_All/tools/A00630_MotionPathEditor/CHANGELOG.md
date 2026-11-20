@@ -1,5 +1,12 @@
 # Changelog — A00630_MotionPathEditor
 
+## v01.15 (2026-11-20)
+
+- **[Change] Edit 묶음을 Speed 탭으로** (사용자 요청) — Path 탭에 있던 `Edit` 묶음 전체(Edit Path · Refresh · Manipulator · Falloff · 선택 표시)를 **Speed 탭 맨 아래**로 옮겼다.
+  그래프를 보면서 뷰포트에서 고친다. Path 탭에는 Range · Animation Layer · Display 만 남는다.
+  같은 탭에 Edit Path 버튼이 둘이 되므로 v01.12 의 Speed 탭 위쪽 버튼은 숨겼다(두 버튼을 맞추는 코드는 그대로).
+- 시험 `test_speed_falloff.py` +2(묶음 위치 · 버튼 하나). 전체 497/497.
+
 ## v01.14 (2026-11-20)
 
 - **[New] 매니퓰레이터 호버** — 버튼을 누르지 않고 마우스를 축 화살표 · 평면 사각형 · 가운데 · 고리 위에 올리면 **그 부분이 굵어져**(3 → 5 px) 잡힐 곳을 알려 준다(사용자 요청).

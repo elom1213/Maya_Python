@@ -53,6 +53,12 @@ try:
     app.processEvents()
     cache = mgr.cache_list()[0]
 
+    # ---- v01.15 Edit 묶음은 Speed 탭 맨 아래 (Path 탭에는 없다), Speed 탭 위쪽 Edit Path 는 숨김
+    path_page = win.tabs.widget(0)
+    check("v01.15: the Edit group (Edit Path, manipulator, falloff) lives in the Speed tab, not the Path tab",
+          panel.isAncestorOf(win.btn_edit) and panel.isAncestorOf(win.cb_falloff) and
+          panel.isAncestorOf(win.manip_buttons.buttons()[0]) and not path_page.isAncestorOf(win.btn_edit))
+    check("v01.15: only one Edit Path button shows in the Speed tab", panel.btn_edit.isHidden() and not win.btn_edit.isHidden())
     # ---- 두 Edit Path 버튼
     check("Speed tab has an Edit Path button (checkable, pin style)", panel.btn_edit.isCheckable())
     win._set_edit_buttons(True)

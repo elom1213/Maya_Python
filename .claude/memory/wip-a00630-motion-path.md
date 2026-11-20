@@ -81,6 +81,7 @@ then move — user's Q4 choice, proportional editing, numeric input), then phase
   smoothing P0 + w(S-P0). Gizmo 1.5x thicker (user). User GUI OK for v01.10, v01.11. v01.08-v01.11 pushed 2026-11-20 (f66468f8).
 - v01.13: Path tab `Drag in` row hidden by user request (code kept, main_window.SHOW_DRAG_IN; plane forced to View while hidden).
 - v01.14: gizmo hover = thicker part; the app event filter watches MouseMove without buttons (not eaten) and maps QCursor to the active M3dView (port/widget scale). Plugin 2.0.
+- v01.15: user moved the whole Edit group (Edit Path, Refresh, Manipulator, Falloff, selection) to the bottom of the Speed tab; Speed tab's top Edit Path (v01.12) hidden. Path tab = Range / Layer / Display.
 - Next: Maya GUI check of v01.12; later candidates: arc-length falloff, pivot options, numeric input, scale manipulator.
 
 Related: [[maya-time-context-traps]] · [[wip-a00380-quad-patch]] · [[mayapy-headless-verify]] · [[feedback-sliders-use-shared-style]]

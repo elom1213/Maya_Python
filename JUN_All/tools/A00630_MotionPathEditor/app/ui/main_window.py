@@ -117,15 +117,19 @@ class MainWindow(QWidget):
         lay.addWidget(self._build_range_group())
         lay.addWidget(self._build_layer_group())
         lay.addWidget(self._build_display_group())
-        lay.addWidget(self._build_edit_group())
         lay.addStretch(1)
         self.tabs.addTab(page, "Path")
-        self.tabs.setTabToolTip(0, "Range, animation layer, display and Edit Path (drag the keys in the viewport).")
+        self.tabs.setTabToolTip(0, "Range, animation layer and display of the paths.")
         self.speed_panel = SpeedPanel(self.manager, self.watcher, self.log, self._save)
-        # v01.12 - Speed 탭에도 Edit Path. 두 버튼은 같은 편집 툴 하나를 켜고 끄며 늘 같은 상태다
+        # v01.12 - Speed 탭 위쪽 Edit Path. 두 버튼은 같은 편집 툴 하나를 켜고 끄며 늘 같은 상태다
         self.speed_panel.btn_edit.toggled.connect(self.set_edit_mode)
+        # v01.15 - Path 탭의 Edit 묶음(Edit Path · Refresh · Manipulator · Falloff · 선택)을 Speed 탭 맨 아래로 (사용자 요청).
+        # 같은 탭에 Edit Path 가 둘이 되므로 위쪽 버튼은 숨긴다(동기화 코드는 그대로 - 다시 보이게 해도 맞는다).
+        self.speed_panel.layout().addWidget(self._build_edit_group())
+        self.speed_panel.btn_edit.setVisible(False)
         self.tabs.addTab(self.speed_panel, "Speed")
-        self.tabs.setTabToolTip(1, "Speed graph: see the timing of a path and smooth it with a brush.")
+        self.tabs.setTabToolTip(1, "Speed graph (timing, smoothing) and Edit Path: edit the paths in the viewport "
+                                   "(points, falloff, manipulator) while the graph follows.")
         root.addWidget(self.tabs, 2)
 
         self.log_view = JUN_mod_log_qt_v01(window_title="Motion Path Editor - Log",

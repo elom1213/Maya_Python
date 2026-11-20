@@ -33,6 +33,10 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-20 (오늘)
 
+> [!summary] **`A00630_MotionPathEditor` v01.15 — Edit 묶음을 Speed 탭으로** `#A00630_MotionPathEditor`
+- 사용자 요청: Path 탭 Edit 묶음 전체를 Speed 탭 맨 아래로. Speed 탭 위쪽 Edit Path(v01.12)는 같은 탭 중복이라 숨김(동기화 코드 유지). 전체 497/497.
+- 이날 v01.12 ~ v01.14 푸시(`2a09f5b0`), v01.15 도 이어서 푸시.
+
 > [!summary] **`A00630_MotionPathEditor` v01.14 — 매니퓰레이터 호버 (굵게)** `#A00630_MotionPathEditor`
 - 버튼 없이 축 · 평면 · 고리 위에 마우스를 올리면 그 부분이 굵어진다. draggerContext 는 버튼 없는 움직임을 안 알려 줘 앱 이벤트 필터가 MouseMove 를 보고(먹지 않음) 활성 3D 뷰 픽셀로 바꿔 고른다. 플러그인 2.0. 전체 495/495.
 

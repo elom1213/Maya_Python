@@ -88,5 +88,8 @@
 # 01.14  기즈모 호버 - 버튼 없이 마우스가 축 · 평면 · 고리 위에 오면 그 부분이 굵어진다(5 px). draggerContext 는 버튼 없는 움직임을
 #        알려 주지 않아 b / w / e 와 같은 앱 이벤트 필터가 MouseMove 를 보고(먹지 않음) 활성 3D 뷰 픽셀로 바꿔 고른다. 바뀔 때만 다시 그린다. 플러그인 2.0.
 
-VERSION = "01.14"
+# 01.15  Path 탭의 Edit 묶음(Edit Path · Refresh · Manipulator · Falloff · 선택 표시)을 Speed 탭 맨 아래로(사용자 요청) - 그래프를 보면서
+#        뷰포트에서 고친다. 같은 탭에 Edit Path 가 둘이 되어 v01.12 의 Speed 탭 위쪽 버튼은 숨김(동기화 코드는 그대로).
+
+VERSION = "01.15"
 LAST_UPDATE = "2026-11-20"
