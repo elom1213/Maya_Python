@@ -28,8 +28,9 @@
 #     최소 폭을 만들지 않고, 창이 좁아지면 버튼도 함께 좁아지며 라벨은 말줄임(…)된다(전체 이름은 툴팁).
 #     Qt 는 setMinimumWidth 가 있으면 minimumSizeHint(글자 폭)를 쓰지 않는다. 프로파일 콤보도 가장 긴 항목
 #     폭을 요구하지 않는다. 그래야 창을 줄일 때 버튼 글자가 잘려 안 보이는 일이 없다.
-#   - Profile / Create / Color 는 접이식(v01.32, 공용 JUN_mod_collapsible_qt_v01). 헤더를 누르면 접히고, 접힘 상태는
-#     data/ui_state.json 에 기억한다(프로파일과 무관). 접거나 펴면 창 높이를 다시 맞춘다(창의 tab_fit).
+#   - Profile / Create / Color 세 그룹을 **하나의** 접이식 섹션에 담는다(v01.33, 공용 JUN_mod_collapsible_qt_v01).
+#     헤더를 누르면 셋이 함께 접히고, 접힘 상태는 data/ui_state.json 에 기억한다(프로파일과 무관).
+#     접거나 펴면 창 높이를 다시 맞춘다(창의 tab_fit). v01.32 는 셋을 따로 접었다.
 
 import os
 
@@ -365,12 +366,11 @@ class ShortcutTab(QWidget):
     def _build_ui(self):
         root = QVBoxLayout(self)
 
-        # 접이식 섹션 (v01.32). 키 = ui_state.json 의 펼침 여부 키
-        self.sections = {}
-        for key, title, builder in (("profile", "Profile", self._build_profile_group),
-                                    ("create", "Create", self._build_create_group),
-                                    ("color", "Color", self._build_color_group)):
-            root.addWidget(self._make_section(key, title, builder()))
+        # Profile · Create · Color 를 한 접이식 섹션에 (v01.33)
+        self.settings_section = self._make_section(
+            "settings", "Profile / Create / Color",
+            (self._build_profile_group(), self._build_create_group(), self._build_color_group()))
+        root.addWidget(self.settings_section)
 
         # 카테고리가 계속 늘어나므로 스크롤 영역에 담는다.
         self._cat_container = QWidget()
@@ -396,14 +396,16 @@ class ShortcutTab(QWidget):
         self._drag_timer.setInterval(40)
         self._drag_timer.timeout.connect(self._on_drag_tick)
 
-    def _make_section(self, key, title, body):
-        """본문 위젯을 접이식 섹션에 담는다. 펼침 여부는 ui_state.json 의 'shortcut_<key>_expanded'."""
+    def _make_section(self, key, title, bodies):
+        """위젯들을 접이식 섹션 하나에 담는다. 펼침 여부는 ui_state.json 의 'shortcut_<key>_expanded'."""
         state_key = "shortcut_{0}_expanded".format(key)
         section = JUN_mod_collapsible_qt_v01(title, expanded=bool(prefs_mod.get_ui_state(state_key, True)))
         section.setObjectName("A00240_section_" + key)
-        section.add_widget(body)
+        section.setToolTip("Click the header to fold / unfold Profile, Create and Color together")
+        section.body.setContentsMargins(0, 0, 0, 0)
+        for body in bodies:
+            section.add_widget(body)
         section.toggled.connect(lambda expanded, k=state_key: self._on_section_toggled(k, expanded))
-        self.sections[key] = section
         return section
 
     def _on_section_toggled(self, state_key, expanded):
@@ -417,10 +419,9 @@ class ShortcutTab(QWidget):
             tab_fit.fit_later()
 
     def _build_profile_group(self):
-        # 프로파일(집/회사처럼 JSON 별로 나뉜 경로 묶음) 선택 + 관리. (v01.32 부터 접이식 섹션의 본문)
-        group = QWidget()
+        # 프로파일(집/회사처럼 JSON 별로 나뉜 경로 묶음) 선택 + 관리. (v01.33 부터 접이식 섹션 안)
+        group = QGroupBox("Profile")
         row = QHBoxLayout(group)
-        row.setContentsMargins(0, 0, 0, 0)
 
         self.cmb_profile = QComboBox()
         self.cmb_profile.setToolTip("Active profile (each is its own JSON)")
@@ -449,9 +450,8 @@ class ShortcutTab(QWidget):
         return group
 
     def _build_create_group(self):
-        group = QWidget()
+        group = QGroupBox("Create")
         row = QHBoxLayout(group)
-        row.setContentsMargins(0, 0, 0, 0)
 
         btn_category = _ElideButton("Category")
         btn_category.setToolTip("Create a new category")
@@ -469,9 +469,8 @@ class ShortcutTab(QWidget):
 
     def _build_color_group(self):
         # 색칠 모드: 카테고리를 넘나들며 여러 버튼을 골라 한 색으로 칠한다.
-        group = QWidget()
+        group = QGroupBox("Color")
         row = QHBoxLayout(group)
-        row.setContentsMargins(0, 0, 0, 0)
 
         # 모드 토글. 켜면 버튼이 체크형이 되고 클릭이 '경로 열기' 대신 '체크'로 바뀐다.
         self.chk_color_mode = QCheckBox("Color Select")

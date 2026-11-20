@@ -2,6 +2,13 @@
 
 All notable changes to this tool are documented here.
 
+## [01.33] - 2026-11-20
+
+- **[UI] Profile · Create · Color 를 하나로 접는다.** v01.32 는 셋을 따로 접었는데, 사용자 요청으로 접이식 섹션 하나
+  (`Profile / Create / Color`)에 셋을 원래 상자 모양 그대로 담았다 — 헤더 한 번에 셋이 함께 접히고 펴진다.
+  상태 키는 `shortcut_settings_expanded` 하나(v01.32 의 키 3개는 더 읽지 않는다). 접으면 페이지 높이 679 → 460px(오프스크린).
+  오프스크린 확인 7항목. **GUI 확인 아직.**
+
 ## [01.32] - 2026-11-20
 
 - **[UI] ShortCut 탭의 Profile · Create · Color 를 접을 수 있다.** 세 그룹 상자를 공용 접이식 섹션
