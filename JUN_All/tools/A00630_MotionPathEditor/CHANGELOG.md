@@ -1,5 +1,25 @@
 # Changelog — A00630_MotionPathEditor
 
+## v01.04 (2026-11-20)
+
+- **[New] Speed 탭 — 속도 그래프 + Smooth** (계획서 `docs/plans/A00630_MotionPathEditor_speed_graph_plan.md` G0~G5, 원본 애드온의 *Speed Graph* 를 독자 구현).
+  - 그래프: 가로 = 프레임, 세로 = **Speed**(프레임당 이동 거리, 기본) · **Position**(월드 X/Y/Z, 읽기 전용) · **Acceleration**(튐 · 떨림 찾기).
+    범위 = Whole Path / Selected Keys / Around Current, 단위 per frame / per second. 키 = 세로선 + 번호(선택 키 주황), 현재 프레임 초록, 다른 경로는 흐리게.
+  - **오른쪽 드래그 = Smooth 브러시** (휠 = 반경, Shift+휠 = 세기):
+    **Smooth Speed** — 경로 **모양은 그대로**, 키 프레임도 그대로, 포즈가 경로를 따라 미끄러지며 속도가 고르게 된다. 브러시 밖 움직임 불변, **정지는 같은 자리에서 정지**.
+    **Smooth Shape** — 경로 자체의 울퉁불퉁함을 줄인다(Taubin - 큰 호는 오그라들지 않는다).
+  - **곡선 끌기** = 그곳을 빠르게 / 느리게(휠 = Reach, 가장자리가 보상) · **키 선 끌기** = 그 키를 시간으로(포즈 전체 - translate · rotate · scale, 이웃 키를 넘지 않음) ·
+    빈 곳 = 스크럽 · Esc = 그 드래그 취소.
+  - **Smooth Range** 버튼(그래프에 보이는 구간 전체 한 번) · **Whole Pose**(같은 시간 왜곡을 rotate · scale 키에도 - 위치만 리타임되면 손목이 늦게 도는 문제) ·
+    **Tolerance %**(키가 따라갈 정확도, 경로 크기 대비) · **Pop Out**(그래프를 따로 띄우기).
+  - 칠하는 동안 뷰포트에 **원래 경로 회색 점선 + 새 프레임 점**, 그래프에 원래 곡선 회색. 놓을 때 커브에 쓰고 **획 하나 = Ctrl+Z 하나**
+    (계획서는 "세션 끝에 undo 한 번" 이었으나 마야에서 Ctrl+Z 가 뷰포트로 가 다른 작업을 되돌리는 위험 때문에 바꿈 - 계획서 §4-5).
+- **목표 움직임 → 애님 커브 refit** (`app/core/refit.py`): 마야 커브 = 핸들 (x·fps/3, y/3) Bezier(비가중은 Hermite) — mayapy 골든 24/30/60 fps · cm/m · 가중/비가중 오차 < 1e-11.
+  키 프레임은 그대로, 키 값 = 목표, 기울기 = 최소제곱(핸들 길이 고정이면 선형), 오차 큰 곳에만 키 추가, 가중 탄젠트는 de Casteljau 정확 분할.
+  안 바뀐 구간 쪽 탄젠트는 원래대로(정지 경계의 flat 유지), 안 바뀐 표본은 10배 엄격. 매 프레임 키(모캡)는 값만 → 정확.
+- 툴 창을 **Path / Speed 탭**으로 나눔(공용 tabFit). 레이어 편집(v01.03)과 함께 동작 — 편집 레이어 커브만 바뀐다.
+- 시험 3종 추가: `test_speed_engine` 40 · `test_speed_session` 46 · `test_speed_graph_ui` 42, 실측 `bench_speed_graph.py`. 기존 8종 170 항목 그대로 통과. **마야 GUI 확인 아직.**
+
 ## v01.03 (2026-11-19)
 
 - **[Feature] 애니메이션 레이어.** 툴 창 **Animation Layer** 목록(Base + 씬 레이어, 레이어 에디터 순서)에서 레이어를 고르면 그 레이어의 키가 경로에 보이고,

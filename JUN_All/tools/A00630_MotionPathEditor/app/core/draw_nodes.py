@@ -82,9 +82,12 @@ def _points(rows):
 
 
 def payload(cache, color, selected_times, current_frame, show_dots=True, show_keys=True, show_numbers=False,
-            line_width=2.0, dot_size=4.0, key_size=9.0):
-    """경로 하나의 그리기 데이터 (draw_bridge.DATA 형식)."""
-    pts = cache.points
+            line_width=2.0, dot_size=4.0, key_size=9.0, points=None, ghost=None):
+    """경로 하나의 그리기 데이터 (draw_bridge.DATA 형식).
+
+    points : cache.points 대신 그릴 점 (그래프 Smooth 미리보기, v01.04) · ghost : 함께 회색으로 그릴 원래 선
+    """
+    pts = cache.points if points is None else points
     sel = {round(t, 3) for t in selected_times}
     keys, chosen, labels = [], [], []
     if show_keys:
@@ -104,6 +107,7 @@ def payload(cache, color, selected_times, current_frame, show_dots=True, show_ke
         "selected": _points(chosen),
         "current": _points(current),
         "labels": labels,
+        "ghost": _points(ghost) if ghost is not None else om.MPointArray(),
         "color": om.MColor((color[0], color[1], color[2], 1.0)),
         "locked": cache.locked,
         "line_width": float(line_width),

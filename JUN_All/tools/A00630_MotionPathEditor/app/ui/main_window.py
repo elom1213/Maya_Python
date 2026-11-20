@@ -22,6 +22,7 @@ from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
 from Framework.qt.MOD_progress_qt_v01 import JUN_mod_progress_qt_v01
 from Framework.qt.MOD_sliderStyle_qt_v01 import JUN_mod_sliderStyle_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
 
 from tools.A00630_MotionPathEditor.app.config.version import VERSION, LAST_UPDATE
 from tools.A00630_MotionPathEditor.app.core import anim_channels as ch
@@ -29,6 +30,7 @@ from tools.A00630_MotionPathEditor.app.core import draw_nodes
 from tools.A00630_MotionPathEditor.app.core import path_manager as pm
 from tools.A00630_MotionPathEditor.app.core import picking
 from tools.A00630_MotionPathEditor.app.core.watcher import Watcher
+from tools.A00630_MotionPathEditor.app.ui.speed_graph import SpeedPanel
 
 WINDOW_OBJECT_NAME = "JUN_A00630_MotionPathEditor_window"
 OPTVAR = "JUN_A00630_"
@@ -51,7 +53,7 @@ class MainWindow(QWidget):
         self.setObjectName(WINDOW_OBJECT_NAME)
         self.setWindowTitle("Motion Path Editor v{0}".format(VERSION))
         self.setWindowFlags(Qt.Window)
-        self.resize(460, 720)
+        self.resize(480, 760)
 
         draw_nodes.ensure_plugin()
         draw_nodes.delete_all()                 # 이전 세션이 남긴 그리기 노드
@@ -82,7 +84,8 @@ class MainWindow(QWidget):
 
         desc = QLabel(
             "Draw the motion of objects / joints as a path, then drag the keys\n"
-            "on the path to change the animation. Ctrl+Z undoes a drag in one step.")
+            "on the path to change the animation. Speed tab: see and smooth the timing.\n"
+            "Ctrl+Z undoes a drag or a stroke in one step.")
         desc.setAlignment(Qt.AlignCenter)
         root.addWidget(desc)
 
@@ -95,15 +98,28 @@ class MainWindow(QWidget):
             sig.connect(self._on_paths_changed)
         root.addWidget(self.tsl_paths, 1)
 
-        root.addWidget(self._build_range_group())
-        root.addWidget(self._build_layer_group())
-        root.addWidget(self._build_display_group())
-        root.addWidget(self._build_edit_group())
+        # v01.04 - 탭: Path (기존 설정 · 편집) / Speed (속도 그래프 · Smooth)
+        self.tabs = QTabWidget()
+        page = QWidget()
+        lay = QVBoxLayout(page)
+        lay.setContentsMargins(2, 2, 2, 2)
+        lay.addWidget(self._build_range_group())
+        lay.addWidget(self._build_layer_group())
+        lay.addWidget(self._build_display_group())
+        lay.addWidget(self._build_edit_group())
+        lay.addStretch(1)
+        self.tabs.addTab(page, "Path")
+        self.tabs.setTabToolTip(0, "Range, animation layer, display and Edit Path (drag the keys in the viewport).")
+        self.speed_panel = SpeedPanel(self.manager, self.watcher, self.log, self._save)
+        self.tabs.addTab(self.speed_panel, "Speed")
+        self.tabs.setTabToolTip(1, "Speed graph: see the timing of a path and smooth it with a brush.")
+        root.addWidget(self.tabs, 2)
 
         self.log_view = JUN_mod_log_qt_v01(window_title="Motion Path Editor - Log",
                                            object_name="JUN_A00630_MotionPathEditor_log_window")
         self.log_view.setMinimumHeight(90)
         root.addWidget(self.log_view, 1)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.tabs)
 
     def _build_range_group(self):
         box = QGroupBox("Range")
@@ -462,6 +478,7 @@ class MainWindow(QWidget):
 
     def closeEvent(self, event):
         try:
+            self.speed_panel.shutdown()
             if self.context is not None:
                 self.context.deactivate()
             if getattr(self, "_tool_cb", None) is not None:

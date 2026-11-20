@@ -24,5 +24,13 @@
 #        레이어 커브를 만든 편집을 undo 하면 마야가 블렌드 체인을 다시 계산하지 않아 낡은 위치가 남았다 → 표시 명령
 #        junMotionPathDirty 를 묶음 맨 앞에 넣어 undo · redo 끝에 대상 + 블렌드 노드를 dgdirty.
 
-VERSION = "01.03"
-LAST_UPDATE = "2026-11-19"
+# 01.04  Speed 탭 (계획서 docs/plans/A00630_MotionPathEditor_speed_graph_plan.md G0~G5) - 경로의 속도 그래프
+#        (Speed / Position / Acceleration, 범위 Whole Path / Selected Keys / Around Current) 와 그 위 조작:
+#        오른쪽 드래그 = Smooth 브러시(Speed: 경로 모양 · 키 프레임 유지, 타이밍만 / Shape: 경로 모양의 울퉁불퉁함),
+#        곡선 끌기 = 그곳 빠르게 · 느리게, 키 선 끌기 = 키 시간 이동(포즈 전체), 빈 곳 = 스크럽. 획 하나 = undo 하나.
+#        목표 움직임 → 애님 커브 refit(마야 Bezier 골든 1e-11, 기울기 최소제곱 + 필요한 곳만 키 추가, 가중 탄젠트 정확 분할).
+#        Whole Pose = 같은 시간 왜곡을 rotate · scale 에도. 칠하는 동안 뷰포트에 원래 경로 회색 점선 + 새 프레임 점.
+#        툴 창을 Path / Speed 탭으로 (tabFit).
+
+VERSION = "01.04"
+LAST_UPDATE = "2026-11-20"

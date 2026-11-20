@@ -31,7 +31,26 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-11-19 (오늘)
+## 2026-11-20 (오늘)
+
+> [!summary] **`A00630_MotionPathEditor` v01.04 — Speed 탭: 속도 그래프 + Smooth 브러시 (속도 그래프 계획서 G0 ~ G5)** `#A00630_MotionPathEditor`
+- 요청: 어제 쓴 [`plans/A00630_MotionPathEditor_speed_graph_plan.md`](plans/A00630_MotionPathEditor_speed_graph_plan.md) 대로 진행 (결정 Q1 ~ Q5 = 추천대로).
+- **G0 실측**: 마야 커브 = 핸들 (x·fps/3, y/3) Bezier · 비가중은 Hermite — 우리 평가가 `MFnAnimCurve.evaluate` 와 24/30/60 fps · cm/m · 가중/비가중 전부 1e-11 안.
+  조밀 경로는 부모 공간 보간으로 충분(회전하는 부모 0.03%, 서브프레임 굽기보다 80배 빠름). dab 0.1 ~ 0.5 ms, 놓기 5 ~ 10 ms(매 프레임 키 1,000 개 146 ms → 칠하는 동안 미리보기, 놓을 때 쓰기).
+- **엔진**: `arc_length`(속도 · 가속도) · `retime`(시간 왜곡 = 모양 유지, 정지에서 끊어 보존 → 정지는 같은 자리, 속도 바꾸기, Taubin 모양 Smooth) ·
+  `refit`(키 프레임 유지 · 값 = 목표 · 기울기 최소제곱 · 필요한 곳만 키 · 가중 탄젠트 de Casteljau 정확 분할 · 안 바뀐 구간 쪽 탄젠트 원래대로 · 경계 키 재시도) ·
+  `speed_session`(원래 경로 기준 목표, 커브에는 차이만 → 흘러가지 않음).
+- **설계 변경**: 계획서 "세션 끝에 undo 한 번" → **획 하나 = undo 하나**. 마야 Ctrl+Z 는 뷰포트로 가서 세션 중 누르면 그 전의 다른 작업이 되돌려진다.
+- **UI**: 툴 창 Path / Speed 탭(tabFit). Speed / Position / Acceleration, 범위 3종, 오른쪽 드래그 브러시(Smooth Speed / Smooth Shape), 곡선 끌기 = 빠르게 · 느리게(Reach),
+  키 선 끌기 = 키 시간 이동(포즈 전체), 스크럽, Whole Pose, Tolerance %, Smooth Range, Pop Out. 칠하는 동안 뷰포트에 원래 경로 회색 점선 + 새 프레임 점.
+- 실측으로 고친 것: 고정 0.01 cm 허용 오차(미터 씬 키 25 개 → 경로 크기 0.1%) · 흐림 σ r/3 → r/2 · Taubin 1 → 3 쌍 · 가중 키 넣기 비율 → 정확 분할(0.19 cm 안 줄던 것) ·
+  정지 0.02 어긋남 → 1e-14 · 키 둘뿐인 회전 Whole Pose 0.7° → 0.04°.
+- 시험: 새 3종 128 항목(`test_speed_engine` 40 · `test_speed_session` 46 · `test_speed_graph_ui` 42) + 기존 8종 170 항목 전부 통과. **마야 GUI 확인 아직.**
+- 문서: 가이드 §2-2 · CHANGELOG · 계획서 §9 실측 · §10 바꾼 것, 포트폴리오 EN/KR.
+
+---
+
+## 2026-11-19
 
 > [!summary] **`A00630_MotionPathEditor` — 속도 그래프 · Smooth 진단과 하위 계획서** `#A00630_MotionPathEditor`
 - 요청: 원본 블렌더 애드온의 "프레임 구간 [a, b] × 미분값/위치값 2D 그래프 + smooth" 를 그대로 · 더 낫게 만들 수 있는지 진단하고 계획서 작성.

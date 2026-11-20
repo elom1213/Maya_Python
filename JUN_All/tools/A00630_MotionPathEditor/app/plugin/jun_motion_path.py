@@ -44,6 +44,7 @@ _SEL_COLOR = om.MColor((1.0, 0.75, 0.1, 1.0))
 _CUR_COLOR = om.MColor((1.0, 0.25, 0.25, 1.0))
 _LOCK_COLOR = om.MColor((0.45, 0.45, 0.45, 1.0))
 _HUD_COLOR = om.MColor((1.0, 1.0, 1.0, 0.8))
+_GHOST_COLOR = om.MColor((0.55, 0.55, 0.55, 0.9))
 
 
 class JunMotionPathNode(omui.MPxLocatorNode):
@@ -128,6 +129,13 @@ class JunMotionPathDrawOverride(omr.MPxDrawOverride):
         dm.setDepthPriority(5)
         locked = p.get("locked", False)
         line_color = _LOCK_COLOR if locked else p.get("color", _KEY_COLOR)
+        ghost = p.get("ghost")
+        if ghost is not None and len(ghost) > 1:            # 그래프 Smooth 미리보기: 원래 경로 (v01.04)
+            dm.setColor(_GHOST_COLOR)
+            dm.setLineWidth(1.0)
+            dm.setLineStyle(omr.MUIDrawManager.kDashed)
+            dm.lineStrip(ghost, False)
+            dm.setLineStyle(omr.MUIDrawManager.kSolid)
         if len(p.get("line", ())) > 1:
             dm.setColor(line_color)
             dm.setLineWidth(float(p.get("line_width", 2.0)))

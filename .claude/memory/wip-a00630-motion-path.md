@@ -1,8 +1,11 @@
 ---
 name: wip-a00630-motion-path
-description: A00630_MotionPathEditor v01.00 - Blender Editable Motion Paths (GPL) re-implemented independently; bake parentMatrix only, curves evaluated directly; phase 1 done, GUI check pending, next = phase 1.5
+description: "A00630_MotionPathEditor v01.00~v01.04 - Blender Editable Motion Paths (GPL) re-implemented; bake parentMatrix only, curves evaluated directly; v01.04 speed graph + smooth brush (refit onto Maya Bezier, one undo per stroke); GUI check pending"
 metadata:
+  node_type: memory
   type: project
+  originSessionId: 31a00341-3a05-453d-ac3e-36ac732d1b96
+  modified: 2026-11-20T00:14:13.367Z
 ---
 
 A00630_MotionPathEditor v01.00 (2026-11-19) — viewport motion path of objects / joints, drag keys on it to edit translate.
@@ -37,5 +40,17 @@ then move — user's Q4 choice, proportional editing, numeric input), then phase
   `junMotionPathDirty` marker command first in the chunk dgdirties node + blends on undo/redo. Tests must compare world
   motion after undo, not only curve keys (curve-only check missed it).
 - Run tests with `mayapy -u` (pipe buffering + os._exit lost output before `_common.finish` flushed).
+- v01.04 Speed tab (plan `docs/plans/A00630_MotionPathEditor_speed_graph_plan.md`, §9 G0 · §10 changes): speed graph + brush.
+  **Maya anim curve = Bezier with handles (x·fps/3 frames, y/3 value)** from `getTangentXY` (x seconds, y internal units);
+  non-weighted handle time is always segment/3 (Hermite, slope = y/x/fps). Golden < 1e-11 for 24/30/60 fps, cm/m, weighted.
+  `setTangent(.., convertUnits=False)` writes raw XY; tangents stored single precision (~1e-7 after write); `addKey` new key
+  tangents are (0,0); with tangent/weight lock on, writing one side changes the other → unlock, write, relock.
+  Weighted key insert must be an exact de Casteljau split (time-ratio scaling broke the shape).
+- v01.04 design: **one undo per stroke** (plan said one per session — Ctrl+Z goes to the viewport and would undo an
+  unrelated earlier op). No drift: targets always from the session-start path, write only the difference
+  (new target = current curve + L(new) − L(prev)); session invalidated by curve signature (`StrokeSession.valid`).
+  Speed smooth = time warp on the original path (shape kept), arc length conserved per run between holds → holds stay put.
+- Tolerance must be relative (0.1% of path size): fixed 0.01 cm needed 25 keys on a metre-unit scene.
+- Next: Maya GUI check (viewport ghost line while painting, Esc/wheel focus, Pop Out), then plan phase 1.5 / 2.
 
 Related: [[maya-time-context-traps]] · [[wip-a00380-quad-patch]] · [[mayapy-headless-verify]] · [[feedback-sliders-use-shared-style]]

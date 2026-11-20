@@ -362,7 +362,7 @@ JUN_All/tools/A00630_MotionPathEditor/
 각 단계는 시작 전에 이 문서에 짧은 하위 계획을 추가한다.
 
 **하위 계획서**
-- 속도 그래프 · Smooth Speed (2단계 타이밍 + 4단계 3번 · 2번 일부) → [`A00630_MotionPathEditor_speed_graph_plan.md`](A00630_MotionPathEditor_speed_graph_plan.md) (2026-11-19, 진단 · 계획만)
+- 속도 그래프 · Smooth Speed (2단계 타이밍 + 4단계 3번 · 2번 일부) → [`A00630_MotionPathEditor_speed_graph_plan.md`](A00630_MotionPathEditor_speed_graph_plan.md) (2026-11-19 계획, **2026-11-20 v01.04 구현** · GUI 확인 전)
 
 ---
 

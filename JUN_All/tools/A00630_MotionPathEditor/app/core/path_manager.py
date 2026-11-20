@@ -8,6 +8,8 @@ PathManager 하나가 툴의 상태를 다 가진다:
     nodes      : {경로 키: 그리기 노드 트랜스폼}
     selection  : {경로 키: {키 시간}}
     settings   : 범위 · 표시 · 드래그 평면
+    preview    : {경로 키: (N,3)} 그래프 Smooth 를 칠하는 동안 보여 줄 새 점 (원래 선은 회색으로 함께) - v01.04
+    listeners  : redraw 끝에 부르는 함수들 (속도 그래프가 따라 그린다) - v01.04
 
 씬을 바꾸는 것은 키 값뿐이고(편집 세션), 그리기 노드는 undo 큐 밖에서 만든다(draw_nodes).
 """
@@ -35,6 +37,15 @@ DEFAULT_SETTINGS = {
     "key_size": 9.0,
     "plane": "view",
     "edit_layer": "",              # v01.03 편집할 애니메이션 레이어 ("" = Base)
+    # v01.04 속도 그래프 (Speed 탭)
+    "graph_mode": "speed",         # speed / position / accel
+    "graph_range": "path",         # path / selected / around
+    "graph_per_second": False,
+    "brush_mode": "speed",         # speed (타이밍만) / shape (모양)
+    "brush_radius": 8.0,           # 프레임
+    "brush_strength": 0.5,
+    "whole_pose": False,           # 속도 획이 rotate · scale 도 같은 시간 왜곡으로 (원본: 끔)
+    "fit_tolerance": 0.1,          # % (경로 크기 대비) - refit 허용 오차
 }
 
 
@@ -49,6 +60,8 @@ class PathManager(object):
         self.log = log or (lambda text: None)
         self.view_refresh = None        # GUI 에서 뷰를 다시 그리는 함수 (헤드리스는 None)
         self.saving = False
+        self.preview = {}
+        self.listeners = []
 
     # ---------------------------------------------------------------- 범위
     def frame_range(self):
@@ -97,12 +110,14 @@ class PathManager(object):
         return len(fresh)
 
     def _remove(self, key):
+        self.preview.pop(key, None)
         draw_nodes.delete_node(self.nodes.pop(key, None))
         draw_bridge.drop(key)
         self.caches.pop(key, None)
         self.selection.pop(key, None)
 
     def clear(self):
+        self.preview = {}
         for key in list(self.caches):
             self._remove(key)
         self.order = []
@@ -178,12 +193,19 @@ class PathManager(object):
             if cache.key not in self.nodes or not cmds.objExists(self.nodes[cache.key]):
                 self.nodes[cache.key] = draw_nodes.create_node(cache.key, cache.label)[0]
             color = draw_nodes.PALETTE[i % len(draw_nodes.PALETTE)]
+            preview = self.preview.get(cache.key)
             draw_bridge.put(cache.key, draw_nodes.payload(
                 cache, color, self.selection.get(cache.key, ()), frame, show_dots=s["show_dots"],
                 show_keys=s["show_keys"], show_numbers=s["show_numbers"], line_width=s["line_width"],
-                dot_size=s["dot_size"], key_size=s["key_size"]))
+                dot_size=s["dot_size"], key_size=s["key_size"], points=preview,
+                ghost=cache.points if preview is not None else None))
         if self.view_refresh is not None:
             self.view_refresh()
+        for fn in list(self.listeners):
+            try:
+                fn()
+            except Exception:                              # noqa: BLE001 - 그래프가 실패해도 뷰는 그린다
+                pass
 
     def hide_for_save(self):
         """저장 직전: 그리기 노드를 지운다 - 노드가 있으면 파일에 `requires` 플러그인 줄이 써진다."""

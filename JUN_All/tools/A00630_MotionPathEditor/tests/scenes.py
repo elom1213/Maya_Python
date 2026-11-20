@@ -134,3 +134,42 @@ def heavy(end=120, joints=200, iks=4, constraints=50, mesh_div=(400, 250), extra
             _key_rotate(oj[i], (1, end), lambda f, k=i: (0, math.sin(f * 0.05 + k) * 15, 0))
         cmds.skinCluster(oj, other, toSelectedBones=True, maximumInfluences=4)
     return {"ctrl": ctrl, "mesh": mesh, "joints": joints}
+
+
+def layered(end=120):
+    """애니메이션 레이어 씬 (test_layers.build 와 같은 구성). 반환: (c, other).
+
+    부모 애니메이션 + Base 키 + 레이어 4종(additive 가중치 애니 · override 0.5 · 뮤트 · 잠김) + 레이어에 없는 오브젝트.
+    """
+    new(end)
+    grp = cmds.group(empty=True, name="grp")
+    for f, v in ((1, 0.0), (end, 30.0)):
+        cmds.setKeyframe(grp, attribute="rotateY", time=f, value=v)
+    c = cmds.polyCube(name="c")[0]
+    cmds.parent(c, grp)
+    for f in (1, 30, 60, 90, end):
+        cmds.setKeyframe(c, attribute="translateX", time=f, value=f * 0.05)
+        cmds.setKeyframe(c, attribute="translateY", time=f, value=(f % 40) * 0.1)
+        cmds.setKeyframe(c, attribute="translateZ", time=f, value=-f * 0.02)
+    other = cmds.polyCube(name="other")[0]
+    for f in (1, end):
+        cmds.setKeyframe(other, attribute="translateX", time=f, value=f * 0.1)
+    cmds.select(c)
+    add = cmds.animLayer("addL", addSelectedObjects=True)
+    for f, (x, y) in ((1, (0.0, 0.0)), (40, (1.0, 0.5)), (80, (-0.5, 1.5)), (end, (0.0, 0.0))):
+        cmds.setKeyframe(c, attribute="translateX", time=f, value=x, animLayer=add)
+        cmds.setKeyframe(c, attribute="translateY", time=f, value=y, animLayer=add)
+    cmds.setKeyframe(add, attribute="weight", time=1, value=1.0)
+    cmds.setKeyframe(add, attribute="weight", time=end, value=0.4)
+    ovr = cmds.animLayer("ovrL", addSelectedObjects=True, override=True)
+    cmds.setKeyframe(c, attribute="translateX", time=20, value=3.0, animLayer=ovr)
+    cmds.setKeyframe(c, attribute="translateX", time=100, value=6.0, animLayer=ovr)
+    cmds.setAttr(ovr + ".weight", 0.5)
+    mute = cmds.animLayer("muteL", addSelectedObjects=True)
+    cmds.setKeyframe(c, attribute="translateZ", time=60, value=2.0, animLayer=mute)
+    cmds.setAttr(mute + ".mute", True)
+    locked = cmds.animLayer("lockL", addSelectedObjects=True)
+    cmds.setKeyframe(c, attribute="translateZ", time=60, value=0.5, animLayer=locked)
+    cmds.setAttr(locked + ".lock", True)
+    cmds.select(clear=True)
+    return c, other

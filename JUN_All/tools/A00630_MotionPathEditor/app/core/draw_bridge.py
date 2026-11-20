@@ -19,6 +19,7 @@ DATA[path_key] 키 (값은 OpenMaya 2.0 객체 - 그리기 때 변환하지 않�
     "selected"  : MPointArray  선택된 키 점
     "current"   : MPointArray  현재 프레임 점 (0 또는 1 개)
     "labels"    : [(MPoint, str)]  키 옆 프레임 번호 (끄면 빈 목록)
+    "ghost"     : MPointArray  원래 경로 (그래프 Smooth 미리보기 중에만 - 회색 점선, v01.04)
     "color"     : MColor  경로 색
     "locked"    : bool  편집 불가 경로 (회색으로)
     "line_width", "dot_size", "key_size" : float

@@ -2,7 +2,7 @@
 title: A00630_MotionPathEditor 사용법
 aliases: [A00630, Motion Path Editor, MotionPathEditor, 모션 경로 편집, editable motion path, motion trail 대체]
 tags: [maya-python, tool-guide, animation, motion-path, motion-trail, viewport-draw]
-updated: 2026-11-19
+updated: 2026-11-20
 ---
 
 # A00630_MotionPathEditor 사용법
@@ -10,10 +10,11 @@ updated: 2026-11-19
 오브젝트 · 조인트가 **프레임마다 어디에 있는지를 뷰포트에 경로로 그리고**, 경로 위의 **키 점을 끌어 애니메이션을 고치는** in-Maya PySide 툴(arch B).
 그래프 에디터를 열지 않고 궤적 모양을 보면서 위치 애니메이션을 고친다.
 
-- **버전**: `app/config/version.py` (v01.03 — **애니메이션 레이어**: 고른 레이어의 키만 끌어 고친다(경로는 합친 움직임) · v01.02 — Edit Path 를 켜도 버튼이 연한 빨강이 안 되던 것 수정 · v01.01 — 키 드래그 에러 수정 · Custom 범위에 Get Current / Get Sel Range · Edit Path 켜짐 = 연한 빨강 · v01.00 — 첫 버전: 위치 경로 표시 + 키 드래그)
+- **버전**: `app/config/version.py` (v01.04 — **Speed 탭: 속도 그래프 + Smooth 브러시 · 속도 끌기 · 키 시간 끌기**(§2-2) · v01.03 — **애니메이션 레이어**: 고른 레이어의 키만 끌어 고친다(경로는 합친 움직임) · v01.02 — Edit Path 를 켜도 버튼이 연한 빨강이 안 되던 것 수정 · v01.01 — 키 드래그 에러 수정 · Custom 범위에 Get Current / Get Sel Range · Edit Path 켜짐 = 연한 빨강 · v01.00 — 첫 버전: 위치 경로 표시 + 키 드래그)
 - **설치**: `__dragDrop_A00630.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **MPath** → `tools.A00630_MotionPathEditor.run(True)`.
   툴 런처(A00370) ANIM 프로파일에도 **MotionPath** 버튼이 있다.
 - **계획서**: [plans/A00630_MotionPathEditor_plan.md](plans/A00630_MotionPathEditor_plan.md) — 단계별 계획 · 0단계 실측 결과 · 다음 단계
+  · 속도 그래프: [plans/A00630_MotionPathEditor_speed_graph_plan.md](plans/A00630_MotionPathEditor_speed_graph_plan.md) — 진단 · G0 실측 · 설계
 - **원본 아이디어**: 블렌더 애드온 *Editable Motion Paths* (GPL-3.0-or-later). **코드는 쓰지 않은 독자 구현**이다(계획서 §1).
 
 ---
@@ -27,6 +28,7 @@ updated: 2026-11-19
 │ ctrl                                │   담으면 바로 경로가 생긴다
 │ j3                                  │
 └─────────────────────────────────────┘
+[ Path ] [ Speed ]                         ← v01.04 탭 (Speed = §2-2)
 ┌ Range ─ ( ) Playback ( ) Scene (o) Custom                          ┐
 │  Start [ 1 ] [Get Current]  End [ 120 ] [Get Current] [Get Sel Range] │
 ┌ Display ─ [x] Frame dots [x] Keys [ ] Frame numbers     │
@@ -105,6 +107,53 @@ updated: 2026-11-19
 
 ---
 
+## 2-2. Speed 탭 — 속도 그래프 · Smooth (v01.04~)
+
+```
+Path [ bumpy            ▾]                                   [Pop Out]
+Show (o) Speed ( ) Position ( ) Acceleration                 [per frame ▾]
+Frames (o) Whole Path ( ) Selected Keys ( ) Around Current
+┌ Speed (cm/frame) ─────────────────────────── Radius 8  Strength 0.50 ┐
+│      |20        |35   |45          |60   |70         (키 선 + 번호) │
+│  ╱‾‾╲__╱‾‾‾╲__        (회색 = 칠하기 전, 색 = 새 곡선)             │
+│ ▔▔▔▔▔▔▔▔ (브러시 띠: 반경 · 세기)          초록 세로선 = 현재 프레임 │
+└──────────────────────────────────────────────────────────────────────┘
+Brush [Smooth Speed ▾]  Radius [ 8.0 fr]  Strength [====|---] 0.50
+[ ] Whole Pose   Tolerance [0.10 %]                      [Smooth Range]
+```
+
+그래프의 가로는 프레임, 세로는 **Speed** = 프레임마다 경로를 따라 움직인 거리(속도, 기본) · **Position** = 월드 X/Y/Z(빨강 · 초록 · 파랑, 읽기 전용) ·
+**Acceleration** = 속도가 얼마나 바뀌나(튀는 곳 · 떨림이 솟는다). **Path** 콤보의 경로가 편집 대상이고 다른 경로는 흐리게 함께 그린다.
+Frames: **Whole Path** · **Selected Keys**(선택 키 사이, 하나면 양쪽 구간) · **Around Current**(현재 프레임 앞뒤 키).
+
+| 그래프 위에서 | 동작 |
+|---|---|
+| **오른쪽 드래그** | **Smooth 브러시** — 지나간 곳을 부드럽게. 휠 = 반경, Shift+휠 = 세기 |
+| 왼쪽 · **곡선** 잡고 위 / 아래 | 그곳을 **빠르게 / 느리게** (끄는 중 휠 = Reach, 가장자리가 보상해 범위 밖은 그대로) — Speed 모드 |
+| 왼쪽 · **키 선** 잡고 좌 / 우 | 그 키를 **시간으로 이동** — translate · rotate · scale 키가 함께(포즈 전체), 이웃 키는 못 넘는다. Ctrl = 소수 프레임 — Speed 모드 |
+| 왼쪽 · 빈 곳 | 현재 프레임 스크럽 |
+| Esc / 끄는 중 반대 버튼 | 그 드래그 취소 |
+
+**Brush** 두 가지:
+
+- **Smooth Speed** (원본 애드온의 그래프 Smooth) — **경로 모양은 그대로** 두고 **타이밍만** 고른다. 키는 프레임을 지키고 포즈가 경로를 따라 미끄러진다.
+  브러시 밖의 움직임은 그대로, **정지(hold)는 같은 자리에서 정지**로 남는다. 경로 위 프레임 점 간격이 고르게 되는 것이 눈에 보인다.
+- **Smooth Shape** — **경로 자체의** 울퉁불퉁함(짧은 파장)을 줄인다. 큰 호는 오그라들지 않게(Taubin 평활). Acceleration 모드로 보면서 칠하면 좋다.
+
+- **획 하나 = Ctrl+Z 하나.** 칠하는 동안은 미리보기만(뷰포트: 원래 경로 회색 점선 + 새 프레임 점, 그래프: 원래 곡선 회색), 놓을 때 커브에 쓴다.
+- 여러 번 칠해도 흘러가지 않는다 — 새 점은 늘 **처음 경로 위**에서 계산한다(세션). 그래프 에디터에서 고치거나 undo 하면 다음 획은 그 상태에서 새로 시작한다.
+- **Whole Pose**: 속도 획이 rotate · scale 키도 **같은 시간 변화**로 옮긴다. 끄면(기본, 원본과 같음) 위치만 바뀌어 손은 일찍 도착하는데 손목은 원래 시간에 돈다.
+- **Tolerance %**: 키가 획을 얼마나 정확히 따라갈지(경로 크기 대비, 기본 0.1%). 작게 하면 정확하지만 키가 더 생긴다. 로그에 축마다 남은 오차와 넣은 키 수가 나온다.
+  매 프레임 키(모캡)는 값만 바꾸므로 늘 정확하고 키도 늘지 않는다.
+- **Smooth Range**: 그래프에 보이는 구간 전체를 브러시 설정으로 한 번(undo 하나).
+- **Pop Out**: 그래프를 따로 띄워 넓게(두 번째 모니터). 다시 누르거나 닫으면 탭으로 돌아온다.
+
+키를 어떻게 고치나 (refit): 키의 **프레임은 그대로** 두고 값 = 목표, 탄젠트 = 목표에 가장 잘 맞는 기울기(최소제곱)로 바꾸고, 그래도 허용치를 넘는 곳에만 키를 넣는다.
+바뀐 키와 그 구간 양 끝 키의 탄젠트는 **fixed** 가 된다(auto · spline 은 값이 바뀌면 마야가 이웃까지 다시 계산한다). 안 바뀐 구간 쪽 탄젠트는 원래 그대로
+(그래서 정지 경계의 flat 이 남는다 — 그 키의 탄젠트 묶음이 풀릴 수 있다).
+
+---
+
 ## 3. 동작 (왜 빠른가)
 
 경로의 점은
@@ -174,6 +223,11 @@ P(f) = (c + T(f)) · parentMatrix(f)
 | `app/core/draw_nodes.py` · `draw_bridge.py` | 플러그인 로드 · 그리기 노드 (API, undo 밖, doNotWrite) · 툴 ↔ 플러그인 데이터 |
 | `app/plugin/jun_motion_path.py` | 노드 `junMotionPath` + VP2 draw override + 명령 `junMotionPathSetKeys`(undo 한 번) |
 | `app/ui/main_window.py` · `edit_context.py` | 툴 창 · 편집 컨텍스트(draggerContext) |
+| `app/core/arc_length.py` | (v01.04) 호 길이 · 속도 · 가속도 · 위치 (numpy, 마야 비의존) |
+| `app/core/retime.py` | (v01.04) 속도 Smooth · 속도 바꾸기(시간 왜곡, 모양 유지 · 보존 · 정지) · 모양 Smooth(Taubin) (마야 비의존) |
+| `app/core/refit.py` | (v01.04) 마야 커브 수학(골든) · 목표 → 키 값 · 기울기 최소제곱 · 키 추가 · 쓰기 |
+| `app/core/speed_session.py` | (v01.04) 획 세션(원래 경로 · 미리보기 · 차이만 쓰기 · undo 하나) · 키 시간 이동 |
+| `app/ui/speed_graph.py` | (v01.04) 그래프 위젯(QPainter) · Speed 탭 패널 |
 
 ---
 
@@ -191,6 +245,10 @@ mayapy 2024 (`tests/`, `-u` 로 실행):
 | `test_layers.py` | 27 | (v01.03) 경로 = 레이어 합친 실제 움직임(Base · additive 가중치 애니 · override 0.5 · 뮤트 · lock · 부모 애니), 키 = 고른 레이어, 레이어 바꿀 때 굽지 않음, 레이어별 끌기 정확 · **그 레이어 커브만** 바뀜 · undo 한 번에 커브와 **실제 움직임** 복원, override 의 커브 없던 축, 잠금 이유 3종, 관리자 레이어 바꾸기 · 지운 레이어 → Base |
 | `test_ui.py` | 35 | 오프스크린 창: 경로 추가/빼기 · 표시 옵션 → 그리기 데이터 · optionVar · 범위(Custom · Get Current · Get Sel Range · 같은 범위면 안 굽기) · 슬라이더 색 · Edit Path 빨강 · 툴 바뀌면 버튼 끔 · Refresh · 닫으면 정리 |
 | `test_picking.py` | 13 | 투영 · 고르기 · 박스 · 카메라 뒤 · 평면 / 축 드래그 |
+| `test_speed_engine.py` | 40 | (v01.04) 속도 · 가속도 · dab 보존 · τ 단조 · 모양 유지 · 정지 유지 · 속도 바꾸기 · Taubin, **마야 커브 골든**(24/30/60 fps · cm/m · 가중/비가중 < 1e-11) · refit(같은 목표 = 안 바꿈, 키 추가, 끝 밖 불변, 쓰기 = 마야, undo, 가중 커브, 매 프레임 키, 첫 키 앞 앵커) |
+| `test_speed_session.py` | 46 | (v01.04) 칠하는 동안 커브 · undo 큐 불변 → 놓으면 쓰기 · **원래 경로 위**(< 0.2%) · 브러시 밖 불변 · 키 프레임 유지 · 속도 고르게 · 두 번째 획 / 여러 획 흘러가지 않음 · **획마다 undo 하나** · 바깥 undo 감지 · 취소 · 키 시간 이동(포즈 전체 · 이웃에서 멈춤) · 정지 유지 · 회전하는 부모 · 레이어(Base 불변) · Whole Pose(회전 = 옛 회전(τ)) · 모양 Smooth · 속도 바꾸기 · 잠긴 경로 |
+| `test_speed_graph_ui.py` | 42 | (v01.04) 오프스크린 Speed 탭: 모드 · 단위 · 범위 3종 · 휠 반경/세기 · 스크럽 · **오른쪽 드래그 획**(미리보기 → 놓으면 쓰기 → undo 하나) · Esc 취소 · Smooth Range · 곡선 끌기 = 빠르게 · 키 선 끌기 = 키 이동 · Shape 브러시 · Pop Out / Dock · 닫으면 정리 |
+| `bench_speed_graph.py` | 실측 | (v01.04) 조밀 경로 보간 vs 서브프레임 굽기(차이 0.03%, 80배 빠름) · dab 0.1~0.5 ms · 놓기(refit + 쓰기) 5~10 ms, 매 프레임 키 1,000 개 146 ms |
 | `test_edit_context.py` | 19 | (v01.01) 편집 컨텍스트 전체 흐름 — 누름 → 끌기 → 놓기 · 축 고정 · 박스 선택 후 함께 끌기 · Shift / Ctrl · 빈 곳 클릭 해제 · 오른쪽 버튼 취소. 가짜 뷰의 `viewToWorld` 가 **마야 2024 와 같은 OUT 인자 모양**이라 v01.00 의 호출 실수를 잡는다 |
 
 **마야 GUI 확인 (아직)** — 헤드리스로는 확인할 수 없는 것:
@@ -199,3 +257,5 @@ mayapy 2024 (`tests/`, `-u` 로 실행):
 3. 그래프 에디터에서 키를 고치면 경로가 따라온다(커브 편집 알림은 마야가 idle 에 보낸다 - 헤드리스에서는 안 온다).
 4. 무거운 리그에서 마야 Editable Motion Trail 과 체감 비교.
 5. 저장 → 툴 없이 다시 열기: 오류 · 남은 노드 없음.
+6. (v01.04) Speed 탭: 그래프 위 오른쪽 드래그 중 뷰포트에 회색 점선(원래 경로) + 새 프레임 점이 보이고, 놓으면 오브젝트가 따라온다 · Ctrl+Z 한 번.
+   그래프에 키보드 포커스가 있을 때 Esc 취소, 휠 · Shift+휠, Pop Out 창.
